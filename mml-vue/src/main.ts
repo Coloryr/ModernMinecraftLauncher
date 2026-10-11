@@ -7,9 +7,10 @@ import { applyTheme, theme } from "./lib/theme";
 import { applyLocale, locale } from "./lib/i18n";
 import { loadAccounts } from "./lib/accountStore";
 import {
+  restoreCapeConfig,
   restoreHeadConfig,
   restoreSelectedInstance,
-  restoreSkinDisplay,
+  restoreSkinConfig,
   sidebarCollapsed,
   sidebarSide,
   viewMode,
@@ -74,7 +75,8 @@ async function bootstrap() {
     setMultiWindow(cfg.windowMode !== "Single");
     // 字体 / 皮肤与头像显示模式：只同步内存状态，不回写配置
     restoreFontFamily(cfg.font);
-    restoreSkinDisplay(cfg.skinDisplay);
+    restoreSkinConfig(cfg.skin.display, cfg.skin.pitch, cfg.skin.yaw);
+    restoreCapeConfig(cfg.cape.display, cfg.cape.pitch, cfg.cape.yaw);
     restoreHeadConfig(cfg.head.headType, cfg.head.x, cfg.head.y);
   }
 

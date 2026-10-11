@@ -125,8 +125,8 @@ pub(super) fn send_skin_preview(skin_type: &str, res: UriSchemeResponder) {
         send_bad(res);
         return;
     };
-    let display = gui_config::get().skin_display;
-    let Some(image) = render_skin_display(&bitmap, st, display) else {
+    let skin = gui_config::get().skin;
+    let Some(image) = render_skin_display(&bitmap, st, &skin) else {
         send_bad(res);
         return;
     };

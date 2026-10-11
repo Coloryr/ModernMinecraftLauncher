@@ -62,8 +62,18 @@ export const KEYS = {
   iconPickSize: "mml.iconPickSize",
 
   // ---- 账户显示 ----
-  /** 皮肤显示模式 Skin2DA / Skin2DB / Skin3D / Skin3DD */
+  /** 皮肤显示模式 Skin2DA / Skin2DB / Skin3D / Skin3DD / Skin3DRotate */
   skinDisplay: "mml.skinDisplay",
+  /** 皮肤 3D 旋转 X */
+  skinPitch: "mml.skinPitch",
+  /** 皮肤 3D 旋转 Y */
+  skinYaw: "mml.skinYaw",
+  /** 披风显示模式 Cape2D / Cape3D / Elytra */
+  capeDisplay: "mml.capeDisplay",
+  /** 披风 3D 旋转 X */
+  capePitch: "mml.capePitch",
+  /** 披风 3D 旋转 Y */
+  capeYaw: "mml.capeYaw",
   /** 头像渲染模式 */
   headType: "mml.headType",
   /** 3D 头像旋转 X */

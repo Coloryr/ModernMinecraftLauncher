@@ -330,6 +330,11 @@
   height: 200px;
 }
 
+/* 披风样例：2D 是竖图、3D 是方图，统一按高度收，宽度自适应 */
+.settings-layout .sample-img.cape {
+  height: 140px;
+}
+
 .settings-layout .sample-label {
   font-size: 11.5px;
   color: var(--text-dim);

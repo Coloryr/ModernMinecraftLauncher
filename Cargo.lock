@@ -3180,6 +3180,7 @@ dependencies = [
  "glam",
  "mml-gpu",
  "mml-skin",
+ "mml-testutil",
  "pollster 1.0.1",
  "tiny-skia",
  "wgpu",

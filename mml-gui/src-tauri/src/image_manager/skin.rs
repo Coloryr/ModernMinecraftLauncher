@@ -16,7 +16,7 @@ use tauri::UriSchemeResponder;
 use tiny_skia::{Pixmap, Point};
 
 use crate::dtos::account_dto::auth_type_from_str;
-use crate::gui_config::{self, HeadType, SkinDisplay};
+use crate::gui_config::{self, HeadType, SkinConfig, SkinDisplay};
 
 use super::head::send_skin_preview;
 use super::push_texture_url;
@@ -96,8 +96,8 @@ pub(super) async fn load_texture_bytes(sha1: &str) -> Option<Vec<u8>> {
 ///   后转 sha1 型渲染——账户列表预览用
 /// - `skin/preview/<uuid>/<skin_type>`：账户型的特例，设置页样例，先判 preview
 ///
-/// 渲染风格由后端读 gui_config 的 `skin_display` 决定，取值 Skin2DA / Skin2DB /
-/// Skin3D / Skin3DD，前端不选风格。皮肤型号段取值 `auto` 自动检测且可省略、
+/// 渲染风格由后端读 gui_config 的 `skin` 决定，取值 Skin2DA / Skin2DB /
+/// Skin3D / Skin3DD / Skin3DRotate，前端不选风格。皮肤型号段取值 `auto` 自动检测且可省略、
 /// `old` 1.7 旧版、`new` 1.8 新版、`slim` 纤细——这是皮肤版型信息，不是渲染风格
 ///
 /// - `uri`: 协议路径片段，首段 `skin` 已剥
@@ -156,10 +156,14 @@ pub(super) async fn send_skin_display(
     server_slim: Option<bool>,
     res: UriSchemeResponder,
 ) {
-    let display = gui_config::get().skin_display;
+    let skin = gui_config::get().skin;
+    // 旋转档的角度参与渲染，一并进缓存键，改角度就是新键
     let key = PairImageKey {
         sha1: sha1.to_string(),
-        config: format!("{display:?}/{skin_type}"),
+        config: format!(
+            "{:?}/{}/{}/{skin_type}",
+            skin.display, skin.pitch, skin.yaw
+        ),
     };
 
     {
@@ -191,7 +195,7 @@ pub(super) async fn send_skin_display(
             })
         }
     };
-    let Some(image) = render_skin_display(&bitmap, st, display) else {
+    let Some(image) = render_skin_display(&bitmap, st, &skin) else {
         send_bad(res);
         return;
     };
@@ -205,11 +209,11 @@ pub(super) async fn send_skin_display(
     send_png(res, data);
 }
 
-/// 按皮肤显示模式选渲染方式：2D 展开 / 2D 大图 / 3D 等距
+/// 按皮肤显示模式选渲染方式：2D 展开 / 2D 大图 / 3D 等距 / 3D 旋转
 ///
 /// - `bitmap`: 皮肤贴图
 /// - `st`: 皮肤型号，`None` 表示不指定
-/// - `display`: 皮肤显示模式
+/// - `skin`: 皮肤显示设置，含显示模式与 3D 旋转角度
 ///
 /// # 返回值
 ///
@@ -217,13 +221,18 @@ pub(super) async fn send_skin_display(
 pub(super) fn render_skin_display(
     bitmap: &Pixmap,
     st: Option<SkinType>,
-    display: SkinDisplay,
+    skin: &SkinConfig,
 ) -> Option<Pixmap> {
-    match display {
+    match skin.display {
         SkinDisplay::Skin2DA => draw_skin(bitmap, DrawSkinType::Type2D(Draw2DType::TypeA), st),
         SkinDisplay::Skin2DB => draw_skin(bitmap, DrawSkinType::Type2D(Draw2DType::TypeB), st),
         SkinDisplay::Skin3D => draw_skin(bitmap, DrawSkinType::Type3D(Draw3DType::TypeAUp), st),
         SkinDisplay::Skin3DD => draw_skin(bitmap, DrawSkinType::Type3D(Draw3DType::TypeADown), st),
+        SkinDisplay::Skin3DRotate => draw_skin(
+            bitmap,
+            DrawSkinType::Type3D(Draw3DType::TypeBRotate(Point::from_xy(skin.pitch, skin.yaw))),
+            st,
+        ),
     }
 }
 

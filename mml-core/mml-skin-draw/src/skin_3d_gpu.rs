@@ -272,7 +272,7 @@ impl Pipelines {
                     topology: wgpu::PrimitiveTopology::TriangleList,
                     // 各面按右手系外侧 CCW 缠绕，但 wgpu 在 y 向下的帧缓冲坐标系里判绕序，
                     // 外侧面读出来是 CW，用 Ccw 会把可见面全剔掉、只剩背面（照不到光）
-                    front_face: wgpu::FrontFace::Cw,
+                    front_face: wgpu::FrontFace::Ccw,
                     cull_mode: Some(wgpu::Face::Back),
                     ..Default::default()
                 },

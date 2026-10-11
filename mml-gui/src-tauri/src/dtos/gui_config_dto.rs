@@ -11,9 +11,34 @@ use serde::{Deserialize, Serialize};
 use mml_names::Lang;
 
 use crate::gui_config::{
-    ClientConfig, CollectConfig, GuiConfig, HeadConfig, HeadType, LoginLockObj, MainWindowConfig,
-    SidebarSide, SkinDisplay, Theme, ViewMode, WindowMode,
+    CapeConfig, CapeDisplay, ClientConfig, CollectConfig, GuiConfig, HeadConfig, HeadType,
+    LoginLockObj, MainWindowConfig, SidebarSide, SkinConfig, SkinDisplay, Theme, ViewMode,
+    WindowMode,
 };
+
+/// 皮肤显示设置，前端 wire 为 camelCase，字段即 `skin`
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SkinConfigDto {
+    /// Skin2DA / Skin2DB / Skin3D / Skin3DD / Skin3DRotate
+    pub display: SkinDisplay,
+    /// 3D 旋转 X
+    pub pitch: f32,
+    /// 3D 旋转 Y
+    pub yaw: f32,
+}
+
+/// 披风显示设置，前端 wire 为 camelCase，字段即 `cape`
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CapeConfigDto {
+    /// Cape2D / Cape3D / Elytra
+    pub display: CapeDisplay,
+    /// 披风 3D 旋转 X
+    pub pitch: f32,
+    /// 披风 3D 旋转 Y
+    pub yaw: f32,
+}
 
 /// 头像设置，前端 wire 为 camelCase，字段即 `head`
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -191,8 +216,10 @@ pub struct GuiConfigDto {
     pub client: ClientConfigDto,
     /// 界面字体族名，空串表示默认字体栈
     pub font: String,
-    /// 皮肤显示模式：Skin2D / Skin3D
-    pub skin_display: SkinDisplay,
+    /// 皮肤显示设置：Skin2DA / Skin2DB / Skin3D / Skin3DD / Skin3DRotate 与旋转角度
+    pub skin: SkinConfigDto,
+    /// 披风显示设置：Cape2D / Cape3D / Elytra 与 3D 角度
+    pub cape: CapeConfigDto,
     /// 背景图来源，文件路径或网址，空串表示无背景图
     pub bg_source: String,
     /// 背景图不透明度，单位 %，取值 5–100
@@ -245,7 +272,16 @@ impl From<GuiConfig> for GuiConfigDto {
                 custom_home: c.client.custom_home,
             },
             font: c.font,
-            skin_display: c.skin_display,
+            skin: SkinConfigDto {
+                display: c.skin.display,
+                pitch: c.skin.pitch,
+                yaw: c.skin.yaw,
+            },
+            cape: CapeConfigDto {
+                display: c.cape.display,
+                pitch: c.cape.pitch,
+                yaw: c.cape.yaw,
+            },
             bg_source: c.bg_source,
             bg_opacity: c.bg_opacity,
             bg_blur: c.bg_blur,
@@ -296,7 +332,16 @@ impl From<GuiConfigDto> for GuiConfig {
                 custom_home: d.client.custom_home,
             },
             font: d.font,
-            skin_display: d.skin_display,
+            skin: SkinConfig {
+                display: d.skin.display,
+                pitch: d.skin.pitch,
+                yaw: d.skin.yaw,
+            },
+            cape: CapeConfig {
+                display: d.cape.display,
+                pitch: d.cape.pitch,
+                yaw: d.cape.yaw,
+            },
             bg_source: d.bg_source,
             bg_opacity: d.bg_opacity,
             bg_blur: d.bg_blur,

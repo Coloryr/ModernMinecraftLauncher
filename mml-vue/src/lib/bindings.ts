@@ -590,6 +590,18 @@ export type ExportProgressDto = {
   file: string,
 };
 
+export type SkinConfigDto = {
+  display: SkinDisplay,
+  pitch: number,
+  yaw: number,
+};
+
+export type CapeConfigDto = {
+  display: CapeDisplay,
+  pitch: number,
+  yaw: number,
+};
+
 export type HeadConfigDto = {
   headType: HeadType,
   x: number,
@@ -637,7 +649,8 @@ export type GuiConfigDto = {
   collect: CollectConfigDto,
   client: ClientConfigDto,
   font: string,
-  skinDisplay: SkinDisplay,
+  skin: SkinConfigDto,
+  cape: CapeConfigDto,
   bgSource: string,
   bgOpacity: number,
   bgBlur: number,
@@ -1092,7 +1105,9 @@ export type SidebarSide = "Left" | "Right";
 
 export type ViewMode = "list" | "group" | "grid";
 
-export type SkinDisplay = "Skin2DA" | "Skin2DB" | "Skin3D" | "Skin3DD";
+export type SkinDisplay = "Skin2DA" | "Skin2DB" | "Skin3D" | "Skin3DD" | "Skin3DRotate";
 
 export type HeadType = "Head2DA" | "Head3DA" | "Head3DB" | "Head3DC" | "Head2DB";
+
+export type CapeDisplay = "Cape2D" | "Cape3D" | "Elytra";
 

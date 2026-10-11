@@ -13,6 +13,8 @@ import { currentAccount } from "../../lib/accountStore";
 import { getImageBaseUrl } from "../../lib/api";
 import { commands, type TexturesDto, type TextureItemDto } from "../../lib/bindings";
 import type { AccountStoreDto } from "../../lib/bindings";
+import { capeRenderUrl } from "../../lib/accountImages";
+import { capeDisplay } from "../../lib/settings";
 import * as skinview3d from "skinview3d";
 
 /** 展示模式 */
@@ -205,7 +207,9 @@ const caperawUrl = computed(() =>
   base.value && selectedCape.value ? `${base.value}/caperaw/${selectedCape.value.sha1}` : "",
 );
 const cape2dUrl = computed(() =>
-  base.value && selectedCape.value ? `${base.value}/cape/${selectedCape.value.sha1}` : "",
+  base.value && selectedCape.value
+    ? capeRenderUrl(selectedCape.value.sha1, capeDisplay.value)
+    : "",
 );
 
 /** 型号字段转显示名：slim 是纤细 Alex，空是经典 Steve */
@@ -218,9 +222,9 @@ function skinThumbUrl(item: TextureItemDto): string {
   return `${base.value}/skin/${item.sha1}/${item.model === "slim" ? "slim" : "new"}`;
 }
 
-/** 披风列表缩略图 */
+/** 披风列表缩略图，档位跟随"披风显示"配置 */
 function capeThumbUrl(item: TextureItemDto): string {
-  return `${base.value}/cape/${item.sha1}`;
+  return capeRenderUrl(item.sha1, capeDisplay.value);
 }
 
 // ---- 装备操作（正版） ----

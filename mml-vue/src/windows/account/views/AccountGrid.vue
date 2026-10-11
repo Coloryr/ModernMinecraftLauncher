@@ -13,7 +13,7 @@ import {
   markImageFailed,
   markImageLoaded,
 } from "../../../lib/accountImages";
-import { skinDisplay } from "../../../lib/settings";
+import { capeDisplay, skinDisplay } from "../../../lib/settings";
 import AccountActions from "../../../components/AccountActions.vue";
 import AccountTypeBadge from "../../../components/AccountTypeBadge.vue";
 import type { AccountStoreDto } from "../../../lib/bindings";
@@ -25,8 +25,16 @@ const props = defineProps<{
   currentUuid: string;
 }>();
 
-// 皮肤显示模式是否为 3D：仰视 / 俯视都用等距全身图，槽位与悬浮样式一致
-const isSkin3D = computed(() => skinDisplay.value === "Skin3D" || skinDisplay.value === "Skin3DD");
+// 皮肤显示模式是否为 3D：仰视 / 俯视 / 旋转都用等距全身图，槽位与悬浮样式一致
+const isSkin3D = computed(
+  () =>
+    skinDisplay.value === "Skin3D" ||
+    skinDisplay.value === "Skin3DD" ||
+    skinDisplay.value === "Skin3DRotate",
+);
+
+// 只有 2D 正反面档的悬浮大图是正 + 背两张，其余档都是同一张图放大
+const isCape2D = computed(() => capeDisplay.value === "Cape2D");
 
 const emit = defineEmits<{
   /** 打开「添加账户」表单 */
@@ -68,7 +76,7 @@ const previewUrl = (kind: string, acc: AccountStoreDto): string =>
     ? acc.avatar || accountAvatarUrl(acc)
     : kind === "skin"
       ? accountSkinUrl(acc)
-      : accountCapeUrl(acc);
+      : accountCapeUrl(acc, capeDisplay.value);
 
 /** 悬停时定位并展示大图；该图已加载失败就不展示 */
 function showPreview(e: MouseEvent, acc: AccountStoreDto, kind: string) {
@@ -78,8 +86,8 @@ function showPreview(e: MouseEvent, acc: AccountStoreDto, kind: string) {
     y: e.clientY,
     kind,
     url: previewUrl(kind, acc),
-    // 披风悬浮多带一张背面图（其余类型空串不渲染）
-    backUrl: kind === "cape" ? accountCapeBackUrl(acc) : "",
+    // 披风 2D 档悬浮多带一张背面图（鞘翅各档没有背面，空串不渲染）
+    backUrl: kind === "cape" && isCape2D.value ? accountCapeBackUrl(acc) : "",
     acc,
   };
 }
@@ -148,7 +156,7 @@ function hidePreview() {
           <span>{{ t("account.noSkin") }}</span>
         </div>
         <div v-if="!imageFailed(acc, 'cape')" class="img-box img-cape-box">
-          <img :src="accountCapeUrl(acc)" class="img-cape" :class="{ pending: imageLoading(acc, 'cape') }"
+          <img :src="accountCapeUrl(acc, capeDisplay)" class="img-cape" :class="{ pending: imageLoading(acc, 'cape') }"
             :alt="t('account.cape')" data-no-fallback @load="markImageLoaded(acc, 'cape')"
             @error="markImageFailed(acc, 'cape')" @mouseenter="showPreview($event, acc, 'cape')"
             @mousemove="movePreview" @mouseleave="hidePreview" />

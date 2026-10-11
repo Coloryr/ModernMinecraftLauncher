@@ -148,8 +148,13 @@ impl SkinRenderWgpu {
                     * Mat4::from_translation(Vec3::new(-value * 0.5, -value * 1.5, 0.0))
             }
             ModelPartType::Proj => {
+                // 左手系投影叠上「画布 y 向下」，画面会整体左右镜像；把投影第一行取负抵消，
+                // 管线侧 front_face 因此取 Ccw
                 let aspect = self.width as f32 / self.height as f32;
-                directx::perspective(PI / 4.0, aspect, 0.1, 10.0)
+                let mut proj = directx::perspective(PI / 4.0, aspect, 0.1, 10.0);
+                // 透视矩阵第一行只有 x 项，取负它就等于把裁剪空间的 x 取负
+                proj.x_axis.x = -proj.x_axis.x;
+                proj
             }
             // 视图必须与上面的 directx 投影同为左手系：物体落在视空间正 z 上，深度才映射进
             // 0..1；混用右手系视图会把物体甩到相机背后，深度整个落在 0..1 之外，什么都画不出来

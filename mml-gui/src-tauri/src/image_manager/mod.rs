@@ -2,16 +2,19 @@
 //!
 //! 前端用 `image_base_url()` 拼地址，请求经 [`url_image`] 按首段路由：
 //! `instance`：实例图标；
-//! `head`：账户头像；`skin`：皮肤全身图；`cape`：披风正面图；`capeback`：披风背面图
-//! ——渲染方式由后端读配置决定，
+//! `head`：账户头像；`skin`：皮肤全身图——这两条的渲染方式由后端读配置决定，
 //! 前端只挑"要哪种图"，不挑"怎么渲染"；
+//! `cape` / `capeback`：披风 2D 正 / 背面；`cape3d`：披风 3D（角度读配置）；
+//! `elytrafolded` / `elytraflying`：鞘翅 2D 收拢 / 张开；`elytra3d`：鞘翅 3D 收拢
+//! ——披风这几条一路一档，前端按"披风显示"配置挑地址；
 //! `skinraw` / `caperaw`：原始皮肤 / 披风贴图，供前端 skinview3d 数据用；
 //! `icon`：远程图片，带内存 + 磁盘 + ETag 缓存；
 //! `block`：方块贴图；`item`：物品贴图；`screenshot`：实例截图。
 //!
 //! 皮肤 / 披风纹理一律按**内容 SHA1** 取，与游戏 assets objects 同款布局，
 //! 同一份贴图跨账户只存一份：`skinraw/<sha1>`、`caperaw/<sha1>`、
-//! `skin/<sha1>[/<skin_type>]`、`cape/<sha1>`、`capeback/<sha1>`。
+//! `skin/<sha1>[/<skin_type>]`、`cape/<sha1>`、`capeback/<sha1>`、`cape3d/<sha1>`、
+//! `elytrafolded/<sha1>`、`elytraflying/<sha1>`、`elytra3d/<sha1>`。
 //! 账户型 URI `head/skin/cape*/<账户类型>/<uuid>` 保留给账户列表的
 //! "当前选中"预览：解析账户 → 下载定 sha1 → 转调 sha1 型渲染。
 //! 渲染缓存键也用内容 sha1，同一贴图的渲染结果跨账户共享。
@@ -34,7 +37,10 @@ mod load;
 mod respond;
 mod skin;
 
-use self::cape::{load_cape_back_image, load_cape_image, load_caperaw_image};
+use self::cape::{
+    load_cape_3d_image, load_cape_back_image, load_cape_image, load_caperaw_image,
+    load_elytra_3d_image, load_elytra_folded_image, load_elytra_flying_image,
+};
 use self::head::load_head_image;
 use self::icon::{icon_name, load_icon_image, load_url_image, save_url_image};
 use self::load::{load_block_image, load_instance_image, load_item_image, load_screenshot_image};
@@ -71,6 +77,18 @@ pub(super) static CAPE_IMAGE: LazyLock<RwLock<HashMap<String, Vec<u8>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 /// 披风背面渲染图内存缓存，键是内容 sha1
 pub(super) static CAPE_BACK_IMAGE: LazyLock<RwLock<HashMap<String, Vec<u8>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+/// 披风 3D 渲染图内存缓存，键是内容 sha1；角度变更时由配置变更整体清空
+pub(super) static CAPE_3D_IMAGE: LazyLock<RwLock<HashMap<String, Vec<u8>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+/// 鞘翅 2D 收拢渲染图内存缓存，键是内容 sha1
+pub(super) static ELYTRA_FOLDED_IMAGE: LazyLock<RwLock<HashMap<String, Vec<u8>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+/// 鞘翅 2D 张开渲染图内存缓存，键是内容 sha1
+pub(super) static ELYTRA_FLYING_IMAGE: LazyLock<RwLock<HashMap<String, Vec<u8>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+/// 鞘翅 3D 渲染图内存缓存，键是内容 sha1
+pub(super) static ELYTRA_3D_IMAGE: LazyLock<RwLock<HashMap<String, Vec<u8>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 /// 纹理内容 sha1 → 源 URL：本地文件被清后按登记地址重新下载
 pub(super) static TEXTURE_URLS: LazyLock<RwLock<HashMap<String, String>>> =
@@ -127,6 +145,10 @@ pub fn clear_texture_images() {
     CAPERAW_IMAGE.write().unwrap().clear();
     CAPE_IMAGE.write().unwrap().clear();
     CAPE_BACK_IMAGE.write().unwrap().clear();
+    CAPE_3D_IMAGE.write().unwrap().clear();
+    ELYTRA_FOLDED_IMAGE.write().unwrap().clear();
+    ELYTRA_FLYING_IMAGE.write().unwrap().clear();
+    ELYTRA_3D_IMAGE.write().unwrap().clear();
     TEXTURE_URLS.write().unwrap().clear();
 }
 
@@ -166,6 +188,14 @@ pub async fn url_image(req: Request<Vec<u8>>, res: UriSchemeResponder) {
         load_cape_image(&uri, res).await;
     } else if image_type == "capeback" {
         load_cape_back_image(&uri, res).await;
+    } else if image_type == "cape3d" {
+        load_cape_3d_image(&uri, res).await;
+    } else if image_type == "elytrafolded" {
+        load_elytra_folded_image(&uri, res).await;
+    } else if image_type == "elytraflying" {
+        load_elytra_flying_image(&uri, res).await;
+    } else if image_type == "elytra3d" {
+        load_elytra_3d_image(&uri, res).await;
     } else if image_type == "icon" {
         load_icon_image(&uri, res).await;
     } else if image_type == "block" {

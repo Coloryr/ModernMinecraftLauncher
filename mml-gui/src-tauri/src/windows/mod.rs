@@ -787,7 +787,9 @@ pub async fn window_save_gui_config(app: AppHandle, config: GuiConfigDto) -> Res
     let mut new_config: crate::gui_config::GuiConfig = config.into();
     let skin_changed = {
         let old = crate::gui_config::get();
-        old.skin_display != new_config.skin_display || old.head != new_config.head
+        old.skin != new_config.skin
+            || old.head != new_config.head
+            || old.cape != new_config.cape
     };
     let client_changed = {
         let old = crate::gui_config::get();

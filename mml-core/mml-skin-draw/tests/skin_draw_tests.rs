@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use mml_skin_draw::{
-    Draw2DType, Draw3DType, DrawCapeType, DrawHeadType, DrawSkinType, draw_cape, draw_head,
-    draw_skin,
+    Draw2DType, Draw3DType, DrawCapeType, DrawElytraType, DrawHeadType, DrawSkinType, draw_cape,
+    draw_cape_3d, draw_elytra, draw_elytra_3d, draw_head, draw_skin,
 };
 use tiny_skia::{Pixmap, Point};
 
@@ -137,6 +137,30 @@ fn test_head_3d_draw_typeb() {
     assert_bitmap_eq(&res, &load_reference("out_head_3d_b.png"));
 }
 
+/// 鞘翅收拢（飞行前）的 2D 图应与参考图逐字节一致
+#[test]
+fn test_elytra_2d_folded() {
+    let image = load_skin("cape.png");
+
+    let res = draw_elytra(&image, DrawElytraType::Folded);
+    assert!(res.is_some());
+    let res = res.unwrap();
+
+    assert_bitmap_eq(&res, &load_reference("out_elytra_2d_folded.png"));
+}
+
+/// 鞘翅张开（飞行中）的 2D 图应与参考图逐字节一致
+#[test]
+fn test_elytra_2d_flying() {
+    let image = load_skin("cape.png");
+
+    let res = draw_elytra(&image, DrawElytraType::Flying);
+    assert!(res.is_some());
+    let res = res.unwrap();
+
+    assert_bitmap_eq(&res, &load_reference("out_elytra_2d_flying.png"));
+}
+
 /// 重新生成 3D 参考图
 ///
 /// 3D 输出带抗锯齿，换光栅器后不可能与旧图逐字节一致，所以这两张图由本实现重新生成：
@@ -155,4 +179,34 @@ fn regen_3d_refs() {
     )
     .expect("3d typeb 应成功");
     mml_skin::save_bitmap(&b, Path::new("tests").join("out_head_3d_b.png").as_path());
+}
+
+/// 渲染披风与鞘翅的输出样例，供人眼确认，默认不跑
+///
+/// 要出图时：
+/// `cargo test -p mml-skin-draw --test skin_draw_tests render_samples -- --ignored`
+///
+/// PNG 写到 `target/temp/skin_samples/`，走 `mml_testutil` 的测试临时目录约定；
+/// 3D 那几张需要可用 GPU。2D 出图都有逐字节参考图钉着（见上面的用例），
+/// 3D 输出带抗锯齿、换光栅器就不一致，所以只出样不比对。
+#[test]
+#[ignore]
+fn render_samples() {
+    let dir = mml_testutil::temp_path("skin_samples");
+    std::fs::create_dir_all(&dir).unwrap();
+    let image = load_skin("cape.png");
+
+    let samples: [(&str, Option<Pixmap>); 4] = [
+        ("cape_3d_yaw0.png", draw_cape_3d(&image, 0.0, 0.0)),
+        ("cape_3d_yaw30.png", draw_cape_3d(&image, 25.0, 45.0)),
+        ("elytra_3d_yaw0.png", draw_elytra_3d(&image, 0.0, 0.0)),
+        ("elytra_3d_yaw30.png", draw_elytra_3d(&image, 0.0, 30.0)),
+    ];
+
+    for (name, bitmap) in samples {
+        let Some(bitmap) = bitmap else {
+            panic!("{name} 应出图")
+        };
+        mml_skin::save_bitmap(&bitmap, dir.join(name).as_path());
+    }
 }

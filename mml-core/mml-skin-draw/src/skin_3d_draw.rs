@@ -129,7 +129,7 @@ fn normalize_texture(image: &Pixmap) -> Option<Pixmap> {
 }
 
 /// 面方向下标，对应 cube.rs 顶点表的面顺序
-mod face {
+pub(crate) mod face {
     /// 背面 z−，角色背后
     pub const BACK: usize = 0;
     /// 正面 z+，角色面朝方向
@@ -158,7 +158,7 @@ mod face {
 ///
 /// 顶点顺序与 uv 布局来自 [`crate::skin_3d_cube`] 的 CUBE 与 [`crate::skin_3d_texture`]
 /// 的 UV 表：正面 / 侧面 / 顶面 u 沿面向右、v 沿面向下；背面 / 底面 u 镜像。
-fn face_corners(h: [f32; 3], d: usize) -> [([f32; 3], [f32; 2]); 4] {
+pub(crate) fn face_corners(h: [f32; 3], d: usize) -> [([f32; 3], [f32; 2]); 4] {
     let (hx, hy, hz) = (h[0], h[1], h[2]);
     match d {
         face::BACK => [
@@ -201,7 +201,7 @@ fn face_corners(h: [f32; 3], d: usize) -> [([f32; 3], [f32; 2]); 4] {
 }
 
 /// 一个面的贴图区域，按皮肤贴图上的 tx / ty / tw / th 排列
-type FaceRect = [i32; 4];
+pub(crate) type FaceRect = [i32; 4];
 
 /// 从部件尺寸与贴图块左上角取六个面的贴图区域
 ///
@@ -216,7 +216,7 @@ type FaceRect = [i32; 4];
 /// 块内布局见 texture.rs：上排为 顶(W,D) 与 底(W,D)，
 /// 下排为 右(D,H)、前(W,H)、左(D,H)、后(W,H)；
 /// 「右」指角色右手侧面 x−，即贴图块最左列。
-fn face_rect(w: i32, h: i32, d: i32, bx: i32, by: i32, di: usize) -> FaceRect {
+pub(crate) fn face_rect(w: i32, h: i32, d: i32, bx: i32, by: i32, di: usize) -> FaceRect {
     match di {
         face::BACK => [bx + 2 * d + w, by + d, w, h],
         face::FRONT => [bx + d, by + d, w, h],

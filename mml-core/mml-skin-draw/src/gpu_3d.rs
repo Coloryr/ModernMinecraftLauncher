@@ -276,15 +276,20 @@ pub(crate) fn render_3d(
         &view,
     );
 
-    let vbase = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("mml-skin-3d base"),
-        contents: bytemuck::cast_slice(base),
-        usage: wgpu::BufferUsages::VERTEX,
+    // 空顶点列表不建缓冲：零长缓冲连 slice 都会 panic，调用方如披风就没有顶层
+    let vbase = (!base.is_empty()).then(|| {
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("mml-skin-3d base"),
+            contents: bytemuck::cast_slice(base),
+            usage: wgpu::BufferUsages::VERTEX,
+        })
     });
-    let voverlay = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("mml-skin-3d overlay"),
-        contents: bytemuck::cast_slice(overlay),
-        usage: wgpu::BufferUsages::VERTEX,
+    let voverlay = (!overlay.is_empty()).then(|| {
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("mml-skin-3d overlay"),
+            contents: bytemuck::cast_slice(overlay),
+            usage: wgpu::BufferUsages::VERTEX,
+        })
     });
 
     // 离屏渲染：先底层并写深度，后顶层做混合且只读深度
@@ -323,12 +328,16 @@ pub(crate) fn render_3d(
             multiview_mask: None,
         });
         pass.set_bind_group(0, &bind, &[]);
-        pass.set_pipeline(&pipes.base);
-        pass.set_vertex_buffer(0, vbase.slice(..));
-        pass.draw(0..base.len() as u32, 0..1);
-        pass.set_pipeline(&pipes.overlay);
-        pass.set_vertex_buffer(0, voverlay.slice(..));
-        pass.draw(0..overlay.len() as u32, 0..1);
+        if let Some(buf) = &vbase {
+            pass.set_pipeline(&pipes.base);
+            pass.set_vertex_buffer(0, buf.slice(..));
+            pass.draw(0..base.len() as u32, 0..1);
+        }
+        if let Some(buf) = &voverlay {
+            pass.set_pipeline(&pipes.overlay);
+            pass.set_vertex_buffer(0, buf.slice(..));
+            pass.draw(0..overlay.len() as u32, 0..1);
+        }
     }
     queue.submit(Some(encoder.finish()));
 

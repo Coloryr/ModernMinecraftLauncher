@@ -3,11 +3,17 @@
 import { ref } from "vue";
 import { listen } from "@tauri-apps/api/event";
 import {
+  DEFAULT_CAPE_PITCH,
+  DEFAULT_CAPE_YAW,
+  DEFAULT_SKIN_PITCH,
+  DEFAULT_SKIN_YAW,
   loadGuiConfig,
+  normalizeCapeDisplay,
   normalizeHeadType,
   normalizeSkinDisplay,
   normalizeViewMode,
   saveGuiConfig,
+  type CapeDisplay,
   type HeadType,
   type SidebarSide,
   type SkinDisplay,
@@ -25,7 +31,7 @@ import {
 import { bumpImageVersion } from "./accountImages";
 import { isTauri } from "../windows/windowManager";
 import { SkinConfigChange } from "./listens";
-export type { SidebarSide, ViewMode, SkinDisplay, HeadType } from "./guiConfig";
+export type { SidebarSide, ViewMode, SkinDisplay, CapeDisplay, HeadType } from "./guiConfig";
 
 export const sidebarSide = ref<SidebarSide>(
   readString(KEYS.sidebarSide) === "Right" ? "Right" : "Left",
@@ -101,32 +107,86 @@ export function setSelectedInstance(uuid: string) {
   saveGuiConfig({ mainWindow: { selectedInstance: uuid } });
 }
 
-// ---- 皮肤显示模式：账户界面皮肤预览的 2D TypeA / 2D TypeB / 3D 模型 ----
+// ---- 皮肤显示模式：账户界面皮肤预览的 2D / 3D / 3D 旋转 ----
 
-export const skinDisplay = ref<SkinDisplay>(
-  normalizeSkinDisplay(readString(KEYS.skinDisplay)),
-);
+export const skinDisplay = ref<SkinDisplay>(normalizeSkinDisplay(readString(KEYS.skinDisplay)));
+// 皮肤 3D 旋转默认角度：X 15 / Y 45（没存过或存了非法值时用默认）
+export const skinPitch = ref(readNumber(KEYS.skinPitch, DEFAULT_SKIN_PITCH));
+export const skinYaw = ref(readNumber(KEYS.skinYaw, DEFAULT_SKIN_YAW));
 
 /**
- * 设置皮肤显示模式
+ * 设置皮肤显示模式，3D 旋转档附带 X / Y 角度
  *
- * - `v`: 显示模式
+ * - `display`: 显示模式
+ * - `pitch`: 3D 旋转 X 角度，缺省用当前值
+ * - `yaw`: 3D 旋转 Y 角度，缺省用当前值
  */
-export function setSkinDisplay(v: SkinDisplay) {
-  skinDisplay.value = v;
-  writeString(KEYS.skinDisplay, v);
-  saveGuiConfig({ skinDisplay: v });
+export function setSkinConfig(display: SkinDisplay, pitch = skinPitch.value, yaw = skinYaw.value) {
+  skinDisplay.value = display;
+  skinPitch.value = pitch;
+  skinYaw.value = yaw;
+  writeString(KEYS.skinDisplay, display);
+  writeNumber(KEYS.skinPitch, pitch);
+  writeNumber(KEYS.skinYaw, yaw);
+  saveGuiConfig({ skin: { display, pitch, yaw } });
   bumpImageVersion();
 }
 
 /**
  * 启动恢复：只同步内存与镜像，不回写 gui_config.json
  *
- * - `v`: 显示模式
+ * - `display`: 显示模式
+ * - `pitch`: 3D 旋转 X 角度
+ * - `yaw`: 3D 旋转 Y 角度
  */
-export function restoreSkinDisplay(v: SkinDisplay) {
-  skinDisplay.value = v;
-  writeString(KEYS.skinDisplay, v);
+export function restoreSkinConfig(display: SkinDisplay, pitch: number, yaw: number) {
+  skinDisplay.value = display;
+  skinPitch.value = pitch;
+  skinYaw.value = yaw;
+  writeString(KEYS.skinDisplay, display);
+  writeNumber(KEYS.skinPitch, pitch);
+  writeNumber(KEYS.skinYaw, yaw);
+}
+
+// ---- 披风显示模式：账户界面披风 / 鞘翅预览出哪种图，3D 档带角度 ----
+
+export const capeDisplay = ref<CapeDisplay>(normalizeCapeDisplay(readString(KEYS.capeDisplay)));
+// 披风 3D 默认角度：X 0 / Y 30（没存过或存了非法值时用默认）
+export const capePitch = ref(readNumber(KEYS.capePitch, DEFAULT_CAPE_PITCH));
+export const capeYaw = ref(readNumber(KEYS.capeYaw, DEFAULT_CAPE_YAW));
+
+/**
+ * 设置披风显示模式，3D 档附带 X / Y 角度
+ *
+ * - `display`: 显示模式
+ * - `pitch`: 3D 旋转 X 角度，缺省用当前值
+ * - `yaw`: 3D 旋转 Y 角度，缺省用当前值
+ */
+export function setCapeConfig(display: CapeDisplay, pitch = capePitch.value, yaw = capeYaw.value) {
+  capeDisplay.value = display;
+  capePitch.value = pitch;
+  capeYaw.value = yaw;
+  writeString(KEYS.capeDisplay, display);
+  writeNumber(KEYS.capePitch, pitch);
+  writeNumber(KEYS.capeYaw, yaw);
+  saveGuiConfig({ cape: { display, pitch, yaw } });
+  bumpImageVersion();
+}
+
+/**
+ * 启动恢复：只同步内存与镜像，不回写 gui_config.json
+ *
+ * - `display`: 显示模式
+ * - `pitch`: 3D 旋转 X 角度
+ * - `yaw`: 3D 旋转 Y 角度
+ */
+export function restoreCapeConfig(display: CapeDisplay, pitch: number, yaw: number) {
+  capeDisplay.value = display;
+  capePitch.value = pitch;
+  capeYaw.value = yaw;
+  writeString(KEYS.capeDisplay, display);
+  writeNumber(KEYS.capePitch, pitch);
+  writeNumber(KEYS.capeYaw, yaw);
 }
 
 // ---- 头像显示模式：渲染端按 head 配置出图，改完自动生效 ----
@@ -175,14 +235,16 @@ export function restoreHeadConfig(type: HeadType, x: number, y: number) {
 }
 
 // ---- 跨窗口同步 ----
-// 每个窗口是独立 JS 上下文，ref 不会自动同步：设置窗口改了皮肤 / 头像模式后，
+// 每个窗口是独立 JS 上下文，ref 不会自动同步：设置窗口改了皮肤 / 头像 / 披风模式后，
 // 后端在 saveGuiConfig 时广播 skin-config-change，本窗口重读配置并让所有
-// 账户图片带新版本号重取：后端渲染缓存键含这两项配置，取到的就是新模式渲染图
+// 账户图片带新版本号重取：皮肤与头像的渲染缓存键含这两项配置，披风则按模式换路由，
+// 取到的都是新模式渲染图
 if (isTauri()) {
   void listen(SkinConfigChange, async () => {
     const cfg = await loadGuiConfig();
     if (!cfg) return;
-    restoreSkinDisplay(cfg.skinDisplay);
+    restoreSkinConfig(cfg.skin.display, cfg.skin.pitch, cfg.skin.yaw);
+    restoreCapeConfig(cfg.cape.display, cfg.cape.pitch, cfg.cape.yaw);
     restoreHeadConfig(cfg.head.headType, cfg.head.x, cfg.head.y);
     bumpImageVersion();
   });

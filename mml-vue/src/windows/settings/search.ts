@@ -17,6 +17,7 @@ export const GROUP_TITLES: Record<string, string> = {
   bgImage: "winSettings.bgImage",
   head: "winSettings.headDisplay",
   skin: "winSettings.skinDisplay",
+  cape: "winSettings.capeDisplay",
   preview: "winSettings.secPreview",
   download: "winSettings.secDownload",
   proxy: "winSettings.secProxy",
@@ -64,6 +65,36 @@ const SETTINGS_INDEX: IndexEntry[] = [
   { tab: "skin", group: "head", labelKey: "winSettings.rotX", extra: ["rotate", "旋转"] },
   { tab: "skin", group: "head", labelKey: "winSettings.rotY", extra: ["rotate", "旋转"] },
   { tab: "skin", group: "skin", labelKey: "winSettings.skinDisplay", extra: ["skin", "皮肤"] },
+  {
+    tab: "skin",
+    group: "skin",
+    labelKey: "winSettings.rotX",
+    extra: ["skin", "rotate", "皮肤", "旋转"],
+  },
+  {
+    tab: "skin",
+    group: "skin",
+    labelKey: "winSettings.rotY",
+    extra: ["skin", "rotate", "皮肤", "旋转"],
+  },
+  {
+    tab: "skin",
+    group: "cape",
+    labelKey: "winSettings.capeDisplay",
+    extra: ["cape", "elytra", "披风", "鞘翅"],
+  },
+  {
+    tab: "skin",
+    group: "cape",
+    labelKey: "winSettings.rotX",
+    extra: ["cape", "rotate", "披风", "旋转"],
+  },
+  {
+    tab: "skin",
+    group: "cape",
+    labelKey: "winSettings.rotY",
+    extra: ["cape", "rotate", "披风", "旋转"],
+  },
 
   // ---- 网络与下载 ----
   { tab: "network", group: "download", labelKey: "winSettings.downloadSource", extra: ["source", "bmclapi", "下载源"] },
@@ -164,6 +195,7 @@ export const RESETTABLE_GROUPS = [
   "bgImage",
   "head",
   "skin",
+  "cape",
   "download",
   "proxy",
   "dns",

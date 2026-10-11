@@ -65,23 +65,47 @@ pub enum ViewMode {
 /// 皮肤显示模式；serde 按变体名序列化，与前端同名
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum SkinDisplay {
-    /// 2D 平面图 TypeA，默认值；兼容旧值的 "Skin2D" 别名
-    #[default]
+    /// 2D 平面图 TypeA；兼容旧值的 "Skin2D" 别名
     #[serde(alias = "Skin2D")]
     Skin2DA,
-    /// 2D 大图，TypeB
+    /// 2D 大图，TypeB，默认
+    #[default]
     Skin2DB,
     /// 3D 等距模型，面朝上，仰视
     Skin3D,
     /// 3D 等距模型，面朝下，俯视
     Skin3DD,
+    /// 3D 等距模型，按配置的 pitch / yaw 旋转
+    Skin3DRotate,
+}
+
+/// 皮肤显示设置，账户列表与设置页预览共用
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct SkinConfig {
+    /// 显示模式：Skin2DA / Skin2DB / Skin3D / Skin3DD / Skin3DRotate
+    pub display: SkinDisplay,
+    /// 3D 旋转模式绕 X 轴旋转角度，单位度；只有 Skin3DRotate 用
+    pub pitch: f32,
+    /// 3D 旋转模式绕 Y 轴旋转角度，单位度；只有 Skin3DRotate 用
+    pub yaw: f32,
+}
+
+impl Default for SkinConfig {
+    /// 默认 2D 大图；旋转角度取 X 15 度 / Y 45 度，与内置的两个固定 3D 档观感接近
+    fn default() -> Self {
+        Self {
+            display: SkinDisplay::default(),
+            pitch: 15.0,
+            yaw: 45.0,
+        }
+    }
 }
 
 /// 头像类型；serde 按变体名序列化，与前端同名
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum HeadType {
-    /// 2D 平面头像，默认
-    #[default]
+    /// 2D 平面头像
     Head2DA,
     /// 3D 头像，面朝下，俯视
     Head3DA,
@@ -89,8 +113,44 @@ pub enum HeadType {
     Head3DB,
     /// 3D 头像，面朝上，仰视
     Head3DC,
-    /// 2D 大头像
+    /// 2D 大头像，默认
+    #[default]
     Head2DB,
+}
+
+/// 披风显示模式；serde 按变体名序列化，与前端同名
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum CapeDisplay {
+    /// 披风 2D 正反面，默认；卡片出正面，悬浮大图并排正面 + 背面
+    #[default]
+    Cape2D,
+    /// 披风 3D 等距图
+    Cape3D,
+    /// 鞘翅 3D 等距图
+    Elytra,
+}
+
+/// 披风渲染设置，账户列表与设置页预览共用
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct CapeConfig {
+    /// 显示模式：Cape2D / Cape3D / Elytra
+    pub display: CapeDisplay,
+    /// 披风 3D 绕 X 轴旋转角度，单位度；只有 Cape3D 用
+    pub pitch: f32,
+    /// 披风 3D 绕 Y 轴旋转角度，单位度；只有 Cape3D 用
+    pub yaw: f32,
+}
+
+impl Default for CapeConfig {
+    /// 默认 2D 正反面；3D 角度取 X 0 度 / Y 30 度，侧一点更立体
+    fn default() -> Self {
+        Self {
+            display: CapeDisplay::default(),
+            pitch: 0.0,
+            yaw: 30.0,
+        }
+    }
 }
 
 /// 头像渲染设置，账户列表与设置页预览共用
@@ -106,7 +166,7 @@ pub struct HeadConfig {
 }
 
 impl Default for HeadConfig {
-    /// 默认 2D 平面头像，旋转角 X 15 度 / Y 65 度
+    /// 默认 2D 大头像，旋转角 X 15 度 / Y 65 度
     fn default() -> Self {
         Self {
             head_type: HeadType::default(),
@@ -280,8 +340,10 @@ pub struct GuiConfig {
     pub client: ClientConfig,
     /// 界面字体族名；空串表示用默认字体栈
     pub font: String,
-    /// 皮肤显示模式：Skin2DA / Skin2DB / Skin3D / Skin3DD
-    pub skin_display: SkinDisplay,
+    /// 皮肤显示设置：Skin2DA / Skin2DB / Skin3D / Skin3DD / Skin3DRotate 与旋转角度
+    pub skin: SkinConfig,
+    /// 披风显示设置：Cape2D / Cape3D / Elytra 与 3D 角度
+    pub cape: CapeConfig,
     /// 背景图来源：文件路径或网址，空串表示无背景图
     pub bg_source: String,
     /// 背景图不透明度，单位百分比，取值 5 到 100
@@ -304,7 +366,8 @@ impl Default for GuiConfig {
             collect: Default::default(),
             client: Default::default(),
             font: String::new(),
-            skin_display: Default::default(),
+            skin: Default::default(),
+            cape: Default::default(),
             bg_source: String::new(),
             bg_opacity: 100,
             bg_blur: 0,

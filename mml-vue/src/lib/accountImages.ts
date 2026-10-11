@@ -3,6 +3,7 @@
 // 离线或拉取失败时该 URI 返回 400，前端监听 img @error 回退到 SVG 占位图
 import { ref } from "vue";
 import type { AccountStoreDto } from "./bindings";
+import type { CapeDisplay } from "./guiConfig";
 import { getImageBaseUrl } from "./api";
 
 /** mml-image 协议前缀：进窗口后异步取一次，浏览器预览取不到时保持空串走占位图 */
@@ -65,21 +66,62 @@ export function accountSkinUrl(acc: AccountStoreDto): string {
   return `${imageBase.value}/skin/${acc.authType}/${acc.uuid}/auto?v=${imageVersion.value}`;
 }
 
+/** 披风显示模式对应的图片路由名，与后端 `image_manager` 的路由一致 */
+const CAPE_ROUTES: Record<CapeDisplay, string> = {
+  Cape2D: "cape",
+  Cape3D: "cape3d",
+  Elytra: "elytra3d",
+};
+
 /**
- * 披风渲染图地址，后端渲染 2D 正面
+ * 披风渲染图地址，档位由调用方按"披风显示"配置传入
+ *
+ * 带图片版本号：披风 3D 的角度也来自配置，改角度时地址不变、图却变了，
+ * 靠版本号让浏览器与前端都重取。
  *
  * - `acc`: 目标账户
+ * - `mode`: 披风显示模式，缺省披风正反面
  *
  * # 返回值
  *
  * 渲染图 URL；协议前缀未就绪时为空串
  */
-export function accountCapeUrl(acc: AccountStoreDto): string {
-  return imageBase.value ? `${imageBase.value}/cape/${acc.authType}/${acc.uuid}` : "";
+export function accountCapeUrl(acc: AccountStoreDto, mode: CapeDisplay = "Cape2D"): string {
+  if (!imageBase.value) return "";
+  return `${imageBase.value}/${CAPE_ROUTES[mode]}/${acc.authType}/${acc.uuid}?v=${imageVersion.value}`;
 }
 
 /**
- * 披风背面渲染图地址，后端渲染 2D 背面，悬浮大图与正面并排用
+ * 按内容 sha1 取披风渲染图地址，账户列表缩略图与悬浮大图共用
+ *
+ * - `sha1`: 披风贴图内容 SHA1
+ * - `mode`: 披风显示模式，缺省披风正反面
+ *
+ * # 返回值
+ *
+ * 渲染图 URL；协议前缀未就绪或 sha1 为空时为空串
+ */
+export function capeRenderUrl(sha1: string, mode: CapeDisplay = "Cape2D"): string {
+  if (!imageBase.value || !sha1) return "";
+  return `${imageBase.value}/${CAPE_ROUTES[mode]}/${sha1}?v=${imageVersion.value}`;
+}
+
+/**
+ * 设置页披风 / 鞘翅样例地址：内置样例披风按显示模式渲染
+ *
+ * - `mode`: 披风显示模式
+ *
+ * # 返回值
+ *
+ * 渲染图 URL；协议前缀未就绪时为空串
+ */
+export function capeSampleUrl(mode: CapeDisplay): string {
+  if (!imageBase.value) return "";
+  return `${imageBase.value}/${CAPE_ROUTES[mode]}/preview/0?v=${imageVersion.value}`;
+}
+
+/**
+ * 披风背面渲染图地址，只有 2D 正反面档用得到：悬浮大图与正面并排
  *
  * - `acc`: 目标账户
  *

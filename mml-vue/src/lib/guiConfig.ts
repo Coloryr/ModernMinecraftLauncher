@@ -17,7 +17,9 @@ export type SidebarSide = "Left" | "Right";
 /** 实例列表显示模式：默认 list，用户改过后用用户的值 */
 export type ViewMode = "list" | "group" | "grid";
 /** 皮肤显示模式：账户界面皮肤预览形态，枚举值即 Rust 变体名 */
-export type SkinDisplay = "Skin2DA" | "Skin2DB" | "Skin3D" | "Skin3DD";
+export type SkinDisplay = "Skin2DA" | "Skin2DB" | "Skin3D" | "Skin3DD" | "Skin3DRotate";
+/** 披风显示模式：账户界面披风 / 鞘翅预览形态，枚举值即 Rust 变体名 */
+export type CapeDisplay = "Cape2D" | "Cape3D" | "Elytra";
 
 /**
  * 把任意值规范成合法的皮肤显示模式
@@ -26,10 +28,56 @@ export type SkinDisplay = "Skin2DA" | "Skin2DB" | "Skin3D" | "Skin3DD";
  *
  * # 返回值
  *
- * 合法模式，非法 / 缺省时回落 `Skin2DA`
+ * 合法模式，非法 / 缺省时回落 `Skin2DB`
  */
 export function normalizeSkinDisplay(value: string | null | undefined): SkinDisplay {
-  return value === "Skin2DB" || value === "Skin3D" || value === "Skin3DD" ? value : "Skin2DA";
+  return value === "Skin2DA" ||
+    value === "Skin3D" ||
+    value === "Skin3DD" ||
+    value === "Skin3DRotate"
+    ? value
+    : "Skin2DB";
+}
+
+/** 皮肤显示设置，对应 Rust SkinConfig，wire 为 skin */
+export interface SkinConfig {
+  /** Skin2DA / Skin2DB / Skin3D / Skin3DD / Skin3DRotate */
+  display: SkinDisplay;
+  /** 3D 旋转 X，单位度 */
+  pitch: number;
+  /** 3D 旋转 Y，单位度 */
+  yaw: number;
+}
+
+/** 皮肤 3D 旋转角度默认值：X 15 / Y 45，与 Rust SkinConfig::default 一致 */
+export const DEFAULT_SKIN_PITCH = 15;
+export const DEFAULT_SKIN_YAW = 45;
+
+/** 披风显示设置，对应 Rust CapeConfig，wire 为 cape */
+export interface CapeConfig {
+  /** Cape2D / Cape3D / Elytra */
+  display: CapeDisplay;
+  /** 披风 3D 旋转 X，单位度 */
+  pitch: number;
+  /** 披风 3D 旋转 Y，单位度 */
+  yaw: number;
+}
+
+/** 披风 3D 角度默认值：X 0 / Y 30，与 Rust CapeConfig::default 一致 */
+export const DEFAULT_CAPE_PITCH = 0;
+export const DEFAULT_CAPE_YAW = 30;
+
+/**
+ * 把任意值规范成合法的披风显示模式
+ *
+ * - `value`: 待规范的原始值，非法 / 缺省时为 null 或 undefined
+ *
+ * # 返回值
+ *
+ * 合法模式，非法 / 缺省时回落 `Cape2D`
+ */
+export function normalizeCapeDisplay(value: string | null | undefined): CapeDisplay {
+  return value === "Cape3D" || value === "Elytra" ? value : "Cape2D";
 }
 
 /**
@@ -52,10 +100,10 @@ export function normalizeViewMode(value: string | null | undefined): ViewMode {
  *
  * # 返回值
  *
- * 合法类型，非法 / 缺省时回落 `Head2DA`
+ * 合法类型，非法 / 缺省时回落 `Head2DB`
  */
 export function normalizeHeadType(value: string | null | undefined): HeadType {
-  return value === "Head3DA" || value === "Head3DB" || value === "Head3DC" || value === "Head2DB" ? value : "Head2DA";
+  return value === "Head3DA" || value === "Head3DB" || value === "Head3DC" || value === "Head2DA" ? value : "Head2DB";
 }
 
 /** 主窗口配置，对应 Rust MainWindowConfig，wire 为 mainWindow */
@@ -140,8 +188,10 @@ export interface GuiConfig {
   client: ClientConfig;
   /** 界面字体族名（空串 = 默认字体栈） */
   font: string;
-  /** 皮肤显示模式：Skin2DA / Skin2DB / Skin3D / Skin3DD */
-  skinDisplay: SkinDisplay;
+  /** 皮肤显示设置：Skin2DA / Skin2DB / Skin3D / Skin3DD / Skin3DRotate 与旋转角度 */
+  skin: SkinConfig;
+  /** 披风显示设置：Cape2D / Cape3D / Elytra 与 3D 角度 */
+  cape: CapeConfig;
   /** 背景图来源：文件路径或网址，空串表示无背景图 */
   bgSource: string;
   /** 背景图不透明度，单位 %，取值 5–100 */
@@ -187,7 +237,8 @@ export interface GuiConfigPatch {
   collect?: Partial<CollectConfig>;
   client?: Partial<ClientConfig>;
   font?: string;
-  skinDisplay?: SkinDisplay;
+  skin?: Partial<SkinConfig>;
+  cape?: Partial<CapeConfig>;
   bgSource?: string;
   bgOpacity?: number;
   bgBlur?: number;
@@ -197,7 +248,7 @@ export interface GuiConfigPatch {
 /**
  * 合并保存 GUI 状态到 gui_config.json
  *
- * mainWindow / head / collect / client 内部做深合并，避免互相覆盖。
+ * mainWindow / head / collect / client / skin / cape 内部做深合并，避免互相覆盖。
  *
  * - `patch`: 要更新的字段，未给的字段保持原值
  */
@@ -211,6 +262,8 @@ export async function saveGuiConfig(patch: GuiConfigPatch): Promise<void> {
       head: { ...cur.head, ...patch.head },
       collect: { ...cur.collect, ...patch.collect },
       client: { ...cur.client, ...patch.client },
+      skin: { ...cur.skin, ...patch.skin },
+      cape: { ...cur.cape, ...patch.cape },
     });
   } catch {
     /* 浏览器环境忽略 */
@@ -297,7 +350,18 @@ export function defaultConfig(): GuiConfig {
       customHome: readFlag(KEYS.customHome),
     },
     font: readString(KEYS.font),
-    skinDisplay: normalizeSkinDisplay(readString(KEYS.skinDisplay)),
+    skin: {
+      display: normalizeSkinDisplay(readString(KEYS.skinDisplay)),
+      // 与 settings.ts 同语义：没存过 / 非法值回落到默认角度
+      pitch: readNumber(KEYS.skinPitch, DEFAULT_SKIN_PITCH),
+      yaw: readNumber(KEYS.skinYaw, DEFAULT_SKIN_YAW),
+    },
+    cape: {
+      display: normalizeCapeDisplay(readString(KEYS.capeDisplay)),
+      // 与 settings.ts 同语义：没存过 / 非法值回落到默认角度
+      pitch: readNumber(KEYS.capePitch, DEFAULT_CAPE_PITCH),
+      yaw: readNumber(KEYS.capeYaw, DEFAULT_CAPE_YAW),
+    },
     bgSource: "",
     bgOpacity: readNumber(KEYS.bgOpacity, 100),
     bgBlur: readNumber(KEYS.bgBlur, 0),
