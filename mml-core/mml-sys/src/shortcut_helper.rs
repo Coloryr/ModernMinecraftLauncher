@@ -1,4 +1,4 @@
-//! 快捷方式创建（指向启动器的实例启动链接）
+//! 快捷方式创建：指向启动器的实例启动链接
 
 use std::path::{Path, PathBuf};
 
@@ -6,10 +6,10 @@ use mml_names::i18_items::error_type::{CoreResult, ErrorType, FileSystemErrorDat
 
 /// 创建快捷方式
 ///
-/// - `uuid`: 实例UUID（快捷方式启动参数）
-/// - `icon`: 图标文件路径（缺省用启动器默认图标）
+/// - `uuid`: 实例 UUID，作为快捷方式的启动参数
+/// - `icon`: 图标文件路径，传 `None` 时用启动器默认图标
 /// - `work`: 工作目录
-/// - `file`: 快捷方式目标路径（Windows 为 .lnk）
+/// - `file`: 快捷方式目标路径，Windows 下为 .lnk 文件
 ///
 /// # 返回值
 ///
@@ -24,6 +24,7 @@ pub fn create_shortcut<P: AsRef<Path>>(
     create_shortcut_inner(uuid, icon, work, file)
 }
 
+/// Windows 实现：通过 Shell COM 的 IShellLink 写出 .lnk 文件
 #[cfg(target_os = "windows")]
 fn create_shortcut_inner<P: AsRef<Path>>(
     uuid: &str,
@@ -62,7 +63,7 @@ fn create_shortcut_inner<P: AsRef<Path>>(
         let hstring = HSTRING::from(std::env::current_exe().unwrap().as_os_str());
         let pcwstr = PCWSTR(hstring.as_ptr());
 
-        // 目标路径（必须）
+        // 目标路径，必须设置
         shell_link.SetPath(pcwstr).map_err(|err| {
             ErrorType::FileSystemError(FileSystemErrorData {
                 path: file.as_ref().to_path_buf(),
@@ -122,6 +123,7 @@ fn create_shortcut_inner<P: AsRef<Path>>(
     }
 }
 
+/// Linux 实现占位，未创建任何快捷方式
 #[cfg(target_os = "linux")]
 fn create_shortcut_inner<P: AsRef<Path>>(
     uuid: &str,
@@ -131,6 +133,7 @@ fn create_shortcut_inner<P: AsRef<Path>>(
 ) -> CoreResult<PathBuf> {
 }
 
+/// macOS 实现占位，未创建任何快捷方式
 #[cfg(target_os = "macos")]
 fn create_shortcut_inner<P: AsRef<Path>>(
     uuid: &str,

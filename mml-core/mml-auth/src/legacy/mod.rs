@@ -1,11 +1,11 @@
 //! 旧版 Yggdrasil 认证协议模块
 //!
-//! 本模块实现了 Minecraft 旧版认证协议（Yggdrasil API），
+//! 本模块实现了 Minecraft 旧版认证协议 Yggdrasil API，
 //! 这是 Mojang 在迁移到 Microsoft OAuth 之前使用的认证系统。
 //! 目前该协议仍被以下第三方认证服务广泛使用：
 //!
-//! - **外置登录（Authlib-Injector）** — 自定义认证服务器
-//! - **统一通行证（Nide8）** — 国内流行的第三方认证
+//! - **外置登录 Authlib-Injector** — 自定义认证服务器
+//! - **统一通行证 Nide8** — 国内流行的第三方认证
 //! - **LittleSkin** — 皮肤站认证服务
 //!
 //! # API 端点
@@ -46,13 +46,11 @@ pub mod nide8;
 pub trait GuiSelectHandel: Send {
     /// 让用户从多个账户中选择一个
     ///
-    /// # 参数
-    ///
     /// - `auths`: 可选账户的用户名列表
     ///
     /// # 返回值
     ///
-    /// 返回被选中账户在列表中的索引（从 0 开始）
+    /// 返回被选中账户在列表中的索引，从 0 开始
     fn select_auth(&self, auths: Vec<String>) -> i32;
 }
 
@@ -60,17 +58,16 @@ pub trait GuiSelectHandel: Send {
 ///
 /// 包含已认证的账户信息，以及可能存在的多角色选择列表。
 pub struct LegacyLoginRes {
-    /// 选中的账户（或仅有令牌的临时账户，等待角色选择）
+    /// 选中的账户；仅有令牌的临时账户表示还在等用户选角色
     pub auth: LoginObj,
-    /// 可选的账户列表（当服务器返回多个角色时为 `Some`）
+    /// 可选的账户列表，服务器返回多个角色时为 `Some`
     pub logins: Option<Vec<LoginObj>>,
 }
 
 /// 把 Yggdrasil 服务器的 HTTP 错误响应转成可读的登录失败原因
 ///
-/// 服务器拒绝时（密码错误等）返回 403/400 + JSON body（含 errorMessage，一般已本地化），
-/// 默认的 HttpError 会把整段 JSON 原文透给界面，这里解析出 errorMessage 单独透出；
-/// body 不是合法的 Yggdrasil 错误结构时保持原错误
+/// 服务器拒绝时返回 403/400 + JSON body，含一般已本地化的 errorMessage，
+/// 直接透原文对用户没用；body 不是合法 Yggdrasil 错误结构时保持原错误
 fn map_auth_error(err: ErrorType) -> ErrorType {
     let ErrorType::HttpError(data) = &err else {
         return err;
@@ -86,15 +83,16 @@ fn map_auth_error(err: ErrorType) -> ErrorType {
 /// 向 Yggdrasil 认证服务器发起登录请求
 ///
 /// 旧版认证协议的通用登录实现，被外置登录、皮肤站和统一通行证共用。
-/// 成功时返回 [`LegacyLoginRes`]（多角色时带可选列表），无角色时返回错误
 ///
-/// # 参数
-///
-/// - `server`: 认证服务器地址（完整 URL）
+/// - `server`: 认证服务器地址，完整 URL
 /// - `client_token`: 客户端标识令牌
-/// - `user`: 用户名（通常是邮箱）
+/// - `user`: 用户名，通常是邮箱
 /// - `password`: 密码
 /// - `use_minecraft`: 是否使用 Minecraft 官方启动器的 Agent 标识
+///
+/// # 返回值
+///
+/// 成功时返回 [`LegacyLoginRes`]，多角色时带可选列表；服务器未给出任何角色时返回错误
 pub async fn authenticate(
     server: &String,
     client_token: String,
@@ -181,18 +179,16 @@ pub async fn authenticate(
     }
 }
 
-/// 刷新 Yggdrasil 认证令牌（提交现有 access token 换取新令牌）。
+/// 刷新 Yggdrasil 认证令牌，提交现有 access token 换取新令牌。
 /// `select` 为 `true` 时附带选定角色；成功后更新 `login` 的账户字段
 ///
-/// # 参数
-///
 /// - `server`: 认证服务器地址
-/// - `login`: 待刷新的账户（可变引用，成功后字段会被更新）
-/// - `select`: 是否需要在刷新时选定角色（`true` 时附带 `selected_profile`）
+/// - `login`: 待刷新的账户，可变引用，成功后字段会被更新
+/// - `select`: 是否需要在刷新时选定角色，`true` 时附带 `selected_profile`
 ///
 /// # 返回值
 ///
-/// 刷新成功返回 `Ok(())`（`login` 的字段已被更新），服务器返回错误或无角色时返回相应错误
+/// 刷新成功返回 `Ok(())`，此时 `login` 的字段已被更新；服务器返回错误或无角色时返回相应错误
 pub async fn refresh(server: &String, login: &mut LoginObj, select: bool) -> CoreResult<()> {
     let obj = if select {
         RefreshObj {
@@ -248,9 +244,7 @@ pub async fn refresh(server: &String, login: &mut LoginObj, select: bool) -> Cor
     }
 }
 
-/// 验证 Yggdrasil 令牌是否仍然有效（仅检查，不刷新）
-///
-/// # 参数
+/// 验证 Yggdrasil 令牌是否仍然有效，仅检查，不刷新
 ///
 /// - `server`: 认证服务器地址
 /// - `login`: 待验证的账户

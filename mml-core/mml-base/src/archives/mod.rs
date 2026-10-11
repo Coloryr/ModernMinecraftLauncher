@@ -294,7 +294,7 @@ fn normalize_path(path: &Path) -> String {
 /// 检查路径是否匹配任一排除规则
 ///
 /// - `path`: 待检查的文件路径
-/// - `patterns`: 排除规则（子串匹配）
+/// - `patterns`: 排除规则，按子串匹配
 fn should_exclude(path: &Path, patterns: &[String]) -> bool {
     let normalized_path = normalize_path(path);
     patterns.iter().any(|pattern| {

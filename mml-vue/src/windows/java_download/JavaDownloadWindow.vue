@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Java 下载窗口：搜索源（Adoptium / Zulu / OpenJ9 / Foojay）+
+// Java 下载窗口：搜索源 Adoptium / Zulu / OpenJ9 / Foojay +
 // 发行类型 / 主版本 / 系统 / 架构 四个下拉筛选拟下载的 Java
 //
 // 链路：java_download_get_options(source) 取四个下拉的候选 →
@@ -21,6 +21,7 @@ import {
 import { isTauri } from "../windowManager";
 import { detectOs } from "../../lib/titlebar";
 
+/** 请求关闭本窗口 */
 defineEmits<{ (e: "close"): void }>();
 
 const inTauri = isTauri();
@@ -39,12 +40,13 @@ const arch = ref("");
 const items = ref<JavaDownloadItemDto[]>([]);
 const listLoading = ref(false);
 
-/** 本机架构（探不出来为 null，回落到选第一项） */
+/** 本机架构：探不出来为 null，回落到选第一项 */
 type PlatformArch = "x86_64" | "x86" | "aarch64" | "arm" | null;
 
+/** 探测本机 CPU 架构 */
 async function detectArch(): Promise<PlatformArch> {
-  // Chromium 的 userAgentData 能给出真实架构（Windows ARM 的 UA 仍伪装成 x64，
-  // 所以不能只靠 UA）；WebView2 支持，浏览器预览也大多支持
+  // Chromium 的 userAgentData 能给出真实架构：Windows ARM 的 UA 仍伪装成 x64，
+  // 所以不能只靠 UA；WebView2 支持，浏览器预览也大多支持
   const uad = (
     navigator as unknown as {
       userAgentData?: { getHighEntropyValues?: (keys: string[]) => Promise<{ architecture?: string; bitness?: string }> };
@@ -76,7 +78,7 @@ const ARCH_CANDIDATES: Record<Exclude<PlatformArch, null>, string[]> = {
   aarch64: ["aarch64", "arm64"],
   arm: ["arm", "aarch32", "arm32"],
 };
-/** 各系统在候选列表里的名字（detectOs() → 各源写法） */
+/** 各系统在候选列表里的名字：键是 detectOs() 的结果，值是各源写法 */
 const OS_CANDIDATES: Record<string, string[]> = {
   windows: ["windows"],
   macos: ["macos", "mac"],
@@ -93,7 +95,7 @@ function pickMatch(list: string[], candidates: string[]): string | null {
   return null;
 }
 
-/** 拉下载源并加载其选项（首次挂载与切回本窗口都走这里；保留用户已选的源） */
+/** 拉下载源并加载其选项：首次挂载与切回本窗口都走这里，保留用户已选的源 */
 async function loadSources() {
   if (!inTauri) return;
   try {
@@ -113,6 +115,7 @@ onMounted(loadSources);
 // 单窗口模式：窗口被 KeepAlive 缓存，切回不会重新挂载 → 自己补一次
 useWindowRefresh(loadSources);
 
+/** 拉当前源的四个下拉候选，并默认选本机对应的系统与架构 */
 async function loadOptions() {
   if (!source.value) return;
   optionsLoading.value = true;
@@ -141,7 +144,7 @@ async function loadOptions() {
 /** 正在下载的项（uuid），同一时间只允许一个 */
 const starting = ref<string | null>(null);
 
-/** 下载选中的包（后端按 uuid 取缓存里的下载信息） */
+/** 下载选中的包：后端按 uuid 取缓存里的下载信息 */
 async function startDownload(uuid: string) {
   if (starting.value) return;
   starting.value = uuid;

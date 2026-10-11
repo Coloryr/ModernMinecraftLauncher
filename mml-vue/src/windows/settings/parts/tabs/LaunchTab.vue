@@ -1,8 +1,8 @@
 <script setup lang="ts">
-// 设置窗口 · 游戏启动标签（游戏窗口 / 内存 / JVM / 游戏参数 / 启动命令）
+// 设置窗口 · 游戏启动标签：游戏窗口 / 内存 / JVM / 游戏参数 / 启动命令
 //
 // 内存冲突即最小 > 最大时，把两个步进器标红并给出提示，保存也会被拦住，见 useSettingsLaunch；
-// 冲突出现时把焦点落到"要改小"的最小内存上（NumberStepper 的输入框在组件内部，取 $el 里的 input）。
+// 冲突出现时把焦点落到"要改小"的最小内存上；NumberStepper 的输入框在组件内部，取 $el 里的 input。
 import { nextTick, ref, watch } from "vue";
 import { t } from "../../../../lib/i18n";
 import { COMMON_MEMORY, COMMON_RESOLUTIONS } from "../../../../lib/resolutions";
@@ -16,7 +16,9 @@ import SaveStateText from "../SaveStateText.vue";
 import type { useSettingsLaunch } from "../../composables/useSettingsLaunch";
 
 const props = defineProps<{
+  /** 游戏启动标签的状态与保存方法，来自 useSettingsLaunch */
   settings: ReturnType<typeof useSettingsLaunch>;
+  /** 需要高亮脉冲的分组 id（搜索命中） */
   flashGroup?: string;
 }>();
 
@@ -33,7 +35,7 @@ const {
   saveState,
 } = props.settings;
 
-/** 本机内存参考值（与实例设置的启动参数共用同一份逻辑） */
+/** 本机内存参考值，与实例设置的启动参数共用同一份逻辑 */
 const { text: memoryText } = useSystemMemory();
 
 /** 预设按钮上的文字：整数 GB 显示 `8 GB`，否则按 MB 显示 */
@@ -43,7 +45,7 @@ function memoryLabel(mib: number): string {
 
 /** 应用一个内存预设：填最大内存；最小内存高于它时一并顶上去 */
 function applyMemory(mib: number) {
-  // run 在设置加载完成前可能为空（模板用 v-if="run && win" 挡住渲染）
+  // run 在设置加载完成前可能为空；模板用 v-if="run && win" 挡住渲染
   if (!run.value) return;
   run.value.maxMemory = mib;
   if (run.value.minMemory > mib) run.value.minMemory = mib;
@@ -97,7 +99,7 @@ watch(memoryConflict, async (bad) => {
           <NumberStepper v-model="run!.maxMemory" :min="256" :max="65536" :step="256" />
         </div>
       </div>
-      <!-- 本机内存参考值：给设最大内存一个依据（始终占一行，拿不到会写明原因） -->
+      <!-- 本机内存参考值：给设最大内存一个依据；始终占一行，拿不到会写明原因 -->
       <p class="mem-hint">{{ memoryText }}</p>
       <!-- 常用内存：一点即填「最大内存」（当前值匹配时高亮）。
            最小内存跟着顶上去，免得点了预设反而触发"最小 > 最大"的冲突 -->

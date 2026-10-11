@@ -1,4 +1,4 @@
-//! 系统打开操作（浏览器 / 资源管理器 / 默认程序）
+//! 系统打开操作：浏览器 / 资源管理器 / 默认程序
 
 use std::path::Path;
 use std::process::Command;
@@ -11,6 +11,7 @@ pub fn open_url(url: &str) {
     open_url_inner(url);
 }
 
+/// Windows 实现：用 cmd start 打开网址
 #[cfg(target_os = "windows")]
 fn open_url_inner(url: &str) {
     Command::new("cmd")
@@ -19,17 +20,19 @@ fn open_url_inner(url: &str) {
         .unwrap();
 }
 
+/// Linux 实现：用 xdg-open 打开网址
 #[cfg(target_os = "linux")]
 fn open_url_inner(url: &str) {
     Command::new("xdg-open").arg(url).spawn().unwrap();
 }
 
+/// macOS 实现：用 open 打开网址
 #[cfg(target_os = "macos")]
 fn open_url_inner(url: &str) {
     Command::new("open").arg(url).spawn().unwrap();
 }
 
-/// 在资源管理器打开文件（定位并选中该文件）
+/// 在资源管理器打开文件并选中该文件
 ///
 /// - `path`: 目标文件路径
 #[inline(always)]
@@ -37,6 +40,7 @@ pub fn open_file_with_explorer<P: AsRef<Path>>(path: P) {
     open_file_with_explorer_inner(path);
 }
 
+/// Windows 实现：用 Shell COM 打开父目录并选中该文件
 #[cfg(target_os = "windows")]
 fn open_file_with_explorer_inner<P: AsRef<Path>>(path: P) {
     unsafe {
@@ -63,6 +67,7 @@ fn open_file_with_explorer_inner<P: AsRef<Path>>(path: P) {
     }
 }
 
+/// macOS 实现：用 open -R 在 Finder 中选中该文件
 #[cfg(target_os = "macos")]
 fn open_file_with_explorer_inner<P: AsRef<Path>>(path: P) {
     Command::new("open")
@@ -79,12 +84,12 @@ pub fn open_file<P: AsRef<Path>>(path: P) {
     open_url_inner(&path.as_ref().to_string_lossy());
 }
 
-/// 在文件管理器中打开并选中指定的文件或文件夹（Linux 实现）
+/// 在文件管理器中打开并选中指定的文件或文件夹，仅 Linux
 ///
 /// 模仿 opener::reveal 的行为：
 /// - 优先通过 D-Bus 调用 FileManager1.ShowItems 实现精确选中。
-/// - 若不可用，尝试 OpenURI 接口（通常只打开文件夹）。
-/// - 最后回退到 `xdg-open` 打开父目录（不会选中目标）。
+/// - 若不可用，尝试 OpenURI 接口，通常只打开文件夹。
+/// - 最后回退到 `xdg-open` 打开父目录，不会选中目标。
 #[cfg(target_os = "linux")]
 fn open_file_with_explorer_inner<P: AsRef<Path>>(path: P) {
     let abs_path = Path::new(path.as_ref()).canonicalize()?;
@@ -122,7 +127,7 @@ fn try_dbus_filemanager1(path: &str) -> Result<(), Box<dyn std::error::Error>> {
         std::time::Duration::from_millis(5000),
     );
 
-    // 构造参数：字符串数组 (要选中的 URI 列表) + 启动目录 (空字符串)
+    // 构造参数：要选中的 URI 列表 + 启动目录，启动目录传空字符串
     let items: Vec<&str> = vec![&uri];
     let startup_dir = "";
     let (): () = proxy.method_call(
@@ -133,7 +138,7 @@ fn try_dbus_filemanager1(path: &str) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// 通过 `org.freedesktop.portal.OpenURI` 接口打开（可能不选中）
+/// 通过 `org.freedesktop.portal.OpenURI` 接口打开，可能不选中
 #[cfg(target_os = "linux")]
 fn try_dbus_openuri(path: &str) -> Result<(), Box<dyn std::error::Error>> {
     use dbus::{BusType, Connection, Message, Path as DbusPath};
@@ -149,7 +154,7 @@ fn try_dbus_openuri(path: &str) -> Result<(), Box<dyn std::error::Error>> {
         std::time::Duration::from_millis(5000),
     );
 
-    // 参数：父窗口句柄 (0)，URI，选项 (空字典)
+    // 参数：父窗口句柄传 0，URI，选项传空字典
     let parent_window = "";
     let options: std::collections::HashMap<&str, &str> = std::collections::HashMap::new();
     let (): () = proxy.method_call(
@@ -160,7 +165,7 @@ fn try_dbus_openuri(path: &str) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// 将本地路径转换为 file:// URI（使用 url crate 自动处理特殊字符）
+/// 将本地路径转换为 file:// URI，用 url crate 自动处理特殊字符
 #[cfg(target_os = "linux")]
 fn url_to_file_uri(path: &str) -> Result<String, Box<dyn std::error::Error>> {
     use url::Url;

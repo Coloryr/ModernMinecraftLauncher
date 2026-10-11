@@ -1,6 +1,6 @@
-//! GPU 渲染后端（wgpu）：离屏渲染 0..1 模型空间 quad -> RGBA 读回
+//! GPU 渲染后端 wgpu：离屏渲染 0..1 模型空间 quad 并读回 RGBA
 //!
-//! 后端回退链 DX12 → VK → GL（无可用适配器时由调用方回退 CPU skia 路径）。
+//! 后端回退链 DX12 → VK → GL；全部不可用时由调用方报错，不再有 CPU skia 回退。
 //! 变换链与光照公式照 26.3 反编译语义：
 //! M = T(slot/2) · S(slot,-slot,slot) · Tt · Rx·Ry·Rz · Ss · T(-0.5)
 //! 光照：accum = min(1, (max(0,dot(L0,N)) + max(0,dot(L1,N))) · 0.6 + 0.4)
@@ -13,31 +13,40 @@ use tiny_skia::Pixmap;
 
 use crate::model::BakedModel;
 
-/// 渲染 shader（cutout/translucent 两个片元入口）
+/// 渲染 shader，含 cutout 与 translucent 两个片元入口
 const WGSL: &str = include_str!("gpu_render.wgsl");
 
-/// uniform 布局（mat4x2 + 两个光向量）
+/// uniform 布局：mat4x2 加两个光向量
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Uniforms {
+    /// 模型视图投影矩阵，含正交投影与深度反向映射
     mvp: [[f32; 4]; 4],
+    /// 法线矩阵，取模型矩阵的逆转置
     normal_mat: [[f32; 4]; 4],
+    /// 第一条方向光，xyz 为单位方向向量、w 为 0
     light0: [f32; 4],
+    /// 第二条方向光，xyz 为单位方向向量、w 为 0
     light1: [f32; 4],
 }
 
-/// 顶点布局（pos/uv/normal/color/fullbright，52字节）
+/// 顶点布局：pos、uv、normal、color、fullbright，共 52 字节
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct GpuVertex {
+    /// 模型空间位置
     pos: [f32; 3],
+    /// 贴图坐标
     uv: [f32; 2],
+    /// 模型空间法线
     normal: [f32; 3],
+    /// 顶点颜色，RGBA
     color: [f32; 4],
-    /// 1.0=自发光（火焰），不做方向光衰减
+    /// 取 1.0 表示自发光，如火焰，不做方向光衰减
     fullbright: f32,
 }
 
+/// 顶点缓冲布局，偏移与 [`GpuVertex`] 的字段一一对应
 const VERTEX_LAYOUT: wgpu::VertexBufferLayout<'static> = wgpu::VertexBufferLayout {
     array_stride: std::mem::size_of::<GpuVertex>() as u64,
     step_mode: wgpu::VertexStepMode::Vertex,
@@ -70,31 +79,31 @@ const VERTEX_LAYOUT: wgpu::VertexBufferLayout<'static> = wgpu::VertexBufferLayou
     ],
 };
 
-/// wgpu 渲染上下文（离屏管线 + 采样器）
+/// wgpu 渲染上下文：离屏管线与采样器
 pub struct GpuCtx {
     /// 逻辑设备
     device: wgpu::Device,
     /// 命令队列
     queue: wgpu::Queue,
-    /// 不透明 / cutout 管线（深度写入、背面剔除）
+    /// 不透明与 cutout 管线，深度写入并背面剔除
     pipeline_cutout: wgpu::RenderPipeline,
-    /// 半透明管线（SrcAlpha 混合、深度只读）
+    /// 半透明管线，SrcAlpha 混合且深度只读
     pipeline_translucent: wgpu::RenderPipeline,
-    /// glint（附魔光效）管线：depth EQUAL、加色混合、无背面剔除
+    /// glint 附魔光效管线：depth EQUAL、加色混合、无背面剔除
     pipeline_glint: wgpu::RenderPipeline,
-    /// glint 贴图 REPEAT 采样器（光纹平铺）
+    /// glint 贴图 REPEAT 采样器，用于光纹平铺
     sampler_repeat: wgpu::Sampler,
-    /// 共用绑定组布局（uniform + sampler + texture）
+    /// 共用绑定组布局：uniform、sampler 与 texture
     bind_layout: wgpu::BindGroupLayout,
-    /// 贴图 NEAREST 采样器（ClampToEdge）
+    /// 贴图 NEAREST 采样器，ClampToEdge
     sampler: wgpu::Sampler,
 }
 
 impl GpuCtx {
-    /// 按系统选择后端回退链，全失败返回 None（图标渲染不再有 CPU 回退）：
-    /// - Windows：DX12 → VK → GL
-    /// - macOS：Metal → VK → GL
-    /// - Linux/其他Unix：VK → GL
+    /// 按系统选择后端回退链，全失败返回 `None`
+    ///
+    /// 回退链按平台：Windows 为 DX12 → VK → GL，macOS 为 Metal → VK → GL，
+    /// Linux 等 Unix 为 VK → GL；图标渲染没有 CPU 回退
     ///
     /// # 返回值
     ///
@@ -108,6 +117,7 @@ impl GpuCtx {
         ]))
     }
 
+    /// macOS 上的后端回退链：Metal → VK → GL
     #[cfg(target_os = "macos")]
     pub fn try_new() -> Option<GpuCtx> {
         block_on(Self::try_new_async(&[
@@ -117,6 +127,7 @@ impl GpuCtx {
         ]))
     }
 
+    /// Linux 等 Unix 上的后端回退链：VK → GL
     #[cfg(all(unix, not(target_os = "macos")))]
     pub fn try_new() -> Option<GpuCtx> {
         block_on(Self::try_new_async(&[
@@ -125,14 +136,15 @@ impl GpuCtx {
         ]))
     }
 
+    /// 其它平台上的后端回退链：GL
     #[cfg(not(any(windows, unix)))]
     pub fn try_new() -> Option<GpuCtx> {
         block_on(Self::try_new_async(&[("GL", wgpu::Backends::GL)]))
     }
 
-    /// 指定单一后端初始化（测试/调试用）
+    /// 指定单一后端初始化，测试与调试用
     ///
-    /// - `name`: 后端显示名（日志用）
+    /// - `name`: 后端显示名，日志用
     /// - `backends`: wgpu 后端位
     ///
     /// # 返回值
@@ -142,9 +154,9 @@ impl GpuCtx {
         block_on(Self::try_new_async(&[(name, backends)]))
     }
 
-    /// 按回退链逐个尝试初始化（独显优先）
+    /// 按回退链逐个尝试初始化，独显优先
     ///
-    /// - `chain`: 回退链（显示名 → wgpu 后端位，按优先级排列）
+    /// - `chain`: 回退链，每项为显示名与 wgpu 后端位，按优先级排列
     ///
     /// # 返回值
     ///
@@ -155,8 +167,8 @@ impl GpuCtx {
             desc.backends = *backends;
             let instance = wgpu::Instance::new(desc);
 
-            // 独显优先：枚举适配器按 独显→其余 排序（离屏渲染无需管是否主显卡），
-            // 逐个尝试建设备，建不成再退下一个适配器/后端
+            // 独显优先：枚举适配器按独显→其余排序，离屏渲染无需管是否主显卡
+            // 逐个尝试建设备，建不成再退下一个适配器或后端
             let mut adapters = instance.enumerate_adapters(*backends).await;
             adapters.sort_by_key(|a| match a.get_info().device_type {
                 wgpu::DeviceType::DiscreteGpu => 0,
@@ -187,7 +199,7 @@ impl GpuCtx {
         None
     }
 
-    /// 创建着色器与三条渲染管线（cutout / translucent / glint）
+    /// 创建着色器与三条渲染管线：cutout、translucent、glint
     ///
     /// - `device`: 逻辑设备
     /// - `queue`: 命令队列
@@ -246,7 +258,7 @@ impl GpuCtx {
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
         };
-        // glint 用 depth EQUAL（只画物品已写像素）、不写深度
+        // glint 用 depth EQUAL 只画物品已写像素，且不写深度
         let depth_eq = wgpu::DepthStencilState {
             format: wgpu::TextureFormat::Depth32Float,
             depth_write_enabled: Some(false),
@@ -300,8 +312,8 @@ impl GpuCtx {
             ..depth.clone()
         };
         let pipeline_cutout = mk_pipeline(None, depth.clone(), Some(wgpu::Face::Back), "fs_cutout");
-        // 半透明：Straight-alpha 混合（color SrcAlpha/1-SrcAlpha，alpha One/1-One），
-        // 读回后按 premultiplied 语义反除回 straight（与 skia 离屏结果一致）
+        // 半透明用 Straight-alpha 混合，color 为 SrcAlpha/1-SrcAlpha、alpha 为 One/1-One
+        // 读回后按 premultiplied 语义反除回 straight，与 skia 离屏结果一致
         let pipeline_translucent = mk_pipeline(
             Some(wgpu::BlendState {
                 color: wgpu::BlendComponent {
@@ -320,7 +332,7 @@ impl GpuCtx {
             "fs_translucent",
         );
 
-        // glint：depth EQUAL 限定物品已写像素、无剔除、加色混合（alpha通道保持目标值）
+        // glint：depth EQUAL 限定物品已写像素，无剔除，加色混合且 alpha 通道保持目标值
         let pipeline_glint = mk_pipeline(
             Some(wgpu::BlendState {
                 color: wgpu::BlendComponent {
@@ -350,7 +362,7 @@ impl GpuCtx {
             ..Default::default()
         });
 
-        // glint 光纹平铺需要 REPEAT 采样（uv×8旋转后越界）
+        // glint 光纹平铺需要 REPEAT 采样：uv×8 旋转后会越界
         let sampler_repeat = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("mml-tex-draw-repeat"),
             mag_filter: wgpu::FilterMode::Nearest,
@@ -375,7 +387,7 @@ impl GpuCtx {
     }
 }
 
-/// gui display 变换矩阵（照 ItemTransform.apply：translate·rotationXYZ·scale·translate(-0.5)）
+/// gui display 变换矩阵，照 ItemTransform.apply：translate·rotationXYZ·scale·translate(-0.5)
 ///
 /// - `t`: gui display 变换参数
 ///
@@ -392,13 +404,13 @@ pub fn item_transform_matrix(t: &crate::model::GuiTransform) -> Mat4 {
         * Mat4::from_translation(Vec3::new(-0.5, -0.5, -0.5))
 }
 
-/// 光照方向（照 Lighting.java：ITEMS_3D / ITEMS_FLAT 两个UBO槽位）
+/// 光照方向，照 Lighting.java 的 ITEMS_3D 与 ITEMS_FLAT 两个 UBO 槽位
 ///
-/// - `item3d`: true=ITEMS_3D（gui_light=side），false=ITEMS_FLAT（gui_light=front）
+/// - `item3d`: true 取 ITEMS_3D，gui_light 为 side；false 取 ITEMS_FLAT，gui_light 为 front
 ///
 /// # 返回值
 ///
-/// 返回（light0，light1）两条方向光（xyz=方向单位向量，w=0）
+/// 返回 light0 与 light1 两条方向光，xyz 为方向单位向量、w 为 0
 pub fn light_dirs(item3d: bool) -> ([f32; 4], [f32; 4]) {
     let l0 = Vec3::new(0.2, 1.0, -0.7).normalize();
     let l1 = Vec3::new(-0.2, 1.0, 0.7).normalize();
@@ -425,10 +437,10 @@ pub fn light_dirs(item3d: bool) -> ([f32; 4], [f32; 4]) {
 impl GpuCtx {
     /// 渲染一个烘焙模型到 size×size RGBA
     ///
-    /// - `model`: 烘焙后的模型（quad 列表 + gui 变换）
-    /// - `textures`: 模型用到的贴图（路径 → 解码位图，缺贴图视为失败）
-    /// - `glint`: Some(贴图)时在物品像素上叠加附魔光效（REPEAT采样、加色混合）
-    /// - `size`: 输出边长（像素）
+    /// - `model`: 烘焙后的模型，含 quad 列表与 gui 变换
+    /// - `textures`: 模型用到的贴图，路径 → 解码位图，缺贴图视为失败
+    /// - `glint`: 为 Some 时在物品像素上叠加附魔光效，REPEAT 采样并加色混合
+    /// - `size`: 输出边长，单位像素
     ///
     /// # 返回值
     ///
@@ -444,9 +456,8 @@ impl GpuCtx {
 
         let slot = size as f32;
 
-        // 完整变换链 + 正交投影（NDC z∈[0,1]）。注意：屏幕像素空间里离观察者越近
-        // 像素z越大，深度需反向映射（z_ndc = 0.5 - z_pix/2000，近处深度小），
-        // 否则LessEqual深度测试永远保留最远的面，效果如同未开深度测试：
+        // 完整变换链 + 正交投影，NDC z∈[0,1]；屏幕像素空间里离观察者越近像素 z 越大，
+        // 深度需反向映射 z_ndc = 0.5 - z_pix/2000，否则 LessEqual 会永远保留最远的面
         // MVP = P · T(slot/2) · S(slot,-slot,slot) · Tt·R·Ss·T(-0.5)
         let model_m = Mat4::from_translation(Vec3::new(slot / 2.0, slot / 2.0, 0.0))
             * Mat4::from_scale(Vec3::new(slot, -slot, slot))
@@ -470,7 +481,7 @@ impl GpuCtx {
             1.0,
         ]) * model_m;
 
-        // 法线矩阵 = 逆转置（逐顶点归一化，等价MC normal matrix + trustedNormals规则）
+        // 法线矩阵取逆转置，逐顶点归一化，等价 MC 的 normal matrix 与 trustedNormals 规则
         let n3 = Mat3::from_mat4(model_m).inverse().transpose();
 
         let (light0, light1) = light_dirs(model.gui_light_3d);
@@ -493,7 +504,7 @@ impl GpuCtx {
                 usage: wgpu::BufferUsages::UNIFORM,
             });
 
-        // 按贴图分组、组内每quad 6顶点（0,1,2,0,2,3）
+        // 按贴图分组，组内每个 quad 6 个顶点，索引为 0,1,2,0,2,3
         let mut groups: Vec<(String, Vec<GpuVertex>)> = Vec::new();
         let mut lookup: HashMap<String, usize> = HashMap::new();
         for quad in &model.quads {
@@ -517,8 +528,8 @@ impl GpuCtx {
             }
         }
 
-        // 半透明组内quad按中心z从小到大排（远→近，配合深度只读的LessEqual；
-        // 屏幕像素z越大越近，远=小z先画）
+        // 半透明组内 quad 按中心 z 从小到大排，远→近，配合深度只读的 LessEqual
+        // 屏幕像素 z 越大越近，远的先画
         let mut pass_groups: Vec<(String, wgpu::Buffer, u32, bool)> = Vec::new();
         for (tex_path, verts) in groups {
             if verts.is_empty() {
@@ -548,7 +559,7 @@ impl GpuCtx {
             pass_groups.push((tex_path, vbuf, verts.len() as u32, translucent));
         }
 
-        // 上传贴图（Bitmap为premul，转straight后建绑定组）
+        // 上传贴图：Bitmap 为 premul，转 straight 后建绑定组
         let mut binds: HashMap<String, wgpu::BindGroup> = HashMap::new();
         let mut views: Vec<(String, wgpu::Texture)> = Vec::new();
         for (tex_path, ..) in &pass_groups {
@@ -558,7 +569,7 @@ impl GpuCtx {
             let Some(tex) = textures.get(tex_path) else {
                 return None;
             };
-            // read_pixels 顺带完成 premul->straight（jar内贴图为straight alpha）
+            // read_pixels 顺带完成 premul 转 straight，jar 内贴图本身是 straight alpha
             let Some((rgba, stride, w, h)) = crate::model::bitmap_rgba(tex) else {
                 return None;
             };
@@ -619,7 +630,7 @@ impl GpuCtx {
             binds.insert(tex_path.clone(), bind);
         }
 
-        // glint 贴图上传 + 绑定组（REPEAT 采样）；无glint时为None并继续正常渲染
+        // glint 贴图上传与绑定组用 REPEAT 采样；无 glint 时为 None 并继续正常渲染
         let glint_bind = glint.map_or(None, |glint_tex| {
             let Some((rgba, stride, w, h)) = crate::model::bitmap_rgba(glint_tex) else {
                 return None;
@@ -742,7 +753,7 @@ impl GpuCtx {
                 multiview_mask: None,
             });
 
-            // 先不透明/cutout（深度写入），后半透明（深度只读）
+            // 先画不透明与 cutout，深度写入；再画半透明，深度只读
             for (tex_path, vbuf, count, translucent) in &pass_groups {
                 let bind = binds.get(tex_path)?;
                 pass.set_bind_group(0, bind, &[]);
@@ -755,7 +766,7 @@ impl GpuCtx {
                 pass.draw(0..*count, 0..1);
             }
 
-            // glint：整模型quad按depth EQUAL加色重画（物品像素上叠加光纹）
+            // glint：整模型 quad 按 depth EQUAL 加色重画，在物品像素上叠加光纹
             if let Some(bind) = &glint_bind {
                 pass.set_pipeline(&self.pipeline_glint);
                 pass.set_bind_group(0, bind, &[]);
@@ -766,7 +777,7 @@ impl GpuCtx {
             }
         }
 
-        // 读回（拷贝到对齐缓冲）
+        // 读回，拷贝到对齐缓冲
         let bytes_per_row = size * 4;
         let read_buf = self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("readback"),
@@ -800,7 +811,7 @@ impl GpuCtx {
             return None;
         }
 
-        // 离屏混合为premultiplied语义，反除回straight（透明背景PNG）
+        // 离屏混合为 premultiplied 语义，反除回 straight，得到透明背景 PNG
         let mut out = vec![0u8; data.len()];
         for (dst, src) in out.chunks_exact_mut(4).zip(data.chunks_exact(4)) {
             let a = src[3];

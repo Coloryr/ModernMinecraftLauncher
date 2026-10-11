@@ -1,26 +1,27 @@
 // 资源管理窗口的视图偏好：左侧分类顺序 / 上次打开的类别 / 模组展示方式 / 表格列宽
 //
-// **存在实例自己的 `gui_setting.json` 里**（`Gui` 字段，见后端 `gui_setting::GameViewSettingObj`），
+// **存在实例自己的 `gui_setting.json` 里**，即 `Gui` 字段，见后端 `gui_setting::GameViewSettingObj`。
 // 不走前端本地存储：这几项都是"这个实例我习惯怎么看"，换个实例就该换一套 ——
 // 本地存储是每台机器一份，切实例时顺序不变反而奇怪。
 //
 // 与模组分组同一份文件、同一套读改写（load → 改这一块 → 存回），互不覆盖。
 // **排序口径与默认值全在这里**：后端只保管"一串分类 id"与"一串列宽键值对"，
-// 不认识有哪几个分类、有哪几列（新增分类 / 新增列时只改前端）。
+// 不认识有哪几个分类、有哪几列，新增分类 / 新增列时只改前端。
 import { ref } from "vue";
 import { getResourceView, setResourceView } from "../../../lib/api";
 import { defaultColWidths, normalizeColWidths, type ModSort } from "../modColumns";
 import { RESOURCE_CATEGORIES, type CategoryId, type ModView } from "../types";
 import type { useResourceData } from "./useResourceData";
 
+/** 实例里存的那份视图偏好 */
 interface ViewPref {
-  /** 左侧分类的顺序（用户拖出来的；只认已知分类，新增分类自动补在末尾） */
+  /** 左侧分类的顺序，用户拖出来的；只认已知分类，新增分类自动补在末尾 */
   order: string[];
   /** 上次打开的类别 */
   category: string;
   /** 模组的展示方式：列表 / 表格 */
   modView: string;
-  /** 表格视图的列宽（列 key → 像素宽） */
+  /** 表格视图的列宽，列 key → 像素宽 */
   modColWidths: Record<string, number>;
 }
 
@@ -60,16 +61,35 @@ function normalizeOrder(saved: unknown): CategoryId[] {
  */
 const DEFAULT_CATEGORY: CategoryId = "mods";
 
+/**
+ * 资源管理窗口的视图偏好
+ *
+ * - `data`: 数据层，只为拿 `instanceUuid`；偏好按实例各存一份
+ *
+ * # 返回值
+ *
+ * - `order`: 左侧分类的显示顺序，拖一下就写回实例
+ * - `initialCategory`: 上次打开的分类，外壳据此决定进哪个面板
+ * - `modView`: 模组的展示方式
+ * - `colWidths`: 表格视图的列宽
+ * - `sort`: 表格的表头排序，不落盘
+ * - `load`: 读该实例的偏好
+ * - `rememberCategory`: 记住这次打开的分类并写回
+ * - `setOrder`: 记下拖动后的分类顺序并写回
+ * - `setModView`: 切换模组展示方式并写回
+ * - `setColWidth`: 记下某一列的宽度，落盘防抖 400ms
+ * - `setSort`: 记下表头排序，只改内存
+ */
 export function useResourceView(data: ReturnType<typeof useResourceData>) {
   const { instanceUuid } = data;
 
-  /** 左侧分类的显示顺序（拖一下就会写回实例的 gui_setting.json） */
+  /** 左侧分类的显示顺序，拖一下就会写回实例的 gui_setting.json */
   const order = ref<CategoryId[]>(normalizeOrder([]));
-  /** 上次打开的类别（没有记录时用 [`DEFAULT_CATEGORY`]） */
+  /** 上次打开的类别，没有记录时用 `DEFAULT_CATEGORY` */
   const initialCategory = ref<CategoryId>(DEFAULT_CATEGORY);
-  /** 模组的展示方式（列表 / 表格 / 树） */
+  /** 模组的展示方式：列表 / 表格 */
   const modView = ref<ModView>("list");
-  /** 表格视图的列宽（列 key → 像素宽；拖动即改，落盘做了防抖） */
+  /** 表格视图的列宽，列 key → 像素宽；拖动即改，落盘做了防抖 */
   const colWidths = ref<Record<string, number>>(defaultColWidths());
   /**
    * 表格的表头排序（正序 / 倒序 / 不排序）
@@ -78,7 +98,7 @@ export function useResourceView(data: ReturnType<typeof useResourceData>) {
    * 属于临时视图状态，切实例 / 重开窗口都回到默认（modid 正序）。
    */
   const sort = ref<ModSort | null>(null);
-  /** 当前类别（保存时要一起写回，和 order 是同一份偏好） */
+  /** 当前类别；保存时要和 order 一起写回，属于同一份偏好 */
   let lastCategory: CategoryId = DEFAULT_CATEGORY;
 
   /** 拖列宽时的高频写盘节流：拖动过程只改内存，停手 400ms 才存一次 */
@@ -92,7 +112,7 @@ export function useResourceView(data: ReturnType<typeof useResourceData>) {
    */
   let loadSeq = 0;
 
-  /** 存一份到实例设置（后端整份覆盖这一块，未改的项照传） */
+  /** 存一份到实例设置；后端整份覆盖这一块，未改的项照传 */
   function save() {
     const uuid = instanceUuid.value;
     if (!uuid) return;
@@ -112,7 +132,7 @@ export function useResourceView(data: ReturnType<typeof useResourceData>) {
     ).catch(() => { });
   }
 
-  /** 读该实例的偏好（进入资源窗口 / 切换实例时调用） */
+  /** 读该实例的偏好，进入资源窗口 / 切换实例时调用 */
   async function load() {
     const uuid = instanceUuid.value;
     if (!uuid) {
@@ -137,7 +157,7 @@ export function useResourceView(data: ReturnType<typeof useResourceData>) {
 
     order.value = normalizeOrder(pref.order);
     modView.value = isModView(pref.modView) ? pref.modView : "list";
-    // 列宽：只认已知列 + 夹在合理范围（存过一半 / 存的是旧版本都能安全落地）
+    // 列宽：只认已知列 + 夹在合理范围，存过一半 / 存的是旧版本都能安全落地
     colWidths.value = normalizeColWidths(pref.modColWidths);
     // 排序是临时状态，切实例就回到默认
     sort.value = null;
@@ -165,10 +185,10 @@ export function useResourceView(data: ReturnType<typeof useResourceData>) {
   }
 
   /**
-   * 记下拖出来的列宽（拖动过程高频调用 → **存盘防抖 400ms**）
+   * 记下拖出来的列宽；拖动过程高频调用，所以**存盘防抖 400ms**
    *
    * 内存里立刻生效（表格实时跟手），落盘等停手 —— 否则一次拖动会写几十次
-   * `gui_setting.json`（后端每次都要 load → 改 → 存回整份）。
+   * `gui_setting.json`，后端每次都要 load → 改 → 存回整份。
    */
   function setColWidth(key: string, px: number) {
     colWidths.value = normalizeColWidths({ ...colWidths.value, [key]: px });
@@ -179,7 +199,7 @@ export function useResourceView(data: ReturnType<typeof useResourceData>) {
     }, 400);
   }
 
-  /** 记下表头排序（**不落盘**，见 `sort` 的说明） */
+  /** 记下表头排序；**不落盘**，见 `sort` 的说明 */
   function setSort(next: ModSort | null) {
     sort.value = next;
   }

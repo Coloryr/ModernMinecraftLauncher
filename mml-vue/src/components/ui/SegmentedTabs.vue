@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 统一分段切换控件（v-model: string），选项可带图标
+// 统一分段切换控件，配合 `v-model` 使用，值为 string；选项可带图标
 import { computed } from "vue";
 
 interface SegOption {
@@ -9,12 +9,15 @@ interface SegOption {
 }
 
 const props = defineProps<{
+  /** 可选项；`value` 为选中值，`icon` 是下面 ICONS 里的内置图标名 */
   options: SegOption[];
+  /** 当前选中值，配合 `v-model` 使用 */
   modelValue: string;
-  /** 禁用整组（加载期间锁住筛选控件用） */
+  /** 禁用整组；加载期间锁住筛选控件用 */
   disabled?: boolean;
 }>();
 
+/** `v-model` 更新：新的选中值 */
 const emit = defineEmits<{ (e: "update:modelValue", value: string): void }>();
 
 const current = computed(() => props.modelValue);

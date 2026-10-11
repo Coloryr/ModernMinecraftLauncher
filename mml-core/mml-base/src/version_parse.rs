@@ -4,16 +4,19 @@
 //! - 旧格式快照: 24w13a, 25w08a
 //! - 旧格式预发布: 1.20.4-pre1, 1.20.4-pre4
 //! - 旧格式 RC: 1.20.4-rc1
-//! - 新格式正式版: 26.1, 26.1.1 (2026年起)
+//! - 新格式正式版: 26.1, 26.1.1，2026 年起
 //! - 新格式快照: 26.1-snapshot-1
 //! - 新格式预发布: 26.1-pre-1
 //! - 新格式 RC: 26.1-rc-2
 //! - 远古版本: a1.0.16, b1.7.3, rd-160052
 
-/// 将 Minecraft 版本号转换为可比较的元组
-/// 返回 None 表示无法解析
+/// 将 Minecraft 版本号转换为可比较的整数向量，按格式依次尝试各解析分支
 ///
-/// - `version`: 版本号字符串
+/// - `version`: 版本号字符串，首尾空白会被忽略
+///
+/// # 返回值
+///
+/// 返回可比较的整数向量；所有分支都匹配不上时返回 `None`
 pub fn parse_game_version(version: &str) -> Option<Vec<i32>> {
     let v = version.trim();
 
@@ -47,7 +50,7 @@ pub fn parse_game_version(version: &str) -> Option<Vec<i32>> {
         return Some(result);
     }
 
-    // 7. 新格式正式版: 26.1, 26.1.1 (年份 >= 25)
+    // 7. 新格式正式版: 26.1, 26.1.1，年份 >= 25
     if let Some(result) = parse_new_release(v) {
         return Some(result);
     }
@@ -60,11 +63,15 @@ pub fn parse_game_version(version: &str) -> Option<Vec<i32>> {
     None
 }
 
-/// 解析旧格式正式版（标准化为三段式）
-/// "1.20"   -> [1, 20, 0]
-/// "1.20.0" -> [1, 20, 0]
-/// "1.7.10" -> [1, 7, 10]
-/// "1.21"   -> [1, 21, 0]
+/// 解析旧格式正式版并标准化为三段式 `[major, minor, patch]`
+///
+/// 例如 `1.20` 得到 `[1, 20, 0]`，`1.7.10` 得到 `[1, 7, 10]`
+///
+/// - `s`: 版本号字符串
+///
+/// # 返回值
+///
+/// 首段不是 1 或完全无法解析时返回 `None`
 fn parse_old_release(s: &str) -> Option<Vec<i32>> {
     let parts: Vec<i32> = s.split('.').filter_map(|p| p.parse().ok()).collect();
 
@@ -72,7 +79,7 @@ fn parse_old_release(s: &str) -> Option<Vec<i32>> {
         return None;
     }
 
-    // 确保是旧格式（以 1 开头）
+    // 旧格式以 1 开头
     if parts[0] != 1 {
         return None;
     }
@@ -85,8 +92,13 @@ fn parse_old_release(s: &str) -> Option<Vec<i32>> {
     Some(vec![major, minor, patch])
 }
 
-/// 解析新格式正式版: 26.1, 26.1.1
-/// 输出: [100 + year, release_num, hotfix_num]
+/// 解析新格式正式版，输出 `[100 + year, release_num, hotfix_num]`
+///
+/// - `s`: 版本号字符串
+///
+/// # 返回值
+///
+/// 不足两段或年份小于 25 时返回 `None`
 fn parse_new_release(s: &str) -> Option<Vec<i32>> {
     let parts: Vec<&str> = s.split('.').collect();
     if parts.len() < 2 {
@@ -108,7 +120,13 @@ fn parse_new_release(s: &str) -> Option<Vec<i32>> {
     Some(vec![100 + year, release_num, hotfix])
 }
 
-/// 解析新格式快照: 26.1-snapshot-11
+/// 解析新格式快照，输出 `[10, 100 + year, release_num, snapshot_num]`
+///
+/// - `s`: 版本号字符串
+///
+/// # 返回值
+///
+/// 形如 `26.1-snapshot-11` 才解析成功，其余返回 `None`
 fn parse_new_snapshot(s: &str) -> Option<Vec<i32>> {
     let parts: Vec<&str> = s.split('-').collect();
     if parts.len() != 3 {
@@ -131,11 +149,17 @@ fn parse_new_snapshot(s: &str) -> Option<Vec<i32>> {
     let release_num = base_parts[1].parse::<i32>().ok()?;
     let snapshot_num = parts[2].parse::<i32>().ok()?;
 
-    // 快照类型 = 10，确保排在正式版(100+)和预发布(30)之前
+    // 快照类型 = 10，排在预发布 30 与正式版 100+ 之前
     Some(vec![10, 100 + year, release_num, snapshot_num])
 }
 
-/// 解析新格式预发布: 26.1-pre-1
+/// 解析新格式预发布，输出 `[30, 100 + year, release_num, pre_num]`
+///
+/// - `s`: 版本号字符串
+///
+/// # 返回值
+///
+/// 形如 `26.1-pre-1` 才解析成功，其余返回 `None`
 fn parse_new_pre_release(s: &str) -> Option<Vec<i32>> {
     let parts: Vec<&str> = s.split('-').collect();
     if parts.len() != 3 {
@@ -158,11 +182,17 @@ fn parse_new_pre_release(s: &str) -> Option<Vec<i32>> {
     let release_num = base_parts[1].parse::<i32>().ok()?;
     let pre_num = parts[2].parse::<i32>().ok()?;
 
-    // 预发布类型 = 30，快照(10) < 预发布(30) < 正式版(100+)
+    // 预发布类型 = 30，排序为快照 10 < 预发布 30 < 正式版 100+
     Some(vec![30, 100 + year, release_num, pre_num])
 }
 
-/// 解析新格式 RC: 26.1-rc-2
+/// 解析新格式 RC，输出 `[20, 100 + year, release_num, rc_num]`
+///
+/// - `s`: 版本号字符串
+///
+/// # 返回值
+///
+/// 形如 `26.1-rc-2` 才解析成功，其余返回 `None`
 fn parse_new_rc(s: &str) -> Option<Vec<i32>> {
     let parts: Vec<&str> = s.split('-').collect();
     if parts.len() != 3 {
@@ -185,11 +215,17 @@ fn parse_new_rc(s: &str) -> Option<Vec<i32>> {
     let release_num = base_parts[1].parse::<i32>().ok()?;
     let rc_num = parts[2].parse::<i32>().ok()?;
 
-    // RC 类型 = 20，快照(10) < RC(20) < 预发布(30) < 正式版(100+)
+    // RC 类型 = 20，排序为快照 10 < RC 20 < 预发布 30 < 正式版 100+
     Some(vec![20, 100 + year, release_num, rc_num])
 }
 
-/// 解析旧格式快照: 24w13a
+/// 解析旧格式快照，输出 `[-10, 2000 + year, week, sub]`
+///
+/// - `s`: 版本号字符串
+///
+/// # 返回值
+///
+/// 形如 `24w13a` 才解析成功，其余返回 `None`
 fn parse_old_snapshot(s: &str) -> Option<Vec<i32>> {
     // 格式: YYwWWx
     let chars: Vec<char> = s.chars().collect();
@@ -211,11 +247,17 @@ fn parse_old_snapshot(s: &str) -> Option<Vec<i32>> {
         0
     };
 
-    // 旧快照类型 = -10，确保排在正式版(1.x)之前
+    // 旧快照类型 = -10，排在正式版 1.x 之前
     Some(vec![-10, 2000 + year, week, sub])
 }
 
-/// 解析旧格式预发布/RC: 1.20.4-pre1, 1.20.4-rc1
+/// 解析旧格式预发布与 RC，输出 `[tag, major, minor, patch, num]`
+///
+/// - `s`: 版本号字符串
+///
+/// # 返回值
+///
+/// 不含 `-pre` / `-rc` 后缀时返回 `None`
 fn parse_old_prerelease(s: &str) -> Option<Vec<i32>> {
     let (base_part, tag, num) = if let Some(idx) = s.find("-pre") {
         let base = &s[..idx];
@@ -255,7 +297,13 @@ fn parse_old_prerelease(s: &str) -> Option<Vec<i32>> {
     Some(vec![tag, major, minor, patch, num])
 }
 
-/// 解析远古版本: a1.0.16, b1.7.3, rd-160052
+/// 解析远古版本，前缀决定排序标记
+///
+/// - `s`: 版本号字符串
+///
+/// # 返回值
+///
+/// `a` 前缀得 `-30`，`b` 前缀得 `-20`，`rd-` / `inf-` 得 `-40`；其余返回 `None`
 fn parse_ancient_version(s: &str) -> Option<Vec<i32>> {
     // Alpha: a1.0.16
     if s.starts_with('a') {
@@ -296,11 +344,14 @@ fn parse_ancient_version(s: &str) -> Option<Vec<i32>> {
     None
 }
 
-/// 比较两个 Minecraft 版本号
-/// 返回 true 如果 version1 > version2
+/// 判断第一个版本号是否大于第二个
 ///
 /// - `v1`: 版本号字符串
 /// - `v2`: 版本号字符串
+///
+/// # 返回值
+///
+/// `v1` 大于 `v2` 时为 `true`；任一无法解析时返回 `false`
 pub fn is_game_version_greater(v1: &str, v2: &str) -> bool {
     let parts1 = parse_game_version(v1);
     let parts2 = parse_game_version(v2);
@@ -311,11 +362,16 @@ pub fn is_game_version_greater(v1: &str, v2: &str) -> bool {
     }
 }
 
-/// 比较两个 Minecraft 版本号
-/// 返回 true 如果 version1 == version2
+/// 判断两个版本号是否相等
+///
+/// 当前实现误用了 `p1 > p2`，实际行为与 [`is_game_version_greater`] 完全一致
 ///
 /// - `v1`: 版本号字符串
 /// - `v2`: 版本号字符串
+///
+/// # 返回值
+///
+/// 任一无法解析时返回 `false`
 pub fn is_game_version_equal(v1: &str, v2: &str) -> bool {
     let parts1 = parse_game_version(v1);
     let parts2 = parse_game_version(v2);
@@ -326,11 +382,14 @@ pub fn is_game_version_equal(v1: &str, v2: &str) -> bool {
     }
 }
 
-/// 比较两个 Minecraft 版本号
-/// 返回 true 如果 version1 >= version2
+/// 判断第一个版本号是否大于等于第二个
 ///
 /// - `v1`: 版本号字符串
 /// - `v2`: 版本号字符串
+///
+/// # 返回值
+///
+/// `v1` 不小于 `v2` 时为 `true`；任一无法解析时返回 `false`
 pub fn is_game_version_greater_equal(v1: &str, v2: &str) -> bool {
     let parts1 = parse_game_version(v1);
     let parts2 = parse_game_version(v2);
@@ -341,20 +400,35 @@ pub fn is_game_version_greater_equal(v1: &str, v2: &str) -> bool {
     }
 }
 
-/// 判断是否是 1.17 以上版本（含 1.17）
+/// 判断是否为 1.17 及以上版本
+///
 /// - `version`: 版本号字符串
+///
+/// # 返回值
+///
+/// 无法解析时返回 `false`
 pub fn is_game_version_117(version: &str) -> bool {
     is_game_version_greater_equal(version, "1.17")
 }
 
-/// 判断是否是 1.20 以上版本（含 1.20）
+/// 判断是否为 1.20 及以上版本
+///
 /// - `version`: 版本号字符串
+///
+/// # 返回值
+///
+/// 无法解析时返回 `false`
 pub fn is_game_version_120(version: &str) -> bool {
     is_game_version_greater_equal(version, "1.20")
 }
 
-/// 判断是否是 1.20.2 以上版本（含 1.20.2）
+/// 判断是否为 1.20.2 及以上版本
+///
 /// - `version`: 版本号字符串
+///
+/// # 返回值
+///
+/// 无法解析时返回 `false`
 pub fn is_game_version_1202(version: &str) -> bool {
     is_game_version_greater_equal(version, "1.20.2")
 }
@@ -373,7 +447,7 @@ mod tests {
         assert_eq!(parse_game_version(" 1.21 "), Some(vec![1, 21, 0]));
     }
 
-    /// 新格式正式版解析（2026 年起）
+    /// 新格式正式版解析，2026 年起
     #[test]
     fn test_parse_new_release() {
         assert_eq!(parse_game_version("26.1"), Some(vec![126, 1, 0]));
@@ -413,9 +487,8 @@ mod tests {
             parse_game_version("1.20.4-rc1"),
             Some(vec![-3, 1, 20, 4, 1])
         );
-        // 现状记录（疑似 bug）：pre/rc 缺编号时该分支返回 None，
-        // 随后由 parse_old_release 的 filter_map 兜底解析成正式版 1.20.0，
-        // 预发布标记被静默丢弃
+        // 现状记录，疑似 bug：pre/rc 缺编号时该分支返回 None，随后由 parse_old_release
+        // 的 filter_map 兜底解析成正式版 1.20.0，预发布标记被静默丢弃
         assert_eq!(parse_game_version("1.20.4-pre"), Some(vec![1, 20, 0]));
     }
 
@@ -452,12 +525,11 @@ mod tests {
 
     /// is_game_version_equal 的现状行为记录
     ///
-    /// 注意（bug）：当前实现复制自 is_game_version_greater（返回 `p1 > p2`），
-    /// 并未做相等判断，行为与 is_game_version_greater 完全一致。
-    /// 修复后应改为：相同版本返回真、不同版本返回假。
+    /// 当前实现复制自 is_game_version_greater 并返回 `p1 > p2`，并未做相等判断；
+    /// 修复后应改为相同版本返回真、不同版本返回假
     #[test]
     fn test_is_game_version_equal_current_behaviour() {
-        // 现状：行为与 is_game_version_greater 完全一致（p1 > p2）
+        // 现状：行为与 is_game_version_greater 完全一致，即 p1 > p2
         assert!(!is_game_version_equal("1.20", "1.20"));
         assert!(!is_game_version_equal("1.20", "1.21"));
         assert!(is_game_version_equal("1.21", "1.20"));

@@ -5,10 +5,15 @@ import { t } from "../../../lib/i18n";
 import BaseModal from "../../../components/ui/BaseModal.vue";
 import BaseButton from "../../../components/ui/BaseButton.vue";
 
-defineProps<{ name: string }>();
+defineProps<{
+  /** 刚创建成功的实例名，弹窗正文里用 */
+  name: string;
+}>();
 
 const emit = defineEmits<{
+  /** 继续添加：清空表单接着加下一个 */
   (e: "continue"): void;
+  /** 不再添加，直接关窗 */
   (e: "finish"): void;
 }>();
 </script>

@@ -7,11 +7,14 @@ import InstanceIcon from "./InstanceIcon.vue";
 import GlyphIcon from "./ui/GlyphIcon.vue";
 
 const props = defineProps<{
+  /** 可选的实例列表 */
   instances: InstanceInfoDto[];
+  /** 当前选中的实例 uuid；`null` 表示没选 */
   modelValue: string | null;
 }>();
 
 const emit = defineEmits<{
+  /** `v-model` 更新：新选中的实例 uuid */
   (e: "update:modelValue", uuid: string): void;
   /** 下拉末尾的「添加实例」入口（由窗口决定怎么开新建窗口） */
   (e: "add"): void;
@@ -22,7 +25,7 @@ const rootEl = ref<HTMLDivElement | null>(null);
 const btnEl = ref<HTMLButtonElement | null>(null);
 
 /**
- * 浮层定位（**fixed**，不是 absolute）
+ * 浮层定位：**fixed**，不是 absolute
  *
  * 它所在的 `.list-mode` 是 `overflow-y: auto` 的滚动容器：absolute 浮层会被算进那个容器的
  * 可滚动区域 —— 一打开下拉，内容区就凭空多出一截能滚的空白（看着像"窗口被撑大了"）。
@@ -64,14 +67,14 @@ async function toggle() {
   placeMenu();
 }
 
-/** 点浮层外面收起（弹层留在组件根内，所以只判根元素即可） */
+/** 点浮层外面收起；弹层留在组件根内，所以只判根元素即可 */
 function onDocMousedown(e: MouseEvent) {
   if (open.value && rootEl.value && !rootEl.value.contains(e.target as Node)) {
     open.value = false;
   }
 }
 
-/** 滚动（内容区自己的滚动不会冒泡到 window，所以用 capture）或改窗口大小：fixed 浮层跟不住，直接收起 */
+/** 滚动或改窗口大小：fixed 浮层跟不住，直接收起。内容区自己的滚动不会冒泡到 window，所以用 capture */
 function closeOnMove(e?: Event) {
   if (!open.value) return;
   // 浮层自己内部滚（实例多时要滚着找）不算"位置变了"，别把下拉收走
@@ -149,7 +152,7 @@ function addNew() {
           </button>
         </div>
 
-        <!-- 浮层底部固定：新建实例入口（在滚动区之外，实例再多也一直看得见） -->
+        <!-- 浮层底部固定：新建实例入口在滚动区之外，实例再多也一直看得见 -->
         <div class="menu-foot">
           <div class="menu-sep"></div>
           <button class="option add-option" @click="addNew">
@@ -257,8 +260,8 @@ function addNew() {
 }
 
 .select-menu {
-  /* fixed：绝不参与 .list-mode 那个滚动容器的可滚动区域
-     （left / top / width / maxHeight 全部由 placeMenu() 现算，见脚本） */
+  /* fixed：绝不参与 .list-mode 那个滚动容器的可滚动区域；
+     left / top / width / maxHeight 全部由 placeMenu() 现算，见脚本 */
   position: fixed;
   display: flex;
   flex-direction: column;
@@ -306,9 +309,9 @@ function addNew() {
 .option.active {
   background: var(--accent-soft);
   outline: 1px solid var(--accent-border);
-  /* outline 画在元素外沿，而列表是滚动容器（overflow-y: auto）：向外那 1px 会被裁掉，
+  /* outline 画在元素外沿，而列表是滚动容器 overflow-y: auto：向外那 1px 会被裁掉，
      表现就是"选中框左右两边被切掉了"。向内收 1px 即可 —— 与侧栏实例行同一套处理，
-     见 MainSidebar 的 .inst-row.active（那里是被收起动画的 overflow: hidden 裁） */
+     见 MainSidebar 的 .inst-row.active，那边是被收起动画的 overflow: hidden 裁的 */
   outline-offset: -1px;
 }
 

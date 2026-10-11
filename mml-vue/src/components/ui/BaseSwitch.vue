@@ -1,11 +1,14 @@
 <script setup lang="ts">
-// 基础 Switch 开关：两态设置项用（单/多窗口、左/右侧栏、动画开关等）
+// 基础 Switch 开关：两态设置项用，如单/多窗口、左/右侧栏、动画开关
 defineProps<{
+  /** 开关状态，配合 `v-model` 使用 */
   modelValue: boolean;
+  /** 是否禁用 */
   disabled?: boolean;
 }>();
 
 const emit = defineEmits<{
+  /** `v-model` 更新：新的开关状态 */
   (e: "update:modelValue", v: boolean): void;
 }>();
 </script>

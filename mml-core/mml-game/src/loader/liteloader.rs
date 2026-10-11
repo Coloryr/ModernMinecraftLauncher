@@ -59,7 +59,7 @@ pub async fn get_liteloader_lib(mc: &str, version: &str) -> CoreResult<Vec<FileI
         }
     };
 
-    // 加载器数据与公共依赖取自同一组（正式版 / 快照），避免两组依赖重复
+    // 加载器数据与公共依赖取自同一组，正式版或快照，避免两组依赖重复
     let (loader, common_libs) = if let Some(loader) = data.artefacts.loader.get(version) {
         (loader, &data.artefacts.libraries)
     } else if let Some(loader) = data.snapshots.loader.get(version) {
@@ -70,12 +70,12 @@ pub async fn get_liteloader_lib(mc: &str, version: &str) -> CoreResult<Vec<FileI
 
     let mut list = Vec::new();
 
-    // 公共依赖运行库（元数据不带校验值）
+    // 公共依赖运行库，元数据不带校验值
     for item in common_libs {
         list.push(make_lib_item(&item.name, &item.url, FileHash::None));
     }
 
-    // 加载器自身运行库（liteloader 本体带 MD5 校验）
+    // 加载器自身运行库，liteloader 本体带 MD5 校验
     for item in &loader.libraries {
         let hash = if item.name.starts_with("com.mumfrey:liteloader") {
             FileHash::Md5(loader.md5.clone())

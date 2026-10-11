@@ -1,6 +1,6 @@
 //! NBT 标签类型定义模块
 //!
-//! 本模块定义了 Minecraft NBT（Named Binary Tag）规范中的全部 13 种标签类型。
+//! 本模块定义了 Minecraft NBT 规范中的全部 13 种标签类型。
 //! 每种类型都是一个独立的 Rust 结构体，封装了具体的数据和二进制序列化/反序列化逻辑。
 //!
 //! # 类型列表
@@ -9,17 +9,17 @@
 //! |------|-----------|---------|-----------|
 //! | TAG_End | [`NbtEnd`] | 无数据 | 0 字节 |
 //! | TAG_Byte | [`NbtByte`] | `u8` | 1 字节 |
-//! | TAG_Short | [`NbtShort`] | `i16` | 2 字节（大端序） |
-//! | TAG_Int | [`NbtInt`] | `i32` | 4 字节（大端序） |
-//! | TAG_Long | [`NbtLong`] | `i64` | 8 字节（大端序） |
-//! | TAG_Float | [`NbtFloat`] | `f32` | 4 字节（IEEE 754 大端序） |
-//! | TAG_Double | [`NbtDouble`] | `f64` | 8 字节（IEEE 754 大端序） |
+//! | TAG_Short | [`NbtShort`] | `i16` | 2 字节，大端序 |
+//! | TAG_Int | [`NbtInt`] | `i32` | 4 字节，大端序 |
+//! | TAG_Long | [`NbtLong`] | `i64` | 8 字节，大端序 |
+//! | TAG_Float | [`NbtFloat`] | `f32` | 4 字节，IEEE 754 大端序 |
+//! | TAG_Double | [`NbtDouble`] | `f64` | 8 字节，IEEE 754 大端序 |
 //! | TAG_Byte_Array | [`NbtByteArray`] | `Vec<u8>` | 4 字节长度 + 数据 |
 //! | TAG_String | [`NbtString`] | `String` | 2 字节长度 + UTF-8 数据 |
 //! | TAG_List | [`NbtList`] | `Vec<NbtType>` | 1 字节元素类型 + 4 字节长度 + 数据 |
 //! | TAG_Compound | [`NbtCompound`] | `HashMap<String, NbtType>` | 键值对循环，以 End 结束 |
-//! | TAG_Int_Array | [`NbtIntArray`] | `Vec<i32>` | 4 字节长度 + 数据（4 字节/元素） |
-//! | TAG_Long_Array | [`NbtLongArray`] | `Vec<i64>` | 4 字节长度 + 数据（8 字节/元素） |
+//! | TAG_Int_Array | [`NbtIntArray`] | `Vec<i32>` | 4 字节长度 + 数据，每元素 4 字节 |
+//! | TAG_Long_Array | [`NbtLongArray`] | `Vec<i64>` | 4 字节长度 + 数据，每元素 8 字节 |
 //!
 //! # 工厂函数
 //!
@@ -35,10 +35,10 @@ use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType};
 
 use crate::{NbtStream, NbtType, io_error, is_nbt_num};
 
-/// NBT 结束标记（TAG_End）
+/// NBT 结束标记，对应 TAG_End
 ///
-/// 无数据负载。用于标识 Compound 标签中键值对列表的结束。
-/// 在 NBT 文件流中不占用任何字节（仅类型序号占用 1 字节）。
+/// 无数据负载，只用于标识 Compound 标签中键值对列表的结束。
+/// 自身不占数据字节，前面那 1 字节类型序号由调用方读写。
 pub struct NbtEnd {}
 
 impl Default for NbtEnd {
@@ -77,12 +77,12 @@ impl NbtStream for NbtEnd {
     }
 }
 
-/// NBT 字节类型（TAG_Byte）
+/// NBT 字节类型，对应 TAG_Byte
 ///
-/// 存储一个有符号 8 位整数（`u8`），在二进制流中占用 1 字节。
+/// 存储一个 8 位整数，Rust 侧类型为 `u8`，在二进制流中占用 1 字节。
 /// 这是 Minecraft NBT 中最小的数值类型。
 pub struct NbtByte {
-    /// 字节数据
+    /// 字节数据，按无符号 `u8` 存取，取值 0–255
     pub data: u8,
 }
 
@@ -138,11 +138,11 @@ impl NbtStream for NbtByte {
     }
 }
 
-/// NBT 短整型（TAG_Short）
+/// NBT 短整型，对应 TAG_Short
 ///
-/// 存储一个有符号 16 位整数（`i16`），在二进制流中占用 2 字节，使用大端序。
+/// 存储一个有符号 16 位整数，在二进制流中占用 2 字节，大端序。
 pub struct NbtShort {
-    /// 短整型数据
+    /// 短整型数据，取值 -32768 到 32767
     pub data: i16,
 }
 
@@ -179,7 +179,7 @@ impl NbtShort {
 }
 
 impl NbtStream for NbtShort {
-    /// 从流中读取 2 字节（大端序）
+    /// 从流中按大端序读取 2 字节
     fn read<R: Read>(&mut self, stream: &mut R) -> CoreResult<()> {
         let mut temp = [0u8; 2];
         stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
@@ -189,7 +189,7 @@ impl NbtStream for NbtShort {
         Ok(())
     }
 
-    /// 将 2 字节写入流（大端序）
+    /// 将 2 字节按大端序写入流
     fn write<W: Write>(&self, stream: &mut W) -> CoreResult<()> {
         let temp = i16::to_be_bytes(self.data);
         stream.write_all(&temp).map_err(|err| io_error(err))?;
@@ -198,11 +198,11 @@ impl NbtStream for NbtShort {
     }
 }
 
-/// NBT 整型（TAG_Int）
+/// NBT 整型，对应 TAG_Int
 ///
-/// 存储一个有符号 32 位整数（`i32`），在二进制流中占用 4 字节，使用大端序。
+/// 存储一个有符号 32 位整数，在二进制流中占用 4 字节，大端序。
 pub struct NbtInt {
-    /// 整型数据
+    /// 整型数据，取值 -2^31 到 2^31-1
     pub data: i32,
 }
 
@@ -239,7 +239,7 @@ impl NbtInt {
 }
 
 impl NbtStream for NbtInt {
-    /// 从流中读取 4 字节（大端序）
+    /// 从流中按大端序读取 4 字节
     fn read<R: Read>(&mut self, stream: &mut R) -> CoreResult<()> {
         let mut temp = [0u8; 4];
         stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
@@ -249,7 +249,7 @@ impl NbtStream for NbtInt {
         Ok(())
     }
 
-    /// 将 4 字节写入流（大端序）
+    /// 将 4 字节按大端序写入流
     fn write<W: Write>(&self, stream: &mut W) -> CoreResult<()> {
         let temp = i32::to_be_bytes(self.data);
         stream.write_all(&temp).map_err(|err| io_error(err))?;
@@ -258,11 +258,11 @@ impl NbtStream for NbtInt {
     }
 }
 
-/// NBT 长整型（TAG_Long）
+/// NBT 长整型，对应 TAG_Long
 ///
-/// 存储一个有符号 64 位整数（`i64`），在二进制流中占用 8 字节，使用大端序。
+/// 存储一个有符号 64 位整数，在二进制流中占用 8 字节，大端序。
 pub struct NbtLong {
-    /// 长整型数据
+    /// 长整型数据，取值 -2^63 到 2^63-1
     pub data: i64,
 }
 
@@ -299,7 +299,7 @@ impl NbtLong {
 }
 
 impl NbtStream for NbtLong {
-    /// 从流中读取 8 字节（大端序）
+    /// 从流中按大端序读取 8 字节
     fn read<R: Read>(&mut self, stream: &mut R) -> CoreResult<()> {
         let mut temp = [0u8; 8];
         stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
@@ -309,7 +309,7 @@ impl NbtStream for NbtLong {
         Ok(())
     }
 
-    /// 将 8 字节写入流（大端序）
+    /// 将 8 字节按大端序写入流
     fn write<W: Write>(&self, stream: &mut W) -> CoreResult<()> {
         let temp = i64::to_be_bytes(self.data);
         stream.write_all(&temp).map_err(|err| io_error(err))?;
@@ -318,11 +318,11 @@ impl NbtStream for NbtLong {
     }
 }
 
-/// NBT 浮点型（TAG_Float）
+/// NBT 浮点型，对应 TAG_Float
 ///
-/// 存储一个 32 位 IEEE 754 浮点数（`f32`），在二进制流中占用 4 字节，使用大端序。
+/// 存储一个 32 位 IEEE 754 浮点数，在二进制流中占用 4 字节，大端序。
 pub struct NbtFloat {
-    /// 浮点数据
+    /// 浮点数据，IEEE 754 单精度
     pub data: f32,
 }
 
@@ -359,7 +359,7 @@ impl NbtFloat {
 }
 
 impl NbtStream for NbtFloat {
-    /// 从流中读取 4 字节（大端序）
+    /// 从流中按大端序读取 4 字节
     fn read<R: Read>(&mut self, stream: &mut R) -> CoreResult<()> {
         let mut temp = [0u8; 4];
         stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
@@ -369,7 +369,7 @@ impl NbtStream for NbtFloat {
         Ok(())
     }
 
-    /// 将 4 字节写入流（大端序）
+    /// 将 4 字节按大端序写入流
     fn write<W: Write>(&self, stream: &mut W) -> CoreResult<()> {
         let temp = f32::to_be_bytes(self.data);
         stream.write_all(&temp).map_err(|err| io_error(err))?;
@@ -378,11 +378,11 @@ impl NbtStream for NbtFloat {
     }
 }
 
-/// NBT 双精度浮点型（TAG_Double）
+/// NBT 双精度浮点型，对应 TAG_Double
 ///
-/// 存储一个 64 位 IEEE 754 浮点数（`f64`），在二进制流中占用 8 字节，使用大端序。
+/// 存储一个 64 位 IEEE 754 浮点数，在二进制流中占用 8 字节，大端序。
 pub struct NbtDouble {
-    /// 双精度浮点数据
+    /// 双精度浮点数据，IEEE 754 双精度
     pub data: f64,
 }
 
@@ -419,7 +419,7 @@ impl NbtDouble {
 }
 
 impl NbtStream for NbtDouble {
-    /// 从流中读取 8 字节（大端序）
+    /// 从流中按大端序读取 8 字节
     fn read<R: Read>(&mut self, stream: &mut R) -> CoreResult<()> {
         let mut temp = [0u8; 8];
         stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
@@ -429,7 +429,7 @@ impl NbtStream for NbtDouble {
         Ok(())
     }
 
-    /// 将 8 字节写入流（大端序）
+    /// 将 8 字节按大端序写入流
     fn write<W: Write>(&self, stream: &mut W) -> CoreResult<()> {
         let temp = f64::to_be_bytes(self.data);
         stream.write_all(&temp).map_err(|err| io_error(err))?;
@@ -438,12 +438,11 @@ impl NbtStream for NbtDouble {
     }
 }
 
-/// NBT 字节数组类型（TAG_Byte_Array）
+/// NBT 字节数组类型，对应 TAG_Byte_Array
 ///
-/// 存储一个字节向量（`Vec<u8>`），在二进制流中格式为：
-/// 4 字节数组长度（大端序 i32）+ 实际的字节数据。
+/// 二进制流格式为 4 字节元素个数，大端序 i32，后跟原始字节数据。
 pub struct NbtByteArray {
-    /// 字节数组数据
+    /// 字节数组数据，元素按无符号字节存取
     pub data: Vec<u8>,
 }
 
@@ -480,7 +479,7 @@ impl NbtByteArray {
 }
 
 impl NbtStream for NbtByteArray {
-    /// 从流中读取：先读 4 字节长度，再读对应数量的字节数据
+    /// 先读 4 字节元素个数，再读对应数量的字节
     fn read<R: Read>(&mut self, stream: &mut R) -> CoreResult<()> {
         let mut temp = [0u8; 4];
         stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
@@ -495,7 +494,7 @@ impl NbtStream for NbtByteArray {
         Ok(())
     }
 
-    /// 写入流：先写 4 字节长度，再写字节数据
+    /// 先写 4 字节元素个数，再写字节数据
     fn write<W: Write>(&self, stream: &mut W) -> CoreResult<()> {
         let temp = i32::to_be_bytes(self.data.len() as i32);
         stream.write_all(&temp).map_err(|err| io_error(err))?;
@@ -505,13 +504,12 @@ impl NbtStream for NbtByteArray {
     }
 }
 
-/// NBT 字符串类型（TAG_String）
+/// NBT 字符串类型，对应 TAG_String
 ///
-/// 存储一个 UTF-8 编码的字符串（`String`），在二进制流中格式为：
-/// 2 字节字符串长度（大端序 i16，字节数）+ UTF-8 字节序列。
-/// 注意：长度字段记录的是**字节数**，而非字符数。
+/// 二进制流格式为 2 字节长度，大端序 i16，后跟 UTF-8 字节序列。
+/// 长度字段记录的是**字节数**，不是字符数。
 pub struct NbtString {
-    /// 字符串数据
+    /// 字符串数据，按 UTF-8 编码写出
     pub data: String,
 }
 
@@ -548,7 +546,7 @@ impl NbtString {
 }
 
 impl NbtStream for NbtString {
-    /// 从流中读取：先读 2 字节长度，再读对应数量的 UTF-8 字节，解码为字符串
+    /// 先读 2 字节长度，再读对应数量的 UTF-8 字节并解码
     fn read<R: Read>(&mut self, stream: &mut R) -> CoreResult<()> {
         let mut temp = [0u8; 2];
         stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
@@ -567,7 +565,7 @@ impl NbtStream for NbtString {
         Ok(())
     }
 
-    /// 写入流：先写 2 字节长度，再写 UTF-8 字节
+    /// 先写 2 字节的字节数，再写 UTF-8 字节
     fn write<W: Write>(&self, stream: &mut W) -> CoreResult<()> {
         let temp = i16::to_be_bytes(self.data.len() as i16);
         stream.write_all(&temp).map_err(|err| io_error(err))?;
@@ -579,19 +577,18 @@ impl NbtStream for NbtString {
     }
 }
 
-/// NBT 列表类型（TAG_List）
+/// NBT 列表类型，对应 TAG_List
 ///
-/// 存储一组相同 NBT 类型的元素列表。所有元素必须是同一 NBT 标签类型。
-/// 在二进制流中格式为：1 字节元素类型序号 + 4 字节元素个数（大端序 i32）+
-/// 每个元素的 NBT 数据（不含元素自身的类型序号）。
+/// 存储一组同类型的 NBT 元素，二进制流格式为 1 字节元素类型序号、
+/// 4 字节元素个数，大端序 i32，后跟各元素的 NBT 数据；元素自身不带类型序号。
 ///
 /// # 注意
 ///
-/// 不允许混合不同类型的元素。修改列表类型时，会清空已有数据。
+/// 不允许混合不同类型的元素，修改列表类型时会清空已有数据。
 pub struct NbtList {
-    /// 数据列表
+    /// 元素列表，每个元素的类型序号都必须等于 `nbt_num`
     data: Vec<NbtType>,
-    /// 列表元素所允许的 NBT 类型序号
+    /// 元素类型序号，取值 0–12；空列表写出时会临时改写成 0
     nbt_num: u8,
 }
 
@@ -607,9 +604,9 @@ impl Default for NbtList {
 impl NbtList {
     /// 创建指定元素类型的空 List 标签
     ///
-    /// # 参数
+    /// 序号不做校验，非法序号要到读回时才会报 `NbtTypeError`。
     ///
-    /// - `nbt_num`: 列表元素的 NBT 类型序号（0–12）
+    /// - `nbt_num`: 元素类型序号，取值 0–12
     pub fn new(nbt_num: u8) -> Self {
         Self {
             nbt_num,
@@ -617,19 +614,19 @@ impl NbtList {
         }
     }
 
-    /// 设置列表的元素类型（通过 NbtType 实例），同时清空已有数据
+    /// 按实例设置列表的元素类型，同时清空已有数据
     ///
-    /// - `nbt_type`: 元素类型实例
+    /// - `nbt_type`: 元素类型实例，取其类型序号
     pub fn set_type(&mut self, nbt_type: NbtType) {
         self.nbt_num = nbt_type.get_num();
         self.data.clear();
     }
 
-    /// 设置列表的元素类型（通过类型序号），同时清空已有数据
+    /// 按类型序号设置列表的元素类型，同时清空已有数据
     ///
-    /// 如果序号不在合法范围（0–12）内，则忽略此操作。
+    /// 序号不在合法范围 0–12 内时忽略本次调用。
     ///
-    /// - `nbt_num`: 列表元素的 NBT 类型序号（0–12）
+    /// - `nbt_num`: 元素类型序号，取值 0–12
     pub fn set_num(&mut self, nbt_num: u8) {
         if is_nbt_num(nbt_num) {
             self.nbt_num = nbt_num;
@@ -637,14 +634,13 @@ impl NbtList {
         }
     }
 
-    /// 向列表中添加一个元素
+    /// 向列表末尾追加一个元素
     ///
     /// - `nbt`: 待添加的元素
     ///
     /// # 返回值
     ///
-    /// 如果元素类型与列表允许的类型一致，则添加成功并返回 `true`；
-    /// 否则返回 `false`。
+    /// 元素类型序号与列表一致时追加并返回 `true`，否则返回 `false` 且不改动列表
     pub fn add_item(&mut self, nbt: NbtType) -> bool {
         if nbt.get_num() != self.nbt_num {
             false
@@ -657,14 +653,22 @@ impl NbtList {
 
     /// 移除并返回指定索引的元素
     ///
-    /// - `index`: 元素索引
+    /// - `index`: 元素索引，从 0 开始
+    ///
+    /// # 返回值
+    ///
+    /// 被移除的元素；`index` 越界会 panic
     pub fn remove(&mut self, index: usize) -> NbtType {
         self.data.remove(index)
     }
 
     /// 获取指定索引元素的不可变引用
     ///
-    /// - `index`: 元素索引
+    /// - `index`: 元素索引，从 0 开始
+    ///
+    /// # 返回值
+    ///
+    /// 索引越界时返回 `None`
     pub fn get_item(&self, index: usize) -> Option<&NbtType> {
         self.data.get(index)
     }
@@ -675,6 +679,10 @@ impl NbtList {
     }
 
     /// 返回列表元素的迭代器
+    ///
+    /// # 返回值
+    ///
+    /// 按列表内的存储顺序遍历全部元素
     pub fn iter(&self) -> impl Iterator<Item = &NbtType> {
         self.data.iter()
     }
@@ -685,16 +693,13 @@ impl NbtList {
     pub fn eq(&self, nbt: &NbtType) -> bool {
         match nbt {
             NbtType::List(nbt) => {
-                // 先比较元素类型序号
                 if self.nbt_num != nbt.nbt_num {
                     return false;
                 }
-                // 再比较元素数量
                 if self.data.len() != nbt.data.len() {
                     return false;
                 }
 
-                // 逐个比较元素值
                 for index in 0..self.data.len() {
                     let item1 = self.data.get(index).unwrap();
                     let item2 = nbt.data.get(index).unwrap();
@@ -717,9 +722,8 @@ impl NbtList {
 }
 
 impl NbtStream for NbtList {
-    /// 从流中读取：元素类型序号 → 元素个数 → 每个元素的 NBT 数据
+    /// 依次读元素类型序号、元素个数和每个元素的 NBT 数据
     fn read<R: Read>(&mut self, stream: &mut R) -> CoreResult<()> {
-        // 读取元素类型序号
         let mut temp = [0u8; 1];
         stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
 
@@ -728,13 +732,11 @@ impl NbtStream for NbtList {
             return Err(ErrorType::NbtTypeError);
         }
 
-        // 读取元素个数
         let mut temp = [0u8; 4];
         stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
 
         let len = i32::from_be_bytes(temp);
 
-        // 逐个读取列表元素
         for _i in 0..len {
             let mut nbt = NbtType::get_nbt(self.nbt_num).unwrap();
             nbt.read(stream)?;
@@ -744,9 +746,9 @@ impl NbtStream for NbtList {
         Ok(())
     }
 
-    /// 写入流：元素类型序号 → 元素个数 → 每个元素的 NBT 数据
+    /// 依次写元素类型序号、元素个数和每个元素的 NBT 数据
     fn write<W: Write>(&self, stream: &mut W) -> CoreResult<()> {
-        // 空列表时元素类型序号写 0（TAG_End）
+        // 空列表按规范写元素类型 0，即 TAG_End
         let nbt_type = if self.data.len() == 0 {
             0
         } else {
@@ -767,12 +769,11 @@ impl NbtStream for NbtList {
     }
 }
 
-/// NBT 复合标签类型（TAG_Compound）
+/// NBT 复合标签类型，对应 TAG_Compound
 ///
-/// 存储一组键值对，键为字符串，值为任意类型的 NBT 标签。
-/// 在二进制流中格式为：循环读取"类型序号 + 键名 + 数据"，直到遇到
-/// TAG_End（类型序号 0）标记结束。这是 Minecraft NBT 中最核心的结构类型，
-/// 用于表示区块数据、物品 NBT 标签等复杂嵌套结构。
+/// 存储一组键值对，键为字符串，值为任意类型的 NBT 标签；二进制流中循环读取
+/// "类型序号 + 键名 + 数据"，遇到类型序号 0 的 TAG_End 即结束。
+/// 这是 Minecraft NBT 中最核心的结构类型，区块数据、物品标签都靠它嵌套。
 ///
 /// # 示例
 ///
@@ -782,7 +783,7 @@ impl NbtStream for NbtList {
 /// compound.data.insert("Level".to_string(), NbtType::int());
 /// ```
 pub struct NbtCompound {
-    /// 键值对数据，键为字符串，值为 NBT 标签
+    /// 键值对数据；HashMap 不保证顺序，写出顺序与插入顺序无关
     pub data: HashMap<String, NbtType>,
 }
 
@@ -803,8 +804,6 @@ impl NbtCompound {
     }
 
     /// 判断另一个 NBT 标签是否为 Compound 类型且所有键值对一致
-    ///
-    /// 比较逻辑：先检查键的数量是否相同，再逐个键检查值是否调用各自的 `eq` 方法。
     ///
     /// - `nbt`: 待比较的 NBT 标签
     pub fn eq(&self, nbt: &NbtType) -> bool {
@@ -886,7 +885,7 @@ impl NbtCompound {
         }
     }
 
-    /// 从 Compound 中提取 `&NbtCompound`（嵌套 Compound），自动进行类型匹配
+    /// 从 Compound 中提取嵌套的 `&NbtCompound`，自动进行类型匹配
     ///
     /// - `key`: 键名
     pub fn get_compound(&self, key: &str) -> Option<&NbtCompound> {
@@ -896,7 +895,7 @@ impl NbtCompound {
         }
     }
 
-    /// 从 Compound 中提取 `&mut NbtCompound`（嵌套 Compound），自动进行类型匹配
+    /// 从 Compound 中提取嵌套的 `&mut NbtCompound`，自动进行类型匹配
     ///
     /// - `key`: 键名
     pub fn get_compound_mut(&mut self, key: &str) -> Option<&mut NbtCompound> {
@@ -906,7 +905,7 @@ impl NbtCompound {
         }
     }
 
-    /// 从 Compound 中提取 `i64` 值（TAG_Long 的数据部分）
+    /// 从 Compound 中提取 TAG_Long 的 `i64` 值
     ///
     /// - `key`: 键名
     pub fn get_long(&self, key: &str) -> Option<i64> {
@@ -916,7 +915,7 @@ impl NbtCompound {
         }
     }
 
-    /// 从 Compound 中提取 `i16` 值（TAG_Short 的数据部分）
+    /// 从 Compound 中提取 TAG_Short 的 `i16` 值
     ///
     /// - `key`: 键名
     pub fn get_short(&self, key: &str) -> Option<i16> {
@@ -926,7 +925,7 @@ impl NbtCompound {
         }
     }
 
-    /// 从 Compound 中提取 `i32` 值（TAG_Int 的数据部分）
+    /// 从 Compound 中提取 TAG_Int 的 `i32` 值
     ///
     /// - `key`: 键名
     pub fn get_int(&self, key: &str) -> Option<i32> {
@@ -936,7 +935,7 @@ impl NbtCompound {
         }
     }
 
-    /// 从 Compound 中提取 `u8` 值（TAG_Byte 的数据部分）
+    /// 从 Compound 中提取 TAG_Byte 的 `u8` 值
     ///
     /// - `key`: 键名
     pub fn get_byte(&self, key: &str) -> Option<u8> {
@@ -946,7 +945,7 @@ impl NbtCompound {
         }
     }
 
-    /// 从 Compound 中提取 `String` 值（TAG_String 的数据部分，克隆返回）
+    /// 从 Compound 中提取 TAG_String 的 `String` 值，克隆返回
     ///
     /// - `key`: 键名
     pub fn get_string(&self, key: &str) -> Option<String> {
@@ -983,16 +982,14 @@ impl NbtCompound {
 }
 
 impl NbtStream for NbtCompound {
-    /// 从流中逐条读取键值对，直到遇到 TAG_End（类型序号 0）为止
+    /// 从流中逐条读取键值对，直到遇到类型序号 0 的 TAG_End
     ///
     /// 每条键值对的格式：1 字节类型序号 → 2 字节键名长度 → 键名字符串 → 值数据
     fn read<R: Read>(&mut self, stream: &mut R) -> CoreResult<()> {
         loop {
-            // 读取下一条目的类型序号
             let mut temp = [0u8; 1];
             stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
 
-            // 遇到 TAG_End 则停止读取
             if temp[0] == 0 {
                 return Ok(());
             }
@@ -1002,13 +999,11 @@ impl NbtStream for NbtCompound {
                 return Err(ErrorType::NbtTypeError);
             }
 
-            // 读取键名长度（大端序 i16）
             let mut temp = [0u8; 2];
             stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
 
             let len = i16::from_be_bytes(temp);
 
-            // 读取键名字符串（UTF-8 编码）
             let mut temp = vec![0; len as usize];
             stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
 
@@ -1018,7 +1013,6 @@ impl NbtStream for NbtCompound {
                 })
             })?;
 
-            // 读取值数据
             let mut nbt = nbt.unwrap();
             nbt.read(stream)?;
 
@@ -1026,27 +1020,24 @@ impl NbtStream for NbtCompound {
         }
     }
 
-    /// 将全部键值对写入流，末尾附加 TAG_End（0x00）作为终止标记
+    /// 将全部键值对写入流，末尾附加 0x00 作为终止标记
     fn write<W: Write>(&self, stream: &mut W) -> CoreResult<()> {
         for (key, nbt) in &self.data {
-            // 写入类型序号
             let temp = [nbt.get_num()];
             stream.write_all(&temp).map_err(|err| io_error(err))?;
 
+            // End 变体只占 1 字节类型序号，后面没有键名和值
             if !matches!(nbt, NbtType::End(_)) {
-                // 写入键名长度和键名
                 let temp = i16::to_be_bytes(key.len() as i16);
                 stream.write_all(&temp).map_err(|err| io_error(err))?;
                 stream
                     .write_all(key.as_bytes())
                     .map_err(|err| io_error(err))?;
 
-                // 写入值数据
                 nbt.write(stream)?;
             }
         }
 
-        // 写入 TAG_End 终止标记
         let temp = [0];
         stream.write_all(&temp).map_err(|err| io_error(err))?;
 
@@ -1054,12 +1045,11 @@ impl NbtStream for NbtCompound {
     }
 }
 
-/// NBT 整型数组类型（TAG_Int_Array）
+/// NBT 整型数组类型，对应 TAG_Int_Array
 ///
-/// 存储一个 32 位整数数组（`Vec<i32>`），在二进制流中格式为：
-/// 4 字节数组长度（大端序 i32，元素个数）+ 每个元素 4 字节（大端序 i32）。
+/// 二进制流格式为 4 字节元素个数，大端序 i32，后跟每个元素 4 字节，大端序。
 pub struct NbtIntArray {
-    /// 32 位整数数组数据
+    /// 32 位整数数组数据，元素按大端序写出
     pub data: Vec<i32>,
 }
 
@@ -1096,7 +1086,7 @@ impl NbtIntArray {
 }
 
 impl NbtStream for NbtIntArray {
-    /// 从流中读取：4 字节长度 → 每个元素 4 字节（大端序 i32）
+    /// 先读 4 字节元素个数，再按每元素 4 字节读出
     fn read<R: Read>(&mut self, stream: &mut R) -> CoreResult<()> {
         let mut temp = [0u8; 4];
         stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
@@ -1107,7 +1097,6 @@ impl NbtStream for NbtIntArray {
         let mut temp = vec![0; len as usize];
         stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
 
-        // 每 4 字节解析为一个大端序 i32
         self.data = temp
             .chunks_exact(4)
             .map(|chunk| i32::from_be_bytes(chunk.try_into().unwrap()))
@@ -1116,7 +1105,7 @@ impl NbtStream for NbtIntArray {
         Ok(())
     }
 
-    /// 写入流：4 字节长度 → 每个元素 4 字节（大端序 i32）
+    /// 先写 4 字节元素个数，再按每元素 4 字节写出
     fn write<W: Write>(&self, stream: &mut W) -> CoreResult<()> {
         let temp = i32::to_be_bytes(self.data.len() as i32);
         stream.write_all(&temp).map_err(|err| io_error(err))?;
@@ -1131,13 +1120,12 @@ impl NbtStream for NbtIntArray {
     }
 }
 
-/// NBT 长整型数组类型（TAG_Long_Array）
+/// NBT 长整型数组类型，对应 TAG_Long_Array
 ///
-/// 存储一个 64 位整数数组（`Vec<i64>`），在二进制流中格式为：
-/// 4 字节数组长度（大端序 i32，元素个数）+ 每个元素 8 字节（大端序 i64）。
-/// 在 Minecraft 1.12+ 中引入，常用于存储区块的高度图等大数据结构。
+/// 二进制流格式为 4 字节元素个数，大端序 i32，后跟每个元素 8 字节，大端序。
+/// Minecraft 1.12 起引入，区块高度图等大数据结构用它存放。
 pub struct NbtLongArray {
-    /// 64 位整数数组数据
+    /// 64 位整数数组数据，元素按大端序写出
     pub data: Vec<i64>,
 }
 
@@ -1174,7 +1162,7 @@ impl NbtLongArray {
 }
 
 impl NbtStream for NbtLongArray {
-    /// 从流中读取：4 字节长度 → 每个元素 8 字节（大端序 i64）
+    /// 先读 4 字节元素个数，再按每元素 8 字节读出
     fn read<R: Read>(&mut self, stream: &mut R) -> CoreResult<()> {
         let mut temp = [0u8; 4];
         stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
@@ -1185,7 +1173,6 @@ impl NbtStream for NbtLongArray {
         let mut temp = vec![0; len as usize];
         stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
 
-        // 每 8 字节解析为一个大端序 i64
         self.data = temp
             .chunks_exact(8)
             .map(|chunk| i64::from_be_bytes(chunk.try_into().unwrap()))
@@ -1194,7 +1181,7 @@ impl NbtStream for NbtLongArray {
         Ok(())
     }
 
-    /// 写入流：4 字节长度 → 每个元素 8 字节（大端序 i64）
+    /// 先写 4 字节元素个数，再按每元素 8 字节写出
     fn write<W: Write>(&self, stream: &mut W) -> CoreResult<()> {
         let temp = i32::to_be_bytes(self.data.len() as i32);
         stream.write_all(&temp).map_err(|err| io_error(err))?;
@@ -1265,8 +1252,6 @@ pub fn byte_array(data: Vec<u8>) -> NbtByteArray {
 
 /// 创建 NbtString 实例
 ///
-/// 注意：传入的 `&str` 会被转换为 `String` 后再存储。
-///
 /// - `data`: 字符串数据
 pub fn string(data: &str) -> NbtString {
     NbtString::new(String::from(data))
@@ -1274,7 +1259,7 @@ pub fn string(data: &str) -> NbtString {
 
 /// 创建指定元素类型的空 NbtList 实例
 ///
-/// - `nbt_num`: 列表元素的 NBT 类型序号（0–12）
+/// - `nbt_num`: 元素类型序号，取值 0–12
 pub fn list(nbt_num: u8) -> NbtList {
     NbtList::new(nbt_num)
 }
@@ -1407,7 +1392,7 @@ mod tests {
         assert!(empty.data.is_empty());
     }
 
-    /// IntArray 的二进制格式：4 字节元素个数 + 每元素 4 字节（大端序）
+    /// IntArray 的二进制格式：4 字节元素个数 + 每元素 4 字节，大端序
     #[test]
     fn int_array_format() {
         let nbt = int_array(vec![1, -1]);
@@ -1423,7 +1408,7 @@ mod tests {
         assert_eq!(back.data, vec![1, -1]);
     }
 
-    /// LongArray 的二进制格式：4 字节元素个数 + 每元素 8 字节（大端序）
+    /// LongArray 的二进制格式：4 字节元素个数 + 每元素 8 字节，大端序
     #[test]
     fn long_array_format() {
         let nbt = long_array(vec![i64::MIN, 1]);
@@ -1499,7 +1484,7 @@ mod tests {
         assert!(list.add_item(long_array(vec![1]).to_nbt()));
     }
 
-    /// 空列表写入时元素类型序号为 0（TAG_End）
+    /// 空列表写入时元素类型序号为 0，即 TAG_End
     #[test]
     fn list_empty_writes_end_type() {
         let list = list(NBT_INT_ORDER);
@@ -1620,7 +1605,7 @@ mod tests {
         let mut cursor = Cursor::new(bytes.as_slice());
         back.read(&mut cursor).unwrap();
 
-        // 先取嵌套数据，再比较整体（to_nbt 会消耗所有权）
+        // 先取嵌套数据，再比较整体；to_nbt 会消耗所有权，不能提前调用
         assert_eq!(back.get_compound("inner").unwrap().get_int("x"), Some(9));
         assert_eq!(back.get_byte_array("arr").unwrap().data, vec![1, 2, 3]);
         // Compound 没有 get_int_array，需通过 get + as_int_array 取值
@@ -1751,7 +1736,7 @@ mod tests {
         assert_eq!(com.to_nbt().to_string(), "{k: 1b}");
     }
 
-    /// 数组类型序号常量与 get_num / get_nbt 的映射一致性（详见 lib.rs 测试）
+    /// 数组类型序号常量与 get_num / get_nbt 的映射一致性，详见 lib.rs 测试
     #[test]
     fn type_orders() {
         assert_eq!(byte(0).to_nbt().get_num(), NBT_BYTE_ORDER);

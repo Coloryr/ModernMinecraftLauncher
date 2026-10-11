@@ -13,6 +13,7 @@ import HighlightText from "../../../components/ui/HighlightText.vue";
 import type { BlockItemDto } from "../../../lib/bindings";
 
 const props = defineProps<{
+  /** 要展示的方块条目 */
   block: BlockItemDto;
   /** 分类显示名（父级已翻译） */
   category: string;
@@ -25,8 +26,11 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  /** 请求关闭弹窗 */
   (e: "close"): void;
+  /** 请求删除该玩家头颅，仅在 `removable` 为真时可用 */
   (e: "remove"): void;
+  /** 请求把它设为某个实例的图标，父级接着打开选实例弹窗 */
   (e: "set-icon"): void;
 }>();
 
@@ -101,7 +105,7 @@ async function copyId() {
   width: 132px;
   height: 132px;
   /* 同 BlockGrid 的 .block-img：256×256 的渲染图缩到 132px，用平滑插值，
-     不要 pixelated（最近邻会把方块斜边采成锯齿） */
+     不要 pixelated，最近邻会把方块斜边采成锯齿 */
 }
 
 .detail-info {

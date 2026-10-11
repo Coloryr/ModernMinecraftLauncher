@@ -35,6 +35,7 @@ fn load_skin(name: &str) -> Pixmap {
     image.unwrap()
 }
 
+/// 披风正面 2D 图应与参考图逐字节一致
 #[test]
 fn test_cape_draw() {
     let image = load_skin("cape.png");
@@ -46,6 +47,7 @@ fn test_cape_draw() {
     assert_bitmap_eq(&res, &load_reference("out_cape.png"));
 }
 
+/// 披风背面 2D 图应与参考图逐字节一致
 #[test]
 fn test_cape_back_draw() {
     let image = load_skin("cape.png");
@@ -57,6 +59,7 @@ fn test_cape_back_draw() {
     assert_bitmap_eq(&res, &load_reference("out_cape_back.png"));
 }
 
+/// TypeA 2D 头像应与参考图逐字节一致
 #[test]
 fn test_head_draw_typea() {
     let image = load_skin("skin_slim.png");
@@ -68,6 +71,7 @@ fn test_head_draw_typea() {
     assert_bitmap_eq(&res, &load_reference("out_head_a.png"));
 }
 
+/// TypeB 2D 头像应与参考图逐字节一致
 #[test]
 fn test_head_draw_typeb() {
     let image = load_skin("skin_slim.png");
@@ -79,6 +83,7 @@ fn test_head_draw_typeb() {
     assert_bitmap_eq(&res, &load_reference("out_head_b.png"));
 }
 
+/// TypeA 皮肤 2D 展开应与参考图逐字节一致
 #[test]
 fn test_skin_draw_typea() {
     let image = load_skin("skin_slim.png");
@@ -90,6 +95,7 @@ fn test_skin_draw_typea() {
     assert_bitmap_eq(&res, &load_reference("out_skin_2d_a.png"));
 }
 
+/// TypeB 皮肤 2D 展开应与参考图逐字节一致
 #[test]
 fn test_skin_draw_typeb() {
     let image = load_skin("skin_slim.png");
@@ -101,6 +107,7 @@ fn test_skin_draw_typeb() {
     assert_bitmap_eq(&res, &load_reference("out_skin_2d_b.png"));
 }
 
+/// 面朝下视角的 3D 头像应与参考图逐字节一致
 #[test]
 fn test_head_3d_draw_typea() {
     let image = load_skin("skin_slim.png");
@@ -112,6 +119,7 @@ fn test_head_3d_draw_typea() {
     assert_bitmap_eq(&res, &load_reference("out_head_3d_a.png"));
 }
 
+/// 指定俯仰与偏航角的 3D 头像应与参考图逐字节一致
 #[test]
 fn test_head_3d_draw_typeb() {
     let image = load_skin("skin_slim.png");

@@ -16,7 +16,10 @@ import {
   type TitleBarStyle,
 } from "../../lib/titlebar";
 
-const props = defineProps<{ style: TitleBarStyle }>();
+const props = defineProps<{
+  /** 标题栏样式；windows 是右端三个图标按钮，macos 是左端三个圆点 */
+  style: TitleBarStyle;
+}>();
 
 /** 是否最大化：决定第二个按钮是「最大化」还是「还原」 */
 const maximized = ref(false);
@@ -55,8 +58,8 @@ const buttons = computed(() => {
 /**
  * 窗口尺寸监听的退订函数
  *
- * 赋值与注册分开：`onUnmounted` 只能在 setup 的**同步阶段**注册（写在 `await` 之后就
- * 注册不上了，监听会一直挂着摘不掉），所以退订函数存这里、由下面那个同步钩子调用。
+ * 赋值与注册分开：`onUnmounted` 只能在 setup 的**同步阶段**注册 —— 写在 `await`
+ * 之后就注册不上了，监听会一直挂着摘不掉 —— 所以退订函数存这里、由同步钩子调用。
  */
 let unlistenResize: (() => void) | null = null;
 

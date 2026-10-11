@@ -19,29 +19,40 @@ import AccountTypeBadge from "../../../components/AccountTypeBadge.vue";
 import type { AccountStoreDto } from "../../../lib/bindings";
 
 const props = defineProps<{
+  /** 要展示的账户，调用方已按锁定 / 筛选 / 搜索过滤好 */
   accounts: AccountStoreDto[];
+  /** 当前使用的账户 uuid，空串表示没有 */
   currentUuid: string;
 }>();
 
-// 皮肤显示模式是否为 3D（仰视 / 俯视都用等距全身图，槽位与悬浮样式一致）
+// 皮肤显示模式是否为 3D：仰视 / 俯视都用等距全身图，槽位与悬浮样式一致
 const isSkin3D = computed(() => skinDisplay.value === "Skin3D" || skinDisplay.value === "Skin3DD");
 
 const emit = defineEmits<{
+  /** 打开「添加账户」表单 */
   (e: "add"): void;
+  /** 双击账户：切换为当前使用 */
   (e: "switch", acc: AccountStoreDto): void;
+  /** 刷新该账户的令牌 */
   (e: "refresh", acc: AccountStoreDto): void;
+  /** 预览该账户的皮肤 / 披风 */
   (e: "viewSkin", acc: AccountStoreDto): void;
+  /** 重取该账户的皮肤渲染图 */
   (e: "refreshSkin", acc: AccountStoreDto): void;
+  /** 重新登录该账户 */
   (e: "relogin", acc: AccountStoreDto): void;
+  /** 编辑该账户 */
   (e: "edit", acc: AccountStoreDto): void;
+  /** 删除该账户 */
   (e: "delete", acc: AccountStoreDto): void;
 }>();
 
+/** 是否当前使用的账户 */
 function isCurrent(acc: AccountStoreDto): boolean {
   return acc.uuid === props.currentUuid;
 }
 
-// 悬停图片浮动显示对应大图（头像 → 头部渲染，皮肤 → 全身图，披风 → 正面 + 背面两张并排）
+// 悬停图片浮动显示对应大图：头像取头部渲染，皮肤取全身图，披风取正面 + 背面两张并排
 const preview = ref<{
   x: number;
   y: number;
@@ -51,6 +62,7 @@ const preview = ref<{
   acc: AccountStoreDto;
 } | null>(null);
 
+/** 按图片类型取预览大图地址 */
 const previewUrl = (kind: string, acc: AccountStoreDto): string =>
   kind === "avatar"
     ? acc.avatar || accountAvatarUrl(acc)
@@ -58,6 +70,7 @@ const previewUrl = (kind: string, acc: AccountStoreDto): string =>
       ? accountSkinUrl(acc)
       : accountCapeUrl(acc);
 
+/** 悬停时定位并展示大图；该图已加载失败就不展示 */
 function showPreview(e: MouseEvent, acc: AccountStoreDto, kind: string) {
   if (imageFailed(acc, kind)) return;
   preview.value = {
@@ -73,7 +86,7 @@ function showPreview(e: MouseEvent, acc: AccountStoreDto, kind: string) {
 
 function movePreview(e: MouseEvent) {
   if (!preview.value) return;
-  // 右/下缘内翻，避免大图出窗（3D 等距图 320px 见方 + 边距）
+  // 右/下缘内翻，避免大图出窗：3D 等距图 320px 见方 + 边距
   preview.value.x = Math.min(e.clientX + 14, window.innerWidth - 352);
   preview.value.y = Math.min(e.clientY + 14, window.innerHeight - 368);
 }
@@ -280,7 +293,7 @@ function hidePreview() {
   image-rendering: pixelated;
 }
 
-/* 披风渲染输出为 10×16 竖图（cape_2d_draw），槽位与皮肤同宽（48px），
+/* 披风渲染输出为 10×16 竖图（cape_2d_draw），槽位与皮肤同宽 48px，
    高度取槽位高，contain 居中不变形 */
 .img-cape-box {
   width: 48px;
@@ -388,7 +401,7 @@ function hidePreview() {
   border: 1px dashed currentColor;
 }
 
-/* 悬停图片时的大图（Teleport 到 body，跟随鼠标），按图片类型取不同尺寸 */
+/* 悬停图片时的大图：Teleport 到 body，跟随鼠标，按图片类型取不同尺寸 */
 .skin-float {
   position: fixed;
   z-index: 999;
@@ -412,7 +425,7 @@ function hidePreview() {
   height: 256px;
 }
 
-/* 皮肤显示模式 = 3D：等距全身图（渲染图为 272x532，contain 防拉伸变形） */
+/* 皮肤显示模式 = 3D：等距全身图，渲染图为 272x532，contain 防拉伸变形 */
 .skin-float.skin3d img {
   width: 320px;
   height: 320px;
@@ -420,7 +433,7 @@ function hidePreview() {
   image-rendering: auto;
 }
 
-/* 披风悬浮大图 = 正面 + 背面两张并排（各 160x256，gap 分开间距） */
+/* 披风悬浮大图 = 正面 + 背面两张并排，各 160x256，gap 分开间距 */
 .skin-float.cape {
   display: flex;
   gap: 8px;

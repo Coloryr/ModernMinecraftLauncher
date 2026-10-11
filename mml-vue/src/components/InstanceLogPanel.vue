@@ -5,8 +5,9 @@ import { t } from "../lib/i18n";
 import type { LogLine } from "../lib/bindings";
 
 const props = defineProps<{
+  /** 日志行，按时间顺序 */
   logs: LogLine[];
-  /** 撑满父容器（独立日志窗口用；默认固定高度内嵌在主窗口里） */
+  /** 撑满父容器；独立日志窗口用，默认固定高度内嵌在主窗口里 */
   fill?: boolean;
 }>();
 
@@ -53,7 +54,7 @@ const filteredLogs = computed(() =>
   ),
 );
 
-// 日志被清空（clear 事件 / 切换实例）时重置筛选
+// 日志被清空时重置筛选，清空来自 clear 事件或切换实例
 watch(
   () => props.logs.length === 0,
   (empty) => {

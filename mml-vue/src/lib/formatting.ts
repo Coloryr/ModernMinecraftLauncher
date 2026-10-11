@@ -5,8 +5,8 @@
 // 原始字符串原样保留在 DTO 里，不在这里改动、也不回写 —— 所以这个模块只产出
 // "渲染用的片段"，调用方拿去铺 `<span>`。
 //
-// 算法与内核 `mml_game::game_motd::chat_from_plain` 一致（同一套颜色表、
-// 同样的"颜色码会重置字体样式"规则），保证 MOTD 卡片与这里的观感统一。
+// 算法与内核 `mml_game::game_motd::chat_from_plain` 一致，同一套颜色表、
+// 同样的"颜色码会重置字体样式"规则，保证 MOTD 卡片与这里的观感统一。
 // 内核那边是解析 MOTD 的 Chat JSON（要发给前端的是结构化的段），这里只需要
 // 把一段纯文本切好，所以不共用代码、只共用规则。
 
@@ -44,12 +44,20 @@ const CODE_COLORS: Record<string, string> = {
 /**
  * 把带 `§` 格式码的文本切成渲染片段
  *
+ * 认得出的码按下面这套规则处理：
+ *
  * - `§r` 重置全部样式；
  * - 颜色码（`§0`–`§f`）**同时重置字体样式** —— 这是原版行为，不照做会出现
  *   "换了颜色但还带着上一段的加粗"；
  * - `§k`（混淆）当普通文字处理：真做混淆要逐帧随机，静态列表里没意义；
  * - 认不出的码（`§x` 之类）按字面 `§x` 显示，别把作者写错的东西吞掉；
- * - 没有任何格式码时返回**单个无样式片段**（调用方不必特判）。
+ * - 没有任何格式码时返回**单个无样式片段**，调用方不必特判。
+ *
+ * - `text`: 原始文本，`§` 格式码按字面出现在里面
+ *
+ * # 返回值
+ *
+ * 按样式切好的片段，按原文顺序排列
  */
 export function parseFormatting(text: string): FormattedSegment[] {
   const out: FormattedSegment[] = [];
@@ -130,7 +138,15 @@ export function parseFormatting(text: string): FormattedSegment[] {
   return out;
 }
 
-/** 片段 → 内联样式（颜色 + 加粗 / 斜体 / 下划线 / 删除线） */
+/**
+ * 片段 → 内联样式，含颜色与加粗 / 斜体 / 下划线 / 删除线
+ *
+ * - `seg`: 待转换的片段
+ *
+ * # 返回值
+ *
+ * Vue 可直接绑定的样式对象
+ */
 export function segmentStyle(seg: FormattedSegment): Record<string, string> {
   const deco = [seg.underlined ? "underline" : "", seg.strikethrough ? "line-through" : ""]
     .filter(Boolean)
@@ -140,7 +156,7 @@ export function segmentStyle(seg: FormattedSegment): Record<string, string> {
     fontStyle: seg.italic ? "italic" : "inherit",
     textDecoration: deco || "none",
   };
-  // 没指定颜色时不写 color：让它继承所在处（副标题本来是淡色，写死白色会跳出来）
+  // 没指定颜色时不写 color：让它继承所在处，写死白色会在浅色主题下跳出来
   if (seg.color) style.color = seg.color;
   return style;
 }
@@ -148,8 +164,14 @@ export function segmentStyle(seg: FormattedSegment): Record<string, string> {
 /**
  * 去掉格式码、只留纯文本
  *
- * 给**不适合上色**的地方用：`title` 悬浮提示、确认弹窗里的名字、搜索匹配等 ——
+ * 给**不适合上色**的地方用：`title` 悬浮提示、确认弹窗里的名字、搜索匹配等，
  * 那些地方 `§a` 只会显示成一串乱码。
+ *
+ * - `text`: 带格式码的原始文本
+ *
+ * # 返回值
+ *
+ * 去掉全部格式码后的纯文本
  */
 export function stripFormatting(text: string): string {
   return parseFormatting(text)

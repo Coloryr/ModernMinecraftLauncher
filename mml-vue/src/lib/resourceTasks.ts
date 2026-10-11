@@ -8,8 +8,15 @@ import { api, onAddResourceStatus } from "./api";
 import type { ResourceStatusDto } from "./bindings";
 
 /**
- * @param own 是否为添加资源窗口本体（own=true 始终显示进度条；
- *   false = 仅在添加资源窗口关闭时负责显示，主窗口用）
+ * 订阅资源下载任务状态
+ *
+ * - `own`: 是否为添加资源窗口本体。true = 始终显示进度条；
+ *   false = 仅在添加资源窗口关闭时负责显示，主窗口用
+ *
+ * # 返回值
+ *
+ * - `status`: 最近一次任务快照
+ * - `init`: 挂载时调用，先同步一次快照再订阅事件，返回解绑函数
  */
 export function useResourceStatus(own: boolean) {
   const status = ref<ResourceStatusDto | null>(null);

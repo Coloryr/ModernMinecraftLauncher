@@ -1,12 +1,12 @@
 <script setup lang="ts">
-// 模组分类：三种展示方式（列表 / 表格 / JiJ 树）+ 自定义分组
+// 模组分类：列表 / 表格两种展示方式 + 自定义分组
 //
 // - 顶栏（ContentHead）：标题 + 视图切换 + 「分组」开关 + 新建分组 + 刷新
 // - 分组打开：每个自建分组一块，末尾跟一块「未分组」；把模组行拖到某块上即归到该组
 // - 分组关闭：选中的视图直接铺平（拖拽也随之关闭 —— 没有落点可言）
 //
 // 数据：模组列表在 useResourceData，分组在 useModGroups（自己的 JSON），
-// 拖拽在 useModDrag（三种视图共用同一套落点判定）。
+// 拖拽在 useModDrag，两种视图共用同一套落点判定。
 import { computed, onMounted, ref, watch } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
@@ -38,8 +38,11 @@ import { orderedMods } from "../modColumns";
 import type { ModView } from "../types";
 
 const props = defineProps<{
+  /** 数据层，模组列表、加载态与扫描进度从这里取 */
   data: ReturnType<typeof useResourceData>;
+  /** 共用操作层，串行化、确认弹窗与打开目录从这里取 */
   ops: ReturnType<typeof useResourceOps>;
+  /** 视图偏好，模组展示方式、列宽与表头排序从这里取 */
   view: ReturnType<typeof useResourceView>;
 }>();
 
@@ -64,7 +67,7 @@ const { draggingKey, dropTarget, onRowPointerDown, consumeSuppressClick } = useM
  *
  * 反向的"状态分组 → 自建分组"由 [`afterGroupDrop`] 收尾（把模组改回启用），见那里的说明。
  *
- * 「识别失败」不是"可拖成的状态"（坏 jar 拖不动，状态也没法靠拖拽造出来），拖过去当没发生。
+ * 「识别失败」不是"可拖成的状态"：坏 jar 拖不动，状态也没法靠拖拽造出来，拖过去当没发生。
  */
 async function applyDrop(target: ModDropTarget, keys: string[]) {
   if (target.kind === "group") {
@@ -90,9 +93,9 @@ async function applyDrop(target: ModDropTarget, keys: string[]) {
 /**
  * 拖进自建分组之后收尾：**把模组改成启用**
  *
- * 用户定的口径是"拖动模组修改分组 = 禁用和启用"，所以从「已禁用」拖到某个分组就是启用它
- * （与拖到「已启用」等价）。已经启用的不用碰 —— 启用 / 禁用会改文件名、uuid 跟着变，
- * 能不动就不动（也让"启动器里拖一下、外面只多了个分组"这种常见操作不产生额外写盘）。
+ * 用户定的口径是"拖动模组修改分组 = 禁用和启用"，所以从「已禁用」拖到某个分组就是启用它，
+ * 与拖到「已启用」等价。已经启用的不用碰 —— 启用 / 禁用会改文件名、uuid 跟着变，
+ * 能不动就不动，也让"启动器里拖一下、外面只多了个分组"这种常见操作不产生额外写盘。
  */
 async function afterGroupDrop(keys: string[]) {
   await setState(pickByState(keys, false), false);
@@ -152,12 +155,12 @@ function onDragStart(payload: { event: PointerEvent; item: ModItemDto }) {
  */
 const selected = ref<Set<string>>(new Set());
 
-/** 选中的那些条目（批量操作要 uuid 去调命令，SHA1 只是选中身份） */
+/** 选中的那些条目；批量操作要 uuid 去调命令，SHA1 只是选中身份 */
 const selectedItems = computed<ModItemDto[]>(() =>
   mods.value.filter((item) => selected.value.has(modSelectKey(item))),
 );
 
-/** 右键一行：加进 / 移出选择 */
+/** 把这一行加进 / 移出选择 */
 function onSelect(item: ModItemDto) {
   const key = modSelectKey(item);
   const next = new Set(selected.value);
@@ -174,6 +177,7 @@ function onSelect(item: ModItemDto) {
 /** Shift 整段选择的锚点：上次点（或勾选）的那一项的 SHA1 */
 const lastClickedKey = ref<string | null>(null);
 
+/** 清空选择与锚点 */
 function clearSelection() {
   selected.value = new Set();
   // 锚点也一起清：取消选择后不该还留着"整段从这里开始"的标记
@@ -202,13 +206,13 @@ function onRowClick(payload: { event: MouseEvent; item: ModItemDto }) {
 }
 
 /**
- * Shift + 点：整段选中（**替换**当前选择）
+ * Shift + 点：整段选中，**替换**当前选择
  *
  * 顺序取**当前显示顺序**：
- * - 表格视图套上"按列排序"的口径（`orderedMods`，与 ModTable 共用同一份实现，
- *   否则按列排序后整段选中的范围和看到的对不上 —— 用户报过"整段选中 78 项"）；
- * - 列表视图套上 `sortedMods`（**列表视图自己就按 modid 正序排**，见 ModList 的 `rows`；
- *   这里不排的话，整段选择会和屏幕顺序对不上 —— 用户报过"选中 159 项"）；
+ * - 表格视图套上"按列排序"的口径，即 `orderedMods`，与 ModTable 共用同一份实现；
+ *   不共用的话，按列排序后整段选中的范围和看到的对不上，用户报过"整段选中 78 项"；
+ * - 列表视图套上 `sortedMods`，**列表视图自己就按 modid 正序排**，见 ModList 的 `rows`；
+ *   这里不排的话，整段选择会和屏幕顺序对不上，用户报过"选中 159 项"；
  * - **收起的分组看不见，不算进整段** —— 选中的就是看得见的那一段。
  *
  * 没有锚点（第一次就是 Shift + 点）时只选这一项。
@@ -269,7 +273,7 @@ function batchRemove() {
  * 批量移到某个分组
  *
  * 复用拖拽归组那条路：`groups.setGroup` 本来就收一串 SHA1。
- * 与拖进自建分组同一口径 —— **顺带启用**（见 [`afterGroupDrop`]）。
+ * 与拖进自建分组同一口径，**顺带启用**，见 [`afterGroupDrop`]。
  */
 async function batchMove(group: string, keys: string[] = [...selected.value]) {
   // 分组的键**必须是 SHA1**（内核的 `Mod.Groups` 按内容哈希记）：
@@ -346,7 +350,7 @@ function groupItems(id: string): ModItemDto[] {
   return sections.value.find((sec) => sec.id === id)?.items ?? [];
 }
 
-/** 打开分组右键菜单（表格视图由 ModTable 抛上来，列表视图直接绑在分组头上） */
+/** 打开分组右键菜单；表格视图由 ModTable 抛上来，列表视图直接绑在分组头上 */
 function openGroupMenu(payload: {
   event: MouseEvent;
   id: string;
@@ -368,7 +372,7 @@ function openGroupMenu(payload: {
   };
 }
 
-/** 右键菜单：整组启用 / 禁用（只挑状态不同的，和顶栏批量一个口径） */
+/** 右键菜单：整组启用 / 禁用；只挑状态不同的，和顶栏批量一个口径 */
 async function groupSetState(id: string, wantDisable: boolean) {
   const picked = groupItems(id).filter((item) => item.disable !== wantDisable);
   if (picked.length) await setState(picked, wantDisable);
@@ -394,7 +398,7 @@ function groupRemoveMods(id: string, label: string) {
 }
 
 /**
- * "转移内容"的源分组（null = 这次转移是顶栏那条，源是选中项）
+ * "转移内容"的源分组；`null` 表示这次转移是顶栏那条，源是选中项
  *
  * 复用同一个"移到分组"弹窗：只是把源从选中项换成整组。弹窗里会把这组名显示出来。
  */
@@ -448,10 +452,10 @@ function onGroupMenuAction(kind: GroupMenuAction) {
 // 四个动作都复用已有的**单行**操作（toggle / openNote / openFolder / remove），
 // 所以这里只做分发。原来右键是"加选 / 取消多选"，改成菜单后多选交给左侧勾选框。
 
-/** 打开项目菜单的那一行（null = 没开） */
+/** 打开项目菜单的那一行，`null` 表示没开 */
 const itemMenu = ref<{ item: ModItemDto; x: number; y: number } | null>(null);
 
-/** 打开模组行右键菜单（列表视图与表格视图都抛这个事件上来） */
+/** 打开模组行右键菜单；列表视图与表格视图都抛这个事件上来 */
 function openItemMenu(payload: { event: MouseEvent; item: ModItemDto }) {
   const x = payload.event.clientX;
   const y = payload.event.clientY;
@@ -527,7 +531,7 @@ function onItemMenuAction(kind: ItemMenuAction) {
 
 // ---------- 搜索 ----------
 
-/** 搜索词（**不持久化**：这是一次性的筛选，不是视图偏好，重开窗口该是干净的） */
+/** 搜索词；**不持久化**，这是一次性的筛选而不是视图偏好，重开窗口该是干净的 */
 const keyword = ref("");
 const query = computed(() => keyword.value.trim().toLowerCase());
 
@@ -552,12 +556,12 @@ const noMatch = computed(() => query.value !== "" && matched.value.length === 0)
 /**
  * 状态分组 → 固定 uuid / 文案键
  *
- * 状态分组与自建分组**共用一套 uuid 键**（见 useModGroups 的 `STATE_GROUP_ID_*`）：
+ * 状态分组与自建分组**共用一套 uuid 键**，即 useModGroups 的 `STATE_GROUP_ID_*`：
  * 渲染身份、排序、折叠状态、投放判定全用它，不必再维护"两套键互相映射"。
  *
  * 它们不是用户分组：不可改名 / 删除。归属由"启用 / 禁用"决定：
- * - 拖**到**「已启用 / 已禁用」= 改状态 + 摘出自建分组（见 [`applyDrop`]）；
- * - 从状态分组里拖**到自建分组** = 只归组 + 启用（见 [`afterGroupDrop`]）。
+ * - 拖**到**「已启用 / 已禁用」= 改状态 + 摘出自建分组，见 [`applyDrop`]；
+ * - 从状态分组里拖**到自建分组** = 只归组 + 启用，见 [`afterGroupDrop`]。
  */
 const STATE_KEYS: Record<ModStateGroup, { id: string; labelKey: string }> = {
   on: { id: STATE_GROUP_ID_ON, labelKey: "resource.groupOn" },
@@ -578,11 +582,11 @@ interface ModSection {
 }
 
 /**
- * 分组视图的块：**按用户拖出来的顺序**（顺序表见 useModGroups 的 `order`）
+ * 分组视图的块：**按用户拖出来的顺序**，顺序表见 useModGroups 的 `order`
  *
  * - 自建分组：空的也留着（是个可以往里拖的落点）
- * - 「已启用 / 已禁用」：**空也显示**（用户点名）—— 它们是"改状态"的落点，空着更是个提示
- * - 「识别失败」：空就收起来（没有坏包时它只是个噪音；它也不接受投放）
+ * - 「已启用 / 已禁用」：**空也显示**，这是用户点名的要求 —— 它们是"改状态"的落点，空着更是个提示
+ * - 「识别失败」：空就收起来（没有坏包时它只是个噪音），它也不接受投放
  *
  * 顺序表里可能有已删分组的旧 uuid，所以以实到的为准（找不到的跳过）。
  */
@@ -658,7 +662,7 @@ function isDropTarget(sec: ModSection): boolean {
   return sec.custom && target.kind === "group" && target.group === sec.id;
 }
 
-/** SHA1 → 列表里那一条（拖拽只带内容哈希，改状态要用 uuid 定位） */
+/** SHA1 → 列表里那一条；拖拽只带内容哈希，改状态要用 uuid 定位 */
 const bySha1 = computed(() => {
   const map = new Map<string, ModItemDto>();
   for (const item of mods.value) {
@@ -685,7 +689,7 @@ function counts(sec: ModSection): string {
 /**
  * 分组块的收起 / 展开
  *
- * 状态存在**实例的 `gui_setting.json`**（`Mod.GroupCollapsed`，见 useModGroups）：
+ * 状态存在**实例的 `gui_setting.json`**，即 `Mod.GroupCollapsed`，见 useModGroups：
  * 用户明确要求记住（"已启用默认不展开"），而且换实例各记各的。
  * 键就是分组 uuid —— 与顺序表同一套，不必再转换。
  */
@@ -693,6 +697,7 @@ function isOpen(id: string): boolean {
   return !groups.isCollapsed(id);
 }
 
+/** 收起 / 展开这一块并落盘 */
 function toggleCollapse(id: string) {
   groups.toggleCollapsed(id);
 }
@@ -708,21 +713,13 @@ watch(dropTarget, (target) => {
   if (id && !isOpen(id)) toggleCollapse(id);
 });
 
-// ---------- 分组增删改 ----------
-
 // ---------- 分组头拖拽排序 ----------
 
 /**
- * 块键 → 那块的 `<section>` 元素（量位置算插入点用）
- *
- * 用 `Map` 而不是 `querySelectorAll`：状态分组的渲染键带 `\u0001`，写进选择器要转义，
- * 而且块的渲染顺序就是 `sections` 的顺序，按 key 直接结对更稳。
- */
-/**
- * 块的元素表（量位置算插入点用）
+ * 块的元素表，量位置算插入点用
  *
  * 用 `Map` 而不是 `querySelectorAll`：块的渲染顺序就是 `sections` 的顺序，
- * 按 uuid 直接结对更稳（uuid 也不适合写进选择器）。
+ * 按 uuid 直接结对更稳，uuid 也不适合写进选择器。
  */
 const sectionEls = new Map<string, HTMLElement>();
 
@@ -775,8 +772,8 @@ function showSectionLine(index: number): boolean {
  * 点分组头（箭头 / 名字那一带）→ 折叠或展开
  *
  * 名字那一带同时是**拖拽把手**，所以要先问一句"刚才那一下是不是拖完松手的"：
- * 拖过就把这次 click 吞掉（否则排完序会顺手把分组折叠了）。
- * `consumeSuppressClick` 只在真的拖过时才返回 true（见 useDragGesture 的 `dragged`）。
+ * 拖过就把这次 click 吞掉，否则排完序会顺手把分组折叠了。
+ * `consumeSuppressClick` 只在真的拖过时才返回 true，见 useDragGesture 的 `dragged`。
  */
 function onSectionToggle(id: string) {
   if (consumeSectionClick()) return;
@@ -799,6 +796,7 @@ function openGroupForm(id = "", name = "") {
   groupForm.value = { id, name };
 }
 
+/** 提交分组名弹窗：有 id 就重命名，否则新建 */
 async function saveGroupForm() {
   const form = groupForm.value;
   if (!form || groupBusy.value) return;
@@ -813,7 +811,7 @@ async function saveGroupForm() {
   }
 }
 
-/** 删除分组（传 uuid；确认框里显示的是分组名） */
+/** 删除分组；传 uuid，确认框里显示的是分组名 */
 function removeGroup(id: string, name: string) {
   askConfirm(
     t("resource.groupDelete"),
@@ -836,6 +834,7 @@ function removeGroup(id: string, name: string) {
 const noteForm = ref<{ item: ModItemDto; text: string } | null>(null);
 const noteBusy = ref(false);
 
+/** 打开备注弹窗，草稿带上当前备注 */
 function openNote(item: ModItemDto) {
   noteForm.value = { item, text: item.note };
 }
@@ -875,7 +874,9 @@ async function saveNoteInline(item: ModItemDto, text: string) {
   }
 }
 
-// ---------- 模组操作（三个视图共用） ----------
+// ---------- 模组操作（两种视图共用） ----------
+
+/** 单行启用 / 禁用；拖拽刚结束的那一下 click 不算 */
 function toggle(item: ModItemDto) {
   if (consumeSuppressClick()) return;
   // 单个就是"批量传一个"：走同一条路，同样不重扫、就地更新那一行
@@ -905,8 +906,8 @@ onMounted(() => void groups.load());
         <button class="mini-btn" :disabled="busy" @click="batchSetState(true)">
           {{ t("resource.disable") }}
         </button>
-        <!-- 归组：开弹窗选目标（不用下拉 —— 下拉一次只看得见一项，
-             而且"移到分组"会以占位项的形式混在选项里，看着像能选的东西）。
+        <!-- 归组：开弹窗选目标，不用下拉 —— 下拉一次只看得见一项，
+             而且"移到分组"会以占位项的形式混在选项里，看着像能选的东西。
              按钮文字不带省略号（用户要求），与弹窗标题共用同一条文案 -->
         <button class="mini-btn icon-btn" :disabled="busy" @click="groupPickOpen = true">
           <GlyphIcon name="folder" :size="14" />
@@ -985,9 +986,9 @@ onMounted(() => void groups.load());
     </div>
   </div>
 
-  <!-- 列表视图：按块渲染（自建分组可拖入归组 + 三个状态分组） -->
+  <!-- 列表视图：按块渲染，自建分组可拖入归组，另加三个状态分组 -->
   <div v-else class="item-list mod-groups">
-    <!-- 按块渲染（不用 section 上的 v-for）：插入线要画在"两块之间"，得有个兄弟节点 -->
+    <!-- 按块渲染，不用 section 上的 v-for：插入线要画在"两块之间"，得有个兄弟节点 -->
     <template v-for="(sec, idx) in sections" :key="sec.id">
       <!-- 拖分组头时的插入线：松手后这一块会落到这里 -->
       <span v-if="showSectionLine(idx)" class="mod-group-insert" />
@@ -1017,8 +1018,8 @@ onMounted(() => void groups.load());
             <span class="mod-group-name">{{ sec.label }}</span>
           </span>
           <span class="mod-group-count">{{ counts(sec) }}</span>
-          <!-- 分组的重命名 / 删除 / 整组批量操作都在**右键菜单**里（用户口径：
-               原来那排悬停按钮撤掉，与表格视图同一套入口） -->
+          <!-- 分组的重命名 / 删除 / 整组批量操作都在**右键菜单**里，用户口径是撤掉原来那排
+               悬停按钮，与表格视图同一套入口 -->
         </div>
 
         <div v-show="isOpen(sec.id)" class="mod-group-body">
@@ -1053,7 +1054,7 @@ onMounted(() => void groups.load());
     </div>
   </BaseModal>
 
-  <!-- 模组备注：文件名只读展示（用户认的是名字，落盘的键是文件名） -->
+  <!-- 模组备注：文件名只读展示；用户认的是名字，落盘的键是文件名 -->
   <BaseModal v-if="noteForm" :title="t('resource.modNoteTitle')" :closable="false" @close="noteForm = null">
     <label class="field-label">{{ noteForm.item.name || noteForm.item.file }}</label>
     <p class="mod-note-file" :title="noteForm.item.file">{{ noteForm.item.file }}</p>
@@ -1109,7 +1110,7 @@ onMounted(() => void groups.load());
     </div>
   </BaseModal>
 
-  <!-- 分组右键菜单：只负责画与定位，动作全部抛回这里执行（见 onGroupMenuAction） -->
+  <!-- 分组右键菜单：只负责画与定位，动作全部抛回这里执行，见 onGroupMenuAction -->
   <ModGroupMenu v-if="groupMenu" :x="groupMenu.x" :y="groupMenu.y" :label="groupMenu.label"
     :custom="groupMenu.custom" :count="groupMenu.count" :can-enable="groupMenu.canEnable"
     :can-disable="groupMenu.canDisable" @action="onGroupMenuAction" @close="groupMenu = null" />
@@ -1125,8 +1126,8 @@ onMounted(() => void groups.load());
 </template>
 
 <!-- 备注弹窗的样式走 scoped：BaseModal 是 `Teleport to="body"` 的，弹窗不在
-     `.resource-layout` 里，窗口级 resource.css 那套前缀规则够不着它
-     （同窗口的 ServerFormModal 也是这么处理的） -->
+     `.resource-layout` 里，窗口级 resource.css 那套前缀规则够不着它。
+     同窗口的 ServerFormModal 也是这么处理的 -->
 <style scoped>
 /* 文件名（落盘的键）压暗一行 */
 .mod-note-file {

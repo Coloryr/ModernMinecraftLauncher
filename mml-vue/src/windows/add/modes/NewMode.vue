@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 添加实例 · 模式一：从头新建（版本类型 / 版本 / 加载器 / 加载器版本 / 自定义加载器路径）
+// 添加实例 · 模式一：从头新建，含版本类型 / 版本 / 加载器 / 加载器版本 / 自定义加载器路径
 // 选项数据（版本类型 / 加载器 / 加载器版本）全部来自 mml-core 的独立 ID，显示名走 i18n
 // 版本类型为多选：下拉展开后是复选项；选中多个类型时，右侧版本列表按类型分组
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
@@ -9,6 +9,7 @@ import LoaderQueryProgress from "../../../components/LoaderQueryProgress.vue";
 import type { VersionInfoDto } from "../../../lib/bindings";
 
 const props = defineProps<{
+  /** 可选版本列表，父组件已按版本类型过滤 */
   versions: VersionInfoDto[];
   /** 版本列表是否已加载（区分"加载中"与"该类型下无版本"） */
   versionsLoaded: boolean;
@@ -18,15 +19,19 @@ const props = defineProps<{
   verTypes: string[];
   /** 版本类型 ID 列表（mml-core） */
   versionTypes: string[];
+  /** 已选游戏版本 ID，空 = 还没选 */
   newVersion: string;
+  /** 已选加载器 ID，取值来自 `loaders` */
   loader: string;
   /** 当前版本支持的加载器 ID 列表（mml-core） */
   loaders: string[];
   /** 支持列表查询中（查询期间下拉禁用） */
   loaderLoading: boolean;
-  /** 支持列表查询进度（查询支持的加载器时显示在加载器字段下面） */
+  /** 支持列表查询已完成的步数 */
   queryStep: number;
+  /** 支持列表查询的总步数 */
   queryTotal: number;
+  /** 已选加载器版本，原版 / 自定义为空 */
   loaderVersion: string;
   /** 可用加载器版本列表（由父组件按加载器 + 游戏版本拉取） */
   loaderVersions: string[];
@@ -34,19 +39,28 @@ const props = defineProps<{
   loaderVerLoading: boolean;
   /** 当前加载器没有版本列表（原版 / 自定义），刷新按钮禁用 */
   noLoaderVersion: boolean;
+  /** 自定义加载器的路径，仅 `loader === "custom"` 时用得上 */
   loaderPath: string;
   /** 校验失败：游戏版本必填（高亮 + 自动聚焦） */
   invalidVersion?: boolean;
 }>();
 
 const emit = defineEmits<{
+  /** 已选版本类型变化，空数组 = 不过滤 */
   (e: "update:verTypes", v: string[]): void;
+  /** 已选游戏版本变化 */
   (e: "update:newVersion", v: string): void;
+  /** 已选加载器变化 */
   (e: "update:loader", v: string): void;
+  /** 已选加载器版本变化 */
   (e: "update:loaderVersion", v: string): void;
+  /** 自定义加载器路径变化 */
   (e: "update:loaderPath", v: string): void;
+  /** 点了版本列表的刷新按钮 */
   (e: "refreshVersions"): void;
+  /** 点了支持加载器列表的刷新按钮 */
   (e: "refreshLoaders"): void;
+  /** 点了加载器版本列表的刷新按钮 */
   (e: "refreshLoaderVersions"): void;
 }>();
 
@@ -177,7 +191,7 @@ function onLoaderPathPick(e: Event) {
           </svg>
         </BaseButton>
       </div>
-      <!-- 查询进度就地显示在这里（它属于"加载器类型"这个下拉；原来浮在窗口正上方，离得太远） -->
+      <!-- 查询进度就地显示在这里：它属于"加载器类型"这个下拉，浮在窗口正上方离得太远 -->
       <LoaderQueryProgress v-if="loaderLoading" kind="query" :visible="true" :step="queryStep" :total="queryTotal" />
       <!-- 没选版本时的提示放下拉框下方，不作为列表项 -->
       <div v-else-if="!newVersion" class="field-hint">{{ t("add.pickVersionFirst") }}</div>

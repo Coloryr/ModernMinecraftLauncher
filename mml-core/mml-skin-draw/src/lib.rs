@@ -4,8 +4,8 @@
 //!
 //! | 模块 | 用途 |
 //! |------|------|
-//! | [`skin_draw`] | 像素级绘制基元（复制/混合/缩放/填充） |
-//! | [`skin_2d_draw`] | 皮肤整体 2D 展开（TypeA/TypeB） |
+//! | [`skin_draw`] | 像素级绘制基元：复制 / 混合 / 缩放 / 填充 |
+//! | [`skin_2d_draw`] | 皮肤整体 2D 展开，TypeA / TypeB |
 //! | [`skin_3d_draw`] | 皮肤整体 3D 等距渲染 |
 //! | [`head_2d_draw`] | 2D 头像渲染 |
 //! | [`head_3d_draw`] | 3D 头像渲染 |
@@ -20,28 +20,34 @@ pub mod skin_3d_draw;
 
 /// 像素级绘制基元
 ///
-/// 所有函数直接按预乘 RGBA8 字节操作（行间无填充），
-/// 绘制失败（越界等）统一返回 `None`。
+/// 所有函数直接按预乘 RGBA8 字节操作，行间无填充；
+/// 绘制失败如越界统一返回 `None`。
 pub mod skin_draw {
     use tiny_skia::Pixmap;
 
-    /// TypeA 头像的放大倍数（8x8 → 128x128）
+    /// TypeA 头像的放大倍数，8x8 放大到 128x128
     pub const SCALE_TYPEA: usize = 16;
     /// TypeB 头像/皮肤的放大倍数
     pub const SCALE_TYPEB: usize = 2;
-    /// TypeA 皮肤的放大倍数（16x32 → 128x256）
+    /// TypeA 皮肤的放大倍数，16x32 放大到 128x256
     pub const SCALE_TYPEC: usize = 8;
 
-    /// 每像素字节数（预乘 RGBA8，行间无填充）
+    /// 每像素字节数，预乘 RGBA8，行间无填充
     pub const BPP: usize = 4;
 
     /// 位图一行占用的字节数
+    ///
+    /// - `image`: 目标位图
+    ///
+    /// # 返回值
+    ///
+    /// 返回 `宽度 * 4` 字节
     #[inline]
     pub fn row_bytes(image: &Pixmap) -> usize {
         image.width() as usize * BPP
     }
 
-    /// 整数倍降采样（预乘像素直接求平均即可，不需要还原成直乘）
+    /// 整数倍降采样，预乘像素直接求平均即可，不需要还原成直乘
     pub(crate) fn downsample(src: &Pixmap, factor: u32) -> Option<Pixmap> {
         let width = src.width() / factor;
         let height = src.height() / factor;
@@ -126,7 +132,14 @@ pub mod skin_draw {
         Some(())
     }
 
-    /// 按字节混合一组像素（`under` 是底色、`over` 是源色），返回混合后的 4 字节
+    /// 按字节混合一组像素，`over` 叠在 `under` 之上
+    ///
+    /// - `under`: 底色，按内存顺序的 4 字节
+    /// - `over`: 源色，按内存顺序的 4 字节
+    ///
+    /// # 返回值
+    ///
+    /// 返回混合后的 4 字节；只有双方 alpha 都为 0 时结果的 alpha 才为 0
     ///
     /// 逐字节对称运算：三个颜色通道各自只和同位置的字节混合，
     /// 所以不受"内存里到底是 RGBA 还是 BGRA"的影响。
@@ -212,7 +225,7 @@ pub mod skin_draw {
     /// 最近邻整数倍放大
     ///
     /// - `source`: 源位图
-    /// - `scale`: 放大倍数（每个源像素复制为 scale x scale 块）
+    /// - `scale`: 放大倍数，每个源像素复制为 scale x scale 块
     ///
     /// # 返回值
     ///
@@ -229,11 +242,11 @@ pub mod skin_draw {
 
         let dst_row_bytes = row_bytes(&dst);
 
-        // 最近邻缩放（批量复制）
+        // 最近邻缩放：批量复制
         for src_y in 0..src_height {
             let src_row_offset = src_y * src_row_bytes;
 
-            // 目标行范围（每个源行重复 scale 次）
+            // 目标行范围：每个源行重复 scale 次
             for repeat_y in 0..scale {
                 let dst_y = src_y * scale + repeat_y;
                 let dst_row_offset = dst_y * dst_row_bytes;
@@ -256,7 +269,7 @@ pub mod skin_draw {
         Some(dst)
     }
 
-    /// 在指定区域填充颜色（`pix` 按内存顺序原样写入）
+    /// 在指定区域填充颜色，`pix` 按内存顺序原样写入
     ///
     /// - `dest`: 目标位图
     /// - `x` / `y`: 区域左上角
@@ -300,7 +313,7 @@ pub mod skin_draw {
     /// - `dest`: 目标位图
     /// - `x` / `y`: 区域左上角
     /// - `width` / `height`: 区域尺寸
-    /// - `pix`: 填充颜色（作为源色与目标像素混合）
+    /// - `pix`: 填充颜色，作为源色与目标像素混合
     ///
     /// # 返回值
     ///
@@ -345,7 +358,7 @@ pub mod skin_draw {
     /// - `source`: 源位图
     /// - `x` / `y`: 目标区域左上角
     /// - `sx` / `sy`: 源区域左上角
-    /// - `swidth` / `sheight`: 源区域尺寸（每像素对应一个色块）
+    /// - `swidth` / `sheight`: 源区域尺寸，每像素对应一个色块
     /// - `width` / `height`: 单个色块尺寸
     ///
     /// # 返回值
@@ -409,7 +422,7 @@ pub mod skin_draw {
     /// - `source`: 源位图
     /// - `x` / `y`: 目标区域左上角
     /// - `sx` / `sy`: 源区域左上角
-    /// - `swidth` / `sheight`: 源区域尺寸（每像素对应一个色块）
+    /// - `swidth` / `sheight`: 源区域尺寸，每像素对应一个色块
     /// - `width` / `height`: 单个色块尺寸
     ///
     /// # 返回值
@@ -474,17 +487,17 @@ pub mod skin_draw {
     }
 }
 
-/// 注意：下面的混合函数按 BGRA 字节序解释像素内存（byte0 = B），
-/// 而位图的内存布局是 R,G,B,A（byte0 = R），
-/// 两者通道命名相反，但由于所有混合运算都是按字节逐通道对称进行的，
-/// 除了 alpha（第 4 字节）外不会产生错误结果。
+/// 注意：下面的混合函数按 BGRA 字节序解释像素内存，byte0 当作 B；
+/// 而位图的内存布局是 R,G,B,A，byte0 是 R。
+/// 两者通道命名相反，但所有混合运算都按字节逐通道对称进行，
+/// 除 alpha 即第 4 字节外不会产生错误结果。
 /// 因此本文件中的测试一律直接比较原始字节，而不是比较语义上的 R/G/B 颜色。
 #[cfg(test)]
 mod tests {
     use super::skin_draw::*;
     use tiny_skia::{IntSize, Pixmap};
 
-    /// 创建位图，并对每个像素调用填充函数得到 4 字节（按内存顺序）
+    /// 创建位图，并对每个像素调用填充函数得到 4 字节，按内存顺序
     fn make_bitmap(w: u32, h: u32, fill: impl Fn(i32, i32) -> [u8; 4]) -> Pixmap {
         let mut data = vec![0u8; (w * h) as usize * BPP];
         for (i, chunk) in data.chunks_exact_mut(BPP).enumerate() {
@@ -503,7 +516,7 @@ mod tests {
         out
     }
 
-    /// 根据坐标生成一个唯一且不透明的字节模式（避免全图同色掩盖拷贝错位）
+    /// 根据坐标生成一个唯一且不透明的字节模式，避免全图同色掩盖拷贝错位
     fn pattern(x: i32, y: i32) -> [u8; 4] {
         [
             (x * 7 + 1) as u8,

@@ -4,7 +4,10 @@ import { computed } from "vue";
 import { t } from "../lib/i18n";
 import { typeLabelKey } from "../lib/accountStore";
 
-const props = defineProps<{ authType: string }>();
+const props = defineProps<{
+  /** 账户认证类型，取值如 microsoft / littleskin / authlib / nide8，决定配色 */
+  authType: string;
+}>();
 
 const label = computed(() => t(typeLabelKey(props.authType)));
 </script>

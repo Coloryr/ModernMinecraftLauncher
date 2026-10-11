@@ -15,7 +15,9 @@ import type { useResourceOps } from "../composables/useResourceOps";
 import type { PackItemDto } from "../../../lib/bindings";
 
 const props = defineProps<{
+  /** 数据层，材质包列表与加载态从这里取 */
   data: ReturnType<typeof useResourceData>;
+  /** 共用操作层，串行化与确认弹窗从这里取 */
   ops: ReturnType<typeof useResourceOps>;
 }>();
 
@@ -45,7 +47,7 @@ async function toggle(item: PackItemDto) {
   });
 }
 
-/** 包格式那段文案（与描述分开渲染：描述要过格式码，这一句不要） */
+/** 包格式那段文案；描述要过格式码，这一句不要，所以两段分开渲染 */
 function formatLabel(item: PackItemDto): string {
   return t("resource.packFormat", { format: item.packFormat });
 }

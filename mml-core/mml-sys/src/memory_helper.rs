@@ -4,7 +4,7 @@
 ///
 /// # 返回值
 ///
-/// 返回物理内存总量（单位 MiB），查询失败时返回 `u64::MAX`
+/// 返回物理内存总量，单位 MiB；查询失败时返回 `u64::MAX`
 #[inline(always)]
 pub fn get_memory_size() -> u64 {
     get_memory_size_inner()
@@ -14,12 +14,13 @@ pub fn get_memory_size() -> u64 {
 ///
 /// # 返回值
 ///
-/// 返回可用物理内存（单位 MiB），查询失败时返回 `u64::MAX`
+/// 返回可用物理内存，单位 MiB；查询失败时返回 `u64::MAX`
 #[inline(always)]
 pub fn get_memory_free() -> u64 {
     get_memory_free_inner()
 }
 
+/// Windows 实现：物理内存总量，单位 MiB
 #[cfg(target_os = "windows")]
 fn get_memory_size_inner() -> u64 {
     memory_status()
@@ -27,6 +28,7 @@ fn get_memory_size_inner() -> u64 {
         .unwrap_or(u64::MAX)
 }
 
+/// Windows 实现：可用物理内存，单位 MiB
 #[cfg(target_os = "windows")]
 fn get_memory_free_inner() -> u64 {
     memory_status()
@@ -36,9 +38,8 @@ fn get_memory_free_inner() -> u64 {
 
 /// 查询一次内存状态
 ///
-/// `dwLength` **必须先填成结构体大小**：`MEMORYSTATUSEX::default()` 给的是 0，
-/// 而 `GlobalMemoryStatusEx` 拿它做版本校验，为 0 会直接失败（`ERROR_INVALID_PARAMETER`），
-/// 那样总量与可用量永远只能拿到哨兵值 `u64::MAX`。
+/// `dwLength` 必须先填成结构体大小：`MEMORYSTATUSEX::default()` 给的是 0，
+/// 而 `GlobalMemoryStatusEx` 拿它做版本校验，为 0 会直接失败，总量与可用量就只能拿到 `u64::MAX`。
 #[cfg(target_os = "windows")]
 fn memory_status() -> Option<windows::Win32::System::SystemInformation::MEMORYSTATUSEX> {
     use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
@@ -51,6 +52,7 @@ fn memory_status() -> Option<windows::Win32::System::SystemInformation::MEMORYST
     unsafe { GlobalMemoryStatusEx(&mut ex) }.ok().map(|_| ex)
 }
 
+/// Linux 实现：读 /proc/meminfo 的 MemTotal，单位 MiB
 #[cfg(target_os = "linux")]
 fn get_memory_size_inner() -> u64 {
     use crate::path_helper;
@@ -81,6 +83,7 @@ fn get_memory_size_inner() -> u64 {
     }
 }
 
+/// Linux 实现：读 /proc/meminfo 的 MemFree，单位 MiB
 #[cfg(target_os = "linux")]
 fn get_memory_free_inner() -> u64 {
     use crate::path_helper;
@@ -111,6 +114,7 @@ fn get_memory_free_inner() -> u64 {
     }
 }
 
+/// macOS 实现：读 sysctl hw.memsize，单位 MiB
 #[cfg(target_os = "macos")]
 fn get_memory_size_inner() -> u64 {
     use crate::process_helper;
@@ -138,6 +142,7 @@ fn get_memory_size_inner() -> u64 {
     return u64::MAX;
 }
 
+/// macOS 实现：读 vm_stat 的 Pages free 与页大小，单位 MiB
 #[cfg(target_os = "macos")]
 fn get_memory_free_inner() -> u64 {
     use crate::process_helper;

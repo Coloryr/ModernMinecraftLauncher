@@ -4,7 +4,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
-/** 命令，按来源 .rs 模块分组（参数顺序与 Rust 一致，Tauri 注入的 AppHandle/WebviewWindow 已剔除）*/
+/** 命令，按来源 .rs 模块分组；参数顺序与 Rust 一致，Tauri 注入的 AppHandle / WebviewWindow 已剔除 */
 export const commands = {
   windows: {
     activateDecoration: () => invoke<string>("window_activate_decoration"),

@@ -1,4 +1,4 @@
-// 国际化：zh_cn / en_us（状态持久化到 gui_config.json，与 core Lang 同名）
+// 国际化：zh_cn / en_us，状态持久化到 gui_config.json，与 core Lang 同名
 // 用法：模板中 {{ t("launch.play") }}；带参数 {{ t("detail.launchCount", { count: 3 }) }}
 import { ref } from "vue";
 import zhCN from "./locales/zh-CN";
@@ -14,6 +14,11 @@ const messages: Record<Locale, Record<string, string>> = {
   en_us: enUS as Record<string, string>,
 };
 
+/**
+ * 切换语言
+ *
+ * - `l`: 目标语言
+ */
 export function setLocale(l: Locale) {
   locale.value = l;
   writeString(KEYS.locale, l);
@@ -21,6 +26,7 @@ export function setLocale(l: Locale) {
   saveGuiConfig({ locale: l });
 }
 
+/** 把当前语言写到 `<html lang>` */
 export function applyLocale() {
   document.documentElement.lang = locale.value;
 }
@@ -33,7 +39,16 @@ onStorageChange(KEYS.locale, (value) => {
   }
 });
 
-/** 翻译：key 用点号分隔的扁平键，{param} 插值 */
+/**
+ * 翻译
+ *
+ * - `key`: 点号分隔的扁平键
+ * - `params`: 插值参数，键对应文案里的 `{param}` 占位
+ *
+ * # 返回值
+ *
+ * 译文；键不存在时原样返回 `key`
+ */
 export function t(key: string, params?: Record<string, string | number>): string {
   const msg = messages[locale.value][key];
   if (msg === undefined) return key;
@@ -48,11 +63,24 @@ export function t(key: string, params?: Record<string, string | number>): string
  *
  * 后端 `Err(...)` 返回的是 i18n 键（`err.*`）；`t()` 对不认识的键原样返回，
  * 所以网络 / 第三方返回的普通错误串传进来也不会有副作用。
+ *
+ * - `e`: 后端返回的错误，通常是 i18n 键
+ *
+ * # 返回值
+ *
+ * 译文；不是已知键时原样返回
  */
 export function tErr(e: unknown): string {
   return t(String(e));
 }
 
+/**
+ * 取本模块的国际化入口
+ *
+ * # 返回值
+ *
+ * `t` / `tErr` 两个翻译函数，`locale` 是当前语言的 ref，`setLocale` 用来切换语言
+ */
 export function useI18n() {
   return { t, tErr, locale, setLocale };
 }

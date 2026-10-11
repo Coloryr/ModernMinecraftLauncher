@@ -22,7 +22,9 @@ import type { useResourceOps } from "../composables/useResourceOps";
 import type { SaveBackupDto, SaveItemDto } from "../../../lib/bindings";
 
 const props = defineProps<{
+  /** 数据层，存档列表与加载态从这里取 */
   data: ReturnType<typeof useResourceData>;
+  /** 共用操作层，串行化、确认弹窗与打开目录从这里取 */
   ops: ReturnType<typeof useResourceOps>;
 }>();
 
@@ -45,9 +47,9 @@ function backup(item: SaveItemDto) {
 }
 
 /**
- * 要还原的那个存档 + 它的备份列表（null = 弹窗没开）
+ * 要还原的那个存档 + 它的备份列表，`null` 表示弹窗没开
  *
- * 列表在**点开弹窗时**才去后端取：备份数已经随存档列表给过来了（`item.backups`），
+ * 列表在**点开弹窗时**才去后端取：备份数已经随存档列表给过来了，即 `item.backups`，
  * 所以"有没有备份"不用额外请求；具体文件列表只在真要还原时才需要。
  */
 const restorePick = ref<{ item: SaveItemDto; list: SaveBackupDto[] } | null>(null);
@@ -82,7 +84,7 @@ function pickRestore(backupFile: string) {
   );
 }
 
-/** 上次游玩时间（Unix 毫秒 → 本地时间，未知显示 --） */
+/** 上次游玩时间；入参是 Unix 毫秒，未知时显示 -- */
 function formatTime(ms: number): string {
   if (!ms) return "--";
   return new Date(ms).toLocaleString();

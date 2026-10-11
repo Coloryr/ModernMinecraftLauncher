@@ -1,10 +1,10 @@
-// 设置窗口 · 游戏启动标签（内存 / JVM / 参数 / 启动命令）+ 游戏窗口 + 游戏标题
+// 设置窗口 · 游戏启动标签：内存 / JVM / 参数 / 启动命令，外加游戏窗口与游戏标题
 //
 // 原来的保存模型保留：整份 `run` + `win` 一起防抖 500ms 落盘。本文件补了三件事：
 // 1. 内存冲突（min > max）不再只是弹个 toast 就完事 —— 露出 `memoryConflict` 给界面标红，
 //    并把保存状态标成失败，避免"界面显示非法值、磁盘还是旧值"却毫无提示；
-// 2. 冲突提示每轮只弹一次（原来防抖每 500ms 就再弹一遍）；
-// 3. 关窗前把还没到时的防抖改动立刻保存（原来在 500ms 内关窗会丢改动）。
+// 2. 冲突提示每轮只弹一次；原来防抖每 500ms 就再弹一遍；
+// 3. 关窗前把还没到时的防抖改动立刻保存；原来在 500ms 内关窗会丢改动。
 import { computed, onUnmounted, ref, watch } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
@@ -13,7 +13,7 @@ import type { RunArgSettingDto, WindowSettingDto } from "../../../lib/bindings";
 import { useSaveState } from "./useSaveState";
 import { loadDefaults } from "./useSettingsDefaults";
 
-/** 连续输入合并窗口（毫秒） */
+/** 连续输入合并窗口，单位毫秒 */
 const SAVE_DEBOUNCE = 500;
 
 export interface EnvLine {
@@ -21,7 +21,7 @@ export interface EnvLine {
   value: string;
 }
 
-/** 把 `KEY=VALUE` 多行文本拆成逐条草稿（与 core splitn(2,'=') 语义一致） */
+/** 把 `KEY=VALUE` 多行文本拆成逐条草稿，与 core 的 splitn(2,'=') 语义一致 */
 function parseEnvLines(text: string): EnvLine[] {
   return text
     .split("\n")
@@ -34,10 +34,20 @@ function parseEnvLines(text: string): EnvLine[] {
     });
 }
 
+/**
+ * 游戏启动标签的状态与保存
+ *
+ * # 返回值
+ *
+ * - `run` / `win`: 启动参数与游戏窗口设置，两者一起防抖 500ms 落盘
+ * - `envLines` / `addEnvLine` / `removeEnvLine` / `commitEnvLines`: JVM 环境变量的逐行编辑
+ * - `gcOptions` / `memoryConflict` / `saveState`: 界面选项、内存冲突标记与保存状态
+ * - `load` / `applyLaunch` / `saveNow` / `resetGroup`: 加载、落盘与分组级恢复默认
+ */
 export function useSettingsLaunch() {
   const run = ref<RunArgSettingDto | null>(null);
   const win = ref<WindowSettingDto | null>(null);
-  /** JVM 环境变量逐条编辑（键 / 值两框；落盘时合成回 run.jvmEnv） */
+  /** JVM 环境变量逐条编辑，键 / 值两框；落盘时合成回 run.jvmEnv */
   const envLines = ref<EnvLine[]>([]);
 
   const { state, track, markError } = useSaveState();
@@ -142,7 +152,7 @@ export function useSettingsLaunch() {
 
   // ---------- 恢复默认 ----------
 
-  /** 这几个分组的默认值都在 Rust（RunArgObj::new / WindowSettingObj::new） */
+  /** 这几个分组的默认值都在 Rust，见 RunArgObj::new / WindowSettingObj::new */
 
   async function resetGroup(id: string): Promise<boolean> {
     const d = await loadDefaults();
@@ -199,7 +209,7 @@ export function useSettingsLaunch() {
   }
 
   onUnmounted(() => {
-    // 关窗前把还在防抖里的改动落盘（原来 500ms 内关窗会丢）
+    // 关窗前把还在防抖里的改动落盘，原来 500ms 内关窗会丢
     if (timer !== null) {
       clearTimeout(timer);
       timer = null;

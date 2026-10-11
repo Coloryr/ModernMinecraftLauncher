@@ -4,6 +4,7 @@ use std::{path::PathBuf, sync::LazyLock};
 
 use clipboard_rs::{Clipboard, ClipboardContext};
 
+/// 全局剪贴板上下文，首次使用时惰性创建
 static CONTEXT: LazyLock<ClipboardContext> = LazyLock::new(|| ClipboardContext::new().unwrap());
 
 /// 将文本复制到剪贴板

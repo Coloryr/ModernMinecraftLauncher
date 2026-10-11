@@ -3,7 +3,7 @@
 // 两条约定：
 // - `argsOf` 对**尚未加载**的实例返回一份骨架默认值并塞进 argsMap，模板可以直接读、
 //   不必到处判空；真实值由 `loadArgs` 回来后覆盖。
-// - 编辑走**防抖写回**（每个按键都写盘会产生大量 I/O），窗口内只发最后一次。
+// - 编辑走**防抖写回**：每个按键都写盘会产生大量 I/O，窗口内只发最后一次。
 import { ref, watch, type Ref } from "vue";
 
 import { api } from "../../../lib/api";
@@ -11,10 +11,10 @@ import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
 import type { InstanceArgsDto, InstanceInfoDto } from "../../../lib/bindings";
 
-/** 写回后端的防抖窗口（ms） */
+/** 写回后端的防抖窗口，单位 ms */
 const SAVE_DEBOUNCE = 600;
 
-/** 未加载时的骨架默认值（与后端 InstanceArgsDto 的字段一一对应） */
+/** 未加载时的骨架默认值，字段与后端 InstanceArgsDto 一一对应 */
 const ARGS_DEFAULTS: InstanceArgsDto = {
   memory: 4096,
   minMemory: 512,
@@ -46,7 +46,19 @@ const ARGS_DEFAULTS: InstanceArgsDto = {
 };
 
 /**
- * - `selected`：当前选中实例（参数按实例 uuid 分别缓存）
+ * 主窗口的实例启动参数状态
+ *
+ * - `selected`: 当前选中实例；参数按实例 uuid 分别缓存
+ *
+ * # 返回值
+ *
+ * - `argsMap`: 实例 uuid → 启动参数
+ * - `argsLoaded`: 实例 uuid → 是否已从后端拉到真实值
+ * - `argsOf`: 取某实例的参数，未加载时先落一份骨架默认值
+ * - `loadArgs`: 拉取某实例的参数并覆盖骨架值
+ * - `updateArgs`: 更新参数并防抖写回后端
+ * - `patchArgs`: 只改部分字段，内部转 `updateArgs`
+ * - `onServerIp` / `onServerJoin`: 服务器地址与"启动时加入"两个输入的写入口
  */
 export function useInstanceArgs(opts: { selected: Ref<InstanceInfoDto | null> }) {
   const { selected } = opts;

@@ -64,17 +64,17 @@ use crate::{
 
 /// 下载任务进度快照
 pub struct TaskStateObj {
-    /// 任务编号
+    /// 任务编号，全局唯一自增 ID
     pub id: u64,
-    /// 下载进度（0.0–100.0）
+    /// 下载进度，范围 0.0–100.0
     pub progress: f64,
 }
 
 /// 下载任务状态变更事件
 pub enum DownloadTaskState {
-    /// 新任务已添加
+    /// 新任务已添加，携带任务编号
     AddTask(u64),
-    /// 任务已移除
+    /// 任务已移除，携带任务编号
     RemoveTask(u64),
     /// 任务进度更新
     UpdateTask(TaskStateObj),
@@ -86,21 +86,17 @@ pub enum DownloadTaskState {
 pub trait IDownloadGui {
     /// 单个文件下载状态更新
     ///
-    /// # 参数
-    ///
     /// - `thread`: 下载线程序号
     /// - `file`: 当前正在下载的文件信息
     fn update(&self, thread: u32, file: &Arc<DownloadItem>);
 
     /// 下载任务进度更新
     ///
-    /// # 参数
-    ///
     /// - `state`: 任务状态变更类型
     fn update_task(&self, state: DownloadTaskState);
 }
 
-/// 下载项目（关联任务和具体文件）
+/// 下载项目，关联任务和具体文件
 pub(crate) struct DownloadObj {
     /// 所属下载任务
     pub task: Arc<DownloadTask>,
@@ -133,20 +129,17 @@ static DOWNLOAD_PATH: OnceLock<PathBuf> = OnceLock::new();
 
 /// 初始化下载文件夹
 ///
-/// # 参数
-///
 /// - `dir`: 程序运行根目录，下载文件夹将创建在 `{dir}/downloads/` 下
 pub fn init<P: AsRef<Path>>(path: P) -> CoreResult<()> {
     let cache = CACHE_PATH.get_or_init(|| path.as_ref().join(names::CACHE_DIR));
     if !cache.exists() {
         path_helper::create_dir_all(cache)?;
     } else {
-        // 启动时清空下载临时目录：此时没有任何下载任务，目录里只会有
-        // 上次运行残留的临时文件（崩溃 / 断电 / 任务被强杀留下），不清会一直占空间。
-        //
-        // **跳过 webview 子目录**：界面的 EBWebView 档案（localStorage / cookie / 缓存）
-        // 也放在 cache 下，那是长期数据，清了等于每次启动都"重装一遍界面状态"
-        // （见 names::WEBVIEW_DIR 与 mml-gui 的 windows/mod.rs）。
+        // 启动时清空下载临时目录：此时没有任何下载任务，目录里只会有上次运行残留的
+        // 临时文件，崩溃 / 断电 / 任务被强杀都会留下，不清会一直占空间。但 webview
+        // 子目录要跳过：界面的 EBWebView 档案（localStorage / cookie / 缓存）也放在
+        // cache 下，那是长期数据，清了等于每次启动都"重装一遍界面状态"，见
+        // names::WEBVIEW_DIR 与 mml-gui 的 windows/mod.rs。
         if let Ok(entries) = std::fs::read_dir(cache) {
             for entry in entries.flatten() {
                 if entry.file_name() == names::WEBVIEW_DIR {
@@ -180,9 +173,11 @@ pub fn get_download_path() -> PathBuf {
     DOWNLOAD_PATH.get().unwrap().clone()
 }
 
-/// 生成一个随机的临时文件路径（UUID v4）
+/// 生成一个随机的临时文件路径，UUID v4
 ///
-/// 保证不与已有文件冲突。
+/// # 返回值
+///
+/// 返回下载临时目录下尚不存在的路径，保证不与已有文件冲突
 pub fn gen_temp_file() -> PathBuf {
     loop {
         let file = CACHE_PATH.get().unwrap().join(Uuid::new_v4().to_string());
@@ -213,7 +208,7 @@ pub(crate) fn update(thread: u32, file: &Arc<DownloadItem>) {
 /// 通知 UI：任务进度更新
 ///
 /// - `id`: 任务编号
-/// - `progress`: 任务进度（0.0–100.0）
+/// - `progress`: 任务进度，范围 0.0–100.0
 pub(crate) fn update_task(id: u64, progress: f64) {
     if let Some(gui) = DOWNLOAD_GUI.get() {
         gui.as_ref()
@@ -239,7 +234,11 @@ pub(crate) fn remove_task(id: u64) {
     }
 }
 
-/// 生成下一个任务编号（原子自增）
+/// 生成下一个任务编号，原子自增
+///
+/// # 返回值
+///
+/// 返回全局唯一且递增的任务编号，从 1 开始
 pub(crate) fn gen_task_id() -> u64 {
     NEXT_TASK_ID.fetch_add(1, Ordering::SeqCst)
 }
@@ -247,7 +246,11 @@ pub(crate) fn gen_task_id() -> u64 {
 /// 从任务队列中获取一个待下载的文件项
 ///
 /// 遍历所有未完成任务，返回第一个有可用下载项的任务。
-/// 暂停中的任务不分配新文件（在途文件由下载线程阻塞等待恢复）。
+/// 暂停中的任务不分配新文件，在途文件由下载线程阻塞等待恢复。
+///
+/// # 返回值
+///
+/// 无可用下载项或全局暂停时返回 `None`
 pub(crate) fn get_item() -> Option<DownloadObj> {
     if PAUSED.load(Ordering::SeqCst) {
         return None;
@@ -281,7 +284,7 @@ pub(crate) fn task_done(task: &DownloadTask) {
 
 /// 启动下载器
 ///
-/// 根据配置中的下载线程数创建工作线程池。
+/// 按配置中的下载线程数创建工作线程池，线程数非法时按 5 个处理。
 /// 应在下载前调用一次。
 pub fn start() {
     let config = mml_config::read_config();
@@ -323,17 +326,21 @@ pub struct TaskSnapshot {
     pub completed: usize,
     /// 失败数
     pub failed: usize,
-    /// 总大小（字节；元信息未知的文件按 0 计）
+    /// 总大小，单位字节；元信息未知的文件按 0 计
     pub all_bytes: u64,
-    /// 已下载大小（字节）
+    /// 已下载大小，单位字节
     pub now_bytes: u64,
-    /// 已进行时间（毫秒）
+    /// 已进行时间，单位毫秒
     pub elapsed_ms: u64,
     /// 是否暂停
     pub paused: bool,
 }
 
-/// 获取当前进行中任务的快照列表（下载窗口查询用）
+/// 获取当前进行中任务的快照列表，供下载窗口查询
+///
+/// # 返回值
+///
+/// 返回队列中每个任务的进度快照，无进行中任务时为空列表
 pub fn get_tasks() -> Vec<TaskSnapshot> {
     let read = TASKS.read().unwrap();
     read.iter()
@@ -355,7 +362,9 @@ pub fn get_tasks() -> Vec<TaskSnapshot> {
 
 /// 暂停指定任务：不再分配新文件，在途文件阻塞等待恢复
 ///
-/// 成功返回 `true`，任务不存在（已完成 / 已取消）返回 `false`
+/// # 返回值
+///
+/// 成功返回 `true`，任务不存在、已完成或已取消时返回 `false`
 pub fn pause_task(id: u64) -> bool {
     let read = TASKS.read().unwrap();
     match read.iter().find(|t| t.id == id) {
@@ -369,7 +378,9 @@ pub fn pause_task(id: u64) -> bool {
 
 /// 恢复指定任务并唤醒下载线程
 ///
-/// 成功返回 `true`，任务不存在（已完成 / 已取消）返回 `false`
+/// # 返回值
+///
+/// 成功返回 `true`，任务不存在、已完成或已取消时返回 `false`
 pub fn resume_task(id: u64) -> bool {
     {
         let read = TASKS.read().unwrap();
@@ -393,6 +404,8 @@ pub fn is_paused_all() -> bool {
 
 /// 全局暂停：暂停所有任务，期间新增的任务也保持暂停
 ///
+/// # 返回值
+///
 /// 返回被暂停的任务数
 pub fn pause_all() -> usize {
     PAUSED.store(true, Ordering::SeqCst);
@@ -404,6 +417,8 @@ pub fn pause_all() -> usize {
 }
 
 /// 全局恢复：恢复所有任务并唤醒下载线程
+///
+/// # 返回值
 ///
 /// 返回被恢复的任务数
 pub fn resume_all() -> usize {
@@ -424,6 +439,8 @@ pub fn resume_all() -> usize {
 
 /// 全局停止：取消所有任务并清空任务队列
 ///
+/// # 返回值
+///
 /// 返回被停止的任务数
 pub fn cancel_all() -> usize {
     let tasks: Vec<Arc<DownloadTask>> = {
@@ -439,9 +456,11 @@ pub fn cancel_all() -> usize {
     count
 }
 
-/// 取消指定任务：移出队列并唤醒完成等待（在途文件自然结束，剩余文件不再下载）
+/// 取消指定任务：移出队列并唤醒完成等待，在途文件自然结束，剩余文件不再下载
 ///
-/// 取消成功返回 `true`，任务不存在（已完成 / 已取消）返回 `false`
+/// # 返回值
+///
+/// 取消成功返回 `true`，任务不存在、已完成或已取消时返回 `false`
 pub fn cancel_task(id: u64) -> bool {
     let task = {
         let mut tasks = TASKS.write().unwrap();
@@ -458,8 +477,6 @@ pub fn cancel_task(id: u64) -> bool {
 
 /// 创建新下载任务并开始下载
 ///
-/// # 参数
-///
 /// - `items`: 需要下载的文件列表
 ///
 /// # 返回值
@@ -472,10 +489,13 @@ pub async fn start_download_task(items: Vec<FileItemObj>) -> bool {
 
 /// 创建新下载任务并开始下载，外部可通过 `cancel` 取消
 ///
-/// 取消后任务被移出队列（在途文件自然结束），返回 `false`
-///
 /// - `items`: 需要下载的文件列表
 /// - `cancel`: 外部取消令牌
+///
+/// # 返回值
+///
+/// `true` — 全部下载成功
+/// `false` — 任务被停止、被取消或有文件下载失败；取消后任务会被移出队列
 pub async fn start_download_task_cancellable(
     items: Vec<FileItemObj>,
     cancel: CancellationToken,

@@ -8,10 +8,14 @@ import BaseButton from "../../../components/ui/BaseButton.vue";
 defineProps<{
   /** overwrite = 覆盖同名实例；其余 = 询问是否允许自动改名 */
   kind: string;
+  /** 冲突的实例名，弹窗正文里用 */
   name: string;
 }>();
 
-const emit = defineEmits<{ (e: "answer", v: boolean): void }>();
+const emit = defineEmits<{
+  /** 答复后端：true = 同意覆盖或自动改名 */
+  (e: "answer", v: boolean): void;
+}>();
 </script>
 
 <template>

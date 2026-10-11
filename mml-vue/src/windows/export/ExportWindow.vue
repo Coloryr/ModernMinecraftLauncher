@@ -1,9 +1,10 @@
 <script setup lang="ts">
-// 实例导出窗口：把游戏实例打包为通用标准整合包（CurseForge zip / Modrinth .mrpack）
+// 实例导出窗口：把游戏实例打包为通用标准整合包，格式为 CurseForge zip 或 Modrinth .mrpack
 //
-// 目标实例来源（按优先级）：openWindow 带入的目标参数（单窗口模式走 windowParams，
-// 多窗口走 URL uuid）→ `export-focus` 事件（窗口已存在时再次打开，壳层推送）→ 实例下拉。
-// 打包在 Rust 侧后台任务执行（export_run），进度经 export-progress 事件上报。
+// 目标实例按优先级取：openWindow 带入的目标参数 → `export-focus` 事件 → 实例下拉。
+// 目标参数单窗口模式走 windowParams，多窗口走 URL uuid；
+// `export-focus` 是窗口已存在时再次打开，由壳层推送。
+// 打包在 Rust 侧后台任务执行，即 export_run，进度经 export-progress 事件上报。
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
@@ -16,6 +17,7 @@ import { isTauri, targetUuid, windowParams } from "../windowManager";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import type { ExportInfoDto, ExportProgressDto, InstanceInfoDto } from "../../lib/bindings";
 
+/** 请求关闭本窗口 */
 defineEmits<{ (e: "close"): void }>();
 
 const inTauri = isTauri();
@@ -47,6 +49,7 @@ const fileExt = computed(() => (pack.value === "modrinth" ? "mrpack" : "zip"));
 
 // ---------------- 实例切换 ----------------
 
+/** 拉选中实例的导出信息，实例名作为包名默认值 */
 async function loadInfo() {
   if (!currentUuid.value) return;
   loadingInfo.value = true;
@@ -71,13 +74,14 @@ watch(currentUuid, loadInfo);
 const progress = ref<ExportProgressDto | null>(null);
 const running = computed(() => progress.value?.state === "running");
 
-/** 进度百分比（running 且 total 有效时） */
+/** 进度百分比：仅在 running 且 total 有效时有意义 */
 const percent = computed(() => {
   const p = progress.value;
   if (!p || p.total <= 0) return 0;
   return Math.min(100, Math.round((p.now / p.total) * 100));
 });
 
+/** 选保存位置后交给 Rust 侧后台导出，进度走 export-progress 事件 */
 async function startExport() {
   if (!currentUuid.value || running.value) return;
   if (!inTauri) return;
@@ -122,7 +126,7 @@ async function startExport() {
 let unlistenProgress: UnlistenFn | null = null;
 let unlistenFocus: UnlistenFn | null = null;
 
-/** 定位到 openWindow 带入的目标实例（没有 / 不存在就保持下拉默认值） */
+/** 定位到 openWindow 带入的目标实例；没有或不存在就保持下拉默认值 */
 function applyTarget() {
   const uuid = targetUuid();
   if (uuid && instances.value.some((i) => i.uuid === uuid)) {
@@ -143,7 +147,7 @@ async function syncInstances() {
 // 单窗口模式：窗口被 KeepAlive 缓存，切回不会重新挂载，自己补一次列表与定位
 useWindowRefresh(syncInstances);
 
-// 已经停在本窗口时又被打开（openWindow 只更新参数、不换组件）：跟着参数换实例
+// 已经停在本窗口时又被打开：openWindow 只更新参数、不换组件，跟着参数换实例
 watch(() => windowParams.value.uuid, applyTarget);
 
 onMounted(async () => {

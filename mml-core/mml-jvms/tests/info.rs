@@ -1,3 +1,4 @@
+/// 扫描本机 Java 并逐条打印，供人工查看
 #[test]
 fn get_java_list() {
     mml_jvms::scan_java();

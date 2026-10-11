@@ -21,6 +21,15 @@ export const SETTINGS_TABS: SettingsTabItem[] = [
   { id: "client", icon: "gear" },
 ];
 
+/**
+ * 判断任意值是不是合法的标签 id
+ *
+ * - `v`: 待判断的值，来自本地存储等不可信来源
+ *
+ * # 返回值
+ *
+ * 命中六个标签之一时为 `true`
+ */
 export function isSettingsTab(v: unknown): v is SettingsTab {
   return SETTINGS_TABS.some((tab) => tab.id === v);
 }

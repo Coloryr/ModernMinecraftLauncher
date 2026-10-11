@@ -16,7 +16,9 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  /** 选中一个实例，父级接着把方块设为它的图标 */
   (e: "pick", inst: InstanceInfoDto): void;
+  /** 请求关闭弹窗，设图标进行中不会触发 */
   (e: "close"): void;
 }>();
 

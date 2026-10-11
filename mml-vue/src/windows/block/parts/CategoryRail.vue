@@ -9,11 +9,16 @@ interface CatItem {
 }
 
 defineProps<{
+  /** 分类条目，第一项是「全部」，其余按后端排序 */
   items: CatItem[];
+  /** 当前选中的分类 ID，空串表示「全部」 */
   active: string;
 }>();
 
-const emit = defineEmits<{ (e: "pick", id: string): void }>();
+const emit = defineEmits<{
+  /** 选中一个分类，参数是分类 ID，空串表示「全部」 */
+  (e: "pick", id: string): void;
+}>();
 </script>
 
 <template>

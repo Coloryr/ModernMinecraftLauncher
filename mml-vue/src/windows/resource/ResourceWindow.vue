@@ -3,10 +3,10 @@
 // 数据来自 resource_* 命令；删除进回收站，操作后重拉当前分类。
 //
 // 这个文件只做编排：
-// - 数据与加载        → composables/useResourceData（分类 / 子页选择也在那儿，加载跟着它走）
-// - 共用操作          → composables/useResourceOps（忙碌标记 / 确认弹窗 / 打开目录 / 重拉）
+// - 数据与加载        → composables/useResourceData；分类 / 子页选择也在那儿，加载跟着它走
+// - 共用操作          → composables/useResourceOps；忙碌标记 / 确认弹窗 / 打开目录 / 重拉
 // - 各分类的列表      → parts/*Pane.vue（每类一个，自带的弹窗跟上）
-// - 窗口级样式        → resource.css（非 scoped，拆开的子组件共用；见该文件头部说明）
+// - 窗口级样式        → resource.css；非 scoped，拆开的子组件共用，见该文件头部说明
 import { computed, onMounted, ref, watch } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
@@ -40,7 +40,10 @@ import "./resource.css";
 // 必须显式声明 close：不声明的话 Vue 会把父级的 @close 当 attrs 透传到根组件（WindowFrame），
 // 与模板里的 @close="$emit('close')" 合并成两个处理器 —— 一次"返回"会调两遍 closeWindow()，
 // 第二遍时 currentKind 已经回到 main，于是"返回"变成退出应用
-defineEmits<{ (e: "close"): void }>();
+defineEmits<{
+  /** 窗口要关掉，由外壳真正执行 */
+  (e: "close"): void;
+}>();
 
 /**
  * 视图偏好（分类顺序 / 上次打开的类别 / 模组展示方式）
@@ -85,7 +88,7 @@ const paneKey = computed(() =>
   category.value === "saves" ? `saves:${saveTab.value}` : category.value,
 );
 
-/** 「下载资源」：开「添加资源」窗口（与主窗口侧边栏那个入口同一个去处） */
+/** 「下载资源」：开「添加资源」窗口，与主窗口侧边栏那个入口同一个去处 */
 function openDownload() {
   openWindow("add_resource");
 }
@@ -128,10 +131,10 @@ const dropLabel = computed(() => {
 const dropParent = computed(() => (dropKind.value === "datapacks" ? dpSave.value : null));
 
 /**
- * 这次拖入接不接（**只在悬停阶段问一次**，见 useFileDrop 的 accept 说明）
+ * 这次拖入接不接，**只在悬停阶段问一次**，见 useFileDrop 的 accept 说明
  *
  * 不接的内容**连拖都拖不进来**：`dragover` 不放行 → 系统画"禁止"光标、松手也不会有 drop。
- * 悬停阶段 DOM 只给 `types` 与（能认出来时的）`isDirectory`，所以这里只判得了两件事：
+ * 悬停阶段 DOM 只给 `types` 与能认出来时的 `isDirectory`，所以这里只判得了两件事：
  * 认出来是目录 → 不接；没带文件（文本 / 网页卡片）→ 不接。
  * 目录与登录快捷方式在悬停时认不全，**松手后由 onFilesDropped 再过滤一次**。
  *
@@ -152,7 +155,7 @@ async function onFilesDropped(payload: FileDropPayload) {
   if (!kind || !uuid) return;
   if (kind === "datapacks" && !parent) return;
 
-  // 这一页只落"资源文件"：目录与登录快捷方式（.url / .webloc）跳过
+  // 这一页只落"资源文件"：目录与登录快捷方式，如 .url / .webloc，跳过
   const paths: string[] = [];
   try {
     for (const path of payload.paths) {
@@ -166,7 +169,7 @@ async function onFilesDropped(payload: FileDropPayload) {
     return;
   }
   if (!paths.length) {
-    // 悬停时没认出目录（`webkitGetAsEntry` 拿不到）、松手才滤空的：给一句说明，别静默
+    // 悬停时没认出目录、松手才滤空的，即 `webkitGetAsEntry` 拿不到：给一句说明，别静默
     showToast(t("resource.dropUnsupported"));
     return;
   }
@@ -194,7 +197,7 @@ async function runImport(kind: string, parent: string | null, paths: string[], m
     } else if (result.skipped.length) {
       showToast(t("resource.dropSkipped", { count: result.skipped.length }));
     }
-    // 磁盘上多/换了文件：重拉当前分类（模组会重解析 jar，但这是导入后必须付的代价）
+    // 磁盘上多/换了文件：重拉当前分类；模组会重解析 jar，但这是导入后必须付的代价
     await data.reloadCurrent();
   } catch (e) {
     showToast(tErr(e));
@@ -237,7 +240,7 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
           否则包一层后间距会丢（主窗口的 .detail-instance 也是这么处理的）。
         -->
         <Transition name="pane-swap" mode="out-in">
-          <!-- 没有选中实例：只给这一条引导（不再顺带铺一个空列表，原先两段会同时出现） -->
+          <!-- 没有选中实例：只给这一条引导，不再顺带铺一个空列表，原先两段会同时出现 -->
           <div v-if="!instance" key="__no-instance" class="empty-tip">
             {{ t("resource.notSelected") }}
           </div>
@@ -262,7 +265,7 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
         @close="dropPending = null" @pick="answerDrop" />
     </div>
 
-    <!-- 拖入文件时的遮罩（标题报出落到哪一类；目录 / 卡片不接，见 canAcceptDrop） -->
+    <!-- 拖入文件时的遮罩：标题报出落到哪一类；目录 / 卡片不接，见 canAcceptDrop -->
     <DropOverlay v-if="fileDragOver" :title="t('resource.dropTitleTo', { name: dropLabel })" />
   </WindowFrame>
 </template>

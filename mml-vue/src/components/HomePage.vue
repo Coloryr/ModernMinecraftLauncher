@@ -11,17 +11,23 @@ import GlyphIcon from "./ui/GlyphIcon.vue";
 
 withDefaults(
   defineProps<{
+    /** 当前这一页的新闻 */
     items: NewsItem[];
+    /** 上次启动的实例；`null` 表示没有，那张卡片不显示 */
     currentInstance: InstanceInfoDto | null;
+    /** 是否一个实例都没有：为 true 时顶部换成空实例引导块 */
     empty?: boolean;
+    /** 新闻是否加载中 */
     loading?: boolean;
+    /** 新闻页码，从 1 开始 */
     page?: number;
+    /** 新闻是否还有下一页 */
     hasMore?: boolean;
     /**
      * 页头返回按钮的文案键
      *
-     * 返回的**去处随视图模式而变**（由调用方决定，见 MainWindow）：
-     * - 列表模式：返回的是"实例列表"那一屏（主页与它同为整屏，属于同级切换）；
+     * 返回的**去处随视图模式而变**，由调用方决定，见 MainWindow：
+     * - 列表模式：返回的是"实例列表"那一屏，主页与它同为整屏，属于同级切换；
      * - 分组 / 平铺模式：实例列表是**常驻的侧栏**，主页只是右侧内容区的一屏，
      *   返回的是被它盖住的"实例设置"详情。
      *
@@ -33,19 +39,29 @@ withDefaults(
 );
 
 const emit = defineEmits<{
+  /** 选中该实例 */
   (e: "select", inst: InstanceInfoDto): void;
+  /** 快捷启动上次启动的实例 */
   (e: "quick-launch"): void;
   /** 点击页头返回按钮：返回实例列表（关闭启动器主页） */
   (e: "back"): void;
+  /** 空实例引导块里的"添加实例" */
   (e: "add-instance"): void;
+  /** 空实例引导块里的"添加账户" */
   (e: "add-account"): void;
+  /** 空实例引导块里的"设置 Java" */
   (e: "add-java"): void;
+  /** 重新拉取新闻 */
   (e: "refresh"): void;
+  /** 新闻上一页 */
   (e: "prev"): void;
+  /** 新闻下一页 */
   (e: "next"): void;
+  /** 打开新闻里的链接 */
   (e: "open", url: string): void;
 }>();
 
+/** 未实现功能的占位提示 */
 function entry(name: string) {
   showToast(t("actions.wip", { name }));
 }
@@ -53,7 +69,7 @@ function entry(name: string) {
 
 <template>
   <div class="home-page">
-    <!-- 页头：主页标题 + 返回（主页自己的页面级控件，不占卡片槽位）。
+    <!-- 页头：主页标题 + 返回，主页自己的页面级控件，不占卡片槽位。
          按钮文案随视图模式变，返回的去处见 backLabelKey 的说明 -->
     <div v-if="!empty" class="page-head">
       <h2 class="page-title">{{ t("home.entry") }}</h2>
@@ -66,7 +82,7 @@ function entry(name: string) {
     <!-- 无实例：空实例引导块（融合空状态设计） -->
     <div v-if="empty" class="empty-block">
       <div class="empty-block-icon">
-        <!-- 图标跟随所在色块的文字色（.empty-block-icon 已把 color 定为 #fff） -->
+        <!-- 图标跟随所在色块的文字色，.empty-block-icon 已把 color 定为 #fff -->
         <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6"
           stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 3 4.5 7.5v9L12 21l7.5-4.5v-9L12 3z" />

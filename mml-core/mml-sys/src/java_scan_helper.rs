@@ -1,10 +1,10 @@
-//! Java 运行时扫描（注册表 / 包管理器 / 常见安装目录）
+//! Java 运行时扫描：注册表 / 包管理器 / 常见安装目录
 
 use std::{collections::HashSet, path::PathBuf};
 
-/// 搜索Java
+/// 搜索本机 Java 运行时：where 命令 + 注册表 + 常见安装目录
 ///
-/// - `java_paths`: 搜索的结果
+/// - `java_paths`: 搜索结果集合，就地插入发现的 javaw.exe 路径
 #[cfg(target_os = "windows")]
 pub fn find_java_inner(java_paths: &mut HashSet<PathBuf>) {
     use mml_names::i18_items::error_type::CoreResult;
@@ -14,7 +14,7 @@ pub fn find_java_inner(java_paths: &mut HashSet<PathBuf>) {
 
     use crate::process_helper;
 
-    /// Windows 注册表读取
+    /// 读取 Oracle JDK/JRE 注册表项下的 JavaHome 值
     fn get_oracle_java_from_registry(key_path: &str) -> CoreResult<Vec<PathBuf>> {
         let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
         let subkey = hklm.open_subkey(key_path).map_err(|_| {
@@ -37,7 +37,7 @@ pub fn find_java_inner(java_paths: &mut HashSet<PathBuf>) {
         Ok(paths)
     }
 
-    /// Eclipse Adoptium（读取子键 `...\hotspot\MSI` 的 Path 值）
+    /// 读取 Eclipse Adoptium 注册表项下 `...\hotspot\MSI` 的 Path 值
     fn get_adoptium_java_from_registry(key_path: &str) -> CoreResult<Vec<PathBuf>> {
         let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
         let subkey = hklm.open_subkey(key_path).map_err(|_| {
@@ -60,7 +60,7 @@ pub fn find_java_inner(java_paths: &mut HashSet<PathBuf>) {
         Ok(paths)
     }
 
-    /// Azul Zulu（读取子键的 InstallationPath 值）
+    /// 读取 Azul Zulu 注册表项下的 InstallationPath 值
     fn get_zulu_java_from_registry(key_path: &str) -> CoreResult<Vec<PathBuf>> {
         let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
         let subkey = hklm.open_subkey(key_path).map_err(|_| {
@@ -143,15 +143,16 @@ pub fn find_java_inner(java_paths: &mut HashSet<PathBuf>) {
     }
 }
 
-/// 搜索Java
+/// 搜索本机 Java 运行时：which 命令 + 发行版包管理器 + 常见安装目录
 ///
-/// - `java_paths`: 搜索的结果
+/// - `java_paths`: 搜索结果集合，就地插入发现的 java 路径
 #[cfg(target_os = "linux")]
 pub(crate) fn find_java_inner(java_paths: &mut HashSet<PathBuf>) {
     use std::path::Path;
 
     use crate::process_helper;
 
+    /// 把符号链接解析为真实路径，非链接时原样返回
     fn resolve_symlink(path: &str) -> Result<PathBuf, std::io::Error> {
         let path = Path::new(path);
         if path.is_symlink() {
@@ -161,7 +162,7 @@ pub(crate) fn find_java_inner(java_paths: &mut HashSet<PathBuf>) {
         }
     }
 
-    /// Arch Linux 查找 Java
+    /// 在 Arch Linux 上通过 pacman 查找 Java
     fn find_java_on_arch(java_paths: &mut HashSet<PathBuf>) {
         // 查询已安装的 JDK/JRE 包
         if let Ok(packages) = process_helper::run_command_arg("pacman", &["-Qs", "jre|jdk"]) {
@@ -239,11 +240,9 @@ pub(crate) fn find_java_inner(java_paths: &mut HashSet<PathBuf>) {
     scan_common_java_dirs(java_paths);
 }
 
-/// 搜索Java
+/// 搜索本机 Java 运行时：java_home 命令 + 系统 JavaVirtualMachines 目录
 ///
-/// # 参数
-///
-/// - `java_paths`: 搜索的结果
+/// - `java_paths`: 搜索结果集合，就地插入发现的 java 路径
 #[cfg(target_os = "macos")]
 pub(crate) fn find_java_inner(java_paths: &mut HashSet<PathBuf>) {
     use std::path::Path;

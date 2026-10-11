@@ -1,7 +1,7 @@
 // 自绘标题栏：平台判定 + 拖动 / 最大化助手
 //
 // 两套样式：`windows` 右端三个方按钮，`macos` 左端红黄绿圆点。
-// 4 月 1 日对调两套样式（愚人节彩蛋）。
+// 4 月 1 日对调两套样式，愚人节彩蛋。
 //
 // 窗口动作都走应用自己的 Rust 命令（见 src-tauri 的 windows/mod.rs 末尾），不走 JS 的
 // `getCurrentWindow()`，省得往 capabilities/default.json 加窗口权限。
@@ -23,7 +23,7 @@ export type TitleBarStyle = "windows" | "macos";
  * 只在 `onMounted` 里设标题的写法再也不会执行，于是从子窗口切回主页面时，
  * 任务栏上仍挂着子窗口的标题。
  *
- * - `title`: 取值函数（每次现取，语言切换后拿到的是新文案）
+ * - `title`: 取值函数，每次现取，语言切换后拿到的是新文案
  */
 export function useWindowTitle(title: () => string) {
   function apply() {
@@ -39,8 +39,16 @@ export function useWindowTitle(title: () => string) {
   onActivated(apply);
 }
 
-/** 运行平台。用 UA 判定——Tauri 与浏览器预览（dev-frontend.bat）都可用，
- *  不必引入 tauri-plugin-os 依赖，也不必加一个异步命令 */
+/**
+ * 运行平台
+ *
+ * 用 UA 判定，Tauri 与浏览器预览都可用，不必引入 tauri-plugin-os 依赖，
+ * 也不必加一个异步命令。
+ *
+ * # 返回值
+ *
+ * `windows` / `linux` / `macos`
+ */
 export function detectOs(): OsKind {
   const ua = navigator.userAgent;
   if (/Macintosh|Mac OS X/.test(ua)) {
@@ -52,7 +60,15 @@ export function detectOs(): OsKind {
   return "windows";
 }
 
-/** 是否 4 月 1 日（本地时间） */
+/**
+ * 是否 4 月 1 日
+ *
+ * - `now`: 判定的时刻，缺省为当前时间
+ *
+ * # 返回值
+ *
+ * 是 4 月 1 日时为 true
+ */
 export function isAprilFools(now = new Date()): boolean {
   return now.getMonth() === 3 && now.getDate() === 1;
 }
@@ -82,8 +98,10 @@ let lastDownTarget: EventTarget | null = null;
 /**
  * 标题栏按下：单击拖动窗口，双击最大化 / 还原
  *
- * 双击在这里自己判——`start_dragging()` 会把指针交给系统，之后的 `dblclick`
+ * 双击在这里自己判：`start_dragging()` 会把指针交给系统，之后的 `dblclick`
  * 事件不一定能到，所以不能依赖 `@dblclick`。
+ *
+ * - `e`: 标题栏上的指针按下事件
  */
 export function onTitleBarPointerDown(e: PointerEvent) {
   if (!isTauri() || e.button !== 0 || isInteractive(e.target)) {
@@ -112,7 +130,13 @@ export function minimizeWindow() {
   commands.windows.minimize().catch(() => { });
 }
 
-/** 最大化 / 还原当前窗口，返回新状态（非 Tauri 环境返回 null） */
+/**
+ * 最大化 / 还原当前窗口
+ *
+ * # 返回值
+ *
+ * 切换后的最大化状态；非 Tauri 环境或调用失败时为 `null`
+ */
 export async function toggleMaximizeWindow(): Promise<boolean | null> {
   if (!isTauri()) {
     return null;
@@ -124,7 +148,13 @@ export async function toggleMaximizeWindow(): Promise<boolean | null> {
   }
 }
 
-/** 当前是否最大化 */
+/**
+ * 当前是否最大化
+ *
+ * # 返回值
+ *
+ * 非 Tauri 环境或调用失败时为 false
+ */
 export async function isWindowMaximized(): Promise<boolean> {
   if (!isTauri()) {
     return false;

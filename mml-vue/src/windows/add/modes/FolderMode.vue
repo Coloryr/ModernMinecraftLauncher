@@ -13,11 +13,15 @@ import type { FileNode } from "../../../lib/fileTree";
 import type { FolderInstanceDto } from "../../../lib/bindings";
 
 const props = defineProps<{
+  /** 文件夹路径 */
   path: string;
+  /** 目录内容树，懒加载时子节点随展开补齐 */
   tree: FileNode[];
+  /** 已勾选的文件 key */
   checked: Set<string>;
+  /** 已展开的目录 key */
   expanded: Set<string>;
-  /** 扫描出的可导入实例（空 = 目录本身就是一个实例目录，走内容树那条路） */
+  /** 扫描出的可导入实例；空表示目录本身就是实例目录，走内容树那条路 */
   found: FolderInstanceDto[];
   /** 已勾选要导入的实例路径 */
   picked: Set<string>;
@@ -30,15 +34,25 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  /** 文件夹路径变化 */
   (e: "update:path", v: string): void;
+  /** 点了「浏览」选文件夹 */
   (e: "pick"): void;
+  /** 点了「扫描目录」，扫描手输 / 粘贴的路径 */
   (e: "rescan"): void;
+  /** 勾选 / 取消某个扫到的实例，`on` 为 true 表示勾选 */
   (e: "toggle-instance", path: string, on: boolean): void;
+  /** 全选 / 全不选扫到的实例，`on` 为 true 表示全选 */
   (e: "set-all-instances", on: boolean): void;
+  /** 勾选 / 取消某个文件 */
   (e: "toggle-file", key: string): void;
+  /** 勾选 / 取消整个目录，`on` 为 true 表示全选 */
   (e: "toggle-dir", node: FileNode, on: boolean): void;
+  /** 展开 / 收起目录 */
   (e: "toggle-expand", key: string): void;
+  /** 展开目录时按需读取它的子节点 */
   (e: "lazy-load", node: FileNode): void;
+  /** 全选 / 全不选内容树，`on` 为 true 表示全选 */
   (e: "set-all", on: boolean): void;
 }>();
 
@@ -68,7 +82,7 @@ watch(
     </BaseButton>
   </div>
 
-  <!-- 扫描失败：把原因显示出来（以前静默回落，看起来像功能没生效） -->
+  <!-- 扫描失败：把原因显示出来，以前静默回落，看起来像功能没生效 -->
   <p v-if="scanError" class="field-hint scan-err">
     {{ t("add.folderScanFail", { msg: scanError }) }}
   </p>

@@ -36,20 +36,21 @@ import { commands } from "../../lib/bindings";
 import type { AccountOAuthDto, AccountOAuthStateDto } from "../../lib/bindings";
 import { loadGuiConfig, type LoginLockItem } from "../../lib/guiConfig";
 import { bumpImageVersion, resetImageState } from "../../lib/accountImages";
-// 皮肤预览弹窗按需加载：它静态引入 skinview3d（内含 three.js，整块 ~560 kB）。
+// 皮肤预览弹窗按需加载：它静态引入 skinview3d，含 three.js 整块 ~560 kB。
 // 账户窗口打开时绝大多数操作是看列表 / 切账户，不该为此先付掉这个体积。
 const SkinModal = defineAsyncComponent(() => import("./SkinModal.vue"));
 
 // 必须显式声明 close：不声明的话 Vue 会把父级的 @close 当 attrs 透传到根组件（WindowFrame），
 // 与模板里的 @close="$emit('close')" 合并成两个处理器 —— 一次"返回"会调两遍 closeWindow()，
 // 第二遍时 currentKind 已经回到 main，于是"返回"变成退出应用
+/** 请求关闭本窗口 */
 defineEmits<{ (e: "close"): void }>();
 
 /** 皮肤预览弹窗（原独立皮肤窗口已并入） */
 const showSkin = ref(false);
 
-// 系统窗口标题由 WindowFrame 统一同步（watch title → window_set_title），
-// 这里不再手动调 JS API setTitle（需要 capabilities 未放行的 set-title 权限）
+// 系统窗口标题由 WindowFrame 统一同步，即 watch title → window_set_title；
+// 这里不再手动调 JS API setTitle，那需要 capabilities 未放行的 set-title 权限
 
 type ViewMode = "grid" | "list" | "detail";
 const view = ref<ViewMode>("grid");
@@ -64,7 +65,7 @@ onMounted(() => {
       loginLock.value = cfg.client.loginLockOn ? cfg.client.loginLock : [];
     }
   });
-  // 设置窗口保存客户端设置时实时同步锁定（增删登录模型后无需重开账户窗口）
+  // 设置窗口保存客户端设置时实时同步锁定，增删登录模型后无需重开账户窗口
   onClientConfigChange((c: ClientConfigDto) => {
     loginLock.value = c.loginLockOn ? c.loginLock : [];
   }).catch(() => { /* 忽略 */ });
@@ -141,7 +142,7 @@ const showAdd = ref(false);
 const addType = ref("offline");
 const addFields = ref<Record<string, string>>({});
 
-// 登录方式锁定（客户端设置里配置的条目列表；总开关打开时只允许列表中的登录方式）
+// 登录方式锁定：客户端设置里配置的条目列表，总开关打开时只允许列表中的登录方式
 const loginLock = ref<LoginLockItem[]>([]);
 const addTypeOptions = computed(() =>
   loginLock.value.length
@@ -149,9 +150,9 @@ const addTypeOptions = computed(() =>
     : ACCOUNT_TYPES,
 );
 
-/** 需要服务器信息的锁定类型（外置登录 / 自定义皮肤站 / 统一通行证） */
+/** 需要服务器信息的锁定类型：外置登录 / 自定义皮肤站 / 统一通行证 */
 const SERVER_LOCK_TYPES = ["authlib", "selflittleskin", "nide8"];
-/** 生效中的锁定类型集合（loginLock 已按总开关过滤，非空 = 锁定生效） */
+/** 生效中的锁定类型集合：loginLock 已按总开关过滤，非空即锁定生效 */
 const lockedTypes = computed(() => new Set(loginLock.value.map((e) => e.ty)));
 
 /** 当前添加类型的锁定服务器条目：有值时服务器输入框换成「登录模型」下拉 */
@@ -160,10 +161,10 @@ const lockServerEntries = computed(() =>
     ? loginLock.value.filter((e) => e.ty === addType.value && e.server)
     : [],
 );
-/** 当前选中的登录模型（值为条目的服务器地址，类型内唯一） */
+/** 当前选中的登录模型：值为条目的服务器地址，类型内唯一 */
 const selectedLockServer = ref("");
 
-/** 选中登录模型：把条目服务器写进对应字段（外置登录 / 自定义皮肤站 → server，统一通行证 → serverId） */
+/** 选中登录模型：把条目服务器写进对应字段，外置登录 / 自定义皮肤站写 server，统一通行证写 serverId */
 function onSelectLockServer(server: string) {
   selectedLockServer.value = server;
   if (addType.value === "nide8") {
@@ -193,7 +194,7 @@ interface AddField {
   key: string;
   labelKey: string;
   password?: boolean;
-  /** 可选字段（如 LittleSkin 的服务器地址：留空即官方站） */
+  /** 可选字段：如 LittleSkin 的服务器地址，留空即官方站 */
   optional?: boolean;
 }
 
@@ -240,19 +241,19 @@ function onAddTypeChange(value: string) {
   resetAddFields();
 }
 
-// ================= 拖入登录快捷方式（.url / .webloc → 预填外置登录地址） =================
+// ================= 拖入登录快捷方式：.url / .webloc 预填外置登录地址 =================
 //
-// 从浏览器直接拖网页上的"卡片"是收不到的（wry 在 Windows 上只认 CF_HDROP，见后端
-// `window_probe_drop` 的说明）：卡片先拖到桌面会变成 `.url` 互联网快捷方式，
+// 从浏览器直接拖网页上的"卡片"是收不到的：wry 在 Windows 上只认 CF_HDROP，
+// 见后端 `window_probe_drop` 的说明。卡片先拖到桌面会变成 `.url` 互联网快捷方式，
 // 再把那个文件拖进来 —— 这两个落点（主窗口 / 本窗口）都走这一段。
 
-/** 拖入的路径是否已经应用过（多窗口模式下 URL 上的参数会一直留着，只能消费一次） */
+/** 拖入的路径是否已经应用过：多窗口模式下 URL 上的参数会一直留着，只能消费一次 */
 let dropApplied = false;
 
 /** 开「添加账户」表单并预填外置登录地址 */
 function applyAuthDrop(url: string) {
   addType.value = "authlib";
-  // 先清上一次的残留（有登录模型锁定时它会把第一个锁定条目选上）
+  // 先清上一次的残留，有登录模型锁定时它会把第一个锁定条目选上
   resetAddFields();
   showAdd.value = true;
   // 锁定生效时服务器字段由下拉决定：地址正好在锁定列表里就选中它，否则直接填进字段
@@ -264,7 +265,7 @@ function applyAuthDrop(url: string) {
   }
 }
 
-/** 消费"拖入的登录快捷方式"（参数从哪读见 windowManager 的 targetDrop） */
+/** 消费"拖入的登录快捷方式"，参数从哪读见 windowManager 的 targetDrop */
 async function consumeDrop() {
   let drop: WindowDropParam | null = null;
   if (multiWindow.value) {
@@ -275,7 +276,7 @@ async function consumeDrop() {
   } else {
     drop = windowParams.value.drop;
     if (!drop) return;
-    // 单窗口：参数用完就清（同 goTo 清 windowParams 的做法）
+    // 单窗口：参数用完就清，同 goTo 清 windowParams 的做法
     windowParams.value = { ...windowParams.value, drop: null };
   }
   if (drop.kind === "shortcut" && drop.url) {
@@ -293,7 +294,7 @@ async function onFilesDropped(payload: FileDropPayload) {
   // ② 快捷方式文件：读文件里的地址
   const first = payload.paths[0];
   if (!first) {
-    // 文本但不是地址（悬停阶段读不到内容，只能等松手）：说明一句，别静默
+    // 文本但不是地址，悬停阶段读不到内容、只能等松手：说明一句，别静默
     showToast(t("account.dropNotShortcut"));
     return;
   }
@@ -312,7 +313,7 @@ async function onFilesDropped(payload: FileDropPayload) {
   applyAuthDrop(probe.url);
 }
 
-// 这里**不传 accept**：悬停阶段 DOM 读不到文本内容（`getData` 在 dragover 期间是空的），
+// 这里**不传 accept**：悬停阶段 DOM 读不到文本内容，`getData` 在 dragover 期间是空的，
 // 判不出"这张卡片是不是地址"，一律接住、松手后再按内容分辨（不是地址就给提示）。
 const { fileDragOver, dragKind } = useFileDrop(onFilesDropped);
 
@@ -326,6 +327,7 @@ watch(
 /** 添加弹窗是否在处理中（防止重复提交） */
 const adding = ref(false);
 
+/** 提交添加：校验必填字段后按类型走设备码流程或直接添加 */
 async function confirmAdd() {
   if (adding.value) return;
   const fields = ADD_FIELDS[addType.value] ?? [];
@@ -366,6 +368,7 @@ async function openBrowser() {
 }
 
 /** 复制到剪贴板：优先异步 Clipboard API，失败回退 execCommand */
+/** 复制文本：异步 Clipboard API 失败时回退 execCommand */
 async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
@@ -395,7 +398,7 @@ function switchAccount(acc: AccountStoreDto) {
   showToast(t("account.switched", { name: acc.userName }));
 }
 
-// 图片种子
+/** 由 uuid 算图片种子，同一账户每次渲染得到同一组随机外观 */
 function seedOf(uuid: string): number {
   let h = 0;
   for (const c of uuid) h = (h * 31 + c.charCodeAt(0)) >>> 0;
@@ -420,7 +423,7 @@ async function refreshSkin(acc: AccountStoreDto) {
   }
 }
 
-/** 查看皮肤：预览被点击的那一条账户（不要求它同时是"当前使用"的账户） */
+/** 查看皮肤：预览被点击的那一条账户，不要求它同时是"当前使用"的账户 */
 const skinTarget = ref<AccountStoreDto | null>(null);
 
 function viewSkin(acc: AccountStoreDto) {
@@ -492,7 +495,7 @@ function openEdit(acc: AccountStoreDto) {
   editFields.value = { name: acc.userName, uuid: acc.uuid };
 }
 
-/** 随机 UUID v4（crypto.randomUUID 不可用时手动拼） */
+/** 随机 UUID v4，crypto.randomUUID 不可用时手动拼 */
 function randomUuid() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     editFields.value.uuid = crypto.randomUUID();
@@ -535,6 +538,7 @@ watch(TYPE_OPTIONS, (opts) => {
   if (!opts.some((o) => o.value === typeFilter.value)) typeFilter.value = "all";
 });
 
+/** 令牌状态转文案 */
 function tokenLabel(acc: AccountStoreDto): string {
   return acc.tokenStatus === "valid" ? t("account.tokenValid") : t("account.tokenExpired");
 }
@@ -754,7 +758,7 @@ function tokenLabel(acc: AccountStoreDto): string {
      min-height 优先于 height，不覆盖就会被撑到 42，比旁边的 36px 控件高一截 */
   min-height: 0;
   height: 36px;
-  /* 定高时高度要和"行高 + 上下内边距 + 上下边框"严格对上（36 = 18 + 8×2 + 1×2），
+  /* 定高时高度要和"行高 + 上下内边距 + 上下边框"严格对上，即 36 = 18 + 8×2 + 1×2，
      对不上文字就会偏离上下中心 */
   line-height: 18px;
   padding: 8px 28px 8px 12px;
@@ -765,7 +769,7 @@ function tokenLabel(acc: AccountStoreDto): string {
   background-size: 11px;
 }
 
-/* 视图切换（grid / list / detail）：SegmentedTabs 默认 35px（27 + 3×2 + 1×2），
+/* 视图切换 grid / list / detail：SegmentedTabs 默认 35px，即 27 + 3×2 + 1×2，
    在标题栏里跟旁边的 36px 控件差 1px，单独拉齐 */
 .head-tabs :deep(.seg-btn) {
   height: 28px;

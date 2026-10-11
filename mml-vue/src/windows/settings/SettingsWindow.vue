@@ -30,7 +30,10 @@ import { isSettingsTab, SETTINGS_TABS, type SettingsTab } from "./types";
 import { groupsOfTab, RESETTABLE_GROUPS, type SettingsHit } from "./search";
 import "./settings.css";
 
-const emit = defineEmits<{ (e: "close"): void }>();
+const emit = defineEmits<{
+  /** 请求关闭本窗口，由标题栏关闭按钮与 Esc 触发 */
+  (e: "close"): void;
+}>();
 
 // ================= 标签（记住上次所在页） =================
 
@@ -70,15 +73,15 @@ function flash(id: string) {
   }, 1600);
 }
 
-/** 各区域的 composable（顺序即"恢复默认"的派发顺序） */
+/** 各区域的 composable，顺序即"恢复默认"的派发顺序 */
 function handlers() {
   return [ui, skin, network, launch, java, client];
 }
 
-/** 本页包含哪些分组（由搜索索引派生：能搜到的分组 = 会被重置的分组） */
+/** 本页包含哪些分组；由搜索索引派生，能搜到的分组就是会被重置的分组 */
 const pageGroups = computed(() => groupsOfTab(tab.value));
 
-/** 本页有没有可恢复的默认值（Java 页没有：列表是系统扫描出来的） */
+/** 本页有没有可恢复的默认值；Java 页没有，列表是系统扫描出来的 */
 const canResetPage = computed(() => pageGroups.value.some((id) => RESETTABLE_GROUPS.includes(id)));
 
 /**
@@ -136,7 +139,7 @@ onMounted(async () => {
   ]);
 });
 
-// 单窗口模式：切走卸掉键盘监听，切回再装上（onActivated 首次挂载也会跑，重复 add 同一函数无副作用）
+// 单窗口模式：切走卸掉键盘监听，切回再装上；onActivated 首次挂载也会跑，重复 add 同一函数无副作用
 onActivated(bindKeys);
 onDeactivated(unbindKeys);
 
@@ -145,7 +148,7 @@ onUnmounted(() => {
   if (flashTimer !== null) clearTimeout(flashTimer);
 });
 
-/** 切到客户端设置页时刷新实例列表 / 自定义主页状态（设置窗口开着时它们可能已被改动） */
+/** 切到客户端设置页时刷新实例列表 / 自定义主页状态；设置窗口开着时它们可能已被改动 */
 watch(tab, (v) => {
   if (v !== "client") return;
   void client.refreshLockInstances();
@@ -156,7 +159,7 @@ watch(tab, (v) => {
 
 function onKeyDown(e: KeyboardEvent) {
   if (e.key !== "Escape") return;
-  // 有弹窗时先让弹窗处理（Java 页的确认框自己听 Esc），别把整扇窗关掉
+  // 有弹窗时先让弹窗处理：Java 页的确认框自己听 Esc，别把整扇窗关掉
   if (document.querySelector(".modal-mask")) return;
   emit("close");
 }
@@ -164,7 +167,7 @@ function onKeyDown(e: KeyboardEvent) {
 
 <template>
   <WindowFrame :title="t('features.settings')" body-fill @close="emit('close')">
-    <!-- 设置项搜索放在标题栏（全局可用：切哪个标签都在，且不随内容区滚动） -->
+    <!-- 设置项搜索放在标题栏：全局可用，切哪个标签都在，且不随内容区滚动 -->
     <template #head-right>
       <SettingsSearch @select="onSearchSelect" />
     </template>

@@ -5,14 +5,19 @@ import GlyphIcon from "./GlyphIcon.vue";
 
 const props = withDefaults(
   defineProps<{
+    /** 当前值，配合 `v-model` 使用 */
     modelValue: number;
+    /** 允许的最小值 */
     min?: number;
+    /** 允许的最大值 */
     max?: number;
+    /** 加减按钮的步长 */
     step?: number;
   }>(),
   { min: 0, max: 99999, step: 1 },
 );
 
+/** `v-model` 更新：夹在 `min`~`max` 之间的新值 */
 const emit = defineEmits<{ (e: "update:modelValue", v: number): void }>();
 
 const editing = ref(false);
@@ -65,8 +70,8 @@ function onCommit() {
 </template>
 
 <style scoped>
-/* 一体式数字步进器：[- 输入框 +] 共用一个圆角边框盒
-   （底色用 --bg-raised：比卡片明显亮一档的专用色阶，见 themes.css） */
+/* 一体式数字步进器：[- 输入框 +] 共用一个圆角边框盒。
+   底色用 --bg-raised，比卡片明显亮一档的专用色阶，见 themes.css */
 .stepper {
   display: inline-flex;
   align-items: stretch;

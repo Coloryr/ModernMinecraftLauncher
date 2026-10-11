@@ -12,11 +12,11 @@ use serde::{Deserialize, Serialize};
 pub struct OAuthGetCodeResObj {
     /// 用户需要在浏览器中输入的设备码
     pub code: String,
-    /// 用户需要访问的验证网址（如 `https://microsoft.com/link`）
+    /// 用户需要访问的验证网址，如 `https://microsoft.com/link`
     pub url: String,
     /// 设备码，用于后续轮询令牌
     pub device_code: String,
-    /// 设备码的有效期（秒），超时后需重新获取
+    /// 设备码的有效期，单位秒，超时后需重新获取
     pub expires_in: i64,
 }
 
@@ -26,15 +26,15 @@ pub struct OAuthGetCodeResObj {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct OAuthObj {
-    /// 用户码（显示给用户，用于手动输入）
+    /// 用户码，显示给用户，用于手动输入
     pub user_code: String,
-    /// 错误信息（授权失败时）
+    /// 错误信息，授权失败时才有值
     pub error: Option<String>,
-    /// 设备码（用于后续令牌轮询）
+    /// 设备码，用于后续令牌轮询
     pub device_code: String,
-    /// 验证网址（用户需访问的 URL）
+    /// 验证网址，用户需访问的 URL
     pub verification_uri: String,
-    /// 有效时间（秒）
+    /// 有效时间，单位秒
     pub expires_in: i64,
 }
 
@@ -64,7 +64,7 @@ pub struct OAuthGetCodeObj {
     pub error: Option<String>,
     /// Microsoft OAuth 访问令牌
     pub access_token: String,
-    /// Microsoft OAuth 刷新令牌（用于长期保持登录状态）
+    /// Microsoft OAuth 刷新令牌，用于长期保持登录状态
     pub refresh_token: String,
 }
 
@@ -82,7 +82,7 @@ impl Default for OAuthGetCodeObj {
 mod tests {
     use super::*;
 
-    /// 设备码端点响应应正确解析（微软实际返回中还含 interval/message 等多余字段）
+    /// 设备码端点响应应正确解析，微软实际返回中还含 interval / message 等多余字段
     #[test]
     fn test_oauth_obj_parse_device_code() {
         // 假数据，字段布局与微软设备授权端点一致
@@ -103,7 +103,7 @@ mod tests {
         assert_eq!(obj.error, None);
     }
 
-    /// 带错误信息的设备码响应（如客户端 ID 无效）
+    /// 带错误信息的设备码响应，如客户端 ID 无效
     #[test]
     fn test_oauth_obj_parse_error() {
         let json = r#"{
@@ -134,7 +134,7 @@ mod tests {
         assert_eq!(back.expires_in, 900);
     }
 
-    /// 令牌端点成功响应应解析出 access/refresh token（多余字段忽略）
+    /// 令牌端点成功响应应解析出 access / refresh token，多余字段忽略
     #[test]
     fn test_oauth_get_code_obj_parse_success() {
         let json = r#"{

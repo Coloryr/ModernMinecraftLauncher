@@ -15,6 +15,21 @@ export const NO_VERSION_LOADERS = ["normal", "custom"];
 /** 支持列表查询失败时的兜底选项（原版 + 自定义） */
 const FALLBACK_LOADERS = NO_VERSION_LOADERS;
 
+/**
+ * 加载器联动：某个游戏版本支持哪些加载器，以及该加载器的版本列表
+ *
+ * - `gameVersion`: 当前游戏版本，变化时自动重查
+ * - `isLeaving`: 询问是否正在关窗；关窗后在途结果一律丢弃
+ *
+ * # 返回值
+ *
+ * - `loaders` / `loader` / `loaderVersion`: 支持的加载器列表、已选加载器、已选加载器版本
+ * - `loaderVersions`: 当前加载器与游戏版本对应的版本列表
+ * - `loaderLoading` / `loaderVerLoading`: 两个查询各自的进行中标志
+ * - `queryStep` / `queryTotal` / `showQueryProgress`: 支持列表查询进度，给进度条用
+ * - `fetchSupportLoaders` / `refreshSupportLoaders` / `refreshLoaderVersions`: 查询与刷新方法
+ * - `dropPending` / `syncCloseGuard`: 丢在途查询状态、按当前状态重判关闭保护
+ */
 export function useLoaders(gameVersion: Ref<string>, isLeaving: () => boolean) {
   const { track } = useUnlisteners();
   /** 当前游戏版本支持的加载器 ID 列表（mml-core 独立 ID，显示名走 i18n） */
@@ -30,7 +45,7 @@ export function useLoaders(gameVersion: Ref<string>, isLeaving: () => boolean) {
   /** 加载器版本列表拉取中 */
   const loaderVerLoading = ref(false);
 
-  /** 支持列表查询进度（弹条用；mml-core 每查完一种加载器推一步） */
+  /** 支持列表查询进度：mml-core 每查完一种加载器推一步，给进度条用 */
   const queryStep = ref(0);
   const queryTotal = ref(0);
   const showQueryProgress = ref(false);
@@ -50,9 +65,13 @@ export function useLoaders(gameVersion: Ref<string>, isLeaving: () => boolean) {
   }
 
   /**
-   * 查询当前游戏版本支持的加载器（无选中版本时清空，加载器下拉禁用）
+   * 查询当前游戏版本支持的加载器
    *
-   * 返回是否拿到了该版本的有效列表（刷新按钮据此决定要不要提示）。
+   * 无选中版本时清空列表，加载器下拉随之禁用。
+   *
+   * # 返回值
+   *
+   * 是否拿到了该版本的有效列表；刷新按钮据此决定要不要提示
    */
   async function fetchSupportLoaders(): Promise<boolean> {
     const mc = gameVersion.value;
@@ -112,9 +131,13 @@ export function useLoaders(gameVersion: Ref<string>, isLeaving: () => boolean) {
   }
 
   /**
-   * 按当前加载器 + 游戏版本拉取版本列表，命中缓存直接用
+   * 按当前加载器 + 游戏版本拉取版本列表
    *
-   * 返回是否拿到了有效列表（刷新按钮据此决定要不要提示）。
+   * 命中缓存直接返回，不再请求。
+   *
+   * # 返回值
+   *
+   * 是否拿到了有效列表；刷新按钮据此决定要不要提示
    */
   async function fetchLoaderVersions(): Promise<boolean> {
     if (NO_VERSION_LOADERS.includes(loader.value) || !gameVersion.value) {
@@ -166,7 +189,7 @@ export function useLoaders(gameVersion: Ref<string>, isLeaving: () => boolean) {
     if (await fetchLoaderVersions()) showToast(t("tip.refreshed"));
   }
 
-  /** 选版本 / 换加载器时自动重查（watch 而非模板事件，避免漏掉程序性赋值） */
+  /** 选版本 / 换加载器时自动重查；用 watch 而非模板事件，避免漏掉程序性赋值 */
   watch(gameVersion, () => {
     fetchSupportLoaders();
   });
@@ -174,10 +197,10 @@ export function useLoaders(gameVersion: Ref<string>, isLeaving: () => boolean) {
     fetchLoaderVersions();
   });
 
-  // 查询数据期间开启窗口关闭保护（后端在 CloseRequested 阶段拒绝关闭）
+  // 查询数据期间开启窗口关闭保护，后端在 CloseRequested 阶段拒绝关闭
   //
-  // 只在"这一页正被用户看着、且真的在查"时才拦：这两个查询是后台跑的（单窗口模式下
-  // 页面被 KeepAlive 缓存、切走照样跑完），如果只看 loading 标志，用户切去安装整合包、
+  // 只在"这一页正被用户看着、且真的在查"时才拦：这两个查询是后台跑的，单窗口模式下
+  // 页面被 KeepAlive 缓存、切走照样跑完；如果只看 loading 标志，用户切去安装整合包、
   // 甚至过一会儿回来关窗口，守卫还按着，就会莫名其妙弹"正在获取数据，暂时无法关闭窗口"。
   // 关窗不该被这种事拦住 —— 真拦下了也只是浪费一次点击。
   watch(

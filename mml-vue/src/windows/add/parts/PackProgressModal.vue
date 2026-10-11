@@ -6,7 +6,10 @@ import { t } from "../../../lib/i18n";
 import BaseModal from "../../../components/ui/BaseModal.vue";
 import type { PackProgressDto } from "../../../lib/bindings";
 
-const props = defineProps<{ progress: PackProgressDto }>();
+const props = defineProps<{
+  /** 安装进度快照，由 add-pack-progress 事件推送 */
+  progress: PackProgressDto;
+}>();
 
 const percent = computed(() =>
   props.progress.total ? (props.progress.now / props.progress.total) * 100 : 0,

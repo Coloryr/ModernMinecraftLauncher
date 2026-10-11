@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct AgentObj {
-    /// 启动器名称（如 "Minecraft" 或 "M²L"）
+    /// 启动器名称，如 "Minecraft" 或 "M²L"
     pub name: String,
     /// 启动器协议版本号
     pub version: i32,
@@ -21,8 +21,6 @@ pub struct AgentObj {
 
 impl AgentObj {
     /// 创建启动器代理信息
-    ///
-    /// # 参数
     ///
     /// - `use_minecraft`: 是否伪装为 Minecraft 原版启动器头
     ///   - `true` → 使用 "Minecraft" 名称和版本 1
@@ -60,7 +58,7 @@ impl Default for AgentObj {
 pub struct AuthenticateObj {
     /// 启动器代理信息
     pub agent: AgentObj,
-    /// 用户名（通常是邮箱地址）
+    /// 用户名，通常是邮箱地址
     pub username: String,
     /// 密码
     pub password: String,
@@ -87,19 +85,19 @@ impl Default for AuthenticateObj {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct AuthenticateResObj {
-    /// 登录访问令牌（access token）
+    /// 登录访问令牌，即 access token
     #[serde(rename = "accessToken")]
     pub access_token: String,
     /// 客户端标识令牌
     #[serde(rename = "clientToken")]
     pub client_token: String,
-    /// 服务器选定的角色（单角色时非空）
+    /// 服务器选定的角色，单角色时非空
     #[serde(rename = "selectedProfile")]
     pub selected_profile: Option<SelectedProfileObj>,
-    /// 可用角色列表（多角色时非空）
+    /// 可用角色列表，多角色时非空
     #[serde(rename = "availableProfiles")]
     pub available_profiles: Option<Vec<SelectedProfileObj>>,
-    /// 错误消息（认证失败时非空）
+    /// 错误消息，认证失败时非空
     #[serde(rename = "errorMessage")]
     pub error_message: Option<String>,
 }
@@ -128,7 +126,7 @@ pub struct RefreshObj {
     /// 客户端标识令牌
     #[serde(rename = "clientToken")]
     pub client_token: String,
-    /// 要选定的角色（可为空，仅刷新令牌）
+    /// 要选定的角色，可为空，为空时仅刷新令牌
     #[serde(rename = "selectedProfile")]
     pub selected_profile: Option<SelectedProfileObj>,
 }
@@ -149,9 +147,9 @@ impl Default for RefreshObj {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct SelectedProfileObj {
-    /// 角色名称（玩家用户名）
+    /// 角色名称，即玩家用户名
     pub name: String,
-    /// 角色 UUID（Minecraft 格式，带连字符）
+    /// 角色 UUID，Minecraft 格式，含连字符
     pub id: String,
 }
 
@@ -283,7 +281,7 @@ mod tests {
             selected_profile: None,
         };
         let json: serde_json::Value = serde_json::to_value(&without_profile).unwrap();
-        // None 应序列化为 null（而非省略字段），与 Yggdrasil 服务端兼容
+        // None 应序列化为 null 而非省略字段，与 Yggdrasil 服务端兼容
         assert_eq!(json["selectedProfile"], serde_json::Value::Null);
     }
 

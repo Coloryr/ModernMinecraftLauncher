@@ -1,8 +1,8 @@
-//! GPU 渲染测试：每后端渲染同一组模型出图对照（方块模型 / extrude物品 / glint物品）
+//! GPU 渲染测试：每后端渲染同一组模型出图对照，含方块模型、extrude 物品与 glint 物品
 //!
-//! 每个后端一个用例，可单独过滤运行（VK/GL在部分机器上可能无适配器，失败只打印跳过）：
+//! 每个后端一个用例，可单独过滤运行；VK 与 GL 在部分机器上可能无适配器，失败只打印跳过：
 //! `cargo test -p mml-tex-draw --test render_gpu -- --ignored --nocapture render_dx12`
-//! 环境变量 MML_TEST_JAR 指定客户端jar，缺省用反编译参考jar
+//! 环境变量 MML_TEST_JAR 指定客户端 jar，缺省用反编译参考 jar
 //! 输出：tests/out/{furnace,apple,enchanted_book}_{DX12,VULKAN,GL}.png
 
 use std::{collections::HashMap, path::PathBuf, sync::Once};
@@ -14,6 +14,7 @@ use mml_tex_draw::{
 };
 use tiny_skia::Pixmap;
 
+/// 取参考客户端 jar 路径，环境变量 MML_TEST_JAR 优先
 fn ref_jar() -> PathBuf {
     std::env::var("MML_TEST_JAR").map(PathBuf::from).unwrap_or_else(|_| {
         PathBuf::from(std::env::var("TEMP").unwrap_or_default())
@@ -22,6 +23,7 @@ fn ref_jar() -> PathBuf {
     })
 }
 
+/// 取 tests/out 目录，不存在时创建
 fn out_dir() -> PathBuf {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
@@ -30,7 +32,7 @@ fn out_dir() -> PathBuf {
     dir
 }
 
-/// item::render_item 写盘需要 item 输出目录（每进程初始化一次）
+/// item::render_item 写盘需要 item 输出目录，每进程初始化一次
 fn ensure_item_dir() {
     static INIT: Once = Once::new();
     INIT.call_once(|| {
@@ -38,6 +40,7 @@ fn ensure_item_dir() {
     });
 }
 
+/// 把 RGBA 像素写成 size×size 的 PNG 到 tests/out
 fn write_png(name: &str, size: u32, rgba: &[u8]) {
     let path = out_dir().join(name);
     let file = std::fs::File::create(&path).unwrap();
@@ -49,7 +52,7 @@ fn write_png(name: &str, size: u32, rgba: &[u8]) {
     println!("输出：{}", path.display());
 }
 
-/// 烘焙对照方块模型（furnace：多贴图元素模型）
+/// 烘焙对照方块模型 furnace，多贴图元素模型
 fn bake_furnace() -> (BakedModel, HashMap<String, Pixmap>) {
     let jar = ref_jar();
     assert!(jar.exists(), "参考jar不存在：{}", jar.display());
@@ -64,7 +67,7 @@ fn bake_furnace() -> (BakedModel, HashMap<String, Pixmap>) {
     (model, textures)
 }
 
-/// 诊断：每个quad的屏幕包围盒与深度（与 GPU 渲染同一矩阵）
+/// 诊断：每个 quad 的屏幕包围盒与深度，与 GPU 渲染用同一矩阵
 fn print_quad_diag(model: &BakedModel) {
     use glam::{Mat3, Mat4, Vec3, Vec4};
     let size = 256.0f32;
@@ -107,12 +110,12 @@ fn print_quad_diag(model: &BakedModel) {
     }
 }
 
-/// 单后端全套出图：方块直调GPU，物品经render_item（extrude + glint各一）
+/// 单后端全套出图：方块直调 GPU，物品经 render_item，extrude 与 glint 各一
 fn render_backend_suite(tag: &str, ctx: &GpuCtx) {
     ensure_item_dir();
     let archive = BaseArchive::open(ref_jar()).expect("参考jar应能打开");
 
-    // 方块：furnace（多贴图元素模型）
+    // 方块：furnace，多贴图元素模型
     let (model, textures) = bake_furnace();
     print_quad_diag(&model);
     let pixels = ctx.render(&model, &textures, None, 256);
@@ -121,7 +124,7 @@ fn render_backend_suite(tag: &str, ctx: &GpuCtx) {
         None => println!("{tag} furnace 渲染失败"),
     }
 
-    // 物品：apple（extrude挤出）、enchanted_book（glint附魔光效）
+    // 物品：apple 走 extrude 挤出，enchanted_book 走 glint 附魔光效
     let mut cache = HashMap::new();
     for id in ["apple", "enchanted_book"] {
         let out = mml_tex_draw::item::render_item(Some(ctx), &archive, &mut cache, id)
@@ -132,7 +135,7 @@ fn render_backend_suite(tag: &str, ctx: &GpuCtx) {
     }
 }
 
-/// DX12后端（Windows缺省）
+/// DX12 后端，Windows 缺省
 #[test]
 #[ignore]
 fn render_dx12() {
@@ -142,7 +145,7 @@ fn render_dx12() {
     }
 }
 
-/// VULKAN后端
+/// VULKAN 后端
 #[test]
 #[ignore]
 fn render_vulkan() {
@@ -152,7 +155,7 @@ fn render_vulkan() {
     }
 }
 
-/// GL后端
+/// GL 后端
 #[test]
 #[ignore]
 fn render_gl() {

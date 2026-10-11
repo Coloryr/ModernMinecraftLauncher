@@ -1,10 +1,10 @@
 <script setup lang="ts">
-// 方块列表窗口：独立窗口承载方块网格（搜索 / 分类 / 设为实例图标）
+// 方块列表窗口：独立窗口承载方块网格，支持搜索 / 分类 / 设为实例图标
 // 当前实例从 gui_config 的选中实例恢复（与主窗口共享同一份配置）
-// 渲染进行中后端拒绝关闭（close-blocked 事件），这里弹二次确认：中断渲染再关
+// 渲染进行中后端拒绝关闭，即 close-blocked 事件；这里弹二次确认，中断渲染再关
 //
-// 工具条（搜索 / 图标尺寸档 / 添加玩家头颅 / 重新渲染）放在标题栏的 head-right 槽里：
-// 所以状态在这一层创建，面板与工具条共用同一份（BlockPanel 只接收它做排版）。
+// 工具条放在标题栏的 head-right 槽里，含搜索 / 图标尺寸档 / 添加玩家头颅 / 重新渲染：
+// 所以状态在这一层创建，面板与工具条共用同一份；BlockPanel 只接收它做排版。
 import { onMounted, onUnmounted, ref } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BlockPanel from "./BlockPanel.vue";
@@ -19,7 +19,10 @@ import { loadGuiConfig } from "../../lib/guiConfig";
 import { useBlockList } from "./composables/useBlockList";
 import type { InstanceInfoDto } from "../../lib/bindings";
 
-const emit = defineEmits<{ (e: "close"): void }>();
+const emit = defineEmits<{
+  /** 请求关闭本窗口，由标题栏关闭按钮与 Esc 触发 */
+  (e: "close"): void;
+}>();
 
 /** 方块列表状态（面板与标题栏工具条共用） */
 const list = useBlockList();
@@ -31,7 +34,7 @@ let unlisten: (() => void) | null = null;
 /** 关闭被渲染拦下时的二次确认框 */
 const confirmClose = ref(false);
 
-// ---------- 添加玩家头颅（入口在标题栏工具条上，所以弹窗跟着放这一层） ----------
+// ---------- 添加玩家头颅：入口在标题栏工具条上，所以弹窗跟着放这一层 ----------
 
 const skinOpen = ref(false);
 const skinBusy = ref(false);
@@ -54,7 +57,7 @@ onMounted(async () => {
   });
 });
 
-/** 当前实例（首次挂载与切回本窗口都走这里：实例可能已被主窗口切走） */
+/** 当前实例；首次挂载与切回本窗口都走这里，实例可能已被主窗口切走 */
 async function syncInstance() {
   try {
     const [cfg, instances] = await Promise.all([loadGuiConfig(), api.getInstances()]);

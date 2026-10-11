@@ -3,14 +3,14 @@
 // 为什么要收成一个文件：
 // - 各家自己 `localStorage.getItem(...)` 时，"键长什么样""默认值是什么""非法值怎么兜"
 //   全靠约定，同一份数据在两处口径不一致就会出现"设置里改了、主界面没变"；
-// - 键名散在十几个文件里，改一处漏一处（guiConfig.ts 的浏览器回退分支就是手工重列了
-//   一整份键，漏一个就静默丢设置）；
+// - 键名散在十几个文件里，改一处漏一处。guiConfig.ts 的浏览器回退分支就是手工重列了
+//   一整份键，漏一个就静默丢设置；
 // - 将来要换掉 localStorage（换 IndexedDB / 走后端文件），只有这一个文件要改。
 //
 // 键名一律 `mml.` 前缀 + 小驼峰，集中登记在 [`KEYS`]；**不要在别处再写字符串字面量**。
 //
 // 跨窗口同步：原来靠 `window.addEventListener("storage")`——那是 localStorage 的事件，
-// **只有"另一个文档"改了值才触发**（同一个文档里写不触发）。换成后端文件后没有这个事件，
+// **只有"另一个文档"改了值才触发**，同一个文档里写不触发。换成后端文件后没有这个事件，
 // 所以这里自己派发同名事件（见 [`emitChange`]），行为与原来一致：
 // 同源（同一窗口）不触发，其它窗口都触发。
 //
@@ -36,7 +36,7 @@ export const KEYS = {
   font: "mml.font",
   /** 动画开关（"0" = 关） */
   animations: "mml.animations",
-  /** 背景图 dataURL（浏览器回退用；Tauri 下以后端落盘的图为准） */
+  /** 背景图 dataURL：浏览器回退用，Tauri 下以后端落盘的图为准 */
   bgImage: "mml.bgImage",
   /** 背景不透明度 %（浏览器回退用） */
   bgOpacity: "mml.bgOpacity",
@@ -114,7 +114,7 @@ export const KEYS = {
 /** 键名类型（只允许 [`KEYS`] 里登记过的键） */
 export type StorageKey = (typeof KEYS)[keyof typeof KEYS];
 
-/** 存储不可用（隐私模式 / 配额写满）：读返回 null、写静默失败，调用方不必 try/catch */
+/** 存储不可用时读返回 null、写静默失败：隐私模式、配额写满都走这条，调用方不必 try/catch */
 function store(): Storage | null {
   try {
     return window.localStorage;
@@ -124,9 +124,15 @@ function store(): Storage | null {
 }
 
 /**
- * 读原始字符串（没有 / 不可用返回 `null`）
+ * 读原始字符串
  *
- * 想区分"没存过"和"存了空串"时必须用这个；否则直接用下面那几个带默认值的便捷函数。
+ * 想区分"没存过"和"存了空串"时必须用这个，否则直接用下面那几个带默认值的便捷函数。
+ *
+ * - `key`: 存储键，只能取 [`KEYS`] 里登记过的
+ *
+ * # 返回值
+ *
+ * 没有存过或存储不可用时为 `null`
  */
 export function readRaw(key: StorageKey): string | null {
   try {
@@ -136,7 +142,12 @@ export function readRaw(key: StorageKey): string | null {
   }
 }
 
-/** 写原始字符串（失败静默：配额满了不该让界面崩） */
+/**
+ * 写原始字符串
+ *
+ * - `key`: 存储键，只能取 [`KEYS`] 里登记过的
+ * - `value`: 要写入的字符串
+ */
 export function writeRaw(key: StorageKey, value: string): void {
   try {
     store()?.setItem(key, value);
@@ -145,7 +156,11 @@ export function writeRaw(key: StorageKey, value: string): void {
   }
 }
 
-/** 删掉一个键（不存在也没关系） */
+/**
+ * 删掉一个键
+ *
+ * - `key`: 存储键，只能取 [`KEYS`] 里登记过的
+ */
 export function remove(key: StorageKey): void {
   try {
     store()?.removeItem(key);
@@ -155,25 +170,47 @@ export function remove(key: StorageKey): void {
 }
 
 /**
- * 读字符串（没存过返回 `dflt`）
+ * 读字符串
  *
  * 空串是**合法值**，不会被当成"没存过"。
+ *
+ * - `key`: 存储键，只能取 [`KEYS`] 里登记过的
+ * - `dflt`: 没存过时的返回值
+ *
+ * # 返回值
+ *
+ * 存过的字符串，没存过时为 `dflt`
  */
 export function readString(key: StorageKey, dflt = ""): string {
   return readRaw(key) ?? dflt;
 }
 
-/** 写字符串；传空串时按"删掉这个键"处理（与全仓 `if (v) set else remove` 的老口径一致） */
+/**
+ * 写字符串
+ *
+ * 传空串时按"删掉这个键"处理，与全仓 `if (v) set else remove` 的老口径一致。
+ *
+ * - `key`: 存储键，只能取 [`KEYS`] 里登记过的
+ * - `value`: 要写入的字符串，空串表示删除
+ */
 export function writeString(key: StorageKey, value: string): void {
   if (value) writeRaw(key, value);
   else remove(key);
 }
 
 /**
- * 读布尔（`"1"` / `"true"` 为真，其余为假）
+ * 读布尔
  *
- * 注意默认值：`readFlag(key, true)` 表示"**没存过时算开**"（并且 `"0"` 表示关），
+ * `"1"` / `"true"` 为真，其余为假。
+ * 注意默认值：`readFlag(key, true)` 表示"**没存过时算开**"，并且 `"0"` 表示关 ——
  * 这正是本仓 `localStorage.getItem(x) !== "0"` 的老口径。
+ *
+ * - `key`: 存储键，只能取 [`KEYS`] 里登记过的
+ * - `dflt`: 没存过时的返回值
+ *
+ * # 返回值
+ *
+ * 存过的布尔值，没存过时为 `dflt`
  */
 export function readFlag(key: StorageKey, dflt = false): boolean {
   const raw = readRaw(key);
@@ -181,12 +218,26 @@ export function readFlag(key: StorageKey, dflt = false): boolean {
   return raw === "1" || raw === "true";
 }
 
-/** 写布尔（`"1"` / `"0"`） */
+/**
+ * 写布尔，落盘为 `"1"` / `"0"`
+ *
+ * - `key`: 存储键，只能取 [`KEYS`] 里登记过的
+ * - `value`: 要写入的布尔值
+ */
 export function writeFlag(key: StorageKey, value: boolean): void {
   writeRaw(key, value ? "1" : "0");
 }
 
-/** 读数字（没存过 / 非数字返回 `dflt`） */
+/**
+ * 读数字
+ *
+ * - `key`: 存储键，只能取 [`KEYS`] 里登记过的
+ * - `dflt`: 没存过或存了非数字时的返回值
+ *
+ * # 返回值
+ *
+ * 存过的数字，非法时为 `dflt`
+ */
 export function readNumber(key: StorageKey, dflt: number): number {
   const raw = readRaw(key);
   if (raw === null) return dflt;
@@ -194,15 +245,26 @@ export function readNumber(key: StorageKey, dflt: number): number {
   return Number.isFinite(v) ? v : dflt;
 }
 
-/** 写数字 */
+/**
+ * 写数字
+ *
+ * - `key`: 存储键，只能取 [`KEYS`] 里登记过的
+ * - `value`: 要写入的数字
+ */
 export function writeNumber(key: StorageKey, value: number): void {
   writeRaw(key, String(value));
 }
 
 /**
- * 读 JSON（解析失败 / 不是对象时返回 `{}`）
+ * 读 JSON 对象
  *
- * 只读"对象形态"的偏好：数组 / 数字之类的偏好用 [`readRaw`] 自己解析。
+ * 只读"对象形态"的偏好，数组 / 数字之类的偏好用 [`readRaw`] 自己解析。
+ *
+ * - `key`: 存储键，只能取 [`KEYS`] 里登记过的
+ *
+ * # 返回值
+ *
+ * 解析出的对象；解析失败或存的不是对象时为 `{}`
  */
 export function readJson<T extends object>(key: StorageKey): Partial<T> {
   const raw = readRaw(key);
@@ -217,7 +279,12 @@ export function readJson<T extends object>(key: StorageKey): Partial<T> {
   }
 }
 
-/** 写 JSON */
+/**
+ * 写 JSON
+ *
+ * - `key`: 存储键，只能取 [`KEYS`] 里登记过的
+ * - `value`: 要序列化的值
+ */
 export function writeJson(key: StorageKey, value: unknown): void {
   try {
     writeRaw(key, JSON.stringify(value));
@@ -227,14 +294,17 @@ export function writeJson(key: StorageKey, value: unknown): void {
 }
 
 /**
- * 值变更监听（跨窗口同步）
+ * 值变更监听，跨窗口同步
  *
  * 无 Tauri（浏览器预览）时退回原生 `storage` 事件；Tauri 下由 [`emitChange`] 派发同名事件。
- * 回调收到 `newValue`（键被删除时为 `null`）。
+ * 回调收到 `newValue`，键被删除时为 `null`。
+ *
+ * - `key`: 存储键，只能取 [`KEYS`] 里登记过的
+ * - `handler`: 变更回调
  *
  * # 返回值
  *
- * 退订函数。
+ * 退订函数
  */
 export function onStorageChange(
   key: StorageKey,
@@ -266,8 +336,11 @@ const CHANGE_EVENT = "mml:storage";
 /**
  * 广播一次值变更，让**其它窗口**知道
  *
- * 在 [`writeRaw`] 之外单独调：写值的语义由业务决定（有的键只是镜像、不需要同步）。
+ * 在 [`writeRaw`] 之外单独调：写值的语义由业务决定，有的键只是镜像、不需要同步。
  * 同源（本窗口）不触发 —— 与原生 `storage` 事件口径一致，调用方自己已经更新过内存状态了。
+ *
+ * - `key`: 存储键，只能取 [`KEYS`] 里登记过的
+ * - `newValue`: 变更后的值，键被删除时传 `null`
  */
 export function emitChange(key: StorageKey, newValue: string | null): void {
   if (!isTauri()) return; // 浏览器预览有原生 storage 事件，别重复派发

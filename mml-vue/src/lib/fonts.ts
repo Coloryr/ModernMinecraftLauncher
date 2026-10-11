@@ -7,7 +7,11 @@ import { saveGuiConfig } from "./guiConfig";
 /** 当前字体族名（空串 = 默认字体栈） */
 export const fontFamily = ref(readString(KEYS.font));
 
-/** 设置界面字体：空串恢复默认；持久化到本地存储 + gui_config.json */
+/**
+ * 设置界面字体，持久化到本地存储 + gui_config.json
+ *
+ * - `family`: 字体族名，空串恢复默认字体栈
+ */
 export function setFontFamily(family: string) {
   fontFamily.value = family;
   writeString(KEYS.font, family);
@@ -15,7 +19,11 @@ export function setFontFamily(family: string) {
   saveGuiConfig({ font: family });
 }
 
-/** 启动恢复：只同步内存与镜像，不回写 gui_config.json */
+/**
+ * 启动恢复：只同步内存与镜像，不回写 gui_config.json
+ *
+ * - `family`: 字体族名，空串恢复默认字体栈
+ */
 export function restoreFontFamily(family: string) {
   fontFamily.value = family;
   writeString(KEYS.font, family);

@@ -8,23 +8,36 @@ import AccountTypeBadge from "../../../components/AccountTypeBadge.vue";
 import type { AccountStoreDto } from "../../../lib/bindings";
 
 const props = defineProps<{
+  /** 要展示的账户，调用方已按锁定 / 筛选 / 搜索过滤好 */
   accounts: AccountStoreDto[];
+  /** 当前使用的账户 uuid，空串表示没有 */
   currentUuid: string;
+  /** 把账户的令牌状态翻成文案 */
   tokenLabel: (acc: AccountStoreDto) => string;
+  /** 取账户的图片种子；本视图当前未用到 */
   seedOf: (uuid: string) => number;
 }>();
 
 const emit = defineEmits<{
+  /** 打开「添加账户」表单 */
   (e: "add"): void;
+  /** 双击账户：切换为当前使用 */
   (e: "switch", acc: AccountStoreDto): void;
+  /** 刷新该账户的令牌 */
   (e: "refresh", acc: AccountStoreDto): void;
+  /** 预览该账户的皮肤 / 披风 */
   (e: "viewSkin", acc: AccountStoreDto): void;
+  /** 重取该账户的皮肤渲染图 */
   (e: "refreshSkin", acc: AccountStoreDto): void;
+  /** 重新登录该账户 */
   (e: "relogin", acc: AccountStoreDto): void;
+  /** 编辑该账户 */
   (e: "edit", acc: AccountStoreDto): void;
+  /** 删除该账户 */
   (e: "delete", acc: AccountStoreDto): void;
 }>();
 
+/** 是否当前使用的账户 */
 function isCurrent(acc: AccountStoreDto): boolean {
   return acc.uuid === props.currentUuid;
 }
@@ -32,6 +45,7 @@ function isCurrent(acc: AccountStoreDto): boolean {
 // 悬停头像浮动显示头像大图（头部渲染），与平铺视图一致
 const preview = ref<{ x: number; y: number; url: string } | null>(null);
 
+/** 悬停时定位并展示头像大图；该图已加载失败就不展示 */
 function showPreview(e: MouseEvent, acc: AccountStoreDto) {
   if (imageFailed(acc, "avatar")) return;
   preview.value = { x: e.clientX, y: e.clientY, url: acc.avatar || accountAvatarUrl(acc) };
@@ -39,7 +53,7 @@ function showPreview(e: MouseEvent, acc: AccountStoreDto) {
 
 function movePreview(e: MouseEvent) {
   if (!preview.value) return;
-  // 右/下缘内翻，避免大图出窗（大图最大 256px 高 + 边距）
+  // 右/下缘内翻，避免大图出窗：大图最大 256px 高 + 边距
   preview.value.x = Math.min(e.clientX + 14, window.innerWidth - 200);
   preview.value.y = Math.min(e.clientY + 14, window.innerHeight - 200);
 }
@@ -278,7 +292,7 @@ function hidePreview() {
   color: var(--red);
 }
 
-/* 悬停头像时的头像大图（Teleport 到 body，跟随鼠标） */
+/* 悬停头像时的头像大图：Teleport 到 body，跟随鼠标 */
 .skin-float {
   position: fixed;
   z-index: 999;

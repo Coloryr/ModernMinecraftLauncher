@@ -3,7 +3,7 @@
 //! 覆盖 Java 扫描与剪贴板；快捷方式 / 回收站涉及 COM 与 Shell 操作，
 //! 在独立线程中执行以避免 COM 单元状态互相干扰。
 //!
-//! 说明：protocol_helper 的注册/反注册会写 HKEY_CLASSES_ROOT（影响全机），
+//! 说明：protocol_helper 的注册/反注册会写 HKEY_CLASSES_ROOT，影响全机，
 //! 不在自动化测试范围内。
 
 #![cfg(windows)]
@@ -22,7 +22,7 @@ fn make_test_root(tag: &str) -> PathBuf {
     dir
 }
 
-/// Java 扫描：只要求能安全执行，结果数量依机器环境而定（可能为 0）
+/// Java 扫描：只要求能安全执行，结果数量依机器环境而定，可能为 0
 #[test]
 fn test_find_java_inner() {
     let mut paths = std::collections::HashSet::new();
@@ -75,7 +75,7 @@ fn test_create_shortcut() {
         assert!(lnk.exists(), "快捷方式文件应存在");
         assert!(std::fs::metadata(&lnk).unwrap().len() > 0);
     } else {
-        // COM 初始化失败（如 RPC_E_CHANGED_MODE）等环境问题时跳过断言
+        // COM 初始化失败等环境问题时跳过断言，如 RPC_E_CHANGED_MODE
         eprintln!("create_shortcut 在当前环境不可用: {:?}", result.err());
     }
 

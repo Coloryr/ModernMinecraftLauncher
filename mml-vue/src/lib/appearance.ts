@@ -17,6 +17,11 @@ import { showToast } from "./toast";
 
 export const animations = ref(readFlag(KEYS.animations, true));
 
+/**
+ * 开关全局动画
+ *
+ * - `v`: 是否启用动画
+ */
 export function setAnimations(v: boolean) {
   animations.value = v;
   writeFlag(KEYS.animations, v);
@@ -33,13 +38,13 @@ export function applyAnimations() {
 /** 显示用背景图 dataURL（Tauri 下是后端处理落盘的图） */
 export const bgImage = ref(readString(KEYS.bgImage));
 
-/** 背景图来源（文件路径 / 网址，空串 = 无；与 gui_config.json 的 bgSource 一致） */
+/** 背景图来源：文件路径或网址，空串 = 无；与 gui_config.json 的 bgSource 一致 */
 export const bgSource = ref("");
 
 /** 背景图层不透明度，单位 %：默认 100 即完整显示，越高图越显 */
 export const bgOpacity = ref(readNumber(KEYS.bgOpacity, 100));
 
-/** 背景模糊（px） */
+/** 背景模糊，单位 px */
 export const bgBlur = ref(readNumber(KEYS.bgBlur, 0));
 
 /** 原始分辨率，单位 %，范围 10–100：后端把源图缩放到源图的百分之多少 */
@@ -61,8 +66,8 @@ function applyBgInfo(info: {
   bgOpacity.value = info.opacity;
   bgBlur.value = info.blur;
   bgNativeSize.value = info.nativeSize;
-  // 缓存一份 dataURL：下次启动挂载时立即有背景，不闪底色
-  // （dataURL 很大，配额写满时静默失败，仅当次会话生效，见 storage.writeRaw）
+  // 缓存一份 dataURL：下次启动挂载时立即有背景，不闪底色。
+  // dataURL 很大，配额写满时会静默失败，仅当次会话生效，见 storage.writeRaw
   writeString(KEYS.bgImage, info.dataUrl);
 }
 
@@ -85,7 +90,11 @@ export async function restoreBg() {
   }
 }
 
-/** 清除背景（传空串；Tauri 下同时删掉后端落盘的图与配置里的来源） */
+/**
+ * 设置背景图
+ *
+ * - `v`: 直接给 dataURL 的浏览器回退路径；空串表示清除，Tauri 下同时删掉后端落盘的图与配置里的来源
+ */
 export async function setBgImage(v: string) {
   if (v) {
     // 直接给 dataURL（浏览器回退路径）
@@ -103,8 +112,14 @@ export async function setBgImage(v: string) {
   }
 }
 
-/** 设置背景图来源（文件路径 / 网址；浏览器模式下直接收 dataURL）：
- *  Tauri 下由后端加载 → 按当前原始分辨率缩放 → 落盘并记入配置 */
+/**
+ * 设置背景图来源
+ *
+ * Tauri 下由后端加载、按当前原始分辨率缩放、落盘并记入配置；
+ * 浏览器模式下把 `source` 当 dataURL 直接显示。
+ *
+ * - `source`: 文件路径或网址
+ */
 export async function setBgImageFromOriginal(source: string) {
   if (!isTauri()) {
     bgImage.value = source;
@@ -124,8 +139,14 @@ export async function setBgImageFromOriginal(source: string) {
   }
 }
 
-/** 调整原始分辨率（点「应用」后调用）：后端用缓存的原图重新缩放处理（不重新下载，
- *  随机图网址不会换图）；只改图片分辨率，不改变图在窗口里的显示（显示始终铺满居中） */
+/**
+ * 调整背景图的原始分辨率，点「应用」后调用
+ *
+ * 后端用缓存的原图重新缩放，不重新下载，随机图网址不会换图。
+ * 只改图片分辨率，不改变图在窗口里的显示，显示始终铺满居中。
+ *
+ * - `percent`: 原始分辨率百分比，会夹到 10–100
+ */
 export async function resizeBg(percent: number) {
   bgNativeSize.value = Math.min(Math.max(Math.round(percent), 10), 100);
   if (!isTauri() || !bgSource.value) return;
@@ -139,20 +160,30 @@ export async function resizeBg(percent: number) {
   }
 }
 
+/**
+ * 设置背景图层不透明度
+ *
+ * - `v`: 不透明度，单位 %
+ */
 export function setBgOpacity(v: number) {
   bgOpacity.value = v;
   writeString(KEYS.bgOpacity, String(v));
   void saveGuiConfig({ bgOpacity: v });
 }
 
+/**
+ * 设置背景模糊
+ *
+ * - `v`: 模糊半径，单位 px
+ */
 export function setBgBlur(v: number) {
   bgBlur.value = v;
   writeString(KEYS.bgBlur, String(v));
   void saveGuiConfig({ bgBlur: v });
 }
 
-/** 背景图层的内联样式（App.vue 的 .app-bg 绑定用）：始终铺满窗口（cover）并居中，
- *  标题栏（.frame-head / .topbar）与各表面一样半透明透出此层（见 themes.css 的 has-bg） */
+/** 背景图层的内联样式，App.vue 的 .app-bg 绑定用：始终铺满窗口并居中，
+ *  标题栏与各表面一样半透明透出此层，见 themes.css 的 has-bg */
 export const bgLayerStyle = computed(() => {
   if (!bgImage.value) return undefined;
   return {

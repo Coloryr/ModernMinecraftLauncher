@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 设置窗口 · Java 标签（手动添加 / 扫描 / 扫描目录 / 压缩包导入 / 下载 / 列表）
+// 设置窗口 · Java 标签：手动添加 / 扫描 / 扫描目录 / 压缩包导入 / 下载 / 列表
 import { t } from "../../../../lib/i18n";
 import { useModalKeys } from "../../../../composables/useModalKeys";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
@@ -10,7 +10,9 @@ import SettingsGroup from "../SettingsGroup.vue";
 import type { useSettingsJava } from "../../composables/useSettingsJava";
 
 const props = defineProps<{
+  /** Java 标签的状态与操作方法，来自 useSettingsJava */
   settings: ReturnType<typeof useSettingsJava>;
+  /** 需要高亮脉冲的分组 id（搜索命中） */
   flashGroup?: string;
 }>();
 
@@ -40,7 +42,7 @@ const {
   downloadJava,
 } = props.settings;
 
-// 删除确认框：Esc = 取消（扫描中的加载弹窗不可关闭，忽略）
+// 删除确认框：Esc = 取消；扫描中的加载弹窗不可关闭，忽略
 useModalKeys((e) => {
   if (e.key !== "Escape") return;
   if (confirmRemoveAll.value) confirmRemoveAll.value = false;
@@ -76,7 +78,7 @@ useModalKeys((e) => {
         </BaseButton>
       </div>
 
-      <!-- 压缩包导入进度条（解包 / 识别阶段经 settings-java-progress 事件推进） -->
+      <!-- 压缩包导入进度条：解包 / 识别阶段经 settings-java-progress 事件推进 -->
       <div v-if="importingJava || importProgress" class="java-progress">
         <span class="java-progress-label">{{ t("winSettings.javaImporting") }}</span>
         <div class="java-progress-track">

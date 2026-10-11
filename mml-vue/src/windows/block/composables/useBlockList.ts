@@ -1,11 +1,11 @@
 // 方块列表窗口的数据与状态
 //
 // 抽自 BlockPanel.vue，负责：
-// 1. 渲染状态查询 / 事件订阅（渲染状态、下载任务补开下载窗口）/ 列表加载；
-// 2. 三态派生（未渲染 / 渲染中 / 已渲染）与进度；
+// 1. 渲染状态查询 / 事件订阅（含下载任务补开下载窗口）/ 列表加载；
+// 2. 三态派生与进度：未渲染 / 渲染中 / 已渲染；
 // 3. 分类聚合、搜索过滤、详情选中与前后切换；
 // 4. 渲染与玩家头颅操作（带提示）；
-// 5. 视图偏好记忆（分类 / 图标尺寸档，存本地存储；**搜索词离开本页即清空**）。
+// 5. 视图偏好记忆：分类 / 图标尺寸档存本地存储，**搜索词离开本页即清空**。
 import { computed, onDeactivated, onMounted, ref, watch } from "vue";
 import { locale, t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
@@ -37,6 +37,17 @@ function readPref(): Partial<ViewPref> {
   return readJson<ViewPref>(KEYS.blockView);
 }
 
+/**
+ * 方块列表窗口的数据与状态
+ *
+ * # 返回值
+ *
+ * - `status` / `blocks` / `rendered` / `running` / `preparing` / `percent` / `cancelling`: 渲染状态与列表
+ * - `startRender` / `cancelRender` / `loadBlocks`: 渲染操作与列表重拉
+ * - `keyword` / `cat` / `size` / `cats` / `catCounts` / `catLabel` / `isFiltered` / `filtered` / `clearFilters`: 搜索、分类与尺寸档
+ * - `detail` / `openDetail` / `closeDetail`: 详情选中，只存 id，列表刷新后按 id 现查
+ * - `addSkin` / `removeSkin` / `setIcon`: 玩家头颅与设为实例图标，均返回是否成功
+ */
 export function useBlockList() {
   const { track } = useUnlisteners();
 
@@ -47,7 +58,7 @@ export function useBlockList() {
 
   const rendered = computed(() => !!status.value?.rendered);
   const running = computed(() => !!status.value?.running);
-  /** 渲染前置阶段（拉清单 / 下载核心 jar）：进度还没开始步进，显示下载文案而非 0 / 0 */
+  /** 渲染前置阶段，即拉清单 / 下载核心 jar：进度还没开始步进，显示下载文案而非 0 / 0 */
   const preparing = computed(() => running.value && (status.value?.now ?? 0) === 0);
   /** 渲染进度百分比（前置阶段未知，显示 0） */
   const percent = computed(() => {
@@ -73,7 +84,7 @@ export function useBlockList() {
 
   // ---------- 事件订阅 ----------
 
-  /** 已发出取消、还没收到渲染结束事件（渲染循环要几毫秒才收手，期间禁用按钮防连点） */
+  /** 已发出取消、还没收到渲染结束事件；渲染循环要几毫秒才收手，期间禁用按钮防连点 */
   const cancelling = ref(false);
   /** 本轮渲染是否已弹过下载窗口（渲染结束复位，下一轮再触发） */
   let downloadWinOpened = false;
@@ -110,7 +121,7 @@ export function useBlockList() {
           cancelling.value = false;
         }
         // 渲染失败主动弹提示：重新渲染失败时界面停在网格视图，错误没有落点，
-        // 只有 toast 能让用户知道（首次渲染失败另有提示卡显示详情）
+        // 只有 toast 能让用户知道；首次渲染失败另有提示卡显示详情
         if (e.error && e.error !== lastError) {
           showToast(e.error, 4000);
         }
@@ -183,7 +194,7 @@ export function useBlockList() {
     writeJson(KEYS.blockView, { cat: cat.value, keyword: keyword.value, size: size.value });
   });
 
-  // 离开方块列表时清掉搜索词（分类 / 图标尺寸档留着：那是浏览上下文）。
+  // 离开方块列表时清掉搜索词；分类 / 图标尺寸档留着，那是浏览上下文。
   // 单窗口模式下这一页被 KeepAlive 缓存，切走不销毁，不清的话再打开时
   // 列表还筛着上次搜的词，用户早忘了自己搜过什么，只会觉得"怎么东西少了"。
   // 清空会经上面的 watch 写回偏好，所以重启后也不会又冒出来。
@@ -205,7 +216,7 @@ export function useBlockList() {
     return map;
   });
 
-  // 当前分类消失（重渲染换版本 / 删掉最后一个玩家头颅）时回到「全部」
+  // 当前分类消失时回到「全部」：重渲染换版本，或删掉最后一个玩家头颅
   watch(cats, (list) => {
     if (cat.value && !list.includes(cat.value)) cat.value = "";
   });
@@ -272,7 +283,7 @@ export function useBlockList() {
     }
   }
 
-  /** 删除玩家头颅（名字不含 custom: 前缀） */
+  /** 删除玩家头颅；id 上的 `custom:` 前缀要去掉 */
   async function removeSkin(b: BlockItemDto) {
     try {
       await blockSkinRemove(b.id.slice("custom:".length));

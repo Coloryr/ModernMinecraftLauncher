@@ -12,7 +12,9 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  /** 提交输入的用户名或 UUID，父级负责校验与落盘 */
   (e: "submit", input: string): void;
+  /** 请求关闭弹窗，提交中不会触发 */
   (e: "close"): void;
 }>();
 

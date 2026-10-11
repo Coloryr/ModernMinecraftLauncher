@@ -1,28 +1,32 @@
 <script setup lang="ts">
 // 账户操作：查看皮肤 / 刷新皮肤 / 刷新 Token / 重新登录 / 编辑 / 删除（单色 SVG 图标按钮）
-// 按钮显隐由后端给的能力标志决定（哪些账户类型有什么操作是业务规则，不由前端硬编码）
+// 按钮显隐由后端给的能力标志决定 —— 哪些账户类型有什么操作是业务规则，不由前端硬编码
 import { t } from "../lib/i18n";
 
 defineProps<{
-  /** 是否有可刷新的令牌（AccountStoreDto.canRefresh） */
+  /** 是否有可刷新的令牌，对应 AccountStoreDto.canRefresh */
   canRefresh?: boolean;
-  /** 是否支持重新登录（AccountStoreDto.canRelogin） */
+  /** 是否支持重新登录，对应 AccountStoreDto.canRelogin */
   canRelogin?: boolean;
-  /** 是否可编辑（AccountStoreDto.canEdit） */
+  /** 是否可编辑，对应 AccountStoreDto.canEdit */
   canEdit?: boolean;
-  /** 该账户是否有皮肤：false 时隐藏「查看皮肤 / 刷新皮肤」两个按钮
-   *  （没皮肤时两个按钮点了也没内容，留着只是噪音） */
+  /** 该账户是否有皮肤：false 时隐藏「查看皮肤 / 刷新皮肤」两个按钮；
+   *  没皮肤时两个按钮点了也没内容，留着只是噪音 */
   hasSkin?: boolean;
 }>();
 
 defineEmits<{
+  /** 刷新账户令牌 */
   (e: "refresh"): void;
   /** 打开皮肤查看弹窗 */
   (e: "viewSkin"): void;
   /** 重新拉取皮肤渲染图 */
   (e: "refreshSkin"): void;
+  /** 重新登录该账户 */
   (e: "relogin"): void;
+  /** 编辑离线账户信息 */
   (e: "edit"): void;
+  /** 删除该账户 */
   (e: "delete"): void;
 }>();
 </script>
@@ -35,7 +39,7 @@ defineEmits<{
         <path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z" />
       </svg>
     </button>
-    <!-- 查看皮肤：眼睛图标（"看一眼"的通用语义，与"刷新"的循环箭头不会混）。
+    <!-- 查看皮肤：眼睛图标，"看一眼"的通用语义，与"刷新"的循环箭头不会混。
          没有皮肤时整个按钮不出现 -->
     <button v-if="hasSkin" class="icon-btn" v-tip="t('account.viewSkin')" @click="$emit('viewSkin')">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"
@@ -44,7 +48,7 @@ defineEmits<{
         <circle cx="12" cy="12" r="2.6" />
       </svg>
     </button>
-    <!-- 刷新皮肤：循环箭头 + 中间一个小人（与「刷新 Token」的纯循环箭头区分开） -->
+    <!-- 刷新皮肤：循环箭头 + 中间一个小人，与「刷新 Token」的纯循环箭头区分开 -->
     <button v-if="hasSkin" class="icon-btn" v-tip="t('account.refreshSkin')" @click="$emit('refreshSkin')">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"
         stroke-linecap="round" stroke-linejoin="round">

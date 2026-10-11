@@ -13,7 +13,9 @@ import type { useResourceOps } from "../composables/useResourceOps";
 import type { DataPackItemDto } from "../../../lib/bindings";
 
 const props = defineProps<{
+  /** 数据层，存档下拉、数据包列表与加载态从这里取 */
   data: ReturnType<typeof useResourceData>;
+  /** 共用操作层，串行化与确认弹窗从这里取 */
   ops: ReturnType<typeof useResourceOps>;
 }>();
 
@@ -30,7 +32,7 @@ function remove(item: DataPackItemDto) {
   askDelete(item.file, () => deleteDatapack(instanceUuid.value, dpSave.value, item.name));
 }
 
-/** 启用状态（三态：开着 / 关着 / 没登记进 level.dat） */
+/** 启用状态的显示名：开着 / 关着 / 没登记进 level.dat */
 function state(item: DataPackItemDto): string {
   if (item.enable === true) return t("resource.dpOn");
   if (item.enable === false) return t("resource.dpOff");
@@ -42,7 +44,7 @@ function name(item: DataPackItemDto): string {
   return item.name.startsWith("file/") ? item.name.slice(5) : item.file || item.name;
 }
 
-/** 包格式那段文案（与描述分开渲染：描述要过格式码，这一句不要） */
+/** 包格式那段文案；描述要过格式码，这一句不要，所以两段分开渲染 */
 function formatLabel(item: DataPackItemDto): string {
   return t("resource.packFormat", { format: item.packFormat });
 }
@@ -62,7 +64,7 @@ function formatLabel(item: DataPackItemDto): string {
     </select>
 
     <template v-if="dpSave">
-      <!-- 加载中用骨架行占位：与其它分类同一套（这里只换行，存档下拉要一直留着） -->
+      <!-- 加载中用骨架行占位：与其它分类同一套；这里只换行，存档下拉要一直留着 -->
       <ListSkeleton v-if="loading" />
       <ResourceRow v-for="item in datapacks" :key="item.name" :name="name(item)">
         <template #badges>
@@ -71,7 +73,7 @@ function formatLabel(item: DataPackItemDto): string {
           </span>
         </template>
         <template #sub>
-          <!-- 描述过格式码（数据包作者会用 `§a` 上色），包格式那句不过 -->
+          <!-- 描述过格式码，数据包作者会用 `§a` 上色；包格式那句不过 -->
           <FormattedText v-if="item.description" :text="item.description" />
           <template v-if="item.description"> · </template>{{ formatLabel(item) }}
         </template>

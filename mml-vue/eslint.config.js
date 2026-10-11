@@ -1,7 +1,7 @@
-// ESLint 扁平配置（ESLint 10 / eslint-plugin-vue 10 / typescript-eslint 8）
+// ESLint 扁平配置：ESLint 10 / eslint-plugin-vue 10 / typescript-eslint 8
 //
 // 定位是**拦真问题、不挑格式**：只上 vue 的 essential 规则集 + js/ts 的 recommended，
-// 不引入 recommended 里那一大批排版规则（属性换行、缩进、标签顺序…）—— 那类规则在本仓库
+// 不引入 recommended 里那一大批排版规则，比如属性换行、缩进、标签顺序——那类规则在本仓库
 // 会刷出上千条噪音，而格式一致性靠 vue-tsc 与人工 review 已经够用。
 //
 // 跑法：cd mml-vue && npm run lint（加 --fix 自动修可修的项）

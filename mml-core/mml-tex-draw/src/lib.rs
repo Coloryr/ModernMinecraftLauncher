@@ -1,16 +1,16 @@
 //! 方块 / 物品贴图离线渲染模块
 //!
 //! 从 Minecraft 客户端 jar 提取模型与贴图，离线渲染出创造模式物品栏
-//! 使用的方块（等轴测 3D）与物品（平面精灵）图标 PNG，并提供图标路径、
-//! 创造分组、语言翻译等查询接口。
+//! 使用的方块图标与物品图标 PNG，前者为等轴测 3D、后者为平面精灵，
+//! 并提供图标路径、创造分组、语言翻译等查询接口。
 //!
 //! # 子模块
 //!
 //! | 模块 | 用途 |
 //! |------|------|
-//! | [`block`] | 方块图标渲染（等轴测 3D） |
+//! | [`block`] | 方块图标渲染，等轴测 3D |
 //! | [`gpu`] | GPU 渲染支持 |
-//! | [`item`] | 物品图标渲染（平面） |
+//! | [`item`] | 物品图标渲染，平面精灵 |
 //! | [`model`] | 游戏模型解析 |
 //! | [`order`] | 创造分类顺序与列表排序键 |
 
@@ -535,7 +535,7 @@ pub fn blocks() -> Vec<String> {
         .collect()
 }
 
-/// 方块数据的渲染版本（未渲染过为空串）
+/// 方块数据的渲染版本，未渲染过为空串
 pub fn block_version() -> String {
     BLOCKS.read().unwrap().id.clone()
 }
@@ -555,7 +555,7 @@ pub fn block_name_key(id: &str) -> Option<String> {
     BLOCKS.read().unwrap().name.get(id).cloned()
 }
 
-/// 物品数据的渲染版本（未渲染过为空串）
+/// 物品数据的渲染版本，未渲染过为空串
 pub fn item_version() -> String {
     ITEMS.read().unwrap().id.clone()
 }
@@ -632,9 +632,9 @@ pub(crate) fn items_write() -> std::sync::RwLockWriteGuard<'static, ItemsObj> {
 /// 列表条目的来源，决定图标走 `block/` 还是 `item/`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntryKind {
-    /// 方块（等轴测 3D 图标）
+    /// 方块，等轴测 3D 图标
     Block,
-    /// 物品（平面精灵图标）
+    /// 物品，平面精灵图标
     Item,
 }
 

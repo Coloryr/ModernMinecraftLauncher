@@ -53,11 +53,11 @@ const currentWindow = computed(() => windowMap[currentKind.value]);
 /**
  * 整合包安装任务的全局状态
  *
- * 放根组件是因为进度弹窗是全局浮层（标题栏上的入口在各窗口自己那边挂），
+ * 放根组件是因为进度弹窗是全局浮层，标题栏上的入口在各窗口自己那边挂，
  * 而安装跑在后台、用户可能已经离开了"下载整合包"那一页。
  *
- * `own=false` + `setModpackFallbackToast(true)`：主窗口那份订阅也在（为了安装成功后
- * 刷新并选中新实例），所以这里指定"整合包那页不在前台时，终态提示只由根组件弹"，
+ * `own=false` + `setModpackFallbackToast(true)`：主窗口那份订阅也在，为了安装成功后
+ * 刷新并选中新实例，所以这里指定"整合包那页不在前台时，终态提示只由根组件弹"，
  * 免得两边各弹一份。
  */
 setModpackFallbackToast(true);
@@ -66,7 +66,7 @@ const { status: modpackStatus, init: initModpackStatus } = useModpackStatus(fals
 /**
  * 关闭被拦截：还有下载任务在跑
  *
- * Rust 侧对"下载窗口"和"主窗口"都设了关闭保护（见 src-tauri 的 `close_guarded`）——
+ * Rust 侧对"下载窗口"和"主窗口"都设了关闭保护，见 src-tauri 的 `close_guarded` ——
  * 这两扇窗关掉都会连带停掉下载，所以它先拒绝、发一条 `close-blocked`，由这里问一句。
  * 放在根组件而不是下载窗口里，是因为单窗口模式下任何页面点 ✕ 都算退出应用，
  * 而各窗口自己收不到这条事件（下载弹窗也可能根本没开着）。
@@ -95,7 +95,7 @@ onUnmounted(() => {
   unsubModpackStatus?.();
 });
 
-/** 确认「停止并关闭 / 停止并退出」：先停掉所有下载（任务清空后 Rust 侧不再拦截），再重放这次关闭 */
+/** 确认「停止并关闭 / 停止并退出」：先停掉所有下载，任务清空后 Rust 侧不再拦截，再重放这次关闭 */
 async function stopDownloadsAndClose() {
   closeAsk.value = false;
   try {
@@ -120,10 +120,10 @@ const closeAskButton = computed(() =>
 </script>
 
 <template>
-  <!-- 背景图层（设置里选的本地图片，所有窗口共用） -->
+  <!-- 背景图层：设置里选的本地图片，所有窗口共用 -->
   <div v-if="bgImage" class="app-bg" :style="bgLayerStyle" />
   <!-- 单窗口模式的页面切换动画：多窗口模式下每个窗口是独立 webview、组件不会变，
-       所以这里平时不动。动画只作用在内容区（base.css 的 .win-page-* 选择器），
+       所以这里平时不动。动画只作用在内容区，见 base.css 的 .win-page-* 选择器，
        标题栏与右上角三个窗口按钮不参与；:duration 与那边的 0.16s 对应，
        因为根元素自身不产生过渡、Vue 推断不出时长。关掉"界面动画"时全局禁用。 -->
   <Transition name="win-page" mode="out-in" :duration="160">
@@ -131,21 +131,22 @@ const closeAskButton = computed(() =>
       <component :is="currentWindow" :key="currentKind" @close="closeWindow" />
     </KeepAlive>
   </Transition>
-  <!-- 单窗口模式：下载管理浮在当前页面之上（工具窗口，见 windowManager 的 openWindow 特例）；
-       关掉它只是收起弹窗，任务照跑，右下角的入口还在 -->
+  <!-- 单窗口模式：下载管理浮在当前页面之上，属工具窗口，见 windowManager 的
+       openWindow 特例；关掉它只是收起弹窗，任务照跑，右下角的入口还在 -->
   <DownloadWindow v-if="!multiWindow && downloadPopupOpen && currentKind !== 'download'" @close="closeDownloadPopup" />
-  <!-- 整合包安装进度弹窗：由标题栏上那个指示器点开（单窗口模式；多窗口模式各窗口
-       自己的标题栏里也有指示器，点开同一个弹窗）。关掉它只是收起，安装照常跑 -->
+  <!-- 整合包安装进度弹窗：由标题栏上那个指示器点开。单窗口模式下是主窗口顶栏，
+       多窗口模式下各窗口自己的标题栏里也有指示器，点开同一个弹窗。
+       关掉它只是收起，安装照常跑 -->
   <ModpackPopup v-if="modpackPopupOpen && modpackStatus?.tasks.length" :status="modpackStatus"
     @close="closeModpackPopup" />
-  <!-- 下载入口不再用右下角浮层：改成主窗口顶栏上的动态图标 + 进度条
-       （DownloadTitleIndicator，与整合包那个并排、排在主页按钮左边）；
+  <!-- 下载入口不再用右下角浮层：改成主窗口顶栏上的动态图标 + 进度条，
+       即 DownloadTitleIndicator，与整合包那个并排、排在主页按钮左边；
        下载管理弹窗仍在这里渲染 -->
   <!-- 全局轻提示（所有窗口统一） -->
   <AppToast />
 
-  <!-- 关闭被拦截（还有下载任务）：先问一句再停下载、关窗 / 退出
-       （Rust 侧的关闭保护见 src-tauri 的 close_guarded） -->
+  <!-- 关闭被拦截：还有下载任务时先问一句再停下载、关窗 / 退出。
+       Rust 侧的关闭保护见 src-tauri 的 close_guarded -->
   <BaseModal v-if="closeAsk" :title="closeAskTitle" :closable="false" @close="closeAsk = false">
     <p class="modal-text">{{ closeAskText }}</p>
     <div class="modal-actions">

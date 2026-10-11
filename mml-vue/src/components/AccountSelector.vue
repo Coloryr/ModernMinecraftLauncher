@@ -8,10 +8,13 @@ import { accountAvatarUrl, imageFailed, imageLoading, markImageFailed, markImage
 import { typeLabelKey } from "../lib/accountStore";
 
 const props = defineProps<{
+  /** 当前账户；`null` 表示还没选账户 */
   account: AccountStoreDto | null;
+  /** 可切换的账户列表 */
   accounts: AccountStoreDto[];
 }>();
 
+/** 切换账户：`update:account` 回传新选中的账户 */
 const emit = defineEmits<{
   (e: "update:account", account: AccountStoreDto): void;
 }>();

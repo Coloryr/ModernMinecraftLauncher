@@ -8,16 +8,22 @@ import SegmentedTabs from "../../../components/ui/SegmentedTabs.vue";
 import { BLOCK_SIZE_ORDER, isBlockSize, type BlockSize } from "../types";
 
 defineProps<{
+  /** 搜索词，父级持有；清空与输入都经 `update:keyword` 回写 */
   keyword: string;
+  /** 当前图标尺寸档 */
   size: BlockSize;
   /** 渲染中：重新渲染禁用 */
   running: boolean;
 }>();
 
 const emit = defineEmits<{
+  /** 搜索词变化，v-model 的回写 */
   (e: "update:keyword", v: string): void;
+  /** 图标尺寸档变化，v-model 的回写 */
   (e: "update:size", v: BlockSize): void;
+  /** 请求打开添加玩家头颅弹窗 */
   (e: "add-skin"): void;
+  /** 请求重新渲染，父级以 force 调 startRender */
   (e: "re-render"): void;
 }>();
 
@@ -46,7 +52,7 @@ function onSize(v: string) {
     <!-- 图标尺寸档：小 / 中 / 大 -->
     <SegmentedTabs :options="sizeOptions" :model-value="size" @update:model-value="onSize" />
 
-    <!-- 图标按钮：标题栏里空间紧，文字放提示里（aria-label 给读屏） -->
+    <!-- 图标按钮：标题栏里空间紧，文字放提示里，aria-label 给读屏 -->
     <BaseButton size="sm" variant="ghost" v-tip="t('blocks.addSkin')" :aria-label="t('blocks.addSkin')"
       @click="emit('add-skin')">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"
@@ -77,7 +83,7 @@ function onSize(v: string) {
   min-width: 0;
 }
 
-/* 图标按钮与同行的搜索框 / 尺寸档统一高度（BaseButton 的 sm 是 28px，这里用 :deep 穿透进去）。
+/* 图标按钮与同行的搜索框 / 尺寸档统一高度：BaseButton 的 sm 是 28px，这里用 :deep 穿透进去。
    36px 是三个用 head-right 的窗口（账户 / 方块 / 设置）共同的约定，改这里记得同步另外两处 */
 .block-top :deep(.ui-btn) {
   height: 36px;

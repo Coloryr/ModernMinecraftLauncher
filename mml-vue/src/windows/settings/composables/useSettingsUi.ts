@@ -1,9 +1,9 @@
 // 设置窗口 · 界面标签（含窗口设置）
 //
-// 这些设置的"真源"分散在 lib/{i18n,fonts,theme,settings,appearance}.ts 里
-// （各家自己负责本地存储 + saveGuiConfig 双写），这里只收成窗口要用的接口：
-// 1. 分段控件的快照 ref（windowMode / side / themeValue / fontPick）；
-// 2. 系统字体的懒加载（font-kit 扫字体是重活，进界面页才拉）；
+// 这些设置的"真源"分散在 lib/{i18n,fonts,theme,settings,appearance}.ts 里，
+// 各家自己负责本地存储并 saveGuiConfig 双写，这里只收成窗口要用的接口：
+// 1. 分段控件的快照 ref：windowMode / side / themeValue / fontPick；
+// 2. 系统字体的懒加载：font-kit 扫字体是重活，进界面页才拉；
 // 3. 背景图的加载 / 清除 / 缩放，以及滑杆草稿（拖动过程中不逐次落盘）；
 // 4. resetGroup(id)：分组级"恢复默认"。
 import { onUnmounted, ref, watch } from "vue";
@@ -39,16 +39,29 @@ import { showToast } from "../../../lib/toast";
 import { isTauri, multiWindow, setMultiWindow } from "../../windowManager";
 import { commands } from "../../../lib/bindings";
 
-/** 界面标签里"即改即存"的默认值（与 Rust 侧 GuiConfig::default 一致） */
+/** 界面标签里"即改即存"的默认值，与 Rust 侧 GuiConfig::default 一致 */
 const DEFAULT_THEME: Theme = "System";
 const DEFAULT_ACCENT = "blue";
 const DEFAULT_CUSTOM_ACCENT = "#4f8cff";
 const DEFAULT_LOCALE = "zh_cn" as const;
 const DEFAULT_SIDE: SidebarSide = "Left";
 
-/** 拖滑杆时的落盘延迟（毫秒）：原来每次 input 都发一次 IPC */
+/** 拖滑杆时的落盘延迟，单位毫秒；原来每次 input 都发一次 IPC */
 const SLIDER_COMMIT_DELAY = 250;
 
+/**
+ * 界面标签（含窗口设置）的状态与保存
+ *
+ * # 返回值
+ *
+ * - `windowMode` / `onModeChange`: 单窗口 / 多窗口，切换后要重启进程
+ * - `locale` / `onLangChange` / `side` / `onSideChange` / `themeValue` / `onThemeChange`: 语言、侧栏、主题
+ * - `fonts` / `fontsLoading` / `loadFonts` / `fontPick` / `setFontFamily`: 系统字体
+ * - `animations` / `setAnimations` / `accent` / `setAccent` / `customAccent` / `setCustomAccent` / `ACCENTS`: 动画与强调色
+ * - `bgImage` / `setBgImage` / `bgLoading` / `bgFileInput` / `bgSourceInput` / `loadBgSource` / `pickBgImage` / `onBgFile`: 背景图加载与清除
+ * - `bgSizeDraft` / `applyBgSize` / `bgNativeSize` / `bgOpacity` / `setBgOpacity` / `bgBlur` / `setBgBlur`: 背景图缩放、不透明度与模糊，均为草稿加延迟落盘
+ * - `inTauri` / `resetGroup`: 环境判断与分组级"恢复默认"
+ */
 export function useSettingsUi() {
   const inTauri = isTauri();
 
@@ -64,7 +77,7 @@ export function useSettingsUi() {
   const fonts = ref<string[]>([]);
   const fontsLoading = ref(false);
 
-  /** 枚举系统字体（只在界面页需要时拉一次；失败留空） */
+  /** 枚举系统字体：只在界面页需要时拉一次，失败留空 */
   async function loadFonts() {
     if (!inTauri || fontsLoading.value || fonts.value.length) return;
     fontsLoading.value = true;
@@ -120,7 +133,7 @@ export function useSettingsUi() {
   // 回显已设置的来源（打开窗口时不再是空的）；清除背景时输入框跟着清空
   watch(bgSource, (v) => (bgSourceInput.value = v), { immediate: true });
 
-  /** 选择图片：Tauri 用系统文件对话框（拿到真实路径回填输入框，走统一加载管线），
+  /** 选择图片：Tauri 用系统文件对话框，拿到真实路径回填输入框后走统一加载管线；
    *  浏览器回退到文件输入 */
   async function pickBgImage() {
     if (inTauri) {
@@ -154,7 +167,7 @@ export function useSettingsUi() {
   async function loadBgSource() {
     const source = bgSourceInput.value.trim();
     if (!source) return;
-    // 后端加载 → 缩放 → 落盘并记入配置（失败时 setBgImageFromOriginal 内部提示）；
+    // 后端加载 → 缩放 → 落盘并记入配置，失败时由 setBgImageFromOriginal 内部提示；
     // 输入框里的地址保留不清空，方便看到当前用的是哪张图
     await setBgImageFromOriginal(source);
   }

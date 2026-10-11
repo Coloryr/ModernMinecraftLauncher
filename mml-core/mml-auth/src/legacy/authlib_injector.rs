@@ -7,7 +7,7 @@
 //! # 认证流程
 //!
 //! 1. 向用户指定的服务器地址发起 Yggdrasil 认证
-//! 2. 处理多角色选择（通过 GUI 回调或自动选择第一个）
+//! 2. 处理多角色选择，通过 GUI 回调或自动选择第一个
 //! 3. 刷新令牌并保存账户
 
 use mml_names::i18_items::error_type::{CoreResult, ErrorType};
@@ -20,16 +20,17 @@ use crate::{
 
 /// 外置登录认证
 ///
-/// `gui` 为 `None` 时自动选择第一个角色；返回已认证并刷新令牌的
-/// [`LoginObj`]（服务器地址存入 `text1`）
-///
-/// # 参数
+/// `gui` 为 `None` 时自动选择第一个角色
 ///
 /// - `client_token`: 客户端标识令牌
 /// - `user`: 用户名
 /// - `password`: 密码
-/// - `server`: 认证服务器地址（完整 URL）
+/// - `server`: 认证服务器地址，完整 URL
 /// - `gui`: 可选的角色选择回调
+///
+/// # 返回值
+///
+/// 已认证并刷新令牌的 [`LoginObj`]，服务器地址存入 `text1`
 pub async fn authenticate(
     client_token: String,
     user: String,
@@ -70,13 +71,11 @@ pub async fn authenticate(
 impl LoginObj {
     /// 刷新 Authlib-Injector 登录令牌：先验证有效性，无效则返回超时错误
     ///
-    /// # 参数
-    ///
     /// - `cancel`: 取消令牌
     ///
     /// # 返回值
     ///
-    /// 刷新成功返回 `Ok(())`（账户凭据已被更新），令牌失效返回 `ErrorType::AuthTokenTimeout`，被取消时返回取消错误
+    /// 刷新成功返回 `Ok(())`，此时账户凭据已被更新；令牌失效返回 `ErrorType::AuthTokenTimeout`，被取消时返回取消错误
     pub async fn refresh_authlib(&mut self, cancel: CancellationToken) -> CoreResult<()> {
         let server = self
             .text1

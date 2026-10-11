@@ -1,3 +1,5 @@
+//! 真实区域文件样本的读写往返测试。
+
 use std::{
     fs::File,
     io::{Cursor, Seek, SeekFrom},
@@ -6,6 +8,7 @@ use std::{
 
 use mml_nbt::chunk::ChunkData;
 
+/// 读取真实样本 tests/r.0.0.mca，写出后读回时区块数与表项数仍为 1024
 #[test]
 fn chunk_mca() {
     let path = Path::new("tests").join("r.0.0.mca");

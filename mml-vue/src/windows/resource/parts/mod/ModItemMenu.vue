@@ -4,9 +4,9 @@
 // 与分组右键菜单（ModGroupMenu）**共用一套外观与定位**（`.mod-ctx-menu*`），
 // 动作同样全部抛给 ModPane 执行 —— 那里才有确认弹窗、备注弹窗与目录打开。
 //
-// ⚠️ 右键原来是"把这一行加进 / 移出多选"（见 types.ts 的 `select`）。改成菜单后，
-// 多选改由**行左侧的勾选框**承担：悬停该行就出现，已经在多选状态时全部常显
-// （见 resource.css 的 `.mod-select` 那段）。
+// ⚠️ 右键原来是"把这一行加进 / 移出多选"，见 types.ts 的 `select`。改成菜单后，
+// 多选改由**行左侧的勾选框**承担：悬停该行就出现，已经在多选状态时全部常显，
+// 见 resource.css 的 `.mod-select` 那段。
 import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { t } from "../../../../lib/i18n";
 import type { ModItemDto } from "../../../../lib/bindings";
@@ -18,12 +18,14 @@ const props = defineProps<{
   /** 点击处（视口坐标） */
   x: number;
   y: number;
-  /** 这一行的模组（用来决定显示"启用"还是"禁用"） */
+  /** 这一行的模组，用来决定显示"启用"还是"禁用" */
   item: ModItemDto;
 }>();
 
 const emit = defineEmits<{
+  /** 选了一个动作，由 ModPane 执行 */
   (e: "action", kind: ItemMenuAction): void;
+  /** 收起菜单 */
   (e: "close"): void;
 }>();
 

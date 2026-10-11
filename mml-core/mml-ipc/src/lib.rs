@@ -1,17 +1,18 @@
 //! 启动器与游戏、以及启动器实例之间的 IPC 通信
 //!
 //! 启动器在本机绑定 `127.0.0.1` 的临时端口作为 TCP 服务端：
-//! - 游戏通过注入的 Agent（`-Dcolormc.mixin.port` 与 `-Dcolormc.mixin.uuid`）连接回启动器；
-//! - 重复启动的启动器实例通过该端口通知已运行实例（无启动参数时请求显示窗口，
-//!   有启动参数时传递参数），防止多开。
+//! - 游戏通过注入的 Agent 连接回启动器，端口与实例 ID 分别来自
+//!   `-Dcolormc.mixin.port` 与 `-Dcolormc.mixin.uuid`；
+//! - 重复启动的启动器实例通过该端口通知已运行实例，防止多开：
+//!   无启动参数时请求显示窗口，有启动参数时传递参数。
 //!
 //! # 消息格式
 //!
 //! 每条消息格式为：`[i32 消息类型][消息体]`，没有总长度前缀。
 //! 消息体按字段自定界：字符串为 `[i32 长度][UTF-8 字节]`，字符串列表为
 //! `[i32 数量][字符串...]`，布尔为 1 字节，整数为 4 字节，均为大端。
-//! 解析时先读消息类型，再按类型逐个读取字段即可确定消息边界
-//! （与 ColorMC 的 `LaunchSocketUtils` 一致）。
+//! 解析时先读消息类型，再按类型逐个读取字段即可确定消息边界，
+//! 与 ColorMC 的 `LaunchSocketUtils` 一致。
 //!
 //! ## 游戏 <-> 启动器
 //!
@@ -74,28 +75,28 @@ const TYPE_GAME_CHANNEL: i32 = 9;
 const TYPE_SET_TITLE: i32 = 10;
 const TYPE_GAME_WINDOW_SIZE: i32 = 11;
 
-/// 单个消息体的最大长度（本地 IPC，正常数据远小于该值，用于防御异常长度）
+/// 单个消息体的最大长度，单位字节；本地 IPC 正常数据远小于该值，用于防御异常长度
 const MAX_FRAME_SIZE: usize = 1 << 20;
 
 /// 客户端出站通道
 type TcpChannel = mpsc::UnboundedSender<BytesMut>;
 
-/// 已连接的客户端（用于广播）
+/// 已连接的客户端，广播时使用
 static CLIENTS: RwLock<Vec<TcpChannel>> = RwLock::new(Vec::new());
-/// 已注册的游戏实例通道（uuid -> 客户端通道）
+/// 已注册的游戏实例通道，键为实例 ID
 static GAME_CHANNELS: LazyLock<RwLock<HashMap<Uuid, TcpChannel>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
-/// 服务器列表（用于向游戏广播 MOTD）
+/// 服务器列表，用于向游戏广播 MOTD
 static SERVER_INFOS: RwLock<Vec<ServerInfo>> = RwLock::new(Vec::new());
-/// 新启动实例传入的启动参数（防止多开）
+/// 新启动实例传入的启动参数，用于防止多开时的参数转发
 static RUN_ARG: RwLock<Vec<String>> = RwLock::new(Vec::new());
-/// 游戏上报的鼠标状态（uuid -> 状态）
+/// 游戏上报的鼠标状态，键为实例 ID
 static MOUSE_STATES: LazyLock<RwLock<HashMap<Uuid, bool>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
-/// 游戏上报的窗口大小（uuid -> (宽, 高)）
+/// 游戏上报的窗口大小，键为实例 ID，值为宽高像素
 static WINDOW_SIZES: LazyLock<RwLock<HashMap<Uuid, (i32, i32)>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
-/// IPC 服务端口（只初始化一次）
+/// IPC 服务端口，只初始化一次
 static IPC_PORT: OnceLock<u16> = OnceLock::new();
 /// 保护服务启动过程：并发调用 [`init()`] 时只启动一个服务，其余复用同一端口
 static INIT_LOCK: Mutex<()> = Mutex::new(());
@@ -109,19 +110,21 @@ static IPC_ARG_EVENT: LazyLock<EventArgHandler<Vec<String>>> =
 /// 服务器信息
 #[derive(Clone, Debug)]
 pub struct ServerInfo {
-    /// 服务器地址
+    /// 服务器地址，IPv4 或域名
     pub ip: String,
-    /// 服务器端口
+    /// 服务器端口，字符串形式的十进制端口号
     pub port: String,
-    /// 服务器 MOTD 信息
+    /// 服务器 MOTD 信息，原样透传给游戏
     pub motd: String,
 }
 
-/// 注册启动显示事件回调（新启动实例请求显示主窗口时触发）
+/// 注册启动显示事件回调，新启动实例请求显示主窗口时触发
 ///
 /// - `handler`: 回调函数
 ///
-/// 返回处理器编号，用于 [`remove_ipc_event`] 移除。
+/// # 返回值
+///
+/// 返回处理器编号，用于 [`remove_ipc_event`] 移除
 pub fn register_ipc_event<F>(handler: F) -> u64
 where
     F: Fn() + Send + Sync + 'static,
@@ -136,11 +139,13 @@ pub fn remove_ipc_event(id: u64) {
     IPC_EVENT.remove_handle(id);
 }
 
-/// 注册启动参数事件回调（新启动实例传入启动参数时触发）
+/// 注册启动参数事件回调，新启动实例传入启动参数时触发
 ///
 /// - `handler`: 回调函数
 ///
-/// 返回处理器编号，用于 [`remove_ipc_arg_event`] 移除。
+/// # 返回值
+///
+/// 返回处理器编号，用于 [`remove_ipc_arg_event`] 移除
 pub fn register_ipc_arg_event<F>(handler: F) -> u64
 where
     F: Fn(&Vec<String>) + Send + Sync + 'static,
@@ -155,7 +160,7 @@ pub fn remove_ipc_arg_event(id: u64) {
     IPC_ARG_EVENT.remove_handel(id);
 }
 
-/// 获取新启动实例传入的启动参数（防止多开时的参数转发）
+/// 获取新启动实例传入的启动参数，用于防止多开时的参数转发
 pub fn get_run_arg() -> Vec<String> {
     RUN_ARG.read().unwrap().clone()
 }
@@ -171,18 +176,18 @@ pub fn get_mouse_state(uuid: Uuid) -> Option<bool> {
     MOUSE_STATES.read().unwrap().get(&uuid).copied()
 }
 
-/// 获取游戏上报的窗口大小（宽, 高）
+/// 获取游戏上报的窗口大小
 ///
 /// - `uuid`: 游戏实例 ID
 ///
 /// # 返回值
 ///
-/// 返回该实例最近一次上报的窗口大小，未上报过返回 `None`
+/// 返回该实例最近一次上报的窗口大小，宽高各为逻辑像素；未上报过返回 `None`
 pub fn get_window_size(uuid: Uuid) -> Option<(i32, i32)> {
     WINDOW_SIZES.read().unwrap().get(&uuid).copied()
 }
 
-/// 添加服务器信息（用于向游戏广播 MOTD）
+/// 添加服务器信息，用于向游戏广播 MOTD
 pub fn add_server(info: ServerInfo) {
     SERVER_INFOS.write().unwrap().push(info);
 }
@@ -194,11 +199,13 @@ pub fn clear_servers() {
 
 /// 向指定游戏实例发送设置标题消息
 ///
-/// 消息体只含标题（与 ColorMC 一致，游戏实例由 `uuid` 对应通道定位）。
-/// 返回是否发送成功（游戏实例未注册通道时返回 `false`）。
-///
 /// - `uuid`: 游戏实例 ID
 /// - `title`: 要设置的标题
+///
+/// # 返回值
+///
+/// 消息体只含标题，与 ColorMC 一致，游戏实例由 `uuid` 对应的通道定位；
+/// 发送成功返回 `true`，游戏实例未注册通道时返回 `false`
 pub fn set_title(uuid: Uuid, title: &str) -> bool {
     let mut content = BytesMut::new();
     content.put_i32(TYPE_SET_TITLE);
@@ -206,18 +213,20 @@ pub fn set_title(uuid: Uuid, title: &str) -> bool {
     send_to_game(uuid, content)
 }
 
-/// 通知已运行的启动器实例（防止多开）—— 启动器客户端
+/// 通知已运行的启动器实例，防止多开 —— 启动器客户端
+///
+/// - `port`: 已运行实例的监听端口
+/// - `args`: 本进程的启动参数，为空则发送「启动显示」
+///
+/// # 返回值
 ///
 /// 作为客户端向 `port` 发送一次数据后立即关闭连接，本进程不会启动 IPC 服务。
 /// 根据启动参数决定发送的消息：
 /// - `args` 为空时发送「启动显示」(3)，请求已运行实例显示主窗口；
 /// - `args` 非空时发送「启动参数」(4)，把本次启动参数交给已运行实例。
 ///
-/// 返回 `true` 表示已通知成功（当前进程应退出，由已有实例接管）；
-/// 返回 `false` 表示没有可连接的实例（端口错误或服务未运行）。
-///
-/// - `port`: 已运行实例的监听端口
-/// - `args`: 本进程的启动参数（为空则发送「启动显示」）
+/// 返回 `true` 表示已通知成功，当前进程应退出，由已有实例接管；
+/// 返回 `false` 表示没有可连接的实例，端口错误或服务未运行
 pub fn notify_existing(port: u16, args: Vec<String>) -> bool {
     use std::io::Write;
 
@@ -231,7 +240,7 @@ pub fn notify_existing(port: u16, args: Vec<String>) -> bool {
         return false;
     }
 
-    // 协议无总长度前缀（与 ColorMC 一致），消息体自定界
+    // 协议无总长度前缀，与 ColorMC 一致，消息体自定界
     let mut content = BytesMut::new();
     if args.is_empty() {
         content.put_i32(TYPE_LAUNCH_SHOW);
@@ -243,13 +252,17 @@ pub fn notify_existing(port: u16, args: Vec<String>) -> bool {
     stream.write_all(&content).is_ok()
 }
 
-/// 初始化 IPC 服务（含单开检查）
+/// 初始化 IPC 服务，含单开检查
 ///
-/// `port` 为已运行启动器实例记录的端口（由调用方从端口文件或启动环境读取）：
+/// - `port`: 已运行启动器实例记录的端口，无已运行实例时为 `None`
+///
+/// # 返回值
+///
+/// `port` 由调用方从端口文件或启动环境读取：
 /// - 为 `Some(port)` 时：读取本进程命令行参数，根据有无启动参数调用
-///   [`notify_existing()`] 通知已运行实例（无参数发送「启动显示」，有参数发送
-///   「启动参数」）。通知成功返回 `Ok(None)`，调用方应退出当前进程；通知失败
-///   说明原实例已退出（端口过期），本进程继续作为第一个实例启动服务。
+///   [`notify_existing()`] 通知已运行实例，无参数发送「启动显示」，有参数发送
+///   「启动参数」。通知成功返回 `Ok(None)`，调用方应退出当前进程；通知失败
+///   说明原实例已退出，端口过期，本进程继续作为第一个实例启动服务。
 /// - 为 `None` 时：直接作为第一个实例启动服务。
 ///
 /// 服务在本机绑定一个临时端口，在独立线程上启动接收客户端连接和服务器列表
@@ -257,12 +270,10 @@ pub fn notify_existing(port: u16, args: Vec<String>) -> bool {
 /// `GameLaunchArg.mixin` 传入并记录供后续启动实例使用；返回 `Ok(None)` 表示
 /// 已通知已运行实例，本进程应立即退出。
 ///
-/// 本进程已启动过服务时，重复调用直接返回第一次绑定的端口。
-///
-/// - `port`: 已运行启动器实例记录的端口（无已运行实例时为 `None`）
+/// 本进程已启动过服务时，重复调用直接返回第一次绑定的端口
 pub fn init(port: Option<u16>) -> CoreResult<Option<u16>> {
     // 串行化服务启动：并发调用时只有一个线程真正启动服务并设置 IPC_PORT，
-    // 其余线程等待锁后直接复用同一端口（否则各自绑定端口会返回不同端口）
+    // 其余线程等待锁后直接复用同一端口，否则各自绑定会返回不同端口
     let _guard = INIT_LOCK.lock().unwrap();
 
     // 本进程已经是服务端：直接返回已绑定端口
@@ -285,7 +296,7 @@ pub fn init(port: Option<u16>) -> CoreResult<Option<u16>> {
 
     // 端口由服务线程绑定后回传。
     // 注意：必须使用 tokio 原生 bind，`TcpListener::from_std` 接受的流
-    // 无法被 spawned 任务正常轮询（本平台实测任务不会运行）。
+    // 无法被 spawned 任务正常轮询，本平台实测任务不会运行。
     let (port_tx, port_rx) = std::sync::mpsc::channel::<u16>();
 
     thread::Builder::new()
@@ -297,7 +308,7 @@ pub fn init(port: Option<u16>) -> CoreResult<Option<u16>> {
             })
         })?;
 
-    // 等待服务绑定端口；若线程启动后立即失败（发送端被丢弃），返回错误
+    // 等待服务绑定端口；若线程启动后立即失败、发送端被丢弃，则返回错误
     let port = port_rx.recv().map_err(|err| {
         SocketError(ErrorData {
             error: err.to_string(),
@@ -310,7 +321,7 @@ pub fn init(port: Option<u16>) -> CoreResult<Option<u16>> {
     Ok(Some(port))
 }
 
-/// 在独立线程上运行 IPC 服务（阻塞直到线程结束）
+/// 在独立线程上运行 IPC 服务，阻塞直到线程结束
 ///
 /// - `port_tx`: 回传绑定端口的通道
 fn run_server(port_tx: std::sync::mpsc::Sender<u16>) {
@@ -360,10 +371,10 @@ async fn accept_loop(listener: TcpListener) -> CoreResult<()> {
     }
 }
 
-/// 处理单个客户端连接（读取循环 + 写入任务）
+/// 处理单个客户端连接，含读取循环与写入任务
 ///
 /// 每个连接分配一条出站通道，写入任务负责将通道中的消息发送到 TCP；
-/// 该通道同时注册进 [`CLIENTS`]（广播）与游戏通道（定向发送）。
+/// 该通道同时注册进 [`CLIENTS`] 用于广播，并注册为游戏通道用于定向发送。
 async fn handle_client(stream: TcpStream) -> CoreResult<()> {
     let (mut reader, mut writer) = tokio::io::split(stream);
     let (write_tx, mut write_rx) = mpsc::unbounded_channel::<BytesMut>();
@@ -381,7 +392,7 @@ async fn handle_client(stream: TcpStream) -> CoreResult<()> {
         }
     });
 
-    // 读取循环：消息无总长度前缀，按类型自定界解析（与 ColorMC 一致）
+    // 读取循环：消息无总长度前缀，按类型自定界解析，与 ColorMC 一致
     let mut buf = BytesMut::with_capacity(1024);
     loop {
         if let Some(msg_len) = message_len(&buf) {
@@ -420,9 +431,9 @@ async fn handle_client(stream: TcpStream) -> CoreResult<()> {
 
 /// 计算缓冲区首条消息的完整长度（字节），不消费数据
 ///
-/// 消息无总长度前缀，按类型读取字段（字符串/列表自带长度）推算边界；
+/// 消息无总长度前缀，按类型读取字段推算边界，字符串与列表自带长度；
 /// 缓冲区中数据不足一条完整消息时返回 `None`。未知类型无法确定长度，
-/// 按一条 4 字节（仅类型头）的消息处理。
+/// 按一条仅含类型头的 4 字节消息处理。
 fn message_len(buf: &[u8]) -> Option<usize> {
     if buf.len() < 4 {
         return None;
@@ -430,7 +441,7 @@ fn message_len(buf: &[u8]) -> Option<usize> {
     let msg_type = i32::from_be_bytes([buf[0], buf[1], buf[2], buf[3]]);
     let mut offset = 4usize;
 
-    // 读取一个字符串字段的长度（4 字节前缀 + 内容），数据不足返回 None
+    // 读取一个字符串字段的长度前缀与内容，数据不足返回 None
     fn string_field(buf: &[u8], offset: &mut usize) -> Option<()> {
         if buf.len() < *offset + 4 {
             return None;
@@ -483,8 +494,8 @@ fn message_len(buf: &[u8]) -> Option<usize> {
 
 /// 处理一条消息
 ///
-/// - `data`: 消息体（不含类型头，读完即消费）
-/// - `client_tx`: 该连接的出站通道（注册游戏通道时使用）
+/// - `data`: 消息体，不含类型头，读完即消费
+/// - `client_tx`: 该连接的出站通道，注册游戏通道时使用
 async fn process_message(
     data: &mut BytesMut,
     client_tx: &mpsc::UnboundedSender<BytesMut>,
@@ -554,7 +565,7 @@ async fn broadcast_servers() {
     loop {
         interval.tick().await;
 
-        // 复制服务器列表（避免长期锁）
+        // 复制服务器列表，避免长期持有锁
         let servers = SERVER_INFOS.read().unwrap().clone();
 
         if servers.is_empty() {
@@ -585,7 +596,7 @@ fn cleanup() {
 
 /// 广播消息给所有客户端
 ///
-/// - `msg`: 完整消息（类型头 + 消息体）
+/// - `msg`: 完整消息，含类型头与消息体
 fn broadcast(msg: BytesMut) {
     cleanup();
     for tx in CLIENTS.read().unwrap().iter() {
@@ -593,10 +604,14 @@ fn broadcast(msg: BytesMut) {
     }
 }
 
-/// 发送消息给指定游戏实例，返回是否发送成功
+/// 发送消息给指定游戏实例
 ///
 /// - `uuid`: 游戏实例 ID
-/// - `msg`: 完整消息（类型头 + 消息体）
+/// - `msg`: 完整消息，含类型头与消息体
+///
+/// # 返回值
+///
+/// 发送成功返回 `true`，实例未注册通道或通道已关闭时返回 `false`
 fn send_to_game(uuid: Uuid, msg: BytesMut) -> bool {
     cleanup();
     if let Some(tx) = GAME_CHANNELS.read().unwrap().get(&uuid) {
@@ -615,6 +630,7 @@ mod tests {
     /// 未初始化时其内部 `SEM.get().unwrap()` 会 panic，故先启动。
     static LOG_STARTED: OnceLock<()> = OnceLock::new();
 
+    /// 幂等地启动日志系统，首次调用时在临时目录建日志
     fn ensure_log() {
         LOG_STARTED.get_or_init(|| {
             let dir = mml_testutil::temp_dir().join(format!("mml_ipc_unit_{}", std::process::id()));
@@ -642,7 +658,7 @@ mod tests {
         assert_eq!(message_len(&buf), Some(4));
     }
 
-    /// 数据不足 4 字节（类型头不完整）时应返回 None
+    /// 数据不足 4 字节，类型头不完整时应返回 None
     #[test]
     fn test_message_len_too_short() {
         let buf = BytesMut::from(&[0u8, 0, 0][..]);
@@ -707,7 +723,7 @@ mod tests {
         assert_eq!(message_len(&bad), None);
     }
 
-    /// 未知类型无法确定边界，按 4 字节（仅类型头）处理（文档化现有行为）
+    /// 未知类型无法确定边界，按仅含类型头的 4 字节处理，文档化现有行为
     #[test]
     fn test_message_len_unknown_type() {
         let mut buf = BytesMut::new();

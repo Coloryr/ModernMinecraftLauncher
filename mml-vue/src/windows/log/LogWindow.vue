@@ -1,10 +1,11 @@
 <script setup lang="ts">
-// 游戏日志窗口：实例运行日志（实时流 + 历史快照，Monaco 只读渲染）与日志文件浏览
+// 游戏日志窗口：实例运行日志与日志文件浏览，日志用 Monaco 只读渲染，含实时流与历史快照
 //
-// 实例下拉的空白项 =「运行中的进程」：聚合当前所有运行中实例的实时日志
-// （LaunchState / GameExit 事件驱动列表刷新）。
-// 目标实例来源（按优先级）：openWindow 带入的目标参数（单窗口模式走 windowParams，
-// 多窗口走 URL uuid）→ `log-focus` 事件（窗口已存在时再次打开，壳层推送）→ 空白（运行中的进程）。
+// 实例下拉的空白项 =「运行中的进程」：聚合当前所有运行中实例的实时日志，
+// 列表由 LaunchState / GameExit 事件驱动刷新。
+// 目标实例按优先级取：openWindow 带入的目标参数 → `log-focus` 事件 → 空白。
+// 目标参数单窗口模式走 windowParams，多窗口走 URL uuid；
+// `log-focus` 是窗口已存在时再次打开，由壳层推送。
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
@@ -19,9 +20,10 @@ import { targetUuid, windowParams } from "../windowManager";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import type { InstanceInfoDto, LogLine } from "../../lib/bindings";
 
+/** 请求关闭本窗口 */
 defineEmits<{ (e: "close"): void }>();
 
-/** 每个实例的日志内存上限（与内核 InstanceRuntimeLog 一致） */
+/** 每个实例的日志内存上限，与内核 InstanceRuntimeLog 保持一致 */
 const MAX_LOG_LINES = 10000;
 
 const instances = ref<InstanceInfoDto[]>([]);
@@ -34,7 +36,7 @@ const viewOptions = computed(() => [
   { value: "files", label: t("logWindow.files") },
 ]);
 
-// ---------------- 运行日志（按实例分段存储，视图按选择聚合） ----------------
+// ---------------- 运行日志：按实例分段存储，视图按选择聚合 ----------------
 
 const runningUuids = ref<string[]>([]);
 const segmentLogs = ref(new Map<string, LogLine[]>());
@@ -43,10 +45,11 @@ const runLogs = computed<LogLine[]>(() => {
   if (currentUuid.value) {
     return segmentLogs.value.get(currentUuid.value) ?? [];
   }
-  // 空白：聚合运行中实例（各实例段内保持时间序，段间按运行列表顺序拼接）
+  // 空白：聚合运行中实例；各实例段内保持时间序，段间按运行列表顺序拼接
   return runningUuids.value.flatMap((u) => segmentLogs.value.get(u) ?? []);
 });
 
+/** 拉一次快照；失败也留一个空段，避免之后反复重拉 */
 async function loadSnapshot(uuid: string) {
   try {
     segmentLogs.value.set(uuid, await api.getRuntimeLog(uuid));
@@ -119,7 +122,7 @@ watch(currentUuid, (uuid) => {
   filesLoadedFor.value = "";
   logFiles.value = [];
   if (uuid) {
-    // 选定实例：拉该实例快照（实时行由 game-log 事件继续追加）
+    // 选定实例：拉该实例快照，实时行由 game-log 事件继续追加
     if (!segmentLogs.value.has(uuid)) loadSnapshot(uuid);
   } else {
     // 空白：跟随运行中的进程
@@ -142,6 +145,7 @@ let unlistenFocus: UnlistenFn | null = null;
 let unlistenLaunchState: UnlistenFn | null = null;
 let unlistenGameExit: UnlistenFn | null = null;
 
+/** 追加一行并裁到上限，超出丢最旧的 */
 function pushLine(uuid: string, line: LogLine) {
   const seg = segmentLogs.value.get(uuid) ?? [];
   seg.push(line);
@@ -149,7 +153,7 @@ function pushLine(uuid: string, line: LogLine) {
   segmentLogs.value.set(uuid, seg);
 }
 
-/** 定位到 openWindow 带入的目标实例（没有 / 不存在就保持空白＝运行中的进程） */
+/** 定位到 openWindow 带入的目标实例；没有或不存在就保持空白，即运行中的进程 */
 function applyTarget() {
   const uuid = targetUuid();
   if (uuid && instances.value.some((i) => i.uuid === uuid)) {
@@ -170,7 +174,7 @@ async function syncInstances() {
 // 单窗口模式：窗口被 KeepAlive 缓存，切回不会重新挂载，自己补一次列表与定位
 useWindowRefresh(syncInstances);
 
-// 已经停在本窗口时又被打开（openWindow 只更新参数、不换组件）：跟着参数换实例
+// 已经停在本窗口时又被打开：openWindow 只更新参数、不换组件，跟着参数换实例
 watch(() => windowParams.value.uuid, applyTarget);
 
 onMounted(async () => {
@@ -285,7 +289,7 @@ onBeforeUnmount(() => {
 .inst-select {
   flex: 1;
   min-width: 0;
-  /* 外观全部走 .field-select（同箭头 / 不透明底 / 主题边框 / 手型光标），这里只覆盖尺寸：
+  /* 外观全部走 .field-select，同箭头、不透明底、主题边框、手型光标；这里只覆盖尺寸：
      原来自己抄了一整份外观，字号也是单独一份，改成"挂 .field-select + 只改尺寸"免得再走偏 */
   padding: 6px 24px 6px 8px;
   font-size: 13px;

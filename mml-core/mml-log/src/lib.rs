@@ -16,7 +16,7 @@
 //!
 //! 1. 业务代码调用日志函数，将日志项加入无锁队列 [`SegQueue`]
 //! 2. 通过信号量唤醒后台日志线程
-//! 3. 日志线程批量将队列中的日志写入文件（带缓冲 [`BufWriter`]）
+//! 3. 日志线程批量将队列中的日志写入文件，带缓冲 [`BufWriter`]
 //!
 //! # 生命周期
 //!
@@ -51,9 +51,9 @@ use std::{
 
 use crate::log_item::{LogItem, LogLevel};
 
-/// 日志写入队列（无锁分段队列，支持高并发推送）
+/// 日志写入队列，无锁分段队列，支持高并发推送
 static QUEUE: RwLock<SegQueue<LogItem>> = RwLock::new(SegQueue::new());
-/// 日志文件写入流（带缓冲）
+/// 日志文件写入流，带缓冲
 static STREAM: OnceLock<BufWriter<File>> = OnceLock::new();
 /// 日志线程运行标志
 static IS_RUN: AtomicBool = AtomicBool::new(true);
@@ -62,12 +62,13 @@ static SEM: OnceLock<Arc<Semaphore>> = OnceLock::new();
 
 /// 启动日志系统
 ///
-/// 创建日志文件（追加模式），启动后台日志写入线程。
-/// 如果无法创建日志文件，程序将 panic。
-///
-/// # 参数
+/// 创建日志文件，追加模式，并启动后台日志写入线程。
 ///
 /// - `local`: 日志文件存储目录
+///
+/// # 返回值
+///
+/// 日志文件打不开时返回 `ErrorType::Panic`；重复调用会 panic
 pub fn start<P: AsRef<Path>>(local: P) -> CoreResult<()> {
     SEM.get_or_init(|| Arc::new(Semaphore::new(0)));
 
@@ -133,8 +134,6 @@ fn save() {
 
 /// 记录信息级别日志
 ///
-/// # 参数
-///
 /// - `text`: 日志内容
 pub fn info(text: String) {
     QUEUE
@@ -144,9 +143,7 @@ pub fn info(text: String) {
     SEM.get().unwrap().up();
 }
 
-/// 记录信息级别日志（使用国际化类型）
-///
-/// # 参数
+/// 记录信息级别日志，内容取自国际化类型
 ///
 /// - `info`: 预定义的国际化信息类型
 pub fn info_type(info: InfoType) {
@@ -159,8 +156,6 @@ pub fn info_type(info: InfoType) {
 
 /// 记录警告级别日志
 ///
-/// # 参数
-///
 /// - `text`: 日志内容
 pub fn warn(text: String) {
     QUEUE
@@ -172,8 +167,6 @@ pub fn warn(text: String) {
 
 /// 记录错误级别日志
 ///
-/// # 参数
-///
 /// - `text`: 日志内容
 pub fn error(text: String) {
     QUEUE
@@ -183,9 +176,7 @@ pub fn error(text: String) {
     SEM.get().unwrap().up();
 }
 
-/// 记录错误级别日志（使用国际化错误类型）
-///
-/// # 参数
+/// 记录错误级别日志，内容取自国际化错误类型
 ///
 /// - `error`: 预定义的国际化错误类型
 pub fn error_type(error: ErrorType) {
@@ -196,11 +187,9 @@ pub fn error_type(error: ErrorType) {
     SEM.get().unwrap().up();
 }
 
-/// 记录严重错误（Fault）级别日志
+/// 记录严重错误 Fault 级别日志
 ///
 /// 用于记录启动器崩溃等严重事件。
-///
-/// # 参数
 ///
 /// - `text`: 日志内容
 pub fn failt(text: String) {

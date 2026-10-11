@@ -4,12 +4,16 @@ import { t } from "../../../lib/i18n";
 import type { SettingsTab, SettingsTabItem } from "../types";
 
 defineProps<{
+  /** 标签清单，顺序即左侧导航顺序 */
   tabs: SettingsTabItem[];
   /** 当前标签（模型值） */
   modelValue: SettingsTab;
 }>();
 
-const emit = defineEmits<{ (e: "update:modelValue", v: SettingsTab): void }>();
+const emit = defineEmits<{
+  /** 切换标签，v-model 的回写 */
+  (e: "update:modelValue", v: SettingsTab): void;
+}>();
 </script>
 
 <template>

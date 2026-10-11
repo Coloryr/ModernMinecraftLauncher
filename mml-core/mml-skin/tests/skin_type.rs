@@ -2,6 +2,7 @@ use std::path::Path;
 
 use mml_skin::{SkinType, skin_type_checker};
 
+/// 64x32 的样本皮肤应判定为 1.7 旧版
 #[test]
 fn test_skin_old() {
     let file = Path::new("tests").join("skin_old.png");
@@ -14,6 +15,7 @@ fn test_skin_old() {
     );
 }
 
+/// 64x64 的样本皮肤应判定为 1.8 新版
 #[test]
 fn test_skin_new() {
     let file = Path::new("tests").join("skin_new.png");
@@ -26,6 +28,7 @@ fn test_skin_new() {
     );
 }
 
+/// 64x64 且纤细标记区域透明的样本皮肤应判定为 1.8 新版纤细
 #[test]
 fn test_skin_slim() {
     let file = Path::new("tests").join("skin_slim.png");
@@ -38,6 +41,7 @@ fn test_skin_slim() {
     );
 }
 
+/// 尺寸不符合已知格式的样本皮肤应判定为未知
 #[test]
 fn test_skin_unknown() {
     let file = Path::new("tests").join("skin_unknown.png");

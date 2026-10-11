@@ -1,9 +1,9 @@
 //! 真实启动器导出包的安装测试。
 //!
-//! - M²L（= ColorMC）实例压缩包：核心导出 API 做导出 → 导入 roundtrip（离线），
+//! - M²L 即 ColorMC 实例压缩包：核心导出 API 做导出到导入的 roundtrip，离线可跑，
 //!   另有真实导出的 colormc-instance.zip 用例。
 //! - HMCL / MMC(Prism) 导出包、HMCL 整包、MultiMC 整包：真实启动器生成的压缩包，
-//!   放到 `tests/packs/`（或环境变量 `MML_REAL_PACK_DIR` 指定的目录），文件不存在时
+//!   放到 `tests/packs/` 或环境变量 `MML_REAL_PACK_DIR` 指定的目录，文件不存在时
 //!   自动跳过。断言基于包内元数据动态推导，不写死版本号。
 //!
 //! 全局初始化每进程一次，互斥锁串行各用例。
@@ -25,14 +25,21 @@ use uuid::Uuid;
 
 mod common;
 
-/// 真实导出包存放目录（环境变量 MML_REAL_PACK_DIR 或 tests/packs/）
+/// 真实导出包存放目录，取环境变量 `MML_REAL_PACK_DIR`，未设置时用 `tests/packs/`
 fn pack_dir() -> PathBuf {
     std::env::var("MML_REAL_PACK_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/packs"))
 }
 
-/// 查找真实导出包，不存在时打印生成说明并返回 None（用例跳过）
+/// 查找真实导出包，不存在时打印生成说明并返回 `None`，用例据此跳过
+///
+/// - `file_name`: 包文件名
+/// - `how_to_make`: 生成方式的说明文本，仅在缺包时打印
+///
+/// # 返回值
+///
+/// 返回包文件路径；文件不存在时返回 `None`
 fn find_pack(file_name: &str, how_to_make: &str) -> Option<PathBuf> {
     let path = pack_dir().join(file_name);
     if path.exists() {
@@ -42,12 +49,12 @@ fn find_pack(file_name: &str, how_to_make: &str) -> Option<PathBuf> {
     None
 }
 
-/// 测试运行目录（系统临时目录 + 进程号，避免多进程冲突）
+/// 测试运行目录，系统临时目录加进程号，避免多进程冲突
 fn run_dir() -> PathBuf {
     mml_testutil::temp_dir().join(format!("mml-real-launcher-packs-{}", std::process::id()))
 }
 
-/// 初始化链（与 mml_core::init 相同），每进程一次
+/// 初始化链，与 `mml_core::init` 相同，每进程一次
 fn ensure_init() {
     static INIT: Once = Once::new();
     INIT.call_once(|| {
@@ -67,18 +74,33 @@ fn ensure_init() {
 /// 全局状态共享同一进程，串行执行各用例
 static TEST_LOCK: Mutex<()> = Mutex::new(());
 
-/// 安装阶段记录器（供断言走完所有阶段）
+/// 安装阶段记录器，供断言检查是否走完所有阶段
 #[derive(Default, Clone)]
 struct StateRecorder {
+    /// 按发生顺序记下的阶段标识
     states: Arc<Mutex<Vec<&'static str>>>,
 }
 
 impl StateRecorder {
+    /// 判断某个阶段是否走到过
+    ///
+    /// - `state`: 阶段标识，取值同 [`state_id`]
+    ///
+    /// # 返回值
+    ///
+    /// 走到过返回 `true`
     fn reached(&self, state: &str) -> bool {
         self.states.lock().unwrap().contains(&state)
     }
 }
 
+/// 把安装阶段枚举转成稳定的字符串标识，供 [`StateRecorder::reached`] 比对
+///
+/// - `state`: 安装阶段
+///
+/// # 返回值
+///
+/// 返回该阶段的字符串标识
 fn state_id(state: &AddModPackState) -> &'static str {
     match state {
         AddModPackState::DownloadPack => "downloadPack",
@@ -102,7 +124,15 @@ impl IAddModPackGui for StateRecorder {
     fn set_sub_now(&self, _value: usize, _all: Option<usize>) {}
 }
 
-/// 安装入口（无界面回调，重名自动改名）
+/// 安装入口，不带界面回调，重名时自动改名
+///
+/// - `zip`: 待安装的压缩包
+/// - `name`: 实例名，`None` 时由包内元数据决定
+/// - `pack_type`: 压缩包类型
+///
+/// # 返回值
+///
+/// 返回新实例的 uuid 与阶段记录器；安装失败会 panic
 async fn install(
     zip: &PathBuf,
     name: Option<String>,
@@ -126,6 +156,13 @@ async fn install(
 }
 
 /// 读取压缩包内指定后缀的文件内容
+///
+/// - `archive`: 已打开的压缩包
+/// - `suffix`: 条目名后缀
+///
+/// # 返回值
+///
+/// 返回文件内容；没有匹配条目或读取失败时返回 `None`
 fn read_entry(archive: &BaseArchive, suffix: &str) -> Option<Vec<u8>> {
     let entry = archive
         .entries()
@@ -134,7 +171,13 @@ fn read_entry(archive: &BaseArchive, suffix: &str) -> Option<Vec<u8>> {
     archive.read(&entry.name).ok()
 }
 
-/// HMCL packmeta 加载器信息 → LoaderType
+/// 把 HMCL packmeta 的组件列表转成加载器类型与版本
+///
+/// - `addons`: 组件列表，每项为组件 ID 与版本
+///
+/// # 返回值
+///
+/// 返回加载器类型与版本；没有已知加载器组件时为原版与 `None`
 fn hmcl_loader(addons: &[(String, String)]) -> (LoaderType, Option<String>) {
     for (id, version) in addons {
         match id.as_str() {
@@ -148,7 +191,7 @@ fn hmcl_loader(addons: &[(String, String)]) -> (LoaderType, Option<String>) {
     (LoaderType::Normal, None)
 }
 
-/// M²L（ColorMC）实例压缩包：导出 → 导入 roundtrip（离线）。
+/// M²L 即 ColorMC 实例压缩包：导出再导入的 roundtrip，离线可跑
 #[tokio::test]
 async fn mml_instance_archive_roundtrip() {
     let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
@@ -162,7 +205,7 @@ async fn mml_instance_archive_roundtrip() {
         loader_version: Some("47.3.0".to_string()),
         ..Default::default()
     };
-    // 分组不在实例配置里（导出包也不带 GroupName 了），创建时单独指定
+    // 分组不在实例配置里，导出包也不带 GroupName 了，创建时单独指定
     let group = mml_game::add_group("导出分组").expect("建组失败");
     let game = setting
         .create_instance_in_group(None, Some(group))
@@ -209,7 +252,7 @@ async fn mml_instance_archive_roundtrip() {
     );
     drop(archive);
 
-    // ---------- 导入（原实例保留，应自动改名且分配新 uuid） ----------
+    // ---------- 导入：原实例保留，应自动改名且分配新 uuid ----------
     let recorder = StateRecorder::default();
     let imported_uuid = add_game::install_archive_from_file(
         &export_file,
@@ -245,8 +288,8 @@ async fn mml_instance_archive_roundtrip() {
         "mod 应导入"
     );
 
-    // 磁盘上的 game.json 应与新实例一致（game.json 由 config_save 异步落盘，
-    // 且解压会先写入包内旧内容，轮询等待落盘稳定后再比对）
+    // 磁盘上的 game.json 应与新实例一致：game.json 由 config_save 异步落盘，
+    // 且解压会先写入包内旧内容，轮询等待落盘稳定后再比对
     let disk = read.get_base_path().join(name_consts::GAME_FILE);
     let expect_uuid = read.uuid;
     drop(read);
@@ -276,7 +319,7 @@ async fn mml_instance_archive_roundtrip() {
     let _ = std::fs::remove_file(&export_file);
 }
 
-/// HMCL 导出的整合包（mcbbs.packmeta 格式）。
+/// HMCL 导出的整合包，mcbbs.packmeta 格式
 ///
 /// 生成方式：HMCL → 版本 → 导出整合包，保存为 hmcl-instance.zip。
 #[tokio::test]
@@ -314,7 +357,7 @@ async fn install_real_hmcl_modpack() {
         .expect("packmeta 应有 game 版本");
     let (expect_loader, expect_loader_version) = hmcl_loader(&addons);
 
-    // overrides 目录名取自随包 manifest.json（HMCL 导出必带）
+    // overrides 目录名取自随包 manifest.json，HMCL 导出必带
     let overrides = {
         let cfg_data = read_entry(&archive, name_consts::MANIFEST_FILE).expect("HMCL 包应带 manifest.json");
         let cfg: mml_game::curseforge::pack_obj::CurseForgePackObj =
@@ -351,8 +394,8 @@ async fn install_real_hmcl_modpack() {
         assert_eq!(read.loader_version.as_deref(), Some(v.as_str()));
     }
 
-    // 包内 overrides 目录下的文件应解压到实例基础目录（导出时 overrides
-    // 为空则跳过文件检查）
+    // 包内 overrides 目录下的文件应解压到实例基础目录；导出时 overrides
+    // 为空则跳过文件检查
     assert!(
         sample.is_empty() || read.get_base_path().is_dir(),
         "实例目录应已创建"
@@ -372,9 +415,9 @@ async fn install_real_hmcl_modpack() {
     mml_game::delete_instance(&uuid).unwrap();
 }
 
-/// HMCL 带启动器的整包（HMCL.exe + .minecraft 目录结构，可能含多个版本）。
+/// HMCL 带启动器的整包，含 HMCL.exe 与 .minecraft 目录结构，可能含多个版本
 ///
-/// 生成方式：把 HMCL 整合目录（含 .minecraft 与 HMCL 启动器文件）压缩为
+/// 生成方式：把 HMCL 整合目录连同 .minecraft 与 HMCL 启动器文件压缩为
 /// hmcl.zip。
 #[tokio::test]
 async fn install_real_hmcl_portable_pack() {
@@ -388,7 +431,7 @@ async fn install_real_hmcl_portable_pack() {
         return;
     };
 
-    // 无整合包元数据 → 按启动器包检测
+    // 无整合包元数据，按启动器包检测
     let detected = detect_pack(&pack).expect("检测失败");
     assert!(
         matches!(detected.pack_type, PackType::LauncherPack),
@@ -402,7 +445,7 @@ async fn install_real_hmcl_portable_pack() {
     let primary = pick_primary(&archive, &mc_prefix, &versions).expect("应有可识别的版本");
     let expect_version = {
         let v = &versions[primary].obj;
-        // HMCL 导出的版本 json 带 patches（game 补丁记录真实游戏版本）
+        // HMCL 导出的版本 json 带 patches，game 补丁记录真实游戏版本
         match v.patches.iter().find(|p| p.id == name_consts::GAME_KEY) {
             Some(p) => p.version.clone(),
             None => {
@@ -463,7 +506,7 @@ async fn install_real_hmcl_portable_pack() {
     mml_game::delete_instance(&uuid).unwrap();
 }
 
-/// 真实 M²L（ColorMC）实例压缩包导入（game.json + .minecraft 布局）。
+/// 真实 M²L 即 ColorMC 实例压缩包导入，布局为 game.json 加 .minecraft
 ///
 /// 由 ColorMC/M²L 真实导出生成，保存为 colormc-instance.zip。
 #[tokio::test]
@@ -531,9 +574,9 @@ async fn install_real_mml_instance_archive() {
     mml_game::delete_instance(&uuid).unwrap();
 }
 
-/// 真实 MultiMC 整包（整个 MultiMC 目录，内含多个实例）。
+/// 真实 MultiMC 整包，即整个 MultiMC 目录，内含多个实例
 ///
-/// 当前导入逻辑取包内第一个 mmc-pack.json 对应的实例（多实例只导入一个），
+/// 当前导入逻辑取包内第一个 mmc-pack.json 对应的实例，多实例只导入一个，
 /// 保存为 MultiMC.zip。
 #[tokio::test]
 async fn install_real_multimc_dir() {
@@ -586,7 +629,7 @@ async fn install_real_multimc_dir() {
         }
     }
 
-    // 该实例目录下的文件应解压到实例基础目录（元数据文件被排除）
+    // 该实例目录下的文件应解压到实例基础目录，元数据文件被排除
     let sample: Vec<String> = archive
         .entries()
         .iter()
@@ -637,7 +680,7 @@ async fn install_real_multimc_dir() {
     mml_game::delete_instance(&uuid).unwrap();
 }
 
-/// MMC / Prism 导出的实例（mmc-pack.json + instance.cfg）。
+/// MMC / Prism 导出的实例，含 mmc-pack.json 与 instance.cfg
 ///
 /// 生成方式：把 Prism/MMC 实例目录压缩为 mmc-instance.zip。
 #[tokio::test]
@@ -656,7 +699,7 @@ async fn install_real_mmc_instance() {
     assert!(matches!(detected.pack_type, PackType::MMC), "应识别为 MMC 包");
     assert!(!detected.name.is_empty(), "应从 instance.cfg 取到实例名");
 
-    // 动态推导期望：net.minecraft 版本 + 加载器组件
+    // 动态推导期望：net.minecraft 版本与加载器组件
     let archive = BaseArchive::open(&pack).unwrap();
     let data = read_entry(&archive, name_consts::MMCJSON_FILE).expect("应有 mmc-pack.json");
     let mmc: mml_game::other_launcher::mmc_obj::MMCObj =

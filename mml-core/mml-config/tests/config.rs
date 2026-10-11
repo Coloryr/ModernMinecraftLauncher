@@ -4,8 +4,8 @@
 //! 进程级全局一次性操作，因此所有断言集中在一个测试里顺序执行。
 //!
 //! 配置与日志文件统一写入仓库 `target/temp` 下的唯一子目录，
-//! 测试结束后尽力清理（日志文件句柄由全局 `STREAM` 持有，Windows 下
-//! 可能无法删除，清理失败会忽略，不影响测试结果）。
+//! 测试结束后尽力清理；日志文件句柄由全局 `STREAM` 持有，Windows 下
+//! 可能无法删除，清理失败会忽略，不影响测试结果。
 
 use std::{fs, path::PathBuf};
 
@@ -31,7 +31,7 @@ fn config_lifecycle() {
     let dir = temp_dir("lifecycle");
     let config_file = dir.join(names::CONFIG_FILE);
 
-    // 保存失败路径会调用 mml_log（SEM.get().unwrap()），需要先启动日志系统。
+    // 保存失败路径会调用 mml_log 的 SEM.get().unwrap()，需要先启动日志系统。
     // 注意：mml_log::start 不会自动创建目录，需先建好 logs 子目录
     let log_dir = dir.join("logs");
     fs::create_dir_all(&log_dir).unwrap();
@@ -52,7 +52,7 @@ fn config_lifecycle() {
     let back: ConfigObj = serde_json::from_str(&fs::read_to_string(&config_file).unwrap()).unwrap();
     assert!(!back.http.check_file, "save_now 后修改应落盘");
 
-    // ---------- 异步保存（后台线程 + 去重队列） ----------
+    // ---------- 异步保存：后台线程 + 去重队列 ----------
     config_save::start();
     write_config().http.source = SourceLocal::Bmclapi;
     save();
@@ -76,9 +76,8 @@ fn config_lifecycle() {
         assert_eq!(cfg.http.download_thread, 64, "load 应读入新字段值");
         assert_eq!(cfg.version, *VERSION, "版本号应迁移为当前版本");
     }
-    // 版本变更触发 save_now。注意当前实现中 save_now 写入的是更新前的内存
-    // CONFIG（download_thread 仍是 5），而 config_obj 在此之后才写入 CONFIG，
-    // 因此磁盘上的 download_thread 与内存不一致——疑似时序 bug，见测试报告。
+    // 版本变更触发 save_now，但 save_now 写的是更新前的内存 CONFIG，download_thread 仍是 5，
+    // 而 config_obj 在此之后才写入 CONFIG，因此磁盘与内存不一致，疑似时序 bug。
     let back: ConfigObj = serde_json::from_str(&fs::read_to_string(&config_file).unwrap()).unwrap();
     assert_eq!(back.version, *VERSION, "config.json 的版本号应已更新");
     assert_eq!(
@@ -86,6 +85,6 @@ fn config_lifecycle() {
         "当前实现下 config.json 写回的是 load 前的内存配置"
     );
 
-    // 清理（日志文件句柄被全局 STREAM 持有，Windows 下可能删除失败，忽略）
+    // 清理；日志文件句柄被全局 STREAM 持有，Windows 下可能删除失败，忽略
     let _ = fs::remove_dir_all(&dir);
 }

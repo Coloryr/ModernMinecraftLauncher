@@ -12,12 +12,23 @@ import type { AccountStoreDto } from "../../../lib/bindings";
 import type { FeatureId } from "../types";
 
 defineProps<{
+  /** 功能入口列表，顺序即显示顺序 */
   features: Array<{ id: FeatureId; icon: string }>;
+  /** 启动器主页是否正显示，用来给主页按钮上按下态 */
   newsActive: boolean;
+  /** 当前账户；没有账户时为 null */
   currentAccount: AccountStoreDto | null;
+  /** 可切换的账户列表，来自共享存储 */
   accounts: AccountStoreDto[];
 }>();
 
+/**
+ * 顶栏动作，一律抛给主窗口执行
+ *
+ * - `toggle-news`: 主页按钮，切换启动器主页
+ * - `feature`: 功能入口，带入口 id
+ * - `update:account`: 账户选择器换人
+ */
 const emit = defineEmits<{
   (e: "toggle-news"): void;
   (e: "feature", id: FeatureId): void;
@@ -43,7 +54,7 @@ const emit = defineEmits<{
     <div class="topbar-right">
       <!-- 进度指示器：排在主页按钮左边（整排的最前面）。
            主页面在两种窗口模式下都是这个顶栏，所以两种模式都挂；
-           功能页（用 WindowFrame 那套标题栏）也有同名组件，跟着当时的标题栏走。
+           功能页用的是 WindowFrame 那套标题栏，那边也有同名组件，跟着当时的标题栏走。
            没有任务时各自整块不存在，不留空位 -->
       <ModpackTitleIndicator />
       <DownloadTitleIndicator />
@@ -95,8 +106,8 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
-/* 高度即标题栏高度：与子窗口框架（WindowFrame 的 .frame-head）共用 --titlebar-h，
-   两边必须一致，否则单窗口模式切换页面时标题栏会跳高（曾经这里写死 64px、那边 60px）
+/* 高度即标题栏高度：与子窗口框架 WindowFrame 的 .frame-head 共用 --titlebar-h，
+   两边必须一致，否则单窗口模式切换页面时标题栏会跳高 —— 曾经这里写死 64px、那边 60px。
    顶栏是 .main-window 的第一个 flex 子节点，改高度会让顶栏以下的所有内容（含侧栏）整体下移 */
 .topbar {
   height: var(--titlebar-h);
@@ -110,9 +121,9 @@ const emit = defineEmits<{
 }
 
 /* windows 样式的窗口按钮是小方块、不贴边，右侧留一点呼吸空间；
-   macos 样式的圆点留在左内边距之后（与系统一致的 ~18px 留白）。
+   macos 样式的圆点留在左内边距之后，与系统一致留 ~18px 空白。
    注意：**不要**在这里叠加插件的 --tauri-plugin-decoration-right-clearance ——
-   插件的按钮已被做成透明占位（见 styles/decoration.css），
+   插件的按钮已被做成透明占位，见 styles/decoration.css，
    视觉与占位都由 M²L 自己的 WindowControls 提供，再让一次宽度会多出一段空白 */
 .topbar.windows {
   padding-right: 10px;
@@ -154,7 +165,7 @@ const emit = defineEmits<{
   color: var(--text-dim);
 }
 
-/* 右侧集群自己顶到最右：窗口按钮插在头（macos）或尾（windows）时，
+/* 右侧集群自己顶到最右：窗口按钮在 macos 下插在头部、windows 下插在尾部，
    都不会被布局挤到中间 */
 .topbar-right {
   display: flex;

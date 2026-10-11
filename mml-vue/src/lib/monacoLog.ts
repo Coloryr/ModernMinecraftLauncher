@@ -1,7 +1,7 @@
 // Monaco 日志视图环境：worker 配置 + 日志专用暗色主题
 //
-// 只加载 editor.api（不带各语言贡献包，日志是纯文本），worker 只需要
-// 基础 editor worker；vite 的 ?worker 导入在 dev / build 下都能正确打包。
+// 只加载 editor.api，不带各语言贡献包，日志是纯文本；worker 只需要
+// 基础 editor worker。vite 的 ?worker 导入在 dev / build 下都能正确打包。
 
 import EditorWorker from "monaco-editor/editor/editor.worker.js?worker";
 import * as monaco from "monaco-editor/editor/editor.api";

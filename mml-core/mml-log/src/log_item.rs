@@ -28,14 +28,12 @@ pub(crate) struct LogItem {
     pub log: String,
     /// 日志级别
     level: LogLevel,
-    /// 日志记录时间（系统时间）
+    /// 日志记录时间，系统时间
     time: SystemTime,
 }
 
 impl LogItem {
     /// 创建一条日志条目
-    ///
-    /// # 参数
     ///
     /// - `text`: 日志内容
     /// - `level`: 日志级别
@@ -49,7 +47,7 @@ impl LogItem {
 
     /// 获取格式化的时间字符串
     ///
-    /// 格式：`YYYY-MM-DD HH:MM:SS`
+    /// 形如 `2026-1-1 12:0:0`，月 / 日 / 时 / 分 / 秒均不补零
     pub fn get_time(&self) -> String {
         let time: DateTime<Local> = self.time.into();
 
@@ -108,7 +106,7 @@ mod tests {
         assert_eq!(item.log, "测试内容");
     }
 
-    /// 时间格式为 `年-月-日 时:分:秒`（月/日/时分秒不补零，长度在 14~19 之间）
+    /// 时间格式为 `年-月-日 时:分:秒`，月 / 日 / 时分秒不补零，长度在 14~19 之间
     #[test]
     fn time_format() {
         let item = LogItem::new(String::from("t"), LogLevel::Info);

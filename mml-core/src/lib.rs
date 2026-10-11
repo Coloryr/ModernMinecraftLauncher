@@ -1,7 +1,7 @@
 //! M²L 启动器内核总入口
 //!
-//! 聚合 mml-core 下各子 crate：按顺序完成初始化（init）、配置加载（load）、
-//! 停止（stop），并提供核心停止事件（core stop）的注册与触发。
+//! 聚合 mml-core 下各子 crate：按顺序完成 init 初始化、load 配置加载与 stop 停止，
+//! 并提供核心停止事件的注册与触发。
 //! 各子 crate 的职责见其自身的 `//!` 头部说明。
 
 /// 核心初始化参数
@@ -61,7 +61,7 @@ pub fn remove_core_stop(id: u64) {
     CORE_STOP_EVENT.remove_handle(id);
 }
 
-/// 触发核心停止事件（执行全部已注册回调）
+/// 触发核心停止事件，执行全部已注册回调
 pub fn invoke_core_stop() {
     CORE_STOP_EVENT.emit();
 }
@@ -134,7 +134,7 @@ pub fn load() -> CoreResult<()> {
     Ok(())
 }
 
-/// 停止核心（触发停止事件，各子 crate 的清理回调随之执行）
+/// 停止核心，触发停止事件，各子 crate 的清理回调随之执行
 pub fn stop() {
     mml_log::info(String::from("M²L stop"));
 

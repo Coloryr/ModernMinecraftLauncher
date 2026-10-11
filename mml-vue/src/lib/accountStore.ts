@@ -1,4 +1,4 @@
-// 账户共享存储（主窗口、账户选择器、账户窗口共用）
+// 账户共享存储：主窗口、账户选择器、账户窗口共用
 // 数据由 Rust 提供（windows/account.rs，持久化 accounts.json），
 // 操作通过 IPC；跨窗口通过 account-change 事件同步。
 import { ref } from "vue";
@@ -20,6 +20,15 @@ export const ACCOUNT_TYPES: Array<{ value: string; labelKey: string }> = [
   { value: "nide8", labelKey: "account.typeNide8" },
 ];
 
+/**
+ * 取账户类型对应的 i18n 文案键
+ *
+ * - `type`: 账户添加类型
+ *
+ * # 返回值
+ *
+ * 文案键；未知类型回落离线账户那一档
+ */
 export function typeLabelKey(type: string): string {
   return ACCOUNT_TYPES.find((t) => t.value === type)?.labelKey ?? "account.typeOffline";
 }
@@ -39,7 +48,11 @@ export async function loadAccounts(): Promise<void> {
 }
 
 
-/** 设置当前使用账户 */
+/**
+ * 设置当前使用账户
+ *
+ * - `acc`: 目标账户
+ */
 export async function setCurrentAccount(acc: AccountStoreDto) {
   try {
     await commands.account.setCurrentAccount(acc.uuid);
@@ -59,7 +72,11 @@ export async function clearCurrentAccount() {
   currentAccount.value = null;
 }
 
-/** 删除账户 */
+/**
+ * 删除账户
+ *
+ * - `uuid`: 目标账户 uuid
+ */
 export async function removeAccount(uuid: string) {
   try {
     await commands.account.removeAccount(uuid);
@@ -73,7 +90,13 @@ export async function removeAccount(uuid: string) {
   }
 }
 
-/** 刷新账户 Token：失败静默忽略；成功由后端广播 account-change 重拉真实状态（含过期标记） */
+/**
+ * 刷新账户 Token
+ *
+ * 失败静默忽略；成功由后端广播 account-change 重拉真实状态，含过期标记。
+ *
+ * - `uuid`: 目标账户 uuid
+ */
 export async function refreshAccountToken(uuid: string) {
   try {
     await commands.account.refreshAccountToken(uuid);
@@ -82,7 +105,18 @@ export async function refreshAccountToken(uuid: string) {
   }
 }
 
-/** 添加账户（真实由 Rust 创建），返回创建的账户；失败抛出后端错误文案 */
+/**
+ * 添加账户，真实由 Rust 创建
+ *
+ * - `type`: 账户添加类型
+ * - `name`: 账户显示名
+ * - `server`: 认证服务器地址或服务器 ID，缺省为不指定
+ * - `password`: 密码，缺省为不传
+ *
+ * # 返回值
+ *
+ * 新创建的账户；失败抛出后端错误文案
+ */
 export async function addAccount(
   type: string,
   name: string,
@@ -96,7 +130,7 @@ export async function addAccount(
 }
 
 /** 微软登录：触发后端设备码流程；弹窗交互与结果经 account-oauth / account-oauth-state 事件通知。
- *  失败时抛出后端错误（如网络不通），由调用方提示 */
+ *  失败时抛出后端错误，如网络不通，由调用方提示 */
 export async function loginMicrosoft(): Promise<void> {
   await commands.account.addAccount("", "microsoft", null, null);
 }

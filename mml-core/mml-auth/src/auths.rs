@@ -26,25 +26,16 @@ use mml_base::{inner_path, serialize_tools};
 use mml_config::config_save;
 use mml_names::{i18_items::error_type::CoreResult, names, uuids};
 
-/// 全局账户存储（键 = UUID + 认证类型）
+/// 全局账户存储，键由 UUID 与认证类型组成
 static AUTHS: LazyLock<RwLock<HashMap<UserKeyObj, LoginObj>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
-/// 当前使用的账户 UUID（内存态；重启后由前端回退到默认选中第一个）
+/// 当前使用的账户键，仅内存态；重启后由前端回退到默认选中第一个
 static CURRENT_USER: LazyLock<RwLock<Option<UserKeyObj>>> = LazyLock::new(|| RwLock::new(None));
-
-/// 选中账户的持久化结构
-///
-/// 文件内容即 `Option<UserKeyObj>` 的直接序列化（`None` 时为 `null`），
-/// 不包外层结构；读取侧类型与此保持一致
-/// （历史上曾按包一层 `user` 字段的结构解析，与写入格式不符导致重启后
-/// 选中账户静默丢失）。
 
 /// 从磁盘加载账户列表到内存
 ///
 /// 读取失败时会打印错误日志并触发一次保存操作。
-///
-/// # 参数
 ///
 /// - `path`: 账户数据文件的路径
 fn load<P: AsRef<Path>>(path: P) {
@@ -56,6 +47,9 @@ fn load<P: AsRef<Path>>(path: P) {
 }
 
 /// 从磁盘加载选中的账户
+///
+/// 文件内容即 `Option<UserKeyObj>` 的直接序列化，`None` 时为 `null`，不包外层结构；
+/// 历史上曾按包一层 `user` 字段的结构解析，与写入格式不符导致重启后选中账户静默丢失。
 ///
 /// - `path`: 选中账户数据文件的路径
 fn load_select<P: AsRef<Path>>(path: P) {
@@ -100,9 +94,7 @@ pub fn init() {
 
 /// 根据 UUID 和认证类型查询已保存的账户
 ///
-/// # 参数
-///
-/// - `uuid`: 账户标识（Minecraft UUID）
+/// - `uuid`: 账户标识，Minecraft UUID
 /// - `auth_type`: 账户认证类型
 ///
 /// # 返回值
@@ -121,9 +113,7 @@ pub fn get(uuid: &str, auth_type: AuthType) -> Option<LoginObj> {
 /// 从 JSON 文件批量导入账户列表
 ///
 /// 文件内容应为 `Vec<LoginObj>` 格式的 JSON 数组。
-/// 导入的账户会合并到已有存储中（使用 `UserKeyObj` 作为唯一键）。
-///
-/// # 参数
+/// 导入的账户按 `UserKeyObj` 为唯一键合并到已有存储中。
 ///
 /// - `file`: JSON 文件路径
 ///
@@ -142,7 +132,7 @@ pub fn import<P: AsRef<Path>>(file: P) -> CoreResult<()> {
     Ok(())
 }
 
-/// 清除所有已保存的账户（内存和磁盘）
+/// 清除所有已保存的账户，内存与磁盘一并清空
 ///
 /// 谨慎使用，此操作不可逆。
 pub fn clear_auths() {
@@ -155,7 +145,11 @@ pub fn clear_auths() {
     save();
 }
 
-/// 获取全部账户（按最后登录时间倒序，最近使用的排在前面）
+/// 获取全部账户，按最后登录时间倒序，最近使用的排在前面
+///
+/// # 返回值
+///
+/// 全部账户的克隆，最近登录的排在最前
 pub fn get_all() -> Vec<LoginObj> {
     let mut list: Vec<LoginObj> = AUTHS.read().unwrap().values().cloned().collect();
     list.sort_by(|a, b| b.last_login.cmp(&a.last_login));
@@ -163,6 +157,10 @@ pub fn get_all() -> Vec<LoginObj> {
 }
 
 /// 获取当前使用的账户
+///
+/// # 返回值
+///
+/// 当前选中账户的键，未选中时为 `None`
 pub fn get_current() -> Option<UserKeyObj> {
     CURRENT_USER.read().unwrap().clone()
 }
@@ -177,6 +175,10 @@ pub fn set_current(user: Option<UserKeyObj>) {
 }
 
 /// 检查是否拥有正版登录账户
+///
+/// # 返回值
+///
+/// 存在微软正版账户返回 `true`
 pub fn check_online_user() -> bool {
     AUTHS
         .read()
@@ -186,7 +188,7 @@ pub fn check_online_user() -> bool {
 }
 
 impl LoginObj {
-    /// 将当前账户保存到全局存储并持久化到磁盘（相同键覆盖更新）
+    /// 将当前账户保存到全局存储并持久化到磁盘，相同键覆盖更新
     pub fn save(&self) {
         let key = self.get_key();
         // 同 clear_auths：先释放写锁再落盘，防重入死锁

@@ -2,8 +2,8 @@
 // 图片放大预览：全屏浮层，滚轮缩放 1~8 倍、放大后拖动平移、点空白处关闭。
 //
 // 从「下载整合包」的项目详情搬过来的 —— 那边原本写死在页面里，
-// 资源窗口的截图预览也要同一套观感，所以抽成组件，两边共用一份
-// （两处各写一遍迟早会漂移成"一个能拖一个不能"）。
+// 资源窗口的截图预览也要同一套观感，所以抽成组件，两边共用一份。
+// 两处各写一遍迟早会漂移成"一个能拖一个不能"。
 //
 // **Esc 不在这里处理**：上层可能还有别的 Esc 语义 —— 项目详情页是
 // "先关预览、再关详情页"，两个 window 级 keydown 监听同时挂着时谁先跑取决于挂载顺序，
@@ -12,10 +12,11 @@ import { onUnmounted, ref, watch } from "vue";
 import { t } from "../../lib/i18n";
 
 const props = defineProps<{
-  /** 图片地址；空串 = 不显示（调用方也可以直接用 v-if） */
+  /** 图片地址；空串 = 不显示，调用方也可以直接用 v-if */
   src: string;
 }>();
 
+/** 请求关闭浮层；拖动结束那一下不算 */
 const emit = defineEmits<{ (e: "close"): void }>();
 
 /** 缩放倍率（1 = 适配大小） */
@@ -35,7 +36,7 @@ function reset() {
 // 换一张图就回到适配大小，别把上一张的缩放 / 偏移带过来
 watch(() => props.src, reset);
 
-/** 按下开始拖动（未放大时没有可平移的余量，直接返回） */
+/** 按下开始拖动；未放大时没有可平移的余量，直接返回 */
 function onDown(e: PointerEvent) {
   if (scale.value <= 1) return;
   dragged = false;
@@ -69,7 +70,7 @@ function onClick() {
   emit("close");
 }
 
-/** 滚轮缩放（向上放大、向下缩小，1~8 倍） */
+/** 滚轮缩放；向上放大、向下缩小，1~8 倍 */
 function onWheel(e: WheelEvent) {
   const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
   const next = Math.min(8, Math.max(1, scale.value * factor));
@@ -86,7 +87,7 @@ function onWheel(e: WheelEvent) {
         @wheel.prevent="onWheel" @pointerdown="onDown">
         <img :src="src" alt="" :style="{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})` }" />
         <!--
-          底部条：提示 + 调用方自己的操作（截图那边放"打开文件夹 / 删除"）。
+          底部条：提示 + 调用方自己的操作，截图那边放"打开文件夹 / 删除"。
           `@click.stop` 是必须的 —— 不然点按钮会顺带触发浮层的"点空白关闭"
         -->
         <div class="img-preview-bar" @click.stop @pointerdown.stop>

@@ -2,8 +2,8 @@
 //!
 //! 常量按用途分组：
 //! - 目录名 / 文件名常量 —— 磁盘相对路径片段，用 [`Path::join`](std::path::Path::join) 拼接
-//! - 扩展名常量 —— 不带点（`ZIP_EXT`）与带点（`ZIP_DOT_EXT`）两种写法一一对应
-//! - jar 内部路径（如 `META-INF/mods.toml`）—— 使用 `/` 分隔，不是磁盘路径
+//! - 扩展名常量 —— `ZIP_EXT` 不带点、`ZIP_DOT_EXT` 带点，两种写法一一对应
+//! - jar 内部路径 —— 如 `META-INF/mods.toml`，使用 `/` 分隔，不是磁盘路径
 //! - JVM 参数、命令行参数、启动参数占位符、GC 参数等
 
 pub const DOWNLOAD_DIR: &str = "download";
@@ -32,12 +32,14 @@ pub const GAME_SAVES_DIR: &str = "saves";
 pub const GAME_CONFIG_DIR: &str = "config";
 pub const GAME_SCHEMATICS_DIR: &str = "schematics";
 pub const JAVA_DIR: &str = "java";
+/// 版本 JSON 目录，目录名是 patches
 pub const JSON_DIR: &str = "patches";
 pub const DEFAULT_DIR: &str = "default";
 pub const OPEN_LOADER_DIR: &str = "openloader";
 pub const DATA_DIR: &str = "data";
 pub const NATIVE_DIR: &str = "native";
 pub const MML_DIR: &str = "mml";
+/// 游戏目录内的启动器数据目录，带前导点
 pub const MML_INNER_DIR: &str = ".mml";
 pub const BLOCK_DIR: &str = "block";
 pub const LANG_DIR: &str = "langs";
@@ -53,6 +55,7 @@ pub const GUI_SETTING_FILE: &str = "gui_setting.json";
 pub const GROUP_FILE: &str = "group_save.json";
 pub const MOD_PACK_FILE: &str = "Modpack.json";
 pub const CONFIG_FILE: &str = "config.json";
+/// 校验文件名，不带扩展名点
 pub const SHA_FILE: &str = "sha1";
 pub const COLOR_MC_INFO_FILE: &str = "colormc.info.json";
 pub const MMCJSON_FILE: &str = "mmc-pack.json";
@@ -93,7 +96,7 @@ pub const BLOCK_FILE: &str = "block.json";
 pub const ITEM_FILE: &str = "items.json";
 pub const GUI_CONFIG_FILE: &str = "gui_config.json";
 pub const COLLECT_FILE: &str = "collect.json";
-/// 从 ColorMC 迁移的"已询问过"标记（运行目录根，见 windows/colormc.rs）
+/// 从 ColorMC 迁移的"已询问过"标记，位于运行目录根，见 windows/colormc.rs
 pub const COLORMC_MIGRATE_FILE: &str = "colormc_migrate.json";
 
 pub const MINECRAFT_KEY: &str = "minecraft";
@@ -173,6 +176,7 @@ pub const MCA_DOT_EXT: &str = ".mca";
 pub const PNG_DOT_EXT: &str = ".png";
 pub const NBT_DOT_EXT: &str = ".nbt";
 
+/// 默认分组名，值是一个空格
 pub const DEFAULT_GROUP: &str = " ";
 
 pub const ARG_JAVA_LOCAL: &str = "%JAVA_LOCAL%";
@@ -193,6 +197,7 @@ pub const MOD_JARS_DIR: &str = "META-INF/jars/";
 pub const MML: &str = "MML";
 pub const MINECRAFT: &str = "Minecraft";
 
+/// G1 垃圾回收器的默认 JVM 参数
 pub const G1GC: [&str; 8] = [
     "-XX:+UnlockExperimentalVMOptions",
     "-XX:+UseG1GC",
@@ -204,6 +209,7 @@ pub const G1GC: [&str; 8] = [
     "-XX:ParallelGCThreads=8",
 ];
 
+/// ZGC 垃圾回收器的默认 JVM 参数
 pub const GCZGC: [&str; 2] = ["-XX:+UseZGC", "-XX:+ZGenerational"];
 
 pub const LANG_ZH_CN: &str = "zh_CN";
@@ -325,7 +331,7 @@ mod tests {
         }
     }
 
-    /// jar 内部路径常量使用 '/' 分隔（这些不是磁盘路径）
+    /// jar 内部路径常量使用 '/' 分隔，不是磁盘路径
     #[test]
     fn jar_inner_path_constants() {
         assert_eq!(MC_MOD_TOML_FILE, "META-INF/mods.toml");

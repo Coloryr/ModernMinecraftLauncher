@@ -32,7 +32,15 @@ export const ADD_MODES: AddModeTab[] = [
  */
 const MODPACK_PACK_TYPES = new Set(["curseforge", "modrinth"]);
 
-/** 该压缩包类型是否为整合包 */
+/**
+ * 该压缩包类型是否为整合包
+ *
+ * - `packType`: 压缩包类型 ID，如 `curseforge` / `modrinth` / `mmc`
+ *
+ * # 返回值
+ *
+ * 只有走内核整合包安装 worker 的两种 manifest 才为 `true`
+ */
 export function isModpackPackType(packType: string): boolean {
   return MODPACK_PACK_TYPES.has(packType);
 }

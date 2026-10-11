@@ -39,7 +39,7 @@ pub struct ArchiveEntryInfo {
 /// ```ignore
 /// use mml_base::archives::BaseArchive;
 ///
-/// // 打开压缩包（根据后缀自动检测类型）
+/// // 打开压缩包，根据后缀自动检测类型
 /// let archive = BaseArchive::open("path/to/file.zip").unwrap();
 ///
 /// // 遍历条目
@@ -650,7 +650,7 @@ impl BaseArchive {
     ) -> CoreResult<()> {
         let output_dir = output_dir.as_ref();
 
-        // 需要剥离目录或存在排除项时逐条提取（批量解压路径无法调整条目位置）
+        // 需要剥离目录或存在排除项时逐条提取，批量解压路径无法调整条目位置
         if strip_dir.is_some() || unselect.is_some() {
             return self.extract_where(
                 |entry| {
@@ -739,7 +739,7 @@ impl BaseArchive {
         if files.is_empty() {
             return Ok(());
         }
-        // Zip / Tar 支持就地追加（复用已打开的文件句柄，不重新打开）；其余解压后重压缩
+        // Zip / Tar 支持就地追加，复用已打开的文件句柄；其余解压后重压缩
         match self.archive_type {
             ArchiveType::Zip | ArchiveType::Tar => {
                 let paths: Vec<(PathBuf, PathBuf)> = files
@@ -772,7 +772,7 @@ impl BaseArchive {
         let temp_dir = std::env::temp_dir().join(format!("mml_archive_{}", Uuid::new_v4()));
         path_helper::create_dir_all(&temp_dir)?;
 
-        // 将已有压缩包解压到临时目录（空压缩包跳过）
+        // 将已有压缩包解压到临时目录，空压缩包跳过
         if !self.entries.is_empty() {
             if let Err(err) = Self::decompress(self.archive_type, &self.path, &temp_dir, None) {
                 let _ = fs::remove_dir_all(&temp_dir);
@@ -869,7 +869,7 @@ impl BaseArchive {
         let temp_dir = std::env::temp_dir().join(format!("mml_archive_{}", Uuid::new_v4()));
         path_helper::create_dir_all(&temp_dir)?;
 
-        // 将已有压缩包解压到临时目录（空压缩包跳过）
+        // 将已有压缩包解压到临时目录，空压缩包跳过
         if !self.entries.is_empty() {
             if let Err(err) = Self::decompress(self.archive_type, &self.path, &temp_dir, None) {
                 let _ = fs::remove_dir_all(&temp_dir);

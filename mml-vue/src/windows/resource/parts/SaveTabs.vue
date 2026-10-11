@@ -5,7 +5,10 @@ import { t } from "../../../lib/i18n";
 import type { useResourceData } from "../composables/useResourceData";
 import type { SaveTab } from "../types";
 
-const props = defineProps<{ data: ReturnType<typeof useResourceData> }>();
+const props = defineProps<{
+  /** 数据层，子页选中值存在它里面，切换即写回 */
+  data: ReturnType<typeof useResourceData>;
+}>();
 const { saveTab } = props.data;
 </script>
 

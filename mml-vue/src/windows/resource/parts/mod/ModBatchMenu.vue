@@ -18,14 +18,16 @@ const props = defineProps<{
   y: number;
   /** 选中了多少项（标题里显示） */
   count: number;
-  /** 选中项里**还有禁用的** → 给"启用"（识别失败的模组改不了状态，不计入） */
+  /** 选中项里**还有禁用的** → 给"启用"；识别失败的模组改不了状态，不计入 */
   canEnable: boolean;
   /** 选中项里**还有启用的** → 给"禁用" */
   canDisable: boolean;
 }>();
 
 const emit = defineEmits<{
+  /** 选了一个动作，作用在这一批选中的模组上 */
   (e: "action", kind: BatchMenuAction): void;
+  /** 收起菜单 */
   (e: "close"): void;
 }>();
 

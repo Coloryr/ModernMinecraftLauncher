@@ -2,8 +2,8 @@
 // Monaco 只读日志视图：线程 / 级别 / 分类筛选 + 级别着色 + 自动滚动
 //
 // 与 InstanceLogPanel 的差异：内容用 monaco-editor 渲染（只读，等宽控制台），
-// 行颜色按级别着色（Error 红 / Warn 黄 / Debug 暗）；主窗口内嵌面板
-// （InstanceLogPanel）不受影响，本组件供独立日志窗口使用。
+// 行颜色按级别着色，Error 红 / Warn 黄 / Debug 暗；主窗口内嵌面板
+// InstanceLogPanel 不受影响，本组件供独立日志窗口使用。
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { editor } from "monaco-editor/editor/editor.api";
 import { ensureLogTheme, monaco } from "../lib/monacoLog";
@@ -11,8 +11,9 @@ import { t } from "../lib/i18n";
 import type { LogLine } from "../lib/bindings";
 
 const props = defineProps<{
+  /** 日志行，按时间顺序 */
   logs: LogLine[];
-  /** 撑满父容器（独立日志窗口用；默认固定高度内嵌） */
+  /** 撑满父容器；独立日志窗口用，默认固定高度内嵌 */
   fill?: boolean;
   /** 无日志时的提示文案（默认"等待游戏日志输出…"） */
   emptyHint?: string;
@@ -63,9 +64,10 @@ watch(
 const hostEl = ref<HTMLElement | null>(null);
 let monacoEditor: editor.IStandaloneCodeEditor | null = null;
 let decorations: editor.IEditorDecorationsCollection | null = null;
-/** 模型当前已应用的行数（用于追加式更新，避免整篇 setValue） */
+/** 模型当前已应用的行数；用于追加式更新，避免整篇 setValue */
 let appliedCount = 0;
 
+/** 级别对应的着色类名；无需着色的级别返回 `null` */
 function levelClass(level: string): string | null {
   if (level === "Error") return "mml-log-error";
   if (level === "Warn") return "mml-log-warn";
@@ -113,7 +115,7 @@ function append() {
   applyDecorations();
 }
 
-/** 按级别给行着色（Error 红 / Warn 黄 / Debug 暗） */
+/** 按级别给行着色，Error 红 / Warn 黄 / Debug 暗 */
 function applyDecorations() {
   if (!monacoEditor || !decorations) return;
   const items: editor.IModelDeltaDecoration[] = [];
@@ -275,7 +277,7 @@ watch([threadFilter, levelFilter, categoryFilter], rebuild);
 }
 </style>
 
-<!-- 着色类供 monaco 内部渲染层使用（无 scope，全局生效） -->
+<!-- 着色类供 monaco 内部渲染层使用，无 scope、全局生效 -->
 <style>
 .monaco-editor .mml-log-error {
   color: #ff7b72;

@@ -12,22 +12,34 @@ import AccountTypeBadge from "../../../components/AccountTypeBadge.vue";
 import type { AccountStoreDto } from "../../../lib/bindings";
 
 const props = defineProps<{
+  /** 要展示的账户，调用方已按锁定 / 筛选 / 搜索过滤好 */
   accounts: AccountStoreDto[];
+  /** 当前使用的账户 uuid，空串表示没有 */
   currentUuid: string;
+  /** 把账户的令牌状态翻成文案 */
   tokenLabel: (acc: AccountStoreDto) => string;
 }>();
 
 const emit = defineEmits<{
+  /** 打开「添加账户」表单 */
   (e: "add"): void;
+  /** 双击账户：切换为当前使用 */
   (e: "switch", acc: AccountStoreDto): void;
+  /** 刷新该账户的令牌 */
   (e: "refresh", acc: AccountStoreDto): void;
+  /** 预览该账户的皮肤 / 披风 */
   (e: "viewSkin", acc: AccountStoreDto): void;
+  /** 重取该账户的皮肤渲染图 */
   (e: "refreshSkin", acc: AccountStoreDto): void;
+  /** 重新登录该账户 */
   (e: "relogin", acc: AccountStoreDto): void;
+  /** 编辑该账户 */
   (e: "edit", acc: AccountStoreDto): void;
+  /** 删除该账户 */
   (e: "delete", acc: AccountStoreDto): void;
 }>();
 
+/** 是否当前使用的账户 */
 function isCurrent(acc: AccountStoreDto): boolean {
   return acc.uuid === props.currentUuid;
 }
@@ -107,10 +119,10 @@ function isCurrent(acc: AccountStoreDto): boolean {
   min-height: 0;
 }
 
-/* 表格在容器内滚动：上下滚动看行，左右滚动看列（列都是 nowrap，长内容不压缩） */
+/* 表格在容器内滚动：上下滚动看行，左右滚动看列；列都是 nowrap，长内容不压缩 */
 .table-wrap {
   overflow: auto;
-  /* 只预留**纵向**那条（scrollbar-gutter 管不到横向）：表格列多是 nowrap，
+  /* 只预留**纵向**那条：scrollbar-gutter 管不到横向；表格列多是 nowrap，
      横向滚动条基本常驻，纵向那条随账户数量出现 / 消失，预留它免得行整体左移 */
   scrollbar-gutter: stable;
   /* 见 styles/scrollbar.css */
@@ -204,7 +216,7 @@ function isCurrent(acc: AccountStoreDto): boolean {
   text-overflow: ellipsis;
 }
 
-/* 自定义字段（微软 ext1 是 refresh_token，很长）同样省略，悬停看全文 */
+/* 自定义字段同样省略，悬停看全文；微软 ext1 是 refresh_token，很长 */
 .cell-ext {
   max-width: 180px;
   overflow: hidden;

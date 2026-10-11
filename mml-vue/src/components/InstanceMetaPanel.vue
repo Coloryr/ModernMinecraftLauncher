@@ -10,33 +10,38 @@ import LoaderQueryProgress from "./LoaderQueryProgress.vue";
 import type { InstanceInfoDto, VersionInfoDto } from "../lib/bindings";
 
 const props = defineProps<{
+  /** 当前实例 */
   instance: InstanceInfoDto;
+  /** 可选版本清单，供版本类型 / 版本下拉使用 */
   versions: VersionInfoDto[];
   /** 实例锁定生效：只留游戏内语言 / 日志编码，版本与加载器整块隐藏 */
   locked?: boolean;
 }>();
 
 const emit = defineEmits<{
+  /** 提交改动；只带要改的字段 */
   (e: "update", patch: Partial<InstanceInfoDto>): void;
+  /** 版本清单刷新完成：回传新清单 */
   (e: "refreshed", versions: VersionInfoDto[]): void;
 }>();
 
+/** 提交一处改动 */
 function change(patch: Partial<InstanceInfoDto>) {
   emit("update", patch);
 }
 
 /**
- * 是不是整合包实例（整合包类型选了具体平台；"" / "none" 表示不是）
+ * 是不是整合包实例：整合包类型选了具体平台，"" / "none" 表示不是
  *
- * 整合包的版本与加载器是整合包作者在包里定下的（版本、加载器、加载器版本都由 manifest
- * 决定），不该在实例设置里随手改 —— 与"实例锁定"同一个理由，所以那一整块隐藏。
- * 整合包类型本身仍可编辑（那是"这个实例挂在哪条更新线上"）。
+ * 整合包的版本与加载器是整合包作者在包里定下的 —— 版本、加载器、加载器版本都由
+ * manifest 决定 —— 不该在实例设置里随手改，与"实例锁定"同一个理由，所以那一整块隐藏。
+ * 整合包类型本身仍可编辑，那是"这个实例挂在哪条更新线上"。
  */
 const isModpack = computed(
   () => !!props.instance.modpackType && props.instance.modpackType !== "none",
 );
 
-// 版本类型显示名（独立 ID 走 i18n：add.type.*）
+// 版本类型显示名；独立 ID 走 i18n 的 add.type.*
 function typeName(vt: string): string {
   return t(`add.type.${vt}`);
 }
@@ -80,7 +85,7 @@ function onVersionTypeChange(value: string) {
   }
 }
 
-// 刷新版本列表（清空后端缓存重新拉取，版本类型 / 版本随列表一起更新）
+// 刷新版本列表：清空后端缓存重新拉取，版本类型 / 版本随列表一起更新
 const verLoading = ref(false);
 
 async function onRefreshVersions() {
@@ -97,7 +102,7 @@ async function onRefreshVersions() {
 
 // ================= 加载器类型 + 加载器版本 =================
 
-// 加载器显示名（独立 ID 走 i18n：add.loader.*）
+// 加载器显示名；独立 ID 走 i18n 的 add.loader.*
 function loaderLabel(id: string): string {
   return t(`add.loader.${id}`);
 }
@@ -117,7 +122,7 @@ const loaderOptions = computed(() => {
   return opts;
 });
 
-// 支持列表查询进度（事件为全局广播，仅本面板查询期间显示）
+// 支持列表查询进度；事件是全局广播，仅本面板查询期间显示
 const progressStep = ref(0);
 const progressTotal = ref(0);
 
@@ -178,7 +183,7 @@ async function onRefreshLoaderVersions() {
   await fetchLoaderVersions(props.instance.loader, true);
 }
 
-// 自定义加载器：路径选择（与添加实例窗口一致，文件名存入加载器版本字段）
+// 自定义加载器：路径选择，与添加实例窗口一致，文件名存入加载器版本字段
 const loaderPathInput = ref<HTMLInputElement | null>(null);
 
 function onLoaderPathPick(e: Event) {
@@ -196,7 +201,7 @@ async function onLoaderChange(value: string) {
 
 // ================= 游戏内语言 + 日志编码 =================
 
-// 语言列表从实例的资源索引里查（minecraft/lang/*.json）；
+// 语言列表从实例的资源索引 minecraft/lang/*.json 里查；
 // 资源未下载 / 查询失败时保留默认（简体中文 + English）
 const DEFAULT_LANGS = [
   { value: "zh_cn", label: "简体中文" },
@@ -212,7 +217,7 @@ async function refreshLangs() {
   try {
     const list = await api.getInstanceLangs(props.instance.uuid);
     if (list.length) {
-      // 显示名由后端从该语言文件里读（language.name，如 简体中文）；
+      // 显示名由后端从该语言文件里读 language.name，如 简体中文；
       // 资源没下全时后端回落成代码，这里再兜一层，反正别显示空串
       langs.value = list.map((item) => ({
         value: item.code,
@@ -249,7 +254,7 @@ const platforms = [
 ];
 
 function onPlatformChange(value: string) {
-  // null 必须显式下发（JSON.stringify 会丢掉 undefined），后端才能区分“清空”
+  // null 必须显式下发，JSON.stringify 会丢掉 undefined，后端才能区分“清空”
   if (!value) {
     change({ modpackType: null, pid: null, fid: null, serverUrl: null });
     return;
@@ -265,12 +270,12 @@ function onPlatformChange(value: string) {
 
 <template>
   <div class="meta-panel">
-    <!-- 加载器查询进度不浮在窗口正上方：就地显示在各自字段下面（见下面的 .meta-progress），
-         与添加实例窗口同一套（LoaderQueryProgress） -->
+    <!-- 加载器查询进度不浮在窗口正上方：就地显示在各自字段下面，见下面的
+         .meta-progress，与添加实例窗口同一套 LoaderQueryProgress -->
 
-    <!-- 版本与加载器：实例锁定时整块隐藏（避免玩家改掉整合包作者选定的版本）；
-         整合包实例同样整块隐藏（版本 / 加载器 / 加载器版本都由整合包 manifest 决定，
-         这里给了也没法改对），版本类型跟着一起隐 —— 它只服务于那个版本下拉 -->
+    <!-- 版本与加载器：实例锁定时整块隐藏，避免玩家改掉整合包作者选定的版本；
+         整合包实例同样整块隐藏 —— 版本 / 加载器 / 加载器版本都由整合包 manifest
+         决定，这里给了也没法改对 —— 版本类型跟着一起隐，它只服务于那个版本下拉 -->
     <template v-if="!locked && !isModpack">
       <!-- 版本类型 + 版本 -->
       <span class="meta-label">{{ t("meta.versionType") }}</span>
@@ -315,7 +320,7 @@ function onPlatformChange(value: string) {
       </div>
       <span class="meta-label small">{{ instance.loader === "custom" ? t("add.loaderPath") : t("meta.loaderVersion")
         }}</span>
-      <!-- 自定义加载器：路径选择（文件名存入加载器版本字段），其余为版本下拉 -->
+      <!-- 自定义加载器：路径选择，文件名存入加载器版本字段；其余为版本下拉 -->
       <div v-if="instance.loader === 'custom'" class="select-row">
         <input class="field-input" :value="instance.loaderVersion ?? ''" :placeholder="t('add.loaderPathPlaceholder')"
           spellcheck="false" @input="change({ loaderVersion: ($event.target as HTMLInputElement).value || null })" />
@@ -338,7 +343,7 @@ function onPlatformChange(value: string) {
         </BaseButton>
       </div>
 
-      <!-- 查询进度就地显示在字段下面（原来浮在窗口正上方）。
+      <!-- 查询进度就地显示在字段下面，原来浮在窗口正上方。
            面板是 4 列网格，所以每行要显式跨满整行，否则会被塞进"加载器版本"那两格里 -->
       <div v-if="loadersLoading" class="meta-progress">
         <LoaderQueryProgress kind="query" :visible="true" :step="progressStep" :total="progressTotal" />
@@ -366,7 +371,7 @@ function onPlatformChange(value: string) {
 
     <!-- 整合包类型：同样是整合包作者的设定，锁定时整块隐藏 -->
     <template v-if="!locked">
-      <!-- 整合包类型（最底部，不占整行；ID 平台填项目 / 文件 ID，在线平台填网址） -->
+      <!-- 整合包类型：最底部，不占整行；ID 平台填项目 / 文件 ID，在线平台填网址 -->
       <span class="meta-label">{{ t("meta.modpack") }}</span>
       <select class="field-select" :value="instance.modpackType === 'none' ? '' : instance.modpackType ?? ''"
         @change="onPlatformChange(($event.target as HTMLSelectElement).value)">

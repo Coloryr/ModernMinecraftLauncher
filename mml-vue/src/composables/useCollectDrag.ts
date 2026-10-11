@@ -1,12 +1,12 @@
 // 收藏卡片的自定义拖拽：把收藏项拖到某个分组上 = 移到那个分组
 //
-// 与实例拖拽（`useInstanceDrag`）同一套路数：**不用** HTML5 draggable
-// （WebView2 里会出现"禁止"光标且投放不可靠），改用指针事件模拟 ——
+// 与实例拖拽 `useInstanceDrag` 同一套路数：**不用** HTML5 draggable ——
+// WebView2 里会出现"禁止"光标且投放不可靠 —— 改用指针事件模拟：
 // 按下记候选 → 移动超阈值开始拖 → 指针下方找分组 → 松开提交。
 //
-// 两者刻意没有合并成一个通用件：**落点语义不同**。实例拖拽要算"组内第几行"
-// （插入位置，内核分组表存了组内次序，还要画插入占位）；收藏这边分组在数据层就是个
-// 集合（`HashSet<uuid>`，DTO 里按 uuid 排序下发），只表达"归到哪个组"，没有次序可算，
+// 两者刻意没有合并成一个通用件：**落点语义不同**。实例拖拽要算"组内第几行"，
+// 即插入位置 —— 内核分组表存了组内次序，还要画插入占位；收藏这边分组在数据层就是个
+// 集合 `HashSet<uuid>`，DTO 里按 uuid 排序下发，只表达"归到哪个组"，没有次序可算，
 // 所以这边只需要"指针落在哪个组上"，提交也只是一次 `collect_set_group_items`。
 import { computed, onMounted, onUnmounted, ref, type Ref } from "vue";
 import { api } from "../lib/api";
@@ -21,7 +21,7 @@ interface DragDeps {
   multiSelect: Ref<boolean>;
   /** uuid → 它所在的具名分组名（未归组没有条目） */
   groupOf: () => Map<string, string>;
-  /** 「默认分组」的键（拖到这里 = 移出所有具名分组） */
+  /** 「默认分组」的键；拖到这里 = 移出所有具名分组 */
   defaultGroup: string;
 }
 
@@ -38,10 +38,23 @@ const SCROLL_EDGE = 60;
 /** 自动滚动每次挪多少像素 */
 const SCROLL_STEP = 10;
 
+/**
+ * 收藏卡片的自定义拖拽
+ *
+ * - `deps`: 勾选集合、多选开关与分组归属查询，均由调用方持有
+ *
+ * # 返回值
+ *
+ * - `dragActive`: 正在拖的批次，`null` 表示没在拖
+ * - `draggingUuids`: 正在拖的项 uuid 集合，卡片据此变淡
+ * - `dropGroup`: 指针当前落在的分组 key，`null` 表示不在任何分组上
+ * - `onCardPointerDown`: 卡片按下时调用，记下拖拽候选
+ * - `consumeSuppressClick`: 取走"抑制紧随 click"的标记，返回 `true` 表示本次 click 该忽略
+ */
 export function useCollectDrag(deps: DragDeps) {
   const dragCandidate = ref<DragCandidate | null>(null);
   const dragActive = ref<DragCandidate | null>(null);
-  /** 指针当前落在哪个分组上（键 = 分组的 key；null = 不在任何分组上，松手即取消） */
+  /** 指针当前落在哪个分组上；键是分组的 key，`null` 表示不在任何分组上，松手即取消 */
   const dropGroup = ref<string | null>(null);
   /** 正在拖拽的收藏项（卡片据此变淡） */
   const draggingUuids = computed(() => new Set(dragActive.value?.uuids ?? []));
@@ -49,7 +62,7 @@ export function useCollectDrag(deps: DragDeps) {
   let pointerId: number | null = null;
   let startX = 0;
   let startY = 0;
-  /** 拖拽结束后抑制紧随的 click（否则一松手就顺手打开了下载窗口） */
+  /** 拖拽结束后抑制紧随的 click；否则一松手就顺手打开了下载窗口 */
   let suppressClick = false;
 
   /** 卡片按下：记候选（真正开始拖要等移动超过阈值） */
@@ -77,7 +90,7 @@ export function useCollectDrag(deps: DragDeps) {
       if (Math.hypot(e.clientX - startX, e.clientY - startY) <= DRAG_THRESHOLD) return;
       dragActive.value = dragCandidate.value;
       if (!dragActive.value) return;
-      // 真拖起来了：这一串指针操作结束时的 click 不算"点卡片"（见 consumeSuppressClick）
+      // 真拖起来了：这一串指针操作结束时的 click 不算"点卡片"，见 consumeSuppressClick
       suppressClick = true;
     }
     updateDropGroup(e);
@@ -100,7 +113,7 @@ export function useCollectDrag(deps: DragDeps) {
     dropGroup.value = null;
   }
 
-  /** 指针下方是哪个分组（用 DOM 反向查找，与实例拖拽同一做法：`data-group` 存分组 key） */
+  /** 指针下方是哪个分组；用 DOM 反向查找，`data-group` 存分组 key，与实例拖拽同一做法 */
   function updateDropGroup(e: PointerEvent) {
     const el = document.elementFromPoint(e.clientX, e.clientY);
 
@@ -141,7 +154,7 @@ export function useCollectDrag(deps: DragDeps) {
           await api.collectRemoveItems(list, name);
         }
       } else {
-        // 移动语义：后端先把它们从其它分组里摘掉（见 collect_utils::set_group_items）
+        // 移动语义：后端会先把它们从其它分组里摘掉，见 collect_utils::set_group_items
         await api.collectSetGroupItems(target, uuids);
       }
       // 移走的项已经不在原来的组里了，勾选跟着清掉（与「移动到分组」弹窗一致）

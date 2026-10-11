@@ -3,7 +3,7 @@
 import type { ModItemDto } from "../../lib/bindings";
 import type { GlyphName } from "../../components/ui/GlyphIcon.vue";
 
-/** 资源分类（左侧导航的一项） */
+/** 资源分类，即左侧导航的一项 */
 export type CategoryId =
   | "saves"
   | "mods"
@@ -35,7 +35,7 @@ export interface ResourceCategory {
 }
 
 /**
- * 分类清单：**这里的顺序就是默认顺序**（见 useResourceView 的 normalizeOrder）
+ * 分类清单：**这里的顺序就是默认顺序**，见 useResourceView 的 normalizeOrder
  *
  * 用户拖过之后以实例里存的那份为准，这里只决定"没拖过时长什么样"。
  * 模组排在存档前面（用户要求）：模组是最常翻的一类，放第一个。
@@ -50,7 +50,15 @@ export const RESOURCE_CATEGORIES: ResourceCategory[] = [
   { id: "schematics", labelKey: "resource.schematics", icon: "cube" },
 ];
 
-/** 某个分类的图标（找不到时返回 null，调用方不画图标） */
+/**
+ * 取某个分类的图标
+ *
+ * - `id`: 分类 id
+ *
+ * # 返回值
+ *
+ * 分类没登记时返回 `null`，调用方不画图标
+ */
 export function categoryIcon(id: CategoryId): GlyphName | null {
   return RESOURCE_CATEGORIES.find((c) => c.id === id)?.icon ?? null;
 }
@@ -58,8 +66,8 @@ export function categoryIcon(id: CategoryId): GlyphName | null {
 /**
  * 分类 → 后端的 kind 串
  *
- * 后端认的是**目录名**（光影包那类是 `shaderpacks`），而左侧导航的 id 是 `shaders`，
- * 各面板调 `openFolder` 时也都是这么手写的（`openFolder("shaderpacks", ...)`）。
+ * 后端认的是**目录名**，光影包那类是 `shaderpacks`，而左侧导航的 id 是 `shaders`，
+ * 各面板调 `openFolder` 时也都是这么手写的。
  * 拖拽导入要按当前面板定落点，得有一份"分类 → 目录"的映射，收在这里；
  * 面板里那几处手写串以后可以一并换过来。
  */
@@ -77,20 +85,33 @@ export const CATEGORY_KIND: Record<CategoryId, string> = {
  * 当前面板对应的后端 kind
  *
  * 存档下的**数据包子页**落点是 `saves/<存档目录名>/datapacks`，所以这一页返回 `datapacks`，
- * 并且必须把当前选中的存档目录名当 `parent` 一起传给后端（见 ResourceWindow 的 dropParent）。
+ * 并且必须把当前选中的存档目录名当 `parent` 一起传给后端，见 ResourceWindow 的 dropParent。
+ *
+ * - `category`: 左侧导航当前选中的分类
+ * - `saveTab`: 存档分类下当前选中的子页
+ *
+ * # 返回值
+ *
+ * 拖拽导入用的后端目录名
  */
 export function dropKindOf(category: CategoryId, saveTab: SaveTab): string {
   if (category === "saves" && saveTab === "datapacks") return "datapacks";
   return CATEGORY_KIND[category];
 }
 
-/** 服务器添加 / 编辑的表单草稿（edit=true 时另带原 name/ip 作为定位键） */
+/** 服务器添加 / 编辑的表单草稿；edit=true 时另带原 name/ip 作为定位键 */
 export interface ServerFormDraft {
+  /** 编辑已有条目，否则是新增 */
   edit: boolean;
+  /** 服务器显示名 */
   name: string;
+  /** 服务器地址，host 或 host:port */
   ip: string;
+  /** 是否接受服务器资源包 */
   acceptTextures: boolean;
+  /** 编辑前的显示名，仅 edit=true 时有意义，作为定位键 */
   origName: string;
+  /** 编辑前的地址，仅 edit=true 时有意义，作为定位键 */
   origIp: string;
 }
 
@@ -103,7 +124,7 @@ export interface ServerFormDraft {
  */
 export type ModView = "list" | "table";
 
-/** 三种模组视图共用的 props */
+/** 两种模组视图共用的 props */
 export interface ModViewProps {
   /** 这一份要显示的模组（分组模式下是某个分组里的那一批） */
   items: ModItemDto[];
@@ -127,7 +148,7 @@ export interface ModViewProps {
   anchorKey?: string | null;
 }
 
-/** 三种模组视图共用的行操作事件 */
+/** 两种模组视图共用的行操作事件 */
 export interface ModViewEmits {
   (e: "toggle", item: ModItemDto): void;
   (e: "remove", item: ModItemDto): void;
@@ -168,17 +189,30 @@ export interface ModViewEmits {
   (e: "row-click", payload: { event: MouseEvent; item: ModItemDto }): void;
 }
 
-/** 一排模组行的通用文案片段：副标题 = 版本 · 作者 · 文件名 */
+/**
+ * 拼模组行的副标题
+ *
+ * - `item`: 模组条目
+ *
+ * # 返回值
+ *
+ * 版本 · 作者 · 文件名，缺的项自动跳过
+ */
 export function modSub(item: ModItemDto): string {
   return [item.version, item.author, item.file].filter(Boolean).join(" · ");
 }
 
 /**
- * 模组行的渲染标识（v-for 的 key）
+ * 模组行的渲染标识，给 v-for 当 key
  *
- * 内置模组（jar-in-jar）没有 sha1 也没有 uuid，退回 modid / 名字。
- * **分组用的是 `sha1`**（内容哈希，与 gui_setting.json 的 Groups 一致），
- * 这个只是行身份，两件事别混。
+ * 内置模组 jar-in-jar 没有 sha1 也没有 uuid，退回 modid / 名字。
+ * **分组用的是 `sha1`**，与 gui_setting.json 的 Groups 同一口径，这个只是行身份，两件事别混。
+ *
+ * - `item`: 模组条目
+ *
+ * # 返回值
+ *
+ * sha1、uuid、modid、名字里第一个非空的
  */
 export function modRowKey(item: ModItemDto): string {
   return item.sha1 || item.uuid || item.modId || item.name;
@@ -187,12 +221,18 @@ export function modRowKey(item: ModItemDto): string {
 /**
  * 多选的键：**优先 SHA1，没有就退回 uuid**
  *
- * SHA1 是内容哈希，启用 / 禁用（改文件名）之后不变，所以正常情况下选中状态能扛住刷新；
- * 但**读取失败的 jar、手动放进 mods 的坏文件没有 SHA1**（内核哈希失败 → `sha1_of` 返回空串），
- * 一律用 uuid 兜底，否则这些行连勾选框都没有、整段选择也会把它们跳过（用户报过）。
+ * SHA1 是内容哈希，启用 / 禁用只改文件名，之后不变，所以正常情况下选中状态能扛住刷新；
+ * 但**读取失败的 jar、手动放进 mods 的坏文件没有 SHA1**，内核哈希失败时 `sha1_of` 返回空串，
+ * 一律用 uuid 兜底，否则这些行连勾选框都没有、整段选择也会把它们跳过，用户报过。
  *
- * 注意：分组的键**只能是 SHA1**（内核 `Mod.Groups` 按内容哈希记），
- * 所以往分组里放之前要换成 SHA1 并丢掉换不出来的（见 ModPane 的 `batchMove`）。
+ * 注意：分组的键**只能是 SHA1**，内核 `Mod.Groups` 按内容哈希记，
+ * 所以往分组里放之前要换成 SHA1 并丢掉换不出来的，见 ModPane 的 `batchMove`。
+ *
+ * - `item`: 模组条目
+ *
+ * # 返回值
+ *
+ * 该行的多选键
  */
 export function modSelectKey(item: ModItemDto): string {
   return item.sha1 || item.uuid;
@@ -205,10 +245,17 @@ export function modSelectKey(item: ModItemDto): string {
  * 用户在两个视图之间切换就会看到"同一个分组、变了顺序"。
  *
  * 规则：
- * 1. modid 字典序（`localeCompare` 固定 `en`，避免跟随系统区域导致顺序不稳）；
- * 2. **没有 modid 的沉到末尾**（用 `\uffff` 当哨兵：它比任何常规字符都大。
- *    不能拿空串比 —— 空串会排到最前面，让"识别失败的包"挤在正常模组之前）；
+ * 1. modid 字典序，`localeCompare` 固定 `en`，避免跟随系统区域导致顺序不稳；
+ * 2. **没有 modid 的沉到末尾**，用 `\uffff` 当哨兵，它比任何常规字符都大。
+ *    不能拿空串比 —— 空串会排到最前面，让"识别失败的包"挤在正常模组之前；
  * 3. modid 相同时按显示名（缺失时用文件名）兜底，保证顺序是全序、不抖动。
+ *
+ * - `a`: 参与比较的第一个模组
+ * - `b`: 参与比较的第二个模组
+ *
+ * # 返回值
+ *
+ * 负数 / 0 / 正数，可直接交给 `Array.sort`
  */
 export function compareMod(a: ModItemDto, b: ModItemDto): number {
   const ka = a.modId || "\uffff";
@@ -219,9 +266,15 @@ export function compareMod(a: ModItemDto, b: ModItemDto): number {
 }
 
 /**
- * 排好序的模组副本（**不改原数组**）
+ * 排好序的模组副本，**不改原数组**
  *
  * 调用方拿到的 `items` 是分组计算出来的切片，直接 `sort` 会就地把上游数据改掉。
+ *
+ * - `items`: 待排序的模组
+ *
+ * # 返回值
+ *
+ * 按 `compareMod` 排好的新数组
  */
 export function sortedMods(items: ModItemDto[]): ModItemDto[] {
   return [...items].sort(compareMod);

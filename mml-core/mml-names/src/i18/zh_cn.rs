@@ -1,3 +1,8 @@
+//! 简体中文文案表
+//!
+//! 实现 [`I18Lang`](crate::i18::I18Lang)，把各条目类型映射为中文文案；
+//! 也是语言包未设置时的默认实现。
+
 use crate::VERSION;
 
 use crate::i18_items::gui_type::GuiType;
@@ -11,9 +16,17 @@ use crate::{
     },
 };
 
+/// 简体中文语言包
 pub struct ZhCn;
 
 impl I18Lang for ZhCn {
+    /// 取中文一般信息文案
+    ///
+    /// - `info`: 信息条目
+    ///
+    /// # 返回值
+    ///
+    /// 中文成品字符串
     fn get_info(&self, info: &InfoType) -> String {
         match info {
             InfoType::CoreStart => format!("M²L启动，版本：{}", *VERSION),
@@ -22,6 +35,13 @@ impl I18Lang for ZhCn {
         }
     }
 
+    /// 取中文错误文案
+    ///
+    /// - `error`: 错误条目，部分条目自带运行时数据
+    ///
+    /// # 返回值
+    ///
+    /// 中文成品字符串
     fn get_error(&self, error: &ErrorType) -> String {
         match error {
             ErrorType::Panic(panic) => self.get_panic(panic),
@@ -157,6 +177,13 @@ impl I18Lang for ZhCn {
         }
     }
 
+    /// 取中文严重错误文案
+    ///
+    /// - `panic`: 严重错误条目
+    ///
+    /// # 返回值
+    ///
+    /// 中文成品字符串
     fn get_panic(&self, panic: &PanicType) -> String {
         match panic {
             PanicType::CoreArgLocalEmpty => String::from("运行路径为空"),
@@ -167,6 +194,13 @@ impl I18Lang for ZhCn {
         }
     }
 
+    /// 取中文线程名
+    ///
+    /// - `thread`: 线程条目
+    ///
+    /// # 返回值
+    ///
+    /// 中文线程名
     fn get_thread(&self, thread: &ThreadType) -> String {
         match thread {
             ThreadType::LogThread => String::from("日志线程"),
@@ -178,6 +212,13 @@ impl I18Lang for ZhCn {
         }
     }
 
+    /// 取中文界面文案
+    ///
+    /// - `gui`: 界面文案条目
+    ///
+    /// # 返回值
+    ///
+    /// 界面文案尚未接入，恒为空串
     fn get_gui(&self, gui: &GuiType) -> String {
         match gui {
             _ => Default::default(),

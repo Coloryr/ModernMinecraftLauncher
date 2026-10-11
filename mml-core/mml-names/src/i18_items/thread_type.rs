@@ -7,12 +7,12 @@ pub enum ThreadType {
     LogThread,
     /// 配置后台保存线程
     ConfigSaveThread,
-    /// IPv4 局域网客户端
+    /// IPv4 局域网游戏监听线程
     LanClientV4,
-    /// IPv6 局域网客户端
+    /// IPv6 局域网游戏监听线程
     LanClientV6,
-    /// 局域网服务端
+    /// 局域网游戏广播线程
     LanServer,
-    /// 游戏计数
+    /// 游戏启动次数统计线程
     GameCount,
 }

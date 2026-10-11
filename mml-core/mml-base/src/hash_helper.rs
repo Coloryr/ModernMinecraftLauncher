@@ -1,7 +1,7 @@
 //! 哈希计算和 Base64 编解码模块
 //!
 //! 提供 MD5、SHA1、SHA256、SHA512 哈希计算以及 Base64 编解码功能。
-//! 支持多种输入源：字节数组、字符串、文件、读取流（同步/异步）。
+//! 支持多种输入源：字节数组、字符串、文件、读取流，同步与异步两种
 
 use std::{io::Read, path::Path};
 
@@ -15,24 +15,24 @@ use tokio::io::{AsyncRead, AsyncReadExt};
 
 use digest::{Digest, DynDigest};
 
-/// 哈希算法类型
+/// 哈希算法类型，决定输出校验串的长度
 pub enum HashType {
-    /// MD5
+    /// MD5，输出 32 位十六进制串
     Md5,
-    /// SHA1
+    /// SHA1，输出 40 位十六进制串
     Sha1,
-    /// SHA256
+    /// SHA256，输出 64 位十六进制串
     Sha256,
-    /// SHA512
+    /// SHA512，输出 128 位十六进制串
     Sha512,
 }
 
-/// 将字节数组格式化为十六进制字符串（小写）
+/// 将字节数组格式化为小写十六进制字符串
 fn bytes_to_hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
-/// 创建哈希
+/// 按算法类型创建哈希器
 fn create_hasher(hash_type: HashType) -> Box<dyn DynDigest + Send> {
     match hash_type {
         HashType::Md5 => Box::new(Md5::new()),
@@ -42,10 +42,14 @@ fn create_hasher(hash_type: HashType) -> Box<dyn DynDigest + Send> {
     }
 }
 
-/// 生成校验值
+/// 从字节数组生成校验值
 ///
-/// - `hash_type`: 校验类型
-/// - `data`: 需要校验的数据
+/// - `hash_type`: 校验算法
+/// - `data`: 需要计算的数据
+///
+/// # 返回值
+///
+/// 返回小写十六进制校验串
 pub fn gen_hash(hash_type: HashType, data: &[u8]) -> String {
     let mut hasher = create_hasher(hash_type);
     hasher.update(data);
@@ -54,18 +58,26 @@ pub fn gen_hash(hash_type: HashType, data: &[u8]) -> String {
 
 /// 从字符串生成校验值
 ///
-/// - `hash_type`: 校验类型
+/// - `hash_type`: 校验算法
 /// - `data`: 需要计算的数据
+///
+/// # 返回值
+///
+/// 返回小写十六进制校验串
 pub fn gen_hash_from_string(hash_type: HashType, data: &str) -> String {
     let mut hasher = create_hasher(hash_type);
     hasher.update(data.as_bytes());
     bytes_to_hex(&hasher.finalize()).to_ascii_lowercase()
 }
 
-/// 从数据流生成校验值
+/// 从数据流生成校验值，分块读取直到流结束
 ///
-/// - `hash_type`: 校验类型
+/// - `hash_type`: 校验算法
 /// - `reader`: 需要计算的数据流
+///
+/// # 返回值
+///
+/// 返回小写十六进制校验串；读取失败时返回相应错误
 pub fn gen_hash_from_reader<R: Read>(hash_type: HashType, reader: &mut R) -> CoreResult<String> {
     let mut hasher = create_hasher(hash_type);
     let mut buffer = [0u8; 1024];
@@ -85,10 +97,14 @@ pub fn gen_hash_from_reader<R: Read>(hash_type: HashType, reader: &mut R) -> Cor
     Ok(bytes_to_hex(&hasher.finalize()).to_ascii_lowercase())
 }
 
-/// 异步从数据流生成校验值
+/// 异步从数据流生成校验值，分块读取直到流结束
 ///
-/// - `hash_type`: 校验类型
+/// - `hash_type`: 校验算法
 /// - `reader`: 需要计算的数据流
+///
+/// # 返回值
+///
+/// 返回小写十六进制校验串；读取失败时返回相应错误
 pub async fn gen_hash_from_reader_async<R: AsyncRead + Unpin>(
     hash_type: HashType,
     reader: &mut R,
@@ -113,8 +129,12 @@ pub async fn gen_hash_from_reader_async<R: AsyncRead + Unpin>(
 
 /// 从文件生成校验值
 ///
-/// - `hash_type`: 校验类型
+/// - `hash_type`: 校验算法
 /// - `file`: 文件路径
+///
+/// # 返回值
+///
+/// 返回小写十六进制校验串；文件无法打开或读取失败时返回相应错误
 pub fn gen_hash_from_file<P: AsRef<Path>>(hash_type: HashType, file: P) -> CoreResult<String> {
     let mut file = path_helper::open_read(file)?;
     gen_hash_from_reader(hash_type, &mut file)
@@ -122,8 +142,12 @@ pub fn gen_hash_from_file<P: AsRef<Path>>(hash_type: HashType, file: P) -> CoreR
 
 /// 异步从文件生成校验值
 ///
-/// - `hash_type`: 校验类型
+/// - `hash_type`: 校验算法
 /// - `file`: 文件路径
+///
+/// # 返回值
+///
+/// 返回小写十六进制校验串；文件无法打开或读取失败时返回相应错误
 pub async fn gen_hash_from_file_async<P: AsRef<Path>>(
     hash_type: HashType,
     file: P,
@@ -132,23 +156,35 @@ pub async fn gen_hash_from_file_async<P: AsRef<Path>>(
     gen_hash_from_reader_async(hash_type, &mut file).await
 }
 
-/// 生成 Base64（字符串）
+/// 生成字符串的 Base64
 ///
-/// - `input`: 需要生成的数据
+/// - `input`: 需要编码的文本
+///
+/// # 返回值
+///
+/// 返回标准 Base64 字符串
 pub fn gen_base64(input: &str) -> String {
     BASE64.encode(input.as_bytes())
 }
 
-/// 生成 Base64（二进制数据）
+/// 生成二进制数据的 Base64
 ///
-/// - `input`: 需要生成的数据（图片字节等）
+/// - `input`: 需要编码的字节，如图片内容
+///
+/// # 返回值
+///
+/// 返回标准 Base64 字符串
 pub fn gen_base64_bytes(input: &[u8]) -> String {
     BASE64.encode(input)
 }
 
-/// 反解 Base64
+/// 反解 Base64 为文本
 ///
-/// - `input`: Base64字符串
+/// - `input`: Base64 字符串
+///
+/// # 返回值
+///
+/// 返回解码后的文本；Base64 非法或结果不是合法 UTF-8 时返回相应错误
 pub fn de_base64(input: &str) -> CoreResult<String> {
     let bytes = BASE64.decode(input).map_err(|err| {
         ErrorType::Base64Error(ErrorData {
@@ -203,7 +239,7 @@ mod tests {
         );
     }
 
-    /// 从数据流生成哈希（含跨缓冲区分块的数据）
+    /// 从数据流生成哈希，数据跨缓冲区分块
     #[test]
     fn test_gen_hash_from_reader() {
         let data = vec![7u8; 4096]; // 超过 1024 缓冲区，触发多次读取
@@ -250,7 +286,7 @@ mod tests {
         }
     }
 
-    /// 从文件生成哈希（同步 + 异步）
+    /// 从文件生成哈希，同步与异步两条路径
     #[test]
     fn test_gen_hash_from_file() {
         let file = temp_file("a.txt", b"abc");
@@ -265,6 +301,7 @@ mod tests {
         cleanup(&file);
     }
 
+    /// 异步从文件生成哈希
     #[tokio::test]
     async fn test_gen_hash_from_file_async() {
         let file = temp_file("b.txt", b"abc");

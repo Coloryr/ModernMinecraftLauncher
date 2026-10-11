@@ -1,4 +1,4 @@
-//! Tar/TarGz/TarXz 压缩/解压实现（基于 `tar` + `flate2`/`xz2` crate）
+//! Tar/TarGz/TarXz 压缩/解压实现，基于 `tar` 与 `flate2` / `xz2` crate
 
 use std::{
     fs,
@@ -20,25 +20,29 @@ use crate::archives::{
     IBaseArchiveGui, TarMode,
 };
 
-/// 保持打开文件句柄的 Tar/TarGz/TarXz 读取句柄。
+/// 保持打开文件句柄的 Tar/TarGz/TarXz 读取句柄
 ///
-/// tar 读取器是流式的、不可复用，每次操作从持有的文件句柄克隆出独立文件描述符再重建读取器。
-/// 同时提供静态的压缩/解压批处理入口（`mode=None` 表示纯 tar）。
+/// tar 读取器是流式的、不可复用，每次操作从持有的文件句柄克隆出独立文件描述符再重建读取器
+/// 同时提供静态的压缩/解压批处理入口，`mode=None` 表示纯 tar
 pub(crate) struct TarReader {
-    /// 读写的文件句柄（追加/读取用）
+    /// 读写的文件句柄，追加与读取时克隆使用
     file: fs::File,
-    /// 压缩包类型（决定读取器是否套解压流）
+    /// 压缩包类型，决定读取器是否套一层解压流
     archive_type: ArchiveType,
-    /// 压缩包磁盘路径
+    /// 压缩包在磁盘上的路径
     path: PathBuf,
 }
 
 impl TarReader {
-    /// 打开 tar/tar.gz/tar.xz 文件。
+    /// 打开 tar/tar.gz/tar.xz 文件
     ///
-    /// * `file` — 已打开的压缩包文件句柄。
-    /// * `archive_type` — 压缩包类型（Tar / TarGz / TarXz）。
-    /// * `path` — 压缩包磁盘路径。
+    /// - `file`: 已打开的压缩包文件句柄
+    /// - `archive_type`: 压缩包类型，取 Tar / TarGz / TarXz
+    /// - `path`: 压缩包磁盘路径
+    ///
+    /// # 返回值
+    ///
+    /// 返回持有该句柄的读取器，此时尚未解析条目
     pub(crate) fn new(
         file: fs::File,
         archive_type: ArchiveType,
@@ -51,9 +55,13 @@ impl TarReader {
         })
     }
 
-    /// 从持有的文件句柄克隆出独立文件描述符，构建对应的 tar 读取器。
+    /// 从持有的文件句柄克隆出独立文件描述符，构建对应的 tar 读取器
     ///
-    /// 克隆句柄与原句柄共享文件偏移，读取前先定位到文件开头。
+    /// 克隆句柄与原句柄共享文件偏移，读取前先定位到文件开头
+    ///
+    /// # 返回值
+    ///
+    /// 返回已定位到文件开头的读取器；克隆或定位失败时返回相应错误
     fn reader(&self) -> CoreResult<Archive<Box<dyn Read>>> {
         let mut file = self.file.try_clone().map_err(|err| {
             ErrorType::FileSystemError(FileSystemErrorData {
@@ -81,14 +89,18 @@ impl TarReader {
         }
     }
 
-    /// 压缩目录为 tar/tar.gz/tar.xz 文件。
+    /// 压缩目录为 tar/tar.gz/tar.xz 文件
     ///
-    /// * `mode` — 压缩模式（`None` 表示纯 tar）。
-    /// * `archive_file` — 压缩包输出路径。
-    /// * `pack_dir` — 需要打包的源目录。
-    /// * `root_path` — 相对根路径，设置后文件在包内的路径相对于此。
-    /// * `filter` — 可选的排除子串列表，匹配的文件将被跳过。
-    /// * `gui` — 可选的进度回调。
+    /// - `mode`: 压缩模式，`None` 表示纯 tar
+    /// - `archive_file`: 压缩包输出路径
+    /// - `pack_dir`: 需要打包的源目录
+    /// - `root_path`: 相对根路径，设置后文件在包内的路径相对于此
+    /// - `filter`: 可选的排除子串列表，匹配的文件将被跳过
+    /// - `gui`: 可选的进度回调
+    ///
+    /// # 返回值
+    ///
+    /// 写入失败时返回相应错误
     pub(crate) fn compress(
         mode: Option<TarMode>,
         archive_file: &Path,
@@ -105,12 +117,16 @@ impl TarReader {
         Self::tar(&process, archive_file, pack_dir, root_path, filter, mode)
     }
 
-    /// 解压 tar/tar.gz/tar.xz 文件到指定目录。
+    /// 解压 tar/tar.gz/tar.xz 文件到指定目录
     ///
-    /// * `mode` — 压缩模式（`None` 表示纯 tar）。
-    /// * `archive_file` — 压缩包文件路径。
-    /// * `output_dir` — 解压输出目录。
-    /// * `gui` — 可选的进度回调。
+    /// - `mode`: 压缩模式，`None` 表示纯 tar
+    /// - `archive_file`: 压缩包文件路径
+    /// - `output_dir`: 解压输出目录
+    /// - `gui`: 可选的进度回调
+    ///
+    /// # 返回值
+    ///
+    /// 解压失败时返回相应错误
     pub(crate) fn decompress(
         mode: Option<TarMode>,
         archive_file: &Path,
@@ -121,14 +137,18 @@ impl TarReader {
         Self::un_tar(&process, archive_file, output_dir, mode)
     }
 
-    /// 压缩实现（带进度）。
+    /// 压缩实现，逐条目写入并推进进度
     ///
-    /// * `process` — 进度追踪器。
-    /// * `archive_file` — 压缩包输出路径。
-    /// * `pack_dir` — 需要打包的源目录。
-    /// * `root_path` — 相对根路径，设置后文件在包内的路径相对于此。
-    /// * `filter` — 可选的排除子串列表，匹配的文件将被跳过。
-    /// * `mode` — 压缩模式（`None` 表示纯 tar）。
+    /// - `process`: 进度追踪器
+    /// - `archive_file`: 压缩包输出路径
+    /// - `pack_dir`: 需要打包的源目录
+    /// - `root_path`: 相对根路径，设置后文件在包内的路径相对于此
+    /// - `filter`: 可选的排除子串列表，匹配的文件将被跳过
+    /// - `mode`: 压缩模式，`None` 表示纯 tar
+    ///
+    /// # 返回值
+    ///
+    /// 写入失败时返回相应错误
     fn tar(
         process: &ArchiveProcess,
         archive_file: &Path,
@@ -199,12 +219,16 @@ impl TarReader {
         Ok(())
     }
 
-    /// 解压实现（带进度）。
+    /// 解压实现，先数一遍条目数再逐条落盘
     ///
-    /// * `process` — 进度追踪器。
-    /// * `archive_file` — 压缩包文件路径。
-    /// * `output_dir` — 解压输出目录。
-    /// * `mode` — 压缩模式（`None` 表示纯 tar）。
+    /// - `process`: 进度追踪器
+    /// - `archive_file`: 压缩包文件路径
+    /// - `output_dir`: 解压输出目录
+    /// - `mode`: 压缩模式，`None` 表示纯 tar
+    ///
+    /// # 返回值
+    ///
+    /// 解压失败时返回相应错误
     fn un_tar(
         process: &ArchiveProcess,
         archive_file: &Path,
@@ -309,6 +333,7 @@ impl TarReader {
 }
 
 impl ArchiveHandle for TarReader {
+    /// 重建读取器并顺序扫一遍头部，收集条目名、是否目录与大小
     fn read_entries(&mut self) -> CoreResult<Vec<ArchiveEntryInfo>> {
         let mut archive = self.reader()?;
 
@@ -345,6 +370,7 @@ impl ArchiveHandle for TarReader {
         Ok(entries)
     }
 
+    /// 线性扫描找到同名条目并读出内容，目录条目视为错误
     fn read(&mut self, name: &str) -> CoreResult<Vec<u8>> {
         let mut archive = self.reader()?;
 
@@ -385,11 +411,13 @@ impl ArchiveHandle for TarReader {
         }))
     }
 
+    /// tar 无法真正流式读取，先整条读进内存再包成游标
     fn read_stream(&mut self, name: &str) -> CoreResult<Box<dyn Read>> {
         let data = self.read(name)?;
         Ok(Box::new(std::io::Cursor::new(data)))
     }
 
+    /// 扫描找到同名条目后解包到目标路径，进度按单文件上报
     fn extract_file(
         &mut self,
         name: &str,
@@ -445,6 +473,7 @@ impl ArchiveHandle for TarReader {
         Ok(())
     }
 
+    /// 就地追加磁盘文件，靠回退 EOF 标记复用已有数据
     fn add_files(&mut self, files: &[(PathBuf, PathBuf)]) -> CoreResult<()> {
         use tar::Builder;
 
@@ -455,8 +484,7 @@ impl ArchiveHandle for TarReader {
             })
         })?;
 
-        // 跳过 tar 的 EOF 标记（两个 512 字节的零块），由 Builder
-        // 用新条目 + 新 EOF 覆盖
+        // 跳过 tar 的 EOF 标记，两个 512 字节零块由 Builder 用新条目与新 EOF 覆盖
         let len = file
             .metadata()
             .map_err(|err| {
@@ -497,6 +525,7 @@ impl ArchiveHandle for TarReader {
         Ok(())
     }
 
+    /// 就地追加内存数据，靠回退 EOF 标记复用已有数据
     fn add_data(&mut self, name: &str, data: &[u8]) -> CoreResult<()> {
         use tar::{Builder, Header};
 
@@ -507,8 +536,7 @@ impl ArchiveHandle for TarReader {
             })
         })?;
 
-        // 跳过 tar 的 EOF 标记（两个 512 字节的零块），由 Builder
-        // 用新条目 + 新 EOF 覆盖
+        // 跳过 tar 的 EOF 标记，两个 512 字节零块由 Builder 用新条目与新 EOF 覆盖
         let len = file
             .metadata()
             .map_err(|err| {

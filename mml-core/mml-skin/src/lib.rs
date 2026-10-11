@@ -15,20 +15,20 @@ pub mod skin_type_checker;
 /// 皮肤类型枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SkinType {
-    /// 1.7旧版
+    /// 1.7 旧版皮肤，贴图 64x32
     Old,
-    /// 1.8新版
+    /// 1.8 新版皮肤，贴图 64x64，手臂 4 像素宽
     New,
-    /// 1.8新版纤细
+    /// 1.8 新版纤细皮肤，贴图 64x64，手臂 3 像素宽
     NewSlim,
-    /// 未知的类型
+    /// 尺寸或纤细标记区域不符合任何已知格式
     Unknown,
 }
 
 /// 读取图片为位图
 ///
-/// 得到的是预乘 RGBA8、行间无填充的像素缓冲，与旧实现
-/// （Skia `RGBA8888` + `Premul`）的内存布局一致——绘制代码一律按裸字节操作。
+/// 得到的是预乘 RGBA8、行间无填充的像素缓冲，与旧实现 Skia `RGBA8888` + `Premul`
+/// 的内存布局一致——绘制代码一律按裸字节操作。
 ///
 /// - `file`: PNG 文件路径
 ///
@@ -55,7 +55,7 @@ mod tests {
     use super::*;
     use tiny_skia::{ColorU8, IntSize};
 
-    /// 创建一个纯色填充的位图（参数为预乘 RGBA 字节）
+    /// 创建一个纯色填充的位图，颜色按预乘 RGBA 字节给出
     fn make_bitmap(w: u32, h: u32, color: [u8; 4]) -> Pixmap {
         let mut data = vec![0u8; (w * h * 4) as usize];
         for px in data.chunks_exact_mut(4) {
@@ -80,7 +80,7 @@ mod tests {
         let bm = make_bitmap(64, 32, [255, 0, 0, 255]);
         let red = ColorU8::from_rgba(255, 0, 0, 255);
 
-        // 临时目录中的唯一文件名（按进程 ID 区分，测完清理）
+        // 临时目录中的唯一文件名，按进程 ID 区分，测完清理
         let path =
             mml_testutil::temp_dir().join(format!("mml_skin_roundtrip_{}.png", std::process::id()));
         save_bitmap(&bm, &path);

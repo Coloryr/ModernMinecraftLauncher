@@ -7,16 +7,24 @@ import FileTree from "../../../components/FileTree.vue";
 import { collectFileKeys, type FileNode } from "../../../lib/fileTree";
 
 const props = defineProps<{
+  /** 内容树根节点 */
   tree: FileNode[];
+  /** 已勾选的文件 key */
   checked: Set<string>;
+  /** 已展开的目录 key */
   expanded: Set<string>;
 }>();
 
 const emit = defineEmits<{
+  /** 勾选 / 取消某个文件 */
   (e: "toggle-file", key: string): void;
+  /** 勾选 / 取消整个目录，`on` 为 true 表示全选 */
   (e: "toggle-dir", node: FileNode, on: boolean): void;
+  /** 展开 / 收起目录 */
   (e: "toggle-expand", key: string): void;
+  /** 展开目录时按需读取它的子节点 */
   (e: "lazy-load", node: FileNode): void;
+  /** 全选 / 全不选，`on` 为 true 表示全选 */
   (e: "set-all", on: boolean): void;
 }>();
 

@@ -10,13 +10,16 @@ import type { useResourceOps } from "../composables/useResourceOps";
 import type { ShaderItemDto } from "../../../lib/bindings";
 
 const props = defineProps<{
+  /** 数据层，光影列表与加载态从这里取 */
   data: ReturnType<typeof useResourceData>;
+  /** 共用操作层，串行化与确认弹窗从这里取 */
   ops: ReturnType<typeof useResourceOps>;
 }>();
 
 const { shaders, instanceUuid, loading } = props.data;
 const { busy, act, askDelete, openFolder } = props.ops;
 
+/** 设为当前光影；点已选中的那个就是取消 */
 function toggle(item: ShaderItemDto) {
   act(async () => {
     // 点已选中的那个 = 取消选择（后端传 null）

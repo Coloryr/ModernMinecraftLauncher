@@ -6,7 +6,7 @@
 //! # 工作原理
 //!
 //! 1. [`save()`] 将序列化后的 JSON 加入队列，并通过信号量唤醒保存线程
-//! 2. 同一个 UUID 的新任务会替换队列中的旧任务（去重）
+//! 2. 同一个 UUID 的新任务会替换队列中的旧任务，实现去重
 //! 3. 保存线程在后台循环等待信号量，被唤醒后批量执行保存
 //! 4. 调用 [`stop()`] 后线程退出，退出前执行最后一次保存
 //!
@@ -42,18 +42,20 @@ pub struct ConfigSaveObj {
     json: String,
     /// 目标文件路径
     file: PathBuf,
-    /// 任务唯一标识（用于去重）
+    /// 任务唯一标识，用于去重
     uuid: Uuid,
 }
 
 impl ConfigSaveObj {
     /// 创建保存任务
     ///
-    /// # 参数
-    ///
     /// - `obj`: 需要序列化保存的对象
     /// - `file`: 目标文件路径
     /// - `uuid`: 任务唯一标识，相同 uuid 的后继任务会替换旧任务
+    ///
+    /// # 返回值
+    ///
+    /// 序列化成功返回任务对象，失败返回相应错误
     pub fn new<T: Serialize>(obj: &T, file: PathBuf, uuid: Uuid) -> CoreResult<Self> {
         Ok(ConfigSaveObj {
             json: serialize_tools::json_to_string(obj)?,
@@ -74,17 +76,14 @@ static QUEUE: Mutex<Vec<ConfigSaveObj>> = Mutex::new(Vec::new());
 static IS_RUN: AtomicBool = AtomicBool::new(true);
 /// 信号量，用于唤醒保存线程
 static SEM: OnceLock<Arc<Semaphore>> = OnceLock::new();
-/// 后台保存线程句柄（stop 时 join，确保最后一次保存落盘后才返回）
+/// 后台保存线程句柄，stop 时 join，确保最后一次保存落盘后才返回
 static HANDLE: Mutex<Option<JoinHandle<()>>> = Mutex::new(None);
 
 /// 将对象加入保存队列
 ///
-/// 相同 `uuid` 的旧任务会被移除（避免重复保存同一个配置）。
-/// 调用后通过信号量唤醒后台保存线程。
+/// 相同 `uuid` 的旧任务会被移除，避免重复保存同一个配置；加入后通过信号量唤醒后台保存线程。
 ///
-/// # 参数
-///
-/// - `uuid`: 任务标识（相同标识会去重）
+/// - `uuid`: 任务标识，相同标识会去重
 /// - `obj`: 需要保存的对象
 /// - `file`: 目标文件路径
 pub fn save<T: Serialize>(uuid: Uuid, obj: &T, file: impl AsRef<Path>) {
@@ -95,7 +94,7 @@ pub fn save<T: Serialize>(uuid: Uuid, obj: &T, file: impl AsRef<Path>) {
     SEM.get().unwrap().up();
 }
 
-/// 执行一次保存（取出队列中所有任务并写入磁盘）
+/// 执行一次保存：取出队列中所有任务并写入磁盘
 fn save_now() {
     let items = {
         let mut queue = QUEUE.lock().unwrap();
@@ -137,7 +136,7 @@ pub fn start() {
 /// 设置运行标志为 false，唤醒线程使其退出，并阻塞等待线程结束——
 /// 线程退出前会执行最后一次保存，因此本函数返回即保证队列内任务全部落盘。
 pub fn stop() {
-    // 未调用过 start（信号量未初始化）时无事可做
+    // 未调用过 start，信号量未初始化，无事可做
     let Some(sem) = SEM.get() else {
         return;
     };

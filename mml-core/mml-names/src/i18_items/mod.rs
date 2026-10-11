@@ -13,10 +13,15 @@ use crate::{
     },
 };
 
+/// 错误条目类型
 pub mod error_type;
+/// 界面文案条目类型
 pub mod gui_type;
+/// 一般信息条目类型
 pub mod info_type;
+/// 严重错误条目类型
 pub mod panic_type;
+/// 线程名条目类型
 pub mod thread_type;
 
 impl fmt::Display for InfoType {

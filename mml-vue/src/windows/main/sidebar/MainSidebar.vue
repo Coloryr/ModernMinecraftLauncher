@@ -10,30 +10,59 @@ import type { ViewMode } from "../../../lib/bindings";
 import type { DragCandidate, GroupView } from "../types";
 
 const props = defineProps<{
+  /** 当前显示模式：group 分组列表 / list 平铺 */
   mode: ViewMode;
+  /** 模式切换控件的候选，label 已由父组件按界面语言算好 */
   modeOptions: Array<{ value: string; label: string; icon: string }>;
+  /** 搜索框当前文本，受控 */
   searchText: string;
+  /** 全部分组，含空分组；用来区分"一个实例都没有"与"搜索没结果"两种空态 */
   groups: GroupView[];
+  /** 过滤后的分组，分组列表实际渲染的就是它 */
   filteredGroups: GroupView[];
+  /** 平铺模式渲染的实例列表 */
   filteredInstances: InstanceInfoDto[];
+  /** 是否正在搜索；搜索时分组强制展开，便于查看命中结果 */
   searching: boolean;
+  /** 当前选中实例 */
   selected: InstanceInfoDto | null;
+  /** 是否处于多选模式 */
   multiSelect: boolean;
+  /** 多选模式下已勾选的实例 uuid */
   selectedIds: Set<string>;
+  /** 分组 uuid → 是否收起 */
   collapsedGroups: Record<string, boolean>;
+  /** 本次拖拽的候选；null 表示没在拖 */
   dragActive: DragCandidate | null;
+  /** 正在拖的实例 uuid；那一行不渲染，位置交给插入占位 */
   draggingUuid: string | null;
+  /** 分组是否收起 */
   isCollapsed: (id: string) => boolean;
+  /** 实例行或分组标题按下，交给父组件起拖拽 */
   onDragPointerDown: (e: PointerEvent, cand: DragCandidate) => void;
+  /** 点击实例行 */
   onInstClick: (inst: InstanceInfoDto) => void;
+  /** 右键实例行 */
   onInstContext: (e: MouseEvent, inst: InstanceInfoDto) => void;
+  /** 右键分组标题 */
   onGroupContext: (e: MouseEvent, groupId: string) => void;
+  /** 点击分组标题，切换收起 / 展开 */
   onGroupTitleClick: (id: string) => void;
+  /** 组内该下标处是否显示实例插入占位 */
   isInstInsert: (groupId: string, idx: number) => boolean;
+  /** 分组末尾是否显示实例插入占位 */
   isInstInsertEnd: (groupId: string) => boolean;
+  /** 该下标处是否显示分组插入占位 */
   isGroupInsert: (index: number) => boolean;
 }>();
 
+/**
+ * 侧栏动作，一律抛给主窗口执行
+ *
+ * - `update:mode` / `update:searchText`: 模式与搜索框的双向绑定
+ * - `add-instance` / `add-group`: 添加实例 / 添加分组
+ * - `collapse`: 收起整个侧栏
+ */
 const emit = defineEmits<{
   (e: "update:mode", v: ViewMode): void;
   (e: "update:searchText", v: string): void;
@@ -470,7 +499,8 @@ function isGroupOpen(id: string) {
   cursor: grabbing;
 }
 
-/* 拖拽插入占位（淡化的实例 / 分组） */
+/* 拖拽插入占位（淡化的实例 / 分组）。
+   pointer-events: none 是必须的：落点靠 elementFromPoint 命中，占位自己接事件就选不中底下的行 */
 .drop-ghost-row {
   display: flex;
   align-items: center;

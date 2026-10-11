@@ -1,4 +1,4 @@
-//! 7z 压缩/解压实现（基于 `sevenz-rust` crate）
+//! 7z 压缩/解压实现，基于 `sevenz-rust` crate
 
 use std::{
     collections::HashMap,
@@ -17,29 +17,37 @@ use crate::archives::{
     self, ArchiveEntryInfo, ArchiveHandle, ArchiveProcess, BaseArchiveGui, IBaseArchiveGui,
 };
 
-/// 保持打开文件句柄的 7z 读取句柄。
+/// 保持打开文件句柄的 7z 读取句柄
 ///
-/// `ArchiveReader` 不可复用，每次操作从持有的文件句柄克隆出独立文件描述符再重建读取器。
-/// 同时提供静态的压缩/解压批处理入口。
+/// `ArchiveReader` 不可复用，每次操作从持有的文件句柄克隆出独立文件描述符再重建读取器
+/// 同时提供静态的压缩/解压批处理入口
 pub(crate) struct R7zReader {
-    /// 读写的文件句柄
+    /// 读写的文件句柄，读取时克隆使用
     file: fs::File,
-    /// 压缩包磁盘路径
+    /// 压缩包在磁盘上的路径
     path: PathBuf,
 }
 
 impl R7zReader {
-    /// 打开 7z 文件。
+    /// 打开 7z 文件
     ///
-    /// * `file` — 已打开的压缩包文件句柄。
-    /// * `path` — 压缩包磁盘路径。
+    /// - `file`: 已打开的压缩包文件句柄
+    /// - `path`: 压缩包磁盘路径
+    ///
+    /// # 返回值
+    ///
+    /// 返回持有该句柄的读取器，此时尚未解析条目
     pub(crate) fn new(file: fs::File, path: PathBuf) -> CoreResult<Self> {
         Ok(Self { file, path })
     }
 
-    /// 从持有的文件句柄克隆出独立文件描述符，构建 `ArchiveReader`。
+    /// 从持有的文件句柄克隆出独立文件描述符，构建 `ArchiveReader`
     ///
-    /// 克隆句柄与原句柄共享文件偏移，读取前先定位到文件开头。
+    /// 克隆句柄与原句柄共享文件偏移，读取前先定位到文件开头
+    ///
+    /// # 返回值
+    ///
+    /// 返回已定位到文件开头的读取器；克隆、定位或解析头部失败时返回相应错误
     fn reader(&self) -> CoreResult<ArchiveReader<fs::File>> {
         let mut file = self.file.try_clone().map_err(|err| {
             ErrorType::FileSystemError(FileSystemErrorData {
@@ -61,13 +69,17 @@ impl R7zReader {
         })
     }
 
-    /// 压缩目录为 7z 文件。
+    /// 压缩目录为 7z 文件
     ///
-    /// * `archive_file` — 压缩包输出路径。
-    /// * `pack_dir` — 需要打包的源目录。
-    /// * `root_path` — 相对根路径，设置后文件在包内的路径相对于此。
-    /// * `filter` — 可选的排除子串列表，匹配的文件将被跳过。
-    /// * `gui` — 可选的进度回调。
+    /// - `archive_file`: 压缩包输出路径
+    /// - `pack_dir`: 需要打包的源目录
+    /// - `root_path`: 相对根路径，设置后文件在包内的路径相对于此
+    /// - `filter`: 可选的排除子串列表，匹配的文件将被跳过
+    /// - `gui`: 可选的进度回调
+    ///
+    /// # 返回值
+    ///
+    /// 写入失败时返回相应错误
     pub(crate) fn compress(
         archive_file: &Path,
         pack_dir: &Path,
@@ -83,11 +95,15 @@ impl R7zReader {
         Self::r7z_compress(&process, archive_file, pack_dir, root_path, filter)
     }
 
-    /// 解压 7z 文件到指定目录。
+    /// 解压 7z 文件到指定目录
     ///
-    /// * `archive_file` — 压缩包文件路径。
-    /// * `output_dir` — 解压输出目录。
-    /// * `gui` — 可选的进度回调。
+    /// - `archive_file`: 压缩包文件路径
+    /// - `output_dir`: 解压输出目录
+    /// - `gui`: 可选的进度回调
+    ///
+    /// # 返回值
+    ///
+    /// 解压失败时返回相应错误
     pub(crate) fn decompress(
         archive_file: &Path,
         output_dir: &Path,
@@ -97,13 +113,17 @@ impl R7zReader {
         Self::r7z_decompress(&process, archive_file, output_dir)
     }
 
-    /// 压缩实现（带进度）。
+    /// 压缩实现，逐条目写入并推进进度
     ///
-    /// * `process` — 进度追踪器。
-    /// * `archive_file` — 压缩包输出路径。
-    /// * `pack_dir` — 需要打包的源目录。
-    /// * `root_path` — 相对根路径，设置后文件在包内的路径相对于此。
-    /// * `filter` — 可选的排除子串列表，匹配的文件将被跳过。
+    /// - `process`: 进度追踪器
+    /// - `archive_file`: 压缩包输出路径
+    /// - `pack_dir`: 需要打包的源目录
+    /// - `root_path`: 相对根路径，设置后文件在包内的路径相对于此
+    /// - `filter`: 可选的排除子串列表，匹配的文件将被跳过
+    ///
+    /// # 返回值
+    ///
+    /// 写入失败时返回相应错误
     fn r7z_compress(
         process: &ArchiveProcess,
         archive_file: &Path,
@@ -158,11 +178,15 @@ impl R7zReader {
         }
     }
 
-    /// 解压实现（带进度）。
+    /// 解压实现，先预计算目标路径再逐条目落盘
     ///
-    /// * `process` — 进度追踪器。
-    /// * `archive_file` — 压缩包文件路径。
-    /// * `output_dir` — 解压输出目录。
+    /// - `process`: 进度追踪器
+    /// - `archive_file`: 压缩包文件路径
+    /// - `output_dir`: 解压输出目录
+    ///
+    /// # 返回值
+    ///
+    /// 解压失败时返回相应错误
     fn r7z_decompress(
         process: &ArchiveProcess,
         archive_file: &Path,
@@ -180,7 +204,7 @@ impl R7zReader {
 
         process.set_count(seven.archive().files.len());
 
-        // 预计算所有条目的目标路径（文件名非法时替换为 `_`，GUI 不同意则取消）
+        // 预计算所有条目的目标路径，文件名非法时替换为 `_`，GUI 不同意则取消
         let dest_map: HashMap<String, PathBuf> = seven
             .archive()
             .files
@@ -211,6 +235,7 @@ impl R7zReader {
 }
 
 impl ArchiveHandle for R7zReader {
+    /// 直接取头部文件表，不逐个解压
     fn read_entries(&mut self) -> CoreResult<Vec<ArchiveEntryInfo>> {
         let archive = self.reader()?;
         let entries = archive
@@ -226,6 +251,7 @@ impl ArchiveHandle for R7zReader {
         Ok(entries)
     }
 
+    /// 遍历条目找到同名文件并读出内容，目录条目视为错误
     fn read(&mut self, name: &str) -> CoreResult<Vec<u8>> {
         let mut archive = self.reader()?;
 
@@ -266,11 +292,13 @@ impl ArchiveHandle for R7zReader {
         })
     }
 
+    /// 7z 无法真正流式读取，先整条读进内存再包成游标
     fn read_stream(&mut self, name: &str) -> CoreResult<Box<dyn Read>> {
         let data = self.read(name)?;
         Ok(Box::new(std::io::Cursor::new(data)))
     }
 
+    /// 遍历条目找到同名文件后解包到目标路径，进度按单文件上报
     fn extract_file(
         &mut self,
         name: &str,

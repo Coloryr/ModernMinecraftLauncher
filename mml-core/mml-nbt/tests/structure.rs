@@ -1,13 +1,13 @@
 //! 嵌套结构、命名根标签、getter、List 操作、类型编号映射与错误处理测试。
 //!
-//! 与 `nbt_types.rs`（标量/数组的往返）和 `nbt_file.rs`（压缩往返）互补，
+//! 与 `nbt_types.rs` 的标量/数组往返、`nbt_file.rs` 的压缩往返互补，
 //! 重点覆盖：
 //! - 多层嵌套 Compound / List-of-Compound 的写入-读取往返；
 //! - 非空名称的根标签读取后应被包装进外层 Compound；
 //! - `NbtCompound` 的各类 getter；
 //! - `NbtList` 的 `set_num` / `set_type` / `remove` 与类型强制；
 //! - `NbtType::get_num` / `get_nbt` 的类型编号映射；
-//! - 空容器（空数组、空列表、空 Compound）的往返；
+//! - 空数组、空列表、空 Compound 的往返；
 //! - 损坏 / 截断输入应返回错误。
 
 use std::io::Cursor;
@@ -238,9 +238,9 @@ fn type_number_mapping() {
     assert!(NbtType::get_nbt(255).is_none());
 }
 
-/// 空容器（空数组、空 Compound）的往返。
+/// 空数组与空 Compound 的往返。
 ///
-/// 空 List 单独断言：按 NBT 规范，空列表写入时元素类型固定为 0（TAG_End），
+/// 空 List 单独断言：按 NBT 规范，空列表写入时元素类型固定为 0，即 TAG_End，
 /// 读回后元素类型不还原，故不与原值做全等比较。
 #[test]
 fn empty_containers_round_trip() {
@@ -278,7 +278,7 @@ fn corrupt_input_returns_error() {
     let mut two = Cursor::new(vec![0x02, 0x00]);
     assert!(NbtFile::read(&mut two).is_err());
 
-    // 根标签类型非法（0x63 = 99，不在 0-12 范围内）
+    // 根标签类型非法：0x63 = 99，不在 0-12 范围内
     let mut bad_type = Cursor::new(vec![0x63, 0x00, 0x00]);
     assert!(NbtFile::read(&mut bad_type).is_err());
 

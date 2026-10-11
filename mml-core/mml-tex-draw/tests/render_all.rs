@@ -1,8 +1,8 @@
-//! 全量渲染测试：走真实下载链（版本清单 → 客户端jar → 解包）分别渲染全部方块 / 全部物品
+//! 全量渲染测试：走真实下载链，版本清单 → 客户端jar → 解包，分别渲染全部方块 / 全部物品
 //!
-//! 运行（需外网，首次会下载约 25MB 的客户端jar）：
+//! 运行，需外网，首次会下载约 25MB 的客户端jar：
 //! `cargo test -p mml-tex-draw --test render_all -- --nocapture`
-//! （无外网时自动跳过；渲染输出在 tests/out/block 与 tests/out/items）
+//! 无外网时自动跳过；渲染输出在 tests/out/block 与 tests/out/items
 
 use std::{path::PathBuf, sync::Arc, sync::Once};
 
@@ -16,17 +16,17 @@ use mml_game::launcher_path::{libraries_path, version_path};
 /// 串行锁：多个测试共用同一运行目录，避免并发下载/渲染冲突
 static CHAIN_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
-/// 测试运行目录（tests/out/run，跨进程复用已下载的jar）
+/// 测试运行目录，即 tests/out/run，跨进程复用已下载的jar
 fn run_dir() -> PathBuf {
     out_dir().join("run")
 }
 
-/// 渲染输出目录（tests 文件夹下的 out 子目录）
+/// 渲染输出目录，tests 文件夹下的 out 子目录
 fn out_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("out")
 }
 
-/// 初始化链（与 mml_core::init 相同），每进程一次
+/// 初始化链，与 mml_core::init 相同，每进程一次
 fn ensure_init() {
     static INIT: Once = Once::new();
     INIT.call_once(|| {
@@ -45,12 +45,12 @@ fn ensure_init() {
         mml_downloader::set_gui_handel(Box::new(TestDownloader));
         mml_downloader::start();
 
-        // 方块/物品数据放到tests/out（block/ items/ 与langs/），方便直接查看生成的图片
+        // 方块/物品数据放到tests/out，含 block/ items/ 与 langs/，方便直接查看生成的图片
         mml_tex_draw::init(out_dir()).unwrap();
     });
 }
 
-/// 探测网络是否可用（无法访问外网时跳过用例）
+/// 探测网络是否可用，无法访问外网时跳过用例
 async fn network_available() -> bool {
     mml_net::get_work_client()
         .get_bytes("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json")
@@ -59,9 +59,11 @@ async fn network_available() -> bool {
 }
 
 /// 带计时的进度回调：每次上报打印百分比、累计耗时、距上次上报的间隔
-/// （间隔突增处即变慢的位置）
+/// 间隔突增处即变慢的位置
 struct TimedProgress {
+    /// 测试开始时刻，用于算累计耗时
     start: std::time::Instant,
+    /// 上一次上报的时刻，用于算本段耗时
     last: std::sync::Mutex<std::time::Instant>,
 }
 
@@ -82,6 +84,7 @@ impl mml_game::gui_hook::IProgressGui for TimedProgress {
     }
 }
 
+/// 把下载器回调转成控制台输出，按 25% 步长打印
 struct TestDownloader;
 
 impl mml_downloader::IDownloadGui for TestDownloader {
@@ -95,7 +98,7 @@ impl mml_downloader::IDownloadGui for TestDownloader {
     fn update_task(&self, _state: mml_downloader::DownloadTaskState) {}
 }
 
-/// 走下载链取得最新正式版客户端jar（本地已存在且sha1匹配时跳过下载）
+/// 走下载链取得最新正式版客户端jar，本地已存在且sha1匹配时跳过下载
 async fn ensure_jar() -> BaseArchive {
     ensure_init();
     let versions = version_path::get_version_obj_online()
@@ -124,7 +127,7 @@ async fn ensure_jar() -> BaseArchive {
     BaseArchive::open(&item.file).expect("客户端jar应能打开")
 }
 
-/// 手动测试：渲染全部方块图标（走真实下载链）
+/// 手动测试：渲染全部方块图标，走真实下载链
 #[tokio::test]
 async fn render_all_blocks() {
     let _lock = CHAIN_LOCK.lock().await;
@@ -149,7 +152,7 @@ async fn render_all_blocks() {
         start.elapsed().as_secs_f64()
     );
 
-    // 注册表：数量与固定表非Skip、非Form行数一致（Form形态只出图不注册）
+    // 注册表：数量与固定表非Skip、非Form行数一致，Form形态只出图不注册
     let ids = mml_tex_draw::blocks();
     let expected = mml_tex_draw::block::icons::BLOCK_ICONS
         .iter()
@@ -166,7 +169,7 @@ async fn render_all_blocks() {
         !ids.contains(&"minecraft:furnace_lit".to_string()),
         "Form形态ID不应出现在方块列表"
     );
-    // Form形态只出图不注册：每个形态条目的PNG都必须落盘（烘焙失败会静默跳过，这里兜底）
+    // Form形态只出图不注册：每个形态条目的PNG都必须落盘，烘焙失败会静默跳过，这里兜底
     let block_dir = out_dir().join("block");
     for (id, _, spec) in mml_tex_draw::block::icons::BLOCK_ICONS {
         if matches!(spec, mml_tex_draw::block::icons::IconSpec::Form(..)) {
@@ -175,7 +178,7 @@ async fn render_all_blocks() {
         }
     }
 
-    // 平面精灵（门/木牌/花草）按新表设计不进表、留给item渲染；
+    // 平面精灵，门/木牌/花草，按新表设计不进表、留给item渲染；
     // 床是composite拼合3D模型，fence用inventory外观
     let dir = out_dir().join("block");
     for name in [
@@ -187,7 +190,7 @@ async fn render_all_blocks() {
         let path = dir.join(name);
         assert!(path.exists(), "应已渲染图标：{}", path.display());
     }
-    // 创造分组（itemGroup lang键尾段，与物品同一套）
+    // 创造分组：itemGroup lang键尾段，与物品同一套
     assert_eq!(
         mml_tex_draw::block_cat("minecraft:oak_stairs").as_deref(),
         Some("buildingBlocks"),
@@ -225,7 +228,7 @@ async fn render_all_blocks() {
     println!("注册：{} 个方块图标", ids.len());
 }
 
-/// 手动测试：渲染全部物品图标（走真实下载链）
+/// 手动测试：渲染全部物品图标，走真实下载链
 #[tokio::test]
 async fn render_all_items() {
     let _lock = CHAIN_LOCK.lock().await;
@@ -250,8 +253,8 @@ async fn render_all_items() {
         start.elapsed().as_secs_f64()
     );
 
-    // extrude平面物品（apple）、分派模型（compass）、select gui分支（trident）应保留；
-    // 引用3D模型的物品形态（stone/oak_stairs等）不进物品表，由方块表渲染
+    // extrude平面物品，如apple、分派模型compass、select gui分支trident，应保留；
+    // 引用3D模型的物品形态，如stone/oak_stairs等，不进物品表，由方块表渲染
     let items = mml_tex_draw::items();
     assert!(
         items.contains(&"minecraft:apple".to_string()),
@@ -277,7 +280,7 @@ async fn render_all_items() {
         !items.contains(&"minecraft:oak_door".to_string()),
         "门已改为3D方块渲染，不应出现在物品表"
     );
-    // 玻璃板/铃铛3D观感差（纯竖直平面/铃身是实体模型），保留游戏原本的平面贴图渲染
+    // 玻璃板/铃铛3D观感差，纯竖直平面或铃身是实体模型，保留游戏原本的平面贴图渲染
     assert!(
         items.contains(&"minecraft:glass_pane".to_string()),
         "玻璃板应走物品表平面贴图渲染"
@@ -287,7 +290,7 @@ async fn render_all_items() {
         "物品数量异常：{}",
         items.len()
     );
-    // 创造分组与方块同一套（itemGroup lang键尾段）
+    // 创造分组与方块同一套，取itemGroup lang键尾段
     assert_eq!(
         mml_tex_draw::item_cat("minecraft:apple").as_deref(),
         Some("foodAndDrink"),

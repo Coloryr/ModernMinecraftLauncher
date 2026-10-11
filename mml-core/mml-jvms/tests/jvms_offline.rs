@@ -5,7 +5,7 @@
 //!
 //! - `init` 创建 Java 存放目录
 //! - `find_java_from_path` 在目录树中查找平台对应的 Java 可执行文件
-//! - `add_item` 添加 / 校验 / 移除 Java（含配置持久化）
+//! - `add_item` 添加 / 校验 / 移除 Java，含配置持久化
 //! - `load` 从配置加载列表，无效 Java 生成占位条目
 //!
 //! 平台差异：Windows 用 `.bat` 模拟 Java 输出，Unix 用 shell 脚本模拟。
@@ -21,16 +21,16 @@ use std::time::{Duration, Instant};
 use mml_config::config_obj::JvmConfigObj;
 use mml_sys::ArchEnum;
 
-/// 测试运行根目录（进程内只初始化一次）
+/// 测试运行根目录，进程内只初始化一次
 static RUN_DIR: OnceLock<PathBuf> = OnceLock::new();
 
-/// 保证初始化流程只执行一次（用例可能并行调用 setup）
+/// 保证初始化流程只执行一次，用例可能并行调用 setup
 static INIT: Once = Once::new();
 
-/// 临时目录自增计数（用例间隔离）
+/// 临时目录自增计数，用于用例间隔离
 static COUNTER: AtomicU64 = AtomicU64::new(0);
 
-/// 初始化全局依赖链（进程内只执行一次），返回运行根目录
+/// 初始化全局依赖链，进程内只执行一次，返回运行根目录
 fn setup() -> PathBuf {
     INIT.call_once(|| {
         let dir = mml_testutil::temp_dir().join(format!("mml-jvms-it-{}", uuid_like()));
@@ -47,7 +47,7 @@ fn setup() -> PathBuf {
     RUN_DIR.get().unwrap().clone()
 }
 
-/// 生成唯一后缀（进程号 + 计数）
+/// 生成唯一后缀，由进程号与计数拼成
 fn uuid_like() -> String {
     format!(
         "{}-{}",
@@ -73,9 +73,11 @@ fn java_file_name() -> &'static str {
     }
 }
 
-/// 创建一个模拟的 Java 可执行文件（输出 `java -version` 风格文本）
+/// 创建一个模拟的 Java 可执行文件，输出 `java -version` 风格文本
 ///
-/// 返回可执行文件路径（位于 `{dir}/jdk/bin/` 下）。
+/// # 返回值
+///
+/// 可执行文件路径，位于 `{dir}/jdk/bin/` 下
 fn create_fake_java(dir: &PathBuf) -> PathBuf {
     let bin = dir.join("jdk").join("bin");
     fs::create_dir_all(&bin).unwrap();
@@ -114,7 +116,7 @@ fn init_creates_java_dir() {
     let java_dir = dir.join(mml_names::names::JAVA_DIR);
     assert!(java_dir.exists(), "应创建 {} 目录", java_dir.display());
 
-    // 重复初始化应安全（幂等）
+    // 重复初始化应安全，幂等
     mml_jvms::init(&dir).expect("重复初始化应安全");
 }
 
@@ -129,7 +131,7 @@ fn find_java_from_path_finds_executable() {
     let found = mml_jvms::find_java_from_path(&dir).expect("应找到 Java 可执行文件");
     assert_eq!(found, expected);
 
-    // 空目录（只含无关文件）应返回 None
+    // 空目录，只含无关文件，应返回 None
     let empty = make_temp_dir("find-empty");
     fs::write(empty.join("readme.txt"), b"nothing here").unwrap();
     assert!(mml_jvms::find_java_from_path(&empty).is_none());
@@ -193,10 +195,10 @@ fn add_and_remove_item_roundtrip() {
     let _ = fs::remove_dir_all(&bad);
 }
 
-/// load：从配置加载 Java 列表，无效 Java 生成占位条目（major_version = -1）
+/// load：从配置加载 Java 列表，无效 Java 生成占位条目，主版本号为 -1
 ///
-/// `load()` 内部使用 `tokio::task::spawn` 异步逐个检测，
-/// 因此需要运行时驱动；检测完成后会触发变更事件。
+/// `load()` 内部用 `tokio::task::spawn` 异步逐个检测，需要运行时驱动；
+/// 检测完成后会触发变更事件
 #[tokio::test]
 async fn load_config_with_invalid_java_creates_placeholder() {
     let dir = setup();
@@ -205,7 +207,7 @@ async fn load_config_with_invalid_java_creates_placeholder() {
     let bad_file = fake_dir.join("broken-java.txt");
     fs::write(&bad_file, b"broken").unwrap();
 
-    // 预置配置中的 Java 列表（内存中的全局配置）
+    // 预置配置中的 Java 列表，即内存中的全局配置
     {
         let mut config = mml_config::write_config();
         config.java_list.push(JvmConfigObj {
@@ -216,7 +218,7 @@ async fn load_config_with_invalid_java_creates_placeholder() {
 
     mml_jvms::load();
 
-    // 轮询等待异步检测完成（最多 10 秒）
+    // 轮询等待异步检测完成，最多 10 秒
     let deadline = Instant::now() + Duration::from_secs(10);
     let mut info = None;
     while Instant::now() < deadline {
@@ -248,6 +250,5 @@ async fn load_config_with_invalid_java_creates_placeholder() {
     let _ = fs::remove_dir_all(&fake_dir);
 }
 
-// 说明：RUN_DIR（运行根目录）由后台保存线程异步写入 config.json，
-// 无法在某个用例结束时安全删除，测试结束后会残留在系统临时目录中，
-// 目录名带有进程号，可由外部清理脚本统一回收。
+// 说明：RUN_DIR 由后台保存线程异步写入 config.json，无法在用例结束时安全删除，
+// 目录名带进程号，会残留在 target/temp 下，可由外部清理脚本统一回收

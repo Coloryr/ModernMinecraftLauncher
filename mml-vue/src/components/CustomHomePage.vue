@@ -3,12 +3,15 @@
 //
 // 故意不给 allow-same-origin：iframe 的 origin 保持 opaque，页面拿不到启动器页面的
 // localStorage / cookie；postMessage 在 opaque origin 下照常可用。
-// 页面里的 window.mml（invoke / on / ready）由 Rust 注入的 custom_home_bridge.js 提供，
+// 页面里的 window.mml 由 Rust 注入的 custom_home_bridge.js 提供，含 invoke / on / ready；
 // 父窗口侧的处理在 lib/customHomeBridge.ts。
 import { onMounted, onUnmounted, ref } from "vue";
 import { attachCustomHomeBridge } from "../lib/customHomeBridge";
 
-defineProps<{ entryUrl: string }>();
+defineProps<{
+  /** iframe 的 src，即服主导入的那份整页 HTML 的入口地址 */
+  entryUrl: string;
+}>();
 
 const frame = ref<HTMLIFrameElement | null>(null);
 let detach: (() => void) | null = null;
@@ -29,7 +32,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* 铺满内容区：父容器都是「确定高度的纵向 flex」（.custom-home-page / .custom-home-fill），
+/* 铺满内容区：父容器都是确定高度的纵向 flex，即 .custom-home-page / .custom-home-fill，
    高度靠 flex:1 吃满，height:100% 只是兜底 */
 .custom-home-frame {
   flex: 1;

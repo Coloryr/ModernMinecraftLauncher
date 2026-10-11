@@ -2,6 +2,7 @@ use std::env;
 
 use mml_sys::open_helper;
 
+/// 手动验证：用系统默认程序打开仓库根下的 .gitignore
 #[ignore = "reason"]
 #[test]
 pub fn open_file() {
@@ -16,6 +17,7 @@ pub fn open_file() {
     // open_helper::open_file_with_explorer(dir);
 }
 
+/// 手动验证：用默认浏览器打开网址
 #[ignore = "reason"]
 #[test]
 pub fn open_url() {

@@ -1,10 +1,10 @@
 // 设置窗口 · 设置项搜索索引
 //
 // 为什么是静态索引而不是扫 DOM：只有当前标签是渲染出来的（v-if），跨 6 个标签搜不到别页的项；
-// 而索引里的 `group` 就是 SettingsGroup 的 id（DOM 锚点 `#set-<id>`），命中后跳过去即可。
+// 而索引里的 `group` 就是 SettingsGroup 的 id，也是 DOM 锚点 `#set-<id>`，命中后跳过去即可。
 //
-// 维护约定：**这里列的是"能搜到的设置项"**，标签页里加/改设置项时同步这里
-// （键名写错不会报错，只是搜不到，所以加完记得在搜索框里打一遍试试）。
+// 维护约定：**这里列的是"能搜到的设置项"**，标签页里加/改设置项时同步这里；
+// 键名写错不会报错，只是搜不到，所以加完记得在搜索框里打一遍试试。
 import { t } from "../../lib/i18n";
 import { SETTINGS_TABS, type SettingsTab } from "./types";
 
@@ -152,7 +152,7 @@ export interface SettingsHit {
  * 有"默认值"可恢复的分组 id
  *
  * 判断依据是默认值有没有真源：
- * - 前端持有的（外观 / 皮肤 / 客户端设置）取 `guiConfig.defaultConfig`；
+ * - 前端持有的外观 / 皮肤 / 客户端设置取 `guiConfig.defaultConfig`；
  * - 核心配置（网络 / 启动 / 游戏窗口）取后端 `settings_get_defaults`；
  * - `javaAdd` 不在内：Java 列表是系统扫描出来的，没有"默认值"可言。
  */
@@ -181,10 +181,15 @@ export const RESETTABLE_GROUPS = [
 ];
 
 /**
- * 某个标签页包含哪些分组（按索引顺序去重）
+ * 某个标签页包含哪些分组，按索引顺序去重
  *
- * 用途：内容区右上角「恢复本页默认」要知道本页该重置哪几组。
- * 从搜索索引派生，保证"能搜到的分组"与"会被重置的分组"始终一致。
+ * 从搜索索引派生，保证能搜到的分组与会被重置的分组始终一致。
+ *
+ * - `tab`: 目标标签页
+ *
+ * # 返回值
+ *
+ * 该页含有的分组 id，供内容区右上角「恢复本页默认」派发
  */
 export function groupsOfTab(tab: SettingsTab): string[] {
   const groups: string[] = [];
@@ -194,7 +199,16 @@ export function groupsOfTab(tab: SettingsTab): string[] {
   return groups;
 }
 
-/** 把命中位置的原文交回界面（用于高亮），不在这里做高亮拼接 */
+/**
+ * 按关键词搜索设置项
+ *
+ * - `query`: 用户输入的关键词，空串直接返回空结果
+ * - `limit`: 最多返回多少条，缺省 40
+ *
+ * # 返回值
+ *
+ * 命中项，含标签页 / 分组 / 设置项的显示名；高亮拼接由调用方做
+ */
 export function searchSettings(query: string, limit = 40): SettingsHit[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 游戏统计窗口：汇总卡片 + 每实例启动次数 / 时长表
-// 数据来自 Rust 侧 stats_get_data（内核 game_count::CountObj 快照），运行中每 5 秒刷新
+// 数据来自 Rust 侧 stats_get_data，即内核 game_count::CountObj 快照；运行中每 5 秒刷新
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import InstanceIcon from "../../components/InstanceIcon.vue";
@@ -12,6 +12,7 @@ import type { StatsDataDto } from "../../lib/bindings";
 // 必须显式声明 close：不声明的话 Vue 会把父级的 @close 当 attrs 透传到根组件（WindowFrame），
 // 与模板里的 @close="$emit('close')" 合并成两个处理器 —— 一次返回会调两遍 closeWindow()，
 // 第二遍时 currentKind 已经回到 main，于是"返回"变成退出应用
+/** 请求关闭本窗口 */
 defineEmits<{ (e: "close"): void }>();
 
 const data = ref<StatsDataDto | null>(null);
@@ -45,7 +46,7 @@ onMounted(async () => {
 });
 
 // 单窗口模式：组件被 KeepAlive 缓存，切走不卸载。切走停掉轮询（别在后台空转 IPC），
-// 切回先补一次数据再继续（useWindowRefresh 就是"切回时补一次"）
+// 切回先补一次数据再继续，useWindowRefresh 就是"切回时补一次"
 useWindowRefresh(load);
 onActivated(startTimer);
 onDeactivated(stopTimer);
@@ -68,7 +69,7 @@ onBeforeUnmount(() => {
   document.removeEventListener("visibilitychange", onVisibilityChange);
 });
 
-/** 总游戏时长（小时） */
+/** 总游戏时长，单位小时 */
 const totalHours = computed(() =>
   data.value ? (data.value.totalSeconds / 3600).toFixed(1) : "0.0",
 );
@@ -78,7 +79,7 @@ function hoursOf(seconds: number) {
   return t("winStats.hours", { h: (seconds / 3600).toFixed(1) });
 }
 
-/** 最近游玩时间（epoch 毫秒 → YYYY-MM-DD HH:mm） */
+/** 最近游玩时间：epoch 毫秒转 YYYY-MM-DD HH:mm */
 function fmtTime(ms: number | null) {
   if (!ms) return t("detail.none");
   const d = new Date(ms);

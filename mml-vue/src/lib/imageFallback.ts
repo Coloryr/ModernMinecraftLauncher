@@ -9,12 +9,12 @@
 // 也不用赌浏览器对 `content` 替换破图的支持。
 // 元素上打标记，防止占位图自己失败时来回递归。
 //
-// **例外**：组件若自己管失败兜底（例如实例图标要回退成"渐变底 + 首字母"），
+// **例外**：组件若自己管失败兜底，例如实例图标要回退成"渐变底 + 首字母"，
 // 在 `<img>` 上写 `data-no-fallback` 即可跳过这里。必须给这个出口的原因是
 // 这里的替换会触发一次 **load** —— 那些组件监听 load 来隐藏自己的占位，
 // 被这一下误触发就会把占位藏掉，最后图标区整个空着。
 
-/** 占位图（灰底 + 图片图标，深浅两种主题都看得清） */
+/** 占位图：灰底 + 图片图标，深浅两种主题都看得清 */
 const FALLBACK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#9aa3af" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="9" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>`;
 
 /** 占位图 data URI（样式见 styles/base.css 的 img[data-mml-fallback]） */

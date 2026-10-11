@@ -6,14 +6,17 @@ import { getImageBaseUrl, onInstanceChange } from "../lib/api";
 
 const props = withDefaults(
   defineProps<{
+    /** 实例名；取首字母作为占位字 */
     name: string;
+    /** 实例 uuid；真图地址与回退配色都由它算 */
     uuid: string;
+    /** 图标边长，单位 px */
     size?: number;
   }>(),
   { size: 48 },
 );
 
-// 根据 uuid 稳定取色，保证同一实例图标一致（图标缺失 / 加载失败时的回退）
+// 根据 uuid 稳定取色，保证同一实例图标一致；图标缺失 / 加载失败时就用它回退
 const gradients = [
   "linear-gradient(135deg, #3f8cff, #5f6cff)",
   "linear-gradient(135deg, #34d399, #22d3ee)",
@@ -36,9 +39,9 @@ const char = computed(() => props.name.trim().charAt(0).toUpperCase() || "M");
 /**
  * 容器样式
  *
- * 真图加载成功后**不再画占位底色**（按 uuid 取色的渐变）：方块图标是透明底 PNG
- * （实测 94%~97% 像素 alpha=0），留着渐变会从透明处透出来，看着就是"占位图没隐藏、
- * 方块图叠在绿色底上"。加载中 / 失败时仍是渐变底 + 字母。
+ * 真图加载成功后**不再画占位底色**：方块图标是透明底 PNG，实测 94%~97% 的像素
+ * alpha=0，留着渐变会从透明处透出来，看着就是"占位图没隐藏、方块图叠在绿色底上"。
+ * 加载中 / 失败时仍是渐变底 + 字母。
  */
 const iconStyle = computed(() => ({
   width: props.size + "px",
@@ -50,15 +53,15 @@ const iconStyle = computed(() => ({
 
 // ---------- 真实图标加载 ----------
 
-// mml-image 协议前缀（浏览器预览无 IPC 时取不到，走回退渐变）
+// mml-image 协议前缀；浏览器预览无 IPC 时取不到，走回退渐变
 const base = ref("");
 const failed = ref(false);
 /**
  * 真图是否已成功加载
  *
- * 加载后必须把字母占位藏掉：方块图标是**透明底** PNG（实测 94%~97% 像素 alpha=0），
+ * 加载后必须把字母占位藏掉：方块图标是**透明底** PNG，实测 94%~97% 的像素 alpha=0，
  * 字母留在 DOM 里会从透明处透出来，看着就是"设了图标但占位图没消失"。
- * 加载中/失败时仍显示字母（原设计意图：不让图标区空着）。
+ * 加载中 / 失败时仍显示字母，不让图标区空着。
  */
 const loaded = ref(false);
 /** 缓存破坏参数（图标被更换后刷新） */
@@ -141,7 +144,7 @@ watch(
   position: relative;
 }
 
-/* 字母占位：加载中 / 失败时才存在（真图加载成功后由 v-if 移除） */
+/* 字母占位：加载中 / 失败时才存在；真图加载成功后由 v-if 移除 */
 .inst-icon-char {
   line-height: 1;
 }
@@ -156,7 +159,7 @@ watch(
   image-rendering: pixelated;
 }
 
-/* 简单的高光装饰（只有占位态才画：真图上方不该再压一层白高光） */
+/* 简单的高光装饰；只有占位态才画，真图上方不该再压一层白高光 */
 .inst-icon::after {
   content: "";
   position: absolute;
@@ -170,7 +173,7 @@ watch(
 }
 
 /* 真图加载后连边框与阴影也去掉：底色没了但这两样还在时，整块会读成"白底 + 深色描边"的方框。
-   保留 1px 透明边框（不是 border: none），盒模型尺寸不变，图标不会比占位态偏移 1px。 */
+   保留 1px 透明边框而不是 border: none，盒模型尺寸不变，图标不会比占位态偏移 1px。 */
 .inst-icon.has-icon {
   border-color: transparent;
   box-shadow: none;

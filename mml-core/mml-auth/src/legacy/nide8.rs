@@ -1,4 +1,4 @@
-//! 统一通行证（Nide8）登录模块
+//! 统一通行证 Nide8 登录模块
 //!
 //! 统一通行证是国内流行的 Minecraft 第三方认证服务，
 //! 使用 Yggdrasil 兼容 API，通过服务器 UUID 区分不同的认证服务器节点。
@@ -12,14 +12,16 @@ use crate::{
     legacy::{self},
 };
 
-/// 统一通行证登录认证；返回已认证的 [`LoginObj`]（`text1` 保存服务器 UUID）
-///
-/// # 参数
+/// 统一通行证登录认证
 ///
 /// - `client_token`: 客户端标识令牌
 /// - `user`: 用户名
 /// - `password`: 密码
-/// - `server`: Nide8 服务器 UUID，用于构建认证 URL（`{NIDE8_URL}{server}`）
+/// - `server`: Nide8 服务器 UUID，用于构建认证 URL `{NIDE8_URL}{server}`
+///
+/// # 返回值
+///
+/// 已认证的 [`LoginObj`]，服务器 UUID 存入 `text1`
 pub async fn authenticate(
     client_token: String,
     user: String,
@@ -40,13 +42,11 @@ pub async fn authenticate(
 impl LoginObj {
     /// 刷新统一通行证登录令牌：先验证有效性，无效则返回超时错误
     ///
-    /// # 参数
-    ///
     /// - `cancel`: 取消令牌
     ///
     /// # 返回值
     ///
-    /// 刷新成功返回 `Ok(())`（账户凭据已被更新），令牌失效返回 `ErrorType::AuthTokenTimeout`，被取消时返回取消错误
+    /// 刷新成功返回 `Ok(())`，此时账户凭据已被更新；令牌失效返回 `ErrorType::AuthTokenTimeout`，被取消时返回取消错误
     pub async fn refresh_nide8(&mut self, cancel: CancellationToken) -> CoreResult<()> {
         let Some(server_id) = self.text1.clone().filter(|s| !s.is_empty()) else {
             return Err(ErrorType::AuthServerNull);

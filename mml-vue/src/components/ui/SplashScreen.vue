@@ -1,14 +1,16 @@
 <script setup lang="ts">
 // 启动画面：初始化中显示 splash，初始化失败显示错误页（splashError）+ 问题反馈入口
 //
-// 加载期间**主窗口顶栏照常渲染**（见 MainWindow 模板），所以这里不需要自己的关闭按钮：
+// 加载期间**主窗口顶栏照常渲染**，见 MainWindow 模板，所以这里不需要自己的关闭按钮：
 // 系统装饰在窗口一出现就被插件摘掉，关闭由顶栏那三个窗口按钮负责。
 import { t } from "../../lib/i18n";
 import BaseButton from "./BaseButton.vue";
 
 withDefaults(
   defineProps<{
+    /** 是否显示启动画面；为 false 且 `splashError` 非空时显示错误页 */
     splashVisible: boolean;
+    /** 初始化失败信息；空串表示没失败 */
     splashError: string;
   }>(),
   {
@@ -17,13 +19,14 @@ withDefaults(
   },
 );
 
+/** 点错误页上的"问题反馈" */
 const emit = defineEmits<{
   (e: "feedback"): void;
 }>();
 </script>
 
 <template>
-  <!-- 启动画面（初始化中，由 closeSplash() 关闭） -->
+  <!-- 启动画面：初始化中，由 closeSplash() 关闭 -->
   <div v-if="splashVisible" class="splash">
     <div class="splash-logo">MC</div>
     <div class="splash-name">{{ t("app.name") }}</div>
@@ -31,7 +34,7 @@ const emit = defineEmits<{
     <div class="splash-text">{{ t("init.splash") }}</div>
   </div>
 
-  <!-- 初始化失败错误页（closeSplash(error) 后显示） -->
+  <!-- 初始化失败错误页：closeSplash(error) 后显示 -->
   <div v-else-if="splashError" class="boot-error">
     <div class="boot-error-card">
       <div class="boot-error-icon">!</div>

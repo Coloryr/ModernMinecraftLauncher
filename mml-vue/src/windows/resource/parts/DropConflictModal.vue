@@ -15,11 +15,13 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  /** 关闭弹窗，这一批文件都不导入 */
   (e: "close"): void;
-  /** mode: overwrite / skip / rename */
+  /** 选了处理方式；`mode` 取 overwrite / skip / rename */
   (e: "pick", mode: string): void;
 }>();
 
+/** 清单里最多列几个同名项，其余折成一行汇总 */
 const previewLimit = 5;
 </script>
 

@@ -6,7 +6,10 @@
 // 里，窗口级 resource.css 的那套前缀规则够不到它。
 import type { ResourceInstance } from "../composables/useResourceData";
 
-defineProps<{ instance: ResourceInstance | null }>();
+defineProps<{
+  /** 当前实例；没有实例时整个 chip 不渲染 */
+  instance: ResourceInstance | null;
+}>();
 </script>
 
 <template>

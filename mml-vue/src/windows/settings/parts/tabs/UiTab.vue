@@ -11,6 +11,7 @@ import SettingsGroup from "../SettingsGroup.vue";
 import type { useSettingsUi } from "../../composables/useSettingsUi";
 
 const props = defineProps<{
+  /** 界面标签的状态与保存方法，来自 useSettingsUi */
   settings: ReturnType<typeof useSettingsUi>;
   /** 需要高亮脉冲的分组 id（搜索命中 / 刚恢复默认） */
   flashGroup?: string;
@@ -183,8 +184,8 @@ onMounted(() => void loadFonts());
           @input="setBgBlur(Number(($event.target as HTMLInputElement).value))" />
         <span class="range-value">{{ bgBlur }}px</span>
       </div>
-      <!-- 原始大小：后端把图片分辨率缩放到原图的百分之多少（点「应用」才生效，
-           且只改分辨率，不改变图在窗口里的显示大小） -->
+      <!-- 原始大小：后端把图片分辨率缩放到原图的百分之多少；点「应用」才生效，
+           且只改分辨率，不改变图在窗口里的显示大小 -->
       <div class="range-row row-card">
         <span class="range-label">{{ t("winSettings.bgNativeSize") }}</span>
         <input class="range" type="range" min="10" max="100" :value="bgSizeDraft"

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 // 方块列表 · 网格（虚拟滚动）
 //
-// 一千多个方块一次性挂载会明显卡顿（每个格子一个组件 + 一张贴图），所以只渲染视口内的行：
+// 一千多个方块一次性挂载会明显卡顿，每个格子一个组件加一张贴图，所以只渲染视口内的行：
 // 容器宽度定列数、尺寸档定固定格高，行高 = 格高 + 间距，再用一个等高的占位撑出滚动条。
 //
-// 键盘：格子间用方向键移动（roving tabindex，只有当前格 tabindex=0），Home / End 到首尾；
+// 键盘：格子间用方向键移动，roving tabindex 只有当前格 tabindex=0；Home / End 到首尾；
 // 移动前会先把目标行滚进视口 —— 否则目标还没被渲染出来，取不到 DOM 也就聚焦不了。
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { t } from "../../../lib/i18n";
@@ -15,8 +15,11 @@ import type { BlockItemDto } from "../../../lib/bindings";
 import { BLOCK_SIZES, type BlockSize } from "../types";
 
 const props = defineProps<{
+  /** 过滤后的方块条目，按后端顺序 */
   items: BlockItemDto[];
+  /** 搜索词，用于名字高亮 */
   keyword: string;
+  /** 图标尺寸档，决定列宽、格高与字号 */
   size: BlockSize;
   /** 详情里正在看的方块（网格里高亮） */
   activeId: string | null;
@@ -27,8 +30,11 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  /** 点开某个方块的详情 */
   (e: "open", b: BlockItemDto): void;
+  /** 删除某个玩家头颅，仅 `skinCat` 那一类会发 */
   (e: "remove-skin", b: BlockItemDto): void;
+  /** 空状态里请求清掉搜索词与分类 */
   (e: "clear-filters"): void;
 }>();
 
@@ -48,11 +54,11 @@ const BOTTOM_SPACE = 22;
 
 const metrics = computed(() => BLOCK_SIZES[props.size]);
 const gap = computed(() => metrics.value.gap);
-/** 虚拟滚动的行高（必须与实际渲染的格子高度一致） */
+/** 虚拟滚动的行高；必须与实际渲染的格子高度一致 */
 const rowH = computed(() => metrics.value.cell + metrics.value.gap);
 
 const scroller = ref<HTMLDivElement | null>(null);
-/** 网格本体：列宽要按它的实际宽度算（它比滚动容器窄，右侧留了 26px 呼吸） */
+/** 网格本体：列宽要按它的实际宽度算；它比滚动容器窄，右侧留了 26px 呼吸 */
 const gridEl = ref<HTMLDivElement | null>(null);
 const gridW = ref(0);
 const viewportH = ref(0);
@@ -68,7 +74,7 @@ function measure(el: HTMLElement) {
   viewportH.value = el.clientHeight;
 }
 
-/** 拿到 DOM 后重新量一次（网格是 v-if 挂上来的，首次量的时候可能还不存在） */
+/** 拿到 DOM 后重新量一次；网格是 v-if 挂上来的，首次量的时候可能还不存在 */
 async function remeasure() {
   const el = scroller.value;
   if (!el) return;
@@ -154,8 +160,8 @@ const focusIndex = ref(0);
 /**
  * 唯一可 Tab 进入的格子
  *
- * 虚拟列表里 `focusIndex` 指向的项可能已被滚出渲染范围（此时窗口内没有任何格子
- * tabindex=0，整个网格会被 Tab 跳过），所以窗口内找不到它时退回到窗口第一项。
+ * 虚拟列表里 `focusIndex` 指向的项可能已被滚出渲染范围，此时窗口内没有任何格子
+ * tabindex=0，整个网格会被 Tab 跳过，所以窗口内找不到它时退回到窗口第一项。
  */
 const tabbableIndex = computed(() => {
   const start = startIndex.value;
@@ -278,8 +284,8 @@ function onCellKey(e: KeyboardEvent, i: number) {
   position: absolute;
   top: 0;
   left: 0;
-  /* 右侧缩进与 .block-main 的 16px 间距一致（原来取 26px 与窗口左内边距对齐，
-     但滚动条本身还占约 9px，看着右边比左边空得多）；滚动条仍在窗口最右边。
+  /* 右侧缩进与 .block-main 的 16px 间距一致：原来取 26px 与窗口左内边距对齐，
+     但滚动条本身还占约 9px，看着右边比左边空得多；滚动条仍在窗口最右边。
      列数按这个更窄的宽度算（见 script 里的 gridW） */
   right: 16px;
   display: grid;
@@ -350,8 +356,8 @@ function onCellKey(e: KeyboardEvent, i: number) {
   width: var(--cell-img);
   height: var(--cell-img);
   border-radius: 8px;
-  /* 不要 image-rendering: pixelated：这里的图标是内核渲染好的 256×256 PNG
-     （mml-tex-draw 的 BLOCK_SIZE），显示时被缩到 40~88px，最近邻采样会把斜边采成
+  /* 不要 image-rendering: pixelated：这里的图标是内核渲染好的 256×256 PNG，
+     即 mml-tex-draw 的 BLOCK_SIZE，显示时被缩到 40~88px，最近邻采样会把斜边采成
      锯齿、细纹理采丢。pixelated 只适合像素画贴图（如玩家头颅），缩放渲染图要用平滑插值 */
 }
 

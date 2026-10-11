@@ -6,7 +6,7 @@
 //
 // 落盘在后端 `block_set_icon_area`：按选区裁剪 → 缩放到所选边长 → 写
 // `<实例目录>/icon.png` → 把实例配置的 `Icon` 指过去 → 清缓存 + 广播
-// `instance-change(edit)`（InstanceIcon 靠它刷新）。
+// `instance-change(edit)` 事件，InstanceIcon 靠它刷新。
 //
 // 弹窗**不可误关**：遮罩点击与 Esc 都不关闭，只认「取消 / 应用」两个按钮——
 // 栽好的选区被一下点没，比多点一次按钮烦人得多。
@@ -22,16 +22,18 @@ import IconCropStage from "./IconCropStage.vue";
 const props = defineProps<{
   /** 目标实例 */
   uuid: string;
+  /** 实例显示名，直接用作弹窗标题 */
   name: string;
   /** 已选中的本地图片路径（由父组件的文件对话框给出） */
   path: string;
 }>();
 
+/** 请求关闭弹窗；取消与应用都走它 */
 const emit = defineEmits<{ (e: "close"): void }>();
 
-/** 可选输出边长（px）：图标最大显示 84px，256 已足够；大档给需要高清图标的场合 */
+/** 可选输出边长，单位 px：图标最大显示 84px，256 已足够；大档给需要高清图标的场合 */
 const SIZES = [64, 128, 256, 512];
-/** 记住上次选的边长（纯前端偏好，与主题 / 侧栏一样走本地存储） */
+/** 记住上次选的边长；纯前端偏好，与主题 / 侧栏一样走本地存储 */
 function readSize(): number {
   const n = readNumber(KEYS.iconPickSize, 256);
   return SIZES.includes(n) ? n : 256;
@@ -44,7 +46,7 @@ function setSize(v: number) {
   writeNumber(KEYS.iconPickSize, v);
 }
 
-/** 预览图 data URL 与**原图**尺寸（选区按原图像素算，后端裁的也是原图） */
+/** 预览图 data URL 与**原图**尺寸；选区按原图像素算，后端裁的也是原图 */
 const src = ref("");
 const imgW = ref(0);
 const imgH = ref(0);
@@ -57,7 +59,7 @@ const applying = ref(false);
  * 读图给截图区用
  *
  * Tauri 的 `<img>` 读不了本地路径，所以经后端转成 data URL；后端给的是**降采样后的预览**
- * 加原图尺寸（`IconSourceDto`）——预览只用于选范围，裁剪仍按原图坐标做，清晰度不受影响。
+ * 加原图尺寸，见 `IconSourceDto` —— 预览只用于选范围，裁剪仍按原图坐标做，清晰度不受影响。
  * 不要在这里拿 data URL 再 `new Image()` 量尺寸：那等于在页面里把原图整个解一遍，
  * 大图会把 WebView 卡住（改之前就是这样）。
  */

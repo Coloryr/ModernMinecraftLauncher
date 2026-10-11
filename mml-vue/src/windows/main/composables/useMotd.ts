@@ -1,7 +1,7 @@
-// 主窗口的两处 MOTD 卡片：启动器下方的悬浮卡（客户端设置里配置的全局地址）与实例详情卡
-// （查实例自己配置的服务器地址）。两者都走内核的 Server List Ping。
+// 主窗口的两处 MOTD 卡片：启动器下方的悬浮卡查客户端设置里的全局地址，实例详情卡查
+// 实例自己配置的服务器地址。两者都走内核的 Server List Ping。
 //
-// 卡片外观（图标 / 彩色分段 / 人数-版本-延迟）在 components/MotdCard.vue —— 本窗口的悬浮卡、
+// 卡片外观在 components/MotdCard.vue：图标 / 彩色分段 / 人数-版本-延迟都在那边，本窗口的悬浮卡、
 // 实例详情卡、资源窗口服务器列表上方那张，三处共用同一份；这里只管**地址来源、竞态保护与定时刷新**。
 import { onUnmounted, ref, watch, type Ref } from "vue";
 
@@ -10,9 +10,19 @@ import type { ClientConfig } from "../../../lib/guiConfig";
 import type { InstanceArgsDto, InstanceInfoDto, MotdDto } from "../../../lib/bindings";
 
 /**
- * - `clientConfig`：客户端设置（MOTD 显示开关 / 地址 / 自动刷新间隔）
- * - `selected`：当前选中实例（实例详情卡的地址来源）
- * - `argsOf`：取实例启动参数（读其中的服务器地址与端口）
+ * 主窗口两处 MOTD 卡片的查询与刷新
+ *
+ * - `clientConfig`: 客户端设置，含 MOTD 显示开关 / 地址 / 自动刷新间隔
+ * - `selected`: 当前选中实例，实例详情卡的地址来源
+ * - `argsOf`: 取实例启动参数，读其中的服务器地址与端口
+ *
+ * # 返回值
+ *
+ * - `motdInfo` / `motdLoading`: 悬浮卡的结果与加载态
+ * - `instMotd` / `instMotdLoading`: 实例详情卡的结果与加载态
+ * - `motdCardVisible`: 悬浮卡是否该显示，由客户端设置的开关决定
+ * - `refreshMotd` / `refreshInstMotd`: 立刻重查两张卡
+ * - `restartMotdTimer`: 按客户端设置重建自动刷新定时器
  */
 export function useMotd(opts: {
   clientConfig: Ref<ClientConfig>;
@@ -96,7 +106,7 @@ export function useMotd(opts: {
     }
   }
 
-  // 定时器随组件卸载一起清掉（原来写在主窗口的 onUnmounted 里）
+  // 定时器随组件卸载一起清掉；原先这段写在主窗口的 onUnmounted 里
   onUnmounted(() => {
     if (motdTimer !== null) clearInterval(motdTimer);
   });

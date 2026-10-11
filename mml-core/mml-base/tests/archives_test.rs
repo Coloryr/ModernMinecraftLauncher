@@ -74,10 +74,15 @@ fn all_types() -> Vec<ArchiveType> {
 /// 简单记录回调调用次数的 GUI
 #[derive(Default)]
 struct TestGui {
+    /// `start` 回调调用次数
     start: AtomicUsize,
+    /// `update` 回调调用次数
     update: AtomicUsize,
+    /// `done` 回调调用次数
     done: AtomicUsize,
+    /// `file_rename` 被询问的次数
     rename_asked: AtomicUsize,
+    /// `file_rename` 的固定答复
     agree_rename: bool,
 }
 
@@ -110,7 +115,7 @@ fn assert_roundtrip_output(out_dir: &Path) {
     );
 }
 
-/// 压缩-解压往返（自由函数 compress/decompress）
+/// 压缩-解压往返，走自由函数 compress / decompress
 #[test]
 fn test_compress_decompress_roundtrip() {
     for archive_type in all_types() {
@@ -290,9 +295,7 @@ fn test_base_archive_open_read_extract() {
             b"stream data".to_vec()
         );
 
-        // 追加磁盘文件
-        // 注意现状（疑似 bug）：文档称"已有同路径条目会被覆盖"，
-        // 但 Zip 就地追加不允许同名条目（zip crate 报 Duplicate filename），
+        // 追加磁盘文件：Zip 就地追加不允许同名条目，会报 Duplicate filename，
         // 因此这里只追加新名字，覆盖行为在下方单独测试中记录
         let extra = root.join("extra.txt");
         fs::write(&extra, b"extra content").unwrap();
@@ -444,7 +447,7 @@ fn test_gui_callback() {
     .unwrap();
     assert!(gui.start.load(Ordering::SeqCst) >= 1);
     assert!(gui.update.load(Ordering::SeqCst) >= 3);
-    // 注意现状（不一致）：各格式 compress 不调用 done 回调，仅 decompress 调用
+    // 注意现状不一致：各格式 compress 不调用 done 回调，仅 decompress 调用
     assert_eq!(gui.done.load(Ordering::SeqCst), 0);
 
     decompress(
@@ -546,8 +549,8 @@ fn test_invalid_entry_name_with_gui() {
     let _ = fs::remove_dir_all(&root);
 }
 
-/// 现状记录（疑似 bug）：Zip 就地 add_files 追加与已有条目同名的文件时报错，
-/// 与 BaseArchive::add_files 文档"已有同路径条目会被覆盖"不符
+/// 现状记录，疑似 bug：Zip 就地追加同名文件会报错，
+/// 与 BaseArchive::add_files 文档所称的"已有同路径条目会被覆盖"不符
 #[test]
 fn test_zip_add_files_duplicate_name_documented() {
     let root = make_test_root();
@@ -569,7 +572,7 @@ fn test_zip_add_files_duplicate_name_documented() {
     let result = archive.add_files(&[(extra.clone(), PathBuf::from("a.txt"))], None);
     assert!(result.is_err(), "Zip 同名追加应报错（现状）");
 
-    // Tar 同名追加不会报错（tar 允许重复条目），此处不展开
+    // Tar 同名追加不会报错，tar 允许重复条目，此处不展开
 
     let _ = fs::remove_dir_all(&root);
 }

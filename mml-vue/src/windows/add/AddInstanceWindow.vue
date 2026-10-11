@@ -3,7 +3,7 @@
 // 四种模式：从头新建 / 导入压缩包 / 添加文件夹 / 在线实例
 //
 // 拆分：数据源与联动在 composables/（版本列表、加载器、文件树），
-// 局部 UI 在 parts/（模式切换、分组框、三个弹窗、浮动进度），四个模式表单在 modes/。
+// 局部 UI 如模式切换、分组框、三个弹窗、浮动进度都在 parts/，四个模式表单在 modes/。
 import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
@@ -42,7 +42,10 @@ import { commands } from "../../lib/bindings";
 import type { FolderInstanceDto, GroupDto, PackProgressDto } from "../../lib/bindings";
 import { ADD_MODES, isModpackPackType, type AddMode } from "./types";
 
-const emit = defineEmits<{ (e: "close"): void }>();
+const emit = defineEmits<{
+  /** 请求关闭本窗口 */
+  (e: "close"): void;
+}>();
 
 // ================= 模式与通用字段 =================
 
@@ -71,8 +74,8 @@ const BUTTON_KEYS: Record<AddMode, string> = {
 };
 const createLabel = computed(() => {
   if (creating.value) return t("add.creating");
-  // 压缩包模式选了整合包类型：这一步实际是"安装整合包"（走的是下载整合包那套安装任务，
-  // 见后端 add_import_archive），按钮上直说，别让用户以为只是解开压缩包
+  // 压缩包模式选了整合包类型：这一步实际是"安装整合包"，走的是下载整合包那套安装任务
+  // （见后端 add_import_archive），按钮上直说，别让用户以为只是解开压缩包
   if (addMode.value === "archive" && isModpackPackType(addPackType.value)) {
     return t("add.installPack");
   }
@@ -140,7 +143,7 @@ function autoName() {
   newName.value = parts.filter(Boolean).join("-");
 }
 
-// 版本 / 加载器 / 加载器版本变化时刷新自动名（切换加载器时会先无版本号、列表到达后补全）
+// 版本 / 加载器 / 加载器版本变化时刷新自动名；切换加载器时会先无版本号，列表到达后补全
 watch([newVersion, loader, loaderVersion], autoName);
 
 // ================= 模式二：导入压缩包（路径框 + 内容树） =================
@@ -232,20 +235,20 @@ async function pickArchive() {
   archiveInput.value?.click();
 }
 
-/** 压缩包读取 / 类型识别中（整合包条目多 + 要解析 manifest，会明显耗时） */
+/** 压缩包读取 / 类型识别中：整合包条目多、要解析 manifest，会明显耗时 */
 const archiveScanning = ref(false);
 
-// ================= 模式三：添加文件夹（路径框 + 扫描出的实例列表 / 内容树，懒加载） =================
+// ================= 模式三：添加文件夹，路径框 + 实例列表 / 内容树，懒加载 =================
 
 const addFolderPath = ref("");
 const folderInput = ref<HTMLInputElement | null>(null);
 
-/** 扫描出的可导入实例（空 = 目录本身就是一个实例目录，走内容树那条路） */
+/** 扫描出的可导入实例；空表示目录本身就是实例目录，走内容树那条路 */
 const folderFound = ref<FolderInstanceDto[]>([]);
 /** 已勾选要导入的实例路径 */
 const folderPicked = ref<Set<string>>(new Set());
 const folderScanning = ref(false);
-/** 扫描失败的原因（扫描命令报错时显示出来，别静默当成"没扫到"） */
+/** 扫描失败的原因：扫描命令报错时显示出来，别静默当成"没扫到" */
 const folderScanError = ref("");
 /** 待确认"是否允许读取"的目录（非空 = 确认框打开着） */
 const scanAsk = ref("");
@@ -341,9 +344,9 @@ function setAllFoundInstances(on: boolean) {
   folderPicked.value = on ? new Set(folderFound.value.map((item) => item.path)) : new Set();
 }
 
-// ================= 拖拽导入（主窗口拖入的文件 / 文件夹转到这里） =================
+// ================= 拖拽导入：主窗口拖入的文件 / 文件夹转到这里 =================
 
-/** 拖入的路径是否已经应用过（多窗口模式下 URL 上的参数会一直留着，只能消费一次） */
+/** 拖入的路径是否已经应用过：多窗口模式下 URL 上的参数会一直留着，只能消费一次 */
 let dropApplied = false;
 
 /** 按拖入路径进对应模式：压缩包交给 applyArchivePath，目录走文件夹模式并填好地址 */
@@ -351,7 +354,7 @@ async function applyDrop(drop: WindowDropParam) {
   if (drop.kind === "folder") {
     addMode.value = "folder";
     addFolderPath.value = drop.path;
-    // 与 pickFolder 一致：先问"是否允许读取这个目录"，允许了再扫（见 confirmScan）
+    // 与 pickFolder 一致：先问"是否允许读取这个目录"，允许了才扫
     scanAsk.value = drop.path;
     return;
   }
@@ -362,8 +365,8 @@ async function applyDrop(drop: WindowDropParam) {
 /**
  * 消费"主窗口拖入的路径"（参数从哪读见 windowManager 的 targetDrop）
  *
- * - 多窗口：参数挂在 URL 上，会一直留着，靠 `dropApplied` 只认一次
- *   （再拖一次会走 window_reopen_window 重载页面，组件重建、标志自然复位）；
+ * - 多窗口：参数挂在 URL 上，会一直留着，靠 `dropApplied` 只认一次；
+ *   再拖一次会走 window_reopen_window 重载页面，组件重建、标志自然复位
  * - 单窗口：参数在 `windowParams` 里，读完立刻清掉，所以"再拖一次"能重新触发。
  */
 async function consumeDrop() {
@@ -540,7 +543,7 @@ watch(addFolderPath, () => {
 });
 watch(addUrl, () => clearFieldError("url"));
 
-// 名称错误：聚焦输入框（版本 / 路径的聚焦交给各模式组件自己处理）
+// 名称错误：聚焦输入框；版本 / 路径的聚焦交给各模式组件自己处理
 watch(addErrorField, async (field) => {
   if (field !== "name") return;
   await nextTick();
@@ -688,7 +691,7 @@ async function finishAdding() {
 /** 当前弹出的重名确认（kind：overwrite 覆盖 / rename 自动改名；null = 无） */
 const nameConflict = ref<{ id: number; kind: string; name: string } | null>(null);
 
-/** 答复后端创建流程（关闭弹窗视为拒绝，避免创建流程挂起） */
+/** 答复后端创建流程；关闭弹窗视为拒绝，避免创建流程挂起 */
 async function answerConflict(answer: boolean) {
   const cur = nameConflict.value;
   nameConflict.value = null;
@@ -706,7 +709,7 @@ function onKeyDown(e: KeyboardEvent) {
     groupOpen.value = false;
     return;
   }
-  // 2) 有未决弹窗 / 正在创建：不关窗（会丢掉后端等着的答复或半个创建流程）
+  // 2) 有未决弹窗 / 正在创建：不关窗，否则会丢掉后端等着的答复或半个创建流程
   if (nameConflict.value || askContinue.value || packProgress.value || creating.value) return;
   // 3) 其余情况等同点标题栏的关闭按钮（查询在途时后端会拦下并提示）
   emit("close");
@@ -726,7 +729,7 @@ function unbindKeys() {
   document.removeEventListener("keydown", onKeyDown);
 }
 
-// 单窗口模式：切走卸掉键盘监听，切回再装上（onActivated 首次挂载也会跑，重复 add 同一函数无副作用）。
+// 单窗口模式：切走卸掉键盘监听，切回再装上；onActivated 首次挂载也会跑，重复 add 同一函数无副作用。
 //
 // 这里刻意**不**动 `leaving`：切走只是"藏起来"，在途的重名确认 / 进度事件还得让用户能答上
 // （回到本窗口时弹窗还在），置 leaving 会把它们吞掉、把安装流程卡住。
@@ -872,7 +875,7 @@ onUnmounted(() => {
     <input ref="archiveInput" type="file" accept=".zip,.mrpack" class="hidden-input" @change="onArchivePick" />
     <input ref="folderInput" type="file" webkitdirectory class="hidden-input" @change="onFolderPick" />
 
-    <!-- 实例重名确认（后端创建流程暂停等待答复，关闭视为拒绝） -->
+    <!-- 实例重名确认：后端创建流程暂停等待答复，关闭视为拒绝 -->
     <NameConflictModal v-if="nameConflict" :kind="nameConflict.kind" :name="nameConflict.name"
       @answer="answerConflict" />
 
@@ -891,8 +894,8 @@ onUnmounted(() => {
     <!-- 整合包安装进度 -->
     <PackProgressModal v-if="packProgress" :progress="packProgress" />
 
-    <!-- 加载器查询进度不再浮在窗口正上方：两条（查询支持的加载器 / 拉取加载器版本）
-         都改成就地显示在各自字段下面了，见 NewMode 里的 LoaderQueryProgress -->
+    <!-- 加载器查询进度不再浮在窗口正上方：两条查询都改成就地显示在各自字段下面了，
+         见 NewMode 里的 LoaderQueryProgress -->
 
     <!-- 拖入整合包 / 文件夹时的遮罩（本窗口只接文件，见 accept） -->
     <DropOverlay v-if="fileDragOver" :title="t('add.dropTitle')" />

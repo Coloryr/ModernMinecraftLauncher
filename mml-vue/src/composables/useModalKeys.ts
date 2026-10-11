@@ -13,6 +13,11 @@
 // ```
 import { onMounted, onUnmounted } from "vue";
 
+/**
+ * 弹窗挂载期间接管 document 的键盘事件
+ *
+ * - `handler`: `keydown` 处理器；弹窗卸载时自动解绑
+ */
 export function useModalKeys(handler: (e: KeyboardEvent) => void) {
   onMounted(() => document.addEventListener("keydown", handler));
   onUnmounted(() => document.removeEventListener("keydown", handler));

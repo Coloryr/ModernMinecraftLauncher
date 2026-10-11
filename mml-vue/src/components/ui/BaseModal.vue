@@ -1,26 +1,29 @@
 <script setup lang="ts">
 // 统一弹窗：标题 + 内容插槽 + 关闭
 //
-// 只在**所属页面处于前台**时渲染（见 lib/pageActive.ts）：单窗口模式下 App.vue 把窗口组件
+// 只在**所属页面处于前台**时渲染，见 lib/pageActive.ts：单窗口模式下 App.vue 把窗口组件
 // KeepAlive 缓存，切走只是停用，页面 DOM 被挪走，可本弹窗是 `Teleport to="body"` 的 ——
-// 不挡住的话它会留在别的页面上照常显示、还能点，而点下去的执行上下文是原页面
-// （"是否继续添加"的"否"就这么把启动器关掉过）。状态在父组件里，回到那一页它自然还在。
+// 不挡住的话它会留在别的页面上照常显示、还能点，而点下去的执行上下文是原页面。
+// "是否继续添加"的"否"就这么把启动器关掉过。状态在父组件里，回到那一页它自然还在。
 import GlyphIcon from "./GlyphIcon.vue";
 import { usePageActive } from "../../lib/pageActive";
 
 const props = withDefaults(
   defineProps<{
+    /** 标题；空串则不画标题栏，右上角关闭按钮也跟着没有 */
     title?: string;
+    /** 面板宽度，单位 px */
     width?: number;
-    /** 锁死面板高度（CSS 长度，如 "520px"）。给定时面板竖直方向不再随内容变化——
-     *  内容区吃掉剩余高度、内部自己滚（下载弹窗的线程表一直在增删行，不锁会一直抽动）；
+    /** 锁死面板高度，CSS 长度如 "520px"。给定时面板竖直方向不再随内容变化：
+     *  内容区吃掉剩余高度、内部自己滚，下载弹窗的线程表一直在增删行，不锁会一直抽动；
      *  不传则按内容自适应 */
     fixedHeight?: string;
+    /** 是否画右上角关闭按钮 */
     closable?: boolean;
     /** 遮罩从自绘标题栏下方开始，让标题栏（可拖动 / 窗口按钮）保持可操作。
      *  默认开启：所有弹窗都不应挡住标题栏 */
     belowTitlebar?: boolean;
-    /** 点击遮罩空白处是否关闭（输入类弹窗建议关掉，避免误触丢内容） */
+    /** 点击遮罩空白处是否关闭；输入类弹窗建议关掉，避免误触丢内容 */
     overlayClose?: boolean;
   }>(),
   {
@@ -33,9 +36,10 @@ const props = withDefaults(
   },
 );
 
+/** 请求关闭；`overlayClose` 为假时点遮罩不发这条 */
 const emit = defineEmits<{ (e: "close"): void }>();
 
-/** 所属页面是否在前台（隐藏时连遮罩一起收掉，别盖到别的页面上） */
+/** 所属页面是否在前台；隐藏时连遮罩一起收掉，别盖到别的页面上 */
 const active = usePageActive();
 </script>
 
@@ -88,7 +92,7 @@ const active = usePageActive();
   box-shadow: var(--shadow-lg);
 }
 
-/* 锁死高度（fixedHeight 传了值）：面板大小不再随内容变，内容区吃掉剩余高度、内部自己滚。
+/* 锁死高度：fixedHeight 传了值。面板大小不再随内容变，内容区吃掉剩余高度、内部自己滚。
    只在这一种形态下开 flex —— 平时保持块级布局，免得相邻外边距不再合并、
    把各弹窗的间距改掉。max-height 仍然生效：窗口太矮时按 85vh 封顶，同样与内容无关 */
 .modal.fixed-h {

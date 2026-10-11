@@ -1,8 +1,8 @@
-//! 3D 渲染公共管线（wgpu 离屏）：头 / 皮肤 3D 共用的顶点格式、管线与渲染流程
+//! 3D 渲染公共管线，wgpu 离屏，头 / 皮肤 3D 共用的顶点格式、管线与渲染流程
 //!
-//! 设备来自全局 [`mml_gpu::device`]（后端回退链见其文档）；管线进程内只建一次。
+//! 设备来自全局 [`mml_gpu::device`]，后端回退链见其文档；管线进程内只建一次。
 //! 像素约定：贴图上传 premul BGRA → straight RGBA，读回 premul RGBA → premul
-//! BGRA（`Pixmap` 内存序，仅交换 R/B），全程预乘语义与 tiny_skia 一致。
+//! BGRA，即 `Pixmap` 内存序，仅交换 R/B；全程预乘语义与 tiny_skia 一致。
 
 use std::sync::OnceLock;
 
@@ -13,22 +13,28 @@ use wgpu::util::DeviceExt;
 
 use crate::skin_draw::downsample;
 
-/// 渲染 shader（底层 / 顶层两个片元入口）
+/// 渲染 shader，含底层与顶层两个片元入口
 const WGSL: &str = include_str!("gpu_3d.wgsl");
 
-/// 顶点（模型坐标 + 整张贴图归一化 uv）
+/// 顶点，模型坐标加整张贴图的归一化 uv
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub(crate) struct Vert {
+    /// 顶点位置，模型坐标，单位皮肤像素
     pub pos: [f32; 3],
+    /// 贴图坐标，已按整张贴图尺寸归一化到 0..1
     pub uv: [f32; 2],
 }
 
-/// 一个面的四个角 → 6 顶点（两三角形 0,1,2 / 0,2,3），uv 按贴图尺寸归一化
+/// 把一个面的四个角展开为 6 顶点，按三角形 0,1,2 与 0,2,3 排列
 ///
-/// - `corners`: 面四角（模型坐标 + 0..1 块内比例，v=0 在贴图块顶部）
-/// - `rect`: 贴图块 (tx, ty, tw, th)，像素坐标
-/// - `tex_w` / `tex_h`: 贴图尺寸（HD 皮肤按实际尺寸归一化）
+/// - `corners`: 面四角，模型坐标加 0..1 的块内比例，v=0 在贴图块顶部
+/// - `rect`: 贴图块，按 tx / ty / tw / th 排列，单位像素
+/// - `tex_w` / `tex_h`: 贴图宽高，单位像素，HD 皮肤按实际尺寸归一化
+///
+/// # 返回值
+///
+/// 返回 6 个顶点，uv 已按贴图尺寸归一化
 pub(crate) fn face_verts(
     corners: [([f32; 3], [f32; 2]); 4],
     rect: [i32; 4],
@@ -55,9 +61,16 @@ pub(crate) fn face_verts(
     out
 }
 
-/// 像素空间（0..width / 0..height，y 向下）→ NDC 的正交投影
+/// 构造像素空间到 NDC 的正交投影矩阵
 ///
-/// z 像素值越大离观察者越近，深度反向映射（近处深度小，配合 LessEqual + 清 1.0）
+/// - `width`: 目标宽度，单位像素
+/// - `height`: 目标高度，单位像素
+///
+/// # 返回值
+///
+/// 返回正交投影矩阵，输入为 0..width / 0..height 且 y 向下的像素坐标
+///
+/// z 像素值越大离观察者越近，深度反向映射，近处深度小，配合 LessEqual 与清 1.0。
 pub(crate) fn ortho(width: u32, height: u32) -> Mat4 {
     let (w, h) = (width as f32, height as f32);
     Mat4::from_cols_array(&[
@@ -80,17 +93,22 @@ pub(crate) fn ortho(width: u32, height: u32) -> Mat4 {
     ])
 }
 
-/// 底层（不透明 / cutout）+ 顶层（半透明）两条管线
+/// 底层不透明 / cutout 与顶层半透明两条管线及其绑定资源
 struct Pipelines {
+    /// 底层管线，写深度并剔除背面
     base: wgpu::RenderPipeline,
+    /// 顶层 overlay 管线，半透明混合且只读深度
     overlay: wgpu::RenderPipeline,
+    /// 绑定组布局：0 号 uniform、1 号采样器、2 号贴图
     bind_layout: wgpu::BindGroupLayout,
+    /// 贴图采样器，NEAREST 采样加边缘钳制
     sampler: wgpu::Sampler,
 }
 
-/// 管线缓存（设备全局唯一，失败也记入避免反复重试）
+/// 管线缓存，设备全局唯一，失败也记入避免反复重试
 static PIPE: OnceLock<Option<Pipelines>> = OnceLock::new();
 
+/// 取全局管线；首次调用时按需创建，无可用 GPU 时返回 `None`
 fn pipelines() -> Option<&'static Pipelines> {
     PIPE.get_or_init(|| {
         let gpu = mml_gpu::device()?;
@@ -100,6 +118,7 @@ fn pipelines() -> Option<&'static Pipelines> {
 }
 
 impl Pipelines {
+    /// 创建两条管线、绑定组布局与采样器
     fn new(device: &wgpu::Device) -> Pipelines {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("mml-skin-3d"),
@@ -144,8 +163,8 @@ impl Pipelines {
             immediate_size: 0,
         });
 
-        // 两条管线都写深度：overlay 部件互相穿插（手臂 overlay 内侧面伸进
-        // 身体 overlay），只读深度会退化成按绘制顺序取胜；底层透明镂空
+        // 两条管线都写深度：overlay 部件互相穿插，手臂 overlay 内侧面会伸进
+        // 身体 overlay，只读深度会退化成按绘制顺序取胜；底层透明镂空
         // 不写深度，overlay 仍能透过镂空显示
         let depth_write = wgpu::DepthStencilState {
             format: wgpu::TextureFormat::Depth32Float,
@@ -161,10 +180,10 @@ impl Pipelines {
             write_mask: wgpu::ColorWrites::ALL,
         };
 
-        // 底层剔除背面：部件间存在共面面（头底/身顶、腿顶/身底、臂内/身侧），
+        // 底层剔除背面：部件间存在共面面，头底与身顶、腿顶与身底、臂内与身侧，
         // 不剔除会 z-fighting，背面盖住正面。
-        // 顶层不剔除：帽子远侧要从透明纹素后面透出来（与 CPU 参考的
-        // 无剔除效果一致），顶层没有共面面，不会 z-fighting
+        // 顶层不剔除：帽子远侧要从透明纹素后面透出来，与 CPU 参考的无剔除效果一致；
+        // 顶层没有共面面，不会 z-fighting
         let mk = |blend: Option<wgpu::BlendState>,
                   depth: wgpu::DepthStencilState,
                   cull: Option<wgpu::Face>,
@@ -204,7 +223,7 @@ impl Pipelines {
                 }),
                 primitive: wgpu::PrimitiveState {
                     topology: wgpu::PrimitiveTopology::TriangleList,
-                    // 面绕序为外侧 CCW（NDC y 向下时屏幕绕序保持 CCW）
+                    // 面绕序为外侧 CCW，NDC 中 y 向下时屏幕绕序仍为 CCW
                     front_face: wgpu::FrontFace::Ccw,
                     cull_mode: cull,
                     ..Default::default()
@@ -216,7 +235,7 @@ impl Pipelines {
             })
         };
 
-        // 顶层：straight-alpha 混合（color SrcAlpha/1-SrcAlpha，alpha One/1-One），
+        // 顶层：straight-alpha 混合，color 用 SrcAlpha/1-SrcAlpha、alpha 用 One/1-One，
         // 透明底上的累积结果即 premul 语义，与读回后的 Pixmap 一致
         let overlay_blend = Some(wgpu::BlendState {
             color: wgpu::BlendComponent {
@@ -249,13 +268,17 @@ impl Pipelines {
     }
 }
 
-/// 渲染一组立方体面（超采样 → 读回 → 降采样，输出预乘 BGRA `Pixmap`）
+/// 渲染一组立方体面，超采样后读回再降采样
 ///
 /// - `texture`: 皮肤贴图
-/// - `base` / `overlay`: 底层 / 顶层顶点（每面 6 顶点，[`face_verts`] 产出）
-/// - `tran`: 模型变换矩阵（旋转 + 缩放 + 平移到像素空间）
-/// - `width` / `height`: 输出尺寸（像素）
+/// - `base` / `overlay`: 底层 / 顶层顶点，每面 6 顶点，由 [`face_verts`] 产出
+/// - `tran`: 模型变换矩阵，含旋转、缩放与平移到像素空间
+/// - `width` / `height`: 输出尺寸，单位像素
 /// - `supersample`: 超采样倍数
+///
+/// # 返回值
+///
+/// 返回预乘 BGRA 的 `Pixmap`，无可用 GPU 或贴图为空时返回 `None`
 pub(crate) fn render_3d(
     texture: &Pixmap,
     base: &[Vert],
@@ -269,7 +292,7 @@ pub(crate) fn render_3d(
     let pipes = pipelines()?;
     let (device, queue) = (gpu.device(), gpu.queue());
     let (w, h) = (width * supersample, height * supersample);
-    // 正交投影按最终尺寸算（变换矩阵的平移 / 缩放以最终像素为单位），
+    // 正交投影按最终尺寸算：变换矩阵的平移 / 缩放以最终像素为单位，
     // 超采样目标渲染出来正好放大 supersample 倍，降采样后回到最终坐标
     let mvp = ortho(width, height) * tran;
 
@@ -313,7 +336,7 @@ pub(crate) fn render_3d(
         usage: wgpu::BufferUsages::VERTEX,
     });
 
-    // 离屏渲染：先底层（写深度），后顶层（混合、只读深度）
+    // 离屏渲染：先底层并写深度，后顶层做混合且只读深度
     let target = mml_gpu::offscreen_target(device, w, h);
     let color_view = target
         .color
@@ -358,15 +381,16 @@ pub(crate) fn render_3d(
     }
     queue.submit(Some(encoder.finish()));
 
-    // 读回（premul RGBA）→ Pixmap（premul BGRA）→ 降采样
+    // 读回 premul RGBA，转成 premul BGRA 的 Pixmap，再降采样
     let premul = mml_gpu::readback(device, queue, &target.color, w, h)?;
     let img = mml_gpu::pixmap_from_premul_rgba(&premul, w, h)?;
     downsample(&img, supersample)
 }
 
-/// uniform 布局（单个 MVP 矩阵）
+/// uniform 布局，只含一个 MVP 矩阵
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Mvp {
+    /// 模型视图投影矩阵，列主序
     mvp: [[f32; 4]; 4],
 }

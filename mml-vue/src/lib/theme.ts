@@ -20,7 +20,7 @@ export type AccentId =
   | "purple"
   | "indigo";
 
-/** 强调色预设列表（color 用于设置界面色块预览，check 为选中对勾颜色） */
+/** 强调色预设列表：color 用于设置界面色块预览，check 为选中对勾颜色 */
 export const ACCENTS: { id: AccentId; color: string; check: string }[] = [
   { id: "blue", color: "#4f8cff", check: "#fff" },
   { id: "sky", color: "#38bdf8", check: "#fff" },
@@ -37,7 +37,13 @@ export const ACCENTS: { id: AccentId; color: string; check: string }[] = [
   { id: "indigo", color: "#818cf8", check: "#fff" },
 ];
 
-/** 系统当前的应用深浅色（无显式选择时的默认来源） */
+/**
+ * 系统当前的应用深浅色，无显式选择时的默认来源
+ *
+ * # 返回值
+ *
+ * `Dark` 或 `Light`
+ */
 export function systemTheme(): Theme {
   return matchMedia("(prefers-color-scheme: dark)").matches ? "Dark" : "Light";
 }
@@ -80,7 +86,7 @@ function shade(hex: string, ratio: number): string {
 }
 
 /** 用自定义色推导一套和预设同构的强调色变量，直接内联到 <html> 上
- *  （内联样式优先级最高，能盖过 themes.css 里的 data-accent 预设块） */
+ *  内联样式优先级最高，能盖过 themes.css 里的 data-accent 预设块 */
 function applyCustomAccentVars(hex: string) {
   const root = document.documentElement;
   root.style.setProperty("--accent", hex);
@@ -100,11 +106,18 @@ function clearCustomAccentVars() {
   }
 }
 
-/** 当前实际生效的主题（System 解析成系统当前的深浅色） */
+/**
+ * 当前实际生效的主题，System 解析成系统当前的深浅色
+ *
+ * # 返回值
+ *
+ * `Dark` 或 `Light`
+ */
 export function resolvedTheme(): Theme {
   return theme.value === "System" ? systemTheme() : theme.value;
 }
 
+/** 把当前主题与强调色写到根元素，CSS 变量按 Dark / Light 定义 */
 export function applyTheme() {
   const root = document.documentElement;
   // CSS 变量按 Dark / Light 定义，System 在这里解析成具体值
@@ -123,7 +136,11 @@ export function applyTheme() {
   }
 }
 
-/** 显式设置主题（设置窗口用；主页面不再提供切换入口） */
+/**
+ * 显式设置主题，设置窗口用，主页面不再提供切换入口
+ *
+ * - `v`: 主题
+ */
 export function setTheme(v: Theme) {
   theme.value = v;
   writeString(KEYS.theme, v);
@@ -131,14 +148,22 @@ export function setTheme(v: Theme) {
   saveGuiConfig({ theme: v });
 }
 
-/** 设置强调色：预设 id 或 "custom"（用已存的自定义色） */
+/**
+ * 设置强调色
+ *
+ * - `a`: 预设 id 或 `custom`；`custom` 时用已存的自定义色
+ */
 export function setAccent(a: AccentId) {
   accent.value = a;
   writeString(KEYS.accent, a);
   applyTheme();
 }
 
-/** 设置自定义强调色：存色值并把当前强调色切到 custom */
+/**
+ * 设置自定义强调色：存色值并把当前强调色切到 custom
+ *
+ * - `hex`: 颜色，`#rrggbb`
+ */
 export function setCustomAccent(hex: string) {
   customAccent.value = hex;
   writeString(KEYS.accentCustom, hex);

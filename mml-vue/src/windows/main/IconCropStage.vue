@@ -1,36 +1,38 @@
 <script setup lang="ts">
 // 修改图标 · 选区裁剪：在图片上拖一个方框选范围
 //
-// 只用 DOM 定位（不上 canvas）：展示区按图片等比缩放到上限以内，选区是区内一个方框
-// （拖动移动、右下角把手缩放，恒为正方形——图标框就是方的）。
-// 对外只给**原图像素坐标**（后端直接拿去 `crop_imm`），坐标换算只在这一处：
+// 只用 DOM 定位，不上 canvas：展示区按图片等比缩放到上限以内，选区是区内一个方框，
+// 拖动移动、右下角把手缩放，恒为正方形 —— 图标框就是方的。
+// 对外只给**原图像素坐标**，后端直接拿去 `crop_imm`；坐标换算只在这一处：
 // 因而 `src` 可以是降采样预览，`width` / `height` 必须是原图尺寸，两者由比例换算连起来。
 import { computed, onUnmounted, ref, watch } from "vue";
 
 const props = defineProps<{
-  /** 预览图 data URL（后端 `block_read_icon_source` 给的可直接当 src，已降采样） */
+  /** 预览图 data URL，由后端 `block_read_icon_source` 给出，已降采样，可直接当 src */
   src: string;
-  /** **原图**宽高（px）：选区与坐标换算都按原图，预览尺寸不参与 */
+  /** **原图**宽，单位 px；选区与坐标换算都按原图，预览尺寸不参与 */
   width: number;
+  /** **原图**高，单位 px；与 `width` 一起定预览比例 */
   height: number;
 }>();
 
+/** 选区变化，抛出原图像素坐标下的裁剪框 */
 const emit = defineEmits<{ (e: "change", area: { x: number; y: number; w: number; h: number }): void }>();
 
-/** 展示区上限（px）；小图不放大，免得糊 */
+/** 展示区上限，单位 px；小图不放大，免得糊 */
 const MAX = 560;
 /**
- * 矮窗口下的展示区下限（px）
+ * 矮窗口下的展示区下限，单位 px
  *
  * 弹窗整体受 `max-height: 85vh` 约束：展示区顶到 560 时，768p 这类屏幕上标题与按钮会被
- * 挤出可视区（弹窗一滚，选区就看不见了），所以按窗口高度收一收。只在挂载时算一次——
+ * 挤出可视区，弹窗一滚选区就看不见了，所以按窗口高度收一收。只在挂载时算一次——
  * 组件随弹窗 `v-if` 创建，开弹窗时取到的就是当时的窗口高度。
  */
 const MIN_STAGE = 280;
-/** 选区最小边长（展示坐标，px） */
+/** 选区最小边长，单位 px，按展示坐标算 */
 const MIN_SEL = 24;
 
-/** 本次实际使用的展示区上限（px） */
+/** 本次实际使用的展示区上限，单位 px */
 const maxBox = Math.max(MIN_STAGE, Math.min(MAX, Math.round(window.innerHeight * 0.55)));
 
 const scale = computed(() => Math.min(1, maxBox / Math.max(props.width || 1, props.height || 1)));

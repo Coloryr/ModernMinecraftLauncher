@@ -1,22 +1,22 @@
 // 模组表格视图的列定义（**唯一来源**）
 //
-// 宽度可拖、表头可点排序；拖出来的宽度存进**实例**的 `gui_setting.json`
-// （`Gui.ResourceModColWidths`，见后端 `gui_setting::GameViewSettingObj`）。
+// 宽度可拖、表头可点排序；拖出来的宽度存进**实例**的 `gui_setting.json`，
+// 即 `Gui.ResourceModColWidths`，见后端 `gui_setting::GameViewSettingObj`。
 // 后端只保管"列 key → 像素宽"这一串键值对，不认识有哪几列 ——
 // 所以**新增 / 改名 / 删除列只改这个文件**，不必动 Rust。
 
-/** 一列的规格 */
 import { t } from "../../lib/i18n";
 import type { ModItemDto } from "../../lib/bindings";
 import { sortedMods } from "./types";
+/** 一列的规格 */
 export interface ModCol {
-  /** 取值键（见 ModTable 的 `colValue`） */
+  /** 取值键，见 ModTable 的 `colValue` */
   key: string;
   /** 表头文案的 i18n 键 */
   label: string;
-  /** 默认宽度（px） */
+  /** 默认宽度，单位 px */
   width: number;
-  /** 拖宽下限（默认 [`MIN_COL_WIDTH`]） */
+  /** 拖宽下限，缺省用 `MIN_COL_WIDTH` */
   min?: number;
   /** 表头可点，在「正序 → 倒序 → 不排序」之间切（启用**右边**的列才给） */
   sortable?: boolean;
@@ -44,13 +44,19 @@ export const MOD_COLS: ModCol[] = [
   { key: "url", label: "resource.colUrl", width: 220, sortable: true, resizable: true },
 ];
 
-/** 列宽下限（再窄就只剩省略号了） */
+/** 列宽下限，单位 px；再窄就只剩省略号了 */
 export const MIN_COL_WIDTH = 60;
 
 /** 上限：手改坏的 `gui_setting.json` 不该让表格没法看 */
 const MAX_COL_WIDTH = 2000;
 
-/** 默认列宽表（列 key → 默认像素宽） */
+/**
+ * 默认列宽表
+ *
+ * # 返回值
+ *
+ * 列 key → 默认像素宽
+ */
 export function defaultColWidths(): Record<string, number> {
   const out: Record<string, number> = {};
   for (const col of MOD_COLS) out[col.key] = col.width;
@@ -60,8 +66,14 @@ export function defaultColWidths(): Record<string, number> {
 /**
  * 把存下来的列宽收敛成一份可用的
  *
- * 只认**已知列**（改过名 / 删掉的列自然丢弃），宽度夹在 `[下限, 上限]` 内，
+ * 只认**已知列**，改过名 / 删掉的列自然丢弃；宽度夹在 `[下限, 上限]` 内，
  * 缺项用默认值补齐 —— 于是"存过一半""存的是旧版本"都能安全落地。
+ *
+ * - `saved`: 从 `gui_setting.json` 读出来的原始值，可能是任何形状
+ *
+ * # 返回值
+ *
+ * 每个已知列都有的完整列宽表
  */
 export function normalizeColWidths(saved: unknown): Record<string, number> {
   const out = defaultColWidths();
@@ -77,9 +89,15 @@ export function normalizeColWidths(saved: unknown): Record<string, number> {
   return out;
 }
 
-/** 表头排序状态（`null` = 不排序，回到与列表视图一致的 modid 正序） */
+/**
+ * 表头排序状态
+ *
+ * `sort` 传 `null` 表示不排序，回到与列表视图一致的 modid 正序。
+ */
 export interface ModSort {
+  /** 排序依据的列 key，与 `MOD_COLS` 的 key 对应 */
   key: string;
+  /** 排序方向 */
   dir: "asc" | "desc";
 }
 
@@ -88,21 +106,61 @@ export interface ModSort {
 // 原来这套只写在 ModTable 里，于是 ModPane 算整段选择时只能用默认顺序 ——
 // 表格按列排序后，选中范围会和看到的对不上（用户报过"整段选中 78 项"）。
 
-/** 加载器列的显示名（可能不止一个：多加载器包后端已汇总去重，这里逐个翻译后连起来） */
+/**
+ * 加载器列的显示名
+ *
+ * 可能不止一个：多加载器包后端已汇总去重，这里逐个翻译后连起来。
+ *
+ * - `v`: 后端的加载器枚举名列表
+ *
+ * # 返回值
+ *
+ * 用 ` / ` 连起来的显示名，空列表得到空串
+ */
 export function loaderNames(v: string[]): string {
   return v.map((name) => t(`resource.loader.${name}`)).join(" / ");
 }
 
-/** 加载侧 / 下载源的显示名（后端出稳定枚举名，文案在前端翻） */
+/**
+ * 加载侧的显示名
+ *
+ * 后端出稳定枚举名，文案在前端翻。
+ *
+ * - `v`: 后端的加载侧枚举名，空串表示未识别
+ *
+ * # 返回值
+ *
+ * 翻译后的显示名，`v` 为空时得到空串
+ */
 export function sideName(v: string): string {
   return v ? t(`resource.side.${v}`) : "";
 }
 
+/**
+ * 下载源的显示名
+ *
+ * 与 `sideName` 同一口径：后端出稳定枚举名，文案在前端翻。
+ *
+ * - `v`: 后端的下载源枚举名，空串表示未识别
+ *
+ * # 返回值
+ *
+ * 翻译后的显示名，`v` 为空时得到空串
+ */
 export function sourceName(v: string): string {
   return v ? t(`resource.source.${v}`) : "";
 }
 
-/** 取某一列的排序值（与 `MOD_COLS` 的 key 对应） */
+/**
+ * 取某一列的排序值
+ *
+ * - `item`: 模组条目
+ * - `key`: 列 key，与 `MOD_COLS` 的 key 对应
+ *
+ * # 返回值
+ *
+ * 该列的字符串值；分组列、启用列与未知 key 都得到空串
+ */
 export function colValue(item: ModItemDto, key: string): string {
   switch (key) {
     case "name":
@@ -134,7 +192,18 @@ export function colValue(item: ModItemDto, key: string): string {
   }
 }
 
-/** 某一层的**显示顺序**：默认 modid 正序；点了表头就按那一列（数字列按数值比） */
+/**
+ * 某一层的**显示顺序**：默认 modid 正序，点了表头就按那一列
+ *
+ * 数字列按数值比，其余按本地化字典序。
+ *
+ * - `items`: 这一层的模组
+ * - `sort`: 表头排序状态，`null` 表示还没点过表头
+ *
+ * # 返回值
+ *
+ * 排好序的新数组，不改 `items`
+ */
 export function orderedMods(items: ModItemDto[], sort: ModSort | null): ModItemDto[] {
   const list = sortedMods(items);
   if (!sort) return list;

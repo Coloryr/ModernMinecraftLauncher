@@ -1,3 +1,5 @@
+//! 四种压缩格式的 NBT 文件往返测试，外加一个真实 `level.dat` 样本。
+
 use std::{
     fs::File,
     io::{Cursor, Seek, SeekFrom},
@@ -10,6 +12,7 @@ use mml_nbt::{
     nbt_types,
 };
 
+/// GZip 压缩的 Compound 文件往返后内容与压缩类型一致
 #[test]
 fn nbt_gzip() {
     let mut stream = Cursor::new(Vec::<u8>::new());
@@ -35,6 +38,7 @@ fn nbt_gzip() {
     assert!(nbt.nbt.eq(&nbt1.nbt));
 }
 
+/// Zlib 压缩的 Compound 文件往返
 #[test]
 fn nbt_zlib() {
     let mut stream = Cursor::new(Vec::<u8>::new());
@@ -60,6 +64,7 @@ fn nbt_zlib() {
     assert!(nbt.nbt.eq(&nbt1.nbt));
 }
 
+/// Lz4 压缩的 Compound 文件往返
 #[test]
 fn nbt_lz4() {
     let mut stream = Cursor::new(Vec::<u8>::new());
@@ -85,6 +90,7 @@ fn nbt_lz4() {
     assert!(nbt.nbt.eq(&nbt1.nbt));
 }
 
+/// 读取真实样本 tests/level.dat，写出后再读回应与原件一致
 #[test]
 fn load_dat() {
     let path = Path::new("tests").join("level.dat");

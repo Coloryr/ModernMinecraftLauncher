@@ -2,9 +2,13 @@
 // 统一按钮，五种变体：primary 主操作、accent 强调、plain 次要、danger 危险、ghost 图标类
 withDefaults(
   defineProps<{
+    /** 外观变体；primary 主操作、accent 强调、plain 次要、danger 危险、ghost 图标类 */
     variant?: "primary" | "accent" | "plain" | "danger" | "ghost";
+    /** 尺寸档；sm 定高 28px、md 35px，lg 由主操作按钮自行覆盖 */
     size?: "sm" | "md" | "lg";
+    /** 是否禁用 */
     disabled?: boolean;
+    /** 是否占满整行宽度 */
     block?: boolean;
   }>(),
   { variant: "plain", size: "md", disabled: false, block: false },
@@ -38,8 +42,8 @@ withDefaults(
   filter: none;
 }
 
-/* 尺寸（定高两档：28 = NumberStepper 档，35 = SegmentedTabs / 设置页 dl-grid 档；
-   lg 留给主操作按钮自行覆盖） */
+/* 尺寸：定高两档，28 = NumberStepper 档，35 = SegmentedTabs / 设置页 dl-grid 档；
+   lg 留给主操作按钮自行覆盖 */
 .s-sm {
   font-size: 12.5px;
   height: 28px;

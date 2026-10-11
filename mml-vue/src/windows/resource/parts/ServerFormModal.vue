@@ -5,15 +5,25 @@
 // 保存中不关弹窗 —— 失败提示已由调用方弹出，输入内容留着让用户改。
 //
 // 两个"别关"一起给上：`closable=false` 去掉右上角 ✕，`overlay-close=false` 让点遮罩
-// 也不关 —— 这是个**输入类**弹窗，误触一下就白填了（BaseModal 的 overlayClose 就是
-// 为这种情况留的）。要取消就点左下角的「取消」
+// 也不关 —— 这是个**输入类**弹窗，误触一下就白填了；BaseModal 的 overlayClose 就是
+// 为这种情况留的。要取消就点左下角的「取消」
 import BaseButton from "../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../components/ui/BaseModal.vue";
 import { t } from "../../../lib/i18n";
 import type { ServerFormDraft } from "../types";
 
-defineProps<{ form: ServerFormDraft; busy: boolean }>();
-const emit = defineEmits<{ (e: "submit"): void; (e: "close"): void }>();
+defineProps<{
+  /** 表单草稿；`edit` 为真时按原 name/ip 定位改那一条 */
+  form: ServerFormDraft;
+  /** 正在保存：按钮置灰，防连点 */
+  busy: boolean;
+}>();
+const emit = defineEmits<{
+  /** 提交表单，保存逻辑在 ServerPane */
+  (e: "submit"): void;
+  /** 取消，收起弹窗 */
+  (e: "close"): void;
+}>();
 </script>
 
 <template>

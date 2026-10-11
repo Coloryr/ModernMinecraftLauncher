@@ -24,10 +24,10 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
 pub struct JvmConfigObj {
-    /// Java 显示名称
+    /// Java 显示名称，对应 JSON 键 `Name`，默认空字符串
     #[serde(rename = "Name")]
     pub name: String,
-    /// Java 可执行文件的路径（相对或绝对路径）
+    /// Java 可执行文件路径，可为相对或绝对路径；对应 JSON 键 `Local`，默认空字符串
     #[serde(rename = "Local")]
     pub local: String,
 }
@@ -47,9 +47,9 @@ impl Default for JvmConfigObj {
 #[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum SourceLocal {
-    /// Mojang 官方下载源
+    /// Mojang 官方下载源，序列化为 0，默认值
     Offical,
-    /// BMCLAPI 国内镜像源（由 bangbang93 维护）
+    /// BMCLAPI 国内镜像源，由 bangbang93 维护，序列化为 1
     Bmclapi,
 }
 
@@ -63,11 +63,11 @@ impl Default for SourceLocal {
 #[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ProxyState {
-    /// 自动检测系统代理设置
+    /// 自动检测系统代理设置，序列化为 0，默认值
     Auto,
-    /// 不使用代理
+    /// 不使用代理，序列化为 1
     None,
-    /// 使用用户自定义代理
+    /// 使用用户自定义代理，序列化为 2
     User,
 }
 
@@ -81,11 +81,11 @@ impl Default for ProxyState {
 #[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ProxyType {
-    /// HTTP 代理
+    /// HTTP 代理，序列化为 0，默认值
     Http,
-    /// SOCKS4 代理
+    /// SOCKS4 代理，序列化为 1
     Sock4,
-    /// SOCKS5 代理
+    /// SOCKS5 代理，序列化为 2
     Sock5,
 }
 
@@ -101,43 +101,43 @@ impl Default for ProxyType {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct HttpObj {
-    /// 资源下载源
+    /// 资源下载源，对应 JSON 键 `Source`，默认 `Offical`
     #[serde(rename = "Source")]
     pub source: SourceLocal,
-    /// 下载并发线程数
+    /// 下载并发线程数，对应 JSON 键 `DownloadThread`，默认 5
     #[serde(rename = "DownloadThread")]
     pub download_thread: u32,
-    /// 代理服务器 IP 地址
+    /// 代理服务器 IP 地址，对应 JSON 键 `ProxyIP`，默认 `127.0.0.1`
     #[serde(rename = "ProxyIP")]
     pub proxy_ip: String,
-    /// 代理服务器端口
+    /// 代理服务器端口，对应 JSON 键 `ProxyPort`，默认 7890
     #[serde(rename = "ProxyPort")]
     pub proxy_port: u16,
-    /// 代理认证用户名
+    /// 代理认证用户名，对应 JSON 键 `ProxyUser`，默认空字符串
     #[serde(rename = "ProxyUser")]
     pub proxy_user: String,
-    /// 代理认证密码
+    /// 代理认证密码，对应 JSON 键 `ProxyPassword`，默认空字符串
     #[serde(rename = "ProxyPassword")]
     pub proxy_password: String,
 
-    /// 一般请求（下载等）的代理策略
+    /// 一般请求的代理策略，对应 JSON 键 `ProxyWork`，默认 `Auto`
     #[serde(rename = "ProxyWork")]
     pub work_proxy: ProxyState,
-    /// 一般请求的代理类型
+    /// 一般请求的代理类型，对应 JSON 键 `ProxyWorkType`，默认 `Http`
     #[serde(rename = "ProxyWorkType")]
     pub work_proxy_type: ProxyType,
 
-    /// 登录请求的代理策略
+    /// 登录请求的代理策略，对应 JSON 键 `ProxyLogin`，默认 `Auto`
     #[serde(rename = "ProxyLogin")]
     pub login_proxy: ProxyState,
-    /// 登录请求的代理类型
+    /// 登录请求的代理类型，对应 JSON 键 `ProxyLoginType`，默认 `Http`
     #[serde(rename = "ProxyLoginType")]
     pub login_proxy_type: ProxyType,
 
-    /// 是否校验下载文件完整性（SHA1）
+    /// 是否校验下载文件完整性，校验算法为 SHA1；对应 JSON 键 `CheckFile`，默认 true
     #[serde(rename = "CheckFile")]
     pub check_file: bool,
-    /// 是否自动下载缺失文件
+    /// 是否自动下载缺失文件，对应 JSON 键 `AutoDownload`，默认 true
     #[serde(rename = "AutoDownload")]
     pub auto_download: bool,
 }
@@ -163,17 +163,17 @@ impl Default for HttpObj {
 
 /// 自定义 DNS 设置
 ///
-/// 支持 DNS over HTTPS（DoH），用于绕过 DNS 污染。
+/// 支持 DNS over HTTPS，即 DoH，用于绕过 DNS 污染。
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct DnsObj {
-    /// 是否启用自定义 DNS
+    /// 是否启用自定义 DNS，对应 JSON 键 `Enable`，默认 false
     #[serde(rename = "Enable")]
     pub enable: bool,
-    /// DNS over HTTPS 服务器地址列表
+    /// DNS over HTTPS 服务器地址列表，对应 JSON 键 `Https`，默认空列表
     #[serde(rename = "Https")]
     pub https: Vec<String>,
-    /// 是否对代理连接也启用自定义 DNS
+    /// 是否对代理连接也启用自定义 DNS，对应 JSON 键 `HttpProxy`，默认 false
     #[serde(rename = "HttpProxy")]
     pub http_proxy: bool,
 }
@@ -192,13 +192,13 @@ impl Default for DnsObj {
 #[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum GCType {
-    /// 自动选择（根据 Java 版本自动匹配合适的 GC）
+    /// 自动选择，按 Java 版本匹配合适的 GC；序列化为 0，默认值
     Auto,
-    /// G1 垃圾回收器（适合大内存、低延迟场景）
+    /// G1 垃圾回收器，适合大内存、低延迟场景；序列化为 1
     G1GC,
-    /// ZGC（分代式 Z Garbage Collector，Java 21+ 推荐）
+    /// 分代式 Z Garbage Collector，Java 21+ 推荐；序列化为 2
     ZGC,
-    /// 不添加任何 GC 参数，使用 JVM 默认
+    /// 不添加任何 GC 参数，使用 JVM 默认；序列化为 3
     None,
 }
 
@@ -215,46 +215,47 @@ impl Default for GCType {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
 pub struct RunArgObj {
-    /// 是否移除原有的 JVM 参数
+    /// 是否移除原有的 JVM 参数，对应 JSON 键 `RemoveJvmArg`，缺省为 `None`
     #[serde(rename = "RemoveJvmArg")]
     pub remove_jvm_arg: Option<bool>,
-    /// 是否移除原有的游戏参数
+    /// 是否移除原有的游戏参数，对应 JSON 键 `RemoveGameArg`，缺省为 `None`
     #[serde(rename = "RemoveGameArg")]
     pub remove_game_arg: Option<bool>,
-    /// 自定义 JVM 参数（追加或替换）
+    /// 自定义 JVM 参数，追加或替换；对应 JSON 键 `JvmArgs`，缺省为 `None`
     #[serde(rename = "JvmArgs")]
     pub jvm_args: Option<String>,
-    /// 自定义游戏参数（追加或替换）
+    /// 自定义游戏参数，追加或替换；对应 JSON 键 `GameArgs`，缺省为 `None`
     #[serde(rename = "GameArgs")]
     pub game_args: Option<String>,
-    /// 自定义 JVM 环境变量
+    /// 自定义 JVM 环境变量，对应 JSON 键 `JvmEnv`，缺省为 `None`
     #[serde(rename = "JvmEnv")]
     pub jvm_env: Option<String>,
-    /// GC 模式
+    /// GC 模式，对应 JSON 键 `GC`，缺省为 `None`
     #[serde(rename = "GC")]
     pub gc_mode: Option<GCType>,
-    /// 最大内存（MB）
+    /// 最大内存，单位 MB；对应 JSON 键 `MaxMemory`，缺省为 `None`
     #[serde(rename = "MaxMemory")]
     pub max_memory: Option<u32>,
-    /// 最小内存（MB）
+    /// 最小内存，单位 MB；对应 JSON 键 `MinMemory`，缺省为 `None`
     #[serde(rename = "MinMemory")]
     pub min_memory: Option<u32>,
-    /// 是否启用 ColorASM 注入
+    /// 是否启用 ColorASM 注入，对应 JSON 键 `ColorASM`，缺省为 `None`
     #[serde(rename = "ColorASM")]
     pub colorasm: Option<bool>,
-    /// 是否在启动 Minecraft 前执行预启动命令
+    /// 是否在启动 Minecraft 前执行预启动命令，对应 JSON 键 `LaunchPre`，缺省为 `None`
     #[serde(rename = "LaunchPre")]
     pub launch_pre_run: Option<bool>,
-    /// 预启动命令是否与游戏同时运行（`true`）还是等命令结束后再启动游戏（`false`）
+    /// 预启动命令是否与游戏同时运行，`true` 同时、`false` 等命令结束后再启动游戏；
+    /// 对应 JSON 键 `PreRunSame`，缺省为 `None`
     #[serde(rename = "PreRunSame")]
     pub pre_run_with_game: Option<bool>,
-    /// 是否在游戏结束后执行后置命令
+    /// 是否在游戏结束后执行后置命令，对应 JSON 键 `LaunchPost`，缺省为 `None`
     #[serde(rename = "LaunchPost")]
     pub launch_post_run: Option<bool>,
-    /// 预启动命令内容
+    /// 预启动命令内容，对应 JSON 键 `LaunchPreData`，缺省为 `None`
     #[serde(rename = "LaunchPreData")]
     pub pre_run_arg: Option<String>,
-    /// 后置命令内容
+    /// 后置命令内容，对应 JSON 键 `LaunchPostData`，缺省为 `None`
     #[serde(rename = "LaunchPostData")]
     pub post_run_arg: Option<String>,
 }
@@ -281,10 +282,9 @@ impl Default for RunArgObj {
 }
 
 impl RunArgObj {
-    /// 创建带有合理默认值的启动参数
+    /// 创建带合理默认值的启动参数
     ///
-    /// 默认分配 512MB–4096MB 内存，自动选择GC参数，
-    /// 预启动命令与游戏同时运行。
+    /// 内存 512–4096 MB，GC 自动，预启动命令与游戏同时运行
     pub fn new() -> Self {
         RunArgObj {
             remove_jvm_arg: Option::Some(false),
@@ -311,34 +311,34 @@ impl RunArgObj {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
 pub struct WindowSettingObj {
-    /// 是否启动全屏模式
+    /// 是否启动全屏模式，对应 JSON 键 `FullScreen`，缺省为 `None`
     #[serde(rename = "FullScreen")]
     pub full_screen: Option<bool>,
-    /// 窗口宽度（像素）
+    /// 窗口宽度，单位像素；对应 JSON 键 `Width`，缺省为 `None`
     #[serde(rename = "Width")]
     pub width: Option<u16>,
-    /// 窗口高度（像素）
+    /// 窗口高度，单位像素；对应 JSON 键 `Height`，缺省为 `None`
     #[serde(rename = "Height")]
     pub height: Option<u16>,
-    /// 自定义游戏窗口标题
+    /// 自定义游戏窗口标题，对应 JSON 键 `GameTitle`，缺省为 `None`
     #[serde(rename = "GameTitle")]
     pub game_title: Option<String>,
-    /// 是否启用自定义标题
+    /// 是否启用自定义标题，对应 JSON 键 `EditTitle`，缺省为 `None`
     #[serde(rename = "EditTitle")]
     pub edit_title: Option<bool>,
-    /// 是否使用随机标题
+    /// 是否使用随机标题，对应 JSON 键 `RandomTitle`，缺省为 `None`
     #[serde(rename = "RandomTitle")]
     pub random_title: Option<bool>,
-    /// 是否循环切换标题
+    /// 是否循环切换标题，对应 JSON 键 `CycTitle`，缺省为 `None`
     #[serde(rename = "CycTitle")]
     pub cycle_title: Option<bool>,
-    /// 循环标题切换延迟（毫秒）
+    /// 循环标题切换延迟，单位毫秒；对应 JSON 键 `TitleDelay`，缺省为 `None`
     #[serde(rename = "TitleDelay")]
     pub title_delay: Option<u32>,
 }
 
 impl WindowSettingObj {
-    /// 创建默认窗口设置（1280×720，窗口模式）
+    /// 创建默认窗口设置：1280×720，窗口模式
     pub fn new() -> Self {
         Self {
             full_screen: Some(false),
@@ -374,28 +374,28 @@ impl Default for WindowSettingObj {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct GameCheckObj {
-    /// 检查游戏核心 jar 文件是否存在
+    /// 检查游戏核心 jar 文件是否存在，对应 JSON 键 `CheckCore`，默认 true
     #[serde(rename = "CheckCore")]
     pub core: bool,
-    /// 检查运行库文件是否存在
+    /// 检查运行库文件是否存在，对应 JSON 键 `CheckLib`，默认 true
     #[serde(rename = "CheckLib")]
     pub lib: bool,
-    /// 检查资源文件是否存在
+    /// 检查资源文件是否存在，对应 JSON 键 `CheckAssets`，默认 true
     #[serde(rename = "CheckAssets")]
     pub assets: bool,
-    /// 检查模组文件是否存在
+    /// 检查模组文件是否存在，对应 JSON 键 `CheckMod`，默认 true
     #[serde(rename = "CheckMod")]
     pub game_mod: bool,
-    /// 校验游戏核心 SHA1
+    /// 校验游戏核心 SHA1，对应 JSON 键 `CheckCoreSha1`，默认 true
     #[serde(rename = "CheckCoreSha1")]
     pub core_sha1: bool,
-    /// 校验运行库 SHA1
+    /// 校验运行库 SHA1，对应 JSON 键 `CheckLibSha1`，默认 true
     #[serde(rename = "CheckLibSha1")]
     pub lib_sha1: bool,
-    /// 校验资源文件 SHA1
+    /// 校验资源文件 SHA1，对应 JSON 键 `CheckAssetsSha1`，默认 true
     #[serde(rename = "CheckAssetsSha1")]
     pub assets_sha1: bool,
-    /// 校验模组 SHA1
+    /// 校验模组 SHA1，对应 JSON 键 `CheckModSha1`，默认 true
     #[serde(rename = "CheckModSha1")]
     pub mod_sha1: bool,
 }
@@ -421,25 +421,25 @@ impl Default for GameCheckObj {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct ConfigObj {
-    /// 配置文件版本（用于自动迁移）
+    /// 配置文件版本，用于自动迁移；对应 JSON 键 `Version`，默认为当前启动器版本
     #[serde(rename = "Version")]
     pub version: String,
-    /// 已添加的 Java 运行时列表
+    /// 已添加的 Java 运行时列表，对应 JSON 键 `JavaList`，默认空列表
     #[serde(rename = "JavaList")]
     pub java_list: Vec<JvmConfigObj>,
-    /// 网络设置
+    /// 网络设置，对应 JSON 键 `Http`，默认 `HttpObj::default()`
     #[serde(rename = "Http")]
     pub http: HttpObj,
-    /// 自定义 DNS 设置
+    /// 自定义 DNS 设置，对应 JSON 键 `Dns`，默认 `DnsObj::default()`
     #[serde(rename = "Dns")]
     pub dns: DnsObj,
-    /// 默认 JVM 启动参数
+    /// 默认 JVM 启动参数，对应 JSON 键 `DefaultJvmArg`，默认 `RunArgObj::new()`
     #[serde(rename = "DefaultJvmArg")]
     pub jvm_arg: RunArgObj,
-    /// 游戏窗口设置
+    /// 游戏窗口设置，对应 JSON 键 `Window`，默认 `WindowSettingObj::new()`
     #[serde(rename = "Window")]
     pub window: WindowSettingObj,
-    /// 游戏文件检查设置
+    /// 游戏文件检查设置，对应 JSON 键 `GameCheck`，默认 `GameCheckObj::default()`
     #[serde(rename = "GameCheck")]
     pub check: GameCheckObj,
 }

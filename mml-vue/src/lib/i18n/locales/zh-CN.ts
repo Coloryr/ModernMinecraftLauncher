@@ -226,7 +226,7 @@ export default {
   // 加载器显示名
   "loader.normal": "原版",
 
-  // 实例元信息（版本 / 加载器 / 分组 / 整合包 / 语言）
+  // 实例元信息：版本 / 加载器 / 分组 / 整合包 / 语言
   "meta.version": "游戏版本",
   "meta.versionType": "版本类型",
   "meta.loader": "加载器",
@@ -262,11 +262,11 @@ export default {
   "resource.modAuthor": "作者",
   "resource.modActions": "操作",
   "resource.modBuiltin": "内置",
-  // 内置的库（没有模组元数据的内置 jar，如 asm / mixinextras）：不是模组
+  // 内置的库：没有模组元数据的内置 jar，如 asm / mixinextras，不是模组
   "resource.modLibrary": "库",
   "resource.modBuiltinExpand": "展开内置模组",
   "resource.modBuiltinCollapse": "收起内置模组",
-  // 表格的列（顺序与 ModTable 的 COLUMNS 一致）
+  // 表格的列，顺序与 ModTable 的 COLUMNS 一致
   "resource.colEnable": "启用",
   "resource.colModId": "modid",
   "resource.colLoader": "加载器类型",
@@ -278,7 +278,7 @@ export default {
   "resource.colUrl": "网页链接",
   "resource.colSortTip": "点击切换：正序 / 倒序 / 不排序",
   "resource.colResizeTip": "拖动调整列宽",
-  // 表格列里的枚举值（后端出稳定英文名，这里翻成中文）
+  // 表格列里的枚举值：后端出稳定英文名，这里翻成中文
   "resource.side.client": "客户端",
   "resource.side.server": "服务端",
   "resource.side.both": "两者",
@@ -311,8 +311,8 @@ export default {
   "resource.groupDeleteConfirm": "确定删除分组「{name}」？组内模组会回到「未分组」，磁盘上的文件不受影响。",
   "resource.groupName": "分组名",
   "resource.groupPlaceholder": "输入分组名",
-  // 一个自建分组都没有时的空态（注意与上面的「未分组」不是一回事：
-  // 那个是"这个模组不属于任何分组"，这个是"你还没建过分组"）
+  // 一个自建分组都没有时的空态。注意与上面的「未分组」不是一回事：
+  // 那个是"这个模组不属于任何分组"，这个是"你还没建过分组"
   "resource.groupNoGroups": "无分组",
   "resource.groupEmptyHint": "该分组没有模组",
 
@@ -600,7 +600,7 @@ export default {
   "account.viewSkin": "查看皮肤",
   "account.addTitle": "添加账户",
   "account.added": "账户已添加",
-  // 拖入登录卡片（网页卡片 / .url / .webloc 快捷方式）
+  // 拖入登录卡片：网页卡片 / .url / .webloc 快捷方式
   "account.dropTitle": "松开以导入登录方式",
   "account.dropFileTitle": "松开以导入登录快捷方式",
   "account.dropNotShortcut": "只支持拖入登录卡片或 .url / .webloc 快捷方式",
@@ -1118,7 +1118,7 @@ export default {
   "collect.openUrl": "打开网址",
   "collect.addToGroup": "移动到分组",
   "collect.addToGroupNone": "还没有分组，先添加一个分组",
-  // 多选模式（默认不进行多选，点工具栏的「多选」才进）
+  // 多选模式：默认不进行多选，点工具栏的「多选」才进
   "collect.multiSelect": "多选",
   "collect.multiSelected": "已选 {count} 项",
   "collect.multiMoveGroup": "转移分组",

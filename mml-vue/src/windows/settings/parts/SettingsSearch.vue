@@ -9,7 +9,10 @@ import HighlightText from "../../../components/ui/HighlightText.vue";
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import { searchSettings, type SettingsHit } from "../search";
 
-const emit = defineEmits<{ (e: "select", hit: SettingsHit): void }>();
+const emit = defineEmits<{
+  /** 选中一条结果，参数是命中项 */
+  (e: "select", hit: SettingsHit): void;
+}>();
 
 const query = ref("");
 const open = ref(false);
@@ -87,9 +90,9 @@ function onKey(e: KeyboardEvent) {
 </template>
 
 <style scoped>
-/* 搜索框在标题栏里，要跟另外两个窗口的 head-right 控件齐平（36px）：
+/* 搜索框在标题栏里，要跟另外两个窗口的 head-right 控件齐平到 36px：
    .field-input 默认 min-height: var(--field-h) = 42px，比标题栏这一排高出一截，
-   显式压到 36（min-height 必须一起清掉，否则 height 不生效） */
+   显式压到 36；min-height 必须一起清掉，否则 height 不生效 */
 .set-search-input {
   height: 36px;
   min-height: 0;

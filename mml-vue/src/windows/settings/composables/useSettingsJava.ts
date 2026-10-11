@@ -1,8 +1,8 @@
 // 设置窗口 · Java 标签
 //
-// Java 列表来自 core 的全局注册表（`settings_get_launch` 里的 javaList），
+// Java 列表来自 core 的全局注册表，即 `settings_get_launch` 里的 javaList，
 // 增删 / 扫描 / 导入 / 扫描目录都会改这份注册表，所以每次操作后统一 `refresh()`。
-// 导入进度经 `settings-java-progress` 事件推进（订阅用 useUnlisteners，卸载时一定注销）。
+// 导入进度经 `settings-java-progress` 事件推进，订阅用 useUnlisteners，卸载时一定注销。
 import { computed, onMounted, ref } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
@@ -13,6 +13,17 @@ import { listen } from "@tauri-apps/api/event";
 import type { JavaImportProgressDto, JavaInfoDto } from "../../../lib/bindings";
 import { isTauri, openWindow } from "../../windowManager";
 
+/**
+ * Java 标签的状态与操作
+ *
+ * # 返回值
+ *
+ * - `javaList` / `javaGroups`: 已注册的 Java 列表，以及按发行类型分好的分组
+ * - `collapsedTypes` / `toggleType` / `typeOpen`: 分组的展开状态
+ * - `newJavaName` / `newJavaPath` / `addingJava` / `browseJava` / `addJava` / `removeJava` / `removeAllJava` / `confirmRemoveAll`: 手动增删
+ * - `scanJava` / `scanJavaDir` / `scanning` / `scanningDir` / `importJavaArchive` / `importingJava` / `importProgress` / `importPercent` / `downloadJava`: 扫描、导入与下载
+ * - `inTauri` / `load` / `resetGroup`: 环境判断、加载与分组级恢复默认
+ */
 export function useSettingsJava() {
   const inTauri = isTauri();
   const { track: trackUnlisten } = useUnlisteners();
@@ -56,7 +67,7 @@ export function useSettingsJava() {
 
   // ---------- 加载 ----------
 
-  /** 拉取 Java 列表（`getLaunch` 会连运行参数一起返回，这里只取 javaList） */
+  /** 拉取 Java 列表；`getLaunch` 会连运行参数一起返回，这里只取 javaList */
   async function load() {
     const launch = await commands.settings.getLaunch().catch(() => null);
     if (launch) javaList.value = launch.javaList;
@@ -176,7 +187,7 @@ export function useSettingsJava() {
     }
   }
 
-  /** 压缩包导入（zip / 7z 等，解包后注册其中的 Java） */
+  /** 压缩包导入：zip / 7z 等，解包后注册其中的 Java */
   async function importJavaArchive() {
     const { open } = await import("@tauri-apps/plugin-dialog");
     const picked = await open({
@@ -199,7 +210,7 @@ export function useSettingsJava() {
     }
   }
 
-  /** 下载 Java：打开独立下载窗口（发行类型 / 主版本 / 系统 / 架构筛选） */
+  /** 下载 Java：打开独立下载窗口，按发行类型 / 主版本 / 系统 / 架构筛选 */
   function downloadJava() {
     openWindow("java_download");
   }

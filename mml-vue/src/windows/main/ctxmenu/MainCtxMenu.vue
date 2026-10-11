@@ -2,22 +2,24 @@
 // 主窗口右键菜单：分组 / 实例 / 多选 三种视图
 // 所有动作通过事件抛给父组件处理
 //
-// 目标分组的选择**不在这里**：那是个弹窗（见 MainWindow 的"选择目标分组"）。
-// 早先把它做成菜单的第二级视图（`moveGroupView`）时，因为 `menu.kind` 仍是 'group'，
+// 目标分组的选择**不在这里**：那是个弹窗，见 MainWindow 的"选择目标分组"。
+// 早先把它做成菜单的第二级视图 `moveGroupView` 时，因为 `menu.kind` 仍是 'group'，
 // 渲染时永远轮不到它，表现就是"点了转移分组没反应"——所以改成了弹窗。
 //
 // 定位：`position: fixed` 钉在点击处，但**渲染后要量一次并收进窗口**——
-// 否则靠近窗口下/右边缘点开时，菜单会超出可视区被裁掉（实例菜单 6 项约 285px 高）。
+// 否则靠近窗口下/右边缘点开时，菜单会超出可视区被裁掉 —— 实例菜单 6 项约 285px 高。
 import { computed, nextTick, ref, watchEffect } from "vue";
 import { t } from "../../../lib/i18n";
 import type { CtxMenuState, GroupView, InstMenuAction } from "../types";
 
 const props = defineProps<{
+  /** 当前菜单状态；null 表示菜单没开 */
   menu: CtxMenuState | null;
+  /** 全部分组视图，用来算置灰与"转移分组"的候选 */
   groups: GroupView[];
 }>();
 
-/** 当前右键的分组（空分组时"全选 / 启动全部"无意义，置灰；"转移分组"另见 canMoveGroup） */
+/** 当前右键的分组；空分组时"全选 / 启动全部"置灰，"转移分组"另见 canMoveGroup */
 const currentGroup = computed(() =>
   props.menu?.kind === "group"
     ? props.groups.find((x) => x.id === props.menu?.groupId)
@@ -25,7 +27,7 @@ const currentGroup = computed(() =>
 );
 const groupEmpty = computed(() => !currentGroup.value || currentGroup.value.items.length === 0);
 
-/** 默认分组不能删（它的名字留白，用 isDefault 判，不看名字） */
+/** 默认分组不能删；它的名字留白，用 isDefault 判，不看名字 */
 const canDeleteGroup = computed(() => !!currentGroup.value && !currentGroup.value.isDefault);
 
 /**
@@ -33,7 +35,7 @@ const canDeleteGroup = computed(() => !!currentGroup.value && !currentGroup.valu
  *
  * 两个前提缺一不可：组里有实例可转移，**而且除它自己以外还有别的组可去**。
  * 后者以前没判——只有一个默认分组时点开弹窗才发现下拉是空的，
- * 所以现在直接置灰（工具提示见 MainWindow 的工具栏按钮）。
+ * 所以现在直接置灰，工具提示见 MainWindow 的工具栏按钮。
  */
 const canMoveGroup = computed(() => {
   const source = currentGroup.value;
@@ -44,6 +46,14 @@ const canMoveGroup = computed(() => {
 /** 多选"修改分组"：表里只有默认分组一个组时同样无处可去 */
 const canMultiMove = computed(() => props.groups.length > 1);
 
+/**
+ * 菜单动作，一律抛给父组件执行
+ *
+ * - `select-all` / `launch-group` / `delete-group`: 分组菜单，带该分组 uuid
+ * - `move-group`: 分组菜单的"转移分组"
+ * - `inst-action`: 实例菜单，带动作 id
+ * - `multi-move` / `multi-delete` / `multi-launch`: 多选菜单
+ */
 const emit = defineEmits<{
   (e: "select-all", groupId?: string): void;
   (e: "launch-group", groupId?: string): void;
@@ -58,7 +68,7 @@ const emit = defineEmits<{
 /** 菜单根元素与最终落点（先按点击处放，量完再修正） */
 const el = ref<HTMLElement | null>(null);
 const pos = ref({ x: 0, y: 0 });
-/** 与窗口边缘至少留这么宽（px） */
+/** 与窗口边缘至少留这么宽，单位 px */
 const MARGIN = 8;
 
 watchEffect(async () => {
@@ -67,7 +77,7 @@ watchEffect(async () => {
   if (!menu) return;
 
   pos.value = { x: menu.x, y: menu.y };
-  // 等菜单渲染出来才有尺寸可量（内容由 v-if 分支决定，量不到就保持点击处）
+  // 等菜单渲染出来才有尺寸可量；内容由 v-if 分支决定，量不到就保持点击处
   await nextTick();
   const rect = el.value?.getBoundingClientRect();
   if (!rect) return;

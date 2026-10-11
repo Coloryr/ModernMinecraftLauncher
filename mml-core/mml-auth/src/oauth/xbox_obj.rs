@@ -1,6 +1,6 @@
 //! Xbox Live / XSTS 认证数据模型
 //!
-//! 本模块定义了与 Xbox Live 认证服务 (XBL) 和 Xbox 安全令牌服务 (XSTS)
+//! 本模块定义了与 Xbox Live 认证服务 XBL 和 Xbox 安全令牌服务 XSTS
 //! 通信所需的 JSON 数据结构。
 //!
 //! # 认证流程中的位置
@@ -12,7 +12,7 @@
 //! - [`XBoxLoginObj`] — XBL 认证请求
 //! - [`XSTSLoginObj`] — XSTS 认证请求
 //! - [`XBoxLoginResObj`] — 统一的认证响应结构
-//! - [`XBoxLiveRes`] — 提取后的认证结果（token + UHS）
+//! - [`XBoxLiveResObj`] — 提取后的认证结果，含 token 与 UHS
 
 use serde::{Deserialize, Serialize};
 
@@ -76,10 +76,10 @@ impl Default for XBoxLoginObj {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct XSTSLoginPropertiesObj {
-    /// 沙盒标识，固定为 "RETAIL"（零售版 Minecraft）
+    /// 沙盒标识，固定为 "RETAIL"，即零售版 Minecraft
     #[serde(rename = "SandboxId")]
     pub sandbox_id: String,
-    /// 上游令牌列表（XBL Token）
+    /// 上游令牌列表，即 XBL Token
     #[serde(rename = "UserTokens")]
     pub user_tokens: Vec<String>,
 }
@@ -122,12 +122,12 @@ impl Default for XSTSLoginObj {
 
 /// Xbox Live 显示声明中的 XUI 条目
 ///
-/// 包含认证返回的用户哈希（User Hash），在后续获取
+/// 包含认证返回的用户哈希，即 User Hash，在后续获取
 /// Minecraft Token 时需要用到。
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct XBoxLoginDisplayClaimsXuiObj {
-    /// 用户哈希（User Hash），用于 Minecraft 认证
+    /// 用户哈希，即 User Hash，用于 Minecraft 认证
     pub uhs: String,
 }
 
@@ -163,7 +163,7 @@ impl Default for XBoxLoginDisplayClaimsObj {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct XBoxLoginResObj {
-    /// 认证令牌（JWT 格式）
+    /// 认证令牌，JWT 格式
     #[serde(rename = "Token")]
     pub token: String,
     /// 显示声明，包含用户哈希信息
@@ -186,7 +186,7 @@ impl Default for XBoxLoginResObj {
 pub struct XBoxLiveResObj {
     /// XBL 或 XSTS 令牌
     pub xbl_token: String,
-    /// 用户哈希（UHS），用于 Minecraft 服务认证
+    /// 用户哈希 UHS，用于 Minecraft 服务认证
     pub xbl_uhs: String,
 }
 
@@ -241,7 +241,7 @@ mod tests {
     /// XBL/XSTS 统一响应应正确解析出 Token 和 UHS
     #[test]
     fn test_xbox_login_res_obj_parse() {
-        // 假数据，字段布局与 Xbox 认证端点一致（xui 条目中还可能有其它字段）
+        // 假数据，字段布局与 Xbox 认证端点一致，xui 条目中还可能有其它字段
         let json = r#"{
             "IssueInstant": "2026-01-01T00:00:00.0000000Z",
             "NotAfter": "2026-01-02T00:00:00.0000000Z",
@@ -267,7 +267,7 @@ mod tests {
         assert!(obj.display_claims.xui.is_empty());
     }
 
-    /// XBoxLiveRes 字段透传
+    /// XBoxLiveResObj 字段透传
     #[test]
     fn test_xbox_live_res_fields() {
         let res = XBoxLiveResObj {

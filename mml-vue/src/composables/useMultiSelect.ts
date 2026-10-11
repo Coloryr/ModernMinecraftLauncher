@@ -10,6 +10,19 @@ interface MultiDeps {
   onExit?: () => void;
 }
 
+/**
+ * 多选模式：右键分组全选进入、勾选切换、强制展开分组并居中滚动
+ *
+ * - `deps`: 当前选中实例、新闻页开关、分组折叠表与退出回调，均由调用方持有
+ *
+ * # 返回值
+ *
+ * - `multiSelect`: 多选模式是否开着
+ * - `selectedIds`: 已勾选的实例 uuid 集合
+ * - `enterMultiSelect`: 进入多选并勾选给定的一批 uuid
+ * - `exitMultiSelect`: 退出多选并清空勾选
+ * - `toggleSelect`: 切换单个实例的勾选；勾掉最后一个会退出多选
+ */
 export function useMultiSelect(deps: MultiDeps) {
   const multiSelect = ref(false);
   const selectedIds = ref<Set<string>>(new Set());

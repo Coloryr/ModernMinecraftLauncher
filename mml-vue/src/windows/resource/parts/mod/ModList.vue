@@ -12,7 +12,7 @@
 // 内置模组装在父 jar 里，**没有独立文件**：只有展示，不给操作按钮，也不参与拖拽归组
 // （归组的是父 jar）。
 //
-// 排序：**按 modid 正序**（见 types.ts 的 `sortedMods`）—— 与表格视图共用同一份比较器，
+// 排序：**按 modid 正序**，见 types.ts 的 `sortedMods` —— 与表格视图共用同一份比较器，
 // 两个视图的顺序必须一致，否则切换视图会看着"顺序变了"。
 import { computed, ref } from "vue";
 import { t } from "../../../../lib/i18n";
@@ -27,10 +27,18 @@ import {
 } from "../../types";
 import { modSelectKey } from "../../types";
 
-const props = withDefaults(defineProps<ModViewProps & { depth?: number }>(), { depth: 0 });
+const props = withDefaults(
+  defineProps<
+    ModViewProps & {
+      /** 递归层级；0 是顶层，每层 +1，只用来缩进与决定给不给操作入口 */
+      depth?: number;
+    }
+  >(),
+  { depth: 0 },
+);
 const emit = defineEmits<ModViewEmits>();
 
-/** 按 modid 正序排好的本层条目（递归渲染的每一层各自排） */
+/** 按 modid 正序排好的本层条目，递归渲染的每一层各自排 */
 const rows = computed(() => sortedMods(props.items));
 
 /**
@@ -44,6 +52,7 @@ const rows = computed(() => sortedMods(props.items));
  */
 const expanded = ref<Set<string>>(new Set());
 
+/** 展开 / 收起这一行 */
 function toggleExpand(key: string) {
   const next = new Set(expanded.value);
   if (next.has(key)) {
@@ -54,6 +63,7 @@ function toggleExpand(key: string) {
   expanded.value = next;
 }
 
+/** 这一行是不是展开的 */
 function isOpen(key: string): boolean {
   return expanded.value.has(key);
 }
@@ -97,10 +107,10 @@ function keyOf(item: ModViewProps["items"][number]): string {
       </template>
 
       <template #badges>
-        <!-- 支持的加载器：一个包可能不止一个（同时带 fabric.mod.json 与 mods.toml），
+        <!-- 支持的加载器：一个包可能不止一个，比如同时带 fabric.mod.json 与 mods.toml；
              后端已汇总去重，这里逐个显示 -->
         <span v-for="name in item.loaders" :key="name" class="badge badge-dim">{{ t(`resource.loader.${name}`) }}</span>
-        <!-- 内置的**库**（没有模组元数据的内置 jar，如 asm / mixinextras）：
+        <!-- 内置的**库**：没有模组元数据的内置 jar，如 asm / mixinextras。
              它不是模组，标出来免得和真正的内置模组混在一起 -->
         <span v-if="item.library" class="badge badge-dim">{{ t("resource.modLibrary") }}</span>
         <span v-if="depth > 0 && !item.library" class="badge badge-dim">
@@ -131,7 +141,7 @@ function keyOf(item: ModViewProps["items"][number]): string {
            也让行尾不再被一排按钮占掉宽度。 -->
     </ResourceRow>
 
-    <!-- 内置模组：递归展开下一层（默认展开，跟着父条目的折叠状态） -->
+    <!-- 内置模组：递归展开下一层，默认收起，见 expanded 的说明 -->
     <ModList v-if="item.jarInJar.length && isOpen(keyOf(item))" :items="item.jarInJar" :busy="busy"
       :dragging-key="draggingKey" :selected-keys="selectedKeys" :depth="depth + 1" @toggle="emit('toggle', $event)"
       @remove="emit('remove', $event)" @note="emit('note', $event)" @open-folder="emit('open-folder', $event)"

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// 设置窗口 · 客户端设置标签（服务器 / MOTD / 登录方式锁定 / 实例锁定 / 自定义主页面 / 游戏标题）
+// 设置窗口 · 客户端设置标签：服务器 / MOTD / 登录方式锁定 / 实例锁定 / 自定义主页面 / 游戏标题
 //
-// 游戏标题那组的数据属于 `window`（由 useSettingsLaunch 持有），所以这里额外接一个 `win`。
+// 游戏标题那组的数据属于 `window`，由 useSettingsLaunch 持有，所以这里额外接一个 `win`。
 import { nextTick, ref, watch } from "vue";
 import { t } from "../../../../lib/i18n";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
@@ -13,9 +13,11 @@ import type { useSettingsClient } from "../../composables/useSettingsClient";
 import type { WindowSettingDto } from "../../../../lib/bindings";
 
 const props = defineProps<{
+  /** 客户端设置标签的状态与保存方法，来自 useSettingsClient */
   settings: ReturnType<typeof useSettingsClient>;
   /** 游戏窗口设置（游戏标题三开关与标题文字） */
   win: WindowSettingDto | null;
+  /** 需要高亮脉冲的分组 id（搜索命中） */
   flashGroup?: string;
 }>();
 
@@ -177,7 +179,7 @@ watch(lockServerError, async (msg) => {
       <span class="custom-home-state">{{ customHomeState }}</span>
     </div>
 
-    <!-- 导入中提示（导入只是校验 + 复制压缩包，通常瞬间完成，所以没有进度百分比） -->
+    <!-- 导入中提示：导入只是校验 + 复制压缩包，通常瞬间完成，所以没有进度百分比 -->
     <div v-if="importingCustomHome" class="java-progress">
       <span class="java-progress-label">{{ t("winSettings.customHomeImporting") }}</span>
       <div class="java-progress-track">
@@ -186,7 +188,7 @@ watch(lockServerError, async (msg) => {
     </div>
   </SettingsGroup>
 
-  <!-- 游戏标题（游戏窗口标题栏的自定义文字，全局默认值；数据属于 window 设置） -->
+  <!-- 游戏标题：游戏窗口标题栏的自定义文字，全局默认值；数据属于 window 设置 -->
   <SettingsGroup v-if="win" id="gameTitle" title-key="winSettings.secGameTitle" :flash="flashGroup === 'gameTitle'">
     <div class="switch-list">
       <div class="switch-row">

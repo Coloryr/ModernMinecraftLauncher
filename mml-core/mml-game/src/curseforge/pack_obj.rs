@@ -1,4 +1,4 @@
-//! CurseForge 整合包清单（manifest.json）DTO
+//! CurseForge 整合包清单 manifest.json 的 DTO
 
 use serde::{Deserialize, Serialize};
 

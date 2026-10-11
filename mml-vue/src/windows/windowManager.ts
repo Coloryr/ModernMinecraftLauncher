@@ -1,8 +1,8 @@
 // 窗口管理器：负责窗口打开 / 关闭、单窗口 / 多窗口模式切换
 //
 // 多窗口模式：
-// - Tauri 环境：统一调用 Rust 窗口管理器（src-tauri 的 windows/mod.rs）的
-//   open_window / close_window 命令创建 / 关闭真实窗口（创建/关闭逻辑都在 Rust 侧）；
+// - Tauri 环境：统一调用 Rust 窗口管理器，即 src-tauri 的 windows/mod.rs 里的
+//   open_window / close_window 命令创建 / 关闭真实窗口，逻辑全在 Rust 侧；
 //   命令失败时回退到官方 JS API new WebviewWindow()，再失败回退应用内切换。
 // - 浏览器环境：用新标签页模拟独立窗口
 // 单窗口模式：应用内页面切换（history 同步，可返回）
@@ -26,57 +26,63 @@ export const multiWindow = ref(readString(KEYS.windowMode) !== "Single");
 /**
  * 单窗口模式的返回栈：记着"上一层是谁"，关窗时先回上一层
  *
- * 多窗口模式不需要它（每个窗口是独立窗口，关掉自然露出下面那个）。
+ * 多窗口模式不需要它：每个窗口都是独立窗口，关掉自然露出下面那个。
  * 只记 kind、不持久化——重启后没有可返回的历史。
  */
 const backStack = ref<WindowKind[]>([]);
 
-/** 返回栈上限（防御性：正常导航不会超过几个） */
+/** 返回栈上限，防御性；正常导航不会超过几个 */
 const BACK_STACK_MAX = 16;
 
 /**
- * 打开下载窗口时要直接跳转到的项目（收藏窗口的「下载」用）
+ * 打开下载窗口时要直接跳转到的项目，收藏窗口的「下载」用它
  *
  * 下载整合包 / 下载资源两个窗口都是"按实例取数"的：光有项目还拉不出版本列表，
  * 所以目标窗口拿到这份参数后，等实例就绪再调自己那套 openDetail / openVersions。
  */
 export interface WindowProjectParam {
-  /** 下载源（`ModPackType::to_string()`：curseforge / modrinth） */
+  /** 下载源，取 `ModPackType::to_string()`，即 curseforge / modrinth */
   source: string;
   /** 项目 ID */
   pid: string;
-  /** 资源类型线串（`FileType::to_string()`） */
+  /** 资源类型线串，取 `FileType::to_string()` */
   fileType: string;
+  /** 项目名 */
   name: string;
+  /** 图标地址；项目没有图标时为 null */
   icon: string | null;
+  /** 项目页面地址 */
   url: string;
 }
 
 /**
- * 拖拽导入带进来的路径（主窗口拖入文件 / 文件夹 / 登录快捷方式 → 目标窗口）
+ * 拖拽导入带进来的路径：主窗口拖入文件 / 文件夹 / 登录快捷方式，送到目标窗口
  *
- * `kind` 由后端探测定（`window_probe_drop`）：
+ * `kind` 由后端 `window_probe_drop` 探测定：
  * - `folder` / `archive` → 「添加实例」窗口进对应模式并填好地址；
- * - `shortcut` → 「账户管理」窗口用 `url`（快捷方式里解析出的认证服务器地址）预填外置登录。
+ * - `shortcut` → 「账户管理」窗口用 `url` 预填外置登录，那是快捷方式里解析出的认证服务器地址。
  */
 export interface WindowDropParam {
   /** 拖入项的绝对路径 */
   path: string;
   /** folder / archive / shortcut */
   kind: "folder" | "archive" | "shortcut";
-  /** `kind = shortcut` 时：从快捷方式里解析出的地址 */
+  /** 从快捷方式里解析出的认证服务器地址；仅 `kind` 为 shortcut 时有值 */
   url?: string;
 }
 
 /**
  * 单窗口模式下"本次打开带入的参数"
  *
- * 单窗口既没有新窗口、也没有新 URL（Tauri 下连 pushState 都不做），壳层的 focus 事件更是
+ * 单窗口既没有新窗口、也没有新 URL，Tauri 下连 pushState 都不做，壳层的 focus 事件更是
  * 无从触发，所以目标实例只能这样送达：openWindow 写进来，窗口组件 watch / onActivated 读走。
  */
 export const windowParams = ref<{
+  /** 目标实例 uuid */
   uuid: string | null;
+  /** 要直接打开的项目 */
   project: WindowProjectParam | null;
+  /** 拖入的路径参数 */
   drop: WindowDropParam | null;
 }>({
   uuid: null,
@@ -88,23 +94,23 @@ export const windowParams = ref<{
  * 单窗口模式：下载管理以"悬浮弹窗"出现，而不是把当前页面换掉
  *
  * 它是个工具型窗口——下载在后台跑，用户常常要一边看别的页面一边盯进度，
- * 所以浮在任意页面之上（见 [`openWindow`] 的特例）；有任务时主窗口顶栏另有入口
- * （`components/DownloadTitleIndicator.vue`）。
+ * 所以浮在任意页面之上，见 [`openWindow`] 里的特例；有任务时主窗口顶栏另有入口，
+ * 即 `components/DownloadTitleIndicator.vue`。
  */
 export const downloadPopupOpen = ref(false);
 
-/** 打开下载管理弹窗（单窗口模式） */
+/** 打开下载管理弹窗；只有单窗口模式走这里 */
 export function openDownloadPopup() {
   downloadPopupOpen.value = true;
 }
 
-/** 关闭下载管理弹窗（单窗口模式；任务不受影响，仍在后台跑） */
+/** 关闭下载管理弹窗；任务不受影响，仍在后台跑 */
 export function closeDownloadPopup() {
   downloadPopupOpen.value = false;
 }
 
 /**
- * 单窗口模式：整合包安装进度以"悬浮弹窗"出现（入口是标题栏上的 ModpackTitleIndicator）
+ * 单窗口模式：整合包安装进度以"悬浮弹窗"出现，入口是标题栏上的 ModpackTitleIndicator
  *
  * 与下载管理同一个路子：安装跑在后台，用户可能已经离开"下载整合包"那一页，
  * 所以进度不能只挂在那个页面上。弹窗只影响"看不看得到进度"，关掉它不影响安装。
@@ -116,51 +122,82 @@ export function openModpackPopup() {
   modpackPopupOpen.value = true;
 }
 
-/** 关闭整合包安装进度弹窗（安装照常继续） */
+/** 关闭整合包安装进度弹窗；安装照常继续 */
 export function closeModpackPopup() {
   modpackPopupOpen.value = false;
 }
 
-/** 目标实例 uuid：单窗口取本次 openWindow 带入的参数，多窗口取本窗口 URL 上的参数 */
+/**
+ * 取本次要定位的实例 uuid
+ *
+ * 单窗口取本次 openWindow 带入的参数，多窗口取本窗口 URL 上的参数
+ *
+ * # 返回值
+ *
+ * 没有目标实例时为 null
+ */
 export function targetUuid(): string | null {
   return multiWindow.value ? uuidFromUrl() : windowParams.value.uuid;
 }
 
-/** 本次要直接打开的项目：单窗口取 openWindow 带入的参数，多窗口取本窗口 URL 上的参数 */
+/**
+ * 取本次要直接打开的项目
+ *
+ * 单窗口取 openWindow 带入的参数，多窗口取本窗口 URL 上的参数
+ *
+ * # 返回值
+ *
+ * 没有目标项目时为 null
+ */
 export function targetProject(): WindowProjectParam | null {
   return multiWindow.value ? projectFromUrl() : windowParams.value.project;
 }
 
 /**
- * 本次带入的拖拽路径：单窗口取 openWindow 带入的参数，多窗口取本窗口 URL 上的参数
+ * 取本次带入的拖拽路径
  *
- * 用完要清（见「添加实例」窗口的 consumeDrop）：多窗口模式下 URL 上的参数会一直留着。
+ * 单窗口取 openWindow 带入的参数，多窗口取本窗口 URL 上的参数。用完要清，
+ * 见「添加实例」窗口的 consumeDrop：多窗口模式下 URL 上的参数会一直留着。
+ *
+ * # 返回值
+ *
+ * 没有拖入参数时为 null
  */
 export function targetDrop(): WindowDropParam | null {
   return multiWindow.value ? dropFromUrl() : windowParams.value.drop;
 }
 
+/**
+ * 切换单窗口 / 多窗口模式
+ *
+ * - `v`: true 为多窗口，false 为单窗口
+ *
+ * # 返回值
+ *
+ * 配置落盘的 Promise；紧接着要重启进程的调用方必须等它，否则写请求会随重启丢掉
+ */
 export function setMultiWindow(v: boolean): Promise<void> {
   multiWindow.value = v;
   // 换了模式，之前的返回栈与带入参数都不再成立
   backStack.value = [];
   windowParams.value = { uuid: null, project: null, drop: null };
   writeString(KEYS.windowMode, v ? "Multi" : "Single");
-  // 返回保存的 Promise：要紧接着重启进程的调用方必须等这次写入真的落盘
-  // （重启会立刻刷盘并退出，写请求还在路上就丢了 —— 见 useSettingsUi 的窗口模式切换）
+  // 返回保存的 Promise：要紧接着重启进程的调用方必须等这次写入真的落盘。
+  // 重启会立刻刷盘并退出，写请求还在路上就丢了，见 useSettingsUi 的窗口模式切换
   return saveGuiConfig({ windowMode: v ? "Multi" : "Single" });
 }
 
-/** 是否运行在 Tauri 环境：实现见 lib/util（放那儿是为了不与 lib/storage 形成循环引用） */
+/** 是否运行在 Tauri 环境；实现见 lib/util，放那儿是为了不与 lib/storage 形成循环引用 */
 export { isTauri };
 
 /** 当前窗口标识 */
 export const currentKind = ref<WindowKind>(resolveKind());
 
+/** 认出当前窗口 kind：Tauri 看窗口标签，浏览器看 URL 查询参数 */
 function resolveKind(): WindowKind {
   if (isTauri()) {
     try {
-      // Tauri：用窗口标签识别（mml-settings → settings，main → main）
+      // Tauri：用窗口标签识别，如 mml-settings → settings，main → main
       const label = getCurrentWindow().label;
       const kind = label.replace(/^mml-/, "");
       if (isWindowKind(kind)) return kind;
@@ -173,7 +210,7 @@ function resolveKind(): WindowKind {
   return isWindowKind(k) ? k : "main";
 }
 
-/** 项目参数在 URL 上的键（多窗口模式下新窗口只能从 URL 拿到"要打开哪个项目"） */
+/** 项目参数在 URL 上的键；多窗口模式下新窗口只能从 URL 拿到"要打开哪个项目" */
 const PROJ_PARAMS = {
   source: "psource",
   pid: "ppid",
@@ -183,13 +220,14 @@ const PROJ_PARAMS = {
   url: "purl",
 } as const;
 
-/** 拖拽导入参数在 URL 上的键（同样只有 URL 一条路能送进新窗口） */
+/** 拖拽导入参数在 URL 上的键；同样只有 URL 一条路能送进新窗口 */
 const DROP_PARAMS = {
   path: "dpath",
   kind: "dkind",
   url: "durl",
 } as const;
 
+/** 按 kind 与带入参数拼出目标窗口的 URL；多窗口模式下新窗口靠它取参数 */
 function urlFor(
   kind: WindowKind,
   params?: { uuid?: string; project?: WindowProjectParam; drop?: WindowDropParam },
@@ -238,17 +276,36 @@ function urlFor(
   return url.toString();
 }
 
+/**
+ * 从 URL 读取窗口 kind
+ *
+ * # 返回值
+ *
+ * 没有该参数或认不出时按 main 处理
+ */
 export function kindFromUrl(): WindowKind {
   const k = new URLSearchParams(window.location.search).get(WIN_PARAM);
   return isWindowKind(k) ? k : "main";
 }
 
-/** 从 URL 读取目标实例 uuid（日志窗口等带参窗口用），没有返回 null */
+/**
+ * 从 URL 读取目标实例 uuid
+ *
+ * # 返回值
+ *
+ * 没有该参数时为 null
+ */
 export function uuidFromUrl(): string | null {
   return new URLSearchParams(window.location.search).get(UUID_PARAM);
 }
 
-/** 从 URL 读取"要直接打开的项目"（下载整合包 / 下载资源窗口用），没有返回 null */
+/**
+ * 从 URL 读取"要直接打开的项目"，供下载整合包 / 下载资源窗口用
+ *
+ * # 返回值
+ *
+ * 源 / 项目 ID / 资源类型三项缺一即为 null
+ */
 export function projectFromUrl(): WindowProjectParam | null {
   const q = new URLSearchParams(window.location.search);
   const source = q.get(PROJ_PARAMS.source);
@@ -268,7 +325,11 @@ export function projectFromUrl(): WindowProjectParam | null {
 }
 
 /**
- * 从 URL 读取拖拽导入的路径（主窗口拖拽时开的目标窗口用），没有 / 不合法返回 null
+ * 从 URL 读取拖拽导入的路径，供主窗口拖拽时开的目标窗口用
+ *
+ * # 返回值
+ *
+ * 没有路径参数或 `kind` 不合法时为 null
  */
 export function dropFromUrl(): WindowDropParam | null {
   const q = new URLSearchParams(window.location.search);
@@ -283,8 +344,12 @@ export function dropFromUrl(): WindowDropParam | null {
 /**
  * 把窗口参数里的项目还原成窗口能直接用的项目条目
  *
- * 只有收藏夹存下来的那几项（名字 / 图标 / 网址 / 源 / 项目 ID），其余字段（作者、标签、
- * 截图、下载次数…）留空 —— 两个窗口的"打开项目"只用到 name / image / url / source.pid。
+ * - `p`: 收藏夹存下来的那几项，见 [`WindowProjectParam`]
+ *
+ * # 返回值
+ *
+ * 只有名字 / 图标 / 网址 / 源 / 项目 ID 有值；作者、标签、截图、下载次数这些
+ * 一律留空 —— 两个窗口的"打开项目"只用到 name / image / url / source.pid。
  */
 export function projectParamToItem(p: WindowProjectParam): ProjectItemDto {
   return {
@@ -306,10 +371,13 @@ export function projectParamToItem(p: WindowProjectParam): ProjectItemDto {
   };
 }
 
-/** 打开一个窗口（功能入口等调用）
+/**
+ * 打开一个窗口，功能入口与各处的跳转都走它
  *
- * - `params.uuid`：目标实例 uuid（游戏日志窗口用，定位要查看的实例）
- * - `params.drop`：拖拽导入带进去的路径（主窗口拖入文件 / 文件夹用）
+ * - `kind`: 目标窗口
+ * - `params.uuid`: 目标实例 uuid，供游戏日志窗口定位要查看的实例
+ * - `params.project`: 要直接打开的项目，供下载整合包 / 下载资源窗口用
+ * - `params.drop`: 拖拽导入带进去的路径，主窗口拖入文件 / 文件夹时用
  */
 export function openWindow(
   kind: WindowKind,
@@ -322,7 +390,7 @@ export function openWindow(
       openDownloadPopup();
       return;
     }
-    // 已经停在这个窗口（例如就在日志页又右键了另一个实例）：不压栈，只把新参数送过去
+    // 已经停在这个窗口，例如就在日志页又右键了另一个实例：不压栈，只把新参数送过去
     if (currentKind.value !== kind) {
       backStack.value.push(currentKind.value);
       if (backStack.value.length > BACK_STACK_MAX) backStack.value.shift();
@@ -339,12 +407,12 @@ export function openWindow(
   }
 
   if (isTauri()) {
-    // 新窗口的目标参数（实例 uuid + "要打开哪个项目" + 拖入的路径）只能靠 URL 送达，而 Rust
+    // 新窗口的目标参数只能靠 URL 送达：实例 uuid + "要打开哪个项目" + 拖入的路径。而 Rust
     // 那条命令原来只认 log / export 的 uuid。所以这里把组装好的 query 一起交过去，由它拼进
-    // WebviewUrl —— 建窗仍然走 Rust（几何恢复 / 句柄表 / 窗口模型都在那边）。
+    // WebviewUrl —— 建窗仍然走 Rust，几何恢复 / 句柄表 / 窗口模型都在那边。
     const query = new URL(urlFor(kind, params)).search.replace(/^\?/, "");
     // 带拖入路径的打开：窗口**已经开着**时必须重新加载才拿得到新参数（只聚焦会把参数丢掉），
-    // 所以走 reopen（Rust 侧已存在则 navigate）；其余窗口维持"只聚焦、目标靠事件切换"
+    // 所以走 reopen，Rust 侧已存在则 navigate；其余窗口维持"只聚焦、目标靠事件切换"
     if (params?.drop) {
       commands.windows.reopenWindow(kind, query).catch((e) => {
         console.error("[windowManager] Rust 重开窗口失败，回退 JS API", kind, e);
@@ -355,7 +423,7 @@ export function openWindow(
     // `instance` 只对 log / export 有意义：那是"窗口已开着时推事件切实例"用的
     const eventUuid = kind === "log" || kind === "export" ? (params?.uuid ?? null) : null;
     // 统一走 Rust 窗口管理器：创建 / 聚焦在 src-tauri 的 windows/mod.rs 处理。
-    // open_window 是 async 命令（不在 Windows 主线程创建窗口，避免冻结）。
+    // open_window 是 async 命令，不在 Windows 主线程创建窗口，避免冻结。
     // 命令失败（例如窗口创建被拒）时回退到官方 JS API。
     commands.windows
       .openWindow(kind, eventUuid, query)
@@ -375,7 +443,7 @@ function createViaJs(kind: WindowKind, params?: { uuid?: string; project?: Windo
   const label = `mml-${kind}`;
   WebviewWindow.getByLabel(label).then(async (existing) => {
     if (existing) {
-      // 窗口已存在则聚焦（目标实例靠 game-log / log-focus 事件链路自行同步）
+      // 窗口已存在则聚焦；目标实例靠 game-log / log-focus 事件链路自行同步
       existing.setFocus();
       return;
     }
@@ -400,11 +468,12 @@ function createViaJs(kind: WindowKind, params?: { uuid?: string; project?: Windo
 }
 
 /**
- * 关掉当前窗口：标题栏 ✕ 的动作（真的关窗）
+ * 关掉当前窗口：标题栏 ✕ 的动作，真的关窗
  *
  * - 多窗口模式：关掉当前这个功能窗口
  * - 单窗口模式：整个应用只有主窗口一个真实窗口，等于退出启动器
- *   （"回上一层"是另一回事，走 closeWindow —— 标题栏的 ‹ 箭头与各窗口的"取消"都走它）
+ *
+ * "回上一层"是另一回事，走 closeWindow —— 标题栏的 ‹ 箭头与各窗口的"取消"都走它。
  */
 export function quitWindow() {
   if (!isTauri()) {
@@ -421,20 +490,20 @@ export function quitWindow() {
 }
 
 /**
- * 同一次事件派发内的去重标志（见 [`closeWindow`]）
+ * 同一次事件派发内的去重标志，见 [`closeWindow`]
  *
  * 这是踩过的坑：窗口组件若没声明 `defineEmits`，Vue 会把父级的 `@close` 当 attrs
  * 透传到根组件上，与模板里的 `@close="$emit('close')"` 合并成**两个**处理器 ——
- * 一次"返回"会同步调两遍 closeWindow()：第一遍切回主页（currentKind 变成 main），
+ * 一次"返回"会同步调两遍 closeWindow()：第一遍切回主页，currentKind 变成 main，
  * 第二遍就撞上"在主页 = 关窗口 = 退出应用"，于是点返回直接把程序关了。
  *
- * 用微任务窗口去重：同一次事件派发里的重复调用被丢掉，用户连点两次返回（两个独立任务）
+ * 用微任务窗口去重：同一次事件派发里的重复调用被丢掉；用户连点两次返回是两个独立任务，
  * 仍然照常逐层后退。
  */
 let closing = false;
 
 /**
- * 收起当前页面 / 窗口（各窗口的「取消」按钮、标题栏的 ‹ 箭头触发）
+ * 收起当前页面 / 窗口，由各窗口的「取消」按钮、标题栏的 ‹ 箭头触发
  *
  * - 多窗口模式：每个功能就是一个独立窗口，收起 = 关掉它
  * - 单窗口模式：应用内页面切换，弹返回栈回上一层（没有上一层就回主页面）
@@ -442,7 +511,7 @@ let closing = false;
  * ✕ 不走这里，走 quitWindow：单窗口模式下 ✕ 是真的退出应用，不是退一层
  */
 export function closeWindow() {
-  // 同一次事件里的重复调用直接丢掉（原因见上面 closing 的说明）
+  // 同一次事件里的重复调用直接丢掉，原因见上面 closing 的说明
   if (closing) return;
   closing = true;
   queueMicrotask(() => {
@@ -477,7 +546,7 @@ export function closeWindow() {
   }
 
   if (isTauri()) {
-    // 多窗口：走 Rust 窗口管理器关闭当前真实窗口（kind → 标签映射在 windows/mod.rs）。
+    // 多窗口：走 Rust 窗口管理器关闭当前真实窗口，kind → 标签的映射在 windows/mod.rs。
     // 命令失败时回退到官方 JS API 关闭当前窗口。
     commands.windows.closeWindow(kind).catch((e) => {
       console.error("[windowManager] Rust 关闭窗口失败，回退 JS API", kind, e);
@@ -489,7 +558,7 @@ export function closeWindow() {
   }
 }
 
-/** 单窗口模式的应用内跳转（同步返回栈之外的显示状态与 URL） */
+/** 单窗口模式的应用内跳转；只管显示状态与 URL，不动返回栈 */
 function goTo(kind: WindowKind) {
   currentKind.value = kind;
   // 返回后不再带着上一次的目标实例 / 目标项目 / 拖入路径，避免窗口"记得"不该记的东西

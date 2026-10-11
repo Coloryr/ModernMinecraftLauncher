@@ -1,8 +1,8 @@
-// 设置窗口 · 客户端设置标签（服务器 / MOTD / 登录方式锁定 / 实例锁定 / 自定义主页面）
+// 设置窗口 · 客户端设置标签：服务器 / MOTD / 登录方式锁定 / 实例锁定 / 自定义主页面
 //
 // 这一片基本都是 `gui_config.client`（即改即存，整对象提交），加上两份"外部状态"：
 // 实例列表（锁定下拉的候选，进页面时重拉）与自定义主页面的导入状态。
-// 游戏标题那组虽然显示在这个标签里，但数据属于 `window`（由 useSettingsLaunch 持有）。
+// 游戏标题那组虽然显示在这个标签里，但数据属于 `window`，由 useSettingsLaunch 持有。
 import { computed, ref } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
@@ -19,10 +19,22 @@ import { useSaveState } from "./useSaveState";
 /** 登录方式锁定的候选（复用账户添加类型的文案） */
 const LOGIN_TYPES = ["offline", "microsoft", "littleskin", "selflittleskin", "authlib", "nide8"];
 
-/** 需要服务器信息的类型（外置登录 / 自定义皮肤站 = 服务器地址，统一通行证 = 服务器 ID）；
+/** 需要服务器信息的类型：外置登录 / 自定义皮肤站填服务器地址，统一通行证填服务器 ID；
  *  这些类型可重复添加，条目带「登录模型名字」，添加账户时直接下拉选择 */
 const SERVER_LOCK_TYPES = ["authlib", "selflittleskin", "nide8"];
 
+/**
+ * 客户端设置标签的状态与保存
+ *
+ * # 返回值
+ *
+ * - `client`: `gui_config.client` 的副本，即改即存
+ * - `serverAddr`: 自动进服与 MOTD 共用的服务器地址，可双向绑定
+ * - `loginTypeLabel` / `addLock*` / `lockServerError` / `lockServerPlaceholder`: 登录方式锁定的添加表单
+ * - `lockInstances` / `refreshLockInstances` / `lockMissing` / `onLockInstanceChange`: 实例锁定
+ * - `customHome` / `importingCustomHome` / `customHomeState` / `refreshCustomHome` / `importCustomHome` / `openCustomHomeDir` / `removeCustomHome`: 自定义主页面
+ * - `load` / `applyClient` / `saveState` / `resetGroup`: 加载、落盘与分组级恢复默认
+ */
 export function useSettingsClient() {
   const client = ref<ClientConfig>({ ...defaultConfig().client });
   const { state, track } = useSaveState();
@@ -45,7 +57,7 @@ export function useSettingsClient() {
     }
   }
 
-  // ---------- 服务器地址（自动进服与 MOTD 共用一个地址） ----------
+  // ---------- 服务器地址：自动进服与 MOTD 共用 ----------
 
   const serverAddr = computed({
     get: () => client.value.motdServer,
@@ -74,7 +86,7 @@ export function useSettingsClient() {
     ),
   );
 
-  /** 登录类型标签（key 用 accountStore 的标准映射，别手拼） */
+  /** 登录类型标签：key 走 accountStore 的标准映射，别手拼 */
   function loginTypeLabel(ty: string): string {
     return t(typeLabelKey(ty));
   }
@@ -88,6 +100,7 @@ export function useSettingsClient() {
         : t("winSettings.lockAuthlibServerHint"),
   );
 
+  /** 校验服务器输入：通过则清空错误，否则把原因写进 `lockServerError` */
   function validateLockServer(): boolean {
     if (!addLockHasServer.value) {
       lockServerError.value = "";
@@ -135,7 +148,7 @@ export function useSettingsClient() {
 
   const lockInstances = ref<InstanceInfoDto[]>([]);
 
-  /** 拉取实例列表（进客户端设置页时刷新，避免锁定的实例已被删掉） */
+  /** 拉取实例列表；进客户端设置页时刷新，避免锁定的实例已被删掉 */
   async function refreshLockInstances() {
     lockInstances.value = await commands.main.getInstances().catch(() => []);
   }
@@ -155,9 +168,9 @@ export function useSettingsClient() {
 
   // ---------- 自定义主页面 ----------
 
-  /** 已导入情况（未导入 / 后端不可用都是 null） */
+  /** 已导入情况；未导入或后端不可用时为 null */
   const customHome = ref<CustomHomeInfoDto | null>(null);
-  /** 导入进行中（导入只是校验 + 复制压缩包，通常瞬间完成） */
+  /** 导入进行中；导入只是校验加复制压缩包，通常瞬间完成 */
   const importingCustomHome = ref(false);
 
   /** 状态行：未导入 / 已保存压缩包（n 个文件）/ 启用中 */
@@ -174,7 +187,7 @@ export function useSettingsClient() {
     customHome.value = await commands.customHome.status().catch(() => null);
   }
 
-  /** 选一个 zip 导入（只保存压缩包，页面请求时从包里现读，不落盘解压） */
+  /** 选一个 zip 导入；只保存压缩包，页面请求时从包里现读，不落盘解压 */
   async function importCustomHome() {
     const { open } = await import("@tauri-apps/plugin-dialog");
     const picked = await open({
@@ -202,7 +215,7 @@ export function useSettingsClient() {
     }
   }
 
-  /** 删除已保存的包（配置里的启用开关不动，主窗口会自动回落到内置主页） */
+  /** 删除已保存的包；配置里的启用开关不动，主窗口会自动回落到内置主页 */
   async function removeCustomHome() {
     try {
       await commands.customHome.remove();
@@ -214,7 +227,7 @@ export function useSettingsClient() {
 
   // ---------- 恢复默认 ----------
 
-  /** 这一片全部属于 gui_config.client，默认值取前端那份镜像（guiConfig.defaultConfig） */
+  /** 这一片全部属于 gui_config.client，默认值取前端镜像 guiConfig.defaultConfig */
 
   async function resetGroup(id: string): Promise<boolean> {
     const d = defaultConfig().client;

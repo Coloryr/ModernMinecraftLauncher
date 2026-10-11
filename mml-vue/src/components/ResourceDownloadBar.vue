@@ -11,19 +11,21 @@ import type { ResourceStatusDto } from "../lib/bindings";
 import { t } from "../lib/i18n";
 
 const props = defineProps<{
+  /** 当前资源下载状态，含各项目的进度 */
   status: ResourceStatusDto;
 }>();
 
 /** 按下载项目分组的进度 */
 const groups = computed(() => resourceGroups(props.status.tasks));
 
-/** 总进度 = 还没下完的各项目进度的均值（已结束的不参与平均，与原口径一致） */
+/** 总进度 = 还没下完的各项目进度的均值；已结束的不参与平均，与原口径一致 */
 const percent = computed(() => {
   const active = groups.value.filter((group) => group.finished < group.total);
   if (!active.length) return 100;
   return active.reduce((acc, group) => acc + group.percent, 0) / active.length;
 });
 
+/** 终态标签；未结束时返回 `null` */
 function stateTag(group: ResourceGroupProgress): string | null {
   if (group.done) return t("addResource.bar.done");
   if (group.failed) return t("addResource.bar.failed");

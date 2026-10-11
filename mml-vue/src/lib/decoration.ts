@@ -9,8 +9,8 @@
 // 插件的做法是：在最大化按钮的位置放一个**原生子窗口**，由它把该消息答成
 // HTMAXBUTTON。而这个子窗口的**位置**，原本是插件用它自己那套按钮量出来的 ——
 // 想保留我们自己的按钮外观就撞上了两难：
-//   - 不给它按钮 → 它量不出矩形 → 报错 → 原生 frame 摘不掉（系统标题栏、
-//     插件按钮、我们的按钮三套并存，实测就是这样）；
+//   - 不给它按钮 → 它量不出矩形 → 报错 → 原生 frame 摘不掉，系统标题栏、
+//     插件按钮、我们的按钮三套并存，实测就是这样；
 //   - 用它按钮 → 就得接受它的外观。
 //
 // 解法：给插件的本地 vendor 版加了一个「外部控件提供者」接口
@@ -50,7 +50,7 @@ interface SnapRect {
 /** 声明的外部提供者接口 */
 interface DecorationRuntime {
   setExternalControlProvider?: (provider: (() => SnapRect | null) | null) => void;
-  /** 插件转发的热区悬停变化（鼠标事件被原生命中区吃掉，DOM 收不到） */
+  /** 插件转发的热区悬停变化：鼠标事件被原生命中区吃掉，DOM 收不到 */
   externalControlHoverListener?: ((hovered: boolean) => void) | null;
   /** 插件转发的热区点击 */
   externalControlClickListener?: (() => void) | null;
@@ -68,13 +68,13 @@ function decorationRuntime(): DecorationRuntime | null {
  * 所以窗口缩放 / 全屏切换 / 按钮重挂载后都会自动跟上，不需要手动失效。
  *
  * 用选择器现查、而不是绑定某个元素引用：主窗口启动时有一段启动画面
- * （SplashScreen），标题栏要等启动完成才渲染出来；绑引用的话注册那一刻还拿不到按钮。
+ * SplashScreen，标题栏要等启动完成才渲染出来；绑引用的话注册那一刻还拿不到按钮。
  *
  * - `root`: 在这些元素范围内查（一般是主窗口根节点）
  *
  * # 返回值
  *
- * 返回清理函数，组件卸载时调用
+ * 清理函数，组件卸载时调用
  */
 export function registerSnapTarget(root: HTMLElement | null): () => void {
   const runtime = decorationRuntime();
@@ -94,7 +94,7 @@ export function registerSnapTarget(root: HTMLElement | null): () => void {
 
   // 悬停态：原生命中区盖在 webview 上、吃掉了鼠标消息，我们自己的按钮
   // **收不到 DOM mouseenter**，所以 :hover 样式不会亮。改为听插件转发的事件，
-  // 手动给按钮打一个标记类，由样式按这个类表现悬停（见 WindowControls.vue）。
+  // 手动给按钮打一个标记类，由样式按这个类表现悬停，见 WindowControls.vue
   runtime.externalControlHoverListener = (hovered: boolean) => {
     const btn = findMaximizeBtn(root);
     if (!btn) return;
@@ -176,13 +176,13 @@ function measure(root: HTMLElement): SnapRect | null {
  *
  * **激活必须在按钮就绪之后**：插件在激活流程里就要量这个矩形，量不到会报
  * `kind: "disabled"`，那次投递会被当作"没有贴靠热区"而生效 —— 之后再补报
- * 也改不回那次已经完成的激活（实测：原生 frame 没被摘掉，系统标题栏与自绘按钮并存）。
+ * 也改不回那次已经完成的激活。实测原生 frame 没被摘掉，系统标题栏与自绘按钮并存。
  *
  * 主窗口启动时先显示启动画面，标题栏（`.window-controls` 在 MainTopbar 里）
  * 要等核心 load 完成、切到主界面才渲染，所以必须等。
  *
  * - `root`: 在这些元素范围内查
- * - `timeoutMs`: 超时上限；到点还没出现就放弃等待（让激活带着无热区继续，至少能起界面）
+ * - `timeoutMs`: 超时上限；到点还没出现就放弃等待，让激活带着无热区继续，至少能起界面
  *
  * # 返回值
  *
@@ -229,8 +229,8 @@ export function waitForSnapTarget(root: HTMLElement | null, timeoutMs = 15000): 
       observer = new ResizeObserver(check);
       observer.observe(root);
     }
-    // ResizeObserver 在"子树整体替换但 root 尺寸没变"时不会回调（启动画面 → 主界面
-    // 恰好可能如此），用轮询兜底；两者任一先到即可
+    // ResizeObserver 在"子树整体替换但 root 尺寸没变"时不会回调，启动画面 → 主界面
+    // 恰好可能如此，用轮询兜底；两者任一先到即可
     timer = window.setInterval(check, 100);
   });
 }

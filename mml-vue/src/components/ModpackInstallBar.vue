@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 整合包安装进度条（多任务）：总进度条 + 任务数，每个任务的详情
-// （阶段 / 主子进度 / 取消按钮）默认可以点击标题行折叠；终态任务带状态标签，可一键清除。
+// 阶段 / 主子进度 / 取消按钮，默认可以点击标题行折叠；终态任务带状态标签，可一键清除。
 // 下载整合包窗口常显；右下角的进度弹窗与多窗口模式的主窗口也用它（由调用方 v-if 控制）。
 import { computed, ref } from "vue";
 import CollapsePanel from "./ui/CollapsePanel.vue";
@@ -11,6 +11,7 @@ import type { ModPackStatusDto, ModPackTaskDto } from "../lib/bindings";
 
 const props = withDefaults(
   defineProps<{
+    /** 整合包安装任务状态 */
     status: ModPackStatusDto;
     /** 任务详情是否可以折叠。默认可以（页面里为了省地方）；
      *  弹窗形态传 false —— 那里本来就是点开来看详情的，再折一层等于白点一次 */
@@ -47,6 +48,7 @@ const percent = computed(() => {
   return sum / running.value.length;
 });
 
+/** 任务是否还在跑 */
 function isRunning(task: ModPackTaskDto): boolean {
   return !task.done && !task.failed && !task.cancelled;
 }
@@ -84,7 +86,7 @@ async function clearDone() {
 <template>
   <div class="mp-bar" :class="{ 'fill-h': fillHeight }">
     <!-- 总览：标题（任务数）+ 展开开关；可折叠时点击整行切换 -->
-    <!-- （"清除已完成"在任务列表底部，见下面的 .mp-footer） -->
+    <!-- "清除已完成"在任务列表底部，见下面的 .mp-footer -->
     <div class="mp-bar-head" :class="{ 'no-toggle': !collapsible }" @click="collapsible && (open = !open)">
       <span class="mp-bar-title">{{ headText }}</span>
       <span v-if="collapsible" class="mp-bar-chevron" :class="{ up: open }" aria-hidden="true">
@@ -95,12 +97,12 @@ async function clearDone() {
       </span>
     </div>
     <!-- 总进度条：只在真有任务在跑时画。全结束时它是条满格蓝杠，什么信息都没表达，
-         还占着标题下面一整行（配合"清除已完成"的 ✕，整块看着像还在下载） -->
+         还占着标题下面一整行，配合"清除已完成"的 ✕ 整块看着像还在下载 -->
     <div v-if="running.length" class="progress-track">
       <div class="progress-fill" :style="{ width: percent + '%' }" />
     </div>
 
-    <!-- 展开的任务详情（fillHeight 时滚动落在 CollapsePanel 内层，见 .mp-bar.fill-h） -->
+    <!-- 展开的任务详情；fillHeight 时滚动落在 CollapsePanel 内层，见 .mp-bar.fill-h -->
     <CollapsePanel :open="open">
       <div class="mp-task-list">
         <div v-for="task in status.tasks" :key="task.uuid" class="mp-task">
@@ -119,8 +121,9 @@ async function clearDone() {
           <div v-else-if="task.failed && task.error" class="mp-task-error">
             {{ tErr(task.error) }}
           </div>
-          <!-- 任务进度：失败 / 取消的任务不再画条（原来兜底给 100%，失败的任务下面就挂着一条满格的灰条，
-               看着像"下载完了"，与旁边的"失败"标签自相矛盾）。已完成才走 100% -->
+          <!-- 任务进度：失败 / 取消的任务不再画条。原来兜底给 100%，失败的任务下面就
+               挂着一条满格的灰条，看着像"下载完了"，与旁边的"失败"标签自相矛盾。
+               已完成才走 100% -->
           <div v-if="!task.failed && !task.cancelled" class="progress-track sub">
             <div class="progress-fill" :style="{ width: taskProgress(task) + '%' }" />
           </div>
@@ -156,16 +159,16 @@ async function clearDone() {
   border: 1px solid var(--border);
 }
 
-/* 弹窗形态（外层 BaseModal 锁了高度，内容区是 flex 列）：
+/* 弹窗形态：外层 BaseModal 锁了高度，内容区是 flex 列。
    本卡片撑满剩余高度，任务多了由任务区自己滚，不再把弹窗顶高。
-   高度由弹窗那侧传 fillHeight 打开，另两处（页面里）保持自适应 */
+   高度由弹窗那侧传 fillHeight 打开，页面里那两处保持自适应 */
 .mp-bar.fill-h {
   flex: 1;
   min-height: 0;
 }
 
-/* 滚动落在 CollapsePanel 的内层（外层是 grid，靠 grid-template-rows 做展开过渡，
-   自身不滚）：展开状态下 1fr 行撑满，内层 overflow 出来就是滚动条 */
+/* 滚动落在 CollapsePanel 的内层：外层是 grid，靠 grid-template-rows 做展开过渡、
+   自身不滚。展开状态下 1fr 行撑满，内层 overflow 出来就是滚动条 */
 .mp-bar.fill-h :deep(.collapse) {
   flex: 1;
   min-height: 0;
@@ -229,7 +232,7 @@ async function clearDone() {
   border-color: var(--accent);
 }
 
-/* 展开指示：用 SVG 画的箭头（原来是个 12px 的字符「▾」—— 太小，粗细还随字体变形） */
+/* 展开指示：用 SVG 画的箭头。原来是 12px 的字符「▾」，太小且粗细随字体变形 */
 .mp-bar-chevron {
   display: flex;
   align-items: center;

@@ -116,7 +116,7 @@ pub fn scan_jar<P: AsRef<Path>>(path: P) -> Result<JarScanResult, Box<dyn std::e
 
         if let Some(class_info) = scan_class_for_annotations(&class_bytes)? {
             if let Some(mut mod_info) = class_info.mod_info {
-                // @SideOnly 优先（Forge 原生机制）
+                // @SideOnly 优先，这是 Forge 的原生机制
                 if class_info.side != LoadSideType::Unknown {
                     mod_info.side = class_info.side;
                 }
@@ -197,7 +197,7 @@ fn scan_class_for_annotations(
         }
     }
 
-    // 扫描类属性（包括类级别的 @Mod 和 @SideOnly）
+    // 扫描类属性，含类级别的 @Mod 与 @SideOnly
     if let Some(info) = scan_class_attributes(bytes, &mut offset, &cp)? {
         if class_side == LoadSideType::Unknown {
             class_side = info.side;
@@ -287,8 +287,6 @@ fn from_modified_utf8(data: &[u8]) -> Result<String, Box<dyn std::error::Error>>
 
 /// 解析常量池，返回按常量池索引直接访问的 UTF8 字符串数组
 ///
-/// # 参数
-///
 /// - `bytes`: class 文件字节流
 ///
 /// # 返回值
@@ -356,10 +354,8 @@ fn parse_constant_pool(bytes: &[u8]) -> Result<(ConstantPool, usize), Box<dyn st
 
 /// 扫描字段
 ///
-/// # 参数
-///
 /// - `bytes`: class 文件字节流
-/// - `offset`: 当前读取偏移（扫描后推进到字段区末尾）
+/// - `offset`: 当前读取偏移，扫描后推进到字段区末尾
 /// - `cp`: 常量池
 ///
 /// # 返回值
@@ -404,10 +400,8 @@ fn scan_fields(
 
 /// 扫描方法
 ///
-/// # 参数
-///
 /// - `bytes`: class 文件字节流
-/// - `offset`: 当前读取偏移（扫描后推进到方法区末尾）
+/// - `offset`: 当前读取偏移，扫描后推进到方法区末尾
 /// - `cp`: 常量池
 ///
 /// # 返回值
@@ -452,10 +446,8 @@ fn scan_methods(
 
 /// 扫描类属性
 ///
-/// # 参数
-///
 /// - `bytes`: class 文件字节流
-/// - `offset`: 当前读取偏移（扫描后推进到属性区末尾）
+/// - `offset`: 当前读取偏移，扫描后推进到属性区末尾
 /// - `cp`: 常量池
 ///
 /// # 返回值
@@ -494,10 +486,8 @@ fn scan_class_attributes(
 
 /// 处理单个属性
 ///
-/// # 参数
-///
 /// - `bytes`: class 文件字节流
-/// - `offset`: 当前读取偏移（处理后推进到该属性末尾）
+/// - `offset`: 当前读取偏移，处理后推进到该属性末尾
 /// - `cp`: 常量池
 ///
 /// # 返回值
@@ -537,8 +527,6 @@ fn process_attribute(
 }
 
 /// 检查注解
-///
-/// # 参数
 ///
 /// - `data`: 注解属性数据
 /// - `cp`: 常量池
@@ -599,10 +587,8 @@ fn check_annotations(
 
 /// 跳过注解的 num_pairs 和所有元素对
 ///
-/// # 参数
-///
 /// - `data`: 注解属性数据
-/// - `offset`: 当前读取偏移（跳过后推进到末尾）
+/// - `offset`: 当前读取偏移，跳过后推进到末尾
 ///
 /// # 返回值
 ///
@@ -637,10 +623,8 @@ fn skip_annotation_pairs(
 
 /// 解析 @SideOnly 注解
 ///
-/// # 参数
-///
 /// - `data`: 注解属性数据
-/// - `offset`: 当前读取偏移（解析后推进到注解末尾）
+/// - `offset`: 当前读取偏移，解析后推进到注解末尾
 /// - `cp`: 常量池
 ///
 /// # 返回值
@@ -693,10 +677,8 @@ fn parse_side_only(
 
 /// 解析 @Mod 注解
 ///
-/// # 参数
-///
 /// - `data`: 注解属性数据
-/// - `offset`: 当前读取偏移（解析后推进到注解末尾）
+/// - `offset`: 当前读取偏移，解析后推进到注解末尾
 /// - `cp`: 常量池
 ///
 /// # 返回值
@@ -783,10 +765,8 @@ fn parse_mod_annotation(
 
 /// 跳过注解值
 ///
-/// # 参数
-///
 /// - `data`: 注解属性数据
-/// - `offset`: 当前读取偏移（跳过后推进到值末尾）
+/// - `offset`: 当前读取偏移，跳过后推进到值末尾
 /// - `tag`: 值类型标记
 ///
 /// # 返回值
@@ -842,8 +822,6 @@ fn skip_annotation_value(
 
 /// 检查参数注解
 ///
-/// # 参数
-///
 /// - `data`: 注解属性数据
 /// - `cp`: 常量池
 ///
@@ -891,9 +869,7 @@ fn check_parameter_annotations(
     Ok(None)
 }
 
-/// 读取 u16（大端）
-///
-/// # 参数
+/// 读取 u16，大端序
 ///
 /// - `bytes`: 字节流
 /// - `offset`: 读取偏移
@@ -908,9 +884,7 @@ fn read_u16(bytes: &[u8], offset: usize) -> Result<u16, Box<dyn std::error::Erro
     Ok(u16::from_be_bytes([bytes[offset], bytes[offset + 1]]))
 }
 
-/// 读取 u32（大端）
-///
-/// # 参数
+/// 读取 u32，大端序
 ///
 /// - `bytes`: 字节流
 /// - `offset`: 读取偏移

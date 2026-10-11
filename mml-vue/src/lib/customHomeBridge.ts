@@ -55,13 +55,18 @@ interface BridgeRequest {
 /**
  * 给一个自定义主页面的 iframe 挂上桥接
  *
- * 返回解绑函数（组件卸载时调用：移除监听、清掉攒批、取消全部事件订阅）。
  * 只认 `event.source === iframe.contentWindow` 且带协议标记的消息，其余一律忽略。
+ *
+ * - `iframe`: 目标 iframe
+ *
+ * # 返回值
+ *
+ * 解绑函数，组件卸载时调用：移除监听、清掉攒批、取消全部事件订阅
  */
 export function attachCustomHomeBridge(iframe: HTMLIFrameElement): () => void {
   /** 订阅 id → 事件名 */
   const subscriptions = new Map<number, string>();
-  /** 事件名 → 已订阅的 id 集合（同一事件多个 id 订阅时只 listen 一次，多路分发） */
+  /** 事件名 → 已订阅的 id 集合：同一事件多个 id 订阅时只 listen 一次，多路分发 */
   const byEvent = new Map<string, Set<number>>();
   /** 事件名 → 已就绪的底层 listen 取消函数 */
   const unlistens = new Map<string, UnlistenFn>();
@@ -72,7 +77,7 @@ export function attachCustomHomeBridge(iframe: HTMLIFrameElement): () => void {
   let queue: Array<{ id: number; event: string; payload: unknown }> = [];
   let flushTimer: number | null = null;
   let disposed = false;
-  /** 是否已经完成握手（iframe 的桥接脚本会一直重复发 ready，直到收到应答） */
+  /** 是否已经完成握手：iframe 的桥接脚本会一直重复发 ready，直到收到应答 */
   let handshaken = false;
 
   /** 回发到 iframe（opaque origin 拿不到确切 origin，只能 targetOrigin "*"） */
@@ -166,8 +171,8 @@ export function attachCustomHomeBridge(iframe: HTMLIFrameElement): () => void {
     if (!data || typeof data !== "object" || data.__mml !== PROTOCOL) return;
 
     // 握手：回一条 ready（带当前主题），iframe 据此 resolve window.mml.ready 并应用主题。
-    // iframe 侧在收到应答前会每 100ms 重发一次 ready，所以这里只管每次都回，不去重
-    // （重发是它发现自己没收到应答时的重试，压制它会让页面一直卡在握手前）
+    // iframe 侧在收到应答前会每 100ms 重发一次 ready，所以这里只管每次都回，不去重。
+    // 重发是它发现自己没收到应答时的重试，压制它会让页面一直卡在握手前
     if (data.type === "ready") {
       handshaken = true;
       post({ type: "ready", theme: resolvedTheme() });

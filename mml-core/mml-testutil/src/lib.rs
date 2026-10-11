@@ -1,16 +1,16 @@
 //! 测试专用工具：把临时目录统一放到仓库的 `target/temp` 下
 //!
-//! **为什么不用 `std::env::temp_dir()`**（系统 `%TEMP%` / `/tmp`）：
-//! - 项目约定就是"临时文件放 `target/temp`"（见 AGENTS.md §6 / §11），不放系统盘 ——
+//! **为什么不用 `std::env::temp_dir()`**，即系统 `%TEMP%` / `/tmp`：
+//! - 项目约定就是"临时文件放 `target/temp`"，见 AGENTS.md §6 / §11，不放系统盘 ——
 //!   系统临时目录会被清理，测试留下的样本下次就找不到了；
-//! - 测试产物散在 `%TEMP%` 里排查时根本找不到（一个用例一个随机名）；
+//! - 测试产物散在 `%TEMP%` 里，一个用例一个随机名，排查时根本找不到；
 //! - `target/` 已在 `.gitignore` 里，放这儿天然不会被误提交。
 //!
 //! **为什么单开一个 crate**：本仓没有"所有 crate 都依赖"的那个内核 crate
-//! （`mml-log` / `mml-names` / `mml-nbt` / `mml-skin*` 都不依赖 `mml-base`），
+//! `mml-log` / `mml-names` / `mml-nbt` / `mml-skin*` 都不依赖 `mml-base`，
 //! 而"仓库根在哪"这件事必须只有一份实现 —— 各处自己拼 `CARGO_MANIFEST_DIR/../..`
 //! 迟早写歪，且改目录结构时要满仓找。所以用一个零依赖的小 crate，各 crate 按
-//! `[dev-dependencies]` 引入（只进测试，不进正式产物）。
+//! `[dev-dependencies]` 引入，只进测试，不进正式产物。
 
 use std::path::{Path, PathBuf};
 
@@ -36,7 +36,7 @@ pub fn temp_dir() -> PathBuf {
     repo_root().join("target").join("temp")
 }
 
-/// 测试临时目录下的一个路径（目录名 / 文件名由调用方给）
+/// 测试临时目录下的一个路径，目录名 / 文件名由调用方给
 ///
 /// 一般用法：`mml_testutil::temp_path(format!("mml-xxx-{}", Uuid::new_v4()))`
 pub fn temp_path(name: impl AsRef<Path>) -> PathBuf {
@@ -47,7 +47,7 @@ pub fn temp_path(name: impl AsRef<Path>) -> PathBuf {
 mod tests {
     use super::*;
 
-    /// 临时目录必须落在仓库的 `target/temp` 下（这是本 crate 存在的唯一理由）
+    /// 临时目录必须落在仓库的 `target/temp` 下，这是本 crate 存在的唯一理由
     #[test]
     fn temp_dir_is_under_target() {
         let dir = temp_dir();
@@ -60,13 +60,14 @@ mod tests {
             !dir.to_string_lossy().contains(".."),
             "路径不该含 `..`：{dir:?}"
         );
-        // 仓库根必须真的存在（parent() 走错层级时这条会挂）
+        // 仓库根必须真的存在，parent() 走错层级时这条会挂
         assert!(
             dir.parent().is_some_and(|p| p.is_dir()),
             "target 目录应存在"
         );
     }
 
+    /// temp_path 拼接在 temp_dir 之下
     #[test]
     fn temp_path_joins_under_temp_dir() {
         let p = temp_path("mml-some-case");

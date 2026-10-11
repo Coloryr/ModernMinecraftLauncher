@@ -375,7 +375,7 @@ select.sel-file-version {
   transform: translateY(14px);
 }
 
-/* 面板头部：固定在面板顶部，用分隔线与内容区分开（返回键在标题栏，这里不再是第一个控件）。
+/* 面板头部：固定在面板顶部，用分隔线与内容区分开；返回键在标题栏，这里不再是第一个控件。
    左右内边距与其它窗口的卡片边缘同值（26px）——详情是整页覆盖，这就是它那一层的边距 */
 .detail-head {
   display: flex;
@@ -513,7 +513,7 @@ select.sel-file-version {
   padding: 16px 26px 22px;
 }
 
-/* 内容区容器（详情不再套卡片，这里只作分区容器） */
+/* 内容区容器：详情不再套卡片，这里只作分区容器 */
 .detail-card {
   padding: 0;
 }
@@ -581,7 +581,7 @@ select.sel-file-version {
 
 /* 版本筛选下拉：比列表页的筛选项小一号。
    高度要跟着一起缩小：--field-h(42) 兜底时多出来的空间在 <select> 里会全沉到底部
-   （不变量见 forms.css：高度 = 行高 20 + 上下内边距 5×2 + 边框 1×2 = 32） */
+   不变量见 forms.css：高度 = 行高 20 + 上下内边距 5×2 + 边框 1×2 = 32 */
 .sel-file-version {
   max-width: 150px;
   height: 32px;

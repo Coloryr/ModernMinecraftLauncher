@@ -1,4 +1,4 @@
-//! Zip 压缩/解压实现（基于 `zip` crate）
+//! Zip 压缩/解压实现，基于 `zip` crate
 
 use std::{
     fs,
@@ -18,26 +18,30 @@ use crate::archives::{
     self, ArchiveEntryInfo, ArchiveHandle, ArchiveProcess, BaseArchiveGui, IBaseArchiveGui,
 };
 
-/// 保持打开的 Zip 读取句柄（缓存 [`ZipArchive`]，中央目录只解析一次）。
+/// 保持打开的 Zip 读取句柄，缓存 [`ZipArchive`]，中央目录只解析一次
 ///
-/// 同时提供静态的压缩/解压批处理入口。
+/// 同时提供静态的压缩/解压批处理入口
 pub(crate) struct ZipReader {
-    /// 读写的文件句柄（追加/重建用）
+    /// 读写的文件句柄，追加与重建时克隆使用
     file: fs::File,
-    /// 缓存的 [`ZipArchive`]（由 `file` 克隆构建）
+    /// 缓存的中央目录句柄，由 `file` 克隆构建
     zip: ZipArchive<fs::File>,
-    /// 压缩包磁盘路径
+    /// 压缩包在磁盘上的路径
     path: PathBuf,
 }
 
 impl ZipReader {
-    /// 压缩目录为 zip 文件。
+    /// 压缩目录为 zip 文件
     ///
-    /// * `archive_file` — 压缩包输出路径。
-    /// * `pack_dir` — 需要打包的源目录。
-    /// * `root_path` — 相对根路径，设置后文件在包内的路径相对于此。
-    /// * `filter` — 可选的排除子串列表，匹配的文件将被跳过。
-    /// * `gui` — 可选的进度回调。
+    /// - `archive_file`: 压缩包输出路径
+    /// - `pack_dir`: 需要打包的源目录
+    /// - `root_path`: 相对根路径，设置后文件在包内的路径相对于此
+    /// - `filter`: 可选的排除子串列表，匹配的文件将被跳过
+    /// - `gui`: 可选的进度回调
+    ///
+    /// # 返回值
+    ///
+    /// 写入失败时返回相应错误
     pub(crate) fn compress(
         archive_file: &Path,
         pack_dir: &Path,
@@ -53,11 +57,15 @@ impl ZipReader {
         Self::zip(&process, archive_file, pack_dir, root_path, filter)
     }
 
-    /// 解压 zip 文件到指定目录。
+    /// 解压 zip 文件到指定目录
     ///
-    /// * `archive_file` — 压缩包文件路径。
-    /// * `output_dir` — 解压输出目录。
-    /// * `gui` — 可选的进度回调。
+    /// - `archive_file`: 压缩包文件路径
+    /// - `output_dir`: 解压输出目录
+    /// - `gui`: 可选的进度回调
+    ///
+    /// # 返回值
+    ///
+    /// 解压失败时返回相应错误
     pub(crate) fn decompress(
         archive_file: &Path,
         output_dir: &Path,
@@ -67,13 +75,17 @@ impl ZipReader {
         Self::unzip(&process, archive_file, output_dir)
     }
 
-    /// 压缩实现（带进度）。
+    /// 压缩实现，逐条目写入并推进进度
     ///
-    /// * `process` — 进度追踪器。
-    /// * `archive_file` — 压缩包输出路径。
-    /// * `pack_dir` — 需要打包的源目录。
-    /// * `root_path` — 相对根路径，设置后文件在包内的路径相对于此。
-    /// * `filter` — 可选的排除子串列表，匹配的文件将被跳过。
+    /// - `process`: 进度追踪器
+    /// - `archive_file`: 压缩包输出路径
+    /// - `pack_dir`: 需要打包的源目录
+    /// - `root_path`: 相对根路径，设置后文件在包内的路径相对于此
+    /// - `filter`: 可选的排除子串列表，匹配的文件将被跳过
+    ///
+    /// # 返回值
+    ///
+    /// 写入失败时返回相应错误
     fn zip(
         process: &ArchiveProcess,
         archive_file: &Path,
@@ -138,11 +150,15 @@ impl ZipReader {
         Ok(())
     }
 
-    /// 解压实现（带进度）。
+    /// 解压实现，逐条目落盘并推进进度
     ///
-    /// * `process` — 进度追踪器。
-    /// * `archive_file` — 压缩包文件路径。
-    /// * `output_dir` — 解压输出目录。
+    /// - `process`: 进度追踪器
+    /// - `archive_file`: 压缩包文件路径
+    /// - `output_dir`: 解压输出目录
+    ///
+    /// # 返回值
+    ///
+    /// 解压失败时返回相应错误
     fn unzip(process: &ArchiveProcess, archive_file: &Path, output_dir: &Path) -> CoreResult<()> {
         let file = path_helper::open_read(archive_file)?;
         let mut archive = ZipArchive::new(file).map_err(|err| {
@@ -161,7 +177,7 @@ impl ZipReader {
             })
         })?;
 
-        // 收集需要恢复权限的路径（Unix 下需要先设置为可写，最后再改回只读）
+        // 收集需要恢复权限的路径，Unix 下先设为可写，最后再改回只读
         #[cfg(unix)]
         let mut unix_modes = Vec::new();
 
@@ -186,7 +202,7 @@ impl ZipReader {
 
             if file.is_dir() {
                 path_helper::create_dir_all(&outpath)?;
-                // Unix 下目录需要保持可写，直到所有子文件提取完成（最后统一恢复权限）
+                // Unix 下目录要保持可写直到子文件提取完，最后统一恢复权限
                 #[cfg(unix)]
                 if let Some(mode) = file.unix_mode() {
                     // 临时设为 0o700 保证可写
@@ -263,7 +279,7 @@ impl ZipReader {
                 })?;
             }
 
-            // 保留修改时间（需要 chrono feature）
+            // 保留修改时间，需要 chrono feature
             if let Some(last_modified) = file.last_modified() {
                 if let Some(system_time) = datetime_to_systemtime(&last_modified) {
                     outfile.set_modified(system_time).map_err(|err| {
@@ -276,7 +292,7 @@ impl ZipReader {
             }
         }
 
-        // 恢复所有目录的最终权限（Unix 下最后才设为只读）
+        // 恢复所有目录的最终权限，Unix 下最后才设为只读
         #[cfg(unix)]
         for (path, mode) in unix_modes {
             use crate::archives::set_perms;
@@ -294,10 +310,14 @@ impl ZipReader {
         Ok(())
     }
 
-    /// 打开 zip 文件并缓存中央目录。
+    /// 打开 zip 文件并缓存中央目录
     ///
-    /// * `file` — 已打开的 zip 文件句柄。
-    /// * `path` — 压缩包磁盘路径。
+    /// - `file`: 已打开的 zip 文件句柄
+    /// - `path`: 压缩包磁盘路径
+    ///
+    /// # 返回值
+    ///
+    /// 中央目录解析失败时返回相应错误
     pub(crate) fn new(file: fs::File, path: PathBuf) -> CoreResult<Self> {
         let zip = ZipArchive::new(file.try_clone().map_err(|err| {
             ErrorType::FileSystemError(FileSystemErrorData {
@@ -314,7 +334,11 @@ impl ZipReader {
         Ok(Self { file, zip, path })
     }
 
-    /// 追加后用持有的读写句柄重新解析中央目录。
+    /// 追加后用持有的读写句柄重新解析中央目录
+    ///
+    /// # 返回值
+    ///
+    /// 重新解析失败时返回相应错误
     fn reload(&mut self) -> CoreResult<()> {
         let mut file = self.file.try_clone().map_err(|err| {
             ErrorType::FileSystemError(FileSystemErrorData {
@@ -339,6 +363,7 @@ impl ZipReader {
 }
 
 impl ArchiveHandle for ZipReader {
+    /// 逐条读取中央目录，得到条目名、是否目录与未压缩大小
     fn read_entries(&mut self) -> CoreResult<Vec<ArchiveEntryInfo>> {
         let mut entries = Vec::with_capacity(self.zip.len());
         for i in 0..self.zip.len() {
@@ -356,6 +381,7 @@ impl ArchiveHandle for ZipReader {
         Ok(entries)
     }
 
+    /// 按名称读出条目内容，目录条目视为错误
     fn read(&mut self, name: &str) -> CoreResult<Vec<u8>> {
         let mut entry = self.zip.by_name(name).map_err(|err| {
             ErrorType::ArchiveReadError(ErrorData {
@@ -378,11 +404,13 @@ impl ArchiveHandle for ZipReader {
         Ok(buf)
     }
 
+    /// zip 无法真正流式读取，先整条读进内存再包成游标
     fn read_stream(&mut self, name: &str) -> CoreResult<Box<dyn Read>> {
         let data = self.read(name)?;
         Ok(Box::new(std::io::Cursor::new(data)))
     }
 
+    /// 提取单个条目到目标路径，进度按单文件上报
     fn extract_file(
         &mut self,
         name: &str,
@@ -415,6 +443,7 @@ impl ArchiveHandle for ZipReader {
         Ok(())
     }
 
+    /// 用 `new_append` 就地追加磁盘文件，再重解析中央目录
     fn add_files(&mut self, files: &[(PathBuf, PathBuf)]) -> CoreResult<()> {
         use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
@@ -462,6 +491,7 @@ impl ArchiveHandle for ZipReader {
         self.reload()
     }
 
+    /// 用 `new_append` 就地追加内存数据，再重解析中央目录
     fn add_data(&mut self, name: &str, data: &[u8]) -> CoreResult<()> {
         use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
@@ -504,7 +534,7 @@ impl ArchiveHandle for ZipReader {
     }
 }
 
-/// 将 zip 时间字段转换为 chrono 时间（字段无效时返回 `None`）
+/// 将 zip 时间字段转换为 chrono 时间，字段无效时返回 `None`
 fn generate_chrono_datetime(time: &DateTime) -> Option<chrono::NaiveDateTime> {
     if let Some(chrono_date) =
         chrono::NaiveDate::from_ymd_opt(time.year().into(), time.month().into(), time.day().into())
@@ -519,7 +549,7 @@ fn generate_chrono_datetime(time: &DateTime) -> Option<chrono::NaiveDateTime> {
     None
 }
 
-/// 将 zip 时间字段转换为系统时间（字段无效时返回 `None`）
+/// 将 zip 时间字段转换为系统时间，字段无效时返回 `None`
 fn datetime_to_systemtime(time: &DateTime) -> Option<std::time::SystemTime> {
     if let Some(chrono_datetime) = generate_chrono_datetime(time) {
         let time = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
@@ -531,15 +561,20 @@ fn datetime_to_systemtime(time: &DateTime) -> Option<std::time::SystemTime> {
     None
 }
 
-/// 创建符号链接（跨平台）
+/// 创建符号链接，各平台各自实现
 ///
-/// * `target_path` — 符号链接的创建路径。
-/// * `link_target` — 链接目标。
+/// - `target_path`: 符号链接的创建路径
+/// - `link_target`: 链接目标
+///
+/// # 返回值
+///
+/// 创建失败时返回相应错误
 #[cfg(unix)]
 fn make_symlink(target_path: &Path, link_target: &str) -> io::Result<()> {
     std::os::unix::fs::symlink(link_target, target_path)
 }
 
+/// 创建符号链接，Windows 下按目标类型选择目录或文件链接
 #[cfg(windows)]
 fn make_symlink(target_path: &Path, link_target: &str) -> CoreResult<()> {
     let target = Path::new(link_target);
@@ -556,18 +591,23 @@ fn make_symlink(target_path: &Path, link_target: &str) -> CoreResult<()> {
     })
 }
 
+/// 创建符号链接，不支持的平台退化为写普通文件
 #[cfg(not(any(unix, windows)))]
 fn make_symlink(target_path: &Path, link_target: &str) -> io::Result<()> {
-    // 不支持符号链接的平台：写为普通文件（内容为链接目标）
+    // 不支持符号链接的平台：写为普通文件，内容为链接目标
     let mut f = File::create(target_path)?;
     f.write_all(link_target.as_bytes())?;
     Ok(())
 }
 
-/// 设置文件/目录的 Unix 权限（仅 Unix）
+/// 设置文件或目录的 Unix 权限，仅 Unix 下编译
 ///
-/// * `path` — 目标文件/目录路径。
-/// * `mode` — 权限位（如 `0o644`）。
+/// - `path`: 目标文件或目录路径
+/// - `mode`: 权限位，如 `0o644`
+///
+/// # 返回值
+///
+/// 设置失败时返回相应错误
 #[cfg(unix)]
 fn set_perms(path: &Path, mode: u32) -> io::Result<()> {
     use std::os::unix::fs::PermissionsExt;

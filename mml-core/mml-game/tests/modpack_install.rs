@@ -3,7 +3,7 @@
 //! readInfo → readVersion → createInstance → extract → getInfo → download → done，
 //! 校验实例创建、元数据写入与 overrides 解压。
 //!
-//! 版本 json 校验（`check_update`）需要联网下载 Mojang 版本清单，
+//! 版本 json 校验 `check_update` 需要联网下载 Mojang 版本清单，
 //! 网络不可用时跳过，与 tests/common 的约定一致。
 //! 全局初始化每进程只能执行一次，用互斥锁串行各用例。
 
@@ -23,12 +23,12 @@ use uuid::Uuid;
 use zip::ZipWriter;
 use zip::write::SimpleFileOptions;
 
-/// 测试运行目录，用进程号区分多进程
+/// 测试运行目录，落在仓库 `target/temp` 下，用进程号区分多进程
 fn run_dir() -> PathBuf {
     mml_testutil::temp_dir().join(format!("mml-modpack-install-{}", std::process::id()))
 }
 
-/// 初始化链（与 mml_core::init 相同），每进程一次
+/// 初始化链，与 mml_core::init 相同，每进程一次
 fn ensure_init() {
     static INIT: Once = Once::new();
     INIT.call_once(|| {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 实例启动参数面板：
 //   启动参数：内存大小，最小 / 最大加右侧输入并显示本机总量与可用量；窗口大小带常用分辨率
-//            / 使用的 Java（自定义时显示路径 + 选择文件）
+//            / 使用的 Java，自定义时显示路径 + 选择文件
 //   扩展参数：GC / 自定义主类 / 附加 JVM 参数 / 附加游戏参数 / 附加 classpath（多行列表）
 //            / 附加环境变量（键值对列表）
 import { ref } from "vue";
@@ -15,18 +15,21 @@ import NumberStepper from "./ui/NumberStepper.vue";
 import CollapsePanel from "./ui/CollapsePanel.vue";
 
 const props = defineProps<{
+  /** 当前实例的启动参数 */
   args: InstanceArgsDto;
+  /** 可选的 Java 列表 */
   javas: JavaInfoDto[];
   /** 实例锁定生效：只留内存 / 窗口大小 / Java，扩展参数整块隐藏 */
   locked?: boolean;
 }>();
 
+/** 回传改动后的整份启动参数 */
 const emit = defineEmits<{ (e: "update:args", v: InstanceArgsDto): void }>();
 
 const advancedOpen = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
 
-/** 本机内存参考值（与设置窗口的「游戏启动」共用同一份逻辑） */
+/** 本机内存参考值，与设置窗口的「游戏启动」共用同一份逻辑 */
 const { text: memoryText } = useSystemMemory();
 
 function applyResolution(w: number, h: number) {
@@ -51,7 +54,7 @@ function onBrowseFile(e: Event) {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
   if (file) {
-    // 浏览器 input 只能拿到 fakepath；待改用 @tauri-apps/plugin-dialog（settings / add 窗口已在用）
+    // 浏览器 input 只能拿到 fakepath；待改用 @tauri-apps/plugin-dialog，settings / add 窗口已在用
     update({ javaPath: file.name });
   }
 }

@@ -1,11 +1,11 @@
-//! mml-auth 账户存储（auths 模块）集成测试
+//! mml-auth 账户存储模块 auths 的集成测试
 //!
 //! # 注意事项
 //!
-//! - `auths` 模块使用全局内存存储 + 磁盘文件（`auth.json` / `auth_select.json`），
-//!   磁盘路径来自 `mml_base::inner_path`（`LOCALAPPDATA` 或 `HOME`）。
+//! - `auths` 模块使用全局内存存储 + 磁盘文件 `auth.json` / `auth_select.json`，
+//!   磁盘路径来自 `mml_base::inner_path`，即 `LOCALAPPDATA` 或 `HOME`。
 //!   为避免污染真实用户数据，本测试在访问任何路径前把 `LOCALAPPDATA` / `HOME`
-//!   重定向到仓库 `target/temp` 下的唯一子目录（`mml_testutil::temp_dir()`），测试结束后清理。
+//!   重定向到仓库 `target/temp` 下的唯一子目录 `mml_testutil::temp_dir()`，测试结束后清理。
 //! - 全局存储只能初始化一次且 `config_save` / `mml_log` 的后台线程只能 `start`
 //!   一次，因此本文件只用单个顺序执行的 `#[test]` 覆盖全部流程。
 //! - 全程使用假凭据，不访问网络。
@@ -19,12 +19,12 @@ use chrono::{FixedOffset, TimeZone};
 use mml_auth::{AuthType, LoginObj, UserKeyObj, auths};
 use mml_base::{inner_path, serialize_tools};
 
-/// 假凭据（与真实账户无关）
+/// 假凭据，与真实账户无关
 const FAKE_UUID_A: &str = "00000000-0000-0000-0000-00000000aaaa";
 const FAKE_UUID_B: &str = "00000000-0000-0000-0000-00000000bbbb";
 const FAKE_UUID_C: &str = "00000000-0000-0000-0000-00000000cccc";
 
-/// 测试根目录（只初始化一次，保证 env 重定向只发生一次）
+/// 测试根目录，只初始化一次，保证 env 重定向只发生一次
 static TEST_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 /// 重定向内部数据目录到临时目录并初始化日志 / 配置保存线程
@@ -35,8 +35,8 @@ fn setup() -> &'static PathBuf {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
 
-        // inner_path 依赖 LOCALAPPDATA（Windows）或 HOME（Linux/macOS），
-        // 必须在任何路径访问之前重定向（edition 2024 中 set_var 为 unsafe）
+        // inner_path 依赖 LOCALAPPDATA 或 HOME，必须在任何路径访问之前重定向；
+        // edition 2024 中 set_var 为 unsafe
         let dir_str = dir.to_str().unwrap().to_string();
         unsafe { std::env::set_var("LOCALAPPDATA", &dir_str) };
         unsafe { std::env::set_var("HOME", &dir_str) };
@@ -125,7 +125,7 @@ fn test_auths_lifecycle() {
     assert_eq!(all.len(), 3);
     assert_eq!(all[0].user_name, "Latest", "最近使用的账户应排在最前");
 
-    // ---- 3) import 合并导入（同键覆盖）----
+    // ---- 3) import 合并导入，同键覆盖 ----
     let import_file = write_json(
         dir,
         "import_auths.json",
@@ -163,7 +163,7 @@ fn test_auths_lifecycle() {
     assert!(auths::get(FAKE_UUID_C, AuthType::Nide8).is_none());
     assert_eq!(auths::get_all().len(), 2);
 
-    // ---- 6) 停止保存线程（触发最终落盘），验证磁盘文件 ----
+    // ---- 6) 停止保存线程，触发最终落盘，验证磁盘文件 ----
     mml_config::config_save::stop();
 
     let saved: Vec<LoginObj> =

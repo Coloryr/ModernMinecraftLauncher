@@ -4,7 +4,7 @@
 //!
 //! # 注意
 //!
-//! 所有测试共用进程内的同一个 IPC 服务（`init` 只启动一次），并默认并行执行，
+//! 所有测试共用进程内的同一个 IPC 服务，`init` 只启动一次，并默认并行执行，
 //! 因此每个测试都必须容忍其他测试产生的消息：
 //! - `test_motd_broadcast` 的 MOTD(2) 广播会发给所有已连接客户端；
 //! - 读取消息时一律按类型跳过无关帧，直到等到自己需要的那条；
@@ -23,7 +23,7 @@ use mml_ipc::{
 };
 use uuid::Uuid;
 
-/// 保证日志系统只启动一次（并行测试共用同一服务线程）
+/// 保证日志系统只启动一次，并行测试共用同一服务线程
 static LOG_STARTED: OnceLock<()> = OnceLock::new();
 
 fn ensure_log() {
@@ -39,7 +39,7 @@ fn ipc_port() -> u16 {
     init(None).unwrap().expect("init should start server")
 }
 
-/// 连接测试用的 TCP 流（统一设置读取超时，防止卡死）
+/// 连接测试用的 TCP 流，统一设置读取超时，防止卡死
 fn connect(port: u16) -> std::net::TcpStream {
     let stream = std::net::TcpStream::connect(("127.0.0.1", port))
         .expect("connect to ipc server");
@@ -49,7 +49,7 @@ fn connect(port: u16) -> std::net::TcpStream {
     stream
 }
 
-/// 读取一条消息（无总长度前缀，按类型自定界解析），返回「类型 + 消息体」完整字节
+/// 读取一条消息，消息无总长度前缀，按类型自定界解析，返回「类型 + 消息体」完整字节
 fn read_frame(stream: &mut std::net::TcpStream) -> Vec<u8> {
     let mut type_buf = [0u8; 4];
     stream.read_exact(&mut type_buf).unwrap();
@@ -71,7 +71,7 @@ fn read_frame(stream: &mut std::net::TcpStream) -> Vec<u8> {
     frame
 }
 
-/// 读取一个字符串字段（i32 长度 + UTF-8 内容）并追加到输出
+/// 读取一个字符串字段，含 i32 长度前缀与 UTF-8 内容，并追加到输出
 fn read_string_into(stream: &mut std::net::TcpStream, out: &mut Vec<u8>) {
     let mut len_buf = [0u8; 4];
     stream.read_exact(&mut len_buf).unwrap();
@@ -82,12 +82,12 @@ fn read_string_into(stream: &mut std::net::TcpStream, out: &mut Vec<u8>) {
     out.extend_from_slice(&bytes);
 }
 
-/// 发送一条消息（无总长度前缀）
+/// 发送一条消息，不带总长度前缀
 fn write_frame(stream: &mut std::net::TcpStream, content: &[u8]) {
     stream.write_all(content).unwrap();
 }
 
-/// 读取一条指定类型的消息，跳过无关帧（如其他测试产生的 MOTD 广播）
+/// 读取一条指定类型的消息，跳过无关帧，如其他测试产生的 MOTD 广播
 fn read_frame_of(stream: &mut std::net::TcpStream, expect_type: i32) -> Vec<u8> {
     loop {
         let payload = read_frame(stream);
@@ -98,6 +98,7 @@ fn read_frame_of(stream: &mut std::net::TcpStream, expect_type: i32) -> Vec<u8> 
     }
 }
 
+/// 从帧字节中读出一个字符串字段
 fn read_string(buf: &mut &[u8]) -> String {
     let len = buf.get_i32() as usize;
     let s = String::from_utf8(buf[..len].to_vec()).unwrap();
@@ -159,13 +160,13 @@ fn test_motd_broadcast() {
     assert_eq!(body.get_i32(), 2);
     assert_eq!(read_string(&mut body), "127.0.0.1");
     assert_eq!(read_string(&mut body), "25565");
-    // ServerInfo 的 motd 字段原样透传（与 ColorMC 的 ColorMCCloudServerObj 一致）
+    // ServerInfo 的 motd 字段原样透传，与 ColorMC 的 ColorMCCloudServerObj 一致
     assert_eq!(read_string(&mut body), "123");
 
     clear_servers();
 }
 
-/// 新启动实例通过 `notify_existing` 通知已运行实例（一次性 client）：
+/// 新启动实例通过 `notify_existing` 通知已运行实例，一次性连接：
 /// - 无参数时只发送 LAUNCH_SHOW(3)：显示事件触发，参数不被设置；
 /// - 有参数时只发送 LAUNCH_ARG(4)：参数被存储，显示事件不触发。
 #[test]
@@ -209,7 +210,7 @@ fn test_notify_existing() {
     assert!(ok, "with args: LAUNCH_ARG not handled");
 }
 
-/// `init` 传入端口：本进程已是服务端时直接返回同一端口（重复调用幂等）
+/// `init` 传入端口：本进程已是服务端时直接返回同一端口，重复调用幂等
 #[test]
 fn test_init_with_port() {
     ensure_log();
@@ -266,7 +267,7 @@ fn test_game_state_report() {
     assert!(size_ok, "window size not recorded");
 }
 
-/// 向未注册通道的游戏发送标题应返回 false（不依赖网络返回）
+/// 向未注册通道的游戏发送标题应返回 false，不依赖网络返回
 #[test]
 fn test_set_title_unknown_uuid() {
     ensure_log();

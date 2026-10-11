@@ -16,21 +16,23 @@ import type { useResourceOps } from "../composables/useResourceOps";
 import type { ScreenshotItemDto } from "../../../lib/bindings";
 
 const props = defineProps<{
+  /** 数据层，截图列表、加载态与截图地址从这里取 */
   data: ReturnType<typeof useResourceData>;
+  /** 共用操作层，确认弹窗与打开目录从这里取 */
   ops: ReturnType<typeof useResourceOps>;
 }>();
 
 const { shots, instanceUuid, loading, shotUrl } = props.data;
 const { busy, askConfirm, askDelete, openFolder } = props.ops;
 
-/** 当前预览的截图（null = 没开大图） */
+/** 当前预览的截图，`null` 表示没开大图 */
 const preview = ref<ScreenshotItemDto | null>(null);
 
 /**
  * Esc 关掉大图
  *
- * `ImagePreview` 自己不处理 Esc（上层可能还有别的 Esc 语义，见那个组件的说明），
- * 所以这里挂一份；只在开着预览时才挂监听。
+ * `ImagePreview` 自己不处理 Esc，上层可能还有别的 Esc 语义，见那个组件的说明；
+ * 所以这里挂一份，且只在开着预览时才挂监听。
  */
 function onKey(e: KeyboardEvent) {
   if (e.key === "Escape") preview.value = null;
@@ -81,9 +83,9 @@ function clearAll() {
   </div>
 
   <!--
-    大图预览：与「下载整合包」项目详情的截图**同一套观感**（共用 ImagePreview：
-    全屏浮层 + 滚轮缩放 + 放大后拖动平移 + 点空白关闭）。
-    两个操作放进浮层底部的槽里 —— 原来的弹窗有它们，换成浮层不该弄丢
+    大图预览：与「下载整合包」项目详情的截图**同一套观感**，共用 ImagePreview ——
+    全屏浮层 + 滚轮缩放 + 放大后拖动平移 + 点空白关闭。
+    两个操作放进浮层底部的槽里：原来的弹窗有它们，换成浮层不该弄丢
   -->
   <ImagePreview v-if="preview" :src="shotUrl(preview)" @close="preview = null">
     <button class="mini-btn" @click="openFolder('screenshots', preview.name)">

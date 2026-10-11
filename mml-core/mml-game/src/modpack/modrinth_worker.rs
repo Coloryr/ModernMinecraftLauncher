@@ -255,7 +255,7 @@ impl ModPackWorker for ModrinthPackWorker {
             manifest::read_manifest::<ModrinthPackObj>(&old_manifest_path)
         };
 
-        // 获取新整合包的模组信息（下载列表 + 在线信息）
+        // 获取新整合包的模组信息，含下载列表与在线信息
         let path = game.read().unwrap().get_game_path();
         let res = modrinth::get_mod_info(
             &path,
@@ -355,7 +355,7 @@ impl ModPackWorker for ModrinthPackWorker {
         // 保存更新后的在线信息
         game.read().unwrap().save_online_info(&online_info);
 
-        // 写入当前整合包 manifest（最后一步：前面任何 `?` 提前返回都不会动到旧清单）
+        // 写入当前整合包 manifest，放在最后一步：前面任何 `?` 提前返回都不会动到旧清单
         manifest::write_manifest(
             game.read().unwrap().get_base_path().join(names::MODRINTH_FILE),
             info,

@@ -1,4 +1,4 @@
-//! 后台保存任务的写入测试（不涉及全局保存线程）
+//! 后台保存任务的写入测试，不涉及全局保存线程
 
 use std::{fs, path::PathBuf};
 
@@ -32,7 +32,9 @@ fn save_obj_struct() {
 
     #[derive(serde::Serialize)]
     struct Demo {
+        /// 名称，序列化为 `name`
         name: String,
+        /// 数量，序列化为 `count`
         count: u32,
     }
 

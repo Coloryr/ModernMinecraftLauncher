@@ -58,7 +58,7 @@ pub(crate) fn bindings_ts(decls: &[Decl], sigs: &[Sig], ext: &BTreeMap<String, S
 /// - `b`: 输出缓冲，追加写入
 /// - `sigs`: 命令签名，已按模块与名字排序
 fn append_commands(b: &mut String, sigs: &[Sig]) {
-    b.push_str("/** 命令，按来源 .rs 模块分组（参数顺序与 Rust 一致，Tauri 注入的 AppHandle/WebviewWindow 已剔除）*/\n");
+    b.push_str("/** 命令，按来源 .rs 模块分组；参数顺序与 Rust 一致，Tauri 注入的 AppHandle / WebviewWindow 已剔除 */\n");
     b.push_str("export const commands = {\n");
 
     // 归组：组键 = 显式分组标记或来源模块最后一段。

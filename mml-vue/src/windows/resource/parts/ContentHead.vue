@@ -10,7 +10,10 @@ import { t } from "../../../lib/i18n";
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import type { useResourceData } from "../composables/useResourceData";
 
-const props = defineProps<{ data: ReturnType<typeof useResourceData> }>();
+const props = defineProps<{
+  /** 数据层，顶栏只用它的加载态与重拉 */
+  data: ReturnType<typeof useResourceData>;
+}>();
 const { loading, reloadCurrent } = props.data;
 </script>
 

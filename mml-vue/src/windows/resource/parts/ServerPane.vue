@@ -27,7 +27,9 @@ import type { ServerFormDraft } from "../types";
 import type { MotdDto, ServerItemDto } from "../../../lib/bindings";
 
 const props = defineProps<{
+  /** 数据层，服务器列表、加载态与重拉从这里取 */
   data: ReturnType<typeof useResourceData>;
+  /** 共用操作层，忙碌标记与确认弹窗从这里取 */
   ops: ReturnType<typeof useResourceOps>;
 }>();
 
@@ -35,11 +37,11 @@ const { servers, instanceUuid, loading, reloadCurrent } = props.data;
 // 行的操作只剩「编辑 / 删除」：服务器行没有"打开文件夹"这一项（用户点名去掉）
 const { busy, askDelete } = props.ops;
 
-/** 表单草稿（null = 没开弹窗） */
+/** 表单草稿，`null` 表示没开弹窗 */
 const form = ref<ServerFormDraft | null>(null);
 const saving = ref(false);
 
-/** 一行的身份键：名字 + 地址（servers.dat 允许重名，地址才是真的定位） */
+/** 一行的身份键：名字 + 地址；servers.dat 允许重名，地址才是真的定位 */
 function keyOf(item: ServerItemDto): string {
   return `${item.name}|${item.ip}`;
 }
@@ -55,7 +57,7 @@ const motds = ref(new Map<string, MotdDto | null>());
 /** 正在查的键集合（用于"查询中…"） */
 const pending = ref(new Set<string>());
 
-/** 并发查全部服务器（进分类 / 刷新列表时跑一遍） */
+/** 并发查全部服务器，进分类 / 刷新列表时跑一遍 */
 async function queryAll() {
   const list = servers.value;
   motds.value = new Map();
@@ -90,7 +92,7 @@ async function queryAll() {
  */
 const selectedKey = ref<string | null>(null);
 
-/** 选中的条目（列表为空时 `null`，上方卡片随之整块不渲染） */
+/** 选中的条目；列表为空时是 `null`，上方卡片随之整块不渲染 */
 const selected = computed<ServerItemDto | null>(() => {
   const list = servers.value;
   if (!list.length) {
@@ -104,7 +106,7 @@ const selected = computed<ServerItemDto | null>(() => {
  * 卡片上"刷新中…"至少露这么久
  *
  * 查本机 / 局域网的服务器常常几十毫秒就回来了，不压住时间的话"刷新中…"一闪而过、
- * 数据又没变，点下去看着就跟没点一样（用户反馈过"点了刷新卡片没有反应"）。
+ * 数据又没变，点下去看着就跟没点一样 —— 用户反馈过"点了刷新卡片没有反应"。
  * 500ms 是"能看清有这么一下"又不拖沓的量
  */
 const REFRESH_MIN_MS = 500;
@@ -162,11 +164,12 @@ watch(
   { immediate: true },
 );
 
-/** 这一行的 MOTD（没查到 / 还在查时返回 null） */
+/** 这一行的 MOTD；没查到 / 还在查时返回 null */
 function motdOf(item: ServerItemDto): MotdDto | null {
   return motds.value.get(keyOf(item)) ?? null;
 }
 
+/** 这一行是不是正在查 */
 function isLoading(item: ServerItemDto): boolean {
   return pending.value.has(keyOf(item));
 }
@@ -179,13 +182,14 @@ function isOnline(item: ServerItemDto): boolean {
 /**
  * 行图标：**只用服务器查询带回来的 favicon**
  *
- * `servers.dat` 里存的那个（`item.icon`，后端已转成 data URL）直接跳过 —— 用户口径。
+ * `servers.dat` 里存的那个直接跳过，即 `item.icon`，后端已转成 data URL —— 用户口径。
  * 查不到 / 还在查时为 `""`，`ResourceRow` 对空图标是"整块不渲染"，不留占位框
  */
 function iconOf(item: ServerItemDto): string {
   return faviconOf(motdOf(item)) || "";
 }
 
+/** 打开表单；传 `null` 是新增，传条目是编辑 */
 function openForm(item: ServerItemDto | null) {
   form.value = item
     ? {
@@ -199,6 +203,7 @@ function openForm(item: ServerItemDto | null) {
     : { edit: false, name: "", ip: "", acceptTextures: false, origName: "", origIp: "" };
 }
 
+/** 提交表单：新增，或按原 name/ip 定位改那一条；成功后重拉列表 */
 async function save() {
   const draft = form.value;
   if (!draft || saving.value) return;
@@ -307,7 +312,7 @@ function remove(item: ServerItemDto) {
   <ServerFormModal v-if="form" :form="form" :busy="saving" @submit="save" @close="form = null" />
 </template>
 
-<!-- 副标题里的分隔号：与模组行的 `·` 同一套观感（行内间距靠 CSS，不靠空格） -->
+<!-- 副标题里的分隔号：与模组行的 `·` 同一套观感；行内间距靠 CSS，不靠空格 -->
 <style scoped>
 .sep {
   margin: 0 5px;

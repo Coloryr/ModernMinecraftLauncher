@@ -6,7 +6,7 @@
 //
 // 挂载位置**两种窗口模式不一样**（由调用方决定）：
 // - 单窗口模式：整个应用只有一个真实窗口，任何页面共用主窗口的顶栏 → 挂在 MainTopbar 上，
-//   这样切到哪一页都在（右下角那种全局浮层能做到，但占地方）；
+//   这样切到哪一页都在；右下角那种全局浮层也能做到，但占地方；
 // - 多窗口模式：整合包安装可能发生在"下载整合包"那个独立窗口里，
 //   → 挂在 WindowFrame 的 head-right 插槽（各窗口自己那条标题栏）。
 //
@@ -30,8 +30,8 @@ const { status, init } = useModpackStatus(false);
 /**
  * 状态订阅的退订函数
  *
- * 赋值与注册分开：`onUnmounted` 只能在 setup 的**同步阶段**注册（写在 `init()` 的
- * `await` 之后就注册不上了，订阅会一直挂着），所以退订函数存这里、由下面的同步钩子调用。
+ * 赋值与注册分开：`onUnmounted` 只能在 setup 的**同步阶段**注册 —— 写在 `init()`
+ * 的 `await` 之后就注册不上了，订阅会一直挂着 —— 所以退订函数存这里、由同步钩子调用。
  */
 let unlistenStatus: (() => void) | null = null;
 
@@ -46,6 +46,7 @@ onUnmounted(() => {
 
 const tasks = computed(() => status.value?.tasks ?? []);
 
+/** 任务是否还在跑 */
 function isRunning(task: ModPackTaskDto): boolean {
   return !task.done && !task.failed && !task.cancelled;
 }
@@ -113,7 +114,7 @@ function onClick() {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* 与顶栏其它入口按钮（.topbar-icon-btn）同规格：并排时行高与间距才对得上 */
+  /* 与顶栏其它入口按钮 .topbar-icon-btn 同规格：并排时行高与间距才对得上 */
   width: 36px;
   height: 36px;
   flex-shrink: 0;
@@ -136,7 +137,7 @@ function onClick() {
 }
 
 /* 安装中：不旋转，靠颜色（强调色）+ 下方进度条表达"在动"。
-   两个指示器（这个与下载那个）都不转 —— 旋转容易晃眼，也容易让人以为点了会有别的动作 */
+   这个与下载那个都不转 —— 旋转容易晃眼，也容易让人以为点了会有别的动作 */
 .mp-indicator.busy {
   color: var(--accent);
 }

@@ -1,19 +1,20 @@
-//! 单方块 / 单物品渲染：GPU管道冒烟与遮挡/透明诊断（直接用本地jar，不走下载链）
+//! 单方块与单物品渲染：GPU 管道冒烟与遮挡、透明诊断，直接用本地 jar，不走下载链
 //!
 //! 运行：cargo test -p mml-tex-draw --test render_single -- --ignored --nocapture
 //! 环境变量：
-//! - MML_TEST_JAR 指定客户端jar，缺省用反编译参考jar
-//! - MML_TEST_BLOCK 指定方块模型（如 block/big_dripleaf），缺省 block/oak_stairs
-//! - MML_TEST_ITEM 指定物品ID（如 enchanted_book），缺省 apple
+//! - MML_TEST_JAR 指定客户端 jar，缺省用反编译参考 jar
+//! - MML_TEST_BLOCK 指定方块模型，如 block/big_dripleaf，缺省 block/oak_stairs
+//! - MML_TEST_ITEM 指定物品 ID，如 enchanted_book，缺省 apple
 //! 出图到 tests/out/
 
 use std::{collections::HashMap, path::PathBuf};
 
 use mml_base::archives::BaseArchive;
 
+/// 取参考客户端 jar 路径，环境变量 MML_TEST_JAR 优先
 fn ref_jar() -> PathBuf {
     std::env::var("MML_TEST_JAR").map(PathBuf::from).unwrap_or_else(|_| {
-        // 优先用渲染测试已下载的客户端jar（tests/out/run），其次H盘Temp的反编译参考jar
+        // 优先用渲染测试已下载的客户端 jar tests/out/run，其次 H 盘 Temp 的反编译参考 jar
         let run_jar = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
             "tests/out/run/minecraft/libraries/net/minecraft/client/26.3/client-26.3.jar",
         );
@@ -25,6 +26,7 @@ fn ref_jar() -> PathBuf {
     })
 }
 
+/// 取 tests/out 下的输出路径，目录不存在时创建
 fn out_path(name: &str) -> PathBuf {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
@@ -33,6 +35,7 @@ fn out_path(name: &str) -> PathBuf {
     dir.join(name)
 }
 
+/// 把 RGBA 像素写成 size×size 的 PNG 到指定路径
 fn write_png(path: &PathBuf, size: u32, rgba: &[u8]) {
     let file = std::fs::File::create(path).unwrap();
     let mut encoder = png::Encoder::new(file, size, size);
@@ -43,7 +46,7 @@ fn write_png(path: &PathBuf, size: u32, rgba: &[u8]) {
     println!("输出：{}", path.display());
 }
 
-/// 渲染单个方块模型并出图（诊断遮挡/透明问题）
+/// 渲染单个方块模型并出图，用于诊断遮挡与透明问题
 #[test]
 #[ignore]
 fn render_one_block() {
@@ -61,7 +64,7 @@ fn render_one_block() {
         panic!("bake_model 失败");
     };
     // 动画贴图换成首帧：渲染器按单帧 uv 取样，直接喂整条帧条带会渲染错
-    //（图标管线 render_baked 内部同样会做这一步）
+    // 图标管线 render_baked 内部同样会做这一步
     mml_tex_draw::block::use_first_frame(&mut textures);
     println!(
         "bake：{} quads，{} 贴图，gui_light_3d={}",
@@ -128,9 +131,10 @@ fn render_one_block() {
     }
 }
 
-/// 渲染单个物品图标（items/*.json → extrude/元素烘焙 → 出图，仅 GPU）
-/// 样例：diamond_sword（挤出）、enchanted_book（glint）、compass（condition→range_dispatch）、
-/// spyglass（select）、leather_chestplate（tint）、trident（select gui分支）
+/// 渲染单个物品图标：items/*.json → extrude 或元素烘焙 → 出图，仅 GPU
+///
+/// 样例：diamond_sword 挤出、enchanted_book glint、compass condition→range_dispatch、
+/// spyglass select、leather_chestplate tint、trident select gui 分支
 #[test]
 #[ignore]
 fn render_one_item() {
@@ -141,7 +145,7 @@ fn render_one_item() {
     let id = std::env::var("MML_TEST_ITEM").unwrap_or_else(|_| "apple".into());
     let name = id.rsplit('/').next().unwrap_or(&id).to_string();
 
-    // 物品输出目录初始化到独立子目录（渲染结果再拷到tests/out查看）
+    // 物品输出目录初始化到独立子目录，渲染结果再拷到 tests/out 查看
     let dir = out_path("item-render");
     mml_tex_draw::init(&dir).unwrap();
 

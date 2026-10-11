@@ -11,13 +11,17 @@ export const splashVisible = ref(true);
 /** 初始化失败信息：非空时启动页关闭后显示错误页 */
 export const splashError = ref("");
 
-/** 关闭启动画面：初始化完成后调用；失败时传入错误信息以显示错误页 */
+/**
+ * 关闭启动画面，初始化完成后调用
+ *
+ * - `error`: 初始化失败信息，传入后启动页关闭时改显示错误页
+ */
 export function closeSplash(error?: string) {
   splashError.value = error ?? "";
   splashVisible.value = false;
 }
 
-/** 重新显示启动画面（错误页重试时调用，同时清空错误信息） */
+/** 重新显示启动画面，错误页重试时调用，同时清空错误信息 */
 export function openSplash() {
   splashError.value = "";
   splashVisible.value = true;

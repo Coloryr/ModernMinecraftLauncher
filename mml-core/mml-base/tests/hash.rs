@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use mml_base::hash_helper::{self, HashType};
 
+/// 校验 gen_hash 的 MD5 / SHA1 / SHA256 结果与 Base64 往返
 #[test]
 fn test_hash_functions() {
     let data = b"Hello, World!";
@@ -26,6 +27,7 @@ fn test_hash_functions() {
     assert_eq!(decoded, input);
 }
 
+/// 校验 gen_hash_from_string 对中文文本的结果
 #[test]
 fn test_string_input() {
     let text = "测试文本";
@@ -43,6 +45,7 @@ fn test_string_input() {
     );
 }
 
+/// 校验 gen_hash_from_file 对样本文件 1 的结果
 #[test]
 fn test_file1_input() {
     let file = PathBuf::from("tests").join("hash_test_file1.bin");
@@ -60,6 +63,7 @@ fn test_file1_input() {
     );
 }
 
+/// 校验 gen_hash_from_file 对样本文件 2 的结果
 #[test]
 fn test_file2_input() {
     let file = PathBuf::from("tests").join("hash_test_file2.bin");

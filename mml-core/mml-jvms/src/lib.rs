@@ -1,13 +1,13 @@
 //! Java 运行时管理模块
 //!
-//! 本模块负责管理启动器中配置的 Java 运行时环境（JRE/JDK）。
+//! 本模块负责管理启动器中配置的 Java 运行时环境，即 JRE / JDK。
 //!
 //! # 核心功能
 //!
-//! - **自动扫描** — 从系统注册表（Windows）、标准路径（Linux/macOS）搜索已安装的 Java
+//! - **自动扫描** — Windows 查系统注册表，Linux / macOS 查标准路径
 //! - **手动添加** — 用户可手动指定 Java 可执行文件路径
 //! - **版本匹配** — 根据 Minecraft 版本自动选择兼容的 Java 版本
-//! - **架构匹配** — 自动过滤与系统架构一致的 Java（x86_64 / aarch64）
+//! - **架构匹配** — 自动过滤与系统架构一致的 Java，即 x86_64 / aarch64
 //! - **变更通知** — 通过事件回调通知 UI 层 Java 列表已变更
 //!
 //! # 数据结构
@@ -36,28 +36,28 @@ pub mod java_helper;
 /// Java 运行时信息
 #[derive(Debug, Clone)]
 pub struct JavaInfoObj {
-    /// Java 显示名称（如 "OpenJDK-17.0.1-x86_64"）
+    /// Java 显示名称，如 "OpenJDK-17.0.1-x86_64"
     pub name: String,
     /// Java 可执行文件的完整路径
     pub path: PathBuf,
-    /// Java 完整版本号字符串（如 "17.0.1"）
+    /// Java 完整版本号字符串，如 "17.0.1"
     pub version: String,
-    /// Java 主版本号（如 8、11、17、21）
+    /// Java 主版本号，如 8、11、17、21；占位条目为 -1 表示不可用
     pub major_version: i32,
-    /// Java 发行版类型（如 "OpenJDK"、"Oracle"）
+    /// Java 发行版类型，如 "OpenJDK"、"Oracle"
     pub java_type: String,
-    /// CPU 架构
+    /// CPU 架构，与系统架构一致才会被版本匹配选中
     pub arch: ArchEnum,
 }
 
-/// Java 运行时存放目录（`{运行目录}/java/`）
+/// Java 运行时存放目录，即 `{运行目录}/java/`
 static JAVA_DIR: OnceLock<PathBuf> = OnceLock::new();
 
-/// 全局 Java 运行时列表（按名称索引）
+/// 全局 Java 运行时列表，按名称索引
 static JVMS: LazyLock<RwLock<HashMap<String, Arc<JavaInfoObj>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
-/// Java 列表变更事件（通知 UI 刷新）
+/// Java 列表变更事件，用于通知 UI 刷新
 static JVM_CHANGE_EVENT: LazyLock<EventHandler> = LazyLock::new(|| EventHandler::new());
 
 /// 注册 Java 列表变更回调
@@ -76,25 +76,25 @@ where
 
 /// 移除 Java 列表变更回调
 ///
-/// # 参数
-///
 /// - `id`: 回调注册时返回的 ID
 pub fn remove_jvm_change(id: u64) {
     JVM_CHANGE_EVENT.remove_handle(id);
 }
 
-/// 触发 Java 列表变更事件（内部使用）
+/// 触发 Java 列表变更事件，仅供 crate 内部调用
 pub(crate) fn invoke_jvm_change() {
     JVM_CHANGE_EVENT.emit();
 }
 
 /// 初始化 Java 运行时管理
 ///
-/// 创建 Java 存放目录，加载配置中保存的 Java 列表。
-///
-/// # 参数
+/// 确定 Java 存放目录并在缺失时创建，仅在程序启动阶段调用一次。
 ///
 /// - `dir`: 程序运行根目录
+///
+/// # 返回值
+///
+/// 目录创建失败时返回相应错误
 pub fn init<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
     let dir = JAVA_DIR.get_or_init(|| dir.as_ref().join(names::JAVA_DIR));
     if !dir.exists() {
@@ -104,10 +104,10 @@ pub fn init<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
     Ok(())
 }
 
-/// 从配置文件加载 Java 列表（异步逐个测试有效性）
+/// 从配置文件加载 Java 列表，异步逐个测试有效性
 ///
 /// 清空内存列表后按配置重建：有效的 Java 记录真实信息，
-/// 无效的保留占位条目（`major_version = -1`），加载完成后触发变更事件。
+/// 无效的保留占位条目，`major_version` 为 -1，加载完成后触发变更事件。
 pub fn load() {
     let config = mml_config::read_config();
     let config = &config.java_list;
@@ -116,8 +116,6 @@ pub fn load() {
 }
 
 /// 根据名称获取 Java 信息
-///
-/// # 参数
 ///
 /// - `key`: Java 名称
 ///
@@ -133,8 +131,6 @@ pub fn get_java_info(key: &str) -> Option<Arc<JavaInfoObj>> {
 /// 删除指定名称的 Java
 ///
 /// 同时从内存列表和配置文件中的 Java 列表中移除。
-///
-/// # 参数
 ///
 /// - `name`: Java 名称
 pub fn remove(name: &str) {
@@ -186,14 +182,12 @@ pub fn remove_all() {
 ///
 /// 测试 Java 可执行文件是否有效，有效则加入列表并保存配置。
 ///
-/// # 参数
-///
 /// - `name`: Java 显示名称
 /// - `file`: Java 可执行文件路径
 ///
 /// # 返回值
 ///
-/// 添加成功返回 `Some(name)`，无效的 Java 返回 `None`
+/// 添加成功返回该 Java 的信息，可执行文件无效时返回 `None`
 pub fn add_item(name: Option<String>, file: String) -> Option<Arc<JavaInfoObj>> {
     let dir = mml_base::get_base_dir();
     let local = if file.starts_with(dir.to_str().unwrap()) {
@@ -241,15 +235,13 @@ pub fn add_item(name: Option<String>, file: String) -> Option<Arc<JavaInfoObj>> 
     }
 }
 
-/// 添加新的JAVA
-///
-/// # 参数
+/// 直接添加一条已知的 Java 信息，跳过可执行文件有效性测试
 ///
 /// - `info`: Java 信息
 ///
 /// # 返回值
 ///
-/// 添加后返回JAVA信息
+/// 存入全局列表后的 Java 信息
 pub fn add_info_item(info: JavaInfoObj) -> Arc<JavaInfoObj> {
     let name = info.name.clone();
 
@@ -279,8 +271,6 @@ pub fn add_info_item(info: JavaInfoObj) -> Arc<JavaInfoObj> {
 }
 
 /// 从配置列表批量测试并添加 Java
-///
-/// # 参数
 ///
 /// - `list`: 配置文件中保存的 Java 列表
 fn add_list(list: &Vec<JvmConfigObj>) {
@@ -329,7 +319,7 @@ fn add_list(list: &Vec<JvmConfigObj>) {
             empty = false;
         }
 
-        // 配置加载完成（含无效占位条目），通知 UI 刷新列表
+        // 配置加载完成，含无效占位条目，通知 UI 刷新列表
         invoke_jvm_change();
 
         if empty {
@@ -340,9 +330,7 @@ fn add_list(list: &Vec<JvmConfigObj>) {
 
 /// 根据版本需求查找匹配的 Java
 ///
-/// # 参数
-///
-/// - `version`: 所需的主版本号（如 17、21）
+/// - `version`: 所需的主版本号，如 17、21
 /// - `over`: `true` 允许返回更高版本的 Java，`false` 要求精确匹配
 ///
 /// # 返回值
@@ -365,7 +353,7 @@ pub fn get_java(version: i32, over: bool) -> Option<Arc<JavaInfoObj>> {
         .map(|item| item.1)
         .collect();
 
-    // 按版本号降序排列（优先选择最新版本）
+    // 按版本号降序排列，优先选择最新版本
     filtered.sort_by(|a, b| b.major_version.cmp(&a.major_version));
 
     filtered.first().map(|&info| info.clone())
@@ -386,6 +374,10 @@ pub fn get_all_java() -> Vec<Arc<JavaInfoObj>> {
 /// 在指定目录中查找 Java 可执行文件
 ///
 /// - `dir`: 查找路径
+///
+/// # 返回值
+///
+/// Windows 找 `javaw.exe`，Linux / macOS 找 `java`；找不到返回 `None`
 pub fn find_java_from_path<P: AsRef<Path>>(dir: P) -> Option<PathBuf> {
     let sys = mml_sys::get_system_info();
     match sys.os {
@@ -415,7 +407,7 @@ fn find_java() -> Option<Vec<JavaInfoObj>> {
         }
     }
 
-    // 去重（基于路径）
+    // 去重，基于路径
     java_list.sort_by(|a, b| a.path.cmp(&b.path));
     java_list.dedup_by(|a, b| a.path == b.path);
 
@@ -428,7 +420,7 @@ fn find_java() -> Option<Vec<JavaInfoObj>> {
 
 /// 扫描系统中已安装的 Java 并添加到列表
 ///
-/// 此函数执行系统级的 Java 搜索（注册表、常见路径等）。
+/// 此函数执行系统级的 Java 搜索：注册表、常见路径等。
 pub fn scan_java() {
     if let Some(list) = find_java() {
         let mut list1 = JVMS.write().unwrap();
@@ -457,7 +449,15 @@ pub fn scan_java() {
     }
 }
 
-/// 解压Java
+/// 解压 Java 压缩包并注册其中的 Java
+///
+/// - `name`: Java 显示名称，`None` 时取压缩包文件名
+/// - `path`: 压缩包路径
+/// - `gui`: 解压进度回调
+///
+/// # 返回值
+///
+/// 解压并注册成功返回该 Java 的信息；压缩包格式不支持或其中找不到 Java 时返回 `None`
 pub async fn unzip_java<P: AsRef<Path>>(
     name: Option<String>,
     path: P,
@@ -525,7 +525,7 @@ mod tests {
     static RUN_DIR: OnceLock<PathBuf> = OnceLock::new();
     static INIT: Once = Once::new();
 
-    /// 初始化全局依赖（配置系统 + 后台保存线程），返回运行根目录
+    /// 初始化配置系统与后台保存线程等全局依赖，返回运行根目录
     fn ensure_env() -> PathBuf {
         INIT.call_once(|| {
             let dir =
@@ -556,7 +556,7 @@ mod tests {
         }
     }
 
-    /// 向全局列表插入测试条目，返回清理函数（避免污染其他用例）
+    /// 向全局列表插入测试条目，返回清理函数，避免污染其他用例
     fn insert(entries: Vec<JavaInfoObj>) -> impl FnOnce() {
         {
             let mut list = JVMS.write().unwrap();
@@ -571,7 +571,7 @@ mod tests {
         }
     }
 
-    /// 与当前系统架构不同的架构（用于架构过滤测试）
+    /// 与当前系统架构不同的架构，用于架构过滤测试
     fn other_arch() -> ArchEnum {
         if mml_sys::get_system_info().system_arch == ArchEnum::X86_64 {
             ArchEnum::AArch64
@@ -596,7 +596,7 @@ mod tests {
         let found = get_java(17, false).expect("应找到 major=17 的 Java");
         assert_eq!(found.major_version, 17);
 
-        // over=true 时取更高版本（降序取最新）
+        // over=true 时取更高版本，降序取最新
         let found = get_java(17, true).expect("应找到 major>=17 的 Java");
         assert_eq!(found.major_version, 21);
 
@@ -733,13 +733,13 @@ mod tests {
         assert_eq!(counter.load(Ordering::SeqCst), 2, "注销后不应再回调");
     }
 
-    /// scan_java：在未安装 Java 的环境下也应安全返回（有 Java 则正常入列）
+    /// scan_java：在未安装 Java 的环境下也应安全返回，有 Java 则正常入列
     #[test]
     fn scan_java_does_not_panic() {
         let _guard = JVMS_LOCK.lock().unwrap();
 
         // 记录扫描前已有条目，扫描后清掉新增条目，
-        // 避免本机真实 JVM 残留干扰其他用例（如 get_java 的版本匹配断言）
+        // 避免本机真实 JVM 残留干扰其他用例，如 get_java 的版本匹配断言
         let before: std::collections::HashSet<String> =
             JVMS.read().unwrap().keys().cloned().collect();
 

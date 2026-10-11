@@ -3,6 +3,7 @@ use mml_base::version_parse::{
     is_game_version_greater_equal, parse_game_version,
 };
 
+/// 校验 1.20.2 门槛判断，含新格式、快照与预发布
 #[test]
 fn test_is_game_version_1202() {
     // 低于 1.20.2
@@ -32,6 +33,7 @@ fn test_is_game_version_1202() {
     assert_eq!(is_game_version_1202("1.20.2-rc1"), false); // RC < 正式版
 }
 
+/// 校验 1.20 门槛判断，含新格式、快照与预发布
 #[test]
 fn test_is_game_version_120() {
     // 低于 1.20
@@ -60,6 +62,7 @@ fn test_is_game_version_120() {
     assert_eq!(is_game_version_120("1.20-rc1"), false); // RC < 正式版
 }
 
+/// 校验 1.17 门槛判断，含新格式、快照与预发布
 #[test]
 fn test_is_game_version_117() {
     // 低于 1.17
@@ -87,6 +90,7 @@ fn test_is_game_version_117() {
     assert_eq!(is_game_version_117("1.20-rc1"), false); // RC < 正式版
 }
 
+/// 校验版本号严格大于比较，含新格式各类型与无法解析的输入
 #[test]
 fn test_version_comparison() {
     // 正式版比较
@@ -115,6 +119,7 @@ fn test_version_comparison() {
     assert!(!is_game_version_greater("1.20.2", "unknown"));
 }
 
+/// 校验版本号大于等于比较，含无法解析的输入
 #[test]
 fn test_version_comparison_equal() {
     // >=
@@ -139,7 +144,7 @@ fn parse_game_version_formats() {
     assert_eq!(parse_game_version("1.20"), Some(vec![1, 20, 0]));
     assert_eq!(parse_game_version("1.7.10"), Some(vec![1, 7, 10]));
 
-    // 新格式正式版（100 + 年份）
+    // 新格式正式版，编码为 100 + 年份
     assert_eq!(parse_game_version("26.1"), Some(vec![126, 1, 0]));
     assert_eq!(parse_game_version("26.1.1"), Some(vec![126, 1, 1]));
 
@@ -173,10 +178,10 @@ fn parse_game_version_formats() {
     assert_eq!(parse_game_version(""), None);
     assert_eq!(parse_game_version("latest"), None);
     assert_eq!(parse_game_version("snapshot"), None);
-    // 非数字段被过滤：首位数字成为主版本（历史行为）
+    // 非数字段被过滤：首位数字成为主版本，属历史行为
     assert_eq!(parse_game_version("1.x"), Some(vec![1, 0, 0]));
     assert_eq!(parse_game_version("x.1.2"), Some(vec![1, 2, 0]));
-    // 主版本既非 1（旧格式）也非 >=25（新格式）→ 无法解析
+    // 主版本既非旧格式的 1，也不满足新格式的 >=25，无法解析
     assert_eq!(parse_game_version("2.0"), None);
     assert_eq!(parse_game_version("20.1"), None);
 }
@@ -189,7 +194,7 @@ fn parse_game_version_ordering() {
     assert!(parse_game_version("1.21") > parse_game_version("1.20.4"));
     assert!(parse_game_version("1.20.1") < parse_game_version("1.20.2"));
 
-    // 新格式整体晚于旧格式（年份 >= 25 → 100 + 年份）
+    // 新格式整体晚于旧格式，年份 >= 25 时编码为 100 + 年份
     assert!(parse_game_version("26.1") > parse_game_version("1.21.1"));
 
     // 新格式内部：正式版 > 预发布 > RC > 快照

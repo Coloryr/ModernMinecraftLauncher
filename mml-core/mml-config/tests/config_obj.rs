@@ -1,4 +1,4 @@
-//! 配置数据结构序列化测试（纯函数，不涉及任何全局状态）
+//! 配置数据结构序列化测试，纯函数，不涉及任何全局状态
 
 use mml_config::config_obj::{
     ConfigObj, DnsObj, GCType, GameCheckObj, HttpObj, JvmConfigObj, ProxyState, ProxyType,
@@ -36,15 +36,15 @@ fn partial_json_fills_defaults() {
     assert_eq!(obj.http.source, SourceLocal::Offical);
     assert_eq!(obj.dns.enable, false);
     assert_eq!(obj.check.lib, true);
-    // Window 缺失时取 ConfigObj::default 中的 WindowSettingObj::new()
-    //（1280x720 窗口模式），而不是 WindowSettingObj::default()（全 None）
+    // Window 缺失时取 ConfigObj::default 里的 WindowSettingObj::new()，即 1280x720 窗口模式，
+    // 而不是 WindowSettingObj::default() 的全 None
     assert_eq!(obj.window.full_screen, Some(false));
     assert_eq!(obj.window.width, Some(1280));
     assert_eq!(obj.window.height, Some(720));
     assert_eq!(obj.window.game_title, None);
 }
 
-/// 下载源枚举序列化为数字（serde_repr）
+/// 下载源枚举序列化为数字，serde_repr
 #[test]
 fn source_local_repr() {
     assert_eq!(serde_json::to_string(&SourceLocal::Offical).unwrap(), "0");
@@ -77,7 +77,7 @@ fn gc_type_repr() {
     assert_eq!(v, GCType::G1GC);
 }
 
-/// Java 配置字段名应为 PascalCase（Name / Local）
+/// Java 配置字段名应为 PascalCase，即 Name / Local
 #[test]
 fn jvm_config_field_names() {
     let j = JvmConfigObj {
@@ -133,8 +133,7 @@ fn run_arg_new_all_some() {
     assert_eq!(arg.launch_post_run, Some(false));
     assert_eq!(arg.pre_run_arg, Some(String::new()));
     assert_eq!(arg.post_run_arg, Some(String::new()));
-    // 注意：new() 中 max_memory=512、min_memory=4096，max < min，疑似写反，
-    // 这里不做大小关系断言（详见测试报告）。
+    // 注意：new() 中 max_memory=4096、min_memory=512，此处只断言两者都有默认值，不校验大小关系
 }
 
 /// RunArgObj 的 Default 与 new 的区别：Default 全部为 None

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // 左侧分类导航：按用户拖出来的顺序渲染；拖一下即改顺序（写回视图偏好）
 //
-// 拖拽沿用仓库里那套指针模拟（见 composables/useInstanceDrag、useCollectDrag）：
-// 不用 HTML5 draggable（WebView2 里会出现"禁止"光标且投放不可靠），
+// 拖拽沿用仓库里那套指针模拟，见 composables/useInstanceDrag、useCollectDrag：
+// 不用 HTML5 draggable，WebView2 里会出现"禁止"光标且投放不可靠；
 // 按下记候选 → 移动超阈值才开始拖 → 按指针位置算插到第几个 → 松手写回。
 // 这一列是**一维顺序**，没有"投放到哪个容器"的问题，所以只需要一个插入位置。
 import { computed, onMounted, onUnmounted, ref } from "vue";
@@ -13,23 +13,28 @@ import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceView } from "../composables/useResourceView";
 
 const props = defineProps<{
+  /** 数据层，当前选中的分类从这里取 */
   data: ReturnType<typeof useResourceData>;
+  /** 视图偏好，分类顺序与写回从这里取 */
   view: ReturnType<typeof useResourceView>;
 }>();
 
-const emit = defineEmits<{ (e: "select", id: CategoryId): void }>();
+const emit = defineEmits<{
+  /** 点了某个分类，外壳据此切换面板 */
+  (e: "select", id: CategoryId): void;
+}>();
 
 const { category } = props.data;
 const { order, setOrder } = props.view;
 
-/** 按偏好顺序排好的分类（含文案键） */
+/** 按偏好顺序排好的分类，含文案键 */
 const items = computed(() =>
   order.value
     .map((id) => RESOURCE_CATEGORIES.find((c) => c.id === id))
     .filter((c) => !!c),
 );
 
-/** 分类列表容器（算插入位置时只在本组件范围内查，不用全局选择器） */
+/** 分类列表容器；算插入位置时只在本组件范围内查，不用全局选择器 */
 const navEl = ref<HTMLElement | null>(null);
 
 /** 开始拖拽的位移阈值（与实例 / 收藏拖拽一致） */
@@ -39,13 +44,13 @@ const DRAG_THRESHOLD = 5;
 let candidate: CategoryId | null = null;
 /** 真正在拖的分类 */
 const dragging = ref<CategoryId | null>(null);
-/** 会插到第几项之前（null = 还没算出来） */
+/** 会插到第几项之前，`null` 表示还没算出来 */
 const insertAt = ref<number | null>(null);
 
 let pointerId: number | null = null;
 let startX = 0;
 let startY = 0;
-/** 拖拽结束后抑制紧随的 click（否则松手会当成"点了这个分类"而切过去） */
+/** 拖拽结束后抑制紧随的 click，否则松手会当成"点了这个分类"而切过去 */
 let suppressClick = false;
 
 function onPointerDown(e: PointerEvent, id: CategoryId) {
@@ -68,7 +73,7 @@ function onPointerMove(e: PointerEvent) {
   updateInsert(e);
 }
 
-/** 按指针纵坐标算插入位置（分类项是等高的一列，取每项中线比较） */
+/** 按指针纵坐标算插入位置；分类项是等高的一列，取每项中线比较 */
 function updateInsert(e: PointerEvent) {
   const list = navEl.value;
   if (!list) return;
@@ -110,7 +115,7 @@ function reset() {
   insertAt.value = null;
 }
 
-/** 点击：拖拽刚结束时忽略这一下（见 onPointerUp 的 suppressClick） */
+/** 点击：拖拽刚结束时忽略这一下，见 onPointerUp 的 suppressClick */
 function onClick(id: CategoryId) {
   if (suppressClick) {
     suppressClick = false;

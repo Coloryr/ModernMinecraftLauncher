@@ -2,7 +2,7 @@
 // 方块列表：左侧分类栏带数量，右侧网格带搜索 / 分类过滤 / 图标尺寸档
 // 三态视图：未渲染 → 提示卡；渲染中 → 顶部一行进度（下方列表照常可用）；已渲染 → 分类栏 + 网格
 //
-// 状态在 BlockWindow（工具条在标题栏，两边要共用同一份状态），这里只做排版与局部交互；
+// 状态在 BlockWindow：工具条在标题栏，两边要共用同一份状态，这里只做排版与局部交互；
 // 数据、事件订阅与操作在 composables/useBlockList，局部 UI 在 parts/。
 import { computed, ref } from "vue";
 import { t } from "../../lib/i18n";
@@ -16,8 +16,9 @@ import type { InstanceInfoDto } from "../../lib/bindings";
 import type { useBlockList } from "./composables/useBlockList";
 
 const props = defineProps<{
-  /** 方块列表状态（在 BlockWindow 里创建：标题栏的工具条用的是同一份状态） */
+  /** 方块列表状态，在 BlockWindow 里创建：标题栏的工具条用的是同一份状态 */
   settings: ReturnType<typeof useBlockList>;
+  /** 主窗口当前选中的实例；没有选中实例时为 null */
   currentInstance: InstanceInfoDto | null;
 }>();
 
@@ -76,7 +77,7 @@ async function onIconPick(inst: InstanceInfoDto) {
   }
 }
 
-/** 详情弹窗里删除玩家头颅（详情会随 removeSkin 一起关掉） */
+/** 详情弹窗里删除玩家头颅；详情会随 removeSkin 一起关掉 */
 async function onDetailRemove() {
   const b = detail.value;
   if (b) await removeSkin(b);
@@ -85,7 +86,7 @@ async function onDetailRemove() {
 
 <template>
   <div class="block-panel">
-    <!-- 渲染中：顶部一行进度（不挤掉下方内容，取消后立即消失） -->
+    <!-- 渲染中：顶部一行进度；不挤掉下方内容，取消后立即消失 -->
     <div v-if="running" class="block-progress">
       <span class="block-progress-text">
         {{ status?.text || (preparing ? t("blocks.downloadingCore") : t("blocks.rendering")) }}
@@ -109,7 +110,7 @@ async function onDetailRemove() {
         :filtered="isFiltered" @open="openDetail" @remove-skin="removeSkin" @clear-filters="clearFilters" />
     </div>
 
-    <!-- 未渲染：提示卡（渲染中显示进度说明，不再给按钮） -->
+    <!-- 未渲染：提示卡；渲染中显示进度说明，不再给按钮 -->
     <div v-if="!rendered" class="block-prompt">
       <div class="block-prompt-icon">
         <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6"
@@ -151,8 +152,8 @@ async function onDetailRemove() {
   min-height: 0;
   /* 上 / 右 / 下 三边抵消 WindowFrame .frame-body 的 22/26 内边距：
      网格与它的滚动条顶到窗口右边缘、上下也一直延伸到窗口边（滚动条是整条）。
-     左内边距保持原样；上下的呼吸改由各自滚动内容自己的留白给
-     （网格见 BlockGrid 的 padding-top / BOTTOM_SPACE，分类栏见 .cat-rail 的 padding）——
+     左内边距保持原样；上下的呼吸改由各自滚动内容自己的留白给 ——
+     网格见 BlockGrid 的 padding-top 与 BOTTOM_SPACE，分类栏见 .cat-rail 的 padding。
      那样空档只在滚到两端时出现，而不是把滚动区缩掉 */
   margin-right: -26px;
   margin-bottom: -22px;

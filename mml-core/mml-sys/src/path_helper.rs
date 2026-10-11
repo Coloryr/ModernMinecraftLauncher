@@ -2,7 +2,7 @@
 //!
 //! 提供跨平台的文件系统操作封装，包括：
 //!
-//! - **基础 IO** — 文件读写（同步/异步）、目录创建、复制与移动
+//! - **基础 IO** — 文件读写、目录创建、复制与移动，同步与异步各一份
 //! - **权限管理** — Unix chmod / Java 权限修复
 //! - **回收站操作** — Windows (SHFileOperationW) / Linux (Trash) / macOS (osascript Finder)
 //! - **文件搜索** — 递归搜索、目录遍历、大小统计
@@ -10,7 +10,7 @@
 //!
 //! 跨平台
 //!
-//! 所有函数均提供同步和异步（Tokio）两种版本。
+//! 所有函数均提供同步版与 Tokio 异步版。
 //! 回收站操作自动根据编译目标选择 Windows/Linux/macOS 实现。
 
 #[cfg(not(windows))]
@@ -53,7 +53,7 @@ pub fn chmod(path: &str) -> io::Result<()> {
     Ok(())
 }
 
-/// 提升Java文件夹权限
+/// 提升 Java 文件夹权限
 ///
 /// # 返回值
 ///
@@ -86,7 +86,7 @@ pub fn per_java_chmod(path: &str) -> io::Result<()> {
 ///
 /// # 返回值
 ///
-/// 返回回收站 files 目录路径（不存在时自动创建）
+/// 返回回收站 files 目录路径，不存在时自动创建
 #[cfg(target_os = "linux")]
 fn get_trash_files_path() -> PathBuf {
     let data_home = env::var("XDG_DATA_HOME")
@@ -105,7 +105,7 @@ fn get_trash_files_path() -> PathBuf {
 ///
 /// # 返回值
 ///
-/// 返回回收站 info 目录路径（不存在时自动创建）
+/// 返回回收站 info 目录路径，不存在时自动创建
 #[cfg(target_os = "linux")]
 fn get_trash_info_path() -> PathBuf {
     let data_home = env::var("XDG_DATA_HOME")
@@ -260,15 +260,13 @@ fn move_to_trash_windows<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
     use windows::core::BOOL;
     use windows::core::PCWSTR;
 
-    // SHFileOperationW 是 shell 操作，要求调用线程能处理窗口消息；
-    // 在 GUI 主线程（STA，命令处理期间不泵消息）上直接调用会死锁。
-    // 放到独立工作线程执行，与普通线程环境（已验证正常）一致。
+    // SHFileOperationW 要求调用线程能处理窗口消息，在 GUI 主线程 STA 上直接调用会死锁；
+    // 放到独立工作线程执行，与已验证正常的普通线程环境一致。
     let dir: std::path::PathBuf = dir.as_ref().to_path_buf();
     let err_path = dir.clone();
     let result = std::thread::spawn(move || -> i32 {
-        // pFrom 要求双 \0 结尾的路径列表；直接用 HSTRING 只有一个 \0，
-        // 结尾字节取决于堆内存内容，导致 SHFileOperationW 间歇性返回 0x2。
-        // 这里手动构建缓冲区并补足双 \0。
+        // pFrom 要求双 \0 结尾的路径列表，HSTRING 只有一个 \0 且结尾字节取自堆内存，
+        // 会让 SHFileOperationW 间歇性返回 0x2；这里手动补足双 \0。
         let mut buf: Vec<u16> = dir.as_os_str().encode_wide().collect();
         buf.push(0);
         buf.push(0);
@@ -290,10 +288,7 @@ fn move_to_trash_windows<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
     .join()
     .unwrap_or(-1);
 
-    // 返回码说明：
-    // 0 = 成功
-    // 0x71 = 无错误但用户取消（未移动任何内容，视为成功）
-    // 其他值表示出错
+    // 返回码：0 成功；0x71 用户取消，未移动任何内容，视为成功；其他值出错
     match result {
         0 => Ok(()),
         0x71 => Err(ErrorType::TaskCancel), // 用户已取消
@@ -310,7 +305,7 @@ fn move_to_trash_windows<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
 ///
 /// # 返回值
 ///
-/// 名字非法（空、全点号、超 80 字节或含非法字符）返回 true
+/// 名字非法时返回 true：空、全点号、超 80 字节或含非法字符
 pub fn file_has_invalid_chars(name: &str) -> bool {
     if name.is_empty() || name.chars().all(|c| c == '.') {
         return true;
@@ -325,7 +320,7 @@ pub fn file_has_invalid_chars(name: &str) -> bool {
 
 /// 获取所有文件
 ///
-/// - `path`: 需要计算的路径
+/// - `local`: 递归搜索的根目录
 ///
 /// # 返回值
 ///
@@ -353,7 +348,7 @@ pub fn get_all_files<P: AsRef<Path>>(local: P) -> Vec<PathBuf> {
 ///
 /// # 返回值
 ///
-/// 返回当前目录下的文件路径列表（不含子目录）
+/// 返回当前目录下的文件路径列表，不含子目录
 pub fn get_files<P: AsRef<Path>>(path: P) -> Vec<PathBuf> {
     let mut files = Vec::new();
 
@@ -418,7 +413,7 @@ pub fn get_last_written_file<P: AsRef<Path>>(path: P) -> CoreResult<Option<PathB
 ///
 /// # 返回值
 ///
-/// 返回目录总大小（字节）
+/// 返回目录总大小，单位字节
 pub fn get_folder_size<P: AsRef<Path>>(path: P) -> u64 {
     let mut size = 0;
 
@@ -460,8 +455,8 @@ pub fn get_dirs<P: AsRef<Path>>(path: P) -> Vec<PathBuf> {
 
 /// 复制文件
 ///
-/// - `input`: 目标文件
-/// - `output`: 输出文件
+/// - `input`: 源文件路径
+/// - `output`: 输出文件路径
 ///
 /// # 返回值
 ///
@@ -478,8 +473,8 @@ pub fn copy_file<P: AsRef<Path>>(input: P, output: P) -> CoreResult<()> {
 
 /// 异步复制文件
 ///
-/// - `input`: 目标文件
-/// - `output`: 输出文件
+/// - `input`: 源文件路径
+/// - `output`: 输出文件路径
 ///
 /// # 返回值
 ///
@@ -496,12 +491,12 @@ pub async fn copy_file_async<P: AsRef<Path>>(input: P, output: P) -> CoreResult<
 
 /// 搬运文件
 ///
-/// - `input`: 目标文件
-/// - `output`: 输出文件
+/// - `input`: 源文件路径
+/// - `output`: 输出文件路径
 ///
 /// # 返回值
 ///
-/// 移动成功返回 `Ok(())`（跨设备时自动回退为复制+删除），失败返回相应错误
+/// 移动成功返回 `Ok(())`；跨设备时自动回退为复制后删除，失败返回相应错误
 pub fn move_file<P: AsRef<Path>>(input: P, output: P) -> CoreResult<()> {
     if let Some(parent) = output.as_ref().parent() {
         create_dir_all(parent)?;
@@ -525,12 +520,12 @@ pub fn move_file<P: AsRef<Path>>(input: P, output: P) -> CoreResult<()> {
 
 /// 异步搬运文件
 ///
-/// - `input`: 目标文件
-/// - `output`: 输出文件
+/// - `input`: 源文件路径
+/// - `output`: 输出文件路径
 ///
 /// # 返回值
 ///
-/// 移动成功返回 `Ok(())`（跨设备时自动回退为复制+删除），失败返回相应错误
+/// 移动成功返回 `Ok(())`；跨设备时自动回退为复制后删除，失败返回相应错误
 pub async fn move_file_async<P: AsRef<Path>>(input: P, output: P) -> CoreResult<()> {
     if let Some(parent) = output.as_ref().parent() {
         create_dir_all(parent)?;
@@ -554,7 +549,7 @@ pub async fn move_file_async<P: AsRef<Path>>(input: P, output: P) -> CoreResult<
 
 /// 复制文件夹
 ///
-/// - `input`: 目标目录
+/// - `input`: 源目录
 /// - `output`: 输出目录
 ///
 /// # 返回值
@@ -589,8 +584,8 @@ pub fn copy_dir<P: AsRef<Path>>(input: P, output: P) -> CoreResult<()> {
 
 /// 异步复制文件夹
 ///
-/// - `input`: 目标目录
-/// - `output`: 输出目录
+/// - `from`: 源目录
+/// - `to`: 输出目录
 ///
 /// # 返回值
 ///
@@ -660,7 +655,7 @@ pub fn open_read<P: AsRef<Path>>(file: P) -> CoreResult<fs::File> {
     }
 }
 
-/// 以读写方式打开已存在的文件（不创建、不截断）
+/// 以读写方式打开已存在的文件，不创建、不截断
 ///
 /// - `file`: 文件路径
 ///
@@ -700,7 +695,7 @@ pub async fn open_read_async<P: AsRef<Path>>(file: P) -> CoreResult<tfs::File> {
 ///
 /// # 返回值
 ///
-/// 返回写入文件句柄（父目录自动创建、写前截断），打开失败返回相应错误
+/// 返回写入文件句柄，父目录自动创建、写前截断；打开失败返回相应错误
 pub fn open_write<P: AsRef<Path>>(file: P) -> CoreResult<fs::File> {
     if let Some(parent) = file.as_ref().parent() {
         if let Err(err) = fs::create_dir_all(parent) {
@@ -733,7 +728,7 @@ pub fn open_write<P: AsRef<Path>>(file: P) -> CoreResult<fs::File> {
 ///
 /// # 返回值
 ///
-/// 返回写入文件句柄（父目录自动创建、写前截断），打开失败返回相应错误
+/// 返回写入文件句柄，父目录自动创建、写前截断；打开失败返回相应错误
 pub async fn open_write_async<P: AsRef<Path>>(file: P) -> CoreResult<tfs::File> {
     if let Some(parent) = file.as_ref().parent() {
         create_dir_all(parent)?;
@@ -761,7 +756,7 @@ pub async fn open_write_async<P: AsRef<Path>>(file: P) -> CoreResult<tfs::File> 
 ///
 /// # 返回值
 ///
-/// 创建成功（含已存在）返回 `Ok(())`，失败返回相应错误
+/// 创建成功或目录已存在均返回 `Ok(())`，失败返回相应错误
 pub fn create_dir_all<P: AsRef<Path>>(path: P) -> CoreResult<()> {
     match fs::create_dir_all(&path) {
         Ok(_) => Ok(()),
@@ -778,7 +773,7 @@ pub fn create_dir_all<P: AsRef<Path>>(path: P) -> CoreResult<()> {
 ///
 /// # 返回值
 ///
-/// 返回追加写文件句柄（父目录自动创建、不存在则创建），打开失败返回相应错误
+/// 返回追加写文件句柄，父目录与文件不存在时自动创建；打开失败返回相应错误
 pub fn open_append<P: AsRef<Path>>(file: P) -> CoreResult<fs::File> {
     if let Some(parent) = file.as_ref().parent() {
         create_dir_all(parent)?;
@@ -874,7 +869,7 @@ pub async fn read_text_async<P: AsRef<Path>>(file: P) -> CoreResult<String> {
     Ok(content)
 }
 
-/// 读取byte数据
+/// 读取字节数据
 ///
 /// - `file`: 文件路径
 ///
@@ -893,7 +888,7 @@ pub fn read_byte<P: AsRef<Path>>(file: P) -> CoreResult<Vec<u8>> {
     Ok(buffer)
 }
 
-/// 异步读取byte数据
+/// 异步读取字节数据
 ///
 /// - `file`: 文件路径
 ///
@@ -918,7 +913,7 @@ pub async fn read_byte_async<P: AsRef<Path>>(file: P) -> CoreResult<Vec<u8>> {
 ///
 /// # 返回值
 ///
-/// 目标是文件时删除并返回 `Ok(())`（目录不做任何事），删除失败返回相应错误
+/// 目标是文件时删除并返回 `Ok(())`，目录不做任何事；删除失败返回相应错误
 pub fn delete<P: AsRef<Path>>(file: P) -> CoreResult<()> {
     if file.as_ref().is_file() {
         fs::remove_file(&file).map_err(|err| {
@@ -937,7 +932,7 @@ pub fn delete<P: AsRef<Path>>(file: P) -> CoreResult<()> {
 ///
 /// # 返回值
 ///
-/// 目标是文件时删除并返回 `Ok(())`（目录不做任何事），删除失败返回相应错误
+/// 目标是文件时删除并返回 `Ok(())`，目录不做任何事；删除失败返回相应错误
 pub async fn delete_async<P: AsRef<Path>>(file: P) -> CoreResult<()> {
     if file.as_ref().is_file() {
         tfs::remove_file(&file).await.map_err(|err| {
@@ -1033,7 +1028,7 @@ pub async fn write_stream_async<P: AsRef<Path>, R: AsyncRead + Unpin>(
 ///
 /// # 返回值
 ///
-/// 返回非法字符（`<>:"/\|?*\0`）替换为 `_` 后的名字
+/// 返回把非法字符 `<>:"/\|?*` 与 `\0` 替换为 `_` 后的名字
 pub fn replace_file_name(name: &str) -> String {
     name.replace(|c: char| "<>:\"/\\|?*\0".contains(c), "_")
 }
@@ -1042,7 +1037,7 @@ pub fn replace_file_name(name: &str) -> String {
 ///
 /// # 返回值
 ///
-/// 返回替换后的路径名（Windows 额外替换 `<>:"/\|?*`，其他平台仅替换 `\0`）
+/// 返回替换后的路径名，Windows 额外替换 `<>:"/\|?*`，其他平台仅替换 `\0`
 pub fn replace_path_name(name: &str) -> String {
     #[cfg(not(windows))]
     let invalid_chars: Vec<char> = vec!['\0'];
@@ -1072,7 +1067,7 @@ mod tests {
         dir
     }
 
-    /// write_text / read_text 往返，以及整文件重写（截断）语义
+    /// write_text / read_text 往返，以及整文件重写的截断语义
     #[test]
     fn test_write_read_text() {
         let root = make_test_root("text");
@@ -1106,7 +1101,7 @@ mod tests {
         write_bytes(&file, &data).unwrap();
         assert_eq!(read_byte(&file).unwrap(), data);
 
-        // 覆盖写（截断）
+        // 覆盖写并截断
         write_bytes(&file, b"short").unwrap();
         assert_eq!(read_byte(&file).unwrap(), b"short".to_vec());
 
@@ -1189,7 +1184,7 @@ mod tests {
         // 复制不存在的文件报错
         assert!(copy_file(root.join("no_such.txt"), dst.clone()).is_err());
 
-        // 移动到新位置（move_file 会自动创建父目录）
+        // 移动到新位置，move_file 会自动创建父目录
         let moved = root.join("sub").join("dir").join("moved.txt");
         move_file(&dst, &moved).unwrap();
         assert!(!dst.exists());
@@ -1263,7 +1258,7 @@ mod tests {
         // 目录大小
         assert_eq!(get_folder_size(&root), 15);
 
-        // 最后写入的文件（当前目录只有 a.txt 一个文件）
+        // 最后写入的文件：当前目录只有 a.txt 一个文件
         let last = get_last_written_file(&root).unwrap().unwrap();
         assert_eq!(last, root.join("a.txt"));
 

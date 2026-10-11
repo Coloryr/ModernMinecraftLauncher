@@ -29,10 +29,14 @@ fn set_pixel(image: &mut Pixmap, x: i32, y: i32, color: [u8; 4]) {
     image.data_mut()[offset..offset + BPP].copy_from_slice(&color);
 }
 
-/// 创建皮肤图片（TypeA 风格）
-/// `image` - 原始皮肤贴图
-/// `skin_type` - 皮肤类型，None 为自动检测
-/// 返回缩放后的 2D 皮肤图片 (128x256)
+/// 创建 TypeA 风格的皮肤 2D 展开图
+///
+/// - `image`: 原始皮肤贴图
+/// - `skin_type`: 皮肤类型，`None` 表示按贴图自动检测
+///
+/// # 返回值
+///
+/// 返回缩放 8 倍后的 2D 皮肤图片，尺寸 128x256；贴图尺寸异常时返回 `None`
 pub fn skin_2d_draw_typea(image: &Pixmap, skin_type: Option<SkinType>) -> Option<Pixmap> {
     // 创建中间 16x32 画布
     let mut image1 = Pixmap::new(16, 32)?;
@@ -122,10 +126,14 @@ pub fn skin_2d_draw_typea(image: &Pixmap, skin_type: Option<SkinType>) -> Option
     scale(&image1, SCALE_TYPEC)
 }
 
-/// 创建皮肤图片（TypeB 风格）
-/// `image` - 原始皮肤贴图
-/// `skin_type` - 皮肤类型，None 为自动检测
-/// 返回缩放后的 2D 皮肤图片 (272x532)
+/// 创建 TypeB 风格的皮肤 2D 展开图
+///
+/// - `image`: 原始皮肤贴图
+/// - `skin_type`: 皮肤类型，`None` 表示按贴图自动检测
+///
+/// # 返回值
+///
+/// 返回缩放 2 倍后的 2D 皮肤图片，尺寸 272x532；贴图尺寸异常时返回 `None`
 pub fn skin_2d_draw_typeb(image: &Pixmap, skin_type: Option<SkinType>) -> Option<Pixmap> {
     // 创建中间 136x266 画布
     let mut image1 = Pixmap::new(136, 266)?;
@@ -343,7 +351,7 @@ pub fn skin_2d_draw_typeb(image: &Pixmap, skin_type: Option<SkinType>) -> Option
     scale(&image1, SCALE_TYPEB)
 }
 
-/// 注意：draw_mix 按 BGRA 字节序解释像素内存，且整个管线（mix -> scale -> PNG 存取）
+/// 注意：draw_mix 按 BGRA 字节序解释像素内存，且整个管线 mix -> scale -> PNG 存取
 /// 都保持同一套字节语义，所以本测试直接在字节层面做断言，不比较语义上的 R/G/B。
 #[cfg(test)]
 mod tests {
@@ -366,7 +374,7 @@ mod tests {
         get_pixel(bm, x, y)
     }
 
-    /// 新版 (1.8+) 皮肤的 2D 展开：各部件应落在 16x32 中间画布的对应区域，
+    /// 新版 1.8+ 皮肤的 2D 展开：各部件应落在 16x32 中间画布的对应区域，
     /// 缩放 8 倍后为 128x256。透明 overlay 不应破坏底层的颜色。
     #[test]
     fn test_skin_2d_draw_typea_new_layout() {
@@ -389,7 +397,7 @@ mod tests {
             } else if in_area(20, 52, 4, 12) {
                 [60, 0, 0, 255] // 左腿 (20,52,4,12)
             } else {
-                [0, 0, 0, 0] // 其余（含所有 overlay 区域）透明
+                [0, 0, 0, 0] // 其余含所有 overlay 区域，透明
             }
         });
 
@@ -411,11 +419,11 @@ mod tests {
         // 左腿 (8,20,4,12) -> 输出中心 (80, 208)
         assert_eq!(get_bytes(&out, 80, 208), [60, 0, 0, 255], "左腿");
 
-        // 部件之间的空隙应保持透明（例如 16x32 画布的 (0,0) -> 输出 (0,0)）
+        // 部件之间的空隙应保持透明，如 16x32 画布的 (0,0) 对应输出 (0,0)
         assert_eq!(get_bytes(&out, 0, 0), [0, 0, 0, 0], "空隙应透明");
     }
 
-    /// 纤细 (slim) 皮肤的右手只有 3 像素宽，左手位置与普通皮肤一致
+    /// 纤细皮肤的右手只有 3 像素宽，左手位置与普通皮肤一致
     #[test]
     fn test_skin_2d_draw_typea_slim_layout() {
         let image = make_bitmap(64, 64, |x, y| {

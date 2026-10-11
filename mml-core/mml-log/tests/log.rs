@@ -1,11 +1,10 @@
 //! mml-log 集成测试
 //!
-//! 日志系统使用进程级全局状态（`STREAM` 只能初始化一次、日志线程只能启动
-//! 一次），因此在同一个测试里顺序执行完整的启动 → 记录 → 校验 → 停止流程。
+//! 日志系统使用进程级全局状态，`STREAM` 只能初始化一次、日志线程只能启动
+//! 一次，因此在同一个测试里顺序执行完整的启动 → 记录 → 校验 → 停止流程。
 //!
-//! 日志文件统一写入仓库 `target/temp` 下的唯一子目录，测试结束后
-//! 尽力清理（日志文件句柄由全局 `STREAM` 持有，Windows 下可能无法删除，
-//! 清理失败会忽略，不影响测试结果）。
+//! 日志文件统一写入仓库 `target/temp` 下的唯一子目录，测试结束后尽力清理；
+//! 日志文件句柄由全局 `STREAM` 持有，Windows 下可能删不掉，失败会忽略
 
 use std::{
     fs,
@@ -26,7 +25,7 @@ fn temp_dir(name: &str) -> PathBuf {
     dir
 }
 
-/// 轮询等待文件内容满足条件（后台线程异步写盘，需要等待）
+/// 轮询等待文件内容满足条件，后台线程异步写盘，需要等待
 fn wait_for_file<F: Fn(&str) -> bool>(file: &PathBuf, check: F) -> String {
     for _ in 0..100 {
         if let Ok(data) = fs::read_to_string(file) {
@@ -76,20 +75,20 @@ fn log_lifecycle() {
     assert!(data.contains("[Error]"), "缺少 [Error] 标记: {data:?}");
     assert!(data.contains("[Fault]"), "缺少 [Fault] 标记: {data:?}");
 
-    // 每条日志独占一行（换行符与平台一致）
+    // 每条日志独占一行，换行符与平台一致
     let line_ending = mml_names::get_line_ending();
     assert!(
         data.contains(&format!("信息日志{line_ending}")),
         "日志应以平台换行符结尾: {data:?}"
     );
 
-    // 重复 start 应失败（STREAM 是 OnceLock，第二次 set 会 panic）
+    // 重复 start 应失败：STREAM 是 OnceLock，第二次 set 会 panic
     let second = panic::catch_unwind(AssertUnwindSafe(|| mml_log::start(&dir)));
     assert!(second.is_err(), "第二次 start 应该失败");
 
     // 停止日志系统
     mml_log::stop();
 
-    // 清理（日志文件句柄被全局 STREAM 持有，Windows 下可能删除失败，忽略）
+    // 清理：日志文件句柄被全局 STREAM 持有，Windows 下可能删除失败，忽略
     let _ = fs::remove_dir_all(&dir);
 }

@@ -12,7 +12,10 @@ import { useModpackStatus } from "../../lib/modpackTasks";
 import type { GroupDto } from "../../lib/bindings";
 import ModpackMode from "./ModpackMode.vue";
 
-defineEmits<{ (e: "close"): void }>();
+defineEmits<{
+  /** 请求关闭本窗口 */
+  (e: "close"): void;
+}>();
 
 /** 详情是否展开：详情铺满窗口后，返回键放到标题栏（标题栏由本组件持有） */
 const detailOpen = ref(false);
@@ -23,7 +26,7 @@ const modeRef = ref<InstanceType<typeof ModpackMode> | null>(null);
 const group = ref("");
 const groups = ref<GroupDto[]>([]);
 
-/** 安装任务状态（本窗口是"负责显示"的窗口，终态 toast 由这里弹） */
+/** 安装任务状态：本窗口负责显示，终态 toast 由这里弹 */
 const { status: modpackStatus, init: initModpackStatus } = useModpackStatus(true);
 
 /** 安装在线整合包：实例名取自整合包元数据，命令立即返回（任务后台安装） */

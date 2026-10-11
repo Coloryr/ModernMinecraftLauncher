@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 设置窗口 · 保存状态文字（配合 composables/useSaveState）
+// 设置窗口 · 保存状态文字，配合 composables/useSaveState
 //
 // **不显示"已保存"**：设置里大部分改动是即时落盘的，成功本来就是常态，
 // 每改一处就冒一句"已保存"只是噪音。只在需要用户注意时才出声：
@@ -9,6 +9,7 @@ import { t } from "../../../lib/i18n";
 import type { SaveState } from "../composables/useSaveState";
 
 const props = defineProps<{
+  /** 当前保存状态，来自 useSaveState */
   state: SaveState;
   /** 显式保存按钮的场景：idle 时显示"有未保存的改动"而不是空白 */
   pending?: boolean;

@@ -14,18 +14,20 @@ import { projectParamToItem, targetProject } from "../windowManager";
 import type { FileListItemDto, GroupDto, ModPackStatusDto, ModPackTaskDto, ProjectDetailDto, ProjectItemDto } from "../../lib/bindings";
 
 const props = defineProps<{
-  /** 安装到的分组名（空 = 默认分组；提交时由上层转成分组 uuid） */
+  /** 安装到的分组名；空 = 默认分组，提交时由上层转成分组 uuid */
   group: string;
   /** 已有分组候选（uuid + 名字；下拉显示名字） */
   groups: GroupDto[];
-  /** 安装任务状态（同步列表的「已安装 / 安装中」角标） */
+  /** 安装任务状态，用来给列表同步「已安装 / 安装中」角标 */
   status: ModPackStatusDto | null;
 }>();
 
 const emit = defineEmits<{
+  /** 安装指定版本：payload 为下载源、项目 ID、文件 ID 与实例名 */
   (e: "install", payload: { source: string; projectId: string; fileId: string; fileName: string }): void;
+  /** 安装到的分组名变化 */
   (e: "update:group", value: string): void;
-  /** 详情展开 / 收起（返回键由上层放到标题栏，需要知道当前有没有详情） */
+  /** 详情展开 / 收起；返回键在标题栏上，需要知道当前有没有详情 */
   (e: "detail", open: boolean): void;
 }>();
 
@@ -41,7 +43,7 @@ const SOURCE_LABELS: Record<string, string> = {
 const sources = ref<Array<{ value: string; label: string }>>([]);
 const source = ref("");
 
-/** 排序方式（取值就是后端枚举线串，原样回传） */
+/** 排序方式：取值就是后端枚举线串，原样回传 */
 const sorts = ref<string[]>([]);
 const sort = ref("");
 
@@ -62,7 +64,7 @@ const groupQuery = computed(() =>
   props.groups.filter((g) => g.name.toLowerCase().includes(props.group.trim().toLowerCase())),
 );
 
-// 离开本窗口时清掉搜索词与分组下拉（来源 / 版本 / 排序 / 分类等筛选留着：那是浏览上下文）。
+// 离开本窗口时清掉搜索词与分组下拉：来源 / 版本 / 排序 / 分类等筛选留着，那是浏览上下文。
 // 单窗口模式下这一页被 KeepAlive 缓存，切走不销毁，不清的话再打开时输入框里
 // 还压着上次搜的词，用户早忘了自己搜过什么，只会觉得界面不对劲。
 onDeactivated(() => {
@@ -95,14 +97,14 @@ const detailError = ref("");
 const files = ref<FileListItemDto[]>([]);
 const allFiles = ref<FileListItemDto[]>([]);
 const filesLoading = ref(false);
-/** 版本列表加载失败的原因（失败时列表区显示错误 + 重试，而不是当成"没有版本"） */
+/** 版本列表加载失败的原因：失败时列表区显示错误 + 重试，而不是当成"没有版本" */
 const filesError = ref("");
 /** 版本列表页码（0 起）与总数 */
 const filePage = ref(0);
 const fileTotal = ref(0);
-/** 最新版本（详情页「下载」按钮用，page 0 的第一条） */
+/** 最新版本：详情页「下载」按钮用，取 page 0 的第一条 */
 const latestFile = ref<FileListItemDto | null>(null);
-/** 详情页版本列表的游戏版本筛选（"" = 全部），打开详情时沿用列表页的筛选 */
+/** 详情页版本列表的游戏版本筛选，空串 = 全部；打开详情时沿用列表页的筛选 */
 const fileVersion = ref("");
 
 /** 版本列表每页条数（与 CurseForge 后端分页一致） */
@@ -269,7 +271,7 @@ let detailSeq = 0;
 /** 版本列表代次：换筛选 / 换页时丢弃旧一发的返回 */
 let fileSeq = 0;
 
-/** 拉取版本列表（fileVersion 过滤 + 指定页）；Modrinth 一次拿全部本地切片，CurseForge 后端分页 */
+/** 拉取版本列表：按 `fileVersion` 过滤并取指定页；Modrinth 一次拿全部本地切片，CurseForge 走后端分页 */
 async function loadFiles(pid: string, page: number) {
   const mine = ++fileSeq;
   filesLoading.value = true;
@@ -580,7 +582,7 @@ async function consumeTargetProject() {
 
   await nextTick();
 
-  // 精简条目只够定位项目（下载次数 / 更新时间 / 收藏状态都是空的）→ 现取一次真的；
+  // 精简条目只够定位项目，下载次数 / 更新时间 / 收藏状态都是空的，所以现取一次真的；
   // 取不到（离线等）就退回精简条目，至少详情能打开
   let item = projectParamToItem(p);
   try {
@@ -645,7 +647,7 @@ watch(source, loadSource);
     <!-- 列表加载指示：翻页 / 换筛选只在结果区上方走一条细进度，不再全窗口遮罩 -->
     <div class="list-bar" :class="{ on: searching }" aria-hidden="true"><span /></div>
 
-    <!-- 结果列表（加载状态内联在本区，旧内容保留并压暗） -->
+    <!-- 结果列表：加载状态内联在本区，旧内容保留并压暗 -->
     <div class="modpack-list" :class="{ 'is-loading-dim': searching }">
       <!-- 首次加载（还没有内容）：骨架行 -->
       <template v-if="searching && items.length === 0">
@@ -712,12 +714,12 @@ watch(source, loadSource);
 
     <!--
       截图放大预览：滚轮缩放、拖动平移、点空白处或 Esc 关闭。
-      UI 与行为都在共用的 `ImagePreview` 里（资源窗口的截图预览用的是同一份）。
+      UI 与行为都在共用的 `ImagePreview` 里，资源窗口的截图预览用的是同一份。
       Esc 仍由本页处理（见 onDetailKey）：这里还有"先关预览、再关详情页"的层次
     -->
     <ImagePreview v-if="preview" :src="preview" @close="closePreview" />
 
-    <!-- 项目详情（单击列表项打开）：铺满标题栏以下的整个窗口，返回键在标题栏上 -->
+    <!-- 项目详情：单击列表项打开，铺满标题栏以下的整个窗口，返回键在标题栏上 -->
     <Teleport to="body">
       <transition name="detail-page">
         <div v-if="detailItem" class="detail-page">

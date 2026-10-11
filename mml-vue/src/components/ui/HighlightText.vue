@@ -1,10 +1,12 @@
 <script setup lang="ts">
-// 把文本里命中查询词的部分包成 <mark>（大小写不敏感；查询词为空或没命中就原样输出）
+// 把文本里命中查询词的部分包成 <mark>；大小写不敏感，查询词为空或没命中就原样输出
 // 用于方块名等搜索结果，让用户看出「为什么这个条目被搜出来」
 import { computed } from "vue";
 
 const props = defineProps<{
+  /** 待高亮的完整文本 */
   text: string;
+  /** 查询词；空串时整段原样输出 */
   query: string;
 }>();
 

@@ -3,6 +3,14 @@ use std::{collections::HashMap, fs, path::{Path, PathBuf}};
 use mml_base::archives::{ArchiveType, BaseArchive, TarMode};
 
 /// 对比两个文件夹是否一致
+///
+/// - `dir1`: 第一个文件夹
+/// - `dir2`: 第二个文件夹
+/// - `skip_patterns`: 对比时跳过的路径模式
+///
+/// # 返回值
+///
+/// 文件数量、相对路径与内容都一致时为 `true`
 pub fn compare_folders(
     dir1: &PathBuf,
     dir2: &PathBuf,
@@ -48,7 +56,15 @@ pub fn compare_folders(
     differences.is_empty()
 }
 
-/// 收集文件夹中所有文件的内容（跳过符合模式的文件）
+/// 收集文件夹中所有文件的内容，跳过符合模式的文件
+///
+/// - `current_dir`: 起始目录
+/// - `root_dir`: 相对路径的基准目录
+/// - `skip_patterns`: 需要跳过的路径模式
+///
+/// # 返回值
+///
+/// 键为相对路径、值为文件内容的映射
 fn collect_files_with_filter(
     current_dir: &Path,
     root_dir: &Path,
@@ -59,7 +75,12 @@ fn collect_files_with_filter(
     files
 }
 
-/// 递归收集文件
+/// 递归收集文件内容到 `files`
+///
+/// - `current_dir`: 当前遍历目录
+/// - `root_dir`: 相对路径的基准目录
+/// - `skip_patterns`: 需要跳过的路径模式
+/// - `files`: 收集结果，键为相对路径
 fn collect_files_recursive(
     current_dir: &Path,
     root_dir: &Path,
@@ -95,14 +116,21 @@ fn collect_files_recursive(
     }
 }
 
-/// 统一路径分隔符
+/// 统一路径分隔符为 `/`
 fn normalize_path(path: &Path) -> String {
     path.to_string_lossy()
         .to_string()
         .replace('\\', "/")
 }
 
-/// 检查是否应该跳过该文件
+/// 检查文件是否命中跳过模式
+///
+/// - `file_path`: 归一化后的相对路径
+/// - `patterns`: 跳过模式，支持 `*` 通配
+///
+/// # 返回值
+///
+/// 命中任一模式时为 `true`
 fn should_skip(file_path: &str, patterns: &[String]) -> bool {
     patterns.iter().any(|pattern| {
         let pattern_normalized = pattern.replace('\\', "/");
@@ -122,7 +150,14 @@ fn should_skip(file_path: &str, patterns: &[String]) -> bool {
     })
 }
 
-/// 简单的通配符匹配
+/// 按 `/` 分段做通配符匹配，`*` 可出现在段内
+///
+/// - `text`: 待匹配的相对路径
+/// - `pattern`: 模式串，`*` 为通配符
+///
+/// # 返回值
+///
+/// 段数与逐段匹配都通过时为 `true`
 fn matches_wildcard(text: &str, pattern: &str) -> bool {
     if pattern == "*" {
         return true;
@@ -151,6 +186,7 @@ fn matches_wildcard(text: &str, pattern: &str) -> bool {
     })
 }
 
+/// 压缩源目录为 zip 并断言成功
 #[test]
 fn zip() {
     let file = Path::new("test_run");
@@ -164,6 +200,7 @@ fn zip() {
     assert!(res.is_ok());
 }
 
+/// 解压 zip 到目录并断言成功，依赖 `zip` 先产出压缩包
 #[test]
 #[ignore]
 fn unzip() {
@@ -174,6 +211,7 @@ fn unzip() {
     assert!(res.is_ok());
 }
 
+/// 断言 zip 解压结果与源目录一致，依赖 `unzip` 先执行
 #[test]
 #[ignore]
 fn zip_equal() {
@@ -186,6 +224,7 @@ fn zip_equal() {
     ]));
 }
 
+/// 压缩源目录为 7z 并断言成功
 #[test]
 #[ignore]
 fn r7z() {
@@ -200,6 +239,7 @@ fn r7z() {
     assert!(res.is_ok());
 }
 
+/// 解压 7z 到目录并断言成功
 #[test]
 #[ignore]
 fn unr7z() {
@@ -210,6 +250,7 @@ fn unr7z() {
     assert!(res.is_ok());
 }
 
+/// 断言 7z 解压结果与源目录一致
 #[test]
 #[ignore]
 fn r7z_equal() {
@@ -222,6 +263,7 @@ fn r7z_equal() {
     ]));
 }
 
+/// 压缩源目录为 tar.gz 并断言成功
 #[test]
 #[ignore]
 fn targz() {
@@ -236,6 +278,7 @@ fn targz() {
     assert!(res.is_ok());
 }
 
+/// 解压 tar.gz 到目录并断言成功
 #[test]
 #[ignore]
 fn untargz() {
@@ -246,6 +289,7 @@ fn untargz() {
     assert!(res.is_ok());
 }
 
+/// 断言 tar.gz 解压结果与源目录一致
 #[test]
 #[ignore]
 fn targz_equal() {
@@ -258,6 +302,7 @@ fn targz_equal() {
     ]));
 }
 
+/// 压缩源目录为 tar.xz 并断言成功
 #[test]
 #[ignore]
 fn tarxz() {
@@ -272,6 +317,7 @@ fn tarxz() {
     assert!(res.is_ok());
 }
 
+/// 解压 tar.xz 到目录并断言成功
 #[test]
 #[ignore]
 fn untarxz() {
@@ -282,6 +328,7 @@ fn untarxz() {
     assert!(res.is_ok());
 }
 
+/// 断言 tar.xz 解压结果与源目录一致
 #[test]
 #[ignore]
 fn tarxz_equal() {
@@ -294,6 +341,7 @@ fn tarxz_equal() {
     ]));
 }
 
+/// 校验 TarMode 按后缀识别 gz 与 xz，不支持的返回 `None`
 #[test]
 fn test_tar_mode_from_path() {
     // 测试 .tar.gz
@@ -317,6 +365,7 @@ fn test_tar_mode_from_path() {
     assert!(TarMode::try_from_path(path_zip).is_none());
 }
 
+/// 清理用例产生的 `test_run` 目录
 #[test]
 #[ignore]
 fn remove_file() {
@@ -324,6 +373,7 @@ fn remove_file() {
     fs::remove_dir_all(file).ok();
 }
 
+/// 校验 zip / 7z / tar.gz 的压缩、打开、读条目与单文件解压
 #[test]
 fn open_read_extract() {
     // 使用独立目录，避免与其它测试并行冲突
@@ -343,7 +393,7 @@ fn open_read_extract() {
         let arc = file.join(name);
         // 压缩
         BaseArchive::compress(archive_type, &arc, &source, Some(&source), &None, None).unwrap();
-        // 打开并查文件（条目名可能用 / 或 \ 分隔，按实际条目名查找）
+        // 打开并查文件：条目名可能用 / 或 \ 分隔，按实际条目名查找
         let base = BaseArchive::open(&arc).unwrap();
         let readme = base
             .entries()
@@ -376,6 +426,7 @@ fn open_read_extract() {
     fs::remove_dir_all(file).ok();
 }
 
+/// 校验排除列表生效，且 zip 走并行解压路径
 #[test]
 fn extract_all_unselect_parallel() {
     // 独立目录，避免与其它测试并行冲突
@@ -391,7 +442,7 @@ fn extract_all_unselect_parallel() {
     BaseArchive::compress(ArchiveType::Zip, &arc, &source, Some(&source), &None, None).unwrap();
     let base = BaseArchive::open(&arc).unwrap();
 
-    // 排除 keep.txt，并行解压剩余文件（zip 走多线程路径）
+    // 排除 keep.txt，并行解压剩余文件，zip 走多线程路径
     let out = file.join("out");
     base.extract_all(&out, Some(vec!["keep.txt".to_string()]), None, None)
         .unwrap();
@@ -403,6 +454,7 @@ fn extract_all_unselect_parallel() {
     fs::remove_dir_all(file).ok();
 }
 
+/// 校验单顶层目录的剥离，以及与排除项同时生效
 #[test]
 fn extract_all_strip_single_top_dir() {
     // 独立目录，避免与其它测试并行冲突
@@ -450,6 +502,7 @@ fn extract_all_strip_single_top_dir() {
     fs::remove_dir_all(file).ok();
 }
 
+/// 校验存在多个顶层目录时不剥离，原路径保留
 #[test]
 fn extract_all_keeps_multiple_top_dirs() {
     // 独立目录，避免与其它测试并行冲突
@@ -475,6 +528,7 @@ fn extract_all_keeps_multiple_top_dirs() {
     fs::remove_dir_all(file).ok();
 }
 
+/// 校验纯 tar 的压缩与解压往返
 #[test]
 fn tar_plain_roundtrip() {
     // 独立目录，避免与其它测试并行冲突
@@ -496,6 +550,7 @@ fn tar_plain_roundtrip() {
     fs::remove_dir_all(file).ok();
 }
 
+/// 校验 zip 与 tar 的就地追加磁盘文件与内存数据
 #[test]
 fn add_files_data_inplace() {
     // 独立目录，避免与其它测试并行冲突
@@ -507,7 +562,7 @@ fn add_files_data_inplace() {
     let extra = file.join("extra.txt");
     fs::write(&extra, b"extra").unwrap();
 
-    // Zip 就地追加（复用已打开句柄）
+    // Zip 就地追加，复用已打开句柄
     let arc = file.join("a.zip");
     BaseArchive::compress(ArchiveType::Zip, &arc, &source, Some(&source), &None, None).unwrap();
     let mut base = BaseArchive::open(&arc).unwrap();
@@ -532,6 +587,7 @@ fn add_files_data_inplace() {
     fs::remove_dir_all(file).ok();
 }
 
+/// 按顺序跑完整套压缩包用例，覆盖压缩、解压与一致性对比
 #[test]
 fn archive_test() {
     zip();

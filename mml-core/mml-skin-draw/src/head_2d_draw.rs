@@ -1,4 +1,4 @@
-//! 头像的 2D 平铺渲染（正面 + 头顶层叠加）
+//! 头像的 2D 平铺渲染，正面叠加头顶层
 
 use tiny_skia::Pixmap;
 
@@ -6,7 +6,7 @@ use crate::skin_draw::{
     SCALE_TYPEA, SCALE_TYPEB, draw, draw_mix, draw_with_fill_image, draw_with_fill_image_mix, scale,
 };
 
-/// 渲染 TypeA 风格的 2D 头像（平铺、无外扩边距）
+/// 渲染 TypeA 风格的 2D 头像，平铺且无外扩边距
 ///
 /// - `image`: 皮肤贴图
 ///
@@ -21,7 +21,7 @@ pub fn head_2d_draw_typea(image: &Pixmap) -> Option<Pixmap> {
     scale(&dest, SCALE_TYPEA)
 }
 
-/// 渲染 TypeB 风格的 2D 头像（带外扩边距的放大版）
+/// 渲染 TypeB 风格的 2D 头像，带外扩边距的放大版
 ///
 /// - `image`: 皮肤贴图
 ///

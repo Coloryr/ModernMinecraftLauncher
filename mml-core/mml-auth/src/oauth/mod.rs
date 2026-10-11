@@ -12,16 +12,16 @@
 //! 获取 Microsoft Token ───► refresh_token 可用于续期
 //!     │
 //!     ▼
-//! Xbox Live 认证（获取 XBL Token）
+//! Xbox Live 认证，换取 XBL Token
 //!     │
 //!     ▼
-//! XSTS 认证（获取 XSTS Token）
+//! XSTS 认证，换取 XSTS Token
 //!     │
 //!     ▼
-//! Minecraft 服务认证（获取 Minecraft Token）
+//! Minecraft 服务认证，换取 Minecraft Token
 //!     │
 //!     ▼
-//! 获取 Minecraft 玩家 Profile（用户名 + UUID）
+//! 获取 Minecraft 玩家 Profile，即用户名 + UUID
 //! ```
 //!
 //! # 子模块
@@ -56,7 +56,7 @@ use crate::{
 pub mod oauth_obj;
 pub mod xbox_obj;
 
-/// OAuth 客户端密钥（Azure 应用程序 ID），启动时通过 `set_key()` 设置
+/// OAuth 客户端密钥，即 Azure 应用程序 ID，启动时通过 `set_key()` 设置
 static KEY: OnceLock<String> = OnceLock::new();
 
 /// 微软认证流程中的当前阶段
@@ -67,7 +67,7 @@ pub enum AuthState {
     OAuth,
     /// 正在进行 Xbox Live 认证
     XBox,
-    /// 正在进行 XSTS（Xbox Secure Token Service）认证
+    /// 正在进行 XSTS 认证，XSTS 即 Xbox Secure Token Service
     XSTS,
     /// 正在获取 Minecraft 服务令牌
     Token,
@@ -78,8 +78,6 @@ pub enum AuthState {
 /// 设置 OAuth 客户端密钥
 ///
 /// 应在程序启动时调用，设置 Azure 应用程序的客户端 ID。
-///
-/// # 参数
 ///
 /// - `key`: Azure 应用程序注册 ID
 pub fn set_key(key: &str) {
@@ -107,7 +105,7 @@ fn have_key() -> CoreResult<String> {
 /// - `code`: 用户需要输入的设备码
 /// - `url`: 用户需要访问的验证网址
 /// - `device_code`: 后续轮询用的设备码
-/// - `expires_in`: 设备码的有效期（秒）
+/// - `expires_in`: 设备码的有效期，单位秒
 pub async fn get_code() -> CoreResult<OAuthGetCodeResObj> {
     let key = have_key()?;
 
@@ -132,9 +130,7 @@ pub async fn get_code() -> CoreResult<OAuthGetCodeResObj> {
 }
 
 /// 轮询等待用户完成设备码授权——第二步：获取 Microsoft Token，
-/// 直到用户完成授权、超时或被取消（初始间隔 2 秒，收到 slow_down 加 5 秒）
-///
-/// # 参数
+/// 直到用户完成授权、超时或被取消，初始间隔 2 秒，收到 slow_down 加 5 秒
 ///
 /// - `res`: 第一步返回的设备码信息
 /// - `cancel`: 取消令牌，用于用户主动终止等待
@@ -169,7 +165,7 @@ pub async fn run_get_code(
         }
 
         // 令牌端点在用户尚未授权时返回 400 + `authorization_pending`，属正常中间态，
-        // 不能用 post_form_get_json（非 2xx 直接报错），须拿原始响应自行解析 body
+        // 不能用 post_form_get_json，非 2xx 直接报错，须拿原始响应自行解析 body
         let resp = mml_net::get_login_client()
             .post_form_get_req(urls::OAUTH_TOKEN, obj)
             .await?;
@@ -203,13 +199,11 @@ pub async fn run_get_code(
 
 /// 用保存的 refresh_token 换取新令牌，无需用户重新授权
 ///
-/// # 参数
-///
 /// - `token`: 之前保存的 refresh_token
 ///
 /// # 返回值
 ///
-/// 成功时返回新的 `OAuthGetCodeObj`（包含新的 access_token 和 refresh_token）
+/// 成功时返回新的 `OAuthGetCodeObj`，其中含新的 access_token 和 refresh_token
 pub async fn refresh_oauth_token(token: &str) -> CoreResult<OAuthGetCodeObj> {
     let key = have_key()?;
 
@@ -229,15 +223,13 @@ pub async fn refresh_oauth_token(token: &str) -> CoreResult<OAuthGetCodeObj> {
     }
 }
 
-/// Xbox Live 认证——第三步：用 Microsoft Token 换取 XBL Token 与用户哈希（UHS）
-///
-/// # 参数
+/// Xbox Live 认证——第三步：用 Microsoft Token 换取 XBL Token 与用户哈希 UHS
 ///
 /// - `token`: Microsoft OAuth access_token
 ///
 /// # 返回值
 ///
-/// 成功时返回 XBL Token 与用户哈希（UHS），令牌为空时返回 `ErrorType::OAuthGetTokenEmpty`
+/// 成功时返回 XBL Token 与用户哈希 UHS，令牌为空时返回 `ErrorType::OAuthGetTokenEmpty`
 pub async fn get_xbox(token: &str) -> CoreResult<XBoxLiveResObj> {
     let obj = XBoxLoginObj {
         properties: XBoxLoginPropertiesObj {
@@ -266,15 +258,13 @@ pub async fn get_xbox(token: &str) -> CoreResult<XBoxLiveResObj> {
     }
 }
 
-/// XSTS 认证——第四步：用 XBL Token 换取 XSTS Token 与用户哈希（UHS）
-///
-/// # 参数
+/// XSTS 认证——第四步：用 XBL Token 换取 XSTS Token 与用户哈希 UHS
 ///
 /// - `token`: XBL token
 ///
 /// # 返回值
 ///
-/// 成功时返回 XSTS Token 与用户哈希（UHS），令牌为空时返回 `ErrorType::OAuthGetTokenEmpty`
+/// 成功时返回 XSTS Token 与用户哈希 UHS，令牌为空时返回 `ErrorType::OAuthGetTokenEmpty`
 pub async fn get_xsts(token: &str) -> CoreResult<XBoxLiveResObj> {
     let obj = XSTSLoginObj {
         properties: XSTSLoginPropertiesObj {
@@ -304,18 +294,16 @@ pub async fn get_xsts(token: &str) -> CoreResult<XBoxLiveResObj> {
 
 impl LoginObj {
     /// 微软正版账户的刷新流程：先用现有 Minecraft Token 快速验证，
-    /// 失败则走完整刷新链（refresh_token → Xbox → XSTS → Minecraft Token → Profile）
+    /// 失败则走完整刷新链：refresh_token → Xbox → XSTS → Minecraft Token → Profile
     ///
-    /// 快速验证成功时不更新凭据（token 仍有效，`expire_at` 保持原值）；
+    /// 快速验证成功时不更新凭据，token 仍有效，`expire_at` 保持原值；
     /// 完整刷新成功后按新令牌的 expires_in 重算 `expire_at`
-    ///
-    /// # 参数
     ///
     /// - `cancel`: 取消令牌，用于中断异步操作
     ///
     /// # 返回值
     ///
-    /// 刷新成功返回 `Ok(())`（账户凭据已被更新），认证链任一步失败或被取消时返回相应错误
+    /// 刷新成功返回 `Ok(())`，此时账户凭据已被更新；认证链任一步失败或被取消时返回相应错误
     pub async fn refresh_oauth(&mut self, cancel: CancellationToken) -> CoreResult<()> {
         let profile = mojang_api::get_minecraft_profile(&self.access_token).await;
         if profile.is_ok() {

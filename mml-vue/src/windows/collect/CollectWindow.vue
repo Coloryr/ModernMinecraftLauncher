@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 资源收藏窗口
 //
-// 布局与交互对应旧启动器的 CollectControl：顶部分组下拉（第 0 项「默认分组」= 不过滤）
+// 布局与交互对应旧启动器的 CollectControl：顶部分组下拉，第 0 项「默认分组」即不过滤
 // + 添加 / 删除分组 / 清空，下面一行类型过滤，主体是多选卡片网格，右键出菜单。
 // 「安装选中」本轮未实现。
 import { computed, onMounted, onUnmounted, ref } from "vue";
@@ -20,9 +20,12 @@ import { showToast } from "../../lib/toast";
 import type { CollectItemDto, InstanceInfoDto } from "../../lib/bindings";
 import { openWindow } from "../windowManager";
 
-defineEmits<{ (e: "close"): void }>();
+defineEmits<{
+  /** 请求关闭本窗口，由标题栏关闭按钮与 Esc 触发 */
+  (e: "close"): void;
+}>();
 
-/** 「默认分组」的键：不在任何具名分组里的那批收藏（见 groupSections） */
+/** 「默认分组」的键：不在任何具名分组里的那批收藏，见 groupSections */
 const DEFAULT_GROUP = "";
 
 const items = ref<CollectItemDto[]>([]);
@@ -48,7 +51,7 @@ const filters = ref<CollectConfig>({
   shaderpack: true,
 });
 
-/** 勾选框 → 资源类型线串（`FileType::to_string()`；存档/数据包等不在收藏范围内） */
+/** 勾选框 → 资源类型线串，取值同 `FileType::to_string()`；存档 / 数据包等不在收藏范围内 */
 const FILTER_TYPES: Array<{ key: keyof CollectConfig; types: string[]; label: () => string }> = [
   { key: "modpack", types: ["modpack"], label: () => t("collect.filterModpack") },
   { key: "showMod", types: ["mod"], label: () => t("resource.mods") },
@@ -72,10 +75,10 @@ const groupOfUuid = computed(() => {
 /** 已经归入具名分组的收藏 uuid（默认分组 = 这批之外的） */
 const groupedUuids = computed(() => new Set(groupOfUuid.value.keys()));
 
-/** 一个收藏都没有（这时只给一条引导文案，不铺一排空分组） */
+/** 一个收藏都没有；这时只给一条引导文案，不铺一排空分组 */
 const isEmpty = computed(() => items.value.length === 0);
 
-/** 当前类型过滤下要显示的收藏（全不勾 = 空列表，与旧启动器一致，没有「全选」兜底） */
+/** 当前类型过滤下要显示的收藏；全不勾就是空列表，与旧启动器一致，没有「全选」兜底 */
 const shownItems = computed(() => {
   const on = new Set(
     FILTER_TYPES.filter((f) => filters.value[f.key]).flatMap((f) => f.types),
@@ -107,7 +110,7 @@ const groupSections = computed(() => [
   })),
 ]);
 
-/** 分组的实例列表是否展开（存的是"折叠"状态，所以默认是展开的） */
+/** 分组的实例列表是否展开；存的是"折叠"状态，所以默认展开 */
 function isGroupOpen(key: string): boolean {
   return !collapsedGroups.value[key];
 }
@@ -147,10 +150,10 @@ function isRemoteIcon(url: string): boolean {
 /**
  * 解析条目图标
  *
- * - 存的是原始网址 → 交给后端登记（`collect_image_url`），拿回可直接用的地址；
+ * - 存的是原始网址 → 交给后端 `collect_image_url` 登记，拿回可直接用的地址；
  *   图片因此走统一的磁盘缓存与 ETag 过期校验
  * - 完全没有图标 → 按 下载源 + 项目 ID 回平台 API 要一次
- * - 老条目存的本地协议地址 → 直接就能用（协议那层查不到登记时会先查磁盘缓存）
+ * - 老条目存的本地协议地址 → 直接就能用；协议那层查不到登记时会先查磁盘缓存
  */
 async function resolveIcon(item: CollectItemDto) {
   const key = iconKey(item);
@@ -175,7 +178,7 @@ async function resolveIcon(item: CollectItemDto) {
   }
 }
 
-/** 列表加载完 / 切回窗口后把图标解析一遍（一次一个，免得把平台 API 打爆） */
+/** 列表加载完 / 切回窗口后把图标解析一遍；一次一个，免得把平台 API 打爆 */
 async function fillIcons() {
   for (const item of items.value) {
     await resolveIcon(item);
@@ -183,9 +186,9 @@ async function fillIcons() {
 }
 
 /**
- * 图片加载失败：多半是本地协议地址的登记丢了（重启后 URL_IMAGE 里没有它，
- * 磁盘也没有缓存）→ 重新解析一次，再给 src 加 `?v=` 让 webview 重新请求
- * （协议那层会忽略查询串，主窗口的 `instance/…?v=0` 就是这个用法）
+ * 图片加载失败：多半是本地协议地址的登记丢了，重启后 URL_IMAGE 里没有它、
+ * 磁盘也没有缓存 → 重新解析一次，再给 src 加 `?v=` 让 webview 重新请求。
+ * 协议那层会忽略查询串，主窗口的 `instance/…?v=0` 就是这个用法。
  */
 async function onIconError(item: CollectItemDto) {
   const key = iconKey(item);
@@ -203,7 +206,7 @@ async function onIconError(item: CollectItemDto) {
   iconRetry.value = { ...iconRetry.value, [key]: 1 };
 }
 
-/** 卡片的图标地址：原始网址要先登记过才用（extraIcons 里存的就是登记后的地址） */
+/** 卡片的图标地址：原始网址要先登记过才用，extraIcons 里存的就是登记后的地址 */
 function iconOf(item: CollectItemDto): string {
   const key = iconKey(item);
   const stored = item.icon ?? "";
@@ -232,7 +235,7 @@ onUnmounted(() => {
   document.removeEventListener("keydown", onDocKeyDown);
 });
 
-/** 重拉收藏列表（首次挂载与切回本窗口都走这里） */
+/** 重拉收藏列表；首次挂载与切回本窗口都走这里 */
 function refresh() {
   // 收藏数据可能被别的窗口（整合包 / 资源窗口的星标）改过
   reload().catch((e) => showToast(tErr(e)));
@@ -362,7 +365,7 @@ const clearCount = computed(
       .length ?? 0,
 );
 
-/** 「移动到分组」：先记下目标再开弹窗（没有具名分组时按钮已置灰，这里兜底） */
+/** 「移动到分组」：先记下目标再开弹窗；没有具名分组时按钮已置灰，这里兜底 */
 function askAddToGroup() {
   actionUuids.value = takeTargets();
   closeMenu();
@@ -445,7 +448,7 @@ function openUrl(item: CollectItemDto) {
 /**
  * 点卡片：多选模式下切换勾选；默认模式下按"下载"处理
  *
- * 下载分两条路（见 [`startDownload`]）：整合包不需要实例，其余资源要先选实例。
+ * 下载分两条路，见 [`startDownload`]：整合包不需要实例，其余资源要先选实例。
  */
 function toggleCard(item: CollectItemDto) {
   if (multiSelect.value) {
@@ -471,7 +474,7 @@ const { draggingUuids, dropGroup, onCardPointerDown, consumeSuppressClick } = us
   defaultGroup: DEFAULT_GROUP,
 });
 
-/** 卡片点击：刚拖完的那一下不算点击（否则一松手就顺手打开了下载窗口） */
+/** 卡片点击：刚拖完的那一下不算点击，否则一松手就顺手打开了下载窗口 */
 function onCardClick(item: CollectItemDto) {
   if (consumeSuppressClick()) return;
   toggleCard(item);
@@ -482,7 +485,7 @@ function onCardClick(item: CollectItemDto) {
  *
  * 分组没有组内次序，所以幽灵只落在**落点分组的末尾**（实例那边要算"插到第几行"）。
  * 已经在目标组里的项不会被移动，一件都不动时不给幽灵 —— 否则看着像"松手会变"，
- * 实际是空操作（见 useCollectDrag 的 commitDrag）。
+ * 实际是空操作，见 useCollectDrag 的 commitDrag。
  */
 const dragGhostCard = computed(() => {
   const group = dropGroup.value;

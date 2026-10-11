@@ -1,3 +1,7 @@
+//! 美式英语文案表
+//!
+//! 实现 [`I18Lang`](crate::i18::I18Lang)，把各条目类型映射为英文文案。
+
 use crate::{
     VERSION,
     i18::I18Lang,
@@ -9,9 +13,17 @@ use crate::{
         thread_type::ThreadType,
     },
 };
+/// 美式英语语言包
 pub struct EnUs;
 
 impl I18Lang for EnUs {
+    /// 取英文一般信息文案
+    ///
+    /// - `info`: 信息条目
+    ///
+    /// # 返回值
+    ///
+    /// 英文成品字符串
     fn get_info(&self, info: &InfoType) -> String {
         match info {
             InfoType::CoreStart => format!("M²L started, version: {}", *VERSION),
@@ -20,6 +32,13 @@ impl I18Lang for EnUs {
         }
     }
 
+    /// 取英文错误文案
+    ///
+    /// - `error`: 错误条目，部分条目自带运行时数据
+    ///
+    /// # 返回值
+    ///
+    /// 英文成品字符串
     fn get_error(&self, error: &ErrorType) -> String {
         match error {
             ErrorType::Panic(panic) => self.get_panic(panic),
@@ -167,6 +186,13 @@ impl I18Lang for EnUs {
         }
     }
 
+    /// 取英文严重错误文案
+    ///
+    /// - `panic`: 严重错误条目
+    ///
+    /// # 返回值
+    ///
+    /// 英文成品字符串
     fn get_panic(&self, panic: &PanicType) -> String {
         match panic {
             PanicType::CoreArgLocalEmpty => String::from("Run path is empty"),
@@ -177,6 +203,13 @@ impl I18Lang for EnUs {
         }
     }
 
+    /// 取英文线程名
+    ///
+    /// - `thread`: 线程条目
+    ///
+    /// # 返回值
+    ///
+    /// 英文线程名
     fn get_thread(&self, thread: &ThreadType) -> String {
         match thread {
             ThreadType::LogThread => String::from("Log thread"),
@@ -188,6 +221,13 @@ impl I18Lang for EnUs {
         }
     }
 
+    /// 取英文界面文案
+    ///
+    /// - `gui`: 界面文案条目
+    ///
+    /// # 返回值
+    ///
+    /// 界面文案尚未接入，恒为空串
     fn get_gui(&self, gui: &GuiType) -> String {
         match gui {
             _ => String::new(),

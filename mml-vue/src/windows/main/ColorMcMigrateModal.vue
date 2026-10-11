@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 加载期间问一次：把 ColorMC 的数据搬过来（复制 / 移动 / 不迁移）
 //
-// 由主窗口在**加载页还盖着的时候**发起（见 MainWindow 的 colorMcReady）：答完（或直接关掉）
+// 由主窗口在**加载页还盖着的时候**发起，见 MainWindow 的 colorMcReady：答完或直接关掉
 // 才关启动页，所以搬运发生在主页面之前。三个按钮都算回答，右上角关掉不算 —— 下次还问。
 //
 // 文案一律从简：来源 + 实例数 + 一句话提醒 + 三个按钮；结果页只列条目名，
@@ -14,7 +14,9 @@ import { t, tErr } from "../../lib/i18n";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 
+/** ColorMC 探测结果：数据目录、命中来源与可迁移实例数 */
 const props = defineProps<{ info: ColorMcInfoDto }>();
+/** 收起弹窗 / 迁移成功；`done` 表示数据已搬完，父组件据此重拉实例与分组 */
 const emit = defineEmits<{ (e: "close"): void; (e: "done"): void }>();
 
 /** 迁移进行中（按钮禁用 + 不允许关闭） */
@@ -39,7 +41,7 @@ const percent = computed(() => {
   return Math.min(100, Math.max(0, Math.round((p.done / p.total) * 100)));
 });
 
-/** 命中来源（后端只给 run / default / fallback） */
+/** 命中来源；后端只给 run / default / fallback */
 const fromText = computed(() => t(`colormc.from.${props.info.from}`));
 
 /** 兼容性结论按级别分档（每档一行条目名） */

@@ -1,7 +1,7 @@
 // 设置窗口 · 网络与下载标签
 //
 // 保存模型（本文件是本次重构的重点）：
-// - **非代理项**即改即存（下载源 / 线程 / 校验开关 / DNS）—— 与原来一致；
+// - **非代理项**即改即存：下载源 / 线程 / 校验开关 / DNS，与原来一致；
 // - **代理项改成"草稿 + 显式保存"**：原来代理字段直接改 `network` 对象，而任一处
 //   `applyNetwork()` 都会把整个 DTO 提交，于是"只改本地、没点保存"的代理地址会被别的开关
 //   顺带写盘。现在草稿独立，只有点「保存」才合并进 `network` 并落盘。
@@ -13,7 +13,7 @@ import type { NetworkSettingDto } from "../../../lib/bindings";
 import { useSaveState } from "./useSaveState";
 import { loadDefaults } from "./useSettingsDefaults";
 
-/** 代理草稿（只在这些字段里改，点保存才落到 network） */
+/** 代理草稿：只在这些字段里改，点保存才落到 network */
 export interface ProxyDraft {
   workProxy: string;
   loginProxy: string;
@@ -36,8 +36,19 @@ const EMPTY_DRAFT: ProxyDraft = {
   proxyPassword: "",
 };
 
+/**
+ * 网络与下载标签的状态与保存
+ *
+ * # 返回值
+ *
+ * - `network`: 已落盘的网络设置，非代理项直接改它
+ * - `proxy`: 代理草稿，与 `proxyDirty` / `proxyDetailVisible` 一起驱动保存按钮
+ * - `dnsLines` / `commitDns` / `commitDnsLine` / `setDnsLine` / `removeDnsLine` / `addDnsLine`: DoH 地址逐行编辑
+ * - `sourceOptions` / `proxyModeOptions` / `proxyTypeOptions`: 分段控件的选项
+ * - `load` / `applyNetwork` / `saveProxy` / `saveState` / `resetGroup`: 加载、落盘与分组级恢复默认
+ */
 export function useSettingsNetwork() {
-  /** 已落盘的网络设置（非代理项直接改它 + applyNetwork） */
+  /** 已落盘的网络设置；非代理项直接改它再 applyNetwork */
   const network = ref<NetworkSettingDto | null>(null);
   /** DoH 地址逐行草稿（失焦 / 回车才落盘） */
   const dnsLines = ref<string[]>([]);
@@ -90,7 +101,7 @@ export function useSettingsNetwork() {
     () => proxy.workProxy === "User" || proxy.loginProxy === "User",
   );
 
-  /** 代理草稿与已落盘值有差异（驱动"未保存"提示与保存按钮的可用态） */
+  /** 代理草稿与已落盘值有差异，驱动"未保存"提示与保存按钮可用态 */
   const proxyDirty = computed(() => {
     const dto = network.value;
     if (!dto) return false;
@@ -118,7 +129,7 @@ export function useSettingsNetwork() {
     }
   }
 
-  /** 显式保存代理：草稿合并进 network 再落盘（成功提示"已生效、在途请求已中断"） */
+  /** 显式保存代理：草稿合并进 network 再落盘，成功后提示已生效、在途请求已中断 */
   async function saveProxy() {
     const dto = network.value;
     if (!dto) return;
@@ -173,7 +184,7 @@ export function useSettingsNetwork() {
 
   // ---------- 恢复默认 ----------
 
-  /** 这几个分组的默认值都在 Rust（HttpObj / DnsObj / GameCheckObj 的 Default） */
+  /** 这几个分组的默认值都在 Rust，见 HttpObj / DnsObj / GameCheckObj 的 Default */
 
   async function resetGroup(id: string): Promise<boolean> {
     const d = await loadDefaults();

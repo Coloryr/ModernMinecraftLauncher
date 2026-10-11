@@ -14,10 +14,10 @@
 //             内置的内置模组名
 //
 // 列宽与排序：
-//   - 列宽**由 JS 给**（`COLS` 一处定义 + 用户拖出来的宽度），所以整表是**固定宽**：
+//   - 列宽**由 JS 给**，`MOD_COLS` 一处定义 + 用户拖出来的宽度，所以整表是**固定宽**：
 //     总宽超出容器时由外层 `.item-list` 横向滚动，不再把列挤成省略号；
-//   - **启用右边的每一列**都能拖右边缘改宽度、点表头在「正序 → 倒序 → 不排序」之间切换
-//     （用户要求；不排序时回到与列表视图一致的 modid 正序）。
+//   - **启用右边的每一列**都能拖右边缘改宽度、点表头在「正序 → 倒序 → 不排序」之间切换，
+//     这是用户要求；不排序时回到与列表视图一致的 modid 正序。
 //
 // 列序（14 列 + 多选）：
 //   分组名 | 启用 | 名字 | 备注 | modid | 版本 | 加载器类型 | 加载侧
@@ -44,20 +44,21 @@ const props = withDefaults(
     ModViewProps & {
       /** 一级节点的名字（分组名） */
       groupLabel?: string;
-      /** 该分组当前的折叠状态（false = 收起，不渲染模组行） */
+      /** 该分组当前的折叠状态；false 表示收起，不渲染模组行 */
       groupOpen?: boolean;
-      /** 该分组的落点信息（拖拽时整块高亮用），与分组块的 data 属性同一份口径 */
+      /** 是不是自建分组；只有自建分组能改名 / 删 */
       custom?: boolean;
-      /** 分组键（自建分组 = 组名；状态分组 = 带前缀的内置键） */
+      /** 分组键：自建分组是组名，状态分组是带前缀的内置键 */
       groupKey?: string;
-      /** 正在被拖动排序的分组键（整块淡出） */
+      /** 正在被拖动排序的分组键，整块淡出 */
       draggingGroup?: string | null;
+      /** 递归层级；1 是模组行，>1 是内置模组行 */
       depth?: number;
       /** 不画表头（只有第一块画，其余块关掉，否则一屏里重复十几列） */
       hideHeader?: boolean;
-      /** 列宽（列 key → 像素宽）—— 状态在外层 `useResourceView`，所有分组共用一份 */
+      /** 列宽，列 key → 像素宽；状态在外层 `useResourceView`，所有分组共用一份 */
       colWidths: Record<string, number>;
-      /** 表头排序状态（null = 不排序）—— 同上，所有分组共用 */
+      /** 表头排序状态，`null` 表示不排序；同上，所有分组共用 */
       sort: ModSort | null;
     }
   >(),
@@ -74,18 +75,23 @@ const props = withDefaults(
 
 const emit = defineEmits<
   ModViewEmits & {
-    /** 备注就地编辑保存：(条目, 新文本) —— 落盘由 ModPane 负责（与备注弹窗同一个命令） */
+    /** 备注就地编辑保存：条目 + 新文本；落盘由 ModPane 负责，与备注弹窗同一个命令 */
     (e: "note-save", item: ModItemDto, text: string): void;
-    /** 拖列宽：列 key + 新像素宽（宽度由 useResourceView 持有并落盘，见 modColumns.ts） */
+    /** 拖列宽：列 key + 新像素宽；宽度由 useResourceView 持有并落盘，见 modColumns.ts */
     (e: "col-resize", key: string, width: number): void;
-    /** 表头排序变化（正序 / 倒序 / 不排序） */
+    /** 表头排序变化：正序 / 倒序 / 不排序 */
     (e: "sort-change", next: ModSort | null): void;
-    /** 右键分组行：交给 ModPane 弹分组菜单（删除分组 / 启用所有 / 禁用所有 / 转移内容 / 删除所有模组） */
+    /** 右键分组行：交给 ModPane 弹分组菜单 */
     (e: "group-menu", payload: {
+      /** 右键事件，菜单按它的坐标定位 */
       event: MouseEvent;
+      /** 分组键，与 `groupKey` 同一口径 */
       id: string;
+      /** 分组名，菜单标题与确认弹窗里显示 */
       label: string;
+      /** 是不是自建分组 */
       custom: boolean;
+      /** 组里的模组数 */
       count: number;
     }): void;
   }
@@ -96,12 +102,12 @@ const emit = defineEmits<
 // 表格视图里分组是多个块、每块一个 ModTable 实例 —— 宽度 / 排序若各自持有一份，
 // 改一组其它组不跟着变，列就不齐了。所以这两项由外层持有、这里只读 props + 发事件。
 
-/** 本列的当前宽度（props 里没有就用 `MOD_COLS` 的默认值） */
+/** 本列的当前宽度；props 里没有就用 `MOD_COLS` 的默认值 */
 function widthOf(col: ModCol): number {
   return props.colWidths[col.key] ?? col.width;
 }
 
-/** 栅格模板：24px 多选 + 各列固定宽（**全 px**，总宽超出时白底内部横向滚动） */
+/** 栅格模板：24px 多选 + 各列固定宽，**全 px**；总宽超出时白底内部横向滚动 */
 const gridTemplate = computed(() =>
   ["24px", ...MOD_COLS.map((col) => `${widthOf(col)}px`)].join(" "),
 );
@@ -109,8 +115,8 @@ const gridTemplate = computed(() =>
 /**
  * 按住表头右边缘拖动改宽度
  *
- * 监听挂在 window 上（与 `useModDrag` 同一套做法）：指针移出表头、甚至移出窗口也不会丢。
- * 每次移动只发事件，真正的宽度与落盘（防抖）都在 `useResourceView`。
+ * 监听挂在 window 上，与 `useModDrag` 同一套做法：指针移出表头、甚至移出窗口也不会丢。
+ * 每次移动只发事件，真正的宽度与落盘防抖都在 `useResourceView`。
  */
 function startResize(event: PointerEvent, col: ModCol) {
   event.preventDefault();
@@ -135,7 +141,7 @@ function startResize(event: PointerEvent, col: ModCol) {
 
 // ---------- 表头点击排序（正序 → 倒序 → 不排序） ----------
 
-/** 点一下表头：没排序 → 正序 → 倒序 → 不排序（第三次点回到 modid 正序） */
+/** 点一下表头：没排序 → 正序 → 倒序 → 不排序，第三次点回到 modid 正序 */
 function cycleSort(key: string) {
   const cur = props.sort;
   if (!cur || cur.key !== key) {
@@ -165,7 +171,9 @@ function sortMark(key: string): string {
  * 所以只在"名字"那一列缩进显示，其余列留空 —— 与它们在内核里的实际情况一致。
  */
 interface TableRow {
+  /** 这一行的模组条目 */
   item: ModItemDto;
+  /** 层级：1 是模组行，大于 1 是内置模组行 */
   depth: number;
 }
 
@@ -177,6 +185,7 @@ interface TableRow {
  */
 const expanded = ref<Set<string>>(new Set());
 
+/** 展开 / 收起这一行 */
 function toggleExpand(key: string) {
   const next = new Set(expanded.value);
   if (next.has(key)) {
@@ -187,6 +196,7 @@ function toggleExpand(key: string) {
   expanded.value = next;
 }
 
+/** 这一行是不是展开的 */
 function isOpen(key: string): boolean {
   return expanded.value.has(key);
 }
@@ -200,7 +210,7 @@ function flatten(items: ModItemDto[], depth: number, out: TableRow[]) {
   }
 }
 
-/** 本表要显示的行（分组收起时为空 —— 一级节点自己那一行由模板单独画） */
+/** 本表要显示的行；分组收起时为空，一级节点自己那一行由模板单独画 */
 const rows = computed(() => {
   const out: TableRow[] = [];
   if (props.groupOpen) flatten(props.items, 1, out);
@@ -221,6 +231,7 @@ const rows = computed(() => {
  */
 const editing = ref<{ key: string; item: ModItemDto } | null>(null);
 
+/** 这一行是不是正在编辑备注 */
 function isEditing(row: TableRow): boolean {
   return editing.value?.key === modRowKey(row.item);
 }
@@ -361,7 +372,7 @@ function onNoteEnter(event: KeyboardEvent) {
         <span v-else class="mod-tree-caret-placeholder" />
       </span>
 
-      <!-- 启用：复选框（勾 = 启用，取消 = 禁用）；内置模组没有独立文件，不给 -->
+      <!-- 启用：复选框，勾 = 启用、取消 = 禁用；内置模组没有独立文件，不给 -->
       <span class="mod-cell mod-enable-cell" @pointerdown.stop>
         <input v-if="row.depth === 1" type="checkbox" class="mod-check" :checked="!row.item.disable"
           :disabled="busy || row.item.fail" @change="emit('toggle', row.item)" />
@@ -371,7 +382,7 @@ function onNoteEnter(event: KeyboardEvent) {
         <span class="mod-name" :title="row.item.name || row.item.file">
           {{ row.item.name || row.item.file }}
         </span>
-        <!-- 内置的**库**（没有模组元数据的内置 jar）：不是模组，与"内置"分开标 -->
+        <!-- 内置的**库**：没有模组元数据的内置 jar。它不是模组，与"内置"分开标 -->
         <span v-if="row.item.library" class="badge badge-dim">
           {{ t("resource.modLibrary") }}
         </span>
@@ -386,7 +397,7 @@ function onNoteEnter(event: KeyboardEvent) {
       </span>
 
       <!--
-        备注：紧挨名字右边（用户要求），**双击原地书写**（不弹输入框：`contenteditable`）。
+        备注：紧挨名字右边，这是用户要求；**双击原地书写**，用 `contenteditable` 不弹输入框。
         内置行没有备注，双击也不进编辑（它没有独立文件，写不了备注）。
       -->
       <span class="mod-cell mod-note-cell" :class="{ 'mod-note-editing': isEditing(row) }"

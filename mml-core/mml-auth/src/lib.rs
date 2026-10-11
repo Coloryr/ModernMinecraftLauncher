@@ -16,14 +16,14 @@
 //! # 模块结构
 //!
 //! - [`auths`] — 账户持久化存储管理
-//! - [`legacy`] — 旧版 Yggdrasil 认证协议（外置登录、皮肤站、统一通行证）
-//! - [`oauth`] — Microsoft OAuth 2.0 现代认证协议（Xbox Live → XSTS → Minecraft）
+//! - [`legacy`] — 旧版 Yggdrasil 认证协议：外置登录、皮肤站、统一通行证
+//! - [`oauth`] — Microsoft OAuth 2.0 现代认证协议：Xbox Live → XSTS → Minecraft
 //!
 //! # 账户数据结构
 //!
 //! 核心类型 [`LoginObj`] 存储一个账户的完整凭据信息，
 //! 包括用户名、UUID、access token、client token、认证类型等。
-//! 账户通过 [`UserKeyObj`]（UUID + 认证类型）作为唯一键进行索引。
+//! 账户通过 [`UserKeyObj`] 作为唯一键进行索引，键由 UUID 与认证类型组成。
 
 use std::{
     collections::HashSet,
@@ -49,9 +49,9 @@ pub mod oauth;
 pub enum AuthType {
     /// 离线账户，无需联网验证，用户名可自定义
     Offline,
-    /// 微软正版登录（Microsoft OAuth 2.0 + Xbox Live 认证链）
+    /// 微软正版登录，走 Microsoft OAuth 2.0 + Xbox Live 认证链
     OAuth,
-    /// 统一通行证（Nide8）第三方认证
+    /// 统一通行证 Nide8 第三方认证
     Nide8,
     /// Authlib-Injector 外置登录认证
     AuthlibInjector,
@@ -69,28 +69,29 @@ impl Default for AuthType {
 }
 
 impl AuthType {
-    /// 是否有可刷新的令牌（离线账户没有凭据，无令牌可刷新）
+    /// 是否有可刷新的令牌；离线账户没有凭据，无令牌可刷新
     pub fn can_refresh(&self) -> bool {
         !matches!(self, AuthType::Offline)
     }
 
-    /// 是否支持重新登录（重输密码重新认证；离线无令牌，OAuth 走静默刷新没有这一步）
+    /// 是否支持重新登录，即重输密码重新认证；离线无令牌，OAuth 走静默刷新没有这一步
     pub fn can_relogin(&self) -> bool {
         !matches!(self, AuthType::Offline | AuthType::OAuth)
     }
 
-    /// 是否可编辑（离线账户没有服务器凭据，改名/改 UUID 即改账户本身）
+    /// 是否可编辑；离线账户没有服务器凭据，改名 / 改 UUID 即改账户本身
     pub fn can_edit(&self) -> bool {
         matches!(self, AuthType::Offline)
     }
 
+    /// 是否微软正版账户
     pub fn is_oauth(&self) -> bool {
         matches!(self, AuthType::OAuth)
     }
 
     /// 从字符串解析认证类型
     ///
-    /// - `str`: 认证类型名称（如 `Offline`、`OAuth`、`Nide8`）
+    /// - `str`: 认证类型名称，如 `Offline`、`OAuth`、`Nide8`
     ///
     /// # 返回值
     ///
@@ -124,34 +125,35 @@ pub struct LoginObj {
     /// 用户名
     #[serde(rename = "UserName")]
     pub user_name: String,
-    /// 账户 UUID（Minecraft 格式，带连字符）
+    /// 账户 UUID，Minecraft 格式，含连字符
     #[serde(rename = "UUID")]
     pub uuid: String,
-    /// 登录访问令牌（access token），用于验证身份
+    /// 登录访问令牌，即 access token，用于验证身份
     #[serde(rename = "AccessToken")]
     pub access_token: String,
-    /// 客户端标识令牌（client token），用于标识启动器实例
+    /// 客户端标识令牌，即 client token，用于标识启动器实例
     #[serde(rename = "ClientToken")]
     pub client_token: String,
     /// 账户认证类型
     #[serde(rename = "AuthType")]
     pub auth_type: AuthType,
-    /// 扩展字段 1：
-    /// - OAuth: 存储 refresh_token
-    /// - Nide8: 存储服务器 UUID
-    /// - AuthlibInjector/LittleSkin: 存储服务器地址
+    /// 扩展字段 1，含义随认证类型而定
+    ///
+    /// - `OAuth`: refresh_token
+    /// - `Nide8`: 服务器 UUID
+    /// - `AuthlibInjector` / `LittleSkin`: 服务器地址
     #[serde(rename = "Text1")]
     pub text1: Option<String>,
-    /// 扩展字段 2（预留，当前未使用）
+    /// 扩展字段 2，预留，当前未使用
     #[serde(rename = "Text2")]
     pub text2: Option<String>,
-    /// 最后登录时间（带时区的日期时间）
+    /// 最后登录时间，带时区
     #[serde(rename = "LastLogin")]
     pub last_login: DateTime<FixedOffset>,
-    /// 访问令牌绝对过期时间（带时区）
+    /// 访问令牌绝对过期时间，带时区
     ///
-    /// 仅 OAuth 账户记录（登录 / 刷新时由响应的 expires_in 换算）；
-    /// None = 无过期信息（离线 / 皮肤站令牌或旧版数据），视为不过期
+    /// 仅 OAuth 账户记录，登录 / 刷新时由响应的 expires_in 换算；
+    /// `None` 表示无过期信息，如离线 / 皮肤站令牌或旧版数据，视为不过期
     #[serde(rename = "ExpireAt")]
     pub expire_at: Option<DateTime<FixedOffset>>,
 }
@@ -160,8 +162,6 @@ impl LoginObj {
     /// 创建完整的账户信息
     ///
     /// 使用当前时间作为最后登录时间，其他扩展字段初始化为空。
-    ///
-    /// # 参数
     ///
     /// - `user_name`: 玩家用户名
     /// - `uuid`: 账户 UUID
@@ -189,11 +189,9 @@ impl LoginObj {
         }
     }
 
-    /// 创建空白账户（仅有用户名和 UUID，无令牌）
+    /// 创建空白账户，仅有用户名和 UUID，无令牌
     ///
     /// 用于存储从认证服务器返回的可选角色列表中尚未选中的账户。
-    ///
-    /// # 参数
     ///
     /// - `user_name`: 玩家用户名
     /// - `uuid`: 账户 UUID
@@ -211,11 +209,9 @@ impl LoginObj {
         }
     }
 
-    /// 创建仅有令牌的账户（无用户名和 UUID）
+    /// 创建仅有令牌的账户，无用户名和 UUID
     ///
     /// 用于多角色选择场景：已获取令牌但尚未确定具体角色。
-    ///
-    /// # 参数
     ///
     /// - `access_token`: 登录访问令牌
     /// - `client_token`: 客户端标识令牌
@@ -233,13 +229,11 @@ impl LoginObj {
         }
     }
 
-    /// 记录访问令牌的有效期（秒），按当前时间换算为绝对过期时间
+    /// 记录访问令牌的有效期，单位秒，按当前时间换算为绝对过期时间
     ///
-    /// 登录 / 刷新成功后调用；`expires_in <= 0` 时忽略（不记录过期时间）
+    /// 登录 / 刷新成功后调用；`expires_in <= 0` 时忽略，不记录过期时间
     ///
-    /// # 参数
-    ///
-    /// - `expires_in`: 令牌剩余有效期（秒）
+    /// - `expires_in`: 令牌剩余有效期，单位秒
     pub fn set_expire_in(&mut self, expires_in: i64) {
         if expires_in > 0 {
             self.expire_at = Some((Local::now() + Duration::seconds(expires_in)).fixed_offset());
@@ -248,7 +242,7 @@ impl LoginObj {
 
     /// 访问令牌是否已过本地记录的过期时间
     ///
-    /// 未记录过期时间（离线 / 皮肤站令牌、旧版数据）视为未过期。
+    /// 未记录过期时间的账户，如离线 / 皮肤站令牌、旧版数据，视为未过期。
     /// 仅代表本地时钟判断，不代表服务端已吊销。
     ///
     /// # 返回值
@@ -259,7 +253,7 @@ impl LoginObj {
             .is_some_and(|t| Local::now().fixed_offset() > t)
     }
 
-    /// 获取账户的唯一键（UUID + 认证类型）
+    /// 获取账户的唯一键，由 UUID 与认证类型组合而成
     ///
     /// 用于在账户存储中索引和去重。
     pub fn get_key(&self) -> UserKeyObj {
@@ -276,9 +270,7 @@ impl LoginObj {
     /// - `Nide8` → 统一通行证刷新
     /// - `AuthlibInjector` → 外置登录刷新
     /// - `LittleSkin` / `SelfLittleSkin` → 皮肤站刷新
-    /// - 离线账户 → 直接返回成功（无需刷新）
-    ///
-    /// # 参数
+    /// - 离线账户 → 直接返回成功，无需刷新
     ///
     /// - `cancel`: 取消令牌，用于中断异步操作
     ///
@@ -320,23 +312,37 @@ impl Default for LoginObj {
 /// 同一 UUID 的不同认证类型视为不同账户。
 #[derive(Eq, Hash, PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct UserKeyObj {
-    /// 账户标识（Minecraft UUID）
+    /// 账户标识，Minecraft UUID
     pub uuid: String,
     /// 账户认证类型
     pub auth_type: AuthType,
 }
 
+/// 正在被登录流程占用的账户键，避免同一账户并发发起登录
 static USER_LOCK: LazyLock<RwLock<HashSet<UserKeyObj>>> =
     LazyLock::new(|| RwLock::new(HashSet::new()));
 
+/// 该账户是否正被登录流程占用
+///
+/// - `user`: 账户唯一键
+///
+/// # 返回值
+///
+/// 已占用返回 `true`
 pub fn have_lock(user: &UserKeyObj) -> bool {
     USER_LOCK.read().unwrap().contains(user)
 }
 
+/// 标记账户已被登录流程占用
+///
+/// - `user`: 账户唯一键
 pub fn lock_user(user: &UserKeyObj) {
     USER_LOCK.write().unwrap().insert(user.clone());
 }
 
+/// 解除账户的登录占用标记
+///
+/// - `user`: 账户唯一键
 pub fn unlock_user(user: &UserKeyObj) {
     USER_LOCK.write().unwrap().remove(user);
 }
@@ -346,7 +352,7 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
 
-    /// 测试用的假凭据（与真实账户无关）
+    /// 测试用的假凭据，与真实账户无关
     const FAKE_UUID: &str = "00000000-0000-0000-0000-00000000aaaa";
     const FAKE_TOKEN: &str = "fake-access-token";
     const FAKE_CLIENT: &str = "fake-client-token";
@@ -370,7 +376,7 @@ mod tests {
         }
     }
 
-    /// AuthType 反序列化非法数字应失败（无 `#[serde(other)]` 兜底）
+    /// AuthType 反序列化非法数字应失败，没有 `#[serde(other)]` 兜底
     #[test]
     fn test_auth_type_deserialize_invalid() {
         assert!(serde_json::from_str::<AuthType>("6").is_err());
@@ -395,7 +401,7 @@ mod tests {
         );
     }
 
-    /// from_str 对未知名称回退为 Offline（文档化现有行为）
+    /// from_str 对未知名称回退为 Offline，固化现有行为
     #[test]
     fn test_auth_type_from_str_fallback() {
         assert_eq!(AuthType::from_str("unknown"), AuthType::Offline);
@@ -472,14 +478,14 @@ mod tests {
         assert_eq!(full.uuid, FAKE_UUID);
         assert_eq!(full.auth_type, AuthType::Offline);
         assert_eq!(full.text1, None);
-        // 最后登录时间应为当前时间（与默认值 0 明显不同）
+        // 最后登录时间应为当前时间，与默认值 0 明显不同
         assert!(full.last_login.timestamp() > 0);
 
         let empty = LoginObj::new_empty("Alex".to_string(), FAKE_UUID.to_string());
         assert_eq!(empty.user_name, "Alex");
         assert_eq!(empty.access_token, "");
         assert_eq!(empty.client_token, "");
-        // 空账户的最后登录时间为默认值（Unix 纪元）
+        // 空账户的最后登录时间为默认值，即 Unix 纪元
         assert_eq!(empty.last_login.timestamp(), 0);
 
         let token = LoginObj::new_token(FAKE_TOKEN.to_string(), FAKE_CLIENT.to_string());

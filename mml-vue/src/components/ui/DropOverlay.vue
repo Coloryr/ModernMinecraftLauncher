@@ -1,10 +1,10 @@
 <script setup lang="ts">
-// 拖入遮罩：四个落点共用。只画外观——是否显示由调用方 v-if、标题由调用方算好传入
-// （拖的是哪一档、该显示哪句，见 useFileDrop 的 dragKind 与各窗口的选键逻辑）
+// 拖入遮罩：四个落点共用。只画外观——是否显示由调用方 v-if、标题由调用方算好传入。
+// 拖的是哪一档、该显示哪句，见 useFileDrop 的 dragKind 与各窗口的选键逻辑。
 import GlyphIcon from "./GlyphIcon.vue";
 
 defineProps<{
-  /** 标题（调用方 `t()` 好的成品） */
+  /** 标题，调用方已 `t()` 好的成品 */
   title: string;
 }>();
 </script>

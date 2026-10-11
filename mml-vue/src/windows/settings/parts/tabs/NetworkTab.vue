@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 设置窗口 · 网络与下载标签
 //
-// 非代理项即改即存；代理项走草稿 + 显式「保存」（见 composables/useSettingsNetwork 的说明）。
+// 非代理项即改即存；代理项走草稿 + 显式「保存」，见 composables/useSettingsNetwork 的说明。
 import { t } from "../../../../lib/i18n";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
@@ -13,7 +13,9 @@ import SaveStateText from "../SaveStateText.vue";
 import type { useSettingsNetwork } from "../../composables/useSettingsNetwork";
 
 const props = defineProps<{
+  /** 网络与下载标签的状态与保存方法，来自 useSettingsNetwork */
   settings: ReturnType<typeof useSettingsNetwork>;
+  /** 需要高亮脉冲的分组 id（搜索命中） */
   flashGroup?: string;
 }>();
 

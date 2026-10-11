@@ -1,4 +1,4 @@
-//! 26.3 模型 JSON → 渲染 quad 的精确烘焙（照反编译 FaceBakery/CuboidRotation/ItemTransform 规则）
+//! 26.3 模型 JSON → 渲染 quad 的精确烘焙，照反编译 FaceBakery/CuboidRotation/ItemTransform 规则
 //!
 //! 顶点 0..1 模型空间，照 FaceBakery.bakeVertex 的 div(16)，gui display 变换由渲染后端在
 //! shader 矩阵里叠加；quad 只携带几何/uv/法线/贴图名/tint 色/透明度分组。
@@ -47,7 +47,7 @@ pub struct BakedModel {
 /// gui display 变换参数，照 ItemTransform 语义，translation 已 ×0.0625
 #[derive(Clone, Copy)]
 pub struct GuiTransform {
-    /// 旋转角度（度，绕 x/y/z 轴）
+    /// 旋转角度，单位度，绕 x/y/z 轴
     pub rotation: [f32; 3],
     /// 平移，模型空间单位，已 ×0.0625 并 clamp ±5
     pub translation: [f32; 3],
@@ -154,13 +154,13 @@ fn element_rotation_matrix(origin: [f32; 3], axis: usize, angle_deg: f32, rescal
 /// 模型 JSON 顶层结构
 #[derive(Deserialize)]
 struct ModelJson {
-    /// 父模型路径（沿链向上合并）
+    /// 父模型路径，沿链向上合并
     #[serde(default)]
     parent: Option<String>,
     /// 贴图引用表，"#side" → 路径或引用
     #[serde(default)]
     textures: HashMap<String, TextureRefObj>,
-    /// 元素集（父模板链上第一个带定义的生效）
+    /// 元素集，父模板链上第一个带定义的生效
     #[serde(default)]
     elements: Option<Vec<ElementJson>>,
     /// 各视角 display 变换，只用 gui
@@ -182,7 +182,7 @@ struct DisplayJson {
 /// gui display 变换，照 ItemTransform 反序列化语义：translation ×0.0625 后 clamp ±5，scale clamp ±4
 #[derive(Deserialize)]
 struct TransformJson {
-    /// 旋转角度（度，绕 x/y/z 轴）
+    /// 旋转角度，单位度，绕 x/y/z 轴
     #[serde(default)]
     rotation: Vec<f32>,
     /// 平移，原始 JSON 单位，resolved 时 ×0.0625
@@ -309,7 +309,7 @@ pub(crate) struct Resolved {
 /// block/block 的 gui 旋转在 cube 找到 elements 之后仍在更上层
 ///
 /// - `archive`: 客户端 jar 归档
-/// - `rel`: 模型文件相对路径（如 `block/stone.json`）
+/// - `rel`: 模型文件相对路径，如 `block/stone.json`
 ///
 /// # 返回值
 ///
@@ -410,7 +410,7 @@ pub(crate) fn texture_path(value: &str) -> Option<String> {
     Some(format!("assets/minecraft/textures/{path}.png"))
 }
 
-/// 加载贴图（带缓存），返回 RGBA 位图
+/// 加载贴图，带缓存，返回 RGBA 位图
 ///
 /// - `archive`: 客户端 jar 归档
 /// - `cache`: 跨模型复用的贴图缓存，路径 → 解码位图
@@ -650,7 +650,7 @@ pub(crate) fn recalculate_winding(pos: &mut [[f32; 3]; 4], uv: &mut [[f32; 2]; 4
 /// - `element`: 模型元素，坐标 0..16
 /// - `textures`: 父链合并后的贴图引用表
 /// - `archive`: 客户端 jar 归档，读取贴图与动画元数据
-/// - `tex_cache`: 跨模型复用的贴图缓存（路径 → 解码位图）
+/// - `tex_cache`: 跨模型复用的贴图缓存，路径 → 解码位图
 /// - `item_tints`: None=方块路径，tintindex按贴图路径取群系常量色；
 ///   Some=物品路径，tintindex索引items/*.json的tint表，越界或无tintindex为白色，与游戏一致
 ///
@@ -782,11 +782,11 @@ fn is_fullbright_tex(path: &str) -> bool {
     path.contains("campfire_fire")
 }
 
-/// 烘焙一个模型为 quad 列表（含贴图缓存），供 GPU/CPU 两种后端共用
+/// 烘焙一个模型为 quad 列表，含贴图缓存，供 GPU/CPU 两种后端共用
 ///
 /// - `archive`: 客户端 jar 归档，读取模型 JSON 与贴图
-/// - `rel`: 模型文件相对路径（如 `block/stone.json`）
-/// - `tex_cache`: 跨模型复用的贴图缓存（路径 → 解码位图）
+/// - `rel`: 模型文件相对路径，如 `block/stone.json`
+/// - `tex_cache`: 跨模型复用的贴图缓存，路径 → 解码位图
 ///
 /// # 返回值
 ///

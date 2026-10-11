@@ -10,7 +10,7 @@
 // 而用户要找的是磁盘上那个文件 —— 只显示 `Name` 时根本对不上文件夹里看到的东西
 // （与光影包列表同一口径，见 ShaderPane 的 sub）。
 //
-// `author` / `description` **只有 litematic 会填**（它的 `Metadata` 里有这两个字段），
+// `author` / `description` **只有 litematic 会填**，它的 `Metadata` 里有这两个字段，
 // `.schem` / `.nbt` 那两个 reader 不设，所以那两种格式这两段是空的、整段不渲染。
 import { t } from "../../../lib/i18n";
 import { deleteSchematic } from "../../../lib/api";
@@ -23,7 +23,9 @@ import type { useResourceOps } from "../composables/useResourceOps";
 import type { SchematicItemDto } from "../../../lib/bindings";
 
 const props = defineProps<{
+  /** 数据层，结构文件列表与加载态从这里取 */
   data: ReturnType<typeof useResourceData>;
+  /** 共用操作层，确认弹窗与打开目录从这里取 */
   ops: ReturnType<typeof useResourceOps>;
 }>();
 
@@ -73,7 +75,7 @@ function metaLabel(item: SchematicItemDto): string {
       </template>
       <!--
         描述单独铺在后面、且走 FormattedText：litematic 的 `Metadata.Description` 是作者
-        自己写的一句话，可能带 `§` 格式码（与材质包 / 数据包那两处同一套做法）。
+        自己写的一句话，可能带 `§` 格式码，与材质包 / 数据包那两处同一套做法。
         只有 litematic 会填它，其余格式为空、整段不渲染
       -->
       <template #sub>

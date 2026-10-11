@@ -6,27 +6,54 @@
 import { commands } from "./bindings";
 import { KEYS, readFlag, readNumber, readRaw, readString } from "./storage";
 
+/** 主题：Dark / Light / System */
 export type Theme = "Dark" | "Light" | "System";
 /** 与 core Lang 变体同名：zh_cn / en_us */
 export type Locale = "zh_cn" | "en_us";
+/** 多窗口 / 单窗口 */
 export type WindowMode = "Multi" | "Single";
+/** 侧栏在左还是在右 */
 export type SidebarSide = "Left" | "Right";
-/** 实例列表显示模式（默认 list，用户改过后用用户的值） */
+/** 实例列表显示模式：默认 list，用户改过后用用户的值 */
 export type ViewMode = "list" | "group" | "grid";
-/** 皮肤显示模式（账户界面皮肤预览形态，枚举值即 Rust 变体名） */
+/** 皮肤显示模式：账户界面皮肤预览形态，枚举值即 Rust 变体名 */
 export type SkinDisplay = "Skin2DA" | "Skin2DB" | "Skin3D" | "Skin3DD";
 
-/** 把任意值规范成合法的皮肤显示模式（非法 / 缺省 → Skin2DA） */
+/**
+ * 把任意值规范成合法的皮肤显示模式
+ *
+ * - `value`: 待规范的原始值，非法 / 缺省时为 null 或 undefined
+ *
+ * # 返回值
+ *
+ * 合法模式，非法 / 缺省时回落 `Skin2DA`
+ */
 export function normalizeSkinDisplay(value: string | null | undefined): SkinDisplay {
   return value === "Skin2DB" || value === "Skin3D" || value === "Skin3DD" ? value : "Skin2DA";
 }
 
-/** 把任意值规范成合法的显示模式（非法 / 缺省 → list） */
+/**
+ * 把任意值规范成合法的显示模式
+ *
+ * - `value`: 待规范的原始值，非法 / 缺省时为 null 或 undefined
+ *
+ * # 返回值
+ *
+ * 合法模式，非法 / 缺省时回落 `list`
+ */
 export function normalizeViewMode(value: string | null | undefined): ViewMode {
   return value === "group" || value === "grid" ? value : "list";
 }
 
-/** 把任意值规范成合法的头像类型（非法 / 缺省 → Head2DA） */
+/**
+ * 把任意值规范成合法的头像类型
+ *
+ * - `value`: 待规范的原始值，非法 / 缺省时为 null 或 undefined
+ *
+ * # 返回值
+ *
+ * 合法类型，非法 / 缺省时回落 `Head2DA`
+ */
 export function normalizeHeadType(value: string | null | undefined): HeadType {
   return value === "Head3DA" || value === "Head3DB" || value === "Head3DC" || value === "Head2DB" ? value : "Head2DA";
 }
@@ -68,17 +95,17 @@ export interface CollectConfig {
   shaderpack: boolean;
 }
 
-/** 客户端设置（对应 Rust ClientConfig，wire 为 client） */
 /** 登录方式锁定的一个条目 */
 export interface LoginLockItem {
   /** 账户添加类型（offline / microsoft / littleskin / selflittleskin / authlib / nide8） */
   ty: string;
-  /** 登录模型名字（添加账户时下拉里的显示名；空 = 用类型名 / 服务器地址显示） */
+  /** 登录模型名字：添加账户时下拉里的显示名，空 = 用类型名 / 服务器地址显示 */
   name: string;
-  /** 锁定的服务器（authlib = 认证服务器地址，nide8 = 服务器 ID，空 = 不指定） */
+  /** 锁定的服务器：authlib = 认证服务器地址，nide8 = 服务器 ID，空 = 不指定 */
   server: string;
 }
 
+/** 客户端设置（对应 Rust ClientConfig，wire 为 client） */
 export interface ClientConfig {
   /** 主窗口实例设置里显示 MOTD 卡片 */
   motdCard: boolean;
@@ -135,7 +162,13 @@ export interface WindowState {
   height: number;
 }
 
-/** 读取 GUI 状态；非 Tauri 环境返回 null（浏览器回退本地存储） */
+/**
+ * 读取 GUI 状态
+ *
+ * # 返回值
+ *
+ * 完整配置；非 Tauri 环境或后端调用失败时为 `null`，调用方回退本地存储
+ */
 export async function loadGuiConfig(): Promise<GuiConfig | null> {
   try {
     return await commands.windows.getGuiConfig();
@@ -144,7 +177,7 @@ export async function loadGuiConfig(): Promise<GuiConfig | null> {
   }
 }
 
-/** GUI 状态局部更新（mainWindow / head 内部可只给一个字段，saveGuiConfig 会深合并） */
+/** GUI 状态局部更新：mainWindow / head 内部可只给一个字段，saveGuiConfig 会深合并 */
 export interface GuiConfigPatch {
   theme?: Theme;
   locale?: Locale;
@@ -161,7 +194,13 @@ export interface GuiConfigPatch {
   bgNativeSize?: number;
 }
 
-/** 合并保存 GUI 状态到 gui_config.json（mainWindow 内部做深合并，避免互相覆盖） */
+/**
+ * 合并保存 GUI 状态到 gui_config.json
+ *
+ * mainWindow / head / collect / client 内部做深合并，避免互相覆盖。
+ *
+ * - `patch`: 要更新的字段，未给的字段保持原值
+ */
 export async function saveGuiConfig(patch: GuiConfigPatch): Promise<void> {
   try {
     const cur = (await loadGuiConfig()) ?? defaultConfig();
@@ -178,7 +217,7 @@ export async function saveGuiConfig(patch: GuiConfigPatch): Promise<void> {
   }
 }
 
-/** 把本地存储里的登录锁定 JSON 解析成条目列表（兼容旧的纯字符串数组；非法 / 缺省 → 空列表） */
+/** 把本地存储里的登录锁定 JSON 解析成条目列表：兼容旧的纯字符串数组，非法 / 缺省 → 空列表 */
 function safeLockList(raw: string | null): LoginLockItem[] {
   if (!raw) return [];
   try {
@@ -203,13 +242,17 @@ function safeLockList(raw: string | null): LoginLockItem[] {
 }
 
 /**
- * 默认配置（浏览器回退用；也是设置窗口「恢复默认」的取值来源）
+ * 默认配置，浏览器回退用，也是设置窗口「恢复默认」的取值来源
  *
  * 口径与 Rust 侧 `GuiConfig::default()` 一致，改这里要同步那边。
  *
- * 每一项都从本地存储的**同名键**取（键登记在 storage.ts 的 `KEYS`），
+ * 每一项都从本地存储的**同名键**取，键登记在 storage.ts 的 `KEYS`，
  * 所以这里不再手写一串字符串字面量 —— 老版本是手工重列的，加一个键就得记得补一处，
- * 漏了就静默回落默认值。读取一律走 storage.ts 的便捷函数（默认值口径也在那边）。
+ * 漏了就静默回落默认值。读取一律走 storage.ts 的便捷函数，默认值口径也在那边。
+ *
+ * # 返回值
+ *
+ * 完整默认配置
  */
 export function defaultConfig(): GuiConfig {
   const storedTheme = readString(KEYS.theme);
@@ -232,7 +275,7 @@ export function defaultConfig(): GuiConfig {
     head: {
       headType: normalizeHeadType(readString(KEYS.headType)),
       // 与 settings.ts 同语义：没存过 / 非法值回落到默认角度
-      // （默认 x 15 / y 65，别用 || 0——未存过时会把默认角度覆盖成 0/0）
+      // 默认 x 15 / y 65。别用 || 0，未存过时会把默认角度覆盖成 0/0
       x: readNumber(KEYS.headX, 15),
       y: readNumber(KEYS.headY, 65),
     },

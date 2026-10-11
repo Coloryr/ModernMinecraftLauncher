@@ -9,28 +9,58 @@ import { showToast } from "../../../lib/toast";
 import { openResourceFolder } from "../../../lib/api";
 import type { useResourceData } from "./useResourceData";
 
-/** 确认弹窗的内容：标题 + 正文 + 确认后要做的事（reload = 做完是否重拉列表） */
+/** 确认弹窗的内容 */
 interface ConfirmBox {
+  /** 弹窗标题，调用方已 `t()` 好的成品 */
   title: string;
+  /** 弹窗正文 */
   text: string;
+  /** 点确认后执行的动作 */
   run: () => Promise<void>;
+  /** 动作做完是否重拉当前列表 */
   reload: boolean;
 }
 
+/**
+ * 资源管理窗口各分类共用的操作
+ *
+ * - `data`: 数据层，只为拿 `instanceUuid` 与 `reloadCurrent`
+ *
+ * # 返回值
+ *
+ * - `busy`: 是否有操作在跑，列表上的按钮据此置灰
+ * - `confirmBox`: 待确认的弹窗内容，`null` 表示不显示
+ * - `confirmBusy`: 确认动作是否在跑
+ * - `askConfirm`: 弹确认框，可指定做完是否重拉
+ * - `askDelete`: 删除类确认，文案统一
+ * - `runConfirm`: 执行确认框里的动作
+ * - `act`: 串行化 + 失败提示 + 成功后重拉列表
+ * - `actLocal`: 同上但不重拉，给调用方自己就地更新的操作用
+ * - `openFolder`: 在文件管理器里打开某个分类目录
+ */
 export function useResourceOps(data: ReturnType<typeof useResourceData>) {
   const { instanceUuid, reloadCurrent } = data;
 
   /** 有操作在跑：列表上的按钮统一置灰，避免连点发两次 */
   const busy = ref(false);
 
+  /** 待确认的弹窗，`null` 表示没有 */
   const confirmBox = ref<ConfirmBox | null>(null);
+  /** 确认动作正在跑，防连点 */
   const confirmBusy = ref(false);
 
+  /**
+   * 弹一个确认框，确认后执行 `run`
+   *
+   * - `title`: 弹窗标题
+   * - `text`: 弹窗正文
+   * - `run`: 确认后要做的动作
+   * - `opts.reload`: 做完是否重拉当前列表，缺省 `true`；分组这类**不在列表里**的数据传 `false`，重拉模组要重解析 jar
+   */
   function askConfirm(
     title: string,
     text: string,
     run: () => Promise<void>,
-    /** 确认后要不要重拉当前列表；分组这类**不在列表里**的数据传 false（重拉模组要重解析 jar） */
     opts?: { reload?: boolean },
   ) {
     confirmBox.value = { title, text, run, reload: opts?.reload ?? true };
@@ -41,6 +71,7 @@ export function useResourceOps(data: ReturnType<typeof useResourceData>) {
     askConfirm(t("resource.delete"), t("resource.deleteConfirm", { name }), run);
   }
 
+  /** 执行确认框里的动作，按 `reload` 决定是否重拉列表 */
   async function runConfirm() {
     const box = confirmBox.value;
     if (!box || confirmBusy.value) return;
@@ -75,8 +106,8 @@ export function useResourceOps(data: ReturnType<typeof useResourceData>) {
   /**
    * 只做"串行化 + 失败提示"，**不重拉列表**
    *
-   * 给那些"改完之后调用方自己就地更新"的操作用：打开目录（只读）、启用 / 禁用模组
-   * （只改文件名，元数据一个字没变 —— 调用方拿后端回的新身份改那一行即可）。
+   * 给那些"改完之后调用方自己就地更新"的操作用：打开目录只读，启用 / 禁用模组
+   * 只改文件名、元数据一个字没变，调用方拿后端回的新身份改那一行即可。
    *
    * 重拉一次模组要把每个 jar 的元数据重新解析一遍（几百个包要好几秒），
    * 这两种操作都不需要它。
@@ -98,6 +129,10 @@ export function useResourceOps(data: ReturnType<typeof useResourceData>) {
    *
    * **不重拉列表**：这是只读操作，列表不会变；而重拉一次模组要重新解析每个 jar 的元数据
    * （数秒），原先它和增删走同一条 act()，点一下"打开文件夹"整个列表就白转一圈。
+   *
+   * - `kind`: 后端认的目录名，见 types.ts 的 `CATEGORY_KIND`
+   * - `name`: 具体条目名；`null` 表示打开该分类目录本身
+   * - `parent`: 只有数据包子页要传，即存档目录名，落点 `saves/<parent>/datapacks`
    */
   async function openFolder(kind: string, name: string | null, parent: string | null = null) {
     await actLocal(() => openResourceFolder(instanceUuid.value, kind, name, parent));

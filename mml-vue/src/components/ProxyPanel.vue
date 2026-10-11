@@ -4,10 +4,15 @@ import { t } from "../lib/i18n";
 import type { InstanceArgsDto } from "../lib/bindings";
 import NumberStepper from "./ui/NumberStepper.vue";
 
-const props = defineProps<{ args: InstanceArgsDto }>();
+const props = defineProps<{
+  /** 当前实例的启动参数 */
+  args: InstanceArgsDto;
+}>();
 
+/** 回传改动后的整份启动参数 */
 const emit = defineEmits<{ (e: "update:args", v: InstanceArgsDto): void }>();
 
+/** 合并 patch 后回传整份参数 */
 function update(patch: Partial<InstanceArgsDto>) {
   emit("update:args", { ...props.args, ...patch });
 }

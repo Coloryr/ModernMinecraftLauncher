@@ -19,18 +19,19 @@ import { usePageActive } from "../../lib/pageActive";
 import { multiWindow } from "../windowManager";
 import type { DownloadStatusDto, DownloadTaskDto } from "../../lib/bindings";
 
+/** 请求关闭本窗口 */
 const emit = defineEmits<{ (e: "close"): void }>();
 
-/** 本页面是否在前台（单窗口模式下切走只是被 KeepAlive 停用，见 lib/pageActive.ts） */
+/** 本页面是否在前台：单窗口模式下切走只是被 KeepAlive 停用，见 lib/pageActive.ts */
 const pageActive = usePageActive();
 
-/** 轮询间隔（毫秒） */
+/** 轮询间隔，单位毫秒 */
 const REFRESH_MS = 700;
 
 /**
- * 外壳两用：多窗口模式下是独立窗口（`WindowFrame`）；单窗口模式下是**悬浮弹窗**
- * （`BaseModal`：遮罩 + 标题 + 右上角 ✕，浮在当前页面之上，不把页面换掉）。
- * 两者同形（title + close 事件 + 默认插槽），所以下面那整块下载内容两种形态共用一份。
+ * 外壳两用：多窗口模式下是独立窗口 `WindowFrame`；单窗口模式下是**悬浮弹窗** `BaseModal`，
+ * 后者带遮罩、标题与右上角 ✕，浮在当前页面之上，不把页面换掉。
+ * 两者同形，title + close 事件 + 默认插槽，所以下面那整块下载内容两种形态共用一份。
  */
 const shell = computed(() => (multiWindow.value ? WindowFrame : BaseModal));
 const shellProps = computed(() =>
@@ -39,12 +40,12 @@ const shellProps = computed(() =>
       title: t("features.download"),
       // 本窗口整页就是下载管理，标题栏不用再放一个下载指示器（整合包那个照留）
       hideDownloadIndicator: true,
-      // 多窗口模式下两段列表都没有自己的高度约束，滚的是内容区本身（见 styles/scrollbar.css）
+      // 多窗口模式下两段列表都没有自己的高度约束，滚的是内容区本身，样式见 styles/scrollbar.css
       bodyGutter: true,
     }
     : {
       title: t("features.download"),
-      // 线程行是固定列宽的网格（26 + 文件名 + 116 + 124 + 78 + 88，加间距与内边距约 612），
+      // 线程行是固定列宽的网格，26 + 文件名 + 116 + 124 + 78 + 88，加间距与内边距约 612，
       // 700 刚好还给文件名留一截；再窄就被压成省略号了（独立窗口最小宽是 670）
       width: 700,
       // 锁死高度：线程表每 700ms 都在增删行，不锁的话弹窗会跟着一直长高变矮
@@ -73,7 +74,7 @@ const threads = computed(() => status.value.threads.filter((x) => x.state !== "d
 // 口径见 lib/progress.ts：多文件按项目数、单文件按字节。总览与单任务、标题栏指示器共用它，
 // 三处必须同源，否则同一个任务在列表和顶栏上会显示成两个进度
 
-/** 总体进度（与单任务同一口径，汇总全部任务） */
+/** 总体进度：与单任务同一口径，汇总全部任务 */
 const overall = computed(() => downloadOverallPercent(tasks.value));
 
 /** 总体字节：已下载 / 总大小 */
@@ -102,6 +103,7 @@ function taskCountKey(task: DownloadTaskDto): string {
 
 type TaskState = "running" | "paused" | "failed" | "done";
 
+/** 任务状态：暂停优先，其次按是否全部结束、有无失败判定 */
 function taskState(task: DownloadTaskDto): TaskState {
   if (task.paused) return "paused";
   if (task.total > 0 && task.completed + task.failed >= task.total) {
@@ -112,6 +114,7 @@ function taskState(task: DownloadTaskDto): TaskState {
 
 // ================= 格式化 =================
 
+/** 字节数转可读文本，100 以上不带小数 */
 function formatBytes(bytes: number): string {
   if (!bytes || bytes <= 0) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -145,19 +148,21 @@ function sizeText(now: number, all: number): string {
   return all > 0 ? `${formatBytes(now)} / ${formatBytes(all)}` : formatBytes(now);
 }
 
+/** 线程状态 → 标签文案，键为 winDownload.state.* */
 function stateLabel(state: string): string {
   return t(`winDownload.state.${state}`);
 }
 
 // ================= 数据刷新 =================
 
-/** 是否出现过任务（任务清空时据此判断“下载结束”并自动关窗） */
+/** 是否出现过任务：任务清空时据此判断下载已结束并自动关窗 */
 let hadTasks = false;
 /** 用户主动停止后本次不自动关窗（停完可能还想看状态） */
 let keepOpen = false;
-/** 上一轮任务里是否有失败（有失败就不自动关窗，留着让用户看到） */
+/** 上一轮任务里是否有失败：有失败就不自动关窗，留着让用户看到 */
 let lastFailed = false;
 
+/** 拉一次状态快照，任务全部结束时按需自动关窗 */
 async function refresh() {
   try {
     status.value = await api.getDownloadStatus();
@@ -175,7 +180,7 @@ async function refresh() {
   }
   // 任务全部结束（下载完成后清空）：自动关窗，不用手动点关闭；
   // 有失败或用户主动停止时保留窗口。
-  // 页面已切走时不发这条关闭（见 lib/pageActive.ts）：此刻"关窗"会被当成关掉当前页面，
+  // 页面已切走时不发这条关闭，见 lib/pageActive.ts：此刻"关窗"会被当成关掉当前页面，
   // 而在主页面就是退出启动器 —— 轮询虽已停，收尾那一发仍可能落到这里
   if (hadTasks && !keepOpen && !lastFailed) {
     hadTasks = false;
@@ -198,6 +203,7 @@ async function resumeAll() {
   await refresh();
 }
 
+/** 停止全部下载，并抑制这次的自动关窗 */
 async function stopAll() {
   keepOpen = true;
   await api.stopAllDownloads();
@@ -219,9 +225,9 @@ async function confirmStopAll() {
  * 点关闭：直接收起弹窗 / 关掉窗口，不打断下载
  *
  * 单窗口模式下它只是浮在当前页上的一层壳，收起 ≠ 停止下载：任务照跑，
- * 顶栏的入口（DownloadTitleIndicator）还在。真正会连带停掉下载的是"关下载窗口"和
- * "退出启动器"——那两种情况由 Rust 侧的关闭保护拦下，再由根组件弹确认框
- * （见 src-tauri 的 close_guarded 与 App.vue）
+ * 顶栏的入口 DownloadTitleIndicator 还在。真正会连带停掉下载的是"关下载窗口"和
+ * "退出启动器"，那两种情况由 Rust 侧的关闭保护拦下，再由根组件弹确认框，
+ * 见 src-tauri 的 close_guarded 与 App.vue
  */
 function requestClose() {
   emit("close");
@@ -647,7 +653,7 @@ onUnmounted(() => {
 }
 
 /* ---------- 线程 ---------- */
-/* 线程行：固定列宽（信息列紧邻），状态列放得下最长的标签（"获取信息" / "Fetching Info"）；
+/* 线程行：固定列宽，信息列紧邻；状态列放得下最长的标签 "获取信息" / "Fetching Info"，
    大小 / 速度列按最宽的 "41.4 MB / 41.4 MB"、"12.3 MB/s" 留宽，数字列一律不换行 */
 .thread-item {
   display: grid;

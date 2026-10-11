@@ -2,7 +2,7 @@
 // 设置窗口 · 皮肤与头像标签
 //
 // 结构与其它标签一致：每个小节都是「分组标题（强调色竖条 + 分隔线）→ 说明 → 控件」，
-// 所以拆成三组（头像显示模式 / 皮肤显示模式 / 样例预览），不再是"无标题分组"。
+// 所以拆成三组：头像显示模式 / 皮肤显示模式 / 样例预览，不再是"无标题分组"。
 import { t } from "../../../../lib/i18n";
 import NumberStepper from "../../../../components/ui/NumberStepper.vue";
 import SegmentedTabs from "../../../../components/ui/SegmentedTabs.vue";
@@ -10,6 +10,7 @@ import SettingsGroup from "../SettingsGroup.vue";
 import type { useSettingsSkin } from "../../composables/useSettingsSkin";
 
 const props = defineProps<{
+  /** 皮肤与头像标签的状态与选项，来自 useSettingsSkin */
   settings: ReturnType<typeof useSettingsSkin>;
   /** 需要高亮脉冲的分组 id（搜索命中） */
   flashGroup?: string;
@@ -56,7 +57,7 @@ const {
   </SettingsGroup>
 
   <SettingsGroup id="preview" title-key="winSettings.secPreview">
-    <!-- 样例预览：内置纤细皮肤按当前头像 / 皮肤配置实时渲染（配置变化经 URL 版本号重取） -->
+    <!-- 样例预览：内置纤细皮肤按当前头像 / 皮肤配置实时渲染，配置变化经 URL 版本号重取 -->
     <div class="sample-row">
       <div class="sample-box">
         <img v-if="imageBase" class="sample-img" :src="headPreviewUrl" alt="" />

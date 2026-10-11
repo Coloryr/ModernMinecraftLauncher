@@ -4,8 +4,8 @@
 // （watch 在里面），外壳与各列表组件共用同一份，不必再往上抛事件。
 //
 // 拆出来的原因：原先这 250 行和模板、样式挤在一个 1100 行的 SFC 里，
-// 列表组件想拿数据只能整份 prop 传下去；现在按 `windows/block` 的写法
-// （薄窗口 + parts/ + composables/）拆开，语义边界清楚。
+// 列表组件想拿数据只能整份 prop 传下去；现在按 `windows/block` 的写法拆开 ——
+// 薄窗口 + parts/ + composables/，语义边界清楚。
 import { ref, watch } from "vue";
 import { locale, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
@@ -41,6 +41,24 @@ export interface ResourceInstance {
   version: string;
 }
 
+/**
+ * 资源管理窗口的数据层
+ *
+ * - `initialCategory`: 进入时默认打开的类别，缺省 `saves`
+ *
+ * # 返回值
+ *
+ * - `category` / `saveTab`: 当前分类与存档子页，外壳与各面板共用这一份
+ * - `instance` / `instanceUuid`: 当前实例的名字版本与 uuid
+ * - `loading`: 有列表正在拉
+ * - `modProgress`: 模组扫描进度
+ * - `mods` / `packs` / `saves` / `shots` / `servers` / `shaders` / `schematics` / `datapacks`: 各分类的列表
+ * - `dpSave`: 数据包子页当前选中的存档目录
+ * - `reloadCurrent`: 重拉当前显示的那一份
+ * - `sync`: 读当前实例与视图偏好，再拉一次列表
+ * - `setInstanceReadyHook`: 注册实例就绪回调，外壳用它先恢复视图偏好
+ * - `shotUrl`: 拼某个截图的预览地址
+ */
 export function useResourceData(initialCategory: CategoryId = "saves") {
   const category = ref<CategoryId>(initialCategory);
   const saveTab = ref<SaveTab>("saves");
@@ -49,7 +67,7 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
   /** 目标实例 uuid：后端每个命令都要它；没有实例时为空串，加载直接跳过 */
   const instanceUuid = ref("");
 
-  /** 有列表正在拉（模组那个分类要解析 jar 元数据，可能要几秒） */
+  /** 有列表正在拉；模组那个分类要解析 jar 元数据，可能要几秒 */
   const loading = ref(false);
 
   const mods = ref<ModItemDto[]>([]);
@@ -64,27 +82,27 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
   /** 数据包子页当前选中的存档目录 */
   const dpSave = ref("");
 
-  /** 截图预览协议前缀（`mml-image://...`） */
+  /** 截图预览协议前缀，形如 `mml-image://...` */
   const imgBase = ref("");
 
   /**
    * 加载代次号
    *
    * 分类可以连点，而每次加载都要等后端（模组那次尤其慢）。只有**最新一发**的结果与
-   * 收尾算数：否则先发的那一发回来晚了会把 `loading` 提前清掉、把界面闪成空态
-   * （与仓库里 `sourceSeq` 修排序竞态同一做法）。
+   * 收尾算数：否则先发的那一发回来晚了会把 `loading` 提前清掉、把界面闪成空态。
+   * 与仓库里 `sourceSeq` 修排序竞态是同一做法。
    */
   let loadSeq = 0;
 
   /**
-   * 模组扫描进度（`done` / `total`；`total = 0` 表示不在扫描）
+   * 模组扫描进度：`done` / `total`，`total` 为 0 表示不在扫描
    *
    * 只有模组这一档需要：它要给每个 jar 解析元数据（几百个包好几秒），
    * 其它分类是读个清单就完了，用不上。
    */
   const modProgress = ref<{ done: number; total: number }>({ done: 0, total: 0 });
 
-  /** 模组扫描进度的退订函数（每次拉列表时挂上，拿到结果就摘掉） */
+  /** 模组扫描进度的退订函数；每次拉列表时挂上，拿到结果就摘掉 */
   let unlistenProgress: (() => void) | null = null;
 
   function stopModProgress() {
@@ -93,7 +111,7 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     unlistenProgress = null;
   }
 
-  /** 按当前分类拉列表（每次切换 / 操作后都重拉，保证与磁盘一致） */
+  /** 按当前分类拉列表；每次切换 / 操作后都重拉，保证与磁盘一致 */
   async function load() {
     if (!instanceUuid.value) return;
     const seq = ++loadSeq;
@@ -143,7 +161,7 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     }
   }
 
-  /** 数据包列表（依赖子页选中的存档） */
+  /** 数据包列表，依赖子页选中的存档 */
   async function loadDatapacks() {
     if (!instanceUuid.value || !dpSave.value) return;
     const seq = ++loadSeq;
@@ -160,7 +178,7 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     }
   }
 
-  /** 当前显示的是数据包子页（重拉时要挑对那一份加载函数） */
+  /** 当前显示的是数据包子页，重拉时要挑对那一份加载函数 */
   function isDatapackTab(): boolean {
     return category.value === "saves" && saveTab.value === "datapacks";
   }
@@ -187,9 +205,9 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
   }
 
   /**
-   * 实例变化时的回调（由外壳挂上"读该实例的视图偏好"）
+   * 实例变化时的回调，由外壳挂上"读该实例的视图偏好"
    *
-   * 放在这儿是因为**只有这里才知道实例什么时候变**（sync 里读 gui_config）。
+   * 放在这儿是因为**只有这里才知道实例什么时候变**，sync 里读 gui_config。
    * 不用 `watch(instanceUuid)`：偏好要在 `reloadCurrent()` **之前**就位，
    * 否则第一次会按旧顺序/旧类别拉一遍列表，看着像闪了一下。
    */
@@ -211,7 +229,7 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
    */
   let syncing = false;
 
-  /** 当前实例 + 当前分类数据（首次挂载与切回本窗口都走这里） */
+  /** 当前实例 + 当前分类数据；首次挂载与切回本窗口都走这里 */
   async function sync() {
     syncing = true;
     try {
@@ -233,14 +251,14 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     await reloadCurrent();
   }
 
-  /** 截图地址（走 `mml-image` 协议按实例 + 文件名取） */
+  /** 截图地址，走 `mml-image` 协议按实例 + 文件名取 */
   function shotUrl(item: ScreenshotItemDto): string {
     return `${imgBase.value}/screenshot/${instanceUuid.value}/${item.name}`;
   }
 
   watch(category, () => {
-    // sync 期间只更新选择，不触发加载（否则同一份列表会被拉两遍，
-    // 见上面 `syncing` 的说明）—— 那一遍由 sync 结尾的 reloadCurrent 统一做
+    // sync 期间只更新选择，不触发加载，否则同一份列表会被拉两遍；
+    // 那一遍由 sync 结尾的 reloadCurrent 统一做，见上面 `syncing` 的说明
     if (syncing) return;
     // 停在数据包子页时切分类再切回来：要按子页那套重新进入，别把存档列表当数据包拉
     if (isDatapackTab()) {

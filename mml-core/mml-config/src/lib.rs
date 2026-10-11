@@ -12,7 +12,7 @@
 //! # 使用方式
 //!
 //! ```ignore
-//! // 初始化（程序启动时调用一次）
+//! // 初始化，程序启动时调用一次
 //! mml_config::init(&run_dir);
 //!
 //! // 读取配置
@@ -41,19 +41,16 @@ use mml_names::{i18_items::error_type::CoreResult, names, uuids};
 
 use crate::config_obj::ConfigObj;
 
-/// 全局配置对象（惰性初始化 + 读写锁保护）
+/// 全局配置对象，惰性初始化并用读写锁保护
 static CONFIG: OnceLock<RwLock<ConfigObj>> = OnceLock::new();
-/// 配置文件路径（惰性初始化）
+/// 配置文件路径，惰性初始化
 static FILE: OnceLock<PathBuf> = OnceLock::new();
 
 /// 初始化配置系统
 ///
-/// 设置配置文件路径并从磁盘加载配置。若文件不存在则创建默认配置。
-/// 应在程序启动时调用一次。
+/// 设置配置文件路径并从磁盘加载配置，文件不存在则创建默认配置；应在程序启动时调用一次。
 ///
-/// # 参数
-///
-/// - `dir`: 程序运行目录，配置文件将保存在 `{dir}/config.json`
+/// - `dir`: 程序运行目录，配置文件保存在 `{dir}/config.json`
 ///
 /// # 返回值
 ///
@@ -66,7 +63,7 @@ pub fn init<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
 /// 获取配置文件的只读锁
 ///
 /// 返回一个 RAII 守卫，持有期间阻塞写操作。
-/// 使用完毕后应尽快释放（drop），以免阻塞保存。
+/// 使用完毕后应尽快 drop，以免阻塞保存。
 pub fn read_config() -> RwLockReadGuard<'static, ConfigObj> {
     CONFIG.get().unwrap().read().unwrap()
 }
@@ -82,7 +79,7 @@ pub fn write_config() -> RwLockWriteGuard<'static, ConfigObj> {
 /// 立即同步保存配置到磁盘
 ///
 /// 直接调用序列化函数写入文件，不经过后台保存队列。
-/// 适用于需要立即持久化的场景（如程序退出前）。
+/// 适用于需要立即持久化的场景，如程序退出前。
 pub fn save_now() {
     let file = FILE.get().unwrap();
     if let Err(err) = serialize_tools::json_to_file(&*CONFIG.get().unwrap().read().unwrap(), file) {
@@ -103,8 +100,6 @@ pub fn save() {
 ///
 /// 如果文件不存在则创建默认配置文件。
 /// 如果配置文件版本与当前启动器版本不匹配，则自动更新版本号。
-///
-/// # 参数
 ///
 /// - `file`: 配置文件路径
 ///

@@ -143,8 +143,7 @@ fn archive_json_name(archive: &BaseArchive, entry: &str) -> String {
         .unwrap_or_default()
 }
 
-/// 读取压缩包内 `instance.cfg` 的 `name=xxx`（MMC 包的实例名）
-/// 读取 MMC 包 `instance.cfg` 里的 `name=`，读不到返回空串
+/// 读取 MMC 包 `instance.cfg` 里的 `name=xxx`，读不到返回空串
 fn archive_cfg_name(archive: &BaseArchive) -> String {
     let entry = match archive
         .entries()
@@ -543,7 +542,7 @@ async fn archive<P: AsRef<Path>>(
         .filter(|s| !s.is_empty())
         .map(|s| s.trim_end_matches(['/', '\\']).to_string());
 
-    // 包内的 game.json 是导出时的旧元数据（旧 uuid），create_instance 已保存
+    // 包内的 game.json 是导出时的旧元数据，旧 uuid；create_instance 已保存
     // 新实例的 game.json，不能被解压覆盖
     let mut unselect = unselect.unwrap_or_default();
     unselect.push(game_entry.name.clone());
@@ -663,7 +662,7 @@ async fn mmc_archive<P: AsRef<Path>>(
     unselect.push(format!("{path}{}", names::MMCJSON_FILE));
     unselect.push(format!("{path}{}", names::MMCCFG_FILE));
 
-    // 解压到实例基础目录，`.minecraft/` 下的内容自然落到游戏目录（base/.minecraft）。
+    // 解压到实例基础目录，`.minecraft/` 下的内容自然落到游戏目录 base/.minecraft。
     // mmc-pack.json 所在目录即包裹层，解压时去掉
     let strip_dir = path.trim_end_matches(['/', '\\']).to_string();
     extract_pack(
@@ -1541,7 +1540,7 @@ pub async fn install_modrinth(
     }
 
     // 直接走 modpack，不走 install_archive_from_file：图标要一路塞给 worker，
-    // 让它在创建实例时一起写（那个 7 臂分发器吃不下这个参数，其中 5 个臂也用不到）
+    // 让它在创建实例时一起写，那个 7 臂分发器吃不下这个参数，其中 5 个臂也用不到
     let uuid = modpack(
         file,
         ModPackType::Modrinth,

@@ -1,5 +1,5 @@
 // 自定义拖拽逻辑：实例排序 / 跨组移动 / 分组排序
-// 不用 HTML5 draggable（WebView2 中会出现“禁止”光标且投放不可靠），
+// 不用 HTML5 draggable —— WebView2 中会出现“禁止”光标且投放不可靠 ——
 // 改为指针事件模拟：按下记录候选 → 移动超阈值开始拖拽 →
 // 组内插入占位（淡化的实例）→ 松开提交；支持同组排序与跨组移动。
 import { computed, onMounted, onUnmounted, ref, type Ref } from "vue";
@@ -33,10 +33,27 @@ interface DragCandidate {
   groupName?: string;
 }
 
+/**
+ * 实例排序 / 跨组移动 / 分组排序的自定义拖拽
+ *
+ * - `deps`: 多选开关、分组视图、折叠表与两个重拉回调，均由调用方持有
+ *
+ * # 返回值
+ *
+ * - `dragActive`: 正在拖的候选，`null` 表示没在拖
+ * - `draggingUuid`: 正在拖的实例 uuid
+ * - `dragInsert`: 实例的插入位置，分组 uuid + 组内下标
+ * - `dragGroupInsert`: 分组的插入位置
+ * - `onDragPointerDown`: 实例行 / 分组按下时调用，记下拖拽候选
+ * - `isInstInsert`: 某组第 idx 个实例之前是否该画插入占位
+ * - `isInstInsertEnd`: 某组末尾是否该画插入占位
+ * - `isGroupInsert`: 分组列表第 index 个之前是否该画插入占位
+ * - `consumeSuppressClick`: 取走"抑制紧随 click"的标记，返回 `true` 表示本次 click 该忽略
+ */
 export function useInstanceDrag(deps: DragDeps) {
   const dragCandidate = ref<DragCandidate | null>(null);
   const dragActive = ref<DragCandidate | null>(null);
-  /** 正在拖拽的实例 uuid（拖拽时该行不渲染，只显示插入占位） */
+  /** 正在拖拽的实例 uuid；拖拽时该行不渲染，只显示插入占位 */
   const draggingUuid = computed(() =>
     dragActive.value?.kind === "instance"
       ? (dragActive.value.instance?.uuid ?? null)
@@ -157,7 +174,7 @@ export function useInstanceDrag(deps: DragDeps) {
     }
   }
 
-  /** 实例插入占位：分组 groupId 中第 idx 个实例之前（末尾由 isInstInsertEnd 渲染，避免同组拖动出现双占位） */
+  /** 实例插入占位：分组 groupId 中第 idx 个实例之前；末尾由 isInstInsertEnd 渲染，避免同组拖动出现双占位 */
   function isInstInsert(groupId: string, idx: number): boolean {
     const ins = dragInsert.value;
     if (!ins || ins.groupId !== groupId) return false;

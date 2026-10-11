@@ -19,7 +19,7 @@ fn get_test_echo_cmd() -> (&'static str, Vec<String>) {
     }
 }
 
-/// 获取工作目录（使用临时目录，仅用于执行轻量命令）
+/// 获取测试用工作目录，固定为当前目录，仅用于执行轻量命令
 fn test_working_dir() -> &'static str {
     "."
 }
@@ -28,6 +28,7 @@ fn test_working_dir() -> &'static str {
 // is_run_as_admin 测试
 // ============================================================================
 
+/// is_run_as_admin 不应 panic，返回布尔值
 #[test]
 fn test_is_run_as_admin_returns_bool() {
     let result = process_helper::is_run_as_admin();
@@ -39,6 +40,7 @@ fn test_is_run_as_admin_returns_bool() {
 // launch 普通启动测试
 // ============================================================================
 
+/// 普通启动能捕获 stdout 与 stderr
 #[test]
 fn test_launch_normal_captures_stdout() {
     let (cmd, args) = get_test_echo_cmd();
@@ -74,6 +76,7 @@ fn test_launch_normal_captures_stdout() {
     );
 }
 
+/// launch 返回的 child 句柄可 try_wait
 #[test]
 fn test_launch_result_child_wait() {
     let (cmd, args) = get_test_echo_cmd();
@@ -96,7 +99,7 @@ fn test_launch_result_child_wait() {
 ///
 /// 期望：
 /// - `is_run_as_admin()` = true
-/// - `LaunchResult.is_admin` = false（不走提权，直接 spawn）
+/// - `LaunchResult.is_admin` = false，不走提权，直接 spawn
 /// - stdout / stderr 正常捕获
 #[test]
 fn test_launch_admin_when_is_admin() {
@@ -152,7 +155,7 @@ fn test_launch_admin_when_is_admin() {
         out_buf.trim()
     );
 
-    // 验证 stderr（echo 不输出到 stderr）
+    // 验证 stderr，echo 不输出到 stderr
     let mut stderr = result.stderr.unwrap();
     let mut err_buf = String::new();
     stderr.read_to_string(&mut err_buf).expect("read stderr");
@@ -171,8 +174,8 @@ fn test_launch_admin_when_is_admin() {
 ///
 /// 期望：
 /// - `is_run_as_admin()` = false
-/// - `LaunchResult.is_admin` = true（走了提权路径）
-/// - 行为和结果取决于平台提权机制（UAC / pkexec / osascript）
+/// - `LaunchResult.is_admin` = true，走了提权路径
+/// - 行为和结果取决于平台提权机制：UAC / pkexec / osascript
 #[test]
 fn test_launch_admin_when_not_admin() {
     let running_as_admin = process_helper::is_run_as_admin();
@@ -217,13 +220,14 @@ fn test_launch_admin_when_not_admin() {
             "non-admin elevation: is_admin must be true, got false"
         );
     }
-    // 如果 launch 返回 Err（如 pkexec / osascript 不在 PATH），也是可接受的
+    // 如果 launch 返回 Err，如 pkexec / osascript 不在 PATH，也是可接受的
 }
 
 // ============================================================================
 // LaunchResult 结构体字段测试
 // ============================================================================
 
+/// 普通启动时 is_admin 与 pid.is_some() 一致
 #[test]
 fn test_launch_result_fields_consistency() {
     let (cmd, args) = get_test_echo_cmd();
@@ -242,6 +246,7 @@ fn test_launch_result_fields_consistency() {
 // Linux 管理员启动测试 (pkexec)
 // ============================================================================
 
+/// Linux 提权路径测试，依赖 pkexec
 #[cfg(target_os = "linux")]
 mod linux_admin_tests {
     use std::collections::HashMap;
@@ -249,9 +254,8 @@ mod linux_admin_tests {
 
     use mml_base::process_utils;
 
-    /// 当非 root 用户请求提权时，会调用 pkexec。
-    /// 在无 TTY 的 CI 环境中 pkexec 会失败，但 launch() 本身不应 panic，
-    /// 且返回的 is_admin 应为 true（走了提权路径）。
+    /// 非 root 用户请求提权时会调用 pkexec；无 TTY 的 CI 环境中 pkexec 会失败，
+    /// 但 launch() 本身不应 panic，且返回的 is_admin 应为 true
     #[test]
     fn test_launch_admin_linux_elevation_path() {
         if process_helper::is_run_as_admin() {
@@ -290,7 +294,7 @@ mod linux_admin_tests {
         }
     }
 
-    /// 以 root 身份运行时，admin=true 应直接 spawn（不走 pkexec）
+    /// 以 root 身份运行时，admin=true 应直接 spawn，不走 pkexec
     #[test]
     fn test_launch_admin_linux_when_root() {
         if !process_helper::is_run_as_admin() {
@@ -317,6 +321,7 @@ mod linux_admin_tests {
 // macOS 管理员启动测试 (osascript)
 // ============================================================================
 
+/// macOS 提权路径测试，依赖 osascript
 #[cfg(target_os = "macos")]
 mod macos_admin_tests {
     use std::collections::HashMap;
@@ -324,9 +329,8 @@ mod macos_admin_tests {
 
     use mml_base::process_utils;
 
-    /// 当非 root 用户请求提权时，会调用 osascript。
-    /// 在无 GUI 的 CI 环境中 osascript 会失败，但 launch() 本身不应 panic，
-    /// 且返回的 is_admin 应为 true。
+    /// 非 root 用户请求提权时会调用 osascript；无 GUI 的 CI 环境中 osascript 会失败，
+    /// 但 launch() 本身不应 panic，且返回的 is_admin 应为 true
     #[test]
     fn test_launch_admin_macos_elevation_path() {
         if process_helper::is_run_as_admin() {
@@ -345,7 +349,7 @@ mod macos_admin_tests {
         match result {
             Ok(r) => {
                 assert!(r.is_admin, "macOS elevation: is_admin should be true");
-                // osascript stdout 是 piped 的（stderr 已通过 2>&1 合并到 stdout）
+                // osascript stdout 是 piped 的，stderr 已通过 2>&1 合并到 stdout
                 assert!(r.stdout.is_some(), "osascript stdout should be piped");
                 // macOS 上 stderr 被合并到 stdout，所以 stderr 为 None
                 assert!(
@@ -362,7 +366,7 @@ mod macos_admin_tests {
         }
     }
 
-    /// 以 root 身份运行时，admin=true 应直接 spawn（不走 osascript）
+    /// 以 root 身份运行时，admin=true 应直接 spawn，不走 osascript
     #[test]
     fn test_launch_admin_macos_when_root() {
         if !process_helper::is_run_as_admin() {
@@ -388,6 +392,7 @@ mod macos_admin_tests {
 // Windows 命名管道单元测试
 // ============================================================================
 
+/// Windows 命名管道与提权链路测试
 #[cfg(target_os = "windows")]
 mod windows_pipe_tests {
     use std::io::{BufRead, Read, Write};
@@ -399,13 +404,14 @@ mod windows_pipe_tests {
     use windows::Win32::Foundation::HANDLE;
     use windows::core::Free;
 
-    /// 打开命名管道客户端（模拟提权进程通过 -RedirectStandardOutput 连接管道）
+    /// 打开命名管道客户端，模拟提权进程通过 -RedirectStandardOutput 连接管道
     fn open_pipe_client(name: &str) -> std::io::Result<std::fs::File> {
         std::fs::OpenOptions::new()
             .write(true)
             .open(format!(r"\\.\pipe\{}", name))
     }
 
+    /// create_named_pipe 返回有效句柄
     #[test]
     fn test_create_named_pipe_success() {
         let name = format!("test_pipe_create_{}", std::process::id());
@@ -420,11 +426,9 @@ mod windows_pipe_tests {
         }
     }
 
-    // 已知 src bug（暂 ignore）：connect_named_pipe_with_timeout 中
-    // `err.code() == HRESULT(ERROR_IO_PENDING.0 as i32)` 的比较方式有误，
-    // 实际错误码是 0x800703E5（HRESULT 包装的 997），恒不相等，
-    // 导致 ERROR_IO_PENDING / ERROR_PIPE_CONNECTED 两种本应成功的路径
-    // 都被当成普通失败返回错误。修复 src 后移除本 ignore。
+    // 已知 src bug：`err.code() == HRESULT(ERROR_IO_PENDING.0 as i32)` 的比较方式有误，
+    // 实际错误码是 HRESULT 包装的 997，恒不相等，两条本应成功的路径都被判失败；修复后移除 ignore
+    /// 命名管道连接后可读到客户端写入的数据
     #[test]
     #[ignore = "受 connect_named_pipe_with_timeout 的 ERROR_IO_PENDING 比较错误阻塞，详见 src bug 记录"]
     fn test_named_pipe_connect_and_read() {
@@ -448,6 +452,7 @@ mod windows_pipe_tests {
         client.join().expect("client thread join");
     }
 
+    /// 无客户端连接时按超时返回错误
     #[test]
     #[ignore = "受 connect_named_pipe_with_timeout 的 ERROR_IO_PENDING 比较错误阻塞，详见 src bug 记录"]
     fn test_named_pipe_timeout() {
@@ -465,6 +470,7 @@ mod windows_pipe_tests {
         );
     }
 
+    /// 两次创建命名管道得到不同句柄
     #[test]
     fn test_named_pipe_multiple_pipes() {
         let name_a = format!("test_pipe_multi_a_{}", std::process::id());
@@ -481,6 +487,7 @@ mod windows_pipe_tests {
         }
     }
 
+    /// 管道可完整传输 64 KiB 数据
     #[test]
     #[ignore = "受 connect_named_pipe_with_timeout 的 ERROR_IO_PENDING 比较错误阻塞，详见 src bug 记录"]
     fn test_named_pipe_large_data() {
@@ -507,6 +514,7 @@ mod windows_pipe_tests {
         client.join().expect("client join");
     }
 
+    /// 客户端先连接时服务端仍能连上并读到数据
     #[test]
     #[ignore = "受 connect_named_pipe_with_timeout 的 ERROR_IO_PENDING 比较错误阻塞，详见 src bug 记录"]
     fn test_named_pipe_client_first_connect() {
@@ -544,8 +552,8 @@ mod windows_pipe_tests {
 
     /// E2E：直接调用 `launch_with_elevation_windows()`，验证提权管道完整链路
     ///
-    /// 命名管道 → 提权 helper (NamedPipeClientStream) → .NET Process.Start → 输出抄送 → 管道读取。
-    /// UAC 接受时验证 stdout 内容；UAC 拒绝时 stdout/stderr 为 None 但不 panic。
+    /// 命名管道 → 提权 helper NamedPipeClientStream → .NET Process.Start → 输出抄送 → 管道读取；
+    /// UAC 接受时验证 stdout 内容，UAC 拒绝时 stdout/stderr 为 None 但不 panic
     #[test]
     fn test_launch_with_elevation_windows_e2e() {
         use std::collections::HashMap;
@@ -588,8 +596,8 @@ mod windows_pipe_tests {
 
     /// E2E：通过 `launch_with_elevation_windows` 启动 `java -version`
     ///
-    /// Java 将版本信息输出到 **stderr**（非 stdout），可验证 stderr 管道是否正常工作。
-    /// 需要已安装 Java 且 UAC 可交互（或已是管理员）。
+    /// Java 将版本信息输出到 **stderr** 而非 stdout，可验证 stderr 管道是否正常工作；
+    /// 需要已安装 Java 且 UAC 可交互，或当前已是管理员
     #[test]
     fn test_launch_java_version_via_elevation() {
         use std::collections::HashMap;
@@ -658,9 +666,8 @@ mod windows_pipe_tests {
     }
 
     /// 验证 `Start-Process -RedirectStandardOutput` 对命名管道的已知限制：
-    /// 管道可以连接，但**数据不会写入**（`Start-Process` 用 `File.OpenWrite`
-    /// 模式打开路径，不兼容命名管道）。这就是为什么 `launch_with_elevation_windows`
-    /// 改为用提权 helper（NamedPipeClientStream + .NET Process.Start）的原因。
+    /// 管道能连接但**数据不会写入**，因为 `Start-Process` 用 `File.OpenWrite`
+    /// 模式打开路径，不兼容命名管道；这正是改用提权 helper 的原因
     #[test]
     fn test_start_process_redirect_to_pipe_is_broken() {
         use std::io::Read;
@@ -730,8 +737,8 @@ mod windows_pipe_tests {
 
     /// 验证：启动真实子进程，命名管道保证收到 stdout/stderr 数据
     ///
-    /// 通过 .NET `Process.Start` + `NamedPipeClientStream`（与提权 helper
-    /// 完全相同的 API 组合）验证管道接收到真实进程的输出。
+    /// 通过 .NET `Process.Start` + `NamedPipeClientStream` 这套与提权 helper 完全相同的组合，
+    /// 验证管道能收到真实进程的输出
     #[test]
     #[ignore = "受 connect_named_pipe_with_timeout 的 ERROR_IO_PENDING 比较错误阻塞，详见 src bug 记录"]
     fn test_real_child_process_data_through_pipe() {
@@ -747,7 +754,7 @@ mod windows_pipe_tests {
         let pipe_out = format!("mml_child_out_{}", id);
         let pipe_err = format!("mml_child_err_{}", id);
 
-        // 1. 创建管道 + 连接线程（必须在 PowerShell 之前）
+        // 1. 创建管道 + 连接线程，必须在 PowerShell 之前
         let h_out = process_helper::create_named_pipe(&pipe_out).expect("create pipe out");
         let h_err = process_helper::create_named_pipe(&pipe_err).expect("create pipe err");
         let o_out = unsafe { OwnedHandle::from_raw_handle(h_out.0) };

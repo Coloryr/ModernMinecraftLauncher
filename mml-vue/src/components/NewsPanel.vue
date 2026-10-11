@@ -7,10 +7,11 @@ import type { NewsItem } from "../lib/bindings";
 
 withDefaults(
   defineProps<{
+    /** 当前这一页的新闻 */
     items: NewsItem[];
-    /** 加载中（刷新按钮转圈并禁用） */
+    /** 加载中；刷新按钮转圈并禁用 */
     loading?: boolean;
-    /** 当前页码（从 1 开始） */
+    /** 当前页码，从 1 开始 */
     page?: number;
     /** 是否还有下一页 */
     hasMore?: boolean;
@@ -19,9 +20,13 @@ withDefaults(
 );
 
 const emit = defineEmits<{
+  /** 重新拉取当前页 */
   (e: "refresh"): void;
+  /** 上一页 */
   (e: "prev"): void;
+  /** 下一页 */
   (e: "next"): void;
+  /** 打开这条新闻的链接 */
   (e: "open", url: string): void;
 }>();
 
@@ -51,7 +56,7 @@ function tagColor(tag: string) {
     </div>
 
     <div class="news-list" :class="{ 'is-loading-dim': loading && items.length > 0 }">
-      <!-- 首次加载：骨架卡片（与整合包列表同一套加载观感，形状照着新闻卡） -->
+      <!-- 首次加载：骨架卡片，与整合包列表同一套加载观感，形状照着新闻卡 -->
       <template v-if="loading && items.length === 0">
         <div v-for="n in 6" :key="n" class="news-item sk-card">
           <div class="sk sk-banner"></div>
@@ -176,7 +181,7 @@ function tagColor(tag: string) {
 
 /* ---------- 首次加载的骨架卡片 ----------
    形状照着新闻卡：封面 110 高 + 标签/日期一行 + 两行标题。
-   占位块本身用全局 .sk（styles/skeleton.css），这里只拼形状 */
+   占位块本身用全局 .sk，见 styles/skeleton.css，这里只拼形状 */
 .sk-card {
   cursor: default;
 }
@@ -221,7 +226,7 @@ function tagColor(tag: string) {
   padding: 14px;
 }
 
-/* 新闻配图外框（AsyncImage 组件根；图片本身的 object-fit 在组件内部） */
+/* 新闻配图外框，即 AsyncImage 组件根；图片本身的 object-fit 在组件内部 */
 .banner {
   width: 100%;
   height: 110px;

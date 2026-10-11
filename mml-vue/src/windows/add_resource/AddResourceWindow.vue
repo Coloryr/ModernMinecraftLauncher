@@ -3,7 +3,7 @@
 //
 // 从主界面「添加资源」按钮打开，目标实例取 gui_config.json 里主窗口
 // 当前选中的实例（与资源管理窗口一致）。数据包下载前必须先选存档。
-// 下载走全局下载器（命令立即返回，进度在下载窗口里看）。
+// 下载走全局下载器：命令立即返回，进度在下载窗口里看。
 import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
@@ -18,7 +18,10 @@ import { useResourceStatus } from "../../lib/resourceTasks";
 import { projectParamToItem, targetProject, targetUuid, type WindowProjectParam } from "../windowManager";
 import type { FileListItemDto, ProjectItemDto, ResourceSaveDto, ResourceTaskDto } from "../../lib/bindings";
 
-defineEmits<{ (e: "close"): void }>();
+defineEmits<{
+  /** 请求关闭本窗口 */
+  (e: "close"): void;
+}>();
 
 /** 下载任务状态（本窗口是"负责显示"的窗口） */
 const { status: resourceStatus, init: initResourceStatus } = useResourceStatus(true);
@@ -64,8 +67,8 @@ const category = ref("");
 const loader = ref("normal");
 const filter = ref("");
 
-// 离开本窗口时清掉搜索词（来源 / 类型 / 版本等**筛选**留着：那是浏览上下文，
-// 搜索词只是"找某样东西"的一次性输入）。
+// 离开本窗口时清掉搜索词：来源 / 类型 / 版本等**筛选**留着，那是浏览上下文，
+// 搜索词只是"找某样东西"的一次性输入。
 // 单窗口模式下这一页被 KeepAlive 缓存，切走不销毁，不清的话再打开时输入框里
 // 还压着上次搜的词，用户早忘了自己搜过什么，只会觉得界面不对劲。
 onDeactivated(() => {
@@ -87,7 +90,7 @@ const filePage = ref(0);
 const fileTotal = ref(0);
 const fileVersion = ref("");
 
-/** 存档选择弹窗（数据包下载前）：待装的文件 + 存档列表 */
+/** 存档选择弹窗，数据包下载前用：待装的文件 + 存档列表 */
 const savePickFile = ref<FileListItemDto | null>(null);
 const saves = ref<ResourceSaveDto[]>([]);
 const savesLoading = ref(false);
@@ -194,7 +197,7 @@ async function search() {
     return;
   }
   // 排序列表还没拉回来时别发请求：换下载源 / 换类型时它是**异步**拉回来的
-  // （loadSource 里 await 三个请求），这中间发出去必然带不上合法排序
+  // loadSource 里 await 三个请求，这中间发出去必然带不上合法排序
   // —— 空串后端也不认（err.sortTypeNotFound）。那次 loadSource 拉完会自己再搜一次。
   if (sorts.value.length === 0) {
     return;
@@ -462,8 +465,8 @@ onMounted(async () => {
 
   try {
     const cfg = await loadGuiConfig();
-    // 目标实例：openWindow 带进来的那个优先（收藏窗口点非整合包卡片时，
-    // 那边会先让用户选好实例再跳过来），否则用主窗口选中的那个
+    // 目标实例：openWindow 带进来的那个优先，收藏窗口点非整合包卡片时
+    // 那边会先让用户选好实例再跳过来；否则用主窗口选中的那个
     instanceUuid.value = targetUuid() ?? cfg?.mainWindow.selectedInstance ?? "";
   } catch {
     instanceUuid.value = targetUuid() ?? "";
@@ -544,7 +547,7 @@ onActivated(consumeTargetProject);
 <template>
   <WindowFrame :title="t('winTitle.addResource')" @close="$emit('close')">
     <div class="res-mode">
-      <!-- 下载任务进度条（多任务，完成后短暂停留再自动消失） -->
+      <!-- 下载任务进度条：多任务，完成后短暂停留再自动消失 -->
       <ResourceDownloadBar v-if="resourceStatus?.tasks.length" :status="resourceStatus" />
 
       <!-- 资源类型 + 下载源 -->
@@ -601,7 +604,7 @@ onActivated(consumeTargetProject);
       <!-- 列表加载指示：翻页 / 换筛选只在结果区上方走一条细进度，不再全窗口遮罩 -->
       <div class="list-bar" :class="{ on: searching }" aria-hidden="true"><span /></div>
 
-      <!-- 结果列表（加载状态内联在本区，旧内容保留并压暗） -->
+      <!-- 结果列表：加载状态内联在本区，旧内容保留并压暗 -->
       <div class="res-list" :class="{ 'is-loading-dim': searching }">
         <!-- 首次加载（还没有内容）：骨架行 -->
         <template v-if="searching && items.length === 0">

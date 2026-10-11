@@ -8,11 +8,17 @@ import LoaderQueryProgress from "../../../components/LoaderQueryProgress.vue";
 import type { FileNode } from "../../../lib/fileTree";
 
 const props = defineProps<{
+  /** 压缩包路径 */
   path: string;
+  /** 压缩包内容树，懒加载时子节点随展开补齐 */
   tree: FileNode[];
+  /** 已勾选的文件 key */
   checked: Set<string>;
+  /** 已展开的目录 key */
   expanded: Set<string>;
+  /** 可选的压缩包类型 ID 列表 */
   packTypes: string[];
+  /** 已选压缩包类型 ID，决定按普通压缩包还是整合包安装 */
   packType: string;
   /** 正在读压缩包条目 / 识别整合包类型 */
   scanning: boolean;
@@ -21,12 +27,19 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  /** 压缩包路径变化 */
   (e: "update:path", v: string): void;
+  /** 点了「浏览」选压缩包 */
   (e: "pick"): void;
+  /** 勾选 / 取消某个文件 */
   (e: "toggle-file", key: string): void;
+  /** 勾选 / 取消整个目录，`on` 为 true 表示全选 */
   (e: "toggle-dir", node: FileNode, on: boolean): void;
+  /** 展开 / 收起目录 */
   (e: "toggle-expand", key: string): void;
+  /** 全选 / 全不选，`on` 为 true 表示全选 */
   (e: "set-all", on: boolean): void;
+  /** 已选压缩包类型变化 */
   (e: "update:packType", v: string): void;
 }>();
 
@@ -52,7 +65,7 @@ watch(
     <BaseButton class="pick-btn" size="sm" variant="accent" @click="emit('pick')">{{ t("add.browse") }}</BaseButton>
   </div>
 
-  <!-- 读取条目 / 识别类型中：不确定滚动进度条（与加载器查询、目录扫描同一套观感） -->
+  <!-- 读取条目 / 识别类型中：不确定滚动进度条，与加载器查询、目录扫描同一套观感 -->
   <LoaderQueryProgress v-if="scanning" kind="versions" :visible="true" :step="0" :total="0"
     :label="t('add.archiveReading')" />
 

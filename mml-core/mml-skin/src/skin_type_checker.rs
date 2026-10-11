@@ -2,7 +2,7 @@ use tiny_skia::Pixmap;
 
 use crate::SkinType;
 
-/// 透明像素（预乘 RGBA，全 0）
+/// 全透明的预乘 RGBA 字节，四个分量均为 0
 const TRANSPARENT: [u8; 4] = [0, 0, 0, 0];
 
 /// 获取皮肤类型
@@ -29,7 +29,7 @@ pub fn get_skin_type(image: &Pixmap) -> SkinType {
     }
 }
 
-/// 是否为1.8新版皮肤（纤细手臂）
+/// 是否为 1.8 新版纤细皮肤，按右臂与左臂的标记区域是否全透明判定
 ///
 /// - `image`: 皮肤位图
 fn is_slim_skin(image: &Pixmap) -> bool {
@@ -47,7 +47,7 @@ fn is_slim_skin(image: &Pixmap) -> bool {
 
 /// 检查像素区域是否所有像素都匹配指定颜色
 ///
-/// `colors` 里给的是**预乘** RGBA 字节（不透明颜色两者相同）
+/// `colors` 里给的是**预乘** RGBA 字节，不透明颜色下两者相同
 ///
 /// - `image`: 皮肤位图
 /// - `x`: 区域左上角横坐标
@@ -116,11 +116,11 @@ mod tests {
         assert_eq!(get_skin_type(&bm), SkinType::NewSlim);
     }
 
-    /// 纤细标记区域不透明、其余透明：应识别为新版（非纤细）
+    /// 纤细标记区域不透明、其余透明：应识别为新版，非纤细
     #[test]
     fn test_get_skin_type_slim_marker_opaque_is_new() {
         let bm = make_bitmap(64, 64, |x, y| {
-            // 纤维判定区域：右臂 (50,16,2,4)、(54,20,2,12)，左臂 (42,48,2,4)、(46,52,2,12)
+            // 纤细判定区域：右臂 (50,16,2,4)、(54,20,2,12)，左臂 (42,48,2,4)、(46,52,2,12)
             let in_marker = (x >= 50 && x < 52 && y >= 16 && y < 20)
                 || (x >= 54 && x < 56 && y >= 20 && y < 32)
                 || (x >= 42 && x < 44 && y >= 48 && y < 52)
@@ -130,14 +130,14 @@ mod tests {
         assert_eq!(get_skin_type(&bm), SkinType::New);
     }
 
-    /// 64x32（宽为高两倍）：应识别为 1.7 旧版皮肤
+    /// 64x32，宽为高两倍：应识别为 1.7 旧版皮肤
     #[test]
     fn test_get_skin_type_old() {
         let bm = make_bitmap(64, 32, |_, _| OPAQUE_BLUE);
         assert_eq!(get_skin_type(&bm), SkinType::Old);
     }
 
-    /// 尺寸不符合任何已知格式（32x64）应返回 Unknown
+    /// 尺寸 32x64 不符合任何已知格式，应返回 Unknown
     #[test]
     fn test_get_skin_type_unknown() {
         let bm = make_bitmap(32, 64, |_, _| OPAQUE_BLUE);

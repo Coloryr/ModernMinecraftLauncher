@@ -4,8 +4,8 @@
 //!
 //! | 模块 | 用途 |
 //! |------|------|
-//! | [`icons`] | 创造模式图标表（方块ID / 分类 / 渲染规格） |
-//! | [`obj`] | 渲染结果数据结构（BlocksObj / ItemsObj） |
+//! | [`icons`] | 创造模式图标表：方块 ID、分类、渲染规格 |
+//! | [`obj`] | 渲染结果数据结构 BlocksObj 与 ItemsObj |
 //! | [`skin`] | 皮肤方块注册 |
 pub mod icons;
 pub mod obj;
@@ -119,9 +119,9 @@ fn extract_frame(tex: &Pixmap, index: usize) -> Option<Pixmap> {
 ///
 /// 取帧时才做克隆与插值混合，避免物化整条逐刻帧序列，frametime 大时可达上千帧位图
 struct AnimTimeline {
-    /// 源帧位图（按条带顺序切出）
+    /// 源帧位图，按条带顺序切出
     src: Vec<Pixmap>,
-    /// 展开后的帧序列（帧号 → 持续刻数）
+    /// 展开后的帧序列，帧号 → 持续刻数
     entries: Vec<(u32, u32)>,
     /// 帧之间是否平滑插值
     interpolate: bool,
@@ -352,8 +352,12 @@ impl RenderProfile {
 
 /// 追加头颅立方体的 6 个面到 `quads`，照 SkullModel 的 head 部件
 ///
-/// 模型空间 y 轴向下，8×8×8 立方体；帽子层同尺寸外扩 0.25 像素、贴图偏移 (32,0)。
-/// 摆放照 SkullBlockRenderer 绕 X 轴 180° 翻转后居中，纯旋转不改变绕序，无需重排 winding
+/// 模型空间 y 轴向下，8×8×8 立方体，x/z ∈ ±4、y ∈ -8..0；帽子层同尺寸外扩 0.25 像素、
+/// 贴图偏移 (32,0)。摆放照 SkullBlockRenderer 绕 X 轴 180° 翻转后居中，头落在方块内
+/// 4..12 / 0..8 / 4..12 像素处；纯旋转不改变绕序，无需重排 winding
+///
+/// uv 矩形取自各面在贴图上的展开位置：右(0,8) 前(8,8) 左(16,8) 后(24,8) 顶(8,0) 底(16,0)；
+/// 每面 4 个顶点按索引取 [0]右上 [1]左上 [2]左下 [3]右下
 ///
 /// - `quads`: 输出 quad 列表，就地追加
 /// - `tex`: 头颅贴图，皮肤头部展开布局
@@ -469,7 +473,7 @@ fn bake_head_model(tex: Pixmap, hat: bool, path: &str) -> BakedModel {
 
     BakedModel {
         quads,
-        // 头颅是3D模型，走 ITEMS_3D 侧向光照（同游戏）
+        // 头颅是 3D 模型，走 ITEMS_3D 侧向光照，同游戏
         gui_light_3d: true,
         transform: crate::model::GuiTransform {
             rotation: [30.0, 45.0, 0.0],
@@ -856,14 +860,14 @@ pub struct AnimFrame {
     pub time: u32,
 }
 
-/// mcmeta 文件顶层（JSON 镜像）
+/// mcmeta 文件顶层，JSON 镜像
 #[derive(Serialize, Deserialize, Default)]
 struct TextureMetaObj {
     /// animation 节点，非动画贴图没有
     animation: Option<TextureAnimationObj>,
 }
 
-/// mcmeta 的 animation 节点（JSON 镜像）
+/// mcmeta 的 animation 节点，JSON 镜像
 #[derive(Serialize, Deserialize, Default)]
 struct TextureAnimationObj {
     /// 帧间隔，单位刻

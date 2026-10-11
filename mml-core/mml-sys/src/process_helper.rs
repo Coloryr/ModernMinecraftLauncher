@@ -31,7 +31,7 @@ pub enum OutputStream {
     Stdout(std::process::ChildStdout),
     /// 普通子进程的 stderr
     Stderr(std::process::ChildStderr),
-    /// 提权进程通过命名管道重定向的输出（Windows）
+    /// 提权进程通过命名管道重定向的输出，仅 Windows
     #[cfg(target_os = "windows")]
     File(std::fs::File),
 }
@@ -51,15 +51,15 @@ impl Read for OutputStream {
 ///
 /// 统一普通启动和提权启动的返回结构
 pub struct LaunchResult {
-    /// 进程句柄（普通启动=目标进程，提权启动=启动器进程）
+    /// 进程句柄，普通启动为目标进程，提权启动为启动器进程
     pub child: Child,
-    /// 是否为提权启动（通过外部启动器启动，非直接子进程）
+    /// 是否为提权启动：通过外部启动器启动，非直接子进程
     pub is_admin: bool,
-    /// 目标进程 PID（仅 Windows 提权时用于 taskkill 强制结束）
+    /// 目标进程 PID，仅 Windows 提权时用于 taskkill 强制结束；其余情况为 `None`
     pub pid: Option<u32>,
-    /// 目标进程 stdout（普通启动=管道，提权=命名管道/pkexec转发）
+    /// 目标进程 stdout，普通启动为管道，提权为命名管道或 pkexec 转发
     pub stdout: Option<OutputStream>,
-    /// 目标进程 stderr（合并策略同 stdout）
+    /// 目标进程 stderr，合并策略同 stdout
     pub stderr: Option<OutputStream>,
 }
 
@@ -76,7 +76,7 @@ pub fn is_run_as_admin() -> bool {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        // 通过 `id -u` 检查是否为 root（跨 macOS / Linux）
+        // 通过 `id -u` 检查是否为 root，跨 macOS / Linux
         std::process::Command::new("id")
             .arg("-u")
             .output()
@@ -139,7 +139,7 @@ pub fn launch<P: AsRef<Path>>(
     }
 }
 
-/// 以管理员权限启动进程（平台特定实现）
+/// 以管理员权限启动进程，平台特定实现
 ///
 /// Windows: 使用命名管道捕获提权进程的 stdout/stderr，PowerShell Wait-Process 保持存活
 /// macOS: 使用 osascript 提权，启动器在目标进程运行期间保持存活
@@ -193,7 +193,7 @@ fn launch_with_elevation<P: AsRef<Path>>(
             is_admin: true,
             pid: None,
             stdout,
-            stderr: None, // stderr 已合并到 stdout（2>&1）
+            stderr: None, // stderr 已由 2>&1 合并到 stdout
         })
     }
 
@@ -246,7 +246,7 @@ fn launch_with_elevation<P: AsRef<Path>>(
 ///
 /// # 返回值
 ///
-/// 返回启动结果（`child` 为初始 PowerShell，`pid` 为 helper PID）
+/// 返回启动结果，`child` 为初始 PowerShell，`pid` 为 helper PID
 #[cfg(target_os = "windows")]
 pub fn launch_with_elevation_windows<P: AsRef<Path>>(
     path: P,
@@ -267,13 +267,13 @@ pub fn launch_with_elevation_windows<P: AsRef<Path>>(
     let stdout_pipe_name = format!("mml_stdout_{}", id);
     let stderr_pipe_name = format!("mml_stderr_{}", id);
 
-    // 创建命名管道（服务器端）
+    // 创建命名管道服务器端
     let stdout_handle = create_named_pipe(&stdout_pipe_name)?;
     let stderr_handle = create_named_pipe(&stderr_pipe_name)?;
     let stdout_owned = unsafe { OwnedHandle::from_raw_handle(stdout_handle.0) };
     let stderr_owned = unsafe { OwnedHandle::from_raw_handle(stderr_handle.0) };
 
-    // 构建目标进程参数（在 PowerShell 中作为字符串传递给 $psi.Arguments）
+    // 目标进程参数，在 PowerShell 中作为字符串传给 $psi.Arguments
     let arg_str = args
         .iter()
         .map(|a| {
@@ -401,7 +401,7 @@ pub fn launch_with_elevation_windows<P: AsRef<Path>>(
     })
 }
 
-// 命名管道相关常量（避免 windows-sys 模块名称差异）
+// 命名管道相关常量，避免 windows-sys 模块名称差异
 #[cfg(target_os = "windows")]
 const FILE_FLAG_OVERLAPPED: u32 = 0x40000000;
 #[cfg(target_os = "windows")]
@@ -415,7 +415,7 @@ const PIPE_WAIT: u32 = 0x00000000;
 
 /// 创建一个命名管道服务器并返回原始 HANDLE
 ///
-/// - `name`: 管道名（不含 `\\.\pipe\` 前缀）
+/// - `name`: 管道名，不含 `\\.\pipe\` 前缀
 ///
 /// # 返回值
 ///
@@ -446,7 +446,7 @@ pub fn create_named_pipe(name: &str) -> Result<windows::Win32::Foundation::HANDL
         )
     };
 
-    // INVALID_HANDLE_VALUE 比较（HANDLE 是 *mut c_void，需要转为 usize）
+    // INVALID_HANDLE_VALUE 比较，HANDLE 是 *mut c_void，需要转为 usize
     if handle == INVALID_HANDLE_VALUE {
         return Err(ErrorType::ProcessError(ErrorData {
             error: format!(
@@ -459,13 +459,13 @@ pub fn create_named_pipe(name: &str) -> Result<windows::Win32::Foundation::HANDL
     Ok(handle)
 }
 
-/// 连接到命名管道客户端（带超时），成功返回 `File` 可供读取
+/// 连接到命名管道客户端，带超时；成功返回 `File` 可供读取
 ///
-/// 接收 `OwnedHandle`（保证 Send），内部提取原始 HANDLE 进行操作，
+/// 接收 `OwnedHandle` 以保证 Send，内部提取原始 HANDLE 进行操作，
 /// 连接成功后转移所有权给 `File`
 ///
 /// - `handle`: 管道服务器句柄
-/// - `timeout_ms`: 等待连接的超时（毫秒）
+/// - `timeout_ms`: 等待连接的超时，单位毫秒
 ///
 /// # 返回值
 ///
@@ -530,7 +530,7 @@ pub fn connect_named_pipe_with_timeout(
                 }));
             }
         } else if err.code() == HRESULT(ERROR_PIPE_CONNECTED.0 as i32) {
-            // 客户端已连接（在 ConnectNamedPipe 之前就连接了）
+            // 客户端在 ConnectNamedPipe 之前就已连接
         } else {
             unsafe {
                 CloseHandle(event).map_err(|err| {
@@ -712,7 +712,7 @@ mod tests {
         dir
     }
 
-    /// is_run_as_admin 只要求不 panic 并返回布尔值（CI 环境权限不定，不做断言）
+    /// is_run_as_admin 只要求不 panic 并返回布尔值，CI 环境权限不定，不做断言
     #[test]
     fn test_is_run_as_admin() {
         let _ = is_run_as_admin();
@@ -726,6 +726,7 @@ mod tests {
         assert_eq!(lines, vec!["hello".to_string()]);
     }
 
+    /// run_command_arg 返回按行拆分的 stdout
     #[cfg(not(target_os = "windows"))]
     #[test]
     fn test_run_command_arg() {
@@ -733,7 +734,7 @@ mod tests {
         assert_eq!(lines, vec!["hello".to_string()]);
     }
 
-    /// 命令执行失败（非零退出码）时返回空列表
+    /// 命令执行失败时返回空列表，非零退出码即视为失败
     #[cfg(target_os = "windows")]
     #[test]
     fn test_run_command_arg_failure_returns_empty() {
@@ -741,6 +742,7 @@ mod tests {
         assert!(lines.is_empty());
     }
 
+    /// 命令执行失败时返回空列表，非零退出码即视为失败
     #[cfg(not(target_os = "windows"))]
     #[test]
     fn test_run_command_arg_failure_returns_empty() {
@@ -785,6 +787,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&work);
     }
 
+    /// launch 启动普通进程并捕获 stdout
     #[cfg(not(target_os = "windows"))]
     #[test]
     fn test_launch_and_capture_stdout() {
@@ -844,6 +847,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&work);
     }
 
+    /// launch 设置的环境变量对子进程可见
     #[cfg(not(target_os = "windows"))]
     #[test]
     fn test_launch_with_env() {

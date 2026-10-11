@@ -1,4 +1,4 @@
-//! 系统交互模块（平台相关的进程 / 路径 / 内存 / 剪贴板等封装）
+//! 系统交互模块，封装平台相关的进程 / 路径 / 内存 / 剪贴板等操作
 //!
 //! # 子模块
 //!
@@ -32,11 +32,11 @@ pub enum Os {
     None,
     /// Microsoft Windows
     Windows,
-    /// Linux（通用发行版）
+    /// Linux 通用发行版
     Linux,
     /// Apple macOS
     MacOS,
-    /// Alpine Linux（使用 musl libc）
+    /// Alpine Linux，使用 musl libc
     AlpineLinux,
     /// IBM AIX
     AIX,
@@ -100,11 +100,11 @@ pub struct SystemInfo {
     pub os: Os,
     /// CPU 架构
     pub system_arch: ArchEnum,
-    /// 系统名称（完整描述，如 `"windows"`、`"linux"`）
+    /// 系统名称，完整描述，如 `"windows"`、`"linux"`
     pub system_name: String,
-    /// Linux 发行版标识（如 `"ubuntu"`、`"arch"`），非 Linux 为空字符串
+    /// Linux 发行版标识，如 `"ubuntu"`、`"arch"`；非 Linux 为空字符串
     pub distribution: String,
-    /// 格式化的系统描述字符串（如 `"Os:Windows Arch:x86_64"`）
+    /// 格式化的系统描述字符串，如 `"Os:Windows Arch:x86_64"`
     pub system: String,
     /// 是否为 ARM 处理器
     pub is_arm: bool,
@@ -112,10 +112,14 @@ pub struct SystemInfo {
     pub is_64_bit: bool,
 }
 
-/// 全局系统信息缓存（惰性初始化）
+/// 全局系统信息缓存，惰性初始化
 static SYSTEM_INFO: LazyLock<SystemInfo> = LazyLock::new(|| SystemInfo::new());
 
-/// 获取系统信息（首次调用时自动检测并缓存）
+/// 获取系统信息，首次调用时自动检测并缓存
+///
+/// # 返回值
+///
+/// 返回缓存系统信息的副本
 pub fn get_system_info() -> SystemInfo {
     SYSTEM_INFO.clone()
 }

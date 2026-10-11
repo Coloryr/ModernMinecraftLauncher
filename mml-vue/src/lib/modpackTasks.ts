@@ -26,7 +26,7 @@ function modpackPageActive(): boolean {
  * 本次终态提示该不该由本窗口弹
  *
  * - `own=true`（下载整合包窗口 / 那一页）：多窗口模式恒弹；单窗口模式只在它显示在前台时弹
- *   （KeepAlive 缓存着的页面照样收事件、照样能弹 toast，不挡就会和别处各弹一份）
+ *   KeepAlive 缓存着的页面照样收事件、照样能弹 toast，不挡就会和别处各弹一份
  * - `own=false`（主窗口 / 根组件那两份订阅）：只负责"整合包那页不在前台"时的兜底。
  *   单窗口模式下根组件那份**任何页面都在场**，所以它不与主窗口互斥 —— 兜底只由它做，
  *   主窗口那份自己也订阅（为了接管新实例），但不再弹提示。
@@ -43,15 +43,26 @@ function shouldToast(own: boolean, windowOpen: boolean): boolean {
 /** 单窗口模式下，"整合包那一页不在前台"时的兜底提示是否由这份订阅负责（只给根组件开） */
 let fallbackToast = false;
 
-/** 标记本份订阅为兜底提示的唯一负责人（根组件调用，见 App.vue） */
+/**
+ * 标记本份订阅为兜底提示的唯一负责人，根组件调用，见 App.vue
+ *
+ * - `enabled`: 是否由本份订阅负责兜底
+ */
 export function setModpackFallbackToast(enabled: boolean) {
   fallbackToast = enabled;
 }
 
 /**
- * @param own 是否为下载整合包窗口本体（true = 多窗口模式下始终负责 toast；
- *   false = 仅在整合包窗口关闭时负责）
- * @param onAddedInstance 安装成功时回调（主窗口用它刷新并选中新实例）
+ * 订阅整合包安装任务状态
+ *
+ * - `own`: 是否为下载整合包窗口本体。true = 多窗口模式下始终负责 toast，
+ *   false = 仅在整合包窗口关闭时负责
+ * - `onAddedInstance`: 安装成功时回调，主窗口用它刷新并选中新实例
+ *
+ * # 返回值
+ *
+ * - `status`: 最近一次任务快照
+ * - `init`: 挂载时调用，先同步一次快照再订阅事件，返回解绑函数
  */
 export function useModpackStatus(
   own: boolean,
@@ -69,7 +80,7 @@ export function useModpackStatus(
       seenDone.add(task.uuid);
       if (task.instanceUuid) {
         writeRaw(KEYS.addedInstance, task.instanceUuid);
-        // 通知其它窗口（原生的 storage 事件只跨文档触发，这里显式广播一次）
+        // 通知其它窗口：原生的 storage 事件只跨文档触发，这里显式广播一次
         emitChange(KEYS.addedInstance, task.instanceUuid);
       }
       // 初次同步只记录：窗口打开前就结束的任务不再提示，也不把选中实例改过去
@@ -80,7 +91,7 @@ export function useModpackStatus(
       if (task.done) {
         // 接管新实例与弹提示分开判：多窗口模式下整合包窗口开着时由它写本地存储、
         // 主窗口收跨窗口的存储通知接管，这里就不重复通知；单窗口模式没有那个事件
-        // （同一个文档里写不触发跨窗口通知），主窗口只能靠这个回调，
+        // 同一个文档里写不触发跨窗口通知，主窗口只能靠这个回调，
         // 所以它不能跟着下面 toast 的门控一起被跳过
         if (task.instanceUuid && !(multiWindow.value && e.windowOpen)) {
           onAddedInstance?.(task.instanceUuid);

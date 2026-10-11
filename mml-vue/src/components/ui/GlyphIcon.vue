@@ -1,14 +1,14 @@
 <script setup lang="ts">
-// 小图标：原来用文字字形（＋ ✓ ✕ ‹ › ▾ − ×）当图标的地方统一走这里
+// 小图标：原来用文字字形当图标的地方统一走这里，如 ＋ ✓ ✕ ‹ › ▾ − ×
 //
 // 为什么不留着字形：
-// - 字形形状 / 粗细 / 位置随字体走：中文字体把 ＋ 画在 em 框偏上，盒子居中了笔画仍显偏上
-//   （AccountSelector 里已经踩过一次，见那里的注释）；
+// - 字形形状 / 粗细 / 位置随字体走：中文字体把 ＋ 画在 em 框偏上，盒子居中了笔画仍显偏上，
+//   AccountSelector 里已经踩过一次，见那里的注释；
 // - ▾ 这类三角按字号画得太小，粗细还随字号变形；
 // - 字号一改图标就变形，而 SVG 的尺寸由 size 定死，线宽由 weight 调。
 //
 // 统一 24 视窗 + stroke=currentColor（跟随所在处的字体色）+ 圆头圆角，
-// 与仓库里其它内联图标（86 处 stroke="currentColor"）同一套画法。
+// 与仓库里其它内联图标同一套画法，那边有 86 处 stroke="currentColor"。
 export type GlyphName =
   | "plus"
   | "minus"
@@ -27,7 +27,7 @@ export type GlyphName =
   | "refresh"
   | "folder"
   | "folder-plus"
-  // 资源分类（见 windows/resource/types.ts 的 RESOURCE_CATEGORIES）
+  // 以下为资源分类，见 windows/resource/types.ts 的 RESOURCE_CATEGORIES
   | "archive"
   | "package"
   | "palette"
@@ -35,10 +35,20 @@ export type GlyphName =
   | "sun"
   | "cube";
 
-withDefaults(defineProps<{ name: GlyphName; size?: number; weight?: number }>(), {
-  size: 14,
-  weight: 2,
-});
+withDefaults(
+  defineProps<{
+    /** 图标名 */
+    name: GlyphName;
+    /** 边长，单位 px */
+    size?: number;
+    /** 线宽 */
+    weight?: number;
+  }>(),
+  {
+    size: 14,
+    weight: 2,
+  },
+);
 </script>
 
 <template>
@@ -52,7 +62,7 @@ withDefaults(defineProps<{ name: GlyphName; size?: number; weight?: number }>(),
     <path v-else-if="name === 'chevron-right'" d="m9 6 6 6-6 6" />
     <path v-else-if="name === 'chevron-down'" d="m6 9 6 6 6-6" />
     <path v-else-if="name === 'play'" d="M7.5 5.2v13.6L19 12 7.5 5.2z" />
-    <!-- 齿轮与顶栏功能按钮上那个是同一个画法（见 MainTopbar 的 gear） -->
+    <!-- 齿轮与顶栏功能按钮上那个是同一个画法，见 MainTopbar 的 gear -->
     <g v-else-if="name === 'gear'">
       <circle cx="12" cy="12" r="3.2" />
       <path
@@ -93,13 +103,13 @@ withDefaults(defineProps<{ name: GlyphName; size?: number; weight?: number }>(),
     <g v-else-if="name === 'folder'">
       <path d="M4 7a2 2 0 0 1 2-2h3.2l2 2.4H18a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z" />
     </g>
-    <!-- 新建分组：文件夹 + 一个加号（与「添加」系列的 plus 同一套画法） -->
+    <!-- 新建分组：文件夹 + 一个加号，与「添加」系列的 plus 同一套画法 -->
     <g v-else-if="name === 'folder-plus'">
       <path d="M4 7a2 2 0 0 1 2-2h3.2l2 2.4H18a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z" />
       <path d="M12 11v6M9 14h6" />
     </g>
     <!--
-      资源分类的图标（见 resource/types.ts）：
+      资源分类的图标，见 resource/types.ts：
       都按"一眼能认出是什么"来画，且与上面那些同一套 24 视窗 + 描边画法。
     -->
     <!-- 存档：带盖的箱体 + 中间一道横线（世界存档） -->

@@ -8,8 +8,14 @@ import BaseModal from "../../../components/ui/BaseModal.vue";
 import { t } from "../../../lib/i18n";
 import type { useResourceOps } from "../composables/useResourceOps";
 
-const props = defineProps<{ ops: ReturnType<typeof useResourceOps> }>();
-const emit = defineEmits<{ (e: "close"): void }>();
+const props = defineProps<{
+  /** 共用操作层，弹窗内容与执行都从它取 */
+  ops: ReturnType<typeof useResourceOps>;
+}>();
+const emit = defineEmits<{
+  /** 关闭弹窗；取消与确认之后都由外壳收起 */
+  (e: "close"): void;
+}>();
 
 const { confirmBox, confirmBusy, runConfirm } = props.ops;
 </script>

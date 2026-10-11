@@ -29,12 +29,23 @@ export const BLOCK_SIZES: Record<BlockSize, BlockSizeMetrics> = {
 /** 尺寸档顺序（工具条分段控件用） */
 export const BLOCK_SIZE_ORDER: readonly BlockSize[] = ["sm", "md", "lg"];
 
+/**
+ * 判断任意值是不是合法的尺寸档
+ *
+ * - `v`: 待判断的值，来自本地存储等不可信来源
+ *
+ * # 返回值
+ *
+ * 命中三档之一时为 `true`
+ */
 export function isBlockSize(v: unknown): v is BlockSize {
   return v === "sm" || v === "md" || v === "lg";
 }
 
-/// 玩家头颅的分类 ID
-///
-/// 值沿用 crate 里的 `playerSkin`（`block/skin.rs` 写入 `Cat`，已写进 `block.json` 的渲染结果，
-/// 改名会让旧数据对不上），**只改显示文案**为「玩家头颅」。
+/**
+ * 玩家头颅的分类 ID
+ *
+ * 值沿用 crate 里的 `playerSkin`，`block/skin.rs` 已把它写进 `block.json` 的渲染结果，
+ * 改名会让旧数据对不上，**只改显示文案**为「玩家头颅」。
+ */
 export const SKIN_CAT = "playerSkin";

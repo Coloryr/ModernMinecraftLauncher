@@ -11,13 +11,18 @@ import type { GroupDto } from "../../../lib/bindings";
 import { t } from "../../../lib/i18n";
 
 const props = defineProps<{
+  /** 输入框里的组名，空 = 默认分组 */
   modelValue: string;
+  /** 已有分组候选，下拉里按输入内容过滤 */
   groups: GroupDto[];
+  /** 下拉是否展开，由父组件持有以配合 Esc 的优先级链 */
   open: boolean;
 }>();
 
 const emit = defineEmits<{
+  /** 组名变化 */
   (e: "update:modelValue", v: string): void;
+  /** 请求展开 / 收起下拉 */
   (e: "update:open", v: boolean): void;
 }>();
 

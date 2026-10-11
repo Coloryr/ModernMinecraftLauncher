@@ -11,18 +11,18 @@ import { onTitleBarPointerDown, titleBarStyle, useWindowTitle } from "../../lib/
 import { useWindowDecoration } from "../../lib/useWindowDecoration";
 
 const props = defineProps<{
+  /** 标题栏文案，同时作为原生窗口标题 */
   title: string;
-  /** 内容区不整页滚动（overflow hidden + flex 列），滚动交给视图内部的容器，
+  /** 内容区不整页滚动，即 overflow hidden + flex 列，滚动交给视图内部的容器；
    *  详情表格这类"工具栏固定、表格自己滚"的布局用 */
   bodyFill?: boolean;
-  /** 内容区**整页滚动**、且内容长短会变时开启：给内容区预留纵向滚动条的位置
-   *  （`scrollbar-gutter: stable`），免得滚动条一冒出来整页内容就左移 9px。
-   *  只有"滚动容器就是 `.frame-body` 本身"的窗口才需要开 ——
-   *  内容区是 `height: 100%` 布局、滚动交给内部容器的窗口（资源 / 添加资源 /
-   *  下载 Java）开了只会白窄 9px。判据见 styles/scrollbar.css */
+  /** 内容区**整页滚动**、且内容长短会变时开启：给内容区预留纵向滚动条的位置，
+   *  免得滚动条一冒出来整页内容就左移 9px，见 styles/scrollbar.css 的 scrollbar-gutter。
+   *  只有"滚动容器就是 `.frame-body` 本身"的窗口才需要开 —— 资源 / 添加资源 /
+   *  下载 Java 这几个内容区是 `height: 100%` 布局、滚动交给内部容器，开了只会白窄 9px */
   bodyGutter?: boolean;
-  /** 窗口内子页面的返回键文案（如"返回"）；不传则用单窗口模式那枚「返回上一页」。
-   *  按钮本身只画箭头，这段文案作为悬停提示（v-tip）与无障碍名称存在；
+  /** 窗口内子页面的返回键文案，如"返回"；不传则用单窗口模式那枚「返回上一页」。
+   *  按钮本身只画箭头，这段文案作为悬停提示 v-tip 与无障碍名称存在；
    *  两种用法共用同一个 `.back-btn`，外观完全一致 */
   back?: string;
   /** 是否在标题栏显示整合包安装进度指示（默认显示）。
@@ -32,10 +32,11 @@ const props = defineProps<{
   hideDownloadIndicator?: boolean;
 }>();
 
+/** `close` 由返回按钮发出，`back` 由窗口内子页面的返回键发出 */
 const emit = defineEmits<{ (e: "close"): void; (e: "back"): void }>();
 
-/** 单窗口模式（浏览器 / Tauri 都一样）才显示返回按钮：
- *  这时功能页都在同一个窗口里切换，"返回"＝回上一层（见 windowManager 的返回栈）；
+/** 单窗口模式才显示返回按钮，浏览器与 Tauri 都一样：
+ *  这时功能页都在同一个窗口里切换，"返回"＝回上一层，返回栈见 windowManager；
  *  多窗口模式下每个功能是独立窗口，关掉它自然露出下面那个，不需要返回键 */
 const showBack = computed(() => !multiWindow.value);
 
@@ -46,7 +47,7 @@ const showBack = computed(() => !multiWindow.value);
 useWindowTitle(() => props.title);
 
 // 窗口装饰：激活插件装饰（原生 frame → 自绘）+ 把贴靠热区交给插件。
-// 每个功能窗口都要做，放这里统一处理（见 lib/useWindowDecoration.ts）
+// 每个功能窗口都要做，放这里统一处理，见 lib/useWindowDecoration.ts
 const rootEl = ref<HTMLElement | null>(null);
 const { decorated } = useWindowDecoration(rootEl);
 </script>
@@ -57,8 +58,8 @@ const { decorated } = useWindowDecoration(rootEl);
       <!-- macos 样式：红黄绿在左端。插件接管时由它画原生圆点，这里不重复渲染 -->
       <WindowControls v-if="titleBarStyle === 'macos' && !decorated" :style="titleBarStyle" />
 
-      <!-- 窗口内子页面的返回键（如整合包详情）：与下面的单窗口返回按钮共用一套外观。
-           按钮只画箭头，文案改由悬停提示给出（见 .back-btn 的说明） -->
+      <!-- 窗口内子页面的返回键，如整合包详情：与下面的单窗口返回按钮共用一套外观。
+           按钮只画箭头，文案改由悬停提示给出，见 .back-btn 的说明 -->
       <button v-if="props.back" class="back-btn" v-tip="props.back" :aria-label="props.back" @click="emit('back')">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"
           stroke-linecap="round">
@@ -79,7 +80,7 @@ const { decorated } = useWindowDecoration(rootEl);
       <slot name="head-right" />
       <!-- 进度指示器：跟着**当时显示的那条标题栏**走。
            多窗口模式下各功能是独立窗口，自然挂各自的；单窗口模式下功能页也各有自己的
-           标题栏（主页面才是 MainTopbar），所以这里照样得挂 —— 之前只在 multiWindow 时挂，
+           标题栏，主页面才是 MainTopbar，所以这里照样得挂 —— 之前只在 multiWindow 时挂，
            结果从"下载整合包"返回"添加实例"后两个指示器都不见了。
            没有任务时各自整块不存在 -->
       <ModpackTitleIndicator v-if="!hideModpackIndicator" />
@@ -123,8 +124,8 @@ const { decorated } = useWindowDecoration(rootEl);
 
 /* 幽灵图标按钮：只有箭头，无边框、无底色，悬停才浮出一层淡底并提亮箭头——
    与右侧窗口按钮"平时透明、悬停才出底"同一套逻辑。
-   文案（"返回"）不再画在按钮上，改由模板里的 v-tip 悬停提示给出。
-   两个用法（单窗口的返回 / 窗口内子页面的返回）共用这一套外观 */
+   文案"返回"不再画在按钮上，改由模板里的 v-tip 悬停提示给出。
+   单窗口的返回与窗口内子页面的返回共用这一套外观 */
 .back-btn {
   display: flex;
   align-items: center;
@@ -148,8 +149,8 @@ const { decorated } = useWindowDecoration(rootEl);
 .frame-head h1 {
   font-size: 16px;
   font-weight: 700;
-  /* 标题不被挤掉：窗口窄时先压右边的上下文与按钮（资源窗口那个实例 chip 就是这么挤掉过
-     "资源管理" 的），标题本身不缩、不换行 */
+  /* 标题不被挤掉：窗口窄时先压右边的上下文与按钮，资源窗口那个实例 chip 就是这么
+     挤掉过 "资源管理" 的，标题本身不缩、不换行 */
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -172,9 +173,9 @@ const { decorated } = useWindowDecoration(rootEl);
   scrollbar-gutter: stable;
 }
 
-/* 不整页滚动的窗口（`body-fill`）：显式取消预留。
-   **必须写**：scrollbar-gutter 不看"这会儿有没有滚动条"，overflow: hidden 一样占位 9px
-   （实测）。账户窗口还会在列表 / 详情之间切换 fill，不取消就会随视图切换忽宽忽窄。
+/* 不整页滚动的窗口 `body-fill`：显式取消预留。
+   **必须写**：scrollbar-gutter 不看"这会儿有没有滚动条"，overflow: hidden 一样占位 9px，
+   实测如此。账户窗口还会在列表 / 详情之间切换 fill，不取消就会随视图切换忽宽忽窄。
    这条要放在 .gutter 之后：两者特异性相同，靠顺序让 .fill 赢 */
 .frame-body.fill {
   overflow: hidden;

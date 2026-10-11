@@ -1,10 +1,21 @@
-// 添加实例 · 文件树状态（压缩包模式与文件夹模式各持一份实例）
+// 添加实例 · 文件树状态：压缩包模式与文件夹模式各持一份实例
 //
 // 两棵树的操作完全同构（勾选 / 展开 / 全选 / 目录级联），差别只在「怎么把节点读进来」，
 // 所以这里只管状态与操作，读盘与懒加载留在窗口里。
 import { ref } from "vue";
 import { collectFileKeys, type FileNode } from "../../../lib/fileTree";
 
+/**
+ * 文件树状态：勾选 / 展开 / 全选 / 目录级联
+ *
+ * # 返回值
+ *
+ * - `tree`: 根节点列表，懒加载时子节点随展开补齐
+ * - `checked`: 已勾选的叶子文件 key
+ * - `expanded`: 已展开的目录 key
+ * - `reset` / `setAll` / `toggleFile` / `toggleDir` / `toggleExpand`: 状态操作方法
+ * - `unselectedKeys`: 未勾选的文件 key，调用方据此决定要不要传排除名单
+ */
 export function useFileTree() {
   /** 根节点列表（懒加载时子节点随展开补齐） */
   const tree = ref<FileNode[]>([]);
@@ -20,7 +31,7 @@ export function useFileTree() {
     expanded.value = new Set();
   }
 
-  /** 全选 / 全不选（只针对已加载的节点：懒加载目录展开后需再点一次） */
+  /** 全选 / 全不选；只针对已加载的节点，懒加载目录展开后需再点一次 */
   function setAll(on: boolean) {
     checked.value = on ? new Set(collectFileKeys(tree.value)) : new Set();
   }
@@ -49,7 +60,7 @@ export function useFileTree() {
     expanded.value = s;
   }
 
-  /** 未勾选的文件 key（全选时为空；调用方据此决定要不要传排除名单） */
+  /** 未勾选的文件 key：全选时为空，调用方据此决定要不要传排除名单 */
   function unselectedKeys(): string[] {
     return collectFileKeys(tree.value).filter((k) => !checked.value.has(k));
   }

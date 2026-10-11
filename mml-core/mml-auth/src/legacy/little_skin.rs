@@ -18,16 +18,17 @@ use crate::{
 };
 
 /// LittleSkin 皮肤站登录认证，支持官方站和自建站两种模式。
-/// `server` 为 `None` 时使用官方 LittleSkin；返回已认证并刷新令牌的
-/// [`LoginObj`]，`auth_type` 为 `LittleSkin` 或 `SelfLittleSkin`
-///
-/// # 参数
+/// `server` 为 `None` 时使用官方 LittleSkin
 ///
 /// - `client_token`: 客户端标识令牌
 /// - `user`: 用户名
 /// - `password`: 密码
-/// - `server`: 自建皮肤站地址（`None` 表示使用官方 LittleSkin）
+/// - `server`: 自建皮肤站地址，`None` 表示使用官方 LittleSkin
 /// - `gui`: 可选的角色选择回调
+///
+/// # 返回值
+///
+/// 已认证并刷新令牌的 [`LoginObj`]，`auth_type` 为 `LittleSkin` 或 `SelfLittleSkin`
 pub async fn authenticate(
     client_token: String,
     user: String,
@@ -92,13 +93,11 @@ pub async fn authenticate(
 impl LoginObj {
     /// 刷新 LittleSkin 皮肤站登录令牌
     ///
-    /// # 参数
-    ///
     /// - `cancel`: 取消令牌
     ///
     /// # 返回值
     ///
-    /// 刷新成功返回 `Ok(())`（账户凭据已被更新），令牌失效返回 `ErrorType::AuthTokenTimeout`，被取消时返回取消错误
+    /// 刷新成功返回 `Ok(())`，此时账户凭据已被更新；令牌失效返回 `ErrorType::AuthTokenTimeout`，被取消时返回取消错误
     pub async fn refresh_littleskin(&mut self, cancel: CancellationToken) -> CoreResult<()> {
         let mut server = if self.auth_type == AuthType::LittleSkin {
             String::from(urls::LITTLE_SKIN_URL)

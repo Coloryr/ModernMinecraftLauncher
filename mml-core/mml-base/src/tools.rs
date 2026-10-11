@@ -9,6 +9,10 @@ static REGEX_WORD: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[a-zA-Z0-9]+
 /// 检查输入是否包含非数字字符
 ///
 /// - `input`: 需要检查的内容
+///
+/// # 返回值
+///
+/// 空串与纯空白串视为含非数字字符
 pub fn check_is_not_number(input: &str) -> bool {
     if input.trim().is_empty() {
         return true;
@@ -19,15 +23,23 @@ pub fn check_is_not_number(input: &str) -> bool {
 /// 检查是否为英文数字
 ///
 /// - `input`: 需要检查的内容
+///
+/// # 返回值
+///
+/// 仅由 ASCII 字母与数字组成时为 `true`，空串为 `false`
 pub fn check_is_word(input: &str) -> bool {
     REGEX_WORD.is_match(input)
 }
 
-/// 截取字符串
+/// 截取起始标记与结束标记之间的内容
 ///
 /// - `input`: 输入内容
 /// - `start`: 起始标记
 /// - `end`: 结束标记
+///
+/// # 返回值
+///
+/// 返回起始标记后一个字符到结束标记之间的内容；任一标记缺失时原样返回 `input`
 pub fn get_string(input: &str, start: &str, end: &str) -> String {
     if let Some(start_byte) = input.find(start) {
         let start_end_byte = start_byte + start.len();
@@ -49,9 +61,13 @@ pub fn get_string(input: &str, start: &str, end: &str) -> String {
 
 /// 将字符串列表转换为以换行符分隔的单个字符串
 ///
-/// 每个原始字符串后附加平台对应的换行符（`\r\n` 或 `\n`）。
+/// 每个原始字符串后附加平台对应的换行符，Windows 为 `\r\n`，其余平台为 `\n`
 ///
 /// - `vec`: 输入数据
+///
+/// # 返回值
+///
+/// 列表为空时返回空串
 pub fn build_vec_string(vec: &Vec<String>) -> String {
     let mut str = String::new();
 
@@ -63,18 +79,23 @@ pub fn build_vec_string(vec: &Vec<String>) -> String {
     str
 }
 
+/// 拆分后的路径两段
 pub struct PathPart {
-    /// 父目录路径
+    /// 父目录路径，没有上级目录时为空串
     pub parent: String,
-    /// 文件名
+    /// 文件名，即路径的最后一段
     pub file: String,
 }
 
-/// 将输入路径拆分
+/// 将输入路径拆分为父目录与文件名两段
 ///
-/// 例如输入home/user/text.txt，则输出home/user和text.txt
+/// 例如 `home/user/text.txt` 拆成 `home/user` 与 `text.txt`
 ///
 /// - `input`: 输入路径
+///
+/// # 返回值
+///
+/// 没有上级目录时返回的 `parent` 为空串
 pub fn get_path_part(input: &str) -> PathPart {
     let path = Path::new(input);
 
@@ -91,13 +112,13 @@ pub fn get_path_part(input: &str) -> PathPart {
     PathPart { parent, file }
 }
 
-/// 命令行参数解析
+/// 按空白切分命令行字符串，双引号内的空白保留
 ///
-/// # 参数
-/// * `input` - 命令行字符串
+/// - `input`: 命令行字符串
 ///
 /// # 返回值
-/// 参数字符串向量
+///
+/// 返回切分后的参数列表；空串与纯空白串返回空列表
 pub fn arg_parse(input: &str) -> Vec<String> {
     let quote_char = '"';
     let escape_char = '\\';
@@ -167,7 +188,7 @@ mod tests {
         // 空串 / 空白串视为含非数字
         assert!(check_is_not_number(""));
         assert!(check_is_not_number("   "));
-        // 纯数字（无任何空白）
+        // 纯数字，无任何空白
         assert!(!check_is_not_number("123"));
         // 注意现状：trim 仅用于空串判断，首尾空白本身按非数字字符处理
         assert!(check_is_not_number(" 123 "));
@@ -245,10 +266,10 @@ mod tests {
     /// arg_parse 转义
     #[test]
     fn test_arg_parse_escape() {
-        // 现状记录（疑似 bug）：转义字符后的字符虽被追加，但计数被清零，
+        // 现状记录，疑似 bug：转义字符后的字符虽被追加，但计数被清零，
         // 若转义后紧跟参数结尾，整个参数会被丢弃
         assert_eq!(arg_parse(r"a\b"), Vec::<String>::new());
-        // 转义后还有后续字符时参数保留（内容为 a + 反斜杠 + bc）
+        // 转义后还有后续字符时参数保留，内容为 a + 反斜杠 + bc
         assert_eq!(arg_parse(r"a\bc"), vec![r"a\bc"]);
         // 引号前的反斜杠转义引号
         assert_eq!(arg_parse("a\\\"b"), vec!["a\"b"]);

@@ -23,8 +23,8 @@ import { vTip } from "./lib/tip";
 // 图片加载失败的统一兜底：装上要趁早，免得启动过程中先加载的那批图漏掉
 installImageFallback();
 
-// 禁用右键默认菜单（WebView2 / 浏览器自带的“刷新、返回、打印”等）。
-// 文本输入框（input / textarea / contenteditable）保留原生菜单，方便复制粘贴。
+// 禁用右键默认菜单，包括 WebView2 / 浏览器自带的“刷新、返回、打印”等。
+// 文本输入框 input / textarea / contenteditable 保留原生菜单，方便复制粘贴。
 document.addEventListener("contextmenu", (e) => {
   const target = e.target as HTMLElement | null;
   if (
@@ -38,12 +38,13 @@ document.addEventListener("contextmenu", (e) => {
   e.preventDefault();
 });
 
-// 发布构建：拦掉 WebView2 自带的浏览器功能键（F5 / Ctrl+R 重载页面、F12 / Ctrl+Shift+C
-// 开发者工具、Ctrl+P 打印）。
+// 发布构建：拦掉 WebView2 自带的浏览器功能键，即 F5 / Ctrl+R 重载页面、
+// F12 / Ctrl+Shift+C 开发者工具、Ctrl+P 打印。
 //
-// 这是**兜底**：正经做法是 WebView2 的设置项（见 src-tauri/src/windows/webview_keys.rs 的
-// AreBrowserAcceleratorKeysEnabled / AreDevToolsEnabled）。万一那两项没生效（老版本 WebView2
-// 没有 Settings3），页面这一层还能挡住。开发构建（vite dev / tauri dev）不拦——调试要用。
+// 这是**兜底**：正经做法是 WebView2 的设置项，见 src-tauri/src/windows/webview_keys.rs 的
+// AreBrowserAcceleratorKeysEnabled / AreDevToolsEnabled。万一那两项没生效，即老版本
+// WebView2 没有 Settings3，页面这一层还能挡住。开发构建 vite dev / tauri dev 不拦，
+// 调试要用。
 //
 // 注意只拦"浏览器专有"的键：Ctrl+C / Ctrl+V / Ctrl+A / Ctrl+Z 这些编辑键一概不动。
 if (import.meta.env.PROD) {
@@ -60,7 +61,7 @@ if (import.meta.env.PROD) {
   });
 }
 
-/** 启动引导：GUI 状态由 Rust（gui_config.json）提供，浏览器回退本地存储 */
+/** 启动引导：GUI 状态由 Rust 的 gui_config.json 提供，浏览器回退本地存储 */
 async function bootstrap() {
   const cfg = await loadGuiConfig();
   if (cfg) {
@@ -77,7 +78,7 @@ async function bootstrap() {
     restoreHeadConfig(cfg.head.headType, cfg.head.x, cfg.head.y);
   }
 
-  // 背景图：不阻塞挂载（大图走 base64 IPC 很慢，挂着等它=黑屏一阵）。
+  // 背景图：不阻塞挂载 —— 大图走 base64 IPC 很慢，挂着等它 = 黑屏一阵。
   // 正常启动时背景 dataURL 已从本地存储秒取，无闪底色；
   // 只有首次设置背景的那一次会先出界面、背景随后淡入
   void restoreBg();

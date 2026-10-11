@@ -4,10 +4,10 @@
 // **三处共用同一份**：主窗口底部的 MOTD 悬浮卡、实例详情里的 MOTD 卡、资源窗口服务器
 // 列表上方的 MOTD 卡。抽成组件而不是各写一遍，是因为 MOTD 的细节不少 —— 两行要保留
 // `\n`、彩色分段要过 `motdSegStyle`、图标可能没有、查不到时要分清"查询中"与"离线" ——
-// 三处各写一遍迟早漂移成"一个能上色一个不能"（`lib/motd.ts` 里对同一件事也说过）。
+// 三处各写一遍迟早漂移成"一个能上色一个不能"，`lib/motd.ts` 里对同一件事也说过。
 //
-// 组件**只负责卡片自身的外观**（描边 / 背景 / 内边距 / 圆角 / 阴影 / 刷新按钮），
-// 摆在哪里、要不要固定定位由调用方决定（主窗口的悬浮卡自己加 `.motd-float`）。
+// 组件**只负责卡片自身的外观**：描边 / 背景 / 内边距 / 圆角 / 阴影 / 刷新按钮；
+// 摆在哪里、要不要固定定位由调用方决定，主窗口的悬浮卡自己加 `.motd-float`。
 import { computed, ref, watch } from "vue";
 import { t } from "../lib/i18n";
 import { faviconOf, motdSegStyle } from "../lib/motd";
@@ -17,7 +17,7 @@ const props = withDefaults(
   defineProps<{
     /** 查询结果；`null` = 还没回来（显示"刷新中…"） */
     motd: MotdDto | null;
-    /** 标题：服务器名或地址（由调用方给，不从 MOTD 里取） */
+    /** 标题：服务器名或地址，由调用方给，不从 MOTD 里取 */
     name: string;
     /**
      * 紧凑版：图标 46px、去阴影、内边距略松
@@ -33,16 +33,17 @@ const props = withDefaults(
   { compact: false, refreshable: false, loading: false },
 );
 
+/** 点右上角刷新按钮 */
 defineEmits<{ (e: "refresh"): void }>();
 
-/** 在线时的 MOTD 分段（离线 / 查询中时为空数组，两种都走下面的兜底文案） */
+/** 在线时的 MOTD 分段；离线 / 查询中时为空数组，两种都走下面的兜底文案 */
 const segments = computed(() => (props.motd?.state === "ok" ? props.motd.segments : []));
 
 /** 在线时才有 meta 行（人数 / 版本 / 延迟） */
 const online = computed(() => (props.motd?.state === "ok" ? props.motd : null));
 
 /**
- * 图标加载失败过（这台服务器的 favicon 有问题）
+ * 图标加载失败过，说明这台服务器的 favicon 有问题
  *
  * 失败就**整块不画**：既不留破图图标，也不让 `lib/imageFallback.ts` 的全局兜底
  * 换成灰底占位图 —— 用户口径是"MOTD 图标不要用占位符显示"。
@@ -72,9 +73,9 @@ const iconUrl = computed(() => (iconFailed.value ? "" : faviconOf(props.motd)));
       </svg>
     </button>
 
-    <!-- 图标：**只认服务器查询带回来的 favicon**（`servers.dat` 里存的那个跳过）。
+    <!-- 图标：**只认服务器查询带回来的 favicon**，`servers.dat` 里存的那个跳过。
          没有 / 加载失败就什么都不画 —— 与资源列表的行同一口径。
-         `data-no-fallback` 是必须的：全局兜底（lib/imageFallback.ts）会把加载失败的图
+         `data-no-fallback` 是必须的：全局兜底 lib/imageFallback.ts 会把加载失败的图
          换成灰底占位图，那正是这里要避免的"占位符" -->
     <img v-if="iconUrl" class="motd-icon" :src="iconUrl" alt="" data-no-fallback @error="iconFailed = true" />
 
@@ -86,8 +87,8 @@ const iconUrl = computed(() => (iconFailed.value ? "" : faviconOf(props.motd)));
             seg.text
           }}</span>
         </template>
-        <!-- 在线但没有文字段：**不能说"连不上"**。查询成功、只是这台服务器没给简介
-             （或简介是启动器认不出的写法）时，以前会落到下面那句"服务器无法连接"，
+        <!-- 在线但没有文字段：**不能说"连不上"**。查询成功、只是这台服务器没给简介，
+             或简介是启动器认不出的写法时，以前会落到下面那句"服务器无法连接"，
              与同一张卡片上显示的人数自相矛盾 -->
         <span v-else-if="online">{{ t("server.noMotd") }}</span>
         <span v-else-if="motd">{{ motd.message || t("server.offline") }}</span>
@@ -112,7 +113,7 @@ const iconUrl = computed(() => (iconFailed.value ? "" : faviconOf(props.motd)));
 </template>
 
 <style scoped>
-/* 卡片外观。摆位由调用方管（悬浮卡是 position: fixed） */
+/* 卡片外观。摆位由调用方管，悬浮卡是 position: fixed */
 .motd-card {
   position: relative;
   display: flex;
@@ -122,11 +123,11 @@ const iconUrl = computed(() => (iconFailed.value ? "" : faviconOf(props.motd)));
   border-radius: 14px;
   border: 1px solid var(--border);
   background: var(--bg-card);
-  /* 用户口径：MOTD 卡片**不要阴影**（原来悬浮卡那份 --shadow-lg 也去掉了，
-     三处保持同一观感） */
+  /* 用户口径：MOTD 卡片**不要阴影**，原来悬浮卡那份 --shadow-lg 也去掉了，
+     三处保持同一观感 */
   /* 固定高度：MOTD 一行 / 两行、在线 / 离线、刷新中之间切换时卡片不跳动。
-     数值按"名字 + 两行 MOTD + meta"三段（行高见下面各条，合计约 78px）
-     加上下 12px 内边距、再留几 px 余量算出来的；多出来的 MOTD 行由
+     数值按"名字 + 两行 MOTD + meta"三段算出来，行高见下面各条、合计约 78px，
+     加上下 12px 内边距、再留几 px 余量；多出来的 MOTD 行由
      `.motd-text` 的 max-height 自己截掉，不会顶破卡片 */
   height: 108px;
   overflow: hidden;
@@ -213,7 +214,7 @@ const iconUrl = computed(() => (iconFailed.value ? "" : faviconOf(props.motd)));
   opacity: 0.5;
 }
 
-/* 右上角刷新（悬停卡片才出现，避免平时喧宾夺主） */
+/* 右上角刷新：悬停卡片才出现，避免平时喧宾夺主 */
 .motd-refresh {
   position: absolute;
   top: 6px;

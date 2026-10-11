@@ -24,7 +24,7 @@ const MODE_OPTIONS = computed(() => [
   { value: "2d", label: t("winSkin.mode2d") },
 ]);
 
-/** 皮肤类型（auto = 自动检测；old = 1.7旧版；new = 1.8新版经典；slim = 纤细） */
+/** 皮肤类型：auto 自动检测，old 1.7 旧版，new 1.8 新版经典，slim 纤细 */
 type SkinTypeOpt = "auto" | "old" | "new" | "slim";
 
 const mode = ref<Mode>("3d");
@@ -43,7 +43,7 @@ const skinType = ref<SkinTypeOpt>("auto");
 /** 用户手动选过型号后，切换预览对象不再自动跟随服务器声明 */
 const skinTypeTouched = ref(false);
 
-/** 动画类型（仅3D，与 demo 一致的 8 种 + 不播放） */
+/** 动画类型，仅 3D；与 demo 一致的 8 种 + 不播放 */
 type AnimType = "none" | "idle" | "walk" | "run" | "fly" | "wave" | "crouch" | "hit" | "swim";
 /** 当前动画（默认不播放） */
 const animType = ref<AnimType>("none");
@@ -77,31 +77,35 @@ const ANIM_FACTORY: Record<Exclude<AnimType, "none">, () => skinview3d.PlayerAni
   swim: () => new skinview3d.SwimAnimation(),
 };
 
+/** 请求关闭弹窗 */
 const emit = defineEmits<{ close: [] }>();
 
 const base = ref("");
 /** 皮肤获取失败（离线账户 / 下载失败） */
 const noSkin = ref(false);
-/** 预览加载中（3D 模型 / 2D 贴图未就绪时在预览区盖加载指示） */
+/** 预览加载中：3D 模型 / 2D 贴图未就绪时在预览区盖加载指示 */
 const loading = ref(false);
-/** 纹理列表加载中（打开弹窗 / 换账户后首次拉取较慢，列表区给个提示） */
+/** 纹理列表加载中：打开弹窗 / 换账户后首次拉取较慢，列表区给个提示 */
 const listLoading = ref(false);
 /** 待上传的本地皮肤文件路径，空表示无；选中后选型号直传，须在下方 immediate watch 之前声明 */
 const uploadFile = ref("");
 
-// 目标账户：由入口传进来（账户条目上的「查看皮肤」按钮点的是哪一条就预览哪一条）。
-// 不传时回退到全局当前账户，兼容旧的「只看当前账户」用法
+/**
+ * 目标账户由入口传进来：账户条目上的「查看皮肤」按钮点的是哪一条就预览哪一条
+ *
+ * 不传时回退到全局当前账户，兼容旧的「只看当前账户」用法
+ */
 const props = defineProps<{ account?: AccountStoreDto | null }>();
 
 const target = computed(() => props.account ?? currentAccount.value);
 
-/** 当前账户的皮肤 / 披风纹理列表（离线 / 查询失败为 null，走占位图） */
+/** 当前账户的皮肤 / 披风纹理列表，离线 / 查询失败为 null 走占位图 */
 const textures = ref<TexturesDto | null>(null);
 
-/** 是否正版账户（第三方规范只有单皮肤单披风，无装备操作） */
+/** 是否正版账户：第三方规范只有单皮肤单披风，无装备操作 */
 const isOauth = computed(() => target.value?.authType === "microsoft");
 
-/** 是否第三方在线账户（皮肤站 / 统一通行证 / 外置登录，皮肤管理在对应网页完成） */
+/** 是否第三方在线账户：皮肤站 / 统一通行证 / 外置登录，皮肤管理在对应网页完成 */
 const isThirdParty = computed(
   () => !!target.value && !isOauth.value && target.value.authType !== "offline",
 );
@@ -117,7 +121,7 @@ async function openSkinSite() {
   }
 }
 
-/** 当前装备的皮肤（无 active 取第一个；离线 / 查询失败为 null） */
+/** 当前装备的皮肤：无 active 取第一个，离线 / 查询失败为 null */
 const activeSkin = computed(() => {
   const list = textures.value?.skins ?? [];
   return list.find((item) => item.active) ?? list[0] ?? null;
@@ -149,16 +153,16 @@ watch(textures, () => {
   previewCapeSha1.value = activeCape.value?.sha1 ?? "";
 });
 
-// 预览对象变化：型号下拉跟随服务器声明的版型（纤细皮肤贴图与经典同版面，
-// 自动检测分不出来，必须显式跟随）；用户手动选过则尊重手选
+// 预览对象变化：型号下拉跟随服务器声明的版型。纤细皮肤贴图与经典同版面，
+// 自动检测分不出来，必须显式跟随；用户手动选过则尊重手选
 watch(selectedSkin, (s) => {
   if (!skinTypeTouched.value) {
     skinType.value = s?.model === "slim" ? "slim" : "auto";
   }
 });
 
-// 账户变化：重拉列表（不先清空，装备披风等操作触发的 account-change 刷新时
-// 旧列表继续显示，避免预览区整个塌掉重载）；换账户才在失败时清空
+// 账户变化：重拉列表。不先清空，装备披风等操作触发的 account-change 刷新时
+// 旧列表继续显示，避免预览区整个塌掉重载；换账户才在失败时清空
 let texturesUuid = "";
 watch(
   target,
@@ -183,8 +187,8 @@ watch(
   { immediate: true },
 );
 
-// 取图走 sha1 型 URI；2D 全身图的型号：用户没动下拉时跟随服务器声明的型号
-// （纤细皮肤贴图与经典版面相同，纯像素检测分不出来，必须带上），动了就用选的
+// 取图走 sha1 型 URI；2D 全身图的型号：用户没动下拉时跟随服务器声明的型号。
+// 纤细皮肤贴图与经典版面相同，纯像素检测分不出来，必须带上；动了就用选的
 const modelParam = computed(() => {
   if (skinType.value !== "auto") return skinType.value;
   return selectedSkin.value?.model === "slim" ? "slim" : "auto";
@@ -204,16 +208,17 @@ const cape2dUrl = computed(() =>
   base.value && selectedCape.value ? `${base.value}/cape/${selectedCape.value.sha1}` : "",
 );
 
-/** 型号字段 → 显示名（slim = 纤细/Alex，空 = 经典/Steve） */
+/** 型号字段转显示名：slim 是纤细 Alex，空是经典 Steve */
 function modelLabel(model: string): string {
   return model === "slim" ? t("winSkin.skinSlim") : t("winSkin.skinClassic");
 }
 
-/** 列表缩略图（型号跟随条目声明，纤细皮肤不渲染成经典版型） */
+/** 列表缩略图：型号跟随条目声明，纤细皮肤不渲染成经典版型 */
 function skinThumbUrl(item: TextureItemDto): string {
   return `${base.value}/skin/${item.sha1}/${item.model === "slim" ? "slim" : "new"}`;
 }
 
+/** 披风列表缩略图 */
 function capeThumbUrl(item: TextureItemDto): string {
   return `${base.value}/cape/${item.sha1}`;
 }
@@ -226,7 +231,7 @@ const equipBusy = ref("");
 /** 上传进行中 */
 const uploading = ref(false);
 
-/** 打开系统文件对话框选皮肤 PNG（浏览器没有对话框插件，按钮本身也不显示） */
+/** 打开系统文件对话框选皮肤 PNG，浏览器没有对话框插件、按钮本身也不显示 */
 async function pickSkinFile() {
   try {
     const { open } = await import("@tauri-apps/plugin-dialog");
@@ -243,7 +248,7 @@ async function pickSkinFile() {
   }
 }
 
-/** 上传选中的皮肤文件并装备（variant = 经典 / 纤细） */
+/** 上传选中的皮肤文件并装备，variant 为经典或纤细 */
 async function doUpload(variant: "classic" | "slim") {
   const acc = target.value;
   if (!acc || !uploadFile.value || uploading.value) return;
@@ -260,6 +265,7 @@ async function doUpload(variant: "classic" | "slim") {
   }
 }
 
+/** 装备选中的皮肤 / 披风，仅正版账户可用 */
 async function equip(kind: "skin" | "cape", item: TextureItemDto) {
   const acc = target.value;
   if (!acc || equipBusy.value) return;
@@ -285,12 +291,13 @@ const stage = ref<HTMLDivElement | null>(null);
 const canvas = ref<HTMLCanvasElement | null>(null);
 let viewer: skinview3d.SkinViewer | null = null;
 
+/** 销毁 3D 观察器 */
 function destroyViewer() {
   viewer?.dispose();
   viewer = null;
 }
 
-/** 皮肤类型 → skinview3d 模型（auto 优先按服务器标记的纤细型号，比贴图像素检测可靠） */
+/** 皮肤类型转 skinview3d 模型：auto 优先按服务器标记的纤细型号，比贴图像素检测可靠 */
 const modelOpt = computed(() => {
   switch (skinType.value) {
     case "slim":
@@ -302,6 +309,7 @@ const modelOpt = computed(() => {
   }
 });
 
+/** 按当前模式与贴图重建 3D 观察器 */
 function setupViewer() {
   destroyViewer();
   noSkin.value = false;
@@ -312,7 +320,7 @@ function setupViewer() {
     width: stage.value.clientWidth,
     height: stage.value.clientHeight,
     model: modelOpt.value,
-    // 观感对齐 skinview3d 官方 demo 的默认参数（fov 70 / zoom 0.9）
+    // 观感对齐 skinview3d 官方 demo 的默认参数，即 fov 70 / zoom 0.9
     fov: 70,
     zoom: 0.9,
   });
@@ -403,6 +411,7 @@ const MAX_SCALE = 8;
 /** 平移拖拽中（光标形态切换用） */
 const panning = ref(false);
 
+/** 回到初始视图：缩放 1、居中 */
 function resetView() {
   viewScale.value = 1;
   viewX.value = 0;
@@ -709,7 +718,7 @@ onBeforeUnmount(destroyViewer);
   margin-top: 0;
 }
 
-/* 控制器区（披风 / 动画 / 自转 / 名牌） */
+/* 控制器区：披风 / 动画 / 自转 / 名牌 */
 .ctl-title {
   margin-top: 18px;
 }

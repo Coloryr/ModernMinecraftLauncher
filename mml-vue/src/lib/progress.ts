@@ -11,18 +11,43 @@
 // 免得同一个数字在两处算出不同的值。
 import type { DownloadTaskDto, ResourceTaskDto } from "./bindings";
 
-/** 0–100 百分比（总量未知按 0 算，不返回 NaN） */
+/**
+ * 算 0–100 百分比
+ *
+ * - `now`: 已完成量
+ * - `all`: 总量
+ *
+ * # 返回值
+ *
+ * 百分比；总量未知按 0 算，不返回 NaN
+ */
 export function percent(now: number, all: number): number {
   if (!(all > 0)) return 0;
   return Math.min(100, (now / all) * 100);
 }
 
-/** 该进度单元是否按项目数计（文件多于 1 个才值得数个数） */
+/**
+ * 该进度单元是否按项目数计，文件多于 1 个才值得数个数
+ *
+ * - `total`: 该进度单元里的文件总数
+ *
+ * # 返回值
+ *
+ * 文件多于 1 个时为 true
+ */
 export function byProjectCount(total: number): boolean {
   return total > 1;
 }
 
-/** 单个下载任务的进度（0–100）：多文件按项目数，单文件按字节 */
+/**
+ * 单个下载任务的进度，0–100：多文件按项目数，单文件按字节
+ *
+ * - `task`: 下载任务
+ *
+ * # 返回值
+ *
+ * 进度百分比
+ */
 export function downloadTaskPercent(task: DownloadTaskDto): number {
   const finished = task.completed + task.failed;
   if (byProjectCount(task.total)) {
@@ -35,7 +60,17 @@ export function downloadTaskPercent(task: DownloadTaskDto): number {
   return percent(finished, task.total);
 }
 
-/** 下载任务集合的总进度（0–100）：与单任务同一口径，把全部任务汇总成一个进程 */
+/**
+ * 下载任务集合的总进度，0–100
+ *
+ * 与单任务同一口径，把全部任务汇总成一个进度。
+ *
+ * - `tasks`: 下载任务列表
+ *
+ * # 返回值
+ *
+ * 进度百分比
+ */
 export function downloadOverallPercent(tasks: DownloadTaskDto[]): number {
   const files = tasks.reduce((n, x) => n + x.total, 0);
   const finished = tasks.reduce((n, x) => n + x.completed + x.failed, 0);
@@ -76,7 +111,13 @@ export interface ResourceGroupProgress {
  * 按 pid 把资源下载任务分组
  *
  * 同一个项目下选了多个版本 / 多个文件时算**一个下载项目**，进度按组内文件数推进；
- * 只有一个文件时用该文件自己的字节进度（见模块头部的口径说明）。
+ * 只有一个文件时用该文件自己的字节进度，见模块头部的口径说明。
+ *
+ * - `tasks`: 资源下载任务列表
+ *
+ * # 返回值
+ *
+ * 每个 pid 一组，含组内进度与"是否按项目数计"
  */
 export function resourceGroups(tasks: ResourceTaskDto[]): ResourceGroupProgress[] {
   const map = new Map<string, ResourceTaskDto[]>();

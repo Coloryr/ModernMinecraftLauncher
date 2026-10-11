@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 帮助窗口：FAQ 手风琴（文案取当前语言的 locale 包）+ 问题反馈提示
+// 帮助窗口：FAQ 手风琴 + 问题反馈提示，文案取当前语言的 locale 包
 import { computed, ref } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import { t, locale } from "../../lib/i18n";
@@ -9,6 +9,7 @@ import { faqs as enFaqs } from "../../lib/i18n/locales/en-US";
 // 必须显式声明 close：不声明的话 Vue 会把父级的 @close 当 attrs 透传到根组件（WindowFrame），
 // 与模板里的 @close="$emit('close')" 合并成两个处理器 —— 一次返回会调两遍 closeWindow()，
 // 第二遍时 currentKind 已经回到 main，于是"返回"变成退出应用
+/** 请求关闭本窗口 */
 defineEmits<{ (e: "close"): void }>();
 
 const faqs = computed(() => (locale.value === "en_us" ? enFaqs : zhFaqs));

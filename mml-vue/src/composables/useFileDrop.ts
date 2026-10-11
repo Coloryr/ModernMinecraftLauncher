@@ -1,6 +1,6 @@
 // 拖拽外部文件 / 文本到窗口
 //
-// 走 **DOM 拖放**（`dragenter` / `dragover` / `dragleave` / `drop`）：
+// 走 **DOM 拖放**：监听 `dragenter` / `dragover` / `dragleave` / `drop` 四个事件。
 // 框架 wry 那份原生实现会顶掉 WebView2 自己的拖放目标、而且只认文件，网页上拖下来的
 // 卡片是文本 / 链接，连 `dragenter` 都收不到，拖动时鼠标显示"禁止"。现在建窗时已经
 // 把它关掉，见 `mml-gui/src-tauri/src/windows/lifecycle.rs`，DOM 拖放因此是全功能的。
@@ -39,11 +39,12 @@ export interface FileDropPayload {
 /** 拖放判定选项 */
 export interface FileDropOptions {
   /**
-   * 这次拖入能不能接（**只在悬停阶段问一次**：决定遮罩显不显示、`dragover` 放不放行）
+   * 这次拖入能不能接
    *
-   * 不接的内容连拖都拖不进来（不 `preventDefault` → 系统画"禁止"光标、松手也没有 drop）。
-   * 此时 `paths` 必为空，判定只能看 `types` 与 `isDirectory`。松手后的内容过滤与提示
-   * 由 `onDrop` 负责。
+   * **只在悬停阶段问一次**：结果决定遮罩显不显示、`dragover` 放不放行。不接的内容
+   * 连拖都拖不进来 —— 不 `preventDefault`，系统会画"禁止"光标、松手也没有 drop。
+   * 此时 `paths` 必为空，判定只能看 `types` 与 `isDirectory`。松手后的内容过滤与
+   * 提示由 `onDrop` 负责。
    */
   accept?: (payload: FileDropPayload) => boolean | Promise<boolean>;
 }
@@ -59,14 +60,14 @@ function readDropText(data: DataTransfer | null): string {
 }
 
 /**
- * 这次拖入的细分类型（遮罩文案按它变）
+ * 这次拖入的细分类型，遮罩文案按它变
  *
- * 悬停阶段 `getData` / `files` 都是空的（浏览器安全设计），只能靠 `webkitGetAsEntry()`
- * （能认出来时）与每项的 MIME 凑：认不出目录时，MIME 全为空才按 `folder` 猜。
+ * 悬停阶段 `getData` / `files` 都是空的，浏览器安全设计如此，只能靠
+ * `webkitGetAsEntry()` 与每项的 MIME 凑：它认不出目录时，MIME 全为空才按 `folder` 猜。
  */
 export type DragKind = "" | "text" | "archive" | "folder" | "files";
 
-/** 认得出是压缩包的 MIME（Chromium 按扩展名映射，未知扩展名给空串） */
+/** 认得出是压缩包的 MIME；Chromium 按扩展名映射，未知扩展名给空串 */
 const ARCHIVE_MIME = [
   "application/zip",
   "application/x-zip-compressed",
@@ -90,7 +91,7 @@ function dragKindOf(
   const mimes = items.filter((item) => item.kind === "file").map((item) => item.type);
   if (!mimes.length) return "files";
   if (mimes.some((mime) => ARCHIVE_MIME.includes(mime))) return "archive";
-  // MIME 全为空时：认不出目录（isDirectory === null）就按目录报，目录是常见情况；
+  // MIME 全为空且 isDirectory === null 时按目录报：目录是常见情况；
   // 能确定不是目录那就是扩展名认不出的普通文件
   if (isDirectory === null && mimes.every((mime) => !mime)) return "folder";
   return "files";
@@ -99,8 +100,8 @@ function dragKindOf(
 /**
  * 悬停阶段"是不是目录"（best effort）
  *
- * 拿不到（`webkitGetAsEntry()` 不可用 / 返回 null）就返回 `null` = 认不出来，
- * 调用方退回按 MIME 猜。多个文件里只要有一个是目录就按目录算。
+ * 拿不到就返回 `null` = 认不出来，调用方退回按 MIME 猜。`webkitGetAsEntry()` 不可用
+ * 或返回 null 都算拿不到。多个文件里只要有一个是目录就按目录算。
  */
 function hoverIsDirectory(items: DataTransferItem[]): boolean | null {
   const entries = items
@@ -120,13 +121,13 @@ function hoverIsDirectory(items: DataTransferItem[]): boolean | null {
 /**
  * 给本窗口挂上拖放监听
  *
- * - `onDrop`: 松手时回调（文件路径与文本地址都在里面）
+ * - `onDrop`: 松手时回调，文件路径与文本地址都在里面
  * - `options.accept`: 自定义"这次拖入接不接"
  *
  * # 返回值
  *
- * - `fileDragOver`: 是否正拖在窗口上（给遮罩层用）
- * - `dragKind`: 这次拖的是**哪一档**（见 [`DragKind`]；`""` = 未知 / 拖入已结束）
+ * - `fileDragOver`: 是否正拖在窗口上，给遮罩层用
+ * - `dragKind`: 这次拖的是哪一档，见 `DragKind`；`""` 表示未知或拖入已结束
  */
 export function useFileDrop(
   onDrop: (payload: FileDropPayload) => void | Promise<void>,
@@ -137,7 +138,7 @@ export function useFileDrop(
   const unlisteners: Array<() => void> = [];
   /** 本次拖入的世代号：异步判定回来时若已经换了新的一次，结果作废 */
   let dragSeq = 0;
-  /** 等路径桥那一步的暂存（DOM 的 drop 有文件时先不发，等 `file-drop` 送来真实路径） */
+  /** 等路径桥那一步的暂存：DOM 的 drop 有文件时先不发，等 `file-drop` 送来真实路径 */
   let pending: { url: string; types: string[]; timer: number } | null = null;
 
   /** 这次拖入接不接（没传 accept 就一律接） */
@@ -154,14 +155,14 @@ export function useFileDrop(
   /**
    * 交付一次拖入
    *
-   * 松手时**不再问一遍 accept**：能不能接在悬停阶段已经定过（不接的内容 `dragover` 就不放行、
-   * 根本不会有 drop）。再判一次只会多一轮探测，还会在判定不通过时静默丢弃。
+   * 松手时**不再问一遍 accept**：能不能接在悬停阶段已经定过 —— 不接的内容 `dragover`
+   * 就不放行、根本不会有 drop。再判一次只会多一轮探测，还会在判定不通过时静默丢弃。
    */
   async function deliver(payload: FileDropPayload) {
     await onDrop(payload);
   }
 
-  /** 文本 → 地址（规则与 Rust 侧共用一份，见 `window_url_of_text`） */
+  /** 文本 → 地址；规则与 Rust 侧的 `window_url_of_text` 共用一份 */
   async function urlOfText(text: string): Promise<string> {
     try {
       return await commands.windows.urlOfText(text);

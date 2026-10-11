@@ -1,16 +1,21 @@
 <script setup lang="ts">
-// 添加实例 · 顶部模式切换（图标 + 渐变激活态，按数量等分填满整行）
+// 添加实例 · 顶部模式切换：图标 + 渐变激活态，按数量等分填满整行
 import { t } from "../../../lib/i18n";
 import type { AddMode, AddModeTab } from "../types";
 
 defineProps<{
+  /** 模式页签清单，顺序即显示顺序 */
   tabs: AddModeTab[];
+  /** 当前模式 */
   modelValue: AddMode;
   /** 创建中禁止切换模式（避免表单在提交过程中换掉） */
   disabled?: boolean;
 }>();
 
-const emit = defineEmits<{ (e: "update:modelValue", v: AddMode): void }>();
+const emit = defineEmits<{
+  /** 切换模式 */
+  (e: "update:modelValue", v: AddMode): void;
+}>();
 </script>
 
 <template>

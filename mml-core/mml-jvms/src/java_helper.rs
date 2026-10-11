@@ -1,3 +1,5 @@
+//! Java 可执行文件探测：运行 `java -version` 解析出版本、发行版与架构
+
 use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -9,10 +11,14 @@ use crate::JavaInfoObj;
 
 /// 从版本字符串提取主版本号
 ///
-/// 传统格式: 1.8.0_201 -> 8
-/// 新格式: 11.0.2 -> 11, 17.0.1 -> 17
+/// 传统格式：1.8.0_201 -> 8
+/// 新格式：11.0.2 -> 11, 17.0.1 -> 17
 ///
 /// - `version`: 输入版本号
+///
+/// # 返回值
+///
+/// 无法解析时返回 0
 fn get_major_version(version: &str) -> i32 {
     if version.starts_with("1.") {
         // 传统版本: 1.8.0 -> 8
@@ -33,7 +39,7 @@ fn get_major_version(version: &str) -> i32 {
 
 /// 获取 Java 信息
 ///
-/// - `file`: 需要检测的java
+/// - `file`: 需要检测的 Java 可执行文件路径
 ///
 /// # 返回值
 ///
@@ -123,7 +129,7 @@ mod tests {
 
     use super::*;
 
-    /// 唯一临时子目录（进程号 + 自增计数，避免并行冲突）
+    /// 唯一临时子目录，由进程号 + 自增计数拼成，避免并行冲突
     fn make_temp_dir(name: &str) -> PathBuf {
         static COUNTER: AtomicU64 = AtomicU64::new(0);
         let dir = mml_testutil::temp_dir().join(format!(
@@ -145,7 +151,7 @@ mod tests {
         assert_eq!(get_major_version("1.6"), 6);
     }
 
-    /// 主版本号解析：新格式（JDK 9+）
+    /// 主版本号解析：新格式，JDK 9 起
     #[test]
     fn major_version_new_format() {
         assert_eq!(get_major_version("11.0.2"), 11);
@@ -172,7 +178,7 @@ mod tests {
         assert!(result.is_none());
     }
 
-    /// 目录（而非文件）返回 None
+    /// 目录而非文件时返回 None
     #[test]
     fn test_java_directory_returns_none() {
         let dir = make_temp_dir("dir");
@@ -190,7 +196,7 @@ mod tests {
         assert!(test_java(&file).is_none(), "普通文本文件不应被识别为 Java");
     }
 
-    /// 用模拟输出验证 `java -version` 的解析逻辑（Windows：批处理文件）
+    /// 用模拟输出验证 `java -version` 的解析逻辑，Windows 走批处理文件
     #[cfg(windows)]
     #[test]
     fn test_java_parses_fake_bat_output() {
@@ -210,13 +216,13 @@ mod tests {
         assert_eq!(info.version, "17.0.2");
         assert_eq!(info.major_version, 17);
         assert_eq!(info.java_type, "openjdk");
-        // 输出包含 64-Bit，架构应与当前系统一致（64 位）
+        // 输出包含 64-Bit，架构应与当前系统的 64 位架构一致
         assert_eq!(info.arch, mml_sys::get_system_info().system_arch);
         assert_eq!(info.path, fake);
         assert!(info.name.starts_with("openjdk-17.0.2-"));
     }
 
-    /// 用模拟输出验证 `java -version` 的解析逻辑（Unix：shell 脚本）
+    /// 用模拟输出验证 `java -version` 的解析逻辑，Unix 走 shell 脚本
     #[cfg(unix)]
     #[test]
     fn test_java_parses_fake_sh_output() {
@@ -239,7 +245,7 @@ mod tests {
         assert_eq!(info.arch, mml_sys::get_system_info().system_arch);
     }
 
-    /// 无版本信息的可执行文件（输出口令）返回 None
+    /// 可执行文件只输出口令、没有版本信息时返回 None
     #[cfg(windows)]
     #[test]
     fn test_java_output_without_version_returns_none() {

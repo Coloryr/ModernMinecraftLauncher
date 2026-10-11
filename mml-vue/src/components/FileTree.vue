@@ -5,18 +5,26 @@ import { collectFileKeys, type FileNode } from "../lib/fileTree";
 import FileTree from "./FileTree.vue";
 
 defineProps<{
+  /** 本层的节点；目录节点带 children */
   nodes: FileNode[];
+  /** 已勾选的叶子文件 key 集合；目录的勾选态由后代推导 */
   checked: Set<string>;
+  /** 已展开的目录 key 集合 */
   expanded: Set<string>;
 }>();
 
 const emit = defineEmits<{
+  /** 切换单个叶子文件的勾选 */
   (e: "toggle-file", key: string): void;
+  /** 切换目录勾选；`on` 为 true 表示整目录选中 */
   (e: "toggle-dir", node: FileNode, on: boolean): void;
+  /** 展开 / 收起目录 */
   (e: "toggle-expand", key: string): void;
+  /** 首次展开懒加载目录时请求子节点 */
   (e: "lazy-load", node: FileNode): void;
 }>();
 
+/** 目录的勾选态：全选 on、部分选 ind、未选 off */
 function dirState(node: FileNode, checked: Set<string>): "on" | "off" | "ind" {
   const files = collectFileKeys(node.children);
   if (!files.length) return "off";
