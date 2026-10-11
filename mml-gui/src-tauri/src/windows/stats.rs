@@ -11,6 +11,19 @@ use uuid::Uuid;
 
 use crate::dtos::stats_dto::{StatsDataDto, StatsInstanceDto};
 
+/// 单实例的统计汇总，聚合期间的中间值
+#[derive(Clone, Copy, Default)]
+struct InstanceAgg {
+    /// 启动次数
+    count: u64,
+    /// 累计运行时长，单位秒
+    seconds: u64,
+    /// 最近一次启动的时间戳，单位毫秒；没有记录时为 `None`
+    last: Option<i64>,
+    /// 当前是否正在运行
+    running: bool,
+}
+
 /// 获取统计快照：全局计数加每实例汇总
 ///
 /// # 返回值
@@ -24,7 +37,7 @@ pub fn stats_get_data() -> Result<StatsDataDto, String> {
     // 每实例：启动次数 = game_runs 条数；时长 = 各次运行起止差之和；
     // 正在运行的那次 stop_time 未更新，把从开始到现在的时长补上
     let now = Local::now();
-    let mut agg: HashMap<Uuid, (u64, u64, Option<i64>, bool)> = HashMap::new();
+    let mut agg: HashMap<Uuid, InstanceAgg> = HashMap::new();
     for (uuid, runs) in &count.game_runs {
         let mut secs = 0u64;
         let mut last: Option<i64> = None;
@@ -41,7 +54,15 @@ pub fn stats_get_data() -> Result<StatsDataDto, String> {
                 running = true;
             }
         }
-        agg.insert(*uuid, (runs.len() as u64, secs, last, running));
+        agg.insert(
+            *uuid,
+            InstanceAgg {
+                count: runs.len() as u64,
+                seconds: secs,
+                last,
+                running,
+            },
+        );
     }
 
     // 实例列表 = 现有实例 ∪ 有历史记录的实例：已删除的实例保留历史，名字取 game_names
@@ -51,19 +72,19 @@ pub fn stats_get_data() -> Result<StatsDataDto, String> {
     for game in mml_game::get_instances() {
         let g = game.read().unwrap();
         seen.insert(g.uuid);
-        let (c, secs, last, running) = agg.get(&g.uuid).copied().unwrap_or((0, 0, None, false));
+        let a = agg.get(&g.uuid).copied().unwrap_or_default();
         items.push(StatsInstanceDto {
             uuid: g.uuid.to_string(),
             name: g.name.clone(),
-            count: c,
-            seconds: secs,
-            last,
-            running,
+            count: a.count,
+            seconds: a.seconds,
+            last: a.last,
+            running: a.running,
         });
     }
     for uuid in agg.keys() {
         if !seen.contains(uuid) {
-            let (c, secs, last, running) = agg[uuid];
+            let a = agg[uuid];
             items.push(StatsInstanceDto {
                 uuid: uuid.to_string(),
                 name: count
@@ -71,10 +92,10 @@ pub fn stats_get_data() -> Result<StatsDataDto, String> {
                     .get(uuid)
                     .cloned()
                     .unwrap_or_else(|| uuid.to_string()),
-                count: c,
-                seconds: secs,
-                last,
-                running,
+                count: a.count,
+                seconds: a.seconds,
+                last: a.last,
+                running: a.running,
             });
         }
     }

@@ -64,17 +64,29 @@ pub(super) async fn fetch_versions() -> Vec<VersionInfoDto> {
 /// MOTD 展示的默认端口
 const MOTD_DEFAULT_PORT: u16 = 25565;
 
+/// 解析出的服务器地址
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct MotdAddr {
+    /// 主机名或 IP；地址为空时是空串
+    pub(super) host: String,
+    /// 端口；没写端口或地址为空时取 [`MOTD_DEFAULT_PORT`]
+    pub(super) port: u16,
+}
+
 /// 解析服务器地址：host / host:port / [IPv6]:port / 裸 IPv6
 ///
 /// - `address`: 用户输入的服务器地址，前后空白会被去掉
 ///
 /// # 返回值
 ///
-/// 主机与端口；没写端口或地址为空时端口取 [`MOTD_DEFAULT_PORT`]
-pub(super) fn parse_motd_addr(address: &str) -> (String, u16) {
+/// 见 [`MotdAddr`]
+pub(super) fn parse_motd_addr(address: &str) -> MotdAddr {
     let addr = address.trim();
     if addr.is_empty() {
-        return (String::new(), MOTD_DEFAULT_PORT);
+        return MotdAddr {
+            host: String::new(),
+            port: MOTD_DEFAULT_PORT,
+        };
     }
     // [IPv6]:port
     if let Some(rest) = addr.strip_prefix('[')
@@ -84,7 +96,10 @@ pub(super) fn parse_motd_addr(address: &str) -> (String, u16) {
             .strip_prefix(':')
             .and_then(|p| p.parse().ok())
             .unwrap_or(MOTD_DEFAULT_PORT);
-        return (host.to_string(), port);
+        return MotdAddr {
+            host: host.to_string(),
+            port,
+        };
     }
     // 只有一个冒号才算 host:port，多个冒号视为裸 IPv6
     if let Some((host, port)) = addr.rsplit_once(':')
@@ -92,32 +107,49 @@ pub(super) fn parse_motd_addr(address: &str) -> (String, u16) {
         && !port.is_empty()
         && let Ok(p) = port.parse::<u16>()
     {
-        return (host.to_string(), p);
+        return MotdAddr {
+            host: host.to_string(),
+            port: p,
+        };
     }
-    (addr.to_string(), MOTD_DEFAULT_PORT)
+    MotdAddr {
+        host: addr.to_string(),
+        port: MOTD_DEFAULT_PORT,
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::parse_motd_addr;
+    use super::{MotdAddr, parse_motd_addr};
+
+    /// 造一个期望的解析结果
+    ///
+    /// - `host`: 期望主机
+    /// - `port`: 期望端口
+    fn addr(host: &str, port: u16) -> MotdAddr {
+        MotdAddr {
+            host: host.into(),
+            port,
+        }
+    }
 
     /// 各种地址写法的解析结果，含空串与裸 IPv6
     #[test]
     fn test_parse_motd_addr() {
         assert_eq!(
             parse_motd_addr("mc.example.com"),
-            ("mc.example.com".into(), 25565)
+            addr("mc.example.com", 25565)
         );
         assert_eq!(
             parse_motd_addr("mc.example.com:25566"),
-            ("mc.example.com".into(), 25566)
+            addr("mc.example.com", 25566)
         );
         assert_eq!(
             parse_motd_addr("  mc.example.com:25566 "),
-            ("mc.example.com".into(), 25566)
+            addr("mc.example.com", 25566)
         );
-        assert_eq!(parse_motd_addr("[::1]:25565"), ("::1".into(), 25565));
-        assert_eq!(parse_motd_addr("::1"), ("::1".into(), 25565));
-        assert_eq!(parse_motd_addr(""), (String::new(), 25565));
+        assert_eq!(parse_motd_addr("[::1]:25565"), addr("::1", 25565));
+        assert_eq!(parse_motd_addr("::1"), addr("::1", 25565));
+        assert_eq!(parse_motd_addr(""), addr("", 25565));
     }
 }

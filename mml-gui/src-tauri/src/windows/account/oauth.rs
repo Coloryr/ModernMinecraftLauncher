@@ -115,14 +115,13 @@ pub(super) async fn microsoft_login(app: &AppHandle) -> Result<AccountStoreDto, 
     };
 
     emit_oauth_state(app, "token", None);
-    let (token, expires_in) =
-        match mojang_api::get_minecraft_token(&xsts.xbl_uhs, &xsts.xbl_token).await {
-            Ok(ok) => ok,
-            Err(err) => return Err(oauth_fail(app, err)),
-        };
+    let mc_token = match mojang_api::get_minecraft_token(&xsts.xbl_uhs, &xsts.xbl_token).await {
+        Ok(ok) => ok,
+        Err(err) => return Err(oauth_fail(app, err)),
+    };
 
     emit_oauth_state(app, "profile", None);
-    let profile = match mojang_api::get_minecraft_profile(&token).await {
+    let profile = match mojang_api::get_minecraft_profile(&mc_token.access_token).await {
         Ok(ok) => ok,
         Err(err) => return Err(oauth_fail(app, err)),
     };
@@ -134,10 +133,10 @@ pub(super) async fn microsoft_login(app: &AppHandle) -> Result<AccountStoreDto, 
         .map(|u| u.to_string())
         .unwrap_or(profile.id);
 
-    let mut login = LoginObj::new(profile.name, uuid, token, String::new());
+    let mut login = LoginObj::new(profile.name, uuid, mc_token.access_token, String::new());
     login.auth_type = AuthType::OAuth;
     login.text1 = Some(oauth_res.refresh_token);
-    login.set_expire_in(expires_in);
+    login.set_expire_in(mc_token.expires_in);
     login.save();
 
     if auths::get_current().is_none() {

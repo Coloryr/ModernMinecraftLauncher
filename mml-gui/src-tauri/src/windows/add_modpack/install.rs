@@ -16,7 +16,7 @@ use crate::dtos::add_modpack_dto::ModPackStatusDto;
 use crate::windows::add::instance_gui;
 use crate::windows::add_resource::SourceInfo;
 use crate::windows::modpack_task::{
-    DOWNLOAD_NOW, build_status, emit_add_modpack_status, finish_task, register_task,
+    DOWNLOAD_NOW, build_status, emit_add_modpack_status, finish_task, register_task, RegisteredTask,
 };
 
 use super::{CURSEFOGRE_INFO, MODRINTH_INFO};
@@ -81,7 +81,10 @@ pub async fn add_modpack_install(
 
     // 登记任务：同 pid+fid 不允许重复安装，进度回调与任务一起给出
     let token = CancellationToken::new();
-    let (task, pack_gui) = register_task(&app, key, &source, name, token.clone())?;
+    let RegisteredTask {
+        task,
+        gui: pack_gui,
+    } = register_task(&app, key, &source, name, token.clone())?;
 
     let gui = instance_gui(&window);
 

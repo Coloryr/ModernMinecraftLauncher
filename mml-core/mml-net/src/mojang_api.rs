@@ -355,6 +355,18 @@ impl Default for MinecraftTokenResObj {
     }
 }
 
+/// Minecraft 访问令牌及其有效期
+///
+/// 由 [`get_minecraft_token`] 从 `MINECRAFT_SERVICES_XBOX` 的响应中取出，
+/// 供账户侧保存令牌并按有效期判断是否需要重新登录
+#[derive(Clone, Debug)]
+pub struct MinecraftToken {
+    /// 访问令牌，对应响应中的 `access_token`，作为后续接口的凭据；空串视为无效
+    pub access_token: String,
+    /// 令牌剩余有效期，单位秒，对应响应中的 `expires_in`；小于等于 0 视为无效
+    pub expires_in: i64,
+}
+
 /// 从 XBOX 登陆获取账户认证
 ///
 /// - `uhs`: Xbox 用户哈希
@@ -362,9 +374,8 @@ impl Default for MinecraftTokenResObj {
 ///
 /// # 返回值
 ///
-/// 返回 Minecraft 访问令牌及其有效期，单位秒，本地判过期用；
-/// 令牌无效时返回 `AuthTokenTimeout`
-pub async fn get_minecraft_token(uhs: &str, token: &str) -> CoreResult<(String, i64)> {
+/// 见 [`MinecraftToken`]；令牌无效时返回 `AuthTokenTimeout`
+pub async fn get_minecraft_token(uhs: &str, token: &str) -> CoreResult<MinecraftToken> {
     let obj = MinecraftTokenObj {
         identity_token: format!("XBL3.0 x={uhs};{token}"),
     };
@@ -376,7 +387,10 @@ pub async fn get_minecraft_token(uhs: &str, token: &str) -> CoreResult<(String, 
     if res.expires_in <= 0 || res.access_token.is_empty() {
         Err(ErrorType::AuthTokenTimeout)
     } else {
-        Ok((res.access_token, res.expires_in))
+        Ok(MinecraftToken {
+            access_token: res.access_token,
+            expires_in: res.expires_in,
+        })
     }
 }
 

@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use tauri::WebviewWindow;
 use uuid::Uuid;
 
-use super::registry::min_size_of;
+use super::registry::{MinSize, min_size_of};
 
 /// 窗口几何状态，落盘为 window_save.json
 ///
@@ -64,12 +64,12 @@ pub(super) static WINDOWS_STATE: LazyLock<RwLock<HashMap<Uuid, WindowState>>> =
 /// 窗口状态文件路径，即 window_save.json
 pub(super) static STATE_FILE: OnceLock<PathBuf> = OnceLock::new();
 
-/// 「带装饰」状态下「外框 − 客户区」的差值缓存：键是 uuid，值是宽高两个物理像素数
+/// 「带装饰」状态下「外框 − 客户区」的差值缓存：键是 uuid，值见 [`PhysicalDelta`]
 ///
 /// 用途见 [`decoration_growth`]：存盘要把无装饰时被撑大的客户区折算回带装饰口径，
 /// 需要知道标题栏有多高；而关窗保存时窗口已无装饰、量不到它，只能在**建窗那一刻**
 /// 仍是 `decorations(true)` 时先量下来。
-pub(super) static DECORATED_INSET: LazyLock<RwLock<HashMap<Uuid, (u32, u32)>>> =
+pub(super) static DECORATED_INSET: LazyLock<RwLock<HashMap<Uuid, PhysicalDelta>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 /// 量并缓存「带装饰」状态下的外框 − 客户区差值，建窗后立即调用
@@ -80,10 +80,10 @@ pub(super) fn remember_decorated_inset(uuid: &Uuid, window: &WebviewWindow) {
     let (Ok(inner), Ok(outer)) = (window.inner_size(), window.outer_size()) else {
         return;
     };
-    let inset = (
-        outer.width.saturating_sub(inner.width),
-        outer.height.saturating_sub(inner.height),
-    );
+    let inset = PhysicalDelta {
+        width: outer.width.saturating_sub(inner.width),
+        height: outer.height.saturating_sub(inner.height),
+    };
     DECORATED_INSET.write().unwrap().insert(*uuid, inset);
 }
 
@@ -130,6 +130,27 @@ pub(super) fn window_state_set(uuid: &Uuid, state: WindowState) {
     save();
 }
 
+/// 窗口客户区的宽高，单位物理像素，由注册表里的最小尺寸换算而来
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(super) struct PhysicalSize {
+    /// 宽，单位物理像素
+    pub(super) width: u32,
+    /// 高，单位物理像素
+    pub(super) height: u32,
+}
+
+/// 宽高两向的物理像素差值，用于「外框 − 客户区」这类差值在两处之间传递
+///
+/// 与 [`PhysicalSize`] 的区别在语义：那个是**尺寸**，这个是**差值** —— 为 0 只表示
+/// 两处量到的一样，不表示宽高是 0。
+#[derive(Debug, Clone, Copy, Default)]
+pub(super) struct PhysicalDelta {
+    /// 宽向差值，单位物理像素；两边相同时为 0
+    pub(super) width: u32,
+    /// 高向差值，单位物理像素；两边相同时为 0
+    pub(super) height: u32,
+}
+
 /// 注册表里的最小客户区尺寸由逻辑像素换算成物理像素
 ///
 /// 存盘与恢复都按客户区口径，夹取时用它。**不要在这里加边框带**：那圈只影响下发给 Windows 的
@@ -140,13 +161,13 @@ pub(super) fn window_state_set(uuid: &Uuid, state: WindowState) {
 ///
 /// # 返回值
 ///
-/// 最小客户区尺寸，单位物理像素，宽高各不小于 1
-pub(super) fn min_inner_physical(min: (f64, f64), scale: f64) -> (u32, u32) {
+/// 见 [`PhysicalSize`]，宽高各不小于 1
+pub(super) fn min_inner_physical(min: MinSize, scale: f64) -> PhysicalSize {
     let scale = if scale > 0.0 { scale } else { 1.0 };
-    (
-        (min.0 * scale).round().max(1.0) as u32,
-        (min.1 * scale).round().max(1.0) as u32,
-    )
+    PhysicalSize {
+        width: (min.width * scale).round().max(1.0) as u32,
+        height: (min.height * scale).round().max(1.0) as u32,
+    }
 }
 
 /// 把注册表里的最小尺寸按客户区口径换算成外框口径，再重设一次
@@ -223,16 +244,16 @@ pub(super) fn save_window_state(
     let scale = window.scale_factor().unwrap_or(1.0);
     // 夹到不小于注册表里的最小客户区：比它还小的值会被反复写回、一直不收敛，
     // 实测窗口停在「外框 = 最小尺寸」上时，主窗口 920×600 的客户区只有 904×600
-    let (min_w, min_h) = min_inner_physical(min_size_of(uuid).unwrap_or((0.0, 0.0)), scale);
+    let min = min_inner_physical(min_size_of(uuid).unwrap_or_default(), scale);
 
     if !maximized {
         // 无装饰时标题栏被并进客户区，直接存 inner 每轮净增约 30px，即 639 → 669 → …；
         // 折算回带装饰口径即收敛，折算量见 decoration_growth
-        let (dw, dh) = decoration_growth(uuid, window);
+        let growth = decoration_growth(uuid, window);
         geom.x = pos.x;
         geom.y = pos.y;
-        geom.width = size.width.saturating_sub(dw).max(min_w);
-        geom.height = size.height.saturating_sub(dh).max(min_h);
+        geom.width = size.width.saturating_sub(growth.width).max(min.width);
+        geom.height = size.height.saturating_sub(growth.height).max(min.height);
     }
     geom.maximized = maximized;
     window_state_set(uuid, geom);
@@ -262,24 +283,25 @@ pub(super) fn save_window_state(
 ///
 /// # 返回值
 ///
-/// 需要从 `inner` 里减掉的宽高增量，单位物理像素；量不到或没有缓存时为 0
-pub(super) fn decoration_growth(uuid: &Uuid, window: &WebviewWindow) -> (u32, u32) {
+/// 见 [`PhysicalDelta`]，即需要从 `inner` 里减掉的宽高增量，单位物理像素；
+/// 量不到或没有缓存时宽高都为 0
+pub(super) fn decoration_growth(uuid: &Uuid, window: &WebviewWindow) -> PhysicalDelta {
     let (Ok(inner), Ok(outer)) = (window.inner_size(), window.outer_size()) else {
-        return (0, 0);
+        return PhysicalDelta::default();
     };
-    let now_inset = (
-        outer.width.saturating_sub(inner.width),
-        outer.height.saturating_sub(inner.height),
-    );
+    let now_inset = PhysicalDelta {
+        width: outer.width.saturating_sub(inner.width),
+        height: outer.height.saturating_sub(inner.height),
+    };
 
     let cached = DECORATED_INSET.read().unwrap().get(uuid).copied();
     let Some(decorated) = cached else {
         // 没缓存到，本进程没经过建窗路径：不折算，保持原值
-        return (0, 0);
+        return PhysicalDelta::default();
     };
 
-    (
-        decorated.0.saturating_sub(now_inset.0),
-        decorated.1.saturating_sub(now_inset.1),
-    )
+    PhysicalDelta {
+        width: decorated.width.saturating_sub(now_inset.width),
+        height: decorated.height.saturating_sub(now_inset.height),
+    }
 }

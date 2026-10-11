@@ -181,10 +181,10 @@ pub async fn get_server_info(ip: &str, port: u16) -> ServerMotdObj {
     let stream = match connect(&info.ip, info.port).await {
         Ok(s) => s,
         Err(e) if is_host_name(&info.ip) => match srv_lookup(&info.ip).await {
-            Some((host, srv_port)) => match connect(&host, srv_port).await {
+            Some(target) => match connect(&target.host, target.port).await {
                 Ok(s) => {
-                    info.ip = host;
-                    info.port = srv_port;
+                    info.ip = target.host;
+                    info.port = target.port;
                     s
                 }
                 Err(e2) => {
@@ -360,8 +360,22 @@ fn read_varint_from(data: &[u8], pos: &mut usize) -> i32 {
     result
 }
 
+/// SRV 记录解析出的真实服务器地址
+struct SrvTarget {
+    /// 目标主机名，已去掉域名结尾的根点
+    host: String,
+    /// 目标端口，取值 1..=65535
+    port: u16,
+}
+
 /// SRV 记录解析：`_minecraft._tcp.<主机名>` → 真实地址 + 端口
-async fn srv_lookup(host: &str) -> Option<(String, u16)> {
+///
+/// - `host`: 待解析的主机名，不含端口
+///
+/// # 返回值
+///
+/// 见 [`SrvTarget`]；没有 SRV 记录、目标为空或解析失败时返回 `None`
+async fn srv_lookup(host: &str) -> Option<SrvTarget> {
     use hickory_resolver::{Resolver, proto::rr::RData};
 
     let resolver = Resolver::builder_tokio().ok()?.build().ok()?;
@@ -380,7 +394,10 @@ async fn srv_lookup(host: &str) -> Option<(String, u16)> {
     if target.is_empty() {
         return None;
     }
-    Some((target, srv.port))
+    Some(SrvTarget {
+        host: target,
+        port: srv.port,
+    })
 }
 
 /// description 解析：按**形状**取值，各种写法都收得下

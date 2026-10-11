@@ -49,8 +49,8 @@ pub(super) fn check(
     for name in src_entries {
         let (level, note) = COMPAT_TABLE
             .iter()
-            .find(|(entry, _, _)| entry == name)
-            .map(|(_, level, note)| (*level, *note))
+            .find(|entry| entry.name == name.as_str())
+            .map(|entry| (entry.level, entry.note))
             .unwrap_or(("extra", "colormc.compat.extra"));
         checked.compat.push(ColorMcCompatDto {
             name: name.clone(),
@@ -79,9 +79,18 @@ pub(super) fn check(
     checked
 }
 
-/// 兼容性对照表：ColorMC 工作目录的**顶层条目** → 级别与说明 i18n key
+/// 兼容性对照表的一行
+pub(super) struct CompatEntry {
+    /// ColorMC 工作目录顶层的条目名，与文件系统里的名字逐字相同，如 `minecraft`
+    pub(super) name: &'static str,
+    /// 兼容级别：`ok` 能直接用 / `partial` 能用但有偏差或会丢东西 / `extra` M²L 读不懂，留着不碍事
+    pub(super) level: &'static str,
+    /// 说明文案的 i18n key，如 `colormc.compat.minecraft`
+    pub(super) note: &'static str,
+}
+
+/// 兼容性对照表：ColorMC 工作目录的**顶层条目** → 每条的级别与说明
 ///
-/// 级别：`ok` 能直接用 / `partial` 能用但有偏差或会丢东西 / `extra` M²L 读不懂，留着不碍事。
 /// 结论来自逐项对照 ColorMC 源码 `E:\code\ColorMC` 与本仓库代码：
 /// - `minecraft/` **同构**：实例、资源、版本库、依赖库都在同样的位置，能直接用；
 /// - `collect.json` 结构一致：M²L 的 `CollectObj` 少了 ColorMC 的 4 个开关，未知字段被忽略；
@@ -90,24 +99,92 @@ pub(super) fn check(
 /// - `count.dat` 是游戏统计，读不了就从零开始；`logs.log` 会盖掉 M²L 自己那份日志；
 /// - `java/` 是 ColorMC 的运行时目录，合过去 M²L 不会自动认那些 JRE；
 /// - 其余目录 / 文件 M²L 根本不读。
-pub(super) const COMPAT_TABLE: &[(&str, &str, &str)] = &[
-    ("minecraft", "ok", "colormc.compat.minecraft"),
-    ("collect.json", "ok", "colormc.compat.collect"),
-    ("config.json", "partial", "colormc.compat.config"),
-    ("count.dat", "partial", "colormc.compat.count"),
-    ("logs.log", "partial", "colormc.compat.logs"),
-    ("java", "partial", "colormc.compat.java"),
-    ("download", "extra", "colormc.compat.download"),
-    ("block", "extra", "colormc.compat.block"),
-    ("image", "extra", "colormc.compat.extra"),
-    ("tools", "extra", "colormc.compat.extra"),
-    ("frpc", "extra", "colormc.compat.extra"),
-    ("inputs", "extra", "colormc.compat.extra"),
-    ("gui.json", "extra", "colormc.compat.gui"),
-    ("window.json", "extra", "colormc.compat.gui"),
-    ("cloud.json", "extra", "colormc.compat.extra"),
-    ("frp.json", "extra", "colormc.compat.extra"),
-    ("lock", "extra", "colormc.compat.lock"),
+pub(super) const COMPAT_TABLE: &[CompatEntry] = &[
+    CompatEntry {
+        name: "minecraft",
+        level: "ok",
+        note: "colormc.compat.minecraft",
+    },
+    CompatEntry {
+        name: "collect.json",
+        level: "ok",
+        note: "colormc.compat.collect",
+    },
+    CompatEntry {
+        name: "config.json",
+        level: "partial",
+        note: "colormc.compat.config",
+    },
+    CompatEntry {
+        name: "count.dat",
+        level: "partial",
+        note: "colormc.compat.count",
+    },
+    CompatEntry {
+        name: "logs.log",
+        level: "partial",
+        note: "colormc.compat.logs",
+    },
+    CompatEntry {
+        name: "java",
+        level: "partial",
+        note: "colormc.compat.java",
+    },
+    CompatEntry {
+        name: "download",
+        level: "extra",
+        note: "colormc.compat.download",
+    },
+    CompatEntry {
+        name: "block",
+        level: "extra",
+        note: "colormc.compat.block",
+    },
+    CompatEntry {
+        name: "image",
+        level: "extra",
+        note: "colormc.compat.extra",
+    },
+    CompatEntry {
+        name: "tools",
+        level: "extra",
+        note: "colormc.compat.extra",
+    },
+    CompatEntry {
+        name: "frpc",
+        level: "extra",
+        note: "colormc.compat.extra",
+    },
+    CompatEntry {
+        name: "inputs",
+        level: "extra",
+        note: "colormc.compat.extra",
+    },
+    CompatEntry {
+        name: "gui.json",
+        level: "extra",
+        note: "colormc.compat.gui",
+    },
+    CompatEntry {
+        name: "window.json",
+        level: "extra",
+        note: "colormc.compat.gui",
+    },
+    CompatEntry {
+        name: "cloud.json",
+        level: "extra",
+        note: "colormc.compat.extra",
+    },
+    CompatEntry {
+        name: "frp.json",
+        level: "extra",
+        note: "colormc.compat.extra",
+    },
+    CompatEntry {
+        name: "lock",
+        level: "extra",
+        note: "colormc.compat.lock",
+    },
 ];
 
 /// 兼容性检测的结果

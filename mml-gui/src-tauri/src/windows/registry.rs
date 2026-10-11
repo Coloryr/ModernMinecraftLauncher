@@ -272,15 +272,27 @@ pub(super) fn uuid_for_kind(kind: &str) -> Option<Uuid> {
         .map(|(uuid, _)| *uuid)
 }
 
+/// 最小客户区尺寸，单位逻辑像素
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub(super) struct MinSize {
+    /// 宽
+    pub(super) width: f64,
+    /// 高
+    pub(super) height: f64,
+}
+
 /// 取某窗口的最小客户区尺寸，注册表口径的逻辑像素
 ///
 /// - `uuid`: 窗口 uuid
 ///
 /// # 返回值
 ///
-/// 宽高二元组；未注册的 uuid 返回 `None`
-pub(super) fn min_size_of(uuid: &Uuid) -> Option<(f64, f64)> {
-    WINDOWS_INFO.get(uuid).map(|e| (e.min_width, e.min_height))
+/// 见 [`MinSize`]；未注册的 uuid 返回 `None`
+pub(super) fn min_size_of(uuid: &Uuid) -> Option<MinSize> {
+    WINDOWS_INFO.get(uuid).map(|e| MinSize {
+        width: e.min_width,
+        height: e.min_height,
+    })
 }
 
 /// 按窗口标签取注册表里的最小客户区尺寸，标签形如 `mml-<kind>`
@@ -289,8 +301,8 @@ pub(super) fn min_size_of(uuid: &Uuid) -> Option<(f64, f64)> {
 ///
 /// # 返回值
 ///
-/// 宽高二元组，单位逻辑像素；未注册的标签返回 `None`
-pub(super) fn min_size_of_label(label: &str) -> Option<(f64, f64)> {
+/// 见 [`MinSize`]；未注册的标签返回 `None`
+pub(super) fn min_size_of_label(label: &str) -> Option<MinSize> {
     let kind = label.strip_prefix("mml-")?;
     let uuid = uuid_for_kind(kind)?;
     min_size_of(&uuid)

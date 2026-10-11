@@ -376,19 +376,24 @@ pub(crate) fn get_lang_dir() -> Option<PathBuf> {
     LANG_DIR.get().cloned()
 }
 
+/// jar 语言文件里提出的两张 ID → 语言键映射
+///
+/// 只存语言键，译文由界面按当前语言经 [`get_lang`] 查询
+pub(crate) struct LangKeys {
+    /// 方块 ID → 语言键，如 `minecraft:stone` → `block.minecraft.stone`
+    pub(crate) block: std::collections::HashMap<String, String>,
+    /// 物品 ID → 语言键，如 `minecraft:apple` → `item.minecraft.apple`
+    pub(crate) item: std::collections::HashMap<String, String>,
+}
+
 /// 提取语言文件到 langs 目录
 ///
 /// - `archive`: 客户端 jar 归档
 ///
 /// # 返回值
 ///
-/// 返回方块 ID → 语言键与物品 ID → 语言键两张映射；zh_cn 优先，en_us 兜底
-pub(crate) fn extract_langs(
-    archive: &BaseArchive,
-) -> (
-    std::collections::HashMap<String, String>,
-    std::collections::HashMap<String, String>,
-) {
+/// 见 [`LangKeys`]；zh_cn 优先，en_us 兜底，两者都取不到时两张表均为空
+pub(crate) fn extract_langs(archive: &BaseArchive) -> LangKeys {
     for name in ["zh_cn", "en_us"] {
         let Ok(data) = archive.read(&format!("assets/minecraft/lang/{name}.json")) else {
             continue;
@@ -417,12 +422,15 @@ pub(crate) fn extract_langs(
                 item_map.insert(format!("{}:{}", keys[1], keys[2]), lang_key);
             }
         }
-        return (block_map, item_map);
+        return LangKeys {
+            block: block_map,
+            item: item_map,
+        };
     }
-    (
-        std::collections::HashMap::new(),
-        std::collections::HashMap::new(),
-    )
+    LangKeys {
+        block: std::collections::HashMap::new(),
+        item: std::collections::HashMap::new(),
+    }
 }
 
 /// 需要从资源索引补下的语言文件
@@ -638,6 +646,17 @@ pub enum EntryKind {
     Item,
 }
 
+/// 一个待展示的方块 / 物品条目
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Entry {
+    /// 分类值，来自 `block_cat` / `item_cat`；显示名由调用方按当前语言翻译
+    pub cat: String,
+    /// 来源，方块还是物品
+    pub kind: EntryKind,
+    /// 条目 id，如 `minecraft:stone`
+    pub id: String,
+}
+
 /// 方块与物品合并后的展示顺序，列表窗口直接用这个
 ///
 /// 全局按 [`order::order_key`] 排序，所以同一分类只出现一次、分类先后即创造栏标签页顺序；
@@ -648,27 +667,35 @@ pub enum EntryKind {
 ///
 /// # 返回值
 ///
-/// 返回按展示顺序排列的条目列表，元素为来源与 id
-pub fn ordered_entries() -> Vec<(EntryKind, String)> {
-    let mut list: Vec<(String, EntryKind, String)> = Vec::new();
+/// 按展示顺序排列的条目，见 [`Entry`]
+pub fn ordered_entries() -> Vec<Entry> {
+    let mut list: Vec<Entry> = Vec::new();
 
     let all_blocks = blocks();
     let block_ids: std::collections::HashSet<&str> =
         all_blocks.iter().map(|id| id.as_str()).collect();
     for id in &all_blocks {
         let cat = block_cat(id).unwrap_or_default();
-        list.push((cat, EntryKind::Block, id.clone()));
+        list.push(Entry {
+            cat,
+            kind: EntryKind::Block,
+            id: id.clone(),
+        });
     }
     for id in items() {
         if block_ids.contains(id.as_str()) {
             continue;
         }
         let cat = item_cat(&id).unwrap_or_default();
-        list.push((cat, EntryKind::Item, id));
+        list.push(Entry {
+            cat,
+            kind: EntryKind::Item,
+            id,
+        });
     }
 
-    list.sort_by(|a, b| order::order_key(&a.0, &a.2).cmp(&order::order_key(&b.0, &b.2)));
-    list.into_iter().map(|(_, kind, id)| (kind, id)).collect()
+    list.sort_by(|a, b| order::order_key(&a.cat, &a.id).cmp(&order::order_key(&b.cat, &b.id)));
+    list
 }
 
 /// 锁定物品数据表，内部读取用

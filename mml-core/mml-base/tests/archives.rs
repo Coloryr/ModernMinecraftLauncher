@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fs, path::{Path, PathBuf}};
 
-use mml_base::archives::{ArchiveType, BaseArchive, TarMode};
+use mml_base::archives::{ArchiveAddFile, ArchiveType, BaseArchive, TarMode};
 
 /// 对比两个文件夹是否一致
 ///
@@ -566,8 +566,14 @@ fn add_files_data_inplace() {
     let arc = file.join("a.zip");
     BaseArchive::compress(ArchiveType::Zip, &arc, &source, Some(&source), &None, None).unwrap();
     let mut base = BaseArchive::open(&arc).unwrap();
-    base.add_files(&[(extra.clone(), PathBuf::from("extra.txt"))], None)
-        .unwrap();
+    base.add_files(
+        &[ArchiveAddFile {
+            src: extra.clone(),
+            dest: PathBuf::from("extra.txt"),
+        }],
+        None,
+    )
+    .unwrap();
     assert_eq!(base.read("extra.txt").unwrap(), b"extra");
     assert_eq!(base.read("a.txt").unwrap(), b"a");
     base.add_data("data.bin", &[1u8, 2, 3]).unwrap();
@@ -578,7 +584,13 @@ fn add_files_data_inplace() {
     BaseArchive::compress(ArchiveType::Tar, &arc2, &source, Some(&source), &None, None).unwrap();
     let mut base2 = BaseArchive::open(&arc2).unwrap();
     base2
-        .add_files(&[(extra.clone(), PathBuf::from("extra.txt"))], None)
+        .add_files(
+            &[ArchiveAddFile {
+                src: extra.clone(),
+                dest: PathBuf::from("extra.txt"),
+            }],
+            None,
+        )
         .unwrap();
     assert_eq!(base2.read("extra.txt").unwrap(), b"extra");
     base2.add_data("data.bin", &[9u8]).unwrap();

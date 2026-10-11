@@ -20,7 +20,7 @@ use super::head::send_skin_preview;
 use super::push_texture_url;
 
 use super::respond::{send_bad, send_png};
-use super::{SKIN_IMAGE, SKINRAW_IMAGE, TEXTURE_URLS};
+use super::{PairImageKey, SKINRAW_IMAGE, SKIN_IMAGE, TEXTURE_URLS};
 
 /// 皮肤类 URI 的账户型请求，解析出账户并取回皮肤 / 披风纹理
 ///
@@ -155,7 +155,10 @@ pub(super) async fn send_skin_display(
     res: UriSchemeResponder,
 ) {
     let display = gui_config::get().skin_display;
-    let key = (sha1.to_string(), format!("{display:?}/{skin_type}"));
+    let key = PairImageKey {
+        sha1: sha1.to_string(),
+        config: format!("{display:?}/{skin_type}"),
+    };
 
     {
         let image = SKIN_IMAGE.read().unwrap().get(&key).cloned();

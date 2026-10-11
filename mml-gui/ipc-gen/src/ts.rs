@@ -7,6 +7,41 @@ use crate::scan::split_top_level;
 /// Tauri 注入的参数：不进前端签名，按类型名识别，与参数位置无关
 const INJECTED: [&str; 4] = ["AppHandle", "WebviewWindow", "Window", "State"];
 
+/// 一个字段转成 TS 的结果
+#[derive(Debug, Clone, PartialEq)]
+pub struct TsField {
+    /// TS 类型
+    pub ty: String,
+    /// 是否可缺省，对应 TS 的 `?`
+    pub optional: bool,
+}
+
+/// 转成 TS 后的一个函数参数
+#[derive(Debug, Clone, PartialEq)]
+pub struct TsParam {
+    /// TS 参数名，已转小驼峰，原始标识符前缀 `r#` 已去掉
+    pub name: String,
+    /// TS 类型
+    pub ty: String,
+    /// 是否可缺省，对应 TS 签名的 `?`
+    pub optional: bool,
+}
+
+impl TsParam {
+    /// 造一个参数，供测试与常量表用
+    ///
+    /// - `name`: TS 参数名
+    /// - `ty`: TS 类型
+    /// - `optional`: 是否可缺省
+    pub fn new(name: &str, ty: &str, optional: bool) -> Self {
+        Self {
+            name: name.into(),
+            ty: ty.into(),
+            optional,
+        }
+    }
+}
+
 /// snake_case / kebab-case -> SCREAMING_SNAKE_CASE，如 account-change -> ACCOUNT_CHANGE
 ///
 /// - `name`: 事件名或标识符
@@ -86,7 +121,7 @@ pub fn ts_type(ty: &str, ext: &BTreeMap<String, String>) -> String {
     }
 }
 
-/// 字段类型 -> (TS 类型, 是否可选)
+/// 字段类型转成 TS 表示
 ///
 /// - `ty`: 字段的 Rust 类型原文
 /// - `input_only`: 只 derive `Deserialize` 的入参 DTO。serde 允许 `Option` 字段整键缺失，
@@ -95,16 +130,25 @@ pub fn ts_type(ty: &str, ext: &BTreeMap<String, String>) -> String {
 ///
 /// # 返回值
 ///
-/// TS 类型与是否可缺省两项；`Option<Option<T>>` 是三态补丁，不传 = 不改 / null = 清空 /
+/// 见 [`TsField`]；`Option<Option<T>>` 是三态补丁，不传 = 不改 / null = 清空 /
 /// 有值 = 更新，可缺省且可为 null
-pub fn ts_field(ty: &str, input_only: bool, ext: &BTreeMap<String, String>) -> (String, bool) {
+pub fn ts_field(ty: &str, input_only: bool, ext: &BTreeMap<String, String>) -> TsField {
     if let Some(inner) = generic_inner(ty.trim(), "Option") {
         if let Some(inner2) = generic_inner(inner.trim(), "Option") {
-            return (format!("{} | null", ts_type(&inner2, ext)), true);
+            return TsField {
+                ty: format!("{} | null", ts_type(&inner2, ext)),
+                optional: true,
+            };
         }
-        return (format!("{} | null", ts_type(&inner, ext)), input_only);
+        return TsField {
+            ty: format!("{} | null", ts_type(&inner, ext)),
+            optional: input_only,
+        };
     }
-    (ts_type(ty, ext), false)
+    TsField {
+        ty: ts_type(ty, ext),
+        optional: false,
+    }
 }
 
 /// `ab_cd` / `ab-cd` -> `abCd`，缩写修正 Oauth -> OAuth，与现有命名保持一致
@@ -126,15 +170,15 @@ pub fn camel(name: &str) -> String {
     format!("{first}{rest}").replace("Oauth", "OAuth")
 }
 
-/// 参数原文 -> Vec<(TS 参数名, TS 类型, 是否可选)>，并丢掉 Tauri 注入的参数
+/// 参数原文转成 TS 参数表，并丢掉 Tauri 注入的参数
 ///
 /// - `params`: 函数签名括号内的参数原文，可跨多行
 /// - `ext`: 外部 crate 的类型映射，透传给 [`ts_field`]
 ///
 /// # 返回值
 ///
-/// 前端签名要用的参数表；Tauri 注入的参数见 [`INJECTED`]，已被剔除
-pub fn ts_params(params: &str, ext: &BTreeMap<String, String>) -> Vec<(String, String, bool)> {
+/// 前端签名要用的参数表，每项见 [`TsParam`]；Tauri 注入的参数见 [`INJECTED`]，已被剔除
+pub fn ts_params(params: &str, ext: &BTreeMap<String, String>) -> Vec<TsParam> {
     split_top_level(params)
         .into_iter()
         .filter_map(|p| {
@@ -145,8 +189,12 @@ pub fn ts_params(params: &str, ext: &BTreeMap<String, String>) -> Vec<(String, S
             if INJECTED.contains(&ty) {
                 return None;
             }
-            let (ts, optional) = ts_field(ty, false, ext);
-            Some((camel(name.trim_start_matches("r#")), ts, optional))
+            let field = ts_field(ty, false, ext);
+            Some(TsParam {
+                name: camel(name.trim_start_matches("r#")),
+                ty: field.ty,
+                optional: field.optional,
+            })
         })
         .collect()
 }
@@ -204,6 +252,26 @@ mod tests {
         BTreeMap::from([("Lang".to_string(), "\"zh_cn\" | \"en_us\"".to_string())])
     }
 
+    /// 造一个字段的期望值
+    ///
+    /// - `ty`: TS 类型
+    /// - `optional`: 是否可缺省
+    fn f(ty: &str, optional: bool) -> TsField {
+        TsField {
+            ty: ty.into(),
+            optional,
+        }
+    }
+
+    /// 造一个参数的期望值
+    ///
+    /// - `name`: TS 参数名
+    /// - `ty`: TS 类型
+    /// - `optional`: 是否可缺省
+    fn p(name: &str, ty: &str, optional: bool) -> TsParam {
+        TsParam::new(name, ty, optional)
+    }
+
     /// 基础类型与容器映射
     #[test]
     fn test_ts_type_basics() {
@@ -257,11 +325,11 @@ mod tests {
     fn test_ts_field_tri_state() {
         assert_eq!(
             ts_field("Option<Option<String>>", false, &ext()),
-            ("string | null".into(), true)
+            f("string | null", true)
         );
         assert_eq!(
             ts_field("Option<Option<String>>", true, &ext()),
-            ("string | null".into(), true)
+            f("string | null", true)
         );
     }
 
@@ -270,13 +338,13 @@ mod tests {
     fn test_ts_field_input_only() {
         assert_eq!(
             ts_field("Option<String>", true, &ext()),
-            ("string | null".into(), true)
+            f("string | null", true)
         );
         assert_eq!(
             ts_field("Option<String>", false, &ext()),
-            ("string | null".into(), false)
+            f("string | null", false)
         );
-        assert_eq!(ts_field("String", false, &ext()), ("string".into(), false));
+        assert_eq!(ts_field("String", false, &ext()), f("string", false));
     }
 
     /// 注入参数按类型名剔除，与位置无关；三种顺序都要过
@@ -291,13 +359,13 @@ mod tests {
         for case in cases {
             let ps = ts_params(case, &e);
             assert!(
-                !ps.iter().any(|p| p.0 == "app" || p.0 == "window"),
+                !ps.iter().any(|q| q.name == "app" || q.name == "window"),
                 "{case} -> {ps:?}"
             );
         }
         assert_eq!(
             ts_params("window: WebviewWindow, app: AppHandle, id: String", &e),
-            vec![("id".into(), "string".into(), false)]
+            vec![p("id", "string", false)]
         );
     }
 
@@ -308,9 +376,9 @@ mod tests {
         assert_eq!(
             ts_params("project_id: String, page: Option<u32>, r#type: String", &e),
             vec![
-                ("projectId".into(), "string".into(), false),
-                ("page".into(), "number | null".into(), false),
-                ("type".into(), "string".into(), false),
+                p("projectId", "string", false),
+                p("page", "number | null", false),
+                p("type", "string", false),
             ]
         );
     }

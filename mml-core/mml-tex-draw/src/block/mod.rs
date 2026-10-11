@@ -23,7 +23,7 @@ use std::{
 
 use crate::block::icons::{BLOCK_ICONS, IconSpec};
 use crate::gpu::GpuCtx;
-use crate::model::{BakedModel, Quad, bake_model};
+use crate::model::{BakedModel, BakedModelTextures, Quad, bake_model};
 
 use mml_base::{archives::BaseArchive, serialize_tools};
 use mml_game::gui_hook::ProgressGui;
@@ -115,14 +115,22 @@ fn extract_frame(tex: &Pixmap, index: usize) -> Option<Pixmap> {
     Some(frame)
 }
 
+/// 时间线上的一段：播放第几帧、持续多久
+struct AnimEntry {
+    /// 源帧序号，索引 `AnimTimeline::src`；构建期已按帧数取模，不会越界
+    frame: u32,
+    /// 该段持续刻数，至少 1
+    ticks: u32,
+}
+
 /// 动画时间线：源帧 + 展开后的帧序列，按刻惰性取帧
 ///
 /// 取帧时才做克隆与插值混合，避免物化整条逐刻帧序列，frametime 大时可达上千帧位图
 struct AnimTimeline {
     /// 源帧位图，按条带顺序切出
     src: Vec<Pixmap>,
-    /// 展开后的帧序列，帧号 → 持续刻数
-    entries: Vec<(u32, u32)>,
+    /// 展开后的帧序列，按播放顺序排列
+    entries: Vec<AnimEntry>,
     /// 帧之间是否平滑插值
     interpolate: bool,
 }
@@ -148,10 +156,20 @@ impl AnimTimeline {
             .as_ref()
             .map(|list| {
                 list.iter()
-                    .map(|f| (f.index % src.len() as u32, f.time.max(1)))
+                    .map(|f| AnimEntry {
+                        frame: f.index % src.len() as u32,
+                        ticks: f.time.max(1),
+                    })
                     .collect::<Vec<_>>()
             })
-            .unwrap_or_else(|| (0..src.len() as u32).map(|i| (i, frametime)).collect());
+            .unwrap_or_else(|| {
+                (0..src.len() as u32)
+                    .map(|i| AnimEntry {
+                        frame: i,
+                        ticks: frametime,
+                    })
+                    .collect()
+            });
         Some(Self {
             src,
             entries,
@@ -161,7 +179,7 @@ impl AnimTimeline {
 
     /// 整条时间线的总时长，单位刻
     fn total_ticks(&self) -> u32 {
-        self.entries.iter().map(|&(_, time)| time).sum()
+        self.entries.iter().map(|entry| entry.ticks).sum()
     }
 
     /// 取逐刻时间线上第 tick 刻的帧；interpolate 时向序列下一帧线性过渡
@@ -173,17 +191,17 @@ impl AnimTimeline {
     /// 返回该刻的帧位图，时间线为空时返回 `None`
     fn frame_at(&self, tick: u32) -> Option<Pixmap> {
         let mut acc = 0u32;
-        for (i, &(idx, time)) in self.entries.iter().enumerate() {
-            if tick < acc + time {
-                let frame = &self.src[idx as usize];
+        for (i, entry) in self.entries.iter().enumerate() {
+            if tick < acc + entry.ticks {
+                let frame = &self.src[entry.frame as usize];
                 if !self.interpolate {
                     return Some(frame.clone());
                 }
-                let next = self.entries[(i + 1) % self.entries.len()].0 as usize;
-                let f = (tick - acc) as f32 / time as f32;
+                let next = self.entries[(i + 1) % self.entries.len()].frame as usize;
+                let f = (tick - acc) as f32 / entry.ticks as f32;
                 return blend_bitmap(frame, &self.src[next], f);
             }
-            acc += time;
+            acc += entry.ticks;
         }
         None
     }
@@ -240,15 +258,23 @@ fn encode_png(size: u32, rgba: &[u8]) -> Option<Vec<u8>> {
     Some(cursor.into_inner())
 }
 
+/// APNG 的一帧：像素与它占用的显示时长
+struct ApngFrame {
+    /// 该帧的 RGBA 像素，长度等于边长²×4
+    rgba: Vec<u8>,
+    /// 该帧持续刻数，含采样步长跨过的刻数；渲染结果与前一帧相同时并入前一帧
+    ticks: u16,
+}
+
 /// 把多帧合并成 APNG，每帧附带显示时长，单位刻
 ///
 /// - `size`: 输出边长，单位像素
-/// - `frames`: 帧列表，每项为 RGBA 像素与持续刻数
+/// - `frames`: 帧列表，按显示顺序排列
 ///
 /// # 返回值
 ///
 /// 返回 APNG 字节，编码失败时返回 `None`
-fn encode_apng(size: u32, frames: Vec<(Vec<u8>, u16)>) -> Option<Vec<u8>> {
+fn encode_apng(size: u32, frames: Vec<ApngFrame>) -> Option<Vec<u8>> {
     let mut cursor = Cursor::new(Vec::new());
     {
         let mut encoder = png::Encoder::new(&mut cursor, size, size);
@@ -265,13 +291,13 @@ fn encode_apng(size: u32, frames: Vec<(Vec<u8>, u16)>) -> Option<Vec<u8>> {
                 return None;
             }
         };
-        for (frame, ticks) in &frames {
+        for frame in &frames {
             // 帧显示时长 = 持续刻数 / FRAME_RATE 秒，采样跨过的刻数一并计入
-            if let Err(e) = writer.set_frame_delay(*ticks, FRAME_RATE) {
+            if let Err(e) = writer.set_frame_delay(frame.ticks, FRAME_RATE) {
                 eprintln!("set_frame_delay失败: {e}");
                 return None;
             }
-            if let Err(e) = writer.write_image_data(frame) {
+            if let Err(e) = writer.write_image_data(&frame.rgba) {
                 eprintln!("write_image_data失败: {e}");
                 return None;
             }
@@ -431,13 +457,13 @@ fn push_head_cube(quads: &mut Vec<Quad>, tex: &Pixmap, path: &str, tex_off: [f32
 ///
 /// # 返回值
 ///
-/// 返回烘焙产物与用到的贴图，贴图读取失败时返回 `None`
+/// 见 [`BakedModelTextures`]；贴图读取失败时返回 `None`
 fn bake_head(
     archive: &BaseArchive,
     tex_rel: &str,
     hat: bool,
     tex_cache: &mut HashMap<String, Pixmap>,
-) -> Option<(BakedModel, HashMap<String, Pixmap>)> {
+) -> Option<BakedModelTextures> {
     let path = crate::model::texture_path(tex_rel)?;
     let tex = crate::model::load_texture(archive, tex_cache, &path)?;
 
@@ -452,7 +478,10 @@ fn bake_head(
 
     let mut textures = HashMap::new();
     textures.insert(path.clone(), tex.clone());
-    Some((bake_head_model(tex, hat, &path), textures))
+    Some(BakedModelTextures {
+        model: bake_head_model(tex, hat, &path),
+        textures,
+    })
 }
 
 /// 头颅烘焙核心：从已加载的贴图直接出模型，外部皮肤文件的图标渲染也走这里
@@ -484,6 +513,14 @@ fn bake_head_model(tex: Pixmap, hat: bool, path: &str) -> BakedModel {
     }
 }
 
+/// 渲染并写盘完成的一个方块图标
+struct IconOutput {
+    /// 方块 / 图标 id，带命名空间，如 `minecraft:stone`
+    id: String,
+    /// 输出文件名，`:` 已换成 `_`，如 `minecraft_stone.png`
+    out_name: String,
+}
+
 /// 渲染一个方块图标，对应 block_icons 表的一行
 ///
 /// 各规格的渲染方式：
@@ -502,14 +539,14 @@ fn bake_head_model(tex: Pixmap, hat: bool, path: &str) -> BakedModel {
 ///
 /// # 返回值
 ///
-/// 返回方块 ID 与输出文件名，失败或规格为 Skip 时返回 `None`
+/// 见 [`IconOutput`]；失败或规格为 Skip 时返回 `None`
 fn render_icon(
     gpu: Option<&GpuCtx>,
     archive: &BaseArchive,
     tex_cache: &mut HashMap<String, Pixmap>,
     id_rel: &str,
     spec: &IconSpec,
-) -> Option<(String, String)> {
+) -> Option<IconOutput> {
     // 表 ID 带命名空间 minecraft:xx，为 mod 支持预留；输出文件名把 ':' 换成 '_'
     let id = id_rel;
     let out_name = format!("{}.png", id_rel.replace(':', "_"));
@@ -518,13 +555,16 @@ fn render_icon(
         IconSpec::Form(_, inner) => return render_icon(gpu, archive, tex_cache, id_rel, inner),
         IconSpec::Model(rel) => {
             // 烘焙失败即跳过：无 elements 的父模板、贴图引用无值
-            let (model, textures) = bake_model(archive, rel, tex_cache)?;
+            let BakedModelTextures { model, textures } = bake_model(archive, rel, tex_cache)?;
             render_baked(gpu, archive, model, textures, None)?
         }
         IconSpec::IsoModel(rel) => {
             // 模型无 display 变换，游戏创造栏对这些走平面贴图；按需求强制标准方块 gui 旋转
             // 即 block/block 的 gui display，出等轴测 3D 观感
-            let (mut model, textures) = bake_model(archive, rel, tex_cache)?;
+            let BakedModelTextures {
+                mut model,
+                textures,
+            } = bake_model(archive, rel, tex_cache)?;
             model.transform = crate::model::GuiTransform {
                 rotation: [30.0, 225.0, 0.0],
                 translation: [0.0; 3],
@@ -533,7 +573,8 @@ fn render_icon(
             render_baked(gpu, archive, model, textures, None)?
         }
         IconSpec::Head(tex_rel, hat) => {
-            let (model, textures) = bake_head(archive, tex_rel, *hat, tex_cache)?;
+            let BakedModelTextures { model, textures } =
+                bake_head(archive, tex_rel, *hat, tex_cache)?;
             render_baked(gpu, archive, model, textures, None)?
         }
         IconSpec::Composite(parts) => {
@@ -542,10 +583,16 @@ fn render_icon(
             let Some((first, rest)) = parts.split_first() else {
                 return None;
             };
-            let (mut model, mut textures) = bake_model(archive, first.0, tex_cache)?;
+            let BakedModelTextures {
+                mut model,
+                mut textures,
+            } = bake_model(archive, first.0, tex_cache)?;
             transform_composite_part(&mut model, first.1, first.2);
             for (rel, tr, yaw) in rest {
-                let (mut part, texs) = bake_model(archive, rel, tex_cache)?;
+                let BakedModelTextures {
+                    model: mut part,
+                    textures: texs,
+                } = bake_model(archive, rel, tex_cache)?;
                 textures.extend(texs);
                 transform_composite_part(&mut part, *tr, *yaw);
                 model.quads.extend(part.quads);
@@ -562,7 +609,10 @@ fn render_icon(
     };
 
     path_helper::write_bytes(&crate::get_block_dir()?.join(&out_name), &data).ok()?;
-    Some((id.to_string(), out_name))
+    Some(IconOutput {
+        id: id.to_string(),
+        out_name,
+    })
 }
 
 /// 把动画贴图条带换成首帧
@@ -630,7 +680,7 @@ pub(crate) fn render_baked(
     const MAX_APNG_FRAMES: usize = 64;
     let stride = total.div_ceil(MAX_APNG_FRAMES as u32);
 
-    let mut frames: Vec<(Vec<u8>, u16)> = Vec::with_capacity((total / stride + 1) as usize);
+    let mut frames: Vec<ApngFrame> = Vec::with_capacity((total / stride + 1) as usize);
     let mut k: u32 = 0;
     while k < total {
         for (j, (path, tl)) in timelines.iter().enumerate() {
@@ -641,8 +691,8 @@ pub(crate) fn render_baked(
         let ticks = stride.min(total - k) as u16;
         match frames.last_mut() {
             // 渲染结果与上一帧相同：并入其显示时长，不重复存帧
-            Some((last_img, last_ticks)) if *last_img == img => *last_ticks += ticks,
-            _ => frames.push((img, ticks)),
+            Some(last) if last.rgba == img => last.ticks += ticks,
+            _ => frames.push(ApngFrame { rgba: img, ticks }),
         }
         k += stride;
     }
@@ -729,6 +779,16 @@ fn render_once(
     gpu.and_then(|ctx| ctx.render(model, textures, glint, BLOCK_SIZE as u32))
 }
 
+/// 一个渲染完成的方块图标
+struct RenderedIcon {
+    /// 方块 / 图标 id
+    id: String,
+    /// 渲染输出的文件名
+    out_name: String,
+    /// 所属分类，来自 `BLOCK_ICONS`
+    cat: String,
+}
+
 /// 按创造模式图标表渲染全部方块
 ///
 /// 渲染清单与分类来自 `block_icons::BLOCK_ICONS`，是生成脚本从 26.2 客户端 jar 提取、
@@ -753,7 +813,7 @@ pub fn render_blocks(archive: &BaseArchive, gui: ProgressGui) -> CoreResult<()> 
     };
 
     // 提取语言文件并构建 ID->语言键 映射
-    let (names, _) = crate::extract_langs(archive);
+    let names = crate::extract_langs(archive);
 
     let total = BLOCK_ICONS.len();
     let done = AtomicUsize::new(0);
@@ -772,7 +832,7 @@ pub fn render_blocks(archive: &BaseArchive, gui: ProgressGui) -> CoreResult<()> 
     let cancel = crate::cancel_token();
 
     // 并发渲染
-    let rendered: Vec<Option<(String, String, &str)>> = BLOCK_ICONS
+    let rendered: Vec<Option<RenderedIcon>> = BLOCK_ICONS
         .par_iter()
         .map(|(id_rel, cat, spec)| {
             if cancel.is_cancelled() {
@@ -809,7 +869,11 @@ pub fn render_blocks(archive: &BaseArchive, gui: ProgressGui) -> CoreResult<()> 
 
                     // Form 形态只出图不注册：ID 非真实方块名，不进 blocks() 列表
                     out.filter(|_| !matches!(spec, IconSpec::Form(..)))
-                        .map(|(id, out_name)| (id, out_name, *cat))
+                        .map(|icon| RenderedIcon {
+                            id: icon.id,
+                            out_name: icon.out_name,
+                            cat: cat.to_string(),
+                        })
                 })
             })
         })
@@ -829,11 +893,11 @@ pub fn render_blocks(archive: &BaseArchive, gui: ProgressGui) -> CoreResult<()> 
     }
 
     let mut blocks = crate::blocks_write();
-    for (id, out_name, cat) in rendered.into_iter().flatten() {
-        blocks.tex.insert(id.clone(), out_name);
-        blocks.cat.insert(id.clone(), cat.to_string());
-        if let Some(lang_key) = names.get(&id) {
-            blocks.name.insert(id, lang_key.clone());
+    for icon in rendered.into_iter().flatten() {
+        blocks.tex.insert(icon.id.clone(), icon.out_name);
+        blocks.cat.insert(icon.id.clone(), icon.cat);
+        if let Some(lang_key) = names.block.get(&icon.id) {
+            blocks.name.insert(icon.id, lang_key.clone());
         }
     }
 
@@ -1083,7 +1147,7 @@ mod head_render_tests {
             ("zombie_head", "entity/zombie/zombie", true),
         ] {
             let mut cache = HashMap::new();
-            let (model, textures) = bake_head(&archive, tex, hat, &mut cache)
+            let BakedModelTextures { model, textures } = bake_head(&archive, tex, hat, &mut cache)
                 .unwrap_or_else(|| panic!("{id} 烘焙失败"));
             assert_eq!(model.quads.len(), if hat { 12 } else { 6 }, "{id} 面数不符");
 
@@ -1190,9 +1254,17 @@ mod sprite_tests {
         let mut frames = Vec::new();
         for k in (0..tl.total_ticks()).step_by(20) {
             let bm = tl.frame_at(k).expect("frame_at应成功");
-            let (px, _, w, h) = crate::model::bitmap_rgba(&bm).expect("位图读出应成功");
+            let crate::model::BitmapRgba {
+                data: px,
+                width: w,
+                height: h,
+                ..
+            } = crate::model::bitmap_rgba(&bm).expect("位图读出应成功");
             assert_eq!((w, h), (16, 16));
-            frames.push((px, 20u16));
+            frames.push(ApngFrame {
+                rgba: px,
+                ticks: 20,
+            });
         }
         let data = encode_apng(16, frames);
         assert!(data.is_some(), "APNG应成功");

@@ -8,7 +8,7 @@ use tiny_skia::Pixmap;
 
 use crate::gui_config;
 
-use super::HEAD_IMAGE;
+use super::{HEAD_IMAGE, PairImageKey};
 use super::respond::{send_bad, send_png};
 use super::skin::{
     gen_head_image, load_texture_bytes, parse_skin_type, render_skin_display, resolve_skin_files,
@@ -53,10 +53,10 @@ pub(super) async fn load_head_image(uri: &[&str], res: UriSchemeResponder) {
 /// - `res`: 响应回写句柄
 pub(super) async fn send_head_image(skin_sha1: &str, res: UriSchemeResponder) {
     let config = gui_config::get().head;
-    let key = (
-        skin_sha1.to_string(),
-        format!("{:?}/{}/{}", config.head_type, config.x, config.y),
-    );
+    let key = PairImageKey {
+        sha1: skin_sha1.to_string(),
+        config: format!("{:?}/{}/{}", config.head_type, config.x, config.y),
+    };
 
     {
         let image = HEAD_IMAGE.read().unwrap().get(&key).cloned();

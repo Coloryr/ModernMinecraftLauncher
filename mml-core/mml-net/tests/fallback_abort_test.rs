@@ -14,8 +14,16 @@ use std::time::{Duration, Instant};
 
 use mml_config::config_obj::ProxyState;
 
-/// "只收不回"的服务，同时统计收到的连接数
-fn silent_server() -> (u16, Arc<AtomicUsize>) {
+/// "只收不回"的测试服务
+struct SilentServer {
+    /// 服务监听端口，即本机 TCP 端口号
+    port: u16,
+    /// 服务累计接受的连接数，每个连接加一，用于断言中断后没有新请求
+    hits: Arc<AtomicUsize>,
+}
+
+/// 启动"只收不回"的服务，同时统计收到的连接数
+fn silent_server() -> SilentServer {
     let listener = TcpListener::bind("127.0.0.1:0").expect("绑定失败");
     let port = listener.local_addr().unwrap().port();
     let hits = Arc::new(AtomicUsize::new(0));
@@ -31,7 +39,7 @@ fn silent_server() -> (u16, Arc<AtomicUsize>) {
             });
         }
     });
-    (port, hits)
+    SilentServer { port, hits }
 }
 
 /// 被中断的请求不应被镜像回退逻辑当成失败而重发
@@ -43,8 +51,8 @@ fn aborted_request_is_not_retried_on_other_source() {
     let _ = mml_config::init(&run_dir);
     mml_net::init();
 
-    let (port, hits) = silent_server();
-    let url = format!("http://127.0.0.1:{port}/forge-meta");
+    let server = silent_server();
+    let url = format!("http://127.0.0.1:{}/forge-meta", server.port);
 
     // 模拟「镜像请求 → 拿到中断错误 → 回退分支判断要不要重发」
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -64,7 +72,7 @@ fn aborted_request_is_not_retried_on_other_source() {
 
         // 等它真的发出去并卡住
         tokio::time::sleep(Duration::from_millis(400)).await;
-        let hits_before_abort = hits.load(Ordering::SeqCst);
+        let hits_before_abort = server.hits.load(Ordering::SeqCst);
 
         // 用户改代理
         let abort_at = Instant::now();
@@ -87,7 +95,7 @@ fn aborted_request_is_not_retried_on_other_source() {
     // 这里再等一会儿，确认没有新的连接打进来，模拟回退分支的行为
     let hits_at_abort = hits_before;
     std::thread::sleep(Duration::from_millis(600));
-    let hits_after = hits.load(Ordering::SeqCst);
+    let hits_after = server.hits.load(Ordering::SeqCst);
     println!("卡住服务收到的连接数：中断前 {hits_at_abort}，等待后 {hits_after}");
 
     // 关键断言：能被识别为中断，回退分支就会提前 return，不会自己重发新请求。

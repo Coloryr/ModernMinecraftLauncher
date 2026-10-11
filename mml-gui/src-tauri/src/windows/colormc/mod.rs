@@ -94,16 +94,17 @@ pub fn window_check_colormc() -> Option<ColorMcInfoDto> {
     if asked() {
         return None;
     }
-    let (path, from) = detect()?;
+    let found = detect()?;
     // 探测结果就是运行目录，不该发生：没什么可搬的，别弹窗
-    if path == get_base_dir() {
+    if found.dir == get_base_dir() {
         return None;
     }
     mml_log::info(format!(
-        "colormc detected: {} (from={from})",
-        path.display()
+        "colormc detected: {} (from={})",
+        found.dir.display(),
+        found.from
     ));
-    Some(info(path, from))
+    Some(info(found.dir, found.from))
 }
 
 /// 记下"不迁移"：以后不再问

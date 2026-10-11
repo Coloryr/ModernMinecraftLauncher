@@ -22,7 +22,7 @@ use std::{
 };
 
 use scan::{commands_in, fns_after, module_path, scan_types, walk_rs};
-use ts::{result_ok, ts_params, ts_type};
+use ts::{result_ok, ts_params, ts_type, TsParam};
 
 /// 抓命令的标记，本仓约定，不做成配置
 const CMD_MARK: &str = "#[tauri::command]";
@@ -101,17 +101,26 @@ impl fmt::Display for GenError {
 
 impl std::error::Error for GenError {}
 
-/// 扫描类型声明，`Decl` 内部的中间表示
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Decl {
-    /// 类型名，即 `pub struct X` / `pub enum X` 里的 X
+/// 一条命令的名字与它在 crate 内的完整路径，供生成注册表用
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct CommandRef {
+    /// 命令名，即 Rust 函数名
     pub(crate) name: String,
+    /// crate 内的完整路径，如 `windows::resource::mods::resource_mod_notes`
+    pub(crate) path: String,
+}
+
+/// 扫描到的类型声明，生成 `bindings.ts` 的中间表示
+#[derive(Debug, Clone, PartialEq)]
+pub struct Decl {
+    /// 类型名，即 `pub struct X` / `pub enum X` 里的 X
+    pub name: String,
     /// 声明前的属性原文，含 `#[derive(...)]` / `#[serde(...)]` 与 `///` 文档行
-    pub(crate) attrs: String,
+    pub attrs: String,
     /// 花括号内的正文原文，即字段 / 变体声明
-    pub(crate) body: String,
+    pub body: String,
     /// 是枚举时为 `true`，结构体为 `false`
-    pub(crate) is_enum: bool,
+    pub is_enum: bool,
 }
 
 /// 一条命令的签名，参数已转成 TS
@@ -123,8 +132,8 @@ pub(crate) struct Sig {
     pub(crate) name: String,
     /// 显式分组标记的值；`None` 表示按来源模块最后一段分组
     pub(crate) group: Option<String>,
-    /// (TS 参数名, TS 类型, 是否可缺省)
-    pub(crate) params: Vec<(String, String, bool)>,
+    /// 转成 TS 的函数参数表
+    pub(crate) params: Vec<TsParam>,
     /// 返回类型原文；没有写返回类型时是空串
     pub(crate) ret: String,
 }
@@ -164,7 +173,7 @@ pub fn generate(cfg: &GenConfig) -> Result<Generated, GenError> {
     files.sort();
 
     // 收集命令与事件名；排序去重保证输出稳定
-    let mut commands: Vec<(String, String)> = Vec::new();
+    let mut commands: Vec<CommandRef> = Vec::new();
     let mut events: Vec<String> = Vec::new();
     for file in &files {
         let Ok(text) = fs::read_to_string(file) else {
@@ -177,7 +186,7 @@ pub fn generate(cfg: &GenConfig) -> Result<Generated, GenError> {
             } else {
                 format!("{module}::{name}")
             };
-            commands.push((name, path));
+            commands.push(CommandRef { name, path });
         }
         for name in fns_after(&text, EMIT_MARK) {
             let event = name
@@ -209,20 +218,15 @@ pub fn generate(cfg: &GenConfig) -> Result<Generated, GenError> {
         if !wanted && !enums_only {
             continue;
         }
-        for (name, attrs, body, is_enum) in scan_types(&text) {
-            if enums_only && !is_enum {
+        for d in scan_types(&text) {
+            if enums_only && !d.is_enum {
                 continue;
             }
             // 没有 serde derive 的不是 IPC 类型
-            if !attrs.contains("Serialize") && !attrs.contains("Deserialize") {
+            if !d.attrs.contains("Serialize") && !d.attrs.contains("Deserialize") {
                 continue;
             }
-            decls.push(Decl {
-                name,
-                attrs,
-                body,
-                is_enum,
-            });
+            decls.push(d);
         }
     }
 
@@ -233,13 +237,13 @@ pub fn generate(cfg: &GenConfig) -> Result<Generated, GenError> {
             continue;
         };
         let module = module_path(src, file);
-        for (name, params, ret, group) in commands_in(&text) {
+        for cmd in commands_in(&text) {
             sigs.push(Sig {
                 module: module.clone(),
-                name,
-                group,
-                params: ts_params(&params, &cfg.external_types),
-                ret: ts_type(&result_ok(&ret), &cfg.external_types),
+                name: cmd.name,
+                group: cmd.group,
+                params: ts_params(&cmd.params, &cfg.external_types),
+                ret: ts_type(&result_ok(&cmd.ret), &cfg.external_types),
             });
         }
     }

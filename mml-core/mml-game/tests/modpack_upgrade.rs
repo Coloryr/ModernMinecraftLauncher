@@ -56,9 +56,29 @@ fn online_map(items: &[OnlineInfoObj]) -> OnlineInfoList {
 
 // ===================== 结果归一化，断言与顺序无关 =====================
 
+/// CurseForge 文件项的身份
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct CfFilePair {
+    /// CurseForge 项目编号
+    project_id: u64,
+    /// 项目下的文件编号
+    file_id: u64,
+}
+
+/// 断言用的 [`CfFilePair`] 构造器
+fn cf_pair(project_id: u64, file_id: u64) -> CfFilePair {
+    CfFilePair {
+        project_id,
+        file_id,
+    }
+}
+
 /// 把文件项归一成排序后的 `(project_id, file_id)` 对
-fn cf_pairs(items: &[&FilesObj]) -> Vec<(u64, u64)> {
-    let mut v: Vec<(u64, u64)> = items.iter().map(|f| (f.project_id, f.file_id)).collect();
+fn cf_pairs(items: &[&FilesObj]) -> Vec<CfFilePair> {
+    let mut v: Vec<CfFilePair> = items
+        .iter()
+        .map(|f| cf_pair(f.project_id, f.file_id))
+        .collect();
     v.sort_unstable();
     v
 }
@@ -70,11 +90,28 @@ fn mr_paths(items: &[&ModrinthPackFileObj]) -> Vec<String> {
     v
 }
 
+/// 在线信息的身份
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct OnlineIdPair {
+    /// 模组标识；CurseForge 是项目编号，Modrinth 是 base62 字符串
+    modid: String,
+    /// 文件标识；CurseForge 是文件编号，Modrinth 是版本 id
+    fileid: String,
+}
+
+/// 断言用的 [`OnlineIdPair`] 构造器
+fn online_pair(modid: &str, fileid: &str) -> OnlineIdPair {
+    OnlineIdPair {
+        modid: modid.to_string(),
+        fileid: fileid.to_string(),
+    }
+}
+
 /// 把在线信息归一成排序后的 `(modid, fileid)` 对
-fn online_pairs(items: &[OnlineInfoObj]) -> Vec<(String, String)> {
-    let mut v: Vec<(String, String)> = items
+fn online_pairs(items: &[OnlineInfoObj]) -> Vec<OnlineIdPair> {
+    let mut v: Vec<OnlineIdPair> = items
         .iter()
-        .map(|i| (i.modid.clone(), i.fileid.clone()))
+        .map(|i| online_pair(&i.modid, &i.fileid))
         .collect();
     v.sort();
     v
@@ -88,8 +125,8 @@ fn cf_file_id_changed_is_add_and_remove() {
     let new = [cf(1, 2)];
     let old = [cf(1, 1)];
     let d = diff::diff_curseforge_files(&new, &old);
-    assert_eq!(cf_pairs(&d.add), vec![(1, 2)]);
-    assert_eq!(cf_pairs(&d.remove), vec![(1, 1)]);
+    assert_eq!(cf_pairs(&d.add), vec![cf_pair(1, 2)]);
+    assert_eq!(cf_pairs(&d.remove), vec![cf_pair(1, 1)]);
 }
 
 /// 只在新清单 → 新增
@@ -98,7 +135,7 @@ fn cf_only_in_new_is_add() {
     let new = [cf(1, 1), cf(2, 2)];
     let old = [cf(1, 1)];
     let d = diff::diff_curseforge_files(&new, &old);
-    assert_eq!(cf_pairs(&d.add), vec![(2, 2)]);
+    assert_eq!(cf_pairs(&d.add), vec![cf_pair(2, 2)]);
     assert!(d.remove.is_empty(), "旧清单里的项都配上了，不该有删除");
 }
 
@@ -109,7 +146,7 @@ fn cf_only_in_old_is_remove() {
     let old = [cf(1, 1), cf(3, 3)];
     let d = diff::diff_curseforge_files(&new, &old);
     assert!(d.add.is_empty(), "没有新增/变更");
-    assert_eq!(cf_pairs(&d.remove), vec![(3, 3)]);
+    assert_eq!(cf_pairs(&d.remove), vec![cf_pair(3, 3)]);
 }
 
 /// `project_id` 与 `file_id` 都不变 → 两个列表都不进，不重复下载
@@ -134,12 +171,12 @@ fn cf_empty_lists_do_not_panic() {
     let old = [cf(1, 1)];
     let d = diff::diff_curseforge_files(&empty, &old);
     assert!(d.add.is_empty());
-    assert_eq!(cf_pairs(&d.remove), vec![(1, 1)]);
+    assert_eq!(cf_pairs(&d.remove), vec![cf_pair(1, 1)]);
 
     // 新有、旧空 → 全新增
     let new = [cf(1, 1)];
     let d = diff::diff_curseforge_files(&new, &empty);
-    assert_eq!(cf_pairs(&d.add), vec![(1, 1)]);
+    assert_eq!(cf_pairs(&d.add), vec![cf_pair(1, 1)]);
     assert!(d.remove.is_empty());
 }
 
@@ -152,7 +189,7 @@ fn cf_duplicate_project_id_pairs_each_old_item_once() {
     let new = [cf(1, 1), cf(1, 2)];
     let old = [cf(1, 1)];
     let d = diff::diff_curseforge_files(&new, &old);
-    assert_eq!(cf_pairs(&d.add), vec![(1, 2)]);
+    assert_eq!(cf_pairs(&d.add), vec![cf_pair(1, 2)]);
     assert!(
         d.remove.is_empty(),
         "旧项 (1,1) 仍在新清单里，不该被删（改动前会误删）"
@@ -168,10 +205,10 @@ fn cf_duplicate_project_id_only_removes_the_vanished_file() {
     let new = [cf(1, 1), cf(1, 2)];
     let old = [cf(1, 1), cf(1, 3)];
     let d = diff::diff_curseforge_files(&new, &old);
-    assert_eq!(cf_pairs(&d.add), vec![(1, 2)]);
+    assert_eq!(cf_pairs(&d.add), vec![cf_pair(1, 2)]);
     assert_eq!(
         cf_pairs(&d.remove),
-        vec![(1, 3)],
+        vec![cf_pair(1, 3)],
         "只该删真正从新清单里消失的 (1,3)"
     );
 }
@@ -258,8 +295,8 @@ fn cf_online_changed_is_add_and_remove() {
     let new = online_map(&[online("100", "200", "sha-new")]);
     let old = online_map(&[online("100", "100", "sha-old")]);
     let d = diff::diff_curseforge_online(&new, &old);
-    assert_eq!(online_pairs(&d.add), vec![("100".into(), "200".into())]);
-    assert_eq!(online_pairs(&d.remove), vec![("100".into(), "100".into())]);
+    assert_eq!(online_pairs(&d.add), vec![online_pair("100", "200")]);
+    assert_eq!(online_pairs(&d.remove), vec![online_pair("100", "100")]);
 }
 
 /// 同 `mod_id`、`fileid` 相同但 `sha1` 变 → 也算变更
@@ -268,8 +305,8 @@ fn cf_online_sha1_change_is_a_change() {
     let new = online_map(&[online("100", "100", "sha-new")]);
     let old = online_map(&[online("100", "100", "sha-old")]);
     let d = diff::diff_curseforge_online(&new, &old);
-    assert_eq!(online_pairs(&d.add), vec![("100".into(), "100".into())]);
-    assert_eq!(online_pairs(&d.remove), vec![("100".into(), "100".into())]);
+    assert_eq!(online_pairs(&d.add), vec![online_pair("100", "100")]);
+    assert_eq!(online_pairs(&d.remove), vec![online_pair("100", "100")]);
 }
 
 /// 新有旧无 → 新增；**旧有新无 → 删除**
@@ -281,10 +318,10 @@ fn cf_online_old_only_is_removed() {
     let new = online_map(&[online("100", "1", "sha-a"), online("200", "2", "sha-b")]);
     let old = online_map(&[online("100", "1", "sha-a"), online("300", "3", "sha-c")]);
     let d = diff::diff_curseforge_online(&new, &old);
-    assert_eq!(online_pairs(&d.add), vec![("200".into(), "2".into())]);
+    assert_eq!(online_pairs(&d.add), vec![online_pair("200", "2")]);
     assert_eq!(
         online_pairs(&d.remove),
-        vec![("300".into(), "3".into())],
+        vec![online_pair("300", "3")],
         "新清单里没有 300 → 要删除"
     );
 }
@@ -303,10 +340,10 @@ fn cf_online_identical_and_empty() {
     // 新清单为空 → 已安装的全都要删
     let d = diff::diff_curseforge_online(&empty, &same);
     assert!(d.add.is_empty());
-    assert_eq!(online_pairs(&d.remove), vec![("100".into(), "1".into())]);
+    assert_eq!(online_pairs(&d.remove), vec![online_pair("100", "1")]);
 
     let d = diff::diff_curseforge_online(&same, &empty);
-    assert_eq!(online_pairs(&d.add), vec![("100".into(), "1".into())]);
+    assert_eq!(online_pairs(&d.add), vec![online_pair("100", "1")]);
     assert!(d.remove.is_empty());
 }
 
@@ -318,8 +355,8 @@ fn mr_online_changed_is_add_and_remove() {
     let new = online_map(&[online("aaa", "v2", "sha-new")]);
     let old = online_map(&[online("aaa", "v1", "sha-old")]);
     let d = diff::diff_modrinth_online(&new, &old);
-    assert_eq!(online_pairs(&d.add), vec![("aaa".into(), "v2".into())]);
-    assert_eq!(online_pairs(&d.remove), vec![("aaa".into(), "v1".into())]);
+    assert_eq!(online_pairs(&d.add), vec![online_pair("aaa", "v2")]);
+    assert_eq!(online_pairs(&d.remove), vec![online_pair("aaa", "v1")]);
 }
 
 /// 新有旧无 → 新增；**旧有新无 → 删除**，与 CF 的在线信息路径一致
@@ -330,10 +367,10 @@ fn mr_online_old_only_is_removed() {
     let new = online_map(&[online("aaa", "v1", "sha-a"), online("bbb", "v1", "sha-b")]);
     let old = online_map(&[online("aaa", "v1", "sha-a"), online("ccc", "v1", "sha-c")]);
     let d = diff::diff_modrinth_online(&new, &old);
-    assert_eq!(online_pairs(&d.add), vec![("bbb".into(), "v1".into())]);
+    assert_eq!(online_pairs(&d.add), vec![online_pair("bbb", "v1")]);
     assert_eq!(
         online_pairs(&d.remove),
-        vec![("ccc".into(), "v1".into())],
+        vec![online_pair("ccc", "v1")],
         "新清单里没有 ccc → 要删除"
     );
 }
@@ -352,10 +389,10 @@ fn mr_online_identical_and_empty() {
     // 新清单为空 → 已安装的全都要删
     let d = diff::diff_modrinth_online(&empty, &same);
     assert!(d.add.is_empty());
-    assert_eq!(online_pairs(&d.remove), vec![("aaa".into(), "v1".into())]);
+    assert_eq!(online_pairs(&d.remove), vec![online_pair("aaa", "v1")]);
 
     let d = diff::diff_modrinth_online(&same, &empty);
-    assert_eq!(online_pairs(&d.add), vec![("aaa".into(), "v1".into())]);
+    assert_eq!(online_pairs(&d.add), vec![online_pair("aaa", "v1")]);
     assert!(d.remove.is_empty());
 }
 
@@ -383,7 +420,10 @@ fn manifest_write_then_read_back_overwrites() {
     };
     manifest::write_manifest(&path, &old).expect("写回旧清单");
     let read: CurseForgePackObj = manifest::read_manifest(&path).expect("写回后应能读回");
-    assert_eq!(cf_pairs(&read.files.iter().collect::<Vec<_>>()), vec![(1, 1)]);
+    assert_eq!(
+        cf_pairs(&read.files.iter().collect::<Vec<_>>()),
+        vec![cf_pair(1, 1)]
+    );
 
     // 覆盖：同一路径再写新清单
     let new = CurseForgePackObj {
@@ -600,10 +640,18 @@ fn read_zip_entry(mrpack: &Path, name: &str) -> Vec<u8> {
     data
 }
 
-/// 读出 .mrpack 里某个前缀下的条目：返回 `(去掉前缀的相对路径, 内容)`
+/// .mrpack 里的一个条目
+struct ZipEntry {
+    /// 去掉 `prefix` 后的相对路径，相对游戏目录
+    path: String,
+    /// 条目原始内容
+    data: Vec<u8>,
+}
+
+/// 读出 .mrpack 里某个前缀下的条目，见 [`ZipEntry`]
 ///
 /// 用来断言 overrides 是否解压与覆盖正确：`overrides/xxx` 落到游戏目录的 `xxx`
-fn zip_entries_under(mrpack: &Path, prefix: &str) -> Vec<(String, Vec<u8>)> {
+fn zip_entries_under(mrpack: &Path, prefix: &str) -> Vec<ZipEntry> {
     let file = std::fs::File::open(mrpack).expect("打开 mrpack");
     let mut zip = zip::ZipArchive::new(file).expect("读 zip");
     let mut out = Vec::new();
@@ -618,34 +666,62 @@ fn zip_entries_under(mrpack: &Path, prefix: &str) -> Vec<(String, Vec<u8>)> {
         }
         let mut data = Vec::new();
         entry.read_to_end(&mut data).expect("读条目内容");
-        out.push((rel.to_string(), data));
+        out.push(ZipEntry {
+            path: rel.to_string(),
+            data,
+        });
     }
     out
 }
 
+/// 清单里一个文件的身份：路径与内容哈希
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct IndexHash {
+    /// 文件路径，相对游戏目录
+    path: String,
+    /// 文件内容的 SHA1
+    sha1: String,
+}
+
 /// 清单里"路径 → sha1"，用于判断两个版本的文件集合是否真的不同
-fn index_hashes(index: &ModrinthPackObj) -> Vec<(String, String)> {
-    let mut v: Vec<(String, String)> = index
+fn index_hashes(index: &ModrinthPackObj) -> Vec<IndexHash> {
+    let mut v: Vec<IndexHash> = index
         .files
         .iter()
-        .map(|f| (f.path.clone(), f.hashes.sha1.clone()))
+        .map(|f| IndexHash {
+            path: f.path.clone(),
+            sha1: f.hashes.sha1.clone(),
+        })
         .collect();
     v.sort();
     v
 }
 
+/// 一套整合包文件：版本元数据、本地包路径与包内清单
+struct PackFiles {
+    /// Modrinth 版本对象；它没有 `Clone`，需要按所有权传给升级入口
+    version: ModrinthVersionObj,
+    /// `.mrpack` 在本地的缓存路径
+    path: PathBuf,
+    /// 包内的 `modrinth.index.json`，见 [`read_index`]
+    pack: ModrinthPackObj,
+}
+
+/// 一对文件集合确实不同的新旧版本
+struct VersionPair {
+    /// 旧版本一套
+    old: PackFiles,
+    /// 新版本一套
+    new: PackFiles,
+}
+
 /// 挑一对"文件集合确实不同"的版本：最新版 + 第一个与它不同的旧版
 ///
-/// 返回 `(旧版本对象, 旧包本地路径, 旧清单, 新版本对象, 新包本地路径, 新清单)`；
+/// # 返回值
+///
+/// 见 [`VersionPair`]；
 /// 网络不可用或找不到不同的版本时返回 `None`，调用方跳过。
-async fn pick_version_pair() -> Option<(
-    ModrinthVersionObj,
-    std::path::PathBuf,
-    ModrinthPackObj,
-    ModrinthVersionObj,
-    std::path::PathBuf,
-    ModrinthPackObj,
-)> {
+async fn pick_version_pair() -> Option<VersionPair> {
     let versions = common::project_versions_async(E2E_SLUG).await?;
     // `ModrinthVersionObj` 没有 `Clone`：全程用所有权传，别 clone
     let mut usable: Vec<ModrinthVersionObj> = versions
@@ -670,7 +746,18 @@ async fn pick_version_pair() -> Option<(
         };
         let index = read_index(&pack);
         if index_hashes(&index) != new_hashes {
-            return Some((candidate, pack, index, new_ver, new_pack, new_index));
+            return Some(VersionPair {
+                old: PackFiles {
+                    version: candidate,
+                    path: pack,
+                    pack: index,
+                },
+                new: PackFiles {
+                    version: new_ver,
+                    path: new_pack,
+                    pack: new_index,
+                },
+            });
         }
     }
 
@@ -694,11 +781,19 @@ async fn upgrade_modpack_end_to_end_matches_new_manifest() {
     if !network_available().await {
         return;
     }
-    let Some((old_ver, old_pack, old_index, new_ver, new_pack, new_index)) =
-        pick_version_pair().await
-    else {
+    let Some(pair) = pick_version_pair().await else {
         return;
     };
+    let PackFiles {
+        version: old_ver,
+        path: old_pack,
+        pack: old_index,
+    } = pair.old;
+    let PackFiles {
+        version: new_ver,
+        path: new_pack,
+        pack: new_index,
+    } = pair.new;
     let expected = diff::diff_modrinth_files(&new_index.files, &old_index.files);
     eprintln!(
         "[e2e] {}：{}（{} 个文件）→ {}（{} 个文件）；差异：要下载 {}、要删除 {}",
@@ -758,12 +853,12 @@ async fn upgrade_modpack_end_to_end_matches_new_manifest() {
         std::fs::write(&p, b"old-placeholder").unwrap();
     }
     // 旧包 overrides：照旧解压进游戏目录
-    for (rel, data) in zip_entries_under(&old_pack, "overrides/") {
-        let p = game_path.join(&rel);
+    for entry in zip_entries_under(&old_pack, "overrides/") {
+        let p = game_path.join(&entry.path);
         if let Some(dir) = p.parent() {
             std::fs::create_dir_all(dir).unwrap();
         }
-        std::fs::write(&p, &data).unwrap();
+        std::fs::write(&p, &entry.data).unwrap();
     }
     eprintln!(
         "[e2e] 旧版状态就绪 uuid={uuid}（清单占位文件 {} 个）",
@@ -776,13 +871,18 @@ async fn upgrade_modpack_end_to_end_matches_new_manifest() {
         !old_overrides.is_empty(),
         "真包应带 overrides，否则这条断言没有意义"
     );
-    for (rel, data) in &old_overrides {
-        let path = game_path.join(rel);
-        assert!(path.exists(), "旧包 overrides 的 {rel} 应落到游戏目录");
+    for entry in &old_overrides {
+        let path = game_path.join(&entry.path);
+        assert!(
+            path.exists(),
+            "旧包 overrides 的 {} 应落到游戏目录",
+            entry.path
+        );
         assert_eq!(
             &std::fs::read(&path).expect("读文件"),
-            data,
-            "旧包 overrides 的 {rel} 内容应一致"
+            &entry.data,
+            "旧包 overrides 的 {} 内容应一致",
+            entry.path
         );
     }
     eprintln!(
@@ -870,17 +970,22 @@ async fn upgrade_modpack_end_to_end_matches_new_manifest() {
         "真包应带 overrides，否则这条断言没有意义"
     );
     let mut covered = 0;
-    for (rel, data) in &new_overrides {
-        if new_index.files.iter().any(|f| f.path == *rel) {
+    for entry in &new_overrides {
+        if new_index.files.iter().any(|f| f.path == entry.path) {
             continue;
         }
-        let path = game_path.join(rel);
-        assert!(path.exists(), "升级后新包 overrides 的 {rel} 应存在");
-        if old_overrides.iter().any(|(o, _)| o == rel) {
+        let path = game_path.join(&entry.path);
+        assert!(
+            path.exists(),
+            "升级后新包 overrides 的 {} 应存在",
+            entry.path
+        );
+        if old_overrides.iter().any(|o| o.path == entry.path) {
             assert_eq!(
                 &std::fs::read(&path).expect("读文件"),
-                data,
-                "升级应把 {rel} 覆盖成新包 overrides 的内容"
+                &entry.data,
+                "升级应把 {} 覆盖成新包 overrides 的内容",
+                entry.path
             );
             covered += 1;
         }
@@ -909,11 +1014,15 @@ async fn upgrade_modpack_cancelled_keeps_old_manifest() {
     if !network_available().await {
         return;
     }
-    let Some((old_ver, old_pack, _old_index, new_ver, _new_pack, _new_index)) =
-        pick_version_pair().await
-    else {
+    let Some(pair) = pick_version_pair().await else {
         return;
     };
+    let PackFiles {
+        version: old_ver,
+        path: old_pack,
+        ..
+    } = pair.old;
+    let PackFiles { version: new_ver, .. } = pair.new;
 
     let uuid = mml_game::add_game::install_archive_from_file(
         &old_pack,

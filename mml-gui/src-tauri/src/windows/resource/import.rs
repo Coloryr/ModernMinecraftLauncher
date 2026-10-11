@@ -138,9 +138,9 @@ fn copy_into(dir: &Path, files: &[PathBuf], mode: &str) -> Result<ResourceDropDt
                     continue;
                 }
                 MODE_RENAME => {
-                    let (new_name, new_target) = unique_name(dir, &name);
-                    path_helper::copy_file(file, &new_target).map_err(|err| err.to_string())?;
-                    result.imported.push(new_name);
+                    let unique = unique_name(dir, &name);
+                    path_helper::copy_file(file, &unique.path).map_err(|err| err.to_string())?;
+                    result.imported.push(unique.name);
                     continue;
                 }
                 // 剩下的都直接覆盖，含 overwrite 与没传清楚的兜底
@@ -193,8 +193,8 @@ fn import_saves(
                     continue;
                 }
                 MODE_RENAME => {
-                    let (_, moved) = unique_name(&dir, &name);
-                    std::fs::rename(&target, &moved).map_err(|err| err.to_string())?;
+                    let unique = unique_name(&dir, &name);
+                    std::fs::rename(&target, &unique.path).map_err(|err| err.to_string())?;
                 }
                 _ => {}
             }
@@ -241,6 +241,17 @@ fn file_name(file: &Path) -> Option<String> {
         .map(|name| name.to_string_lossy().into_owned())
 }
 
+/// 改名后的落点：新文件名与它在目标目录下的完整路径
+///
+/// 两者一起返回，是因为调用方一个要落盘 `path`、另一个要把 `name` 报给前端，
+/// 而两者必须同源。
+struct UniqueName {
+    /// 新的文件名，含扩展名，形如 `a (1).jar`
+    name: String,
+    /// `name` 拼在目标目录下的完整路径，与 `name` 同源
+    path: PathBuf,
+}
+
 /// 在 `dir` 里给 `name` 找一个不撞的名字：`a.jar` → `a (1).jar`
 ///
 /// - `dir`: 目标目录
@@ -248,10 +259,10 @@ fn file_name(file: &Path) -> Option<String> {
 ///
 /// # 返回值
 ///
-/// 新的文件名与它的完整路径；999 个候选都撞时退回原名
+/// 见 [`UniqueName`]；999 个候选都撞时退回原名
 ///
 /// 试到 999 还撞就退回原名，宁可覆盖，也不要在这里无限找下去。
-fn unique_name(dir: &Path, name: &str) -> (String, PathBuf) {
+fn unique_name(dir: &Path, name: &str) -> UniqueName {
     let path = Path::new(name);
     let stem = path
         .file_stem()
@@ -266,10 +277,16 @@ fn unique_name(dir: &Path, name: &str) -> (String, PathBuf) {
         let candidate = format!("{stem} ({index}){ext}");
         let target = dir.join(&candidate);
         if !target.exists() {
-            return (candidate, target);
+            return UniqueName {
+                name: candidate,
+                path: target,
+            };
         }
     }
-    (name.to_string(), dir.join(name))
+    UniqueName {
+        name: name.to_string(),
+        path: dir.join(name),
+    }
 }
 
 #[cfg(test)]

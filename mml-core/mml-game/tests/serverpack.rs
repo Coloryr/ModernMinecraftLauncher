@@ -277,7 +277,7 @@ fn downloads_prefer_own_url_then_resolved() {
     let urls: Vec<(String, String)> = d
         .files
         .iter()
-        .map(|(i, u)| (i.file.clone(), u.clone()))
+        .map(|f| (f.item.file.clone(), f.url.clone()))
         .collect();
 
     assert_eq!(
@@ -307,7 +307,7 @@ fn downloads_include_archives_in_order() {
     let urls: Vec<(String, String)> = d
         .archives
         .iter()
-        .map(|(i, u)| (i.file.clone(), u.clone()))
+        .map(|a| (a.item.file.clone(), a.url.clone()))
         .collect();
 
     assert_eq!(

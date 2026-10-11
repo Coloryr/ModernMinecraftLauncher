@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex, Once};
 
 mod common;
 
+use common::{ZipEntry, entry};
 use mml_downloader::download_item::DownloadItem;
 use mml_game::add_game::{self, PackType};
 use mml_game::gui_hook::{AddModPackState, IAddInstanceGui, IAddModPackGui};
@@ -67,14 +68,22 @@ async fn network_available() -> bool {
 static TEST_LOCK: Mutex<()> = Mutex::new(());
 
 /// 程序化生成一个 zip 压缩包
-fn make_zip(dir: &PathBuf, stem: &str, files: &[(&str, &[u8])]) -> PathBuf {
+///
+/// - `dir`: 输出目录
+/// - `stem`: 压缩包文件名，不带扩展名
+/// - `files`: 条目路径与原始内容
+///
+/// # 返回值
+///
+/// 生成的压缩包路径
+fn make_zip(dir: &PathBuf, stem: &str, files: &[ZipEntry]) -> PathBuf {
     let zip_path = dir.join(format!("{stem}.zip"));
     let file = std::fs::File::create(&zip_path).expect("创建测试压缩包失败");
     let mut writer = ZipWriter::new(file);
     let options = SimpleFileOptions::default();
-    for (name, content) in files {
-        writer.start_file(*name, options).unwrap();
-        writer.write_all(content).unwrap();
+    for e in files {
+        writer.start_file(e.name, options).unwrap();
+        writer.write_all(e.data).unwrap();
     }
     writer.finish().unwrap();
     zip_path
@@ -161,8 +170,16 @@ impl mml_downloader::IDownloadGui for TestDownloader {
     fn update_task(&self, _state: mml_downloader::DownloadTaskState) {}
 }
 
+/// 程序化造出的整合包：压缩包与它所在的临时目录
+struct PackFixture {
+    /// 生成的压缩包路径
+    zip: PathBuf,
+    /// 压缩包所在的临时目录，用例结束时整个删掉
+    dir: PathBuf,
+}
+
 /// 构造一个 CurseForge 整合包，空文件清单加 overrides
-fn make_curseforge_pack(name: &str) -> (PathBuf, PathBuf) {
+fn make_curseforge_pack(name: &str) -> PackFixture {
     let dir = mml_testutil::temp_dir()
         .join("mml-modpack-install-packs")
         .join(Uuid::new_v4().to_string());
@@ -175,16 +192,16 @@ fn make_curseforge_pack(name: &str) -> (PathBuf, PathBuf) {
         &dir,
         "cf-pack",
         &[
-            ("manifest.json", manifest.as_bytes()),
-            ("overrides/options.txt", b"lang:zh_cn\n"),
-            ("overrides/mods/dummy.jar", b"dummy mod jar"),
+            entry("manifest.json", manifest.as_bytes()),
+            entry("overrides/options.txt", b"lang:zh_cn\n"),
+            entry("overrides/mods/dummy.jar", b"dummy mod jar"),
         ],
     );
-    (zip, dir)
+    PackFixture { zip, dir }
 }
 
 /// 构造一个 Modrinth 整合包，空文件清单加 overrides
-fn make_modrinth_pack(name: &str) -> (PathBuf, PathBuf) {
+fn make_modrinth_pack(name: &str) -> PackFixture {
     let dir = mml_testutil::temp_dir()
         .join("mml-modpack-install-packs")
         .join(Uuid::new_v4().to_string());
@@ -197,11 +214,11 @@ fn make_modrinth_pack(name: &str) -> (PathBuf, PathBuf) {
         &dir,
         "mr-pack",
         &[
-            ("modrinth.index.json", index.as_bytes()),
-            ("overrides/mods/mr-dummy.jar", b"dummy mod jar"),
+            entry("modrinth.index.json", index.as_bytes()),
+            entry("overrides/mods/mr-dummy.jar", b"dummy mod jar"),
         ],
     );
-    (zip, dir)
+    PackFixture { zip, dir }
 }
 
 /// CurseForge 整合包完整安装：实例创建、元数据、overrides 解压、重名自动改名
@@ -214,7 +231,7 @@ async fn install_curseforge_pack_end_to_end() {
         return;
     }
 
-    let (zip, pack_dir) = make_curseforge_pack("CF安装测试包");
+    let PackFixture { zip, dir: pack_dir } = make_curseforge_pack("CF安装测试包");
 
     // 类型检测
     let detected = add_game::detect_pack(&zip).expect("类型检测失败");
@@ -310,7 +327,7 @@ async fn install_modrinth_pack_end_to_end() {
         return;
     }
 
-    let (zip, pack_dir) = make_modrinth_pack("MR安装测试包");
+    let PackFixture { zip, dir: pack_dir } = make_modrinth_pack("MR安装测试包");
 
     let detected = add_game::detect_pack(&zip).expect("类型检测失败");
     assert!(matches!(detected.pack_type, PackType::Modrinth));
@@ -369,7 +386,7 @@ async fn install_curseforge_cancelled_cleans_up() {
         return;
     }
 
-    let (zip, pack_dir) = make_curseforge_pack("CF取消测试包");
+    let PackFixture { zip, dir: pack_dir } = make_curseforge_pack("CF取消测试包");
     let before = mml_game::get_instances().len();
 
     let token = CancellationToken::new();

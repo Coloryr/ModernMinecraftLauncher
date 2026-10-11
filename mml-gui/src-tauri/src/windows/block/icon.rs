@@ -210,28 +210,28 @@ pub async fn block_set_icon_area(
             .await
             .map_err(|err| err.to_string())??;
 
-    let Some((id, instance)) = core_instance(&uuid) else {
+    let Some(core) = core_instance(&uuid) else {
         return Err("err.gameNotFound".to_string());
     };
-    let dest = instance.read().unwrap().get_icon_file_or_default();
+    let dest = core.instance.read().unwrap().get_icon_file_or_default();
     tokio::fs::write(&dest, &png)
         .await
         .map_err(|err| err.to_string())?;
 
     // 上传图片 = 图标二选一里的"图片"那一支：Icon 指到 icon.png，并把方块 ID 清掉
     {
-        let inst = instance.read().unwrap().clone();
+        let inst = core.instance.read().unwrap().clone();
         crate::gui_setting::clear_block(&inst);
     }
     {
-        let mut inst = instance.write().unwrap();
+        let mut inst = core.instance.write().unwrap();
         if inst.icon.as_deref() != Some(names::ICON_FILE) {
             inst.icon = Some(names::ICON_FILE.to_string());
             inst.save();
         }
     }
 
-    image_manager::clear_instance_image(&id);
+    image_manager::clear_instance_image(&core.uuid);
     emit_instance_change(&app, "edit");
     Ok(true)
 }
@@ -259,24 +259,24 @@ pub async fn block_set_icon(app: AppHandle, uuid: String, id: String) -> Result<
         return Err("err.fileNotFound".to_string());
     };
 
-    let Some((uid, instance)) = core_instance(&uuid) else {
+    let Some(core) = core_instance(&uuid) else {
         return Err("err.gameNotFound".to_string());
     };
 
     // 写方块 ID 并清空 Icon：两步必须一起做，只写一个会让图标读取走错分支
     {
-        let inst = instance.read().unwrap().clone();
+        let inst = core.instance.read().unwrap().clone();
         crate::gui_setting::set_block(&inst, id.clone());
     }
     {
-        let mut inst = instance.write().unwrap();
+        let mut inst = core.instance.write().unwrap();
         if inst.icon.is_some() {
             inst.icon = None;
             inst.save();
         }
     }
 
-    image_manager::clear_instance_image(&uid);
+    image_manager::clear_instance_image(&core.uuid);
     emit_instance_change(&app, "edit");
     Ok(true)
 }
@@ -293,13 +293,13 @@ pub async fn block_set_icon(app: AppHandle, uuid: String, id: String) -> Result<
 #[gui_macros::ipc_group("block")]
 #[tauri::command]
 pub async fn block_skin_add(input: String) -> Result<String, String> {
-    let (name, skin) = mml_game::player_skin::fetch_skin_by_input(&input)
+    let skin = mml_game::player_skin::fetch_skin_by_input(&input)
         .await
         .map_err(|e| e.to_string())?;
 
     // 锁内只取路径，文件读取在 drop 后，std 锁跨 await 破坏 Send 同理，这里没锁
-    let data = tokio::fs::read(&skin).await.map_err(|e| e.to_string())?;
-    mml_tex_draw::add_skin_block(&name, &data).map_err(|e| e.to_string())
+    let data = tokio::fs::read(&skin.path).await.map_err(|e| e.to_string())?;
+    mml_tex_draw::add_skin_block(&skin.name, &data).map_err(|e| e.to_string())
 }
 
 /// 删除皮肤方块，名字就是皮肤方块的显示名

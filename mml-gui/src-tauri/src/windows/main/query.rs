@@ -128,8 +128,8 @@ pub async fn main_get_instance_langs(uuid: String) -> Vec<InstanceLangDto> {
 #[gui_macros::ipc_group("main")]
 #[tauri::command]
 pub fn main_get_instance_args(window: WebviewWindow, uuid: String) -> InstanceArgsDto {
-    if let Some((_, instance)) = core_instance(&uuid) {
-        let obj = instance.read().unwrap();
+    if let Some(core) = core_instance(&uuid) {
+        let obj = core.instance.read().unwrap();
         return args_from_core(&obj);
     }
     if let Ok(store) = model(&window)
@@ -158,9 +158,9 @@ pub fn main_update_instance_args(
     uuid: String,
     args: InstanceArgsDto,
 ) -> Result<bool, String> {
-    if let Some((_, instance)) = core_instance(&uuid) {
+    if let Some(core) = core_instance(&uuid) {
         {
-            let mut obj = instance.write().unwrap();
+            let mut obj = core.instance.write().unwrap();
             apply_args_to_core(&mut obj, &args);
             obj.save();
         }
@@ -317,8 +317,10 @@ pub fn main_load_state() -> LoadState {
 #[gui_macros::ipc_group("main")]
 #[tauri::command]
 pub async fn main_get_motd(address: String) -> MotdDto {
-    let (ip, port) = parse_motd_addr(&address);
-    mml_game::game_motd::get_server_info(&ip, port).await.into()
+    let addr = parse_motd_addr(&address);
+    mml_game::game_motd::get_server_info(&addr.host, addr.port)
+        .await
+        .into()
 }
 
 /// 从 mml_jvms 读取 Java 列表，配置加载 / 扫描异步进行，未完成时为空

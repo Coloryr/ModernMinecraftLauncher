@@ -296,7 +296,10 @@ pub async fn add_modpack_file(
 
                 for item in list.data {
                     let fid = item.id.to_string();
-                    let key = (pid.clone(), fid.clone());
+                    let key = PackFileId {
+                        pid: pid.clone(),
+                        fid: fid.clone(),
+                    };
                     list1.push(FileListItemDto::new_curseforge(
                         &item,
                         FileType::Modpack,
@@ -354,7 +357,10 @@ pub async fn add_modpack_file(
                 let list2 = lock.entry(pid.clone()).or_default();
 
                 for item in list {
-                    let key = (pid.clone(), item.id.clone());
+                    let key = PackFileId {
+                        pid: pid.clone(),
+                        fid: item.id.clone(),
+                    };
                     // 没有文件可下的版本直接跳过，见 new_modrinth 的注释
                     if let Some(dto) = FileListItemDto::new_modrinth(
                         &item,
@@ -400,12 +406,21 @@ pub(super) fn installed_modpack_pids() -> HashSet<String> {
         .collect()
 }
 
+/// 整合包的项目 ID 与文件 ID 组合
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(super) struct PackFileId {
+    /// 项目 ID
+    pub(super) pid: String,
+    /// 文件 ID
+    pub(super) fid: String,
+}
+
 /// 已安装过的整合包 pid + fid 组合集合，版本列表共用
 ///
 /// # 返回值
 ///
 /// 已安装整合包的项目 ID 与文件 ID 组合；缺 pid 或 fid 的实例跳过
-pub(super) fn installed_modpack_files() -> HashSet<(String, String)> {
+pub(super) fn installed_modpack_files() -> HashSet<PackFileId> {
     mml_game::get_instances()
         .iter()
         .filter_map(|item| {
@@ -414,7 +429,7 @@ pub(super) fn installed_modpack_files() -> HashSet<(String, String)> {
                 return None;
             }
             match (temp.pid.clone(), temp.fid.clone()) {
-                (Some(pid), Some(fid)) => Some((pid, fid)),
+                (Some(pid), Some(fid)) => Some(PackFileId { pid, fid }),
                 _ => None,
             }
         })
@@ -440,11 +455,14 @@ pub(super) fn running_pids() -> HashSet<String> {
 /// # 返回值
 ///
 /// 有安装任务在跑的项目 ID 与文件 ID 组合
-pub(super) fn running_files() -> HashSet<(String, String)> {
+pub(super) fn running_files() -> HashSet<PackFileId> {
     DOWNLOAD_NOW
         .read()
         .unwrap()
         .keys()
-        .map(|key| (key.pid.clone(), key.fid.clone()))
+        .map(|key| PackFileId {
+            pid: key.pid.clone(),
+            fid: key.fid.clone(),
+        })
         .collect()
 }

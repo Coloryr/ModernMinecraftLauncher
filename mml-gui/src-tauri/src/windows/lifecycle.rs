@@ -29,7 +29,7 @@ use super::geometry::{
 };
 use super::registry::{
     ADD_MODPACK_WINDOW_UUID, ADD_WINDOW_UUID, BLOCK_WINDOW_UUID, DOWNLOAD_WINDOW_UUID,
-    MAIN_WINDOW_UUID, WINDOWS_INFO, uuid_for_kind,
+    MAIN_WINDOW_UUID, MinSize, WINDOWS_INFO, uuid_for_kind,
 };
 use super::{add_modpack, block};
 
@@ -311,11 +311,17 @@ pub(super) fn create_window(
 
             // 恢复前先夹一次最小客户区：历史几何可能小于当前最小尺寸，旧版本存的或最小尺寸
             // 后来调大过；直接创建会得到一个比最小值还小的窗口，而这个非法值又会被写回文件
-            let (min_pw, min_ph) = min_inner_physical((min_w, min_h), scale);
+            let min = min_inner_physical(
+                MinSize {
+                    width: min_w,
+                    height: min_h,
+                },
+                scale,
+            );
             builder
                 .inner_size(
-                    g.width.max(min_pw) as f64 / scale,
-                    g.height.max(min_ph) as f64 / scale,
+                    g.width.max(min.width) as f64 / scale,
+                    g.height.max(min.height) as f64 / scale,
                 )
                 .position(g.x as f64 / scale, g.y as f64 / scale)
                 .build()

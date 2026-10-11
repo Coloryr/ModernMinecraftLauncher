@@ -58,8 +58,10 @@ fn render_one_block() {
     let name = rel.rsplit('/').next().unwrap_or(&rel).to_string();
 
     let mut cache = HashMap::new();
-    let Some((model, mut textures)) =
-        mml_tex_draw::model::bake_model(&archive, &rel, &mut cache)
+    let Some(mml_tex_draw::model::BakedModelTextures {
+        model,
+        mut textures,
+    }) = mml_tex_draw::model::bake_model(&archive, &rel, &mut cache)
     else {
         panic!("bake_model 失败");
     };
@@ -98,16 +100,17 @@ fn render_one_block() {
             * mml_tex_draw::gpu::item_transform_matrix(&model.transform);
         let n3 = Mat3::from_mat4(model_m).inverse().transpose();
         println!("  n3列={:?}", n3.to_cols_array());
-        let (l0, l1) = mml_tex_draw::gpu::light_dirs(model.gui_light_3d);
+        let mml_tex_draw::gpu::LightDirs { light0, light1 } =
+            mml_tex_draw::gpu::light_dirs(model.gui_light_3d);
         println!(
             "  L0=({:.3},{:.3},{:.3}) L1=({:.3},{:.3},{:.3})",
-            l0[0], l0[1], l0[2], l1[0], l1[1], l1[2]
+            light0[0], light0[1], light0[2], light1[0], light1[1], light1[2]
         );
         for q in &model.quads {
             let n = n3 * Vec3::from(q.normal);
             let n = n.normalize();
-            let d = Vec3::from_slice(&l0[..3]).dot(n).max(0.0)
-                + Vec3::from_slice(&l1[..3]).dot(n).max(0.0);
+            let d = Vec3::from_slice(&light0[..3]).dot(n).max(0.0)
+                + Vec3::from_slice(&light1[..3]).dot(n).max(0.0);
             let accum = (d * 0.6 + 0.4).min(1.0);
             println!(
                 "  光照 tex={} n=({:.2},{:.2},{:.2}) accum={:.3}",
@@ -153,5 +156,5 @@ fn render_one_item() {
     let gpu = mml_tex_draw::gpu::GpuCtx::try_new();
     let out = mml_tex_draw::item::render_item(gpu.as_ref(), &archive, &mut cache, &id)
         .unwrap_or_else(|| panic!("render_item GPU失败：{id}"));
-    std::fs::copy(dir.join("items").join(&out.1), out_path(&format!("{name}_gpu.png"))).unwrap();
+    std::fs::copy(dir.join("items").join(&out.out_name), out_path(&format!("{name}_gpu.png"))).unwrap();
 }

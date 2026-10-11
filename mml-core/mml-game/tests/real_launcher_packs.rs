@@ -138,6 +138,14 @@ impl IAddModPackGui for StateRecorder {
     fn set_sub_now(&self, _value: usize, _all: Option<usize>) {}
 }
 
+/// 一次安装的产物
+struct InstalledPack {
+    /// 新建实例的 uuid
+    uuid: Uuid,
+    /// 安装阶段记录器，与传给安装流程的是同一份
+    recorder: StateRecorder,
+}
+
 /// 安装入口，不带界面回调，重名时自动改名
 ///
 /// - `zip`: 待安装的压缩包
@@ -146,12 +154,12 @@ impl IAddModPackGui for StateRecorder {
 ///
 /// # 返回值
 ///
-/// 返回新实例的 uuid 与阶段记录器；安装失败会 panic
+/// 见 [`InstalledPack`]；安装失败会 panic
 async fn install(
     zip: &PathBuf,
     name: Option<String>,
     pack_type: PackType,
-) -> (Uuid, StateRecorder) {
+) -> InstalledPack {
     let recorder = StateRecorder::default();
     let uuid = add_game::install_archive_from_file(
         zip,
@@ -166,7 +174,7 @@ async fn install(
     )
     .await
     .expect("安装失败");
-    (uuid, recorder)
+    InstalledPack { uuid, recorder }
 }
 
 /// 读取压缩包内指定后缀的文件内容
@@ -185,24 +193,63 @@ fn read_entry(archive: &BaseArchive, suffix: &str) -> Option<Vec<u8>> {
     archive.read(&entry.name).ok()
 }
 
+/// HMCL packmeta 里的一个组件
+struct LoaderAddon {
+    /// 组件 ID，取值如 `game` / `forge` / `neoforge` / `fabric-loader` / `quilt-loader`
+    id: String,
+    /// 组件版本，取值如 `1.20.1` / `47.3.0`
+    version: String,
+}
+
+/// HMCL packmeta 推导出的加载器
+struct LoaderChoice {
+    /// 加载器类型；没有已知加载器组件时是 `LoaderType::Normal`
+    loader: LoaderType,
+    /// 加载器版本；原版或元数据没给版本时是 `None`
+    version: Option<String>,
+}
+
 /// 把 HMCL packmeta 的组件列表转成加载器类型与版本
 ///
-/// - `addons`: 组件列表，每项为组件 ID 与版本
+/// - `addons`: 组件列表，见 [`LoaderAddon`]
 ///
 /// # 返回值
 ///
-/// 返回加载器类型与版本；没有已知加载器组件时为原版与 `None`
-fn hmcl_loader(addons: &[(String, String)]) -> (LoaderType, Option<String>) {
-    for (id, version) in addons {
-        match id.as_str() {
-            name_consts::FORGE_KEY => return (LoaderType::Forge, Some(version.clone())),
-            name_consts::NEOFORGE_KEY => return (LoaderType::NeoForge, Some(version.clone())),
-            name_consts::FABRIC_KEY => return (LoaderType::Fabric, Some(version.clone())),
-            name_consts::QUILT_KEY => return (LoaderType::Quilt, Some(version.clone())),
+/// 见 [`LoaderChoice`]
+fn hmcl_loader(addons: &[LoaderAddon]) -> LoaderChoice {
+    for addon in addons {
+        match addon.id.as_str() {
+            name_consts::FORGE_KEY => {
+                return LoaderChoice {
+                    loader: LoaderType::Forge,
+                    version: Some(addon.version.clone()),
+                };
+            }
+            name_consts::NEOFORGE_KEY => {
+                return LoaderChoice {
+                    loader: LoaderType::NeoForge,
+                    version: Some(addon.version.clone()),
+                };
+            }
+            name_consts::FABRIC_KEY => {
+                return LoaderChoice {
+                    loader: LoaderType::Fabric,
+                    version: Some(addon.version.clone()),
+                };
+            }
+            name_consts::QUILT_KEY => {
+                return LoaderChoice {
+                    loader: LoaderType::Quilt,
+                    version: Some(addon.version.clone()),
+                };
+            }
             _ => {}
         }
     }
-    (LoaderType::Normal, None)
+    LoaderChoice {
+        loader: LoaderType::Normal,
+        version: None,
+    }
 }
 
 /// M²L 即 ColorMC 实例压缩包：导出再导入的 roundtrip，离线可跑
@@ -359,17 +406,23 @@ async fn install_real_hmcl_modpack() {
     let packmeta: mml_game::other_launcher::hmcl_obj::HMCLObj =
         mml_base::serialize_tools::json_from_bytes(&data).unwrap();
     let expect_name = packmeta.name.clone();
-    let addons: Vec<(String, String)> = packmeta
+    let addons: Vec<LoaderAddon> = packmeta
         .addons
         .iter()
-        .map(|a| (a.id.clone(), a.version.clone()))
+        .map(|a| LoaderAddon {
+            id: a.id.clone(),
+            version: a.version.clone(),
+        })
         .collect();
     let expect_version = addons
         .iter()
-        .find(|(id, _)| id.as_str() == name_consts::GAME_KEY)
-        .map(|(_, v)| v.clone())
+        .find(|a| a.id == name_consts::GAME_KEY)
+        .map(|a| a.version.clone())
         .expect("packmeta 应有 game 版本");
-    let (expect_loader, expect_loader_version) = hmcl_loader(&addons);
+    let LoaderChoice {
+        loader: expect_loader,
+        version: expect_loader_version,
+    } = hmcl_loader(&addons);
 
     // overrides 目录名取自随包 manifest.json，HMCL 导出必带
     let overrides = {
@@ -393,7 +446,7 @@ async fn install_real_hmcl_modpack() {
         .collect();
     drop(archive);
 
-    let (uuid, recorder) = install(&pack, None, PackType::HMCL).await;
+    let InstalledPack { uuid, recorder } = install(&pack, None, PackType::HMCL).await;
 
     let game = mml_game::get_instance(&uuid).expect("安装后应能取到实例");
     let read = game.read().unwrap();
@@ -497,7 +550,8 @@ async fn install_real_hmcl_portable_pack() {
         .collect();
     drop(archive);
 
-    let (uuid, recorder) = install(&pack, Some("HMCL整包导入".to_string()), PackType::LauncherPack).await;
+    let InstalledPack { uuid, recorder } =
+        install(&pack, Some("HMCL整包导入".to_string()), PackType::LauncherPack).await;
 
     let game = mml_game::get_instance(&uuid).expect("安装后应能取到实例");
     let read = game.read().unwrap();
@@ -561,7 +615,7 @@ async fn install_real_mml_instance_archive() {
         .collect();
     drop(archive);
 
-    let (uuid, recorder) = install(&pack, None, PackType::ArchivePack).await;
+    let InstalledPack { uuid, recorder } = install(&pack, None, PackType::ArchivePack).await;
 
     let game = mml_game::get_instance(&uuid).expect("安装后应能取到实例");
     let read = game.read().unwrap();
@@ -664,7 +718,7 @@ async fn install_real_multimc_dir() {
     drop(archive);
     assert!(!expect_version.is_empty(), "mmc-pack.json 应有 net.minecraft 组件");
 
-    let (uuid, recorder) = install(&pack, None, PackType::MMC).await;
+    let InstalledPack { uuid, recorder } = install(&pack, None, PackType::MMC).await;
 
     let game = mml_game::get_instance(&uuid).expect("安装后应能取到实例");
     let read = game.read().unwrap();
@@ -742,7 +796,7 @@ async fn install_real_mmc_instance() {
     drop(archive);
     assert!(!expect_version.is_empty(), "mmc-pack.json 应有 net.minecraft 组件");
 
-    let (uuid, recorder) = install(&pack, None, PackType::MMC).await;
+    let InstalledPack { uuid, recorder } = install(&pack, None, PackType::MMC).await;
 
     let game = mml_game::get_instance(&uuid).expect("安装后应能取到实例");
     let read = game.read().unwrap();

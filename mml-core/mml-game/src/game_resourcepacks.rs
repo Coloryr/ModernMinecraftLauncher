@@ -43,10 +43,10 @@ fn parse_pack_meta(meta: MiniJsonObj, lang: &HashMap<String, String>) -> Option<
 
     // 版本区间：显式给的 `min_format` / `max_format` 优先，两者都没写时才用
     // `supported_formats`，这是 1.20.5+ 的新写法，别让它盖掉显式给的旧字段
-    let (sf_min, sf_max) = pack
+    let format_range = pack
         .get("supported_formats")
         .map(supported_formats_range)
-        .unwrap_or((0, 0));
+        .unwrap_or_default();
     let min_format = pack.get("min_format").and_then(number_or_min).unwrap_or(0);
     let max_format = pack.get("max_format").and_then(number_or_max).unwrap_or(0);
 
@@ -56,8 +56,16 @@ fn parse_pack_meta(meta: MiniJsonObj, lang: &HashMap<String, String>) -> Option<
             .map(|value| flatten_text(value, lang))
             .unwrap_or_default(),
         pack_format: pack.get("pack_format").and_then(number_or_max).unwrap_or(0),
-        min_format: if min_format != 0 { min_format } else { sf_min },
-        max_format: if max_format != 0 { max_format } else { sf_max },
+        min_format: if min_format != 0 {
+            min_format
+        } else {
+            format_range.min
+        },
+        max_format: if max_format != 0 {
+            max_format
+        } else {
+            format_range.max
+        },
         ..Default::default()
     })
 }
@@ -103,7 +111,7 @@ fn number_or_max(value: &MiniJsonObj) -> Option<i64> {
         .max()
 }
 
-/// `supported_formats` 的**三种**写法 → `(min, max)`
+/// `supported_formats` 的**三种**写法 → 资源包格式版本区间
 ///
 /// 三种都在真实资源包里见过，前两种当初都是"整包读取失败"报上来的：
 /// - 对象：`{"min_inclusive": 5, "max_inclusive": 75}`，两个键都可选，只写 min
@@ -112,36 +120,50 @@ fn number_or_max(value: &MiniJsonObj) -> Option<i64> {
 /// - 单个数字：`20`，表示"从这一版起"
 ///
 /// 缺的那一侧按"未知"给 `0`。
+#[derive(Default)]
+struct FormatRange {
+    /// 区间下界，即最早的资源包格式版本；未知时为 `0`
+    min: i64,
+    /// 区间上界，即最晚的资源包格式版本；未知时为 `0`
+    max: i64,
+}
+
+/// 解析 `supported_formats`，见 [`FormatRange`]
 ///
 /// - `value`: `supported_formats` 的 JSON 值
 ///
 /// # 返回值
 ///
-/// 返回 `(min, max)`，缺的一侧为 `0`
-fn supported_formats_range(value: &MiniJsonObj) -> (i64, i64) {
+/// 见 [`FormatRange`]；缺的一侧为 `0`
+fn supported_formats_range(value: &MiniJsonObj) -> FormatRange {
     // 对象写法：两个键都可选
     if let Some(map) = value.as_object() {
-        return (
-            map.get("min_inclusive")
+        return FormatRange {
+            min: map
+                .get("min_inclusive")
                 .and_then(number_or_min)
                 .unwrap_or(0),
-            map.get("max_inclusive")
+            max: map
+                .get("max_inclusive")
                 .and_then(number_or_max)
                 .unwrap_or(0),
-        );
+        };
     }
 
     // 数组 `[min, max]`；只给一个元素时等价于"从这一版起"，空数组当"没给"
     if let Some(list) = value.as_list() {
         let numbers: Vec<i64> = list.iter().filter_map(|item| item.as_i64()).collect();
-        return (
-            numbers.first().copied().unwrap_or(0),
-            numbers.get(1).copied().unwrap_or(0),
-        );
+        return FormatRange {
+            min: numbers.first().copied().unwrap_or(0),
+            max: numbers.get(1).copied().unwrap_or(0),
+        };
     }
 
     // 单个数字写法：`"supported_formats": 20`
-    (value.as_i64().unwrap_or(0), 0)
+    FormatRange {
+        min: value.as_i64().unwrap_or(0),
+        max: 0,
+    }
 }
 
 /// 把文本组件的 JSON 值抠成一句能显示的文字，简介要的就是这个
@@ -578,6 +600,7 @@ impl InstanceSettingObj {
 #[cfg(test)]
 mod tests {
     use super::{ResourcepackObj, flatten_text, is_pack_lang_file, parse_pack_meta};
+    use crate::test_support::{TextEntry, text_entry};
     use mml_base::serialize_tools::MiniJsonObj;
     use std::collections::HashMap;
 
@@ -592,9 +615,9 @@ mod tests {
     }
 
     /// 造一张语言表
-    fn lang(list: &[(&str, &str)]) -> HashMap<String, String> {
+    fn lang(list: &[TextEntry]) -> HashMap<String, String> {
         list.iter()
-            .map(|(key, text)| (key.to_string(), text.to_string()))
+            .map(|e| (e.name.to_string(), e.text.to_string()))
             .collect()
     }
 
@@ -624,7 +647,7 @@ mod tests {
     /// `translate`：语言表命中就用译文，**压过** `fallback`；没命中才退回兜底链
     #[test]
     fn flatten_translate_resolves_from_lang() {
-        let table = lang(&[("some.key", "译文")]);
+        let table = lang(&[text_entry("some.key", "译文")]);
 
         // 命中：译文优先于 `fallback`
         assert_eq!(
@@ -675,7 +698,7 @@ mod tests {
         assert_eq!(
             flatten_text(
                 &mini(r#"{"text":"A","extra":[{"translate":"k"}]}"#),
-                &lang(&[("k", "译文")])
+                &lang(&[text_entry("k", "译文")])
             ),
             "A译文"
         );

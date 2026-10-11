@@ -1043,6 +1043,7 @@ fn mcmod_logo_file_in(json: &str) -> Option<String> {
 #[cfg(test)]
 mod meta_tests {
     use super::*;
+    use crate::test_support::{TextEntry, text_entry};
     use std::io::Write;
     use zip::ZipWriter;
     use zip::write::SimpleFileOptions;
@@ -1058,15 +1059,15 @@ mod meta_tests {
     }
 
     /// 造一个只含指定条目的 jar
-    fn make_jar(entries: &[(&str, &str)]) -> PathBuf {
+    fn make_jar(entries: &[TextEntry]) -> PathBuf {
         boot_log();
         let path = mml_testutil::temp_dir().join(format!("mml-mod-{}.jar", Uuid::new_v4()));
         let file = std::fs::File::create(&path).unwrap();
         let mut writer = ZipWriter::new(file);
         let options = SimpleFileOptions::default();
-        for (name, body) in entries {
-            writer.start_file(*name, options).unwrap();
-            writer.write_all(body.as_bytes()).unwrap();
+        for e in entries {
+            writer.start_file(e.name, options).unwrap();
+            writer.write_all(e.text.as_bytes()).unwrap();
         }
         writer.finish().unwrap();
         path
@@ -1080,14 +1081,14 @@ mod meta_tests {
     #[test]
     fn broken_toml_does_not_fail_whole_jar() {
         let path = make_jar(&[
-            (
+            text_entry(
                 names::NEO_TOML_FILE,
                 "modLoader=\"javafml\"\nloaderVersion=\"[1,)\"\nlicense=\"MIT\"\n\
                  [[mods]]\nmodId=\"mekanism_lasers\"\ndisplayName=\"Mekanism Lasers\"\nversion=\"1.1.10.3\"\n",
             ),
             // 非法样本用**根目录的 neoforge.mods.toml**，即第三个扫描路径，`[[mods]` 少一个方括号；
             // 这正是"一个包里两个 toml、坏的那个把整包带崩"的真实形态
-            (names::NEO_TOML1_FILE, "[[mods]\nmodId=\"whatever\"\n"),
+            text_entry(names::NEO_TOML1_FILE, "[[mods]\nmodId=\"whatever\"\n"),
         ]);
 
         let info = read_mod_info(&path).expect("坏 toml 不该让整包解析失败");
@@ -1101,7 +1102,7 @@ mod meta_tests {
     /// 只有非法 toml：当作"读不出元数据"，但不 panic、也不报错
     #[test]
     fn only_broken_toml_yields_empty_info() {
-        let path = make_jar(&[(names::MC_MOD_TOML_FILE, "[[mods]\n")]);
+        let path = make_jar(&[text_entry(names::MC_MOD_TOML_FILE, "[[mods]\n")]);
 
         let info = read_mod_info(&path).expect("坏 toml 不该让整包解析失败");
         assert!(info.info.is_empty(), "解析不出条目时 info 应为空");
@@ -1115,11 +1116,11 @@ mod meta_tests {
     #[test]
     fn manifest_without_core_marker_adds_no_info() {
         let path = make_jar(&[
-            (
+            text_entry(
                 names::FABRIC_MOD_FILE,
                 r#"{"id":"demo","name":"Demo","version":"1.0"}"#,
             ),
-            (
+            text_entry(
                 "META-INF/MANIFEST.MF",
                 "Manifest-Version: 1.0\nCreated-By: Gradle\n",
             ),
@@ -1138,7 +1139,7 @@ mod meta_tests {
     /// 真的带 core mod 标记时，那条 info 仍要保留，别把功能一起改掉
     #[test]
     fn manifest_with_core_marker_keeps_info() {
-        let path = make_jar(&[(
+        let path = make_jar(&[text_entry(
             "META-INF/MANIFEST.MF",
             "Manifest-Version: 1.0\nFMLCorePlugin: com.example.CorePlugin\n",
         )]);

@@ -18,8 +18,8 @@ use std::sync::{
 
 use bytes::Buf;
 use mml_ipc::{
-    ServerInfo, add_server, clear_servers, get_mouse_state, get_run_arg, get_window_size, init,
-    notify_existing, register_ipc_event, remove_ipc_event, set_title,
+    ServerInfo, WindowSize, add_server, clear_servers, get_mouse_state, get_run_arg,
+    get_window_size, init, notify_existing, register_ipc_event, remove_ipc_event, set_title,
 };
 use uuid::Uuid;
 
@@ -255,7 +255,12 @@ fn test_game_state_report() {
         if get_mouse_state(uuid) == Some(true) {
             mouse_ok = true;
         }
-        if get_window_size(uuid) == Some((1920, 1080)) {
+        if get_window_size(uuid)
+            == Some(WindowSize {
+                width: 1920,
+                height: 1080,
+            })
+        {
             size_ok = true;
         }
         if mouse_ok && size_ok {

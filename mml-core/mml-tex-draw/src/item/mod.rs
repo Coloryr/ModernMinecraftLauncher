@@ -31,9 +31,9 @@ use crate::{
     block::{GRASS_TINT, fit_composite, read_anim_meta, render_baked},
     gpu::GpuCtx,
     model::{
-        BakedModel, FACE_INFO, GuiTransform, Quad, Resolved, calculate_facing, face_index_of,
-        face_normal, load_texture, recalculate_winding, rect_translucent, resolve, select_extent,
-        texture_path,
+        BakedModel, BakedModelTextures, FACE_INFO, GuiTransform, Quad, Resolved, calculate_facing,
+        face_index_of, face_normal, load_texture, recalculate_winding, rect_translucent, resolve,
+        select_extent, texture_path,
     },
 };
 use mml_sys::path_helper;
@@ -314,6 +314,16 @@ fn transform_matrix(t: &TransformDefJson) -> Mat4 {
 
 /// ===== bake：extrude 挤出，照反编译 ItemModelGenerator；以及物品模型烘焙 =====
 
+/// 一个面的顶点数据，烘进 `Quad` 前仍是模型空间
+struct FaceData {
+    /// 4 个顶点位置，模型空间 0..1
+    pos: [[f32; 3]; 4],
+    /// 4 个顶点 uv，0..1，与 `pos` 同序
+    uv: [[f32; 2]; 4],
+    /// 面法线，轴向单位向量；朝向无法量化时取 (0,1,0)
+    normal: [f32; 3],
+}
+
 /// bakeQuad 核心，无元素旋转，照 FaceBakery.bakeQuad：FaceInfo 角选点/16 → uv 角映射
 /// 即 Quadrant.R0，再做 calculateFacing 量化 + 规范角序重排。
 /// from/to 可为退化或翻转盒，extrude 裙边即是，照反编译原样传入即可
@@ -325,19 +335,14 @@ fn transform_matrix(t: &TransformDefJson) -> Mat4 {
 ///
 /// # 返回值
 ///
-/// 返回 `(4 顶点位置, 4 顶点 uv, 法线)`，0..1 模型空间
-fn bake_face(
-    from: &[f32; 3],
-    to: &[f32; 3],
-    facing: usize,
-    uvs: [f32; 4],
-) -> ([[f32; 3]; 4], [[f32; 2]; 4], [f32; 3]) {
+/// 见 [`FaceData`]；位置与 uv 都已归一到 0..1 模型空间
+fn bake_face(from: &[f32; 3], to: &[f32; 3], facing: usize, uvs: [f32; 4]) -> FaceData {
     let corner = |i: usize| -> [f32; 3] {
         let info = FACE_INFO[facing][i];
         [
-            select_extent(info.0, from, to) / 16.0,
-            select_extent(info.1, from, to) / 16.0,
-            select_extent(info.2, from, to) / 16.0,
+            select_extent(info.x, from, to) / 16.0,
+            select_extent(info.y, from, to) / 16.0,
+            select_extent(info.z, from, to) / 16.0,
         ]
     };
     let mut pos: [[f32; 3]; 4] = std::array::from_fn(corner);
@@ -355,7 +360,7 @@ fn bake_face(
     let normal = f
         .map(|f| face_normal(f).to_array())
         .unwrap_or([0.0, 1.0, 0.0]);
-    (pos, uv, normal)
+    FaceData { pos, uv, normal }
 }
 
 /// extrude 挤出烘焙，照反编译 ItemModelGenerator：
@@ -407,7 +412,13 @@ fn bake_generated(
 
         // 不透明像素判定：alpha != 0，照 SpriteContents.isTransparent；
         // 动画贴图取各帧并集，getSideFrames 走唯一帧集合
-        let Some((base, stride, w, h_total)) = crate::model::bitmap_rgba(tex) else {
+        let Some(crate::model::BitmapRgba {
+            data: base,
+            stride,
+            width: w,
+            height: h_total,
+        }) = crate::model::bitmap_rgba(tex)
+        else {
             continue;
         };
         if w == 0 {
@@ -428,7 +439,7 @@ fn bake_generated(
             (3usize, [0.0f32, 0.0, 16.0, 16.0]), // SOUTH
             (2usize, [16.0, 0.0, 0.0, 16.0]),    // NORTH
         ] {
-            let (pos, uv, normal) =
+            let FaceData { pos, uv, normal } =
                 bake_face(&[0.0, 0.0, MIN_Z], &[16.0, 16.0, MAX_Z], facing, uv16);
             quads.push(Quad {
                 pos,
@@ -517,7 +528,8 @@ fn bake_generated(
                         5 => ([start_x, start_y, MIN_Z], [start_x, end_y, MAX_Z]),
                         _ => ([end_x, start_y, MIN_Z], [end_x, end_y, MAX_Z]),
                     };
-                    let (pos, uv, normal) = bake_face(&from, &to, facing, [u0, v0, u1, v1]);
+                    let FaceData { pos, uv, normal } =
+                        bake_face(&from, &to, facing, [u0, v0, u1, v1]);
                     quads.push(Quad {
                         pos,
                         uv,
@@ -551,14 +563,14 @@ fn bake_generated(
 ///
 /// # 返回值
 ///
-/// 返回 `(烘焙产物, 本次用到的贴图)`；非 generated 链或烘焙失败时返回 `None`
+/// 见 [`BakedModelTextures`]；非 generated 链或烘焙失败时返回 `None`
 pub(crate) fn bake_item_model(
     archive: &BaseArchive,
     rel: &str,
     tex_cache: &mut HashMap<String, Pixmap>,
     tints: &[[u8; 3]],
     extra: Option<Mat4>,
-) -> Option<(BakedModel, HashMap<String, Pixmap>)> {
+) -> Option<BakedModelTextures> {
     let Resolved {
         textures,
         transform,
@@ -597,14 +609,14 @@ pub(crate) fn bake_item_model(
             used_textures.insert(quad.tex.clone(), tex);
         }
     }
-    Some((
-        BakedModel {
+    Some(BakedModelTextures {
+        model: BakedModel {
             quads,
             gui_light_3d,
             transform,
         },
-        used_textures,
-    ))
+        textures: used_textures,
+    })
 }
 
 /// ===== 渲染入口 =====
@@ -635,7 +647,7 @@ pub fn render_items(archive: &BaseArchive, gui: ProgressGui) -> CoreResult<()> {
     let Some(gpu) = GpuCtx::try_new() else {
         return Err(ErrorType::GpuNotAvailable);
     };
-    let (block_names, item_names) = crate::extract_langs(archive);
+    let names = crate::extract_langs(archive);
 
     // 枚举jar内全部物品定义；block表已有的ID不重复渲染，图标由方块表负责
     let defs: Vec<String> = archive
@@ -664,7 +676,7 @@ pub fn render_items(archive: &BaseArchive, gui: ProgressGui) -> CoreResult<()> {
     // 已写出的 PNG 留着，下次全量渲染覆盖，与渲染失败时的残留一致
     let cancel = crate::cancel_token();
 
-    let rendered: Vec<Option<(String, String)>> = defs
+    let rendered: Vec<Option<ItemIconOutput>> = defs
         .par_iter()
         .map(|id| {
             if cancel.is_cancelled() {
@@ -706,15 +718,15 @@ pub fn render_items(archive: &BaseArchive, gui: ProgressGui) -> CoreResult<()> {
 
     // 单线程汇总写入物品状态
     let mut items = crate::items_write();
-    for (id, out_name) in rendered.into_iter().flatten() {
-        let key = format!("minecraft:{id}");
-        items.tex.insert(key.clone(), out_name);
+    for icon in rendered.into_iter().flatten() {
+        let key = format!("minecraft:{}", icon.id);
+        items.tex.insert(key.clone(), icon.out_name);
         // 创造分组，与方块表同一套itemGroup分类
-        if let Some(cat) = icons::item_cat(&id) {
+        if let Some(cat) = icons::item_cat(&icon.id) {
             items.cat.insert(key.clone(), cat.to_string());
         }
         // 物品语言键优先，方块物品如stone回落block.minecraft.*
-        if let Some(name) = item_names.get(&key).or_else(|| block_names.get(&key)) {
+        if let Some(name) = names.item.get(&key).or_else(|| names.block.get(&key)) {
             items.name.insert(key, name.clone());
         }
     }
@@ -722,7 +734,15 @@ pub fn render_items(archive: &BaseArchive, gui: ProgressGui) -> CoreResult<()> {
     Ok(())
 }
 
-/// 渲染单个物品图标，返回 `(物品ID, 输出文件名)`
+/// 渲染并写盘完成的一个物品图标
+pub struct ItemIconOutput {
+    /// 物品 ID，不带命名空间，如 `apple`
+    pub id: String,
+    /// 输出文件名，如 `minecraft_apple.png`
+    pub out_name: String,
+}
+
+/// 渲染单个物品图标并写盘
 ///
 /// 公开供单物品诊断渲染 tests/render_one.rs 与render_items复用
 ///
@@ -733,13 +753,13 @@ pub fn render_items(archive: &BaseArchive, gui: ProgressGui) -> CoreResult<()> {
 ///
 /// # 返回值
 ///
-/// 返回 `(物品ID, 输出文件名)`；定义不可渲染或渲染失败时返回 `None`
+/// 见 [`ItemIconOutput`]；定义不可渲染或渲染失败时返回 `None`
 pub fn render_item(
     gpu: Option<&GpuCtx>,
     archive: &BaseArchive,
     tex_cache: &mut HashMap<String, Pixmap>,
     id: &str,
-) -> Option<(String, String)> {
+) -> Option<ItemIconOutput> {
     let data = archive
         .read(&format!("assets/minecraft/items/{id}.json"))
         .ok()?;
@@ -763,7 +783,10 @@ pub fn render_item(
     // composite 子模型带 transformation，床等，超出单格，渲染前按投影包围盒适配画布
     let mut oversized = false;
     for child in &children {
-        let (part, texs) = bake_item_model(
+        let BakedModelTextures {
+            model: part,
+            textures: texs,
+        } = bake_item_model(
             archive,
             &child.model,
             tex_cache,
@@ -790,7 +813,10 @@ pub fn render_item(
     let data = render_baked(gpu, archive, model, textures, glint_tex.as_ref())?;
     let out_name = format!("minecraft_{id}.png");
     path_helper::write_bytes(&crate::get_item_dir()?.join(&out_name), &data).ok()?;
-    Some((id.to_string(), out_name))
+    Some(ItemIconOutput {
+        id: id.to_string(),
+        out_name,
+    })
 }
 
 #[cfg(test)]

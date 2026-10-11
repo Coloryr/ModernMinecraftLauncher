@@ -16,8 +16,8 @@ use tar::{Archive, Builder};
 use xz2::{read::XzDecoder, write::XzEncoder};
 
 use crate::archives::{
-    self, ArchiveEntryInfo, ArchiveHandle, ArchiveProcess, ArchiveType, BaseArchiveGui,
-    IBaseArchiveGui, TarMode,
+    self, ArchiveAddFile, ArchiveEntryInfo, ArchiveHandle, ArchiveProcess, ArchiveType,
+    BaseArchiveGui, IBaseArchiveGui, TarMode,
 };
 
 /// 保持打开文件句柄的 Tar/TarGz/TarXz 读取句柄
@@ -474,7 +474,7 @@ impl ArchiveHandle for TarReader {
     }
 
     /// 就地追加磁盘文件，靠回退 EOF 标记复用已有数据
-    fn add_files(&mut self, files: &[(PathBuf, PathBuf)]) -> CoreResult<()> {
+    fn add_files(&mut self, files: &[ArchiveAddFile]) -> CoreResult<()> {
         use tar::Builder;
 
         let mut file = self.file.try_clone().map_err(|err| {
@@ -504,9 +504,9 @@ impl ArchiveHandle for TarReader {
         }
 
         let mut builder = Builder::new(file);
-        for (src, dest) in files {
-            let internal_path = dest.to_string_lossy();
-            let mut reader = path_helper::open_read(src)?;
+        for file in files {
+            let internal_path = file.dest.to_string_lossy();
+            let mut reader = path_helper::open_read(&file.src)?;
 
             builder
                 .append_file(internal_path.as_ref(), &mut reader)

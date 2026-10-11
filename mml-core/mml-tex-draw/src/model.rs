@@ -44,6 +44,16 @@ pub struct BakedModel {
     pub transform: GuiTransform,
 }
 
+/// 一次烘焙的产物：模型与它引用到的贴图
+///
+/// 方块与物品两条烘焙链路共用，`textures` 直接喂给渲染器
+pub struct BakedModelTextures {
+    /// 烘焙出的模型；其 quad 的 `tex` 是 `textures` 的键
+    pub model: BakedModel,
+    /// 模型 quad 引用到的贴图，路径 → 解码位图；同一路径跨模型复用同一份解码结果
+    pub textures: HashMap<String, Pixmap>,
+}
+
 /// gui display 变换参数，照 ItemTransform 语义，translation 已 ×0.0625
 #[derive(Clone, Copy)]
 pub struct GuiTransform {
@@ -66,31 +76,95 @@ impl Default for GuiTransform {
     }
 }
 
+/// FACE_INFO 表里的一格：一个顶点角，三个轴各选盒子的一条边
+#[derive(Clone, Copy)]
+pub(crate) struct FaceVertex {
+    /// x 轴选哪条边：0=MIN_X、3=MAX_X；本表内只出现这两个值
+    pub(crate) x: u8,
+    /// y 轴选哪条边：1=MIN_Y、4=MAX_Y；本表内只出现这两个值
+    pub(crate) y: u8,
+    /// z 轴选哪条边：2=MIN_Z、5=MAX_Z；本表内只出现这两个值
+    pub(crate) z: u8,
+}
+
+impl FaceVertex {
+    /// 按 x/y/z 选择器造一格，书写顺序照 FaceInfo 的 VertexInfo
+    const fn new(x: u8, y: u8, z: u8) -> Self {
+        Self { x, y, z }
+    }
+}
+
 /// FaceInfo：六个面的 4 个顶点角，坐标选择器 0=MIN_X 1=MIN_Y 2=MIN_Z 3=MAX_X 4=MAX_Y 5=MAX_Z；
 /// 照抄 net.minecraft.client.renderer.FaceInfo 的六个枚举常量
-pub(crate) const FACE_INFO: [[(u8, u8, u8); 4]; 6] = [
+pub(crate) const FACE_INFO: [[FaceVertex; 4]; 6] = [
     // down: (MIN_X,MIN_Y,MAX_Z) (MIN_X,MIN_Y,MIN_Z) (MAX_X,MIN_Y,MIN_Z) (MAX_X,MIN_Y,MAX_Z)
-    [(0, 1, 5), (0, 1, 2), (3, 1, 2), (3, 1, 5)],
+    [
+        FaceVertex::new(0, 1, 5),
+        FaceVertex::new(0, 1, 2),
+        FaceVertex::new(3, 1, 2),
+        FaceVertex::new(3, 1, 5),
+    ],
     // up: (MIN_X,MAX_Y,MIN_Z) (MIN_X,MAX_Y,MAX_Z) (MAX_X,MAX_Y,MAX_Z) (MAX_X,MAX_Y,MIN_Z)
-    [(0, 4, 2), (0, 4, 5), (3, 4, 5), (3, 4, 2)],
+    [
+        FaceVertex::new(0, 4, 2),
+        FaceVertex::new(0, 4, 5),
+        FaceVertex::new(3, 4, 5),
+        FaceVertex::new(3, 4, 2),
+    ],
     // north: (MAX_X,MAX_Y,MIN_Z) (MAX_X,MIN_Y,MIN_Z) (MIN_X,MIN_Y,MIN_Z) (MIN_X,MAX_Y,MIN_Z)
-    [(3, 4, 2), (3, 1, 2), (0, 1, 2), (0, 4, 2)],
+    [
+        FaceVertex::new(3, 4, 2),
+        FaceVertex::new(3, 1, 2),
+        FaceVertex::new(0, 1, 2),
+        FaceVertex::new(0, 4, 2),
+    ],
     // south: (MIN_X,MAX_Y,MAX_Z) (MIN_X,MIN_Y,MAX_Z) (MAX_X,MIN_Y,MAX_Z) (MAX_X,MAX_Y,MAX_Z)
-    [(0, 4, 5), (0, 1, 5), (3, 1, 5), (3, 4, 5)],
+    [
+        FaceVertex::new(0, 4, 5),
+        FaceVertex::new(0, 1, 5),
+        FaceVertex::new(3, 1, 5),
+        FaceVertex::new(3, 4, 5),
+    ],
     // west: (MIN_X,MAX_Y,MIN_Z) (MIN_X,MIN_Y,MIN_Z) (MIN_X,MIN_Y,MAX_Z) (MIN_X,MAX_Y,MAX_Z)
-    [(0, 4, 2), (0, 1, 2), (0, 1, 5), (0, 4, 5)],
+    [
+        FaceVertex::new(0, 4, 2),
+        FaceVertex::new(0, 1, 2),
+        FaceVertex::new(0, 1, 5),
+        FaceVertex::new(0, 4, 5),
+    ],
     // east: (MAX_X,MAX_Y,MAX_Z) (MAX_X,MIN_Y,MAX_Z) (MAX_X,MIN_Y,MIN_Z) (MAX_X,MAX_Y,MIN_Z)
-    [(3, 4, 5), (3, 1, 5), (3, 1, 2), (3, 4, 2)],
+    [
+        FaceVertex::new(3, 4, 5),
+        FaceVertex::new(3, 1, 5),
+        FaceVertex::new(3, 1, 2),
+        FaceVertex::new(3, 4, 2),
+    ],
 ];
 
+/// FACE_INDEX 表里的一行：模型 JSON 的面名与它对应的面下标
+#[derive(Clone, Copy)]
+struct FaceIndexEntry {
+    /// 模型 JSON `faces` 的键，取值 `down` / `up` / `north` / `south` / `west` / `east`
+    name: &'static str,
+    /// 该面的下标，与 [`FACE_INFO`] 和 [`face_normal`] 同一套，0=down..5=east
+    index: usize,
+}
+
+impl FaceIndexEntry {
+    /// 按面名与面下标造一行
+    const fn new(name: &'static str, index: usize) -> Self {
+        Self { name, index }
+    }
+}
+
 /// 面名 → FACE_INFO 下标，与游戏 Direction 枚举序一致
-const FACE_INDEX: [(&str, usize); 6] = [
-    ("down", 0),
-    ("up", 1),
-    ("north", 2),
-    ("south", 3),
-    ("west", 4),
-    ("east", 5),
+const FACE_INDEX: [FaceIndexEntry; 6] = [
+    FaceIndexEntry::new("down", 0),
+    FaceIndexEntry::new("up", 1),
+    FaceIndexEntry::new("north", 2),
+    FaceIndexEntry::new("south", 3),
+    FaceIndexEntry::new("west", 4),
+    FaceIndexEntry::new("east", 5),
 ];
 
 /// defaultFaceUV：照 FaceBakery.defaultFaceUV，面无显式 uv 时从盒子边界投影
@@ -436,17 +510,34 @@ pub(crate) fn load_texture(
     Some(tex)
 }
 
+/// 解码后的位图，straight-alpha RGBA
+pub(crate) struct BitmapRgba {
+    /// 像素数据，straight-alpha RGBA
+    pub(crate) data: Vec<u8>,
+    /// 每行字节数
+    pub(crate) stride: usize,
+    /// 宽，单位像素
+    pub(crate) width: usize,
+    /// 高，单位像素；动画贴图是各帧堆叠后的总高
+    pub(crate) height: usize,
+}
+
 /// 读取位图为 straight-alpha RGBA
 ///
 /// - `tex`: 解码后的位图
 ///
 /// # 返回值
 ///
-/// 返回 `(RGBA 数据, 行字节数, 宽, 高)`
-pub(crate) fn bitmap_rgba(tex: &Pixmap) -> Option<(Vec<u8>, usize, usize, usize)> {
+/// 见 [`BitmapRgba`]
+pub(crate) fn bitmap_rgba(tex: &Pixmap) -> Option<BitmapRgba> {
     let (w, h) = (tex.width() as usize, tex.height() as usize);
 
-    Some((crate::block::to_straight_rgba(tex.data()), w * 4, w, h))
+    Some(BitmapRgba {
+        data: crate::block::to_straight_rgba(tex.data()),
+        stride: w * 4,
+        width: w,
+        height: h,
+    })
 }
 
 /// 按 NativeImage.computeTransparency 扫 uv 矩形：仅当含 1..254 之间的 alpha
@@ -461,7 +552,13 @@ pub(crate) fn bitmap_rgba(tex: &Pixmap) -> Option<(Vec<u8>, usize, usize, usize)
 ///
 /// uv 矩形内含半透明像素返回 true，否则 false
 pub(crate) fn rect_translucent(tex: &Pixmap, anim: Option<&AnimMeta>, uv: &[f32; 4]) -> bool {
-    let Some((base, stride, w, h_total)) = bitmap_rgba(tex) else {
+    let Some(BitmapRgba {
+        data: base,
+        stride,
+        width: w,
+        height: h_total,
+    }) = bitmap_rgba(tex)
+    else {
         return false;
     };
     if w == 0 || h_total == 0 {
@@ -634,9 +731,9 @@ pub(crate) fn recalculate_winding(pos: &mut [[f32; 3]; 4], uv: &mut [[f32; 2]; 4
     for vertex in 0..4 {
         let info = FACE_INFO[facing][vertex];
         let want: [f32; 3] = [
-            select_extent(info.0, &min, &max),
-            select_extent(info.1, &min, &max),
-            select_extent(info.2, &min, &max),
+            select_extent(info.x, &min, &max),
+            select_extent(info.y, &min, &max),
+            select_extent(info.z, &min, &max),
         ];
         let found = (vertex..4).find(|&i| (0..3).all(|c| (pos[i][c] - want[c]).abs() < 1e-5));
         if let Some(i) = found {
@@ -672,7 +769,11 @@ pub(crate) fn bake_element(
         return quads;
     };
     for (name, face) in faces {
-        let Some(facing) = FACE_INDEX.iter().find(|(n, _)| n == name).map(|(_, i)| *i) else {
+        let Some(facing) = FACE_INDEX
+            .iter()
+            .find(|f| f.name == name.as_str())
+            .map(|f| f.index)
+        else {
             continue;
         };
         // uv：显式或 defaultFaceUV
@@ -700,9 +801,9 @@ pub(crate) fn bake_element(
         let corner = |i: usize| -> [f32; 3] {
             let info = FACE_INFO[facing][i];
             [
-                select_extent(info.0, &element.from, &element.to) / 16.0,
-                select_extent(info.1, &element.from, &element.to) / 16.0,
-                select_extent(info.2, &element.from, &element.to) / 16.0,
+                select_extent(info.x, &element.from, &element.to) / 16.0,
+                select_extent(info.y, &element.from, &element.to) / 16.0,
+                select_extent(info.z, &element.from, &element.to) / 16.0,
             ]
         };
         let mut pos: [[f32; 3]; 4] = std::array::from_fn(corner);
@@ -793,12 +894,12 @@ fn is_fullbright_tex(path: &str) -> bool {
 ///
 /// # 返回值
 ///
-/// 返回 `(烘焙产物, 本次新加载的贴图缓存)`；模型解析失败时返回 `None`
+/// 见 [`BakedModelTextures`]；模型解析失败时返回 `None`
 pub fn bake_model(
     archive: &BaseArchive,
     rel: &str,
     tex_cache: &mut HashMap<String, Pixmap>,
-) -> Option<(BakedModel, HashMap<String, Pixmap>)> {
+) -> Option<BakedModelTextures> {
     let resolved = resolve(archive, rel)?;
     let mut quads = Vec::new();
     for element in &resolved.elements {
@@ -820,12 +921,12 @@ pub fn bake_model(
             used_textures.insert(quad.tex.clone(), tex);
         }
     }
-    Some((
-        BakedModel {
+    Some(BakedModelTextures {
+        model: BakedModel {
             quads,
             gui_light_3d: resolved.gui_light_3d,
             transform: resolved.transform,
         },
-        used_textures,
-    ))
+        textures: used_textures,
+    })
 }

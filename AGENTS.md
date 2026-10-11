@@ -283,8 +283,8 @@ windows/<窗口>/mod.rs 里：
 ///
 /// # 返回值
 ///
-/// 未注册的标签返回 `None`
-pub(super) fn min_size_of_label(label: &str) -> Option<(f64, f64)> {
+/// 见 [`MinSize`]；未注册的标签返回 `None`
+pub(super) fn min_size_of_label(label: &str) -> Option<MinSize> {
     // 标签非法时按"没有历史几何"处理，默认尺寸由调用方给
     let kind = label.strip_prefix("mml-")?;
     min_size_of(&uuid_for_kind(kind)?)
@@ -305,6 +305,29 @@ pub(super) struct WindowEntry {
     /// 最小**客户区**宽度，单位逻辑像素；没有历史几何时就是默认宽度
     pub(super) min_width: f64,
 }
+```
+
+**复合元组只准在函数体内当局部值用。** 一旦要**作为参数传入**或**作为返回值传出**——含集合
+元素、`type` 别名与模块级数据（`const` / `static` 表、结构体字段）的元素类型——就定义具名结构体。
+元组靠位置记含义，调用方与实现两侧都看不出 `(String, String)` 里哪个是哪个；
+`(String, String, String, bool)` 这种更是只能回头翻文档。函数**内部**的中间值（去重用的
+`Vec<(u8, String)>`、临时坐标对）不必为此建类型。
+
+```rust
+/// 解析出的服务器地址
+pub(super) struct MotdAddr {
+    /// 主机名或 IP；地址为空时是空串
+    pub(super) host: String,
+    /// 端口；没写端口或地址为空时取 `MOTD_DEFAULT_PORT`
+    pub(super) port: u16,
+}
+
+/// - `address`: 用户输入的服务器地址，前后空白会被去掉
+///
+/// # 返回值
+///
+/// 见 [`MotdAddr`]
+pub(super) fn parse_motd_addr(address: &str) -> MotdAddr { /* ... */ }
 ```
 
 ### 14.3 三条硬约束（写错会出事）

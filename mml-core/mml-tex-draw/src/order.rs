@@ -41,15 +41,38 @@ pub fn cat_index(cat: &str) -> usize {
         .unwrap_or(CAT_ORDER.len())
 }
 
-/// 列表排序键：`(分类序号, 分类名, 条目ID)`
+/// 列表排序键
 ///
-/// - 第 1 项决定分组先后，即游戏创造栏标签页顺序；
-/// - 第 2 项只对"未登记分类"起作用，保证同一个未知分类的条目聚在一起；
-/// - 第 3 项是组内兜底序：同分类内按 id 字典序，稳定、与语言无关。
+/// 派生 `Ord` 逐字段比较，所以**字段顺序就是优先级**：
+/// - `rank` 决定分组先后，即游戏创造栏标签页顺序；
+/// - `cat` 只对"未登记分类"起作用，保证同一个未知分类的条目聚在一起；
+/// - `id` 是组内兜底序：同分类内按 id 字典序，稳定、与语言无关。
 ///
-/// 注意：**不要**用翻译后的显示名排序——那样换界面语言顺序就会变。
-pub fn order_key<'a>(cat: &'a str, id: &'a str) -> (usize, &'a str, &'a str) {
-    (cat_index(cat), cat, id)
+/// 注意：**不要**改成用翻译后的显示名排序——那样换界面语言顺序就会变。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct OrderKey<'a> {
+    /// 分类序号，见 [`cat_index`]
+    pub rank: usize,
+    /// 分类名
+    pub cat: &'a str,
+    /// 条目 id
+    pub id: &'a str,
+}
+
+/// 造一个列表排序键
+///
+/// - `cat`: 分类名
+/// - `id`: 条目 id
+///
+/// # 返回值
+///
+/// 见 [`OrderKey`]
+pub fn order_key<'a>(cat: &'a str, id: &'a str) -> OrderKey<'a> {
+    OrderKey {
+        rank: cat_index(cat),
+        cat,
+        id,
+    }
 }
 
 #[cfg(test)]
@@ -94,6 +117,9 @@ mod tests {
         );
         // 未知分类聚在最后，并在其后按分类名排
         assert!(cat_index("zzz") > cat_index("playerSkin"));
-        assert_eq!(order_key("aaa", "x"), (CAT_ORDER.len(), "aaa", "x"));
+        let key = order_key("aaa", "x");
+        assert_eq!(key.rank, CAT_ORDER.len());
+        assert_eq!(key.cat, "aaa");
+        assert_eq!(key.id, "x");
     }
 }

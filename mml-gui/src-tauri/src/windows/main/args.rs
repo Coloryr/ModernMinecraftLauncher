@@ -159,15 +159,29 @@ pub(super) fn apply_args_to_core(inst: &mut InstanceSettingObj, a: &InstanceArgs
     server.port = (a.server_port > 0).then_some(a.server_port as u16);
 }
 
+/// 已解析出来的核心实例：uuid 与实例句柄
+///
+/// 两者一起返回，是因为调用方几乎总要拿 uuid 去发事件或清缓存，而 `GameInstance` 自身
+/// 只有设置内容、没有 uuid。
+pub(crate) struct CoreInstance {
+    /// 实例 uuid，由调用方传入的字符串解析而来
+    pub(crate) uuid: Uuid,
+    /// 实例句柄，与 `mml_game::get_instance` 返回的是同一份
+    pub(crate) instance: GameInstance,
+}
+
 /// 取核心实例，含 uuid 解析与存在性检查
 ///
 /// - `uuid`: 实例 uuid 字符串，可能非法
 ///
 /// # 返回值
 ///
-/// 命中时返回该实例的 uuid 与句柄；uuid 非法或实例不存在返回 `None`
-pub(crate) fn core_instance(uuid: &str) -> Option<(Uuid, GameInstance)> {
-    Uuid::parse_str(uuid)
-        .ok()
-        .and_then(|id| mml_game::get_instance(&id).map(|inst| (id, inst)))
+/// 见 [`CoreInstance`]；uuid 非法或实例不存在返回 `None`
+pub(crate) fn core_instance(uuid: &str) -> Option<CoreInstance> {
+    Uuid::parse_str(uuid).ok().and_then(|id| {
+        mml_game::get_instance(&id).map(|inst| CoreInstance {
+            uuid: id,
+            instance: inst,
+        })
+    })
 }

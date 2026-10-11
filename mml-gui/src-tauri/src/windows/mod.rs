@@ -619,8 +619,8 @@ pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'stati
     // 装饰已摘掉，此刻量到的「外框 − 客户区」才是那圈 Windows 边框带；
     // 建窗那一刻量到的是边框带 + 标题栏，见 reconcile_min_size 的文档。
     // 建窗那次调用**保留**：激活失败退回原生 frame 时，那个口径才是对的。
-    if let Some((min_w, min_h)) = min_size_of_label(window.label()) {
-        reconcile_min_size(&window, min_w, min_h);
+    if let Some(min) = min_size_of_label(window.label()) {
+        reconcile_min_size(&window, min.width, min.height);
     }
 
     window.show().map_err(|err| err.to_string())?;

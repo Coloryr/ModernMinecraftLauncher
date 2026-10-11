@@ -122,26 +122,26 @@ impl InstanceSettingObj {
         let mut downloads: Vec<FileItemObj> = Vec::new();
         let mut archives: Vec<(&ServerArchiveItemObj, PathBuf)> = Vec::new();
 
-        for (item, url) in &plan.files {
+        for planned in &plan.files {
             downloads.push(FileItemObj {
-                url: url.clone(),
-                name: item.file.clone(),
-                file: game_path.join(&item.file),
-                hash: plan::make_hash(&item.sha1, &item.sha256),
+                url: planned.url.clone(),
+                name: planned.item.file.clone(),
+                file: game_path.join(&planned.item.file),
+                hash: plan::make_hash(&planned.item.sha1, &planned.item.sha256),
                 later: LaterRun::None,
             });
         }
 
-        for (item, url) in &plan.archives {
-            let temp = self.get_temp_path().join(&item.file);
+        for planned in &plan.archives {
+            let temp = self.get_temp_path().join(&planned.item.file);
             downloads.push(FileItemObj {
-                url: url.clone(),
-                name: item.file.clone(),
+                url: planned.url.clone(),
+                name: planned.item.file.clone(),
                 file: temp.clone(),
-                hash: plan::make_hash(&item.sha1, &item.sha256),
+                hash: plan::make_hash(&planned.item.sha1, &planned.item.sha256),
                 later: LaterRun::None,
             });
-            archives.push((item, temp));
+            archives.push((planned.item, temp));
         }
 
         if !downloads.is_empty() && !mml_downloader::start_download_task(downloads).await {

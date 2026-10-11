@@ -131,6 +131,16 @@ pub fn emit_add_modpack_status(app: &AppHandle, dto: ModPackStatusDto) {
 /// `installed_modpack_pids` 那边只拿它给**在线列表**打角标，不会与真实项目 ID 撞车。
 pub(crate) const LOCAL_PACK_PID: &str = "local";
 
+/// 一次登记成功的整合包安装任务：任务句柄与它的安装进度回调
+///
+/// 两者都是调用方在安装期间必须拿住的东西：任务句柄用于收尾记终态，回调交给内核安装流程。
+pub(crate) struct RegisteredTask {
+    /// 任务句柄，已登记进任务表，同一 pid + fid 不会再登记第二个
+    pub(crate) task: Arc<ModPackTask>,
+    /// 交给内核安装流程的进度回调，进度写回 `task` 并广播总览事件
+    pub(crate) gui: AddModPackGui,
+}
+
 /// 登记一个整合包安装任务，同 pid+fid 不重复安装；返回任务句柄与安装进度回调
 ///
 /// 在线安装 [`add_modpack_install`] 与本地压缩包导入 [`super::add::add_import_archive`]
@@ -148,14 +158,14 @@ pub(crate) const LOCAL_PACK_PID: &str = "local";
 ///
 /// # 返回值
 ///
-/// 任务句柄与安装进度回调；同键已有任务在跑时返回错误文案
+/// 见 [`RegisteredTask`]；同键已有任务在跑时返回错误文案
 pub(crate) fn register_task(
     app: &AppHandle,
     key: SourceInfo,
     source: &str,
     name: String,
     cancel: CancellationToken,
-) -> Result<(Arc<ModPackTask>, AddModPackGui), String> {
+) -> Result<RegisteredTask, String> {
     let task = Arc::new(ModPackTask {
         uuid: Uuid::new_v4(),
         source: source.to_string(),
@@ -191,7 +201,10 @@ pub(crate) fn register_task(
         task: task.clone(),
         app: app.clone(),
     }));
-    Ok((task, pack_gui))
+    Ok(RegisteredTask {
+        task,
+        gui: pack_gui,
+    })
 }
 
 /// 记录安装终态并广播

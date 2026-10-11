@@ -11,9 +11,27 @@ use tauri::{AppHandle, Emitter};
 use crate::dtos::BgInfoDto;
 use crate::listens;
 
+/// 一张图片的字节与它的实际 mime
+#[derive(Debug, Clone)]
+pub(super) struct ImageBytes {
+    /// 图片字节
+    pub(super) bytes: Vec<u8>,
+    /// 实际 mime，取 `image/png` / `image/jpeg` / `image/webp`
+    pub(super) mime: String,
+}
+
 /// 最近一次下载的原图缓存，仅网址来源且仅内存：调「原始大小」时按来源命中缓存，
 /// 直接用原图重新缩放，不重新走网络；换来源或重启后失效，重新下载即可
-pub(super) static BG_ORIGINAL: Mutex<Option<(String, Vec<u8>, String)>> = Mutex::new(None);
+#[derive(Debug, Clone)]
+pub(super) struct BgOriginal {
+    /// 来源网址，命中缓存时按它比对
+    pub(super) source: String,
+    /// 原图与它的 mime
+    pub(super) image: ImageBytes,
+}
+
+/// 最近一次下载的原图
+pub(super) static BG_ORIGINAL: Mutex<Option<BgOriginal>> = Mutex::new(None);
 
 /// 加载背景图来源，得到原始字节与 mime
 ///
@@ -24,8 +42,8 @@ pub(super) static BG_ORIGINAL: Mutex<Option<(String, Vec<u8>, String)>> = Mutex:
 ///
 /// # 返回值
 ///
-/// 原始字节与实际 mime；网址返回文本类型或本地扩展名不支持时返回错误信息
-pub(super) async fn load_bg_bytes(source: &str) -> Result<(Vec<u8>, String), String> {
+/// 见 [`ImageBytes`]；网址返回文本类型或本地扩展名不支持时返回错误信息
+pub(super) async fn load_bg_bytes(source: &str) -> Result<ImageBytes, String> {
     if source.starts_with("http://") || source.starts_with("https://") {
         let client = mml_net::Client::new(mml_config::config_obj::ProxyState::Auto);
         let resp = client.get(source).await.map_err(|err| err.to_string())?;
@@ -48,7 +66,10 @@ pub(super) async fn load_bg_bytes(source: &str) -> Result<(Vec<u8>, String), Str
             return Err(format!("not an image (mime: {mime})"));
         }
         let bytes = resp.bytes().await.map_err(|err| err.to_string())?;
-        Ok((bytes.to_vec(), mime))
+        Ok(ImageBytes {
+            bytes: bytes.to_vec(),
+            mime,
+        })
     } else {
         let mime = match source
             .rsplit('.')
@@ -67,7 +88,10 @@ pub(super) async fn load_bg_bytes(source: &str) -> Result<(Vec<u8>, String), Str
         })
         .await
         .map_err(|err| err.to_string())??;
-        Ok((bytes, mime.to_string()))
+        Ok(ImageBytes {
+            bytes,
+            mime: mime.to_string(),
+        })
     }
 }
 
@@ -85,12 +109,12 @@ pub(super) async fn load_bg_bytes(source: &str) -> Result<(Vec<u8>, String), Str
 ///
 /// # 返回值
 ///
-/// 处理后的字节与实际写出的 mime，即 `image/jpeg` 或 `image/png`
+/// 见 [`ImageBytes`]，mime 是实际写出的那个，即 `image/jpeg` 或 `image/png`
 pub(super) fn resize_bg_image(
     bytes: Vec<u8>,
     mime: &str,
     percent: u32,
-) -> Result<(Vec<u8>, String), String> {
+) -> Result<ImageBytes, String> {
     let format = match mime {
         "image/png" => image::ImageFormat::Png,
         "image/jpeg" => image::ImageFormat::Jpeg,
@@ -123,15 +147,17 @@ pub(super) fn resize_bg_image(
             "image/png"
         }
     };
-    Ok((out, out_mime.to_string()))
+    Ok(ImageBytes {
+        bytes: out,
+        mime: out_mime.to_string(),
+    })
 }
 
 /// 缩放 → 落盘 → 记配置 → 广播刷新，设置与调大小共用的后半段流程
 ///
 /// - `app`: 应用句柄，落盘后广播背景变更
 /// - `source`: 背景图来源，写入配置供之后重新加载
-/// - `bytes`: 源图原始字节
-/// - `mime`: 源图 mime
+/// - `image`: 源图字节与 mime
 /// - `percent`: 缩放百分比，取值 10..=100
 ///
 /// # 返回值
@@ -140,25 +166,25 @@ pub(super) fn resize_bg_image(
 pub(super) async fn store_bg(
     app: &AppHandle,
     source: String,
-    bytes: Vec<u8>,
-    mime: String,
+    image: ImageBytes,
     percent: u32,
 ) -> Result<String, String> {
     use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
-    let (data, mime) =
-        tauri::async_runtime::spawn_blocking(move || resize_bg_image(bytes, &mime, percent))
-            .await
-            .map_err(|err| err.to_string())
-            .inspect_err(|err| mml_log::error(format!("bg resize join failed: {err}")))?
-            .inspect_err(|err| mml_log::error(format!("bg resize failed: {err}")))?;
+    let image = tauri::async_runtime::spawn_blocking(move || {
+        resize_bg_image(image.bytes, &image.mime, percent)
+    })
+    .await
+    .map_err(|err| err.to_string())
+    .inspect_err(|err| mml_log::error(format!("bg resize join failed: {err}")))?
+    .inspect_err(|err| mml_log::error(format!("bg resize failed: {err}")))?;
 
     // 处理结果落盘到配置目录，文件名不带扩展名、读取时按魔数识别格式，各窗口启动时从这里取图
     let Some(dir) = crate::gui_config::dir() else {
         mml_log::error("set_bg failed: config dir not initialized".to_string());
         return Err("config dir not initialized".to_string());
     };
-    let write_data = data.clone();
+    let write_data = image.bytes.clone();
     tauri::async_runtime::spawn_blocking(move || {
         std::fs::write(dir.join("bg_image"), write_data).map_err(|err| err.to_string())
     })
@@ -174,16 +200,22 @@ pub(super) async fn store_bg(
     crate::gui_config::set(config);
 
     emit_bg_change(app);
-    Ok(format!("data:{mime};base64,{}", BASE64.encode(&data)))
+    Ok(format!(
+        "data:{};base64,{}",
+        image.mime,
+        BASE64.encode(&image.bytes)
+    ))
 }
 
 /// 把下载结果写入原图缓存，仅网址来源用
 ///
 /// - `source`: 背景图来源网址，命中缓存时按它比对
-/// - `bytes`: 原图字节
-/// - `mime`: 原图 mime
-pub(super) fn cache_bg_original(source: &str, bytes: &[u8], mime: &str) {
-    *BG_ORIGINAL.lock().unwrap() = Some((source.to_string(), bytes.to_vec(), mime.to_string()));
+/// - `image`: 原图与它的 mime
+pub(super) fn cache_bg_original(source: &str, image: &ImageBytes) {
+    *BG_ORIGINAL.lock().unwrap() = Some(BgOriginal {
+        source: source.to_string(),
+        image: image.clone(),
+    });
 }
 
 /// 设置背景图：每次都按来源重新加载 → 缩放到 `percent` → 落盘 `bg_image` → 记入配置；
@@ -207,13 +239,13 @@ pub async fn settings_set_bg(
     let percent = percent.clamp(10, 100);
     mml_log::info(format!("set_bg: percent={percent} source={source}"));
 
-    let (bytes, mime) = load_bg_bytes(&source).await.inspect_err(|err| {
+    let image = load_bg_bytes(&source).await.inspect_err(|err| {
         mml_log::error(format!("set_bg load failed: {err}"));
     })?;
     if source.starts_with("http://") || source.starts_with("https://") {
-        cache_bg_original(&source, &bytes, &mime);
+        cache_bg_original(&source, &image);
     }
-    store_bg(&app, source, bytes, mime, percent).await
+    store_bg(&app, source, image, percent).await
 }
 
 /// 调整原始大小：只按新 `percent` 重新缩放已设置的背景图，不改来源
@@ -244,24 +276,24 @@ pub async fn settings_resize_bg(app: AppHandle, percent: u32) -> Result<String, 
             .lock()
             .unwrap()
             .as_ref()
-            .filter(|(src, _, _)| *src == source)
-            .map(|(_, bytes, mime)| (bytes.clone(), mime.clone()))
+            .filter(|c| c.source == source)
+            .map(|c| c.image.clone())
     } else {
         None
     };
-    let (bytes, mime) = match cached {
+    let image = match cached {
         Some(hit) => hit,
         None => {
-            let (bytes, mime) = load_bg_bytes(&source).await.inspect_err(|err| {
+            let image = load_bg_bytes(&source).await.inspect_err(|err| {
                 mml_log::error(format!("resize_bg load failed: {err}"));
             })?;
             if is_url {
-                cache_bg_original(&source, &bytes, &mime);
+                cache_bg_original(&source, &image);
             }
-            (bytes, mime)
+            image
         }
     };
-    store_bg(&app, source, bytes, mime, percent).await
+    store_bg(&app, source, image, percent).await
 }
 
 /// 清除背景图：删除落盘文件并清空配置里的来源

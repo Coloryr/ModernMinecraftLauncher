@@ -92,6 +92,19 @@ impl PartialEq for LibVersionObj {
 
 impl Eq for LibVersionObj {}
 
+/// 忽略版本号后的运行库键：包名、名字与额外信息
+///
+/// 与 [`LibVersionObj`] 的 `PartialEq` / `Hash` 同一口径——只认这三项，不比版本号。
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct LibKey {
+    /// 包名，对应 Maven 的 groupId
+    pub pack: String,
+    /// 名字，对应 Maven 的 artifactId
+    pub name: String,
+    /// 额外信息，对应 Maven 的 classifier；没有时为空串
+    pub extr: String,
+}
+
 impl std::hash::Hash for LibVersionObj {
     /// 与 `eq` 口径一致：只哈希包名、名字与额外信息，保证同键同哈希
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -151,9 +164,13 @@ impl LibVersionObj {
     ///
     /// # 返回值
     ///
-    /// 返回三元组键，顺序为包名、名字、额外信息
-    pub fn key_without_version(&self) -> (String, String, String) {
-        (self.pack.clone(), self.name.clone(), self.extr.clone())
+    /// 见 [`LibKey`]
+    pub fn key_without_version(&self) -> LibKey {
+        LibKey {
+            pack: self.pack.clone(),
+            name: self.name.clone(),
+            extr: self.extr.clone(),
+        }
     }
 }
 

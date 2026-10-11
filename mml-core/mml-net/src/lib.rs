@@ -37,8 +37,9 @@ use mml_config::config_obj::{HttpObj, ProxyState, ProxyType};
 use mml_names::i18_items::error_type::{CoreResult, ErrorType, HttpErrorData};
 use reqwest::header::{ETAG, HeaderMap, HeaderValue, IF_NONE_MATCH, USER_AGENT};
 use reqwest::{Proxy, Request, Response, StatusCode};
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::ser::SerializeTuple;
+use serde::{Serialize, Serializer};
 use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock, RwLock};
@@ -160,6 +161,27 @@ impl fmt::Debug for Client {
             .field("inner", &self.inner)
             .field("rate_limiter", &"Arc<Mutex<Option<RateLimiter>>>")
             .finish()
+    }
+}
+
+/// 表单请求的一个键值对
+pub struct FormField<'a> {
+    /// 表单字段名，必填，如 `client_id`
+    pub key: &'a str,
+    /// 表单字段值，按 `application/x-www-form-urlencoded` 编码后进请求体
+    pub value: &'a str,
+}
+
+impl Serialize for FormField<'_> {
+    /// 按 2 元组而不是结构体序列化
+    ///
+    /// `serde_urlencoded` 只把 2 元组当键值对，具名结构体走 `serialize_struct` 会被它判为
+    /// unsupported pair，请求直接失败；按元组序列化后线格式与原先的 `(&str, &str)` 完全一致。
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut tuple = serializer.serialize_tuple(2)?;
+        tuple.serialize_element(self.key)?;
+        tuple.serialize_element(self.value)?;
+        tuple.end()
     }
 }
 
@@ -639,7 +661,7 @@ impl Client {
     /// 发送 POST 请求，表单请求体，返回反序列化的 JSON
     ///
     /// - `url`: 请求地址
-    /// - `params`: 表单键值对，按 `application/x-www-form-urlencoded` 编码
+    /// - `params`: 表单字段列表，见 [`FormField`]
     ///
     /// # 返回值
     ///
@@ -647,7 +669,7 @@ impl Client {
     pub async fn post_form_get_json<T: DeserializeOwned + Send + 'static>(
         &self,
         url: &str,
-        params: &[(&str, &str)],
+        params: &[FormField<'_>],
     ) -> CoreResult<T> {
         // `.form()` 即刻把参数编码进 body，builder 不借用 `params`
         let req = self.inner.post(url).form(params);
@@ -661,7 +683,7 @@ impl Client {
     /// 400 加 `authorization_pending` 属正常中间态，不应视为请求失败。
     ///
     /// - `url`: 请求地址
-    /// - `params`: 表单键值对，按 `application/x-www-form-urlencoded` 编码
+    /// - `params`: 表单字段列表，见 [`FormField`]
     ///
     /// # 返回值
     ///
@@ -669,7 +691,7 @@ impl Client {
     pub async fn post_form_get_req(
         &self,
         url: &str,
-        params: &[(&str, &str)],
+        params: &[FormField<'_>],
     ) -> CoreResult<reqwest::Response> {
         let req = self.inner.post(url).form(params);
         abortable(async move { req.send().await.map_err(map_err) }).await

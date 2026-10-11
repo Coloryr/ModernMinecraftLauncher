@@ -38,7 +38,7 @@ use std::{sync::OnceLock, time::Duration};
 
 use chrono::Local;
 use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType, HttpErrorData};
-use mml_net::{mojang_api, urls};
+use mml_net::{FormField, mojang_api, urls};
 use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
 
@@ -109,9 +109,15 @@ fn have_key() -> CoreResult<String> {
 pub async fn get_code() -> CoreResult<OAuthGetCodeResObj> {
     let key = have_key()?;
 
-    let obj: &[(&str, &str)] = &[
-        ("client_id", &key),
-        ("scope", "XboxLive.signin offline_access"),
+    let obj = &[
+        FormField {
+            key: "client_id",
+            value: key.as_str(),
+        },
+        FormField {
+            key: "scope",
+            value: "XboxLive.signin offline_access",
+        },
     ];
 
     let data = mml_net::get_login_client()
@@ -144,10 +150,19 @@ pub async fn run_get_code(
 ) -> CoreResult<OAuthGetCodeObj> {
     let key = have_key()?;
 
-    let obj: &[(&str, &str)] = &[
-        ("client_id", &key),
-        ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
-        ("device_code", &res.device_code.clone()),
+    let obj = &[
+        FormField {
+            key: "client_id",
+            value: key.as_str(),
+        },
+        FormField {
+            key: "grant_type",
+            value: "urn:ietf:params:oauth:grant-type:device_code",
+        },
+        FormField {
+            key: "device_code",
+            value: res.device_code.as_str(),
+        },
     ];
 
     let start_time = Local::now().timestamp();
@@ -207,10 +222,19 @@ pub async fn run_get_code(
 pub async fn refresh_oauth_token(token: &str) -> CoreResult<OAuthGetCodeObj> {
     let key = have_key()?;
 
-    let obj: &[(&str, &str)] = &[
-        ("client_id", &key),
-        ("grant_type", "refresh_token"),
-        ("refresh_token", &token),
+    let obj = &[
+        FormField {
+            key: "client_id",
+            value: key.as_str(),
+        },
+        FormField {
+            key: "grant_type",
+            value: "refresh_token",
+        },
+        FormField {
+            key: "refresh_token",
+            value: token,
+        },
     ];
 
     let data = mml_net::get_login_client()
@@ -326,18 +350,17 @@ impl LoginObj {
         if cancel.is_cancelled() {
             return Err(ErrorType::TaskCancel);
         }
-        let (token, expires_in) =
-            mojang_api::get_minecraft_token(&xsts.xbl_uhs, &xsts.xbl_token).await?;
+        let mc_token = mojang_api::get_minecraft_token(&xsts.xbl_uhs, &xsts.xbl_token).await?;
         if cancel.is_cancelled() {
             return Err(ErrorType::TaskCancel);
         }
-        let profile = mojang_api::get_minecraft_profile(&token).await?;
+        let profile = mojang_api::get_minecraft_profile(&mc_token.access_token).await?;
 
         self.user_name = profile.name;
         self.uuid = profile.id;
         self.text1 = Some(oauth.refresh_token);
-        self.access_token = token;
-        self.set_expire_in(expires_in);
+        self.access_token = mc_token.access_token;
+        self.set_expire_in(mc_token.expires_in);
         self.last_login = Local::now().fixed_offset();
 
         Ok(())

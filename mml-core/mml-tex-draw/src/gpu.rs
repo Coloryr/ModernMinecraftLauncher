@@ -404,14 +404,25 @@ pub fn item_transform_matrix(t: &crate::model::GuiTransform) -> Mat4 {
         * Mat4::from_translation(Vec3::new(-0.5, -0.5, -0.5))
 }
 
+/// 两条方向光的方向向量，喂给 shader 的 light0 / light1
+///
+/// 照 Lighting.java 的 ITEMS_3D 与 ITEMS_FLAT 两个 UBO 槽位，各自按位姿旋转后归一化
+#[derive(Clone, Copy)]
+pub struct LightDirs {
+    /// 主光方向，xyz 是单位向量、w 恒为 0
+    pub light0: [f32; 4],
+    /// 副光方向，xyz 是单位向量、w 恒为 0
+    pub light1: [f32; 4],
+}
+
 /// 光照方向，照 Lighting.java 的 ITEMS_3D 与 ITEMS_FLAT 两个 UBO 槽位
 ///
 /// - `item3d`: true 取 ITEMS_3D，gui_light 为 side；false 取 ITEMS_FLAT，gui_light 为 front
 ///
 /// # 返回值
 ///
-/// 返回 light0 与 light1 两条方向光，xyz 为方向单位向量、w 为 0
-pub fn light_dirs(item3d: bool) -> ([f32; 4], [f32; 4]) {
+/// 见 [`LightDirs`]；两条光都是单位方向向量
+pub fn light_dirs(item3d: bool) -> LightDirs {
     let l0 = Vec3::new(0.2, 1.0, -0.7).normalize();
     let l1 = Vec3::new(-0.2, 1.0, 0.7).normalize();
     let m = if item3d {
@@ -431,7 +442,10 @@ pub fn light_dirs(item3d: bool) -> ([f32; 4], [f32; 4]) {
         let t = m.transform_vector3(d).normalize();
         [t.x, t.y, t.z, 0.0]
     };
-    (v(l0), v(l1))
+    LightDirs {
+        light0: v(l0),
+        light1: v(l1),
+    }
 }
 
 impl GpuCtx {
@@ -484,7 +498,7 @@ impl GpuCtx {
         // 法线矩阵取逆转置，逐顶点归一化，等价 MC 的 normal matrix 与 trustedNormals 规则
         let n3 = Mat3::from_mat4(model_m).inverse().transpose();
 
-        let (light0, light1) = light_dirs(model.gui_light_3d);
+        let LightDirs { light0, light1 } = light_dirs(model.gui_light_3d);
         let uniforms = Uniforms {
             mvp: mvp.to_cols_array_2d(),
             normal_mat: [
@@ -570,7 +584,13 @@ impl GpuCtx {
                 return None;
             };
             // read_pixels 顺带完成 premul 转 straight，jar 内贴图本身是 straight alpha
-            let Some((rgba, stride, w, h)) = crate::model::bitmap_rgba(tex) else {
+            let Some(crate::model::BitmapRgba {
+                data: rgba,
+                stride,
+                width: w,
+                height: h,
+            }) = crate::model::bitmap_rgba(tex)
+            else {
                 return None;
             };
             let (w, h) = (w as u32, h as u32);
@@ -632,7 +652,13 @@ impl GpuCtx {
 
         // glint 贴图上传与绑定组用 REPEAT 采样；无 glint 时为 None 并继续正常渲染
         let glint_bind = glint.map_or(None, |glint_tex| {
-            let Some((rgba, stride, w, h)) = crate::model::bitmap_rgba(glint_tex) else {
+            let Some(crate::model::BitmapRgba {
+                data: rgba,
+                stride,
+                width: w,
+                height: h,
+            }) = crate::model::bitmap_rgba(glint_tex)
+            else {
                 return None;
             };
             let (w, h) = (w as u32, h as u32);

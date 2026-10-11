@@ -7,15 +7,29 @@ use mml_sys::process_helper;
 // 测试辅助函数
 // ============================================================================
 
+/// 跨平台测试用命令
+struct TestCommand {
+    /// 可执行文件名或路径；Windows 为 `cmd`，其它平台为 `/bin/echo`
+    cmd: &'static str,
+    /// 传给可执行文件的参数列表，末尾为待回显的文本 `hello_test`
+    args: Vec<String>,
+}
+
 /// 获取跨平台测试用命令
-fn get_test_echo_cmd() -> (&'static str, Vec<String>) {
+fn get_test_echo_cmd() -> TestCommand {
     #[cfg(target_os = "windows")]
     {
-        ("cmd", vec!["/c".into(), "echo".into(), "hello_test".into()])
+        TestCommand {
+            cmd: "cmd",
+            args: vec!["/c".into(), "echo".into(), "hello_test".into()],
+        }
     }
     #[cfg(not(target_os = "windows"))]
     {
-        ("/bin/echo", vec!["hello_test".into()])
+        TestCommand {
+            cmd: "/bin/echo",
+            args: vec!["hello_test".into()],
+        }
     }
 }
 
@@ -43,10 +57,10 @@ fn test_is_run_as_admin_returns_bool() {
 /// 普通启动能捕获 stdout 与 stderr
 #[test]
 fn test_launch_normal_captures_stdout() {
-    let (cmd, args) = get_test_echo_cmd();
+    let cmd = get_test_echo_cmd();
     let result = process_helper::launch(
-        cmd,
-        args,
+        cmd.cmd,
+        cmd.args,
         HashMap::new(),
         test_working_dir(),
         false, // 不提权
@@ -79,9 +93,10 @@ fn test_launch_normal_captures_stdout() {
 /// launch 返回的 child 句柄可 try_wait
 #[test]
 fn test_launch_result_child_wait() {
-    let (cmd, args) = get_test_echo_cmd();
-    let mut result = process_helper::launch(cmd, args, HashMap::new(), test_working_dir(), false)
-        .expect("launch should succeed");
+    let cmd = get_test_echo_cmd();
+    let mut result =
+        process_helper::launch(cmd.cmd, cmd.args, HashMap::new(), test_working_dir(), false)
+            .expect("launch should succeed");
 
     // try_wait 可能在进程退出后返回 Some，也可能进程还在运行返回 None
     let status = result.child.try_wait().expect("try_wait should not error");
@@ -111,9 +126,10 @@ fn test_launch_admin_when_is_admin() {
         return;
     }
 
-    let (cmd, args) = get_test_echo_cmd();
-    let mut result = process_helper::launch(cmd, args, HashMap::new(), test_working_dir(), true)
-        .expect("launch should succeed");
+    let cmd = get_test_echo_cmd();
+    let mut result =
+        process_helper::launch(cmd.cmd, cmd.args, HashMap::new(), test_working_dir(), true)
+            .expect("launch should succeed");
 
     eprintln!(
         "Current process: admin (is_run_as_admin=true)\n\
@@ -187,14 +203,20 @@ fn test_launch_admin_when_not_admin() {
     }
 
     // 先验证普通启动不受影响
-    let (cmd, args) = get_test_echo_cmd();
-    let normal =
-        process_helper::launch(cmd, args.clone(), HashMap::new(), test_working_dir(), false)
-            .expect("normal launch should succeed");
+    let cmd = get_test_echo_cmd();
+    let normal = process_helper::launch(
+        cmd.cmd,
+        cmd.args.clone(),
+        HashMap::new(),
+        test_working_dir(),
+        false,
+    )
+    .expect("normal launch should succeed");
     assert!(!normal.is_admin, "normal launch: is_admin should be false");
 
     // 提权启动
-    let elevated = process_helper::launch(cmd, args, HashMap::new(), test_working_dir(), true);
+    let elevated =
+        process_helper::launch(cmd.cmd, cmd.args, HashMap::new(), test_working_dir(), true);
 
     eprintln!(
         "Current process: non-admin (is_run_as_admin=false)\n\
@@ -230,9 +252,10 @@ fn test_launch_admin_when_not_admin() {
 /// 普通启动时 is_admin 与 pid.is_some() 一致
 #[test]
 fn test_launch_result_fields_consistency() {
-    let (cmd, args) = get_test_echo_cmd();
-    let result = process_helper::launch(cmd, args, HashMap::new(), test_working_dir(), false)
-        .expect("launch should succeed");
+    let cmd = get_test_echo_cmd();
+    let result =
+        process_helper::launch(cmd.cmd, cmd.args, HashMap::new(), test_working_dir(), false)
+            .expect("launch should succeed");
 
     // is_admin 和 pid 的一致性：普通启动时 pid 应为 None
     assert_eq!(

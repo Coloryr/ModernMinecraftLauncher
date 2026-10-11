@@ -165,18 +165,17 @@ pub fn block_list(lang: String) -> Vec<BlockItemDto> {
 
     mml_tex_draw::ordered_entries()
         .into_iter()
-        .map(|(kind, id)| {
-            // 方块与物品只差：分类来源、名称语言键、图标目录与版本号
-            let (cat, name_key, dir, ver) = match kind {
+        .map(|entry| {
+            // 分类已在 ordered_entries 里算过，直接取，不再重复查 block_cat / item_cat；
+            // 方块与物品只差名称语言键、图标目录与版本号
+            let (name_key, dir, ver) = match entry.kind {
                 mml_tex_draw::EntryKind::Block => (
-                    mml_tex_draw::block_cat(&id),
-                    mml_tex_draw::block_name_key(&id),
+                    mml_tex_draw::block_name_key(&entry.id),
                     "block",
                     &version,
                 ),
                 mml_tex_draw::EntryKind::Item => (
-                    mml_tex_draw::item_cat(&id),
-                    mml_tex_draw::item_name_key(&id),
+                    mml_tex_draw::item_name_key(&entry.id),
                     "item",
                     &item_version,
                 ),
@@ -184,12 +183,12 @@ pub fn block_list(lang: String) -> Vec<BlockItemDto> {
             // 显示名：语言键翻译，miss 回退 id 尾段，如 minecraft:stone → stone
             let name = name_key
                 .and_then(|key| mml_tex_draw::get_lang(lang, &key))
-                .unwrap_or_else(|| id.rsplit(':').next().unwrap_or(&id).to_string());
+                .unwrap_or_else(|| entry.id.rsplit(':').next().unwrap_or(&entry.id).to_string());
             BlockItemDto {
                 name,
-                cat: cat_name(cat.unwrap_or_default()),
-                image: format!("{base}/{dir}/{id}?v={ver}"),
-                id,
+                cat: cat_name(entry.cat),
+                image: format!("{base}/{dir}/{}?v={ver}", entry.id),
+                id: entry.id,
             }
         })
         .collect()

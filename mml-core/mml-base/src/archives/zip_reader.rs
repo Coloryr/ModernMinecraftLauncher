@@ -15,7 +15,8 @@ use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, DateTime, ZipArchive, ZipWriter};
 
 use crate::archives::{
-    self, ArchiveEntryInfo, ArchiveHandle, ArchiveProcess, BaseArchiveGui, IBaseArchiveGui,
+    self, ArchiveAddFile, ArchiveEntryInfo, ArchiveHandle, ArchiveProcess, BaseArchiveGui,
+    IBaseArchiveGui,
 };
 
 /// 保持打开的 Zip 读取句柄，缓存 [`ZipArchive`]，中央目录只解析一次
@@ -444,7 +445,7 @@ impl ArchiveHandle for ZipReader {
     }
 
     /// 用 `new_append` 就地追加磁盘文件，再重解析中央目录
-    fn add_files(&mut self, files: &[(PathBuf, PathBuf)]) -> CoreResult<()> {
+    fn add_files(&mut self, files: &[ArchiveAddFile]) -> CoreResult<()> {
         use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
         let file = self.file.try_clone().map_err(|err| {
@@ -464,9 +465,9 @@ impl ArchiveHandle for ZipReader {
             .compression_method(CompressionMethod::Deflated)
             .unix_permissions(0o644);
 
-        for (src, dest) in files {
-            let internal_path = dest.to_string_lossy();
-            let mut reader = path_helper::open_read(src)?;
+        for file in files {
+            let internal_path = file.dest.to_string_lossy();
+            let mut reader = path_helper::open_read(&file.src)?;
 
             zip.start_file(internal_path.as_ref(), options)
                 .map_err(|err| {

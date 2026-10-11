@@ -68,13 +68,31 @@ pub fn plan_removals<'a>(old: &'a ServerPackObj, new: &ServerPackObj) -> ServerP
     out
 }
 
+/// 要下载的一个在线文件
+#[derive(Debug)]
+pub struct ServerFileDownload<'a> {
+    /// 在线文件条目，含游戏目录下的相对路径与校验值
+    pub item: &'a ServerItemObj,
+    /// 下载地址；条目自带 `url` 为空且 `fid` 解析不到时是空串
+    pub url: String,
+}
+
+/// 要下载的一个配置压缩包
+#[derive(Debug)]
+pub struct ServerArchiveDownload<'a> {
+    /// 配置压缩包条目，含目标目录与 `delete_old`
+    pub item: &'a ServerArchiveItemObj,
+    /// 下载地址，取自条目自带的 `url`；没写时是空串
+    pub url: String,
+}
+
 /// 要下载的内容
 #[derive(Debug, Default)]
 pub struct ServerPackDownloads<'a> {
-    /// 在线文件：(条目, 下载地址)
-    pub files: Vec<(&'a ServerItemObj, String)>,
-    /// 配置压缩包：(条目, 下载地址)
-    pub archives: Vec<(&'a ServerArchiveItemObj, String)>,
+    /// 在线文件与各自的下载地址
+    pub files: Vec<ServerFileDownload<'a>>,
+    /// 配置压缩包与各自的下载地址
+    pub archives: Vec<ServerArchiveDownload<'a>>,
 }
 
 /// 算出要下载的文件列表与各自地址
@@ -82,6 +100,10 @@ pub struct ServerPackDownloads<'a> {
 /// 地址规则与原内联逻辑一致：条目自带 `url` 优先，空串视为没有；为空时用 `resolved`
 /// 里的地址，即 `fid → url`，由 `resolve_download_urls` 解析；都拿不到就是空串，
 /// 下载阶段会因此失败并报 `DownloadFileFail`。
+///
+/// # 返回值
+///
+/// 见 [`ServerPackDownloads`]，顺序与清单一致
 pub fn plan_downloads<'a>(
     pack: &'a ServerPackObj,
     resolved: &HashMap<String, String>,
@@ -96,14 +118,17 @@ pub fn plan_downloads<'a>(
                 .filter(|u| !u.is_empty())
                 .or_else(|| item.fid.as_ref().and_then(|f| resolved.get(f).cloned()))
                 .unwrap_or_default();
-            (item, url)
+            ServerFileDownload { item, url }
         })
         .collect();
 
     let archives = pack
         .archive_list
         .iter()
-        .map(|item| (item, item.url.clone()))
+        .map(|item| ServerArchiveDownload {
+            item,
+            url: item.url.clone(),
+        })
         .collect();
 
     ServerPackDownloads { files, archives }

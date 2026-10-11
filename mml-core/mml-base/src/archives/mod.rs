@@ -219,6 +219,17 @@ impl ArchiveProcess {
     }
 }
 
+/// 就地追加时的单个待写入文件
+///
+/// 两个字段都是路径且同型，靠字段名区分方向：`src` 只从磁盘读，`dest` 只当压缩包内的条目名。
+#[derive(Debug, Clone)]
+pub struct ArchiveAddFile {
+    /// 磁盘上的源文件路径，必须已存在且可读
+    pub src: PathBuf,
+    /// 源文件写入压缩包内的路径，用 `/` 分隔，如 `subdir/readme.txt`
+    pub dest: PathBuf,
+}
+
 /// 已打开的压缩包读取句柄，统一各格式的查文件与单文件解压
 ///
 /// 文件句柄在打开后保持持有，各格式内部决定如何复用：zip 缓存 [`zip::ZipArchive`]，
@@ -263,12 +274,12 @@ pub(crate) trait ArchiveHandle: Send {
     ) -> CoreResult<()>;
     /// 就地追加文件，仅支持随机可写的格式
     ///
-    /// - `files`: `(磁盘源路径, 压缩包内路径)` 对
+    /// - `files`: 待追加的文件列表，见 [`ArchiveAddFile`]
     ///
     /// # 返回值
     ///
     /// 不支持的格式返回 `InvalidOperation`
-    fn add_files(&mut self, _files: &[(PathBuf, PathBuf)]) -> CoreResult<()> {
+    fn add_files(&mut self, _files: &[ArchiveAddFile]) -> CoreResult<()> {
         Err(ErrorType::InvalidOperation)
     }
     /// 就地追加内存数据，仅支持随机可写的格式

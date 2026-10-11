@@ -47,8 +47,18 @@ fn silent_server() -> u16 {
     port
 }
 
-/// 在独立线程 + 独立 runtime 里发一个请求，把 (耗时, 是否错误, 错误文本) 回传
-fn spawn_request(url: String) -> mpsc::Receiver<(Duration, bool, String)> {
+/// 一次请求的观测结果
+struct RequestOutcome {
+    /// 从发起到拿到结果的耗时
+    elapsed: Duration,
+    /// 是否以错误结束
+    is_err: bool,
+    /// 结果详情：成功是 `Ok(n bytes)`，失败是错误调试文本
+    detail: String,
+}
+
+/// 在独立线程 + 独立 runtime 里发一个请求，把结果回传
+fn spawn_request(url: String) -> mpsc::Receiver<RequestOutcome> {
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_current_thread()
@@ -63,7 +73,11 @@ fn spawn_request(url: String) -> mpsc::Receiver<(Duration, bool, String)> {
                 Ok(text) => format!("Ok({} bytes)", text.len()),
                 Err(err) => format!("{err:?}"),
             };
-            let _ = tx.send((started.elapsed(), result.is_err(), detail));
+            let _ = tx.send(RequestOutcome {
+                elapsed: started.elapsed(),
+                is_err: result.is_err(),
+                detail,
+            });
         });
     });
     rx
@@ -89,7 +103,11 @@ fn abort_interrupts_inflight_request() {
     let abort_at = Instant::now();
     mml_net::abort_all();
 
-    let (elapsed, is_err, detail) = rx
+    let RequestOutcome {
+        elapsed,
+        is_err,
+        detail,
+    } = rx
         .recv_timeout(Duration::from_secs(5))
         .expect("abort 之后请求仍未返回");
     let lag = abort_at.elapsed();

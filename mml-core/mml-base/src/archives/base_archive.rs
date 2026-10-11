@@ -17,8 +17,8 @@ use mml_sys::path_helper;
 use uuid::Uuid;
 
 use crate::archives::{
-    ArchiveHandle, ArchiveType, BaseArchiveGui, IBaseArchiveGui, TarMode, r7z_reader::R7zReader,
-    replace_invalid_name, tar_reader::TarReader, zip_reader::ZipReader,
+    ArchiveAddFile, ArchiveHandle, ArchiveType, BaseArchiveGui, IBaseArchiveGui, TarMode,
+    r7z_reader::R7zReader, replace_invalid_name, tar_reader::TarReader, zip_reader::ZipReader,
 };
 
 /// 压缩包条目信息
@@ -62,6 +62,18 @@ pub struct BaseArchive {
     entries: Vec<ArchiveEntryInfo>,
     /// 已打开的读取句柄，各格式实现见对应读取器
     handle: Mutex<Box<dyn ArchiveHandle>>,
+}
+
+/// 一条待提取任务，供批量解压的串行与并行路径共用
+///
+/// 目标路径已在收集阶段由 [`BaseArchive::resolve_output_path`] 解析完毕，
+/// 提取时直接落盘，不再参与路径计算。
+#[derive(Clone)]
+struct ExtractTask {
+    /// 条目在压缩包内的名称/路径，如 `assets/a.txt`
+    name: String,
+    /// 条目解包后写入的目标磁盘路径，已含重命名与非法字符处理结果
+    output_path: PathBuf,
 }
 
 impl BaseArchive {
@@ -530,7 +542,7 @@ impl BaseArchive {
 
     /// 顺序提取一组条目
     ///
-    /// - `tasks`: `(条目名, 目标路径)` 任务列表
+    /// - `tasks`: 待提取任务列表，见 [`ExtractTask`]
     /// - `gui`: 可选的进度回调，每提取完一个文件触发一次
     ///
     /// # 返回值
@@ -538,15 +550,15 @@ impl BaseArchive {
     /// 任一任务失败时返回相应错误
     fn extract_tasks_sequential(
         &self,
-        tasks: &[(String, PathBuf)],
+        tasks: &[ExtractTask],
         gui: Option<&dyn IBaseArchiveGui>,
     ) -> CoreResult<()> {
         let mut current = 0usize;
-        for (name, output) in tasks {
-            self.extract_resolved(name, output, None)?;
+        for task in tasks {
+            self.extract_resolved(&task.name, &task.output_path, None)?;
             current += 1;
             if let Some(gui) = gui {
-                gui.update(Some(name.clone()), current);
+                gui.update(Some(task.name.clone()), current);
             }
         }
         Ok(())
@@ -554,7 +566,7 @@ impl BaseArchive {
 
     /// 并行提取一组条目，仅用于 Zip，每个线程持有独立读取句柄随机访问
     ///
-    /// - `tasks`: `(条目名, 目标路径)` 任务列表
+    /// - `tasks`: 待提取任务列表，见 [`ExtractTask`]
     /// - `gui`: 可选的进度回调，每提取完一个文件触发一次
     ///
     /// # 返回值
@@ -562,7 +574,7 @@ impl BaseArchive {
     /// 任一任务失败时返回该错误；可用线程数不足 2 时退化为顺序提取
     fn extract_tasks_parallel(
         &self,
-        tasks: &[(String, PathBuf)],
+        tasks: &[ExtractTask],
         gui: Option<&dyn IBaseArchiveGui>,
     ) -> CoreResult<()> {
         let thread_count = std::thread::available_parallelism()
@@ -602,23 +614,23 @@ impl BaseArchive {
                             return;
                         }
                     };
-                    for (name, output) in chunk {
+                    for task in chunk {
                         if error.lock().unwrap().is_some() {
                             return;
                         }
-                        if let Some(parent) = output.parent() {
+                        if let Some(parent) = task.output_path.parent() {
                             if let Err(err) = path_helper::create_dir_all(parent) {
                                 *error.lock().unwrap() = Some(err);
                                 return;
                             }
                         }
-                        if let Err(err) = handle.extract_file(&name, &output, None) {
+                        if let Err(err) = handle.extract_file(&task.name, &task.output_path, None) {
                             *error.lock().unwrap() = Some(err);
                             return;
                         }
                         let now = current.fetch_add(1, Ordering::SeqCst) + 1;
                         if let Some(gui) = gui {
-                            gui.update(Some(name.clone()), now);
+                            gui.update(Some(task.name.clone()), now);
                         }
                     }
                 });
@@ -695,14 +707,17 @@ impl BaseArchive {
         gui: Option<&dyn IBaseArchiveGui>,
     ) -> CoreResult<()> {
         // 顺序阶段：计算目标路径，文件名非法时的 GUI 询问保持串行
-        let mut tasks: Vec<(String, PathBuf)> = Vec::new();
+        let mut tasks: Vec<ExtractTask> = Vec::new();
         for entry in &self.entries {
             if entry.is_dir {
                 continue;
             }
             if let Some(base) = map(entry) {
                 let output = self.resolve_output_path(&entry.name, base, gui)?;
-                tasks.push((entry.name.clone(), output));
+                tasks.push(ExtractTask {
+                    name: entry.name.clone(),
+                    output_path: output,
+                });
             }
         }
 
@@ -727,29 +742,21 @@ impl BaseArchive {
     /// Zip 和 Tar 格式下文件直接追加，无需解压或重压缩已有条目；
     /// 7z 和压缩 tar 格式则先解压到临时目录，合并文件后重压缩
     ///
-    /// - `files`: `(磁盘源路径, 压缩包内路径)` 对
+    /// - `files`: 待追加的文件列表，见 [`ArchiveAddFile`]
     /// - `gui`: 可选的进度回调，仅在重压缩时使用
     ///
     /// # 返回值
     ///
     /// 写入失败时返回相应错误；成功后内部条目列表自动刷新
-    pub fn add_files<P: AsRef<Path>>(
-        &mut self,
-        files: &[(P, P)],
-        gui: BaseArchiveGui,
-    ) -> CoreResult<()> {
+    pub fn add_files(&mut self, files: &[ArchiveAddFile], gui: BaseArchiveGui) -> CoreResult<()> {
         if files.is_empty() {
             return Ok(());
         }
         // Zip / Tar 支持就地追加，复用已打开的文件句柄；其余解压后重压缩
         match self.archive_type {
             ArchiveType::Zip | ArchiveType::Tar => {
-                let paths: Vec<(PathBuf, PathBuf)> = files
-                    .iter()
-                    .map(|(src, dest)| (src.as_ref().to_path_buf(), dest.as_ref().to_path_buf()))
-                    .collect();
                 let mut handle = self.handle.lock().unwrap();
-                handle.add_files(&paths)?;
+                handle.add_files(files)?;
                 self.entries = handle.read_entries()?;
                 Ok(())
             }
@@ -759,15 +766,15 @@ impl BaseArchive {
 
     /// 7z / tar.gz / tar.xz 的后备路径：解压到临时目录，写入文件后重压缩
     ///
-    /// - `files`: `(磁盘源路径, 压缩包内路径)` 对
+    /// - `files`: 待追加的文件列表，见 [`ArchiveAddFile`]
     /// - `gui`: 可选的进度回调，仅在重压缩时使用
     ///
     /// # 返回值
     ///
     /// 任一环节失败时返回相应错误
-    fn add_files_extract_recompress<P: AsRef<Path>>(
+    fn add_files_extract_recompress(
         &mut self,
-        files: &[(P, P)],
+        files: &[ArchiveAddFile],
         gui: BaseArchiveGui,
     ) -> CoreResult<()> {
         // 创建临时目录用于解压和新文件
@@ -783,12 +790,12 @@ impl BaseArchive {
         }
 
         // 将新文件复制到临时目录
-        for (src, dest) in files {
-            let dest_path = temp_dir.join(dest.as_ref());
+        for file in files {
+            let dest_path = temp_dir.join(&file.dest);
             if let Some(parent) = dest_path.parent() {
                 path_helper::create_dir_all(parent)?;
             }
-            if let Err(err) = path_helper::copy_file(src.as_ref(), &dest_path) {
+            if let Err(err) = path_helper::copy_file(&file.src, &dest_path) {
                 let _ = fs::remove_dir_all(&temp_dir);
                 return Err(err);
             }
@@ -944,7 +951,13 @@ impl BaseArchive {
     ///
     /// 写入失败时返回相应错误；成功后内部条目列表自动刷新
     pub fn add_file<P: AsRef<Path>>(&mut self, name: &str, path: P) -> CoreResult<()> {
-        self.add_files(&[(path.as_ref().to_path_buf(), PathBuf::from(name))], None)
+        self.add_files(
+            &[ArchiveAddFile {
+                src: path.as_ref().to_path_buf(),
+                dest: PathBuf::from(name),
+            }],
+            None,
+        )
     }
 
     /// 将一个流的内容添加到压缩包并原地保存，已有同路径条目会被覆盖

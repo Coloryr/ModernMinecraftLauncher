@@ -343,14 +343,14 @@ pub fn get_tasks() -> Vec<TaskSnapshot> {
     let read = TASKS.read().unwrap();
     read.iter()
         .map(|t| {
-            let (all_bytes, now_bytes) = t.bytes();
+            let bytes = t.bytes();
             TaskSnapshot {
                 id: t.id,
                 total: t.total_size,
                 completed: t.completed_count.load(Ordering::SeqCst),
                 failed: t.failed_count.load(Ordering::SeqCst),
-                all_bytes,
-                now_bytes,
+                all_bytes: bytes.all_bytes,
+                now_bytes: bytes.now_bytes,
                 elapsed_ms: t.elapsed_ms(),
                 paused: t.is_paused(),
             }

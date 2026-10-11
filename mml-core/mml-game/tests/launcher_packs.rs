@@ -18,6 +18,9 @@ use uuid::Uuid;
 use zip::ZipWriter;
 use zip::write::SimpleFileOptions;
 
+mod common;
+use common::{ZipEntry, entry};
+
 /// 测试运行目录，mml_testutil 临时目录下的进程号子目录，避免多进程冲突
 fn run_dir() -> PathBuf {
     mml_testutil::temp_dir().join(format!("mml-launcher-packs-{}", std::process::id()))
@@ -53,14 +56,22 @@ fn pack_dir() -> PathBuf {
 }
 
 /// 程序化生成一个 zip 压缩包
-fn make_zip(dir: &PathBuf, stem: &str, files: &[(&str, &[u8])]) -> PathBuf {
+///
+/// - `dir`: 输出目录
+/// - `stem`: 压缩包文件名，不带扩展名
+/// - `files`: 条目路径与原始内容
+///
+/// # 返回值
+///
+/// 生成的压缩包路径
+fn make_zip(dir: &PathBuf, stem: &str, files: &[ZipEntry]) -> PathBuf {
     let zip_path = dir.join(format!("{stem}.zip"));
     let file = std::fs::File::create(&zip_path).expect("创建测试压缩包失败");
     let mut writer = ZipWriter::new(file);
     let options = SimpleFileOptions::default();
-    for (name, content) in files {
-        writer.start_file(*name, options).unwrap();
-        writer.write_all(content).unwrap();
+    for e in files {
+        writer.start_file(e.name, options).unwrap();
+        writer.write_all(e.data).unwrap();
     }
     writer.finish().unwrap();
     zip_path
@@ -104,12 +115,20 @@ impl IAddModPackGui for StateRecorder {
     fn set_sub_now(&self, _value: usize, _all: Option<usize>) {}
 }
 
+/// 一次安装的产物
+struct InstalledPack {
+    /// 新建实例的 uuid
+    uuid: Uuid,
+    /// 安装阶段记录器，与传给安装流程的是同一份
+    recorder: StateRecorder,
+}
+
 /// 通用安装入口：无界面回调，重名自动改名
 ///
 /// # 返回值
 ///
-/// 返回实例 uuid 与阶段记录器
-async fn install(zip: &PathBuf, name: Option<String>, pack_type: PackType) -> (Uuid, StateRecorder) {
+/// 见 [`InstalledPack`]；安装失败会 panic
+async fn install(zip: &PathBuf, name: Option<String>, pack_type: PackType) -> InstalledPack {
     let recorder = StateRecorder::default();
     let uuid = add_game::install_archive_from_file(
         zip,
@@ -124,7 +143,7 @@ async fn install(zip: &PathBuf, name: Option<String>, pack_type: PackType) -> (U
     )
     .await
     .expect("安装失败");
-    (uuid, recorder)
+    InstalledPack { uuid, recorder }
 }
 
 /// 断言读到的文件内容
@@ -147,10 +166,10 @@ async fn install_hmcl_pack() {
         &dir,
         "hmcl-pack",
         &[
-            ("mcbbs.packmeta", packmeta.as_bytes()),
-            ("manifest.json", manifest.as_bytes()),
-            ("minecraft/options.txt", b"lang:zh_cn\n"),
-            ("minecraft/mods/dummy.jar", b"dummy mod jar"),
+            entry("mcbbs.packmeta", packmeta.as_bytes()),
+            entry("manifest.json", manifest.as_bytes()),
+            entry("minecraft/options.txt", b"lang:zh_cn\n"),
+            entry("minecraft/mods/dummy.jar", b"dummy mod jar"),
         ],
     );
 
@@ -159,7 +178,7 @@ async fn install_hmcl_pack() {
     assert!(matches!(detected.pack_type, PackType::HMCL));
     assert_eq!(detected.name, "HMCL测试包");
 
-    let (uuid, recorder) = install(&zip, None, PackType::HMCL).await;
+    let InstalledPack { uuid, recorder } = install(&zip, None, PackType::HMCL).await;
 
     let game = mml_game::get_instance(&uuid).expect("安装后应能取到实例");
     let read = game.read().unwrap();
@@ -197,16 +216,16 @@ async fn install_hmcl_server_pack() {
         &dir,
         "hms-pack",
         &[
-            ("server-manifest.json", manifest.as_bytes()),
-            ("overrides/server.properties", b"online-mode=false\n"),
-            ("overrides/mods/dummy.jar", b"dummy mod jar"),
+            entry("server-manifest.json", manifest.as_bytes()),
+            entry("overrides/server.properties", b"online-mode=false\n"),
+            entry("overrides/mods/dummy.jar", b"dummy mod jar"),
         ],
     );
 
     let detected = add_game::detect_pack(&zip).expect("检测失败");
     assert!(matches!(detected.pack_type, PackType::HMCLServer));
 
-    let (uuid, recorder) = install(&zip, None, PackType::HMCLServer).await;
+    let InstalledPack { uuid, recorder } = install(&zip, None, PackType::HMCLServer).await;
 
     let game = mml_game::get_instance(&uuid).expect("安装后应能取到实例");
     let read = game.read().unwrap();
@@ -249,10 +268,10 @@ async fn install_mmc_pack() {
         &dir,
         "mmc-pack",
         &[
-            ("mmcinst/mmc-pack.json", mmc.as_bytes()),
-            ("mmcinst/instance.cfg", cfg.as_bytes()),
-            ("mmcinst/.minecraft/mods/dummy.jar", b"dummy mod jar"),
-            ("mmcinst/.minecraft/options.txt", b"lang:zh_cn\n"),
+            entry("mmcinst/mmc-pack.json", mmc.as_bytes()),
+            entry("mmcinst/instance.cfg", cfg.as_bytes()),
+            entry("mmcinst/.minecraft/mods/dummy.jar", b"dummy mod jar"),
+            entry("mmcinst/.minecraft/options.txt", b"lang:zh_cn\n"),
         ],
     );
 
@@ -260,7 +279,7 @@ async fn install_mmc_pack() {
     assert!(matches!(detected.pack_type, PackType::MMC));
     assert_eq!(detected.name, "MMC测试包");
 
-    let (uuid, recorder) = install(&zip, None, PackType::MMC).await;
+    let InstalledPack { uuid, recorder } = install(&zip, None, PackType::MMC).await;
 
     let game = mml_game::get_instance(&uuid).expect("安装后应能取到实例");
     let read = game.read().unwrap();
@@ -302,9 +321,9 @@ async fn install_game_json_archive() {
         &dir,
         "plain-pack",
         &[
-            ("pack/game.json", game_json.as_bytes()),
-            ("pack/options.txt", b"lang:zh_cn\n"),
-            ("pack/mods/dummy.jar", b"dummy mod jar"),
+            entry("pack/game.json", game_json.as_bytes()),
+            entry("pack/options.txt", b"lang:zh_cn\n"),
+            entry("pack/mods/dummy.jar", b"dummy mod jar"),
         ],
     );
 
@@ -312,7 +331,7 @@ async fn install_game_json_archive() {
     assert!(matches!(detected.pack_type, PackType::ArchivePack));
 
     // 传入的名字覆盖包内配置的名字
-    let (uuid, recorder) =
+    let InstalledPack { uuid, recorder } =
         install(&zip, Some("直接解压导入".to_string()), PackType::ArchivePack).await;
 
     let game = mml_game::get_instance(&uuid).expect("安装后应能取到实例");
@@ -351,12 +370,12 @@ async fn install_launcher_pack_isolated() {
         &dir,
         "pcl-pack",
         &[
-            (json_entry.as_str(), version_json.as_bytes()),
-            (
+            entry(json_entry.as_str(), version_json.as_bytes()),
+            entry(
                 format!(".minecraft/versions/{version_name}/options.txt").as_str(),
                 b"lang:zh_cn\n",
             ),
-            (
+            entry(
                 format!(".minecraft/versions/{version_name}/mods/dummy.jar").as_str(),
                 b"dummy mod jar",
             ),
@@ -366,7 +385,7 @@ async fn install_launcher_pack_isolated() {
     let detected = add_game::detect_pack(&zip).expect("检测失败");
     assert!(matches!(detected.pack_type, PackType::LauncherPack));
 
-    let (uuid, recorder) =
+    let InstalledPack { uuid, recorder } =
         install(&zip, Some("PCL导入".to_string()), PackType::LauncherPack).await;
 
     let game = mml_game::get_instance(&uuid).expect("安装后应能取到实例");
@@ -404,16 +423,16 @@ async fn install_launcher_pack_not_isolated() {
         &dir,
         "plain-mc-pack",
         &[
-            (".minecraft/1.20.1.json", r#"{"id":"1.20.1"}"#.as_bytes()),
-            (".minecraft/mods/dummy.jar", b"dummy mod jar"),
-            (".minecraft/options.txt", b"lang:zh_cn\n"),
+            entry(".minecraft/1.20.1.json", r#"{"id":"1.20.1"}"#.as_bytes()),
+            entry(".minecraft/mods/dummy.jar", b"dummy mod jar"),
+            entry(".minecraft/options.txt", b"lang:zh_cn\n"),
         ],
     );
 
     let detected = add_game::detect_pack(&zip).expect("检测失败");
     assert!(matches!(detected.pack_type, PackType::LauncherPack));
 
-    let (uuid, recorder) = install(&zip, None, PackType::LauncherPack).await;
+    let InstalledPack { uuid, recorder } = install(&zip, None, PackType::LauncherPack).await;
 
     let game = mml_game::get_instance(&uuid).expect("安装后应能取到实例");
     let read = game.read().unwrap();

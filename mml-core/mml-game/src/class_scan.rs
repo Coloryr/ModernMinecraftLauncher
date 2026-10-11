@@ -166,8 +166,9 @@ fn scan_class_for_annotations(
         return Ok(None);
     }
 
-    let (cp, offset_after_pool) = parse_constant_pool(bytes)?;
-    let mut offset = offset_after_pool;
+    let parsed_pool = parse_constant_pool(bytes)?;
+    let cp = parsed_pool.pool;
+    let mut offset = parsed_pool.end_offset;
 
     // 跳过访问标志、this_class、super_class
     offset += 2 + 2 + 2;
@@ -285,14 +286,24 @@ fn from_modified_utf8(data: &[u8]) -> Result<String, Box<dyn std::error::Error>>
     Ok(String::from_utf8(result)?)
 }
 
+/// 常量池解析结果：池本身与它占用的字节区间
+struct ParsedConstantPool {
+    /// 按常量池索引直接访问的 UTF8 字符串数组，见 [`ConstantPool`]
+    pool: ConstantPool,
+    /// 常量池结束后的字节偏移，后续的字段 / 方法解析从这里接着读
+    end_offset: usize,
+}
+
 /// 解析常量池，返回按常量池索引直接访问的 UTF8 字符串数组
 ///
 /// - `bytes`: class 文件字节流
 ///
 /// # 返回值
 ///
-/// 返回常量池与其结束偏移；解析越界返回对应错误
-fn parse_constant_pool(bytes: &[u8]) -> Result<(ConstantPool, usize), Box<dyn std::error::Error>> {
+/// 见 [`ParsedConstantPool`]；解析越界返回对应错误
+fn parse_constant_pool(
+    bytes: &[u8],
+) -> Result<ParsedConstantPool, Box<dyn std::error::Error>> {
     let pool_count = read_u16(bytes, 8)? as usize;
     // 索引 0 保留，实际条目从 1 到 pool_count-1
     let mut cp: ConstantPool = vec![None; pool_count];
@@ -349,7 +360,10 @@ fn parse_constant_pool(bytes: &[u8]) -> Result<(ConstantPool, usize), Box<dyn st
         i += 1;
     }
 
-    Ok((cp, offset))
+    Ok(ParsedConstantPool {
+        pool: cp,
+        end_offset: offset,
+    })
 }
 
 /// 扫描字段

@@ -10,9 +10,8 @@ use std::{collections::HashMap, path::PathBuf, sync::Once};
 use mml_base::archives::BaseArchive;
 use mml_tex_draw::{
     gpu::GpuCtx,
-    model::{bake_model, BakedModel},
+    model::{BakedModel, BakedModelTextures, bake_model},
 };
-use tiny_skia::Pixmap;
 
 /// 取参考客户端 jar 路径，环境变量 MML_TEST_JAR 优先
 fn ref_jar() -> PathBuf {
@@ -53,18 +52,20 @@ fn write_png(name: &str, size: u32, rgba: &[u8]) {
 }
 
 /// 烘焙对照方块模型 furnace，多贴图元素模型
-fn bake_furnace() -> (BakedModel, HashMap<String, Pixmap>) {
+fn bake_furnace() -> BakedModelTextures {
     let jar = ref_jar();
     assert!(jar.exists(), "参考jar不存在：{}", jar.display());
     let archive = BaseArchive::open(&jar).unwrap();
     let mut cache = HashMap::new();
-    let (model, mut textures) =
-        bake_model(&archive, "block/furnace", &mut cache).expect("bake_model 失败");
+    let BakedModelTextures {
+        model,
+        mut textures,
+    } = bake_model(&archive, "block/furnace", &mut cache).expect("bake_model 失败");
 
     // 动画贴图换成首帧：渲染器按单帧 uv 取样，直接喂整条帧条带会渲染错
     mml_tex_draw::block::use_first_frame(&mut textures);
 
-    (model, textures)
+    BakedModelTextures { model, textures }
 }
 
 /// 诊断：每个 quad 的屏幕包围盒与深度，与 GPU 渲染用同一矩阵
@@ -74,12 +75,13 @@ fn print_quad_diag(model: &BakedModel) {
     let model_m = Mat4::from_translation(Vec3::new(size / 2.0, size / 2.0, 0.0))
         * Mat4::from_scale(Vec3::new(size, -size, size))
         * mml_tex_draw::gpu::item_transform_matrix(&model.transform);
-    let (l0, l1) = mml_tex_draw::gpu::light_dirs(model.gui_light_3d);
+    let mml_tex_draw::gpu::LightDirs { light0, light1 } =
+        mml_tex_draw::gpu::light_dirs(model.gui_light_3d);
     println!(
         "furnace：{} quads，L0=({:.2},{:.2},{:.2}) L1=({:.2},{:.2},{:.2})",
         model.quads.len(),
-        l0[0], l0[1], l0[2],
-        l1[0], l1[1], l1[2],
+        light0[0], light0[1], light0[2],
+        light1[0], light1[1], light1[2],
     );
     for q in &model.quads {
         let mut min_x = f32::MAX;
@@ -97,8 +99,8 @@ fn print_quad_diag(model: &BakedModel) {
         }
         let n = Mat3::from_mat4(model_m).inverse().transpose() * Vec3::from(q.normal);
         let n = n.normalize();
-        let d = Vec3::from_slice(&l0[..3]).dot(n).max(0.0)
-            + Vec3::from_slice(&l1[..3]).dot(n).max(0.0);
+        let d = Vec3::from_slice(&light0[..3]).dot(n).max(0.0)
+            + Vec3::from_slice(&light1[..3]).dot(n).max(0.0);
         println!(
             "  {:8} 屏幕x[{:.0},{:.0}] y[{:.0},{:.0}] depth={:.2} n=({:.2},{:.2},{:.2}) accum={:.3}",
             q.tex.split('/').next_back().unwrap_or(""),
@@ -116,7 +118,7 @@ fn render_backend_suite(tag: &str, ctx: &GpuCtx) {
     let archive = BaseArchive::open(ref_jar()).expect("参考jar应能打开");
 
     // 方块：furnace，多贴图元素模型
-    let (model, textures) = bake_furnace();
+    let BakedModelTextures { model, textures } = bake_furnace();
     print_quad_diag(&model);
     let pixels = ctx.render(&model, &textures, None, 256);
     match pixels {
@@ -130,7 +132,7 @@ fn render_backend_suite(tag: &str, ctx: &GpuCtx) {
         let out = mml_tex_draw::item::render_item(Some(ctx), &archive, &mut cache, id)
             .unwrap_or_else(|| panic!("{tag} {id} 渲染失败"));
         let dst = out_dir().join(format!("{id}_{tag}.png"));
-        std::fs::copy(out_dir().join("items").join(&out.1), &dst).unwrap();
+        std::fs::copy(out_dir().join("items").join(&out.out_name), &dst).unwrap();
         println!("输出：{}", dst.display());
     }
 }

@@ -86,6 +86,14 @@ pub fn download(url: &str) -> Option<PathBuf> {
     Some(path)
 }
 
+/// Modrinth 版本里的一个待用文件
+pub struct ProjectFile {
+    /// 文件名，如 `fabulously-optimized-14.0.0-beta.3.mrpack`
+    pub name: String,
+    /// 下载地址，绝对 URL
+    pub url: String,
+}
+
 /// 通过 Modrinth API 解析指定项目与版本号的主文件下载地址
 ///
 /// - `project`: Modrinth 项目 slug
@@ -93,8 +101,8 @@ pub fn download(url: &str) -> Option<PathBuf> {
 ///
 /// # 返回值
 ///
-/// 返回文件名与下载地址；项目或版本不存在时返回 `None`
-pub fn resolve_project_version(project: &str, version: &str) -> Option<(String, String)> {
+/// 见 [`ProjectFile`]；项目或版本不存在时返回 `None`
+pub fn resolve_project_version(project: &str, version: &str) -> Option<ProjectFile> {
     let url = format!("https://api.modrinth.com/v2/project/{project}/version");
     let versions: Vec<ModrinthVersionObj> = get_json(&url)?;
     let target = versions.into_iter().find(|v| v.version_number == version)?;
@@ -106,8 +114,8 @@ pub fn resolve_project_version(project: &str, version: &str) -> Option<(String, 
 /// 版本号是硬编码的：解析测试断言依赖该版本的具体字段与文件数，
 /// 若跟随最新版本，字段会随上游变动而失效
 pub fn download_mrpack() -> Option<PathBuf> {
-    let (_name, url) = resolve_project_version("fabulously-optimized", "14.0.0-beta.3")?;
-    download(&url)
+    let file = resolve_project_version("fabulously-optimized", "14.0.0-beta.3")?;
+    download(&file.url)
 }
 
 /// 常用光影包在 Modrinth 上的项目 slug，已逐一验证存在
@@ -141,8 +149,8 @@ pub fn download_latest(slug: &str) -> Option<PathBuf> {
     let url = format!("https://api.modrinth.com/v2/project/{slug}/version");
     let versions: Vec<ModrinthVersionObj> = get_json(&url)?;
     let target = versions.into_iter().next()?;
-    let (_name, file_url) = pick_file(target)?;
-    download(&file_url)
+    let file = pick_file(target)?;
+    download(&file.url)
 }
 
 /// 取项目的全部版本，Modrinth 的返回顺序是**最新在前**
@@ -202,10 +210,41 @@ fn get_json<T: serde::de::DeserializeOwned>(url: &str) -> Option<T> {
 }
 
 /// 从版本对象中挑选主文件，无主文件时取第一个非空地址
-fn pick_file(target: ModrinthVersionObj) -> Option<(String, String)> {
+fn pick_file(target: ModrinthVersionObj) -> Option<ProjectFile> {
     let file = target
         .files
         .into_iter()
         .find(|f| f.primary || !f.url.is_empty())?;
-    Some((file.filename, file.url))
+    Some(ProjectFile {
+        name: file.filename,
+        url: file.url,
+    })
+}
+
+// ===================== 程序化造包用的条目 =====================
+
+/// 压缩包里的一个二进制条目
+pub struct ZipEntry<'a> {
+    /// 压缩包内的条目路径，用 `/` 分隔
+    pub name: &'a str,
+    /// 条目的原始字节内容，不解码、不改码
+    pub data: &'a [u8],
+}
+
+/// 造 [`ZipEntry`]，供各造包函数把 `&[(&str, &[u8])]` 换成 `&[entry("a", b"x")]`
+pub fn entry<'a>(name: &'a str, data: &'a [u8]) -> ZipEntry<'a> {
+    ZipEntry { name, data }
+}
+
+/// 压缩包里的一个文本条目
+pub struct TextEntry<'a> {
+    /// 压缩包内的条目路径，用 `/` 分隔
+    pub name: &'a str,
+    /// 条目的文本内容，写盘时按 UTF-8 取字节
+    pub text: &'a str,
+}
+
+/// 造 [`TextEntry`]，用途同 [`entry`]
+pub fn text_entry<'a>(name: &'a str, text: &'a str) -> TextEntry<'a> {
+    TextEntry { name, text }
 }

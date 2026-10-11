@@ -33,3 +33,19 @@ pub fn boot() -> PathBuf {
     });
     run
 }
+
+/// 程序化造 jar / 语言表时的一个文本条目
+///
+/// 与 `tests/common` 里那份是同一形状，但 `tests/` 与 crate 内的 `#[cfg(test)]`
+/// 是两个编译单元，类型无法互用，各留一份。
+pub struct TextEntry<'a> {
+    /// 条目名：jar 里是包内路径，语言表里是 key
+    pub name: &'a str,
+    /// 文本内容，写盘时按 UTF-8 取字节
+    pub text: &'a str,
+}
+
+/// 造 [`TextEntry`]
+pub fn text_entry<'a>(name: &'a str, text: &'a str) -> TextEntry<'a> {
+    TextEntry { name, text }
+}

@@ -79,9 +79,9 @@ pub(super) fn looks_like_colormc(dir: &Path) -> bool {
 ///
 /// # 返回值
 ///
-/// 候选目录与来源标记，标记取 `run` / `default` / `fallback`，按可信度从高到低排列
-pub(super) fn candidates() -> Vec<(PathBuf, &'static str)> {
-    let mut list: Vec<(PathBuf, &'static str)> = Vec::new();
+/// 候选目录与来源标记，按可信度从高到低排列
+pub(super) fn candidates() -> Vec<Candidate> {
+    let mut list: Vec<Candidate> = Vec::new();
 
     // 1. run 文件里记的路径
     if let Some(local) = dirs::data_local_dir() {
@@ -91,7 +91,10 @@ pub(super) fn candidates() -> Vec<(PathBuf, &'static str)> {
         {
             let text = text.trim();
             if !text.is_empty() {
-                list.push((PathBuf::from(text), "run"));
+                list.push(Candidate {
+                    dir: PathBuf::from(text),
+                    from: "run",
+                });
             }
         }
     }
@@ -106,15 +109,30 @@ pub(super) fn candidates() -> Vec<(PathBuf, &'static str)> {
     #[cfg(target_os = "macos")]
     let default = Some(PathBuf::from("/Users/shared/ColorMC"));
     if let Some(dir) = default {
-        list.push((dir, "default"));
+        list.push(Candidate {
+            dir,
+            from: "default",
+        });
     }
 
     // 3. 兜底位置
     if let Some(data) = dirs::data_dir() {
-        list.push((data.join(COLORMC_DIR), "fallback"));
+        list.push(Candidate {
+            dir: data.join(COLORMC_DIR),
+            from: "fallback",
+        });
     }
 
     list
+}
+
+/// 一个 ColorMC 工作目录候选
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct Candidate {
+    /// 候选目录
+    pub(super) dir: PathBuf,
+    /// 来源标记，取 `run` / `default` / `fallback`，可信度从高到低
+    pub(super) from: &'static str,
 }
 
 /// 探测本机的 ColorMC 工作目录，取第一个"存在且像 ColorMC 目录"的候选
@@ -122,10 +140,10 @@ pub(super) fn candidates() -> Vec<(PathBuf, &'static str)> {
 /// # 返回值
 ///
 /// 命中的目录与来源标记；一个都没命中返回 `None`
-pub(super) fn detect() -> Option<(PathBuf, &'static str)> {
+pub(super) fn detect() -> Option<Candidate> {
     candidates()
         .into_iter()
-        .find(|(dir, _)| dir.is_dir() && looks_like_colormc(dir))
+        .find(|c| c.dir.is_dir() && looks_like_colormc(&c.dir))
 }
 
 /// ColorMC 的账户文件位置，**在工作目录之外**，所以永远不会被迁移

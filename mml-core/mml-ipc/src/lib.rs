@@ -93,8 +93,8 @@ static RUN_ARG: RwLock<Vec<String>> = RwLock::new(Vec::new());
 /// 游戏上报的鼠标状态，键为实例 ID
 static MOUSE_STATES: LazyLock<RwLock<HashMap<Uuid, bool>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
-/// 游戏上报的窗口大小，键为实例 ID，值为宽高像素
-static WINDOW_SIZES: LazyLock<RwLock<HashMap<Uuid, (i32, i32)>>> =
+/// 游戏上报的窗口大小，键为实例 ID
+static WINDOW_SIZES: LazyLock<RwLock<HashMap<Uuid, WindowSize>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 /// IPC 服务端口，只初始化一次
 static IPC_PORT: OnceLock<u16> = OnceLock::new();
@@ -116,6 +116,18 @@ pub struct ServerInfo {
     pub port: String,
     /// 服务器 MOTD 信息，原样透传给游戏
     pub motd: String,
+}
+
+/// 游戏上报的窗口大小
+///
+/// 由游戏端的「窗口大小」(11) 消息上报，按实例 ID 记入 [`WINDOW_SIZES`]，
+/// 经 [`get_window_size`] 查询
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WindowSize {
+    /// 窗口宽度，单位像素；取值来自游戏端上报的 i32，无有效范围约束
+    pub width: i32,
+    /// 窗口高度，单位像素；取值来自游戏端上报的 i32，无有效范围约束
+    pub height: i32,
 }
 
 /// 注册启动显示事件回调，新启动实例请求显示主窗口时触发
@@ -182,8 +194,8 @@ pub fn get_mouse_state(uuid: Uuid) -> Option<bool> {
 ///
 /// # 返回值
 ///
-/// 返回该实例最近一次上报的窗口大小，宽高各为逻辑像素；未上报过返回 `None`
-pub fn get_window_size(uuid: Uuid) -> Option<(i32, i32)> {
+/// 见 [`WindowSize`]；未上报过返回 `None`
+pub fn get_window_size(uuid: Uuid) -> Option<WindowSize> {
     WINDOW_SIZES.read().unwrap().get(&uuid).copied()
 }
 
@@ -549,7 +561,10 @@ async fn process_message(
             })?;
             let width = data.get_i32();
             let height = data.get_i32();
-            WINDOW_SIZES.write().unwrap().insert(guid, (width, height));
+            WINDOW_SIZES
+                .write()
+                .unwrap()
+                .insert(guid, WindowSize { width, height });
         }
         _ => {
             mml_log::warn(format!("IPC: unknown message type {}", msg_type));
@@ -801,7 +816,13 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(get_window_size(uuid), Some((1920, 1080)));
+        assert_eq!(
+            get_window_size(uuid),
+            Some(WindowSize {
+                width: 1920,
+                height: 1080
+            })
+        );
     }
 
     /// 启动参数消息应写入全局状态并触发参数事件

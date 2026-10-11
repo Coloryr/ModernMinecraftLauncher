@@ -171,6 +171,29 @@ fn create_tran(pitch: f32, yaw: f32) -> Mat4 {
     tran * scale * rotx * roty
 }
 
+/// 二维坐标对，两个 f32 分量
+///
+/// 本身不带语义与单位，口径由使用处确定：投影结果与三角形顶点的屏幕坐标、
+/// 顶点的贴图坐标都是它。一对有明确语义的坐标见 [`Vertex`]。
+#[derive(Clone, Copy)]
+pub(crate) struct Vec2 {
+    /// 横向分量，口径与单位由使用处决定
+    pub(crate) x: f32,
+    /// 纵向分量，口径与单位由使用处决定
+    pub(crate) y: f32,
+}
+
+/// 一个屏幕顶点及其对应的皮肤贴图坐标
+///
+/// 填充三角形时由三个顶点给出「屏幕 → 贴图」的对应关系。
+#[derive(Clone, Copy)]
+pub(crate) struct Vertex {
+    /// 屏幕坐标，单位像素，原点在画布左上角，y 向下增大
+    pub(crate) screen: Vec2,
+    /// 皮肤贴图坐标，单位纹素，原点在贴图左上角，按 64x64 皮肤布局取值
+    pub(crate) uv: Vec2,
+}
+
 /// 投影一个顶点到屏幕坐标
 ///
 /// - `tran`: 模型变换矩阵
@@ -179,8 +202,8 @@ fn create_tran(pitch: f32, yaw: f32) -> Mat4 {
 ///
 /// # 返回值
 ///
-/// 返回 `(x, y)` 屏幕坐标，单位像素
-pub(crate) fn project(tran: &Mat4, point: [f32; 3], enable_z: bool) -> (f32, f32) {
+/// 返回屏幕坐标，单位像素，见 [`Vec2`]
+pub(crate) fn project(tran: &Mat4, point: [f32; 3], enable_z: bool) -> Vec2 {
     let mut res = tran * Vec4::new(point[0], point[1], point[2], 1.0);
 
     if res.w != 0.0 {
@@ -195,7 +218,7 @@ pub(crate) fn project(tran: &Mat4, point: [f32; 3], enable_z: bool) -> (f32, f32
         res.y /= z;
     }
 
-    (res.x, res.y)
+    Vec2 { x: res.x, y: res.y }
 }
 
 /// 输出边长，单位像素，裁剪前为正方形画布
@@ -212,7 +235,7 @@ pub(crate) const SUPERSAMPLE: u32 = 2;
 ///
 /// - `pixmap`: 目标位图，超采样尺寸
 /// - `texture`: 皮肤贴图
-/// - `triangle`: 三个顶点的 `(屏幕坐标, 纹理坐标)`，屏幕坐标单位像素
+/// - `triangle`: 三个顶点，每点给出屏幕坐标与贴图坐标，见 [`Vertex`]
 /// - `scale`: 超采样倍数，屏幕坐标先乘以它
 ///
 /// 三个顶点给出屏幕坐标与纹理坐标的对应关系，据此求出「屏幕 → 纹理」的仿射变换；
@@ -220,20 +243,29 @@ pub(crate) const SUPERSAMPLE: u32 = 2;
 pub(crate) fn fill_triangle(
     pixmap: &mut Pixmap,
     texture: &Pixmap,
-    triangle: [((f32, f32), (f32, f32)); 3],
+    triangle: [Vertex; 3],
     scale: f32,
 ) {
-    let (p0, t0) = triangle[0];
-    let (p1, t1) = triangle[1];
-    let (p2, t2) = triangle[2];
+    let Vertex { screen: p0, uv: t0 } = triangle[0];
+    let Vertex { screen: p1, uv: t1 } = triangle[1];
+    let Vertex { screen: p2, uv: t2 } = triangle[2];
 
     // 屏幕空间的两条边，放大到超采样坐标
-    let p0 = (p0.0 * scale, p0.1 * scale);
-    let p1 = (p1.0 * scale, p1.1 * scale);
-    let p2 = (p2.0 * scale, p2.1 * scale);
+    let p0 = Vec2 {
+        x: p0.x * scale,
+        y: p0.y * scale,
+    };
+    let p1 = Vec2 {
+        x: p1.x * scale,
+        y: p1.y * scale,
+    };
+    let p2 = Vec2 {
+        x: p2.x * scale,
+        y: p2.y * scale,
+    };
 
-    let (ax, ay) = (p1.0 - p0.0, p1.1 - p0.1);
-    let (bx, by) = (p2.0 - p0.0, p2.1 - p0.1);
+    let (ax, ay) = (p1.x - p0.x, p1.y - p0.y);
+    let (bx, by) = (p2.x - p0.x, p2.y - p0.y);
     let det = ax * by - ay * bx;
 
     // 完全退化的三角形会投影成一条线，让下面的仿射变换不可逆，丢掉
@@ -242,16 +274,16 @@ pub(crate) fn fill_triangle(
     }
 
     // 纹理空间的两条边
-    let (ux, uy) = (t1.0 - t0.0, t1.1 - t0.1);
-    let (vx, vy) = (t2.0 - t0.0, t2.1 - t0.1);
+    let (ux, uy) = (t1.x - t0.x, t1.y - t0.y);
+    let (vx, vy) = (t2.x - t0.x, t2.y - t0.y);
 
     let inv = 1.0 / det;
     let m00 = (ux * by - vx * ay) * inv;
     let m01 = (-ux * bx + vx * ax) * inv;
     let m10 = (uy * by - vy * ay) * inv;
     let m11 = (-uy * bx + vy * ax) * inv;
-    let m02 = t0.0 - (m00 * p0.0 + m01 * p0.1);
-    let m12 = t0.1 - (m10 * p0.0 + m11 * p0.1);
+    let m02 = t0.x - (m00 * p0.x + m01 * p0.y);
+    let m12 = t0.y - (m10 * p0.x + m11 * p0.y);
 
     // 注意 `from_row` 的参数是 (sx, ky, kx, sy, tx, ty)，对应矩阵 | sx kx tx ; ky sy ty |，
     // 所以这里不能按行序传，传错等于把矩阵转置，纹理采样会整片错位
@@ -274,9 +306,9 @@ pub(crate) fn fill_triangle(
     paint.blend_mode = BlendMode::SourceOver;
 
     let mut builder = PathBuilder::new();
-    builder.move_to(p0.0, p0.1);
-    builder.line_to(p1.0, p1.1);
-    builder.line_to(p2.0, p2.1);
+    builder.move_to(p0.x, p0.y);
+    builder.line_to(p1.x, p1.y);
+    builder.line_to(p2.x, p2.y);
     builder.close();
 
     let Some(path) = builder.finish() else {
@@ -321,7 +353,13 @@ fn draw_texture_faces(
         let pos = face_pos[face];
 
         // 先把这个面的四个角都投影出来
-        let mut corners = [((0.0f32, 0.0f32), (0.0f32, 0.0f32)); 4];
+        let mut corners = [
+            Vertex {
+                screen: Vec2 { x: 0.0, y: 0.0 },
+                uv: Vec2 { x: 0.0, y: 0.0 },
+            };
+            4
+        ];
         for (i, corner) in corners.iter_mut().enumerate() {
             let screen = project(tran, CUBE_VERTICES[indices[base + i]], enable_z);
             let src = SOURCE_VERTICES[base + i];
@@ -331,7 +369,10 @@ fn draw_texture_faces(
                 pos[0] as f32 + src[0] * 8.0 - (src[0] * 2.0 - 1.0) * texel_eps,
                 pos[1] as f32 + src[1] * 8.0 - (src[1] * 2.0 - 1.0) * texel_eps,
             );
-            *corner = (screen, tex);
+            *corner = Vertex {
+                screen,
+                uv: Vec2 { x: tex.0, y: tex.1 },
+            };
         }
 
         for tri in 0..2 {
@@ -350,6 +391,19 @@ fn draw_texture_faces(
     }
 }
 
+/// 不透明像素的包围盒，坐标是闭区间，单位像素
+#[derive(Clone, Copy)]
+struct Bounds {
+    /// 最左列
+    min_x: u32,
+    /// 最上行
+    min_y: u32,
+    /// 最右列
+    max_x: u32,
+    /// 最下行
+    max_y: u32,
+}
+
 /// 按不透明像素的包围盒裁剪，四周留出 `margin` 像素边距
 ///
 /// - `pixmap`: 待裁剪的位图
@@ -366,7 +420,7 @@ pub(crate) fn crop_content(pixmap: &Pixmap, margin: u32) -> Option<Pixmap> {
     let height = pixmap.height();
     let data = pixmap.data();
 
-    let mut bounds: Option<(u32, u32, u32, u32)> = None; // (min_x, min_y, max_x, max_y)
+    let mut bounds: Option<Bounds> = None;
     for y in 0..height {
         for x in 0..width {
             let offset = ((y * width + x) * 4) as usize;
@@ -374,22 +428,30 @@ pub(crate) fn crop_content(pixmap: &Pixmap, margin: u32) -> Option<Pixmap> {
                 continue;
             }
             bounds = Some(match bounds {
-                None => (x, y, x, y),
-                Some((min_x, min_y, max_x, max_y)) => {
-                    (min_x.min(x), min_y.min(y), max_x.max(x), max_y.max(y))
-                }
+                None => Bounds {
+                    min_x: x,
+                    min_y: y,
+                    max_x: x,
+                    max_y: y,
+                },
+                Some(b) => Bounds {
+                    min_x: b.min_x.min(x),
+                    min_y: b.min_y.min(y),
+                    max_x: b.max_x.max(x),
+                    max_y: b.max_y.max(y),
+                },
             });
         }
     }
 
-    let Some((min_x, min_y, max_x, max_y)) = bounds else {
+    let Some(b) = bounds else {
         return None; // 全透明
     };
 
-    let x0 = min_x.saturating_sub(margin);
-    let y0 = min_y.saturating_sub(margin);
-    let x1 = (max_x + 1 + margin).min(width);
-    let y1 = (max_y + 1 + margin).min(height);
+    let x0 = b.min_x.saturating_sub(margin);
+    let y0 = b.min_y.saturating_sub(margin);
+    let x1 = (b.max_x + 1 + margin).min(width);
+    let y1 = (b.max_y + 1 + margin).min(height);
     let w = x1 - x0;
     let h = y1 - y0;
 

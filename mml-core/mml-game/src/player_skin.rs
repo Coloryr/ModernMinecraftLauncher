@@ -174,6 +174,14 @@ fn is_uuid(input: &str) -> bool {
     plain.len() == 32 && plain.chars().all(|c| c.is_ascii_hexdigit())
 }
 
+/// 按玩家名或 UUID 取到的皮肤
+pub struct SkinFetch {
+    /// 玩家名，以档案里的 `profileName` 为准；档案没给名字时是传入的 UUID
+    pub name: String,
+    /// 皮肤图片的本地缓存路径，由 [`load_texture`] 按内容 SHA1 落盘
+    pub path: PathBuf,
+}
+
 /// 按用户名或 UUID 取玩家皮肤，走官方会话服务器
 ///
 /// - `input`: 玩家名或 UUID
@@ -182,9 +190,9 @@ fn is_uuid(input: &str) -> bool {
 ///
 /// # 返回值
 ///
-/// 玩家名与皮肤文件缓存路径，名字以档案里的 `profileName` 为准；
+/// 见 [`SkinFetch`]；
 /// 玩家不存在 / 档案没有皮肤 / 皮肤下载失败都报 DataNotFound
-pub async fn fetch_skin_by_input(input: &str) -> CoreResult<(String, PathBuf)> {
+pub async fn fetch_skin_by_input(input: &str) -> CoreResult<SkinFetch> {
     let input = input.trim();
     let not_found = || ErrorType::SkinBlockError(SkinBlockErrorData::PlayerNotFound);
 
@@ -210,7 +218,10 @@ pub async fn fetch_skin_by_input(input: &str) -> CoreResult<(String, PathBuf)> {
         .profile_name
         .or(name)
         .unwrap_or_else(|| uuid.clone());
-    Ok((name, file.path))
+    Ok(SkinFetch {
+        name,
+        path: file.path,
+    })
 }
 
 /// 解析 profile 属性里的皮肤数据，属性值是 base64 后的 JSON

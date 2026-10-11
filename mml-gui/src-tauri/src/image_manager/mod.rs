@@ -44,8 +44,17 @@ use self::skin::{load_skin_image, load_skinraw_image};
 /// 实例图标内存缓存
 pub(super) static INSTANCE_IMAGE: LazyLock<RwLock<HashMap<Uuid, Vec<u8>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
+/// 渲染图缓存的键：皮肤内容 sha1 加渲染配置
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(super) struct PairImageKey {
+    /// 皮肤 / 披风内容的 sha1
+    pub(super) sha1: String,
+    /// 渲染配置，决定同一份皮肤出哪张图
+    pub(super) config: String,
+}
+
 /// 「(皮肤内容 sha1, 渲染配置) → PNG 字节」的内存缓存类型，头像与皮肤全身图同形状
-pub(super) type PairImageCache = LazyLock<RwLock<HashMap<(String, String), Vec<u8>>>>;
+pub(super) type PairImageCache = LazyLock<RwLock<HashMap<PairImageKey, Vec<u8>>>>;
 
 /// 账户头像内存缓存，键是皮肤内容 sha1 加头像渲染配置；同一皮肤的头像跨账户共享
 pub(super) static HEAD_IMAGE: PairImageCache = LazyLock::new(|| RwLock::new(HashMap::new()));

@@ -124,7 +124,14 @@ fn append_commands(b: &mut String, sigs: &[Sig]) {
             let list = s
                 .params
                 .iter()
-                .map(|(n, t, opt)| format!("{n}{}: {t}", if *opt { "?" } else { "" }))
+                .map(|p| {
+                    format!(
+                        "{}{}: {}",
+                        p.name,
+                        if p.optional { "?" } else { "" },
+                        p.ty
+                    )
+                })
                 .collect::<Vec<_>>()
                 .join(", ");
             let arg = if s.params.is_empty() {
@@ -133,7 +140,7 @@ fn append_commands(b: &mut String, sigs: &[Sig]) {
                 let obj = s
                     .params
                     .iter()
-                    .map(|(n, _, _)| n.clone())
+                    .map(|p| p.name.clone())
                     .collect::<Vec<_>>()
                     .join(", ");
                 format!(", {{ {obj} }}")
@@ -213,10 +220,11 @@ fn append_types(b: &mut String, decls: &[Decl], ext: &BTreeMap<String, String>) 
                 Some("lowercase") => raw_name.to_ascii_lowercase(),
                 _ => raw_name.to_string(),
             };
-            let (ts, opt) = ts_field(raw_ty, input_only, ext);
+            let field = ts_field(raw_ty, input_only, ext);
             b.push_str(&format!(
-                "  {ts_name}{}: {ts},\n",
-                if opt { "?" } else { "" }
+                "  {ts_name}{}: {},\n",
+                if field.optional { "?" } else { "" },
+                field.ty
             ));
         }
         b.push_str("};\n\n");
@@ -226,27 +234,24 @@ fn append_types(b: &mut String, decls: &[Decl], ext: &BTreeMap<String, String>) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Decl, Sig};
+    use crate::{ts::TsParam, Decl, Sig};
 
     /// 造一条命令签名，无显式分组
     ///
     /// - `module`: 来源模块路径
     /// - `name`: 命令名
-    /// - `params`: (TS 参数名, TS 类型, 是否可缺省)
+    /// - `params`: 命令参数表
     /// - `ret`: TS 返回类型
     ///
     /// # 返回值
     ///
     /// 测试用签名
-    fn sig(module: &str, name: &str, params: Vec<(&str, &str, bool)>, ret: &str) -> Sig {
+    fn sig(module: &str, name: &str, params: Vec<TsParam>, ret: &str) -> Sig {
         Sig {
             module: module.into(),
             name: name.into(),
             group: None,
-            params: params
-                .into_iter()
-                .map(|(n, t, o)| (n.into(), t.into(), o))
-                .collect(),
+            params,
             ret: ret.into(),
         }
     }
@@ -293,7 +298,7 @@ mod tests {
             sig(
                 "windows::add_modpack",
                 "add_modpack_search",
-                vec![("source", "string", false)],
+                vec![TsParam::new("source", "string", false)],
                 "ModpackSearchDto",
             ),
             sig("windows::add_modpack", "add_modpack_start", vec![], "void"),
@@ -375,7 +380,7 @@ mod tests {
         let sigs = vec![sig(
             "windows::main",
             "main_open",
-            vec![("page", "number | null", true)],
+            vec![TsParam::new("page", "number | null", true)],
             "void",
         )];
         let out = bindings_ts(&[], &sigs, &BTreeMap::new());

@@ -15,21 +15,24 @@ use uuid::Uuid;
 use zip::ZipWriter;
 use zip::write::SimpleFileOptions;
 
+mod common;
+use common::{ZipEntry, entry};
+
 /// 程序化生成一个 zip 压缩包
 ///
-/// - `files`: 条目路径与内容的列表
+/// - `files`: 条目路径与原始内容
 ///
 /// # 返回值
 ///
 /// 生成的压缩包路径，落在测试临时目录
-fn make_zip(files: &[(&str, &[u8])]) -> PathBuf {
+fn make_zip(files: &[ZipEntry]) -> PathBuf {
     let zip_path = mml_testutil::temp_dir().join(format!("mml-launcherpack-{}.zip", Uuid::new_v4()));
     let file = std::fs::File::create(&zip_path).expect("创建测试压缩包失败");
     let mut writer = ZipWriter::new(file);
     let options = SimpleFileOptions::default();
-    for (name, content) in files {
-        writer.start_file(*name, options).unwrap();
-        writer.write_all(content).unwrap();
+    for e in files {
+        writer.start_file(e.name, options).unwrap();
+        writer.write_all(e.data).unwrap();
     }
     writer.finish().unwrap();
     zip_path
@@ -50,8 +53,8 @@ fn version_json(id: &str) -> Vec<u8> {
 #[test]
 fn find_minecraft_prefix_finds_root() {
     let zip = make_zip(&[
-        (".minecraft/mods/a.jar", b"a"),
-        (".minecraft/options.txt", b"x"),
+        entry(".minecraft/mods/a.jar", b"a"),
+        entry(".minecraft/options.txt", b"x"),
     ]);
     let archive = BaseArchive::open(&zip).unwrap();
     assert_eq!(
@@ -63,7 +66,7 @@ fn find_minecraft_prefix_finds_root() {
 /// `.minecraft` 被一层目录包住时也能定位到
 #[test]
 fn find_minecraft_prefix_finds_wrapped() {
-    let zip = make_zip(&[("mygame/.minecraft/mods/a.jar", b"a")]);
+    let zip = make_zip(&[entry("mygame/.minecraft/mods/a.jar", b"a")]);
     let archive = BaseArchive::open(&zip).unwrap();
     assert_eq!(
         find_minecraft_prefix(archive.entries()).as_deref(),
@@ -74,7 +77,7 @@ fn find_minecraft_prefix_finds_wrapped() {
 /// 压缩包里没有 `.minecraft` 时返回 `None`
 #[test]
 fn find_minecraft_prefix_none() {
-    let zip = make_zip(&[("some/other/file.txt", b"a")]);
+    let zip = make_zip(&[entry("some/other/file.txt", b"a")]);
     let archive = BaseArchive::open(&zip).unwrap();
     assert!(find_minecraft_prefix(archive.entries()).is_none());
 }
@@ -85,9 +88,9 @@ fn version_folder_has_data_detects_isolation() {
     // 版本文件夹内除 json/jar 外还有游戏资源 → 视为隔离
     let json = version_json("1.21.1");
     let zip = make_zip(&[
-        (".minecraft/versions/1.21.1/1.21.1.json", json.as_slice()),
-        (".minecraft/versions/1.21.1/1.21.1.jar", b"jar"),
-        (".minecraft/versions/1.21.1/config/example.toml", b"c"),
+        entry(".minecraft/versions/1.21.1/1.21.1.json", json.as_slice()),
+        entry(".minecraft/versions/1.21.1/1.21.1.jar", b"jar"),
+        entry(".minecraft/versions/1.21.1/config/example.toml", b"c"),
     ]);
     let archive = BaseArchive::open(&zip).unwrap();
     assert!(version_folder_has_data(&archive, ".minecraft/", "1.21.1"));
@@ -95,8 +98,8 @@ fn version_folder_has_data_detects_isolation() {
     // 只有 json/jar → 常规布局，未隔离
     let json = version_json("1.21.1");
     let zip = make_zip(&[
-        (".minecraft/versions/1.21.1/1.21.1.json", json.as_slice()),
-        (".minecraft/versions/1.21.1/1.21.1.jar", b"jar"),
+        entry(".minecraft/versions/1.21.1/1.21.1.json", json.as_slice()),
+        entry(".minecraft/versions/1.21.1/1.21.1.jar", b"jar"),
     ]);
     let archive = BaseArchive::open(&zip).unwrap();
     assert!(!version_folder_has_data(&archive, ".minecraft/", "1.21.1"));
@@ -108,8 +111,8 @@ fn scan_versions_detects_isolation_and_name() {
     let root = version_json("1.20.1");
     let isolated = version_json("1.21.1");
     let zip = make_zip(&[
-        (".minecraft/1.20.1.json", root.as_slice()),
-        (
+        entry(".minecraft/1.20.1.json", root.as_slice()),
+        entry(
             ".minecraft/versions/1.21.1/1.21.1.json",
             isolated.as_slice(),
         ),
@@ -139,9 +142,9 @@ fn pick_primary_prefers_launcher_profiles() {
     let v1 = version_json("1.20.1");
     let v2 = version_json("1.21.1");
     let zip = make_zip(&[
-        (".minecraft/1.20.1.json", v1.as_slice()),
-        (".minecraft/1.21.1.json", v2.as_slice()),
-        (
+        entry(".minecraft/1.20.1.json", v1.as_slice()),
+        entry(".minecraft/1.21.1.json", v2.as_slice()),
+        entry(
             ".minecraft/launcher_profiles.json",
             br#"{"profiles":{"a":{"lastVersionId":"1.21.1"}}}"#,
         ),
@@ -158,9 +161,9 @@ fn pick_primary_prefers_isolated_with_data() {
     let v1 = version_json("1.20.1");
     let v2 = version_json("1.21.1");
     let zip = make_zip(&[
-        (".minecraft/1.20.1.json", v1.as_slice()),
-        (".minecraft/versions/1.21.1/1.21.1.json", v2.as_slice()),
-        (".minecraft/versions/1.21.1/config/example.toml", b"c"),
+        entry(".minecraft/1.20.1.json", v1.as_slice()),
+        entry(".minecraft/versions/1.21.1/1.21.1.json", v2.as_slice()),
+        entry(".minecraft/versions/1.21.1/config/example.toml", b"c"),
     ]);
     let archive = BaseArchive::open(&zip).unwrap();
     let versions = scan_versions(&archive, ".minecraft/");
@@ -172,7 +175,7 @@ fn pick_primary_prefers_isolated_with_data() {
 #[test]
 fn pick_primary_single_version() {
     let v1 = version_json("1.20.1");
-    let zip = make_zip(&[(".minecraft/1.20.1.json", v1.as_slice())]);
+    let zip = make_zip(&[entry(".minecraft/1.20.1.json", v1.as_slice())]);
     let archive = BaseArchive::open(&zip).unwrap();
     let versions = scan_versions(&archive, ".minecraft/");
     assert_eq!(pick_primary(&archive, ".minecraft/", &versions), Some(0));

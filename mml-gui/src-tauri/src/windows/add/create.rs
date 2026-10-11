@@ -14,11 +14,19 @@ use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 
 use crate::dtos::{DetectedPackDto, DirEntry, FolderInstanceDto};
 use crate::windows::add_resource::SourceInfo;
-use crate::windows::modpack_task::{LOCAL_PACK_PID, finish_task, register_task};
+use crate::windows::modpack_task::{LOCAL_PACK_PID, RegisteredTask, finish_task, register_task};
 use uuid::Uuid;
 
 use super::loader::{parse_loader, parse_pack_type};
 use super::model::{AddWindowModel, instance_gui, model, pack_gui};
+
+/// 一次安装任务的前置上下文：窗口模型句柄与这次任务的取消令牌
+pub(super) struct PreparedTask {
+    /// 本窗口模型句柄，与窗口注册表里那份是同一个；持有它即保证安装期间模型不被释放
+    pub(super) model: Arc<Mutex<AddWindowModel>>,
+    /// 本次任务的取消令牌，已通过 `set_cancel` 写进模型
+    pub(super) token: CancellationToken,
+}
 
 /// 任务前置检查：确认窗口模型存在，即窗口已开，并返回模型与新任务的取消令牌
 ///
@@ -29,14 +37,15 @@ use super::model::{AddWindowModel, instance_gui, model, pack_gui};
 ///
 /// # 返回值
 ///
-/// 模型缺失时返回 `err.modelMissing`
-pub(super) fn prepare(
-    window: &WebviewWindow,
-) -> Result<(Arc<Mutex<AddWindowModel>>, CancellationToken), String> {
+/// 见 [`PreparedTask`]；模型缺失时返回 `err.modelMissing`
+pub(super) fn prepare(window: &WebviewWindow) -> Result<PreparedTask, String> {
     let store = model(window)?;
     let token = CancellationToken::new();
     store.lock().unwrap().set_cancel(token.clone());
-    Ok((store, token))
+    Ok(PreparedTask {
+        model: store,
+        token,
+    })
 }
 
 /// 列出目录的直接内容，目录优先，再按名称排序
@@ -172,7 +181,10 @@ pub async fn add_create_new(
     loader_version: Option<String>,
     group: Option<String>,
 ) -> Result<String, String> {
-    let (_store, _token) = prepare(&window)?;
+    let PreparedTask {
+        model: _store,
+        token: _token,
+    } = prepare(&window)?;
     // 前端传的是分组 uuid；空 / 非法 = 默认分组
     let group = crate::windows::parse_group_id(group);
     let loader = parse_loader(&loader)?;
@@ -218,7 +230,10 @@ pub async fn add_import_folder(
     name: Option<String>,
     group: Option<String>,
 ) -> Result<String, String> {
-    let (_store, token) = prepare(&window)?;
+    let PreparedTask {
+        model: _store,
+        token,
+    } = prepare(&window)?;
     // 前端传的是分组 uuid；空 / 非法 = 默认分组
     let group = crate::windows::parse_group_id(group);
     // 安装 future 非 Send：阻塞线程 block_on；读锁在块内释放后再发事件
@@ -269,7 +284,10 @@ pub async fn add_import_archive(
     group: Option<String>,
     unselect: Option<Vec<String>>,
 ) -> Result<String, String> {
-    let (_store, token) = prepare(&window)?;
+    let PreparedTask {
+        model: _store,
+        token,
+    } = prepare(&window)?;
     // 前端传的是分组 uuid；空 / 非法 = 默认分组
     let group = crate::windows::parse_group_id(group);
     let pack = parse_pack_type(&pack_type)?;
@@ -284,7 +302,10 @@ pub async fn add_import_archive(
             fid: path.clone(),
         };
         let display = name.clone().unwrap_or_else(|| pack_file_stem(&path));
-        let (task, progress) = register_task(&app, key, "local", display, token.clone())?;
+        let RegisteredTask {
+            task,
+            gui: progress,
+        } = register_task(&app, key, "local", display, token.clone())?;
         (progress, Some(task))
     } else {
         (pack_gui(&window), None)
@@ -375,7 +396,10 @@ pub async fn add_import_url(
     name: Option<String>,
     group: Option<String>,
 ) -> Result<String, String> {
-    let (_store, token) = prepare(&window)?;
+    let PreparedTask {
+        model: _store,
+        token,
+    } = prepare(&window)?;
     // 前端传的是分组 uuid；空 / 非法 = 默认分组
     let group = crate::windows::parse_group_id(group);
     let gui = instance_gui(&window);

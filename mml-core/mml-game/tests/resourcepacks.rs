@@ -6,6 +6,7 @@
 
 mod common;
 
+use common::{TextEntry, text_entry};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Once;
@@ -80,7 +81,7 @@ fn make_resourcepack_with(meta: &[u8]) -> PathBuf {
 }
 
 /// 生成一个带**自带语言表**的资源包 zip，表放在 `assets/<命名空间>/lang/<语言代码>.json`
-fn make_resourcepack_with_lang(meta: &[u8], lang_files: &[(&str, &str)]) -> PathBuf {
+fn make_resourcepack_with_lang(meta: &[u8], lang_files: &[TextEntry]) -> PathBuf {
     let path = mml_testutil::temp_dir().join(format!(
         "mml-resourcepack-lang-{}.zip",
         uuid::Uuid::new_v4()
@@ -92,9 +93,9 @@ fn make_resourcepack_with_lang(meta: &[u8], lang_files: &[(&str, &str)]) -> Path
     writer.start_file("pack.mcmeta", options).unwrap();
     writer.write_all(meta).unwrap();
 
-    for (name, text) in lang_files {
-        writer.start_file(*name, options).unwrap();
-        writer.write_all(text.as_bytes()).unwrap();
+    for e in lang_files {
+        writer.start_file(e.name, options).unwrap();
+        writer.write_all(e.text.as_bytes()).unwrap();
     }
 
     writer.finish().unwrap();
@@ -248,7 +249,7 @@ fn read_translate_from_pack_lang() {
     let meta = r#"{"pack":{"pack_format":18,"min_format":18,"max_format":97,"description":{"translate":"fo.resourcePack.chatreportinghelper","fallback":"§7Explains chat reporting with simple phrases and icons§r"}}}"#;
     let path = make_resourcepack_with_lang(
         meta.as_bytes(),
-        &[(
+        &[text_entry(
             "assets/fo/lang/zh_cn.json",
             r#"{"fo.resourcePack.chatreportinghelper":"§7用简单的短语与图标说明聊天举报机制§r"}"#,
         )],
@@ -265,7 +266,7 @@ fn read_translate_falls_back_to_en_us_lang() {
     let meta = br#"{"pack":{"pack_format":15,"description":{"translate":"sodium.resource_pack.unofficial","fallback":"Unofficial translations for Sodium"}}}"#;
     let path = make_resourcepack_with_lang(
         meta,
-        &[(
+        &[text_entry(
             "assets/sodium/lang/en_us.json",
             r#"{"sodium.resource_pack.unofficial":"EN text"}"#,
         )],
@@ -291,7 +292,7 @@ fn read_translate_without_lang_falls_back() {
     let other_key = make_resourcepack_with_lang(
         r#"{"pack":{"pack_format":15,"description":{"translate":"some.key","fallback":"兜底文字"}}}"#
             .as_bytes(),
-        &[("assets/fo/lang/zh_cn.json", r#"{"other.key":"别的"}"#)],
+        &[text_entry("assets/fo/lang/zh_cn.json", r#"{"other.key":"别的"}"#)],
     );
     assert_eq!(
         process_resourcepack(&other_key).unwrap().description,
@@ -301,7 +302,7 @@ fn read_translate_without_lang_falls_back() {
     // 连 fallback 都没有 → 把 key 原样给出来，比留空强
     let bare = make_resourcepack_with_lang(
         r#"{"pack":{"pack_format":15,"description":{"translate":"some.key"}}}"#.as_bytes(),
-        &[("assets/fo/lang/zh_cn.json", r#"{"other.key":"别的"}"#)],
+        &[text_entry("assets/fo/lang/zh_cn.json", r#"{"other.key":"别的"}"#)],
     );
     assert_eq!(process_resourcepack(&bare).unwrap().description, "some.key");
 }

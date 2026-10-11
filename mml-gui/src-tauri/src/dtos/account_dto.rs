@@ -85,14 +85,14 @@ impl AccountStoreDto {
     ///
     /// 返回前端显示用 DTO
     pub fn from_login(login: &LoginObj) -> Self {
-        let (c1, c2) = palette(&login.uuid);
+        let AvatarPalette { start, end } = palette(&login.uuid);
         Self {
             user_name: login.user_name.clone(),
             uuid: login.uuid.clone(),
             auth_type: auth_type_str(&login.auth_type).to_string(),
             login_time: login.last_login.format("%Y-%m-%d %H:%M").to_string(),
-            avatar_color: format!("linear-gradient(135deg, {c1}, {c2})"),
-            skin: c1,
+            avatar_color: format!("linear-gradient(135deg, {start}, {end})"),
+            skin: start,
             // 本地判过期：仅 OAuth 记录了 expire_at，其余类型恒有效
             token_status: if login.is_expired() {
                 "expired".to_string()
@@ -149,14 +149,22 @@ fn auth_type_str(t: &AuthType) -> &'static str {
     }
 }
 
+/// 无皮肤账户的头像占位配色，按 uuid 哈希取，供前端画渐变占位图
+struct AvatarPalette {
+    /// 渐变起点色，CSS 颜色字面量，同时用作无皮肤时的占位色
+    start: String,
+    /// 渐变终点色，CSS 颜色字面量
+    end: String,
+}
+
 /// 按 uuid 哈希取配色，用作无皮肤时的占位色
 ///
 /// - `uuid`: 账户 UUID
 ///
 /// # 返回值
 ///
-/// 返回渐变起点色与终点色，均为 CSS 颜色
-fn palette(uuid: &str) -> (String, String) {
+/// 见 [`AvatarPalette`]
+fn palette(uuid: &str) -> AvatarPalette {
     const P: [(&str, &str); 6] = [
         ("#3f8cff", "#5f6cff"),
         ("#34d399", "#22d3ee"),
@@ -169,5 +177,8 @@ fn palette(uuid: &str) -> (String, String) {
         .bytes()
         .fold(0u32, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u32));
     let (c1, c2) = P[(h as usize) % P.len()];
-    (c1.to_string(), c2.to_string())
+    AvatarPalette {
+        start: c1.to_string(),
+        end: c2.to_string(),
+    }
 }

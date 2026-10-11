@@ -18,6 +18,18 @@ use tokio_util::sync::CancellationToken;
 
 use crate::download_item::DownloadItem;
 
+/// 下载任务的字节统计
+///
+/// 由 [`DownloadTask::bytes()`] 汇总全部下载项得到，口径与
+/// `crate::TaskSnapshot` 的 `all_bytes` / `now_bytes` 一致
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct TaskBytes {
+    /// 全部文件的总大小，单位字节；元信息未知、无 Content-Length 的文件按 0 计
+    pub(crate) all_bytes: u64,
+    /// 已下载大小，单位字节；元信息未知的文件按 0 计
+    pub(crate) now_bytes: u64,
+}
+
 /// 下载任务
 ///
 /// 封装一组待下载文件的队列，提供进度跟踪、取消、暂停和完成等待功能。
@@ -159,15 +171,19 @@ impl DownloadTask {
     ///
     /// # 返回值
     ///
-    /// 返回总大小与已下载大小，单位字节；元信息未知、无 Content-Length 的文件按 0 计
-    pub fn bytes(&self) -> (u64, u64) {
+    /// 见 [`TaskBytes`]
+    pub fn bytes(&self) -> TaskBytes {
         let all = self.all.lock().unwrap();
-        all.iter().fold((0, 0), |(all_size, now_size), item| {
-            (
-                all_size + item.get_all_size(),
-                now_size + item.get_now_size(),
-            )
-        })
+        all.iter().fold(
+            TaskBytes {
+                all_bytes: 0,
+                now_bytes: 0,
+            },
+            |acc, item| TaskBytes {
+                all_bytes: acc.all_bytes + item.get_all_size(),
+                now_bytes: acc.now_bytes + item.get_now_size(),
+            },
+        )
     }
 
     /// 获取下载进度百分比，包含已完成和失败的文件

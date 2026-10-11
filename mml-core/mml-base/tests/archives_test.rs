@@ -17,7 +17,7 @@ use std::{
 };
 
 use mml_base::archives::{
-    ArchiveType, BaseArchive, IBaseArchiveGui, TarMode, compress, decompress,
+    ArchiveAddFile, ArchiveType, BaseArchive, IBaseArchiveGui, TarMode, compress, decompress,
 };
 use mml_sys::path_helper;
 
@@ -301,7 +301,10 @@ fn test_base_archive_open_read_extract() {
         fs::write(&extra, b"extra content").unwrap();
         archive
             .add_files(
-                &[(extra.clone(), PathBuf::from("added/from_disk.txt"))],
+                &[ArchiveAddFile {
+                    src: extra.clone(),
+                    dest: PathBuf::from("added/from_disk.txt"),
+                }],
                 None,
             )
             .unwrap_or_else(|e| panic!("{:?} add_files 失败: {:?}", archive_type, e));
@@ -569,7 +572,13 @@ fn test_zip_add_files_duplicate_name_documented() {
 
     let extra = root.join("a2.txt");
     fs::write(&extra, b"other").unwrap();
-    let result = archive.add_files(&[(extra.clone(), PathBuf::from("a.txt"))], None);
+    let result = archive.add_files(
+        &[ArchiveAddFile {
+            src: extra.clone(),
+            dest: PathBuf::from("a.txt"),
+        }],
+        None,
+    );
     assert!(result.is_err(), "Zip 同名追加应报错（现状）");
 
     // Tar 同名追加不会报错，tar 允许重复条目，此处不展开

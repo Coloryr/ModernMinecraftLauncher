@@ -95,11 +95,19 @@ impl ThreadInfo {
 static THREADS: LazyLock<RwLock<HashMap<u32, ThreadInfo>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
+/// 某个下载线程最近一次上报的文件名与状态，去重比较用
+struct LastReport {
+    /// 文件名，与发给前端的名字同一个口径，见 [`DownloadGuiHook::item_name`]
+    name: String,
+    /// 内核下载状态编号，取自 `DownloadItemState::state_to_int()`，只用于比较是否变化
+    state: u32,
+}
+
 /// 下载线程 → 最近一次上报的文件名与状态两项
 ///
 /// 下载器按 HTTP 块粒度回调 `update`，这里去重：同一线程
 /// 文件名与状态均未变化时不重复发事件。
-type LastItem = HashMap<u32, (String, u32)>;
+type LastItem = HashMap<u32, LastReport>;
 
 /// 下载器 UI 回调桥接，把回调转发为 Tauri 事件
 pub struct DownloadGuiHook {
@@ -203,11 +211,17 @@ impl mml_downloader::IDownloadGui for DownloadGuiHook {
         {
             let mut last = self.last.lock().unwrap();
             match last.get(&thread) {
-                Some((old_name, old_state)) if *old_name == name && *old_state == state_num => {
+                Some(old) if old.name == name && old.state == state_num => {
                     return;
                 }
                 _ => {
-                    last.insert(thread, (name.clone(), state_num));
+                    last.insert(
+                        thread,
+                        LastReport {
+                            name: name.clone(),
+                            state: state_num,
+                        },
+                    );
                 }
             }
         }
