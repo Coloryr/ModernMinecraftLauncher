@@ -1,50 +1,50 @@
-//! 26.3 固定方块图标表（生成脚本一次性提取，26.3增量更新，提交后可手工维护）
+//! 26.3 固定方块图标表：生成脚本一次性提取，26.3增量更新，提交后可手工维护
 //!
-//! 每行：方块ID、创造模式分类（itemGroup lang键尾段）、渲染规格。
-//! 渲染规格取自 assets/minecraft/items/*.json（创造物品栏图标定义）：
-//! - Model：block/ 或 item/ 模型（引用链上有 elements，走等轴测渲染）
-//! - Composite：多模型拼接（床），translation 单位为方块（0-16空间×16）
-//! - Skip：实体渲染（special），无法离线渲染
-//! 平面精灵类方块（树苗/花草/火把/铁轨/悬挂式告示牌等纯cross/平面模型，无3D观感）不进表，
+//! 每行：方块ID、创造模式分类，即itemGroup lang键尾段、渲染规格。
+//! 渲染规格取自 assets/minecraft/items/*.json，即创造物品栏图标定义：
+//! - Model：block/ 或 item/ 模型，引用链上有 elements，走等轴测渲染
+//! - Composite：多模型拼接，用于床；translation 单位为方块，即0-16空间×16
+//! - Skip：实体渲染，即special，无法离线渲染
+//! 平面精灵类方块，树苗/花草/火把/铁轨/悬挂式告示牌等纯cross或平面模型、无3D观感，不进表，
 //! 留给item渲染；门/木牌/蛋糕/炼药锅/比较器等有3D方块模型的均进表。
-//! 其中蛋糕/炼药锅/比较器在游戏创造栏走平面贴图（模型无display），
-//! 按需求用IsoModel强制标准gui旋转让其3D化；门为bottom+top拼合（同样强制iso）。
-//! 玻璃板/铃铛3D观感差（纯竖直平面/铃身是实体模型），不进表，走item平面贴图。
-//! 双形态方块：按钮(_pressed)/压力板(_down)/熔炉高炉(_lit)/红石灯(_lit)等
+//! 其中蛋糕/炼药锅/比较器在游戏创造栏走平面贴图，模型无display，
+//! 按需求用IsoModel强制标准gui旋转让其3D化；门为bottom+top拼合，同样强制iso。
+//! 玻璃板/铃铛3D观感差，纯竖直平面或铃身是实体模型，不进表，走item平面贴图。
+//! 双形态方块：按钮 `_pressed` / 压力板 `_down` / 熔炉高炉 `_lit` / 红石灯 `_lit` 等
 //! 两种形态各出一图标，条目用IconSpec::Form(SpecialForm, 规格)标记，
-//! 后缀ID非真实方块名（如 furnace_lit → block/furnace_on 模型），
+//! 后缀ID非真实方块名，如 furnace_lit → block/furnace_on 模型，
 //! 出图但不注册进方块列表，经SpecialForm/get_block_path_form按形态取图。
-//! 分类提取自 CreativeModeTabs.class 字节码（tab lambda 的 Items/Blocks 引用），
+//! 分类提取自 CreativeModeTabs.class 字节码，即 tab lambda 的 Items/Blocks 引用，
 //! 未提取到的归 ingredients。
 
 /// 渲染规格
 #[derive(Debug, Clone, Copy)]
 pub enum IconSpec {
-    /// 3D模型（block/或item/相对名）
+    /// 3D模型，取 block/ 或 item/ 下的相对名
     Model(&'static str),
-    /// 强制等轴测3D模型：模型无display变换（游戏创造栏对这些走平面贴图），
-    /// 按标准方块gui旋转（30/225/0，缩放0.625）渲染出3D观感
+    /// 强制等轴测3D模型：模型无display变换，游戏创造栏对这些走平面贴图，
+    /// 按标准方块gui旋转，30/225/0、缩放0.625，渲染出3D观感
     IsoModel(&'static str),
-    /// 多模型拼接（rel, translation[3]方块单位, 绕Y轴旋转角度/度）
+    /// 多模型拼接：rel, translation[3] 方块单位, 绕Y轴旋转角度，单位度
     Composite(&'static [(&'static str, [f32; 3], f32)]),
-    /// 特殊形态：第二种状态的图标，ID = 基础ID + "_" + 形态后缀
-    /// （如 minecraft:oak_door + Open → minecraft:oak_door_open）。ID非真实方块名，
-    /// 出图但不注册进方块列表（blocks()查不到），经get_block_path_form按形态取图
+    /// 特殊形态：第二种状态的图标，ID = 基础ID + "_" + 形态后缀，
+    /// 如 minecraft:oak_door + Open → minecraft:oak_door_open。ID非真实方块名，
+    /// 出图但不注册进方块列表，blocks()查不到，经get_block_path_form按形态取图
     Form(SpecialForm, &'static IconSpec),
-    /// 头颅（方块实体渲染器画的头部立方体，照 SkullModel/SkullBlockRenderer 的几何与摆放）：
-    /// 值 = 贴图（jar内相对路径，如 entity/zombie/zombie），
-    /// 第二项 = 是否带帽子层：玩家头/僵尸头走 humanoidHeadLayer（64×64，含 texOffs(32,0) 的帽子层），
-    /// 骷髅/凋灵骷髅/苦力怕走 mobHeadLayer（64×32 单层）。
-    /// 玩家头离线取不到皮肤缓存，用默认皮肤；猪灵头（耳朵）/龙头（下颌）是自定义模型，仍是 Skip
+    /// 头颅：方块实体渲染器画的头部立方体，照 SkullModel/SkullBlockRenderer 的几何与摆放，
+    /// 值 = 贴图，jar内相对路径，如 entity/zombie/zombie，
+    /// 第二项 = 是否带帽子层：玩家头/僵尸头走 humanoidHeadLayer，64×64，含 texOffs(32,0) 的帽子层，
+    /// 骷髅/凋灵骷髅/苦力怕走 mobHeadLayer，64×32 单层。
+    /// 玩家头离线取不到皮肤缓存，用默认皮肤；猪灵头耳朵/龙头下颌是自定义模型，仍是 Skip
     Head(&'static str, bool),
     /// 实体渲染，跳过
     Skip,
 }
 
-/// 方块表是否已为该ID渲染图标（非Skip条目）；
+/// 方块表是否已为该ID渲染图标，非Skip条目即算已渲染；
 /// 物品渲染据此跳过block已有的ID，避免同一图标出两份
-/// （Form形态ID非真实方块名，不算）
-/// `id`为不带命名空间的裸ID（jar内items/下的相对名），内部补minecraft:前缀查表
+/// Form形态ID非真实方块名，不算
+/// `id`为不带命名空间的裸ID，即jar内items/下的相对名，内部补minecraft:前缀查表
 pub(crate) fn has_icon(id: &str) -> bool {
     let full = format!("minecraft:{id}");
     BLOCK_ICONS.iter().any(|(name, _, spec)| {
@@ -53,24 +53,24 @@ pub(crate) fn has_icon(id: &str) -> bool {
 }
 
 /// 方块特殊形态：这些方块在表里有第二种状态的图标，
-/// 图标ID = 基础ID + "_" + 形态后缀（如 oak_door + Open → oak_door_open）
+/// 图标ID = 基础ID + "_" + 形态后缀，如 oak_door + Open → oak_door_open
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SpecialForm {
-    /// 按下（按钮，_pressed）
+    /// 按下，按钮 `_pressed`
     Pressed,
-    /// 踩下（压力板，_down）
+    /// 踩下，压力板 `_down`
     Down,
-    /// 燃烧中/点亮（熔炉/高炉/烟熏炉/红石灯/铜灯，_lit）
+    /// 燃烧中/点亮，熔炉/高炉/烟熏炉/红石灯/铜灯 `_lit`
     Lit,
-    /// 开启/触发（观察者/避雷针/红石比较器，_on）
+    /// 开启/触发，观察者/避雷针/红石比较器 `_on`
     On,
-    /// 打开（门/活板门/栅栏门/木桶，_open）
+    /// 打开，门/活板门/栅栏门/木桶 `_open`
     Open,
-    /// 伸出（活塞，_extended）
+    /// 伸出，活塞 `_extended`
     Extended,
-    /// 激活（幽匿感测体/试点刷怪笼/宝库，_active）
+    /// 激活，幽匿感测体/试点刷怪笼/宝库 `_active`
     Active,
-    /// 熄灭（篝火，_off）
+    /// 熄灭，篝火 `_off`
     Off,
 }
 
@@ -90,7 +90,7 @@ impl SpecialForm {
     }
 }
 
-/// 基础方块ID → 特殊形态（从表尾的特殊形态专区自动推导）
+/// 基础方块ID → 特殊形态，从表尾的特殊形态专区自动推导
 pub(crate) fn special_form(id: &str) -> Option<SpecialForm> {
     static MAP: std::sync::LazyLock<std::collections::HashMap<&'static str, SpecialForm>> =
         std::sync::LazyLock::new(|| {
@@ -109,7 +109,7 @@ pub(crate) fn special_form(id: &str) -> Option<SpecialForm> {
     MAP.get(id).copied()
 }
 
-/// (方块ID, 创造分类, 渲染规格)
+/// 每项：方块ID, 创造分类, 渲染规格
 pub const BLOCK_ICONS: &[(&str, &str, IconSpec)] = &[
     (
         "minecraft:acacia_button",
@@ -1840,7 +1840,7 @@ pub const BLOCK_ICONS: &[(&str, &str, IconSpec)] = &[
         "functional",
         IconSpec::Model("block/dragon_egg"),
     ),
-    // 龙头是自定义模型（含下颌），几何不是头部立方体，暂不渲染
+    // 龙头是自定义模型，含下颌，几何不是头部立方体，暂不渲染
     ("minecraft:dragon_head", "functional", IconSpec::Skip),
     (
         "minecraft:dried_ghast",
@@ -3221,8 +3221,8 @@ pub const BLOCK_ICONS: &[(&str, &str, IconSpec)] = &[
         "redstone",
         IconSpec::Form(SpecialForm::On, &IconSpec::Model("block/observer_on")),
     ),
-    // piston_extended.json无parent且贴图引用未定义（游戏内不作为物品渲染），
-    // 用头板+活塞本体拼出伸出形态（头板0..4px、活塞杆4..20px、本体12..28px）
+    // piston_extended.json无parent且贴图引用未定义，游戏内不作为物品渲染；
+    // 用头板+活塞本体拼出伸出形态，头板0..4px、活塞杆4..20px、本体12..28px
     (
         "minecraft:obsidian",
         "natural",
@@ -3559,7 +3559,7 @@ pub const BLOCK_ICONS: &[(&str, &str, IconSpec)] = &[
         "ingredients",
         IconSpec::Model("block/petrified_oak_slab"),
     ),
-    // 猪灵头是自定义模型（含耳朵），几何不是头部立方体，暂不渲染
+    // 猪灵头是自定义模型，含耳朵，几何不是头部立方体，暂不渲染
     ("minecraft:piglin_head", "functional", IconSpec::Skip),
     ("minecraft:pink_banner", "coloredBlocks", IconSpec::Skip),
     (
@@ -3635,7 +3635,7 @@ pub const BLOCK_ICONS: &[(&str, &str, IconSpec)] = &[
         "redstone",
         IconSpec::Model("block/piston_inventory"),
     ),
-    // 玩家头取不到皮肤缓存（离线），用默认皮肤
+    // 玩家头取不到皮肤缓存，离线环境，用默认皮肤
     (
         "minecraft:player_head",
         "functional",
@@ -5338,7 +5338,7 @@ pub const BLOCK_ICONS: &[(&str, &str, IconSpec)] = &[
             ]),
         ),
     ),
-    // 活板门打开（open模型无display，强制iso）
+    // 活板门打开，open模型无display，强制iso
     (
         "minecraft:waxed_oxidized_copper_golem_statue",
         "ingredients",
@@ -5362,7 +5362,7 @@ pub const BLOCK_ICONS: &[(&str, &str, IconSpec)] = &[
             &IconSpec::IsoModel("block/oxidized_copper_trapdoor_open"),
         ),
     ),
-    // 栅栏门打开（open模板无display，强制iso）
+    // 栅栏门打开，open模板无display，强制iso
     (
         "minecraft:waxed_oxidized_cut_copper",
         "ingredients",
@@ -5743,8 +5743,8 @@ pub const BLOCK_ICONS: &[(&str, &str, IconSpec)] = &[
         "functional",
         IconSpec::Head("entity/zombie/zombie", true),
     ),
-    // ---- 特殊形态（对应SpecialForm，ID = 基础ID + "_" + 形态后缀，非真实方块名）----
-    // 门打开（open模型本身已转90°朝向，同closed一样yaw 90正对镜头）
+    // ---- 特殊形态：对应SpecialForm，ID = 基础ID + "_" + 形态后缀，非真实方块名 ----
+    // 门打开，open模型本身已转90°朝向，同closed一样yaw 90正对镜头
     (
         "minecraft:yellow_wool_slab",
         "coloredBlocks",

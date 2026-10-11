@@ -2,22 +2,16 @@ use std::{env, path::Path, sync::Arc};
 
 use mml_downloader::{IDownloadGui, DownloadTaskState, download_item::DownloadItem};
 
+/// 下载回调的测试实现，只把状态打到标准输出
 struct GuiRun {}
 
 impl IDownloadGui for GuiRun {
+    /// 单文件进度回调，测试里不输出
     fn update(&self, thread: u32, file: &Arc<DownloadItem>) {
-        // let pro = file.progress() as u64;
-        // if pro > 0 && pro % 10 == 0 {
-        //     println!(
-        //         "线程 {thread} 下载项目 {} {}/{} {}%",
-        //         file.base.name,
-        //         file.get_now_size(),
-        //         file.get_all_size(),
-        //         file.progress()
-        //     );
-        // }
+        // 需要看进度时打开：按线程号打印每个下载项的百分比
     }
 
+    /// 任务级状态回调，增删改都打到标准输出
     fn update_task(&self, state: DownloadTaskState) {
         match state {
             DownloadTaskState::AddTask(task) => {
@@ -36,6 +30,9 @@ impl IDownloadGui for GuiRun {
     }
 }
 
+/// 依次启动日志 / 配置 / 网络 / 下载器
+///
+/// - `run_dir`: 运行目录，日志与配置都落在它下面
 fn start(run_dir: &Path) {
     mml_log::start(&run_dir);
     mml_config::init(&run_dir);
@@ -49,6 +46,7 @@ fn start(run_dir: &Path) {
     mml_downloader::start();
 }
 
+/// 冒烟测试：把各内核系统初始化一遍，不做断言
 #[tokio::test]
 async fn start_game() {
     let exe_path = env::current_exe().expect("Failed to get exe path");

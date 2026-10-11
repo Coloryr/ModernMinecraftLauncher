@@ -54,8 +54,6 @@ impl InstanceSettingObj {
 
     /// 保存服务器包信息
     ///
-    /// # 参数
-    ///
     /// - `pack`: 服务器包信息
     pub fn save_serverpack(&self, pack: &ServerPackObj) {
         config_save::save(
@@ -69,8 +67,6 @@ impl InstanceSettingObj {
     ///
     /// 对比旧版服务器包信息，删除已移除的文件，下载并解压新增的文件，
     /// 最后保存新版本信息并清理旧文件。
-    ///
-    /// # 参数
     ///
     /// - `new_pack`: 新版服务器包信息
     /// - `cancel`: 取消令牌
@@ -88,10 +84,10 @@ impl InstanceSettingObj {
         let game_path = self.get_game_path();
 
         if let Some(old) = &old {
-            // 删什么由纯函数算（见 `serverpack::plan`），这里只负责执行
+            // 删什么由纯函数算，见 `serverpack::plan`，这里只负责执行
             let plan = plan::plan_removals(old, &new_pack);
 
-            // 删除已移除或已更换路径的文件（`file` 是游戏目录下的相对路径）
+            // 删除已移除或已更换路径的文件，`file` 是游戏目录下的相对路径
             for item in &plan.files {
                 if cancel.is_cancelled() {
                     return Err(ErrorType::TaskCancel);
@@ -99,7 +95,7 @@ impl InstanceSettingObj {
                 delete_with_disabled(game_path.join(&item.file));
             }
 
-            // 删除已移除的配置文件（仅删除由该配置独享的目录）
+            // 删除已移除的配置文件，仅删除由该配置独享的目录
             for item in &plan.dirs {
                 if cancel.is_cancelled() {
                     return Err(ErrorType::TaskCancel);
@@ -184,9 +180,7 @@ impl InstanceSettingObj {
 }
 
 
-/// 删除文件，若文件已被禁用（追加了 `.disable`/`.disabled` 后缀）则一并删除。
-///
-/// # 参数
+/// 删除文件；若文件已被禁用，即追加了 `.disable`/`.disabled` 后缀，则一并删除
 ///
 /// - `file`: 文件路径
 fn delete_with_disabled<P: AsRef<Path>>(file: P) {
@@ -197,12 +191,10 @@ fn delete_with_disabled<P: AsRef<Path>>(file: P) {
     let _ = path_helper::delete(format!("{}{}", file.display(), names::DISABLED_DOT_EXT));
 }
 
-/// 解析空 url 的文件下载地址（通过 pid/fid 从 CurseForge 或 Modrinth 获取）。
+/// 解析空 url 的文件下载地址：通过 pid/fid 从 CurseForge 或 Modrinth 获取
 ///
 /// 按编号格式判断来源：纯数字为 CurseForge，否则为 Modrinth。
 /// 优先批量获取，失败或缺失的文件再逐文件降级，返回 `fid → url` 映射。
-///
-/// # 参数
 ///
 /// - `items`: 缺少下载地址的文件列表
 /// - `cancel`: 取消令牌

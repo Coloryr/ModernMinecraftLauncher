@@ -6,9 +6,9 @@
 //! 所以必须**中断后重新发起**才能走新代理。
 //!
 //! 本测试验证这个前提成立：
-//! 1. 用客户端 A（打不通）发起请求 → 卡住；
+//! 1. 用打不通的客户端 A 发起请求 → 卡住；
 //! 2. 中断；
-//! 3. 用客户端 B（能打通）重新发起 → 必须成功。
+//! 3. 用能打通的客户端 B 重新发起 → 必须成功。
 
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 
 use mml_config::config_obj::{ProxyState, ProxyType};
 
-/// 只收不回的"坏"服务（模拟打不通的代理/源）
+/// 只收不回的"坏"服务，模拟打不通的代理或源
 fn blackhole_server() -> u16 {
     let listener = TcpListener::bind("127.0.0.1:0").expect("绑定失败");
     let port = listener.local_addr().unwrap().port();
@@ -35,7 +35,7 @@ fn blackhole_server() -> u16 {
     port
 }
 
-/// 正常回 200 的"好"服务（模拟新代理后能连通的源）
+/// 正常回 200 的"好"服务，模拟新代理后能连通的源
 fn good_server(hits: Arc<AtomicUsize>) -> u16 {
     let listener = TcpListener::bind("127.0.0.1:0").expect("绑定失败");
     let port = listener.local_addr().unwrap().port();
@@ -85,7 +85,7 @@ fn retry_after_abort_uses_fresh_client() {
         .unwrap();
 
     let report = rt.block_on(async {
-        // 第一次：用"坏"客户端（直连黑洞）发起 → 应该卡住
+        // 第一次：用"坏"客户端，直连黑洞，发起后应该卡住
         let old_client = Arc::new(mml_net::Client::new_proxy(
             ProxyType::Http,
             &"127.0.0.1".to_string(),
@@ -111,7 +111,7 @@ fn retry_after_abort_uses_fresh_client() {
         let aborted = first_res.as_ref().err().is_some_and(mml_net::is_aborted);
         let lag = abort_at.elapsed();
 
-        // 第二次：用"新"客户端（直连好服务）重新发起 → 必须成功
+        // 第二次：用"新"客户端，直连好服务，重新发起必须成功
         let new_client = Arc::new(mml_net::Client::new(ProxyState::Auto));
         let good_url = format!("http://127.0.0.1:{good_port}/ok");
         let retry = new_client.get_text(&good_url).await;

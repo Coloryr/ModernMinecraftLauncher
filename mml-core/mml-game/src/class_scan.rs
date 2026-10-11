@@ -30,13 +30,11 @@ mod constant_tags {
     pub const PACKAGE: u8 = 20;
 }
 
-/// 常量池：按常量池索引（1-based）存储 UTF8 字符串
+/// 常量池：按常量池索引存储 UTF8 字符串，索引从 1 开始
 /// index 0 保留不用，index 1..pool_count 对应常量池条目
 type ConstantPool = Vec<Option<String>>;
 
 /// 从常量池索引获取 UTF8 字符串引用
-///
-/// # 参数
 ///
 /// - `cp`: 常量池
 /// - `idx`: 常量池索引
@@ -51,16 +49,16 @@ fn cp_get<'a>(cp: &'a ConstantPool, idx: usize) -> Option<&'a str> {
 /// Mod 信息
 #[derive(Debug, Clone)]
 pub struct ModInfo {
-    /// Mod ID
+    /// Mod 标识，取自 @Mod 注解；缺失时回退成 jar 文件名
     pub modid: String,
-    /// 物理端类型
+    /// 物理端类型，没有 @SideOnly 时是 `Both`
     pub side: LoadSideType,
 }
 
 /// 单个 jar 的扫描结果
 #[derive(Debug, Default)]
 pub struct JarScanResult {
-    /// 该 jar 中所有的 Mod
+    /// 该 jar 中扫出的所有 Mod
     pub mods: Vec<ModInfo>,
     /// 扫描过程中发现的警告
     pub warnings: Vec<String>,
@@ -68,7 +66,7 @@ pub struct JarScanResult {
 
 /// 类的注解扫描结果
 struct ClassAnnotationInfo {
-    /// 类的物理端类型
+    /// 这个类上的物理端类型
     side: LoadSideType,
     /// 类级 `@Mod` 注解信息
     mod_info: Option<ModAnnotation>,
@@ -76,15 +74,13 @@ struct ClassAnnotationInfo {
 
 /// @Mod 注解信息
 struct ModAnnotation {
-    /// Mod ID
+    /// Mod 标识
     modid: String,
-    /// 物理端类型
+    /// 由 clientSideOnly / serverSideOnly 推出的物理端
     side: LoadSideType,
 }
 
 /// 扫描单个模组 jar 文件，返回所有 Mod 的信息
-///
-/// # 参数
 ///
 /// - `path`: jar 文件路径
 ///
@@ -158,8 +154,6 @@ pub fn scan_jar<P: AsRef<Path>>(path: P) -> Result<JarScanResult, Box<dyn std::e
 
 /// 扫描单个 class 文件
 ///
-/// # 参数
-///
 /// - `bytes`: class 文件字节流
 ///
 /// # 返回值
@@ -225,10 +219,8 @@ fn scan_class_for_annotations(
 
 /// 将 Java Modified UTF-8 转换为标准 UTF-8
 /// Java 的 Modified UTF-8 与标准 UTF-8 有两个区别：
-/// 1. U+0000 被编码为 0xC0 0x80（而非 0x00）
+/// 1. U+0000 被编码为 0xC0 0x80，而不是 0x00
 /// 2. U+10000 以上的字符用代理对编码后分别 UTF-8
-///
-/// # 参数
 ///
 /// - `data`: Modified UTF-8 字节流
 ///
@@ -257,11 +249,11 @@ fn from_modified_utf8(data: &[u8]) -> Result<String, Box<dyn std::error::Error>>
             result.push(data[i + 1]);
             i += 2;
         } else if byte & 0xF0 == 0xE0 {
-            // 三字节序列（标准 UTF-8）
+            // 三字节序列，标准 UTF-8
             if i + 2 >= data.len() {
                 break;
             }
-            // 检查是否为代理对（Modified UTF-8 特有）
+            // 检查是否为代理对，Modified UTF-8 特有
             if byte == 0xED
                 && i + 5 < data.len()
                 && (data[i + 1] & 0xF0) == 0xA0

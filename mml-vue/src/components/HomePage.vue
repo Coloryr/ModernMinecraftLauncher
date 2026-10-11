@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 启动器主页：上次启动实例 / 联机大厅 / 方块列表 入口 + Minecraft 新闻
-// empty=true 时（无任何实例）顶部展示空实例引导块（含添加实例按钮）
+// empty=true 时顶部展示空实例引导块，含添加实例按钮；此时一个实例都没有
 import { t } from "../lib/i18n";
 import { showToast } from "../lib/toast";
 import { openWindow } from "../windows/windowManager";

@@ -70,8 +70,6 @@ static OPTIFINE_WRAPPER: LazyLock<PathBuf> = LazyLock::new(|| {
 
 /// 初始化文件夹
 ///
-/// # 参数
-///
 /// - `dir`: 工作的目录
 ///
 /// # 返回值

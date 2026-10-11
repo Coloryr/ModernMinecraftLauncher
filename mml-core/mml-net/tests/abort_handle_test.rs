@@ -1,4 +1,4 @@
-//! 实验（修正版）：卡死请求是否挤占调度，以及 abort() 能否恢复
+//! 实验，修正版：卡死请求是否挤占调度，以及 abort() 能否恢复
 //!
 //! 上一版缺陷：用 current_thread runtime 却只在主线程 sleep，没人驱动 runtime，
 //! 于是"0 个被 poll"是测试自身的问题，不能当结论。本版用 rt.block_on 真正驱动。
@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
-/// 只回响应头、不回 body 的服务（制造“卡在读 body”）
+/// 只回响应头、不回 body 的服务，制造"卡在读 body"
 fn header_only_server(hits: Arc<AtomicUsize>) -> u16 {
     let listener = TcpListener::bind("127.0.0.1:0").expect("绑定失败");
     let port = listener.local_addr().unwrap().port();

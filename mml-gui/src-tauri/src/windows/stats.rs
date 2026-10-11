@@ -1,6 +1,6 @@
 //! 统计窗口：规格 + 数据读取
 //!
-//! 统计数据由内核 `mml_game::game_count`（`CountObj`，NBT 落盘）维护，
+//! 统计数据由内核 `mml_game::game_count` 维护，落盘结构是 `CountObj`，走 NBT，
 //! 这里只做快照聚合：全局计数 + 每实例启动次数 / 累计时长 / 最近启动。
 
 use std::collections::{HashMap, HashSet};
@@ -11,7 +11,11 @@ use uuid::Uuid;
 
 use crate::dtos::stats_dto::{StatsDataDto, StatsInstanceDto};
 
-/// 获取统计快照（全局计数 + 每实例汇总）
+/// 获取统计快照：全局计数加每实例汇总
+///
+/// # 返回值
+///
+/// 全局启动计数与每实例的启动次数 / 累计时长 / 最近启动；失败返回错误文案
 #[tauri::command]
 pub fn stats_get_data() -> Result<StatsDataDto, String> {
     let count = game_count::get_count();
@@ -40,7 +44,7 @@ pub fn stats_get_data() -> Result<StatsDataDto, String> {
         agg.insert(*uuid, (runs.len() as u64, secs, last, running));
     }
 
-    // 实例列表 = 现有实例 ∪ 有历史记录的实例（已删除的实例保留历史，名字取 game_names）
+    // 实例列表 = 现有实例 ∪ 有历史记录的实例：已删除的实例保留历史，名字取 game_names
     let mut items: Vec<StatsInstanceDto> = Vec::new();
     let mut seen: HashSet<Uuid> = HashSet::new();
 

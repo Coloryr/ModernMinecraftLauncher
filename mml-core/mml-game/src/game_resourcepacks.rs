@@ -21,30 +21,28 @@ use zip::ZipArchive;
 
 use crate::launcher::instance_setting_obj::InstanceSettingObj;
 
-/// 解析 `pack.mcmeta` 的 JSON：版本区间 + 简介
+/// 解析 `pack.mcmeta` 的 JSON，取出版本区间与简介
 ///
 /// **全程按形状取值，不做结构性反序列化**：原先那套 `PackMeta` / `PackInfo` /
-/// `SupportedFormats` 结构体已经删掉了。原因是那三个字段的写法太多（简介有字符串 /
-/// 数组 / 对象三种，版本字段有数字 / 区间数组 / 区间对象三种），只要有一种没枚举到，
-/// 整个结构体就解不出来，`process_resourcepack` 走失败分支、界面上整包显示"读取失败"
-/// —— 这个坑真实发生过两次（数据包的组件数组、Slightly Improved Font 的区间数组）。
+/// `SupportedFormats` 结构体已经删掉了。原因是那三个字段的写法太多，简介有字符串 /
+/// 数组 / 对象三种，版本字段有数字 / 区间数组 / 区间对象三种，只要有一种没枚举到，
+/// 整个结构体就解不出来，`process_resourcepack` 走失败分支、界面上整包显示"读取失败"。
+/// 这个坑真实发生过两次：数据包的组件数组、Slightly Improved Font 的区间数组。
 ///
 /// 现在任何一段写法不认识，最多让**那一段**回落默认值，不影响整包。
 ///
-/// # 参数
-///
 /// - `meta`: `pack.mcmeta` 的 JSON
-/// - `lang`: 资源包自带的语言表（[`read_lang_map`]），用于翻简介里的 `translate` 键
+/// - `lang`: 资源包自带的语言表，见 [`read_lang_map`]，用于翻简介里的 `translate` 键
 ///
 /// # 返回值
 ///
-/// 返回只填了简介与三个版本字段的资源包信息；**`pack` 段不是对象**时返回 `None`
-/// （调用方按"读取失败"处理）
+/// 返回只填了简介与三个版本字段的资源包信息；`pack` 段不是对象时返回 `None`，
+/// 调用方按"读取失败"处理
 fn parse_pack_meta(meta: MiniJsonObj, lang: &HashMap<String, String>) -> Option<ResourcepackObj> {
     let pack = meta.as_object()?.get_object("pack")?;
 
-    // 版本区间：显式给的 `min_format` / `max_format` 优先；两者都没写时才用
-    // `supported_formats`（1.20.5+ 的新写法）—— 别让新写法盖掉显式给的旧字段
+    // 版本区间：显式给的 `min_format` / `max_format` 优先，两者都没写时才用
+    // `supported_formats`，这是 1.20.5+ 的新写法，别让它盖掉显式给的旧字段
     let (sf_min, sf_max) = pack
         .get("supported_formats")
         .map(supported_formats_range)
@@ -66,10 +64,8 @@ fn parse_pack_meta(meta: MiniJsonObj, lang: &HashMap<String, String>) -> Option<
 
 /// `pack_format` / `min_format` / `max_format` 的取值：数字直接用，**数组取最小值**
 ///
-/// 这三个字段都可能被写成区间数组（真实样本：Mod Menu Helper 的
-/// `"min_format":[97,1]`），口径与 `serialize_tools::deserialize_number_or_min` 一致。
-///
-/// # 参数
+/// 这三个字段都可能被写成区间数组，真实样本如 Mod Menu Helper 的
+/// `"min_format":[97,1]`，口径与 `serialize_tools::deserialize_number_or_min` 一致。
 ///
 /// - `value`: 字段的 JSON 值
 ///
@@ -88,9 +84,7 @@ fn number_or_min(value: &MiniJsonObj) -> Option<i64> {
         .min()
 }
 
-/// 同上，**数组取最大值**（口径同 `serialize_tools::deserialize_number_or_max`）
-///
-/// # 参数
+/// 同上，**数组取最大值**，口径同 `serialize_tools::deserialize_number_or_max`
 ///
 /// - `value`: 字段的 JSON 值
 ///
@@ -111,21 +105,19 @@ fn number_or_max(value: &MiniJsonObj) -> Option<i64> {
 
 /// `supported_formats` 的**三种**写法 → `(min, max)`
 ///
-/// 三种都在真实资源包里见过（前两种当初都是"整包读取失败"报上来的）：
-/// - 对象：`{"min_inclusive": 5, "max_inclusive": 75}`（两个键都可选，只写 min
-///   表示"这一版及以后"）
-/// - 数组：`[8, 9999]`（就是 `[min, max]`）
-/// - 单个数字：`20`（"从这一版起"）
+/// 三种都在真实资源包里见过，前两种当初都是"整包读取失败"报上来的：
+/// - 对象：`{"min_inclusive": 5, "max_inclusive": 75}`，两个键都可选，只写 min
+///   表示"这一版及以后"
+/// - 数组：`[8, 9999]`，就是 `[min, max]`
+/// - 单个数字：`20`，表示"从这一版起"
 ///
 /// 缺的那一侧按"未知"给 `0`。
-///
-/// # 参数
 ///
 /// - `value`: `supported_formats` 的 JSON 值
 ///
 /// # 返回值
 ///
-/// 返回 `(min, max)`
+/// 返回 `(min, max)`，缺的一侧为 `0`
 fn supported_formats_range(value: &MiniJsonObj) -> (i64, i64) {
     // 对象写法：两个键都可选
     if let Some(map) = value.as_object() {
@@ -148,31 +140,29 @@ fn supported_formats_range(value: &MiniJsonObj) -> (i64, i64) {
         );
     }
 
-    // 单个数字：`"supported_formats": 20`
+    // 单个数字写法：`"supported_formats": 20`
     (value.as_i64().unwrap_or(0), 0)
 }
 
-/// 把文本组件的 JSON 值抠成一句能显示的文字（简介要的就是这个）
+/// 把文本组件的 JSON 值抠成一句能显示的文字，简介要的就是这个
 ///
-/// 按形状分派（[`MiniJsonObj`] 的取值方法对不上的形状一律返回 `None`，所以数字 /
-/// 布尔 / `null` 自然落到最后一条）：
+/// 按形状分派，[`MiniJsonObj`] 的取值方法对不上的形状一律返回 `None`，所以数字 /
+/// 布尔 / `null` 自然落到最后一条：
 /// - **字符串** —— 本身就是文字；
-/// - **数组** —— 每个元素各自展平后按顺序拼接（多个组件合起来就是一段话）；
+/// - **数组** —— 每个元素各自展平后按顺序拼接，多个组件合起来就是一段话；
 /// - **对象** —— 文本组件，见 [`tran_text`]；
 /// - **其余** —— 给空串。
 ///
-/// 最后一条是有意的：这些形状**不能**退回去 `to_string()` 成 JSON —— 那样简介里会
-/// 冒出 `null` / `true` 这种字面量，纯属噪音（`serde_json::Value` 的 `to_string()`
-/// 就是坑在这）。
-///
-/// # 参数
+/// 最后一条是有意的：这些形状**不能**退回去 `to_string()` 成 JSON，那样简介里会
+/// 冒出 `null` / `true` 这种字面量，纯属噪音，`serde_json::Value` 的 `to_string()`
+/// 就是坑在这。
 ///
 /// - `value`: 文本组件的 JSON 值
-/// - `lang`: 资源包自带的语言表（[`read_lang_map`]），只用于翻 `translate` 的 key
+/// - `lang`: 资源包自带的语言表，见 [`read_lang_map`]，只用于翻 `translate` 的 key
 ///
 /// # 返回值
 ///
-/// 返回展平后的纯文字
+/// 返回展平后的纯文字；不认识的形状返回空串
 fn flatten_text(value: &MiniJsonObj, lang: &HashMap<String, String>) -> String {
     if let Some(text) = value.as_string() {
         return text;
@@ -189,7 +179,7 @@ fn flatten_text(value: &MiniJsonObj, lang: &HashMap<String, String>) -> String {
     String::new()
 }
 
-/// 文本组件对象（`{...}`）→ 一句纯文本
+/// 文本组件对象 → 一句纯文本
 ///
 /// 取文字的优先级：
 /// 1. `text` —— 直接写死的文字；
@@ -197,7 +187,7 @@ fn flatten_text(value: &MiniJsonObj, lang: &HashMap<String, String>) -> String {
 ///    连 `fallback` 都没有才把 key 原样显示出来；
 /// 3. 单写的 `fallback`。
 ///
-/// 最后把 `extra` 里的子组件**追加**在主文字之后（可以嵌多层）。
+/// 最后把 `extra` 里的子组件**追加**在主文字之后，可以嵌多层。
 ///
 /// | 写法 | 语言表命中 | 结果 |
 /// | --- | --- | --- |
@@ -207,21 +197,19 @@ fn flatten_text(value: &MiniJsonObj, lang: &HashMap<String, String>) -> String {
 /// | `{"translate": "k"}` | 未命中 | `k` |
 /// | `{"text": "A", "extra": [{"text": "B"}]}` | — | `AB` |
 ///
-/// 这个顺序与游戏里的口径一致（key 命中就用译文，否则 fallback，再否则显示 key 本身）。
-/// 裸 key 不好看，但比留空强 —— 至少能看出这是个没翻出来的条目；而**绝不能**把整个
+/// 这个顺序与游戏里的口径一致：key 命中就用译文，否则 fallback，再否则显示 key 本身。
+/// 裸 key 不好看，但比留空强，至少能看出这是个没翻出来的条目；而**绝不能**把整个
 /// 组件 `to_string()` 成 JSON 塞进简介。
 ///
 /// `keybind` / `score` / `selector` / `nbt` 这类只有客户端渲染得出来的组件
-/// **不给文字**（留空），不过它们自己的 `extra` 照样会接着处理。
-///
-/// # 参数
+/// **不给文字**，留空，不过它们自己的 `extra` 照样会接着处理。
 ///
 /// - `map`: 文本组件对象的键值对
-/// - `lang`: 资源包自带的语言表（[`read_lang_map`]）
+/// - `lang`: 资源包自带的语言表，见 [`read_lang_map`]
 ///
 /// # 返回值
 ///
-/// 返回展平后的纯文字
+/// 返回展平后的纯文字；只有客户端组件时为空串
 fn tran_text(map: &MiniJsonMap, lang: &HashMap<String, String>) -> String {
     let mut out = if let Some(text) = map.get("text") {
         flatten_text(text, lang)
@@ -240,7 +228,7 @@ fn tran_text(map: &MiniJsonMap, lang: &HashMap<String, String>) -> String {
         String::new()
     };
 
-    // `extra` 是**追加**在主文字之后的子组件（可以嵌多层）
+    // `extra` 是**追加**在主文字之后的子组件，可以嵌多层
     if let Some(extra) = map.get("extra") {
         out.push_str(&flatten_text(extra, lang));
     }
@@ -250,13 +238,11 @@ fn tran_text(map: &MiniJsonMap, lang: &HashMap<String, String>) -> String {
 
 /// 这个条目是不是资源包自带的某个语言表：`assets/<命名空间>/lang/<语言代码>.json`
 ///
-/// 命名空间是包自己起的（`fo` / `sodium` / `minecraft` …），**与 key 长什么样无关**
-/// —— 翻译键归哪个命名空间，由它写在哪个文件里决定。
-///
-/// # 参数
+/// 命名空间是包自己起的，如 `fo`、`sodium`、`minecraft`，**与 key 长什么样无关**：
+/// 翻译键归哪个命名空间，由它写在哪个文件里决定。
 ///
 /// - `name`: zip 里的条目名
-/// - `code`: 语言代码（如 `zh_cn`）
+/// - `code`: 语言代码，如 `zh_cn`
 ///
 /// # 返回值
 ///
@@ -272,23 +258,21 @@ fn is_pack_lang_file(name: &str, code: &str) -> bool {
         && parts[3].strip_suffix(".json") == Some(code)
 }
 
-/// 读资源包自带的语言表（`assets/<命名空间>/lang/<语言代码>.json` 里的键值对）
+/// 读资源包自带的语言表，即 `assets/<命名空间>/lang/<语言代码>.json` 里的键值对
 ///
-/// 简介里的 `translate` 键就靠它翻 —— 语言表是**包自己带的**，所以这条完全离线，
+/// 简介里的 `translate` 键就靠它翻，语言表是**包自己带的**，所以这条完全离线，
 /// 不需要客户端 jar、也不需要资源索引。
 ///
-/// 多命中几个命名空间时逐个合并（同一个 key 不该重名，真重了以后读到的为准）。
-/// 语言代码用界面语言（`zh_cn` / `en_us`，与游戏的语言代码同名）；**该语言没有就用
-/// `en_us` 兜底** —— 包的作者一般都会写英文，比拿不到译文去显示裸 key 强。
-///
-/// # 参数
+/// 多命中几个命名空间时逐个合并，同一个 key 不该重名，真重了以后读到的为准。
+/// 语言代码用界面语言 `zh_cn` / `en_us`，与游戏的语言代码同名；**该语言没有就用
+/// `en_us` 兜底**，包的作者一般都会写英文，比拿不到译文去显示裸 key 强。
 ///
 /// - `zip`: 已打开的资源包
 /// - `code`: 语言代码
 ///
 /// # 返回值
 ///
-/// 返回「翻译键 → 译文」；这个语言（含 `en_us` 兜底）都没有时返回空表
+/// 返回翻译键到译文的映射；这个语言连同 `en_us` 兜底都没有时返回空表
 fn read_lang_map<Z: Read + std::io::Seek>(
     zip: &mut ZipArchive<Z>,
     code: &str,
@@ -297,7 +281,7 @@ fn read_lang_map<Z: Read + std::io::Seek>(
 
     // 先按界面语言找，找不到再按英文找
     for code in [code, "en_us"] {
-        // `file_names()` 借着 `zip` 不放，先把命中的条目名收下来，再逐个读（要可变借用）
+        // `file_names()` 借着 `zip` 不放，先把命中的条目名收下来，再逐个读，读要可变借用
         let names: Vec<String> = zip
             .file_names()
             .map(|item| item.unwrap_or_default())
@@ -313,7 +297,7 @@ fn read_lang_map<Z: Read + std::io::Seek>(
             if file.read_to_string(&mut text).is_err() {
                 continue;
             }
-            // 译文以外的值（数字 / 嵌套对象）直接丢掉：解成 `Value` 才不会因为一个怪值
+            // 译文以外的值，如数字、嵌套对象，直接丢掉：解成 `Value` 才不会因为一个怪值
             // 让整份语言表作废
             let Ok(part) =
                 serialize_tools::json_from_str::<HashMap<String, serde_json::Value>>(&text)
@@ -336,27 +320,28 @@ fn read_lang_map<Z: Read + std::io::Seek>(
 
 /// 资源包信息
 pub struct ResourcepackObj {
-    /// 简介
+    /// 来自 pack.mcmeta 的简介，已展平成纯文字
     pub description: String,
-    /// 版本号
+    /// `pack_format` 声明的版本号，缺失为 0
     pub pack_format: i64,
-    /// 最小版本
+    /// 支持的起始版本号，缺失为 0
     pub min_format: i64,
-    /// 最大版本号
+    /// 支持的结束版本号，缺失为 0
     pub max_format: i64,
-    /// 文件校验
+    /// 文件校验，同时记录 sha1 与 sha256
     pub hash: FileHash,
-    /// 路径
+    /// 资源包文件或目录的完整路径
     pub path: PathBuf,
-    /// 图标
+    /// pack.png 的原始字节，没有图标时为 `None`
     pub icon: Option<Vec<u8>>,
-    /// 是否读取失败
+    /// 是否读取失败，失败时界面按"读取失败"展示
     pub fail: bool,
-    /// 是否启用
+    /// 是否已在 options.txt 的 `resourcePacks` 里启用
     pub enable: bool,
 }
 
 impl Default for ResourcepackObj {
+    /// 文本与版本号为缺省值，`icon` 为 `None`，`fail` 与 `enable` 为 `false`
     fn default() -> Self {
         Self {
             description: Default::default(),
@@ -374,11 +359,9 @@ impl Default for ResourcepackObj {
 
 /// 解析材质包
 ///
-/// # 参数
-///
-/// - `path`: 材质包文件路径（zip）
-/// - `lang`: 界面语言代码（`zh_cn` / `en_us`）——简介里的 `translate` 键按它查
-///   资源包自带的语言表（见 [`read_lang_map`]）
+/// - `path`: 材质包文件路径，zip 格式
+/// - `lang`: 界面语言代码，如 `zh_cn`、`en_us`；简介里的 `translate` 键按它查
+///   资源包自带的语言表，见 [`read_lang_map`]
 ///
 /// # 返回值
 ///
@@ -404,7 +387,7 @@ pub fn process_resourcepack<P: AsRef<Path>>(path: P, lang: &str) -> CoreResult<R
             })
         })?;
 
-        // 按形状取值（`MiniJsonMap`），不做结构性反序列化：写法认不出来也只丢那一段
+        // 按形状取值，走 `MiniJsonMap`，不做结构性反序列化：写法认不出来也只丢那一段
         match MiniJsonObj::from_stream(meta)
             .ok()
             .and_then(|json| parse_pack_meta(json, &lang_map))
@@ -437,7 +420,7 @@ impl ResourcepackObj {
     ///
     /// # 返回值
     ///
-    /// 成功返回 `Ok(())`；删除失败返回对应错误
+    /// 移入回收站失败时返回对应错误
     pub fn remove(&self) -> CoreResult<()> {
         path_helper::move_to_trash(&self.path)
     }
@@ -446,13 +429,11 @@ impl ResourcepackObj {
 impl InstanceSettingObj {
     /// 获取资源包列表
     ///
-    /// # 参数
-    ///
-    /// - `lang`: 界面语言代码（`zh_cn` / `en_us`），用于翻简介里的 `translate` 键
+    /// - `lang`: 界面语言代码，如 `zh_cn`、`en_us`，用于翻简介里的 `translate` 键
     ///
     /// # 返回值
     ///
-    /// 返回资源包列表（读取失败的文件会记录日志并标记 `fail`）
+    /// 返回资源包列表；读取失败的文件会记录日志并标记 `fail`
     pub async fn get_resourcepacks(&self, lang: &str) -> Vec<ResourcepackObj> {
         let dir = self.get_resourcepacks_path();
         if !dir.exists() || !dir.is_dir() {
@@ -530,6 +511,12 @@ impl InstanceSettingObj {
     }
 
     /// 启用材质包
+    ///
+    /// - `pack`: 待启用的资源包
+    ///
+    /// # 返回值
+    ///
+    /// 写 options.txt 失败时返回对应错误
     pub fn enable_resourcepacks(&self, pack: &ResourcepackObj) -> CoreResult<()> {
         let mut opt = self.get_options().unwrap_or_default();
 
@@ -555,6 +542,12 @@ impl InstanceSettingObj {
     }
 
     /// 禁用材质包
+    ///
+    /// - `pack`: 待禁用的资源包
+    ///
+    /// # 返回值
+    ///
+    /// 写 options.txt 失败时返回对应错误
     pub fn disable_resourcepacks(&self, pack: &ResourcepackObj) -> CoreResult<()> {
         let mut opt = self.get_options().unwrap_or_default();
 
@@ -588,7 +581,7 @@ mod tests {
     use mml_base::serialize_tools::MiniJsonObj;
     use std::collections::HashMap;
 
-    /// 从 JSON 文本造一个 [`MiniJsonObj`]（`from_value` 是私有的，只能走字符串）
+    /// 从 JSON 文本造一个 [`MiniJsonObj`]；`from_value` 是私有的，只能走字符串
     fn mini(text: &str) -> MiniJsonObj {
         MiniJsonObj::from_str(text).unwrap()
     }
@@ -628,7 +621,7 @@ mod tests {
         );
     }
 
-    /// `translate`：语言表命中就用译文（**压过** `fallback`）；没命中才退回兜底链
+    /// `translate`：语言表命中就用译文，**压过** `fallback`；没命中才退回兜底链
     #[test]
     fn flatten_translate_resolves_from_lang() {
         let table = lang(&[("some.key", "译文")]);
@@ -656,7 +649,7 @@ mod tests {
         );
     }
 
-    /// 只写了 `fallback`（没有 `text` / `translate`）也要认
+    /// 只写了 `fallback`，没有 `text` / `translate`，也要认
     #[test]
     fn flatten_bare_fallback() {
         assert_eq!(
@@ -750,7 +743,7 @@ mod tests {
         let obj = parse(r#"{"pack":{"min_format":11,"max_format":22,"supported_formats":[5,75]}}"#);
         assert_eq!((obj.min_format, obj.max_format), (11, 22));
 
-        // 版本字段写成区间数组（Mod Menu Helper 的真实写法）：min 取小、max 取大
+        // 版本字段写成区间数组，Mod Menu Helper 的真实写法：min 取小、max 取大
         let obj = parse(r#"{"pack":{"pack_format":18,"min_format":[97,1],"max_format":[97,1]}}"#);
         assert_eq!(obj.pack_format, 18);
         assert_eq!((obj.min_format, obj.max_format), (1, 97));
@@ -776,7 +769,7 @@ mod tests {
         assert!(!is_pack_lang_file("assets/lang/zh_cn.json", "zh_cn"));
         assert!(!is_pack_lang_file("fo/lang/zh_cn.json", "zh_cn"));
         assert!(!is_pack_lang_file("assets/fo/zh_cn.json", "zh_cn"));
-        // zip 里的目录条目（真实包里就有 `assets/fo/lang/` 这么一条）也不是语言表
+        // zip 里的目录条目也不是语言表，真实包里就有 `assets/fo/lang/` 这么一条
         assert!(!is_pack_lang_file("assets/fo/lang/", "zh_cn"));
     }
 }

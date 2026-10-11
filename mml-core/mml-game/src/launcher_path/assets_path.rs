@@ -1,4 +1,4 @@
-//! 游戏资源（assets）目录
+//! 游戏资源 assets 目录
 
 use std::{
     fs::File,
@@ -20,21 +20,19 @@ use crate::mojang::{
     game_arg_obj::{GameArgObj, GameAssetIndexObj},
 };
 
-/// 基础路径
+/// assets 根目录，初始化时固定
 static BASE_DIR: OnceLock<PathBuf> = OnceLock::new();
 
-/// 资源文件路径
+/// 资源对象目录，按 SHA1 分桶存放
 static OBJECTS_DIR: OnceLock<PathBuf> = OnceLock::new();
-/// 索引文件路径
+/// 资源索引目录，每个版本一份 json
 static INDEX_DIR: OnceLock<PathBuf> = OnceLock::new();
-/// 皮肤文件路径
+/// 皮肤与披风目录，按 SHA1 分桶存放
 static SKIN_DIR: OnceLock<PathBuf> = OnceLock::new();
 
-/// 初始化
+/// 初始化 assets 目录结构
 ///
-/// # 参数
-///
-/// - `dir`: 运行目录
+/// - `dir`: 启动器运行目录，其下的 assets 目录作为根
 ///
 /// # 返回值
 ///
@@ -63,57 +61,51 @@ pub(crate) fn init<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
     Ok(())
 }
 
-/// 获取资源文件夹
+/// 取 assets 根目录
 ///
 /// # 返回值
 ///
-/// 返回资源根目录
+/// assets 根目录
 pub fn get_assets_dir() -> PathBuf {
     BASE_DIR.get().unwrap().clone()
 }
 
-/// 获取对象文件目录
+/// 取资源对象目录
 ///
 /// # 返回值
 ///
-/// 返回资源对象文件目录
+/// 资源对象目录
 pub fn get_obj_dir() -> PathBuf {
     OBJECTS_DIR.get().unwrap().clone()
 }
 
-/// 添加资源数据
+/// 把资源索引写进索引目录
 ///
-/// # 参数
-///
-/// - `obj`: 版本数据
-/// - `data`: 资源索引文件数据
+/// - `obj`: 版本详情，取其中的 `assetIndex` 段
+/// - `data`: 资源索引文件的原始字节流
 pub fn add_index(obj: &GameArgObj, data: &mut Cursor<Vec<u8>>) {
     let index = obj.asset_index.as_ref().unwrap();
     let file = INDEX_DIR.get().unwrap().join(format!("{}.json", index.id));
     path_helper::write_stream(&file, data).unwrap();
 }
 
-/// 获取资源数据
+/// 按版本读资源索引
 ///
-/// # 参数
-///
-/// - `obj`: 版本数据资源
+/// - `obj`: 资源索引段，取其中的 `id` 找文件
 ///
 /// # 返回值
 ///
-/// 返回解析出的资源索引；读取或解析失败返回对应错误
+/// 解析出的资源索引；读取或解析失败返回对应错误
 pub fn get_index(obj: &GameAssetIndexObj) -> CoreResult<AssetsObj> {
     let file = INDEX_DIR.get().unwrap().join(format!("{}.json", obj.id));
     let obj = serialize_tools::json_from_file::<AssetsObj>(&file)?;
     Ok(obj)
 }
 
-/// 保存皮肤图片
+/// 把一张图片存成账户皮肤
 ///
-/// # 参数
-///
-/// - `obj`: 保存的账户
-/// - `file`: 需要导入的文件
+/// - `obj`: 目标账户，文件名用它的 uuid
+/// - `file`: 需要导入的图片文件
 pub fn save_skin(obj: LoginObj, file: PathBuf) {
     let path = SKIN_DIR
         .get()
@@ -122,18 +114,16 @@ pub fn save_skin(obj: LoginObj, file: PathBuf) {
     path_helper::copy_file(&file, &path).unwrap();
 }
 
-/// 按内容 SHA1 保存皮肤 / 披风贴图（与游戏 assets objects 同款布局）
-///
-/// 皮肤与披风共用一套存储：`SKIN_DIR/<sha1前2字符>/<sha1>`，
-/// 同一份贴图（无论来自哪个账户 / 哪个 URL）只存一份。
-///
-/// # 参数
+/// 按内容 SHA1 保存皮肤 / 披风贴图，布局与游戏 assets objects 相同
 ///
 /// - `data`: 贴图文件内容
 ///
+/// 皮肤与披风共用一套存储：`SKIN_DIR/<sha1前2字符>/<sha1>`，
+/// 同一份贴图不论来自哪个账户或 URL 都只存一份。
+///
 /// # 返回值
 ///
-/// 返回内容 SHA1（十六进制小写）；写入失败返回对应错误
+/// 内容 SHA1，十六进制小写；写入失败返回对应错误
 pub fn save_skin_object(data: &[u8]) -> CoreResult<String> {
     let hash = hash_helper::gen_hash(HashType::Sha1, data);
     let file = get_skin_object(&hash);
@@ -145,27 +135,23 @@ pub fn save_skin_object(data: &[u8]) -> CoreResult<String> {
 
 /// 按内容 SHA1 取皮肤 / 披风贴图位置
 ///
-/// # 参数
-///
 /// - `sha1`: 贴图内容 SHA1
 ///
 /// # 返回值
 ///
-/// 返回贴图文件位置（不保证文件存在，由调用方判断）
+/// 贴图文件位置；不保证文件存在，由调用方判断
 pub fn get_skin_object(sha1: &str) -> PathBuf {
     let dir: String = sha1.chars().take(2).collect();
     Path::new(&SKIN_DIR.get().unwrap()).join(dir).join(sha1)
 }
 
-/// 读取资源文件
+/// 按 SHA1 读取资源文件的文本内容
 ///
-/// # 参数
-///
-/// - `hash`: 资源文件SHA1值
+/// - `hash`: 资源文件 SHA1，十六进制小写
 ///
 /// # 返回值
 ///
-/// 返回文件文本内容；读取失败记录日志并返回 `None`
+/// 文件文本内容；读取失败记录日志并返回 `None`
 pub fn read_assets_text(hash: String) -> Option<String> {
     let dir: String = hash.chars().take(2).collect();
     let local = Path::new(&OBJECTS_DIR.get().unwrap())
@@ -183,15 +169,13 @@ pub fn read_assets_text(hash: String) -> Option<String> {
     }
 }
 
-/// 读取资源文件
+/// 按 SHA1 打开资源文件的读取流
 ///
-/// # 参数
-///
-/// - `hash`: 资源文件SHA1值
+/// - `hash`: 资源文件 SHA1，十六进制小写
 ///
 /// # 返回值
 ///
-/// 返回文件读取流；读取失败记录日志并返回 `None`
+/// 文件读取流；读取失败记录日志并返回 `None`
 pub fn read_assets_stream(hash: String) -> Option<File> {
     let dir: String = hash.chars().take(2).collect();
     let local = Path::new(&OBJECTS_DIR.get().unwrap())

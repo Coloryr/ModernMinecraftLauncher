@@ -1,6 +1,6 @@
 //! 添加资源窗口的元数据查询：下载源 / 资源分类 / 排序方式 / 游戏版本
 //!
-//! 都是"问内核要一份静态列表"的薄命令（游戏版本列表走内核缓存）。
+//! 都是"问内核要一份静态列表"的薄命令，游戏版本列表走内核缓存。
 
 use std::collections::HashMap;
 
@@ -9,7 +9,11 @@ use mml_game::{curseforge, modrinth};
 use mml_net::curseforge_api::CurseForgeSortType;
 use mml_net::modrinth_api::ModrinthSortType;
 
-/// 获取下载源
+/// 获取下载源，即添加资源窗口支持的资源站
+///
+/// # 返回值
+///
+/// 下载源的内部名列表，Modrinth 在前、CurseForge 在后；目前不会失败
 #[gui_macros::ipc_group("add_resource")]
 #[tauri::command]
 pub fn add_resource_source_type() -> Result<Vec<String>, String> {
@@ -19,7 +23,15 @@ pub fn add_resource_source_type() -> Result<Vec<String>, String> {
     ])
 }
 
-/// 获取分组
+/// 获取分组，即资源分类下拉框的候选
+///
+/// - `source`: 下载源，取 `curseforge` 或 `modrinth`
+/// - `file_type`: 资源类型
+///
+/// # 返回值
+///
+/// 分类名到显示名的映射；CurseForge 的数据包走固定 categoryId、不支持再按分类过滤，
+/// 这里返回空表；类型非法或源不受支持时返回 `Err`
 #[gui_macros::ipc_group("add_resource")]
 #[tauri::command]
 pub async fn add_resource_categories(
@@ -47,6 +59,12 @@ pub async fn add_resource_categories(
 }
 
 /// 获取排序方式
+///
+/// - `source`: 下载源，取 `curseforge` 或 `modrinth`
+///
+/// # 返回值
+///
+/// 该源支持的排序方式内部名列表；源不受支持时返回 `Err`
 #[gui_macros::ipc_group("add_resource")]
 #[tauri::command]
 pub fn add_resource_sort_type(source: String) -> Result<Vec<String>, String> {
@@ -72,6 +90,12 @@ pub fn add_resource_sort_type(source: String) -> Result<Vec<String>, String> {
 }
 
 /// 获取支持的游戏版本列表
+///
+/// - `source`: 下载源，取 `curseforge` 或 `modrinth`
+///
+/// # 返回值
+///
+/// 该源支持的游戏版本字符串列表，走内核缓存；源不受支持时返回 `Err`
 #[gui_macros::ipc_group("add_resource")]
 #[tauri::command]
 pub async fn add_resource_game_versions(source: String) -> Result<Vec<String>, String> {

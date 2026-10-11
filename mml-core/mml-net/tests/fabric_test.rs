@@ -1,5 +1,6 @@
 use std::env;
 
+/// 初始化日志 / 配置 / 网络
 fn init() {
     let exe_path = env::current_exe().expect("Failed to get exe path");
     let exe_dir = exe_path.parent().expect("Failed to get exe directory");
@@ -10,6 +11,7 @@ fn init() {
     mml_net::init();
 }
 
+/// 停止日志
 fn stop() {
     mml_log::stop();
 }

@@ -1,4 +1,4 @@
-//! Mojang 版本启动参数（version.json）DTO
+//! Mojang 版本启动参数 DTO，对应 version.json
 
 use serde::{Deserialize, Serialize};
 
@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
 pub struct GameOsObj {
-    /// 系统名（`windows` / `linux` / `osx`）
+    /// 系统名，取值 `windows` / `linux` / `osx`
     pub name: String,
-    /// 架构（`x86` 等）
+    /// 架构，如 `x86`
     pub arch: String,
 }
 
@@ -25,9 +25,9 @@ impl Default for GameOsObj {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
 pub struct GameRulesObj {
-    /// 动作（`allow` / `disallow`）
+    /// 动作，取值 `allow` / `disallow`
     pub action: String,
-    /// 适用的系统（`None` 表示全部）
+    /// 适用的系统，`None` 表示全部系统
     pub os: Option<GameOsObj>,
 }
 
@@ -99,7 +99,7 @@ impl Default for ClassifiersObj {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
 pub struct GameLibrariesDownloadsObj {
-    /// 各平台原生库（无原生库为 `None`）
+    /// 各平台原生库，没有原生库时为 `None`
     pub classifiers: Option<ClassifiersObj>,
     /// 主构件
     pub artifact: ArtifactObj,
@@ -114,7 +114,7 @@ impl Default for GameLibrariesDownloadsObj {
     }
 }
 
-/// 参数值（单个或多个）
+/// 参数值，单个值或一组值
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ArgValue {
@@ -149,7 +149,7 @@ impl Default for GameJvmObj {
     }
 }
 
-/// 启动参数项（纯字符串或带规则）
+/// 启动参数项，纯字符串或带规则
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Argument {
@@ -330,7 +330,7 @@ pub struct GameArgObj {
     /// 主类
     #[serde(rename = "mainClass")]
     pub main_class: String,
-    /// 旧版游戏参数（合并式字符串）
+    /// 旧版游戏参数，合并式字符串
     #[serde(rename = "minecraftArguments")]
     pub minecraft_arguments: Option<String>,
     /// 最低启动器版本

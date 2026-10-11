@@ -1,10 +1,10 @@
-//! GUI 配置前端 DTO（TS 命名，camelCase wire）
+//! GUI 配置前端 DTO：TS 命名，camelCase wire
 //!
-//! 配置文件 `gui_config.json` 落盘用 Rust 命名（见 `../gui_config.rs`），
+//! 配置文件 `gui_config.json` 落盘用 Rust 命名，见 `../gui_config.rs`，
 //! 仅当跨 Tauri IPC 传输到前端时转成此结构：
 //! - 字段 camelCase = 前端 `mml-vue/src/lib/guiConfig.ts` 的类型名
-//! - 枚举值 = Rust 变体名（"Dark" / "Light" / "Multi" / "Single" / "Left" / "Right"）
-//! - locale 为字符串（core `Lang` 未实现 serde）
+//! - 枚举值 = Rust 变体名："Dark" / "Light" / "Multi" / "Single" / "Left" / "Right"
+//! - locale 为字符串，core `Lang` 未实现 serde
 
 use serde::{Deserialize, Serialize};
 
@@ -15,7 +15,7 @@ use crate::gui_config::{
     SidebarSide, SkinDisplay, Theme, ViewMode, WindowMode,
 };
 
-/// 头像设置（前端 wire：camelCase，字段即 `head`）
+/// 头像设置，前端 wire 为 camelCase，字段即 `head`
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct HeadConfigDto {
@@ -27,7 +27,7 @@ pub struct HeadConfigDto {
     pub y: f32,
 }
 
-/// 主窗口配置（前端 wire：camelCase，字段即 `mainWindow`）
+/// 主窗口配置，前端 wire 为 camelCase，字段即 `mainWindow`
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct MainWindowConfigDto {
@@ -35,13 +35,13 @@ pub struct MainWindowConfigDto {
     pub sidebar_side: SidebarSide,
     /// 侧栏是否收起
     pub sidebar_collapsed: bool,
-    /// 实例列表显示模式：list（默认）/ group / grid
+    /// 实例列表显示模式：list / group / grid，默认 list
     pub view_mode: ViewMode,
-    /// 当前选中实例 uuid（空串 = 未选中）
+    /// 当前选中实例 uuid，空串表示未选中
     pub selected_instance: String,
 }
 
-/// 收藏界面设置（前端 wire：camelCase，字段即 `collect`）
+/// 收藏界面设置，前端 wire 为 camelCase，字段即 `collect`
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct CollectConfigDto {
@@ -55,19 +55,26 @@ pub struct CollectConfigDto {
     pub shaderpack: bool,
 }
 
-/// 登录方式锁定的一个条目（前端 wire：camelCase）
+/// 登录方式锁定的一个条目，前端 wire 为 camelCase
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct LoginLockItemDto {
-    /// 账户添加类型（offline / microsoft / littleskin / selflittleskin / authlib / nide8）
+    /// 账户添加类型：offline / microsoft / littleskin / selflittleskin / authlib / nide8
     pub ty: String,
-    /// 登录模型名字（添加账户时下拉里的显示名；空 = 用类型名 / 服务器地址显示）
+    /// 登录模型名字，添加账户时下拉里的显示名；空串表示用类型名 / 服务器地址显示
     pub name: String,
-    /// 锁定的服务器（authlib = 认证服务器地址，nide8 = 服务器 ID，空 = 不指定）
+    /// 锁定的服务器，authlib 为认证服务器地址，nide8 为服务器 ID，空串表示不指定
     pub server: String,
 }
 
 impl From<LoginLockObj> for LoginLockItemDto {
+    /// 磁盘上的登录方式锁定项 → 前端 wire 形态
+    ///
+    /// - `o`: 磁盘配置里的锁定条目
+    ///
+    /// # 返回值
+    ///
+    /// 返回字段一一对应的 DTO
     fn from(o: LoginLockObj) -> Self {
         Self {
             ty: o.ty,
@@ -78,6 +85,13 @@ impl From<LoginLockObj> for LoginLockItemDto {
 }
 
 impl From<LoginLockItemDto> for LoginLockObj {
+    /// 前端 wire 形态 → 磁盘上的登录方式锁定项，保存配置时用
+    ///
+    /// - `d`: 前端提交的锁定条目
+    ///
+    /// # 返回值
+    ///
+    /// 返回字段一一对应的磁盘配置
     fn from(d: LoginLockItemDto) -> Self {
         Self {
             ty: d.ty,
@@ -87,31 +101,38 @@ impl From<LoginLockItemDto> for LoginLockObj {
     }
 }
 
-/// 客户端设置（前端 wire：camelCase，字段即 `client`）
+/// 客户端设置，前端 wire 为 camelCase，字段即 `client`
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct ClientConfigDto {
     /// 主窗口实例设置里显示 MOTD 卡片
     pub motd_card: bool,
-    /// MOTD 卡片刷新间隔（秒）
+    /// MOTD 卡片刷新间隔，单位秒
     pub motd_interval: u32,
-    /// 登录方式锁定总开关（false = 锁定列表不生效）
+    /// 登录方式锁定总开关，false 表示锁定列表不生效
     pub login_lock_on: bool,
-    /// 登录方式锁定列表（空 = 不锁定，可添加多个条目）
+    /// 登录方式锁定列表，空表示不锁定，可添加多个条目
     pub login_lock: Vec<LoginLockItemDto>,
-    /// 游戏自动进服（启动时自动进入 `auto_join_server`）
+    /// 游戏自动进服，启动时自动进入 `auto_join_server`
     pub auto_join: bool,
-    /// 游戏自动进服地址（host 或 host:port，空 = 不自动进服）
+    /// 游戏自动进服地址，host 或 host:port，空串表示不自动进服
     pub auto_join_server: String,
-    /// MOTD 显示地址（host 或 host:port，空 = 不显示真实服务器信息）
+    /// MOTD 显示地址，host 或 host:port，空串表示不显示真实服务器信息
     pub motd_server: String,
-    /// 实例锁定：锁定的实例 uuid（空 = 未锁定）；锁定时主窗口不允许切换到其它实例
+    /// 实例锁定：锁定的实例 uuid，空串表示未锁定；锁定时主窗口不允许切换到其它实例
     pub lock_instance: String,
     /// 自定义主页面：启用后主窗口的启动器主页换成导入的页面
     pub custom_home: bool,
 }
 
 impl From<ClientConfig> for ClientConfigDto {
+    /// 磁盘客户端设置 → 前端 wire 形态
+    ///
+    /// - `c`: 磁盘配置里的客户端设置
+    ///
+    /// # 返回值
+    ///
+    /// 返回转换后的 DTO，登录方式锁定列表逐项转换
     fn from(c: ClientConfig) -> Self {
         Self {
             motd_card: c.motd_card,
@@ -128,6 +149,13 @@ impl From<ClientConfig> for ClientConfigDto {
 }
 
 impl From<ClientConfigDto> for ClientConfig {
+    /// 前端 wire 形态 → 磁盘客户端设置，保存配置时用
+    ///
+    /// - `c`: 前端提交的客户端设置
+    ///
+    /// # 返回值
+    ///
+    /// 返回可落盘的客户端设置
     fn from(c: ClientConfigDto) -> Self {
         Self {
             motd_card: c.motd_card,
@@ -143,7 +171,7 @@ impl From<ClientConfigDto> for ClientConfig {
     }
 }
 
-/// GUI 配置（前端 wire：camelCase，即 `window_get_gui_config` 返回值）
+/// GUI 配置，前端 wire 为 camelCase，即 `window_get_gui_config` 的返回值
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct GuiConfigDto {
@@ -161,22 +189,28 @@ pub struct GuiConfigDto {
     pub collect: CollectConfigDto,
     /// 客户端设置
     pub client: ClientConfigDto,
-    /// 界面字体族名（空串 = 默认字体栈）
+    /// 界面字体族名，空串表示默认字体栈
     pub font: String,
     /// 皮肤显示模式：Skin2D / Skin3D
     pub skin_display: SkinDisplay,
-    /// 背景图来源（文件路径 / 网址，空串 = 无背景图）
+    /// 背景图来源，文件路径或网址，空串表示无背景图
     pub bg_source: String,
-    /// 背景图不透明度（%，5–100）
+    /// 背景图不透明度，单位 %，取值 5–100
     pub bg_opacity: u32,
-    /// 背景图模糊（px，0–40）
+    /// 背景图模糊，单位 px，取值 0–40
     pub bg_blur: u32,
-    /// 背景图原始分辨率（%，10–100）
+    /// 背景图原始分辨率，单位 %，取值 10–100
     pub bg_native_size: u32,
 }
 
 impl From<GuiConfig> for GuiConfigDto {
     /// 磁盘配置 → 前端 wire 形态
+    ///
+    /// - `c`: 磁盘上的 GUI 配置
+    ///
+    /// # 返回值
+    ///
+    /// 返回各子结构一并转换后的 DTO
     fn from(c: GuiConfig) -> Self {
         Self {
             theme: c.theme,
@@ -222,6 +256,12 @@ impl From<GuiConfig> for GuiConfigDto {
 
 impl From<GuiConfigDto> for GuiConfig {
     /// 前端 wire 形态 → 磁盘配置
+    ///
+    /// - `d`: 前端提交的 GUI 配置
+    ///
+    /// # 返回值
+    ///
+    /// 返回可落盘的 GUI 配置
     fn from(d: GuiConfigDto) -> Self {
         Self {
             theme: d.theme,

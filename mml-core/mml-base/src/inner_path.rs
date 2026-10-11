@@ -14,7 +14,7 @@ use std::{env, fs, path::PathBuf, sync::LazyLock};
 
 use mml_sys::Os;
 
-/// 内部数据存储路径（惰性初始化，自动创建目录）
+/// 内部数据存储路径，惰性初始化并自动创建目录
 static INNER: LazyLock<PathBuf> = LazyLock::new(|| {
     let inner_path = if mml_sys::get_system_info().os == Os::MacOS {
         let home = env::var("HOME").expect("");
@@ -34,6 +34,10 @@ static INNER: LazyLock<PathBuf> = LazyLock::new(|| {
 });
 
 /// 获取内部数据存储路径
+///
+/// # 返回值
+///
+/// 返回进程内缓存的同一路径，首次调用时创建目录
 pub fn get_inner_path() -> PathBuf {
     INNER.clone()
 }

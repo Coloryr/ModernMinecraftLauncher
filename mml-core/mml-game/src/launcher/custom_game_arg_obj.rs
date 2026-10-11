@@ -8,7 +8,7 @@ use crate::mojang::game_arg_obj::{GameArgObj, GameLibrariesObj};
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct CustomGameArgObj {
-    /// 基础版本 JSON 字段（扁平合并）
+    /// 基础版本 JSON 字段，按扁平方式合并进本结构
     #[serde(flatten)]
     pub base: GameArgObj,
     /// 兼容的 Java 主版本列表

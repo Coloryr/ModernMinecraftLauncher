@@ -1,13 +1,10 @@
 //! 复现「改代理后加载器查询卡住不返回」的根因并验证修复
 //!
-//! 现场：查询六路并发，其中 Forge / NeoForge 有「BMCLAPI 镜像不可达 → 回退官方源」
-//! 的逻辑。中断发生后，回退分支把"已中断"当成"镜像挂了"，**又发了一次新请求**；
-//! 新请求带着更新的世代号，本次中断对它无效 → 这一路永不返回 → `try_join!` 卡死 →
-//! 命令不返回 → 前端进度条停在 1/6。
+//! 现场：查询六路并发，Forge / NeoForge 有「BMCLAPI 镜像不可达 → 回退官方源」的分支。
+//! 中断发生后该分支把"已中断"当成"镜像挂了"，又发了一次新请求，新请求带着更新的
+//! 世代号，本次中断对它无效，于是这一路永不返回、`try_join!` 卡死、进度条停在 1/6。
 //!
-//! 这里直接验证两个修复点：
-//! 1. `is_aborted` 能认出中断错误（回退逻辑据此提前 return）；
-//! 2. 中断后**不会**有人再发出新请求（用"卡住服务收到的连接数"来断言）。
+//! 这里验证两个修复点：`is_aborted` 能认出中断错误，且中断后不会有人再发新请求。
 
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -37,6 +34,7 @@ fn silent_server() -> (u16, Arc<AtomicUsize>) {
     (port, hits)
 }
 
+/// 被中断的请求不应被镜像回退逻辑当成失败而重发
 #[test]
 fn aborted_request_is_not_retried_on_other_source() {
     let exe = std::env::current_exe().unwrap();
@@ -86,26 +84,21 @@ fn aborted_request_is_not_retried_on_other_source() {
     assert!(lag < Duration::from_millis(500), "中断太慢：{lag:?}");
 
     // 关键断言：回退逻辑若正确判断 is_aborted，就不会再对"官方源"发新请求。
-    // 这里再等一会儿，确认没有新的连接打进来（模拟回退分支的行为）
+    // 这里再等一会儿，确认没有新的连接打进来，模拟回退分支的行为
     let hits_at_abort = hits_before;
     std::thread::sleep(Duration::from_millis(600));
     let hits_after = hits.load(Ordering::SeqCst);
     println!("卡住服务收到的连接数：中断前 {hits_at_abort}，等待后 {hits_after}");
 
-    // 用 get_with_retry 再打一次同一个卡住地址（模拟"回退源"也是卡住的）：
-    // 因为此时世代已经变了，这一次请求属于"新请求"，会被正常发出——
-    // 我们要确认的是**旧的、已被中断的那条链路**不会自己重发。
-    // 这里用 is_aborted 判定即可：能被识别为中断，回退分支就会提前 return。
+    // 关键断言：能被识别为中断，回退分支就会提前 return，不会自己重发新请求。
+    // 注意此时世代已经变了，此刻再发的请求属于"新请求"，本来就会被正常发出。
     assert!(
         mml_net::is_aborted(&first_err),
         "is_aborted 必须能识别中断，回退分支才能据此不重发"
     );
 
     // 反向用例：普通连接失败**不能**被判为中断，否则镜像回退会失效。
-    //
-    // 注意：不能用"连不上的地址"来造普通错误——本机配置里可能配了代理
-    // （Auto 会跟随系统/配置代理），那样任何地址都可能被代理接走、变成 200。
-    // 这里改成直接构造一个普通 HttpError，验证 is_aborted 只认中断那一条。
+    // 不能用"连不上的地址"造错，本机可能配了代理把任何地址接走，所以直接构造 HttpError。
     use mml_names::i18_items::error_type::{ErrorType, HttpErrorData};
 
     let plain_err = ErrorType::HttpError(HttpErrorData {
@@ -118,7 +111,7 @@ fn aborted_request_is_not_retried_on_other_source() {
         "普通网络错误被误判为中断，镜像回退会失效"
     );
 
-    // 反向用例 2：真正的中断错误必须被认出（回退分支据此提前 return）
+    // 反向用例 2：真正的中断错误必须被认出，回退分支据此提前 return
     let abort_err = ErrorType::HttpError(HttpErrorData {
         url: String::new(),
         error: mml_net::ABORT_MSG.to_string(),

@@ -10,7 +10,7 @@
 /// LittleSkin 皮肤站官方地址
 pub const LITTLE_SKIN_URL: &str = "https://littleskin.cn/";
 
-/// 统一通行证（Nide8）认证服务器地址
+/// 统一通行证 Nide8 认证服务器地址
 pub const NIDE8_URL: &str = "https://auth.mc-user.com:233/";
 /// 统一通行证 JAR 下载地址
 pub const NIDE8_JAR_URL: &str = "https://login.mc-user.com:233/index/jar";
@@ -32,17 +32,17 @@ pub const XSTS: &str = "https://xsts.auth.xboxlive.com/xsts/authorize";
 // Java 运行时下载
 // ============================================================================
 
-/// Adoptium（Eclipse Temurin）API 地址
+/// Adoptium Eclipse Temurin API 地址
 pub const ADOPTIUM_URL: &str = "https://api.adoptium.net/";
 
-/// Foojay Disco API 地址（v3.0）
+/// Foojay Disco API 地址，v3.0
 pub const FOOJAY: &str = "https://api.foojay.io/disco/v3.0/";
 
 // ============================================================================
 // 镜像源
 // ============================================================================
 
-/// BMCLAPI 国内镜像源（bangbang93 维护）
+/// BMCLAPI 国内镜像源，bangbang93 维护
 pub const BMCLAPI: &str = "https://bmclapi2.bangbang93.com/";
 
 // ============================================================================
@@ -58,7 +58,7 @@ pub const MOJANG_PISTON_DATA: &str = "https://piston-data.mojang.com/";
 /// Mojang Piston 元数据
 pub const MOJANG_PISTON_META: &str = "https://piston-meta.mojang.com/";
 
-/// 所有 Mojang 官方域名的列表（用于镜像源替换）
+/// 所有 Mojang 官方域名的列表，用于镜像源替换
 pub const MOJANG: [&str; 4] = [
     MOJANG_META,
     MOJANG_LAUNCHER,
@@ -114,10 +114,10 @@ pub const LITELOADER: &str = "https://dl.liteloader.com/";
 
 /// Minecraft 玩家档案 API
 pub const MINECRAFT_SERVICES: &str = "https://api.minecraftservices.com/minecraft/profile";
-/// Minecraft 会话服务器（皮肤/披风查询）
+/// Minecraft 会话服务器，用于查皮肤 / 披风
 pub const MINECRAFT_SESSION_SERVER: &str =
     "https://sessionserver.mojang.com/session/minecraft/profile";
-/// Minecraft 玩家名查UUID（无需鉴权，查不到返回204）
+/// Minecraft 玩家名查 UUID，无需鉴权，查不到返回 204
 pub const MINECRAFT_PROFILE_API: &str = "https://api.mojang.com/users/profiles/minecraft";
 /// Minecraft Xbox 登录认证
 pub const MINECRAFT_SERVICES_XBOX: &str =
@@ -165,10 +165,12 @@ pub const OPENFRP_DOWNLOAD: &str = "https://console.openfrp.net/web/commonQuery/
 // SakuraFrp API
 // ============================================================================
 
-/// SakuraFrp（樱花内网穿透）API
+/// SakuraFrp 樱花内网穿透 API
 pub const SAKURA_FRP: &str = "https://api.natfrp.com/v4/";
 
+/// IBM Semeru 下载页接口，响应里带 HTML 与内嵌 JS
 pub const OPENJ9: &str =
     "https://developer.ibm.com/middleware/v1/contents/static/semeru-runtime-downloads";
 
+/// Azul Zulu 包列表接口，只取社区版
 pub const ZULU: &str = "https://www.azul.com/wp-admin/admin-ajax.php?action=bundles&endpoint=community&use_stage=false&include_fields=java_version%2Copenjdk_build_number%2Crelease_status%2Csupport_term%2Cos%2Carch%2Chw_bitness%2Cabi%2Cbundle_type%2Cjavafx%2Clatest%2Cext%2Cname%2Csha256_hash%2Curl%2Ccpu_gen%2Cfeatures";

@@ -17,12 +17,21 @@ use super::progress;
 
 /// 兼容性检测：把"搬过来的东西 M²L 到底能不能用"逐条判定
 ///
-/// - 顶层条目查 [`COMPAT_TABLE`]（没列进去的按 `extra` 处理）；
-/// - 实例逐个用 M²L 的解析器读 `game.json` —— 这是真正的判据：M²L 只认"目录里有能解析的
-///   `game.json`"的实例，所以解析失败就等于"搬过来了也看不见"；
-/// - 实例里还留着 ColorMC 的 `guisetting.json` 时单独记一笔：M²L 读的是自己的
-///   `gui_setting.json`（见 `crate::gui_setting`），所以 ColorMC 那份里的模组分组 / 备注 /
-///   日志设置**不会跟着过来**（文件本身留着，将来要转换还有原数据）。
+/// - `app`: 窗口句柄，`None` 表示不报进度
+/// - `src_entries`: 源工作目录的顶层条目名
+/// - `src_instances`: 源目录里的实例目录名
+/// - `dst`: 目标目录，实例就在这里逐个验
+///
+/// 顶层条目查 [`COMPAT_TABLE`]，没列进去的按 `extra` 处理。
+/// 实例逐个用 M²L 的解析器读 `game.json` —— 这是真正的判据：M²L 只认"目录里有能解析的
+/// `game.json`"的实例，所以解析失败就等于"搬过来了也看不见"。
+/// 实例里还留着 ColorMC 的 `guisetting.json` 时单独记一笔：M²L 读的是自己的
+/// `gui_setting.json`，见 `crate::gui_setting`，所以 ColorMC 那份里的模组分组 / 备注 /
+/// 日志设置**不会跟着过来**，文件本身留着，将来要转换还有原数据。
+///
+/// # 返回值
+///
+/// 实例三分类结论与顶层条目逐条结论，见 [`Checked`]
 pub(super) fn check(
     app: Option<&AppHandle>,
     src_entries: &[String],
@@ -70,15 +79,15 @@ pub(super) fn check(
     checked
 }
 
-/// 兼容性对照表：ColorMC 工作目录的**顶层条目** → （级别，说明 i18n key）
+/// 兼容性对照表：ColorMC 工作目录的**顶层条目** → 级别与说明 i18n key
 ///
-/// 级别：`ok` 能直接用 / `partial` 能用但有偏差或会丢东西 / `extra` M²L 读不懂（留着不碍事）。
-/// 结论来自逐项对照 ColorMC 源码（`E:\code\ColorMC`）与本仓库代码：
+/// 级别：`ok` 能直接用 / `partial` 能用但有偏差或会丢东西 / `extra` M²L 读不懂，留着不碍事。
+/// 结论来自逐项对照 ColorMC 源码 `E:\code\ColorMC` 与本仓库代码：
 /// - `minecraft/` **同构**：实例、资源、版本库、依赖库都在同样的位置，能直接用；
-/// - `collect.json` 结构一致（M²L 的 `CollectObj` 少了 ColorMC 的 4 个开关，未知字段被忽略）；
-/// - `config.json` 能读（`#[serde(default)]`），但 ColorMC 独有的 `SafeLog4j` 会丢、
+/// - `collect.json` 结构一致：M²L 的 `CollectObj` 少了 ColorMC 的 4 个开关，未知字段被忽略；
+/// - `config.json` 能读，靠的是 `#[serde(default)]`，但 ColorMC 独有的 `SafeLog4j` 会丢、
 ///   代理用 3 个 bool 表达而 M²L 用"策略 + 类型"两组枚举 —— 语义不同，会回落成默认值；
-/// - `count.dat` 是游戏统计（读不了就从零开始）；`logs.log` 会盖掉 M²L 自己那份日志；
+/// - `count.dat` 是游戏统计，读不了就从零开始；`logs.log` 会盖掉 M²L 自己那份日志；
 /// - `java/` 是 ColorMC 的运行时目录，合过去 M²L 不会自动认那些 JRE；
 /// - 其余目录 / 文件 M²L 根本不读。
 pub(super) const COMPAT_TABLE: &[(&str, &str, &str)] = &[
@@ -102,10 +111,15 @@ pub(super) const COMPAT_TABLE: &[(&str, &str, &str)] = &[
 ];
 
 /// 兼容性检测的结果
+///
+/// 字段给同级的 migrate 模块读，故都是 `pub(super)`
 pub(super) struct Checked {
-    /// 字段给同级的 migrate 模块读，故 pub(super)
+    /// 能被 M²L 解析出 `game.json` 的实例目录名
     pub(super) instances_ok: Vec<String>,
+    /// 解析不出 `game.json` 的实例目录名，搬过来了 M²L 也看不见
     pub(super) instances_bad: Vec<String>,
+    /// 还带着 ColorMC 界面设置文件的实例目录名
     pub(super) instances_legacy_gui: Vec<String>,
+    /// 顶层条目逐条结论，含级别与说明的 i18n 键
     pub(super) compat: Vec<ColorMcCompatDto>,
 }

@@ -46,8 +46,6 @@ static GAME_VERSIONS: OnceLock<Vec<String>> = OnceLock::new();
 
 /// 转换为 Modrinth 的加载器 ID
 ///
-/// # 参数
-///
 /// - `loader`: 加载器类型
 ///
 /// # 返回值
@@ -64,8 +62,6 @@ pub fn to_loader_id(loader: &LoaderType) -> Option<String> {
 }
 
 /// 创建下载项目
-///
-/// # 参数
 ///
 /// - `obj`: Modrinth 版本信息
 /// - `path`: 保存目录
@@ -89,9 +85,7 @@ pub fn make_download_obj<P: AsRef<Path>>(obj: &ModrinthVersionObj, path: P) -> F
     }
 }
 
-/// 创建下载项目（整合包内文件）
-///
-/// # 参数
+/// 创建整合包内文件的下载项目
 ///
 /// - `obj`: 整合包文件信息
 /// - `path`: 保存目录
@@ -110,8 +104,6 @@ pub fn make_pack_download_obj<P: AsRef<Path>>(obj: &ModrinthPackFileObj, path: P
 }
 
 /// 创建在线文件信息
-///
-/// # 参数
 ///
 /// - `obj`: Modrinth 版本信息
 /// - `path`: 实例内相对目录
@@ -139,8 +131,6 @@ pub fn make_file_online_obj(obj: &ModrinthVersionObj, path: &str) -> OnlineInfoO
 
 /// 获取分类图标地址
 ///
-/// # 参数
-///
 /// - `name`: 分类名
 ///
 /// # 返回值
@@ -167,8 +157,6 @@ pub async fn get_categories_icon(name: &str) -> Option<String> {
 }
 
 /// 获取分组
-///
-/// # 参数
 ///
 /// - `file_type`: 项目文件类型
 ///
@@ -204,7 +192,7 @@ pub async fn get_categories(file_type: FileType) -> CoreResult<HashMap<String, S
 ///
 /// # 返回值
 ///
-/// 返回游戏版本列表（首位为空串表示不限）；查询失败返回对应错误
+/// 返回游戏版本列表，首位为空串表示不限；查询失败返回对应错误
 pub async fn get_game_versions() -> CoreResult<Vec<String>> {
     match GAME_VERSIONS.get() {
         Some(versions) => Ok(versions.clone()),
@@ -220,8 +208,6 @@ pub async fn get_game_versions() -> CoreResult<Vec<String>> {
 }
 
 /// 获取整合包模组信息
-///
-/// # 参数
 ///
 /// - `path`: 整合包解压目录
 /// - `info`: 整合包信息
@@ -348,15 +334,13 @@ pub struct ModrinthModDependenciesRes {
 
 /// 获取模组依赖
 ///
-/// # 参数
-///
 /// - `obj`: Modrinth 文件信息
 /// - `version`: 游戏版本
 /// - `loader`: 加载器类型
 ///
 /// # 返回值
 ///
-/// 返回依赖列表（含递归解析出的子依赖，已去重）
+/// 返回依赖列表，含递归解析出的子依赖，已去重
 pub async fn get_mod_dependencies(
     obj: &ModrinthVersionObj,
     version: &str,
@@ -376,12 +360,10 @@ pub async fn get_mod_dependencies(
 
 /// 递归解析模组依赖
 ///
-/// # 参数
-///
 /// - `dependencies`: 依赖列表
 /// - `version`: 游戏版本
 /// - `loader`: 加载器类型
-/// - `ids`: 已解析的项目 ID 集合（避免重复解析）
+/// - `ids`: 已解析的项目 ID 集合，避免重复解析
 /// - `handle`: 用于并发查询的运行时句柄
 ///
 /// # 返回值
@@ -397,7 +379,7 @@ fn get_mod_dependencies_inner(
     let list: Mutex<Vec<ModrinthModDependenciesRes>> = Mutex::new(Vec::new());
 
     dependencies.par_iter().for_each(|item| {
-        // 无 project_id 的依赖是打包内置文件（如 Mod Menu Helper.zip），无法通过项目 API 解析
+        // 无 project_id 的依赖是打包内置文件，如 Mod Menu Helper.zip，无法通过项目 API 解析
         let Some(project_id) = &item.project_id else {
             return;
         };
@@ -458,7 +440,7 @@ fn get_mod_dependencies_inner(
             list: vec![data1],
         });
 
-        // 添加未被标记的子依赖（避免同时持有 ids 和 list 锁）
+        // 添加未被标记的子依赖，避免同时持有 ids 和 list 锁
         for item5 in sub_deps {
             let mut ids_guard = ids.lock().unwrap();
             if ids_guard.contains(&item5.mod_id) {
@@ -474,8 +456,6 @@ fn get_mod_dependencies_inner(
 }
 
 /// 升级整合包
-///
-/// # 参数
 ///
 /// - `game`: 目标实例
 /// - `data`: 新版本的文件信息
@@ -536,9 +516,7 @@ pub async fn upgrade_modpack(
     }
 
     // **排除包根的 `modrinth.index.json`**：`extract` 会把"不在 `overrides/` 下"的条目写进
-    // 实例的 base 目录，而那份清单正是 `check_upgrade` 要读的"旧清单" —— 被新包覆盖之后
-    // 新旧清单相同，差异算成空，于是既不下载也不删除（升级等于只换了个包）。清单由
-    // `check_upgrade` 末尾统一写回。
+    // 实例 base 目录，覆盖掉 `check_upgrade` 要读的旧清单，差异算成空就不下载也不删除。
     worker
         .extract(Some(vec![names::MODRINTH_FILE.to_string()]))
         .await?;
@@ -575,8 +553,6 @@ pub async fn upgrade_modpack(
 
 impl InstanceSettingObj {
     /// 自动标记模组
-    ///
-    /// # 参数
     ///
     /// - `over`: 是否覆盖已经标记的模组
     ///

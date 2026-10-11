@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 pub struct FabricMetaLoaderObj {
     /// 版本号
     pub version: String,
-    /// 是否为稳定版
+    /// 是否为稳定版，`false` 表示快照或测试版
     pub stable: bool,
 }
 

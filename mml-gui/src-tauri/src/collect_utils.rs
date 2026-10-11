@@ -17,7 +17,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(default)]
 pub struct CollectItemObj {
-    /// 收藏项 uuid（加载时由 `CollectObj::items` 的 key 回填，不落盘）
+    /// 收藏项 uuid；加载时由 `CollectObj::items` 的 key 回填，不落盘
     #[serde(skip)]
     pub uuid: String,
     /// 下载源
@@ -52,17 +52,23 @@ pub struct CollectObj {
     pub groups: HashMap<String, HashSet<String>>,
 }
 
-/// 收藏文件路径（init 时设置）
+/// 收藏文件路径，init 时设置
 static FILE: OnceLock<PathBuf> = OnceLock::new();
 /// 内存收藏数据
 static COLLECT: LazyLock<RwLock<CollectObj>> = LazyLock::new(|| RwLock::new(Default::default()));
 
-/// 记录收藏文件路径（启动时调用）；实际读取见 [`load`]
+/// 记录收藏文件路径，启动时调用；实际读取见 [`load`]
+///
+/// - `path`: 运行路径，收藏文件放它下面
 pub fn init<P: AsRef<Path>>(path: P) {
     FILE.get_or_init(|| path.as_ref().join(names::COLLECT_FILE));
 }
 
-/// 取当前收藏（克隆一份，供命令层转换 DTO）
+/// 取当前收藏，供命令层转换 DTO
+///
+/// # 返回值
+///
+/// 收藏数据的克隆，调用方随便改都不影响内存里那份
 pub fn get() -> CollectObj {
     COLLECT.read().unwrap().clone()
 }
@@ -95,7 +101,7 @@ pub fn load() -> CoreResult<()> {
     Ok(())
 }
 
-/// 保存收藏数据（异步落盘）
+/// 保存收藏数据，异步落盘
 pub fn save() {
     config_save::save(
         uuids::COLLECT_UUID,
@@ -104,11 +110,9 @@ pub fn save() {
     );
 }
 
-/// 删除收藏条目（按下载源 + 项目 ID 匹配，并从所有分组移除）
+/// 删除收藏条目，按下载源加项目 ID 匹配，并从所有分组移除
 ///
-/// # 参数
-///
-/// - `obj`: 待删除的收藏条目（用 source + pid 匹配，uuid 无关）
+/// - `obj`: 待删除的收藏条目，只看 source 与 pid，不看 uuid
 pub fn remove_item(obj: CollectItemObj) {
     {
         let mut collect = COLLECT.write().unwrap();
@@ -132,9 +136,7 @@ pub fn remove_item(obj: CollectItemObj) {
     save();
 }
 
-/// 按 uuid 删除收藏条目（并从所有分组移除）
-///
-/// # 参数
+/// 按 uuid 删除收藏条目，并从所有分组移除
 ///
 /// - `uuid`: 收藏条目 uuid
 pub fn remove_uuid(uuid: &str) {
@@ -151,11 +153,9 @@ pub fn remove_uuid(uuid: &str) {
     save();
 }
 
-/// 添加收藏条目（同下载源同项目 ID 已存在时忽略）
+/// 添加收藏条目，同下载源同项目 ID 已存在时忽略
 ///
-/// # 参数
-///
-/// - `obj`: 收藏条目（uuid 自动生成）
+/// - `obj`: 收藏条目，uuid 由这里生成
 pub fn add_item(obj: CollectItemObj) {
     {
         let mut collect = COLLECT.write().unwrap();
@@ -176,9 +176,7 @@ pub fn add_item(obj: CollectItemObj) {
     save();
 }
 
-/// 添加收藏分组（同名已存在时忽略）
-///
-/// # 参数
+/// 添加收藏分组，同名已存在时忽略
 ///
 /// - `name`: 分组名
 pub fn add_group(name: &str) {
@@ -195,9 +193,7 @@ pub fn add_group(name: &str) {
     save();
 }
 
-/// 删除收藏分组（分组内条目保留，仅脱离分组）
-///
-/// # 参数
+/// 删除收藏分组，分组内条目保留，仅脱离分组
 ///
 /// - `name`: 分组名
 pub fn remove_group(name: &str) {
@@ -209,7 +205,7 @@ pub fn remove_group(name: &str) {
     save();
 }
 
-/// 清空全部收藏（分组保留，只清成员）
+/// 清空全部收藏，分组保留，只清成员
 pub fn clear() {
     {
         let mut collect = COLLECT.write().unwrap();
@@ -224,7 +220,9 @@ pub fn clear() {
     save();
 }
 
-/// 只清空某个分组的成员（收藏条目本身保留）
+/// 只清空某个分组的成员，收藏条目本身保留
+///
+/// - `name`: 分组名，不存在时不做任何事
 pub fn clear_group(name: &str) {
     {
         let mut collect = COLLECT.write().unwrap();
@@ -237,7 +235,10 @@ pub fn clear_group(name: &str) {
     save();
 }
 
-/// 从分组移除若干收藏（条目本身保留，之后会回到默认分组）
+/// 从分组移除若干收藏，条目本身保留，之后会回到默认分组
+///
+/// - `group`: 分组名，不存在时不做任何事
+/// - `uuids`: 要移除的收藏条目 uuid
 pub fn remove_group_items(group: &str, uuids: &[String]) {
     {
         let mut collect = COLLECT.write().unwrap();
@@ -252,11 +253,14 @@ pub fn remove_group_items(group: &str, uuids: &[String]) {
     save();
 }
 
-/// 把若干收藏移入分组（**移动语义**：先从其它分组里摘掉；分组不存在时不做任何事）
+/// 把若干收藏移入分组，移动语义：先从其它分组里摘掉
 ///
-/// 界面上的「默认分组」不是这里的一个分组，而是"不在任何具名分组里"的那批收藏
-/// （收藏时没有分组参数，所以新收藏天然落在那边）。既然同一个具名分组之外还有个
-/// 默认分组，一项就只能属于一个具名分组 —— 否则各组计数相加不等于收藏总数。
+/// - `group`: 分组名，不存在时不做任何事
+/// - `uuids`: 要移入的收藏条目 uuid
+///
+/// 界面上的「默认分组」不是这里的具名分组，而是"不在任何具名分组里"的那批收藏，
+/// 收藏时不带分组参数，新收藏天然落在那边。既然具名分组之外还有默认分组，
+/// 一项就只能属于一个具名分组，否则各组计数相加不等于收藏总数。
 pub fn set_group_items(group: &str, uuids: &[String]) {
     {
         let mut collect = COLLECT.write().unwrap();
@@ -285,9 +289,7 @@ pub fn set_group_items(group: &str, uuids: &[String]) {
     save();
 }
 
-/// 项目是否已收藏（`items` 以收藏条目 uuid 为键，这里按 pid 匹配值里的项目 ID）
-///
-/// # 参数
+/// 项目是否已收藏；`items` 以收藏条目 uuid 为键，这里按值里的项目 ID 匹配
 ///
 /// - `pid`: 项目 ID
 ///

@@ -25,10 +25,8 @@ use crate::{
 impl GameArgObj {
     /// 创建游戏运行库项目
     ///
-    /// # 参数
-    ///
-    /// - `native`: 本地库路径
-    /// - `game`: 游戏实例
+    /// - `native`: 原生库解压目录
+    /// - `game`: 游戏实例，目录回退查找用，可为 `None`
     ///
     /// # 返回值
     ///
@@ -91,7 +89,7 @@ impl GameArgObj {
         .await
         .unwrap();
 
-        // 阶段 2：ARM 本地库回退（在异步上下文中进行网络请求）
+        // 阶段 2：ARM 本地库回退，网络请求只能在异步上下文里做
         let sys = mml_sys::get_system_info();
         if sys.is_arm {
             for item in natives_arm.iter() {
@@ -171,17 +169,15 @@ impl GameArgObj {
     }
 }
 
-/// 处理单个库项目
-///
-/// # 参数
+/// 处理单个运行库条目，把需要的下载项推进列表
 ///
 /// - `item`: 运行库信息
-/// - `list`: 下载项列表（并发写入）
-/// - `keys`: 已处理运行库的 SHA1 集合（去重）
+/// - `list`: 下载项列表，并发写入
+/// - `keys`: 已处理运行库的 SHA1 集合，用于去重
 /// - `natives`: 原生库键集合
 /// - `natives_arm`: ARM 原生库键列表
 /// - `native`: 原生库解压路径
-/// - `game`: 游戏实例（目录回退查找用）
+/// - `game`: 游戏实例，目录回退查找用，可为 `None`
 fn process_one_library(
     item: &GameLibrariesObj,
     list: &Mutex<Vec<FileItemObj>>,

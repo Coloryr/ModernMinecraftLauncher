@@ -38,11 +38,13 @@ export default {
   "empty.addAccount": "添加账户",
   "empty.setJava": "设置 Java",
 
-  // 拖拽整合包
-  "drop.title": "松开以添加整合包",
-  "drop.desc": "支持 .zip / .mrpack / .modpack 整合包文件",
-  "drop.added": "已添加整合包 {name}",
-  "drop.notModpack": "不支持的文件类型，仅支持整合包",
+  // 拖拽导入遮罩：只有标题（按拖入类型分）
+  "drop.titleFiles": "松开以导入整合包或文件夹",
+  "drop.titleArchive": "松开以导入整合包",
+  "drop.titleFolder": "松开以导入文件夹",
+  "drop.titleLogin": "松开以导入登录方式",
+  "drop.onlyFirst": "一次只能拖入一个，已取第一个",
+  "drop.notModpack": "不支持的文件类型，仅支持整合包、实例文件夹与登录卡片",
 
   // 多选模式
   "multi.selectAll": "全选",
@@ -244,6 +246,17 @@ export default {
   // 资源管理窗口
   "resource.title": "资源管理",
   "resource.download": "下载资源",
+  // 拖拽导入（落点 = 当前分类对应的目录）
+  "resource.dropTitleTo": "松开以导入到「{name}」",
+  "resource.dropUnsupported": "这一类不收目录与登录快捷方式",
+  "resource.dropImported": "已导入 {count} 个文件",
+  "resource.dropSkipped": "已跳过 {count} 个同名文件",
+  "resource.dropConflictTitle": "有同名项",
+  "resource.dropConflictText": "目标目录里已有 {count} 个同名项，怎么处理？",
+  "resource.dropConflictMore": "…还有 {count} 个",
+  "resource.dropOverwrite": "覆盖",
+  "resource.dropSkip": "跳过",
+  "resource.dropRename": "重命名",
   "resource.modName": "名字",
   "resource.modVersion": "版本",
   "resource.modAuthor": "作者",
@@ -523,6 +536,9 @@ export default {
   "add.yes": "是",
   "add.no": "否",
   "add.closeBlocked": "正在获取数据，暂时无法关闭窗口",
+  "add.dropBusy": "上一个操作还没结束，稍后再拖入",
+  // 添加实例窗口的拖入遮罩（只接文件）
+  "add.dropTitle": "松开以导入整合包或文件夹",
   "add.cancel": "取消",
   "add.create": "创建实例",
   "add.creating": "创建中…",
@@ -584,6 +600,10 @@ export default {
   "account.viewSkin": "查看皮肤",
   "account.addTitle": "添加账户",
   "account.added": "账户已添加",
+  // 拖入登录卡片（网页卡片 / .url / .webloc 快捷方式）
+  "account.dropTitle": "松开以导入登录方式",
+  "account.dropFileTitle": "松开以导入登录快捷方式",
+  "account.dropNotShortcut": "只支持拖入登录卡片或 .url / .webloc 快捷方式",
   "account.loginHint": "点击添加开始微软登录",
   "account.actions": "操作",
   "account.username": "账户",

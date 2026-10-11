@@ -8,6 +8,7 @@ use mml_gui_lib::{collect_utils, err_box, gui_config, image_manager, windows};
 use mml_names::names;
 use mml_sys::path_helper;
 
+/// 程序入口：定运行路径、初始化各单例，最后进入 Tauri 事件循环
 fn main() {
     let mut obj = CoreInitObj {
         path: Default::default(),
@@ -19,6 +20,7 @@ fn main() {
 
     println!("Run path: {}", path.display());
 
+    // 先试写一次探测目录可写性，不可写就退回系统数据目录
     let temp = path.join("test");
     let res = path_helper::write_text(temp, "test write");
     obj.path = if res.is_err() { get_save_path() } else { path };
@@ -37,7 +39,7 @@ fn main() {
     mml_gui_lib::run()
 }
 
-/// 获取兜底运行路径（系统数据目录下的 M²L 目录）
+/// 获取兜底运行路径：系统数据目录下的 M²L 目录
 ///
 /// # 返回值
 ///
@@ -67,7 +69,7 @@ fn get_run_path() -> PathBuf {
     exe_dir.join(names::MML_DIR)
 }
 
-/// 发布构建：读数据目录下 `run` 文件里记录的运行路径（路径需存在才有效）
+/// 发布构建：读数据目录下 `run` 文件里记录的运行路径，路径需存在才有效
 ///
 /// # 返回值
 ///
@@ -91,7 +93,7 @@ fn get_config_path() -> Option<PathBuf> {
     None
 }
 
-/// 发布构建（Windows）：取 `run` 文件记录的路径，取不到用 exe 同目录
+/// 发布构建 Windows：取 `run` 文件记录的路径，取不到用 exe 同目录
 ///
 /// # 返回值
 ///
@@ -110,7 +112,7 @@ fn get_run_path() -> PathBuf {
     })
 }
 
-/// 发布构建（Linux）：取 `run` 文件记录的路径，取不到用家目录下的安装目录
+/// 发布构建 Linux：取 `run` 文件记录的路径，取不到用家目录下的安装目录
 ///
 /// # 返回值
 ///
@@ -127,7 +129,7 @@ fn get_run_path() -> PathBuf {
     })
 }
 
-/// 发布构建（macOS）：取 `run` 文件记录的路径，取不到用共享目录
+/// 发布构建 macOS：取 `run` 文件记录的路径，取不到用共享目录
 ///
 /// # 返回值
 ///

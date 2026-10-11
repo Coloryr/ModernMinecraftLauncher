@@ -1,11 +1,11 @@
 //! 构建脚本：Tauri 胶水 + 调用 gui-ipc-gen 生成 IPC 绑定
 //!
-//! 扫描与生成逻辑全在 `mml-gui/ipc-gen/`（包名 `gui-ipc-gen`，有单测），
+//! 扫描与生成逻辑全在 `mml-gui/ipc-gen/`，包名 `gui-ipc-gen`，有单测，
 //! 这里只负责算路径、传配置、写文件、打 cargo 指令。
 //!
 //! 注意：vendor 插件的还原**不能**放这里 —— cargo 在解析依赖图时就要读
 //! `target/vendor/tauri-plugin-decoration/Cargo.toml`，那发生在任何 build script
-//! 之前。改由各构建入口在 cargo 之前跑 `vendor/prepare.ps1`（见 build-*.bat）。
+//! 之前。改由各构建入口在 cargo 之前跑 `vendor/prepare.ps1`，见 build-*.bat。
 
 use std::{collections::BTreeMap, path::PathBuf};
 
@@ -24,7 +24,7 @@ fn main() {
     let generated = gui_ipc_gen::generate(&gui_ipc_gen::GenConfig {
         src_dir: manifest.join("src"),
         // mml-names 的 Lang 是外部 crate 的 unit 枚举：线上是变体名，
-        // 变体固定 zh_cn / en_us，前端一直这么写死（见 lib/guiConfig.ts 的 Locale）
+        // 变体固定 zh_cn / en_us，前端一直这么写死，见 lib/guiConfig.ts 的 Locale
         external_types: BTreeMap::from([(
             "Lang".to_string(),
             "\"zh_cn\" | \"en_us\"".to_string(),

@@ -45,21 +45,21 @@ use crate::{
 pub enum AutoJoinType {
     /// 无自动操作
     None,
-    /// 进入存档
+    /// 进入指定存档，值为存档信息
     Save(Arc<SaveObj>),
-    /// 进入服务器
+    /// 进入指定服务器，值为服务器配置
     Server(Arc<ServerObj>),
 }
 
 /// 游戏启动所使用的参数
 pub struct GameLaunchArg {
-    /// 登录账户
+    /// 登录账户，含玩家名与令牌
     pub auth: LoginObj,
     /// 自动进入的操作
     pub auto: AutoJoinType,
     /// 是否以管理员方式启动
     pub admin: bool,
-    /// ASM端口
+    /// Mixin 调试端口，不调试时为 `None`
     pub mixin: Option<u16>,
     /// 启动时设置语言
     pub lang: Option<String>,
@@ -67,29 +67,29 @@ pub struct GameLaunchArg {
 
 /// 游戏实例处理完成后的参数
 pub struct GameRunObj {
-    /// 游戏实例
+    /// 游戏实例 uuid
     pub uuid: Uuid,
     /// 日志编码
     pub encoding: LogEncoding,
     /// 登陆的账户
     pub auth: LoginObj,
-    /// 运行路径
+    /// 工作目录，即游戏根目录
     pub path: PathBuf,
-    /// Java路径
+    /// Java 可执行文件路径
     pub java: PathBuf,
     /// 启动参数
     pub args: Vec<String>,
-    /// 运行环境
+    /// 环境变量
     pub env: HashMap<String, String>,
     /// 是否管理员方式启动
     pub admin: bool,
 }
 
-/// 创建启动命令参数
+/// 启动命令的参数集合
 pub struct LaunchCmd {
-    /// Java路径
+    /// Java 可执行文件路径
     pub java: PathBuf,
-    /// 运行目录
+    /// 工作目录
     pub dir: PathBuf,
     /// 启动参数
     pub arg: Vec<String>,
@@ -99,11 +99,10 @@ pub struct LaunchCmd {
 
 /// 游戏句柄
 pub(crate) struct InstanceHandle {
-    /// 游戏进程（共享所有权，用于等待退出和强制结束）
-    /// 提权启动时存储的是启动器进程（PowerShell/pkexec/osascript），
-    /// 该进程在目标进程运行期间保持存活，可通过 try_wait 检测退出
+    /// 游戏进程，共享所有权，用于等待退出和强制结束；提权启动时存的是
+    /// 启动器进程，它在目标进程运行期间保持存活，可照样用 try_wait 检测退出
     process: Arc<Mutex<Option<Child>>>,
-    /// 游戏实例UUID
+    /// 游戏实例 uuid
     pub uuid: Uuid,
     /// 进程是否已经退出
     is_exit: Arc<AtomicBool>,
@@ -111,14 +110,12 @@ pub(crate) struct InstanceHandle {
     pub is_admin: bool,
     /// 退出码
     exit_code: i32,
-    /// 提权启动时的目标进程 PID（用于强制结束目标进程）
+    /// 提权启动时的目标进程 PID，用于强制结束目标进程
     elevated_pid: Option<u32>,
 }
 
 impl InstanceHandle {
     /// 创建游戏句柄并启动游戏进程
-    ///
-    /// # 参数
     ///
     /// - `run`: 游戏运行参数
     ///
@@ -175,11 +172,9 @@ impl InstanceHandle {
 
     /// 强制结束游戏进程
     ///
-    /// # 返回值
-    ///
-    /// 无返回值；结束失败时静默忽略
+    /// 结束失败时静默忽略。
     pub fn kill(&self) {
-        // 提权启动时，通过 taskkill 结束目标进程（Windows）
+        // 提权启动时通过 taskkill 结束目标进程，仅 Windows
         #[cfg(target_os = "windows")]
         if let Some(pid) = self.elevated_pid {
             let _ = std::process::Command::new("taskkill")
@@ -188,7 +183,7 @@ impl InstanceHandle {
                 .stderr(Stdio::null())
                 .spawn();
         }
-        // 结束启动器进程（所有平台）；提权启动时启动器退出会连带终止目标进程
+        // 结束启动器进程，所有平台都走这条；提权启动时启动器退出会连带终止目标进程
         if let Ok(mut guard) = self.process.lock() {
             if let Some(ref mut child) = *guard {
                 let _ = child.kill();
@@ -199,9 +194,7 @@ impl InstanceHandle {
 
     /// 轮询进程状态，退出时标记退出标志
     ///
-    /// # 返回值
-    ///
-    /// 无返回值；已退出或已标记时忽略
+    /// 已退出或已标记时忽略。
     pub fn tick(&self) {
         // 等待进程退出线程
         let process_clone = self.process.clone();
@@ -245,16 +238,12 @@ impl InstanceHandle {
 
 /// 读取进程输出流并转发到游戏日志
 ///
-/// # 参数
-///
 /// - `reader`: 缓冲读取器
-/// - `uuid`: 游戏实例 UUID
-/// - `encoding`: 日志编码（UTF-8 或 GBK）
+/// - `uuid`: 游戏实例 uuid
+/// - `encoding`: 日志编码，UTF-8 或 GBK
 /// - `exit_flag`: 退出标志，用于停止读取
 ///
-/// # 返回值
-///
-/// 无返回值；流关闭或收到退出标志后结束
+/// 流关闭或收到退出标志后结束。
 fn read_process_stream<R: std::io::Read>(
     reader: R,
     uuid: Uuid,
@@ -292,8 +281,6 @@ fn read_process_stream<R: std::io::Read>(
 
 impl InstanceSettingObj {
     /// 尝试刷新账户，若失败则询问是否离线模式
-    ///
-    /// # 参数
     ///
     /// - `arg`: 启动参数
     /// - `gui`: 启动界面回调
@@ -347,8 +334,6 @@ impl InstanceSettingObj {
     }
 
     /// 检查缺失的文件，自动下载，完成后返回启动配置
-    ///
-    /// # 参数
     ///
     /// - `arg`: 启动参数
     /// - `gui`: 启动界面回调
@@ -445,8 +430,6 @@ impl InstanceSettingObj {
 
     /// 检查服务器包更新
     ///
-    /// # 参数
-    ///
     /// - `gui`: 启动界面回调
     /// - `cancel`: 取消令牌
     ///
@@ -515,9 +498,7 @@ impl InstanceSettingObj {
         }
     }
 
-    /// 获取启动使用的java
-    ///
-    /// # 参数
+    /// 获取启动使用的 Java
     ///
     /// - `obj`: 启动配置
     /// - `gui`: 启动界面回调
@@ -570,9 +551,7 @@ impl InstanceSettingObj {
 
     /// 执行指令
     ///
-    /// # 参数
-    ///
-    /// - `cmd`: 命令行（换行分隔的指令）
+    /// - `cmd`: 命令行，按换行分隔
     /// - `env`: 环境变量
     /// - `wait_run`: 是否等待执行完成
     /// - `admin`: 是否以管理员方式启动
@@ -605,7 +584,7 @@ impl InstanceSettingObj {
             }));
         }
 
-        // 收集参数（跳过第0个，即程序名本身）
+        // 收集参数，跳过第 0 个，那是程序名本身
         let proc_args: Vec<String> = args
             .iter()
             .skip(1)
@@ -659,8 +638,6 @@ impl InstanceSettingObj {
     }
 
     /// 生成游戏启动参数，不用于启动
-    ///
-    /// # 参数
     ///
     /// - `arg`: 启动参数
     /// - `cancel`: 取消令牌
@@ -740,8 +717,6 @@ impl InstanceSettingObj {
     }
 
     /// 启动游戏实例
-    ///
-    /// # 参数
     ///
     /// - `arg`: 启动参数
     /// - `gui`: 启动界面回调

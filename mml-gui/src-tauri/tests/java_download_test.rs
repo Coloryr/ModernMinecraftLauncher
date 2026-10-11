@@ -3,7 +3,7 @@
 //! 走完整链路：foojay `/packages` 拉取候选列表 → `java_download_start`
 //! 经下载器下载压缩包 → `mml_jvms::unzip_java` 解包识别并注册进 Java 列表。
 //!
-//! 真实联网 + 真实解包；运行目录在仓库 `target/temp`（git 忽略，可反复复用）。
+//! 真实联网 + 真实解包；运行目录在仓库 `target/temp`，git 忽略，可反复复用。
 //! 注意：本测试会下载几十 MB 的压缩包，比一般单测慢。
 
 use std::path::PathBuf;
@@ -14,12 +14,16 @@ use mml_gui_lib::windows::java_download::{java_download_get_list, java_download_
 
 static INIT: Once = Once::new();
 
-/// 运行根目录（核心初始化 / 下载 / Java 存放都在这下面）
+/// 运行根目录，核心初始化 / 下载 / Java 存放都在这下面
+///
+/// # 返回值
+///
+/// 仓库 `target/temp` 下的固定目录，git 忽略，可跨进程复用
 fn run_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/temp/java-download-test")
 }
 
-/// 初始化全局依赖链（进程内只执行一次），与应用 `mml_core::init` 同构
+/// 初始化全局依赖链，进程内只执行一次，与应用 `mml_core::init` 同构
 fn setup() {
     INIT.call_once(|| {
         std::fs::create_dir_all(run_dir()).unwrap();
@@ -41,7 +45,7 @@ fn setup() {
 async fn foojay_download_and_register() {
     setup();
 
-    // jre 包比 jdk 小很多，下载快；只挑 zip（其他格式可能是不支持的安装器）
+    // jre 包比 jdk 小很多，下载快；只挑 zip，其他格式可能是不支持的安装器
     let list = java_download_get_list(
         JavaTypes::Foojay,
         "jre".to_string(),

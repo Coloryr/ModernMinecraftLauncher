@@ -11,7 +11,13 @@ use super::{KIND_SHADERPACKS, block_on_instance, parse_instance, resource_file};
 
 // ==================== 光影包 ====================
 
-/// 光影包列表（解析 zip 内语言文件），并按 options.txt 的 shaderPack 标出启用中的包
+/// 光影包列表：解析 zip 内语言文件，并按 options.txt 的 shaderPack 标出启用中的包
+///
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// 光影包列表，`selected` 标记当前启用中的那个；实例不存在或解析失败返回错误串
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub async fn resource_list_shaderpacks(uuid: String) -> Result<Vec<ShaderItemDto>, String> {
@@ -50,7 +56,14 @@ pub async fn resource_list_shaderpacks(uuid: String) -> Result<Vec<ShaderItemDto
     })
 }
 
-/// 启用 / 停用光影包（写 options.txt 的 shaderPack 键；None = OFF 停用）
+/// 启用 / 停用光影包：写 options.txt 的 shaderPack 键，None = OFF 停用
+///
+/// - `uuid`: 实例 uuid
+/// - `file`: 光影包文件名；`None` 表示写 `OFF` 停用，有值时必须是纯文件名
+///
+/// # 返回值
+///
+/// 只表示成功 / 失败：文件名非法返回 `err.fileName`，其余是读写 options.txt 的错误串
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub async fn resource_shader_set(uuid: String, file: Option<String>) -> Result<(), String> {
@@ -76,7 +89,14 @@ pub async fn resource_shader_set(uuid: String, file: Option<String>) -> Result<(
     .await?
 }
 
-/// 删除光影包（进回收站）
+/// 删除光影包，文件进回收站
+///
+/// - `uuid`: 实例 uuid
+/// - `file`: 光影包文件名，不是完整路径
+///
+/// # 返回值
+///
+/// 只表示成功 / 失败：文件名非法返回 `err.fileName`，其余是删除失败的错误串
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub async fn resource_delete_shaderpack(uuid: String, file: String) -> Result<(), String> {

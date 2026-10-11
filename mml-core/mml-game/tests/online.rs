@@ -5,7 +5,11 @@
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
-/// 临时运行目录（每次运行前先删除旧目录）
+/// 初始化内核各系统并返回本次运行的临时目录，每次运行前先删旧目录
+///
+/// # 返回值
+///
+/// 本次测试专用的运行目录，进程内只初始化一次
 fn init_all() -> PathBuf {
     static INIT: OnceLock<PathBuf> = OnceLock::new();
     INIT.get_or_init(|| {

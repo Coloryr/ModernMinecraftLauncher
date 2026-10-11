@@ -1,4 +1,4 @@
-//! 启动设置 DTO：运行参数（内存 / 窗口 / GC / 自定义命令）
+//! 启动设置 DTO：运行参数，含内存 / 窗口 / GC / 自定义命令
 //!
 //! 从 `settings_dto/mod.rs` 拆出来的。与 `config.json` 的 `RunArgObj` 双向转换。
 
@@ -8,9 +8,9 @@ use mml_config::config_obj::{GCType, RunArgObj};
 
 use super::conv::{gc_from_str, gc_to_str};
 
-/// 启动参数（前端 wire：camelCase，字段即 core `RunArgObj`）
+/// 启动参数，前端 wire 为 camelCase，字段即 core `RunArgObj`
 ///
-/// core 侧是 `Option` 字段（`None` = 用全局默认），DTO 落到
+/// core 侧是 `Option` 字段，`None` = 用全局默认；DTO 落到
 /// `RunArgObj::new()` 同款默认值；保存时全部写回 `Some(...)`。
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
@@ -19,23 +19,23 @@ pub struct RunArgSettingDto {
     pub remove_jvm_arg: bool,
     /// 是否移除原有的游戏参数
     pub remove_game_arg: bool,
-    /// 自定义 JVM 参数（换行分隔多条）
+    /// 自定义 JVM 参数，换行分隔多条
     pub jvm_args: String,
-    /// 自定义游戏参数（换行分隔多条）
+    /// 自定义游戏参数，换行分隔多条
     pub game_args: String,
     /// 自定义 JVM 环境变量
     pub jvm_env: String,
     /// GC 模式：Auto / G1GC / ZGC / None
     pub gc_mode: String,
-    /// 最小内存（MB）
+    /// 最小内存，单位 MB
     pub min_memory: u32,
-    /// 最大内存（MB）
+    /// 最大内存，单位 MB
     pub max_memory: u32,
-    /// 是否启用 ColorASM（彩色日志输出）
+    /// 是否启用 ColorASM，即彩色日志输出
     pub colorasm: bool,
     /// 是否在启动游戏前执行预启动命令
     pub launch_pre_run: bool,
-    /// 预启动命令与游戏同时运行（true）还是等命令结束再启动游戏（false）
+    /// 预启动命令与游戏同时运行时为 true，等命令结束再启动游戏为 false
     pub pre_run_with_game: bool,
     /// 是否在游戏结束后执行后置命令
     pub launch_post_run: bool,
@@ -46,6 +46,13 @@ pub struct RunArgSettingDto {
 }
 
 impl From<&RunArgObj> for RunArgSettingDto {
+    /// 由 core 配置构造前端 DTO，core 侧的 `None` 落到 `RunArgObj::new()` 同款默认值
+    ///
+    /// - `r`: `config.json` 里的启动参数，字段多为 `Option`
+    ///
+    /// # 返回值
+    ///
+    /// 前端可直接绑定的启动参数，GC 模式已转成 wire 字符串
     fn from(r: &RunArgObj) -> Self {
         Self {
             remove_jvm_arg: r.remove_jvm_arg.unwrap_or(false),
@@ -67,6 +74,13 @@ impl From<&RunArgObj> for RunArgSettingDto {
 }
 
 impl From<RunArgSettingDto> for RunArgObj {
+    /// 由前端 DTO 写回 core 配置，所有字段都写 `Some(...)`，不留 `None`
+    ///
+    /// - `d`: 前端保存上来的启动参数
+    ///
+    /// # 返回值
+    ///
+    /// 待写入 `config.json` 的启动参数，GC 模式已还原成 core 枚举
     fn from(d: RunArgSettingDto) -> Self {
         Self {
             remove_jvm_arg: Some(d.remove_jvm_arg),

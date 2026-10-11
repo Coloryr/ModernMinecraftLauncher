@@ -6,11 +6,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct LibrariesObj {
-    /// Maven 坐标名
+    /// Maven 坐标，形如 group:artifact:version
     pub name: String,
     /// 下载地址
     pub url: String,
-    /// SHA-256 校验值
+    /// SHA-256 校验值，十六进制串
     pub sha256: String,
 }
 

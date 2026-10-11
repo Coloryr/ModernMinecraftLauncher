@@ -28,6 +28,7 @@ pub struct OnlineInfoObj {
 }
 
 impl Default for OnlineInfoObj {
+    /// 全字段取默认值：字符串为空串
     fn default() -> Self {
         Self {
             path: Default::default(),

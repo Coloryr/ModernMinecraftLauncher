@@ -50,37 +50,37 @@ pub mod item;
 pub mod model;
 pub mod order;
 
-/// 渲染防重入标志：load_blocks 可能被并发触发（界面按钮连点、界面与内核各起一轮），
+/// 渲染防重入标志：load_blocks 可能被并发触发，界面按钮连点或界面与内核各起一轮，
 /// 不挡住的话会各自下发一次客户端 jar 下载任务，同一文件下两遍
 static LOADING: AtomicBool = AtomicBool::new(false);
 
-/// 本轮渲染的取消令牌（每轮 load_blocks 开始时换新，取消不会串到下一轮）
+/// 本轮渲染的取消令牌，每轮 load_blocks 开始时换新，取消不会串到下一轮
 ///
-/// 同时用于两处：渲染循环按条目查询（[`cancel_token`] 克隆后无锁读），
-/// 以及本轮下发的下载任务（客户端 jar / 语言文件）——取消只影响本轮，
-/// 不动下载队列里其它任务（整合包安装等）
+/// 同时用于渲染循环按条目查询与本轮下发的下载任务，取消只影响本轮，
+/// 不动下载队列里其它任务如整合包安装
 static CANCEL: LazyLock<RwLock<CancellationToken>> =
     LazyLock::new(|| RwLock::new(CancellationToken::new()));
 
-/// 全局渲染进度回调（GUI 启动时注册）：调用 [`load_blocks`] 时没传回调的
-/// 调用方经它上报进度（界面按钮那条路径自带回调，这里只是兜底）
+/// 全局渲染进度回调，GUI 启动时注册；调用 [`load_blocks`] 时没传回调的
+/// 调用方经它上报进度，界面按钮那条路径自带回调，这里只是兜底
 static GUI: OnceLock<gui_hook::ProgressGui> = OnceLock::new();
 
-/// 注册全局渲染进度回调（启动时调用一次）
+/// 注册全局渲染进度回调，启动时调用一次
+///
+/// - `gui`: 全局进度回调，重复注册会被忽略
 pub fn set_gui_handel(gui: gui_hook::ProgressGui) {
     let _ = GUI.set(gui);
 }
 
-/// 是否正在渲染（供界面层防重入查询）
+/// 是否正在渲染，供界面层防重入查询
 pub fn is_loading() -> bool {
     LOADING.load(Ordering::Acquire)
 }
 
 /// 取消本轮渲染
 ///
-/// 渲染循环与在途下载都是协作式取消：置位后循环跳过剩余条目、
-/// 下载在下一个数据块处收手，`load_blocks` 返回 [`ErrorType::TaskCancel`]。
-/// 也挂在核心停止链上，退出程序时不再等渲染跑完
+/// 渲染循环与在途下载都是协作式取消：置位后循环跳过剩余条目、下载在下一个数据块
+/// 处收手，`load_blocks` 返回 [`ErrorType::TaskCancel`]；也挂在核心停止链上
 pub fn cancel() {
     CANCEL.read().unwrap().cancel();
 }
@@ -90,16 +90,20 @@ pub fn is_cancelled() -> bool {
     CANCEL.read().unwrap().is_cancelled()
 }
 
-/// 取本轮取消令牌（渲染循环持有克隆，按条目无锁查询）
+/// 取本轮取消令牌，渲染循环持有克隆，按条目无锁查询
 pub(crate) fn cancel_token() -> CancellationToken {
     CANCEL.read().unwrap().clone()
 }
 
-/// 下载并渲染方块/物品贴图（版本清单 → 客户端jar → 解包渲染）
+/// 下载并渲染方块与物品贴图：版本清单 → 客户端 jar → 解包渲染
 ///
-/// `gui`可选，渲染期间按已处理的模型数上报进度（未传时回退全局注册的回调）；
-/// `force`为 true 时忽略版本短路，全量重渲染；
-/// 已有渲染在跑时直接返回 `Ok(())`（调用方先查 [`is_loading`] 区分）；
+/// 已有渲染在跑时直接返回 `Ok(())`，调用方先查 [`is_loading`] 区分
+///
+/// - `gui`: 渲染期间的进度回调，未传时回退全局注册的回调
+/// - `force`: 为 true 时忽略版本短路，全量重渲染
+///
+/// # 返回值
+///
 /// 被 [`cancel`] 取消时返回 [`ErrorType::TaskCancel`]
 pub async fn load_blocks(gui: gui_hook::ProgressGui, force: bool) -> CoreResult<()> {
     if LOADING.swap(true, Ordering::AcqRel) {
@@ -119,17 +123,18 @@ pub async fn load_blocks(gui: gui_hook::ProgressGui, force: bool) -> CoreResult<
     result
 }
 
+/// [`load_blocks`] 的实现：短路判断、补下载客户端 jar 与语言文件、再渲染
 async fn load_blocks_impl(gui: gui_hook::ProgressGui, force: bool) -> CoreResult<()> {
     // 本轮取消令牌：渲染循环按条目查询，下载任务也挂在它上面
     let cancel = cancel_token();
 
-    // 版本清单（本地缓存，缺了才在线拉）；方块与物品分开短路，只补渲染缺的那部分
+    // 版本清单用本地缓存，缺了才在线拉；方块与物品分开短路，只补渲染缺的那部分
     let versions = version_path::get_version_obj_online().await?;
     let last = versions.latest.release.clone();
     let block_done = !force && block::mml_tex_draw_id() == last;
     let item_done = !force && item::items_id() == last;
-    // 语言文件也算“已完成”：客户端 jar 只带 en_us，中文要按资源索引单独补下，
-    // 已渲染过的版本也可能还没下过（短路掉就永远补不上）
+    // 语言文件也算"已完成"：客户端 jar 只带 en_us，中文要按资源索引单独补下
+    // 已渲染过的版本也可能还没下过，短路掉就永远补不上
     if block_done && item_done && langs_ready() {
         return Ok(());
     }
@@ -137,13 +142,13 @@ async fn load_blocks_impl(gui: gui_hook::ProgressGui, force: bool) -> CoreResult
     let Some(ver) = versions.versions.iter().find(|v| v.id == last) else {
         return Err(ErrorType::DataNotFound(DataNotFoundData::Version(last)));
     };
-    // 版本JSON（带下载源切换和本地缓存）
+    // 版本 JSON 带下载源切换与本地缓存
     let obj = version_path::add_game(ver).await?;
     if obj.downloads.client.url.is_empty() {
         return Err(ErrorType::DataNotFound(DataNotFoundData::Version(last)));
     }
 
-    // 客户端jar（与游戏库共用一份，已存在且sha1匹配时跳过下载）
+    // 客户端 jar 与游戏库共用一份，已存在且 sha1 匹配时跳过下载
     let item = FileItemObj {
         name: format!("{last}.jar"),
         file: libraries_path::get_game_file(&last),
@@ -158,15 +163,15 @@ async fn load_blocks_impl(gui: gui_hook::ProgressGui, force: bool) -> CoreResult
         return Err(cancel_or(ErrorType::DownloadFileFail, &cancel));
     }
 
-    // 语言文件（方块/物品显示名）：jar 里只有 en_us，中文等按资源索引补下。
-    // 取消要往外抛（本轮已作废），其它失败只记日志：界面退化成显示 ID，贴图照常渲染
+    // 语言文件是方块与物品的显示名，jar 里只有 en_us，中文等按资源索引补下
+    // 取消要往外抛，本轮已作废；其它失败只记日志，界面退化成显示 ID，贴图照常渲染
     match download_langs(&obj, &cancel).await {
         Ok(()) => {}
         Err(ErrorType::TaskCancel) => return Err(ErrorType::TaskCancel),
         Err(err) => mml_log::error_type(err),
     }
 
-    // 打开jar并渲染
+    // 打开 jar 并渲染
     let archive = BaseArchive::open(&item.file)?;
     if !block_done {
         block::render_blocks(&archive, gui.clone())?;
@@ -181,9 +186,7 @@ async fn load_blocks_impl(gui: gui_hook::ProgressGui, force: bool) -> CoreResult
     Ok(())
 }
 
-/// 收尾错误：本轮已被取消时报取消（用户主动中断，不算失败），否则报原错误
-///
-/// # 参数
+/// 收尾错误：本轮已被取消时报取消，用户主动中断不算失败，否则报原错误
 ///
 /// - `err`: 取消未发生时要返回的错误
 /// - `cancel`: 本轮取消令牌
@@ -199,14 +202,14 @@ fn cancel_or(err: ErrorType, cancel: &CancellationToken) -> ErrorType {
     }
 }
 
-/// 方块语言表缓存（按语言缓存整个翻译表）
+/// 方块语言表缓存，按语言缓存整个翻译表
 static LANGS: LazyLock<RwLock<HashMap<Lang, HashMap<String, String>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
-/// 读取方块语言翻译（数据来自blocks/langs下的语言文件，随load_blocks从客户端jar提取）
+/// 读取方块语言翻译，数据来自 langs 目录下的语言文件，随 load_blocks 从客户端 jar 提取
 ///
 /// - `lang`: 目标语言
-/// - `key`: 语言键（如 `block.minecraft.stone`）
+/// - `key`: 语言键，如 `block.minecraft.stone`
 ///
 /// # 返回值
 ///
@@ -256,7 +259,7 @@ pub fn init<P: AsRef<Path>>(path: P) -> CoreResult<()> {
         path_helper::create_dir_all(dir)?;
     }
 
-    // 语言文件目录与block平级（方块/物品共用，随渲染从客户端jar提取）
+    // 语言文件目录与 block 平级，方块与物品共用，随渲染从客户端 jar 提取
     let dir = LANG_DIR.get_or_init(|| path.as_ref().join(names::LANG_DIR));
     if !dir.exists() {
         path_helper::create_dir_all(dir)?;
@@ -270,11 +273,14 @@ pub fn init<P: AsRef<Path>>(path: P) -> CoreResult<()> {
     Ok(())
 }
 
-/// 加载数据
+/// 加载数据：只读回上次的渲染结果，版本号在 `block.json` / `items.json` 里
 ///
-/// 只读回上次的渲染结果（版本号在 `block.json` / `items.json` 里），
-/// **不**在启动时自动补渲染：渲染一律由界面按钮经 [`load_blocks`] 触发。
+/// **不**在启动时自动补渲染，渲染一律由界面按钮经 [`load_blocks`] 触发；
 /// 首次运行没有数据文件也正常，读不到就是「未渲染」
+///
+/// # 返回值
+///
+/// 数据文件缺失或解析失败时保持空表，仍返回 `Ok(())`
 pub fn load() -> CoreResult<()> {
     if let Ok(obj) = serialize_tools::json_from_file::<BlocksObj>(BLOCK_FILE.get().unwrap()) {
         *BLOCKS.write().unwrap() = obj;
@@ -288,7 +294,11 @@ pub fn load() -> CoreResult<()> {
     Ok(())
 }
 
-/// 保存数据
+/// 保存数据：方块表与物品表都写回各自的 json 文件
+///
+/// # 返回值
+///
+/// 数据文件路径未初始化或写盘失败时返回相应错误，成功返回 `Ok(())`
 pub fn save() -> CoreResult<()> {
     let file = BLOCK_FILE.get().ok_or_else(|| {
         ErrorType::PathNotExists(PathNotExistsData {
@@ -308,7 +318,7 @@ pub fn save() -> CoreResult<()> {
 
 /// 获取方块图片路径
 ///
-/// - `id`: 方块ID（`minecraft:stone` 或裸 ID `stone`）
+/// - `id`: 方块 ID，`minecraft:stone` 或裸 ID `stone`
 ///
 /// # 返回值
 ///
@@ -324,18 +334,26 @@ pub fn get_block_path(id: &str) -> Option<PathBuf> {
 pub use block::icons::SpecialForm;
 pub use block::skin::{SKIN_CAT, add_skin_block, remove_skin_block};
 
-/// 判断方块ID是否有特殊形态图标，返回对应的形态
+/// 判断方块 ID 是否有特殊形态图标，有则返回对应形态
 ///
-/// ID带不带"minecraft:"前缀均可
+/// - `id`: 方块 ID，带不带 `minecraft:` 前缀均可
+///
+/// # 返回值
+///
+/// 无特殊形态时返回 `None`
 pub fn block_special_form(id: &str) -> Option<SpecialForm> {
     let base = id.strip_prefix("minecraft:").unwrap_or(id);
     block::icons::special_form(&format!("minecraft:{base}"))
 }
 
-/// 获取方块特殊形态的图片路径（形态图标ID = 基础ID + "_" + 形态后缀，如 oak_door_open）
+/// 获取方块特殊形态的图片路径，形态图标 ID = 基础 ID + "_" + 形态后缀，如 oak_door_open
 ///
-/// 与`block_special_form`配合使用：该方块无此形态时返回None。
-/// 形态条目不注册进方块列表（blocks()查不到），文件名按规则直接拼出
+/// - `id`: 方块 ID，带不带 `minecraft:` 前缀均可
+/// - `form`: 要取的形态
+///
+/// # 返回值
+///
+/// 该方块没有此形态时返回 `None`；形态条目不注册进方块列表，文件名按规则直接拼出
 pub fn get_block_path_form(id: &str, form: SpecialForm) -> Option<PathBuf> {
     if block_special_form(id) != Some(form) {
         return None;
@@ -358,8 +376,13 @@ pub(crate) fn get_lang_dir() -> Option<PathBuf> {
     LANG_DIR.get().cloned()
 }
 
-/// 提取语言文件到langs目录，返回（方块ID→语言键, 物品ID→语言键）映射
-/// （zh_cn优先，en_us兜底；新版jar可能只有en_us）
+/// 提取语言文件到 langs 目录
+///
+/// - `archive`: 客户端 jar 归档
+///
+/// # 返回值
+///
+/// 返回方块 ID → 语言键与物品 ID → 语言键两张映射；zh_cn 优先，en_us 兜底
 pub(crate) fn extract_langs(
     archive: &BaseArchive,
 ) -> (
@@ -370,7 +393,7 @@ pub(crate) fn extract_langs(
         let Ok(data) = archive.read(&format!("assets/minecraft/lang/{name}.json")) else {
             continue;
         };
-        // 复制到langs目录，供get_lang查询翻译
+        // 复制到 langs 目录，供 get_lang 查询翻译
         if let Some(dir) = get_lang_dir() {
             let _ = path_helper::write_bytes(dir.join(format!("{name}.json")), &data);
         }
@@ -382,8 +405,8 @@ pub(crate) fn extract_langs(
         else {
             continue;
         };
-        // 方块/物品ID → 语言键：block.minecraft.stone / item.minecraft.apple → minecraft:stone / minecraft:apple
-        //（Name只存语言键，由GUI按当前语言经get_lang翻译）
+        // 方块与物品 ID → 语言键：block.minecraft.stone → minecraft:stone
+        // Name 只存语言键，由 GUI 按当前语言经 get_lang 翻译
         let mut block_map = std::collections::HashMap::new();
         let mut item_map = std::collections::HashMap::new();
         for lang_key in lang.into_keys() {
@@ -404,15 +427,13 @@ pub(crate) fn extract_langs(
 
 /// 需要从资源索引补下的语言文件
 ///
-/// 客户端 jar 只内置 `en_us.json`（由 [`extract_langs`] 提取），其余语言
-/// 只在资源索引里列出；这里列的是除 en_us 外界面用得到的语言
+/// 客户端 jar 只内置 `en_us.json`，由 [`extract_langs`] 提取；其余语言只在资源索引里
+/// 列出，这里列的是除 en_us 外界面用得到的语言
 const EXTRA_LANGS: [&str; 1] = ["zh_cn"];
 
-/// 语言文件路径（`langs/<name>.json`，不保证存在）
+/// 语言文件路径，形如 `langs/<name>.json`，不保证存在
 ///
-/// # 参数
-///
-/// - `name`: 语言名（如 `zh_cn`）
+/// - `name`: 语言名，如 `zh_cn`
 ///
 /// # 返回值
 ///
@@ -432,27 +453,24 @@ fn langs_ready() -> bool {
         .all(|name| lang_path(name).is_some_and(|file| file.is_file()))
 }
 
-/// 从资源索引下载方块/物品名称需要的语言文件
+/// 从资源索引下载方块与物品名称需要的语言文件
 ///
-/// 客户端 jar 只带 `en_us.json`，`zh_cn` 等语言由版本 JSON 的 `assetIndex`
-/// 列出、经资源下载站取回；缺了只能回退显示方块 ID。
-/// 失败不算渲染失败（只记日志）：界面退化成显示 ID，贴图渲染照常。
+/// 客户端 jar 只带 `en_us.json`，`zh_cn` 等语言由版本 JSON 的 `assetIndex` 列出、
+/// 经资源下载站取回；缺了只能回退显示方块 ID。失败不算渲染失败，只记日志
 ///
-/// # 参数
-///
-/// - `obj`: 版本数据（取其 `assetIndex` 定位资源索引）
-/// - `cancel`: 本轮取消令牌（下载挂在它上面，取消只影响本次任务）
+/// - `obj`: 版本数据，取其 `assetIndex` 定位资源索引
+/// - `cancel`: 本轮取消令牌，下载挂在它上面，取消只影响本次任务
 ///
 /// # 返回值
 ///
 /// 成功或无需下载返回 `Ok(())`；本轮被取消返回 [`ErrorType::TaskCancel`]；
-/// 索引/语言文件获取失败返回对应错误
+/// 索引或语言文件获取失败返回对应错误
 async fn download_langs(obj: &GameArgObj, cancel: &CancellationToken) -> CoreResult<()> {
     let Some(index) = &obj.asset_index else {
         return Ok(());
     };
 
-    // 资源索引：与游戏本体的资源检查共用一份本地缓存（assets/indexes/<id>.json），缺了才在线拉
+    // 资源索引与游戏本体共用一份本地缓存 assets/indexes/<id>.json，缺了才在线拉
     let assets = match assets_path::get_index(index) {
         Ok(assets) => assets,
         Err(_) => {
@@ -465,7 +483,7 @@ async fn download_langs(obj: &GameArgObj, cancel: &CancellationToken) -> CoreRes
         }
     };
 
-    // 只下本地缺失或大小不符的（大小不符 = 客户端换版本了）
+    // 只下本地缺失或大小不符的，大小不符说明客户端换版本了
     let mut list = Vec::new();
     for name in EXTRA_LANGS {
         let Some(asset) = assets.objects.get(&format!("minecraft/lang/{name}.json")) else {
@@ -503,10 +521,10 @@ async fn download_langs(obj: &GameArgObj, cancel: &CancellationToken) -> CoreRes
     Ok(())
 }
 
-/// 获取方块数据（**集合语义，顺序无意义**）
+/// 获取方块数据，集合语义，顺序无意义
 ///
-/// 底层是 `HashMap::keys()`，每次调用顺序都可能不同。要能直接展示的顺序用
-/// [`ordered_blocks`]（按游戏创造栏分类顺序）。
+/// 底层是 `HashMap::keys()`，每次调用顺序都可能不同；要能直接展示的顺序用
+/// [`ordered_entries`]
 pub fn blocks() -> Vec<String> {
     BLOCKS
         .read()
@@ -522,15 +540,17 @@ pub fn block_version() -> String {
     BLOCKS.read().unwrap().id.clone()
 }
 
-/// 是否已有渲染结果（方块或物品任一非空）
+/// 是否已有渲染结果，方块或物品任一非空
 ///
-/// 给"只想知道有没有渲染过"的调用方用：[`blocks`] / [`items`] 都是**整表克隆**，
-/// 拿它们判空等于每次白拷两份全表（mml-gui 的方块状态快照就在每个进度回调里调）。
+/// 给"只想知道有没有渲染过"的调用方用：[`blocks`] / [`items`] 都是整表克隆，
+/// 拿它们判空等于每次白拷两份全表，mml-gui 的方块状态快照就在每个进度回调里调
 pub fn has_rendered() -> bool {
     !BLOCKS.read().unwrap().tex.is_empty() || !ITEMS.read().unwrap().tex.is_empty()
 }
 
-/// 方块ID → 语言键（block.minecraft.stone 之类，翻译经 `get_lang`）
+/// 方块 ID → 语言键，如 block.minecraft.stone，翻译经 `get_lang`
+///
+/// - `id`: 方块 ID
 pub fn block_name_key(id: &str) -> Option<String> {
     BLOCKS.read().unwrap().name.get(id).cloned()
 }
@@ -540,24 +560,26 @@ pub fn item_version() -> String {
     ITEMS.read().unwrap().id.clone()
 }
 
-/// 物品ID → 语言键（item.minecraft.apple 之类，翻译经 `get_lang`）
+/// 物品 ID → 语言键，如 item.minecraft.apple，翻译经 `get_lang`
+///
+/// - `id`: 物品 ID
 pub fn item_name_key(id: &str) -> Option<String> {
     ITEMS.read().unwrap().name.get(id).cloned()
 }
 
-/// 锁定方块数据表（内部写入用）
+/// 锁定方块数据表，内部写入用
 pub(crate) fn blocks_write() -> std::sync::RwLockWriteGuard<'static, BlocksObj> {
     BLOCKS.write().unwrap()
 }
 
-/// 锁定方块数据表（内部读取用）
+/// 锁定方块数据表，内部读取用
 pub(crate) fn blocks_read() -> std::sync::RwLockReadGuard<'static, BlocksObj> {
     BLOCKS.read().unwrap()
 }
 
 /// 获取物品图片路径
 ///
-/// - `id`: 物品ID（`minecraft:apple` 或裸 ID `apple`）
+/// - `id`: 物品 ID，`minecraft:apple` 或裸 ID `apple`
 ///
 /// # 返回值
 ///
@@ -570,12 +592,16 @@ pub fn get_item_path(id: &str) -> Option<PathBuf> {
     Some(dir.join(file))
 }
 
-/// 获取方块创造分组（itemGroup lang键尾段，Name字段为语言键，翻译经get_lang）
+/// 获取方块创造分组，值为 itemGroup lang 键尾段，翻译经 `get_lang`
+///
+/// - `id`: 方块 ID
 pub fn block_cat(id: &str) -> Option<String> {
     BLOCKS.read().unwrap().cat.get(id).cloned()
 }
 
-/// 获取物品创造分组（itemGroup lang键尾段，与block_cat同一套）
+/// 获取物品创造分组，值与 `block_cat` 同一套
+///
+/// - `id`: 物品 ID
 pub fn item_cat(id: &str) -> Option<String> {
     ITEMS.read().unwrap().cat.get(id).cloned()
 }
@@ -585,9 +611,9 @@ pub(crate) fn get_item_dir() -> Option<PathBuf> {
     ITEM_DIR.get().cloned()
 }
 
-/// 获取物品数据（**集合语义，顺序无意义**）
+/// 获取物品数据，集合语义，顺序无意义
 ///
-/// 同 [`blocks`]：要能直接展示的顺序用 [`ordered_items`]。
+/// 同 [`blocks`]，要能直接展示的顺序用 [`ordered_entries`]
 pub fn items() -> Vec<String> {
     ITEMS
         .read()
@@ -598,12 +624,12 @@ pub fn items() -> Vec<String> {
         .collect()
 }
 
-/// 锁定物品数据表（内部写入用）
+/// 锁定物品数据表，内部写入用
 pub(crate) fn items_write() -> std::sync::RwLockWriteGuard<'static, ItemsObj> {
     ITEMS.write().unwrap()
 }
 
-/// 列表条目的来源（决定图标走 `block/` 还是 `item/`）
+/// 列表条目的来源，决定图标走 `block/` 还是 `item/`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntryKind {
     /// 方块（等轴测 3D 图标）
@@ -612,12 +638,17 @@ pub enum EntryKind {
     Item,
 }
 
-/// 方块 + 物品合并后的**展示顺序**（列表窗口直接用这个）
+/// 方块与物品合并后的展示顺序，列表窗口直接用这个
 ///
-/// - 全局按 [`order::order_key`] 排序，所以同一分类只出现一次、分类先后＝游戏创造栏标签页顺序；
-///   （方块与物品分开排再拼接是**错的**：只有物品的分类会被挤到最后）
-/// - 同一个 id 既是方块又是物品时（`minecraft:stone` 之类）只保留**方块**那条，避免重复条目；
-/// - 分类值来自 `block_cat` / `item_cat`，显示名由调用方按当前语言翻译（本函数不碰语言）。
+/// 全局按 [`order::order_key`] 排序，所以同一分类只出现一次、分类先后即创造栏标签页顺序；
+/// 方块与物品分开排再拼接是错的，只有物品的分类会被挤到最后
+///
+/// - 同一个 id 既是方块又是物品时只保留方块那条，避免重复条目
+/// - 分类值来自 `block_cat` / `item_cat`，显示名由调用方按当前语言翻译
+///
+/// # 返回值
+///
+/// 返回按展示顺序排列的条目列表，元素为来源与 id
 pub fn ordered_entries() -> Vec<(EntryKind, String)> {
     let mut list: Vec<(String, EntryKind, String)> = Vec::new();
 
@@ -640,14 +671,18 @@ pub fn ordered_entries() -> Vec<(EntryKind, String)> {
     list.into_iter().map(|(_, kind, id)| (kind, id)).collect()
 }
 
-/// 锁定物品数据表（内部读取用）
+/// 锁定物品数据表，内部读取用
 pub(crate) fn items_read() -> std::sync::RwLockReadGuard<'static, ItemsObj> {
     ITEMS.read().unwrap()
 }
 
-/// 生成测试用的唯一临时目录（不自动创建，由调用方决定）
+/// 生成测试用的唯一临时目录路径，不自动创建
 ///
-/// 目录位于系统临时目录下，带有进程 ID 与纳秒级时间戳，避免并发冲突。
+/// - `tag`: 目录名里的用例标识
+///
+/// # 返回值
+///
+/// 返回 `mml_testutil` 临时目录下带进程 ID 与纳秒时间戳的路径
 #[cfg(test)]
 fn unique_temp_dir(tag: &str) -> PathBuf {
     let nanos = std::time::SystemTime::now()
@@ -683,7 +718,7 @@ mod tests {
         let dir = root.join(names::BLOCK_DIR);
         assert!(dir.exists(), "init 后应创建 block 目录：{}", dir.display());
 
-        // 重复调用不应报错（OnceLock 保持首次的路径）
+        // 重复调用不应报错，OnceLock 保持首次的路径
         assert!(init(&root).is_ok());
 
         // 清理临时目录

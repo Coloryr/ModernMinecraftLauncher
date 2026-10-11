@@ -1,7 +1,7 @@
 //! `url_helper` 的 URL 构建逻辑测试。
 //!
-//! 大部分构建函数按当前配置的下载源（`SourceLocal`）分支，因此测试先初始化
-//! 配置（临时目录），再在单个测试内依次切换官方 / Bmclapi 源断言各 URL 形状。
+//! 大部分构建函数按当前配置的下载源 `SourceLocal` 分支，因此测试先初始化
+//! 配置到临时目录，再在单个测试内依次切换官方 / Bmclapi 源断言各 URL 形状。
 //! 全局配置只有一份，避免并行测试间互相踩踏。
 
 use mml_config::config_obj::SourceLocal;
@@ -21,7 +21,9 @@ fn init_config() {
     mml_config::init(&dir);
 }
 
-/// 设置下载源。
+/// 设置下载源并同步落盘
+///
+/// - `source`: 目标下载源
 ///
 /// 用 `save_now()` 直接同步写盘：`save()` 依赖 GUI 启动的后台保存线程，
 /// 测试进程中没有该线程，会触发空指针 panic。
@@ -43,7 +45,7 @@ fn game_version_with_explicit_source() {
     );
 }
 
-/// Forge 版本地址修正（纯逻辑）。
+/// Forge 版本地址修正，纯逻辑。
 #[test]
 fn forge_url_fix_special_versions() {
     assert_eq!(url_helper::forge_url_fix("1.7.2"), "-mc172");
@@ -182,7 +184,7 @@ fn url_builders_follow_selected_source() {
         url_helper::replace_forge_libraries("https://maven.minecraftforge.net/y.jar"),
         "https://bmclapi2.bangbang93.com/maven/y.jar"
     );
-    // NeoForge 库地址替换的是 forge maven 前缀（旧版 NeoForge 库托管于该域名）
+    // NeoForge 库地址替换的是 forge maven 前缀，旧版 NeoForge 库托管于该域名
     assert_eq!(
         url_helper::replace_neoforge_libraries("https://maven.minecraftforge.net/z.jar"),
         "https://bmclapi2.bangbang93.com/maven/z.jar"

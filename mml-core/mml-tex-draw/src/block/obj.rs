@@ -12,10 +12,10 @@ pub struct BlocksObj {
     /// 方块ID → 图标 PNG 文件名
     #[serde(rename = "Tex")]
     pub tex: HashMap<String, String>,
-    /// 方块ID → 语言键（翻译经 `get_lang`）
+    /// 方块ID → 语言键，翻译经 `get_lang`
     #[serde(rename = "Name")]
     pub name: HashMap<String, String>,
-    /// 创造模式分类（itemGroup lang键尾段，如 buildingBlocks/natural）
+    /// 创造模式分类，取 itemGroup lang键尾段，如 buildingBlocks/natural
     #[serde(rename = "Cat")]
     pub cat: HashMap<String, String>,
 }
@@ -41,10 +41,10 @@ pub struct ItemsObj {
     /// 物品ID → 图标 PNG 文件名
     #[serde(rename = "Tex")]
     pub tex: HashMap<String, String>,
-    /// 物品ID → 语言键（翻译经 `get_lang`）
+    /// 物品ID → 语言键，翻译经 `get_lang`
     #[serde(rename = "Name")]
     pub name: HashMap<String, String>,
-    /// 创造模式分类（itemGroup lang键尾段，与BlocksObj.cat同一套）
+    /// 创造模式分类，取 itemGroup lang键尾段，与BlocksObj.cat同一套
     #[serde(rename = "Cat")]
     pub cat: HashMap<String, String>,
 }

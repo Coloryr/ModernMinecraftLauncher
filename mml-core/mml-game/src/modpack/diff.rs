@@ -1,34 +1,34 @@
-//! 整合包升级的**纯差异计算**（无 IO、无网络，便于离线单测）
+//! 整合包升级的**纯差异计算**：无 IO、无网络，便于离线单测
 //!
 //! 这些逻辑原本内联在两个 worker 的 `check_upgrade` 里，夹在 API 调用与文件删除之间，
 //! 离线测不了；这里按"只搬逻辑、不改判定规则"抽出来。**随后按用户要求改过一轮判定规则**：
 //! 四条路径统一成"**根据新旧清单做两向比对**"——
 //!
-//! - 新有旧无 → 下载（`add`）
-//! - 旧有新无 → 删除（`remove`）
-//! - 同键但版本 / 哈希变了 → 又下载（新）又删除（旧）
+//! - 新有旧无 → 下载，即 `add`
+//! - 旧有新无 → 删除，即 `remove`
+//! - 同键但版本 / 哈希变了 → 又下载新的又删除旧的
 //!
 //! 四条路径：
 //!
 //! | 函数 | 触发条件 | 配对键 | 版本判定 |
 //! | --- | --- | --- | --- |
 //! | [`diff_curseforge_files`] | 有旧 `manifest.json` | `project_id` | `file_id` |
-//! | [`diff_curseforge_online`] | 无旧 manifest（解析失败也算） | `mod_id` | `fileid` / `sha1` |
+//! | [`diff_curseforge_online`] | 无旧 manifest，解析失败也算 | `mod_id` | `fileid` / `sha1` |
 //! | [`diff_modrinth_files`] | 有旧 `modrinth.index.json` | 包内路径 | `sha1` |
 //! | [`diff_modrinth_online`] | 无旧 manifest | `mod_id` | `fileid` / `sha1` |
 //!
-//! 规则改动（本轮，用户确认）：
+//! 现行判定规则：
 //!
-//! 1. **CF 有旧 manifest**：配对时跳过**已配对的旧项**（原来不跳）。否则新清单里同一个
+//! 1. **CF 有旧 manifest**：配对时跳过**已配对的旧项**。否则新清单里同一个
 //!    `project_id` 出现两次时，第二个新项会重复配到第一个旧项，把一个**仍在新清单里**的
 //!    文件推进 `remove` → 升级后实例缺文件。
-//! 2. **Modrinth 有旧 manifest**：配对键从 `sha1` 改成**包内路径**。原来按 `sha1` 做双向
-//!    差集，同一个 `sha1` 出现在两个路径时，第一个新项被当成"与旧文件相同"而跳过下载、
-//!    旧项又被抵消而不删 → 新清单里的那个路径**永远不会被创建**（实例缺文件）。
-//!    按路径配对后：路径相同且 `sha1` 相同才算"不动"，改名 = 删旧路径 + 下新路径。
-//! 3. **两条"在线信息"路径（CF SHA1 / Modrinth 无 manifest）**：补上"旧有新无 → 删除"。
-//!    原来只更新与新增（CF 那条还专门注释了"不作删除"）。已确认 `online_info` 只由整合包
-//!    路径写入（`update_online` 只清理、`copy_to_other` 只复制，`make_file_online_*` 无调用者），
+//! 2. **Modrinth 有旧 manifest**：配对键用**包内路径**而非 `sha1`。按 `sha1` 做双向差集时，
+//!    同一个 `sha1` 出现在两个路径，第一个新项被当成"与旧文件相同"而跳过下载、旧项又被
+//!    抵消而不删 → 新清单里的那个路径**永远不会被创建**，实例缺文件。按路径配对后路径与
+//!    `sha1` 都相同才算不动，改名 = 删旧路径 + 下新路径。
+//! 3. **两条"在线信息"路径**，即 CF SHA1 与 Modrinth 无 manifest：补上"旧有新无 → 删除"。
+//!    只更新与新增会留下垃圾文件。已确认 `online_info` 只由整合包
+//!    路径写入，`update_online` 只清理、`copy_to_other` 只复制，`make_file_online_*` 无调用者，
 //!    所以删除它记录的文件不会误伤用户自己装的模组。
 
 use std::collections::HashMap;
@@ -38,30 +38,35 @@ use crate::launcher::file_online_info_obj::OnlineInfoObj;
 use crate::launcher_path::instance_path::OnlineInfoList;
 use crate::modrinth::pack_obj::ModrinthPackFileObj;
 
-/// 文件级差异：借用新旧清单里的项（调用方随后自己决定怎么下载 / 删除）
+/// 文件级差异：借用新旧清单里的项，下载与删除由调用方决定
 #[derive(Debug, Default)]
 pub struct FileDiff<'a, T> {
-    /// 需要下载的项（新增 + 变更后的新版本）
+    /// 需要下载的项：新增项与变更后的新版本
     pub add: Vec<&'a T>,
-    /// 需要删除的项（仅旧清单有 + 变更前的旧版本）
+    /// 需要删除的项：仅旧清单有的项与变更前的旧版本
     pub remove: Vec<&'a T>,
 }
 
 /// 在线信息级差异：`OnlineInfoObj` 是 `Clone`，直接给出副本
 #[derive(Debug, Default)]
 pub struct OnlineDiff {
-    /// 需要下载的项（新增 + 变更后的新版本）
+    /// 需要下载的项：新增项与变更后的新版本
     pub add: Vec<OnlineInfoObj>,
-    /// 需要删除的项（仅旧有 + 变更前的旧版本）
+    /// 需要删除的项：仅旧有项与变更前的旧版本
     pub remove: Vec<OnlineInfoObj>,
 }
 
-/// CurseForge：**有旧 manifest** —— 按 `project_id` 配对，`file_id` 不同视为变更
+/// CurseForge：有旧 manifest 时按 `project_id` 配对，`file_id` 不同视为变更
 ///
-/// 1. 以 `project_id` 为键比对新旧文件列表（**已配对的旧项不再参与配对**）；
-/// 2. 同 `project_id` 但 `file_id` 不同 → 变更（新版本进 `add`、旧版本进 `remove`）；
-/// 3. 仅在新清单中 → 新增；
-/// 4. 仅在旧清单中 → 删除。
+/// - `new_files`: 新整合包清单里的文件
+/// - `old_files`: 实例内旧 manifest 里的文件
+///
+/// 已配对的旧项不再参与配对，否则同一 `project_id` 出现两次时，第二个新项会重复配到
+/// 第一个旧项，把仍在新清单里的文件推进 `remove`。
+///
+/// # 返回值
+///
+/// 需下载与需删除的借用项，怎么下载 / 删除由调用方决定
 pub fn diff_curseforge_files<'a>(
     new_files: &'a [FilesObj],
     old_files: &'a [FilesObj],
@@ -71,12 +76,10 @@ pub fn diff_curseforge_files<'a>(
 
     let mut old_matched = vec![false; old_files.len()];
 
-    // 第一遍：匹配新旧列表中 project_id 相同的文件
     for new_file in new_files {
         let mut found = false;
         for (j, old_file) in old_files.iter().enumerate() {
-            // 已配对的旧项不再参与：新清单里同一个 project_id 出现多次时，
-            // 后面的新项应该去配"另一个还没配上的旧项"，而不是重复配第一个
+            // 已配对的旧项不再参与，否则同一 project_id 的第二个新项会重复配到第一个旧项
             if old_matched[j] {
                 continue;
             }
@@ -107,13 +110,17 @@ pub fn diff_curseforge_files<'a>(
     FileDiff { add, remove }
 }
 
-/// CurseForge：**无旧 manifest** —— 按 `mod_id` 比对在线信息（`fileid` / `sha1` 变化视为变更）
+/// CurseForge：无旧 manifest 时按 `mod_id` 比对在线信息，`fileid` 或 `sha1` 变化视为变更
 ///
-/// - `new_online`：新清单解析出来的在线信息（`mod_id` → 信息）
-/// - `old_online`：实例当前已安装的在线信息
+/// - `new_online`: 新清单解析出来的在线信息，键为 `mod_id`
+/// - `old_online`: 实例当前已安装的在线信息
 ///
-/// 两向比对：同 `mod_id` 且 `fileid` 或 `sha1` 不同 → 变更；新有旧无 → 新增；
-/// **旧有新无 → 删除**（本轮补上；`online_info` 只记整合包管的文件）。
+/// 两向比对，新有旧无进 `add`，旧有新无进 `remove`；`online_info` 只记整合包管的文件，
+/// 所以删除它记录的文件不会误伤用户自装的模组。
+///
+/// # 返回值
+///
+/// 需下载与需删除的在线信息副本
 pub fn diff_curseforge_online(
     new_online: &OnlineInfoList,
     old_online: &OnlineInfoList,
@@ -121,7 +128,6 @@ pub fn diff_curseforge_online(
     let mut add: Vec<OnlineInfoObj> = Vec::new();
     let mut remove: Vec<OnlineInfoObj> = Vec::new();
 
-    // 遍历现有模组
     for (mod_id, existing_mod) in old_online.iter() {
         match new_online.get(mod_id) {
             Some(new_mod) => {
@@ -146,13 +152,16 @@ pub fn diff_curseforge_online(
     OnlineDiff { add, remove }
 }
 
-/// Modrinth：**有旧 manifest** —— 按**包内路径**配对，`sha1` 不同视为变更
+/// Modrinth：有旧 manifest 时按包内路径配对，`sha1` 不同视为变更
 ///
-/// 两向比对：
-/// - 新清单里的路径在旧清单里不存在，或同路径 `sha1` 不同 → `add`（下载）；
-/// - 旧清单里的路径在新清单里不存在，或同路径 `sha1` 不同 → `remove`（删除）。
+/// - `new_files`: 新整合包索引里的文件
+/// - `old_files`: 实例内旧 `modrinth.index.json` 的文件
 ///
-/// 所以"改名"= 删旧路径 + 下新路径；路径与 `sha1` 都一样才不动。
+/// 路径与 `sha1` 都一样才不动，改名 = 删旧路径 + 下新路径。
+///
+/// # 返回值
+///
+/// 需下载与需删除的借用项，怎么下载 / 删除由调用方决定
 pub fn diff_modrinth_files<'a>(
     new_files: &'a [ModrinthPackFileObj],
     old_files: &'a [ModrinthPackFileObj],
@@ -186,13 +195,17 @@ pub fn diff_modrinth_files<'a>(
     FileDiff { add, remove }
 }
 
-/// Modrinth：**无旧 manifest** —— 按 `mod_id` 比对在线信息
+/// Modrinth：无旧 manifest 时按 `mod_id` 比对在线信息
 ///
-/// - `new_online`：新整合包解析出来的在线信息
-/// - `old_online`：实例当前已安装的在线信息
+/// - `new_online`: 新整合包解析出来的在线信息
+/// - `old_online`: 实例当前已安装的在线信息
 ///
 /// 两向比对：同 `mod_id` 且 `fileid` 或 `sha1` 不同 → 变更；新有旧无 → 新增；
-/// **旧有新无 → 删除**（本轮补上）。
+/// 旧有新无 → 删除。
+///
+/// # 返回值
+///
+/// 需下载与需删除的在线信息副本
 pub fn diff_modrinth_online(
     new_online: &OnlineInfoList,
     old_online: &OnlineInfoList,

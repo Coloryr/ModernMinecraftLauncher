@@ -16,11 +16,14 @@ export const commands = {
     isMaximized: () => invoke<boolean>("window_is_maximized"),
     minimize: () => invoke<void>("window_minimize"),
     openWindow: (kind: string, instance: string | null, query: string | null) => invoke<void>("window_open_window", { kind, instance, query }),
+    probeDrop: (path: string) => invoke<DropPathDto>("window_probe_drop", { path }),
+    reopenWindow: (kind: string, query: string | null) => invoke<void>("window_reopen_window", { kind, query }),
     restartApp: () => invoke<void>("window_restart_app"),
     saveGuiConfig: (config: GuiConfigDto) => invoke<void>("window_save_gui_config", { config }),
     setTitle: (title: string) => invoke<void>("window_set_title", { title }),
     startDragging: () => invoke<void>("window_start_dragging"),
     toggleMaximize: () => invoke<boolean>("window_toggle_maximize"),
+    urlOfText: (text: string) => invoke<string>("window_url_of_text", { text }),
   },
   account: {
     addAccount: (name: string, accountType: string, server: string | null, password: string | null) => invoke<AccountStoreDto>("account_add_account", { name, accountType, server, password }),
@@ -169,6 +172,7 @@ export const commands = {
     deleteSchematic: (uuid: string, file: string) => invoke<void>("resource_delete_schematic", { uuid, file }),
     deleteScreenshot: (uuid: string, name: string) => invoke<void>("resource_delete_screenshot", { uuid, name }),
     deleteShaderpack: (uuid: string, file: string) => invoke<void>("resource_delete_shaderpack", { uuid, file }),
+    importFiles: (uuid: string, kind: string, paths: string[], mode: string, parent: string | null) => invoke<ResourceDropDto>("resource_import_files", { uuid, kind, paths, mode, parent }),
     listDatapacks: (uuid: string, dir: string) => invoke<DataPackItemDto[]>("resource_list_datapacks", { uuid, dir }),
     listMods: (uuid: string) => invoke<ModItemDto[]>("resource_list_mods", { uuid }),
     listResourcepacks: (uuid: string, lang: string) => invoke<PackItemDto[]>("resource_list_resourcepacks", { uuid, lang }),
@@ -943,6 +947,12 @@ export type DataPackItemDto = {
   enable: boolean | null,
 };
 
+export type ResourceDropDto = {
+  conflicts: string[],
+  imported: string[],
+  skipped: string[],
+};
+
 export type RunArgSettingDto = {
   removeJvmArg: boolean,
   removeGameArg: boolean,
@@ -1063,6 +1073,15 @@ export type WindowSizeDto = {
   kind: string,
   width: number,
   height: number,
+};
+
+export type DropPathDto = {
+  kind: string,
+  url: string,
+};
+
+export type FileDropDto = {
+  paths: string[],
 };
 
 export type Theme = "System" | "Light" | "Dark";

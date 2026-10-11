@@ -1,4 +1,4 @@
-//! 官方启动器版本 JSON（version.json）DTO
+//! 官方启动器版本 JSON DTO：version.json
 
 use std::io::Read;
 use std::path::Path;
@@ -13,7 +13,7 @@ pub struct OfficialObj {
     pub id: String,
     /// 继承的版本 ID
     pub inherits_from: String,
-    /// 补丁列表（拆分式版本）
+    /// 补丁列表，拆分式版本用
     pub patches: Vec<PatchObj>,
     /// 依赖库列表
     pub libraries: Vec<LibrarieObj>,
@@ -22,6 +22,7 @@ pub struct OfficialObj {
 }
 
 impl Default for OfficialObj {
+    /// 全字段取默认值：字符串为空串、列表为空
     fn default() -> Self {
         Self {
             id: Default::default(),
@@ -35,7 +36,7 @@ impl Default for OfficialObj {
 
 /// 补丁信息
 pub struct PatchObj {
-    /// 补丁 ID（如 `game` / `net.minecraft`）
+    /// 补丁 ID，如 `game` / `net.minecraft`
     pub id: String,
     /// 补丁版本
     pub version: String,
@@ -49,11 +50,12 @@ pub struct LibrarieObj {
 
 /// 启动参数
 pub struct ArgumentsObj {
-    /// 游戏参数（字符串或键值对象）
+    /// 游戏参数，字符串或键值对象
     pub game: Vec<MiniJsonObj>,
 }
 
 impl Default for ArgumentsObj {
+    /// 全字段取默认值：列表为空
     fn default() -> Self {
         Self {
             game: Default::default(),
@@ -64,9 +66,7 @@ impl Default for ArgumentsObj {
 impl OfficialObj {
     /// 从读取流解析信息
     ///
-    /// # 参数
-    ///
-    /// - `stream`: 数据流（文件、内存字节等）
+    /// - `stream`: 数据流，如文件、内存字节
     ///
     /// # 返回值
     ///
@@ -113,8 +113,6 @@ impl OfficialObj {
     }
 
     /// 从文件读取信息
-    ///
-    /// # 参数
     ///
     /// - `file`: 文件位置
     ///

@@ -87,13 +87,11 @@ const V1_JVM_ARG: [&str; 3] = [
 
 /// 创建V1游戏启动参数
 ///
-/// # 参数
-///
 /// - `game`: 游戏版本数据
 ///
 /// # 返回值
 ///
-/// 返回游戏启动参数列表（无参数时为空列表）。
+/// 返回游戏启动参数列表，无参数时为空列表。
 fn make_v1_game_arg(game: &GameArgObj) -> Vec<String> {
     match &game.minecraft_arguments {
         None => Vec::new(),
@@ -103,13 +101,11 @@ fn make_v1_game_arg(game: &GameArgObj) -> Vec<String> {
 
 /// 创建V2游戏启动参数
 ///
-/// # 参数
-///
 /// - `game`: 游戏版本数据
 ///
 /// # 返回值
 ///
-/// 返回游戏启动参数列表（仅取无条件参数，条件参数被忽略）。
+/// 返回游戏启动参数列表，仅取无条件参数，带规则的条件参数被忽略。
 fn make_v2_game_arg(game: &GameArgObj) -> Vec<String> {
     game.arguments.as_ref().map_or(Vec::new(), |args| {
         args.game
@@ -124,10 +120,8 @@ fn make_v2_game_arg(game: &GameArgObj) -> Vec<String> {
 
 /// 创建V1加载器启动参数
 ///
-/// # 参数
-///
 /// - `obj`: 游戏实例
-/// - `game`: 游戏版本数据（部分加载器会在此基础上追加参数）
+/// - `game`: 游戏版本数据，部分加载器会在此基础上追加参数
 ///
 /// # 返回值
 ///
@@ -193,8 +187,6 @@ fn make_loader_v1_game_arg(obj: &InstanceSettingObj, game: &GameArgObj) -> Vec<S
 
 /// 创建V2加载器启动参数
 ///
-/// # 参数
-///
 /// - `obj`: 游戏实例
 ///
 /// # 返回值
@@ -234,13 +226,11 @@ fn make_loader_v2_game_arg(obj: &InstanceSettingObj) -> Vec<String> {
 
 /// 创建V2游戏Jvm参数
 ///
-/// # 参数
-///
 /// - `game`: 游戏版本数据
 ///
 /// # 返回值
 ///
-/// 返回Jvm启动参数列表（条件参数按规则过滤后展开）。
+/// 返回Jvm启动参数列表，条件参数按规则过滤后再展开。
 fn make_v2_jvm_arg(game: &GameArgObj) -> Vec<String> {
     let Some(data) = &game.arguments else {
         return Vec::new();
@@ -264,8 +254,6 @@ fn make_v2_jvm_arg(game: &GameArgObj) -> Vec<String> {
 }
 
 /// 创建加载器Jvm参数
-///
-/// # 参数
 ///
 /// - `v2`: 是否为V2版本
 /// - `obj`: 游戏实例
@@ -347,13 +335,11 @@ async fn make_loader_jvm_arg(v2: bool, obj: &InstanceSettingObj) -> Vec<String> 
 impl InstanceSettingObj {
     /// 创建游戏启动参数
     ///
-    /// # 参数
-    ///
-    /// - `auto`: 自动加入的目标（存档 / 服务器）
+    /// - `auto`: 自动加入的目标，存档或服务器
     ///
     /// # 返回值
     ///
-    /// 返回游戏启动参数列表（窗口尺寸、代理、自动加入、自定义参数）。
+    /// 返回游戏启动参数列表，含窗口尺寸、代理、自动加入与自定义参数。
     pub fn make_game_arg(&self, auto: &AutoJoinType) -> Vec<String> {
         let mut args = Vec::new();
 
@@ -444,8 +430,6 @@ impl InstanceSettingObj {
     }
 
     /// 创建Jvm参数
-    ///
-    /// # 参数
     ///
     /// - `auth`: 登陆使用的账户
     /// - `java`: 使用的JAVA主版本号
@@ -596,8 +580,6 @@ impl InstanceSettingObj {
 
     /// 替换启动参数中的占位符
     ///
-    /// # 参数
-    ///
     /// - `auth`: 使用的账户
     /// - `args`: 需要替换的参数列表
     /// - `classpath`: 运行库列表
@@ -681,15 +663,13 @@ impl InstanceSettingObj {
 
     /// 创建启动参数
     ///
-    /// # 参数
-    ///
-    /// - `arg`: 启动配置（账户、语言等）
+    /// - `arg`: 启动配置，含账户与语言
     /// - `obj`: 已生成的启动内容
-    /// - `check`: 是否校验运行库文件存在（缺失的将被跳过）
+    /// - `check`: 是否校验运行库文件存在，缺失的将被跳过
     ///
     /// # 返回值
     ///
-    /// 返回完整命令行参数（Jvm参数 + 主类 + 游戏参数）。
+    /// 返回完整命令行参数，依次为Jvm参数、主类与游戏参数。
     pub fn make_run_arg(
         &self,
         arg: &GameLaunchArg,
@@ -804,10 +784,8 @@ impl InstanceSettingObj {
 
     /// 替换参数中的占位符
     ///
-    /// # 参数
-    ///
     /// - `jvm`: 使用的JAVA路径
-    /// - `arg`: JVM参数列表（用于替换 `{java_args}` 类占位符）
+    /// - `arg`: JVM参数列表，用于替换 `{java_args}` 类占位符
     /// - `item`: 待替换的参数
     ///
     /// # 返回值
@@ -826,8 +804,6 @@ impl InstanceSettingObj {
     }
 
     /// 创建常规启动内容
-    ///
-    /// # 参数
     ///
     /// - `arg`: 启动配置
     /// - `obj`: 待填充的启动内容
@@ -992,9 +968,7 @@ impl InstanceSettingObj {
         Ok(())
     }
 
-    /// 创建自定义json启动内容（MMC整合包格式）
-    ///
-    /// # 参数
+    /// 创建自定义json启动内容，走MMC整合包格式
     ///
     /// - `arg`: 启动配置
     /// - `obj`: 待填充的启动内容
@@ -1171,13 +1145,11 @@ impl InstanceSettingObj {
 
     /// 创建游戏完整启动内容
     ///
-    /// # 参数
-    ///
     /// - `arg`: 启动配置
     ///
     /// # 返回值
     ///
-    /// 返回启动内容（运行库、参数、主类等），游戏版本不存在返回对应错误。
+    /// 返回启动内容，含运行库、参数与主类；游戏版本不存在返回对应错误。
     pub async fn make_game_launch_obj(&self, arg: &GameLaunchArg) -> CoreResult<GameLaunchObj> {
         let mut obj = GameLaunchObj::default();
 
@@ -1206,10 +1178,8 @@ impl InstanceSettingObj {
 
 /// 处理单个运行库项
 ///
-/// # 参数
-///
 /// - `item`: 运行库项
-/// - `game_libs`: 游戏运行库列表（有效项追加到其中）
+/// - `game_libs`: 游戏运行库列表，有效项追加到其中
 ///
 /// # 返回值
 ///

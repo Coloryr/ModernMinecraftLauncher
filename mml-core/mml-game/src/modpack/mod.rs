@@ -29,16 +29,16 @@ pub mod diff;
 pub mod manifest;
 pub mod modrinth_worker;
 
-/// 整合包安装器
+/// 整合包安装流程的统一接口，CurseForge 与 Modrinth 各实现一份
 #[async_trait]
 pub(crate) trait ModPackWorker {
-    /// 获取主信息
+    /// 读取整合包主信息
     ///
     /// # 返回值
     ///
     /// 成功返回 `Ok(())`；读取失败返回对应错误
     fn read_info(&mut self) -> CoreResult<()>;
-    /// 获取版本数据
+    /// 读取整合包要求的游戏版本与加载器
     ///
     /// # 返回值
     ///
@@ -46,40 +46,34 @@ pub(crate) trait ModPackWorker {
     async fn read_version(&mut self) -> CoreResult<()>;
     /// 创建游戏实例
     ///
-    /// # 参数
-    ///
-    /// - `name`: 实例名（`None` 时用整合包名）
-    /// - `group`: 目标分组 uuid（`None` = 默认分组）
+    /// - `name`: 实例名，`None` 时用整合包名
+    /// - `group`: 目标分组 uuid，`None` 表示默认分组
     ///
     /// # 返回值
     ///
-    /// 返回新实例的 UUID；创建失败返回对应错误
+    /// 新实例的 UUID；创建失败返回对应错误
     async fn create_instance(&self, name: Option<String>, group: Option<Uuid>) -> CoreResult<Uuid>;
-    /// 解压文件
+    /// 解压整合包内的文件
     ///
-    /// # 参数
-    ///
-    /// - `unselect`: 不解压的文件列表
+    /// - `unselect`: 不解压的条目路径列表，`None` 表示全解压
     ///
     /// # 返回值
     ///
     /// 成功返回 `Ok(())`；解压失败返回对应错误
     async fn extract(&self, unselect: Option<Vec<String>>) -> CoreResult<()>;
-    /// 获取模组信息
+    /// 查询整合包内各模组的下载信息
     ///
     /// # 返回值
     ///
-    /// 返回是否成功取得全部模组信息；查询失败返回对应错误
+    /// 是否成功取得全部模组信息；查询失败返回对应错误
     async fn get_info(&self) -> CoreResult<bool>;
     /// 下载所需文件
     async fn download(&self);
     /// 更新游戏实例版本信息
     ///
-    /// # 参数
-    ///
     /// - `game`: 目标实例
     fn update_game(&mut self, game: &GameInstance);
-    /// 检查更新
+    /// 按最新清单检查整合包更新
     ///
     /// # 返回值
     ///
@@ -87,9 +81,9 @@ pub(crate) trait ModPackWorker {
     async fn check_upgrade(&self) -> CoreResult<()>;
 }
 
-/// 整合包安装器
+/// 整合包安装器的公共状态，两条安装路径共用
 pub struct BaseModPackWorker {
-    /// 压缩包
+    /// 整合包压缩包
     pub archive: BaseArchive,
     /// 实例创建界面回调
     pub instance_gui: AddInstanceGui,
@@ -97,33 +91,31 @@ pub struct BaseModPackWorker {
     pub pack_gui: AddModPackGui,
     /// 压缩包操作界面回调
     pub archive_gui: BaseArchiveGui,
-    /// 加载器类型
+    /// 加载器类型，创建时默认 Normal
     pub loader: LoaderType,
-    /// 加载器版本
+    /// 加载器版本，空串表示未指定
     pub loader_version: String,
-    /// 游戏版本
+    /// 游戏版本，空串表示未指定
     pub game_version: String,
-    /// 游戏实例
+    /// 创建出来的游戏实例，未创建时为 `None`
     pub game: Option<GameInstance>,
-    /// 下载列表（Mutex 允许 `&self` 方法修改）
+    /// 待下载文件列表，用 Mutex 让 `&self` 方法也能改
     pub downloads: Mutex<Vec<FileItemObj>>,
-    /// 取消
+    /// 取消令牌，触发后安装流程尽快退出
     pub cancel: CancellationToken,
-    /// 图标
+    /// 整合包图标 URL；可缺省
     pub icon: Option<String>,
 }
 
 impl BaseModPackWorker {
     /// 创建安装器
     ///
-    /// # 参数
-    ///
     /// - `archive`: 整合包压缩包
     /// - `instance_gui`: 实例创建界面回调
     /// - `pack_gui`: 整合包安装界面回调
     /// - `archive_gui`: 压缩包操作界面回调
     /// - `cancel`: 取消令牌
-    /// - `icon`: 整合包图标 URL（在线安装时由调用方给；创建实例时写进实例，`None` 表示没有）
+    /// - `icon`: 整合包图标 URL，在线安装时由调用方给，创建实例时写进实例，`None` 表示没有
     pub fn new(
         archive: BaseArchive,
         instance_gui: AddInstanceGui,
@@ -147,10 +139,17 @@ impl BaseModPackWorker {
         }
     }
 
-    /// 解压整合包覆盖文件到游戏目录。
+    /// 解压整合包覆盖文件到游戏目录
     ///
-    /// `prefix/` 下的文件去除前缀后写入游戏根目录；其余文件直接写入
-    /// 游戏基础目录。进度通过 `archive_gui` 上报。
+    /// - `prefix`: 需要去掉的目录前缀，如 `overrides`
+    /// - `unselect`: 不解压的条目路径列表，`None` 表示全解压
+    ///
+    /// `prefix/` 下的文件去掉前缀后写入游戏根目录，其余文件直接写入游戏基础目录，
+    /// 进度通过 `archive_gui` 上报。
+    ///
+    /// # 返回值
+    ///
+    /// 成功返回 `Ok(())`；实例未创建或解压失败返回对应错误
     pub fn extract_pack_files(
         &self,
         prefix: &str,

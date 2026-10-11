@@ -1,7 +1,7 @@
 //! 其余 API 数据结构的离线反序列化测试。
 //!
-//! 覆盖：Nide8、OpenFrp、SakuraFrp、Authlib-Injector、OptiFine（BMCLAPI 镜像
-//! 返回的 JSON）、Adoptium。样例 JSON 均为对应 API 真实响应结构的内嵌字符串，
+//! 覆盖：Nide8、OpenFrp、SakuraFrp、Authlib-Injector、OptiFine 的 BMCLAPI 镜像
+//! 返回 JSON，以及 Adoptium。样例 JSON 均为对应 API 真实响应结构的内嵌字符串，
 //! 不联网。
 
 use mml_net::adoptium_api::{AdoptiumJavaVersionObj, AdoptiumObj};
@@ -17,7 +17,7 @@ const NIDE8_JSON: &str = r#"{
     "jarHash": "5f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c"
 }"#;
 
-/// OpenFrp 通道列表接口（`?action=getallproxies`）的响应
+/// OpenFrp 通道列表接口 `?action=getallproxies` 的响应
 const OPENFRP_CHANNEL_JSON: &str = r#"{
     "state": "success",
     "data": [
@@ -30,7 +30,7 @@ const OPENFRP_CHANNEL_JSON: &str = r#"{
     ]
 }"#;
 
-/// OpenFrp 通道配置接口（`?action=getproxy`）的响应
+/// OpenFrp 通道配置接口 `?action=getproxy` 的响应
 const OPENFRP_CONFIG_JSON: &str = r#"{
     "proxies": {
         "1.2.3.4": "节点说明",
@@ -51,7 +51,7 @@ const OPENFRP_DOWNLOAD_JSON: &str = r#"{
     }
 }"#;
 
-/// SakuraFrp 客户端下载接口（`system/clients`）的响应
+/// SakuraFrp 客户端下载接口 `system/clients` 的响应
 const SAKURA_DOWNLOAD_JSON: &str = r#"{
     "frpc": {
         "ver": "1.0.3",
@@ -66,7 +66,7 @@ const SAKURA_DOWNLOAD_JSON: &str = r#"{
     }
 }"#;
 
-/// Authlib-Injector 元数据接口（`artifacts.json`）的响应
+/// Authlib-Injector 元数据接口 `artifacts.json` 的响应
 const AUTHLIB_META_JSON: &str = r#"{
     "meta": {
         "version": 1,
@@ -99,7 +99,7 @@ const AUTHLIB_OBJ_JSON: &str = r#"{
     "checksums": { "sha256": "ff14bc5acffc7d885bd5bd5942b99f36d6299302beae356b2fc5807fe42652bc" }
 }"#;
 
-/// BMCLAPI 的 OptiFine 版本列表接口（`optifine/versionList`）的响应
+/// BMCLAPI 的 OptiFine 版本列表接口 `optifine/versionList` 的响应
 const OPTIFINE_LIST_JSON: &str = r#"[
     {
         "mcversion": "1.20.4",
@@ -117,12 +117,12 @@ const OPTIFINE_LIST_JSON: &str = r#"[
     }
 ]"#;
 
-/// Adoptium Java 版本列表接口（`v3/info/available_releases`）的响应
+/// Adoptium Java 版本列表接口 `v3/info/available_releases` 的响应
 const ADOPTIUM_RELEASES_JSON: &str = r#"{
     "available_releases": [8, 11, 17, 21, 25]
 }"#;
 
-/// Adoptium 资产接口（`v3/assets/latest/{ver}/hotspot`）的响应
+/// Adoptium 资产接口 `v3/assets/latest/{ver}/hotspot` 的响应
 const ADOPTIUM_ASSETS_JSON: &str = r#"[
     {
         "download_count": 1000000,

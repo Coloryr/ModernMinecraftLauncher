@@ -1,9 +1,9 @@
-//! 整合包安装任务的共享注册表（添加实例窗口与下载整合包窗口共用）
+//! 整合包安装任务的共享注册表，添加实例窗口与下载整合包窗口共用
 //!
-//! 原先这段基础设施住在 `add_modpack.rs` 里，而 `add.rs`（本地压缩包导入）也要用它 ——
+//! 原先这段基础设施住在 `add_modpack.rs` 里，而 `add.rs` 本地压缩包导入也要用它 ——
 //! 于是两个窗口模块互相 `use`，成了一个环。抽到这里之后依赖是单向的：
 //! `add` → `modpack_task` ← `add_modpack`，两个窗口之间只剩"下载整合包用添加实例窗口的
-//! 重名确认回调"这一条（`add_modpack` → `add`）。
+//! 重名确认回调"这一条，方向是 `add_modpack` → `add`。
 //!
 //! 任务与窗口生命周期解耦：窗口关了任务照跑，进度通过 `add-modpack-status` 事件广播。
 
@@ -20,13 +20,13 @@ use crate::dtos::add_modpack_dto::{ModPackStatusDto, ModPackTaskDto};
 use crate::listens;
 use crate::windows::add_resource::SourceInfo;
 
-/// 进行中的整合包安装任务（键 = pid+fid，同键不重复安装）
+/// 进行中的整合包安装任务，键为 pid+fid，同键不重复安装
 pub(super) static DOWNLOAD_NOW: LazyLock<RwLock<HashMap<SourceInfo, Arc<ModPackTask>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
-/// 任务主/子进度快照（各回调分别更新字段）
+/// 任务主/子进度快照，各回调分别更新字段
 pub(super) struct ModPackProgress {
-    /// 安装阶段 ID（见 [`pack_state_id`])
+    /// 安装阶段 ID，见 [`pack_state_id`]
     pub(super) state: String,
     /// 主进度：已完成数
     pub(super) now: u32,
@@ -42,15 +42,18 @@ pub(super) struct ModPackProgress {
 
 /// 一个整合包安装任务：进度 + 取消令牌 + 终态标记
 ///
-/// 终态（done / failed / cancelled）的任务保留在表里供前端展示，
+/// 终态为 done / failed / cancelled 的任务保留在表里供前端展示，
 /// 由 `add_modpack_clear_done` 清除。
 pub(super) struct ModPackTask {
-    /// 任务 ID（安装开始时生成，与最终实例 uuid 无关）
+    /// 任务 ID，安装开始时生成，与最终实例 uuid 无关
     pub(super) uuid: Uuid,
+    /// 整合包来源平台 ID
     pub(super) source: String,
+    /// 整合包项目 ID
     pub(super) pid: String,
+    /// 整合包文件 ID
     pub(super) fid: String,
-    /// 显示名（安装开始时从列表缓存取）
+    /// 显示名，安装开始时从列表缓存取
     pub(super) name: String,
     /// 取消令牌
     pub(super) cancel: CancellationToken,
@@ -62,14 +65,18 @@ pub(super) struct ModPackTask {
     pub(super) failed: AtomicBool,
     /// 已取消
     pub(super) cancelled: AtomicBool,
-    /// 失败错误文案（failed 为 true 时有值）
+    /// 失败错误文案，failed 为 true 时有值
     pub(super) error: Mutex<Option<String>>,
-    /// 安装出的实例 uuid（成功后回填）
+    /// 安装出的实例 uuid，成功后回填
     pub(super) instance_uuid: Mutex<Option<String>>,
 }
 
 impl ModPackTask {
-    /// 转前端 DTO（快照当前进度与终态）
+    /// 转前端 DTO，快照当前进度与终态
+    ///
+    /// # 返回值
+    ///
+    /// 任务此刻的跨 IPC 快照
     fn dto(&self) -> ModPackTaskDto {
         let progress = self.progress.lock().unwrap();
         ModPackTaskDto {
@@ -93,7 +100,13 @@ impl ModPackTask {
     }
 }
 
-/// 整合包安装任务总览快照（事件负载 / 查询返回）
+/// 整合包安装任务总览快照，事件负载与查询返回共用
+///
+/// - `app`: 应用句柄，用它判断整合包窗口是否开着
+///
+/// # 返回值
+///
+/// 当前全部任务与窗口开闭状态
 pub(super) fn build_status(app: &AppHandle) -> ModPackStatusDto {
     let map = DOWNLOAD_NOW.read().unwrap();
     ModPackStatusDto {
@@ -102,7 +115,10 @@ pub(super) fn build_status(app: &AppHandle) -> ModPackStatusDto {
     }
 }
 
-/// 整合包安装任务总览事件（任务增删 / 进度变化 / 终态时广播）
+/// 整合包安装任务总览事件，任务增删 / 进度变化 / 终态时广播
+///
+/// - `app`: 应用句柄，广播用它
+/// - `dto`: 广播出去的总览快照
 #[gui_macros::emit]
 pub fn emit_add_modpack_status(app: &AppHandle, dto: ModPackStatusDto) {
     let _ = app.emit(listens::ADD_MODPACK_STATUS, dto);
@@ -110,19 +126,29 @@ pub fn emit_add_modpack_status(app: &AppHandle, dto: ModPackStatusDto) {
 
 /// 本地压缩包导入用的占位项目 ID
 ///
-/// 任务表以 pid + fid 为键，而本地包**没有**项目 ID（也不该假装有）。用这个固定值占位、
-/// 把包路径当文件 ID（同一个包不重复安装）。它只活在任务表里：`running_pids` /
+/// 任务表以 pid + fid 为键，而本地包**没有**项目 ID，也不该假装有。用这个固定值占位、
+/// 把包路径当文件 ID，同一个包就不会重复安装。它只活在任务表里：`running_pids` /
 /// `installed_modpack_pids` 那边只拿它给**在线列表**打角标，不会与真实项目 ID 撞车。
 pub(crate) const LOCAL_PACK_PID: &str = "local";
 
-/// 登记一个整合包安装任务（同 pid+fid 不重复安装），返回任务句柄与安装进度回调
+/// 登记一个整合包安装任务，同 pid+fid 不重复安装；返回任务句柄与安装进度回调
 ///
-/// 在线安装（[`add_modpack_install`]）与本地压缩包导入（[`super::add::add_import_archive`]）
-/// 共用它：两条路径产生的任务、进度事件、取消与终态处理完全一致
-/// （标题栏指示器、进度弹窗、主窗口列表刷新都复用那一套）。
+/// 在线安装 [`add_modpack_install`] 与本地压缩包导入 [`super::add::add_import_archive`]
+/// 共用它：两条路径产生的任务、进度事件、取消与终态处理完全一致，
+/// 标题栏指示器、进度弹窗、主窗口列表刷新都复用那一套。
 ///
 /// `cancel` 由调用方给：本地导入复用**添加实例窗口**那份令牌，
 /// 这样窗口上的取消按钮与任务上的取消停掉的是同一次安装。
+///
+/// - `app`: 应用句柄，事件与回调桥接都用它
+/// - `key`: 任务键，即下载源加项目与文件 ID；同键不重复安装
+/// - `source`: 整合包来源平台 ID
+/// - `name`: 显示名，取自整合包列表缓存
+/// - `cancel`: 取消令牌，调用方持有同一份
+///
+/// # 返回值
+///
+/// 任务句柄与安装进度回调；同键已有任务在跑时返回错误文案
 pub(crate) fn register_task(
     app: &AppHandle,
     key: SourceInfo,
@@ -170,9 +196,14 @@ pub(crate) fn register_task(
 
 /// 记录安装终态并广播
 ///
-/// - `Ok(uuid)`：安装成功 —— 回填新实例 uuid 并广播 instance-change（主窗口据此刷新并选中）
-/// - `Err(err)`：失败 —— **令牌已取消时记为"已取消"**（取消可能来自别的入口，
-///   例如添加实例窗口自己的取消按钮，那条路径不会去置 cancelled 标记），否则记失败原因
+/// - `app`: 应用句柄，广播总览与实例变更都用它
+/// - `task`: 目标任务
+/// - `cancel`: 该任务的取消令牌，用来区分失败与被取消
+/// - `res`: 安装结果
+///
+/// `res` 为 `Ok` 时回填新实例 uuid 并广播 instance-change，主窗口据此刷新并选中；
+/// 为 `Err` 时**令牌已取消就记为"已取消"**，取消可能来自别的入口，例如添加实例窗口自己的
+/// 取消按钮，那条路径不会去置 cancelled 标记；否则记失败原因
 pub(crate) fn finish_task(
     app: &AppHandle,
     task: &ModPackTask,
@@ -183,7 +214,7 @@ pub(crate) fn finish_task(
         Ok(uuid) => {
             *task.instance_uuid.lock().unwrap() = Some(uuid.to_string());
             // 装完了就是装完了：取消标记要清掉。用户恰在成功前点了取消的话，
-            // 两个标记会同时为真（DTO 注释里三者互斥），前端会同时显示"已完成"和"已取消"
+            // 两个标记会同时为真，DTO 注释里三者互斥，前端会同时显示"已完成"和"已取消"
             task.cancelled.store(false, Ordering::Release);
             task.done.store(true, Ordering::Release);
             crate::windows::main::emit_instance_change(app, "add");
@@ -200,7 +231,13 @@ pub(crate) fn finish_task(
     emit_add_modpack_status(app, build_status(app));
 }
 
-/// 安装阶段 ID（与前端 i18n 键对应）
+/// 安装阶段 ID，与前端 i18n 键对应
+///
+/// - `state`: 内核安装状态
+///
+/// # 返回值
+///
+/// `downloadPack` / `readInfo` / `getInfo` / `downloadFile` / `extract` / `done` 之一
 pub(super) fn pack_state_id(state: AddModPackState) -> &'static str {
     match state {
         AddModPackState::DownloadPack => "downloadPack",
@@ -214,12 +251,16 @@ pub(super) fn pack_state_id(state: AddModPackState) -> &'static str {
 
 /// 整合包安装进度回调：把安装状态 / 进度写进任务并广播总览事件
 pub(super) struct TaskPackGui {
+    /// 回调对应的任务，进度写进它
     task: Arc<ModPackTask>,
+    /// 应用句柄，广播总览事件用
     app: AppHandle,
 }
 
 impl TaskPackGui {
     /// 更新任务进度并广播总览事件
+    ///
+    /// - `f`: 就地改写进度快照的闭包
     fn update(&self, f: impl FnOnce(&mut ModPackProgress)) {
         {
             let mut progress = self.task.progress.lock().unwrap();
@@ -231,11 +272,16 @@ impl TaskPackGui {
 
 impl IAddModPackGui for TaskPackGui {
     /// 设置安装阶段
+    ///
+    /// - `state`: 内核安装状态
     fn set_state(&self, state: AddModPackState) {
         self.update(|progress| progress.state = pack_state_id(state).into());
     }
 
-    /// 设置主进度（value / all）
+    /// 设置主进度
+    ///
+    /// - `value`: 已完成数
+    /// - `all`: 总数，`None` 时按 0 处理
     fn set_now(&self, value: usize, all: Option<usize>) {
         self.update(|progress| {
             progress.now = value as u32;
@@ -244,11 +290,16 @@ impl IAddModPackGui for TaskPackGui {
     }
 
     /// 设置子任务说明文字
+    ///
+    /// - `text`: 说明文字，`None` 表示当前没有子任务
     fn set_sub_text(&self, text: Option<String>) {
         self.update(|progress| progress.sub_text = text);
     }
 
-    /// 设置子任务进度（value / all）
+    /// 设置子任务进度
+    ///
+    /// - `value`: 子任务已完成数
+    /// - `all`: 子任务总数，`None` 时按 0 处理
     fn set_sub_now(&self, value: usize, all: Option<usize>) {
         self.update(|progress| {
             progress.sub_now = value as u32;

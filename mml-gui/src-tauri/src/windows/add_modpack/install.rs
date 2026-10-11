@@ -1,8 +1,8 @@
 //! 下载整合包窗口的安装执行：发起 / 取消 / 状态 / 清理终态
 //!
-//! 从 `add_modpack/mod.rs` 拆出来的（`add_modpack_install` 104 行）。安装走内核
+//! 从 `add_modpack/mod.rs` 拆出来的，光 `add_modpack_install` 就有 104 行。安装走内核
 //! `mml_game::add_game`，任务登记在共享的 `modpack_task` 注册表里，与窗口生命周期解耦。
-//! 命令带 `#[gui_macros::ipc_group("add_modpack")]` 把组键钉回 `addModpack`（AGENTS.md §4）。
+//! 命令带分组标记，值填原始组名 add_modpack，把组键钉回 `addModpack`，见 AGENTS.md §4。
 
 use std::sync::atomic::Ordering;
 
@@ -21,8 +21,20 @@ use crate::windows::modpack_task::{
 
 use super::{CURSEFOGRE_INFO, MODRINTH_INFO};
 
-/// 安装在线整合包（多任务：命令立即返回，任务在后台跑，
-/// 进度走 `add-modpack-status` 事件；name 取自整合包元数据）
+/// 安装在线整合包，多任务：命令立即返回，任务在后台跑，进度走 `add-modpack-status` 事件
+///
+/// 实例名与图标取自列表缓存，缓存没有时退回项目 ID 作名字、图标留空。
+///
+/// - `window`: 调用方窗口，用于取本窗口模型做重名确认
+/// - `app`: 应用句柄，用于登记任务并发状态事件
+/// - `source`: 下载源标识，取值 `curseforge` / `modrinth`
+/// - `project_id`: 项目 ID
+/// - `file_id`: 文件 ID；CurseForge 是数字字符串，Modrinth 是版本 ID
+/// - `group`: 分组 uuid；空 / 非法 = 默认分组
+///
+/// # 返回值
+///
+/// 任务登记成功即返回 `Ok(())`，不等安装结束；下载源不支持、同 pid+fid 已在安装返回 `Err`
 #[gui_macros::ipc_group("add_modpack")]
 #[tauri::command]
 pub async fn add_modpack_install(
@@ -46,9 +58,9 @@ pub async fn add_modpack_install(
         fid: file_id.clone(),
     };
 
-    // 显示名与图标都从列表缓存取（列表页已缓存过项目元数据）。
-    // 单窗口模式下本页会被 KeepAlive 缓存，缓存一直在；万一没了（多窗口下直接开安装命令、
-    // 或窗口关了再装），退回项目 ID 作名字、图标留空 —— 都只是显示层面的事，不影响安装
+    // 显示名与图标都从列表缓存取，列表页已缓存过项目元数据。
+    // 单窗口模式下本页会被 KeepAlive 缓存，缓存一直在；万一没了，比如多窗口下直接开安装命令、
+    // 或窗口关了再装，退回项目 ID 作名字、图标留空 —— 都只是显示层面的事，不影响安装
     let (name, icon) = match source_type {
         ModPackType::CurseForge => {
             let cache = CURSEFOGRE_INFO.read().await;
@@ -67,13 +79,13 @@ pub async fn add_modpack_install(
         _ => (project_id.clone(), None),
     };
 
-    // 登记任务：同 pid+fid 不允许重复安装（进度回调与任务一起给出）
+    // 登记任务：同 pid+fid 不允许重复安装，进度回调与任务一起给出
     let token = CancellationToken::new();
     let (task, pack_gui) = register_task(&app, key, &source, name, token.clone())?;
 
     let gui = instance_gui(&window);
 
-    // 后台安装：命令不等安装结束（安装 future 非 Send，放阻塞线程上 block_on）
+    // 后台安装：命令不等安装结束，安装 future 非 Send，放阻塞线程上 block_on
     let app_task = app.clone();
     let install_token = token.clone();
     tauri::async_runtime::spawn(async move {
@@ -130,7 +142,15 @@ pub async fn add_modpack_install(
     Ok(())
 }
 
-/// 取一个进行中的整合包安装任务（pid + fid 定位）
+/// 取消一个进行中的整合包安装任务，按 pid 与 fid 定位
+///
+/// - `app`: 应用句柄，用于广播状态事件
+/// - `pid`: 项目 ID
+/// - `fid`: 文件 ID
+///
+/// # 返回值
+///
+/// 标记取消后返回 `Ok(())`；找不到该任务返回 `Err`
 #[gui_macros::ipc_group("add_modpack")]
 #[tauri::command]
 pub async fn add_modpack_cancel(app: AppHandle, pid: String, fid: String) -> Result<(), String> {
@@ -145,14 +165,26 @@ pub async fn add_modpack_cancel(app: AppHandle, pid: String, fid: String) -> Res
     Ok(())
 }
 
-/// 查询整合包安装任务总览（窗口挂载时同步一次，之后靠事件）
+/// 查询整合包安装任务总览，窗口挂载时同步一次，之后靠事件
+///
+/// - `app`: 应用句柄，用于算各任务的窗口开关状态
+///
+/// # 返回值
+///
+/// 当前全部安装任务的快照
 #[gui_macros::ipc_group("add_modpack")]
 #[tauri::command]
 pub async fn add_modpack_status(app: AppHandle) -> Result<ModPackStatusDto, String> {
     Ok(build_status(&app))
 }
 
-/// 清除已结束（完成 / 失败 / 取消）的安装任务
+/// 清除已结束的安装任务，即完成 / 失败 / 取消三态
+///
+/// - `app`: 应用句柄，用于广播状态事件
+///
+/// # 返回值
+///
+/// 清完即返回 `Ok(())`
 #[gui_macros::ipc_group("add_modpack")]
 #[tauri::command]
 pub async fn add_modpack_clear_done(app: AppHandle) -> Result<(), String> {

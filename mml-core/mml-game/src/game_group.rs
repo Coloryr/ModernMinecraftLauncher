@@ -1,12 +1,12 @@
 //! 分组表：`group_save.json`
 //!
 //! 分组以 **uuid 为身份**，组名只是可改的显示数据：
-//! - 一个分组可以没有任何实例（空分组）—— 归属信息若存在实例里，空分组就没有
+//! - 一个分组可以没有任何实例，空分组也合法 —— 归属信息若存在实例里，空分组就没有
 //!   任何实例可以承载它，这正是之前"空分组留不住"的根因；
 //! - 组内次序、分组自身的顺序也都由本表表达，不再散落在各实例的 `gui_setting.json` 里；
-//! - 组名不进任何"身份"位置（键、顺序表），改名不会牵连归属与顺序。
+//! - 组名不进任何"身份"位置，如键与顺序表，改名不会牵连归属与顺序。
 //!
-//! 文件放**实例根目录**下、与各实例目录并列（下面用默认分组举例）：
+//! 文件放**实例根目录**下、与各实例目录并列，下面用默认分组举例：
 //! ```json
 //! {
 //!   "group_order": [],
@@ -16,14 +16,14 @@
 //! }
 //! ```
 //! 四列各管一件事：
-//! - `group_order` — 分组 uuid 的显示顺序（**含默认分组**：它只是初始排首位，
-//!   之后可以和别的分组一样换位置）
-//! - `names` — 分组 uuid → 组名（**显示数据**；空白名字就是默认分组）
-//! - `groups` — 分组 uuid → 组内实例（**只表达归属**，先后一律看 `order`）
+//! - `group_order` — 分组 uuid 的显示顺序，**含默认分组**：它只是初始排首位，
+//!   之后可以和别的分组一样换位置
+//! - `names` — 分组 uuid → 组名，**显示数据**；空白名字就是默认分组
+//! - `groups` — 分组 uuid → 组内实例，**只表达归属**，先后一律看 `order`
 //! - `order` — 实例 uuid → 组内次序
 //!
-//! 实例配置（`game.json`）里**没有** `group` 字段；判断某个实例属于哪一组，
-//! 靠在本表里查它的 uuid（见 [`group_of`]）。
+//! 实例配置 `game.json` 里**没有** `group` 字段；判断某个实例属于哪一组，
+//! 靠在本表里查它的 uuid，见 [`group_of`]。
 
 use std::{
     collections::{HashMap, HashSet},
@@ -37,7 +37,7 @@ use mml_names::{i18_items::error_type::CoreResult, names, uuids};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-/// 默认分组的固定 uuid（**全 0**）
+/// 默认分组的固定 uuid，**全 0**
 ///
 /// 全 0 就是"没有分组"本身：对外 `Option<Uuid>` 的 `None` 即指向它，
 /// 重启后也必须还是同一个身份。
@@ -46,31 +46,31 @@ use uuid::Uuid;
 /// 这里是数据身份；混在一起会让"uuid 有没有重复"的检查失去意义。
 pub const DEFAULT_GROUP_UUID: Uuid = Uuid::nil();
 
-/// 分组条目（uuid + 显示名）
+/// 分组条目：uuid 加显示名
 pub struct GroupInfoObj {
     /// 分组 uuid
     pub uuid: Uuid,
-    /// 分组显示名（默认分组是空白，由界面翻译成"默认分组"）
+    /// 分组显示名；默认分组是空白，由界面翻译成"默认分组"
     pub name: String,
 }
 
-/// 分组表（内存与磁盘共用同一个结构）
+/// 分组表：内存与磁盘共用同一个结构
 ///
 /// 单独再定义一个"落盘用"的镜像结构没有意义 —— 字段完全一样，只会多一份要同步的东西，
-/// 所以 `Default`（空表）与 `Serialize` / `Deserialize`（文件）都落在本类型上。
+/// 所以 `Default` 的空表与 `Serialize` / `Deserialize` 的文件形态都落在本类型上。
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct GroupStore {
-    /// 分组的显示顺序（分组 uuid，**含默认分组**）
+    /// 分组的显示顺序，元素是分组 uuid，**含默认分组**
     ///
-    /// 默认分组只是**初始排在首位**（见 `normalize`：顺序表里没有它时补在最前），
+    /// 默认分组只是**初始排在首位**，见 `normalize`：顺序表里没有它时补在最前，
     /// 之后用户可以把它拖到任意位置 —— 它的特殊之处是"未分组"这个身份
-    /// （固定 uuid + 空白名字），不是"位置固定"。
+    /// 即固定 uuid 加空白名字，不是"位置固定"。
     #[serde(default)]
     group_order: Vec<String>,
     /// 分组 uuid → 组名
     #[serde(default)]
     names: HashMap<String, String>,
-    /// 分组 uuid → 组内实例（只表达归属，先后看 `order`）
+    /// 分组 uuid → 组内实例，只表达归属，先后看 `order`
     #[serde(default)]
     groups: HashMap<String, Vec<Uuid>>,
     /// 实例 uuid → 组内次序
@@ -81,28 +81,28 @@ struct GroupStore {
 impl GroupStore {
     /// 归一化：补默认分组、清悬空项、把每个组的组内次序压实成 `0..n-1`
     ///
-    /// 读盘后（以及手改过文件后）必须跑一次：文件里的次序可能缺项、并列、是负数，
+    /// 读盘后、以及手改过文件后，必须跑一次：文件里的次序可能缺项、并列、是负数，
     /// 也可能指向早就删掉的实例。压实之后"次序"才是一个确定的全序。
     fn normalize(&mut self) {
         let default = DEFAULT_GROUP_UUID.to_string();
 
-        // 默认分组恒存在：身份是固定 uuid，名字留白（界面自行翻译）
+        // 默认分组恒存在：身份是固定 uuid，名字留白，界面自行翻译
         self.names
             .entry(default.clone())
             .or_insert_with(|| names::DEFAULT_GROUP.to_string());
         self.groups.entry(default.clone()).or_default();
 
-        // 没有名字的分组视为损坏（只有 add_group 会建组，一定带名字）
+        // 没有名字的分组视为损坏：只有 add_group 会建组，一定带名字
         let named: HashSet<String> = self.names.keys().cloned().collect();
         self.groups.retain(|key, _| named.contains(key));
-        // 反向也要补齐：有名字但少了成员数组（手改过文件）的组补一个空数组。
+        // 反向也要补齐：手改过文件时会出现有名字但少了成员数组的组，补一个空数组。
         // 缺了它，实例会被从原组摘下来却推不进目标组 —— 直接从界面上消失
         let keys: Vec<String> = self.names.keys().cloned().collect();
         for key in keys {
             self.groups.entry(key).or_default();
         }
 
-        // 分组顺序：默认分组**初始排首位**（顺序表里没有它时补在最前，已有则尊重用户排的位置）；
+        // 分组顺序：默认分组**初始排首位**，顺序表里没有它时补在最前，已有则尊重用户排的位置；
         // 不存在的名字丢掉，存在但漏掉的补在末尾
         let mut next: Vec<String> = Vec::with_capacity(self.names.len() + 1);
         let mut has_default = false;
@@ -116,7 +116,7 @@ impl GroupStore {
             next.push(key.clone());
         }
         if !has_default {
-            // 老文件（默认分组不在顺序表里）：补到最前 —— 这正是"默认初始位置"，
+            // 老文件的默认分组不在顺序表里：补到最前 —— 这正是"默认初始位置"，
             // 用户之后拖到哪儿就存哪儿，下次读出来 has_default 为真、不再挪
             next.insert(0, default.clone());
         }
@@ -148,7 +148,7 @@ impl GroupStore {
         }
         self.groups = fixed;
 
-        // 悬空次序（实例已不在任何组里）清掉
+        // 悬空次序，即实例已不在任何组里的那些，清掉
         let alive: HashSet<String> = self
             .groups
             .values()
@@ -158,7 +158,7 @@ impl GroupStore {
         self.order.retain(|key, _| alive.contains(key));
     }
 
-    /// 实例的组内次序（表里缺这一项时排到最后）
+    /// 实例的组内次序；表里缺这一项时排到最后
     fn rank(&self, uuid: Uuid) -> i32 {
         self.order
             .get(&uuid.to_string())
@@ -166,7 +166,7 @@ impl GroupStore {
             .unwrap_or(i32::MAX)
     }
 
-    /// 全部分组 uuid（顺序 = `group_order`，默认分组只是初始排在首位）
+    /// 全部分组 uuid，顺序同 `group_order`，默认分组只是初始排在首位
     fn keys(&self) -> Vec<Uuid> {
         let mut list = Vec::with_capacity(self.group_order.len() + 1);
         for key in &self.group_order {
@@ -176,12 +176,12 @@ impl GroupStore {
                 list.push(uuid);
             }
         }
-        // 兜底一：默认分组必须始终可见（老文件 / 手改过的文件可能没记它）
+        // 兜底一：默认分组必须始终可见，老文件与手改过的文件可能没记它
         if !list.contains(&DEFAULT_GROUP_UUID) {
             list.insert(0, DEFAULT_GROUP_UUID);
         }
         // 兜底二：表里有、顺序表里没有的分组也得能被看到。
-        // 正常路径（init 的 normalize / new_group）不会出现这种状态，这里只是别让它悄悄消失
+        // 正常路径，即 init 的 normalize 与 new_group，不会出现这种状态，这里只是别让它悄悄消失
         for key in self.names.keys() {
             if let Ok(uuid) = Uuid::parse_str(key)
                 && !list.contains(&uuid)
@@ -192,7 +192,7 @@ impl GroupStore {
         list
     }
 
-    /// 分组名（默认分组是空白）
+    /// 分组名；默认分组是空白
     fn name_of(&self, uuid: Uuid) -> Option<String> {
         self.names.get(&uuid.to_string()).cloned()
     }
@@ -202,7 +202,7 @@ impl GroupStore {
         self.names.contains_key(&uuid.to_string())
     }
 
-    /// 是否已经有同名的分组（组名保持唯一，免得界面上分不清）
+    /// 是否已经有同名的分组，组名保持唯一，免得界面上分不清
     fn has_name(&self, name: &str) -> bool {
         self.names.values().any(|n| n == name)
     }
@@ -232,7 +232,7 @@ impl GroupStore {
         DEFAULT_GROUP_UUID
     }
 
-    /// 实例在它所属分组里的位置（0 起）：由次序编号算出来，不是直接读编号
+    /// 实例在它所属分组里的位置，0 起：由次序编号算出来，不是直接读编号
     ///
     /// 直接读编号是不行的 —— 文件被手改过后编号可能并列、跳号或为负。
     fn position_of(&self, uuid: &Uuid) -> Option<usize> {
@@ -245,7 +245,7 @@ impl GroupStore {
         self.groups.values().any(|items| items.contains(uuid))
     }
 
-    /// 新建分组（返回新分组的 uuid；名字为空或重名返回 `None`）
+    /// 新建分组，返回新分组的 uuid；名字为空或重名返回 `None`
     fn new_group(&mut self, name: &str) -> Option<Uuid> {
         let name = name.trim();
         if name.is_empty() || self.has_name(name) {
@@ -261,14 +261,14 @@ impl GroupStore {
         Some(uuid)
     }
 
-    /// 把一批实例移入目标分组（从所有旧分组里摘掉，按次序追加到目标组末尾）
+    /// 把一批实例移入目标分组：从所有旧分组里摘掉，按次序追加到目标组末尾
     ///
-    /// 目标分组不存在（界面上拿到的是过期数据，或者表还没 init）时落到默认分组，
+    /// 目标分组不存在时落到默认分组，界面上拿到过期数据、表还没 init 都属于这种情况，
     /// 不凭空造一个没名字的组。
     ///
     /// # 返回值
     ///
-    /// 返回实际落到的分组 uuid（调用方接着排序时要用它，别拿原来那个）
+    /// 返回实际落到的分组 uuid；调用方接着排序时要用它，别拿原来那个
     fn move_items(&mut self, list: &[Uuid], target: Uuid) -> Uuid {
         let target = if self.exists(target) {
             target
@@ -277,7 +277,7 @@ impl GroupStore {
         };
         let key = target.to_string();
 
-        // 落点必须真的存在（名字 + 成员数组都要有）：只摘不放会让实例从界面上消失
+        // 落点必须真的存在，名字与成员数组都要有：只摘不放会让实例从界面上消失
         self.names
             .entry(key.clone())
             .or_insert_with(|| names::DEFAULT_GROUP.to_string());
@@ -304,9 +304,9 @@ impl GroupStore {
         target
     }
 
-    /// 把已在组内的实例挪到第 `index` 位（整组重新编号 `0..n-1`）
+    /// 把已在组内的实例挪到第 `index` 位，整组重新编号 `0..n-1`
     ///
-    /// 重新编号而不是只改这一个值：旧数据里次序全是默认 0（并列），只改一个值排不出顺序。
+    /// 重新编号而不是只改这一个值：旧数据里次序全是默认 0、互相并列，只改一个值排不出顺序。
     fn reposition(&mut self, group: Uuid, uuid: &Uuid, index: usize) {
         // 组不存在就什么都不做 —— 别在这里 insert 出一个没有名字的组
         if !self.exists(group) {
@@ -334,8 +334,8 @@ impl GroupStore {
 
         for uuid in order {
             let key = uuid.to_string();
-            // 默认分组恒是合法成员（names 里一定有它，但别依赖这一点 —— 直接放行，
-            // 否则一个没跑过 normalize 的 store 会把它悄悄丢掉）
+            // 默认分组恒是合法成员：names 里一定有它，但别依赖这一点，直接放行，
+            // 否则一个没跑过 normalize 的 store 会把它悄悄丢掉
             if (self.names.contains_key(&key) || key == default) && !next.contains(&key) {
                 next.push(key);
             }
@@ -349,11 +349,11 @@ impl GroupStore {
         self.group_order = next;
     }
 
-    /// 把某个实例从所有分组里摘掉（连同它的组内次序）
+    /// 把某个实例从所有分组里摘掉，连同它的组内次序
     ///
     /// # 返回值
     ///
-    /// 有改动返回 `true`（调用方据此决定要不要落盘）
+    /// 有改动返回 `true`，调用方据此决定要不要落盘
     fn forget(&mut self, uuid: &Uuid) -> bool {
         self.order.remove(&uuid.to_string());
 
@@ -367,19 +367,19 @@ impl GroupStore {
     }
 }
 
-/// 分组表（内存中的唯一数据源）
+/// 分组表：内存中的唯一数据源
 static STORE: LazyLock<RwLock<GroupStore>> = LazyLock::new(|| RwLock::new(GroupStore::default()));
 
-/// 分组文件路径（`init` 时确定）
+/// 分组文件路径，`init` 时确定
 static GROUP_FILE: LazyLock<RwLock<Option<PathBuf>>> = LazyLock::new(|| RwLock::new(None));
 
-/// 初始化分组存储（在实例目录确定后调用）
+/// 初始化分组存储，在实例目录确定后调用
 ///
-/// - `dir`: 实例根目录（`launcher_path::get_instance_dir()`）
+/// - `dir`: 实例根目录，取自 `launcher_path::get_instance_dir()`
 ///
 /// # 返回值
 ///
-/// 读取失败返回对应错误；文件不存在时按空表开始（首次运行）
+/// 读取失败返回对应错误；文件不存在时按空表开始，即首次运行
 pub fn init(dir: PathBuf) -> CoreResult<()> {
     let file = dir.join(names::GROUP_FILE);
     *GROUP_FILE.write().unwrap() = Some(file.clone());
@@ -397,20 +397,20 @@ pub fn init(dir: PathBuf) -> CoreResult<()> {
     Ok(())
 }
 
-/// 保存分组表到磁盘（异步落盘）
+/// 保存分组表到磁盘，异步落盘
 pub fn save() {
     let file = GROUP_FILE.read().unwrap().clone();
     let Some(file) = file else {
         return;
     };
 
-    // config_save 入队前就把对象序列化好了（见 `ConfigSaveObj::new`），
+    // config_save 入队前就把对象序列化好了，见 `ConfigSaveObj::new`，
     // 所以直接交引用即可，不必再拷一份整表
     let store = STORE.read().unwrap();
     config_save::save(uuids::GROUP_UUID, &*store, &file);
 }
 
-/// 全部分组（含空分组）
+/// 全部分组，含空分组
 ///
 /// # 返回值
 ///
@@ -433,12 +433,12 @@ pub fn group_list() -> Vec<GroupInfoObj> {
 ///
 /// # 返回值
 ///
-/// 返回分组名；分组不存在返回 `None`（默认分组的名字是空白）
+/// 返回分组名；分组不存在返回 `None`，默认分组的名字是空白
 pub fn group_name(uuid: &Uuid) -> Option<String> {
     STORE.read().unwrap().name_of(*uuid)
 }
 
-/// 某分组内的实例 uuid（按组内次序）
+/// 某分组内的实例 uuid，按组内次序
 ///
 /// - `uuid`: 分组 uuid
 ///
@@ -451,18 +451,18 @@ pub fn group_items(uuid: &Uuid) -> Vec<Uuid> {
 
 /// 某个实例所属的分组 uuid
 ///
-/// 在表里反查实例；查不到时回落到默认分组（实例刚建好、还没登记时就是这种情况）
+/// 在表里反查实例；查不到时回落到默认分组，实例刚建好还没登记就是这种情况
 ///
 /// - `uuid`: 实例 uuid
 ///
 /// # 返回值
 ///
-/// 返回分组 uuid（可能是 [`DEFAULT_GROUP_UUID`]）
+/// 返回分组 uuid，可能是 [`DEFAULT_GROUP_UUID`]
 pub fn group_of(uuid: &Uuid) -> Uuid {
     STORE.read().unwrap().group_of(uuid)
 }
 
-/// 某个实例在它所属分组里的显示次序（0 起）
+/// 某个实例在它所属分组里的显示次序，0 起
 ///
 /// - `uuid`: 实例 uuid
 ///
@@ -475,7 +475,7 @@ pub fn index_of(uuid: &Uuid) -> Option<i32> {
 
 /// 新建分组
 ///
-/// - `name`: 分组名（首尾空白会被去掉）
+/// - `name`: 分组名，首尾空白会被去掉
 ///
 /// # 返回值
 ///
@@ -489,7 +489,7 @@ pub fn add_group(name: &str) -> Option<Uuid> {
     Some(uuid)
 }
 
-/// 删除分组（组内实例移入默认分组）
+/// 删除分组，组内实例移入默认分组
 ///
 /// 空分组也能删 —— 这正是把分组独立存的目的
 ///
@@ -508,7 +508,7 @@ pub fn remove_group(uuid: &Uuid) -> Option<Vec<Uuid>> {
     store.names.remove(&key)?;
     let items = store.groups.remove(&key).unwrap_or_default();
     store.group_order.retain(|k| k != &key);
-    // 组内实例移入默认分组（接在默认分组末尾），而不是凭空丢失归属
+    // 组内实例移入默认分组，接在默认分组末尾，而不是凭空丢失归属
     store.move_items(&items, DEFAULT_GROUP_UUID);
     drop(store);
 
@@ -516,7 +516,7 @@ pub fn remove_group(uuid: &Uuid) -> Option<Vec<Uuid>> {
     Some(items)
 }
 
-/// 把一批实例移入某分组（追加到目标组末尾）
+/// 把一批实例移入某分组，追加到目标组末尾
 ///
 /// - `list`: 要移动的实例 uuid
 /// - `new`: 目标分组 uuid；`None` 表示默认分组
@@ -532,13 +532,13 @@ pub fn move_group(list: Vec<Uuid>, new: Option<Uuid>) {
 
 /// 把一个实例放到目标分组的第 `index` 位
 ///
-/// 跨组移动与组内排序在这里是**同一件事**：先确保目标分组存在（不存在则落到默认分组），
-/// 再把它从原分组摘掉、插到目标下标。分两步调（先 [`move_group`] 再排序）会落两次盘，
+/// 跨组移动与组内排序在这里是**同一件事**：先确保目标分组存在，不存在则落到默认分组，
+/// 再把它从原分组摘掉、插到目标下标。分两步调，即先 [`move_group`] 再排序，会落两次盘，
 /// 调用方也容易漏掉后一半。
 ///
 /// - `uuid`: 实例 uuid
 /// - `new`: 目标分组 uuid；`None` 表示默认分组
-/// - `index`: 目标下标（超出范围则排到末尾）
+/// - `index`: 目标下标；超出范围则排到末尾
 pub fn place_in_group(uuid: &Uuid, new: Option<Uuid>, index: usize) {
     let target = new.unwrap_or(DEFAULT_GROUP_UUID);
 
@@ -552,7 +552,7 @@ pub fn place_in_group(uuid: &Uuid, new: Option<Uuid>, index: usize) {
     save();
 }
 
-/// 调整分组本身的顺序（按给定的完整列表重排）
+/// 调整分组本身的顺序，按给定的完整列表重排
 ///
 /// - `order`: 期望的分组 uuid 顺序；不在表里的忽略，表里没提到的组保持在后
 pub fn reorder_groups(order: &[Uuid]) {
@@ -565,7 +565,7 @@ pub fn reorder_groups(order: &[Uuid]) {
 
 /// 删除实例后的清理：把它从所有分组里摘掉
 ///
-/// 不删空分组 —— 空分组是合法状态（用户可以手工建一个空组）
+/// 不删空分组 —— 空分组是合法状态，用户可以手工建一个空组
 ///
 /// - `uuid`: 实例 uuid
 pub(crate) fn forget_instance(uuid: &Uuid) {
@@ -578,7 +578,7 @@ pub(crate) fn forget_instance(uuid: &Uuid) {
     }
 }
 
-/// 登记一个新实例到某分组（创建实例后调用）
+/// 登记一个新实例到某分组，创建实例后调用
 ///
 /// **已经在表里的实例保持原分组** —— 加载流程会对每个实例都调一次，
 /// 无条件移动会把用户分好的组全部冲回默认分组。
@@ -595,9 +595,9 @@ pub fn register_instance(uuid: Uuid, group: Option<Uuid>) {
     move_group(vec![uuid], group);
 }
 
-/// 剔除表里指向已不存在实例的悬空项（归属与组内次序一起清）
+/// 剔除表里指向已不存在实例的悬空项，归属与组内次序一起清
 ///
-/// 实例可能在别处被删（外部改动目录、别的进程），那时不会有删除事件；
+/// 实例可能在别处被删，如外部改动目录、别的进程，那时不会有删除事件；
 /// 加载完成后调一次即可保持表与实际数据一致。
 ///
 /// - `alive`: 当前实际存在的实例 uuid 集合
@@ -633,7 +633,7 @@ mod tests {
 
     use super::*;
 
-    /// 文件四列（分组顺序 / 组名 / 归属 / 组内次序）都要能原样往返
+    /// 文件四列：分组顺序 / 组名 / 归属 / 组内次序，都要能原样往返
     ///
     /// 这几种顺序都只由本表的字段表达，丢哪一列都会让对应的那一种变成随机 ——
     /// 而这是纯序列化行为，不用碰全局状态就能测。
@@ -677,14 +677,14 @@ mod tests {
         let dead = Uuid::new_v4();
 
         let mut store = GroupStore {
-            // "幽灵组"没有名字（只在 groups 里）：视为损坏，连成员一起丢掉
+            // "幽灵组"没有名字，只在 groups 里：视为损坏，连成员一起丢掉
             // "整合包"在顺序表里重复一次；"测试"存在但漏在顺序外
             group_order: vec!["幽灵组".to_string(), pack.to_string(), pack.to_string()],
             names: HashMap::from([
                 (pack.to_string(), "整合包".to_string()),
                 (test.to_string(), "测试".to_string()),
             ]),
-            // b 有次序、a 缺次序（应排到 b 后面）、dead 只挂在"幽灵组"上
+            // b 有次序，a 缺次序且应排到 b 后面，dead 只挂在"幽灵组"上
             order: HashMap::from([(b.to_string(), 0), (dead.to_string(), 7)]),
             groups: HashMap::from([
                 (pack.to_string(), vec![a, b]),
@@ -720,10 +720,10 @@ mod tests {
         );
     }
 
-    /// 重排：传入的顺序生效（默认分组不特殊对待）；不存在 / 没提到的按原相对顺序排在后面
+    /// 重排：传入的顺序生效，默认分组不特殊对待；不存在 / 没提到的按原相对顺序排在后面
     #[test]
     /// 重排：传入的顺序生效，没提到的组保持原相对顺序排在后面；
-    /// 默认分组不在传入列表里时补到**最前**（"默认初始位置"）
+    /// 默认分组不在传入列表里时补到**最前**，即"默认初始位置"
     #[test]
     fn reorder_groups_applies_order() {
         let a = Uuid::new_v4();
@@ -737,11 +737,11 @@ mod tests {
             store.group_order.push(uuid.to_string());
         }
 
-        // 默认分组不在 store.group_order 里（老数据形态）→ 补到最前
+        // 默认分组不在 store.group_order 里，老数据形态 → 补到最前
         store.reorder_groups(&[c, Uuid::new_v4(), a]);
         assert_eq!(store.keys(), vec![DEFAULT_GROUP_UUID, c, a, b]);
 
-        // 一旦用户把它排到别处，就照用户的来（本次改动之前它会一直被钉在首位）
+        // 一旦用户把它排到别处，就照用户的来；本次改动之前它会一直被钉在首位
         store.reorder_groups(&[c, DEFAULT_GROUP_UUID, a]);
         assert_eq!(store.keys(), vec![c, DEFAULT_GROUP_UUID, a, b]);
     }
@@ -773,7 +773,7 @@ mod tests {
         assert_eq!(store.position_of(&uuid), Some(0));
     }
 
-    /// 有名字但少了成员数组的分组（手改过文件）也要能收人
+    /// 手改过文件造成有名字但少了成员数组的分组也要能收人
     ///
     /// 只摘不放会让实例从界面上直接消失，所以落点必须能自己补出来。
     #[test]
@@ -803,13 +803,13 @@ mod tests {
     ///
     /// `STORE` 与 `GROUP_FILE` 是进程级单例，而 cargo 默认并行跑用例 ——
     /// 两个用例各 `init` 一次同一个目录，会互相把对方的分组表覆盖掉
-    /// （表现为随机失败，单独跑就过）。凡是碰磁盘状态的用例都先拿这把锁。
+    /// 表现为随机失败，单独跑就过。凡是碰磁盘状态的用例都先拿这把锁。
     static DISK_LOCK: Mutex<()> = Mutex::new(());
 
-    /// 建地基：起内核那几个进程级单例（见 [`crate::test_support::boot`]）
+    /// 建地基：起内核那几个进程级单例，见 [`crate::test_support::boot`]
     ///
     /// **不要在这里自己再写一份**：`mml_log::STREAM` 是 `OnceLock`，第二次
-    /// `mml_log::start()` 会 panic（`STREAM.set(..).unwrap()`）——
+    /// `mml_log::start()` 会 panic，即 `STREAM.set(..).unwrap()` ——
     /// 这正是本模块与 `game_mods::meta_tests` 曾经互相踩挂的原因。
     fn boot() -> std::path::PathBuf {
         crate::test_support::boot()
@@ -830,7 +830,7 @@ mod tests {
         init(dir.clone()).unwrap();
         let first = add_group("甲组").expect("建组失败");
         let second = add_group("乙组").expect("建组失败");
-        // 乙组拖到默认分组之后（非默认组的第一位）。
+        // 乙组拖到默认分组之后，非默认组的第一位。
         // 顺序表**含默认分组**：把它一起传进去，它才不会被甩到末尾
         reorder_groups(&[DEFAULT_GROUP_UUID, second, first]);
 
@@ -879,11 +879,11 @@ mod tests {
     /// 默认分组只是**初始**排首位：拖到后面应生效，且重启后保持
     ///
     /// 这是"默认分组拖不动"那个问题的回归测试 —— 它原先被写死在首位
-    /// （`keys()` 里无条件 push、`reorder_groups` 里跳过它）。
+    /// 即 `keys()` 里无条件 push、`reorder_groups` 里跳过它。
     ///
-    /// **用自己的目录**（不复用上面那个用例的）：落盘是异步的，两个用例共用一个目录时，
+    /// **用自己的目录**，不复用上面那个用例的：落盘是异步的，两个用例共用一个目录时，
     /// 先跑完的那个可能在另一个 `remove_dir_all` 之后才把文件写出来，
-    /// 于是后者的 `init` 读到了前者的数据（表现为随机失败、单独跑就过）。
+    /// 于是后者的 `init` 读到了前者的数据，表现为随机失败、单独跑就过。
     /// `DISK_LOCK` 已把两个用例串起来，各用各的目录就互不干扰了。
     #[test]
     fn default_group_can_be_reordered() {
@@ -919,7 +919,7 @@ mod tests {
         }
         assert!(saved(), "分组表未在限时内落盘: {}", file.display());
 
-        // 模拟重启：位置要能从文件读回来（说明存的是"用户排的位置"而不是每次重算）
+        // 模拟重启：位置要能从文件读回来，说明存的是"用户排的位置"而不是每次重算
         init(dir).unwrap();
         assert_eq!(
             group_list().iter().map(|g| g.uuid).collect::<Vec<_>>(),

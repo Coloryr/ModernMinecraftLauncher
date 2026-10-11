@@ -22,13 +22,26 @@ use super::{DOWNLOAD_NOW, SourceDownloadInfo, SourceInfo};
 
 /// 下载资源到实例
 ///
-/// 模组 / 资源包 / 光影包直接放入实例对应目录；数据包必须指定存档
-/// `world`（saves/ 下的文件夹名），zip 原样放入其 datapacks 目录；
-/// 存档先下到下载目录，下载完成后再解压导入（`import_save`）。
+/// 模组 / 资源包 / 光影包直接放入实例对应目录；数据包必须指定存档 `world`，
+/// zip 原样放入其 datapacks 目录；存档先下到下载目录，
+/// 下载完成后再走 `import_save` 解压导入。
 ///
-/// 下载走全局下载器（下载窗口可见进度），命令立即返回；
+/// 下载走全局下载器，进度在下载窗口可见，命令立即返回；
 /// 进度按目标文件路径匹配后经 add-resource-status 事件推给前端，
-/// 完成后条目保留一段时间再从任务表移除（窗口顶部进度条「完成」停留）
+/// 完成后条目保留一段时间再从任务表移除，窗口顶部进度条停在「完成」
+///
+/// - `app`: 窗口句柄，用于广播下载状态事件
+/// - `game`: 实例 uuid
+/// - `source`: 下载源，取 `curseforge` 或 `modrinth`
+/// - `pid`: 项目 ID
+/// - `fid`: 文件 ID
+/// - `file_type`: 资源类型，取 `mod` / `resourcepack` / `shaderpack` / `save` / `datapacks`
+/// - `world`: 目标存档的目录名，即 saves/ 下的文件夹名；只有数据包必填，其余类型忽略
+///
+/// # 返回值
+///
+/// 参数非法、类型不受支持或该文件已在下载中时返回 `Err`，内容为 i18n 键；
+/// 占位并交给下载器后立即返回 `Ok(())`，真实进度靠事件推
 #[gui_macros::ipc_group("add_resource")]
 #[tauri::command]
 pub async fn add_resource_download(
@@ -69,7 +82,7 @@ pub async fn add_resource_download(
     if !matches!(source, ModPackType::CurseForge | ModPackType::Modrinth) {
         return Err(String::from("err.sourceType"));
     }
-    // 存档只有 CurseForge 有（Modrinth 没有 world 类型）
+    // 存档只有 CurseForge 有，Modrinth 没有 world 类型
     if file_type == FileType::Save && !matches!(source, ModPackType::CurseForge) {
         return Err(String::from("addResource.saveSourceLimit"));
     }
@@ -97,7 +110,7 @@ pub async fn add_resource_download(
         }
     };
 
-    // 同一实例同一文件不重复下载（先占位，名字与目标路径等文件信息拿到后再补全）
+    // 同一实例同一文件不重复下载：先占位，名字与目标路径等文件信息拿到后再补全
     let key = SourceInfo {
         pid: pid.clone(),
         fid: fid.clone(),
@@ -186,7 +199,7 @@ pub async fn add_resource_download(
         }
     };
 
-    // 补全条目的显示名与目标路径（进度回调按路径匹配）
+    // 补全条目的显示名与目标路径，进度回调按路径匹配
     {
         let mut map = DOWNLOAD_NOW.write().unwrap();
         if let Some(info) = map.get_mut(&uuid).and_then(|entry| entry.get_mut(&key)) {
@@ -205,7 +218,7 @@ pub async fn add_resource_download(
     tauri::async_runtime::spawn(async move {
         let ok = mml_downloader::start_download_task(vec![obj]).await;
 
-        // 终态：进度拉满并打标记广播（完成后条目保留一段时间再移除）
+        // 终态：进度拉满并打标记广播，完成后条目保留一段时间再移除
         {
             let mut map = DOWNLOAD_NOW.write().unwrap();
             if let Some(info) = map.get_mut(&uuid).and_then(|entry| entry.get_mut(&key)) {
@@ -238,7 +251,7 @@ pub async fn add_resource_download(
             game.save_online_info(&list);
         }
 
-        // 完成保留 5 秒、失败保留 15 秒（留时间看清错误）再从任务表移除
+        // 完成保留 5 秒、失败保留 15 秒，留时间看清错误，再从任务表移除
         tokio::time::sleep(Duration::from_secs(if ok { 5 } else { 15 })).await;
         DOWNLOAD_NOW
             .write()
@@ -252,7 +265,13 @@ pub async fn add_resource_download(
     Ok(())
 }
 
-/// 获取实例的存档列表（下载数据包时选择目标存档）
+/// 获取实例的存档列表，下载数据包时用来选目标存档
+///
+/// - `game`: 实例 uuid
+///
+/// # 返回值
+///
+/// 未损坏的存档，含 `name` 显示名与 `dir` 目录名；uuid 非法或实例不存在时返回 `Err`
 #[gui_macros::ipc_group("add_resource")]
 #[tauri::command]
 pub async fn add_resource_saves(game: String) -> Result<Vec<ResourceSaveDto>, String> {
@@ -267,10 +286,8 @@ pub async fn add_resource_saves(game: String) -> Result<Vec<ResourceSaveDto>, St
     }
     let game = game.unwrap();
 
-    // get_saves 是异步方法，但 std 锁卫不能跨 await（future 须 Send）：
-    // 放进阻塞线程里 block_on，**并且先把实例设置克隆一份快照、立刻放锁**，
-    // 再在快照上 await。原来是把读锁卫一路持到 await 结束（clippy 的
-    // await_holding_lock 报的就是这里）—— 持锁等异步很容易和写锁互相卡死。
+    // get_saves 是异步的，而 std 锁卫不能跨 await，future 须 Send：先克隆实例设置快照、立刻放锁，
+    // 再在阻塞线程里 block_on —— 持锁等异步很容易和写锁互相卡死，clippy 的 await_holding_lock 报的就是这里
     let saves = tauri::async_runtime::spawn_blocking(move || {
         let game = game.read().unwrap().clone();
         tokio::runtime::Handle::current().block_on(async { game.get_saves().await })

@@ -1,13 +1,13 @@
 //! 实测：用**已配置好的用户代理**发起真实加载器查询，看能否成功
 //!
-//! 背景：用户报告"用了代理仍拉不到加载器列表"。
-//! 本测试直接调用 `get_support_loaders`，用真实网络 + 真实代理配置，
-//! 看每一路的结果与错误，定位到底哪一路失败、错在哪。
+//! 本测试直接调用 `get_support_loaders`，用真实网络加真实代理配置，看每一路的结果
+//! 与错误，定位到底哪一路失败。
 
 use mml_config::config_obj::{ProxyState, ProxyType};
 use std::sync::Arc;
 use std::time::Duration;
 
+/// 初始化日志、配置与 HTTP 客户端，进程内只跑一次
 fn init_once() {
     use std::sync::Once;
     static INIT: Once = Once::new();
@@ -20,7 +20,7 @@ fn init_once() {
     });
 }
 
-/// 直接用配置里的代理客户端访问 Forge 官方源（那条唯一没有镜像回退的路径）
+/// 直接用配置里的代理客户端访问 Forge 官方源，那是唯一没有镜像回退的路径
 #[test]
 fn forge_official_with_user_proxy() {
     init_once();
@@ -40,7 +40,7 @@ fn forge_official_with_user_proxy() {
         .build()
         .unwrap();
 
-    // 三种客户端对比：不走代理 / 用户代理
+    // 两种客户端对比：跟随系统 / 用户代理
     let cases: Vec<(&str, mml_net::Client)> = vec![
         ("Auto（跟随系统）", mml_net::Client::new(ProxyState::Auto)),
         (

@@ -28,58 +28,60 @@ use crate::{
     loader::LoaderType,
 };
 
-/// 加载侧类型
+/// 模组的加载侧，来自元数据的 side 字段或注解扫描
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum LoadSideType {
-    /// 未知
+    /// 没识别出加载侧
     Unknown,
-    /// 客户端
+    /// 仅客户端
     Client,
-    /// 服务端
+    /// 仅服务端
     Server,
-    /// 两者
+    /// 客户端与服务端都要
     Both,
 }
 
 impl Default for LoadSideType {
+    /// 默认按"未识别"处理
     fn default() -> Self {
         LoadSideType::Unknown
     }
 }
 
-/// 依赖类型
+/// 前置依赖的类型
 pub enum DependantType {
-    /// 强制要求
+    /// 强制要求的前置 modid
     Required(String),
-    /// 推荐
+    /// 推荐安装的前置 modid
     Recommend(String),
 }
 
-/// 模组内容信息
+/// 一个包里的单份模组元数据，同一个 jar 可能有多条
 pub struct ModItemObj {
-    /// modid
+    /// 模组标识，取自元数据；缺失时为空串
     pub mod_id: String,
-    /// 名字
+    /// 显示名，元数据没写时回退成 modid
     pub name: String,
-    /// 描述
+    /// 描述，没写时为 `None`
     pub description: Option<String>,
-    /// 版本号
+    /// 版本号，没写时为 `None`
     pub version: Option<String>,
-    /// 作者
+    /// 作者列表，可能为空
     pub author: Vec<String>,
-    /// 依赖
+    /// 前置依赖，含强制与推荐两种
     pub dependants: Vec<DependantType>,
-    /// 网站
+    /// 主页地址，没写时为 `None`
     pub url: Option<String>,
-    /// 图标
+    /// 图标原始字节，超过 `MAX_ICON_SIZE` 不读；没图标时为 `None`
     pub icon: Option<Vec<u8>>,
-    /// 支持的加载器
+    /// 这份元数据声明的加载器
     pub loaders: LoaderType,
-    /// 加载侧
+    /// 加载侧，默认 `Unknown`
     pub side: LoadSideType,
 }
 
 impl Default for ModItemObj {
+    /// 全字段取默认值
     fn default() -> Self {
         Self {
             mod_id: Default::default(),
@@ -96,27 +98,28 @@ impl Default for ModItemObj {
     }
 }
 
-/// 模组信息
+/// 模组目录里的一个文件及其解析结果
 pub struct ModObj {
-    /// 稳定标识（文件完整路径的 uuid v5，同一文件每次扫描结果一致）
+    /// 稳定标识，文件完整路径的 uuid v5，同一文件每次扫描结果一致
     pub uuid: Uuid,
-    /// 模组列表
+    /// 元数据条目，一个包可能有多条；读不出元数据时为空
     pub info: Vec<ModItemObj>,
-    /// 是否被禁用
+    /// 文件名是否带禁用后缀
     pub disable: bool,
-    /// 是否为Core模组
+    /// 是否为老式 core mod，由 `META-INF/MANIFEST.MF` 的标记决定
     pub core: bool,
-    /// 校验
+    /// 文件校验值，`read_mod_fast` 只填 SHA1
     pub hash: FileHash,
-    /// 内置的模组
+    /// 内置的模组，递归展开；没有时为空
     pub jar_in_jar: Vec<ModObj>,
-    /// 是否读取失败
+    /// 是否读取失败，为真时 `info` 为空、只剩文件名可用
     pub fail: bool,
-    /// 文件路径
+    /// 文件完整路径；内置模组存的是包内条目名
     pub file: PathBuf,
 }
 
 impl Default for ModObj {
+    /// 全字段取默认值
     fn default() -> Self {
         Self {
             uuid: Default::default(),
@@ -142,12 +145,11 @@ enum Quote {
     Single,
 }
 
-/// 容错处理 mcmod.info 中常见的非法 JSON：
+/// 容错处理 mcmod.info 中常见的非法 JSON
+///
 /// - 单引号字符串：`'value'` → `"value"`
 /// - 数组内未加引号的标识符：`[mod_minecraftForge]` → `["mod_minecraftForge"]`
 /// - 字符串内未转义的控制字符：换行符 → `\n`，回车符 → `\r`，制表符 → `\t`
-///
-/// # 参数
 ///
 /// - `json`: 原始 json 文本
 ///
@@ -269,7 +271,7 @@ fn sanitize_mcmod_json(json: &str) -> String {
                 i += 1;
             }
 
-            // 检测裸标识符（以字母或下划线开头）
+            // 检测裸标识符，即以字母或下划线开头
             if i < chars.len() && (chars[i].is_alphabetic() || chars[i] == '_') {
                 let start = i;
                 while i < chars.len()
@@ -302,10 +304,8 @@ fn sanitize_mcmod_json(json: &str) -> String {
 
 /// 读取 Forge 的 mcmod.info
 ///
-/// # 参数
-///
 /// - `reader`: mcmod.info 文件流
-/// - `mod_info`: 模组信息（解析结果追加到其中）
+/// - `mod_info`: 模组信息，解析结果追加到其中
 ///
 /// # 返回值
 ///
@@ -374,11 +374,9 @@ fn read_forge_json(mut reader: impl Read, mod_info: &mut ModObj) -> CoreResult<(
 
 /// 读取 Forge / NeoForge 的 mods.toml
 ///
-/// # 参数
-///
 /// - `reader`: mods.toml 文件流
-/// - `loader`: 加载器类型
-/// - `mod_info`: 模组信息（解析结果追加到其中）
+/// - `loader`: 加载器类型，决定写进条目的 `loaders`
+/// - `mod_info`: 模组信息，解析结果追加到其中
 ///
 /// # 返回值
 ///
@@ -467,10 +465,8 @@ fn read_forge_toml(
 
 /// 读取 Fabric 的 fabric.mod.json
 ///
-/// # 参数
-///
 /// - `reader`: fabric.mod.json 文件流
-/// - `mod_info`: 模组信息（解析结果追加到其中）
+/// - `mod_info`: 模组信息，解析结果追加到其中
 ///
 /// # 返回值
 ///
@@ -540,10 +536,8 @@ fn read_fabric_json(reader: impl Read, mod_info: &mut ModObj) -> CoreResult<()> 
 
 /// 读取 Quilt 的 quilt.mod.json
 ///
-/// # 参数
-///
 /// - `reader`: quilt.mod.json 文件流
-/// - `mod_info`: 模组信息（解析结果追加到其中）
+/// - `mod_info`: 模组信息，解析结果追加到其中
 ///
 /// # 返回值
 ///
@@ -552,7 +546,7 @@ fn read_quilt_json(reader: impl Read, mod_info: &mut ModObj) -> CoreResult<()> {
     let obj = MiniJsonObj::from_stream(reader)?;
 
     let mut info = ModItemObj::default();
-    // 同上：不写这一句就会显示成「原版」（Quilt 与 Fabric 是同一个毛病）
+    // 同上：不写这一句就会显示成「原版」，Quilt 与 Fabric 是同一个毛病
     info.loaders = LoaderType::Quilt;
 
     if let Some(map) = obj
@@ -593,13 +587,11 @@ fn read_quilt_json(reader: impl Read, mod_info: &mut ModObj) -> CoreResult<()> {
 
 /// 解析 MANIFEST.MF 内容
 ///
-/// # 参数
-///
 /// - `content`: MANIFEST.MF 文本
 ///
 /// # 返回值
 ///
-/// 返回键值对映射（支持续行）
+/// 返回键值对映射，支持以空格开头的续行
 fn parse_manifest(content: &str) -> HashMap<String, String> {
     let mut map = HashMap::new();
     let mut current_key = String::new();
@@ -628,16 +620,14 @@ fn parse_manifest(content: &str) -> HashMap<String, String> {
     map
 }
 
-/// 读取 core mod 信息（通过 MANIFEST.MF 识别）
-///
-/// # 参数
+/// 读取 core mod 信息，靠 MANIFEST.MF 识别
 ///
 /// - `archive`: 模组压缩包
-/// - `mod_info`: 模组信息（解析结果追加到其中）
+/// - `mod_info`: 模组信息，识别出 core mod 时追加一条
 ///
 /// # 返回值
 ///
-/// 成功返回 `Ok(())`；读取失败返回对应错误（无 MANIFEST.MF 时忽略）
+/// 成功返回 `Ok(())`；读取失败返回对应错误，没有 MANIFEST.MF 时直接成功
 fn read_core_mod(
     archive: &mut ZipArchive<impl Read + Seek>,
     mod_info: &mut ModObj,
@@ -662,7 +652,7 @@ fn read_core_mod(
     // 只有真的识别出 core mod 标记才算 core mod
     let mut is_core = false;
 
-    // 检查 FMLCorePlugin（Forge core mod 主类）
+    // 检查 FMLCorePlugin，即 Forge core mod 主类
     if let Some(core_plugin) = manifest.get("FMLCorePlugin") {
         info.mod_id = core_plugin.clone();
         info.name = core_plugin
@@ -674,7 +664,7 @@ fn read_core_mod(
         is_core = true;
     }
 
-    // 检查 TweakClass（LaunchWrapper 注入类）
+    // 检查 TweakClass，即 LaunchWrapper 注入类
     if let Some(tweak_class) = manifest.get("TweakClass") {
         if info.mod_id.is_empty() {
             info.mod_id = tweak_class.clone();
@@ -689,9 +679,7 @@ fn read_core_mod(
     }
 
     // **没识别出 core mod 就不要 push 这条 info**：`META-INF/MANIFEST.MF` 几乎每个 jar 都有，
-    // 无条件 push 会多出一条"空条目"（modid / 名字都空，加载器还是默认的 `Normal`）。
-    // 它以前只是排在真实元数据**后面**、没人看；而界面改成"汇总所有条目的加载器"之后，
-    // **每个模组都会多出一个「原版」**（用户反馈"为什么会有个原版"）。
+    // 无条件 push 会多出一条加载器为默认值 `Normal` 的空条目，界面上每个模组都会多出「原版」
     if is_core {
         mod_info.info.push(info);
     }
@@ -703,25 +691,18 @@ fn read_core_mod(
     Ok(())
 }
 
-/// 读取jarinjar
+/// 扫描内置的模组，即 jar-in-jar
 ///
-/// # 参数
+/// **会递归**：内置 jar 里还能再套内置 jar，`parse_mod_archive` 又会调回这里，层数不限。
 ///
-/// - `archive`: 压缩包
-/// - `mod_info`: 模组信息（内置模组追加到其中）
+/// - `archive`: 当前这一层的压缩包
+/// - `mod_info`: 解析结果追加到其中
+/// - `base`: **当前层在父包里的路径链**，顶层为空；内置 jar 没有独立文件路径，
+///   得靠它拼出唯一身份
 ///
 /// # 返回值
 ///
 /// 成功返回 `Ok(())`；读取失败返回对应错误
-/// 扫描内置的模组（jar-in-jar）
-///
-/// **会递归**：内置 jar 里还能再套内置 jar（`parse_mod_archive` 又会调回这里），
-/// 层数不限。
-///
-/// - `archive`: 当前这一层的压缩包
-/// - `mod_info`: 解析结果追加到其中
-/// - `base`: **当前层在父包里的路径链**（顶层为空）。
-///   内置 jar 没有独立文件路径，得靠它拼出唯一身份，见下面的赋值
 fn read_jar_in_jar(
     archive: &mut ZipArchive<impl Read + Seek>,
     mod_info: &mut ModObj,
@@ -774,14 +755,8 @@ fn read_jar_in_jar(
 
         match parse_mod_archive(&mut inner_zip, &rel) {
             Ok(mut inmod) => {
-                // 内置 jar 没有独立文件路径。以前这两个字段就留在默认值上 ——
-                // `file` 空、`uuid` 是 **nil**，于是同一层所有内置 jar 的渲染 key
-                // 完全一样（前端 `modRowKey` 优先取 uuid），**展开一个会把同层的全展开**、
-                // 折叠状态也串在一起。用户反馈的"内置嵌内置展开不了"就是这个。
-                //
-                // `file` 存**条目名**（如 `META-INF/jarjar/foo.jar`）：前端取 `file_name()`
-                // 得到 `foo.jar` 用来显示，取整串用来显示"在父包里的位置"。
-                // `uuid` 由**路径链**生成：不同父包下的同名内置 jar 不会撞。
+                // 内置 jar 没有独立文件路径，`file` 存条目名、`uuid` 由路径链生成；
+                // 留默认值会让同层内置 jar 的渲染 key 全一样，展开一个就把同层全展开
                 inmod.file = PathBuf::from(&entry_name);
                 inmod.uuid = gen_mod_uuid(&rel);
                 mod_info.jar_in_jar.push(inmod);
@@ -795,12 +770,10 @@ fn read_jar_in_jar(
     Ok(())
 }
 
-/// 从任意可读的 ZIP 归档中解析模组信息（核心解析逻辑）
-///
-/// # 参数
+/// 从任意可读的 ZIP 归档中解析模组信息，核心解析逻辑
 ///
 /// - `archive`: 压缩包
-/// - `base`: 这个包在**父包里的路径链**（顶层传文件路径；内置 jar 传"父条目名/子条目名"）。
+/// - `base`: 这个包在**父包里的路径链**，顶层传文件路径，内置 jar 传"父条目名/子条目名"；
 ///   只用来给内置 jar 生成唯一身份，见 [`read_jar_in_jar`]
 ///
 /// # 返回值
@@ -812,24 +785,16 @@ fn parse_mod_archive(
 ) -> CoreResult<ModObj> {
     let mut mod_info = ModObj::default();
 
-    // 读取 mcmod.info
-    // 与下面的 mods.toml 同一口径：元数据文件坏了只跳过它自己，不牵连整包
-    // （老包里的 mcmod.info 手改坏、编码不对的情况并不少见）
+    // mcmod.info 与下面的 mods.toml 同一口径：坏文件只跳过它自己，不牵连整包；
+    // 老包的 mcmod.info 手改坏、编码不对的情况并不少见
     if let Ok(item) = archive.by_name(names::MC_MOD_INFO_FILE)
         && let Err(err) = read_forge_json(item, &mut mod_info)
     {
         mml_log::error_type(err);
     }
 
-    // 读取 mods.toml
-    //
     // **单个元数据文件坏了不该让整包失败**：真实案例 `mekanism_lasers-1.1.10.3-a.jar`
-    // 里有两个 toml（`META-INF/neoforge.mods.toml` 与根目录 `neoforge.mods.toml`），
-    // 其中一个语法非法 —— 旧实现用 `?` 把错误抛出去，整包就变成"读取失败"，
-    // 界面上连模组名都看不到，而另一个 toml 其实是好的。
-    //
-    // 现在：坏的那个**记一条日志后跳过**，其余照常解析；全坏时 info 为空，
-    // 由上层按"读不出元数据"处理（仍能显示文件名）。
+    // 里两个 toml 坏了一个，旧实现用 `?` 抛出后整包变成"读取失败"、连模组名都看不到
     macro_rules! try_read_file {
         ($archive:expr, $name:expr, $func:expr, $loader:expr) => {
             if let Ok(item) = $archive.by_name($name) {
@@ -859,8 +824,7 @@ fn parse_mod_archive(
         LoaderType::NeoForge
     );
 
-    // 读取 fabric.mod.json / quilt.mod.json
-    // 同样是"坏了只跳过它自己"（见上面 mods.toml 的说明）
+    // 读取 fabric.mod.json / quilt.mod.json，同样是"坏了只跳过它自己"
     if let Ok(item) = archive.by_name(names::FABRIC_MOD_FILE)
         && let Err(err) = read_fabric_json(item, &mut mod_info)
     {
@@ -876,27 +840,25 @@ fn parse_mod_archive(
     // 扫描coremod
     read_core_mod(archive, &mut mod_info)?;
 
-    // 扫描jar-in-jar（会递归：内置 jar 里还能再套内置 jar）
+    // 扫描 jar-in-jar，会递归：内置 jar 里还能再套内置 jar
     read_jar_in_jar(archive, &mut mod_info, base)?;
 
-    // 读图标（放在最后：此时 info 里的条目已经齐了，图标挂在第一条上）
+    // 读图标：放在最后是因为图标要挂在已经解析出的第一条 info 上
     read_mod_icon(archive, &mut mod_info);
 
     Ok(mod_info)
 }
 
-/// 图标体积上限（512 KiB）：图标是装饰性的，有人往里塞过整张高清图，不值得读进内存
+/// 图标体积上限，单位字节；图标只是装饰，有人塞过整张高清图，不值得读进内存
 const MAX_ICON_SIZE: u64 = 512 * 1024;
 
 /// 读模组图标
 ///
-/// 各加载器把图标路径放在不同字段里（见 [`find_mod_icon_path`]），这里再按条目名把
-/// **图片字节**读出来 —— `ModItemObj::icon` 存的是字节，界面那边转 data URL。
-///
-/// # 参数
+/// 各加载器把图标路径放在不同字段里，见 [`find_mod_icon_path`]；这里再按条目名把
+/// **图片字节**读出来，`ModItemObj::icon` 存的是字节，界面那边转 data URL。
 ///
 /// - `archive`: 模组压缩包
-/// - `mod_info`: 模组信息（图标写到第一条 info 上）
+/// - `mod_info`: 模组信息，图标写到第一条 info 上
 fn read_mod_icon(archive: &mut ZipArchive<impl Read + Seek>, mod_info: &mut ModObj) {
     let Some(path) = find_mod_icon_path(archive) else {
         return;
@@ -924,13 +886,11 @@ fn read_mod_icon(archive: &mut ZipArchive<impl Read + Seek>, mod_info: &mut ModO
     }
 }
 
-/// 找出图标在包里的条目名（没有返回 `None`）
+/// 找出图标在包里的条目名
 ///
 /// 支持：Forge / NeoForge 的 `mods.toml` `logoFile`、1.12 及更早 Forge 老包的
-/// `mcmod.info` `logoFile`、Fabric / Quilt 的 `icon`（字符串，或 `{"64": "…png"}`
-/// 这种按尺寸分的对象）。
-///
-/// # 参数
+/// `mcmod.info` `logoFile`、Fabric / Quilt 的 `icon`，后者是字符串或按尺寸分的
+/// 对象如 `{"64": "…png"}`。
 ///
 /// - `archive`: 模组压缩包
 ///
@@ -956,12 +916,12 @@ fn find_mod_icon_path(archive: &mut ZipArchive<impl Read + Seek>) -> Option<Stri
         }
     }
 
-    // 1.12 及更早的 Forge 老包：mcmod.info 的 logoFile（这类包没有 mods.toml）
+    // 1.12 及更早的 Forge 老包：mcmod.info 的 logoFile，这类包没有 mods.toml
     if let Some(path) = mcmod_logo_file(archive) {
         return Some(path);
     }
 
-    // Fabric / Quilt：JSON 的 icon（quilt 在 quilt_loader.metadata.icon 下）
+    // Fabric / Quilt：JSON 的 icon，quilt 在 quilt_loader.metadata.icon 下
     for name in [names::FABRIC_MOD_FILE, names::QUILT_MOD_FILE] {
         let Ok(file) = archive.by_name(name) else {
             continue;
@@ -986,7 +946,7 @@ fn find_mod_icon_path(archive: &mut ZipArchive<impl Read + Seek>) -> Option<Stri
         if let Some(value) = holder.get_opt_string("icon") {
             return Some(value);
         }
-        // 对象形式（按尺寸分档）：取第一个非空值，够用
+        // 对象形式按尺寸分档，取第一个非空值够用
         if let Some(map) = holder.get_object("icon") {
             for (_, value) in map.iter() {
                 if let Some(value) = value.as_string() {
@@ -1001,9 +961,8 @@ fn find_mod_icon_path(archive: &mut ZipArchive<impl Read + Seek>) -> Option<Stri
 
 /// 从 mods.toml 文本里取未被注释的 `logoFile`
 ///
-/// Forge 的 mods.toml 模板里那行 `logoFile` **基本都是注释掉的**
-/// （`#logoFile="examplemod.png"`），照读会去开一个不存在的条目 —— 所以跳过注释行，
-/// 并去掉行尾的行内注释。
+/// Forge 的 mods.toml 模板里 `logoFile` 基本都注释掉了，如 `#logoFile="examplemod.png"`；
+/// 照读会去开不存在的条目，所以跳过注释行并去掉行尾注释。
 fn forge_logo_file(text: &str) -> Option<String> {
     for line in text.lines() {
         let line = line.trim();
@@ -1016,7 +975,7 @@ fn forge_logo_file(text: &str) -> Option<String> {
         let Some(rest) = rest.trim_start().strip_prefix('=') else {
             continue;
         };
-        // 去掉引号与行内注释（`logoFile="a.png" # 图标`）
+        // 去掉引号与行内注释，如 `logoFile="a.png" # 图标`
         let value = rest.split('#').next().unwrap_or(rest).trim();
         let value = value.trim_matches(|c| c == '"' || c == '\'').trim();
         if !value.is_empty() {
@@ -1027,9 +986,7 @@ fn forge_logo_file(text: &str) -> Option<String> {
     None
 }
 
-/// 从 `mcmod.info` 里取 `logoFile`（1.12 及更早的 Forge 老包）
-///
-/// # 参数
+/// 从 `mcmod.info` 里取 `logoFile`，只认 1.12 及更早的 Forge 老包
 ///
 /// - `archive`: 模组压缩包
 ///
@@ -1044,7 +1001,7 @@ fn mcmod_logo_file(archive: &mut ZipArchive<impl Read + Seek>) -> Option<String>
     mcmod_logo_file_in(&json)
 }
 
-/// 从 `mcmod.info` 的**文本**里取 `logoFile`（[`mcmod_logo_file`] 的纯文本部分）
+/// 从 `mcmod.info` 的**文本**里取 `logoFile`，即 [`mcmod_logo_file`] 的纯文本部分
 ///
 /// 形态与 [`read_forge_json`] 一致：顶层是数组，或带 `modList` 数组的对象。
 /// 逐条看 `logoFile`，取第一个非空的 —— 图标是装饰性的，多条目包认第一个就够。
@@ -1079,12 +1036,10 @@ fn mcmod_logo_file_in(json: &str) -> Option<String> {
     None
 }
 
-/// 模块里某类文件的解析结果不该影响整包
+/// 单个元数据文件坏了不该影响整包
 ///
-/// 真实案例：`mekanism_lasers-1.1.10.3-a.jar` 里有**两个** toml，其中一个非法
-/// （打字 / 手改留下的坏文件）。旧实现里 `try_read_file!` 用 `?` 把错误抛出去，
-/// 于是**整包判定为"读取失败"**、界面上连名字都看不到 —— 而另一个 toml 其实是好的。
-/// 正确行为：坏的那个跳过（记一条日志），好的照常读出来。
+/// 真实案例 `mekanism_lasers-1.1.10.3-a.jar` 里两个 toml 坏了一个，旧实现用 `?` 抛出后
+/// 整包判为"读取失败"、连名字都看不到；正确行为是坏的那个跳过并记一条日志，好的照常读。
 #[cfg(test)]
 mod meta_tests {
     use super::*;
@@ -1092,14 +1047,12 @@ mod meta_tests {
     use zip::ZipWriter;
     use zip::write::SimpleFileOptions;
 
-    /// 起日志系统：解析失败时我们**故意**要记一条日志，而 `mml_log` 没 start 过就会 panic
+    /// 起日志系统：解析失败时**故意**要记一条日志，而 `mml_log` 没 start 过就会 panic，
+    /// 那是"日志系统还没起来"的前提问题，不是被测逻辑的问题。
     ///
-    /// （`SEM.get().unwrap()` 在 `error_type` 里）—— 那是"日志系统还没起来"的前提问题，
-    /// 不是被测逻辑的问题。
-    ///
-    /// **走 crate 级的共用 boot**（见 [`crate::test_support::boot`]）：`mml_log::STREAM`
-    /// 是 `OnceLock`，各测试模块自己再写一份就会第二次 `start()` → panic
-    /// （这正是本模块与 `game_group::tests` 曾经互相踩挂的原因）。
+    /// **走 crate 级的共用 boot**，见 [`crate::test_support::boot`]：`mml_log::STREAM` 是
+    /// `OnceLock`，各测试模块各写一份就会第二次 `start()` → panic，本模块与
+    /// `game_group::tests` 曾经互相踩挂就是这个原因。
     fn boot_log() {
         crate::test_support::boot();
     }
@@ -1121,8 +1074,8 @@ mod meta_tests {
 
     /// 两个 toml、其中一个非法：整包仍应读出**合法那个**的信息，而不是判失败
     ///
-    /// 两个路径都必须是**会被扫描的**那三个之一（`META-INF/mods.toml` /
-    /// `META-INF/neoforge.mods.toml` / `neoforge.mods.toml`）——
+    /// 两个路径都必须是**会被扫描的**那三个之一，即 `META-INF/mods.toml` /
+    /// `META-INF/neoforge.mods.toml` / `neoforge.mods.toml`；
     /// 放在别处的 toml 根本不进解析，拿它当样本是测不出问题的。
     #[test]
     fn broken_toml_does_not_fail_whole_jar() {
@@ -1132,9 +1085,8 @@ mod meta_tests {
                 "modLoader=\"javafml\"\nloaderVersion=\"[1,)\"\nlicense=\"MIT\"\n\
                  [[mods]]\nmodId=\"mekanism_lasers\"\ndisplayName=\"Mekanism Lasers\"\nversion=\"1.1.10.3\"\n",
             ),
-            // 非法：`[[mods]` 少一个方括号（toml 语法错误）。
-            // 用**根目录的 neoforge.mods.toml**（第三个扫描路径）——
-            // 这正是"一个包里有两个 toml、坏的那个把整包带崩"的真实形态
+            // 非法样本用**根目录的 neoforge.mods.toml**，即第三个扫描路径，`[[mods]` 少一个方括号；
+            // 这正是"一个包里两个 toml、坏的那个把整包带崩"的真实形态
             (names::NEO_TOML1_FILE, "[[mods]\nmodId=\"whatever\"\n"),
         ]);
 
@@ -1158,8 +1110,8 @@ mod meta_tests {
     /// MANIFEST.MF 里**没有** core mod 标记时，不该多出一条空 info
     ///
     /// `META-INF/MANIFEST.MF` 几乎每个 jar 都有，而 `read_core_mod` 以前无条件 push 一条
-    /// info —— 那条的加载器是枚举默认值 `Normal`。界面改成"汇总**所有**条目的加载器"之后，
-    /// **每个模组都会多出一个「原版」**（用户反馈"为什么会有个原版"）。
+    /// info，那条的加载器是枚举默认值 `Normal`；界面改成"汇总**所有**条目的加载器"之后，
+    /// 用户就会看到**每个模组都多出一个「原版」**。
     #[test]
     fn manifest_without_core_marker_adds_no_info() {
         let path = make_jar(&[
@@ -1183,7 +1135,7 @@ mod meta_tests {
         assert!(!info.core, "没有 core mod 标记就不该判成 core");
     }
 
-    /// 真的带 core mod 标记时，那条 info 仍要保留（别把功能一起改掉）
+    /// 真的带 core mod 标记时，那条 info 仍要保留，别把功能一起改掉
     #[test]
     fn manifest_with_core_marker_keeps_info() {
         let path = make_jar(&[(
@@ -1199,8 +1151,6 @@ mod meta_tests {
 }
 
 /// 读取模组信息
-///
-/// # 参数
 ///
 /// - `path`: 模组文件路径
 ///
@@ -1221,7 +1171,7 @@ pub fn read_mod_info<P: AsRef<Path>>(path: P) -> CoreResult<ModObj> {
     let mut mod_info = parse_mod_archive(&mut zip, path.as_ref())?;
     mod_info.file = path.as_ref().to_path_buf();
 
-    // 从注解扫描 side（仅文件类模组可用）
+    // 从注解扫描 side，仅文件类模组可用
     if let Ok(scan_result) = class_scan::scan_jar(path.as_ref()) {
         for scan_mod in &scan_result.mods {
             if let Some(info) = mod_info
@@ -1239,14 +1189,12 @@ pub fn read_mod_info<P: AsRef<Path>>(path: P) -> CoreResult<ModObj> {
 
 /// 读模组
 ///
-/// # 参数
-///
 /// - `path`: 模组文件路径
-/// - `sha256`: 是否计算sha256
+/// - `sha256`: 是否连 SHA256 一起算，否则只算 SHA1
 ///
 /// # 返回值
 ///
-/// 返回模组信息（含哈希）；读取失败返回对应错误
+/// 返回模组信息，含哈希；读取失败返回对应错误
 fn read_mod<P: AsRef<Path>>(path: P, sha256: bool) -> CoreResult<ModObj> {
     let sha1 = hash_helper::gen_hash_from_file(HashType::Sha1, path.as_ref())?;
 
@@ -1263,14 +1211,12 @@ fn read_mod<P: AsRef<Path>>(path: P, sha256: bool) -> CoreResult<ModObj> {
     Ok(mod_info)
 }
 
-/// 模组 uuid 的命名空间（固定值，保证不同启动器数据目录下生成的 uuid 一致）
+/// 模组 uuid 的命名空间，固定值，保证不同启动器数据目录下生成的 uuid 一致
 const MOD_UUID_NAMESPACE: Uuid = Uuid::from_u128(0x9d1a_2f3e_4c5b_6a70_8192_a3b4_c5d6_e7f8);
 
 /// 模组的稳定标识：文件完整路径的 uuid v5
 ///
 /// 同一文件每次扫描得到同一个 uuid，启用 / 禁用 / 删除按它定位
-///
-/// # 参数
 ///
 /// - `path`: 模组文件完整路径
 ///
@@ -1278,30 +1224,28 @@ const MOD_UUID_NAMESPACE: Uuid = Uuid::from_u128(0x9d1a_2f3e_4c5b_6a70_8192_a3b4
 ///
 /// 返回模组的稳定标识
 ///
-/// **注意文件名一变 uuid 就变**（它是路径的哈希）：启用 / 禁用只是给文件名加减后缀，
-/// 所以那两个操作之后 uuid 会变成另一个值 —— 需要同步身份的地方都靠这个函数重算。
+/// **注意文件名一变 uuid 就变**，它是路径的哈希；启用 / 禁用只是给文件名加减后缀，
+/// 所以那两个操作之后 uuid 会变成另一个值，需要同步身份的地方都靠这个函数重算。
 pub fn gen_mod_uuid(path: &Path) -> Uuid {
     Uuid::new_v5(&MOD_UUID_NAMESPACE, path.to_string_lossy().as_bytes())
 }
 
 /// 扫描文件列表
 ///
-/// # 参数
-///
 /// - `files`: 文件列表
-/// - `process_fn`: 处理的函数
-/// - `gui`: 进度回调（可选，见 [`ProgressGui`]）：每完成一个文件报一次 `(已完成, 总数)`
+/// - `process_fn`: 单个文件的处理函数
+/// - `gui`: 进度回调，可传 `None`，见 [`ProgressGui`]；每完成一个文件报一次 `(已完成, 总数)`
 ///
 /// # 返回值
 ///
-/// 返回扫描出的模组列表（读取失败的文件标记 `fail`）
+/// 返回扫描出的模组列表，读取失败的文件标记 `fail`
 fn scan_mod_files<F>(files: Vec<PathBuf>, process_fn: F, gui: ProgressGui) -> Vec<ModObj>
 where
     F: Fn(&PathBuf) -> CoreResult<ModObj> + Send + Sync,
 {
     let list = Mutex::new(Vec::new());
 
-    // 总数只算**真正要处理的**（.jar / .disable / .disabled）：
+    // 总数只算**真正要处理的** .jar / .disable / .disabled：
     // 目录里可能有 .txt、.DS_Store 之类，拿文件总数当中会导致进度永远到不了 x/x
     let total = files
         .iter()
@@ -1313,7 +1257,7 @@ where
             })
         })
         .count();
-    // 并行完成数（rayon 里各线程都会加）
+    // 并行完成数，rayon 里各线程都会加
     let done = AtomicUsize::new(0);
 
     files.par_iter().for_each(|item| {
@@ -1345,7 +1289,7 @@ where
                 list.lock().unwrap().push(entry);
 
                 if let Some(gui) = &gui {
-                    // 完成一个报一次（顺序不定，界面只关心计数）
+                    // 完成一个报一次，顺序不定，界面只关心计数
                     gui.set_progress_now(done.fetch_add(1, Ordering::Relaxed) + 1, Some(total));
                 }
             }
@@ -1363,14 +1307,12 @@ where
 
 /// 为文件追加禁用后缀
 ///
-/// # 参数
-///
 /// - `path`: 模组文件路径
 ///
 /// # 返回值
 ///
-/// 成功返回**改名后的新路径**（调用方要拿它更新身份 —— 模组的 uuid 是路径的 v5，
-/// 文件名一变 uuid 就变）；重命名失败返回对应错误
+/// 成功返回**改名后的新路径**，调用方要拿它更新身份，因为模组的 uuid 是路径的 v5、
+/// 文件名一变 uuid 就变；重命名失败返回对应错误
 pub fn add_disable_suffix(path: &Path) -> CoreResult<PathBuf> {
     let file_name = path
         .file_name()
@@ -1386,13 +1328,11 @@ pub fn add_disable_suffix(path: &Path) -> CoreResult<PathBuf> {
 
 /// 移除文件的禁用后缀
 ///
-/// # 参数
-///
 /// - `path`: 模组文件路径
 ///
 /// # 返回值
 ///
-/// 成功返回**改名后的新路径**（无后缀时原样返回，什么都没改）；
+/// 成功返回**改名后的新路径**，无后缀时原样返回、什么都没改；
 /// 重命名失败返回对应错误
 pub fn remove_disable_suffix(path: &Path) -> CoreResult<PathBuf> {
     let file_name = path
@@ -1417,7 +1357,7 @@ pub fn remove_disable_suffix(path: &Path) -> CoreResult<PathBuf> {
 }
 
 impl ModObj {
-    /// 删除
+    /// 删除模组文件，进回收站
     ///
     /// # 返回值
     ///
@@ -1430,7 +1370,7 @@ impl ModObj {
     ///
     /// # 返回值
     ///
-    /// 成功返回**改名后的新路径**（前端要拿它更新那一行的 uuid / 文件名 / 路径）；
+    /// 成功返回**改名后的新路径**，前端要拿它更新那一行的 uuid / 文件名 / 路径；
     /// 已禁用、文件不存在或重命名失败返回对应错误
     pub fn disable(&self) -> CoreResult<PathBuf> {
         if self.disable || !self.file.exists() {
@@ -1444,7 +1384,7 @@ impl ModObj {
     ///
     /// # 返回值
     ///
-    /// 成功返回**改名后的新路径**（同上）；未禁用、文件不存在或重命名失败返回对应错误
+    /// 成功返回**改名后的新路径**；未禁用、文件不存在或重命名失败返回对应错误
     pub fn enable(&self) -> CoreResult<PathBuf> {
         if !self.disable || !self.file.exists() {
             return Err(ErrorType::InvalidOperation);
@@ -1457,13 +1397,11 @@ impl ModObj {
 impl InstanceSettingObj {
     /// 扫描模组
     ///
-    /// # 参数
-    ///
-    /// - `gui`: 进度回调（可选）：每完成一个文件报一次 `(已完成, 总数)`
+    /// - `gui`: 进度回调，可传 `None`；每完成一个文件报一次 `(已完成, 总数)`
     ///
     /// # 返回值
     ///
-    /// 返回模组列表（仅哈希，不解析模组信息；失败文件标记 `fail`）
+    /// 返回模组列表，只有哈希、不解析模组信息；失败文件标记 `fail`
     pub async fn read_mod_fast(&self, gui: ProgressGui) -> Vec<ModObj> {
         let dir = self.get_mods_path();
         let files = path_helper::get_files(dir);
@@ -1488,14 +1426,12 @@ impl InstanceSettingObj {
 
     /// 读取模组列表
     ///
-    /// # 参数
-    ///
-    /// - `sha256`: 是否计算SHA256
-    /// - `gui`: 进度回调（可选）：每完成一个文件报一次 `(已完成, 总数)`
+    /// - `sha256`: 是否连 SHA256 一起算，否则只算 SHA1
+    /// - `gui`: 进度回调，可传 `None`；每完成一个文件报一次 `(已完成, 总数)`
     ///
     /// # 返回值
     ///
-    /// 返回模组列表（含解析出的模组信息；失败文件标记 `fail`）
+    /// 返回模组列表，含解析出的模组信息；失败文件标记 `fail`
     pub async fn read_mod(&self, sha256: bool, gui: ProgressGui) -> Vec<ModObj> {
         let dir = self.get_mods_path();
         let files = path_helper::get_files(dir);
@@ -1512,7 +1448,7 @@ impl InstanceSettingObj {
 mod icon_tests {
     use super::*;
 
-    /// 模板里被注释掉的 logoFile 必须跳过（这是最常见的形态）
+    /// 模板里被注释掉的 logoFile 必须跳过，这是最常见的形态
     #[test]
     fn logo_file_ignores_comments() {
         let text = "#logoFile=\"examplemod.png\"\nmodId=\"demo\"\n";
@@ -1543,7 +1479,7 @@ mod icon_tests {
         assert_eq!(mcmod_logo_file_in(json).unwrap(), "assets/logo.png");
     }
 
-    /// 带 `modList` 的对象形态（部分老包这么写），空值跳过
+    /// 带 `modList` 的对象形态，部分老包这么写，空值跳过
     #[test]
     fn mcmod_logo_file_reads_mod_list() {
         let json = r#"{"modListVersion": 2, "modList": [
@@ -1553,7 +1489,7 @@ mod icon_tests {
         assert_eq!(mcmod_logo_file_in(json).unwrap(), "icon.png");
     }
 
-    /// 非法的单引号 JSON 也能读（走 sanitize_mcmod_json 那条容错路径）
+    /// 非法的单引号 JSON 也能读，走 sanitize_mcmod_json 那条容错路径
     #[test]
     fn mcmod_logo_file_sanitizes_single_quotes() {
         let json = "[{'modid': 'demo', 'logoFile': 'logo.png'}]";

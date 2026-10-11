@@ -3,7 +3,7 @@
 // 标签：界面（含窗口设置）/ Java / 网络与下载 / 游戏启动 / 皮肤与头像 / 客户端设置
 //
 // 这里只做编排：状态与保存逻辑全在 composables/（每个标签一份），
-// 排版在 parts/tabs/（每个标签一个组件），窗口级样式在 settings.css（非 scoped，子组件共用）。
+// 排版在 parts/tabs/，每个标签一个组件；窗口级样式在 settings.css，非 scoped、子组件共用。
 // 本文件负责：标签切换（记忆上次所在页）、Esc 关窗、分组级「恢复默认」的派发与高亮。
 import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";

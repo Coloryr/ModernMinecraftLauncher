@@ -55,6 +55,35 @@ export function categoryIcon(id: CategoryId): GlyphName | null {
   return RESOURCE_CATEGORIES.find((c) => c.id === id)?.icon ?? null;
 }
 
+/**
+ * 分类 → 后端的 kind 串
+ *
+ * 后端认的是**目录名**（光影包那类是 `shaderpacks`），而左侧导航的 id 是 `shaders`，
+ * 各面板调 `openFolder` 时也都是这么手写的（`openFolder("shaderpacks", ...)`）。
+ * 拖拽导入要按当前面板定落点，得有一份"分类 → 目录"的映射，收在这里；
+ * 面板里那几处手写串以后可以一并换过来。
+ */
+export const CATEGORY_KIND: Record<CategoryId, string> = {
+  mods: "mods",
+  saves: "saves",
+  resourcepacks: "resourcepacks",
+  screenshots: "screenshots",
+  servers: "servers",
+  shaders: "shaderpacks",
+  schematics: "schematics",
+};
+
+/**
+ * 当前面板对应的后端 kind
+ *
+ * 存档下的**数据包子页**落点是 `saves/<存档目录名>/datapacks`，所以这一页返回 `datapacks`，
+ * 并且必须把当前选中的存档目录名当 `parent` 一起传给后端（见 ResourceWindow 的 dropParent）。
+ */
+export function dropKindOf(category: CategoryId, saveTab: SaveTab): string {
+  if (category === "saves" && saveTab === "datapacks") return "datapacks";
+  return CATEGORY_KIND[category];
+}
+
 /** 服务器添加 / 编辑的表单草稿（edit=true 时另带原 name/ip 作为定位键） */
 export interface ServerFormDraft {
   edit: boolean;
@@ -90,7 +119,7 @@ export interface ModViewProps {
    */
   selectedKeys: Set<string>;
   /**
-   * Shift 整段选择的**锚点**：上次点（或勾选）的那一项的键（见 `modSelectKey`）
+   * Shift 整段选择的**锚点**：上次点或勾选的那一项的键，见 `modSelectKey`
    *
    * 视图在那一行上加个标记（左侧一道强调色竖条），让人看得出"整段从哪儿开始"。
    * 可空：还没点过任何一行时不标记。

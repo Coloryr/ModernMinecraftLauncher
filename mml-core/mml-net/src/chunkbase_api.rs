@@ -2,7 +2,7 @@ use mml_base::version_parse;
 
 use crate::urls;
 
-/// 生成Chunkbase网址
+/// 生成 Chunkbase 网址
 ///
 /// - `version`: 游戏版本
 /// - `seed`: 世界种子
@@ -10,7 +10,7 @@ use crate::urls;
 ///
 /// # 返回值
 ///
-/// 返回 Chunkbase 种子地图页面 URL（版本过低时按 1.7 处理）
+/// 返回 Chunkbase 种子地图页面 URL；版本过低或解析失败时按 1.7 处理
 pub fn gen_url(version: &str, seed: i64, islb: bool) -> String {
     let res = version_parse::parse_game_version(version);
     let ver = if let Some(vec) = res {

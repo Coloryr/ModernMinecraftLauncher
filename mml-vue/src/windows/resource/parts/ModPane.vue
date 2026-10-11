@@ -794,7 +794,7 @@ function onSectionToggle(id: string) {
 const groupForm = ref<{ id: string; name: string } | null>(null);
 const groupBusy = ref(false);
 
-/** 打开弹窗：新建（不传 id）/ 重命名（传分组 uuid 与当前名字） */
+/** 打开弹窗：不传 id 是新建，传分组 uuid 与当前名字是重命名 */
 function openGroupForm(id = "", name = "") {
   groupForm.value = { id, name };
 }

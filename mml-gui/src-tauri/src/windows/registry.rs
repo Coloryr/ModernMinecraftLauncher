@@ -4,15 +4,15 @@
 //! 原先与"建窗 / 存几何 / 模型生命周期"混在一个 1200 行的文件里，
 //! 改个窗口尺寸要翻半个文件。
 //!
-//! 尺寸口径：注册表里全是**客户区 + 逻辑像素**（与 Windows 外框之间的换算见
-//! `super::geometry`）。各窗口的默认尺寸就是这张表 —— 前端不再维护第二份。
+//! 尺寸口径：注册表里全是**客户区 + 逻辑像素**，与 Windows 外框之间的换算见
+//! `super::geometry`。各窗口的默认尺寸就是这张表 —— 前端不再维护第二份。
 
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
 use uuid::{Uuid, uuid};
 
-/// 主窗口固定 uuid（其余窗口从 2 号起按顺序分配）
+/// 主窗口固定 uuid；其余窗口从 2 号起按顺序分配
 pub(super) const MAIN_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000001");
 
 /// 账户窗口
@@ -59,15 +59,15 @@ pub(super) const EXPORT_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-00000
 
 /// 窗口注册表条目
 pub(super) struct WindowEntry {
-    /// 窗口标签（`mml-<kind>`，与前端 kind 对应）
+    /// 窗口标签，形如 `mml-<kind>`，与前端 kind 对应
     pub(super) label: &'static str,
-    /// 最小**客户区**宽度（逻辑像素；= 无历史几何时的默认宽度）
+    /// 最小**客户区**宽度，单位逻辑像素；没有历史几何时就是默认宽度
     pub(super) min_width: f64,
-    /// 最小**客户区**高度（逻辑像素；= 无历史几何时的默认高度）
+    /// 最小**客户区**高度，单位逻辑像素；没有历史几何时就是默认高度
     pub(super) min_height: f64,
 }
 
-/// 通用窗口最小尺寸（= 无历史几何时的默认尺寸）
+/// 通用窗口最小尺寸，也就是没有历史几何时的默认尺寸
 pub(super) const MIN_WIDTH: f64 = 640.0;
 /// 通用窗口最小高度
 pub(super) const MIN_HEIGHT: f64 = 480.0;
@@ -82,7 +82,7 @@ pub(super) const ACCOUNT_MIN_WIDTH: f64 = 800.0;
 /// 账户窗口最小高度
 pub(super) const ACCOUNT_MIN_HEIGHT: f64 = 650.0;
 
-/// 资源管理窗口最小宽度（分类栏 + 内容区）
+/// 资源管理窗口最小宽度，按分类栏加内容区算
 pub(super) const RESOURCE_MIN_WIDTH: f64 = 800.0;
 /// 资源管理窗口最小高度
 pub(super) const RESOURCE_MIN_HEIGHT: f64 = 510.0;
@@ -102,35 +102,35 @@ pub(super) const ADD_MODPACK_MIN_WIDTH: f64 = 920.0;
 /// 下载整合包窗口最小高度
 pub(super) const ADD_MODPACK_MIN_HEIGHT: f64 = 600.0;
 
-/// 设置窗口最小宽度（左侧标签导航布局需要的宽度）
+/// 设置窗口最小宽度，左侧标签导航布局需要这么宽
 pub(super) const SETTINGS_MIN_WIDTH: f64 = 850.0;
 /// 设置窗口最小高度
 pub(super) const SETTINGS_MIN_HEIGHT: f64 = 600.0;
 
-/// Java 下载窗口最小宽度（四行下拉 + 下载按钮的小表单窗）
+/// Java 下载窗口最小宽度，四行下拉加下载按钮的小表单窗
 pub(super) const JAVA_DOWNLOAD_MIN_WIDTH: f64 = 520.0;
 /// Java 下载窗口最小高度
 pub(super) const JAVA_DOWNLOAD_MIN_HEIGHT: f64 = 420.0;
 
-/// 游戏日志窗口最小宽度（日志控制台 + 实例选择条）
+/// 游戏日志窗口最小宽度，日志控制台加实例选择条
 pub(super) const LOG_MIN_WIDTH: f64 = 720.0;
 /// 游戏日志窗口最小高度
 pub(super) const LOG_MIN_HEIGHT: f64 = 480.0;
 
-/// 实例导出窗口最小宽度（元数据表单 + 导出设置）
+/// 实例导出窗口最小宽度，元数据表单加导出设置
 pub(super) const EXPORT_MIN_WIDTH: f64 = 560.0;
 /// 实例导出窗口最小高度
 pub(super) const EXPORT_MIN_HEIGHT: f64 = 500.0;
 
-/// 方块列表窗口最小宽度（分类栏 + 网格；工具条上还有搜索框、图标尺寸档与两个按钮）
+/// 方块列表窗口最小宽度，分类栏加网格；工具条上还有搜索框、图标尺寸档与两个按钮
 pub(super) const BLOCK_MIN_WIDTH: f64 = 770.0;
 /// 方块列表窗口最小高度
 pub(super) const BLOCK_MIN_HEIGHT: f64 = 560.0;
 
 /// 窗口注册表：uuid → 窗口信息
 ///
-/// **必须是 `static`，不能是 `const`**：`const` 会在每个使用点各展开一份
-/// （每处各建一张 HashMap、各自初始化一次），`static` 才是全进程一张表。
+/// **必须是 `static`，不能是 `const`**：`const` 会在每个使用点各展开一份，
+/// 每处各建一张 HashMap、各自初始化一次，`static` 才是全进程一张表。
 pub(super) static WINDOWS_INFO: LazyLock<HashMap<Uuid, WindowEntry>> = LazyLock::new(|| {
     HashMap::from([
         (
@@ -166,7 +166,7 @@ pub(super) static WINDOWS_INFO: LazyLock<HashMap<Uuid, WindowEntry>> = LazyLock:
             },
         ),
         // 帮助窗口是**纯前端静态页**：没有 IPC 命令、没有窗口模型、除了这条注册表项也没有
-        // 别的规格 —— 所以 `windows/` 下没有 help.rs（全仓唯一这样的窗口）。
+        // 别的规格 —— 全仓只有这一个窗口是这样，所以 `windows/` 下没有 help.rs。
         (
             HELP_WINDOW_UUID,
             WindowEntry {
@@ -258,7 +258,13 @@ pub(super) static WINDOWS_INFO: LazyLock<HashMap<Uuid, WindowEntry>> = LazyLock:
     ])
 });
 
-/// 前端窗口 kind → uuid（标签去 `mml-` 前缀匹配）
+/// 前端窗口 kind → uuid，标签去 `mml-` 前缀匹配
+///
+/// - `kind`: 窗口类型，即标签去掉 `mml-` 前缀后的那一段
+///
+/// # 返回值
+///
+/// 未注册的 kind 返回 `None`
 pub(super) fn uuid_for_kind(kind: &str) -> Option<Uuid> {
     WINDOWS_INFO
         .iter()
@@ -266,12 +272,24 @@ pub(super) fn uuid_for_kind(kind: &str) -> Option<Uuid> {
         .map(|(uuid, _)| *uuid)
 }
 
-/// 取某窗口的最小客户区尺寸（注册表口径：逻辑像素）
+/// 取某窗口的最小客户区尺寸，注册表口径的逻辑像素
+///
+/// - `uuid`: 窗口 uuid
+///
+/// # 返回值
+///
+/// 宽高二元组；未注册的 uuid 返回 `None`
 pub(super) fn min_size_of(uuid: &Uuid) -> Option<(f64, f64)> {
     WINDOWS_INFO.get(uuid).map(|e| (e.min_width, e.min_height))
 }
 
-/// 按窗口标签取注册表里的最小客户区尺寸（`mml-<kind>` → 注册表）
+/// 按窗口标签取注册表里的最小客户区尺寸，标签形如 `mml-<kind>`
+///
+/// - `label`: 窗口标签
+///
+/// # 返回值
+///
+/// 宽高二元组，单位逻辑像素；未注册的标签返回 `None`
 pub(super) fn min_size_of_label(label: &str) -> Option<(f64, f64)> {
     let kind = label.strip_prefix("mml-")?;
     let uuid = uuid_for_kind(kind)?;

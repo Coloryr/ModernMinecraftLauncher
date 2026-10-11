@@ -1,4 +1,4 @@
-//! `version_name_to_path` 的纯函数测试（不涉及网络与配置）。
+//! `version_name_to_path` 的纯函数测试，不涉及网络与配置。
 //!
 //! 转换规则：
 //! - `"group:artifact:version"` → `"group/artifact/version/artifact-version.jar"`
@@ -24,7 +24,7 @@ fn three_part_coordinate() {
     );
 }
 
-/// 四段坐标（带 classifier）。
+/// 四段坐标，带 classifier
 #[test]
 fn four_part_coordinate() {
     assert_eq!(
@@ -37,7 +37,7 @@ fn four_part_coordinate() {
     );
 }
 
-/// 少于 3 段的非坐标名称。
+/// 少于 3 段的非坐标名称
 #[test]
 fn non_coordinate_name() {
     assert_eq!(version_name_to_path("plain.name"), "plain/name.jar");

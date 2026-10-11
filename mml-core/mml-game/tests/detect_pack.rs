@@ -1,6 +1,6 @@
 //! 整合包类型检测测试：在临时目录动态构造 zip，验证 `detect_pack` 的类型判定与名字提取。
 //!
-//! 纯离线测试，不依赖全局初始化；压缩包放在系统临时目录下，测完删除。
+//! 纯离线测试，不依赖全局初始化；压缩包放在 mml_testutil 的临时目录下，测完删除。
 
 use std::io::Write;
 use std::path::PathBuf;
@@ -10,7 +10,7 @@ use uuid::Uuid;
 use zip::ZipWriter;
 use zip::write::SimpleFileOptions;
 
-/// 测试压缩包输出目录（系统临时目录 + 唯一子目录）
+/// 测试压缩包输出目录，mml_testutil 临时目录下的唯一子目录
 fn work_dir() -> PathBuf {
     let dir = mml_testutil::temp_dir()
         .join("mml-detect-pack-test")
@@ -48,7 +48,7 @@ fn detect_curseforge() {
     let _ = std::fs::remove_dir(&dir);
 }
 
-/// CurseForge：`manifest.json` 位于子目录（overrides 层级）时也能命中。
+/// CurseForge：`manifest.json` 位于 overrides 层级的子目录时也能命中。
 #[test]
 fn detect_curseforge_nested() {
     let dir = work_dir();
@@ -186,7 +186,7 @@ fn detect_launcher_pack() {
     let _ = std::fs::remove_dir(&dir);
 }
 
-/// `.minecraft` 包在子目录下（双层包装）也能识别。
+/// `.minecraft` 包在子目录下，双层包装也能识别。
 #[test]
 fn detect_launcher_pack_wrapped() {
     let dir = work_dir();

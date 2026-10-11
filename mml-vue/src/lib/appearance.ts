@@ -36,13 +36,13 @@ export const bgImage = ref(readString(KEYS.bgImage));
 /** 背景图来源（文件路径 / 网址，空串 = 无；与 gui_config.json 的 bgSource 一致） */
 export const bgSource = ref("");
 
-/** 背景图层不透明度（%）：默认 100（完整显示），越高图越显 */
+/** 背景图层不透明度，单位 %：默认 100 即完整显示，越高图越显 */
 export const bgOpacity = ref(readNumber(KEYS.bgOpacity, 100));
 
 /** 背景模糊（px） */
 export const bgBlur = ref(readNumber(KEYS.bgBlur, 0));
 
-/** 原始分辨率（%）：后端把源图缩放到源图的百分之多少（范围 10–100） */
+/** 原始分辨率，单位 %，范围 10–100：后端把源图缩放到源图的百分之多少 */
 export const bgNativeSize = ref(100);
 
 /** 后端正在加载 / 处理背景图（加载提示与按钮禁用用） */

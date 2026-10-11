@@ -1,14 +1,14 @@
 //! 复现用户日志里的**精确形态**：请求已拿到响应头，正卡在"读 body"
 //!
-//! 用户日志（多次出现）：
+//! 用户日志里多次出现：
 //! ```text
 //! [TEMP] get_text 头部已回 url=https://maven.minecraftforge.net/...，开始读 body 世代=0
 //! [TEMP] abortable#8 开始等待：进入世代=0 通道当前值=0 线程=ThreadId(42)
-//! （中断后 #8 再无任何输出）
+//! (中断后 #8 再无任何输出)
 //! ```
 //!
-//! 关键差别：**服务器先回响应头（含 Content-Length），然后不发送 body**。
-//! 这样 `get_with_retry`（头部阶段）正常返回，`abortable` 在**读 body**阶段卡住。
+//! 关键差别：**服务器先回响应头，含 Content-Length，然后不发送 body**。
+//! 这样 `get_with_retry` 在头部阶段正常返回，`abortable` 在**读 body**阶段卡住。
 //! 之前所有测试用的都是"连接后连头都不回"，走的不是同一条路径。
 
 use std::io::{Read, Write};
@@ -77,7 +77,7 @@ fn abort_while_reading_body() {
         });
     });
 
-    // 等它进入"读 body"阶段
+    // 等它进入读 body 阶段
     std::thread::sleep(Duration::from_millis(800));
 
     let abort_at = Instant::now();

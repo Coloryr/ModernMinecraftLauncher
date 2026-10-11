@@ -2,7 +2,7 @@
 //!
 //! 整合包 / 光影包等二进制样本不允许提交进 git，改为在测试运行时通过
 //! Modrinth API 解析下载地址、下载并缓存到系统临时目录。
-//! 网络不可用时调用方跳过对应测试（打印提示，不 fail）。
+//! 网络不可用时调用方跳过对应测试，打印提示而不 fail。
 //!
 //! 该模块按测试二进制单独编译，各二进制只用到部分函数，故关闭死代码警告。
 
@@ -15,7 +15,7 @@ use std::sync::OnceLock;
 use mml_base::serialize_tools::json_from_bytes;
 use mml_net::modrinth_api::version_obj::ModrinthVersionObj;
 
-/// 网络请求所需的一次性初始化（配置 + 语言 + HTTP 客户端）。
+/// 网络请求所需的一次性初始化，含配置、语言与 HTTP 客户端
 fn init_net() {
     static NET: OnceLock<()> = OnceLock::new();
     NET.get_or_init(|| {
@@ -27,7 +27,7 @@ fn init_net() {
     });
 }
 
-/// 在同步测试中执行异步请求。
+/// 在同步测试中执行异步请求
 fn block_on<F: std::future::Future>(future: F) -> F::Output {
     static RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
     let runtime = RUNTIME.get_or_init(|| {
@@ -39,14 +39,14 @@ fn block_on<F: std::future::Future>(future: F) -> F::Output {
     runtime.block_on(future)
 }
 
-/// 下载缓存目录（系统临时目录下，跨测试与跨进程复用）。
+/// 下载缓存目录，位于系统临时目录下，跨测试与跨进程复用
 fn cache_dir() -> PathBuf {
     let dir = mml_testutil::temp_dir().join("mml-test-data");
     std::fs::create_dir_all(&dir).expect("创建测试数据缓存目录失败");
     dir
 }
 
-/// 由 URL 推导稳定的缓存文件名（文件名字段 + URL 哈希）。
+/// 由 URL 推导稳定的缓存文件名，取文件名字段加 URL 哈希
 fn cache_path(url: &str) -> PathBuf {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     url.hash(&mut hasher);
@@ -69,9 +69,9 @@ fn cache_path(url: &str) -> PathBuf {
     cache_dir().join(format!("{hash:016x}-{name}"))
 }
 
-/// 下载 URL 到缓存目录并返回本地路径。
+/// 下载 URL 到缓存目录并返回本地路径
 ///
-/// 已有缓存直接复用（不重新下载）；下载失败返回 `None`，由调用方决定跳过。
+/// 已有缓存直接复用，不重新下载；下载失败返回 `None`，由调用方决定跳过
 pub fn download(url: &str) -> Option<PathBuf> {
     let path = cache_path(url);
     if path.exists() {
@@ -86,9 +86,14 @@ pub fn download(url: &str) -> Option<PathBuf> {
     Some(path)
 }
 
-/// 通过 Modrinth API 解析指定项目 + 版本号的主文件下载地址。
+/// 通过 Modrinth API 解析指定项目与版本号的主文件下载地址
 ///
-/// 返回 `(文件名, 下载地址)`；项目或版本不存在时返回 `None`。
+/// - `project`: Modrinth 项目 slug
+/// - `version`: 版本号
+///
+/// # 返回值
+///
+/// 返回文件名与下载地址；项目或版本不存在时返回 `None`
 pub fn resolve_project_version(project: &str, version: &str) -> Option<(String, String)> {
     let url = format!("https://api.modrinth.com/v2/project/{project}/version");
     let versions: Vec<ModrinthVersionObj> = get_json(&url)?;
@@ -96,16 +101,16 @@ pub fn resolve_project_version(project: &str, version: &str) -> Option<(String, 
     pick_file(target)
 }
 
-/// 下载测试整合包（Fabulously Optimized 14.0.0-beta.3）到缓存目录。
+/// 下载测试整合包 Fabulously Optimized 14.0.0-beta.3 到缓存目录
 ///
 /// 版本号是硬编码的：解析测试断言依赖该版本的具体字段与文件数，
-/// 若跟随最新版本，字段会随上游变动而失效。
+/// 若跟随最新版本，字段会随上游变动而失效
 pub fn download_mrpack() -> Option<PathBuf> {
     let (_name, url) = resolve_project_version("fabulously-optimized", "14.0.0-beta.3")?;
     download(&url)
 }
 
-/// 常用光影包在 Modrinth 上的项目 slug（已逐一验证存在）。
+/// 常用光影包在 Modrinth 上的项目 slug，已逐一验证存在
 pub const SHADERPACK_SLUGS: &[&str] = &[
     "bsl-shaders",
     "complementary-reimagined",
@@ -116,7 +121,7 @@ pub const SHADERPACK_SLUGS: &[&str] = &[
     "spooklementary",
 ];
 
-/// 常用资源包在 Modrinth 上的项目 slug（已逐一验证存在）。
+/// 常用资源包在 Modrinth 上的项目 slug，已逐一验证存在
 pub const RESOURCEPACK_SLUGS: &[&str] = &[
     "faithful-32x",
     "faithful-64x",
@@ -125,7 +130,13 @@ pub const RESOURCEPACK_SLUGS: &[&str] = &[
     "fancy-foliage",
 ];
 
-/// 解析项目最新版本的主文件并下载到缓存目录。
+/// 解析项目最新版本的主文件并下载到缓存目录
+///
+/// - `slug`: Modrinth 项目 slug
+///
+/// # 返回值
+///
+/// 返回缓存到本地的文件路径；解析或下载失败返回 `None`
 pub fn download_latest(slug: &str) -> Option<PathBuf> {
     let url = format!("https://api.modrinth.com/v2/project/{slug}/version");
     let versions: Vec<ModrinthVersionObj> = get_json(&url)?;
@@ -134,13 +145,19 @@ pub fn download_latest(slug: &str) -> Option<PathBuf> {
     download(&file_url)
 }
 
-/// 取项目的全部版本（Modrinth 的返回顺序是**最新在前**）。
+/// 取项目的全部版本，Modrinth 的返回顺序是**最新在前**
 ///
-/// 与 [`resolve_project_version`] 的区别：那个只要"某个版本号的主文件地址"，这个要
-/// **完整版本对象**（升级用例需要把它交给 `upgrade_modpack`），并且要能挑出两个版本做比对。
+/// 与 [`resolve_project_version`] 的区别：那个只要某个版本号的主文件地址，这个要
+/// **完整版本对象**，升级用例需要把它交给 `upgrade_modpack`，并且要能挑出两个版本做比对。
 ///
-/// 异步版：`#[tokio::test]` 里必须用这个 —— 同步版走 `block_on`，在异步上下文里会 panic
-/// （"Cannot start a runtime from within a runtime"）。
+/// 异步版：`#[tokio::test]` 里必须用这个，同步版走 `block_on`，在异步上下文里会 panic，
+/// 报 "Cannot start a runtime from within a runtime"。
+///
+/// - `slug`: Modrinth 项目 slug
+///
+/// # 返回值
+///
+/// 返回该项目的版本列表；请求或解析失败返回 `None`
 pub async fn project_versions_async(slug: &str) -> Option<Vec<ModrinthVersionObj>> {
     init_net();
     let data = mml_net::get_work_client()
@@ -150,9 +167,15 @@ pub async fn project_versions_async(slug: &str) -> Option<Vec<ModrinthVersionObj
     json_from_bytes(&data).ok()
 }
 
-/// 下载某个版本对象的主文件到缓存目录（已有缓存直接复用）。
+/// 下载某个版本对象的主文件到缓存目录，已有缓存直接复用
 ///
-/// 异步版：理由同上。
+/// 异步版，理由同上。
+///
+/// - `version`: Modrinth 版本对象
+///
+/// # 返回值
+///
+/// 返回缓存到本地的文件路径；下载失败返回 `None`
 pub async fn download_version_async(version: &ModrinthVersionObj) -> Option<PathBuf> {
     let file = version
         .files
@@ -171,14 +194,14 @@ pub async fn download_version_async(version: &ModrinthVersionObj) -> Option<Path
     Some(path)
 }
 
-/// 请求 Modrinth API 并反序列化。
+/// 请求 Modrinth API 并反序列化
 fn get_json<T: serde::de::DeserializeOwned>(url: &str) -> Option<T> {
     init_net();
     let data = block_on(mml_net::get_work_client().get_bytes(url)).ok()?;
     json_from_bytes(&data).ok()
 }
 
-/// 从版本对象中挑选主文件（无主文件时取第一个非空地址）。
+/// 从版本对象中挑选主文件，无主文件时取第一个非空地址
 fn pick_file(target: ModrinthVersionObj) -> Option<(String, String)> {
     let file = target
         .files

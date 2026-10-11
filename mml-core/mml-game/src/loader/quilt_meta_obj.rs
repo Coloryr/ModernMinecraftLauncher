@@ -11,6 +11,7 @@ pub struct QuiltMetaLoaderObj {
 }
 
 impl Default for QuiltMetaLoaderObj {
+    /// 全字段取默认值：字符串为空串
     fn default() -> Self {
         Self {
             version: Default::default(),
@@ -27,6 +28,7 @@ pub struct QuiltMetaObj {
 }
 
 impl Default for QuiltMetaObj {
+    /// 全字段取默认值：版本列表为空
     fn default() -> Self {
         Self {
             loader: Default::default(),

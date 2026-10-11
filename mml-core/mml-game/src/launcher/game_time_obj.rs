@@ -3,16 +3,14 @@
 use chrono::{DateTime, Duration, FixedOffset, Local, TimeDelta};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// 序列化：将 Duration 转换为统一格式（支持天）
+/// 把时长序列化成 `天.HH:MM:SS.fff` 或 `HH:MM:SS.fff` 文本
 ///
-/// # 参数
-///
-/// - `duration`: 时长
-/// - `serializer`: 序列化器
+/// - `duration`: 待序列化的时长
+/// - `serializer`: serde 序列化器
 ///
 /// # 返回值
 ///
-/// 返回序列化结果（`天.HH:MM:SS.fff` 或 `HH:MM:SS.fff`）
+/// 形如 `6.04:35:49.3989028` 的字符串，无天时省掉天数段
 fn serialize_duration<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
@@ -30,7 +28,7 @@ where
     let seconds_with_frac = seconds as f64 + fractional_seconds;
 
     let formatted = if days > 0 {
-        // 格式: days.HH:MM:SS.fffffff (保留7位小数，但不截断有效数字)
+        // 带天时用 `.` 分隔天与时分秒，小数位按有效数字截断
         format!(
             "{}.{:02}:{:02}:{:09.7}",
             days, hours, minutes, seconds_with_frac
@@ -44,15 +42,13 @@ where
     serializer.serialize_str(&formatted)
 }
 
-/// 移除小数末尾多余的 0（至少保留 1 位小数）
+/// 移除小数末尾多余的 0，至少保留 1 位小数
 ///
-/// # 参数
-///
-/// - `s`: 数字字符串
+/// - `s`: 待处理的时长文本
 ///
 /// # 返回值
 ///
-/// 返回处理后的字符串
+/// 处理后的文本，没有小数点时原样返回
 fn trim_trailing_zeros(s: &str) -> String {
     if let Some(dot_pos) = s.find('.') {
         let integer_part = &s[..dot_pos];
@@ -71,15 +67,13 @@ fn trim_trailing_zeros(s: &str) -> String {
     }
 }
 
-/// 反序列化：支持多种格式
+/// 反序列化时长，兼容带天与不带天两种格式
 ///
-/// # 参数
-///
-/// - `deserializer`: 反序列化器
+/// - `deserializer`: serde 反序列化器
 ///
 /// # 返回值
 ///
-/// 返回解析出的时长；格式不支持返回错误
+/// 解析出的时长；格式不支持返回错误
 fn deserialize_duration<'de, D>(deserializer: D) -> Result<Duration, D::Error>
 where
     D: Deserializer<'de>,
@@ -88,19 +82,17 @@ where
     parse_duration_flexible(&s).map_err(serde::de::Error::custom)
 }
 
-/// 解析时长字符串（支持带天与不带天两种格式）
+/// 解析时长字符串，兼容带天与不带天两种格式
 ///
-/// # 参数
-///
-/// - `time_str`: 时长字符串
+/// - `time_str`: 待解析的时长文本
 ///
 /// # 返回值
 ///
-/// 返回解析出的时长；格式不支持返回错误说明
+/// 解析出的时长；格式不支持返回错误说明
 fn parse_duration_flexible(time_str: &str) -> Result<Duration, String> {
     let time_str = time_str.trim();
 
-    // 格式1: "6.04:35:49.3989028" (带天数)
+    // 带天格式，如 "6.04:35:49.3989028"
     if let Some(dot_pos) = time_str.find('.') {
         let days_part = &time_str[..dot_pos];
         let time_part = &time_str[dot_pos + 1..];
@@ -113,7 +105,7 @@ fn parse_duration_flexible(time_str: &str) -> Result<Duration, String> {
         }
     }
 
-    // 格式2: "00:16:49.9106414" (标准格式)
+    // 不带天格式，如 "00:16:49.9106414"
     if time_str.contains(':') {
         return parse_time_part(time_str);
     }
@@ -123,13 +115,11 @@ fn parse_duration_flexible(time_str: &str) -> Result<Duration, String> {
 
 /// 解析 `HH:MM:SS.fff` 时间段
 ///
-/// # 参数
-///
-/// - `time_str`: 时间段字符串
+/// - `time_str`: 待解析的时间段文本，不含天数段
 ///
 /// # 返回值
 ///
-/// 返回解析出的时长；格式或数值非法返回错误说明
+/// 解析出的时长；格式或数值非法返回错误说明
 fn parse_time_part(time_str: &str) -> Result<Duration, String> {
     let parts: Vec<&str> = time_str.split(':').collect();
     if parts.len() != 3 {
@@ -139,12 +129,10 @@ fn parse_time_part(time_str: &str) -> Result<Duration, String> {
         ));
     }
 
-    // 解析小时
     let hours: i64 = parts[0]
         .parse()
         .map_err(|_| format!("Invalid hours: {}", parts[0]))?;
 
-    // 解析分钟
     let minutes: i64 = parts[1]
         .parse()
         .map_err(|_| format!("Invalid minutes: {}", parts[1]))?;
@@ -154,7 +142,6 @@ fn parse_time_part(time_str: &str) -> Result<Duration, String> {
         return Err(format!("Minutes must be between 0-59, got: {}", minutes));
     }
 
-    // 解析秒和纳秒
     let sec_part = parts[2];
     let (seconds, nanos) = if let Some(dot_pos) = sec_part.find('.') {
         let secs_str = &sec_part[..dot_pos];
@@ -169,7 +156,7 @@ fn parse_time_part(time_str: &str) -> Result<Duration, String> {
             return Err(format!("Seconds must be between 0-59, got: {}", seconds));
         }
 
-        // 将小数部分转换为纳秒（支持1-9位）
+        // 小数部分右侧补 0 到 9 位，作为纳秒
         let nano_str = format!("{:0<9}", frac_str);
         let nano_str = &nano_str[..9.min(nano_str.len())];
         let nanos: i64 = nano_str
@@ -195,24 +182,24 @@ fn parse_time_part(time_str: &str) -> Result<Duration, String> {
         + Duration::nanoseconds(nanos))
 }
 
-/// 游戏统计
+/// 单个实例的游戏时长统计，落盘在实例目录的统计文件里
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct GameTimeObj {
-    /// 实例添加时间
+    /// 实例添加时间，带时区偏移
     #[serde(rename = "AddTime")]
     pub add_time: DateTime<FixedOffset>,
-    /// 上次启动时间
+    /// 上次启动时间，带时区偏移
     #[serde(rename = "LastTime")]
     pub last_time: DateTime<FixedOffset>,
-    /// 游戏时间
+    /// 累计游戏总时长
     #[serde(rename = "GameTime")]
     #[serde(
         serialize_with = "serialize_duration",
         deserialize_with = "deserialize_duration"
     )]
     pub game_time: Duration,
-    /// 上次运行时长
+    /// 最近一次运行的时长
     #[serde(rename = "LastPlay")]
     #[serde(
         serialize_with = "serialize_duration",
@@ -233,7 +220,7 @@ impl Default for GameTimeObj {
 }
 
 impl GameTimeObj {
-    /// 创建统计对象（添加时间为当前时间）
+    /// 新建统计对象，添加时间取当前时间
     ///
     /// # 返回值
     ///

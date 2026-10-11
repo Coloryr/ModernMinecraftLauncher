@@ -1,21 +1,21 @@
 //! 创造模式分类顺序与列表排序键
 //!
-//! 分类**值**来自 `block/icons.rs`（从游戏 `CreativeModeTabs.class` 字节码提取），
+//! 分类**值**来自 `block/icons.rs`，从游戏 `CreativeModeTabs.class` 字节码提取，
 //! 本模块只补「**顺序**」。为什么必须由 crate 自己带：
 //!
-//! - 方块 / 物品 id 名单是从语言文件键推出来的（`extract_langs`），而语言文件是**字母序**；
-//! - 图标表 `BLOCK_ICONS` 按 **id 字母序**排列（`acacia_button` 开头）；
+//! - 方块 / 物品 id 名单是从语言文件键推出来的 `extract_langs`，而语言文件是**字母序**；
+//! - 图标表 `BLOCK_ICONS` 按 **id 字母序**排列，`acacia_button` 开头；
 //! - 客户端 jar 的语言 / 资源里没有"标签页顺序 + 组内顺序"这种东西——游戏里写在代码里。
 //!
 //! 组内顺序（标签页内的物品先后）目前**没有**数据源，用 id 兜底：
 //! 顺序稳定、且与界面语言无关，但**不等于游戏内顺序**。
-//! 补法见 `TASK.md`：重新提取 `CreativeModeTabs.class`（按 tab 方法里 `Items.X` / `Blocks.X`
-//! 的出现顺序）得到带序表，届时把 [`order_key`] 中间那一项换成条目序号即可，其它代码不用动。
+//! 补法见 `TASK.md`：重新提取 `CreativeModeTabs.class`，按 tab 方法里 `Items.X` / `Blocks.X`
+//! 的出现顺序得到带序表，届时把 [`order_key`] 中间那一项换成条目序号即可，其它代码不用动。
 
 /// 创造栏标签页顺序（与游戏一致）
 ///
-/// 游戏里 `hotbar` / `search` / `inventory` 不是物品分类（前者只是界面页签），**不入表**。
-/// `playerSkin` 是启动器自己的分组（用户添加的皮肤方块），固定排最后。
+/// 游戏里 `hotbar` / `search` / `inventory` 不是物品分类，前者只是界面页签，**不入表**。
+/// `playerSkin` 是启动器自己的分组，即用户添加的皮肤方块，固定排最后。
 pub const CAT_ORDER: &[&str] = &[
     "buildingBlocks",
     "coloredBlocks",
@@ -58,7 +58,7 @@ mod tests {
 
     #[test]
     fn cat_order_follows_game_tabs() {
-        // 游戏创造栏的标签页先后（首项与末项都能确认即可）
+        // 游戏创造栏的标签页先后，首项与末项都能确认即可
         assert_eq!(cat_index("buildingBlocks"), 0);
         assert!(cat_index("buildingBlocks") < cat_index("coloredBlocks"));
         assert!(cat_index("coloredBlocks") < cat_index("natural"));
@@ -75,7 +75,7 @@ mod tests {
 
     #[test]
     fn order_key_is_language_independent() {
-        // 同分类内按 id 排（与显示名/语言无关）
+        // 同分类内按 id 排，与显示名和语言无关
         let mut v = vec![
             ("buildingBlocks", "minecraft:stone"),
             ("buildingBlocks", "minecraft:oak_planks"),

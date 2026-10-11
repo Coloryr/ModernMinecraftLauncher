@@ -1,4 +1,4 @@
-//! Modrinth API 的集成测试（实时网络请求）。
+//! Modrinth API 的集成测试，走实时网络请求。
 //!
 //! 与 mml-game 的测试约定一致：网络不可用时打印提示并跳过，不视为失败。
 //! 请求通过 `mml_net` 的全局客户端进行，需先初始化配置与 HTTP 客户端。
@@ -8,7 +8,7 @@ use mml_net::modrinth_api::{
     get_versions,
 };
 
-/// 一次性初始化（配置 + HTTP 客户端）。
+/// 一次性初始化：配置与 HTTP 客户端。
 fn init() {
     static INIT: std::sync::OnceLock<()> = std::sync::OnceLock::new();
     INIT.get_or_init(|| {

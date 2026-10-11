@@ -1,6 +1,6 @@
 //! 账户窗口：账户列表 + 微软设备码登录 + Token 刷新
 //!
-//! 数据由 `mml_auth::auths` 持有（`accounts.json`），这里只做命令与事件转发。
+//! 数据由 `mml_auth::auths` 持有，落在 `accounts.json`，这里只做命令与事件转发。
 
 use mml_auth::{
     AuthType, LoginObj, auths,
@@ -21,18 +21,32 @@ pub(crate) mod skin;
 
 use self::oauth::microsoft_login;
 
-/// 账户变更事件（跨窗口同步刷新列表）
+/// 广播账户变更事件，让各窗口同步刷新列表
+///
+/// - `app`: 应用句柄，事件发往所有窗口
 #[gui_macros::emit]
 pub(super) fn emit_account_change(app: &AppHandle) {
     let _ = app.emit(listens::ACCOUNT_CHANGE, ());
 }
 
-/// 按 UUID 在账户列表中查找账户（auths 以 UUID + 类型为键，此处 UUID 即可唯一定位当前场景）
+/// 按 UUID 在账户列表中查找账户
+///
+/// auths 以 UUID + 类型为键，此处 UUID 即可唯一定位当前场景。
+///
+/// - `uuid`: 账户 UUID，带连字符
+///
+/// # 返回值
+///
+/// 没有该 UUID 的账户时返回 `None`
 pub(super) fn find_by_uuid(uuid: &str) -> Option<LoginObj> {
     auths::get_all().into_iter().find(|a| a.uuid == uuid)
 }
 
 /// 获取账户列表 + 当前账户
+///
+/// # 返回值
+///
+/// 全部账户的 DTO 与当前账户的 UUID，未选任何账户时为 `None`
 #[tauri::command]
 pub fn account_get_accounts() -> AccountStoreViewDto {
     AccountStoreViewDto {
@@ -44,11 +58,21 @@ pub fn account_get_accounts() -> AccountStoreViewDto {
     }
 }
 
-/// 添加账户（离线 / 皮肤站等由前端传账户类型与凭据；微软走设备码登录流程）
+/// 添加账户；离线与皮肤站等由前端传账户类型与凭据，微软走设备码登录流程
 ///
-/// 皮肤站类（LittleSkin / 外置登录 / 统一通行证）会向对应认证服务器发起真实
+/// 皮肤站类 LittleSkin / 外置登录 / 统一通行证会向对应认证服务器发起真实
 /// Yggdrasil 登录，服务器地址由认证层存入 `LoginObj.text1` 供后续刷新与皮肤拉取；
 /// 离线账户本地直接创建。
+///
+/// - `app`: 应用句柄，微软登录流程与变更广播都要用
+/// - `name`: 账户名，离线账户即游戏内名字
+/// - `account_type`: 前端账户类型串：`offline` / `microsoft` / `littleskin` / `selflittleskin` / `authlib` / `nide8`，无法识别按离线处理
+/// - `server`: 认证服务器地址；`None` 表示用该类型默认站点，LittleSkin 即官方站
+/// - `password`: 账户密码；`None` 视为空串
+///
+/// # 返回值
+///
+/// 新建账户的 DTO；失败时返回前端 i18n 错误键，如 `err.loginLocked` / `err.serverEmpty` / `err.nameEmpty`
 #[tauri::command]
 pub async fn account_add_account(
     app: AppHandle,
@@ -57,9 +81,8 @@ pub async fn account_add_account(
     mut server: Option<String>,
     password: Option<String>,
 ) -> Result<AccountStoreDto, String> {
-    // 登录方式锁定（客户端设置）：总开关打开且锁定了条目列表时，只允许添加
-    // 其中的类型；同一类型可有多个锁定条目（各自带服务器），此时传入的服务器
-    // 必须命中其中一个条目；条目都没配服务器时只按类型锁定
+    // 登录方式锁定：客户端设置里开关打开且锁定列表非空时，只允许添加其中的类型；
+    // 同一类型可有多个锁定条目，各带服务器；传入的服务器须命中其一，都没配则只按类型锁
     let lock = &crate::gui_config::get().client;
     let ty_locks: Vec<&crate::gui_config::LoginLockObj> = if lock.login_lock_on {
         lock.login_lock
@@ -133,7 +156,7 @@ pub async fn account_add_account(
     }
     .map_err(|e| e.to_string())?;
 
-    // 皮肤站类的 auth_type 与 text1（服务器地址）由认证层设置，此处不覆盖
+    // 皮肤站类的 auth_type 与服务器地址 text1 由认证层设置，此处不覆盖
     if auth_type == AuthType::Offline {
         login.auth_type = AuthType::Offline;
     }
@@ -146,12 +169,21 @@ pub async fn account_add_account(
 }
 
 /// 用系统浏览器打开微软授权页面
+///
+/// - `url`: 要打开的授权页地址，含设备码
 #[tauri::command]
 pub fn account_open_browser(url: String) {
     open_helper::open_url(&url);
 }
 
-/// 删除账户
+/// 删除账户；被删的是当前账户时自动改选列表里的第一个
+///
+/// - `app`: 应用句柄，删除成功后广播变更
+/// - `uuid`: 要删除的账户 UUID
+///
+/// # 返回值
+///
+/// 删掉返回 `Ok(true)`；该 UUID 不存在返回 `Ok(false)`
 #[tauri::command]
 pub fn account_remove_account(app: AppHandle, uuid: String) -> Result<bool, String> {
     let Some(login) = find_by_uuid(&uuid) else {
@@ -165,7 +197,14 @@ pub fn account_remove_account(app: AppHandle, uuid: String) -> Result<bool, Stri
     Ok(true)
 }
 
-/// 刷新账户 Token（按认证类型走 LoginObj::refresh，微软账户走完整 OAuth 刷新链）
+/// 刷新账户 Token；按认证类型走 LoginObj::refresh，微软账户走完整 OAuth 刷新链
+///
+/// - `app`: 应用句柄，刷新成功后广播变更
+/// - `uuid`: 要刷新的账户 UUID
+///
+/// # 返回值
+///
+/// 刷新成功返回 `Ok(true)`；该 UUID 不存在返回 `Ok(false)`；刷新失败返回认证层错误信息
 #[tauri::command]
 pub async fn account_refresh_account_token(app: AppHandle, uuid: String) -> Result<bool, String> {
     let Some(mut login) = find_by_uuid(&uuid) else {
@@ -184,6 +223,13 @@ pub async fn account_refresh_account_token(app: AppHandle, uuid: String) -> Resu
 ///
 /// 本地皮肤文件按内容 SHA1 缓存，服务器换肤后贴图内容变化自动落新文件；
 /// webview 侧旧图由前端 bump 图片版本号破掉
+///
+/// - `app`: 应用句柄，清缓存后广播变更让各窗口重取贴图
+/// - `uuid`: 账户 UUID，仅用于校验账户存在
+///
+/// # 返回值
+///
+/// 账户不存在时返回 `err.accountMissing`
 #[tauri::command]
 pub fn account_refresh_skin(app: AppHandle, uuid: String) -> Result<(), String> {
     find_by_uuid(&uuid).ok_or("err.accountMissing")?;
@@ -193,9 +239,16 @@ pub fn account_refresh_skin(app: AppHandle, uuid: String) -> Result<(), String> 
 }
 
 /// 设置当前使用账户
+///
+/// - `app`: 应用句柄，设置成功后广播变更
+/// - `uuid`: 要选中的账户 UUID；空串表示取消选择
+///
+/// # 返回值
+///
+/// 设置成功返回 `Ok(true)`，空串取消也算成功；该 UUID 不存在返回 `Ok(false)`
 #[tauri::command]
 pub fn account_set_current_account(app: AppHandle, uuid: String) -> Result<bool, String> {
-    // 空串 = 取消选择（登录方式锁定把当前账户滤掉时前端调这个）
+    // 空串 = 取消选择；登录方式锁定把当前账户滤掉时前端调这个
     if uuid.is_empty() {
         auths::set_current(None);
         emit_account_change(&app);
@@ -211,7 +264,17 @@ pub fn account_set_current_account(app: AppHandle, uuid: String) -> Result<bool,
 
 /// 编辑离线账户的名字与 UUID
 ///
-/// 离线账户没有服务器凭据，改名/改 UUID 就是改账户本身（存储键随之更新）。
+/// 离线账户没有服务器凭据，改名/改 UUID 就是改账户本身，存储键随之更新。
+///
+/// - `app`: 应用句柄，改名成功后广播变更
+/// - `uuid`: 原账户 UUID
+/// - `new_name`: 新账户名，首尾空白会被去掉，不能为空
+/// - `new_uuid`: 新 UUID，首尾空白会被去掉，不能为空
+///
+/// # 返回值
+///
+/// 失败时返回前端 i18n 错误键：`err.accountMissing` / `err.nameEmpty` /
+/// `err.uuidEmpty` / `err.uuidConflict`
 #[tauri::command]
 pub fn account_edit_offline(
     app: AppHandle,
@@ -229,7 +292,7 @@ pub fn account_edit_offline(
     if new_uuid.is_empty() {
         return Err("err.uuidEmpty".to_string());
     }
-    // 新 UUID 不能与其它离线账户冲突（同键会静默覆盖）
+    // 新 UUID 不能与其它离线账户冲突，同键会静默覆盖
     if new_uuid != uuid && auths::get(&new_uuid, AuthType::Offline).is_some() {
         return Err("err.uuidConflict".to_string());
     }
@@ -250,4 +313,4 @@ pub fn account_edit_offline(
     Ok(())
 }
 
-// ---- 皮肤 / 披风纹理（原皮肤窗口的查询与正版装备操作） ----
+// ---- 皮肤 / 披风纹理：原皮肤窗口的查询与正版装备操作 ----

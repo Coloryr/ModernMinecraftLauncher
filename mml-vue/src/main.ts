@@ -38,6 +38,28 @@ document.addEventListener("contextmenu", (e) => {
   e.preventDefault();
 });
 
+// 发布构建：拦掉 WebView2 自带的浏览器功能键（F5 / Ctrl+R 重载页面、F12 / Ctrl+Shift+C
+// 开发者工具、Ctrl+P 打印）。
+//
+// 这是**兜底**：正经做法是 WebView2 的设置项（见 src-tauri/src/windows/webview_keys.rs 的
+// AreBrowserAcceleratorKeysEnabled / AreDevToolsEnabled）。万一那两项没生效（老版本 WebView2
+// 没有 Settings3），页面这一层还能挡住。开发构建（vite dev / tauri dev）不拦——调试要用。
+//
+// 注意只拦"浏览器专有"的键：Ctrl+C / Ctrl+V / Ctrl+A / Ctrl+Z 这些编辑键一概不动。
+if (import.meta.env.PROD) {
+  window.addEventListener("keydown", (e) => {
+    const ctrl = e.ctrlKey || e.metaKey;
+    const blocked =
+      e.key === "F5" ||
+      e.key === "F12" ||
+      (ctrl && ["r", "R", "p", "P"].includes(e.key)) ||
+      (ctrl && e.shiftKey && ["c", "C", "r", "R"].includes(e.key));
+    if (blocked) {
+      e.preventDefault();
+    }
+  });
+}
+
 /** 启动引导：GUI 状态由 Rust（gui_config.json）提供，浏览器回退本地存储 */
 async function bootstrap() {
   const cfg = await loadGuiConfig();

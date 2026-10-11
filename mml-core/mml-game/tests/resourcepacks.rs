@@ -1,8 +1,8 @@
 //! 资源包读取测试。
 //!
 //! 资源包样本不提交进 git：
-//! - 用 `zip::ZipWriter` 程序化生成一个最小有效样本做精确断言（离线）；
-//! - 通过 Modrinth API 解析多个常用资源包的最新版本并下载（网络不可用时跳过）。
+//! - 用 `zip::ZipWriter` 程序化生成一个最小有效样本做精确断言，离线可跑；
+//! - 通过 Modrinth API 解析多个常用资源包的最新版本并下载，网络不可用时跳过。
 
 mod common;
 
@@ -16,17 +16,16 @@ use mml_game::game_resourcepacks::{
 use zip::write::SimpleFileOptions;
 use zip::ZipWriter;
 
-/// 测试里固定的界面语言（与前端 `locale` 同值）
+/// 测试里固定的界面语言，与前端 `locale` 同值
 const LANG: &str = "zh_cn";
 
-/// 网络样本用例的启动链（每进程一次）
+/// 网络样本用例的启动链，每进程一次
 ///
 /// **必须先把日志系统起来**：`common::init_net` 里的 `mml_net::init` 会打日志，
-/// 而 `mml_log` 没 `start()` 过时 `info()` 直接 panic（`SEM` / `STREAM` 都是
-/// `OnceLock`，见 AGENTS.md §6）。与 `real_pack_download.rs` 的 `ensure_init` 同一口径。
+/// 而 `mml_log` 没 `start()` 过时 `info()` 直接 panic，`SEM` / `STREAM` 都是
+/// `OnceLock`，见 AGENTS.md §6。与 `real_pack_download.rs` 的 `ensure_init` 同一口径。
 ///
-/// 只给走网络的那条用例用：纯本地用例（`make_resourcepack_with*` 自己造 zip）
-/// 不碰日志，也就没有这个前置要求。
+/// 只给走网络的那条用例用：纯本地用例自己造 zip、不碰日志，没有这个前置要求。
 fn ensure_init() {
     static INIT: Once = Once::new();
     INIT.call_once(|| {
@@ -40,12 +39,12 @@ fn ensure_init() {
     });
 }
 
-/// 按界面语言解析资源包（省得每个用例都写第二个参数；错误转成可读字符串）
+/// 按界面语言解析资源包，省得每个用例都写第二个参数；错误转成可读字符串
 fn process_resourcepack<P: AsRef<Path>>(path: P) -> Result<ResourcepackObj, String> {
     process_resourcepack_raw(path, LANG).map_err(|err| err.to_string())
 }
 
-/// 1×1 透明 PNG（最小有效文件）。
+/// 1×1 透明 PNG，最小有效文件
 const PACK_PNG: &[u8] = &[
     0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
     0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
@@ -61,7 +60,7 @@ fn make_mini_resourcepack() -> PathBuf {
     )
 }
 
-/// 生成一个资源包 zip，pack.mcmeta 内容由调用方给（用于覆盖各种写法）。
+/// 生成一个资源包 zip，pack.mcmeta 内容由调用方给，用于覆盖各种写法
 fn make_resourcepack_with(meta: &[u8]) -> PathBuf {
     let path = mml_testutil::temp_dir().join(format!(
         "mml-resourcepack-mini-{}.zip",
@@ -80,7 +79,7 @@ fn make_resourcepack_with(meta: &[u8]) -> PathBuf {
     path
 }
 
-/// 生成一个带**自带语言表**的资源包 zip（`assets/<命名空间>/lang/<语言代码>.json`）
+/// 生成一个带**自带语言表**的资源包 zip，表放在 `assets/<命名空间>/lang/<语言代码>.json`
 fn make_resourcepack_with_lang(meta: &[u8], lang_files: &[(&str, &str)]) -> PathBuf {
     let path = mml_testutil::temp_dir().join(format!(
         "mml-resourcepack-lang-{}.zip",
@@ -119,10 +118,8 @@ fn read_generated_resourcepack() {
 
 /// `supported_formats` 写成**数组**：`[8, 9999]`
 ///
-/// 这是真实踩过的第二个坑（Slightly Improved Font）：`SupportedFormats` 起初只认
-/// "对象"和"单个数字"两种，数组形式**两种都不匹配** → untagged 全部失败 →
-/// 整个 `PackInfo` 反序列化报错 → 界面显示"读取失败"。
-/// 数组形式语义就是 `[min, max]`。
+/// 真实踩过的坑：`SupportedFormats` 起初只认"对象"和"单个数字"，数组形式两种都不匹配，
+/// untagged 全部失败、整个 `PackInfo` 反序列化报错，界面显示"读取失败"；数组语义是 `[min, max]`。
 #[test]
 fn read_supported_formats_as_array() {
     let meta = br#"{"pack":{"pack_format":8,"supported_formats":[8,9999],"description":"test"}}"#;
@@ -146,7 +143,7 @@ fn read_supported_formats_variants() {
     assert!(!obj.fail);
     assert_eq!((obj.min_format, obj.max_format), (5, 75));
 
-    // 单个数字（"从这一版起"）
+    // 单个数字，含义是"从这一版起"
     let obj = process_resourcepack(&make_resourcepack_with(
         br#"{"pack":{"pack_format":15,"supported_formats":20}}"#,
     ))
@@ -154,7 +151,7 @@ fn read_supported_formats_variants() {
     assert!(!obj.fail);
     assert_eq!((obj.min_format, obj.max_format), (20, 0));
 
-    // 数组：只给一个元素（等价于"从这一版起"）
+    // 数组只给一个元素，等价于"从这一版起"
     let obj = process_resourcepack(&make_resourcepack_with(
         br#"{"pack":{"pack_format":15,"supported_formats":[30]}}"#,
     ))
@@ -173,11 +170,10 @@ fn explicit_min_max_wins() {
     assert_eq!((obj.min_format, obj.max_format), (11, 22));
 }
 
-/// 数组形式 + 带 `§` 格式码且含换行的描述（Slightly Improved Font 的真实 pack.mcmeta）
+/// 数组形式 + 带 `§` 格式码且含换行的描述，样本取自 Slightly Improved Font 的 pack.mcmeta
 ///
-/// 两个坑叠在一起：数组形式让**整包**解析失败（见上一个用例），
-/// 描述里的 `§e` / `§b` 与 `\n` 则要求文本原样保留 ——
-/// 上色是**前端**渲染时的事（见 mml-vue 的 lib/formatting.ts），后端不改原始文本。
+/// 两个坑叠在一起：数组形式让**整包**解析失败，见上一个用例；描述里的 `§e` / `§b` 与 `\n`
+/// 则要求文本原样保留 —— 上色是**前端**渲染时的事，见 mml-vue 的 lib/formatting.ts。
 #[test]
 fn read_real_font_pack() {
     let meta = r#"{"pack":{"pack_format":8,"supported_formats":[8,9999],"description":"§eSlightly Improved Font 1.1.5\n§bMade by latvian.dev"}}"#;
@@ -186,7 +182,7 @@ fn read_real_font_pack() {
     assert!(!obj.fail, "这个包不该被判为读取失败");
     assert_eq!(obj.pack_format, 8);
     assert_eq!((obj.min_format, obj.max_format), (8, 9999));
-    // 原始文本原样保留（`§` 码与换行都不动）
+    // 原始文本原样保留，`§` 码与换行都不动
     assert_eq!(
         obj.description,
         "§eSlightly Improved Font 1.1.5\n§bMade by latvian.dev"
@@ -195,9 +191,8 @@ fn read_real_font_pack() {
 
 /// 组件数组形式的 `description` + `supported_formats` 区间
 ///
-/// 这是真实踩过的坑（Sophisticated Backpacks 的那个数据包）：
-/// `description` 写成 `[{"text": "…"}]` 时，旧的 `description: String` 会让**整包**
-/// 反序列化失败、界面显示"读取失败"。
+/// 真实踩过的坑，样本是 Sophisticated Backpacks 的数据包：`description` 写成
+/// `[{"text": "…"}]` 时，旧的 `description: String` 会让**整包**反序列化失败。
 #[test]
 fn read_component_description_and_supported_formats() {
     let meta = br#"{"pack":{"pack_format":57,"supported_formats":{"min_inclusive":5,"max_inclusive":75},"description":[{"text":"123456"}]}}"#;
@@ -229,7 +224,7 @@ fn read_description_variants() {
     .unwrap();
     assert_eq!(obj.description, "前半后半");
 
-    // 数组里混裸字符串（也是合法写法）
+    // 数组里混裸字符串，也是合法写法
     let obj = process_resourcepack(&make_resourcepack_with(
         br#"{"pack":{"pack_format":15,"description":[{"text":"a"},"b"]}}"#,
     ))
@@ -239,7 +234,7 @@ fn read_description_variants() {
 
 /// 简介里的 `translate` 键用**资源包自带**的语言表翻
 ///
-/// 样本是 FO 整合包里的 "Chat Reporting Helper"（真实 pack.mcmeta）：它写的是
+/// 样本是 FO 整合包里的 "Chat Reporting Helper"，取自真实 pack.mcmeta：它写的是
 /// `{"translate":"fo.resourcePack.chatreportinghelper","fallback":"§7Explains…§r"}`，
 /// 同时包自带 `assets/fo/lang/zh_cn.json` 写着中文译文。命中语言表时应当用**译文**，
 /// 而不是 fallback —— 与游戏里的表现一致。
@@ -248,8 +243,8 @@ fn read_description_variants() {
 /// 所以这条用例同时钉住了"读语言表"与"展平组件"两步的衔接。
 #[test]
 fn read_translate_from_pack_lang() {
-    // 简介里的 `§` 是**字面字符**（真实文件就是 UTF-8 的 §），所以这里用普通原始字符串
-    // 而不是 `br#""#`（字节串只能是 ASCII）
+    // 简介里的 `§` 是**字面字符**，真实文件就是 UTF-8 的 §，所以这里用普通原始字符串
+    // 而不是 `br#""#`，字节串只能是 ASCII
     let meta = r#"{"pack":{"pack_format":18,"min_format":18,"max_format":97,"description":{"translate":"fo.resourcePack.chatreportinghelper","fallback":"§7Explains chat reporting with simple phrases and icons§r"}}}"#;
     let path = make_resourcepack_with_lang(
         meta.as_bytes(),
@@ -264,7 +259,7 @@ fn read_translate_from_pack_lang() {
     assert_eq!(obj.description, "§7用简单的短语与图标说明聊天举报机制§r");
 }
 
-/// 语言表里没有界面语言时用 `en_us` 兜底（包的作者一般都会写英文）
+/// 语言表里没有界面语言时用 `en_us` 兜底，包的作者一般都会写英文
 #[test]
 fn read_translate_falls_back_to_en_us_lang() {
     let meta = br#"{"pack":{"pack_format":15,"description":{"translate":"sodium.resource_pack.unofficial","fallback":"Unofficial translations for Sodium"}}}"#;
@@ -281,7 +276,7 @@ fn read_translate_falls_back_to_en_us_lang() {
     assert_eq!(obj.description, "EN text");
 }
 
-/// 语言表里没这个 key（或整包没有语言表）：退回 `fallback`，再没有就原样显示 key
+/// 语言表里没这个 key、或整包没有语言表：退回 `fallback`，再没有就原样显示 key
 #[test]
 fn read_translate_without_lang_falls_back() {
     // 整包没有语言表 → 用 fallback
@@ -303,7 +298,7 @@ fn read_translate_without_lang_falls_back() {
         "兜底文字"
     );
 
-    // 连 fallback 都没有 → 把 key 原样给出来（比留空强）
+    // 连 fallback 都没有 → 把 key 原样给出来，比留空强
     let bare = make_resourcepack_with_lang(
         r#"{"pack":{"pack_format":15,"description":{"translate":"some.key"}}}"#.as_bytes(),
         &[("assets/fo/lang/zh_cn.json", r#"{"other.key":"别的"}"#)],
@@ -331,7 +326,7 @@ fn read_real_resourcepacks() {
             Ok(obj) => {
                 // 下载成功但 pack.mcmeta 解析失败时 fail 置 true，属真实缺陷
                 assert!(!obj.fail, "资源包 {slug} 的 pack.mcmeta 解析失败");
-                // 新格式资源包（1.20.5+）不再提供 pack_format，只用 min/max_format
+                // 新格式资源包 1.20.5+ 不再提供 pack_format，只用 min/max_format
                 assert!(
                     obj.pack_format > 0 || obj.min_format > 0 || obj.max_format > 0,
                     "资源包 {slug} 未提供任何格式版本字段"

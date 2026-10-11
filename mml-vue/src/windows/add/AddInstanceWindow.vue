@@ -8,6 +8,7 @@ import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted,
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
+import DropOverlay from "../../components/ui/DropOverlay.vue";
 import ModeTabs from "./parts/ModeTabs.vue";
 import GroupCombo from "./parts/GroupCombo.vue";
 import NameConflictModal from "./parts/NameConflictModal.vue";
@@ -21,6 +22,8 @@ import { useAddVersions } from "./composables/useAddVersions";
 import { useLoaders, NO_VERSION_LOADERS } from "./composables/useLoaders";
 import { useFileTree } from "./composables/useFileTree";
 import { useUnlisteners } from "../../composables/useUnlisteners";
+import { useFileDrop } from "../../composables/useFileDrop";
+import type { FileDropPayload } from "../../composables/useFileDrop";
 import { buildTree, type FileNode } from "../../lib/fileTree";
 import {
   api,
@@ -33,7 +36,8 @@ import { showToast } from "../../lib/toast";
 import { KEYS, emitChange, writeRaw } from "../../lib/storage";
 import { usePageActive } from "../../lib/pageActive";
 import { t, tErr } from "../../lib/i18n";
-import { isTauri, openWindow } from "../windowManager";
+import { dropFromUrl, isTauri, multiWindow, openWindow, windowParams } from "../windowManager";
+import type { WindowDropParam } from "../windowManager";
 import { commands } from "../../lib/bindings";
 import type { FolderInstanceDto, GroupDto, PackProgressDto } from "../../lib/bindings";
 import { ADD_MODES, isModpackPackType, type AddMode } from "./types";
@@ -336,6 +340,88 @@ function toggleFoundInstance(path: string, on: boolean) {
 function setAllFoundInstances(on: boolean) {
   folderPicked.value = on ? new Set(folderFound.value.map((item) => item.path)) : new Set();
 }
+
+// ================= 拖拽导入（主窗口拖入的文件 / 文件夹转到这里） =================
+
+/** 拖入的路径是否已经应用过（多窗口模式下 URL 上的参数会一直留着，只能消费一次） */
+let dropApplied = false;
+
+/** 按拖入路径进对应模式：压缩包交给 applyArchivePath，目录走文件夹模式并填好地址 */
+async function applyDrop(drop: WindowDropParam) {
+  if (drop.kind === "folder") {
+    addMode.value = "folder";
+    addFolderPath.value = drop.path;
+    // 与 pickFolder 一致：先问"是否允许读取这个目录"，允许了再扫（见 confirmScan）
+    scanAsk.value = drop.path;
+    return;
+  }
+  addMode.value = "archive";
+  await applyArchivePath(drop.path);
+}
+
+/**
+ * 消费"主窗口拖入的路径"（参数从哪读见 windowManager 的 targetDrop）
+ *
+ * - 多窗口：参数挂在 URL 上，会一直留着，靠 `dropApplied` 只认一次
+ *   （再拖一次会走 window_reopen_window 重载页面，组件重建、标志自然复位）；
+ * - 单窗口：参数在 `windowParams` 里，读完立刻清掉，所以"再拖一次"能重新触发。
+ */
+async function consumeDrop() {
+  if (!multiWindow.value) {
+    const drop = windowParams.value.drop;
+    if (!drop) return;
+    windowParams.value = { ...windowParams.value, drop: null };
+    await applyDrop(drop);
+    return;
+  }
+  if (dropApplied) return;
+  const drop = dropFromUrl();
+  if (!drop) return;
+  dropApplied = true;
+  await applyDrop(drop);
+}
+
+// 单窗口模式下已经停在本页时不会再触发 onActivated，靠参数变化接住
+watch(
+  () => windowParams.value.drop,
+  () => void consumeDrop(),
+);
+
+/**
+ * 本窗口自己也接拖入：拖进来的整合包 / 文件夹直接进对应模式
+ *
+ * 与主窗口那条路共用 [`applyDrop`] —— 那边是"带着路径把本窗口开起来"，
+ * 这边是"窗口已经开着，直接拖进来"，最后落到同一个模式切换上。
+ */
+async function onFilesDropped(payload: FileDropPayload) {
+  // 正在创建 / 扫描 / 读压缩包：模式切换本身就禁用着（busy），
+  // 这里也不能把在跑的流程丢在半路（archiveScanning 这类状态是共用的）
+  if (busy.value) {
+    showToast(t("add.dropBusy"));
+    return;
+  }
+  // 本窗口只认文件（整合包 / 文件夹）：网页卡片那种文本是账户窗口的事
+  const first = payload.paths[0];
+  if (!first) return;
+  if (payload.paths.length > 1) showToast(t("drop.onlyFirst"));
+  let probe: { kind: string; url: string };
+  try {
+    probe = await commands.windows.probeDrop(first);
+  } catch (e) {
+    showToast(tErr(e));
+    return;
+  }
+  if (probe.kind !== "folder" && probe.kind !== "archive") {
+    showToast(t("drop.notModpack"));
+    return;
+  }
+  await applyDrop({ path: first, kind: probe.kind });
+}
+
+const { fileDragOver } = useFileDrop(onFilesDropped, {
+  // 只接文件拖入：拖文本进来不该亮遮罩，悬停阶段也只有类型清单可看
+  accept: (payload) => payload.types.includes("Files"),
+});
 
 /** 文件夹模式扫到了实例：此时实例名由各自的目录名决定，「实例名称」那个输入框无意义 */
 const folderScanned = computed(() => addMode.value === "folder" && folderFound.value.length > 0);
@@ -657,6 +743,8 @@ onActivated(() => {
   // 切回来时把模型补回来（切走时释放掉了），再按当时状态恢复守卫
   void api.ensureWindowModel("add").catch(() => { });
   syncCloseGuard();
+  // 单窗口模式下"带着拖入路径跳回本页"走这里
+  void consumeDrop();
 });
 onDeactivated(() => {
   unbindKeys();
@@ -702,6 +790,8 @@ onMounted(async () => {
   // 版本列表与下拉数据源各拉一次；核心尚未就绪时轮询等待（关窗即停）
   await Promise.all([loadVersions(), fetchOptionLists()]);
   if (!versions.value.length) startPolling();
+  // 主窗口拖入的路径：多窗口模式下这次挂载就是为它来的（参数挂在 URL 上）
+  await consumeDrop();
 });
 
 onUnmounted(() => {
@@ -803,6 +893,9 @@ onUnmounted(() => {
 
     <!-- 加载器查询进度不再浮在窗口正上方：两条（查询支持的加载器 / 拉取加载器版本）
          都改成就地显示在各自字段下面了，见 NewMode 里的 LoaderQueryProgress -->
+
+    <!-- 拖入整合包 / 文件夹时的遮罩（本窗口只接文件，见 accept） -->
+    <DropOverlay v-if="fileDragOver" :title="t('add.dropTitle')" />
   </WindowFrame>
 </template>
 

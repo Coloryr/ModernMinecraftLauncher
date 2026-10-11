@@ -8,9 +8,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct ObjectsObj {
-    /// 资源哈希（sha1）
+    /// 资源哈希，sha1 十六进制串
     pub hash: String,
-    /// 资源大小（字节）
+    /// 资源大小，单位字节
     pub size: i64,
 }
 
@@ -27,7 +27,7 @@ impl Default for ObjectsObj {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct AssetsObj {
-    /// 资源表（相对路径 → 资源条目）
+    /// 资源表，键为 assets 目录下的相对路径，值为资源条目
     pub objects: HashMap<String, ObjectsObj>,
 }
 

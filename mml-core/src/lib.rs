@@ -7,11 +7,11 @@
 /// 核心初始化参数
 #[derive(Debug)]
 pub struct CoreInitObj {
-    /// 运行路径
+    /// 启动器运行根目录，须已存在，否则 [`init`] 报错
     pub path: PathBuf,
-    /// 微软登录密钥
+    /// 微软登录 OAuth 密钥，空串表示未配置
     pub oauth_key: String,
-    /// CF平台密钥
+    /// CurseForge 平台密钥，空串表示未配置
     pub curseforge_key: String,
 }
 
@@ -37,7 +37,7 @@ pub static NEW_START: RwLock<bool> = RwLock::new(false);
 /// 核心是否已通过 load 完成加载
 static STATE: RwLock<bool> = RwLock::new(false);
 
-/// 核心停止事件（stop 时触发，各子 crate 在此挂清理回调）
+/// 核心停止事件，stop 时触发，各子 crate 在此挂清理回调
 static CORE_STOP_EVENT: LazyLock<EventHandler> = LazyLock::new(|| EventHandler::new());
 
 /// 注册核心停止事件回调
@@ -46,7 +46,7 @@ static CORE_STOP_EVENT: LazyLock<EventHandler> = LazyLock::new(|| EventHandler::
 ///
 /// # 返回值
 ///
-/// 返回回调ID（remove_core_stop 用）
+/// 返回回调 ID，供 [`remove_core_stop`] 使用
 pub fn add_core_stop<F>(handler: F) -> u64
 where
     F: Fn() + Send + Sync + 'static,
@@ -56,7 +56,7 @@ where
 
 /// 移除核心停止事件回调
 ///
-/// - `id`: add_core_stop 返回的回调ID
+/// - `id`: [`add_core_stop`] 返回的回调 ID
 pub fn remove_core_stop(id: u64) {
     CORE_STOP_EVENT.remove_handle(id);
 }
@@ -75,14 +75,13 @@ pub fn get_state() -> bool {
     return *STATE.read().unwrap();
 }
 
-/// 初始化核心
-/// 这一步只设置允许目录，不加载内容
+/// 初始化核心，只设置允许目录，不加载内容
 ///
-/// - `arg`: 核心参数
+/// - `arg`: 核心初始化参数
 ///
 /// # 返回值
 ///
-/// 运行路径非法或子模块初始化失败时返回相应错误，成功返回 `Ok(())`
+/// 运行路径为空或不存在、子模块初始化失败时返回相应错误，成功返回 `Ok(())`
 pub fn init(arg: CoreInitObj) -> CoreResult<()> {
     if arg.path.as_os_str().is_empty() {
         return Err(Panic(PanicType::CoreArgLocalEmpty));

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 设置窗口 · 游戏启动标签（游戏窗口 / 内存 / JVM / 游戏参数 / 启动命令）
 //
-// 内存冲突（最小 > 最大）时把两个步进器标红并给出提示，保存也会被拦住（见 useSettingsLaunch）；
+// 内存冲突即最小 > 最大时，把两个步进器标红并给出提示，保存也会被拦住，见 useSettingsLaunch；
 // 冲突出现时把焦点落到"要改小"的最小内存上（NumberStepper 的输入框在组件内部，取 $el 里的 input）。
 import { nextTick, ref, watch } from "vue";
 import { t } from "../../../../lib/i18n";

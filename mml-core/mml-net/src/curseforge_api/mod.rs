@@ -40,11 +40,11 @@ pub mod file_obj;
 pub mod list_obj;
 pub mod version_obj;
 
-/// CurseForge 游戏 ID（Minecraft = 432）
+/// CurseForge 游戏 ID，Minecraft 为 432
 pub const GAME_ID: u32 = 432;
-/// 模组加载器类型：Fabric（modLoaderType 查询参数）
+/// 模组加载器类型：Fabric，用于 `modLoaderType` 查询参数
 pub const MODLOADER_FABRIC: u32 = 4;
-/// 模组加载器类型：NeoForge（modLoaderType 查询参数）
+/// 模组加载器类型：NeoForge，用于 `modLoaderType` 查询参数
 pub const MODLOADER_NEOFORGE: u32 = 6;
 /// 分类 ID：整合包
 pub const CLASS_MODPACK: u32 = 4471;
@@ -56,26 +56,26 @@ pub const CLASS_SAVES: u32 = 17;
 pub const CLASS_RESOURCEPACKS: u32 = 12;
 /// 分类 ID：光影包
 pub const CLASS_SHADERPACKS: u32 = 6552;
-/// 分类 ID：数据包（OpenLoader）
+/// 分类 ID：数据包，OpenLoader 用
 pub const CLASS_OPENLOADER_DATAPACK: u32 = 6945;
-/// 类别 ID：数据包
+/// 分类 ID：数据包，配 `CLASS_RESOURCEPACKS` 使用
 pub const CATEGORYID_DATAPACKS: u32 = 5193;
 
-/// 全局 CurseForge API Key
+/// 全局 CurseForge API Key，由 `set_key` 首次写入
 static API_KEY: OnceLock<String> = OnceLock::new();
 
-/// 搜索排序方式
+/// 搜索排序方式，对应 API 的 `sortField` 取值
 #[derive(Debug, Clone, Copy)]
 pub enum CurseForgeSortType {
-    /// 流行度
+    /// 流行度，`sortField` = 2
     Popularity,
-    /// 特性
+    /// 特性，`sortField` = 1
     Featured,
-    /// 上次更新
+    /// 上次更新，`sortField` = 3
     LastUpdated,
-    /// 名字
+    /// 名字，`sortField` = 4
     Name,
-    /// 下载次数
+    /// 下载次数，`sortField` = 6
     TotalDownloads,
 }
 
@@ -99,7 +99,7 @@ impl CurseForgeSortType {
     ///
     /// # 返回值
     ///
-    /// 返回 API 的 `sortOrder` 取值（1=降序，0=字母序）
+    /// 返回 API 的 `sortOrder` 取值：1 为降序，0 为字母序
     fn to_order_index(&self) -> u32 {
         match self {
             CurseForgeSortType::Featured
@@ -145,6 +145,7 @@ impl CurseForgeSortType {
 }
 
 impl Default for CurseForgeSortType {
+    /// 默认排序方式：流行度
     fn default() -> Self {
         CurseForgeSortType::Popularity
     }
@@ -152,25 +153,26 @@ impl Default for CurseForgeSortType {
 
 /// CurseForge 搜索/列表请求参数
 pub struct CurseFogreArg {
-    /// 项目编号
+    /// 项目编号；`None` 或空串表示不带
     pub id: Option<String>,
-    /// 游戏版本
+    /// 游戏版本，形如 `1.20.4`；`None` 或空串表示不限
     pub version: Option<String>,
-    /// 页数
+    /// 页数，从 0 起；`None` 按 0 处理
     pub page: Option<u32>,
-    /// 过滤
+    /// 排序方式；`None` 按流行度
     pub sort: Option<CurseForgeSortType>,
-    /// 过滤名
+    /// 搜索过滤词；`None` 或空串表示不带
     pub filter: Option<String>,
-    /// 页大小
+    /// 每页条数；`None` 时列表类按 20、文件列表按 50
     pub page_size: Option<u32>,
-    /// 分类
+    /// 分类 ID；`None` 或空串表示不限
     pub category: Option<String>,
-    /// 模组加载器类型
+    /// 模组加载器类型，取值见 `MODLOADER_*` 常量；`None` 或 0 表示不限
     pub loader: Option<u32>,
 }
 
 impl Default for CurseFogreArg {
+    /// 所有筛选条件留空，`sort` 取流行度
     fn default() -> Self {
         Self {
             id: Default::default(),
@@ -185,13 +187,18 @@ impl Default for CurseFogreArg {
     }
 }
 
-/// 设置API KEY
-/// - `key`: 密钥
+/// 设置 API Key，只在首次调用时生效
+///
+/// - `key`: CurseForge API Key
 pub fn set_key(key: &str) {
     API_KEY.get_or_init(|| key.to_string());
 }
 
-/// 获取API KEY
+/// 获取 API Key
+///
+/// # 返回值
+///
+/// 返回已设置的 Key；没设置过返回 `KeyIsNull`
 pub fn get_key() -> CoreResult<String> {
     match API_KEY.get() {
         Some(key) => Ok(key.clone()),
@@ -199,9 +206,13 @@ pub fn get_key() -> CoreResult<String> {
     }
 }
 
-/// 发送请求
+/// 发送请求，带上 API Key 并解析响应
 ///
-/// - `req`: 请求内容
+/// - `req`: 请求内容，方法、URL、请求体都已装好
+///
+/// # 返回值
+///
+/// 返回响应体反序列化后的 `T`
 async fn send<T: DeserializeOwned>(mut req: reqwest::Request) -> CoreResult<T> {
     req.headers_mut()
         .insert("x-api-key", get_key()?.parse().unwrap());
@@ -210,17 +221,17 @@ async fn send<T: DeserializeOwned>(mut req: reqwest::Request) -> CoreResult<T> {
     crate::handle_response(res).await
 }
 
-/// 发送项目搜索请求（各类列表的公共实现）
+/// 发送项目搜索请求，各类列表的公共实现
 ///
-/// - `classid`: 分类 ID
-/// - `version`: 游戏版本
-/// - `page`: 页码（从 0 起）
+/// - `classid`: 分类 ID，取值见 `CLASS_*` 常量
+/// - `version`: 游戏版本，空串表示不限
+/// - `page`: 页码，从 0 起
 /// - `sort`: 排序字段编号
 /// - `filter`: 搜索过滤词
 /// - `page_size`: 页大小
 /// - `sort_order`: 排序方向编号
-/// - `category`: 分类 ID（空串表示不限）
-/// - `mod_loader_type`: 加载器类型（0 表示不限）
+/// - `category`: 分类 ID，空串表示不限
+/// - `mod_loader_type`: 加载器类型，0 表示不限
 ///
 /// # 返回值
 ///
@@ -254,9 +265,7 @@ async fn get_list(
 
 /// 获取整合包列表
 ///
-/// 需要version page sort filter page_size category
-///
-/// - `arg`: 搜索参数
+/// - `arg`: 搜索参数，`loader` 字段在这里不生效
 ///
 /// # 返回值
 ///
@@ -344,7 +353,9 @@ pub async fn get_resourcepack_list(arg: CurseFogreArg) -> CoreResult<CurseForgeL
 
 /// 获取数据包列表
 ///
-/// - `arg`: 搜索参数
+/// CurseForge 没有独立的数据包分类，这里走资源包分类加 datapack 分类 ID。
+///
+/// - `arg`: 搜索参数，`category` 字段在这里被固定的 datapack 分类覆盖
 ///
 /// # 返回值
 ///
@@ -402,11 +413,11 @@ pub async fn get_mod(pid: &str, fid: &str) -> CoreResult<CurseForgeFileObj> {
     send(req).await
 }
 
-/// 批量查询文件的请求体
+/// 批量查询文件的请求体，对应 `mods/files` 接口
 #[derive(Serialize, Debug)]
 #[serde(default)]
 struct CurseForgeGetFilesObj {
-    /// 文件 ID 列表
+    /// 文件 ID 列表，对应请求键 `fileIds`
     #[serde(rename = "fileIds")]
     pub file_ids: Vec<u64>,
 }
@@ -451,9 +462,8 @@ pub async fn get_files(ids: Vec<u64>) -> CoreResult<Vec<CurseForgeFileDataObj>> 
 
     json(&mut req, &obj)?;
 
-    // 这个接口返回的是包装对象 `{"data": [...]}`，不是裸数组：
-    // 按 Vec 反序列化会得到 "invalid type: map, expected a sequence"。
-    // 复用分页那套结构装它（只有 data，没有 pagination —— 该字段有 serde(default) 兜底）
+    // 该接口返回包装对象 `{"data": [...]}` 而非裸数组，按 Vec 反序列化会报
+    // "invalid type: map, expected a sequence"；复用分页结构，pagination 由 serde(default) 兜底
     let res: CurseFogreFilePageObj = send(req).await?;
 
     Ok(res.data)
@@ -472,7 +482,7 @@ pub async fn get_categories() -> CoreResult<CurseForgeCategoriesObj> {
     send(req).await
 }
 
-/// 获取版本信息
+/// 获取游戏版本列表
 ///
 /// # 返回值
 ///
@@ -485,11 +495,11 @@ pub async fn get_version() -> CoreResult<CurseForgeVersionObj> {
     send(req).await
 }
 
-/// 获取版本信息
+/// 获取版本类型列表
 ///
 /// # 返回值
 ///
-/// 返回 Minecraft 的版本类型列表
+/// 返回 Minecraft 的版本类型列表，如 release / beta
 pub async fn get_version_type() -> CoreResult<CurseForgeVersionTypeObj> {
     let url = format!("{}games/{}/version-types", urls::CURSEFORGE, GAME_ID);
 
@@ -513,14 +523,14 @@ pub async fn get_mod_info(id: &str) -> CoreResult<CurseForgeListObj> {
     send(req).await
 }
 
-/// 批量查询项目的请求体
+/// 批量查询项目的请求体，对应 `mods` 接口
 #[derive(Serialize, Debug)]
 #[serde(default)]
 struct CurseForgeModsInfoObj {
-    /// 项目 ID 列表
+    /// 项目 ID 列表，对应请求键 `modIds`
     #[serde(rename = "modIds")]
     pub mod_ids: Vec<u64>,
-    /// 是否仅保留 PC 可用项目
+    /// 是否仅保留 PC 可用项目，对应请求键 `filterPcOnly`
     #[serde(rename = "filterPcOnly")]
     pub filter: bool,
 }
@@ -547,11 +557,9 @@ pub async fn get_mods_info(ids: Vec<u64>) -> CoreResult<CurseForgeListPageObj> {
     send(req).await
 }
 
-/// 获取文件列表
+/// 获取指定项目的文件列表
 ///
-/// 使用参数 page_size id page version loader
-///
-/// - `arg`: 查询参数
+/// - `arg`: 查询参数，用其中的 `id` / `page` / `page_size` / `version` / `loader`
 ///
 /// # 返回值
 ///
@@ -579,9 +587,7 @@ pub async fn get_files_page(arg: CurseFogreArg) -> CoreResult<CurseFogreFilePage
 impl CurseForgeFileDataObj {
     /// 修正下载地址
     ///
-    /// # 返回值
-    ///
-    /// 无返回值，`download_url` 缺失时就地按 CDN 规则补齐
+    /// `download_url` 缺失时就地按 CurseForge 的 CDN 规则补齐
     pub fn fix_download_url(&mut self) {
         if self.download_url.is_none() {
             self.download_url = Some(format!(
@@ -614,8 +620,8 @@ mod tests {
     use super::*;
     use crate::curseforge_api::file_obj::HashesObj;
 
-    /// 排序方式编号：与 CurseForge API 的 sortField 取值一致
-    /// （Featured=1, Popularity=2, LastUpdated=3, Name=4, TotalDownloads=6）
+    /// 排序方式编号与 CurseForge API 的 sortField 取值一致：
+    /// Featured=1，Popularity=2，LastUpdated=3，Name=4，TotalDownloads=6
     #[test]
     fn sort_type_index() {
         assert_eq!(CurseForgeSortType::Featured.to_id(), 1);
@@ -625,7 +631,7 @@ mod tests {
         assert_eq!(CurseForgeSortType::TotalDownloads.to_id(), 6);
     }
 
-    /// 排序方向编号：除 Name 外均为 1（升序），Name 为 0（字母序）
+    /// 排序方向编号：Name 为 0，其余为 1
     #[test]
     fn sort_type_order_index() {
         assert_eq!(CurseForgeSortType::Featured.to_order_index(), 1);
@@ -660,8 +666,8 @@ mod tests {
         }
     }
 
-    /// fix_download_url：downloadUrl 缺失时按 CF 的 CDN 规则补齐
-    /// （{CDN}files/{id/1000}/{id%1000}/{文件名}）
+    /// fix_download_url：downloadUrl 缺失时按 CF 的 CDN 规则补齐，
+    /// 形如 `{CDN}files/{id/1000}/{id%1000}/{文件名}`
     #[test]
     fn fix_download_url_when_missing() {
         let mut obj = make_file(5152805, "jei-1.20.4-forge-15.3.0.4.jar", Some("aaa"));

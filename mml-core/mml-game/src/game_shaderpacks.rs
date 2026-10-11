@@ -17,15 +17,16 @@ use crate::{game_options, launcher::instance_setting_obj::InstanceSettingObj};
 
 /// 光影包
 pub struct ShaderpackObj {
-    /// 名字
+    /// 显示名，取自语言文件，取不到时回退成文件名
     pub name: String,
-    /// 说明
+    /// 说明文字，取自语言文件，可能为空
     pub comment: String,
-    /// 文件位置
+    /// 光影包文件或目录的完整路径
     pub file: PathBuf,
 }
 
 impl Default for ShaderpackObj {
+    /// 全字段取默认值
     fn default() -> Self {
         Self {
             name: Default::default(),
@@ -36,7 +37,7 @@ impl Default for ShaderpackObj {
 }
 
 impl ShaderpackObj {
-    /// 删除
+    /// 删除光影包，进回收站
     ///
     /// # 返回值
     ///
@@ -47,8 +48,6 @@ impl ShaderpackObj {
 }
 
 /// 从光影包语言文件读取名字与说明
-///
-/// # 参数
 ///
 /// - `stream`: 语言文件数据流
 /// - `obj`: 写入目标
@@ -77,9 +76,7 @@ fn read_data<R: Read>(stream: R, obj: &mut ShaderpackObj) {
 
 /// 读取光影包信息
 ///
-/// # 参数
-///
-/// - `path`: 光影包文件路径（zip）
+/// - `path`: 光影包文件路径，必须是 zip
 ///
 /// # 返回值
 ///
@@ -128,15 +125,13 @@ pub fn read_shaderpacks<P: AsRef<Path>>(path: P) -> CoreResult<ShaderpackObj> {
     Err(ErrorType::ArgError(ArgErrorData::ArchiveType))
 }
 
-/// 读取光影包信息
+/// 读取未打包成 zip 的光影包目录
 ///
-/// # 参数
-///
-/// - `path`: 光影包文件路径
+/// - `path`: 光影包目录路径
 ///
 /// # 返回值
 ///
-/// 返回光影包信息
+/// 返回光影包信息；目录读取失败返回对应错误
 fn read_shaderpacks_dir<P: AsRef<Path>>(path: P) -> CoreResult<ShaderpackObj> {
     let mut obj = ShaderpackObj {
         file: path.as_ref().to_path_buf(),
@@ -172,7 +167,7 @@ impl InstanceSettingObj {
     ///
     /// # 返回值
     ///
-    /// 返回光影包列表（读取失败的文件会记录日志并跳过）
+    /// 返回光影包列表，读取失败的文件记录日志后跳过
     pub async fn get_shaderpacks(&self) -> Vec<ShaderpackObj> {
         let path = self.get_shaderpacks_path();
 

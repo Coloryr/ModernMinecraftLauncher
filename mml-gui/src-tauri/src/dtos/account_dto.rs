@@ -1,13 +1,13 @@
-//! 账户窗口 DTO：账户列表视图（IPC 返回，前端 wire camelCase）
+//! 账户窗口 DTO：账户列表视图，IPC 返回，前端 wire 为 camelCase
 //!
-//! 账户在 Rust 侧以 `mml_auth::LoginObj`（完整凭据）存储并持久化到 `accounts.json`，
+//! 账户在 Rust 侧以 `mml_auth::LoginObj` 存完整凭据并持久化到 `accounts.json`，
 //! 通过 [`AccountStoreDto::from_login`] 转成前端消费的 DTO：
-//! 登录信息（userName / authType / loginTime）+ 前端显示（avatarColor / skin / tokenStatus / avatar）。
+//! 登录信息 userName / authType / loginTime，加上前端显示用的 avatarColor / skin / tokenStatus / avatar。
 
 use mml_auth::{AuthType, LoginObj};
 use serde::{Deserialize, Serialize};
 
-/// 账户列表视图（IPC 返回）
+/// 账户列表视图，IPC 返回
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountStoreViewDto {
@@ -17,7 +17,7 @@ pub struct AccountStoreViewDto {
     pub current_uuid: Option<String>,
 }
 
-/// 单个账户（前端 wire：camelCase，字段即 `mml-vue/src/lib/types.ts` 的 Account）
+/// 单个账户，前端 wire 为 camelCase，字段即 `mml-vue/src/lib/types.ts` 的 Account
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountStoreDto {
@@ -27,32 +27,32 @@ pub struct AccountStoreDto {
     pub uuid: String,
     /// 账户类型：offline / microsoft / littleskin / authlib / nide8
     pub auth_type: String,
-    /// 最后登录时间（展示用）
+    /// 最后登录时间，仅用于展示
     pub login_time: String,
-    /// 头像渐变起点色（CSS，无皮肤时前端回退占位图）
+    /// 头像渐变起点色，CSS 颜色，无皮肤时前端回退占位图
     pub avatar_color: String,
-    /// 皮肤主色（SVG 占位图生成用）
+    /// 皮肤主色，用于生成 SVG 占位图
     pub skin: String,
     /// Token 状态：valid / expired
     pub token_status: String,
-    /// 皮肤头像（mml-skin-draw 渲染的 data URI PNG）；无皮肤为 None
+    /// 皮肤头像，mml-skin-draw 渲染的 data URI PNG；无皮肤为 None
     pub avatar: Option<String>,
-    /// 服务器地址（重登预填用：littleskin/authlib 为服务器 URL，nide8 为服务器 ID；
-    /// offline 没有，微软的 text1 存的是 refresh_token，绝不能下发给前端）
+    /// 服务器地址，重登时预填：littleskin/authlib 为服务器 URL，nide8 为服务器 ID；
+    /// offline 没有，微软的 text1 存的是 refresh_token，绝不能下发给前端
     pub server: Option<String>,
-    /// 自定义字段 1（详情页展示；微软的 text1 是 refresh_token，仅本地显示）
+    /// 自定义字段 1，详情页展示；微软的 text1 是 refresh_token，仅本地显示
     pub ext1: Option<String>,
-    /// 自定义字段 2（详情页展示）
+    /// 自定义字段 2，详情页展示
     pub ext2: Option<String>,
-    /// 是否有可刷新的令牌（决定前端显示刷新按钮）
+    /// 是否有可刷新的令牌，决定前端是否显示刷新按钮
     pub can_refresh: bool,
-    /// 是否支持重新登录（决定前端显示重登按钮）
+    /// 是否支持重新登录，决定前端是否显示重登按钮
     pub can_relogin: bool,
-    /// 是否可编辑（决定前端显示编辑按钮）
+    /// 是否可编辑，决定前端是否显示编辑按钮
     pub can_edit: bool,
 }
 
-/// OAuth登录开始
+/// OAuth 登录开始
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountOAuthDto {
@@ -62,24 +62,22 @@ pub struct AccountOAuthDto {
     pub url: String,
 }
 
-/// OAuth登录阶段进度（state：waiting / xbox / xsts / token / profile / ok / fail）
+/// OAuth 登录阶段进度，state 取值：waiting / xbox / xsts / token / profile / ok / fail
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountOAuthStateDto {
-    /// 当前阶段标识（前端按 key 做 i18n）
+    /// 当前阶段标识，前端按 key 做 i18n
     pub state: String,
-    /// 附加信息（fail 时的错误文案）
+    /// 附加信息，fail 时为错误文案
     pub message: Option<String>,
 }
 
 impl AccountStoreDto {
-    /// 从 LoginObj（账户完整凭据）构造前端 DTO
+    /// 从 LoginObj 构造前端 DTO，LoginObj 即账户完整凭据
     ///
-    /// 有皮肤时 `avatar` 应为 `mml-skin-draw` 渲染的头像 data URI（渲染管线见
-    /// `windows/account.rs`）；当前 LoginObj 尚未携带皮肤贴图，故为 None，
+    /// 有皮肤时 `avatar` 应为 `mml-skin-draw` 渲染的头像 data URI，渲染管线见
+    /// `windows/account.rs`；当前 LoginObj 尚未携带皮肤贴图，故为 None，
     /// 前端回退到原来的占位图显示。
-    ///
-    /// # 参数
     ///
     /// - `login`: 账户完整凭据
     ///
@@ -117,8 +115,6 @@ impl AccountStoreDto {
 
 /// 前端账户类型字符串 → AuthType
 ///
-/// # 参数
-///
 /// - `s`: 前端账户类型字符串
 ///
 /// # 返回值
@@ -137,8 +133,6 @@ pub fn auth_type_from_str(s: &str) -> AuthType {
 
 /// AuthType → 前端账户类型字符串
 ///
-/// # 参数
-///
 /// - `t`: 账户类型
 ///
 /// # 返回值
@@ -155,15 +149,13 @@ fn auth_type_str(t: &AuthType) -> &'static str {
     }
 }
 
-/// 按 uuid 哈希取配色（无皮肤时的占位色）
-///
-/// # 参数
+/// 按 uuid 哈希取配色，用作无皮肤时的占位色
 ///
 /// - `uuid`: 账户 UUID
 ///
 /// # 返回值
 ///
-/// 返回渐变起点色与终点色（CSS 颜色）
+/// 返回渐变起点色与终点色，均为 CSS 颜色
 fn palette(uuid: &str) -> (String, String) {
     const P: [(&str, &str); 6] = [
         ("#3f8cff", "#5f6cff"),

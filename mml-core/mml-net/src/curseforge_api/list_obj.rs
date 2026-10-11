@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// CurseForge 项目列表查询结果
+/// 项目详情接口 `/mods/{id}` 的响应
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct CurseForgeListObj {
@@ -18,7 +18,7 @@ impl Default for CurseForgeListObj {
     }
 }
 
-/// CurseForge 项目分页列表
+/// 项目分页列表，搜索接口 `/mods/search` 与批量查询 `/mods` 共用
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct CurseForgeListPageObj {
@@ -43,7 +43,7 @@ impl Default for CurseForgeListPageObj {
 pub struct CurseForgeListDataObj {
     /// 项目 ID
     pub id: u64,
-    /// 所属大类 ID（模组 / 整合包等）
+    /// 所属大类 ID，如模组 / 整合包
     #[serde(rename = "classId")]
     pub class_id: u32,
     /// 项目名称
@@ -63,7 +63,7 @@ pub struct CurseForgeListDataObj {
     pub logo: LogoObj,
     /// 截图列表
     pub screenshots: Vec<ScreenshotsObj>,
-    /// 最后更新时间
+    /// 最后更新时间，ISO 8601 UTC 字符串
     #[serde(rename = "dateModified")]
     pub date_modified: String,
 }
@@ -112,7 +112,7 @@ impl Default for ScreenshotsObj {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct LogoObj {
-    /// Logo URL
+    /// Logo 图片地址，接口未提供时为 `None`
     pub url: Option<String>,
 }
 
@@ -130,7 +130,7 @@ impl Default for LogoObj {
 pub struct AuthorsObj {
     /// 作者名称
     pub name: String,
-    /// 头像 URL
+    /// 头像图片地址，接口未提供时为 `None`
     #[serde(rename = "avatarUrl")]
     pub avatar_url: Option<String>,
 }
@@ -189,7 +189,7 @@ impl Default for LinksObj {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct CurseForgeListPaginationObj {
-    /// 结果总数
+    /// 结果总数，用于翻页
     #[serde(rename = "totalCount")]
     pub total_count: u64,
 }

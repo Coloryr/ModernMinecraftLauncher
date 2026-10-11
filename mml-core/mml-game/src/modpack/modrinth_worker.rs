@@ -28,18 +28,16 @@ use crate::{
     },
 };
 
-/// Modrinth整合包安装器
+/// Modrinth 整合包安装器
 pub struct ModrinthPackWorker {
-    /// 整合包信息
+    /// 解析出的 modrinth.index.json，`read_info` 之前为 `None`
     info: Option<ModrinthPackObj>,
-    /// 基础安装器
+    /// 安装流程的公共部分
     base: BaseModPackWorker,
 }
 
 impl ModrinthPackWorker {
     /// 创建 Modrinth 整合包安装器
-    ///
-    /// # 参数
     ///
     /// - `base`: 基础安装器
     ///
@@ -53,7 +51,7 @@ impl ModrinthPackWorker {
 
 #[async_trait]
 impl ModPackWorker for ModrinthPackWorker {
-    /// 获取主信息
+    /// 读取 modrinth.index.json
     fn read_info(&mut self) -> CoreResult<()> {
         if let Some(item) = self
             .base
@@ -76,7 +74,7 @@ impl ModPackWorker for ModrinthPackWorker {
         }
     }
 
-    /// 获取版本数据
+    /// 从依赖里取游戏版本与加载器，并校验版本 json
     async fn read_version(&mut self) -> CoreResult<()> {
         if self.info.is_none() {
             return Err(ErrorType::DataNotFound(DataNotFoundData::Info));
@@ -113,10 +111,8 @@ impl ModPackWorker for ModrinthPackWorker {
 
     /// 创建游戏实例
     ///
-    /// # 参数
-    ///
-    /// - `name`: 实例名（`None` 时用整合包名）
-    /// - `group`: 分组名
+    /// - `name`: 实例名，传 `None` 时用整合包名加版本号
+    /// - `group`: 目标分组 uuid，`None` 表示不分组
     ///
     /// # 返回值
     ///
@@ -134,14 +130,13 @@ impl ModPackWorker for ModrinthPackWorker {
                     loader_version: Some(self.base.loader_version.clone()),
                     ..Default::default()
                 };
-                // 分组不在实例配置里，创建时一并交给分组表（不存在的组会被建出来）
+                // 分组不在实例配置里，创建时一并交给分组表，不存在的组会被建出来
                 let game = game
                     .create_instance_in_group(self.base.instance_gui.clone(), group)
                     .await?;
 
                 if let Some(icon) = &self.base.icon {
-                    // 图标是装饰性的：写失败只记日志，不让整个安装失败
-                    // （与 add_game 里整合包安装的图标处理一致）
+                    // 图标是装饰性的：写失败只记日志，不让整个安装失败，与 add_game 的处理一致
                     if let Err(err) =
                         InstanceSettingObj::save_icon(&game, InputFile::Url(icon.clone())).await
                     {
@@ -158,8 +153,6 @@ impl ModPackWorker for ModrinthPackWorker {
     ///
     /// `overrides/` 下的文件去除前缀后写入游戏根目录；其余文件直接
     /// 写入游戏路径。
-    ///
-    /// # 参数
     ///
     /// - `unselect`: 不解压的文件列表
     ///
@@ -209,8 +202,7 @@ impl ModPackWorker for ModrinthPackWorker {
 
     /// 统一下载所有模组文件。
     async fn download(&self) {
-        // 取出下载列表（在 .await 前释放 MutexGuard），取走后列表为空，
-        // 重复调用不会重复下载
+        // 取出下载列表并在 .await 前释放 MutexGuard；取走后列表为空，重复调用不会重复下载
         let items = {
             let Ok(mut guard) = self.base.downloads.lock() else {
                 return;
@@ -255,8 +247,8 @@ impl ModPackWorker for ModrinthPackWorker {
             return Err(ErrorType::DataNotFound(DataNotFoundData::GameInstance));
         };
 
-        // 读取上次安装时保存的整合包 manifest（base 目录）
-        // 缺失 / 打不开 / 非法 JSON 一律当作"没有旧清单"（见 `modpack::manifest`）
+        // 读取上次安装时保存的整合包 manifest，存在 base 目录
+        // 缺失 / 打不开 / 非法 JSON 一律当作"没有旧清单"，见 `modpack::manifest`
         let old_info = {
             let game = game.read().unwrap();
             let old_manifest_path = game.get_base_path().join(names::MODRINTH_FILE);
@@ -279,7 +271,7 @@ impl ModPackWorker for ModrinthPackWorker {
         let mut new_downloads: Vec<FileItemObj> = Vec::new();
 
         if let Some(old_info) = old_info {
-            // 差异计算已抽到 `modpack::diff`（纯函数，离线可测）；判定规则一字未改
+            // 差异计算已抽到 `modpack::diff`，纯函数、离线可测；判定规则一字未改
             let diff = diff::diff_modrinth_files(&info.files, &old_info.files);
             let add_list = diff.add;
             let remove_list = diff.remove;
@@ -335,7 +327,7 @@ impl ModPackWorker for ModrinthPackWorker {
                 }
             }
         } else {
-            // 差异计算已抽到 `modpack::diff`（纯函数，离线可测）；判定规则一字未改
+            // 差异计算已抽到 `modpack::diff`，纯函数、离线可测；判定规则一字未改
             let diff = diff::diff_modrinth_online(&res.online, &online_info);
             let add_list = diff.add;
             let remove_list = diff.remove;
@@ -376,9 +368,7 @@ impl ModPackWorker for ModrinthPackWorker {
     }
 }
 
-/// 删除文件，若文件已被禁用（追加了 `.disable`/`.disabled` 后缀）则一并删除。
-///
-/// # 参数
+/// 删除文件，若文件已被禁用则连同 `.disable`/`.disabled` 后缀那份一起删。
 ///
 /// - `file`: 文件路径
 fn delete_with_disabled<P: AsRef<Path>>(file: P) {

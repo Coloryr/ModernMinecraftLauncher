@@ -1,7 +1,7 @@
 //! Mojang API 的离线测试。
 //!
 //! 覆盖各数据结构对真实 Mojang / minecraft.net API 响应结构的反序列化。
-//! 含一个标记 `#[ignore]` 的真实网络测试（版本清单）。
+//! 含一个标记 `#[ignore]` 的真实网络测试，即版本清单。
 //!
 //! 运行网络测试：
 //! `cargo test -p mml-net --test mojang_api_test -- --ignored`
@@ -11,7 +11,7 @@ use mml_net::mojang_api::{
     MinecraftTokenResObj, UserProfileObj, get_versions,
 };
 
-/// Minecraft Profile 接口（`api.minecraftservices.com/minecraft/profile`）的响应
+/// Minecraft Profile 接口 `api.minecraftservices.com/minecraft/profile` 的响应
 const PROFILE_JSON: &str = r#"{
     "id": "069a79f444e94726a5befca90e38aaf5",
     "name": "Notch",
@@ -26,7 +26,7 @@ const PROFILE_JSON: &str = r#"{
     "capes": []
 }"#;
 
-/// 会话服务器档案接口（`sessionserver.mojang.com/session/minecraft/profile/{uuid}`）的响应
+/// 会话服务器档案接口 `sessionserver.mojang.com/session/minecraft/profile/{uuid}` 的响应
 const USER_PROFILE_JSON: &str = r#"{
     "id": "069a79f444e94726a5befca90e38aaf5",
     "name": "Notch",
@@ -38,14 +38,14 @@ const USER_PROFILE_JSON: &str = r#"{
     ]
 }"#;
 
-/// Xbox 登录换取 Minecraft Token（`login_with_xbox`）的响应
+/// Xbox 登录换取 Minecraft Token，即 `login_with_xbox` 的响应
 const TOKEN_RES_JSON: &str = r#"{
     "access_token": "eyJhbGciOiJIUzI1NiJ9",
     "token_type": "Bearer",
     "expires_in": 86400
 }"#;
 
-/// Minecraft 官方新闻接口的响应（AEM 输出，snake_case + imageURL 混合命名）
+/// Minecraft 官方新闻接口的响应，AEM 输出，snake_case 与 imageURL 混合命名
 const NEWS_JSON: &str = r#"{
     "article_grid": [
         {
@@ -86,7 +86,7 @@ fn deserialize_user_profile() {
     );
 }
 
-/// Token 响应反序列化：字段与 get_minecraft_token 的校验逻辑对应
+/// Token 响应反序列化，字段与 get_minecraft_token 的校验逻辑对应
 #[test]
 fn deserialize_token_res() {
     let obj: MinecraftTokenResObj = serde_json::from_str(TOKEN_RES_JSON).unwrap();
@@ -95,7 +95,7 @@ fn deserialize_token_res() {
     assert!(obj.expires_in > 0);
 }
 
-/// 新闻响应反序列化：嵌套结构逐层校验
+/// 新闻响应反序列化，嵌套结构逐层校验
 #[test]
 fn deserialize_news() {
     let obj: MinecraftNewsObj = serde_json::from_str(NEWS_JSON).unwrap();
@@ -126,25 +126,25 @@ fn deserialize_news() {
     assert_eq!(grid.default_tile.title, "t");
 }
 
-/// Token 响应字段缺失时应用默认值（`#[serde(default)]`）
+/// Token 响应字段缺失时应用默认值，靠 serde 的 default 属性
 #[test]
 fn token_res_defaults_on_missing_fields() {
     let obj: MinecraftTokenResObj = serde_json::from_str("{}").unwrap();
     assert_eq!(obj.access_token, "");
     assert_eq!(obj.expires_in, 0);
 
-    // expires_in <= 0 时 get_minecraft_token 应视为失效（AuthTokenTimeout）
+    // expires_in <= 0 时 get_minecraft_token 应视为失效，报 AuthTokenTimeout
     assert!(obj.expires_in <= 0);
 }
 
-/// 获取主版本清单（真实网络请求，默认忽略）。
+/// 获取主版本清单，真实网络请求，默认忽略。
 ///
 /// 运行方式：
 /// `cargo test -p mml-net --test mojang_api_test -- --ignored`
 #[tokio::test]
 #[ignore = "需要真实网络：请求 Mojang 版本清单，cargo test -- --ignored 运行"]
 async fn versions_manifest_network() {
-    // 初始化配置与 HTTP 客户端（临时目录，测后清理）
+    // 初始化配置与 HTTP 客户端，用临时目录，测后清理
     let dir = mml_testutil::temp_dir().join(format!("mml-net-mojang-test-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("创建临时配置目录失败");
     mml_config::init(&dir);

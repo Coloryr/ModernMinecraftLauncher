@@ -103,7 +103,7 @@ export function useBlockList() {
     track(
       onBlockRender((e) => {
         status.value = e;
-        // 渲染刚结束（且已有结果）：刷新列表（首次渲染完成时列表还没拉过）
+        // 渲染刚结束且已有结果时刷新列表：首次渲染完成时列表还没拉过
         if (!e.running && e.rendered) void loadBlocks();
         if (!e.running) {
           downloadWinOpened = false;

@@ -17,7 +17,11 @@ use mml_game::game_saves::SaveObj;
 use mml_game::launcher::instance_setting_obj::{InstanceSettingObj, ProxyHostObj, ServerObj};
 use mml_names::get_line_ending;
 
-/// 临时运行目录（每次运行前先删除旧目录）
+/// 初始化内核各系统并返回本次运行的临时目录，每次运行前先删旧目录
+///
+/// # 返回值
+///
+/// 本次测试专用的运行目录，进程内只初始化一次
 fn init_all() -> PathBuf {
     static INIT: OnceLock<PathBuf> = OnceLock::new();
     INIT.get_or_init(|| {
@@ -41,13 +45,19 @@ fn init_all() -> PathBuf {
     .clone()
 }
 
-/// 修改全局配置的测试需要独占执行（其他依赖空窗口配置的测试也持锁）
+/// 修改全局配置的测试需要独占执行，其他依赖空窗口配置的测试也持同一把锁
 fn lock_config() -> MutexGuard<'static, ()> {
     static CONFIG_LOCK: Mutex<()> = Mutex::new(());
     CONFIG_LOCK.lock().unwrap_or_else(|err| err.into_inner())
 }
 
 /// 构造一个无附加配置的测试实例
+///
+/// - `version`: 游戏版本
+///
+/// # 返回值
+///
+/// 返回实例名与目录都是 `arg-test` 的实例
 fn make_instance(version: &str) -> InstanceSettingObj {
     InstanceSettingObj {
         name: "arg-test".to_string(),
@@ -57,7 +67,7 @@ fn make_instance(version: &str) -> InstanceSettingObj {
     }
 }
 
-/// 窗口参数：实例设置了宽高 → 生成 `--width` / `--height`。
+/// 窗口参数：实例设置了宽高，应生成 `--width` / `--height`
 #[test]
 fn game_arg_window_size() {
     init_all();
@@ -76,7 +86,7 @@ fn game_arg_window_size() {
     assert_eq!(args, vec!["--width", "1280", "--height", "720"]);
 }
 
-/// 窗口参数：全屏时只生成 `--fullscreen`，忽略宽高。
+/// 窗口参数：全屏时只生成 `--fullscreen`，忽略宽高
 #[test]
 fn game_arg_full_screen() {
     init_all();
@@ -96,7 +106,7 @@ fn game_arg_full_screen() {
     assert_eq!(args, vec!["--fullscreen"]);
 }
 
-/// 窗口参数：实例与全局配置都没设置时不生成窗口参数。
+/// 窗口参数：实例与全局配置都没设置时不生成窗口参数
 #[test]
 fn game_arg_no_window() {
     init_all();
@@ -107,7 +117,7 @@ fn game_arg_no_window() {
     assert!(args.is_empty(), "不应生成窗口参数: {args:?}");
 }
 
-/// 窗口参数：实例未设置时回退到全局配置（默认 1280x720）。
+/// 窗口参数：实例未设置时回退到全局配置，即默认 1280x720
 #[test]
 fn game_arg_window_config_fallback() {
     init_all();
@@ -137,7 +147,7 @@ fn game_arg_window_config_fallback() {
     assert!(ok, "实例缺省时应使用全局窗口配置: {args:?}");
 }
 
-/// 自动进入存档：生成 `--quickPlaySingleplayer`。
+/// 自动进入存档：生成 `--quickPlaySingleplayer`
 #[test]
 fn game_arg_auto_join_save() {
     init_all();
@@ -153,7 +163,7 @@ fn game_arg_auto_join_save() {
     assert_eq!(args, vec!["--quickPlaySingleplayer", "my-world"]);
 }
 
-/// 自动进入服务器：1.20+ 用 quickPlayMultiplayer，端口缺省 25565。
+/// 自动进入服务器：1.20 及以上用 quickPlayMultiplayer，端口缺省 25565
 #[test]
 fn game_arg_auto_join_server_quick_play() {
     init_all();
@@ -170,7 +180,7 @@ fn game_arg_auto_join_server_quick_play() {
     assert_eq!(args, vec!["--quickPlayMultiplayer", "mc.example.com:25565"]);
 }
 
-/// 自动进入服务器：1.20 以下用 `--server` / `--port`。
+/// 自动进入服务器：1.20 以下用 `--server` / `--port`
 #[test]
 fn game_arg_auto_join_server_legacy() {
     init_all();
@@ -187,7 +197,7 @@ fn game_arg_auto_join_server_legacy() {
     assert_eq!(args, vec!["--server", "mc.example.com", "--port", "25566"]);
 }
 
-/// 自动进入服务器：地址为空时不生成参数。
+/// 自动进入服务器：地址为空时不生成参数
 #[test]
 fn game_arg_auto_join_server_empty_ip() {
     init_all();
@@ -204,7 +214,7 @@ fn game_arg_auto_join_server_empty_ip() {
     assert!(args.is_empty(), "空地址不应生成参数: {args:?}");
 }
 
-/// 代理设置：生成 `--proxyHost` 等参数，未设置的项跳过。
+/// 代理设置：生成 `--proxyHost` 等参数，未设置的项跳过
 #[test]
 fn game_arg_proxy() {
     init_all();
@@ -234,7 +244,7 @@ fn game_arg_proxy() {
     );
 }
 
-/// 自定义游戏参数：按行拆分追加到末尾。
+/// 自定义游戏参数：按行拆分追加到末尾
 #[test]
 fn game_arg_custom_game_args() {
     init_all();
@@ -252,7 +262,7 @@ fn game_arg_custom_game_args() {
     assert_eq!(args, vec!["-doSomething", "-doAnother"]);
 }
 
-/// 自定义 GC 参数不参与游戏参数生成（属于 JVM 参数）。
+/// 自定义 GC 参数属于 JVM 参数，不参与游戏参数生成
 #[test]
 fn game_arg_ignores_gc_mode() {
     init_all();
@@ -270,7 +280,7 @@ fn game_arg_ignores_gc_mode() {
     assert!(args.is_empty(), "GC 配置不应影响游戏参数: {args:?}");
 }
 
-/// 占位符替换：实例名、UUID、游戏目录、Java 路径与 JVM 参数。
+/// 占位符替换：实例名、UUID、游戏目录、Java 路径与 JVM 参数
 #[test]
 fn replace_arg_placeholders() {
     init_all();
@@ -289,7 +299,7 @@ fn replace_arg_placeholders() {
     let mut parts = out.split('|');
     assert_eq!(parts.next(), Some("arg-test"));
     assert_eq!(parts.next(), Some(uuid.as_str()));
-    // %GAME_DIR% 与 %GAME_BASE_DIR% 都替换为游戏目录（.minecraft）
+    // %GAME_DIR% 与 %GAME_BASE_DIR% 都替换为游戏目录 .minecraft
     assert_eq!(parts.next(), Some(game_path.as_str()));
     assert_eq!(parts.next(), Some(game_path.as_str()));
     assert_eq!(parts.next(), Some("java-bin"));
@@ -298,7 +308,7 @@ fn replace_arg_placeholders() {
     assert_eq!(parts.next(), None);
 }
 
-/// 占位符替换：无占位符的参数原样返回。
+/// 占位符替换：无占位符的参数原样返回
 #[test]
 fn replace_arg_no_placeholder() {
     init_all();

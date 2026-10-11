@@ -1,7 +1,7 @@
-//! 设置窗口：规格 + IPC 命令（系统字体枚举 / 网络设置 / 启动设置）
+//! 设置窗口：规格 + IPC 命令，含系统字体枚举 / 网络设置 / 启动设置
 //!
 //! 网络设置落在 core `config.json` 的 `HttpObj`，启动设置落在 `RunArgObj`
-//! 与 Java 列表（mml-jvms，增删即时持久化）。
+//! 与 Java 列表；Java 列表由 mml-jvms 持有，增删即时持久化。
 
 use mml_config::config_obj::{DnsObj, GameCheckObj, HttpObj, RunArgObj, WindowSettingObj};
 
@@ -18,7 +18,11 @@ use self::java::java_list;
 
 // ================= 界面字体 =================
 
-/// 枚举系统已安装字体的族名（系统直接给出已去重的列表，这里再排序一次）
+/// 枚举系统已安装字体的族名；系统给出的列表已去重，这里再排序一次
+///
+/// # 返回值
+///
+/// 按小写字母序排好的字体族名；系统查询失败时返回空列表
 #[tauri::command]
 pub fn settings_get_system_fonts() -> Vec<String> {
     use font_kit::source::SystemSource;
@@ -30,11 +34,15 @@ pub fn settings_get_system_fonts() -> Vec<String> {
 
 // ================= 缓存目录 =================
 
-/// 下载缓存目录（`<运行目录>/cache`，见 mml-downloader）的字符串形式
+/// 下载缓存目录的字符串形式，即运行目录下的 `cache`，见 mml-downloader
 ///
-/// 前端把 webview 的持久化数据（localStorage 的那份镜像）写在它的 `webview/` 子目录下
+/// 前端把 webview 的持久化数据写在它的 `webview/` 子目录下，即 localStorage 的那份镜像
 /// —— 那里是启动器自己的缓存区，与下载临时文件同一个根、由内核 `init` 保证存在。
 /// 路径的唯一来源是 `mml_downloader::get_cache_path()`，**不要**在前端另拼一套。
+///
+/// # 返回值
+///
+/// 缓存目录的绝对路径，非 UTF-8 字符按替换符处理
 #[tauri::command]
 pub fn settings_get_cache_path() -> String {
     mml_downloader::get_cache_path()
@@ -46,7 +54,11 @@ pub fn settings_get_cache_path() -> String {
 
 // ================= 网络设置 =================
 
-/// 读取网络与下载设置（core config.json 的 HttpObj + DnsObj + GameCheckObj）
+/// 读取网络与下载设置：core config.json 的 HttpObj + DnsObj + GameCheckObj
+///
+/// # 返回值
+///
+/// 网络 / 代理、DNS 与游戏文件检查三项当前配置
 #[tauri::command]
 pub fn settings_get_network() -> NetworkSettingDto {
     let config = mml_config::read_config();
@@ -56,20 +68,21 @@ pub fn settings_get_network() -> NetworkSettingDto {
     dto
 }
 
-/// 保存网络与下载设置（Http / DNS / 游戏文件检查一次落盘）
+/// 保存网络与下载设置：Http / DNS / 游戏文件检查一次落盘
 ///
 /// 保存后**立即生效**，三件事依次做：
-/// 1. `mml_net::rebuild()` —— 重建两个 HTTP 客户端，并**中断所有在途请求**
-///    （旧实现用 `OnceLock` 只建一次，改完代理必须重启才生效）；
+/// 1. `mml_net::rebuild()` —— 重建两个 HTTP 客户端，并**中断所有在途请求**；
+///    旧实现用 `OnceLock` 只建一次，改完代理必须重启才生效；
 ///    被中断的请求返回"请求已中断"错误，调用方按失败处理、重试即走新代理；
 /// 2. `mml_downloader::cancel_all()` —— 取消全部下载任务，别让它们在旧代理上继续跑；
 /// 3. 落盘配置。
 ///
 /// 这样"卡在加载器列表时改代理"能立刻生效，不用关窗重开。
+///
+/// - `dto`: 网络 / 代理、DNS 与游戏文件检查三项的新值，整体覆盖
 #[tauri::command]
 pub fn settings_save_network(dto: NetworkSettingDto) {
-    // 先记一行"收到的代理配置"，用来判断前端到底有没有把值送进来
-    // （代理字段是草稿，只有点保存才会到这里）
+    // 记一行收到的代理配置，用来判断前端到底有没有把值送进来；代理字段是草稿，点保存才到这里
     mml_log::info(format!(
         "保存网络设置：workProxy={} ({} {}:{}) loginProxy={} ({} {}:{})",
         dto.work_proxy,
@@ -94,7 +107,11 @@ pub fn settings_save_network(dto: NetworkSettingDto) {
 
 // ================= 游戏启动设置 =================
 
-/// 读取启动设置（Java 列表 + 启动参数 + 窗口设置）
+/// 读取启动设置：Java 列表 + 启动参数 + 窗口设置
+///
+/// # 返回值
+///
+/// 当前 Java 列表，由 `java_list` 现取；以及启动参数与窗口设置
 #[tauri::command]
 pub fn settings_get_launch() -> LaunchSettingDto {
     let config = mml_config::read_config();
@@ -107,7 +124,10 @@ pub fn settings_get_launch() -> LaunchSettingDto {
     dto
 }
 
-/// 保存启动参数与窗口设置（Java 列表走独立命令增删）
+/// 保存启动参数与窗口设置；Java 列表走独立命令增删
+///
+/// - `run`: 启动参数新值
+/// - `window`: 窗口设置新值
 #[tauri::command]
 pub fn settings_save_launch(run: RunArgSettingDto, window: WindowSettingDto) {
     let mut config = mml_config::write_config();
@@ -117,15 +137,19 @@ pub fn settings_save_launch(run: RunArgSettingDto, window: WindowSettingDto) {
     mml_config::save();
 }
 
-/// 设置项的出厂默认值（供界面「恢复默认」用）
+/// 设置项的出厂默认值，供界面「恢复默认」用
 ///
 /// 形状与 `settings_get_network` / `settings_get_launch` 一致，值取自 core 的默认值：
 /// - `HttpObj::default()` / `DnsObj::default()` / `GameCheckObj::default()`
-/// - `RunArgObj::new()`（512 / 4096 / GC Auto / 预启动与游戏同时运行）
-/// - `WindowSettingObj::new()`（窗口 1280×720）
+/// - `RunArgObj::new()`：512 / 4096 / GC Auto / 预启动与游戏同时运行
+/// - `WindowSettingObj::new()`：窗口 1280×720
 ///
 /// 注意 `GameCheckSettingDto` 的 `derive(Default)` 是**全 false**，与 core 的
 /// 「八项全 true」不同，所以这里必须走 `From<&GameCheckObj>` 而不是 DTO 自己的 Default。
+///
+/// # 返回值
+///
+/// 网络 / 代理、启动参数与窗口设置三项的出厂默认值
 #[tauri::command]
 pub fn settings_get_defaults() -> SettingsDefaultsDto {
     let mut network = NetworkSettingDto::from(&HttpObj::default());

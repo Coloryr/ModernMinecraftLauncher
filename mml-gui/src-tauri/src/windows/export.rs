@@ -1,7 +1,7 @@
 //! 实例导出窗口：导出为 CurseForge / Modrinth 标准整合包
 //!
-//! 打包逻辑在内核 `mml_game::game_export`（`InstanceSettingObj::export`），
-//! 这里只做信息收集（实例文件 → 在线模组 / 本地文件分组）与任务托管：
+//! 打包逻辑在内核 `mml_game::game_export` 的 `InstanceSettingObj::export`，
+//! 这里只做实例文件到在线模组 / 本地文件分组的收集与任务托管：
 //! `export_run` 后台跑导出，进度经 `export-progress` 事件上报前端。
 
 use std::{
@@ -31,22 +31,34 @@ use crate::{
     listens,
 };
 
-/// 导出任务进行中（同时只允许一个导出任务）
+/// 导出任务进行中，同时只允许一个导出任务
 static EXPORT_RUNNING: AtomicBool = AtomicBool::new(false);
 
-/// 切换目标实例事件（窗口已存在时再次打开会推送，前端据此切换实例）
+/// 切换目标实例事件：窗口已存在时再次打开会推送，前端据此切换实例
+///
+/// - `app`: 应用句柄，广播用它
+/// - `event`: 目标实例 uuid
 #[gui_macros::emit]
 pub fn emit_export_focus(app: &AppHandle, event: LogFocusDto) {
     let _ = app.emit(listens::EXPORT_FOCUS, event);
 }
 
-/// 导出进度事件（打包各文件时推进，结束时发 done / failed）
+/// 导出进度事件：打包各文件时推进，结束时发 done / failed
+///
+/// - `app`: 应用句柄，广播用它
+/// - `event`: 当前进度快照
 #[gui_macros::emit]
 fn emit_export_progress(app: &AppHandle, event: ExportProgressDto) {
     let _ = app.emit(listens::EXPORT_PROGRESS, event);
 }
 
 /// 解析实例 uuid
+///
+/// - `uuid`: 实例 uuid 字符串
+///
+/// # 返回值
+///
+/// 实例设置的克隆；uuid 非法返回 `err.uuid`，实例不存在返回 `err.gameNotFound`
 fn parse_instance(uuid: &str) -> Result<InstanceSettingObj, String> {
     let uuid = Uuid::parse_str(uuid).map_err(|_| "err.uuid".to_string())?;
     mml_game::get_instance(&uuid)
@@ -54,12 +66,24 @@ fn parse_instance(uuid: &str) -> Result<InstanceSettingObj, String> {
         .ok_or_else(|| "err.gameNotFound".to_string())
 }
 
-/// 目录是否含至少一个文件（递归）
+/// 目录是否含至少一个文件，递归统计
+///
+/// - `path`: 待检查的目录
+///
+/// # 返回值
+///
+/// 目录存在且有文件时为真
 fn dir_has_files(path: &PathBuf) -> bool {
     path.is_dir() && !path_helper::get_all_files(path).is_empty()
 }
 
-/// 收集目录下全部文件（目录不存在返回空表）
+/// 收集目录下全部文件
+///
+/// - `path`: 待收集的目录
+///
+/// # 返回值
+///
+/// 目录下的全部文件；目录不存在时返回空表
 fn collect_files(path: &PathBuf) -> Vec<PathBuf> {
     if path.is_dir() {
         path_helper::get_all_files(path)
@@ -68,12 +92,18 @@ fn collect_files(path: &PathBuf) -> Vec<PathBuf> {
     }
 }
 
-/// 获取实例导出信息（在线模组 / 本地模组分组 + 各内容目录有无）
+/// 获取实例导出信息：在线模组 / 本地模组分组加各内容目录有无
+///
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// 实例元数据与模组分组；uuid 非法或实例不存在返回错误文案
 #[tauri::command]
 pub fn export_get_info(uuid: String) -> Result<ExportInfoDto, String> {
     let game = parse_instance(&uuid)?;
 
-    // mod_info.json 里有来源（modid + fileid 非空）的文件走在线清单，其余进 overrides
+    // mod_info.json 里有来源的文件走在线清单，判据是 modid 与 fileid 都非空；其余进 overrides
     let online_list = game.read_online_info();
     let mut online: std::collections::HashMap<
         String,
@@ -121,7 +151,15 @@ pub fn export_get_info(uuid: String) -> Result<ExportInfoDto, String> {
     })
 }
 
-/// 在线模组 → 导出条目（算文件大小与 sha1/sha512，供 Modrinth index 使用）
+/// 在线模组 → 导出条目：算文件大小与 sha1/sha512，供 Modrinth index 使用
+///
+/// - `file`: 模组文件路径
+/// - `info`: 该文件在 mod_info.json 里的来源信息
+/// - `pack`: 目标整合包格式
+///
+/// # 返回值
+///
+/// 导出条目；文件元数据读不到时返回 `None`
 fn make_online_export(
     file: PathBuf,
     info: mml_game::launcher::file_online_info_obj::OnlineInfoObj,
@@ -143,11 +181,16 @@ fn make_online_export(
 
 /// 进度回调：内核 `IBaseArchiveGui` → `export-progress` 事件
 struct ExportProgressGui {
+    /// 应用句柄，事件经它转发到前端
     app: AppHandle,
+    /// 导出目标文件名，随每条进度一起下发
     file: String,
 }
 
 impl IBaseArchiveGui for ExportProgressGui {
+    /// 开始打包：发一条 `running` 且进度归零的事件
+    ///
+    /// - `total`: 总计需要打包的文件数
     fn start(&self, total: usize) {
         emit_export_progress(
             &self.app,
@@ -162,6 +205,10 @@ impl IBaseArchiveGui for ExportProgressGui {
         );
     }
 
+    /// 单个文件打包完成：推进进度并带上当前文件名
+    ///
+    /// - `filename`: 当前文件名
+    /// - `current`: 已处理数量
     fn update(&self, filename: Option<String>, current: usize) {
         emit_export_progress(
             &self.app,
@@ -176,14 +223,30 @@ impl IBaseArchiveGui for ExportProgressGui {
         );
     }
 
+    /// 打包完成：终态由 `export_run` 统一发，这里不做处理
     fn done(&self) {}
 
+    /// 文件名含非法字符时一律同意替换，导出侧不拦
+    ///
+    /// - `_name`: 原始文件名，这里不看
+    ///
+    /// # 返回值
+    ///
+    /// 恒为 `true`，即同意替换
     fn file_rename(&self, _name: &str) -> bool {
         true
     }
 }
 
-/// 发起导出（后台任务，进度经 export-progress 事件上报）
+/// 发起导出：后台任务，进度经 export-progress 事件上报
+///
+/// - `app`: 应用句柄，事件与后台任务都用它
+/// - `uuid`: 实例 uuid
+/// - `config`: 导出设置，含目标文件名、格式与要打包的内容目录
+///
+/// # 返回值
+///
+/// 任务已开始返回 `Ok(())`；已有导出在跑、uuid 非法、格式或文件名为空返回错误文案
 #[tauri::command]
 pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Result<(), String> {
     if EXPORT_RUNNING.swap(true, Ordering::SeqCst) {
@@ -201,12 +264,12 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
     };
     if config.file.trim().is_empty() {
         EXPORT_RUNNING.store(false, Ordering::SeqCst);
-        // 这里校验的是**导出文件名**，原来报的是 err.serverEmpty（服务器为空），
+        // 这里校验的是**导出文件名**，原来报的是 err.serverEmpty，即服务器为空，
         // 前端弹出来的文案牛头不对马嘴
         return Err("err.fileName".to_string());
     }
 
-    // 在线模组：mods 目录文件与 mod_info.json 对上号的（进 manifest / index）
+    // 在线模组：mods 目录文件与 mod_info.json 对上号的进 manifest / index
     let online_list = game.read_online_info();
     let mut online_by_name: std::collections::HashMap<
         String,

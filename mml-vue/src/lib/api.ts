@@ -70,17 +70,37 @@ export interface CreateInstanceOpts {
 }
 
 export const api = {
-  /** 获取实例列表（含运行状态） */
+  /**
+   * 获取实例列表
+   *
+   * # 返回值
+   *
+   * 全部实例，含各自的运行状态
+   */
   async getInstances(): Promise<InstanceInfoDto[]> {
     return commands.main.getInstances();
   },
 
-  /** 获取统计快照（全局计数 + 每实例启动次数 / 时长） */
+  /**
+   * 获取统计快照
+   *
+   * # 返回值
+   *
+   * 全局启动计数，以及每实例的启动次数与累计时长
+   */
   async getStatsData(): Promise<StatsDataDto> {
     return commands.stats.data();
   },
 
-  /** 查询服务器 MOTD（地址 host 或 host:port，端口缺省 25565） */
+  /**
+   * 查询服务器 MOTD
+   *
+   * - `address`: 服务器地址，可写 host 或 host:port，端口缺省 25565
+   *
+   * # 返回值
+   *
+   * MOTD 查询结果；连不上或无数据时 `state` 为对应失败态
+   */
   async getMotd(address: string): Promise<MotdDto> {
     return getMotd(address);
   },
@@ -149,7 +169,7 @@ export const api = {
     return commands.main.openUrl(url);
   },
 
-  /** 从头新建实例（版本 + 加载器），返回新实例 uuid（group 是分组 uuid，null = 默认分组） */
+  /** 从头新建实例，版本 + 加载器；返回新实例 uuid。group 是分组 uuid，null 表示默认分组 */
   async addCreateNew(
     name: string,
     version: string,

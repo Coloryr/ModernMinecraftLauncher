@@ -1,16 +1,23 @@
-//! 资源管理窗口的数据包分类（存档子页）：列表 / 启用禁用 / 删除
+//! 资源管理窗口的数据包分类，也就是存档子页：列表 / 启用禁用 / 删除
 //!
-//! 数据包挂在**某个存档**下（`saves/<dir>/datapacks`），所以每条命令都要先按目录名
-//! 定位存档（`find_save`）。
+//! 数据包挂在**某个存档**下的 `saves/<dir>/datapacks`，所以每条命令都要先按目录名
+//! 定位存档，走 `find_save`。
 
 use crate::dtos::DataPackItemDto;
 use mml_sys::path_helper;
 
 use super::{find_save, parse_instance};
 
-// ==================== 数据包（存档子页） ====================
+// ==================== 数据包，存档子页 ====================
 
-/// 存档的数据包列表（get_datapacks 同步 + rayon 解 zip，放阻塞线程）
+/// 存档的数据包列表，get_datapacks 同步 + rayon 解 zip，放阻塞线程
+///
+/// - `uuid`: 实例 uuid
+/// - `dir`: 存档目录名，即 saves 下的一级目录
+///
+/// # 返回值
+///
+/// 该存档的数据包列表；实例 / 存档找不到或读取失败返回错误串
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub async fn resource_list_datapacks(
@@ -42,7 +49,15 @@ pub async fn resource_list_datapacks(
         .collect())
 }
 
-/// 切换数据包启用状态（change_data_pack 对传入的包做状态翻转，传单个即 toggle）
+/// 切换数据包启用状态；change_data_pack 对传入的包做状态翻转，传单个即 toggle
+///
+/// - `uuid`: 实例 uuid
+/// - `dir`: 存档目录名，即 saves 下的一级目录
+/// - `name`: 数据包名，即 `pack.mcmeta` 里的 `name`，忽略大小写匹配
+///
+/// # 返回值
+///
+/// 只表示成功 / 失败：找不到同名包返回 `err.fileNotFound`，其余是内核错误串
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub async fn resource_datapack_toggle(
@@ -67,7 +82,15 @@ pub async fn resource_datapack_toggle(
     .map_err(|err| err.to_string())?
 }
 
-/// 删除数据包（清 level.dat 引用后把文件 / 目录一并进回收站）
+/// 删除数据包：清 level.dat 引用后把文件 / 目录一并进回收站
+///
+/// - `uuid`: 实例 uuid
+/// - `dir`: 存档目录名，即 saves 下的一级目录
+/// - `name`: 数据包名，即 `pack.mcmeta` 里的 `name`，忽略大小写匹配
+///
+/// # 返回值
+///
+/// 只表示成功 / 失败：找不到同名包返回 `err.fileNotFound`，其余是内核错误串
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub async fn resource_datapack_delete(

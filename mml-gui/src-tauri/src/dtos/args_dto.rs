@@ -1,7 +1,7 @@
 //! 启动参数 DTO
 use serde::{Deserialize, Serialize};
 
-/// 附加环境变量（键值对）
+/// 附加环境变量，键值对
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EnvVarLineDto {
@@ -11,13 +11,13 @@ pub struct EnvVarLineDto {
     pub value: String,
 }
 
-/// 实例启动参数（内存 / 窗口 / Java + 扩展参数 + 自定义执行 + 代理）
+/// 实例启动参数：内存 / 窗口 / Java，加上扩展参数、自定义执行与代理
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InstanceArgsDto {
-    /// 最大内存（MB）
+    /// 最大内存，单位 MB
     pub memory: i64,
-    /// 最小内存（MB）
+    /// 最小内存，单位 MB
     pub min_memory: i64,
     /// 是否全屏
     pub fullscreen: bool,
@@ -31,7 +31,7 @@ pub struct InstanceArgsDto {
     pub java_path: String,
     /// GC 回收器：auto / g1gc / zgc / none / custom
     pub gc: String,
-    /// 自定义 GC 参数（gc 为 custom 时使用）
+    /// 自定义 GC 参数，gc 为 custom 时使用
     pub gc_custom: String,
     /// 自定义主类
     pub main_class: String,
@@ -72,7 +72,11 @@ pub struct InstanceArgsDto {
 }
 
 impl Default for InstanceArgsDto {
-    /// 默认启动参数（不是全零：内存 2048 / 窗口 854×480 这些是可用初值）
+    /// 默认启动参数，不是全零：内存 2048 / 窗口 854×480 这些是可用初值
+    ///
+    /// # 返回值
+    ///
+    /// 返回新建实例可直接使用的启动参数
     fn default() -> Self {
         Self {
             memory: 2048,

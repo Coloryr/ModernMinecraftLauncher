@@ -1,8 +1,8 @@
-//! Java 运行时下载列表：按源（Adoptium / Zulu / OpenJ9 / Foojay）查可用包
+//! Java 运行时下载列表：按源查可用包，源有 Adoptium / Zulu / OpenJ9 / Foojay
 //!
-//! 从 `java_download/mod.rs` 拆出来的（`java_download_get_list` 一个函数 205 行）。
-//! 列表查询是"每个源一套参数与解析"，四个分支各自独立；命令带
-//! `#[gui_macros::ipc_group("java_download")]` 把组键钉回 `javaDownload`（AGENTS.md §4）。
+//! 从 `java_download/mod.rs` 拆出来的，`java_download_get_list` 一个函数就有 205 行。
+//! 列表查询是"每个源一套参数与解析"，四个分支各自独立；命令带分组标记，
+//! 值填原始组名 `java_download`，把组键钉回 `javaDownload`，见 AGENTS.md §4。
 
 use mml_base::file_item::{FileHash, FileItemObj, LaterRun};
 use mml_net::adoptium_api;
@@ -13,12 +13,18 @@ use crate::dtos::{JavaDownloadItemDto, JavaTypes};
 use super::JAVA_ITEMS;
 use super::zulu_arch;
 
-/// 获取按当前筛选条件匹配的 Java 包列表（窗口下方的文本列表）
+/// 获取按当前筛选条件匹配的 Java 包列表，即窗口下方的文本列表
 ///
-/// # 参数
+/// - `source`: 搜索源，四个源各一套查询参数与解析
+/// - `java_type`: 发行类型，取 `jdk` 或 `jre`
+/// - `major`: 主版本号，如 `21`
+/// - `system`: 目标系统，如 `windows` / `linux`
+/// - `arch`: 目标架构，如 `x64` / `aarch64`
 ///
-/// - `source`: 搜索源
-/// - `java_type` / `major` / `system` / `arch`: 四个下拉框的当前值
+/// # 返回值
+///
+/// 匹配到的包列表，每项含 uuid / 显示名 / 版本 / 文件名 / 大小，大小单位为字节、未知为 0；
+/// 每次调用先清空 `JAVA_ITEMS` 再填入本次结果，网络失败时返回 `Err`
 #[gui_macros::ipc_group("java_download")]
 #[tauri::command]
 pub async fn java_download_get_list(
@@ -75,7 +81,7 @@ pub async fn java_download_get_list(
                 .await
                 .map_err(|err| err.to_string())?;
 
-            // 先过滤再按 zulu 版本倒序（新版本在前）
+            // 先过滤再按 zulu 版本倒序，新版本在前
             let mut list: Vec<_> = list
                 .into_iter()
                 .filter(|item| {
@@ -132,7 +138,7 @@ pub async fn java_download_get_list(
         JavaTypes::OpenJ9 => {
             // openj9_api 内部持有 rquickjs 运行时，future 非 Send，
             // 不能直接跨 Tauri 的异步命令 await；丢到阻塞线程上用
-            // block_on 单线程驱动（阻塞线程不是异步 worker，block_on 合法）
+            // block_on 单线程驱动；阻塞线程不是异步 worker，block_on 合法
             let obj = tauri::async_runtime::spawn_blocking(move || {
                 tauri::async_runtime::block_on(mml_net::openj9_api::get_java_list())
             })
@@ -188,7 +194,7 @@ pub async fn java_download_get_list(
                 .await
                 .map_err(|err| err.to_string())?;
 
-            // API 返回顺序是乱的，按 OpenJDK 版本号倒序（新版本在前）
+            // API 返回顺序是乱的，按 OpenJDK 版本号倒序，新版本在前
             list.sort_by_key(|a| std::cmp::Reverse(version_key(&a.java_version)));
 
             let mut locker = JAVA_ITEMS.write().unwrap();
@@ -227,7 +233,13 @@ pub async fn java_download_get_list(
     Ok(out)
 }
 
-/// 从下载地址取文件名（最后一段路径）
+/// 从下载地址取文件名，即最后一段路径
+///
+/// - `url`: 下载地址
+///
+/// # 返回值
+///
+/// 最后一段路径；地址里没有 `/` 时原样返回
 pub(super) fn file_name_of(url: &str) -> &str {
     url.rsplit('/').next().unwrap_or(url)
 }
@@ -235,6 +247,12 @@ pub(super) fn file_name_of(url: &str) -> &str {
 /// 只保留能被 `mml_jvms::unzip_java` 解包的压缩包
 ///
 /// msi / exe / pkg / dmg 是安装器 / 磁盘镜像，无法解包注册，不应进列表
+///
+/// - `name`: 文件名或下载地址，只看扩展名且大小写不敏感
+///
+/// # 返回值
+///
+/// 可以被解包时为 `true`
 pub(super) fn unpackable(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
     !(lower.ends_with(".msi")
@@ -243,9 +261,15 @@ pub(super) fn unpackable(name: &str) -> bool {
         || lower.ends_with(".dmg"))
 }
 
-/// 版本号拆成数值段（如 "21.0.5+11" → [21, 0, 5, 11]），供逐段比较排序
+/// 版本号拆成数值段供逐段比较排序，如 "21.0.5+11" 拆成 [21, 0, 5, 11]
 ///
 /// 非数值段跳过；字典序比较会把 "9" 排在 "21" 后面，数值逐段比较不会
+///
+/// - `version`: 版本号字符串，以 `.` / `+` / `_` 分段
+///
+/// # 返回值
+///
+/// 各数值段；解析不出的段直接丢掉，可能为空
 pub(super) fn version_key(version: &str) -> Vec<u32> {
     version
         .split(['.', '+', '_'])

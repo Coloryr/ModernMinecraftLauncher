@@ -1,13 +1,13 @@
 //! 验证：`CancellationToken` 能否终止"卡在 reqwest body 读取"的请求
 //!
-//! 背景：用户环境里 `abortable#17` **从未被 poll**——新任务排不上 worker，
-//! 因此任何写在 future 内部的检查（`select!` + `sleep` / `watch` / token）
+//! 背景：用户环境里 `abortable#17` **从未被 poll**，新任务排不上 worker，
+//! 因此任何写在 future 内部的检查，如 `select!` + `sleep` / `watch` / token，
 //! 都没有机会执行。
 //!
 //! 本测试构造与服务端"只回响应头、不回 body"的连接，让 `get_text` 卡在 body 读取；
 //! 然后在**另一个线程**取消 token，观察：
 //! - 请求能否被终止；
-//! - 用 `join` 观察是否真的结束（而不是永远 pending）。
+//! - 用 `join` 观察是否真的结束，而不是永远 pending。
 
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -16,7 +16,7 @@ use std::time::{Duration, Instant};
 
 use mml_config::config_obj::ProxyState;
 
-/// 只回响应头、不回 body 的服务（制造"卡在读 body"）
+/// 只回响应头、不回 body 的服务，制造"卡在读 body"
 fn header_only_server() -> u16 {
     let listener = TcpListener::bind("127.0.0.1:0").expect("绑定失败");
     let port = listener.local_addr().unwrap().port();

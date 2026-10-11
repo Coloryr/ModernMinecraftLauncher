@@ -1,6 +1,6 @@
 //! 添加实例窗口：模型 + 创建操作 + 窗口按钮调用的方法
 //!
-//! 实例创建走 `mml_game::add_game`（新建 / 文件夹导入 / 压缩包 / 在线网址），
+//! 实例创建走 `mml_game::add_game`，含新建 / 文件夹导入 / 压缩包 / 在线网址，
 //! 创建成功后发 instance-change 事件通知主窗口刷新列表。
 //! 模型只保存跟随窗口生命周期的运行态：当前安装任务的取消令牌。
 
@@ -15,7 +15,11 @@ pub(crate) use self::model::{AddWindowModel, instance_gui};
 
 use self::model::model;
 
-/// 用户对重名确认对话框的答复（唤醒等待中的创建流程）
+/// 用户对重名确认对话框的答复，用于唤醒等待中的创建流程
+///
+/// - `window`: 调用方窗口，用于取本窗口模型
+/// - `id`: 对话框事件 id，对应后端登记的应答通道
+/// - `answer`: 用户是否同意
 #[tauri::command]
 pub fn add_answer_name_conflict(window: WebviewWindow, id: u32, answer: bool) {
     if let Ok(store) = model(&window)
@@ -26,6 +30,12 @@ pub fn add_answer_name_conflict(window: WebviewWindow, id: u32, answer: bool) {
 }
 
 /// 取消进行中的安装任务
+///
+/// - `window`: 调用方窗口，用于取本窗口模型
+///
+/// # 返回值
+///
+/// 确实取消了返回 `true`；没有进行中的任务或模型缺失返回 `false`
 #[tauri::command]
 pub fn add_cancel(window: WebviewWindow) -> bool {
     let Ok(store) = model(&window) else {
@@ -40,7 +50,10 @@ pub fn add_cancel(window: WebviewWindow) -> bool {
     }
 }
 
-/// 设置本窗口的关闭保护（查询数据期间开启，`CloseRequested` 阶段拒绝关闭）
+/// 设置本窗口的关闭保护：查询数据期间开启，`CloseRequested` 阶段拒绝关闭
+///
+/// - `window`: 调用方窗口，用于取本窗口模型
+/// - `enabled`: 是否开启关闭保护
 #[tauri::command]
 pub fn add_set_close_guard(window: WebviewWindow, enabled: bool) {
     if let Ok(store) = model(&window) {

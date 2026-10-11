@@ -35,13 +35,14 @@ use crate::launcher::instance_setting_obj::InstanceSettingObj;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
 pub struct SaveBackupObj {
-    /// 存档目录
+    /// 存档目录名，相对实例的 saves 目录
     pub dir: String,
-    /// 备份文件列表
+    /// 该存档的备份文件名列表，按加入顺序排列
     pub back: Vec<String>,
 }
 
 impl Default for SaveBackupObj {
+    /// 目录名与备份列表均为空
     fn default() -> Self {
         Self {
             dir: Default::default(),
@@ -50,47 +51,48 @@ impl Default for SaveBackupObj {
     }
 }
 
-/// 游戏存档
+/// 游戏存档，由 level.dat 解析而来
 pub struct SaveObj {
     /// 地图种子
     pub random_seed: i64,
-    /// 上次游玩
+    /// 上次游玩时间，单位毫秒的 Unix 时间戳
     pub last_played: i64,
-    /// 游戏类型
+    /// 游戏模式：0 生存 / 1 创造 / 2 冒险 / 3 旁观
     pub game_type: i32,
-    /// 极限模式
+    /// 是否极限模式，非 0 即开启
     pub hard_core: u8,
-    /// 世界名字
+    /// 世界名字，界面上的存档名
     pub level_name: String,
-    /// 难度
+    /// 难度：0 和平 / 1 简单 / 2 普通 / 3 困难
     pub difficulty: u8,
-    /// 生成器名字
+    /// 生成器名字，如 `minecraft:large_biomes`
     pub generator_name: String,
-    /// 路径
+    /// 存档目录的完整路径
     pub path: PathBuf,
-    /// 图标
+    /// 存档图标文件路径，没有 icon.png 时为 `None`
     pub icon: Option<PathBuf>,
-    /// 是否损坏
+    /// level.dat 缺少必要字段时为 `true`，此时其余字段全是缺省值
     pub broken: bool,
-    /// 存档信息
+    /// 解析出的原始 NBT，写回时以它为准
     pub nbt: NbtFile,
 }
 
-/// 数据包信息
+/// 存档内的数据包信息
 pub struct SaveDataPackObj {
-    /// 名字
+    /// 数据包名，形如 `file/<包名>`
     pub name: String,
-    /// 路径
+    /// 数据包文件或目录的完整路径
     pub path: PathBuf,
-    /// 描述
+    /// 来自 pack.mcmeta 的描述文本
     pub description: String,
-    /// 格式版本号
+    /// 数据包格式版本号，元数据缺失时为 -1
     pub pack_format: i64,
-    /// 是否启用
+    /// 是否启用；`None` 表示 level.dat 的启用与禁用列表里都没有它
     pub enable: Option<bool>,
 }
 
 impl Default for SaveObj {
+    /// 所有字段取缺省值，`broken` 为 `false`、`icon` 为 `None`
     fn default() -> Self {
         Self {
             random_seed: Default::default(),
@@ -109,8 +111,6 @@ impl Default for SaveObj {
 }
 
 /// 读取存档文件
-///
-/// # 参数
 ///
 /// - `stream`: 存档文件流
 ///
@@ -144,7 +144,7 @@ fn read_save<R: Read + Seek>(stream: &mut R) -> CoreResult<SaveObj> {
         .map(String::from)
         .unwrap_or_default();
 
-    // WorldGenSettings（新版格式，含种子和生成器名）
+    // WorldGenSettings 是新版格式，含种子和生成器名
     if let Some(world_gen) = data.get_compound("WorldGenSettings") {
         if let Some(seed) = world_gen.get_long("seed") {
             obj.random_seed = seed;
@@ -159,7 +159,7 @@ fn read_save<R: Read + Seek>(stream: &mut R) -> CoreResult<SaveObj> {
         }
     }
 
-    // generatorName（旧版格式，优先级高于 WorldGenSettings）
+    // generatorName 是旧版格式，优先级高于 WorldGenSettings
     if let Some(name) = data.get_string("generatorName") {
         obj.generator_name = format!("minecraft:{}", name);
     }
@@ -173,7 +173,7 @@ impl InstanceSettingObj {
     ///
     /// # 返回值
     ///
-    /// 返回存档列表（读取失败的存档被跳过）
+    /// 返回存档列表；读取失败的存档被跳过
     pub async fn get_saves(&self) -> Vec<SaveObj> {
         let dir = self.get_saves_path();
         let dirs = path_helper::get_dirs(dir);
@@ -210,19 +210,18 @@ impl InstanceSettingObj {
         .unwrap_or_default()
     }
 
-    /// 还原备份（**实例上的方法**：靠 `info.dir` 定位是哪个存档）
+    /// 还原备份，靠 `info.dir` 定位是哪个存档
     ///
-    /// 备份 zip 在**备份目录**里，而还原目标是**存档目录** `saves/<info.dir>` ——
-    /// 以前这里解压到 `备份目录/<info.dir>`，等于在备份文件夹里又展开一份，
-    /// 真正的存档一点没变（这个方法此前没有任何调用方，所以一直没暴露出来）。
+    /// 备份 zip 在备份目录里，还原目标却是存档目录 `saves/<info.dir>`；
+    /// 这里必须显式拼出目标路径，否则只会在备份目录里再展开一份，真正的存档毫无变化。
     ///
-    /// - `info`: 备份信息（`dir` 是存档目录名）
-    /// - `file`: 备份文件名（来自 [`get_backups`](Self::get_backups) 的 `back`）
+    /// - `info`: 备份信息，`dir` 是存档目录名
+    /// - `file`: 备份文件名，来自 [`get_backups`](Self::get_backups) 的 `back`
     /// - `gui`: 压缩进度回调
     ///
     /// # 返回值
     ///
-    /// 成功返回 `Ok(())`；现有存档移入回收站或解压失败返回对应错误
+    /// 现有存档移入回收站或解压失败时返回对应错误
     pub fn restore_backup(
         &self,
         info: &SaveBackupObj,
@@ -232,8 +231,7 @@ impl InstanceSettingObj {
         let backup_file = self.get_backup_path().join(file);
         let target = self.get_saves_path().join(&info.dir);
 
-        // 先把现有存档整目录移进回收站（不是直接删）：
-        // 还原是破坏性操作，用户发现选错了还能从回收站捞回来
+        // 先把现有存档整目录移进回收站而不是直接删：还原是破坏性操作，用户选错了还能捞回来
         if target.exists() && target.is_dir() {
             path_helper::move_to_trash(&target)?;
         }
@@ -258,8 +256,6 @@ impl InstanceSettingObj {
 
     /// 保存备份信息
     ///
-    /// # 参数
-    ///
     /// - `info`: 存档名到备份信息的映射
     pub fn save_backups(&self, info: &HashMap<String, SaveBackupObj>) {
         let file = self.get_backup_file();
@@ -268,13 +264,11 @@ impl InstanceSettingObj {
 
     /// 导入存档
     ///
-    /// # 参数
-    ///
     /// - `file`: 存档压缩包路径
     ///
     /// # 返回值
     ///
-    /// 成功返回 `Ok(())`；打开或解压失败返回对应错误
+    /// 打开或解压失败时返回对应错误
     pub fn import_save<P: AsRef<Path>>(&self, file: P) -> CoreResult<()> {
         let saves_dir = self.get_saves_path();
         if !saves_dir.exists() {
@@ -289,13 +283,13 @@ impl InstanceSettingObj {
             // 有唯一顶层文件夹：直接解压，顶层文件夹就是存档目录
             saves_dir
         } else {
-            // 没有套壳：用压缩包文件名（去掉后缀）建一个新目录
+            // 没有套壳：用压缩包文件名去掉后缀建一个新目录
             let file_path = file.as_ref();
             let stem = file_path
                 .file_stem()
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_else(|| "save".to_string());
-            // 二次去后缀（处理 .tar.gz 这类双后缀）
+            // 二次去后缀，处理 .tar.gz 这类双后缀
             let stem = stem.trim_end_matches(".tar").to_string();
             saves_dir.join(&stem)
         };
@@ -328,14 +322,12 @@ impl SaveObj {
     ///
     /// # 返回值
     ///
-    /// 成功返回 `Ok(())`；删除失败返回对应错误
+    /// 移入回收站失败时返回对应错误
     pub fn delete(&self) -> CoreResult<()> {
         path_helper::move_to_trash(&self.path)
     }
 
     /// 导出存档
-    ///
-    /// # 参数
     ///
     /// - `path`: 导出保存位置
     /// - `archive_type`: 压缩类型
@@ -343,7 +335,7 @@ impl SaveObj {
     ///
     /// # 返回值
     ///
-    /// 成功返回 `Ok(())`；压缩失败返回对应错误
+    /// 压缩失败时返回对应错误
     pub fn export<P: AsRef<Path>>(
         &self,
         path: P,
@@ -363,14 +355,13 @@ impl SaveObj {
 
     /// 备份存档
     ///
-    /// # 参数
-    ///
     /// - `instance`: 所属实例
     /// - `gui`: 压缩进度回调
     ///
     /// # 返回值
     ///
-    /// 返回备份文件名（level_name_年_月_日_时_分_秒.zip）；压缩或保存备份信息失败返回对应错误
+    /// 返回备份文件名，形如 `level_name_年_月_日_时_分_秒.zip`；
+    /// 压缩或保存备份信息失败时返回对应错误
     pub fn backup(&self, instance: &InstanceSettingObj, gui: BaseArchiveGui) -> CoreResult<String> {
         let path = instance.get_backup_path();
         path_helper::create_dir_all(&path)?;
@@ -419,7 +410,7 @@ impl SaveObj {
     ///
     /// # 返回值
     ///
-    /// 成功返回 `Ok(())`；写入失败返回对应错误
+    /// 写入失败时返回对应错误
     fn save_nbt(&self) -> CoreResult<()> {
         let file = self.get_level_file();
         let mut stream = path_helper::open_write(file)?;
@@ -433,7 +424,7 @@ impl SaveObj {
     ///
     /// # 返回值
     ///
-    /// 返回数据包列表（含启用状态）；目录不存在返回空列表，读取失败返回对应错误
+    /// 返回带启用状态的数据包列表；目录不存在返回空列表，读取失败返回对应错误
     pub fn get_datapacks(&self) -> CoreResult<Vec<SaveDataPackObj>> {
         let path = self.get_datapack_path();
         if !path.exists() || !path.is_dir() {
@@ -490,11 +481,10 @@ impl SaveObj {
                         return;
                     }
                     let json = json.unwrap();
-                    // 传**这个包自己的路径**（`item`），不是 `path`（datapacks 目录）——
-                    // `read_pack` 用 `path.file_name()` 拼出 `file/<包名>`，而这个名字
-                    // 既是列表里显示的名字、也是和 `Enabled` / `Disabled` 比对启用状态的键。
-                    // 传父目录的话**每个包都叫 `file/datapacks`**：列表里全显示成 "datapacks"，
-                    // 启用状态也全对不上（改一个的状态等于改全部）。
+                    // 必须传这个包自己的路径 item，不能传父目录 path：
+                    // read_pack 用 file_name 拼成 `file/<包名>`，这个名字既是列表显示名，
+                    // 也是与 Enabled / Disabled 比对启用状态的键；传父目录会让所有包同名，
+                    // 列表里全叫 datapacks，改一个的状态等于改全部。
                     if let Some(data) = read_pack(item.clone(), ens, dis, json) {
                         list.lock().unwrap().push(data);
                     }
@@ -533,13 +523,11 @@ impl SaveObj {
 
     /// 修改数据包启用状态
     ///
-    /// # 参数
-    ///
     /// - `list`: 需要变更状态的数据包列表
     ///
     /// # 返回值
     ///
-    /// 成功返回 `Ok(())`；NBT 结构缺失或写入失败返回对应错误
+    /// NBT 结构缺失或写入失败时返回对应错误
     pub fn change_data_pack(&mut self, list: &Vec<SaveDataPackObj>) -> CoreResult<()> {
         let Some(data) = self
             .nbt
@@ -553,7 +541,7 @@ impl SaveObj {
             return Err(ErrorType::DataNotFound(DataNotFoundData::Info));
         };
 
-        // 先用不可变访问收集信息
+        // 先只读收集增删项，避免与后面的可变借用冲突
         let mut remove_from_enabled: Vec<usize> = Vec::new();
         let mut remove_from_disabled: Vec<usize> = Vec::new();
         let mut add_to_enabled: Vec<String> = Vec::new();
@@ -593,9 +581,9 @@ impl SaveObj {
                     add_to_enabled.push(item.name.clone());
                 }
             }
-        } // immutable refs dropped here
+        }
 
-        // 应用修改 — 每次只处理一个列表，避免双重可变借用
+        // 每次只取一个列表的可变引用，否则同时借用两个列表
         {
             let Some(ens) = data_packs.get_list_mut("Enabled") else {
                 return Err(ErrorType::DataNotFound(DataNotFoundData::Info));
@@ -628,13 +616,11 @@ impl SaveObj {
 
     /// 删除数据包
     ///
-    /// # 参数
-    ///
     /// - `list`: 待删除的数据包列表
     ///
     /// # 返回值
     ///
-    /// 成功返回 `Ok(())`；NBT 结构缺失或写入失败返回对应错误
+    /// NBT 结构缺失或写入失败时返回对应错误
     pub fn delete_datapack(&mut self, list: &Vec<SaveDataPackObj>) -> CoreResult<()> {
         let Some(data) = self
             .nbt
@@ -648,7 +634,7 @@ impl SaveObj {
             return Err(ErrorType::DataNotFound(DataNotFoundData::Info));
         };
 
-        // 先用不可变访问收集要移除的索引
+        // 先只读收集要移除的索引，避免与后面的可变借用冲突
         let mut remove_from_enabled: Vec<usize> = Vec::new();
         let mut remove_from_disabled: Vec<usize> = Vec::new();
 
@@ -679,9 +665,9 @@ impl SaveObj {
                     remove_from_disabled.push(idx);
                 }
             }
-        } // immutable refs dropped here
+        }
 
-        // 应用删除 — 每次只处理一个列表，按索引降序排列
+        // 每次只取一个列表的可变引用，按索引降序删除
         if !remove_from_enabled.is_empty() {
             let Some(ens) = data_packs.get_list_mut("Enabled") else {
                 return Err(ErrorType::DataNotFound(DataNotFoundData::Info));
@@ -709,8 +695,6 @@ impl SaveObj {
 
     /// 打开种子信息网站
     ///
-    /// # 参数
-    ///
     /// - `version`: 游戏版本
     pub fn open_world_seed(&self, version: &str) {
         let url = chunkbase_api::gen_url(
@@ -724,16 +708,14 @@ impl SaveObj {
 
 /// 读取数据包信息
 ///
-/// # 参数
-///
 /// - `path`: 数据包路径
-/// - `ens`: 已启用的数据包列表
-/// - `dis`: 已禁用的数据包列表
-/// - `data`: 数据包元数据
+/// - `ens`: 已启用的数据包列表，`None` 表示 level.dat 里没有该字段
+/// - `dis`: 已禁用的数据包列表，`None` 表示 level.dat 里没有该字段
+/// - `data`: 数据包元数据，即 pack.mcmeta
 ///
 /// # 返回值
 ///
-/// 返回数据包信息；元数据格式不符返回 `None`
+/// 元数据格式不符时返回 `None`
 fn read_pack(
     path: PathBuf,
     ens: Option<&NbtList>,

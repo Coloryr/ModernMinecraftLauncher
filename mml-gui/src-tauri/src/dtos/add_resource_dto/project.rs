@@ -1,7 +1,7 @@
-//! 项目（搜索）列表 DTO：搜索结果条目与分页信息
+//! 项目搜索列表 DTO：搜索结果条目与分页信息
 //!
 //! 从 `add_resource_dto/mod.rs` 拆出来的。两个源的搜索命中统一成同一份前端结构，
-//! 标签图标走内核的 Modrinth 分类接口（带缓存）。
+//! 标签图标走内核的 Modrinth 分类接口，带缓存。
 
 use serde::{Deserialize, Serialize};
 
@@ -14,7 +14,7 @@ use crate::image_manager;
 
 use super::common::{DecPicDto, McmodDto, PicDto, SourceTypeDto, TagDto, get_modrinth_url};
 
-/// 项目搜索结果（分页）
+/// 项目搜索结果，分页
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectDto {
@@ -24,7 +24,7 @@ pub struct ProjectDto {
     pub count: u64,
 }
 
-/// 项目搜索结果条目（列表卡片）
+/// 项目搜索结果条目，即列表卡片
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectItemDto {
@@ -32,7 +32,7 @@ pub struct ProjectItemDto {
     pub name: String,
     /// 描述
     pub summary: String,
-    /// 图片地址 从image_manager加载
+    /// 图片地址，经 image_manager 转发，无则 None
     pub image: Option<String>,
     /// 作者
     pub authors: Vec<PicDto>,
@@ -54,7 +54,7 @@ pub struct ProjectItemDto {
     pub download_now: bool,
     /// 跳转网址
     pub url: String,
-    /// 百科翻译
+    /// 百科翻译条目，没有则 None
     pub mcmod: Option<McmodDto>,
     /// 下载源信息
     pub source: SourceTypeDto,
@@ -63,19 +63,17 @@ pub struct ProjectItemDto {
 impl ProjectItemDto {
     /// 由 CurseForge 项目数据构造
     ///
-    /// # 参数
-    ///
     /// - `data`: CurseForge 项目数据
     /// - `file_type`: 资源类型
     /// - `download`: 是否已经下载
     /// - `can_star`: 能否收藏
     /// - `is_star`: 是否已经收藏
     /// - `download_now`: 是否正在下载
-    /// - `mcmod`: 百科翻译（无则 None）
+    /// - `mcmod`: 百科翻译，无则 None
     ///
     /// # 返回值
     ///
-    /// 返回列表条目（图标 / 作者头像 / 标签 / 截图经 image_manager 转发地址）
+    /// 返回列表条目，图标 / 作者头像 / 标签 / 截图都经 image_manager 转发地址
     pub fn new_curseforge(
         data: &CurseForgeListDataObj,
         file_type: FileType,
@@ -142,11 +140,9 @@ impl ProjectItemDto {
         }
     }
 
-    /// 列表项只从 HitObj 构造，不发 project / team 请求（对齐旧 C# GetModPackListAsync）；
-    /// 作者头像 / 截图在列表里留空，等项目详情（GetFileItemAsync）再补。
-    /// 分类 svg 来自 OnceLock 缓存的 /tag/category，逐条取没有额外网络请求
-    ///
-    /// # 参数
+    /// 由 Modrinth 搜索命中项构造，对齐旧 C# GetModPackListAsync：只从 HitObj 构造，
+    /// 不发 project / team 请求，作者头像与截图留到项目详情 GetFileItemAsync 再补；
+    /// 分类 svg 走 OnceLock 缓存的 /tag/category，逐条取没有额外网络请求
     ///
     /// - `data`: Modrinth 搜索命中项
     /// - `file_type`: 资源类型
@@ -154,7 +150,7 @@ impl ProjectItemDto {
     /// - `can_star`: 能否收藏
     /// - `is_star`: 是否已经收藏
     /// - `download_now`: 是否正在下载
-    /// - `mcmod`: 百科翻译（无则 None）
+    /// - `mcmod`: 百科翻译，无则 None
     ///
     /// # 返回值
     ///

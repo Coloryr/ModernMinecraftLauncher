@@ -8,7 +8,13 @@ use std::{
 
 use gui_ipc_gen::{GenConfig, generate};
 
-/// 建一个空的临时 src 目录（同名目录先清掉）
+/// 建一个空的临时 src 目录，同名目录先清掉
+///
+/// - `name`: 用例特征名，拼进目录名；各用例各用各的目录，避免互相踩
+///
+/// # 返回值
+///
+/// 建好的目录，落在 `target/temp`
 fn temp_src(name: &str) -> PathBuf {
     let dir = mml_testutil::temp_dir().join(format!("gui_ipc_gen_it_{name}"));
     let _ = fs::remove_dir_all(&dir);
@@ -16,13 +22,24 @@ fn temp_src(name: &str) -> PathBuf {
     dir
 }
 
-/// 在 src 下写文件（自动建父目录）
+/// 在 src 下写文件，自动建父目录
+///
+/// - `src`: 临时 src 根目录
+/// - `rel`: 相对路径，如 `windows/add_modpack.rs`
+/// - `text`: 文件内容
 fn write(src: &Path, rel: &str, text: &str) {
     let path = src.join(rel);
     fs::create_dir_all(path.parent().unwrap()).unwrap();
     fs::write(path, text).unwrap();
 }
 
+/// 造一份生成配置：源码根为 `src`，外部类型只映射 `Lang`
+///
+/// - `src`: 临时 src 根目录
+///
+/// # 返回值
+///
+/// 测试用配置，其余字段取默认值
 fn config(src: &Path) -> GenConfig {
     GenConfig {
         src_dir: src.to_path_buf(),
@@ -124,7 +141,7 @@ pub enum Internal {
 
     // 命令：按 .rs 分组，剥掉公共前段
     assert!(b.contains("  addModpack: {\n"), "{b}");
-    // 命令参数的 Option<T> 是 `T | null` 且不可缺省（前端要显式传 null）
+    // 命令参数的 Option<T> 是 `T | null` 且不可缺省，前端要显式传 null
     assert!(
         b.contains("    search: (source: string, page: number | null) => invoke<ModpackSearchDto>(\"add_modpack_search\", { source, page }),\n"),
         "{b}"
@@ -149,7 +166,7 @@ pub enum Internal {
         b.contains("export type ModpackSearchInput = {\n  source: string,\n  keyword?: string | null,\n};\n\n"),
         "{b}"
     );
-    // 枚举：rename_all 生效，文档注释与 #[default] 不干扰；非 serde 类型不收
+    // 枚举：serde 命名风格生效，文档注释与 #[default] 不干扰；非 serde 类型不收
     assert!(b.contains("export type HeadType = \"auto\" | \"head\";\n\n"), "{b}");
     assert!(!b.contains("Internal"), "{b}");
 
@@ -170,7 +187,7 @@ pub enum Internal {
     let _ = fs::remove_dir_all(&src);
 }
 
-/// 外部 crate 类型（Lang）走映射表，不留裸类型名
+/// 外部 crate 类型 Lang 走映射表，不留裸类型名
 #[test]
 fn test_generate_external_type() {
     let src = temp_src("ext");
@@ -198,7 +215,7 @@ pub struct GuiConfigDto {
     let _ = fs::remove_dir_all(&src);
 }
 
-/// 同一份源码生成两次结果必须完全一致（排序稳定）
+/// 同一份源码生成两次结果必须完全一致，排序稳定
 #[test]
 fn test_generate_is_deterministic() {
     let src = temp_src("det");

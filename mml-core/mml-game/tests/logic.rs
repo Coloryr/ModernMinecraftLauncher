@@ -1,6 +1,6 @@
 //! 纯逻辑单元测试：版本解析、版本比较、加载器、运行库版本对比、规则判断。
 //!
-//! 这些测试不依赖全局状态（实例列表、路径缓存等），可以独立运行。
+//! 这些测试不依赖全局状态，如实例列表、路径缓存，可以独立运行。
 
 use mml_game::launcher_path::libraries_path::LibVersionObj;
 use mml_game::launcher_path::version_path::get_forge_json_name;
@@ -53,7 +53,7 @@ fn lib_version_obj() {
     assert_eq!(obj.version, "1.20.4");
     assert_eq!(obj.extr, "");
 
-    // 带 classifier（第 4 段）
+    // 带 classifier，第 4 段
     let obj = LibVersionObj::new("org.lwjgl:lwjgl:3.3.1:windows");
     assert_eq!(obj.pack, "org.lwjgl");
     assert_eq!(obj.name, "lwjgl");

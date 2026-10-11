@@ -1,8 +1,8 @@
 //! 账户皮肤与披风：贴图列表 / 应用 / 上传 / 去官网
 //!
-//! 从 `account/mod.rs` 拆出来的。贴图来自账户档案（Mojang 的 skin / cape），
-//! 应用走 `auths` 的"当前选中"标记（与游戏内显示一致）。命令带
-//! `#[gui_macros::ipc_group("account")]` 把组键钉回 `account`（AGENTS.md §4）。
+//! 从 `account/mod.rs` 拆出来的。贴图来自账户档案的 Mojang skin / cape 两项，
+//! 应用走 `auths` 的"当前选中"标记，与游戏内显示一致。命令带分组标记，
+//! 值填原始组名 `account`，免得组键随文件名变掉，见 AGENTS.md §4。
 
 use std::path::Path;
 
@@ -20,10 +20,17 @@ use super::oauth::get_oauth_profile;
 
 /// 查询账户的皮肤 / 披风纹理列表
 ///
-/// OAuth 账户走 minecraft services 档案（多皮肤 + 多披风，`active` 是服务端
-/// 当前选中项）；其余在线账户走会话服务器（单皮肤 + 单披风，恒 `active`）；
-/// 离线账户返回空列表（前端走占位图）。取到的纹理同时按内容 SHA1 缓存并登记
-/// 源 URL，前端拿到 sha1 后经 `mml-image` 的 sha1 型 URI 取图。
+/// OAuth 账户走 minecraft services 档案，多皮肤 + 多披风，`active` 是服务端当前选中项；
+/// 其余在线账户走会话服务器，只有单皮肤 + 单披风且恒为 `active`；离线账户返回空列表，
+/// 前端走占位图。取到的纹理同时按内容 SHA1 缓存并登记源 URL，前端拿到 sha1 后经
+/// `mml-image` 的 sha1 型 URI 取图。
+///
+/// - `account_type`: 前端账户类型串，见 `auth_type_from_str`
+/// - `uuid`: 账户 UUID
+///
+/// # 返回值
+///
+/// 皮肤与披风两个列表，离线账户两者都为空；账户不存在返回 `err.accountMissing`
 #[gui_macros::ipc_group("account")]
 #[tauri::command]
 pub async fn account_get_textures(
@@ -82,15 +89,21 @@ pub async fn account_get_textures(
     Ok(TexturesDto { skins, capes })
 }
 
-/// 把 OAuth 档案的纹理列表转成 DTO（逐个下载定内容 SHA1 并登记源 URL）
+/// 把 OAuth 档案的纹理列表转成 DTO，逐个下载定内容 SHA1 并登记源 URL
 ///
-/// 各项并行下载（都是等网络的 IO，串行会随皮肤/披风数量线性变慢）；
-/// 某个纹理下载失败时跳过该项（不整体失败），结果保持档案里的顺序
+/// 各项并行下载：都是等网络的 IO，串行会随皮肤 / 披风数量线性变慢；
+/// 某个纹理下载失败时跳过该项而不整体失败，结果保持档案里的顺序
+///
+/// - `items`: 档案里的纹理条目，皮肤或披风
+///
+/// # 返回值
+///
+/// 下载成功条目的 DTO，顺序与 `items` 一致
 pub(super) async fn textures_from(items: &[SkinObj]) -> Vec<TextureItemDto> {
     let handles: Vec<_> = items
         .iter()
         .map(|item| {
-            // 披风项用服务器给的披风名（alias），皮肤项没有 alias，退回条目 UUID
+            // 披风项用服务器给的披风名 alias，皮肤项没有 alias，退回条目 UUID
             let name = item.alias.clone().unwrap_or_else(|| item.id.clone());
             let state = item.state.clone();
             let url = item.url.clone();
@@ -118,15 +131,20 @@ pub(super) async fn textures_from(items: &[SkinObj]) -> Vec<TextureItemDto> {
     out
 }
 
-/// 装备账户的皮肤 / 披风（正版专用，第三方规范无多纹理接口）
+/// 装备账户的皮肤 / 披风，正版专用；第三方规范无多纹理接口
 ///
 /// 先重查档案，按内容 SHA1 找到对应条目再调服务端装备接口；
-/// 成功后清纹理渲染缓存并广播账户变更（列表预览跟随刷新）。
+/// 成功后清纹理渲染缓存并广播账户变更，列表预览跟随刷新。
 ///
-/// # 参数
-///
+/// - `app`: 应用句柄，装备成功后广播账户变更
+/// - `account_type`: 前端账户类型串，非正版类型返回 `err.notOauth`
+/// - `uuid`: 账户 UUID
 /// - `kind`: 纹理种类，`skin` 走换肤接口、`cape` 走显示披风接口
 /// - `sha1`: 要装备的纹理内容 SHA1
+///
+/// # 返回值
+///
+/// 账户不存在返回 `err.accountMissing`；档案里没有该 SHA1 返回 `err.textureMissing`
 pub(super) async fn equip_texture(
     app: &AppHandle,
     account_type: &str,
@@ -146,7 +164,7 @@ pub(super) async fn equip_texture(
         .await
         .map_err(|err| err.to_string())?;
 
-    // 按内容 SHA1 匹配条目（load_texture 有进程内 URL→SHA1 缓存，重复查询开销小）
+    // 按内容 SHA1 匹配条目；load_texture 有进程内 URL→SHA1 缓存，重复查询开销小
     let mut target = None;
     let items = if kind == "skin" {
         &profile.skins
@@ -179,7 +197,16 @@ pub(super) async fn equip_texture(
     Ok(())
 }
 
-/// 装备账户选中的皮肤（正版）
+/// 装备账户选中的皮肤，仅正版
+///
+/// - `app`: 应用句柄，装备成功后广播账户变更
+/// - `account_type`: 前端账户类型串，非正版类型返回 `err.notOauth`
+/// - `uuid`: 账户 UUID
+/// - `sha1`: 要装备的皮肤内容 SHA1
+///
+/// # 返回值
+///
+/// 与 [`equip_texture`] 相同：账户不存在 / 纹理不存在时返回对应错误键
 #[gui_macros::ipc_group("account")]
 #[tauri::command]
 pub async fn account_set_active_skin(
@@ -191,7 +218,16 @@ pub async fn account_set_active_skin(
     equip_texture(&app, &account_type, &uuid, "skin", &sha1).await
 }
 
-/// 装备账户选中的披风（正版）
+/// 装备账户选中的披风，仅正版
+///
+/// - `app`: 应用句柄，装备成功后广播账户变更
+/// - `account_type`: 前端账户类型串，非正版类型返回 `err.notOauth`
+/// - `uuid`: 账户 UUID
+/// - `sha1`: 要装备的披风内容 SHA1
+///
+/// # 返回值
+///
+/// 与 [`equip_texture`] 相同：账户不存在 / 纹理不存在时返回对应错误键
 #[gui_macros::ipc_group("account")]
 #[tauri::command]
 pub async fn account_set_active_cape(
@@ -203,15 +239,21 @@ pub async fn account_set_active_cape(
     equip_texture(&app, &account_type, &uuid, "cape", &sha1).await
 }
 
-/// 上传本地皮肤文件并装备（正版专用，第三方规范无上传接口）
+/// 上传本地皮肤文件并装备，正版专用；第三方规范无上传接口
 ///
-/// 文件路径来自前端系统文件对话框（仅支持 PNG）；上传成功后服务端
+/// 文件路径来自前端系统文件对话框，仅支持 PNG；上传成功后服务端
 /// 自动装备新皮肤，这里清纹理渲染缓存并广播账户变更。
 ///
-/// # 参数
-///
-/// - `variant`: 皮肤型号，`classic`（经典）或 `slim`（纤细）
+/// - `app`: 应用句柄，上传成功后广播账户变更
+/// - `account_type`: 前端账户类型串，非正版类型返回 `err.notOauth`
+/// - `uuid`: 账户 UUID
+/// - `variant`: 皮肤型号，`classic` 是经典、`slim` 是纤细
 /// - `path`: 本地皮肤 PNG 文件路径
+///
+/// # 返回值
+///
+/// 型号非法返回 `err.variantInvalid`；文件不是 PNG 返回 `err.notPng`；
+/// 账户不存在返回 `err.accountMissing`；读取文件失败返回 IO 错误信息
 #[gui_macros::ipc_group("account")]
 #[tauri::command]
 pub async fn account_upload_skin(
@@ -230,7 +272,7 @@ pub async fn account_upload_skin(
     }
 
     let data = mml_sys::path_helper::read_byte(&path).map_err(|err| err.to_string())?;
-    // PNG 文件签名（89 50 4E 47 0D 0A 1A 0A），服务端只收 PNG，提前拦下明显不对的文件
+    // PNG 文件签名 89 50 4E 47 0D 0A 1A 0A；服务端只收 PNG，提前拦下明显不对的文件
     if !data.starts_with(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]) {
         return Err(String::from("err.notPng"));
     }
@@ -251,11 +293,18 @@ pub async fn account_upload_skin(
     Ok(())
 }
 
-/// 打开第三方账户对应皮肤站的网页（皮肤上传 / 装备在皮肤站的网页面板完成）
+/// 打开第三方账户对应皮肤站的网页；皮肤上传与装备在皮肤站的网页面板上完成
 ///
 /// LittleSkin 开官网，统一通行证开对应服务器页，自建皮肤站 / 外置登录开
-/// 服务器根地址（外置登录存的是 Yggdrasil API 根，剥掉 `/api/yggdrasil` 后缀
-/// 得到站点根）。
+/// 服务器根地址；外置登录存的是 Yggdrasil API 根，剥掉 `/api/yggdrasil` 后缀
+/// 得到站点根。
+///
+/// - `account_type`: 前端账户类型串，离线与正版返回 `err.notOauth`
+/// - `uuid`: 账户 UUID
+///
+/// # 返回值
+///
+/// 账户不存在返回 `err.accountMissing`；服务器地址为空 / 不是 http 开头返回 `err.serverEmpty`
 #[gui_macros::ipc_group("account")]
 #[tauri::command]
 pub fn account_open_skin_site(account_type: String, uuid: String) -> Result<(), String> {

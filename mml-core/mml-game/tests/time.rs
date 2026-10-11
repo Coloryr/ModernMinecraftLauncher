@@ -1,5 +1,12 @@
 use mml_game::launcher::game_time_obj::GameTimeObj;
 
+/// 把游戏时长格式化成 `[天数.]时:分:秒.百分秒`
+///
+/// - `time`: 游戏时长记录
+///
+/// # 返回值
+///
+/// 返回格式化后的文本；不满一天时省略天数段
 pub fn format_game_time(time: &GameTimeObj) -> String {
     let total_seconds = time.game_time.num_seconds();
     let days = total_seconds / 86400;
@@ -28,13 +35,21 @@ pub fn format_game_time(time: &GameTimeObj) -> String {
     }
 }
 
+/// 把游戏时长换算成秒
+///
+/// - `time`: 游戏时长记录
+///
+/// # 返回值
+///
+/// 返回秒数，带小数
 pub fn game_time_seconds_f64(time: &GameTimeObj) -> f64 {
     time.game_time.num_milliseconds() as f64 / 1000.0
 }
 
+/// 解析两种时长文本并校验序列化往返：不满一天与带天数
 #[test]
 fn time_dec_test() {
-    // 测试第一种格式（无天数）
+    // 第一种格式：没有天数
     let json_data1 = r#"
     {
         "AddTime": "2024-06-23T18:38:40.9238897+08:00",
@@ -43,7 +58,7 @@ fn time_dec_test() {
         "LastPlay": "00:00:17.1875992"
     }"#;
 
-    // 测试第二种格式（带天数）
+    // 第二种格式：带天数
     let json_data2 = r#"
     {
         "AddTime": "2025-02-08T23:08:24.4002849+08:00",

@@ -24,15 +24,15 @@ use crate::archives::{
 /// 压缩包条目信息
 #[derive(Debug, Clone)]
 pub struct ArchiveEntryInfo {
-    /// 条目名称 / 压缩包内路径
+    /// 条目名称，即压缩包内路径
     pub name: String,
-    /// 是否为目录
+    /// 是否为目录条目
     pub is_dir: bool,
-    /// 未压缩大小（字节），目录为 `0`
+    /// 未压缩大小，单位字节；目录条目恒为 `0`
     pub size: u64,
 }
 
-/// 统一的压缩包处理器，自动检测压缩包格式并提供读写功能。
+/// 统一的压缩包处理器，自动检测格式并提供读写功能
 ///
 /// # 示例
 ///
@@ -54,24 +54,24 @@ pub struct ArchiveEntryInfo {
 /// archive.extract_all("output_dir/", None, None, None).unwrap();
 /// ```
 pub struct BaseArchive {
-    /// 压缩包磁盘路径
+    /// 压缩包在磁盘上的路径
     path: PathBuf,
-    /// 压缩包类型
+    /// 打开时按文件名后缀判定出的压缩包格式
     archive_type: ArchiveType,
-    /// 条目列表缓存
+    /// 打开时读取并缓存的条目列表，增删后同步刷新
     entries: Vec<ArchiveEntryInfo>,
-    /// 统一的已打开压缩包读取句柄，各格式实现见对应 runner 的读取器。
+    /// 已打开的读取句柄，各格式实现见对应读取器
     handle: Mutex<Box<dyn ArchiveHandle>>,
 }
 
 impl BaseArchive {
-    /// 打开压缩包文件，根据文件扩展名自动检测类型。
+    /// 打开压缩包文件，根据文件扩展名自动检测类型
     ///
-    /// * `path` — 压缩包文件路径。
+    /// - `path`: 压缩包文件路径
     ///
-    /// # 错误
+    /// # 返回值
     ///
-    /// 文件无法打开、格式不支持或压缩包损坏时返回错误。
+    /// 返回已打开并读完条目列表的处理器；文件无法打开、格式不支持或压缩包损坏时返回错误
     pub fn open<P: AsRef<Path>>(path: P) -> CoreResult<Self> {
         let path = path.as_ref().to_path_buf();
         let archive_type = ArchiveType::try_from_path(&path).ok_or_else(|| {
@@ -94,12 +94,16 @@ impl BaseArchive {
         })
     }
 
-    /// 以只读方式打开压缩包，不支持后续的就地写入。
+    /// 以只读方式打开压缩包，不支持后续的就地写入
     ///
-    /// 与[`open`](Self::open)等价，但句柄不带写权限：
-    /// 并发打开同一文件时不受写模式打开的杀软扫描影响，适合多线程各自持有一份句柄的场景。
+    /// 与 [`open`](Self::open) 等价但句柄不带写权限：并发打开同一文件时不受
+    /// 写模式打开的杀软扫描影响，适合多线程各自持有一份句柄的场景
     ///
-    /// * `path` — 压缩包文件路径。
+    /// - `path`: 压缩包文件路径
+    ///
+    /// # 返回值
+    ///
+    /// 返回已打开并读完条目列表的处理器；文件无法打开、格式不支持或压缩包损坏时返回错误
     pub fn open_readonly<P: AsRef<Path>>(path: P) -> CoreResult<Self> {
         let path = path.as_ref().to_path_buf();
         let archive_type = ArchiveType::try_from_path(&path).ok_or_else(|| {
@@ -121,15 +125,21 @@ impl BaseArchive {
         })
     }
 
-    /// 从目录创建新的压缩包并返回已打开的状态。
+    /// 从目录创建新的压缩包并返回已打开的状态
     ///
     /// 创建成功后可通过 [`add_files`](Self::add_files) /
-    /// [`add_data`](Self::add_data) 继续添加内容。
+    /// [`add_data`](Self::add_data) 继续添加内容
     ///
-    /// * `output_file` — 压缩包输出路径。
-    /// * `source_dir` — 需要打包的源目录。
-    /// * `root_path` — 相对根路径，设置后文件在包内的路径相对于此。
-    /// * `filter` — 可选的排除子串列表，匹配的文件将被跳过。
+    /// - `archive_type`: 压缩包格式
+    /// - `output_file`: 压缩包输出路径
+    /// - `source_dir`: 需要打包的源目录
+    /// - `root_path`: 相对根路径，设置后文件在包内的路径相对于此
+    /// - `filter`: 可选的排除子串列表，匹配的文件将被跳过
+    /// - `gui`: 可选的进度回调
+    ///
+    /// # 返回值
+    ///
+    /// 返回新压缩包已打开的状态；写入失败时返回相应错误
     pub fn compress<P: AsRef<Path>>(
         archive_type: ArchiveType,
         output_file: P,
@@ -149,13 +159,17 @@ impl BaseArchive {
         Self::open(output_file)
     }
 
-    /// 创建一个空的压缩包（无条目）并返回已打开的状态。
+    /// 创建一个不含条目的空压缩包并返回已打开的状态
     ///
     /// 创建后通过 [`add_files`](Self::add_files) /
-    /// [`add_data`](Self::add_data) 填充内容。
+    /// [`add_data`](Self::add_data) 填充内容
     ///
-    /// * `archive_type` — 压缩包格式。
-    /// * `output_file` — 压缩包输出路径。
+    /// - `archive_type`: 压缩包格式
+    /// - `output_file`: 压缩包输出路径
+    ///
+    /// # 返回值
+    ///
+    /// 返回空压缩包已打开的状态；创建或打开失败时返回相应错误
     pub fn create_empty<P: AsRef<Path>>(
         archive_type: ArchiveType,
         output_file: P,
@@ -177,12 +191,16 @@ impl BaseArchive {
         Self::open(output_file)
     }
 
-    /// 解压压缩包到指定目录，无需构造 [`BaseArchive`] 实例。
+    /// 解压压缩包到指定目录，无需构造 [`BaseArchive`] 实例
     ///
-    /// * `archive_type` — 压缩包格式。
-    /// * `archive_file` — 压缩包文件路径。
-    /// * `output_dir` — 解压输出目录。
-    /// * `gui` — 可选的进度回调。
+    /// - `archive_type`: 压缩包格式
+    /// - `archive_file`: 压缩包文件路径
+    /// - `output_dir`: 解压输出目录
+    /// - `gui`: 可选的进度回调
+    ///
+    /// # 返回值
+    ///
+    /// 解压失败时返回相应错误，成功返回 `Ok(())`
     pub fn decompress<P: AsRef<Path>>(
         archive_type: ArchiveType,
         archive_file: P,
@@ -204,14 +222,18 @@ impl BaseArchive {
         }
     }
 
-    /// 内部辅助：仅执行压缩写入磁盘，不打开结果文件。
+    /// 仅执行压缩并写入磁盘，不打开结果文件
     ///
-    /// * `archive_type` — 压缩包格式。
-    /// * `output_file` — 压缩包输出路径。
-    /// * `source_dir` — 需要打包的源目录。
-    /// * `root_path` — 相对根路径，设置后文件在包内的路径相对于此。
-    /// * `filter` — 可选的排除子串列表，匹配的文件将被跳过。
-    /// * `gui` — 可选的进度回调。
+    /// - `archive_type`: 压缩包格式
+    /// - `output_file`: 压缩包输出路径
+    /// - `source_dir`: 需要打包的源目录
+    /// - `root_path`: 相对根路径，设置后文件在包内的路径相对于此
+    /// - `filter`: 可选的排除子串列表，匹配的文件将被跳过
+    /// - `gui`: 可选的进度回调
+    ///
+    /// # 返回值
+    ///
+    /// 写入失败时返回相应错误
     fn compress_inner(
         archive_type: ArchiveType,
         output_file: &Path,
@@ -249,11 +271,15 @@ impl BaseArchive {
         }
     }
 
-    /// 根据压缩包类型创建对应的读取句柄。
+    /// 根据压缩包类型创建对应的读取句柄
     ///
-    /// * `archive_type` — 压缩包格式。
-    /// * `path` — 压缩包磁盘路径。
-    /// * `file` — 已打开的压缩包文件句柄。
+    /// - `archive_type`: 压缩包格式
+    /// - `path`: 压缩包磁盘路径
+    /// - `file`: 已打开的压缩包文件句柄
+    ///
+    /// # 返回值
+    ///
+    /// 返回对应格式的读取句柄；句柄构造失败时返回相应错误
     fn make_handle(
         archive_type: ArchiveType,
         path: &Path,
@@ -268,9 +294,13 @@ impl BaseArchive {
         })
     }
 
-    /// 在磁盘上创建一个空的 zip 文件（仅含中央目录，零条目）。
+    /// 在磁盘上创建一个只含中央目录、零条目的空 zip 文件
     ///
-    /// * `path` — 输出文件路径。
+    /// - `path`: 输出文件路径
+    ///
+    /// # 返回值
+    ///
+    /// 创建失败时返回相应错误
     fn create_empty_zip(path: &Path) -> CoreResult<()> {
         use zip::ZipWriter;
 
@@ -291,9 +321,13 @@ impl BaseArchive {
         Ok(())
     }
 
-    /// 在磁盘上创建一个空的 tar 文件（头 + 两个零块 EOF 标记）。
+    /// 在磁盘上创建一个空的 tar 文件，内容为两个零块 EOF 标记
     ///
-    /// * `path` — 输出文件路径。
+    /// - `path`: 输出文件路径
+    ///
+    /// # 返回值
+    ///
+    /// 创建失败时返回相应错误
     fn create_empty_tar(path: &Path) -> CoreResult<()> {
         use tar::Builder;
 
@@ -314,35 +348,53 @@ impl BaseArchive {
         Ok(())
     }
 
-    /// 返回检测到的压缩包类型。
+    /// 返回检测到的压缩包类型
+    ///
+    /// # 返回值
+    ///
+    /// 打开时按文件名后缀判定出的格式
     pub fn archive_type(&self) -> ArchiveType {
         self.archive_type
     }
 
-    /// 返回压缩包在磁盘上的路径。
+    /// 返回压缩包在磁盘上的路径
+    ///
+    /// # 返回值
+    ///
+    /// 打开时传入的文件路径
     pub fn path(&self) -> &Path {
         &self.path
     }
 
-    /// 返回压缩包内所有条目。
+    /// 返回压缩包内所有条目
     ///
-    /// 用于在不解压的情况下遍历压缩包内容。
+    /// 用于在不解压的情况下遍历压缩包内容
+    ///
+    /// # 返回值
+    ///
+    /// 返回打开时缓存的条目列表，增删后已同步刷新
     pub fn entries(&self) -> &[ArchiveEntryInfo] {
         &self.entries
     }
 
-    /// 检查压缩包中是否存在指定名称的条目。
+    /// 检查压缩包中是否存在指定名称的条目
     ///
-    /// * `name` — 条目名（与包内路径完全匹配）。
+    /// - `name`: 条目名，与包内路径完全匹配
+    ///
+    /// # 返回值
+    ///
+    /// 存在同名条目时为 `true`
     pub fn contains(&self, name: &str) -> bool {
         self.entries.iter().any(|e| e.name == name)
     }
 
-    /// 如果所有条目共享同一个顶层目录，返回该目录名。
+    /// 所有条目共享同一个顶层目录时返回该目录名
     ///
-    /// 例如所有条目都以 `"MyWorld/"` 开头时返回
-    /// `Some("MyWorld")`。条目位于压缩包根目录或有多个
-    /// 顶层目录时返回 `None`。
+    /// 例如条目都以 `"MyWorld/"` 开头时返回 `Some("MyWorld")`
+    ///
+    /// # 返回值
+    ///
+    /// 条目位于压缩包根目录或有多个顶层目录时返回 `None`
     pub fn single_top_dir(&self) -> Option<&str> {
         let mut firsts: Vec<&str> = self
             .entries
@@ -362,42 +414,40 @@ impl BaseArchive {
         }
     }
 
-    /// 读取压缩包内单个条目的内容到内存。
+    /// 读取压缩包内单个条目的内容到内存
     ///
-    /// * `name` — 条目在压缩包内的名称/路径（如 `"subdir/readme.txt"`）。
+    /// - `name`: 条目在压缩包内的名称/路径，如 `"subdir/readme.txt"`
     ///
-    /// 返回条目内容的原始字节。
+    /// # 返回值
     ///
-    /// # 错误
-    ///
-    /// 条目不存在、是目录或读取失败时返回错误。
+    /// 返回条目内容的原始字节；条目不存在、是目录或读取失败时返回错误
     pub fn read(&self, name: &str) -> CoreResult<Vec<u8>> {
         self.handle.lock().unwrap().read(name)
     }
 
-    /// 以流式 [`Read`] 接口打开压缩包内的单个文件条目。
+    /// 以流式 [`Read`] 接口打开压缩包内的单个文件条目
     ///
     /// 与返回完整 `Vec<u8>` 的 [`read`](Self::read) 不同，此方法返回
-    /// `Box<dyn Read>`，可直接传递给任何接受 [`Read`] trait 的函数。
+    /// `Box<dyn Read>`，可直接传递给任何接受 [`Read`] trait 的函数
     ///
-    /// * `name` — 条目在压缩包内的名称/路径（如 `"subdir/readme.txt"`）。
+    /// - `name`: 条目在压缩包内的名称/路径，如 `"subdir/readme.txt"`
     ///
-    /// # 错误
+    /// # 返回值
     ///
-    /// 条目不存在、是目录或读取失败时返回错误。
+    /// 返回只读流，由调用方负责读完或丢弃；条目不存在、是目录或读取失败时返回错误
     pub fn read_stream(&self, name: &str) -> CoreResult<Box<dyn Read>> {
         self.handle.lock().unwrap().read_stream(name)
     }
 
-    /// 将压缩包中单个文件提取到指定输出路径。
+    /// 将压缩包中单个文件提取到指定输出路径
     ///
-    /// * `name` — 条目在压缩包内的名称/路径（如 `"subdir/readme.txt"`）。
-    /// * `output_path` — 目标磁盘路径，父目录会自动创建。
-    /// * `gui` — 可选的进度回调。
+    /// - `name`: 条目在压缩包内的名称/路径，如 `"subdir/readme.txt"`
+    /// - `output_path`: 目标磁盘路径，父目录会自动创建
+    /// - `gui`: 可选的进度回调
     ///
-    /// # 错误
+    /// # 返回值
     ///
-    /// 条目不存在或提取失败时返回错误。
+    /// 条目不存在或提取失败时返回相应错误
     pub fn extract_file<P: AsRef<Path>>(
         &self,
         name: &str,
@@ -409,13 +459,17 @@ impl BaseArchive {
         self.extract_resolved(name, &output_path, gui)
     }
 
-    /// 解析最终输出路径：文件名非法时替换非法字符为 `_`，并询问 GUI 是否同意。
+    /// 解析最终输出路径，文件名非法时替换非法字符为 `_` 并询问 GUI 是否同意
     ///
-    /// 仅替换目标路径的最后一个名称段；GUI 不同意替换时返回 `TaskCancel`。
+    /// 仅替换目标路径的最后一个名称段
     ///
-    /// * `name` — 条目在压缩包内的名称/路径。
-    /// * `output` — 原始目标磁盘路径。
-    /// * `gui` — 可选的重命名确认回调。
+    /// - `name`: 条目在压缩包内的名称/路径
+    /// - `output`: 原始目标磁盘路径
+    /// - `gui`: 可选的重命名确认回调
+    ///
+    /// # 返回值
+    ///
+    /// 返回替换后的目标路径；GUI 不同意替换时返回 `TaskCancel`
     fn resolve_output_path(
         &self,
         name: &str,
@@ -448,11 +502,15 @@ impl BaseArchive {
         }
     }
 
-    /// 提取单个条目到已解析的目标路径（创建父目录）。
+    /// 提取单个条目到已解析的目标路径，并按需创建父目录
     ///
-    /// * `name` — 条目在压缩包内的名称/路径。
-    /// * `output_path` — 已解析的目标磁盘路径。
-    /// * `gui` — 可选的进度回调。
+    /// - `name`: 条目在压缩包内的名称/路径
+    /// - `output_path`: 已解析的目标磁盘路径
+    /// - `gui`: 可选的进度回调
+    ///
+    /// # 返回值
+    ///
+    /// 提取失败时返回相应错误
     fn extract_resolved(
         &self,
         name: &str,
@@ -468,10 +526,14 @@ impl BaseArchive {
             .extract_file(name, output_path, gui)
     }
 
-    /// 顺序提取一组条目。
+    /// 顺序提取一组条目
     ///
-    /// * `tasks` — `(条目名, 目标路径)` 任务列表。
-    /// * `gui` — 可选的进度回调（按每个已提取文件触发）。
+    /// - `tasks`: `(条目名, 目标路径)` 任务列表
+    /// - `gui`: 可选的进度回调，每提取完一个文件触发一次
+    ///
+    /// # 返回值
+    ///
+    /// 任一任务失败时返回相应错误
     fn extract_tasks_sequential(
         &self,
         tasks: &[(String, PathBuf)],
@@ -488,10 +550,14 @@ impl BaseArchive {
         Ok(())
     }
 
-    /// 并行提取一组条目（仅 Zip：每个线程持有独立的读取句柄随机访问）。
+    /// 并行提取一组条目，仅用于 Zip，每个线程持有独立读取句柄随机访问
     ///
-    /// * `tasks` — `(条目名, 目标路径)` 任务列表。
-    /// * `gui` — 可选的进度回调（按每个已提取文件触发）。
+    /// - `tasks`: `(条目名, 目标路径)` 任务列表
+    /// - `gui`: 可选的进度回调，每提取完一个文件触发一次
+    ///
+    /// # 返回值
+    ///
+    /// 任一任务失败时返回该错误；可用线程数不足 2 时退化为顺序提取
     fn extract_tasks_parallel(
         &self,
         tasks: &[(String, PathBuf)],
@@ -563,15 +629,18 @@ impl BaseArchive {
         Ok(())
     }
 
-    /// 将压缩包中所有文件提取到指定输出目录。
+    /// 将压缩包中所有文件提取到指定输出目录
     ///
-    /// * `output_dir` — 目标目录。
-    /// * `unselect` — 可选的排除条目名列表，名字完全匹配的条目将被跳过。
-    /// * `strip_dir` — 可选的顶层包裹目录名。压缩包整体被 `dir/` 包裹时
-    ///   （如 `dir/file.txt`），去掉该目录直接提取到 `output_dir`
-    ///   （`dir/file.txt` → `output_dir/file.txt`），避免多套一层文件夹。
-    ///   条目不在该目录下时保持原路径。
-    /// * `gui` — 可选的进度回调。
+    /// - `output_dir`: 目标目录
+    /// - `unselect`: 可选的排除条目名列表，名字完全匹配的条目将被跳过
+    /// - `strip_dir`: 可选的顶层包裹目录名；压缩包整体被 `dir/` 包裹时去掉该目录直接提取，
+    ///   `dir/file.txt` 落到 `output_dir/file.txt`，避免多套一层文件夹；
+    ///   条目不在该目录下时保持原路径
+    /// - `gui`: 可选的进度回调
+    ///
+    /// # 返回值
+    ///
+    /// 提取失败时返回相应错误
     pub fn extract_all<P: AsRef<Path>>(
         &self,
         output_dir: P,
@@ -604,16 +673,20 @@ impl BaseArchive {
         Self::decompress(self.archive_type, self.path.as_path(), output_dir, gui)
     }
 
-    /// 按条件提取选中条目到由闭包计算的输出路径。
+    /// 按条件提取选中条目到由闭包计算的输出路径
     ///
     /// 闭包接收每个文件 [`ArchiveEntryInfo`]，返回 `Some(输出路径)` 则提取，
-    /// 返回 `None` 则跳过。目录条目始终自动跳过。
+    /// 返回 `None` 则跳过；目录条目始终自动跳过
     ///
-    /// Zip 格式下并行解压（每个线程持有独立读取句柄随机访问），其余格式流式解压保持顺序。
-    /// 文件名非法时的 GUI 询问发生在任务收集阶段，保持串行。
+    /// Zip 格式下并行解压，每个线程持有独立读取句柄随机访问，其余格式流式解压保持顺序。
+    /// 文件名非法时的 GUI 询问发生在任务收集阶段，保持串行
     ///
-    /// * `map` — 将每个条目映射为可选输出路径的闭包。
-    /// * `gui` — 可选的进度回调（按每个已提取文件触发）。
+    /// - `map`: 将每个条目映射为可选输出路径的闭包
+    /// - `gui`: 可选的进度回调，每提取完一个文件触发一次
+    ///
+    /// # 返回值
+    ///
+    /// 提取失败时返回相应错误
     pub fn extract_where<F: FnMut(&ArchiveEntryInfo) -> Option<PathBuf>>(
         &self,
         mut map: F,
@@ -647,16 +720,17 @@ impl BaseArchive {
         result
     }
 
-    /// 向压缩包添加文件并原地保存。
+    /// 向压缩包添加文件并原地保存，已有同路径条目会被覆盖
     ///
-    /// Zip 和 Tar 格式下文件直接追加，无需解压或重压缩已有条目。
-    /// 7z 和压缩 tar 格式则先解压到临时目录，合并文件后重压缩。
-    /// 已有同路径条目会被覆盖。
+    /// Zip 和 Tar 格式下文件直接追加，无需解压或重压缩已有条目；
+    /// 7z 和压缩 tar 格式则先解压到临时目录，合并文件后重压缩
     ///
-    /// * `files` — `(磁盘源路径, 压缩包内路径)` 对。
-    /// * `gui` — 可选的进度回调（仅在重压缩时使用）。
+    /// - `files`: `(磁盘源路径, 压缩包内路径)` 对
+    /// - `gui`: 可选的进度回调，仅在重压缩时使用
     ///
-    /// 调用成功后内部条目列表会自动刷新。
+    /// # 返回值
+    ///
+    /// 写入失败时返回相应错误；成功后内部条目列表自动刷新
     pub fn add_files<P: AsRef<Path>>(
         &mut self,
         files: &[(P, P)],
@@ -681,10 +755,14 @@ impl BaseArchive {
         }
     }
 
-    /// 7z / tar.gz / tar.xz 的后备路径：解压到临时目录，写入文件后重压缩。
+    /// 7z / tar.gz / tar.xz 的后备路径：解压到临时目录，写入文件后重压缩
     ///
-    /// * `files` — `(磁盘源路径, 压缩包内路径)` 对。
-    /// * `gui` — 可选的进度回调（仅在重压缩时使用）。
+    /// - `files`: `(磁盘源路径, 压缩包内路径)` 对
+    /// - `gui`: 可选的进度回调，仅在重压缩时使用
+    ///
+    /// # 返回值
+    ///
+    /// 任一环节失败时返回相应错误
     fn add_files_extract_recompress<P: AsRef<Path>>(
         &mut self,
         files: &[(P, P)],
@@ -754,16 +832,17 @@ impl BaseArchive {
         Ok(())
     }
 
-    /// 将内存中的文件添加到压缩包并原地保存。
+    /// 将内存中的文件添加到压缩包并原地保存，已有同路径条目会被覆盖
     ///
-    /// Zip 格式下直接追加，无需解压或重压缩已有条目。
-    /// 7z 和 tar 系列格式则先解压到临时目录，写入数据后重压缩。
-    /// 已有同路径条目会被覆盖。
+    /// Zip 和 Tar 格式下直接追加，无需解压或重压缩已有条目；
+    /// 7z 和 tar 系列格式则先解压到临时目录，写入数据后重压缩
     ///
-    /// * `name` — 条目在压缩包内的路径（如 `"subdir/readme.txt"`）。
-    /// * `data` — 文件内容的原始字节。
+    /// - `name`: 条目在压缩包内的路径，如 `"subdir/readme.txt"`
+    /// - `data`: 文件内容的原始字节
     ///
-    /// 调用成功后内部条目列表会自动刷新。
+    /// # 返回值
+    ///
+    /// 写入失败时返回相应错误；成功后内部条目列表自动刷新
     pub fn add_data(&mut self, name: &str, data: &[u8]) -> CoreResult<()> {
         // Zip / Tar 支持就地追加；其余解压后重压缩
         match self.archive_type {
@@ -777,10 +856,14 @@ impl BaseArchive {
         }
     }
 
-    /// 7z / tar.gz / tar.xz 的后备路径：解压到临时目录，写入数据后重压缩。
+    /// 7z / tar.gz / tar.xz 的后备路径：解压到临时目录，写入数据后重压缩
     ///
-    /// * `name` — 条目在压缩包内的路径（如 `"subdir/readme.txt"`）。
-    /// * `data` — 文件内容的原始字节。
+    /// - `name`: 条目在压缩包内的路径，如 `"subdir/readme.txt"`
+    /// - `data`: 文件内容的原始字节
+    ///
+    /// # 返回值
+    ///
+    /// 任一环节失败时返回相应错误
     fn add_data_extract_recompress(&mut self, name: &str, data: &[u8]) -> CoreResult<()> {
         // 创建临时目录用于解压和新文件
         let temp_dir = std::env::temp_dir().join(format!("mml_archive_{}", Uuid::new_v4()));
@@ -847,30 +930,32 @@ impl BaseArchive {
         Ok(())
     }
 
-    /// 将磁盘上的单个文件添加到压缩包并原地保存。
+    /// 将磁盘上的单个文件添加到压缩包并原地保存，已有同路径条目会被覆盖
     ///
-    /// Zip / Tar 格式下文件直接追加，无需解压或重压缩已有条目。
-    /// 7z 和压缩 tar 格式则先解压到临时目录，复制文件后重压缩。
-    /// 已有同路径条目会被覆盖。
+    /// Zip / Tar 格式下文件直接追加，无需解压或重压缩已有条目；
+    /// 7z 和压缩 tar 格式则先解压到临时目录，复制文件后重压缩
     ///
-    /// * `name` — 条目在压缩包内的路径（如 `"subdir/readme.txt"`）。
-    /// * `path` — 磁盘上的源文件路径。
+    /// - `name`: 条目在压缩包内的路径，如 `"subdir/readme.txt"`
+    /// - `path`: 磁盘上的源文件路径
     ///
-    /// 调用成功后内部条目列表会自动刷新。
+    /// # 返回值
+    ///
+    /// 写入失败时返回相应错误；成功后内部条目列表自动刷新
     pub fn add_file<P: AsRef<Path>>(&mut self, name: &str, path: P) -> CoreResult<()> {
         self.add_files(&[(path.as_ref().to_path_buf(), PathBuf::from(name))], None)
     }
 
-    /// 将一个流的内容添加到压缩包并原地保存。
+    /// 将一个流的内容添加到压缩包并原地保存，已有同路径条目会被覆盖
     ///
     /// tar 系格式需要预知条目大小，因此统一先把流写入临时文件，
-    /// 再按 [`add_file`](Self::add_file) 的路径追加；内存占用恒定。
-    /// 已有同路径条目会被覆盖。
+    /// 再按 [`add_file`](Self::add_file) 的路径追加，内存占用恒定
     ///
-    /// * `name` — 条目在压缩包内的路径（如 `"subdir/readme.txt"`）。
-    /// * `stream` — 内容来源，读取到 EOF 为止。
+    /// - `name`: 条目在压缩包内的路径，如 `"subdir/readme.txt"`
+    /// - `stream`: 内容来源，读取到 EOF 为止
     ///
-    /// 调用成功后内部条目列表会自动刷新。
+    /// # 返回值
+    ///
+    /// 写入失败时返回相应错误；成功后内部条目列表自动刷新
     pub fn add_stream(&mut self, name: &str, stream: &mut dyn Read) -> CoreResult<()> {
         let temp_file = std::env::temp_dir().join(format!("mml_stream_{}", Uuid::new_v4()));
 
@@ -889,7 +974,11 @@ impl BaseArchive {
         result
     }
 
-    /// 在磁盘上的压缩包被**替换**后重新打开读取句柄并刷新条目。
+    /// 磁盘上的压缩包被替换后重新打开读取句柄并刷新条目
+    ///
+    /// # 返回值
+    ///
+    /// 重新打开或读条目失败时返回相应错误
     fn refresh_after_modify(&mut self) -> CoreResult<()> {
         let file = path_helper::open_read_write(&self.path)?;
         let mut handle = Self::make_handle(self.archive_type, &self.path, file)?;
@@ -899,13 +988,16 @@ impl BaseArchive {
     }
 }
 
-/// 去掉条目名指定的顶层包裹目录前缀。
+/// 去掉条目名指定的顶层包裹目录前缀
 ///
-/// 例如 `dir/file.txt` 去掉 `dir` 后 → `file.txt`（兼容 `\` 分隔的条目名）。
-/// 条目不在该目录下、或本身就是 `dir`（没有更深路径段）时保持原名，避免误剥。
+/// 例如 `dir/file.txt` 去掉 `dir` 后得到 `file.txt`，同时兼容 `\` 分隔的条目名
 ///
-/// * `name` — 条目名。
-/// * `dir` — 要去掉的顶层包裹目录名。
+/// - `name`: 条目名
+/// - `dir`: 要去掉的顶层包裹目录名
+///
+/// # 返回值
+///
+/// 条目不在该目录下、或本身就是 `dir` 时保持原名，避免误剥
 fn strip_dir_prefix(name: &str, dir: &str) -> String {
     name.strip_prefix(&format!("{dir}/"))
         .or_else(|| name.strip_prefix(&format!("{dir}\\")))

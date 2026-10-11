@@ -34,9 +34,7 @@ pub mod hmcl_obj;
 pub mod mmc_obj;
 pub mod official_obj;
 
-/// 检测是否为MMC实例
-///
-/// # 参数
+/// 检测是否为 MMC 实例
 ///
 /// - `dir`: 实例目录
 ///
@@ -51,8 +49,6 @@ pub fn is_mmc_version<P: AsRef<Path>>(dir: P) -> bool {
 }
 
 /// 检测是否为官方实例
-///
-/// # 参数
 ///
 /// - `dir`: 实例目录
 ///
@@ -89,9 +85,7 @@ pub fn is_minecraft_version<P: AsRef<Path>>(dir: P) -> bool {
 }
 
 impl MMCObj {
-    /// 转换为实例信息
-    ///
-    /// # 参数
+    /// 把 MMC 配置转成本启动器的实例信息
     ///
     /// - `cfg`: MMC 配置选项
     ///
@@ -226,7 +220,7 @@ impl MMCObj {
 }
 
 impl OfficialObj {
-    /// 转换为实例信息
+    /// 把官方启动器版本 json 转成实例信息
     ///
     /// # 返回值
     ///
@@ -239,7 +233,7 @@ impl OfficialObj {
 
         if self.patches.is_empty() {
             // 版本号取自 json 自己，但要用 `have_version()` 确认这个版本在本启动器已知的
-            // 版本清单里（清单见 [`version_path::have_version`]：内存没有时会读本地缓存）
+            // 版本清单里，见 [`version_path::have_version`]，内存没有时会读本地缓存
             if !self.inherits_from.is_empty() {
                 if version_path::have_version(&self.inherits_from) {
                     instance.version = self.inherits_from
@@ -316,7 +310,7 @@ impl OfficialObj {
 }
 
 impl HMCLObj {
-    /// 转换为实例信息
+    /// 把 HMCL 配置转成实例信息
     ///
     /// # 返回值
     ///
@@ -404,7 +398,7 @@ impl HMCLObj {
 }
 
 impl HMCLServerObj {
-    /// 转换为实例信息
+    /// 把 HMCL 服务器配置转成实例信息，标记为服务端整合包
     ///
     /// # 返回值
     ///

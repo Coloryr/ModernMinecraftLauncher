@@ -1,4 +1,4 @@
-// GUI 状态（由 Rust 提供）：gui_config.json（界面状态）+ window_save.json（窗口几何）
+// GUI 状态由 Rust 提供：gui_config.json 存界面状态，window_save.json 存窗口几何
 // 主窗口使用固定 uuid，与 Rust window_manager.rs 一致。
 // IPC wire 使用 TS 命名（camelCase），经 Rust dtos::GuiConfigDto 转换；
 // 磁盘 gui_config.json 使用 Rust 命名（snake_case），前端不直接接触。

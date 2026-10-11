@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 统一按钮：primary（主操作）/ accent（强调）/ plain（次要）/ danger（危险）/ ghost（图标类）
+// 统一按钮，五种变体：primary 主操作、accent 强调、plain 次要、danger 危险、ghost 图标类
 withDefaults(
   defineProps<{
     variant?: "primary" | "accent" | "plain" | "danger" | "ghost";

@@ -4,15 +4,28 @@ use std::collections::BTreeMap;
 
 use crate::scan::split_top_level;
 
-/// Tauri 注入的参数：不进前端签名（按类型名识别，与参数位置无关）
+/// Tauri 注入的参数：不进前端签名，按类型名识别，与参数位置无关
 const INJECTED: [&str; 4] = ["AppHandle", "WebviewWindow", "Window", "State"];
 
-/// snake_case / kebab-case -> SCREAMING_SNAKE_CASE（account-change -> ACCOUNT_CHANGE）
+/// snake_case / kebab-case -> SCREAMING_SNAKE_CASE，如 account-change -> ACCOUNT_CHANGE
+///
+/// - `name`: 事件名或标识符
+///
+/// # 返回值
+///
+/// 全大写、`-` 换成 `_` 的名字
 pub fn screaming(name: &str) -> String {
     name.replace('-', "_").to_ascii_uppercase()
 }
 
-/// `Option<T>` -> `T`；不是该泛型则 None
+/// 取出 `Name<T>` 里的 `T`
+///
+/// - `ty`: 待解析的类型原文
+/// - `name`: 要匹配的泛型名，如 `Option` / `Vec` / `Result`
+///
+/// # 返回值
+///
+/// 内层类型；不是该泛型或写法不规范时返回 `None`
 fn generic_inner(ty: &str, name: &str) -> Option<String> {
     let t = ty.trim();
     let rest = t.strip_prefix(name)?;
@@ -23,11 +36,16 @@ fn generic_inner(ty: &str, name: &str) -> Option<String> {
 
 /// Rust 类型 -> TS 类型
 ///
-/// - `ext`：外部 crate 的类型映射（本 crate 里定义不了的，如 `mml-names` 的 `Lang`）；
+/// - `ty`: Rust 类型原文，可带 `&` / `'static` 引用
+/// - `ext`: 外部 crate 的类型映射，本 crate 里定义不了的，如 `mml-names` 的 `Lang`；
 ///   不在表里的类型名按「本 crate 生成的类型」处理，直接用原名
+///
+/// # 返回值
+///
+/// 对应的 TS 类型；认不出的类型名原样返回
 pub fn ts_type(ty: &str, ext: &BTreeMap<String, String>) -> String {
     let t = ty.trim();
-    // 引用类型（`&str`、`&'static str`）按值处理
+    // 引用类型如 `&str`、`&'static str` 按值处理
     let t = t
         .trim_start_matches('&')
         .trim_start_matches("'static")
@@ -61,7 +79,7 @@ pub fn ts_type(ty: &str, ext: &BTreeMap<String, String>) -> String {
         "bool" => "boolean".into(),
         "i8" | "i16" | "i32" | "i64" | "isize" | "u8" | "u16" | "u32" | "u64" | "usize" | "f32"
         | "f64" => "number".into(),
-        // 空串 = Rust 侧写了 `fn f()`（无返回类型），等价于 `()`
+        // 空串 = Rust 侧写了 `fn f()`，即无返回类型，等价于 `()`
         "" | "()" => "void".into(),
         // 本 crate 生成的类型：直接用名字
         other => other.to_string(),
@@ -70,10 +88,15 @@ pub fn ts_type(ty: &str, ext: &BTreeMap<String, String>) -> String {
 
 /// 字段类型 -> (TS 类型, 是否可选)
 ///
-/// - `Option<Option<T>>` 是三态补丁（不传 = 不改 / null = 清空 / 有值 = 更新）：
-///   可缺省且可为 null
-/// - `input_only`（只 derive `Deserialize` 的入参 DTO）：serde 允许 `Option` 字段整键缺失，
+/// - `ty`: 字段的 Rust 类型原文
+/// - `input_only`: 只 derive `Deserialize` 的入参 DTO。serde 允许 `Option` 字段整键缺失，
 ///   所以 `Option<T>` 标成可缺省；输出 DTO 的键一定会被序列化出来，保持必填
+/// - `ext`: 外部 crate 的类型映射，透传给 [`ts_type`]
+///
+/// # 返回值
+///
+/// TS 类型与是否可缺省两项；`Option<Option<T>>` 是三态补丁，不传 = 不改 / null = 清空 /
+/// 有值 = 更新，可缺省且可为 null
 pub fn ts_field(ty: &str, input_only: bool, ext: &BTreeMap<String, String>) -> (String, bool) {
     if let Some(inner) = generic_inner(ty.trim(), "Option") {
         if let Some(inner2) = generic_inner(inner.trim(), "Option") {
@@ -84,7 +107,13 @@ pub fn ts_field(ty: &str, input_only: bool, ext: &BTreeMap<String, String>) -> (
     (ts_type(ty, ext), false)
 }
 
-/// `ab_cd` / `ab-cd` -> `abCd`（缩写修正 Oauth -> OAuth，与现有命名保持一致）
+/// `ab_cd` / `ab-cd` -> `abCd`，缩写修正 Oauth -> OAuth，与现有命名保持一致
+///
+/// - `name`: snake_case 或 kebab-case 名字
+///
+/// # 返回值
+///
+/// 小驼峰名字
 pub fn camel(name: &str) -> String {
     let mut parts = name.split(['_', '-']).filter(|s| !s.is_empty());
     let first = parts.next().unwrap_or("").to_string();
@@ -98,6 +127,13 @@ pub fn camel(name: &str) -> String {
 }
 
 /// 参数原文 -> Vec<(TS 参数名, TS 类型, 是否可选)>，并丢掉 Tauri 注入的参数
+///
+/// - `params`: 函数签名括号内的参数原文，可跨多行
+/// - `ext`: 外部 crate 的类型映射，透传给 [`ts_field`]
+///
+/// # 返回值
+///
+/// 前端签名要用的参数表；Tauri 注入的参数见 [`INJECTED`]，已被剔除
 pub fn ts_params(params: &str, ext: &BTreeMap<String, String>) -> Vec<(String, String, bool)> {
     split_top_level(params)
         .into_iter()
@@ -115,7 +151,13 @@ pub fn ts_params(params: &str, ext: &BTreeMap<String, String>) -> Vec<(String, S
         .collect()
 }
 
-/// `Result<T, E>` -> `T`；其它原样（命令返回值都是 Promise，错误通道另算）
+/// `Result<T, E>` -> `T`；其它原样，命令返回值都是 Promise，错误通道另算
+///
+/// - `ty`: 返回类型原文
+///
+/// # 返回值
+///
+/// `Ok` 侧的类型；不是 `Result` 就原样返回
 pub fn result_ok(ty: &str) -> String {
     if let Some(inner) = generic_inner(ty, "Result") {
         let parts = split_top_level(&inner);
@@ -127,6 +169,12 @@ pub fn result_ok(ty: &str) -> String {
 }
 
 /// snake_case / kebab-case -> PascalCase，缩写词修正 Oauth -> OAuth
+///
+/// - `name`: snake_case 或 kebab-case 名字
+///
+/// # 返回值
+///
+/// 大驼峰名字，事件名常量等用
 pub fn pascal(name: &str) -> String {
     name.split(['_', '-'])
         .filter(|s| !s.is_empty())
@@ -147,6 +195,11 @@ pub fn pascal(name: &str) -> String {
 mod tests {
     use super::*;
 
+    /// 测试用的外部类型映射，只有 `Lang` 一条
+    ///
+    /// # 返回值
+    ///
+    /// 只含 `Lang` 的映射表
     fn ext() -> BTreeMap<String, String> {
         BTreeMap::from([("Lang".to_string(), "\"zh_cn\" | \"en_us\"".to_string())])
     }
@@ -165,11 +218,11 @@ mod tests {
             ts_type("HashMap<String, Vec<String>>", &e),
             "Record<string, string[]>"
         );
-        // 自定义类型原样返回（它由本 crate 生成）
+        // 自定义类型原样返回，它由本 crate 生成
         assert_eq!(ts_type("NewsItem", &e), "NewsItem");
     }
 
-    /// 引用类型按值处理（`Vec<&'static str>` 是本仓真实用到的写法）
+    /// 引用类型按值处理，`Vec<&'static str>` 是本仓真实用到的写法
     #[test]
     fn test_ts_type_references() {
         let e = ext();
@@ -212,7 +265,7 @@ mod tests {
         );
     }
 
-    /// 入参 DTO（只 derive Deserialize）的 Option 字段可缺省；输出 DTO 必填
+    /// 只 derive Deserialize 的入参 DTO，其 Option 字段可缺省；输出 DTO 必填
     #[test]
     fn test_ts_field_input_only() {
         assert_eq!(
@@ -226,7 +279,7 @@ mod tests {
         assert_eq!(ts_field("String", false, &ext()), ("string".into(), false));
     }
 
-    /// 注入参数按类型名剔除，与位置无关（三种顺序都要过）
+    /// 注入参数按类型名剔除，与位置无关；三种顺序都要过
     #[test]
     fn test_ts_params_drops_injected() {
         let e = ext();
@@ -271,7 +324,7 @@ mod tests {
         assert_eq!(result_ok(""), "");
     }
 
-    /// 命名转换（含 Oauth -> OAuth 修正）
+    /// 命名转换，含 Oauth -> OAuth 修正
     #[test]
     fn test_name_helpers() {
         assert_eq!(camel("add_modpack_search"), "addModpackSearch");

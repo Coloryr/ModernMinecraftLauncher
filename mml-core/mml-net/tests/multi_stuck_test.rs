@@ -1,12 +1,7 @@
 //! 复现生产环境的真实形态：四个请求同时卡在"读 body"，中断从**同步线程**发出
 //!
-//! 与之前几个测试的关键差别（也是之前测试没能复现问题的原因）：
-//! - 之前：请求与 abort 都在**同一个线程里的同一个 runtime**，且都是"卡在头部请求"；
-//! - 真实：请求跑在 Tauri runtime（多线程），abort 由**同步命令**在另一个线程调用，
-//!   四个请求**同时**处于 `resp.body()` 读取阶段。
-//!
-//! 本测试用 4 个独立线程 + 4 个独立 current_thread runtime 模拟这种分布，
-//! 让 4 个请求同时卡住，然后从一个**没有 runtime 上下文的线程**调用 `abort_all()`。
+//! 与旧测试的差别在分布方式：请求跑在 4 个独立线程加独立 current_thread runtime，
+//! 中断从一个没有 runtime 上下文的线程发出，对应 Tauri 的同步命令。
 
 use std::io::Read;
 use std::net::TcpListener;
@@ -32,6 +27,7 @@ fn silent_server() -> u16 {
     port
 }
 
+/// 初始化日志、配置与 HTTP 客户端，进程内只跑一次
 fn init_once() {
     use std::sync::Once;
     static INIT: Once = Once::new();
@@ -44,12 +40,13 @@ fn init_once() {
     });
 }
 
+/// 四个并发卡住的请求应被一次中断全部唤醒
 #[test]
 fn four_concurrent_stuck_requests_all_abort() {
     init_once();
     let port = silent_server();
 
-    // 四个请求：各自独立线程 + 独立 current_thread runtime（模拟真实分布）
+    // 四个请求：各自独立线程加独立 current_thread runtime，模拟真实分布
     let mut receivers = Vec::new();
     for i in 0..4 {
         let (tx, rx) = mpsc::channel();
@@ -76,7 +73,7 @@ fn four_concurrent_stuck_requests_all_abort() {
     // 让四个请求都进入卡住状态
     std::thread::sleep(Duration::from_millis(600));
 
-    // 从中断发起方：一个**没有 runtime 上下文**的普通线程（对应 Tauri 同步命令）
+    // 从中断发起方：一个**没有 runtime 上下文**的普通线程，对应 Tauri 同步命令
     let abort_at = Instant::now();
     std::thread::spawn(move || {
         mml_net::abort_all();

@@ -38,14 +38,12 @@ use std::{
     sync::OnceLock,
 };
 
-/// 程序运行根目录（全局单例）
+/// 程序运行根目录，进程级全局单例
 static BASE_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 /// 初始化程序运行根目录
 ///
 /// 应在程序启动时调用一次，设置后可通过 [`get_base_dir()`] 获取。
-///
-/// # 参数
 ///
 /// - `dir`: 程序运行目录
 pub fn init<P: AsRef<Path>>(dir: P) {
@@ -53,6 +51,10 @@ pub fn init<P: AsRef<Path>>(dir: P) {
 }
 
 /// 获取程序运行根目录
+///
+/// # 返回值
+///
+/// 返回 [`init`] 传入的目录；尚未调用 [`init`] 时 panic
 pub fn get_base_dir() -> PathBuf {
     BASE_DIR.get().unwrap().clone()
 }
@@ -63,8 +65,7 @@ mod tests {
 
     /// init / get_base_dir 全局根目录
     ///
-    /// 注意：BASE_DIR 为进程级全局单例（OnceLock + get_or_init），
-    /// 首次调用的参数生效，重复 init 不会 panic 也不会覆盖。
+    /// BASE_DIR 是进程级全局单例，首次调用的参数生效，重复 init 不 panic 也不覆盖
     #[test]
     fn test_init_and_get_base_dir() {
         let dir = mml_testutil::temp_dir().join(format!(

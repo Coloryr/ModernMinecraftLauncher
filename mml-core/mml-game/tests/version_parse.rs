@@ -1,6 +1,6 @@
-//! Mojang 版本 JSON 解析测试：版本清单、版本详情（V1/V2 启动参数格式）、版本号判断。
+//! Mojang 版本 JSON 解析测试：版本清单、版本详情、V1/V2 启动参数格式、版本号判断。
 //!
-//! 纯离线测试，不依赖全局初始化（不创建实例目录、不发网络请求）。
+//! 纯离线测试，不依赖全局初始化：不创建实例目录、不发网络请求。
 
 use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 use mml_game::mojang::VersionType;
@@ -8,7 +8,7 @@ use mml_game::mojang::game_arg_obj::{ArgValue, Argument, GameArgObj};
 use mml_game::mojang::version_obj::VersionObj;
 use serde_json::json;
 
-/// 版本清单（version_manifest_v2.json）解析。
+/// 版本清单 version_manifest_v2.json 解析
 #[test]
 fn version_manifest_parse() {
     let json = json!({
@@ -54,7 +54,7 @@ fn version_manifest_parse() {
     assert_eq!(restored.versions.len(), 2);
 }
 
-/// 版本清单缺字段时使用默认值（serde default）。
+/// 版本清单缺字段时使用默认值，serde default 生效
 #[test]
 fn version_manifest_defaults() {
     let obj: VersionObj = serde_json::from_str("{}").unwrap();
@@ -102,7 +102,7 @@ fn game_arg_obj_v1_parse() {
     assert!(obj.arguments.is_none());
 }
 
-/// V2 版本详情：新版 `arguments` 列表格式（Plain + 带规则的 Conditional）。
+/// V2 版本详情：新版 `arguments` 列表格式，Plain 与带规则的 Conditional 混排
 #[test]
 fn game_arg_obj_v2_parse() {
     let json = json!({
@@ -185,7 +185,7 @@ fn game_arg_obj_v2_parse() {
     );
 }
 
-/// 版本详情缺字段时使用默认值（V1 之前的老版本 / 残缺 JSON）。
+/// 版本详情缺字段时使用默认值，覆盖 V1 之前的老版本与残缺 JSON
 #[test]
 fn game_arg_obj_defaults() {
     let obj: GameArgObj = serde_json::from_str(r#"{"id":"a1.0.16","mainClass":"Main"}"#).unwrap();
@@ -199,7 +199,7 @@ fn game_arg_obj_defaults() {
     assert_eq!(obj.downloads.client.url, "");
 }
 
-/// 版本号判断（version_checker）：V1/V2、1.17 / 1.20 / 1.20.2 阈值。
+/// 版本号判断，逻辑在 version_checker：V1/V2 与 1.17 / 1.20 / 1.20.2 阈值
 #[test]
 fn game_arg_version_checker() {
     let make = |id: &str, min: i32| {
@@ -210,26 +210,26 @@ fn game_arg_version_checker() {
         }
     };
 
-    // 1.17 阈值（含 1.17）
+    // 1.17 阈值，含 1.17
     assert!(make("1.17", 21).is_game_version_117());
     assert!(make("1.20.4", 21).is_game_version_117());
     assert!(!make("1.16.5", 21).is_game_version_117());
 
-    // 1.20 阈值（含 1.20）
+    // 1.20 阈值，含 1.20
     assert!(make("1.20", 21).is_game_version_120());
     assert!(make("1.20.4", 21).is_game_version_120());
     assert!(!make("1.19.4", 21).is_game_version_120());
 
-    // 1.20.2 阈值（含 1.20.2）
+    // 1.20.2 阈值，含 1.20.2
     assert!(make("1.20.2", 21).is_game_version_1202());
     assert!(make("1.21", 21).is_game_version_1202());
     assert!(!make("1.20.1", 21).is_game_version_1202());
 
-    // 新版本号格式（26.x）视为最新
+    // 新版本号格式 26.x 视为最新
     assert!(make("26.1", 21).is_game_version_1202());
 }
 
-/// 实例配置上的版本号判断（与版本详情同源的封装）。
+/// 实例配置上的版本号判断，与版本详情同源
 #[test]
 fn instance_version_checker() {
     let make = |version: &str| InstanceSettingObj {
@@ -245,7 +245,7 @@ fn instance_version_checker() {
     assert!(!make("1.12.2").is_game_version_117());
 }
 
-/// 版本类型枚举与独立 ID 的双向转换。
+/// 版本类型枚举与独立 ID 的双向转换
 #[test]
 fn version_type_ids() {
     assert_eq!(VersionType::Release.id(), "release");

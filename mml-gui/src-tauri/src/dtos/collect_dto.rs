@@ -1,8 +1,8 @@
 //! 收藏窗口 DTO
 //!
-//! 磁盘上的 `collect.json` 用 Rust 命名（见 `../collect_utils.rs`），
+//! 磁盘上的 `collect.json` 用 Rust 命名，见 `../collect_utils.rs`，
 //! 这里转成 camelCase 的 wire 形态给前端。
-//! 类型过滤状态不在这里——它属于 `gui_config`（见 `../gui_config.rs` 的 `CollectConfig`）。
+//! 类型过滤状态不在这里——它属于 `gui_config`，见 `../gui_config.rs` 的 `CollectConfig`。
 
 use std::collections::HashMap;
 
@@ -14,7 +14,7 @@ use crate::collect_utils::{CollectItemObj, CollectObj};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CollectItemDto {
-    /// 收藏项 uuid（`CollectObj::items` 的 key，前端寻址用）
+    /// 收藏项 uuid，即 `CollectObj::items` 的 key，前端寻址用
     pub uuid: String,
     /// 资源名字
     pub name: String,
@@ -24,7 +24,7 @@ pub struct CollectItemDto {
     pub file_type: String,
     /// 项目 ID
     pub pid: String,
-    /// 图标地址（URL）
+    /// 图标地址，URL 形式
     pub icon: Option<String>,
     /// 项目网页地址
     pub url: String,
@@ -32,8 +32,6 @@ pub struct CollectItemDto {
 
 impl CollectItemDto {
     /// 由磁盘收藏项构造
-    ///
-    /// # 参数
     ///
     /// - `uuid`: `CollectObj::items` 里的 key
     /// - `data`: 磁盘收藏项
@@ -58,20 +56,20 @@ impl CollectItemDto {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CollectDataDto {
-    /// 收藏项（按名字排序）
+    /// 收藏项，按名字排序
     pub items: Vec<CollectItemDto>,
     /// 分组：分组名 → 收藏项 uuid 列表
     pub groups: HashMap<String, Vec<String>>,
 }
 
 impl From<CollectObj> for CollectDataDto {
-    /// # 参数
+    /// 磁盘收藏数据 → 前端 wire 形态
     ///
     /// - `obj`: 磁盘收藏数据
     ///
     /// # 返回值
     ///
-    /// 返回转换后的 DTO（收藏项与各分组的 uuid 列表均按名字 / 值排序）
+    /// 返回转换后的 DTO，收藏项与各分组的 uuid 列表均按名字 / 值排序
     fn from(obj: CollectObj) -> Self {
         let mut items: Vec<CollectItemDto> = obj
             .items

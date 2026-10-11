@@ -1,8 +1,8 @@
 //! CurseForge API 的离线测试。
 //!
 //! 重点覆盖：
-//! - 各数据结构（`*_obj`）对真实 CurseForge API 响应结构的反序列化
-//! - API Key 的设置与读取行为（使用假密钥 `test-key`，绝不使用真实密钥）
+//! - 各数据结构 `*_obj` 对真实 CurseForge API 响应结构的反序列化
+//! - API Key 的设置与读取行为，使用假密钥 `test-key`，绝不使用真实密钥
 //!
 //! 不联网：所有样例 JSON 均为内嵌字符串，结构与 CurseForge REST API v1
 //! 的真实响应一致。
@@ -15,7 +15,7 @@ use mml_net::curseforge_api::{
     version_obj::CurseForgeVersionTypeObj, CLASS_MOD, CLASS_MODPACK, GAME_ID, get_key, set_key,
 };
 
-/// CurseForge 搜索接口（`/mods/search`）的真实响应结构
+/// CurseForge 搜索接口 `/mods/search` 的真实响应结构
 const SEARCH_JSON: &str = r#"{
     "data": [
         {
@@ -83,7 +83,7 @@ const SEARCH_JSON: &str = r#"{
     }
 }"#;
 
-/// CurseForge 文件列表接口（`/mods/{id}/files`）的真实响应结构
+/// CurseForge 文件列表接口 `/mods/{id}/files` 的真实响应结构
 const FILE_PAGE_JSON: &str = r#"{
     "data": [
         {
@@ -119,7 +119,7 @@ const FILE_PAGE_JSON: &str = r#"{
     }
 }"#;
 
-/// CurseForge 单文件接口（`/mods/{id}/files/{fileId}`）的响应，downloadUrl 可为 null
+/// CurseForge 单文件接口 `/mods/{id}/files/{fileId}` 的响应，`downloadUrl` 可为 null
 const FILE_OBJ_NULL_URL_JSON: &str = r#"{
     "data": {
         "id": 4279300,
@@ -139,7 +139,7 @@ const FILE_OBJ_NULL_URL_JSON: &str = r#"{
     }
 }"#;
 
-/// CurseForge 分类接口（`/categories`）的响应，只保留叶子分类（classId 非 null）
+/// CurseForge 分类接口 `/categories` 的响应，只保留 `classId` 非 null 的叶子分类
 const CATEGORIES_JSON: &str = r#"{
     "data": [
         {
@@ -166,7 +166,7 @@ const CATEGORIES_JSON: &str = r#"{
     ]
 }"#;
 
-/// CurseForge 版本列表接口（`/games/{id}/versions`）的响应
+/// CurseForge 版本列表接口 `/games/{id}/versions` 的响应
 const VERSIONS_JSON: &str = r#"{
     "data": [
         { "type": 3, "versions": ["1.20.4", "1.20.3"] },
@@ -174,8 +174,7 @@ const VERSIONS_JSON: &str = r#"{
     ]
 }"#;
 
-/// CurseForge 版本类型接口（`/games/{id}/version-types`）的响应
-/// （`id` 为整数，见 API 文档的 GameVersionType）
+/// CurseForge 版本类型接口 `/games/{id}/version-types` 的响应，`id` 为整数
 const VERSION_TYPES_JSON: &str = r#"{
     "data": [
         { "id": 628, "name": "Minecraft 1.20.4" },
@@ -183,7 +182,7 @@ const VERSION_TYPES_JSON: &str = r#"{
     ]
 }"#;
 
-/// 项目详情接口（`/mods/{id}`）的响应
+/// 项目详情接口 `/mods/{id}` 的响应
 const MOD_INFO_JSON: &str = r#"{
     "data": {
         "id": 361387,
@@ -319,7 +318,7 @@ fn api_constants() {
     assert_eq!(CLASS_MOD, 6);
 }
 
-/// API Key 的设置与读取（假密钥）。
+/// API Key 的设置与读取，使用假密钥。
 ///
 /// `API_KEY` 是全局 `OnceLock`，只能设置一次，因此本测试集中验证：
 /// 未设置时返回 `KeyIsNull`，设置后返回原值；重复设置第一次的值不会被覆盖。

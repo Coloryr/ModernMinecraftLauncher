@@ -86,7 +86,7 @@ const noSkin = ref(false);
 const loading = ref(false);
 /** 纹理列表加载中（打开弹窗 / 换账户后首次拉取较慢，列表区给个提示） */
 const listLoading = ref(false);
-/** 待上传的本地皮肤文件路径（空 = 无），选中后选型号直传（须在下方 immediate watch 之前声明） */
+/** 待上传的本地皮肤文件路径，空表示无；选中后选型号直传，须在下方 immediate watch 之前声明 */
 const uploadFile = ref("");
 
 // 目标账户：由入口传进来（账户条目上的「查看皮肤」按钮点的是哪一条就预览哪一条）。

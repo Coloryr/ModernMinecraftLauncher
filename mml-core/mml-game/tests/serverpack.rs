@@ -1,16 +1,16 @@
-//! 服务器包（serverpack）测试
+//! 服务器包 serverpack 测试
 //!
 //! 覆盖用户要求的五条链路，以及各自落在哪一层：
 //!
 //! | 链路 | 对应实现 | 本文件怎么测 |
 //! | --- | --- | --- |
-//! | **生成** | 服务端产出的 `server.json`（+ `.sha1`）；本仓库**只有消费侧** | 测试里构造 `ServerPackObj`（模拟服务端生成）→ 走保存 / 读回 / 升级 |
-//! | **获取** | `server_pack_update` 拉 `<url>/server.json.sha1` 与 `server.json` | 离线：本地起 HTTP 服务喂这两个文件（见文件末尾） |
+//! | **生成** | 服务端产出的 `server.json` 与 `.sha1`；本仓库**只有消费侧** | 测试里构造 `ServerPackObj` 模拟服务端生成 → 走保存 / 读回 / 升级 |
+//! | **获取** | `server_pack_update` 拉 `<url>/server.json.sha1` 与 `server.json` | 离线：本地起 HTTP 服务喂这两个文件，见文件末尾 |
 //! | **下载** | `upgrade_serverpack` 里按 `plan_downloads` 下的文件 / 配置包 | 离线：纯函数用例 + 本地 HTTP 服务真实下载 |
 //! | **更新** | 本地 `server.json` 的 SHA1 与远端 `.sha1` 比对 | 离线：本地 HTTP 服务 + 哈希一致/不一致两条 |
-//! | **升级** | `upgrade_serverpack`（删旧 + 下载 + 解压 + 落盘新清单） | 离线：纯函数用例 + 真实升级链路 |
+//! | **升级** | `upgrade_serverpack` 删旧 + 下载 + 解压 + 落盘新清单 | 离线：纯函数用例 + 真实升级链路 |
 //!
-//! 判定逻辑已抽到 [`mml_game::serverpack::plan`]（纯函数，无 IO/无网络），
+//! 判定逻辑已抽到 [`mml_game::serverpack::plan`]，纯函数，无 IO 无网络，
 //! 所以"删错文件 / 下错地址"这类最危险的判定都能离线测。
 
 use std::path::{Path, PathBuf};
@@ -22,7 +22,7 @@ use mml_game::serverpack::plan;
 use mml_game::serverpack::serverpack_obj::{ServerArchiveItemObj, ServerItemObj, ServerPackObj};
 use uuid::Uuid;
 
-/// 初始化链（只用到磁盘与配置后台保存线程，不需要网络与下载器）
+/// 初始化链，只用到磁盘与配置后台保存线程，不需要网络与下载器
 fn ensure_init() {
     static INIT: Once = Once::new();
     INIT.call_once(|| {
@@ -43,10 +43,10 @@ fn ensure_init() {
     });
 }
 
-/// 内核那几个系统是进程级单例（AGENTS.md §6），用例串行执行
+/// 内核那几个系统是进程级单例，见 AGENTS.md §6；用例串行执行
 static TEST_LOCK: Mutex<()> = Mutex::new(());
 
-/// 等待条件成立（后台保存线程异步写盘，需要轮询）
+/// 等待条件成立，后台保存线程异步写盘，需要轮询
 fn wait_for<F: Fn() -> bool>(timeout: Duration, cond: F) -> bool {
     let start = Instant::now();
     while start.elapsed() < timeout {
@@ -58,7 +58,7 @@ fn wait_for<F: Fn() -> bool>(timeout: Duration, cond: F) -> bool {
     false
 }
 
-/// 每个用例各用各的子目录（AGENTS.md §6：落盘是异步的，共用目录会互相踩）
+/// 每个用例各用各的子目录，见 AGENTS.md §6：落盘是异步的，共用目录会互相踩
 fn case_dir(case: &str) -> PathBuf {
     let dir = mml_testutil::temp_dir().join(format!(
         "mml-serverpack-{case}-{}",
@@ -71,7 +71,7 @@ fn case_dir(case: &str) -> PathBuf {
 
 // ===================== 构造器 =====================
 
-/// 在线文件条目（`file` 是游戏目录下的相对路径）
+/// 在线文件条目，`file` 是游戏目录下的相对路径
 fn item(file: &str, pid: Option<&str>, fid: Option<&str>, url: &str) -> ServerItemObj {
     ServerItemObj {
         file: file.to_string(),
@@ -116,7 +116,7 @@ fn removed_dirs(removals: &plan::ServerPackRemovals<'_>) -> Vec<String> {
     v
 }
 
-// ===================== 身份标识 / 哈希 / 来源判定（纯函数） =====================
+// ===================== 身份标识 / 哈希 / 来源判定，纯函数 =====================
 
 /// `mod_key`：有 `pid` 用 `pid`，没有才退回文件名
 #[test]
@@ -155,11 +155,11 @@ fn is_curseforge_by_numeric_id() {
     // 没有 pid 时只看 fid
     assert!(plan::is_curseforge(&item("m", None, Some("456"), "")));
     assert!(!plan::is_curseforge(&item("m", None, Some("def"), "")));
-    // 两个都没有 → 判为 Modrinth（原实现如此）
+    // 两个都没有 → 判为 Modrinth，原实现如此
     assert!(!plan::is_curseforge(&item("m", None, None, "")));
 }
 
-// ===================== 升级要删什么（纯函数） =====================
+// ===================== 升级要删什么，纯函数 =====================
 
 /// 新清单里没有的项目 → 删旧文件
 #[test]
@@ -178,7 +178,7 @@ fn removals_include_files_missing_from_new_pack() {
     assert!(r.dirs.is_empty());
 }
 
-/// 同一项目换了路径 → 删旧路径（新路径由下载阶段写入）
+/// 同一项目换了路径 → 删旧路径，新路径由下载阶段写入
 #[test]
 fn removals_include_old_path_when_file_moved() {
     let old = pack(vec![item("mods/old-name.jar", Some("1"), None, "")], vec![]);
@@ -188,7 +188,7 @@ fn removals_include_old_path_when_file_moved() {
     assert_eq!(removed_files(&r), vec!["mods/old-name.jar"]);
 }
 
-/// 同一项目、同一路径 → 不删（下载阶段会按哈希决定是否重下）
+/// 同一项目、同一路径 → 不删，下载阶段会按哈希决定是否重下
 #[test]
 fn removals_skip_unchanged_file() {
     let old = pack(vec![item("mods/a.jar", Some("1"), None, "")], vec![]);
@@ -241,7 +241,7 @@ fn removals_of_archive_dirs_follow_delete_old_flag() {
     );
 }
 
-/// 空清单（旧空 / 新空）不应 panic，也不产生删除项
+/// 旧清单与新清单都为空时不应 panic，也不产生删除项
 #[test]
 fn removals_with_empty_lists() {
     let empty = pack(vec![], vec![]);
@@ -257,7 +257,7 @@ fn removals_with_empty_lists() {
     assert_eq!(removed_files(&r), vec!["mods/a.jar"], "新清单为空 → 全删");
 }
 
-// ===================== 升级要下什么（纯函数） =====================
+// ===================== 升级要下什么，纯函数 =====================
 
 /// 自带 url 优先；为空时用解析出来的 `fid → url`
 #[test]
@@ -285,7 +285,7 @@ fn downloads_prefer_own_url_then_resolved() {
         vec![
             ("mods/a.jar".to_string(), "https://cdn/a.jar".to_string()),
             ("mods/b.jar".to_string(), "https://cdn/b.jar".to_string()),
-            // 解析不到 → 空串（下载阶段会失败并报 DownloadFileFail）
+            // 解析不到 → 空串，下载阶段会失败并报 DownloadFileFail
             ("mods/c.jar".to_string(), String::new()),
         ],
         "顺序与清单一致，地址按 自带 url → 解析结果 → 空串 逐级回退"
@@ -320,7 +320,7 @@ fn downloads_include_archives_in_order() {
     assert!(d.files.is_empty());
 }
 
-// ===================== 清单落盘（生成 / 保存） =====================
+// ===================== 清单落盘，生成 / 保存 =====================
 
 /// 保存 → 读回：`save_serverpack` 写的是实例的 `server.json`，`move_serverpack_to_old`
 /// 把它变成 `server_old.json`
@@ -352,17 +352,17 @@ fn save_then_move_to_old_round_trip() {
     assert!(!pack_file.exists(), "移动后不该还留着 server.json");
     assert!(old_file.exists(), "移动后应出现 server_old.json");
 
-    // 读回内容一致（走 json 反序列化）
+    // 读回内容一致，走 json 反序列化
     let read: ServerPackObj =
         mml_base::serialize_tools::json_from_file(&old_file).expect("读回旧清单");
     assert_eq!(read.online_list.len(), 1);
     assert_eq!(read.online_list[0].file, "mods/a.jar");
 }
 
-/// 没有旧清单时 `move_serverpack_to_old` 会失败（源文件不存在）
+/// 没有旧清单时 `move_serverpack_to_old` 会失败，源文件不存在
 ///
-/// 原实现直接 `path_helper::move_file`，没有"文件不存在就跳过"的分支 —— 这里把现状钉住，
-/// 是否要容错由用户决定（未擅自改）。
+/// 原实现直接 `path_helper::move_file`，没有"文件不存在就跳过"的分支；这里把现状钉住，
+/// 是否要容错由用户决定，未擅自改。
 #[test]
 fn move_to_old_without_file_is_error() {
     let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());

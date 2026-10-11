@@ -1,4 +1,4 @@
-//! 实例内资源下载项（下载位置与在线文件记录的联动）
+//! 实例内资源下载项，含下载位置与在线文件记录的联动
 
 use std::path::PathBuf;
 
@@ -12,19 +12,19 @@ use crate::{
 
 /// 下载项的存放位置信息
 pub struct ItemPathRes {
-    /// 存放目录
+    /// 文件要写入的目录，实例内绝对路径
     pub file_path: PathBuf,
-    /// 实例内相对路径
+    /// 实例内相对路径，写进在线文件记录用
     pub path: String,
-    /// 文件类型
+    /// 下载项类型，与 `path` 指向的目录对应
     pub file_type: FileType,
 }
 
 /// 一批下载项及其在线文件记录
 pub struct DownloadItemRes {
-    /// 下载项列表
+    /// 待下载的文件列表
     pub list: Vec<FileItemObj>,
-    /// 在线文件信息（保存到实例）
+    /// 在线文件信息，要保存到实例
     pub online: OnlineInfoList,
 }
 

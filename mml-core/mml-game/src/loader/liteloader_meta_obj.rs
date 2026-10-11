@@ -1,4 +1,4 @@
-//! LiteLoader 版本元数据（liteloader json）DTO
+//! LiteLoader 版本元数据 DTO：liteloader json
 
 use std::collections::HashMap;
 
@@ -15,6 +15,7 @@ pub struct ReopObj {
 }
 
 impl Default for ReopObj {
+    /// 全字段取默认值：字符串为空串
     fn default() -> Self {
         Self {
             stream: Default::default(),
@@ -34,6 +35,7 @@ pub struct LibrariesObj {
 }
 
 impl Default for LibrariesObj {
+    /// 全字段取默认值：字符串为空串
     fn default() -> Self {
         Self {
             name: Default::default(),
@@ -60,6 +62,7 @@ pub struct LoaderObj {
 }
 
 impl Default for LoaderObj {
+    /// 全字段取默认值：字符串为空串、列表为空
     fn default() -> Self {
         Self {
             tweak_class: Default::default(),
@@ -83,6 +86,7 @@ pub struct SnapshotsObj {
 }
 
 impl Default for SnapshotsObj {
+    /// 全字段取默认值：列表为空、映射为空
     fn default() -> Self {
         Self {
             libraries: Default::default(),
@@ -104,6 +108,7 @@ pub struct LiteloaderVersionObj {
 }
 
 impl Default for LiteloaderVersionObj {
+    /// 全字段取默认值：各字段取所属类型的空值
     fn default() -> Self {
         Self {
             repo: Default::default(),
@@ -122,6 +127,7 @@ pub struct LiteloaderMetaObj {
 }
 
 impl Default for LiteloaderMetaObj {
+    /// 全字段取默认值：版本映射为空
     fn default() -> Self {
         Self {
             versions: Default::default(),

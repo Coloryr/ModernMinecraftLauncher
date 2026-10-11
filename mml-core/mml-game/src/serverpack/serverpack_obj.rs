@@ -52,6 +52,7 @@ pub struct ServerPackObj {
 }
 
 impl Default for ServerPackObj {
+    /// 全字段取默认值：字符串为空串、列表为空、可选字段为 `None`
     fn default() -> Self {
         Self {
             name: Default::default(),
@@ -70,6 +71,7 @@ impl Default for ServerPackObj {
     }
 }
 
+/// 服务器包里的配置文件压缩包条目
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct ServerArchiveItemObj {
@@ -94,6 +96,7 @@ pub struct ServerArchiveItemObj {
 }
 
 impl Default for ServerArchiveItemObj {
+    /// 全字段取默认值：字符串为空串、可选字段为 `None`
     fn default() -> Self {
         Self {
             file: Default::default(),
@@ -106,10 +109,11 @@ impl Default for ServerArchiveItemObj {
     }
 }
 
+/// 服务器包里的模组文件条目
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct ServerItemObj {
-    /// 游戏目录下的相对路径（如 `mods/foo.jar`、`config/bar.toml`）
+    /// 游戏目录下的相对路径，如 `mods/foo.jar`、`config/bar.toml`
     #[serde(rename = "File")]
     pub file: String,
     /// 项目编号
@@ -130,6 +134,7 @@ pub struct ServerItemObj {
 }
 
 impl Default for ServerItemObj {
+    /// 全字段取默认值：字符串为空串、可选字段为 `None`
     fn default() -> Self {
         Self {
             file: Default::default(),

@@ -20,9 +20,9 @@ use crate::launcher::{
     game_time_obj::GameTimeObj, instance_setting_obj::InstanceSettingObj,
 };
 
-/// 在线文件信息表（mod_id → 信息）
+/// 在线文件信息表，键为 mod_id
 pub type OnlineInfoList = HashMap<String, OnlineInfoObj>;
-/// 自定义启动配置表（文件名 → 配置）
+/// 自定义启动配置表，键为文件名
 pub type CustomGameArgList = HashMap<String, CustomGameArgObj>;
 
 /// 实例根目录
@@ -30,13 +30,11 @@ static BASE_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 /// 初始化实例路径
 ///
-/// # 参数
-///
 /// - `dir`: 运行路径
 ///
 /// # 返回值
 ///
-/// 成功返回 `Ok(())`；创建目录失败返回对应错误
+/// 创建目录失败时返回对应错误
 pub(crate) fn init<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
     let dir = BASE_DIR.get_or_init(|| dir.as_ref().join(names::INSTANCE_DIR));
 
@@ -51,7 +49,7 @@ pub(crate) fn init<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
 ///
 /// # 返回值
 ///
-/// 返回实例根目录
+/// 返回实例根目录；未初始化会 panic
 pub fn get_instance_dir() -> PathBuf {
     BASE_DIR.get().unwrap().clone()
 }
@@ -85,13 +83,11 @@ pub(crate) fn load_instance_dir() -> CoreResult<Vec<InstanceSettingObj>> {
 
 /// 从文件夹路径加载实例
 ///
-/// # 参数
-///
 /// - `dir`: 实例目录
 ///
 /// # 返回值
 ///
-/// 返回实例信息；目录或配置文件不存在返回 `None`
+/// 目录或配置文件不存在时返回 `None`
 pub(crate) fn load_instance<P: AsRef<Path>>(dir: P) -> Option<InstanceSettingObj> {
     let file = dir.as_ref();
     if !file.is_dir() {
@@ -281,11 +277,11 @@ impl InstanceSettingObj {
             .join(names::GAME_FILE)
     }
 
-    /// 获取实例 GUI 设置文件（gui_setting.json，与 game.json 并列）
+    /// 获取实例 GUI 设置文件 gui_setting.json，与 game.json 并列
     ///
-    /// **归属 GUI**：实例 GUI 设置（日志窗口 / 模组分组 / 方块背景 / 自开日志窗 /
-    /// 排列顺序）是界面状态，内核不读也不写它，读写实现在
-    /// `mml-gui/src-tauri/src/gui_setting.rs`。这里只提供路径——
+    /// **归属 GUI**：实例 GUI 设置，含日志窗口、模组分组、方块背景、自开日志窗与
+    /// 排列顺序，是界面状态，内核不读也不写它，读写实现在
+    /// `mml-gui/src-tauri/src/gui_setting.rs`。这里只提供路径：
     /// "实例目录在哪"是内核的知识，"目录里放什么 GUI 文件"不是。
     pub fn get_gui_setting_file(&self) -> PathBuf {
         BASE_DIR
@@ -295,9 +291,9 @@ impl InstanceSettingObj {
             .join(names::GUI_SETTING_FILE)
     }
 
-    /// 获取图标文件（兼容老数据：`Icon` 为空时回退到默认的 `icon.png`）
+    /// 获取图标文件，兼容老数据：`Icon` 为空时回退到默认的 `icon.png`
     ///
-    /// 给"显示图标"用。区分两种 `None` 是做不到的（配置里就是个空字段），
+    /// 给"显示图标"用。配置里 `Icon` 就是个空字段，区分不出"没配"与"配了空值"，
     /// 所以这里一律给默认名，由调用方判断文件是否存在。
     pub fn get_icon_file_or_default(&self) -> PathBuf {
         BASE_DIR
@@ -409,8 +405,6 @@ impl InstanceSettingObj {
 
     /// 保存在线文件信息
     ///
-    /// # 参数
-    ///
     /// - `info`: 在线文件信息表
     pub fn save_online_info(&self, info: &OnlineInfoList) {
         config_save::save(
@@ -447,13 +441,11 @@ impl InstanceSettingObj {
 
     /// 保存自定义启动配置
     ///
-    /// # 参数
-    ///
-    /// - `info`: 配置表（键为文件名）
+    /// - `info`: 配置表，键为文件名
     ///
     /// # 返回值
     ///
-    /// 成功返回 `Ok(())`；写入失败返回对应错误
+    /// 写入失败时返回对应错误
     pub fn save_custom_json(&self, info: &CustomGameArgList) -> CoreResult<()> {
         let dir = self.get_json_path();
         path_helper::create_dir_all(&dir)?;
@@ -482,8 +474,6 @@ impl InstanceSettingObj {
     }
 
     /// 保存启动统计数据
-    ///
-    /// # 参数
     ///
     /// - `obj`: 统计数据
     pub fn save_launch_count_data(&self, obj: &GameTimeObj) {

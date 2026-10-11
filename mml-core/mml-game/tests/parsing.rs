@@ -13,7 +13,7 @@ use mml_game::serverpack::serverpack_obj::ServerPackObj;
 use mml_net::modrinth_api::version_obj::HasheObj;
 use serde_json::json;
 
-/// Modrinth mrpack 的 `modrinth.index.json` 解析（camelCase 字段名）。
+/// Modrinth mrpack 的 `modrinth.index.json` 解析，字段名为 camelCase
 #[test]
 fn modrinth_pack_obj_parse() {
     let json = json!({
@@ -59,7 +59,7 @@ fn modrinth_pack_obj_parse() {
     assert_eq!(file.file_size, 46949);
 }
 
-/// `_private_data`（本项目私有字段）解析为 `project`。
+/// `_private_data` 是本项目私有字段，应解析为 `project`
 #[test]
 fn modrinth_pack_private_data() {
     let json = json!({
@@ -83,7 +83,7 @@ fn modrinth_pack_private_data() {
     assert_eq!(project.fid, "def");
 }
 
-/// `make_pack_download_obj`：从 Modrinth 整合包文件构建下载项。
+/// `make_pack_download_obj`：从 Modrinth 整合包文件构建下载项
 #[test]
 fn make_pack_download_obj_hash() {
     let obj = ModrinthPackFileObj {
@@ -104,7 +104,7 @@ fn make_pack_download_obj_hash() {
     assert!(matches!(item.hash, FileHash::Sha1Sha512(ref s1, ref s512) if s1.len() == 40 && s512.len() == 128));
 }
 
-/// CurseForge `manifest.json` 解析（驼峰字段名 + projectID/fileID）。
+/// CurseForge `manifest.json` 解析，字段名为驼峰式，含 projectID 与 fileID
 #[test]
 fn curseforge_pack_obj_parse() {
     let json = json!({
@@ -142,7 +142,7 @@ fn curseforge_pack_obj_parse() {
     assert!(file.required);
 }
 
-/// ServerPack 格式解析（PascalCase 字段名）。
+/// ServerPack 格式解析，字段名为 PascalCase
 #[test]
 fn server_pack_obj_parse() {
     let json = json!({
@@ -190,7 +190,7 @@ fn server_pack_obj_parse() {
     assert_eq!(obj.archive_list[0].sha1.as_deref(), Some("ccc"));
 }
 
-/// 游戏实例配置：PascalCase 字段名 + serde_repr 枚举整数序列化。
+/// 游戏实例配置：字段名为 PascalCase，serde_repr 枚举按整数序列化
 #[test]
 fn instance_setting_round_trip() {
     let instance = InstanceSettingObj {

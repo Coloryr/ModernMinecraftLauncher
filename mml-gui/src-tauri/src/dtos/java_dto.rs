@@ -13,17 +13,17 @@ pub struct JavaInfoDto {
     pub version: String,
     /// 主版本号
     pub major: i32,
-    /// 发行类型（JDK / JRE）
+    /// 发行类型：JDK / JRE
     pub java_type: String,
-    /// 位数（x86 / x64）
+    /// 位数：x86 / x64
     pub arch: String,
 }
 
-/// Java 压缩包导入进度（`settings-java-progress` 事件）
+/// Java 压缩包导入进度，事件名 `settings-java-progress`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct JavaImportProgressDto {
-    /// 当前阶段 ID（如 extract 解包 / detect 识别）
+    /// 当前阶段 ID，如 extract 解包 / detect 识别
     pub state: String,
     /// 当前进度
     pub now: u32,

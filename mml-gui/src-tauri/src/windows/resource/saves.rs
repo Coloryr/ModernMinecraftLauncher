@@ -1,6 +1,6 @@
 //! 资源管理窗口的存档分类：列表 / 备份列表 / 还原 / 删除 / 备份
 //!
-//! 存档本体由内核 `game_saves` 扫描（level.dat）；备份目录在存档下的 backups。
+//! 存档本体由内核 `game_saves` 扫描 level.dat；备份目录在存档下的 backups。
 
 use std::collections::HashMap;
 
@@ -11,14 +11,20 @@ use super::{KIND_SAVES, data_url, load_saves, parse_instance, resource_file};
 
 // ==================== 存档 ====================
 
-/// 存档列表（解析 level.dat）
+/// 存档列表：解析 level.dat
+///
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// 存档列表，含备份数量与图标；实例不存在或扫描失败返回错误串
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub async fn resource_list_saves(uuid: String) -> Result<Vec<SaveItemDto>, String> {
     let instance = parse_instance(&uuid)?;
     let list = load_saves(instance.clone()).await?;
 
-    // 备份索引只读一次（不是每个存档读一遍）：存档 → 备份数
+    // 备份索引只读一次，不是每个存档读一遍：存档 → 备份数
     let counts: HashMap<String, u32> = {
         let game = instance.read().unwrap();
         game.get_backups()
@@ -37,7 +43,7 @@ pub async fn resource_list_saves(uuid: String) -> Result<Vec<SaveItemDto>, Strin
             if dir.is_empty() {
                 return None;
             }
-            // 图标是存档目录里的 png（SaveObj.icon 给了路径），小文件直接读
+            // 图标是存档目录里的 png，SaveObj.icon 给了路径，小文件直接读
             let icon = item
                 .icon
                 .as_ref()
@@ -57,10 +63,17 @@ pub async fn resource_list_saves(uuid: String) -> Result<Vec<SaveItemDto>, Strin
         .collect())
 }
 
-/// 某个存档的备份列表（按时间倒序，最近的在最上面）
+/// 某个存档的备份列表，按时间倒序，最近的在最上面
 ///
-/// 索引是按**存档名**存的（见 `game_saves::backup`），这里按**目录名**反查 ——
-/// 目录名才是稳定的键（存档可以改名，改名后索引会另起一条）。
+/// 索引是按**存档名**存的，见 `game_saves::backup`，这里按**目录名**反查 ——
+/// 目录名才是稳定的键，存档可以改名，改名后索引会另起一条。
+///
+/// - `uuid`: 实例 uuid
+/// - `dir`: 存档目录名，即 saves 下的一级目录
+///
+/// # 返回值
+///
+/// 备份列表，按修改时间倒序，最近的在最上面；索引里没有这个存档时返回空表
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub fn resource_list_save_backups(uuid: String, dir: String) -> Result<Vec<SaveBackupDto>, String> {
@@ -95,7 +108,15 @@ pub fn resource_list_save_backups(uuid: String, dir: String) -> Result<Vec<SaveB
     Ok(list)
 }
 
-/// 还原某个备份（**破坏性**：现有存档整目录移入回收站，再解开备份）
+/// 还原某个备份，**破坏性**：现有存档整目录移入回收站，再解开备份
+///
+/// - `uuid`: 实例 uuid
+/// - `dir`: 存档目录名，即 saves 下的一级目录
+/// - `file`: 备份文件名，取自 [`resource_list_save_backups`]
+///
+/// # 返回值
+///
+/// 只表示成功 / 失败：索引里找不到该存档返回 `err.saveNotFound`，其余是内核错误串
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub async fn resource_restore_save_backup(
@@ -109,7 +130,7 @@ pub async fn resource_restore_save_backup(
     tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
         let game = instance.read().unwrap();
         let info = game.get_backups().map_err(|err| err.to_string())?;
-        // 索引按存档名存，这里按目录名找（目录名才稳定）
+        // 索引按存档名存，这里按目录名找，目录名才稳定
         let entry = info
             .values()
             .find(|item| item.dir == dir)
@@ -122,7 +143,14 @@ pub async fn resource_restore_save_backup(
     .map_err(|err| err.to_string())?
 }
 
-/// 删除存档（进回收站）
+/// 删除存档，目录进回收站
+///
+/// - `uuid`: 实例 uuid
+/// - `dir`: 存档目录名，即 saves 下的一级目录
+///
+/// # 返回值
+///
+/// 只表示成功 / 失败：目录名非法返回 `err.fileName`，该名字不是目录返回 `err.saveNotFound`
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub async fn resource_delete_save(uuid: String, dir: String) -> Result<(), String> {
@@ -134,16 +162,21 @@ pub async fn resource_delete_save(uuid: String, dir: String) -> Result<(), Strin
     path_helper::move_to_trash(&file).map_err(|err| err.to_string())
 }
 
-/// 备份存档（zip 到实例备份目录并登记），返回备份文件名
+/// 备份存档：zip 到实例备份目录并登记
+///
+/// - `uuid`: 实例 uuid
+/// - `dir`: 存档目录名，即 saves 下的一级目录
+///
+/// # 返回值
+///
+/// 该存档的显示名 `level_name`，前端拿去提示；找不到存档返回 `err.saveNotFound`
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub async fn resource_backup_save(uuid: String, dir: String) -> Result<String, String> {
     let instance = parse_instance(&uuid)?;
 
-    // 备份期间压缩耗时较长，这里**全程不持锁**：先克隆一份设置快照，
-    // 取存档列表与压缩都在这份快照上做。原来压缩阶段一直持着实例读锁
-    // （注释自称"只挡住同时改设置"，实际整个 zip 期间都挡着），
-    // 而且 `get_saves().await` 时读锁卫还跨了 await（clippy 也报这条）。
+    // 压缩耗时较长，这里**全程不持锁**：先克隆一份设置快照，取存档列表与压缩都在这份
+    // 快照上做；原来的实现整个 zip 期间都持着读锁，`get_saves().await` 还跨了 await
     let name = tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
         let game = instance.read().unwrap().clone();
         let saves = tokio::runtime::Handle::current().block_on(async { game.get_saves().await });

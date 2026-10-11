@@ -1,4 +1,4 @@
-//! 统一通行证（Nide8）API
+//! 统一通行证 Nide8 API
 //!
 //! 提供从 Nide8 服务器获取认证 JAR 版本信息和哈希值的功能。
 //! 用于在游戏启动时注入 Nide8 认证模块。
@@ -8,19 +8,20 @@ use serde::{Deserialize, Serialize};
 
 use crate::urls;
 
-/// Nide8 JAR 信息
+/// Nide8 认证 JAR 信息
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct Nide8Obj {
-    /// JAR 版本号
+    /// JAR 版本号，对应响应键 `jarVersion`
     #[serde(rename = "jarVersion")]
     pub jar_version: String,
-    /// JAR 文件哈希
+    /// JAR 文件哈希，对应响应键 `jarHash`
     #[serde(rename = "jarHash")]
     pub jar_hash: String,
 }
 
 impl Default for Nide8Obj {
+    /// 全字段取默认值，配合 `#[serde(default)]` 兜底缺失字段
     fn default() -> Self {
         Self {
             jar_version: Default::default(),
@@ -31,7 +32,7 @@ impl Default for Nide8Obj {
 
 /// 获取 Nide8 认证 JAR 的最新版本信息和哈希
 ///
-/// 向 Nide8 服务器查询最新 JAR 版本，用于下载和校验。
+/// 用于下载并在游戏启动时注入 Nide8 认证模块。
 ///
 /// # 返回值
 ///

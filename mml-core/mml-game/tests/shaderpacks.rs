@@ -7,7 +7,7 @@ mod common;
 
 use mml_game::game_shaderpacks;
 
-/// 从 Modrinth 下载多个常见光影包并解析名称 / 说明。
+/// 从 Modrinth 下载多个常见光影包并解析名称与说明
 #[test]
 fn read_shaderpacks() {
     let mut downloaded = 0;

@@ -1,10 +1,10 @@
-//! 实例来源项目信息（保存于实例目录）
+//! 实例来源项目信息，保存于实例目录
 
 use serde::{Deserialize, Serialize};
 
 use crate::launcher::ModPackType;
 
-/// 实例来源项目信息（记录整合包来源，用于更新等场景）
+/// 实例来源项目信息，记录整合包来源，用于更新等场景
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct MmlProjectSaveObj {

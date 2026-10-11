@@ -12,7 +12,7 @@ use super::conv::{
     source_from_str, source_to_str,
 };
 
-/// 网络设置（前端 wire：camelCase）
+/// 网络设置，前端 wire 为 camelCase
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct NetworkSettingDto {
@@ -36,17 +36,24 @@ pub struct NetworkSettingDto {
     pub login_proxy: String,
     /// 登录请求的代理类型：Http / Sock4 / Sock5
     pub login_proxy_type: String,
-    /// 是否校验下载文件完整性（SHA1）
+    /// 是否校验下载文件完整性，按 SHA1
     pub check_file: bool,
     /// 是否自动下载缺失文件
     pub auto_download: bool,
-    /// 自定义 DNS（DoH）
+    /// 自定义 DNS，走 DoH
     pub dns: DnsSettingDto,
     /// 游戏文件检查
     pub check: GameCheckSettingDto,
 }
 
 impl From<&HttpObj> for NetworkSettingDto {
+    /// 由 core 配置构造前端 DTO，下载源 / 代理策略 / 代理类型都转成 wire 字符串
+    ///
+    /// - `h`: `config.json` 里的网络设置
+    ///
+    /// # 返回值
+    ///
+    /// 前端可直接绑定的网络设置；DNS 与文件检查不在 `HttpObj` 里，先给默认值
     fn from(h: &HttpObj) -> Self {
         Self {
             source: source_to_str(h.source),
@@ -68,6 +75,13 @@ impl From<&HttpObj> for NetworkSettingDto {
 }
 
 impl From<&DnsObj> for DnsSettingDto {
+    /// 由 core 配置构造前端 DTO
+    ///
+    /// - `d`: `config.json` 里的自定义 DNS 设置
+    ///
+    /// # 返回值
+    ///
+    /// 前端可直接绑定的 DNS 设置
     fn from(d: &DnsObj) -> Self {
         Self {
             enable: d.enable,
@@ -78,6 +92,13 @@ impl From<&DnsObj> for DnsSettingDto {
 }
 
 impl From<&GameCheckObj> for GameCheckSettingDto {
+    /// 由 core 配置构造前端 DTO
+    ///
+    /// - `c`: `config.json` 里的游戏文件检查设置
+    ///
+    /// # 返回值
+    ///
+    /// 前端可直接绑定的文件检查设置
     fn from(c: &GameCheckObj) -> Self {
         Self {
             core: c.core,
@@ -92,7 +113,7 @@ impl From<&GameCheckObj> for GameCheckSettingDto {
     }
 }
 
-/// 自定义 DNS 设置（前端 wire：camelCase，字段即 core `DnsObj`）
+/// 自定义 DNS 设置，前端 wire 为 camelCase，字段即 core `DnsObj`
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct DnsSettingDto {
@@ -104,7 +125,7 @@ pub struct DnsSettingDto {
     pub http_proxy: bool,
 }
 
-/// 游戏文件检查设置（前端 wire：camelCase，字段即 core `GameCheckObj`）
+/// 游戏文件检查设置，前端 wire 为 camelCase，字段即 core `GameCheckObj`
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct GameCheckSettingDto {
@@ -127,6 +148,13 @@ pub struct GameCheckSettingDto {
 }
 
 impl From<NetworkSettingDto> for HttpObj {
+    /// 由前端 DTO 写回 core 配置，wire 字符串还原成 core 枚举
+    ///
+    /// - `d`: 前端保存上来的网络设置
+    ///
+    /// # 返回值
+    ///
+    /// 待写入 `config.json` 的网络设置；DNS / 文件检查不在 `HttpObj` 里，由各自的 DTO 单独转换
     fn from(d: NetworkSettingDto) -> Self {
         Self {
             source: source_from_str(&d.source),
@@ -146,6 +174,13 @@ impl From<NetworkSettingDto> for HttpObj {
 }
 
 impl From<DnsSettingDto> for DnsObj {
+    /// 由前端 DTO 写回 core 配置
+    ///
+    /// - `d`: 前端保存上来的 DNS 设置
+    ///
+    /// # 返回值
+    ///
+    /// 待写入 `config.json` 的自定义 DNS 设置
     fn from(d: DnsSettingDto) -> Self {
         Self {
             enable: d.enable,
@@ -156,6 +191,13 @@ impl From<DnsSettingDto> for DnsObj {
 }
 
 impl From<GameCheckSettingDto> for GameCheckObj {
+    /// 由前端 DTO 写回 core 配置
+    ///
+    /// - `c`: 前端保存上来的文件检查设置
+    ///
+    /// # 返回值
+    ///
+    /// 待写入 `config.json` 的游戏文件检查设置
     fn from(c: GameCheckSettingDto) -> Self {
         Self {
             core: c.core,

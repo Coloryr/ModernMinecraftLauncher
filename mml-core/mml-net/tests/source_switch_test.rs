@@ -1,4 +1,4 @@
-//! 下载源切换（官方 / BMCLAPI 镜像）的补充测试。
+//! 下载源切换的补充测试，覆盖官方源与 BMCLAPI 镜像源。
 //!
 //! 与 `tests/url_helper.rs` 互补：这里覆盖 `change_source` 对 Mojang 全部
 //! 四个域名的替换，以及各类库地址替换函数在镜像源下的行为。
@@ -9,8 +9,11 @@
 use mml_config::config_obj::SourceLocal;
 use mml_net::{url_helper, urls};
 
-/// 初始化全局配置到临时目录，返回目录路径供测后清理
-/// （与其它测试文件互不冲突：每个测试二进制独立进程）。
+/// 初始化全局配置到临时目录
+///
+/// # 返回值
+///
+/// 返回配置目录路径供测后清理；与其它测试文件互不冲突，每个测试二进制独立进程
 fn init_config() -> std::path::PathBuf {
     let dir = mml_testutil::temp_dir().join(format!(
         "mml-net-source-switch-test-{}",
@@ -21,7 +24,9 @@ fn init_config() -> std::path::PathBuf {
     dir
 }
 
-/// 设置下载源并同步落盘。
+/// 设置下载源并同步落盘
+///
+/// - `source`: 目标下载源
 ///
 /// 用 `save_now()` 而非 `save()`：后者依赖 GUI 启动的后台保存线程，
 /// 测试进程中没有该线程会 panic。

@@ -43,7 +43,7 @@ export function systemTheme(): Theme {
 }
 
 const storedTheme = readString(KEYS.theme);
-// 显式存过的用存储值（含 System），否则跟随系统（配置加载前先用它首绘，避免闪一下错误主题）
+// 显式存过的用存储值，含 System；否则跟随系统。配置加载前先用它首绘，避免闪一下错误主题
 export const theme = ref<Theme>(
   storedTheme === "Light" || storedTheme === "Dark" || storedTheme === "System"
     ? storedTheme
@@ -71,7 +71,7 @@ function rgbToHex(r: number, g: number, b: number): string {
   return "#" + [r, g, b].map((v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, "0")).join("");
 }
 
-/** 按比例向白（ratio > 0）或黑（ratio < 0）靠拢 */
+/** 按比例靠拢：ratio > 0 向白，ratio < 0 向黑 */
 function shade(hex: string, ratio: number): string {
   const [r, g, b] = hexToRgb(hex);
   const target = ratio > 0 ? 255 : 0;

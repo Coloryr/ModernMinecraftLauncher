@@ -26,14 +26,12 @@ pub async fn get_liteloader_meta() -> CoreResult<LiteloaderMetaObj> {
 
 /// 按加载器版本号从版本信息中取加载器数据
 ///
-/// # 参数
-///
 /// - `data`: 游戏版本对应的 LiteLoader 版本信息
 /// - `version`: 加载器版本号
 ///
 /// # 返回值
 ///
-/// 返回加载器数据（优先正式版 artefacts，取不到找快照 snapshots）
+/// 返回加载器数据，优先正式版 artefacts，取不到再找快照 snapshots
 pub fn find_loader_obj<'a>(data: &'a LiteloaderVersionObj, version: &str) -> Option<&'a LoaderObj> {
     data.artefacts
         .loader
@@ -41,9 +39,7 @@ pub fn find_loader_obj<'a>(data: &'a LiteloaderVersionObj, version: &str) -> Opt
         .or_else(|| data.snapshots.loader.get(version))
 }
 
-/// 获取liteloader运行库列表
-///
-/// # 参数
+/// 获取 LiteLoader 运行库列表
 ///
 /// - `mc`: 游戏版本号
 /// - `version`: 加载器版本号
@@ -94,8 +90,6 @@ pub async fn get_liteloader_lib(mc: &str, version: &str) -> CoreResult<Vec<FileI
 
 /// 由 Maven 坐标生成运行库下载项
 ///
-/// # 参数
-///
 /// - `name`: Maven 坐标
 /// - `url`: 仓库根地址
 /// - `hash`: 文件校验值
@@ -122,7 +116,7 @@ fn make_lib_item(name: &str, url: &str, hash: FileHash) -> FileItemObj {
 }
 
 impl InstanceSettingObj {
-    /// 获取liteloader的所有运行库
+    /// 获取 LiteLoader 的全部运行库
     ///
     /// # 返回值
     ///

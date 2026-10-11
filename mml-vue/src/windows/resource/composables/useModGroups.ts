@@ -200,7 +200,7 @@ export function useModGroups(data: ReturnType<typeof useResourceData>) {
   }
 
   /**
-   * 把若干模组移到某个分组（**传分组 uuid**）；`group` 传 null = 移出所有分组（回到"未分组"）
+   * 把若干模组移到某个分组，**传分组 uuid**；`group` 传 null 表示移出所有分组、回到"未分组"
    *
    * **不重读**：落盘是异步排队的，立刻 `load()` 读到的还是旧成员表 ——
    * 拖进分组的模组会看着"没进去"。本地按同一套规则改成员即可：

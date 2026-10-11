@@ -33,7 +33,7 @@ pub enum ExportPackType {
     CurseForge,
     /// Modrinth 格式
     Modrinth,
-    /// 纯压缩包
+    /// 纯压缩包，只打包文件不带整合包清单
     Zip,
 }
 
@@ -41,15 +41,15 @@ pub enum ExportPackType {
 pub struct OnlineFileExport {
     /// 文件路径
     pub file: PathBuf,
-    /// 文件大小
+    /// 文件大小，单位字节
     pub size: usize,
     /// 导出方式
     pub pack: ExportPackType,
     /// 下载地址
     pub url: String,
-    /// 校验
+    /// 文件校验值
     pub hash: FileHash,
-    /// 文件在线信息
+    /// 文件在线信息，非线上来源时为 `None`
     pub info: Option<OnlineInfoObj>,
 }
 
@@ -69,13 +69,13 @@ pub struct ExportArg {
     pub unselect: Vec<PathBuf>,
     /// 一起打包的文件
     pub select: Vec<PathBuf>,
-    /// 名字
+    /// 整合包名字
     pub name: String,
-    /// 作者
+    /// 整合包作者
     pub author: String,
-    /// 版本
+    /// 整合包版本号
     pub version: String,
-    /// 说明
+    /// 整合包简介
     pub summary: String,
     /// 压缩进度条
     pub gui: BaseArchiveGui,
@@ -84,9 +84,7 @@ pub struct ExportArg {
 impl InstanceSettingObj {
     /// 导出整合包
     ///
-    /// # 参数
-    ///
-    /// - `data`: 导出参数
+    /// - `arg`: 导出参数
     ///
     /// # 返回值
     ///
@@ -102,8 +100,6 @@ impl InstanceSettingObj {
 }
 
 /// 将作者列表拼接为字符串
-///
-/// # 参数
 ///
 /// - `author`: 作者列表
 ///
@@ -125,8 +121,6 @@ fn get_author_string(author: &Vec<AuthorsObj>) -> String {
 }
 
 /// 导出为 ColorMC 整合包格式
-///
-/// # 参数
 ///
 /// - `game`: 目标实例
 /// - `data`: 导出参数
@@ -168,10 +162,8 @@ fn colormc(game: &InstanceSettingObj, data: ExportArg) -> CoreResult<()> {
 
 /// 导出为 CurseForge 整合包格式
 ///
-/// # 参数
-///
 /// - `game`: 目标实例
-/// - `data`: 导出参数
+/// - `arg`: 导出参数
 ///
 /// # 返回值
 ///
@@ -272,6 +264,14 @@ async fn curseforge(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()>
     Ok(())
 }
 
+/// 导出为 Modrinth 整合包格式
+///
+/// - `game`: 目标实例
+/// - `arg`: 导出参数
+///
+/// # 返回值
+///
+/// 成功返回 `Ok(())`；打包失败返回对应错误
 async fn modrinth(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
     let mut obj = ModrinthPackObj {
         format_version: 1,

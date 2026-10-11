@@ -17,14 +17,14 @@ use serde::Deserialize;
 
 use crate::launcher_path::assets_path;
 
-/// 皮肤数据（profile 属性 base64 解码后的 JSON）
+/// 皮肤数据，来自 profile 属性 base64 解码后的 JSON
 #[derive(Debug, Deserialize, Default)]
 #[serde(default)]
 struct MinecraftTexturesObj {
-    /// 档案所属玩家名（皮肤方块的显示名来源）
+    /// 档案所属玩家名，皮肤方块的显示名来源；可缺省
     #[serde(rename = "profileName")]
     profile_name: Option<String>,
-    /// 纹理数据
+    /// 皮肤与披风纹理，两者都可缺省
     textures: TexturesObj,
 }
 
@@ -32,21 +32,21 @@ struct MinecraftTexturesObj {
 #[derive(Debug, Deserialize, Default)]
 #[serde(default)]
 struct TexturesObj {
-    /// 皮肤
+    /// 皮肤纹理；没有皮肤时缺省
     #[serde(rename = "SKIN")]
     skin: Option<TextureObj>,
-    /// 披风
+    /// 披风纹理；没有披风时缺省
     #[serde(rename = "CAPE")]
     cape: Option<TextureObj>,
 }
 
-/// 单个皮肤 / 披风
+/// 单个纹理条目
 #[derive(Debug, Deserialize, Default)]
 #[serde(default)]
 struct TextureObj {
-    /// 下载地址
+    /// 纹理下载地址
     url: String,
-    /// 元数据
+    /// 纹理元数据；可缺省
     metadata: Option<TextureMetadataObj>,
 }
 
@@ -54,29 +54,29 @@ struct TextureObj {
 #[derive(Debug, Deserialize, Default)]
 #[serde(default)]
 struct TextureMetadataObj {
-    /// 皮肤模型
+    /// 皮肤模型，`slim` 表示纤细皮肤，`classic` 表示经典皮肤
     model: String,
 }
 
-/// 单个纹理的本地缓存（内容 SHA1 寻址，皮肤 / 披风共用一套存储）
+/// 单个纹理的本地缓存，按内容 SHA1 寻址，皮肤与披风共用一套存储
 #[derive(Debug, Clone)]
 pub struct TextureFile {
-    /// 文件位置
+    /// 本地缓存文件位置
     pub path: PathBuf,
-    /// 内容 SHA1（十六进制小写，与游戏 assets objects 命名一致）
+    /// 内容 SHA1，十六进制小写，与游戏 assets objects 命名一致
     pub sha1: String,
-    /// 纹理源地址（供上层登记，本地文件被清后按此回源）
+    /// 纹理源地址，供上层登记；本地文件被清后按此回源
     pub url: String,
 }
 
 /// 皮肤下载结果
 #[derive(Debug, Default)]
 pub struct DownloadSkinRes {
-    /// 皮肤文件
+    /// 皮肤文件；没有皮肤时为 `None`
     pub skin: Option<TextureFile>,
-    /// 披风文件
+    /// 披风文件；没有披风时为 `None`
     pub cape: Option<TextureFile>,
-    /// 是否为纤细（slim）皮肤
+    /// 皮肤模型是否为纤细 slim
     pub is_new_slim: bool,
 }
 
@@ -86,15 +86,13 @@ static URL_HASH: LazyLock<RwLock<HashMap<String, String>>> =
 
 /// 下载皮肤与披风
 ///
-/// 按认证类型查询对应的会话服务器，取回皮肤 / 披风文件并缓存到本地皮肤目录。
-///
-/// # 参数
-///
 /// - `obj`: 账户信息
+///
+/// 按认证类型查询对应的会话服务器，取回皮肤 / 披风文件并缓存到本地皮肤目录。
 ///
 /// # 返回值
 ///
-/// 返回下载结果；查询失败返回空结果
+/// 下载结果；查询失败返回全空的默认值
 pub async fn download_skin(obj: &LoginObj) -> DownloadSkinRes {
     let url = match obj.auth_type {
         AuthType::Offline | AuthType::OAuth => None,
@@ -151,14 +149,12 @@ pub async fn download_skin(obj: &LoginObj) -> DownloadSkinRes {
 
 /// 查询档案并解析皮肤数据
 ///
-/// # 参数
-///
 /// - `obj`: 账户信息
-/// - `url`: 会话服务器地址（`None` 时用官方服务器）
+/// - `url`: 会话服务器地址，`None` 时用官方服务器
 ///
 /// # 返回值
 ///
-/// 返回解析出的皮肤数据；查询或解析失败返回 `None`
+/// 解析出的皮肤数据；查询或解析失败返回 `None`
 async fn load_textures(obj: &LoginObj, url: Option<&str>) -> Option<MinecraftTexturesObj> {
     let res = mojang_api::get_user_profile(&obj.uuid, url).await.ok()?;
     let value = res.properties.first()?.value.clone();
@@ -166,37 +162,33 @@ async fn load_textures(obj: &LoginObj, url: Option<&str>) -> Option<MinecraftTex
     parse_textures(&value)
 }
 
-/// 输入是否为UUID（带/不带横线均可）
-///
-/// # 参数
+/// 输入是否为 UUID，带不带横线都认
 ///
 /// - `input`: 待检查的字符串
 ///
 /// # 返回值
 ///
-/// 返回是否为合法 UUID 格式
+/// 是否为合法 UUID 格式
 fn is_uuid(input: &str) -> bool {
     let plain = input.replace('-', "");
     plain.len() == 32 && plain.chars().all(|c| c.is_ascii_hexdigit())
 }
 
-/// 按用户名或UUID取玩家皮肤（走官方会话服务器）
-///
-/// 输入是UUID（带/不带横线）时直接查档案，否则先经Mojang API按名查UUID。
-///
-/// # 参数
+/// 按用户名或 UUID 取玩家皮肤，走官方会话服务器
 ///
 /// - `input`: 玩家名或 UUID
 ///
+/// 输入是 UUID 时直接查档案，否则先经 Mojang API 按名查 UUID。
+///
 /// # 返回值
 ///
-/// 返回（玩家名，皮肤文件缓存路径），名字以档案里的profileName为准；
-/// 玩家不存在 / 档案没有皮肤 / 皮肤下载失败都报DataNotFound
+/// 玩家名与皮肤文件缓存路径，名字以档案里的 `profileName` 为准；
+/// 玩家不存在 / 档案没有皮肤 / 皮肤下载失败都报 DataNotFound
 pub async fn fetch_skin_by_input(input: &str) -> CoreResult<(String, PathBuf)> {
     let input = input.trim();
     let not_found = || ErrorType::SkinBlockError(SkinBlockErrorData::PlayerNotFound);
 
-    // UUID直接用；玩家名先查UUID（查UUID成功后档案里会带权威名字，以那个为准）
+    // UUID 直接用；玩家名先查 UUID，档案里的 profileName 才是权威名字
     let (uuid, name) = if is_uuid(input) {
         (input.to_string(), None)
     } else {
@@ -221,15 +213,13 @@ pub async fn fetch_skin_by_input(input: &str) -> CoreResult<(String, PathBuf)> {
     Ok((name, file.path))
 }
 
-/// 解析 profile 属性（base64 后的 JSON）里的皮肤数据
-///
-/// # 参数
+/// 解析 profile 属性里的皮肤数据，属性值是 base64 后的 JSON
 ///
 /// - `value`: base64 编码的属性值
 ///
 /// # 返回值
 ///
-/// 返回解析出的皮肤数据；解码或解析失败返回 `None`
+/// 解析出的皮肤数据；解码或解析失败返回 `None`
 fn parse_textures(value: &str) -> Option<MinecraftTexturesObj> {
     let data = hash_helper::de_base64(value).ok()?;
 
@@ -238,16 +228,14 @@ fn parse_textures(value: &str) -> Option<MinecraftTexturesObj> {
 
 /// 取回单个皮肤 / 披风纹理，按内容 SHA1 缓存
 ///
-/// 下载后按内容定键（游戏 assets objects 同款布局），同一份贴图
-/// 不论来自哪个 URL / 账户都只存一份；同进程内同 URL 只下载一次。
-///
-/// # 参数
-///
 /// - `url`: 纹理下载地址
+///
+/// 下载后按内容定键，布局与游戏 assets objects 相同；同一份贴图不论来自哪个
+/// URL / 账户都只存一份，同进程内同 URL 只下载一次。
 ///
 /// # 返回值
 ///
-/// 返回本地文件与内容 SHA1；下载或写入失败返回 `None`
+/// 本地文件与内容 SHA1；下载或写入失败返回 `None`
 pub async fn load_texture(url: &str) -> Option<TextureFile> {
     let url = url.trim();
     if url.is_empty() {
@@ -289,7 +277,7 @@ mod tests {
     /// 只有 timestamp 等字段、没有任何纹理的 textures 属性
     const EMPTY: &str = "eyJ0aW1lc3RhbXAiOjE2MDAwMDAwMDAwMDAsInByb2ZpbGVJZCI6IjA2OWE3OWY0NDRlOTQ3MjZhNWJlZmNhOTBlMzhhYWY1IiwicHJvZmlsZU5hbWUiOiJOb3RjaCIsInRleHR1cmVzIjp7fX0=";
 
-    /// 应解析出皮肤（含 slim 标记）与披风地址
+    /// 应解析出皮肤与披风地址，皮肤带 slim 标记
     #[test]
     fn test_parse_textures_slim() {
         let obj = parse_textures(SLIM).expect("应能解析");

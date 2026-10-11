@@ -31,6 +31,7 @@ import {
 import type { AccountStoreDto, CustomHomeInfoDto, GroupDto, InstanceInfoDto, JavaInfoDto, NewsItem, VersionInfoDto } from "../../lib/bindings";
 import InstanceIcon from "../../components/InstanceIcon.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
+import DropOverlay from "../../components/ui/DropOverlay.vue";
 import InstanceSelect from "../../components/InstanceSelect.vue";
 import InstanceMetaPanel from "../../components/InstanceMetaPanel.vue";
 import LaunchArgsPanel from "../../components/LaunchArgsPanel.vue";
@@ -51,6 +52,7 @@ import ColorMcMigrateModal from "./ColorMcMigrateModal.vue";
 import { useInstanceDrag } from "../../composables/useInstanceDrag";
 import { useMultiSelect } from "../../composables/useMultiSelect";
 import { useFileDrop } from "../../composables/useFileDrop";
+import type { FileDropPayload } from "../../composables/useFileDrop";
 import { useMotd } from "./composables/useMotd";
 import { useInstanceArgs } from "./composables/useInstanceArgs";
 import { usePlayHours } from "./composables/usePlayHours";
@@ -953,12 +955,58 @@ const features: Array<{ id: FeatureId; icon: string }> = [
 
 const versions = ref<VersionInfoDto[]>([]);
 
-// ================= 拖拽整合包文件（逻辑见 composables/useFileDrop） =================
+// ================= 拖拽文件（逻辑见 composables/useFileDrop） =================
 
-const { fileDragOver } = useFileDrop({
-  versions,
-  loadInstances,
-});
+/**
+ * 拖入的文件 / 文件夹 / 登录卡片：认出类型后交给对应窗口
+ *
+ * - **网页卡片**（DOM 给的文本地址）与 `.url` / `.webloc` 快捷方式文件 → 「账户管理」预填地址；
+ * - 整合包与文件夹 → 「添加实例」（那边有完整的导入链路，主窗口只负责"认类型 + 开窗"）。
+ *
+ * 多个文件只取第一个。
+ */
+async function onFilesDropped(payload: FileDropPayload) {
+  // ① 网页卡片：地址已经在手上（DOM 那条路），直接开账户窗口
+  if (payload.url) {
+    openWindow("account", { drop: { path: "", kind: "shortcut", url: payload.url } });
+    return;
+  }
+  // ② 文件：路径由路径桥补上，照旧认类型再开窗
+  const first = payload.paths[0];
+  if (!first) return;
+  if (payload.paths.length > 1) showToast(t("drop.onlyFirst"));
+  let probe: { kind: string; url: string };
+  try {
+    probe = await commands.windows.probeDrop(first);
+  } catch (e) {
+    showToast(tErr(e));
+    return;
+  }
+  if (probe.kind === "shortcut" && probe.url) {
+    openWindow("account", { drop: { path: first, kind: "shortcut", url: probe.url } });
+    return;
+  }
+  if (probe.kind !== "folder" && probe.kind !== "archive") {
+    showToast(t("drop.notModpack"));
+    return;
+  }
+  openWindow("add", { drop: { path: first, kind: probe.kind } });
+}
+
+const { fileDragOver, dragKind } = useFileDrop(onFilesDropped);
+
+/**
+ * 拖入遮罩的标题：按这次拖的是哪一档选（见 useFileDrop 的 DragKind）
+ *
+ * 悬停阶段拿不到文件名，所以"整合包"只在 MIME 认得出来时才算。
+ */
+const DROP_TITLE_KEYS: Record<string, string> = {
+  text: "drop.titleLogin",
+  archive: "drop.titleArchive",
+  folder: "drop.titleFolder",
+  files: "drop.titleFiles",
+};
+const dropTitleKey = computed(() => DROP_TITLE_KEYS[dragKind.value] ?? DROP_TITLE_KEYS.files);
 
 const showAddGroup = ref(false);
 const groupName = ref("");
@@ -1463,25 +1511,30 @@ onMounted(async () => {
               <InstanceSelect v-if="!lockActive" :instances="instances" :model-value="selected?.uuid ?? null"
                 @update:model-value="onPickInstance" @add="openAdd" />
 
+              <!-- 启动按钮一行、次级操作一行小按钮，两块宽度不同、整块居中不撑满：
+                   启动按钮就按文案取宽（同改动前），下面那行按三个按钮的文案取宽
+                   （见 main-window.css .launch-actions） -->
               <div class="launch-actions">
-                <BaseButton variant="primary" size="lg" class="list-launch-btn"
+                <BaseButton variant="primary" size="lg" class="launch-main-btn"
                   :disabled="!selected || selected.running" @click="launch">
                   <span v-if="selected?.running" class="btn-spinner"></span>
                   <GlyphIcon v-else name="play" :size="15" /> {{ t("launch.play") }}
                 </BaseButton>
-                <!-- 实例设置：含启动参数（与分组模式下的设置面板一致） -->
-                <BaseButton :disabled="!selected" @click="toggleSettings">
-                  <GlyphIcon name="gear" :size="14" :weight="1.8" /> {{ t("detail.settings") }}
-                </BaseButton>
-                <!-- 实例日志：主页面不展示日志内容，直接开独立日志窗口 -->
-                <BaseButton :disabled="!selected" @click="openLogWindow">
-                  <GlyphIcon name="document" :size="14" :weight="1.8" /> {{ t("detail.logs") }}
-                </BaseButton>
-                <!-- 资源管理：分组 / 平铺模式的右侧详情面板里有这个入口，而列表模式没有详情面板，
-                   这里不补一个就进不去资源管理窗口（添加资源在资源窗口里有自己的入口） -->
-                <BaseButton :disabled="!selected" @click="onAction('manageResource')">
-                  <GlyphIcon name="package" :size="14" :weight="1.8" /> {{ t("actions.manageResource") }}
-                </BaseButton>
+                <div class="launch-sub-actions">
+                  <!-- 实例设置：含启动参数（与分组模式下的设置面板一致） -->
+                  <BaseButton size="sm" :disabled="!selected" @click="toggleSettings">
+                    <GlyphIcon name="gear" :size="13" :weight="1.8" /> {{ t("detail.settings") }}
+                  </BaseButton>
+                  <!-- 实例日志：主页面不展示日志内容，直接开独立日志窗口 -->
+                  <BaseButton size="sm" :disabled="!selected" @click="openLogWindow">
+                    <GlyphIcon name="document" :size="13" :weight="1.8" /> {{ t("detail.logs") }}
+                  </BaseButton>
+                  <!-- 资源管理：分组 / 平铺模式的右侧详情面板里有这个入口，而列表模式没有详情面板，
+                     这里不补一个就进不去资源管理窗口（添加资源在资源窗口里有自己的入口） -->
+                  <BaseButton size="sm" :disabled="!selected" @click="onAction('manageResource')">
+                    <GlyphIcon name="package" :size="13" :weight="1.8" /> {{ t("actions.manageResource") }}
+                  </BaseButton>
+                </div>
               </div>
               <!-- 设置面板整体展开/收起；宽度与居中由外层槽位承担，与原 .list-args 的占位一致 -->
               <CollapsePanel :open="settingsOpen && !!selected" class="list-settings-wrap">
@@ -1844,18 +1897,8 @@ onMounted(async () => {
     </BaseModal>
 
     <!-- ===== 拖拽整合包文件遮罩层 ===== -->
-    <div v-if="fileDragOver" class="file-drop-layer">
-      <div class="file-drop-box">
-        <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.6"
-          stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 8v13H3V8" />
-          <path d="M1 3h22v5H1z" />
-          <path d="M10 12h4" />
-        </svg>
-        <h2>{{ t("drop.title") }}</h2>
-        <p>{{ t("drop.desc") }}</p>
-      </div>
-    </div>
+    <!-- 拖拽文件 / 登录卡片时的遮罩（标题按拖入类型变，见 DROP_TITLE_KEYS） -->
+    <DropOverlay v-if="fileDragOver" :title="t(dropTitleKey)" />
   </div>
 </template>
 

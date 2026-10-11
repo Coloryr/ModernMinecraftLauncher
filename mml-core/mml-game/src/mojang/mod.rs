@@ -24,7 +24,7 @@ pub mod game_arg_obj;
 pub mod version_checker;
 pub mod version_obj;
 
-/// 游戏版本类型
+/// 游戏版本类型，按变体顺序序列化为 `u8`
 #[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum VersionType {
@@ -45,7 +45,11 @@ impl Default for VersionType {
 }
 
 impl VersionType {
-    /// 独立 ID（跨进程传输用，显示名由前端 i18n 翻译）
+    /// 独立 ID，跨进程传输用，显示名由前端 i18n 翻译
+    ///
+    /// # 返回值
+    ///
+    /// 返回该类型的 ID 字符串
     pub fn id(&self) -> &'static str {
         match self {
             VersionType::Release => "release",
@@ -56,6 +60,10 @@ impl VersionType {
     }
 
     /// 按 ID 解析版本类型
+    ///
+    /// # 返回值
+    ///
+    /// 未知 ID 返回 `Release`
     pub fn from_id(id: &str) -> Self {
         match id {
             "snapshot" => VersionType::Snapshot,
@@ -67,8 +75,6 @@ impl VersionType {
 }
 
 /// 检查规则是否适用
-///
-/// # 参数
 ///
 /// - `list`: 规则列表
 ///
@@ -123,8 +129,6 @@ pub fn check_allow(list: &Vec<GameRulesObj>) -> bool {
 
 /// 安全Log4j文件
 ///
-/// # 参数
-///
 /// - `obj`: 游戏数据
 ///
 /// # 返回值
@@ -144,10 +148,8 @@ pub fn build_log4j_item(obj: &LoggingObj) -> FileItemObj {
 
 /// 创建游戏资源下载项目
 ///
-/// # 参数
-///
-/// - `name`: 名字
-/// - `hash`: 校验值
+/// - `name`: 资源名
+/// - `hash`: 资源 sha1 校验值
 ///
 /// # 返回值
 ///
@@ -165,13 +167,11 @@ pub fn build_assets_item(name: &str, hash: &str) -> FileItemObj {
 
 /// 创建游戏本体下载项目
 ///
-/// # 参数
-///
 /// - `version`: 游戏版本号
 ///
 /// # 返回值
 ///
-/// 返回游戏本体下载项（版本不存在时 panic）
+/// 返回游戏本体下载项，版本不存在时 panic
 pub fn build_game_item(version: &str) -> FileItemObj {
     version_path::get_version(version)
         .unwrap()

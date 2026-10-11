@@ -23,10 +23,10 @@ static REGEX_LOG: LazyLock<Regex> =
 static REGEX_LOG_OLD: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\[(.*?)\] \[(.*?)(?:\/(.*?))?\]:?").unwrap());
 
-/// 日志级别
+/// 日志级别，由日志行里的级别文本解析得出
 #[derive(Clone)]
 pub enum LogLevel {
-    /// 未识别
+    /// 未识别，解析不出级别时用
     None,
     /// 信息
     Info,
@@ -39,7 +39,11 @@ pub enum LogLevel {
 }
 
 impl LogLevel {
-    /// 级别文本（与原版日志一致；None为空串）
+    /// 级别文本，与原版日志一致
+    ///
+    /// # 返回值
+    ///
+    /// 返回级别名；`None` 返回空串
     pub fn as_str(&self) -> &'static str {
         match self {
             LogLevel::None => "",
@@ -51,33 +55,33 @@ impl LogLevel {
     }
 }
 
-/// 单条游戏日志
+/// 单条已解析的游戏日志
 #[derive(Clone)]
 pub struct GameLogObj {
-    /// 日志内容
+    /// 整行原始日志文本
     pub log: String,
-    /// 日志时间
+    /// 日志行里的时间戳文本，原样保留
     pub time: String,
     /// 线程名
     pub thread: String,
-    /// 日志级别
+    /// 解析出的级别
     pub level: LogLevel,
-    /// 日志分类
+    /// 日志分类，如 `minecraft/advancements`
     pub category: String,
 }
 
-/// 游戏日志启动器消息
+/// 日志面板里的一行内容，游戏输出与启动器自己的消息共用
 #[derive(Clone)]
 pub enum GameLog {
-    /// 没有分类的日志输出
+    /// 不匹配日志格式的原始输出
     Text(String),
-    /// 游戏日志
+    /// 解析成结构的游戏日志
     GameLog(GameLogObj),
-    /// 运行库输出
+    /// 运行库输出，值是运行库文件路径
     RuntimeLib(PathBuf),
-    /// 日志重定向
+    /// 日志已重定向到文件
     JavaRedirect,
-    /// Java切换回启动查找
+    /// Java 切换回启动器查找
     JavaLocalRedirect,
     /// 登录用时
     LoginTime(Duration),
@@ -89,7 +93,7 @@ pub enum GameLog {
     DownloadFileTime(Duration),
     /// 启动参数
     LaunchArgs(String),
-    /// Java路径
+    /// Java 路径
     JavaPath(PathBuf),
     /// 启动用时
     LaunchTime(Duration),
@@ -99,20 +103,20 @@ pub enum GameLog {
     CmdPostTime(Duration),
 }
 
-/// 游戏运行日志
+/// 带时间戳的一条日志
 #[derive(Clone)]
 pub struct GameLogItemObj {
-    /// 获取时间
+    /// 入库时间，本地时区带偏移
     pub time: DateTime<FixedOffset>,
-    /// 日志内容
+    /// 这一行的内容
     pub log: GameLog,
 }
 
 /// 游戏运行日志处理
 pub struct InstanceRuntimeLog {
-    /// 日志列表
+    /// 已入库的日志，最多保留 10000 条
     pub logs: RwLock<Arc<VecDeque<GameLogItemObj>>>,
-    /// 日志文件，如果是打开日志文件时
+    /// 日志来源文件，从文件读入时才有值
     pub file: Option<PathBuf>,
 }
 
@@ -131,14 +135,12 @@ impl InstanceRuntimeLog {
 
     /// 从文件读取日志
     ///
-    /// # 参数
-    ///
-    /// - `file`: 日志文件（.log / .txt / .log.gz）
+    /// - `file`: 日志文件路径，支持 .log / .txt / .log.gz
     /// - `encoding`: 日志编码
     ///
     /// # 返回值
     ///
-    /// 返回日志处理器（读取失败时内容为空）
+    /// 返回日志处理器，读取失败时内容为空
     pub fn from_file<P: AsRef<Path>>(file: P, encoding: LogEncoding) -> Self {
         let mut log = Self {
             logs: RwLock::new(Arc::new(VecDeque::new())),
@@ -185,15 +187,13 @@ impl InstanceRuntimeLog {
         log
     }
 
-    /// 清理所有日志
+    /// 清空所有日志
     pub fn clear(&mut self) {
         let mut logs = self.logs.write().unwrap();
         *logs = Arc::new(VecDeque::new());
     }
 
     /// 添加游戏输出的日志
-    ///
-    /// # 参数
     ///
     /// - `log`: 单行日志文本
     ///
@@ -231,10 +231,8 @@ impl InstanceRuntimeLog {
 
     /// 解析单行游戏日志
     ///
-    /// 与[`InstanceRuntimeLog::add_game_log`]同一套正则；解析不出的行
-    /// thread / category / time 为空、级别为None。GUI据此填充筛选字段。
-    ///
-    /// # 参数
+    /// 与 [`InstanceRuntimeLog::add_game_log`] 同一套正则；解析不出的行
+    /// thread / category / time 为空、级别为 `None`。GUI 据此填充筛选字段。
     ///
     /// - `log`: 单行日志文本
     ///
@@ -276,8 +274,6 @@ impl InstanceRuntimeLog {
 
     /// 添加日志
     ///
-    /// # 参数
-    ///
     /// - `log`: 日志内容
     ///
     /// # 返回值
@@ -302,9 +298,7 @@ impl InstanceRuntimeLog {
 
 /// 按日志文本解析级别
 ///
-/// # 参数
-///
-/// - `level`: 日志级别文本
+/// - `level`: 日志级别文本，大小写不敏感
 ///
 /// # 返回值
 ///
@@ -327,6 +321,7 @@ impl InstanceSettingObj {
     ///
     /// 返回日志目录与崩溃报告目录下的日志文件列表
     pub fn get_log_files(&self) -> Vec<PathBuf> {
+        /// 判断是不是日志文件，含 .log / .txt / .log.gz
         fn is_log_file(path: &Path) -> bool {
             if let Some(ext) = path.extension() {
                 if ext.eq_ignore_ascii_case(names::LOG_EXT)
@@ -364,9 +359,7 @@ impl InstanceSettingObj {
 
     /// 获取最新的崩溃日志
     ///
-    /// # 参数
-    ///
-    /// - `sec`: 和最新时间最大差值
+    /// - `sec`: 与最新修改时间的最大差值，单位秒；不传时按 5 秒算
     ///
     /// # 返回值
     ///
@@ -399,8 +392,6 @@ impl InstanceSettingObj {
     }
 
     /// 读取日志
-    ///
-    /// # 参数
     ///
     /// - `path`: 相对日志目录的文件名
     ///

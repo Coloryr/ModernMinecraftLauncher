@@ -4,9 +4,14 @@ import { computed, defineAsyncComponent, onDeactivated, onMounted, ref, watch } 
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
+import DropOverlay from "../../components/ui/DropOverlay.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
+import { useFileDrop } from "../../composables/useFileDrop";
+import type { FileDropPayload } from "../../composables/useFileDrop";
+import { dropFromUrl, multiWindow, windowParams } from "../windowManager";
+import type { WindowDropParam } from "../windowManager";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
 import AccountGrid from "./views/AccountGrid.vue";
@@ -96,6 +101,9 @@ onMounted(() => {
 
 // 单窗口模式：窗口被 KeepAlive 缓存，切回不会重新挂载 → 自己补一次（账户可能在别处被加/删）
 useWindowRefresh(loadAccounts);
+
+// 主窗口拖入的登录快捷方式：多窗口模式下这次挂载就是为它来的（参数挂在 URL 上）
+onMounted(() => void consumeDrop());
 
 const VIEW_OPTIONS = computed(() => [
   { value: "grid", label: t("account.view.grid"), icon: "grid" },
@@ -231,6 +239,89 @@ function onAddTypeChange(value: string) {
   addType.value = value;
   resetAddFields();
 }
+
+// ================= 拖入登录快捷方式（.url / .webloc → 预填外置登录地址） =================
+//
+// 从浏览器直接拖网页上的"卡片"是收不到的（wry 在 Windows 上只认 CF_HDROP，见后端
+// `window_probe_drop` 的说明）：卡片先拖到桌面会变成 `.url` 互联网快捷方式，
+// 再把那个文件拖进来 —— 这两个落点（主窗口 / 本窗口）都走这一段。
+
+/** 拖入的路径是否已经应用过（多窗口模式下 URL 上的参数会一直留着，只能消费一次） */
+let dropApplied = false;
+
+/** 开「添加账户」表单并预填外置登录地址 */
+function applyAuthDrop(url: string) {
+  addType.value = "authlib";
+  // 先清上一次的残留（有登录模型锁定时它会把第一个锁定条目选上）
+  resetAddFields();
+  showAdd.value = true;
+  // 锁定生效时服务器字段由下拉决定：地址正好在锁定列表里就选中它，否则直接填进字段
+  const matched = lockServerEntries.value.find((item) => item.server === url);
+  if (matched) {
+    onSelectLockServer(matched.server);
+  } else {
+    addFields.value.server = url;
+  }
+}
+
+/** 消费"拖入的登录快捷方式"（参数从哪读见 windowManager 的 targetDrop） */
+async function consumeDrop() {
+  let drop: WindowDropParam | null = null;
+  if (multiWindow.value) {
+    if (dropApplied) return;
+    drop = dropFromUrl();
+    if (!drop) return;
+    dropApplied = true;
+  } else {
+    drop = windowParams.value.drop;
+    if (!drop) return;
+    // 单窗口：参数用完就清（同 goTo 清 windowParams 的做法）
+    windowParams.value = { ...windowParams.value, drop: null };
+  }
+  if (drop.kind === "shortcut" && drop.url) {
+    applyAuthDrop(drop.url);
+  }
+}
+
+/** 本窗口自己也接：网页卡片（DOM 给的文本地址）与 .url / .webloc 快捷方式文件 */
+async function onFilesDropped(payload: FileDropPayload) {
+  // ① 网页卡片：地址已经在手上
+  if (payload.url) {
+    applyAuthDrop(payload.url);
+    return;
+  }
+  // ② 快捷方式文件：读文件里的地址
+  const first = payload.paths[0];
+  if (!first) {
+    // 文本但不是地址（悬停阶段读不到内容，只能等松手）：说明一句，别静默
+    showToast(t("account.dropNotShortcut"));
+    return;
+  }
+  if (payload.paths.length > 1) showToast(t("drop.onlyFirst"));
+  let probe: { kind: string; url: string };
+  try {
+    probe = await commands.windows.probeDrop(first);
+  } catch (e) {
+    showToast(tErr(e));
+    return;
+  }
+  if (probe.kind !== "shortcut" || !probe.url) {
+    showToast(t("account.dropNotShortcut"));
+    return;
+  }
+  applyAuthDrop(probe.url);
+}
+
+// 这里**不传 accept**：悬停阶段 DOM 读不到文本内容（`getData` 在 dragover 期间是空的），
+// 判不出"这张卡片是不是地址"，一律接住、松手后再按内容分辨（不是地址就给提示）。
+const { fileDragOver, dragKind } = useFileDrop(onFilesDropped);
+
+// 单窗口：切回本页时消费一次；已经停在本页时靠参数变化接住
+useWindowRefresh(() => consumeDrop());
+watch(
+  () => windowParams.value.drop,
+  () => void consumeDrop(),
+);
 
 /** 添加弹窗是否在处理中（防止重复提交） */
 const adding = ref(false);
@@ -625,6 +716,10 @@ function tokenLabel(acc: AccountStoreDto): string {
     <!-- 皮肤 / 披风预览弹窗（2D / 3D 预览 + 纹理列表 + 正版装备）。
          目标账户由点开它的那一条决定，不是"当前使用"的账户 -->
     <SkinModal v-if="showSkin" :account="skinTarget" @close="showSkin = false" />
+
+    <!-- 拖入登录卡片 / 快捷方式时的遮罩（标题按拖入类型变） -->
+    <DropOverlay v-if="fileDragOver"
+      :title="t(dragKind === 'text' ? 'account.dropTitle' : 'account.dropFileTitle')" />
   </WindowFrame>
 </template>
 

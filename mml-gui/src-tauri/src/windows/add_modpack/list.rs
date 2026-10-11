@@ -1,8 +1,8 @@
-//! 下载整合包窗口的查询类命令：项目列表 / 详情 / 文件（版本）列表
+//! 下载整合包窗口的查询类命令：项目列表 / 详情 / 文件列表，文件即版本
 //!
-//! 从 `add_modpack/mod.rs` 拆出来的（`list_projects` 118 行、`add_modpack_file` 132 行）。
+//! 从 `add_modpack/mod.rs` 拆出来的，光 `list_projects` 就有 118 行、`add_modpack_file` 132 行。
 //! 列表页顺手把项目与文件写进 `CURSEFOGRE_*` / `MODRINTH_*` 缓存，详情与安装都从缓存取。
-//! 命令带 `#[gui_macros::ipc_group("add_modpack")]` 把组键钉回 `addModpack`（AGENTS.md §4）。
+//! 命令带分组标记，值填原始组名 add_modpack，把组键钉回 `addModpack`，见 AGENTS.md §4。
 
 use std::collections::HashSet;
 
@@ -21,6 +21,18 @@ use crate::windows::modpack_task::DOWNLOAD_NOW;
 use super::{CURSEFOGRE_FILE, CURSEFOGRE_INFO, MODRINTH_FILE, MODRINTH_INFO, register_search};
 
 /// 获取项目列表
+///
+/// - `window`: 调用方窗口，用于按窗口标签登记本发搜索
+/// - `source`: 下载源标识，取值 `curseforge` / `modrinth`
+/// - `page`: 页码，从 1 起
+/// - `sort`: 排序方式 ID，取值由各下载源自己的排序枚举定
+/// - `category`: 分类 ID，缺省为不限
+/// - `filter`: 搜索词，缺省为不筛
+/// - `version`: 游戏版本过滤，缺省为不限
+///
+/// # 返回值
+///
+/// 该页项目列表与总数；本发被新一发顶掉时返回 `err.cancelled`，下载源或排序非法返回 `Err`
 #[gui_macros::ipc_group("add_modpack")]
 #[tauri::command]
 pub async fn add_modpack_list(
@@ -42,6 +54,19 @@ pub async fn add_modpack_list(
 }
 
 /// 按下载源拉取项目列表
+///
+/// 顺手把项目元数据写进 `CURSEFOGRE_INFO` / `MODRINTH_INFO`，详情与安装都从缓存取。
+///
+/// - `source`: 下载源标识，取值 `curseforge` / `modrinth`
+/// - `page`: 页码，从 1 起
+/// - `sort`: 排序方式 ID，取值由各下载源自己的排序枚举定
+/// - `category`: 分类 ID，缺省为不限
+/// - `filter`: 搜索词，缺省为不筛
+/// - `version`: 游戏版本过滤，缺省为不限
+///
+/// # 返回值
+///
+/// 该页项目列表与总数；下载源或排序非法、请求失败返回 `Err`
 pub(super) async fn list_projects(
     source: String,
     page: u32,
@@ -124,8 +149,8 @@ pub(super) async fn list_projects(
             let installed = installed_modpack_pids();
             let running = running_pids();
 
-            // 与上面 CurseForge 分支同理：构建 DTO 期间不持锁（new_modrinth 会
-            // await 查标签图标），攒完一次性写入缓存。
+            // 与上面 CurseForge 分支同理：构建 DTO 期间不持锁，new_modrinth 会
+            // await 查标签图标；攒完一次性写入缓存。
             let mut cached = Vec::new();
 
             for item in list.hits {
@@ -161,10 +186,17 @@ pub(super) async fn list_projects(
     }
 }
 
-/// 获取项目详情（双击列表项）
+/// 获取项目详情，双击列表项时调用
 ///
-/// Modrinth：project 拿正文（markdown）/ 截图，team 拿作者头像；
+/// Modrinth：project 拿 markdown 正文与截图，team 拿作者头像；
 /// CurseForge：只有简介 + 截图，优先用列表缓存，缓存未命中再查 mod_info
+///
+/// - `source`: 下载源标识，取值 `curseforge` / `modrinth`
+/// - `pid`: 项目 ID
+///
+/// # 返回值
+///
+/// 项目详情，含简介、正文与截图；下载源非法或请求失败返回 `Err`
 #[gui_macros::ipc_group("add_modpack")]
 #[tauri::command]
 pub async fn add_modpack_detail(source: String, pid: String) -> Result<ProjectDetailDto, String> {
@@ -202,9 +234,16 @@ pub async fn add_modpack_detail(source: String, pid: String) -> Result<ProjectDe
 
 /// 获取文件列表
 ///
-/// 一页50个项目
-/// CurseForge换页需要查询
-/// Modrinth没有换页，一次获取所有
+/// 一页 50 个项目；CurseForge 换页要再查，Modrinth 一次返回全部，`max_page` 按 50 折算。
+///
+/// - `source`: 下载源标识，取值 `curseforge` / `modrinth`
+/// - `pid`: 项目 ID
+/// - `page`: 页码，从 1 起；只有 CurseForge 用得上
+/// - `version`: 游戏版本过滤，缺省为不限
+///
+/// # 返回值
+///
+/// 该页文件列表、总数与项目名；下载源非法或请求失败返回 `Err`
 #[gui_macros::ipc_group("add_modpack")]
 #[tauri::command]
 pub async fn add_modpack_file(
@@ -276,7 +315,7 @@ pub async fn add_modpack_file(
             })
         }
         ModPackType::Modrinth => {
-            // 同上：列表页缓存里已有项目名（title），未命中才查 project。
+            // 同上：列表页缓存里已有项目名 title，未命中才查 project。
             // project 是 ModrinthProjectObj、与缓存的 HitObj 不同型，故不回填
             let cached = MODRINTH_INFO
                 .read()
@@ -316,7 +355,7 @@ pub async fn add_modpack_file(
 
                 for item in list {
                     let key = (pid.clone(), item.id.clone());
-                    // 没有文件可下的版本直接跳过（见 new_modrinth 的注释）
+                    // 没有文件可下的版本直接跳过，见 new_modrinth 的注释
                     if let Some(dto) = FileListItemDto::new_modrinth(
                         &item,
                         FileType::Modpack,
@@ -340,9 +379,13 @@ pub async fn add_modpack_file(
     }
 }
 
-/// 已安装过的整合包 pid 集合（整页列表共用一次构建）
+/// 已安装过的整合包 pid 集合，整页列表共用一次构建
 ///
 /// 逐项调用会让每个列表项各自遍历一遍实例表并加一次锁；一页 20 项就是 20 遍。
+///
+/// # 返回值
+///
+/// 已安装整合包的项目 ID 集合；非整合包实例不计入
 pub(super) fn installed_modpack_pids() -> HashSet<String> {
     mml_game::get_instances()
         .iter()
@@ -357,7 +400,11 @@ pub(super) fn installed_modpack_pids() -> HashSet<String> {
         .collect()
 }
 
-/// 已安装过的整合包 (pid, fid) 集合（版本列表共用）
+/// 已安装过的整合包 pid + fid 组合集合，版本列表共用
+///
+/// # 返回值
+///
+/// 已安装整合包的项目 ID 与文件 ID 组合；缺 pid 或 fid 的实例跳过
 pub(super) fn installed_modpack_files() -> HashSet<(String, String)> {
     mml_game::get_instances()
         .iter()
@@ -374,7 +421,11 @@ pub(super) fn installed_modpack_files() -> HashSet<(String, String)> {
         .collect()
 }
 
-/// 正在安装的 pid 集合（列表角标：该项目任一版本在装）
+/// 正在安装的 pid 集合，供列表角标显示该项目任一版本在装
+///
+/// # 返回值
+///
+/// 有安装任务在跑的项目 ID 集合
 pub(super) fn running_pids() -> HashSet<String> {
     DOWNLOAD_NOW
         .read()
@@ -384,7 +435,11 @@ pub(super) fn running_pids() -> HashSet<String> {
         .collect()
 }
 
-/// 正在安装的 (pid, fid) 集合（版本列表角标）
+/// 正在安装的 pid + fid 组合集合，供版本列表角标
+///
+/// # 返回值
+///
+/// 有安装任务在跑的项目 ID 与文件 ID 组合
 pub(super) fn running_files() -> HashSet<(String, String)> {
     DOWNLOAD_NOW
         .read()

@@ -1,8 +1,8 @@
 //! 设置窗口的 Java 运行时：扫描 / 添加 / 删除 / 导入压缩包 / 探测
 //!
 //! 从 `settings/mod.rs` 拆出来的。Java 列表由 `mml-jvms` 持有并即时持久化，
-//! 这里只做命令与进度事件。命令带 `#[gui_macros::ipc_group("settings")]`
-//! 把组键钉回 `settings`（AGENTS.md §4）。
+//! 这里只做命令与进度事件。命令带分组标记，值填原始组名
+//! `settings`，免得组键随文件名变掉，见 AGENTS.md §4。
 
 use std::path::Path;
 use std::sync::Arc;
@@ -16,6 +16,10 @@ use crate::dtos::{JavaImportProgressDto, JavaInfoDto};
 use crate::listens;
 
 /// 扫描系统已安装的 Java 并持久化到配置
+///
+/// # 返回值
+///
+/// 扫描后的完整 Java 列表
 #[gui_macros::ipc_group("settings")]
 #[tauri::command]
 pub fn settings_scan_java() -> Vec<JavaInfoDto> {
@@ -23,7 +27,14 @@ pub fn settings_scan_java() -> Vec<JavaInfoDto> {
     java_list()
 }
 
-/// 手动添加一个 Java（路径无效返回错误）
+/// 手动添加一个 Java
+///
+/// - `name`: 显示名；`None` 时按探测结果取名
+/// - `path`: Java 可执行文件路径
+///
+/// # 返回值
+///
+/// 新增的 Java 项；路径无效返回 `err.javaInvalid`
 #[gui_macros::ipc_group("settings")]
 #[tauri::command]
 pub fn settings_add_java(name: Option<String>, path: String) -> Result<JavaInfoDto, String> {
@@ -41,21 +52,26 @@ pub fn settings_add_java(name: Option<String>, path: String) -> Result<JavaInfoD
     }
 }
 
-/// 移除一个 Java（按名称）
+/// 移除一个 Java
+///
+/// - `name`: 要移除项的显示名，也是列表里的唯一键
 #[gui_macros::ipc_group("settings")]
 #[tauri::command]
 pub fn settings_remove_java(name: String) {
     mml_jvms::remove(&name);
 }
 
-/// 移除全部 Java，返回刷新后的列表
+/// 移除全部 Java
 #[gui_macros::ipc_group("settings")]
 #[tauri::command]
 pub fn settings_remove_all_java() {
     mml_jvms::remove_all();
 }
 
-/// Java 压缩包导入进度事件（解包 / 识别阶段推进时发）
+/// Java 压缩包导入进度事件，解包与识别阶段推进时发
+///
+/// - `app`: 应用句柄，事件发往所有窗口
+/// - `dto`: 当前阶段、进度与文件名
 #[gui_macros::emit]
 pub(super) fn emit_settings_java_progress(app: &AppHandle, dto: JavaImportProgressDto) {
     let _ = app.emit(listens::SETTINGS_JAVA_PROGRESS, dto);
@@ -67,13 +83,23 @@ pub(super) fn emit_settings_java_progress(app: &AppHandle, dto: JavaImportProgre
 /// `start` 下发的 total 记在内部，`update` 携带它一起转发成进度事件，
 /// 当前文件名放进 `subText`；命令返回即导入完成，`done` 无需再发。
 pub(super) struct JavaArchiveGui {
+    /// 应用句柄，进度事件发往所有窗口
     app: AppHandle,
     /// `start` 下发的总数，`update` 时回读
     total: AtomicUsize,
 }
 
-/// 从压缩包（zip / 7z / tar.gz 等）解包导入 Java，返回刷新后的列表。
-/// 解包与识别过程中经 `settings-java-progress` 事件上报进度
+/// 从压缩包解包导入 Java，支持 zip / 7z / tar.gz 等
+///
+/// 解包与识别过程中经 `settings-java-progress` 事件上报进度。
+///
+/// - `app`: 应用句柄，用于上报进度事件
+/// - `name`: 显示名；`None` 时按探测结果取名
+/// - `archive_path`: 本地压缩包路径
+///
+/// # 返回值
+///
+/// 导入成功的 Java 项；包里没有可用的 Java 时返回 `None`；解包失败返回错误信息
 #[gui_macros::ipc_group("settings")]
 #[tauri::command]
 pub async fn settings_import_java(
@@ -102,7 +128,13 @@ pub async fn settings_import_java(
     }
 }
 
-/// 扫描指定文件夹（含子目录）里的 Java 并注册，返回刷新后的列表
+/// 扫描指定文件夹里的 Java 并注册，含子目录
+///
+/// - `path`: 要扫描的目录路径
+///
+/// # 返回值
+///
+/// 注册成功的 Java 项；目录里没找到 Java 时返回 `None`
 #[gui_macros::ipc_group("settings")]
 #[tauri::command]
 pub async fn settings_scan_java_dir(path: String) -> Result<Option<JavaInfoDto>, String> {
@@ -131,7 +163,13 @@ pub async fn settings_scan_java_dir(path: String) -> Result<Option<JavaInfoDto>,
     }
 }
 
-/// 测试获取 Java 信息（不注册）：探测路径指向的 Java，返回识别到的名称 / 版本等
+/// 探测路径指向的 Java，只取信息不注册
+///
+/// - `path`: Java 可执行文件路径
+///
+/// # 返回值
+///
+/// 识别到的显示名；探测不出 Java 时返回 `None`
 #[gui_macros::ipc_group("settings")]
 #[tauri::command]
 pub async fn settings_detect_java(path: String) -> Result<Option<String>, String> {
@@ -146,7 +184,11 @@ pub async fn settings_detect_java(path: String) -> Result<Option<String>, String
     }
 }
 
-/// mml-jvms 内存列表 → 前端 DTO（与 windows::main 的 java_list 同构）
+/// mml-jvms 内存列表 → 前端 DTO
+///
+/// # 返回值
+///
+/// 当前全部 Java 的 DTO，与 windows::main 的 java_list 同构
 pub(super) fn java_list() -> Vec<JavaInfoDto> {
     mml_jvms::get_all_java()
         .iter()
@@ -162,6 +204,13 @@ pub(super) fn java_list() -> Vec<JavaInfoDto> {
 }
 
 impl JavaArchiveGui {
+    /// 按应用句柄建一个进度桥接器，总数从 0 起
+    ///
+    /// - `app`: 应用句柄，进度事件发往所有窗口
+    ///
+    /// # 返回值
+    ///
+    /// 共享的桥接器实例，交给 `mml_jvms::unzip_java` 用
     fn new(app: &AppHandle) -> Arc<Self> {
         Arc::new(Self {
             app: app.clone(),
@@ -171,6 +220,9 @@ impl JavaArchiveGui {
 }
 
 impl IBaseArchiveGui for JavaArchiveGui {
+    /// 解包开始：记下总条目数并发出 `extract` 阶段的首个进度事件
+    ///
+    /// - `total`: 压缩包内待解包的条目总数
     fn start(&self, total: usize) {
         self.total.store(total, Ordering::Relaxed);
         emit_settings_java_progress(
@@ -184,6 +236,10 @@ impl IBaseArchiveGui for JavaArchiveGui {
         );
     }
 
+    /// 解包推进：转发当前进度
+    ///
+    /// - `filename`: 当前正在解包的条目名；没有名字时为 `None`
+    /// - `current`: 已完成的条目数
     fn update(&self, filename: Option<String>, current: usize) {
         emit_settings_java_progress(
             &self.app,
@@ -196,9 +252,16 @@ impl IBaseArchiveGui for JavaArchiveGui {
         );
     }
 
+    /// 解包结束：命令返回即导入完成，这里不额外发事件
     fn done(&self) {}
 
     /// 导入场景无需询问，非法字符文件名直接同意替换
+    ///
+    /// - `_name`: 待替换的文件名，本实现不关心
+    ///
+    /// # 返回值
+    ///
+    /// 恒为 `true`，即总是同意替换
     fn file_rename(&self, _name: &str) -> bool {
         true
     }

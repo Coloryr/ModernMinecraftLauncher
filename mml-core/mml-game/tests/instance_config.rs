@@ -1,8 +1,8 @@
 //! 实例配置与 game_options 配置文件的磁盘读写测试。
 //!
-//! 需要全局初始化（实例目录 / 运行库目录 / 配置后台保存线程），
+//! 需要全局初始化：实例目录 / 运行库目录 / 配置后台保存线程，
 //! 全部测试共用同一个临时运行目录，通过 `OnceLock` 保证初始化只执行一次。
-//! 临时目录位于系统临时目录下，进程结束由操作系统回收，运行前先清理旧目录。
+//! 运行目录由 mml_testutil 提供，运行前先清理旧目录。
 
 use std::path::PathBuf;
 use std::sync::OnceLock;
@@ -15,7 +15,11 @@ use mml_game::loader::LoaderType;
 use mml_game::{get_instance_by_name, init as game_init, load as game_load};
 use uuid::Uuid;
 
-/// 临时运行目录（每次运行前先删除旧目录）
+/// 初始化内核各系统，返回运行目录；每次运行前先删除旧目录
+///
+/// # 返回值
+///
+/// 本次运行的临时运行目录
 fn init_all() -> PathBuf {
     static INIT: OnceLock<PathBuf> = OnceLock::new();
     INIT.get_or_init(|| {
@@ -36,7 +40,14 @@ fn init_all() -> PathBuf {
     .clone()
 }
 
-/// 等待条件成立（后台保存线程异步写盘，需要轮询）
+/// 轮询等待条件成立，后台保存线程是异步写盘
+///
+/// - `timeout`: 最长等待时间
+/// - `cond`: 判定条件，返回 true 即结束等待
+///
+/// # 返回值
+///
+/// 超时前成立返回 true，否则返回最后一次判断结果
 fn wait_for<F: Fn() -> bool>(timeout: Duration, cond: F) -> bool {
     let start = Instant::now();
     while start.elapsed() < timeout {
@@ -49,6 +60,12 @@ fn wait_for<F: Fn() -> bool>(timeout: Duration, cond: F) -> bool {
 }
 
 /// 构造一个测试实例配置
+///
+/// - `dir`: 实例目录名
+///
+/// # 返回值
+///
+/// 填好加载器、服务器、代理等字段的配置，其余取默认值
 fn make_instance(dir: &str) -> InstanceSettingObj {
     InstanceSettingObj {
         uuid: Uuid::new_v4(),
@@ -75,7 +92,7 @@ fn make_instance(dir: &str) -> InstanceSettingObj {
     }
 }
 
-/// 实例配置保存到磁盘：写入 `{实例目录}/game.json`，字段为 PascalCase。
+/// 实例配置保存到磁盘：写入 `{实例目录}/game.json`，字段为 PascalCase
 #[test]
 fn instance_save_to_disk() {
     init_all();
@@ -116,7 +133,7 @@ fn instance_save_to_disk() {
     );
 }
 
-/// 实例配置写入磁盘后能被启动器加载回来（load → get_instance_by_name）。
+/// 实例配置写盘后能被加载回来：load 之后按名字能找到
 #[test]
 fn instance_load_round_trip() {
     init_all();
@@ -139,11 +156,11 @@ fn instance_load_round_trip() {
     assert_eq!(loaded.version, "1.20.4");
     assert_eq!(loaded.loader, LoaderType::Fabric);
     assert_eq!(loaded.encoding, LogEncoding::GBK);
-    // 目录名与 DirName 不一致时以目录名为准（本测试两者一致）
+    // 目录名与 DirName 不一致时以目录名为准，本测试两者一致
     assert_eq!(loaded.dir, dir);
 }
 
-/// game_options：save_options 写盘 → read_options_from_file 读回，往返一致。
+/// game_options 往返：save_options 写盘后 read_options_from_file 读回一致
 #[test]
 fn game_options_save_and_read_round_trip() {
     init_all();
@@ -172,13 +189,13 @@ fn game_options_save_and_read_round_trip() {
         assert_eq!(data.get(key), Some(value), "key {key} 值不一致");
     }
 
-    // 实例上的读取入口（get_options）应读到同样内容
+    // 实例上的读取入口 get_options 应读到同样内容
     let data = instance.get_options().unwrap();
     assert_eq!(data.get("fov").map(String::as_str), Some("0.5"));
     assert_eq!(data.get("renderDistance").map(String::as_str), Some("12"));
 }
 
-/// game_options：换行符不敏感（CRLF / LF 均可解析）。
+/// game_options 换行符不敏感，CRLF 与 LF 都能解析
 #[test]
 fn game_options_line_endings() {
     init_all();
@@ -192,7 +209,7 @@ fn game_options_line_endings() {
         [("fov".to_string(), "1.0".to_string())].into_iter().collect();
     instance.save_options(&options, None).unwrap();
 
-    // 手工用另一种换行符写盘再读（键值分隔符仍是 :）
+    // 手工用另一种换行符写盘再读，键值分隔符仍是 :
     let file = instance.get_optifine_file();
     let sep = if cfg!(windows) { "\n" } else { "\r\n" };
     std::fs::write(&file, format!("gamma:0.8{sep}fov:1.0{sep}")).unwrap();
@@ -209,7 +226,7 @@ fn game_options_line_endings() {
     assert_eq!(data.get("fov").map(String::as_str), Some("1.0"));
 }
 
-/// game_options：配置文件不存在时 get_options 返回空表。
+/// game_options：配置文件不存在时 get_options 返回空表
 #[test]
 fn game_options_missing_file_returns_empty() {
     init_all();

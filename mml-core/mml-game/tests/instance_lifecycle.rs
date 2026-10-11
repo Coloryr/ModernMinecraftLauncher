@@ -1,6 +1,6 @@
-//! 实例生命周期集成测试（离线）：创建、重名自动改名、改名、分组、删除。
+//! 实例生命周期集成测试，离线运行：创建、重名自动改名、改名、分组、删除。
 //!
-//! 不依赖网络与版本下载（版本号只是字符串标记，不真正启动游戏）。
+//! 不依赖网络与版本下载：版本号只是字符串标记，不真正启动游戏。
 //! 全局初始化每进程一次，互斥锁串行各用例。
 
 use std::path::PathBuf;
@@ -9,12 +9,12 @@ use std::sync::{Mutex, Once};
 use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 use uuid::Uuid;
 
-/// 测试运行目录（系统临时目录 + 进程号，避免多进程冲突）
+/// 测试运行目录：临时根目录加进程号，避免多进程冲突
 fn run_dir() -> PathBuf {
     mml_testutil::temp_dir().join(format!("mml-instance-lifecycle-{}", std::process::id()))
 }
 
-/// 初始化链（与 mml_core::init 相同），每进程一次
+/// 初始化链，与 mml_core::init 相同；每进程只跑一次
 fn ensure_init() {
     static INIT: Once = Once::new();
     INIT.call_once(|| {
@@ -31,13 +31,19 @@ fn ensure_init() {
     });
 }
 
-/// 全局实例表共享同一进程，串行执行各用例
+/// 用例互斥锁：实例表是进程级共享，各用例必须串行
 static TEST_LOCK: Mutex<()> = Mutex::new(());
 
-/// 用唯一前缀构造实例设置
+/// 构造实例设置，只填名称与版本号
 ///
-/// 分组**不在**实例配置里（已迁到内核的 `group_save.json`），
+/// - `name`: 实例名，调用方保证带唯一后缀
+///
+/// 分组不在实例配置里，已迁到内核的 `group_save.json`，
 /// 要指定分组得走 `create_instance_in_group`。
+///
+/// # 返回值
+///
+/// 可直接交给创建接口的实例配置
 fn setting(name: &str) -> InstanceSettingObj {
     InstanceSettingObj {
         name: name.to_string(),
@@ -64,7 +70,7 @@ async fn create_instance_makes_dirs() {
     // 全局表登记
     assert!(mml_game::have_instance_name(&name));
     assert!(mml_game::get_instance_by_name(&name).is_some());
-    // 分组归属在独立的分组表里（实例配置上没有这个字段），按 uuid 记录
+    // 分组归属在独立的分组表里，实例配置上没有这个字段，按 uuid 记录
     assert_eq!(mml_game::get_instance_group(&uuid), Some(group));
     assert!(
         mml_game::get_group_list().iter().any(|g| g.uuid == group),
@@ -90,7 +96,7 @@ async fn create_instance_makes_dirs() {
     assert!(!mml_game::have_instance_name(&name));
 }
 
-/// 重名创建（无界面）：自动改名 `{name}1`，两个实例共存
+/// 重名创建时自动改名 `{name}1`，两个实例共存
 #[tokio::test]
 async fn create_duplicate_name_auto_renames() {
     let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
@@ -147,7 +153,7 @@ async fn rename_instance_rules() {
     // 空名 → 拒绝
     assert!(mml_game::rename_instance(&uuid, "   ").is_err());
 
-    // 保持原名 → 允许（自己不算重名）
+    // 保持原名 → 允许，自己不算重名
     mml_game::rename_instance(&uuid, &new_name).expect("保持原名不应报错");
 
     mml_game::delete_instance(&uuid).unwrap();
@@ -183,7 +189,7 @@ async fn delete_instance_removes_everywhere() {
     );
     assert!(!base.exists(), "实例目录应被清理（回收站）");
 
-    // 重复删除 → 报错（uuid 已不存在）
+    // 重复删除 → 报错，uuid 已不存在
     assert!(mml_game::delete_instance(&uuid).is_err());
 }
 
@@ -207,7 +213,7 @@ async fn move_instance_sets_group_and_order() {
     let ua = a.read().unwrap().uuid;
     let ub = b.read().unwrap().uuid;
 
-    // 先后移进同一个组（每次插入到第 0 位），最终顺序应为 B、A
+    // 先后移进同一个组，每次插入到第 0 位，最终顺序应为 B、A
     mml_game::move_instance(&ua, Some(group), 0);
     mml_game::move_instance(&ub, Some(group), 0);
 

@@ -1,26 +1,36 @@
 //! 主窗口的"目录类"数据：版本清单缓存与 MOTD 地址解析
 //!
-//! 从 `main.rs` 拆出来的纯逻辑（不碰窗口、不碰模型），连同它自己的单测。
+//! 从 `main.rs` 拆出来的纯逻辑，不碰窗口、不碰模型，连同它自己的单测。
 
 use std::sync::{LazyLock, RwLock};
 
 use crate::dtos::VersionInfoDto;
 
-/// 版本列表缓存（进程级：主窗口 / 添加实例窗口共用，不挂在窗口模型上）
+/// 版本列表缓存，进程级：主窗口 / 添加实例窗口共用，不挂在窗口模型上
 pub(super) static VERSIONS_CACHE: LazyLock<RwLock<Vec<VersionInfoDto>>> =
     LazyLock::new(|| RwLock::new(Vec::new()));
 
-/// 从 mml-core 拉取版本清单（按配置源：官方 / BMCLAPI），
-/// 按类型分组排序（正式版 > 快照 > 旧版 Beta > 旧版 Alpha），
-/// 组内保持清单顺序（清单本身按新旧排列）；失败返回空
+/// 从 mml-core 拉取版本清单，配置源可选官方或 BMCLAPI
+///
+/// 按类型分组排序，正式版 > 快照 > 旧版 Beta > 旧版 Alpha，组内保持清单顺序，
+/// 因为清单本身按新旧排列。
+///
+/// # 返回值
+///
+/// 版本列表；拉取或解析失败返回空列表
 pub(super) async fn fetch_versions() -> Vec<VersionInfoDto> {
+    /// 版本清单 JSON 的顶层结构，只取 `versions`
     #[derive(serde::Deserialize)]
     struct Manifest {
+        /// 清单里的全部版本条目，顺序即新旧顺序
         versions: Vec<ManifestVersion>,
     }
+    /// 清单里的单个版本条目
     #[derive(serde::Deserialize)]
     struct ManifestVersion {
+        /// 版本号，如 `1.21.1` / `25w14a`
         id: String,
+        /// 版本类型，取值 `release` / `snapshot` / `old_beta` / `old_alpha`
         #[serde(rename = "type")]
         version_type: String,
     }
@@ -39,7 +49,7 @@ pub(super) async fn fetch_versions() -> Vec<VersionInfoDto> {
         })
         .collect();
     // 只按类型分组排序，组内不动：清单本身即最新在前，
-    // 按版本号数值重排会把快照（25w14a）排到 1.21.x 之上、打乱 rc / 旧版顺序
+    // 按版本号数值重排会把快照 25w14a 排到 1.21.x 之上、打乱 rc / 旧版顺序
     list.sort_by_key(|v| match v.version_type.as_str() {
         "release" => 0,
         "snapshot" => 1,
@@ -55,6 +65,12 @@ pub(super) async fn fetch_versions() -> Vec<VersionInfoDto> {
 const MOTD_DEFAULT_PORT: u16 = 25565;
 
 /// 解析服务器地址：host / host:port / [IPv6]:port / 裸 IPv6
+///
+/// - `address`: 用户输入的服务器地址，前后空白会被去掉
+///
+/// # 返回值
+///
+/// 主机与端口；没写端口或地址为空时端口取 [`MOTD_DEFAULT_PORT`]
 pub(super) fn parse_motd_addr(address: &str) -> (String, u16) {
     let addr = address.trim();
     if addr.is_empty() {
@@ -70,7 +86,7 @@ pub(super) fn parse_motd_addr(address: &str) -> (String, u16) {
             .unwrap_or(MOTD_DEFAULT_PORT);
         return (host.to_string(), port);
     }
-    // host:port（只有一个冒号才算 host:port，多个冒号视为裸 IPv6）
+    // 只有一个冒号才算 host:port，多个冒号视为裸 IPv6
     if let Some((host, port)) = addr.rsplit_once(':')
         && !host.contains(':')
         && !port.is_empty()
@@ -85,6 +101,7 @@ pub(super) fn parse_motd_addr(address: &str) -> (String, u16) {
 mod tests {
     use super::parse_motd_addr;
 
+    /// 各种地址写法的解析结果，含空串与裸 IPv6
     #[test]
     fn test_parse_motd_addr() {
         assert_eq!(

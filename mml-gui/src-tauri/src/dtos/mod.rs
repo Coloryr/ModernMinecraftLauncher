@@ -1,8 +1,8 @@
-//! 传输对象（DTO）—— 前端 IPC wire 形态，使用 TS 命名（camelCase）。
+//! 传输对象 DTO —— 前端 IPC wire 形态，使用 TS 命名 camelCase。
 //!
-//! 配置 / 持久化文件（gui_config.json、main_data.json 等）用 Rust 命名，
-//! 仅当跨 Tauri IPC 传输到前端时才转成 DTO（或 DTO 本身即 wire 形态，
-//! 如事件负载 / 命令入参）。纯传输、无业务方法的窗口类型也集中在此。
+//! 配置 / 持久化文件如 gui_config.json、main_data.json 等用 Rust 命名，
+//! 仅当跨 Tauri IPC 传输到前端时才转成 DTO，或 DTO 本身即 wire 形态，
+//! 如事件负载 / 命令入参。纯传输、无业务方法的窗口类型也集中在此。
 
 pub mod account_dto;
 pub mod add_dto;
@@ -58,8 +58,8 @@ pub use main_dto::{
 pub use motd_dto::{MotdDto, MotdSegmentDto};
 pub use resource_dto::{
     DataPackItemDto, ModGroupDto, ModItemDto, ModRenameDto, ModScanProgressDto, PackItemDto,
-    ResourceViewDto, SaveBackupDto, SaveItemDto, SchematicItemDto, ScreenshotItemDto,
-    ServerItemDto, ShaderItemDto,
+    ResourceDropDto, ResourceViewDto, SaveBackupDto, SaveItemDto, SchematicItemDto,
+    ScreenshotItemDto, ServerItemDto, ShaderItemDto,
 };
 pub use settings_dto::{
     BgInfoDto, DnsSettingDto, GameCheckSettingDto, LaunchSettingDto, NetworkSettingDto,
@@ -67,4 +67,4 @@ pub use settings_dto::{
 };
 pub use stats_dto::{StatsDataDto, StatsInstanceDto};
 pub use version_dto::VersionInfoDto;
-pub use window_dto::WindowSizeDto;
+pub use window_dto::{DropPathDto, FileDropDto, WindowSizeDto};

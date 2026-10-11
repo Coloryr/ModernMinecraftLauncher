@@ -7,31 +7,31 @@ use mml_sys::path_helper;
 
 use crate::launcher::instance_setting_obj::InstanceSettingObj;
 
-/// 屏幕截图文件
+/// 一张截图
 pub struct ScreenshotObj {
-    /// 文件名
+    /// 文件名，含扩展名
     pub name: String,
-    /// 路径
+    /// 截图的完整路径
     pub file: PathBuf,
 }
 
 impl ScreenshotObj {
-    /// 删除截图
+    /// 把这张截图移入回收站
     ///
     /// # 返回值
     ///
-    /// 成功返回 `Ok(())`（移入回收站）；失败返回对应错误
+    /// 成功返回 `Ok(())`；失败返回对应错误
     pub fn delete(&self) -> CoreResult<()> {
         path_helper::move_to_trash(&self.file)
     }
 }
 
 impl InstanceSettingObj {
-    /// 获取实例的所有截图
+    /// 取实例截图目录下的全部截图
     ///
     /// # 返回值
     ///
-    /// 返回截图目录下的 PNG 文件列表
+    /// 截图目录下的 PNG 文件列表
     pub fn get_screenshots(&self) -> Vec<ScreenshotObj> {
         let dir = self.get_screenshots_path();
         let mut list = Vec::new();
@@ -51,7 +51,7 @@ impl InstanceSettingObj {
         list
     }
 
-    /// 删除所有截图
+    /// 把实例的全部截图移入回收站
     ///
     /// # 返回值
     ///

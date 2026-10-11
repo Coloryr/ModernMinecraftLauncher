@@ -2,15 +2,16 @@
 
 use serde::{Deserialize, Serialize};
 
-/// CurseForge 分类列表
+/// CurseForge 分类列表，对应 `categories` 接口响应
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
 pub struct CurseForgeCategoriesObj {
-    /// 分类数据列表
+    /// 分类数据列表，对应响应键 `data`
     pub data: Vec<CurseForgeCategoriesDataObj>,
 }
 
 impl Default for CurseForgeCategoriesObj {
+    /// 全字段取默认值，配合 `#[serde(default)]` 兜底缺失字段
     fn default() -> Self {
         Self {
             data: Default::default(),
@@ -22,16 +23,17 @@ impl Default for CurseForgeCategoriesObj {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
 pub struct CurseForgeCategoriesDataObj {
-    /// 分类 ID
+    /// 分类 ID，对应响应键 `id`
     pub id: u64,
-    /// 分类名称
+    /// 分类名称，对应响应键 `name`
     pub name: String,
-    /// 所属大类 ID（区分模组 / 整合包等）
+    /// 所属大类 ID，对应响应键 `classId`，用于区分模组 / 整合包等
     #[serde(rename = "classId")]
     pub class_id: u32,
 }
 
 impl Default for CurseForgeCategoriesDataObj {
+    /// 全字段取默认值，配合 `#[serde(default)]` 兜底缺失字段
     fn default() -> Self {
         Self {
             id: Default::default(),

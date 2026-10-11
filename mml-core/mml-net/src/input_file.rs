@@ -18,11 +18,11 @@ use tokio::io::{AsyncRead, AsyncWriteExt};
 /// 方法将内容写入目标路径，无需关心具体来源类型。
 ///
 /// 两个流变体都要求 `Send`：`save_file` 是 async 函数，调用方常在
-/// `#[async_trait]`（要求 `future: Send`）/ `tokio::spawn` 这类地方 await 它，
-/// 而 future 是否 `Send` 取决于它跨 await 持有的值 —— 不要求 `Send` 的话
-/// 整条调用链都不是 `Send`（整合包安装器里就撞过这个）。
+/// `#[async_trait]` 这类要求 future 为 `Send` 的地方或 `tokio::spawn` 里 await 它，
+/// 而 future 是否 `Send` 取决于它跨 await 持有的值；不要求 `Send` 的话
+/// 整条调用链都不是 `Send`，整合包安装器里就撞过这个。
 pub enum InputFile {
-    /// 本地文件系统中的文件（异步复制）
+    /// 本地文件系统中的文件，异步复制
     Path(PathBuf),
     /// 通过 HTTP GET 下载的网络文件
     Url(String),
@@ -36,8 +36,6 @@ pub enum InputFile {
 
 impl InputFile {
     /// 将输入文件内容保存到指定路径
-    ///
-    /// # 参数
     ///
     /// - `path`: 目标文件路径
     ///

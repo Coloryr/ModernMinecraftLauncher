@@ -13,6 +13,7 @@ pub struct QuiltArgumentsObj {
 }
 
 impl Default for QuiltArgumentsObj {
+    /// 全字段取默认值：参数列表为空
     fn default() -> Self {
         Self {
             game: Default::default(),
@@ -36,6 +37,7 @@ pub struct QuiltLoaderObj {
 }
 
 impl Default for QuiltLoaderObj {
+    /// 全字段取默认值：字符串为空串、列表为空
     fn default() -> Self {
         Self {
             id: Default::default(),

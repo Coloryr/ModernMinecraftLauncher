@@ -1,7 +1,7 @@
-//! GUI 状态（gui_config.json）
+//! GUI 状态，配置文件 gui_config.json
 //!
-//! 配置文件使用 Rust 命名（snake_case 字段 / PascalCase 枚举 / locale 变体名）。
-//! 仅当经 Tauri IPC 传输到前端时转成 `crate::dtos::GuiConfigDto`（TS 命名，camelCase）。
+//! 配置文件使用 Rust 命名：snake_case 字段 / PascalCase 枚举 / locale 变体名。
+//! 仅当经 Tauri IPC 传输到前端时转成 `crate::dtos::GuiConfigDto`，TS 命名 camelCase。
 //! 读写统一走 [`init`] 初始化后的内存缓存，保存经 `config_save` 异步落盘。
 
 use std::{
@@ -17,7 +17,7 @@ use mml_config::config_save;
 use mml_names::{Lang, names, uuids};
 use serde::{Deserialize, Serialize};
 
-/// 主题（serde 按变体名序列化，与前端同名）
+/// 主题；serde 按变体名序列化，与前端同名
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum Theme {
     /// 跟随系统深浅色
@@ -32,7 +32,7 @@ pub enum Theme {
 /// 窗口模式：多窗口 / 单窗口
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum WindowMode {
-    /// 多窗口（默认）
+    /// 多窗口，默认
     #[default]
     Multi,
     /// 单窗口
@@ -42,18 +42,18 @@ pub enum WindowMode {
 /// 侧栏位置
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum SidebarSide {
-    /// 左侧（默认）
+    /// 左侧，默认
     #[default]
     Left,
     /// 右侧
     Right,
 }
 
-/// 主窗口实例列表显示模式（wire 名小写，与前端一致）
+/// 主窗口实例列表显示模式；wire 名小写，与前端一致
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ViewMode {
-    /// 列表（默认）
+    /// 列表，默认
     #[default]
     List,
     /// 分组
@@ -62,50 +62,51 @@ pub enum ViewMode {
     Grid,
 }
 
-/// 皮肤显示模式（serde 按变体名序列化，与前端同名）
+/// 皮肤显示模式；serde 按变体名序列化，与前端同名
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum SkinDisplay {
-    /// 2D 平面图（TypeA，默认；兼容旧值的 "Skin2D" 别名）
+    /// 2D 平面图 TypeA，默认值；兼容旧值的 "Skin2D" 别名
     #[default]
     #[serde(alias = "Skin2D")]
     Skin2DA,
-    /// 2D 大图（TypeB）
+    /// 2D 大图，TypeB
     Skin2DB,
-    /// 3D 等距模型，面朝上（仰视）
+    /// 3D 等距模型，面朝上，仰视
     Skin3D,
-    /// 3D 等距模型，面朝下（俯视）
+    /// 3D 等距模型，面朝下，俯视
     Skin3DD,
 }
 
-/// 头像类型（serde 按变体名序列化，与前端同名）
+/// 头像类型；serde 按变体名序列化，与前端同名
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum HeadType {
-    /// 2D 平面头像（默认）
+    /// 2D 平面头像，默认
     #[default]
     Head2DA,
-    /// 3D 头像，面朝下（俯视）
+    /// 3D 头像，面朝下，俯视
     Head3DA,
     /// 3D 头像，按 X / Y 旋转
     Head3DB,
-    /// 3D 头像，面朝上（仰视）
+    /// 3D 头像，面朝上，仰视
     Head3DC,
     /// 2D 大头像
     Head2DB,
 }
 
-/// 头像设置
+/// 头像渲染设置，账户列表与设置页预览共用
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct HeadConfig {
-    /// 头像类型：Head2DA / Head3DA / Head3DB / Head2DB
+    /// 头像类型：Head2DA / Head2DB / Head3DA / Head3DB / Head3DC
     pub head_type: HeadType,
-    /// 3D 旋转 X
+    /// 3D 头像绕 X 轴旋转角度，单位度；只有 Head3DB 用
     pub x: f32,
-    /// 3D 旋转 Y
+    /// 3D 头像绕 Y 轴旋转角度，单位度；只有 Head3DB 用
     pub y: f32,
 }
 
 impl Default for HeadConfig {
+    /// 默认 2D 平面头像，旋转角 X 15 度 / Y 65 度
     fn default() -> Self {
         Self {
             head_type: HeadType::default(),
@@ -115,7 +116,7 @@ impl Default for HeadConfig {
     }
 }
 
-/// 主窗口配置（字段名即 wire 名，与前端同名）
+/// 主窗口配置；字段名即 wire 名，与前端同名
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct MainWindowConfig {
@@ -123,19 +124,20 @@ pub struct MainWindowConfig {
     pub sidebar_side: SidebarSide,
     /// 侧栏是否收起
     pub sidebar_collapsed: bool,
-    /// 实例列表显示模式：list（默认）/ group / grid
+    /// 实例列表显示模式：list / group / grid，默认 list
     pub view_mode: ViewMode,
-    /// 当前选中实例 uuid（空串 = 未选中）
+    /// 当前选中实例 uuid；空串表示未选中
     pub selected_instance: String,
 }
 
 impl Default for MainWindowConfig {
+    /// 默认：侧栏在左且收起、列表模式、未选中实例
     fn default() -> Self {
         Self {
             sidebar_side: Default::default(),
-            // 默认收起侧栏（首次启动 / 无配置时）
+            // 首次启动或没有配置时默认收起侧栏
             sidebar_collapsed: true,
-            // 默认列表模式（用户改过后用用户的值）
+            // 默认列表模式，用户改过后用用户的值
             view_mode: ViewMode::default(),
             // 默认未选中
             selected_instance: String::new(),
@@ -158,6 +160,7 @@ pub struct CollectConfig {
 }
 
 impl Default for CollectConfig {
+    /// 默认：四类资源都显示
     fn default() -> Self {
         Self {
             modpack: true,
@@ -172,22 +175,31 @@ impl Default for CollectConfig {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct LoginLockObj {
-    /// 账户添加类型（offline / microsoft / littleskin / selflittleskin / authlib / nide8）
+    /// 账户添加类型：offline / microsoft / littleskin / selflittleskin / authlib / nide8
     pub ty: String,
-    /// 登录模型名字（添加账户时下拉里的显示名；空 = 用类型名 / 服务器地址显示）
+    /// 登录模型名字，即添加账户时下拉里的显示名；空串表示用类型名或服务器地址显示
     pub name: String,
-    /// 锁定的服务器（authlib = 认证服务器地址，nide8 = 服务器 ID，空 = 不指定）
+    /// 锁定的服务器：authlib 填认证服务器地址，nide8 填服务器 ID，空串表示不指定
     pub server: String,
 }
 
-/// 旧版兼容：锁定列表曾是纯字符串数组（无服务器信息）
+/// 旧版兼容：锁定列表曾是纯字符串数组，没有服务器信息
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum LoginLockRaw {
+    /// 新格式：完整对象
     Obj(LoginLockObj),
+    /// 旧格式：只有类型名的字符串
     Str(String),
 }
 
+/// 反序列化登录方式锁定列表，兼容旧的纯字符串数组
+///
+/// - `d`: serde 反序列化器
+///
+/// # 返回值
+///
+/// 统一成 [`LoginLockObj`] 列表；旧格式只有类型名，名字与服务器留空
 fn de_login_lock<'de, D>(d: D) -> Result<Vec<LoginLockObj>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -206,32 +218,33 @@ where
         .collect())
 }
 
-/// 客户端设置（主窗口 MOTD 卡片 / 登录方式限制）
+/// 客户端设置：主窗口 MOTD 卡片与登录方式限制
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct ClientConfig {
     /// 主窗口实例设置里显示 MOTD 卡片
     pub motd_card: bool,
-    /// MOTD 卡片刷新间隔（秒）
+    /// MOTD 卡片刷新间隔，单位秒
     pub motd_interval: u32,
-    /// 登录方式锁定总开关（false = 锁定列表不生效，任何类型都可添加）
+    /// 登录方式锁定总开关；false 时锁定列表不生效，任何类型都可添加
     pub login_lock_on: bool,
-    /// 登录方式锁定列表（空 = 不锁定，可添加多个条目）
+    /// 登录方式锁定列表；空表表示不锁定，可添加多个条目
     #[serde(deserialize_with = "de_login_lock")]
     pub login_lock: Vec<LoginLockObj>,
-    /// 游戏自动进服（启动时自动进入 `auto_join_server`）
+    /// 游戏自动进服，启动时自动进入 `auto_join_server`
     pub auto_join: bool,
-    /// 游戏自动进服地址（host 或 host:port，空 = 不自动进服）
+    /// 游戏自动进服地址，host 或 host:port；空串表示不自动进服
     pub auto_join_server: String,
-    /// MOTD 显示地址（host 或 host:port，空 = 不显示真实服务器信息）
+    /// MOTD 显示地址，host 或 host:port；空串表示不显示真实服务器信息
     pub motd_server: String,
-    /// 实例锁定：锁定的实例 uuid（空 = 未锁定）；锁定时主窗口不允许切换到其它实例
+    /// 实例锁定：锁定的实例 uuid，空串表示未锁定；锁定时主窗口不允许切换到其它实例
     pub lock_instance: String,
     /// 自定义主页面：启用后主窗口的启动器主页换成 base_dir/custom_home 里的 index.html
     pub custom_home: bool,
 }
 
 impl Default for ClientConfig {
+    /// 默认：不开 MOTD 卡片、不锁登录方式、不自动进服、不启用自定义主页面
     fn default() -> Self {
         Self {
             motd_card: false,
@@ -247,13 +260,13 @@ impl Default for ClientConfig {
     }
 }
 
-/// 界面设置
+/// 界面设置，跨窗口共用的那份界面状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct GuiConfig {
-    /// 主题：Dark / Light
+    /// 主题：System / Light / Dark
     pub theme: Theme,
-    /// 语言：zh_cn / en_us（core Lang）
+    /// 语言，取值是内核的 Lang：zh_cn / en_us
     pub locale: Lang,
     /// 窗口模式：Multi / Single
     pub window_mode: WindowMode,
@@ -265,21 +278,22 @@ pub struct GuiConfig {
     pub collect: CollectConfig,
     /// 客户端设置
     pub client: ClientConfig,
-    /// 界面字体族名（空串 = 默认字体栈）
+    /// 界面字体族名；空串表示用默认字体栈
     pub font: String,
-    /// 皮肤显示模式：Skin2D / Skin3D
+    /// 皮肤显示模式：Skin2DA / Skin2DB / Skin3D / Skin3DD
     pub skin_display: SkinDisplay,
-    /// 背景图来源（文件路径 / 网址，空串 = 无背景图）
+    /// 背景图来源：文件路径或网址，空串表示无背景图
     pub bg_source: String,
-    /// 背景图不透明度（%，5–100）
+    /// 背景图不透明度，单位百分比，取值 5 到 100
     pub bg_opacity: u32,
-    /// 背景图模糊（px，0–40）
+    /// 背景图模糊半径，单位像素，取值 0 到 40
     pub bg_blur: u32,
-    /// 背景图原始分辨率（%，10–100，后端按此把源图缩放后落盘）
+    /// 背景图原始分辨率，单位百分比，取值 10 到 100；后端按此把源图缩放后落盘
     pub bg_native_size: u32,
 }
 
 impl Default for GuiConfig {
+    /// 默认：跟随系统主题、简体中文、多窗口、无背景图
     fn default() -> Self {
         Self {
             theme: Default::default(),
@@ -299,18 +313,16 @@ impl Default for GuiConfig {
     }
 }
 
-/// 配置文件路径（init 时设置）
+/// 配置文件路径，init 时设置
 static FILE: OnceLock<PathBuf> = OnceLock::new();
-/// 内存配置缓存（init 时设置）
+/// 内存配置缓存，init 时设置
 static CONFIG: OnceLock<Arc<RwLock<GuiConfig>>> = OnceLock::new();
-/// 启动时没有配置文件（用户还没做过任何显式设置，默认值应跟随系统主题）
+/// 启动时没有配置文件，说明用户还没做过任何显式设置，默认主题应跟随系统
 static FRESH_CONFIG: AtomicBool = AtomicBool::new(false);
 
-/// 读取配置（启动时调用）
+/// 读取配置，启动时调用
 ///
-/// # 参数
-///
-/// - `path`: 运行路径（配置文件放在其下）
+/// - `path`: 运行路径，配置文件放它下面
 pub fn init<P: AsRef<Path>>(path: P) {
     let file = FILE.get_or_init(|| path.as_ref().join(names::GUI_CONFIG_FILE));
 
@@ -326,7 +338,7 @@ pub fn init<P: AsRef<Path>>(path: P) {
     let _ = CONFIG.set(Arc::new(RwLock::new(config)));
 }
 
-/// 启动时是否没有配置文件（前端据此让默认主题跟随系统）
+/// 启动时是否没有配置文件，前端据此让默认主题跟随系统
 ///
 /// # 返回值
 ///
@@ -347,14 +359,16 @@ pub fn get() -> GuiConfig {
         .unwrap_or_default()
 }
 
-/// 配置目录（背景图等派生文件放这里；未初始化返回 None）
+/// 配置目录，背景图等派生文件放这里
+///
+/// # 返回值
+///
+/// 配置所在目录；未初始化返回 `None`
 pub fn dir() -> Option<PathBuf> {
     FILE.get().and_then(|p| p.parent()).map(Path::to_path_buf)
 }
 
 /// 更新配置并保存
-///
-/// # 参数
 ///
 /// - `config`: 新配置
 pub fn set(config: GuiConfig) {
@@ -366,7 +380,7 @@ pub fn set(config: GuiConfig) {
     save();
 }
 
-/// 保存配置（异步写入 gui_config.json；未初始化时忽略）
+/// 保存配置，异步写入 gui_config.json；未初始化时忽略
 pub fn save() {
     let Some(file) = FILE.get() else {
         return;

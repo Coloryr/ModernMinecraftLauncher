@@ -321,11 +321,6 @@
   min-height: 52px;
 }
 
-/* 列表模式的启动按钮：同样固定高度 */
-.list-launch-btn {
-  min-height: 46px;
-}
-
 /* 服务器 MOTD 悬浮卡片的**摆位**（启动器下方居中）。
    卡片本身的外观与内容（图标 / 彩色分段 / 人数-版本-延迟 / 刷新按钮）在
    components/MotdCard.vue —— 这里只负责把它钉在哪儿 */
@@ -712,10 +707,105 @@
   text-align: center;
 }
 
+/* 列表模式的启动区：启动按钮一行，下面一行三个次级小按钮。
+   两块宽度**不同**：启动按钮不额外定宽、就按文案取宽（同改动前，lg 内边距撑开），
+   下面那行按三个按钮的文案取宽（中文约 330px）；整块居中，不撑满内容区 */
 .launch-actions {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
   align-items: center;
+  gap: 10px;
+}
+
+/* 列表模式的启动按钮：高度沿用原来的口径（46px 最小高），宽度 230px（比下面那行窄）。
+   颜色全部取自主题变量（18 套主题都跟着走）；
+   动效（渐变流动 / 呼吸光晕 / 高光扫过）**只在悬停时**出现，平时完全静态 */
+.launch-actions .launch-main-btn {
+  position: relative;
+  /* 高光扫过要裁掉溢出的那截；呼吸光晕走 box-shadow，不受裁切影响 */
+  overflow: hidden;
+  min-height: 46px;
+  width: 230px;
+  /* 重写一遍背景：--accent-grad 拉宽到 220% 才有横向「流动」的位移空间。
+     不靠顺序、靠这条选择器的高优先级压住 BaseButton 的 .v-primary */
+  background: var(--accent-grad);
+  background-size: 220% 100%;
+  /* 停在流动动画的起点（0%），悬停进来不会先跳一下 */
+  background-position: 0% 50%;
+  /* 静态阴影取呼吸动画 0% 那一帧，悬停进出都不闪 */
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* 悬停才跑 ① 渐变流动 + ② 呼吸光晕（:not(:disabled)：运行中不给动效） */
+.launch-actions .launch-main-btn:hover:not(:disabled) {
+  animation:
+    launch-flow 6s ease-in-out infinite,
+    launch-breath 3.2s ease-in-out infinite;
+}
+
+/* ① 渐变缓慢来回流动 */
+@keyframes launch-flow {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* ② 呼吸光晕：强调色阴影轻轻起伏 */
+@keyframes launch-breath {
+  0%,
+  100% {
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+  50% {
+    box-shadow: 0 6px 24px color-mix(in srgb, var(--accent) 48%, transparent);
+  }
+}
+
+/* ③ 高光：一条斜向白色亮带，悬停时从左扫到右（扫一次就停） */
+.launch-actions .launch-main-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 32%, rgba(255, 255, 255, 0.32) 50%, transparent 68%);
+  transform: translateX(-130%);
+}
+
+.launch-actions .launch-main-btn:hover:not(:disabled)::after {
+  animation: launch-shine 0.75s ease-out;
+}
+
+@keyframes launch-shine {
+  from {
+    transform: translateX(-130%);
+  }
+  to {
+    transform: translateX(130%);
+  }
+}
+
+/* 系统开了「减弱动效」：悬停也不动 */
+@media (prefers-reduced-motion: reduce) {
+  .launch-actions .launch-main-btn:hover:not(:disabled),
+  .launch-actions .launch-main-btn:hover:not(:disabled)::after {
+    animation: none;
+  }
+}
+
+/* 次级操作（设置 / 日志 / 资源管理）：一行，各自按文案取宽；
+   min-width 让「日志」这种短文案不至于比旁边窄一截（中文下三个因此等宽） */
+.launch-sub-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.launch-sub-actions :deep(.ui-btn) {
+  min-width: 120px;
+  height: 30px;
 }
 
 /* ================= 多选模式 ================= */
@@ -782,44 +872,9 @@
 
 /* 右键菜单样式见 MainCtxMenu.vue */
 
-/* ================= 拖拽整合包文件遮罩层 ================= */
+/* ================= 拖拽文件遮罩层 ================= */
 
-.file-drop-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 300;
-  background: var(--overlay);
-  backdrop-filter: blur(2px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* 事件穿透到 window 级拖拽处理器 */
-  pointer-events: none;
-}
-
-.file-drop-box {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 44px 64px;
-  border: 2px dashed var(--accent);
-  border-radius: 20px;
-  background: var(--bg-card);
-  color: var(--accent);
-  box-shadow: var(--shadow-lg);
-}
-
-.file-drop-box h2 {
-  font-size: 19px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.file-drop-box p {
-  font-size: 13px;
-  color: var(--text-dim);
-}
+/* 外观在 components/ui/DropOverlay.vue（四个落点共用同一个组件），这里不再定义 */
 
 /* 启动按钮加载态：与 ▶ 字号保持一致，避免按钮高度跳动 */
 .btn-spinner {

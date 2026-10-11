@@ -1,8 +1,8 @@
-//! 26.3 物品创造分组表（生成脚本从 CreativeModeTabs.class 反编译源一次性提取，
-//! 26.3增量更新，提交后可手工维护）。每行：物品ID、itemGroup lang键尾段。
-//! 同一物品出现在多个分组时取靠前的（创造栏里它在两个分组都出现）。
+//! 26.3 物品创造分组表：生成脚本从 CreativeModeTabs.class 反编译源一次性提取，
+//! 26.3增量更新，提交后可手工维护。每行：物品ID、itemGroup lang键尾段。
+//! 同一物品出现在多个分组时取靠前的，创造栏里它在两个分组都出现。
 
-/// (物品ID, 创造分组)
+/// 每项：物品ID、创造分组
 pub const ITEM_ICONS: &[(&str, &str)] = &[
     ("acacia_boat", "tools"),
     ("acacia_chest_boat", "tools"),
@@ -810,9 +810,9 @@ pub const ITEM_ICONS: &[(&str, &str)] = &[
     ("zombie_head", "functional"),
 ];
 
-/// 物品的创造分组（itemGroup lang键尾段），不在任何分组的物品返回None
+/// 物品的创造分组，即itemGroup lang键尾段；不在任何分组的物品返回None
 ///
-/// - `id`: 物品ID（不带命名空间）
+/// - `id`: 物品ID，不带命名空间
 pub(crate) fn item_cat(id: &str) -> Option<&'static str> {
     ITEM_ICONS
         .iter()

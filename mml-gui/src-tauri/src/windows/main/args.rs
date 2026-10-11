@@ -1,6 +1,6 @@
 //! 主窗口的实例启动参数：核心配置 ↔ 前端 DTO 的双向转换
 //!
-//! 从 `main.rs` 拆出来的（那边只剩命令与窗口模型）。这里的字段是一对一搬运，
+//! 从 `main.rs` 拆出来的，那边只剩命令与窗口模型。这里的字段是一对一搬运，
 //! 但要对着 `InstanceSettingObj` 看语义，单独放一处免得埋在命令堆里。
 
 use crate::dtos::{EnvVarLineDto, InstanceArgsDto};
@@ -12,6 +12,12 @@ use mml_game::launcher::instance_setting_obj::{
 use uuid::Uuid;
 
 /// 解析核心实例配置 -> 前端启动参数 DTO
+///
+/// - `inst`: 核心实例配置，各字段都是 `Option`，缺省项保留 DTO 的默认值
+///
+/// # 返回值
+///
+/// 前端启动参数 DTO；核心侧缺省的内存 / 全屏等沿用 `InstanceArgsDto` 默认值
 pub(super) fn args_from_core(inst: &InstanceSettingObj) -> InstanceArgsDto {
     let mut a = InstanceArgsDto::default();
     if let Some(jvm) = &inst.jvm_arg {
@@ -96,7 +102,10 @@ pub(super) fn args_from_core(inst: &InstanceSettingObj) -> InstanceArgsDto {
     a
 }
 
-/// 前端启动参数 DTO -> 写入核心实例配置（不保存，由调用方 save）
+/// 前端启动参数 DTO -> 写入核心实例配置，不保存，由调用方 save
+///
+/// - `inst`: 待写入的核心实例配置，缺失的子对象就地创建
+/// - `a`: 前端提交的启动参数
 pub(super) fn apply_args_to_core(inst: &mut InstanceSettingObj, a: &InstanceArgsDto) {
     let jvm = inst.jvm_arg.get_or_insert_with(RunArgObj::default);
     jvm.max_memory = Some(a.memory.max(0) as u32);
@@ -150,7 +159,13 @@ pub(super) fn apply_args_to_core(inst: &mut InstanceSettingObj, a: &InstanceArgs
     server.port = (a.server_port > 0).then_some(a.server_port as u16);
 }
 
-/// 取核心实例（uuid 解析 + 存在性检查）
+/// 取核心实例，含 uuid 解析与存在性检查
+///
+/// - `uuid`: 实例 uuid 字符串，可能非法
+///
+/// # 返回值
+///
+/// 命中时返回该实例的 uuid 与句柄；uuid 非法或实例不存在返回 `None`
 pub(crate) fn core_instance(uuid: &str) -> Option<(Uuid, GameInstance)> {
     Uuid::parse_str(uuid)
         .ok()

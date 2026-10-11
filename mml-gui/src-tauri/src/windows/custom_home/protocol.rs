@@ -1,7 +1,7 @@
 //! `mml-home` 自定义协议：把用户导入的整包网页资源当站点伺服
 //!
 //! 从 `custom_home/mod.rs` 拆出来的。路径一律按"ZIP 内相对路径"处理，
-//! **必须先过 [`is_safe_rel`]**（拒绝 `..`、绝对路径、盘符），否则自定义主页就成了
+//! **必须先过 [`is_safe_rel`]**，它会拒绝 `..`、绝对路径与盘符，否则自定义主页就成了
 //! 任意文件读取入口 —— 这是本模块最要紧的不变量。`url_custom_home` 由 `lib.rs`
 //! 注册为协议处理器，按原路径再导出。
 
@@ -12,21 +12,29 @@ use tauri::http::{Request, Response, StatusCode};
 
 use super::archive::{HomeArchive, INDEX_FILE, open_handle};
 
-/// 持久压缩包名（运行根目录下）；前缀统一，改名时两处一起改
+/// 持久压缩包名，在运行根目录下；前缀统一，改名时两处一起改
 pub(crate) const ZIP_PREFIX: &str = "custom_home";
 
-/// 桥接脚本的请求路径（内置资源，zip 里的同名文件不生效）
+/// 桥接脚本的请求路径；内置资源，zip 里的同名文件不生效
 pub(super) const BRIDGE_PATH: &str = "/__mml_bridge.js";
 
-/// 桥接脚本本体（独立 js 文件放 `src-tauri/resources/`，别塞成 Rust 字符串字面量）
-/// - `include_str!` 编译期嵌入二进制：运行时不需要分发这个文件，
-///   因此**不要**把它加进 tauri.conf.json 的 `bundle.resources`（那会多打一份没人读的副本）
+/// 桥接脚本本体，独立 js 文件放 `src-tauri/resources/`，别塞成 Rust 字符串字面量
+///
+/// `include_str!` 在编译期嵌入二进制，运行时不需要分发这个文件，因此**不要**把它
+/// 加进 tauri.conf.json 的 `bundle.resources`，那会多打一份没人读的副本。
 pub(super) const BRIDGE_JS: &str = include_str!("../../../resources/custom_home_bridge.js");
 
 /// 注入到 HTML 里的桥接脚本标签
 pub(super) const BRIDGE_TAG: &str = "<script src=\"/__mml_bridge.js\"></script>";
 
-/// 以 200 响应（带 CORS 头：iframe 是 opaque origin，取子资源要过 CORS）
+/// 以 200 响应，并带上 CORS 头
+///
+/// iframe 是 opaque origin，取子资源要过 CORS，所以响应必须带
+/// `Access-Control-Allow-Origin`。
+///
+/// - `res`: 协议响应器
+/// - `data`: 响应体字节
+/// - `mime`: 响应体的 Content-Type
 pub(super) fn send_ok(res: UriSchemeResponder, data: Vec<u8>, mime: &str) {
     res.respond(
         Response::builder()
@@ -38,7 +46,9 @@ pub(super) fn send_ok(res: UriSchemeResponder, data: Vec<u8>, mime: &str) {
     );
 }
 
-/// 以 404 响应（未导入 / 文件不存在 / 路径越界）
+/// 以 404 响应，用于未导入、文件不存在或路径越界
+///
+/// - `res`: 协议响应器
 pub(super) fn send_not_found(res: UriSchemeResponder) {
     res.respond(
         Response::builder()
@@ -50,6 +60,12 @@ pub(super) fn send_not_found(res: UriSchemeResponder) {
 }
 
 /// 十六进制半字节
+///
+/// - `b`: 单个 ASCII 字符
+///
+/// # 返回值
+///
+/// `0-9` / `a-f` / `A-F` 对应的数值；其余字符返回 `None`
 pub(super) fn hex_val(b: u8) -> Option<u8> {
     match b {
         b'0'..=b'9' => Some(b - b'0'),
@@ -59,10 +75,16 @@ pub(super) fn hex_val(b: u8) -> Option<u8> {
     }
 }
 
-/// 百分号解码（`%XX`）
+/// 百分号解码，把 `%XX` 还原成字节
 ///
-/// 非法转义（如真实文件名里的 `100%.png`）原样保留，交给后面的安全检查处理；
-/// 但 `%2e%2e` 这类编码穿越会在解码后被下面的 `..` 检查挡掉。
+/// 非法转义原样保留，比如真实文件名里的 `100%.png`，交给后面的安全检查处理；
+/// 而 `%2e%2e` 这类编码穿越会在解码后被 `..` 检查挡掉。
+///
+/// - `s`: 待解码的字符串
+///
+/// # 返回值
+///
+/// 解码后的字符串，非 UTF-8 字节按替换符处理
 pub(super) fn percent_decode(s: &str) -> String {
     let bytes = s.as_bytes();
     let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
@@ -84,7 +106,14 @@ pub(super) fn percent_decode(s: &str) -> String {
 
 /// 请求的相对路径是否安全
 ///
-/// 拒绝反斜杠（Windows 分隔符）、`:`（盘符 / 协议）、NUL，以及任何 `..` 段。
+/// 拒绝反斜杠、`:` 与 NUL，以及任何 `..` 段；反斜杠在 Windows 上是路径分隔符，
+/// `:` 可能是盘符或协议。
+///
+/// - `rel`: 待检查的相对路径
+///
+/// # 返回值
+///
+/// 安全返回 `true`，命中任一条拒绝规则返回 `false`
 pub(super) fn is_safe_rel(rel: &str) -> bool {
     if rel.contains('\\') || rel.contains(':') || rel.contains('\0') {
         return false;
@@ -92,13 +121,20 @@ pub(super) fn is_safe_rel(rel: &str) -> bool {
     !rel.split('/').any(|seg| seg == "..")
 }
 
-/// 请求路径 → 包内条目名（未导入 / 越界 / 不存在一律 `None`）
+/// 请求路径 → 包内条目名
 ///
-/// 路径穿越防护（本次唯一强制安全项）：
-/// 1. 原始串与百分号解码后都要过 [`is_safe_rel`]（挡 `..` / `\` / `:`）；
-/// 2. 只接受**规范化后能精确命中包内条目**的结果（[`HomeArchive::entry_name`] 是精确匹配，
-///    不是前缀拼接），所以不存在「拼出包外路径」的可能；
+/// 路径穿越防护，本次唯一强制安全项：
+/// 1. 原始串与百分号解码后都要过 [`is_safe_rel`]，挡掉 `..` / `\` / `:`；
+/// 2. 只接受**规范化后能精确命中包内条目**的结果，[`HomeArchive::entry_name`] 是精确匹配
+///    而不是前缀拼接，所以不存在拼出包外路径的可能；
 /// 3. 入口页允许两种布局：包根 `index.html`，或整包套一层目录时的 `<目录>/index.html`。
+///
+/// - `archive`: 常驻的整包句柄
+/// - `raw_path`: 请求 URI 里的路径部分
+///
+/// # 返回值
+///
+/// 包内原始条目名；未导入、越界或不存在时返回 `None`
 pub(super) fn resolve_entry<'a>(archive: &'a HomeArchive, raw_path: &str) -> Option<&'a str> {
     let rel = if raw_path.is_empty() || raw_path == "/" {
         INDEX_FILE.to_string()
@@ -124,7 +160,7 @@ pub(super) fn resolve_entry<'a>(archive: &'a HomeArchive, raw_path: &str) -> Opt
     if let Some(found) = archive.entry_name(&name) {
         return Some(found);
     }
-    // 整包套一层目录：把唯一顶层目录名的前缀试一遍（只在根请求时兜底，避免多花开销）
+    // 整包套一层目录：把唯一顶层目录名的前缀试一遍；只在根请求时兜底，避免每次都花这份开销
     if name == INDEX_FILE
         && let Some(dir) = archive.single_top_dir()
     {
@@ -134,7 +170,13 @@ pub(super) fn resolve_entry<'a>(archive: &'a HomeArchive, raw_path: &str) -> Opt
     None
 }
 
-/// 按扩展名给 MIME（未知扩展名一律 `application/octet-stream`）
+/// 按扩展名给 MIME
+///
+/// - `name`: 包内条目名
+///
+/// # 返回值
+///
+/// 对应的 MIME；未知扩展名一律 `application/octet-stream`
 pub(super) fn mime_of(name: &str) -> &'static str {
     match Path::new(name)
         .extension()
@@ -161,7 +203,14 @@ pub(super) fn mime_of(name: &str) -> &'static str {
     }
 }
 
-/// 大小写不敏感地找 ASCII 子串（`</head>` / `</HEAD>` 都要命中）
+/// 大小写不敏感地找 ASCII 子串
+///
+/// - `hay`: 被查找的文本
+/// - `needle`: 要查找的子串
+///
+/// # 返回值
+///
+/// 子串首个匹配位置的字节下标；没找到返回 `None`
 pub(super) fn find_ignore_ascii_case(hay: &str, needle: &str) -> Option<usize> {
     let (h, n) = (hay.as_bytes(), needle.as_bytes());
     if n.is_empty() || h.len() < n.len() {
@@ -172,7 +221,13 @@ pub(super) fn find_ignore_ascii_case(hay: &str, needle: &str) -> Option<usize> {
 
 /// 在 HTML 的 `</head>` 之前插入桥接脚本；没有 `</head>` 就插在最前面
 ///
-/// 响应体不是合法 UTF-8 时原样返回（页面仍能显示，只是拿不到 `window.mml`）。
+/// 响应体不是合法 UTF-8 时原样返回，页面仍能显示，只是拿不到 `window.mml`。
+///
+/// - `data`: HTML 响应体字节
+///
+/// # 返回值
+///
+/// 注入脚本后的响应体字节
 pub(super) fn inject_bridge(data: Vec<u8>) -> Vec<u8> {
     let text = match String::from_utf8(data) {
         Ok(text) => text,
@@ -195,10 +250,13 @@ pub(super) fn inject_bridge(data: Vec<u8>) -> Vec<u8> {
 
 /// `mml-home` 协议入口：从常驻的压缩包里按条目读取，按 MIME 返回
 ///
-/// - `/` 或空路径 → `index.html`（含「整包套一层目录」的兜底）
-/// - `/__mml_bridge.js` 是内置资源，直接返回桥接脚本（不在包里）
-/// - query string（`?v=...` 只是破缓存）与 fragment 由 `uri().path()` 天然滤掉
-/// - 全程不落盘：内容是 [`BaseArchive::read`] 从 zip 条目现读出来的
+/// `/` 或空路径落到 `index.html`，含「整包套一层目录」的兜底；`/__mml_bridge.js`
+/// 是内置资源，直接返回桥接脚本，不在包里；query string 与 fragment 由
+/// `uri().path()` 天然滤掉，`?v=...` 只是破缓存；全程不落盘，内容是
+/// `BaseArchive::read` 从 zip 条目现读出来的。
+///
+/// - `req`: 协议请求
+/// - `res`: 协议响应器
 pub(crate) async fn url_custom_home(req: Request<Vec<u8>>, res: UriSchemeResponder) {
     let path = req.uri().path();
 

@@ -52,26 +52,27 @@ static SPAN_TIME_LIST: LazyLock<Mutex<HashMap<Uuid, TimeDelta>>> =
 static LAUNCH_DATA_MAP: LazyLock<Mutex<HashMap<Uuid, GameTimeObj>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-/// 统计数据
+/// 落盘到 COUNT_DATA_FILE 的统计总表
 #[derive(Clone, Debug)]
 pub struct CountObj {
-    /// 启动次数
+    /// 累计启动次数，含成功与失败
     pub launch_count: i64,
-    /// 启动完成次数
+    /// 启动成功次数
     pub launch_done_count: i64,
     /// 启动失败次数
     pub launch_error_count: i64,
-    /// 总游戏时长
+    /// 所有实例累计的游戏时长
     pub all_time: TimeDelta,
-    /// 游戏运行时间段
+    /// 每个实例的运行时间段，按 uuid 分组
     pub game_runs: HashMap<Uuid, Vec<GameTimeData>>,
-    /// 启动日志
+    /// 每个实例的启动记录，按 uuid 分组
     pub launch_logs: HashMap<Uuid, Vec<LaunchLogData>>,
-    /// 游戏实例名字
+    /// 实例名快照，按 uuid 分组；实例删掉后仍能显示名字
     pub game_names: HashMap<Uuid, String>,
 }
 
 impl Default for CountObj {
+    /// 全字段取默认值
     fn default() -> Self {
         Self {
             launch_count: 0,
@@ -85,31 +86,29 @@ impl Default for CountObj {
     }
 }
 
-/// 游戏运行时间段
+/// 一次游戏运行的时间段
 #[derive(Clone, Debug)]
 pub struct GameTimeData {
-    /// 是否正在运行
+    /// 是否仍在运行，关闭后置 `false`
     pub now: bool,
-    /// 开始时间
+    /// 开始时间，本地时区
     pub start_time: DateTime<Local>,
-    /// 结束时间
+    /// 结束时间，本地时区；仍在运行时等于开始时间
     pub stop_time: DateTime<Local>,
 }
 
-/// 启动日志
+/// 一条启动记录
 #[derive(Clone, Debug)]
 pub struct LaunchLogData {
-    /// 时间
+    /// 记录时间，本地时区
     pub time: DateTime<Local>,
-    /// 是否为错误日志
+    /// 是否为错误日志；当前与原版一致，失败也记 `false`
     pub error: bool,
 }
 
 /// 初始化游戏统计
 ///
-/// # 参数
-///
-/// - `dir`: 运行路径
+/// - `dir`: 运行路径，统计文件落在它下面
 pub fn init<P: AsRef<Path>>(dir: P) {
     let _ = COUNT_FILE.get_or_init(|| dir.as_ref().join(names::COUNT_DATA_FILE));
 
@@ -142,9 +141,7 @@ pub fn get_count() -> GameCountObj {
 
 /// 读取统计数据
 ///
-/// # 返回值
-///
-/// 成功返回 `Ok(())`；读取或解析失败返回对应错误（内部已记录日志）
+/// 文件不存在或解析失败时退回空统计，错误只记日志不向外抛。
 fn read() {
     let Some(file) = COUNT_FILE.get().cloned() else {
         return;
@@ -262,7 +259,7 @@ fn read() {
     save();
 }
 
-/// 统计线程
+/// 统计线程主体：每 100 毫秒累加一次运行中实例的时长
 fn run() {
     let mut a: u32 = 0;
     while IS_RUN.load(Ordering::Relaxed) {
@@ -302,7 +299,7 @@ fn run() {
                 count.all_time += span;
             }
 
-            // 每 10 次统计（约 1 秒）保存一次启动数据
+            // 每 10 次统计约 1 秒，保存一次启动数据
             if should_save {
                 let data = {
                     let data_list = LAUNCH_DATA_MAP.lock().unwrap();
@@ -329,7 +326,7 @@ pub fn save_async() {
     tokio::task::spawn_blocking(save);
 }
 
-/// 保存统计数据
+/// 保存统计数据到 COUNT_DATA_FILE，重入时直接返回
 fn save() {
     if IS_SAVE.swap(true, Ordering::SeqCst) {
         return;
@@ -436,8 +433,6 @@ fn save() {
 
 /// 游戏实例启动完毕
 ///
-/// # 参数
-///
 /// - `uuid`: 游戏实例标识
 pub fn launch_done(uuid: &Uuid) {
     let now = Local::now();
@@ -480,8 +475,6 @@ pub fn launch_done(uuid: &Uuid) {
 
 /// 启动失败
 ///
-/// # 参数
-///
 /// - `uuid`: 游戏实例标识
 pub fn launch_error(uuid: &Uuid) {
     let now = Local::now();
@@ -502,8 +495,6 @@ pub fn launch_error(uuid: &Uuid) {
 }
 
 /// 游戏实例关闭
-///
-/// # 参数
 ///
 /// - `uuid`: 游戏实例标识
 pub fn game_close(uuid: &Uuid) {
@@ -558,9 +549,7 @@ fn copy_game_time(data: &GameTimeObj) -> GameTimeObj {
 
 /// 将 .NET 刻度数转换为本地时间
 ///
-/// # 参数
-///
-/// - `ticks`: .NET 刻度数（100 纳秒为单位）
+/// - `ticks`: .NET 刻度数，单位 100 纳秒
 ///
 /// # 返回值
 ///
@@ -579,35 +568,29 @@ fn ticks_to_date(ticks: i64) -> DateTime<Local> {
 
 /// 将本地时间转换为 .NET 刻度数
 ///
-/// # 参数
-///
 /// - `date`: 本地时间
 ///
 /// # 返回值
 ///
-/// 返回 .NET 刻度数（100 纳秒为单位）
+/// 返回 .NET 刻度数，单位 100 纳秒
 fn date_to_ticks(date: DateTime<Local>) -> i64 {
     (date.timestamp() + 62135596800) * 10_000_000 + date.timestamp_subsec_nanos() as i64 / 100
 }
 
 /// 将时长转换为 .NET 刻度数
 ///
-/// # 参数
-///
 /// - `duration`: 时长
 ///
 /// # 返回值
 ///
-/// 返回 .NET 刻度数（100 纳秒为单位）
+/// 返回 .NET 刻度数，单位 100 纳秒
 fn duration_to_ticks(duration: TimeDelta) -> i64 {
     duration.num_seconds().saturating_mul(10_000_000) + (duration.subsec_nanos() as i64) / 100
 }
 
 /// 将 .NET 刻度数转换为时长
 ///
-/// # 参数
-///
-/// - `ticks`: .NET 刻度数（100 纳秒为单位）
+/// - `ticks`: .NET 刻度数，单位 100 纳秒
 ///
 /// # 返回值
 ///

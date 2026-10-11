@@ -1,7 +1,7 @@
-//! 其他启动器导出包的安装测试（离线，程序化构造假包）：
-//! HMCL（mcbbs.packmeta）、HMCL 服务器包（server-manifest.json）、
-//! MMC / Prism（mmc-pack.json + instance.cfg）、game.json 直接解压包、
-//! 其他启动器（PCL 导出的 `.minecraft` 目录，版本隔离 / 非隔离两种布局）。
+//! 其他启动器导出包的安装测试，离线，程序化构造假包：
+//! HMCL 的 mcbbs.packmeta、HMCL 服务器包的 server-manifest.json、
+//! MMC / Prism 的 mmc-pack.json + instance.cfg、game.json 直接解压包、
+//! 其他启动器 PCL 导出的 `.minecraft` 目录，版本隔离 / 非隔离两种布局。
 //!
 //! 全部纯离线：这些包类型不经过 `check_update`，不需要网络。
 //! 全局初始化每进程一次，互斥锁串行各用例。
@@ -18,12 +18,12 @@ use uuid::Uuid;
 use zip::ZipWriter;
 use zip::write::SimpleFileOptions;
 
-/// 测试运行目录（系统临时目录 + 进程号，避免多进程冲突）
+/// 测试运行目录，mml_testutil 临时目录下的进程号子目录，避免多进程冲突
 fn run_dir() -> PathBuf {
     mml_testutil::temp_dir().join(format!("mml-launcher-packs-{}", std::process::id()))
 }
 
-/// 初始化链（与 mml_core::init 相同），每进程一次
+/// 初始化链与 mml_core::init 相同，每进程一次
 fn ensure_init() {
     static INIT: Once = Once::new();
     INIT.call_once(|| {
@@ -66,18 +66,21 @@ fn make_zip(dir: &PathBuf, stem: &str, files: &[(&str, &[u8])]) -> PathBuf {
     zip_path
 }
 
-/// 安装阶段记录器（供断言走完所有阶段）
+/// 安装阶段记录器，供断言走完所有阶段
 #[derive(Default, Clone)]
 struct StateRecorder {
+    /// 已走过的阶段 ID，按到达顺序追加
     states: Arc<Mutex<Vec<&'static str>>>,
 }
 
 impl StateRecorder {
+    /// 该阶段是否已经走到
     fn reached(&self, state: &str) -> bool {
         self.states.lock().unwrap().contains(&state)
     }
 }
 
+/// 把安装状态映射成前端使用的 ID
 fn state_id(state: &AddModPackState) -> &'static str {
     match state {
         AddModPackState::DownloadPack => "downloadPack",
@@ -101,7 +104,11 @@ impl IAddModPackGui for StateRecorder {
     fn set_sub_now(&self, _value: usize, _all: Option<usize>) {}
 }
 
-/// 通用安装入口（无界面回调，重名自动改名），返回 (实例 uuid, 阶段记录器)
+/// 通用安装入口：无界面回调，重名自动改名
+///
+/// # 返回值
+///
+/// 返回实例 uuid 与阶段记录器
 async fn install(zip: &PathBuf, name: Option<String>, pack_type: PackType) -> (Uuid, StateRecorder) {
     let recorder = StateRecorder::default();
     let uuid = add_game::install_archive_from_file(
@@ -125,7 +132,7 @@ fn assert_file(path: std::path::PathBuf, expected: &[u8], what: &str) {
     assert_eq!(std::fs::read(path).expect(what), expected, "{what}");
 }
 
-/// HMCL 导出包：`mcbbs.packmeta`（名字/版本/加载器）+ `manifest.json`（overrides 目录）。
+/// HMCL 导出包：`mcbbs.packmeta` 提供名字/版本/加载器，`manifest.json` 声明 overrides 目录。
 /// 文件在 `minecraft/` 下，解压后去掉该层放进实例基础目录。
 #[tokio::test]
 async fn install_hmcl_pack() {
@@ -228,8 +235,8 @@ async fn install_hmcl_server_pack() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// MMC / Prism 导出包：`mmc-pack.json`（components 声明版本与加载器）+
-/// `instance.cfg`（实例名），游戏文件在 `.minecraft/` 下落到实例基础目录。
+/// MMC / Prism 导出包：`mmc-pack.json` 的 components 声明版本与加载器，
+/// `instance.cfg` 提供实例名，游戏文件在 `.minecraft/` 下落到实例基础目录。
 #[tokio::test]
 async fn install_mmc_pack() {
     let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
@@ -329,7 +336,7 @@ async fn install_game_json_archive() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// PCL 等启动器导出的 `.minecraft` 目录（版本隔离布局）：
+/// PCL 等启动器导出的 `.minecraft` 目录，版本隔离布局：
 /// 版本 json 在 `versions/{name}/` 下且该目录有游戏资源，只导入版本文件夹内容。
 #[tokio::test]
 async fn install_launcher_pack_isolated() {
@@ -365,7 +372,7 @@ async fn install_launcher_pack_isolated() {
     let game = mml_game::get_instance(&uuid).expect("安装后应能取到实例");
     let read = game.read().unwrap();
     assert_eq!(read.name, "PCL导入");
-    // 版本号取版本文件夹名（不在版本清单里时回退 json 的 id）
+    // 版本号取版本文件夹名，不在版本清单里时回退 json 的 id
     assert_eq!(read.version, version_name);
 
     // 版本文件夹内的游戏资源导入游戏目录
@@ -385,7 +392,7 @@ async fn install_launcher_pack_isolated() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// 其他启动器导出的 `.minecraft` 目录（非隔离布局）：
+/// 其他启动器导出的 `.minecraft` 目录，非隔离布局：
 /// 版本 json 直接在 `.minecraft` 根下，整个 `.minecraft` 内容导入游戏目录。
 #[tokio::test]
 async fn install_launcher_pack_not_isolated() {

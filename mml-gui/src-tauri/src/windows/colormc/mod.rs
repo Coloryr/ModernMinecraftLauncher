@@ -1,30 +1,30 @@
-//! 从 ColorMC 迁移（首次启动问一次：复制 / 移动 / 不迁移）
+//! 从 ColorMC 迁移：首次启动问一次，复制 / 移动 / 不迁移
 //!
-//! **迁移本身是原样的文件夹搬运**：把 ColorMC 工作目录的顶层条目复制（或移动）到 M²L 的
+//! **迁移本身是原样的文件夹搬运**：把 ColorMC 工作目录的顶层条目复制或移动到 M²L 的
 //! 运行目录，不做字段级转换、不做合并。两边目录结构同构 —— `minecraft/{instances,assets,
-//! libraries,versions}`、`config.json`、`collect.json` 语义一致，所以实例搬过来 M²L 直接能用
-//! （两边实例都在 `minecraft/instances/<名>/game.json`）。
+//! libraries,versions}`、`config.json`、`collect.json` 语义一致，两边实例又都在
+//! `minecraft/instances/<名>/game.json`，所以实例搬过来 M²L 直接能用。
 //!
-//! 搬完再做一次**兼容性检测**（见 [`check`]）：哪些能直接用、哪些用起来有偏差、哪些 ColorMC
-//! 有而 M²L 读不懂。实例是不是"真的能用"用 **M²L 自己的解析器**判定（`game.json` →
-//! [`InstanceSettingObj`]）—— M²L 只认"目录里有能解析的 `game.json`"的实例，所以解析失败
+//! 搬完再做一次**兼容性检测**，见 [`check`]：哪些能直接用、哪些用起来有偏差、哪些 ColorMC
+//! 有而 M²L 读不懂。实例是不是"真的能用"用 **M²L 自己的解析器**判定，即 `game.json` →
+//! [`InstanceSettingObj`] —— M²L 只认"目录里有能解析的 `game.json`"的实例，所以解析失败
 //! 就等于"搬过来了也看不见"。
 //!
-//! 实例目录里那份 `guisetting.json`（ColorMC 的界面设置）**M²L 不读**：M²L 自己那份叫
-//! `gui_setting.json`（改名就是为了不撞它，理由见 `crate::gui_setting` 的文件头）。
+//! 实例目录里那份 `guisetting.json` 是 ColorMC 的界面设置，**M²L 不读**：M²L 自己那份叫
+//! `gui_setting.json`，改名就是为了不撞它，理由见 `crate::gui_setting` 的文件头。
 //! 于是 ColorMC 的模组分组 / 备注 / 日志设置不会迁移过来 —— 但**文件本身留着、不会被覆盖**，
 //! 弹窗里会把这件事说出来。
 //!
-//! 两条与用户约定好的口径（弹窗上也要写清楚）：
+//! 两条与用户约定好的口径，弹窗上也要写清楚：
 //! - **一律覆盖**：运行目录里同名的文件 / 目录直接被 ColorMC 的版本盖掉。Windows 的
 //!   `rename` 不覆盖已存在的目标，所以移动时先删掉目标条目；
-//! - **移动 = 重命名**：按顶层条目 `rename`，同盘瞬时完成；跨盘（`CrossesDevices`）回退成
+//! - **移动 = 重命名**：按顶层条目 `rename`，同盘瞬时完成；跨盘报 `CrossesDevices` 时回退成
 //!   "复制 + 删源"。**全部条目都搬完**才删空的源目录，任何一条失败都保留源目录。
 //!
-//! 单个文件失败（被别的进程占用、无权限）**不中断**整次迁移，记进报告的 `failed` 里 ——
+//! 单个文件失败**不中断**整次迁移，比如被别的进程占用、无权限，记进报告的 `failed` 里 ——
 //! 真实场景下 `logs.log` / `config.json` / `count.dat` 可能正被 ColorMC 或本进程打开。
 //!
-//! 首次启动的"问过了"状态存在运行目录下的 `colormc_migrate.json`（见 [`mark`]）：
+//! 首次启动的"问过了"状态存在运行目录下的 `colormc_migrate.json`，见 [`mark`]：
 //! 它表达的是"这个运行目录已经问过了"，删掉它就能重新触发询问。
 
 use std::path::PathBuf;
@@ -37,7 +37,6 @@ use mml_base::get_base_dir;
 use crate::dtos::{ColorMcInfoDto, ColorMcProgressDto, ColorMcReportDto};
 use crate::listens;
 
-/// 迁移是否正在进行（防重入：迁移期间再点一次不该并发跑第二遍）
 mod check;
 mod detect;
 mod migrate;
@@ -45,9 +44,13 @@ mod migrate;
 use self::detect::{asked, detect, info, mark};
 use self::migrate::migrate;
 
+/// 迁移是否正在进行，防重入：迁移期间再点一次不该并发跑第二遍
 pub(super) static MIGRATING: AtomicBool = AtomicBool::new(false);
 
-/// 迁移进度事件（`colormc-progress`）
+/// 迁移进度事件，即 `colormc-progress`
+///
+/// - `app`: 窗口句柄
+/// - `data`: 本次进度，含阶段 / 已完成数 / 总数 / 文字
 #[gui_macros::emit]
 pub fn emit_colormc_progress(app: &AppHandle, data: ColorMcProgressDto) {
     let _ = app.emit(listens::COLORMC_PROGRESS, data);
@@ -55,8 +58,14 @@ pub fn emit_colormc_progress(app: &AppHandle, data: ColorMcProgressDto) {
 
 /// 推一次进度
 ///
-/// `app` 为 `None` 时不推（测试里没有界面句柄）—— 进度是"有界面就报"的东西，
+/// `app` 为 `None` 时不推，测试里没有界面句柄 —— 进度是"有界面就报"的东西，
 /// 不该为了测试往引擎里塞一个假的 AppHandle，所以它一路是 `Option`。
+///
+/// - `app`: 窗口句柄，`None` 表示不推
+/// - `stage`: 阶段名，取 `scan` / `copy` / `move` / `check`
+/// - `done`: 已完成数
+/// - `total`: 总数，`0` 表示未知
+/// - `text`: 当前处理的条目相对路径
 fn progress(app: Option<&AppHandle>, stage: &str, done: u32, total: u32, text: &str) {
     let Some(app) = app else {
         return;
@@ -72,16 +81,21 @@ fn progress(app: Option<&AppHandle>, stage: &str, done: u32, total: u32, text: &
     );
 }
 
-/// 检查本机有没有可迁移的 ColorMC 数据（**问过了就返回 `None`**）
+/// 检查本机有没有可迁移的 ColorMC 数据；**问过了就返回 `None`**
 ///
 /// 主窗口启动后调一次；返回 `Some` 时前端弹"要不要把数据搬过来"的三选一弹窗。
+///
+/// # 返回值
+///
+/// 探测到的 ColorMC 工作目录信息，含路径 / 来源 / 实例数 / 顶层条目；
+/// 已经问过、没探测到、或探测结果就是运行目录时返回 `None`
 #[tauri::command]
 pub fn window_check_colormc() -> Option<ColorMcInfoDto> {
     if asked() {
         return None;
     }
     let (path, from) = detect()?;
-    // 探测结果就是运行目录（不该发生）：没什么可搬的，别弹窗
+    // 探测结果就是运行目录，不该发生：没什么可搬的，别弹窗
     if path == get_base_dir() {
         return None;
     }
@@ -93,6 +107,10 @@ pub fn window_check_colormc() -> Option<ColorMcInfoDto> {
 }
 
 /// 记下"不迁移"：以后不再问
+///
+/// # 返回值
+///
+/// 标记写成功返回 `Ok(())`；写标记失败返回 `Err`，内容为错误原文
 #[tauri::command]
 pub fn window_skip_colormc() -> Result<(), String> {
     mark("skip")?;
@@ -102,10 +120,16 @@ pub fn window_skip_colormc() -> Result<(), String> {
 
 /// 执行迁移并返回兼容性报告
 ///
-/// - `source`: ColorMC 工作目录（前端把 [`window_check_colormc`] 给的那份传回来）
-/// - `mode`: `"copy"` 复制（源目录保留）/ `"move"` 移动（源目录搬空后删除）
+/// - `app`: 窗口句柄，进度经它广播
+/// - `source`: ColorMC 工作目录，前端把 [`window_check_colormc`] 给的那份传回来
+/// - `mode`: 取 `"copy"` 表示复制、源目录保留，取 `"move"` 表示移动、源目录搬空后删除
 ///
-/// 跑在阻塞线程池上（可能搬几十 GB），期间用 `colormc-progress` 事件报进度。
+/// 跑在阻塞线程池上，可能搬几十 GB，期间用 `colormc-progress` 事件报进度。
+///
+/// # 返回值
+///
+/// 迁移与兼容性检测的报告，含搬入条目数 / 失败项 / 实例结论表；
+/// 模式非法、已有迁移在跑或迁移失败时返回 `Err`，内容为 i18n 键
 #[tauri::command]
 pub async fn window_migrate_colormc(
     app: AppHandle,
@@ -134,8 +158,8 @@ pub async fn window_migrate_colormc(
 
     match result {
         Ok(Ok(report)) => {
-            // 只在**迁移成功后**记"问过了"（写不上只记日志：数据已经搬完，
-            // 不该因为一个标记文件把整次迁移报成失败，顶多下次启动再问一遍）
+            // 只在**迁移成功后**记"问过了"；写不上只记日志：数据已经搬完，
+            // 不该因为一个标记文件把整次迁移报成失败，顶多下次启动再问一遍
             if let Err(err) = mark(if moved { "move" } else { "copy" }) {
                 mml_log::error(format!("colormc marker write failed: {err}"));
             }
@@ -155,14 +179,14 @@ mod tests {
     //! 迁移引擎的用例
     //!
     //! 数据两种：
-    //! - **真实样本** `tests/colormc/`（真 ColorMC 工作目录裁出来的一份，见那边的 README）——
+    //! - **真实样本** `tests/colormc/`，从真 ColorMC 工作目录裁出来的一份，见那边的 README ——
     //!   验"真实的 ColorMC 目录能被识别、里面的实例 M²L 读得出来、结论表覆盖齐全"；
-    //! - **临时小目录**：边界情况（覆盖同名文件、拒绝套娃路径、只有 auth.json 的目录）现场造。
+    //! - **临时小目录**：边界情况现场造，覆盖同名文件、拒绝套娃路径、只有 auth.json 的目录。
     //!
-    //! 全部在 `target/temp` 下操作（AGENTS.md §6），而且**只读**真实样本 —— 移动用例先把样本
+    //! 全部在 `target/temp` 下操作，见 AGENTS.md §6，而且**只读**真实样本 —— 移动用例先把样本
     //! 复制一份再搬，反复跑也不会把样本搬没。
 
-    // 单测要同时用到三个子模块的实现细节（原先是同一个文件里的 `use super::*`）
+    // 单测要同时用到三个子模块的实现细节，原先是同一个文件里的 `use super::*`
     use std::fs;
     use std::path::Path;
 
@@ -176,7 +200,7 @@ mod tests {
     use super::*;
     use crate::test_support::{cleanup, ensure_boot, temp_dir};
 
-    /// 真实样本目录（`mml-gui/src-tauri/tests/colormc`）
+    /// 真实样本目录 `mml-gui/src-tauri/tests/colormc`
     fn fixture() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests")
@@ -278,7 +302,7 @@ mod tests {
         assert_eq!(level_of(&checked, "count.dat"), "partial");
         assert_eq!(level_of(&checked, "logs.log"), "partial");
         assert_eq!(level_of(&checked, "java"), "partial");
-        // M²L 读不懂（留着不碍事）——包括表里没列到的
+        // M²L 读不懂，留着不碍事 —— 包括表里没列到的
         for name in [
             "download",
             "block",
@@ -322,7 +346,7 @@ mod tests {
             report.instances_bad
         );
 
-        // 实例里的文件真的搬过去了（不是只建了目录），而且还能被 M²L 解析
+        // 实例里的文件真的搬过去了，不是只建了目录，而且还能被 M²L 解析
         let game = dst
             .join(names::MINECRAFT_DIR)
             .join(names::INSTANCE_DIR)
@@ -336,7 +360,7 @@ mod tests {
 
     /// 移动：条目被重命名过去，搬空后源目录被删
     ///
-    /// **先复制再移动** —— 真实样本不能被搬走（用例要能反复跑）。
+    /// **先复制再移动** —— 真实样本不能被搬走，用例要能反复跑。
     #[test]
     fn move_renames_entries_and_removes_source() {
         ensure_boot();
@@ -367,7 +391,7 @@ mod tests {
         cleanup(&[&dst]);
     }
 
-    /// 复制时目标里的同名文件被覆盖（用户选的是"一律覆盖"）
+    /// 复制时目标里的同名文件被覆盖，用户选的是"一律覆盖"
     #[test]
     fn copy_overwrites_same_named_file() {
         ensure_boot();
@@ -417,9 +441,9 @@ mod tests {
         cleanup(&[&src, &dst, &empty]);
     }
 
-    /// 探测判据：只有 `auth.json` 的目录（`%LOCALAPPDATA%\ColorMC` 那种）**不算**工作目录
+    /// 探测判据：只有 `auth.json` 的目录**不算**工作目录，`%LOCALAPPDATA%\ColorMC` 那种
     ///
-    /// ColorMC 只要跑过一次就会建出那个目录（里面是账户与方块解锁状态，与工作目录在哪无关），
+    /// ColorMC 只要跑过一次就会建出那个目录，里面是账户与方块解锁状态，与工作目录在哪无关，
     /// 拿它当命中会误报 —— 这条用例把这个坑钉住。
     #[test]
     fn only_auth_json_is_not_a_working_dir() {
@@ -434,9 +458,9 @@ mod tests {
         cleanup(&[&dir]);
     }
 
-    /// 选「不迁移」会写下标记：之后就是"问过了"（重启也不弹）
+    /// 选「不迁移」会写下标记：之后就是"问过了"，重启也不弹
     ///
-    /// 标记落在**运行目录**（测试里是 `test_support` boot 时那个临时目录）。
+    /// 标记落在**运行目录**，测试里是 `test_support` boot 时那个临时目录。
     /// 这条同时把"标记文件是唯一判据"钉住：删掉它就能重新触发询问。
     #[test]
     fn skip_writes_marker_and_stops_asking() {

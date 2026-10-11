@@ -10,33 +10,33 @@ use super::launch::RunArgSettingDto;
 use super::network::NetworkSettingDto;
 use crate::dtos::JavaInfoDto;
 
-/// 设置项的出厂默认值（「恢复默认」用）
+/// 设置项的出厂默认值，供「恢复默认」使用
 ///
 /// 与各 getter 返回同一批 DTO 形状，值取自 core 的 `Default` / `new()`：
 /// 前端不再自己复制一套默认值，避免两处口径漂移。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsDefaultsDto {
-    /// 网络与下载（HttpObj / DnsObj / GameCheckObj 的默认值）
+    /// 网络与下载，即 HttpObj / DnsObj / GameCheckObj 的默认值
     pub network: NetworkSettingDto,
-    /// 启动参数（RunArgObj::new()）
+    /// 启动参数，取自 `RunArgObj::new()`
     pub run: RunArgSettingDto,
-    /// 游戏窗口（WindowSettingObj::new()）
+    /// 游戏窗口，取自 `WindowSettingObj::new()`
     pub window: WindowSettingDto,
 }
 
-/// 游戏窗口设置（前端 wire：camelCase，字段即 core `WindowSettingObj`）
+/// 游戏窗口设置，前端 wire 为 camelCase，字段即 core `WindowSettingObj`
 ///
-/// core 侧是 `Option` 字段，DTO 落到 `WindowSettingObj::new()` 同款默认值
-/// （`title_delay` core 尚无既有默认值，取 3000ms）。
+/// core 侧是 `Option` 字段，DTO 落到 `WindowSettingObj::new()` 同款默认值；
+/// `title_delay` core 尚无既有默认值，取 3000ms。
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct WindowSettingDto {
     /// 是否启动全屏模式
     pub full_screen: bool,
-    /// 窗口宽度（像素）
+    /// 窗口宽度，单位像素
     pub width: u16,
-    /// 窗口高度（像素）
+    /// 窗口高度，单位像素
     pub height: u16,
     /// 是否启用自定义标题
     pub edit_title: bool,
@@ -46,45 +46,52 @@ pub struct WindowSettingDto {
     pub random_title: bool,
     /// 是否循环切换标题
     pub cycle_title: bool,
-    /// 循环标题切换间隔（毫秒）
+    /// 循环标题切换间隔，单位毫秒
     pub title_delay: u32,
 }
 
-/// 启动设置（前端 wire：camelCase）
+/// 启动设置，前端 wire 为 camelCase
 ///
-/// Java 列表只读（增删走 `settings_scan_java` / `settings_add_java` /
-/// `settings_remove_java`），启动参数与窗口设置走 `settings_save_launch`。
+/// Java 列表只读，增删走 `settings_scan_java` / `settings_add_java` /
+/// `settings_remove_java`，启动参数与窗口设置走 `settings_save_launch`。
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct LaunchSettingDto {
     /// 已添加的 Java 运行时列表
     pub java_list: Vec<JavaInfoDto>,
-    /// 启动参数（core `RunArgObj`）
+    /// 启动参数，即 core `RunArgObj`
     pub run: RunArgSettingDto,
-    /// 游戏窗口设置（core `WindowSettingObj`）
+    /// 游戏窗口设置，即 core `WindowSettingObj`
     pub window: WindowSettingDto,
 }
 
-/// 背景图信息（前端 wire：camelCase，`settings_get_bg` 返回值）
+/// 背景图信息，前端 wire 为 camelCase，即 `settings_get_bg` 返回值
 ///
 /// 源地址与显示参数来自 `gui_config.json`，图片是后端处理落盘的
-/// `bg_image.png`（base64 dataURL）。
+/// `bg_image.png`，base64 dataURL。
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct BgInfoDto {
-    /// 背景图来源（文件路径 / 网址）
+    /// 背景图来源，文件路径或网址
     pub source: String,
-    /// 处理后的背景图（dataURL）
+    /// 处理后的背景图，dataURL
     pub data_url: String,
-    /// 不透明度（%）
+    /// 不透明度，百分比
     pub opacity: u32,
-    /// 模糊（px）
+    /// 模糊，单位 px
     pub blur: u32,
-    /// 原始分辨率（%）
+    /// 原始分辨率，百分比
     pub native_size: u32,
 }
 
 impl From<&WindowSettingObj> for WindowSettingDto {
+    /// 由 core 配置构造前端 DTO，core 侧的 `None` 落到 `WindowSettingObj::new()` 同款默认值
+    ///
+    /// - `w`: `config.json` 里的游戏窗口设置，字段多为 `Option`
+    ///
+    /// # 返回值
+    ///
+    /// 前端可直接绑定的窗口设置
     fn from(w: &WindowSettingObj) -> Self {
         Self {
             full_screen: w.full_screen.unwrap_or(false),
@@ -100,6 +107,13 @@ impl From<&WindowSettingObj> for WindowSettingDto {
 }
 
 impl From<WindowSettingDto> for WindowSettingObj {
+    /// 由前端 DTO 写回 core 配置，所有字段都写 `Some(...)`，不留 `None`
+    ///
+    /// - `d`: 前端保存上来的窗口设置
+    ///
+    /// # 返回值
+    ///
+    /// 待写入 `config.json` 的窗口设置
     fn from(d: WindowSettingDto) -> Self {
         Self {
             full_screen: Some(d.full_screen),

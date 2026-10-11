@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 添加实例 · 整合包安装进度弹窗（压缩包 / 网址 / 在线整合包安装共用）
-// 两级进度：整体（已处理条目 / 总条目）+ 当前子任务（如某个文件的解压或下载）
+// 两级进度：整体是已处理条目 / 总条目，加上当前子任务，如某个文件的解压或下载
 import { computed } from "vue";
 import { t } from "../../../lib/i18n";
 import BaseModal from "../../../components/ui/BaseModal.vue";

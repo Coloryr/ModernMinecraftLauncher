@@ -11,11 +11,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::urls;
 
-/// 通道列表
+/// 通道列表，对应 `OPENFRP` 取通道接口的响应体
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct OpenFrpChannelObj {
-    /// 通道列表
+    /// 节点分组列表，对应 `data`
     pub data: Vec<OpenFrpChannelData>,
 }
 
@@ -27,13 +27,13 @@ impl Default for OpenFrpChannelObj {
     }
 }
 
-/// 通道分组
+/// 通道分组，对应 `data[]` 的元素
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct OpenFrpChannelData {
-    /// 分组名称
+    /// 分组名称，对应 `name`
     pub name: String,
-    /// 组内节点列表
+    /// 组内节点列表，对应 `proxies`
     pub proxies: Vec<ProxieObj>,
 }
 
@@ -46,18 +46,18 @@ impl Default for OpenFrpChannelData {
     }
 }
 
-/// 单个节点
+/// 单个节点，对应 `proxies[]` 的元素
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct ProxieObj {
-    /// 节点名称
+    /// 节点名称，对应 `name`
     pub name: String,
-    /// 节点 ID
+    /// 节点 ID，对应 `id`，查节点配置时作为 `proxy` 参数
     pub id: i32,
-    /// 节点协议类型
+    /// 节点协议类型，对应 `type`
     #[serde(rename = "type")]
     pub p_type: String,
-    /// 远程访问地址
+    /// 远程访问地址，对应 `remote`
     pub remote: String,
 }
 
@@ -72,11 +72,11 @@ impl Default for ProxieObj {
     }
 }
 
-/// 通道配置信息
+/// 通道配置信息，对应 `OPENFRP` 取节点配置接口的响应体
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct OpenFrpChannelInfoObj {
-    /// 配置键值对
+    /// 配置键值对，对应 `proxies`，直接落进 frpc 的 ini 配置
     pub proxies: HashMap<String, String>,
 }
 
@@ -88,11 +88,11 @@ impl Default for OpenFrpChannelInfoObj {
     }
 }
 
-/// frpc 客户端下载信息
+/// frpc 客户端下载信息，对应 `OPENFRP_DOWNLOAD` 的响应体
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct OpenFrpDownloadObj {
-    /// 下载配置
+    /// 下载配置，对应 `data`
     pub data: OpenFrpDownloadItemObj,
 }
 
@@ -104,15 +104,15 @@ impl Default for OpenFrpDownloadObj {
     }
 }
 
-/// frpc 下载配置
+/// frpc 下载配置，对应响应体的 `data`
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct OpenFrpDownloadItemObj {
-    /// 最新版本号
+    /// 最新版本号，对应 `latest`，是拼下载地址的路径段
     pub latest: String,
-    /// 最新完整版本号
+    /// 最新完整版本号，对应 `latest_full`
     pub latest_full: String,
-    /// 下载源列表
+    /// 下载源列表，对应 `source`，取第一个即可
     pub source: Vec<SourceObj>,
 }
 
@@ -126,11 +126,11 @@ impl Default for OpenFrpDownloadItemObj {
     }
 }
 
-/// 下载源
+/// 下载源，对应 `source[]` 的元素
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct SourceObj {
-    /// 源地址前缀
+    /// 源地址前缀，对应 `value`，下载地址 = 前缀 + 版本号 + 文件名
     pub value: String,
 }
 
@@ -159,7 +159,7 @@ pub async fn get_channel(key: &str) -> CoreResult<OpenFrpChannelObj> {
 /// 获取通道配置
 ///
 /// - `key`: 账户密钥
-/// - `id`: 通道ID
+/// - `id`: 通道 ID，取节点列表里的 `id`
 ///
 /// # 返回值
 ///
@@ -182,7 +182,7 @@ pub async fn get_download() -> CoreResult<OpenFrpDownloadObj> {
     client.get_json(urls::OPENFRP_DOWNLOAD).await
 }
 
-/// 创建Frp下载项目
+/// 创建 Frp 下载项目
 ///
 /// # 返回值
 ///

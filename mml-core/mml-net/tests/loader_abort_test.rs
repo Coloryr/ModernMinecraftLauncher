@@ -1,9 +1,9 @@
 //! 复现用户场景：查询支持的加载器卡住时改代理
 //!
-//! 验证三件事（对应之前"改了代理但查询没停"的三个成因）：
-//! 1. `abort_all()` 能中断卡住的加载器查询，并把它作为**错误**冒出来（不再被吞掉）；
-//! 2. 中断后重试能真的重新发起（不会命中失败的缓存单元）；
-//! 3. 重试走的是新客户端（这里用"换成一个能立刻连上的服务"来体现）。
+//! 验证三件事，对应"改了代理但查询没停"的三个成因：
+//! 1. `abort_all()` 能中断卡住的加载器查询，并把它作为错误冒出来，不再被吞掉；
+//! 2. 中断后重试能真的重新发起，不会命中失败的缓存单元；
+//! 3. 重试走的是新客户端，这里用"换成一个能立刻连上的服务"来体现。
 
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 
 use mml_config::config_obj::ProxyState;
 
-/// 起一个"只收不回"的服务：模拟卡住的加载器源
+/// 起一个"只收不回"的服务，返回监听端口，模拟卡住的加载器源
 fn silent_server() -> u16 {
     let listener = TcpListener::bind("127.0.0.1:0").expect("绑定端口失败");
     let port = listener.local_addr().unwrap().port();
@@ -29,7 +29,7 @@ fn silent_server() -> u16 {
     port
 }
 
-/// 起一个"立刻回 200 空 JSON 数组"的服务：模拟换了代理之后能连通的源
+/// 起一个"立刻回 200 空 JSON 数组"的服务，返回监听端口，模拟换代理后能连通的源
 fn responsive_server() -> u16 {
     let listener = TcpListener::bind("127.0.0.1:0").expect("绑定端口失败");
     let port = listener.local_addr().unwrap().port();
@@ -53,6 +53,7 @@ fn responsive_server() -> u16 {
     port
 }
 
+/// 卡住的加载器查询应作为中断错误冒出来，重试要打到新客户端，普通错误不能被误判为中断
 #[test]
 fn aborted_loader_query_surfaces_error_and_retries_fresh() {
     let exe = std::env::current_exe().unwrap();
@@ -66,7 +67,7 @@ fn aborted_loader_query_surfaces_error_and_retries_fresh() {
     let ok_port = responsive_server();
     let ok_url = format!("http://127.0.0.1:{ok_port}/forge-meta");
 
-    // ---- 1) 卡住的请求被中断，并且是"错误"（不会被 unwrap_or(false) 吞掉）----
+    // ---- 1) 卡住的请求被中断，并且是错误，不会被 unwrap_or(false) 吞掉 ----
     let (tx, rx) = mpsc::channel();
     let url = stuck_url.clone();
     std::thread::spawn(move || {
@@ -97,7 +98,7 @@ fn aborted_loader_query_surfaces_error_and_retries_fresh() {
     assert!(aborted, "应被识别为中断错误（上层才能据此放弃而不是跳过）");
     assert!(lag < Duration::from_millis(500), "中断太慢：{lag:?}");
 
-    // ---- 2) 中断后重试：新请求能正常完成（模拟走新代理）----
+    // ---- 2) 中断后重试：新请求能正常完成，模拟走新代理 ----
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

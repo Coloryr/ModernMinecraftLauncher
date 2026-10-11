@@ -12,15 +12,15 @@ use mml_sys::path_helper;
 
 use crate::launcher::instance_setting_obj::InstanceSettingObj;
 
-/// 服务器储存
+/// 服务器列表里的单个条目，对应 `servers.dat` 里的一条记录
 pub struct ServerInfoObj {
-    /// 服务器地址
+    /// 服务器地址，形如 `host:port`
     pub ip: String,
-    /// 服务器名
+    /// 服务器显示名
     pub name: String,
-    /// 服务器图标（Base64）
+    /// 服务器图标，Base64 编码；可缺省
     pub icon: Option<String>,
-    /// 是否接受服务器资源包
+    /// 是否接受服务器资源包，缺省为 false
     pub accept_textures: bool,
     /// 所属实例
     pub instance: Arc<InstanceSettingObj>,
@@ -39,11 +39,11 @@ impl Default for ServerInfoObj {
 }
 
 impl InstanceSettingObj {
-    /// 获取服务器存储
+    /// 读取实例的服务器列表
     ///
     /// # 返回值
     ///
-    /// 返回服务器列表；文件不存在返回空列表，读取失败返回对应错误
+    /// 服务器列表；文件不存在返回空列表，读取失败返回对应错误
     pub fn get_server_infos(&self) -> CoreResult<Vec<ServerInfoObj>> {
         let file = self.get_servers_file();
         let mut list = Vec::new();
@@ -80,11 +80,9 @@ impl InstanceSettingObj {
         Ok(list)
     }
 
-    /// 保存服务器列表
+    /// 保存服务器列表，整体覆盖实例的 `servers.dat`
     ///
-    /// # 参数
-    ///
-    /// - `list`: 服务器列表
+    /// - `list`: 待写入的服务器列表
     ///
     /// # 返回值
     ///
@@ -122,12 +120,10 @@ impl InstanceSettingObj {
         nbt_file.write(stream)
     }
 
-    /// 添加服务器地址
+    /// 往列表末尾追加一个服务器
     ///
-    /// # 参数
-    ///
-    /// - `name`: 名字
-    /// - `ip`: 地址
+    /// - `name`: 服务器显示名
+    /// - `ip`: 服务器地址，形如 `host:port`
     ///
     /// # 返回值
     ///
@@ -143,12 +139,10 @@ impl InstanceSettingObj {
         self.save_servers(&list)
     }
 
-    /// 删除服务器地址
+    /// 删除名字与地址都匹配的服务器条目
     ///
-    /// # 参数
-    ///
-    /// - `name`: 名字
-    /// - `ip`: 地址
+    /// - `name`: 服务器显示名
+    /// - `ip`: 服务器地址，形如 `host:port`
     ///
     /// # 返回值
     ///

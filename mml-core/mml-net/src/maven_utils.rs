@@ -1,6 +1,6 @@
 //! Maven 坐标工具
 //!
-//! 提供 Maven 坐标（Gradle 风格）与文件路径之间的转换，
+//! 提供 Maven 坐标，即 Gradle 风格坐标，与文件路径之间的转换，
 //! 以及从 Maven 仓库获取文件哈希校验值的功能。
 
 use mml_base::file_item::FileHash;
@@ -29,6 +29,7 @@ use crate::{url_helper, urls};
 /// version_name_to_path("com.example:artifact:1.0:sources");
 /// // -> "com/example/artifact/1.0/artifact-1.0-sources.jar"
 /// ```
+///
 /// # 返回值
 ///
 /// 返回 Maven 仓库内的相对路径
@@ -62,17 +63,17 @@ pub fn version_name_to_path(name: &str) -> String {
 pub struct UrlHashObj {
     /// 文件校验值
     pub hash: FileHash,
-    /// 文件下载 URL
+    /// 文件下载 URL，已按当前下载源拼好
     pub url: String,
 }
 
-/// 测试这个jar文件是否能从网上下载
+/// 测试这个 jar 文件是否能从网上下载
 ///
-/// - `dir`: jar文件路径
+/// - `dir`: jar 文件在 Maven 仓库内的相对路径
 ///
 /// # 返回值
 ///
-/// 返回（校验值，完整下载 URL）；所有校验文件都拿不到时返回 `None`
+/// 返回校验值与完整下载 URL；所有校验文件都拿不到时返回 `None`
 pub async fn test_hash(dir: &str) -> Option<UrlHashObj> {
     let url = match url_helper::get_source() {
         SourceLocal::Offical => urls::MAVEN,

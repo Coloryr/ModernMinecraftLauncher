@@ -1,7 +1,7 @@
 //! 源码扫描与语法解析
 //!
 //! 全部是纯函数：输入源码文本，输出结构化数据，不碰文件系统与环境变量
-//! （`walk_rs` 除外，它只负责遍历目录）。
+//! `walk_rs` 除外，它只负责遍历目录。
 
 use std::{
     fs,
@@ -9,6 +9,9 @@ use std::{
 };
 
 /// 递归收集目录下的 .rs 文件
+///
+/// - `dir`: 起始目录，读不了就当作空目录，不报错
+/// - `out`: 收集结果，追加写入，调用方自己先清空
 pub fn walk_rs(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
@@ -23,8 +26,15 @@ pub fn walk_rs(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// 文件路径 -> Rust 模块路径（src/windows/account.rs -> "windows::account"；
-/// mod.rs / lib.rs / main.rs -> 所在目录即模块）
+/// 文件路径 -> Rust 模块路径，如 src/windows/account.rs -> "windows::account"；
+/// mod.rs / lib.rs / main.rs -> 所在目录即模块
+///
+/// - `src`: 源码根目录
+/// - `file`: 要换算的 .rs 文件
+///
+/// # 返回值
+///
+/// `::` 分隔的模块路径；文件不在 `src` 下时返回空串
 pub fn module_path(src: &Path, file: &Path) -> String {
     let rel = match file.strip_prefix(src) {
         Ok(rel) => rel,
@@ -48,7 +58,14 @@ pub fn module_path(src: &Path, file: &Path) -> String {
     comps.join("::")
 }
 
-/// 找 marker 之后的第一个函数名（跳过中间的文档 / 属性，标准格式下足够可靠）
+/// 找 marker 之后的第一个函数名，跳过中间的文档 / 属性，标准格式下足够可靠
+///
+/// - `text`: 源码全文
+/// - `marker`: 标记字面量，即命令属性或事件属性
+///
+/// # 返回值
+///
+/// 每个 marker 之后的第一个函数名，按出现顺序
 pub fn fns_after(text: &str, marker: &str) -> Vec<String> {
     let mut names = Vec::new();
     let mut rest = text;
@@ -69,6 +86,13 @@ pub fn fns_after(text: &str, marker: &str) -> Vec<String> {
 }
 
 /// 从 `from` 起，最早的 `pub struct` / `pub enum` 声明起始位置
+///
+/// - `text`: 源码全文
+/// - `from`: 起始字节位置
+///
+/// # 返回值
+///
+/// 声明起始位置；后面没有声明时返回 `None`
 fn next_decl(text: &str, from: usize) -> Option<usize> {
     let a = text[from..].find("\npub struct ").map(|p| p + from + 1);
     let b = text[from..].find("\npub enum ").map(|p| p + from + 1);
@@ -82,7 +106,11 @@ fn next_decl(text: &str, from: usize) -> Option<usize> {
 
 /// 扫描 `pub struct` / `pub enum` 声明
 ///
-/// 返回 (类型名, 声明前的属性原文, 花括号内的正文, 是枚举)
+/// - `text`: 源码全文
+///
+/// # 返回值
+///
+/// 每项为 (类型名, 声明前的属性原文, 花括号内的正文, 是枚举)
 pub fn scan_types(text: &str) -> Vec<(String, String, String, bool)> {
     let mut out = Vec::new();
     let mut search = 0usize;
@@ -98,7 +126,7 @@ pub fn scan_types(text: &str) -> Vec<(String, String, String, bool)> {
             search = name_start;
             continue;
         }
-        // 属性块：从声明往回逐行收集 `#[...]` / `///`，遇到其它内容（空行、`}`）即停
+        // 属性块：从声明往回逐行收集 `#[...]` / `///`，遇到空行或 `}` 等其它内容即停
         let mut attr_lines: Vec<&str> = Vec::new();
         for line in text[..pos].lines().rev() {
             let t = line.trim();
@@ -139,7 +167,13 @@ pub fn scan_types(text: &str) -> Vec<(String, String, String, bool)> {
     out
 }
 
-/// 从属性块里取 `#[serde(rename_all = "camelCase")]` 的值
+/// 从属性块里取 serde 命名风格的值，如 camelCase
+///
+/// - `attrs`: [`scan_types`] 返回的属性原文
+///
+/// # 返回值
+///
+/// 命名的风格名，如 `camelCase`；没有该属性时返回 `None`
 pub fn rename_all_of(attrs: &str) -> Option<String> {
     let p = attrs.find("rename_all")?;
     let rest = &attrs[p..];
@@ -148,7 +182,13 @@ pub fn rename_all_of(attrs: &str) -> Option<String> {
     Some(rest[q1..q2].to_string())
 }
 
-/// 拆顶层逗号（不切泛型里的逗号）
+/// 拆顶层逗号，不切泛型里的逗号
+///
+/// - `s`: 待拆分的原文，如参数表、泛型参数表
+///
+/// # 返回值
+///
+/// 各段，已 trim，空段丢弃
 pub fn split_top_level(s: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut depth = 0i32;
@@ -176,14 +216,20 @@ pub fn split_top_level(s: &str) -> Vec<String> {
     out
 }
 
-/// 取命令属性块里的显式分组标记 `#[ipc_group("resource")]`
+/// 取命令属性块里的显式分组标记，标记的值就是原始组名
 ///
 /// **为什么需要它**：`bindings.ts` 的命令组键默认取"来源 .rs 模块最后一段"，于是把命令
-/// 拆进子模块（`windows::resource::mods`）会让组键从 `resource` 变成 `mods`，前端所有
+/// 拆进子模块 `windows::resource::mods` 会让组键从 `resource` 变成 `mods`，前端所有
 /// `commands.resource.*` 调用点一起断。加上这个标记，命令可以按分类拆文件、组键不变。
 ///
 /// 与 `commands_in` 一样是**裸文本**扫描：从命令属性往上逐行看，允许中间夹着别的属性 /
-/// 文档注释 / 空行，遇到别的代码就停（只有 `#[` 开头的行才算，注释里写出来无效）。
+/// 文档注释 / 空行，遇到别的代码就停；只有 `#[` 开头的行才算，注释里写出来无效。
+///
+/// - `head`: 命令属性**之前**的那段源码
+///
+/// # 返回值
+///
+/// 分组名；没写标记时返回 `None`，由调用方按来源模块分组
 fn group_of(head: &str) -> Option<String> {
     const KEY: &str = "ipc_group(";
     for line in head.lines().rev() {
@@ -208,10 +254,16 @@ fn group_of(head: &str) -> Option<String> {
     None
 }
 
-/// 取 `#[tauri::command]` 后面的函数：返回 (函数名, 参数原文, 返回类型原文, 显式分组)
+/// 取命令属性后面的函数：返回 (函数名, 参数原文, 返回类型原文, 显式分组)
 ///
 /// 参数/返回按括号与尖括号配平截取，能处理跨多行的签名。
-/// 显式分组来自属性块里的 `#[ipc_group("...")]`，没有则为 `None`（按来源模块分组）。
+/// 显式分组来自属性块里的分组标记，没有则为 `None`，按来源模块分组。
+///
+/// - `text`: 源码全文
+///
+/// # 返回值
+///
+/// 每个命令一项；没有写返回类型的函数，返回类型原文是空串
 pub fn commands_in(text: &str) -> Vec<(String, String, String, Option<String>)> {
     const MARK: &str = "#[tauri::command]";
     let mut out = Vec::new();
@@ -256,7 +308,7 @@ pub fn commands_in(text: &str) -> Vec<(String, String, String, Option<String>)> 
         };
         let params = after_fn[lp + 1..rp].to_string();
 
-        // 返回类型：若紧跟 `->`，取到函数体的 `{`（尖括号/圆括号配平）
+        // 返回类型：若紧跟 `->`，取到函数体的 `{`，尖括号与圆括号配平
         let tail = &after_fn[rp + 1..];
         let ret = match tail.find("->") {
             Some(a) if tail[..a].trim().is_empty() => {
@@ -289,7 +341,7 @@ pub fn commands_in(text: &str) -> Vec<(String, String, String, Option<String>)> 
 mod tests {
     use super::*;
 
-    /// 命令签名跨多行也能解析，注入参数留在参数原文里（由 ts.rs 过滤）
+    /// 命令签名跨多行也能解析，注入参数留在参数原文里，由 ts.rs 过滤
     #[test]
     fn test_commands_in_multiline() {
         let src = r#"
@@ -338,7 +390,7 @@ pub fn resource_list_mods(uuid: String) -> Result<Vec<ModItemDto>, String> {
         assert_eq!(cmds[0].3.as_deref(), Some("resource"));
     }
 
-    /// 没有标记就是 None；注释里写出标记**不算**（只认 `#[` 开头的行）
+    /// 没有标记就是 None；注释里写出标记**不算**，只认 `#[` 开头的行
     #[test]
     fn test_commands_in_group_absent() {
         let src = "#[tauri::command]\npub fn a() -> bool { true }";
@@ -387,7 +439,7 @@ pub fn resource_list_mods(uuid: String) -> Result<Vec<ModItemDto>, String> {
         assert_eq!(module_path(src, Path::new("/x/src/main.rs")), "");
     }
 
-    /// 属性块回溯要能跨过文档注释，并取到 rename_all
+    /// 属性块回溯要能跨过文档注释，并取到 serde 命名风格
     #[test]
     fn test_scan_types_attrs_and_rename() {
         let src = r#"

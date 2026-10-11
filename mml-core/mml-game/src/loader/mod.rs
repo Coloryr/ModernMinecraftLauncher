@@ -31,7 +31,7 @@ pub mod quilt;
 pub mod quilt_loader_obj;
 pub mod quilt_meta_obj;
 
-/// 加载器版本键
+/// 加载器版本键，用于按游戏版本与加载器版本缓存数据
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub struct LoaderKey {
     /// 游戏版本
@@ -43,10 +43,12 @@ pub struct LoaderKey {
 impl LoaderKey {
     /// 创建版本键
     ///
-    /// # 参数
-    ///
     /// - `mc`: 游戏版本
     /// - `version`: 加载器版本
+    ///
+    /// # 返回值
+    ///
+    /// 返回新建的版本键
     pub fn new(mc: &str, version: &str) -> Self {
         LoaderKey {
             mc: String::from(mc),
@@ -74,7 +76,7 @@ impl Default for LibrariesObj {
     }
 }
 
-/// 模组加载器类型
+/// 模组加载器类型，按变体顺序序列化为 `u8`
 #[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum LoaderType {
@@ -103,7 +105,11 @@ impl Default for LoaderType {
 }
 
 impl LoaderType {
-    /// 加载器独立 ID（与前端 i18n 键对应，不随语言变化）
+    /// 加载器独立 ID，与前端 i18n 键对应，不随语言变化
+    ///
+    /// # 返回值
+    ///
+    /// 返回该加载器的 ID 字符串
     pub fn to_string(&self) -> &'static str {
         match self {
             LoaderType::Normal => "normal",
@@ -118,6 +124,10 @@ impl LoaderType {
     }
 
     /// 按 ID 解析加载器类型
+    ///
+    /// # 返回值
+    ///
+    /// 未知 ID 返回 `None`
     pub fn from_string(id: &str) -> Option<Self> {
         match id {
             "normal" => Some(LoaderType::Normal),
@@ -132,7 +142,11 @@ impl LoaderType {
         }
     }
 
-    /// 全部加载器 ID（下拉列表数据源）
+    /// 全部加载器 ID，作为下拉列表数据源
+    ///
+    /// # 返回值
+    ///
+    /// 返回按展示顺序排列的全部 ID
     pub fn ids() -> Vec<&'static str> {
         vec![
             "normal",

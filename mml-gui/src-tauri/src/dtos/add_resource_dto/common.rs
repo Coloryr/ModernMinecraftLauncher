@@ -7,21 +7,21 @@ use serde::{Deserialize, Serialize};
 use mml_game::launcher::FileType;
 use mml_net::urls;
 
-/// 下载源定位信息（pid + fid 唯一确定一个资源 / 文件）
+/// 下载源定位信息，pid + fid 唯一确定一个资源 / 文件
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceTypeDto {
-    /// 资源类型
+    /// 资源类型，即 `FileType` 的字符串形态
     pub file_type: String,
-    /// 下载源
+    /// 下载源：CurseForge / Modrinth
     pub source: String,
-    /// 项目ID
+    /// 项目 ID，即源站的项目标识
     pub pid: String,
-    /// 文件ID
+    /// 文件 ID，即项目下的版本 / 文件标识；列表级条目还没有具体文件时为空串
     pub fid: String,
 }
 
-/// MC 百科（mcmod.cn）翻译条目
+/// MC 百科 mcmod.cn 的翻译条目
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct McmodDto {
@@ -31,13 +31,13 @@ pub struct McmodDto {
     pub mcmod_name: String,
 }
 
-/// 图像条目（作者头像等）
+/// 图像条目，如作者头像
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PicDto {
     /// 名字
     pub name: String,
-    /// 图像地址（mml-image 转发地址，无则 None）
+    /// 图像地址，经 mml-image 转发，无则 None
     pub logo: Option<String>,
 }
 
@@ -47,9 +47,9 @@ pub struct PicDto {
 pub struct TagDto {
     /// 标签名
     pub name: String,
-    /// 位图图标地址（CurseForge，无则 None）
+    /// 位图图标地址，来自 CurseForge，无则 None
     pub logo: Option<String>,
-    /// SVG 图标内容（Modrinth，无则 None）
+    /// SVG 图标内容，来自 Modrinth，无则 None
     pub svg: Option<String>,
 }
 
@@ -59,7 +59,7 @@ pub struct TagDto {
 pub struct DecPicDto {
     /// 标题
     pub name: String,
-    /// 图像地址（mml-image 转发地址）
+    /// 图像地址，经 mml-image 转发
     pub logo: String,
     /// 描述
     pub description: String,
@@ -67,9 +67,7 @@ pub struct DecPicDto {
 
 /// 拼接 Modrinth 项目网页地址
 ///
-/// # 参数
-///
-/// - `file_type`: 资源类型（决定 URL 段）
+/// - `file_type`: 资源类型，决定 URL 段
 /// - `id`: 项目 ID
 ///
 /// # 返回值

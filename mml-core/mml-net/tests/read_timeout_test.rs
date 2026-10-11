@@ -1,11 +1,7 @@
 //! 验证：`read_timeout` 对"服务端只回响应头、不回 body"是否真的生效
 //!
-//! 用户约束：**不能加全局 `timeout()`**——它会让大文件下载被误杀。
-//! 所以只能依靠 `read_timeout`（两次读取间隔）。但它是否对"卡在读 body"有效，
-//! 直接决定我们能不能用它兜底。
-//!
-//! 实测要点：`Client::new()` 已设 `read_timeout(10s)`，
-//! 本测试把服务器造成"只回头不回 body"，观察请求在多久后失败。
+//! 不能加全局 `timeout()`，它会让大文件下载被误杀，所以卡死只能靠 `read_timeout`
+//! 即两次读取间隔兜底；本测试把服务器造成只回头不回 body，看请求多久失败。
 
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -14,7 +10,7 @@ use std::time::{Duration, Instant};
 
 use mml_config::config_obj::ProxyState;
 
-/// 只回响应头、不回 body（Content-Length 声明很大，实际一个字节不发）
+/// 只回响应头、不回 body：Content-Length 声明很大，实际一个字节不发
 fn header_only_server() -> u16 {
     let listener = TcpListener::bind("127.0.0.1:0").expect("绑定失败");
     let port = listener.local_addr().unwrap().port();
@@ -36,6 +32,7 @@ fn header_only_server() -> u16 {
     port
 }
 
+/// 初始化日志、配置与 HTTP 客户端，进程内只跑一次
 fn init_once() {
     use std::sync::Once;
     static INIT: Once = Once::new();
@@ -48,6 +45,7 @@ fn init_once() {
     });
 }
 
+/// 读 body 卡住时应在 read_timeout 到期后失败
 #[test]
 fn read_timeout_kills_body_stall() {
     init_once();

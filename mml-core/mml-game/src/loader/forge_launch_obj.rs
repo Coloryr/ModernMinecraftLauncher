@@ -13,6 +13,7 @@ pub struct ForgeDownloadsObj {
 }
 
 impl Default for ForgeDownloadsObj {
+    /// 全字段取默认值：嵌套结构取默认值
     fn default() -> Self {
         Self {
             artifact: Default::default(),
@@ -31,6 +32,7 @@ pub struct ForgeLibrariesObj {
 }
 
 impl Default for ForgeLibrariesObj {
+    /// 全字段取默认值：字符串为空串
     fn default() -> Self {
         Self {
             name: Default::default(),
@@ -50,6 +52,7 @@ pub struct ForgeArgumentsObj {
 }
 
 impl Default for ForgeArgumentsObj {
+    /// 全字段取默认值：参数列表为空
     fn default() -> Self {
         Self {
             game: Default::default(),
@@ -65,16 +68,17 @@ pub struct ForgeLaunchObj {
     /// 主类
     #[serde(rename = "mainClass")]
     pub main_class: String,
-    /// 游戏启动参数（旧版格式）
+    /// 游戏启动参数，旧版格式
     #[serde(rename = "minecraftArguments")]
     pub minecraft_arguments: Option<String>,
-    /// 启动参数（新版格式）
+    /// 启动参数，新版格式
     pub arguments: Option<ForgeArgumentsObj>,
     /// 运行库列表
     pub libraries: Vec<ForgeLibrariesObj>,
 }
 
 impl Default for ForgeLaunchObj {
+    /// 全字段取默认值：可选字段为 `None`、列表为空
     fn default() -> Self {
         Self {
             main_class: Default::default(),

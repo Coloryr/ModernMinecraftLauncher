@@ -1,6 +1,6 @@
 //! 资源管理窗口的服务器分类：列表 / 添加 / 修改 / 删除
 //!
-//! 读写 `servers.dat`（NBT），由内核 `InstanceSettingObj` 的 server 方法承担。
+//! 读写 `servers.dat`，即 NBT 格式，由内核 `InstanceSettingObj` 的 server 方法承担。
 
 use crate::dtos::ServerItemDto;
 
@@ -8,7 +8,13 @@ use super::parse_instance;
 
 // ==================== 服务器 ====================
 
-/// 服务器列表（servers.dat，同步纯读）
+/// 服务器列表：读 servers.dat，同步纯读
+///
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// 服务器条目，图标由 servers.dat 里存的 base64 拼成 data URL；实例不存在或读取失败返回错误串
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub fn resource_list_servers(uuid: String) -> Result<Vec<ServerItemDto>, String> {
@@ -35,6 +41,14 @@ pub fn resource_list_servers(uuid: String) -> Result<Vec<ServerItemDto>, String>
 }
 
 /// 添加服务器
+///
+/// - `uuid`: 实例 uuid
+/// - `name`: 服务器显示名，空白会被拒绝
+/// - `ip`: 服务器地址，空白会被拒绝
+///
+/// # 返回值
+///
+/// 只表示成功 / 失败：名字或地址为空返回 `err.nameIp`，其余是写入失败的错误串
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub fn resource_server_add(uuid: String, name: String, ip: String) -> Result<(), String> {
@@ -49,7 +63,19 @@ pub fn resource_server_add(uuid: String, name: String, ip: String) -> Result<(),
         .map_err(|err| err.to_string())
 }
 
-/// 编辑服务器（按原 name + ip 定位，替换名字 / 地址 / 资源包接受开关）
+/// 编辑服务器：按原 name + ip 定位，替换名字 / 地址 / 资源包接受开关
+///
+/// - `uuid`: 实例 uuid
+/// - `name`: 原服务器显示名，与 `ip` 一起定位
+/// - `ip`: 原服务器地址，与 `name` 一起定位
+/// - `new_name`: 新显示名，空白会被拒绝
+/// - `new_ip`: 新地址，空白会被拒绝
+/// - `accept_textures`: 是否接受服务器资源包
+///
+/// # 返回值
+///
+/// 只表示成功 / 失败：新名字 / 新地址为空返回 `err.nameIp`，
+/// 没找到原条目返回 `err.fileNotFound`，其余是写入失败的错误串
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub fn resource_server_update(
@@ -85,6 +111,14 @@ pub fn resource_server_update(
 }
 
 /// 删除服务器
+///
+/// - `uuid`: 实例 uuid
+/// - `name`: 服务器显示名，与 `ip` 一起定位
+/// - `ip`: 服务器地址，与 `name` 一起定位
+///
+/// # 返回值
+///
+/// 只表示成功 / 失败：实例不存在或删除失败返回错误串
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub fn resource_server_delete(uuid: String, name: String, ip: String) -> Result<(), String> {

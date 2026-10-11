@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::curseforge_api::list_obj::CurseForgeListPaginationObj;
 
-/// CurseForge 文件分页结果
+/// 文件列表接口 `/mods/{id}/files` 的响应
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct CurseFogreFilePageObj {
@@ -23,7 +23,7 @@ impl Default for CurseFogreFilePageObj {
     }
 }
 
-/// 模组文件查询结果
+/// 单文件接口 `/mods/{pid}/files/{fid}` 的响应
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct CurseForgeFileObj {
@@ -48,28 +48,28 @@ pub struct CurseForgeFileDataObj {
     /// 所属模组 ID
     #[serde(rename = "modId")]
     pub mod_id: u64,
-    /// 显示名称
+    /// 显示名称，可含空格与中文
     #[serde(rename = "displayName")]
     pub display_name: String,
     /// 文件名
     #[serde(rename = "fileName")]
     pub file_name: String,
-    /// 文件哈希列表
+    /// 文件哈希列表，含 SHA-1 与 MD5
     #[serde(rename = "hashes")]
     pub hashes: Vec<HashesObj>,
-    /// 上传时间
+    /// 上传时间，ISO 8601 UTC 字符串
     #[serde(rename = "fileDate")]
     pub file_date: String,
-    /// 文件大小（字节）
+    /// 文件大小，单位字节
     #[serde(rename = "fileLength")]
     pub file_length: u64,
     /// 下载量
     #[serde(rename = "downloadCount")]
     pub download_count: u64,
-    /// 下载 URL
+    /// 下载地址；接口对不允许分发的文件返回 null，可缺省
     #[serde(rename = "downloadUrl")]
     pub download_url: Option<String>,
-    /// 依赖文件列表
+    /// 依赖文件列表，接口未返回时为 `None`
     pub dependencies: Option<Vec<DependenciesObj>>,
 }
 
@@ -94,9 +94,9 @@ impl Default for CurseForgeFileDataObj {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct HashesObj {
-    /// 哈希值
+    /// 哈希值的十六进制小写字符串
     pub value: String,
-    /// 哈希算法（1=SHA-1，2=MD5）
+    /// 哈希算法，1=SHA-1，2=MD5
     pub algo: i32,
 }
 
@@ -116,7 +116,7 @@ pub struct DependenciesObj {
     /// 依赖的模组 ID
     #[serde(rename = "modId")]
     pub mod_id: u64,
-    /// 依赖关系类型（1=嵌入，2=可选，3=必选，4=工具，5=不兼容）
+    /// 依赖关系类型，1=嵌入，2=可选，3=必选，4=工具，5=不兼容
     #[serde(rename = "relationType")]
     pub relation_type: i32,
 }

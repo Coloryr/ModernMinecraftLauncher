@@ -1,6 +1,6 @@
 //! 资源管理窗口的结构文件分类：列表 / 删除
 //!
-//! 结构类型（litematica / sponge / 原版 nbt）由内核按文件内容识别。
+//! 结构类型由内核按文件内容识别，取值 litematica / sponge / 原版 nbt。
 
 use crate::dtos::SchematicItemDto;
 use mml_game::game_schematics::SchematicType;
@@ -11,6 +11,12 @@ use super::{KIND_SCHEMATICS, block_on_instance, parse_instance, resource_file};
 // ==================== 结构文件 ====================
 
 /// 结构类型标签
+///
+/// - `schematic_type`: 内核识别出来的结构类型
+///
+/// # 返回值
+///
+/// 前端按 i18n 显示的稳定枚举名，取值 `Minecraft` / `Litematic` / `WorldEdit` / `Create`
 fn schematic_type_name(schematic_type: &SchematicType) -> &'static str {
     match schematic_type {
         SchematicType::Minecraft => "Minecraft",
@@ -20,7 +26,13 @@ fn schematic_type_name(schematic_type: &SchematicType) -> &'static str {
     }
 }
 
-/// 结构文件列表（按扩展名解析 NBT）
+/// 结构文件列表：按扩展名解析 NBT
+///
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// 结构文件列表；取不到文件名的条目已被过滤，实例不存在或解析失败返回错误串
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub async fn resource_list_schematics(uuid: String) -> Result<Vec<SchematicItemDto>, String> {
@@ -55,7 +67,14 @@ pub async fn resource_list_schematics(uuid: String) -> Result<Vec<SchematicItemD
         .collect())
 }
 
-/// 删除结构文件（进回收站）
+/// 删除结构文件，文件进回收站
+///
+/// - `uuid`: 实例 uuid
+/// - `file`: 结构文件名，不是完整路径
+///
+/// # 返回值
+///
+/// 只表示成功 / 失败：文件名非法返回 `err.fileName`，其余是内核错误串
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub async fn resource_delete_schematic(uuid: String, file: String) -> Result<(), String> {

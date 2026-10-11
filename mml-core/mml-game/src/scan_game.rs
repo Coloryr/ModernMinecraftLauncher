@@ -10,23 +10,16 @@ use crate::{add_game::PackType, other_launcher};
 
 /// 扫描文件夹下的游戏版本
 ///
-/// 按"越像越先试"的顺序，**先认启动器布局、最后才逐个目录嗅探** —— 顺序就是性能：
-/// 官方/MMC 的数据目录会在前两步命中，不会去解析 `config` / `mods` 里的杂项 json。
-///
-/// 1. 传进来的目录是**启动器数据目录**（其下有 `versions` / `instances`），
-///    或者它的**直接子目录**才是 —— 后者是为了"选了 `.minecraft` 的上级目录"也能扫到
-///    （`<上级>/.minecraft/versions/*`）；
-/// 2. 传进来的目录**本身就是实例**（直接选了某个版本目录 / MMC 实例目录）；
-/// 3. 传进来的目录就是 `versions` / `instances` 本身（它下面一个个就是实例）；
-/// 4. 兜底：直接子目录本身就是实例目录。
-///
-/// # 参数
+/// 按"越像越先试"的顺序：先认启动器布局，最后才逐个目录嗅探。顺序就是性能——
+/// 官方 / MMC 的数据目录会在前两步命中，不会去解析 `config` / `mods` 里的杂项 json。
+/// 依次尝试：目录或它的直接子目录是启动器数据目录、目录本身就是实例、目录就是
+/// `versions` / `instances` 本身、直接子目录本身就是实例目录。
 ///
 /// - `path`: 待扫描的目录
 ///
 /// # 返回值
 ///
-/// 返回可导入的游戏实例路径列表
+/// 可导入的游戏实例路径列表
 pub fn scan_game_from_path<P: AsRef<Path>>(path: P) -> Vec<PathBuf> {
     let root = path.as_ref();
     let mut list = Vec::new();
@@ -85,12 +78,11 @@ pub fn scan_game_from_path<P: AsRef<Path>>(path: P) -> Vec<PathBuf> {
     list
 }
 
-/// 从"启动器数据目录"里收集实例：`versions/*`（官方）与 `instances/*`（MMC）
+/// 从"启动器数据目录"里收集实例：官方的 `versions/*` 与 MMC 的 `instances/*`
 ///
-/// 走到这里说明目录**确实有这个布局**（`versions` / `instances` 是存在的目录），
-/// 所以下面的每个子目录都按实例去判定，不做额外过滤 ——
-/// 目录名与 json 名不一致的版本目录（`1.20.1-forge/` 里是 `1.20.1-forge-47.2.0.json`）
-/// 也得认出来。
+/// 走到这里说明目录确实有这个布局，`versions` / `instances` 都是存在的目录，
+/// 所以下面的每个子目录都按实例去判定，不做额外过滤 —— 目录名与 json 名不一致的
+/// 版本目录也得认出来，如 `1.20.1-forge/` 里放的是 `1.20.1-forge-47.2.0.json`。
 ///
 /// - `root`: 启动器数据目录
 /// - `out`: 结果追加到这里
@@ -120,13 +112,11 @@ fn collect_launcher_instances(root: &Path, out: &mut Vec<PathBuf>) {
 
 /// 检测压缩包类型
 ///
-/// # 参数
-///
 /// - `path`: 压缩包路径
 ///
 /// # 返回值
 ///
-/// 返回识别出的包类型；打不开或无法识别返回 `None`
+/// 识别出的包类型；打不开或无法识别返回 `None`
 pub fn test_archive_type<P: AsRef<Path>>(path: P) -> Option<PackType> {
     if let Some(ext) = path.as_ref().extension()
         && ext == names::MRPACK_EXT

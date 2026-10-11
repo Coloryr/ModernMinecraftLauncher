@@ -1,6 +1,6 @@
 //! 复现并确认 `add_optifine` / `add_liteloader` 的**自死锁**
 //!
-//! 代码事实（mml-core/mml-game/src/launcher_path/version_path.rs）：
+//! 代码事实见 mml-core/mml-game/src/launcher_path/version_path.rs：
 //!
 //! ```text
 //! add_liteloader:
@@ -14,8 +14,8 @@
 //!
 //! `std::sync::RwLock` 不可重入/不可升级，所以 ② 必然死锁。
 //! 本测试用**同样的锁使用模式**复现该阻塞，用来证明：
-//! - 现写法（写锁内调 save）会卡死；
-//! - 收窄作用域（先释放写锁再 save）不会卡死。
+//! - 现写法在写锁内调 save 会卡死；
+//! - 收窄作用域、先释放写锁再 save 不会卡死。
 //!
 //! 这样修复就有据可依，而不是"看起来对"。
 
@@ -29,7 +29,7 @@ fn save_like(list: &RwLock<HashMap<String, Arc<String>>>) -> usize {
     guard.len()
 }
 
-/// 现写法：**持有写锁**时调用 save（会死锁）
+/// 现写法：**持有写锁**时调用 save，会死锁
 fn add_current_style(list: &RwLock<HashMap<String, Arc<String>>>, item: String) -> usize {
     let mut guard = list.write().unwrap();
     guard.insert(item.clone(), Arc::new(item));
@@ -59,6 +59,7 @@ where
     rx.recv_timeout(timeout).is_ok()
 }
 
+/// 断言现写法在超时内完不成，即确实自死锁
 #[test]
 fn current_style_deadlocks() {
     let list = Arc::new(RwLock::new(HashMap::new()));
@@ -76,6 +77,7 @@ fn current_style_deadlocks() {
     );
 }
 
+/// 断言收窄写锁作用域后不再死锁
 #[test]
 fn fixed_style_does_not_deadlock() {
     let list = Arc::new(RwLock::new(HashMap::new()));

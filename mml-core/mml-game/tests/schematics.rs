@@ -13,14 +13,17 @@ use mml_nbt::NbtType;
 
 use mml_game::game_schematics::{self, SchematicType};
 
+/// 构造 NBT Short 值
 fn short(v: i16) -> NbtType {
     NbtShort::new(v).to_nbt()
 }
 
+/// 构造 NBT Int 值
 fn int(v: i32) -> NbtType {
     NbtInt::new(v).to_nbt()
 }
 
+/// 构造 NBT String 值
 fn string(v: &str) -> NbtType {
     NbtString::new(v.to_string()).to_nbt()
 }
@@ -91,7 +94,7 @@ fn create_sample() -> PathBuf {
     write_sample(root, "test.nbt")
 }
 
-/// 生成最小的投影 `.litematic`：Metadata + Regions（BlockStatePalette + BlockStates）。
+/// 生成最小的投影 `.litematic`：Metadata + Regions，内含 BlockStatePalette 与 BlockStates。
 fn litematic_sample() -> PathBuf {
     let mut root = NbtCompound::new();
 
@@ -116,7 +119,7 @@ fn litematic_sample() -> PathBuf {
     stone.data.insert("Name".into(), string("minecraft:stone"));
     palette.add_item(stone.to_nbt());
     main.data.insert("BlockStatePalette".into(), palette.to_nbt());
-    // 2 位打包：第 0 位方块 = 1（stone），第 1 位 = 0（air），共 2 个方块
+    // 2 位打包：第 0 位方块 = 1 即 stone，第 1 位 = 0 即 air，共 2 个方块
     main.data.insert("BlockStates".into(), NbtLongArray::new(vec![1]).to_nbt());
 
     let mut regions = NbtCompound::new();
@@ -132,6 +135,7 @@ fn read_generated(path: &Path, schematic_type: SchematicType) -> game_schematics
     game_schematics::read_schematic_file(&mut file, schematic_type).unwrap()
 }
 
+/// 校验原版 `.schematic` 只按三个 Short 读出尺寸
 #[test]
 fn read_schematic() {
     let sche = read_generated(&minecraft_sample(), SchematicType::Minecraft);
@@ -140,6 +144,7 @@ fn read_schematic() {
     assert_eq!(sche.length, 5);
 }
 
+/// 校验 WorldEdit `.schem` 的尺寸与方块统计
 #[test]
 fn read_schem() {
     let sche = read_generated(&worldedit_sample(), SchematicType::WorldEdit);
@@ -152,6 +157,7 @@ fn read_schem() {
     assert_eq!(sche.blocks.get("minecraft:stone"), Some(&1));
 }
 
+/// 校验机械动力 `.nbt` 的尺寸与方块统计
 #[test]
 fn read_nbt() {
     let sche = read_generated(&create_sample(), SchematicType::Create);
@@ -164,6 +170,7 @@ fn read_nbt() {
     assert_eq!(sche.blocks.get("minecraft:stone"), Some(&1));
 }
 
+/// 校验投影 `.litematic` 的元数据、尺寸与位打包方块统计
 #[test]
 fn read_litematic() {
     let sche = read_generated(&litematic_sample(), SchematicType::Litematic);

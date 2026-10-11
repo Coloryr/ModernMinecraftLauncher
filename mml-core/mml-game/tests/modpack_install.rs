@@ -1,10 +1,10 @@
-//! 整合包安装链路集成测试：程序化构造 CurseForge / Modrinth 整合包压缩包
-//! （`files` 清单为空，避免 CurseForge API 依赖），走完整安装链
+//! 整合包安装链路集成测试：程序化构造 CurseForge / Modrinth 整合包压缩包，
+//! `files` 清单留空以免依赖 CurseForge API，走完整安装链
 //! readInfo → readVersion → createInstance → extract → getInfo → download → done，
 //! 校验实例创建、元数据写入与 overrides 解压。
 //!
 //! 版本 json 校验（`check_update`）需要联网下载 Mojang 版本清单，
-//! 网络不可用时跳过（与 tests/common 的约定一致）。
+//! 网络不可用时跳过，与 tests/common 的约定一致。
 //! 全局初始化每进程只能执行一次，用互斥锁串行各用例。
 
 use std::io::Write;
@@ -23,7 +23,7 @@ use uuid::Uuid;
 use zip::ZipWriter;
 use zip::write::SimpleFileOptions;
 
-/// 测试运行目录（系统临时目录 + 进程号，避免多进程冲突）
+/// 测试运行目录，用进程号区分多进程
 fn run_dir() -> PathBuf {
     mml_testutil::temp_dir().join(format!("mml-modpack-install-{}", std::process::id()))
 }
@@ -50,7 +50,7 @@ fn ensure_init() {
     });
 }
 
-/// 网络探测：Mojang 版本清单可达才继续（check_update 依赖它）
+/// 网络探测：Mojang 版本清单可达才继续，`check_update` 依赖它
 async fn network_available() -> bool {
     let ok = mml_net::get_work_client()
         .get_bytes("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json")
@@ -85,27 +85,44 @@ struct TestGui;
 
 #[async_trait::async_trait]
 impl IAddInstanceGui for TestGui {
+    /// 名字被占用时一律允许自动改名
     async fn name_replace(&self, _name: &str) -> bool {
         true
     }
 
+    /// 一律拒绝覆盖已有实例，逼安装流程走自动改名
     async fn overwrite(&self, _obj: mml_game::GameInstance) -> bool {
         false
     }
 }
 
-/// 安装阶段记录器（供断言走完所有阶段）
+/// 安装阶段记录器，供断言走完所有阶段
 #[derive(Default, Clone)]
 struct StateRecorder {
+    /// 已经到达过的阶段 id，按到达顺序追加
     states: Arc<Mutex<Vec<&'static str>>>,
 }
 
 impl StateRecorder {
+    /// 判断某个阶段是否到达过
+    ///
+    /// - `state`: 阶段 id，取值见 [`state_id`]
+    ///
+    /// # 返回值
+    ///
+    /// 到达过返回 `true`
     fn reached(&self, state: &str) -> bool {
         self.states.lock().unwrap().contains(&state)
     }
 }
 
+/// 把安装阶段映射成断言用的短 id
+///
+/// - `state`: 安装阶段枚举
+///
+/// # 返回值
+///
+/// 返回阶段 id，如 `readInfo` / `extract`
 fn state_id(state: &AddModPackState) -> &'static str {
     match state {
         AddModPackState::DownloadPack => "downloadPack",
@@ -118,26 +135,33 @@ fn state_id(state: &AddModPackState) -> &'static str {
 }
 
 impl IAddModPackGui for StateRecorder {
+    /// 记下到达的阶段
     fn set_state(&self, state: AddModPackState) {
         self.states.lock().unwrap().push(state_id(&state));
     }
 
+    /// 总体进度桩，测试不校验
     fn set_now(&self, _value: usize, _all: Option<usize>) {}
 
+    /// 子标题桩，测试不校验
     fn set_sub_text(&self, _text: Option<String>) {}
 
+    /// 子进度桩，测试不校验
     fn set_sub_now(&self, _value: usize, _all: Option<usize>) {}
 }
 
+/// 下载回调桩，测试里什么都不做
 struct TestDownloader;
 
 impl mml_downloader::IDownloadGui for TestDownloader {
+    /// 单文件进度桩，测试不校验
     fn update(&self, _thread: u32, _file: &Arc<DownloadItem>) {}
 
+    /// 任务状态桩，测试不校验
     fn update_task(&self, _state: mml_downloader::DownloadTaskState) {}
 }
 
-/// 构造一个 CurseForge 整合包（空文件清单 + overrides）
+/// 构造一个 CurseForge 整合包，空文件清单加 overrides
 fn make_curseforge_pack(name: &str) -> (PathBuf, PathBuf) {
     let dir = mml_testutil::temp_dir()
         .join("mml-modpack-install-packs")
@@ -159,7 +183,7 @@ fn make_curseforge_pack(name: &str) -> (PathBuf, PathBuf) {
     (zip, dir)
 }
 
-/// 构造一个 Modrinth 整合包（空文件清单 + overrides）
+/// 构造一个 Modrinth 整合包，空文件清单加 overrides
 fn make_modrinth_pack(name: &str) -> (PathBuf, PathBuf) {
     let dir = mml_testutil::temp_dir()
         .join("mml-modpack-install-packs")
@@ -226,7 +250,7 @@ async fn install_curseforge_pack_end_to_end() {
     assert!(matches!(game.modpack_type, ModPackType::CurseForge));
     drop(game);
 
-    // 分组不在实例配置里：归属得去内核分组表查（安装时选的分组不能丢）
+    // 分组不在实例配置里：归属得去内核分组表查，安装时选的分组不能丢
     assert_eq!(mml_game::get_instance_group(&uuid), Some(group));
 
     // overrides 解压到游戏目录

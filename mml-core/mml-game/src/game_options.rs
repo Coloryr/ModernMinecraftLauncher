@@ -11,15 +11,13 @@ use mml_sys::path_helper;
 
 use crate::launcher::instance_setting_obj::InstanceSettingObj;
 
-/// 配置选项表（键 → 值）
+/// 配置选项表，键 → 值
 pub type InstanceCfg = HashMap<String, String>;
 
 /// 从配置文件读取选项
 ///
-/// # 参数
-///
 /// - `file`: 配置文件路径
-/// - `sp`: 键值分隔符（`None` 时为 `:`）
+/// - `sp`: 键值分隔符；`None` 时取 `:`
 ///
 /// # 返回值
 ///
@@ -32,12 +30,10 @@ pub fn read_options_from_file<P: AsRef<Path>>(
     read_options(file, sp)
 }
 
-/// 从数据流读取选项（忽略 `#` 注释行与行内注释）
-///
-/// # 参数
+/// 从数据流读取选项，忽略 `#` 注释行与行内注释
 ///
 /// - `buffer`: 数据流
-/// - `sp`: 键值分隔符（`None` 时为 `:`）
+/// - `sp`: 键值分隔符；`None` 时取 `:`
 ///
 /// # 返回值
 ///
@@ -104,10 +100,8 @@ impl InstanceSettingObj {
 
     /// 保存配置文件
     ///
-    /// # 参数
-    ///
     /// - `list`: 配置选项
-    /// - `sp`: 键值分隔符（`None` 时为 `:`）
+    /// - `sp`: 键值分隔符；`None` 时取 `:`
     ///
     /// # 返回值
     ///
@@ -135,7 +129,7 @@ impl InstanceSettingObj {
         Ok(())
     }
 
-    /// 读取游戏配置文件（options.txt，`=` 分隔；文件不存在时返回空表）
+    /// 读取游戏配置文件 options.txt，`=` 分隔；文件不存在时返回空表
     ///
     /// # 返回值
     ///
@@ -149,9 +143,7 @@ impl InstanceSettingObj {
         }
     }
 
-    /// 保存游戏配置文件（options.txt，`=` 分隔）
-    ///
-    /// # 参数
+    /// 保存游戏配置文件 options.txt，`=` 分隔
     ///
     /// - `list`: 配置选项
     ///

@@ -1,6 +1,6 @@
 //! 实例目录文件监视
 //!
-//! 监听实例根目录的创建 / 删除事件（`notify` crate），
+//! 监听实例根目录的创建 / 删除事件，基于 `notify` crate，
 //! 供实例列表在目录被外部改动时刷新。
 
 use std::{
@@ -59,7 +59,7 @@ pub(crate) fn init_watch() -> CoreResult<()> {
 
                         match event.kind {
                             EventKind::Create(CreateKind::Folder) => {
-                                // 新文件夹自动载入为实例（game.json 尚未写出时跳过）；
+                                // 新文件夹自动载入为实例，game.json 尚未写出时跳过；
                                 // 本启动器创建 / 改名实例时监听已暂停，uuid 已存在的忽略
                                 for path in &event.paths {
                                     if let Some(obj) = instance_path::load_instance(path)
@@ -108,7 +108,7 @@ pub(crate) fn init_watch() -> CoreResult<()> {
     Ok(())
 }
 
-/// 开始监听（实例创建 / 删除期间暂停，完成后恢复）
+/// 开始监听，实例创建 / 删除期间暂停，完成后恢复
 pub(crate) fn start_watch() {
     ENABLE_WATCHER.store(true, Ordering::Release);
 }

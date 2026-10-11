@@ -1,4 +1,4 @@
-//! 迁移引擎：顶层条目的复制 / 移动（含跨盘回退）与失败收集
+//! 迁移引擎：顶层条目的复制 / 移动，含跨盘回退，以及失败收集
 //!
 //! 从 `colormc/mod.rs` 拆出来的。**原样文件夹搬运**，不做字段级转换；单个文件失败不中断
 //! 整次迁移，记进报告的 `failed` 里。
@@ -16,10 +16,20 @@ use super::check::check;
 use super::detect::{auth_file, list_instances, looks_like_colormc, top_entries};
 use super::progress;
 
-/// 迁移主流程（同步、在阻塞线程里跑）
+/// 迁移主流程，同步执行，由调用方放到阻塞线程里跑
 ///
-/// 目标目录是**参数**（命令传运行目录，测试传自己的临时目录）—— 引擎里不去摸全局单例，
+/// 目标目录是**参数**，命令传运行目录、测试传自己的临时目录 —— 引擎里不去摸全局单例，
 /// 既能测，也避免了"引擎偷偷决定搬到哪"。
+///
+/// - `app`: 窗口句柄，`None` 表示不报进度
+/// - `src`: 源目录，必须是能识别的 ColorMC 工作目录
+/// - `dst`: 目标目录，通常是运行目录
+/// - `moved`: `true` 走移动、`false` 走复制
+///
+/// # 返回值
+///
+/// 迁移与兼容性检测的报告；源目录不合法、与目标相同、目标嵌在源里或源为空时
+/// 返回 `Err`，内容为 i18n 键
 pub(super) fn migrate(
     app: Option<&AppHandle>,
     src: &Path,
@@ -53,13 +63,13 @@ pub(super) fn migrate(
     ));
 
     // ---- 1. 搬运 ----
-    // `failed` 里可能有**嵌套**的失败项（某个文件被占用），所以成功条目数单独数，
+    // `failed` 里可能有**嵌套**的失败项，比如某个文件被占用，所以成功条目数单独数，
     // 不能用"总数 - failed.len()"倒推
     let mut failed: Vec<String> = Vec::new();
     let mut ok_entries: u32 = 0;
 
     if moved {
-        // 移动：按顶层条目重命名（跨盘回退复制 + 删源）
+        // 移动：按顶层条目重命名，跨盘时回退成复制 + 删源
         let total = src_entries.len() as u32;
         progress(app, "move", 0, total, "");
         let mut done: u32 = 0;
@@ -74,7 +84,7 @@ pub(super) fn migrate(
                 }
             }
         }
-        // 全部条目都搬完（源目录空了）才删掉它；有失败就留着
+        // 全部条目都搬完、源目录空了才删掉它；有失败就留着
         let empty = fs::read_dir(src)
             .map(|mut reader| reader.next().is_none())
             .unwrap_or(false);
@@ -86,7 +96,7 @@ pub(super) fn migrate(
             mml_log::info(String::from("colormc move: source kept (not empty)"));
         }
     } else {
-        // 复制：先数一遍文件数（进度用），再逐文件复制
+        // 复制：先数一遍文件数供进度用，再逐文件复制
         progress(app, "scan", 0, 0, "");
         let total = count_files(src);
         progress(app, "copy", 0, total, "");
@@ -128,7 +138,13 @@ pub(super) fn migrate(
     })
 }
 
-/// 递归数文件（复制模式的进度总量）
+/// 递归数文件，复制模式拿它当进度总量
+///
+/// - `dir`: 要数的目录
+///
+/// # 返回值
+///
+/// 目录下的文件总数；目录读不到返回 0
 pub(super) fn count_files(dir: &Path) -> u32 {
     let Ok(reader) = fs::read_dir(dir) else {
         return 0;
@@ -145,7 +161,13 @@ pub(super) fn count_files(dir: &Path) -> u32 {
     total
 }
 
-/// 删掉一个条目（文件或目录）—— 移动前清掉目标位置的同名条目（Windows 的 rename 不覆盖）
+/// 删掉一个条目，文件或目录都行；移动前清掉目标位置的同名条目，因为 Windows 的 rename 不覆盖
+///
+/// - `path`: 要删除的路径
+///
+/// # 返回值
+///
+/// 删除成功或路径本就不存在返回 `Ok(())`，其余返回 io 错误
 pub(super) fn remove_entry(path: &Path) -> io::Result<()> {
     if path.is_dir() {
         fs::remove_dir_all(path)
@@ -156,10 +178,23 @@ pub(super) fn remove_entry(path: &Path) -> io::Result<()> {
     }
 }
 
-/// 复制一个条目（目录递归、文件直接复制；同名一律覆盖）
+/// 复制一个条目：目录递归、文件直接复制，同名一律覆盖
 ///
 /// 单个文件失败只记进 `failed` 并继续：占用 / 无权限不该毁掉整次迁移。
-/// `stage` 只是进度事件里报的阶段名（移动的跨盘回退也走这里，那时报 `move`）。
+///
+/// - `app`: 窗口句柄，`None` 表示不报进度
+/// - `stage`: 进度事件里报的阶段名；移动的跨盘回退也走这里，那时报 `move`
+/// - `from`: 源路径
+/// - `to`: 目标路径
+/// - `rel`: 相对顶层条目的路径，报进度用
+/// - `done`: 已完成文件数，按引用累加
+/// - `total`: 总文件数，`0` 表示未知
+/// - `failed`: 失败项收集表，同样按相对路径记
+///
+/// # 返回值
+///
+/// 成功返回 `Ok(())`；目录内部的单个文件失败不影响返回，只在顶层条目本身失败时
+/// 返回 `Err`，内容为错误原文
 #[allow(clippy::too_many_arguments)]
 pub(super) fn copy_entry(
     app: Option<&AppHandle>,
@@ -202,8 +237,19 @@ pub(super) fn copy_entry(
 
 /// 移动一个顶层条目
 ///
-/// 先 `rename`（同盘瞬时）；跨盘时回退成"复制 + 删源"（[`path_helper::move_file`] 也是这个
-/// 策略，但这里要按文件报进度，所以自己走一遍 [`copy_entry`]）。
+/// 先 `rename`，同盘瞬时完成；跨盘时回退成"复制 + 删源"。[`path_helper::move_file`] 也是这个
+/// 策略，但这里要按文件报进度，所以自己走一遍 [`copy_entry`]。
+///
+/// - `app`: 窗口句柄，`None` 表示不报进度
+/// - `from`: 源路径
+/// - `to`: 目标路径
+/// - `rel`: 相对顶层条目的路径，报进度用
+/// - `done`: 已完成条目数，按引用累加
+/// - `total`: 总条目数，`0` 表示未知
+///
+/// # 返回值
+///
+/// 成功返回 `Ok(())`；删旧目标、rename 或跨盘复制失败时返回 `Err`，内容为错误原文
 pub(super) fn move_entry(
     app: Option<&AppHandle>,
     from: &Path,
@@ -226,7 +272,7 @@ pub(super) fn move_entry(
         Err(err) if err.kind() == io::ErrorKind::CrossesDevices => {
             let mut failed: Vec<String> = Vec::new();
             let mut files: u32 = 0;
-            // 跨盘只能真的复制：进度总量未知（0 = 未知），阶段名仍报 move
+            // 跨盘只能真的复制：进度总量未知，0 表示未知，阶段名仍报 move
             copy_entry(app, "move", from, to, rel, &mut files, 0, &mut failed)?;
             remove_entry(from).map_err(|err| err.to_string())?;
             *done += 1;

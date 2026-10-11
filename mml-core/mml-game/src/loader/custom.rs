@@ -1,4 +1,4 @@
-//! 自定义加载器安装（分析 Forge 型 jar）
+//! 自定义加载器安装：分析 Forge 型 jar
 
 use std::{io::Read, path::Path};
 
@@ -25,35 +25,32 @@ use crate::{
     },
 };
 
-/// 自定义加载器分析结果
+/// 自定义加载器 jar 的分析结果
 pub struct CutsomLoaderResObj {
-    /// 加载器名称
+    /// 加载器名称，如 `1.20.1-forge-47.2.0`
     pub name: String,
-    /// 需要下载的运行库列表
+    /// 需要下载的运行库列表，已排除本地齐全的项
     pub libs: Vec<FileItemObj>,
 }
 
 impl InstanceSettingObj {
-    /// 分析加载器 jar
+    /// 分析实例自己的加载器 jar
     ///
     /// # 返回值
     ///
-    /// 返回分析结果；读取或解析失败返回对应错误
+    /// 分析结果；读取或解析失败返回对应错误
     pub async fn decode_loader_jar(&self) -> CoreResult<CutsomLoaderResObj> {
         self.decode_loader_jar_with_path(self.get_loader_file())
             .await
     }
 
-    /// 分析加载器 jar
-    ///
-    /// # 参数
+    /// 分析指定路径的加载器 jar
     ///
     /// - `path`: 加载器 jar 路径
     ///
     /// # 返回值
     ///
-    /// 返回分析结果（加载器名与缺失的运行库）；文件不是合法的
-    /// Forge 型加载器返回 `DataNotFound`
+    /// 加载器名与缺失的运行库；文件不是合法的 Forge 型加载器返回 `DataNotFound`
     pub async fn decode_loader_jar_with_path<P: AsRef<Path>>(
         &self,
         path: P,
@@ -67,7 +64,7 @@ impl InstanceSettingObj {
             })
         })?;
 
-        // 读取 version.json（ForgeLaunchObj）
+        // 读取 version.json，解析成 ForgeLaunchObj
         let mut version_json = String::new();
         let version_ok = match zip.by_name(names::VERSION_FILE) {
             Ok(mut file) => {
@@ -81,7 +78,7 @@ impl InstanceSettingObj {
             Err(_) => false,
         };
 
-        // 读取 install_profile.json（ForgeInstallObj）
+        // 读取 install_profile.json，解析成 ForgeInstallObj
         let mut install_json = String::new();
         let install_ok = match zip.by_name(names::FILE_INSTALL_PROFILE) {
             Ok(mut file) => {
@@ -112,7 +109,7 @@ impl InstanceSettingObj {
 
         for item in all_libraries {
             if !item.downloads.artifact.url.is_empty() {
-                // 有下载地址 - 检查本地文件是否已存在且哈希正确
+                // 有下载地址：本地已有且哈希正确就跳过
                 let local = libraries_path.join(&item.downloads.artifact.path);
                 let mut skip = false;
                 if let Ok(mut read) = path_helper::open_read(&local) {
@@ -132,7 +129,7 @@ impl InstanceSettingObj {
                     });
                 }
             } else {
-                // 无下载地址 - 运行库在 zip 压缩包内部
+                // 无下载地址：运行库在 zip 压缩包内部
                 let zip_path = format!("maven/{}", item.downloads.artifact.path);
                 if let Ok(zip_file) = zip.by_name(&zip_path) {
                     let local = libraries_path.join(&item.downloads.artifact.path);
@@ -169,11 +166,11 @@ impl InstanceSettingObj {
         Ok(CutsomLoaderResObj { name, libs: list })
     }
 
-    /// 获取自定义加载器游戏参数
+    /// 取自定义加载器的游戏参数
     ///
     /// # 返回值
     ///
-    /// 返回游戏参数列表；未设置自定义加载器返回空列表
+    /// 游戏参数列表；未设置自定义加载器返回空列表
     pub fn get_custom_loader_game_args(&self) -> Vec<String> {
         if let Some(data) = self.get_custom_loader() {
             match data.as_ref() {
@@ -200,11 +197,11 @@ impl InstanceSettingObj {
         }
     }
 
-    /// 获取自定义加载器的JVM启动参数
+    /// 取自定义加载器的 JVM 参数
     ///
     /// # 返回值
     ///
-    /// 返回 JVM 参数列表；未设置自定义加载器返回空列表
+    /// JVM 参数列表；未设置自定义加载器返回空列表
     pub fn get_custom_loader_jvm_args(&self) -> Vec<String> {
         if let Some(data) = self.get_custom_loader() {
             match data.as_ref() {
@@ -225,11 +222,11 @@ impl InstanceSettingObj {
         }
     }
 
-    /// 获取自定义加载器主类
+    /// 取自定义加载器的主类
     ///
     /// # 返回值
     ///
-    /// 返回主类名；未设置自定义加载器返回空串
+    /// 主类名；未设置自定义加载器返回空串
     pub fn get_custom_loader_mainclass(&self) -> String {
         if let Some(data) = self.get_custom_loader() {
             match data.as_ref() {

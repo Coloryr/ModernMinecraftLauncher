@@ -10,13 +10,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::url_helper;
 
-/// Authlib-Injector 元数据
+/// Authlib-Injector 元数据，对应元数据接口的响应体
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct AuthlibInjectorMetaObj {
-    /// 最新构建号
+    /// 最新构建号，对应 `latest_build_number`
     pub latest_build_number: i32,
-    /// 各版本构建产物列表
+    /// 各版本构建产物列表，对应 `artifacts`
     pub artifacts: Vec<ArtifactsObj>,
 }
 
@@ -29,11 +29,11 @@ impl Default for AuthlibInjectorMetaObj {
     }
 }
 
-/// 单个构建产物
+/// 单个构建产物，对应 `artifacts[]` 的元素
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct ArtifactsObj {
-    /// 构建号
+    /// 构建号，对应 `build_number`，与 `latest_build_number` 比对挑最新
     pub build_number: i32,
 }
 
@@ -45,17 +45,17 @@ impl Default for ArtifactsObj {
     }
 }
 
-/// Authlib-Injector 下载信息
+/// Authlib-Injector 下载信息，对应单个构建的详情接口响应
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct AuthlibInjectorObj {
-    /// 构建号
+    /// 构建号，对应 `build_number`
     pub build_number: i32,
-    /// 版本号
+    /// 版本号，对应 `version`
     pub version: String,
-    /// 下载 URL
+    /// 下载 URL，对应 `download_url`
     pub download_url: String,
-    /// 校验值
+    /// 校验值，对应 `checksums`
     pub checksums: ChecksumsObj,
 }
 
@@ -70,11 +70,11 @@ impl Default for AuthlibInjectorObj {
     }
 }
 
-/// 校验值集合
+/// 校验值集合，对应详情接口的 `checksums`
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct ChecksumsObj {
-    /// SHA-256 哈希
+    /// SHA-256 哈希，对应 `sha256`，下载后校验用
     pub sha256: String,
 }
 
@@ -86,7 +86,7 @@ impl Default for ChecksumsObj {
     }
 }
 
-/// 内置的 Authlib-Injector 兜底版本（元数据接口不可用时使用）
+/// 内置的 Authlib-Injector 兜底版本，元数据接口不可用时使用
 pub static LOCAL_AUTHLIB: LazyLock<AuthlibInjectorObj> = LazyLock::new(|| AuthlibInjectorObj {
     build_number: 55,
     version: String::from("1.2.7"),
@@ -98,7 +98,7 @@ pub static LOCAL_AUTHLIB: LazyLock<AuthlibInjectorObj> = LazyLock::new(|| Authli
     },
 });
 
-/// 获取最新AuthlibInjector信息
+/// 获取最新 AuthlibInjector 信息
 ///
 /// # 返回值
 ///

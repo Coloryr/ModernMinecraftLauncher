@@ -1,14 +1,14 @@
 //! 验证：`tokio::sync::watch` 的唤醒到底能不能跨 runtime
 //!
-//! 背景：我怀疑"请求在 runtime A 等待、`abort_all()` 在 runtime B 广播"会导致
-//! 唤醒失效。但这个怀疑需要证据——`tokio::sync` 的通道 waker 是普通 `Waker`，
-//! 理论上与 runtime 无关。本测试直接把两种情形都跑一遍对比。
+//! 背景：怀疑"请求在 runtime A 等待、`abort_all()` 在 runtime B 广播"会导致
+//! 唤醒失效。但 `tokio::sync` 的通道 waker 是普通 `Waker`，理论上与 runtime 无关，
+//! 本测试把三种情形都跑一遍对比。
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-/// 情形 1：发送端与接收端在**同一个 runtime**
+/// 情形 1：发送端与接收端在同一个 runtime
 #[test]
 fn watch_wake_same_runtime() {
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -33,10 +33,10 @@ fn watch_wake_same_runtime() {
     assert!(woke.load(Ordering::SeqCst), "同 runtime 内唤醒应生效");
 }
 
-/// 情形 2：接收端在 runtime A 里等待，发送端（`send`）在**另一个 OS 线程**上调用
+/// 情形 2：接收端在 runtime A 里等待，发送端 `send` 在另一个 OS 线程上调用
 ///
 /// 注意：`send` 本身是同步的，不要求调用者在某个 tokio runtime 里——
-/// 这正对应实际场景（Tauri 同步命令里调 `abort_all()`）。
+/// 这正对应实际场景：Tauri 同步命令里调 `abort_all()`。
 #[test]
 fn watch_wake_across_threads() {
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -56,7 +56,7 @@ fn watch_wake_across_threads() {
 
     std::thread::sleep(Duration::from_millis(100));
 
-    // 发送端在**裸 OS 线程**（不在任何 tokio runtime 上下文里）调用 send
+    // 发送端在裸 OS 线程里调用 send，不在任何 tokio runtime 上下文里
     let handle = std::thread::spawn(move || {
         tx.send(1).unwrap();
     });
@@ -70,7 +70,7 @@ fn watch_wake_across_threads() {
     );
 }
 
-/// 情形 3：接收端在 runtime A，发送端在**另一个独立 runtime B** 里
+/// 情形 3：接收端在 runtime A，发送端在另一个独立 runtime B 里
 #[test]
 fn watch_wake_across_runtimes() {
     let rt_a = tokio::runtime::Builder::new_current_thread()

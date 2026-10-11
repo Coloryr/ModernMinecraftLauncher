@@ -139,7 +139,7 @@ function iconKey(item: CollectItemDto): string {
   return `${item.source}:${item.pid}`;
 }
 
-/** 存的是**原始网址**（收藏时落盘的就是它）还是本地协议地址（老条目） */
+/** 存的是**原始网址**，收藏时落盘的就是它；老条目存的是本地协议地址 */
 function isRemoteIcon(url: string): boolean {
   return !!url && !url.startsWith("http://mml-image.localhost") && !url.startsWith("mml-image://");
 }

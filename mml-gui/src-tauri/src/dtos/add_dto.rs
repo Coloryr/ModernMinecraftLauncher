@@ -1,8 +1,8 @@
-//! 添加实例窗口 DTO：目录项（`add_list_dir` 返回，前端 wire）
+//! 添加实例窗口 DTO：目录项，由 `add_list_dir` 返回，前端 wire 形态
 
 use serde::Serialize;
 
-/// 目录项（list_dir 返回）
+/// 目录项，由 list_dir 返回
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DirEntry {
@@ -12,17 +12,17 @@ pub struct DirEntry {
     pub is_dir: bool,
 }
 
-/// 扫描文件夹时找到的可导入实例（`add_scan_folder` 返回）
+/// 扫描文件夹时找到的可导入实例，由 `add_scan_folder` 返回
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FolderInstanceDto {
     /// 实例目录路径
     pub path: String,
-    /// 显示名（目录名，如 `1.20.1`）
+    /// 显示名，取目录名，如 `1.20.1`
     pub name: String,
 }
 
-/// 加载器支持列表查询进度（前端弹窗显示进度条）
+/// 加载器支持列表查询进度，前端弹窗用它显示进度条
 #[derive(Clone, Serialize)]
 pub struct LoaderProgressDto {
     /// 当前步数
@@ -31,7 +31,7 @@ pub struct LoaderProgressDto {
     pub total: u32,
 }
 
-/// 实例重名确认（前端弹窗询问）
+/// 实例重名确认，前端弹窗询问用户
 #[derive(Clone, Serialize)]
 pub struct NameConflictDto {
     /// 冲突实例 ID
@@ -52,7 +52,7 @@ pub struct DetectedPackDto {
     pub name: String,
 }
 
-/// 整合包安装进度（state：downloadPack / readInfo / getInfo / downloadFile / extract / done）
+/// 整合包安装进度，state 取值：downloadPack / readInfo / getInfo / downloadFile / extract / done
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PackProgressDto {

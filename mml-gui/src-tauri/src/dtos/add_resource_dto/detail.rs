@@ -1,6 +1,6 @@
 //! 项目详情 DTO：简介 + 正文 + 作者 + 标签 + 截图
 //!
-//! 从 `add_resource_dto/mod.rs` 拆出来的（`new_modrinth` / `new_curseforge` 两套构造）。
+//! 从 `add_resource_dto/mod.rs` 拆出来的，`new_modrinth` / `new_curseforge` 两套构造。
 
 use serde::{Deserialize, Serialize};
 
@@ -14,13 +14,13 @@ use crate::image_manager;
 
 use super::common::{DecPicDto, PicDto, TagDto};
 
-/// 项目详情（双击列表项弹出）：简介 + 正文 + 作者 + 标签 + 截图
+/// 项目详情，双击列表项弹出：简介 + 正文 + 作者 + 标签 + 截图
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectDetailDto {
     /// 简介
     pub summary: String,
-    /// 正文（Modrinth 的 body，markdown 文本）；CurseForge 没有正文，只有简介
+    /// 正文，即 Modrinth 的 body，markdown 文本；CurseForge 没有正文，只有简介
     pub body: Option<String>,
     /// 作者
     pub authors: Vec<PicDto>,
@@ -32,8 +32,6 @@ pub struct ProjectDetailDto {
 
 impl ProjectDetailDto {
     /// Modrinth 详情：project 拿正文 / 截图，team 拿作者头像
-    ///
-    /// # 参数
     ///
     /// - `data`: Modrinth 项目数据
     ///
@@ -86,15 +84,13 @@ impl ProjectDetailDto {
         })
     }
 
-    /// CurseForge 详情：只有简介（数据来自列表缓存或 mod_info，没有正文）
-    ///
-    /// # 参数
+    /// CurseForge 详情：只有简介，数据来自列表缓存或 mod_info，没有正文
     ///
     /// - `data`: CurseForge 项目数据
     ///
     /// # 返回值
     ///
-    /// 返回项目详情（body 为 None）
+    /// 返回项目详情，body 为 None
     pub fn new_curseforge(data: &CurseForgeListDataObj) -> Self {
         let mut authors = Vec::new();
         for item in data.authors.iter() {

@@ -9,10 +9,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::urls;
 
+/// Semeru 下载页接口返回的单条结果
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
 pub struct ResultsObj {
+    /// 页面 HTML 正文，用于解析主版本 / 系统 / 架构下拉框
     pub content: String,
+    /// 页面内嵌的 JS 脚本，含全部下载条目 `sourceDataJson`
     pub pagepost_custom_js_value: String,
 }
 
@@ -25,10 +28,13 @@ impl Default for ResultsObj {
     }
 }
 
+/// Semeru 下载页接口的响应
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
 pub struct OpenJ9Obj {
+    /// 接口是否报错，为 true 时 `results` 不可用
     pub error: bool,
+    /// 页面结果列表，代码只取第一条
     pub results: Vec<ResultsObj>,
 }
 
@@ -41,11 +47,14 @@ impl Default for OpenJ9Obj {
     }
 }
 
+/// 单个下载选项
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
 pub struct OptObj {
+    /// 下载直链
     #[serde(rename = "downloadLink")]
     pub download_link: String,
+    /// 文件校验值，算法由页面给定
     pub checksum: String,
 }
 
@@ -58,9 +67,11 @@ impl Default for OptObj {
     }
 }
 
+/// 某一种包类型下的下载选项集合，字段名沿用页面里的 `opt1`
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
 pub struct JdkObj {
+    /// 页面中该包类型只给出 opt1 一个选项
     pub opt1: OptObj,
 }
 
@@ -72,14 +83,21 @@ impl Default for JdkObj {
     }
 }
 
+/// 单条 Java 下载条目
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
 pub struct DownloadObj {
+    /// 条目名称，页面原文以 `<br>` 分三段，初始化时改写成 `{第二段}+{第三段}`
     pub name: String,
+    /// Java 主版本号
     pub version: i32,
+    /// 目标操作系统
     pub os: String,
+    /// 目标架构
     pub arch: String,
+    /// JDK 包下载信息
     pub jdk: JdkObj,
+    /// JRE 包下载信息
     pub jre: JdkObj,
 }
 
@@ -96,9 +114,11 @@ impl Default for DownloadObj {
     }
 }
 
+/// 页面 JS 里 `sourceDataJson` 的结构
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct OpenJ9FileObj {
+    /// 全部下载条目
     pub downloads: Vec<DownloadObj>,
 }
 
@@ -110,17 +130,23 @@ impl Default for OpenJ9FileObj {
     }
 }
 
+/// 解析后的 IBM Semeru 可下载列表
 #[derive(Debug, Clone)]
 pub struct OpenJ9ListObj {
+    /// 架构候选值，已剔除页面里的 any
     pub arch: Vec<String>,
+    /// 操作系统候选值，已剔除页面里的 any
     pub os: Vec<String>,
+    /// Java 主版本候选值
     pub main_version: Vec<String>,
+    /// 全部下载条目
     pub download: Vec<DownloadObj>,
 }
 
+/// 解析结果缓存，首次查询后复用
 static OPENJ9: OnceLock<OpenJ9ListObj> = OnceLock::new();
 
-/// 获取JAVA列表
+/// 抓取并解析 Semeru 下载页，结果写入 `OPENJ9` 缓存
 async fn init() -> CoreResult<OpenJ9ListObj> {
     let data: OpenJ9Obj = crate::get_work_client().get_json(urls::OPENJ9).await?;
     let data = &data.results[0];
@@ -197,6 +223,7 @@ async fn init() -> CoreResult<OpenJ9ListObj> {
         }
     }
 
+    // 脚本里 `function` 之后是页面渲染逻辑，截掉后追加一句把 sourceDataJson 序列化出来
     let Some(temp) = data.pagepost_custom_js_value.find("function") else {
         return Err(ErrorType::DataNotFound(DataNotFoundData::Info));
     };
@@ -233,6 +260,11 @@ async fn init() -> CoreResult<OpenJ9ListObj> {
     Ok(OPENJ9.get_or_init(|| obj).clone())
 }
 
+/// 获取 IBM Semeru 的 Java 列表
+///
+/// # 返回值
+///
+/// 首次调用抓取并解析下载页，之后直接返回缓存
 pub async fn get_java_list() -> CoreResult<OpenJ9ListObj> {
     match OPENJ9.get() {
         Some(data) => Ok(data.clone()),

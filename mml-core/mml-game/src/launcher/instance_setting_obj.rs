@@ -12,6 +12,7 @@ use crate::{
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
 pub struct ServerObj {
+    /// 是否在启动后自动加入该服务器
     pub enable: bool,
     /// 服务器地址
     #[serde(rename = "IP")]
@@ -22,6 +23,7 @@ pub struct ServerObj {
 }
 
 impl Default for ServerObj {
+    /// 默认不自动加入服务器，地址与端口为空
     fn default() -> Self {
         Self {
             enable: Default::default(),
@@ -42,15 +44,16 @@ pub struct ProxyHostObj {
     #[serde(rename = "Port")]
     pub port: Option<u16>,
 
-    /// 服务器地址
+    /// 代理用户名，缺省表示不需要认证
     #[serde(rename = "User")]
     pub user: Option<String>,
-    /// 服务器地址
+    /// 代理密码，缺省表示不需要认证
     #[serde(rename = "Password")]
     pub password: Option<String>,
 }
 
 impl Default for ProxyHostObj {
+    /// 地址、端口与认证信息均可缺省
     fn default() -> Self {
         Self {
             ip: Default::default(),
@@ -61,19 +64,20 @@ impl Default for ProxyHostObj {
     }
 }
 
-/// 高级Jvm启动参数
+/// 高级 JVM 启动参数
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
 pub struct AdvanceJvmObj {
-    /// 自定义mainclass
+    /// 自定义主类，覆盖版本 JSON 里的 mainClass
     #[serde(rename = "MainClass")]
     pub main_class: Option<String>,
-    /// 附加classpath
+    /// 附加 classpath，追加在自动拼接的类路径之后
     #[serde(rename = "ClassPath")]
     pub class_path: Option<String>,
 }
 
 impl Default for AdvanceJvmObj {
+    /// 不覆盖主类、不追加类路径
     fn default() -> Self {
         Self {
             main_class: Default::default(),
@@ -101,6 +105,7 @@ pub struct CustomLoaderObj {
 }
 
 impl Default for CustomLoaderObj {
+    /// 四项开关全部关闭，即不改动原版运行库与启动配置
     fn default() -> Self {
         Self {
             offset_lib: Default::default(),
@@ -133,13 +138,13 @@ pub struct InstanceSettingObj {
     /// 模组加载器版本
     #[serde(rename = "LoaderVersion")]
     pub loader_version: Option<String>,
-    /// Jvm参数
+    /// JVM 参数
     #[serde(rename = "JvmArg")]
     pub jvm_arg: Option<RunArgObj>,
-    /// Jvm名字
+    /// JVM 预设名，仅作展示，实际参数取 `jvm_arg`
     #[serde(rename = "JvmName")]
     pub jvm_name: Option<String>,
-    /// Jvm路径
+    /// 指定使用的 Java 可执行文件路径，缺省则自动选择
     #[serde(rename = "JvmLocal")]
     pub jvm_local: Option<String>,
     /// 窗口设置
@@ -154,19 +159,19 @@ pub struct InstanceSettingObj {
     /// 高级Jvm设置
     #[serde(rename = "AdvanceJvm")]
     pub advance_jvm: Option<AdvanceJvmObj>,
-    /// 是否为整合包
+    /// 是否为整合包实例
     #[serde(rename = "Modpack")]
     pub is_modpack: bool,
-    /// 整合包类型
+    /// 整合包来源类型
     #[serde(rename = "ModPackType")]
     pub modpack_type: ModPackType,
-    /// 游戏发布类型
+    /// 游戏发布类型，如正式版、快照
     #[serde(rename = "GameType")]
     pub game_type: VersionType,
-    /// 整合包项目
+    /// 整合包项目 ID，非整合包实例为空
     #[serde(rename = "PID")]
     pub pid: Option<String>,
-    /// 整合包版本
+    /// 整合包文件 ID，非整合包实例为空
     #[serde(rename = "FID")]
     pub fid: Option<String>,
     /// 图标
@@ -184,6 +189,7 @@ pub struct InstanceSettingObj {
 }
 
 impl Default for InstanceSettingObj {
+    /// 可缺省字段全为 `None`，uuid 与各枚举取各自缺省值
     fn default() -> Self {
         Self {
             uuid: Default::default(),

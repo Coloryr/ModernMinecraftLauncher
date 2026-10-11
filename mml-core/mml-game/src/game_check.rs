@@ -20,8 +20,6 @@ use crate::{
 
 /// 检查文件是否需要添加到下载列表
 ///
-/// # 参数
-///
 /// - `item`: 需要检查的文件
 /// - `check_sha1`: 是否校验SHA1
 ///
@@ -37,8 +35,6 @@ fn check_to_add(item: &FileItemObj, check_sha1: bool) -> bool {
 }
 
 /// 检查单个文件的SHA1是否匹配
-///
-/// # 参数
 ///
 /// - `file`: 文件路径
 /// - `sha1`: 期望的SHA1值
@@ -60,8 +56,6 @@ fn check_file_sha1<P: AsRef<Path>>(file: P, sha1: &str) -> bool {
 
 impl InstanceSettingObj {
     /// 检查游戏文件
-    ///
-    /// # 参数
     ///
     /// - `obj`: 启动配置
     ///

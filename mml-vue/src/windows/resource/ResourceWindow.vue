@@ -7,11 +7,15 @@
 // - 共用操作          → composables/useResourceOps（忙碌标记 / 确认弹窗 / 打开目录 / 重拉）
 // - 各分类的列表      → parts/*Pane.vue（每类一个，自带的弹窗跟上）
 // - 窗口级样式        → resource.css（非 scoped，拆开的子组件共用；见该文件头部说明）
-import { computed, onMounted, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
-import { t } from "../../lib/i18n";
+import { t, tErr } from "../../lib/i18n";
+import { showToast } from "../../lib/toast";
+import { commands } from "../../lib/bindings";
+import { useFileDrop } from "../../composables/useFileDrop";
+import type { FileDropPayload } from "../../composables/useFileDrop";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import { openWindow } from "../windowManager";
 import { useResourceData } from "./composables/useResourceData";
@@ -20,6 +24,8 @@ import { useResourceView } from "./composables/useResourceView";
 import CategoryRail from "./parts/CategoryRail.vue";
 import ConfirmModal from "./parts/ConfirmModal.vue";
 import DatapackPane from "./parts/DatapackPane.vue";
+import DropConflictModal from "./parts/DropConflictModal.vue";
+import DropOverlay from "../../components/ui/DropOverlay.vue";
 import InstanceChip from "./parts/InstanceChip.vue";
 import ModPane from "./parts/ModPane.vue";
 import PackPane from "./parts/PackPane.vue";
@@ -28,7 +34,7 @@ import SchematicPane from "./parts/SchematicPane.vue";
 import ScreenshotPane from "./parts/ScreenshotPane.vue";
 import ServerPane from "./parts/ServerPane.vue";
 import ShaderPane from "./parts/ShaderPane.vue";
-import type { CategoryId } from "./types";
+import { dropKindOf, RESOURCE_CATEGORIES, type CategoryId } from "./types";
 import "./resource.css";
 
 // 必须显式声明 close：不声明的话 Vue 会把父级的 @close 当 attrs 透传到根组件（WindowFrame），
@@ -46,7 +52,7 @@ defineEmits<{ (e: "close"): void }>();
 const data = useResourceData();
 const view = useResourceView(data);
 const ops = useResourceOps(data);
-const { category, saveTab, instance, sync } = data;
+const { category, saveTab, instance, instanceUuid, dpSave, sync } = data;
 const { confirmBox } = ops;
 const { load: loadView } = view;
 
@@ -83,6 +89,129 @@ const paneKey = computed(() =>
 function openDownload() {
   openWindow("add_resource");
 }
+
+// ================= 拖拽导入（落点 = 当前面板对应的目录） =================
+
+/** 待处理的拖入：已经预检出同名冲突，等用户在弹窗里选处理方式 */
+const dropPending = ref<{
+  kind: string;
+  parent: string | null;
+  paths: string[];
+  conflicts: string[];
+} | null>(null);
+/** 有导入在跑：弹窗按钮置灰 */
+const dropBusy = ref(false);
+
+/** 当前面板对应的后端 kind */
+const dropKind = computed(() => dropKindOf(category.value, saveTab.value));
+
+/**
+ * 当前面板的显示名（遮罩文案里报"落到哪一类"）
+ *
+ * 存档下的**数据包子页**要用子页的名字（「数据包」），不能报成「存档」——
+ * 两者落点不同（`saves/` 与 `saves/<存档>/datapacks`）。
+ */
+const dropLabel = computed(() => {
+  if (category.value === "saves" && saveTab.value === "datapacks") {
+    return t("resource.datapacks");
+  }
+  const item = RESOURCE_CATEGORIES.find((c) => c.id === category.value);
+  return item ? t(item.labelKey) : "";
+});
+
+/**
+ * 数据包那一页的 parent（存档目录名）
+ *
+ * 数据包挂在某个存档下（`saves/<存档目录名>/datapacks`），落点必须连它一起传；
+ * 其它分类传 null。数据包页的下拉框选的就是 `dpSave`（见 DatapackPane）。
+ */
+const dropParent = computed(() => (dropKind.value === "datapacks" ? dpSave.value : null));
+
+/**
+ * 这次拖入接不接（**只在悬停阶段问一次**，见 useFileDrop 的 accept 说明）
+ *
+ * 不接的内容**连拖都拖不进来**：`dragover` 不放行 → 系统画"禁止"光标、松手也不会有 drop。
+ * 悬停阶段 DOM 只给 `types` 与（能认出来时的）`isDirectory`，所以这里只判得了两件事：
+ * 认出来是目录 → 不接；没带文件（文本 / 网页卡片）→ 不接。
+ * 目录与登录快捷方式在悬停时认不全，**松手后由 onFilesDropped 再过滤一次**。
+ *
+ * 数据包页还得先选中一个存档，否则无处可放。
+ */
+async function canAcceptDrop(payload: FileDropPayload) {
+  if (!dropKind.value || !instanceUuid.value) return false;
+  if (dropKind.value === "datapacks" && !dpSave.value) return false;
+  if (payload.isDirectory === true) return false;
+  return payload.types.includes("Files");
+}
+
+/** 松手：先滤掉目录 / 快捷方式，再预检同名冲突；有冲突就弹窗问，没有就直接导入 */
+async function onFilesDropped(payload: FileDropPayload) {
+  const kind = dropKind.value;
+  const uuid = instanceUuid.value;
+  const parent = dropParent.value;
+  if (!kind || !uuid) return;
+  if (kind === "datapacks" && !parent) return;
+
+  // 这一页只落"资源文件"：目录与登录快捷方式（.url / .webloc）跳过
+  const paths: string[] = [];
+  try {
+    for (const path of payload.paths) {
+      const probe = await commands.windows.probeDrop(path);
+      if (probe.kind !== "folder" && probe.kind !== "shortcut") {
+        paths.push(path);
+      }
+    }
+  } catch (e) {
+    showToast(tErr(e));
+    return;
+  }
+  if (!paths.length) {
+    // 悬停时没认出目录（`webkitGetAsEntry` 拿不到）、松手才滤空的：给一句说明，别静默
+    showToast(t("resource.dropUnsupported"));
+    return;
+  }
+
+  try {
+    const check = await commands.resource.importFiles(uuid, kind, paths, "check", parent);
+    if (check.conflicts.length) {
+      dropPending.value = { kind, parent, paths, conflicts: check.conflicts };
+      return;
+    }
+    await runImport(kind, parent, paths, "overwrite");
+  } catch (e) {
+    showToast(tErr(e));
+  }
+}
+
+/** 真正落盘并重拉当前列表 */
+async function runImport(kind: string, parent: string | null, paths: string[], mode: string) {
+  if (dropBusy.value) return;
+  dropBusy.value = true;
+  try {
+    const result = await commands.resource.importFiles(instanceUuid.value, kind, paths, mode, parent);
+    if (result.imported.length) {
+      showToast(t("resource.dropImported", { count: result.imported.length }));
+    } else if (result.skipped.length) {
+      showToast(t("resource.dropSkipped", { count: result.skipped.length }));
+    }
+    // 磁盘上多/换了文件：重拉当前分类（模组会重解析 jar，但这是导入后必须付的代价）
+    await data.reloadCurrent();
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    dropBusy.value = false;
+  }
+}
+
+/** 冲突弹窗里选完 */
+async function answerDrop(mode: string) {
+  const pending = dropPending.value;
+  dropPending.value = null;
+  if (!pending) return;
+  await runImport(pending.kind, pending.parent, pending.paths, mode);
+}
+
+const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
 </script>
 
 <template>
@@ -127,6 +256,13 @@ function openDownload() {
 
       <!-- 删除 / 清空确认（全窗口共用一份，内容来自 ops） -->
       <ConfirmModal v-if="confirmBox" :ops="ops" @close="confirmBox = null" />
+
+      <!-- 拖拽导入：同名冲突问一次（覆盖 / 跳过 / 重命名），选完才落盘 -->
+      <DropConflictModal v-if="dropPending" :conflicts="dropPending.conflicts" :busy="dropBusy"
+        @close="dropPending = null" @pick="answerDrop" />
     </div>
+
+    <!-- 拖入文件时的遮罩（标题报出落到哪一类；目录 / 卡片不接，见 canAcceptDrop） -->
+    <DropOverlay v-if="fileDragOver" :title="t('resource.dropTitleTo', { name: dropLabel })" />
   </WindowFrame>
 </template>

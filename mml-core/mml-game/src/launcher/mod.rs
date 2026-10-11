@@ -38,13 +38,14 @@ pub enum ModPackType {
 }
 
 impl Default for ModPackType {
+    /// 默认为未识别
     fn default() -> Self {
         ModPackType::None
     }
 }
 
 impl ModPackType {
-    /// 独立 ID（跨进程传输用，显示名由前端 i18n 翻译）
+    /// 独立 ID，跨进程传输用，显示名由前端 i18n 翻译
     pub fn to_string(&self) -> String {
         String::from(match self {
             ModPackType::CurseForge => "curseforge",
@@ -78,6 +79,7 @@ pub enum LogEncoding {
 }
 
 impl Default for LogEncoding {
+    /// 默认为 UTF-8
     fn default() -> Self {
         LogEncoding::UTF8
     }
@@ -146,6 +148,7 @@ pub enum FileType {
 }
 
 impl Default for FileType {
+    /// 默认为整合包
     fn default() -> Self {
         FileType::Modpack
     }
@@ -153,8 +156,6 @@ impl Default for FileType {
 
 impl FileType {
     /// 按独立 ID 解析文件类型
-    ///
-    /// # 参数
     ///
     /// - `id`: 文件类型 ID
     ///
@@ -174,7 +175,7 @@ impl FileType {
         }
     }
 
-    /// 独立 ID（跨进程传输用，显示名由前端 i18n 翻译）
+    /// 独立 ID，跨进程传输用，显示名由前端 i18n 翻译
     ///
     /// # 返回值
     ///
@@ -195,14 +196,12 @@ impl FileType {
 
 /// 检测下载源
 ///
-/// # 参数
-///
 /// - `pid`: 项目号
 /// - `fid`: 文件号
 ///
 /// # 返回值
 ///
-/// 返回下载源类型（非纯数字 ID 判定为 Modrinth，否则为 CurseForge）
+/// 返回下载源类型：非纯数字 ID 判定为 Modrinth，否则为 CurseForge
 pub fn get_source_type(pid: &str, fid: &str) -> ModPackType {
     if tools::check_is_not_number(pid) || tools::check_is_not_number(fid) {
         ModPackType::Modrinth

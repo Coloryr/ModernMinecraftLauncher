@@ -1,6 +1,6 @@
-//! 添加资源窗口的列表查询：文件列表（某项目的版本）与项目列表（搜索 / 分类翻页）
+//! 添加资源窗口的列表查询：某项目的文件列表，以及项目列表的搜索与分类翻页
 //!
-//! 从 `add_resource/mod.rs` 拆出来的两个大函数（135 / 160 行）。列表页顺手把项目与文件
+//! 从 `add_resource/mod.rs` 拆出来的两个大函数，各 135 / 160 行。列表页顺手把项目与文件
 //! 数据写进 `CURSEFOGRE_*` / `MODRINTH_*` 缓存，详情与下载都从缓存里取。
 
 use mml_game::launcher::{FileType, ModPackType};
@@ -16,11 +16,21 @@ use crate::dtos::add_resource_dto::{FileListDto, FileListItemDto, ProjectDto, Pr
 
 use super::{CURSEFOGRE_FILE, CURSEFOGRE_INFO, DOWNLOAD_NOW, MODRINTH_FILE, MODRINTH_INFO};
 
-/// 获取文件列表
+/// 获取文件列表，即某个项目的版本 / 文件
 ///
-/// 一页50个项目
-/// CurseForge换页需要查询
-/// Modrinth没有换页，一次获取所有
+/// 一页 50 个项目：CurseForge 换页需要重新查询，Modrinth 没有换页、一次获取所有。
+///
+/// - `game`: 实例 uuid，用来标记"已下载 / 正在下载"
+/// - `source`: 下载源，取 `curseforge` 或 `modrinth`
+/// - `pid`: 项目 ID
+/// - `file_type`: 资源类型，决定 `loader` 是否生效
+/// - `page`: 页码，从 1 开始
+/// - `version`: 游戏版本过滤，`None` 表示不限
+/// - `loader`: 模组加载器过滤，仅模组类型有意义，缺省 / 非法值按 normal
+///
+/// # 返回值
+///
+/// 该页文件列表、总数与最大页数、项目名；源不受支持、类型非法或实例不存在时返回 `Err`
 #[gui_macros::ipc_group("add_resource")]
 #[tauri::command]
 pub async fn add_resource_file(
@@ -49,7 +59,7 @@ pub async fn add_resource_file(
         return Err(String::from("err.fileTypeNotFound"));
     }
     let file_type = file_type.unwrap();
-    // loader 只对模组有意义，其余类型一律 Normal（缺省 / 非法值也视为 normal）
+    // loader 只对模组有意义，其余类型一律 Normal，缺省 / 非法值也视为 normal
     let mod_loader = if matches!(file_type, FileType::Mod) {
         LoaderType::from_string(&loader.clone().unwrap_or_default()).unwrap_or(LoaderType::Normal)
     } else {
@@ -135,7 +145,7 @@ pub async fn add_resource_file(
                         None => false,
                     };
 
-                    // 没有文件可下的版本直接跳过（见 new_modrinth 的注释）
+                    // 没有文件可下的版本直接跳过，理由见 new_modrinth 的注释
                     if let Some(dto) = FileListItemDto::new_modrinth(
                         &item,
                         file_type,
@@ -159,10 +169,24 @@ pub async fn add_resource_file(
     }
 }
 
-/// 获取项目列表
+/// 获取项目列表，支持搜索与分类翻页
 ///
-/// 参数就是 IPC 契约（`bindings.ts` 由 Rust 源码生成，见 AGENTS.md §4），
+/// 参数就是 IPC 契约，见 AGENTS.md §4：`bindings.ts` 由 Rust 源码生成，
 /// 不能为了少几个参数把它们并成结构体 —— 那等于改前端调用方式。
+///
+/// - `game`: 实例 uuid，用来标记"已下载 / 正在下载 / 已收藏"
+/// - `source`: 下载源，取 `curseforge` 或 `modrinth`
+/// - `file_type`: 资源类型，取 `mod` / `save` / `resourcepack` / `shaderpack` / `datapacks`
+/// - `page`: 页码，从 1 开始
+/// - `sort`: 排序方式，取值来自 `add_resource_sort_type`
+/// - `category`: 分类过滤，`None` 表示不限
+/// - `filter`: 搜索关键字，`None` 表示不限
+/// - `version`: 游戏版本过滤，`None` 表示不限
+/// - `loader`: 模组加载器过滤，仅模组类型有意义，缺省 / 非法值按 normal
+///
+/// # 返回值
+///
+/// 该页项目列表与命中总数；源 / 排序不受支持或实例不存在时返回 `Err`
 #[allow(clippy::too_many_arguments)]
 #[gui_macros::ipc_group("add_resource")]
 #[tauri::command]
@@ -194,7 +218,7 @@ pub async fn add_resource_list(
         return Err(String::from("err.fileTypeNotFound"));
     }
     let file_type = file_type.unwrap();
-    // loader 只对模组有意义，其余类型一律 Normal（缺省 / 非法值也视为 normal）
+    // loader 只对模组有意义，其余类型一律 Normal，缺省 / 非法值也视为 normal
     let mod_loader = if matches!(file_type, FileType::Mod) {
         LoaderType::from_string(&loader.clone().unwrap_or_default()).unwrap_or(LoaderType::Normal)
     } else {
@@ -276,7 +300,7 @@ pub async fn add_resource_list(
                 ..Default::default()
             };
 
-            // Modrinth 没有存档（world）类型
+            // Modrinth 没有存档 world 类型
             let list = match file_type {
                 FileType::Mod => modrinth_api::get_mod_list(arg).await,
                 FileType::Resourcepack => modrinth_api::get_resourcepack_list(arg).await,
@@ -288,7 +312,7 @@ pub async fn add_resource_list(
 
             let mut list1 = Vec::new();
             // 缓存先攒着，**构建 DTO 期间不持锁**：new_modrinth 里会 await 查
-            // 标签图标（首次可能真发网络请求），持全局写锁跨 await 会把其它
+            // 标签图标，首次可能真发网络请求，持全局写锁跨 await 会把其它
             // 窗口读同一份缓存的请求一起堵住。攒完最后一次性写入。
             let mut cached = Vec::new();
 
@@ -327,7 +351,14 @@ pub async fn add_resource_list(
     }
 }
 
-/// 项目是否正在下载（该实例任务表里有同 pid 的条目，列表角标用）
+/// 项目是否正在下载，列表角标用；判据是该实例任务表里有同 pid 的条目
+///
+/// - `game`: 实例 uuid
+/// - `pid`: 项目 ID
+///
+/// # 返回值
+///
+/// 该项目下有任一文件在下载即为 `true`
 fn check_download_now(game: &Uuid, pid: &str) -> bool {
     let read = DOWNLOAD_NOW.read().unwrap();
     let list = read.get(game);
@@ -343,7 +374,15 @@ fn check_download_now(game: &Uuid, pid: &str) -> bool {
     false
 }
 
-/// 具体文件是否正在下载（该实例任务表里有同 pid + fid 的条目）
+/// 具体文件是否正在下载；判据是该实例任务表里有同 pid 与 fid 的条目
+///
+/// - `game`: 实例 uuid
+/// - `pid`: 项目 ID
+/// - `fid`: 文件 ID
+///
+/// # 返回值
+///
+/// 该项目下这个文件正在下载即为 `true`
 fn check_version_download_now(game: &Uuid, pid: &str, fid: &str) -> bool {
     let read = DOWNLOAD_NOW.read().unwrap();
     let list = read.get(game);

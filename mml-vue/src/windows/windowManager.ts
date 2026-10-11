@@ -53,14 +53,35 @@ export interface WindowProjectParam {
 }
 
 /**
+ * 拖拽导入带进来的路径（主窗口拖入文件 / 文件夹 / 登录快捷方式 → 目标窗口）
+ *
+ * `kind` 由后端探测定（`window_probe_drop`）：
+ * - `folder` / `archive` → 「添加实例」窗口进对应模式并填好地址；
+ * - `shortcut` → 「账户管理」窗口用 `url`（快捷方式里解析出的认证服务器地址）预填外置登录。
+ */
+export interface WindowDropParam {
+  /** 拖入项的绝对路径 */
+  path: string;
+  /** folder / archive / shortcut */
+  kind: "folder" | "archive" | "shortcut";
+  /** `kind = shortcut` 时：从快捷方式里解析出的地址 */
+  url?: string;
+}
+
+/**
  * 单窗口模式下"本次打开带入的参数"
  *
  * 单窗口既没有新窗口、也没有新 URL（Tauri 下连 pushState 都不做），壳层的 focus 事件更是
  * 无从触发，所以目标实例只能这样送达：openWindow 写进来，窗口组件 watch / onActivated 读走。
  */
-export const windowParams = ref<{ uuid: string | null; project: WindowProjectParam | null }>({
+export const windowParams = ref<{
+  uuid: string | null;
+  project: WindowProjectParam | null;
+  drop: WindowDropParam | null;
+}>({
   uuid: null,
   project: null,
+  drop: null,
 });
 
 /**
@@ -110,11 +131,20 @@ export function targetProject(): WindowProjectParam | null {
   return multiWindow.value ? projectFromUrl() : windowParams.value.project;
 }
 
+/**
+ * 本次带入的拖拽路径：单窗口取 openWindow 带入的参数，多窗口取本窗口 URL 上的参数
+ *
+ * 用完要清（见「添加实例」窗口的 consumeDrop）：多窗口模式下 URL 上的参数会一直留着。
+ */
+export function targetDrop(): WindowDropParam | null {
+  return multiWindow.value ? dropFromUrl() : windowParams.value.drop;
+}
+
 export function setMultiWindow(v: boolean): Promise<void> {
   multiWindow.value = v;
   // 换了模式，之前的返回栈与带入参数都不再成立
   backStack.value = [];
-  windowParams.value = { uuid: null, project: null };
+  windowParams.value = { uuid: null, project: null, drop: null };
   writeString(KEYS.windowMode, v ? "Multi" : "Single");
   // 返回保存的 Promise：要紧接着重启进程的调用方必须等这次写入真的落盘
   // （重启会立刻刷盘并退出，写请求还在路上就丢了 —— 见 useSettingsUi 的窗口模式切换）
@@ -153,9 +183,16 @@ const PROJ_PARAMS = {
   url: "purl",
 } as const;
 
+/** 拖拽导入参数在 URL 上的键（同样只有 URL 一条路能送进新窗口） */
+const DROP_PARAMS = {
+  path: "dpath",
+  kind: "dkind",
+  url: "durl",
+} as const;
+
 function urlFor(
   kind: WindowKind,
-  params?: { uuid?: string; project?: WindowProjectParam },
+  params?: { uuid?: string; project?: WindowProjectParam; drop?: WindowDropParam },
 ): string {
   const url = new URL(window.location.href);
   if (kind === "main") {
@@ -167,6 +204,19 @@ function urlFor(
     url.searchParams.set(UUID_PARAM, params.uuid);
   } else {
     url.searchParams.delete(UUID_PARAM);
+  }
+  if (params?.drop) {
+    url.searchParams.set(DROP_PARAMS.path, params.drop.path);
+    url.searchParams.set(DROP_PARAMS.kind, params.drop.kind);
+    if (params.drop.url) {
+      url.searchParams.set(DROP_PARAMS.url, params.drop.url);
+    } else {
+      url.searchParams.delete(DROP_PARAMS.url);
+    }
+  } else {
+    for (const key of Object.values(DROP_PARAMS)) {
+      url.searchParams.delete(key);
+    }
   }
   if (params?.project) {
     const p = params.project;
@@ -218,6 +268,19 @@ export function projectFromUrl(): WindowProjectParam | null {
 }
 
 /**
+ * 从 URL 读取拖拽导入的路径（主窗口拖拽时开的目标窗口用），没有 / 不合法返回 null
+ */
+export function dropFromUrl(): WindowDropParam | null {
+  const q = new URLSearchParams(window.location.search);
+  const path = q.get(DROP_PARAMS.path);
+  const kind = q.get(DROP_PARAMS.kind);
+  if (!path || (kind !== "folder" && kind !== "archive" && kind !== "shortcut")) {
+    return null;
+  }
+  return { path, kind, url: q.get(DROP_PARAMS.url) ?? "" };
+}
+
+/**
  * 把窗口参数里的项目还原成窗口能直接用的项目条目
  *
  * 只有收藏夹存下来的那几项（名字 / 图标 / 网址 / 源 / 项目 ID），其余字段（作者、标签、
@@ -246,8 +309,12 @@ export function projectParamToItem(p: WindowProjectParam): ProjectItemDto {
 /** 打开一个窗口（功能入口等调用）
  *
  * - `params.uuid`：目标实例 uuid（游戏日志窗口用，定位要查看的实例）
+ * - `params.drop`：拖拽导入带进去的路径（主窗口拖入文件 / 文件夹用）
  */
-export function openWindow(kind: WindowKind, params?: { uuid?: string; project?: WindowProjectParam }) {
+export function openWindow(
+  kind: WindowKind,
+  params?: { uuid?: string; project?: WindowProjectParam; drop?: WindowDropParam },
+) {
   // 单窗口模式（浏览器 / Tauri 一致）：应用内页面切换
   if (!multiWindow.value) {
     // 下载管理是工具型窗口：浮在当前页面之上，不把页面换掉（关掉它也不会"返回"到哪去）
@@ -262,16 +329,29 @@ export function openWindow(kind: WindowKind, params?: { uuid?: string; project?:
       currentKind.value = kind;
     }
     // 目标实例 / 目标项目只能靠这里送达：单窗口没有新窗口 / 新 URL，也没有壳层的 focus 事件
-    windowParams.value = { uuid: params?.uuid ?? null, project: params?.project ?? null };
+    windowParams.value = {
+      uuid: params?.uuid ?? null,
+      project: params?.project ?? null,
+      drop: params?.drop ?? null,
+    };
     if (!isTauri()) window.history.pushState({}, "", urlFor(kind, params));
     return;
   }
 
   if (isTauri()) {
-    // 新窗口的目标参数（实例 uuid + "要打开哪个项目"）只能靠 URL 送达，而 Rust 那条命令
-    // 原来只认 log / export 的 uuid。所以这里把组装好的 query 一起交过去，由它拼进
+    // 新窗口的目标参数（实例 uuid + "要打开哪个项目" + 拖入的路径）只能靠 URL 送达，而 Rust
+    // 那条命令原来只认 log / export 的 uuid。所以这里把组装好的 query 一起交过去，由它拼进
     // WebviewUrl —— 建窗仍然走 Rust（几何恢复 / 句柄表 / 窗口模型都在那边）。
     const query = new URL(urlFor(kind, params)).search.replace(/^\?/, "");
+    // 带拖入路径的打开：窗口**已经开着**时必须重新加载才拿得到新参数（只聚焦会把参数丢掉），
+    // 所以走 reopen（Rust 侧已存在则 navigate）；其余窗口维持"只聚焦、目标靠事件切换"
+    if (params?.drop) {
+      commands.windows.reopenWindow(kind, query).catch((e) => {
+        console.error("[windowManager] Rust 重开窗口失败，回退 JS API", kind, e);
+        createViaJs(kind, params);
+      });
+      return;
+    }
     // `instance` 只对 log / export 有意义：那是"窗口已开着时推事件切实例"用的
     const eventUuid = kind === "log" || kind === "export" ? (params?.uuid ?? null) : null;
     // 统一走 Rust 窗口管理器：创建 / 聚焦在 src-tauri 的 windows/mod.rs 处理。
@@ -412,8 +492,8 @@ export function closeWindow() {
 /** 单窗口模式的应用内跳转（同步返回栈之外的显示状态与 URL） */
 function goTo(kind: WindowKind) {
   currentKind.value = kind;
-  // 返回后不再带着上一次的目标实例 / 目标项目，避免窗口"记得"不该记的东西
-  windowParams.value = { uuid: null, project: null };
+  // 返回后不再带着上一次的目标实例 / 目标项目 / 拖入路径，避免窗口"记得"不该记的东西
+  windowParams.value = { uuid: null, project: null, drop: null };
   if (!isTauri()) window.history.pushState({}, "", urlFor(kind));
 }
 

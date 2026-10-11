@@ -17,7 +17,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::launcher::instance_setting_obj::InstanceSettingObj;
 
-/// 结构文件类型
+/// 结构文件类型，由文件扩展名判定
 #[derive(Debug)]
 pub enum SchematicType {
     /// 原版
@@ -39,29 +39,29 @@ impl Default for SchematicType {
 /// 结构文件
 #[derive(Debug)]
 pub struct SchematicObj {
-    /// 名字
+    /// 结构名，取自文件元数据
     pub name: String,
-    /// 路径
+    /// 结构文件路径
     pub path: PathBuf,
-    /// 高
+    /// 高度，单位方块
     pub height: i32,
-    /// 长
+    /// 长度，单位方块
     pub length: i32,
-    /// 宽
+    /// 宽度，单位方块
     pub width: i32,
-    /// 作者
+    /// 作者，取自文件元数据
     pub author: String,
-    /// 描述
+    /// 描述，取自文件元数据
     pub description: String,
     /// 文件类型
     pub schematic_type: SchematicType,
     /// 方块总数
     pub block_count: u64,
-    /// 方块种类
+    /// 方块种类数
     pub block_types: u32,
-    /// 方块数量
+    /// 各方块数量，键为方块 ID，值为出现次数
     pub blocks: HashMap<String, u64>,
-    /// 是否读取错误
+    /// 是否读取失败，失败时其余字段为默认值
     pub fail: bool,
 }
 
@@ -98,8 +98,6 @@ impl SchematicObj {
 impl SchematicType {
     /// 按扩展名判断结构文件类型
     ///
-    /// # 参数
-    ///
     /// - `ext`: 文件扩展名
     ///
     /// # 返回值
@@ -120,7 +118,7 @@ impl SchematicType {
     }
 }
 
-/// 从 NbtCompound 读取 Short 类型的尺寸信息 (Height/Length/Width)
+/// 从 NBT 读取 Short 类型的尺寸信息，对应 Height / Length / Width 三个标签
 fn read_dimensions_short(nbt: &NbtCompound, obj: &mut SchematicObj) {
     if let Some(h) = nbt.get_short("Height") {
         obj.height = h as i32;
@@ -133,9 +131,7 @@ fn read_dimensions_short(nbt: &NbtCompound, obj: &mut SchematicObj) {
     }
 }
 
-/// 根据 palette 大小计算打包所需的位数（整数运算）
-///
-/// # 参数
+/// 根据 palette 大小计算打包所需的位数，全程整数运算
 ///
 /// - `palette_size`: 方块调色板大小
 ///
@@ -150,9 +146,7 @@ fn bits_per_entry(palette_size: usize) -> usize {
     }
 }
 
-/// 读取投影模组（Litematic）结构文件
-///
-/// # 参数
+/// 读取投影模组 Litematic 结构文件
 ///
 /// - `nbt`: 结构文件 NBT 数据
 ///
@@ -247,8 +241,6 @@ fn read_litematic(nbt: NbtFile) -> CoreResult<SchematicObj> {
 
 /// 读取原版结构文件
 ///
-/// # 参数
-///
 /// - `nbt`: 结构文件 NBT 数据
 ///
 /// # 返回值
@@ -269,8 +261,6 @@ fn read_schematic(nbt: NbtFile) -> CoreResult<SchematicObj> {
 
 /// 去除方块名中的属性部分，如 "minecraft:stone[axis=y]" → "minecraft:stone"
 ///
-/// # 参数
-///
 /// - `input`: 方块名
 ///
 /// # 返回值
@@ -280,9 +270,7 @@ fn base_name(input: &str) -> &str {
     input.find('[').map_or(input, |pos| &input[..pos])
 }
 
-/// 读取创世神模组（WorldEdit）结构文件
-///
-/// # 参数
+/// 读取创世神模组 WorldEdit 结构文件
 ///
 /// - `nbt`: 结构文件 NBT 数据
 ///
@@ -335,9 +323,7 @@ fn read_schem(nbt: NbtFile) -> CoreResult<SchematicObj> {
     }
 }
 
-/// 读取机械动力蓝图（Create）结构文件
-///
-/// # 参数
+/// 读取机械动力蓝图 Create 结构文件
 ///
 /// - `nbt`: 结构文件 NBT 数据
 ///
@@ -407,8 +393,6 @@ fn read_nbt(nbt: NbtFile) -> CoreResult<SchematicObj> {
 
 /// 读取结构文件
 ///
-/// # 参数
-///
 /// - `stream`: 结构文件数据流
 /// - `schematic_type`: 结构文件类型
 ///
@@ -433,7 +417,7 @@ impl InstanceSettingObj {
     ///
     /// # 返回值
     ///
-    /// 返回结构文件列表（读取失败的文件标记 `fail`）
+    /// 返回结构文件列表，读取失败的文件标记 `fail`
     pub async fn get_schematics(&self) -> Vec<SchematicObj> {
         let dir = self.get_schematics_path();
         let files = path_helper::get_all_files(&dir);
@@ -467,9 +451,7 @@ impl InstanceSettingObj {
 
     /// 导入结构文件
     ///
-    /// # 参数
-    ///
-    /// - `files`: 待导入的文件列表（重名自动加序号后缀）
+    /// - `files`: 待导入的文件列表，重名自动加序号后缀
     ///
     /// # 返回值
     ///

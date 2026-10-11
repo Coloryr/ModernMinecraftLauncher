@@ -36,40 +36,35 @@ use crate::{
     modpack::{BaseModPackWorker, ModPackWorker},
 };
 
-/// CurseForge整合包安装器
+/// CurseForge 整合包安装器
 pub struct CurseForgeWorker {
-    /// 整合包信息
+    /// 整合包信息，`read_info` 之前为 `None`
     info: Option<CurseForgePackObj>,
-    /// 基础安装器
+    /// 基础安装器，负责实例创建、解压与下载列表
     base: BaseModPackWorker,
 }
 
 impl CurseForgeWorker {
     /// 创建 CurseForge 整合包安装器
     ///
-    /// # 参数
-    ///
     /// - `base`: 基础安装器
     ///
     /// # 返回值
     ///
-    /// 返回安装器实例
+    /// 返回安装器实例，`info` 初始为空
     pub fn new(base: BaseModPackWorker) -> Self {
         Self { info: None, base }
     }
 }
 
-/// 批量解析文件 ID 为 `CurseForgeFileDataObj`。
-/// 优先批量接口，失败则逐文件查询。
-///
-/// # 参数
+/// 批量解析文件 ID 为 `CurseForgeFileDataObj`，优先走批量接口，失败则逐文件查询
 ///
 /// - `file_ids`: 文件 ID 列表
-/// - `cancel`: 取消令牌
+/// - `cancel`: 取消令牌，降级查询时逐个检查
 ///
 /// # 返回值
 ///
-/// 返回解析成功的文件信息列表（失败项被跳过）
+/// 返回解析成功的文件信息列表，失败项被跳过
 async fn resolve_files(
     file_ids: &[u64],
     cancel: &Option<CancellationToken>,
@@ -97,7 +92,7 @@ async fn resolve_files(
 
 #[async_trait]
 impl ModPackWorker for CurseForgeWorker {
-    /// 获取主信息
+    /// 获取主信息，从压缩包里读出 `manifest.json`
     fn read_info(&mut self) -> CoreResult<()> {
         let data = self
             .base
@@ -120,7 +115,7 @@ impl ModPackWorker for CurseForgeWorker {
         }
     }
 
-    /// 获取版本数据
+    /// 获取版本数据，解析 modLoaders 得到加载器与其版本，并确认游戏版本可用
     async fn read_version(&mut self) -> CoreResult<()> {
         if self.info.is_none() {
             return Err(ErrorType::DataNotFound(DataNotFoundData::Info));
@@ -160,6 +155,13 @@ impl ModPackWorker for CurseForgeWorker {
     }
 
     /// 创建游戏实例
+    ///
+    /// - `name`: 实例名；`None` 时用整合包名与版本拼出
+    /// - `group`: 所属分组 uuid；`None` 表示不分组
+    ///
+    /// # 返回值
+    ///
+    /// 返回新建实例的 uuid
     async fn create_instance(&self, name: Option<String>, group: Option<Uuid>) -> CoreResult<Uuid> {
         match &self.info {
             Some(info) => {
@@ -173,7 +175,7 @@ impl ModPackWorker for CurseForgeWorker {
                     loader_version: Some(self.base.loader_version.clone()),
                     ..Default::default()
                 };
-                // 分组不在实例配置里，创建时一并交给分组表（不存在的组会被建出来）
+                // 分组不在实例配置里，创建时一并交给分组表，不存在的组会被建出来
                 let game = game
                     .create_instance_in_group(self.base.instance_gui.clone(), group)
                     .await?;
@@ -192,10 +194,15 @@ impl ModPackWorker for CurseForgeWorker {
         }
     }
 
-    /// 解压整合包覆盖文件到游戏目录。
+    /// 解压整合包覆盖文件到游戏目录
     ///
-    /// `overrides/` 下的文件去除前缀后写入游戏根目录；其余文件直接
-    /// 写入游戏路径。
+    /// `overrides/` 下的文件去除前缀后写入游戏根目录，其余文件直接写入游戏路径。
+    ///
+    /// - `unselect`: 不参与覆盖的文件名列表，`None` 表示全部覆盖
+    ///
+    /// # 返回值
+    ///
+    /// 解压失败时返回对应错误
     async fn extract(&self, unselect: Option<Vec<String>>) -> CoreResult<()> {
         let Some(info) = &self.info else {
             return Err(ErrorType::DataNotFound(DataNotFoundData::Info));
@@ -203,10 +210,14 @@ impl ModPackWorker for CurseForgeWorker {
         self.base.extract_pack_files(&info.overrides, unselect)
     }
 
-    /// 获取模组下载信息。
+    /// 获取模组下载信息
     ///
-    /// 批量解析 manifest 中的文件列表，构建下载项并存入
-    /// `base.downloads`，后续由 [`download`] 统一下载。
+    /// 批量解析 manifest 中的文件列表，构建下载项并存入 `base.downloads`，
+    /// 后续由 [`Self::download`] 统一下载。
+    ///
+    /// # 返回值
+    ///
+    /// 有下载项或整合包本身不含文件时返回 `true`
     async fn get_info(&self) -> CoreResult<bool> {
         let Some(game) = &self.base.game else {
             return Err(ErrorType::DataNotFound(DataNotFoundData::GameInstance));
@@ -228,10 +239,9 @@ impl ModPackWorker for CurseForgeWorker {
         Ok(!guard.is_empty() || info.files.is_empty())
     }
 
-    /// 统一下载所有模组文件。
+    /// 统一下载所有模组文件
     async fn download(&self) {
-        // 取出下载列表（在 .await 前释放 MutexGuard），取走后列表为空，
-        // 重复调用不会重复下载
+        // 先取出下载列表再 await：取走后列表为空，重复调用不会重复下载
         let items = {
             let Ok(mut guard) = self.base.downloads.lock() else {
                 return;
@@ -246,6 +256,8 @@ impl ModPackWorker for CurseForgeWorker {
     }
 
     /// 更新游戏实例版本信息
+    ///
+    /// - `game`: 目标实例
     fn update_game(&mut self, game: &GameInstance) {
         self.base.game = Some(game.clone());
 
@@ -257,13 +269,17 @@ impl ModPackWorker for CurseForgeWorker {
         game.save();
     }
 
-    /// 检查整合包更新。
+    /// 检查整合包更新
     ///
     /// 对比当前整合包 manifest 与上一次安装的 manifest：
-    /// - 存在旧 manifest：用 fileID 快速比对，找出新增/变更/删除的模组
+    /// - 存在旧 manifest：用 fileID 快速比对，找出新增、变更与删除的模组
     /// - 无旧 manifest：通过 API 获取文件信息后比对 SHA1
     ///
     /// 最终将需要下载的文件存入 `base.downloads`。
+    ///
+    /// # 返回值
+    ///
+    /// 取消或查询失败时返回对应错误
     async fn check_upgrade(&self) -> CoreResult<()> {
         let Some(game) = &self.base.game else {
             return Err(ErrorType::DataNotFound(DataNotFoundData::GameInstance));
@@ -272,7 +288,7 @@ impl ModPackWorker for CurseForgeWorker {
             return Err(ErrorType::DataNotFound(DataNotFoundData::Info));
         };
 
-        // 读旧清单：缺失 / 打不开 / 非法 JSON 一律当作"没有旧清单"（见 `modpack::manifest`）
+        // 读旧清单：缺失、打不开或非法 JSON 一律当作"没有旧清单"，见 `modpack::manifest`
         let old_info = {
             let game = game.read().unwrap();
             let old_manifest_path = game.get_base_path().join(names::MANIFEST_FILE);
@@ -280,7 +296,7 @@ impl ModPackWorker for CurseForgeWorker {
         };
 
         if let Some(old_info) = old_info {
-            // ── 有旧 manifest：用 fileID 比对 ──
+            // 有旧 manifest：用 fileID 比对
             check_upgrade_with_old_manifest(
                 info,
                 &old_info,
@@ -291,7 +307,7 @@ impl ModPackWorker for CurseForgeWorker {
             )
             .await?;
         } else {
-            // ── 无旧 manifest：通过 SHA1 比对 ──
+            // 无旧 manifest：通过 SHA1 比对
             check_upgrade_sha1(
                 info,
                 game,
@@ -303,7 +319,7 @@ impl ModPackWorker for CurseForgeWorker {
         }
 
         // 写入当前整合包 manifest，作为下一次升级比对用的旧清单
-        // （最后一步：前面任何 `?` 提前返回都不会动到旧清单）
+        // 放在最后一步：前面任何 `?` 提前返回都不会动到旧清单
         manifest::write_manifest(
             game.read().unwrap().get_base_path().join(names::MANIFEST_FILE),
             info,
@@ -313,26 +329,24 @@ impl ModPackWorker for CurseForgeWorker {
     }
 }
 
-/// 有旧 manifest 时：对比两边的 `Files` 列表，找出新增、删除、变更。
+/// 有旧 manifest 时：对比两边的 `Files` 列表，找出新增、删除、变更
 ///
 /// 1. 以 `project_id` 为键比对新旧文件列表
-/// 2. 同 project 但不同 file_id → 变更（下载新版本，删除旧版本）
-/// 3. 仅在新 manifest 中 → 新增
-/// 4. 仅在旧 manifest 中 → 删除
+/// 2. 同 project 但不同 file_id 视为变更，下载新版本并删除旧版本
+/// 3. 仅在新 manifest 中视为新增
+/// 4. 仅在旧 manifest 中视为删除
 /// 5. 对每个需要下载的文件调用 API 解析，构建下载项并更新在线信息
-///
-/// # 参数
 ///
 /// - `new_info`: 新版整合包信息
 /// - `old_info`: 旧版整合包信息
 /// - `game`: 目标实例
-/// - `downloads`: 下载列表（写入需要下载的文件）
+/// - `downloads`: 下载列表，写入需要下载的文件
 /// - `pack_gui`: 整合包安装界面回调
 /// - `cancel`: 取消令牌
 ///
 /// # 返回值
 ///
-/// 成功返回 `Ok(())`；取消或查询失败返回对应错误
+/// 取消或查询失败时返回对应错误
 async fn check_upgrade_with_old_manifest(
     new_info: &CurseForgePackObj,
     old_info: &CurseForgePackObj,
@@ -341,12 +355,12 @@ async fn check_upgrade_with_old_manifest(
     pack_gui: &AddModPackGui,
     cancel: &CancellationToken,
 ) -> CoreResult<()> {
-    // 差异计算已抽到 `modpack::diff`（纯函数，离线可测）；判定规则一字未改
+    // 差异计算已抽到 `modpack::diff`，纯函数、离线可测；判定规则一字未改
     let diff = diff::diff_curseforge_files(&new_info.files, &old_info.files);
     let add_list = diff.add;
     let remove_list = diff.remove;
 
-    // 检查取消
+    // 删文件前先看一次取消，避免任务已取消还去动磁盘
     if cancel.is_cancelled() {
         return Err(ErrorType::TaskCancel);
     }
@@ -368,12 +382,11 @@ async fn check_upgrade_with_old_manifest(
         game.save_online_info(&online_info);
     }
 
-    // 检查取消
     if cancel.is_cancelled() {
         return Err(ErrorType::TaskCancel);
     }
 
-    // 无需下载 → 完成
+    // 无需下载，直接完成
     if add_list.is_empty() {
         downloads.lock().unwrap().clear();
         return Ok(());
@@ -393,7 +406,6 @@ async fn check_upgrade_with_old_manifest(
     let mut new_downloads: Vec<FileItemObj> = Vec::with_capacity(total);
 
     for (b, item) in add_list.iter().enumerate() {
-        // 检查取消
         if cancel.is_cancelled() {
             return Err(ErrorType::TaskCancel);
         }
@@ -445,25 +457,23 @@ async fn check_upgrade_with_old_manifest(
     Ok(())
 }
 
-/// 无旧 manifest 时：通过 API 获取最新文件信息，以 mod_id 和 SHA1 比对。
+/// 无旧 manifest 时：通过 API 获取最新文件信息，以 mod_id 和 SHA1 比对
 ///
 /// 1. 批量解析 manifest 中的全部文件
-/// 2. 构建 `FileOnlineInfoObj` 映射（mod_id → 在线信息）
-/// 3. 与现有 `online_info` 比对：同 mod_id 但 fileid/sha1 不同 → 变更
-/// 4. 仅在在线信息中不存在 → 新增
+/// 2. 构建 mod_id 到在线信息的映射
+/// 3. 与现有 `online_info` 比对：同 mod_id 但 fileid 或 sha1 不同视为变更
+/// 4. 仅在在线信息中不存在视为新增
 /// 5. 删除旧文件，构建下载列表
-///
-/// # 参数
 ///
 /// - `new_info`: 新版整合包信息
 /// - `game`: 目标实例
-/// - `downloads`: 下载列表（写入需要下载的文件）
+/// - `downloads`: 下载列表，写入需要下载的文件
 /// - `pack_gui`: 整合包安装界面回调
 /// - `cancel`: 取消令牌
 ///
 /// # 返回值
 ///
-/// 成功返回 `Ok(())`；取消或查询失败返回对应错误
+/// 取消或查询失败时返回对应错误
 async fn check_upgrade_sha1(
     new_info: &CurseForgePackObj,
     game: &GameInstance,
@@ -511,19 +521,17 @@ async fn check_upgrade_sha1(
         files
     };
 
-    // 检查取消
     if cancel.is_cancelled() {
         return Err(ErrorType::TaskCancel);
     }
 
-    // 从解析结果构建 mod_id → (FileOnlineInfoObj, FileItemObj) 映射
+    // 从解析结果构建 mod_id 到在线信息与下载项的映射
     let (game_path, mods_path) = {
         let game = game.read().unwrap();
         (game.get_game_path(), game.get_mods_path())
     };
 
-    // new_mods: mod_id → 在线文件信息对象
-    // new_download_map: mod_id → 下载项对象
+    // new_online_map 是 mod_id 到在线文件信息，new_download_map 是 mod_id 到下载项
     let mut new_online_map: OnlineInfoList = HashMap::new();
     let mut new_download_map: HashMap<String, FileItemObj> = HashMap::new();
 
@@ -553,13 +561,13 @@ async fn check_upgrade_sha1(
         new_download_map.insert(mod_id_str, download);
     }
 
-    // ── 比对现有在线信息 ──
+    // 比对现有在线信息
     let mut online_info = {
         let game = game.read().unwrap();
         game.read_online_info()
     };
 
-    // 差异计算已抽到 `modpack::diff`（纯函数，离线可测）；判定规则一字未改
+    // 差异计算已抽到 `modpack::diff`，纯函数、离线可测；判定规则一字未改
     let diff = diff::diff_curseforge_online(&new_online_map, &online_info);
     let add_list = diff.add;
     let remove_list = diff.remove;
@@ -587,14 +595,12 @@ async fn check_upgrade_sha1(
     Ok(())
 }
 
-/// 删除文件，若文件已被禁用（追加了 `.disable`/`.disabled` 后缀）则一并删除。
-///
-/// # 参数
+/// 删除文件，若文件已被禁用并追加了 `.disable` 或 `.disabled` 后缀则一并删除
 ///
 /// - `file`: 待删除的文件路径
 fn delete_with_disabled<P: AsRef<Path>>(file: P) {
     let file = file.as_ref();
-    // `delete` 在文件不存在时是无操作
+    // 文件不存在时 delete 是无操作
     let _ = path_helper::delete(file);
     let _ = path_helper::delete(format!("{}{}", file.display(), names::DISABLE_DOT_EXT));
     let _ = path_helper::delete(format!("{}{}", file.display(), names::DISABLED_DOT_EXT));

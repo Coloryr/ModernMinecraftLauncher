@@ -2,7 +2,7 @@
 //!
 //! 真实联网 + 依赖本机压缩包，默认跳过；手动运行：
 //! `cargo test -p mml-game --test modpack -- --ignored --nocapture`
-//! （压缩包路径改源码里的 `PACK_FILE`，CurseForge key 由 GUI 正常注入，测试内为空）
+//! 压缩包路径改源码里的 `PACK_FILE`，CurseForge key 由 GUI 正常注入，测试内为空
 
 use std::{env, path::Path, path::PathBuf, sync::Arc};
 
@@ -14,6 +14,7 @@ use tokio_util::sync::CancellationToken;
 /// 测试压缩包路径
 const PACK_FILE: &str = r"H:\ftb-stoneblock-4-1.14.2.zip";
 
+/// 实例创建回调桩：同意自动改名，拒绝覆盖已有实例
 struct TestGui;
 
 #[async_trait::async_trait]
@@ -27,6 +28,7 @@ impl IAddInstanceGui for TestGui {
     }
 }
 
+/// 把安装状态映射成前端使用的 ID
 fn state_id(state: &AddModPackState) -> &'static str {
     match state {
         AddModPackState::DownloadPack => "downloadPack",
@@ -38,6 +40,7 @@ fn state_id(state: &AddModPackState) -> &'static str {
     }
 }
 
+/// 整合包安装回调桩：把阶段与进度打到 stdout
 struct PackGui;
 
 impl IAddModPackGui for PackGui {
@@ -58,10 +61,11 @@ impl IAddModPackGui for PackGui {
     }
 }
 
+/// 按 mml_core::init 的链路初始化各内核系统
 fn start(run_dir: &Path) {
-    // 与 mml_core::init 相同的初始化链（不含 jvms / config_save）
+    // 与 mml_core::init 相同的初始化链，不含 jvms / config_save
     mml_base::init(run_dir.to_path_buf());
-    // 不设置 CurseForge key：仅测试 API 之前的阶段（检测/读信息/建实例/解压）
+    // 不设置 CurseForge key：仅测试 API 之前的阶段，即检测、读信息、建实例、解压
     mml_names::init(mml_base::get_base_dir()).unwrap();
     mml_log::start(mml_base::get_base_dir()).unwrap();
     mml_config::init(mml_base::get_base_dir()).unwrap();
@@ -74,6 +78,7 @@ fn start(run_dir: &Path) {
     mml_downloader::start();
 }
 
+/// 下载回调桩：每过 25% 打一行
 struct TestDownloader;
 
 impl mml_downloader::IDownloadGui for TestDownloader {
@@ -99,6 +104,7 @@ impl mml_downloader::IDownloadGui for TestDownloader {
     }
 }
 
+/// 用本机真实压缩包跑一遍完整的 CurseForge 整合包安装
 #[tokio::test]
 #[ignore]
 async fn install_curseforge_pack() {
@@ -108,7 +114,7 @@ async fn install_curseforge_pack() {
 
     let file = PathBuf::from(PACK_FILE);
     if !file.exists() {
-        // 本机没有测试压缩包时跳过（保证全平台可跑）
+        // 本机没有测试压缩包时跳过，保证全平台可跑
         eprintln!("跳过: 测试压缩包不存在: {}", file.display());
         return;
     }

@@ -38,11 +38,13 @@ export default {
   "empty.addAccount": "Add account",
   "empty.setJava": "Set Java",
 
-  // Modpack drag & drop
-  "drop.title": "Drop to add modpack",
-  "drop.desc": "Supports .zip / .mrpack / .modpack modpack files",
-  "drop.added": "Added modpack {name}",
-  "drop.notModpack": "Unsupported file type, modpack files only",
+  // Drag & drop overlay: title only (depends on what is being dragged)
+  "drop.titleFiles": "Drop to import a modpack or folder",
+  "drop.titleArchive": "Drop to import a modpack",
+  "drop.titleFolder": "Drop to import a folder",
+  "drop.titleLogin": "Drop to import a login",
+  "drop.onlyFirst": "One item at a time — using the first",
+  "drop.notModpack": "Unsupported file: modpacks, instance folders and login cards only",
 
   // Multi-select
   "multi.selectAll": "Select all",
@@ -244,6 +246,17 @@ export default {
   // Resource window
   "resource.title": "Resource Manager",
   "resource.download": "Download Resources",
+  // Drag & drop import (target = the current category's folder)
+  "resource.dropTitleTo": "Drop to import into \"{name}\"",
+  "resource.dropUnsupported": "This category doesn't take folders or login shortcuts",
+  "resource.dropImported": "Imported {count} file(s)",
+  "resource.dropSkipped": "Skipped {count} file(s) with the same name",
+  "resource.dropConflictTitle": "Duplicate names",
+  "resource.dropConflictText": "{count} item(s) with the same name already exist. What should we do?",
+  "resource.dropConflictMore": "…and {count} more",
+  "resource.dropOverwrite": "Overwrite",
+  "resource.dropSkip": "Skip",
+  "resource.dropRename": "Rename",
   "resource.modName": "Name",
   "resource.modVersion": "Version",
   "resource.modAuthor": "Author",
@@ -522,6 +535,9 @@ export default {
   "add.yes": "Yes",
   "add.no": "No",
   "add.closeBlocked": "Loading data — the window can't be closed yet",
+  "add.dropBusy": "The previous action is still running — try dropping again in a moment",
+  // Add-instance window overlay (files only)
+  "add.dropTitle": "Drop to import a modpack or folder",
   "add.cancel": "Cancel",
   "add.create": "Create",
   "add.creating": "Creating…",
@@ -583,6 +599,10 @@ export default {
   "account.viewSkin": "View Skin",
   "account.addTitle": "Add AccountStoreDto",
   "account.added": "AccountStoreDto added",
+  // Dropped login card (web page card / .url / .webloc shortcut)
+  "account.dropTitle": "Drop to import a login",
+  "account.dropFileTitle": "Drop to import a login shortcut",
+  "account.dropNotShortcut": "Only a login card or a .url / .webloc shortcut can be dropped here",
   "account.loginHint": "Online login (WIP); the account is recorded for now",
   "account.actions": "Actions",
   "account.username": "AccountStoreDto",

@@ -88,8 +88,6 @@ impl CurseForgeSortField {
 
 /// 转换为 CurseForge 的加载器 ID
 ///
-/// # 参数
-///
 /// - `loader`: 加载器类型
 ///
 /// # 返回值
@@ -106,8 +104,6 @@ pub fn to_loader_id(loader: &LoaderType) -> Option<u32> {
 }
 
 /// 创建下载项目
-///
-/// # 参数
 ///
 /// - `obj`: CurseForge 文件信息
 /// - `path`: 保存目录
@@ -128,8 +124,6 @@ pub fn make_file_item_obj<P: AsRef<Path>>(obj: &mut CurseForgeFileDataObj, path:
 }
 
 /// 创建在线文件信息
-///
-/// # 参数
 ///
 /// - `obj`: CurseForge 文件信息
 /// - `path`: 实例内相对目录
@@ -165,15 +159,13 @@ pub struct CurseForgeModDependenciesRes {
 
 /// 获取模组依赖
 ///
-/// # 参数
-///
 /// - `obj`: CurseForge 文件信息
 /// - `version`: 游戏版本
 /// - `loader`: 加载器类型
 ///
 /// # 返回值
 ///
-/// 返回依赖列表（含递归解析出的子依赖，已去重）
+/// 返回依赖列表，含递归解析出的子依赖，已去重
 pub async fn get_mod_dependencies(
     obj: &CurseForgeFileDataObj,
     version: &str,
@@ -193,12 +185,10 @@ pub async fn get_mod_dependencies(
 
 /// 递归解析模组依赖
 ///
-/// # 参数
-///
 /// - `dependencies`: 依赖列表
 /// - `version`: 游戏版本
 /// - `loader`: 加载器类型
-/// - `ids`: 已解析的项目 ID 集合（避免重复解析）
+/// - `ids`: 已解析的项目 ID 集合，避免重复解析
 /// - `handle`: 用于并发查询的运行时句柄
 ///
 /// # 返回值
@@ -266,7 +256,7 @@ fn get_mod_dependencies_inner(
             list: data.data,
         });
 
-        // 添加未被标记的子依赖（避免同时持有 ids 和 list 锁）
+        // 添加未被标记的子依赖，避免同时持有 ids 和 list 锁
         for item5 in sub_deps {
             let mut ids_guard = ids.lock().unwrap();
             if ids_guard.contains(&item5.mod_id) {
@@ -297,8 +287,6 @@ fn sort_version_types(
 
 /// 获取文件类型对应的 class ID
 ///
-/// # 参数
-///
 /// - `file_type`: 项目文件类型
 ///
 /// # 返回值
@@ -315,8 +303,6 @@ fn get_classid(file_type: FileType) -> u32 {
 }
 
 /// 获取分组数据
-///
-/// # 参数
 ///
 /// - `file_type`: 项目文件类型
 ///
@@ -352,7 +338,7 @@ pub async fn get_categories(file_type: FileType) -> CoreResult<HashMap<String, S
 ///
 /// # 返回值
 ///
-/// 返回游戏版本列表（首位为空串表示不限）；查询失败返回对应错误
+/// 返回游戏版本列表，首位为空串表示不限；查询失败返回对应错误
 pub async fn get_game_versions() -> CoreResult<Vec<String>> {
     if let Some(data) = GAME_VERSION.get() {
         return Ok(data.clone());
@@ -382,8 +368,8 @@ pub async fn get_game_versions() -> CoreResult<Vec<String>> {
     Ok(GAME_VERSION.get_or_init(|| list).clone())
 }
 
-/// 构建下载结果（串行处理）。
-/// 只有 `get_modpack_info` 中的 `spawn_fetch_task` 才需要并行处理。
+/// 构建下载结果，串行处理
+/// 只有 `get_modpack_info` 中的 `spawn_fetch_task` 才需要并行处理
 async fn build_results(
     game: &GameInstance,
     items: Vec<CurseForgeFileDataObj>,
@@ -399,9 +385,8 @@ async fn build_results(
             continue;
         };
 
-        // 修正下载地址并只计算一次 SHA1（避免
-        // 在 make_file_item_obj 和 make_file_online_info_obj
-        // 中被重复计算）
+        // 修正下载地址并只计算一次 SHA1，避免在 make_file_item_obj
+        // 和 make_file_online_info_obj 中被重复计算
         item.fix_download_url();
         let url = item.download_url.clone().unwrap_or_default();
         let sha1 = item.sha1_hash();
@@ -449,8 +434,6 @@ async fn build_results(
 }
 
 /// 获取整合包模组信息
-///
-/// # 参数
 ///
 /// - `game`: 目标实例
 /// - `obj`: 整合包信息
@@ -512,6 +495,7 @@ pub async fn get_modpack_info(
     Ok(build_results(game, fetched, gui, size).await)
 }
 
+/// 派发单个文件的查询任务；查询失败时置位 failed 标记
 fn spawn_fetch_task(
     tasks: &mut tokio::task::JoinSet<Option<CurseForgeFileObj>>,
     file_ref: &pack_obj::FilesObj,
@@ -605,8 +589,6 @@ fn apply_class_id(class_id: u32, item: &mut ItemPathRes, instance: &InstanceSett
 
 /// 升级整合包
 ///
-/// # 参数
-///
 /// - `game`: 目标实例
 /// - `data`: 新版本的文件信息
 /// - `pack_gui`: 整合包安装界面回调
@@ -667,7 +649,7 @@ pub async fn upgrade_modpack(
         gui.set_now(3, Some(6));
     }
 
-    // **排除包根的 `manifest.json`**（理由见 modrinth 那边的详细说明）：`extract` 会把
+    // **排除包根的 `manifest.json`**，理由见 modrinth 那边的详细说明：`extract` 会把
     // "不在 `overrides/` 下"的条目写进实例 base 目录，而那份清单就是 `check_upgrade` 读的
     // "旧清单"；被新包覆盖后差异算成空 → 不下载也不删除。清单由 `check_upgrade` 末尾写回。
     worker

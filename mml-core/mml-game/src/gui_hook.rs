@@ -1,7 +1,7 @@
 //! 界面回调接口
 //!
-//! 内核通过这些 trait 与界面交互（询问 / 汇报进度），
-//! 由桌面壳实现后传入；全部以 `Option<Arc<...>>` 形式使用，可为空（无界面时跳过交互）。
+//! 内核通过这些 trait 与界面交互，用于询问与汇报进度，
+//! 由桌面壳实现后传入；全部以 `Option<Arc<...>>` 形式使用，可为空，无界面时跳过交互。
 
 use std::sync::Arc;
 
@@ -19,7 +19,7 @@ pub type AddModPackGui = Option<Arc<dyn IAddModPackGui>>;
 /// 进度条界面回调
 pub type ProgressGui = Option<Arc<dyn IProgressGui>>;
 
-/// 项目安装状态
+/// 项目安装状态，按变体顺序从 `DownloadPack` 推进到 `Done`
 pub enum AddModPackState {
     /// 下载整合包
     DownloadPack,
@@ -40,8 +40,6 @@ pub enum AddModPackState {
 pub trait IAddInstanceGui: Send + Sync {
     /// 是否同意替换名字
     ///
-    /// # 参数
-    ///
     /// - `name`: 重名的实例名
     ///
     /// # 返回值
@@ -49,8 +47,6 @@ pub trait IAddInstanceGui: Send + Sync {
     /// 返回 `true` 表示同意自动改名后继续创建
     async fn name_replace(&self, name: &str) -> bool;
     /// 是否同意覆盖
-    ///
-    /// # 参数
     ///
     /// - `obj`: 已存在的重名实例
     ///
@@ -64,29 +60,21 @@ pub trait IAddInstanceGui: Send + Sync {
 pub trait IAddModPackGui: Send + Sync {
     /// 设置整合包安装状态
     ///
-    /// # 参数
-    ///
     /// - `state`: 新的安装状态
     fn set_state(&self, state: AddModPackState);
     /// 设置当前进度
     ///
-    /// # 参数
-    ///
     /// - `value`: 当前进度
-    /// - `all`: 总进度（未知为 `None`）
+    /// - `all`: 总进度，未知为 `None`
     fn set_now(&self, value: usize, all: Option<usize>);
     /// 子进度文字
     ///
-    /// # 参数
-    ///
-    /// - `text`: 文字内容（`None` 表示清除）
+    /// - `text`: 文字内容，`None` 表示清除
     fn set_sub_text(&self, text: Option<String>);
     /// 子进度
     ///
-    /// # 参数
-    ///
     /// - `value`: 当前进度
-    /// - `all`: 总进度（未知为 `None`）
+    /// - `all`: 总进度，未知为 `None`
     fn set_sub_now(&self, value: usize, all: Option<usize>);
 }
 
@@ -94,20 +82,16 @@ pub trait IAddModPackGui: Send + Sync {
 pub trait IProgressGui: Send + Sync {
     /// 显示文字
     ///
-    /// # 参数
-    ///
-    /// - `text`: 文字内容（`None` 表示清除）
+    /// - `text`: 文字内容，`None` 表示清除
     fn set_progress_text(&self, text: Option<String>);
     /// 进度
     ///
-    /// # 参数
-    ///
     /// - `value`: 当前进度
-    /// - `all`: 总进度（未知为 `None`）
+    /// - `all`: 总进度，未知为 `None`
     fn set_progress_now(&self, value: usize, all: Option<usize>);
 }
 
-/// 实例启动状态
+/// 实例启动状态，按变体顺序推进，`progress` 依赖该顺序
 pub enum LaunchState {
     /// 登陆账户
     Login,
@@ -134,10 +118,14 @@ pub enum LaunchState {
 }
 
 impl LaunchState {
-    /// 启动进度百分比（0–100，按阶段等权近似）
+    /// 启动进度百分比，取值 0–100，按阶段等权近似
     ///
-    /// 阶段集合与顺序以本枚举为准（GUI 侧不再自持阶段表）；
+    /// 阶段集合与顺序以本枚举为准，GUI 侧不再自持阶段表；
     /// 新增变体时这里的 match 会因非穷尽而编译失败，强制同步
+    ///
+    /// # 返回值
+    ///
+    /// 返回该状态对应的百分比
     pub fn progress(&self) -> u32 {
         let idx = match self {
             LaunchState::Login => 0,
@@ -169,14 +157,10 @@ pub enum ProcessRunType {
 pub trait ILaunchGui: Send + Sync {
     /// 启动状态修改
     ///
-    /// # 参数
-    ///
     /// - `setting`: 目标实例设置
     /// - `state`: 新的启动状态
     fn update_state(&self, setting: &InstanceSettingObj, state: LaunchState);
     /// 登陆失败
-    ///
-    /// # 参数
     ///
     /// - `auth`: 登陆信息
     ///
@@ -192,13 +176,9 @@ pub trait ILaunchGui: Send + Sync {
     async fn request_download_file(&self) -> bool;
     /// 没有合适的java
     ///
-    /// # 参数
-    ///
     /// - `java`: 所需的 Java 版本
     fn no_java(&self, java: i32);
     /// 是否运行启动其他进程
-    ///
-    /// # 参数
     ///
     /// - `run_type`: 进程运行时机
     ///

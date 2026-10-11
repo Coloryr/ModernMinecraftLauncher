@@ -1,16 +1,17 @@
-//! 验证"自轮询"在最恶劣情形下也能生效：请求 future **很长时间不被 poll**
+//! 验证"自轮询"在最恶劣情形下也能生效：请求 future 很长时间不被 poll
 //!
 //! 用户环境里出现过"广播成功、接收者数=4、通道值已变，但请求侧一条唤醒日志都没有"。
 //! 自轮询的设计前提是"只要还会被 poll 一次，就能发现自己该中断了"。
 //!
-//! 本测试构造一个**长时间不让出**的请求 future（用 `std::thread::sleep` 模拟阻塞，
-//! 期间完全不 await），然后在中途调用 `abort_all()`：
-//! - 若它醒来后立刻发现自己被中断 → 自轮询有效；
-//! - 这是 `watch.changed()` 单独无法覆盖的情形（阻塞期间收不到任何唤醒）。
+//! 本测试构造一个长时间不让出的请求 future，用 `std::thread::sleep` 模拟阻塞，
+//! 期间完全不 await，然后在中途调用 `abort_all()`：
+//! - 若它醒来后立刻发现自己被中断，说明自轮询有效；
+//! - 这是 `watch.changed()` 单独无法覆盖的情形，阻塞期间收不到任何唤醒。
 
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
+/// 初始化日志 / 配置 / 网络，全进程只做一次
 fn init_once() {
     use std::sync::Once;
     static INIT: Once = Once::new();
@@ -23,7 +24,7 @@ fn init_once() {
     });
 }
 
-/// 用 `Client::get_text` 打一个"只收不回"的本地服务，制造真正卡住的请求
+/// 起一个"只收不回"的本地服务，返回监听端口，用于制造真正卡住的请求
 fn silent_server() -> u16 {
     use std::io::Read;
     use std::net::TcpListener;
@@ -42,6 +43,7 @@ fn silent_server() -> u16 {
     port
 }
 
+/// 三个并发请求全部卡住时，`abort_all()` 仍能让它们在一秒内以中断错误返回
 #[test]
 fn abort_effective_even_with_slow_polling() {
     init_once();

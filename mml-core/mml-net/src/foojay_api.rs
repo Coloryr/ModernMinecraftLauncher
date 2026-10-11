@@ -1,6 +1,6 @@
 //! Foojay Disco API
 //!
-//! foojay.io 聚合了各 OpenJDK 发行版（Temurin / Zulu / Semeru / Corretto 等）
+//! foojay.io 聚合了 Temurin / Zulu / Semeru / Corretto 等各 OpenJDK 发行版
 //! 的下载元数据，`/disco/v3.0/parameters` 给出全部参数的合法取值，
 //! `/disco/v3.0/packages` 按条件筛选可下载的 Java 包。
 //! 下载走 `links.pkg_download_redirect`，由服务端 302 到发行方 CDN 直链。
@@ -12,19 +12,19 @@ use serde::{Deserialize, Serialize};
 
 use crate::urls;
 
-/// 可选项缓存（首次查询后复用）
+/// 可选项缓存，首次查询后复用
 static OPTIONS: OnceLock<FoojayOptionsObj> = OnceLock::new();
 
 /// 四个下拉框的候选列表
 #[derive(Debug, Clone)]
 pub struct FoojayOptionsObj {
-    /// 发行类型（jdk / jre）
+    /// 发行类型，取值 jdk / jre
     pub types: Vec<String>,
-    /// 主版本号（降序）
+    /// 主版本号，按数值降序
     pub majors: Vec<String>,
-    /// 系统（windows / linux / macos …）
+    /// 操作系统，如 windows / linux / macos
     pub systems: Vec<String>,
-    /// 架构（x64 / x86 / aarch64 …）
+    /// 架构，如 x64 / x86 / aarch64
     pub archs: Vec<String>,
 }
 
@@ -32,7 +32,9 @@ pub struct FoojayOptionsObj {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct FoojayParametersResultObj {
+    /// `/parameters` 返回的参数集合，通常只取第一条
     pub result: Vec<FoojayParametersObj>,
+    /// 接口提示信息，成功时为空串
     pub message: String,
 }
 
@@ -61,13 +63,17 @@ impl Default for FoojayParametersObj {
     }
 }
 
-/// `/packages` 各参数的合法取值（逗号分隔字符串）
+/// `/packages` 各参数的合法取值，逗号分隔的字符串
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct FoojayPackagesParamsObj {
+    /// 架构，对应查询参数 `architecture`
     pub architecture: String,
+    /// 主版本号，对应查询参数 `version`
     pub major_version: String,
+    /// 操作系统，对应查询参数 `operating_system`
     pub operating_system: String,
+    /// 包类型，对应查询参数 `package_type`，取值 jdk / jre
     pub package_type: String,
 }
 
@@ -86,7 +92,9 @@ impl Default for FoojayPackagesParamsObj {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct FoojayMajorVersionsResultObj {
+    /// `/major_versions` 返回的主版本列表
     pub result: Vec<FoojayMajorVersionObj>,
+    /// 接口提示信息，成功时为空串
     pub message: String,
 }
 
@@ -105,11 +113,11 @@ impl Default for FoojayMajorVersionsResultObj {
 pub struct FoojayMajorVersionObj {
     /// 主版本号
     pub major_version: u32,
-    /// 支持等级（LTS / MTS / STS）
+    /// 支持等级，取值 LTS / MTS / STS
     pub term_of_support: String,
     /// 是否仍在维护
     pub maintained: bool,
-    /// 是否仅有早期访问版（无 GA 正式版，查 /packages 拿不到包）
+    /// 是否仅有早期访问版；为 true 时查 `/packages` 拿不到包
     pub early_access_only: bool,
 }
 
@@ -128,7 +136,9 @@ impl Default for FoojayMajorVersionObj {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct FoojayResultObj {
+    /// `/packages` 返回的包列表，无匹配时为空
     pub result: Vec<FoojayObj>,
+    /// 接口提示信息，成功时为空串
     pub message: String,
 }
 
@@ -145,25 +155,25 @@ impl Default for FoojayResultObj {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct FoojayObj {
-    /// 包 ID（用于拼下载重定向地址）
+    /// 包 ID，用于拼下载重定向地址
     pub id: String,
-    /// 打包格式（msi / exe / zip / tar.gz / pkg …）
+    /// 打包格式，如 msi / exe / zip / tar.gz / pkg
     pub archive_type: String,
-    /// 发行版（zulu / temurin / semeru …）
+    /// 发行版，如 zulu / temurin / semeru
     pub distribution: String,
-    /// 主版本号
+    /// Java 主版本号
     pub major_version: i32,
-    /// OpenJDK 版本号（如 21+35）
+    /// OpenJDK 版本号，如 21+35
     pub java_version: String,
-    /// 发行方自己的版本号（如 21.28.85）
+    /// 发行方自己的版本号，如 21.28.85
     pub distribution_version: String,
-    /// 发布状态（ga / ea）
+    /// 发布状态，取值 ga / ea
     pub release_status: String,
-    /// 目标系统
+    /// 目标操作系统
     pub operating_system: String,
     /// 目标架构
     pub architecture: String,
-    /// 包类型（jdk / jre）
+    /// 包类型，取值 jdk / jre
     pub package_type: String,
     /// 是否内置 JavaFX
     pub javafx_bundled: bool,
@@ -171,7 +181,7 @@ pub struct FoojayObj {
     pub directly_downloadable: bool,
     /// 包文件名
     pub filename: String,
-    /// 包大小（字节；API 对未知大小返回 -1）
+    /// 包大小，单位字节；API 对未知大小返回 -1
     pub size: i64,
     /// 相关链接
     pub links: FoojayLinksObj,
@@ -205,7 +215,7 @@ impl Default for FoojayObj {
 pub struct FoojayLinksObj {
     /// 包详情页
     pub pkg_info_uri: String,
-    /// 下载重定向地址（302 到发行方 CDN 直链）
+    /// 下载重定向地址，服务端 302 到发行方 CDN 直链
     pub pkg_download_redirect: String,
 }
 
@@ -226,11 +236,11 @@ fn split_values(data: &str) -> Vec<String> {
         .collect()
 }
 
-/// 获取四个下拉框的候选列表（发行类型 / 主版本 / 系统 / 架构）
+/// 获取四个下拉框的候选列表：发行类型 / 主版本 / 系统 / 架构
 ///
-/// 类型 / 系统 / 架构来自 `/parameters`；主版本来自 `/major_versions`——
-/// `/parameters` 会把仅有早期访问版的主版本也列出来（如 29+），那些版本
-/// 查 `/packages`（固定 `release_status=ga`）拿不到任何包，得过滤掉。
+/// 类型 / 系统 / 架构来自 `/parameters`；主版本来自 `/major_versions`，
+/// 因为 `/parameters` 会把仅有早期访问版的主版本也列出来，如 29+，那些版本
+/// 在 `/packages` 里固定 `release_status=ga`，拿不到任何包，得过滤掉。
 /// 首次查询后缓存。
 ///
 /// # 返回值
@@ -261,7 +271,7 @@ pub async fn get_options() -> CoreResult<FoojayOptionsObj> {
     archs.sort();
     archs.dedup();
 
-    // 主版本只取有 GA 正式版的（按数值降序）
+    // 主版本只取有 GA 正式版的，按数值降序
     let major_url = format!("{}major_versions", urls::FOOJAY);
     let major_res = crate::get_work_client()
         .get_json::<FoojayMajorVersionsResultObj>(&major_url)
@@ -286,16 +296,14 @@ pub async fn get_options() -> CoreResult<FoojayOptionsObj> {
     Ok(obj)
 }
 
-/// 获取Java包列表
+/// 获取 Java 包列表
 ///
 /// 固定带 `release_status=ga` 与 `directly_downloadable=true`，只返回可直接下载的正式版。
 ///
-/// # 参数
-///
-/// - `major`: Java主版本
-/// - `os`: 系统（API 的 operating_system 取值，如 windows / macos），空串表示不限
-/// - `arch`: 架构（如 x64 / aarch64），空串表示不限
-/// - `package_type`: 包类型（jdk / jre），空串表示不限
+/// - `major`: Java 主版本号
+/// - `os`: 操作系统，取 API 的 operating_system 取值，如 windows / macos；空串表示不限
+/// - `arch`: 架构，如 x64 / aarch64；空串表示不限
+/// - `package_type`: 包类型，取值 jdk / jre；空串表示不限
 ///
 /// # 返回值
 ///

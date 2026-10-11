@@ -13,13 +13,14 @@ use crate::{
     loader::{fabric_loader_obj::FabricLoaderObj, fabric_meta_obj::FabricMetaObj},
 };
 
-/// 获取Fabric下载项目
-/// - `mc`: 游戏版本号
-/// - `version`: fabric版本号
+/// 取 Fabric 加载器的运行库下载项
+///
+/// - `mc`: 游戏版本号，如 `1.20.1`
+/// - `version`: Fabric 加载器版本号，`None` 表示取最新稳定版
 ///
 /// # 返回值
 ///
-/// 返回运行库下载项列表；版本不存在返回 `DataNotFound`
+/// 运行库下载项列表；版本不存在返回 `DataNotFound`
 pub async fn get_fabric_libs(mc: &str, version: Option<&str>) -> CoreResult<Vec<FileItemObj>> {
     let meta = fabric_api::get_meta().await?;
 
@@ -45,11 +46,11 @@ pub async fn get_fabric_libs(mc: &str, version: Option<&str>) -> CoreResult<Vec<
 }
 
 impl FabricLoaderObj {
-    /// 生成运行库列表
+    /// 把加载器元数据里的运行库转成下载项
     ///
     /// # 返回值
     ///
-    /// 返回各运行库的下载项
+    /// 各运行库的下载项
     pub fn make_libs(&self) -> Vec<FileItemObj> {
         let mut list = Vec::new();
 
@@ -69,11 +70,11 @@ impl FabricLoaderObj {
 }
 
 impl InstanceSettingObj {
-    /// 获取fabric的所有运行库
+    /// 取实例所需的 Fabric 运行库
     ///
     /// # 返回值
     ///
-    /// 返回运行库下载项列表（本地已有版本 JSON 时直接读取）
+    /// 运行库下载项列表；本地已有版本 JSON 时直接读取，否则走网络
     pub async fn get_fabric_libs(&self) -> CoreResult<Vec<FileItemObj>> {
         let fabric =
             version_path::get_fabric(&self.version, &self.loader_version.as_ref().unwrap());

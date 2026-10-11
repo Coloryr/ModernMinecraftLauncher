@@ -23,7 +23,7 @@ fn loader_type_id_round_trip() {
     assert!(LoaderType::from_string("").is_none());
 }
 
-/// 加载器类型前缀（用于拼接版本目录名）。
+/// 加载器类型前缀，用于拼接版本目录名
 #[test]
 fn loader_type_prefixes() {
     // 前缀 = id，保持与版本文件夹命名一致
@@ -50,7 +50,7 @@ fn mod_pack_type_id_round_trip() {
     assert_eq!(serde_json::to_value(ModPackType::None).unwrap(), 4);
 }
 
-/// 压缩包类型（添加实例入口）：id 与 from_id 双向转换。
+/// 压缩包类型，用于添加实例入口：id 与 from_id 双向转换
 #[test]
 fn pack_type_id_round_trip() {
     let ids = PackType::ids();
@@ -76,7 +76,7 @@ fn source_type_detection() {
     assert_eq!(get_source_type("abc", "67890"), ModPackType::Modrinth);
 }
 
-/// Forge / NeoForge 版本 JSON 文件名构造（补充分支覆盖）。
+/// Forge / NeoForge 版本 JSON 文件名构造，补充分支覆盖
 #[test]
 fn forge_json_name_variants() {
     // 带 hotfix 的 Forge 版本号
@@ -85,7 +85,7 @@ fn forge_json_name_variants() {
         "forge-1.16.5-36.2.39.json"
     );
 
-    // NeoForge 新版（1.20.2+）：版本号独立，不带 mc 前缀
+    // NeoForge 新版 1.20.2+：版本号独立，不带 mc 前缀
     assert_eq!(
         get_forge_json_name("1.21.1", "21.1.77", true, false),
         "neoforge-21.1.77.json"
@@ -95,7 +95,7 @@ fn forge_json_name_variants() {
         "neoforge-21.1.77-install.json"
     );
 
-    // NeoForge 老版（1.20.2 前）：回退 forge-{mc}-{version}，版本号不带 mc 前缀
+    // NeoForge 老版 1.20.2 之前：回退 forge-{mc}-{version}，版本号不带 mc 前缀
     assert_eq!(
         get_forge_json_name("1.20.1", "47.1.3", true, false),
         "forge-1.20.1-47.1.3.json"

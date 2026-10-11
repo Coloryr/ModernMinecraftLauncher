@@ -36,13 +36,11 @@ static LAN_INFO_RE: LazyLock<Regex> =
 
 /// 从广播文本解析 MOTD
 ///
-/// # 参数
-///
 /// - `text`: 广播文本
 ///
 /// # 返回值
 ///
-/// 返回解析出的 MOTD；格式不符返回 `None`
+/// 格式不符时返回 `None`
 fn get_motd(text: &str) -> Option<GameMotd> {
     let caps = LAN_INFO_RE.captures(text)?;
 
@@ -59,8 +57,6 @@ fn get_motd(text: &str) -> Option<GameMotd> {
 
 /// 构建 MOTD 广播文本
 ///
-/// # 参数
-///
 /// - `motd`: MOTD 信息
 ///
 /// # 返回值
@@ -70,29 +66,29 @@ fn build_motd(motd: GameMotd) -> String {
     format!("[MOTD]{}[/MOTD][AD]{}[/AD]", motd.motd, motd.port)
 }
 
-/// 局域网组播收发器
+/// 局域网组播收发器，客户端与服务端共用一个类型，靠创建方式区分角色
 pub struct GameLan {
     /// IPv4 组播 socket
     socket_v4: Arc<Socket>,
-    /// IPv6 组播 socket（本机无 IPv6 时为 `None`）
+    /// IPv6 组播 socket，本机没有 IPv6 时为 `None`
     socket_v6: Arc<Option<Socket>>,
-    /// 是否运行中
+    /// 是否运行中，`stop` 后收发线程退出循环
     is_run: Arc<AtomicBool>,
-    /// 接收回调（仅客户端）
+    /// 接收回调，只有客户端有
     events: Option<Arc<EventArgHandler<GameMotd>>>,
-    /// IPv4 发送地址（仅服务端）
+    /// IPv4 发送地址，只有服务端有
     send_v4: Option<SockAddr>,
-    /// IPv6 发送地址（仅服务端）
+    /// IPv6 发送地址，只有服务端且本机有 IPv6 时才有
     send_v6: Option<SockAddr>,
 }
 
 /// 局域网广播信息
 pub struct GameMotd {
-    /// 服务器描述
+    /// 服务器描述，即广播文本里 `[MOTD]` 段的内容
     pub motd: String,
-    /// 服务器端口
+    /// 服务器端口，即广播文本里 `[AD]` 段的内容，以字符串承载
     pub port: String,
-    /// 发送方地址
+    /// 发送方地址，发送侧不填，接收侧由 socket 补上
     pub addr: Option<SocketAddr>,
 }
 
@@ -319,8 +315,6 @@ impl GameLan {
 
     /// 添加接受回调
     ///
-    /// # 参数
-    ///
     /// - `handler`: 收到广播时的回调
     ///
     /// # 返回值
@@ -338,8 +332,6 @@ impl GameLan {
 
     /// 删除接受回调
     ///
-    /// # 参数
-    ///
     /// - `id`: 回调 ID
     pub fn remove_event_handler(&self, id: u64) {
         if let Some(handle) = self.events.as_ref() {
@@ -347,15 +339,13 @@ impl GameLan {
         }
     }
 
-    /// 启动发送组播（服务端）
-    ///
-    /// # 参数
+    /// 启动发送组播，服务端专用
     ///
     /// - `motd`: 广播的服务器信息
     ///
     /// # 返回值
     ///
-    /// 成功返回 `Ok(())`；未按服务端创建或线程创建失败返回对应错误
+    /// 未按服务端创建或线程创建失败时返回对应错误
     pub fn start_send(&self, motd: GameMotd) -> CoreResult<()> {
         self.is_run.store(true, Ordering::Release);
 
@@ -408,11 +398,11 @@ impl GameLan {
         Ok(())
     }
 
-    /// 启动接收组播（客户端）
+    /// 启动接收组播，客户端专用
     ///
     /// # 返回值
     ///
-    /// 成功返回 `Ok(())`；线程创建失败返回对应错误
+    /// 线程创建失败时返回对应错误
     pub fn start_read(&self) -> CoreResult<()> {
         self.is_run.store(true, Ordering::Release);
 
@@ -509,7 +499,7 @@ impl GameLan {
         Ok(())
     }
 
-    /// 停止组播收发
+    /// 停止组播收发，收发线程在下一轮循环检查到标志后自行退出
     pub fn stop(&self) {
         self.is_run.store(false, Ordering::Release);
     }

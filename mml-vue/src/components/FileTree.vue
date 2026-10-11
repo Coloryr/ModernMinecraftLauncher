@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 文件树（递归组件）：目录可展开 / 收起，节点带勾选框
-// checked 保存文件（叶子）key 集合；目录勾选态由后代文件推导（全选 / 半选 / 未选）
+// checked 保存叶子文件的 key 集合；目录勾选态由后代文件推导：全选 / 半选 / 未选
 import { collectFileKeys, type FileNode } from "../lib/fileTree";
 import FileTree from "./FileTree.vue";
 

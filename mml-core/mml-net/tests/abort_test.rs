@@ -1,4 +1,4 @@
-//! 全局中断（改代理时中断所有在途请求）的行为验证
+//! 全局中断的行为验证：改代理时中断所有在途请求
 //!
 //! 不依赖外网：本地起一个"只收不回"的 TCP 服务装作卡住的服务器，
 //! 断言 `abort_all()` 能让卡住的请求**立刻**返回中断错误，
@@ -16,6 +16,7 @@ use mml_config::config_obj::ProxyState;
 /// 重复 init 会让 mml_log 在打开同一个日志文件时 panic
 static INIT: Once = Once::new();
 
+/// 初始化日志、配置与 HTTP 客户端，进程内只跑一次
 fn init() {
     INIT.call_once(|| {
         let exe_path = env::current_exe().expect("Failed to get exe path");
@@ -68,6 +69,7 @@ fn spawn_request(url: String) -> mpsc::Receiver<(Duration, bool, String)> {
     rx
 }
 
+/// 中断能让卡住的在途请求立刻返回中断错误
 #[test]
 fn abort_interrupts_inflight_request() {
     init();
@@ -76,7 +78,7 @@ fn abort_interrupts_inflight_request() {
     let url = format!("http://127.0.0.1:{port}/stuck");
     let rx = spawn_request(url);
 
-    // 前提：请求确实卡住了（本地服务不回响应）
+    // 前提：请求确实卡住了，本地服务不回响应
     std::thread::sleep(Duration::from_millis(600));
     assert!(
         rx.try_recv().is_err(),
@@ -104,6 +106,7 @@ fn abort_interrupts_inflight_request() {
     );
 }
 
+/// 中断之后发出的新请求不受上一轮中断影响
 #[test]
 fn new_request_after_abort_unaffected() {
     init();

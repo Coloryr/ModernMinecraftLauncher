@@ -8,7 +8,7 @@ use crate::loader::{LibrariesObj, forge_launch_obj::ForgeLibrariesObj};
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct ForgeInstallObj {
-    /// 配置类型（forgeclient / forge server 等）
+    /// 配置类型，取值如 `forgeclient`、`forgeserver`
     pub profile: String,
     /// Forge 版本
     pub version: String,
@@ -19,6 +19,7 @@ pub struct ForgeInstallObj {
 }
 
 impl Default for ForgeInstallObj {
+    /// 字段全取缺省值，运行库列表为空
     fn default() -> Self {
         Self {
             profile: Default::default(),
@@ -44,6 +45,7 @@ pub struct VersionInfoObj {
 }
 
 impl Default for VersionInfoObj {
+    /// 主类与启动参数为空串，运行库列表为空
     fn default() -> Self {
         Self {
             main_class: Default::default(),
@@ -63,6 +65,7 @@ pub struct ForgeInstallOldObj {
 }
 
 impl Default for ForgeInstallOldObj {
+    /// 版本信息取缺省值
     fn default() -> Self {
         Self {
             version_info: Default::default(),
