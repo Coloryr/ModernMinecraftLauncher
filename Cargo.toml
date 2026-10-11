@@ -25,7 +25,6 @@ members = [
     "mml-core/mml-net",
     "mml-core/mml-skin",
     "mml-core/mml-skin-draw",
-    "mml-core/mml-skin-render",
     "mml-core/mml-sys",
     "mml-core/mml-testutil",
     "mml-gui/src-tauri",

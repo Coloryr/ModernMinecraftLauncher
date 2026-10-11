@@ -125,37 +125,8 @@ impl Pipelines {
             source: wgpu::ShaderSource::Wgsl(WGSL.into()),
         });
 
-        let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("mml-skin-3d"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-            ],
-        });
+        // 绑定组布局与采样器是三类离屏渲染共用的形状，统一由 mml-gpu 提供
+        let bind_layout = mml_gpu::texture_bind_layout(device, wgpu::ShaderStages::VERTEX);
 
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("mml-skin-3d"),
@@ -254,16 +225,7 @@ impl Pipelines {
             base: mk(None, depth_write, Some(wgpu::Face::Back), "fs_base"),
             overlay: mk(overlay_blend, depth_ro, None, "fs_overlay"),
             bind_layout,
-            sampler: device.create_sampler(&wgpu::SamplerDescriptor {
-                label: Some("mml-skin-3d"),
-                mag_filter: wgpu::FilterMode::Nearest,
-                min_filter: wgpu::FilterMode::Nearest,
-                mipmap_filter: wgpu::MipmapFilterMode::Nearest,
-                address_mode_u: wgpu::AddressMode::ClampToEdge,
-                address_mode_v: wgpu::AddressMode::ClampToEdge,
-                address_mode_w: wgpu::AddressMode::ClampToEdge,
-                ..Default::default()
-            }),
+            sampler: mml_gpu::nearest_sampler(device),
         }
     }
 }
@@ -306,24 +268,13 @@ pub(crate) fn render_3d(
         }),
         usage: wgpu::BufferUsages::UNIFORM,
     });
-    let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("mml-skin-3d"),
-        layout: &pipes.bind_layout,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uniform_buf.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: wgpu::BindingResource::Sampler(&pipes.sampler),
-            },
-            wgpu::BindGroupEntry {
-                binding: 2,
-                resource: wgpu::BindingResource::TextureView(&view),
-            },
-        ],
-    });
+    let bind = mml_gpu::texture_bind_group(
+        device,
+        &pipes.bind_layout,
+        &uniform_buf,
+        &pipes.sampler,
+        &view,
+    );
 
     let vbase = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("mml-skin-3d base"),

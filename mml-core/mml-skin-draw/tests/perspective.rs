@@ -1,10 +1,11 @@
-//! 验证 `glam::camera::lh::proj::directx::perspective` 与旧 `Mat4::perspective_lh` 行为一致。
+//! 验证 TypeB 引擎用的 `glam::camera::lh::proj::directx::perspective` 与旧
+//! `Mat4::perspective_lh` 行为一致。
 //!
 //! 两者的矩阵完全相同：glam 0.33.1 起 `Mat4::perspective_lh` 被弃用，官方指向
 //! `directx::perspective` 作为替代，弃用只是 API 组织上的重命名。
 
+use glam::Vec4;
 use glam::camera::lh::proj::directx;
-use glam::{Mat4, Vec4};
 use std::f32::consts::PI;
 
 /// 验证左撇子投影的 NDC 深度映射：near 映射到 0，far 映射到 1

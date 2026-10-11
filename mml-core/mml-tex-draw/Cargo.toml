@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+mml-gpu = { path = "../mml-gpu" }
 mml-names = { path = "../mml-names" }
 mml-sys = { path = "../mml-sys" }
 mml-game = { path = "../mml-game" }

@@ -8,10 +8,12 @@ use mml_game::launcher_path::assets_path;
 use mml_game::player_skin::{self, TextureFile};
 use mml_net::mojang_api;
 use mml_skin::{SkinType, skin_type_checker};
-use mml_skin_draw::{head_2d_draw, head_3d_draw, skin_2d_draw, skin_3d_draw};
+use mml_skin_draw::{
+    Draw2DType, Draw3DType, DrawHeadType, DrawSkinType, draw_head, draw_skin,
+};
 use mml_sys::path_helper;
 use tauri::UriSchemeResponder;
-use tiny_skia::Pixmap;
+use tiny_skia::{Pixmap, Point};
 
 use crate::dtos::account_dto::auth_type_from_str;
 use crate::gui_config::{self, HeadType, SkinDisplay};
@@ -218,10 +220,10 @@ pub(super) fn render_skin_display(
     display: SkinDisplay,
 ) -> Option<Pixmap> {
     match display {
-        SkinDisplay::Skin2DA => skin_2d_draw::skin_2d_draw_typea(bitmap, st),
-        SkinDisplay::Skin2DB => skin_2d_draw::skin_2d_draw_typeb(bitmap, st),
-        SkinDisplay::Skin3D => skin_3d_draw::draw_skin_3d_typea(bitmap, st),
-        SkinDisplay::Skin3DD => skin_3d_draw::draw_skin_3d_typea_down(bitmap, st),
+        SkinDisplay::Skin2DA => draw_skin(bitmap, DrawSkinType::Type2D(Draw2DType::TypeA), st),
+        SkinDisplay::Skin2DB => draw_skin(bitmap, DrawSkinType::Type2D(Draw2DType::TypeB), st),
+        SkinDisplay::Skin3D => draw_skin(bitmap, DrawSkinType::Type3D(Draw3DType::TypeAUp), st),
+        SkinDisplay::Skin3DD => draw_skin(bitmap, DrawSkinType::Type3D(Draw3DType::TypeADown), st),
     }
 }
 
@@ -284,11 +286,14 @@ pub(super) fn gen_head_image(bitmap: &Pixmap) -> Option<Pixmap> {
     let config = gui_config::get().head;
 
     match config.head_type {
-        HeadType::Head3DA => head_3d_draw::draw_head_3d_typea_down(bitmap),
-        HeadType::Head3DB => head_3d_draw::draw_head_3d_typeb(bitmap, config.x, config.y),
-        HeadType::Head3DC => head_3d_draw::draw_head_3d_typea_up(bitmap),
-        HeadType::Head2DB => head_2d_draw::head_2d_draw_typeb(bitmap),
-        HeadType::Head2DA => head_2d_draw::head_2d_draw_typea(bitmap),
+        HeadType::Head3DA => draw_head(bitmap, DrawHeadType::Type3D(Draw3DType::TypeADown)),
+        HeadType::Head3DB => draw_head(
+            bitmap,
+            DrawHeadType::Type3D(Draw3DType::TypeBRotate(Point::from_xy(config.x, config.y))),
+        ),
+        HeadType::Head3DC => draw_head(bitmap, DrawHeadType::Type3D(Draw3DType::TypeAUp)),
+        HeadType::Head2DB => draw_head(bitmap, DrawHeadType::Type2D(Draw2DType::TypeB)),
+        HeadType::Head2DA => draw_head(bitmap, DrawHeadType::Type2D(Draw2DType::TypeA)),
     }
 }
 

@@ -1,6 +1,7 @@
 //! GPU 渲染后端 wgpu：离屏渲染 0..1 模型空间 quad 并读回 RGBA
 //!
-//! 后端回退链 DX12 → VK → GL；全部不可用时由调用方报错，不再有 CPU skia 回退。
+//! 设备与离屏目标都来自 [`mml_gpu`]，后端回退链 DX12 → VK → GL 见其文档；
+//! 全部不可用时由调用方报错，不再有 CPU skia 回退。
 //! 变换链与光照公式照 26.3 反编译语义：
 //! M = T(slot/2) · S(slot,-slot,slot) · Tt · Rx·Ry·Rz · Ss · T(-0.5)
 //! 光照：accum = min(1, (max(0,dot(L0,N)) + max(0,dot(L1,N))) · 0.6 + 0.4)
@@ -8,7 +9,6 @@
 use std::collections::HashMap;
 
 use glam::{Mat3, Mat4, Vec3};
-use pollster::block_on;
 use tiny_skia::Pixmap;
 
 use crate::model::BakedModel;
@@ -81,9 +81,9 @@ const VERTEX_LAYOUT: wgpu::VertexBufferLayout<'static> = wgpu::VertexBufferLayou
 
 /// wgpu 渲染上下文：离屏管线与采样器
 pub struct GpuCtx {
-    /// 逻辑设备
+    /// 逻辑设备，是全局设备的句柄克隆
     device: wgpu::Device,
-    /// 命令队列
+    /// 命令队列，是全局队列的句柄克隆
     queue: wgpu::Queue,
     /// 不透明与 cutout 管线，深度写入并背面剔除
     pipeline_cutout: wgpu::RenderPipeline,
@@ -100,46 +100,13 @@ pub struct GpuCtx {
 }
 
 impl GpuCtx {
-    /// 按系统选择后端回退链，全失败返回 `None`
-    ///
-    /// 回退链按平台：Windows 为 DX12 → VK → GL，macOS 为 Metal → VK → GL，
-    /// Linux 等 Unix 为 VK → GL；图标渲染没有 CPU 回退
+    /// 取全局设备建上下文，全部后端都不可用时返回 `None`
     ///
     /// # 返回值
     ///
-    /// 返回初始化成功的上下文，全部后端失败时返回 `None`
-    #[cfg(windows)]
+    /// 返回初始化成功的上下文
     pub fn try_new() -> Option<GpuCtx> {
-        block_on(Self::try_new_async(&[
-            ("DX12", wgpu::Backends::DX12),
-            ("VULKAN", wgpu::Backends::VULKAN),
-            ("GL", wgpu::Backends::GL),
-        ]))
-    }
-
-    /// macOS 上的后端回退链：Metal → VK → GL
-    #[cfg(target_os = "macos")]
-    pub fn try_new() -> Option<GpuCtx> {
-        block_on(Self::try_new_async(&[
-            ("METAL", wgpu::Backends::METAL),
-            ("VULKAN", wgpu::Backends::VULKAN),
-            ("GL", wgpu::Backends::GL),
-        ]))
-    }
-
-    /// Linux 等 Unix 上的后端回退链：VK → GL
-    #[cfg(all(unix, not(target_os = "macos")))]
-    pub fn try_new() -> Option<GpuCtx> {
-        block_on(Self::try_new_async(&[
-            ("VULKAN", wgpu::Backends::VULKAN),
-            ("GL", wgpu::Backends::GL),
-        ]))
-    }
-
-    /// 其它平台上的后端回退链：GL
-    #[cfg(not(any(windows, unix)))]
-    pub fn try_new() -> Option<GpuCtx> {
-        block_on(Self::try_new_async(&[("GL", wgpu::Backends::GL)]))
+        Some(Self::build(mml_gpu::device()?))
     }
 
     /// 指定单一后端初始化，测试与调试用
@@ -151,99 +118,27 @@ impl GpuCtx {
     ///
     /// 返回初始化成功的上下文，失败时返回 `None`
     pub fn try_new_backend(name: &str, backends: wgpu::Backends) -> Option<GpuCtx> {
-        block_on(Self::try_new_async(&[(name, backends)]))
-    }
-
-    /// 按回退链逐个尝试初始化，独显优先
-    ///
-    /// - `chain`: 回退链，每项为显示名与 wgpu 后端位，按优先级排列
-    ///
-    /// # 返回值
-    ///
-    /// 返回首个成功的上下文，全部失败时返回 `None`
-    async fn try_new_async(chain: &[(&str, wgpu::Backends)]) -> Option<GpuCtx> {
-        for (name, backends) in chain {
-            let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
-            desc.backends = *backends;
-            let instance = wgpu::Instance::new(desc);
-
-            // 独显优先：枚举适配器按独显→其余排序，离屏渲染无需管是否主显卡
-            // 逐个尝试建设备，建不成再退下一个适配器或后端
-            let mut adapters = instance.enumerate_adapters(*backends).await;
-            adapters.sort_by_key(|a| match a.get_info().device_type {
-                wgpu::DeviceType::DiscreteGpu => 0,
-                _ => 1,
-            });
-            for adapter in adapters {
-                let info = adapter.get_info();
-                let Ok((device, queue)) = adapter
-                    .request_device(&wgpu::DeviceDescriptor {
-                        label: Some("mml-tex-draw"),
-                        required_features: wgpu::Features::empty(),
-                        required_limits: wgpu::Limits::default(),
-                        experimental_features: wgpu::ExperimentalFeatures::default(),
-                        memory_hints: wgpu::MemoryHints::default(),
-                        trace: wgpu::Trace::Off,
-                    })
-                    .await
-                else {
-                    continue;
-                };
-                println!(
-                    "[渲染] GPU后端 {name}：{}（{:?}）",
-                    info.name, info.device_type
-                );
-                return Some(Self::build(device, queue));
-            }
-        }
-        None
+        Some(Self::build(&mml_gpu::device_with_chain(&[(name, backends)])?))
     }
 
     /// 创建着色器与三条渲染管线：cutout、translucent、glint
     ///
-    /// - `device`: 逻辑设备
-    /// - `queue`: 命令队列
+    /// - `gpu`: 设备来源，全局或临时的都行，设备与队列按句柄克隆进上下文
     ///
     /// # 返回值
     ///
     /// 返回组装完成的上下文
-    fn build(device: wgpu::Device, queue: wgpu::Queue) -> GpuCtx {
+    fn build(gpu: &mml_gpu::GpuDevice) -> GpuCtx {
+        let device = gpu.device().clone();
+        let queue = gpu.queue().clone();
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("mml-tex-draw"),
             source: wgpu::ShaderSource::Wgsl(WGSL.into()),
         });
 
-        let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("mml-tex-draw"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-            ],
-        });
+        // 绑定组布局与采样器是三类离屏渲染共用的形状，统一由 mml-gpu 提供
+        let bind_layout =
+            mml_gpu::texture_bind_layout(&device, wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT);
 
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("mml-tex-draw"),
@@ -351,16 +246,7 @@ impl GpuCtx {
             "fs_glint",
         );
 
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("mml-tex-draw"),
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            ..Default::default()
-        });
+        let sampler = mml_gpu::nearest_sampler(&device);
 
         // glint 光纹平铺需要 REPEAT 采样：uv×8 旋转后会越界
         let sampler_repeat = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -628,24 +514,13 @@ impl GpuCtx {
                 },
             );
             let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-            let bind = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("sprite"),
-                layout: &self.bind_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: uniform_buf.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&self.sampler),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: wgpu::BindingResource::TextureView(&view),
-                    },
-                ],
-            });
+            let bind = mml_gpu::texture_bind_group(
+                &self.device,
+                &self.bind_layout,
+                &uniform_buf,
+                &self.sampler,
+                &view,
+            );
             views.push((tex_path.clone(), texture));
             binds.insert(tex_path.clone(), bind);
         }
@@ -696,58 +571,24 @@ impl GpuCtx {
                 },
             );
             let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-            let bind = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("glint"),
-                layout: &self.bind_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: uniform_buf.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&self.sampler_repeat),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: wgpu::BindingResource::TextureView(&view),
-                    },
-                ],
-            });
+            let bind = mml_gpu::texture_bind_group(
+                &self.device,
+                &self.bind_layout,
+                &uniform_buf,
+                &self.sampler_repeat,
+                &view,
+            );
             Some(bind)
         });
 
-        // 离屏目标 + 深度
-        let color_tex = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("target"),
-            size: wgpu::Extent3d {
-                width: size,
-                height: size,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[],
-        });
-        let color_view = color_tex.create_view(&wgpu::TextureViewDescriptor::default());
-        let depth_tex = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("depth"),
-            size: wgpu::Extent3d {
-                width: size,
-                height: size,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Depth32Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &[],
-        });
-        let depth_view = depth_tex.create_view(&wgpu::TextureViewDescriptor::default());
+        // 离屏目标与深度附件由 mml-gpu 统一创建，单采样可直接读回
+        let target = mml_gpu::offscreen_target(&self.device, size, size);
+        let color_view = target
+            .color
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        let depth_view = target
+            .depth
+            .create_view(&wgpu::TextureViewDescriptor::default());
 
         let mut encoder = self
             .device
@@ -803,43 +644,12 @@ impl GpuCtx {
             }
         }
 
-        // 读回，拷贝到对齐缓冲
-        let bytes_per_row = size * 4;
-        let read_buf = self.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("readback"),
-            size: (bytes_per_row * size) as u64,
-            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        encoder.copy_texture_to_buffer(
-            color_tex.as_image_copy(),
-            wgpu::TexelCopyBufferInfo {
-                buffer: &read_buf,
-                layout: wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(bytes_per_row),
-                    rows_per_image: Some(size),
-                },
-            },
-            wgpu::Extent3d {
-                width: size,
-                height: size,
-                depth_or_array_layers: 1,
-            },
-        );
         self.queue.submit(Some(encoder.finish()));
 
-        let slice = read_buf.slice(..);
-        slice.map_async(wgpu::MapMode::Read, |_| {});
-        self.device.poll(wgpu::PollType::wait_indefinitely()).ok()?;
-        let data = slice.get_mapped_range().ok()?;
-        if data.len() != (bytes_per_row * size) as usize {
-            return None;
-        }
-
-        // 离屏混合为 premultiplied 语义，反除回 straight，得到透明背景 PNG
-        let mut out = vec![0u8; data.len()];
-        for (dst, src) in out.chunks_exact_mut(4).zip(data.chunks_exact(4)) {
+        // 读回预乘 RGBA，再按 premultiplied 语义反除回 straight，得到透明背景 PNG
+        let premul = mml_gpu::readback(&self.device, &self.queue, &target.color, size, size)?;
+        let mut out = vec![0u8; premul.len()];
+        for (dst, src) in out.chunks_exact_mut(4).zip(premul.chunks_exact(4)) {
             let a = src[3];
             dst.copy_from_slice(src);
             if a > 0 && a < 255 {
@@ -848,8 +658,7 @@ impl GpuCtx {
                 }
             }
         }
-        drop(data);
-        read_buf.unmap();
+
         Some(out)
     }
 }

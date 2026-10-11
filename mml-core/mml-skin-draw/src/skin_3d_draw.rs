@@ -1,23 +1,32 @@
-//! 皮肤整体 3D 等距渲染，wgpu 离屏，固定视角正交投影 + 深度测试
+//! 皮肤整体 3D 渲染
 //!
-//! 模型坐标约定与 `mml-skin-render` 一致，即 cube.rs 的顶点顺序加 texture.rs 的 UV 布局：
+//! TypeA / TypeA下 走本文件的正交等距渲染，固定视角正交投影 + 深度测试；
+//! TypeB 走内置的透视渲染引擎（[`crate::skin_3d_render`] 与 [`crate::skin_3d_gpu`]）。
+//!
+//! 模型坐标约定与 TypeB 引擎一致，即 [`crate::skin_3d_cube`] 的顶点顺序加
+//! [`crate::skin_3d_texture`] 的 UV 布局：
 //! 角色面朝 +z、x− 为角色右手侧、+y 为上，原点取身高一半处；贴图 v 向下。
 //! 旧版 64x32 皮肤先补成 64x64，右肢镜像填进左肢块，再统一按新版布局取贴图。
 //! 底层部件先画并写深度，顶层 1.125 倍 overlay 后画并做半透明混合。
 
 use std::f32::consts::PI;
 
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Vec3, Vec4};
 use mml_skin::{SkinType, skin_type_checker};
 use tiny_skia::Pixmap;
 
 use crate::gpu_3d::{face_verts, render_3d};
+use crate::skin_3d_gpu::SkinRenderWgpu;
+use crate::skin_3d_render::SkinRenderType;
 use crate::skin_draw::{BPP, draw, row_bytes};
 
 /// 输出宽度，单位像素，与皮肤 2D 叠加一致
 const SIZE_W: u32 = 272;
 /// 输出高度，单位像素，与皮肤 2D 叠加一致
 const SIZE_H: u32 = 532;
+
+/// TypeB 档位的画布边长，单位像素，模型居中且不铺满
+const SIZE_TYPEB: u32 = 256;
 
 /// 模型缩放，全身 32 像素加 overlay 边缘 33 像素共 478px，画布 532 高
 const SCALE: f32 = 14.5;
@@ -147,8 +156,8 @@ mod face {
 /// 返回四个 `(位置, uv)`；位置是相对部件中心的模型坐标偏移，
 /// uv 是 0..1 的块内比例，v=0 在贴图块顶部
 ///
-/// 顶点顺序与 uv 布局来自 `mml-skin-render`，即 cube.rs 的 CUBE 与 texture.rs 的
-/// UV 表：正面 / 侧面 / 顶面 u 沿面向右、v 沿面向下；背面 / 底面 u 镜像。
+/// 顶点顺序与 uv 布局来自 [`crate::skin_3d_cube`] 的 CUBE 与 [`crate::skin_3d_texture`]
+/// 的 UV 表：正面 / 侧面 / 顶面 u 沿面向右、v 沿面向下；背面 / 底面 u 镜像。
 fn face_corners(h: [f32; 3], d: usize) -> [([f32; 3], [f32; 2]); 4] {
     let (hx, hy, hz) = (h[0], h[1], h[2]);
     match d {
@@ -309,6 +318,10 @@ fn create_tran(pitch: f32, yaw: f32) -> Mat4 {
 
 /// 渲染 3D 等距全身图，角度由调用方指定
 ///
+/// 渲染 3D 等距全身图，角度由调用方指定
+///
+/// TypeA / TypeA下 的内置实现，只在本 crate 内按固定角度调用。
+///
 /// - `image`: 皮肤贴图，支持 64x64 与 64x32，其它尺寸按原样取贴图
 /// - `skin_type`: 皮肤类型，`None` 表示按贴图自动检测
 /// - `pitch`: 俯仰角，单位度，负 = 面朝上，正 = 面朝下
@@ -317,7 +330,7 @@ fn create_tran(pitch: f32, yaw: f32) -> Mat4 {
 /// # 返回值
 ///
 /// 返回 `SIZE_W` x `SIZE_H` 的渲染结果，分配失败或无可用 GPU 时返回 `None`
-pub fn draw_skin_3d_typeb(
+fn draw_skin_3d(
     image: &Pixmap,
     skin_type: Option<SkinType>,
     pitch: f32,
@@ -398,8 +411,8 @@ pub fn draw_skin_3d_typeb(
 /// # 返回值
 ///
 /// 返回 `SIZE_W` x `SIZE_H` 的渲染结果，分配失败或无可用 GPU 时返回 `None`
-pub fn draw_skin_3d_typea(image: &Pixmap, skin_type: Option<SkinType>) -> Option<Pixmap> {
-    draw_skin_3d_typeb(image, skin_type, -30.0, 45.0)
+pub fn typea_up(image: &Pixmap, skin_type: Option<SkinType>) -> Option<Pixmap> {
+    draw_skin_3d(image, skin_type, -30.0, 45.0)
 }
 
 /// 渲染 3D 等距全身图，固定水平 45°、面朝下 30° 的俯视角度
@@ -410,8 +423,43 @@ pub fn draw_skin_3d_typea(image: &Pixmap, skin_type: Option<SkinType>) -> Option
 /// # 返回值
 ///
 /// 返回 `SIZE_W` x `SIZE_H` 的渲染结果，分配失败或无可用 GPU 时返回 `None`
-pub fn draw_skin_3d_typea_down(image: &Pixmap, skin_type: Option<SkinType>) -> Option<Pixmap> {
-    draw_skin_3d_typeb(image, skin_type, 30.0, 45.0)
+pub fn typea_down(image: &Pixmap, skin_type: Option<SkinType>) -> Option<Pixmap> {
+    draw_skin_3d(image, skin_type, 30.0, 45.0)
+}
+
+/// 渲染 TypeB 风格的 3D 全身图：透视视角、透明背景、含顶层
+///
+/// 与 TypeA / TypeA下 的正交等距图不同，这一档走内置的透视渲染引擎，画布是边长
+/// `SIZE_TYPEB` 的正方形，模型居中且不铺满画布。
+///
+/// - `image`: 皮肤贴图，宽度须为 64
+/// - `skin_type`: 皮肤类型，`None` 为自动检测
+/// - `pitch`: 俯仰角，单位度，负 = 面朝上，正 = 面朝下
+/// - `yaw`: 偏航角，单位度，取 0 为正视图
+///
+/// # 返回值
+///
+/// 返回 `SIZE_TYPEB` x `SIZE_TYPEB` 的渲染结果；贴图宽度不是 64、皮肤类型未知
+/// 或无可用 GPU 时返回 `None`
+pub fn typeb(
+    image: &Pixmap,
+    skin_type: Option<SkinType>,
+    pitch: f32,
+    yaw: f32,
+) -> Option<Pixmap> {
+    let st = skin_type.unwrap_or_else(|| skin_type_checker::get_skin_type(image));
+
+    let mut render = SkinRenderWgpu::new();
+    render.width = SIZE_TYPEB as i32;
+    render.height = SIZE_TYPEB as i32;
+    render.skin_type = st;
+    render.enable_top = true;
+    render.back_color = Vec4::new(0.0, 0.0, 0.0, 0.0);
+    render.render_type = SkinRenderType::MSAA;
+    render.set_skin_tex(image).ok()?;
+    render.rotate(pitch, yaw);
+
+    render.render().ok()
 }
 
 #[cfg(test)]
@@ -421,7 +469,7 @@ mod tests {
 
     /// 构造 64x64 新版皮肤：头 / 身体正面用可辨识颜色，其余透明
     fn make_skin() -> Pixmap {
-        let mut data = vec![0u8; 64 * 64 * BPP];
+        let data = vec![0u8; 64 * 64 * BPP];
         let mut bm = Pixmap::from_vec(data, IntSize::from_wh(64, 64).unwrap()).unwrap();
         // 头正面 (8,8,8,8) 红；身体正面 (20,20,8,12) 蓝
         for j in 0..8 {
@@ -442,7 +490,7 @@ mod tests {
     #[test]
     fn test_draw_skin_3d_layout() {
         let skin = make_skin();
-        let out = draw_skin_3d_typea(&skin, Some(SkinType::New)).expect("渲染应成功");
+        let out = typea_up(&skin, Some(SkinType::New)).expect("渲染应成功");
         assert_eq!(out.width(), SIZE_W);
         assert_eq!(out.height(), SIZE_H);
 
@@ -464,7 +512,7 @@ mod tests {
     /// 45° 视角下绿色区域最左端 ≈ 75；若手臂半埋进身体，x 从 -6 起，只能到 ≈ 95
     #[test]
     fn test_draw_skin_3d_arm_outside() {
-        let mut data = vec![0u8; 64 * 64 * BPP];
+        let data = vec![0u8; 64 * 64 * BPP];
         let mut bm = Pixmap::from_vec(data, IntSize::from_wh(64, 64).unwrap()).unwrap();
         // 右臂块下排四个侧面 (40,20)-(56,32) 绿色
         for j in 0..12 {
@@ -472,7 +520,7 @@ mod tests {
                 set_pixel(&mut bm, 40 + i, 20 + j, [0, 255, 0, 255]);
             }
         }
-        let out = draw_skin_3d_typea(&bm, Some(SkinType::New)).expect("渲染应成功");
+        let out = typea_up(&bm, Some(SkinType::New)).expect("渲染应成功");
 
         let mut leftmost = SIZE_W as i32;
         for y in 0..SIZE_H as i32 {
@@ -495,7 +543,7 @@ mod tests {
     /// 旧版 64x32 皮肤：右肢镜像补进左肢块后应能正常渲染
     #[test]
     fn test_draw_skin_3d_old_skin() {
-        let mut data = vec![0u8; 64 * 32 * BPP];
+        let data = vec![0u8; 64 * 32 * BPP];
         let mut bm = Pixmap::from_vec(data, IntSize::from_wh(64, 32).unwrap()).unwrap();
         // 头正面
         for j in 0..8 {
@@ -503,7 +551,7 @@ mod tests {
                 set_pixel(&mut bm, 8 + i, 8 + j, [255, 0, 0, 255]);
             }
         }
-        let out = draw_skin_3d_typea(&bm, None).expect("旧皮肤渲染应成功");
+        let out = typea_up(&bm, None).expect("旧皮肤渲染应成功");
         assert_eq!(out.width(), SIZE_W);
         assert_eq!(get_pixel(&out, 177, 95)[0], 255, "头正面应为红色");
 
@@ -511,5 +559,36 @@ mod tests {
         let norm = normalize_texture(&bm).expect("归一化应成功");
         assert_eq!(norm.width(), 64);
         assert_eq!(norm.height(), 64);
+    }
+
+    /// TypeB 档位输出 SIZE_TYPEB 见方、背景透明，模型画在画面里且不铺满
+    #[test]
+    fn test_draw_skin_3d_typeb() {
+        let skin = make_skin();
+        let out = typeb(&skin, Some(SkinType::New), 0.0, 30.0).expect("渲染应成功");
+        assert_eq!(out.width(), SIZE_TYPEB);
+        assert_eq!(out.height(), SIZE_TYPEB);
+
+        // 背景 alpha 为 0，四角应透明
+        for (x, y) in [(0, 0), (255, 0), (0, 255), (255, 255)] {
+            assert_eq!(get_pixel(&out, x, y)[3], 0, "四角应透明 ({x},{y})");
+        }
+
+        let drawn = (0..SIZE_TYPEB)
+            .flat_map(|y| (0..SIZE_TYPEB).map(move |x| (x as i32, y as i32)))
+            .filter(|(x, y)| get_pixel(&out, *x, *y)[3] > 0)
+            .count();
+        assert!(drawn > 1000, "模型应画在画面里，实际不透明像素 {drawn}");
+
+        // 旋转是入参，换个偏航角结果必须不同
+        let turned = typeb(&skin, Some(SkinType::New), 0.0, -30.0).expect("渲染应成功");
+        assert_ne!(out.data(), turned.data(), "偏航角变化后画面必须变化");
+
+        // 宽度不是 64 的贴图直接拒绝
+        let narrow = Pixmap::new(32, 32).unwrap();
+        assert!(
+            typeb(&narrow, Some(SkinType::New), 0.0, 30.0).is_none(),
+            "宽度非 64 的贴图不应出图"
+        );
     }
 }

@@ -5,8 +5,8 @@
 use mml_skin::SkinType;
 
 use crate::{
-    cube,
-    cube_model::{CubeModelItemObj, SteveModel},
+    skin_3d_cube,
+    skin_3d_cube_model::{CubeModelItemObj, SteveModel},
 };
 
 /// 按皮肤类型生成本体模型
@@ -21,35 +21,35 @@ pub fn get_steve(skin_type: SkinType) -> SteveModel {
 
     // 公共部件
     let head = CubeModelItemObj::new(
-        cube::get_square_default(),
-        cube::get_square_indices_default(),
+        skin_3d_cube::get_square_default(),
+        skin_3d_cube::get_square_indices_default(),
     );
 
     let body = CubeModelItemObj::new(
-        cube::get_square(1.0, 1.5, 0.5, 0.0, 0.0, 0.0, 1.0),
-        cube::get_square_indices_default(),
+        skin_3d_cube::get_square(1.0, 1.5, 0.5, 0.0, 0.0, 0.0, 1.0),
+        skin_3d_cube::get_square_indices_default(),
     );
 
     let left_leg = CubeModelItemObj::new(
-        cube::get_square(0.5, 1.5, 0.5, 0.0, 0.0, 0.0, 1.0),
-        cube::get_square_indices_default(),
+        skin_3d_cube::get_square(0.5, 1.5, 0.5, 0.0, 0.0, 0.0, 1.0),
+        skin_3d_cube::get_square_indices_default(),
     );
 
     let right_leg = CubeModelItemObj::new(
-        cube::get_square(0.5, 1.5, 0.5, 0.0, 0.0, 0.0, 1.0),
-        cube::get_square_indices_default(),
+        skin_3d_cube::get_square(0.5, 1.5, 0.5, 0.0, 0.0, 0.0, 1.0),
+        skin_3d_cube::get_square_indices_default(),
     );
 
     let cape = CubeModelItemObj::new(
-        cube::get_square(1.25, 2.0, 0.1, 0.0, 0.0, 0.0, 1.0),
-        cube::get_square_indices_default(),
+        skin_3d_cube::get_square(1.25, 2.0, 0.1, 0.0, 0.0, 0.0, 1.0),
+        skin_3d_cube::get_square_indices_default(),
     );
 
     // 手臂：按类型决定宽度
     let arm_width = if is_slim { 0.375 } else { 0.5 };
     let arm = CubeModelItemObj::new(
-        cube::get_square(arm_width, 1.5, 0.5, 0.0, 0.0, 0.0, 1.0),
-        cube::get_square_indices_default(),
+        skin_3d_cube::get_square(arm_width, 1.5, 0.5, 0.0, 0.0, 0.0, 1.0),
+        skin_3d_cube::get_square_indices_default(),
     );
 
     SteveModel::new(head, body, arm.clone(), arm, left_leg, right_leg, cape)
@@ -70,8 +70,8 @@ pub fn get_steve_top(skin_type: SkinType) -> SteveModel {
 
     // 头部：总是存在
     let head = CubeModelItemObj::new(
-        cube::get_square(1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.125),
-        cube::get_square_indices_default(),
+        skin_3d_cube::get_square(1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.125),
+        skin_3d_cube::get_square_indices_default(),
     );
 
     let mut body = CubeModelItemObj::new(Vec::new(), Vec::new());
@@ -83,25 +83,25 @@ pub fn get_steve_top(skin_type: SkinType) -> SteveModel {
 
     if !is_old {
         body = CubeModelItemObj::new(
-            cube::get_square(1.0, 1.5, 0.5, 0.0, 0.0, 0.0, 1.125),
-            cube::get_square_indices_default(),
+            skin_3d_cube::get_square(1.0, 1.5, 0.5, 0.0, 0.0, 0.0, 1.125),
+            skin_3d_cube::get_square_indices_default(),
         );
 
         let arm_width = if is_slim { 0.375 } else { 0.5 };
-        let arm_model = cube::get_square(arm_width, 1.5, 0.5, 0.0, 0.0, 0.0, 1.125);
-        let arm_indices = cube::get_square_indices_default();
+        let arm_model = skin_3d_cube::get_square(arm_width, 1.5, 0.5, 0.0, 0.0, 0.0, 1.125);
+        let arm_indices = skin_3d_cube::get_square_indices_default();
 
         left_arm = CubeModelItemObj::new(arm_model.clone(), arm_indices.clone());
         right_arm = CubeModelItemObj::new(arm_model, arm_indices);
 
         left_leg = CubeModelItemObj::new(
-            cube::get_square(0.5, 1.5, 0.5, 0.0, 0.0, 0.0, 1.125),
-            cube::get_square_indices_default(),
+            skin_3d_cube::get_square(0.5, 1.5, 0.5, 0.0, 0.0, 0.0, 1.125),
+            skin_3d_cube::get_square_indices_default(),
         );
 
         right_leg = CubeModelItemObj::new(
-            cube::get_square(0.5, 1.5, 0.5, 0.0, 0.0, 0.0, 1.125),
-            cube::get_square_indices_default(),
+            skin_3d_cube::get_square(0.5, 1.5, 0.5, 0.0, 0.0, 0.0, 1.125),
+            skin_3d_cube::get_square_indices_default(),
         );
     }
 
@@ -128,28 +128,28 @@ mod tests {
         let m = get_steve(SkinType::New);
 
         // 头部：1 x 1 x 1
-        assert_eq!(max_abs_axis(&m.head.model, 0), cube::VALUE);
-        assert_eq!(max_abs_axis(&m.head.model, 1), cube::VALUE);
-        assert_eq!(max_abs_axis(&m.head.model, 2), cube::VALUE);
+        assert_eq!(max_abs_axis(&m.head.model, 0), skin_3d_cube::VALUE);
+        assert_eq!(max_abs_axis(&m.head.model, 1), skin_3d_cube::VALUE);
+        assert_eq!(max_abs_axis(&m.head.model, 2), skin_3d_cube::VALUE);
 
         // 身体：1 x 1.5 x 0.5
-        assert_eq!(max_abs_axis(&m.body.model, 0), cube::VALUE);
-        assert_eq!(max_abs_axis(&m.body.model, 1), 1.5 * cube::VALUE);
-        assert_eq!(max_abs_axis(&m.body.model, 2), 0.5 * cube::VALUE);
+        assert_eq!(max_abs_axis(&m.body.model, 0), skin_3d_cube::VALUE);
+        assert_eq!(max_abs_axis(&m.body.model, 1), 1.5 * skin_3d_cube::VALUE);
+        assert_eq!(max_abs_axis(&m.body.model, 2), 0.5 * skin_3d_cube::VALUE);
 
         // 手臂：0.5 x 1.5 x 0.5，宽臂
-        assert_eq!(max_abs_axis(&m.left_arm.model, 0), 0.5 * cube::VALUE);
-        assert_eq!(max_abs_axis(&m.left_arm.model, 1), 1.5 * cube::VALUE);
-        assert_eq!(max_abs_axis(&m.right_arm.model, 0), 0.5 * cube::VALUE);
+        assert_eq!(max_abs_axis(&m.left_arm.model, 0), 0.5 * skin_3d_cube::VALUE);
+        assert_eq!(max_abs_axis(&m.left_arm.model, 1), 1.5 * skin_3d_cube::VALUE);
+        assert_eq!(max_abs_axis(&m.right_arm.model, 0), 0.5 * skin_3d_cube::VALUE);
 
         // 腿：0.5 x 1.5 x 0.5
-        assert_eq!(max_abs_axis(&m.left_leg.model, 0), 0.5 * cube::VALUE);
-        assert_eq!(max_abs_axis(&m.left_leg.model, 1), 1.5 * cube::VALUE);
+        assert_eq!(max_abs_axis(&m.left_leg.model, 0), 0.5 * skin_3d_cube::VALUE);
+        assert_eq!(max_abs_axis(&m.left_leg.model, 1), 1.5 * skin_3d_cube::VALUE);
 
         // 披风：1.25 x 2 x 0.1
-        assert_eq!(max_abs_axis(&m.cape.model, 0), 1.25 * cube::VALUE);
-        assert_eq!(max_abs_axis(&m.cape.model, 1), 2.0 * cube::VALUE);
-        assert_eq!(max_abs_axis(&m.cape.model, 2), 0.1 * cube::VALUE);
+        assert_eq!(max_abs_axis(&m.cape.model, 0), 1.25 * skin_3d_cube::VALUE);
+        assert_eq!(max_abs_axis(&m.cape.model, 1), 2.0 * skin_3d_cube::VALUE);
+        assert_eq!(max_abs_axis(&m.cape.model, 2), 0.1 * skin_3d_cube::VALUE);
 
         // 左右手臂使用同一份模型数据
         assert_eq!(m.left_arm.model, m.right_arm.model);
@@ -160,8 +160,8 @@ mod tests {
     #[test]
     fn test_get_steve_slim_arm() {
         let slim = get_steve(SkinType::NewSlim);
-        assert_eq!(max_abs_axis(&slim.left_arm.model, 0), 0.375 * cube::VALUE);
-        assert_eq!(max_abs_axis(&slim.left_arm.model, 1), 1.5 * cube::VALUE);
+        assert_eq!(max_abs_axis(&slim.left_arm.model, 0), 0.375 * skin_3d_cube::VALUE);
+        assert_eq!(max_abs_axis(&slim.left_arm.model, 1), 1.5 * skin_3d_cube::VALUE);
 
         // slim 与宽臂的身体、头部相同
         let normal = get_steve(SkinType::New);
@@ -175,12 +175,12 @@ mod tests {
         let top = get_steve_top(SkinType::New);
 
         // 头部：1.125 倍 -> ±0.5625
-        assert_eq!(max_abs_axis(&top.head.model, 0), 1.125 * cube::VALUE);
-        assert_eq!(max_abs_axis(&top.head.model, 1), 1.125 * cube::VALUE);
+        assert_eq!(max_abs_axis(&top.head.model, 0), 1.125 * skin_3d_cube::VALUE);
+        assert_eq!(max_abs_axis(&top.head.model, 1), 1.125 * skin_3d_cube::VALUE);
 
         // 身体：1 x 1.5 x 0.5，放大 1.125
-        assert_eq!(max_abs_axis(&top.body.model, 1), 1.5 * 1.125 * cube::VALUE);
-        assert_eq!(max_abs_axis(&top.body.model, 2), 0.5 * 1.125 * cube::VALUE);
+        assert_eq!(max_abs_axis(&top.body.model, 1), 1.5 * 1.125 * skin_3d_cube::VALUE);
+        assert_eq!(max_abs_axis(&top.body.model, 2), 0.5 * 1.125 * skin_3d_cube::VALUE);
 
         // 顶层没有披风数据
         assert!(top.cape.model.is_empty());

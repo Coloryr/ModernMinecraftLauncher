@@ -34,34 +34,50 @@ impl GpuDevice {
 
 /// 取全局设备；首次调用时按后端回退链初始化，之后所有调用方共用
 pub fn device() -> Option<&'static GpuDevice> {
-    GPU.get_or_init(|| block_on(init())).as_ref()
+    GPU.get_or_init(|| block_on(init(default_chain()))).as_ref()
 }
 
-/// 按系统选择后端回退链逐个尝试初始化，独显优先，全失败返回 `None`：
+/// 按给定回退链初始化一个设备，不占用也不读全局缓存，测试与调试用
+///
+/// - `chain`: 回退链，每项为显示名与后端位，按优先级排列
+///
+/// # 返回值
+///
+/// 返回首个成功的设备，全部失败时返回 `None`
+pub fn device_with_chain(chain: &[(&str, wgpu::Backends)]) -> Option<GpuDevice> {
+    block_on(init(chain))
+}
+
+/// 按系统给出默认后端回退链：
 /// - Windows：DX12 → VK → GL
 /// - macOS：Metal → VK → GL
 /// - Linux/其他 Unix：VK → GL
-async fn init() -> Option<GpuDevice> {
+fn default_chain() -> &'static [(&'static str, wgpu::Backends)] {
     #[cfg(windows)]
-    let chain: &[(&str, wgpu::Backends)] = &[
+    return &[
         ("DX12", wgpu::Backends::DX12),
         ("VULKAN", wgpu::Backends::VULKAN),
         ("GL", wgpu::Backends::GL),
     ];
     #[cfg(target_os = "macos")]
-    let chain: &[(&str, wgpu::Backends)] = &[
+    return &[
         ("METAL", wgpu::Backends::METAL),
         ("VULKAN", wgpu::Backends::VULKAN),
         ("GL", wgpu::Backends::GL),
     ];
     #[cfg(all(unix, not(target_os = "macos")))]
-    let chain: &[(&str, wgpu::Backends)] = &[
+    return &[
         ("VULKAN", wgpu::Backends::VULKAN),
         ("GL", wgpu::Backends::GL),
     ];
     #[cfg(not(any(windows, unix)))]
-    let chain: &[(&str, wgpu::Backends)] = &[("GL", wgpu::Backends::GL)];
+    return &[("GL", wgpu::Backends::GL)];
+}
 
+/// 按回退链逐个后端、逐个适配器尝试初始化，独显优先，全失败返回 `None`
+///
+/// - `chain`: 回退链，每项为显示名与后端位，按优先级排列
+async fn init(chain: &[(&str, wgpu::Backends)]) -> Option<GpuDevice> {
     for (name, backends) in chain {
         let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
         desc.backends = *backends;
@@ -214,52 +230,223 @@ pub fn upload_texture(
     Some(texture)
 }
 
-/// 离屏渲染目标，颜色与深度附件成对创建
+/// 离屏渲染目标，颜色与深度附件成对创建，多重采样时另带解析目标
 pub struct OffscreenTarget {
-    /// 颜色附件，格式 Rgba8Unorm，用途 RENDER_ATTACHMENT | COPY_SRC
+    /// 颜色附件，格式 Rgba8Unorm；单采样时用途含 COPY_SRC，可直接读回
     pub color: wgpu::Texture,
     /// 深度附件，格式 Depth32Float，仅用于深度测试
     pub depth: wgpu::Texture,
+    /// 多重采样的解析目标，单采样时为 `None`；采样数与读回都应当用它
+    pub resolve: Option<wgpu::Texture>,
 }
 
-/// 创建指定尺寸的离屏渲染目标
+/// 建一个渲染附件纹理
 ///
-/// - `device`: 全局 wgpu 逻辑设备
+/// - `device`: wgpu 逻辑设备
+/// - `width` / `height`: 尺寸，单位像素
+/// - `samples`: 采样数，1 表示单采样
+/// - `format`: 纹理格式，颜色用 `Rgba8Unorm`，深度用 `Depth32Float`
+/// - `usage`: 用途
+/// - `label`: 调试标签
+fn attachment(
+    device: &wgpu::Device,
+    width: u32,
+    height: u32,
+    samples: u32,
+    format: wgpu::TextureFormat,
+    usage: wgpu::TextureUsages,
+    label: &str,
+) -> wgpu::Texture {
+    device.create_texture(&wgpu::TextureDescriptor {
+        label: Some(label),
+        size: wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: samples,
+        dimension: wgpu::TextureDimension::D2,
+        format,
+        usage,
+        view_formats: &[],
+    })
+}
+
+/// 创建指定尺寸的离屏渲染目标，单采样
+///
+/// - `device`: wgpu 逻辑设备
 /// - `width`: 目标宽度，单位像素
 /// - `height`: 目标高度，单位像素
 ///
 /// # 返回值
 ///
-/// 返回成对的颜色与深度附件
+/// 见 [`OffscreenTarget`]，`resolve` 恒为 `None`
 pub fn offscreen_target(device: &wgpu::Device, width: u32, height: u32) -> OffscreenTarget {
-    let mk = |format, usage, label| {
-        device.create_texture(&wgpu::TextureDescriptor {
-            label: Some(label),
-            size: wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format,
-            usage,
-            view_formats: &[],
-        })
+    offscreen_target_samples(device, width, height, 1)
+}
+
+/// 创建指定尺寸与采样数的离屏渲染目标
+///
+/// 采样数大于 1 时 `color` 与 `depth` 是多重采样附件，另给一个单采样的 `resolve`
+/// 当解析目标，读回必须用 `resolve`；单采样时 `resolve` 为 `None`，直接用 `color`。
+///
+/// - `device`: wgpu 逻辑设备
+/// - `width`: 目标宽度，单位像素
+/// - `height`: 目标高度，单位像素
+/// - `samples`: 采样数，1 表示单采样
+///
+/// # 返回值
+///
+/// 见 [`OffscreenTarget`]
+pub fn offscreen_target_samples(
+    device: &wgpu::Device,
+    width: u32,
+    height: u32,
+    samples: u32,
+) -> OffscreenTarget {
+    let msaa = samples > 1;
+    let color_usage = if msaa {
+        wgpu::TextureUsages::RENDER_ATTACHMENT
+    } else {
+        wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC
     };
+
     OffscreenTarget {
-        color: mk(
+        color: attachment(
+            device,
+            width,
+            height,
+            samples,
             wgpu::TextureFormat::Rgba8Unorm,
-            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            color_usage,
             "mml-gpu target",
         ),
-        depth: mk(
+        depth: attachment(
+            device,
+            width,
+            height,
+            samples,
             wgpu::TextureFormat::Depth32Float,
             wgpu::TextureUsages::RENDER_ATTACHMENT,
             "mml-gpu depth",
         ),
+        resolve: msaa.then(|| {
+            attachment(
+                device,
+                width,
+                height,
+                1,
+                wgpu::TextureFormat::Rgba8Unorm,
+                wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+                "mml-gpu resolve",
+            )
+        }),
     }
+}
+
+/// 离屏渲染统一用的贴图采样器：NEAREST 取整加边缘钳制
+///
+/// - `device`: wgpu 逻辑设备
+///
+/// # 返回值
+///
+/// 返回可直接塞进绑定组的采样器
+pub fn nearest_sampler(device: &wgpu::Device) -> wgpu::Sampler {
+    device.create_sampler(&wgpu::SamplerDescriptor {
+        label: Some("mml-gpu nearest"),
+        mag_filter: wgpu::FilterMode::Nearest,
+        min_filter: wgpu::FilterMode::Nearest,
+        mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+        address_mode_u: wgpu::AddressMode::ClampToEdge,
+        address_mode_v: wgpu::AddressMode::ClampToEdge,
+        address_mode_w: wgpu::AddressMode::ClampToEdge,
+        ..Default::default()
+    })
+}
+
+/// 离屏渲染统一用的绑定组布局：0 号 uniform、1 号采样器、2 号二维贴图
+///
+/// - `device`: wgpu 逻辑设备
+/// - `uniform_visibility`: uniform 对哪些着色阶段可见，只有顶点读就传 `VERTEX`，
+///   片元也要读就并上 `FRAGMENT`
+///
+/// # 返回值
+///
+/// 返回与 [`texture_bind_group`] 配套的布局
+pub fn texture_bind_layout(
+    device: &wgpu::Device,
+    uniform_visibility: wgpu::ShaderStages,
+) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("mml-gpu texture"),
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: uniform_visibility,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+        ],
+    })
+}
+
+/// 按 [`texture_bind_layout`] 建绑定组，按 0 uniform、1 采样器、2 贴图填三个槽
+///
+/// - `device`: wgpu 逻辑设备
+/// - `layout`: 由 [`texture_bind_layout`] 建出的布局
+/// - `uniform`: uniform 缓冲
+/// - `sampler`: 贴图采样器，通常来自 [`nearest_sampler`]
+/// - `texture`: 贴图视图
+///
+/// # 返回值
+///
+/// 返回可直接 `set_bind_group(0, ..)` 的绑定组
+pub fn texture_bind_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    uniform: &wgpu::Buffer,
+    sampler: &wgpu::Sampler,
+    texture: &wgpu::TextureView,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("mml-gpu texture"),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: uniform.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::Sampler(sampler),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::TextureView(texture),
+            },
+        ],
+    })
 }
 
 /// 读回离屏颜色目标，输出预乘 RGBA 字节且行紧邻无填充

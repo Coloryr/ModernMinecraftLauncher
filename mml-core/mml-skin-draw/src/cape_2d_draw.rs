@@ -11,7 +11,7 @@ use crate::skin_draw::{SCALE_TYPEA, draw, scale};
 /// # 返回值
 ///
 /// 返回渲染后的位图，贴图尺寸异常时返回 `None`
-pub fn draw_cape_2d(image: &Pixmap) -> Option<Pixmap> {
+pub fn front(image: &Pixmap) -> Option<Pixmap> {
     let mut dest = Pixmap::new(10, 16)?;
 
     draw(&mut dest, image, 0, 0, 1, 1, 10, 16)?;
@@ -25,7 +25,7 @@ pub fn draw_cape_2d(image: &Pixmap) -> Option<Pixmap> {
 /// # 返回值
 ///
 /// 返回渲染后的位图，贴图尺寸异常时返回 `None`
-pub fn draw_cape_back_2d(image: &Pixmap) -> Option<Pixmap> {
+pub fn back(image: &Pixmap) -> Option<Pixmap> {
     let mut dest = Pixmap::new(10, 16)?;
 
     draw(&mut dest, image, 0, 0, 12, 1, 10, 16)?;

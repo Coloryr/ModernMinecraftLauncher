@@ -37,7 +37,7 @@ fn set_pixel(image: &mut Pixmap, x: i32, y: i32, color: [u8; 4]) {
 /// # 返回值
 ///
 /// 返回缩放 8 倍后的 2D 皮肤图片，尺寸 128x256；贴图尺寸异常时返回 `None`
-pub fn skin_2d_draw_typea(image: &Pixmap, skin_type: Option<SkinType>) -> Option<Pixmap> {
+pub fn typea(image: &Pixmap, skin_type: Option<SkinType>) -> Option<Pixmap> {
     // 创建中间 16x32 画布
     let mut image1 = Pixmap::new(16, 32)?;
 
@@ -134,7 +134,7 @@ pub fn skin_2d_draw_typea(image: &Pixmap, skin_type: Option<SkinType>) -> Option
 /// # 返回值
 ///
 /// 返回缩放 2 倍后的 2D 皮肤图片，尺寸 272x532；贴图尺寸异常时返回 `None`
-pub fn skin_2d_draw_typeb(image: &Pixmap, skin_type: Option<SkinType>) -> Option<Pixmap> {
+pub fn typeb(image: &Pixmap, skin_type: Option<SkinType>) -> Option<Pixmap> {
     // 创建中间 136x266 画布
     let mut image1 = Pixmap::new(136, 266)?;
 
@@ -401,7 +401,7 @@ mod tests {
             }
         });
 
-        let out = skin_2d_draw_typea(&image, Some(SkinType::New)).expect("typea 2D 展开应成功");
+        let out = typea(&image, Some(SkinType::New)).expect("typea 2D 展开应成功");
         assert_eq!(out.width(), 128, "typea 输出宽度应为 16 * 8");
         assert_eq!(out.height(), 256, "typea 输出高度应为 32 * 8");
 
@@ -442,7 +442,7 @@ mod tests {
         });
 
         let out =
-            skin_2d_draw_typea(&image, Some(SkinType::NewSlim)).expect("纤细皮肤 typea 展开应成功");
+            typea(&image, Some(SkinType::NewSlim)).expect("纤细皮肤 typea 展开应成功");
         assert_eq!(out.width(), 128);
         assert_eq!(out.height(), 256);
 

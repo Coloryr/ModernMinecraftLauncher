@@ -554,7 +554,7 @@ fn draw_head(
 /// # 返回值
 ///
 /// 返回 `SIZE` x `SIZE` 的渲染结果，分配失败时返回 `None`
-pub fn draw_head_3d_typea_up(image: &Pixmap) -> Option<Pixmap> {
+pub fn typea_up(image: &Pixmap) -> Option<Pixmap> {
     let tran = create_tran(30.0, 45.0);
     draw_head(image, &CUBE_INDICES_UP, &FACE_POS_UP, &tran, false, 0.001)
 }
@@ -566,7 +566,7 @@ pub fn draw_head_3d_typea_up(image: &Pixmap) -> Option<Pixmap> {
 /// # 返回值
 ///
 /// 返回 `SIZE` x `SIZE` 的渲染结果，分配失败时返回 `None`
-pub fn draw_head_3d_typea_down(image: &Pixmap) -> Option<Pixmap> {
+pub fn typea_down(image: &Pixmap) -> Option<Pixmap> {
     let tran = create_tran(-30.0, 45.0);
     draw_head(image, &CUBE_INDICES, &FACE_POS, &tran, false, 0.0)
 }
@@ -580,7 +580,7 @@ pub fn draw_head_3d_typea_down(image: &Pixmap) -> Option<Pixmap> {
 /// # 返回值
 ///
 /// 返回 `SIZE` x `SIZE` 的渲染结果，分配失败时返回 `None`
-pub fn draw_head_3d_typeb(image: &Pixmap, x: f32, y: f32) -> Option<Pixmap> {
+pub fn typeb(image: &Pixmap, x: f32, y: f32) -> Option<Pixmap> {
     let tran = create_tran(-x, y);
     draw_head(image, &CUBE_INDICES, &FACE_POS, &tran, true, 0.0)
 }

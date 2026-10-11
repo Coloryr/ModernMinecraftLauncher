@@ -5,7 +5,7 @@
 /// 单个部件的方块模型数据，含顶点与索引
 #[derive(Debug, Clone)]
 pub struct CubeModelItemObj {
-    /// 顶点坐标数据，每个顶点 x / y / z 三个分量，单位同 `cube::VALUE`
+    /// 顶点坐标数据，每个顶点 x / y / z 三个分量，单位同 [`crate::skin_3d_cube::VALUE`]
     pub model: Vec<f32>,
     /// 三角面索引数据，指向 `model` 中的顶点
     pub point: Vec<u16>,

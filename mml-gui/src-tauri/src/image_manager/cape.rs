@@ -2,7 +2,7 @@
 //!
 //! 从 `image_manager/mod.rs` 拆出来的。渲染缓存键同样是内容 sha1 + 显示模式。
 
-use mml_skin_draw::cape_2d_draw;
+use mml_skin_draw::{DrawCapeType, draw_cape};
 use tauri::UriSchemeResponder;
 use tiny_skia::Pixmap;
 
@@ -93,7 +93,7 @@ pub(super) async fn send_cape_image(sha1: &str, res: UriSchemeResponder) {
         send_bad(res);
         return;
     };
-    let Some(image) = cape_2d_draw::draw_cape_2d(&bitmap) else {
+    let Some(image) = draw_cape(&bitmap, DrawCapeType::Front) else {
         send_bad(res);
         return;
     };
@@ -162,7 +162,7 @@ pub(super) async fn send_cape_back_image(sha1: &str, res: UriSchemeResponder) {
         send_bad(res);
         return;
     };
-    let Some(image) = cape_2d_draw::draw_cape_back_2d(&bitmap) else {
+    let Some(image) = draw_cape(&bitmap, DrawCapeType::Back) else {
         send_bad(res);
         return;
     };

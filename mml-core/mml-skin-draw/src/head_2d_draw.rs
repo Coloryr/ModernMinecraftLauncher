@@ -13,7 +13,7 @@ use crate::skin_draw::{
 /// # 返回值
 ///
 /// 返回渲染后的位图，贴图尺寸异常时返回 `None`
-pub fn head_2d_draw_typea(image: &Pixmap) -> Option<Pixmap> {
+pub fn typea(image: &Pixmap) -> Option<Pixmap> {
     let mut dest = Pixmap::new(8, 8)?;
 
     draw(&mut dest, image, 0, 0, 8, 8, 8, 8)?;
@@ -28,7 +28,7 @@ pub fn head_2d_draw_typea(image: &Pixmap) -> Option<Pixmap> {
 /// # 返回值
 ///
 /// 返回渲染后的位图，贴图尺寸异常时返回 `None`
-pub fn head_2d_draw_typeb(image: &Pixmap) -> Option<Pixmap> {
+pub fn typeb(image: &Pixmap) -> Option<Pixmap> {
     let mut dest = Pixmap::new(72, 72)?;
 
     draw_with_fill_image(&mut dest, image, 4, 4, 8, 8, 8, 8, 8, 8)?;

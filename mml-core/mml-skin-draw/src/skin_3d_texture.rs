@@ -5,7 +5,7 @@
 
 use mml_skin::SkinType;
 
-use crate::cube_model::SteveTexture;
+use crate::skin_3d_cube_model::SteveTexture;
 
 /// 头部 UV 布局，单位皮肤像素，每面 8x8
 const HEAD_TEX: [f32; 48] = [

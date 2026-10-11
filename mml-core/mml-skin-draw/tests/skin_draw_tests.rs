@@ -1,7 +1,10 @@
 use std::path::Path;
 
-use mml_skin_draw::{cape_2d_draw, head_2d_draw, head_3d_draw, skin_2d_draw, skin_3d_draw};
-use tiny_skia::Pixmap;
+use mml_skin_draw::{
+    Draw2DType, Draw3DType, DrawCapeType, DrawHeadType, DrawSkinType, draw_cape, draw_head,
+    draw_skin,
+};
+use tiny_skia::{Pixmap, Point};
 
 /// 比较两个位图的内容是否完全一致
 fn assert_bitmap_eq(a: &Pixmap, b: &Pixmap) {
@@ -40,7 +43,7 @@ fn load_skin(name: &str) -> Pixmap {
 fn test_cape_draw() {
     let image = load_skin("cape.png");
 
-    let res = cape_2d_draw::draw_cape_2d(&image);
+    let res = draw_cape(&image, DrawCapeType::Front);
     assert!(res.is_some());
     let res = res.unwrap();
 
@@ -52,7 +55,7 @@ fn test_cape_draw() {
 fn test_cape_back_draw() {
     let image = load_skin("cape.png");
 
-    let res = cape_2d_draw::draw_cape_back_2d(&image);
+    let res = draw_cape(&image, DrawCapeType::Back);
     assert!(res.is_some());
     let res = res.unwrap();
 
@@ -64,7 +67,7 @@ fn test_cape_back_draw() {
 fn test_head_draw_typea() {
     let image = load_skin("skin_slim.png");
 
-    let res = head_2d_draw::head_2d_draw_typea(&image);
+    let res = draw_head(&image, DrawHeadType::Type2D(Draw2DType::TypeA));
     assert!(res.is_some());
     let res = res.unwrap();
 
@@ -76,7 +79,7 @@ fn test_head_draw_typea() {
 fn test_head_draw_typeb() {
     let image = load_skin("skin_slim.png");
 
-    let res = head_2d_draw::head_2d_draw_typeb(&image);
+    let res = draw_head(&image, DrawHeadType::Type2D(Draw2DType::TypeB));
     assert!(res.is_some());
     let res = res.unwrap();
 
@@ -88,7 +91,7 @@ fn test_head_draw_typeb() {
 fn test_skin_draw_typea() {
     let image = load_skin("skin_slim.png");
 
-    let res = skin_2d_draw::skin_2d_draw_typea(&image, None);
+    let res = draw_skin(&image, DrawSkinType::Type2D(Draw2DType::TypeA), None);
     assert!(res.is_some());
     let res = res.unwrap();
 
@@ -100,7 +103,7 @@ fn test_skin_draw_typea() {
 fn test_skin_draw_typeb() {
     let image = load_skin("skin_slim.png");
 
-    let res = skin_2d_draw::skin_2d_draw_typeb(&image, None);
+    let res = draw_skin(&image, DrawSkinType::Type2D(Draw2DType::TypeB), None);
     assert!(res.is_some());
     let res = res.unwrap();
 
@@ -112,7 +115,7 @@ fn test_skin_draw_typeb() {
 fn test_head_3d_draw_typea() {
     let image = load_skin("skin_slim.png");
 
-    let res = head_3d_draw::draw_head_3d_typea_down(&image);
+    let res = draw_head(&image, DrawHeadType::Type3D(Draw3DType::TypeADown));
     assert!(res.is_some());
     let res = res.unwrap();
 
@@ -124,7 +127,10 @@ fn test_head_3d_draw_typea() {
 fn test_head_3d_draw_typeb() {
     let image = load_skin("skin_slim.png");
 
-    let res = head_3d_draw::draw_head_3d_typeb(&image, 15.0, 65.0);
+    let res = draw_head(
+        &image,
+        DrawHeadType::Type3D(Draw3DType::TypeBRotate(Point::from_xy(15.0, 65.0))),
+    );
     assert!(res.is_some());
     let res = res.unwrap();
 
@@ -140,9 +146,13 @@ fn test_head_3d_draw_typeb() {
 fn regen_3d_refs() {
     let image = load_skin("skin_slim.png");
 
-    let a = head_3d_draw::draw_head_3d_typea_down(&image).expect("3d typea 应成功");
+    let a = draw_head(&image, DrawHeadType::Type3D(Draw3DType::TypeADown)).expect("3d typea 应成功");
     mml_skin::save_bitmap(&a, Path::new("tests").join("out_head_3d_a.png").as_path());
 
-    let b = head_3d_draw::draw_head_3d_typeb(&image, 15.0, 65.0).expect("3d typeb 应成功");
+    let b = draw_head(
+        &image,
+        DrawHeadType::Type3D(Draw3DType::TypeBRotate(Point::from_xy(15.0, 65.0))),
+    )
+    .expect("3d typeb 应成功");
     mml_skin::save_bitmap(&b, Path::new("tests").join("out_head_3d_b.png").as_path());
 }
