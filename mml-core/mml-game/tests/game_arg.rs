@@ -1,7 +1,7 @@
 //! 启动参数构造测试：游戏参数、自动进入存档 / 服务器、代理、自定义参数与占位符替换。
 //!
-//! `make_game_arg` 依赖全局配置（`mml_config::read_config`），
-//! `replace_arg` 依赖实例目录初始化（`mml_game::init`），
+//! `make_game_arg` 依赖全局配置，即 `mml_config::read_config`，
+//! `replace_arg` 依赖实例目录初始化，即 `mml_game::init`，
 //! 因此本文件所有测试共用同一个临时运行目录，通过 `OnceLock` 保证初始化只执行一次。
 //!
 //! 初始化时会把全局窗口配置清空，使参数生成只由实例自身配置决定；

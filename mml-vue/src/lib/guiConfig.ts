@@ -58,7 +58,7 @@ export function normalizeHeadType(value: string | null | undefined): HeadType {
   return value === "Head3DA" || value === "Head3DB" || value === "Head3DC" || value === "Head2DB" ? value : "Head2DA";
 }
 
-/** 主窗口配置（对应 Rust MainWindowConfig，wire 为 mainWindow） */
+/** 主窗口配置，对应 Rust MainWindowConfig，wire 为 mainWindow */
 export interface MainWindowConfig {
   /** Left / Right */
   sidebarSide: SidebarSide;
@@ -73,7 +73,7 @@ export interface MainWindowConfig {
 /** 头像类型（枚举值即 Rust 变体名） */
 export type HeadType = "Head2DA" | "Head3DA" | "Head3DB" | "Head3DC" | "Head2DB";
 
-/** 头像设置（对应 Rust HeadConfig，wire 为 head） */
+/** 头像设置，对应 Rust HeadConfig，wire 为 head */
 export interface HeadConfig {
   /** Head2DA / Head3DA / Head3DB / Head3DC / Head2DB */
   headType: HeadType;
@@ -83,7 +83,7 @@ export interface HeadConfig {
   y: number;
 }
 
-/** 收藏窗口的类型过滤（对应 Rust CollectConfig，wire 为 collect） */
+/** 收藏窗口的类型过滤，对应 Rust CollectConfig，wire 为 collect */
 export interface CollectConfig {
   /** 显示整合包 */
   modpack: boolean;
@@ -97,7 +97,7 @@ export interface CollectConfig {
 
 /** 登录方式锁定的一个条目 */
 export interface LoginLockItem {
-  /** 账户添加类型（offline / microsoft / littleskin / selflittleskin / authlib / nide8） */
+  /** 账户添加类型：offline / microsoft / littleskin / selflittleskin / authlib / nide8 */
   ty: string;
   /** 登录模型名字：添加账户时下拉里的显示名，空 = 用类型名 / 服务器地址显示 */
   name: string;
@@ -105,21 +105,21 @@ export interface LoginLockItem {
   server: string;
 }
 
-/** 客户端设置（对应 Rust ClientConfig，wire 为 client） */
+/** 客户端设置，对应 Rust ClientConfig，wire 为 client */
 export interface ClientConfig {
   /** 主窗口实例设置里显示 MOTD 卡片 */
   motdCard: boolean;
-  /** MOTD 卡片刷新间隔（秒） */
+  /** MOTD 卡片刷新间隔，单位秒 */
   motdInterval: number;
-  /** 登录方式锁定总开关（false = 锁定列表不生效） */
+  /** 登录方式锁定总开关；false 表示锁定列表不生效 */
   loginLockOn: boolean;
-  /** 登录方式锁定列表（空 = 不锁定，可添加多个条目） */
+  /** 登录方式锁定列表；空表示不锁定，可添加多个条目 */
   loginLock: LoginLockItem[];
-  /** 游戏自动进服（启动时自动进入 autoJoinServer） */
+  /** 游戏自动进服，启动时自动进入 autoJoinServer */
   autoJoin: boolean;
-  /** 游戏自动进服地址（host 或 host:port，空 = 不自动进服） */
+  /** 游戏自动进服地址：host 或 host:port，空表示不自动进服 */
   autoJoinServer: string;
-  /** MOTD 显示地址（host 或 host:port，空 = 不显示真实服务器信息） */
+  /** MOTD 显示地址：host 或 host:port，空表示不显示真实服务器信息 */
   motdServer: string;
   /** 实例锁定：锁定的实例 uuid（空 = 未锁定）；锁定时主窗口不允许切换到其它实例 */
   lockInstance: string;
@@ -142,19 +142,19 @@ export interface GuiConfig {
   font: string;
   /** 皮肤显示模式：Skin2DA / Skin2DB / Skin3D / Skin3DD */
   skinDisplay: SkinDisplay;
-  /** 背景图来源（文件路径 / 网址，空串 = 无背景图） */
+  /** 背景图来源：文件路径或网址，空串表示无背景图 */
   bgSource: string;
-  /** 背景图不透明度（%，5–100） */
+  /** 背景图不透明度，单位 %，取值 5–100 */
   bgOpacity: number;
-  /** 背景图模糊（px，0–40） */
+  /** 背景图模糊，单位 px，取值 0–40 */
   bgBlur: number;
-  /** 背景图原始分辨率（%，10–100） */
+  /** 背景图原始分辨率，单位 %，取值 10–100 */
   bgNativeSize: number;
 }
 
 export interface WindowState {
   uuid: string;
-  /** 窗口标签（main / mml-settings …） */
+  /** 窗口标签：main / mml-settings … */
   label: string;
   x: number;
   y: number;
@@ -257,7 +257,7 @@ function safeLockList(raw: string | null): LoginLockItem[] {
 export function defaultConfig(): GuiConfig {
   const storedTheme = readString(KEYS.theme);
   return {
-    // 没有显式选择时跟随系统深浅色（与 theme.ts 的首绘兜底一致）
+    // 没有显式选择时跟随系统深浅色，与 theme.ts 的首绘兜底一致
     theme:
       storedTheme === "Light" || storedTheme === "Dark" || storedTheme === "System"
         ? storedTheme

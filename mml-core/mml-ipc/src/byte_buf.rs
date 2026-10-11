@@ -127,7 +127,7 @@ mod tests {
         assert!(buf.read_bool());
     }
 
-    /// 长度前缀应与写入字节数一致（手动校验编码布局）
+    /// 长度前缀应与写入字节数一致，手动校验编码布局
     #[test]
     fn test_byte_buf_string_layout() {
         let mut buf = BytesMut::new();

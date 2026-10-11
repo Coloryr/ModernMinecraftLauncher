@@ -4,7 +4,7 @@
 // 不走前端本地存储：这几项都是"这个实例我习惯怎么看"，换个实例就该换一套 ——
 // 本地存储是每台机器一份，切实例时顺序不变反而奇怪。
 //
-// 与模组分组同一份文件、同一套读改写（load → 改这一块 → 存回），互不覆盖。
+// 与模组分组同一份文件、同一套读改写，即 load → 改这一块 → 存回，互不覆盖。
 // **排序口径与默认值全在这里**：后端只保管"一串分类 id"与"一串列宽键值对"，
 // 不认识有哪几个分类、有哪几列，新增分类 / 新增列时只改前端。
 import { ref } from "vue";
@@ -57,7 +57,7 @@ function normalizeOrder(saved: unknown): CategoryId[] {
  *
  * 模组是这个窗口最常翻的一类，在 `RESOURCE_CATEGORIES` 里也排第一 ——
  * 打开就停在模组上，与左侧列表的顺序一致。
- * 单独抽成常量：它散在 4 处（初值 / 无实例 / 存的值不认识），改的时候容易漏。
+ * 单独抽成常量：它散在 4 处，初值 / 无实例 / 存的值不认识，改的时候容易漏。
  */
 const DEFAULT_CATEGORY: CategoryId = "mods";
 
@@ -108,7 +108,7 @@ export function useResourceView(data: ReturnType<typeof useResourceData>) {
    * 加载代次号
    *
    * 实例可以切换，而每次加载都要等后端读文件；只有最新一发算数，
-   * 否则先发后到的会把新实例的偏好覆盖成旧实例的（与 useResourceData 的 loadSeq 同一做法）。
+   * 否则先发后到的会把新实例的偏好覆盖成旧实例的；与 useResourceData 的 loadSeq 同一做法。
    */
   let loadSeq = 0;
 

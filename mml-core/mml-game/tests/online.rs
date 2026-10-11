@@ -1,4 +1,4 @@
-//! 在线版本接口测试（依赖网络，默认忽略）。
+//! 在线版本接口测试，依赖网络，默认忽略。
 //!
 //! 运行方式：`cargo test --test online -- --ignored --nocapture`
 

@@ -16,8 +16,10 @@ const props = defineProps<{
   title?: string;
 }>();
 
-/** 加载失败时抛出去；调用方可据此重试 / 换地址，不接就是纯展示 */
-const emit = defineEmits<{ (e: "error"): void }>();
+const emit = defineEmits<{
+  /** 加载失败时抛出去；调用方可据此重试 / 换地址，不接就是纯展示 */
+  (e: "error"): void;
+}>();
 
 const loaded = ref(false);
 const failed = ref(false);

@@ -68,10 +68,12 @@ impl NbtEnd {
 
 /// End 标签无任何数据需要读写
 impl NbtStream for NbtEnd {
+    /// 读取 End 标签：本身无内容，不消费流中任何字节
     fn read<R: Read>(&mut self, _stream: &mut R) -> CoreResult<()> {
         Ok(())
     }
 
+    /// 写入 End 标签：本身无内容，不向流中写出任何字节
     fn write<W: Write>(&self, _stream: &mut W) -> CoreResult<()> {
         Ok(())
     }

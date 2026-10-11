@@ -16,26 +16,26 @@ use mml_base::file_item::FileItemObj;
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DownloadItemState {
-    /// 等待分配到下载线程
+    /// 等待分配到下载线程，整数编码 0
     Wait,
-    /// 正在下载文件数据
+    /// 正在下载文件数据，整数编码 1
     Download,
-    /// 正在获取文件元信息（大小等）
+    /// 正在获取文件元信息，如大小，整数编码 2
     GetInfo,
-    /// 暂停
+    /// 暂停，整数编码 3
     Pause,
-    /// 初始化中
+    /// 初始化中，整数编码 4
     Init,
-    /// 执行下载后处理（解压等）
+    /// 执行下载后处理，如解压，整数编码 5
     Action,
-    /// 下载完成
+    /// 下载完成，整数编码 6
     Done,
-    /// 下载出错
+    /// 下载出错，整数编码 7
     Error,
 }
 
 impl DownloadItemState {
-    /// 将状态转换为整数（用于原子存储）
+    /// 将状态转换为整数，用于原子存储
     pub fn state_to_int(&self) -> u32 {
         match self {
             DownloadItemState::Wait => 0,
@@ -50,6 +50,10 @@ impl DownloadItemState {
     }
 
     /// 从整数恢复状态
+    ///
+    /// # 返回值
+    ///
+    /// 返回编码对应的状态，未知整数统一回落到 `Error`
     pub fn int_to_state(value: u32) -> DownloadItemState {
         match value {
             0 => DownloadItemState::Wait,
@@ -69,24 +73,22 @@ impl DownloadItemState {
 ///
 /// 所有字段使用原子变量，支持多线程安全的读写。
 pub struct DownloadItem {
-    /// 文件基本信息（URL、路径、哈希等）
+    /// 文件基本信息，含 URL、路径、哈希等
     pub base: FileItemObj,
-    /// 下载时是否覆盖已存在的文件
+    /// 下载时是否覆盖已存在的文件，缺省为 `false`
     pub overwrite: bool,
-    /// 文件总大小（字节）
+    /// 文件总大小，单位字节；元信息未知时为 0
     all_size: AtomicU64,
-    /// 已下载大小（字节）
+    /// 已下载大小，单位字节；断点续传时从续传起点开始累加
     now_size: AtomicU64,
-    /// 当前下载状态
+    /// 当前下载状态，取值见 [`DownloadItemState`]
     state: AtomicU32,
-    /// 累计错误次数
+    /// 累计错误次数，达到 5 次后放弃该文件
     error: AtomicU32,
 }
 
 impl DownloadItem {
     /// 创建下载项目
-    ///
-    /// # 参数
     ///
     /// - `file`: 文件基本信息
     pub fn new(file: FileItemObj) -> Self {
@@ -100,15 +102,23 @@ impl DownloadItem {
         }
     }
 
-    /// 设置是否覆盖已存在文件（构建器模式）
+    /// 设置是否覆盖已存在文件，构建器模式
     ///
     /// - `overwrite`: `true` 表示下载时覆盖已存在的文件
+    ///
+    /// # 返回值
+    ///
+    /// 返回设置后的自身，便于链式调用
     pub fn set_overwrite(mut self, overwrite: bool) -> Self {
         self.overwrite = overwrite;
         self
     }
 
-    /// 获取当前下载进度百分比（0.0–100.0）
+    /// 获取当前下载进度百分比
+    ///
+    /// # 返回值
+    ///
+    /// 返回 0.0–100.0 的进度；总大小未知或为 0 时返回 0.0
     pub fn progress(&self) -> f64 {
         let size = self.all_size.load(Ordering::Acquire);
         if size > 0 {
@@ -119,21 +129,31 @@ impl DownloadItem {
     }
 
     /// 累加已下载字节数
+    ///
+    /// - `size`: 本次新增的字节数
     pub fn add_progress(&self, size: u64) {
         self.now_size.fetch_add(size, Ordering::Relaxed);
     }
 
-    /// 设置已下载字节数（用于断点续传恢复）
+    /// 设置已下载字节数，用于断点续传恢复
+    ///
+    /// - `size`: 已下载的字节数，断点续传时为续传起点
     pub fn set_now_size(&self, size: u64) {
         self.now_size.store(size, Ordering::Relaxed);
     }
 
     /// 设置文件总大小
+    ///
+    /// - `size`: 文件总大小，单位字节；元信息未知时传 0
     pub fn set_all_size(&self, size: u64) {
         self.all_size.store(size, Ordering::Relaxed);
     }
 
     /// 获取文件总大小
+    ///
+    /// # 返回值
+    ///
+    /// 返回文件总大小，单位字节；元信息未知时为 0
     pub fn get_all_size(&self) -> u64 {
         self.all_size.load(Ordering::Acquire)
     }
@@ -144,16 +164,26 @@ impl DownloadItem {
     }
 
     /// 设置当前下载状态
+    ///
+    /// - `state`: 要写入的状态
     pub fn set_state(&self, state: DownloadItemState) {
         self.state.store(state.state_to_int(), Ordering::Relaxed);
     }
 
     /// 获取当前下载状态
+    ///
+    /// # 返回值
+    ///
+    /// 返回最近一次写入的状态，未设置过时为 `Wait`
     pub fn get_state(&self) -> DownloadItemState {
         DownloadItemState::int_to_state(self.state.load(Ordering::Acquire))
     }
 
     /// 获取已下载字节数
+    ///
+    /// # 返回值
+    ///
+    /// 返回当前累计的已下载字节数
     pub fn get_now_size(&self) -> u64 {
         self.now_size.load(Ordering::Acquire)
     }

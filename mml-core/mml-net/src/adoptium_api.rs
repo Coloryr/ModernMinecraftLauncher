@@ -141,6 +141,9 @@ pub async fn get_java_version() -> Result<Vec<String>, ErrorType> {
         list.push(item.to_string());
     }
 
+    // 并发下可能已被别的任务写入，写失败不影响本次返回
+    let _ = JAVA_VERSION.set(list.clone());
+
     Ok(list)
 }
 

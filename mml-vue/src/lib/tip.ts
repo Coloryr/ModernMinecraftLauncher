@@ -46,7 +46,7 @@ function show() {
   const el = ensureEl();
   el.textContent = text;
   el.classList.add("show");
-  // 先渲染出来再量尺寸（display 不能是 none），随后按锚点定位：
+  // 先渲染出来再量尺寸，display 不能是 none，随后按锚点定位：
   // 锚点下方水平居中，超出视口就收回；下方放不下且上方有空间则放上方
   const rect = anchor.getBoundingClientRect();
   const tw = el.offsetWidth;

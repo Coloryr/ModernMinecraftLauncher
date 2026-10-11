@@ -344,7 +344,7 @@ export function dropFromUrl(): WindowDropParam | null {
 /**
  * 把窗口参数里的项目还原成窗口能直接用的项目条目
  *
- * - `p`: 收藏夹存下来的那几项，见 [`WindowProjectParam`]
+ * - `p`: 窗口参数里的项目，字段来自收藏夹存下来的条目
  *
  * # 返回值
  *

@@ -46,10 +46,10 @@ defineEmits<{
 }>();
 
 /**
- * 视图偏好（分类顺序 / 上次打开的类别 / 模组展示方式）
+ * 视图偏好：分类顺序 / 上次打开的类别 / 模组展示方式
  *
  * 存在**实例**的 `gui_setting.json` 里，所以要先有实例才能读 —— 数据层建好之后
- * 把"读偏好"挂成它的实例就绪回调（见 useResourceData 的 setInstanceReadyHook），
+ * 把"读偏好"挂成它的实例就绪回调，见 useResourceData 的 setInstanceReadyHook，
  * 在它拉列表**之前**跑，第一次就按记住的顺序与类别显示。
  */
 const data = useResourceData();
@@ -61,7 +61,7 @@ const { load: loadView } = view;
 
 data.setInstanceReadyHook(async () => {
   await loadView();
-  // 读回来的"上次类别"要落到当前选择上（数据层的 watch 会跟着拉对应列表）
+  // 读回来的"上次类别"要落到当前选择上；数据层的 watch 会跟着拉对应列表
   category.value = view.initialCategory.value;
 });
 
@@ -79,7 +79,7 @@ function selectCategory(id: CategoryId) {
 }
 
 /**
- * 内容区切换动画的 key（见模板里的 `<Transition name="pane-swap">`）
+ * 内容区切换动画的 key，见模板里的 `<Transition name="pane-swap">`
  *
  * 分类变了才换 key，动画随之触发。**存档那一类的两个子页共用一个分类 id**，
  * 所以子页也要进 key —— 否则在「存档 ↔ 数据包」之间切换时 key 没变、动画不触发。
@@ -112,7 +112,7 @@ const dropKind = computed(() => dropKindOf(category.value, saveTab.value));
  * 当前面板的显示名（遮罩文案里报"落到哪一类"）
  *
  * 存档下的**数据包子页**要用子页的名字（「数据包」），不能报成「存档」——
- * 两者落点不同（`saves/` 与 `saves/<存档>/datapacks`）。
+ * 两者落点不同，分别是 `saves/` 与 `saves/<存档>/datapacks`。
  */
 const dropLabel = computed(() => {
   if (category.value === "saves" && saveTab.value === "datapacks") {
@@ -125,7 +125,7 @@ const dropLabel = computed(() => {
 /**
  * 数据包那一页的 parent（存档目录名）
  *
- * 数据包挂在某个存档下（`saves/<存档目录名>/datapacks`），落点必须连它一起传；
+ * 数据包挂在某个存档下，落点 `saves/<存档目录名>/datapacks`，必须连它一起传；
  * 其它分类传 null。数据包页的下拉框选的就是 `dpSave`（见 DatapackPane）。
  */
 const dropParent = computed(() => (dropKind.value === "datapacks" ? dpSave.value : null));
@@ -234,10 +234,10 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
 
       <section class="cat-content">
         <!--
-          切分类加一段淡入淡出（与主窗口的 view-swap 同一套观感）。
+          切分类加一段淡入淡出，与主窗口的 view-swap 同一套观感。
           `<Transition>` 不产生 DOM，所以 .cat-content 的 flex 布局不受影响；
           但里面的 `.pane-swap` 要**复刻**「顶栏 + 列表」之间的纵向间距（gap 12px），
-          否则包一层后间距会丢（主窗口的 .detail-instance 也是这么处理的）。
+          否则包一层后间距会丢；主窗口的 .detail-instance 也是这么处理的。
         -->
         <Transition name="pane-swap" mode="out-in">
           <!-- 没有选中实例：只给这一条引导，不再顺带铺一个空列表，原先两段会同时出现 -->
@@ -257,7 +257,7 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
         </Transition>
       </section>
 
-      <!-- 删除 / 清空确认（全窗口共用一份，内容来自 ops） -->
+      <!-- 删除 / 清空确认；全窗口共用一份，内容来自 ops -->
       <ConfirmModal v-if="confirmBox" :ops="ops" @close="confirmBox = null" />
 
       <!-- 拖拽导入：同名冲突问一次（覆盖 / 跳过 / 重命名），选完才落盘 -->

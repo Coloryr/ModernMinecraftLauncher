@@ -19,12 +19,12 @@
   padding: 10px 12px;
   border-radius: 9px;
   border: 1px solid var(--border);
-  /* 背景图模式下 var(--bg) 是半透明的，下拉框必须不透明（--bg-solid 见 themes.css 的 has-bg）；
+  /* 背景图模式下 var(--bg) 是半透明的，下拉框必须不透明，--bg-solid 见 themes.css 的 has-bg；
      无背景图时用 --bg-card 提亮一档，和窗口底色区分开 */
   background: var(--bg-solid, var(--bg-card));
   color: var(--text);
   font-size: 14px;
-  /* 定死行高：<select>（含 appearance: base-select 的页面内渲染）与借用此类的
+  /* 定死行高：<select>，含 appearance: base-select 的页面内渲染，与借用此类的
      <button>（见 NewMode.vue 的 .type-trigger）UA 行高口径不同，不定死两者高度会差一截 */
   line-height: 20px;
   /* 高度下限 = 行高 20 + 上下内边距 10×2 + 上下边框 1×2（见 --field-h）。
@@ -41,9 +41,9 @@
   appearance: none;
   -webkit-appearance: none;
   padding-right: 28px;
-  /* 下拉是可点的控件，给个手型光标（原生 <select> 默认是箭头光标） */
+  /* 下拉是可点的控件，给个手型光标；原生 <select> 默认是箭头光标 */
   cursor: pointer;
-  /* 箭头是 data-URI 图片，颜色按主题各嵌一份（见 themes.css 的 --select-arrow）：
+  /* 箭头是 data-URI 图片，颜色按主题各嵌一份，见 themes.css 的 --select-arrow：
      内联 SVG 图片拿不到 currentColor，所以走变量而不是写死 gray */
   background-image: var(--select-arrow);
   background-repeat: no-repeat;
@@ -67,7 +67,7 @@ select.field-select {
    @supports 兜底——不支持该值的浏览器整块跳过，退回原生外观。 */
 @supports (appearance: base-select) {
 
-  /* 限定 select.：.field-select 也被 <button> 借去做样式类（见 NewMode.vue 的 .type-trigger） */
+  /* 限定 select.：.field-select 也被 <button> 借去做样式类，见 NewMode.vue 的 .type-trigger */
   select.field-select,
   select.field-select::picker(select) {
     -webkit-appearance: base-select;
@@ -202,7 +202,7 @@ select.field-select {
   align-items: center;
 }
 
-/* 行内按钮与同行的输入框 / 下拉等高：BaseButton 的定高（s-sm 28px、s-md 35px）在这里让位。
+/* 行内按钮与同行的输入框 / 下拉等高：BaseButton 的定高 s-sm 28px、s-md 35px 在这里让位。
    三条类选择器是为了压过 BaseButton 里带 scope 属性的 .s-sm[data-v-*]（两条） */
 .path-row .ui-btn.s-sm,
 .path-row .ui-btn.s-md {
@@ -228,7 +228,7 @@ select.field-select {
   margin-top: 6px;
 }
 
-/* 必填校验失败的字段：红边（聚焦态也保持红色，别被 :focus 的强调色盖掉） */
+/* 必填校验失败的字段：红边；聚焦态也保持红色，别被 :focus 的强调色盖掉 */
 .field-input.is-invalid,
 .field-select.is-invalid,
 .field-input.is-invalid:focus,

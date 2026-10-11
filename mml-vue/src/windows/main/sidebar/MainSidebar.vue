@@ -30,8 +30,6 @@ const props = defineProps<{
   multiSelect: boolean;
   /** 多选模式下已勾选的实例 uuid */
   selectedIds: Set<string>;
-  /** 分组 uuid → 是否收起 */
-  collapsedGroups: Record<string, boolean>;
   /** 本次拖拽的候选；null 表示没在拖 */
   dragActive: DragCandidate | null;
   /** 正在拖的实例 uuid；那一行不渲染，位置交给插入占位 */
@@ -56,18 +54,17 @@ const props = defineProps<{
   isGroupInsert: (index: number) => boolean;
 }>();
 
-/**
- * 侧栏动作，一律抛给主窗口执行
- *
- * - `update:mode` / `update:searchText`: 模式与搜索框的双向绑定
- * - `add-instance` / `add-group`: 添加实例 / 添加分组
- * - `collapse`: 收起整个侧栏
- */
+/** 侧栏动作，一律抛给主窗口执行 */
 const emit = defineEmits<{
+  /** 切换显示模式 */
   (e: "update:mode", v: ViewMode): void;
+  /** 搜索框文本变化 */
   (e: "update:searchText", v: string): void;
+  /** 添加实例 */
   (e: "add-instance"): void;
+  /** 添加分组 */
   (e: "add-group"): void;
+  /** 收起整个侧栏 */
   (e: "collapse"): void;
 }>();
 

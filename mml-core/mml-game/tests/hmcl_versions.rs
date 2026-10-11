@@ -182,7 +182,7 @@ fn read_hmcl_versions() {
 
     for d in &dumps {
         if d.no_patches {
-            // 无 patches：版本号来自 json（inheritsFrom 优先），且必须能被 have_version 认出来
+            // 无 patches：版本号来自 json，inheritsFrom 优先，且必须能被 have_version 认出来
             let want = if d.inherits_from.is_empty() {
                 &d.id
             } else {

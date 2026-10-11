@@ -394,24 +394,26 @@ impl BaseArchive {
     ///
     /// # 返回值
     ///
-    /// 条目位于压缩包根目录或有多个顶层目录时返回 `None`
+    /// 根目录下直接有文件、或有多个顶层名字时返回 `None`
     pub fn single_top_dir(&self) -> Option<&str> {
-        let mut firsts: Vec<&str> = self
-            .entries
-            .iter()
-            .filter_map(|e| {
-                let trimmed = e.name.trim_end_matches(['/', '\\']);
-                trimmed.split(['/', '\\']).next()
-            })
-            .collect();
-        firsts.sort_unstable();
-        firsts.dedup();
-        firsts.retain(|s| !s.is_empty());
-        if firsts.len() == 1 {
-            Some(firsts[0])
-        } else {
-            None
+        let mut top: Option<&str> = None;
+        for entry in self.entries.iter() {
+            let trimmed = entry.name.trim_end_matches(['/', '\\']);
+            let mut parts = trimmed.split(['/', '\\']);
+            let Some(first) = parts.next().filter(|s| !s.is_empty()) else {
+                continue;
+            };
+            // 根目录下的单个文件也占一个首段，但它不是顶层目录
+            if parts.next().is_none() && !entry.is_dir {
+                return None;
+            }
+            match top {
+                None => top = Some(first),
+                Some(name) if name == first => {}
+                Some(_) => return None,
+            }
         }
+        top
     }
 
     /// 读取压缩包内单个条目的内容到内存
@@ -835,7 +837,7 @@ impl BaseArchive {
     /// 将内存中的文件添加到压缩包并原地保存，已有同路径条目会被覆盖
     ///
     /// Zip 和 Tar 格式下直接追加，无需解压或重压缩已有条目；
-    /// 7z 和 tar 系列格式则先解压到临时目录，写入数据后重压缩
+    /// 7z 和压缩 tar 格式则先解压到临时目录，写入数据后重压缩
     ///
     /// - `name`: 条目在压缩包内的路径，如 `"subdir/readme.txt"`
     /// - `data`: 文件内容的原始字节

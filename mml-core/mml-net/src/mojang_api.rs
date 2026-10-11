@@ -305,7 +305,7 @@ pub async fn get_user_profile(uuid: &str, url: Option<&str>) -> CoreResult<UserP
         .await
 }
 
-/// 按玩家名查 UUID 档案，查不到玩家时接口返回 204，这里同样报 `DataNotFound`
+/// 按玩家名查 UUID 档案，查不到玩家时接口返回 204、响应体为空，这里按 JSON 解析失败报错
 ///
 /// - `name`: 玩家名
 ///

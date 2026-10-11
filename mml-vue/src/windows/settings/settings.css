@@ -4,22 +4,22 @@
  * 所以公共样式集中放这里，由 SettingsWindow.vue 注入一次。
  *
  * 反外溢：所有规则都挂在 `.settings-layout` 之下（这个类只属于本窗口），
- * 因此即使类名很通用（.switch-row / .grid-2 / .panel …），也不会影响其它窗口里
+ * 因此即使类名很通用，如 .switch-row / .grid-2 / .panel，也不会影响其它窗口里
  * 同名的 scoped 类。新增规则请保持这个前缀。
  *
  * 口径统一：控件高度用全局 `--field-h`（forms.css）与 BaseButton md 的 35px；
  * 分组标题、设置行、说明文字只用这里的类，不在组件里另写一套。
  *
- * 垂直间距**只有这一处规则**（模板里不再写 margin / 间距类），见下面「组内垂直节奏」。
+ * 垂直间距**只有这一处规则**，模板里不再写 margin / 间距类，见下面「组内垂直节奏」。
  */
 
 /* ---------- 组内垂直节奏（唯一来源） ----------
  * 只有四档，其余都是"贴住它解释的东西"：
- *   行内：标签 ↔ 它的说明        4px（.switch-text 的 gap）
+ *   行内：标签 ↔ 它的说明        4px，即 .switch-text 的 gap
  *   紧贴：标签 ↔ 它的控件        8px
  *        说明 ↔ 它解释的块       上 6px / 下 8px（说明永远贴着被解释的那一块）
  *   块 ↔ 块（行与行、标签之前）  16px
- *   分组之间                    24px；标题分隔线到首行内容 12px（.group-title 的上下边距）
+ *   分组之间                    24px；标题分隔线到首行内容 12px，即 .group-title 的上下边距
  * 例外只有两条，都是"附着在上面那一行"的状态文字：提示 .hint 8px、校验红字 6px。
  * 需要新的例外就加在本节里并写清原因，别回模板写 margin。
  */
@@ -43,7 +43,7 @@
   margin-top: 8px;
 }
 
-/* 说明是标签的补充：跟标签更近（此时它是"标签 → 说明 → 控件"里的中间那行） */
+/* 说明是标签的补充：跟标签更近，此时它是"标签 → 说明 → 控件"里的中间那行 */
 .settings-layout .setting-group>.field-label+.field-desc {
   margin-top: 4px;
 }
@@ -141,7 +141,7 @@
   flex-shrink: 0;
 }
 
-/* ---------- 设置项搜索（在标题栏里，不属于 .settings-layout） ---------- */
+/* ---------- 设置项搜索：在标题栏里，不属于 .settings-layout ---------- */
 
 .frame-head .set-search {
   position: relative;
@@ -216,7 +216,7 @@
   margin-top: 3px;
 }
 
-/* ---------- 分组标题（左侧强调色竖条 + 底部分隔线） ---------- */
+/* ---------- 分组标题：左侧强调色竖条 + 底部分隔线 ---------- */
 
 .settings-layout .group-title {
   display: flex;
@@ -370,7 +370,7 @@
   box-shadow: 0 0 0 3px var(--bg-card), 0 0 0 5px var(--text-dim);
 }
 
-/* 自定义强调色：彩虹色块，点击弹出系统取色器（input 只当取色入口用，不占位） */
+/* 自定义强调色：彩虹色块，点击弹出系统取色器；input 只当取色入口用，不占位 */
 .settings-layout .accent-custom {
   background: conic-gradient(#ff5f56, #facc15, #34d399, #22d3ee, #4f8cff, #a78bfa, #e879f9, #ff5f56);
   position: relative;
@@ -435,7 +435,7 @@
   color: var(--text-dim);
 }
 
-/* 开关列表（下载校验 / DNS / 游戏文件检查）：纵向排布 */
+/* 开关列表：下载校验 / DNS / 游戏文件检查，纵向排布 */
 .settings-layout .switch-list {
   display: flex;
   flex-direction: column;
@@ -550,7 +550,7 @@
   min-width: 0;
 }
 
-/* 服务器信息缺失 / 重复：红框（含聚焦态，覆盖默认的 accent 边框） */
+/* 服务器信息缺失 / 重复：红框；含聚焦态，覆盖默认的 accent 边框 */
 .settings-layout .lock-add-server.lock-server-error,
 .settings-layout .lock-add-server.lock-server-error:focus {
   border-color: var(--red);
@@ -801,7 +801,7 @@
 }
 
 .settings-layout .java-meta {
-  /* 版本 · 架构这一行不该被拉伸（卡片是列布局，flex: 1 会让它撑开挤走路径行） */
+  /* 版本 · 架构这一行不该被拉伸：卡片是列布局，flex: 1 会让它撑开挤走路径行 */
   flex: none;
   font-size: 11.5px;
   color: var(--text-dim);
@@ -821,7 +821,7 @@
 
 .settings-layout .java-add-row {
   display: flex;
-  /* 按钮与 42px 输入框等高（stretch 撑高，覆盖 BaseButton 定高） */
+  /* 按钮与 42px 输入框等高：stretch 撑高，覆盖 BaseButton 定高 */
   align-items: stretch;
   gap: 8px;
 }

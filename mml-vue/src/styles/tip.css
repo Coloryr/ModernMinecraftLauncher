@@ -1,4 +1,4 @@
-/* v-tip 悬停提示（lib/tip.ts 挂载到 body 的单例） */
+/* v-tip 悬停提示：由 lib/tip.ts 挂载到 body 的单例 */
 .app-tip {
   position: fixed;
   z-index: 9999;

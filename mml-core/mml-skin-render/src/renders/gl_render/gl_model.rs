@@ -87,13 +87,13 @@ impl ModelVao {
     }
 }
 
-/// 上传到 OpenGL 的顶点布局（与着色器中的 attrib 布局对应）
+/// 上传到 OpenGL 的顶点布局，与着色器中的 attrib 布局对应
 #[repr(C)]
 pub struct VertexOpenGL {
-    /// 顶点坐标
+    /// 顶点坐标，模型坐标
     pub pos: Vec3,
-    /// 贴图 UV
+    /// 贴图 UV，已归一化到 0..1
     pub uv: Vec2,
-    /// 顶点法线
+    /// 顶点法线，取值为单位轴向量
     pub normal: Vec3,
 }

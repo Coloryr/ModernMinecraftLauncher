@@ -17,8 +17,10 @@ const props = withDefaults(
   { min: 0, max: 99999, step: 1 },
 );
 
-/** `v-model` 更新：夹在 `min`~`max` 之间的新值 */
-const emit = defineEmits<{ (e: "update:modelValue", v: number): void }>();
+const emit = defineEmits<{
+  /** `v-model` 更新：夹在 `min`~`max` 之间的新值 */
+  (e: "update:modelValue", v: number): void;
+}>();
 
 const editing = ref(false);
 const draft = ref(String(props.modelValue));

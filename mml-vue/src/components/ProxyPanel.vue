@@ -9,8 +9,10 @@ const props = defineProps<{
   args: InstanceArgsDto;
 }>();
 
-/** 回传改动后的整份启动参数 */
-const emit = defineEmits<{ (e: "update:args", v: InstanceArgsDto): void }>();
+const emit = defineEmits<{
+  /** 回传改动后的整份启动参数 */
+  (e: "update:args", v: InstanceArgsDto): void;
+}>();
 
 /** 合并 patch 后回传整份参数 */
 function update(patch: Partial<InstanceArgsDto>) {

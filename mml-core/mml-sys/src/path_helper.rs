@@ -288,7 +288,7 @@ fn move_to_trash_windows<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
     .join()
     .unwrap_or(-1);
 
-    // 返回码：0 成功；0x71 用户取消，未移动任何内容，视为成功；其他值出错
+    // 返回码：0 成功；0x71 用户取消，未移动任何内容；其他值出错
     match result {
         0 => Ok(()),
         0x71 => Err(ErrorType::TaskCancel), // 用户已取消
@@ -1002,7 +1002,7 @@ pub fn write_stream<P: AsRef<Path>, R: Read>(file: P, mut reader: R) -> CoreResu
 
 /// 写文件
 ///
-/// - `file`: 文件路径
+/// - `path`: 文件路径
 /// - `reader`: 数据流
 ///
 /// # 返回值

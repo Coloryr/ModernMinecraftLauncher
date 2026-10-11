@@ -24,7 +24,7 @@
 //! | 设置标题 | 10 | 启动器 -> 游戏 | 标题(String) |
 //! | 窗口大小 | 11 | 游戏 -> 启动器 | uuid(String) + 宽(i32) + 高(i32) |
 //!
-//! ## 启动器 -> 启动器（防止多开）
+//! ## 启动器 -> 启动器，防止多开
 //!
 //! | 类型 | 值 | 消息体 |
 //! |------|----|--------|
@@ -429,7 +429,7 @@ async fn handle_client(stream: TcpStream) -> CoreResult<()> {
     Ok(())
 }
 
-/// 计算缓冲区首条消息的完整长度（字节），不消费数据
+/// 计算缓冲区首条消息的完整长度，单位字节，不消费数据
 ///
 /// 消息无总长度前缀，按类型读取字段推算边界，字符串与列表自带长度；
 /// 缓冲区中数据不足一条完整消息时返回 `None`。未知类型无法确定长度，
@@ -742,7 +742,7 @@ mod tests {
         let second = msg_with_string(TYPE_GAME_CHANNEL, &Uuid::new_v4().to_string());
         buf.extend_from_slice(&second);
 
-        // 应先推算出第一条消息（4 字节）
+        // 应先推算出第一条消息，4 字节
         assert_eq!(message_len(&buf), Some(4));
         // 消费掉第一条后应能推算出第二条
         let mut rest = buf.split_off(4);

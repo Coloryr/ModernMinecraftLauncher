@@ -21,7 +21,7 @@ export interface FormattedSegment {
   strikethrough: boolean;
 }
 
-/** `§` 颜色码 → #RRGGBB（与内核 `code_color` 同一张表） */
+/** `§` 颜色码 → #RRGGBB，与内核 `code_color` 同一张表 */
 const CODE_COLORS: Record<string, string> = {
   "0": "#000000",
   "1": "#0000AA",
@@ -68,7 +68,7 @@ export function parseFormatting(text: string): FormattedSegment[] {
   let strikethrough = false;
   let current = "";
 
-  /** 把攒下的文字收成一段（空的不收，免得前端多出空 span） */
+  /** 把攒下的文字收成一段；空的不收，免得前端多出空 span */
   function flush() {
     if (!current) return;
     out.push({ text: current, color, bold, italic, underlined, strikethrough });

@@ -25,7 +25,7 @@ const props = defineProps<{
   activeId: string | null;
   /** 玩家头颅分类 ID：这类格子带悬停删除角标 */
   skinCat: string;
-  /** 是否处于筛选态（决定空状态要不要给「清除筛选」） */
+  /** 是否处于筛选态，决定空状态要不要给「清除筛选」 */
   filtered: boolean;
 }>();
 
@@ -42,11 +42,11 @@ const emit = defineEmits<{
 const OVERSCAN = 2;
 
 /**
- * 列表末尾的留白（px）
+ * 列表末尾的留白，单位 px
  *
- * 由滚动内容自己提供（加在占位高度上），不是把滚动区从底部缩进来：
+ * 由滚动内容自己提供，即加在占位高度上，而不是把滚动区从底部缩进来：
  * 这样滚动条能一直延伸到底边，而"最后一行下面有空档"只在滚到最下面时出现。
- * 数值等于窗口内容区原本的下内边距（22px），观感与之前一致。
+ * 数值等于窗口内容区原本的下内边距 22px，观感与之前一致。
  */
 const BOTTOM_SPACE = 22;
 
@@ -272,7 +272,7 @@ function onCellKey(e: KeyboardEvent, i: number) {
      它是滚动内容的一部分，所以只在滚到最上面时出现，滚动条轨道仍是整条；
      否则第一排格子悬停上浮时会被裁掉上边缘那条线 */
   padding-top: 24px;
-  /* 右侧不留内边距：滚动条要贴窗口右边缘（父级已抵消 frame-body 的右内边距） */
+  /* 右侧不留内边距：滚动条要贴窗口右边缘，父级已抵消 frame-body 的右内边距 */
 }
 
 /* 等高占位：撑出滚动条长度；真正的格子绝对定位在里面并按行偏移 */
@@ -286,7 +286,7 @@ function onCellKey(e: KeyboardEvent, i: number) {
   left: 0;
   /* 右侧缩进与 .block-main 的 16px 间距一致：原来取 26px 与窗口左内边距对齐，
      但滚动条本身还占约 9px，看着右边比左边空得多；滚动条仍在窗口最右边。
-     列数按这个更窄的宽度算（见 script 里的 gridW） */
+     列数按这个更窄的宽度算，见 script 里的 gridW */
   right: 16px;
   display: grid;
 }

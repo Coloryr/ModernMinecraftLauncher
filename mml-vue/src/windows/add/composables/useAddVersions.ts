@@ -31,7 +31,7 @@ const POLL_TIMES = 30;
 export function useAddVersions(isLeaving: () => boolean) {
   /** 全部版本 */
   const versions = ref<VersionInfoDto[]>([]);
-  /** 版本类型 ID 列表（mml-core 独立 ID，显示名走 i18n） */
+  /** 版本类型 ID 列表，取自 mml-core 的独立 ID，显示名走 i18n */
   const versionTypes = ref<string[]>([]);
   /** 压缩包类型 ID 列表（「导入压缩包」模式用） */
   const packTypes = ref<string[]>([]);
@@ -46,7 +46,7 @@ export function useAddVersions(isLeaving: () => boolean) {
     return versions.value.filter((v) => sel.length === 0 || sel.includes(v.versionType));
   });
 
-  /** 拉取下拉数据源：版本类型 / 压缩包类型（独立 ID，显示名走 i18n） */
+  /** 拉取下拉数据源：版本类型 / 压缩包类型，独立 ID，显示名走 i18n */
   async function fetchOptionLists() {
     try {
       const [types, packs] = await Promise.all([api.addGetVersionTypes(), api.addGetPackTypes()]);
@@ -58,7 +58,7 @@ export function useAddVersions(isLeaving: () => boolean) {
     }
   }
 
-  /** 首次加载版本列表（失败留空，由 startPolling 继续重试） */
+  /** 首次加载版本列表，失败留空，由 startPolling 继续重试 */
   async function loadVersions() {
     try {
       const list = await api.getVersions();

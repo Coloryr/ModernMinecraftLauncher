@@ -16,7 +16,7 @@ import type { FileListItemDto, GroupDto, ModPackStatusDto, ModPackTaskDto, Proje
 const props = defineProps<{
   /** 安装到的分组名；空 = 默认分组，提交时由上层转成分组 uuid */
   group: string;
-  /** 已有分组候选（uuid + 名字；下拉显示名字） */
+  /** 已有分组候选，uuid + 名字；下拉显示名字 */
   groups: GroupDto[];
   /** 安装任务状态，用来给列表同步「已安装 / 安装中」角标 */
   status: ModPackStatusDto | null;
@@ -39,7 +39,7 @@ const SOURCE_LABELS: Record<string, string> = {
   modrinth: "modpack.modrinth",
 };
 
-/** 下载源（取值是后端线串，显示的标签走 i18n） */
+/** 下载源，取值是后端线串，显示的标签走 i18n */
 const sources = ref<Array<{ value: string; label: string }>>([]);
 const source = ref("");
 
@@ -107,7 +107,7 @@ const latestFile = ref<FileListItemDto | null>(null);
 /** 详情页版本列表的游戏版本筛选，空串 = 全部；打开详情时沿用列表页的筛选 */
 const fileVersion = ref("");
 
-/** 版本列表每页条数（与 CurseForge 后端分页一致） */
+/** 版本列表每页条数，与 CurseForge 后端分页一致 */
 const FILE_PAGE_SIZE = 50;
 
 const isModrinth = computed(() => source.value === "modrinth");
@@ -206,8 +206,8 @@ let searchSeq = 0;
 /** 搜索期间置 `searching`（弹窗锁住窗口），成败都清掉 */
 async function search() {
   // 排序列表还没拉回来时别发请求：换下载源时它是**异步**拉回来的
-  // （loadSource 里 await 若干请求），这中间发出去必然带不上合法排序
-  // —— 空串后端也不认（err.sortTypeNotFound）。那次 loadSource 拉完会自己再搜一次。
+  // loadSource 里 await 若干请求，这中间发出去必然带不上合法排序
+  // —— 空串后端也不认，会报 err.sortTypeNotFound。那次 loadSource 拉完会自己再搜一次。
   if (sorts.value.length === 0) {
     return;
   }
@@ -404,7 +404,7 @@ function closeDetail() {
   emit("detail", false);
 }
 
-// 标题栏上的返回键由上层（AddModpackWindow）持有，通过 ref 调这里
+// 标题栏上的返回键由上层 AddModpackWindow 持有，通过 ref 调这里
 defineExpose({ closeDetail });
 
 function install(item: ProjectItemDto, file: FileListItemDto) {
@@ -425,7 +425,7 @@ const bodyHtml = computed(() => {
 });
 
 /**
- * Modrinth 分类图标：icon 字段是内联 svg 源码（stroke=currentColor），消毒后内联渲染
+ * Modrinth 分类图标：icon 字段是内联 svg 源码，stroke=currentColor，消毒后内联渲染
  *
  * 消毒结果按源码缓存：模板里直接调用函数，每次重渲染都会重跑一遍 DOMPurify，
  * 而同一批分类图标的源码是不变的。
@@ -441,10 +441,10 @@ function svgIcon(svg: string): string {
 }
 
 /**
- * 截图放大预览（当前预览的图片地址，空 = 关闭）
+ * 截图放大预览，这里是当前预览的图片地址，空 = 关闭
  *
  * 缩放 / 平移 / 点空白关闭都在共用的 `ImagePreview` 里；这里只留"开哪张 / 关掉"，
- * 以及 Esc 的分层处理（先关预览、再关详情页，见 [`onDetailKey`]）。
+ * 以及 Esc 的分层处理：先关预览、再关详情页，见 [`onDetailKey`]。
  */
 const preview = ref("");
 
@@ -512,7 +512,7 @@ watch(
  *
  * 由 `props.status` 直接**派生**，不再往列表项里写回 `download` / `downloadNow`：
  * 写回是单向的（只置 true 不复位），任务取消、失败或清除之后角标会一直挂着。
- * 「已安装」取实例表来源（`item.download` / `file.isDownload`）与上面那张累计表的「或」。
+ * 「已安装」取实例表来源 `item.download` / `file.isDownload`，与上面那张累计表取「或」。
  */
 const taskState = computed(() => {
   const running = (task: ModPackTaskDto) => !task.done && !task.failed && !task.cancelled;
@@ -562,7 +562,7 @@ onMounted(async () => {
  * 收藏窗口点「下载」跳进来的整合包：进页面就直接打开它的详情（版本列表在里面）
  *
  * 与下载资源窗口同理 —— 本页在单窗口模式下也被 KeepAlive 缓存，先把上一次留下的
- * 视图状态清掉再打开新项目（`closeDetail()` 同时把上层的"返回"状态复位），
+ * 视图状态清掉再打开新项目：`closeDetail()` 同时把上层的"返回"状态复位，
  * 改完 source 会触发列表刷新，所以等一轮再开详情，免得被那批刷新盖掉。
  */
 async function consumeTargetProject() {
@@ -572,7 +572,7 @@ async function consumeTargetProject() {
   }
   closeDetail();
   filter.value = "";
-  // 换源会让排序表作废：**同步**清掉（不能等 watch 里那次异步重载），
+  // 换源会让排序表作废：**同步**清掉，不能等 watch 里那次异步重载，
   // 否则中间那几发搜索会带着上一个源的排序名发出去（后端不认 → 报未知排序）
   sorts.value = [];
   sort.value = "";

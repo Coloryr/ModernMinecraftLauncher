@@ -19,7 +19,7 @@
   --text: #e8eaed;
   --text-dim: #9aa3af;
 
-  /* 下拉框箭头（各处下拉共用的那一枚 data-URI 图标）
+  /* 下拉框箭头：各处下拉共用的那一枚 data-URI 图标
      内联 SVG 图片里没法用 currentColor —— 背景图是独立文档，拿不到引用元素的 color，
      所以只能按主题各嵌一份；颜色取本主题的 --text-dim，与其它图标一样跟着主题走。
      改色时两套主题一起改（亮色那份在下面的 [data-theme="Light"] 里） */
@@ -44,7 +44,7 @@
   /* 弹窗遮罩 */
   --overlay: rgba(0, 0, 0, 0.55);
 
-  /* 自绘标题栏高度：主窗口顶栏（MainTopbar 的 .topbar）与子窗口框架（WindowFrame 的
+  /* 自绘标题栏高度：主窗口顶栏 MainTopbar 的 .topbar 与子窗口框架 WindowFrame 的
      .frame-head）共用这一个值，两边必须一致——单窗口模式下切换页面时窗口根组件会换掉，
      值不一样标题栏就会跳高。弹窗 / 覆盖层想避开标题栏时也用这个值 */
   --titlebar-h: 64px;
@@ -64,7 +64,7 @@
   --text: #1d2229;
   --text-dim: #6a7480;
 
-  /* 下拉框箭头（同暗色那份，只换成本主题的 --text-dim） */
+  /* 下拉框箭头：同暗色那份，只换成本主题的 --text-dim */
   --select-arrow: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236a7480' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 
   --accent: #2f6fe4;
@@ -319,7 +319,7 @@ html.has-bg[data-theme="Light"] {
   --bg-solid: #ffffff;
 }
 
-/* 标题栏随背景图转半透明（比普通表面略实，保证拖动区与按钮可读）。
+/* 标题栏随背景图转半透明：比普通表面略实，保证拖动区与按钮可读。
    .frame-head 是子窗口的 WindowFrame 标题栏，.topbar 是主窗口顶栏（兼作标题栏） */
 html.has-bg .frame-head,
 html.has-bg .topbar {

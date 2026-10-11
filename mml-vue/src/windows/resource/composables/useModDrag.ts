@@ -7,7 +7,7 @@
 import { onMounted, onUnmounted, ref } from "vue";
 
 /**
- * 开始拖拽的位移阈值（像素）
+ * 开始拖拽的位移阈值，单位像素
  *
  * 8 而不是 5：分组头是**整条都能拖**的大目标，点击时手抖几像素很常见 ——
  * 阈值太小会让"想点却变成拖"（用户报的问题）。8px 仍在"明显移动"的范围内，
@@ -17,6 +17,7 @@ const DRAG_THRESHOLD = 8;
 
 /** 可拖拽的目标：带一个用于渲染身份的 key */
 export interface DragItem {
+  /** 渲染身份用的键 */
   key: string;
 }
 
@@ -250,7 +251,7 @@ export function useReorderDrag(deps: {
     // 被拖项的 key 由骨架交过来。**以前这里读 `gesture.dragKey`**，
     // 而那时它已被 reset 清成 null —— 于是 `from` 永远是空、
     // `deps.onDrop` 根本没被调用过：拖分组头看着有插入线，松手却什么都没发生，
-    // 顺序自然也永远没写进 `GroupOrder`（用户报的"模组分组无法移动顺序"）。
+    // 顺序自然也永远没写进 `GroupOrder`，用户报过"模组分组无法移动顺序"。
     onDrop: (index, key) => deps.onDrop(key, index),
   });
 

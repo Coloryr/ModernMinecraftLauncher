@@ -457,7 +457,7 @@ pub fn scan_java() {
 ///
 /// # 返回值
 ///
-/// 解压并注册成功返回该 Java 的信息；压缩包格式不支持或其中找不到 Java 时返回 `None`
+/// 解压并注册成功返回该 Java 的信息；格式不支持时返回 `Err`，其中找不到 Java 或测试不通过时返回 `None`
 pub async fn unzip_java<P: AsRef<Path>>(
     name: Option<String>,
     path: P,

@@ -13,8 +13,10 @@ defineProps<{
   status: ModPackStatusDto;
 }>();
 
-/** 关闭弹窗；安装任务不受影响 */
-const emit = defineEmits<{ (e: "close"): void }>();
+const emit = defineEmits<{
+  /** 关闭弹窗；安装任务不受影响 */
+  (e: "close"): void;
+}>();
 </script>
 
 <template>

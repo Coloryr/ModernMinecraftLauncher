@@ -17,8 +17,10 @@ const props = defineProps<{
   disabled?: boolean;
 }>();
 
-/** `v-model` 更新：新的选中值 */
-const emit = defineEmits<{ (e: "update:modelValue", value: string): void }>();
+const emit = defineEmits<{
+  /** `v-model` 更新：新的选中值 */
+  (e: "update:modelValue", value: string): void;
+}>();
 
 const current = computed(() => props.modelValue);
 

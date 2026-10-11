@@ -123,7 +123,9 @@ fn create_shortcut_inner<P: AsRef<Path>>(
     }
 }
 
-/// Linux 实现占位，未创建任何快捷方式
+/// Linux 实现：写一个指向启动器的 .desktop 文件
+///
+/// 参数含义同 [`create_shortcut`]。
 #[cfg(target_os = "linux")]
 fn create_shortcut_inner<P: AsRef<Path>>(
     uuid: &str,
@@ -131,14 +133,76 @@ fn create_shortcut_inner<P: AsRef<Path>>(
     work: P,
     file: P,
 ) -> CoreResult<PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+
+    use mml_names::names;
+
+    let exe = std::env::current_exe().map_err(|err| {
+        ErrorType::FileSystemError(FileSystemErrorData {
+            error: err.to_string(),
+            path: file.as_ref().to_path_buf(),
+        })
+    })?;
+
+    // 显示名取快捷方式文件名，与 Windows 下 .lnk 的表现一致
+    let name = file
+        .as_ref()
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| uuid.to_string());
+
+    let mut content = String::from("[Desktop Entry]\nType=Application\nTerminal=false\n");
+    content.push_str(&format!("Name={name}\n"));
+    content.push_str(&format!(
+        "Exec=\"{}\" {} {}\n",
+        exe.display(),
+        names::COMMAND_GAME,
+        uuid
+    ));
+    content.push_str(&format!("Path={}\n", work.as_ref().display()));
+    if let Some(icon) = icon {
+        content.push_str(&format!("Icon={}\n", icon.as_ref().display()));
+    }
+
+    std::fs::write(file.as_ref(), content).map_err(|err| {
+        ErrorType::FileSystemError(FileSystemErrorData {
+            error: err.to_string(),
+            path: file.as_ref().to_path_buf(),
+        })
+    })?;
+
+    // 桌面环境要求启动器文件带可执行位，否则会被标成"不受信任"
+    if let Ok(meta) = std::fs::metadata(file.as_ref()) {
+        let mut perm = meta.permissions();
+        perm.set_mode(0o755);
+        let _ = std::fs::set_permissions(file.as_ref(), perm);
+    }
+
+    Ok(file.as_ref().to_path_buf())
 }
 
-/// macOS 实现占位，未创建任何快捷方式
+/// macOS 实现：暂不支持创建快捷方式
+///
+/// 参数含义同 [`create_shortcut`]。
 #[cfg(target_os = "macos")]
 fn create_shortcut_inner<P: AsRef<Path>>(
-    uuid: &str,
-    icon: Option<P>,
-    work: P,
-    file: P,
+    _uuid: &str,
+    _icon: Option<P>,
+    _work: P,
+    _file: P,
 ) -> CoreResult<PathBuf> {
+    Err(ErrorType::InvalidOperation)
+}
+
+/// 其它平台：不支持创建快捷方式
+///
+/// 参数含义同 [`create_shortcut`]。
+#[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+fn create_shortcut_inner<P: AsRef<Path>>(
+    _uuid: &str,
+    _icon: Option<P>,
+    _work: P,
+    _file: P,
+) -> CoreResult<PathBuf> {
+    Err(ErrorType::InvalidOperation)
 }

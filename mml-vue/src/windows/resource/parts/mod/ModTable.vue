@@ -22,7 +22,7 @@
 // 列序（14 列 + 多选）：
 //   分组名 | 启用 | 名字 | 备注 | modid | 版本 | 加载器类型 | 加载侧
 //          | 下载源 | 项目编号 | 文件编号 | 路径 | 作者 | 网页链接
-//   - 备注紧挨名字右边；没有操作列（删除 / 打开文件夹在列表视图里，备注双击就地编辑）。
+//   - 备注紧挨名字右边；没有操作列，删除 / 打开文件夹在列表视图里，备注双击就地编辑。
 import { computed, nextTick, ref } from "vue";
 import { t } from "../../../../lib/i18n";
 import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
@@ -54,7 +54,7 @@ const props = withDefaults(
       draggingGroup?: string | null;
       /** 递归层级；1 是模组行，>1 是内置模组行 */
       depth?: number;
-      /** 不画表头（只有第一块画，其余块关掉，否则一屏里重复十几列） */
+      /** 不画表头；只有第一块画，其余块关掉，否则一屏里重复十几列 */
       hideHeader?: boolean;
       /** 列宽，列 key → 像素宽；状态在外层 `useResourceView`，所有分组共用一份 */
       colWidths: Record<string, number>;
@@ -165,7 +165,7 @@ function sortMark(key: string): string {
 // ---------- 行的拍平（父行 + 已展开的内置模组行） ----------
 
 /**
- * 表格里展开的行（父行 + 缩进的内部模组行拍平成一串）
+ * 表格里展开的行：父行 + 缩进的内部模组行拍平成一串
  *
  * 内置模组装在父 jar 里、没有独立文件：它们**没有**启用 / 备注 / 下载源这些东西，
  * 所以只在"名字"那一列缩进显示，其余列留空 —— 与它们在内核里的实际情况一致。
@@ -178,7 +178,7 @@ interface TableRow {
 }
 
 /**
- * **展开**的父条目 key（默认**收起**，与列表视图同一口径）
+ * **展开**的父条目 key；默认**收起**，与列表视图同一口径
  *
  * 内置模组（jar-in-jar）默认不铺开：一个包常带好几个内置库，全展开会把表撑得很长，
  * 想看的模组被挤到屏幕外。点名字前的箭头才展开。
@@ -225,7 +225,7 @@ const rows = computed(() => {
 /**
  * 正在编辑的备注（同时只能有一个）
  *
- * **不弹输入框**：双击直接把这一格变成可书写区域（`contenteditable`），文字原地编辑 ——
+ * **不弹输入框**：双击直接把这一格变成 `contenteditable` 的可书写区域，文字原地编辑 ——
  * 用户口径"不需要显示输入框，直接可以写文字"。提交（回车 / 失焦）时从单元格读文本，
  * 取消（Esc）把原文写回去。
  */
@@ -279,7 +279,7 @@ function commitEdit(event: Event) {
   }
 }
 
-/** 取消：把原文写回去（理由同 `commitEdit`） */
+/** 取消：把原文写回去，理由同 `commitEdit` */
 function cancelEdit(event: Event) {
   const cur = editing.value;
   editing.value = null;
@@ -315,7 +315,7 @@ function onNoteEnter(event: KeyboardEvent) {
 
     <!--
       一级节点：分组行。名字与箭头**都能点开 / 收起**（和列表视图的分组头同一口径），
-      按住名字拖动 = 调整分组顺序（交给 ModPane 的 `onSectionPointerDown`）。
+      按住名字拖动 = 调整分组顺序，交给 ModPane 的 `onSectionPointerDown`。
       其余列留空占位 —— 栅格必须占满，否则这一行会整体左移、列全错位。
     -->
     <div class="mod-tr mod-group-row" :style="{ gridTemplateColumns: gridTemplate }"
@@ -356,7 +356,7 @@ function onNoteEnter(event: KeyboardEvent) {
       </span>
 
       <!--
-        树列（最左）：**缩进 + 展开箭头都放这里**（用户要求"把展开放在左边"）。
+        树列在最左：**缩进 + 展开箭头都放这里**，用户要求"把展开放在左边"。
         层级靠 16px 一级的缩进；箭头只给带内置模组的行，其余留等宽占位。
         组名只在分组行那一行出现，模组行这一格是空的。
       -->
@@ -424,7 +424,7 @@ function onNoteEnter(event: KeyboardEvent) {
 
     <!--
       空分组：一级节点那一行已经把组名画出来了（可折叠、可拖动排序），
-      这里只补一句提示，跨掉剩下的列。
+      这里只补一句提示，横跨剩下的列。
     -->
     <div v-if="groupOpen && !rows.length" class="mod-tr mod-tr-empty"
       :style="{ gridTemplateColumns: gridTemplate }">

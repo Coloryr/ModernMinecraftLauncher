@@ -100,7 +100,7 @@ select.sel-file-version {
   cursor: not-allowed;
 }
 
-/* 目标实例一行（同样回缩 8px，与上下两张卡对齐） */
+/* 目标实例一行：同样回缩 8px，与上下两张卡对齐 */
 .res-instance {
   display: flex;
   align-items: center;
@@ -150,7 +150,7 @@ select.sel-file-version {
   transition: box-shadow 0.15s ease;
 }
 
-/* 悬停：主题阴影（与主页卡片 .entry-card 同一套 token，也与整合包窗口一致）。
+/* 悬停：主题阴影，与主页卡片 .entry-card 同一套 token，也与整合包窗口一致。
    刻意不换颜色：底色换成 --bg-hover 在浅色主题下白卡会发灰，
    描边染成强调色则跟着主题色走（红 / 粉主题下很跳）。
    也不上浮：列表容器是滚动容器，会把自己的溢出裁掉，上浮会把卡片顶边切掉 */
@@ -355,7 +355,7 @@ select.sel-file-version {
 
 /* 版本筛选下拉：比列表页的筛选项小一号。
    高度要跟着一起缩小：--field-h(42) 兜底时多出来的空间在 <select> 里会全沉到底部
-   （不变量见 forms.css：高度 = 行高 20 + 上下内边距 6×2 + 边框 1×2 = 34） */
+   不变量见 forms.css：高度 = 行高 20 + 上下内边距 6×2 + 边框 1×2 = 34 */
 .sel-file-version {
   height: 34px;
   min-height: 0;

@@ -24,7 +24,7 @@ use super::{CURSEFOGRE_FILE, CURSEFOGRE_INFO, DOWNLOAD_NOW, MODRINTH_FILE, MODRI
 /// - `source`: 下载源，取 `curseforge` 或 `modrinth`
 /// - `pid`: 项目 ID
 /// - `file_type`: 资源类型，决定 `loader` 是否生效
-/// - `page`: 页码，从 1 开始
+/// - `page`: 页码，从 0 开始
 /// - `version`: 游戏版本过滤，`None` 表示不限
 /// - `loader`: 模组加载器过滤，仅模组类型有意义，缺省 / 非法值按 normal
 ///
@@ -177,7 +177,7 @@ pub async fn add_resource_file(
 /// - `game`: 实例 uuid，用来标记"已下载 / 正在下载 / 已收藏"
 /// - `source`: 下载源，取 `curseforge` 或 `modrinth`
 /// - `file_type`: 资源类型，取 `mod` / `save` / `resourcepack` / `shaderpack` / `datapacks`
-/// - `page`: 页码，从 1 开始
+/// - `page`: 页码，从 0 开始
 /// - `sort`: 排序方式，取值来自 `add_resource_sort_type`
 /// - `category`: 分类过滤，`None` 表示不限
 /// - `filter`: 搜索关键字，`None` 表示不限

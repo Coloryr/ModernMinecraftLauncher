@@ -3,13 +3,13 @@
 //! 使用本机 `127.0.0.1` 上的临时 TCP HTTP 服务模拟下载源，
 //! 不访问任何外部网络。覆盖以下离线逻辑：
 //!
-//! - 下载器初始化（`init` / `get_download_path`）
-//! - 临时文件生成（`gen_temp_file`，UUID 唯一且位于下载目录内）
-//! - 端到端下载流程（任务入队 → 工作线程下载 → 大小/哈希校验 → 移动到目标路径）
-//! - GUI 回调事件（AddTask / UpdateTask / RemoveTask）
-//! - 任务快照与取消接口（`get_tasks` / `cancel_task`）
+//! - 下载器初始化，`init` / `get_download_path`
+//! - 临时文件生成，`gen_temp_file` 的 UUID 唯一且位于下载目录内
+//! - 端到端下载流程：任务入队 → 工作线程下载 → 大小/哈希校验 → 移动到目标路径
+//! - GUI 回调事件，AddTask / UpdateTask / RemoveTask
+//! - 任务快照与取消接口，`get_tasks` / `cancel_task`
 //!
-//! 注意：进程级全局状态（日志/配置/GUI 回调/下载线程池）只能初始化一次，
+//! 注意：进程级全局状态，日志/配置/GUI 回调/下载线程池，只能初始化一次，
 //! 因此所有依赖初始化的用例集中在同一个测试函数内顺序执行。
 
 use std::fs;
@@ -30,7 +30,7 @@ static GUI_EVENTS: OnceLock<Arc<Mutex<Vec<String>>>> = OnceLock::new();
 /// 测试运行根目录
 static RUN_DIR: OnceLock<PathBuf> = OnceLock::new();
 
-/// 记录事件的 GUI 回调实现
+/// 记录事件的 GUI 回调实现，事件以字符串形式存入 `GUI_EVENTS`
 struct GuiRecorder;
 
 impl IDownloadGui for GuiRecorder {
@@ -56,7 +56,11 @@ impl IDownloadGui for GuiRecorder {
     }
 }
 
-/// 初始化下载器运行环境（进程内只执行一次），返回运行根目录
+/// 初始化下载器运行环境，进程内只执行一次
+///
+/// # 返回值
+///
+/// 返回运行根目录，重复调用返回同一目录
 fn setup() -> PathBuf {
     if let Some(dir) = RUN_DIR.get() {
         return dir.clone();
@@ -71,7 +75,7 @@ fn setup() -> PathBuf {
         .set(Arc::new(Mutex::new(Vec::new())))
         .expect("GUI_EVENTS 只能初始化一次");
 
-    // 初始化全局依赖链（顺序与主程序一致）
+    // 初始化全局依赖链，顺序与主程序一致
     mml_base::init(&dir);
     mml_log::start(&dir).expect("日志系统启动失败");
     mml_config::init(&dir).expect("配置系统初始化失败");
@@ -93,7 +97,11 @@ fn setup() -> PathBuf {
 
 /// 启动一个只响应单次 GET 请求的本地 HTTP 服务
 ///
-/// 返回端口号和服务线程句柄（测试结束后 join 以确认正常收尾）。
+/// - `body`: 响应体内容，Content-Length 按它的字节数写入
+///
+/// # 返回值
+///
+/// 返回监听端口号和服务线程句柄，测试结束后 join 以确认正常收尾
 fn spawn_http_server(body: Vec<u8>) -> (u16, JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("绑定本机端口失败");
     let port = listener.local_addr().unwrap().port();
@@ -116,7 +124,7 @@ fn spawn_http_server(body: Vec<u8>) -> (u16, JoinHandle<()>) {
     (port, handle)
 }
 
-/// 读取并丢弃请求头（读到空行即止），避免客户端写阻塞
+/// 读取并丢弃请求头，读到空行即止，避免客户端写阻塞
 fn read_request_head(stream: &mut TcpStream) {
     let mut buf = [0u8; 1024];
     let mut total = 0;
@@ -125,7 +133,7 @@ fn read_request_head(stream: &mut TcpStream) {
             Ok(0) | Err(_) => break,
             Ok(n) => {
                 total += n;
-                // HTTP 头以空行（\r\n\r\n）结束
+                // HTTP 头以空行 \r\n\r\n 结束
                 if let Some(pos) = buf[..total].windows(4).position(|w| w == b"\r\n\r\n") {
                     let _ = pos;
                     break;
@@ -150,7 +158,7 @@ async fn offline_download_pipeline() {
     assert!(!temp1.exists(), "生成的临时文件不应已存在");
     assert!(download_dir.exists(), "下载目录应已创建");
 
-    // ---- 端到端下载（本机 HTTP 服务）----
+    // ---- 端到端下载，走本机 HTTP 服务 ----
     let body: Vec<u8> = b"hello mml downloader offline test body 1234567890".to_vec();
     let (port, server) = spawn_http_server(body.clone());
 
@@ -171,7 +179,7 @@ async fn offline_download_pipeline() {
 
     server.join().unwrap();
 
-    // 文件内容与哈希一致（含大小写校验）
+    // 文件内容与哈希一致，含大小写校验
     let downloaded = fs::read(&target).expect("下载后的文件应存在");
     assert_eq!(downloaded, body);
 
@@ -210,7 +218,7 @@ async fn offline_download_pipeline() {
     assert!(!mml_downloader::cancel_task(0));
     assert!(!mml_downloader::cancel_task(u64::MAX));
 
-    // ---- 清理（下载线程仍持有空闲句柄，尽力清理即可）----
+    // ---- 清理，下载线程仍持有空闲句柄，尽力清理即可 ----
     let _ = fs::remove_file(&target);
     let _ = fs::remove_dir_all(&dir);
 }

@@ -33,7 +33,7 @@ export function useResourceStatus(own: boolean) {
       status.value = null;
     }
     return onAddResourceStatus((e) => {
-      // 添加资源窗口开着时主窗口不显示（由 windowOpen 决定，这里只存数据）
+      // 添加资源窗口开着时主窗口不显示，由 windowOpen 决定，这里只存数据
       if (!own && e.windowOpen) return;
       apply(e);
     });

@@ -40,7 +40,7 @@ pub struct ChunkNbt {
 pub struct ChunkInfo {
     /// 表项序号，取值 0–1023，与文件头位置表一一对应
     pub index: u32,
-    /// 数据起始偏移，单位 4 KiB 扇区
+    /// 数据起始偏移；读出后是字节偏移，写回文件头时换算成 4 KiB 扇区号
     pub pos: u32,
     /// 占用的扇区数，0 表示该表项没有区块
     pub count: u8,

@@ -63,7 +63,7 @@ import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, 
 export interface CreateInstanceOpts {
   loader?: string;
   loaderVersion?: string | null;
-  /** 目标分组 uuid，null 或缺省 = 默认分组 */
+  /** 目标分组 uuid；后端原样存下不做解析，null / 缺省表示不归组 */
   group?: string | null;
   modpackType?: string;
   source?: string;

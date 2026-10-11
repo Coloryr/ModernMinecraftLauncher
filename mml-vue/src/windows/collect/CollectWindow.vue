@@ -37,13 +37,13 @@ const multiSelect = ref(false);
 /** 本次操作的目标 uuid。点菜单 / 多选条时**快照**下来 ——
  *  等确认弹窗弹出来时，右键菜单早就关了，不能再从 menu 里现取 */
 const actionUuids = ref<string[]>([]);
-/** 折叠起来的分组（键 = 分组的 key；默认展开） */
+/** 折叠起来的分组，键是分组的 key；默认展开 */
 const collapsedGroups = ref<Record<string, boolean>>({});
 
 /** 收藏数据变更订阅的退订函数（挂载后赋值，卸载时统一摘掉） */
 let unlistenCollect: (() => void) | null = null;
 
-/** 类型过滤（持久化在 gui_config 的 collect 里） */
+/** 类型过滤，持久化在 gui_config 的 collect 里 */
 const filters = ref<CollectConfig>({
   modpack: true,
   showMod: true,
@@ -461,10 +461,10 @@ function toggleCard(item: CollectItemDto) {
 // ---------------- 拖拽改分组 ----------------
 
 /**
- * 拖卡片到分组上 = 移到那个分组（逻辑见 composables/useCollectDrag）
+ * 拖卡片到分组上 = 移到那个分组，逻辑见 composables/useCollectDrag
  *
  * 与拖动游戏实例同一套做法：指针拖拽、落点用 `data-group` 反查、多选模式下拖已勾选的
- * 卡片整批一起走。收藏的分组没有组内次序（数据层是集合），所以只做归属、不做排序。
+ * 卡片整批一起走。收藏的分组没有组内次序，数据层是集合，所以只做归属、不做排序。
  */
 const { draggingUuids, dropGroup, onCardPointerDown, consumeSuppressClick } = useCollectDrag({
   checked,
@@ -481,9 +481,9 @@ function onCardClick(item: CollectItemDto) {
 }
 
 /**
- * 拖拽幽灵卡片的内容（与实例拖拽的 `.drop-ghost-row` 同一观感：图标 + 名字）
+ * 拖拽幽灵卡片的内容：与实例拖拽的 `.drop-ghost-row` 同一观感，图标 + 名字
  *
- * 分组没有组内次序，所以幽灵只落在**落点分组的末尾**（实例那边要算"插到第几行"）。
+ * 分组没有组内次序，所以幽灵只落在**落点分组的末尾**，实例那边才要算"插到第几行"。
  * 已经在目标组里的项不会被移动，一件都不动时不给幽灵 —— 否则看着像"松手会变"，
  * 实际是空操作，见 useCollectDrag 的 commitDrag。
  */
@@ -508,7 +508,7 @@ const dragGhostCard = computed(() => {
   };
 });
 
-/** 幽灵卡片是否画在这一组（空分组也要渲染网格时同样用它判断） */
+/** 幽灵卡片是否画在这一组；空分组也要渲染网格时同样用它判断 */
 function isGhostGroup(key: string): boolean {
   return dragGhostCard.value?.group === key;
 }
@@ -518,11 +518,11 @@ function isGhostGroup(key: string): boolean {
 /**
  * 下载这一项：打开「下载整合包」或「下载资源」窗口，并把项目带过去
  *
- * 两个窗口都是"按实例取数"的（`add_resource_list(game, …)` 必须有实例 uuid），
+ * 两个窗口都是"按实例取数"的，`add_resource_list(game, …)` 必须有实例 uuid，
  * 所以这里只把项目参数送过去，由目标窗口在实例就绪后自己打开版本列表。
  *
  * `uuid` 也要送：非整合包那条路已经让用户选好实例了，
- * 目标窗口会优先用它（见 AddResourceWindow 的 onMounted）。
+ * 目标窗口会优先用它，见 AddResourceWindow 的 onMounted。
  */
 function openDownloadWindow(item: CollectItemDto, uuid?: string) {
   openWindow(item.fileType === "modpack" ? "add_modpack" : "add_resource", {
@@ -542,8 +542,8 @@ function openDownloadWindow(item: CollectItemDto, uuid?: string) {
  * 点卡片后的分流
  *
  * - **整合包**：目标窗口自己就是"下载并新建实例"，不需要先有实例，直接跳详情；
- * - **其余资源**（模组 / 资源包 / 光影包）：要装进某个已有实例，所以**先让用户选实例**
- *   再跳（在那边选不了 —— 下载资源窗口只有一行只读的实例名，没有选择器）。
+ * - **其余资源**：模组 / 资源包 / 光影包要装进某个已有实例，所以**先让用户选实例**
+ *   再跳。在那边选不了 —— 下载资源窗口只有一行只读的实例名，没有选择器。
  *   选定后把 uuid 一并带过去，目标窗口就不会再退回主窗口选中的那个。
  */
 function startDownload(item: CollectItemDto) {
@@ -576,7 +576,7 @@ async function loadInstances() {
   }
 }
 
-/** 选定实例：带着它跳过去（下载资源窗口会优先用这个 uuid） */
+/** 选定实例：带着它跳过去，下载资源窗口会优先用这个 uuid */
 function pickInstance(inst: InstanceInfoDto) {
   const item = pickItem.value;
   pickItem.value = null;
@@ -622,7 +622,7 @@ function openMenu(e: MouseEvent, item: CollectItemDto) {
     y: Math.max(8, Math.min(e.clientY, window.innerHeight - MENU_H - 8)),
     item,
   };
-  // 多选模式下右键顺带把该项勾上（默认模式不动勾选，菜单只作用于点中的这一项）
+  // 多选模式下右键顺带把该项勾上；默认模式不动勾选，菜单只作用于点中的这一项
   if (multiSelect.value) {
     toggleCheck(item.uuid, true);
   }
@@ -635,7 +635,7 @@ function closeMenu() {
 
 <template>
   <WindowFrame :title="t('winTitle.collect')" body-gutter @close="$emit('close')">
-    <!-- 工具栏整体进标题栏（与账户 / 方块 / 设置三个窗口同一套做法）：
+    <!-- 工具栏整体进标题栏，与账户 / 方块 / 设置三个窗口同一套做法：
          类型开关 + 总计数 + 多选入口，正文直接从折叠分组开始 -->
     <template #head-right>
       <div class="collect-toolbar">
@@ -720,8 +720,8 @@ function closeMenu() {
                   </span>
                 </span>
                 <div class="card-icon">
-                  <!-- 用全仓通用的 AsyncImage：加载中是流光占位、失败是灰底占位
-                       （与下载整合包窗口的项目图标同一套观感） -->
+                  <!-- 用全仓通用的 AsyncImage：加载中是流光占位、失败是灰底占位，
+                       与下载整合包窗口的项目图标同一套观感 -->
                   <AsyncImage v-if="iconOf(item)" :src="iconOf(item)" @error="onIconError(item)" />
                   <GlyphIcon v-else class="card-icon-none" name="image" :size="22" :weight="1.6" />
                 </div>
@@ -740,8 +740,8 @@ function closeMenu() {
                 </span>
               </div>
 
-              <!-- 拖拽幽灵卡片：与实例拖拽的 .drop-ghost-row 同一观感（虚框 + 淡强调底 +
-                   淡化），摆在落点分组的末尾。分组没有组内次序，所以不跟着鼠标插行 -->
+              <!-- 拖拽幽灵卡片：与实例拖拽的 .drop-ghost-row 同一观感，虚框 + 淡强调底 +
+                   淡化，摆在落点分组的末尾。分组没有组内次序，所以不跟着鼠标插行 -->
               <div v-if="isGhostGroup(g.key)" class="collect-card ghost">
                 <div class="card-icon">
                   <AsyncImage v-if="dragGhostCard?.icon" :src="dragGhostCard.icon" />
@@ -781,8 +781,8 @@ function closeMenu() {
     <!-- 添加分组 -->
     <BaseModal v-if="showAddGroup" :title="t('collect.addGroupTitle')" :closable="false" @close="showAddGroup = false">
       <!-- 纯文本输入：用 .field-input。别挂 .field-select —— 那个类除了尺寸还带
-           右侧下拉箭头（padding-right: 28px + --select-arrow 背景图），输入框上会
-           凭空多出一个"能点开下拉"的箭头（主窗口同款弹窗用的就是 .field-input） -->
+           右侧下拉箭头，即 padding-right: 28px 加 --select-arrow 背景图，输入框上会
+           凭空多出一个"能点开下拉"的箭头；主窗口同款弹窗用的就是 .field-input -->
       <input v-model="newGroupName" class="field-input" :placeholder="t('collect.groupPlaceholder')" spellcheck="false"
         @keydown.enter="confirmAddGroup" />
       <div class="modal-actions">
@@ -801,7 +801,7 @@ function closeMenu() {
       </div>
     </BaseModal>
 
-    <!-- 删除收藏确认（多选条与卡片菜单共用；多选条上会更正标题里的数量） -->
+    <!-- 删除收藏确认：多选条与卡片菜单共用，多选条上会更正标题里的数量 -->
     <BaseModal v-if="removeOpen" :title="t('collect.multiDelete')" :closable="false" @close="removeOpen = false">
       <p class="delete-tip">{{ t("collect.removeConfirm", { count: actionUuids.length }) }}</p>
       <div class="modal-actions">
@@ -838,7 +838,7 @@ function closeMenu() {
     </BaseModal>
 
     <!--
-      选实例再下载（非整合包专用，见 startDownload）
+      选实例再下载，非整合包专用，见 startDownload
 
       模组 / 资源包 / 光影包都得装进某个已有实例，而"下载资源"窗口里只有一行只读的实例名、
       没有选择器，所以实例只能在这儿先选好，再连同 uuid 一起带过去。

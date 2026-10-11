@@ -1,15 +1,15 @@
 /* 资源管理窗口的窗口级样式（**非 scoped**）
  *
  * 这个窗口拆成了「薄外壳 + 十个 parts + 两个 composable」，而 scoped 样式跨不过组件边界
- * （各 pane 里的 .item-row / .badge / .mini-btn 拿不到外壳的 scoped 规则），所以公共样式集中
+ * 各 pane 里的 .item-row / .badge / .mini-btn 拿不到外壳的 scoped 规则，所以公共样式集中
  * 放这里，由 ResourceWindow.vue 注入一次 —— 与 windows/settings/settings.css 同一做法。
  *
  * 反外溢：**所有规则都挂在 `.resource-layout` 之下**（这个类只属于本窗口），
- * 因此即使类名很通用（.badge / .mini-btn / .item-row…），也不会影响其它窗口里同名的
+ * 因此即使类名很通用，如 .badge / .mini-btn / .item-row，也不会影响其它窗口里同名的
  * scoped 类。新增规则请保持这个前缀。
  *
  * 例外：弹窗内容是 Teleport 到 body 的，不在 .resource-layout 里 —— 那几处的样式由各自
- * 的弹窗组件自带（ConfirmModal / ServerFormModal / ScreenshotPane 的大图预览），
+ * 的弹窗组件自带，即 ConfirmModal / ServerFormModal / ScreenshotPane 的大图预览，
  * 按钮一律用全仓通用的 BaseButton + 全局 .modal-actions。
  */
 
@@ -45,7 +45,7 @@
   font-family: inherit;
   cursor: pointer;
   transition: all 0.12s;
-  /* 图标 + 分类名摆成一行（按钮默认块级，不这样会各占一行） */
+  /* 图标 + 分类名摆成一行：按钮默认块级，不这样会各占一行 */
   display: flex;
   align-items: center;
   gap: 9px;
@@ -102,7 +102,7 @@
   gap: 12px;
 }
 
-/* 分类切换动画（ResourceWindow 的 `<Transition name="pane-swap">`）：
+/* 分类切换动画：ResourceWindow 的 `<Transition name="pane-swap">`，
    淡入淡出 + 轻微上收，数值与主窗口的 `.view-swap` 一致，全应用观感统一。
    `mode="out-in"` 保证同一时刻只有一个子节点，避免两块 `flex:1` 叠在一起 */
 .resource-layout .pane-swap-enter-active,
@@ -143,7 +143,7 @@
   padding-right: calc(26px + 9px);
 }
 
-/* 左侧（标题 + 搜索框 + 视图切换…）可被挤压，按钮组不缩 */
+/* 左侧的标题 + 搜索框 + 视图切换可被挤压，按钮组不缩 */
 .resource-layout .content-head> :first-child {
   flex: 1;
   min-width: 0;
@@ -207,7 +207,7 @@
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  /* 内置模组的缩进：由 ResourceRow 传进来的 --row-depth 决定（每级 22px，与原来树形视图同步长）。
+  /* 内置模组的缩进：由 ResourceRow 传进来的 --row-depth 决定，每级 22px，与原来树形视图同步长。
      用 padding 而不是 margin：行的底色/描边仍然铺满整宽，看着还是一张卡片 */
   padding-left: calc(12px + var(--row-depth, 0) * 22px);
   border-radius: 9px;
@@ -218,7 +218,7 @@
   border: 1px solid var(--border);
 }
 
-/* 行底色的两个组成（**唯一来源**，`.item-actions` 也复用它）：
+/* 行底色的两个组成，**唯一来源**，`.item-actions` 也复用它：
    - `--row-bg`   ：不透明的底（普通行 = 卡片色，内置行 = 侧栏色）
    - `--row-tint` ：叠在上面的一层（选中时 = 强调色，平时透明）
 
@@ -233,7 +233,7 @@
   --row-tint: transparent;
 }
 
-/* 内置模组的行：底色压暗一档（它在父 jar 里面，视觉上"凹进去"），
+/* 内置模组的行：底色压暗一档，它在父 jar 里面，视觉上"凹进去"，
    与父行拉开层次 —— 缩进之外再给一个底色差，扫一眼就知道哪几行是"包里的"。
    类由 ResourceRow 按 depth 挂上（.mod-nested），不依赖内联样式的序列化形式 */
 .resource-layout .item-row.mod-nested {
@@ -241,7 +241,7 @@
   border-style: dashed;
 }
 
-/* 行图标：**没有图标时这一格整个不渲染**（见 ResourceRow 的模板），
+/* 行图标：**没有图标时这一格整个不渲染**，见 ResourceRow 的模板，
    所以这里不需要"占位"样式 —— 名字会直接靠左，不再有大片灰框 */
 .resource-layout .item-icon {
   width: 36px;
@@ -472,7 +472,7 @@
 }
 
 /* 整张表共用**一块白底**（用户要求：不要一行一个白底）：白底 + 圆角 + 描边，
-   **自己不滚、也不带内边距** —— 左右内边距挪到了内容（`.mod-group-table`）身上，
+   **自己不滚、也不带内边距** —— 左右内边距挪到了内容 `.mod-group-table` 身上，
    上下呼吸位挪到滚动容器的 `padding-top`。这样滚动容器铺满卡片，
    两条滚动条都**贴住白底的右边与下边**（否则会被 padding 顶开一段，用户报过两次）。 */
 .resource-layout .mod-table-panel {
@@ -486,8 +486,8 @@
   flex-direction: column;
 }
 
-/* 真正的滚动容器：铺满卡片（滚动条落在**白色底里面**、且贴住右边框与下边框）。
-   **不加内边距** —— 内容四边都贴着白底（用户口径：上/下/左/右都不留空）；
+/* 真正的滚动容器：铺满卡片，滚动条落在**白色底里面**、且贴住右边框与下边框。
+   **不加内边距** —— 内容四边都贴着白底；用户口径：上/下/左/右都不留空；
    唯一例外是滚动条自身那 9px，那是浏览器画的，不占内容盒。 */
 .resource-layout .mod-table-scroll {
   flex: 1;
@@ -599,13 +599,13 @@
   color: var(--accent);
 }
 
-/* 正被拖动的分组块：留在原位但淡下去（与左侧分类栏的 .cat-item.dragging 同一观感），
+/* 正被拖动的分组块：留在原位但淡下去，与左侧分类栏的 .cat-item.dragging 同一观感，
    落到哪里由下面那条插入线表达 */
 .resource-layout .mod-group.mod-group-dragging {
   opacity: 0.45;
 }
 
-/* 分组排序的插入线：一条 2px 强调色横线（与左侧分类栏的 .cat-insert 同一套） */
+/* 分组排序的插入线：一条 2px 强调色横线，与左侧分类栏的 .cat-insert 同一套 */
 .resource-layout .mod-group-insert {
   display: block;
   height: 2px;
@@ -667,7 +667,7 @@
   background: var(--accent-soft);
 }
 
-/* 模组搜索框：工具条里的小号输入（与同一行的按钮同高 35px，见上面的说明） */
+/* 模组搜索框：工具条里的小号输入，与同一行的按钮同高 35px，见上面的说明 */
 .resource-layout .mod-search {
   height: 35px;
   width: 140px;
@@ -696,7 +696,7 @@
   opacity: 0.4;
 }
 
-/* 右键选中的模组行（列表的 .item-row 与表格的 .mod-tr 共用这个类）
+/* 右键选中的模组行：列表的 .item-row 与表格的 .mod-tr 共用这个类
    用内描边而不是外描边：列表与表格的行都是紧挨着的，外描边会糊到相邻行上。
    底色走 `--row-tint`（见 `.item-row` 上方那段说明）：**叠在行底上**而不是替换掉行底，
    这样它是个确定的不透明色，悬浮操作条才能用同一个色遮住底下的文字而不露异色 */
@@ -772,7 +772,7 @@
   flex-shrink: 0;
 }
 
-/* 空分组那一行（表格视图）：提示文字跨掉分组名之后的全部列 */
+/* 空分组那一行，表格视图：提示文字横跨分组名之后的全部列 */
 .resource-layout .mod-empty-tip {
   grid-column: 2 / -1;
   color: var(--text-dim);
@@ -803,7 +803,7 @@
   white-space: nowrap;
 }
 
-/* 批量「移到分组」的按钮：与同一行的其它按钮同高（35px，见 .head-actions 的说明）。
+/* 批量「移到分组」的按钮：与同一行的其它按钮同高 35px，见 .head-actions 的说明。
    目标分组改成弹窗里选（见 ModPane 的 group-pick 弹窗），这里不再有下拉 */
 .resource-layout .head-actions .icon-btn {
   height: 35px;
@@ -843,12 +843,12 @@
   border-top: 1px solid var(--border);
 }
 
-/* 内置模组的行：底色压暗一档 + 缩进（--row-depth 由 ModTable 按层级给） */
+/* 内置模组的行：底色压暗一档 + 缩进，--row-depth 由 ModTable 按层级给 */
 .resource-layout .mod-tr.mod-nested {
   background: var(--bg-side);
 }
 
-/* 名字列：缩进不在这里做 —— 树列的"缩进 + 箭头"在最左边（见 ModTable 的树列注释） */
+/* 名字列：缩进不在这里做 —— 树列的"缩进 + 箭头"在最左边，见 ModTable 的树列注释 */
 
 /* 分组名那一列：折叠箭头 + 名字。第一列是"这一行属于哪个组"，
    只在每个分组的首行出现（表格里一片连续的组名看着像重复数据） */
@@ -918,7 +918,7 @@
   font-weight: 600;
 }
 
-/* 备注格：**双击原地书写**（提示走 title，见 ModTable）。
+/* 备注格：**双击原地书写**，提示走 title，见 ModTable。
    `align-self: stretch` 是必须的：行是 `align-items: center`，**空单元格的高度会是 0** ——
    备注为空时那一格根本没有可点的面积，双击只会落在行背景上，`@dblclick` 不触发
    （用户报的"双击备注写不进内容"就是这个）。撑满行高后整列都是热区。 */
@@ -929,7 +929,7 @@
   cursor: text;
 }
 
-/* 书写中：**不画任何框**（用户口径："不要显示输入框，就是这个圆角框"）——
+/* 书写中：**不画任何框**，用户口径："不要显示输入框，就是这个圆角框" ——
    单元格保持表格文字的原样，只是能直接写；底色 / 描边 / 圆角一律不给。
 
    但**必须切成 `display: block`**：`display: flex` 时文字落在匿名 flex 项里，
@@ -971,7 +971,7 @@
   cursor: default;
 }
 
-/* 可排序的列：整格是一个按钮（点一下切正序 / 倒序 / 不排序） */
+/* 可排序的列：整格是一个按钮，点一下切正序 / 倒序 / 不排序 */
 .resource-layout .mod-th-sort {
   display: flex;
   align-items: center;
@@ -989,7 +989,7 @@
   color: var(--accent);
 }
 
-/* 排序标记（↑ 正序 / ↓ 倒序；不排序时不画） */
+/* 排序标记：↑ 正序 / ↓ 倒序；不排序时不画 */
 .resource-layout .mod-th-mark {
   color: var(--accent);
   font-size: 11px;
@@ -1034,7 +1034,7 @@
   color: var(--accent);
 }
 
-/* （"操作"列已按用户要求去掉，`.mod-th-actions` 的规则一并删除） */
+/* "操作"列已按用户要求去掉，`.mod-th-actions` 的规则一并删除 */
 
 .resource-layout .mod-cell {
   min-width: 0;
@@ -1062,7 +1062,7 @@
 
 /* ---------- 模组备注 ---------- */
 
-/* 列表里的备注：淡底小标签，**放在名字前面**（ResourceRow 的 name-lead 插槽）。
+/* 列表里的备注：淡底小标签，**放在名字前面**，即 ResourceRow 的 name-lead 插槽。
    备注是用户自己写的，可能很长 —— 让它自己截断（悬浮 title 看全文），
    不然会把名字挤没 */
 .resource-layout .mod-note {
@@ -1119,7 +1119,7 @@
 
 /* ---------- 数据包子页 ---------- */
 
-/* 存档下拉：外观全部走 .field-select（挂两个类，见 DatapackPane），
+/* 存档下拉：外观全部走 .field-select，挂两个类，见 DatapackPane，
    这里只把尺寸压小一号 —— 原先自己抄了一整份外观，改一处漏一处 */
 .resource-layout .dp-select {
   padding: 8px 28px 8px 10px;
@@ -1127,7 +1127,7 @@
   min-height: 0;
 }
 
-/* ---------- 分组右键菜单（ModGroupMenu.vue）----------
+/* ---------- 分组右键菜单：ModGroupMenu.vue ----------
    位置由组件用 `position: fixed` 钉在点击处，这里只管外观。 */
 .resource-layout .mod-ctx-menu {
   position: fixed;

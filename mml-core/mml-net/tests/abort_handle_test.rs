@@ -43,6 +43,8 @@ fn init_once() {
     });
 }
 
+/// 在真正被 block_on 驱动的 runtime 上验证：卡在读 body 的请求会占住调度，让后续任务排不上，
+/// 而对这些请求 abort 之后调度能恢复
 #[test]
 fn stuck_requests_and_abort_under_driven_runtime() {
     init_once();

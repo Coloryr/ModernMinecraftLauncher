@@ -3,7 +3,7 @@
 // 两套样式：`windows` 右端三个方按钮，`macos` 左端红黄绿圆点。
 // 4 月 1 日对调两套样式，愚人节彩蛋。
 //
-// 窗口动作都走应用自己的 Rust 命令（见 src-tauri 的 windows/mod.rs 末尾），不走 JS 的
+// 窗口动作都走应用自己的 Rust 命令，见 src-tauri 的 windows/mod.rs 末尾，不走 JS 的
 // `getCurrentWindow()`，省得往 capabilities/default.json 加窗口权限。
 // 唯一的例外是「关闭」——它复用 windowManager 的 quitWindow()，那条链路才会跑
 // 关闭保护（下载中 / 查询中拒关）与几何保存。收起当前页是 closeWindow()，别混。
@@ -88,7 +88,7 @@ const DOUBLE_CLICK_MS = 400;
 function isInteractive(target: EventTarget | null): boolean {
   // 注意用 Element 而非 HTMLElement：按钮内是 SVG 图标，
   // 点击目标是 SVGElement，instanceof HTMLElement 会判定为非交互元素，
-  // 导致 startDragging 吞掉按钮的 click（关闭/最小化按钮失灵的直接原因）
+  // 导致 startDragging 吞掉按钮的 click，这是关闭 / 最小化按钮失灵的直接原因
   return target instanceof Element && target.closest(INTERACTIVE) !== null;
 }
 

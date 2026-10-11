@@ -1,4 +1,4 @@
-//! HMCL 配置（hmclversion.cfg / server.json）DTO
+//! HMCL 配置 DTO，覆盖 hmclversion.cfg 与 server.json
 
 use std::collections::HashMap;
 

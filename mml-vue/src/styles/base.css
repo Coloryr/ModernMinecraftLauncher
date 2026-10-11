@@ -12,7 +12,7 @@ body,
   height: 100%;
 }
 
-/* 无边框窗口自绘轮廓：系统阴影已关（Win10 上阴影伴随客户区黑边），
+/* 无边框窗口自绘轮廓：系统阴影已关，Win10 上阴影伴随客户区黑边，
    用 outline 在内容之上描一圈，不影响布局（border 会把 100vh 内容挤出 2px） */
 #app {
   outline: 1px solid var(--border);
@@ -52,7 +52,7 @@ body {
   transform: translateY(-4px) scaleY(0.94);
 }
 
-/* ---------------- 关闭动画（设置里的动画开关，lib/appearance.ts） ----------------
+/* ---------------- 关闭动画：开关在设置里，见 lib/appearance.ts ----------------
    全局禁用过渡与动画，界面瞬时应答 */
 html.no-anim *,
 html.no-anim *::before,
@@ -61,7 +61,7 @@ html.no-anim *::after {
   animation: none !important;
 }
 
-/* ---------------- 单窗口模式的页面切换动画（App.vue 的 <Transition name="win-page">） ----------------
+/* ---------------- 单窗口模式的页面切换动画：App.vue 的 <Transition name="win-page"> ----------------
    只在这一层做：多窗口模式下每个窗口是独立 webview，窗口组件不会变、自然不触发。
 
    动画**只作用到"标题栏以下的内容区"**（`WindowFrame` 的 `.frame-body` / 主窗口的 `.main`），
@@ -90,7 +90,7 @@ html.no-anim *::after {
   transform: scale(0.99);
 }
 
-/* ---------------- 图片加载失败的兜底（见 lib/imageFallback.ts） ----------------
+/* ---------------- 图片加载失败的兜底：见 lib/imageFallback.ts ----------------
    失败的图会被换成一张灰底图片图标：这里补一层淡底、按 contain 缩放并留出内边距，
    让它在深/浅两套主题、以及各种尺寸（28px 头像到 110px 新闻大图）下都像"占位"而不像破图。
    内边距用百分比：跟着容器宽度走，头像那种小尺寸才不会把图标挤没 */
@@ -100,7 +100,7 @@ img[data-mml-fallback] {
   background: var(--bg-hover);
 }
 
-/* ---------------- 背景图层（App.vue 渲染，lib/appearance.ts 供参） ----------------
+/* ---------------- 背景图层：App.vue 渲染，lib/appearance.ts 供参 ----------------
    z-index: -1 落在所有内容之后、画布底色之前；表面半透明见 themes.css 的 has-bg */
 .app-bg {
   position: fixed;

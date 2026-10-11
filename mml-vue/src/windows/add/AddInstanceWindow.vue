@@ -75,7 +75,7 @@ const BUTTON_KEYS: Record<AddMode, string> = {
 const createLabel = computed(() => {
   if (creating.value) return t("add.creating");
   // 压缩包模式选了整合包类型：这一步实际是"安装整合包"，走的是下载整合包那套安装任务
-  // （见后端 add_import_archive），按钮上直说，别让用户以为只是解开压缩包
+  // 见后端 add_import_archive，按钮上直说，别让用户以为只是解开压缩包
   if (addMode.value === "archive" && isModpackPackType(addPackType.value)) {
     return t("add.installPack");
   }
@@ -130,7 +130,7 @@ function onNameInput(e: Event) {
 }
 
 /**
- * 自动实例名：`游戏版本-加载器-加载器版本`（如 26.2-Fabric-0.19.3）；
+ * 自动实例名：`游戏版本-加载器-加载器版本`，如 26.2-Fabric-0.19.3；
  * 原版只有游戏版本，自定义 / 未拉到加载器版本时省略对应段
  */
 function autoName() {
@@ -168,7 +168,7 @@ function onArchivePick(e: Event) {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
   if (!file) return;
-  applyArchivePath(`C:\\Users\\demo\\Downloads\\${file.name}`);
+  applyArchivePath(`${MOCK_PATH}\\Downloads\\${file.name}`);
 }
 
 /** 应用压缩包路径并生成内容树（默认全部选中、不展开目录） */
@@ -183,7 +183,7 @@ async function applyArchivePath(path: string) {
   // 读条目 + 识别类型都是磁盘活，期间给个滚动进度条并挡住模式切换
   archiveScanning.value = true;
   try {
-    // 读取压缩包真实条目（目录以 / 结尾，buildTree 直接解析）
+    // 读取压缩包真实条目，目录以 / 结尾，buildTree 直接解析
     try {
       const list = await commands.add.listArchive(path);
       if (isLeaving()) return;
@@ -269,7 +269,7 @@ function onFolderPick(e: Event) {
   const file = input.files?.[0];
   if (!file) return;
   const folder = file.webkitRelativePath.split("/")[0];
-  addFolderPath.value = `C:\\Users\\demo\\.minecraft\\versions\\${folder}`;
+  addFolderPath.value = `${MOCK_PATH}\\.minecraft\\versions\\${folder}`;
   // 浏览器回退：用 mock 内容树（默认不勾选、不展开）
   resetFolder(buildTree(MOCK_FOLDER_FILES));
 }
@@ -363,7 +363,7 @@ async function applyDrop(drop: WindowDropParam) {
 }
 
 /**
- * 消费"主窗口拖入的路径"（参数从哪读见 windowManager 的 targetDrop）
+ * 消费"主窗口拖入的路径"，参数从哪读见 windowManager 的 targetDrop
  *
  * - 多窗口：参数挂在 URL 上，会一直留着，靠 `dropApplied` 只认一次；
  *   再拖一次会走 window_reopen_window 重载页面，组件重建、标志自然复位
@@ -398,7 +398,7 @@ watch(
  */
 async function onFilesDropped(payload: FileDropPayload) {
   // 正在创建 / 扫描 / 读压缩包：模式切换本身就禁用着（busy），
-  // 这里也不能把在跑的流程丢在半路（archiveScanning 这类状态是共用的）
+  // 这里也不能把在跑的流程丢在半路，archiveScanning 这类状态是共用的
   if (busy.value) {
     showToast(t("add.dropBusy"));
     return;
@@ -430,14 +430,14 @@ const { fileDragOver } = useFileDrop(onFilesDropped, {
 const folderScanned = computed(() => addMode.value === "folder" && folderFound.value.length > 0);
 
 /**
- * 有在途的耗时操作（创建中 / 扫描目录中 / 读压缩包中）
+ * 有在途的耗时操作：创建中 / 扫描目录中 / 读压缩包中
  *
  * 期间禁用模式切换与创建按钮：切换会把正在跑的流程丢在半路，
  * 创建则还没拿到扫描结果（比如剩下的实例），都不该点得动。
  */
 const busy = computed(() => creating.value || folderScanning.value || archiveScanning.value);
 
-/** 列出目录直接内容为树节点（目录标记 lazy，展开时再加载） */
+/** 列出目录直接内容为树节点；目录标记 lazy，展开时再加载 */
 async function listDirNodes(dirPath: string, rel: string): Promise<FileNode[]> {
   const entries = await commands.add.listDir(dirPath);
   return entries.map((en) => {
@@ -483,6 +483,9 @@ function folderPathOf(rel: string): string {
 const addUrl = ref("");
 
 // ================= mock 文件列表（仅浏览器预览用） =================
+
+// 浏览器预览下没有真实路径，用占位前缀拼一个像 Windows 的路径给视图渲染
+const MOCK_PATH = "C:\\Users\\User";
 
 const MOCK_ARCHIVE_FILES = [
   "manifest.json",
@@ -531,7 +534,7 @@ watch(addArchivePath, () => clearFieldError("archive"));
 /**
  * 路径一变就把上一次的扫描结果清掉
  *
- * **不自动扫描**：选目录走"确认框 → 允许了再扫"（pickFolder → scanAsk → confirmScan），
+ * **不自动扫描**：选目录走"确认框 → 允许了再扫"，即 pickFolder → scanAsk → confirmScan；
  * 手输 / 粘贴路径用路径框右边的「扫描目录」按钮触发。扫描要读磁盘，不该在用户
  * 还在敲路径的时候就自己跑起来。
  */
@@ -557,7 +560,7 @@ watch(addErrorField, async (field) => {
  *
  * 单窗口模式下 App.vue 把窗口组件 KeepAlive 缓存，切走只是藏起来 —— 安装却在后台继续跑，
  * 异步回来时（装完 / 后端要重名答复）必须先问一句"这个上下文还在不在"：
- * 弹窗由 BaseModal 自己收起来（见 lib/pageActive.ts），而**关窗动作**得在这里挡住
+ * 弹窗由 BaseModal 自己收起来，见 lib/pageActive.ts，而**关窗动作**得在这里挡住
  * —— 页面已切走时 `emit('close')` 会被 App.vue 当成"关掉当前窗口"，当前页是主页面，
  * 那就是退出启动器。
  */
@@ -631,7 +634,7 @@ async function create() {
       uuid = await api.addImportUrl(addUrl.value.trim(), name, groupId);
     }
     if (isLeaving()) return;
-    // 通知主窗口选中新实例（后端已发 instance-change 刷新列表），然后询问是否继续添加
+    // 通知主窗口选中新实例，后端已发 instance-change 刷新列表，然后询问是否继续添加
     writeRaw(KEYS.addedInstance, uuid);
     emitChange(KEYS.addedInstance, uuid);
     addedName.value = doneName;
@@ -646,7 +649,7 @@ async function create() {
 
 // ================= 整合包安装进度 =================
 
-/** 安装进度（add-pack-progress 事件驱动，null = 未在安装） */
+/** 安装进度，由 add-pack-progress 事件驱动；null 表示未在安装 */
 const packProgress = ref<PackProgressDto | null>(null);
 
 // ================= 创建成功后的继续添加询问 =================
@@ -656,7 +659,7 @@ const addedName = ref("");
 /** 创建成功后弹出「是否继续添加」询问 */
 const askContinue = ref(false);
 
-/** 继续添加：清空一次性表单（保留模式 / 版本列表等数据源），回到干净表单 */
+/** 继续添加：清空一次性表单，保留模式 / 版本列表等数据源，回到干净表单 */
 function continueAdding() {
   askContinue.value = false;
   addError.value = "";
@@ -674,13 +677,13 @@ function continueAdding() {
   addUrl.value = "";
 }
 
-/** 不继续：丢掉本窗口的查询状态（加载器支持列表 / 加载器版本）并直接关窗 */
+/** 不继续：丢掉本窗口的查询状态，即加载器支持列表与加载器版本，并直接关窗 */
 async function finishAdding() {
   askContinue.value = false;
-  // 页面已经切走：没有"本窗口"可关（见 pageActive 的说明），本次添加到此为止即可
+  // 页面已经切走：没有"本窗口"可关，见 pageActive 的说明，本次添加到此为止即可
   if (!pageActive.value) return;
   leaving = true;
-  // 查询在途时后端有关闭保护（CloseRequested 被拒），先解除再关，否则窗关不掉
+  // 查询在途时后端有关闭保护，CloseRequested 会被拒，先解除再关，否则窗关不掉
   dropPending();
   await api.setCloseGuard(false).catch(() => { });
   emit("close");
@@ -688,7 +691,7 @@ async function finishAdding() {
 
 // ================= 实例重名确认 =================
 
-/** 当前弹出的重名确认（kind：overwrite 覆盖 / rename 自动改名；null = 无） */
+/** 当前弹出的重名确认；kind = overwrite 覆盖 / rename 自动改名，null 表示没有 */
 const nameConflict = ref<{ id: number; kind: string; name: string } | null>(null);
 
 /** 答复后端创建流程；关闭弹窗视为拒绝，避免创建流程挂起 */
@@ -738,8 +741,8 @@ function unbindKeys() {
 // 用户在别的页面（比如下载整合包）关窗口时，不该因为这里还有个查询在跑就被拦下、
 // 弹一句"正在获取数据"。回到本页时下面的 watch 会按当时状态重新判定。
 //
-// 模型（取消令牌 / 关闭保护 / 重名应答通道）也跟着页面的启停走：
-// 挂载时建、切走时释放，别让它常驻占内存（见 api.ensureWindowModel / dropWindowModel）。
+// 模型也跟着页面的启停走，包括取消令牌 / 关闭保护 / 重名应答通道：
+// 挂载时建、切走时释放，别让它常驻占内存，见 api.ensureWindowModel / dropWindowModel。
 // **创建任务在途时不释放** —— 取消令牌就在模型里，丢了就没法取消，回到本页也会拿到一份空模型。
 onActivated(() => {
   bindKeys();
@@ -772,7 +775,7 @@ onMounted(async () => {
       if (!pageActive.value) showToast(t("add.conflictAway"));
     }),
   );
-  // 整合包安装进度（压缩包 / 网址 / 在线整合包安装共用）
+  // 整合包安装进度，压缩包 / 网址 / 在线整合包安装共用
   track(
     onAddPackProgress((e) => {
       packProgress.value = e;
@@ -799,7 +802,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   unbindKeys();
-  // 直接点标题栏关窗（不走 finishAdding）时也要停止轮询、丢弃在途结果
+  // 直接点标题栏关窗、不走 finishAdding 时也要停止轮询、丢弃在途结果
   leaving = true;
 });
 </script>
@@ -942,7 +945,7 @@ onUnmounted(() => {
   min-height: 180px;
 }
 
-/* 确认弹窗正文（如"是否允许读取目录 xxx"）：路径可能很长，允许换行 */
+/* 确认弹窗正文如"是否允许读取目录 xxx"：路径可能很长，允许换行 */
 .confirm-text {
   margin: 0;
   font-size: 13px;

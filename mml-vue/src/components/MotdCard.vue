@@ -33,8 +33,10 @@ const props = withDefaults(
   { compact: false, refreshable: false, loading: false },
 );
 
-/** 点右上角刷新按钮 */
-defineEmits<{ (e: "refresh"): void }>();
+defineEmits<{
+  /** 点右上角刷新按钮 */
+  (e: "refresh"): void;
+}>();
 
 /** 在线时的 MOTD 分段；离线 / 查询中时为空数组，两种都走下面的兜底文案 */
 const segments = computed(() => (props.motd?.state === "ok" ? props.motd.segments : []));

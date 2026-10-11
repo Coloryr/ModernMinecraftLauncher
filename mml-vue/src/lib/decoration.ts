@@ -3,7 +3,7 @@
 // 背景（为什么需要这个文件）
 // ------------------------------------------------------------------
 // Windows 11 的「窗口位置选择」贴靠面板，靠的是系统在窗口上问一句话：
-// "鼠标底下是不是最大化按钮？"（`WM_NCHITTEST` → `HTMAXBUTTON`）。
+// "鼠标底下是不是最大化按钮？" 靠 `WM_NCHITTEST` → `HTMAXBUTTON` 回答。
 // 用自绘标题栏的应用必须自己回答这个问题，否则悬停最大化按钮不会弹面板。
 //
 // 插件的做法是：在最大化按钮的位置放一个**原生子窗口**，由它把该消息答成
@@ -14,18 +14,18 @@
 //   - 用它按钮 → 就得接受它的外观。
 //
 // 解法：给插件的本地 vendor 版加了一个「外部控件提供者」接口
-// （见 mml-gui/vendor/patches/external-controls.patch 里的 `M²L 本地修改` 注释）。
+// 见 mml-gui/vendor/patches/external-controls.patch 里的 `M²L 本地修改` 注释。
 // 注册之后，插件不再要求自己那套按钮存在，直接用**我们给出的矩形**摆那个
 // 原生命中区。外观完全由我们掌控。
 //
 // 坐标口径
 // ------------------------------------------------------------------
-// 插件内部吃的是**物理像素**（它自己做 CSS 像素 × devicePixelRatio），
+// 插件内部吃的是**物理像素**，它自己做 CSS 像素 × devicePixelRatio，
 // 所以这里也按物理像素上报，避免双重换算。
 
 import { ref } from "vue";
 
-/** 插件暴露的全局对象（与插件 js/titlebar.js 的 GLOBAL_NAME 一致） */
+/** 插件暴露的全局对象，与插件 js/titlebar.js 的 GLOBAL_NAME 一致 */
 const DECORATION_GLOBAL = "__TAURI_PLUGIN_DECORATION__";
 
 /**
@@ -37,7 +37,7 @@ const DECORATION_GLOBAL = "__TAURI_PLUGIN_DECORATION__";
  */
 export const pluginDecorated = ref(false);
 
-/** 贴靠热区矩形（物理像素，与插件内部口径一致） */
+/** 贴靠热区矩形，单位物理像素，与插件内部口径一致 */
 interface SnapRect {
   x: number;
   y: number;
@@ -79,7 +79,7 @@ function decorationRuntime(): DecorationRuntime | null {
 export function registerSnapTarget(root: HTMLElement | null): () => void {
   const runtime = decorationRuntime();
   if (!runtime?.setExternalControlProvider) {
-    // 插件没起来（浏览器预览 / 插件版本没这个接口）：什么都不做
+    // 插件没起来时什么都不做：浏览器预览，或插件版本没这个接口
     return () => { };
   }
 
@@ -114,13 +114,13 @@ export function registerSnapTarget(root: HTMLElement | null): () => void {
   };
 }
 
-/** 找当前窗口右上角的最大化按钮（windows 样式才有；macos 是左端原生圆点） */
+/** 找当前窗口右上角的最大化按钮；windows 样式才有，macos 是左端原生圆点 */
 function findMaximizeBtn(root: HTMLElement): HTMLElement | null {
   const btn = root.querySelector<HTMLElement>(".window-controls.windows .wc-btn.maximize");
   return btn?.isConnected ? btn : null;
 }
 
-/** 贴靠热区矩形（物理像素，与插件内部口径一致） */
+/** 贴靠热区矩形，单位物理像素，与插件内部口径一致 */
 function measure(root: HTMLElement): SnapRect | null {
   if (!root.isConnected) return null;
 
@@ -145,7 +145,7 @@ function measure(root: HTMLElement): SnapRect | null {
   // 两个边界都是踩过坑换来的（都是"扩出去"导致的）：
   //
   // 1. 横向不能越过相邻按钮。热区会吃掉落在里面的鼠标消息、一律回答
-  //    "这是最大化按钮"（WM_NCHITTEST → HTMAXBUTTON）。曾把它扩到标题栏右缘
+  //    "这是最大化按钮"，即 WM_NCHITTEST → HTMAXBUTTON。曾把它扩到标题栏右缘
   //    （含关闭键那段），结果关闭键点不动、鼠标放在关闭键上却高亮最大化按钮。
   //
   // 2. 纵向也不能比按钮高。曾做成"整条标题栏高、贴顶"（y=0 h=64），
@@ -178,7 +178,7 @@ function measure(root: HTMLElement): SnapRect | null {
  * `kind: "disabled"`，那次投递会被当作"没有贴靠热区"而生效 —— 之后再补报
  * 也改不回那次已经完成的激活。实测原生 frame 没被摘掉，系统标题栏与自绘按钮并存。
  *
- * 主窗口启动时先显示启动画面，标题栏（`.window-controls` 在 MainTopbar 里）
+ * 主窗口启动时先显示启动画面，标题栏的 `.window-controls` 在 MainTopbar 里，
  * 要等核心 load 完成、切到主界面才渲染，所以必须等。
  *
  * - `root`: 在这些元素范围内查

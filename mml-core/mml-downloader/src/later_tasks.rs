@@ -15,13 +15,11 @@ use zip::ZipArchive;
 
 /// 解压 Minecraft native 库
 ///
-/// 从下载的 JAR 包中提取 `META-INF` 目录下的原生库文件。
-/// 这些文件是 LWJGL 等底层库在各平台上的本地实现（.dll / .so / .dylib）。
-///
-/// # 参数
-///
 /// - `native`: 解压目标目录
-/// - `read`: 可读取 + 可定位的输入流（通常是下载的 jar 文件）
+/// - `read`: 可读取 + 可定位的输入流，通常是下载的 jar 文件
+///
+/// 从下载的 JAR 包中提取 `META-INF` 目录下的原生库文件。
+/// 这些文件是 LWJGL 等底层库在各平台上的本地实现，如 .dll / .so / .dylib。
 pub fn unpack_native<R: Read + Seek>(native: &Path, read: R) -> CoreResult<()> {
     let mut archive = ZipArchive::new(read).map_err(|err| {
         ErrorType::ArchiveOpenError(FileSystemErrorData {
@@ -41,7 +39,7 @@ pub fn unpack_native<R: Read + Seek>(native: &Path, read: R) -> CoreResult<()> {
             continue;
         }
 
-        // 仅提取 META-INF 目录下的文件（native 库的存放位置）
+        // 仅提取 META-INF 目录下的文件，那是 native 库的存放位置
         if let Some(name) = file.enclosed_name()
             && name.starts_with("META-INF")
         {
@@ -71,23 +69,27 @@ mod tests {
     use super::*;
 
     /// 在内存中构造一个包含 native 库结构的 zip 包
+    ///
+    /// # 返回值
+    ///
+    /// 返回完整 zip 字节，含 META-INF 下的 native 库、子目录库与普通 class 文件
     fn make_test_zip() -> Vec<u8> {
         let buf = Cursor::new(Vec::new());
         let mut writer = ZipWriter::new(buf);
         let options = SimpleFileOptions::default();
 
-        // META-INF 下的 native 库（应被提取）
+        // META-INF 下的 native 库，应被提取
         writer.start_file("META-INF/lwjgl.dll", options).unwrap();
         writer.write_all(b"native-data").unwrap();
 
-        // META-INF 子目录中的 native 库（应被提取并展平到目标目录）
+        // META-INF 子目录中的 native 库，应被提取并展平到目标目录
         writer.add_directory("META-INF/sub", options).unwrap();
         writer
             .start_file("META-INF/sub/liblwjgl.so", options)
             .unwrap();
         writer.write_all(b"so-data").unwrap();
 
-        // 普通 class 文件（不应被提取）
+        // 普通 class 文件，不应被提取
         writer
             .start_file("net/minecraft/Main.class", options)
             .unwrap();
@@ -106,7 +108,7 @@ mod tests {
 
         // META-INF 根下的文件被提取
         assert_eq!(fs::read(native.join("lwjgl.dll")).unwrap(), b"native-data");
-        // 子目录文件被展平提取（只保留文件名）
+        // 子目录文件被展平提取，只保留文件名
         assert_eq!(fs::read(native.join("liblwjgl.so")).unwrap(), b"so-data");
         // 非 META-INF 文件不提取
         assert!(!native.join("Main.class").exists());
@@ -123,7 +125,7 @@ mod tests {
         assert!(result.is_err(), "非法 zip 应返回错误");
     }
 
-    /// 空 zip（无任何条目）应成功返回
+    /// 空 zip 无任何条目时应成功返回
     #[test]
     fn unpack_native_empty_zip_ok() {
         let dir = crate::test_util::make_temp_dir("native-empty");

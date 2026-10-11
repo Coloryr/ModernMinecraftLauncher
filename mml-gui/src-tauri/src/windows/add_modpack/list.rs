@@ -24,7 +24,7 @@ use super::{CURSEFOGRE_FILE, CURSEFOGRE_INFO, MODRINTH_FILE, MODRINTH_INFO, regi
 ///
 /// - `window`: 调用方窗口，用于按窗口标签登记本发搜索
 /// - `source`: 下载源标识，取值 `curseforge` / `modrinth`
-/// - `page`: 页码，从 1 起
+/// - `page`: 页码，从 0 起
 /// - `sort`: 排序方式 ID，取值由各下载源自己的排序枚举定
 /// - `category`: 分类 ID，缺省为不限
 /// - `filter`: 搜索词，缺省为不筛
@@ -58,7 +58,7 @@ pub async fn add_modpack_list(
 /// 顺手把项目元数据写进 `CURSEFOGRE_INFO` / `MODRINTH_INFO`，详情与安装都从缓存取。
 ///
 /// - `source`: 下载源标识，取值 `curseforge` / `modrinth`
-/// - `page`: 页码，从 1 起
+/// - `page`: 页码，从 0 起
 /// - `sort`: 排序方式 ID，取值由各下载源自己的排序枚举定
 /// - `category`: 分类 ID，缺省为不限
 /// - `filter`: 搜索词，缺省为不筛
@@ -238,7 +238,7 @@ pub async fn add_modpack_detail(source: String, pid: String) -> Result<ProjectDe
 ///
 /// - `source`: 下载源标识，取值 `curseforge` / `modrinth`
 /// - `pid`: 项目 ID
-/// - `page`: 页码，从 1 起；只有 CurseForge 用得上
+/// - `page`: 页码，从 0 起；只有 CurseForge 用得上
 /// - `version`: 游戏版本过滤，缺省为不限
 ///
 /// # 返回值

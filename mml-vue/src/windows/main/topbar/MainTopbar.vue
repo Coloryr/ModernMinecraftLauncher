@@ -22,16 +22,13 @@ defineProps<{
   accounts: AccountStoreDto[];
 }>();
 
-/**
- * 顶栏动作，一律抛给主窗口执行
- *
- * - `toggle-news`: 主页按钮，切换启动器主页
- * - `feature`: 功能入口，带入口 id
- * - `update:account`: 账户选择器换人
- */
+/** 顶栏动作，一律抛给主窗口执行 */
 const emit = defineEmits<{
+  /** 切换启动器主页 */
   (e: "toggle-news"): void;
+  /** 打开某个功能入口 */
   (e: "feature", id: FeatureId): void;
+  /** 账户选择器换人 */
   (e: "update:account", acc: AccountStoreDto): void;
 }>();
 </script>

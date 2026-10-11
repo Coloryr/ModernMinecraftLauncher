@@ -53,6 +53,8 @@ fn init_once() {
     });
 }
 
+/// 验证服务器回了响应头却不发 body 时，卡在读 body 阶段的请求仍能被整体中断，
+/// 并以中断错误返回，且中断到返回不超过 500ms
 #[test]
 fn abort_while_reading_body() {
     init_once();

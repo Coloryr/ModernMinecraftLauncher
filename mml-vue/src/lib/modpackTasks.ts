@@ -1,8 +1,8 @@
-// 整合包安装任务状态（下载整合包窗口 / 主窗口共用）
+// 整合包安装任务状态，下载整合包窗口与主窗口共用
 //
 // 任务在后端全局表维护，与窗口生命周期解耦；本模块只负责把
 // add-modpack-status 事件 / 初始查询落到本地 ref，并处理终态副作用：
-// - 安装成功 → 写本地存储通知主窗口切换选中实例（见 MainWindow 的存储监听）
+// - 安装成功 → 写本地存储通知主窗口切换选中实例，见 MainWindow 的存储监听
 // - 完成 / 失败 → toast；只由当前"负责显示"的窗口弹
 //
 // "谁负责"两种窗口模式下不一样，见 shouldToast：
@@ -36,7 +36,7 @@ function shouldToast(own: boolean, windowOpen: boolean): boolean {
   if (own) return multiWindow.value || pageActive;
   // 多窗口模式：整合包窗口开着时由它弹，主窗口不弹
   if (multiWindow.value) return !windowOpen;
-  // 单窗口模式：那一页在前台时由它弹；否则兜底只由根组件弹（见 App.vue 的 fallbackToast）
+  // 单窗口模式：那一页在前台时由它弹；否则兜底只由根组件弹，见 App.vue 的 fallbackToast
   return !pageActive && fallbackToast;
 }
 
@@ -96,7 +96,7 @@ export function useModpackStatus(
         if (task.instanceUuid && !(multiWindow.value && e.windowOpen)) {
           onAddedInstance?.(task.instanceUuid);
         }
-        // 重复的那一条由 showToast 自己兜住（见 lib/toast.ts 的 DEDUP_MS）：
+        // 重复的那一条由 showToast 自己兜住，见 lib/toast.ts 的 DEDUP_MS：
         // 这里有多份订阅，各自判定稍有偏差就会弹两条。去重键带任务 uuid，
         // 同时装完两个同名整合包是两件事，不会被误吞
         if (shouldToast(own, e.windowOpen)) {

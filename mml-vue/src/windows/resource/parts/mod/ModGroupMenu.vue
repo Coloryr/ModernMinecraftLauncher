@@ -20,8 +20,9 @@ export type GroupMenuAction =
   | "delete-mods";
 
 const props = defineProps<{
-  /** 点击处（视口坐标） */
+  /** 点击处的横坐标，视口坐标 */
   x: number;
+  /** 点击处的纵坐标，视口坐标 */
   y: number;
   /** 分组名（确认弹窗里显示） */
   label: string;

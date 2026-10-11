@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 添加实例 · 模式二：导入压缩包（路径框 + 文件树 + 压缩包类型）
+// 添加实例 · 模式二：导入压缩包，路径框 + 文件树 + 压缩包类型
 import { nextTick, ref, watch } from "vue";
 import { t } from "../../../lib/i18n";
 import BaseButton from "../../../components/ui/BaseButton.vue";
@@ -45,7 +45,7 @@ const emit = defineEmits<{
 
 const pathInput = ref<HTMLInputElement | null>(null);
 
-// 必填校验失败：聚焦路径框（高亮见模板的 is-invalid）
+// 必填校验失败：聚焦路径框，高亮见模板的 is-invalid
 watch(
   () => props.invalid,
   async (invalid) => {

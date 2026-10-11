@@ -27,7 +27,6 @@
 //! | [`liteloader_api`] | LiteLoader API |
 //! | [`openfrp_api`] / [`sakurafrp_api`] | 联机平台 OpenFrp / SakuraFrp 的节点列表 |
 //! | [`chunkbase_api`] | Chunkbase 相关接口 |
-//! | [`coloryr_api`] | ColorYr 自有服务接口 |
 //! | [`urls`] | URL 常量定义 |
 //! | [`url_helper`] | URL 构建辅助函数 |
 //! | [`maven_utils`] | Maven 坐标工具 |
@@ -49,7 +48,6 @@ use tokio::sync::Mutex;
 pub mod adoptium_api;
 pub mod authlib_api;
 pub mod chunkbase_api;
-pub mod coloryr_api;
 pub mod curseforge_api;
 pub mod fabric_api;
 pub mod foojay_api;
@@ -91,7 +89,7 @@ fn map_err(error: reqwest::Error) -> ErrorType {
 
 /// 请求速率限制器
 ///
-/// 基于滑动时间窗口实现，限制每分钟的最大请求数。
+/// 按固定时间窗口实现，限制每分钟的最大请求数。
 /// 当达到上限后，后续请求将等待下一个时间窗口。
 struct RateLimiter {
     /// 每分钟允许的最大请求数
@@ -981,7 +979,7 @@ pub fn init() {
 /// 按当前配置**重建**两个 HTTP 客户端，改代理设置后调用
 ///
 /// 客户端存在 `RwLock<Arc<Client>>` 里，保存网络设置后调本函数即可立刻换上新配置，
-/// 不必重启启动器。已经取走的 `Arc` 不受影响，正在进行的下载会用旧客户端跑完，
+/// 不必重启启动器。已经取走的 `Arc` 不受影响，仍指向旧客户端，但在途请求会先被中断，
 /// 之后新取的请求一律用新客户端。
 ///
 /// [`init`] 尚未调用时什么都不做：配置还没读，此时也没有请求在跑。

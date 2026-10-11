@@ -46,22 +46,23 @@ const canMoveGroup = computed(() => {
 /** 多选"修改分组"：表里只有默认分组一个组时同样无处可去 */
 const canMultiMove = computed(() => props.groups.length > 1);
 
-/**
- * 菜单动作，一律抛给父组件执行
- *
- * - `select-all` / `launch-group` / `delete-group`: 分组菜单，带该分组 uuid
- * - `move-group`: 分组菜单的"转移分组"
- * - `inst-action`: 实例菜单，带动作 id
- * - `multi-move` / `multi-delete` / `multi-launch`: 多选菜单
- */
+/** 菜单动作，一律抛给父组件执行 */
 const emit = defineEmits<{
+  /** 分组菜单"全选"：选中该分组的全部实例 */
   (e: "select-all", groupId?: string): void;
+  /** 分组菜单"启动全部"：启动该分组的全部实例 */
   (e: "launch-group", groupId?: string): void;
+  /** 分组菜单"转移分组" */
   (e: "move-group"): void;
+  /** 分组菜单"删除分组" */
   (e: "delete-group", groupId?: string): void;
+  /** 实例菜单的动作 */
   (e: "inst-action", id: InstMenuAction): void;
+  /** 多选菜单"修改分组" */
   (e: "multi-move"): void;
+  /** 多选菜单"删除" */
   (e: "multi-delete"): void;
+  /** 多选菜单"启动全部" */
   (e: "multi-launch"): void;
 }>();
 

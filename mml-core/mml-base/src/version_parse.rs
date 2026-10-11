@@ -364,8 +364,6 @@ pub fn is_game_version_greater(v1: &str, v2: &str) -> bool {
 
 /// 判断两个版本号是否相等
 ///
-/// 当前实现误用了 `p1 > p2`，实际行为与 [`is_game_version_greater`] 完全一致
-///
 /// - `v1`: 版本号字符串
 /// - `v2`: 版本号字符串
 ///
@@ -523,16 +521,17 @@ mod tests {
         assert!(!is_game_version_greater("1.20", "abc"));
     }
 
-    /// is_game_version_equal 的现状行为记录
-    ///
-    /// 当前实现复制自 is_game_version_greater 并返回 `p1 > p2`，并未做相等判断；
-    /// 修复后应改为相同版本返回真、不同版本返回假
+    /// 相同版本判定：解析结果相等为真，不等或任一无法解析为假
     #[test]
-    fn test_is_game_version_equal_current_behaviour() {
-        // 现状：行为与 is_game_version_greater 完全一致，即 p1 > p2
-        assert!(!is_game_version_equal("1.20", "1.20"));
+    fn test_is_game_version_equal() {
+        assert!(is_game_version_equal("1.20", "1.20"));
+        assert!(is_game_version_equal("1.20.4", "1.20.4"));
+        assert!(is_game_version_equal("a1.0.16", "a1.0.16"));
         assert!(!is_game_version_equal("1.20", "1.21"));
-        assert!(is_game_version_equal("1.21", "1.20"));
+        assert!(!is_game_version_equal("1.21", "1.20"));
+        // 解析失败时返回 false
+        assert!(!is_game_version_equal("abc", "1.20"));
+        assert!(!is_game_version_equal("1.20", "abc"));
     }
 
     /// is_game_version_greater_equal 与版本门槛判断

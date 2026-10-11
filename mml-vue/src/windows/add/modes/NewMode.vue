@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 添加实例 · 模式一：从头新建，含版本类型 / 版本 / 加载器 / 加载器版本 / 自定义加载器路径
-// 选项数据（版本类型 / 加载器 / 加载器版本）全部来自 mml-core 的独立 ID，显示名走 i18n
+// 选项数据全部来自 mml-core 的独立 ID，显示名走 i18n；含版本类型 / 加载器 / 加载器版本
 // 版本类型为多选：下拉展开后是复选项；选中多个类型时，右侧版本列表按类型分组
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 import { t } from "../../../lib/i18n";
@@ -11,7 +11,7 @@ import type { VersionInfoDto } from "../../../lib/bindings";
 const props = defineProps<{
   /** 可选版本列表，父组件已按版本类型过滤 */
   versions: VersionInfoDto[];
-  /** 版本列表是否已加载（区分"加载中"与"该类型下无版本"） */
+  /** 版本列表是否已加载，用来区分"加载中"与"该类型下无版本" */
   versionsLoaded: boolean;
   /** 版本列表刷新中 */
   verLoading: boolean;
@@ -33,7 +33,7 @@ const props = defineProps<{
   queryTotal: number;
   /** 已选加载器版本，原版 / 自定义为空 */
   loaderVersion: string;
-  /** 可用加载器版本列表（由父组件按加载器 + 游戏版本拉取） */
+  /** 可用加载器版本列表，由父组件按加载器 + 游戏版本拉取 */
   loaderVersions: string[];
   /** 加载器版本列表拉取中 */
   loaderVerLoading: boolean;
@@ -67,7 +67,7 @@ const emit = defineEmits<{
 const loaderPathInput = ref<HTMLInputElement | null>(null);
 const versionSelect = ref<HTMLSelectElement | null>(null);
 
-// 必填校验失败：把焦点落到版本下拉上（高亮见模板的 is-invalid）
+// 必填校验失败：把焦点落到版本下拉上，高亮见模板的 is-invalid
 watch(
   () => props.invalidVersion,
   async (invalid) => {

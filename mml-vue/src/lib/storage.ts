@@ -5,16 +5,16 @@
 //   全靠约定，同一份数据在两处口径不一致就会出现"设置里改了、主界面没变"；
 // - 键名散在十几个文件里，改一处漏一处。guiConfig.ts 的浏览器回退分支就是手工重列了
 //   一整份键，漏一个就静默丢设置；
-// - 将来要换掉 localStorage（换 IndexedDB / 走后端文件），只有这一个文件要改。
+// - 将来要换掉 localStorage，比如换 IndexedDB 或走后端文件，只有这一个文件要改。
 //
 // 键名一律 `mml.` 前缀 + 小驼峰，集中登记在 [`KEYS`]；**不要在别处再写字符串字面量**。
 //
 // 跨窗口同步：原来靠 `window.addEventListener("storage")`——那是 localStorage 的事件，
 // **只有"另一个文档"改了值才触发**，同一个文档里写不触发。换成后端文件后没有这个事件，
-// 所以这里自己派发同名事件（见 [`emitChange`]），行为与原来一致：
+// 所以这里自己派发同名事件，见 [`emitChange`]，行为与原来一致：
 // 同源（同一窗口）不触发，其它窗口都触发。
 //
-// WebView2 的用户数据目录已经搬到 `<cache>/webview`（见 mml-gui 的 windows/mod.rs），
+// WebView2 的用户数据目录已经搬到 `<cache>/webview`，见 mml-gui 的 windows/mod.rs，
 // 所以 localStorage 本身也跟着运行目录走了 —— 这一层不再需要额外落盘一份镜像。
 import { isTauri } from "./util";
 
@@ -71,10 +71,10 @@ export const KEYS = {
   /** 3D 头像旋转 Y */
   headY: "mml.headY",
 
-  // ---- 客户端设置（settings 窗口改，主界面读） ----
+  // ---- 客户端设置：settings 窗口改，主界面读 ----
   /** MOTD 卡片开关（"0" = 关） */
   motdCard: "mml.client.motdCard",
-  /** MOTD 刷新间隔（秒） */
+  /** MOTD 刷新间隔，单位秒 */
   motdInterval: "mml.client.motdInterval",
   /** 登录方式锁定总开关 */
   loginLockOn: "mml.client.loginLockOn",
@@ -102,19 +102,19 @@ export const KEYS = {
    * 方块窗口：分类 / 搜索词 / 图标尺寸档
    *
    * **资源窗口**的分类顺序 / 上次类别 / 模组展示方式**不在这里** —— 那三项跟着实例走，
-   * 存在实例自己的 `gui_setting.json`（见 `windows/resource/composables/useResourceView`）。
+   * 存在实例自己的 `gui_setting.json`，见 `windows/resource/composables/useResourceView`。
    */
   blockView: "mml.blockView",
 
   // ---- 跨窗口一次性通知 ----
-  /** 新增实例 uuid：添加实例 / 整合包窗口写给主窗口（见 AddInstanceWindow） */
+  /** 新增实例 uuid：添加实例 / 整合包窗口写给主窗口，见 AddInstanceWindow */
   addedInstance: "mml.addedInstance",
 } as const;
 
-/** 键名类型（只允许 [`KEYS`] 里登记过的键） */
+/** 键名类型，只允许 [`KEYS`] 里登记过的键 */
 export type StorageKey = (typeof KEYS)[keyof typeof KEYS];
 
-/** 存储不可用时读返回 null、写静默失败：隐私模式、配额写满都走这条，调用方不必 try/catch */
+/** 取 localStorage；隐私模式等拿不到时返回 null，调用方据此把读当空、把写当无事发生 */
 function store(): Storage | null {
   try {
     return window.localStorage;
@@ -330,7 +330,7 @@ export function onStorageChange(
   };
 }
 
-/** 自派发的变更事件名（与原生 `storage` 分开，避免和真事件混淆） */
+/** 自派发的变更事件名，与原生 `storage` 分开，避免和真事件混淆 */
 const CHANGE_EVENT = "mml:storage";
 
 /**

@@ -1,13 +1,13 @@
 //! 游戏实例管理模块
 //!
-//! 本 crate 是启动器的游戏实例层，负责实例的创建 / 管理 / 启动，以及
-//! 实例内各类资源（模组、资源包、光影包、存档、截图、结构文件等）的读写。
+//! 本 crate 是启动器的游戏实例层，负责实例的创建、管理与启动，以及
+//! 实例内各类资源，包括模组、资源包、光影包、存档、截图、结构文件等的读写。
 //!
 //! # 核心概念
 //!
-//! - **实例** — 一个可启动的 Minecraft 游戏环境（版本 + 加载器 + 独立游戏目录），
+//! - **实例** — 一个可启动的 Minecraft 游戏环境，由版本、加载器与独立游戏目录组成，
 //!   对应 [`launcher::instance_setting_obj::InstanceSettingObj`]，
-//!   全局以 [`GameInstance`]（`Arc<RwLock<...>>`）形式共享
+//!   全局以 [`GameInstance`] 形式共享，即 `Arc<RwLock<...>>`
 //! - **分组** — 实例的分组展示，组名到实例 UUID 的映射保存在内存
 //! - **运行句柄** — 启动后的实例由 [`game_launch::InstanceHandle`] 跟踪，
 //!   后台线程每秒轮询退出状态并触发 [`InstanceExit`] 事件
@@ -18,35 +18,35 @@
 //!
 //! | 模块 | 用途 |
 //! |------|------|
-//! | [`add_game`] | 添加游戏实例（导入版本 / 文件夹 / 压缩包） |
-//! | [`class_scan`] | 模组 Side 扫描（1.12.2 时代 mod 的 client/server 判定） |
+//! | [`add_game`] | 添加游戏实例：导入版本、文件夹或压缩包 |
+//! | [`class_scan`] | 模组 Side 扫描，即 1.12.2 时代 mod 的 client/server 判定 |
 //! | [`curseforge`] | CurseForge 整合包下载安装 |
-//! | [`data_res`] | 实例内资源下载位置与类型切换（资源包 / 光影包 / 存档 / 数据包） |
+//! | [`data_res`] | 实例内资源下载位置与类型切换，覆盖资源包、光影包、存档、数据包 |
 //! | [`game_arg`] | 启动参数生成 |
 //! | [`game_check`] | 实例文件校验 |
 //! | [`game_count`] | 启动与游戏时长统计 |
 //! | [`game_export`] | 实例导出 |
-//! | [`game_group`] | 分组表（独立于实例配置的 `group_save.json`） |
+//! | [`game_group`] | 分组表，独立于实例配置的 `group_save.json` |
 //! | [`game_lan`] | 局域网联机 |
 //! | [`game_launch`] | 游戏实例启动 |
 //! | [`game_libraries`] | 实例运行库处理 |
-//! | [`game_log`] | 实例日志（运行日志与过往日志） |
+//! | [`game_log`] | 实例日志，含运行日志与过往日志 |
 //! | [`game_mods`] | 实例模组管理 |
 //! | [`game_options`] | options.txt 配置读写 |
 //! | [`game_resourcepacks`] | 实例资源包管理 |
-//! | [`game_saves`] | 实例存档管理（含存档内数据包） |
+//! | [`game_saves`] | 实例存档管理，含存档内数据包 |
 //! | [`game_schematics`] | 结构文件读取 |
 //! | [`game_screenshots`] | 实例截图管理 |
 //! | [`game_server`] | 实例服务器管理 |
 //! | [`game_shaderpacks`] | 实例光影包管理 |
-//! | [`gui_hook`] | GUI 回调钩子（启动 / 安装进度等界面交互） |
+//! | [`gui_hook`] | GUI 回调钩子，用于启动与安装进度等界面交互 |
 //! | [`launcher`] | 实例设置与运行配置 |
-//! | [`launcher_path`] | 各类目录路径管理（版本 / 库 / 资源 / 实例） |
-//! | [`loader`] | 加载器安装（Forge / Fabric / Quilt / OptiFine / LiteLoader / 自定义） |
-//! | [`modpack`] | 整合包安装框架（Modrinth / CurseForge worker） |
+//! | [`launcher_path`] | 各类目录路径管理，覆盖版本、库、资源、实例 |
+//! | [`loader`] | 加载器安装，覆盖 Forge、Fabric、Quilt、OptiFine、LiteLoader、自定义 |
+//! | [`modpack`] | 整合包安装框架，含 Modrinth 与 CurseForge worker |
 //! | [`modrinth`] | Modrinth 整合包下载安装 |
-//! | [`mojang`] | Mojang 版本数据处理（版本清单 / 下载项） |
-//! | [`other_launcher`] | 其他启动器实例导入（HMCL / PCL / 官方 / MMC） |
+//! | [`mojang`] | Mojang 版本数据处理，含版本清单与下载项 |
+//! | [`other_launcher`] | 其他启动器实例导入，覆盖 HMCL、PCL、官方、MMC |
 //! | [`path_watch`] | 实例目录文件监视 |
 //! | [`player_skin`] | 玩家皮肤获取 |
 //! | [`scan_game`] | 扫描游戏版本 |
@@ -90,7 +90,7 @@ pub mod game_arg;
 pub mod game_check;
 pub mod game_count;
 pub mod game_export;
-/// 分组表（独立于实例配置，见模块文档）
+/// 分组表，独立于实例配置，详见模块文档
 pub mod game_group;
 pub mod game_lan;
 pub mod game_launch;
@@ -121,24 +121,24 @@ pub mod serverpack;
 #[cfg(test)]
 mod test_support;
 
-/// 实例共享句柄（全局以 `Arc<RwLock>` 形式持有实例设置）
+/// 实例共享句柄，全局以 `Arc<RwLock>` 形式持有实例设置
 pub type GameInstance = Arc<RwLock<InstanceSettingObj>>;
 
 /// 实例结束运行事件
 pub struct InstanceExit {
     /// 实例 UUID
     pub uuid: Uuid,
-    /// 进程退出码
+    /// 进程退出码，正常退出为 0
     pub code: i32,
 }
 
 /// 实例修改事件参数
 pub enum InstanceChange {
-    /// 添加实例
+    /// 添加实例，携带实例 UUID
     AddInstance(Uuid),
-    /// 删除实例
+    /// 删除实例，携带实例 UUID
     RemoveInstance(Uuid),
-    /// 移动分组（第二个是分组 uuid，`None` 表示默认分组）
+    /// 移动分组，依次为实例 UUID 与分组 uuid，`None` 表示默认分组
     MoveGroup(Uuid, Option<Uuid>),
 }
 
@@ -154,23 +154,23 @@ pub enum InstanceLogType {
 pub struct InstanceLog {
     /// 实例 UUID
     pub uuid: Uuid,
-    /// 日志内容
+    /// 本次日志变更的内容
     pub log: InstanceLogType,
 }
 
-/// 保存的运行日志
+/// 各实例的运行日志，按实例 UUID 存内存
 static RUNTIME_LOGS: LazyLock<RwLock<HashMap<Uuid, InstanceRuntimeLog>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
-/// 保存的实例句柄
+/// 正在运行的实例句柄，按实例 UUID 存内存
 static HANDELS: LazyLock<RwLock<HashMap<Uuid, InstanceHandle>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
-// 分组表已拆到 [`game_group`]：分组不再存在实例配置里（也没有 GROUPS 静态表），
-// 而是独立的 group_save.json —— 这样空分组才能存在、组内顺序也有了落点。
+// 分组表已拆到 [`game_group`]：分组不再存在实例配置里，也没有 GROUPS 静态表，
+// 而是独立的 group_save.json，这样空分组才能存在、组内顺序也有了落点。
 // 对外接口保留在下面几个函数里，委托给该模块。
 
-/// 实例列表
+/// 已登记的实例，按实例 UUID 索引
 static INSTANCES: LazyLock<RwLock<HashMap<Uuid, GameInstance>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
@@ -189,7 +189,7 @@ static LOG_EVENT: LazyLock<EventArgHandler<InstanceLog>> = LazyLock::new(|| Even
 ///
 /// # 返回值
 ///
-/// 返回回调 ID（`remove_exit` 用）
+/// 返回回调 ID，供 `remove_exit` 取消订阅
 pub fn add_exit<F>(handler: F) -> u64
 where
     F: Fn(&InstanceExit) + Send + Sync + 'static,
@@ -203,7 +203,7 @@ where
 ///
 /// # 返回值
 ///
-/// 返回回调 ID（`remove_change` 用）
+/// 返回回调 ID，供 `remove_change` 取消订阅
 pub fn add_change<F>(handler: F) -> u64
 where
     F: Fn(&InstanceChange) + Send + Sync + 'static,
@@ -217,7 +217,7 @@ where
 ///
 /// # 返回值
 ///
-/// 返回回调 ID（`remove_run_log` 用）
+/// 返回回调 ID，供 `remove_run_log` 取消订阅
 pub fn add_run_log<F>(handler: F) -> u64
 where
     F: Fn(&InstanceLog) + Send + Sync + 'static,
@@ -246,24 +246,36 @@ pub fn remove_run_log(id: u64) {
     LOG_EVENT.remove_handel(id);
 }
 
+/// 发出实例退出事件，由退出轮询线程调用
+///
+/// - `uuid`: 实例 UUID
+/// - `code`: 进程退出码
 pub(crate) fn invoke_exit(uuid: Uuid, code: i32) {
     EXIT_EVENT.emit(InstanceExit { uuid, code });
 }
 
+/// 发出实例变更事件
+///
+/// - `change`: 变更内容
 pub(crate) fn invoke_change(change: InstanceChange) {
     CHANGE_EVENT.emit(change);
 }
 
+/// 发出实例运行日志事件
+///
+/// - `uuid`: 实例 UUID
+/// - `log`: 日志变更内容
 pub(crate) fn invoke_run_log(uuid: Uuid, log: InstanceLogType) {
     LOG_EVENT.emit(InstanceLog { uuid, log });
 }
 
 /// 初始化
+///
 /// - `dir`: 运行路径
 ///
 /// # 返回值
 ///
-/// 成功返回 `Ok(())`；路径初始化失败返回对应错误
+/// 路径初始化失败时返回对应错误
 pub fn init<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
     launcher_path::init(dir)
 }
@@ -275,11 +287,11 @@ pub fn init<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
 ///
 /// # 返回值
 ///
-/// 成功返回 `Ok(())`；实例目录加载失败返回对应错误
+/// 实例目录加载失败时返回对应错误
 pub fn load() -> CoreResult<()> {
     version_path::load();
 
-    // 分组表（group_save.json，放实例根目录下）：必须在实例登记前读，
+    // 分组表 group_save.json 放实例根目录下，必须在实例登记前读，
     // 否则 register_instance 看不到已有归属、会把它们冲回默认分组
     game_group::init(instance_path::get_instance_dir())?;
 
@@ -359,26 +371,26 @@ pub fn get_instance(uuid: &Uuid) -> Option<GameInstance> {
     Some(list.get(uuid)?.clone())
 }
 
-/// 游戏内语言（语言代码 + 显示名）
+/// 游戏内语言，语言代码加显示名
 pub struct InstanceLangObj {
     /// 语言代码：资源索引里 `minecraft/lang/<code>.json` 的 `<code>`，如 `zh_cn`
     pub code: String,
-    /// 显示名：该语言文件里的 `language.name`（如“简体中文”）；读不到时为语言代码
+    /// 显示名：该语言文件里的 `language.name`，如“简体中文”；读不到时为语言代码
     pub name: String,
 }
 
-/// 获取实例的游戏内语言列表（从资源索引里查 minecraft/lang/*.json）
+/// 获取实例的游戏内语言列表，从资源索引里查 minecraft/lang/*.json
 ///
-/// 每项的显示名就写在该语言文件里（`language.name`，如 zh_cn → “简体中文”），
-/// 与游戏内语言菜单同一份数据；资源没下全 / 文件里没有这个键时回落为语言代码本身。
+/// 每项的显示名就写在该语言文件里，即 `language.name`，如 zh_cn 对应“简体中文”，
+/// 与游戏内语言菜单同一份数据；资源没下全或文件里没有这个键时回落为语言代码本身。
 ///
-/// 资源索引未下载 / 版本数据缺失时返回空列表，由前端回退默认语言（中文 / 英文）。
+/// 资源索引未下载或版本数据缺失时返回空列表，由前端回退默认语言，即中文与英文。
 ///
 /// - `uuid`: 实例 UUID
 ///
 /// # 返回值
 ///
-/// 返回按语言代码排序的语言列表（代码 + 显示名）
+/// 返回按语言代码排序的语言列表，每项含代码与显示名
 pub fn get_instance_langs(uuid: &Uuid) -> Vec<InstanceLangObj> {
     let Some(instance) = get_instance(uuid) else {
         return Vec::new();
@@ -409,35 +421,31 @@ pub fn get_instance_langs(uuid: &Uuid) -> Vec<InstanceLangObj> {
     langs
 }
 
-/// 已解析出的语言显示名缓存（语言代码 → 显示名）
+/// 已解析出的语言显示名缓存，键为语言代码
 ///
-/// 打开一次实例设置要把上百个语言文件的 `language.name` 读出来（单个 500KB 上下），
-/// 而这份名单在所有实例之间是共用的 —— 读到的名字缓存起来，之后再开就直接命中。
+/// 打开一次实例设置要把上百个语言文件的 `language.name` 读出来，单个 500KB 上下，
+/// 而这份名单在所有实例之间是共用的，读到的名字缓存起来，之后再开就直接命中。
 /// **只缓存真读到名字的项**：回落成代码的不进缓存，等资源下全了还能再补上。
 static LANG_NAMES: LazyLock<RwLock<HashMap<String, String>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
-/// 从资源对象里读出语言文件的显示名（`language.name`）
-///
-/// 资源对象按 sha1 前两位分目录存放。**读不到就静默返回 None**，不走
-/// [`assets_path::read_assets_text`] —— 那个失败时会记一条错误日志，而这里一次要读上百个
-/// 语言文件，资源没下全就会把日志刷满。
+/// 从资源对象里读出语言文件的显示名，即 `language.name`
 ///
 /// - `hash`: 语言文件在资源索引里的 sha1
+/// - `code`: 语言代码，缓存命中时直接返回
 ///
 /// # 返回值
 ///
-/// 返回显示名；两处都读不到 / 解析失败 / 没有该键返回 `None`
+/// 返回显示名；两处都读不到、解析失败或没有该键时返回 `None`
 fn read_lang_name(hash: &str, code: &str) -> Option<String> {
     if let Some(name) = LANG_NAMES.read().unwrap().get(code) {
         return Some(name.clone());
     }
 
-    // 1) 游戏资源对象（`assets/…/objects/<sha1>`）—— 与游戏内语言菜单同一来源，
-    //    资源下全时最权威；
-    // 2) 本地语言文件缓存 `langs/<code>.json`：mml-tex-draw 从客户端 jar 提取 /
-    //    按资源索引下载的那份（方块与物品名单也用它）。**玩家还没启动过游戏时
-    //    资源对象是空的**，就得靠它 —— 否则下拉里只会看到一堆 zh_cn 这样的代码。
+    // 两个来源按可靠性排序：一是游戏资源对象 `assets/…/objects/<sha1>`，与游戏内语言菜单
+    // 同一来源，资源下全时最权威；二是本地语言文件缓存 `langs/<code>.json`，
+    // mml-tex-draw 从客户端 jar 提取或按资源索引下载，方块与物品名单也用它。
+    // **玩家还没启动过游戏时资源对象是空的**，就得靠后者，否则下拉里只会看到一堆 zh_cn 这样的代码。
     let name = read_object_lang_name(hash).or_else(|| read_cached_lang_name(code))?;
     LANG_NAMES
         .write()
@@ -449,7 +457,7 @@ fn read_lang_name(hash: &str, code: &str) -> Option<String> {
 /// 从游戏资源对象里读语言名
 ///
 /// 对象按 sha1 前两位分目录存放。**读不到就静默返回 None**，不走
-/// [`assets_path::read_assets_text`] —— 那个失败时会记一条错误日志，而这里一次要读上百个
+/// [`assets_path::read_assets_text`]，那个失败时会记一条错误日志，而这里一次要读上百个
 /// 语言文件，资源没下全就会把日志刷满。
 fn read_object_lang_name(hash: &str) -> Option<String> {
     if hash.len() < 2 {
@@ -459,7 +467,7 @@ fn read_object_lang_name(hash: &str) -> Option<String> {
     lang_name_from_file(&file)
 }
 
-/// 从 `langs/<code>.json`（mml-tex-draw 的语言文件缓存）里读语言名
+/// 从 mml-tex-draw 的语言文件缓存 `langs/<code>.json` 里读语言名
 fn read_cached_lang_name(code: &str) -> Option<String> {
     let file = mml_base::get_base_dir()
         .join(names::LANG_DIR)
@@ -473,14 +481,14 @@ fn read_cached_lang_name(code: &str) -> Option<String> {
 ///
 /// # 返回值
 ///
-/// 返回显示名；文件不存在 / 解析失败 / 没有该键返回 `None`
+/// 返回显示名；文件不存在、解析失败或没有该键时返回 `None`
 fn lang_name_from_file(file: &Path) -> Option<String> {
     if !file.is_file() {
         return None;
     }
     let text = path_helper::read_text(file).ok()?;
     // 按 Value 解析而不是直接 HashMap<String, String>：语言文件里万一有个非字符串的值，
-    // 整份解析就废了 —— 这里只关心 language.name 一项，别被别处带崩
+    // 整份解析就废了，而这里只关心 language.name 一项，别被别处带崩
     let map = mml_base::serialize_tools::json_from_str::<HashMap<String, serde_json::Value>>(&text)
         .ok()?;
     map.get(names::LANG_NAME_KEY)
@@ -488,25 +496,25 @@ fn lang_name_from_file(file: &Path) -> Option<String> {
         .map(String::from)
 }
 
-/// 获取所有分组（含空分组）
+/// 获取所有分组，含空分组
 ///
 /// # 返回值
 ///
-/// 返回分组条目（uuid + 显示名）列表；默认分组置顶，其余按用户排定的顺序
+/// 返回分组条目列表，每项含 uuid 与显示名；默认分组置顶，其余按用户排定的顺序
 pub fn get_group_list() -> Vec<game_group::GroupInfoObj> {
     game_group::group_list()
 }
 
 /// 取某个实例所属的分组 uuid
 ///
-/// 分组归属存在独立的 `group_save.json`（实例配置里没有这个字段），
+/// 分组归属存在独立的 `group_save.json`，实例配置里没有这个字段，
 /// 所以想显示"这个实例在哪个组"必须来这里查。
 ///
 /// - `uuid`: 实例 UUID
 ///
 /// # 返回值
 ///
-/// 返回分组 uuid；属于默认分组时返回 `None`（"没有分组"就是默认分组的表示）
+/// 返回分组 uuid；属于默认分组时返回 `None`，即"没有分组"就是默认分组的表示
 pub fn get_instance_group(uuid: &Uuid) -> Option<Uuid> {
     let group = game_group::group_of(uuid);
     if group == game_group::DEFAULT_GROUP_UUID {
@@ -516,9 +524,9 @@ pub fn get_instance_group(uuid: &Uuid) -> Option<Uuid> {
     }
 }
 
-/// 取某个实例在它所属分组里的显示次序（0 起）
+/// 取某个实例在它所属分组里的显示次序，从 0 起
 ///
-/// 组内次序存在独立的 `group_save.json` 里（`order`：实例 uuid → 次序），
+/// 组内次序存在独立的 `group_save.json` 里，键是实例 uuid 到次序的映射，
 /// 不再写各实例的 `gui_setting.json`。
 ///
 /// - `uuid`: 实例 UUID
@@ -530,21 +538,21 @@ pub fn get_instance_order(uuid: &Uuid) -> Option<i32> {
     game_group::index_of(uuid)
 }
 
-/// 按给定顺序重排分组（默认分组只是初始排首位，同样可以换位置）
+/// 按给定顺序重排分组，默认分组只是初始排首位，同样可以换位置
 ///
 /// - `order`: 期望的分组 uuid 顺序；不存在的忽略，没提到的组保持在后
 pub fn reorder_groups(order: &[Uuid]) {
     game_group::reorder_groups(order);
 }
 
-/// 把某个实例移到分组的第 `index` 位（跨组移动 + 组内排序一次到位）
+/// 把某个实例移到分组的第 `index` 位，跨组移动与组内排序一次到位
 ///
 /// 归属与组内次序都在 `group_save.json`：拖拽落点既可能换组、也可能只是同组内换位置，
 /// 统一由这一个入口处理。
 ///
-/// - `uuid`: 实例 UUID（不存在时什么都不做，也不发事件）
+/// - `uuid`: 实例 UUID；不存在时什么都不做，也不发事件
 /// - `group`: 目标分组 uuid；`None` 表示默认分组
-/// - `index`: 目标下标（超出范围则排到末尾）
+/// - `index`: 目标下标；超出范围则排到末尾
 ///
 /// # 返回值
 ///
@@ -561,7 +569,7 @@ pub fn move_instance(uuid: &Uuid, group: Option<Uuid>, index: usize) {
     invoke_change(InstanceChange::MoveGroup(*uuid, get_instance_group(uuid)));
 }
 
-/// 获取游戏版本类型列表（Mojang 版本清单的 type 字段取值）
+/// 获取游戏版本类型列表，取 Mojang 版本清单的 type 字段
 ///
 /// 返回独立 ID：release / snapshot / old_beta / old_alpha，
 /// 显示名由前端 i18n 翻译。
@@ -574,11 +582,12 @@ pub fn get_version_types() -> Vec<&'static str> {
 }
 
 /// 从分组 uuid 获取对应的实例
+///
 /// - `uuid`: 分组 uuid
 ///
 /// # 返回值
 ///
-/// 返回该分组下的实例列表
+/// 返回该分组下的实例列表，组内按用户排定的次序
 pub fn get_group(uuid: &Uuid) -> Vec<GameInstance> {
     let mut list = Vec::new();
 
@@ -592,6 +601,7 @@ pub fn get_group(uuid: &Uuid) -> Vec<GameInstance> {
 }
 
 /// 添加分组
+///
 /// - `name`: 分组名
 ///
 /// # 返回值
@@ -602,13 +612,14 @@ pub fn add_group(name: &str) -> Option<Uuid> {
 }
 
 /// 删除分组
+///
 /// - `uuid`: 分组 uuid
 ///
 /// # 返回值
 ///
-/// 删除成功返回 `true`（组内实例移入默认分组）；分组不存在或为默认分组返回 `false`
+/// 删除成功返回 `true`，组内实例移入默认分组；分组不存在或为默认分组返回 `false`
 pub fn remove_group(uuid: &Uuid) -> bool {
-    // 只通知**被移入默认分组的那些**实例（不是整个默认分组）
+    // 只通知**被移入默认分组的那些**实例，不是整个默认分组
     let Some(moved) = game_group::remove_group(uuid) else {
         return false;
     };
@@ -619,15 +630,14 @@ pub fn remove_group(uuid: &Uuid) -> bool {
 }
 
 /// 移动实例到分组
+///
 /// - `list`: 需要移动的实例列表
-/// - `new`: 目标分组 uuid（`None` = 默认分组）
+/// - `new`: 目标分组 uuid；`None` 表示默认分组
 ///
-/// # 返回值
+/// 移动完成后为每个实例发一次 `MoveGroup` 事件。
 ///
-/// 无返回值；移动完成后发 `MoveGroup` 事件
-///
-/// 分组表是独立存储（`group_save.json`），实例配置里不再有 group 字段，
-/// 所以这里只需改表 + 通知，不必逐个 `save()` 实例。
+/// 分组表是独立存储的 `group_save.json`，实例配置里不再有 group 字段，
+/// 所以这里只需改表与通知，不必逐个 `save()` 实例。
 pub fn move_group(list: Vec<Uuid>, new: Option<Uuid>) {
     // 只处理真实存在的实例，避免把不存在的 uuid 写进分组表
     let moved: Vec<Uuid> = list
@@ -640,13 +650,14 @@ pub fn move_group(list: Vec<Uuid>, new: Option<Uuid>) {
 
     game_group::move_group(moved.clone(), new);
 
-    // 回读实际分组发事件（目标组不存在时内核会把实例落到默认分组）
+    // 回读实际分组发事件，目标组不存在时内核会把实例落到默认分组
     for uuid in moved {
         invoke_change(InstanceChange::MoveGroup(uuid, get_instance_group(&uuid)));
     }
 }
 
 /// 从实例名字获取实例
+///
 /// - `name`: 实例名字
 ///
 /// # 返回值
@@ -663,6 +674,7 @@ pub fn get_instance_by_name(name: &str) -> Option<GameInstance> {
 }
 
 /// 是否存在这个名字的实例
+///
 /// - `name`: 实例名字
 ///
 /// # 返回值
@@ -677,7 +689,8 @@ pub fn have_instance_name(name: &str) -> bool {
     !temp.is_none()
 }
 
-/// 是否存在这个名字的实例
+/// 是否存在这个 uuid 的实例
+///
 /// - `uuid`: 实例标识
 ///
 /// # 返回值
@@ -692,8 +705,8 @@ pub fn have_instance_uuid(uuid: &Uuid) -> bool {
 ///
 /// UUID 为空或冲突时自动重新生成。
 ///
-/// - `obj`: 实例配置（其中**没有**分组字段）
-/// - `group`: 要登记到哪个分组（分组 uuid）；`None` 表示默认分组
+/// - `obj`: 实例配置，其中**没有**分组字段
+/// - `group`: 要登记到哪个分组，给分组 uuid；`None` 表示默认分组
 ///
 /// # 返回值
 ///
@@ -710,7 +723,7 @@ fn add_to_group(obj: InstanceSettingObj, group: Option<Uuid>) -> GameInstance {
 
     INSTANCES.write().unwrap().insert(key, game.clone());
 
-    // 登记到分组表（分组已独立存储；不存在的组会被自动创建）
+    // 登记到分组表；分组已独立存储，不存在的组会被自动创建
     game_group::register_instance(key, group);
 
     invoke_change(InstanceChange::AddInstance(key));
@@ -723,42 +736,39 @@ fn add_to_group(obj: InstanceSettingObj, group: Option<Uuid>) -> GameInstance {
 ///
 /// # 返回值
 ///
-/// 成功返回 `Ok(())`（实例文件移入回收站）；实例不存在或删除失败返回对应错误
+/// 成功返回 `Ok(())`，实例文件移入回收站；实例不存在或删除失败返回对应错误
 pub fn delete_instance(uuid: &Uuid) -> CoreResult<()> {
     let instance = get_instance(uuid).ok_or(ErrorType::ArgEmpty(ArgEmptyData::UUID))?;
 
-    // 先删实例文件（回收站），失败则保留实例数据，避免 UI 消失但文件还在
+    // 先删实例文件并移入回收站，失败则保留实例数据，避免 UI 消失但文件还在
     instance.read().unwrap().delete_files()?;
 
     remove_instance_record(uuid);
     Ok(())
 }
 
-/// 从实例列表移除记录（不删除文件，实例目录监视用）
-///
-/// # 参数
+/// 从实例列表移除记录，不删除文件，实例目录监视用
 ///
 /// - `uuid`: 实例 UUID
 pub(crate) fn remove_instance_record(uuid: &Uuid) {
     INSTANCES.write().unwrap().remove(uuid);
-    // 从分组表里摘掉它，但**不删空分组** —— 空分组是合法状态
-    // （之前这里有 `groups.retain(|_, list| !list.is_empty())`，
-    //  正是"空分组留不住"的原因）
+    // 从分组表里摘掉它，但**不删空分组**：空分组是合法状态。
+    // 这里以前有一句"顺手清掉空分组"，正是"空分组留不住"的原因
     game_group::forget_instance(uuid);
 
     invoke_change(InstanceChange::RemoveInstance(*uuid));
 }
 
-/// 重命名实例（名字与实例目录一起改）
+/// 重命名实例，名字与实例目录一起改
 ///
-/// 新名字与其他实例重复时拒绝；成功后发 `MoveGroup` 事件刷新前端列表。
+/// 新名字与其他实例重复时拒绝；成功后发一次变更事件刷新前端列表。
 ///
 /// - `uuid`: 实例 UUID
 /// - `name`: 新名字
 ///
 /// # 返回值
 ///
-/// 成功返回 `Ok(())`；名字为空 / 重复或目录改名失败返回对应错误
+/// 成功返回 `Ok(())`；名字为空、重复或目录改名失败返回对应错误
 pub fn rename_instance(uuid: &Uuid, name: &str) -> CoreResult<()> {
     let name = name.trim();
     if name.is_empty() {
@@ -767,14 +777,14 @@ pub fn rename_instance(uuid: &Uuid, name: &str) -> CoreResult<()> {
 
     let instance = get_instance(uuid).ok_or(ErrorType::ArgEmpty(ArgEmptyData::UUID))?;
 
-    // 新名字与别的实例重复（自己保持原名除外）则拒绝
+    // 新名字与别的实例重复时拒绝，自己保持原名除外
     if have_instance_name(name) && instance.read().unwrap().name != name {
         return Err(ErrorType::InstanceNameExists(name.to_string()));
     }
 
     let old_base = instance.read().unwrap().get_base_path();
 
-    // 实例目录跟着改名（目录名由名字派生），改名成功后再更新名字并保存
+    // 实例目录跟着改名，目录名由名字派生，改名成功后再更新名字并保存
     let new_dir = path_helper::replace_path_name(name);
     let new_base = old_base
         .parent()
@@ -796,7 +806,7 @@ pub fn rename_instance(uuid: &Uuid, name: &str) -> CoreResult<()> {
         obj.save();
     }
 
-    // 重命名不改分组归属（分组表按 uuid 记录，与名字无关），
+    // 重命名不改分组归属，分组表按 uuid 记录、与名字无关，
     // 但要让前端刷新那一行，所以照旧发一次带当前分组的变更事件
     invoke_change(InstanceChange::MoveGroup(*uuid, get_instance_group(uuid)));
     Ok(())
@@ -860,11 +870,11 @@ pub(crate) fn add_run_game(handel: InstanceHandle) {
     games.insert(handel.uuid, handel);
 }
 
-/// 获取正在运行的实例UUID列表
+/// 获取正在运行的实例 UUID 列表
 ///
 /// # 返回值
 ///
-/// 返回运行中实例的 UUID 列表
+/// 返回运行中实例的 UUID 列表，顺序不保证
 pub fn get_running_instances() -> Vec<Uuid> {
     HANDELS.read().unwrap().keys().cloned().collect()
 }
@@ -890,11 +900,11 @@ pub fn stop_game(uuid: &Uuid) {
 }
 
 impl InstanceSettingObj {
-    /// 创建实例（落默认分组）
+    /// 创建实例，落在默认分组
     ///
     /// 重名实例经 GUI 询问覆盖或改名；创建实例目录结构并保存设置。
     ///
-    /// - `gui`: 添加实例界面回调（无界面时重名实例自动改名）
+    /// - `gui`: 添加实例界面回调；无界面时重名实例自动改名
     ///
     /// # 返回值
     ///
@@ -905,12 +915,12 @@ impl InstanceSettingObj {
 
     /// 创建实例并指定分组
     ///
-    /// 与 [`create_instance`](Self::create_instance) 只差分组：分组归属不在实例配置里
-    /// （见 [`crate::game_group`]），只能在登记时一并指定，所以导入 / 安装整合包这类
+    /// 与 [`create_instance`](Self::create_instance) 只差分组：分组归属不在实例配置里，
+    /// 见 [`crate::game_group`]，只能在登记时一并指定，所以导入或安装整合包这类
     /// "用户已经选了目标分组"的流程走这里。
     ///
-    /// - `gui`: 添加实例界面回调（无界面时重名实例自动改名）
-    /// - `group`: 目标分组 uuid；`None` 表示默认分组（不存在/已删的组会落到默认分组）
+    /// - `gui`: 添加实例界面回调；无界面时重名实例自动改名
+    /// - `group`: 目标分组 uuid；`None` 表示默认分组，不存在或已删的组也会落到默认分组
     ///
     /// # 返回值
     ///
@@ -923,7 +933,7 @@ impl InstanceSettingObj {
         path_watch::stop_watch();
 
         let old = get_instance_by_name(&self.name);
-        // 是否覆盖重名实例（无界面 / 用户拒绝覆盖时改为自动改名，保留原实例）
+        // 是否覆盖重名实例；无界面或用户拒绝覆盖时改为自动改名，保留原实例
         let mut overwrite = false;
         if let Some(instance) = &old {
             if let Some(gui) = &gui {
@@ -987,7 +997,7 @@ impl InstanceSettingObj {
 
         path_watch::start_watch();
 
-        // 分组归属不在实例配置里，落在独立的 group_save.json（`None` 即默认分组）
+        // 分组归属不在实例配置里，落在独立的 group_save.json，`None` 即默认分组
         Ok(add_to_group(self, group))
     }
 
@@ -995,15 +1005,19 @@ impl InstanceSettingObj {
     ///
     /// # 返回值
     ///
-    /// 成功返回 `Ok(())`（实例目录移入回收站）；失败返回对应错误
+    /// 成功返回 `Ok(())`，实例目录移入回收站；失败返回对应错误
     pub fn delete_files(&self) -> CoreResult<()> {
         path_helper::move_to_trash(self.get_base_path())
     }
 
-    /// 复制实例设置为新的对象。
+    /// 复制实例设置为新的对象
     ///
     /// `InstanceSettingObj` 刻意不实现 `Clone`，避免被随意整对象复制；
-    /// 仅在确有需要构建一个独立新对象时（如复制实例）显式调用本方法。
+    /// 仅在确有需要构建一个独立新对象时显式调用本方法，如复制实例。
+    ///
+    /// # 返回值
+    ///
+    /// 返回字段逐项克隆出的新对象，uuid 仍是原实例的
     fn copy_self(&self) -> Self {
         Self {
             uuid: self.uuid,
@@ -1032,12 +1046,13 @@ impl InstanceSettingObj {
     }
 
     /// 复制数据到新的实例
+    ///
     /// - `name`: 新的实例名字
     /// - `gui`: 添加实例界面回调
     ///
     /// # 返回值
     ///
-    /// 返回新实例句柄
+    /// 返回新实例句柄；新实例与原实例同组
     pub async fn copy_to_other(&self, name: &str, gui: AddInstanceGui) -> CoreResult<GameInstance> {
         // 复制品与原实例同组：分组不在实例配置里，得单独问一次
         let group = get_instance_group(&self.uuid);
@@ -1058,7 +1073,7 @@ impl InstanceSettingObj {
 
     /// 更新在线文件信息
     ///
-    /// 清理掉磁盘上已不存在的文件记录（`.jar.disabled` 的视作仍存在）。
+    /// 清理掉磁盘上已不存在的文件记录；被禁用而追加了 `.disabled` 后缀的视作仍存在。
     pub async fn update_online(&self) {
         let mut online = self.read_online_info();
         let dir = self.get_game_path();
@@ -1086,7 +1101,7 @@ impl InstanceSettingObj {
     /// 将文件复制到其他地方
     ///
     /// - `path`: 目标目录
-    /// - `skip`: 需要跳过的相对路径列表
+    /// - `skip`: 需要跳过的相对路径列表；`None` 表示一个都不跳过
     /// - `is_base`: `true` 复制实例整个目录，`false` 只复制游戏目录
     /// - `gui`: 进度界面回调
     ///
@@ -1145,12 +1160,10 @@ impl InstanceSettingObj {
     /// 写入实例图标文件，并把实际写进去的文件名记回实例
     ///
     /// 故意不做成 `&mut self` 方法：那样调用方就得在 `.await` 期间持有实例写锁，
-    /// 而实例锁的守卫不是 `Send`，在 `#[async_trait]`（要求 `future: Send`）里编译不过。
-    /// 这里自己控制加锁范围 —— 只在锁内问出"图标写到哪个文件"，写盘时不持锁。
+    /// 而实例锁的守卫不是 `Send`，在 `#[async_trait]` 里编译不过，它要求 `future: Send`。
+    /// 这里自己控制加锁范围，只在锁内问出"图标写到哪个文件"，写盘时不持锁。
     ///
-    /// 调用方也不要带着实例锁进来（`std` 的 `RwLock` 不可重入，会死锁）。
-    ///
-    /// # 参数
+    /// 调用方也不要带着实例锁进来，`std` 的 `RwLock` 不可重入，会死锁。
     ///
     /// - `game`: 目标实例
     /// - `icon`: 图标输入源

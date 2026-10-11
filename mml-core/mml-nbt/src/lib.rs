@@ -618,11 +618,11 @@ impl fmt::Display for NbtType {
 
 /// 判断给定的序号是否为合法的 NBT 标签类型 ID
 ///
-/// - `nbt_type`: 待校验的 NBT 标签类型序号
+/// - `nbt_type`: 待校验的 NBT 标签类型序号，合法范围 0 到 12，含两端
 ///
 /// # 返回值
 ///
-/// 合法范围是 0 到 12，含两端
+/// 在合法范围内返回 `true`
 pub fn is_nbt_num(nbt_type: u8) -> bool {
     nbt_type >= NBT_END_ORDER && nbt_type <= NBT_LONG_ARRAY_ORDER
 }

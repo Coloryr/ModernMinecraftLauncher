@@ -7,7 +7,7 @@ import { api } from "./api";
 import { t } from "./i18n";
 import type { SystemMemoryDto } from "./bindings";
 
-/** MiB → 可读文本（≥1 GB 用 GB，否则 MB） */
+/** MiB → 可读文本：≥1 GB 用 GB，否则 MB */
 function formatMemory(mib: number): string {
   return mib >= 1024 ? `${(mib / 1024).toFixed(1)} GB` : `${Math.round(mib)} MB`;
 }

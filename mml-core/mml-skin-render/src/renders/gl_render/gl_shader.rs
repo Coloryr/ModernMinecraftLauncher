@@ -3,12 +3,12 @@
 //! 内置皮肤渲染使用的 GLSL 顶点 / 片段着色器源码，
 //! 通过宏兼容不同 GLSL 版本与 macOS。
 
-/// macOS 专用的 GLSL 版本头（`#version 150` + `Macos` 宏定义）
+/// macOS 专用的 GLSL 版本头，内容为 `#version 150` 加 `Macos` 宏定义
 pub const MACOS_HEADER: &str = r#"#version 150
 #define Macos
 "#;
 
-/// 顶点着色器源码（变换坐标并传出 UV / 法线 / 世界坐标）
+/// 顶点着色器源码，变换坐标并传出 UV、法线与世界坐标
 pub const VERTEX_SHADER_SOURCE: &str = r#"#if __VERSION__ >= 130
 #define COMPAT_VARYING out
 #define COMPAT_ATTRIBUTE in
@@ -43,7 +43,7 @@ void main()
     gl_Position = projection * temp * vec4(a_position, 1.0);
 }"#;
 
-/// 片段着色器源码（环境光 + 漫反射的简单光照模型采样贴图）
+/// 片段着色器源码，按环境光加漫反射的简单光照模型采样贴图
 pub const FRAGMENT_SHADER_SOURCE: &str = r#"#if defined(GL_ES)
 precision mediump float;
 #endif

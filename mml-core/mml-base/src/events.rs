@@ -11,7 +11,7 @@ use std::{
     },
 };
 
-/// 带参数的通用事件，回调按注册顺序收到事件引用
+/// 带参数的通用事件，回调存于 HashMap，调用顺序不保证与注册顺序一致
 pub struct EventArgHandler<E> {
     /// 回调表，键为自增编号
     handlers: RwLock<HashMap<u64, Box<dyn Fn(&E) + Send + Sync>>>,
@@ -56,7 +56,7 @@ impl<E> EventArgHandler<E> {
         self.handlers.write().unwrap().remove(&id);
     }
 
-    /// 触发事件，按注册顺序调用全部回调
+    /// 触发事件，调用全部回调，顺序为 HashMap 迭代顺序
     ///
     /// - `event`: 事件参数
     pub fn emit(&self, event: E) {
@@ -71,7 +71,7 @@ impl<E> EventArgHandler<E> {
     }
 }
 
-/// 不带参数的通用事件，回调按注册顺序被调用
+/// 不带参数的通用事件，回调存于 HashMap，调用顺序不保证与注册顺序一致
 pub struct EventHandler {
     /// 回调表，键为自增编号
     handlers: RwLock<HashMap<u64, Box<dyn Fn() + Send + Sync>>>,
@@ -116,7 +116,7 @@ impl EventHandler {
         self.handlers.write().unwrap().remove(&id);
     }
 
-    /// 触发事件，按注册顺序调用全部回调
+    /// 触发事件，调用全部回调，顺序为 HashMap 迭代顺序
     pub fn emit(&self) {
         for (_, handler) in self.handlers.read().unwrap().iter() {
             handler();

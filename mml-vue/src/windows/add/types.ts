@@ -6,7 +6,7 @@
 /** 四种添加模式 */
 export type AddMode = "new" | "archive" | "folder" | "online";
 
-/** 模式切换项的图标名（对应 ModeTabs 内置的四个 svg） */
+/** 模式切换项的图标名，对应 ModeTabs 内置的四个 svg */
 export type AddModeIcon = "cube" | "box" | "folder" | "globe";
 
 export interface AddModeTab {
@@ -24,11 +24,11 @@ export const ADD_MODES: AddModeTab[] = [
 ];
 
 /**
- * 真·整合包（内核里走整合包安装 worker 的两种 manifest）
+ * 真·整合包：内核里走整合包安装 worker 的那两种 manifest
  *
  * 这两种压缩包导入时走「下载整合包」那条安装任务路径：进度在标题栏的整合包指示器上，
  * 装完自动出现并选中新实例；MMC / HMCL / 直接解压等只是"别人的包格式"，
- * 内核按普通压缩包解，没有在线安装那套元数据（见 add.rs 的 is_modpack）。
+ * 内核按普通压缩包解，没有在线安装那套元数据，见 add.rs 的 is_modpack。
  */
 const MODPACK_PACK_TYPES = new Set(["curseforge", "modrinth"]);
 

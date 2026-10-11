@@ -56,6 +56,7 @@ pub fn order_key<'a>(cat: &'a str, id: &'a str) -> (usize, &'a str, &'a str) {
 mod tests {
     use super::*;
 
+    /// 校验 CAT_ORDER 的标签页先后与游戏一致，并确认皮肤分组固定最后、未登记分类排到表尾
     #[test]
     fn cat_order_follows_game_tabs() {
         // 游戏创造栏的标签页先后，首项与末项都能确认即可
@@ -73,6 +74,7 @@ mod tests {
         assert_eq!(cat_index("somethingNew"), CAT_ORDER.len());
     }
 
+    /// 校验 order_key 只按分类序号与条目 id 排序，换界面语言或显示名都不会改变结果
     #[test]
     fn order_key_is_language_independent() {
         // 同分类内按 id 排，与显示名和语言无关

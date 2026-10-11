@@ -8,6 +8,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::Decl;
+
 /// 递归收集目录下的 .rs 文件
 ///
 /// - `dir`: 起始目录，读不了就当作空目录，不报错
@@ -110,8 +112,8 @@ fn next_decl(text: &str, from: usize) -> Option<usize> {
 ///
 /// # 返回值
 ///
-/// 每项为 (类型名, 声明前的属性原文, 花括号内的正文, 是枚举)
-pub fn scan_types(text: &str) -> Vec<(String, String, String, bool)> {
+/// 每个声明一项，字段含义见 [`Decl`]
+pub fn scan_types(text: &str) -> Vec<Decl> {
     let mut out = Vec::new();
     let mut search = 0usize;
     while let Some(pos) = next_decl(text, search) {
@@ -156,12 +158,12 @@ pub fn scan_types(text: &str) -> Vec<(String, String, String, bool)> {
             }
             i += 1;
         }
-        out.push((
+        out.push(Decl {
             name,
             attrs,
-            text[body_start..i.saturating_sub(1)].to_string(),
+            body: text[body_start..i.saturating_sub(1)].to_string(),
             is_enum,
-        ));
+        });
         search = i;
     }
     out
@@ -254,7 +256,20 @@ fn group_of(head: &str) -> Option<String> {
     None
 }
 
-/// 取命令属性后面的函数：返回 (函数名, 参数原文, 返回类型原文, 显式分组)
+/// 扫描到的一条命令函数
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScannedCommand {
+    /// 命令名，即 Rust 函数名
+    pub name: String,
+    /// 参数原文，可跨多行；Tauri 注入的参数仍留在里面，由 [`crate::ts::ts_params`] 过滤
+    pub params: String,
+    /// 返回类型原文；没写返回类型时是空串
+    pub ret: String,
+    /// 显式分组标记的值；`None` 表示按来源模块分组
+    pub group: Option<String>,
+}
+
+/// 取命令属性后面的函数
 ///
 /// 参数/返回按括号与尖括号配平截取，能处理跨多行的签名。
 /// 显式分组来自属性块里的分组标记，没有则为 `None`，按来源模块分组。
@@ -263,8 +278,8 @@ fn group_of(head: &str) -> Option<String> {
 ///
 /// # 返回值
 ///
-/// 每个命令一项；没有写返回类型的函数，返回类型原文是空串
-pub fn commands_in(text: &str) -> Vec<(String, String, String, Option<String>)> {
+/// 每个命令一项，各字段含义见 [`ScannedCommand`]
+pub fn commands_in(text: &str) -> Vec<ScannedCommand> {
     const MARK: &str = "#[tauri::command]";
     let mut out = Vec::new();
     let mut rest = text;
@@ -331,7 +346,12 @@ pub fn commands_in(text: &str) -> Vec<(String, String, String, Option<String>)> 
             _ => String::new(),
         };
 
-        out.push((name, params, ret, group));
+        out.push(ScannedCommand {
+            name,
+            params,
+            ret,
+            group,
+        });
         rest = tail;
     }
     out
@@ -357,10 +377,10 @@ pub async fn add_modpack_search(
 "#;
         let cmds = commands_in(src);
         assert_eq!(cmds.len(), 1);
-        assert_eq!(cmds[0].0, "add_modpack_search");
-        assert!(cmds[0].1.contains("source: String"));
-        assert!(cmds[0].1.contains("page: u32"));
-        assert_eq!(cmds[0].2, "Result<ModpackSearchDto, String>");
+        assert_eq!(cmds[0].name, "add_modpack_search");
+        assert!(cmds[0].params.contains("source: String"));
+        assert!(cmds[0].params.contains("page: u32"));
+        assert_eq!(cmds[0].ret, "Result<ModpackSearchDto, String>");
     }
 
     /// 没有返回类型的函数，返回类型原文是空串
@@ -370,8 +390,8 @@ pub async fn add_modpack_search(
             "#[tauri::command]\npub fn add_set_close_guard(window: WebviewWindow, enabled: bool) {";
         let cmds = commands_in(src);
         assert_eq!(cmds.len(), 1);
-        assert_eq!(cmds[0].0, "add_set_close_guard");
-        assert_eq!(cmds[0].2, "");
+        assert_eq!(cmds[0].name, "add_set_close_guard");
+        assert_eq!(cmds[0].ret, "");
     }
 
     /// 显式分组标记：夹在文档注释 / 其它属性之间也要认出来
@@ -387,24 +407,24 @@ pub fn resource_list_mods(uuid: String) -> Result<Vec<ModItemDto>, String> {
 "#;
         let cmds = commands_in(src);
         assert_eq!(cmds.len(), 1);
-        assert_eq!(cmds[0].3.as_deref(), Some("resource"));
+        assert_eq!(cmds[0].group.as_deref(), Some("resource"));
     }
 
     /// 没有标记就是 None；注释里写出标记**不算**，只认 `#[` 开头的行
     #[test]
     fn test_commands_in_group_absent() {
         let src = "#[tauri::command]\npub fn a() -> bool { true }";
-        assert_eq!(commands_in(src)[0].3, None);
+        assert_eq!(commands_in(src)[0].group, None);
 
         let src2 = "// 说明：本来该写 #[ipc_group(\"x\")]，但这只是注释\n#[tauri::command]\npub fn b() -> bool { true }";
-        assert_eq!(commands_in(src2)[0].3, None);
+        assert_eq!(commands_in(src2)[0].group, None);
     }
 
     /// 多个命令都要收进来
     #[test]
     fn test_commands_in_multiple() {
         let src = "#[tauri::command]\npub fn a() -> bool { true }\n\n#[tauri::command]\npub fn b() -> i64 { 0 }";
-        let names: Vec<String> = commands_in(src).into_iter().map(|c| c.0).collect();
+        let names: Vec<String> = commands_in(src).into_iter().map(|c| c.name).collect();
         assert_eq!(names, vec!["a", "b"]);
     }
 
@@ -452,10 +472,10 @@ pub struct Foo {
 "#;
         let types = scan_types(src);
         assert_eq!(types.len(), 1);
-        assert_eq!(types[0].0, "Foo");
-        assert!(!types[0].3, "不是枚举");
-        assert_eq!(rename_all_of(&types[0].1).as_deref(), Some("camelCase"));
-        assert!(types[0].2.contains("bar_baz"));
+        assert_eq!(types[0].name, "Foo");
+        assert!(!types[0].is_enum, "不是枚举");
+        assert_eq!(rename_all_of(&types[0].attrs).as_deref(), Some("camelCase"));
+        assert!(types[0].body.contains("bar_baz"));
     }
 
     /// 枚举变体前的文档注释与 `#[default]` 不能干扰变体名提取
@@ -473,8 +493,8 @@ pub enum ViewMode {
 }
 "#;
         let types = scan_types(src);
-        assert!(types[0].3, "是枚举");
-        assert_eq!(types[0].2.trim().starts_with("/// 列表（默认）"), true);
+        assert!(types[0].is_enum, "是枚举");
+        assert_eq!(types[0].body.trim().starts_with("/// 列表（默认）"), true);
     }
 
     /// 顶层逗号拆分不切泛型内部的逗号

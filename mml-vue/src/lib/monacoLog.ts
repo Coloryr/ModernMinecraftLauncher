@@ -20,7 +20,7 @@ self.MonacoEnvironment = {
 
 let themeDefined = false;
 
-/** 日志控制台主题（与 InstanceLogPanel 的控制台同底色，始终暗色） */
+/** 日志控制台主题，与 InstanceLogPanel 的控制台同底色，始终暗色 */
 export function ensureLogTheme() {
   if (themeDefined) return;
   themeDefined = true;

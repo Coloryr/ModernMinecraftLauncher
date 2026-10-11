@@ -8,8 +8,8 @@
 // 是独立窗口、自己有整页进度，标题栏再来一个就是重复。
 // 点击走 openWindow("download")：单窗口模式它会被特判成弹窗，多窗口模式开真实窗口。
 //
-// "动态"的落点：**下载时图标持续旋转**（下载进度靠下方细条表达），
-// 与整合包那个刻意错开 —— 整合包不转、靠颜色，两个并排时只有一个在动，不至于晃眼。
+// "动态"的落点：下载时图标**不转**，靠强调色 + 下方细条表达进度，
+// 与整合包那个同一套口径 —— 两个并排都不转，不至于晃眼。
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { t } from "../lib/i18n";
 import { api, onDownloadItem, onDownloadTask } from "../lib/api";

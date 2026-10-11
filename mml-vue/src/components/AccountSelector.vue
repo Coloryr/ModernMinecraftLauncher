@@ -14,8 +14,8 @@ const props = defineProps<{
   accounts: AccountStoreDto[];
 }>();
 
-/** 切换账户：`update:account` 回传新选中的账户 */
 const emit = defineEmits<{
+  /** 切换账户：回传新选中的账户 */
   (e: "update:account", account: AccountStoreDto): void;
 }>();
 

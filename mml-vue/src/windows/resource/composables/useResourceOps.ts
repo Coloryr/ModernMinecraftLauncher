@@ -79,8 +79,8 @@ export function useResourceOps(data: ReturnType<typeof useResourceData>) {
     try {
       await box.run();
       confirmBox.value = null;
-      // 动作改的是磁盘上的列表：不重拉的话，删掉的那一行还留在界面上
-      // （分组数据不在列表里，askConfirm 会明确传 reload: false）
+      // 动作改的是磁盘上的列表：不重拉的话，删掉的那一行还留在界面上。
+      // 分组数据不在列表里，askConfirm 会明确传 reload: false
       if (box.reload) await reloadCurrent();
     } catch (e) {
       showToast(tErr(e));

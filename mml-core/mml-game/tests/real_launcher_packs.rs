@@ -2,7 +2,7 @@
 //!
 //! - M²L 即 ColorMC 实例压缩包：核心导出 API 做导出到导入的 roundtrip，离线可跑，
 //!   另有真实导出的 colormc-instance.zip 用例。
-//! - HMCL / MMC(Prism) 导出包、HMCL 整包、MultiMC 整包：真实启动器生成的压缩包，
+//! - HMCL 导出包、MMC 即 Prism 导出包、HMCL 整包、MultiMC 整包：真实启动器生成的压缩包，
 //!   放到 `tests/packs/` 或环境变量 `MML_REAL_PACK_DIR` 指定的目录，文件不存在时
 //!   自动跳过。断言基于包内元数据动态推导，不写死版本号。
 //!
@@ -113,14 +113,28 @@ fn state_id(state: &AddModPackState) -> &'static str {
 }
 
 impl IAddModPackGui for StateRecorder {
+    /// 记录阶段
+    ///
+    /// - `state`: 本次到达的安装阶段
     fn set_state(&self, state: AddModPackState) {
         self.states.lock().unwrap().push(state_id(&state));
     }
 
+    /// 记录进度，本测试不关心
+    ///
+    /// - `_value`: 当前进度
+    /// - `_all`: 总数，`None` 表示未知
     fn set_now(&self, _value: usize, _all: Option<usize>) {}
 
+    /// 记录子状态文字，本测试不关心
+    ///
+    /// - `_text`: 子状态文字
     fn set_sub_text(&self, _text: Option<String>) {}
 
+    /// 记录子进度，本测试不关心
+    ///
+    /// - `_value`: 当前进度
+    /// - `_all`: 总数，`None` 表示未知
     fn set_sub_now(&self, _value: usize, _all: Option<usize>) {}
 }
 

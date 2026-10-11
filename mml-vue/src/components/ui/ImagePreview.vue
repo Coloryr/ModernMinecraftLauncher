@@ -16,12 +16,14 @@ const props = defineProps<{
   src: string;
 }>();
 
-/** 请求关闭浮层；拖动结束那一下不算 */
-const emit = defineEmits<{ (e: "close"): void }>();
+const emit = defineEmits<{
+  /** 请求关闭浮层；拖动结束那一下不算 */
+  (e: "close"): void;
+}>();
 
 /** 缩放倍率（1 = 适配大小） */
 const scale = ref(1);
-/** 平移偏移（px，放大后拖动看局部） */
+/** 平移偏移，单位 px；放大后拖动看局部 */
 const offset = ref({ x: 0, y: 0 });
 
 /** 本次按下是否真的拖动过：拖动结束那一下的 click 不该关闭预览 */

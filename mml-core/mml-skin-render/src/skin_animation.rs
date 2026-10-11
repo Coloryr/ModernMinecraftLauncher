@@ -1,6 +1,6 @@
 //! 皮肤部件动画模块
 //!
-//! 以 120 帧为一个循环（每帧 0.01 秒）演算行走动画，
+//! 以 120 帧为一个循环演算行走动画，每帧 0.01 秒，
 //! 输出手臂、腿部、头部、披风的旋转角度。
 
 use glam::Vec3;
@@ -9,28 +9,28 @@ use mml_skin::SkinType;
 /// 皮肤的动画
 #[derive(Debug, Clone)]
 pub struct SkinAnimation {
-    /// 当前动画帧（0–119）
+    /// 当前动画帧，取值 0–119
     frame: i32,
-    /// 不足一帧的剩余时间累计（秒）
+    /// 不足一帧的剩余时间累计，单位秒
     count: f64,
-    /// 是否已被关闭（关闭后 `tick` 返回 `false`）
+    /// 是否已被关闭，关闭后 `tick` 返回 `false`
     close: bool,
     /// 是否正在播放
     pub run: bool,
-    /// 皮肤类型（影响头部摆动的轴）
+    /// 皮肤类型，影响头部摆动走 x 轴还是 z 轴
     pub skin_type: SkinType,
-    /// 手臂旋转角度（x/z 侧摆、y 前后摆）
+    /// 手臂旋转角度，单位度，x / z 为侧摆、y 为前后摆
     pub arm: Vec3,
-    /// 腿部旋转角度
+    /// 腿部旋转角度，单位度
     pub leg: Vec3,
-    /// 头部旋转角度
+    /// 头部旋转角度，单位度
     pub head: Vec3,
-    /// 披风摆动角度
+    /// 披风摆动角度，单位度
     pub cape: f32,
 }
 
 impl SkinAnimation {
-    /// 创建动画（初始手臂抬起 40 度）
+    /// 创建动画，初始手臂抬起 40 度
     pub fn new() -> Self {
         Self {
             frame: 0,
@@ -52,9 +52,8 @@ impl SkinAnimation {
     }
 
     /// 进行动画演算
-    /// 返回 false 表示动画已关闭
     ///
-    /// - `time`: 本次推进的时间（秒），每累计 0.01 秒推进一帧
+    /// - `time`: 本次推进的时间，单位秒，每累计 0.01 秒推进一帧
     ///
     /// # 返回值
     ///
@@ -129,12 +128,12 @@ impl SkinAnimation {
         self.cape = 0.0;
     }
 
-    /// 获取当前动画进度 (0-120)
+    /// 获取当前动画帧，取值 0–119
     pub fn get_frame(&self) -> i32 {
         self.frame
     }
 
-    /// 设置动画帧率
+    /// 设置动画帧，对 120 取模
     pub fn set_frame(&mut self, frame: i32) {
         self.frame = frame % 120;
     }
@@ -156,7 +155,7 @@ mod tests {
         assert_eq!(anim.cape, 0.0);
     }
 
-    /// run 为 false 时 tick 不推进帧，但返回 true（未关闭）
+    /// run 为 false 时 tick 不推进帧，但返回 true 表示未关闭
     #[test]
     fn test_tick_without_run() {
         let mut anim = SkinAnimation::new();
@@ -200,7 +199,7 @@ mod tests {
         assert_eq!(anim.head.z, 31.0 - 30.0);
     }
 
-    /// 纤细 (NewSlim) 皮肤动画走 head.x 摆动、head.z 固定为 0
+    /// 纤细皮肤 NewSlim 的动画走 head.x 摆动，head.z 固定为 0
     #[test]
     fn test_tick_slim_head_axis() {
         let mut anim = SkinAnimation::new();
@@ -222,7 +221,7 @@ mod tests {
         anim.tick(0.03);
         assert_eq!(anim.get_frame(), 0);
 
-        // 后半段 (frame > 60) 的角度公式
+        // 后半段 frame > 60 的角度公式
         // 注意：set_frame 不清空内部的时间累计，第一次 tick(0.03) 后剩余 count=0.01，
         // 再 tick(0.02) 会累计出 3 帧推进：61 -> 63
         anim.set_frame(61);

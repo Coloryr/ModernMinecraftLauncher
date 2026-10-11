@@ -53,7 +53,7 @@ function isRunning(task: ModPackTaskDto): boolean {
   return !task.done && !task.failed && !task.cancelled;
 }
 
-/** 单任务主进度（百分比）：总数未知时按 0 算，别凭"不是进行中"就当成完成 */
+/** 单任务主进度，单位 %；总数未知时按 0 算，别凭"不是进行中"就当成完成 */
 function taskProgress(task: ModPackTaskDto): number {
   if (task.done) return 100;
   return task.total ? (task.now / task.total) * 100 : 0;

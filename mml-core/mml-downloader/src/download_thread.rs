@@ -5,7 +5,7 @@
 //! # 下载流程
 //!
 //! 1. **检查已存在文件** — 文件已存在且哈希匹配 → 跳过
-//! 2. **发起 HTTP 请求** — 支持 Range 断点续传（需服务器返回 `Accept-Ranges: bytes`）
+//! 2. **发起 HTTP 请求** — 支持 Range 断点续传，需服务器返回 `Accept-Ranges: bytes`
 //! 3. **流式写入临时文件** — 边下载边写入，实时更新进度
 //! 4. **下载后校验** — 检查文件大小和哈希值
 //! 5. **后处理** — 解压 native 库 / 存档文件
@@ -50,6 +50,12 @@ use crate::{DownloadObj, download_item::DownloadItemState, later_tasks};
 static RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
 
 /// 在当前线程中阻塞执行异步任务
+///
+/// - `f`: 待执行的异步任务
+///
+/// # 返回值
+///
+/// 返回异步任务的输出
 fn block_on<F: Future>(f: F) -> F::Output {
     RUNTIME
         .get_or_init(|| {
@@ -77,9 +83,7 @@ pub(crate) struct DownloadThread {
 impl DownloadThread {
     /// 创建并启动下载线程
     ///
-    /// # 参数
-    ///
-    /// - `index`: 线程序号（用于 UI 更新标识）
+    /// - `index`: 线程序号，用于 UI 更新标识
     pub fn new(index: u32) -> Self {
         let sem = Arc::new(Sem::new(0).unwrap());
         let is_stop = Arc::new(AtomicBool::new(false));
@@ -100,9 +104,8 @@ impl DownloadThread {
                     break;
                 }
 
-                // 消化队列中所有可取的任务，取不到新任务再休眠
-                // （此前每次唤醒只下载一个文件，任务入队时仅唤醒一轮，
-                //   剩余文件无人再唤醒线程，多文件任务会卡在中途）
+                // 消化队列中所有可取的任务，取不到新任务再休眠：
+                // 此前每次唤醒只下载一个文件，多文件任务入队只唤醒一轮，剩余文件会卡住
                 while let Some(item) = crate::get_item() {
                     if is_stop_clone.load(Ordering::SeqCst) {
                         break;
@@ -135,12 +138,10 @@ impl DownloadThread {
     }
 }
 
-/// 检查错误次数是否超过阈值（5 次）
-///
-/// # 参数
+/// 检查错误次数是否超过阈值 5 次
 ///
 /// - `err`: 错误信息
-/// - `times`: 当前错误次数（可变引用，会自增）
+/// - `times`: 当前错误次数，可变引用，会自增
 ///
 /// # 返回值
 ///
@@ -157,10 +158,8 @@ fn is_need_err(err: ErrorType, times: &mut i32) -> bool {
 
 /// 下载单个文件
 ///
-/// # 参数
-///
 /// - `index`: 下载线程序号
-/// - `obj`: 下载项目（包含任务和文件信息）
+/// - `obj`: 下载项目，包含任务和文件信息
 fn download(index: u32, mut obj: DownloadObj) {
     // ============================================================
     // 第一步：检查文件是否已存在
@@ -192,13 +191,13 @@ fn download(index: u32, mut obj: DownloadObj) {
     }
 
     // ============================================================
-    // 第二步：循环下载（支持重试）
+    // 第二步：循环下载，失败时重试
     // ============================================================
     let mut times = 0;
     let mut use_break = false;
     let mut server_ranges = true;
     let mut is_keep = false;
-    // 重试次数耗尽后放弃此文件（不能把残缺的临时文件移到目标路径）
+    // 重试次数耗尽后放弃此文件，不能把残缺的临时文件移到目标路径
     let mut is_fail = false;
 
     let mut temp_file;
@@ -206,8 +205,7 @@ fn download(index: u32, mut obj: DownloadObj) {
     loop {
         temp_file = crate::gen_temp_file();
 
-        // 任务已被取消：立即放弃，不再重试
-        // （stop 时下载线程要 join，取消必须能尽快打断在途下载）
+        // 任务已被取消：立即放弃，不再重试；stop 时下载线程要 join，取消必须尽快打断在途下载
         if obj.task.is_cancelled() {
             is_fail = true;
             break;
@@ -231,7 +229,7 @@ fn download(index: u32, mut obj: DownloadObj) {
 
         let mut file = file.unwrap();
 
-        // 发起 HTTP 请求（支持断点续传）
+        // 发起 HTTP 请求，支持断点续传
         let mut resp = if use_break && server_ranges {
             let result = block_on(
                 mml_net::get_work_client().get_ranges(&obj.item.base.url, obj.item.get_now_size()),
@@ -321,7 +319,7 @@ fn download(index: u32, mut obj: DownloadObj) {
     path_helper::move_file(&temp_file, &obj.item.base.file).unwrap();
 
     // ============================================================
-    // 第五步：后处理（解压 native 库 / 存档）
+    // 第五步：后处理，解压 native 库 / 存档
     // ============================================================
     let res: Result<(), ErrorType> = match &obj.item.base.later {
         LaterRun::None => Ok(()),
@@ -345,8 +343,6 @@ fn download(index: u32, mut obj: DownloadObj) {
 
 /// 流式写入下载数据到文件
 ///
-/// # 参数
-///
 /// - `index`: 线程序号
 /// - `obj`: 下载项目
 /// - `resp`: HTTP 响应流
@@ -362,14 +358,14 @@ async fn write_file(
     file: &mut File,
 ) -> CoreResult<()> {
     loop {
-        // 任务已被取消：立即中断在途下载（stop / 用户取消时不再等当前文件下完）
+        // 任务已被取消：立即中断在途下载，stop 或用户取消时不再等当前文件下完
         if obj.task.is_cancelled() {
             obj.item.set_state(DownloadItemState::Error);
             crate::update(index, &obj.item);
             return Err(ErrorType::TaskCancel);
         }
 
-        // 任务暂停：原地等待恢复（期间同时响应取消，避免暂停期间无法取消）
+        // 任务暂停：原地等待恢复，期间同时响应取消，避免暂停期间无法取消
         while obj.task.is_paused() {
             if obj.task.is_cancelled() {
                 obj.item.set_state(DownloadItemState::Error);
@@ -429,9 +425,8 @@ async fn write_file(
 
 /// 校验文件哈希
 ///
-/// 支持 MD5、SHA1、SHA256、SHA512 及组合校验（SHA1+SHA256、SHA1+SHA512）。
-///
-/// # 参数
+/// 支持 MD5、SHA1、SHA256、SHA512 及组合校验：SHA1+SHA256、SHA1+SHA512，
+/// 比较时忽略大小写。
 ///
 /// - `file`: 文件路径
 /// - `hash`: 期望的哈希值
@@ -629,13 +624,19 @@ mod tests {
 
     use super::*;
 
-    /// "hello" 的标准哈希值（公开测试向量）
+    /// "hello" 的标准哈希值，公开测试向量
     const HELLO_MD5: &str = "5d41402abc4b2a76b9719d911017c592";
     const HELLO_SHA1: &str = "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d";
     const HELLO_SHA256: &str = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824";
     const HELLO_SHA512: &str = "9b71d224bd62f3785d96d46ad3ea3d73319bfbc2890caadae2dff72519673ca72323c3d99ba5c11d7c7acc6e14b8c5da0c4663475c2e5c3adef46f73bcdec043";
 
     /// 在临时目录创建内容为 "hello" 的测试文件
+    ///
+    /// - `name`: 临时子目录的用例特征
+    ///
+    /// # 返回值
+    ///
+    /// 返回已写入 `hello` 的文件路径
     fn make_hello_file(name: &str) -> PathBuf {
         let dir = crate::test_util::make_temp_dir(name);
         let file = dir.join("hello.txt");
@@ -643,7 +644,7 @@ mod tests {
         file
     }
 
-    /// 重试次数未达上限（5 次）时继续重试
+    /// 重试次数未达上限 5 次时继续重试
     #[test]
     fn is_need_err_allows_under_threshold() {
         crate::test_util::ensure_env();
@@ -655,7 +656,7 @@ mod tests {
         assert_eq!(times, 5);
     }
 
-    /// 重试次数超过上限（5 次）后放弃
+    /// 重试次数超过上限 5 次后放弃
     #[test]
     fn is_need_err_stops_over_threshold() {
         crate::test_util::ensure_env();
@@ -673,7 +674,7 @@ mod tests {
         assert!(check_hash(&file, &FileHash::None, &mut stream).is_ok());
     }
 
-    /// 单哈希（MD5/SHA1/SHA256/SHA512）匹配（含大小写不敏感）
+    /// 单哈希 MD5/SHA1/SHA256/SHA512 匹配，且大小写不敏感
     #[test]
     fn check_hash_single_matches() {
         let file = make_hello_file("hash-single");
@@ -692,7 +693,7 @@ mod tests {
                 "{expected} 应校验通过"
             );
 
-            // 大写匹配（校验值大小写不敏感）
+            // 大写匹配，校验值大小写不敏感
             let upper = hash_to_upper(&hash);
             let mut stream = fs::File::open(&file).unwrap();
             assert!(
@@ -727,7 +728,7 @@ mod tests {
         let combo = FileHash::Sha1Sha256(HELLO_SHA1.to_string(), "0".repeat(64));
         assert!(check_hash(&file, &combo, &mut stream).is_err());
 
-        // SHA1 错误（短路，不再校验第二个）
+        // SHA1 错误时短路，不再校验第二个
         let mut stream = fs::File::open(&file).unwrap();
         let combo = FileHash::Sha1Sha256("0".repeat(40), HELLO_SHA256.to_string());
         assert!(check_hash(&file, &combo, &mut stream).is_err());
@@ -754,7 +755,7 @@ mod tests {
         assert!(check_hash(&file, &combo, &mut stream).is_err());
     }
 
-    /// 将校验值转为大写（测试大小写不敏感比较）
+    /// 将校验值转为大写，用于测试大小写不敏感比较
     fn hash_to_upper(hash: &FileHash) -> FileHash {
         match hash {
             FileHash::Md5(v) => FileHash::Md5(v.to_uppercase()),

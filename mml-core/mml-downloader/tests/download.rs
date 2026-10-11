@@ -3,6 +3,7 @@ use std::{env, fs, sync::Arc};
 use mml_base::file_item::{FileHash, FileItemObj, LaterRun};
 use mml_downloader::{DownloadTaskState, IDownloadGui, download_item::DownloadItem};
 
+/// 测试用 GUI 回调，把下载状态打印到标准输出
 struct GuiRun {}
 
 impl IDownloadGui for GuiRun {
@@ -37,8 +38,8 @@ impl IDownloadGui for GuiRun {
     }
 }
 
-/// 真实网络下载测试：需要访问外网（Apache 镜像），仅在显式运行时执行
-/// （`cargo test -- --ignored`），默认 `cargo test` 下跳过。
+/// 真实网络下载测试：需要访问外网，Apache 镜像，仅在显式运行时执行：
+/// `cargo test -- --ignored`，默认 `cargo test` 下跳过。
 #[ignore = "需要访问外网"]
 #[tokio::test]
 async fn test_download() {

@@ -7,7 +7,7 @@ use mml_game::launcher::{ModPackType, get_source_type};
 use mml_game::launcher_path::version_path::get_forge_json_name;
 use mml_game::loader::LoaderType;
 
-/// 加载器类型：id 与 from_id 双向转换，且 ids() 列表覆盖全部变体。
+/// 加载器类型：id 与 from_id 双向转换，且 ids() 列表覆盖全部变体
 #[test]
 fn loader_type_id_round_trip() {
     let ids = LoaderType::ids();
@@ -44,7 +44,7 @@ fn mod_pack_type_id_round_trip() {
     // 未知 ID 回退 None
     assert_eq!(ModPackType::from_string("unknown"), ModPackType::None);
 
-    // 整数序列化顺序（serde_repr）
+    // 整数序列化顺序，由 serde_repr 决定
     assert_eq!(serde_json::to_value(ModPackType::CurseForge).unwrap(), 0);
     assert_eq!(serde_json::to_value(ModPackType::Modrinth).unwrap(), 1);
     assert_eq!(serde_json::to_value(ModPackType::None).unwrap(), 4);

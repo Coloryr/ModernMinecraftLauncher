@@ -1,6 +1,6 @@
 //! 史蒂夫模型生成模块
 //!
-//! 按皮肤类型（宽臂 / 纤细 / 旧版）生成本体模型与第二层（顶层）模型。
+//! 按皮肤类型生成本体模型与第二层顶层模型，皮肤类型分宽臂、纤细与旧版。
 
 use mml_skin::SkinType;
 
@@ -9,13 +9,13 @@ use crate::{
     cube_model::{CubeModelItemObj, SteveModel},
 };
 
-/// 生成一个模型
+/// 按皮肤类型生成本体模型
 ///
-/// - `skin_type`: 皮肤类型（决定手臂宽度，纤细模型手臂为 0.375）
+/// - `skin_type`: 皮肤类型，决定手臂宽度；纤细模型手臂为 0.375
 ///
 /// # 返回值
 ///
-/// 返回按 Minecraft 标准比例拼装的模型
+/// 返回按 Minecraft 标准比例拼装的本体模型，披风也在其中
 pub fn get_steve(skin_type: SkinType) -> SteveModel {
     let is_slim = skin_type == SkinType::NewSlim;
 
@@ -45,7 +45,7 @@ pub fn get_steve(skin_type: SkinType) -> SteveModel {
         cube::get_square_indices_default(),
     );
 
-    // 手臂 (根据类型决定宽度)
+    // 手臂：按类型决定宽度
     let arm_width = if is_slim { 0.375 } else { 0.5 };
     let arm = CubeModelItemObj::new(
         cube::get_square(arm_width, 1.5, 0.5, 0.0, 0.0, 0.0, 1.0),
@@ -55,20 +55,20 @@ pub fn get_steve(skin_type: SkinType) -> SteveModel {
     SteveModel::new(head, body, arm.clone(), arm, left_leg, right_leg, cape)
 }
 
-/// 生成第二层模型
+/// 按皮肤类型生成第二层模型
 ///
-/// 所有存在的部件均放大 1.125 倍；旧版（1.7）皮肤只有顶层头部。
+/// 所有存在的部件均放大 1.125 倍；旧版 1.7 皮肤只有顶层头部。
 ///
 /// - `skin_type`: 皮肤类型
 ///
 /// # 返回值
 ///
-/// 返回顶层模型（旧版皮肤下无数据的部件为空数组）
+/// 返回顶层模型；旧版皮肤下无数据的部件为空数组
 pub fn get_steve_top(skin_type: SkinType) -> SteveModel {
     let is_slim = skin_type == SkinType::NewSlim;
     let is_old = skin_type == SkinType::Old;
 
-    // 头部 (总是存在)
+    // 头部：总是存在
     let head = CubeModelItemObj::new(
         cube::get_square(1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.125),
         cube::get_square_indices_default(),
@@ -121,8 +121,8 @@ mod tests {
             .fold(0.0f32, |m, v| m.max(v.abs()))
     }
 
-    /// 史蒂夫模型的部件尺寸应与 Minecraft 标准模型一致
-    /// （以 VALUE = 0.5 为单位：头 1x1x1、身体 1x1.5x0.5、手臂 0.5x1.5x0.5 等）
+    /// 史蒂夫模型的部件尺寸应与 Minecraft 标准模型一致，
+    /// 以 VALUE = 0.5 为单位：头 1x1x1、身体 1x1.5x0.5、手臂 0.5x1.5x0.5
     #[test]
     fn test_get_steve_dimensions() {
         let m = get_steve(SkinType::New);
@@ -137,7 +137,7 @@ mod tests {
         assert_eq!(max_abs_axis(&m.body.model, 1), 1.5 * cube::VALUE);
         assert_eq!(max_abs_axis(&m.body.model, 2), 0.5 * cube::VALUE);
 
-        // 手臂：0.5 x 1.5 x 0.5（宽臂）
+        // 手臂：0.5 x 1.5 x 0.5，宽臂
         assert_eq!(max_abs_axis(&m.left_arm.model, 0), 0.5 * cube::VALUE);
         assert_eq!(max_abs_axis(&m.left_arm.model, 1), 1.5 * cube::VALUE);
         assert_eq!(max_abs_axis(&m.right_arm.model, 0), 0.5 * cube::VALUE);
@@ -156,7 +156,7 @@ mod tests {
         assert_eq!(m.left_arm.point, m.right_arm.point);
     }
 
-    /// 纤细 (slim) 模型手臂宽度应为 0.375，其余部件不变
+    /// 纤细模型手臂宽度应为 0.375，其余部件不变
     #[test]
     fn test_get_steve_slim_arm() {
         let slim = get_steve(SkinType::NewSlim);
@@ -169,7 +169,7 @@ mod tests {
         assert_eq!(slim.head.model, normal.head.model);
     }
 
-    /// 第二层（顶层）模型应放大 1.125 倍
+    /// 第二层即顶层模型应放大 1.125 倍
     #[test]
     fn test_get_steve_top_enlarged() {
         let top = get_steve_top(SkinType::New);
@@ -187,7 +187,7 @@ mod tests {
         assert!(top.cape.point.is_empty());
     }
 
-    /// 旧版 (1.7) 皮肤没有顶层身体部件，只有顶层头部
+    /// 旧版 1.7 皮肤没有顶层身体部件，只有顶层头部
     #[test]
     fn test_get_steve_top_old_only_head() {
         let top = get_steve_top(SkinType::Old);

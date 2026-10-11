@@ -32,7 +32,7 @@ const FALLBACK_LOADERS = NO_VERSION_LOADERS;
  */
 export function useLoaders(gameVersion: Ref<string>, isLeaving: () => boolean) {
   const { track } = useUnlisteners();
-  /** 当前游戏版本支持的加载器 ID 列表（mml-core 独立 ID，显示名走 i18n） */
+  /** 当前游戏版本支持的加载器 ID 列表，取自 mml-core 的独立 ID，显示名走 i18n */
   const loaders = ref<string[]>([]);
   /** 已选加载器 ID */
   const loader = ref("normal");
@@ -230,7 +230,7 @@ export function useLoaders(gameVersion: Ref<string>, isLeaving: () => boolean) {
   /**
    * 按当前状态重新判定关闭保护
    *
-   * 页面被切走时调用方会直接把守卫关掉（见 AddInstanceWindow 的 onDeactivated），
+   * 页面被切走时调用方会直接把守卫关掉，见 AddInstanceWindow 的 onDeactivated，
    * 切回来得按"这会儿还在不在查"再定一次，否则查询在途时窗口又能被随手关掉。
    */
   function syncCloseGuard() {

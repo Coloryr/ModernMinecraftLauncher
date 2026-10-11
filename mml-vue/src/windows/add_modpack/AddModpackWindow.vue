@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 下载整合包窗口：CurseForge / Modrinth 在线搜索 + 选版本安装
 // 安装是多任务的：命令立即返回，进度由 add-modpack-status 事件驱动，
-// 顶部进度条显示任务数与详情（见 ModpackInstallBar）。
+// 顶部进度条显示任务数与详情，见 ModpackInstallBar。
 import { onMounted, onUnmounted, ref } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import ModpackInstallBar from "../../components/ModpackInstallBar.vue";

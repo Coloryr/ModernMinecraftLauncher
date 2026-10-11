@@ -3,7 +3,7 @@
 //
 // - 顶栏（ContentHead）：标题 + 视图切换 + 「分组」开关 + 新建分组 + 刷新
 // - 分组打开：每个自建分组一块，末尾跟一块「未分组」；把模组行拖到某块上即归到该组
-// - 分组关闭：选中的视图直接铺平（拖拽也随之关闭 —— 没有落点可言）
+// - 分组关闭：选中的视图直接铺平，拖拽也随之关闭 —— 没有落点可言
 //
 // 数据：模组列表在 useResourceData，分组在 useModGroups（自己的 JSON），
 // 拖拽在 useModDrag，两种视图共用同一套落点判定。
@@ -85,7 +85,7 @@ async function applyDrop(target: ModDropTarget, keys: string[]) {
   // 拖拽只带 SHA1（内容哈希），要调启用 / 禁用得换回那一条的 uuid
   const picked = pickByState(keys, wantDisable);
 
-  // 先摘出分组：它不属于列表数据，单独提交（reload: false 那条路）
+  // 先摘出分组：它不属于列表数据，单独提交，走 reload: false 那条路
   await groups.setGroup(null, keys);
   await setState(picked, wantDisable);
 }
@@ -108,7 +108,7 @@ async function afterGroupDrop(keys: string[]) {
  *
  * **不重拉列表**：启用 / 禁用只是给文件名加减后缀，jar 里的元数据一个字都没变 ——
  * 重扫要把每个包重新解析一遍（几百个包好几秒），纯属白干。
- * 后端会回**改名后的新身份**（uuid / 文件名 / 路径），就地改那一行即可；
+ * 后端会回**改名后的新身份**，即 uuid / 文件名 / 路径，就地改那一行即可；
  * `disable` 一改，`sections` 会把它挪到「已禁用 / 已启用」那一块去。
  */
 async function setState(picked: ModItemDto[], wantDisable: boolean) {
@@ -215,7 +215,7 @@ function onRowClick(payload: { event: MouseEvent; item: ModItemDto }) {
  *   这里不排的话，整段选择会和屏幕顺序对不上，用户报过"选中 159 项"；
  * - **收起的分组看不见，不算进整段** —— 选中的就是看得见的那一段。
  *
- * 没有锚点（第一次就是 Shift + 点）时只选这一项。
+ * 没有锚点时，也就是第一次就是 Shift + 点，只选这一项。
  */
 function selectRange(item: ModItemDto) {
   const order = sections.value
@@ -225,7 +225,7 @@ function selectRange(item: ModItemDto) {
   const to = order.findIndex((x) => modSelectKey(x) === modSelectKey(item));
   if (to < 0) return;
 
-  // 锚点也是"混合键"（SHA1 优先、uuid 兜底），比较要用同一个函数
+  // 锚点也是"混合键"，SHA1 优先、uuid 兜底，比较要用同一个函数
   const from = order.findIndex((x) => modSelectKey(x) === lastClickedKey.value);
   if (from < 0) {
     selected.value = new Set([modSelectKey(item)]);
@@ -240,7 +240,7 @@ function selectRange(item: ModItemDto) {
     .filter((key): key is string => !!key);
   selected.value = new Set(keys);
   // **锚点不动**：它始终是"最初点的那一项"，反复 Shift + 点都从同一个起点重新划范围
-  // （资源管理器同一口径；锚点行上那道竖条就是"起点在这里"的标记）
+  // 资源管理器同一口径；锚点行上那道竖条就是"起点在这里"的标记
 }
 
 /** 批量改启用状态：`wantDisable = true` 禁用、`false` 启用 */
@@ -264,7 +264,7 @@ function batchRemove() {
       });
       clearSelection();
     },
-    // act 内部已经重拉过列表了，这里别再拉一遍（模组那一次要重解析所有 jar，很慢）
+    // act 内部已经重拉过列表了，这里别再拉一遍；重拉模组要重解析所有 jar，很慢
     { reload: false },
   );
 }
@@ -276,7 +276,7 @@ function batchRemove() {
  * 与拖进自建分组同一口径，**顺带启用**，见 [`afterGroupDrop`]。
  */
 async function batchMove(group: string, keys: string[] = [...selected.value]) {
-  // 分组的键**必须是 SHA1**（内核的 `Mod.Groups` 按内容哈希记）：
+  // 分组的键**必须是 SHA1**，内核的 `Mod.Groups` 按内容哈希记：
   // 选中键现在可能是 uuid（没有 SHA1 的条目），这里换成 SHA1 并把换不出来的过滤掉，
   // 别把 uuid 混进分组表里
   const sha1s = keys
@@ -328,7 +328,7 @@ function createGroupFromPick() {
 // ---------- 分组右键菜单 ----------
 //
 // 菜单项全部作用在**整组**上：启用所有 / 禁用所有 / 转移内容 / 删除所有模组，
-// 自建分组再多一项删除分组（状态分组是内核按启用状态分的，删不掉）。
+// 自建分组再多一项删除分组；状态分组是内核按启用状态分的，删不掉。
 // 菜单本身是 `mod/ModGroupMenu.vue`（只负责画与定位），动作在这里执行。
 
 /** 打开右键菜单的那个分组（null = 没开） */
@@ -345,7 +345,7 @@ const groupMenu = ref<{
   y: number;
 } | null>(null);
 
-/** 分组里的模组（按 id 从当前 sections 里取那一批） */
+/** 分组里的模组；按 id 从当前 sections 里取那一批 */
 function groupItems(id: string): ModItemDto[] {
   return sections.value.find((sec) => sec.id === id)?.items ?? [];
 }
@@ -363,7 +363,7 @@ function openGroupMenu(payload: {
     label: payload.label,
     custom: payload.custom,
     count: payload.count,
-    // 启用 / 禁用两项**按组内实际状态**给（用户口径：已启用分组只显示"禁用所有"）：
+    // 启用 / 禁用两项**按组内实际状态**给，用户口径是已启用分组只显示"禁用所有"：
     // 识别失败的模组改不了启用状态（勾选框也是禁用的），所以不计入判断
     canEnable: groupItems(payload.id).some((item) => !item.fail && item.disable),
     canDisable: groupItems(payload.id).some((item) => !item.fail && !item.disable),
@@ -392,7 +392,7 @@ function groupRemoveMods(id: string, label: string) {
         }
       });
     },
-    // act 内部已经重拉过列表，这里别再拉一遍（重拉要重解析所有 jar，很慢）
+    // act 内部已经重拉过列表，这里别再拉一遍；重拉要重解析所有 jar，很慢
     { reload: false },
   );
 }
@@ -449,7 +449,7 @@ function onGroupMenuAction(kind: GroupMenuAction) {
 
 // ---------- 模组行右键菜单 ----------
 //
-// 四个动作都复用已有的**单行**操作（toggle / openNote / openFolder / remove），
+// 四个动作都复用已有的**单行**操作，即 toggle / openNote / openFolder / remove，
 // 所以这里只做分发。原来右键是"加选 / 取消多选"，改成菜单后多选交给左侧勾选框。
 
 /** 打开项目菜单的那一行，`null` 表示没开 */
@@ -460,7 +460,7 @@ function openItemMenu(payload: { event: MouseEvent; item: ModItemDto }) {
   const x = payload.event.clientX;
   const y = payload.event.clientY;
 
-  // 有选中项时，右键 = **批量动作**（用户口径：多选后菜单也要跟着变）
+  // 有选中项时，右键 = **批量动作**；用户口径是多选后菜单也要跟着变
   const picked = selectedItems.value;
   if (picked.length) {
     batchMenu.value = {
@@ -573,7 +573,9 @@ const STATE_KEYS: Record<ModStateGroup, { id: string; labelKey: string }> = {
 interface ModSection {
   /** 分组 uuid（自建与状态分组同一套键空间） */
   id: string;
+  /** 分组名；自建分组是用户起的名字，状态分组是 `t()` 好的文案 */
   label: string;
+  /** 这一块里的模组，顺序就是显示顺序 */
   items: ModItemDto[];
   /** 自建分组：可改名 / 删除，落点 = 归组 */
   custom: boolean;
@@ -728,7 +730,7 @@ function bindSection(id: string, el: Element | null) {
   else sectionEls.delete(id);
 }
 
-/** 当前渲染的块 id（拖拽排序的坐标轴；与 DOM 里的顺序一致） */
+/** 当前渲染的块 id；拖拽排序的坐标轴，与 DOM 里的顺序一致 */
 const sectionIds = computed(() => sections.value.map((sec) => sec.id));
 
 const {
@@ -746,7 +748,7 @@ const {
  * 把某一块拖到第 `insertAt` 块之前
  *
  * 与左侧分类栏同一算法：摘掉被拖项后，目标下标在被拖项之后要减一。
- * 落盘的就是**分组 uuid**（状态分组与自建分组同一套键空间，不用转换）。
+ * 落盘的就是**分组 uuid**；状态分组与自建分组同一套键空间，不用转换。
  */
 async function moveSection(from: string, insertAt: number) {
   const ids = sectionIds.value;
@@ -817,7 +819,7 @@ function removeGroup(id: string, name: string) {
     t("resource.groupDelete"),
     t("resource.groupDeleteConfirm", { name }),
     () => groups.remove(id),
-    // 分组数据不在资源列表里：删完不用重拉列表（模组那一次要重解析 jar，很慢）
+    // 分组数据不在资源列表里：删完不用重拉列表；重拉模组要重解析 jar，很慢
     { reload: false },
   );
 }
@@ -825,7 +827,7 @@ function removeGroup(id: string, name: string) {
 // ---------- 模组备注 ----------
 
 /**
- * 备注弹窗的草稿（`item` 是列表里那一条的引用，存完直接改它）
+ * 备注弹窗的草稿；`item` 是列表里那一条的引用，存完直接改它
  *
  * 备注存在 `gui_setting.json` 的 `Mod.ModName`（与 ColorMC 互通），
  * **不在模组列表里**，所以存完**不能重拉列表** —— 重拉一次要重新解析每个 jar
@@ -839,7 +841,7 @@ function openNote(item: ModItemDto) {
   noteForm.value = { item, text: item.note };
 }
 
-/** 保存（`text` 传空串 = 清掉备注） */
+/** 保存；`text` 传空串 = 清掉备注 */
 async function saveNote(text: string) {
   const form = noteForm.value;
   if (!form || noteBusy.value) return;
@@ -894,7 +896,7 @@ onMounted(() => void groups.load());
   <ContentHead :data="data">
     <template #actions>
       <!--
-        有选中项时顶栏换成批量操作条（用户选的口径："顶栏出现批量按钮"）。
+        有选中项时顶栏换成批量操作条，用户选的口径是"顶栏出现批量按钮"。
         整条替换而不是并列：搜索框 + 视图切换 + 新建分组本来就占满一行，
         再挤进 4 个批量按钮会互相压。
       -->
@@ -937,10 +939,10 @@ onMounted(() => void groups.load());
   </ContentHead>
 
   <!--
-    加载中：与「下载整合包」窗口同一套骨架行（呼吸动画，见 `styles/skeleton.css`）
+    加载中：与「下载整合包」窗口同一套骨架行，呼吸动画见 `styles/skeleton.css`
 
     模组这一档是真慢 —— 每个 jar 都要解析元数据，几百个包要好几秒，
-    所以给骨架 + **扫描进度 `x/x`**（进度事件由后端逐文件发出，见 useResourceData）
+    所以给骨架 + **扫描进度 `x/x`**，进度事件由后端逐文件发出，见 useResourceData
   -->
   <div v-if="loading" class="item-list">
     <ListSkeleton :done="modProgress.done" :total="modProgress.total" />
@@ -951,7 +953,7 @@ onMounted(() => void groups.load());
     表格视图：**一张总表**（分组名就是第一列），不是每块一张小表
     —— 这样"哪个模组在哪个组"一眼看得到，也不必在每块上重复 15 列表头。
 
-    每个分组仍是拖拽落点（data-* 属性挂在 <section> 上，落点判定与列表视图共用一套），
+    每个分组仍是拖拽落点，data-* 属性挂在 <section> 上，落点判定与列表视图共用一套，
     只是这一块内部不再画分组头与模组行，而是把整批交给 ModTable 自己渲染。
   -->
   <div v-else-if="modView === 'table'" class="item-list mod-groups mod-groups-table">
@@ -1004,7 +1006,7 @@ onMounted(() => void groups.load());
         })">
           <!--
             分组头分两块，**两块都能点开 / 收起**：
-            - 箭头：只管折叠，不参与拖拽（`@pointerdown.stop` 挡住把手的按下事件）；
+            - 箭头：只管折叠，不参与拖拽，`@pointerdown.stop` 挡住把手的按下事件；
             - 名字那一带：既是折叠的点击区，也是拖拽把手（按住拖动即调整分组顺序）。
               拖动结束时那一下 click 由 onSectionToggle 里的抑制标记吞掉。
           -->

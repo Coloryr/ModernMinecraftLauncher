@@ -23,8 +23,10 @@ const props = defineProps<{
   locked?: boolean;
 }>();
 
-/** 回传改动后的整份启动参数 */
-const emit = defineEmits<{ (e: "update:args", v: InstanceArgsDto): void }>();
+const emit = defineEmits<{
+  /** 回传改动后的整份启动参数 */
+  (e: "update:args", v: InstanceArgsDto): void;
+}>();
 
 const advancedOpen = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);

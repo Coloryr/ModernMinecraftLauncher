@@ -242,10 +242,12 @@ pub(crate) struct ElementJson {
     rotation: Option<RotationJson>,
 }
 
+/// elements.from 的缺省值，即元素最小角 [0,0,0]，0..16 坐标
 fn d_from() -> Vec<f32> {
     vec![0.0, 0.0, 0.0]
 }
 
+/// elements.to 的缺省值，即元素最大角 [16,16,16]，0..16 坐标
 fn d_to() -> Vec<f32> {
     vec![16.0, 16.0, 16.0]
 }
@@ -267,6 +269,7 @@ struct RotationJson {
     rescale: Option<bool>,
 }
 
+/// rotation.origin 的缺省值，即元素旋转原点 [8,8,8]，0..16 坐标
 fn d_rot_origin() -> Vec<f32> {
     vec![8.0, 8.0, 8.0]
 }

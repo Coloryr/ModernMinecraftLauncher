@@ -36,8 +36,10 @@ const props = withDefaults(
   },
 );
 
-/** 请求关闭；`overlayClose` 为假时点遮罩不发这条 */
-const emit = defineEmits<{ (e: "close"): void }>();
+const emit = defineEmits<{
+  /** 请求关闭；`overlayClose` 为假时点遮罩不发这条 */
+  (e: "close"): void;
+}>();
 
 /** 所属页面是否在前台；隐藏时连遮罩一起收掉，别盖到别的页面上 */
 const active = usePageActive();

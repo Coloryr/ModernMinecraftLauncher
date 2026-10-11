@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 存档列表：备份、还原、打开目录、删除（数据包是同一分类下的子页，见 DatapackPane）
+// 存档列表：备份、还原、打开目录、删除；数据包是同一分类下的子页，见 DatapackPane
 import { ref } from "vue";
 import { t } from "../../../lib/i18n";
 import { stripFormatting } from "../../../lib/formatting";
@@ -90,7 +90,7 @@ function formatTime(ms: number): string {
   return new Date(ms).toLocaleString();
 }
 
-/** 备份体积（字节 → 人类可读） */
+/** 备份体积，输入字节，输出人类可读文本 */
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;

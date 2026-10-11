@@ -1,5 +1,5 @@
 // 账户共享存储：主窗口、账户选择器、账户窗口共用
-// 数据由 Rust 提供（windows/account.rs，持久化 accounts.json），
+// 数据由 Rust 提供，见 windows/account.rs，持久化到 accounts.json，
 // 操作通过 IPC；跨窗口通过 account-change 事件同步。
 import { ref } from "vue";
 import { listen } from "@tauri-apps/api/event";
@@ -51,6 +51,9 @@ export async function loadAccounts(): Promise<void> {
 /**
  * 设置当前使用账户
  *
+ * 乐观更新：本地状态先改，后端失败也不回滚 —— 失败时后端不会再广播
+ * `account-change`，界面与后端的不一致会持续到下一次重拉。
+ *
  * - `acc`: 目标账户
  */
 export async function setCurrentAccount(acc: AccountStoreDto) {
@@ -62,7 +65,7 @@ export async function setCurrentAccount(acc: AccountStoreDto) {
   currentAccount.value = acc;
 }
 
-/** 取消当前选择（后端清空记录并广播 account-change） */
+/** 取消当前选择，后端清空记录并广播 account-change */
 export async function clearCurrentAccount() {
   try {
     await commands.account.setCurrentAccount("");
@@ -86,6 +89,7 @@ export async function removeAccount(uuid: string) {
   const idx = accounts.value.findIndex((a) => a.uuid === uuid);
   if (idx >= 0) accounts.value.splice(idx, 1);
   if (currentAccount.value?.uuid === uuid) {
+    // 删掉的正是当前账户：回退到第一个剩余账户，与后端 account_remove_account 同一口径
     currentAccount.value = accounts.value[0] ?? null;
   }
 }

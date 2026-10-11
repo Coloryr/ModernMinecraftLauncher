@@ -69,7 +69,7 @@ import { useWindowDecoration } from "../../lib/useWindowDecoration";
 // 注意：不能用顶层 await —— 会让 <script setup> 变成 async setup，
 // App.vue 没有 <Suspense> 包裹，Vue 将不渲染该组件（窗口白屏）
 // 系统窗口标题（任务栏 / Alt+Tab）走自定义命令 window_set_title：
-// JS API setTitle 需要 core:window:allow-set-title 权限（capabilities 未放行）。
+// JS API setTitle 需要 core:window:allow-set-title 权限，capabilities 未放行。
 // 必须用 useWindowTitle 而不是在这里直接设一次：单窗口模式下本页被 KeepAlive 缓存，
 // 从子窗口切回来不重新挂载，只设一次的话任务栏上会一直挂着子窗口的标题
 useWindowTitle(() => t("winTitle.main"));
@@ -120,10 +120,10 @@ const filteredGroups = computed(() => {
 });
 
 function select(inst: InstanceInfoDto) {
-  // 实例锁定：只能使用锁定的那个实例（对玩家静默拦截，不暴露"被锁定"这件事）
+  // 实例锁定：只能使用锁定的那个实例；对玩家静默拦截，不暴露"被锁定"这件事
   if (lockActive.value && inst.uuid !== lockUuid.value) return;
   selected.value = inst;
-  // 持久化当前选中实例到 gui_config.json（uuid 未变时内部跳过，不会重复写盘）
+  // 持久化当前选中实例到 gui_config.json；uuid 未变时内部跳过，不会重复写盘
   setSelectedInstance(inst.uuid);
   newsActive.value = false;
   // 分组模式下展开所在分组
@@ -137,7 +137,7 @@ function select(inst: InstanceInfoDto) {
 
 // ================= 游戏列表模式 =================
 
-// 显示模式：共享状态（默认「列表」，用户改过后持久化到 gui_config.json）
+// 显示模式：共享状态，默认「列表」，用户改过后持久化到 gui_config.json
 const mode = viewMode;
 const MODE_OPTIONS = computed(() => [
   { value: "group", label: t("mode.group"), icon: "folder" },
@@ -146,15 +146,15 @@ const MODE_OPTIONS = computed(() => [
 ]);
 
 /**
- * 分组注册表（含空分组；顺序即显示顺序）
+ * 分组注册表，含空分组；顺序即显示顺序
  *
- * 分组以 **uuid 为身份**、组名只是显示数据（见 mml-game 的 `game_group`），
+ * 分组以 **uuid 为身份**、组名只是显示数据，见 mml-game 的 `game_group`，
  * 所以界面上一律按 uuid 认组：改名、重复显示名都不会混淆，也不怕组名留白。
  */
 const groupList = ref<GroupDto[]>([]);
 
 /**
- * 默认分组的 uuid（对不上时回退到"名字为空"那个）
+ * 默认分组的 uuid；对不上时回退到"名字为空"那个
  *
  * 默认分组由后端保证恒存在、名字留白；它**只是初始排在首位**，用户能拖到别处，
  * 所以这里**按名字找**，不能取"表里的第一个"（那会取到恰好排在最前的那一组）。
@@ -166,8 +166,8 @@ const defaultGroupId = computed(
 /**
  * 实例所在分组的 uuid
  *
- * 归属为空（默认分组）或指向一个已经不在表里的组（界面上是过期数据）时，
- * 一律算默认分组 —— 宁可归错组，也不能让实例从界面上消失。
+ * 归属为空说明实例在默认分组，指向一个已经不在表里的组说明界面上是过期数据，
+ * 两种都一律算默认分组 —— 宁可归错组，也不能让实例从界面上消失。
  */
 function groupIdOf(inst: InstanceInfoDto): string {
   const id = inst.group;
@@ -194,7 +194,7 @@ const groups = computed<GroupView[]>(() => {
     : [{ uuid: "", name: "" }];
   // 顺序就是内核表给的顺序：默认分组在前，其余按用户排定的先后
   return list.map((g) => {
-    // 组内次序由后端下发（分组表 group_save.json 的 order）；
+    // 组内次序由后端下发，见分组表 group_save.json 的 order；
     // 同值时按名字兜底，保证顺序确定而不是随 HashMap 抖动
     const items = [...(map.get(g.uuid) ?? [])].sort(
       (a, b) => a.order - b.order || a.name.localeCompare(b.name),
@@ -246,10 +246,10 @@ function toggleNews() {
   newsActive.value = !newsActive.value;
 }
 
-// ---- 自定义主页面（服主导入的 zip 顶替内置主页；导入 / 删除在设置窗口「客户端设置」） ----
+// ---- 自定义主页面：服主导入的 zip 顶替内置主页，导入 / 删除在设置窗口「客户端设置」 ----
 // 启用与否在 gui_config.client.customHome，已导入情况来自常驻压缩包，都由 status 现算
 
-/** 自定义主页面状态（null = 还没拉到 / 出错 → 一律回落内置主页） */
+/** 自定义主页面状态；null 表示还没拉到或出错，一律回落内置主页 */
 const customHome = ref<CustomHomeInfoDto | null>(null);
 
 /** 是否用自定义页面顶替内置主页：启用 + 已导入 + 有入口 URL，任一不满足都回落，不白屏 */
@@ -258,7 +258,7 @@ const useCustomHome = computed(
     !!customHome.value?.enabled && !!customHome.value.installed && !!customHome.value.entryUrl,
 );
 
-/** 拉取自定义主页面状态（没导入过就是 installed=false，不报错） */
+/** 拉取自定义主页面状态；没导入过就是 installed=false，不报错 */
 async function loadCustomHome() {
   try {
     customHome.value = await commands.customHome.status();
@@ -269,8 +269,8 @@ async function loadCustomHome() {
 
 // 切换选中实例后自动滚动到详情顶部
 //
-// 监听 uuid 而不是 selected 对象本身：改实例设置会触发 instance-change → 重拉实例列表
-// （loadInstances），那里会把 selected 换成一个新对象（uuid 没变）。监听对象引用的话，
+// 监听 uuid 而不是 selected 对象本身：改实例设置会触发 instance-change → 重拉实例列表，
+// 即 loadInstances，那里会把 selected 换成一个新对象，uuid 并没变。监听对象引用的话，
 // 每次改设置都会把详情滚回顶部
 const detailEl = ref<HTMLElement | null>(null);
 
@@ -283,7 +283,7 @@ watch(
   },
 );
 
-/** 主页卡片显示的就是当前选中实例（持久化在 gui_config.json） */
+/** 主页卡片的启动：选中当前实例并收起主页，再走正常启动流程 */
 function quickLaunch() {
   const inst = selected.value;
   if (inst) {
@@ -297,7 +297,7 @@ const newsPage = ref(1);
 const newsHasMore = ref(true);
 let newsLoadedPage = 0; // 已成功加载的页码（0 = 未加载）
 
-/** 拉取指定页的新闻（页码从 1 开始；翻页翻到空页时回退并禁用下一页） */
+/** 拉取指定页的新闻；页码从 1 开始，翻到空页时回退并禁用下一页 */
 async function fetchNews(page: number) {
   if (newsLoading.value) return;
   newsLoading.value = true;
@@ -378,13 +378,13 @@ const launchStageText = computed(() =>
 
 // ================= 启动参数（经 IPC 读写核心实例配置） =================
 
-/** 列表模式下的实例设置面板（版本/加载器/内存/Java + 启动参数，与分组模式一致） */
+/** 列表模式下的实例设置面板，内容与分组模式下的设置区一致 */
 const settingsOpen = ref(false);
 const execOpen = ref(false);
 const serverOpen = ref(false);
 const proxyOpen = ref(false);
 
-/** 打开独立日志窗口（实例日志只在那个窗口里看，主页面不展示日志内容） */
+/** 打开独立日志窗口；实例日志只在那个窗口里看，主页面不展示 */
 function openLogWindow() {
   if (selected.value) openWindow("log", { uuid: selected.value.uuid });
 }
@@ -423,7 +423,7 @@ const ACTION_LABELS: Record<ActionId, string> = {
   delete: "actions.delete",
 };
 
-// ================= 二级菜单操作（导出 / 生成在线实例 / 生成实例信息） =================
+// ================= 二级菜单操作：导出 / 生成在线实例 / 生成实例信息 =================
 
 const openMenu = ref<string | null>(null);
 
@@ -465,7 +465,7 @@ function onMenuPick(opt: { labelKey: string }) {
   showToast(t("actions.wip", { name: t(opt.labelKey) }));
 }
 
-// ================= 元信息（版本 / 加载器 / 整合包 / 语言，合并进实例设置） =================
+// ================= 元信息：版本 / 加载器 / 整合包 / 语言，合并进实例设置 =================
 
 async function onMetaUpdate(patch: Partial<InstanceInfoDto>) {
   if (!selected.value) return;
@@ -484,15 +484,15 @@ function onVersionsRefreshed(list: VersionInfoDto[]) {
 
 // ================= 分组拖拽移动 =================
 
-// ================= 自定义拖拽（useInstanceDrag，见下方多选初始化之后） =================
+// ================= 自定义拖拽：useInstanceDrag，见下方多选初始化之后 =================
 
-/** 点击分组标题（拖拽结束后抑制误触折叠） */
+/** 点击分组标题，拖拽结束后抑制误触折叠 */
 function onGroupTitleClick(id: string) {
   if (consumeSuppressClick()) return;
   toggleGroup(id);
 }
 
-// ================= 多选模式（逻辑见 composables/useMultiSelect） =================
+// ================= 多选模式：逻辑见 composables/useMultiSelect =================
 // 入口：右键分组 → 全选 → 进入多选；多选模式下右键实例出现操作菜单。
 
 const {
@@ -534,9 +534,9 @@ function onInstClick(inst: InstanceInfoDto) {
 // ----- 自定义右键菜单 -----
 
 const ctxMenu = ref<CtxMenuState | null>(null);
-/** 目标分组选择弹窗是否打开（转移分组 / 移动选中实例共用） */
+/** 目标分组选择弹窗是否打开；转移分组与移动选中实例共用 */
 const showMoveGroupPick = ref(false);
-/** 要转移的源分组（null 表示"移动选中的实例"） */
+/** 要转移的源分组；null 表示移动选中的实例 */
 const groupMoveSource = ref<string | null>(null);
 /** 弹窗下拉框里选中的目标分组 uuid */
 const moveGroupTarget = ref("");
@@ -590,7 +590,7 @@ function onMoveGroupClick() {
   if (id) openMoveGroupPicker(id);
 }
 
-/** 打开"选择目标分组"弹窗（`sourceId` 为 null 表示移动当前多选的实例） */
+/** 打开"选择目标分组"弹窗；`sourceId` 为 null 表示移动当前多选的实例 */
 function openMoveGroupPicker(sourceId: string | null) {
   // 顺序有讲究：closeCtxMenu 之后才记源分组，否则会被菜单的复位清掉
   closeCtxMenu();
@@ -658,7 +658,7 @@ async function moveGroupTo(sourceId: string, targetId: string | null) {
   const target = targetId ?? defaultGroupId.value;
   if (!g || g.items.length === 0 || target === sourceId) return;
   for (const inst of g.items) {
-    // 已经在目标组里的不必再发一次（一次一条 IPC，省掉无谓往返）
+    // 已经在目标组里的不必再发一次；一次一条 IPC，省掉无谓往返
     if (groupIdOf(inst) !== target) {
       await api.updateInstance(inst.uuid, { group: targetId });
     }
@@ -675,7 +675,7 @@ const deleteGroupCount = ref(0);
 const deleteGroupBusy = ref(false);
 
 function onDeleteGroup(groupId?: string) {
-  // 默认分组删不得（它的名字是空白，按 uuid 判，不看名字）
+  // 默认分组删不得；它的名字是空白，按 uuid 判，不看名字
   if (!groupId || groupId === defaultGroupId.value) return;
   const g = groups.value.find((x) => x.id === groupId);
   closeCtxMenu();
@@ -751,7 +751,7 @@ const iconPickPath = ref("");
 /**
  * 右键菜单「选择图片」：**直接开系统文件对话框**，不先弹一层自己的窗口
  *
- * 选到图才开截图弹窗（裁剪范围要用图片本身，那一步需要界面）；
+ * 选到图才开截图弹窗 —— 裁剪范围要用图片本身，那一步需要界面；
  * 取消选择就什么都不发生。
  */
 async function pickIconFile(inst: InstanceInfoDto) {
@@ -858,7 +858,7 @@ function onDocKeyDown(e: KeyboardEvent) {
   else if (multiSelect.value) exitMultiSelect();
 }
 
-/** 刷新实例列表并选中给定实例（添加 / 整合包安装完成后调用） */
+/** 刷新实例列表并选中给定实例；添加 / 整合包安装完成后调用 */
 async function adoptAddedInstance(uuid: string) {
   await Promise.all([loadInstances(), loadGroups()]);
   const inst = instances.value.find((i) => i.uuid === uuid);
@@ -874,7 +874,7 @@ async function onAddedInstanceStorage(newValue: string | null) {
 /** 上面那条通知的退订函数（挂载时订阅，卸载时摘掉） */
 let unlistenAdded: (() => void) | null = null;
 
-// 轻提示（统一使用全局 showToast）
+// 轻提示统一使用全局 showToast
 const showRename = ref(false);
 const renameName = ref("");
 const renameBusy = ref(false);
@@ -892,11 +892,11 @@ function onAction(id: ActionId) {
       showDelete.value = true;
       break;
     case "manageResource":
-      // 跳转到资源管理窗口（当前实例已持久化在 gui_config.json，窗口自己读）
+      // 跳转到资源管理窗口；当前实例已持久化在 gui_config.json，窗口自己读
       openWindow("resource");
       break;
     case "addResource":
-      // 跳转到添加资源窗口（当前实例已持久化在 gui_config.json，窗口自己读）
+      // 跳转到添加资源窗口；当前实例已持久化在 gui_config.json，窗口自己读
       openWindow("add_resource");
       break;
     case "viewLog":
@@ -955,13 +955,13 @@ const features: Array<{ id: FeatureId; icon: string }> = [
 
 const versions = ref<VersionInfoDto[]>([]);
 
-// ================= 拖拽文件（逻辑见 composables/useFileDrop） =================
+// ================= 拖拽文件：逻辑见 composables/useFileDrop =================
 
 /**
  * 拖入的文件 / 文件夹 / 登录卡片：认出类型后交给对应窗口
  *
  * - **网页卡片**（DOM 给的文本地址）与 `.url` / `.webloc` 快捷方式文件 → 「账户管理」预填地址；
- * - 整合包与文件夹 → 「添加实例」（那边有完整的导入链路，主窗口只负责"认类型 + 开窗"）。
+ * - 整合包与文件夹 → 「添加实例」，那边有完整的导入链路，主窗口只负责"认类型 + 开窗"。
  *
  * 多个文件只取第一个。
  */
@@ -996,7 +996,7 @@ async function onFilesDropped(payload: FileDropPayload) {
 const { fileDragOver, dragKind } = useFileDrop(onFilesDropped);
 
 /**
- * 拖入遮罩的标题：按这次拖的是哪一档选（见 useFileDrop 的 DragKind）
+ * 拖入遮罩的标题：按这次拖的是哪一档选，见 useFileDrop 的 DragKind
  *
  * 悬停阶段拿不到文件名，所以"整合包"只在 MIME 认得出来时才算。
  */
@@ -1017,7 +1017,7 @@ const groupAdding = ref(false);
 // 地址来源、竞态保护与定时刷新见 composables/useMotd；卡片外观在 components/MotdCard.vue，
 // 本窗口的悬浮卡、实例详情卡与资源窗口服务器列表上方那张三处共用同一份
 
-// ---- 客户端设置（gui_config.client）：MOTD 卡片显示与自动刷新间隔 ----
+// ---- 客户端设置，存在 gui_config.client：MOTD 卡片显示与自动刷新间隔 ----
 const clientConfig = ref<ClientConfig>({
   motdCard: true,
   motdInterval: 15,
@@ -1030,23 +1030,23 @@ const clientConfig = ref<ClientConfig>({
   customHome: false,
 });
 
-// ---- 实例锁定：只允许使用锁定的那个实例（设置窗口「客户端设置 → 实例锁定」） ----
+// ---- 实例锁定：只允许使用锁定的那个实例，入口在设置窗口「客户端设置 → 实例锁定」 ----
 /** 锁定的实例 uuid（空 = 未锁定） */
 const lockUuid = computed(() => clientConfig.value.lockInstance);
-/** 锁定是否生效：uuid 非空且实例还在（实例被删掉后走 lockMissing 的错误页） */
+/** 锁定是否生效：uuid 非空且实例还在；实例被删掉后走 lockMissing 的错误页 */
 const lockActive = computed(
   () => !!lockUuid.value && instances.value.some((i) => i.uuid === lockUuid.value),
 );
 /** 实例列表是否已加载过：区分「还在加载」与「确实没有这个实例」，避免启动瞬间闪错误页 */
 const instancesLoaded = ref(false);
-/** 锁定的实例已不存在（整合包作者的实例目录被删 / 改名）：主窗口整块换成错误页 */
+/** 锁定的实例已不存在，例如整合包作者的实例目录被删 / 改名：主窗口整块换成错误页 */
 const lockMissing = computed(
   () =>
     instancesLoaded.value &&
     !!lockUuid.value &&
     !instances.value.some((i) => i.uuid === lockUuid.value),
 );
-/** 锁定生效时强制按列表模式渲染（只覆盖渲染，不写回 gui_config，解锁后自动回到原模式） */
+/** 锁定生效时强制按列表模式渲染；只覆盖渲染，不写回 gui_config，解锁后自动回到原模式 */
 const effectiveMode = computed<ViewMode>(() => (lockActive.value ? "list" : mode.value));
 
 // 锁定生效时把选中实例压到锁定实例：切换入口已隐藏，若还停在别处（比如上次退出时选的是另一个）
@@ -1063,7 +1063,7 @@ watch(
 );
 
 // ---- 登录方式锁定：账户选择列表只显示锁定类型，当前账户被滤掉就取消选择 ----
-/** 锁定的登录类型（总开关关闭或列表为空 = 不过滤） */
+/** 锁定的登录类型；总开关关闭或列表为空时不过滤 */
 const lockedTypes = computed(
   () =>
     new Set(
@@ -1110,12 +1110,12 @@ function onClientConfig(c: ClientConfig) {
 
 const unlistens: Array<() => void> = [];
 
-// 整合包安装任务：进度本身已交给标题栏上的指示器（ModpackTitleIndicator），
-// 这里只借它做一件事 —— 安装成功后刷新实例列表并选中刚装好的那个（adoptAddedInstance）。
+// 整合包安装任务：进度本身已交给标题栏上的 ModpackTitleIndicator 指示器，
+// 这里只借它做一件事 —— 安装成功后刷新实例列表并选中刚装好的那个，即 adoptAddedInstance。
 // 所以不取 status，只用 init 返回的订阅。
 const { init: initModpackStatus } = useModpackStatus(false, adoptAddedInstance);
 
-// 资源下载任务（添加资源窗口关闭后，进度条迁到主窗口显示）
+// 资源下载任务：添加资源窗口关闭后，进度条迁到主窗口显示
 const { status: resourceStatus, init: initResourceStatus } = useResourceStatus(false);
 
 async function subscribeEvents() {
@@ -1149,11 +1149,11 @@ async function subscribeEvents() {
       loadInstances();
       loadGroups();
     }),
-    // 自定义主页面导入 / 删除（该动作不改 gui_config，client-config-change 不会发）
+    // 自定义主页面导入 / 删除：该动作不改 gui_config，client-config-change 不会发
     onCustomHomeChange(() => {
       void loadCustomHome();
     }),
-    // Java 列表变更（添加 / 删除 / 配置加载完成）→ 重新拉取
+    // Java 列表变更：添加 / 删除 / 配置加载完成，都重新拉取
     onJavaChange(() => {
       loadJava();
     }),
@@ -1172,10 +1172,10 @@ const colorMcInfo = ref<ColorMcInfoDto | null>(null);
 let colorMcSettled: (() => void) | null = null;
 
 /**
- * 问后端有没有可迁移的 ColorMC 数据（**在加载期间问，主页面之前**）
+ * 问后端有没有可迁移的 ColorMC 数据，**在加载期间问，主页面之前**
  *
  * 探测只读几个目录项、不依赖内核，所以挂载时就能发起（见 onMounted），与核心加载并行；
- * 一旦要弹窗，就**等用户答完**才放行主界面（加载页继续盖着，见 doInit）。
+ * 一旦要弹窗，就**等用户答完**才放行主界面 —— 加载页继续盖着，见 doInit。
  * 后端已问过（标记文件存在）或本机没有 ColorMC 时返回 null，直接放行。
  */
 async function checkColorMc() {
@@ -1191,7 +1191,7 @@ async function checkColorMc() {
   }
 }
 
-/** 弹窗关闭（三种选择任一，或右上角直接关掉）：放行主界面 */
+/** 弹窗关闭：三种选择任一或右上角直接关掉，都放行主界面 */
 function onColorMcClosed() {
   colorMcInfo.value = null;
   colorMcSettled?.();
@@ -1201,7 +1201,7 @@ function onColorMcClosed() {
 /**
  * 迁移完成
  *
- * 实例是"文件夹搬进来"的，运行中的核心**不会**重新扫实例目录（见 windows/colormc.rs），
+ * 实例是"文件夹搬进来"的，运行中的核心**不会**重新扫实例目录，见 windows/colormc.rs，
  * 所以权威结果是重启后再看；这里先把列表拉一次，万一被文件监听捡到了也能立刻显示。
  */
 function onColorMcDone() {
@@ -1316,7 +1316,7 @@ function onPickInstance(uuid: string) {
 // ================= 添加实例（独立窗口） =================
 
 function openAdd() {
-  // 实例锁定生效时禁止新建实例（入口本就随侧边栏 / 禁用按钮不可达，这里兜底）
+  // 实例锁定生效时禁止新建实例；入口本就随侧边栏 / 禁用按钮不可达，这里兜底
   if (lockActive.value) return;
   openWindow("add");
 }
@@ -1349,7 +1349,7 @@ async function createGroup() {
 /** 主窗口根元素：贴靠热区在里面惰性查找自己的最大化按钮 */
 const rootEl = ref<HTMLElement | null>(null);
 
-// 窗口装饰（激活插件装饰 + 交出贴靠热区）：与其它窗口共用同一套逻辑。
+// 窗口装饰：激活插件装饰 + 交出贴靠热区，与其它窗口共用同一套逻辑。
 // 主窗口的特别之处只在"启动画面"——标题栏要等核心 load 完成才渲染，
 // waitForSnapTarget 会一直等到那时，所以这里无需额外处理
 useWindowDecoration(rootEl);
@@ -1404,9 +1404,9 @@ onMounted(async () => {
 
 <template>
   <div class="main-window" ref="rootEl">
-    <!-- 加载期间：**只画一个关闭按钮**的标题栏（不放整条顶栏）。
-         两颗不画的按钮用 visibility 占位（见 .boot-head 的样式）—— 自绘装饰激活要量
-         "最大化按钮"的矩形（lib/decoration.ts 的 findMaximizeBtn），量不到插件会退回
+    <!-- 加载期间：**只画一个关闭按钮**的标题栏，不放整条顶栏。
+         两颗不画的按钮用 visibility 占位，见 .boot-head 的样式 —— 自绘装饰激活要量
+         "最大化按钮"的矩形，即 lib/decoration.ts 的 findMaximizeBtn，量不到插件会退回
          原生 frame、系统标题栏就又冒出来。 -->
     <header v-if="splashVisible || splashError" class="boot-head" :class="titleBarStyle"
       @pointerdown="onTitleBarPointerDown">
@@ -1414,7 +1414,7 @@ onMounted(async () => {
       <WindowControls :style="titleBarStyle" />
     </header>
 
-    <!-- 主界面顶栏：加载完成后才出现（加载期间上面那条只给关闭按钮） -->
+    <!-- 主界面顶栏：加载完成后才出现；加载期间上面那条只给关闭按钮 -->
     <MainTopbar v-else :features="features" :news-active="newsActive" :current-account="currentAccount"
       :accounts="visibleAccounts" @toggle-news="toggleNews" @feature="openWindow" @update:account="onAccountChange" />
 
@@ -1425,15 +1425,15 @@ onMounted(async () => {
     <!-- ===== 主界面 ===== -->
     <template v-else>
 
-      <!-- 整合包安装进度不再内嵌在这里：它改成了标题栏上的指示器 + 弹窗
-           （ModpackTitleIndicator / ModpackPopup），否则这条卡片会一直占着内容区的高度、把列表顶下去。
-           状态订阅在各处自己拿（标题栏指示器自包含），弹窗由 App.vue 渲染 -->
+      <!-- 整合包安装进度不再内嵌在这里：它改成了标题栏上的指示器 + 弹窗，
+           即 ModpackTitleIndicator / ModpackPopup，否则这条卡片会一直占着内容区的高度、把列表顶下去。
+           状态订阅在各处自己拿，标题栏指示器自包含；弹窗由 App.vue 渲染 -->
 
-      <!-- 资源下载进度（添加资源窗口关闭后迁到这里显示） -->
+      <!-- 资源下载进度：添加资源窗口关闭后迁到这里显示 -->
       <ResourceDownloadBar v-if="resourceStatus?.tasks.length && !resourceStatus.windowOpen" :status="resourceStatus"
         class="mpbar-in-main" />
 
-      <!-- 启动进度（启动期间显示：阶段文本 + 进度条；未知阶段走滚动条） -->
+      <!-- 启动进度：启动期间显示阶段文本 + 进度条，未知阶段走滚动条 -->
       <div v-if="selected?.running" class="mpbar-in-main launch-progress">
         <div class="launch-progress-head">
           <span class="launch-spinner"></span>
@@ -1459,7 +1459,7 @@ onMounted(async () => {
           <button class="multi-exit" @click="exitMultiSelect">{{ t("multi.exit") }}</button>
         </div>
 
-        <!-- 锁定的实例已不存在（整合包作者的实例被删 / 改名）：整块换成错误页，顶部栏保留 -->
+        <!-- 锁定的实例已不存在，例如整合包作者的实例被删 / 改名：整块换成错误页，顶部栏保留 -->
         <template v-if="lockMissing">
           <section class="lock-error">
             <div class="lock-error-badge">!</div>
@@ -1469,7 +1469,7 @@ onMounted(async () => {
 
         <!-- 空实例：强制打开启动器主页，主页内融合空状态引导（隐藏实例分组） -->
         <template v-else-if="instances.length === 0">
-          <!-- 自定义主页面：整块铺满内容区（不留四周内边距，也不给底部留白） -->
+          <!-- 自定义主页面：整块铺满内容区，不留四周内边距，也不给底部留白 -->
           <section v-if="useCustomHome" class="custom-home-page">
             <CustomHomePage :entry-url="customHome?.entryUrl ?? ''" />
           </section>
@@ -1512,8 +1512,8 @@ onMounted(async () => {
                 @update:model-value="onPickInstance" @add="openAdd" />
 
               <!-- 启动按钮一行、次级操作一行小按钮，两块宽度不同、整块居中不撑满：
-                   启动按钮就按文案取宽（同改动前），下面那行按三个按钮的文案取宽
-                   （见 main-window.css .launch-actions） -->
+                   启动按钮按自己的文案取宽，下面那行按三个按钮的文案取宽，
+                   见 main-window.css .launch-actions -->
               <div class="launch-actions">
                 <BaseButton variant="primary" size="lg" class="launch-main-btn"
                   :disabled="!selected || selected.running" @click="launch">
@@ -1530,7 +1530,7 @@ onMounted(async () => {
                     <GlyphIcon name="document" :size="13" :weight="1.8" /> {{ t("detail.logs") }}
                   </BaseButton>
                   <!-- 资源管理：分组 / 平铺模式的右侧详情面板里有这个入口，而列表模式没有详情面板，
-                     这里不补一个就进不去资源管理窗口（添加资源在资源窗口里有自己的入口） -->
+                     这里不补一个就进不去资源管理窗口；添加资源在资源窗口里有自己的入口 -->
                   <BaseButton size="sm" :disabled="!selected" @click="onAction('manageResource')">
                     <GlyphIcon name="package" :size="13" :weight="1.8" /> {{ t("actions.manageResource") }}
                   </BaseButton>
@@ -1549,14 +1549,14 @@ onMounted(async () => {
           </Transition>
         </template>
 
-        <!-- 模式：游戏分组 / 平铺（列表模式已在上面的分支处理，这里兜底） -->
+        <!-- 模式：游戏分组 / 平铺；列表模式已在上面的分支处理，这里兜底 -->
         <template v-else>
-          <!-- 侧栏槽位：宽度在展开(300px) / 收起(24px) 之间过渡，动画期间内容被裁掉而不被压扁 -->
+          <!-- 侧栏槽位：宽度在展开 300px / 收起 24px 之间过渡，动画期间内容被裁掉而不被压扁 -->
           <div class="sidebar-slot" :class="{ collapsed: sidebarCollapsed }">
             <MainSidebar :mode="effectiveMode" :mode-options="MODE_OPTIONS" :search-text="searchText" :groups="groups"
               :filtered-groups="filteredGroups" :filtered-instances="filteredInstances" :searching="searching"
               :selected="selected" :multi-select="multiSelect" :selected-ids="selectedIds"
-              :collapsed-groups="collapsedGroups" :drag-active="dragActive" :dragging-uuid="draggingUuid"
+              :drag-active="dragActive" :dragging-uuid="draggingUuid"
               :is-collapsed="isCollapsed" :on-drag-pointer-down="onDragPointerDown" :on-inst-click="onInstClick"
               :on-inst-context="onInstContext" :on-group-context="onGroupContext"
               :on-group-title-click="onGroupTitleClick" :is-inst-insert="isInstInsert"
@@ -1595,7 +1595,7 @@ onMounted(async () => {
                       <div class="detail-info">
                         <h2>{{ selected.name }}</h2>
                       </div>
-                      <!-- 右侧：启动游戏（大）+ 添加/管理资源（小） -->
+                      <!-- 右侧：启动游戏用大按钮，添加 / 管理资源用小按钮 -->
                       <div class="detail-side">
                         <BaseButton variant="primary" size="lg" class="play-btn" :disabled="selected.running"
                           @click="launch">
@@ -1646,7 +1646,7 @@ onMounted(async () => {
                       </div>
                     </div>
 
-                    <!-- 实例操作（导出直接开窗 / 生成为二级菜单） -->
+                    <!-- 实例操作：导出直接开窗，生成类走二级菜单 -->
                     <div class="action-grid">
                       <button class="action-btn" @click="openExportWindow">
                         {{ t("actions.export") }}
@@ -1669,7 +1669,7 @@ onMounted(async () => {
                       </div>
                     </div>
 
-                    <!-- 实例设置（直接展示：版本 / 加载器 / 整合包 / 语言 / 内存 / Java / 启动参数） -->
+                    <!-- 实例设置：版本 / 加载器 / 整合包 / 语言 / 内存 / Java / 启动参数，全部直接展示 -->
                     <div class="inline-settings">
                       <InstanceMetaPanel :instance="selected" :versions="versions" :locked="lockActive"
                         @update="onMetaUpdate" @refreshed="onVersionsRefreshed" />
@@ -1706,7 +1706,7 @@ onMounted(async () => {
                       </button>
                       <CollapsePanel :open="serverOpen">
                         <div class="server-config">
-                          <!-- 自动加入服务器设置：地址（可带 `:端口`，不写用 25565）+ 启动时加入 -->
+                          <!-- 自动加入服务器设置：地址可带 `:端口`，不写就用 25565；另有"启动时加入"开关 -->
                           <div class="server-row">
                             <span class="server-label">{{ t("server.ip") }}</span>
                             <input class="field-input grow" :value="argsOf(selected.uuid).serverIp"
@@ -1721,8 +1721,8 @@ onMounted(async () => {
 
                           <!-- MOTD 展示：只在**填了服务器地址**时出现。
                            没填时整块不显示 —— 原来会渲染一张只有兜底文案的卡片
-                           （"M²L 服务器 / 欢迎来到 M²L 服务器大厅"），看着像查询成功了，其实没查。
-                           卡片本身（图标 / 彩色分段 / 人数-版本-延迟）在 components/MotdCard.vue，
+                           "M²L 服务器 / 欢迎来到 M²L 服务器大厅"，看着像查询成功了，其实没查。
+                           卡片本身在 components/MotdCard.vue：图标 / 彩色分段 / 人数-版本-延迟，
                            与底部悬浮卡、资源窗口服务器列表上方那张是同一份 -->
                           <MotdCard v-if="argsOf(selected.uuid).serverIp.trim()" compact :motd="instMotd"
                             :loading="instMotdLoading" :name="instMotd?.ip || argsOf(selected.uuid).serverIp" />
@@ -1748,8 +1748,8 @@ onMounted(async () => {
                   </div>
                 </Transition>
 
-                <!-- 未选中实例：多选提示 / 空提示（保持是 .detail-content 的直接 flex 子节点，
-                   两者都靠 flex:1 垂直居中） -->
+                <!-- 未选中实例：多选提示 / 空提示。两者都要是 .detail-content 的直接 flex 子节点，
+                   靠 flex:1 垂直居中 -->
                 <template v-if="!selected">
                   <template v-if="multiSelect">
                     <div class="multi-detail">
@@ -1769,7 +1769,7 @@ onMounted(async () => {
 
       </main>
 
-      <!-- 服务器 MOTD 悬浮卡片（启动器下方；客户端设置里配置地址与开关）。
+      <!-- 服务器 MOTD 悬浮卡片，摆在启动器下方；地址与开关在客户端设置里配置。
            `.motd-float` 只管固定摆位，卡片外观与内容在 components/MotdCard.vue —
            与实例详情里的那张、资源窗口服务器列表上方那张是同一份 -->
       <div v-if="motdCardVisible" class="motd-float">
@@ -1806,7 +1806,7 @@ onMounted(async () => {
       @close="!deleteBusy && (showDelete = false)">
       <p class="delete-tip">{{ t("actions.deleteConfirm", { name: selected.name }) }}</p>
 
-      <!-- 删除进度（整目录挪回收站无法取得真实进度，显示滚动动画条） -->
+      <!-- 删除进度：整目录挪回收站无法取得真实进度，只显示滚动动画条 -->
       <div v-if="deleteBusy" class="delete-progress">
         <div class="delete-progress-bar rolling"></div>
       </div>
@@ -1825,7 +1825,7 @@ onMounted(async () => {
       @close="!multiDeleteBusy && (showMultiDelete = false)">
       <p class="delete-tip">{{ t("multi.deleteConfirm", { count: selectedIds.size }) }}</p>
 
-      <!-- 删除进度（真实进度：已完成实例数 / 总数） -->
+      <!-- 删除进度：真实进度，已完成实例数 / 总数 -->
       <div v-if="multiDeleteBusy" class="delete-progress">
         <div class="delete-progress-bar" :style="{ width: multiPct + '%' }"></div>
       </div>
@@ -1841,14 +1841,14 @@ onMounted(async () => {
       </div>
     </BaseModal>
 
-    <!-- ===== 修改实例图标（右键实例 → 选择图片 → 截图范围）===== -->
+    <!-- ===== 修改实例图标：右键实例 → 选择图片 → 截图范围 ===== -->
     <IconPickModal v-if="iconPickInst" :uuid="iconPickInst.uuid" :name="iconPickInst.name" :path="iconPickPath"
       @close="((iconPickInst = null), (iconPickPath = ''))" />
 
     <!-- ===== 首次启动：把 ColorMC 的数据搬过来（见 doInit 的探测）===== -->
     <ColorMcMigrateModal v-if="colorMcInfo" :info="colorMcInfo" @close="onColorMcClosed" @done="onColorMcDone" />
 
-    <!-- ===== 选择目标分组（转移分组 / 移动选中实例共用）===== -->
+    <!-- ===== 选择目标分组：转移分组与移动选中实例共用 ===== -->
     <BaseModal v-if="showMoveGroupPick" :title="t('group.pickTitle')" :closable="false"
       @close="showMoveGroupPick = false">
       <p class="delete-tip">{{ movePickDesc }}</p>
@@ -1897,7 +1897,7 @@ onMounted(async () => {
     </BaseModal>
 
     <!-- ===== 拖拽整合包文件遮罩层 ===== -->
-    <!-- 拖拽文件 / 登录卡片时的遮罩（标题按拖入类型变，见 DROP_TITLE_KEYS） -->
+    <!-- 拖拽文件 / 登录卡片时的遮罩；标题按拖入类型变，见 DROP_TITLE_KEYS -->
     <DropOverlay v-if="fileDragOver" :title="t(dropTitleKey)" />
   </div>
 </template>

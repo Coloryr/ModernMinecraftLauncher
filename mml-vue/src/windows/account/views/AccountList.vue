@@ -14,8 +14,6 @@ const props = defineProps<{
   currentUuid: string;
   /** 把账户的令牌状态翻成文案 */
   tokenLabel: (acc: AccountStoreDto) => string;
-  /** 取账户的图片种子；本视图当前未用到 */
-  seedOf: (uuid: string) => number;
 }>();
 
 const emit = defineEmits<{

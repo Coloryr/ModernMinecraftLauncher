@@ -1,4 +1,4 @@
-// 主题管理：暗色 / 亮色 + 强调色预设（状态持久化到 gui_config.json）
+// 主题管理：暗色 / 亮色 + 强调色预设，状态持久化到 gui_config.json
 import { ref } from "vue";
 import { KEYS, readString, writeString, onStorageChange } from "./storage";
 import { saveGuiConfig, type Theme } from "./guiConfig";
@@ -122,7 +122,7 @@ export function applyTheme() {
   const root = document.documentElement;
   // CSS 变量按 Dark / Light 定义，System 在这里解析成具体值
   root.dataset.theme = resolvedTheme();
-  // 强调色：blue 是默认（theme.css 基础块已定义），其余通过 data-accent 覆盖；
+  // 强调色：blue 是默认，theme.css 基础块已定义；其余通过 data-accent 覆盖；
   // custom 走内联变量，不用 data-accent
   if (accent.value === "custom") {
     delete root.dataset.accent;

@@ -1,5 +1,5 @@
 // 皮肤 3D 渲染 shader：MVP 变换 + nearest 采样
-// 底层（fs_base）镂空 discard、无混合、写深度；顶层（fs_overlay）SrcAlpha 混合、只读深度
+// 底层 fs_base 镂空 discard、无混合、写深度；顶层 fs_overlay SrcAlpha 混合、只读深度
 
 struct Uniforms {
     mvp: mat4x4<f32>,
@@ -25,7 +25,7 @@ fn vs(
     return out;
 }
 
-// 底层：ALPHA_CUTOUT 语义（镂空 discard），无混合
+// 底层：ALPHA_CUTOUT 语义，镂空 discard，无混合
 @fragment
 fn fs_base(in: VsOut) -> @location(0) vec4<f32> {
     let c = textureSample(tex, samp, in.uv);
@@ -35,7 +35,7 @@ fn fs_base(in: VsOut) -> @location(0) vec4<f32> {
     return c;
 }
 
-// 顶层：半透明 SrcAlpha 混合（镂空同样 discard，避免透明片写混合）
+// 顶层：半透明 SrcAlpha 混合，镂空同样 discard，避免透明片写混合
 @fragment
 fn fs_overlay(in: VsOut) -> @location(0) vec4<f32> {
     let c = textureSample(tex, samp, in.uv);

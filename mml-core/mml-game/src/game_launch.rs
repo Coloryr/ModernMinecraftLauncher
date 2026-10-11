@@ -174,11 +174,11 @@ impl InstanceHandle {
     ///
     /// 结束失败时静默忽略。
     pub fn kill(&self) {
-        // 提权启动时通过 taskkill 结束目标进程，仅 Windows
+        // 提权启动时提权 helper 才是游戏进程的父进程，必须 /T 连整棵进程树一起结束，仅 Windows
         #[cfg(target_os = "windows")]
         if let Some(pid) = self.elevated_pid {
             let _ = std::process::Command::new("taskkill")
-                .args(["/PID", &pid.to_string(), "/F"])
+                .args(["/PID", &pid.to_string(), "/T", "/F"])
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
                 .spawn();

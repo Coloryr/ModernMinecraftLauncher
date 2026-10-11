@@ -31,7 +31,7 @@ export const sidebarSide = ref<SidebarSide>(
   readString(KEYS.sidebarSide) === "Right" ? "Right" : "Left",
 );
 
-// 侧栏是否收起：默认收起（只有显式存过 "0" 才是展开）
+// 侧栏是否收起：默认收起，只有显式存过 "0" 才是展开
 export const sidebarCollapsed = ref(readFlag(KEYS.sidebarCollapsed, true));
 
 // 实例列表显示模式：默认列表；用户改过后用用户的值

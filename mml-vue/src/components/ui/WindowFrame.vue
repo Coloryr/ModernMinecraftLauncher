@@ -32,8 +32,12 @@ const props = defineProps<{
   hideDownloadIndicator?: boolean;
 }>();
 
-/** `close` 由返回按钮发出，`back` 由窗口内子页面的返回键发出 */
-const emit = defineEmits<{ (e: "close"): void; (e: "back"): void }>();
+const emit = defineEmits<{
+  /** 返回按钮：单窗口模式下回上一层 */
+  (e: "close"): void;
+  /** 窗口内子页面的返回键 */
+  (e: "back"): void;
+}>();
 
 /** 单窗口模式才显示返回按钮，浏览器与 Tauri 都一样：
  *  这时功能页都在同一个窗口里切换，"返回"＝回上一层，返回栈见 windowManager；

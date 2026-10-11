@@ -1,5 +1,5 @@
 /* 分组下拉框（GroupCombo）：添加实例窗口与下载整合包窗口共用。
- * 用法见 multi-bar.css 的说明（同一个文件被多个组件各自 scoped 编译）。
+ * 用法见 multi-bar.css 的说明：同一个文件被多个组件各自 scoped 编译。
  */
 
 .group-drop {

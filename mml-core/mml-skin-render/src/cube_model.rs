@@ -1,27 +1,27 @@
 //! 立方体模型数据结构模块
 //!
-//! 定义由立方体拼装的角色模型（[`SteveModel`]）与对应的贴图 UV 数据（[`SteveTexture`]）。
+//! 定义由立方体拼装的角色模型 [`SteveModel`] 与对应的贴图 UV 数据 [`SteveTexture`]。
 
-/// 一个方块模型数据
+/// 单个部件的方块模型数据，含顶点与索引
 #[derive(Debug, Clone)]
 pub struct CubeModelItemObj {
-    /// 顶点坐标数据（每个顶点 x/y/z 三个分量）
+    /// 顶点坐标数据，每个顶点 x / y / z 三个分量，单位同 `cube::VALUE`
     pub model: Vec<f32>,
-    /// 三角面索引数据
+    /// 三角面索引数据，指向 `model` 中的顶点
     pub point: Vec<u16>,
 }
 
 impl CubeModelItemObj {
     /// 创建方块模型数据
     ///
-    /// - `model`: 顶点坐标数据
+    /// - `model`: 顶点坐标数据，每个顶点三个分量
     /// - `point`: 三角面索引数据
     pub fn new(model: Vec<f32>, point: Vec<u16>) -> Self {
         Self { model, point }
     }
 }
 
-/// 一个史蒂夫模型数据
+/// 史蒂夫角色模型，按部件存放方块模型数据
 #[derive(Debug, Clone)]
 pub struct SteveModel {
     /// 头部
@@ -73,7 +73,7 @@ impl SteveModel {
 
 /// 模型贴图数据
 ///
-/// 存储各部件的 UV 坐标（已归一化，每个顶点 u/v 两个分量）。
+/// 存储各部件的 UV 坐标，已归一化到 0..1，每个顶点 u / v 两个分量。
 #[derive(Debug, Clone)]
 pub struct SteveTexture {
     /// 头部 UV

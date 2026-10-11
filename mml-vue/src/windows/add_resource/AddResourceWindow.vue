@@ -28,10 +28,10 @@ const { status: resourceStatus, init: initResourceStatus } = useResourceStatus(t
 
 /** 后端列表每页 20 个项目 */
 const PAGE_SIZE = 20;
-/** 版本列表每页条数（与 CurseForge 后端分页一致） */
+/** 版本列表每页条数，与 CurseForge 后端分页一致 */
 const FILE_PAGE_SIZE = 50;
 
-/** 资源类型（取值是后端 FileType 线串，显示标签走 i18n） */
+/** 资源类型，取值是后端 FileType 线串，显示标签走 i18n */
 const TYPES = [
   { value: "mod", label: t("addResource.mods") },
   { value: "resourcepack", label: t("addResource.resourcepacks") },
@@ -63,7 +63,7 @@ const version = ref("");
 /** 分类，"" = 全部。键 = 传给后端的分类值，值 = 显示名 */
 const categories = ref<Array<{ value: string; label: string }>>([]);
 const category = ref("");
-/** 加载器（仅模组；normal = 全部） */
+/** 加载器，仅模组类型有意义；normal 表示全部 */
 const loader = ref("normal");
 const filter = ref("");
 
@@ -108,7 +108,7 @@ const pageFiles = computed(() =>
 );
 const fileMaxPage = computed(() => Math.max(1, Math.ceil(fileTotal.value / FILE_PAGE_SIZE)));
 
-/** 存档下载只有 CurseForge 有（Modrinth 没有 world 类型） */
+/** 存档下载只有 CurseForge 有，Modrinth 没有 world 类型 */
 const sourceOptions = computed(() =>
   type.value === "save"
     ? sources.value.filter((s) => s.value === "curseforge")
@@ -198,7 +198,7 @@ async function search() {
   }
   // 排序列表还没拉回来时别发请求：换下载源 / 换类型时它是**异步**拉回来的
   // loadSource 里 await 三个请求，这中间发出去必然带不上合法排序
-  // —— 空串后端也不认（err.sortTypeNotFound）。那次 loadSource 拉完会自己再搜一次。
+  // —— 空串后端也不认，报 err.sortTypeNotFound。那次 loadSource 拉完会自己再搜一次。
   if (sorts.value.length === 0) {
     return;
   }
@@ -406,7 +406,7 @@ watch(
  *
  * 由 `resourceStatus` 直接**派生**，不再往列表项里写回 `download` / `downloadNow`：
  * 写回是单向的（只置 true 不复位），任务失败或结束后角标会一直挂着。
- * 「已下载」取实例侧来源（`item.download` / `file.isDownload`）与上面那张累计表的「或」。
+ * 「已下载」取实例侧来源 `item.download` / `file.isDownload`，与上面那张累计表取「或」。
  */
 const taskState = computed(() => {
   const running = (task: ResourceTaskDto) => !task.done && !task.failed;
@@ -447,7 +447,7 @@ function formatSize(size: number): string {
   return `${Math.max(1, Math.round(size / 1024))} KB`;
 }
 
-/** 类型 / 下载源变化：换源重载（存档类型强制 CurseForge） */
+/** 类型 / 下载源变化：换源重载；存档类型强制 CurseForge */
 watch([source, type], () => {
   if (source.value) loadSource();
 });

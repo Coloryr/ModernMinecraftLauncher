@@ -6,7 +6,7 @@
 //! # 存储方式
 //!
 //! - 内存中：使用 `LazyLock<RwLock<HashMap<UserKeyObj, LoginObj>>>` 作为全局单例存储
-//! - 磁盘上：以 JSON 格式序列化为 `Vec<LoginObj>`，保存到程序内部目录的 `auths.json` 文件中
+//! - 磁盘上：以 JSON 格式序列化为 `Vec<LoginObj>`，保存到程序内部目录的 `auth.json` 文件中
 //!
 //! # 使用流程
 //!
@@ -30,7 +30,7 @@ use mml_names::{i18_items::error_type::CoreResult, names, uuids};
 static AUTHS: LazyLock<RwLock<HashMap<UserKeyObj, LoginObj>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
-/// 当前使用的账户键，仅内存态；重启后由前端回退到默认选中第一个
+/// 当前使用的账户键，随 `auth_select.json` 持久化，`init` 时载回
 static CURRENT_USER: LazyLock<RwLock<Option<UserKeyObj>>> = LazyLock::new(|| RwLock::new(None));
 
 /// 从磁盘加载账户列表到内存

@@ -32,7 +32,7 @@ function isDeactivated(instance: ComponentInternalInstance | null): boolean {
 }
 
 /**
- * 所属页面是否在前台（响应式，须在 setup 里调用）
+ * 所属页面是否在前台，响应式，须在 setup 里调用
  *
  * 初始值按**当下**判定：浮层可能在页面已经切走之后才出现（异步流程回来了），
  * 那它一开始就不该渲染。之后跟着切页变化。

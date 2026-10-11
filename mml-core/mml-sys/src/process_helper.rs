@@ -55,7 +55,7 @@ pub struct LaunchResult {
     pub child: Child,
     /// 是否为提权启动：通过外部启动器启动，非直接子进程
     pub is_admin: bool,
-    /// 目标进程 PID，仅 Windows 提权时用于 taskkill 强制结束；其余情况为 `None`
+    /// 提权 helper 的 PID，Windows 提权时用于 taskkill /T 结束整棵进程树；其余情况为 `None`
     pub pid: Option<u32>,
     /// 目标进程 stdout，普通启动为管道，提权为命名管道或 pkexec 转发
     pub stdout: Option<OutputStream>,
@@ -461,7 +461,7 @@ pub fn create_named_pipe(name: &str) -> Result<windows::Win32::Foundation::HANDL
 
 /// 连接到命名管道客户端，带超时；成功返回 `File` 可供读取
 ///
-/// 接收 `OwnedHandle` 以保证 Send，内部提取原始 HANDLE 进行操作，
+/// 调用方持 `OwnedHandle` 以保证 Send，此处接收其原始 HANDLE，
 /// 连接成功后转移所有权给 `File`
 ///
 /// - `handle`: 管道服务器句柄

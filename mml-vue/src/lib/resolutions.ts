@@ -15,7 +15,7 @@ export const COMMON_RESOLUTIONS: ReadonlyArray<{ w: number; h: number }> = [
   { w: 3840, h: 2160 },
 ];
 
-// 常用最大内存预设（MiB），从小到大多档，点了直接填「最大内存」
+// 常用最大内存预设，单位 MiB，从小到大多档，点了直接填「最大内存」
 //
 // 只覆盖到 16 GB 这档为止：再往上（32/64 GB）意义不大 —— Minecraft 单实例吃不下那么多，
 // 且堆开太大反而拖慢 GC；需要更大的仍可在步进器里手输。

@@ -17,7 +17,7 @@ const emit = defineEmits<{
 
 const urlInput = ref<HTMLInputElement | null>(null);
 
-// 必填校验失败：聚焦地址框（高亮见模板的 is-invalid）
+// 必填校验失败：聚焦地址框，高亮见模板的 is-invalid
 watch(
   () => props.invalid,
   async (invalid) => {

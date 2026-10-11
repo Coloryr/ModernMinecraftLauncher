@@ -16,7 +16,9 @@ export type CategoryId =
 /** 存档分类下的子页：存档本体 / 数据包 */
 export type SaveTab = "saves" | "datapacks";
 
+/** 左侧导航的一类：类别 id + 显示名文案键 + 图标 */
 export interface ResourceCategory {
+  /** 类别 id，与 `category` 当前值同一套取值 */
   id: CategoryId;
   /**
    * 显示名文案键
@@ -26,7 +28,7 @@ export interface ResourceCategory {
    */
   labelKey: string;
   /**
-   * 图标（`GlyphIcon` 的字形名）
+   * 图标，取 `GlyphIcon` 的字形名
    *
    * 放在分类定义里而不是各处硬写：左侧导航与内容区标题都要它，
    * 两处各写一份迟早会写成两个图标。
@@ -116,17 +118,17 @@ export interface ServerFormDraft {
 }
 
 /**
- * 模组的展示方式（两种视图，见 parts/mod/）
+ * 模组的展示方式，两种视图见 parts/mod/
  *
  * 原先还有第三种「树形」：按 jar-in-jar 展开层级。它已**并入列表** ——
- * 层级现在就在列表列里展开（有下级的行前面是展开箭头，下一层缩进显示），
+ * 层级现在就在列表列里展开：有下级的行前面是展开箭头，下一层缩进显示，
  * 所以"看得见层级"与"看得见图标/副标题"不再需要二选一。
  */
 export type ModView = "list" | "table";
 
 /** 两种模组视图共用的 props */
 export interface ModViewProps {
-  /** 这一份要显示的模组（分组模式下是某个分组里的那一批） */
+  /** 这一份要显示的模组；分组模式下是某个分组里的那一批 */
   items: ModItemDto[];
   /** 有操作在跑：按钮统一置灰 */
   busy: boolean;
@@ -165,23 +167,23 @@ export interface ModViewEmits {
    * 分组名那一格按下：交给 ModPane 的**分组排序**拖拽
    *
    * 列表视图的分组头本来就能按住拖动排序，表格视图只有"点一下折叠"——
-   * 于是表格里分组顺序改不了（用户报的"模组分组无法移动顺序"）。
+   * 于是表格里分组顺序改不了，用户报过"模组分组无法移动顺序"。
    * 这里把按下抛上去，与列表视图走同一个 `onSectionPointerDown`。
    */
   (e: "drag-group", event: PointerEvent): void;
   /** 行按下：交给 ModPane 的拖拽逻辑（拖到分组上即归组） */
   (e: "drag-start", payload: { event: PointerEvent; item: ModItemDto }): void;
-  /** 勾选框：把这一行加进 / 移出多选（批量操作的选择方式，见 ModPane 的 selected） */
+  /** 勾选框：把这一行加进 / 移出多选；批量操作的选择方式见 ModPane 的 selected */
   (e: "select", item: ModItemDto): void;
   /**
-   * 右键模组行：交给 ModPane 弹**项目菜单**（启用/禁用、备注、打开文件夹、删除）
+   * 右键模组行：交给 ModPane 弹**项目菜单**，项目是启用/禁用、备注、打开文件夹、删除
    *
    * 原来右键是"加选 / 取消多选"，改成菜单后多选交给行左侧的勾选框（悬停即出现）。
    */
   (e: "item-menu", payload: { event: MouseEvent; item: ModItemDto }): void;
   /**
    * 左键点整行：**已经在多选模式时**用来加选 / 反选；按住 Shift 则是**整段选中**
-   * （从上次点的那一项到这一项，按显示顺序，与资源管理器同一口径）
+   * 从上次点的那一项到这一项，按显示顺序，与资源管理器同一口径
    *
    * 不在多选模式、也没按 Shift 时什么都不做（保持原来的"按下即拖拽归组"）；
    * 拖拽结束那一下的 click 由 ModPane 用抑制标记吞掉。

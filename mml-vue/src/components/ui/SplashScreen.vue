@@ -19,8 +19,8 @@ withDefaults(
   },
 );
 
-/** 点错误页上的"问题反馈" */
 const emit = defineEmits<{
+  /** 点错误页上的"问题反馈" */
   (e: "feedback"): void;
 }>();
 </script>
@@ -48,29 +48,6 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
-/* 初始化期间的关闭按钮：浮在右上角，不占布局 */
-.splash-close {
-  position: fixed;
-  top: 10px;
-  right: 10px;
-  width: 34px;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-dim);
-  cursor: default;
-  transition: background 0.12s, color 0.12s;
-}
-
-.splash-close:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
 .splash {
   flex: 1;
   display: flex;

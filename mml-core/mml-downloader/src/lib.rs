@@ -15,10 +15,10 @@
 //! DownloadThread (× N)           —— N 个工作线程从队列取文件下载
 //!     │
 //!     ▼
-//! download()                     —— 单文件下载流程（断点续传 + 哈希校验）
+//! download()                     —— 单文件下载流程，断点续传 + 哈希校验
 //!     │
 //!     ▼
-//! later_tasks::unpack_native()   —— 下载后处理（解压 native 库等）
+//! later_tasks::unpack_native()   —— 下载后处理，解压 native 库等
 //! ```
 //!
 //! # 核心类型
@@ -33,7 +33,7 @@
 //! # 下载流程
 //!
 //! 1. 每个文件首先检查是否已存在且哈希匹配 → 跳过下载
-//! 2. 支持 `Range` 断点续传（需服务器支持）
+//! 2. 支持 `Range` 断点续传，需服务器支持
 //! 3. 下载完成后校验文件大小和哈希值
 //! 4. 超过 5 次错误自动放弃当前文件
 //! 5. 下载后支持解压 native 库和存档文件
@@ -109,13 +109,13 @@ static THREADS: RwLock<Vec<DownloadThread>> = RwLock::new(Vec::new());
 /// 下载任务队列
 static TASKS: RwLock<Vec<Arc<DownloadTask>>> = RwLock::new(Vec::new());
 
-/// 下载器 UI 回调（全局单例）
+/// 下载器 UI 回调，全局单例
 static DOWNLOAD_GUI: OnceLock<Box<dyn IDownloadGui + Sync + Send>> = OnceLock::new();
 
 /// 下载器停止标志
 static STOP: AtomicBool = AtomicBool::new(false);
 
-/// 全局暂停标志（暂停期间不分配任何文件，后续新增任务同样暂停）
+/// 全局暂停标志，暂停期间不分配任何文件，后续新增任务同样暂停
 static PAUSED: AtomicBool = AtomicBool::new(false);
 
 /// 自增任务编号
@@ -135,11 +135,9 @@ pub fn init<P: AsRef<Path>>(path: P) -> CoreResult<()> {
     if !cache.exists() {
         path_helper::create_dir_all(cache)?;
     } else {
-        // 启动时清空下载临时目录：此时没有任何下载任务，目录里只会有上次运行残留的
-        // 临时文件，崩溃 / 断电 / 任务被强杀都会留下，不清会一直占空间。但 webview
-        // 子目录要跳过：界面的 EBWebView 档案（localStorage / cookie / 缓存）也放在
-        // cache 下，那是长期数据，清了等于每次启动都"重装一遍界面状态"，见
-        // names::WEBVIEW_DIR 与 mml-gui 的 windows/mod.rs。
+        // 启动时清空下载临时目录：目录里只会有上次运行残留的临时文件，不清会一直占空间。
+        // 但必须跳过 webview 子目录：界面的 EBWebView 档案，含 localStorage 与缓存，
+        // 也放在 cache 下，清了等于每次启动都重装一遍界面状态，见 names::WEBVIEW_DIR。
         if let Ok(entries) = std::fs::read_dir(cache) {
             for entry in entries.flatten() {
                 if entry.file_name() == names::WEBVIEW_DIR {
@@ -315,7 +313,7 @@ pub fn stop() {
     }
 }
 
-/// 下载任务快照（GUI 查询用）
+/// 下载任务快照，供 GUI 查询
 #[derive(Debug, Clone)]
 pub struct TaskSnapshot {
     /// 任务编号
@@ -539,7 +537,7 @@ pub async fn start_download_task_cancellable(
 
 #[cfg(test)]
 pub(crate) mod test_util {
-    //! 测试公共辅助：全局状态（日志/配置/基础目录/GUI 回调）在同一个测试
+    //! 测试公共辅助：日志、配置、基础目录、GUI 回调等全局状态在同一个测试
     //! 二进制中只能初始化一次，这里用 `OnceLock` + `Once` 保证幂等。
 
     use std::fs;
@@ -549,7 +547,7 @@ pub(crate) mod test_util {
     /// GUI 回调记录到的事件列表
     pub static GUI_EVENTS: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
 
-    /// 测试运行根目录（临时目录下的唯一子目录）
+    /// 测试运行根目录，临时目录下的唯一子目录
     static RUN_DIR: OnceLock<PathBuf> = OnceLock::new();
     /// 保证初始化流程只执行一次
     static INIT: Once = Once::new();
@@ -580,7 +578,13 @@ pub(crate) mod test_util {
         }
     }
 
-    /// 在临时目录下创建唯一的子目录（测试用）
+    /// 在临时目录下创建唯一的子目录，供测试隔离使用
+    ///
+    /// - `name`: 目录名中的用例特征，用于区分同一测试的不同用例
+    ///
+    /// # 返回值
+    ///
+    /// 返回已创建的空目录路径，名字带用例特征、进程 id 与自增序号
     pub fn make_temp_dir(name: &str) -> PathBuf {
         static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let dir = mml_testutil::temp_dir().join(format!(
@@ -594,7 +598,11 @@ pub(crate) mod test_util {
         dir
     }
 
-    /// 初始化测试环境（进程内只执行一次），返回测试运行根目录
+    /// 初始化测试环境，进程内只执行一次
+    ///
+    /// # 返回值
+    ///
+    /// 返回测试运行根目录，重复调用返回同一目录
     pub fn ensure_env() -> PathBuf {
         INIT.call_once(|| {
             let dir = make_temp_dir("run");
@@ -604,13 +612,13 @@ pub(crate) mod test_util {
                 .ok()
                 .unwrap_or_else(|| panic!("GUI_EVENTS 初始化失败"));
 
-            // 日志系统（下载线程内部记录错误时依赖信号量已初始化）
+            // 日志系统，下载线程内部记录错误时依赖信号量已初始化
             mml_log::start(&dir).unwrap();
             // 基础目录
             mml_base::init(&dir);
             // 配置系统
             mml_config::init(&dir).unwrap();
-            // GUI 回调（全局单例）
+            // GUI 回调，全局单例
             super::set_gui_handel(Box::new(TestGui));
 
             RUN_DIR.set(dir).unwrap();
@@ -665,8 +673,8 @@ mod tests {
         let task = DownloadTask::new(vec![file_item("a")]);
         let id = task.id;
 
-        // 队列非空时任务未完成，wait_done 不会被提前唤醒
-        // （这里先取走唯一文件再标记完成，保证不会阻塞）
+        // 队列非空时任务未完成，wait_done 不会被提前唤醒；
+        // 这里先取走唯一文件再标记完成，保证不会阻塞
         let _item = task.get_item().unwrap();
         task.done();
         assert_eq!(task.completed_count.load(Ordering::SeqCst), 1);
@@ -677,7 +685,7 @@ mod tests {
         let ok = rt.block_on(task.wait_done());
         assert!(ok);
 
-        // 完成后任务已从全局队列移除（任务原本也不在队列中，此处确认无副作用）
+        // 任务原本就不在全局队列中，此处确认移除无副作用
         assert!(super::get_tasks().iter().all(|t| t.id != id));
     }
 
@@ -698,7 +706,7 @@ mod tests {
         assert!(!ok);
     }
 
-    /// 任务进度通过 GUI 回调上报（1/2 完成 = 50%）
+    /// 任务进度通过 GUI 回调上报，1/2 完成即 50%
     #[test]
     fn task_progress_notifies_gui() {
         ensure_env();

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-// 添加实例 · 模式三：添加文件夹（路径框 + 扫描出的实例列表 / 内容树）
+// 添加实例 · 模式三：添加文件夹，路径框 + 实例列表 / 内容树
 //
 // 两种结果二选一：
-// - 目录里**装着实例**（如 `.minecraft`，其下 `versions/*`）→ 列出来让用户勾选要导入哪些；
+// - 目录里**装着实例**，如 `.minecraft` 及其下的 `versions/*` → 列出来让用户勾选要导入哪些；
 // - 目录本身就是**一个实例目录**（没有可扫描的实例）→ 退回原来的内容树，整目录作为一个实例导入。
 import { nextTick, ref, watch } from "vue";
 import { t } from "../../../lib/i18n";
@@ -58,7 +58,7 @@ const emit = defineEmits<{
 
 const pathInput = ref<HTMLInputElement | null>(null);
 
-// 必填校验失败：聚焦路径框（高亮见模板的 is-invalid）
+// 必填校验失败：聚焦路径框，高亮见模板的 is-invalid
 watch(
   () => props.invalid,
   async (invalid) => {

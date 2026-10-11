@@ -4,8 +4,8 @@
 // 添加/编辑的表单状态属于本分类，就放在这一层（草稿 + 保存中标记），
 // 弹窗排版在 ServerFormModal。
 //
-// MOTD 分成两处（与主窗口的 MOTD 卡同一套观感）：
-// - **列表上方一张卡**，显示当前**选中**那一台的完整 MOTD（彩色分段、保留换行、人数/版本/延迟）；
+// MOTD 分成两处，与主窗口的 MOTD 卡同一套观感：
+// - **列表上方一张卡**，显示当前**选中**那一台的完整 MOTD：彩色分段、保留换行、人数/版本/延迟；
 //   点列表里的行切换。卡片是 `components/MotdCard.vue`，与主窗口那两张是同一个组件。
 // - **行里只说"能不能连上"** + 地址 —— 一行一句话，扫一眼就知道哪台连得上。
 //
@@ -87,7 +87,7 @@ async function queryAll() {
 /**
  * 列表上方那张 MOTD 卡显示哪一台：存 `keyOf`，`null` = 还没选
  *
- * 默认选中第一台（列表一加载上方就有内容，不用先点一下）；选中的那台被删掉或改名
+ * 默认选中第一台，列表一加载上方就有内容，不用先点一下；选中的那台被删掉或改名
  * 之后键会落空，也在下面退回第一台。
  */
 const selectedKey = ref<string | null>(null);
@@ -152,7 +152,7 @@ async function queryOne(item: ServerItemDto) {
   }
 }
 
-// 列表一换（首次加载、点刷新、增删改之后重拉）就重查一遍，并把选中项落到仍然有效的那台
+// 列表一换就重查一遍，即首次加载、点刷新、增删改之后重拉；并把选中项落到仍然有效的那台
 watch(
   servers,
   () => {
@@ -273,7 +273,7 @@ function remove(item: ServerItemDto) {
         <span v-if="item.acceptTextures" class="badge badge-dim">
           {{ t("resource.acceptTextures") }}
         </span>
-        <!-- 在线人数：查到了才显示（查不到时那一行下面会写连不上的原因） -->
+        <!-- 在线人数：查到了才显示；查不到时那一行下面会写连不上的原因 -->
         <span v-if="isOnline(item)" class="badge">
           {{
             t("server.players", {

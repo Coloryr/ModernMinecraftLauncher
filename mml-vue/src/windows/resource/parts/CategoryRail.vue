@@ -96,8 +96,8 @@ function onPointerUp(e: PointerEvent) {
   reset();
   if (!id || index === null) return;
 
-  // 从顺序里摘掉被拖的那一项，再插到目标位置
-  // （被拖项原本在插入点之前时，摘掉之后目标下标要减一）
+  // 从顺序里摘掉被拖的那一项，再插到目标位置。
+  // 被拖项原本在插入点之前时，摘掉之后目标下标要减一
   const list = [...order.value];
   const from = list.indexOf(id);
   if (from < 0) return;

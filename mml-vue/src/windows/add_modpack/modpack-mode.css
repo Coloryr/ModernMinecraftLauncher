@@ -25,7 +25,7 @@
   font-size: 13px;
 }
 
-/* field-select 的自定义箭头留位（sel-group 是组合框输入框，不在此列） */
+/* field-select 的自定义箭头留位：sel-group 是组合框输入框，不在此列 */
 select.sel-version,
 select.sel-sort,
 select.sel-category,
@@ -33,7 +33,7 @@ select.sel-file-version {
   padding-right: 26px;
 }
 
-/* 分组是组合框（外层 div 包输入框 + 下拉），内边距和字号落到输入框上 */
+/* 分组是组合框：外层 div 包输入框 + 下拉，内边距和字号落到输入框上 */
 .sel-group {
   padding: 0;
 }
@@ -61,7 +61,7 @@ select.sel-file-version {
   padding: 10px 18px;
 }
 
-/* 不设 align-items：靠默认 stretch 让按钮（无固定高、无纵向 padding）与输入框等高 */
+/* 不设 align-items：靠默认 stretch 让按钮与输入框等高，按钮无固定高、无纵向 padding */
 .modpack-search {
   display: flex;
   gap: 8px;
@@ -152,7 +152,7 @@ select.sel-file-version {
   transition: box-shadow 0.15s ease;
 }
 
-/* 悬停：主题阴影（与主页卡片 .entry-card 同一套 token）。
+/* 悬停：主题阴影，与主页卡片 .entry-card 同一套 token。
    刻意不换颜色：底色换成 --bg-hover 在浅色主题下白卡会发灰，
    描边染成强调色则跟着主题色走（红 / 粉主题下很跳），两处一起动更显杂。
    也不上浮：列表容器是滚动容器，会把自己的溢出裁掉，上浮会把卡片顶边切掉 */
@@ -534,7 +534,7 @@ select.sel-file-version {
   line-height: 1.65;
 }
 
-/* 分区标题（项目简介 / 截图 / 版本列表）：左侧强调色竖条 + 底部分隔线，
+/* 分区标题：项目简介 / 截图 / 版本列表，左侧强调色竖条 + 底部分隔线，
    与设置窗口的分组标题（settings.css 的 .group-title）同一套观感。
    注意只写 margin-bottom：.detail-block 的 margin-top 不能被这里的简写冲掉 */
 .detail-section {
@@ -560,7 +560,7 @@ select.sel-file-version {
   flex-shrink: 0;
 }
 
-/* 版本列表标题行：标题 + 版本筛选 + 翻页控件（分隔线由 .detail-section 提供）。
+/* 版本列表标题行：标题 + 版本筛选 + 翻页控件；分隔线由 .detail-section 提供。
    不能用 space-between：竖条也是 flex 子项，那样会把竖条与标题之间也拉开一截；
    改成标题 margin-right:auto 把右侧工具条顶到最右。 */
 .detail-versions-head {
@@ -699,7 +699,7 @@ select.sel-file-version {
   color: var(--accent);
 }
 
-/* Modrinth 正文 markdown 排版（v-html 注入，需要 :deep 穿透） */
+/* Modrinth 正文 markdown 排版：v-html 注入，需要 :deep 穿透 */
 .detail-md {
   font-size: 13.5px;
   line-height: 1.65;

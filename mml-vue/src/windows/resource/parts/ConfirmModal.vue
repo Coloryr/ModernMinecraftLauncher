@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 删除 / 清空确认弹窗（全窗口共用一份，内容来自 useResourceOps 的 confirmBox）
+// 删除 / 清空确认弹窗；全窗口共用一份，内容来自 useResourceOps 的 confirmBox
 //
 // 按钮改用全仓通用的 BaseButton + 全局 .modal-actions：原先这里是手写的 .modal-btn，
 // 尺寸与配色都是本窗口自己一套，和别的窗口的确认框不一致。

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 模组行右键菜单：启用 / 禁用、备注、打开文件夹、删除
 //
-// 与分组右键菜单（ModGroupMenu）**共用一套外观与定位**（`.mod-ctx-menu*`），
+// 与分组右键菜单 ModGroupMenu **共用一套外观与定位**，选择器都是 `.mod-ctx-menu*`，
 // 动作同样全部抛给 ModPane 执行 —— 那里才有确认弹窗、备注弹窗与目录打开。
 //
 // ⚠️ 右键原来是"把这一行加进 / 移出多选"，见 types.ts 的 `select`。改成菜单后，
@@ -11,12 +11,13 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { t } from "../../../../lib/i18n";
 import type { ModItemDto } from "../../../../lib/bindings";
 
-/** 菜单项（ModPane 按这个分发动作） */
+/** 菜单项；ModPane 按这个分发动作 */
 export type ItemMenuAction = "enable" | "disable" | "note" | "open-folder" | "remove";
 
 const props = defineProps<{
-  /** 点击处（视口坐标） */
+  /** 点击处的横坐标，视口坐标 */
   x: number;
+  /** 点击处的纵坐标，视口坐标 */
   y: number;
   /** 这一行的模组，用来决定显示"启用"还是"禁用" */
   item: ModItemDto;
@@ -70,7 +71,7 @@ function pick(kind: ItemMenuAction) {
 <template>
   <div ref="el" class="mod-ctx-menu" :style="{ left: `${pos.x}px`, top: `${pos.y}px` }" @pointerdown.stop
     @contextmenu.prevent>
-    <!-- 分组（用户口径）：备注 / 打开文件夹 一组 ─ 启用或禁用（**二选一显示一个**）一组 ─ 删除 一组 -->
+    <!-- 分组口径：备注 / 打开文件夹 一组 ─ 启用或禁用**二选一显示一个** 一组 ─ 删除 一组 -->
     <button class="mod-ctx-menu-item" @click="pick('note')">
       {{ t("resource.modNote") }}
     </button>

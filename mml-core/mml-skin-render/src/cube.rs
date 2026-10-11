@@ -3,10 +3,10 @@
 //! 提供单位立方体的顶点坐标、法线与三角面索引数据，
 //! 以及按轴缩放 / 偏移生成方块顶点数据的工具函数。
 
-/// 方块模型的半边长（立方体边长为 1）
+/// 方块模型的半边长，立方体边长为 1
 pub const VALUE: f32 = 0.5;
 
-/// 立方体每个顶点的法线数据（24 个顶点 × 3 分量，取值为 -1 / 0 / 1）
+/// 立方体每个顶点的法线数据，24 个顶点 × 3 分量，取值 -1 / 0 / 1
 pub const VERTICES: [f32; 72] = [
     0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0,
     0.0, 0.0, 1.0, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0,
@@ -14,7 +14,7 @@ pub const VERTICES: [f32; 72] = [
     1.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0,
 ];
 
-/// 立方体 24 个顶点的坐标数据（6 面 × 4 顶点 × 3 分量）
+/// 立方体 24 个顶点的坐标数据，6 面 × 4 顶点 × 3 分量，单位半边长 VALUE
 const CUBE: [f32; 72] = [
     VALUE, VALUE, -VALUE, /* 背面。 */
     VALUE, -VALUE, -VALUE, -VALUE, -VALUE, -VALUE, -VALUE, VALUE, -VALUE, -VALUE, VALUE,
@@ -30,26 +30,25 @@ const CUBE: [f32; 72] = [
     VALUE, -VALUE, VALUE, -VALUE, -VALUE, VALUE, -VALUE, -VALUE, -VALUE,
 ];
 
-/// 立方体的三角面索引（6 面 × 2 三角形 × 3 索引）
+/// 立方体的三角面索引，6 面 × 2 三角形 × 3 索引
 const CUBE_INDICES: [u16; 36] = [
     0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15, 16, 17, 18,
     16, 18, 19, 20, 21, 22, 20, 22, 23,
 ];
 
-/// 获得一个方块X Y Z坐标
+/// 按轴乘数、偏移与放大系数变换出方块顶点坐标
 ///
-/// # 参数
-/// * `multiply_x` - X轴乘数
-/// * `multiply_y` - Y轴乘数
-/// * `multiply_z` - Z轴乘数
-/// * `add_x` - X轴偏移
-/// * `add_y` - Y轴偏移
-/// * `add_z` - Z轴偏移
-/// * `enlarge` - 放大系数
+/// - `multiply_x`: X 轴乘数
+/// - `multiply_y`: Y 轴乘数
+/// - `multiply_z`: Z 轴乘数
+/// - `add_x`: X 轴偏移
+/// - `add_y`: Y 轴偏移
+/// - `add_z`: Z 轴偏移
+/// - `enlarge`: 放大系数，先作用于单位立方体再乘轴乘数
 ///
 /// # 返回值
 ///
-/// 变换后的顶点坐标数组（每个顶点 x/y/z 三个分量）
+/// 返回变换后的顶点坐标数组，每个顶点 x / y / z 三个分量，单位同 `VALUE`
 pub fn get_square(
     multiply_x: f32,
     multiply_y: f32,
@@ -74,14 +73,13 @@ pub fn get_square(
     temp
 }
 
-/// 获得一个标准方块顶点顺序
+/// 生成标准方块的三角面索引，可整体叠加偏移
 ///
-/// # 参数
-/// * `offset` - 顶点索引偏移量
+/// - `offset`: 顶点索引偏移量，加到每个索引上
 ///
 /// # 返回值
 ///
-/// 偏移后的三角面索引数组
+/// 返回偏移后的三角面索引数组
 pub fn get_square_indices(offset: u16) -> Vec<u16> {
     let mut temp = vec![0; CUBE_INDICES.len()];
 
@@ -92,20 +90,20 @@ pub fn get_square_indices(offset: u16) -> Vec<u16> {
     temp
 }
 
-/// 使用默认参数获得方块坐标
+/// 用默认参数取标准立方体的顶点坐标
 ///
 /// # 返回值
 ///
-/// 标准立方体的顶点坐标数组
+/// 返回标准立方体的顶点坐标数组
 pub fn get_square_default() -> Vec<f32> {
     get_square(1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0)
 }
 
-/// 使用默认参数获得顶点顺序
+/// 用默认参数取标准立方体的三角面索引
 ///
 /// # 返回值
 ///
-/// 无偏移的三角面索引数组
+/// 返回无偏移的三角面索引数组
 pub fn get_square_indices_default() -> Vec<u16> {
     get_square_indices(0)
 }
@@ -114,8 +112,8 @@ pub fn get_square_indices_default() -> Vec<u16> {
 mod tests {
     use super::*;
 
-    /// get_square_default 应返回标准立方体的 24 个顶点（72 个分量），
-    /// 每个分量只可能是 -0.5 / 0.5（边长为 1 的立方体）
+    /// get_square_default 应返回标准立方体的 24 个顶点共 72 个分量，
+    /// 每个分量只可能是 ±0.5，对应边长为 1 的立方体
     #[test]
     fn test_get_square_default() {
         let v = get_square_default();
@@ -144,7 +142,7 @@ mod tests {
     fn test_get_square_indices() {
         let idx = get_square_indices(0);
         assert_eq!(idx.len(), 36, "6 个面 x 2 个三角形 x 3 个索引");
-        // 索引最大值不应超过 23（24 个顶点）
+        // 索引最大值不应超过 23，即 24 个顶点
         assert_eq!(*idx.iter().max().unwrap(), 23);
 
         // 偏移 7：前 6 个索引变为 7,8,9,7,9,10

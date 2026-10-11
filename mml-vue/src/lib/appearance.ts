@@ -2,7 +2,7 @@
 // - 动画开关：全局禁用 CSS 过渡 / 动画（前端自持，本地存储）
 // - 背景图：来源与显示参数存 gui_config.json（Rust 侧持久化），处理后的图片
 //   由后端落盘并经 IPC 下发 dataURL，改动经 bg-change 事件同步到所有窗口；
-//   浏览器环境回退本地存储（仅 dataURL 直显，无缩放处理）
+//   浏览器环境回退本地存储，仅 dataURL 直显，无缩放处理
 import { computed, ref, watch } from "vue";
 import { listen } from "@tauri-apps/api/event";
 import { isTauri } from "../windows/windowManager";
@@ -35,7 +35,7 @@ export function applyAnimations() {
 
 // ---------------- 背景图 ----------------
 
-/** 显示用背景图 dataURL（Tauri 下是后端处理落盘的图） */
+/** 显示用背景图 dataURL；Tauri 下是后端处理落盘的图 */
 export const bgImage = ref(readString(KEYS.bgImage));
 
 /** 背景图来源：文件路径或网址，空串 = 无；与 gui_config.json 的 bgSource 一致 */
@@ -53,7 +53,7 @@ export const bgNativeSize = ref(100);
 /** 后端正在加载 / 处理背景图（加载提示与按钮禁用用） */
 export const bgLoading = ref(false);
 
-/** 用后端返回的信息更新本地状态（restoreBg / bg-change 共用） */
+/** 用后端返回的信息更新本地状态，restoreBg 与 bg-change 共用 */
 function applyBgInfo(info: {
   source: string;
   dataUrl: string;

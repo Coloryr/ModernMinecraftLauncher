@@ -707,6 +707,13 @@ mod tests {
     /// 走一遍 `pack.mcmeta` 的解析：简介与版本区间的各种写法都要收得下
     #[test]
     fn parse_pack_meta_shapes() {
+        /// 从 JSON 文本造一个资源包信息，只填 pack.mcmeta 相关字段
+        ///
+        /// - `meta`: `pack.mcmeta` 的 JSON 文本
+        ///
+        /// # 返回值
+        ///
+        /// 返回解析出的资源包信息，其余字段取缺省值
         fn parse(meta: &str) -> ResourcepackObj {
             parse_pack_meta(mini(meta), &no_lang()).expect("pack 段是对象就应解析成功")
         }

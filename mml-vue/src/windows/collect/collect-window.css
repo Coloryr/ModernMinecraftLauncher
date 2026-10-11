@@ -22,7 +22,7 @@
   gap: 12px;
 }
 
-/* 标题栏控件统一 36px（账户 / 方块 / 设置三个窗口共同的约定，见 BlockToolbar 的注释） */
+/* 标题栏控件统一 36px：账户 / 方块 / 设置三个窗口共同的约定，见 BlockToolbar 的注释 */
 .collect-toolbar .multi-toggle {
   height: 36px;
 }
@@ -78,13 +78,13 @@
 .collect-groups {
   display: flex;
   flex-direction: column;
-  /* 与卡片之间的间距（.collect-grid 的 gap）保持一致：
+  /* 与卡片之间的间距保持一致，即 .collect-grid 的 gap：
      项目↔项目、项目↔分组头、分组↔分组 三处都是 12px */
   gap: 12px;
   min-height: 0;
 }
 
-/* 分组：**只给标题行加底色**，内容区不铺底（卡片自己就是框，铺底会变"框套框"） */
+/* 分组：**只给标题行加底色**，内容区不铺底；卡片自己就是框，铺底会变"框套框" */
 .group-block {
   min-width: 0;
   /* 拖拽落点的高亮框要贴着整块（标题行 + 卡片区）画，所以这里留出圆角与内缩基准 */
@@ -116,7 +116,7 @@
   transition: outline-color 0.12s;
 }
 
-/* 悬停**不改底色**（这层本来就比页面亮一档，压成 --bg-hover 反而像塌下去），
+/* 悬停**不改底色**：这层本来就比页面亮一档，压成 --bg-hover 反而像塌下去，
    改成一圈强调色描边 + 两处小变化：箭头点亮、计数药丸描边；右边还会浮出操作按钮 */
 .group-head:hover {
   outline-color: var(--accent-border);
@@ -344,7 +344,7 @@
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  /* 修掉不存在的 --bg-panel（全仓没有定义，等于这行无效 → 卡片一直没底色） */
+  /* 修掉不存在的 --bg-panel：全仓没有定义，等于这行无效 → 卡片一直没底色 */
   background: var(--bg-card);
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s, transform 0.15s;
@@ -362,7 +362,7 @@
   background: var(--accent-soft);
 }
 
-/* 正被拖着的卡片：留在原位但淡下去（卡片网格去掉一张会整片重排，反而看不清拖的是哪个），
+/* 正被拖着的卡片：留在原位但淡下去；卡片网格去掉一张会整片重排，反而看不清拖的是哪个，
    落点由目标分组那圈虚线 + 幽灵卡片表达 */
 .collect-card.dragging {
   opacity: 0.4;
@@ -381,7 +381,7 @@
   flex: 0 0 auto;
   width: 60px;
   height: 60px;
-  /* 与方块列表的图标同规格（.block-img 是 8px） */
+  /* 与方块列表的图标同规格：.block-img 是 8px */
   border-radius: 8px;
   overflow: hidden;
   background: var(--bg-hover);
@@ -390,7 +390,7 @@
   justify-content: center;
 }
 
-/* 图标槽：AsyncImage 的根是个 span，撑满 60×60（里面的 img 走 :deep —— 它是子组件里的元素） */
+/* 图标槽：AsyncImage 的根是个 span，撑满 60×60；里面的 img 走 :deep，它是子组件里的元素 */
 .card-icon :deep(.async-img),
 .card-icon :deep(img) {
   width: 100%;
@@ -462,7 +462,7 @@
 
 .ctx-menu {
   position: fixed;
-  /* 与主窗口右键菜单同级（原来是 30，会被标题栏/浮层压住） */
+  /* 与主窗口右键菜单同级：原来是 30，会被标题栏/浮层压住 */
   z-index: 120;
   display: flex;
   flex-direction: column;
@@ -506,7 +506,7 @@
   cursor: not-allowed;
 }
 
-/* ----- 选实例弹窗（与方块窗口的 .pick-* 同规格，那边不在同一作用域内，这里重写一份） ----- */
+/* ----- 选实例弹窗：与方块窗口的 .pick-* 同规格，那边不在同一作用域内，这里重写一份 ----- */
 
 .pick-list {
   display: flex;

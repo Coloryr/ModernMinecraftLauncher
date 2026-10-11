@@ -1,8 +1,8 @@
 //! 皮肤 3D 渲染模块
 //!
-//! 提供渲染器公共状态与交互逻辑基类 [`BaseSkinRender`]（指针交互、
-//! 部件矩阵计算、动画、FPS 统计），由 [`renders`] 中的具体渲染后端
-//! （如 OpenGL）组合实现。
+//! 提供渲染器公共状态与交互逻辑基类 [`BaseSkinRender`]，涵盖指针交互、
+//! 部件矩阵计算、动画与 FPS 统计，由 [`renders`] 中的具体渲染后端
+//! 如 OpenGL 组合实现。
 //!
 //! # 子模块
 //!
@@ -11,7 +11,7 @@
 //! | [`cube`] | 立方体几何基元 |
 //! | [`cube_model`] | 立方体模型数据结构 |
 //! | [`model`] | 史蒂夫模型生成 |
-//! | [`renders`] | 渲染后端实现（OpenGL） |
+//! | [`renders`] | 渲染后端实现，目前是 OpenGL |
 //! | [`skin_animation`] | 部件动画演算 |
 //! | [`texture`] | 模型贴图 UV 生成 |
 
@@ -36,7 +36,7 @@ use crate::skin_animation::SkinAnimation;
 /// 渲染错误类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorType {
-    /// 皮肤贴图无效（宽度不是 64 等格式错误）
+    /// 皮肤贴图无效，宽度不是 64 或格式错误
     InvalidSkin,
     /// 无法识别的皮肤类型
     UnknownSkin,
@@ -66,9 +66,9 @@ pub enum StateType {
 /// 鼠标按键类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeyType {
-    /// 左键（拖拽旋转模型）
+    /// 左键，拖拽旋转模型
     Left,
-    /// 右键（拖拽平移模型）
+    /// 右键，拖拽平移模型
     Right,
     /// 中键
     Middle,
@@ -101,12 +101,12 @@ pub enum ModelPartType {
 
 /// 抽象皮肤渲染器基类
 ///
-/// 持有渲染器公共状态（交互输入、动画、回调、画布尺寸等），
-/// 具体渲染后端持有此结构并根据标志位（`switch_*`）刷新资源。
+/// 持有渲染器公共状态，涵盖交互输入、动画、回调与画布尺寸；
+/// 具体渲染后端持有此结构并根据 `switch_*` 标志位刷新资源。
 pub struct BaseSkinRender {
     /// 是否渲染披风
     pub enable_cape: bool,
-    /// 是否渲染第二层（顶层）
+    /// 是否渲染第二层，即顶层
     pub enable_top: bool,
     /// 模型已变化，需要重新加载模型数据
     pub switch_model: bool,
@@ -119,9 +119,9 @@ pub struct BaseSkinRender {
     /// 是否播放动画
     pub animation: bool,
 
-    /// 背景色（RGBA）
+    /// 背景色，RGBA 四个分量，取值范围 0.0..1.0
     pub back_color: Vec4,
-    /// 皮肤类型（决定模型与贴图布局）
+    /// 皮肤类型，决定模型与贴图布局
     pub skin_type: SkinType,
 
     /// 皮肤贴图
@@ -129,14 +129,14 @@ pub struct BaseSkinRender {
     /// 披风贴图
     pub cape: Option<Pixmap>,
 
-    /// FPS 统计累计时间（秒）
+    /// FPS 统计累计时间，单位秒
     pub time: f64,
     /// 当前 FPS 计数
     pub fps: i32,
 
-    /// 模型视距（缩放距离）
+    /// 模型视距，即缩放距离，越大越远
     pub distance: f32,
-    /// 待应用的旋转增量（度，`tick` 时累积到变换矩阵）
+    /// 待应用的旋转增量，单位度，`tick` 时累积到变换矩阵
     pub rot_xy: Vec2,
     /// 左键拖拽的基准点
     pub diff_xy: Vec2,
@@ -158,11 +158,11 @@ pub struct BaseSkinRender {
     /// 是否已加载皮肤
     pub have_skin: bool,
 
-    /// 手臂旋转角度（度）
+    /// 手臂旋转角度，单位度
     pub arm_rotate: Vec3,
-    /// 腿部旋转角度（度）
+    /// 腿部旋转角度，单位度
     pub leg_rotate: Vec3,
-    /// 头部旋转角度（度）
+    /// 头部旋转角度，单位度
     pub head_rotate: Vec3,
 
     /// 错误回调
@@ -172,14 +172,14 @@ pub struct BaseSkinRender {
     /// FPS 更新回调
     pub fps_callback: Option<Arc<Mutex<dyn Fn(i32) + Send + Sync>>>,
 
-    /// 画布宽度（像素）
+    /// 画布宽度，单位像素
     pub width: i32,
-    /// 画布高度（像素）
+    /// 画布高度，单位像素
     pub height: i32,
 }
 
 impl BaseSkinRender {
-    /// 创建渲染器基类（默认画布 800x600，黑色背景）
+    /// 创建渲染器基类，默认画布 800x600、黑色背景
     pub fn new() -> Self {
         Self {
             enable_cape: false,
@@ -237,7 +237,7 @@ impl BaseSkinRender {
     /// 指针松开：右键松开时保存当前平移位置
     ///
     /// - `key_type`: 松开的按键类型
-    /// - `_point`: 指针位置（未使用）
+    /// - `_point`: 指针位置，未使用
     pub fn pointer_released(&mut self, key_type: KeyType, _point: Vec2) {
         if let KeyType::Right = key_type {
             self.save_xy.x = self.xy.x;
@@ -269,7 +269,7 @@ impl BaseSkinRender {
 
     /// 滚轮滚动：调整模型视距
     ///
-    /// - `is_post`: `true` 表示向前滚动（拉远），`false` 表示向后滚动（拉近）
+    /// - `is_post`: `true` 表示向前滚动即拉远，`false` 表示向后滚动即拉近
     pub fn pointer_wheel_changed(&mut self, is_post: bool) {
         if is_post {
             self.distance += 0.1;
@@ -278,7 +278,7 @@ impl BaseSkinRender {
         }
     }
 
-    /// 追加模型旋转增量（度，`tick` 时累积到变换矩阵）
+    /// 追加模型旋转增量，单位度，`tick` 时累积到变换矩阵
     ///
     /// - `x`: x 轴增量
     /// - `y`: y 轴增量
@@ -349,7 +349,7 @@ impl BaseSkinRender {
         }
     }
 
-    /// 重置位置状态（视距、平移、旋转矩阵恢复默认值）
+    /// 重置位置状态，视距、平移与旋转矩阵恢复默认值
     pub fn reset_position(&mut self) {
         self.distance = 1.0;
         self.diff_xy = Vec2::new(0.0, 0.0);
@@ -361,7 +361,7 @@ impl BaseSkinRender {
 
     /// 帧驱动：推进动画、把旋转增量累积到变换矩阵、统计 FPS
     ///
-    /// - `time`: 距上帧的时间（秒）
+    /// - `time`: 距上帧的时间，单位秒
     pub fn tick(&mut self, time: f64) {
         if self.animation {
             self.skin_animation.tick(time);
@@ -390,7 +390,7 @@ impl BaseSkinRender {
         }
     }
 
-    /// 触发错误回调（未设置回调时无操作）
+    /// 触发错误回调，未设置回调时无操作
     ///
     /// - `error`: 错误类型
     pub fn on_error(&self, error: ErrorType) {
@@ -401,7 +401,7 @@ impl BaseSkinRender {
         }
     }
 
-    /// 触发状态变更回调（未设置回调时无操作）
+    /// 触发状态变更回调，未设置回调时无操作
     ///
     /// - `state`: 新状态
     pub fn on_state_change(&self, state: StateType) {
@@ -412,7 +412,7 @@ impl BaseSkinRender {
         }
     }
 
-    /// 触发 FPS 更新回调（未设置回调时无操作）
+    /// 触发 FPS 更新回调，未设置回调时无操作
     ///
     /// - `fps`: 当前 FPS
     pub fn on_fps_update(&self, fps: i32) {
@@ -425,8 +425,8 @@ impl BaseSkinRender {
 
     /// 计算指定部件的变换矩阵
     ///
-    /// - `part_type`: 部件类型（普通部件取动画或手动旋转角度，
-    ///   `Proj` / `View` / `Model` 返回对应的投影 / 视图 / 模型矩阵）
+    /// - `part_type`: 部件类型；普通部件取动画或手动旋转角度，
+    ///   `Proj` / `View` / `Model` 返回对应的投影 / 视图 / 模型矩阵
     ///
     /// # 返回值
     ///
@@ -549,7 +549,7 @@ impl BaseSkinRender {
         self.animation
     }
 
-    /// 设置皮肤类型（类型变化时标记需要重新加载模型）
+    /// 设置皮肤类型，类型变化时标记需要重新加载模型
     ///
     /// - `value`: 皮肤类型
     pub fn set_skin_type(&mut self, value: SkinType) {
@@ -567,7 +567,7 @@ impl BaseSkinRender {
 
     /// 设置背景色
     ///
-    /// - `color`: 背景色（RGBA）
+    /// - `color`: 背景色，RGBA 四个分量，取值范围 0.0..1.0
     pub fn set_back_color(&mut self, color: Vec4) {
         self.back_color = color;
         self.switch_back = true;
@@ -591,7 +591,7 @@ impl BaseSkinRender {
         self.enable_cape
     }
 
-    /// 设置是否渲染第二层（顶层）
+    /// 设置是否渲染第二层，即顶层
     ///
     /// - `value`: `true` 表示渲染
     pub fn set_enable_top(&mut self, value: bool) {
@@ -599,43 +599,43 @@ impl BaseSkinRender {
         self.switch_type = true;
     }
 
-    /// 获取是否渲染第二层（顶层）
+    /// 获取是否渲染第二层，即顶层
     pub fn get_enable_top(&self) -> bool {
         self.enable_top
     }
 
-    /// 设置手臂旋转角度（度）
+    /// 设置手臂旋转角度，单位度
     ///
     /// - `rotate`: 旋转角度
     pub fn set_arm_rotate(&mut self, rotate: Vec3) {
         self.arm_rotate = rotate;
     }
 
-    /// 获取手臂旋转角度（度）
+    /// 获取手臂旋转角度，单位度
     pub fn get_arm_rotate(&self) -> Vec3 {
         self.arm_rotate
     }
 
-    /// 设置腿部旋转角度（度）
+    /// 设置腿部旋转角度，单位度
     ///
     /// - `rotate`: 旋转角度
     pub fn set_leg_rotate(&mut self, rotate: Vec3) {
         self.leg_rotate = rotate;
     }
 
-    /// 获取腿部旋转角度（度）
+    /// 获取腿部旋转角度，单位度
     pub fn get_leg_rotate(&self) -> Vec3 {
         self.leg_rotate
     }
 
-    /// 设置头部旋转角度（度）
+    /// 设置头部旋转角度，单位度
     ///
     /// - `rotate`: 旋转角度
     pub fn set_head_rotate(&mut self, rotate: Vec3) {
         self.head_rotate = rotate;
     }
 
-    /// 获取头部旋转角度（度）
+    /// 获取头部旋转角度，单位度
     pub fn get_head_rotate(&self) -> Vec3 {
         self.head_rotate
     }
@@ -663,7 +663,7 @@ mod tests {
     use std::sync::Mutex;
     use tiny_skia::IntSize;
 
-    /// 创建指定位图的辅助函数（RGBA8，纯色填充；不透明色预乘值与原色相同）
+    /// 创建指定位图的辅助函数，RGBA8 纯色填充；不透明色下预乘值与原色相同
     fn make_bitmap(w: u32, h: u32, r: u8, g: u8, b: u8) -> Pixmap {
         let mut data = vec![0u8; (w * h * 4) as usize];
         for px in data.chunks_exact_mut(4) {
@@ -697,7 +697,7 @@ mod tests {
 
         render.pointer_moved(KeyType::Left, Vec2::new(15.0, 25.0));
         // rot_xy.y = (15-10)*2 = 10；rot_xy.x = (25 + (-20))*2 = 10
-        // （按下时 diff_xy.y = -20，相当于以按下点 y 为基准计算增量）
+        // 按下时 diff_xy.y = -20，相当于以按下点 y 为基准计算增量
         assert_eq!(render.rot_xy, Vec2::new(10.0, 10.0));
         // diff_xy 更新为当前点
         assert_eq!(render.diff_xy, Vec2::new(15.0, -25.0));
@@ -807,7 +807,7 @@ mod tests {
         render.set_skin_type(SkinType::NewSlim);
         assert_eq!(render.get_skin_type(), SkinType::NewSlim);
         assert!(render.switch_model);
-        // 相同类型不再置位（先复位标志再设置一次）
+        // 相同类型不再置位：先复位标志再设置一次
         render.switch_model = false;
         render.set_skin_type(SkinType::NewSlim);
         assert!(!render.switch_model);
@@ -857,8 +857,8 @@ mod tests {
         assert!((w.z - 0.0).abs() < 1e-5);
     }
 
-    /// 手臂矩阵在零旋转下的落点：肩部枢轴 x = arm_width * VALUE
-    /// （get_matrix 中宽臂 arm_width = 1.5，纤细 = 1.375）
+    /// 手臂矩阵在零旋转下的落点：肩部枢轴 x = arm_width * VALUE，
+    /// 其中宽臂 arm_width = 1.5、纤细 = 1.375
     #[test]
     fn test_get_matrix_arms_width() {
         let mut render = BaseSkinRender::new();

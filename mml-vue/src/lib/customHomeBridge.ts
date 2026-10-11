@@ -1,13 +1,13 @@
 // 自定义主页面桥接（父窗口侧）
 //
-// iframe 里的 `window.mml`（Rust 侧注入的 `custom_home_bridge.js`）通过 postMessage
+// iframe 里的 `window.mml` 由 Rust 侧注入的 `custom_home_bridge.js` 提供，通过 postMessage
 // 把 invoke / 订阅请求发到主窗口，这里负责校验来源、转发命令、按白名单转发事件。
 //
-// 消息格式（与 custom_home_bridge.js 严格对应）：
+// 消息格式，与 custom_home_bridge.js 严格对应：
 //   iframe → 父：{ __mml: 1, id, type: "invoke", cmd, args }
 //   iframe → 父：{ __mml: 1, id, type: "subscribe", event }
 //   iframe → 父：{ __mml: 1, type: "unsubscribe", id }
-//   iframe → 父：{ __mml: 1, type: "ready" }（握手；父窗口回 ready + 当前主题）
+//   iframe → 父：{ __mml: 1, type: "ready" }，握手；父窗口回 ready + 当前主题
 //   父 → iframe：{ __mml: 1, id, ok: true, data } / { __mml: 1, id, ok: false, error }
 //   父 → iframe：{ __mml: 1, type: "event", id, event, payload }
 //   父 → iframe：{ __mml: 1, type: "ready", theme: "Dark" | "Light" }
@@ -42,7 +42,7 @@ const ALLOWED_EVENTS: ReadonlySet<string> = new Set<string>([
  */
 const FLUSH_INTERVAL = 50;
 
-/** iframe → 父 的消息（字段都可能缺，全部当 unknown 处理） */
+/** iframe → 父 的消息，字段都可能缺，全部当 unknown 处理 */
 interface BridgeRequest {
   __mml: number;
   type?: string;
@@ -70,7 +70,7 @@ export function attachCustomHomeBridge(iframe: HTMLIFrameElement): () => void {
   const byEvent = new Map<string, Set<number>>();
   /** 事件名 → 已就绪的底层 listen 取消函数 */
   const unlistens = new Map<string, UnlistenFn>();
-  /** 事件名 → 正在建立的 listen（避免同一事件并发 listen 两次） */
+  /** 事件名 → 正在建立的 listen，避免同一事件并发 listen 两次 */
   const pendingListens = new Map<string, Promise<UnlistenFn>>();
 
   /** 待转发的事件（攒批） */
@@ -80,7 +80,7 @@ export function attachCustomHomeBridge(iframe: HTMLIFrameElement): () => void {
   /** 是否已经完成握手：iframe 的桥接脚本会一直重复发 ready，直到收到应答 */
   let handshaken = false;
 
-  /** 回发到 iframe（opaque origin 拿不到确切 origin，只能 targetOrigin "*"） */
+  /** 回发到 iframe；opaque origin 拿不到确切 origin，只能 targetOrigin "*" */
   function post(msg: Record<string, unknown>) {
     if (disposed) return;
     const win = iframe.contentWindow;
@@ -119,7 +119,7 @@ export function attachCustomHomeBridge(iframe: HTMLIFrameElement): () => void {
     if (pendingListens.has(event)) return;
 
     const pending = listen(event, (e) => {
-      // 原始 payload 直接转发（不走 api.ts 那些带类型转换的包装）
+      // 原始 payload 直接转发，不走 api.ts 那些带类型转换的包装
       for (const sub of byEvent.get(event) ?? []) {
         pushEvent(sub, event, e.payload);
       }
@@ -192,7 +192,7 @@ export function attachCustomHomeBridge(iframe: HTMLIFrameElement): () => void {
   window.addEventListener("message", onMessage);
 
   // 主题：iframe 是独立文档，拿不到启动器 `<html data-theme>` 上的 CSS 变量，
-  // 所以握手时先回一份，之后主题变化（设置窗口切换 / System 跟随系统）再主动推。
+  // 所以握手时先回一份，之后主题变化时再主动推，设置窗口切换或 System 跟随系统都算。
   // 注册 watch 时不会立刻触发（没有 immediate），首屏由握手那条负责，不会重复发。
   const stopThemeWatch = watch(resolvedTheme, (v) => {
     post({ type: "theme", theme: v });

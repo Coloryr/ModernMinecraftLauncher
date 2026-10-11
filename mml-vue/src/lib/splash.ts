@@ -1,7 +1,7 @@
 // 启动画面控制器
 //
 // 主窗口在初始化完成后调用 closeSplash() 关闭启动页；失败时传入错误信息，
-// 启动页关闭后转而显示错误页（splashError 非空时 SplashScreen 渲染错误页）；
+// 启动页关闭后转而显示错误页：splashError 非空时 SplashScreen 渲染错误页；
 // 错误页重试时调用 openSplash() 重新显示启动页。
 import { ref } from "vue";
 

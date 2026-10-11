@@ -1,9 +1,9 @@
 <script setup lang="ts">
 // 截图分类：网格 + 大图预览
 //
-// 预览是**本分类自己的视图状态**（打开哪张、删掉后要不要跟着关掉），所以留在这一层，
+// 预览是**本分类自己的视图状态**：打开哪张、删掉后要不要跟着关掉，所以留在这一层，
 // 不往上塞进窗口级 composable；删除 / 清空的确认走共用的 ops。
-// 放大效果用共用的 `ImagePreview`（与「下载整合包」项目详情同一套）。
+// 放大效果用共用的 `ImagePreview`，与「下载整合包」项目详情同一套。
 import { onUnmounted, ref, watch } from "vue";
 import AsyncImage from "../../../components/ui/AsyncImage.vue";
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";

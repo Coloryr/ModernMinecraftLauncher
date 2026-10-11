@@ -267,7 +267,7 @@ function applyAuthDrop(url: string) {
 
 /** 消费"拖入的登录快捷方式"，参数从哪读见 windowManager 的 targetDrop */
 async function consumeDrop() {
-  let drop: WindowDropParam | null = null;
+  let drop: WindowDropParam | null;
   if (multiWindow.value) {
     if (dropApplied) return;
     drop = dropFromUrl();
@@ -396,13 +396,6 @@ async function copyOauthValue(value: string) {
 function switchAccount(acc: AccountStoreDto) {
   setCurrentAccount(acc);
   showToast(t("account.switched", { name: acc.userName }));
-}
-
-/** 由 uuid 算图片种子，同一账户每次渲染得到同一组随机外观 */
-function seedOf(uuid: string): number {
-  let h = 0;
-  for (const c of uuid) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return h;
 }
 
 // 操作
@@ -581,7 +574,7 @@ function tokenLabel(acc: AccountStoreDto): string {
         @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin" @refresh-skin="refreshSkin"
         @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" />
       <AccountList v-else-if="view === 'list'" :accounts="filtered" :current-uuid="currentAccount?.uuid ?? ''"
-        :token-label="tokenLabel" :seed-of="seedOf" @add="openAdd" @switch="switchAccount" @refresh="refreshToken"
+        :token-label="tokenLabel" @add="openAdd" @switch="switchAccount" @refresh="refreshToken"
         @view-skin="viewSkin" @refresh-skin="refreshSkin" @relogin="relogin" @edit="openEdit"
         @delete="deleteTarget = $event" />
       <AccountDetail v-else :accounts="filtered" :current-uuid="currentAccount?.uuid ?? ''" :token-label="tokenLabel"

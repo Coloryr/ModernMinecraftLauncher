@@ -56,7 +56,7 @@ export function downloadTaskPercent(task: DownloadTaskDto): number {
   if (task.allBytes > 0) {
     return percent(task.nowBytes, task.allBytes);
   }
-  // 单文件但还没拿到总大小（下载器尚未读到 Content-Length）：退回文件数口径
+  // 单文件但还没拿到总大小，下载器尚未读到 Content-Length：退回文件数口径
   return percent(finished, task.total);
 }
 

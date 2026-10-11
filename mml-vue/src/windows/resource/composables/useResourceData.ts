@@ -1,6 +1,6 @@
 // 资源管理窗口的数据层：当前实例 + 七个分类的列表 + 数据包子页
 //
-// 分类与存档子页的**选择**也放这里（`category` / `saveTab`）：加载是跟着它们走的
+// 分类与存档子页的**选择**也放这里，即 `category` / `saveTab`；加载是跟着它们走的
 // （watch 在里面），外壳与各列表组件共用同一份，不必再往上抛事件。
 //
 // 拆出来的原因：原先这 250 行和模板、样式挤在一个 1100 行的 SFC 里，
@@ -37,7 +37,9 @@ import type { CategoryId, SaveTab } from "../types";
 
 /** 左侧导航上显示的当前实例（只需要名字与版本） */
 export interface ResourceInstance {
+  /** 实例名，来自内核的实例列表 */
   name: string;
+  /** 游戏版本，如 `1.20.1` */
   version: string;
 }
 
@@ -119,7 +121,7 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     try {
       switch (category.value) {
         case "mods":
-          // 扫描开始才订阅进度（事件由后端在扫描期间逐文件发出）；
+          // 扫描开始才订阅进度，事件由后端在扫描期间逐文件发出；
           // 先订阅再调命令，否则可能漏掉最开始那几条
           modProgress.value = { done: 0, total: 0 };
           unlistenProgress?.();
@@ -223,7 +225,7 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
    *
    * 恢复"上次类别"会改 `category`，那会触发下面的 `watch(category)` → `load()`；
    * 而 `sync()` 结尾还要 `reloadCurrent()` 一次 —— **同一份列表被拉两遍**，
-   * 模组那一档就是"解析 401 个 jar 两次"（用户看到的：进度跑完 401/401 又从 0 来一遍）。
+   * 模组那一档就是"解析 401 个 jar 两次"：用户看到进度跑完 401/401 又从 0 来一遍。
    *
    * 所以 sync 期间让 watch 只更新选择、不触发加载，最后由 sync 自己统一拉一次。
    */
@@ -244,10 +246,10 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
       instance.value = null;
       instanceUuid.value = "";
     }
-    // 先把该实例的视图偏好读回来（分类顺序 / 上次类别 / 模组视图），再拉列表
+    // 先把该实例的视图偏好读回来，即分类顺序 / 上次类别 / 模组视图，再拉列表
     if (onInstanceReady) await onInstanceReady();
     syncing = false;
-    // 重拉**当前显示的那一份**（停在数据包子页时不该去拉存档列表）
+    // 重拉**当前显示的那一份**；停在数据包子页时不该去拉存档列表
     await reloadCurrent();
   }
 

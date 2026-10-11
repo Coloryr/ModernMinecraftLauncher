@@ -1,6 +1,6 @@
 //! 基于 OpenGL 的皮肤渲染后端
 //!
-//! 组合 [`BaseSkinRender`] 与 glow 上下文，把史蒂夫模型（本体 + 顶层 + 披风）
+//! 组合 [`BaseSkinRender`] 与 glow 上下文，把史蒂夫模型的本体、顶层与披风
 //! 渲染到指定的帧缓冲。
 
 pub mod gl_model;
@@ -24,7 +24,7 @@ use crate::{
 /// 渲染类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SkinRenderType {
-    /// 普通渲染（无后处理抗锯齿）
+    /// 普通渲染，无后处理抗锯齿
     Normal,
     /// FXAA 后处理抗锯齿
     FXAA,
@@ -32,7 +32,7 @@ pub enum SkinRenderType {
     MSAA,
 }
 
-/// 编译并链接着色器程序（macOS 下注入版本头）
+/// 编译并链接着色器程序，macOS 下注入版本头
 ///
 /// - `gl`: OpenGL 上下文
 ///
@@ -108,10 +108,10 @@ fn check_error(gl: &Context) {
     }
 }
 
-/// 把位图上传为 OpenGL 纹理（NEAREST 采样、边缘钳制）
+/// 把位图上传为 OpenGL 纹理，NEAREST 采样加边缘钳制
 ///
 /// - `gl`: OpenGL 上下文
-/// - `image`: 要上传的位图（RGBA8）
+/// - `image`: 要上传的位图，RGBA8 内存序
 /// - `texture`: 目标纹理对象
 fn load_tex(gl: &glow::Context, image: &Pixmap, texture: Texture) {
     unsafe {
@@ -124,7 +124,7 @@ fn load_tex(gl: &glow::Context, image: &Pixmap, texture: Texture) {
         gl.tex_parameter_i32(TEXTURE_2D, TEXTURE_WRAP_T, CLAMP_TO_BORDER as i32);
     }
 
-    // 位图固定是 RGBA8，直接按 RGBA 上传（原先 GLES 下的 BGRA 转换分支不再需要）
+    // 位图固定是 RGBA8，直接按 RGBA 上传，原先 GLES 下的 BGRA 转换分支不再需要
     unsafe {
         gl.tex_image_2d(
             glow::TEXTURE_2D,
@@ -144,13 +144,13 @@ fn load_tex(gl: &glow::Context, image: &Pixmap, texture: Texture) {
     }
 }
 
-/// 把模型数据（顶点 / UV / 法线 / 索引）填充到 VAO 缓冲
+/// 把模型数据的顶点、UV、法线与索引填充到 VAO 缓冲
 ///
 /// - `gl`: OpenGL 上下文
 /// - `vao`: 目标部件的缓冲对象集合
 /// - `model`: 模型顶点与索引数据
 /// - `uv`: 归一化 UV 坐标数组
-/// - `pg`: 着色器程序（用于获取 attrib 位置）
+/// - `pg`: 着色器程序，用于获取 attrib 位置
 fn put_vao_item(gl: &Context, vao: &VaoItem, model: &CubeModelItemObj, uv: &Vec<f32>, pg: Program) {
     unsafe {
         gl.use_program(Some(pg));
@@ -233,7 +233,7 @@ fn put_vao_item(gl: &Context, vao: &VaoItem, model: &CubeModelItemObj, uv: &Vec<
 
 /// 渲染类型枚举
 ///
-/// 与 [`SkinRenderType`] 内容相同，供后处理分支代码使用（当前相关逻辑被注释停用）。
+/// 与 [`SkinRenderType`] 内容相同，供后处理分支代码使用；当前相关逻辑被注释停用。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SkinRenderGLType {
     /// 普通渲染
@@ -252,13 +252,13 @@ impl Default for SkinRenderGLType {
 
 /// OpenGL 皮肤渲染器
 pub struct SkinRenderOpenGL {
-    /// 公共渲染状态（交互、动画、贴图来源等）
+    /// 公共渲染状态，含交互、动画与贴图来源
     pub base: BaseSkinRender,
 
     /// OpenGL 上下文
     gl: Arc<Context>,
 
-    /// OpenGL 适配信息（渲染器 / 版本 / GLSL 版本）
+    /// OpenGL 适配信息，含渲染器、版本与 GLSL 版本
     pub info: String,
 
     // 渲染状态
@@ -288,12 +288,12 @@ pub struct SkinRenderOpenGL {
     top_vao: ModelVao,
 
     // 模型数据
-    /// 单个部件的索引数量（绘制时的元素个数）
+    /// 单个部件的索引数量，即绘制时的元素个数
     steve_model_draw_order_count: i32,
 }
 
 impl SkinRenderOpenGL {
-    /// 创建 OpenGL 渲染器（编译着色器、创建纹理与缓冲、启用背面剔除）
+    /// 创建 OpenGL 渲染器，编译着色器、创建纹理与缓冲并启用背面剔除
     ///
     /// - `gl`: OpenGL 上下文
     pub fn new(gl: Arc<glow::Context>) -> Self {
@@ -332,7 +332,7 @@ impl SkinRenderOpenGL {
         }
     }
 
-    /// 设置渲染类型（下次渲染时生效）
+    /// 设置渲染类型，下次渲染时生效
     ///
     /// - `value`: 渲染类型
     pub fn set_render_type(&mut self, value: SkinRenderType) {
@@ -345,7 +345,7 @@ impl SkinRenderOpenGL {
         self.render_type
     }
 
-    /// 绘制披风（未加载披风或未启用披风渲染时跳过）
+    /// 绘制披风，未加载披风或未启用披风渲染时跳过
     fn draw_cape(&self) {
         if self.base.have_cape && self.base.enable_cape {
             unsafe {
@@ -369,7 +369,7 @@ impl SkinRenderOpenGL {
         }
     }
 
-    /// 绘制本体模型（身体、头部、四肢，各自应用部件矩阵）
+    /// 绘制本体模型的身体、头部与四肢，各自应用部件矩阵
     fn draw_skin(&mut self) {
         unsafe {
             self.gl.bind_texture(TEXTURE_2D, Some(self.texture_skin));
@@ -453,7 +453,7 @@ impl SkinRenderOpenGL {
         }
     }
 
-    /// 绘制顶层模型（半透明混合、关闭深度写入，避免与本体穿插闪烁）
+    /// 绘制顶层模型，半透明混合并关闭深度写入，避免与本体穿插闪烁
     fn draw_skin_top(&mut self) {
         unsafe {
             self.gl.bind_texture(TEXTURE_2D, Some(self.texture_skin));
@@ -642,10 +642,10 @@ impl SkinRenderOpenGL {
 
     /// 开始渲染
     ///
+    /// - `fb`: 目标帧缓冲，传 `None` 表示绑定默认帧缓冲
+    ///
     /// 按标志位刷新贴图 / 模型后，清屏并把本体、披风、顶层依次绘制到
     /// 指定帧缓冲。未加载皮肤或画布尺寸为 0 时跳过绘制。
-    ///
-    /// - `fb`: 目标帧缓冲，传 `None` 表示绑定默认帧缓冲
     pub fn open_gl_render(&mut self, fb: Option<Framebuffer>) {
         if self.base.switch_skin {
             self.load_skin();
@@ -806,7 +806,7 @@ impl SkinRenderOpenGL {
         }
     }
 
-    /// 上传皮肤 / 披风贴图（贴图无效或皮肤类型未知时触发错误回调）
+    /// 上传皮肤 / 披风贴图，贴图无效或皮肤类型未知时触发错误回调
     fn load_skin(&mut self) {
         let base = &mut self.base;
 

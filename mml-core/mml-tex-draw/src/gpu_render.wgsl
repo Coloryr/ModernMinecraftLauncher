@@ -1,5 +1,5 @@
-// 26.3 GUI 物品渲染 shader（照 item.vsh/item.fsh + light.glsl）
-// 顶点：MVP 变换 + 法线矩阵；片元：双方向半兰伯特光照（cutout 带阈值 discard）
+// 26.3 GUI 物品渲染 shader，照 item.vsh/item.fsh + light.glsl
+// 顶点：MVP 变换 + 法线矩阵；片元：双方向半兰伯特光照，cutout 带阈值 discard
 
 struct Uniforms {
     mvp: mat4x4<f32>,
@@ -17,9 +17,9 @@ struct VsOut {
     @location(0) uv: vec2<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) color: vec4<f32>,
-    // glint（附魔光效）采样坐标：RotZ(π/18)·S(8)·uv（t=0帧无平移偏移）
+    // glint 附魔光效的采样坐标：RotZ(π/18)·S(8)·uv，t=0 帧无平移偏移
     @location(3) glint_uv: vec2<f32>,
-    // 1.0=自发光（火焰），光照不衰减
+    // 1.0 表示自发光，火焰等发光物品不参与光照衰减
     @location(4) fullbright: f32,
 };
 
@@ -37,14 +37,14 @@ fn vs(
     out.normal = normalize((u.normal_mat * vec4<f32>(normal, 0.0)).xyz);
     out.color = color;
     out.fullbright = fullbright;
-    // glint 坐标：先放大8倍再绕z转10°（静态图标取t=0，无平移偏移）
+    // glint 坐标：先放大 8 倍再绕 z 转 10°，静态图标取 t=0，无平移偏移
     let g = uv * 8.0;
     let a = 0.17453292519943295; // π/18
     out.glint_uv = vec2<f32>(g.x * cos(a) - g.y * sin(a), g.x * sin(a) + g.y * cos(a));
     return out;
 }
 
-// light.glsl: minecraft_mix_light —— lightmap 全亮（15728880）时等价于直接乘
+// light.glsl: minecraft_mix_light —— lightmap 全亮 15728880 时等价于直接乘
 fn light_acc(n: vec3<f32>, color: vec4<f32>, fullbright: f32) -> vec4<f32> {
     let l = max(
         vec2<f32>(dot(u.light0.xyz, n), dot(u.light1.xyz, n)),
@@ -71,8 +71,8 @@ fn fs_translucent(in: VsOut) -> @location(0) vec4<f32> {
     return c * light_acc(in.normal, in.color, in.fullbright);
 }
 
-// GLINT（附魔光效）：加色混合在物品像素上叠加光纹；
-// 采样坐标用 glint_uv（REPEAT 采样），depth EQUAL 只画物品已写像素
+// GLINT 附魔光效：加色混合在物品像素上叠加光纹；
+// 采样坐标用 glint_uv，REPEAT 采样；depth EQUAL 只画物品已写像素
 @fragment
 fn fs_glint(in: VsOut) -> @location(0) vec4<f32> {
     let c = textureSample(tex, samp, in.glint_uv);

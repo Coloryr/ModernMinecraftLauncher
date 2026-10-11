@@ -59,7 +59,7 @@ pub struct GetOptifineObj {
     pub forge: String,
     /// 文件名
     pub file_name: String,
-    /// 发布日期，官方源为页面原文，镜像源为空串
+    /// 发布日期，官方源已把页面的 `日.月.年` 统一成 `年.月.日`，镜像源为空串
     pub date: String,
     /// 下载地址，官方源为下载页，镜像源为 JAR 地址
     pub url1: Option<String>,

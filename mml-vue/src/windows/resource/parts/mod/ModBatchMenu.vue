@@ -13,8 +13,9 @@ import { t } from "../../../../lib/i18n";
 export type BatchMenuAction = "enable" | "disable" | "move" | "remove";
 
 const props = defineProps<{
-  /** 点击处（视口坐标） */
+  /** 点击处的横坐标，视口坐标 */
   x: number;
+  /** 点击处的纵坐标，视口坐标 */
   y: number;
   /** 选中了多少项（标题里显示） */
   count: number;
