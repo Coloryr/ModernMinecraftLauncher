@@ -52,6 +52,8 @@ export const KEYS = {
   sidebarCollapsed: "mml.sidebarCollapsed",
   /** 实例列表显示模式 list / group / grid */
   viewMode: "mml.viewMode",
+  /** 启动时先显示哪一屏 Home / List */
+  startupPage: "mml.startupPage",
   /** 当前选中实例 uuid */
   selectedInstance: "mml.selectedInstance",
   /** 语言 zh_cn / en_us */

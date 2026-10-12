@@ -126,25 +126,30 @@ export interface ServerFormDraft {
  */
 export type ModView = "list" | "table";
 
+/**
+ * 状态分组的三种类型，与 useModGroups 的 `STATE_GROUP_ID_*` 一一对应
+ *
+ * `on` / `off` / `fail` 分别是「已启用」「已禁用」「识别失败」三块。
+ */
+export type ModStateGroup = "on" | "off" | "fail";
+
 /** 两种模组视图共用的 props */
 export interface ModViewProps {
   /** 这一份要显示的模组；分组模式下是某个分组里的那一批 */
   items: ModItemDto[];
   /** 有操作在跑：按钮统一置灰 */
   busy: boolean;
-  /** 正在被拖拽的模组 SHA1（那行变淡）：归组用 SHA1，与 gui_setting.json 的 Groups 同一口径 */
-  draggingKey: string | null;
   /**
-   * 已选中的模组 SHA1 集合（右键多选，供顶栏批量操作）
+   * 已选中的模组键集合（多选，供顶栏批量操作）
    *
-   * 与拖拽、分组同一套键（SHA1 = 内容哈希）：启用 / 禁用只改文件名，
-   * uuid 会跟着变，SHA1 不变，所以刷新列表后选中状态还在。
+   * 与分组同一套键（SHA1 = 内容哈希）：启用 / 禁用只改文件名，
+   * uuid 会跟着变，SHA1 不变，所以刷新列表后选中状态还在。取键见 `modSelectKey`。
    */
   selectedKeys: Set<string>;
   /**
    * Shift 整段选择的**锚点**：上次点或勾选的那一项的键，见 `modSelectKey`
    *
-   * 视图在那一行上加个标记（左侧一道强调色竖条），让人看得出"整段从哪儿开始"。
+   * 视图在那一行上加个标记（边框换成实心强调色），让人看得出"整段从哪儿开始"。
    * 可空：还没点过任何一行时不标记。
    */
   anchorKey?: string | null;
@@ -171,22 +176,21 @@ export interface ModViewEmits {
    * 这里把按下抛上去，与列表视图走同一个 `onSectionPointerDown`。
    */
   (e: "drag-group", event: PointerEvent): void;
-  /** 行按下：交给 ModPane 的拖拽逻辑（拖到分组上即归组） */
-  (e: "drag-start", payload: { event: PointerEvent; item: ModItemDto }): void;
-  /** 勾选框：把这一行加进 / 移出多选；批量操作的选择方式见 ModPane 的 selected */
+  /** 勾选框：把这一行加进 / 移出多选；选择逻辑见 composables/useRowSelect.ts */
   (e: "select", item: ModItemDto): void;
   /**
-   * 右键模组行：交给 ModPane 弹**项目菜单**，项目是启用/禁用、备注、打开文件夹、删除
+   * 右键模组行：交给 ModPane 弹**行菜单**（RowMenu）
    *
-   * 原来右键是"加选 / 取消多选"，改成菜单后多选交给行左侧的勾选框（悬停即出现）。
+   * 没有选中项时是单行菜单：启用/禁用、备注、打开文件夹、移出分组、删除；
+   * 有选中项时换成批量菜单，动作作用在选中的那一批上。
+   * 多选的入口是行左侧的勾选框（悬停即出现），不再是右键。
    */
   (e: "item-menu", payload: { event: MouseEvent; item: ModItemDto }): void;
   /**
    * 左键点整行：**已经在多选模式时**用来加选 / 反选；按住 Shift 则是**整段选中**
    * 从上次点的那一项到这一项，按显示顺序，与资源管理器同一口径
    *
-   * 不在多选模式、也没按 Shift 时什么都不做（保持原来的"按下即拖拽归组"）；
-   * 拖拽结束那一下的 click 由 ModPane 用抑制标记吞掉。
+   * 不在多选模式、也没按 Shift 时什么都不做，只记下整段选择的锚点。
    */
   (e: "row-click", payload: { event: MouseEvent; item: ModItemDto }): void;
 }

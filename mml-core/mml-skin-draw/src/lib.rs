@@ -96,6 +96,15 @@ pub fn draw_head(image: &Pixmap, mode: DrawHeadType) -> Option<Pixmap> {
     }
 }
 
+/// 渲染皮肤
+///
+/// - `image`: 皮肤贴图
+/// - `mode`: 渲染模式
+/// - `skin_type`: 角色皮肤模型
+///
+/// # 返回值
+///
+/// 返回渲染后的位图，贴图尺寸异常时返回 `None`
 pub fn draw_skin(
     image: &Pixmap,
     mode: DrawSkinType,

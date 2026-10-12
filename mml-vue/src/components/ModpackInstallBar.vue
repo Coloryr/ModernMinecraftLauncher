@@ -148,15 +148,21 @@ async function clearDone() {
 </template>
 
 <style scoped>
-/* 左右 18px：卡片边缘 26 + 18 = 44，卡内内容与同窗口其它卡片对齐 */
+/* 左右 18px：卡片边缘 26 + 18 = 44，卡内内容与同窗口其它卡片对齐。
+   不用 gap 分行：收起时 CollapsePanel 高度为 0，flex 的 gap 仍会在它前面留一道间隔，
+   卡片就成了上 10px 下 16px。间距改由各块自己带，收起时随内层一起被裁掉 */
 .mp-bar {
   display: flex;
   flex-direction: column;
-  gap: 6px;
   padding: 10px 18px;
   border-radius: 10px;
   background: var(--bg-card);
   border: 1px solid var(--border);
+}
+
+/* 标题与总进度条的间距，原来由 .mp-bar 的 gap 提供 */
+.mp-bar>.progress-track {
+  margin-top: 6px;
 }
 
 /* 弹窗形态：外层 BaseModal 锁了高度，内容区是 flex 列。
@@ -205,10 +211,11 @@ async function clearDone() {
   color: var(--text);
 }
 
-/* 清掉已结束的任务：列表底部一条文字按钮，与任务列表隔一条分隔线 */
+/* 清掉已结束的任务：列表底部一条文字按钮，与任务列表隔一条分隔线。
+   靠右放：与弹窗、表单底部的按钮同一个位置口径，居中看着像块独立内容 */
 .mp-footer {
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid var(--border);
@@ -249,7 +256,9 @@ async function clearDone() {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding-top: 4px;
+  /* 10px = 原来 .mp-bar 的 6px gap 加这里的 4px。间距放进内层，
+     收起时才会跟着被裁掉，不在卡片底部留下空白 */
+  padding-top: 10px;
 }
 
 .mp-task {

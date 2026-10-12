@@ -11,6 +11,7 @@ import {
   restoreHeadConfig,
   restoreSelectedInstance,
   restoreSkinConfig,
+  restoreStartupPage,
   sidebarCollapsed,
   sidebarSide,
   viewMode,
@@ -72,6 +73,7 @@ async function bootstrap() {
     sidebarCollapsed.value = cfg.mainWindow.sidebarCollapsed;
     viewMode.value = cfg.mainWindow.viewMode;
     restoreSelectedInstance(cfg.mainWindow.selectedInstance);
+    restoreStartupPage(cfg.mainWindow.startupPage);
     setMultiWindow(cfg.windowMode !== "Single");
     // 字体 / 皮肤与头像显示模式：只同步内存状态，不回写配置
     restoreFontFamily(cfg.font);

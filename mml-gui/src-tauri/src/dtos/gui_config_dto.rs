@@ -12,8 +12,8 @@ use mml_names::Lang;
 
 use crate::gui_config::{
     CapeConfig, CapeDisplay, ClientConfig, CollectConfig, GuiConfig, HeadConfig, HeadType,
-    LoginLockObj, MainWindowConfig, SidebarSide, SkinConfig, SkinDisplay, Theme, ViewMode,
-    WindowMode,
+    LoginLockObj, MainWindowConfig, SidebarSide, SkinConfig, SkinDisplay, StartupPage, Theme,
+    ViewMode, WindowMode,
 };
 
 /// 皮肤显示设置，前端 wire 为 camelCase，字段即 `skin`
@@ -62,6 +62,8 @@ pub struct MainWindowConfigDto {
     pub sidebar_collapsed: bool,
     /// 实例列表显示模式：list / group / grid，默认 list
     pub view_mode: ViewMode,
+    /// 启动时先显示哪一屏：Home / List，默认 Home
+    pub startup_page: StartupPage,
     /// 当前选中实例 uuid，空串表示未选中
     pub selected_instance: String,
 }
@@ -247,6 +249,7 @@ impl From<GuiConfig> for GuiConfigDto {
                 sidebar_side: c.main_window.sidebar_side,
                 sidebar_collapsed: c.main_window.sidebar_collapsed,
                 view_mode: c.main_window.view_mode,
+                startup_page: c.main_window.startup_page,
                 selected_instance: c.main_window.selected_instance,
             },
             head: HeadConfigDto {
@@ -307,6 +310,7 @@ impl From<GuiConfigDto> for GuiConfig {
                 sidebar_side: d.main_window.sidebar_side,
                 sidebar_collapsed: d.main_window.sidebar_collapsed,
                 view_mode: d.main_window.view_mode,
+                startup_page: d.main_window.startup_page,
                 selected_instance: d.main_window.selected_instance,
             },
             head: HeadConfig {

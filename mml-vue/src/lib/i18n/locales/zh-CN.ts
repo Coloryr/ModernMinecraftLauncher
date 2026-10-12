@@ -320,14 +320,19 @@ export default {
   "resource.enableAll": "启用所有",
   "resource.disableAll": "禁用所有",
   "resource.moveGroupItems": "转移内容",
+  "resource.ungroupGroup": "移除分组",
   "resource.deleteGroupMods": "删除所有模组",
   "resource.deleteGroupModsConfirm": "确定删除「{name}」里的 {n} 个模组？文件会进回收站。",
   "resource.moveGroupTitle": "把「{name}」里的模组移到…",
-  // 右键多选 + 顶栏批量操作
+  "resource.moveModTitle": "把「{name}」移到…",
+  // 多选：右键菜单与顶栏批量操作条
   "resource.selectedCount": "已选 {n} 项",
   "resource.clearSelection": "取消选择",
   "resource.batchMoveTo": "移到分组",
-  "resource.batchDeleteConfirm": "确定删除选中的 {n} 个模组吗？将移入回收站。",
+  "resource.ungroup": "移出分组",
+  // 各分类通用；存档另有一条把"项"写成"个存档"的，见下
+  "resource.batchDeleteConfirm": "确定删除选中的 {n} 项吗？将移入回收站。",
+  "resource.batchDeleteSaveConfirm": "确定删除选中的 {n} 个存档吗？将移入回收站。",
   "resource.groupCounts": "{n} 项 · 启用 {on} · 禁用 {off}",
   "resource.groupCountItems": "{n} 项",
   "resource.groupCollapse": "折叠 / 展开",
@@ -945,6 +950,12 @@ export default {
   "winSettings.sidebarLeft": "左侧",
   "winSettings.sidebarRight": "右侧",
   "winSettings.sidebarDesc": "侧栏可收起（主界面顶栏按钮），位置在这里调整。",
+
+  // 启动页
+  "winSettings.startupPage": "启动页",
+  "winSettings.startupHome": "启动器主页",
+  "winSettings.startupList": "项目列表",
+  "winSettings.startupPageDesc": "启动器启动后主窗口先显示哪一屏，之后随时可以切换。",
 
   // 统计窗口
   "winStats.instances": "游戏实例",

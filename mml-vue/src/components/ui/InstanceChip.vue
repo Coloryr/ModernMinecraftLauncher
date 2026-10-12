@@ -1,14 +1,18 @@
 <script setup lang="ts">
-// 标题栏上的当前实例（名字 + 版本）
-//
-// 原先它在左侧分类栏顶部（占了左栏最显眼的位置）；用户要求挪到标题栏，于是走
-// WindowFrame 的 head-right 槽渲染。自带 scoped 样式：标题栏不在 `.resource-layout`
-// 里，窗口级 resource.css 的那套前缀规则够不到它。
-import type { ResourceInstance } from "../composables/useResourceData";
+// 标题栏上的当前实例（名字 + 版本），走 WindowFrame 的 head-right 槽渲染。
+// 资源管理窗口与添加资源窗口共用：自带 scoped 样式，标题栏不在各窗口自己的布局容器里，
+// 窗口级样式够不到它
+/** 标题栏 chip 需要的实例信息，只取渲染用得到的两个字段 */
+interface InstanceChipData {
+  /** 实例名 */
+  name: string;
+  /** 游戏版本，如 1.20.1 */
+  version: string;
+}
 
 defineProps<{
   /** 当前实例；没有实例时整个 chip 不渲染 */
-  instance: ResourceInstance | null;
+  instance: InstanceChipData | null;
 }>();
 </script>
 

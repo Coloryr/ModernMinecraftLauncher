@@ -26,7 +26,7 @@ import ConfirmModal from "./parts/ConfirmModal.vue";
 import DatapackPane from "./parts/DatapackPane.vue";
 import DropConflictModal from "./parts/DropConflictModal.vue";
 import DropOverlay from "../../components/ui/DropOverlay.vue";
-import InstanceChip from "./parts/InstanceChip.vue";
+import InstanceChip from "../../components/ui/InstanceChip.vue";
 import ModPane from "./parts/ModPane.vue";
 import PackPane from "./parts/PackPane.vue";
 import SavePane from "./parts/SavePane.vue";

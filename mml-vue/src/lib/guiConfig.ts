@@ -16,6 +16,8 @@ export type WindowMode = "Multi" | "Single";
 export type SidebarSide = "Left" | "Right";
 /** 实例列表显示模式：默认 list，用户改过后用用户的值 */
 export type ViewMode = "list" | "group" | "grid";
+/** 启动器启动时主窗口先显示哪一屏：枚举值即 Rust 变体名 */
+export type StartupPage = "Home" | "List";
 /** 皮肤显示模式：账户界面皮肤预览形态，枚举值即 Rust 变体名 */
 export type SkinDisplay = "Skin2DA" | "Skin2DB" | "Skin3D" | "Skin3DD" | "Skin3DRotate";
 /** 披风显示模式：账户界面披风 / 鞘翅预览形态，枚举值即 Rust 变体名 */
@@ -94,6 +96,19 @@ export function normalizeViewMode(value: string | null | undefined): ViewMode {
 }
 
 /**
+ * 把任意值规范成合法的启动页
+ *
+ * - `value`: 待规范的原始值，非法 / 缺省时为 null 或 undefined
+ *
+ * # 返回值
+ *
+ * 合法取值，非法 / 缺省时回落 `Home`
+ */
+export function normalizeStartupPage(value: string | null | undefined): StartupPage {
+  return value === "List" ? "List" : "Home";
+}
+
+/**
  * 把任意值规范成合法的头像类型
  *
  * - `value`: 待规范的原始值，非法 / 缺省时为 null 或 undefined
@@ -114,6 +129,8 @@ export interface MainWindowConfig {
   sidebarCollapsed: boolean;
   /** list / group / grid */
   viewMode: ViewMode;
+  /** 启动时先显示哪一屏：Home / List */
+  startupPage: StartupPage;
   /** 当前选中实例 uuid（空串 = 未选中） */
   selectedInstance: string;
 }
@@ -323,6 +340,7 @@ export function defaultConfig(): GuiConfig {
       sidebarSide: readString(KEYS.sidebarSide) === "Right" ? "Right" : "Left",
       sidebarCollapsed: readFlag(KEYS.sidebarCollapsed, true),
       viewMode: normalizeViewMode(readString(KEYS.viewMode)),
+      startupPage: normalizeStartupPage(readString(KEYS.startupPage)),
       selectedInstance: readString(KEYS.selectedInstance),
     },
     head: {

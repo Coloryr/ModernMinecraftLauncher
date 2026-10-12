@@ -684,11 +684,18 @@
      这样第一项仍然可见、能正常往下滚（`center` 会把溢出部分顶到滚动范围之外） */
   justify-content: safe center;
   gap: 16px;
-  padding: 20px 30px 130px;
+  /* 底部那 130px 是给 MOTD 悬浮卡让位的，卡片没开时纯属白留：最小窗口下会平白多出
+     一条滚动条，所以它只在卡片显示时生效，见 .list-mode.has-motd */
+  padding: 20px 30px 30px;
   overflow-y: auto;
   scrollbar-gutter: stable;
   /* 见 styles/scrollbar.css */
   min-width: 0;
+}
+
+/* MOTD 悬浮卡钉在窗口底部（.motd-float），露出来时给它让位，否则会盖住设置面板 */
+.list-mode.has-motd {
+  padding-bottom: 130px;
 }
 
 .list-toolbar {

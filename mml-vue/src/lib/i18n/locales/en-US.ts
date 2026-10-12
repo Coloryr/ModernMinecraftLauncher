@@ -319,14 +319,19 @@ export default {
   "resource.enableAll": "Enable all",
   "resource.disableAll": "Disable all",
   "resource.moveGroupItems": "Move contents",
+  "resource.ungroupGroup": "Remove all from group",
   "resource.deleteGroupMods": "Delete all mods",
   "resource.deleteGroupModsConfirm": "Delete all {n} mods in {name}? Files go to the recycle bin.",
   "resource.moveGroupTitle": "Move mods in {name} to…",
-  // Right-click multi-select + batch actions in the header
+  "resource.moveModTitle": "Move {name} to…",
+  // Multi-select: row context menu and batch actions in the header
   "resource.selectedCount": "{n} selected",
   "resource.clearSelection": "Clear selection",
   "resource.batchMoveTo": "Move to group",
-  "resource.batchDeleteConfirm": "Delete the {n} selected mods? They go to the recycle bin.",
+  "resource.ungroup": "Remove from group",
+  // Shared by every category; saves have their own wording below
+  "resource.batchDeleteConfirm": "Delete the {n} selected items? They go to the recycle bin.",
+  "resource.batchDeleteSaveConfirm": "Delete the {n} selected worlds? They go to the recycle bin.",
   "resource.groupCounts": "{n} items · {on} enabled · {off} disabled",
   "resource.groupCountItems": "{n} items",
   "resource.groupCollapse": "Collapse / expand",
@@ -944,6 +949,12 @@ export default {
   "winSettings.sidebarLeft": "Left",
   "winSettings.sidebarRight": "Right",
   "winSettings.sidebarDesc": "The sidebar can be collapsed from the top bar; adjust its position here.",
+
+  // Startup page
+  "winSettings.startupPage": "Startup Page",
+  "winSettings.startupHome": "Launcher Home",
+  "winSettings.startupList": "Instance List",
+  "winSettings.startupPageDesc": "Which screen the main window opens on after the launcher starts; you can still switch at any time.",
 
   // Stats window
   "winStats.instances": "Instances",

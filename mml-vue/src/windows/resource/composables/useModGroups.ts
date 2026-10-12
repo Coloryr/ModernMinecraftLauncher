@@ -241,7 +241,7 @@ export function useModGroups(data: ReturnType<typeof useResourceData>) {
    * 把若干模组移到某个分组
    *
    * **不重读**：落盘是异步排队的，立刻 `load()` 读到的还是旧成员表 ——
-   * 拖进分组的模组会看着"没进去"。本地按同一套规则改成员即可：
+   * 移进分组的模组会看着"没进去"。本地按同一套规则改成员即可：
    * 先从所有分组里摘掉，再进目标组（一个模组同时只属于一个组）。
    *
    * - `group`: 目标分组 uuid；`null` 表示移出所有分组，回到"未分组"
@@ -249,7 +249,7 @@ export function useModGroups(data: ReturnType<typeof useResourceData>) {
    */
   async function setGroup(group: string | null, keys: string[]) {
     if (!keys.length) return;
-    // 已经在目标组里的不用动（拖回原组是一次空操作）
+    // 已经在目标组里的不用动（移回原组是一次空操作）
     const target = group ?? "";
     const moved = keys.filter((key) => (groupOfKey.value.get(key) ?? "") !== target);
     if (!moved.length) return;

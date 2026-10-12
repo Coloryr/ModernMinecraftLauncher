@@ -115,7 +115,7 @@ const gridTemplate = computed(() =>
 /**
  * 按住表头右边缘拖动改宽度
  *
- * 监听挂在 window 上，与 `useModDrag` 同一套做法：指针移出表头、甚至移出窗口也不会丢。
+ * 监听挂在 window 上，与分组头排序那套拖拽同一做法：指针移出表头、甚至移出窗口也不会丢。
  * 每次移动只发事件，真正的宽度与落盘防抖都在 `useResourceView`。
  */
 function startResize(event: PointerEvent, col: ModCol) {
@@ -323,7 +323,7 @@ function onNoteEnter(event: KeyboardEvent) {
       @contextmenu.prevent="emit('group-menu', {
         event: $event, id: groupKey, label: groupLabel, custom, count: items.length,
       })">
-      <span class="mod-cell mod-select-cell" />
+      <span class="mod-cell row-select-cell" />
       <span class="mod-cell mod-group-cell">
         <button class="mod-tree-caret" :class="{ collapsed: !groupOpen }" @click.stop="emit('toggle-group')">
           <GlyphIcon name="chevron-down" :size="13" :weight="2.4" />
@@ -339,20 +339,18 @@ function onNoteEnter(event: KeyboardEvent) {
       gridTemplateColumns: gridTemplate,
       '--row-depth': row.depth - 1,
     }" :class="{
-      'mod-dragging': !!row.item.sha1 && draggingKey === row.item.sha1,
-      'mod-selected': selectedKeys.has(modSelectKey(row.item)),
-      'mod-anchor': modSelectKey(row.item) === anchorKey,
-      'mod-selecting': selectedKeys.size > 0,
+      'row-selected': selectedKeys.has(modSelectKey(row.item)),
+      'row-anchor': modSelectKey(row.item) === anchorKey,
+      'row-selecting': selectedKeys.size > 0,
       'mod-nested': row.depth > 1,
-    }" @pointerdown="row.depth === 1 ? emit('drag-start', { event: $event, item: row.item }) : undefined"
-      @contextmenu.prevent="row.depth === 1 ? emit('item-menu', { event: $event, item: row.item }) : undefined"
+    }" @contextmenu.prevent="row.depth === 1 ? emit('item-menu', { event: $event, item: row.item }) : undefined"
       @click="row.depth === 1 ? emit('row-click', { event: $event, item: row.item }) : undefined">
-      <!-- 多选勾选框（与列表视图同一套）：内置行没有 SHA1，留等宽占位保持各列对齐 -->
-      <span class="mod-cell mod-select-cell">
-        <input v-if="row.depth === 1" type="checkbox" class="mod-select"
+      <!-- 多选勾选框（与列表视图同一套）：内置行在父 jar 里、没有独立文件，留等宽占位保持各列对齐 -->
+      <span class="mod-cell row-select-cell">
+        <input v-if="row.depth === 1" type="checkbox" class="row-select"
           :checked="selectedKeys.has(modSelectKey(row.item))" @pointerdown.stop @change.stop="emit('select', row.item)"
           @click.stop />
-        <span v-else class="mod-select-gap" />
+        <span v-else class="row-select-gap" />
       </span>
 
       <!--
@@ -428,7 +426,7 @@ function onNoteEnter(event: KeyboardEvent) {
     -->
     <div v-if="groupOpen && !rows.length" class="mod-tr mod-tr-empty"
       :style="{ gridTemplateColumns: gridTemplate }">
-      <span class="mod-cell mod-select-cell" />
+      <span class="mod-cell row-select-cell" />
       <span class="mod-cell mod-empty-tip">{{ t("resource.groupEmptyHint") }}</span>
     </div>
   </div>

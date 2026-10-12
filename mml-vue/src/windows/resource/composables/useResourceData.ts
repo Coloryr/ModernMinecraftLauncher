@@ -2,6 +2,8 @@
 //
 // 分类与存档子页的**选择**也放这里，即 `category` / `saveTab`；加载是跟着它们走的
 // （watch 在里面），外壳与各列表组件共用同一份，不必再往上抛事件。
+// 拉过的分类留在窗口里、切回来不重读（模组那一档重扫一次要解析几百个 jar），
+// 见 loadedCats；要跟磁盘对齐走 reloadCurrent。
 //
 // 拆出来的原因：原先这 250 行和模板、样式挤在一个 1100 行的 SFC 里，
 // 列表组件想拿数据只能整份 prop 传下去；现在按 `windows/block` 的写法拆开 ——
@@ -84,6 +86,18 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
   /** 数据包子页当前选中的存档目录 */
   const dpSave = ref("");
 
+  /**
+   * 已经拉过列表的分类
+   *
+   * 切分类**不重读**：模组那一档要给几百个 jar 解析元数据，来回切一次就重扫一遍。
+   * 新鲜度靠"操作后重拉"与顶栏刷新按钮保证（两者都走 reloadCurrent，是强制重拉），
+   * 换实例时整份作废，见 sync。
+   */
+  const loadedCats = new Set<CategoryId>();
+
+  /** 数据包列表当前对应哪个存档；换存档、换实例或操作后都要重拉 */
+  let loadedDpSave = "";
+
   /** 截图预览协议前缀，形如 `mml-image://...` */
   const imgBase = ref("");
 
@@ -113,13 +127,16 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     unlistenProgress = null;
   }
 
-  /** 按当前分类拉列表；每次切换 / 操作后都重拉，保证与磁盘一致 */
+  /** 按分类拉列表；操作后重拉、点刷新都走这里，切分类走 loadIfNeeded */
   async function load() {
     if (!instanceUuid.value) return;
+    // 拉的过程中用户可能又切了分类：这一发算在**发起时**那一档上
+    const target = category.value;
     const seq = ++loadSeq;
     loading.value = true;
+    let ok = false;
     try {
-      switch (category.value) {
+      switch (target) {
         case "mods":
           // 扫描开始才订阅进度，事件由后端在扫描期间逐文件发出；
           // 先订阅再调命令，否则可能漏掉最开始那几条
@@ -155,21 +172,33 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
           schematics.value = await listSchematics(instanceUuid.value);
           break;
       }
+      ok = true;
     } catch (e) {
       if (seq === loadSeq) showToast(tErr(e));
     } finally {
       // 慢的那一发回来时可能已经有更新的一发了：别把它的加载态关掉
       if (seq === loadSeq) loading.value = false;
     }
+    // 拉成了才算这一档"已加载"；失败不记，下次切回来还能再试
+    if (ok) loadedCats.add(target);
+  }
+
+  /** 这一档还没有列表时才拉：切分类走这里，操作后重拉 / 点刷新走 reloadCurrent */
+  async function loadIfNeeded() {
+    if (loadedCats.has(category.value)) return;
+    await load();
   }
 
   /** 数据包列表，依赖子页选中的存档 */
   async function loadDatapacks() {
     if (!instanceUuid.value || !dpSave.value) return;
+    // 与 load 同一道理：这一发算在**发起时**那个存档上，中途换存档不能记到新的头上
+    const save = dpSave.value;
     const seq = ++loadSeq;
     loading.value = true;
     try {
-      datapacks.value = await listDatapacks(instanceUuid.value, dpSave.value);
+      datapacks.value = await listDatapacks(instanceUuid.value, save);
+      loadedDpSave = save;
     } catch (e) {
       if (seq === loadSeq) {
         datapacks.value = [];
@@ -197,13 +226,15 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
   /** 进入数据包子页：先保证存档列表在、选中一个存档，再拉数据包 */
   async function enterDatapackTab() {
     if (!instanceUuid.value) return;
-    if (!saves.value.length) await load();
+    // 存档列表是这一页的前提：这一档还没拉过就先拉
+    if (!loadedCats.has("saves")) await load();
     if (!dpSave.value && saves.value.length) {
       // 选中变化会触发下面的 watch，由它去拉数据包
       dpSave.value = saves.value[0].dir;
       return;
     }
-    await loadDatapacks();
+    // 同一个存档的数据包列表拉过就留着：切去别的分类再切回来不重读
+    if (loadedDpSave !== dpSave.value) await loadDatapacks();
   }
 
   /**
@@ -223,7 +254,7 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
   /**
    * 正在 sync 中（实例刚就绪、偏好刚恢复）
    *
-   * 恢复"上次类别"会改 `category`，那会触发下面的 `watch(category)` → `load()`；
+   * 恢复"上次类别"会改 `category`，那会触发下面的 `watch(category)` → `loadIfNeeded()`；
    * 而 `sync()` 结尾还要 `reloadCurrent()` 一次 —— **同一份列表被拉两遍**，
    * 模组那一档就是"解析 401 个 jar 两次"：用户看到进度跑完 401/401 又从 0 来一遍。
    *
@@ -234,6 +265,8 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
   /** 当前实例 + 当前分类数据；首次挂载与切回本窗口都走这里 */
   async function sync() {
     syncing = true;
+    // 换没换实例要在改写之前记下来，见下面"整份作废"
+    const prevUuid = instanceUuid.value;
     try {
       // 当前实例取自 gui_config.json（主窗口选中时写入），本窗口是独立 webview，需自己读一次
       const [list, cfg] = await Promise.all([api.getInstances(), loadGuiConfig()]);
@@ -245,6 +278,12 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     } catch {
       instance.value = null;
       instanceUuid.value = "";
+    }
+    // 换实例：上一份列表属于别的实例，整份作废。同一个实例内切窗口回来则留着，
+    // 切回本窗口要重拉的那一份由结尾的 reloadCurrent 负责
+    if (instanceUuid.value !== prevUuid) {
+      loadedCats.clear();
+      loadedDpSave = "";
     }
     // 先把该实例的视图偏好读回来，即分类顺序 / 上次类别 / 模组视图，再拉列表
     if (onInstanceReady) await onInstanceReady();
@@ -267,7 +306,8 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
       void enterDatapackTab();
       return;
     }
-    void load();
+    // 拉过的分类留在窗口里，切回来不再重读（见 loadedCats）
+    void loadIfNeeded();
   }); watch(saveTab, (tab) => {
     if (tab === "datapacks") void enterDatapackTab();
   });

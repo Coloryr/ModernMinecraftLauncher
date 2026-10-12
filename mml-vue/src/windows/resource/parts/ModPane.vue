@@ -1,13 +1,13 @@
 <script setup lang="ts">
 // 模组分类：列表 / 表格两种展示方式 + 自定义分组
 //
-// - 顶栏（ContentHead）：标题 + 视图切换 + 「分组」开关 + 新建分组 + 刷新
-// - 分组打开：每个自建分组一块，末尾跟一块「未分组」；把模组行拖到某块上即归到该组
-// - 分组关闭：选中的视图直接铺平，拖拽也随之关闭 —— 没有落点可言
+// - 顶栏（ContentHead）：搜索 + 视图切换 + 新建分组；有选中项时整条换成批量操作
+// - 每个自建分组一块，后面按顺序表跟着「已启用 / 已禁用 / 识别失败」三个状态分组
+// - 归组走「移到分组」弹窗与单行右键菜单的「移出分组」，**不支持拖动模组改分组**
 //
 // 数据：模组列表在 useResourceData，分组在 useModGroups（自己的 JSON），
-// 拖拽在 useModDrag，两种视图共用同一套落点判定。
-import { computed, onMounted, ref, watch } from "vue";
+// 拖动分组头调整分组顺序在 useReorderDrag。
+import { computed, onMounted, ref } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
 import SegmentedTabs from "../../../components/ui/SegmentedTabs.vue";
@@ -19,10 +19,10 @@ import ListSkeleton from "./ListSkeleton.vue";
 import ModList from "./mod/ModList.vue";
 import ModTable from "./mod/ModTable.vue";
 import ModGroupMenu, { type GroupMenuAction } from "./mod/ModGroupMenu.vue";
-import ModItemMenu, { type ItemMenuAction } from "./mod/ModItemMenu.vue";
-import ModBatchMenu, { type BatchMenuAction } from "./mod/ModBatchMenu.vue";
+import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
 import { deleteMod, disableMod, enableMod, setModNote } from "../../../lib/api";
-import { useModDrag, useReorderDrag, type ModDropTarget, type ModStateGroup } from "../composables/useModDrag";
+import { useReorderDrag } from "../composables/useReorderDrag";
+import { useRowSelect } from "../composables/useRowSelect";
 import {
   useModGroups,
   STATE_GROUP_ID_OFF,
@@ -33,7 +33,7 @@ import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceOps } from "../composables/useResourceOps";
 import type { useResourceView } from "../composables/useResourceView";
 import type { ModItemDto } from "../../../lib/bindings";
-import { modSelectKey, sortedMods } from "../types";
+import { modSelectKey, sortedMods, type ModStateGroup } from "../types";
 import { orderedMods } from "../modColumns";
 import type { ModView } from "../types";
 
@@ -52,52 +52,16 @@ const { modView, setModView, colWidths, setColWidth, sort, setSort } = props.vie
 
 const groups = useModGroups(props.data);
 
-// ---------- 拖拽归组 / 改状态 ----------
-
-const { draggingKey, dropTarget, onRowPointerDown, consumeSuppressClick } = useModDrag({
-  onDrop: (target, keys) => void applyDrop(target, keys),
-});
+// ---------- 归组 / 改状态 ----------
 
 /**
- * 投放：自建分组 = 归组；状态分组 = 改启用状态
+ * 移到自建分组之后收尾：**把模组改成启用**
  *
- * 状态分组只装"不在任何自建分组里"的模组（见 [`sections`]）。所以拖过去光改状态是看不见的
- * —— 模组还留在原来那个自建分组里，那一块不会出现在状态分组下。要**先摘出分组**，
- * 投放才算真的生效。
- *
- * 反向的"状态分组 → 自建分组"由 [`afterGroupDrop`] 收尾（把模组改回启用），见那里的说明。
- *
- * 「识别失败」不是"可拖成的状态"：坏 jar 拖不动，状态也没法靠拖拽造出来，拖过去当没发生。
+ * 用户定的口径是"移进分组 = 顺带启用"，所以从「已禁用」移进某个分组就是启用它。
+ * 已经启用的不用碰 —— 启用 / 禁用会改文件名、uuid 跟着变，
+ * 能不动就不动，也让"只是想归个组"这种常见操作不产生额外写盘。
  */
-async function applyDrop(target: ModDropTarget, keys: string[]) {
-  if (target.kind === "group") {
-    await groups.setGroup(target.group, keys);
-    await afterGroupDrop(keys);
-    return;
-  }
-  if (target.kind === "ungrouped") {
-    await groups.setGroup(null, keys);
-    return;
-  }
-  if (target.state === "fail") return;
-
-  const wantDisable = target.state === "off";
-  // 拖拽只带 SHA1（内容哈希），要调启用 / 禁用得换回那一条的 uuid
-  const picked = pickByState(keys, wantDisable);
-
-  // 先摘出分组：它不属于列表数据，单独提交，走 reload: false 那条路
-  await groups.setGroup(null, keys);
-  await setState(picked, wantDisable);
-}
-
-/**
- * 拖进自建分组之后收尾：**把模组改成启用**
- *
- * 用户定的口径是"拖动模组修改分组 = 禁用和启用"，所以从「已禁用」拖到某个分组就是启用它，
- * 与拖到「已启用」等价。已经启用的不用碰 —— 启用 / 禁用会改文件名、uuid 跟着变，
- * 能不动就不动，也让"启动器里拖一下、外面只多了个分组"这种常见操作不产生额外写盘。
- */
-async function afterGroupDrop(keys: string[]) {
+async function enableAfterMove(keys: string[]) {
   await setState(pickByState(keys, false), false);
 }
 
@@ -128,7 +92,7 @@ async function setState(picked: ModItemDto[], wantDisable: boolean) {
   });
 }
 
-/** 从拖拽带过来的 SHA1 里挑出"当前状态与目标不同"的那些条目 */
+/** 从分组表记的 SHA1 里挑出"当前状态与目标不同"的那些条目 */
 function pickByState(keys: string[], wantDisable: boolean): ModItemDto[] {
   return keys
     .map((key) => bySha1.value.get(key))
@@ -136,112 +100,40 @@ function pickByState(keys: string[], wantDisable: boolean): ModItemDto[] {
     .filter((item) => item.disable !== wantDisable);
 }
 
-/** 行按下：坏 jar 没有 SHA1，不可归组 / 改状态 */
-function onDragStart(payload: { event: PointerEvent; item: ModItemDto }) {
-  if (!payload.item.sha1) return;
-  onRowPointerDown(payload.event, payload.item.sha1);
-}
-
-// ---------- 右键多选（顶栏批量操作） ----------
+// ---------- 多选（顶栏批量操作） ----------
+//
+// 选中逻辑在 useRowSelect，与存档列表共用一套；这里只接上模组自己的键与显示顺序。
 
 /**
- * 已选中的模组（**SHA1** 集合）
+ * 选中键取 `modSelectKey`，即 **SHA1 优先、uuid 兜底**
  *
  * 用 SHA1 而不是 uuid：启用 / 禁用只是给文件名加减后缀，uuid（文件路径的 v5）会跟着变，
- * 而 SHA1 是内容哈希、不变 —— 与拖拽归组同一套键。所以"批量启用"之后选中状态仍然有效，
- * 可以接着"移到分组"。
+ * 而 SHA1 是内容哈希、不变 —— 与分组表同一套键。所以"批量启用"之后选中状态仍然有效，
+ * 可以接着"移到分组"；坏 jar 读不出内容哈希，`modSelectKey` 用 uuid 兜底。
  *
- * 坏 jar 没有 SHA1（读不出内容哈希），不参与多选 —— 它们也做不了启用 / 归组。
+ * 整段选择按**当前看得见**的顺序：表格视图套"按列排序"的 `orderedMods`，
+ * 列表视图套 `sortedMods`，与两个视图各自渲染出来的顺序一致；收起的分组不算进整段。
  */
-const selected = ref<Set<string>>(new Set());
+const {
+  selected,
+  anchorKey,
+  count: selectedCount,
+  isSelected,
+  toggle: toggleSelect,
+  onRowClick,
+  clear: clearSelection,
+} = useRowSelect<ModItemDto>({
+  keyOf: (item) => modSelectKey(item),
+  order: () =>
+    sections.value
+      .filter((sec) => isOpen(sec.id))
+      .flatMap((sec) =>
+        modView.value === "table" ? orderedMods(sec.items, sort.value) : sortedMods(sec.items),
+      ),
+});
 
-/** 选中的那些条目；批量操作要 uuid 去调命令，SHA1 只是选中身份 */
-const selectedItems = computed<ModItemDto[]>(() =>
-  mods.value.filter((item) => selected.value.has(modSelectKey(item))),
-);
-
-/** 把这一行加进 / 移出选择 */
-function onSelect(item: ModItemDto) {
-  const key = modSelectKey(item);
-  const next = new Set(selected.value);
-  if (next.has(key)) {
-    next.delete(key);
-  } else {
-    next.add(key);
-  }
-  selected.value = next;
-  // 记住"上次点（或勾选）的那一项"：Shift + 点的整段选择从这里算起
-  lastClickedKey.value = modSelectKey(item);
-}
-
-/** Shift 整段选择的锚点：上次点（或勾选）的那一项的 SHA1 */
-const lastClickedKey = ref<string | null>(null);
-
-/** 清空选择与锚点 */
-function clearSelection() {
-  selected.value = new Set();
-  // 锚点也一起清：取消选择后不该还留着"整段从这里开始"的标记
-  lastClickedKey.value = null;
-}
-
-/**
- * 左键点整行：多选模式下加选 / 反选；**按住 Shift 则整段选中**（用户口径）
- *
- * - Shift + 点：把"上次点的那一项"到这一项之间（按显示顺序）整段选中，
- *   与资源管理器同一口径 —— **不需要先进入多选模式**，Shift 本身就表示"要选一段"；
- * - 没有选中项、也没按 Shift：什么都不做 —— 保持原来的"按下即拖拽归组"；
- * - 刚才那一下是拖拽（拖过阈值）：用抑制标记吞掉，别把归组的拖动当成点击。
- */
-function onRowClick(payload: { event: MouseEvent; item: ModItemDto }) {
-  if (consumeSuppressClick()) return;
-  if (payload.event.shiftKey) {
-    selectRange(payload.item);
-    return;
-  }
-  // 普通点击也**记下锚点**：这样"先点一行、再 Shift + 点另一行"就能选出这一段，
-  // 即使第一次点击本身没有改变选择（不在多选模式时它什么都不做）
-  lastClickedKey.value = modSelectKey(payload.item);
-  if (!selected.value.size) return;
-  onSelect(payload.item);
-}
-
-/**
- * Shift + 点：整段选中，**替换**当前选择
- *
- * 顺序取**当前显示顺序**：
- * - 表格视图套上"按列排序"的口径，即 `orderedMods`，与 ModTable 共用同一份实现；
- *   不共用的话，按列排序后整段选中的范围和看到的对不上，用户报过"整段选中 78 项"；
- * - 列表视图套上 `sortedMods`，**列表视图自己就按 modid 正序排**，见 ModList 的 `rows`；
- *   这里不排的话，整段选择会和屏幕顺序对不上，用户报过"选中 159 项"；
- * - **收起的分组看不见，不算进整段** —— 选中的就是看得见的那一段。
- *
- * 没有锚点时，也就是第一次就是 Shift + 点，只选这一项。
- */
-function selectRange(item: ModItemDto) {
-  const order = sections.value
-    .filter((sec) => isOpen(sec.id))
-    .flatMap((sec) => (modView.value === "table" ? orderedMods(sec.items, sort.value) : sortedMods(sec.items)));
-
-  const to = order.findIndex((x) => modSelectKey(x) === modSelectKey(item));
-  if (to < 0) return;
-
-  // 锚点也是"混合键"，SHA1 优先、uuid 兜底，比较要用同一个函数
-  const from = order.findIndex((x) => modSelectKey(x) === lastClickedKey.value);
-  if (from < 0) {
-    selected.value = new Set([modSelectKey(item)]);
-    lastClickedKey.value = modSelectKey(item);
-    return;
-  }
-
-  const [lo, hi] = from <= to ? [from, to] : [to, from];
-  const keys = order
-    .slice(lo, hi + 1)
-    .map((x) => modSelectKey(x))
-    .filter((key): key is string => !!key);
-  selected.value = new Set(keys);
-  // **锚点不动**：它始终是"最初点的那一项"，反复 Shift + 点都从同一个起点重新划范围
-  // 资源管理器同一口径；锚点行上那道竖条就是"起点在这里"的标记
-}
+/** 选中的那些条目；批量操作要 uuid 去调命令，选中键只是身份 */
+const selectedItems = computed<ModItemDto[]>(() => mods.value.filter(isSelected));
 
 /** 批量改启用状态：`wantDisable = true` 禁用、`false` 启用 */
 async function batchSetState(wantDisable: boolean) {
@@ -272,20 +164,35 @@ function batchRemove() {
 /**
  * 批量移到某个分组
  *
- * 复用拖拽归组那条路：`groups.setGroup` 本来就收一串 SHA1。
- * 与拖进自建分组同一口径，**顺带启用**，见 [`afterGroupDrop`]。
+ * - `group`: 目标分组 uuid
+ * - `keys`: 要移动的选中键，缺省是当前选中的那些
+ *
+ * **顺带启用**，见 [`enableAfterMove`]。
  */
 async function batchMove(group: string, keys: string[] = [...selected.value]) {
-  // 分组的键**必须是 SHA1**，内核的 `Mod.Groups` 按内容哈希记：
-  // 选中键现在可能是 uuid（没有 SHA1 的条目），这里换成 SHA1 并把换不出来的过滤掉，
-  // 别把 uuid 混进分组表里
-  const sha1s = keys
+  const sha1s = sha1Of(keys);
+  if (!sha1s.length) return;
+  await groups.setGroup(group, sha1s);
+  await enableAfterMove(sha1s);
+}
+
+/**
+ * 把选中键换算成分组表认的 SHA1
+ *
+ * 分组的键**必须是 SHA1**，内核的 `Mod.Groups` 按内容哈希记；而选中键可能是 uuid
+ * （没有 SHA1 的条目），这里换掉并把换不出来的过滤掉，别把 uuid 混进分组表里。
+ *
+ * - `keys`: 选中键，SHA1 或 uuid
+ *
+ * # 返回值
+ *
+ * 换算出来的 SHA1 列表；一个都换不出来时为空
+ */
+function sha1Of(keys: string[]): string[] {
+  return keys
     .map((key) => mods.value.find((item) => modSelectKey(item) === key))
     .map((item) => item?.sha1)
     .filter((sha1): sha1 is string => !!sha1);
-  if (!sha1s.length) return;
-  await groups.setGroup(group, sha1s);
-  await afterGroupDrop(sha1s);
 }
 
 /**
@@ -307,6 +214,11 @@ function pickGroup(group: string) {
     void batchMove(group);
     return;
   }
+  if (source.kind === "mod") {
+    // 单行右键的"移到分组"：源就这一行
+    void batchMove(group, [source.sha1]);
+    return;
+  }
   // 分组右键菜单的"转移内容"：源是那一整组
   const keys = groupItems(source.id)
     .map((item) => item.sha1)
@@ -315,20 +227,22 @@ function pickGroup(group: string) {
 }
 
 /**
- * 弹窗里点「新建分组」：先关掉这个弹窗，再开新建分组表单
+ * 弹窗里点「新建分组」：新建分组表单**叠在**这个弹窗上（用户口径）
  *
- * 不叠着开两个弹窗（互相压、关闭顺序也乱）。**选中项不会丢** ——
- * 建完再点一次「移到分组」就能选到刚建的那个。
+ * 刻意**不关**"移到分组"弹窗：建完新分组直接出现在下面的候选里，点一下就能移过去，
+ * 不用关掉再重新点一次「移到分组」。两个弹窗都是 Teleport 到 body 的，
+ * 后挂载的那个自然画在上面，所以表单盖住它、关掉表单又回到它。
  */
 function createGroupFromPick() {
-  groupPickOpen.value = false;
   openGroupForm();
 }
 
 // ---------- 分组右键菜单 ----------
 //
 // 菜单项全部作用在**整组**上：启用所有 / 禁用所有 / 转移内容 / 删除所有模组，
-// 自建分组再多一项删除分组；状态分组是内核按启用状态分的，删不掉。
+// 自建分组再多三项：重命名分组 / 删除分组 / 移除分组，即把内容移出自建分组。
+// 状态分组是内核按启用状态分的，改不了名也删不掉，也没有"移出"可言 ——
+// 它里面的模组本来就不在任何自建分组里。
 // 菜单本身是 `mod/ModGroupMenu.vue`（只负责画与定位），动作在这里执行。
 
 /** 打开右键菜单的那个分组（null = 没开） */
@@ -398,24 +312,108 @@ function groupRemoveMods(id: string, label: string) {
 }
 
 /**
- * "转移内容"的源分组；`null` 表示这次转移是顶栏那条，源是选中项
+ * "移到分组"弹窗的源
  *
- * 复用同一个"移到分组"弹窗：只是把源从选中项换成整组。弹窗里会把这组名显示出来。
+ * - `group`: 分组右键的「转移内容」，源是那一整组，候选里要排掉它自己
+ * - `mod`: 单行右键的「移到分组」，源就是这一行
+ * - `null`: 顶栏那条，源是当前选中项
+ *
+ * 三种源共用同一个弹窗，标题里报出源是谁，见 groupPickTitle。
  */
-const moveGroupSource = ref<{ id: string; label: string } | null>(null);
+const moveGroupSource = ref<
+  | { kind: "group"; id: string; label: string }
+  | { kind: "mod"; sha1: string; label: string }
+  | null
+>(null);
 
-/** 右键菜单：整组转移 */
+/** 分组右键菜单：整组转移 */
 function groupMoveAll(id: string, label: string) {
-  moveGroupSource.value = { id, label };
+  moveGroupSource.value = { kind: "group", id, label };
   groupPickOpen.value = true;
 }
 
-/** 弹窗里的候选目标：排除源分组自己（不然就是"移到自己"） */
-const groupPickTargets = computed(() =>
-  groups.groups.value.filter((g) => g.uuid !== moveGroupSource.value?.id),
-);
+/** 单行菜单：把这一行移到别的分组 */
+function modMoveToGroup(item: ModItemDto) {
+  // 没算出 sha1 的模组没有分组身份，菜单里那一项是灰的
+  if (!item.sha1) return;
+  moveGroupSource.value = { kind: "mod", sha1: item.sha1, label: item.name || item.file };
+  groupPickOpen.value = true;
+}
 
-/** 关掉"移到分组"弹窗：顺手清掉整组转移的源，免得下次顶栏那条被当成整组转移 */
+/**
+ * 右键菜单：把整组内容移出自建分组
+ *
+ * 与单行菜单的「移出分组」同一条路：只改归属，**不动启用状态**，
+ * 移完它们回到「已启用 / 已禁用」那一块；分组本身留着，成了个空分组。
+ */
+async function groupMoveOut(id: string) {
+  const sha1s = groupItems(id)
+    .map((item) => item.sha1)
+    .filter((sha1): sha1 is string => !!sha1);
+  if (!sha1s.length) return;
+  await groups.setGroup(null, sha1s);
+}
+
+/** 这次要移的那些模组的 SHA1：单行就是那一行，顶栏那条与批量就是选中项 */
+function sourceSha1s(): string[] {
+  const source = moveGroupSource.value;
+  if (source?.kind === "mod") return [source.sha1];
+  return selectedItems.value.map((item) => item.sha1).filter((sha1) => !!sha1);
+}
+
+/** 这些模组**共同**归属的自建分组 uuid；不都在同一个分组里时是空串 */
+function groupOfAll(sha1s: string[]): string {
+  const first = sha1s.length ? (groups.groupOfKey.value.get(sha1s[0]) ?? "") : "";
+  if (!first) return "";
+  return sha1s.every((sha1) => groups.groupOfKey.value.get(sha1) === first) ? first : "";
+}
+
+/**
+ * 这些模组还有没有别的分组可去
+ *
+ * 只有一个分组、而它们就在这个分组里时无处可去，单行 / 批量那几处「移到分组」都置灰。
+ * **一个分组都没有时算有**：弹窗里有「新建分组」，建完就能移过去。
+ *
+ * - `sha1s`: 要移的那些模组的 SHA1；没有 SHA1 的条目会被滤掉
+ *
+ * # 返回值
+ *
+ * 还能移时为 `true`
+ */
+function canMoveKeys(sha1s: string[]): boolean {
+  const keys = sha1s.filter((sha1) => !!sha1);
+  if (!keys.length) return false;
+  if (!groups.groups.value.length) return true;
+  const own = groupOfAll(keys);
+  return groups.groups.value.some((g) => g.uuid !== own);
+}
+
+/** 顶栏那条与批量菜单：这一批还有没有别的分组可去 */
+const canMoveSelection = computed(() => canMoveKeys(selectedItems.value.map((item) => item.sha1)));
+
+/**
+ * 弹窗里的候选目标
+ *
+ * 排掉源**已经在**的那个分组：整组转移时就是源分组自己，单行 / 批量时是这一批
+ * 共同的那个归属 —— 移过去是空操作。一批横跨两个分组时只排共同的那一个：
+ * "把它们都挪到 A"对还在 B 里的那些仍然是有意义的动作。
+ */
+const groupPickTargets = computed(() => {
+  const source = moveGroupSource.value;
+  const own = source?.kind === "group" ? source.id : groupOfAll(sourceSha1s());
+  return groups.groups.value.filter((g) => g.uuid !== own);
+});
+
+/** 弹窗标题：把这次是谁要移报出来，三种源共用这一个弹窗 */
+const groupPickTitle = computed(() => {
+  const source = moveGroupSource.value;
+  if (!source) return t("resource.batchMoveTo");
+  return source.kind === "group"
+    ? t("resource.moveGroupTitle", { name: source.label })
+    : t("resource.moveModTitle", { name: source.label });
+});
+
+/** 关掉"移到分组"弹窗：顺手清掉这次的源，免得下次打开时还按上一次的源算 */
 function closeGroupPick() {
   groupPickOpen.value = false;
   moveGroupSource.value = null;
@@ -441,6 +439,9 @@ function onGroupMenuAction(kind: GroupMenuAction) {
     case "move-all":
       groupMoveAll(menu.id, menu.label);
       break;
+    case "move-out":
+      void groupMoveOut(menu.id);
+      break;
     case "delete-mods":
       groupRemoveMods(menu.id, menu.label);
       break;
@@ -449,13 +450,69 @@ function onGroupMenuAction(kind: GroupMenuAction) {
 
 // ---------- 模组行右键菜单 ----------
 //
-// 四个动作都复用已有的**单行**操作，即 toggle / openNote / openFolder / remove，
-// 所以这里只做分发。原来右键是"加选 / 取消多选"，改成菜单后多选交给左侧勾选框。
+// 单行与批量**共用一个菜单组件**（RowMenu）：没有选中项时是单行菜单，动作只作用在
+// 右键那一行；有选中项时是批量菜单，动作作用在选中的那一批。菜单项在这里算好，
+// 动作由 onMenuPick 分发到已有的单行 / 批量操作上。
 
-/** 打开项目菜单的那一行，`null` 表示没开 */
-const itemMenu = ref<{ item: ModItemDto; x: number; y: number } | null>(null);
+/**
+ * 打开着的菜单，`null` 表示没开
+ *
+ * `item` 为 `null` 表示这是**批量菜单**，动作作用在选中项上；否则是单行菜单。
+ */
+const rowMenu = ref<{
+  x: number;
+  y: number;
+  title?: string;
+  items: RowMenuItem[];
+  item: ModItemDto | null;
+} | null>(null);
 
-/** 打开模组行右键菜单；列表视图与表格视图都抛这个事件上来 */
+/** 单行菜单项 */
+function itemMenuItems(item: ModItemDto): RowMenuItem[] {
+  const items: RowMenuItem[] = [
+    { id: "note", label: t("resource.modNote") },
+    { id: "open-folder", label: t("resource.openFolder") },
+  ];
+  // 分组那两条挨着：移到别的分组 / 移出分组，后者只在这一行确实在组里时才给
+  items.push({
+    id: "move",
+    label: t("resource.batchMoveTo"),
+    // 只有它自己那个分组时无处可去，置灰，见 canMoveKeys
+    disabled: !canMoveKeys([item.sha1]),
+    separated: true,
+  });
+  if (isGrouped(item)) items.push({ id: "ungroup", label: t("resource.ungroup") });
+  items.push({
+    id: item.disable ? "enable" : "disable",
+    label: item.disable ? t("resource.enable") : t("resource.disable"),
+    // 识别失败的模组改不了启用状态，勾选框也是禁用的
+    disabled: item.fail,
+    separated: true,
+  });
+  items.push({ id: "remove", label: t("resource.delete"), danger: true, separated: true });
+  return items;
+}
+
+/**
+ * 批量菜单项：只放**对这一批每一项都成立**的动作
+ *
+ * 判据与分组菜单同一口径：识别失败的模组改不了启用状态，不计入。
+ * 单行菜单里的「备注」「打开文件夹」对一批模组没有意义，所以不出现。
+ */
+function batchMenuItems(picked: ModItemDto[]): RowMenuItem[] {
+  const items: RowMenuItem[] = [];
+  if (picked.some((item) => !item.fail && item.disable)) {
+    items.push({ id: "enable", label: t("resource.enable") });
+  }
+  if (picked.some((item) => !item.fail && !item.disable)) {
+    items.push({ id: "disable", label: t("resource.disable") });
+  }
+  items.push({ id: "move", label: t("resource.batchMoveTo"), disabled: !canMoveSelection.value, separated: true });
+  items.push({ id: "remove", label: t("resource.delete"), danger: true, separated: true });
+  return items;
+}
+
+/** 打开右键菜单；列表视图与表格视图都抛这个事件上来 */
 function openItemMenu(payload: { event: MouseEvent; item: ModItemDto }) {
   const x = payload.event.clientX;
   const y = payload.event.clientY;
@@ -463,68 +520,73 @@ function openItemMenu(payload: { event: MouseEvent; item: ModItemDto }) {
   // 有选中项时，右键 = **批量动作**；用户口径是多选后菜单也要跟着变
   const picked = selectedItems.value;
   if (picked.length) {
-    batchMenu.value = {
-      count: picked.length,
-      // 判据与分组菜单同一口径：识别失败的模组改不了启用状态，不计入
-      canEnable: picked.some((item) => !item.fail && item.disable),
-      canDisable: picked.some((item) => !item.fail && !item.disable),
+    rowMenu.value = {
       x,
       y,
+      title: t("resource.selectedCount", { n: picked.length }),
+      items: batchMenuItems(picked),
+      item: null,
     };
     return;
   }
 
-  itemMenu.value = { item: payload.item, x, y };
+  rowMenu.value = { x, y, items: itemMenuItems(payload.item), item: payload.item };
 }
 
-/** 多选状态下右键弹出的批量菜单（null = 没开） */
-const batchMenu = ref<{
-  count: number;
-  canEnable: boolean;
-  canDisable: boolean;
-  x: number;
-  y: number;
-} | null>(null);
-
-/** 批量菜单动作分发：全部复用顶栏那几条批量操作 */
-function onBatchMenuAction(kind: BatchMenuAction) {
-  switch (kind) {
-    case "enable":
-      void batchSetState(false);
-      break;
-    case "disable":
-      void batchSetState(true);
-      break;
-    case "move":
-      // 源就是当前选中项：`moveGroupSource` 清空即走"顶栏那条"分支
-      moveGroupSource.value = null;
-      groupPickOpen.value = true;
-      break;
-    case "remove":
-      batchRemove();
-      break;
-  }
+/** 这一行是否在某个自建分组里；不在的话「移出分组」是空操作，菜单里就不给 */
+function isGrouped(item: ModItemDto): boolean {
+  return !!item.sha1 && groups.groupOfKey.value.has(item.sha1);
 }
 
-/** 项目菜单动作分发 */
-function onItemMenuAction(kind: ItemMenuAction) {
-  const menu = itemMenu.value;
+/** 菜单动作分发 */
+function onMenuPick(id: string) {
+  const menu = rowMenu.value;
   if (!menu) return;
-  switch (kind) {
+
+  // 批量：全部复用顶栏那几条批量操作
+  if (!menu.item) {
+    switch (id) {
+      case "enable":
+        void batchSetState(false);
+        break;
+      case "disable":
+        void batchSetState(true);
+        break;
+      case "move":
+        // 源就是当前选中项：`moveGroupSource` 清空即走"顶栏那条"分支
+        moveGroupSource.value = null;
+        groupPickOpen.value = true;
+        break;
+      case "remove":
+        batchRemove();
+        break;
+    }
+    return;
+  }
+
+  const item = menu.item;
+  switch (id) {
+    case "move":
+      modMoveToGroup(item);
+      break;
+    case "ungroup":
+      // 只改归属，**不动启用状态**：移完它回到「已启用 / 已禁用」那一块
+      if (item.sha1) void groups.setGroup(null, [item.sha1]);
+      break;
     case "enable":
-      void setState([menu.item], false);
+      void setState([item], false);
       break;
     case "disable":
-      void setState([menu.item], true);
+      void setState([item], true);
       break;
     case "note":
-      openNote(menu.item);
+      openNote(item);
       break;
     case "open-folder":
-      openFolder("mods", menu.item.file);
+      openFolder("mods", item.file);
       break;
     case "remove":
-      remove(menu.item);
+      remove(item);
       break;
   }
 }
@@ -557,11 +619,10 @@ const noMatch = computed(() => query.value !== "" && matched.value.length === 0)
  * 状态分组 → 固定 uuid / 文案键
  *
  * 状态分组与自建分组**共用一套 uuid 键**，即 useModGroups 的 `STATE_GROUP_ID_*`：
- * 渲染身份、排序、折叠状态、投放判定全用它，不必再维护"两套键互相映射"。
+ * 渲染身份、排序、折叠状态全用它，不必再维护"两套键互相映射"。
  *
- * 它们不是用户分组：不可改名 / 删除。归属由"启用 / 禁用"决定：
- * - 拖**到**「已启用 / 已禁用」= 改状态 + 摘出自建分组，见 [`applyDrop`]；
- * - 从状态分组里拖**到自建分组** = 只归组 + 启用，见 [`afterGroupDrop`]。
+ * 它们不是用户分组：不可改名 / 删除，归属由"启用 / 禁用"决定 ——
+ * 只在**不属于任何自建分组**的模组之间分桶，见 [`sections`]。
  */
 const STATE_KEYS: Record<ModStateGroup, { id: string; labelKey: string }> = {
   on: { id: STATE_GROUP_ID_ON, labelKey: "resource.groupOn" },
@@ -577,7 +638,7 @@ interface ModSection {
   label: string;
   /** 这一块里的模组，顺序就是显示顺序 */
   items: ModItemDto[];
-  /** 自建分组：可改名 / 删除，落点 = 归组 */
+  /** 自建分组：可改名 / 删除，能接收「移到分组」 */
   custom: boolean;
   /** 状态分组的类型；自建分组没有 */
   state?: ModStateGroup;
@@ -586,9 +647,9 @@ interface ModSection {
 /**
  * 分组视图的块：**按用户拖出来的顺序**，顺序表见 useModGroups 的 `order`
  *
- * - 自建分组：空的也留着（是个可以往里拖的落点）
- * - 「已启用 / 已禁用」：**空也显示**，这是用户点名的要求 —— 它们是"改状态"的落点，空着更是个提示
- * - 「识别失败」：空就收起来（没有坏包时它只是个噪音），它也不接受投放
+ * - 自建分组：空的也留着，那是「移到分组」的去处，得看得见
+ * - 「已启用 / 已禁用」：**空也显示**，这是用户点名的要求 —— 空着更是个提示
+ * - 「识别失败」：空就收起来（没有坏包时它只是个噪音）
  *
  * 顺序表里可能有已删分组的旧 uuid，所以以实到的为准（找不到的跳过）。
  */
@@ -650,21 +711,7 @@ function visible(sec: ModSection): boolean {
   return sec.state !== "fail" || sec.items.length > 0;
 }
 
-/**
- * 这一块当前是不是拖拽落点（拖着东西悬在它上面）
- *
- * 「识别失败」不接受投放 —— 不给高亮，松手也不做事，免得看着像"能放"。
- */
-function isDropTarget(sec: ModSection): boolean {
-  const target = dropTarget.value;
-  if (!target) return false;
-  if (target.kind === "state") {
-    return !sec.custom && sec.state === target.state && target.state !== "fail";
-  }
-  return sec.custom && target.kind === "group" && target.group === sec.id;
-}
-
-/** SHA1 → 列表里那一条；拖拽只带内容哈希，改状态要用 uuid 定位 */
+/** SHA1 → 列表里那一条；选中与归组都按内容哈希记，改启用状态要用 uuid 定位 */
 const bySha1 = computed(() => {
   const map = new Map<string, ModItemDto>();
   for (const item of mods.value) {
@@ -703,17 +750,6 @@ function isOpen(id: string): boolean {
 function toggleCollapse(id: string) {
   groups.toggleCollapsed(id);
 }
-
-// 拖到收起的块上自动展开：收起后整块只剩一条分组头，落点太小、不好瞄
-watch(dropTarget, (target) => {
-  const id =
-    target?.kind === "group"
-      ? target.group
-      : target?.kind === "state"
-        ? STATE_KEYS[target.state].id
-        : "";
-  if (id && !isOpen(id)) toggleCollapse(id);
-});
 
 // ---------- 分组头拖拽排序 ----------
 
@@ -878,9 +914,8 @@ async function saveNoteInline(item: ModItemDto, text: string) {
 
 // ---------- 模组操作（两种视图共用） ----------
 
-/** 单行启用 / 禁用；拖拽刚结束的那一下 click 不算 */
+/** 单行启用 / 禁用 */
 function toggle(item: ModItemDto) {
-  if (consumeSuppressClick()) return;
   // 单个就是"批量传一个"：走同一条路，同样不重扫、就地更新那一行
   void setState([item], !item.disable);
 }
@@ -900,8 +935,8 @@ onMounted(() => void groups.load());
         整条替换而不是并列：搜索框 + 视图切换 + 新建分组本来就占满一行，
         再挤进 4 个批量按钮会互相压。
       -->
-      <template v-if="selected.size">
-        <span class="mod-selected-count">{{ t("resource.selectedCount", { n: selected.size }) }}</span>
+      <template v-if="selectedCount">
+        <span class="row-selected-count">{{ t("resource.selectedCount", { n: selectedCount }) }}</span>
         <button class="mini-btn" :disabled="busy" @click="batchSetState(false)">
           {{ t("resource.enable") }}
         </button>
@@ -910,8 +945,9 @@ onMounted(() => void groups.load());
         </button>
         <!-- 归组：开弹窗选目标，不用下拉 —— 下拉一次只看得见一项，
              而且"移到分组"会以占位项的形式混在选项里，看着像能选的东西。
-             按钮文字不带省略号（用户要求），与弹窗标题共用同一条文案 -->
-        <button class="mini-btn icon-btn" :disabled="busy" @click="groupPickOpen = true">
+             按钮文字不带省略号（用户要求），与弹窗标题共用同一条文案。
+             选中项都在同一个分组里、又没别的分组可去时置灰，见 canMoveSelection -->
+        <button class="mini-btn icon-btn" :disabled="busy || !canMoveSelection" @click="groupPickOpen = true">
           <GlyphIcon name="folder" :size="14" />
           {{ t("resource.batchMoveTo") }}
         </button>
@@ -952,9 +988,6 @@ onMounted(() => void groups.load());
   <!--
     表格视图：**一张总表**（分组名就是第一列），不是每块一张小表
     —— 这样"哪个模组在哪个组"一眼看得到，也不必在每块上重复 15 列表头。
-
-    每个分组仍是拖拽落点，data-* 属性挂在 <section> 上，落点判定与列表视图共用一套，
-    只是这一块内部不再画分组头与模组行，而是把整批交给 ModTable 自己渲染。
   -->
   <div v-else-if="modView === 'table'" class="item-list mod-groups mod-groups-table">
     <!--
@@ -970,34 +1003,29 @@ onMounted(() => void groups.load());
           <span v-if="showSectionLine(idx)" class="mod-group-insert" />
 
           <section :ref="(el) => bindSection(sec.id, el as Element | null)" class="mod-group mod-group-table"
-            :data-mod-group="sec.custom ? sec.id : undefined" :data-state-group="sec.custom ? undefined : sec.state" :class="{
-              'drop-target': isDropTarget(sec),
-              'mod-group-dragging': draggingSection === sec.id,
-            }">
-            <ModTable :items="sec.items" :busy="busy" :dragging-key="draggingKey" :selected-keys="selected"
+            :class="{ 'mod-group-dragging': draggingSection === sec.id }">
+            <ModTable :items="sec.items" :busy="busy" :selected-keys="selected"
               :group-label="sec.label" :group-key="sec.id" :group-open="isOpen(sec.id)" :custom="sec.custom"
               :dragging-group="draggingSection" :hide-header="idx > 0" :col-widths="colWidths" :sort="sort"
               @col-resize="setColWidth" @sort-change="setSort" @group-menu="openGroupMenu" @toggle="toggle"
               @remove="remove"
               @toggle-group="onSectionToggle(sec.id)" @drag-group="onSectionPointerDown($event, sec.id)"
-              @note-save="saveNoteInline" @open-folder="openFolder('mods', $event.file)" @drag-start="onDragStart"
-              @select="onSelect" @item-menu="openItemMenu" @row-click="onRowClick" :anchor-key="lastClickedKey" />
+              @note-save="saveNoteInline" @open-folder="openFolder('mods', $event.file)"
+              @select="toggleSelect" @item-menu="openItemMenu" @row-click="onRowClick" :anchor-key="anchorKey" />
           </section>
         </template>
       </div>
     </div>
   </div>
 
-  <!-- 列表视图：按块渲染，自建分组可拖入归组，另加三个状态分组 -->
+  <!-- 列表视图：按块渲染，自建分组与三个状态分组各一块 -->
   <div v-else class="item-list mod-groups">
     <!-- 按块渲染，不用 section 上的 v-for：插入线要画在"两块之间"，得有个兄弟节点 -->
     <template v-for="(sec, idx) in sections" :key="sec.id">
       <!-- 拖分组头时的插入线：松手后这一块会落到这里 -->
       <span v-if="showSectionLine(idx)" class="mod-group-insert" />
 
-      <section :ref="(el) => bindSection(sec.id, el as Element | null)" class="mod-group"
-        :data-mod-group="sec.custom ? sec.id : undefined" :data-state-group="sec.custom ? undefined : sec.state" :class="{
-          'drop-target': isDropTarget(sec),
+      <section :ref="(el) => bindSection(sec.id, el as Element | null)" class="mod-group" :class="{
           'mod-group-dragging': draggingSection === sec.id,
           'mod-group-empty': !sec.items.length,
         }">
@@ -1028,10 +1056,10 @@ onMounted(() => void groups.load());
           <p v-if="!sec.items.length" class="empty-tip">
             {{ t("resource.groupEmptyHint") }}
           </p>
-          <ModList :items="sec.items" :busy="busy" :dragging-key="draggingKey" :selected-keys="selected"
+          <ModList :items="sec.items" :busy="busy" :selected-keys="selected"
             @toggle="toggle" @remove="remove" @note="openNote" @open-folder="openFolder('mods', $event.file)"
-            @drag-start="onDragStart" @select="onSelect" @item-menu="openItemMenu" @row-click="onRowClick"
-            :anchor-key="lastClickedKey" />
+            @select="toggleSelect" @item-menu="openItemMenu" @row-click="onRowClick"
+            :anchor-key="anchorKey" />
         </div>
       </section>
 
@@ -1079,14 +1107,11 @@ onMounted(() => void groups.load());
     批量「移到分组」：把自建分组一次列全，点哪一行就移到哪一组（点完即关）。
     比下拉快一步 —— 下拉要先展开、再选、再触发 change。
 
-    **没有「移出分组」那一行**（用户要求）：那是"撤销归组"，把模组拖到状态分组上
-    就能做；混在这里会让"移到分组"多出一个反向选项。
+    **没有「移出分组」那一行**（用户要求）：那是"撤销归组"，混在这里会让"移到分组"
+    多出一个反向选项；要移出就在模组行右键菜单里选「移出分组」。
     一个分组都没有时列表位置写「无分组」，下面用「新建分组」建一个
   -->
-  <BaseModal v-if="groupPickOpen" :closable="false" @close="closeGroupPick"
-    :title="moveGroupSource
-      ? t('resource.moveGroupTitle', { name: moveGroupSource.label })
-      : t('resource.batchMoveTo')">
+  <BaseModal v-if="groupPickOpen" :closable="false" @close="closeGroupPick" :title="groupPickTitle">
     <div class="group-pick-list">
       <button v-for="g in groupPickTargets" :key="g.uuid" class="group-pick-row" :disabled="busy"
         @click="pickGroup(g.uuid)">
@@ -1117,14 +1142,9 @@ onMounted(() => void groups.load());
     :custom="groupMenu.custom" :count="groupMenu.count" :can-enable="groupMenu.canEnable"
     :can-disable="groupMenu.canDisable" @action="onGroupMenuAction" @close="groupMenu = null" />
 
-  <!-- 模组行右键菜单：同一套外观，动作见 onItemMenuAction -->
-  <ModItemMenu v-if="itemMenu" :x="itemMenu.x" :y="itemMenu.y" :item="itemMenu.item"
-    @action="onItemMenuAction" @close="itemMenu = null" />
-
-  <!-- 多选状态下右键：换成作用于选中项的批量菜单 -->
-  <ModBatchMenu v-if="batchMenu" :x="batchMenu.x" :y="batchMenu.y" :count="batchMenu.count"
-    :can-enable="batchMenu.canEnable" :can-disable="batchMenu.canDisable" @action="onBatchMenuAction"
-    @close="batchMenu = null" />
+  <!-- 模组行右键菜单：单行与批量共用 RowMenu，菜单项见 itemMenuItems / batchMenuItems -->
+  <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title"
+    @pick="onMenuPick" @close="rowMenu = null" />
 </template>
 
 <!-- 备注弹窗的样式走 scoped：BaseModal 是 `Teleport to="body"` 的，弹窗不在
@@ -1157,10 +1177,14 @@ onMounted(() => void groups.load());
   /* 分组可能很多：给个上限自己滚，别把弹窗撑出屏幕 */
   max-height: 320px;
   overflow-y: auto;
-  scrollbar-gutter: stable;
+  /* 这里**不预留**滚动条槽位：预留的话行会整体缩进 9px，左端就与标题、
+     右端就与下面的按钮错开。槽位由 BaseModal 的 `.modal` 统一在两侧留 */
   /* 见 styles/scrollbar.css */
 }
 
+/* 一行一个分组：整行可点。
+   底色取 `--bg-hover` 而不是 `--bg-raised` —— 亮色主题下后者与弹窗底 `--bg-card`
+   都是纯白，行就只剩一圈浅边框，"看不出是个能点的项目" */
 .group-pick-row {
   display: flex;
   align-items: center;
@@ -1169,7 +1193,7 @@ onMounted(() => void groups.load());
   padding: 9px 11px;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: var(--bg-raised);
+  background: var(--bg-hover);
   color: var(--text);
   font-size: 12.5px;
   font-family: inherit;
@@ -1180,6 +1204,7 @@ onMounted(() => void groups.load());
 
 .group-pick-row:hover:not(:disabled) {
   border-color: var(--accent);
+  background: var(--accent-soft);
   color: var(--accent);
 }
 

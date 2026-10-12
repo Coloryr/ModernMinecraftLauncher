@@ -26,6 +26,8 @@ const {
   onModeChange,
   side,
   onSideChange,
+  startup,
+  onStartupChange,
   themeValue,
   onThemeChange,
   fonts,
@@ -145,6 +147,14 @@ onMounted(() => void loadFonts());
   </SettingsGroup>
 
   <SettingsGroup id="mainWindow" title-key="winSettings.secMainWindow" :flash="flashGroup === 'mainWindow'">
+    <!-- 启动页：启动器启动后主窗口先落到哪一屏 -->
+    <label class="field-label">{{ t("winSettings.startupPage") }}</label>
+    <SegmentedTabs :model-value="startup" :options="[
+      { value: 'Home', label: t('winSettings.startupHome') },
+      { value: 'List', label: t('winSettings.startupList') },
+    ]" @update:model-value="onStartupChange" />
+    <p class="field-desc">{{ t("winSettings.startupPageDesc") }}</p>
+
     <label class="field-label">{{ t("winSettings.sidebar") }}</label>
     <SegmentedTabs :model-value="side" :options="[
       { value: 'Left', label: t('winSettings.sidebarLeft') },

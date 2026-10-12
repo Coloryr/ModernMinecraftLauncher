@@ -612,6 +612,7 @@ export type MainWindowConfigDto = {
   sidebarSide: SidebarSide,
   sidebarCollapsed: boolean,
   viewMode: ViewMode,
+  startupPage: StartupPage,
   selectedInstance: string,
 };
 
@@ -1104,6 +1105,8 @@ export type WindowMode = "Multi" | "Single";
 export type SidebarSide = "Left" | "Right";
 
 export type ViewMode = "list" | "group" | "grid";
+
+export type StartupPage = "Home" | "List";
 
 export type SkinDisplay = "Skin2DA" | "Skin2DB" | "Skin3D" | "Skin3DD" | "Skin3DRotate";
 

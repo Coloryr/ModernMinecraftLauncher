@@ -1,4 +1,4 @@
-// 界面设置：侧栏位置 / 收起状态 / 列表显示模式 / 皮肤与头像显示
+// 界面设置：侧栏位置 / 收起状态 / 列表显示模式 / 启动页 / 皮肤与头像显示
 // 持久化到本地存储 + gui_config.json
 import { ref } from "vue";
 import { listen } from "@tauri-apps/api/event";
@@ -11,12 +11,14 @@ import {
   normalizeCapeDisplay,
   normalizeHeadType,
   normalizeSkinDisplay,
+  normalizeStartupPage,
   normalizeViewMode,
   saveGuiConfig,
   type CapeDisplay,
   type HeadType,
   type SidebarSide,
   type SkinDisplay,
+  type StartupPage,
   type ViewMode,
 } from "./guiConfig";
 import {
@@ -31,7 +33,7 @@ import {
 import { bumpImageVersion } from "./accountImages";
 import { isTauri } from "../windows/windowManager";
 import { SkinConfigChange } from "./listens";
-export type { SidebarSide, ViewMode, SkinDisplay, CapeDisplay, HeadType } from "./guiConfig";
+export type { SidebarSide, ViewMode, SkinDisplay, CapeDisplay, HeadType, StartupPage } from "./guiConfig";
 
 export const sidebarSide = ref<SidebarSide>(
   readString(KEYS.sidebarSide) === "Right" ? "Right" : "Left",
@@ -42,6 +44,30 @@ export const sidebarCollapsed = ref(readFlag(KEYS.sidebarCollapsed, true));
 
 // 实例列表显示模式：默认列表；用户改过后用用户的值
 export const viewMode = ref<ViewMode>(normalizeViewMode(readString(KEYS.viewMode)));
+
+// 启动器启动时先显示哪一屏：默认启动器主页；用户改过后用用户的值
+export const startupPage = ref<StartupPage>(normalizeStartupPage(readString(KEYS.startupPage)));
+
+/**
+ * 设置启动器启动时先显示哪一屏
+ *
+ * - `v`: 启动页
+ */
+export function setStartupPage(v: StartupPage) {
+  startupPage.value = v;
+  writeString(KEYS.startupPage, v);
+  saveGuiConfig({ mainWindow: { startupPage: v } });
+}
+
+/**
+ * 启动恢复：只同步内存与本地存储，不回写 gui_config.json
+ *
+ * - `v`: 启动页
+ */
+export function restoreStartupPage(v: StartupPage) {
+  startupPage.value = v;
+  writeString(KEYS.startupPage, v);
+}
 
 /**
  * 设置侧栏在左还是在右

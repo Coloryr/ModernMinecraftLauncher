@@ -187,11 +187,6 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  /* 左边留出「落点描边」溢出的那圈：`.mod-group.drop-target` 用 outline-offset 向外描边，
-     而滚动容器会把内容盒之外的绘制裁掉（overflow-y: auto 时另一轴也按 auto 处理）——
-     不留这边距的话，**拖拽时左边那条蓝框正好被切掉**。
-     宽度 = outline-offset 4 + outline 1 = 5，见 .mod-group.drop-target */
-  padding-left: 5px;
   /* 右边让出卡片的留白（26px，与窗口其它三边一致）。
      加在**滚动容器**上而不是 `.cat-content` 上，是为了让滚动条仍贴在容器最右
      （= 窗口右边）：滚动条的 gutter 在 padding box 之外，内容盒才受 padding 影响。 */
@@ -218,15 +213,9 @@
   border: 1px solid var(--border);
 }
 
-/* 行底色的两个组成，**唯一来源**，`.item-actions` 也复用它：
+/* 行底色的两个组成：
    - `--row-bg`   ：不透明的底（普通行 = 卡片色，内置行 = 侧栏色）
-   - `--row-tint` ：叠在上面的一层（选中时 = 强调色，平时透明）
-
-   为什么要拆成变量：行内的操作按钮是**悬浮**的（见 `.item-actions`），
-   它必须有不透明底色才能盖住底下的文件名；而那个底色**必须和所在行一致**，
-   否则选中行上会露出一块异色方块 —— 用户截图里的"4 个按钮背景有颜色"
-   就是这一条：行是浅蓝的选中色，而操作条是 --bg-card（亮色下是白）。
-   把底色做成变量，行与操作条就永远同色，且改一处即可 */
+   - `--row-tint` ：叠在上面的一层（选中时 = 强调色，平时透明） */
 .resource-layout .item-row,
 .resource-layout .mod-tr {
   --row-bg: var(--bg-card);
@@ -317,37 +306,11 @@
   color: var(--red);
 }
 
-.resource-layout .item-actions {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-/* 列表行的操作按钮：**浮**在行的右端，平时不占宽度
-   （三个文字按钮横着一排会把名字/副标题挤窄，见用户截图），
-   悬停该行才淡入；同时用 pointer-events 挡住"看不见却能点"的误触。
-   表格视图不适用：那里本来就有独立的操作列 */
-.resource-layout .item-row .item-actions {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  padding: 3px 4px;
-  border-radius: 8px;
-  /* 垫上**所在行**的底色，免得按钮压住下面的文件名。
-     用 `--row-bg` / `--row-tint`（行上定义的同一对变量，自定义属性会继承下来）——
-     写死 --bg-card 的话，选中行（浅蓝）上会露出一块白方块 */
-  background-color: var(--row-bg);
-  background-image: linear-gradient(var(--row-tint), var(--row-tint));
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.12s;
-}
-
-.resource-layout .item-row:hover .item-actions,
-.resource-layout .item-row:focus-within .item-actions {
-  opacity: 1;
-  pointer-events: auto;
+/* 「已禁用」徽标：暖色，与「识别失败」的红分开 —— 停用是用户自己按的，不是包坏了。
+   底色照 `.badge-red` 的写法写死一份浅色主题的暖色，字色跟主题走 */
+.resource-layout .badge-off {
+  background: rgba(217, 119, 6, 0.14);
+  color: var(--yellow);
 }
 
 .resource-layout .mini-btn {
@@ -420,29 +383,48 @@
   cursor: zoom-in;
 }
 
-.resource-layout .shot-del {
+/* 截图格子的多选：类名与列表行同一套（row-selected / row-anchor / row-selecting），
+   但格子自带边框与圆角，所以选中直接改边框色，不叠行底那种底色 */
+.resource-layout .shot-cell.row-selected {
+  border-color: var(--accent-border);
+  outline: 1px solid var(--accent-border);
+  outline-offset: -1px;
+}
+
+/* 整段选择的起点：边框换成实心强调色，与列表行同一口径 */
+.resource-layout .shot-cell.row-anchor {
+  border-color: var(--accent);
+  outline-color: var(--accent);
+}
+
+/* 勾选框浮在格子左上角：亮图上直接放勾选框看不清，垫一层暗底。
+   整块（暗底 + 勾选框）一起淡入淡出 —— 只淡勾选框的话，每张图上都会一直挂着一块
+   空的深色方块 */
+.resource-layout .shot-check {
   position: absolute;
   top: 4px;
-  right: 4px;
+  left: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 22px;
   height: 22px;
-  border: none;
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  font-size: 14px;
-  line-height: 1;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.12s;
 }
 
-.resource-layout .shot-cell:hover .shot-del {
+/* 里面的勾选框不再单独控透明度：由外层这一块统一控制 */
+.resource-layout .shot-check .row-select {
   opacity: 1;
 }
 
-.resource-layout .shot-del:hover {
-  background: var(--red);
+.resource-layout .shot-cell:hover .shot-check,
+.resource-layout .shot-cell.row-selected .shot-check,
+.resource-layout .shot-cell.row-selecting .shot-check {
+  opacity: 1;
 }
 
 /* ---------- 模组：分组块 ---------- */
@@ -515,25 +497,11 @@
   padding: 0;
 }
 
-/* 表格视图里分组块贴着白底左边缘，`.mod-group.drop-target` 那条**向外**的描边会被
-   滚动容器裁掉（列表视图不贴边，所以只在这个视图里改成向内描）。 */
-.resource-layout .mod-groups-table .mod-group.drop-target {
-  outline-offset: -2px;
-}
-
 .resource-layout .mod-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
   border-radius: 12px;
-}
-
-/* 拖拽落点：整块描一圈虚线强调色（松手就把拖着的模组归到这一组）
-   向外偏 4px 描：`.item-list` 留了对应的左 / 右内边距，否则滚动容器会把这一圈裁掉
-   （左边原本就是被切掉的那一条） */
-.resource-layout .mod-group.drop-target {
-  outline: 1px dashed var(--accent);
-  outline-offset: 4px;
 }
 
 .resource-layout .mod-group-head {
@@ -638,19 +606,18 @@
   padding-left: 2px;
 }
 
-/* 空分组：把「这个分组还是空的，把模组拖上来即可」那行字放进一块虚线落点区里。
-   原先只有一行居中灰字孤零零挂在分组头下面，不像"能放东西的地方"（用户反馈
+/* 空分组：把「该分组没有模组」那行字放进一块虚线区里。
+   原先只有一行居中灰字孤零零挂在分组头下面，不像"一块能放东西的地方"（用户反馈
    "没有边框看起来不合适"）。
 
    只框**内容区**、不框整个分组：非空时是"分组头条 + 下面若干行卡片"，
    整块再套一圈就成"框套框"了 —— 那正是 `.mod-group` 当初不画边框的原因。
 
-   边框保持中性虚线，不跟着落点高亮变色：拖拽悬停时已有的
-   `.mod-group.drop-target` 会在整块外面描一圈强调色，这里再变一次就是双重高亮 */
+   边框保持中性虚线，不抢强调色 —— 强调色留给选中行与分组排序的插入线 */
 .resource-layout .mod-group-empty .mod-group-body {
   border: 1px dashed var(--border);
   border-radius: 9px;
-  /* 比一行卡片略高一点，看着像个"落点"而不是一行说明文字 */
+  /* 比一行卡片略高一点，看着像一块区域而不是一行说明文字 */
   padding: 14px 12px;
   background: var(--bg-side);
 }
@@ -691,17 +658,14 @@
   color: var(--text-dim);
 }
 
-/* 正被拖拽的模组行（三个视图共用一个类） */
-.resource-layout .mod-dragging {
-  opacity: 0.4;
-}
-
-/* 右键选中的模组行：列表的 .item-row 与表格的 .mod-tr 共用这个类
+/* 多选选中的行：列表的 .item-row 与表格的 .mod-tr 共用这个类，
+   **各分类都用**（除截图那个自绘网格，它见下面的 `.shot-cell.row-selected`），
+   选中逻辑见 composables/useRowSelect.ts。
    用内描边而不是外描边：列表与表格的行都是紧挨着的，外描边会糊到相邻行上。
    底色走 `--row-tint`（见 `.item-row` 上方那段说明）：**叠在行底上**而不是替换掉行底，
-   这样它是个确定的不透明色，悬浮操作条才能用同一个色遮住底下的文字而不露异色 */
-.resource-layout .item-row.mod-selected,
-.resource-layout .mod-tr.mod-selected {
+   这样选中态是个确定的颜色，与行本身是卡片色还是内置行的暗色无关 */
+.resource-layout .item-row.row-selected,
+.resource-layout .mod-tr.row-selected {
   --row-tint: var(--accent-soft);
   outline: 1px solid var(--accent-border);
   outline-offset: -1px;
@@ -709,7 +673,7 @@
 
 /* 表格的行现在是**白底上的一格**（不再自带底色），所以选中 / 悬停要自己给底色：
    选中 = 叠一层强调色；悬停 = 浅底，否则鼠标划过去只有勾选框会亮 */
-.resource-layout .mod-tr.mod-selected {
+.resource-layout .mod-tr.row-selected {
   background-color: var(--accent-soft);
 }
 
@@ -733,10 +697,9 @@
 
 /* 列表上方那张 MOTD 卡的横向对齐。
    卡片是 `.pane-swap` 的直接子节点，不在滚动容器里，拿不到 `.item-list` 的内边距 ——
-   这里照抄一份：左 5px 对齐行的描边留白（见 `.item-list` 的 padding-left），
+   这里照抄一份：左与行齐平，`.item-list` 没有左内边距；
    右 26px + 9px 与 `.content-head` 同一口径（卡片留白 + 滚动条占位） */
 .resource-layout .sv-motd {
-  padding-left: 5px;
   padding-right: calc(26px + 9px);
 }
 
@@ -744,8 +707,9 @@
    位置始终占着（固定宽 + gap），所以出现 / 消失都不会让整行左右跳动；
    只在三种情况下露出来：鼠标悬停该行、该行已选中、或**已经在多选状态**
    （选中了任意一项 —— 此时全部露出来，方便继续点着加选）。
-   用户的口径是"右键用左边加勾选"：右键进多选，然后靠左边的勾选框加选 */
-.resource-layout .mod-select {
+   勾选框是进入多选的入口，各分类共用，选中逻辑见 composables/useRowSelect.ts；
+   截图那个网格是自绘的格子，勾选框浮在角上，见下面 `.shot-check` */
+.resource-layout .row-select {
   width: 15px;
   height: 15px;
   flex-shrink: 0;
@@ -755,17 +719,17 @@
   transition: opacity 0.12s;
 }
 
-.resource-layout .item-row:hover .mod-select,
-.resource-layout .item-row.mod-selected .mod-select,
-.resource-layout .item-row.mod-selecting .mod-select,
-.resource-layout .mod-tr:hover .mod-select,
-.resource-layout .mod-tr.mod-selected .mod-select,
-.resource-layout .mod-tr.mod-selecting .mod-select {
+.resource-layout .item-row:hover .row-select,
+.resource-layout .item-row.row-selected .row-select,
+.resource-layout .item-row.row-selecting .row-select,
+.resource-layout .mod-tr:hover .row-select,
+.resource-layout .mod-tr.row-selected .row-select,
+.resource-layout .mod-tr.row-selecting .row-select {
   opacity: 1;
 }
 
 /* 内置行没有勾选框，但要占同样的宽度，父子行的名字才会对齐 */
-.resource-layout .mod-select-gap {
+.resource-layout .row-select-gap {
   display: inline-block;
   width: 15px;
   height: 15px;
@@ -780,7 +744,7 @@
 }
 
 /* 表格里那一格：勾选框居中，且不受 .mod-cell 的省略号规则影响 */
-.resource-layout .mod-select-cell {
+.resource-layout .row-select-cell {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -791,7 +755,7 @@
 }
 
 /* 顶栏批量操作条里的「已选 n 项」：与按钮同高的一行文字，视觉上当作标签 */
-.resource-layout .mod-selected-count {
+.resource-layout .row-selected-count {
   display: inline-flex;
   align-items: center;
   height: 35px;
@@ -1127,9 +1091,9 @@
   min-height: 0;
 }
 
-/* ---------- 分组右键菜单：ModGroupMenu.vue ----------
+/* ---------- 右键菜单：RowMenu.vue（行）与 ModGroupMenu.vue（分组头）共用 ----------
    位置由组件用 `position: fixed` 钉在点击处，这里只管外观。 */
-.resource-layout .mod-ctx-menu {
+.resource-layout .row-ctx-menu {
   position: fixed;
   z-index: 40;
   min-width: 150px;
@@ -1141,13 +1105,13 @@
 }
 
 /* 批量菜单顶部的"已选 n 项"（说明动作作用在这一批上） */
-.resource-layout .mod-ctx-menu-title {
+.resource-layout .row-ctx-menu-title {
   display: block;
   padding: 4px 10px 6px;
   color: var(--text-dim);
   font-size: 11.5px;
 }
-.resource-layout .mod-ctx-menu-item {
+.resource-layout .row-ctx-menu-item {
   display: block;
   width: 100%;
   padding: 6px 10px;
@@ -1161,29 +1125,39 @@
   cursor: pointer;
 }
 
-.resource-layout .mod-ctx-menu-item:hover:not(:disabled) {
+.resource-layout .row-ctx-menu-item:hover:not(:disabled) {
   background: var(--bg-hover);
 }
 
-.resource-layout .mod-ctx-menu-item.danger:hover:not(:disabled) {
+.resource-layout .row-ctx-menu-item.danger:hover:not(:disabled) {
   color: var(--red);
 }
 
-.resource-layout .mod-ctx-menu-item:disabled {
+.resource-layout .row-ctx-menu-item:disabled {
   color: var(--text-dim);
   cursor: default;
   opacity: 0.55;
 }
 
-.resource-layout .mod-ctx-menu-sep {
+.resource-layout .row-ctx-menu-sep {
   display: block;
   height: 1px;
   margin: 4px 6px;
   background: var(--border);
 }
 
-/* Shift 整段选择的**锚点行**：左侧一道强调色竖条，让人看得出"整段从这一项开始"。
-   用 inset 阴影而不是 border —— 不改变行高与列宽，表格不会因此错位。 */
-.resource-layout .mod-anchor {
-  box-shadow: inset 3px 0 0 0 var(--accent);
+/* Shift 整段选择的**锚点行**：把这一行的边框换成**实心强调色**，表示"整段从这一项开始"。
+   多选那圈内描边是半透明的 `--accent-border`，这里用满强度的 `--accent` ——
+   同色系但浓淡差一档，叠在同一行上也认得出是有起点的那一条。
+   列表行自己带边框，直接改边框色，并把内描边一起提亮，免得两层不同浓淡叠着显脏；
+   表格行没有边框（只有行间的分隔线），所以只能靠内描边画。
+   两处都走 outline / border，不改行高与列宽，表格不会错位 */
+.resource-layout .item-row.row-anchor {
+  border-color: var(--accent);
+  outline-color: var(--accent);
+}
+
+.resource-layout .mod-tr.row-anchor {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
 }

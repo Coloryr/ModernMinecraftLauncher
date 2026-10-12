@@ -150,6 +150,9 @@ select.sel-file-version {
   background: var(--bg-card);
   overflow: hidden;
   transition: box-shadow 0.15s ease;
+  /* 不参与压缩：上面的 overflow: hidden 会让 flex 项的自动最小高度退化成 0，
+     列表一旦变成定高容器，卡片就会被压成一条边线（添加资源窗口踩过） */
+  flex-shrink: 0;
 }
 
 /* 悬停：主题阴影，与主页卡片 .entry-card 同一套 token。

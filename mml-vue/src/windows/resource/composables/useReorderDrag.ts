@@ -1,9 +1,8 @@
-// 两类拖拽，共用一套"按下 → 超阈值 → 指针位置"的骨架（见文件末尾）：
+// 竖排列表的重排拖拽：拖分组头调整分组的上下顺序
 //
-// 1. **模组行** [`useModDrag`]：把模组拖进某个分组 / 状态分组，或拖到"未分组"里摘出来
-// 2. **分组头** [`useReorderDrag`]：拖分组头调整分组的上下顺序，左侧分类栏也是这一套
-//
-// 都用指针事件模拟，不用 HTML5 draggable：WebView2 里会出现"禁止"光标且投放不可靠。
+// 手势骨架（按下 → 超阈值 → 按指针位置算落点 → 松手提交）在 [`useDragGesture`]，
+// 本文件里的 [`useReorderDrag`] 只做"插到第几项之前"这一层判定。
+// 用指针事件模拟，不用 HTML5 draggable：WebView2 里会出现"禁止"光标且投放不可靠。
 import { onMounted, onUnmounted, ref } from "vue";
 
 /**
@@ -15,17 +14,10 @@ import { onMounted, onUnmounted, ref } from "vue";
  */
 const DRAG_THRESHOLD = 8;
 
-/** 可拖拽的目标：带一个用于渲染身份的 key */
-export interface DragItem {
-  /** 渲染身份用的键 */
-  key: string;
-}
-
 /**
  * 通用的「按下 → 拖过阈值 → 按指针位置算落点 → 松手提交」
  *
- * 只处理骨架（阈值判定、抑制拖后点击），"落在第几项之前"由调用方的 `hitTest` 算 ——
- * 模组行是找投放容器，认两种 `data-*` 属性；分组头与分类栏是找"插到第几项之前"。
+ * 只处理骨架（阈值判定、抑制拖后点击），"落在第几项之前"由调用方的 `hitTest` 算。
  *
  * - `deps.hitTest`: 拖动中每次指针移动调用，返回要提交的落点，`null` 表示不提交
  * - `deps.onDrop`: 松手时调用，落点非 `null` 才调。**第二个参数是被拖项的 key** ——
@@ -135,83 +127,8 @@ export function useDragGesture<T>(deps: {
   return { dragKey, dropAt, onPointerDown, consumeSuppressClick, reset };
 }
 
-/** 状态分组的三种类型，与 ModPane 的 STATE_KEYS 一一对应 */
-export type ModStateGroup = "on" | "off" | "fail";
-
-/** 松手时的投放目标 */
-export type ModDropTarget =
-  /** 自建分组：归到该组 */
-  | { kind: "group"; group: string }
-  /** 未分组：移出自建分组，即组名是空串的那个容器 */
-  | { kind: "ungrouped" }
-  /** 状态分组：按状态启用 / 禁用 */
-  | { kind: "state"; state: ModStateGroup };
-
-/** 模组行拖拽的依赖 */
-interface ModDragDeps {
-  /** 提交：落点 + 拖着的那些模组 key，即 SHA1 */
-  onDrop: (target: ModDropTarget, keys: string[]) => void;
-}
-
 /**
- * 模组行的拖拽：拖进分组 / 状态分组
- *
- * - `deps.onDrop`: 松手时提交，落点与拖着的模组键一起交出去
- *
- * # 返回值
- *
- * - `draggingKey`: 正在被拖的模组键，`null` 表示没在拖
- * - `dropTarget`: 指针下的落点，`null` 表示无落点
- * - `onRowPointerDown`: 在模组行上按下，开始一轮手势
- * - `consumeSuppressClick`: 取走"这次 click 要吞掉"的标记
- */
-export function useModDrag(deps: ModDragDeps) {
-  /** 指针下方是哪个投放容器 */
-  function hitTest(e: PointerEvent): ModDropTarget | null {
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    // 靠近内容区上下边缘自动滚动，方便投给远处的分组
-    const scroller = (el?.closest?.(".item-list, .mod-table") ?? null) as HTMLElement | null;
-    if (scroller) {
-      const rect = scroller.getBoundingClientRect();
-      if (e.clientY < rect.top + 60) scroller.scrollTop -= 10;
-      else if (e.clientY > rect.bottom - 60) scroller.scrollTop += 10;
-    }
-
-    // 状态分组优先判：它是"更具体"的落点；两者不会嵌在一起，但先判少一次查找
-    const state = (el?.closest?.("[data-state-group]") ?? null) as HTMLElement | null;
-    if (state) {
-      const value = state.dataset.stateGroup;
-      return value === "on" || value === "off" || value === "fail"
-        ? { kind: "state", state: value }
-        : null;
-    }
-
-    const box = (el?.closest?.("[data-mod-group]") ?? null) as HTMLElement | null;
-    if (!box) return null;
-    const group = box.dataset.modGroup ?? "";
-    return group ? { kind: "group", group } : { kind: "ungrouped" };
-  }
-
-  const gesture = useDragGesture<ModDropTarget>({
-    hitTest,
-    // key 由骨架在松手那一刻交过来；**不能**读 gesture.dragKey，那时已被 reset 清掉
-    onDrop: (target, key) => deps.onDrop(target, [key]),
-  });
-
-  function onRowPointerDown(e: PointerEvent, key: string) {
-    gesture.onPointerDown(e, key);
-  }
-
-  return {
-    draggingKey: gesture.dragKey,
-    dropTarget: gesture.dropAt,
-    onRowPointerDown,
-    consumeSuppressClick: gesture.consumeSuppressClick,
-  };
-}
-
-/**
- * 竖排列表的重排拖拽，用于分组头与左侧分类栏
+ * 竖排列表的重排拖拽，当前用于模组分组头
  *
  * 落点 = "会插到第几项之前"：调用方给出这一列可拖项的**渲染顺序 key**，
  * 以及它们的元素（用于量位置），本 hook 只做阈值与指针位置判定。

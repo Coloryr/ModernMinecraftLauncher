@@ -54,6 +54,7 @@ const SETTINGS_INDEX: IndexEntry[] = [
   { tab: "ui", group: "theme", labelKey: "winSettings.theme", extra: ["theme", "dark", "light", "深色", "浅色"] },
   { tab: "ui", group: "theme", labelKey: "winSettings.accent", extra: ["accent", "color", "强调色", "主题色"] },
   { tab: "ui", group: "window", labelKey: "winSettings.windowMode", extra: ["window mode", "多窗口", "单窗口"] },
+  { tab: "ui", group: "mainWindow", labelKey: "winSettings.startupPage", extra: ["startup", "home", "启动页", "主页", "项目列表"] },
   { tab: "ui", group: "mainWindow", labelKey: "winSettings.sidebar", extra: ["sidebar", "侧栏"] },
   { tab: "ui", group: "bgImage", labelKey: "winSettings.bgImage", extra: ["background", "壁纸", "背景"] },
   { tab: "ui", group: "bgImage", labelKey: "winSettings.bgOpacity", extra: ["opacity", "不透明度"] },

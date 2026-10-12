@@ -62,6 +62,16 @@ pub enum ViewMode {
     Grid,
 }
 
+/// 启动器启动时主窗口先显示哪一屏；serde 按变体名序列化，与前端同名
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum StartupPage {
+    /// 启动器主页，默认
+    #[default]
+    Home,
+    /// 项目列表
+    List,
+}
+
 /// 皮肤显示模式；serde 按变体名序列化，与前端同名
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum SkinDisplay {
@@ -186,12 +196,14 @@ pub struct MainWindowConfig {
     pub sidebar_collapsed: bool,
     /// 实例列表显示模式：list / group / grid，默认 list
     pub view_mode: ViewMode,
+    /// 启动时先显示哪一屏：Home / List，默认 Home
+    pub startup_page: StartupPage,
     /// 当前选中实例 uuid；空串表示未选中
     pub selected_instance: String,
 }
 
 impl Default for MainWindowConfig {
-    /// 默认：侧栏在左且收起、列表模式、未选中实例
+    /// 默认：侧栏在左且收起、列表模式、启动进启动器主页、未选中实例
     fn default() -> Self {
         Self {
             sidebar_side: Default::default(),
@@ -199,6 +211,8 @@ impl Default for MainWindowConfig {
             sidebar_collapsed: true,
             // 默认列表模式，用户改过后用用户的值
             view_mode: ViewMode::default(),
+            // 默认先显示启动器主页
+            startup_page: StartupPage::default(),
             // 默认未选中
             selected_instance: String::new(),
         }

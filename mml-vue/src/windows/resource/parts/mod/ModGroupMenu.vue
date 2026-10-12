@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 分组右键菜单：删除分组 / 启用所有 / 禁用所有 / 转移内容 / 删除所有模组
+// 分组右键菜单：删除分组 / 启用所有 / 禁用所有 / 转移内容 / 移除分组 / 删除所有模组
 //
 // 动作**全部抛给父组件**（ModPane）处理 —— 只有它认识分组、模组、确认弹窗与
 // "移到分组"弹窗。这里只管画菜单与定位。
@@ -17,6 +17,7 @@ export type GroupMenuAction =
   | "enable-all"
   | "disable-all"
   | "move-all"
+  | "move-out"
   | "delete-mods";
 
 const props = defineProps<{
@@ -88,18 +89,18 @@ function pick(kind: GroupMenuAction) {
 </script>
 
 <template>
-  <div ref="el" class="mod-ctx-menu" :style="{ left: `${pos.x}px`, top: `${pos.y}px` }" @pointerdown.stop
+  <div ref="el" class="row-ctx-menu" :style="{ left: `${pos.x}px`, top: `${pos.y}px` }" @pointerdown.stop
     @contextmenu.prevent>
     <!-- 重命名 / 删除分组只给自建分组；已启用 / 已禁用 / 识别失败这三个状态分组是内核按状态
          分的，改不了名也删不掉。**空分组照样能删** —— 删掉一个空分组正是它最常见的用法 -->
     <template v-if="custom">
-      <button class="mod-ctx-menu-item" @click="pick('rename-group')">
+      <button class="row-ctx-menu-item" @click="pick('rename-group')">
         {{ t("resource.groupRename") }}
       </button>
-      <button class="mod-ctx-menu-item danger" @click="pick('delete-group')">
+      <button class="row-ctx-menu-item danger" @click="pick('delete-group')">
         {{ t("resource.groupDelete") }}
       </button>
-      <span class="mod-ctx-menu-sep" />
+      <span class="row-ctx-menu-sep" />
     </template>
 
     <!-- 启用 / 禁用**按组内实际状态给**，用户口径是已启用分组只显示"禁用所有"，其它同理：
@@ -107,19 +108,24 @@ function pick(kind: GroupMenuAction) {
          识别失败分组里的模组改不了状态，两项都不出现。
          分隔线放在条件块内，两项都不出现时不会多出一条空线 -->
     <template v-if="canEnable || canDisable">
-      <button v-if="canEnable" class="mod-ctx-menu-item" @click="pick('enable-all')">
+      <button v-if="canEnable" class="row-ctx-menu-item" @click="pick('enable-all')">
         {{ t("resource.enableAll") }}
       </button>
-      <button v-if="canDisable" class="mod-ctx-menu-item" @click="pick('disable-all')">
+      <button v-if="canDisable" class="row-ctx-menu-item" @click="pick('disable-all')">
         {{ t("resource.disableAll") }}
       </button>
-      <span class="mod-ctx-menu-sep" />
+      <span class="row-ctx-menu-sep" />
     </template>
 
-    <button class="mod-ctx-menu-item" :disabled="empty" @click="pick('move-all')">
+    <button class="row-ctx-menu-item" :disabled="empty" @click="pick('move-all')">
       {{ t("resource.moveGroupItems") }}
     </button>
-    <button class="mod-ctx-menu-item danger" :disabled="empty" @click="pick('delete-mods')">
+    <!-- 移除分组：把这一组的内容移出自建分组（分组本身留着）。状态分组不给 ——
+         它里面的模组本来就不在任何自建分组里，没有"移出"可言 -->
+    <button v-if="custom" class="row-ctx-menu-item" :disabled="empty" @click="pick('move-out')">
+      {{ t("resource.ungroupGroup") }}
+    </button>
+    <button class="row-ctx-menu-item danger" :disabled="empty" @click="pick('delete-mods')">
       {{ t("resource.deleteGroupMods") }}
     </button>
   </div>

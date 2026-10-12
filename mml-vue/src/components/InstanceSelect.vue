@@ -23,6 +23,7 @@ const emit = defineEmits<{
 const open = ref(false);
 const rootEl = ref<HTMLDivElement | null>(null);
 const btnEl = ref<HTMLButtonElement | null>(null);
+const listEl = ref<HTMLDivElement | null>(null);
 
 /**
  * 浮层定位：**fixed**，不是 absolute
@@ -33,7 +34,12 @@ const btnEl = ref<HTMLButtonElement | null>(null);
  */
 const menuStyle = ref<Record<string, string>>({});
 
-/** 量一次按钮位置：贴按钮下方；下面放不下就翻到上方，并按可用空间限高 */
+/**
+ * 量一次按钮位置并定高
+ *
+ * 下方装不下整份内容、上方装得下时翻到上方。只封顶不换边的话，列表会为差出来的那十几
+ * 像素白多一条滚动条：鼠标停在行上时滚轮才落到列表上，看上去就像列表自己在长高。
+ */
 function placeMenu() {
   const btn = btnEl.value;
   if (!btn) return;
@@ -43,17 +49,39 @@ function placeMenu() {
   const EDGE = 10;
   const below = window.innerHeight - rect.bottom - GAP - EDGE;
   const above = rect.top - GAP - EDGE;
-  // 下面连一屏都放不下、上面更宽裕时翻上去（贴着窗口底边也能用）
-  const up = below < 180 && above > below;
+  // 不限高时浮层要多高：没被截就是当前高度，被截过就把列表藏起来的那截加回去
+  const list = listEl.value;
+  const menu = list?.parentElement as HTMLElement | null;
+  const hidden = list ? Math.max(0, list.scrollHeight - list.clientHeight) : 0;
+  const natural = menu ? menu.offsetHeight + hidden : 0;
+  const up = natural <= below ? false : natural <= above || above > below;
 
   menuStyle.value = {
     left: `${rect.left}px`,
     width: `${rect.width}px`,
-    maxHeight: `${Math.max(140, Math.min(280, up ? above : below))}px`,
+    // 用满那一侧的空间而不是封顶 280：实例多时少滚几次，140 是"再挤也要露出一行多"的下限
+    maxHeight: `${Math.max(140, up ? above : below)}px`,
     ...(up
       ? { bottom: `${window.innerHeight - rect.top + GAP}px` }
       : { top: `${rect.bottom + GAP}px` }),
   };
+}
+
+/**
+ * 打开时把当前实例带进视野
+ *
+ * 浮层每次打开都是重新挂载的，scrollTop 必然回到 0：不滚一下，实例一多就得每次从最上面往下
+ * 翻着找，切到别的实例再打开也一样。
+ */
+function revealActive() {
+  const list = listEl.value;
+  const active = list?.querySelector<HTMLElement>(".option.active");
+  if (!list || !active) return;
+  // 用布局值而不是 getBoundingClientRect：此刻浮层还在播 enter 动画，rect 带着缩放
+  const top = active.offsetTop - list.offsetTop;
+  const bottom = top + active.offsetHeight;
+  if (top < list.scrollTop) list.scrollTop = top;
+  else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
 }
 
 async function toggle() {
@@ -62,9 +90,10 @@ async function toggle() {
     return;
   }
   open.value = true;
-  // 渲染出来才量得到按钮位置
+  // 渲染出来才量得到按钮位置和当前实例那一行
   await nextTick();
   placeMenu();
+  revealActive();
 }
 
 /** 点浮层外面收起；弹层留在组件根内，所以只判根元素即可 */
@@ -135,7 +164,7 @@ function addNew() {
       <div v-if="open" class="select-menu" :style="menuStyle">
         <!-- 实例列表：整块浮层里**唯一**可滚动的地方，
              所以右侧滚动条只在这一段，不会延伸到下面的"添加实例"上去 -->
-        <div class="menu-list">
+        <div class="menu-list" ref="listEl">
           <button v-for="inst in instances" :key="inst.uuid" class="option"
             :class="{ active: inst.uuid === modelValue }" @click="pick(inst)">
             <InstanceIcon :name="inst.name" :uuid="inst.uuid" :size="30" />
@@ -270,7 +299,6 @@ function addNew() {
   border-radius: 12px;
   box-shadow: var(--shadow-lg);
   padding: 6px;
-  max-height: 280px;
   /* 自己滚会把滚动条拉到整块浮层的高度（跨过下面的"添加实例"），
      所以这里不滚：溢出交给 .menu-list  */
   overflow: hidden;
@@ -285,6 +313,8 @@ function addNew() {
   overflow-y: auto;
   scrollbar-gutter: stable;
   /* 见 styles/scrollbar.css */
+  /* 滚到底不把滚动交给页面：浮层是 fixed，页面一动它就脱离按钮，还会被 closeOnMove 收掉 */
+  overscroll-behavior: contain;
 }
 
 .option {

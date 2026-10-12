@@ -26,6 +26,7 @@ import {
   sidebarSide,
   setSidebarCollapsed,
   setViewMode,
+  startupPage,
   viewMode,
 } from "../../lib/settings";
 import type { AccountStoreDto, CustomHomeInfoDto, GroupDto, InstanceInfoDto, JavaInfoDto, NewsItem, VersionInfoDto } from "../../lib/bindings";
@@ -236,9 +237,11 @@ function collapseSidebar(collapsed: boolean) {
   }, 300);
 }
 
-// ================= 启动器主页（默认打开） =================
+// ================= 启动器主页 =================
 
-const newsActive = ref(true);
+// 启动时先落到主页还是项目列表，由设置窗口「主窗口 → 启动页」决定；
+// main.ts 的 bootstrap 在挂载前已把 gui_config 恢复进 startupPage，这里读到的就是最终值
+const newsActive = ref(startupPage.value === "Home");
 const newsLoading = ref(false);
 
 /** 打开 / 关闭启动器主页（保留选中实例） */
@@ -1251,7 +1254,7 @@ async function loadInstances() {
 }
 
 /** 启动时按 gui_config 恢复上次选中的实例。
- *  故意不走 select()：那会置 newsActive=false 关掉启动器主页，而默认应停在主页。 */
+ *  故意不走 select()：那会把 newsActive 置 false，而启动页设成「启动器主页」时应停在主页。 */
 function restoreSelection() {
   const uuid = selectedInstance.value;
   if (!uuid) return;
@@ -1497,7 +1500,7 @@ onMounted(async () => {
                 @quick-launch="quickLaunch" back-label-key="home.backToList" @back="newsActive = false" />
             </section>
 
-            <section v-else key="list" class="list-mode">
+            <section v-else key="list" class="list-mode" :class="{ 'has-motd': motdCardVisible }">
               <!-- 实例锁定生效时视图固定为列表，模式切换控件整块隐藏（只留个空工具栏会很怪） -->
               <div v-if="!lockActive" class="list-toolbar">
                 <SegmentedTabs :model-value="mode" :options="MODE_OPTIONS"

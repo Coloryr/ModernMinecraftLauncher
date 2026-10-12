@@ -85,12 +85,16 @@ const active = usePageActive();
   max-width: 92vw;
   max-height: 85vh;
   overflow-y: auto;
-  scrollbar-gutter: stable;
-  /* 见 styles/scrollbar.css */
+  /* 滚动条槽位**两侧都留**：只留右侧时，内容整体左移一截，`padding` 虽然左右对称，
+     看着却是右边宽（见 styles/scrollbar.css 的 9px）。槽位常驻，所以滚动条出现 /
+     消失时内容不会横向跳。
+     左右内边距因此各减 9px：15 + 9 = 设计上的 24px，内容区仍在原来的位置，
+     只是把原先白占的右侧槽位补回来 */
+  scrollbar-gutter: stable both-edges;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 22px 24px;
+  padding: 22px 15px;
   box-shadow: var(--shadow-lg);
 }
 

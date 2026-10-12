@@ -20,7 +20,9 @@ import MotdCard from "../../../components/MotdCard.vue";
 import ContentHead from "./ContentHead.vue";
 import ListSkeleton from "./ListSkeleton.vue";
 import ResourceRow from "./ResourceRow.vue";
+import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
 import ServerFormModal from "./ServerFormModal.vue";
+import { useRowSelect } from "../composables/useRowSelect";
 import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceOps } from "../composables/useResourceOps";
 import type { ServerFormDraft } from "../types";
@@ -34,8 +36,9 @@ const props = defineProps<{
 }>();
 
 const { servers, instanceUuid, loading, reloadCurrent } = props.data;
-// 行的操作只剩「编辑 / 删除」：服务器行没有"打开文件夹"这一项（用户点名去掉）
-const { busy, askDelete } = props.ops;
+// 行的操作只剩「编辑 / 删除」：服务器行没有"打开文件夹"这一项（用户点名去掉），
+// 且都搬进了右键菜单
+const { busy, act, askConfirm, askDelete } = props.ops;
 
 /** 表单草稿，`null` 表示没开弹窗 */
 const form = ref<ServerFormDraft | null>(null);
@@ -240,12 +243,141 @@ async function save() {
 function remove(item: ServerItemDto) {
   askDelete(item.name || item.ip, () => deleteServer(instanceUuid.value, item.name, item.ip));
 }
+
+// ---------- 多选 ----------
+//
+// 与其它分类同一套口径（见 useRowSelect / RowMenu），身份键就是 keyOf。
+// 唯一的差别在行点击：这里点行原来是"切换上方 MOTD 卡显示哪一台"，
+// 所以只有多选状态下点行才是加选，见 onServerClick。
+
+// `selected` 这个名字已经被上方 MOTD 卡占用了，所以这里把多选的集合改名
+const {
+  selected: selection,
+  anchorKey,
+  count,
+  isSelected,
+  toggle,
+  onRowClick,
+  clear,
+} = useRowSelect<ServerItemDto>({
+  keyOf,
+  order: () => servers.value,
+});
+
+/** 选中的服务器 */
+const selectedItems = computed(() => servers.value.filter(isSelected));
+
+/**
+ * 行点击
+ *
+ * 多选状态下点行 = 加选，与其它分类一致；否则维持原行为：
+ * 把上方那张 MOTD 卡切到这一台
+ *
+ * - `payload.event`: 原始点击事件，取 `shiftKey` 判整段选择
+ * - `payload.item`: 点到的这一行
+ */
+function onServerClick(payload: { event: MouseEvent; item: ServerItemDto }) {
+  if (payload.event.shiftKey || count.value) {
+    onRowClick(payload);
+    return;
+  }
+  selectedKey.value = keyOf(payload.item);
+}
+
+/** 批量删除；删完选中项已不在列表里，直接清空选择 */
+function batchRemove() {
+  const picked = selectedItems.value;
+  if (!picked.length) return;
+  askConfirm(
+    t("resource.delete"),
+    t("resource.batchDeleteConfirm", { n: picked.length }),
+    async () => {
+      await act(async () => {
+        for (const item of picked) await deleteServer(instanceUuid.value, item.name, item.ip);
+      });
+      clear();
+    },
+    // act 内部已经重拉过列表了，这里别再拉一遍
+    { reload: false },
+  );
+}
+
+// ---------- 右键菜单 ----------
+
+/** 打开着的菜单；`item` 为 `null` 表示批量菜单 */
+const rowMenu = ref<{
+  x: number;
+  y: number;
+  title?: string;
+  items: RowMenuItem[];
+  item: ServerItemDto | null;
+} | null>(null);
+
+/** 单行菜单项：服务器的动作与这一行的内容无关，所以不看 `item` */
+function itemMenuItems(): RowMenuItem[] {
+  return [
+    { id: "edit", label: t("resource.serverEdit") },
+    { id: "remove", label: t("resource.delete"), danger: true, separated: true },
+  ];
+}
+
+/** 打开右键菜单 */
+function openMenu(payload: { event: MouseEvent; item: ServerItemDto }) {
+  const x = payload.event.clientX;
+  const y = payload.event.clientY;
+
+  // 有选中项时，右键 = **批量动作**
+  const picked = selectedItems.value;
+  if (picked.length) {
+    rowMenu.value = {
+      x,
+      y,
+      title: t("resource.selectedCount", { n: picked.length }),
+      items: [{ id: "remove", label: t("resource.delete"), danger: true }],
+      item: null,
+    };
+    return;
+  }
+
+  rowMenu.value = { x, y, items: itemMenuItems(), item: payload.item };
+}
+
+/** 菜单动作分发 */
+function onMenuPick(id: string) {
+  const menu = rowMenu.value;
+  if (!menu) return;
+
+  if (!menu.item) {
+    if (id === "remove") batchRemove();
+    return;
+  }
+
+  const item = menu.item;
+  switch (id) {
+    case "edit":
+      openForm(item);
+      break;
+    case "remove":
+      remove(item);
+      break;
+  }
+}
 </script>
 
 <template>
   <ContentHead :data="data">
+    <!-- 有选中项时顶栏换成批量操作条，与其它分类同一口径 -->
     <template #actions>
-      <button class="mini-btn" :disabled="busy" @click="openForm(null)">
+      <template v-if="count">
+        <span class="row-selected-count">{{ t("resource.selectedCount", { n: count }) }}</span>
+        <button class="mini-btn danger" :disabled="busy" @click="batchRemove">
+          {{ t("resource.delete") }}
+        </button>
+        <button class="mini-btn" :disabled="busy" @click="clear">
+          {{ t("resource.clearSelection") }}
+        </button>
+      </template>
+      <button v-else class="mini-btn" :disabled="busy" @click="openForm(null)">
         {{ t("resource.serverAdd") }}
       </button>
     </template>
@@ -266,9 +398,17 @@ function remove(item: ServerItemDto) {
     <ListSkeleton />
   </div>
   <div v-else class="item-list">
-    <ResourceRow v-for="item in servers" :key="keyOf(item)" class="sv-row"
-      :class="{ 'sv-selected': keyOf(item) === selectedKey }" :icon="iconOf(item)" :name="item.name"
-      @click="selectedKey = keyOf(item)">
+    <ResourceRow v-for="item in servers" :key="keyOf(item)" class="sv-row" :class="{
+      'sv-selected': keyOf(item) === selectedKey,
+      'row-selected': isSelected(item),
+      'row-anchor': anchorKey === keyOf(item),
+      'row-selecting': selection.size > 0,
+    }" :icon="iconOf(item)" :name="item.name" @click="onServerClick({ event: $event, item })"
+      @contextmenu.prevent="openMenu({ event: $event, item })">
+      <template #select>
+        <input type="checkbox" class="row-select" :checked="isSelected(item)" @pointerdown.stop
+          @change.stop="toggle(item)" @click.stop />
+      </template>
       <template #badges>
         <span v-if="item.acceptTextures" class="badge badge-dim">
           {{ t("resource.acceptTextures") }}
@@ -296,18 +436,13 @@ function remove(item: ServerItemDto) {
         <span class="sep">·</span>
         <span>{{ item.ip }}</span>
       </template>
-
-      <template #actions>
-        <button class="mini-btn" :disabled="busy" @click="openForm(item)">
-          {{ t("resource.serverEdit") }}
-        </button>
-        <button class="mini-btn danger" :disabled="busy" @click="remove(item)">
-          {{ t("resource.delete") }}
-        </button>
-      </template>
     </ResourceRow>
     <div v-if="!servers.length" class="empty-tip">{{ t("resource.empty") }}</div>
   </div>
+
+  <!-- 行右键菜单：单行与批量共用，菜单项见 itemMenuItems -->
+  <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title"
+    @pick="onMenuPick" @close="rowMenu = null" />
 
   <ServerFormModal v-if="form" :form="form" :busy="saving" @submit="save" @close="form = null" />
 </template>

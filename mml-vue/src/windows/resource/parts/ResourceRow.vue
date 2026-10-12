@@ -1,15 +1,17 @@
 <script setup lang="ts">
-// 资源列表的通用行：图标（有才显示）+ 名称 + 徽标 + 副标题 + 右侧操作
+// 资源列表的通用行：图标（有才显示）+ 名称 + 徽标 + 副标题
 //
-// 七个分类的行长得一模一样，差别只在徽标、副标题与操作按钮上，所以那三处走插槽；
+// 各分类的行长得一模一样，差别只在徽标与副标题上，所以那两处走插槽；
 // 行的样式在窗口级 resource.css 里，非 scoped，拆开的子组件共用，见那里的头部说明。
 //
 // 另有「展开箭头」插槽与缩进：模组列表要把 jar-in-jar 的内置模组**缩进**显示在同一列里
 // （见 ModList），层级与列表合在一处；其它分类不用这两个口子，不传就是原来的样子。
 //
+// 行里**没有操作按钮**：各分类的单行动作都走右键菜单，见 RowMenu。
+//
 // 插槽：`select` 最左侧的多选勾选框；`lead` 图标之前的展开箭头；`name-lead` 名字之前；
 // 默认插槽是名字本身，需要过 `§` 格式码时由调用方换成 FormattedText；`badges` 名字之后；
-// `sub` 副标题；`actions` 右侧操作按钮。
+// `sub` 副标题。
 withDefaults(
   defineProps<{
     /** 图标地址；**空 / null 时整块不渲染**（不留占位框，见模板注释） */
@@ -30,8 +32,8 @@ withDefaults(
 <template>
   <div class="item-row" :class="{ 'mod-nested': depth > 0 }" :style="{ '--row-depth': depth }">
     <!--
-      多选勾选框，模组列表用，见 ModList：在**最左边**，箭头与图标之前。
-      用户要求"右键用左边加勾选" —— 右键进入多选后，左边出现勾选框继续加选。
+      多选勾选框：在**最左边**，箭头与图标之前。
+      它是进入多选的唯一入口 —— 悬停该行出现，已在多选状态时全部常显；
       其它分类不传这个插槽，什么都不渲染
     -->
     <slot name="select" />
@@ -61,9 +63,6 @@ withDefaults(
       <span class="item-sub">
         <slot name="sub" />
       </span>
-    </div>
-    <div class="item-actions">
-      <slot name="actions" />
     </div>
   </div>
 </template>

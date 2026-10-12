@@ -5,7 +5,9 @@
 // 当前选中的实例（与资源管理窗口一致）。数据包下载前必须先选存档。
 // 下载走全局下载器：命令立即返回，进度在下载窗口里看。
 import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from "vue";
+import DOMPurify from "dompurify";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
+import InstanceChip from "../../components/ui/InstanceChip.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import AsyncImage from "../../components/ui/AsyncImage.vue";
@@ -51,6 +53,14 @@ const LOADERS = ["normal", "forge", "fabric", "quilt", "neoforge"];
 /** 目标实例（uuid + 显示名），空 = 未选择 */
 const instanceUuid = ref("");
 const instanceName = ref("");
+const instanceVersion = ref("");
+
+/** 标题栏 chip 的数据；没有目标实例时标题栏换成一句提示 */
+const instanceChip = computed(() =>
+  instanceUuid.value
+    ? { name: instanceName.value || instanceUuid.value, version: instanceVersion.value }
+    : null,
+);
 
 const type = ref("mod");
 const sources = ref<Array<{ value: string; label: string }>>([]);
@@ -369,6 +379,22 @@ async function doDownload(pid: string, file: FileListItemDto, world: string | nu
   }
 }
 
+/**
+ * Modrinth 分类图标：icon 字段是内联 svg 源码，stroke=currentColor，消毒后内联渲染
+ *
+ * 消毒结果按源码缓存：模板里直接调用函数，每次重渲染都会重跑一遍 DOMPurify，
+ * 而同一批分类图标的源码是不变的。
+ */
+const svgCache = new Map<string, string>();
+
+function svgIcon(svg: string): string {
+  const hit = svgCache.get(svg);
+  if (hit !== undefined) return hit;
+  const safe = DOMPurify.sanitize(svg);
+  svgCache.set(svg, safe);
+  return safe;
+}
+
 function formatDate(date: string): string {
   return date ? date.slice(0, 10) : "";
 }
@@ -431,6 +457,25 @@ function projectRunning(item: ProjectItemDto): boolean {
   return taskState.value.runningProjects.has(item.source.pid);
 }
 
+/** 收藏 / 取消收藏 */
+async function toggleStar(item: ProjectItemDto) {
+  const star = !item.isStar;
+  try {
+    await api.collectStar(
+      item.source.source,
+      item.source.fileType,
+      item.source.pid,
+      item.name,
+      item.image,
+      item.url,
+      star,
+    );
+    item.isStar = star;
+  } catch (e) {
+    showToast(tErr(e));
+  }
+}
+
 /** 文件级「已下载」 */
 function fileInstalled(file: FileListItemDto): boolean {
   return file.isDownload || doneFileKeys.value.has(fileKey(file));
@@ -475,9 +520,12 @@ onMounted(async () => {
   if (instanceUuid.value) {
     try {
       const list = await api.getInstances();
-      instanceName.value = list.find((i) => i.uuid === instanceUuid.value)?.name ?? "";
+      const found = list.find((i) => i.uuid === instanceUuid.value);
+      instanceName.value = found?.name ?? "";
+      instanceVersion.value = found?.version ?? "";
     } catch {
       instanceName.value = "";
+      instanceVersion.value = "";
     }
   }
 
@@ -545,12 +593,18 @@ onActivated(consumeTargetProject);
 </script>
 
 <template>
-  <WindowFrame :title="t('winTitle.addResource')" @close="$emit('close')">
+  <WindowFrame :title="t('winTitle.addResource')" body-gutter @close="$emit('close')">
+    <!-- 标题栏：目标实例。本窗口是"装进哪个实例"的上下文，没实例就直说 -->
+    <template #head-right>
+      <InstanceChip v-if="instanceChip" :instance="instanceChip" />
+      <span v-else class="head-warn">{{ t("addResource.noInstance") }}</span>
+    </template>
+
     <div class="res-mode">
       <!-- 下载任务进度条：多任务，完成后短暂停留再自动消失 -->
       <ResourceDownloadBar v-if="resourceStatus?.tasks.length" :status="resourceStatus" />
 
-      <!-- 资源类型 + 下载源 -->
+      <!-- 资源类型 + 下载源 + 版本 -->
       <div class="res-top">
         <div class="res-filters">
           <SegmentedTabs v-model="type" :options="TYPES" :disabled="searching" />
@@ -560,14 +614,15 @@ onActivated(consumeTargetProject);
             <span class="res-source-name">{{ t("modpack.curseforge") }}</span>
             <span class="res-source-hint">{{ t("addResource.saveSourceLimit") }}</span>
           </div>
-        </div>
-
-        <!-- 过滤条件 + 搜索：加载期间整条锁死，避免半途改条件与在途请求打架 -->
-        <div class="res-filters">
-          <select v-model="version" class="field-select sel-filter" :disabled="searching" @change="submitSearch">
+          <select v-model="version" class="field-select sel-filter sel-version" :disabled="searching"
+            @change="submitSearch">
             <option value="">{{ t("modpack.allVersions") }}</option>
             <option v-for="v in versions" :key="v" :value="v">{{ v }}</option>
           </select>
+        </div>
+
+        <!-- 过滤条件 + 搜索同一行：加载期间整条锁死，避免半途改条件与在途请求打架 -->
+        <div class="res-filters">
           <select v-model="sort" class="field-select sel-filter" :disabled="searching" @change="submitSearch">
             <option v-for="s in sorts" :key="s" :value="s">{{ t(`modpack.sort.${s}`) }}</option>
           </select>
@@ -582,23 +637,16 @@ onActivated(consumeTargetProject);
               {{ l === "normal" ? t("addResource.loader.normal") : l }}
             </option>
           </select>
-        </div>
 
-        <div class="res-search">
-          <input v-model="filter" class="field-input search-input" :placeholder="t('addResource.searchHint')"
-            spellcheck="false" :disabled="searching" @keydown.enter="submitSearch" />
-          <button class="search-btn" :disabled="searching" @click="submitSearch">
-            <span v-if="searching" class="btn-spinner"></span>
-            {{ t("modpack.search") }}
-          </button>
+          <div class="res-search">
+            <input v-model="filter" class="field-input search-input" :placeholder="t('addResource.searchHint')"
+              spellcheck="false" :disabled="searching" @keydown.enter="submitSearch" />
+            <button class="search-btn" :disabled="searching" @click="submitSearch">
+              <span v-if="searching" class="btn-spinner"></span>
+              {{ t("modpack.search") }}
+            </button>
+          </div>
         </div>
-      </div>
-
-      <!-- 目标实例 -->
-      <div class="res-instance">
-        <span>{{ t("addResource.instance") }}</span>
-        <strong v-if="instanceUuid">{{ instanceName || instanceUuid }}</strong>
-        <span v-else class="res-no-instance">{{ t("addResource.noInstance") }}</span>
       </div>
 
       <!-- 列表加载指示：翻页 / 换筛选只在结果区上方走一条细进度，不再全窗口遮罩 -->
@@ -621,6 +669,13 @@ onActivated(consumeTargetProject);
         <div v-else-if="items.length === 0" class="empty-tip">{{ t("addResource.empty") }}</div>
         <template v-else>
           <div v-for="item in items" :key="item.source.pid" class="pack-item">
+            <!-- 收藏星标（右上角）：点击收藏 / 取消收藏 -->
+            <button class="pack-star" :class="{ on: item.isStar }"
+              v-tip="item.isStar ? t('modpack.unstar') : t('modpack.star')" @click.stop="toggleStar(item)">
+              <svg viewBox="0 0 24 24" width="17" height="17" stroke-width="2" stroke-linejoin="round">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+              </svg>
+            </button>
             <div class="pack-main" @click="openVersions(item)">
               <AsyncImage v-if="item.image" class="pack-icon" :src="item.image" alt="" />
               <div v-else class="pack-icon pack-icon-fallback">{{ item.name.slice(0, 1).toUpperCase() }}</div>
@@ -635,7 +690,11 @@ onActivated(consumeTargetProject);
                 </div>
                 <div class="pack-desc">{{ item.summary }}</div>
                 <div v-if="item.tag.length" class="pack-tags">
-                  <span v-for="tag in item.tag" :key="tag.name" class="pack-tag">{{ tag.name }}</span>
+                  <span v-for="tag in item.tag" :key="tag.name" class="pack-tag">
+                    <span v-if="tag.svg" class="tag-svg" v-html="svgIcon(tag.svg)"></span>
+                    <img v-else-if="tag.logo" class="pack-tag-icon" :src="tag.logo" loading="lazy" alt="" />
+                    {{ tag.name }}
+                  </span>
                 </div>
                 <div class="pack-meta">
                   {{ t("modpack.downloads", { n: item.downloadCount.toLocaleString() }) }}
