@@ -251,15 +251,8 @@ pub async fn add_resource_download(
             game.save_online_info(&list);
         }
 
-        // 完成保留 5 秒、失败保留 15 秒，留时间看清错误，再从任务表移除
-        tokio::time::sleep(Duration::from_secs(if ok { 5 } else { 15 })).await;
-        DOWNLOAD_NOW
-            .write()
-            .unwrap()
-            .entry(uuid)
-            .or_default()
-            .remove(&key);
-        emit_add_resource_status(&app2, build_status(&app2));
+        // 终态条目**不自动移除**：用户要能回头看这次下了哪些、哪些失败了，
+        // 由 add_resource_clear_done 手动清（与整合包安装那套一致）
     });
 
     Ok(())

@@ -7,6 +7,7 @@ import { multiWindow } from "../../windows/windowManager";
 import WindowControls from "./WindowControls.vue";
 import ModpackTitleIndicator from "../ModpackTitleIndicator.vue";
 import DownloadTitleIndicator from "../DownloadTitleIndicator.vue";
+import ResourceTitleIndicator from "../ResourceTitleIndicator.vue";
 import { onTitleBarPointerDown, titleBarStyle, useWindowTitle } from "../../lib/titlebar";
 import { useWindowDecoration } from "../../lib/useWindowDecoration";
 
@@ -89,6 +90,7 @@ const { decorated } = useWindowDecoration(rootEl);
            没有任务时各自整块不存在 -->
       <ModpackTitleIndicator v-if="!hideModpackIndicator" />
       <DownloadTitleIndicator v-if="!hideDownloadIndicator" />
+      <ResourceTitleIndicator />
 
       <!-- windows 样式：最小化 / 最大化 / 关闭在右端。
            插件不再画自己的按钮（vendor patch），热区按这三颗的位置摆，
@@ -169,22 +171,27 @@ const { decorated } = useWindowDecoration(rootEl);
   padding: 22px 26px;
 }
 
-/* 整页滚动的窗口（`body-gutter`）：预留那条 9px，滚动条出现时不挤窄内容。
+/* 整页滚动的窗口（`body-gutter`）：预留那条 9px，滚动条出现时不挤窄内容；
+   右边距同时减掉这 9px，内容右边缘因此仍落在 26px 上（与左边、与不滚动的标题栏对称），
+   滚动条被画进这条外边距里，不再从内容盒里吃掉一条。
+   两句必须成对，理由与踩过的坑见 styles/scrollbar.css。
    不加在 .frame-body 上无条件生效 —— 多数窗口的内容区是 height: 100% 布局、
-   滚动交给内部容器，那些窗口的 .frame-body 根本不滚，预留只会白窄 9px。
-   判据与踩过的坑见 styles/scrollbar.css */
+   滚动交给内部容器，那些窗口的 .frame-body 根本不滚，预留只会白窄 9px */
 .frame-body.gutter {
   scrollbar-gutter: stable;
+  padding-right: calc(26px - 9px);
 }
 
 /* 不整页滚动的窗口 `body-fill`：显式取消预留。
    **必须写**：scrollbar-gutter 不看"这会儿有没有滚动条"，overflow: hidden 一样占位 9px，
    实测如此。账户窗口还会在列表 / 详情之间切换 fill，不取消就会随视图切换忽宽忽窄。
+   上面那条边距补偿要一起取消：这里没有槽位，减掉的 9px 就真少了。
    这条要放在 .gutter 之后：两者特异性相同，靠顺序让 .fill 赢 */
 .frame-body.fill {
   overflow: hidden;
   display: flex;
   flex-direction: column;
   scrollbar-gutter: auto;
+  padding-right: 26px;
 }
 </style>

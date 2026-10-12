@@ -70,6 +70,9 @@ export const commands = {
   },
   addResource: {
     categories: (source: string, fileType: string) => invoke<Record<string, string>>("add_resource_categories", { source, fileType }),
+    clearDone: () => invoke<void>("add_resource_clear_done"),
+    dependencies: (game: string, source: string, pid: string, fid: string, fileType: string) => invoke<ResourceDependencyDto[]>("add_resource_dependencies", { game, source, pid, fid, fileType }),
+    detail: (source: string, pid: string) => invoke<ProjectDetailDto>("add_resource_detail", { source, pid }),
     download: (game: string, source: string, pid: string, fid: string, fileType: string, world: string | null) => invoke<void>("add_resource_download", { game, source, pid, fid, fileType, world }),
     file: (game: string, source: string, pid: string, fileType: string, page: number, version: string | null, loader: string | null) => invoke<FileListDto>("add_resource_file", { game, source, pid, fileType, page, version, loader }),
     gameVersions: (source: string) => invoke<string[]>("add_resource_game_versions", { source }),
@@ -349,6 +352,21 @@ export type DecPicDto = {
   name: string,
   logo: string,
   description: string,
+};
+
+export type ResourceDependencyDto = {
+  pid: string,
+  fid: string,
+  name: string,
+  icon: string | null,
+  optional: boolean,
+  files: ResourceDependencyFileDto[],
+};
+
+export type ResourceDependencyFileDto = {
+  fid: string,
+  name: string,
+  time: string,
 };
 
 export type ProjectDetailDto = {

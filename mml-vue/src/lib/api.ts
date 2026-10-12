@@ -45,6 +45,7 @@ import type {
   PackProgressDto,
   ProjectDetailDto,
   ProjectDto,
+  ResourceDependencyDto,
   ResourceSaveDto,
   ResourceStatusDto,
   SaveBackupDto,
@@ -570,6 +571,43 @@ export const api = {
   },
 
   /**
+   * 获取某资源的项目详情
+   *
+   * - `source`: 下载源 ID
+   * - `projectId`: 项目 ID
+   *
+   * # 返回值
+   *
+   * 项目详情；Modrinth 含 markdown 正文，CurseForge 只有简介
+   */
+  async getResourceDetail(source: string, projectId: string): Promise<ProjectDetailDto> {
+    return commands.addResource.detail(source, projectId);
+  },
+
+  /**
+   * 拉取某个版本需要的前置，含前置的前置
+   *
+   * - `game`: 实例 uuid，用来按实例的版本 / 加载器挑文件，并跳过实例里已经装了的
+   * - `source`: 下载源 ID
+   * - `projectId`: 项目 ID
+   * - `fileId`: 文件 ID
+   * - `fileType`: 资源类型；只有模组有前置，其余类型返回空表
+   *
+   * # 返回值
+   *
+   * 待勾选的前置；某一项 `fid` 为空串表示该前置在本实例的版本 / 加载器下没有可用文件
+   */
+  async getResourceDependencies(
+    game: string,
+    source: string,
+    projectId: string,
+    fileId: string,
+    fileType: string,
+  ): Promise<ResourceDependencyDto[]> {
+    return commands.addResource.dependencies(game, source, projectId, fileId, fileType);
+  },
+
+  /**
    * 获取实例的存档列表
    *
    * - `game`: 实例 uuid
@@ -628,9 +666,14 @@ export const api = {
     return commands.addModpack.cancel(pid, fid);
   },
 
-  /** 清除已结束（完成 / 失败 / 取消）的整合包安装任务 */
+  /** 清除已结束（完成 / 失败）的整合包安装任务 */
   async clearModpackDone(): Promise<void> {
     return commands.addModpack.clearDone();
+  },
+
+  /** 清除已结束（完成 / 失败）的资源下载条目 */
+  async clearResourceDone(): Promise<void> {
+    return commands.addResource.clearDone();
   },
 
   /**

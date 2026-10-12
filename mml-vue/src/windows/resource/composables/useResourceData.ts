@@ -25,6 +25,7 @@ import {
   onModScanProgress,
 } from "../../../lib/api";
 import { loadGuiConfig } from "../../../lib/guiConfig";
+import { takeResourceListDirty } from "../../../lib/resourceTasks";
 import type {
   DataPackItemDto,
   ModItemDto,
@@ -59,7 +60,7 @@ export interface ResourceInstance {
  * - `mods` / `packs` / `saves` / `shots` / `servers` / `shaders` / `schematics` / `datapacks`: 各分类的列表
  * - `dpSave`: 数据包子页当前选中的存档目录
  * - `reloadCurrent`: 重拉当前显示的那一份
- * - `sync`: 读当前实例与视图偏好，再拉一次列表
+ * - `sync`: 读当前实例与视图偏好，必要时重读列表（换实例，或列表已被下载标记为过期）
  * - `setInstanceReadyHook`: 注册实例就绪回调，外壳用它先恢复视图偏好
  * - `shotUrl`: 拼某个截图的预览地址
  */
@@ -255,7 +256,7 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
    * 正在 sync 中（实例刚就绪、偏好刚恢复）
    *
    * 恢复"上次类别"会改 `category`，那会触发下面的 `watch(category)` → `loadIfNeeded()`；
-   * 而 `sync()` 结尾还要 `reloadCurrent()` 一次 —— **同一份列表被拉两遍**，
+   * 而 `sync()` 结尾自己还要拉一次 —— **同一份列表被拉两遍**，
    * 模组那一档就是"解析 401 个 jar 两次"：用户看到进度跑完 401/401 又从 0 来一遍。
    *
    * 所以 sync 期间让 watch 只更新选择、不触发加载，最后由 sync 自己统一拉一次。
@@ -280,16 +281,31 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
       instanceUuid.value = "";
     }
     // 换实例：上一份列表属于别的实例，整份作废。同一个实例内切窗口回来则留着，
-    // 切回本窗口要重拉的那一份由结尾的 reloadCurrent 负责
-    if (instanceUuid.value !== prevUuid) {
+    // 要不要重读由下面那一段判断
+    const instanceChanged = instanceUuid.value !== prevUuid;
+    if (instanceChanged) {
       loadedCats.clear();
       loadedDpSave = "";
     }
-    // 先把该实例的视图偏好读回来，即分类顺序 / 上次类别 / 模组视图，再拉列表
-    if (onInstanceReady) await onInstanceReady();
-    syncing = false;
-    // 重拉**当前显示的那一份**；停在数据包子页时不该去拉存档列表
-    await reloadCurrent();
+    try {
+      // 先把该实例的视图偏好读回来，即分类顺序 / 上次类别 / 模组视图，再决定拉什么
+      if (onInstanceReady) await onInstanceReady();
+      // 同一个实例内切回本窗口**不重读**：模组那一档要给几百个 jar 解析元数据，
+      // 白扫一次要好几秒。只有换了实例、或期间有资源下载完成（磁盘真变了）才重拉；
+      // 强制跟磁盘对齐是另一回事，走 reloadCurrent（顶栏刷新按钮与各操作之后都调它）。
+      // 不重读时也要补上"当前这一档还没有数据"的情况：偏好恢复可能刚改过 category，
+      // 而那一发 watch 被 syncing 压住了
+      if (instanceChanged || takeResourceListDirty()) {
+        await reloadCurrent();
+      } else if (isDatapackTab()) {
+        await enterDatapackTab();
+      } else {
+        await loadIfNeeded();
+      }
+    } finally {
+      // 无论成败都要放开：卡住的话之后切分类就再也不加载了
+      syncing = false;
+    }
   }
 
   /** 截图地址，走 `mml-image` 协议按实例 + 文件名取 */

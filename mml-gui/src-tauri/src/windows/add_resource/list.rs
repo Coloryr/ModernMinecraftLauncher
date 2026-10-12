@@ -1,7 +1,7 @@
-//! 添加资源窗口的列表查询：某项目的文件列表，以及项目列表的搜索与分类翻页
+//! 添加资源窗口的列表与详情查询：项目列表的搜索与分类翻页，某项目的文件列表与项目详情
 //!
-//! 从 `add_resource/mod.rs` 拆出来的两个大函数，各 135 / 160 行。列表页顺手把项目与文件
-//! 数据写进 `CURSEFOGRE_*` / `MODRINTH_*` 缓存，详情与下载都从缓存里取。
+//! 从 `add_resource/mod.rs` 拆出来的几个大函数。列表页顺手把项目与文件数据写进
+//! `CURSEFOGRE_*` / `MODRINTH_*` 缓存，详情与下载都从缓存里取。
 
 use mml_game::launcher::{FileType, ModPackType};
 use mml_game::loader::LoaderType;
@@ -12,7 +12,9 @@ use mml_net::modrinth_api::{self, ModrinthSearchArg, ModrinthSortType};
 use uuid::Uuid;
 
 use crate::collect_utils;
-use crate::dtos::add_resource_dto::{FileListDto, FileListItemDto, ProjectDto, ProjectItemDto};
+use crate::dtos::add_resource_dto::{
+    FileListDto, FileListItemDto, ProjectDetailDto, ProjectDto, ProjectItemDto,
+};
 
 use super::{CURSEFOGRE_FILE, CURSEFOGRE_INFO, DOWNLOAD_NOW, MODRINTH_FILE, MODRINTH_INFO};
 
@@ -164,6 +166,52 @@ pub async fn add_resource_file(
                 name: data.title,
                 max_page: len / 50,
             })
+        }
+        _ => Err(String::from("err.sourceType")),
+    }
+}
+
+/// 获取项目详情：简介 + 正文 + 作者 + 标签 + 截图
+///
+/// 与整合包窗口的 `add_modpack_detail` 同一口径，只是缓存改用本窗口的
+/// `CURSEFOGRE_INFO` / `MODRINTH_INFO`（列表页请求时填充）。
+///
+/// - `source`: 下载源，取 `curseforge` 或 `modrinth`
+/// - `pid`: 项目 ID
+///
+/// # 返回值
+///
+/// 项目详情；Modrinth 含 markdown 正文，CurseForge 只有简介；源不受支持或请求失败返回 `Err`
+#[gui_macros::ipc_group("add_resource")]
+#[tauri::command]
+pub async fn add_resource_detail(source: String, pid: String) -> Result<ProjectDetailDto, String> {
+    let source = ModPackType::from_string(&source);
+
+    match source {
+        ModPackType::CurseForge => {
+            // 列表页已缓存项目数据，直接借用构造；未命中才发请求
+            let detail = {
+                let map = CURSEFOGRE_INFO.read().await;
+                map.get(&pid).map(ProjectDetailDto::new_curseforge)
+            };
+            match detail {
+                Some(detail) => Ok(detail),
+                None => {
+                    let data = curseforge_api::get_mod_info(&pid)
+                        .await
+                        .map_err(|err| err.to_string())?;
+                    Ok(ProjectDetailDto::new_curseforge(&data.data))
+                }
+            }
+        }
+        ModPackType::Modrinth => {
+            let data = modrinth_api::get_project(&pid)
+                .await
+                .map_err(|err| err.to_string())?;
+
+            ProjectDetailDto::new_modrinth(&data)
+                .await
+                .map_err(|err| err.to_string())
         }
         _ => Err(String::from("err.sourceType")),
     }
@@ -351,7 +399,7 @@ pub async fn add_resource_list(
     }
 }
 
-/// 项目是否正在下载，列表角标用；判据是该实例任务表里有同 pid 的条目
+/// 项目是否正在下载，列表角标用；判据是该实例任务表里有同 pid 且**还没结束**的条目
 ///
 /// - `game`: 实例 uuid
 /// - `pid`: 项目 ID
@@ -365,8 +413,9 @@ fn check_download_now(game: &Uuid, pid: &str) -> bool {
     if list.is_none() {
         return false;
     }
-    for (key, _) in list.unwrap().iter() {
-        if key.pid == pid {
+    // 终态条目会一直留在表里（等用户点「清除已完成」），所以必须把 done / failed 排掉
+    for (key, info) in list.unwrap().iter() {
+        if key.pid == pid && !info.done && !info.failed {
             return true;
         }
     }
@@ -374,7 +423,7 @@ fn check_download_now(game: &Uuid, pid: &str) -> bool {
     false
 }
 
-/// 具体文件是否正在下载；判据是该实例任务表里有同 pid 与 fid 的条目
+/// 具体文件是否正在下载；判据是该实例任务表里有同 pid 与 fid 且**还没结束**的条目
 ///
 /// - `game`: 实例 uuid
 /// - `pid`: 项目 ID
@@ -389,8 +438,8 @@ fn check_version_download_now(game: &Uuid, pid: &str, fid: &str) -> bool {
     if list.is_none() {
         return false;
     }
-    for (key, _) in list.unwrap().iter() {
-        if key.fid == fid && key.pid == pid {
+    for (key, info) in list.unwrap().iter() {
+        if key.fid == fid && key.pid == pid && !info.done && !info.failed {
             return true;
         }
     }

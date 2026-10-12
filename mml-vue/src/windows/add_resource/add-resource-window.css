@@ -1,18 +1,11 @@
 /* 不写 height：内容自己撑高，滚动交给窗口框架的 .frame-body（与整合包窗口一致），
-   滚动条因此贴窗口右缘、贯穿整窗，而不是只在列表那一段里 */
+   滚动条因此贴窗口右缘、贯穿整窗，而不是只在列表那一段里。
+   顶部卡片齐着窗口内容边距，不额外回缩 —— 那 8px 是项目列表给悬停阴影留的，
+   列表用负外边距自己抵掉，卡片边缘因此和筛选卡落在同一条竖线上 */
 .res-mode {
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-
-/* 顶部卡片与下载进度条都齐着窗口内容边距，不额外回缩 —— 那 8px 是项目列表给悬停阴影留的，
-   列表用负外边距自己抵掉，卡片边缘因此和筛选卡落在同一条竖线上。
-   进度条的内边距只在本窗口覆盖成 18px：组件本身主窗口也在用，那边缩进口径不同。
-   下外边距补 2px：整合包窗口的进度条与筛选卡之间隔 12px，本窗口这一列的行距是 10px */
-.res-mode> :deep(.res-bar) {
-  padding: 10px 18px;
-  margin-bottom: 2px;
 }
 
 .res-top {
@@ -37,10 +30,11 @@
   flex-wrap: wrap;
 }
 
+/* 第二行的三个下拉（排序 / 分类 / 加载器）：固定 150px 且不参与拉伸，
+   同行剩余宽度留给搜索框；第一行那个独占剩余的版本下拉见 .sel-version */
 .sel-filter {
-  /* 默认不参与拉伸：第二行剩余宽度留给同行的搜索框；第一行的版本下拉见 .sel-version */
-  flex: 0 1 110px;
-  min-width: 110px;
+  flex: 0 1 150px;
+  min-width: 150px;
   /* 纵向内边距别改小：下拉的高度由 --field-h（42）兜底，比"行高 + 内边距"多出来的
      那几px在 <select> 里会全沉到底部，文字看着偏上（不变量见 forms.css） */
   padding: 10px;
@@ -48,12 +42,11 @@
 }
 
 /* field-select 的自定义箭头留位 */
-select.sel-filter,
-select.sel-file-version {
+select.sel-filter {
   padding-right: 26px;
 }
 
-/* 第一行的版本下拉独占该行剩余宽度；其余下拉固定 110px，把宽度让给同行的搜索框 */
+/* 第一行的版本下拉独占该行剩余宽度；第二行那三个固定 150px，把宽度让给同行的搜索框 */
 .sel-version {
   flex: 1 1 110px;
 }
@@ -300,7 +293,8 @@ select.sel-file-version {
   overflow: hidden;
 }
 
-/* 固定单行高，超出裁掉：没有标签也占位，卡片高度一致 */
+/* 固定单行高，卡片高度一致；标签超过 lib/projectTags 的上限时由模板换成省略号，
+   overflow 只是安全网（窗口窄到连上限个也放不下时裁掉） */
 .pack-tags {
   display: flex;
   flex-wrap: nowrap;
@@ -411,143 +405,6 @@ select.sel-file-version {
 
 /* 结果区上方的细进度条与骨架行：样式在 styles/skeleton.css（跨窗口共用） */
 
-/* 版本选择弹窗 */
-.ver-head {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.ver-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 10px;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-
-.ver-icon-fallback {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-hover);
-  color: var(--text-dim);
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.ver-title {
-  flex: 1;
-  min-width: 0;
-}
-
-.ver-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.ver-summary {
-  font-size: 12px;
-  color: var(--text-dim);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.ver-tools {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-/* 版本筛选下拉：比列表页的筛选项小一号。
-   高度要跟着一起缩小：--field-h(42) 兜底时多出来的空间在 <select> 里会全沉到底部
-   不变量见 forms.css：高度 = 行高 20 + 上下内边距 6×2 + 边框 1×2 = 34 */
-.sel-file-version {
-  max-width: 150px;
-  height: 32px;
-  min-height: 0;
-  padding: 5px 8px;
-  font-size: 12px;
-  /* 选中的版本名可能很长：不让它在这条定高下拉里折成两行 */
-  white-space: nowrap;
-}
-
-.file-page {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  /* 不参与收缩：被压窄的话里面的「1 / 2 · 共 43 个」会折成两行 */
-  flex-shrink: 0;
-}
-
-.file-page-num {
-  font-size: 12px;
-  color: var(--text-dim);
-  white-space: nowrap;
-}
-
-.ver-files {
-  max-height: 320px;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-  /* 见 styles/scrollbar.css */
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.file-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-
-.file-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.file-name {
-  font-size: 13px;
-  color: var(--text);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.file-meta {
-  font-size: 11px;
-  color: var(--text-dim);
-}
-
-.install-btn {
-  height: 35px;
-  padding: 0 16px;
-  border: none;
-  border-radius: 8px;
-  background: var(--accent-grad);
-  color: #fff;
-  font-size: 13px;
-  font-family: inherit;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
 /* 存档选择弹窗 */
 .save-head {
   font-size: 15px;
@@ -595,4 +452,176 @@ select.sel-file-version {
 .save-actions {
   display: flex;
   justify-content: flex-end;
+}
+
+/* 前置勾选弹窗 */
+.deps-head {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.deps-hint {
+  margin: 4px 0 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* 解析前置时的转圈：动画与搜索按钮那个同源（res-spin），颜色跟文字走 ——
+   按钮是渐变底所以那边单独写了白色圈。
+   flex: 1 是给"锁高的弹窗"用的：解析期间它是列表区唯一的内容，铺满并居中 */
+.deps-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 18px 12px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.deps-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: res-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+/* 前置列表：弹窗锁了高度，这里吃掉剩余高度、内部自己滚。
+   不给 max-height：锁高弹窗下那样会白留一截空档 */
+.deps-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+/* 一行一个前置：左侧勾选框，右侧两行（名字行 + 版本行）。
+   勾选框挂在整行上、按整行高度上下居中 —— 放进名字行里的话它只会跟着那一行居中，
+   版本行一出现就显得偏上 */
+.dep-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+/* 勾选框：与仓库里其它勾选同一套写法 —— 原生控件 + accent-color 跟主题走
+   （对照 CustomExecPanel 的 .exec-chk、FileTree、ServerFormModal 的 .form-check） */
+.dep-check {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+/* 必选 / 该前置没有可用文件时勾不了，光标说明一下 */
+.dep-check:disabled {
+  cursor: not-allowed;
+}
+
+/* 右侧两行；左缘即图标左缘（勾选框 13 + 间距 8 = 21） */
+.dep-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dep-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+/* 解析不到文件的前置：照样列出来，但勾不了，整行压暗 */
+.dep-row.off {
+  opacity: 0.6;
+}
+
+.dep-row.off .dep-main {
+  cursor: not-allowed;
+}
+
+/* 版本行：标签 + 下拉。这一行已经在 .dep-body 里，左缘就是图标左缘，不再自己加边距；
+   标签取图标同宽居中，下拉框左缘因此对齐前置名字（32 + 8） */
+.dep-files {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dep-files-label {
+  width: 32px;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+/* 版本下拉：比列表页的筛选项小一号，右边留出自定义箭头的位置。
+   给得宽一点：版本名可能很长（如 `0.6.13+1.21.4 · 2026-10-01`），
+   原生下拉的宽度跟着它走，太窄会把选项文字切掉。
+   左缘由上面那行的标签宽度顶到名字的位置，这里不再另外偏移；
+   高度按 forms.css 的不变量给：行高 20 + 上下内边距 5×2 + 边框 1×2 = 32 */
+.dep-select {
+  flex: 1;
+  min-width: 200px;
+  max-width: 430px;
+  height: 32px;
+  min-height: 0;
+  padding: 5px 26px 5px 8px;
+  font-size: 12px;
+}
+
+.dep-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.dep-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dep-tag {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--bg-hover);
+  color: var(--text-dim);
+  font-size: 10.5px;
+}
+
+.dep-none {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.deps-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }

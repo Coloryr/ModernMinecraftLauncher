@@ -171,11 +171,14 @@ impl ProjectItemDto {
 
         let mut tag = Vec::new();
 
-        for item in data.categories.iter() {
+        // 命中项的 categories 把加载器与分类混在一起，先排成"加载器在前、分类在后"，
+        // 与项目详情页的标签顺序一致
+        for item in modrinth::order_tags(&data.categories).await {
+            let svg = modrinth::get_categories_icon(&item).await;
             tag.push(TagDto {
-                name: item.clone(),
+                name: item,
                 logo: None,
-                svg: modrinth::get_categories_icon(item).await,
+                svg,
             });
         }
 

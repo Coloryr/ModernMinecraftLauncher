@@ -60,6 +60,27 @@ pub fn add_resource_status(app: AppHandle) -> ResourceStatusDto {
     build_status(&app)
 }
 
+/// 清除已结束的资源下载条目，即完成 / 失败两态
+///
+/// 终态条目不再自动移除：用户要能回头看下过什么、哪些失败了。清理由这里手动做。
+///
+/// - `app`: 应用句柄，用于广播状态事件
+///
+/// # 返回值
+///
+/// 清完即返回 `Ok(())`
+#[gui_macros::ipc_group("add_resource")]
+#[tauri::command]
+pub fn add_resource_clear_done(app: AppHandle) -> Result<(), String> {
+    DOWNLOAD_NOW.write().unwrap().retain(|_, entry| {
+        entry.retain(|_, info| !(info.done || info.failed));
+        // 这个实例的条目清空了就把实例那一层也去掉，别留一堆空表
+        !entry.is_empty()
+    });
+    emit_add_resource_status(&app, build_status(&app));
+    Ok(())
+}
+
 /// 下载器回调，由 DownloadGuiHook 转发：按目标文件路径匹配资源下载条目并更新进度。
 /// 匹配不到的直接返回，比如整合包 / 游戏文件等其它下载，无额外开销。
 ///

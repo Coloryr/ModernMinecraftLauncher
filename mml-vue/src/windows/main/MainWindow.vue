@@ -42,8 +42,6 @@ import CustomHomePage from "../../components/CustomHomePage.vue";
 import CustomExecPanel from "../../components/CustomExecPanel.vue";
 import ProxyPanel from "../../components/ProxyPanel.vue";
 import { useModpackStatus } from "../../lib/modpackTasks";
-import ResourceDownloadBar from "../../components/ResourceDownloadBar.vue";
-import { useResourceStatus } from "../../lib/resourceTasks";
 import SplashScreen from "../../components/ui/SplashScreen.vue";
 import MainTopbar from "./topbar/MainTopbar.vue";
 import MainSidebar from "./sidebar/MainSidebar.vue";
@@ -1118,9 +1116,6 @@ const unlistens: Array<() => void> = [];
 // 所以不取 status，只用 init 返回的订阅。
 const { init: initModpackStatus } = useModpackStatus(false, adoptAddedInstance);
 
-// 资源下载任务：添加资源窗口关闭后，进度条迁到主窗口显示
-const { status: resourceStatus, init: initResourceStatus } = useResourceStatus(false);
-
 async function subscribeEvents() {
   const fns = await Promise.all([
     onLaunchState((e) => {
@@ -1360,7 +1355,6 @@ useWindowDecoration(rootEl);
 onMounted(async () => {
   subscribeEvents();
   initModpackStatus().then((unlisten) => unlistens.push(unlisten));
-  initResourceStatus().then((unlisten) => unlistens.push(unlisten));
   document.addEventListener("click", onDocClick);
   document.addEventListener("keydown", onDocKeyDown);
   unlistenAdded = onStorageChange(KEYS.addedInstance, (v) => void onAddedInstanceStorage(v));
@@ -1432,9 +1426,8 @@ onMounted(async () => {
            即 ModpackTitleIndicator / ModpackPopup，否则这条卡片会一直占着内容区的高度、把列表顶下去。
            状态订阅在各处自己拿，标题栏指示器自包含；弹窗由 App.vue 渲染 -->
 
-      <!-- 资源下载进度：添加资源窗口关闭后迁到这里显示 -->
-      <ResourceDownloadBar v-if="resourceStatus?.tasks.length && !resourceStatus.windowOpen" :status="resourceStatus"
-        class="mpbar-in-main" />
+      <!-- 资源下载进度同样改成了标题栏指示器 + 弹窗，即 ResourceTitleIndicator / ResourcePopup，
+           主页面顶栏那份挂在 MainTopbar 上，这里不再内嵌卡片 -->
 
       <!-- 启动进度：启动期间显示阶段文本 + 进度条，未知阶段走滚动条 -->
       <div v-if="selected?.running" class="mpbar-in-main launch-progress">

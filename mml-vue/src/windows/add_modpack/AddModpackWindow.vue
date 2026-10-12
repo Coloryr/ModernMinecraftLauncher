@@ -4,7 +4,6 @@
 // 顶部进度条显示任务数与详情，见 ModpackInstallBar。
 import { onMounted, onUnmounted, ref } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
-import ModpackInstallBar from "../../components/ModpackInstallBar.vue";
 import { api } from "../../lib/api";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
@@ -59,12 +58,11 @@ onMounted(async () => {
 </script>
 
 <template>
-  <WindowFrame :title="t('winTitle.addModpack')" :back="detailOpen ? t('modpack.back') : ''" hide-modpack-indicator
-    body-gutter @back="modeRef?.closeDetail()" @close="$emit('close')">
+  <!-- hide-modpack-indicator 不再传：安装进度改成标题栏上的指示器 + 弹窗
+       （ModpackTitleIndicator / ModpackPopup），与资源下载那一套一致，内容区不再内嵌进度卡片 -->
+  <WindowFrame :title="t('winTitle.addModpack')" :back="detailOpen ? t('modpack.back') : ''" body-gutter
+    @back="modeRef?.closeDetail()" @close="$emit('close')">
     <div class="modpack-body">
-      <!-- 安装任务进度条（多任务，点击展开详情） -->
-      <ModpackInstallBar v-if="modpackStatus?.tasks.length" :status="modpackStatus" />
-
       <ModpackMode ref="modeRef" :group="group" :groups="groups" :status="modpackStatus" @update:group="group = $event"
         @install="install" @detail="detailOpen = $event" />
     </div>

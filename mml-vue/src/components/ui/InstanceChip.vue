@@ -25,18 +25,19 @@ defineProps<{
 
 <style scoped>
 /* 标题栏里的一小段上下文：**不套框**（用户要求），就是一行文字；
-   名字长了省略，别把右边的按钮与窗口键挤走 */
+   名字长了省略，别把右边的按钮与窗口键挤走。
+   宽度是"能显示多少个字"的旋钮：名字 260px 约 21 个汉字，版本名再占一点点 */
 .inst-chip {
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
-  max-width: 220px;
+  max-width: 340px;
   font-size: 12px;
   color: var(--text-dim);
 }
 
 .inst-chip-name {
-  max-width: 140px;
+  max-width: 260px;
   color: var(--text);
   font-weight: 600;
   white-space: nowrap;

@@ -6,30 +6,45 @@
 // 口径见 lib/progress.ts：同一个项目下选了多个文件时按「项目数」推进，
 // 只有一个文件时用该文件自己的字节进度（单独下一个模组就是这一种）。
 import { computed } from "vue";
-import { resourceGroups, type ResourceGroupProgress } from "../lib/progress";
+import { api } from "../lib/api";
+import { resourceGroups, resourceOverallPercent, type ResourceGroupProgress } from "../lib/progress";
 import type { ResourceStatusDto } from "../lib/bindings";
-import { t } from "../lib/i18n";
+import { t, tErr } from "../lib/i18n";
+import { showToast } from "../lib/toast";
 
-const props = defineProps<{
-  /** 当前资源下载状态，含各项目的进度 */
-  status: ResourceStatusDto;
-}>();
+const props = withDefaults(
+  defineProps<{
+    /** 当前资源下载状态，含各项目的进度 */
+    status: ResourceStatusDto;
+    /** 弹窗形态：撑满弹窗剩余高度，任务多了由任务区自己滚（弹窗那侧锁死高度时用） */
+    fillHeight?: boolean;
+  }>(),
+  { fillHeight: false },
+);
 
 /** 按下载项目分组的进度 */
 const groups = computed(() => resourceGroups(props.status.tasks));
 
-/** 总进度 = 还没下完的各项目进度的均值；已结束的不参与平均，与原口径一致 */
-const percent = computed(() => {
-  const active = groups.value.filter((group) => group.finished < group.total);
-  if (!active.length) return 100;
-  return active.reduce((acc, group) => acc + group.percent, 0) / active.length;
-});
+/** 总进度，与标题栏指示器同一口径，见 lib/progress.ts */
+const percent = computed(() => resourceOverallPercent(props.status.tasks));
 
 /** 终态标签；未结束时返回 `null` */
 function stateTag(group: ResourceGroupProgress): string | null {
   if (group.done) return t("addResource.bar.done");
   if (group.failed) return t("addResource.bar.failed");
   return null;
+}
+
+/** 已结束的项目（完成 / 失败），决定"清除已完成"显不显示 */
+const finished = computed(() => groups.value.filter((group) => group.done || group.failed));
+
+/** 清掉已结束的条目；终态条目不再自动移除，只能手动清 */
+async function clearDone() {
+  try {
+    await api.clearResourceDone();
+  } catch (e) {
+    showToast(tErr(e));
+  }
 }
 
 /** 进度文案：多个文件的项目说"项目 x/y"，单文件用字节百分比 */
@@ -42,7 +57,7 @@ function progressText(group: ResourceGroupProgress): string {
 </script>
 
 <template>
-  <div class="res-bar">
+  <div class="res-bar" :class="{ 'fill-h': props.fillHeight }">
     <div class="res-bar-head">
       <span class="res-bar-title">{{ t("addResource.bar.running", { count: groups.length }) }}</span>
     </div>
@@ -64,6 +79,14 @@ function progressText(group: ResourceGroupProgress): string {
           <div class="progress-fill" :style="{ width: group.percent + '%' }" />
         </div>
       </div>
+    </div>
+
+    <!-- 清掉已结束的条目：放列表底部，与整合包那条进度卡同一位置口径。
+         终态条目不再自动移除，不点它就一直在，方便回头看下过什么 -->
+    <div v-if="finished.length" class="res-footer">
+      <button class="res-clear-btn" @click="clearDone">
+        {{ t("addResource.bar.clearDone") }}
+      </button>
     </div>
   </div>
 </template>
@@ -97,6 +120,19 @@ function progressText(group: ResourceGroupProgress): string {
   flex-direction: column;
   gap: 8px;
   padding-top: 2px;
+}
+
+/* 弹窗形态：卡片撑满弹窗剩余高度，任务多了由任务列表自己滚，不再把弹窗顶高。
+   高度由弹窗那侧传 fillHeight 打开，窗口里那处保持自适应 */
+.res-bar.fill-h {
+  flex: 1;
+  min-height: 0;
+}
+
+.res-bar.fill-h .res-task-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .res-task {
@@ -160,5 +196,31 @@ function progressText(group: ResourceGroupProgress): string {
 
 .progress-track.sub {
   height: 6px;
+}
+
+/* 清除已完成：列表底部一个次级按钮，靠右放（与弹窗、表单底部的按钮同一位置口径） */
+.res-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+/* 尺寸与外观照整合包那条进度卡的 .mp-clear-btn：28px 高、左右 14px、细描边次级按钮 */
+.res-clear-btn {
+  height: 28px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+}
+
+.res-clear-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
 }
 </style>

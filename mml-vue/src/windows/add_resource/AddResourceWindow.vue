@@ -4,21 +4,32 @@
 // 从主界面「添加资源」按钮打开，目标实例取 gui_config.json 里主窗口
 // 当前选中的实例（与资源管理窗口一致）。数据包下载前必须先选存档。
 // 下载走全局下载器：命令立即返回，进度在下载窗口里看。
+//
+// 项目详情与下载整合包窗口共用 components/ProjectDetailPage.vue。
 import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from "vue";
-import DOMPurify from "dompurify";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import InstanceChip from "../../components/ui/InstanceChip.vue";
+import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import AsyncImage from "../../components/ui/AsyncImage.vue";
-import ResourceDownloadBar from "../../components/ResourceDownloadBar.vue";
+import ProjectDetailPage from "../../components/ProjectDetailPage.vue";
 import { api } from "../../lib/api";
+import { useDownloadBadges } from "../../lib/downloadBadges";
 import { t, tErr } from "../../lib/i18n";
+import { svgIcon } from "../../lib/modrinthIcon";
+import { cardTags } from "../../lib/projectTags";
 import { showToast } from "../../lib/toast";
 import { loadGuiConfig } from "../../lib/guiConfig";
 import { useResourceStatus } from "../../lib/resourceTasks";
 import { projectParamToItem, targetProject, targetUuid, type WindowProjectParam } from "../windowManager";
-import type { FileListItemDto, ProjectItemDto, ResourceSaveDto, ResourceTaskDto } from "../../lib/bindings";
+import type {
+  FileListItemDto,
+  ProjectItemDto,
+  ResourceDependencyDto,
+  ResourceDependencyFileDto,
+  ResourceSaveDto,
+} from "../../lib/bindings";
 
 defineEmits<{
   /** 请求关闭本窗口 */
@@ -30,8 +41,6 @@ const { status: resourceStatus, init: initResourceStatus } = useResourceStatus(t
 
 /** 后端列表每页 20 个项目 */
 const PAGE_SIZE = 20;
-/** 版本列表每页条数，与 CurseForge 后端分页一致 */
-const FILE_PAGE_SIZE = 50;
 
 /** 资源类型，取值是后端 FileType 线串，显示标签走 i18n */
 const TYPES = [
@@ -54,6 +63,9 @@ const LOADERS = ["normal", "forge", "fabric", "quilt", "neoforge"];
 const instanceUuid = ref("");
 const instanceName = ref("");
 const instanceVersion = ref("");
+
+/** 详情是否展开：详情铺满窗口后，返回键放到标题栏 */
+const detailOpen = ref(false);
 
 /** 标题栏 chip 的数据；没有目标实例时标题栏换成一句提示 */
 const instanceChip = computed(() =>
@@ -91,14 +103,8 @@ const page = ref(0);
 const searching = ref(false);
 const error = ref("");
 
-/** 版本选择弹窗：当前项目 + 版本列表 */
-const versionItem = ref<ProjectItemDto | null>(null);
-const files = ref<FileListItemDto[]>([]);
-const allFiles = ref<FileListItemDto[]>([]);
-const filesLoading = ref(false);
-const filePage = ref(0);
-const fileTotal = ref(0);
-const fileVersion = ref("");
+/** 详情页展示的项目；null = 收起。详情与版本列表的状态都在共用组件里 */
+const detailItem = ref<ProjectItemDto | null>(null);
 
 /** 存档选择弹窗，数据包下载前用：待装的文件 + 存档列表 */
 const savePickFile = ref<FileListItemDto | null>(null);
@@ -106,17 +112,19 @@ const saves = ref<ResourceSaveDto[]>([]);
 const savesLoading = ref(false);
 const pickedSave = ref("");
 
+/** 前置勾选弹窗：正在下载的主文件 + 解析出的前置（已剔除实例里装了的） */
+const depFile = ref<FileListItemDto | null>(null);
+const deps = ref<ResourceDependencyDto[]>([]);
+/** 勾上的前置：pid → 要下载的文件 ID；不在表里就是没勾，默认填自动选中的版本 */
+const depsPick = ref(new Map<string, string>());
+const depsLoading = ref(false);
+/** 「不下载前置」的二次确认 */
+const depSkipAsk = ref(false);
+
+/** 内容区根节点，翻页时用它把窗口滚回顶部 */
+const bodyRef = ref<HTMLElement | null>(null);
+
 const maxPage = computed(() => Math.max(0, Math.ceil(total.value / PAGE_SIZE) - 1));
-
-const isModrinth = computed(() => source.value === "modrinth");
-
-/** 当前页显示的版本列表：Modrinth 一次拿全部本地切片，CurseForge 后端分页 */
-const pageFiles = computed(() =>
-  isModrinth.value
-    ? allFiles.value.slice(filePage.value * FILE_PAGE_SIZE, (filePage.value + 1) * FILE_PAGE_SIZE)
-    : files.value,
-);
-const fileMaxPage = computed(() => Math.max(1, Math.ceil(fileTotal.value / FILE_PAGE_SIZE)));
 
 /** 存档下载只有 CurseForge 有，Modrinth 没有 world 类型 */
 const sourceOptions = computed(() =>
@@ -159,6 +167,7 @@ async function loadSource() {
   total.value = 0;
   page.value = 0;
   error.value = "";
+  closeDetail();
   filter.value = "";
   version.value = "";
   category.value = "";
@@ -182,6 +191,9 @@ async function loadSource() {
     sorts.value = sortList;
     sort.value = sortList[0] ?? "";
     versions.value = versionList.filter((item) => item !== "");
+    // 游戏版本默认落在实例自己的版本上：本窗口是"装进哪个实例"的上下文，默认「全部版本」
+    // 会把不兼容的资源一起列出来。实例版本不在候选里（比如快照对不上）才退回全部
+    version.value = versions.value.includes(instanceVersion.value) ? instanceVersion.value : "";
     categories.value = Object.entries(categoryMap)
       .map(([value, label]) => ({ value, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
@@ -263,77 +275,48 @@ function turnPage(delta: number) {
   const next = page.value + delta;
   if (next < 0 || next > maxPage.value) return;
   page.value = next;
+  // 翻页先回到内容顶部：整页滚动的窗口里，用户此刻停在列表底部，不拉回去就看不到
+  // 新一页的头几条。scrollIntoView 会自己找最近的滚动容器（这里是窗口框架的 .frame-body）
+  bodyRef.value?.scrollIntoView({ behavior: "smooth", block: "start" });
   void search();
 }
 
-/** 版本列表代次：换筛选 / 换页时丢弃旧一发的返回 */
-let fileSeq = 0;
+/** 列表卡片上的「已下载 / 下载中」角标，与整合包窗口、详情页共用一份判定 */
+const { projectInstalled, projectRunning } = useDownloadBadges(resourceStatus);
 
-async function loadFiles(pid: string, pageNo: number) {
-  if (!instanceUuid.value) return;
-  const mine = ++fileSeq;
-  filesLoading.value = true;
-  try {
-    const res = await api.getResourceFiles(
-      instanceUuid.value,
-      source.value,
-      pid,
-      type.value,
-      pageNo,
-      fileVersion.value || null,
-      null,
-    );
-    if (mine !== fileSeq) return;
-    fileTotal.value = res.count || res.list.length;
-    if (isModrinth.value) {
-      allFiles.value = res.list;
-    } else {
-      files.value = res.list;
-    }
-  } catch (e) {
-    if (mine === fileSeq) showToast(tErr(e));
-  } finally {
-    if (mine === fileSeq) filesLoading.value = false;
-  }
+/** 打开详情：正文 / 截图与版本列表由共用组件并行加载 */
+function openDetail(item: ProjectItemDto) {
+  detailItem.value = item;
+  detailOpen.value = true;
 }
 
-/** 点击项目：打开版本选择弹窗（筛选沿用列表页选中的游戏版本） */
-function openVersions(item: ProjectItemDto) {
-  versionItem.value = item;
-  files.value = [];
-  allFiles.value = [];
-  filePage.value = 0;
-  fileTotal.value = 0;
-  fileVersion.value = version.value;
-  loadFiles(item.source.pid, 0);
+/** 收起详情；标题栏上的返回键与 Esc 都走这里 */
+function closeDetail() {
+  detailItem.value = null;
+  detailOpen.value = false;
 }
 
-function closeVersions() {
-  fileSeq++;
-  versionItem.value = null;
-  files.value = [];
-  allFiles.value = [];
+/** 详情页取数：资源接口按实例取，加载器过滤留给列表页 */
+function loadDetail(pid: string) {
+  return api.getResourceDetail(source.value, pid);
 }
 
-function onFileVersionChange() {
-  filePage.value = 0;
-  if (versionItem.value) {
-    loadFiles(versionItem.value.source.pid, 0);
-  }
+function loadFiles(pid: string, pageNo: number, fileVersion: string | null) {
+  return api.getResourceFiles(
+    instanceUuid.value,
+    source.value,
+    pid,
+    type.value,
+    pageNo,
+    fileVersion,
+    null,
+  );
 }
 
-function turnFilePage(delta: number) {
-  const next = filePage.value + delta;
-  if (next < 0 || next >= fileMaxPage.value) return;
-  filePage.value = next;
-  if (isModrinth.value || !versionItem.value) return;
-  loadFiles(versionItem.value.source.pid, next);
-}
-
-/** 下载资源：数据包先选存档，其余直接加入下载 */
+/** 详情页点下载：数据包先选存档，模组先解析前置，其余直接加入下载 */
 async function download(file: FileListItemDto) {
-  if (!versionItem.value || !instanceUuid.value) return;
-  const pid = versionItem.value.source.pid;
+  if (!detailItem.value || !instanceUuid.value) return;
+  const pid = detailItem.value.source.pid;
 
   if (type.value === "dataPacks") {
     savePickFile.value = file;
@@ -350,13 +333,161 @@ async function download(file: FileListItemDto) {
     return;
   }
 
+  await openDeps(pid, file);
+}
+
+/**
+ * 打开前置勾选弹窗
+ *
+ * 解析在后端做（递归拉前置的前置，并剔除实例里已经装了的），这里只负责把它列出来：
+ * 必选默认勾上、可选默认不勾，版本默认用后端自动挑的那个、可以改选。
+ * 一个前置都没有时不弹空窗，直接下主文件。
+ *
+ * - `pid`: 主文件的项目 ID
+ * - `file`: 主文件
+ */
+/** 前置解析代次：关掉弹窗或换一个前置时，旧一发的返回丢掉 */
+let depsSeq = 0;
+
+async function openDeps(pid: string, file: FileListItemDto) {
+  const mine = ++depsSeq;
+  depFile.value = file;
+  deps.value = [];
+  depsPick.value = new Map();
+  depsLoading.value = true;
+
+  try {
+    const list = await api.getResourceDependencies(
+      instanceUuid.value,
+      source.value,
+      pid,
+      file.source.fid,
+      type.value,
+    );
+    if (mine !== depsSeq) return;
+    deps.value = list;
+    // 必选的默认勾上，版本用后端自动挑的那个（files 的第一个）；可选的默认不勾
+    depsPick.value = new Map(
+      list.filter((dep) => dep.fid && !dep.optional).map((dep) => [dep.pid, dep.fid]),
+    );
+  } catch (e) {
+    if (mine !== depsSeq) return;
+    showToast(tErr(e));
+  } finally {
+    if (mine === depsSeq) depsLoading.value = false;
+  }
+
+  if (!deps.value.length) {
+    closeDeps();
+    await doDownload(pid, file);
+  }
+}
+
+/** 勾选 / 取消一个前置；勾上时用它自动选中的版本 */
+function toggleDep(pid: string, on: boolean, fid: string) {
+  const map = new Map(depsPick.value);
+  if (on) {
+    map.set(pid, fid);
+  } else {
+    map.delete(pid);
+  }
+  depsPick.value = map;
+}
+
+/** 改选某个前置的版本；选了版本就顺手把它勾上（必选本来就在表里） */
+function pickDepFile(pid: string, fid: string) {
+  const map = new Map(depsPick.value);
+  map.set(pid, fid);
+  depsPick.value = map;
+}
+
+/** 版本下拉里的一行文案：版本名 + 日期 */
+function depFileLabel(file: ResourceDependencyFileDto): string {
+  return file.time ? `${file.name} · ${file.time.slice(0, 10)}` : file.name;
+}
+
+/** 有可选前置时才有「下载所选」这一档：全是必选时它跟「全部下载」是同一件事 */
+const hasOptional = computed(() => deps.value.some((dep) => dep.optional));
+
+/** 收起前置弹窗：没点确认就什么都不下 */
+function closeDeps() {
+  // 代次 +1：在途的那次解析回来时丢掉，免得把状态写回已关掉的弹窗
+  depsSeq++;
+  depFile.value = null;
+  deps.value = [];
+  depsPick.value = new Map();
+  depsLoading.value = false;
+  depSkipAsk.value = false;
+}
+
+/**
+ * 收起弹窗并把主文件与给定前置一起排队
+ *
+ * - `picked`: 要一起下的前置；空表就是"不下载前置"
+ */
+async function startDownloads(picked: { pid: string; fid: string }[]) {
+  const file = depFile.value;
+  const pid = detailItem.value?.source.pid;
+  if (!file || !pid || !instanceUuid.value) {
+    closeDeps();
+    return;
+  }
+  closeDeps();
+
   await doDownload(pid, file);
+
+  let queued = 0;
+  for (const dep of picked) {
+    try {
+      await api.downloadResource(
+        instanceUuid.value,
+        source.value,
+        dep.pid,
+        dep.fid,
+        type.value,
+        null,
+      );
+      queued += 1;
+    } catch (e) {
+      showToast(tErr(e));
+    }
+  }
+  if (queued) {
+    showToast(t("addResource.depsQueued", { n: queued }));
+  }
+}
+
+/** 全部下载：主文件 + 列表里每一个前置，各自用下拉里显示的那个版本 */
+async function confirmAllDeps() {
+  const picked = deps.value
+    .filter((dep) => dep.fid)
+    .map((dep) => ({ pid: dep.pid, fid: depsPick.value.get(dep.pid) ?? dep.fid }));
+  await startDownloads(picked);
+}
+
+/** 下载所选：只下勾上的那些（必选一定在勾选表里，取消不了） */
+async function confirmSelectedDeps() {
+  const picked = deps.value
+    .filter((dep) => dep.fid && depsPick.value.has(dep.pid))
+    .map((dep) => ({ pid: dep.pid, fid: depsPick.value.get(dep.pid) ?? dep.fid }));
+  await startDownloads(picked);
+}
+
+/** 点「不下载前置」：先弹一句确认，免得误点把前置漏掉 */
+function askSkipDeps() {
+  depSkipAsk.value = true;
+}
+
+/** 确认跳过：只下主文件 */
+async function skipDeps() {
+  depSkipAsk.value = false;
+  await startDownloads([]);
 }
 
 /** 存档选择确认：真正发起数据包下载 */
 async function confirmSave() {
-  if (!savePickFile.value || !versionItem.value || !pickedSave.value) return;
-  const pid = versionItem.value.source.pid;
+  if (!savePickFile.value || !detailItem.value || !pickedSave.value) return;
+  const pid = detailItem.value.source.pid;
   const file = savePickFile.value;
   savePickFile.value = null;
   await doDownload(pid, file, pickedSave.value);
@@ -373,88 +504,14 @@ async function doDownload(pid: string, file: FileListItemDto, world: string | nu
       world,
     );
     showToast(t("addResource.downloadOk", { name: file.name }));
-    closeVersions();
+    closeDetail();
   } catch (e) {
     showToast(tErr(e));
   }
 }
 
-/**
- * Modrinth 分类图标：icon 字段是内联 svg 源码，stroke=currentColor，消毒后内联渲染
- *
- * 消毒结果按源码缓存：模板里直接调用函数，每次重渲染都会重跑一遍 DOMPurify，
- * 而同一批分类图标的源码是不变的。
- */
-const svgCache = new Map<string, string>();
-
-function svgIcon(svg: string): string {
-  const hit = svgCache.get(svg);
-  if (hit !== undefined) return hit;
-  const safe = DOMPurify.sanitize(svg);
-  svgCache.set(svg, safe);
-  return safe;
-}
-
 function formatDate(date: string): string {
   return date ? date.slice(0, 10) : "";
-}
-
-/**
- * 本次会话里见过的「下载完成」标记（只增不减）
- *
- * 任务表的终态条目由后端延时移除，但文件确实已经装进实例了——
- * 「已下载」角标不能跟着任务一起消失。只往集合里加，不做任何复位。
- */
-const donePids = ref(new Set<string>());
-const doneFileKeys = ref(new Set<string>());
-
-watch(
-  resourceStatus,
-  (status) => {
-    const tasks = status?.tasks ?? [];
-    if (!tasks.some((task) => task.done)) return;
-    const pids = new Set(donePids.value);
-    const files = new Set(doneFileKeys.value);
-    for (const task of tasks) {
-      if (!task.done) continue;
-      pids.add(task.pid);
-      files.add(`${task.pid}|${task.fid}`);
-    }
-    // 只在真新增时换引用：进度事件很频繁，无谓的赋值会带着模板一起重渲染
-    if (pids.size !== donePids.value.size) donePids.value = pids;
-    if (files.size !== doneFileKeys.value.size) doneFileKeys.value = files;
-  },
-  { immediate: true },
-);
-
-/**
- * 进行中任务派生的角标状态
- *
- * 由 `resourceStatus` 直接**派生**，不再往列表项里写回 `download` / `downloadNow`：
- * 写回是单向的（只置 true 不复位），任务失败或结束后角标会一直挂着。
- * 「已下载」取实例侧来源 `item.download` / `file.isDownload`，与上面那张累计表取「或」。
- */
-const taskState = computed(() => {
-  const running = (task: ResourceTaskDto) => !task.done && !task.failed;
-  const tasks = resourceStatus.value?.tasks ?? [];
-  return {
-    runningProjects: new Set(tasks.filter(running).map((task) => task.pid)),
-    runningFiles: new Set(tasks.filter(running).map((task) => `${task.pid}|${task.fid}`)),
-  };
-});
-
-function fileKey(file: FileListItemDto): string {
-  return `${file.source.pid}|${file.source.fid}`;
-}
-
-/** 项目级「已下载」（实例侧已装 + 本次会话装完） */
-function projectInstalled(item: ProjectItemDto): boolean {
-  return item.download || donePids.value.has(item.source.pid);
-}
-
-/** 项目级「下载中」：只看任务表——DTO 里那份是取列表时的快照，用它角标会粘住 */
-function projectRunning(item: ProjectItemDto): boolean {
-  return taskState.value.runningProjects.has(item.source.pid);
 }
 
 /** 收藏 / 取消收藏 */
@@ -474,22 +531,6 @@ async function toggleStar(item: ProjectItemDto) {
   } catch (e) {
     showToast(tErr(e));
   }
-}
-
-/** 文件级「已下载」 */
-function fileInstalled(file: FileListItemDto): boolean {
-  return file.isDownload || doneFileKeys.value.has(fileKey(file));
-}
-
-/** 文件级「下载中」 */
-function fileRunning(file: FileListItemDto): boolean {
-  return taskState.value.runningFiles.has(fileKey(file));
-}
-
-function formatSize(size: number): string {
-  if (!size) return t("modpack.unknownSize");
-  if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`;
-  return `${Math.max(1, Math.round(size / 1024))} KB`;
 }
 
 /** 类型 / 下载源变化：换源重载；存档类型强制 CurseForge */
@@ -537,12 +578,12 @@ onMounted(async () => {
  * 收藏窗口点「下载」跳进来的项目
  *
  * 本窗口是"按实例取数"的（没实例拉不出版本列表），所以参数先存着：
- * 实例已选就直接打开版本列表，没选就等用户选好实例再打开（见下面的 watch）。
+ * 实例已选就直接打开详情，没选就等用户选好实例再打开（见下面的 watch）。
  *
  * 进去之前**先把上一次留下的视图状态清掉**：这页在单窗口模式下是 KeepAlive 缓存的，
- * 不清的话会带着上个项目的版本弹窗 / 文件列表 / 搜索词跳转（看着就像"跳错了/没跳"）。
+ * 不清的话会带着上个项目的版本列表 / 搜索词跳转（看着就像"跳错了/没跳"）。
  * 清完还要等一轮 —— 改 type / source 会触发各自的 watch 去刷新列表，
- * 紧接着就开弹窗的话可能被那批刷新顺手盖掉。
+ * 紧接着就开详情的话可能被那批刷新顺手盖掉。
  */
 const pendingProject = ref<WindowProjectParam | null>(null);
 
@@ -551,7 +592,7 @@ async function consumeTargetProject() {
   if (!p || p.fileType === "modpack") {
     return;
   }
-  closeVersions();
+  closeDetail();
   filter.value = "";
   // 换源会让排序表作废：**同步**清掉，否则中间那几发搜索会带着上一个源的排序名
   sorts.value = [];
@@ -573,7 +614,7 @@ async function consumeTargetProject() {
   }
 
   if (instanceUuid.value) {
-    openVersions(item);
+    openDetail(item);
   } else {
     pendingProject.value = p;
   }
@@ -584,7 +625,7 @@ watch(instanceUuid, async () => {
     const p = pendingProject.value;
     pendingProject.value = null;
     await nextTick();
-    openVersions(projectParamToItem(p));
+    openDetail(projectParamToItem(p));
   }
 });
 
@@ -593,16 +634,15 @@ onActivated(consumeTargetProject);
 </script>
 
 <template>
-  <WindowFrame :title="t('winTitle.addResource')" body-gutter @close="$emit('close')">
+  <WindowFrame :title="t('winTitle.addResource')" :back="detailOpen ? t('winCommon.back') : ''" body-gutter
+    @close="$emit('close')" @back="closeDetail()">
     <!-- 标题栏：目标实例。本窗口是"装进哪个实例"的上下文，没实例就直说 -->
     <template #head-right>
       <InstanceChip v-if="instanceChip" :instance="instanceChip" />
       <span v-else class="head-warn">{{ t("addResource.noInstance") }}</span>
     </template>
 
-    <div class="res-mode">
-      <!-- 下载任务进度条：多任务，完成后短暂停留再自动消失 -->
-      <ResourceDownloadBar v-if="resourceStatus?.tasks.length" :status="resourceStatus" />
+    <div class="res-mode" ref="bodyRef">
 
       <!-- 资源类型 + 下载源 + 版本 -->
       <div class="res-top">
@@ -676,7 +716,7 @@ onActivated(consumeTargetProject);
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
               </svg>
             </button>
-            <div class="pack-main" @click="openVersions(item)">
+            <div class="pack-main" @click="openDetail(item)">
               <AsyncImage v-if="item.image" class="pack-icon" :src="item.image" alt="" />
               <div v-else class="pack-icon pack-icon-fallback">{{ item.name.slice(0, 1).toUpperCase() }}</div>
               <div class="pack-info">
@@ -690,11 +730,13 @@ onActivated(consumeTargetProject);
                 </div>
                 <div class="pack-desc">{{ item.summary }}</div>
                 <div v-if="item.tag.length" class="pack-tags">
-                  <span v-for="tag in item.tag" :key="tag.name" class="pack-tag">
+                  <span v-for="tag in cardTags(item.tag).shown" :key="tag.name" class="pack-tag">
                     <span v-if="tag.svg" class="tag-svg" v-html="svgIcon(tag.svg)"></span>
                     <img v-else-if="tag.logo" class="pack-tag-icon" :src="tag.logo" loading="lazy" alt="" />
                     {{ tag.name }}
                   </span>
+                  <!-- 超过上限的标签用省略号顶上，别把最后一个切掉一半 -->
+                  <span v-if="cardTags(item.tag).more" class="pack-tag">…</span>
                 </div>
                 <div class="pack-meta">
                   {{ t("modpack.downloads", { n: item.downloadCount.toLocaleString() }) }}
@@ -717,72 +759,6 @@ onActivated(consumeTargetProject);
         </button>
       </div>
 
-      <!-- 版本选择弹窗 -->
-      <BaseModal v-if="versionItem" :width="620" below-titlebar @close="closeVersions">
-        <div class="ver-head">
-          <AsyncImage v-if="versionItem.image" class="ver-icon" :src="versionItem.image" alt="" />
-          <div v-else class="ver-icon ver-icon-fallback">
-            {{ versionItem.name.slice(0, 1).toUpperCase() }}
-          </div>
-          <div class="ver-title">
-            <div class="ver-name">{{ versionItem.name }}</div>
-            <div v-if="versionItem.summary" class="ver-summary">{{ versionItem.summary }}</div>
-          </div>
-        </div>
-        <div class="ver-tools">
-          <select v-model="fileVersion" class="field-select sel-file-version" :disabled="filesLoading"
-            @change="onFileVersionChange">
-            <option value="">{{ t("modpack.allVersions") }}</option>
-            <option v-for="v in versions" :key="v" :value="v">{{ v }}</option>
-          </select>
-          <div v-if="fileMaxPage > 1" class="file-page">
-            <button class="page-btn" :disabled="filePage === 0 || filesLoading" @click="turnFilePage(-1)">
-              {{ t("modpack.prevPage") }}
-            </button>
-            <span class="file-page-num">{{ filePage + 1 }} / {{ fileMaxPage }} · {{ t("modpack.totalItems", {
-              n:
-              fileTotal })
-              }}</span>
-            <button class="page-btn" :disabled="filePage >= fileMaxPage - 1 || filesLoading" @click="turnFilePage(1)">
-              {{ t("modpack.nextPage") }}
-            </button>
-          </div>
-        </div>
-        <div class="ver-files" :class="{ 'is-loading-dim': filesLoading }">
-          <!-- 首次加载用骨架；翻页时保留旧内容并压暗（结果到了才整体替换） -->
-          <template v-if="filesLoading && pageFiles.length === 0">
-            <div v-for="n in 4" :key="n" class="sk-row compact">
-              <div class="sk-lines">
-                <div class="sk sk-line w70"></div>
-                <div class="sk sk-line w45"></div>
-              </div>
-            </div>
-          </template>
-          <div v-else-if="pageFiles.length === 0" class="empty-tip">{{ t("modpack.noVersions") }}</div>
-          <template v-else>
-            <div v-for="file in pageFiles" :key="file.source.fid" class="file-row">
-              <div class="file-info">
-                <span class="file-name">
-                  {{ file.name }}
-                  <span v-if="fileInstalled(file)" class="pack-badge">{{ t("modpack.installed") }}</span>
-                  <span v-else-if="fileRunning(file)" class="pack-badge busy">{{ t("modpack.downloading") }}</span>
-                </span>
-                <span class="file-meta">
-                  {{ t("modpack.fileMeta", {
-                    n: file.download.toLocaleString(),
-                    date: formatDate(file.time),
-                    size: formatSize(file.size),
-                  }) }}
-                </span>
-              </div>
-              <button class="install-btn" @click="download(file)">
-                {{ t("addResource.download") }}
-              </button>
-            </div>
-          </template>
-        </div>
-      </BaseModal>
-
       <!-- 存档选择弹窗（数据包下载前） -->
       <BaseModal v-if="savePickFile" :width="420" below-titlebar @close="savePickFile = null">
         <div class="save-head">{{ t("addResource.chooseSave") }}</div>
@@ -801,6 +777,75 @@ onActivated(consumeTargetProject);
           </button>
         </div>
       </BaseModal>
+
+      <!-- 前置勾选弹窗（下载模组前）：必选默认勾上且取消不了，可选的自己挑；
+           点遮罩不关闭，右上角有关闭按钮（BaseModal 的 title 那一档） -->
+      <BaseModal v-if="depFile" :title="t('addResource.depsTitle')" :width="640" fixed-height="520px" below-titlebar
+        :overlay-close="false" @close="closeDeps">
+        <div class="deps-hint">{{ t("addResource.depsHint") }}</div>
+        <div class="deps-list">
+          <div v-if="depsLoading" class="deps-loading">
+            <span class="deps-spinner"></span>
+            {{ t("addResource.depsLoading") }}
+          </div>
+          <template v-else>
+            <div v-for="dep in deps" :key="dep.pid" class="dep-row" :class="{ off: !dep.fid }">
+              <!-- 必选取消不了：勾上且禁用，要跳过前置只能走下面那个「不下载前置」。
+                   勾选框挂在整行上（不放进第一行），这样它按整行高度上下居中 -->
+              <input :id="`dep-${dep.pid}`" class="dep-check" type="checkbox" :checked="depsPick.has(dep.pid)"
+                :disabled="!dep.fid || !dep.optional"
+                @change="toggleDep(dep.pid, ($event.target as HTMLInputElement).checked, dep.fid)" />
+              <div class="dep-body">
+                <label class="dep-main" :for="`dep-${dep.pid}`">
+                  <AsyncImage v-if="dep.icon" class="dep-icon" :src="dep.icon" alt="" />
+                  <span class="dep-name">{{ dep.name || dep.pid }}</span>
+                  <span class="dep-tag">
+                    {{ dep.optional ? t("addResource.depsOptional") : t("addResource.depsRequired") }}
+                  </span>
+                </label>
+                <!-- 版本：默认是自动挑的那个，可以改选 -->
+                <div v-if="dep.files.length" class="dep-files">
+                  <span class="dep-files-label">{{ t("addResource.depsVersion") }}</span>
+                  <select class="field-select dep-select" :value="depsPick.get(dep.pid) ?? dep.fid"
+                    @change="pickDepFile(dep.pid, ($event.target as HTMLSelectElement).value)">
+                    <option v-for="file in dep.files" :key="file.fid" :value="file.fid">
+                      {{ depFileLabel(file) }}
+                    </option>
+                  </select>
+                </div>
+                <span v-else class="dep-none">{{ t("addResource.depsNoFile") }}</span>
+              </div>
+            </div>
+          </template>
+        </div>
+        <div class="deps-actions">
+          <BaseButton :disabled="depsLoading" @click="askSkipDeps">
+            {{ t("addResource.depsSkip") }}
+          </BaseButton>
+          <BaseButton variant="accent" :disabled="depsLoading" @click="confirmAllDeps">
+            {{ t("addResource.depsAll") }}
+          </BaseButton>
+          <!-- 全是必选时它跟「全部下载」是同一件事，不显示 -->
+          <BaseButton v-if="hasOptional" variant="accent" :disabled="depsLoading" @click="confirmSelectedDeps">
+            {{ t("addResource.depsSelected") }}
+          </BaseButton>
+        </div>
+      </BaseModal>
+
+      <!-- 跳过前置的二次确认 -->
+      <BaseModal v-if="depSkipAsk" :width="380" below-titlebar :overlay-close="false" @close="depSkipAsk = false">
+        <div class="deps-head">{{ t("addResource.depsSkipTitle") }}</div>
+        <div class="deps-hint">{{ t("addResource.depsSkipHint") }}</div>
+        <div class="deps-actions">
+          <BaseButton @click="depSkipAsk = false">{{ t("actions.cancel") }}</BaseButton>
+          <BaseButton variant="accent" @click="skipDeps">{{ t("addResource.depsSkipConfirm") }}</BaseButton>
+        </div>
+      </BaseModal>
+
+      <!-- 项目详情：与下载整合包窗口共用同一份实现 -->
+      <ProjectDetailPage :item="detailItem" :versions="versions" :initial-version="version"
+        :action-label="t('addResource.download')" :status="resourceStatus" :load-detail="loadDetail"
+        :load-files="loadFiles" @close="closeDetail" @download="download" />
     </div>
   </WindowFrame>
 </template>

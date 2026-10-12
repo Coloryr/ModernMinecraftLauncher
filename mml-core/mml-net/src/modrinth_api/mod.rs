@@ -597,6 +597,38 @@ pub async fn get_categories() -> CoreResult<Vec<ModrinthCategoriesObj>> {
         .await
 }
 
+/// 加载器标签，对应 `tag/loader` 接口
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(default)]
+pub struct ModrinthLoaderObj {
+    /// 加载器名称，如 `fabric`，与搜索命中 `categories` 里的写法一致
+    pub name: String,
+}
+
+impl Default for ModrinthLoaderObj {
+    /// 全字段取默认值，配合 `#[serde(default)]` 兜底缺失字段
+    fn default() -> Self {
+        Self {
+            name: Default::default(),
+        }
+    }
+}
+
+/// 获取所有加载器名
+///
+/// 与分类表互不重叠：搜索结果把加载器混在 `categories` 里返回，只能拿这张表认出来。
+///
+/// # 返回值
+///
+/// 返回 Modrinth 的加载器标签表
+pub async fn get_loaders() -> CoreResult<Vec<ModrinthLoaderObj>> {
+    let url = format!("{}tag/loader", urls::MODRINTH_API);
+
+    crate::get_work_client()
+        .get_json_limited(&url, LIMITE_PER_MIN)
+        .await
+}
+
 /// 按哈希反查版本的请求体，对应 `version_files` 接口
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]

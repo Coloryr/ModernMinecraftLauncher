@@ -149,11 +149,13 @@ pub fn make_file_online_info_obj(obj: &mut CurseForgeFileDataObj, path: &str) ->
 pub struct CurseForgeModDependenciesRes {
     /// 名字
     pub name: String,
+    /// 图标地址，项目接口给的是远程地址，没有时是 None
+    pub icon: Option<String>,
     /// 项目编号
     pub mod_id: u64,
     /// 是否可选
     pub opt: bool,
-    /// 文件列表
+    /// 候选文件，按"合适程度"排好，**第一个是自动选中的那个**；调用方可以让用户改选
     pub list: Vec<CurseForgeFileDataObj>,
 }
 
@@ -218,7 +220,13 @@ fn get_mod_dependencies_inner(
         }
 
         let id = item.mod_id.to_string();
-        let opt = item.relation_type != 2;
+        // 只保留"要用户去下"的两种关系：1 内嵌库 / 4 工具 / 5 明确冲突 / 6 包含都不算前置。
+        // 这里算的是"是否可选"，写进结果时**不要再取反**
+        let optional = match item.relation_type {
+            2 => true,
+            3 => false,
+            _ => return,
+        };
 
         let (res1, res2) = handle.block_on(async {
             let res1 = curseforge_api::get_files_page(CurseFogreArg {
@@ -251,8 +259,9 @@ fn get_mod_dependencies_inner(
 
         list.lock().unwrap().push(CurseForgeModDependenciesRes {
             name: data1.data.name.clone(),
+            icon: data1.data.logo.url.clone(),
             mod_id: data1.data.id,
-            opt: !opt,
+            opt: optional,
             list: data.data,
         });
 

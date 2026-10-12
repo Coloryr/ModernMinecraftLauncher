@@ -6,6 +6,7 @@ import AccountSelector from "../../../components/AccountSelector.vue";
 import WindowControls from "../../../components/ui/WindowControls.vue";
 import ModpackTitleIndicator from "../../../components/ModpackTitleIndicator.vue";
 import DownloadTitleIndicator from "../../../components/DownloadTitleIndicator.vue";
+import ResourceTitleIndicator from "../../../components/ResourceTitleIndicator.vue";
 import { onTitleBarPointerDown, titleBarStyle } from "../../../lib/titlebar";
 import { pluginDecorated } from "../../../lib/decoration";
 import type { AccountStoreDto } from "../../../lib/bindings";
@@ -55,6 +56,7 @@ const emit = defineEmits<{
            没有任务时各自整块不存在，不留空位 -->
       <ModpackTitleIndicator />
       <DownloadTitleIndicator />
+      <ResourceTitleIndicator />
 
       <!-- 启动器主页（切换按钮） -->
       <button class="topbar-icon-btn" :class="{ pressed: newsActive }" v-tip="t('home.entry')"

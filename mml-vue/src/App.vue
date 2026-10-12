@@ -9,18 +9,22 @@ import {
   closeWindow,
   closeDownloadPopup,
   closeModpackPopup,
+  closeResourcePopup,
   currentKind,
   downloadPopupOpen,
   modpackPopupOpen,
   multiWindow,
   quitWindow,
+  resourcePopupOpen,
 } from "./windows/windowManager";
 import type { WindowKind } from "./windows/registry";
 import { setModpackFallbackToast, useModpackStatus } from "./lib/modpackTasks";
+import { useResourceStatus } from "./lib/resourceTasks";
 import AppToast from "./components/ui/AppToast.vue";
 import BaseButton from "./components/ui/BaseButton.vue";
 import BaseModal from "./components/ui/BaseModal.vue";
 import ModpackPopup from "./components/ModpackPopup.vue";
+import ResourcePopup from "./components/ResourcePopup.vue";
 
 applyTheme();
 applyLocale();
@@ -64,6 +68,14 @@ setModpackFallbackToast(true);
 const { status: modpackStatus, init: initModpackStatus } = useModpackStatus(false);
 
 /**
+ * 资源下载任务的全局状态
+ *
+ * 与整合包那份同理：进度弹窗是全局浮层，而下载跑在后台、用户可能已经离开了"添加资源"
+ * 那一页。标题栏指示器自带订阅，这里这份只喂弹窗。
+ */
+const { status: resourceStatus, init: initResourceStatus } = useResourceStatus(true);
+
+/**
  * 关闭被拦截：还有下载任务在跑
  *
  * Rust 侧对"下载窗口"和"主窗口"都设了关闭保护，见 src-tauri 的 `close_guarded` ——
@@ -77,6 +89,7 @@ const closeAskQuit = ref(false);
 
 let unsubCloseBlocked: (() => void) | null = null;
 let unsubModpackStatus: (() => void) | null = null;
+let unsubResourceStatus: (() => void) | null = null;
 
 onMounted(async () => {
   unsubCloseBlocked = await onCloseBlocked(() => {
@@ -88,11 +101,14 @@ onMounted(async () => {
 
   // 整合包安装状态订阅：挂在这里而不是各窗口里，安装跑在后台、进度要能在任何页面显示
   unsubModpackStatus = await initModpackStatus();
+  // 资源下载同理：进度弹窗是全局浮层，下载跑在后台
+  unsubResourceStatus = await initResourceStatus();
 });
 
 onUnmounted(() => {
   unsubCloseBlocked?.();
   unsubModpackStatus?.();
+  unsubResourceStatus?.();
 });
 
 /** 确认「停止并关闭 / 停止并退出」：先停掉所有下载，任务清空后 Rust 侧不再拦截，再重放这次关闭 */
@@ -139,6 +155,9 @@ const closeAskButton = computed(() =>
        关掉它只是收起，安装照常跑 -->
   <ModpackPopup v-if="modpackPopupOpen && modpackStatus?.tasks.length" :status="modpackStatus"
     @close="closeModpackPopup" />
+  <!-- 资源下载进度弹窗：入口是标题栏上的 ResourceTitleIndicator，关掉只收起、下载照跑 -->
+  <ResourcePopup v-if="resourcePopupOpen && resourceStatus?.tasks.length" :status="resourceStatus"
+    @close="closeResourcePopup" />
   <!-- 下载入口不再用右下角浮层：改成主窗口顶栏上的动态图标 + 进度条，
        即 DownloadTitleIndicator，与整合包那个并排、排在主页按钮左边；
        下载管理弹窗仍在这里渲染 -->

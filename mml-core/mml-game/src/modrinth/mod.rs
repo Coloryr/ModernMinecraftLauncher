@@ -41,6 +41,8 @@ pub mod pack_obj;
 
 /// 分类信息缓存
 static CATEGORISE: OnceLock<Vec<ModrinthCategoriesObj>> = OnceLock::new();
+/// 加载器名缓存，即 `tag/loader` 的名字表
+static LOADERS: OnceLock<Vec<String>> = OnceLock::new();
 /// 游戏版本列表缓存
 static GAME_VERSIONS: OnceLock<Vec<String>> = OnceLock::new();
 
@@ -188,6 +190,41 @@ pub async fn get_categories(file_type: FileType) -> CoreResult<HashMap<String, S
     Ok(map)
 }
 
+/// 把搜索命中的标签排成"加载器在前、分类在后"
+///
+/// Modrinth 的搜索接口把加载器与分类混在同一个 `categories` 数组里返回（命中项没有
+/// `loaders` 字段），顺序由服务端定，于是分类会夹在加载器中间。这里按 `tag/loader`
+/// 的名字表把加载器认出来整体挪到前面，认不出来的一律当分类、保持原顺序 ——
+/// 与项目详情页一致（那边接口里 `loaders` / `categories` 本来就是分开的）。
+///
+/// - `names`: 命中项的 `categories`，原样传入
+///
+/// # 返回值
+///
+/// 排好序的标签名；加载器表取不到时原样返回
+pub async fn order_tags(names: &[String]) -> Vec<String> {
+    let loaders = match LOADERS.get() {
+        Some(list) => list,
+        None => {
+            let list = modrinth_api::get_loaders().await;
+            match list {
+                Ok(list) => {
+                    LOADERS.get_or_init(|| list.into_iter().map(|item| item.name).collect())
+                }
+                Err(err) => {
+                    mml_log::error_type(err);
+                    &Vec::new()
+                }
+            }
+        }
+    };
+
+    let (loader_tags, rest): (Vec<&String>, Vec<&String>) =
+        names.iter().partition(|name| loaders.contains(*name));
+
+    loader_tags.into_iter().chain(rest).cloned().collect()
+}
+
 /// 获取所有游戏版本
 ///
 /// # 返回值
@@ -324,11 +361,13 @@ pub async fn get_mod_info<P: AsRef<Path>>(
 pub struct ModrinthModDependenciesRes {
     /// 名字
     pub name: String,
+    /// 图标地址，项目接口给的是远程地址，没有时是 None
+    pub icon: Option<String>,
     /// 项目编号
     pub mod_id: String,
     /// 是否可选
     pub opt: bool,
-    /// 文件列表
+    /// 候选文件，按"合适程度"排好，**第一个是自动选中的那个**；调用方可以让用户改选
     pub list: Vec<ModrinthVersionObj>,
 }
 
@@ -393,16 +432,28 @@ fn get_mod_dependencies_inner(
         }
 
         let id = project_id.clone();
-        let opt = !item.dependency_type.eq_ignore_ascii_case("required");
+        // 只保留"要用户去下"的两种类型。embedded 是打包在 jar 里的、incompatible 是明确
+        // 冲突的，都不该出现在前置列表里，也不必为它们发请求。
+        // 注意这里算的是"是否可选"，写进结果时**不要再取反**
+        let optional = if item.dependency_type.eq_ignore_ascii_case("required") {
+            false
+        } else if item.dependency_type.eq_ignore_ascii_case("optional") {
+            true
+        } else {
+            return;
+        };
 
         let (res1, res2) = handle.block_on(async {
             let res1 = modrinth_api::get_project(&id).await;
 
             match res1 {
                 Ok(data) => match &item.version_id {
+                    // 依赖指名了版本：候选就只有这一个
                     Some(version) => (
                         Ok(data),
-                        modrinth_api::get_version(project_id, version).await,
+                        modrinth_api::get_version(project_id, version)
+                            .await
+                            .map(|item| vec![item]),
                     ),
                     None => {
                         let loader = if matches!(loader, LoaderType::Custom)
@@ -413,14 +464,12 @@ fn get_mod_dependencies_inner(
                         } else {
                             Some(loader.to_string())
                         };
+                        // 整份候选都带上：前端要让用户在这些版本里挑，不只用第一个
                         let data1 =
                             modrinth_api::get_file_versions(project_id, Some(version), loader)
                                 .await;
 
-                        match data1 {
-                            Ok(mut data1) => (Ok(data), Ok(data1.remove(0))),
-                            Err(err) => (Ok(data), Err(err)),
-                        }
+                        (Ok(data), data1)
                     }
                 },
                 Err(err) => (Err(err), Err(ErrorType::InvalidOperation)),
@@ -429,15 +478,20 @@ fn get_mod_dependencies_inner(
 
         let Ok(data) = res1 else { return };
         let Ok(data1) = res2 else { return };
+        // 该项目在本版本 / 加载器下一个文件都没有：当作这条依赖解析失败，整条跳过
+        let Some(first) = data1.first() else { return };
 
-        let sub_deps =
-            get_mod_dependencies_inner(&data1.dependencies, version, loader, ids, handle);
+        let sub_deps = get_mod_dependencies_inner(&first.dependencies, version, loader, ids, handle);
+
+        // 图标：项目接口给的是空串，按"没有"处理
+        let icon = (!data.icon_url.is_empty()).then(|| data.icon_url.clone());
 
         list.lock().unwrap().push(ModrinthModDependenciesRes {
             name: data.title,
+            icon,
             mod_id: data.id.clone(),
-            opt: !opt,
-            list: vec![data1],
+            opt: optional,
+            list: data1,
         });
 
         // 添加未被标记的子依赖，避免同时持有 ids 和 list 锁

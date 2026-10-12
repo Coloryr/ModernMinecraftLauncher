@@ -43,4 +43,14 @@
  *    确实要让位的顶栏写 `calc(26px + 9px)`，并在注释里点明与这里同源。
  * 4. **横向滚动没有等价物**：`scrollbar-gutter` 只管纵向那一条，横向滚动条出现会吃掉高度，
  *    得固定高度或另想办法，别拿它当万能药。
+ * 5. **不想让这 9px 从内容盒里出，就成对再写一句 `padding-right: calc(26px - 9px)`** ——
+ *    槽位照旧常驻（内容不跳），内容右边缘仍落在 26px 上、与不滚动的头部 / 卡片对齐，
+ *    滚动条被画进那条外边距里。**必须与 `scrollbar-gutter: stable` 成对**：少了它，9px
+ *    只在真有滚动条时存在，没滚动条时内容会被顶出右边缘（即第 3 条）；容器改回不滚
+ *    （`overflow: hidden`）时又要连同补偿一起取消，见 WindowFrame 的 `.frame-body.fill`。
+ *    参考实现：`WindowFrame` 的 `.frame-body.gutter`、`project-detail.css` 的 `.detail-scroll`。
+ *
+ * 别指望 `overflow: overlay` 能顶替第 5 条：WebView2（Chromium 156）实测把它按 `auto` 处理，
+ * 自定义了 `::-webkit-scrollbar` 的滚动条照样占那 9px。真要"浮层滚动条"只有
+ * `--enable-features=OverlayScrollbar` 那条路，代价是放弃 `::-webkit-scrollbar` 这套外观。
  */

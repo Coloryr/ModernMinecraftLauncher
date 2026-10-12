@@ -7,7 +7,7 @@
 // - 共用操作          → composables/useResourceOps；忙碌标记 / 确认弹窗 / 打开目录 / 重拉
 // - 各分类的列表      → parts/*Pane.vue（每类一个，自带的弹窗跟上）
 // - 窗口级样式        → resource.css；非 scoped，拆开的子组件共用，见该文件头部说明
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
@@ -17,6 +17,7 @@ import { commands } from "../../lib/bindings";
 import { useFileDrop } from "../../composables/useFileDrop";
 import type { FileDropPayload } from "../../composables/useFileDrop";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
+import { useResourceStatus } from "../../lib/resourceTasks";
 import { openWindow } from "../windowManager";
 import { useResourceData } from "./composables/useResourceData";
 import { useResourceOps } from "./composables/useResourceOps";
@@ -68,9 +69,36 @@ data.setInstanceReadyHook(async () => {
 // 记住这次看的是哪一类：下次打开直接停在这儿
 watch(category, (id) => view.rememberCategory(id));
 
-onMounted(sync);
+/**
+ * 资源下载任务的订阅
+ *
+ * 本窗口不显示进度条，只借 lib/resourceTasks 里那条"有资源下载完成"的标记：
+ * 切回来时据此决定要不要重读列表，见 useResourceData 的 sync。
+ */
+const { init: initResourceStatus } = useResourceStatus(false);
 
-// 单窗口模式：窗口被 KeepAlive 缓存，切回不会重新挂载 → 自己补一次（实例可能已被主窗口切走）
+/** 订阅的解绑函数；它异步挂上，挂好之前窗口可能已经关了 */
+let unlistenStatus: (() => void) | null = null;
+let gone = false;
+
+onMounted(async () => {
+  const unlisten = await initResourceStatus();
+  if (gone) {
+    unlisten();
+    return;
+  }
+  unlistenStatus = unlisten;
+  await sync();
+});
+
+onUnmounted(() => {
+  gone = true;
+  unlistenStatus?.();
+  unlistenStatus = null;
+});
+
+// 单窗口模式：窗口被 KeepAlive 缓存，切回不会重新挂载 → 自己补一次。实例可能已被主窗口
+// 切走、模组列表可能刚被下载改过，两种都靠 sync 自己判断；都没变就不重读
 useWindowRefresh(sync);
 
 /** 切分类：只改选择，加载由 useResourceData 里的 watch 负责 */

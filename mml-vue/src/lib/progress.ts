@@ -145,3 +145,22 @@ export function resourceGroups(tasks: ResourceTaskDto[]): ResourceGroupProgress[
     };
   });
 }
+
+/**
+ * 资源下载的总进度，0–100
+ *
+ * 还没下完的各项目进度的均值，已结束的不参与平均；全都结束了就是 100。
+ * 进度卡片与标题栏指示器共用这一份，免得同一个数字在两处算出不同的值。
+ *
+ * - `tasks`: 资源下载任务列表
+ *
+ * # 返回值
+ *
+ * 进度百分比
+ */
+export function resourceOverallPercent(tasks: ResourceTaskDto[]): number {
+  const groups = resourceGroups(tasks);
+  const active = groups.filter((group) => group.finished < group.total);
+  if (!active.length) return 100;
+  return active.reduce((acc, group) => acc + group.percent, 0) / active.length;
+}

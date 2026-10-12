@@ -16,6 +16,7 @@ use mml_net::modrinth_api::version_obj::ModrinthVersionObj;
 use tokio::sync::RwLock as AsyncRwLock;
 use uuid::Uuid;
 
+pub(crate) mod dependency;
 pub(crate) mod download;
 pub(crate) mod list;
 pub(crate) mod meta;

@@ -4,12 +4,14 @@
 //! 所以 `crate::dtos::add_resource_dto::XxxDto` 这些既有路径都没变。
 
 mod common;
+mod dependency;
 mod detail;
 mod file;
 mod project;
 mod status;
 
 pub use self::common::{DecPicDto, McmodDto, PicDto, SourceTypeDto, TagDto};
+pub use self::dependency::{ResourceDependencyDto, ResourceDependencyFileDto};
 pub use self::detail::ProjectDetailDto;
 pub use self::file::{FileListDto, FileListItemDto};
 pub use self::project::{ProjectDto, ProjectItemDto};

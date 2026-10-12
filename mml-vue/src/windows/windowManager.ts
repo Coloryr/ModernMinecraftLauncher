@@ -38,7 +38,7 @@ const BACK_STACK_MAX = 16;
  * 打开下载窗口时要直接跳转到的项目，收藏窗口的「下载」用它
  *
  * 下载整合包 / 下载资源两个窗口都是"按实例取数"的：光有项目还拉不出版本列表，
- * 所以目标窗口拿到这份参数后，等实例就绪再调自己那套 openDetail / openVersions。
+ * 所以目标窗口拿到这份参数后，等实例就绪再调自己的 openDetail 打开详情页。
  */
 export interface WindowProjectParam {
   /** 下载源，取 `ModPackType::to_string()`，即 curseforge / modrinth */
@@ -125,6 +125,24 @@ export function openModpackPopup() {
 /** 关闭整合包安装进度弹窗；安装照常继续 */
 export function closeModpackPopup() {
   modpackPopupOpen.value = false;
+}
+
+/**
+ * 资源下载进度以"悬浮弹窗"出现，入口是标题栏上的 ResourceTitleIndicator
+ *
+ * 与下载管理 / 整合包安装同一个路子：下载跑在后台，用户可能已经离开了"添加资源"那一页，
+ * 所以进度不能只挂在那个页面上。弹窗只影响"看不看得见进度"，关掉它不影响下载。
+ */
+export const resourcePopupOpen = ref(false);
+
+/** 打开资源下载进度弹窗 */
+export function openResourcePopup() {
+  resourcePopupOpen.value = true;
+}
+
+/** 关闭资源下载进度弹窗；任务不受影响，仍在后台跑 */
+export function closeResourcePopup() {
+  resourcePopupOpen.value = false;
 }
 
 /**

@@ -129,7 +129,7 @@ export function useSettingsNetwork() {
     }
   }
 
-  /** 显式保存代理：草稿合并进 network 再落盘，成功后提示已生效、在途请求已中断 */
+  /** 显式保存代理：草稿合并进 network 再落盘，成功后提示已生效 */
   async function saveProxy() {
     const dto = network.value;
     if (!dto) return;
@@ -142,8 +142,8 @@ export function useSettingsNetwork() {
     dto.proxyUser = proxy.proxyUser;
     dto.proxyPassword = proxy.proxyPassword;
     try {
-      // 保存后后端会重建 HTTP 客户端并中断所有在途请求（卡住的请求会立刻失败），
-      // 所以这里明确告诉用户"已生效、之前的请求已中断"
+      // 与"即改即存"的其它项不同，代理这一项保存后要提示一句已生效：后端会重建 HTTP
+      // 客户端，不提示的话用户会以为要重启；在途请求会被中断，那是实现细节，不必写进提示
       await track(() => commands.settings.saveNetwork(dto));
       showToast(t("winSettings.proxyApplied"));
     } catch (e) {
