@@ -18,7 +18,7 @@ const segments = computed(() => parseFormatting(props.text));
   <!-- 外层 span 是为了不破坏父级的布局（inline 容器，逐段铺开） -->
   <span class="fmt-text"><span v-for="(seg, i) in segments" :key="i" :style="segmentStyle(seg)">{{
     seg.text
-  }}</span></span>
+      }}</span></span>
 </template>
 
 <style scoped>

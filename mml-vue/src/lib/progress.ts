@@ -95,10 +95,12 @@ export interface ResourceGroupProgress {
   name: string;
   /** 组内文件数 */
   total: number;
-  /** 组内已结束（完成 / 失败）的文件数 */
+  /** 组内已结束（完成 / 失败 / 取消）的文件数 */
   finished: number;
   /** 组内是否有失败 */
   failed: boolean;
+  /** 组内是否有取消 */
+  cancelled: boolean;
   /** 组内是否全部完成 */
   done: boolean;
   /** 组内进度（0–100）：多文件按项目数，单文件按该文件自己的字节进度 */
@@ -131,7 +133,7 @@ export function resourceGroups(tasks: ResourceTaskDto[]): ResourceGroupProgress[
   }
 
   return [...map.entries()].map(([pid, list]) => {
-    const finished = list.filter((task) => task.done || task.failed).length;
+    const finished = list.filter((task) => task.done || task.failed || task.cancelled).length;
     const byCount = byProjectCount(list.length);
     return {
       pid,
@@ -139,6 +141,7 @@ export function resourceGroups(tasks: ResourceTaskDto[]): ResourceGroupProgress[
       total: list.length,
       finished,
       failed: list.some((task) => task.failed),
+      cancelled: list.some((task) => task.cancelled),
       done: list.every((task) => task.done),
       byCount,
       percent: byCount ? percent(finished, list.length) : list[0].progress,

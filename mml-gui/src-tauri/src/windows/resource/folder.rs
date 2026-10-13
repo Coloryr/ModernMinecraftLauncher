@@ -3,6 +3,7 @@
 use mml_sys::{open_helper, path_helper};
 
 use super::{KIND_DATAPACKS, datapack_dir, instance_dir, parse_instance, resource_file};
+use crate::err_keys;
 
 // ==================== 打开文件夹 ====================
 
@@ -45,7 +46,7 @@ pub fn resource_open_folder(
         }
     };
     if !target.exists() {
-        return Err("err.fileNotFound".to_string());
+        return Err(err_keys::FILE_NOT_FOUND.to_string());
     }
 
     open_helper::open_file_with_explorer(&target);

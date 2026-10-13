@@ -48,6 +48,7 @@ mml-log = { path = "../../mml-core/mml-log" }
 mml-base = { path = "../../mml-core/mml-base" }
 mml-auth = { path = "../../mml-core/mml-auth" }
 mml-names = { path = "../../mml-core/mml-names" }
+mml-nbt = { path = "../../mml-core/mml-nbt" }
 mml-skin = { path = "../../mml-core/mml-skin" }
 mml-skin-draw = { path = "../../mml-core/mml-skin-draw" }
 mml-tex-draw = { path = "../../mml-core/mml-tex-draw" }

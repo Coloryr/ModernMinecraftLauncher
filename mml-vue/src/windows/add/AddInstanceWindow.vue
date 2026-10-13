@@ -9,7 +9,7 @@ import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import DropOverlay from "../../components/ui/DropOverlay.vue";
-import ModeTabs from "./parts/ModeTabs.vue";
+import IconTabs from "../../components/ui/IconTabs.vue";
 import GroupCombo from "./parts/GroupCombo.vue";
 import NameConflictModal from "./parts/NameConflictModal.vue";
 import ContinueModal from "./parts/ContinueModal.vue";
@@ -811,7 +811,7 @@ onUnmounted(() => {
   <WindowFrame :title="t('add.title')" body-gutter @close="$emit('close')">
     <!-- 内容区：撑满窗口，底部按钮靠 margin-top:auto 钉在右下角 -->
     <div class="add-body">
-      <ModeTabs v-model="addMode" :tabs="ADD_MODES" :disabled="busy" />
+      <IconTabs v-model="addMode" :tabs="ADD_MODES" :disabled="busy" />
 
       <!-- 实例名称 + 分组 -->
       <div class="add-card">

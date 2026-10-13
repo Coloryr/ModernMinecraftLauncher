@@ -82,7 +82,7 @@ select.field-select {
     display: none;
   }
 
-  /* 弹层：观感对齐 .menu-drop / .account-menu */
+  /* 弹层：观感对齐 .account-menu */
   select.field-select::picker(select) {
     margin-top: 4px;
     padding: 5px;
@@ -120,7 +120,7 @@ select.field-select {
     }
   }
 
-  /* 候选项：观感对齐 .menu-drop 里的 .menu-item */
+  /* 候选项：观感对齐 .account-menu 里的 .menu-item */
   select.field-select option {
     padding: 8px 12px;
     border-radius: 8px;

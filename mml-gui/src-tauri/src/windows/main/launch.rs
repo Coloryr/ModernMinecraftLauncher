@@ -4,11 +4,13 @@
 //! `game-exit`，这里只负责发起与转发。命令带分组标记，值填原始组名 main，
 //! 把组键钉回 `main`，见 AGENTS.md §4。
 
+use crate::log_text::LogText;
 use std::time::Duration;
 
 use tauri::{AppHandle, Emitter, WebviewWindow};
 
 use crate::dtos::{ExitEvent, StateEvent};
+use crate::err_keys;
 use crate::listens;
 use crate::windows::log::emit_log_line;
 
@@ -33,7 +35,7 @@ pub fn main_launch_game(app: AppHandle, window: WebviewWindow, uuid: String) -> 
     {
         let mut store = store.lock().unwrap();
         if store.running.contains(&uuid) {
-            return Err("err.instanceRunning".to_string());
+            return Err(err_keys::INSTANCE_RUNNING.to_string());
         }
         store.running.insert(uuid.clone());
     }
@@ -97,7 +99,7 @@ pub fn main_stop_game(app: AppHandle, window: WebviewWindow, uuid: String) -> Re
 #[tauri::command]
 pub fn main_get_running(window: WebviewWindow) -> Vec<String> {
     let Ok(store) = model(&window) else {
-        mml_log::warn(String::from("[main_get_running] 主窗口模型未初始化"));
+        mml_log::warn(LogText::MainWindowModelMissing.text());
         return Vec::new();
     };
     store.lock().unwrap().running.iter().cloned().collect()

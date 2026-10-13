@@ -110,7 +110,7 @@ async function clearDone() {
             <span class="mp-task-name">{{ task.name }}</span>
             <span v-if="task.done" class="mp-tag done">{{ t("add.packState.done") }}</span>
             <span v-else-if="task.failed" class="mp-tag failed" v-tip="task.error || ''">{{ t("modpack.bar.failed")
-              }}</span>
+            }}</span>
             <span v-else-if="task.cancelled" class="mp-tag cancelled">{{ t("modpack.bar.cancelled") }}</span>
             <button v-else class="mp-cancel" @click="cancel(task)">{{ t("modpack.bar.cancel") }}</button>
           </div>

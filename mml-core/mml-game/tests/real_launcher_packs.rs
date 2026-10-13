@@ -252,6 +252,86 @@ fn hmcl_loader(addons: &[LoaderAddon]) -> LoaderChoice {
     }
 }
 
+/// MMC / HMCL 整包导出：包内布局要对上导入侧认的目录名，导出的包还应能被重新识别成对应类型
+#[tokio::test]
+async fn mmc_and_hmcl_export_roundtrip() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    ensure_init();
+
+    let setting = InstanceSettingObj {
+        name: "整包导出测试".to_string(),
+        version: "1.20.1".to_string(),
+        loader: LoaderType::Fabric,
+        loader_version: Some("0.15.0".to_string()),
+        ..Default::default()
+    };
+    let game = setting.create_instance_in_group(None, None).await.unwrap();
+    let game_dir = game.read().unwrap().get_game_path();
+    std::fs::create_dir_all(game_dir.join("mods")).unwrap();
+    let mod_file = game_dir.join("mods").join("testmod.jar");
+    std::fs::write(&mod_file, b"test mod").unwrap();
+
+    for pack in [ExportPackType::MMC, ExportPackType::HMCL] {
+        let export_file = mml_testutil::temp_dir().join(format!(
+            "export-{}-{}.zip",
+            match pack {
+                ExportPackType::MMC => "mmc",
+                _ => "hmcl",
+            },
+            Uuid::new_v4()
+        ));
+
+        game.read()
+            .unwrap()
+            .export(ExportArg {
+                file: export_file.clone(),
+                pack,
+                archive: ArchiveType::Zip,
+                mods: Vec::new(),
+                files: Vec::new(),
+                unselect: Vec::new(),
+                // 整包格式没有下载清单，选中的文件直接进包
+                select: vec![mod_file.clone()],
+                name: "整包导出测试".to_string(),
+                author: "mml".to_string(),
+                version: "1.0.0".to_string(),
+                summary: String::new(),
+                gui: None,
+            })
+            .await
+            .expect("导出失败");
+
+        // 包内布局：元数据文件名与游戏文件前缀都要对上导入侧的口径
+        let (meta, game_file) = match pack {
+            ExportPackType::MMC => (name_consts::MMCJSON_FILE, ".minecraft/mods/testmod.jar"),
+            _ => (name_consts::HMCLFILE, "overrides/mods/testmod.jar"),
+        };
+        let archive = BaseArchive::open(&export_file).unwrap();
+        let entries: Vec<String> = archive
+            .entries()
+            .iter()
+            .map(|e| e.name.replace('\\', "/"))
+            .collect();
+        assert!(
+            entries.iter().any(|n| n.ends_with(meta)),
+            "{pack:?} 包内应有 {meta}，实际: {entries:?}"
+        );
+        assert!(
+            entries.iter().any(|n| n.ends_with(game_file)),
+            "{pack:?} 包内应有 {game_file}，实际: {entries:?}"
+        );
+        drop(archive);
+
+        // 重新识别：本启动器要能把它认成对应的整包格式，并读出实例名
+        let detected = detect_pack(&export_file).expect("识别失败");
+        match (pack, detected.pack_type) {
+            (ExportPackType::MMC, PackType::MMC) | (ExportPackType::HMCL, PackType::HMCL) => {}
+            (expect, _) => panic!("识别类型不对，导出的是 {expect:?}"),
+        }
+        assert_eq!(detected.name, "整包导出测试", "实例名应能从包里读出来");
+    }
+}
+
 /// M²L 即 ColorMC 实例压缩包：导出再导入的 roundtrip，离线可跑
 #[tokio::test]
 async fn mml_instance_archive_roundtrip() {

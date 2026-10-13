@@ -12,7 +12,7 @@ use mml_base::file_item::FileItemObj;
 /// ```text
 /// Wait → Init → GetInfo → Download → Done
 ///                    ↓          ↓
-///                 Action     Error
+///                 Action     Error / Cancel
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DownloadItemState {
@@ -32,6 +32,8 @@ pub enum DownloadItemState {
     Done,
     /// 下载出错，整数编码 7
     Error,
+    /// 被取消，如用户停止全部下载或退出启动器，整数编码 8
+    Cancel,
 }
 
 impl DownloadItemState {
@@ -46,6 +48,7 @@ impl DownloadItemState {
             DownloadItemState::Action => 5,
             DownloadItemState::Done => 6,
             DownloadItemState::Error => 7,
+            DownloadItemState::Cancel => 8,
         }
     }
 
@@ -64,6 +67,7 @@ impl DownloadItemState {
             5 => DownloadItemState::Action,
             6 => DownloadItemState::Done,
             7 => DownloadItemState::Error,
+            8 => DownloadItemState::Cancel,
             _ => DownloadItemState::Error,
         }
     }
@@ -213,6 +217,7 @@ mod tests {
             DownloadItemState::Action,
             DownloadItemState::Done,
             DownloadItemState::Error,
+            DownloadItemState::Cancel,
         ];
 
         for (index, state) in states.iter().enumerate() {
@@ -229,7 +234,7 @@ mod tests {
     /// 状态机：未知整数统一回落到 Error 状态
     #[test]
     fn unknown_int_maps_to_error() {
-        assert_eq!(DownloadItemState::int_to_state(8), DownloadItemState::Error);
+        assert_eq!(DownloadItemState::int_to_state(9), DownloadItemState::Error);
         assert_eq!(
             DownloadItemState::int_to_state(u32::MAX),
             DownloadItemState::Error

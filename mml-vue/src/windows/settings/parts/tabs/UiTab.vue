@@ -138,7 +138,7 @@ onMounted(() => void loadFonts());
       <div class="switch-text">
         <span class="switch-label">{{ t("winSettings.windowMode") }}</span>
         <span class="switch-state">{{ windowMode === "Multi" ? t("winSettings.multi") : t("winSettings.single")
-          }}</span>
+        }}</span>
       </div>
       <BaseSwitch :model-value="windowMode === 'Multi'"
         @update:model-value="(v) => onModeChange(v ? 'Multi' : 'Single')" />

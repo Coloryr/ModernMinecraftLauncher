@@ -792,4 +792,10 @@ onUnmounted(() => {
   color: #ff8080;
   background: rgba(255, 90, 90, 0.16);
 }
+
+/* 取消不是出错：用与"等待中"同一套弱化色区分开 */
+.state-cancel {
+  color: var(--text-dim);
+  background: var(--bg-hover);
+}
 </style>

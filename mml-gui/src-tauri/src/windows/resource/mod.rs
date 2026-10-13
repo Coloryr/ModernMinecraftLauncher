@@ -23,6 +23,7 @@ pub(crate) mod view;
 
 use std::path::{Path, PathBuf};
 
+use crate::err_keys;
 use mml_base::hash_helper;
 use mml_game::GameInstance;
 use mml_game::game_saves::SaveObj;
@@ -55,8 +56,8 @@ pub(super) const KIND_DATAPACKS: &str = "datapacks";
 ///
 /// uuid 非法返回 `err.uuid`，实例不存在返回 `err.gameNotFound`
 pub(super) fn parse_instance(uuid: &str) -> Result<GameInstance, String> {
-    let uuid = Uuid::parse_str(uuid).map_err(|_| "err.uuid".to_string())?;
-    mml_game::get_instance(&uuid).ok_or_else(|| "err.gameNotFound".to_string())
+    let uuid = Uuid::parse_str(uuid).map_err(|_| err_keys::UUID.to_string())?;
+    mml_game::get_instance(&uuid).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())
 }
 
 /// 实例下的资源目录路径，拿设置本体，给"已经取了快照"的调用方用
@@ -77,7 +78,7 @@ pub(super) fn dir_of(game: &InstanceSettingObj, kind: &str) -> Result<PathBuf, S
         KIND_SHADERPACKS => game.get_shaderpacks_path(),
         KIND_SCHEMATICS => game.get_schematics_path(),
         KIND_SERVERS => game.get_game_path(),
-        _ => return Err("err.fileTypeNotFound".to_string()),
+        _ => return Err(err_keys::FILE_TYPE_NOT_FOUND.to_string()),
     })
 }
 
@@ -108,7 +109,7 @@ pub(super) fn check_parent(parent: &str) -> Result<&Path, String> {
     let parent = parent.trim();
     let path = Path::new(parent);
     if parent.is_empty() || path.file_name() != Some(path.as_os_str()) {
-        return Err("err.fileName".to_string());
+        return Err(err_keys::FILE_NAME.to_string());
     }
     Ok(path)
 }
@@ -123,7 +124,10 @@ pub(super) fn check_parent(parent: &str) -> Result<&Path, String> {
 /// 存档目录名非法时返回 `err.fileName`
 pub(super) fn datapack_dir(game: &InstanceSettingObj, parent: &str) -> Result<PathBuf, String> {
     let parent = check_parent(parent)?;
-    Ok(game.get_saves_path().join(parent).join(names::GAME_DATAPACK_DIR))
+    Ok(game
+        .get_saves_path()
+        .join(parent)
+        .join(names::GAME_DATAPACK_DIR))
 }
 
 /// 目录 + 纯文件名定位一个资源文件，防路径穿越
@@ -143,11 +147,11 @@ pub(super) fn resource_file(
     let dir = instance_dir(instance, kind)?;
     let name_path = Path::new(name);
     if name.is_empty() || name_path.file_name() != Some(name_path.as_os_str()) {
-        return Err("err.fileName".to_string());
+        return Err(err_keys::FILE_NAME.to_string());
     }
     let file = dir.join(name_path);
     if !file.starts_with(&dir) {
-        return Err("err.fileName".to_string());
+        return Err(err_keys::FILE_NAME.to_string());
     }
     Ok(file)
 }
@@ -251,16 +255,16 @@ pub(super) async fn find_save(instance: GameInstance, dir: &str) -> Result<SaveO
                 .map(|n| *n.to_string_lossy() == dir)
                 .unwrap_or(false)
         })
-        .ok_or_else(|| "err.saveNotFound".to_string())
+        .ok_or_else(|| err_keys::SAVE_NOT_FOUND.to_string())
 }
 
 #[cfg(test)]
 mod tests {
+    use super::check_parent;
     use super::image_mime;
     use super::mods::{mod_note, mod_note_key};
-    use super::check_parent;
     use std::collections::HashMap;
-    use std::path::{Path, MAIN_SEPARATOR};
+    use std::path::{MAIN_SEPARATOR, Path};
 
     /// 按魔术字节认 MIME；认不出来的一律 png，PNG 自己的魔数也走这条
     #[test]
@@ -285,7 +289,10 @@ mod tests {
     fn test_check_parent() {
         assert_eq!(check_parent("New World").unwrap(), Path::new("New World"));
         // 前后空白不算名字的一部分
-        assert_eq!(check_parent("  New World  ").unwrap(), Path::new("New World"));
+        assert_eq!(
+            check_parent("  New World  ").unwrap(),
+            Path::new("New World")
+        );
 
         let nested = format!("a{MAIN_SEPARATOR}b");
         let bad = [

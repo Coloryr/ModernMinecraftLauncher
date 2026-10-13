@@ -298,8 +298,7 @@ function onNoteEnter(event: KeyboardEvent) {
 
 <template>
   <div class="mod-table" :style="{ gridTemplateColumns: gridTemplate }">
-    <div class="mod-tr mod-th" :class="{ 'mod-th-hidden': hideHeader }"
-      :style="{ gridTemplateColumns: gridTemplate }">
+    <div class="mod-tr mod-th" :class="{ 'mod-th-hidden': hideHeader }" :style="{ gridTemplateColumns: gridTemplate }">
       <span class="mod-th-cell mod-th-select"></span>
       <span v-for="col in MOD_COLS" :key="col.key" class="mod-th-cell"
         :class="{ 'mod-th-center': col.center, 'mod-th-sortable': col.sortable }">
@@ -319,8 +318,7 @@ function onNoteEnter(event: KeyboardEvent) {
       其余列留空占位 —— 栅格必须占满，否则这一行会整体左移、列全错位。
     -->
     <div class="mod-tr mod-group-row" :style="{ gridTemplateColumns: gridTemplate }"
-      :class="{ 'mod-group-dragging': draggingGroup === groupKey }"
-      @contextmenu.prevent="emit('group-menu', {
+      :class="{ 'mod-group-dragging': draggingGroup === groupKey }" @contextmenu.prevent="emit('group-menu', {
         event: $event, id: groupKey, label: groupLabel, custom, count: items.length,
       })">
       <span class="mod-cell row-select-cell" />
@@ -362,8 +360,8 @@ function onNoteEnter(event: KeyboardEvent) {
         <span class="mod-tree-indent" :style="{ width: `${(row.depth - 1) * 16}px` }" />
         <button v-if="row.item.jarInJar.length" class="mod-tree-caret"
           :class="{ collapsed: !isOpen(modRowKey(row.item)) }" v-tip="isOpen(modRowKey(row.item))
-              ? t('resource.modBuiltinCollapse')
-              : t('resource.modBuiltinExpand')
+            ? t('resource.modBuiltinCollapse')
+            : t('resource.modBuiltinExpand')
             " @click.stop="toggleExpand(modRowKey(row.item))" @pointerdown.stop>
           <GlyphIcon name="chevron-down" :size="13" :weight="2.4" />
         </button>
@@ -401,9 +399,9 @@ function onNoteEnter(event: KeyboardEvent) {
       <span class="mod-cell mod-note-cell" :class="{ 'mod-note-editing': isEditing(row) }"
         :contenteditable="isEditing(row) ? 'true' : undefined"
         :title="isEditing(row) ? '' : row.item.note || (row.depth === 1 ? t('resource.modNoteDoubleClick') : '')"
-        @dblclick.stop="row.depth === 1 ? startEdit(row.item, $event) : undefined"
-        @keydown.enter="onNoteEnter" @keydown.esc.prevent="cancelEdit($event)" @blur="commitEdit($event)"
-        @pointerdown.stop>{{ row.item.note }}</span>
+        @dblclick.stop="row.depth === 1 ? startEdit(row.item, $event) : undefined" @keydown.enter="onNoteEnter"
+        @keydown.esc.prevent="cancelEdit($event)" @blur="commitEdit($event)" @pointerdown.stop>{{ row.item.note
+        }}</span>
 
       <span class="mod-cell" :title="row.item.modId">{{ row.item.modId }}</span>
       <span class="mod-cell" :title="row.item.version">{{ row.item.version }}</span>
@@ -424,8 +422,7 @@ function onNoteEnter(event: KeyboardEvent) {
       空分组：一级节点那一行已经把组名画出来了（可折叠、可拖动排序），
       这里只补一句提示，横跨剩下的列。
     -->
-    <div v-if="groupOpen && !rows.length" class="mod-tr mod-tr-empty"
-      :style="{ gridTemplateColumns: gridTemplate }">
+    <div v-if="groupOpen && !rows.length" class="mod-tr mod-tr-empty" :style="{ gridTemplateColumns: gridTemplate }">
       <span class="mod-cell row-select-cell" />
       <span class="mod-cell mod-empty-tip">{{ t("resource.groupEmptyHint") }}</span>
     </div>

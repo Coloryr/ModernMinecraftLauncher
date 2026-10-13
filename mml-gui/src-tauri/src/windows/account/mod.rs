@@ -13,6 +13,7 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::dtos::account_dto::{AccountStoreDto, AccountStoreViewDto, auth_type_from_str};
+use crate::err_keys;
 use crate::listens;
 
 // 带命令的子模块必须 `pub(crate)`：生成的 `tauri_commands!` 从 crate 根引用它们
@@ -93,7 +94,7 @@ pub async fn account_add_account(
         Vec::new()
     };
     if lock.login_lock_on && !lock.login_lock.is_empty() && ty_locks.is_empty() {
-        return Err("err.loginLocked".to_string());
+        return Err(err_keys::LOGIN_LOCKED.to_string());
     }
     let locked_servers: Vec<&str> = ty_locks
         .iter()
@@ -104,7 +105,7 @@ pub async fn account_add_account(
         let entered = server.as_deref().unwrap_or("").trim();
         match locked_servers.iter().find(|s| **s == entered) {
             Some(s) => server = Some((*s).to_string()),
-            None => return Err("err.loginLocked".to_string()),
+            None => return Err(err_keys::LOGIN_LOCKED.to_string()),
         }
     }
 
@@ -123,28 +124,28 @@ pub async fn account_add_account(
         AuthType::LittleSkin | AuthType::SelfLittleSkin => {
             // 自建皮肤站必须填服务器地址；LittleSkin 的 server 为 None 时使用官方站
             if auth_type == AuthType::SelfLittleSkin && server.is_none() {
-                return Err("err.serverEmpty".to_string());
+                return Err(err_keys::SERVER_EMPTY.to_string());
             }
             little_skin::authenticate(Uuid::new_v4().to_string(), user, password, server, None)
                 .await
         }
         AuthType::AuthlibInjector => {
             let Some(server) = server else {
-                return Err("err.serverEmpty".to_string());
+                return Err(err_keys::SERVER_EMPTY.to_string());
             };
             authlib_injector::authenticate(Uuid::new_v4().to_string(), user, password, server, None)
                 .await
         }
         AuthType::Nide8 => {
             let Some(server) = server else {
-                return Err("err.serverEmpty".to_string());
+                return Err(err_keys::SERVER_EMPTY.to_string());
             };
             nide8::authenticate(Uuid::new_v4().to_string(), user, password, server).await
         }
         _ => {
             // 离线账户：本地生成，无凭据
             if user.is_empty() {
-                return Err("err.nameEmpty".to_string());
+                return Err(err_keys::NAME_EMPTY.to_string());
             }
             Ok(LoginObj::new(
                 user,
@@ -232,7 +233,7 @@ pub async fn account_refresh_account_token(app: AppHandle, uuid: String) -> Resu
 /// 账户不存在时返回 `err.accountMissing`
 #[tauri::command]
 pub fn account_refresh_skin(app: AppHandle, uuid: String) -> Result<(), String> {
-    find_by_uuid(&uuid).ok_or("err.accountMissing")?;
+    find_by_uuid(&uuid).ok_or(err_keys::ACCOUNT_MISSING)?;
     crate::image_manager::clear_texture_images();
     emit_account_change(&app);
     Ok(())
@@ -282,19 +283,19 @@ pub fn account_edit_offline(
     new_name: String,
     new_uuid: String,
 ) -> Result<(), String> {
-    let mut login = auths::get(&uuid, AuthType::Offline).ok_or("err.accountMissing")?;
+    let mut login = auths::get(&uuid, AuthType::Offline).ok_or(err_keys::ACCOUNT_MISSING)?;
 
     let new_name = new_name.trim().to_string();
     let new_uuid = new_uuid.trim().to_string();
     if new_name.is_empty() {
-        return Err("err.nameEmpty".to_string());
+        return Err(err_keys::NAME_EMPTY.to_string());
     }
     if new_uuid.is_empty() {
-        return Err("err.uuidEmpty".to_string());
+        return Err(err_keys::UUID_EMPTY.to_string());
     }
     // 新 UUID 不能与其它离线账户冲突，同键会静默覆盖
     if new_uuid != uuid && auths::get(&new_uuid, AuthType::Offline).is_some() {
-        return Err("err.uuidConflict".to_string());
+        return Err(err_keys::UUID_CONFLICT.to_string());
     }
 
     let was_current = auths::get_current()

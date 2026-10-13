@@ -319,7 +319,7 @@ function onPlatformChange(value: string) {
         </BaseButton>
       </div>
       <span class="meta-label small">{{ instance.loader === "custom" ? t("add.loaderPath") : t("meta.loaderVersion")
-        }}</span>
+      }}</span>
       <!-- 自定义加载器：路径选择，文件名存入加载器版本字段；其余为版本下拉 -->
       <div v-if="instance.loader === 'custom'" class="select-row">
         <input class="field-input" :value="instance.loaderVersion ?? ''" :placeholder="t('add.loaderPathPlaceholder')"

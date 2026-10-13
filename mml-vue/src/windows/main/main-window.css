@@ -434,86 +434,6 @@
   line-height: 1.6;
 }
 
-/* ----- 实例操作按钮 ----- */
-
-.action-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-  gap: 8px;
-}
-
-.action-btn {
-  width: 100%;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: 9px;
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  color: var(--text-dim);
-  font-size: 12.5px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.action-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-soft);
-}
-
-/* 二级菜单 */
-.menu-wrap {
-  position: relative;
-}
-
-.action-btn .export-chevron {
-  margin-left: 4px;
-  transition: transform 0.15s;
-  vertical-align: -1px;
-}
-
-.action-btn .export-chevron.flip {
-  transform: rotate(180deg);
-}
-
-.menu-drop {
-  position: absolute;
-  left: 0;
-  top: calc(100% + 4px);
-  min-width: 100%;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: var(--shadow-lg);
-  padding: 5px;
-  z-index: 120;
-  /* 菜单贴按钮左缘，展开时以左上角为原点 */
-  transform-origin: top left;
-}
-
-.menu-item {
-  width: 100%;
-  text-align: left;
-  padding: 8px 12px;
-  border: none;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--text);
-  font-size: 12.5px;
-  font-family: inherit;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.menu-item:hover {
-  background: var(--bg-hover);
-  color: var(--accent);
-}
-
 /* ----- 启动参数 ----- */
 
 .args-section {
@@ -752,10 +672,12 @@
 
 /* ① 渐变缓慢来回流动 */
 @keyframes launch-flow {
+
   0%,
   100% {
     background-position: 0% 50%;
   }
+
   50% {
     background-position: 100% 50%;
   }
@@ -763,10 +685,12 @@
 
 /* ② 呼吸光晕：强调色阴影轻轻起伏 */
 @keyframes launch-breath {
+
   0%,
   100% {
     box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 22%, transparent);
   }
+
   50% {
     box-shadow: 0 6px 24px color-mix(in srgb, var(--accent) 48%, transparent);
   }
@@ -790,6 +714,7 @@
   from {
     transform: translateX(-130%);
   }
+
   to {
     transform: translateX(130%);
   }
@@ -797,6 +722,7 @@
 
 /* 系统开了「减弱动效」：悬停也不动 */
 @media (prefers-reduced-motion: reduce) {
+
   .launch-actions .launch-main-btn:hover:not(:disabled),
   .launch-actions .launch-main-btn:hover:not(:disabled)::after {
     animation: none;

@@ -32,6 +32,7 @@ pub(super) fn build_status(app: &AppHandle) -> ResourceStatusDto {
                     progress: info.now,
                     done: info.done,
                     failed: info.failed,
+                    cancelled: info.cancelled,
                 })
             })
             .collect(),
@@ -60,7 +61,7 @@ pub fn add_resource_status(app: AppHandle) -> ResourceStatusDto {
     build_status(&app)
 }
 
-/// 清除已结束的资源下载条目，即完成 / 失败两态
+/// 清除已结束的资源下载条目，即完成 / 失败 / 取消三态
 ///
 /// 终态条目不再自动移除：用户要能回头看下过什么、哪些失败了。清理由这里手动做。
 ///
@@ -73,7 +74,7 @@ pub fn add_resource_status(app: AppHandle) -> ResourceStatusDto {
 #[tauri::command]
 pub fn add_resource_clear_done(app: AppHandle) -> Result<(), String> {
     DOWNLOAD_NOW.write().unwrap().retain(|_, entry| {
-        entry.retain(|_, info| !(info.done || info.failed));
+        entry.retain(|_, info| !(info.done || info.failed || info.cancelled));
         // 这个实例的条目清空了就把实例那一层也去掉，别留一堆空表
         !entry.is_empty()
     });

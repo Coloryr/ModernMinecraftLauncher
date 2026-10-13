@@ -13,6 +13,7 @@ use mml_net::modrinth_api::{self, version_obj::ModrinthVersionObj};
 use uuid::Uuid;
 
 use crate::dtos::add_resource_dto::{ResourceDependencyDto, ResourceDependencyFileDto};
+use crate::err_keys;
 use crate::image_manager;
 
 /// 解析前置，并过滤掉实例里已有的
@@ -36,17 +37,18 @@ pub async fn add_resource_dependencies(
     fid: String,
     file_type: String,
 ) -> Result<Vec<ResourceDependencyDto>, String> {
-    let uuid = Uuid::parse_str(&game).map_err(|_| String::from("err.uuid"))?;
-    let instance = mml_game::get_instance(&uuid).ok_or_else(|| String::from("err.gameNotFound"))?;
+    let uuid = Uuid::parse_str(&game).map_err(|_| String::from(err_keys::UUID))?;
+    let instance =
+        mml_game::get_instance(&uuid).ok_or_else(|| String::from(err_keys::GAME_NOT_FOUND))?;
     let file_type = FileType::from_string(&file_type)
-        .ok_or_else(|| String::from("err.fileTypeNotFound"))?;
+        .ok_or_else(|| String::from(err_keys::FILE_TYPE_NOT_FOUND))?;
     if file_type != FileType::Mod {
         return Ok(Vec::new());
     }
 
     let source = ModPackType::from_string(&source);
     if !matches!(source, ModPackType::CurseForge | ModPackType::Modrinth) {
-        return Err(String::from("err.sourceType"));
+        return Err(String::from(err_keys::SOURCE_TYPE));
     }
 
     // 实例侧：游戏版本与加载器决定给依赖挑哪个文件，"已装表"决定哪些不用再列出来
@@ -75,7 +77,10 @@ pub async fn add_resource_dependencies(
 
                     ResourceDependencyDto {
                         // 内核把最合适的那个排在第一个，它就是默认选中的
-                        fid: files.first().map(|file| file.fid.clone()).unwrap_or_default(),
+                        fid: files
+                            .first()
+                            .map(|file| file.fid.clone())
+                            .unwrap_or_default(),
                         pid: item.mod_id,
                         name: item.name,
                         icon: item.icon.map(|url| image_manager::push_image_url(&url)),
@@ -104,7 +109,10 @@ pub async fn add_resource_dependencies(
                         .collect();
 
                     ResourceDependencyDto {
-                        fid: files.first().map(|file| file.fid.clone()).unwrap_or_default(),
+                        fid: files
+                            .first()
+                            .map(|file| file.fid.clone())
+                            .unwrap_or_default(),
                         pid: item.mod_id.to_string(),
                         name: item.name,
                         icon: item.icon.map(|url| image_manager::push_image_url(&url)),
@@ -145,10 +153,13 @@ async fn modrinth_file(pid: &str, fid: &str) -> Result<ModrinthVersionObj, Strin
 ///
 /// 文件对象；请求失败或文件不存在返回错误串
 async fn curseforge_file(_pid: &str, fid: &str) -> Result<CurseForgeFileDataObj, String> {
-    let fnum: u64 = fid.parse().map_err(|_| String::from("err.badFileId"))?;
+    let fnum: u64 = fid
+        .parse()
+        .map_err(|_| String::from(err_keys::BAD_FILE_ID))?;
     let mut list = curseforge_api::get_files(vec![fnum])
         .await
         .map_err(|err| err.to_string())?;
 
-    list.pop().ok_or_else(|| String::from("err.fileNotFound"))
+    list.pop()
+        .ok_or_else(|| String::from(err_keys::FILE_NOT_FOUND))
 }

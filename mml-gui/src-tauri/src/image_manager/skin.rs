@@ -8,9 +8,7 @@ use mml_game::launcher_path::assets_path;
 use mml_game::player_skin::{self, TextureFile};
 use mml_net::mojang_api;
 use mml_skin::{SkinType, skin_type_checker};
-use mml_skin_draw::{
-    Draw2DType, Draw3DType, DrawHeadType, DrawSkinType, draw_head, draw_skin,
-};
+use mml_skin_draw::{Draw2DType, Draw3DType, DrawHeadType, DrawSkinType, draw_head, draw_skin};
 use mml_sys::path_helper;
 use tauri::UriSchemeResponder;
 use tiny_skia::{Pixmap, Point};
@@ -22,7 +20,7 @@ use super::head::send_skin_preview;
 use super::push_texture_url;
 
 use super::respond::{send_bad, send_png};
-use super::{PairImageKey, SKINRAW_IMAGE, SKIN_IMAGE, TEXTURE_URLS};
+use super::{PairImageKey, SKIN_IMAGE, SKINRAW_IMAGE, TEXTURE_URLS};
 
 /// 皮肤类 URI 的账户型请求，解析出账户并取回皮肤 / 披风纹理
 ///
@@ -160,10 +158,7 @@ pub(super) async fn send_skin_display(
     // 旋转档的角度参与渲染，一并进缓存键，改角度就是新键
     let key = PairImageKey {
         sha1: sha1.to_string(),
-        config: format!(
-            "{:?}/{}/{}/{skin_type}",
-            skin.display, skin.pitch, skin.yaw
-        ),
+        config: format!("{:?}/{}/{}/{skin_type}", skin.display, skin.pitch, skin.yaw),
     };
 
     {
@@ -230,7 +225,9 @@ pub(super) fn render_skin_display(
         SkinDisplay::Skin3DD => draw_skin(bitmap, DrawSkinType::Type3D(Draw3DType::TypeADown), st),
         SkinDisplay::Skin3DRotate => draw_skin(
             bitmap,
-            DrawSkinType::Type3D(Draw3DType::TypeBRotate(Point::from_xy(skin.pitch, skin.yaw))),
+            DrawSkinType::Type3D(Draw3DType::TypeBRotate(Point::from_xy(
+                skin.pitch, skin.yaw,
+            ))),
             st,
         ),
     }

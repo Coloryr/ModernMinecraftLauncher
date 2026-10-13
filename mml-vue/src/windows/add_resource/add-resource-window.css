@@ -405,19 +405,7 @@ select.sel-filter {
 
 /* 结果区上方的细进度条与骨架行：样式在 styles/skeleton.css（跨窗口共用） */
 
-/* 存档选择弹窗 */
-.save-head {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.save-hint {
-  margin: 4px 0 12px;
-  font-size: 12px;
-  color: var(--text-dim);
-}
-
+/* 存档选择弹窗：标题 / 提示 / 按钮栏都用全局那套（styles/modal.css），这里只管列表本身 */
 .save-list {
   max-height: 280px;
   overflow-y: auto;
@@ -439,9 +427,10 @@ select.sel-filter {
   cursor: pointer;
 }
 
+/* 选中态跟全仓一致：强调色描边 + --accent-soft 底，见 styles/parts/instance-check.css */
 .save-row.on {
-  border-color: var(--text);
-  background: var(--bg-hover);
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .save-name {
@@ -449,18 +438,7 @@ select.sel-filter {
   color: var(--text);
 }
 
-.save-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-/* 前置勾选弹窗 */
-.deps-head {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text);
-}
-
+/* 前置勾选弹窗：标题与按钮栏都用全局那套，这里只留它自己那段副提示 */
 .deps-hint {
   margin: 4px 0 12px;
   font-size: 12px;
@@ -618,10 +596,4 @@ select.sel-filter {
   flex-shrink: 0;
   font-size: 11px;
   color: var(--text-dim);
-}
-
-.deps-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
 }

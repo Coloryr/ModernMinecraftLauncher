@@ -10,7 +10,7 @@
 //! ```json
 //! {
 //!   "group_order": [],
-//!   "names": { "00000000-0000-0000-0000-000000000000": " " },
+//!   "names": { "00000000-0000-0000-0000-000000000000": "" },
 //!   "groups": { "00000000-0000-0000-0000-000000000000": ["8bb5fca2-...", "6a6af958-..."] },
 //!   "order": { "8bb5fca2-...": 0, "6a6af958-...": 1 }
 //! }
@@ -87,9 +87,7 @@ impl GroupStore {
         let default = DEFAULT_GROUP_UUID.to_string();
 
         // 默认分组恒存在：身份是固定 uuid，名字留白，界面自行翻译
-        self.names
-            .entry(default.clone())
-            .or_insert_with(|| names::DEFAULT_GROUP.to_string());
+        self.names.entry(default.clone()).or_default();
         self.groups.entry(default.clone()).or_default();
 
         // 没有名字的分组视为损坏：只有 add_group 会建组，一定带名字
@@ -277,10 +275,9 @@ impl GroupStore {
         };
         let key = target.to_string();
 
-        // 落点必须真的存在，名字与成员数组都要有：只摘不放会让实例从界面上消失
-        self.names
-            .entry(key.clone())
-            .or_insert_with(|| names::DEFAULT_GROUP.to_string());
+        // 落点必须真的存在，名字与成员数组都要有：只摘不放会让实例从界面上消失。
+        // 补出来的名字是空串，正是默认分组"留白"的那个口径
+        self.names.entry(key.clone()).or_default();
         self.groups.entry(key.clone()).or_default();
 
         // 追加位置：接在目标组现有最大次序之后
@@ -646,7 +643,7 @@ mod tests {
         let store = GroupStore {
             group_order: vec![pack.to_string(), test.to_string()],
             names: HashMap::from([
-                (DEFAULT_GROUP_UUID.to_string(), " ".to_string()),
+                (DEFAULT_GROUP_UUID.to_string(), String::new()),
                 (pack.to_string(), "整合包".to_string()),
                 (test.to_string(), "测试".to_string()),
             ]),

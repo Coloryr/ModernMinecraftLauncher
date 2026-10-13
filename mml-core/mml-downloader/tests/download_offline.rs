@@ -4,7 +4,7 @@
 //! 不访问任何外部网络。覆盖以下离线逻辑：
 //!
 //! - 下载器初始化，`init` / `get_download_path`
-//! - 临时文件生成，`gen_temp_file` 的 UUID 唯一且位于下载目录内
+//! - 临时文件生成，`gen_temp_file` 的 UUID 唯一且位于下载临时目录内
 //! - 端到端下载流程：任务入队 → 工作线程下载 → 大小/哈希校验 → 移动到目标路径
 //! - GUI 回调事件，AddTask / UpdateTask / RemoveTask
 //! - 任务快照与取消接口，`get_tasks` / `cancel_task`
@@ -36,9 +36,11 @@ struct GuiRecorder;
 impl IDownloadGui for GuiRecorder {
     fn update(&self, thread: u32, file: &Arc<DownloadItem>) {
         let mut events = GUI_EVENTS.get().unwrap().lock().unwrap();
+        // 状态放在文件名之前：文件级断言按 "名字:进度" 结尾匹配，别被状态挤掉
         events.push(format!(
-            "file:{}:{}:{:.1}",
+            "file:{}:{:?}:{}:{:.1}",
             thread,
+            file.get_state(),
             file.base.name,
             file.progress()
         ));
@@ -148,15 +150,16 @@ fn read_request_head(stream: &mut TcpStream) {
 async fn offline_download_pipeline() {
     let dir = setup();
 
-    // ---- gen_temp_file：路径唯一、位于下载目录内、文件不存在 ----
+    // ---- gen_temp_file：路径唯一、位于下载**临时**目录内、文件不存在 ----
     let temp1 = mml_downloader::gen_temp_file();
     let temp2 = mml_downloader::gen_temp_file();
     assert_ne!(temp1, temp2, "临时文件路径应唯一");
-    let download_dir = mml_downloader::get_download_path();
-    assert!(temp1.starts_with(&download_dir));
-    assert!(temp2.starts_with(&download_dir));
+    // 临时文件在 cache（启动时会清掉的下载临时目录），不是最终的 downloads
+    let cache_dir = mml_downloader::get_cache_path();
+    assert!(temp1.starts_with(&cache_dir));
+    assert!(temp2.starts_with(&cache_dir));
     assert!(!temp1.exists(), "生成的临时文件不应已存在");
-    assert!(download_dir.exists(), "下载目录应已创建");
+    assert!(cache_dir.exists(), "下载临时目录应已创建");
 
     // ---- 端到端下载，走本机 HTTP 服务 ----
     let body: Vec<u8> = b"hello mml downloader offline test body 1234567890".to_vec();
@@ -212,6 +215,17 @@ async fn offline_download_pipeline() {
             .any(|e| e.starts_with("file:") && e.ends_with("target.bin:100.0")),
         "文件级进度应上报到 100%，实际: {:?}",
         events
+    );
+    // 取到项目的那一刻就要先报一次「初始化」：不报的话，后面等 HTTP 响应头的那段
+    // 界面会一直显示"所有下载线程空闲"，而线程其实已经拿着这个文件了
+    let first_file_event = events
+        .iter()
+        .find(|e| e.starts_with("file:"))
+        .expect("应收到文件级事件");
+    assert!(
+        first_file_event.contains(":Init:"),
+        "文件级的第一条上报应是 Init（取到项目即上报），实际: {:?}",
+        first_file_event
     );
 
     // ---- 取消接口：不存在的任务返回 false ----

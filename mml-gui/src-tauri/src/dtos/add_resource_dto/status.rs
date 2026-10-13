@@ -15,6 +15,8 @@ pub struct ResourceSaveDto {
 }
 
 /// 资源下载任务条目，供添加资源窗口顶部进度条显示
+///
+/// `done` / `failed` / `cancelled` 为终态标记，三者互斥，与整合包任务同一套口径。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceTaskDto {
@@ -30,6 +32,8 @@ pub struct ResourceTaskDto {
     pub done: bool,
     /// 下载失败
     pub failed: bool,
+    /// 下载被取消
+    pub cancelled: bool,
 }
 
 /// 资源下载任务总览，即 add-resource-status 事件负载 / add_resource_status 返回

@@ -1,20 +1,26 @@
 //! 实例导出窗口 DTO：前端 wire，camelCase
 //!
-//! 导出信息 / 导出配置 / 导出进度事件的负载。
+//! 导出信息 / 目录浏览 / 导出配置 / 导出进度事件的负载。
 
 use serde::{Deserialize, Serialize};
 
-/// 单个模组文件的导出信息
+/// 导出时可勾选的一个条目，模组与普通文件共用
+///
+/// 路径一律**相对游戏目录**（`.minecraft`），如 `mods/xxx.jar`、`config/abc.toml`。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ExportModDto {
-    /// 文件名，即 mods 目录下的文件名
-    pub name: String,
-    /// 是否有在线来源，即 mod_info.json 里有 modid / fileid
-    pub online: bool,
-    /// 项目 ID，在线模组才有
+pub struct ExportEntryDto {
+    /// 相对游戏目录的路径
+    pub path: String,
+    /// 是否目录
+    pub dir: bool,
+    /// 文件大小，单位字节；目录为 0
+    pub size: u64,
+    /// 下载地址；没有在线来源时是空串
+    pub url: String,
+    /// 项目 ID，只有在线来源的模组才有
     pub mod_id: Option<String>,
-    /// 文件 ID，在线模组才有
+    /// 文件 ID，只有在线来源的模组才有
     pub file_id: Option<String>,
 }
 
@@ -30,16 +36,18 @@ pub struct ExportInfoDto {
     pub loader: String,
     /// 加载器版本
     pub loader_version: Option<String>,
-    /// 在线模组，进 manifest / index 下载清单
-    pub online_mods: Vec<ExportModDto>,
-    /// 本地模组，打进 overrides
-    pub local_mods: Vec<ExportModDto>,
-    /// config 目录是否有内容
-    pub has_config: bool,
-    /// resourcepacks 目录是否有内容
-    pub has_resource_packs: bool,
-    /// shaderpacks 目录是否有内容
-    pub has_shader_packs: bool,
+    /// `mods` 目录下的模组，有在线来源的带上项目号与下载地址
+    pub mods: Vec<ExportEntryDto>,
+}
+
+/// 前端勾选的一个条目，即 `export_run` 入参里的一份
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportPickDto {
+    /// 相对游戏目录的路径；目录会被展开成其中的文件
+    pub path: String,
+    /// 下载地址；Modrinth 格式下填了才写进 index，空串进 overrides
+    pub url: String,
 }
 
 /// 前端提交的导出配置，即 `export_run` 的入参
@@ -50,14 +58,10 @@ pub struct ExportConfigDto {
     pub pack: String,
     /// 保存位置，前端 save 对话框选好的完整路径
     pub file: String,
-    /// 包含模组
-    pub include_mods: bool,
-    /// 包含配置文件
-    pub include_config: bool,
-    /// 包含资源包
-    pub include_resource_packs: bool,
-    /// 包含光影包
-    pub include_shader_packs: bool,
+    /// 勾选的模组
+    pub mods: Vec<ExportPickDto>,
+    /// 勾选的文件与目录
+    pub files: Vec<ExportPickDto>,
     /// 整合包名
     pub name: String,
     /// 作者

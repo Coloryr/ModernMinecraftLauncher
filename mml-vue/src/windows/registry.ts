@@ -17,7 +17,8 @@ export type WindowKind =
   | "java_download"
   | "block"
   | "log"
-  | "export";
+  | "export"
+  | "config";
 
 export interface WindowInfo {
   /** 窗口标识，与后端注册表、URL 上的 `window` 参数一致 */
@@ -44,6 +45,7 @@ export const WINDOW_REGISTRY: WindowInfo[] = [
   { kind: "block", title: "方块列表" },
   { kind: "log", title: "游戏日志" },
   { kind: "export", title: "导出实例" },
+  { kind: "config", title: "配置文件" },
 ];
 
 /**

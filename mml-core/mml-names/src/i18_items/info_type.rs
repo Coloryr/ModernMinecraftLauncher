@@ -10,4 +10,40 @@ pub enum InfoType {
 
     /// 临时文件
     TempFile,
+
+    /// 代理描述：手动代理，带类型 / 地址 / 端口与是否认证
+    ProxyUser {
+        /// 代理类型名，如 `http` / `socks5`
+        kind: String,
+        /// 代理地址
+        ip: String,
+        /// 代理端口
+        port: u16,
+        /// 代理是否带用户名密码
+        auth: bool,
+    },
+    /// 代理描述：禁用代理
+    ProxyNone,
+    /// 代理描述：跟随系统
+    ProxyAuto,
+
+    /// HTTP 客户端已初始化，带通用 / 登录两个客户端的代理描述
+    HttpClientInit {
+        /// 通用客户端的代理描述
+        work: String,
+        /// 登录客户端的代理描述
+        login: String,
+    },
+    /// HTTP 客户端重启，带被中断的在途请求世代号
+    HttpClientRestart {
+        /// 世代号，每次重启递增
+        generation: u64,
+    },
+    /// HTTP 客户端重启完成，字段同 [`InfoType::HttpClientInit`]
+    HttpClientRestartDone {
+        /// 通用客户端的代理描述
+        work: String,
+        /// 登录客户端的代理描述
+        login: String,
+    },
 }

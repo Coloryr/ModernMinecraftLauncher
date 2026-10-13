@@ -9,8 +9,10 @@ use uuid::Uuid;
 use mml_game::launcher::{LogEncoding, ModPackType};
 use mml_game::loader::LoaderType;
 use mml_game::mojang::VersionType;
+use mml_sys::open_helper;
 
 use crate::dtos::{InstanceArgsDto, InstanceInfoDto, InstancePatch};
+use crate::err_keys;
 use crate::windows;
 
 use super::{emit_instance_change, model};
@@ -78,7 +80,7 @@ pub fn main_move_group(app: AppHandle, uuid: String, index: i64) -> Result<bool,
     // 这里**不**按 `parse_group_id` 的"非法 = 默认分组"兜底：空 / 非法的 uuid 指不到
     // 任何组，不像 `main_move_instance` 那样有默认分组这个有意义的落点，直接报错更安全
     let Some(uuid) = windows::parse_group_id(Some(uuid)) else {
-        return Err("err.uuid".to_string());
+        return Err(err_keys::UUID.to_string());
     };
 
     let mut list: Vec<Uuid> = mml_game::get_group_list()
@@ -88,7 +90,7 @@ pub fn main_move_group(app: AppHandle, uuid: String, index: i64) -> Result<bool,
     let from = list
         .iter()
         .position(|g| *g == uuid)
-        .ok_or_else(|| "err.groupNotFound".to_string())?;
+        .ok_or_else(|| err_keys::GROUP_NOT_FOUND.to_string())?;
     list.remove(from);
     let at = (index.max(0) as usize).min(list.len());
     list.insert(at, uuid);
@@ -392,10 +394,10 @@ pub fn main_move_instance(
     index: i64,
 ) -> Result<bool, String> {
     let Ok(id) = Uuid::parse_str(&uuid) else {
-        return Err("err.uuid".to_string());
+        return Err(err_keys::UUID.to_string());
     };
     if mml_game::get_instance(&id).is_none() {
-        return Err("err.gameNotFound".to_string());
+        return Err(err_keys::GAME_NOT_FOUND.to_string());
     }
 
     // 前端传的是分组 uuid；空 / 非法 = 默认分组
@@ -405,6 +407,36 @@ pub fn main_move_instance(
 
     emit_instance_change(&app, "edit");
     Ok(true)
+}
+
+/// 在文件管理器里打开这个实例的目录
+///
+/// 落点是**实例目录**（`instances/<实例名>/`，里面有 game.json 等实例文件），
+/// 不是游戏目录 `.minecraft` —— 要开游戏目录用资源管理窗口的「打开文件夹」。
+///
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// uuid 非法返回 `err.uuid`，实例不存在或目录已不在返回 `err.gameNotFound`
+#[gui_macros::ipc_group("main")]
+#[tauri::command]
+pub fn main_open_instance_dir(uuid: String) -> Result<(), String> {
+    let Ok(id) = Uuid::parse_str(&uuid) else {
+        return Err(err_keys::UUID.to_string());
+    };
+    let Some(instance) = mml_game::get_instance(&id) else {
+        return Err(err_keys::GAME_NOT_FOUND.to_string());
+    };
+
+    // 目录建实例时就建好了，这里兜一次：实例目录被手动删掉后别点下去毫无反应
+    let dir = instance.read().unwrap().get_base_path();
+    if !dir.exists() {
+        return Err(err_keys::GAME_NOT_FOUND.to_string());
+    }
+
+    open_helper::open_file_with_explorer(&dir);
+    Ok(())
 }
 
 /// 生成短 uuid，形如 `mml-<16 位十六进制>`，给不落内核的遗留实例用

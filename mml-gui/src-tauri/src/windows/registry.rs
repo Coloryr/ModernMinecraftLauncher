@@ -57,6 +57,9 @@ pub(super) const LOG_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-00000000
 /// 实例导出窗口固定 uuid
 pub(super) const EXPORT_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000010");
 
+/// 配置文件窗口固定 uuid
+pub(super) const CONFIG_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000011");
+
 /// 窗口注册表条目
 pub(super) struct WindowEntry {
     /// 窗口标签，形如 `mml-<kind>`，与前端 kind 对应
@@ -117,15 +120,20 @@ pub(super) const LOG_MIN_WIDTH: f64 = 720.0;
 /// 游戏日志窗口最小高度
 pub(super) const LOG_MIN_HEIGHT: f64 = 480.0;
 
-/// 实例导出窗口最小宽度，元数据表单加导出设置
-pub(super) const EXPORT_MIN_WIDTH: f64 = 560.0;
+/// 实例导出窗口最小宽度，元数据表单加两侧勾选列表
+pub(super) const EXPORT_MIN_WIDTH: f64 = 780.0;
 /// 实例导出窗口最小高度
-pub(super) const EXPORT_MIN_HEIGHT: f64 = 500.0;
+pub(super) const EXPORT_MIN_HEIGHT: f64 = 640.0;
 
 /// 方块列表窗口最小宽度，分类栏加网格；工具条上还有搜索框、图标尺寸档与两个按钮
 pub(super) const BLOCK_MIN_WIDTH: f64 = 770.0;
 /// 方块列表窗口最小高度
 pub(super) const BLOCK_MIN_HEIGHT: f64 = 560.0;
+
+/// 配置文件窗口最小宽度，左侧文件列表加右侧编辑器
+pub(super) const CONFIG_MIN_WIDTH: f64 = 820.0;
+/// 配置文件窗口最小高度
+pub(super) const CONFIG_MIN_HEIGHT: f64 = 560.0;
 
 /// 窗口注册表：uuid → 窗口信息
 ///
@@ -253,6 +261,14 @@ pub(super) static WINDOWS_INFO: LazyLock<HashMap<Uuid, WindowEntry>> = LazyLock:
                 label: "mml-export",
                 min_width: EXPORT_MIN_WIDTH,
                 min_height: EXPORT_MIN_HEIGHT,
+            },
+        ),
+        (
+            CONFIG_WINDOW_UUID,
+            WindowEntry {
+                label: "mml-config",
+                min_width: CONFIG_MIN_WIDTH,
+                min_height: CONFIG_MIN_HEIGHT,
             },
         ),
     ])

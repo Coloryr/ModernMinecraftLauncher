@@ -13,6 +13,7 @@ use mml_jvms::java_helper;
 use tauri::{AppHandle, Emitter};
 
 use crate::dtos::{JavaImportProgressDto, JavaInfoDto};
+use crate::err_keys;
 use crate::listens;
 
 /// 扫描系统已安装的 Java 并持久化到配置
@@ -48,7 +49,7 @@ pub fn settings_add_java(name: Option<String>, path: String) -> Result<JavaInfoD
             arch: added.arch.to_string(),
         })
     } else {
-        Err("err.javaInvalid".to_string())
+        Err(err_keys::JAVA_INVALID.to_string())
     }
 }
 

@@ -8,15 +8,13 @@ use core::fmt;
 use crate::{
     i18,
     i18_items::{
-        error_type::ErrorType, gui_type::GuiType, info_type::InfoType, panic_type::PanicType,
+        error_type::ErrorType, info_type::InfoType, panic_type::PanicType,
         thread_type::ThreadType,
     },
 };
 
 /// 错误条目类型
 pub mod error_type;
-/// 界面文案条目类型
-pub mod gui_type;
 /// 一般信息条目类型
 pub mod info_type;
 /// 严重错误条目类型
@@ -48,8 +46,3 @@ impl fmt::Display for ThreadType {
     }
 }
 
-impl fmt::Display for GuiType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", i18::with_gui(self))
-    }
-}

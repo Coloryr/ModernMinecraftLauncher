@@ -828,18 +828,41 @@ function onSectionToggle(id: string) {
  */
 const groupForm = ref<{ id: string; name: string } | null>(null);
 const groupBusy = ref(false);
+/** 用户在名字框里打过字或点过保存：碰过之后才报红，弹窗刚开时不报警 */
+const groupFormTouched = ref(false);
+
+/**
+ * 分组名不合法时的提示，空串表示合法
+ *
+ * 判定与后端 `resource_mod_group_add` / `_rename` 同一套：去掉首尾空白后为空、或与别的分组
+ * 重名。重命名时要排除自己，否则一打开就报"已存在"。
+ */
+const groupFormError = computed(() => {
+  const form = groupForm.value;
+  if (!form) return "";
+  const name = form.name.trim();
+  if (!name) return t("err.groupEmpty");
+  const dup = groups.groups.value.some((g) => g.uuid !== form.id && g.name === name);
+  return dup ? t("err.groupExists") : "";
+});
+
+/** 现在要不要画红框与提示 */
+const groupFormInvalid = computed(() => groupFormTouched.value && !!groupFormError.value);
 
 /** 打开弹窗：不传 id 是新建，传分组 uuid 与当前名字是重命名 */
 function openGroupForm(id = "", name = "") {
   groupForm.value = { id, name };
+  groupFormTouched.value = false;
 }
 
 /** 提交分组名弹窗：有 id 就重命名，否则新建 */
 async function saveGroupForm() {
   const form = groupForm.value;
   if (!form || groupBusy.value) return;
+  // 名字不合法时给出红框与提示，不再静默什么都不做
+  groupFormTouched.value = true;
+  if (groupFormError.value) return;
   const name = form.name.trim();
-  if (!name) return;
   groupBusy.value = true;
   try {
     const ok = form.id ? await groups.rename(form.id, name) : await groups.add(name);
@@ -1004,14 +1027,13 @@ onMounted(() => void groups.load());
 
           <section :ref="(el) => bindSection(sec.id, el as Element | null)" class="mod-group mod-group-table"
             :class="{ 'mod-group-dragging': draggingSection === sec.id }">
-            <ModTable :items="sec.items" :busy="busy" :selected-keys="selected"
-              :group-label="sec.label" :group-key="sec.id" :group-open="isOpen(sec.id)" :custom="sec.custom"
-              :dragging-group="draggingSection" :hide-header="idx > 0" :col-widths="colWidths" :sort="sort"
-              @col-resize="setColWidth" @sort-change="setSort" @group-menu="openGroupMenu" @toggle="toggle"
-              @remove="remove"
+            <ModTable :items="sec.items" :busy="busy" :selected-keys="selected" :group-label="sec.label"
+              :group-key="sec.id" :group-open="isOpen(sec.id)" :custom="sec.custom" :dragging-group="draggingSection"
+              :hide-header="idx > 0" :col-widths="colWidths" :sort="sort" @col-resize="setColWidth"
+              @sort-change="setSort" @group-menu="openGroupMenu" @toggle="toggle" @remove="remove"
               @toggle-group="onSectionToggle(sec.id)" @drag-group="onSectionPointerDown($event, sec.id)"
-              @note-save="saveNoteInline" @open-folder="openFolder('mods', $event.file)"
-              @select="toggleSelect" @item-menu="openItemMenu" @row-click="onRowClick" :anchor-key="anchorKey" />
+              @note-save="saveNoteInline" @open-folder="openFolder('mods', $event.file)" @select="toggleSelect"
+              @item-menu="openItemMenu" @row-click="onRowClick" :anchor-key="anchorKey" />
           </section>
         </template>
       </div>
@@ -1026,9 +1048,9 @@ onMounted(() => void groups.load());
       <span v-if="showSectionLine(idx)" class="mod-group-insert" />
 
       <section :ref="(el) => bindSection(sec.id, el as Element | null)" class="mod-group" :class="{
-          'mod-group-dragging': draggingSection === sec.id,
-          'mod-group-empty': !sec.items.length,
-        }">
+        'mod-group-dragging': draggingSection === sec.id,
+        'mod-group-empty': !sec.items.length,
+      }">
         <div class="mod-group-head" @contextmenu.prevent="openGroupMenu({
           event: $event, id: sec.id, label: sec.label, custom: sec.custom, count: sec.items.length,
         })">
@@ -1056,10 +1078,9 @@ onMounted(() => void groups.load());
           <p v-if="!sec.items.length" class="empty-tip">
             {{ t("resource.groupEmptyHint") }}
           </p>
-          <ModList :items="sec.items" :busy="busy" :selected-keys="selected"
-            @toggle="toggle" @remove="remove" @note="openNote" @open-folder="openFolder('mods', $event.file)"
-            @select="toggleSelect" @item-menu="openItemMenu" @row-click="onRowClick"
-            :anchor-key="anchorKey" />
+          <ModList :items="sec.items" :busy="busy" :selected-keys="selected" @toggle="toggle" @remove="remove"
+            @note="openNote" @open-folder="openFolder('mods', $event.file)" @select="toggleSelect"
+            @item-menu="openItemMenu" @row-click="onRowClick" :anchor-key="anchorKey" />
         </div>
       </section>
 
@@ -1072,8 +1093,10 @@ onMounted(() => void groups.load());
   <BaseModal v-if="groupForm" :title="groupForm.id ? t('resource.groupRenameTitle') : t('resource.groupAddTitle')"
     :closable="false" @close="groupForm = null">
     <label class="field-label">{{ t("resource.groupName") }}</label>
-    <input v-model="groupForm.name" class="field-input" :placeholder="t('resource.groupPlaceholder')" spellcheck="false"
+    <input v-model="groupForm.name" class="field-input" :class="{ 'is-invalid': groupFormInvalid }"
+      :placeholder="t('resource.groupPlaceholder')" spellcheck="false" @input="groupFormTouched = true"
       @keydown.enter="saveGroupForm" />
+    <p v-if="groupFormInvalid" class="error-text">{{ groupFormError }}</p>
     <div class="modal-actions">
       <BaseButton :disabled="groupBusy" @click="groupForm = null">
         {{ t("resource.cancel") }}
@@ -1138,13 +1161,13 @@ onMounted(() => void groups.load());
   </BaseModal>
 
   <!-- 分组右键菜单：只负责画与定位，动作全部抛回这里执行，见 onGroupMenuAction -->
-  <ModGroupMenu v-if="groupMenu" :x="groupMenu.x" :y="groupMenu.y" :label="groupMenu.label"
-    :custom="groupMenu.custom" :count="groupMenu.count" :can-enable="groupMenu.canEnable"
-    :can-disable="groupMenu.canDisable" @action="onGroupMenuAction" @close="groupMenu = null" />
+  <ModGroupMenu v-if="groupMenu" :x="groupMenu.x" :y="groupMenu.y" :label="groupMenu.label" :custom="groupMenu.custom"
+    :count="groupMenu.count" :can-enable="groupMenu.canEnable" :can-disable="groupMenu.canDisable"
+    @action="onGroupMenuAction" @close="groupMenu = null" />
 
   <!-- 模组行右键菜单：单行与批量共用 RowMenu，菜单项见 itemMenuItems / batchMenuItems -->
-  <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title"
-    @pick="onMenuPick" @close="rowMenu = null" />
+  <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title" @pick="onMenuPick"
+    @close="rowMenu = null" />
 </template>
 
 <!-- 备注弹窗的样式走 scoped：BaseModal 是 `Teleport to="body"` 的，弹窗不在

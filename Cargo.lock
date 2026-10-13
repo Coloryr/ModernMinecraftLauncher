@@ -3067,6 +3067,7 @@ dependencies = [
  "mml-jvms",
  "mml-log",
  "mml-names",
+ "mml-nbt",
  "mml-net",
  "mml-skin",
  "mml-skin-draw",

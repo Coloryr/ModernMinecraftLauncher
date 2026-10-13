@@ -1,13 +1,16 @@
-//! 资源管理窗口的存档分类：列表 / 备份列表 / 还原 / 删除 / 备份
+//! 资源管理窗口的存档分类：列表 / 备份列表 / 还原 / 删除 / 备份 / 改模式与难度
 //!
 //! 存档本体由内核 `game_saves` 扫描 level.dat；备份目录在存档下的 backups。
 
 use std::collections::HashMap;
 
-use crate::dtos::{SaveBackupDto, SaveItemDto};
+use crate::dtos::{SaveBackupDto, SaveEditDto, SaveItemDto};
+use crate::err_keys;
+use mml_game::game_saves::SaveEditObj;
 use mml_sys::path_helper;
+use uuid::Uuid;
 
-use super::{KIND_SAVES, data_url, load_saves, parse_instance, resource_file};
+use super::{KIND_SAVES, data_url, find_save, load_saves, parse_instance, resource_file};
 
 // ==================== 存档 ====================
 
@@ -56,6 +59,7 @@ pub async fn resource_list_saves(uuid: String) -> Result<Vec<SaveItemDto>, Strin
                 hard_core: item.hard_core != 0,
                 difficulty: item.difficulty,
                 broken: item.broken,
+                seed: item.random_seed.to_string(),
                 icon: data_url(icon.as_ref()),
                 backups: counts.get(&dir).copied().unwrap_or(0),
             })
@@ -134,7 +138,7 @@ pub async fn resource_restore_save_backup(
         let entry = info
             .values()
             .find(|item| item.dir == dir)
-            .ok_or_else(|| "err.saveNotFound".to_string())?;
+            .ok_or_else(|| err_keys::SAVE_NOT_FOUND.to_string())?;
 
         game.restore_backup(entry, &file, None)
             .map_err(|err| err.to_string())
@@ -157,7 +161,7 @@ pub async fn resource_delete_save(uuid: String, dir: String) -> Result<(), Strin
     let instance = parse_instance(&uuid)?;
     let file = resource_file(&instance, KIND_SAVES, &dir)?;
     if !file.is_dir() {
-        return Err("err.saveNotFound".to_string());
+        return Err(err_keys::SAVE_NOT_FOUND.to_string());
     }
     path_helper::move_to_trash(&file).map_err(|err| err.to_string())
 }
@@ -188,7 +192,7 @@ pub async fn resource_backup_save(uuid: String, dir: String) -> Result<String, S
                     .map(|n| *n.to_string_lossy() == dir)
                     .unwrap_or(false)
             })
-            .ok_or_else(|| "err.saveNotFound".to_string())?;
+            .ok_or_else(|| err_keys::SAVE_NOT_FOUND.to_string())?;
 
         save.backup(&game, None).map_err(|err| err.to_string())?;
         Ok(save.level_name.clone())
@@ -197,4 +201,54 @@ pub async fn resource_backup_save(uuid: String, dir: String) -> Result<String, S
     .map_err(|err| err.to_string())??;
 
     Ok(name)
+}
+
+/// 改存档的基本信息：模式 / 难度 / 极限模式 / 名字 / 种子，写回 level.dat
+///
+/// 实例正在运行时**不改**：游戏退出时会用它内存里的值覆盖这个文件，改了也白改。
+/// 入参是下拉与输入框给的值，越界的模式与难度一律夹到合法区间，别把没意义的值写进存档。
+///
+/// - `uuid`: 实例 uuid
+/// - `dir`: 存档目录名，即 saves 下的一级目录
+/// - `info`: 新的信息，见 [`SaveEditDto`]
+///
+/// # 返回值
+///
+/// 只表示成功 / 失败：实例在运行返回 `err.instanceRunning`，名字为空返回
+/// `err.saveNameEmpty`，种子不是整数返回 `err.saveSeed`，存档找不到返回
+/// `err.saveNotFound`，其余是内核错误串
+#[gui_macros::ipc_group("resource")]
+#[tauri::command]
+pub async fn resource_save_edit(
+    uuid: String,
+    dir: String,
+    info: SaveEditDto,
+) -> Result<(), String> {
+    let parsed = Uuid::parse_str(&uuid).map_err(|_| String::from(err_keys::UUID))?;
+    let instance = parse_instance(&uuid)?;
+    if mml_game::is_running(&parsed) {
+        return Err(String::from(err_keys::INSTANCE_RUNNING));
+    }
+
+    // 前端已经拦过一道，这里是 IPC 边界，自己再判一次
+    let level_name = info.level_name.trim().to_string();
+    if level_name.is_empty() {
+        return Err(String::from(err_keys::SAVE_NAME_EMPTY));
+    }
+    let seed = info
+        .seed
+        .trim()
+        .parse::<i64>()
+        .map_err(|_| String::from(err_keys::SAVE_SEED))?;
+
+    let edit = SaveEditObj {
+        game_type: info.game_type.clamp(0, 3),
+        difficulty: info.difficulty.min(3),
+        hard_core: info.hard_core,
+        level_name,
+        seed,
+    };
+
+    let mut save = find_save(instance, &dir).await?;
+    save.set_info(&edit).map_err(|err| err.to_string())
 }

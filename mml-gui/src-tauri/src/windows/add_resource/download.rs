@@ -16,6 +16,7 @@ use tauri::AppHandle;
 use uuid::Uuid;
 
 use crate::dtos::add_resource_dto::ResourceSaveDto;
+use crate::err_keys;
 
 use super::status::{build_status, emit_add_resource_status};
 use super::{DOWNLOAD_NOW, SourceDownloadInfo, SourceInfo};
@@ -55,17 +56,17 @@ pub async fn add_resource_download(
 ) -> Result<(), String> {
     let uuid = Uuid::parse_str(&game);
     if uuid.is_err() {
-        return Err(String::from("err.uuid"));
+        return Err(String::from(err_keys::UUID));
     }
     let uuid = uuid.unwrap();
     let instance = mml_game::get_instance(&uuid);
     if instance.is_none() {
-        return Err(String::from("err.gameNotFound"));
+        return Err(String::from(err_keys::GAME_NOT_FOUND));
     }
     let instance = instance.unwrap();
     let file_type = FileType::from_string(&file_type);
     if file_type.is_none() {
-        return Err(String::from("err.fileTypeNotFound"));
+        return Err(String::from(err_keys::FILE_TYPE_NOT_FOUND));
     }
     let file_type = file_type.unwrap();
     if !matches!(
@@ -76,11 +77,11 @@ pub async fn add_resource_download(
             | FileType::Save
             | FileType::DataPacks
     ) {
-        return Err(String::from("err.fileTypeNotFound"));
+        return Err(String::from(err_keys::FILE_TYPE_NOT_FOUND));
     }
     let source = ModPackType::from_string(&source);
     if !matches!(source, ModPackType::CurseForge | ModPackType::Modrinth) {
-        return Err(String::from("err.sourceType"));
+        return Err(String::from(err_keys::SOURCE_TYPE));
     }
     // 存档只有 CurseForge 有，Modrinth 没有 world 类型
     if file_type == FileType::Save && !matches!(source, ModPackType::CurseForge) {
@@ -91,7 +92,7 @@ pub async fn add_resource_download(
         .filter(|item| !item.is_empty());
     // 数据包必须指定目标存档
     if file_type == FileType::DataPacks && world.is_none() {
-        return Err(String::from("err.saveNotFound"));
+        return Err(String::from(err_keys::SAVE_NOT_FOUND));
     }
 
     // 目标目录
@@ -119,7 +120,7 @@ pub async fn add_resource_download(
         let mut map = DOWNLOAD_NOW.write().unwrap();
         let entry = map.entry(uuid).or_default();
         if entry.contains_key(&key) {
-            return Err(String::from("err.alreadyDownloading"));
+            return Err(String::from(err_keys::ALREADY_DOWNLOADING));
         }
         entry.insert(
             key.clone(),
@@ -129,6 +130,7 @@ pub async fn add_resource_download(
                 now: 0.0,
                 done: false,
                 failed: false,
+                cancelled: false,
             },
         );
     }
@@ -138,11 +140,15 @@ pub async fn add_resource_download(
     let res: Result<(FileItemObj, OnlineInfoObj), String> = async {
         match source {
             ModPackType::CurseForge => {
-                let fnum: u64 = fid.parse().map_err(|_| String::from("err.badFileId"))?;
+                let fnum: u64 = fid
+                    .parse()
+                    .map_err(|_| String::from(err_keys::BAD_FILE_ID))?;
                 let mut list = curseforge_api::get_files(vec![fnum])
                     .await
                     .map_err(|err| err.to_string())?;
-                let mut data = list.pop().ok_or_else(|| String::from("err.fileNotFound"))?;
+                let mut data = list
+                    .pop()
+                    .ok_or_else(|| String::from(err_keys::FILE_NOT_FOUND))?;
                 let obj = curseforge::make_file_item_obj(&mut data, &dir);
                 let info = OnlineInfoObj {
                     path: dir.to_string_lossy().to_string(),
@@ -168,7 +174,7 @@ pub async fn add_resource_download(
                     .iter()
                     .find(|item| item.primary)
                     .or_else(|| data.files.first())
-                    .ok_or_else(|| String::from("err.fileNotFound"))?;
+                    .ok_or_else(|| String::from(err_keys::FILE_NOT_FOUND))?;
                 let info = OnlineInfoObj {
                     path: dir.to_string_lossy().to_string(),
                     name: data.name.clone(),
@@ -180,7 +186,7 @@ pub async fn add_resource_download(
                 };
                 Ok((obj, info))
             }
-            _ => Err(String::from("err.sourceType")),
+            _ => Err(String::from(err_keys::SOURCE_TYPE)),
         }
     }
     .await;
@@ -216,23 +222,27 @@ pub async fn add_resource_download(
 
     // 后台任务：下载 → 终态标记 → 存档导入 / 已下载标记 → 延时移除
     tauri::async_runtime::spawn(async move {
-        let ok = mml_downloader::start_download_task(vec![obj]).await;
+        let outcome = mml_downloader::start_download_task_outcome(vec![obj]).await;
 
-        // 终态：进度拉满并打标记广播，完成后条目保留一段时间再移除
+        // 终态：完成 / 失败 / 取消三态互斥（与整合包那套一致）；取消时进度停在原地，
+        // 不拉满 —— 用户看得见它是被中途停掉的
         {
             let mut map = DOWNLOAD_NOW.write().unwrap();
             if let Some(info) = map.get_mut(&uuid).and_then(|entry| entry.get_mut(&key)) {
-                info.now = 100.0;
-                if ok {
+                if outcome.is_done() {
+                    info.now = 100.0;
                     info.done = true;
+                } else if outcome.is_cancelled() {
+                    info.cancelled = true;
                 } else {
+                    info.now = 100.0;
                     info.failed = true;
                 }
             }
         }
         emit_add_resource_status(&app2, build_status(&app2));
 
-        if ok {
+        if outcome.is_done() {
             if is_save {
                 let instance = instance.clone();
                 // 只关心"解包失败"；spawn_blocking 自身的 JoinError 沿用原来的忽略口径
@@ -270,12 +280,12 @@ pub async fn add_resource_download(
 pub async fn add_resource_saves(game: String) -> Result<Vec<ResourceSaveDto>, String> {
     let uuid = Uuid::parse_str(&game);
     if uuid.is_err() {
-        return Err(String::from("err.uuid"));
+        return Err(String::from(err_keys::UUID));
     }
     let uuid = uuid.unwrap();
     let game = mml_game::get_instance(&uuid);
     if game.is_none() {
-        return Err(String::from("err.gameNotFound"));
+        return Err(String::from(err_keys::GAME_NOT_FOUND));
     }
     let game = game.unwrap();
 

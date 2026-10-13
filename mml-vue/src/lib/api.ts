@@ -7,6 +7,7 @@ import { commands } from "./bindings";
 import type {
   BlockItemDto,
   BlockStatusDto,
+  BytesSliceDto,
   CollectDataDto,
   ColorMcInfoDto,
   ColorMcProgressDto,
@@ -20,9 +21,11 @@ import type {
   ErrorEvent,
   ExitEvent,
   FileListDto,
+  FileItemDto,
   FolderInstanceDto,
   ClientConfigDto,
   ExportConfigDto,
+  ExportEntryDto,
   ExportInfoDto,
   ExportProgressDto,
   GroupDto,
@@ -33,12 +36,14 @@ import type {
   LoadState,
   LogEvent,
   LogFocusDto,
+  McaChunkDto,
   ModGroupDto,
   ResourceViewDto,
   ModItemDto,
   ModRenameDto,
   ModScanProgressDto,
   MotdDto,
+  NbtNodeDto,
   ModPackStatusDto,
   NewsItem,
   PackItemDto,
@@ -49,10 +54,12 @@ import type {
   ResourceSaveDto,
   ResourceStatusDto,
   SaveBackupDto,
+  SaveEditDto,
   SaveItemDto,
   ScreenshotItemDto,
   ServerItemDto,
   ShaderItemDto,
+  SchematicDetailDto,
   SchematicItemDto,
   StatsDataDto,
   StateEvent,
@@ -1020,10 +1027,24 @@ export const api = {
    *
    * # 返回值
    *
-   * 在线模组与本地模组分组，以及各内容目录有没有文件
+   * 实例元数据与 `mods` 目录下的模组，有在线来源的带上项目号与下载地址
    */
   async getExportInfo(uuid: string): Promise<ExportInfoDto> {
     return commands.export.getInfo(uuid);
+  },
+
+  /**
+   * 浏览游戏目录下的一个目录，给导出窗口的文件树当懒加载用
+   *
+   * - `uuid`: 实例 uuid
+   * - `dir`: 相对游戏目录的路径；空串表示游戏目录本身
+   *
+   * # 返回值
+   *
+   * 该目录的直接子项，目录在前、同类按路径排序
+   */
+  async listExportDir(uuid: string, dir: string): Promise<ExportEntryDto[]> {
+    return commands.export.listDir(uuid, dir);
   },
 
   /**
@@ -1964,6 +1985,19 @@ export function deleteSave(uuid: string, dir: string): Promise<void> {
   return commands.resource.deleteSave(uuid, dir);
 }
 /**
+ * 编辑存档：游戏模式 / 难度 / 极限模式 / 名字 / 地图种子
+ *
+ * - `uuid`: 实例 uuid
+ * - `dir`: 存档目录名
+ * - `info`: 新的信息，字段口径见 `SaveEditDto`
+ *
+ * 写回存档的 level.dat；实例正在运行时报 err.instanceRunning。
+ * 种子走字符串：它在 level.dat 里是 i64，当数字传会被前端丢精度。
+ */
+export function editSave(uuid: string, dir: string, info: SaveEditDto): Promise<void> {
+  return commands.resource.saveEdit(uuid, dir, info);
+}
+/**
  * 备份存档
  *
  * - `uuid`: 实例 uuid
@@ -2174,6 +2208,19 @@ export function listSchematics(uuid: string): Promise<SchematicItemDto[]> {
   return commands.resource.listSchematics(uuid);
 }
 /**
+ * 结构文件详情
+ *
+ * - `uuid`: 实例 uuid
+ * - `file`: 结构文件名
+ *
+ * # 返回值
+ *
+ * 尺寸、方块总数与种类数，外加逐种方块的数量（按数量从多到少）
+ */
+export function getSchematicDetail(uuid: string, file: string): Promise<SchematicDetailDto> {
+  return commands.resource.schematicDetail(uuid, file);
+}
+/**
  * 删除结构文件
  *
  * - `uuid`: 实例 uuid
@@ -2183,6 +2230,111 @@ export function listSchematics(uuid: string): Promise<SchematicItemDto[]> {
  */
 export function deleteSchematic(uuid: string, file: string): Promise<void> {
   return commands.resource.deleteSchematic(uuid, file);
+}
+/**
+ * 在文件管理器里打开实例目录
+ *
+ * - `uuid`: 实例 uuid
+ *
+ * 落点是 `instances/<实例名>/`，里面有 game.json 等实例文件；游戏目录 `.minecraft`
+ * 走资源管理窗口的「打开文件夹」
+ */
+export function openInstanceDir(uuid: string): Promise<void> {
+  return commands.main.openInstanceDir(uuid);
+}
+/**
+ * 实例可编辑的配置文件列表
+ *
+ * - `uuid`: 实例 uuid
+ *
+ * # 返回值
+ *
+ * options.txt 与 `config` / `kubejs` / `local` 下的全部文件，名字是**相对游戏目录**的路径
+ */
+export function listConfigFiles(uuid: string): Promise<FileItemDto[]> {
+  return commands.config.getFiles(uuid);
+}
+/**
+ * 读取一个文本配置文件
+ *
+ * - `uuid`: 实例 uuid
+ * - `file`: 相对游戏目录的路径，取自 `listConfigFiles` / `listConfigSaveFiles`
+ *
+ * # 返回值
+ *
+ * 全文；二进制文件报 err.fileBinary，过大报 err.fileTooLarge
+ */
+export function readConfigFile(uuid: string, file: string): Promise<string> {
+  return commands.config.getFile(uuid, file);
+}
+/**
+ * 保存文本配置文件，整份覆盖
+ *
+ * - `uuid`: 实例 uuid
+ * - `file`: 相对游戏目录的路径
+ * - `data`: 新的全文内容
+ */
+export function writeConfigFile(uuid: string, file: string, data: string): Promise<void> {
+  return commands.config.saveFile(uuid, file, data);
+}
+/**
+ * 读取 NBT 文件，转成可展示的树
+ *
+ * - `uuid`: 实例 uuid
+ * - `file`: 相对游戏目录的路径
+ *
+ * # 返回值
+ *
+ * 见 `NbtNodeDto`；数组只报元素个数，不展开内容
+ */
+export function readConfigNbt(uuid: string, file: string): Promise<NbtNodeDto> {
+  return commands.config.getNbt(uuid, file);
+}
+/**
+ * 读取区域文件（`.mca`）的区块表
+ *
+ * - `uuid`: 实例 uuid
+ * - `file`: 相对游戏目录的路径
+ *
+ * # 返回值
+ *
+ * 有数据的区块，按表项下标升序；只读 8 KiB 文件头，不解析区块内容
+ */
+export function readConfigMca(uuid: string, file: string): Promise<McaChunkDto[]> {
+  return commands.config.getMca(uuid, file);
+}
+/**
+ * 读取任意文件的一段字节，给二进制视图翻页用
+ *
+ * - `uuid`: 实例 uuid
+ * - `file`: 相对游戏目录的路径
+ * - `offset`: 起始偏移，单位字节；越界会被夹到文件末尾
+ * - `length`: 想要的字节数，上限 64 KiB
+ *
+ * # 返回值
+ *
+ * 见 `BytesSliceDto`；`data` 是标准 Base64
+ */
+export function readConfigBytes(
+  uuid: string,
+  file: string,
+  offset: number,
+  length: number,
+): Promise<BytesSliceDto> {
+  return commands.config.getBytesSlice(uuid, file, offset, length);
+}
+/**
+ * 某个存档目录下的文件列表
+ *
+ * - `uuid`: 实例 uuid
+ * - `save`: 存档目录名，即 saves 下的一级目录
+ *
+ * # 返回值
+ *
+ * 该存档目录下递归列出的文件，名字同样是相对游戏目录的路径
+ */
+export function listConfigSaveFiles(uuid: string, save: string): Promise<FileItemDto[]> {
+  return commands.configSaves.file(uuid, save);
 }
 
 // ==================== 数据包（存档子页） ====================

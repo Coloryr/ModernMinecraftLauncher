@@ -1,12 +1,13 @@
 //! 窗口生命周期：句柄表 / 模型表 / 建窗 / 开关窗 / 窗口事件
 //!
-//! 从 `windows/mod.rs` 拆出来的。这里管"窗口从生到死"：建窗，含几何恢复 + 装饰时机 +
-//! 最小尺寸校正；句柄与模型的登记清理、关闭保护，以及 `on_window_event` 里的
-//! 关闭 / 销毁 / 缩放事件。
+//! 从 `windows/mod.rs` 拆出来的。这里管"窗口从生到死"：建窗，含几何恢复 + 装饰时机；
+//! 句柄与模型的登记清理、关闭保护，以及 `on_window_event` 里的关闭 / 销毁 / 缩放事件。
+//! 最小尺寸不在这里设，原因见 [`create_window`] 的说明。
 //!
 //! **`window_*` 命令留在 `mod.rs`**：`bindings.ts` 的组键取"来源 .rs 模块最后一段"，
 //! 命令搬文件会让组键从 `windows` 变成别的名字，前端会断，见 AGENTS.md §4。
 
+use crate::log_text::LogText;
 use std::{
     any::Any,
     collections::HashMap,
@@ -23,13 +24,10 @@ use crate::listens;
 use mml_names::names;
 use uuid::Uuid;
 
-use super::geometry::{
-    min_inner_physical, reconcile_min_size, remember_decorated_inset, save_window_state,
-    window_state_for,
-};
+use super::geometry::{remember_decorated_inset, save_window_state, window_state_for};
 use super::registry::{
     ADD_MODPACK_WINDOW_UUID, ADD_WINDOW_UUID, BLOCK_WINDOW_UUID, DOWNLOAD_WINDOW_UUID,
-    MAIN_WINDOW_UUID, MinSize, WINDOWS_INFO, uuid_for_kind,
+    MAIN_WINDOW_UUID, WINDOWS_INFO, uuid_for_kind,
 };
 use super::{add_modpack, block};
 
@@ -252,12 +250,13 @@ pub(super) fn create_window(
         return Ok(win);
     }
 
-    let geom = window_state_for(uuid);
+    // 尺寸为 0 的条目按"没有历史几何"处理：serde 对缺失字段给 0，而恢复端不再夹最小尺寸
+    let geom = window_state_for(uuid).filter(|g| g.width > 0 && g.height > 0);
     // 上次是最大化：按记录里的「最大化之前」几何开窗，开完再最大化，见 save_window_state
     let restore_maximized = geom.as_ref().map(|g| g.maximized).unwrap_or(false);
 
-    // 最小尺寸随注册表条目走，各窗口内容布局不同、可压缩程度不同；
-    // 无历史几何时直接以最小尺寸居中打开，注册表即窗口尺寸的唯一来源
+    // 最小尺寸随注册表条目走，各窗口布局不同、可压缩程度不同；无历史几何时直接以最小尺寸
+    // 居中打开，下限则在装饰激活后按它设，见 window_activate_decoration
     let binding = &*WINDOWS_INFO;
     let (min_w, min_h) = binding
         .get(uuid)
@@ -267,10 +266,14 @@ pub(super) fn create_window(
     // 所有窗口都走插件装饰：必须以 decorations(true) 建出来，插件才能在原生 frame 上激活
     // 自绘装饰，激活前先藏起来。收益是 Win11 贴靠布局，矩形由前端量好交给插件，见 decoration.ts
 
+    // 建窗时**不设**最小尺寸：此刻窗口是带装饰口径，最小客户区加上边框带算出的下限是外框 639，
+    // 比拉到最小的窗口（外框 608）还高；而 tao 的 set_min_inner_size 会把当前尺寸立刻重设一遍，
+    // Windows 借这次变更按下限把窗口顶上去，于是每开一次就比用户拉到的位置高一截。
+    // 下限改在装饰激活后设，见 window_activate_decoration
+
     // webview 铺不透明暗色底，避免加载首帧透出桌面，与暗色主题 --bg 一致
     let builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App(url_path.into()))
         .title(names::MML)
-        .min_inner_size(min_w, min_h)
         // 原生 frame 起步 + 隐藏：装饰激活成功后再显示，失败则退回原生 frame 显示
         .decorations(true)
         // 关掉框架 wry 自己那份拖放实现：它会顶掉 WebView2 的拖放目标且只认文件，网页上
@@ -284,10 +287,13 @@ pub(super) fn create_window(
         Some(dir) => {
             if let Err(err) = std::fs::create_dir_all(&dir) {
                 // 建不出来不致命：退回 Tauri 的默认目录总比开不了窗好
-                mml_log::error(format!(
-                    "[window] 创建 webview 数据目录失败，退回默认位置：{} ({err})",
-                    dir.display()
-                ));
+                mml_log::error(
+                    LogText::WebviewDataDirFailed {
+                        dir: dir.display().to_string(),
+                        error: err.to_string(),
+                    }
+                    .text(),
+                );
                 builder
             } else {
                 builder.data_directory(dir)
@@ -309,20 +315,10 @@ pub(super) fn create_window(
                 .map(|m| m.scale_factor())
                 .unwrap_or(1.0);
 
-            // 恢复前先夹一次最小客户区：历史几何可能小于当前最小尺寸，旧版本存的或最小尺寸
-            // 后来调大过；直接创建会得到一个比最小值还小的窗口，而这个非法值又会被写回文件
-            let min = min_inner_physical(
-                MinSize {
-                    width: min_w,
-                    height: min_h,
-                },
-                scale,
-            );
+            // 这里**不夹**最小客户区：存的是带装饰口径，比运行时口径小一个标题栏，夹会把它
+            // 顶上去。下限由 clamp_runtime_min_size 在装饰激活后按运行时口径补
             builder
-                .inner_size(
-                    g.width.max(min.width) as f64 / scale,
-                    g.height.max(min.height) as f64 / scale,
-                )
+                .inner_size(g.width as f64 / scale, g.height as f64 / scale)
                 .position(g.x as f64 / scale, g.y as f64 / scale)
                 .build()
         }
@@ -333,10 +329,6 @@ pub(super) fn create_window(
     // 必须在**这一刻**量：此时窗口还是 decorations(true)，差值包含原生标题栏；插件激活摘掉
     // 装饰后标题栏并进客户区就再也量不到它，而关窗保存正发生在那个状态
     remember_decorated_inset(uuid, &win);
-
-    // 无边框 + 系统阴影时客户区比外框小一圈，而 WM_GETMINMAXINFO 约束的是外框：不把这圈
-    // 带宽补上，min_inner_size 实际会把客户区压得比注册表里设定的更小
-    reconcile_min_size(&win, min_w, min_h);
 
     OPEN_WINDOWS.write().unwrap().insert(*uuid, win.clone());
     ensure_window_model(uuid);

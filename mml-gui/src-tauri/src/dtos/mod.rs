@@ -11,6 +11,7 @@ pub mod add_resource_dto;
 pub mod args_dto;
 pub mod collect_dto;
 pub mod colormc_dto;
+pub mod config_dto;
 pub mod custom_home_dto;
 pub mod download_dto;
 pub mod export_dto;
@@ -41,11 +42,14 @@ pub use add_resource_dto::{
 pub use args_dto::{EnvVarLineDto, InstanceArgsDto};
 pub use collect_dto::{CollectDataDto, CollectItemDto};
 pub use colormc_dto::{ColorMcCompatDto, ColorMcInfoDto, ColorMcProgressDto, ColorMcReportDto};
+pub use config_dto::{
+    BytesSliceDto, FileItemDto, FileItemType, McaChunkDto, NbtKindDto, NbtNodeDto,
+};
 pub use custom_home_dto::CustomHomeInfoDto;
 pub use download_dto::{
     DownloadItemEvent, DownloadStatusDto, DownloadTaskDto, DownloadTaskEvent, DownloadThreadDto,
 };
-pub use export_dto::{ExportConfigDto, ExportInfoDto, ExportModDto, ExportProgressDto};
+pub use export_dto::{ExportConfigDto, ExportEntryDto, ExportInfoDto, ExportProgressDto};
 pub use gui_config_dto::{ClientConfigDto, GuiConfigDto, LoginLockItemDto, MainWindowConfigDto};
 pub use instance_dto::{GroupDto, InstanceInfoDto};
 pub use java_download_dto::{JavaDownloadItemDto, JavaDownloadOptionsDto, JavaTypes};
@@ -58,8 +62,8 @@ pub use main_dto::{
 pub use motd_dto::{MotdDto, MotdSegmentDto};
 pub use resource_dto::{
     DataPackItemDto, ModGroupDto, ModItemDto, ModRenameDto, ModScanProgressDto, PackItemDto,
-    ResourceDropDto, ResourceViewDto, SaveBackupDto, SaveItemDto, SchematicItemDto,
-    ScreenshotItemDto, ServerItemDto, ShaderItemDto,
+    ResourceDropDto, ResourceViewDto, SaveBackupDto, SaveEditDto, SaveItemDto, SchematicBlockDto,
+    SchematicDetailDto, SchematicItemDto, ScreenshotItemDto, ServerItemDto, ShaderItemDto,
 };
 pub use settings_dto::{
     BgInfoDto, DnsSettingDto, GameCheckSettingDto, LaunchSettingDto, NetworkSettingDto,

@@ -13,6 +13,7 @@ use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 use uuid::Uuid;
 
 use crate::dtos::ModGroupDto;
+use crate::err_keys;
 
 use super::mods::mod_note_key;
 use super::parse_instance;
@@ -259,14 +260,14 @@ fn collapsed_of(mods: &crate::gui_setting::GameModSettingObj) -> Vec<String> {
 pub fn resource_mod_group_add(uuid: String, name: String) -> Result<String, String> {
     let name = name.trim();
     if name.is_empty() {
-        return Err(String::from("err.groupEmpty"));
+        return Err(String::from(err_keys::GROUP_EMPTY));
     }
     let instance = parse_instance(&uuid)?;
     if mod_groups_of(&instance.read().unwrap())
         .iter()
         .any(|item| item.name == name)
     {
-        return Err(String::from("err.groupExists"));
+        return Err(String::from(err_keys::GROUP_EXISTS));
     }
 
     // uuid v4：分组身份与名字解耦，改名不动键
@@ -324,7 +325,7 @@ pub fn resource_mod_group_rename(
     let new_name = new_name.trim();
 
     if new_name.is_empty() {
-        return Err(String::from("err.groupEmpty"));
+        return Err(String::from(err_keys::GROUP_EMPTY));
     }
     let instance = parse_instance(&uuid)?;
     // 重名检查要排除它自己，改回原名 / 只改大小写不该报"已存在"
@@ -332,7 +333,7 @@ pub fn resource_mod_group_rename(
         .iter()
         .any(|item| item.uuid != group && item.name == new_name)
     {
-        return Err(String::from("err.groupExists"));
+        return Err(String::from(err_keys::GROUP_EXISTS));
     }
 
     edit_mod_setting(&instance, |mods| {

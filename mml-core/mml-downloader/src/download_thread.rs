@@ -41,12 +41,14 @@ use mml_sys::path_helper;
 use reqwest::Response;
 use semka::Sem;
 
-use crate::{DownloadObj, download_item::DownloadItemState, later_tasks};
+use crate::{
+    DownloadObj, download_item::DownloadItemState, download_task::DownloadTask, later_tasks,
+};
 
 /// 用于在下载线程中执行异步任务的 Tokio 运行时
 ///
-/// 每个下载线程独立使用一个 `current_thread` 运行时，
-/// 通过 `block_on` 将异步 HTTP 请求转为同步调用。
+/// 全部下载线程共用 `OnceLock` 里这一份 `current_thread` 运行时，
+/// 各线程通过 `block_on` 把异步 HTTP 请求转成同步调用。
 static RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
 
 /// 在当前线程中阻塞执行异步任务
@@ -65,6 +67,31 @@ fn block_on<F: Future>(f: F) -> F::Output {
                 .unwrap()
         })
         .block_on(f)
+}
+
+/// 在当前线程中阻塞执行一个 HTTP 请求，任务被取消时立即放弃它
+///
+/// 请求挂住时（服务端不回包、连接半开）自身要等读超时才结束，而 `stop()` 会 join
+/// 下载线程，取消只靠请求结束后的标志检查就来不及了 —— 退出会跟着一起卡住。
+/// 这里让请求与取消令牌竞速，取消时直接丢弃请求 Future，连接随之断开。
+///
+/// - `task`: 请求所属的下载任务，用它的取消令牌
+/// - `fut`: 待执行的请求 Future
+///
+/// # 返回值
+///
+/// `None` 表示任务已被取消，请求结果作废；其余情况是请求自身的输出
+fn block_on_cancellable<F, T>(task: &Arc<DownloadTask>, fut: F) -> Option<T>
+where
+    F: Future<Output = T>,
+{
+    let cancel = task.cancel_token();
+    block_on(async move {
+        tokio::select! {
+            res = fut => Some(res),
+            _ = cancel.cancelled() => None,
+        }
+    })
 }
 
 /// 下载工作线程
@@ -110,6 +137,11 @@ impl DownloadThread {
                     if is_stop_clone.load(Ordering::SeqCst) {
                         break;
                     }
+                    // 一拿到项目就上报一次，别等 `download` 里的 HTTP 响应头到达才报：
+                    // 中间那段（域名解析 / 建连 / 等响应头）界面会一直显示"所有下载线程空闲"，
+                    // 而线程其实已经拿着文件在跑了；顺带让文件名在取到的这一刻就换成新的
+                    item.item.set_state(DownloadItemState::Init);
+                    crate::update(index, &item.item);
                     download(index, item);
                 }
             }
@@ -171,6 +203,9 @@ fn download(index: u32, mut obj: DownloadObj) {
                     file: obj.item.base.file.clone(),
                     error: Box::new(err),
                 }));
+                // 这条早退也要落到终态，否则界面上这一行会一直停在取到项目时的「初始化」
+                obj.item.set_state(DownloadItemState::Error);
+                crate::update(index, &obj.item);
                 obj.task.fail();
                 return;
             }
@@ -183,6 +218,8 @@ fn download(index: u32, mut obj: DownloadObj) {
                     mml_log::error_type(err);
                 } else {
                     // 文件已存在且哈希匹配，直接跳过
+                    obj.item.set_state(DownloadItemState::Done);
+                    crate::update(index, &obj.item);
                     obj.task.done();
                     return;
                 }
@@ -199,6 +236,8 @@ fn download(index: u32, mut obj: DownloadObj) {
     let mut is_keep = false;
     // 重试次数耗尽后放弃此文件，不能把残缺的临时文件移到目标路径
     let mut is_fail = false;
+    // 任务被取消：与失败分开，见循环末尾的收尾
+    let mut is_cancel = false;
 
     let mut temp_file;
 
@@ -207,7 +246,7 @@ fn download(index: u32, mut obj: DownloadObj) {
 
         // 任务已被取消：立即放弃，不再重试；stop 时下载线程要 join，取消必须尽快打断在途下载
         if obj.task.is_cancelled() {
-            is_fail = true;
+            is_cancel = true;
             break;
         }
 
@@ -229,12 +268,24 @@ fn download(index: u32, mut obj: DownloadObj) {
 
         let mut file = file.unwrap();
 
-        // 发起 HTTP 请求，支持断点续传
+        // 发起 HTTP 请求，支持断点续传。客户端先落成局部变量：请求 Future 借用它，
+        // 写成 `get_work_client().get(..)` 的话临时 Arc 活不过这个 Future
+        let client = mml_net::get_work_client();
         let mut resp = if use_break && server_ranges {
-            let result = block_on(
-                mml_net::get_work_client().get_ranges(&obj.item.base.url, obj.item.get_now_size()),
+            let result = block_on_cancellable(
+                &obj.task,
+                client.get_ranges(&obj.item.base.url, obj.item.get_now_size()),
             );
+            // 取消优先于重试：请求是被取消打断的，不是网络故障
+            let Some(result) = result else {
+                is_cancel = true;
+                break;
+            };
             if let Err(err) = result {
+                if obj.task.is_cancelled() {
+                    is_cancel = true;
+                    break;
+                }
                 obj.item.add_error();
                 if is_need_err(err, &mut times) {
                     is_fail = true;
@@ -255,8 +306,16 @@ fn download(index: u32, mut obj: DownloadObj) {
 
             resp
         } else {
-            let result = block_on(mml_net::get_work_client().get(&obj.item.base.url));
+            let result = block_on_cancellable(&obj.task, client.get(&obj.item.base.url));
+            let Some(result) = result else {
+                is_cancel = true;
+                break;
+            };
             if let Err(err) = result {
+                if obj.task.is_cancelled() {
+                    is_cancel = true;
+                    break;
+                }
                 obj.item.add_error();
                 if is_need_err(err, &mut times) {
                     is_fail = true;
@@ -292,6 +351,11 @@ fn download(index: u32, mut obj: DownloadObj) {
         // ============================================================
         let result = block_on(write_file(index, &mut obj, &mut resp, &mut file));
         if let Err(err) = result {
+            // 取消是 write_file 自己报出来的，优先于失败判定
+            if obj.task.is_cancelled() {
+                is_cancel = true;
+                break;
+            }
             obj.item.add_error();
             if is_need_err(err, &mut times) {
                 is_fail = true;
@@ -307,6 +371,15 @@ fn download(index: u32, mut obj: DownloadObj) {
     // ============================================================
     // 第四步：移动到最终路径
     // ============================================================
+    if is_cancel {
+        // 取消不是失败：状态记"已取消"、不计入任务失败数，残缺的临时文件也不留在缓存里
+        let _ = path_helper::delete(&temp_file);
+        obj.item.set_state(DownloadItemState::Cancel);
+        crate::update(index, &obj.item);
+        obj.task.mark_cancelled();
+        return;
+    }
+
     if is_fail {
         // 下载失败：不移动残缺的临时文件，删除后按失败计入任务
         let _ = path_helper::delete(&temp_file);
@@ -357,10 +430,13 @@ async fn write_file(
     resp: &mut Response,
     file: &mut File,
 ) -> CoreResult<()> {
+    // 取消令牌单独拿出来：下面读块要与它竞速，不能借 obj
+    let cancel = obj.task.cancel_token();
+
     loop {
         // 任务已被取消：立即中断在途下载，stop 或用户取消时不再等当前文件下完
         if obj.task.is_cancelled() {
-            obj.item.set_state(DownloadItemState::Error);
+            obj.item.set_state(DownloadItemState::Cancel);
             crate::update(index, &obj.item);
             return Err(ErrorType::TaskCancel);
         }
@@ -368,14 +444,25 @@ async fn write_file(
         // 任务暂停：原地等待恢复，期间同时响应取消，避免暂停期间无法取消
         while obj.task.is_paused() {
             if obj.task.is_cancelled() {
-                obj.item.set_state(DownloadItemState::Error);
+                obj.item.set_state(DownloadItemState::Cancel);
                 crate::update(index, &obj.item);
                 return Err(ErrorType::TaskCancel);
             }
             thread::sleep(std::time::Duration::from_millis(50));
         }
 
-        match resp.chunk().await {
+        // 读块同样与取消竞速：服务端停发时 chunk() 要等读超时才结束，取消不能陪着一起等
+        let chunk = tokio::select! {
+            chunk = resp.chunk() => Some(chunk),
+            _ = cancel.cancelled() => None,
+        };
+        let Some(chunk) = chunk else {
+            obj.item.set_state(DownloadItemState::Cancel);
+            crate::update(index, &obj.item);
+            return Err(ErrorType::TaskCancel);
+        };
+
+        match chunk {
             Ok(None) => break,
             Ok(Some(data)) => {
                 file.write_all(&data).map_err(|err| {

@@ -313,6 +313,13 @@
   color: var(--yellow);
 }
 
+/* 「已启用」徽标：绿色。数据包这类"开 / 关"两态用两种颜色分开，
+   扫一眼就知道哪些是开着的（只有两态，没登记进 level.dat 的按开着算） */
+.resource-layout .badge-on {
+  background: rgba(22, 163, 74, 0.14);
+  color: var(--green);
+}
+
 .resource-layout .mini-btn {
   height: 28px;
   padding: 0 12px;
@@ -803,7 +810,7 @@
 }
 
 /* 行之间的淡分隔线（白底上一格格地读） */
-.resource-layout .mod-tr + .mod-tr {
+.resource-layout .mod-tr+.mod-tr {
   border-top: 1px solid var(--border);
 }
 
@@ -1083,9 +1090,27 @@
 
 /* ---------- 数据包子页 ---------- */
 
-/* 存档下拉：外观全部走 .field-select，挂两个类，见 DatapackPane，
-   这里只把尺寸压小一号 —— 原先自己抄了一整份外观，改一处漏一处 */
+/* 存档标签 + 下拉同一行：标签不缩不换行，下拉吃满剩下的宽度 */
+.resource-layout .dp-save-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.resource-layout .dp-label {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+/* 外观全部走 .field-select，挂两个类，见 DatapackPane：这里只把尺寸压小一号
+   （原先自己抄了一整份外观，改一处漏一处），并把默认的 width: 100% 改回 auto —— 在
+   flex 行里 100% 会撑破这一行 */
 .resource-layout .dp-select {
+  flex: 1;
+  width: auto;
+  min-width: 0;
   padding: 8px 28px 8px 10px;
   font-size: 13px;
   min-height: 0;
@@ -1111,6 +1136,7 @@
   color: var(--text-dim);
   font-size: 11.5px;
 }
+
 .resource-layout .row-ctx-menu-item {
   display: block;
   width: 100%;

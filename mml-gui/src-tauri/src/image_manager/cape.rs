@@ -18,7 +18,7 @@ use super::respond::{send_bad, send_png};
 use super::skin::{is_sha1, load_texture_bytes, resolve_skin_files};
 use super::{
     CAPE_3D_IMAGE, CAPE_BACK_IMAGE, CAPE_IMAGE, CAPERAW_IMAGE, ELYTRA_3D_IMAGE,
-    ELYTRA_FOLDED_IMAGE, ELYTRA_FLYING_IMAGE,
+    ELYTRA_FLYING_IMAGE, ELYTRA_FOLDED_IMAGE,
 };
 
 /// 披风贴图的渲染档位，决定缓存与出图方式
@@ -248,8 +248,7 @@ fn send_cape_preview(kind: CapeRender, res: UriSchemeResponder) {
 /// 设置页样例披风贴图，取自 mml-skin-draw 的测试资源
 ///
 /// 这张图同时含披风盒展开与鞘翅翼块，所以披风与鞘翅两档都能拿它出样。
-const PREVIEW_CAPE: &[u8] =
-    include_bytes!("../../../../mml-core/mml-skin-draw/tests/cape.png");
+const PREVIEW_CAPE: &[u8] = include_bytes!("../../../../mml-core/mml-skin-draw/tests/cape.png");
 
 /// 解析披风贴图的内容 SHA1
 ///

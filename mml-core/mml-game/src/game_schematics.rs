@@ -98,12 +98,14 @@ impl SchematicObj {
 impl SchematicType {
     /// 按扩展名判断结构文件类型
     ///
+    /// [`read_schematic_file`] 要求先给出类型，所以它必须公开：调用方要能自己从文件名认。
+    ///
     /// - `ext`: 文件扩展名
     ///
     /// # 返回值
     ///
     /// 返回对应的结构文件类型；无法识别返回原版
-    fn from_ext(ext: &str) -> Self {
+    pub fn from_ext(ext: &str) -> Self {
         if ext.eq_ignore_ascii_case(names::LITEMATIC_EXT) {
             SchematicType::Litematic
         } else if ext.eq_ignore_ascii_case(names::SCHEMATIC_EXT) {

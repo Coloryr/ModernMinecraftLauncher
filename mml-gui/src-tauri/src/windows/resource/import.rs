@@ -18,6 +18,7 @@ use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 use mml_sys::path_helper;
 
 use crate::dtos::ResourceDropDto;
+use crate::err_keys;
 
 use super::{KIND_DATAPACKS, KIND_SAVES, datapack_dir, dir_of, parse_instance};
 
@@ -82,7 +83,7 @@ fn import(
         .filter(|item| item.is_file())
         .collect();
     if files.is_empty() {
-        return Err(String::from("err.dropNoFile"));
+        return Err(String::from(err_keys::DROP_NO_FILE));
     }
 
     // 取一份设置快照后**立刻放锁**，与 mod.rs 的 block_on_instance 同一口径

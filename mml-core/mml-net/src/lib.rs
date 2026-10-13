@@ -34,7 +34,9 @@
 
 use mml_base::serialize_tools;
 use mml_config::config_obj::{HttpObj, ProxyState, ProxyType};
+use mml_names::i18;
 use mml_names::i18_items::error_type::{CoreResult, ErrorType, HttpErrorData};
+use mml_names::i18_items::info_type::InfoType;
 use reqwest::header::{ETAG, HeaderMap, HeaderValue, IF_NONE_MATCH, USER_AGENT};
 use reqwest::{Proxy, Request, Response, StatusCode};
 use serde::de::DeserializeOwned;
@@ -948,23 +950,19 @@ fn build_client(state: ProxyState, ptype: ProxyType, http: &HttpObj) -> Client {
 /// 返回形如 `User/http 127.0.0.1:7890 认证=有` 的描述
 fn describe_proxy(state: ProxyState, ptype: ProxyType, http: &HttpObj) -> String {
     match state {
-        ProxyState::User => format!(
-            "User/{} {}:{}（认证={}）",
-            match ptype {
+        ProxyState::User => i18::get_info(InfoType::ProxyUser {
+            kind: match ptype {
                 ProxyType::Http => "http",
                 ProxyType::Sock4 => "socks4",
                 ProxyType::Sock5 => "socks5",
-            },
-            http.proxy_ip,
-            http.proxy_port,
-            if http.proxy_user.is_empty() {
-                "无"
-            } else {
-                "有"
             }
-        ),
-        ProxyState::None => "None（禁用代理）".to_string(),
-        ProxyState::Auto => "Auto（跟随系统）".to_string(),
+            .to_string(),
+            ip: http.proxy_ip.clone(),
+            port: http.proxy_port,
+            auth: !http.proxy_user.is_empty(),
+        }),
+        ProxyState::None => i18::get_info(InfoType::ProxyNone),
+        ProxyState::Auto => i18::get_info(InfoType::ProxyAuto),
     }
 }
 
@@ -991,11 +989,10 @@ pub fn init() {
         )))
     });
 
-    mml_log::info(format!(
-        "HTTP 客户端已初始化：通用[{}] 登录[{}]",
-        describe_proxy(http.work_proxy, http.work_proxy_type, http),
-        describe_proxy(http.login_proxy, http.login_proxy_type, http)
-    ));
+    mml_log::info_type(InfoType::HttpClientInit {
+        work: describe_proxy(http.work_proxy, http.work_proxy_type, http),
+        login: describe_proxy(http.login_proxy, http.login_proxy_type, http),
+    });
 }
 
 /// 按当前配置**重建**两个 HTTP 客户端，改代理设置后调用
@@ -1009,9 +1006,9 @@ pub fn rebuild() {
     // 先中断所有在途请求，含限速等待，再换客户端：顺序反了的话，
     // 旧请求可能刚醒过来又用旧客户端发出去
     let aborted_gen = abort_all();
-    mml_log::info(format!(
-        "HTTP 客户端重启：已中断在途请求（世代 -> {aborted_gen}）"
-    ));
+    mml_log::info_type(InfoType::HttpClientRestart {
+        generation: aborted_gen,
+    });
 
     let config = mml_config::read_config();
     let http = &config.http;
@@ -1029,11 +1026,10 @@ pub fn rebuild() {
         }
     }
 
-    mml_log::info(format!(
-        "HTTP 客户端重启完成：通用[{}] 登录[{}]",
-        describe_proxy(http.work_proxy, http.work_proxy_type, http),
-        describe_proxy(http.login_proxy, http.login_proxy_type, http)
-    ));
+    mml_log::info_type(InfoType::HttpClientRestartDone {
+        work: describe_proxy(http.work_proxy, http.work_proxy_type, http),
+        login: describe_proxy(http.login_proxy, http.login_proxy_type, http),
+    });
 }
 
 /// 中断所有在途请求

@@ -4,6 +4,7 @@
 //! 定位存档，走 `find_save`。
 
 use crate::dtos::DataPackItemDto;
+use crate::err_keys;
 use mml_sys::path_helper;
 
 use super::{find_save, parse_instance};
@@ -74,7 +75,7 @@ pub async fn resource_datapack_toggle(
         let pack = packs
             .into_iter()
             .find(|item| item.name.eq_ignore_ascii_case(&name))
-            .ok_or_else(|| "err.fileNotFound".to_string())?;
+            .ok_or_else(|| err_keys::FILE_NOT_FOUND.to_string())?;
         save.change_data_pack(&vec![pack])
             .map_err(|err| err.to_string())
     })
@@ -107,7 +108,7 @@ pub async fn resource_datapack_delete(
         let pack = packs
             .into_iter()
             .find(|item| item.name.eq_ignore_ascii_case(&name))
-            .ok_or_else(|| "err.fileNotFound".to_string())?;
+            .ok_or_else(|| err_keys::FILE_NOT_FOUND.to_string())?;
         let path = pack.path.clone();
         save.delete_datapack(&vec![pack])
             .map_err(|err| err.to_string())?;

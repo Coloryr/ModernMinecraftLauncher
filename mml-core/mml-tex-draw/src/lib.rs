@@ -159,6 +159,7 @@ async fn load_blocks_impl(gui: gui_hook::ProgressGui, force: bool) -> CoreResult
     if !item.check_hash()
         && !mml_downloader::start_download_task_cancellable(vec![item.clone()], cancel.clone())
             .await
+            .is_done()
     {
         return Err(cancel_or(ErrorType::DownloadFileFail, &cancel));
     }
@@ -520,7 +521,10 @@ async fn download_langs(obj: &GameArgObj, cancel: &CancellationToken) -> CoreRes
         return Ok(());
     }
 
-    if !mml_downloader::start_download_task_cancellable(list, cancel.clone()).await {
+    if !mml_downloader::start_download_task_cancellable(list, cancel.clone())
+        .await
+        .is_done()
+    {
         return Err(cancel_or(ErrorType::DownloadFileFail, cancel));
     }
     // 语言表按语言整体缓存，重下后要清掉旧版本的翻译

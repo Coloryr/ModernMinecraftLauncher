@@ -99,6 +99,20 @@ fn read_chunk_head<R: Read>(stream: &mut R) -> CoreResult<Vec<ChunkInfo>> {
 }
 
 impl ChunkData {
+    /// 只读文件头的 1024 项位置表，**不解析任何区块**
+    ///
+    /// 给"先看一眼这个区域文件里有什么"的用：`read_chunk` 会把 1024 个区块全解析一遍，
+    /// 只为列个表不值当。
+    ///
+    /// - `stream`: 区域文件流，从当前位置起必须能读出 8192 字节文件头
+    ///
+    /// # 返回值
+    ///
+    /// 1024 项位置表，下标即表项序号；文件头读不满时返回对应错误
+    pub fn read_head<R: Read>(stream: &mut R) -> CoreResult<Vec<ChunkInfo>> {
+        read_chunk_head(stream)
+    }
+
     /// 读取整个区域文件，逐个解析有数据的区块
     ///
     /// - `stream`: 区域文件流，会跨线程共享，内部加锁串行 seek

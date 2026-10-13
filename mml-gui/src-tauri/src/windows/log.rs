@@ -12,15 +12,17 @@
 
 use std::path::PathBuf;
 
-use mml_game::GameInstance;
 use mml_game::game_log::{GameLog, GameLogItemObj, InstanceRuntimeLog};
 use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
 
 use crate::dtos::LogEvent;
 use crate::dtos::{LogFocusDto, main_dto::LogLine};
+use crate::err_keys;
 use crate::listens;
 use mml_game::{InstanceLog, InstanceLogType};
+
+use super::instance_handle;
 
 /// 切换目标实例事件：窗口已存在时再次打开会推送，前端据此切换实例
 ///
@@ -29,18 +31,6 @@ use mml_game::{InstanceLog, InstanceLogType};
 #[gui_macros::emit]
 pub fn emit_log_focus(app: &AppHandle, event: LogFocusDto) {
     let _ = app.emit(listens::LOG_FOCUS, event);
-}
-
-/// 解析实例 uuid
-///
-/// - `uuid`: 实例 uuid 字符串
-///
-/// # 返回值
-///
-/// 实例句柄；uuid 非法返回 `err.uuid`，实例不存在返回 `err.gameNotFound`
-fn parse_instance(uuid: &str) -> Result<GameInstance, String> {
-    let uuid = Uuid::parse_str(uuid).map_err(|_| "err.uuid".to_string())?;
-    mml_game::get_instance(&uuid).ok_or_else(|| "err.gameNotFound".to_string())
 }
 
 /// 列出实例的日志文件，取自 logs 与 crash-reports 目录，返回绝对路径
@@ -52,7 +42,7 @@ fn parse_instance(uuid: &str) -> Result<GameInstance, String> {
 /// 日志文件绝对路径列表；uuid 非法或实例不存在返回错误文案
 #[tauri::command]
 pub fn log_get_files(uuid: String) -> Result<Vec<String>, String> {
-    let instance = parse_instance(&uuid)?;
+    let instance = instance_handle(&uuid)?;
     let game = instance.read().unwrap();
     Ok(game
         .get_log_files()
@@ -71,11 +61,11 @@ pub fn log_get_files(uuid: String) -> Result<Vec<String>, String> {
 /// 解析出的日志行；路径不在列表内或实例不存在返回错误文案
 #[tauri::command]
 pub fn log_read_file(uuid: String, path: String) -> Result<Vec<LogLine>, String> {
-    let instance = parse_instance(&uuid)?;
+    let instance = instance_handle(&uuid)?;
     let game = instance.read().unwrap();
     let path = PathBuf::from(&path);
     if !game.get_log_files().contains(&path) {
-        return Err("err.fileNotFound".to_string());
+        return Err(err_keys::FILE_NOT_FOUND.to_string());
     }
     let runtime = InstanceRuntimeLog::from_file(&path, game.encoding);
     let logs = runtime.logs.read().unwrap();

@@ -574,9 +574,8 @@ function tokenLabel(acc: AccountStoreDto): string {
         @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin" @refresh-skin="refreshSkin"
         @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" />
       <AccountList v-else-if="view === 'list'" :accounts="filtered" :current-uuid="currentAccount?.uuid ?? ''"
-        :token-label="tokenLabel" @add="openAdd" @switch="switchAccount" @refresh="refreshToken"
-        @view-skin="viewSkin" @refresh-skin="refreshSkin" @relogin="relogin" @edit="openEdit"
-        @delete="deleteTarget = $event" />
+        :token-label="tokenLabel" @add="openAdd" @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin"
+        @refresh-skin="refreshSkin" @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" />
       <AccountDetail v-else :accounts="filtered" :current-uuid="currentAccount?.uuid ?? ''" :token-label="tokenLabel"
         @add="openAdd" @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin" @refresh-skin="refreshSkin"
         @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" />
@@ -715,8 +714,7 @@ function tokenLabel(acc: AccountStoreDto): string {
     <SkinModal v-if="showSkin" :account="skinTarget" @close="showSkin = false" />
 
     <!-- 拖入登录卡片 / 快捷方式时的遮罩（标题按拖入类型变） -->
-    <DropOverlay v-if="fileDragOver"
-      :title="t(dragKind === 'text' ? 'account.dropTitle' : 'account.dropFileTitle')" />
+    <DropOverlay v-if="fileDragOver" :title="t(dragKind === 'text' ? 'account.dropTitle' : 'account.dropFileTitle')" />
   </WindowFrame>
 </template>
 

@@ -95,8 +95,8 @@ function keyOf(item: ModViewProps["items"][number]): string {
       <!-- 展开箭头：只有带内置模组的行才有（内置行自己没有下级）；默认收起 -->
       <template #lead>
         <button v-if="item.jarInJar.length" class="mod-tree-caret" :class="{ collapsed: !isOpen(keyOf(item)) }" v-tip="isOpen(keyOf(item))
-            ? t('resource.modBuiltinCollapse')
-            : t('resource.modBuiltinExpand')
+          ? t('resource.modBuiltinCollapse')
+          : t('resource.modBuiltinExpand')
           " @click.stop="toggleExpand(keyOf(item))" @pointerdown.stop>
           <GlyphIcon name="chevron-down" :size="13" :weight="2.4" />
         </button>
@@ -137,8 +137,7 @@ function keyOf(item: ModViewProps["items"][number]): string {
 
     <!-- 内置模组：递归展开下一层，默认收起，见 expanded 的说明 -->
     <ModList v-if="item.jarInJar.length && isOpen(keyOf(item))" :items="item.jarInJar" :busy="busy"
-      :selected-keys="selectedKeys" :depth="depth + 1" @toggle="emit('toggle', $event)"
-      @remove="emit('remove', $event)" @note="emit('note', $event)" @open-folder="emit('open-folder', $event)"
-      @select="emit('select', $event)" />
+      :selected-keys="selectedKeys" :depth="depth + 1" @toggle="emit('toggle', $event)" @remove="emit('remove', $event)"
+      @note="emit('note', $event)" @open-folder="emit('open-folder', $event)" @select="emit('select', $event)" />
   </template>
 </template>

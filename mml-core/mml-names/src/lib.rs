@@ -39,7 +39,7 @@ use crate::{
 /// 启动器主版本号
 pub const VERSION_NUM: i32 = 1;
 /// 启动器日期，格式 yyyymmdd
-pub const DATE: &str = "20260831";
+pub const DATE: &str = "20261013";
 /// 启动器版本号，由主版本号与日期拼成
 pub const VERSION: LazyLock<String> = LazyLock::new(|| format!("1.{}.{DATE}", VERSION_NUM));
 

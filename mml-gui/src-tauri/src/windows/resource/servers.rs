@@ -3,6 +3,7 @@
 //! 读写 `servers.dat`，即 NBT 格式，由内核 `InstanceSettingObj` 的 server 方法承担。
 
 use crate::dtos::ServerItemDto;
+use crate::err_keys;
 
 use super::parse_instance;
 
@@ -53,7 +54,7 @@ pub fn resource_list_servers(uuid: String) -> Result<Vec<ServerItemDto>, String>
 #[tauri::command]
 pub fn resource_server_add(uuid: String, name: String, ip: String) -> Result<(), String> {
     if name.trim().is_empty() || ip.trim().is_empty() {
-        return Err("err.nameIp".to_string());
+        return Err(err_keys::NAME_IP.to_string());
     }
     let instance = parse_instance(&uuid)?;
     instance
@@ -87,7 +88,7 @@ pub fn resource_server_update(
     accept_textures: bool,
 ) -> Result<(), String> {
     if new_name.trim().is_empty() || new_ip.trim().is_empty() {
-        return Err("err.nameIp".to_string());
+        return Err(err_keys::NAME_IP.to_string());
     }
     let instance = parse_instance(&uuid)?;
     let game = instance.read().unwrap();
@@ -104,7 +105,7 @@ pub fn resource_server_update(
         }
     }
     if !found {
-        return Err("err.fileNotFound".to_string());
+        return Err(err_keys::FILE_NOT_FOUND.to_string());
     }
 
     game.save_servers(&list).map_err(|err| err.to_string())

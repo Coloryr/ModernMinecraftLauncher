@@ -18,6 +18,7 @@ use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 
 use crate::dtos::{NameConflictDto, PackProgressDto};
+use crate::err_keys;
 use crate::listens;
 use crate::windows;
 use crate::windows::modpack_task::pack_state_id;
@@ -139,7 +140,7 @@ impl AddWindowModel {
 ///
 /// 该窗口的模型；缺失时返回 `err.modelMissing`
 pub(super) fn model(_window: &WebviewWindow) -> Result<Arc<Mutex<AddWindowModel>>, String> {
-    windows::model_for_kind("add").ok_or_else(|| "err.modelMissing".to_string())
+    windows::model_for_kind("add").ok_or_else(|| err_keys::MODEL_MISSING.to_string())
 }
 
 /// 重名确认对话框事件 id 自增

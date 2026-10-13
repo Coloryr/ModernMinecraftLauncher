@@ -12,6 +12,7 @@ import {
   onJavaChange,
   onLaunchError,
   onLaunchState,
+  openInstanceDir,
 } from "../../lib/api";
 import { commands } from "../../lib/bindings";
 import { loadGuiConfig, type ClientConfig } from "../../lib/guiConfig";
@@ -406,8 +407,6 @@ type ActionId =
   | "openFolder"
   | "viewLog"
   | "editConfig"
-  | "genOnline"
-  | "genInfo"
   | "rename"
   | "delete";
 
@@ -418,52 +417,14 @@ const ACTION_LABELS: Record<ActionId, string> = {
   openFolder: "actions.openFolder",
   viewLog: "actions.viewLog",
   editConfig: "actions.editConfig",
-  genOnline: "actions.genOnline",
-  genInfo: "actions.genInfo",
   rename: "actions.rename",
   delete: "actions.delete",
 };
-
-// ================= 二级菜单操作：导出 / 生成在线实例 / 生成实例信息 =================
-
-const openMenu = ref<string | null>(null);
-
-const menuActions: Array<{
-  id: ActionId;
-  labelKey: string;
-  options: Array<{ id: string; labelKey: string }>;
-}> = [
-    {
-      id: "genOnline",
-      labelKey: "actions.genOnline",
-      options: [
-        { id: "share", labelKey: "actions.genShare" },
-        { id: "link", labelKey: "actions.genLink" },
-      ],
-    },
-    {
-      id: "genInfo",
-      labelKey: "actions.genInfo",
-      options: [
-        { id: "json", labelKey: "actions.genInfoJson" },
-        { id: "text", labelKey: "actions.genInfoText" },
-      ],
-    },
-  ];
 
 /** 打开实例导出窗口（导出整合包） */
 function openExportWindow() {
   if (!selected.value) return;
   openWindow("export", { uuid: selected.value.uuid });
-}
-
-function toggleMenu(id: string) {
-  openMenu.value = openMenu.value === id ? null : id;
-}
-
-function onMenuPick(opt: { labelKey: string }) {
-  openMenu.value = null;
-  showToast(t("actions.wip", { name: t(opt.labelKey) }));
 }
 
 // ================= 元信息：版本 / 加载器 / 整合包 / 语言，合并进实例设置 =================
@@ -904,8 +865,26 @@ function onAction(id: ActionId) {
       // 日志只在独立窗口里看（主页面不展示日志内容）
       openLogWindow();
       break;
+    case "openFolder":
+      // 打开的是**实例目录**（instances/<实例名>/），不是游戏目录 .minecraft
+      void openInstanceDirOf(selected.value);
+      break;
+    case "editConfig":
+      // 配置文件窗口自己从 gui_config 读当前实例，与资源管理窗口同一口径
+      openWindow("config");
+      break;
     default:
       showToast(t("actions.wip", { name: t(ACTION_LABELS[id]) }));
+  }
+}
+
+/** 在文件管理器里打开某个实例的目录；失败时把后端错误串提示出来 */
+async function openInstanceDirOf(instance: InstanceInfoDto | null) {
+  if (!instance) return;
+  try {
+    await openInstanceDir(instance.uuid);
+  } catch (e) {
+    showToast(tErr(e));
   }
 }
 
@@ -1551,10 +1530,9 @@ onMounted(async () => {
           <div class="sidebar-slot" :class="{ collapsed: sidebarCollapsed }">
             <MainSidebar :mode="effectiveMode" :mode-options="MODE_OPTIONS" :search-text="searchText" :groups="groups"
               :filtered-groups="filteredGroups" :filtered-instances="filteredInstances" :searching="searching"
-              :selected="selected" :multi-select="multiSelect" :selected-ids="selectedIds"
-              :drag-active="dragActive" :dragging-uuid="draggingUuid"
-              :is-collapsed="isCollapsed" :on-drag-pointer-down="onDragPointerDown" :on-inst-click="onInstClick"
-              :on-inst-context="onInstContext" :on-group-context="onGroupContext"
+              :selected="selected" :multi-select="multiSelect" :selected-ids="selectedIds" :drag-active="dragActive"
+              :dragging-uuid="draggingUuid" :is-collapsed="isCollapsed" :on-drag-pointer-down="onDragPointerDown"
+              :on-inst-click="onInstClick" :on-inst-context="onInstContext" :on-group-context="onGroupContext"
               :on-group-title-click="onGroupTitleClick" :is-inst-insert="isInstInsert"
               :is-inst-insert-end="isInstInsertEnd" :is-group-insert="isGroupInsert" @update:mode="setViewMode($event)"
               @update:search-text="searchText = $event" @add-instance="openAdd" @add-group="showAddGroup = true"
@@ -1613,6 +1591,13 @@ onMounted(async () => {
                       <span>{{ t("detail.launchCount", { count: 0 }) }}</span>
                       <!-- 小图标快捷操作（单色 SVG） -->
                       <div class="meta-actions">
+                        <button class="icon-btn" v-tip="t('actions.export')" @click="openExportWindow">
+                          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 15V3M8 7l4-4 4 4" />
+                            <path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5" />
+                          </svg>
+                        </button>
                         <button class="icon-btn" v-tip="t('actions.openFolder')" @click="onAction('openFolder')">
                           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
                             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -1639,29 +1624,6 @@ onMounted(async () => {
                               d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6" />
                           </svg>
                         </button>
-                      </div>
-                    </div>
-
-                    <!-- 实例操作：导出直接开窗，生成类走二级菜单 -->
-                    <div class="action-grid">
-                      <button class="action-btn" @click="openExportWindow">
-                        {{ t("actions.export") }}
-                      </button>
-                      <div v-for="m in menuActions" :key="m.id" class="menu-wrap">
-                        <button class="action-btn" @click="toggleMenu(m.id)">
-                          {{ t(m.labelKey) }}
-                          <svg class="export-chevron" :class="{ flip: openMenu === m.id }" viewBox="0 0 24 24"
-                            width="11" height="11" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="m6 9 6 6 6-6" />
-                          </svg>
-                        </button>
-                        <Transition name="drop">
-                          <div v-if="openMenu === m.id" class="menu-drop">
-                            <button v-for="opt in m.options" :key="opt.id" class="menu-item" @click="onMenuPick(opt)">
-                              {{ t(opt.labelKey) }}
-                            </button>
-                          </div>
-                        </Transition>
                       </div>
                     </div>
 

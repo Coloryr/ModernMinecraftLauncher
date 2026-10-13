@@ -313,7 +313,7 @@ function loadFiles(pid: string, pageNo: number, fileVersion: string | null) {
   );
 }
 
-/** 详情页点下载：数据包先选存档，模组先解析前置，其余直接加入下载 */
+/** 详情页点下载：数据包先选存档，模组先解析前置，其余类型直接下载 */
 async function download(file: FileListItemDto) {
   if (!detailItem.value || !instanceUuid.value) return;
   const pid = detailItem.value.source.pid;
@@ -330,6 +330,12 @@ async function download(file: FileListItemDto) {
     } finally {
       savesLoading.value = false;
     }
+    return;
+  }
+
+  // 前置只有模组才有：其余类型直接下载，不为一张空表白跑一次解析
+  if (type.value !== "mod") {
+    await doDownload(pid, file);
     return;
   }
 
@@ -713,7 +719,8 @@ onActivated(consumeTargetProject);
             <button class="pack-star" :class="{ on: item.isStar }"
               v-tip="item.isStar ? t('modpack.unstar') : t('modpack.star')" @click.stop="toggleStar(item)">
               <svg viewBox="0 0 24 24" width="17" height="17" stroke-width="2" stroke-linejoin="round">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                <path
+                  d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
               </svg>
             </button>
             <div class="pack-main" @click="openDetail(item)">
@@ -759,22 +766,24 @@ onActivated(consumeTargetProject);
         </button>
       </div>
 
-      <!-- 存档选择弹窗（数据包下载前） -->
-      <BaseModal v-if="savePickFile" :width="420" below-titlebar @close="savePickFile = null">
-        <div class="save-head">{{ t("addResource.chooseSave") }}</div>
-        <div class="save-hint">{{ t("addResource.chooseSaveHint") }}</div>
+      <!-- 存档选择弹窗（数据包下载前）：标题、提示、按钮栏都用全仓那套
+           BaseModal + .modal-text + 全局 .modal-actions + BaseButton，与下面两个弹窗一致 -->
+      <BaseModal v-if="savePickFile" :title="t('addResource.chooseSave')" :width="420" below-titlebar :closable="false"
+        :overlay-close="false" @close="savePickFile = null">
+        <p class="modal-text">{{ t("addResource.chooseSaveHint") }}</p>
         <div class="save-list">
-          <div v-if="savesLoading" class="empty-tip">{{ t("modpack.loading") }}</div>
+          <div v-if="savesLoading" class="empty-tip">{{ t("resource.loading") }}</div>
           <div v-else-if="saves.length === 0" class="empty-tip">{{ t("resource.empty") }}</div>
           <label v-for="save in saves" :key="save.dir" class="save-row" :class="{ on: pickedSave === save.dir }">
             <input v-model="pickedSave" type="radio" name="save-pick" :value="save.dir" />
             <span class="save-name">{{ save.name }}</span>
           </label>
         </div>
-        <div class="save-actions">
-          <button class="search-btn" :disabled="!pickedSave" @click="confirmSave">
-            {{ t("modpack.install") }}
-          </button>
+        <div class="modal-actions">
+          <BaseButton @click="savePickFile = null">{{ t("actions.cancel") }}</BaseButton>
+          <BaseButton variant="accent" :disabled="!pickedSave || savesLoading" @click="confirmSave">
+            {{ t("addResource.download") }}
+          </BaseButton>
         </div>
       </BaseModal>
 
@@ -818,7 +827,7 @@ onActivated(consumeTargetProject);
             </div>
           </template>
         </div>
-        <div class="deps-actions">
+        <div class="modal-actions">
           <BaseButton :disabled="depsLoading" @click="askSkipDeps">
             {{ t("addResource.depsSkip") }}
           </BaseButton>
@@ -833,10 +842,10 @@ onActivated(consumeTargetProject);
       </BaseModal>
 
       <!-- 跳过前置的二次确认 -->
-      <BaseModal v-if="depSkipAsk" :width="380" below-titlebar :overlay-close="false" @close="depSkipAsk = false">
-        <div class="deps-head">{{ t("addResource.depsSkipTitle") }}</div>
-        <div class="deps-hint">{{ t("addResource.depsSkipHint") }}</div>
-        <div class="deps-actions">
+      <BaseModal v-if="depSkipAsk" :title="t('addResource.depsSkipTitle')" :width="380" below-titlebar :closable="false"
+        :overlay-close="false" @close="depSkipAsk = false">
+        <p class="deps-hint">{{ t("addResource.depsSkipHint") }}</p>
+        <div class="modal-actions">
           <BaseButton @click="depSkipAsk = false">{{ t("actions.cancel") }}</BaseButton>
           <BaseButton variant="accent" @click="skipDeps">{{ t("addResource.depsSkipConfirm") }}</BaseButton>
         </div>

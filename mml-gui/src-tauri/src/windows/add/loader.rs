@@ -3,6 +3,7 @@
 //! 从 `add/mod.rs` 拆出来的，光 `add_get_support_loaders` 就有 62 行。命令带
 //! 分组标记，值填原始组名 add，把组键钉回 `add`，见 AGENTS.md §4。
 
+use crate::log_text::LogText;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -12,6 +13,7 @@ use mml_game::loader::LoaderType;
 use tauri::{AppHandle, Emitter};
 
 use crate::dtos::LoaderProgressDto;
+use crate::err_keys;
 use crate::listens;
 
 /// 前端加载器 ID 转成 LoaderType，ID 列表见 [`add_get_loaders`]
@@ -22,7 +24,7 @@ use crate::listens;
 ///
 /// 未知 ID 返回 `err.unknownLoader`
 pub(super) fn parse_loader(id: &str) -> Result<LoaderType, String> {
-    LoaderType::from_string(id).ok_or_else(|| "err.unknownLoader".to_string())
+    LoaderType::from_string(id).ok_or_else(|| err_keys::UNKNOWN_LOADER.to_string())
 }
 
 /// 前端压缩包 ID 转成 PackType，ID 列表见 [`add_get_pack_types`]
@@ -33,7 +35,7 @@ pub(super) fn parse_loader(id: &str) -> Result<LoaderType, String> {
 ///
 /// 未知 ID 返回 `err.unknownPackType`
 pub(super) fn parse_pack_type(id: &str) -> Result<PackType, String> {
-    PackType::from_id(id).ok_or_else(|| "err.unknownPackType".to_string())
+    PackType::from_id(id).ok_or_else(|| err_keys::UNKNOWN_PACK_TYPE.to_string())
 }
 
 /// 获取加载器的可用版本列表，供添加实例窗口的加载器版本下拉
@@ -168,9 +170,13 @@ pub async fn add_get_support_loaders(app: AppHandle, mc: String) -> Result<Vec<S
                 // 被中断即用户改了代理 → 用新客户端重跑一次
                 if mml_net::is_aborted(&e) && attempt < RETRY_ON_ABORT {
                     attempt += 1;
-                    mml_log::info(format!(
-                        "加载器查询被中断，用新客户端重试（第 {attempt} 次）：mc={mc}"
-                    ));
+                    mml_log::info(
+                        LogText::LoaderQueryRetry {
+                            attempt,
+                            mc: mc.clone(),
+                        }
+                        .text(),
+                    );
                     continue;
                 }
 

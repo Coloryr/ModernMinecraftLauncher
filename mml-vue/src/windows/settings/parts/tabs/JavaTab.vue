@@ -85,7 +85,7 @@ useModalKeys((e) => {
           <div class="java-progress-fill" :style="{ width: importPercent + '%' }" />
         </div>
         <span class="java-progress-text">{{ importProgress ? `${importProgress.now}/${importProgress.total}` : ""
-          }}</span>
+        }}</span>
         <span v-if="importProgress?.subText" class="java-progress-sub" v-tip="importProgress.subText">{{
           importProgress.subText }}</span>
       </div>

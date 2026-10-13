@@ -17,6 +17,7 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::dtos::add_modpack_dto::{ModPackStatusDto, ModPackTaskDto};
+use crate::err_keys;
 use crate::listens;
 use crate::windows::add_resource::SourceInfo;
 
@@ -191,7 +192,7 @@ pub(crate) fn register_task(
     {
         let mut map = DOWNLOAD_NOW.write().unwrap();
         if map.contains_key(&key) {
-            return Err(String::from("err.alreadyDownloading"));
+            return Err(String::from(err_keys::ALREADY_DOWNLOADING));
         }
         map.insert(key, task.clone());
     }

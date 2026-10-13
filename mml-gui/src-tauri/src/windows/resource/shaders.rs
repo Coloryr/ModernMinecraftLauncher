@@ -5,6 +5,7 @@
 use std::path::Path;
 
 use crate::dtos::ShaderItemDto;
+use crate::err_keys;
 use mml_sys::path_helper;
 
 use super::{KIND_SHADERPACKS, block_on_instance, parse_instance, resource_file};
@@ -70,7 +71,7 @@ pub async fn resource_shader_set(uuid: String, file: Option<String>) -> Result<(
     if let Some(file) = file.as_ref() {
         let path = Path::new(file);
         if file.is_empty() || path.file_name() != Some(path.as_os_str()) {
-            return Err("err.fileName".to_string());
+            return Err(err_keys::FILE_NAME.to_string());
         }
     }
     let instance = parse_instance(&uuid)?;

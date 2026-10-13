@@ -27,6 +27,7 @@
 //! 首次启动的"问过了"状态存在运行目录下的 `colormc_migrate.json`，见 [`mark`]：
 //! 它表达的是"这个运行目录已经问过了"，删掉它就能重新触发询问。
 
+use crate::log_text::LogText;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -35,6 +36,7 @@ use tauri::{AppHandle, Emitter};
 use mml_base::get_base_dir;
 
 use crate::dtos::{ColorMcInfoDto, ColorMcProgressDto, ColorMcReportDto};
+use crate::err_keys;
 use crate::listens;
 
 mod check;
@@ -140,11 +142,11 @@ pub async fn window_migrate_colormc(
     let moved = match mode.as_str() {
         "copy" => false,
         "move" => true,
-        _ => return Err(String::from("err.colormcMode")),
+        _ => return Err(String::from(err_keys::COLORMC_MODE)),
     };
 
     if MIGRATING.swap(true, Ordering::AcqRel) {
-        return Err(String::from("err.colormcBusy"));
+        return Err(String::from(err_keys::COLORMC_BUSY));
     }
 
     let handle = app.clone();
@@ -169,8 +171,13 @@ pub async fn window_migrate_colormc(
         Ok(Err(err)) => Err(err),
         Err(err) => {
             // 原始错误只进日志：把 i18n 键和原始串拼一起，前端既翻不出来也读不懂
-            mml_log::error(format!("[colormc] 迁移任务失败：{err}"));
-            Err(String::from("err.colormcTask"))
+            mml_log::error(
+                LogText::ColormcMigrateFailed {
+                    error: err.to_string(),
+                }
+                .text(),
+            );
+            Err(String::from(err_keys::COLORMC_TASK))
         }
     }
 }

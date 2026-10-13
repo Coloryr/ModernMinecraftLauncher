@@ -11,6 +11,7 @@ use mml_sys::path_helper;
 use tauri::AppHandle;
 
 use crate::dtos::ColorMcReportDto;
+use crate::err_keys;
 
 use super::check::check;
 use super::detect::{auth_file, list_instances, looks_like_colormc, top_entries};
@@ -38,21 +39,21 @@ pub(super) fn migrate(
 ) -> Result<ColorMcReportDto, String> {
     // 源目录必须是"真的 ColorMC 工作目录"：调用方传来的路径不能当数
     if !src.is_dir() || !looks_like_colormc(src) {
-        return Err(String::from("err.colormcSource"));
+        return Err(String::from(err_keys::COLORMC_SOURCE));
     }
     if src == dst {
-        return Err(String::from("err.colormcSameDir"));
+        return Err(String::from(err_keys::COLORMC_SAME_DIR));
     }
     // 运行目录在源目录里面：复制会递归地把自己再拷一遍，直接拒绝
     if dst.starts_with(src) {
-        return Err(String::from("err.colormcNested"));
+        return Err(String::from(err_keys::COLORMC_NESTED));
     }
 
     // 实例名要在搬运前收集：移动模式下源目录随后就没了
     let src_instances = list_instances(src);
     let src_entries = top_entries(src);
     if src_entries.is_empty() {
-        return Err(String::from("err.colormcEmpty"));
+        return Err(String::from(err_keys::COLORMC_EMPTY));
     }
 
     mml_log::info(format!(

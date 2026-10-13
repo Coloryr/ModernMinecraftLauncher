@@ -15,6 +15,7 @@
 //! 时机：`on_webview_ready` 拿到 `ICoreWebView2` 后设一次，**每个 webview 各自设**，
 //! 设置项是 per-webview 的。
 
+use crate::log_text::LogText;
 use webview2_com::Microsoft::Web::WebView2::Win32::{ICoreWebView2, ICoreWebView2Settings3};
 use windows::core::Interface;
 
@@ -27,13 +28,18 @@ pub fn disable_browser_keys(core: &ICoreWebView2) {
     }
 
     let Ok(settings) = (unsafe { core.Settings() }) else {
-        mml_log::error(String::from("[webview] 取 WebView2 设置失败，快捷键未能关闭"));
+        mml_log::error(LogText::WebviewSettingsFailed.text());
         return;
     };
 
     // DevTools：F12 之外，右键菜单等入口也一并关掉
     if let Err(err) = unsafe { settings.SetAreDevToolsEnabled(false) } {
-        mml_log::error(format!("[webview] 关闭 DevTools 失败: {err}"));
+        mml_log::error(
+            LogText::DevtoolsDisableFailed {
+                error: err.to_string(),
+            }
+            .text(),
+        );
     }
 
     // 浏览器快捷键 F5 / Ctrl+R 重载、Ctrl+P、缩放…：老版本 WebView2 没有 Settings3，
@@ -41,13 +47,16 @@ pub fn disable_browser_keys(core: &ICoreWebView2) {
     match settings.cast::<ICoreWebView2Settings3>() {
         Ok(settings3) => {
             if let Err(err) = unsafe { settings3.SetAreBrowserAcceleratorKeysEnabled(false) } {
-                mml_log::error(format!("[webview] 关闭浏览器快捷键失败: {err}"));
+                mml_log::error(
+                    LogText::AcceleratorKeysDisableFailed {
+                        error: err.to_string(),
+                    }
+                    .text(),
+                );
             }
         }
         Err(_) => {
-            mml_log::info(String::from(
-                "[webview] 当前 WebView2 不支持关闭浏览器快捷键（Settings3 缺失）",
-            ));
+            mml_log::info(LogText::AcceleratorKeysUnsupported.text());
         }
     }
 }

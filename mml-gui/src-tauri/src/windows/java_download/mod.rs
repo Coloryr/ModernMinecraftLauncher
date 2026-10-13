@@ -14,6 +14,7 @@ use mml_base::file_item::FileItemObj;
 use uuid::Uuid;
 
 use crate::dtos::{JavaDownloadOptionsDto, JavaTypes};
+use crate::err_keys;
 
 // 带命令的子模块必须 `pub(crate)`：生成的 `tauri_commands!` 从 crate 根引用它
 pub(crate) mod list;
@@ -198,7 +199,7 @@ fn zulu_arch(arch: &str, bitness: &str) -> String {
 #[tauri::command]
 pub async fn java_download_start(uuid: String) -> Result<(), String> {
     let Ok(uuid) = Uuid::parse_str(&uuid) else {
-        return Err("err.javaItemNotFound".to_string());
+        return Err(err_keys::JAVA_ITEM_NOT_FOUND.to_string());
     };
 
     let item = {
@@ -206,13 +207,13 @@ pub async fn java_download_start(uuid: String) -> Result<(), String> {
         locker.get(&uuid).cloned()
     };
     let Some(item) = item else {
-        return Err("err.javaItemNotFound".to_string());
+        return Err(err_keys::JAVA_ITEM_NOT_FOUND.to_string());
     };
 
     // 下载压缩包，进度在下载窗口可见
     let ok = mml_downloader::start_download_task(vec![item.clone()]).await;
     if !ok {
-        return Err("err.downloadFailed".to_string());
+        return Err(err_keys::DOWNLOAD_FAILED.to_string());
     }
 
     // 解包识别并注册，解包无需进度回调，传 None

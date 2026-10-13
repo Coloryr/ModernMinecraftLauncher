@@ -5,7 +5,6 @@
 
 use crate::VERSION;
 
-use crate::i18_items::gui_type::GuiType;
 use crate::{
     i18::I18Lang,
     i18_items::{
@@ -32,6 +31,26 @@ impl I18Lang for ZhCn {
             InfoType::CoreStart => format!("M²L启动，版本：{}", *VERSION),
             InfoType::CoreStop => format!("M²L停止"),
             InfoType::TempFile => format!("临时文件"),
+            InfoType::ProxyUser {
+                kind,
+                ip,
+                port,
+                auth,
+            } => format!(
+                "User/{kind} {ip}:{port}（认证={}）",
+                if *auth { "有" } else { "无" }
+            ),
+            InfoType::ProxyNone => String::from("None（禁用代理）"),
+            InfoType::ProxyAuto => String::from("Auto（跟随系统）"),
+            InfoType::HttpClientInit { work, login } => {
+                format!("HTTP 客户端已初始化：通用[{work}] 登录[{login}]")
+            }
+            InfoType::HttpClientRestart { generation } => {
+                format!("HTTP 客户端重启：已中断在途请求（世代 -> {generation}）")
+            }
+            InfoType::HttpClientRestartDone { work, login } => {
+                format!("HTTP 客户端重启完成：通用[{work}] 登录[{login}]")
+            }
         }
     }
 
@@ -209,19 +228,6 @@ impl I18Lang for ZhCn {
             ThreadType::LanClientV6 => String::from("局域网游戏V6监听线程"),
             ThreadType::LanServer => String::from("局域网游戏广播线程"),
             ThreadType::GameCount => String::from("游戏启动统计线程"),
-        }
-    }
-
-    /// 取中文界面文案
-    ///
-    /// - `gui`: 界面文案条目
-    ///
-    /// # 返回值
-    ///
-    /// 界面文案尚未接入，恒为空串
-    fn get_gui(&self, gui: &GuiType) -> String {
-        match gui {
-            _ => Default::default(),
         }
     }
 }

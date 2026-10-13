@@ -8,11 +8,11 @@ use tiny_skia::Pixmap;
 
 use crate::gui_config;
 
-use super::{HEAD_IMAGE, PairImageKey};
 use super::respond::{send_bad, send_png};
 use super::skin::{
     gen_head_image, load_texture_bytes, parse_skin_type, render_skin_display, resolve_skin_files,
 };
+use super::{HEAD_IMAGE, PairImageKey};
 
 /// 账户头像，URI 形如 `head/<账户类型>/<uuid>`：解析账户当前皮肤后按配置的头像类型渲染
 ///

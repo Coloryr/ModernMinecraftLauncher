@@ -155,6 +155,7 @@ impl DownloadGuiHook {
             DownloadItemState::Action => "action",
             DownloadItemState::Done => "done",
             DownloadItemState::Error => "error",
+            DownloadItemState::Cancel => "cancel",
         }
         .into()
     }

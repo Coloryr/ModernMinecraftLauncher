@@ -20,8 +20,8 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <BaseModal :title="t('addResource.bar.title')" :width="560" fixed-height="420px" below-titlebar
-    :overlay-close="false" @close="emit('close')">
+  <BaseModal :title="t('addResource.bar.title')" :width="560" fixed-height="420px" below-titlebar :overlay-close="false"
+    @close="emit('close')">
     <!-- 高度锁死而不是随任务数长高：任务增删时高度一直跳很难看，任务多了让内容区自己滚 -->
     <ResourceDownloadBar :status="status" fill-height />
   </BaseModal>

@@ -8,6 +8,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::dtos::CustomHomeInfoDto;
+use crate::err_keys;
 
 use mml_base::archives::BaseArchive;
 
@@ -17,7 +18,7 @@ use super::{current_info, zip_path};
 pub(crate) const INDEX_FILE: &str = "index.html";
 
 /// 找不到入口页时的错误键，前端 i18n 的 `err.customHomeNoIndex`
-pub(super) const ERR_NO_INDEX: &str = "err.customHomeNoIndex";
+pub(super) const ERR_NO_INDEX: &str = err_keys::CUSTOM_HOME_NO_INDEX;
 
 /// 已打开的压缩包：条目名 → 内容
 ///

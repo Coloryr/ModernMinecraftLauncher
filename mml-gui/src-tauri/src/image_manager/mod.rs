@@ -39,7 +39,7 @@ mod skin;
 
 use self::cape::{
     load_cape_3d_image, load_cape_back_image, load_cape_image, load_caperaw_image,
-    load_elytra_3d_image, load_elytra_folded_image, load_elytra_flying_image,
+    load_elytra_3d_image, load_elytra_flying_image, load_elytra_folded_image,
 };
 use self::head::load_head_image;
 use self::icon::{icon_name, load_icon_image, load_url_image, save_url_image};

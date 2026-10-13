@@ -441,8 +441,8 @@ function onMenuPick(id: string) {
   </div>
 
   <!-- 行右键菜单：单行与批量共用，菜单项见 itemMenuItems -->
-  <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title"
-    @pick="onMenuPick" @close="rowMenu = null" />
+  <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title" @pick="onMenuPick"
+    @close="rowMenu = null" />
 
   <ServerFormModal v-if="form" :form="form" :busy="saving" @submit="save" @close="form = null" />
 </template>

@@ -14,6 +14,7 @@ use tauri::AppHandle;
 
 use crate::dtos::account_dto::auth_type_from_str;
 use crate::dtos::skin_dto::{TextureItemDto, TexturesDto};
+use crate::err_keys;
 
 use super::emit_account_change;
 use super::oauth::get_oauth_profile;
@@ -43,7 +44,7 @@ pub async fn account_get_textures(
     }
 
     let Some(mut auth) = auths::get(&uuid, auth_type) else {
-        return Err(String::from("err.accountMissing"));
+        return Err(String::from(err_keys::ACCOUNT_MISSING));
     };
 
     if auth_type.is_oauth() {
@@ -154,10 +155,10 @@ pub(super) async fn equip_texture(
 ) -> Result<(), String> {
     let auth_type = auth_type_from_str(account_type);
     if !auth_type.is_oauth() {
-        return Err(String::from("err.notOauth"));
+        return Err(String::from(err_keys::NOT_OAUTH));
     }
     let Some(mut auth) = auths::get(uuid, auth_type) else {
-        return Err(String::from("err.accountMissing"));
+        return Err(String::from(err_keys::ACCOUNT_MISSING));
     };
 
     let profile = get_oauth_profile(&mut auth)
@@ -181,7 +182,7 @@ pub(super) async fn equip_texture(
         }
     }
     let Some(item) = target else {
-        return Err(String::from("err.textureMissing"));
+        return Err(String::from(err_keys::TEXTURE_MISSING));
     };
 
     if kind == "skin" {
@@ -265,19 +266,19 @@ pub async fn account_upload_skin(
 ) -> Result<(), String> {
     let auth_type = auth_type_from_str(&account_type);
     if !auth_type.is_oauth() {
-        return Err(String::from("err.notOauth"));
+        return Err(String::from(err_keys::NOT_OAUTH));
     }
     if variant != "classic" && variant != "slim" {
-        return Err(String::from("err.variantInvalid"));
+        return Err(String::from(err_keys::VARIANT_INVALID));
     }
 
     let data = mml_sys::path_helper::read_byte(&path).map_err(|err| err.to_string())?;
     // PNG 文件签名 89 50 4E 47 0D 0A 1A 0A；服务端只收 PNG，提前拦下明显不对的文件
     if !data.starts_with(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]) {
-        return Err(String::from("err.notPng"));
+        return Err(String::from(err_keys::NOT_PNG));
     }
 
-    let auth = auths::get(&uuid, auth_type).ok_or("err.accountMissing")?;
+    let auth = auths::get(&uuid, auth_type).ok_or(err_keys::ACCOUNT_MISSING)?;
     let file_name = Path::new(&path)
         .file_stem()
         .and_then(|s| s.to_str())
@@ -310,9 +311,9 @@ pub async fn account_upload_skin(
 pub fn account_open_skin_site(account_type: String, uuid: String) -> Result<(), String> {
     let auth_type = auth_type_from_str(&account_type);
     if auth_type == AuthType::Offline || auth_type.is_oauth() {
-        return Err(String::from("err.notOauth"));
+        return Err(String::from(err_keys::NOT_OAUTH));
     }
-    let auth = auths::get(&uuid, auth_type).ok_or("err.accountMissing")?;
+    let auth = auths::get(&uuid, auth_type).ok_or(err_keys::ACCOUNT_MISSING)?;
     let server = auth.text1.clone().unwrap_or_default();
 
     let url = match auth_type {
@@ -323,10 +324,10 @@ pub fn account_open_skin_site(account_type: String, uuid: String) -> Result<(), 
             .trim_end_matches("/api/yggdrasil")
             .to_string(),
         AuthType::SelfLittleSkin => server.trim_end_matches('/').to_string(),
-        _ => return Err(String::from("err.notOauth")),
+        _ => return Err(String::from(err_keys::NOT_OAUTH)),
     };
     if !url.starts_with("http") {
-        return Err(String::from("err.serverEmpty"));
+        return Err(String::from(err_keys::SERVER_EMPTY));
     }
     open_helper::open_url(&url);
     Ok(())

@@ -3,6 +3,7 @@
 //! 网络设置落在 core `config.json` 的 `HttpObj`，启动设置落在 `RunArgObj`
 //! 与 Java 列表；Java 列表由 mml-jvms 持有，增删即时持久化。
 
+use crate::log_text::LogText;
 use mml_config::config_obj::{DnsObj, GameCheckObj, HttpObj, RunArgObj, WindowSettingObj};
 
 use crate::dtos::{
@@ -83,17 +84,17 @@ pub fn settings_get_network() -> NetworkSettingDto {
 #[tauri::command]
 pub fn settings_save_network(dto: NetworkSettingDto) {
     // 记一行收到的代理配置，用来判断前端到底有没有把值送进来；代理字段是草稿，点保存才到这里
-    mml_log::info(format!(
-        "保存网络设置：workProxy={} ({} {}:{}) loginProxy={} ({} {}:{})",
-        dto.work_proxy,
-        dto.work_proxy_type,
-        dto.proxy_ip,
-        dto.proxy_port,
-        dto.login_proxy,
-        dto.login_proxy_type,
-        dto.proxy_ip,
-        dto.proxy_port,
-    ));
+    mml_log::info(
+        LogText::NetworkSettingsSaved {
+            work_proxy: dto.work_proxy.to_string(),
+            work_proxy_type: dto.work_proxy_type.to_string(),
+            proxy_ip: dto.proxy_ip.clone(),
+            proxy_port: dto.proxy_port.to_string(),
+            login_proxy: dto.login_proxy.to_string(),
+            login_proxy_type: dto.login_proxy_type.to_string(),
+        }
+        .text(),
+    );
 
     let mut config = mml_config::write_config();
     config.http = dto.clone().into();

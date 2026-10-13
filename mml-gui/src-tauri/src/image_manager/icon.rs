@@ -4,6 +4,7 @@
 //! 磁盘 `<图标缓存目录>/<sha256>`，落盘前统一转 PNG → 回源，带 `If-None-Match`。
 //! 网址登记表 `urls.json` 把 `sha256 → 远程网址` 存下来，否则重启后回不了源。
 
+use crate::log_text::LogText;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -173,10 +174,13 @@ pub(super) fn save_url_image() {
     if let Err(err) = path_helper::write_bytes(&file, &json) {
         // 落盘失败的表现是"重启后收藏夹里的图标回不了源、只能吃磁盘缓存"——
         // 属于原因不明显的问题，必须留一条日志，见 AGENTS.md §13
-        mml_log::error(format!(
-            "[image] 图标网址登记表落盘失败 {}：{err}",
-            file.display()
-        ));
+        mml_log::error(
+            LogText::IconUrlsSaveFailed {
+                path: file.display().to_string(),
+                error: err.to_string(),
+            }
+            .text(),
+        );
     }
 }
 
@@ -268,7 +272,13 @@ pub(super) fn read_icon_etag(file: &Path) -> Option<String> {
 pub(super) fn write_icon_etag(file: &Path, etag: &str) {
     if let Err(err) = fs::write(file, etag) {
         // 写不上 ETag 的表现是"每次都全量回源下载图标"，同样需要一条线索
-        mml_log::error(format!("[image] ETag 落盘失败 {}：{err}", file.display()));
+        mml_log::error(
+            LogText::IconEtagSaveFailed {
+                path: file.display().to_string(),
+                error: err.to_string(),
+            }
+            .text(),
+        );
     }
 }
 
@@ -296,10 +306,13 @@ pub(super) fn read_icon_bytes(file: &Path) -> Option<IconBytes> {
 pub(super) fn write_icon_file(file: &Path, data: &[u8]) {
     if let Err(err) = path_helper::write_bytes(file, data) {
         // 磁盘缓存写不上 = 每次启动都要重新下载图标，留日志便于排查
-        mml_log::error(format!(
-            "[image] 图标磁盘缓存落盘失败 {}：{err}",
-            file.display()
-        ));
+        mml_log::error(
+            LogText::IconCacheSaveFailed {
+                path: file.display().to_string(),
+                error: err.to_string(),
+            }
+            .text(),
+        );
     }
 }
 

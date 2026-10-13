@@ -20,6 +20,7 @@ use tauri::{AppHandle, Emitter, WebviewWindow};
 
 use crate::dtos::main_dto::LoadState;
 use crate::dtos::{ErrorEvent, InstanceArgsDto, InstanceChangeEvent, InstanceInfoDto};
+use crate::err_keys;
 use crate::{listens, windows};
 
 // block.rs 也用它，故按原路径再导出，供 use super::main::core_instance 取到
@@ -85,7 +86,7 @@ impl Default for MainWindowModel {
 ///
 /// 取不到模型时返回 `err.modelMissing`
 pub(super) fn model(window: &WebviewWindow) -> Result<Arc<Mutex<MainWindowModel>>, String> {
-    windows::window_model(window).ok_or_else(|| "err.modelMissing".to_string())
+    windows::window_model(window).ok_or_else(|| err_keys::MODEL_MISSING.to_string())
 }
 
 /// 实例数据变更事件

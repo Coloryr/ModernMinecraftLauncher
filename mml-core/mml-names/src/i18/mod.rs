@@ -1,7 +1,7 @@
 use std::sync::{OnceLock, RwLock};
 
 use crate::i18_items::{
-    error_type::ErrorType, gui_type::GuiType, info_type::InfoType, panic_type::PanicType,
+    error_type::ErrorType, info_type::InfoType, panic_type::PanicType,
     thread_type::ThreadType,
 };
 
@@ -47,14 +47,6 @@ pub trait I18Lang {
     ///
     /// 当前语言的线程名
     fn get_thread(&self, thread: &ThreadType) -> String;
-    /// 取界面文案
-    ///
-    /// - `gui`: 界面文案条目
-    ///
-    /// # 返回值
-    ///
-    /// 当前语言的界面文案
-    fn get_gui(&self, gui: &GuiType) -> String;
 }
 
 /// 当前语言包；首次访问时惰性初始化为简体中文
@@ -114,17 +106,6 @@ pub fn get_thread(thread: ThreadType) -> String {
     with_thread(&thread)
 }
 
-/// 取界面文案
-///
-/// - `gui`: 界面文案条目
-///
-/// # 返回值
-///
-/// 当前语言的界面文案
-pub fn get_gui(gui: GuiType) -> String {
-    with_gui(&gui)
-}
-
 /// 取一般信息文案，条目按引用传入
 ///
 /// - `info`: 信息条目
@@ -176,17 +157,4 @@ pub fn with_thread(thread: &ThreadType) -> String {
     let i18 = I18.get_or_init(|| RwLock::new(Box::new(zh_cn::ZhCn)));
     let lang = i18.read().unwrap();
     lang.get_thread(thread)
-}
-
-/// 取界面文案，条目按引用传入
-///
-/// - `gui`: 界面文案条目
-///
-/// # 返回值
-///
-/// 当前语言的界面文案
-pub fn with_gui(gui: &GuiType) -> String {
-    let i18 = I18.get_or_init(|| RwLock::new(Box::new(zh_cn::ZhCn)));
-    let lang = i18.read().unwrap();
-    lang.get_gui(gui)
 }

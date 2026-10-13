@@ -1,9 +1,9 @@
-//! 资源管理窗口的结构文件分类：列表 / 删除
+//! 资源管理窗口的结构文件分类：列表 / 详情 / 删除
 //!
 //! 结构类型由内核按文件内容识别，取值 litematica / sponge / 原版 nbt。
 
-use crate::dtos::SchematicItemDto;
-use mml_game::game_schematics::SchematicType;
+use crate::dtos::{SchematicBlockDto, SchematicDetailDto, SchematicItemDto};
+use mml_game::game_schematics::{SchematicObj, SchematicType, read_schematic_file};
 use mml_sys::path_helper;
 
 use super::{KIND_SCHEMATICS, block_on_instance, parse_instance, resource_file};
@@ -65,6 +65,76 @@ pub async fn resource_list_schematics(uuid: String) -> Result<Vec<SchematicItemD
             })
         })
         .collect())
+}
+
+/// 结构文件详情：逐种方块的数量都在这儿
+///
+/// 只读这一个文件，不重扫目录：`read_schematic_file` 是单文件读取器，
+/// 而目录扫描要把每个结构都解析一遍，点一次详情不值当。
+///
+/// - `uuid`: 实例 uuid
+/// - `file`: 结构文件名，不是完整路径
+///
+/// # 返回值
+///
+/// 见 [`SchematicDetailDto`]；文件名非法返回 `err.fileName`，打开失败返回内核错误串。
+/// 解析失败不返回错误，而是 `fail` 为真、其余字段为默认值，与列表条目同一口径
+#[gui_macros::ipc_group("resource")]
+#[tauri::command]
+pub async fn resource_schematic_detail(
+    uuid: String,
+    file: String,
+) -> Result<SchematicDetailDto, String> {
+    let instance = parse_instance(&uuid)?;
+    let path = resource_file(&instance, KIND_SCHEMATICS, &file)?;
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let ext = path
+        .extension()
+        .map(|e| e.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    // 解一个结构可能不小：丢到阻塞线程，别占住 async runtime。
+    // 解析失败按"读不出来"处理，与列表条目一样标 `fail`，不把内核错误串弹给用户
+    let parsed = tauri::async_runtime::spawn_blocking(move || -> Result<Option<SchematicObj>, String> {
+        let mut stream = path_helper::open_read(&path).map_err(|err| err.to_string())?;
+        Ok(read_schematic_file(&mut stream, SchematicType::from_ext(&ext)).ok())
+    })
+    .await
+    .map_err(|err| err.to_string())??;
+
+    let obj = parsed.unwrap_or_else(|| SchematicObj {
+        fail: true,
+        ..Default::default()
+    });
+
+    // 逐种方块按数量从多到少；同数量的按 ID 排，保证每次打开顺序一致
+    let mut blocks: Vec<SchematicBlockDto> = obj
+        .blocks
+        .iter()
+        .map(|(id, count)| SchematicBlockDto {
+            id: id.clone(),
+            count: *count,
+        })
+        .collect();
+    blocks.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.id.cmp(&b.id)));
+
+    Ok(SchematicDetailDto {
+        file: name,
+        name: obj.name,
+        author: obj.author,
+        description: obj.description,
+        type_name: schematic_type_name(&obj.schematic_type).to_string(),
+        width: obj.width,
+        height: obj.height,
+        length: obj.length,
+        block_count: obj.block_count,
+        block_types: obj.block_types,
+        blocks,
+        fail: obj.fail,
+    })
 }
 
 /// 删除结构文件，文件进回收站

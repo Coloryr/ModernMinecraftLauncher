@@ -20,6 +20,7 @@ use mml_sys::path_helper;
 use tauri::{Emitter, WebviewWindow};
 
 use crate::dtos::{ModItemDto, ModRenameDto, ModScanProgressDto};
+use crate::err_keys;
 use crate::listens;
 
 use super::{block_on_instance, data_url, parse_instance};
@@ -338,7 +339,7 @@ async fn find_mod(instance: GameInstance, mod_uuid: &str) -> Result<ModObj, Stri
     })
     .await?;
 
-    let path = found.ok_or_else(|| "err.fileNotFound".to_string())?;
+    let path = found.ok_or_else(|| err_keys::FILE_NOT_FOUND.to_string())?;
     // 禁用状态由后缀决定，不需要读文件
     let disable = path.extension().is_some_and(|ext| {
         ext.eq_ignore_ascii_case(names::DISABLE_EXT)

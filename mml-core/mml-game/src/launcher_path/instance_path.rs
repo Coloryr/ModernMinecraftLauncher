@@ -268,6 +268,26 @@ impl InstanceSettingObj {
             .join(names::GAME_CRASH_DIR)
     }
 
+    /// kubejs路径
+    pub fn get_kubejs_path(&self) -> PathBuf {
+        BASE_DIR
+            .get()
+            .unwrap()
+            .join(&self.dir)
+            .join(names::GAME_DIR)
+            .join(names::KUBEJS_DIR)
+    }
+
+    /// local路径
+    pub fn get_local_path(&self) -> PathBuf {
+        BASE_DIR
+            .get()
+            .unwrap()
+            .join(&self.dir)
+            .join(names::GAME_DIR)
+            .join(names::LOCAL_DIR)
+    }
+
     /// 获取储存文件
     pub fn get_json_file(&self) -> PathBuf {
         BASE_DIR

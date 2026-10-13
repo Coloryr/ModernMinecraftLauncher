@@ -145,6 +145,16 @@ pub enum FileType {
     OpenLoaderDataPack,
     /// 语言文件
     Lang,
+    /// Json文件
+    Json,
+    /// Nbt文件
+    Nbt,
+    /// 区块文件
+    Mca,
+    /// Toml文件
+    Toml,
+    /// Yaml文件
+    Yaml,
 }
 
 impl Default for FileType {

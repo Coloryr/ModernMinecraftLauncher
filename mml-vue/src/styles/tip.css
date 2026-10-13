@@ -10,6 +10,8 @@
   color: var(--text);
   font-size: 12px;
   line-height: 1.5;
+  /* 多行提示（如存档那几条信息）按 `\n` 断行：textContent 里的换行默认会被折成空格 */
+  white-space: pre-line;
   word-break: break-all;
   pointer-events: none;
   box-shadow: var(--shadow-lg);

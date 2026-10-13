@@ -6,7 +6,7 @@
 /** 四种添加模式 */
 export type AddMode = "new" | "archive" | "folder" | "online";
 
-/** 模式切换项的图标名，对应 ModeTabs 内置的四个 svg */
+/** 模式切换项的图标名，对应 IconTabs 内置的四个 svg */
 export type AddModeIcon = "cube" | "box" | "folder" | "globe";
 
 export interface AddModeTab {

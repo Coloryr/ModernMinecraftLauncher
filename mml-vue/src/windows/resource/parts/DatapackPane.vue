@@ -179,11 +179,14 @@ function onMenuPick(id: string) {
   }
 }
 
-/** 启用状态的显示名：开着 / 关着 / 没登记进 level.dat */
+/**
+ * 启用状态的显示名：**只有两态**
+ *
+ * `null`（level.dat 的两个列表里都没有）按**开着**算：世界下次载入时 MC 会把它当启用，
+ * 界面上因此不出现"未登记"这一态，只分已启用 / 未启用
+ */
 function state(item: DataPackItemDto): string {
-  if (item.enable === true) return t("resource.dpOn");
-  if (item.enable === false) return t("resource.dpOff");
-  return t("resource.dpNone");
+  return item.enable === false ? t("resource.dpOff") : t("resource.dpOn");
 }
 
 /** 显示名：去掉 NBT 登记名里的 `file/` 前缀 */
@@ -221,12 +224,17 @@ function formatLabel(item: DataPackItemDto): string {
   </ContentHead>
 
   <div class="item-list">
-    <select v-model="dpSave" class="field-select dp-select">
-      <option value="" disabled>{{ t("resource.selectSave") }}</option>
-      <option v-for="s in saves" :key="s.dir" :value="s.dir">
-        {{ stripFormatting(s.levelName || s.dir) }}
-      </option>
-    </select>
+    <!-- 存档下拉：选完之后选中项只显示存档名，前面补一个常驻的标签说明这是什么。
+         标签与下拉同一行，下拉吃满剩余宽度 -->
+    <div class="dp-save-row">
+      <span class="dp-label">{{ t("resource.saveLabel") }}</span>
+      <select v-model="dpSave" class="field-select dp-select">
+        <option value="" disabled>{{ t("resource.selectSave") }}</option>
+        <option v-for="s in saves" :key="s.dir" :value="s.dir">
+          {{ stripFormatting(s.levelName || s.dir) }}
+        </option>
+      </select>
+    </div>
 
     <template v-if="dpSave">
       <!-- 加载中用骨架行占位：与其它分类同一套；这里只换行，存档下拉要一直留着 -->
@@ -235,14 +243,13 @@ function formatLabel(item: DataPackItemDto): string {
         'row-selected': isSelected(item),
         'row-anchor': anchorKey === item.name,
         'row-selecting': selected.size > 0,
-      }" @click="onRowClick({ event: $event, item })"
-        @contextmenu.prevent="openMenu({ event: $event, item })">
+      }" @click="onRowClick({ event: $event, item })" @contextmenu.prevent="openMenu({ event: $event, item })">
         <template #select>
           <input type="checkbox" class="row-select" :checked="isSelected(item)" @pointerdown.stop
             @change.stop="toggleSelect(item)" @click.stop />
         </template>
         <template #badges>
-          <span class="badge" :class="{ 'badge-red': item.enable === false }">
+          <span class="badge" :class="item.enable === false ? 'badge-off' : 'badge-on'">
             {{ state(item) }}
           </span>
         </template>
@@ -258,6 +265,6 @@ function formatLabel(item: DataPackItemDto): string {
   </div>
 
   <!-- 行右键菜单：单行与批量共用，菜单项见 itemMenuItems / batchMenuItems -->
-  <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title"
-    @pick="onMenuPick" @close="rowMenu = null" />
+  <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title" @pick="onMenuPick"
+    @close="rowMenu = null" />
 </template>

@@ -1,22 +1,26 @@
 <script setup lang="ts">
-// 存档列表：备份、还原、打开目录、删除；数据包是同一分类下的子页，见 DatapackPane
+// 存档列表：编辑模式 / 难度 / 极限 / 名字 / 种子、备份、还原、打开目录、删除；
+// 数据包是同一分类下的子页，见 DatapackPane
 //
 // 支持多选（与模组列表同一套口径）：行左端勾选框加选、Shift + 点整段选中，
 // 有选中项时顶栏换成批量操作条，右键则换成批量菜单 —— 两处**都只有「删除」**（用户口径）。
 // **行尾不排按钮**，单行动作全在右键菜单里，单行与批量共用一个菜单组件，见 RowMenu。
 // 批量备份与「还原」都不进批量：备份要一个一个来、还原得逐个挑备份，见 openRestore。
 import { computed, ref } from "vue";
-import { t } from "../../../lib/i18n";
+import { t, tErr } from "../../../lib/i18n";
 import { stripFormatting } from "../../../lib/formatting";
 import { showToast } from "../../../lib/toast";
 import {
+  api,
   backupSave,
   deleteSave,
+  editSave,
   listSaveBackups,
   restoreSaveBackup,
 } from "../../../lib/api";
 import BaseButton from "../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../components/ui/BaseModal.vue";
+import BaseSwitch from "../../../components/ui/BaseSwitch.vue";
 import ContentHead from "./ContentHead.vue";
 import FormattedText from "../../../components/ui/FormattedText.vue";
 import ListSkeleton from "./ListSkeleton.vue";
@@ -35,7 +39,7 @@ const props = defineProps<{
   ops: ReturnType<typeof useResourceOps>;
 }>();
 
-const { saves, instanceUuid, loading } = props.data;
+const { saves, instanceUuid, loading, reloadCurrent } = props.data;
 const { busy, act, actLocal, askConfirm, askDelete, openFolder } = props.ops;
 
 function remove(item: SaveItemDto) {
@@ -109,7 +113,12 @@ const rowMenu = ref<{
 
 /** 单行菜单项 */
 function itemMenuItems(item: SaveItemDto): RowMenuItem[] {
-  const items: RowMenuItem[] = [{ id: "backup", label: t("resource.backup") }];
+  // 「编辑存档」放最前：改模式与难度是这个列表里唯一的"改内容"动作。
+  // 损坏的存档置灰：它没有 `Data` 复合标签，后端 set_mode 必然返回 DataNotFound
+  const items: RowMenuItem[] = [
+    { id: "edit", label: t("resource.saveEdit"), disabled: item.broken },
+    { id: "backup", label: t("resource.backup") },
+  ];
   // 有备份才给还原入口：没有备份的存档点还原只会弹一句"还没有备份"
   if (item.backups) items.push({ id: "restore", label: t("resource.restore") });
   items.push({ id: "open-folder", label: t("resource.openFolder"), separated: true });
@@ -150,6 +159,9 @@ function onMenuPick(id: string) {
 
   const item = menu.item;
   switch (id) {
+    case "edit":
+      openEdit(item);
+      break;
     case "backup":
       backup(item);
       break;
@@ -195,6 +207,155 @@ function pickRestore(backupFile: string) {
   );
 }
 
+// ---------- 编辑存档 ----------
+//
+// 写的是存档里的 level.dat，后端 `resource_save_edit`：模式 / 难度 / 极限模式 / 名字 / 种子
+// 一次全部下发。实例正在运行时后端拒绝，前端在开弹窗前也拦一道，见 openEdit。
+
+/**
+ * 编辑弹窗的草稿；`null` 表示没开
+ *
+ * 初值取**列表里那一条**，不重新读盘：列表本来就来自 level.dat，两边一致。
+ * 种子在列表里就是字符串，一路带着走，别在这里转成数字。
+ */
+const editForm = ref<{
+  item: SaveItemDto;
+  levelName: string;
+  gameType: number;
+  difficulty: number;
+  hardCore: boolean;
+  seed: string;
+} | null>(null);
+const editBusy = ref(false);
+/** 碰过输入框或点过保存才报红，弹窗刚开时不报警，与分组名弹窗同一口径 */
+const editTouched = ref(false);
+
+/**
+ * 打开编辑弹窗
+ *
+ * 实例跑着的时候**不开**：游戏退出时会用它内存里的值覆盖 level.dat，改了也白改，
+ * 所以先查一次运行状态并给提示。
+ *
+ * 运行标记取自 `main_get_instances`：`main_get_running` 读的是**调用方窗口**的模型，
+ * 资源窗口调它只会拿到空表。
+ *
+ * - `item`: 要编辑的那条存档
+ */
+async function openEdit(item: SaveItemDto) {
+  try {
+    const list = await api.getInstances();
+    if (list.some((one) => one.uuid === instanceUuid.value && one.running)) {
+      showToast(t("err.instanceRunning"));
+      return;
+    }
+  } catch (e) {
+    showToast(tErr(e));
+    return;
+  }
+
+  editForm.value = {
+    item,
+    levelName: item.levelName,
+    gameType: item.gameType,
+    difficulty: item.difficulty,
+    hardCore: item.hardCore,
+    seed: item.seed,
+  };
+  editTouched.value = false;
+}
+
+/**
+ * 取值能不能在下拉里摆出来，即 0–3
+ *
+ * 旧存档的 GameType 常见 -1，那时下拉里只画一条禁用的「未知」占位，
+ * 必须重新选一个才能存 —— 直接存会把"认不出来"悄悄写成"生存"。
+ */
+function isKnownValue(value: number): boolean {
+  return value >= 0 && value <= 3;
+}
+
+/** 种子是否合法：十进制整数、可带负号，且落在 i64 范围内；口径与后端 `resource_save_edit` 一致 */
+function seedValid(text: string): boolean {
+  const trimmed = text.trim();
+  if (!/^-?\d+$/.test(trimmed)) return false;
+  // 用 BigInt 比范围：种子常常超出 JS 的安全整数范围，按 Number 判定会漏
+  const value = BigInt(trimmed);
+  return value >= -(2n ** 63n) && value <= 2n ** 63n - 1n;
+}
+
+/** 名字的校验结果，空串表示没问题 */
+const editNameError = computed(() => {
+  const form = editForm.value;
+  if (!form) return "";
+  return form.levelName.trim() ? "" : t("err.saveNameEmpty");
+});
+
+/** 种子的校验结果，空串表示没问题 */
+const editSeedError = computed(() => {
+  const form = editForm.value;
+  if (!form) return "";
+  return seedValid(form.seed) ? "" : t("err.saveSeed");
+});
+
+/**
+ * 随机一个种子填进输入框
+ *
+ * 用 `crypto` 取 8 个随机字节按 i64 解释：level.dat 里的种子就是这个范围，
+ * 而 `Math.random` 只有 53 位有效位，凑不出完整的 64 位。
+ */
+function randomSeed() {
+  const form = editForm.value;
+  if (!form) return;
+
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  let value = 0n;
+  for (const byte of bytes) value = (value << 8n) | BigInt(byte);
+  form.seed = BigInt.asIntN(64, value).toString();
+  editTouched.value = true;
+}
+
+/** 模式或难度还是"认不出来的原值"：给一条重新选的提示 */
+const editModeUnknown = computed(() => {
+  const form = editForm.value;
+  if (!form) return false;
+  return !isKnownValue(form.gameType) || !isKnownValue(form.difficulty);
+});
+
+/** 点过保存之后才报的那几处错 */
+const editInvalid = computed(
+  () => editTouched.value && (editModeUnknown.value || !!editNameError.value || !!editSeedError.value),
+);
+
+/**
+ * 保存：写回 level.dat，然后重拉列表
+ *
+ * 模式与难度只在行的悬停提示里显示，重拉一次让它与新写进去的值对齐。
+ * 实例正在运行时后端回 `err.instanceRunning`，这时弹窗**留着不关**，用户可以先去退游戏。
+ */
+async function saveEdit() {
+  const form = editForm.value;
+  if (!form || editBusy.value) return;
+  editTouched.value = true;
+  if (editInvalid.value) return;
+  editBusy.value = true;
+  try {
+    await editSave(instanceUuid.value, form.item.dir, {
+      gameType: form.gameType,
+      difficulty: form.difficulty,
+      hardCore: form.hardCore,
+      levelName: form.levelName.trim(),
+      seed: form.seed.trim(),
+    });
+    editForm.value = null;
+    await reloadCurrent();
+    showToast(t("resource.saveEditOk"));
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    editBusy.value = false;
+  }
+}
+
 /** 上次游玩时间；入参是 Unix 毫秒，未知时显示 -- */
 function formatTime(ms: number): string {
   if (!ms) return "--";
@@ -206,6 +367,48 @@ function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/** 游戏模式的取值名，下标就是 level.dat 的 GameType */
+const GAME_TYPES = ["survival", "creative", "adventure", "spectator"];
+
+/** 难度的取值名，下标就是 level.dat 的 Difficulty */
+const DIFFICULTIES = ["peaceful", "easy", "normal", "hard"];
+
+/** 游戏模式：level.dat 的 GameType，取值 0–3；认不出的（旧存档常见 -1）按未知显示 */
+function modeLabel(value: number): string {
+  return GAME_TYPES[value]
+    ? t(`resource.gameType.${GAME_TYPES[value]}`)
+    : t("resource.saveValueUnknown");
+}
+
+/** 难度：level.dat 的 Difficulty，取值 0–3 */
+function difficultyLabel(value: number): string {
+  return DIFFICULTIES[value]
+    ? t(`resource.difficulty.${DIFFICULTIES[value]}`)
+    : t("resource.saveValueUnknown");
+}
+
+/**
+ * 悬停提示：行里放不下的那几条信息
+ *
+ * 行上只有名字、目录、上次游玩与几个徽标，游戏模式与难度没有展示位，这里补上；
+ * 一行一条，靠 `\n` 断行（`.app-tip` 是 `pre-line`）。
+ *
+ * - `item`: 存档条目
+ *
+ * # 返回值
+ *
+ * 多行提示文本
+ */
+function saveTip(item: SaveItemDto): string {
+  return [
+    t("resource.saveModeLine", { value: modeLabel(item.gameType) }),
+    t("resource.saveDifficultyLine", { value: difficultyLabel(item.difficulty) }),
+    t("resource.lastPlayed", { time: formatTime(item.lastPlayed) }),
+    t("resource.backupCount", { n: item.backups }),
+    t("resource.saveDirLine", { dir: item.dir }),
+  ].join("\n");
 }
 </script>
 
@@ -231,11 +434,12 @@ function formatSize(bytes: number): string {
     <ListSkeleton />
   </div>
   <div v-else class="item-list">
-    <ResourceRow v-for="item in saves" :key="item.dir" :icon="item.icon" :name="item.levelName || item.dir" :class="{
-      'row-selected': isSelected(item),
-      'row-anchor': anchorKey === item.dir,
-      'row-selecting': selected.size > 0,
-    }" @click="onRowClick({ event: $event, item })" @contextmenu.prevent="openMenu({ event: $event, item })">
+    <ResourceRow v-for="item in saves" :key="item.dir" :icon="item.icon" :name="item.levelName || item.dir"
+      v-tip="saveTip(item)" :class="{
+        'row-selected': isSelected(item),
+        'row-anchor': anchorKey === item.dir,
+        'row-selecting': selected.size > 0,
+      }" @click="onRowClick({ event: $event, item })" @contextmenu.prevent="openMenu({ event: $event, item })">
       <!-- 多选勾选框，与模组列表同一套，见 useRowSelect -->
       <template #select>
         <input type="checkbox" class="row-select" :checked="isSelected(item)" @pointerdown.stop
@@ -261,8 +465,80 @@ function formatSize(bytes: number): string {
   </div>
 
   <!-- 行右键菜单：单行与批量共用，菜单项见 itemMenuItems / batchMenuItems -->
-  <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title"
-    @pick="onMenuPick" @close="rowMenu = null" />
+  <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title" @pick="onMenuPick"
+    @close="rowMenu = null" />
+
+  <!--
+    编辑存档：名字 / 游戏模式 / 难度 / 极限模式 / 地图种子，写回该存档的 level.dat
+
+    模式与难度**只能选 0–3**：原值认不出来时（旧存档的 GameType 常见 -1）多画一条禁用的
+    「未知」占位，把现状摆在眼前，逼用户重新选一个 —— 直接存会把"认不出来"悄悄写成"生存"。
+
+    种子是**字符串**：它在 level.dat 里是 i64，超过 JS 的安全整数范围，当数字过一遍就变样了。
+    名字与种子的红框与提示在碰过之后才出现，与分组名弹窗同一口径。
+  -->
+  <BaseModal v-if="editForm" :title="t('resource.saveEdit')" :closable="false" @close="editForm = null">
+    <p class="save-edit-name">
+      <FormattedText :text="editForm.item.levelName || editForm.item.dir" />
+    </p>
+    <p class="save-edit-dir" :title="editForm.item.dir">{{ editForm.item.dir }}</p>
+
+    <label class="field-label">{{ t("resource.saveNameField") }}</label>
+    <input v-model="editForm.levelName" class="field-input" :class="{ 'is-invalid': editTouched && !!editNameError }"
+      spellcheck="false" @input="editTouched = true" @keydown.enter="saveEdit" />
+    <p v-if="editTouched && editNameError" class="error-text">{{ editNameError }}</p>
+
+    <div class="field-row-2">
+      <div>
+        <label class="field-label">{{ t("resource.saveModeField") }}</label>
+        <select v-model.number="editForm.gameType" class="field-select"
+          :class="{ 'is-invalid': editTouched && !isKnownValue(editForm.gameType) }" @change="editTouched = true">
+          <option v-if="!isKnownValue(editForm.gameType)" :value="-1" disabled>
+            {{ t("resource.saveValueUnknown") }}
+          </option>
+          <option v-for="(name, index) in GAME_TYPES" :key="name" :value="index">
+            {{ t(`resource.gameType.${name}`) }}
+          </option>
+        </select>
+      </div>
+      <div>
+        <label class="field-label">{{ t("resource.saveDifficultyField") }}</label>
+        <select v-model.number="editForm.difficulty" class="field-select"
+          :class="{ 'is-invalid': editTouched && !isKnownValue(editForm.difficulty) }" @change="editTouched = true">
+          <option v-if="!isKnownValue(editForm.difficulty)" :value="-1" disabled>
+            {{ t("resource.saveValueUnknown") }}
+          </option>
+          <option v-for="(name, index) in DIFFICULTIES" :key="name" :value="index">
+            {{ t(`resource.difficulty.${name}`) }}
+          </option>
+        </select>
+      </div>
+    </div>
+    <p v-if="editTouched && editModeUnknown" class="error-text">{{ t("resource.saveEditUnknown") }}</p>
+
+    <label class="field-label">{{ t("resource.saveSeedField") }}</label>
+    <!-- 输入框 + 随机：`.path-row` 是"输入框 + 按钮一行"的通用写法，按钮靠它跟输入框等高 -->
+    <div class="path-row">
+      <input v-model="editForm.seed" class="field-input" :class="{ 'is-invalid': editTouched && !!editSeedError }"
+        spellcheck="false" @input="editTouched = true" @keydown.enter="saveEdit" />
+      <BaseButton size="sm" class="pick-btn" @click="randomSeed">
+        {{ t("resource.saveSeedRandom") }}
+      </BaseButton>
+    </div>
+    <p v-if="editTouched && editSeedError" class="error-text">{{ editSeedError }}</p>
+
+    <div class="save-edit-switch">
+      <span class="field-label">{{ t("resource.saveHardcoreField") }}</span>
+      <BaseSwitch v-model="editForm.hardCore" />
+    </div>
+
+    <div class="modal-actions">
+      <BaseButton :disabled="editBusy" @click="editForm = null">{{ t("resource.cancel") }}</BaseButton>
+      <BaseButton variant="primary" :disabled="editBusy" @click="saveEdit">
+        {{ t("resource.save") }}
+      </BaseButton>
+    </div>
+  </BaseModal>
 
   <!-- 选一个备份来还原（破坏性，选中后还会再确认一次） -->
   <BaseModal v-if="restorePick" :title="t('resource.restorePickTitle')" :closable="false" @close="restorePick = null">
@@ -279,9 +555,38 @@ function formatSize(bytes: number): string {
   </BaseModal>
 </template>
 
-<!-- 备份弹窗的样式走 scoped：BaseModal 是 Teleport 到 body 的，
+<!-- 编辑弹窗与备份弹窗的样式都走 scoped：BaseModal 是 Teleport 到 body 的，
      窗口级 resource.css 那套 .resource-layout 前缀够不着它（备注弹窗同理） -->
 <style scoped>
+/* 存档名（作者可能带 `§` 格式码，过一遍显示期解析）与它的目录名，一行一条 */
+.save-edit-name {
+  margin: 0 0 2px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.save-edit-dir {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 极限模式：标签 + 开关一行，标签不要 .field-label 的上下外边距 */
+.save-edit-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.save-edit-switch .field-label {
+  margin: 0;
+}
+
 .backup-pick-list {
   display: flex;
   flex-direction: column;

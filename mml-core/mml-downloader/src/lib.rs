@@ -44,6 +44,8 @@ pub mod download_task;
 mod download_thread;
 pub mod later_tasks;
 
+pub use download_task::TaskOutcome;
+
 use std::{
     path::{Path, PathBuf},
     sync::{
@@ -480,8 +482,19 @@ pub fn cancel_task(id: u64) -> bool {
 /// # 返回值
 ///
 /// `true` — 全部下载成功
-/// `false` — 下载被停止或有文件下载失败
+/// `false` — 下载被停止、被取消或有文件下载失败
 pub async fn start_download_task(items: Vec<FileItemObj>) -> bool {
+    start_download_task_outcome(items).await.is_done()
+}
+
+/// 创建新下载任务并开始下载，区分成功 / 失败 / 取消
+///
+/// - `items`: 需要下载的文件列表
+///
+/// # 返回值
+///
+/// 见 [`TaskOutcome`]
+pub async fn start_download_task_outcome(items: Vec<FileItemObj>) -> TaskOutcome {
     start_download_task_cancellable(items, CancellationToken::new()).await
 }
 
@@ -492,14 +505,13 @@ pub async fn start_download_task(items: Vec<FileItemObj>) -> bool {
 ///
 /// # 返回值
 ///
-/// `true` — 全部下载成功
-/// `false` — 任务被停止、被取消或有文件下载失败；取消后任务会被移出队列
+/// 见 [`TaskOutcome`]；取消后任务会被移出队列
 pub async fn start_download_task_cancellable(
     items: Vec<FileItemObj>,
     cancel: CancellationToken,
-) -> bool {
+) -> TaskOutcome {
     if STOP.load(Ordering::SeqCst) {
-        return false;
+        return TaskOutcome::Cancelled;
     }
     let task = DownloadTask::new(items);
     // 全局暂停期间新增的任务同样保持暂停
@@ -526,7 +538,7 @@ pub async fn start_download_task_cancellable(
             TASKS.write().unwrap().retain(|t| t.id != id);
             task_handel.cancel();
             task_done(&task_handel);
-            false
+            TaskOutcome::Cancelled
         }
     }
 }
@@ -634,7 +646,7 @@ mod tests {
 
     use mml_base::file_item::FileItemObj;
 
-    use crate::download_task::DownloadTask;
+    use crate::download_task::{DownloadTask, TaskOutcome};
 
     use super::test_util::{GUI_EVENTS, ensure_env};
 
@@ -665,7 +677,7 @@ mod tests {
         assert!(task.get_item().is_none());
     }
 
-    /// 成功完成的任务：wait_done 返回 true，并从全局任务队列移除
+    /// 成功完成的任务：wait_done 返回 Done，并从全局任务队列移除
     #[test]
     fn task_done_waits_and_completes() {
         ensure_env();
@@ -682,14 +694,14 @@ mod tests {
         let rt = tokio::runtime::Builder::new_current_thread()
             .build()
             .unwrap();
-        let ok = rt.block_on(task.wait_done());
-        assert!(ok);
+        let res = rt.block_on(task.wait_done());
+        assert_eq!(res, TaskOutcome::Done);
 
         // 任务原本就不在全局队列中，此处确认移除无副作用
         assert!(super::get_tasks().iter().all(|t| t.id != id));
     }
 
-    /// 存在失败文件的任务：wait_done 返回 false
+    /// 存在失败文件的任务：wait_done 返回 Failed
     #[test]
     fn task_failed_reports_false() {
         ensure_env();
@@ -702,8 +714,39 @@ mod tests {
         let rt = tokio::runtime::Builder::new_current_thread()
             .build()
             .unwrap();
-        let ok = rt.block_on(task.wait_done());
-        assert!(!ok);
+        let res = rt.block_on(task.wait_done());
+        assert_eq!(res, TaskOutcome::Failed);
+    }
+
+    /// 任务被取消：结束方式是 Cancelled，且不计入失败数
+    #[test]
+    fn task_cancelled_is_not_a_failure() {
+        ensure_env();
+
+        let task = DownloadTask::new(vec![file_item("a")]);
+        let _item = task.get_item().unwrap();
+        task.mark_cancelled();
+        assert_eq!(task.failed_count.load(Ordering::SeqCst), 0);
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        assert_eq!(rt.block_on(task.wait_done()), TaskOutcome::Cancelled);
+    }
+
+    /// 取消令牌已触发：wait_done 立刻返回 Cancelled，不等在途文件自行收尾
+    #[test]
+    fn task_cancel_token_reports_cancelled() {
+        ensure_env();
+
+        let task = DownloadTask::new(vec![file_item("a")]);
+        let _item = task.get_item().unwrap();
+        task.cancel();
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        assert_eq!(rt.block_on(task.wait_done()), TaskOutcome::Cancelled);
     }
 
     /// 任务进度通过 GUI 回调上报，1/2 完成即 50%

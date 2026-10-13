@@ -7,7 +7,6 @@ use crate::{
     i18::I18Lang,
     i18_items::{
         error_type::{ArgEmptyData, ArgErrorData, DataNotFoundData, ErrorType, SkinBlockErrorData},
-        gui_type::GuiType,
         info_type::InfoType,
         panic_type::PanicType,
         thread_type::ThreadType,
@@ -29,6 +28,26 @@ impl I18Lang for EnUs {
             InfoType::CoreStart => format!("M²L started, version: {}", *VERSION),
             InfoType::CoreStop => String::from("M²L stopped"),
             InfoType::TempFile => String::from("Temporary files"),
+            InfoType::ProxyUser {
+                kind,
+                ip,
+                port,
+                auth,
+            } => format!(
+                "User/{kind} {ip}:{port} (auth={})",
+                if *auth { "yes" } else { "no" }
+            ),
+            InfoType::ProxyNone => String::from("None (proxy disabled)"),
+            InfoType::ProxyAuto => String::from("Auto (follow system)"),
+            InfoType::HttpClientInit { work, login } => {
+                format!("HTTP client initialized: work[{work}] login[{login}]")
+            }
+            InfoType::HttpClientRestart { generation } => format!(
+                "HTTP client restarting, in-flight requests aborted (generation -> {generation})"
+            ),
+            InfoType::HttpClientRestartDone { work, login } => {
+                format!("HTTP client restarted: work[{work}] login[{login}]")
+            }
         }
     }
 
@@ -218,19 +237,6 @@ impl I18Lang for EnUs {
             ThreadType::LanClientV6 => String::from("LAN game V6 listener thread"),
             ThreadType::LanServer => String::from("LAN game broadcast thread"),
             ThreadType::GameCount => String::from("Game launch stats thread"),
-        }
-    }
-
-    /// 取英文界面文案
-    ///
-    /// - `gui`: 界面文案条目
-    ///
-    /// # 返回值
-    ///
-    /// 界面文案尚未接入，恒为空串
-    fn get_gui(&self, gui: &GuiType) -> String {
-        match gui {
-            _ => String::new(),
         }
     }
 }

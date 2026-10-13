@@ -18,6 +18,7 @@ pub mod add_resource;
 pub mod block;
 pub mod collect;
 pub mod colormc;
+pub mod config;
 pub mod custom_home;
 pub mod download;
 pub mod export;
@@ -47,6 +48,8 @@ pub(crate) mod file_drop;
 #[cfg(windows)]
 pub(crate) mod webview_keys;
 
+use mml_game::GameInstance;
+use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
 pub use self::geometry::init;
@@ -58,13 +61,14 @@ use self::lifecycle::{
     close_window_from_uuid, drop_model_for_kind, ensure_model_for_kind, open_window_from_uuid,
 };
 
-use self::geometry::reconcile_min_size;
+use self::geometry::{clamp_runtime_min_size, reconcile_min_size};
 use self::registry::{WINDOWS_INFO, min_size_of_label, uuid_for_kind};
 
 use crate::listens;
 use uuid::Uuid;
 
 use crate::dtos::{DropPathDto, GuiConfigDto, LogFocusDto, WindowSizeDto};
+use crate::err_keys;
 
 /// 解析前端传来的分组 uuid，空白 / 非法一律按"默认分组"处理
 ///
@@ -80,6 +84,35 @@ pub fn parse_group_id(group: Option<String>) -> Option<Uuid> {
     group
         .filter(|g| !g.trim().is_empty())
         .and_then(|g| Uuid::parse_str(&g).ok())
+}
+
+/// 解析实例 uuid，拿实例句柄
+///
+/// 要用实例上的方法（尤其异步的扫存档 / 读模组）时走它。
+///
+/// - `uuid`: 实例 uuid 字符串
+///
+/// # 返回值
+///
+/// uuid 非法返回 `err.uuid`，实例不存在返回 `err.gameNotFound`
+pub(crate) fn instance_handle(uuid: &str) -> Result<GameInstance, String> {
+    let uuid = Uuid::parse_str(uuid).map_err(|_| String::from(err_keys::UUID))?;
+    mml_game::get_instance(&uuid).ok_or_else(|| String::from(err_keys::GAME_NOT_FOUND))
+}
+
+/// 取实例设置的快照，路径类方法都在这份克隆上
+///
+/// 紧接着要读盘（遍历目录、扫 level.dat）时走它：持着读锁走一圈会把别的窗口一起卡住。
+///
+/// - `uuid`: 实例 uuid 字符串
+///
+/// # 返回值
+///
+/// uuid 非法返回 `err.uuid`，实例不存在返回 `err.gameNotFound`
+pub(crate) fn instance_snapshot(uuid: &str) -> Result<InstanceSettingObj, String> {
+    let instance = instance_handle(uuid)?;
+    let snapshot = instance.read().unwrap().clone();
+    Ok(snapshot)
 }
 
 /// 取各窗口的默认宽高，无历史几何时创建窗口就用它，与 WINDOWS_INFO 同源
@@ -139,7 +172,7 @@ pub async fn window_open_window(
             // 前端那份 query 是 URLSearchParams 编出来的，不会出现裸 # / 控制字符；
             // 这里只做一次兜底，别把畸形串拼进 WebviewUrl
             if query.contains('#') || query.chars().any(char::is_control) {
-                return Err(String::from("err.windowQuery"));
+                return Err(String::from(err_keys::WINDOW_QUERY));
             }
             format!("index.html?{query}")
         }
@@ -188,7 +221,7 @@ fn kind_parse_check(kind: &str, instance: &Option<String>) -> Result<(), String>
     if (kind == "log" || kind == "export")
         && let Some(instance) = instance
     {
-        Uuid::parse_str(instance).map_err(|_| "err.uuid".to_string())?;
+        Uuid::parse_str(instance).map_err(|_| err_keys::UUID.to_string())?;
     }
     Ok(())
 }
@@ -236,7 +269,7 @@ pub async fn window_reopen_window(
     // 前端那份 query 是 URLSearchParams 编出来的，不会出现裸 # / 控制字符；
     // 这里只做一次兜底，别把畸形串拼进 URL，同 window_open_window
     if query.contains('#') || query.chars().any(char::is_control) {
-        return Err(String::from("err.windowQuery"));
+        return Err(String::from(err_keys::WINDOW_QUERY));
     }
     let url_path = if query.is_empty() {
         String::from("index.html")
@@ -244,7 +277,10 @@ pub async fn window_reopen_window(
         format!("index.html?{query}")
     };
 
-    let label = WINDOWS_INFO.get(&uuid).map(|entry| entry.label).unwrap_or_default();
+    let label = WINDOWS_INFO
+        .get(&uuid)
+        .map(|entry| entry.label)
+        .unwrap_or_default();
     if let Some(win) = app.get_webview_window(label) {
         // 基准 URL 取窗口当前的：origin / devUrl 都一致，join 一个相对路径即可
         let base = win.url().map_err(|err| err.to_string())?;
@@ -321,7 +357,11 @@ pub fn window_probe_drop(path: String) -> DropPathDto {
         return other("folder");
     }
 
-    match path.to_ascii_lowercase().rsplit_once('.').map(|(_, ext)| ext) {
+    match path
+        .to_ascii_lowercase()
+        .rsplit_once('.')
+        .map(|(_, ext)| ext)
+    {
         Some("zip" | "mrpack" | "modpack") => other("archive"),
         Some("url" | "webloc" | "website") => shortcut_of(&path),
         // 卡片拖到桌面后不一定是 `.url`：有的站点给的是 `.json` / `.txt`。
@@ -453,11 +493,7 @@ fn find_http(text: &str) -> Option<String> {
         })
         .unwrap_or(rest.len());
     let url = clean_url(&rest[..end]);
-    if url.is_empty() {
-        None
-    } else {
-        Some(url)
-    }
+    if url.is_empty() { None } else { Some(url) }
 }
 
 #[cfg(test)]
@@ -478,15 +514,22 @@ mod tests {
     /// Windows 互联网快捷方式 INI：读 `URL=`，忽略其它键
     #[test]
     fn shortcut_url_from_ini() {
-        let text = "[InternetShortcut]\r\nURL=https://littleskin.cn/api/yggdrasil\r\nIconIndex=0\r\n";
-        assert_eq!(url_of("LittleSkin.url", text.as_bytes()), "https://littleskin.cn/api/yggdrasil");
+        let text =
+            "[InternetShortcut]\r\nURL=https://littleskin.cn/api/yggdrasil\r\nIconIndex=0\r\n";
+        assert_eq!(
+            url_of("LittleSkin.url", text.as_bytes()),
+            "https://littleskin.cn/api/yggdrasil"
+        );
     }
 
     /// 键名大小写不敏感；结尾斜杠去掉，后端认证时会自己补
     #[test]
     fn shortcut_url_is_normalized() {
         assert_eq!(
-            url_of("a.url", b"[InternetShortcut]\nurl=https://example.com/api/yggdrasil/\n"),
+            url_of(
+                "a.url",
+                b"[InternetShortcut]\nurl=https://example.com/api/yggdrasil/\n"
+            ),
             "https://example.com/api/yggdrasil"
         );
     }
@@ -517,12 +560,27 @@ mod tests {
     /// 探测：`.url` → shortcut；"只有一个地址"的 `.txt` / `.json` → 也认
     #[test]
     fn probe_shortcut_files() {
-        assert_eq!(probe("a.url", b"[InternetShortcut]\nURL=https://littleskin.cn/api/yggdrasil\n"), "shortcut");
-        // 卡片拖到桌面有时是这些后缀：内容可能是裸地址、带引号、或包一层 json
-        assert_eq!(probe("card.txt", b"  https://littleskin.cn/api/yggdrasil  \n"), "shortcut");
-        assert_eq!(probe("quoted.json", b"\"https://littleskin.cn/api/yggdrasil\""), "shortcut");
         assert_eq!(
-            probe("wrapped.json", br#"{"url":"https://littleskin.cn/api/yggdrasil"}"#),
+            probe(
+                "a.url",
+                b"[InternetShortcut]\nURL=https://littleskin.cn/api/yggdrasil\n"
+            ),
+            "shortcut"
+        );
+        // 卡片拖到桌面有时是这些后缀：内容可能是裸地址、带引号、或包一层 json
+        assert_eq!(
+            probe("card.txt", b"  https://littleskin.cn/api/yggdrasil  \n"),
+            "shortcut"
+        );
+        assert_eq!(
+            probe("quoted.json", b"\"https://littleskin.cn/api/yggdrasil\""),
+            "shortcut"
+        );
+        assert_eq!(
+            probe(
+                "wrapped.json",
+                br#"{"url":"https://littleskin.cn/api/yggdrasil"}"#
+            ),
             "shortcut"
         );
         // 里面夹着别的东西，如 modpack 的 manifest.json 有多个地址 + 大段内容，不能当登录快捷方式
@@ -612,15 +670,22 @@ pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'stati
     if let Err(error) = window.activate_decoration().await {
         // 回退：先确保原生 frame 还在，再显示，最后把原因带回前端
         let _ = window.restore_decoration().await;
+        // 退回原生 frame：此刻量到的差值含标题栏，正好是带装饰窗口该有的下限
+        if let Some(min) = min_size_of_label(window.label()) {
+            reconcile_min_size(&window, min.width, min.height);
+        }
         let _ = window.show();
         return Err(format!("decoration activate failed: {error}"));
     }
 
     // 装饰已摘掉，此刻量到的「外框 − 客户区」才是那圈 Windows 边框带；
-    // 建窗那一刻量到的是边框带 + 标题栏，见 reconcile_min_size 的文档。
-    // 建窗那次调用**保留**：激活失败退回原生 frame 时，那个口径才是对的。
+    // 建窗时量到的是边框带 + 标题栏，拿它当客户区下限会把窗口顶高，所以建窗时**不设**下限，
+    // 到这里才设；激活失败退回原生 frame 的那条分支另设一次
     if let Some(min) = min_size_of_label(window.label()) {
         reconcile_min_size(&window, min.width, min.height);
+        // 存盘口径是带装饰的客户区，比运行时口径小一个标题栏，恢复几何时夹不了这个下限，
+        // 只能等装饰摘掉、inner_size() 变成运行时口径后在这里补一次
+        clamp_runtime_min_size(&window, min);
     }
 
     window.show().map_err(|err| err.to_string())?;
@@ -787,9 +852,7 @@ pub async fn window_save_gui_config(app: AppHandle, config: GuiConfigDto) -> Res
     let mut new_config: crate::gui_config::GuiConfig = config.into();
     let skin_changed = {
         let old = crate::gui_config::get();
-        old.skin != new_config.skin
-            || old.head != new_config.head
-            || old.cape != new_config.cape
+        old.skin != new_config.skin || old.head != new_config.head || old.cape != new_config.cape
     };
     let client_changed = {
         let old = crate::gui_config::get();

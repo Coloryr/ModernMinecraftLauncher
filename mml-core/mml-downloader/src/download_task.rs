@@ -30,6 +30,29 @@ pub(crate) struct TaskBytes {
     pub(crate) now_bytes: u64,
 }
 
+/// 下载任务的结束方式
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TaskOutcome {
+    /// 全部文件下载成功
+    Done,
+    /// 有文件下载失败
+    Failed,
+    /// 被取消：用户停止下载、退出启动器或外部取消令牌
+    Cancelled,
+}
+
+impl TaskOutcome {
+    /// 是否全部成功；只需要分"成没成"时用它
+    pub fn is_done(&self) -> bool {
+        matches!(self, TaskOutcome::Done)
+    }
+
+    /// 是否被取消
+    pub fn is_cancelled(&self) -> bool {
+        matches!(self, TaskOutcome::Cancelled)
+    }
+}
+
 /// 下载任务
 ///
 /// 封装一组待下载文件的队列，提供进度跟踪、取消、暂停和完成等待功能。
@@ -50,6 +73,8 @@ pub(crate) struct DownloadTask {
     pub completed_count: AtomicUsize,
     /// 失败数量
     pub failed_count: AtomicUsize,
+    /// 被取消的数量；取消不是失败，单独计数
+    cancelled_count: AtomicUsize,
     /// 是否暂停，暂停期间不再分配新文件，在途文件阻塞在写入循环
     paused: AtomicBool,
     /// 任务创建时间，用于统计已进行时间
@@ -81,6 +106,7 @@ impl DownloadTask {
             total_size: size,
             completed_count: AtomicUsize::new(0),
             failed_count: AtomicUsize::new(0),
+            cancelled_count: AtomicUsize::new(0),
             paused: AtomicBool::new(false),
             start: Instant::now(),
             cancel: CancellationToken::new(),
@@ -88,15 +114,16 @@ impl DownloadTask {
         }
     }
 
-    /// 检查任务是否完成，完成时发送信号
+    /// 检查任务是否结束，结束时发送信号
     ///
-    /// 按“已完成 + 已失败 == 总数”判定：队列取空只说明文件都被线程取走，
+    /// 按"已完成 + 已失败 + 已取消 == 总数"判定：队列取空只说明文件都被线程取走，
     /// 不能说明都下载完了，在途文件会被误判为任务完成，导致提前返回。
     fn check_done(&self) {
         crate::update_task(self.id, self.progress());
         let completed = self.completed_count.load(Ordering::SeqCst);
         let failed = self.failed_count.load(Ordering::SeqCst);
-        if completed + failed >= self.total_size {
+        let cancelled = self.cancelled_count.load(Ordering::SeqCst);
+        if completed + failed + cancelled >= self.total_size {
             crate::task_done(self);
             self.sem.add_permits(1);
         }
@@ -114,26 +141,40 @@ impl DownloadTask {
         self.check_done();
     }
 
+    /// 标记一个文件被取消
+    ///
+    /// 取消不是失败：单独计数，界面按"已取消"展示，任务失败数不因它上涨。
+    pub fn mark_cancelled(&self) {
+        self.cancelled_count.fetch_add(1, Ordering::SeqCst);
+        self.check_done();
+    }
+
     /// 从队列中取出一个待下载文件，无锁操作
     pub fn get_item(&self) -> Option<Arc<DownloadItem>> {
         self.items.pop()
     }
 
-    /// 异步等待任务全部完成
+    /// 异步等待任务结束
     ///
     /// # 返回值
     ///
-    /// `true` — 全部文件下载成功
-    /// `false` — 有文件下载失败或任务被取消
-    pub async fn wait_done(&self) -> bool {
+    /// 见 [`TaskOutcome`]；被取消时立即返回，不再等在途文件自行失败收尾
+    pub async fn wait_done(&self) -> TaskOutcome {
         tokio::select! {
-            res = async {
+            _ = async {
                 let _ = self.sem.acquire().await.unwrap();
-                self.total_size == self.completed_count.load(Ordering::SeqCst)
-            } => res,
+            } => {
+                if self.cancel.is_cancelled() || self.cancelled_count.load(Ordering::SeqCst) > 0 {
+                    TaskOutcome::Cancelled
+                } else if self.failed_count.load(Ordering::SeqCst) == 0 {
+                    TaskOutcome::Done
+                } else {
+                    TaskOutcome::Failed
+                }
+            }
             // 取消时立即唤醒等待方：任务已移出队列，不再等在途文件
             // 自行失败收尾，那可能要等网络超时，长达数十秒
-            _ = self.cancel.cancelled() => false,
+            _ = self.cancel.cancelled() => TaskOutcome::Cancelled,
         }
     }
 
@@ -145,6 +186,15 @@ impl DownloadTask {
     /// 此任务是否已被取消
     pub fn is_cancelled(&self) -> bool {
         self.cancel.is_cancelled()
+    }
+
+    /// 取取消令牌的克隆，供下载线程在 await 期间与取消竞速
+    ///
+    /// # 返回值
+    ///
+    /// 与 [`cancel`](Self::cancel) 同一份令牌
+    pub fn cancel_token(&self) -> CancellationToken {
+        self.cancel.clone()
     }
 
     /// 暂停此任务，在途文件阻塞、不再分配新文件
@@ -186,12 +236,13 @@ impl DownloadTask {
         )
     }
 
-    /// 获取下载进度百分比，包含已完成和失败的文件
+    /// 获取下载进度百分比，包含已完成、已失败与已取消的文件
     fn progress(&self) -> f64 {
         if self.total_size > 0 {
             let completed = self.completed_count.load(Ordering::SeqCst);
             let failed = self.failed_count.load(Ordering::SeqCst);
-            ((completed + failed) as f64 / self.total_size as f64) * 100.0
+            let cancelled = self.cancelled_count.load(Ordering::SeqCst);
+            ((completed + failed + cancelled) as f64 / self.total_size as f64) * 100.0
         } else {
             0.0
         }

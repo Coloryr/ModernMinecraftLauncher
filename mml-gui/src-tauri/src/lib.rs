@@ -5,9 +5,11 @@
 //! | [`collect_utils`] | 收藏数据读写 |
 //! | [`dtos`] | 跨 IPC DTO，Rust 结构转 camelCase |
 //! | [`err_box`] | 致命错误弹窗 |
+//! | [`err_keys`] | 命令返回给前端的错误键，与语言表对账 |
 //! | [`gui_config`] | GUI 配置读写 |
 //! | [`gui_setting`] | 实例 GUI 设置读写，文件 gui_setting.json，归属 GUI 而非内核 |
 //! | [`image_manager`] | 图片资源加载，走 `mml-image://` 协议 |
+//! | [`log_text`] | 界面侧日志文案，中英两套，不进内核 i18n |
 //! | [`windows`] | 各窗口的规格 / IPC 命令 / 事件，窗口创建 / 聚焦 / 关闭统一处理 |
 //!
 //! 自定义主页面走 `mml-home://` 协议，其压缩包在运行根目录常驻，
@@ -21,9 +23,11 @@ use crate::windows::{block, download, main};
 pub mod collect_utils;
 pub mod dtos;
 pub mod err_box;
+pub mod err_keys;
 pub mod gui_config;
 pub mod gui_setting;
 pub mod image_manager;
+pub mod log_text;
 pub mod windows;
 
 /// 单元测试的共用启动，内核单例每进程只 boot 一次，见 AGENTS.md §6

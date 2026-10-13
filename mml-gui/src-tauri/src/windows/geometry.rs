@@ -1,13 +1,15 @@
 //! 窗口几何：口径换算 + `window_save.json` 读写
 //!
-//! 从 `windows/mod.rs` 拆出来的。这里是全仓**最贵的一段经验**，原注释一字未删：
+//! 从 `windows/mod.rs` 拆出来的。这里是全仓**最贵的一段经验**：
 //! 外框 / 客户区两种口径、逻辑 / 物理两种单位、以及"摘掉原生装饰会把标题栏并进
 //! 客户区"导致的高度漂移 —— 都集中在这个文件里，改之前先读注释。
 //!
 //! 口径速记，详见 `WindowState` 的文档：
 //! - 存盘 / 恢复一律按**客户区**，即 `inner_size()`，且折算回**带装饰**时的口径；
 //! - `WINDOWS_INFO` 里的最小尺寸是**客户区 + 逻辑像素**，见 `super::registry`；
-//! - 只有下发给 Windows 的外框最小尺寸才需要加上那圈边框带，见 [`reconcile_min_size`]。
+//! - 只有下发给 Windows 的外框最小尺寸才需要加上那圈边框带，见 [`reconcile_min_size`]；
+//!   而下限**只在装饰激活后设**：建窗时窗口是带装饰口径，那时算出的下限比恢复值高一个标题栏，
+//!   tao 重设尺寸时 Windows 会顺着它把窗口顶上去，实测每开一次高 31px。
 
 use std::{
     collections::HashMap,
@@ -28,8 +30,8 @@ use super::registry::{MinSize, min_size_of};
 ///
 /// 全仓统一这一套口径：
 /// - `x / y`：**外框**位置，单位物理像素，与 `outer_position()` 同源
-/// - `width / height`：**客户区**尺寸，单位物理像素，与 `inner_size()` 同源，
-///   且不小于注册表里的最小客户区
+/// - `width / height`：**带装饰口径的客户区**尺寸，单位物理像素，与 `inner_size()` 同源，
+///   下限见 [`save_window_state`]
 ///
 /// 注册表 `WINDOWS_INFO` 里的最小 / 默认尺寸则是**客户区 + 逻辑像素**，两者之间只差显示器的
 /// 缩放系数一次换算，见 [`min_inner_physical`]；只有下发给 Windows 的外框最小尺寸
@@ -170,14 +172,13 @@ pub(super) fn min_inner_physical(min: MinSize, scale: f64) -> PhysicalSize {
     }
 }
 
-/// 把注册表里的最小尺寸按客户区口径换算成外框口径，再重设一次
+/// 把注册表里的最小**客户区**尺寸换算成窗口的**外框**最小尺寸，下发给 Windows
 ///
-/// Windows 的最小尺寸走 `WM_GETMINMAXINFO`，它约束的是**外框**；而我们关心的其实是客户区，
-/// 也就是 webview 能拿到多少排版空间。无边框 + 系统阴影时「外框 − 客户区」就是那圈 Windows
-/// 边框带：96 DPI 下左右下各 8px、顶部 1px，且只有 Windows 有。
-/// 这里量出真实差值加到最小尺寸上，差值单位物理像素，随 DPI 自动变化，不用自己算
+/// 注册表写的是 webview 能拿到多少排版空间，而 Windows 的最小尺寸走 `WM_GETMINMAXINFO`、
+/// 约束的是外框。无边框 + 系统阴影时「外框 − 客户区」就是那圈边框带：96 DPI 下左右下各 8px、
+/// 顶部 1px，且只有 Windows 有。这里量出真实差值加上去，随 DPI 自动变化，不用自己算
 /// SM_CXSIZEFRAME —— 那双指标也不是按 DPI 倍数缩的：96→8、120→9、144→11。
-/// 没有这个带时差值为 0，等于什么都没做，关掉阴影或换到别的平台都安全。
+/// 边框带为 0 时该项退化为 0，**照样要下发**：建窗时已不设下限，跳过会让窗口完全没有下限。
 ///
 /// - `win`: 目标窗口，量它当前的外框与客户区差值
 /// - `min_w`: 最小客户区宽度，逻辑像素
@@ -188,12 +189,9 @@ pub(super) fn reconcile_min_size(win: &WebviewWindow, min_w: f64, min_h: f64) {
     };
     let dx = outer.width.saturating_sub(inner.width);
     let dy = outer.height.saturating_sub(inner.height);
-    if dx == 0 && dy == 0 {
-        return;
-    }
     // 量到的差值是物理像素，换算回逻辑像素后与 min_w / min_h 一起设回去。
     // 必须用逻辑单位：tauri/tao 把它存成 `PixelUnit::Logical`，换到别的 DPI 显示器时会跟着
-    // 缩放，与建窗时 `min_inner_size(min_w, min_h)` 的口径一致；物理像素则不会缩放。
+    // 缩放；物理像素则不会缩放
     let scale = win.scale_factor().unwrap_or(1.0);
     if scale <= 0.0 {
         return;
@@ -201,6 +199,28 @@ pub(super) fn reconcile_min_size(win: &WebviewWindow, min_w: f64, min_h: f64) {
     let width = min_w + dx as f64 / scale;
     let height = min_h + dy as f64 / scale;
     let _ = win.set_min_size(Some(tauri::LogicalSize::new(width, height)));
+}
+
+/// 把窗口的**运行时**客户区补到不小于注册表里的最小客户区
+///
+/// 存盘口径比运行时口径小一个标题栏，恢复几何时夹不了这个下限，只能在装饰激活之后补一次。
+/// 调用点在显示窗口之前，用户看不到跳变。
+///
+/// - `win`: 目标窗口
+/// - `min`: 注册表里的最小客户区尺寸，逻辑像素
+pub(super) fn clamp_runtime_min_size(win: &WebviewWindow, min: MinSize) {
+    let Ok(inner) = win.inner_size() else {
+        return;
+    };
+    let want = min_inner_physical(min, win.scale_factor().unwrap_or(1.0));
+    if inner.width >= want.width && inner.height >= want.height {
+        return;
+    }
+    // set_size 落到 tao 的 set_inner_size，给的就是客户区尺寸，不用自己补边框带
+    let _ = win.set_size(tauri::PhysicalSize::new(
+        inner.width.max(want.width),
+        inner.height.max(want.height),
+    ));
 }
 
 /// 保存窗口几何到状态表
@@ -219,7 +239,8 @@ pub(super) fn reconcile_min_size(win: &WebviewWindow, min_w: f64, min_h: f64) {
 /// 实测主窗口注册表定义 600，文件里出现过 621 与 630。折算就是为了消掉这个漂移。
 ///
 /// 两条统一规则：
-/// - 尺寸夹到不小于注册表里的最小**客户区**，见 [`min_inner_physical`]；
+/// - **无装饰**时把客户区夹到不小于注册表里的最小客户区，见 [`min_inner_physical`]；
+///   带装饰时不夹，下限由 [`clamp_runtime_min_size`] 在激活后补；
 /// - `maximized` 为真时**不覆盖几何**，只记下这个标志，最大化与全屏都算。最大化窗口的
 ///   `outer_position()` 带着框外偏移，常见是 −8，当成普通位置存下来，下次开窗
 ///   `monitor_from_point` 可能解析到**另一块显示器**，而且开出来还不是最大化。
@@ -242,18 +263,25 @@ pub(super) fn save_window_state(
     let mut geom = window_state_for(uuid).unwrap_or_default();
 
     let scale = window.scale_factor().unwrap_or(1.0);
-    // 夹到不小于注册表里的最小客户区：比它还小的值会被反复写回、一直不收敛，
-    // 实测窗口停在「外框 = 最小尺寸」上时，主窗口 920×600 的客户区只有 904×600
+    // 物理像素的最小客户区，夹取用。必须夹：窗口停在「外框 = 最小尺寸」上时，主窗口
+    // 920×600 的客户区只有 904×600，不收的话这个偏小的值会被一直写回、不收敛
     let min = min_inner_physical(min_size_of(uuid).unwrap_or_default(), scale);
 
     if !maximized {
         // 无装饰时标题栏被并进客户区，直接存 inner 每轮净增约 30px，即 639 → 669 → …；
         // 折算回带装饰口径即收敛，折算量见 decoration_growth
         let growth = decoration_growth(uuid, window);
+        // 夹取只在**无装饰**时做：那时 inner 是运行时口径。带装饰时 inner 是带装饰口径，
+        // 比运行时口径小一个标题栏，用最小客户区夹会把它顶高，窗口每开一次就高一截
+        let (width, height) = if growth.width > 0 || growth.height > 0 {
+            (size.width.max(min.width), size.height.max(min.height))
+        } else {
+            (size.width, size.height)
+        };
         geom.x = pos.x;
         geom.y = pos.y;
-        geom.width = size.width.saturating_sub(growth.width).max(min.width);
-        geom.height = size.height.saturating_sub(growth.height).max(min.height);
+        geom.width = width.saturating_sub(growth.width);
+        geom.height = height.saturating_sub(growth.height);
     }
     geom.maximized = maximized;
     window_state_set(uuid, geom);

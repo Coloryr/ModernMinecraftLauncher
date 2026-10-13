@@ -13,6 +13,7 @@ use tauri::{AppHandle, Emitter};
 use crate::collect_utils::{self, CollectItemObj};
 use crate::dtos::CollectDataDto;
 use crate::dtos::add_resource_dto::ProjectItemDto;
+use crate::err_keys;
 use crate::image_manager;
 use crate::listens;
 
@@ -46,10 +47,10 @@ pub fn collect_get_data() -> Result<CollectDataDto, String> {
 pub fn collect_add_group(app: AppHandle, name: String) -> Result<(), String> {
     let name = name.trim();
     if name.is_empty() {
-        return Err(String::from("err.groupEmpty"));
+        return Err(String::from(err_keys::GROUP_EMPTY));
     }
     if collect_utils::get().groups.contains_key(name) {
-        return Err(String::from("err.groupExists"));
+        return Err(String::from(err_keys::GROUP_EXISTS));
     }
 
     collect_utils::add_group(name);
@@ -143,7 +144,7 @@ pub fn collect_star(
     let source = ModPackType::from_string(&source);
     let file_type = match FileType::from_string(&file_type) {
         Some(data) => data,
-        None => return Err(String::from("err.fileTypeNotFound")),
+        None => return Err(String::from(err_keys::FILE_TYPE_NOT_FOUND)),
     };
 
     let item = CollectItemObj {
@@ -206,7 +207,7 @@ pub async fn collect_project_icon(source: String, pid: String) -> Result<Option<
                 Some(image_manager::push_image_url(&data.icon_url))
             })
         }
-        _ => Err(String::from("err.sourceType")),
+        _ => Err(String::from(err_keys::SOURCE_TYPE)),
     }
 }
 
@@ -246,7 +247,7 @@ pub async fn collect_project_item(
 ) -> Result<Option<ProjectItemDto>, String> {
     let file_type = match FileType::from_string(&file_type) {
         Some(data) => data,
-        None => return Err(String::from("err.fileTypeNotFound")),
+        None => return Err(String::from(err_keys::FILE_TYPE_NOT_FOUND)),
     };
     // 收藏状态以本地收藏夹为准
     let is_star = collect_utils::is_star(&pid);
@@ -278,7 +279,7 @@ pub async fn collect_project_item(
 
             ProjectItemDto::new_modrinth(&hit, file_type, false, true, is_star, false, None).await
         }
-        _ => return Err(String::from("err.sourceType")),
+        _ => return Err(String::from(err_keys::SOURCE_TYPE)),
     };
 
     Ok(Some(item))

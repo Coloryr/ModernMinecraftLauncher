@@ -69,4 +69,6 @@ pub struct SourceDownloadInfo {
     pub done: bool,
     /// 下载失败
     pub failed: bool,
+    /// 下载被取消，与失败互斥
+    pub cancelled: bool,
 }

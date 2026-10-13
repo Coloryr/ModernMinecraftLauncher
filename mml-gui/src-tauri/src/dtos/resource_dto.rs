@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// 模组条目
 #[derive(Debug, Clone, Serialize)]
@@ -181,6 +181,11 @@ pub struct SaveItemDto {
     pub difficulty: u8,
     /// 是否损坏，即 level.dat 解析失败
     pub broken: bool,
+    /// 地图种子
+    ///
+    /// 它在 level.dat 里是 i64，超过 JS 的安全整数范围，跨 IPC 一律走字符串：
+    /// 当数字传会在前端被四舍五入，再存回来就悄悄改了用户的种子。
+    pub seed: String,
     /// 图标 data URL，无图标为空串
     pub icon: String,
     /// 已有几个备份
@@ -188,6 +193,25 @@ pub struct SaveItemDto {
     /// 由后端从备份索引里数出来，一次 JSON 读取；前端据此决定**要不要显示「还原」按钮** ——
     /// 没有备份的存档给个点不动的还原按钮没有意义。
     pub backups: u32,
+}
+
+/// 「编辑存档」提交的新信息，见 `resource_save_edit`
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveEditDto {
+    /// 游戏模式：0 生存 / 1 创造 / 2 冒险 / 3 旁观，越界由后端夹到合法区间
+    pub game_type: i32,
+    /// 难度：0 和平 / 1 简单 / 2 普通 / 3 困难，越界由后端夹到合法区间
+    pub difficulty: u8,
+    /// 是否极限模式
+    pub hard_core: bool,
+    /// 世界名字，去空白后不能为空，否则后端返回 `err.saveNameEmpty`
+    pub level_name: String,
+    /// 地图种子，十进制整数、可带负号
+    ///
+    /// 与 [`SaveItemDto::seed`] 同一口径走字符串：i64 当数字传会被前端丢精度。
+    /// 解析不出来时后端返回 `err.saveSeed`。
+    pub seed: String,
 }
 
 /// 一个存档备份
@@ -263,6 +287,46 @@ pub struct SchematicItemDto {
     /// 方块种类数
     pub block_types: u32,
     /// 是否解析失败
+    pub fail: bool,
+}
+
+/// 结构文件里的一种方块
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SchematicBlockDto {
+    /// 方块 ID，形如 `minecraft:stone`
+    pub id: String,
+    /// 该方块出现的次数
+    pub count: u64,
+}
+
+/// 结构文件详情，比列表条目多一份逐种方块的数量
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SchematicDetailDto {
+    /// schematics 目录下的文件名，打开目录按此定位
+    pub file: String,
+    /// 名称
+    pub name: String,
+    /// 作者，只有 litematic 会填
+    pub author: String,
+    /// 描述，只有 litematic 会填
+    pub description: String,
+    /// 类型标签：Minecraft / Litematic / WorldEdit / Create
+    pub type_name: String,
+    /// 宽
+    pub width: i32,
+    /// 高
+    pub height: i32,
+    /// 长
+    pub length: i32,
+    /// 方块总数
+    pub block_count: u64,
+    /// 方块种类数
+    pub block_types: u32,
+    /// 逐种方块的数量，按数量从多到少排序
+    pub blocks: Vec<SchematicBlockDto>,
+    /// 是否解析失败，失败时其余字段是默认值、`blocks` 为空
     pub fail: bool,
 }
 

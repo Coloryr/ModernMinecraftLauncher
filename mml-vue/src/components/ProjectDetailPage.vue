@@ -306,7 +306,7 @@ function scrollToVersions() {
                 {{ current.name }}
                 <span v-if="projectInstalled(current)" class="pack-badge">{{ t("modpack.installed") }}</span>
                 <span v-else-if="projectRunning(current)" class="pack-badge busy">{{ t("modpack.downloading")
-                  }}</span>
+                }}</span>
               </div>
               <div class="detail-sub">
                 <span v-if="current.authors.length">{{current.authors.map((a) => a.name).join(", ")}}</span>
@@ -360,8 +360,8 @@ function scrollToVersions() {
                 <template v-if="detail.screenshots.length">
                   <div class="detail-section detail-block">{{ t("modpack.screenshots") }}</div>
                   <div class="detail-shots">
-                    <AsyncImage v-for="shot in detail.screenshots" :key="shot.logo" class="detail-shot"
-                      :src="shot.logo" v-tip="shot.name || shot.description" @click="openPreview(shot.logo)" />
+                    <AsyncImage v-for="shot in detail.screenshots" :key="shot.logo" class="detail-shot" :src="shot.logo"
+                      v-tip="shot.name || shot.description" @click="openPreview(shot.logo)" />
                   </div>
                 </template>
               </template>
@@ -381,8 +381,9 @@ function scrollToVersions() {
                       </button>
                       <span class="file-page-num">{{ filePage + 1 }} / {{ fileMaxPage }} · {{ t("modpack.totalItems",
                         {
-                        n:
-                        fileTotal }) }}</span>
+                          n:
+                            fileTotal
+                        }) }}</span>
                       <button class="page-btn" :disabled="filePage >= fileMaxPage - 1 || filesLoading"
                         @click="turnFilePage(1)">
                         {{ t("modpack.nextPage") }}
@@ -413,7 +414,7 @@ function scrollToVersions() {
                           {{ file.name }}
                           <span v-if="fileInstalled(file)" class="pack-badge">{{ t("modpack.installed") }}</span>
                           <span v-else-if="fileRunning(file)" class="pack-badge busy">{{ t("modpack.downloading")
-                            }}</span>
+                          }}</span>
                         </span>
                         <span class="file-meta">
                           {{ t("modpack.fileMeta", {

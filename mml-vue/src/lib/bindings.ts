@@ -110,6 +110,17 @@ export const commands = {
     migrateColormc: (source: string, mode: string) => invoke<ColorMcReportDto>("window_migrate_colormc", { source, mode }),
     skipColormc: () => invoke<void>("window_skip_colormc"),
   },
+  config: {
+    getBytesSlice: (game: string, file: string, offset: number, length: number) => invoke<BytesSliceDto>("config_get_bytes_slice", { game, file, offset, length }),
+    getFile: (game: string, file: string) => invoke<string>("config_get_file", { game, file }),
+    getFiles: (game: string) => invoke<FileItemDto[]>("config_get_files", { game }),
+    getMca: (game: string, file: string) => invoke<McaChunkDto[]>("config_get_mca", { game, file }),
+    getNbt: (game: string, file: string) => invoke<NbtNodeDto>("config_get_nbt", { game, file }),
+    saveFile: (game: string, file: string, data: string) => invoke<void>("config_save_file", { game, file, data }),
+  },
+  configSaves: {
+    file: (game: string, save: string) => invoke<FileItemDto[]>("config_saves_get_file", { game, save }),
+  },
   customHome: {
     import: (path: string) => invoke<CustomHomeInfoDto>("custom_home_import", { path }),
     openDir: () => invoke<void>("custom_home_open_dir"),
@@ -124,6 +135,7 @@ export const commands = {
   },
   export: {
     getInfo: (uuid: string) => invoke<ExportInfoDto>("export_get_info", { uuid }),
+    listDir: (uuid: string, dir: string) => invoke<ExportEntryDto[]>("export_list_dir", { uuid, dir }),
     run: (uuid: string, config: ExportConfigDto) => invoke<void>("export_run", { uuid, config }),
   },
   javaDownload: {
@@ -156,6 +168,7 @@ export const commands = {
     loadState: () => invoke<LoadState>("main_load_state"),
     moveGroup: (uuid: string, index: number) => invoke<boolean>("main_move_group", { uuid, index }),
     moveInstance: (uuid: string, group: string | null, index: number) => invoke<boolean>("main_move_instance", { uuid, group, index }),
+    openInstanceDir: (uuid: string) => invoke<void>("main_open_instance_dir", { uuid }),
     openUrl: (url: string) => invoke<void>("main_open_url", { url }),
     refreshVersions: () => invoke<VersionInfoDto[]>("main_refresh_versions"),
     removeGroup: (uuid: string) => invoke<boolean>("main_remove_group", { uuid }),
@@ -201,6 +214,8 @@ export const commands = {
     resourcepackDisable: (uuid: string, file: string) => invoke<void>("resource_resourcepack_disable", { uuid, file }),
     resourcepackEnable: (uuid: string, file: string) => invoke<void>("resource_resourcepack_enable", { uuid, file }),
     restoreSaveBackup: (uuid: string, dir: string, file: string) => invoke<void>("resource_restore_save_backup", { uuid, dir, file }),
+    saveEdit: (uuid: string, dir: string, info: SaveEditDto) => invoke<void>("resource_save_edit", { uuid, dir, info }),
+    schematicDetail: (uuid: string, file: string) => invoke<SchematicDetailDto>("resource_schematic_detail", { uuid, file }),
     serverAdd: (uuid: string, name: string, ip: string) => invoke<void>("resource_server_add", { uuid, name, ip }),
     serverDelete: (uuid: string, name: string, ip: string) => invoke<void>("resource_server_delete", { uuid, name, ip }),
     serverUpdate: (uuid: string, name: string, ip: string, newName: string, newIp: string, acceptTextures: boolean) => invoke<void>("resource_server_update", { uuid, name, ip, newName, newIp, acceptTextures }),
@@ -429,6 +444,7 @@ export type ResourceTaskDto = {
   progress: number,
   done: boolean,
   failed: boolean,
+  cancelled: boolean,
 };
 
 export type ResourceStatusDto = {
@@ -519,6 +535,40 @@ export type ColorMcReportDto = {
   authOutside: boolean,
 };
 
+export type FileItemType = "json" | "json5" | "toml" | "yaml" | "properties" | "xml" | "javascript" | "snbt" | "nbt" | "mca" | "image" | "archive" | "text";
+
+export type FileItemDto = {
+  name: string,
+  fileType: FileItemType,
+};
+
+export type BytesSliceDto = {
+  offset: number,
+  length: number,
+  total: number,
+  data: string,
+};
+
+export type NbtKindDto = "End" | "Byte" | "Short" | "Int" | "Long" | "Float" | "Double" | "ByteArray" | "String" | "List" | "Compound" | "IntArray" | "LongArray";
+
+export type NbtNodeDto = {
+  name: string,
+  kind: NbtKindDto,
+  value: string,
+  length: number,
+  children: NbtNodeDto[],
+  items: NbtNodeDto[],
+};
+
+export type McaChunkDto = {
+  index: number,
+  x: number,
+  z: number,
+  pos: number,
+  sectors: number,
+  time: number,
+};
+
 export type CustomHomeInfoDto = {
   installed: boolean,
   enabled: boolean,
@@ -567,9 +617,11 @@ export type DownloadStatusDto = {
   paused: boolean,
 };
 
-export type ExportModDto = {
-  name: string,
-  online: boolean,
+export type ExportEntryDto = {
+  path: string,
+  dir: boolean,
+  size: number,
+  url: string,
   modId: string | null,
   fileId: string | null,
 };
@@ -579,20 +631,19 @@ export type ExportInfoDto = {
   version: string,
   loader: string,
   loaderVersion: string | null,
-  onlineMods: ExportModDto[],
-  localMods: ExportModDto[],
-  hasConfig: boolean,
-  hasResourcePacks: boolean,
-  hasShaderPacks: boolean,
+  mods: ExportEntryDto[],
+};
+
+export type ExportPickDto = {
+  path: string,
+  url: string,
 };
 
 export type ExportConfigDto = {
   pack: string,
   file: string,
-  includeMods: boolean,
-  includeConfig: boolean,
-  includeResourcePacks: boolean,
-  includeShaderPacks: boolean,
+  mods: ExportPickDto[],
+  files: ExportPickDto[],
   name: string,
   author: string,
   version: string,
@@ -929,8 +980,17 @@ export type SaveItemDto = {
   hardCore: boolean,
   difficulty: number,
   broken: boolean,
+  seed: string,
   icon: string,
   backups: number,
+};
+
+export type SaveEditDto = {
+  gameType: number,
+  difficulty: number,
+  hardCore: boolean,
+  levelName: string,
+  seed: string,
 };
 
 export type SaveBackupDto = {
@@ -968,6 +1028,26 @@ export type SchematicItemDto = {
   length: number,
   blockCount: number,
   blockTypes: number,
+  fail: boolean,
+};
+
+export type SchematicBlockDto = {
+  id: string,
+  count: number,
+};
+
+export type SchematicDetailDto = {
+  file: string,
+  name: string,
+  author: string,
+  description: string,
+  typeName: string,
+  width: number,
+  height: number,
+  length: number,
+  blockCount: number,
+  blockTypes: number,
+  blocks: SchematicBlockDto[],
   fail: boolean,
 };
 

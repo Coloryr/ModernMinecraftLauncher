@@ -209,8 +209,7 @@ function onMenuPick(id: string) {
         'row-selected': isSelected(item),
         'row-anchor': anchorKey === item.name,
         'row-selecting': selected.size > 0,
-      }" @click="onCellClick({ event: $event, item })"
-        @contextmenu.prevent="openMenu({ event: $event, item })">
+      }" @click="onCellClick({ event: $event, item })" @contextmenu.prevent="openMenu({ event: $event, item })">
         <!-- 勾选框是进入多选的入口：点它不能顺带开大图，所以整块 stop -->
         <label class="shot-check" @click.stop>
           <input type="checkbox" class="row-select" :checked="isSelected(item)" @pointerdown.stop
@@ -223,8 +222,8 @@ function onMenuPick(id: string) {
   </div>
 
   <!-- 行右键菜单：单行与批量共用，菜单项见 itemMenuItems -->
-  <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title"
-    @pick="onMenuPick" @close="rowMenu = null" />
+  <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title" @pick="onMenuPick"
+    @close="rowMenu = null" />
 
   <!--
     大图预览：与「下载整合包」项目详情的截图**同一套观感**，共用 ImagePreview ——

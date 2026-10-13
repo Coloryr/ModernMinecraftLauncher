@@ -10,6 +10,7 @@ use mml_base::hash_helper;
 use mml_names::names;
 
 use crate::dtos::IconSourceDto;
+use crate::err_keys;
 use crate::image_manager;
 
 use super::super::main::{core_instance, emit_instance_change};
@@ -66,19 +67,19 @@ pub(super) fn clamp_icon_size(size: u32) -> u32 {
 /// 预览 data URL，形如 `data:image/png;base64,...`，以及原图宽高；读不到 / 解不出 /
 /// 超过 [`MAX_SOURCE_PIXELS`] 时返回 `Err`，内容为 i18n 键
 pub(super) fn read_icon_preview(path: &str) -> Result<IconSourceDto, String> {
-    let bytes = std::fs::read(path).map_err(|_| "err.fileNotFound".to_string())?;
-    let format = image::guess_format(&bytes).map_err(|_| "err.imageInvalid".to_string())?;
+    let bytes = std::fs::read(path).map_err(|_| err_keys::FILE_NOT_FOUND.to_string())?;
+    let format = image::guess_format(&bytes).map_err(|_| err_keys::IMAGE_INVALID.to_string())?;
 
     // 先只读文件头拿尺寸：解压炸弹不必真解码就能挡掉，`into_dimensions` 不读像素
     let (width, height) = image::ImageReader::with_format(std::io::Cursor::new(&bytes), format)
         .into_dimensions()
-        .map_err(|_| "err.imageInvalid".to_string())?;
+        .map_err(|_| err_keys::IMAGE_INVALID.to_string())?;
     if u64::from(width) * u64::from(height) > MAX_SOURCE_PIXELS {
-        return Err("err.imageInvalid".to_string());
+        return Err(err_keys::IMAGE_INVALID.to_string());
     }
 
     let image = image::load_from_memory_with_format(&bytes, format)
-        .map_err(|_| "err.imageInvalid".to_string())?;
+        .map_err(|_| err_keys::IMAGE_INVALID.to_string())?;
     // thumbnail 先整数抽样再插值，比 resize 快得多；等比缩放到 PREVIEW_MAX 以内
     let preview = if width > PREVIEW_MAX || height > PREVIEW_MAX {
         image.thumbnail(PREVIEW_MAX, PREVIEW_MAX)
@@ -140,8 +141,8 @@ pub(super) fn render_icon_png(
     h: u32,
     size: u32,
 ) -> Result<Vec<u8>, String> {
-    let bytes = std::fs::read(path).map_err(|_| "err.fileNotFound".to_string())?;
-    let image = image::load_from_memory(&bytes).map_err(|_| "err.imageInvalid".to_string())?;
+    let bytes = std::fs::read(path).map_err(|_| err_keys::FILE_NOT_FOUND.to_string())?;
+    let image = image::load_from_memory(&bytes).map_err(|_| err_keys::IMAGE_INVALID.to_string())?;
     let (img_w, img_h) = (image.width(), image.height());
 
     let icon = if w == 0 || h == 0 {
@@ -211,7 +212,7 @@ pub async fn block_set_icon_area(
             .map_err(|err| err.to_string())??;
 
     let Some(core) = core_instance(&uuid) else {
-        return Err("err.gameNotFound".to_string());
+        return Err(err_keys::GAME_NOT_FOUND.to_string());
     };
     let dest = core.instance.read().unwrap().get_icon_file_or_default();
     tokio::fs::write(&dest, &png)
@@ -256,11 +257,11 @@ pub async fn block_set_icon(app: AppHandle, uuid: String, id: String) -> Result<
     // 方块优先，未作为方块出现的 id 回退物品贴图
     let Some(_) = mml_tex_draw::get_block_path(&id).or_else(|| mml_tex_draw::get_item_path(&id))
     else {
-        return Err("err.fileNotFound".to_string());
+        return Err(err_keys::FILE_NOT_FOUND.to_string());
     };
 
     let Some(core) = core_instance(&uuid) else {
-        return Err("err.gameNotFound".to_string());
+        return Err(err_keys::GAME_NOT_FOUND.to_string());
     };
 
     // 写方块 ID 并清空 Icon：两步必须一起做，只写一个会让图标读取走错分支
@@ -298,7 +299,9 @@ pub async fn block_skin_add(input: String) -> Result<String, String> {
         .map_err(|e| e.to_string())?;
 
     // 锁内只取路径，文件读取在 drop 后，std 锁跨 await 破坏 Send 同理，这里没锁
-    let data = tokio::fs::read(&skin.path).await.map_err(|e| e.to_string())?;
+    let data = tokio::fs::read(&skin.path)
+        .await
+        .map_err(|e| e.to_string())?;
     mml_tex_draw::add_skin_block(&skin.name, &data).map_err(|e| e.to_string())
 }
 

@@ -16,6 +16,7 @@ use crate::dtos::add_resource_dto::{
     FileListDto, FileListItemDto, ProjectDetailDto, ProjectDto, ProjectItemDto,
 };
 
+use crate::err_keys;
 use crate::windows::modpack_task::DOWNLOAD_NOW;
 
 use super::{CURSEFOGRE_FILE, CURSEFOGRE_INFO, MODRINTH_FILE, MODRINTH_INFO, register_search};
@@ -49,7 +50,7 @@ pub async fn add_modpack_list(
 
     tokio::select! {
         res = list_projects(source, page, sort, category, filter, version) => res,
-        _ = token.cancelled() => Err(String::from("err.cancelled")),
+        _ = token.cancelled() => Err(String::from(err_keys::CANCELLED)),
     }
 }
 
@@ -81,7 +82,7 @@ pub(super) async fn list_projects(
         ModPackType::CurseForge => {
             let sort = CurseForgeSortType::from_string(&sort);
             if sort.is_none() {
-                return Err(String::from("err.sortTypeNotFound"));
+                return Err(String::from(err_keys::SORT_TYPE_NOT_FOUND));
             }
             let sort = sort.unwrap();
 
@@ -128,7 +129,7 @@ pub(super) async fn list_projects(
         ModPackType::Modrinth => {
             let sort = ModrinthSortType::from_string(&sort);
             if sort.is_none() {
-                return Err(String::from("err.sortTypeNotFound"));
+                return Err(String::from(err_keys::SORT_TYPE_NOT_FOUND));
             }
             let sort = sort.unwrap();
 
@@ -182,7 +183,7 @@ pub(super) async fn list_projects(
                 count: list.total_hits,
             })
         }
-        _ => Err(String::from("err.sourceType")),
+        _ => Err(String::from(err_keys::SOURCE_TYPE)),
     }
 }
 
@@ -228,7 +229,7 @@ pub async fn add_modpack_detail(source: String, pid: String) -> Result<ProjectDe
                 .await
                 .map_err(|err| err.to_string())
         }
-        _ => Err(String::from("err.sourceType")),
+        _ => Err(String::from(err_keys::SOURCE_TYPE)),
     }
 }
 
@@ -381,7 +382,7 @@ pub async fn add_modpack_file(
                 max_page: len / 50,
             })
         }
-        _ => Err(String::from("err.sourceType")),
+        _ => Err(String::from(err_keys::SOURCE_TYPE)),
     }
 }
 

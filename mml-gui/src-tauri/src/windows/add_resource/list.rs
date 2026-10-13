@@ -15,6 +15,7 @@ use crate::collect_utils;
 use crate::dtos::add_resource_dto::{
     FileListDto, FileListItemDto, ProjectDetailDto, ProjectDto, ProjectItemDto,
 };
+use crate::err_keys;
 
 use super::{CURSEFOGRE_FILE, CURSEFOGRE_INFO, DOWNLOAD_NOW, MODRINTH_FILE, MODRINTH_INFO};
 
@@ -44,23 +45,17 @@ pub async fn add_resource_file(
     version: Option<String>,
     loader: Option<String>,
 ) -> Result<FileListDto, String> {
-    let uuid = Uuid::parse_str(&game);
-    if uuid.is_err() {
-        return Err(String::from("err.uuid"));
-    }
-    let uuid = uuid.unwrap();
-    let game = mml_game::get_instance(&uuid);
-    if game.is_none() {
-        return Err(String::from("err.gameNotFound"));
-    }
-    let game = game.unwrap();
+    let Ok(uuid) = Uuid::parse_str(&game) else {
+        return Err(String::from(err_keys::UUID));
+    };
+    let Some(game) = mml_game::get_instance(&uuid) else {
+        return Err(String::from(err_keys::GAME_NOT_FOUND));
+    };
     let info = game.read().unwrap().read_online_info();
     let source = ModPackType::from_string(&source);
-    let file_type = FileType::from_string(&file_type);
-    if file_type.is_none() {
-        return Err(String::from("err.fileTypeNotFound"));
-    }
-    let file_type = file_type.unwrap();
+    let Some(file_type) = FileType::from_string(&file_type) else {
+        return Err(String::from(err_keys::FILE_TYPE_NOT_FOUND));
+    };
     // loader 只对模组有意义，其余类型一律 Normal，缺省 / 非法值也视为 normal
     let mod_loader = if matches!(file_type, FileType::Mod) {
         LoaderType::from_string(&loader.clone().unwrap_or_default()).unwrap_or(LoaderType::Normal)
@@ -167,7 +162,7 @@ pub async fn add_resource_file(
                 max_page: len / 50,
             })
         }
-        _ => Err(String::from("err.sourceType")),
+        _ => Err(String::from(err_keys::SOURCE_TYPE)),
     }
 }
 
@@ -213,7 +208,7 @@ pub async fn add_resource_detail(source: String, pid: String) -> Result<ProjectD
                 .await
                 .map_err(|err| err.to_string())
         }
-        _ => Err(String::from("err.sourceType")),
+        _ => Err(String::from(err_keys::SOURCE_TYPE)),
     }
 }
 
@@ -249,23 +244,17 @@ pub async fn add_resource_list(
     version: Option<String>,
     loader: Option<String>,
 ) -> Result<ProjectDto, String> {
-    let uuid = Uuid::parse_str(&game);
-    if uuid.is_err() {
-        return Err(String::from("err.uuid"));
-    }
-    let uuid = uuid.unwrap();
-    let game = mml_game::get_instance(&uuid);
-    if game.is_none() {
-        return Err(String::from("err.gameNotFound"));
-    }
-    let game = game.unwrap();
+    let Ok(uuid) = Uuid::parse_str(&game) else {
+        return Err(String::from(err_keys::UUID));
+    };
+    let Some(game) = mml_game::get_instance(&uuid) else {
+        return Err(String::from(err_keys::GAME_NOT_FOUND));
+    };
     let info = game.read().unwrap().read_online_info();
     let source = ModPackType::from_string(&source);
-    let file_type = FileType::from_string(&file_type);
-    if file_type.is_none() {
-        return Err(String::from("err.fileTypeNotFound"));
-    }
-    let file_type = file_type.unwrap();
+    let Some(file_type) = FileType::from_string(&file_type) else {
+        return Err(String::from(err_keys::FILE_TYPE_NOT_FOUND));
+    };
     // loader 只对模组有意义，其余类型一律 Normal，缺省 / 非法值也视为 normal
     let mod_loader = if matches!(file_type, FileType::Mod) {
         LoaderType::from_string(&loader.clone().unwrap_or_default()).unwrap_or(LoaderType::Normal)
@@ -275,11 +264,9 @@ pub async fn add_resource_list(
 
     match source {
         ModPackType::CurseForge => {
-            let sort = CurseForgeSortType::from_string(&sort);
-            if sort.is_none() {
-                return Err(String::from("err.sortTypeNotFound"));
-            }
-            let sort = sort.unwrap();
+            let Some(sort) = CurseForgeSortType::from_string(&sort) else {
+                return Err(String::from(err_keys::SORT_TYPE_NOT_FOUND));
+            };
 
             let arg = CurseFogreArg {
                 version,
@@ -329,11 +316,9 @@ pub async fn add_resource_list(
             })
         }
         ModPackType::Modrinth => {
-            let sort = ModrinthSortType::from_string(&sort);
-            if sort.is_none() {
-                return Err(String::from("err.sortTypeNotFound"));
-            }
-            let sort = sort.unwrap();
+            let Some(sort) = ModrinthSortType::from_string(&sort) else {
+                return Err(String::from(err_keys::SORT_TYPE_NOT_FOUND));
+            };
 
             // 有一项分类需要输入文本才能搜索
             // if matches!(sort, ModrinthSortType::Downloads)
@@ -395,7 +380,7 @@ pub async fn add_resource_list(
                 count: list.total_hits,
             })
         }
-        _ => Err(String::from("err.sourceType")),
+        _ => Err(String::from(err_keys::SOURCE_TYPE)),
     }
 }
 

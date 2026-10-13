@@ -4,6 +4,7 @@
 
 use std::collections::HashMap;
 
+use crate::err_keys;
 use mml_game::launcher::{FileType, ModPackType};
 use mml_game::{curseforge, modrinth};
 use mml_net::curseforge_api::CurseForgeSortType;
@@ -41,7 +42,7 @@ pub async fn add_resource_categories(
     let source = ModPackType::from_string(&source);
     let file_type = FileType::from_string(&file_type);
     if file_type.is_none() {
-        return Err(String::from("err.fileTypeNotFound"));
+        return Err(String::from(err_keys::FILE_TYPE_NOT_FOUND));
     }
     let file_type = file_type.unwrap();
 
@@ -54,7 +55,7 @@ pub async fn add_resource_categories(
         ModPackType::Modrinth => modrinth::get_categories(file_type)
             .await
             .map_err(|err| err.to_string()),
-        _ => Err(String::from("err.sourceType")),
+        _ => Err(String::from(err_keys::SOURCE_TYPE)),
     }
 }
 
@@ -85,7 +86,7 @@ pub fn add_resource_sort_type(source: String) -> Result<Vec<String>, String> {
             ModrinthSortType::Newest.to_string(),
             ModrinthSortType::Updated.to_string(),
         ]),
-        _ => Err(String::from("err.sourceType")),
+        _ => Err(String::from(err_keys::SOURCE_TYPE)),
     }
 }
 
@@ -108,6 +109,6 @@ pub async fn add_resource_game_versions(source: String) -> Result<Vec<String>, S
         ModPackType::Modrinth => modrinth::get_game_versions()
             .await
             .map_err(|err| err.to_string()),
-        _ => Err("err.sourceType".to_string()),
+        _ => Err(err_keys::SOURCE_TYPE.to_string()),
     }
 }

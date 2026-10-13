@@ -30,6 +30,7 @@
 //! 于是 `tauri://drag-drop` **不再触发**，前端只走本模块这条路径事件 + DOM 事件。
 //! 两套不能并存，否则遮罩会闪两次。
 
+use crate::log_text::LogText;
 use tauri::AppHandle;
 use webview2_com::{
     AddScriptToExecuteOnDocumentCreatedCompletedHandler,
@@ -115,20 +116,24 @@ pub fn install(app: &AppHandle, label: String, webview2: &ICoreWebView2) {
 /// 文档**，窗口一旦被 `window_reopen_window` 导航重载，脚本就没了，文件拖入会静默失效。
 /// 前者对**每个新建文档**都执行，重载后依然在。
 fn inject_script(webview2: &ICoreWebView2) {
-    let script: Vec<u16> = INJECT_SCRIPT.encode_utf16().chain(std::iter::once(0)).collect();
+    let script: Vec<u16> = INJECT_SCRIPT
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect();
     unsafe {
         let _ = webview2.AddScriptToExecuteOnDocumentCreated(
             PCWSTR::from_raw(script.as_ptr()),
-            &AddScriptToExecuteOnDocumentCreatedCompletedHandler::create(Box::new(
-                |error, _id| {
-                    if error.is_err() {
-                        mml_log::error(format!(
-                            "[drop] 注入文件路径桥脚本失败（文件拖入将只有文件名）: {error:?}"
-                        ));
-                    }
-                    Ok(())
-                },
-            )),
+            &AddScriptToExecuteOnDocumentCreatedCompletedHandler::create(Box::new(|error, _id| {
+                if error.is_err() {
+                    mml_log::error(
+                        LogText::FilePathBridgeInjectFailed {
+                            error: format!("{error:?}"),
+                        }
+                        .text(),
+                    );
+                }
+                Ok(())
+            })),
         );
     }
 }

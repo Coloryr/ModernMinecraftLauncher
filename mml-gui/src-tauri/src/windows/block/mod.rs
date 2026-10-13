@@ -169,11 +169,9 @@ pub fn block_list(lang: String) -> Vec<BlockItemDto> {
             // 分类已在 ordered_entries 里算过，直接取，不再重复查 block_cat / item_cat；
             // 方块与物品只差名称语言键、图标目录与版本号
             let (name_key, dir, ver) = match entry.kind {
-                mml_tex_draw::EntryKind::Block => (
-                    mml_tex_draw::block_name_key(&entry.id),
-                    "block",
-                    &version,
-                ),
+                mml_tex_draw::EntryKind::Block => {
+                    (mml_tex_draw::block_name_key(&entry.id), "block", &version)
+                }
                 mml_tex_draw::EntryKind::Item => (
                     mml_tex_draw::item_name_key(&entry.id),
                     "item",

@@ -21,7 +21,7 @@ use mml_names::{
 };
 use mml_nbt::{
     nbt_file::NbtFile,
-    nbt_types::{NbtCompound, NbtList, NbtString},
+    nbt_types::{NbtByte, NbtCompound, NbtInt, NbtList, NbtLong, NbtString},
 };
 use mml_net::chunkbase_api;
 use mml_sys::path_helper;
@@ -89,6 +89,20 @@ pub struct SaveDataPackObj {
     pub pack_format: i64,
     /// 是否启用；`None` 表示 level.dat 的启用与禁用列表里都没有它
     pub enable: Option<bool>,
+}
+
+/// 存档可编辑的那几项，由资源管理窗口的「编辑存档」提交
+pub struct SaveEditObj {
+    /// 游戏模式：0 生存 / 1 创造 / 2 冒险 / 3 旁观
+    pub game_type: i32,
+    /// 难度：0 和平 / 1 简单 / 2 普通 / 3 困难
+    pub difficulty: u8,
+    /// 是否极限模式
+    pub hard_core: bool,
+    /// 世界名字，界面上的存档名
+    pub level_name: String,
+    /// 地图种子
+    pub seed: i64,
 }
 
 impl Default for SaveObj {
@@ -418,6 +432,65 @@ impl SaveObj {
         self.nbt.write(&mut stream)?;
 
         Ok(())
+    }
+
+    /// 改存档的基本信息，写回 level.dat
+    ///
+    /// 只动 `Data` 下的 `GameType`、`Difficulty`、`hardcore`、`LevelName` 与种子，其余字段
+    /// 原样写回；缺的字段按 level.dat 的标准类型补上，否则游戏读不到、等于白改。
+    ///
+    /// 种子写两份：`RandomSeed` 给旧版本，`WorldGenSettings.seed` 给 1.16 起的新版本 ——
+    /// 新版本以后者为准，只写前者不生效；没有这个复合标签的老存档就只写前者。
+    ///
+    /// 调用前要确认实例没在运行 —— 游戏退出时会用它内存里的值覆盖这个文件。
+    ///
+    /// - `info`: 新的信息，见 [`SaveEditObj`]
+    ///
+    /// # 返回值
+    ///
+    /// NBT 里没有 `Data` 复合标签或写盘失败时返回对应错误
+    pub fn set_info(&mut self, info: &SaveEditObj) -> CoreResult<()> {
+        let Some(data) = self
+            .nbt
+            .nbt
+            .as_compound_mut()
+            .and_then(|nbt| nbt.get_compound_mut("Data"))
+        else {
+            return Err(ErrorType::DataNotFound(DataNotFoundData::Info));
+        };
+
+        data.data.insert(
+            String::from("GameType"),
+            NbtInt::new(info.game_type).to_nbt(),
+        );
+        data.data.insert(
+            String::from("Difficulty"),
+            NbtByte::new(info.difficulty).to_nbt(),
+        );
+        // 键名是小写的 `hardcore`，与读取处一致
+        data.data.insert(
+            String::from("hardcore"),
+            NbtByte::new(if info.hard_core { 1 } else { 0 }).to_nbt(),
+        );
+        data.data.insert(
+            String::from("LevelName"),
+            NbtString::new(info.level_name.clone()).to_nbt(),
+        );
+        data.data
+            .insert(String::from("RandomSeed"), NbtLong::new(info.seed).to_nbt());
+        if let Some(world_gen) = data.get_compound_mut("WorldGenSettings") {
+            world_gen
+                .data
+                .insert(String::from("seed"), NbtLong::new(info.seed).to_nbt());
+        }
+
+        self.game_type = info.game_type;
+        self.difficulty = info.difficulty;
+        self.hard_core = if info.hard_core { 1 } else { 0 };
+        self.level_name = info.level_name.clone();
+        self.random_seed = info.seed;
+
+        self.save_nbt()
     }
 
     /// 获取数据包列表
@@ -759,5 +832,103 @@ fn read_pack(
         Some(obj)
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use mml_names::names;
+    use mml_nbt::{
+        nbt_file::{CompressType, NbtFile},
+        nbt_types::{NbtByte, NbtCompound, NbtInt, NbtLong, NbtString},
+    };
+    use mml_sys::path_helper;
+    use uuid::Uuid;
+
+    use super::{SaveEditObj, SaveObj};
+
+    /// 改模式 / 难度 / 极限 / 名字 / 种子都要落到 level.dat 上：写回的文件重新读出来是改后的值
+    #[test]
+    fn set_info_writes_back_to_level_dat() {
+        let dir = mml_testutil::temp_dir().join(format!("mml-save-setinfo-{}", Uuid::new_v4()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join(names::LEVEL_FILE);
+
+        // 造一个最小 level.dat：待改的五个字段先给旧值，另一个字段用来验证"其余原样写回"
+        let mut world_gen = NbtCompound::new();
+        world_gen
+            .data
+            .insert(String::from("seed"), NbtLong::new(1).to_nbt());
+        let mut data = NbtCompound::new();
+        data.data
+            .insert(String::from("GameType"), NbtInt::new(0).to_nbt());
+        data.data
+            .insert(String::from("Difficulty"), NbtByte::new(0).to_nbt());
+        data.data
+            .insert(String::from("hardcore"), NbtByte::new(0).to_nbt());
+        data.data.insert(
+            String::from("LevelName"),
+            NbtString::new(String::from("旧名字")).to_nbt(),
+        );
+        data.data
+            .insert(String::from("RandomSeed"), NbtLong::new(1).to_nbt());
+        data.data
+            .insert(String::from("WorldGenSettings"), world_gen.to_nbt());
+        data.data
+            .insert(String::from("keep"), NbtInt::new(7).to_nbt());
+        let mut root = NbtCompound::new();
+        root.data.insert(String::from("Data"), data.to_nbt());
+        let mut stream = path_helper::open_write(&file).unwrap();
+        NbtFile::new(root.to_nbt(), CompressType::GZip)
+            .write(&mut stream)
+            .unwrap();
+        drop(stream);
+
+        // 种子取一个超过 2^53 的值：它在 level.dat 里是 i64，前端跨 IPC 走字符串就是为了它
+        let seed = -4172144997902289642_i64;
+        // 按真实链路走：SaveObj 持原始 NBT，改完以它为准写回
+        let mut save = SaveObj {
+            path: dir.clone(),
+            nbt: NbtFile::read(&mut path_helper::open_read(&file).unwrap()).unwrap(),
+            ..Default::default()
+        };
+        save.set_info(&SaveEditObj {
+            game_type: 1,
+            difficulty: 3,
+            hard_core: true,
+            level_name: String::from("新名字"),
+            seed,
+        })
+        .unwrap();
+        assert_eq!(save.game_type, 1);
+        assert_eq!(save.difficulty, 3);
+        assert_eq!(save.hard_core, 1);
+        assert_eq!(save.level_name, "新名字");
+        assert_eq!(save.random_seed, seed);
+
+        // 重新读盘：字段真的写进去了
+        let back = NbtFile::read(&mut path_helper::open_read(&file).unwrap()).unwrap();
+        let data = back
+            .nbt
+            .as_compound()
+            .and_then(|nbt| nbt.get_compound("Data"))
+            .unwrap();
+        assert_eq!(data.get_int("GameType"), Some(1));
+        assert_eq!(data.get_byte("Difficulty"), Some(3));
+        assert_eq!(data.get_byte("hardcore"), Some(1));
+        assert_eq!(data.get_string("LevelName").as_deref(), Some("新名字"));
+        assert_eq!(data.get_long("RandomSeed"), Some(seed));
+        // 新版格式的种子也要跟着改，否则 1.16 起读的还是旧值
+        assert_eq!(
+            data.get_compound("WorldGenSettings")
+                .and_then(|world_gen| world_gen.get_long("seed")),
+            Some(seed)
+        );
+        assert_eq!(data.get_int("keep"), Some(7));
+
+        let _ = fs::remove_dir_all(&dir);
     }
 }

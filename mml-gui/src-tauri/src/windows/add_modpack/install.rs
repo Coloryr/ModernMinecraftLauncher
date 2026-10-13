@@ -13,10 +13,11 @@ use tauri::{AppHandle, WebviewWindow};
 use tokio_util::sync::CancellationToken;
 
 use crate::dtos::add_modpack_dto::ModPackStatusDto;
+use crate::err_keys;
 use crate::windows::add::instance_gui;
 use crate::windows::add_resource::SourceInfo;
 use crate::windows::modpack_task::{
-    DOWNLOAD_NOW, build_status, emit_add_modpack_status, finish_task, register_task, RegisteredTask,
+    DOWNLOAD_NOW, RegisteredTask, build_status, emit_add_modpack_status, finish_task, register_task,
 };
 
 use super::{CURSEFOGRE_INFO, MODRINTH_INFO};
@@ -50,7 +51,7 @@ pub async fn add_modpack_install(
 
     let source_type = ModPackType::from_string(&source);
     if !matches!(source_type, ModPackType::CurseForge | ModPackType::Modrinth) {
-        return Err(String::from("err.sourceType"));
+        return Err(String::from(err_keys::SOURCE_TYPE));
     }
 
     let key = SourceInfo {
@@ -96,14 +97,16 @@ pub async fn add_modpack_install(
             tauri::async_runtime::block_on(async {
                 match source.as_str() {
                     "curseforge" => {
-                        let fid: u64 = file_id.parse().map_err(|_| "err.badFileId".to_string())?;
+                        let fid: u64 = file_id
+                            .parse()
+                            .map_err(|_| err_keys::BAD_FILE_ID.to_string())?;
                         let list = curseforge_api::get_files(vec![fid])
                             .await
                             .map_err(|e| e.to_string())?;
                         let mut data = list
                             .into_iter()
                             .next()
-                            .ok_or_else(|| "err.fileNotFound".to_string())?;
+                            .ok_or_else(|| err_keys::FILE_NOT_FOUND.to_string())?;
                         add_game::install_curseforge(
                             &mut data,
                             group,
@@ -132,7 +135,7 @@ pub async fn add_modpack_install(
                         .await
                         .map_err(|e| e.to_string())
                     }
-                    _ => Err(String::from("err.unknownSource")),
+                    _ => Err(String::from(err_keys::UNKNOWN_SOURCE)),
                 }
             })
         })
@@ -160,7 +163,7 @@ pub async fn add_modpack_cancel(app: AppHandle, pid: String, fid: String) -> Res
     let key = SourceInfo { pid, fid };
     let task = DOWNLOAD_NOW.read().unwrap().get(&key).cloned();
     let Some(task) = task else {
-        return Err(String::from("err.taskNotFound"));
+        return Err(String::from(err_keys::TASK_NOT_FOUND));
     };
     task.cancelled.store(true, Ordering::Release);
     task.cancel.cancel();

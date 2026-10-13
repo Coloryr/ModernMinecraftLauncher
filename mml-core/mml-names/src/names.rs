@@ -32,20 +32,20 @@ pub const GAME_SAVES_DIR: &str = "saves";
 pub const GAME_CONFIG_DIR: &str = "config";
 pub const GAME_SCHEMATICS_DIR: &str = "schematics";
 pub const JAVA_DIR: &str = "java";
-/// 版本 JSON 目录，目录名是 patches
 pub const JSON_DIR: &str = "patches";
 pub const DEFAULT_DIR: &str = "default";
 pub const OPEN_LOADER_DIR: &str = "openloader";
 pub const DATA_DIR: &str = "data";
 pub const NATIVE_DIR: &str = "native";
 pub const MML_DIR: &str = "mml";
-/// 游戏目录内的启动器数据目录，带前导点
 pub const MML_INNER_DIR: &str = ".mml";
 pub const BLOCK_DIR: &str = "block";
 pub const LANG_DIR: &str = "langs";
 pub const ITEM_DIR: &str = "items";
 pub const MINECRAFT_DIR: &str = "minecraft";
 pub const IMAGE_DIR: &str = "image";
+pub const KUBEJS_DIR: &str = "kubejs";
+pub const LOCAL_DIR: &str = "local";
 
 pub const LOG_FILE: &str = "logs.log";
 pub const LANG_FILE: &str = "lang.txt";
@@ -55,7 +55,6 @@ pub const GUI_SETTING_FILE: &str = "gui_setting.json";
 pub const GROUP_FILE: &str = "group_save.json";
 pub const MOD_PACK_FILE: &str = "Modpack.json";
 pub const CONFIG_FILE: &str = "config.json";
-/// 校验文件名，不带扩展名点
 pub const SHA_FILE: &str = "sha1";
 pub const COLOR_MC_INFO_FILE: &str = "colormc.info.json";
 pub const MMCJSON_FILE: &str = "mmc-pack.json";
@@ -96,7 +95,6 @@ pub const BLOCK_FILE: &str = "block.json";
 pub const ITEM_FILE: &str = "items.json";
 pub const GUI_CONFIG_FILE: &str = "gui_config.json";
 pub const COLLECT_FILE: &str = "collect.json";
-/// 从 ColorMC 迁移的"已询问过"标记，位于运行目录根，见 windows/colormc.rs
 pub const COLORMC_MIGRATE_FILE: &str = "colormc_migrate.json";
 
 pub const MINECRAFT_KEY: &str = "minecraft";
@@ -147,6 +145,26 @@ pub const RIO_EXT: &str = "rio";
 pub const MCA_EXT: &str = "mca";
 pub const PNG_EXT: &str = "png";
 pub const NBT_EXT: &str = "nbt";
+pub const TOML_EXT: &str = "toml";
+pub const YAML_EXT: &str = "yaml";
+pub const JSONC_EXT: &str = "jsonc";
+pub const JSON5_EXT: &str = "json5";
+pub const MCMETA_EXT: &str = "mcmeta";
+pub const YML_EXT: &str = "yml";
+pub const PROPERTIES_EXT: &str = "properties";
+pub const CFG_EXT: &str = "cfg";
+pub const CONF_EXT: &str = "conf";
+pub const INI_EXT: &str = "ini";
+pub const XML_EXT: &str = "xml";
+pub const JS_EXT: &str = "js";
+pub const MJS_EXT: &str = "mjs";
+pub const CJS_EXT: &str = "cjs";
+pub const SNBT_EXT: &str = "snbt";
+pub const JPG_EXT: &str = "jpg";
+pub const JPEG_EXT: &str = "jpeg";
+pub const GIF_EXT: &str = "gif";
+pub const WEBP_EXT: &str = "webp";
+pub const GZ_EXT: &str = "gz";
 
 pub const LOG_DOT_EXT: &str = ".log";
 pub const TXT_DOT_EXT: &str = ".txt";
@@ -175,9 +193,6 @@ pub const RIO_DOT_EXT: &str = ".rio";
 pub const MCA_DOT_EXT: &str = ".mca";
 pub const PNG_DOT_EXT: &str = ".png";
 pub const NBT_DOT_EXT: &str = ".nbt";
-
-/// 默认分组名，值是一个空格
-pub const DEFAULT_GROUP: &str = " ";
 
 pub const ARG_JAVA_LOCAL: &str = "%JAVA_LOCAL%";
 pub const ARG_JAVA_ARG: &str = "%JAVA_ARG%";
