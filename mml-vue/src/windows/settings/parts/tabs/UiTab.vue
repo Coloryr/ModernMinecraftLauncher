@@ -28,6 +28,8 @@ const {
   onSideChange,
   startup,
   onStartupChange,
+  view,
+  onViewModeChange,
   themeValue,
   onThemeChange,
   fonts,
@@ -154,6 +156,15 @@ onMounted(() => void loadFonts());
       { value: 'List', label: t('winSettings.startupList') },
     ]" @update:model-value="onStartupChange" />
     <p class="field-desc">{{ t("winSettings.startupPageDesc") }}</p>
+
+    <!-- 实例列表显示模式：主窗口里不再有这个切换控件，只在这里改 -->
+    <label class="field-label">{{ t("winSettings.viewMode") }}</label>
+    <SegmentedTabs :model-value="view" :options="[
+      { value: 'group', label: t('mode.group') },
+      { value: 'grid', label: t('mode.grid') },
+      { value: 'list', label: t('mode.list') },
+    ]" @update:model-value="onViewModeChange" />
+    <p class="field-desc">{{ t("winSettings.viewModeDesc") }}</p>
 
     <label class="field-label">{{ t("winSettings.sidebar") }}</label>
     <SegmentedTabs :model-value="side" :options="[

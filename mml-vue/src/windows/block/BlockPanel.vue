@@ -54,6 +54,16 @@ const catItems = computed(() => [
   ...cats.value.map((c) => ({ id: c, label: catLabel(c), count: catCounts.value.get(c) ?? 0 })),
 ]);
 
+/**
+ * 提示卡的正文
+ *
+ * 只在"有话说"时才出来：渲染失败给原因，渲染中给下载说明；**未渲染这一档不写正文**，
+ * 只留标题、下面那行下载提示与按钮
+ */
+const descText = computed(() =>
+  status.value?.error ?? (running.value ? t("blocks.renderFirstHint") : ""),
+);
+
 // ---------- 设为实例图标 ----------
 
 const iconPick = ref(false);
@@ -123,10 +133,7 @@ async function onDetailRemove() {
       <h2 class="block-prompt-title">
         {{ status?.error ? t("blocks.renderFailed") : running ? t("blocks.rendering") : t("blocks.renderPromptTitle") }}
       </h2>
-      <p class="block-prompt-desc">
-        {{ status?.error ?? (running ? t("blocks.renderFirstHint") : t("blocks.renderPromptDesc")) }}
-      </p>
-      <p v-if="!status?.error && !running" class="block-prompt-hint">{{ t("blocks.renderSizeHint") }}</p>
+      <p v-if="descText" class="block-prompt-desc">{{ descText }}</p>
       <BaseButton v-if="!running" variant="primary" @click="startRender(false)">
         {{ status?.error ? t("blocks.retry") : t("blocks.renderNow") }}
       </BaseButton>
@@ -162,10 +169,12 @@ async function onDetailRemove() {
 }
 
 /* 只有网格 / 分类栏区域是"通栏"的，其余卡片保持和网格一致的留白：
-   进度行在第一行时要补回 22px（它在面板顶部）；提示卡只在自己是第一行、或作为最底元素时补 */
+   进度行在第一行时要补回 22px（它在面板顶部）；提示卡只在自己是第一行、或作为最底元素时补。
+   右边距取 26 而不是网格那 16：网格的缩进 16 之外还有约 9px 的滚动条槽，
+   卡片没有那条槽，按 16 补会让卡片右边比左边多空出去 16px，看着左右不一样宽 */
 .block-progress,
 .block-prompt {
-  margin-right: 16px;
+  margin-right: 26px;
 }
 
 .block-progress,
@@ -214,15 +223,6 @@ async function onDetailRemove() {
   color: var(--text-dim);
   text-align: center;
   max-width: 420px;
-}
-
-.block-prompt-hint {
-  font-size: 12px;
-  color: var(--text-dim);
-  opacity: 0.75;
-  text-align: center;
-  max-width: 420px;
-  margin-bottom: 8px;
 }
 
 /* ---------- 进度（渲染中，顶部一行） ---------- */

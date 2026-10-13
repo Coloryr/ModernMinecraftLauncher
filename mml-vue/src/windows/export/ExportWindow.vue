@@ -76,6 +76,11 @@ const fileExt = computed(() => (pack.value === "modrinth" ? "mrpack" : "zip"));
 /** 只有 Modrinth 的清单带下载地址，其余格式整包打包 */
 const withUrls = computed(() => pack.value === "modrinth");
 
+/** 自定义加载器只在两种整包格式下会丢：它们的包内没有这个组件位，其余格式原样带着 */
+const customLoaderLost = computed(
+  () => !!info.value?.customLoader && (pack.value === "mmc" || pack.value === "hmcl"),
+);
+
 /** 默认勾选的目录：就是导出一直以来的那三块，重建同名前先保持行为不变 */
 const DEFAULT_DIRS = ["config", "resourcepacks", "shaderpacks"];
 
@@ -235,6 +240,9 @@ async function startExport() {
   });
   if (!picked) return;
 
+  // 选完保存位置再提醒一次：这一条决定了收包的人能不能直接跑起来
+  if (customLoaderLost.value) showToast(t("winExport.customLoaderWarn"), 4000);
+
   progress.value = { state: "running", now: 0, total: 0, text: "", error: null, file: picked };
   try {
     await api.runExport(currentUuid.value, {
@@ -329,6 +337,9 @@ onBeforeUnmount(() => {
           <label class="field-label">{{ t("winExport.format") }}</label>
           <SegmentedTabs v-model="pack" :options="packOptions" />
         </div>
+
+        <!-- 这层限制在选择格式时就说清楚，别让用户以为包里带了自定义加载器 -->
+        <p v-if="customLoaderLost" class="warn-hint">{{ t("winExport.customLoaderWarn") }}</p>
 
         <!-- 选项卡：与「添加实例」窗口同一套图标页签 -->
         <IconTabs v-model="tab" :tabs="tabOptions" />
@@ -509,6 +520,13 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: 11.5px;
   color: var(--text-dim);
+}
+
+/* 会丢东西的提示：与设置页里那些"改了要重启"的提示同一档观感 */
+.warn-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--yellow);
 }
 
 .sec-bar {

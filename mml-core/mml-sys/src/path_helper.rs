@@ -124,7 +124,8 @@ fn get_trash_info_path() -> PathBuf {
 ///
 /// # 返回值
 ///
-/// 路径不存在时直接返回 `Ok(())`；挪入回收站成功返回 `Ok(())`，失败返回相应错误
+/// 路径不存在时直接返回 `Ok(())`；挪入回收站成功返回 `Ok(())`；
+/// 用户中止返回 `ErrorType::TaskCancel`，其他失败返回相应错误
 pub fn move_to_trash<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
     // 检查路径是否存在
     if !dir.as_ref().exists() {
@@ -264,7 +265,7 @@ fn move_to_trash_windows<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
     // 放到独立工作线程执行，与已验证正常的普通线程环境一致。
     let dir: std::path::PathBuf = dir.as_ref().to_path_buf();
     let err_path = dir.clone();
-    let result = std::thread::spawn(move || -> i32 {
+    let (result, aborted) = std::thread::spawn(move || -> (i32, bool) {
         // pFrom 要求双 \0 结尾的路径列表，HSTRING 只有一个 \0 且结尾字节取自堆内存，
         // 会让 SHFileOperationW 间歇性返回 0x2；这里手动补足双 \0。
         let mut buf: Vec<u16> = dir.as_os_str().encode_wide().collect();
@@ -283,10 +284,16 @@ fn move_to_trash_windows<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
             lpszProgressTitle: PCWSTR::null(),
         };
 
-        unsafe { SHFileOperationW(&mut operation) }
+        let result = unsafe { SHFileOperationW(&mut operation) };
+        (result, operation.fAnyOperationsAborted.as_bool())
     })
     .join()
-    .unwrap_or(-1);
+    .unwrap_or((-1, false));
+
+    // 用户中止时返回码不定，先看 fAnyOperationsAborted，否则会把"取消"报成文件系统错误
+    if aborted {
+        return Err(ErrorType::TaskCancel);
+    }
 
     // 返回码：0 成功；0x71 用户取消，未移动任何内容；其他值出错
     match result {

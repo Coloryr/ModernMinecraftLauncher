@@ -54,7 +54,7 @@ pub use gui_config_dto::{ClientConfigDto, GuiConfigDto, LoginLockItemDto, MainWi
 pub use instance_dto::{GroupDto, InstanceInfoDto};
 pub use java_download_dto::{JavaDownloadItemDto, JavaDownloadOptionsDto, JavaTypes};
 pub use java_dto::{JavaImportProgressDto, JavaInfoDto};
-pub use log_dto::LogFocusDto;
+pub use log_dto::{LogFocusDto, LogSettingDto};
 pub use main_dto::{
     BlockItemDto, BlockStatusDto, ErrorEvent, ExitEvent, IconSourceDto, InstanceChangeEvent,
     InstanceLangDto, InstancePatch, LogEvent, NewsItem, StateEvent, SystemMemoryDto,

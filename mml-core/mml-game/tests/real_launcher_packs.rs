@@ -332,6 +332,79 @@ async fn mmc_and_hmcl_export_roundtrip() {
     }
 }
 
+/// 纯压缩包导出：整个实例目录原样进包，且不写任何整合包清单
+#[tokio::test]
+async fn zip_export_packs_instance_dir() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    ensure_init();
+
+    let setting = InstanceSettingObj {
+        name: "纯压缩包导出测试".to_string(),
+        version: "1.20.1".to_string(),
+        ..Default::default()
+    };
+    let game = setting.create_instance_in_group(None, None).await.unwrap();
+    let game_dir = game.read().unwrap().get_game_path();
+    std::fs::create_dir_all(game_dir.join("mods")).unwrap();
+    std::fs::write(game_dir.join("mods").join("testmod.jar"), b"test mod").unwrap();
+    std::fs::write(game_dir.join("options.txt"), "lang:zh_cn\n").unwrap();
+
+    let export_file = mml_testutil::temp_dir().join(format!("export-zip-{}.zip", Uuid::new_v4()));
+    game.read()
+        .unwrap()
+        .export(ExportArg {
+            file: export_file.clone(),
+            pack: ExportPackType::Zip,
+            archive: ArchiveType::Zip,
+            mods: Vec::new(),
+            files: Vec::new(),
+            unselect: Vec::new(),
+            select: Vec::new(),
+            name: "纯压缩包导出测试".to_string(),
+            author: "mml".to_string(),
+            version: "1.0.0".to_string(),
+            summary: String::new(),
+            gui: None,
+        })
+        .await
+        .expect("导出失败");
+
+    let archive = BaseArchive::open(&export_file).unwrap();
+    let entries: Vec<String> = archive
+        .entries()
+        .iter()
+        .map(|e| e.name.replace('\\', "/"))
+        .collect();
+
+    // 包内路径相对实例目录：游戏文件在 `.minecraft/` 下，实例元数据在根，没有额外套层
+    for want in [
+        format!("{}/mods/testmod.jar", name_consts::GAME_DIR),
+        format!("{}/options.txt", name_consts::GAME_DIR),
+    ] {
+        assert!(
+            entries.iter().any(|n| n == &want),
+            "纯压缩包里应有 {want}，实际: {entries:?}"
+        );
+    }
+    // 不写整合包清单：三种整包格式的元数据文件都不该出现。
+    // 实例目录自带的 modfileinfo.json 不算清单，它本来就该原样进包
+    for meta in [
+        name_consts::MMCJSON_FILE,
+        name_consts::HMCLFILE,
+        name_consts::MANIFEST_FILE,
+    ] {
+        assert!(
+            !entries.iter().any(|n| n.ends_with(meta)),
+            "纯压缩包里不该有 {meta}: {entries:?}"
+        );
+    }
+    drop(archive);
+
+    let _ = std::fs::remove_file(&export_file);
+    let uuid = game.read().unwrap().uuid;
+    mml_game::delete_instance(&uuid).unwrap();
+}
+
 /// M²L 即 ColorMC 实例压缩包：导出再导入的 roundtrip，离线可跑
 #[tokio::test]
 async fn mml_instance_archive_roundtrip() {

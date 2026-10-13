@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // 主窗口：实例列表（分组 / 平铺 / 搜索）、实例详情与设置、启动流程与日志、启动器主页
 // 子组件在 topbar / sidebar / ctxmenu/；拖拽、多选、文件拖放逻辑在 composables/
+// 显示模式的切换入口不在这里，在设置窗口「界面 → 主窗口」
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import {
   api,
@@ -8,6 +9,7 @@ import {
   onClientConfigChange,
   onCustomHomeChange,
   onGameExit,
+  onGuiViewModeChange,
   onInstanceChange,
   onJavaChange,
   onLaunchError,
@@ -26,7 +28,6 @@ import {
   sidebarCollapsed,
   sidebarSide,
   setSidebarCollapsed,
-  setViewMode,
   startupPage,
   viewMode,
 } from "../../lib/settings";
@@ -55,13 +56,12 @@ import { useFileDrop } from "../../composables/useFileDrop";
 import type { FileDropPayload } from "../../composables/useFileDrop";
 import { useMotd } from "./composables/useMotd";
 import { useInstanceArgs } from "./composables/useInstanceArgs";
-import { usePlayHours } from "./composables/usePlayHours";
+import { useInstanceStats } from "./composables/useInstanceStats";
 import type { ColorMcInfoDto, ViewMode } from "../../lib/bindings";
 import type { CtxMenuState, FeatureId, GroupView, InstMenuAction } from "./types";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import WindowControls from "../../components/ui/WindowControls.vue";
-import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import CollapsePanel from "../../components/ui/CollapsePanel.vue";
 import { titleBarStyle, onTitleBarPointerDown, useWindowTitle } from "../../lib/titlebar";
 import { useWindowDecoration } from "../../lib/useWindowDecoration";
@@ -137,13 +137,9 @@ function select(inst: InstanceInfoDto) {
 
 // ================= 游戏列表模式 =================
 
-// 显示模式：共享状态，默认「列表」，用户改过后持久化到 gui_config.json
+// 显示模式：共享状态，默认「列表」，改它的入口在设置窗口（界面 → 主窗口），
+// 那边改完由后端广播 gui-view-mode-change，见 subscribeEvents
 const mode = viewMode;
-const MODE_OPTIONS = computed(() => [
-  { value: "group", label: t("mode.group"), icon: "folder" },
-  { value: "grid", label: t("mode.grid"), icon: "grid" },
-  { value: "list", label: t("mode.list"), icon: "list" },
-]);
 
 /**
  * 分组注册表，含空分组；顺序即显示顺序
@@ -394,9 +390,19 @@ function openLogWindow() {
 function toggleSettings() {
   settingsOpen.value = !settingsOpen.value;
 }
-// 启动参数（懒加载骨架值 / 防抖写回）与累计游玩时长：见 composables/ 下的两个组合式函数
+// 启动参数（懒加载骨架值 / 防抖写回）与启动统计（时长 / 次数）：见 composables/ 下的组合式函数
 const { argsMap, argsOf, updateArgs, onServerIp, onServerJoin } = useInstanceArgs({ selected });
-const { playHoursOf } = usePlayHours();
+const { statsOf, playHoursOf, refresh: refreshStats } = useInstanceStats();
+
+/** 列表模式图标下那行：选中实例的启动统计；未选中实例时为空串，那一行不渲染 */
+const listStats = computed(() => {
+  const inst = selected.value;
+  if (!inst) return "";
+  return t("list.launchStats", {
+    count: statsOf(inst.uuid)?.count ?? 0,
+    hours: playHoursOf(inst.uuid),
+  });
+});
 
 // ================= 实例操作 =================
 
@@ -1111,6 +1117,8 @@ async function subscribeEvents() {
       launchPct.value = null;
       const inst = instances.value.find((i) => i.uuid === e.uuid);
       if (inst) inst.running = false;
+      // 这一局的时长 / 次数刚记进内核统计，重拉一次，界面上那行不是启动前的旧值
+      void refreshStats();
     }),
     onLaunchError((e) => {
       if (e.uuid && e.uuid !== selected.value?.uuid) return;
@@ -1133,6 +1141,10 @@ async function subscribeEvents() {
     // Java 列表变更：添加 / 删除 / 配置加载完成，都重新拉取
     onJavaChange(() => {
       loadJava();
+    }),
+    // 显示模式在设置窗口改：多窗口模式下这里是另一个 webview，只能靠这条广播同步
+    onGuiViewModeChange((v) => {
+      viewMode.value = v;
     }),
   ]);
   unlistens.push(...fns);
@@ -1473,14 +1485,11 @@ onMounted(async () => {
             </section>
 
             <section v-else key="list" class="list-mode" :class="{ 'has-motd': motdCardVisible }">
-              <!-- 实例锁定生效时视图固定为列表，模式切换控件整块隐藏（只留个空工具栏会很怪） -->
-              <div v-if="!lockActive" class="list-toolbar">
-                <SegmentedTabs :model-value="mode" :options="MODE_OPTIONS"
-                  @update:model-value="setViewMode($event as ViewMode)" />
-              </div>
-
               <InstanceIcon :name="selected?.name ?? '—'" :uuid="selected?.uuid ?? '0'" :size="120" />
-              <h2 class="list-title">{{ selected?.name ?? t("launch.selectInstance") }}</h2>
+
+              <!-- 图标下面这行是**启动统计**（实例名在下拉框里已经有一份，不重复）；
+                   一个实例都没选时整行不渲染，免得与下拉框的「选择游戏实例」说两遍 -->
+              <p v-if="listStats" class="list-stats">{{ listStats }}</p>
 
               <!-- 实例锁定生效：只有这一个实例可用，切换入口整块隐藏 -->
               <InstanceSelect v-if="!lockActive" :instances="instances" :model-value="selected?.uuid ?? null"
@@ -1528,13 +1537,13 @@ onMounted(async () => {
         <template v-else>
           <!-- 侧栏槽位：宽度在展开 300px / 收起 24px 之间过渡，动画期间内容被裁掉而不被压扁 -->
           <div class="sidebar-slot" :class="{ collapsed: sidebarCollapsed }">
-            <MainSidebar :mode="effectiveMode" :mode-options="MODE_OPTIONS" :search-text="searchText" :groups="groups"
+            <MainSidebar :mode="effectiveMode" :search-text="searchText" :groups="groups"
               :filtered-groups="filteredGroups" :filtered-instances="filteredInstances" :searching="searching"
               :selected="selected" :multi-select="multiSelect" :selected-ids="selectedIds" :drag-active="dragActive"
               :dragging-uuid="draggingUuid" :is-collapsed="isCollapsed" :on-drag-pointer-down="onDragPointerDown"
               :on-inst-click="onInstClick" :on-inst-context="onInstContext" :on-group-context="onGroupContext"
               :on-group-title-click="onGroupTitleClick" :is-inst-insert="isInstInsert"
-              :is-inst-insert-end="isInstInsertEnd" :is-group-insert="isGroupInsert" @update:mode="setViewMode($event)"
+              :is-inst-insert-end="isInstInsertEnd" :is-group-insert="isGroupInsert"
               @update:search-text="searchText = $event" @add-instance="openAdd" @add-group="showAddGroup = true"
               @collapse="collapseSidebar(true)" />
 
@@ -1588,7 +1597,7 @@ onMounted(async () => {
                     <div class="detail-meta">
                       <span>{{ t("detail.playTime", { hours: playHoursOf(selected.uuid) }) }}</span>
                       <span class="sep">·</span>
-                      <span>{{ t("detail.launchCount", { count: 0 }) }}</span>
+                      <span>{{ t("detail.launchCount", { count: statsOf(selected.uuid)?.count ?? 0 }) }}</span>
                       <!-- 小图标快捷操作（单色 SVG） -->
                       <div class="meta-actions">
                         <button class="icon-btn" v-tip="t('actions.export')" @click="openExportWindow">
@@ -1603,6 +1612,10 @@ onMounted(async () => {
                             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
                           </svg>
+                        </button>
+                        <!-- 实例日志窗口：与平铺模式的「日志」按钮同一个图标，两种模式里认得出来 -->
+                        <button class="icon-btn" v-tip="t('actions.viewLog')" @click="onAction('viewLog')">
+                          <GlyphIcon name="document" :size="15" :weight="1.8" />
                         </button>
                         <button class="icon-btn" v-tip="t('actions.editConfig')" @click="onAction('editConfig')">
                           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"

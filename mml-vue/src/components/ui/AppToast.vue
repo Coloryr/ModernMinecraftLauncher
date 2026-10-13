@@ -31,7 +31,7 @@ import { dismissToast, toasts } from "../../lib/toast";
 
 .toast-item {
   pointer-events: auto;
-  background: var(--bg-card);
+  background: var(--bg-modal);
   border: 1px solid var(--accent-border);
   color: var(--text);
   font-size: 13px;

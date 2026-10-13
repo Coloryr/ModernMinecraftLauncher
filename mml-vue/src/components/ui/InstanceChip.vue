@@ -1,25 +1,34 @@
 <script setup lang="ts">
-// 标题栏上的当前实例（名字 + 版本），走 WindowFrame 的 head-right 槽渲染。
-// 资源管理窗口与添加资源窗口共用：自带 scoped 样式，标题栏不在各窗口自己的布局容器里，
-// 窗口级样式够不到它
-/** 标题栏 chip 需要的实例信息，只取渲染用得到的两个字段 */
+// 标题栏上的当前实例：名字必给，版本可选（不传就只显示名字）。
+// 走 WindowFrame 的 head-right 槽渲染，资源管理 / 添加资源窗口与游戏日志窗口共用：
+// 自带 scoped 样式，标题栏不在各窗口自己的布局容器里，窗口级样式够不到它
+import { computed } from "vue";
+
+/** 标题栏 chip 需要的实例信息 */
 interface InstanceChipData {
   /** 实例名 */
   name: string;
-  /** 游戏版本，如 1.20.1 */
-  version: string;
+  /** 游戏版本，如 1.20.1；不传时只显示名字 */
+  version?: string;
 }
 
-defineProps<{
+const props = defineProps<{
   /** 当前实例；没有实例时整个 chip 不渲染 */
   instance: InstanceChipData | null;
 }>();
+
+/** 悬停提示：名字，带版本时才追加版本 */
+const tip = computed(() =>
+  props.instance?.version
+    ? `${props.instance.name} · ${props.instance.version}`
+    : (props.instance?.name ?? ""),
+);
 </script>
 
 <template>
-  <span v-if="instance" class="inst-chip" :title="`${instance.name} · ${instance.version}`">
+  <span v-if="instance" class="inst-chip" :title="tip">
     <span class="inst-chip-name">{{ instance.name }}</span>
-    <span class="inst-chip-ver">{{ instance.version }}</span>
+    <span v-if="instance.version" class="inst-chip-ver">{{ instance.version }}</span>
   </span>
 </template>
 

@@ -286,7 +286,7 @@ function pick(account: AccountStoreDto) {
   overflow-y: auto;
   scrollbar-gutter: stable;
   /* 见 styles/scrollbar.css */
-  background: var(--bg-card);
+  background: var(--bg-modal);
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);

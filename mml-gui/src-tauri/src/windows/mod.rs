@@ -58,11 +58,12 @@ pub use self::lifecycle::{on_window_event, show_main_window};
 pub(crate) use self::lifecycle::{model_for_kind, window_model};
 
 use self::lifecycle::{
-    close_window_from_uuid, drop_model_for_kind, ensure_model_for_kind, open_window_from_uuid,
+    close_window, close_window_from_uuid, drop_model_for_kind, ensure_model_for_kind, open_window,
+    open_window_from_uuid,
 };
 
 use self::geometry::{clamp_runtime_min_size, reconcile_min_size};
-use self::registry::{WINDOWS_INFO, min_size_of_label, uuid_for_kind};
+use self::registry::{WINDOWS_INFO, log_window_id, min_size_of_label, uuid_for_kind};
 
 use crate::listens;
 use uuid::Uuid;
@@ -142,8 +143,8 @@ pub fn window_get_window_sizes() -> Vec<WindowSizeDto> {
 ///
 /// - `app`: 应用句柄，建窗与发事件都用它
 /// - `kind`: 窗口类型
-/// - `instance`: 目标实例 UUID，游戏日志窗口用它定位要查看的实例；窗口已存在时
-///   聚焦并推送 `log-focus` 事件让已开窗口切换实例
+/// - `instance`: 目标实例 UUID；日志窗口必须有它，窗口身份由实例 uuid 派生，
+///   同一实例只会有一个日志窗口，重复打开只是聚焦；窗口已存在时目标实例**不会**再切换
 /// - `query`: 新窗口 URL 上的 query，**不含 `?`**
 ///
 /// `query` 由前端 `windowManager` 组装 —— 目标窗口的实例与"要打开哪个项目"
@@ -162,9 +163,6 @@ pub async fn window_open_window(
     query: Option<String>,
 ) -> Result<(), String> {
     kind_parse_check(&kind, &instance)?;
-    let Some(uuid) = uuid_for_kind(&kind) else {
-        return Err(format!("unknown window kind: {kind}"));
-    };
     // 新窗口的目标参数只能靠 URL 送达：前端组装好了就用它，里面带 uuid / 项目参数；
     // 没给就退回老路子 —— 只有 log / export 把 uuid 拼进去
     let url_path = match query.as_deref().filter(|q| !q.is_empty()) {
@@ -183,25 +181,32 @@ pub async fn window_open_window(
             _ => String::from("index.html"),
         },
     };
+
+    // 日志窗口是"一个实例一个"的窗口族：身份由实例 uuid 派生，没有实例就无从开窗
+    if kind == "log" {
+        let Some(instance) = instance.as_deref() else {
+            return Err(err_keys::LOG_INSTANCE_MISSING.to_string());
+        };
+        let instance = Uuid::parse_str(instance).map_err(|_| err_keys::UUID.to_string())?;
+        let id = log_window_id(&instance);
+        // 目标实例已经写进窗口身份，已开的窗口不必、也不能再换实例
+        return open_window(&app, &id.uuid, &id.label, &url_path);
+    }
+
+    let Some(uuid) = uuid_for_kind(&kind) else {
+        return Err(format!("unknown window kind: {kind}"));
+    };
     open_window_from_uuid(&app, &uuid, &url_path)?;
     // 新创建的窗口靠 URL query 拿目标；已存在的窗口 URL 不变，靠事件切换
-    if let Some(instance) = &instance {
-        if kind == "log" {
-            log::emit_log_focus(
-                &app,
-                LogFocusDto {
-                    uuid: instance.clone(),
-                },
-            );
-        }
-        if kind == "export" {
-            export::emit_export_focus(
-                &app,
-                LogFocusDto {
-                    uuid: instance.clone(),
-                },
-            );
-        }
+    if let Some(instance) = &instance
+        && kind == "export"
+    {
+        export::emit_export_focus(
+            &app,
+            LogFocusDto {
+                uuid: instance.clone(),
+            },
+        );
     }
     Ok(())
 }
@@ -230,12 +235,26 @@ fn kind_parse_check(kind: &str, instance: &Option<String>) -> Result<(), String>
 ///
 /// - `app`: 应用句柄，取窗口与关闭都用它
 /// - `kind`: 窗口类型
+/// - `instance`: 目标实例 UUID；日志窗口必须有它，窗口身份由实例 uuid 派生，见 [`log_window_id`]
 ///
 /// # 返回值
 ///
 /// 关闭请求已发出即返回 `Ok(())`，是否真关由关闭保护决定；kind 未知或窗口不存在返回错误文案
 #[tauri::command]
-pub fn window_close_window(app: AppHandle, kind: String) -> Result<(), String> {
+pub fn window_close_window(
+    app: AppHandle,
+    kind: String,
+    instance: Option<String>,
+) -> Result<(), String> {
+    kind_parse_check(&kind, &instance)?;
+    if kind == "log" {
+        let Some(instance) = instance.as_deref() else {
+            return Err(err_keys::LOG_INSTANCE_MISSING.to_string());
+        };
+        let instance = Uuid::parse_str(instance).map_err(|_| err_keys::UUID.to_string())?;
+        let id = log_window_id(&instance);
+        return close_window(&app, &id.uuid, &id.label);
+    }
     let Some(uuid) = uuid_for_kind(&kind) else {
         return Err(format!("unknown window kind: {kind}"));
     };
@@ -245,7 +264,7 @@ pub fn window_close_window(app: AppHandle, kind: String) -> Result<(), String> {
 /// 打开一个功能窗口；**已经在时按新 query 重新加载**，带新参数重开时用
 ///
 /// 与 [`window_open_window`] 的区别全在"窗口已存在"那一支：那个只聚焦，
-/// 页面状态要保留，目标实例靠 `log-focus` 这类事件推送；而这里的 query 本身就是
+/// 页面状态要保留，目标实例靠 `export-focus` 这类事件推送；而这里的 query 本身就是
 /// "要填进页面的东西"，如主窗口拖入的文件路径，不重新加载就送不进去，
 /// 所以直接 `navigate` 到新 URL —— 页面重新挂载，`onMounted` 里即可读到新参数。
 ///
@@ -262,6 +281,11 @@ pub async fn window_reopen_window(
     kind: String,
     query: Option<String>,
 ) -> Result<(), String> {
+    // 日志窗口是窗口族，身份由实例派生：这条路拿不到实例，定位不到是哪一个日志窗口。
+    // 前端只在带拖入路径时才走 reopen，而日志窗口不接受拖入，所以这里直接拒
+    if kind == "log" {
+        return Err(err_keys::LOG_INSTANCE_MISSING.to_string());
+    }
     let Some(uuid) = uuid_for_kind(&kind) else {
         return Err(format!("unknown window kind: {kind}"));
     };
@@ -839,7 +863,9 @@ pub fn window_get_gui_config(window: WebviewWindow) -> GuiConfigDto {
 /// 保存 GUI 状态到 gui_config.json，前端 DTO 转内部 GuiConfig
 ///
 /// 皮肤显示模式 / 头像配置有变化时广播 `skin-config-change`：渲染缓存键里含这两项，
-/// 各窗口收到后按新模式重取头像 / 皮肤图
+/// 各窗口收到后按新模式重取头像 / 皮肤图；实例列表显示模式有变化时广播
+/// `gui-view-mode-change`，主窗口据此立即换视图；背景图的不透明度 / 模糊有变化时
+/// 广播 `bg-change`，各窗口重取背景状态
 ///
 /// - `app`: 应用句柄，广播变更事件用它
 /// - `config`: 前端提交的完整 GUI 状态，内部转成落盘用的 `GuiConfig`
@@ -858,6 +884,16 @@ pub async fn window_save_gui_config(app: AppHandle, config: GuiConfigDto) -> Res
         let old = crate::gui_config::get();
         old.client != new_config.client
     };
+    let view_mode_changed = {
+        let old = crate::gui_config::get();
+        old.main_window.view_mode != new_config.main_window.view_mode
+    };
+    // 背景图的不透明度 / 模糊没有专门的命令，只经这里落盘：变了就广播背景变更，
+    // 否则别的窗口要等下次启动才跟着变
+    let bg_view_changed = {
+        let old = crate::gui_config::get();
+        old.bg_opacity != new_config.bg_opacity || old.bg_blur != new_config.bg_blur
+    };
     let new_client = new_config.client.clone();
     if client_changed {
         let uuid = new_client.lock_instance.clone();
@@ -868,12 +904,19 @@ pub async fn window_save_gui_config(app: AppHandle, config: GuiConfigDto) -> Res
             new_config.main_window.selected_instance = new_client.lock_instance.clone();
         }
     }
+    let new_view_mode = new_config.main_window.view_mode;
     crate::gui_config::set(new_config);
     if skin_changed {
         emit_skin_config_change(&app);
     }
     if client_changed {
         emit_client_config_change(&app, new_client.into());
+    }
+    if view_mode_changed {
+        emit_gui_view_mode_change(&app, new_view_mode);
+    }
+    if bg_view_changed {
+        crate::windows::settings::bg::emit_bg_change(&app);
     }
     Ok(())
 }
@@ -893,4 +936,16 @@ fn emit_skin_config_change(app: &AppHandle) {
 #[gui_macros::emit]
 fn emit_client_config_change(app: &AppHandle, config: crate::dtos::ClientConfigDto) {
     let _ = app.emit(listens::CLIENT_CONFIG_CHANGE, config);
+}
+
+/// 实例列表显示模式变更事件，跨窗口同步
+///
+/// 切换入口在设置窗口，主窗口只是读的一方：多窗口模式下两者是不同的 webview，
+/// 不广播的话只能等下次启动才生效，见 `window_save_gui_config`。
+///
+/// - `app`: 应用句柄，广播用它
+/// - `mode`: 变更后的显示模式
+#[gui_macros::emit]
+fn emit_gui_view_mode_change(app: &AppHandle, mode: crate::gui_config::ViewMode) {
+    let _ = app.emit(listens::GUI_VIEW_MODE_CHANGE, mode);
 }

@@ -20,6 +20,14 @@ import { isWindowKind, type WindowKind, WINDOW_REGISTRY } from "./registry";
 const WIN_PARAM = "window";
 const UUID_PARAM = "uuid";
 
+/**
+ * 日志窗口族的标签前缀，完整形式 `mml-log-<实例uuid>`
+ *
+ * 日志窗口是**一个实例一个**的窗口族，身份由后端按实例 uuid 派生，见 src-tauri 的
+ * windows/registry.rs `log_window_id`。前端只按这个前缀认它，不再另立一套命名。
+ */
+const LOG_LABEL_PREFIX = "mml-log-";
+
 /** 是否多窗口模式（默认多窗口） */
 export const multiWindow = ref(readString(KEYS.windowMode) !== "Single");
 
@@ -146,6 +154,52 @@ export function closeResourcePopup() {
 }
 
 /**
+ * 单窗口模式：日志以"悬浮面板"出现，而不是把当前页面换掉
+ *
+ * 与下载管理同一个路子：日志是工具型窗口，用户常常一边看别的页面一边盯日志。
+ * 与下载管理不同的是它**可以同时开多个**——一个实例一个，各自锁定，互不干扰；
+ * 多窗口模式下同样是"一个实例一个"，只不过那边是真实窗口。
+ */
+export const logPopups = ref<string[]>([]);
+
+/** 打开某个实例的日志浮窗；已经开着就把它提到最前 */
+export function openLogPopup(uuid: string) {
+  raiseLogPopup(uuid);
+}
+
+/** 把某个实例的日志浮窗提到最前；点面板时也走它 */
+export function raiseLogPopup(uuid: string) {
+  // 重建数组而不是原地挪：数组顺序就是层叠顺序，整份替换让模板稳定重渲染
+  logPopups.value = [...logPopups.value.filter((u) => u !== uuid), uuid];
+}
+
+/** 收起某个实例的日志浮窗 */
+export function closeLogPopup(uuid: string) {
+  logPopups.value = logPopups.value.filter((u) => u !== uuid);
+}
+
+/**
+ * 取本窗口（日志窗口族）锁定的实例 uuid
+ *
+ * 多窗口模式下窗口标签是唯一权威来源——后端就是按实例派生出这个标签的；
+ * 浏览器预览与单窗口模式没有这个标签，由调用方另给参数，见 [`targetUuid`]。
+ *
+ * # 返回值
+ *
+ * 标签不是日志窗口族时为 null
+ */
+export function logInstanceFromLabel(): string | null {
+  if (!isTauri()) return null;
+  try {
+    const label = getCurrentWindow().label;
+    return label.startsWith(LOG_LABEL_PREFIX) ? label.slice(LOG_LABEL_PREFIX.length) : null;
+  } catch (e) {
+    console.error("[windowManager] 读取窗口标签失败", e);
+    return null;
+  }
+}
+
+/**
  * 取本次要定位的实例 uuid
  *
  * 单窗口取本次 openWindow 带入的参数，多窗口取本窗口 URL 上的参数
@@ -217,6 +271,8 @@ function resolveKind(): WindowKind {
     try {
       // Tauri：用窗口标签识别，如 mml-settings → settings，main → main
       const label = getCurrentWindow().label;
+      // 日志窗口族先判：标签是 mml-log-<实例uuid>，去掉前缀不是任何一个 kind
+      if (label.startsWith(LOG_LABEL_PREFIX)) return "log";
       const kind = label.replace(/^mml-/, "");
       if (isWindowKind(kind)) return kind;
     } catch (e) {
@@ -402,10 +458,23 @@ export function openWindow(
   params?: { uuid?: string; project?: WindowProjectParam; drop?: WindowDropParam },
 ) {
   // 单窗口模式（浏览器 / Tauri 一致）：应用内页面切换
+  // 日志窗口是"一个实例一个"：实例是窗口身份的一部分（后端按它派生 uuid 与标签），
+  // 没有实例就开不出正确的窗口，两种模式都直接作罢
+  const logUuid = kind === "log" ? (params?.uuid ?? null) : null;
+  if (kind === "log" && !logUuid) {
+    console.warn("[windowManager] 打开日志窗口缺少实例 uuid，已忽略");
+    return;
+  }
+
   if (!multiWindow.value) {
     // 下载管理是工具型窗口：浮在当前页面之上，不把页面换掉（关掉它也不会"返回"到哪去）
     if (kind === "download") {
       openDownloadPopup();
+      return;
+    }
+    // 日志同样是工具型窗口，且**一个实例一个**：浮在当前页面之上，不换页面
+    if (logUuid) {
+      openLogPopup(logUuid);
       return;
     }
     // 已经停在这个窗口，例如就在日志页又右键了另一个实例：不压栈，只把新参数送过去
@@ -438,7 +507,8 @@ export function openWindow(
       });
       return;
     }
-    // `instance` 只对 log / export 有意义：那是"窗口已开着时推事件切实例"用的
+    // `instance` 只对 log / export 有意义：日志窗口靠它派生出"实例专属"的窗口身份，
+    // 导出窗口靠它在已开窗口上切目标实例
     const eventUuid = kind === "log" || kind === "export" ? (params?.uuid ?? null) : null;
     // 统一走 Rust 窗口管理器：创建 / 聚焦在 src-tauri 的 windows/mod.rs 处理。
     // open_window 是 async 命令，不在 Windows 主线程创建窗口，避免冻结。
@@ -458,10 +528,13 @@ export function openWindow(
 
 /** 回退路径：用官方 JS API 创建 / 聚焦真实 WebviewWindow */
 function createViaJs(kind: WindowKind, params?: { uuid?: string; project?: WindowProjectParam }) {
-  const label = `mml-${kind}`;
+  // 日志窗口族的标签带实例 uuid，与后端 log_window_id 同一口径：
+  // 少了这一段就会开出一个身份不对的窗口，跟 Rust 那条路开的也不是同一个
+  const label =
+    kind === "log" && params?.uuid ? `${LOG_LABEL_PREFIX}${params.uuid}` : `mml-${kind}`;
   WebviewWindow.getByLabel(label).then(async (existing) => {
     if (existing) {
-      // 窗口已存在则聚焦；目标实例靠 game-log / log-focus 事件链路自行同步
+      // 窗口已存在则聚焦；导出窗口的目标实例靠 export-focus 事件链路自行同步
       existing.setFocus();
       return;
     }
@@ -486,6 +559,22 @@ function createViaJs(kind: WindowKind, params?: { uuid?: string; project?: Windo
 }
 
 /**
+ * 关闭窗口时随 kind 一起报给后端的实例参数
+ *
+ * 只有日志窗口族需要：它的窗口身份由实例派生，光一个 `log` 定不下是哪一个窗口，
+ * 见后端 `window_close_window`。
+ *
+ * - `kind`: 当前窗口类型
+ *
+ * # 返回值
+ *
+ * 实例 uuid；其余窗口为 null
+ */
+function closeInstanceArg(kind: WindowKind): string | null {
+  return kind === "log" ? logInstanceFromLabel() : null;
+}
+
+/**
  * 关掉当前窗口：标题栏 ✕ 的动作，真的关窗
  *
  * - 多窗口模式：关掉当前这个功能窗口
@@ -501,7 +590,8 @@ export function quitWindow() {
   }
   // 单窗口模式只有主窗口是真的：那里 kind 是"当前页"而不是窗口标签，拿它去找窗口会 not found
   const target = multiWindow.value ? currentKind.value : "main";
-  commands.windows.closeWindow(target).catch((e) => {
+  const instance = multiWindow.value ? closeInstanceArg(target) : null;
+  commands.windows.closeWindow(target, instance).catch((e) => {
     console.error("[windowManager] 关闭窗口失败，回退 JS API", target, e);
     getCurrentWindow().close();
   });
@@ -552,7 +642,7 @@ export function closeWindow() {
     // 已经在主页面：主页面就是应用本身，关它 = 退出应用。
     // 不能走上面"切回主页面"的分支——那样标题栏的 ✕ 会变成空操作（启动画面为此单独绕过过）
     if (isTauri()) {
-      commands.windows.closeWindow("main").catch((e) => {
+      commands.windows.closeWindow("main", null).catch((e) => {
         console.error("[windowManager] 关闭主窗口失败，回退 JS API", e);
         getCurrentWindow().close();
       });
@@ -565,8 +655,9 @@ export function closeWindow() {
 
   if (isTauri()) {
     // 多窗口：走 Rust 窗口管理器关闭当前真实窗口，kind → 标签的映射在 windows/mod.rs。
+    // 日志窗口族的标签带实例 uuid，所以要把实例一起报上去。
     // 命令失败时回退到官方 JS API 关闭当前窗口。
-    commands.windows.closeWindow(kind).catch((e) => {
+    commands.windows.closeWindow(kind, closeInstanceArg(kind)).catch((e) => {
       console.error("[windowManager] Rust 关闭窗口失败，回退 JS API", kind, e);
       getCurrentWindow().close();
     });

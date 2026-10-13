@@ -174,3 +174,10 @@ pub const OPENJ9: &str =
 
 /// Azul Zulu 包列表接口，只取社区版
 pub const ZULU: &str = "https://www.azul.com/wp-admin/admin-ajax.php?action=bundles&endpoint=community&use_stage=false&include_fields=java_version%2Copenjdk_build_number%2Crelease_status%2Csupport_term%2Cos%2Carch%2Chw_bitness%2Cabi%2Cbundle_type%2Cjavafx%2Clatest%2Cext%2Cname%2Csha256_hash%2Curl%2Ccpu_gen%2Cfeatures";
+
+// ============================================================================
+// 日志上传
+// ============================================================================
+
+/// mclo.gs 日志上传接口：表单字段 `content`，响应里带可分享的网址
+pub const MCLO_PUSH: &str = "https://api.mclo.gs/1/log";

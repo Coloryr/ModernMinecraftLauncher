@@ -77,16 +77,21 @@ impl Default for MainWindowModel {
 
 /// 取主窗口模型，模型跟随主窗口生命周期，开窗创建、关窗销毁，见 `windows`
 ///
-/// 这些命令只会由主窗口 webview 调用；模型缺失属异常情形，即主窗口未创建，
-/// 返回 Err / 空列表由调用方降级，不 panic。
+/// 模型缺失属异常情形，即主窗口未创建，返回 Err / 空列表由调用方降级，不 panic。
 ///
-/// - `window`: 调用方窗口，模型按窗口标签取
+/// **调用方不一定是主窗口**：日志窗口也要读运行列表、启动 / 停止实例（标题栏的
+/// 「测试启动 / 停止」）。所以先按调用窗口取，拿不到再退到 kind 为 `main` 的那一份 ——
+/// 按窗口解析在别的窗口上必然拿不到 `MainWindowModel`，命令会静默返回空列表或报模型缺失。
+///
+/// - `window`: 调用方窗口
 ///
 /// # 返回值
 ///
 /// 取不到模型时返回 `err.modelMissing`
 pub(super) fn model(window: &WebviewWindow) -> Result<Arc<Mutex<MainWindowModel>>, String> {
-    windows::window_model(window).ok_or_else(|| err_keys::MODEL_MISSING.to_string())
+    windows::window_model(window)
+        .or_else(|| windows::model_for_kind::<Mutex<MainWindowModel>>("main"))
+        .ok_or_else(|| err_keys::MODEL_MISSING.to_string())
 }
 
 /// 实例数据变更事件

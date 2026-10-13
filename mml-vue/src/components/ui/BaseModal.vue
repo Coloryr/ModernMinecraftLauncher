@@ -91,7 +91,8 @@ const active = usePageActive();
      左右内边距因此各减 9px：15 + 9 = 设计上的 24px，内容区仍在原来的位置，
      只是把原先白占的右侧槽位补回来 */
   scrollbar-gutter: stable both-edges;
-  background: var(--bg-card);
+  /* 专用底色而不是 --bg-card：弹窗面板比普通表面实一些，见 themes.css 的 --bg-modal */
+  background: var(--bg-modal);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 22px 15px;

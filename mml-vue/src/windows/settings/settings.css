@@ -317,22 +317,24 @@
   background: var(--bg-side);
   border: 1px solid var(--border);
   border-radius: 10px;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .settings-layout .sample-img {
-  height: 100px;
+  height: 130px;
   width: auto;
-  image-rendering: pixelated;
+  image-rendering: revert;
 }
 
 /* 皮肤全身图比头像高一些 */
 .settings-layout .sample-img.skin {
-  height: 200px;
+  height: 220px;
 }
 
 /* 披风样例：2D 是竖图、3D 是方图，统一按高度收，宽度自适应 */
 .settings-layout .sample-img.cape {
-  height: 140px;
+  height: 200px;
 }
 
 .settings-layout .sample-label {

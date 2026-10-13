@@ -618,19 +618,9 @@
   padding-bottom: 130px;
 }
 
-.list-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  width: 100%;
-  max-width: 560px;
-  margin-bottom: 4px;
-}
-
-.list-title {
-  font-size: 20px;
-  font-weight: 700;
-  word-break: break-all;
+.list-stats {
+  font-size: 13.5px;
+  color: var(--text-dim);
   text-align: center;
 }
 

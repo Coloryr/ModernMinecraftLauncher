@@ -34,6 +34,9 @@ fn main() {
         err_box::fatal_error(e);
     }
 
+    // 内核日志语言跟随界面语言：没有 lang.txt 时内核按系统语言走，可能与 GUI 配置不一致
+    gui_config::sync_core_lang(gui_config::get().locale);
+
     image_manager::init();
 
     mml_gui_lib::run()

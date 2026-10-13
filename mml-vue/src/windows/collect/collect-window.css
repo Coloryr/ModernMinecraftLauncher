@@ -471,7 +471,7 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   /* 同 --bg-panel 问题：不存在 → 菜单一直是透明的（能看见底下的卡片） */
-  background: var(--bg-card);
+  background: var(--bg-modal);
   box-shadow: var(--shadow-lg);
 }
 

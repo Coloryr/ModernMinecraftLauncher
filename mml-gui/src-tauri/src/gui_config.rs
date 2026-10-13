@@ -445,10 +445,28 @@ pub fn dir() -> Option<PathBuf> {
     FILE.get().and_then(|p| p.parent()).map(Path::to_path_buf)
 }
 
+/// 让内核侧文案，即日志，跟随界面语言
+///
+/// 内核语言另有 `lang.txt` 一份，不跟随时会一直停在启动时的语言上。
+///
+/// - `locale`: 界面语言
+pub fn sync_core_lang(locale: Lang) {
+    // 已经一致就别再写一次 lang.txt
+    if mml_names::get_lang_type() == locale {
+        return;
+    }
+
+    if let Err(err) = mml_names::set_lang(locale) {
+        mml_log::error(format!("lang.txt 写入失败: {err:?}"));
+    }
+}
+
 /// 更新配置并保存
 ///
 /// - `config`: 新配置
 pub fn set(config: GuiConfig) {
+    sync_core_lang(config.locale);
+
     if let Some(c) = CONFIG.get() {
         *c.write().unwrap() = config;
     }

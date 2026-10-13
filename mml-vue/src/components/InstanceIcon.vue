@@ -155,8 +155,10 @@ watch(
   width: 100%;
   height: 100%;
   object-fit: cover;
-  /* 实例图标多为低分辨率像素图，平滑缩放会发糊 */
-  image-rendering: pixelated;
+  /* 实例图标基本都是内核渲染的 256×256 方块图（mml-tex-draw 的 BLOCK_SIZE），
+     与方块网格 / 账户格子同一条口径：缩放交给浏览器的平滑插值，**不要 pixelated**，
+     最近邻会把方块的斜边采成锯齿。代价是自传的小尺寸像素图放大会发软 */
+  image-rendering: auto;
 }
 
 /* 简单的高光装饰；只有占位态才画，真图上方不该再压一层白高光 */

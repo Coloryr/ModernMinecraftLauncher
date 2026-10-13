@@ -24,6 +24,12 @@ pub const VARIANT_INVALID: &str = "err.variantInvalid";
 pub const MODEL_MISSING: &str = "err.modelMissing";
 /// 窗口参数不合法
 pub const WINDOW_QUERY: &str = "err.windowQuery";
+/// 没给实例 uuid，日志窗口定不下是哪一个
+pub const LOG_INSTANCE_MISSING: &str = "err.logInstanceMissing";
+/// 没有可上传的日志内容
+pub const LOG_EMPTY: &str = "err.logEmpty";
+/// 日志上传失败
+pub const LOG_UPLOAD: &str = "err.logUpload";
 /// 未知的排序方式
 pub const SORT_TYPE_NOT_FOUND: &str = "err.sortTypeNotFound";
 

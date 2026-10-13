@@ -8,7 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 export const commands = {
   windows: {
     activateDecoration: () => invoke<string>("window_activate_decoration"),
-    closeWindow: (kind: string) => invoke<void>("window_close_window", { kind }),
+    closeWindow: (kind: string, instance: string | null) => invoke<void>("window_close_window", { kind, instance }),
     dropModel: (kind: string) => invoke<void>("window_drop_model", { kind }),
     ensureModel: (kind: string) => invoke<void>("window_ensure_model", { kind }),
     getGuiConfig: () => invoke<GuiConfigDto>("window_get_gui_config"),
@@ -147,7 +147,10 @@ export const commands = {
   log: {
     getFiles: (uuid: string) => invoke<string[]>("log_get_files", { uuid }),
     getRuntime: (uuid: string) => invoke<LogLine[]>("log_get_runtime", { uuid }),
+    getSetting: (uuid: string) => invoke<LogSettingDto>("log_get_setting", { uuid }),
     readFile: (uuid: string, path: string) => invoke<LogLine[]>("log_read_file", { uuid, path }),
+    setSetting: (uuid: string, setting: LogSettingDto) => invoke<void>("log_set_setting", { uuid, setting }),
+    upload: (uuid: string, file: string | null) => invoke<string>("log_upload", { uuid, file }),
   },
   main: {
     addGroup: (name: string) => invoke<string | null>("main_add_group", { name }),
@@ -628,9 +631,7 @@ export type ExportEntryDto = {
 
 export type ExportInfoDto = {
   name: string,
-  version: string,
-  loader: string,
-  loaderVersion: string | null,
+  customLoader: boolean,
   mods: ExportEntryDto[],
 };
 
@@ -787,6 +788,16 @@ export type JavaImportProgressDto = {
 
 export type LogFocusDto = {
   uuid: string,
+};
+
+export type LogSettingDto = {
+  wordWrap: boolean,
+  auto: boolean,
+  enableNone: boolean,
+  enableInfo: boolean,
+  enableWarn: boolean,
+  enableError: boolean,
+  enableDebug: boolean,
 };
 
 export type InstanceLangDto = {

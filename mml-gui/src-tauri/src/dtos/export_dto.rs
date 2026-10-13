@@ -30,12 +30,8 @@ pub struct ExportEntryDto {
 pub struct ExportInfoDto {
     /// 实例名
     pub name: String,
-    /// 游戏版本
-    pub version: String,
-    /// 加载器类型：Normal / Forge / Fabric / Quilt / NeoForge
-    pub loader: String,
-    /// 加载器版本
-    pub loader_version: Option<String>,
+    /// 实例用的是自定义加载器：MMC / HMCL 的包内没有它的组件位，导出的包里只有游戏版本
+    pub custom_loader: bool,
     /// `mods` 目录下的模组，有在线来源的带上项目号与下载地址
     pub mods: Vec<ExportEntryDto>,
 }

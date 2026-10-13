@@ -163,7 +163,7 @@ watchEffect(async () => {
   max-height: calc(100vh - 16px);
   overflow-y: auto;
   padding: 6px;
-  background: var(--bg-card);
+  background: var(--bg-modal);
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: var(--shadow-lg);

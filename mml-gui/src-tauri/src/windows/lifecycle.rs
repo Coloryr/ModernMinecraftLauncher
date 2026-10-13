@@ -27,7 +27,7 @@ use uuid::Uuid;
 use super::geometry::{remember_decorated_inset, save_window_state, window_state_for};
 use super::registry::{
     ADD_MODPACK_WINDOW_UUID, ADD_WINDOW_UUID, BLOCK_WINDOW_UUID, DOWNLOAD_WINDOW_UUID,
-    MAIN_WINDOW_UUID, WINDOWS_INFO, uuid_for_kind,
+    MAIN_WINDOW_UUID, WINDOWS_INFO, min_size_of_label, uuid_for_kind, uuid_of_label,
 };
 use super::{add_modpack, block};
 
@@ -257,10 +257,9 @@ pub(super) fn create_window(
 
     // 最小尺寸随注册表条目走，各窗口布局不同、可压缩程度不同；无历史几何时直接以最小尺寸
     // 居中打开，下限则在装饰激活后按它设，见 window_activate_decoration
-    let binding = &*WINDOWS_INFO;
-    let (min_w, min_h) = binding
-        .get(uuid)
-        .map(|e| (e.min_width, e.min_height))
+    // 按标签取：日志窗口族的标签不在静态表里，见 min_size_of_label
+    let (min_w, min_h) = min_size_of_label(label)
+        .map(|m| (m.width, m.height))
         .unwrap_or((600.0, 400.0));
 
     // 所有窗口都走插件装饰：必须以 decorations(true) 建出来，插件才能在原生 frame 上激活
@@ -360,21 +359,16 @@ pub(super) fn webview_data_dir() -> Option<PathBuf> {
     Some(cache.join(names::WEBVIEW_DIR))
 }
 
-/// 关闭指定 uuid 的窗口：先保存几何，再真正关闭窗口
+/// 关闭指定窗口：先保存几何，再真正关闭窗口
 ///
 /// - `app`: 应用句柄，按标签补查窗口用
 /// - `uuid`: 窗口 uuid
+/// - `label`: 与 `uuid` 对应的窗口标签；静态窗口取自注册表，日志窗口族由实例派生
 ///
 /// # 返回值
 ///
-/// 关闭请求已发出返回 `Ok(())`；uuid 未注册或窗口已不存在返回错误文案
-pub(crate) fn close_window_from_uuid(app: &AppHandle, uuid: &Uuid) -> Result<(), String> {
-    let binding = &*WINDOWS_INFO;
-    let Some(entry) = binding.get(uuid) else {
-        return Err(WindowNotFound.to_string());
-    };
-    let label = entry.label;
-
+/// 关闭请求已发出返回 `Ok(())`；窗口已不存在返回错误文案
+pub(crate) fn close_window(app: &AppHandle, uuid: &Uuid, label: &str) -> Result<(), String> {
     // 句柄优先取句柄表，缺失时按标签现查，覆盖外部创建的窗口。这里**只克隆、不提前摘表**：
     // `close()` 会先发 `CloseRequested`，关闭保护完全可能拦下它，摘了表就与真实窗口脱节
     let window = OPEN_WINDOWS
@@ -401,7 +395,42 @@ pub(crate) fn close_window_from_uuid(app: &AppHandle, uuid: &Uuid) -> Result<(),
     Ok(())
 }
 
-/// 打开或聚焦指定 uuid 的窗口
+/// 关闭注册表里静态登记的窗口
+///
+/// - `app`: 应用句柄，按标签补查窗口用
+/// - `uuid`: 窗口 uuid
+///
+/// # 返回值
+///
+/// 关闭请求已发出返回 `Ok(())`；uuid 未注册或窗口已不存在返回错误文案
+pub(crate) fn close_window_from_uuid(app: &AppHandle, uuid: &Uuid) -> Result<(), String> {
+    let Some(entry) = WINDOWS_INFO.get(uuid) else {
+        return Err(WindowNotFound.to_string());
+    };
+    close_window(app, uuid, entry.label)
+}
+
+/// 打开或聚焦一个窗口
+///
+/// - `app`: 应用句柄，建窗用
+/// - `uuid`: 窗口 uuid
+/// - `label`: 与 `uuid` 对应的窗口标签
+/// - `url_path`: 传给 [`create_window`] 的 webview 路径
+///
+/// # 返回值
+///
+/// 窗口已打开或已聚焦返回 `Ok(())`；建窗失败返回错误文案
+pub(crate) fn open_window(
+    app: &AppHandle,
+    uuid: &Uuid,
+    label: &str,
+    url_path: &str,
+) -> Result<(), String> {
+    create_window(app, label, uuid, url_path)?;
+    Ok(())
+}
+
+/// 打开或聚焦注册表里静态登记的窗口
 ///
 /// - `app`: 应用句柄，建窗用
 /// - `uuid`: 窗口 uuid
@@ -415,14 +444,10 @@ pub(crate) fn open_window_from_uuid(
     uuid: &Uuid,
     url_path: &str,
 ) -> Result<(), String> {
-    let binding = &*WINDOWS_INFO;
-    let Some(entry) = binding.get(uuid) else {
+    let Some(entry) = WINDOWS_INFO.get(uuid) else {
         return Err(WindowNotFound.to_string());
     };
-    let label = entry.label;
-
-    create_window(app, label, uuid, url_path)?;
-    Ok(())
+    open_window(app, uuid, entry.label, url_path)
 }
 
 /// 创建 / 聚焦主窗口，setup 阶段调用
@@ -446,14 +471,14 @@ pub fn show_main_window(app: &AppHandle) -> Result<(), String> {
 /// - `event`: 窗口事件，只处理关闭请求 / 销毁 / 缩放与移动
 pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::WindowEvent) {
     let label = window.label().to_string();
-    let binding = &*WINDOWS_INFO;
-    let Some((uuid, _)) = binding.iter().find(|(_, e)| e.label == label) else {
+    // uuid 按标签反查：静态窗口走注册表，日志窗口族按 `mml-log-<实例uuid>` 派生
+    let Some(uuid) = uuid_of_label(&label) else {
         return;
     };
     match event {
         tauri::WindowEvent::CloseRequested { api, .. } => {
             // 窗口模型开启关闭保护时，如正在查询数据，拒绝本次关闭请求并通知前端提示
-            if close_guarded(uuid) {
+            if close_guarded(&uuid) {
                 api.prevent_close();
                 emit_close_blocked(window);
                 return;
@@ -464,9 +489,9 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
                 // 最大化 / 全屏：只记标志、不覆盖几何，否则下次会开在另一块屏、而且不最大化
                 let maximized =
                     win.is_maximized().unwrap_or(false) || win.is_fullscreen().unwrap_or(false);
-                let _ = save_window_state(uuid, &win, maximized);
+                let _ = save_window_state(&uuid, &win, maximized);
             }
-            if *uuid == MAIN_WINDOW_UUID {
+            if uuid == MAIN_WINDOW_UUID {
                 mml_core::stop();
                 let others: Vec<(Uuid, WebviewWindow<tauri::Wry>)> = OPEN_WINDOWS
                     .write()
@@ -497,8 +522,8 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
             {
                 model.lock().unwrap().reject_all_dialogs();
             }
-            OPEN_WINDOWS.write().unwrap().remove(uuid);
-            remove_window_model(uuid);
+            OPEN_WINDOWS.write().unwrap().remove(&uuid);
+            remove_window_model(&uuid);
         }
         // 缩放 / 移动：实时记录几何，不必等关窗，配置保存按文件去重合并写入
         // 最大化 / 全屏时不记，否则还原后会以最大化尺寸打开
@@ -508,7 +533,7 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
                     return;
                 }
                 // 这里已确定不是最大化 / 全屏；取消最大化时也会走到这，顺手把标志清掉
-                let _ = save_window_state(uuid, &win, false);
+                let _ = save_window_state(&uuid, &win, false);
             }
         }
         _ => {}

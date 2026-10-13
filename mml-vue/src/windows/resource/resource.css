@@ -1125,7 +1125,8 @@
   padding: 4px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--bg-raised);
+  /* 与其它悬浮层同为 0.9，只是沿用抬升色调，见 themes.css 的 --bg-modal-raised */
+  background: var(--bg-modal-raised);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.28);
 }
 

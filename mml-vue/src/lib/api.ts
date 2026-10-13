@@ -36,6 +36,7 @@ import type {
   LoadState,
   LogEvent,
   LogFocusDto,
+  LogSettingDto,
   McaChunkDto,
   ModGroupDto,
   ResourceViewDto,
@@ -65,8 +66,9 @@ import type {
   StateEvent,
   SystemMemoryDto,
   VersionInfoDto,
+  ViewMode,
 } from "./bindings";
-import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, InstanceChange, JavaChange, LaunchError, LaunchState, LogFocus, ResourceListModsProgress } from "./listens";
+import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress } from "./listens";
 
 export interface CreateInstanceOpts {
   loader?: string;
@@ -1021,6 +1023,43 @@ export const api = {
   },
 
   /**
+   * 读取实例的日志窗口设置
+   *
+   * - `uuid`: 实例 uuid
+   *
+   * # 返回值
+   *
+   * 自动换行 / 自动下拉 / 五个等级开关；存在实例的 `gui_setting.json` 里，没写过是默认值
+   */
+  async getLogSetting(uuid: string): Promise<LogSettingDto> {
+    return commands.log.getSetting(uuid);
+  },
+
+  /**
+   * 保存实例的日志窗口设置
+   *
+   * - `uuid`: 实例 uuid
+   * - `setting`: 新的日志设置，整份回写
+   */
+  async setLogSetting(uuid: string, setting: LogSettingDto): Promise<void> {
+    return commands.log.setSetting(uuid, setting);
+  },
+
+  /**
+   * 把日志上传到 mclo.gs
+   *
+   * - `uuid`: 实例 uuid
+   * - `file`: 日志文件绝对路径，取自 `getLogFiles`；`null` 表示当前运行日志
+   *
+   * # 返回值
+   *
+   * 可分享的网址；没有内容或上传失败时抛错
+   */
+  async uploadLog(uuid: string, file: string | null): Promise<string> {
+    return commands.log.upload(uuid, file);
+  },
+
+  /**
    * 获取实例导出信息
    *
    * - `uuid`: 实例 uuid
@@ -1301,20 +1340,6 @@ export function onColormcProgress(
   return listen<ColorMcProgressDto>(ColormcProgress, (e) => cb(e.payload));
 }
 /**
- * 日志窗口切换目标实例事件
- *
- * - `cb`: 收到新目标实例 uuid 时回调
- *
- * # 返回值
- *
- * 取消监听的函数
- *
- * 窗口已存在时再次打开，壳层推送新目标
- */
-export function onLogFocus(cb: (uuid: string) => void): Promise<UnlistenFn> {
-  return listen<LogFocusDto>(LogFocus, (e) => cb(e.payload.uuid));
-}
-/**
  * 客户端设置变更事件
  *
  * - `cb`: 收到新配置时回调
@@ -1327,6 +1352,20 @@ export function onLogFocus(cb: (uuid: string) => void): Promise<UnlistenFn> {
  */
 export function onClientConfigChange(cb: (e: ClientConfigDto) => void): Promise<UnlistenFn> {
   return listen<ClientConfigDto>(ClientConfigChange, (e) => cb(e.payload));
+}
+/**
+ * 实例列表显示模式变更事件
+ *
+ * - `cb`: 收到新模式时回调，取值 list / group / grid
+ *
+ * # 返回值
+ *
+ * 取消监听的函数
+ *
+ * 设置窗口改了显示模式后广播，payload 为变更后的模式
+ */
+export function onGuiViewModeChange(cb: (mode: ViewMode) => void): Promise<UnlistenFn> {
+  return listen<ViewMode>(GuiViewModeChange, (e) => cb(e.payload));
 }
 /**
  * 实例导出进度事件

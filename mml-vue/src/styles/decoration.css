@@ -1,0 +1,13 @@
+/* tauri-plugin-decoration 注入节点的兜底约束
+   ============================================================
+   正常情况下页面里**根本不会出现**这个节点：vendor 补丁
+   mml-gui/vendor/patches/no-decoration-root.patch 已经让插件在 createRoot 里只创建、不插入
+   `document.body`（M²L 的窗口按钮一律自己画 —— 顶栏见 MainTopbar、子窗口见 WindowControls，
+   Windows 的贴靠热区由 lib/decoration.ts 上报按钮矩形来摆原生命中区，macOS 用插件画的原生红黄绿）。
+
+   留这一条是兜底：万一补丁没跟上（上游改了 createRoot、或某个 checkout 是补丁前的产物），
+   也不会突然在窗口里多出一套窗口按钮。
+   用 visibility 而不是 display: none：插件的 JS 会量这层的高度算贴靠几何，几何不能塌。 */
+[data-tauri-plugin-decoration-root] {
+  visibility: hidden !important;
+}

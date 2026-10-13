@@ -1,10 +1,9 @@
 <script setup lang="ts">
-// 实例下拉选择（带实例图标），用于列表模式选中实例
+// 实例下拉选择，用于列表模式选中实例
+// 整块控件**不带图标**：按钮与展开的列表都只有文字（名字 / 版本 / 加载器），详见下方模板
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import { t } from "../lib/i18n";
 import type { InstanceInfoDto } from "../lib/bindings";
-import InstanceIcon from "./InstanceIcon.vue";
-import GlyphIcon from "./ui/GlyphIcon.vue";
 
 const props = defineProps<{
   /** 可选的实例列表 */
@@ -142,8 +141,6 @@ function addNew() {
 <template>
   <div class="instance-select" ref="rootEl">
     <button class="select-btn" ref="btnEl" @click="toggle">
-      <InstanceIcon v-if="selected" :name="selected.name" :uuid="selected.uuid" :size="30" />
-      <span class="placeholder" v-else>—</span>
       <span class="select-text">
         <span v-if="selected" class="sel-name">{{ selected.name }}</span>
         <span v-else class="sel-placeholder">{{ t("launch.selectInstance") }}</span>
@@ -163,11 +160,11 @@ function addNew() {
     <Transition name="drop">
       <div v-if="open" class="select-menu" :style="menuStyle">
         <!-- 实例列表：整块浮层里**唯一**可滚动的地方，
-             所以右侧滚动条只在这一段，不会延伸到下面的"添加实例"上去 -->
+             所以右侧滚动条只在这一段，不会延伸到下面的"添加实例"上去。
+             每行只有文字：图标（实例头像 / 加号）在这个下拉里一律不画 -->
         <div class="menu-list" ref="listEl">
           <button v-for="inst in instances" :key="inst.uuid" class="option"
             :class="{ active: inst.uuid === modelValue }" @click="pick(inst)">
-            <InstanceIcon :name="inst.name" :uuid="inst.uuid" :size="30" />
             <span class="option-text">
               <span class="option-name">{{ inst.name }}</span>
               <span class="option-sub">
@@ -185,9 +182,6 @@ function addNew() {
         <div class="menu-foot">
           <div class="menu-sep"></div>
           <button class="option add-option" @click="addNew">
-            <span class="add-icon">
-              <GlyphIcon name="plus" :size="15" />
-            </span>
             <span class="option-text">
               <span class="option-name">{{ t("add.title") }}</span>
             </span>
@@ -223,18 +217,6 @@ function addNew() {
 .select-btn:hover {
   border-color: var(--accent);
   background: var(--bg-hover);
-}
-
-.placeholder {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: var(--bg-hover);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-dim);
-  flex-shrink: 0;
 }
 
 .select-text {
@@ -294,7 +276,7 @@ function addNew() {
   position: fixed;
   display: flex;
   flex-direction: column;
-  background: var(--bg-card);
+  background: var(--bg-modal);
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: var(--shadow-lg);
@@ -396,14 +378,5 @@ function addNew() {
 
 .add-option {
   color: var(--accent);
-}
-
-.add-icon {
-  /* 与实例图标同宽，让文字左对齐一致 */
-  width: 30px;
-  text-align: center;
-  font-size: 16px;
-  line-height: 1;
-  flex-shrink: 0;
 }
 </style>

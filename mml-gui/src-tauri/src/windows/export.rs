@@ -23,6 +23,7 @@ use mml_base::{
 use mml_game::game_export::{ExportArg, ExportPackType, OnlineFileExport};
 use mml_game::launcher::file_online_info_obj::OnlineInfoObj;
 use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
+use mml_game::loader::LoaderType;
 use mml_sys::path_helper;
 use tauri::{AppHandle, Emitter};
 
@@ -151,9 +152,7 @@ pub fn export_get_info(uuid: String) -> Result<ExportInfoDto, String> {
 
     Ok(ExportInfoDto {
         name: game.name.clone(),
-        version: game.version.clone(),
-        loader: game.loader.to_string().to_owned(),
-        loader_version: game.loader_version.clone(),
+        custom_loader: game.loader == LoaderType::Custom,
         mods,
     })
 }

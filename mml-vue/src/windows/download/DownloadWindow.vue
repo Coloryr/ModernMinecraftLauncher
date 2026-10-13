@@ -16,7 +16,7 @@ import {
 } from "../../lib/progress";
 import { t } from "../../lib/i18n";
 import { usePageActive } from "../../lib/pageActive";
-import { multiWindow } from "../windowManager";
+import { isTauri, multiWindow } from "../windowManager";
 import type { DownloadStatusDto, DownloadTaskDto } from "../../lib/bindings";
 
 /** 请求关闭本窗口 */
@@ -162,12 +162,22 @@ let keepOpen = false;
 /** 上一轮任务里是否有失败：有失败就不自动关窗，留着让用户看到 */
 let lastFailed = false;
 
+/** 上一轮刷新是否报过 IPC 错误：每段故障只报一次，别让 700ms 的轮询刷屏 */
+let ipcErrorReported = false;
+
 /** 拉一次状态快照，任务全部结束时按需自动关窗 */
 async function refresh() {
   try {
     status.value = await api.getDownloadStatus();
-  } catch {
-    /* 纯浏览器模式：无 IPC，保持空状态 */
+    // 拉到了说明这段故障过去了，下次再坏还值得报一条
+    ipcErrorReported = false;
+  } catch (err) {
+    // 纯浏览器模式下本来就没有 IPC，静默保持空状态；真接上后端还失败就得留下痕迹，
+    // 否则界面一直显示"所有下载线程空闲"，日志里什么都没有
+    if (isTauri() && !ipcErrorReported) {
+      ipcErrorReported = true;
+      console.warn("download_get_status 失败，下载状态无法刷新", err);
+    }
   } finally {
     loading.value = false;
   }

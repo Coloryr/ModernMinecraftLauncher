@@ -23,7 +23,7 @@ import {
   setBgOpacity,
   resizeBg,
 } from "../../../lib/appearance";
-import { sidebarSide, setSidebarSide, startupPage, setStartupPage, type SidebarSide, type StartupPage } from "../../../lib/settings";
+import { sidebarSide, setSidebarSide, setViewMode, startupPage, setStartupPage, viewMode, type SidebarSide, type StartupPage, type ViewMode } from "../../../lib/settings";
 import {
   ACCENTS,
   accent,
@@ -46,6 +46,7 @@ const DEFAULT_CUSTOM_ACCENT = "#4f8cff";
 const DEFAULT_LOCALE = "zh_cn" as const;
 const DEFAULT_SIDE: SidebarSide = "Left";
 const DEFAULT_STARTUP_PAGE: StartupPage = "Home";
+const DEFAULT_VIEW_MODE: ViewMode = "list";
 
 /** 拖滑杆时的落盘延迟，单位毫秒；原来每次 input 都发一次 IPC */
 const SLIDER_COMMIT_DELAY = 250;
@@ -58,6 +59,7 @@ const SLIDER_COMMIT_DELAY = 250;
  * - `windowMode` / `onModeChange`: 单窗口 / 多窗口，切换后要重启进程
  * - `locale` / `onLangChange` / `side` / `onSideChange` / `themeValue` / `onThemeChange`: 语言、侧栏、主题
  * - `startup` / `onStartupChange`: 启动器启动时先显示启动器主页还是项目列表
+ * - `view` / `onViewModeChange`: 实例列表按分组 / 平铺 / 列表哪种方式显示
  * - `fonts` / `fontsLoading` / `loadFonts` / `fontPick` / `setFontFamily`: 系统字体
  * - `animations` / `setAnimations` / `accent` / `setAccent` / `customAccent` / `setCustomAccent` / `ACCENTS`: 动画与强调色
  * - `bgImage` / `setBgImage` / `bgLoading` / `bgFileInput` / `bgSourceInput` / `loadBgSource` / `pickBgImage` / `onBgFile`: 背景图加载与清除
@@ -72,6 +74,7 @@ export function useSettingsUi() {
   const windowMode = ref(multiWindow.value ? "Multi" : "Single");
   const side = ref<SidebarSide>(sidebarSide.value);
   const startup = ref<StartupPage>(startupPage.value);
+  const view = ref<ViewMode>(viewMode.value);
   const themeValue = ref<Theme>(theme.value);
   const fontPick = ref(fontFamily.value);
 
@@ -124,6 +127,12 @@ export function useSettingsUi() {
   function onStartupChange(v: string) {
     startup.value = v === "List" ? "List" : DEFAULT_STARTUP_PAGE;
     setStartupPage(startup.value);
+  }
+
+  /** 实例列表显示模式：改完落盘，主窗口由后端广播的 gui-view-mode-change 跟着换视图 */
+  function onViewModeChange(v: string) {
+    view.value = v === "group" || v === "grid" ? v : DEFAULT_VIEW_MODE;
+    setViewMode(view.value);
   }
 
   function onThemeChange(v: string) {
@@ -234,6 +243,8 @@ export function useSettingsUi() {
         side.value = DEFAULT_SIDE;
         setStartupPage(DEFAULT_STARTUP_PAGE);
         startup.value = DEFAULT_STARTUP_PAGE;
+        setViewMode(DEFAULT_VIEW_MODE);
+        view.value = DEFAULT_VIEW_MODE;
         return true;
       case "bgImage":
         setBgImage("");
@@ -256,6 +267,8 @@ export function useSettingsUi() {
     onSideChange,
     startup,
     onStartupChange,
+    view,
+    onViewModeChange,
     themeValue,
     onThemeChange,
     fonts,

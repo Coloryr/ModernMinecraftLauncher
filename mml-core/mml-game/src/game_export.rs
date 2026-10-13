@@ -107,7 +107,7 @@ impl InstanceSettingObj {
             ExportPackType::Modrinth => modrinth(self, arg).await,
             ExportPackType::MMC => mmc(self, arg),
             ExportPackType::HMCL => hmcl(self, arg),
-            ExportPackType::Zip => todo!(),
+            ExportPackType::Zip => zip_pack(self, arg),
         }
     }
 }
@@ -168,6 +168,36 @@ fn colormc(game: &InstanceSettingObj, data: ExportArg) -> CoreResult<()> {
     archive.add_data(
         names::MOD_INFO_FILE,
         &serialize_tools::json_to_bytes(&list1)?,
+    )?;
+
+    Ok(())
+}
+
+/// 导出为纯压缩包：整个实例目录原样打包，不写任何整合包清单
+///
+/// 包内就是实例目录本身：游戏文件在 `.minecraft/` 下，`game.json` 等实例元数据在根。
+/// 因为没有清单，这份包不能被任何启动器当整合包导入，只能手工解包使用。
+///
+/// - `game`: 目标实例
+/// - `data`: 导出参数
+///
+/// # 返回值
+///
+/// 成功返回 `Ok(())`；打包失败返回对应错误
+fn zip_pack(game: &InstanceSettingObj, data: ExportArg) -> CoreResult<()> {
+    let list = data
+        .unselect
+        .iter()
+        .map(|item| item.to_string_lossy().to_string())
+        .collect();
+
+    BaseArchive::compress(
+        data.archive,
+        &data.file,
+        &game.get_base_path(),
+        None,
+        &Some(list),
+        data.gui.clone(),
     )?;
 
     Ok(())
@@ -561,7 +591,8 @@ fn instance_cfg(game: &InstanceSettingObj) -> String {
 ///
 /// # 返回值
 ///
-/// 成功返回 `Ok(())`；打包失败返回对应错误
+/// 成功返回 `Ok(())`；打包失败返回对应错误。自定义加载器在 HMCL 里没有对应组件，
+/// 这时只导游戏版本
 fn hmcl(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
     let obj = HMCLObj {
         name: game.name.clone(),

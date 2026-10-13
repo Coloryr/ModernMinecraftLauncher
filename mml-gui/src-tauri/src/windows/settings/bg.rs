@@ -370,8 +370,10 @@ pub(super) fn sniff_bg_mime(bytes: &[u8]) -> &'static str {
 
 /// 广播背景图变更事件，跨窗口同步刷新背景层
 ///
+/// 只改显示参数时也走这条，见 `window_save_gui_config`：不透明度 / 模糊没有专门的命令。
+///
 /// - `app`: 应用句柄，事件发往所有窗口
 #[gui_macros::emit]
-pub(super) fn emit_bg_change(app: &AppHandle) {
+pub(crate) fn emit_bg_change(app: &AppHandle) {
     let _ = app.emit(listens::BG_CHANGE, ());
 }

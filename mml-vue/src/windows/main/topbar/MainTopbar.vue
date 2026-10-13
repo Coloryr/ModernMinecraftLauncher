@@ -42,7 +42,6 @@ const emit = defineEmits<{
     <WindowControls v-if="titleBarStyle === 'macos' && !pluginDecorated" :style="titleBarStyle" />
 
     <div class="brand">
-      <div class="brand-logo">MC</div>
       <div class="brand-text">
         <div class="brand-name">{{ t("app.name") }}</div>
         <div class="brand-sub">{{ t("app.sub") }}</div>
@@ -97,9 +96,8 @@ const emit = defineEmits<{
     </div>
 
     <!-- windows 样式：最小化 / 最大化 / 关闭在右端。
-         主窗口接了插件装饰时，这里**照常渲染**自己的按钮（外观与其它窗口一致），
-         插件的按钮被 .topbar 下的样式隐藏成透明占位、只负责给系统量贴靠热区，
-         见 <style> 里 data-tauri-decoration-* 那一段 -->
+         窗口按钮一律由 M²L 自己画，插件那套 DOM 全局隐藏，见 styles/decoration.css；
+         Windows 的贴靠热区由 lib/decoration.ts 把这三个按钮的矩形报给插件去摆原生命中区 -->
     <WindowControls v-if="titleBarStyle === 'windows'" :style="titleBarStyle" />
   </header>
 </template>
@@ -122,7 +120,7 @@ const emit = defineEmits<{
 /* windows 样式的窗口按钮是小方块、不贴边，右侧留一点呼吸空间；
    macos 样式的圆点留在左内边距之后，与系统一致留 ~18px 空白。
    注意：**不要**在这里叠加插件的 --tauri-plugin-decoration-right-clearance ——
-   插件的按钮已被做成透明占位，见 styles/decoration.css，
+   插件那套按钮 DOM 已全局隐藏、不参与布局，见 styles/decoration.css，
    视觉与占位都由 M²L 自己的 WindowControls 提供，再让一次宽度会多出一段空白 */
 .topbar.windows {
   padding-right: 10px;

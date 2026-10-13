@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// 主窗口侧栏：模式切换 / 搜索 / 分组列表（拖拽排序）/ 平铺
-// 状态与交互全部通过 props / emits 与 MainWindow 联通
-import SegmentedTabs from "../../../components/ui/SegmentedTabs.vue";
+// 主窗口侧栏：搜索 / 分组列表（拖拽排序）/ 平铺
+// 状态与交互全部通过 props / emits 与 MainWindow 联通；
+// 分组 / 平铺 / 列表的切换入口不在这里，在设置窗口「界面 → 主窗口」
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import InstanceIcon from "../../../components/InstanceIcon.vue";
 import { t } from "../../../lib/i18n";
@@ -10,10 +10,8 @@ import type { ViewMode } from "../../../lib/bindings";
 import type { DragCandidate, GroupView } from "../types";
 
 const props = defineProps<{
-  /** 当前显示模式：group 分组列表 / list 平铺 */
+  /** 当前显示模式：group 分组列表 / grid 平铺 */
   mode: ViewMode;
-  /** 模式切换控件的候选，label 已由父组件按界面语言算好 */
-  modeOptions: Array<{ value: string; label: string; icon: string }>;
   /** 搜索框当前文本，受控 */
   searchText: string;
   /** 全部分组，含空分组；用来区分"一个实例都没有"与"搜索没结果"两种空态 */
@@ -56,8 +54,6 @@ const props = defineProps<{
 
 /** 侧栏动作，一律抛给主窗口执行 */
 const emit = defineEmits<{
-  /** 切换显示模式 */
-  (e: "update:mode", v: ViewMode): void;
   /** 搜索框文本变化 */
   (e: "update:searchText", v: string): void;
   /** 添加实例 */
@@ -82,27 +78,23 @@ function isGroupOpen(id: string) {
 
 <template>
   <aside class="sidebar">
+    <!-- 搜索框与收起按钮同一行：侧栏顶部只占一行，下面整段留给列表 -->
     <div class="sidebar-head">
-      <SegmentedTabs :model-value="mode" :options="modeOptions"
-        @update:model-value="emit('update:mode', $event as ViewMode)" />
-      <div class="sidebar-head-actions">
-        <button class="icon-btn" v-tip="t('sidebar.collapse')" @click="emit('collapse')">
-          <GlyphIcon name="chevron-left" :size="16" />
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.5-3.5" />
+        </svg>
+        <input :value="searchText" class="search-input" :placeholder="t('search.placeholder')" spellcheck="false"
+          @input="onSearchInput" />
+        <button v-if="searchText" class="search-clear" @click="emit('update:searchText', '')">
+          <GlyphIcon name="close" :size="12" :weight="2.4" />
         </button>
       </div>
-    </div>
 
-    <!-- 实例搜索 -->
-    <div class="search-box">
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round">
-        <circle cx="11" cy="11" r="7" />
-        <path d="m20 20-3.5-3.5" />
-      </svg>
-      <input :value="searchText" class="search-input" :placeholder="t('search.placeholder')" spellcheck="false"
-        @input="onSearchInput" />
-      <button v-if="searchText" class="search-clear" @click="emit('update:searchText', '')">
-        <GlyphIcon name="close" :size="12" :weight="2.4" />
+      <button class="icon-btn" v-tip="t('sidebar.collapse')" @click="emit('collapse')">
+        <GlyphIcon name="chevron-left" :size="16" />
       </button>
     </div>
 
@@ -230,34 +222,27 @@ function isGroupOpen(id: string) {
   border-left: 1px solid var(--border);
 }
 
+/* 搜索框 + 收起按钮同一行：行内间距由这里给，搜索框自己不留外边距 */
 .sidebar-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   padding: 12px 12px 10px;
 }
 
-.sidebar-head-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-/* 实例搜索框 */
+/* 实例搜索框：吃掉按钮之外的那一段宽度 */
 .search-box {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 0 12px 8px;
   padding: 0 10px;
   height: 34px;
   border-radius: 9px;
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text-dim);
-  flex-shrink: 0;
 }
 
 .search-box:focus-within {

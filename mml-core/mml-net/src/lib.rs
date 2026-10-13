@@ -57,6 +57,7 @@ pub mod foojay_api;
 pub mod input_file;
 pub mod liteloader_api;
 pub mod maven_utils;
+pub mod mclo_api;
 pub mod modrinth_api;
 pub mod mojang_api;
 pub mod nide8_api;

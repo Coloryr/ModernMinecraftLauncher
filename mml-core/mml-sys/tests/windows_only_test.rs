@@ -97,3 +97,17 @@ fn test_move_to_trash() {
 
     let _ = std::fs::remove_dir_all(&root);
 }
+
+/// move_to_trash 将整个目录树移入回收站：删实例走的就是这条路径
+#[test]
+fn test_move_to_trash_dir() {
+    let root = make_test_root("trash_dir");
+    let dir = root.join("instances").join("mml_trash_dir_target");
+    std::fs::create_dir_all(dir.join("mods")).unwrap();
+    std::fs::write(dir.join("mods").join("a.jar"), b"jar").unwrap();
+
+    mml_sys::path_helper::move_to_trash(&dir).unwrap();
+    assert!(!dir.exists(), "目录树应已移出原位置");
+
+    let _ = std::fs::remove_dir_all(&root);
+}

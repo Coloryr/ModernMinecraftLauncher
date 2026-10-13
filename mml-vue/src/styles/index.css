@@ -1,6 +1,7 @@
 /* M²L 全局样式总入口：按职责拆分，避免单个文件过大 */
 @import "./themes.css";
 @import "./base.css";
+@import "./decoration.css";
 @import "./forms.css";
 @import "./modal.css";
 @import "./skeleton.css";
