@@ -32,6 +32,8 @@ const REFRESH_MS = 700;
  * 外壳两用：多窗口模式下是独立窗口 `WindowFrame`；单窗口模式下是**悬浮弹窗** `BaseModal`，
  * 后者带遮罩、标题与右上角 ✕，浮在当前页面之上，不把页面换掉。
  * 两者同形，title + close 事件 + 默认插槽，所以下面那整块下载内容两种形态共用一份。
+ * 四周留白随外壳走：独立窗口是 `.frame-body` 的 22/26，弹窗是 `BaseModal` 的 `.modal`
+ * （上下 22、左右 15 再加两侧滚动条槽）—— 弹窗那一档是它自己的口径，不按页面外壳对齐。
  */
 const shell = computed(() => (multiWindow.value ? WindowFrame : BaseModal));
 const shellProps = computed(() =>
@@ -589,7 +591,7 @@ onUnmounted(() => {
   height: var(--ctl-h);
   padding: 0 10px;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: var(--ctl-radius);
   background: var(--bg-raised);
   color: var(--text);
   font-size: 11.5px;

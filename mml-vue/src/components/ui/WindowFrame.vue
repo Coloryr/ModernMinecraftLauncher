@@ -17,6 +17,10 @@ const props = defineProps<{
   /** 内容区不整页滚动，即 overflow hidden + flex 列，滚动交给视图内部的容器；
    *  详情表格这类"工具栏固定、表格自己滚"的布局用 */
   bodyFill?: boolean;
+  /** 内容区满铺：内边距归零，排版与留白交给窗口自己。
+   *  设置窗口那种"左侧导航顶到窗口边缘 + 右侧内容自己滚"的两栏布局用，
+   *  与 `bodyFill` 叠加时不用再拿负外边距去抵消 `.frame-body` 的内边距 */
+  bodyFlush?: boolean;
   /** 内容区**整页滚动**、且内容长短会变时开启：给内容区预留纵向滚动条的位置，
    *  免得滚动条一冒出来整页内容就左移 9px，见 styles/scrollbar.css 的 scrollbar-gutter。
    *  只有"滚动容器就是 `.frame-body` 本身"的窗口才需要开 —— 资源 / 添加资源 /
@@ -97,7 +101,7 @@ const { decorated } = useWindowDecoration(rootEl);
            所以这里照常渲染，悬停反馈由插件转发的事件驱动 -->
       <WindowControls v-if="titleBarStyle === 'windows'" :style="titleBarStyle" />
     </header>
-    <div class="frame-body" :class="{ fill: props.bodyFill, gutter: props.bodyGutter }">
+    <div class="frame-body" :class="{ fill: props.bodyFill, gutter: props.bodyGutter, flush: props.bodyFlush }">
       <slot />
     </div>
   </div>
@@ -194,5 +198,12 @@ const { decorated } = useWindowDecoration(rootEl);
   flex-direction: column;
   scrollbar-gutter: auto;
   padding-right: 26px;
+}
+
+/* 满铺内容区 `body-flush`：内边距全部归零，留白与滚动都由窗口自己安排
+   （设置窗口的左侧导航要顶到窗口边缘，右侧内容自己滚）。
+   放上面两条之后：特异性相同，靠顺序把左右（含 fill 补回的 26px）一起清掉 */
+.frame-body.flush {
+  padding: 0;
 }
 </style>

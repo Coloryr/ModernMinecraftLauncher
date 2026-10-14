@@ -8,6 +8,7 @@
  * - `.head-select`：标题栏下拉。宽度默认 min 170 / max 280；确实需要更宽或更窄的，
  *   写在窗口自己的 scoped 样式里，并注明理由（现在有两处：账户窗口的窄筛选、导出窗口的长路径）
  * - `.icon-btn-head`：**纯图标**按钮（只有图标 + v-tip 的那种）。文字按钮不要挂它
+ * - 主窗口自绘顶栏的方形图标键与三个进度指示器：尺寸与圆角也在这里，见文件末尾
  * - `.ui-btn`：标题栏这一排不许被压扁；`.inst-chip` 相反，窗口窄时先让实例名走省略号
  */
 
@@ -36,4 +37,17 @@
 /* 实例 chip 也能被压：标题栏控件多，窗口窄时先让名字走省略号 */
 .frame-head .inst-chip {
   min-width: 0;
+}
+
+/* 标题栏里的**方形**图标键：主窗口自绘顶栏的功能入口，加三个进度指示器。
+ * 与槽里的 .icon-btn-head 是同一档，但那几个是 .ui-btn、宽度由内容撑，这几个自带描边、
+ * 必须自己给尺寸。尺寸与圆角只留这一份 —— 顶栏那枚曾自造 10px 圆角，与槽里的 8px 不齐 */
+.topbar .topbar-icon-btn,
+.mp-indicator,
+.dl-indicator,
+.rs-indicator {
+  width: var(--ctl-h);
+  height: var(--ctl-h);
+  border-radius: var(--ctl-radius);
+  flex-shrink: 0;
 }

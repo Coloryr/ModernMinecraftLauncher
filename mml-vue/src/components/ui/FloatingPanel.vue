@@ -104,7 +104,8 @@ const emit = defineEmits<{
   min-height: 0;
   display: flex;
   flex-direction: column;
-  /* 左右与 .fp-head 的 16 对齐：标题与内容同一条左边缘 */
+  /* 左右与 .fp-head 的 16 对齐：标题与内容同一条左边缘。
+     12px 是浮动面板自己的紧凑档：它不遮页面、可以同时开几个，不按页面外壳的 22/26 */
   padding: 12px 16px;
 }
 </style>

@@ -3,7 +3,7 @@
 import { computed, defineAsyncComponent, onDeactivated, onMounted, ref, watch } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
-import GlyphIcon from "../../components/ui/GlyphIcon.vue";
+import SearchBox from "../../components/ui/SearchBox.vue";
 import DropOverlay from "../../components/ui/DropOverlay.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
@@ -551,17 +551,9 @@ function tokenLabel(acc: AccountStoreDto): string {
       <select v-model="typeFilter" class="field-select head-select">
         <option v-for="o in TYPE_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
       </select>
-      <div class="head-search">
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round">
-          <circle cx="11" cy="11" r="7" />
-          <path d="m20 20-3.5-3.5" />
-        </svg>
-        <input v-model="searchText" :placeholder="t('account.search')" spellcheck="false" />
-        <button v-if="searchText" class="head-search-clear" :aria-label="t('account.search')" @click="searchText = ''">
-          <GlyphIcon name="close" :size="12" :weight="2.4" />
-        </button>
-      </div>
+      <!-- 搜索框与设置窗口那是同一份（components/ui/SearchBox），
+           宽度按这里的需要给：这一排还有筛选下拉与视图切换，168px 是余下的空间 -->
+      <SearchBox v-model="searchText" :placeholder="t('account.search')" width="168px" />
       <SegmentedTabs class="head-tabs" :model-value="view" :options="VIEW_OPTIONS"
         @update:model-value="view = $event as ViewMode" />
       <!-- 添加账户已移到账户列表里（作为列表的第一项，三种视图都是），
@@ -743,57 +735,7 @@ function tokenLabel(acc: AccountStoreDto): string {
   min-width: 128px;
 }
 
-.head-search {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 11px;
-  height: var(--ctl-h);
-  border-radius: var(--ctl-radius);
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  color: var(--text-dim);
-  width: 168px;
-}
-
-/* 与 .field-input 同一套反馈：悬停淡淡一档，里面有焦点就是满强调色 */
-.head-search:hover {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
-}
-
-.head-search:focus-within {
-  border-color: var(--accent);
-}
-
-.head-search input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  font-size: var(--ctl-font);
-  outline: none;
-  font-family: inherit;
-}
-
-/* 清空键与配置文件窗口那一枚同口径：20px 方形热区，压在输入框右端 */
-.head-search-clear {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: none;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--text-dim);
-  cursor: pointer;
-}
-
-.head-search-clear:hover {
-  color: var(--text);
-}
+/* 标题栏搜索框走共享组件 SearchBox；它自己的外观全部来自 .field-input 与 .input-clear */
 
 .grow {
   flex: 1;

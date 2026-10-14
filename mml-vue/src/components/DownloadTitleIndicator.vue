@@ -110,13 +110,9 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* 与顶栏其它入口按钮 .topbar-icon-btn 同规格：并排时行高与间距才对得上 */
-  width: var(--ctl-h);
-  height: var(--ctl-h);
-  flex-shrink: 0;
+  /* 尺寸与圆角见 styles/titlebar.css 的方形图标键，这里只留外观 */
   padding: 0;
   border: 1px solid transparent;
-  border-radius: 10px;
   background: transparent;
   color: var(--accent);
   cursor: pointer;

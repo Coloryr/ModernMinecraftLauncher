@@ -8,8 +8,9 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 7px 12px;
-  border-radius: 9px;
+  height: var(--ctl-h);
+  padding: 0 12px;
+  border-radius: var(--ctl-radius);
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text);
@@ -48,8 +49,9 @@
 }
 
 .multi-exit {
-  padding: 7px 12px;
-  border-radius: 9px;
+  height: var(--ctl-h);
+  padding: 0 12px;
+  border-radius: var(--ctl-radius);
   border: 1px solid var(--border);
   background: var(--bg-raised);
   color: var(--text-dim);

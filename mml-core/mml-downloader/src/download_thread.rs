@@ -523,6 +523,12 @@ async fn write_file(
 ///
 /// 校验通过返回 `Ok(())`；不匹配或哈希计算失败时返回相应错误
 fn check_hash<R: Read + Seek>(file: &PathBuf, hash: &FileHash, stream: &mut R) -> CoreResult<()> {
+    // 期望值全空 = 上游没公布哈希（Fabric 的 loader jar 就是这样）：不校验，
+    // 否则每次下载都判失败、反复重下，最后整个文件检查以 DownloadFileFail 收场
+    if hash.is_empty() {
+        return Ok(());
+    }
+
     match hash {
         FileHash::None => Ok(()),
         FileHash::Md5(md5) => match hash_helper::gen_hash_from_reader(HashType::Md5, stream) {
@@ -798,6 +804,20 @@ mod tests {
         let mut stream = fs::File::open(&file).unwrap();
         let result = check_hash(&file, &wrong, &mut stream);
         assert!(result.is_err(), "错误的 SHA256 应校验失败");
+    }
+
+    /// 期望值是空串时按"没公布哈希"处理：不校验、也不判失败
+    ///
+    /// Fabric 的 loader jar 就是这样：上游 JSON 里声明了 sha256 字段但值是空
+    #[test]
+    fn check_hash_empty_expected_passes() {
+        let file = make_hello_file("hash-empty");
+        let empty = FileHash::Sha256(String::new());
+        let mut stream = fs::File::open(&file).unwrap();
+        assert!(
+            check_hash(&file, &empty, &mut stream).is_ok(),
+            "空期望值不该判失败"
+        );
     }
 
     /// 组合校验 SHA1+SHA256：两者都匹配才通过

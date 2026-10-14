@@ -22,3 +22,10 @@ export const COMMON_RESOLUTIONS: ReadonlyArray<{ w: number; h: number }> = [
 export const COMMON_MEMORY: ReadonlyArray<number> = [
   1024, 2048, 3072, 4096, 6144, 8192, 12288, 16384,
 ];
+
+// 常用「最小内存」预设，单位 MiB：比最大内存那排多出 256 / 512 两档
+//
+// 单独一份是因为默认最小内存就是 512（见 Rust 侧 RunArgSettingObj 的 default）——
+// 不带这两档时，最小内存那栏一打开永远显示「自定义」；而 256 / 512 当最大内存没有意义，
+// 所以不并进上面那排
+export const COMMON_MIN_MEMORY: ReadonlyArray<number> = [256, 512, ...COMMON_MEMORY];

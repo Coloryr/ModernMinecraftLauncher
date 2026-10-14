@@ -8,7 +8,9 @@
 //
 // 布局照 ColorMC 的 GameLogControl：一行"日志文件 + 刷新 / 搜索 / 上传 / 测试启动"，
 // 一行"自动换行 / 自动下拉 + 五个等级"，一行"线程 / 分组"，最后是日志正文。
-// 等级、换行、下拉都存进实例的 `gui_setting.json`（一个实例一套），线程与分组只筛当前这份。
+// 等级与自动下拉存进实例的 `gui_setting.json`（一个实例一套）；**自动换行不跟实例走** ——
+// 它是全局偏好（lib/editorWrap），与配置编辑器共用一份，Alt+Z 在任一处都能切。
+// 线程与分组只筛当前这份日志，不落盘。
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
@@ -16,6 +18,7 @@ import FloatingPanel from "../../components/ui/FloatingPanel.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import BaseSwitch from "../../components/ui/BaseSwitch.vue";
+import { toggleWordWrap, wordWrap } from "../../lib/editorWrap";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import InstanceChip from "../../components/ui/InstanceChip.vue";
 // Monaco 编辑器按需加载：它一块就是 ~2.6 MB（gzip 674 kB）。
@@ -79,10 +82,11 @@ const shellProps = computed(() =>
     },
 );
 
-// ---------------- 设置：换行 / 自动下拉 / 五个等级 ----------------
+// ---------------- 设置：自动下拉 / 五个等级（换行是全局偏好，不在这里） ----------------
 
-/** 默认值与后端 `GameLogSettingObj::default` 一致：换行开、自动下拉关、等级全开 */
+/** 默认值与后端 `GameLogSettingObj::default` 一致：自动下拉关、等级全开 */
 const setting = ref<LogSettingDto>({
+  // wordWrap 只为对齐后端结构留着：界面上的换行读全局偏好，不读它
   wordWrap: true,
   auto: false,
   enableNone: true,
@@ -434,18 +438,21 @@ onBeforeUnmount(() => {
     </template>
 
     <div class="log-window" :class="{ fill: !multiWindow }">
-      <!-- 第一行：换行 / 自动下拉 / 等级 -->
+      <!-- 第一行：换行 / 自动下拉 / 等级。等级也走开关，与旁边两个同款；
+           "等级"这行标签与第二行的"线程 / 分组"同一套 -->
       <div class="bar">
         <label class="sw">
-          <BaseSwitch v-model="setting.wordWrap" />
+          <!-- 开关读的是全局换行偏好（lib/editorWrap），与配置编辑器共用一份 -->
+          <BaseSwitch :model-value="wordWrap" @update:model-value="toggleWordWrap" />
           <span>{{ t("logWindow.wordWrap") }}</span>
         </label>
         <label class="sw">
           <BaseSwitch v-model="setting.auto" />
           <span>{{ t("logWindow.autoScroll") }}</span>
         </label>
-        <label v-for="lv in LEVELS" :key="lv.key" class="lv">
-          <input type="checkbox" v-model="setting[lv.key]" />
+        <span class="lbl">{{ t("logWindow.level") }}</span>
+        <label v-for="lv in LEVELS" :key="lv.key" class="sw">
+          <BaseSwitch v-model="setting[lv.key]" />
           <span>{{ t(lv.label) }}</span>
         </label>
       </div>
@@ -465,7 +472,7 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- 日志正文 -->
-      <MonacoLogView ref="viewRef" :logs="shownLogs" :word-wrap="setting.wordWrap" :auto-scroll="setting.auto"
+      <MonacoLogView ref="viewRef" :logs="shownLogs" :auto-scroll="setting.auto"
         :empty-hint="loadingSource ? t('logWindow.loading') : undefined" fill
         @scroll-away="setting.auto = false" />
     </div>
@@ -554,17 +561,6 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
-  color: var(--text);
-  user-select: none;
-  cursor: pointer;
-}
-
-/* 等级勾选：一排小标签，与开关同高 */
-.lv {
-  display: flex;
-  align-items: center;
-  gap: 4px;
   font-size: 12.5px;
   color: var(--text);
   user-select: none;

@@ -325,7 +325,9 @@ function onCellKey(e: KeyboardEvent, i: number) {
   background: var(--accent-soft);
 }
 
-/* 玩家头颅的删除角标（悬停或键盘聚焦时显示） */
+/* 玩家头颅的删除角标（悬停或键盘聚焦时显示）。
+   与小图标键同档（20px 方块 + 5px 圆角），但不挂 .input-clear：它不压在输入框里，
+   而是常显在格子上的一枚角标，底色与悬停色都是自己的 */
 .block-del {
   position: absolute;
   top: 4px;
@@ -335,7 +337,7 @@ function onCellKey(e: KeyboardEvent, i: number) {
   display: none;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: 5px;
   background: var(--bg-hover);
   color: var(--text-dim);
   font-size: 11px;
@@ -380,9 +382,10 @@ function onCellKey(e: KeyboardEvent, i: number) {
 }
 
 .empty-clear {
-  padding: 6px 14px;
+  height: var(--ctl-h);
+  padding: 0 14px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--ctl-radius);
   background: var(--bg-raised);
   color: var(--accent);
   font-size: 12.5px;

@@ -1,44 +1,68 @@
 //! 主窗口的启动 / 停止与运行态查询
 //!
-//! 从 `main/mod.rs` 拆出来的。启动流程的状态与日志都走事件 `launch-state` / `game-log` /
-//! `game-exit`，这里只负责发起与转发。命令带分组标记，值填原始组名 main，
-//! 把组键钉回 `main`，见 AGENTS.md §4。
+//! 真实启动全在 `mml_game`：这里只取实例、取当前账户、组装 [`GameLaunchArg`]，
+//! 然后把启动交给 `start_game`，命令自身立刻返回。
+//!
+//! 事件分工：启动阶段推进走 `launch-state`，游戏输出走 `game-log`（订阅在 lib.rs），
+//! 进程退出走 `game-exit`（订阅在 lib.rs），启动失败走 `launch-error`。
+//! 运行态一律以 `mml_game` 为准（`is_running` / `get_running_instances`），
+//! 窗口模型不再自己记一份。
+//!
+//! 命令带分组标记，值填原始组名 main，把组键钉回 `main`，见 AGENTS.md §4。
 
-use crate::log_text::LogText;
-use std::time::Duration;
+use std::sync::Arc;
 
-use tauri::{AppHandle, Emitter, WebviewWindow};
+use mml_auth::auths;
+use mml_game::game_launch::{AutoJoinType, GameLaunchArg};
+use mml_game::gui_hook::{ILaunchGui, LaunchState, ProcessRunType};
+use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
+use mml_game::{InstanceExit, get_running_instances, is_running, stop_game};
+use tauri::{AppHandle, Emitter};
+use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
 
-use crate::dtos::{ExitEvent, StateEvent};
+use crate::dtos::{ErrorEvent, ExitEvent, StateEvent};
 use crate::err_keys;
+use crate::i18;
 use crate::listens;
+use crate::windows::account::find_by_uuid;
 use crate::windows::log::emit_log_line;
 
-use super::model;
+use super::args::core_instance;
+use super::emit_launch_error;
 
-/// 启动游戏，占位：标记运行 + 发事件，接入核心后替换为真实启动
+/// 启动游戏
 ///
-/// 启动用户名由后端自己从当前账户解析 `auths::get_current()`，前端不传
+/// 账户取后端记的"当前账户"，实例取核心实例表。启动本身在后台任务里跑，命令立刻返回。
 ///
 /// - `app`: 应用句柄，用于发启动状态 / 日志 / 退出事件
-/// - `window`: 调用方窗口，用于取本窗口模型记运行态
 /// - `uuid`: 实例 uuid
 ///
 /// # 返回值
 ///
-/// 发起成功返回 `Ok(())`；该实例已在运行或模型缺失返回 `Err`
+/// 已交给后台任务时返回 `Ok(())`；实例不存在 / 没有当前账户 / 已在运行返回 `Err`
 #[gui_macros::ipc_group("main")]
 #[tauri::command]
-pub fn main_launch_game(app: AppHandle, window: WebviewWindow, uuid: String) -> Result<(), String> {
-    mml_log::info(format!("[launch_game] uuid={uuid}"));
-    let store = model(&window)?;
-    {
-        let mut store = store.lock().unwrap();
-        if store.running.contains(&uuid) {
-            return Err(err_keys::INSTANCE_RUNNING.to_string());
-        }
-        store.running.insert(uuid.clone());
+pub async fn main_launch_game(app: AppHandle, uuid: String) -> Result<(), String> {
+    let core = core_instance(&uuid).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())?;
+    if is_running(&core.uuid) {
+        return Err(err_keys::INSTANCE_RUNNING.to_string());
     }
+
+    let auth = auths::get_current()
+        .and_then(|key| find_by_uuid(&key.uuid))
+        .ok_or_else(|| err_keys::ACCOUNT_MISSING.to_string())?;
+
+    // 实例快照 + 自启参数：实例配了"加入服务器"就自动进服
+    let (setting, auto) = {
+        let inst = core.instance.read().unwrap();
+        let auto = match &inst.start_server {
+            Some(server) if server.enable => AutoJoinType::Server(Arc::new(server.clone())),
+            _ => AutoJoinType::None,
+        };
+        (inst.clone(), auto)
+    };
+
     emit_launch_state(
         &app,
         StateEvent {
@@ -49,60 +73,178 @@ pub fn main_launch_game(app: AppHandle, window: WebviewWindow, uuid: String) -> 
     );
     emit_log_line(&app, &uuid, "游戏启动中…", true);
 
-    // 占位：3 秒后发出退出事件，真实启动需接入 mml-core
-    // 直接持有模型的 Arc：模型跟随主窗口，销毁后后台线程仍能安全收尾
-    let store2 = store.clone();
-    let uuid2 = uuid.clone();
-    std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_secs(3));
-        emit_log_line(&app, &uuid2, "游戏进程已退出", false);
-        emit_game_exit(
-            &app,
-            ExitEvent {
-                uuid: uuid2.clone(),
-                code: 0,
-            },
-        );
-        let mut s = store2.lock().unwrap();
-        s.running.remove(&uuid2);
+    let gui = Arc::new(LaunchGuiHook {
+        app: app.clone(),
+        uuid: core.uuid,
     });
+    let mut arg = GameLaunchArg {
+        auth,
+        auto,
+        admin: false,
+        mixin: None,
+        lang: None,
+    };
+
+    // 命令返回后这次启动还要跑完：实例快照与 app 都搬进后台线程，
+    // 进度 / 日志 / 退出继续走事件。
+    //
+    // 用独立线程 + 自己的 current-thread 运行时，而不是 tauri 的 async 运行时：
+    // `start_game` 的 future 不是 `Send`（内核里跨 await 持有 std 锁的读守卫），
+    // 进不了 `tauri::async_runtime::spawn`。线程名带上实例 uuid，排查时认得出来。
+    std::thread::Builder::new()
+        .name(format!("Mml Game Launch {}", core.uuid))
+        .spawn(move || {
+            let runtime = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
+                Ok(runtime) => runtime,
+                Err(err) => {
+                    mml_log::error(format!("游戏启动运行时创建失败: {err}"));
+                    return;
+                }
+            };
+
+            let uuid = core.uuid.to_string();
+            runtime.block_on(async move {
+                match setting
+                    .start_game(&mut arg, Some(gui), CancellationToken::new())
+                    .await
+                {
+                    Ok(()) => emit_log_line(&app, &uuid, "游戏进程已启动", false),
+                    Err(err) => {
+                        mml_log::error_type(err.clone());
+                        let text = i18::get_error(err.clone());
+                        emit_log_line(&app, &uuid, &text, false);
+                        emit_launch_error(
+                            &app,
+                            ErrorEvent {
+                                uuid: Some(uuid),
+                                message: text,
+                            },
+                        );
+                    }
+                }
+            });
+        })
+        .map_err(|err| err.to_string())?;
+
     Ok(())
 }
 
 /// 停止游戏
 ///
-/// - `app`: 应用句柄，用于发退出事件
-/// - `window`: 调用方窗口，用于取本窗口模型清运行态
+/// 退出事件由内核的退出轮询线程发出，这里只负责结束进程；没在跑时静默返回。
+///
 /// - `uuid`: 实例 uuid
 ///
 /// # 返回值
 ///
-/// 清掉运行态并发出退出事件后返回 `Ok(())`；模型缺失返回 `Err`
+/// 始终返回 `Ok(())`；uuid 非法返回 `Err`
 #[gui_macros::ipc_group("main")]
 #[tauri::command]
-pub fn main_stop_game(app: AppHandle, window: WebviewWindow, uuid: String) -> Result<(), String> {
-    let store = model(&window)?;
-    let mut store = store.lock().unwrap();
-    store.running.remove(&uuid);
-    emit_game_exit(&app, ExitEvent { uuid, code: 0 });
+pub fn main_stop_game(uuid: String) -> Result<(), String> {
+    let id = Uuid::parse_str(&uuid).map_err(|_| err_keys::UUID.to_string())?;
+    stop_game(&id);
     Ok(())
 }
 
 /// 获取运行中实例
 ///
-/// - `window`: 调用方窗口，用于取本窗口模型
+/// # 返回值
+///
+/// 运行中实例的 uuid 列表，取自内核的实例句柄表
+#[gui_macros::ipc_group("main")]
+#[tauri::command]
+pub fn main_get_running() -> Vec<String> {
+    get_running_instances()
+        .iter()
+        .map(|uuid| uuid.to_string())
+        .collect()
+}
+
+/// 转发内核的实例退出事件
+///
+/// 订阅在 lib.rs 的启动流程里，与 `game-log` 的转发同一处。
+///
+/// - `app`: 应用句柄，事件的发送方
+/// - `event`: 内核的实例退出事件
+pub(crate) fn forward_game_exit(app: &AppHandle, event: &InstanceExit) {
+    emit_game_exit(
+        app,
+        ExitEvent {
+            uuid: event.uuid.to_string(),
+            code: event.code,
+        },
+    );
+}
+
+/// 启动过程的界面回调：把内核的阶段推成 `launch-state`
+struct LaunchGuiHook {
+    /// 应用句柄，用于发状态事件
+    app: AppHandle,
+    /// 实例 uuid
+    uuid: Uuid,
+}
+
+#[async_trait::async_trait]
+impl ILaunchGui for LaunchGuiHook {
+    /// 阶段推进：转成前端认的状态名与进度
+    fn update_state(&self, _setting: &InstanceSettingObj, state: LaunchState) {
+        emit_launch_state(
+            &self.app,
+            StateEvent {
+                uuid: self.uuid.to_string(),
+                state: state_key(&state).to_string(),
+                progress: Some(state.progress()),
+            },
+        );
+    }
+
+    /// 登录失败：不重登，错因由启动结果统一讲
+    async fn login_fail(&self, _auth: &mml_auth::LoginObj) -> bool {
+        false
+    }
+
+    /// 缺文件要不要下：内核只在配置里关掉自动下载时才问，这里一律同意
+    async fn request_download_file(&self) -> bool {
+        true
+    }
+
+    /// 没有可用的 Java：写进启动日志，让原因在界面上看得到
+    fn no_java(&self, java: i32) {
+        emit_log_line(
+            &self.app,
+            &self.uuid.to_string(),
+            &format!("没有找到 Java {java}，请在实例设置里指定 Java 路径"),
+            false,
+        );
+    }
+
+    /// 启动前 / 后命令：都放行
+    fn launch_process(&self, _run_type: ProcessRunType) -> bool {
+        true
+    }
+}
+
+/// 启动阶段对应的前端状态名，与 i18n 的 `state.*` 一一对应
+///
+/// - `state`: 内核给的阶段
 ///
 /// # 返回值
 ///
-/// 运行中实例的 uuid 列表，顺序不定；模型未初始化时返回空列表
-#[gui_macros::ipc_group("main")]
-#[tauri::command]
-pub fn main_get_running(window: WebviewWindow) -> Vec<String> {
-    let Ok(store) = model(&window) else {
-        mml_log::warn(LogText::MainWindowModelMissing.text());
-        return Vec::new();
-    };
-    store.lock().unwrap().running.iter().cloned().collect()
+/// 返回前端状态名；新增阶段时这里的 match 会因非穷尽而编译失败，强制同步
+fn state_key(state: &LaunchState) -> &'static str {
+    match state {
+        LaunchState::Login => "login",
+        LaunchState::Check => "check",
+        LaunchState::ReadInfo => "readinfo",
+        LaunchState::Download => "download",
+        LaunchState::Jvm => "jvm",
+        LaunchState::Pre => "pre",
+        LaunchState::Post => "post",
+        LaunchState::End => "end",
+        LaunchState::LoadServerPack => "loadserverpack",
+        LaunchState::CheckServerPack => "checkserverpack",
+        LaunchState::DownloadServerPack => "downloadserverpack",
+    }
 }
 
 /// 启动状态事件

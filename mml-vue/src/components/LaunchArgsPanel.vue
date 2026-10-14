@@ -8,7 +8,7 @@
 //            / 附加环境变量（键值对列表）
 import { computed, ref, watch } from "vue";
 import { t } from "../lib/i18n";
-import { COMMON_MEMORY, COMMON_RESOLUTIONS } from "../lib/resolutions";
+import { COMMON_MEMORY, COMMON_MIN_MEMORY, COMMON_RESOLUTIONS } from "../lib/resolutions";
 import type { InstanceArgsDto, JavaInfoDto } from "../lib/bindings";
 import BaseButton from "./ui/BaseButton.vue";
 import GlyphIcon from "./ui/GlyphIcon.vue";
@@ -54,9 +54,9 @@ const memPick = computed(() =>
   !memManual.value && COMMON_MEMORY.includes(props.args.memory) ? String(props.args.memory) : "custom",
 );
 
-/** 最小内存下拉的当前项：与最大内存同一口径（默认值 512 不在预设里，显示为「自定义」） */
+/** 最小内存下拉的当前项：口径与最大内存相同，预设表多出 256 / 512 两档 */
 const minMemPick = computed(() =>
-  !minMemManual.value && COMMON_MEMORY.includes(props.args.minMemory) ? String(props.args.minMemory) : "custom",
+  !minMemManual.value && COMMON_MIN_MEMORY.includes(props.args.minMemory) ? String(props.args.minMemory) : "custom",
 );
 
 /** 当前选的 Java 不在候选列表里（被删了 / 还没扫到）：下拉要补一条同名的，否则显示成空白 */
@@ -221,10 +221,10 @@ const gcOptions = [
         <span class="args-label">{{ t("args.memory") }}</span>
         <span class="sub-tag">{{ t("args.minMemory") }}</span>
         <select class="field-select pick-select" :value="minMemPick" @change="onMinMemPick">
-          <option v-for="m in COMMON_MEMORY" :key="m" :value="String(m)">{{ memoryLabel(m) }}</option>
+          <option v-for="m in COMMON_MIN_MEMORY" :key="m" :value="String(m)">{{ memoryLabel(m) }}</option>
           <option value="custom">{{ t("args.custom") }}</option>
         </select>
-        <NumberStepper :model-value="args.minMemory" :min="512" :max="args.memory" :step="256"
+        <NumberStepper :model-value="args.minMemory" :min="256" :max="args.memory" :step="256"
           @update:model-value="(v: number) => update({ minMemory: v })" />
         <span class="mem-unit">MB</span>
       </div>
@@ -238,7 +238,7 @@ const gcOptions = [
           @update:model-value="(v: number) => update({ memory: v })" />
         <span class="mem-unit">MB</span>
       </div>
-      <!-- 本机内存参考值：给设最大内存一个依据（文字 + 可用占比的条，拿不到会写明原因） -->
+      <!-- 本机内存参考值：给设最大内存一个依据（已用 / 共 · 剩余 + 左占用右剩余的条，拿不到会写明原因） -->
       <MemoryHint class="mem-line" />
 
       <div class="args-row">
@@ -388,86 +388,14 @@ const gcOptions = [
   margin-top: 10px;
 }
 
-.args-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.args-label {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-dim);
-  flex: 0 0 84px;
-}
-
 /* 扩展参数区内的独立标题（列布局）：flex-basis 会作用到高度，需重置，避免 84px 大空白 */
 .advanced-body>.args-label {
   flex: none;
 }
 
-/* 与内存行对齐用的小标签（宽 / 高 / 最小 / 最大）：定宽 28px + 居中。
-   靠右对齐时单字标签（宽）会贴着右缘，和两字标签（最小）的左缘差一个字，看着没对齐；
-   居中之后两者中心落在同一条竖线上 */
-.sub-tag {
-  flex: 0 0 28px;
-  font-size: 12px;
-  color: var(--text-dim);
-  white-space: nowrap;
-  text-align: center;
-}
-
-/* 本机内存参考值：与上面那行控件的左边缘对齐（标签列 84 + 行内间距 12） */
-.mem-line {
-  padding-left: 96px;
-  margin-top: 6px;
-}
-
-/* 预设下拉：尺寸（含高度）全走 .field-select —— 同一个元素上挂了两个类，
-   这里只按档位文字收窄宽度，并把箭头收小一档 */
-.pick-select {
-  width: auto;
-  min-width: 118px;
-  font-size: 12.5px;
-  background-position: right 6px center;
-  background-size: 11px;
-}
-
 .grow {
   flex: 1;
   min-width: 120px;
-}
-
-/* 窗口分辨率这条比内存的两条长一些，档位文字居中。
-   base-select 下关闭态显示的内容在 ::selectedcontent 里，默认是收缩盒：只写 text-align
-   没有可分配的余量，字不会动；而弹层里的 option 是全宽的，反倒被继承成居中。
-   所以这里把内容撑满（父盒是 flex 还是块盒随版本，两条都留）再居中，选项钉回靠左 */
-.res-pick {
-  min-width: 200px;
-  text-align: center;
-}
-
-.res-pick::selectedcontent {
-  flex: 1;
-  width: 100%;
-  text-align: center;
-}
-
-.res-pick option {
-  text-align: left;
-}
-
-/* 续行：缩进到上一行控件的左边缘（标签列 84 + 行内间距 12）。
-   窗口大小的宽 / 高、内存的最大两处用它，别再加"把控件压窄"的第二个口径 */
-.sub-row {
-  padding-left: 96px;
-}
-
-.mem-unit {
-  font-size: 12px;
-  color: var(--text-dim);
-  white-space: nowrap;
 }
 
 .hidden-file {
@@ -567,3 +495,6 @@ const gcOptions = [
   background: var(--accent-soft);
 }
 </style>
+
+<!-- 参数行的行 / 标签 / 子标签 / 预设下拉：与设置窗口的「游戏启动」共用这一份 -->
+<style scoped src="../styles/parts/args-row.css"></style>

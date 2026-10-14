@@ -88,7 +88,7 @@ function isGroupOpen(id: string) {
         </svg>
         <input :value="searchText" class="search-input" :placeholder="t('search.placeholder')" spellcheck="false"
           @input="onSearchInput" />
-        <button v-if="searchText" class="search-clear" @click="emit('update:searchText', '')">
+        <button v-if="searchText" class="input-clear" @click="emit('update:searchText', '')">
           <GlyphIcon name="close" :size="12" :weight="2.4" />
         </button>
       </div>
@@ -215,6 +215,9 @@ function isGroupOpen(id: string) {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* 侧栏一行的高度：实例行、拖拽占位、底部的「添加实例 / 添加分组」都取这一档，
+     全列节奏才一致（原来 48 / 50 / 50 三处各写一个数） */
+  --row-h: 48px;
 }
 
 .main.side-right .sidebar {
@@ -267,19 +270,6 @@ function isGroupOpen(id: string) {
 
 .search-input::placeholder {
   color: var(--text-dim);
-}
-
-.search-clear {
-  border: none;
-  background: transparent;
-  color: var(--text-dim);
-  font-size: 12px;
-  cursor: pointer;
-  padding: 2px 4px;
-}
-
-.search-clear:hover {
-  color: var(--text);
 }
 
 .icon-btn {
@@ -402,7 +392,7 @@ function isGroupOpen(id: string) {
   font-family: inherit;
   cursor: pointer;
   transition: all 0.12s;
-  min-height: 48px;
+  min-height: var(--row-h);
 }
 
 /* 默认态就用主题色，和绿色系的「添加分组」区分开 */
@@ -479,7 +469,7 @@ function isGroupOpen(id: string) {
   border-radius: 10px;
   cursor: grab;
   transition: background 0.12s;
-  min-height: 50px;
+  min-height: var(--row-h);
 }
 
 .inst-row:active {
@@ -493,7 +483,7 @@ function isGroupOpen(id: string) {
   align-items: center;
   gap: 10px;
   padding: 9px 12px;
-  min-height: 50px;
+  min-height: var(--row-h);
   border-radius: 10px;
   border: 1.5px dashed var(--accent-border);
   background: var(--accent-soft);

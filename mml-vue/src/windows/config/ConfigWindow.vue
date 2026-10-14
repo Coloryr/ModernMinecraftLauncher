@@ -1,6 +1,12 @@
 <script setup lang="ts">
 // 配置文件窗口：左侧是可搜索的文件树，右侧按类型给四种视图
 //
+// 左栏与主窗口的侧栏是同一套皮肤：--bg-side 底、右侧描边、贴窗口的上 / 下 / 左缘；
+// 目录当"分组标题"、文件当"实例行"，两种行同高一档 --row-h: 24px。
+// 窗口因此走 body-flush，右栏只有卡片类视图留 22/26 外留白。
+//
+// 还没选文件时右栏是一个**禁用的空编辑器**，不是一句提示 —— 打开就是编辑器窗口的样子。
+//
 // - 文本（json / json5 / toml / yaml / properties / xml / js / snbt / 纯文本）→ Monaco 编辑（行号 + 着色）+ 保存
 // - NBT（.dat / .nbt / .rio）→ NBT 树
 // - 区域文件（.mca）→ 区块表
@@ -29,6 +35,7 @@ import { buildTree, type FileNode } from "../../lib/fileTree";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
+import SearchBox from "../../components/ui/SearchBox.vue";
 import InstanceChip from "../../components/ui/InstanceChip.vue";
 import MonacoText from "../../components/ui/MonacoText.vue";
 import HexView from "./parts/HexView.vue";
@@ -287,7 +294,7 @@ useWindowRefresh(() => {
 </script>
 
 <template>
-  <WindowFrame :title="t('config.title')" body-fill @close="emit('close')">
+  <WindowFrame :title="t('config.title')" body-fill body-flush @close="emit('close')">
     <!-- 实例、来源与操作都放标题栏，与日志窗口同一套；内容区整块留给文件树 -->
     <template #head-right>
       <div class="head-cfg">
@@ -320,34 +327,40 @@ useWindowRefresh(() => {
     </template>
 
     <div class="cfg-body">
-      <!-- 左：搜索固定，只有树滚动 -->
+      <!-- 左：与主窗口侧栏同一套，搜索固定在上，只有下面的树滚动 -->
       <aside class="cfg-list">
-        <div class="cfg-search">
-          <input v-model="query" class="field-input" :placeholder="t('config.search')" spellcheck="false" />
-          <button v-if="query" class="cfg-search-clear" v-tip="t('config.searchClear')"
-            :aria-label="t('config.searchClear')" @click="query = ''">
-            <GlyphIcon name="close" :size="12" />
-          </button>
+        <div class="cfg-list-head">
+          <SearchBox v-model="query" :placeholder="t('config.search')" :clear-label="t('config.searchClear')"
+            width="100%" />
         </div>
 
         <div class="cfg-tree">
-          <button v-for="row in rows" :key="row.key" class="cfg-row"
-            :class="{ on: selected?.name === row.key }"
-            :style="{ paddingLeft: `${6 + row.depth * 14}px` }" :title="row.key"
-            @click="row.isDir ? toggleExpand(row.key) : openFile(row.key)">
-            <GlyphIcon v-if="row.isDir" class="cfg-chevron" :class="{ open: expanded.has(row.key) }" name="chevron-down"
-              :size="11" :weight="2.4" />
-            <span v-else class="cfg-chevron"></span>
-            <span class="cfg-file-name">{{ row.name }}</span>
-          </button>
+          <template v-for="row in rows" :key="row.key">
+            <!-- 目录：按侧栏的分组标题写，缩进由层级给 -->
+            <button v-if="row.isDir" class="cfg-dir" :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
+              @click="toggleExpand(row.key)">
+              <GlyphIcon class="cfg-chevron" :class="{ open: expanded.has(row.key) }" name="chevron-down" :size="13"
+                :weight="2.4" />
+              <span class="cfg-dir-name" :title="row.key">{{ row.name }}</span>
+            </button>
+            <!-- 文件：按侧栏的实例行写 -->
+            <button v-else class="cfg-row" :class="{ on: selected?.name === row.key }"
+              :style="{ paddingLeft: `${8 + row.depth * 14}px` }" :title="row.key" @click="openFile(row.key)">
+              <span class="cfg-chevron-spacer"></span>
+              <span class="cfg-file-name">{{ row.name }}</span>
+            </button>
+          </template>
           <p v-if="!rows.length" class="empty-tip">{{ emptyTip }}</p>
         </div>
       </aside>
 
-      <!-- 右：按类型选视图 -->
-      <section class="cfg-view">
-        <p v-if="!selected" class="empty-tip">{{ t("config.pickFile") }}</p>
-        <MonacoText v-else-if="isText" v-model="text" :language="langOf(selected)" />
+      <!-- 右：按类型选视图。没选文件时也摆着文本编辑器，只是禁用 ——
+           打开窗口就是"编辑器窗口"的样子，不再是中间一句提示 -->
+      <section class="cfg-view" :class="{ flush: !selected || isText }">
+        <!-- 与下面那个必须给不同的 key：同为 MonacoText，Vue 会复用实例，
+             而只读是创建时的选项，复用后切不回可编辑 -->
+        <MonacoText v-if="!selected" key="empty" :model-value="''" readonly />
+        <MonacoText v-else-if="isText" key="file" v-model="text" :language="langOf(selected)" />
         <NbtTree v-else-if="selected.fileType === 'nbt'" :uuid="instanceUuid" :file="selected.name" />
         <McaTable v-else-if="selected.fileType === 'mca'" :uuid="instanceUuid" :file="selected.name" />
         <ImageView v-else-if="selected.fileType === 'image'" :uuid="instanceUuid" :file="selected.name" />
@@ -381,99 +394,98 @@ useWindowRefresh(() => {
 /* 两栏：左固定宽、右吃掉剩余；两层都要 min-height: 0，不然子元素滚不动 */
 .cfg-body {
   display: flex;
-  gap: 12px;
   flex: 1;
   min-height: 0;
 }
 
-/* 左栏：搜索固定在上，只有下面的树滚动 */
+/* 左栏：主窗口侧栏那一套 —— --bg-side 底 + 右侧描边 + 贴窗口的上 / 下 / 左缘，宽 300px。
+   窗口走 body-flush，所以这里不再是自己一张"卡片"，而是真的侧栏 */
 .cfg-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  /* 比原来宽 30px：树按层级缩进，路径又长，250px 下名字动不动就走省略号 */
-  width: 280px;
+  width: 300px;
   flex-shrink: 0;
+  min-height: 0;
   overflow: hidden;
-  padding: 6px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--bg-solid, var(--bg-card));
+  background: var(--bg-side);
+  border-right: 1px solid var(--border);
+  /* 左栏一行的高度：目录行与文件行同取这一档。比全 app 控件那一档（32px）矮，
+     树里一行就一个名字，24px 一屏能多看几条 */
+  --row-h: 24px;
 }
 
+/* 搜索固定在上：内边距与侧栏的 .sidebar-head 一致 */
+.cfg-list-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px 10px;
+}
+
+/* 树的滚动区：内边距与侧栏的 .group-list 一致 */
 .cfg-tree {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
+  /* 见 styles/scrollbar.css */
+  padding: 2px 10px 14px;
 }
 
-/* 搜索框：清空按钮压在输入框右端 */
-.cfg-search {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.cfg-search .field-input {
-  width: 100%;
-  padding-right: 28px;
-}
-
-.cfg-search-clear {
-  position: absolute;
-  top: 50%;
-  right: 6px;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: none;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--text-dim);
-  cursor: pointer;
-}
-
-.cfg-search-clear:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-/* 树的一行：目录点开 / 收起，文件点开进右栏。缩进由模板按层级给 padding-left */
+/* 目录行与文件行同高同圆角：一棵树里两种行的尺寸不一致，扫起来会一跳一跳。
+   行高取左栏自己的 --row-h，比全 app 控件那一档矮：树里条密，一行一个名字就够 */
+.cfg-dir,
 .cfg-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
+  gap: 8px;
+  width: 100%;
+  height: var(--row-h);
+  /* 必须不缩：.cfg-tree 是 flex 列，条目一多就会被压扁（展开后行高比折叠时矮一半就是这么来的），
+     该滚动的是容器 */
+  flex-shrink: 0;
+  padding: 0 12px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--ctl-radius);
   background: transparent;
   color: var(--text);
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: var(--ctl-font);
   text-align: left;
   cursor: pointer;
+  transition: background 0.12s;
+}
+
+/* 目录：只差颜色与字重，就是"分组标题"那个观感；缩进由模板按层级给 */
+.cfg-dir {
+  color: var(--text-dim);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.cfg-dir:hover {
+  background: var(--bg-hover);
+  color: var(--text);
 }
 
 .cfg-row:hover {
   background: var(--bg-hover);
 }
 
+/* 选中态：强调色底 + 一圈描边 */
 .cfg-row.on {
   background: var(--accent-soft);
   color: var(--accent);
+  outline: 1px solid var(--accent-border);
 }
 
 /* 收起时箭头朝右，展开朝下 */
 .cfg-chevron {
   flex-shrink: 0;
-  /* 文件行这里是占位：给同宽，同一层的文件名才和目录名对齐 */
-  width: 11px;
   color: var(--text-dim);
   transform: rotate(-90deg);
   transition: transform 0.12s;
@@ -483,6 +495,13 @@ useWindowRefresh(() => {
   transform: rotate(0);
 }
 
+/* 文件行里占住箭头那一格：同一层的文件名才与目录名对齐 */
+.cfg-chevron-spacer {
+  flex-shrink: 0;
+  width: 13px;
+}
+
+.cfg-dir-name,
 .cfg-file-name {
   flex: 1;
   min-width: 0;
@@ -491,11 +510,19 @@ useWindowRefresh(() => {
   white-space: nowrap;
 }
 
+/* 右栏：四周留白回到全 app 内容区那一档（窗口走了 body-flush，这里自己给） */
 .cfg-view {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-width: 0;
   min-height: 0;
+  padding: 22px 26px;
+}
+
+/* 文本视图与默认态贴边满铺：编辑器自己那圈描边就是分界，再套一层外留白只是无谓的空。
+   卡片类视图（NBT / 区块 / 图片 / 二进制）自带圆角与描边，仍要上面那圈外留白 */
+.cfg-view.flush {
+  padding: 0;
 }
 </style>

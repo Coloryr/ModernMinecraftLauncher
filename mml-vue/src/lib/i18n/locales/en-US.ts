@@ -112,6 +112,7 @@ export default {
   "logWindow.stopConfirm": "Force kill this instance's game process? Unsaved progress will be lost.",
   "logWindow.wordWrap": "Word wrap",
   "logWindow.autoScroll": "Auto scroll",
+  "logWindow.level": "Level",
   "logWindow.levelInfo": "Info",
   "logWindow.levelWarn": "Warning",
   "logWindow.levelError": "Error",
@@ -501,7 +502,7 @@ export default {
 
   // Launch args
   "args.memory": "Memory",
-  "args.memoryHint": "Physical {total} · {free} available",
+  "args.memoryHint": "{used} used / {total} · {free} free",
   "args.memoryTotal": "Physical {total}",
   "args.memoryReading": "Reading system memory…",
   "args.memoryUnknown": "Could not read system memory",
@@ -559,6 +560,7 @@ export default {
   "launch.error": "[Error] {msg}",
 
   // Launch states
+  "state.launching": "Launching…",
   "state.login": "Signing in",
   "state.check": "Checking game files",
   "state.readinfo": "Reading version info",

@@ -3,8 +3,10 @@
 //
 // 索引在 ../search.ts（静态表，覆盖 6 个标签）。这里只负责输入与结果列表：
 // ↑/↓ 选择、Enter 跳转、点击跳转；Esc 有内容时先清空（不关窗口）。
+// 输入框与清空键的观感走共享组件 SearchBox，结果列表由它的 `drop` 插槽挂出来。
 import { computed, onDeactivated, ref, watch } from "vue";
 import { t } from "../../../lib/i18n";
+import SearchBox from "../../../components/ui/SearchBox.vue";
 import HighlightText from "../../../components/ui/HighlightText.vue";
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import { searchSettings, type SettingsHit } from "../search";
@@ -22,6 +24,11 @@ const hits = computed(() => searchSettings(query.value));
 
 watch(hits, () => {
   active.value = 0;
+});
+
+// 一打字就展开结果（清空时不用展开，列表本来就空）
+watch(query, (q) => {
+  if (q.trim()) open.value = true;
 });
 
 /**
@@ -68,23 +75,24 @@ function onKey(e: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="set-search">
-    <input v-model="query" class="field-input set-search-input" :placeholder="t('winSettings.searchPlaceholder')"
-      spellcheck="false" autocomplete="off" @focus="open = true" @input="open = true" @blur="open = false"
-      @keydown="onKey" />
-    <div v-if="open && query.trim()" class="set-search-drop">
-      <button v-for="(h, i) in hits" :key="`${h.tab}/${h.group}/${h.label}`" type="button" class="set-search-item"
-        :class="{ on: i === active }" @mousedown.prevent @click="choose(i)">
-        <span class="set-search-label">
-          <HighlightText :text="h.label" :query="query" />
-        </span>
-        <span class="set-search-path">
-          {{ h.tabLabel }}
-          <GlyphIcon name="chevron-right" :size="10" :weight="2.6" />
-          <HighlightText :text="h.groupLabel" :query="query" />
-        </span>
-      </button>
-      <div v-if="!hits.length" class="empty-tip">{{ t("winSettings.searchNone") }}</div>
-    </div>
-  </div>
+  <SearchBox v-model="query" :placeholder="t('winSettings.searchPlaceholder')" width="280px" @focus="open = true"
+    @blur="open = false" @keydown="onKey">
+    <!-- 结果列表：位置由 SearchBox 的定位参照决定，样式在 settings.css 的 .set-search-drop -->
+    <template #drop>
+      <div v-if="open && query.trim()" class="set-search-drop">
+        <button v-for="(h, i) in hits" :key="`${h.tab}/${h.group}/${h.label}`" type="button" class="set-search-item"
+          :class="{ on: i === active }" @mousedown.prevent @click="choose(i)">
+          <span class="set-search-label">
+            <HighlightText :text="h.label" :query="query" />
+          </span>
+          <span class="set-search-path">
+            {{ h.tabLabel }}
+            <GlyphIcon name="chevron-right" :size="10" :weight="2.6" />
+            <HighlightText :text="h.groupLabel" :query="query" />
+          </span>
+        </button>
+        <div v-if="!hits.length" class="empty-tip">{{ t("winSettings.searchNone") }}</div>
+      </div>
+    </template>
+  </SearchBox>
 </template>

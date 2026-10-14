@@ -14,6 +14,7 @@ export type GlyphName =
   | "minus"
   | "check"
   | "close"
+  | "search"
   | "chevron-left"
   | "chevron-right"
   | "chevron-down"
@@ -59,6 +60,11 @@ withDefaults(
     <path v-else-if="name === 'minus'" d="M5 12h14" />
     <path v-else-if="name === 'check'" d="m5 13 4 4L19 7" />
     <path v-else-if="name === 'close'" d="M6 6l12 12M18 6L6 18" />
+    <!-- 放大镜：搜索框左端那枚 -->
+    <g v-else-if="name === 'search'">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </g>
     <path v-else-if="name === 'chevron-left'" d="m15 6-6 6 6 6" />
     <path v-else-if="name === 'chevron-right'" d="m9 6 6 6-6 6" />
     <path v-else-if="name === 'chevron-down'" d="m6 9 6 6 6-6" />

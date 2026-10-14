@@ -43,12 +43,14 @@ pub(crate) fn init<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
         path_helper::create_dir_all(dir)?;
     }
 
-    let obj = OBJECTS_DIR.get_or_init(|| dir.join(names::GAME_INDEX_DIR));
+    // 两个目录名不能接反：对象按 SHA1 分桶放 `objects`，每个版本一份索引放 `indexes`。
+    // 接反时索引会被写进 objects、资源对象又去 indexes 里找，两边的文件都错位
+    let obj = OBJECTS_DIR.get_or_init(|| dir.join(names::GAME_OBJECT_DIR));
     if !obj.is_dir() {
         path_helper::create_dir_all(obj)?;
     }
 
-    let index = INDEX_DIR.get_or_init(|| dir.join(names::GAME_OBJECT_DIR));
+    let index = INDEX_DIR.get_or_init(|| dir.join(names::GAME_INDEX_DIR));
     if !index.is_dir() {
         path_helper::create_dir_all(index)?;
     }

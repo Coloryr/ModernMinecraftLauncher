@@ -43,7 +43,7 @@ function onSize(v: string) {
       <input :value="keyword" class="field-input block-search" type="text" :placeholder="t('blocks.search')"
         spellcheck="false" autocomplete="off" @input="emit('update:keyword', ($event.target as HTMLInputElement).value)"
         @keydown.esc="emit('update:keyword', '')" />
-      <button v-if="keyword" type="button" class="search-clear" v-tip="t('blocks.searchClear')"
+      <button v-if="keyword" type="button" class="input-clear search-clear" v-tip="t('blocks.searchClear')"
         @click="emit('update:keyword', '')">
         <GlyphIcon name="close" :size="12" :weight="2.4" />
       </button>
@@ -104,27 +104,11 @@ function onSize(v: string) {
   font-size: 13px;
 }
 
+/* 外观走共享的 .input-clear（styles/controls.css），这里只负责摆位：压在输入框右端 */
 .search-clear {
   position: absolute;
   top: 50%;
   right: 6px;
   transform: translateY(-50%);
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-dim);
-  font-size: 11px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.search-clear:hover {
-  background: var(--bg-hover);
-  color: var(--text);
 }
 </style>

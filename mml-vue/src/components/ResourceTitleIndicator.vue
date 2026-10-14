@@ -86,18 +86,14 @@ const iconState = computed(() => {
 </template>
 
 <style scoped>
-/* 与顶栏其它入口按钮同规格：并排时行高与间距才对得上 */
+/* 尺寸与圆角见 styles/titlebar.css 的方形图标键，这里只留外观 */
 .rs-indicator {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: var(--ctl-h);
-  height: var(--ctl-h);
-  flex-shrink: 0;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: 10px;
   background: transparent;
   color: var(--accent);
   cursor: pointer;

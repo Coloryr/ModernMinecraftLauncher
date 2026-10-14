@@ -54,6 +54,26 @@ impl Default for LaterRun {
 }
 
 impl FileHash {
+    /// 期望值是否为空
+    ///
+    /// 上游没公布哈希时会声明了算法但值是空串（Fabric 的 loader jar 就没有 `sha256`）。
+    /// 这种情况按"没什么可校验"处理，否则文件会被判校验失败、反复重下。
+    ///
+    /// # 返回值
+    ///
+    /// 没有任何可校验的值时为 `true`
+    pub fn is_empty(&self) -> bool {
+        match self {
+            FileHash::None => true,
+            FileHash::Md5(hash)
+            | FileHash::Sha1(hash)
+            | FileHash::Sha256(hash)
+            | FileHash::Sha512(hash) => hash.is_empty(),
+            FileHash::Sha1Sha256(sha1, sha256) => sha1.is_empty() && sha256.is_empty(),
+            FileHash::Sha1Sha512(sha1, sha512) => sha1.is_empty() && sha512.is_empty(),
+        }
+    }
+
     /// 检查给定校验值是否命中自身记录的哈希，区分大小写
     ///
     /// - `check`: 目标校验值
@@ -143,6 +163,10 @@ impl FileItemObj {
     /// 文件不存在、读取失败或校验不通过时为 `false`；[`FileHash::None`] 下文件存在即为 `true`
     pub fn check_hash(&self) -> bool {
         if self.file.exists() && self.file.is_file() {
+            // 上游没给哈希（空串）时没什么可校验，文件在就算完整
+            if self.hash.is_empty() {
+                return true;
+            }
             if let Ok(mut stream) = path_helper::open_read(&self.file) {
                 match &self.hash {
                     FileHash::None => true,

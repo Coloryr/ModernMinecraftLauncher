@@ -100,6 +100,12 @@ pub fn run() {
                 windows::log::forward_run_log(&handle, log);
             });
 
+            // 游戏退出：内核退出轮询线程发的事件 → 转发为前端 `game-exit` 事件
+            let handle = app.handle().clone();
+            mml_game::add_exit(move |event| {
+                windows::main::launch::forward_game_exit(&handle, event);
+            });
+
             // 下载器：挂接 UI 回调并转发为前端事件，随后启动下载线程池
             let handle = app.handle().clone();
             mml_downloader::set_gui_handel(Box::new(download::DownloadGuiHook::new(handle)));

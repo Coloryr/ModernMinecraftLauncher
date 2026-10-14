@@ -112,6 +112,7 @@ export default {
   "logWindow.stopConfirm": "强制结束这个实例的游戏进程？没保存的游戏进度会丢失。",
   "logWindow.wordWrap": "自动换行",
   "logWindow.autoScroll": "自动下拉",
+  "logWindow.level": "等级",
   "logWindow.levelInfo": "信息",
   "logWindow.levelWarn": "警告",
   "logWindow.levelError": "错误",
@@ -502,7 +503,7 @@ export default {
 
   // 启动参数
   "args.memory": "内存大小",
-  "args.memoryHint": "物理内存 {total} · 当前可用 {free}",
+  "args.memoryHint": "已用 {used} / {total} · 剩余 {free}",
   "args.memoryTotal": "物理内存 {total}",
   "args.memoryReading": "读取本机内存…",
   "args.memoryUnknown": "本机内存读取失败",
@@ -560,6 +561,7 @@ export default {
   "launch.error": "[错误] {msg}",
 
   // 启动状态
+  "state.launching": "正在启动…",
   "state.login": "登录账户",
   "state.check": "检查游戏文件",
   "state.readinfo": "读取版本信息",

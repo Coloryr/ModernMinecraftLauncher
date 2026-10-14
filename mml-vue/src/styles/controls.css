@@ -20,7 +20,7 @@
  * 存量类名（各窗口手写的小按钮外观，与上面同一角色；改到所在文件时请换成上面的写法，
  * 新代码不要再出现）：
  *   .page-btn .mini-btn .files-btn .install-btn .mp-cancel .mp-clear-btn .res-clear-btn
- *   .refresh-btn .pager-btn .pack-star .res-btn .retry-btn .line-add .line-del .icon-btn .card-act
+ *   .refresh-btn .pager-btn .pack-star .retry-btn .line-add .line-del .icon-btn .card-act
  */
 
 /* 控件高度：全 app 一档 32px = 行高 20 + 上下内边距 5×2 + 上下边框 1×2。
@@ -35,15 +35,8 @@
   --ctl-font: 12.5px;
 }
 
-/* 预留档位（当前全 app 无人使用，按需取用；用时同样只改上面的变量）
- *   22px  开关的矮档（BaseSwitch 原值）
- *   27px  分段按钮内胆（SegmentedTabs 原值，整轨 35）
- *   28px  控件高度的上一版（改动前的一档）
- *   30px  侧栏 / 主页面次级操作按钮的矮档
- *   35px  BaseButton 的 .s-md 与设置页 dl-grid 档
- *   36px  工具条 / 标题栏档（原来 19 处）
- *   42px  表单规格（--ctl-h 的最初值，纵向留白更松）
- */
+/* 旧档位已废弃，不再登记：42px（--ctl-h 的最初值）、36px 工具条档、35px .s-md、30px 侧栏档、
+ * 28 / 27 / 22px 全部并进了现在这一档 32px。要新档位就改上面的变量，不要在窗口里写数字。 */
 
 .field-label {
   display: block;
@@ -216,6 +209,29 @@ select.field-select {
   padding: 5px 24px 5px 8px;
   /* 字号跟全 app 控件一样；横向收窄、箭头靠里一点 */
   background-position: right 6px center;
+}
+
+/* 输入框里的清空键：20px 方形热区，压在输入框右端。
+   20px 是有意的第二档，不是漏改 —— 它整枚压在 --ctl-h（32px）的输入框内部，只有矮一档
+   才能上下各留出边距；同样的原因，圆角也不能用 --ctl-radius（8px 放在 20px 的方块上过圆）。
+   各窗口只负责把它摆到自己那个输入框的右端（有的走 flex 行内，有的绝对定位）。 */
+.input-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.input-clear:hover {
+  background: var(--bg-hover);
+  color: var(--text);
 }
 
 .range {

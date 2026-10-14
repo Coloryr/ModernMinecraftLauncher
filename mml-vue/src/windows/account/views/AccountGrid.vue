@@ -200,7 +200,9 @@ function hidePreview() {
   gap: 16px;
 }
 
-/* 空状态：横跨全部列并在内容区居中 */
+/* 空状态：横跨全部列并在内容区居中。
+   48px 的上下留白是有意的：它要在一片卡片格里撑出一块呼吸区，
+   与全局 .empty-tip 的 10px 不是一个场景，不回全局值 */
 .empty-tip {
   grid-column: 1 / -1;
   padding: 48px 0;

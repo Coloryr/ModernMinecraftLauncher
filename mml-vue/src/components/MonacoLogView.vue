@@ -1,11 +1,13 @@
 <script setup lang="ts">
-// Monaco 只读日志视图：把给它的日志行画成控制台，管自动换行 / 自动下拉 / 页内查找
+// Monaco 只读日志视图：把给它的日志行画成控制台，管自动下拉 / 页内查找。
+// 自动换行是**全局偏好**（lib/editorWrap，Alt+Z 切），日志与配置编辑器共用，这里只把它喂给编辑器。
 //
 // **筛选不在这里**：等级 / 线程 / 分组都归日志窗口的工具栏管，筛完的行才传进来，
 // 免得同一套筛选条件在两边各存一份、还要互相同步。
 import { onActivated, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { editor } from "monaco-editor/editor/editor.api";
 import { applyLogTheme, monaco } from "../lib/monaco";
+import { toggleWordWrap, wordWrap } from "../lib/editorWrap";
 import type { LogLine } from "../lib/bindings";
 
 const props = defineProps<{
@@ -15,8 +17,6 @@ const props = defineProps<{
   fill?: boolean;
   /** 无日志时的遮罩提示；不给就不盖东西，没有日志时直接是空的编辑器 */
   emptyHint?: string;
-  /** 自动换行 */
-  wordWrap?: boolean;
   /** 自动下拉：有新行就跟到末尾 */
   autoScroll?: boolean;
 }>();
@@ -134,7 +134,7 @@ onMounted(() => {
     language: "plaintext",
     readOnly: true,
     automaticLayout: true,
-    wordWrap: props.wordWrap === false ? "off" : "on",
+    wordWrap: wordWrap.value ? "on" : "off",
     minimap: { enabled: false },
     // 行号常开（包括没有日志的空态）：这里就是日志正文的文本编辑器
     lineNumbers: "on",
@@ -157,6 +157,8 @@ onMounted(() => {
     guides: { indentation: false },
   });
   decorations = monacoEditor.createDecorationsCollection([]);
+  // Alt+Z：与 VS Code 同键位，写的是全局偏好，配置编辑器与其它窗口跟着变
+  monacoEditor.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.KeyZ, toggleWordWrap);
   themeWatcher.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
   monacoEditor.onDidScrollChange(() => {
     // 自动下拉开着时用户往上滚：说明他在回头看历史，让调用方把开关关掉
@@ -189,8 +191,8 @@ watch(
   },
 );
 
-// 自动换行开关：只是编辑器的一个渲染选项，不用重建文档
-watch(() => props.wordWrap, (on) => {
+// 别处翻转了换行（配置编辑器里的 Alt+Z、另一个窗口、工具栏开关）：跟上，不用重建文档
+watch(wordWrap, (on) => {
   monacoEditor?.updateOptions({ wordWrap: on ? "on" : "off" });
 });
 </script>

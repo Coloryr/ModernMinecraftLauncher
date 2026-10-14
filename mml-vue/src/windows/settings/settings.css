@@ -105,23 +105,25 @@
 
 /* ---------- 布局：左标签 + 右内容 ---------- */
 
-/* 占满窗口内容区，右侧独立滚动。用负外边距抵消 WindowFrame .frame-body 的 22px/26px
-   内边距，让标签导航和滚动条都顶到窗口边缘（滚动条贴右） */
+/* 占满窗口内容区：外壳用 body-fill + body-flush（见 WindowFrame），已经是 flex 列、且不带内边距，
+   所以这里 flex: 1 就够 —— 不必再算 calc(100% + 44px)，也不必用负外边距去抵消 .frame-body 的
+   22/26（那种写法一改外壳内边距就会静默错位）。左侧导航因此顶到窗口左缘 */
 .settings-layout {
   display: flex;
   gap: 0;
-  height: calc(100% + 44px);
+  flex: 1;
   min-height: 0;
-  margin: -22px -26px;
 }
 
+/* 右侧内容：自己滚，留白取全 app 内容区那一档 22/26；
+   右内边距减掉滚动条那 9px，内容右缘因此仍落在 26px 上（与 .frame-body.gutter 同一处理） */
 .settings-layout .tab-content {
   flex: 1;
   min-width: 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
   /* 见 styles/scrollbar.css */
-  padding: 18px 22px 24px;
+  padding: 22px calc(26px - 9px) 22px 26px;
 }
 
 .settings-layout .set-panel {
@@ -141,19 +143,9 @@
   flex-shrink: 0;
 }
 
-/* ---------- 设置项搜索：在标题栏里，不属于 .settings-layout ---------- */
-
-.frame-head .set-search {
-  position: relative;
-  flex: 0 0 auto;
-  width: 280px;
-}
-
-/* 高度走全 app 那一档（--ctl-h = 32px），标题栏里与标题、窗口按钮同一视觉水平线 */
-.frame-head .set-search-input {
-  padding: 3px 10px;
-  font-size: 12.5px;
-}
+/* ---------- 设置项搜索：在标题栏里，不属于 .settings-layout ----------
+   输入框、放大镜与清空键走共享组件 SearchBox（宽度由它自己按 280px 给），
+   这里只留结果下拉的外观；下拉的定位参照是 SearchBox 的根元素 */
 
 .frame-head .set-search-drop {
   /* 标题栏之上：下拉要压在内容区上方 */
@@ -180,7 +172,7 @@
   width: 100%;
   padding: 8px 10px;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--ctl-radius);
   background: transparent;
   color: var(--text);
   font-family: inherit;
@@ -558,52 +550,6 @@
   color: var(--red);
   font-size: 12px;
   margin: 6px 0 0;
-}
-
-/* 本机内存参考值（内存设置下方一行说明） */
-.settings-layout .mem-hint {
-  color: var(--text-dim);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  margin: 8px 0 0;
-}
-
-/* 常用分辨率：小方块按钮，当前值匹配时高亮（与实例设置里那排一致） */
-.settings-layout .res-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.settings-layout .res-label {
-  font-size: 12px;
-  color: var(--text-dim);
-}
-
-.settings-layout .res-btn {
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-dim);
-  font-family: inherit;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  height: var(--ctl-h);
-  padding: 0 9px;
-  border-radius: 7px;
-  cursor: pointer;
-}
-
-.settings-layout .res-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-.settings-layout .res-btn.on {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 /* ---------- 动作行 / 保存反馈 ---------- */

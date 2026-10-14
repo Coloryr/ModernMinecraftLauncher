@@ -82,7 +82,7 @@ const total = computed(() => collectFileKeys(props.tree).length);
 
 .files-btn {
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: var(--ctl-radius);
   background: var(--bg-raised);
   color: var(--accent);
   font-size: 12px;

@@ -15,6 +15,10 @@
 use std::path::PathBuf;
 use std::sync::Once;
 
+use uuid::Uuid;
+
+use crate::game_log::GameLog;
+
 /// 启动全部全局单例，返回本次测试运行的目录
 ///
 /// 幂等：重复调用只生效第一次，见 `Once`。**不清理目录** —— 日志流可能已经打开，
@@ -32,6 +36,33 @@ pub fn boot() -> PathBuf {
         mml_config::config_save::start();
     });
     run
+}
+
+/// 取某个实例运行日志里的原始文本行
+///
+/// 只取不经解析的原始输出（`GameLog::Text`，即进程的 stdout / stderr），
+/// 起进程的用例靠它断言"输出真的进了启动器的日志"。
+///
+/// - `uuid`: 实例 UUID
+///
+/// # 返回值
+///
+/// 原始文本行，按入库顺序；该实例还没有日志时是空列表
+pub fn run_log_texts(uuid: &Uuid) -> Vec<String> {
+    let logs = crate::RUNTIME_LOGS.read().unwrap();
+    let Some(log) = logs.get(uuid) else {
+        return Vec::new();
+    };
+
+    log.logs
+        .read()
+        .unwrap()
+        .iter()
+        .filter_map(|item| match &item.log {
+            GameLog::Text(text) => Some(text.clone()),
+            _ => None,
+        })
+        .collect()
 }
 
 /// 程序化造 jar / 语言表时的一个文本条目

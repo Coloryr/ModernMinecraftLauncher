@@ -171,10 +171,8 @@ const emit = defineEmits<{
   margin-left: auto;
 }
 
+/* 尺寸与圆角走标题栏标准（styles/titlebar.css 的方形图标键），这里只留外观 */
 .topbar-icon-btn {
-  width: var(--ctl-h);
-  height: var(--ctl-h);
-  border-radius: 10px;
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-dim);

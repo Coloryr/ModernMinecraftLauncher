@@ -322,7 +322,7 @@
 .resource-layout .mini-btn {
   height: var(--ctl-h);
   padding: 0 12px;
-  border-radius: 7px;
+  border-radius: var(--ctl-radius);
   border: 1px solid var(--border);
   background: var(--bg-raised);
   color: var(--text-dim);
@@ -927,6 +927,8 @@
   min-width: 0;
   /* 拖宽把手要绝对定位在这一格右边缘 */
   position: relative;
+  /* 表头与数据行等高：数据行由上下 7px 内边距和 12px 字号撑出这一档。
+     表头不是控件，不取 --ctl-h 的 32px —— 撑上去整张表会显得头重 */
   height: 28px;
   padding: 0;
   border: none;

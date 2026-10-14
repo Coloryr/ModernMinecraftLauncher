@@ -511,9 +511,15 @@ impl InstanceSettingObj {
             args.push(format!("-Xmx{max}m"));
         }
 
-        if !jvm_args.is_empty() {
-            args.extend(jvm_args.split('\n').map(|item| item.trim().to_string()));
-        }
+        // 空行必须滤掉：空参数会被 java 当成主类名，直接"找不到或无法加载主类"起不来。
+        // 自定义参数是从文本框整段贴进来的，结尾带一个换行太常见了
+        args.extend(
+            jvm_args
+                .split('\n')
+                .map(|item| item.trim())
+                .filter(|item| !item.is_empty())
+                .map(|item| item.to_string()),
+        );
 
         // 统一处理外置登录认证参数
         let auth_key: Option<String> = match &auth.auth_type {
@@ -634,25 +640,32 @@ impl InstanceSettingObj {
         };
 
         let mut map = HashMap::new();
-        map.insert("{auth_player_name}", auth.user_name.clone());
-        map.insert("{version_name}", version_name);
-        map.insert("{game_directory}", game_dir.to_string_lossy().to_string());
-        map.insert("{assets_root}", assets_path.to_string_lossy().to_string());
-        map.insert("{assets_index_name}", assets_index);
-        map.insert("{auth_uuid}", auth.uuid.clone());
-        map.insert("{auth_access_token}", token);
-        map.insert("{user_properties}", user_properties);
-        map.insert("{user_type}", user_type.to_string());
-        map.insert("{version_type}", self.get_version_type());
-        map.insert("{natives_directory}", native.to_string_lossy().to_string());
+        // 键必须带上 `${}` 里那个 `$`：版本 json 原文就是 `${auth_player_name}`，
+        // 少了 `$` 只会替换花括号那一段，替换完留下一个裸 `$`（实测会拼出
+        // `-cp $E:\...\client.jar`、`--username $`，游戏直接起不来）
+        map.insert("${auth_player_name}", auth.user_name.clone());
+        map.insert("${version_name}", version_name);
+        map.insert("${game_directory}", game_dir.to_string_lossy().to_string());
+        map.insert("${assets_root}", assets_path.to_string_lossy().to_string());
+        map.insert("${assets_index_name}", assets_index);
+        map.insert("${auth_uuid}", auth.uuid.clone());
+        map.insert("${auth_access_token}", token);
+        map.insert("${user_properties}", user_properties);
+        map.insert("${user_type}", user_type.to_string());
+        map.insert("${version_type}", self.get_version_type());
+        map.insert("${natives_directory}", native.to_string_lossy().to_string());
         map.insert(
-            "{library_directory}",
+            "${library_directory}",
             libraries_path::get_lib_dir().to_string_lossy().to_string(),
         );
-        map.insert("{classpath_separator}", sep.to_string());
-        map.insert("{launcher_name}", names::MML.to_string());
-        map.insert("{launcher_version}", mml_names::VERSION.clone());
-        map.insert("{classpath}", classpath.to_string());
+        map.insert("${classpath_separator}", sep.to_string());
+        map.insert("${launcher_name}", names::MML.to_string());
+        map.insert("${launcher_version}", mml_names::VERSION.clone());
+        map.insert("${classpath}", classpath.to_string());
+        // 这两个是微软账户的客户端 id 与 xuid，离线 / 外置账户没有对应值，置空即可 ——
+        // 留着 `${clientid}` 字面量会被游戏当成真的 id
+        map.insert("${clientid}", String::new());
+        map.insert("${auth_xuid}", String::new());
 
         for index in 0..args.len() {
             for (key, value) in map.iter() {
@@ -705,7 +718,9 @@ impl InstanceSettingObj {
                         &mml_base::get_base_dir().to_string_lossy(),
                     );
                 if let Ok(path) = soft_canonicalize::soft_canonicalize(path.trim()) {
-                    if !check || (path.exists() && path.is_file()) {
+                    // 存在即可：这里既可能是 jar，也可能是一个类目录（advance_jvm 的 ClassPath
+                    // 常被填成编译输出目录），只认 is_file 会把目录整条丢掉
+                    if !check || path.exists() {
                         libs.push(path);
                     }
                 }
@@ -714,7 +729,8 @@ impl InstanceSettingObj {
 
         let mut classpath_parts: Vec<String> = Vec::with_capacity(libs.len());
         for item in &libs {
-            if !check || (item.exists() && item.is_file()) {
+            // 存在即可，别只认文件：类路径里既有 jar，也有目录（编译输出目录、资源目录）
+            if !check || item.exists() {
                 crate::add_game_log_item(&self.uuid, GameLog::RuntimeLib(item.clone()));
                 classpath_parts.push(item.to_string_lossy().to_string());
             }
@@ -1188,9 +1204,290 @@ fn do_lib_item(item: &FileItemObj, game_libs: &mut Vec<FileItemObj>) -> CoreResu
     if !item.file.as_os_str().is_empty() {
         game_libs.push(item.clone());
     }
-    if let LaterRun::UnpackNative(native) = &item.later {
+    // 已经在本地的解包项顺手解一次；还没下载的不能在这里读 —— 首次安装时它必然不在，
+    // 直接 open_read 会让整个检查以 FileSystemError 中止（老版本 1.7.10 / 1.12.2 都带这种
+    // natives 分类库）。缺失的交给下载任务的 later：下载完再按同一份 native 目录解包
+    if let LaterRun::UnpackNative(native) = &item.later
+        && item.file.exists()
+    {
         let reader = path_helper::open_read(&item.file)?;
         mml_downloader::later_tasks::unpack_native(native, reader)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    //! 启动参数里的 JVM 部分：内存 `-Xms` / `-Xmx`、GC 档与自定义 JVM 参数。
+    //!
+    //! 放在 crate 内是因为 `make_jvm_arg` 是私有方法，`tests/game_arg.rs` 够不着；
+    //! 而公开的 `make_run_arg` 要先过版本 json 的联网校验，没法在测试里用。
+    //! 全程离线：账户取默认的离线账户，只有外置登录那几档才会联网。
+    //!
+    //! 全局配置里的 `jvm_arg` 是实例没给值时的兜底，所以这里先清成全 `None`，
+    //! 并让改配置的用例独占执行（同 `tests/game_arg.rs` 的 CONFIG_LOCK）。
+    use std::path::PathBuf;
+    use std::process::Command;
+    use std::sync::{Mutex, MutexGuard, Once};
+    use std::thread;
+    use std::time::{Duration, Instant};
+
+    use mml_auth::LoginObj;
+    use mml_config::config_obj::{GCType, RunArgObj};
+    use mml_names::names;
+    use uuid::Uuid;
+
+    use super::*;
+    use crate::game_launch::{AutoJoinType, GameLaunchArg, GameRunObj, InstanceHandle};
+    use crate::launcher::LogEncoding;
+    use crate::test_support::{boot, run_log_texts};
+
+    /// 取全局配置锁，改配置与读配置的用例串行
+    fn lock_config() -> MutexGuard<'static, ()> {
+        static CONFIG_LOCK: Mutex<()> = Mutex::new(());
+        CONFIG_LOCK.lock().unwrap_or_else(|err| err.into_inner())
+    }
+
+    /// 起内核各系统，并把全局 JVM 配置清成全 `None`
+    ///
+    /// `boot()` 不含本 crate 的 `init`，而 `-Dcolormc.*` 那段要读实例路径（`BASE_DIR`），
+    /// 所以这里补上；路径都是 `OnceLock::get_or_init`，重复初始化是幂等的。
+    ///
+    /// # 返回值
+    ///
+    /// 持有配置锁，用例结束才释放
+    fn setup() -> MutexGuard<'static, ()> {
+        static INIT: Once = Once::new();
+        let guard = lock_config();
+        INIT.call_once(|| {
+            let run = boot();
+            crate::init(&run).unwrap();
+            let mut config = mml_config::write_config();
+            config.jvm_arg = RunArgObj::default();
+        });
+        guard
+    }
+
+    /// 造一个带指定 JVM 配置的实例
+    ///
+    /// - `jvm`: 实例自己的 JVM 配置，其余字段取默认值
+    ///
+    /// # 返回值
+    ///
+    /// 返回实例
+    fn instance(jvm: RunArgObj) -> InstanceSettingObj {
+        InstanceSettingObj {
+            name: "launch-arg-test".to_string(),
+            dir: "launch-arg-test".to_string(),
+            version: "1.21.1".to_string(),
+            jvm_arg: Some(jvm),
+            ..Default::default()
+        }
+    }
+
+    /// 内存：最小填 `-Xms`、最大填 `-Xmx`，且 `-Xms` 排在前面
+    #[tokio::test]
+    async fn jvm_arg_memory() {
+        let _guard = setup();
+        let obj = instance(RunArgObj {
+            min_memory: Some(512),
+            max_memory: Some(4096),
+            // 关掉 GC，这条只盯内存
+            gc_mode: Some(GCType::None),
+            ..Default::default()
+        });
+
+        let args = obj.make_jvm_arg(&LoginObj::default(), 21, None).await.unwrap();
+
+        let min = args.iter().position(|a| a == "-Xms512m").expect("应生成 -Xms512m");
+        let max = args.iter().position(|a| a == "-Xmx4096m").expect("应生成 -Xmx4096m");
+        assert!(min < max, "-Xms 应排在 -Xmx 之前");
+    }
+
+    /// 内存是 0 或没设：该档不生成，0 表示不限而不是 0 MB
+    #[tokio::test]
+    async fn jvm_arg_memory_zero_skips() {
+        let _guard = setup();
+        let obj = instance(RunArgObj {
+            min_memory: Some(0),
+            max_memory: None,
+            gc_mode: Some(GCType::None),
+            ..Default::default()
+        });
+
+        let args = obj.make_jvm_arg(&LoginObj::default(), 21, None).await.unwrap();
+
+        assert!(!args.iter().any(|a| a.starts_with("-Xms")), "0 不该生成 -Xms");
+        assert!(!args.iter().any(|a| a.starts_with("-Xmx")), "没设不该生成 -Xmx");
+    }
+
+    /// GC 档：自动档按 Java 版本挑，21 及以上走 ZGC、之下走 G1GC；显式指定时听指定的
+    #[tokio::test]
+    async fn jvm_arg_gc() {
+        let _guard = setup();
+        let auth = LoginObj::default();
+        let auto = instance(RunArgObj {
+            gc_mode: Some(GCType::Auto),
+            ..Default::default()
+        });
+
+        let zgc = auto.make_jvm_arg(&auth, 21, None).await.unwrap();
+        assert!(names::GCZGC.iter().all(|item| zgc.contains(&item.to_string())), "Java 21 应走 ZGC");
+        assert!(!zgc.contains(&names::G1GC[0].to_string()), "自动档不该同时给 G1GC");
+
+        let g1 = auto.make_jvm_arg(&auth, 17, None).await.unwrap();
+        assert!(names::G1GC.iter().all(|item| g1.contains(&item.to_string())), "Java 17 应走 G1GC");
+        assert!(!g1.contains(&names::GCZGC[0].to_string()), "低版本不该给 ZGC");
+
+        // 显式档与自动判定不一致时按显式的来
+        let forced = instance(RunArgObj {
+            gc_mode: Some(GCType::G1GC),
+            ..Default::default()
+        });
+        let forced = forced.make_jvm_arg(&auth, 21, None).await.unwrap();
+        assert!(names::G1GC.iter().all(|item| forced.contains(&item.to_string())), "显式 G1GC 应压过自动档");
+    }
+
+    /// 自定义 JVM 参数：按行追加，首尾空白与空行都去掉
+    #[tokio::test]
+    async fn jvm_arg_custom_lines() {
+        let _guard = setup();
+        let obj = instance(RunArgObj {
+            jvm_args: Some("  -Dfoo=1  \n\n-Dbar=2\n".to_string()),
+            gc_mode: Some(GCType::None),
+            ..Default::default()
+        });
+
+        let args = obj.make_jvm_arg(&LoginObj::default(), 17, None).await.unwrap();
+
+        assert!(args.contains(&"-Dfoo=1".to_string()), "应保留自定义参数并去掉首尾空白");
+        assert!(args.contains(&"-Dbar=2".to_string()));
+        assert!(!args.iter().any(|a| a.is_empty()), "空行不该留成空参数");
+    }
+
+    /// 本机能跑的 Java：先 `JAVA_HOME`，再 PATH 上的 `java`
+    ///
+    /// 探针走源文件模式（`java 探针.java`），那是 JDK 的能力，纯 JRE 跑不了，
+    /// 所以这里用 `--list-modules` 认一下有没有 `jdk.compiler`。
+    ///
+    /// # 返回值
+    ///
+    /// 可用则返回 java 可执行文件路径，没有可用 JDK 时返回 `None`
+    fn find_jdk() -> Option<PathBuf> {
+        let mut list = Vec::new();
+        if let Ok(home) = std::env::var("JAVA_HOME") {
+            let name = if cfg!(windows) { "java.exe" } else { "java" };
+            list.push(PathBuf::from(home).join("bin").join(name));
+        }
+        list.push(PathBuf::from("java"));
+
+        list.into_iter().find(|java| {
+            Command::new(java)
+                .arg("--list-modules")
+                .output()
+                .map(|out| {
+                    out.status.success() && String::from_utf8_lossy(&out.stdout).contains("jdk.compiler")
+                })
+                .unwrap_or(false)
+        })
+    }
+
+    /// 真实启动：命令行由启动器自己拼，进程是真的 Java、跑的是真代码
+    ///
+    /// 探针用源文件模式跑，打印自定义 JVM 参数与游戏参数，于是"参数是否真的传进进程"
+    /// 也能一起断言。本机没有带 `jdk.compiler` 的 JDK 就跳过 —— 那种机器上启动器
+    /// 本身也起不了游戏。
+    #[tokio::test]
+    async fn real_launch_starts_java_process() {
+        let _guard = setup();
+        let Some(java) = find_jdk() else {
+            eprintln!("跳过真实启动用例：本机没有可用的 JDK");
+            return;
+        };
+
+        // 探针：把自定义 JVM 参数与游戏参数都打出来
+        let dir = mml_testutil::temp_path(format!("mml-real-launch-{}", Uuid::new_v4().simple()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let probe = dir.join("MmlLaunchProbe.java");
+        std::fs::write(
+            &probe,
+            r#"public class MmlLaunchProbe {
+    public static void main(String[] args) {
+        System.out.println("mml-probe-ok prop=" + System.getProperty("mml.probe") + " args=" + String.join(",", args));
+    }
+}
+"#,
+        )
+        .unwrap();
+
+        // 命令行：JVM 参数走 make_jvm_arg，整条走 make_run_arg，与真实启动同一入口
+        let instance = instance(RunArgObj {
+            min_memory: Some(256),
+            max_memory: Some(512),
+            // GC 档不选：本机 Java 版本不确定，GC 的两条用例已经各自断言过参数内容
+            gc_mode: Some(GCType::None),
+            jvm_args: Some("-Dmml.probe=1".to_string()),
+            ..Default::default()
+        });
+        let jvm = instance.make_jvm_arg(&LoginObj::default(), 21, None).await.unwrap();
+
+        let mut obj = GameLaunchObj {
+            jvm_args: jvm,
+            main_class: probe.to_string_lossy().to_string(),
+            game_args: vec!["--probe-arg".to_string()],
+            ..Default::default()
+        };
+        let launch_arg = GameLaunchArg {
+            auth: LoginObj::default(),
+            auto: AutoJoinType::None,
+            admin: false,
+            mixin: None,
+            lang: None,
+        };
+        let args = instance.make_run_arg(&launch_arg, &mut obj, false);
+        assert!(args.contains(&"-Xms256m".to_string()), "命令行里应有内存参数");
+        assert!(args.contains(&probe.to_string_lossy().to_string()), "命令行里应有主类");
+
+        // 真起进程：句柄负责读流进运行日志、tick 判退出
+        let uuid = Uuid::new_v4();
+        let handle = InstanceHandle::new(GameRunObj {
+            uuid,
+            encoding: LogEncoding::UTF8,
+            auth: LoginObj::default(),
+            path: dir.join("game"),
+            java,
+            args,
+            env: Default::default(),
+            admin: false,
+        })
+        .expect("启动 Java 进程失败");
+
+        // 先等输出：源文件模式要先编译，给足 60 秒
+        let deadline = Instant::now() + Duration::from_secs(60);
+        while run_log_texts(&uuid).iter().all(|line| !line.contains("mml-probe-ok"))
+            && Instant::now() < deadline
+        {
+            thread::sleep(Duration::from_millis(50));
+        }
+
+        let texts = run_log_texts(&uuid);
+        let line = texts
+            .iter()
+            .find(|line| line.contains("mml-probe-ok"))
+            .unwrap_or_else(|| panic!("运行日志里应出现探针输出，实际：{texts:?}"));
+
+        // 三件事各证明一段链路：进程起来了、自定义 JVM 参数到了 JVM、游戏参数到了进程
+        assert!(line.contains("prop=1"), "自定义 JVM 参数应真的传给 JVM：{line}");
+        assert!(line.contains("args=--probe-arg"), "游戏参数应真的传给进程：{line}");
+
+        // 再等进程退出
+        let deadline = Instant::now() + Duration::from_secs(30);
+        while !handle.is_exit() && Instant::now() < deadline {
+            handle.tick();
+            thread::sleep(Duration::from_millis(50));
+        }
+        assert!(handle.is_exit(), "Java 进程应在 30 秒内退出");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

@@ -22,9 +22,13 @@ const emit = defineEmits<{
 
 <style scoped>
 .switch {
-  width: 48px;
-  /* 与全 app 控件同高；开关是自成一体的小控件，宽高比也在这一处定 */
-  height: var(--ctl-h);
+  /* 比全 app 控件那一档（--ctl-h = 32px）矮一档：开关是成对出现的小控件，
+     32px 高的胶囊放在工具条里比旁边的文案与勾选都抢眼。
+     宽高比与圆点直径只在这一处定，圆点的位移由它们推出来 */
+  --sw-h: 24px;
+  --sw-knob: calc(var(--sw-h) - 6px);
+  width: calc(var(--sw-h) * 1.5);
+  height: var(--sw-h);
   flex-shrink: 0;
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -44,8 +48,8 @@ const emit = defineEmits<{
   position: absolute;
   top: 2px;
   left: 2px;
-  width: calc(var(--ctl-h) - 6px);
-  height: calc(var(--ctl-h) - 6px);
+  width: var(--sw-knob);
+  height: var(--sw-knob);
   border-radius: 50%;
   background: var(--text-dim);
   transition: transform 0.15s, background 0.15s;
@@ -57,7 +61,9 @@ const emit = defineEmits<{
 }
 
 .switch.on .knob {
-  transform: translateX(calc(var(--ctl-h) - 8px));
+  /* 位移 = 内部可用宽 - 圆点 - 两侧内缩 = 1.5H - (H - 6) - 6 = H / 2。
+     原来写的 H - 8 会多推一段，圆点在"开"时凸出开关右缘 */
+  transform: translateX(calc(var(--sw-h) / 2));
   background: #fff;
 }
 </style>

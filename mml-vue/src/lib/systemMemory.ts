@@ -1,4 +1,4 @@
-// 本机内存参考值：内存设置旁边显示的"物理内存 / 当前可用"
+// 本机内存参考值：内存设置旁边显示的"已用 / 共 · 剩余"，外加一条左占用、右剩余的细条
 //
 // 前端拿不到物理内存，走后端命令 `main_get_system_memory`（内核 mml-sys 查询）。
 // 设置窗口的「游戏启动」与实例设置的启动参数共用这一份 —— 读的是整机一份数据，
@@ -76,14 +76,14 @@ function stop() {
  * # 返回值
  *
  * - `text`: 参考文案，随查询结果变化的响应式文本，结构固定，模板直接渲染一行
- * - `freePercent`: 当前可用占物理内存的百分比，0–100，给"可用"那条进度条用；读不到时为 0
+ * - `usedPercent`: 已用占物理内存的百分比，0–100，给那条"左占用右剩余"的细条用；读不到时为 0
  *
  * `text` 始终非空，取值分这几种：
  *
  * - 未取到：`读取本机内存…`
  * - 调用失败：`本机内存读取失败：<原因>`，原因多为命令不存在 = 后端没重编
  * - 后端返回 0：`本机内存读取失败`，查询本身失败
- * - 正常：`物理内存 31.9 GB · 当前可用 18.2 GB`
+ * - 正常：`已用 13.7 GB / 31.9 GB · 剩余 18.2 GB`
  */
 export function useSystemMemory() {
   onMounted(start);
@@ -96,18 +96,20 @@ export function useSystemMemory() {
     const { total, free } = data.value;
     if (!total) return t("args.memoryUnknown");
     if (!free) return t("args.memoryTotal", { total: formatMemory(total) });
+    // 后端只给总量与可用量，已用是这里减出来的
     return t("args.memoryHint", {
+      used: formatMemory(total - free),
       total: formatMemory(total),
       free: formatMemory(free),
     });
   });
 
-  // 条上画的是"可用"：这个读数的用途就是让人判断还能开多大堆
-  const freePercent = computed(() => {
+  // 条左段画的是"已用"：这个读数的用途就是让人判断还能开多大堆；右段（轨道本身）即剩余
+  const usedPercent = computed(() => {
     const { total, free } = data.value;
     if (!total || !free) return 0;
-    return Math.min(100, Math.max(0, (free / total) * 100));
+    return Math.min(100, Math.max(0, ((total - free) / total) * 100));
   });
 
-  return { text, freePercent };
+  return { text, usedPercent };
 }

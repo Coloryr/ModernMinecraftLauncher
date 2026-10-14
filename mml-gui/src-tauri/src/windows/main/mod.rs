@@ -116,12 +116,11 @@ pub fn emit_java_change(app: &AppHandle) {
     let _ = app.emit(listens::JAVA_CHANGE, ());
 }
 
-/// 启动失败事件，预留：接入 mml-core 启动链后使用
+/// 启动失败事件：启动链报错时发，前端据此显示"启动失败"与原因
 ///
 /// - `app`: 应用句柄，事件的发送方
 /// - `event`: 失败详情，含错误文案与实例 uuid；启动前的错误没有 uuid
-#[allow(dead_code)]
 #[gui_macros::emit]
-fn emit_launch_error(app: &AppHandle, event: ErrorEvent) {
+pub(super) fn emit_launch_error(app: &AppHandle, event: ErrorEvent) {
     let _ = app.emit(listens::LAUNCH_ERROR, event);
 }

@@ -109,6 +109,10 @@ export const KEYS = {
   collectResourcePack: "mml.collect.resourcePack",
   collectShaderpack: "mml.collect.shaderpack",
 
+  // ---- 编辑器（日志视图与配置编辑器共用这一份） ----
+  /** 自动换行，"0" = 关；Alt+Z 与界面上那个开关都写它 */
+  editorWordWrap: "mml.editor.wordWrap",
+
   // ---- 各窗口视图偏好（JSON） ----
   /**
    * 方块窗口：分类 / 搜索词 / 图标尺寸档

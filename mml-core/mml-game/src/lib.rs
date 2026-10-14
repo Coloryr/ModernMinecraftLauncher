@@ -817,17 +817,17 @@ pub fn rename_instance(uuid: &Uuid, name: &str) -> CoreResult<()> {
 /// - `uuid`: 实例 UUID
 /// - `data`: 日志原文
 pub(crate) fn add_game_log(uuid: &Uuid, data: &str) {
-    let mut logs = RUNTIME_LOGS.write().unwrap();
-    if let Some(log) = logs.get_mut(uuid) {
-        log.add_game_log(&data);
-    } else {
-        let mut log = InstanceRuntimeLog::new();
-        let item = log.add_game_log(&data);
+    // 先入库、后发事件，而且要放开写锁再发：事件回调可能回头读日志（GUI 就会读到），
+    // 持锁发事件会自锁。每一行都要发 —— 只在新建日志那一次发，实时日志就只剩第一行
+    let item = {
+        let mut logs = RUNTIME_LOGS.write().unwrap();
+        if !logs.contains_key(uuid) {
+            logs.insert(uuid.clone(), InstanceRuntimeLog::new());
+        }
+        logs.get_mut(uuid).unwrap().add_game_log(&data)
+    };
 
-        logs.insert(uuid.clone(), log);
-
-        invoke_run_log(uuid.clone(), InstanceLogType::AddLog(item));
-    }
+    invoke_run_log(uuid.clone(), InstanceLogType::AddLog(item));
 }
 
 /// 添加运行日志
@@ -835,16 +835,16 @@ pub(crate) fn add_game_log(uuid: &Uuid, data: &str) {
 /// - `uuid`: 实例 UUID
 /// - `data`: 已解析的日志项
 pub(crate) fn add_game_log_item(uuid: &Uuid, data: GameLog) {
-    let mut logs = RUNTIME_LOGS.write().unwrap();
-    if let Some(log) = logs.get_mut(uuid) {
-        log.add_log_item(data);
-    } else {
-        let mut log = InstanceRuntimeLog::new();
-        let item = log.add_log_item(data);
+    // 与 [`add_game_log`] 同一条：每一行都发事件，且发之前放开写锁
+    let item = {
+        let mut logs = RUNTIME_LOGS.write().unwrap();
+        if !logs.contains_key(uuid) {
+            logs.insert(uuid.clone(), InstanceRuntimeLog::new());
+        }
+        logs.get_mut(uuid).unwrap().add_log_item(data)
+    };
 
-        logs.insert(uuid.clone(), log);
-        invoke_run_log(uuid.clone(), InstanceLogType::AddLog(item));
-    }
+    invoke_run_log(uuid.clone(), InstanceLogType::AddLog(item));
 }
 
 /// 清理日志
