@@ -53,7 +53,8 @@ function onSize(v: string) {
     <SegmentedTabs :options="sizeOptions" :model-value="size" @update:model-value="onSize" />
 
     <!-- 图标按钮：标题栏里空间紧，文字放提示里，aria-label 给读屏 -->
-    <BaseButton size="sm" variant="ghost" v-tip="t('blocks.addSkin')" :aria-label="t('blocks.addSkin')"
+    <BaseButton size="sm" variant="ghost" class="icon-btn-head" v-tip="t('blocks.addSkin')"
+      :aria-label="t('blocks.addSkin')"
       @click="emit('add-skin')">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"
         stroke-linecap="round" stroke-linejoin="round">
@@ -62,7 +63,7 @@ function onSize(v: string) {
         <path d="M19 8v6M22 11h-6" />
       </svg>
     </BaseButton>
-    <BaseButton size="sm" variant="ghost" :disabled="running" v-tip="t('blocks.reRender')"
+    <BaseButton size="sm" variant="ghost" class="icon-btn-head" :disabled="running" v-tip="t('blocks.reRender')"
       :aria-label="t('blocks.reRender')" @click="emit('re-render')">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linecap="round" stroke-linejoin="round">
@@ -83,17 +84,7 @@ function onSize(v: string) {
   min-width: 0;
 }
 
-/* 图标按钮与同行的搜索框 / 尺寸档统一高度：BaseButton 的 sm 是 28px，这里用 :deep 穿透进去。
-   36px 是三个用 head-right 的窗口（账户 / 方块 / 设置）共同的约定，改这里记得同步另外两处 */
-.block-top :deep(.ui-btn) {
-  height: 36px;
-  padding: 0 10px;
-}
-
-/* 尺寸档（SegmentedTabs）默认 35px，跟着这一排一起到 36 */
-.block-top :deep(.seg-btn) {
-  height: 28px;
-}
+/* 横向留白交给标题栏标准里的 .icon-btn-head（styles/titlebar.css） */
 
 .search-wrap {
   position: relative;
@@ -105,14 +96,11 @@ function onSize(v: string) {
   display: flex;
 }
 
-/* 压到与工具条按钮同高（这一排统一 36px）：
-   .field-input 默认 min-height: var(--field-h) = 42px，这里显式覆盖 */
+/* 搜索框：高度走 --ctl-h，这里只把右侧留白加大给清空角标让位 */
 .block-top .block-search {
   flex: 1;
   min-width: 0;
-  height: 36px;
-  min-height: 0;
-  padding: 0 30px 0 12px;
+  padding: 3px 30px 3px 12px;
   font-size: 13px;
 }
 

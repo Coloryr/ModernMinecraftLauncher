@@ -161,8 +161,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   border: none;
   border-radius: 9px;
   background: transparent;
@@ -194,8 +194,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   border: none;
   border-radius: 9px;
   background: transparent;
@@ -286,16 +286,12 @@
   gap: 8px;
 }
 
-/* 版本筛选下拉：比列表页的筛选项小一号。
-   高度要跟着一起缩小：--field-h(42) 兜底时多出来的空间在 <select> 里会全沉到底部
-   不变量见 forms.css：高度 = 行高 20 + 上下内边距 5×2 + 边框 1×2 = 32 */
+/* 版本筛选下拉：只收横向尺寸（max-width 与内边距），高度跟全 app 一样走 --ctl-h 那一档 */
 .sel-file-version {
   max-width: 150px;
-  height: 32px;
-  min-height: 0;
-  padding: 5px 8px;
+  padding: 3px 8px;
   font-size: 12px;
-  /* 选中的版本名可能很长：不让它在这条定高下拉里折成两行 */
+  /* 选中的版本名可能很长：不让它在这条下拉里折成两行 */
   white-space: nowrap;
 }
 
@@ -321,7 +317,7 @@ select.sel-file-version {
 
 /* 头部「版本列表」跳转按钮：点击滚动到版本区 */
 .detail-jump {
-  height: 35px;
+  height: var(--ctl-h);
   padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -341,7 +337,7 @@ select.sel-file-version {
 }
 
 .detail-download {
-  height: 35px;
+  height: var(--ctl-h);
   padding: 0 22px;
   border: none;
   border-radius: 10px;
@@ -393,7 +389,7 @@ select.sel-file-version {
 /* 失败提示里的重试按钮，也是详情的空态 / 失败提示 */
 .retry-btn {
   margin-left: 8px;
-  height: 24px;
+  height: var(--ctl-h);
   padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -564,7 +560,7 @@ select.sel-file-version {
 }
 
 .install-btn {
-  height: 28px;
+  height: var(--ctl-h);
   padding: 0 14px;
   border: 1px solid var(--accent-border);
   border-radius: 7px;
@@ -583,7 +579,7 @@ select.sel-file-version {
 }
 
 .page-btn {
-  height: 28px;
+  height: var(--ctl-h);
   padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: 8px;

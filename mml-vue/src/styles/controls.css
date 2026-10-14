@@ -1,10 +1,49 @@
-/* ---------------- 通用表单类（跨窗口统一） ---------------- */
+/* ================= 控件样式：全 app 唯一来源 =================
+ *
+ * 高度 / 圆角 / 字号只有这里一套，**窗口里不要再写这三个数字**：
+ *   --ctl-h       32px    控件高度（主操作大按钮 lg 除外）
+ *   --ctl-radius   8px    控件圆角
+ *   --ctl-font  12.5px    控件字号（lg 主操作按钮 15px）
+ *
+ * 新界面照这张表写，别再自造一套外观：
+ *   文本输入      <input class="field-input">
+ *   下拉          <select class="field-select">
+ *   工具条小下拉  <select class="field-select filter-select">（用系统原生弹层，更省地方）
+ *   按钮          <BaseButton variant="primary|accent|plain|danger|ghost" size="sm|md|lg">
+ *                 裸标签等价写法：<button class="ui-btn v-plain s-sm">
+ *   图标按钮      <button class="ui-btn-icon">…</button>
+ *   开关 / 分段 / 步进器 / 弹窗 / 窗口内容：用组件 BaseSwitch / SegmentedTabs / NumberStepper /
+ *                 BaseModal / FloatingPanel / CollapsePanel
+ *   表单行        .field-label（标签）+ .field-hint（说明）+ .field-row-2（两列）+ .path-row（输入框与按钮同行）
+ *   校验红边      .is-invalid
+ *
+ * 存量类名（各窗口手写的小按钮外观，与上面同一角色；改到所在文件时请换成上面的写法，
+ * 新代码不要再出现）：
+ *   .page-btn .mini-btn .files-btn .install-btn .mp-cancel .mp-clear-btn .res-clear-btn
+ *   .refresh-btn .pager-btn .pack-star .res-btn .retry-btn .line-add .line-del .icon-btn .card-act
+ */
 
-/* 表单控件统一高度 = 行高 20 + 上下内边距 10×2 + 上下边框 1×2；
-   输入框 / 下拉 / 与它们同一行的按钮共用，免得行内按钮比输入框矮一截 */
+/* 控件高度：全 app 一档 32px = 行高 20 + 上下内边距 5×2 + 上下边框 1×2。
+   输入框 / 下拉 / 与它们同一行的按钮（含工具条、标题栏里那些）都取这一档，
+   需要别的档位时改下面这个变量，不要在窗口里就地写数字 */
 :root {
-  --field-h: 42px;
+  /* 控件高度：32 = 行高 20 + 上下内边距 5×2 + 上下边框 1×2 */
+  --ctl-h: 32px;
+  /* 控件圆角 */
+  --ctl-radius: 8px;
+  /* 控件字号（主操作大按钮 lg 用 15px） */
+  --ctl-font: 12.5px;
 }
+
+/* 预留档位（当前全 app 无人使用，按需取用；用时同样只改上面的变量）
+ *   22px  开关的矮档（BaseSwitch 原值）
+ *   27px  分段按钮内胆（SegmentedTabs 原值，整轨 35）
+ *   28px  控件高度的上一版（改动前的一档）
+ *   30px  侧栏 / 主页面次级操作按钮的矮档
+ *   35px  BaseButton 的 .s-md 与设置页 dl-grid 档
+ *   36px  工具条 / 标题栏档（原来 19 处）
+ *   42px  表单规格（--ctl-h 的最初值，纵向留白更松）
+ */
 
 .field-label {
   display: block;
@@ -16,21 +55,21 @@
 .field-input,
 .field-select {
   width: 100%;
-  padding: 10px 12px;
-  border-radius: 9px;
+  padding: 5px 12px;
+  border-radius: var(--ctl-radius);
   border: 1px solid var(--border);
   /* 背景图模式下 var(--bg) 是半透明的，下拉框必须不透明，--bg-solid 见 themes.css 的 has-bg；
      无背景图时用 --bg-card 提亮一档，和窗口底色区分开 */
   background: var(--bg-solid, var(--bg-card));
   color: var(--text);
-  font-size: 14px;
+  font-size: var(--ctl-font);
   /* 定死行高：<select>，含 appearance: base-select 的页面内渲染，与借用此类的
      <button>（见 NewMode.vue 的 .type-trigger）UA 行高口径不同，不定死两者高度会差一截 */
   line-height: 20px;
-  /* 高度下限 = 行高 20 + 上下内边距 10×2 + 上下边框 1×2（见 --field-h）。
+  /* 高度下限 = 行高 20 + 上下内边距 5×2 + 上下边框 1×2 = --ctl-h。
      没有占位项的 <select>（如添加实例窗口的游戏版本 / 加载器）在未选中时渲染不出任何内容，
      base-select 下内容盒会塌掉，只有加下限才能和已选中时一样高 */
-  min-height: var(--field-h);
+  min-height: var(--ctl-h);
   outline: none;
   transition: border-color 0.15s;
   font-family: inherit;
@@ -139,8 +178,25 @@ select.field-select {
   }
 }
 
-.field-input:focus,
-.field-select:focus {
+/* 悬停：描边往强调色靠一档（比聚焦弱），让"能点/能打字"这件事在鼠标移上去时有个反馈；
+   禁用态不响应 */
+.field-input:hover:not(:disabled),
+.field-select:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+/* 聚焦：满强调色。与悬停同特异性、写在后面，所以悬停中的控件一旦聚焦就转成强调色。
+   `:focus-within` 是给 base-select 用的：下拉一点开，焦点就落到弹层里，
+   `select` 自己不再匹配 `:focus`，只有 `:focus-within` 还认 */
+.field-input:focus:not(:disabled),
+.field-input:focus-within:not(:disabled),
+.field-select:focus:not(:disabled),
+.field-select:focus-within:not(:disabled) {
+  border-color: var(--accent);
+}
+
+/* 原生下拉展开态（:open）也算聚焦；单独成条 —— 认不得 :open 的老浏览器只丢这一条 */
+.field-select:open:not(:disabled) {
   border-color: var(--accent);
 }
 
@@ -157,10 +213,8 @@ select.field-select {
 .filter-select {
   flex: 1;
   min-width: 0;
-  padding: 6px 24px 6px 8px;
-  font-size: 12px;
-  /* .field-select 的 min-height 是表单规格（42px），工具条里要矮一档 */
-  min-height: 0;
+  padding: 5px 24px 5px 8px;
+  /* 字号跟全 app 控件一样；横向收窄、箭头靠里一点 */
   background-position: right 6px center;
 }
 
@@ -202,11 +256,12 @@ select.field-select {
   align-items: center;
 }
 
-/* 行内按钮与同行的输入框 / 下拉等高：BaseButton 的定高 s-sm 28px、s-md 35px 在这里让位。
+/* 行内按钮与同行的输入框 / 下拉等高：全 app 都是 `--ctl-h` 这一档，
+   这里**显式**再钉一次，是为了以后换档位时行内按钮跟着走（BaseButton 自己的定高会挡）
    三条类选择器是为了压过 BaseButton 里带 scope 属性的 .s-sm[data-v-*]（两条） */
 .path-row .ui-btn.s-sm,
 .path-row .ui-btn.s-md {
-  height: var(--field-h);
+  height: var(--ctl-h);
 }
 
 /* 路径选择按钮（"选择" / Browse）：只有两个字时按钮太窄，跟旁边的输入框不成比例；
@@ -228,9 +283,10 @@ select.field-select {
   margin-top: 6px;
 }
 
-/* 必填校验失败的字段：红边；聚焦态也保持红色，别被 :focus 的强调色盖掉 */
-.field-input.is-invalid,
-.field-select.is-invalid,
+/* 必填校验失败的字段：红边；聚焦 / 悬停时也保持红色，别被强调色盖掉
+   （与 :hover / :focus 同特异性，靠写在后面压住它们） */
+.field-input.is-invalid:not(:disabled),
+.field-select.is-invalid:not(:disabled),
 .field-input.is-invalid:focus,
 .field-select.is-invalid:focus {
   border-color: var(--red);
@@ -239,4 +295,128 @@ select.field-select {
 /* 浏览器回退用的隐藏文件 / 目录选择器 */
 .hidden-input {
   display: none;
+}
+/* ---------- 按钮 ----------
+ * BaseButton.vue 只是把下面这些类拼起来（.ui-btn + .v-* + .s-*）；
+ * 裸 <button> 也可以直接用这套类名，效果与组件一致 */
+
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: none;
+  border-radius: var(--ctl-radius);
+  font-family: inherit;
+  font-size: var(--ctl-font);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.ui-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: none;
+}
+
+/* 尺寸：定高只有一档（--ctl-h）；sm / md 只差左右内边距，
+   lg 留给主操作按钮（启动游戏那种），高度由使用处给、字号大一档 */
+.s-sm {
+  height: var(--ctl-h);
+  padding: 0 14px;
+}
+
+.s-md {
+  height: var(--ctl-h);
+  padding: 0 20px;
+}
+
+.s-lg {
+  font-size: 15px;
+  padding: 13px 30px;
+}
+
+/* 图标按钮：方形、无边框，悬停才出底 */
+.ui-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
+  padding: 0;
+  border: none;
+  border-radius: var(--ctl-radius);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.ui-btn-icon:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/* 变体 */
+.v-primary {
+  background: var(--accent-grad);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(79, 140, 255, 0.22);
+}
+
+.v-primary:hover {
+  filter: brightness(1.1);
+}
+
+.v-primary:active {
+  transform: scale(0.98);
+}
+
+.v-plain {
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text-dim);
+}
+
+.v-plain:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.v-accent {
+  border: 1px solid var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.v-accent:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.v-danger {
+  background: rgba(255, 95, 86, 0.14);
+  color: var(--red);
+  border: 1px solid rgba(255, 95, 86, 0.4);
+}
+
+.v-danger:hover {
+  background: rgba(255, 95, 86, 0.24);
+}
+
+.v-ghost {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid transparent;
+}
+
+.v-ghost:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.block {
+  width: 100%;
 }

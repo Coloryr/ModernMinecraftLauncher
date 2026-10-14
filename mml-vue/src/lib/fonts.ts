@@ -30,6 +30,26 @@ export function restoreFontFamily(family: string) {
   applyFont();
 }
 
+/**
+ * 字体族名 → 可直接用的 font-family 值
+ *
+ * 名字本身排最前，后面跟全局那套回退栈（缺字时用系统字体兜底）；
+ * 中英文界面的栈序不同，基线归属见 base.css 注释。
+ *
+ * - `family`: 字体族名，不要带引号
+ * - `western`: 是否按西文界面排（默认按中文那套：CJK 字体在前）
+ *
+ * # 返回值
+ *
+ * `font-family` 的值，可直接塞进样式
+ */
+export function fontStack(family: string, western = false): string {
+  const f = `"${family.replace(/"/g, '\\"')}"`;
+  return western
+    ? `${f}, "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif`
+    : `${f}, "Microsoft YaHei", "PingFang SC", "Segoe UI", system-ui, sans-serif`;
+}
+
 /** 把当前字体写到根元素 CSS 变量，base.css 的 body 字体栈引用它 */
 export function applyFont() {
   const root = document.documentElement;
@@ -38,11 +58,8 @@ export function applyFont() {
     root.style.removeProperty("--app-font-en");
     return;
   }
-  const f = `"${fontFamily.value.replace(/"/g, '\\"')}"`;
-  // 中文界面 CJK 字体在前，基线归属见 base.css 注释，西文界面反过来，
-  // 用户选的字体两头都排第一
-  root.style.setProperty("--app-font", `${f}, "Microsoft YaHei", "PingFang SC", "Segoe UI", system-ui, sans-serif`);
-  root.style.setProperty("--app-font-en", `${f}, "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif`);
+  root.style.setProperty("--app-font", fontStack(fontFamily.value));
+  root.style.setProperty("--app-font-en", fontStack(fontFamily.value, true));
 }
 
 // 窗口启动即应用（配置恢复前的兜底用本地存储值）

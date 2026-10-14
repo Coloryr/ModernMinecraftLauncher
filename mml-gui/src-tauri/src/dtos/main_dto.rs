@@ -150,7 +150,8 @@ pub struct ErrorEvent {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InstanceChangeEvent {
-    /// 变更类型：add / edit / remove / group
+    /// 变更类型：add / edit / remove / group / icon
+    /// （`icon` 专指图标换了或清了，只有图标订阅它）
     pub r#type: String,
 }
 

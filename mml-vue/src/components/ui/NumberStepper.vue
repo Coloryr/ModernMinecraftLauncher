@@ -77,15 +77,15 @@ function onCommit() {
 .stepper {
   display: inline-flex;
   align-items: stretch;
-  height: 28px;
+  height: var(--ctl-h);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--ctl-radius);
   background: var(--bg-raised);
   overflow: hidden;
 }
 
 .step-btn {
-  width: 28px;
+  width: var(--ctl-h);
   border: none;
   background: transparent;
   color: var(--text-dim);

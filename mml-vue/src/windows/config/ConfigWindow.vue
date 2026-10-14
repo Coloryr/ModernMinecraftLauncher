@@ -1,14 +1,16 @@
 <script setup lang="ts">
-// 配置文件窗口：左侧列可编辑的文件，右侧按类型给四种视图
+// 配置文件窗口：左侧是可搜索的文件树，右侧按类型给四种视图
 //
-// - 文本（json / json5 / toml / yaml / properties / xml / js / snbt / 纯文本）→ 文本框编辑 + 保存
+// - 文本（json / json5 / toml / yaml / properties / xml / js / snbt / 纯文本）→ Monaco 编辑（行号 + 着色）+ 保存
 // - NBT（.dat / .nbt / .rio）→ NBT 树
 // - 区域文件（.mca）→ 区块表
-// - 图片 / 压缩包 → 二进制视图（一页 4 KiB 的十六进制）
+// - 图片（png / jpg / gif / webp）→ 直接显示
+// - 其余（压缩包与别的二进制）→ 二进制视图（一页 4 KiB 的十六进制）
 //
 // 来源两条：实例自己的 options.txt 与 `config` / `kubejs` / `local`，或某个存档目录下的文件。
 // 实例取自 gui_config 的 `mainWindow.selectedInstance`（与资源管理窗口同一口径，窗口自己读）；
 // 后端只认"相对游戏目录的路径"，列表里给什么就原样回传。
+// 标题栏跟日志窗口同一套：左边窗口名，右边实例 chip + 来源下拉，操作留在工具条。
 import { computed, onMounted, ref } from "vue";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
@@ -23,9 +25,14 @@ import {
   writeConfigFile,
 } from "../../lib/api";
 import { loadGuiConfig } from "../../lib/guiConfig";
+import { buildTree, type FileNode } from "../../lib/fileTree";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
+import GlyphIcon from "../../components/ui/GlyphIcon.vue";
+import InstanceChip from "../../components/ui/InstanceChip.vue";
+import MonacoText from "../../components/ui/MonacoText.vue";
 import HexView from "./parts/HexView.vue";
+import ImageView from "./parts/ImageView.vue";
 import McaTable from "./parts/McaTable.vue";
 import NbtTree from "./parts/NbtTree.vue";
 import type { FileItemDto, SaveItemDto } from "../../lib/bindings";
@@ -35,6 +42,25 @@ const emit = defineEmits<{ (e: "close"): void }>();
 
 /** 文本类文件：能编能存；其余走只读的结构 / 二进制视图 */
 const TEXT_TYPES = ["json", "json5", "toml", "yaml", "properties", "xml", "javascript", "snbt", "text"];
+
+/**
+ * 文件类型 → Monaco 语言 id
+ *
+ * 没有对应语言包的一律退回纯文本。两处近似：
+ * toml 用仓库里自己注册的那份着色器，见 lib/monacoToml；
+ * snbt 长得像 JSON 但键不带引号，借 javascript 的着色器只上色、不做 JSON 校验，免得满屏红线
+ */
+const LANG_OF_TYPE: Record<string, string> = {
+  json: "json",
+  json5: "json",
+  toml: "toml",
+  yaml: "yaml",
+  properties: "ini",
+  xml: "xml",
+  javascript: "javascript",
+  snbt: "javascript",
+  text: "plaintext",
+};
 
 /** 当前实例 */
 const instanceUuid = ref("");
@@ -54,6 +80,104 @@ const saving = ref(false);
 
 const dirty = computed(() => text.value !== origin.value);
 const isText = computed(() => !!selected.value && TEXT_TYPES.includes(selected.value.fileType));
+
+/** 当前文件该用哪种 Monaco 语言 */
+function langOf(file: FileItemDto): string {
+  return LANG_OF_TYPE[file.fileType] ?? "plaintext";
+}
+
+// ---------- 文件树与搜索 ----------
+
+/** 标题栏上的当前实例；与日志窗口一样只给名字，不给版本 */
+const instanceChip = computed(() => (instanceName.value ? { name: instanceName.value } : null));
+
+/** 搜索关键字，空串 = 不过滤 */
+const query = ref("");
+/** 已展开的目录 key */
+const expanded = ref<Set<string>>(new Set());
+
+/** 路径 → 文件条目：树节点只带路径，打开文件与取类型都要回查 */
+const fileByPath = computed(() => new Map(files.value.map((f) => [f.name, f])));
+
+/** 每层目录在前、文件在后，各自按名字排；`buildTree` 只按插入顺序给 */
+function sortDirsFirst(nodes: FileNode[]) {
+  nodes.sort((a, b) => (a.isDir === b.isDir ? a.name.localeCompare(b.name) : a.isDir ? -1 : 1));
+  for (const n of nodes) {
+    if (n.isDir) sortDirsFirst(n.children);
+  }
+}
+
+/** 文件树；多层路径由 buildTree 合并出目录节点，顺序由这里统一给 */
+const tree = computed(() => {
+  const nodes = buildTree(files.value.map((f) => f.name));
+  sortDirsFirst(nodes);
+  return nodes;
+});
+
+/** 展开后的一行 */
+interface TreeRow {
+  /** 完整路径，与 `FileItemDto.name` 一致 */
+  key: string;
+  /** 显示名，只有最后一段 */
+  name: string;
+  /** 是否目录 */
+  isDir: boolean;
+  /** 层级，从 0 起，用来算缩进 */
+  depth: number;
+}
+
+/** 自身或后代是否命中关键字 */
+function subtreeHit(node: FileNode, q: string): boolean {
+  if (node.key.toLowerCase().includes(q)) return true;
+  return node.children.some((c) => subtreeHit(c, q));
+}
+
+/**
+ * 把树按展开状态摊平成可见行
+ *
+ * 有搜索词时不看展开状态：命中的目录一律展开，否则搜到的东西藏在收起的分支里看不见
+ */
+const rows = computed<TreeRow[]>(() => {
+  const q = query.value.trim().toLowerCase();
+  const out: TreeRow[] = [];
+  const walk = (nodes: FileNode[], depth: number) => {
+    for (const n of nodes) {
+      if (q && !subtreeHit(n, q)) continue;
+      out.push({ key: n.key, name: n.name, isDir: n.isDir, depth });
+      if (n.isDir && (q || expanded.value.has(n.key))) walk(n.children, depth + 1);
+    }
+  };
+  walk(tree.value, 0);
+  return out;
+});
+
+/** 展开 / 收起一个目录；Set 整体换掉才会触发更新 */
+function toggleExpand(key: string) {
+  const next = new Set(expanded.value);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  expanded.value = next;
+}
+
+/** 打开树上的文件：树里只有路径，条目回查后再读 */
+function openFile(key: string) {
+  const file = fileByPath.value.get(key);
+  if (!file) return;
+  // 搜索命中的文件可能藏在收起的分支里：点开时把沿途各级目录一并展开，清掉搜索后仍看得见
+  const parts = key.split("/");
+  const next = new Set(expanded.value);
+  for (let i = 1; i < parts.length; i += 1) next.add(parts.slice(0, i).join("/"));
+  expanded.value = next;
+  void open(file);
+}
+
+/** 左栏占位文案：加载中 / 没选实例 / 搜不到 / 这个位置没有文件 */
+const emptyTip = computed(() => {
+  if (loading.value) return t("config.loading");
+  if (!instanceUuid.value) return t("config.noInstance");
+  if (query.value) return t("config.searchEmpty");
+  return t("config.noFiles");
+});
 
 /** 读当前实例与它的存档列表，再列文件 */
 async function load() {
@@ -83,6 +207,9 @@ async function loadFiles() {
   selected.value = null;
   text.value = "";
   origin.value = "";
+  // 树与搜索都跟着这批文件走：换了来源 / 实例，旧的目录 key 与关键字都没意义了
+  expanded.value = new Set();
+  query.value = "";
   if (!instanceUuid.value) {
     files.value = [];
     return;
@@ -93,8 +220,8 @@ async function loadFiles() {
     const list = source.value
       ? await listConfigSaveFiles(instanceUuid.value, source.value)
       : await listConfigFiles(instanceUuid.value);
-    // 后端按扫描顺序给，这里按路径排序：同一批文件每次打开顺序都一样
-    files.value = [...list].sort((a, b) => a.name.localeCompare(b.name));
+    // 顺序交给文件树统一给（每层目录在前）；这里只拷一份，不和 IPC 返回的数组共享引用
+    files.value = [...list];
   } catch (e) {
     files.value = [];
     showToast(tErr(e));
@@ -161,46 +288,69 @@ useWindowRefresh(() => {
 
 <template>
   <WindowFrame :title="t('config.title')" body-fill @close="emit('close')">
-    <div class="cfg-bar">
-      <span class="cfg-inst">{{ instanceName || t("config.noInstance") }}</span>
-      <select class="field-select cfg-source" :value="source" :disabled="loading"
-        @change="pickSource(($event.target as HTMLSelectElement).value)">
-        <option value="">{{ t("config.instance") }}</option>
-        <option v-for="world in worlds" :key="world.dir" :value="world.dir">
-          {{ world.levelName || world.dir }}
-        </option>
-      </select>
-      <BaseButton size="sm" :disabled="loading" @click="loadFiles">{{ t("config.refresh") }}</BaseButton>
-      <BaseButton size="sm" :disabled="!instanceUuid" @click="openDir">{{ t("config.openDir") }}</BaseButton>
+    <!-- 实例、来源与操作都放标题栏，与日志窗口同一套；内容区整块留给文件树 -->
+    <template #head-right>
+      <div class="head-cfg">
+        <InstanceChip :instance="instanceChip" />
+        <select class="field-select head-select" :value="source" :disabled="loading" v-tip="t('config.sourceTip')"
+          :aria-label="t('config.sourceTip')" @change="pickSource(($event.target as HTMLSelectElement).value)">
+          <option value="">{{ t("config.instance") }}</option>
+          <option v-for="world in worlds" :key="world.dir" :value="world.dir">
+            {{ world.levelName || world.dir }}
+          </option>
+        </select>
 
-      <template v-if="isText">
-        <span v-if="dirty" class="cfg-dirty">{{ t("config.unsaved") }}</span>
-        <BaseButton size="sm" variant="primary" :disabled="saving || !dirty" @click="save">
-          {{ t("config.save") }}
+        <!-- 保存状态：未保存时下面那颗保存键转强调色，工具条因此整行省掉 -->
+        <span v-if="isText && dirty" class="head-dirty">{{ t("config.unsaved") }}</span>
+        <span v-else-if="!isText && selected" class="head-readonly">{{ t("config.readonly") }}</span>
+
+        <BaseButton size="sm" variant="ghost" class="icon-btn-head" :disabled="loading" v-tip="t('config.refresh')"
+          :aria-label="t('config.refresh')" @click="loadFiles">
+          <GlyphIcon name="refresh" :size="15" :weight="1.8" />
         </BaseButton>
-      </template>
-      <span v-else-if="selected" class="cfg-readonly">{{ t("config.readonly") }}</span>
-    </div>
+        <BaseButton size="sm" variant="ghost" class="icon-btn-head" :disabled="!instanceUuid" v-tip="t('config.openDir')"
+          :aria-label="t('config.openDir')" @click="openDir">
+          <GlyphIcon name="folder" :size="15" :weight="1.8" />
+        </BaseButton>
+        <BaseButton v-if="isText" size="sm" :variant="dirty ? 'accent' : 'ghost'" class="icon-btn-head"
+          :disabled="saving || !dirty" v-tip="t('config.save')" :aria-label="t('config.save')" @click="save">
+          <GlyphIcon name="save" :size="15" :weight="1.8" />
+        </BaseButton>
+      </div>
+    </template>
 
     <div class="cfg-body">
-      <!-- 左：文件列表。名字是相对游戏目录的路径，长的自己省略 -->
+      <!-- 左：搜索固定，只有树滚动 -->
       <aside class="cfg-list">
-        <button v-for="file in files" :key="file.name" class="cfg-file"
-          :class="{ on: selected?.name === file.name }" :title="file.name" @click="open(file)">
-          <span class="cfg-file-name">{{ file.name }}</span>
-          <span class="cfg-file-type">{{ file.fileType }}</span>
-        </button>
-        <p v-if="!files.length" class="empty-tip">
-          {{ loading ? t("config.loading") : t("config.noFiles") }}
-        </p>
+        <div class="cfg-search">
+          <input v-model="query" class="field-input" :placeholder="t('config.search')" spellcheck="false" />
+          <button v-if="query" class="cfg-search-clear" v-tip="t('config.searchClear')"
+            :aria-label="t('config.searchClear')" @click="query = ''">
+            <GlyphIcon name="close" :size="12" />
+          </button>
+        </div>
+
+        <div class="cfg-tree">
+          <button v-for="row in rows" :key="row.key" class="cfg-row"
+            :class="{ on: selected?.name === row.key }"
+            :style="{ paddingLeft: `${6 + row.depth * 14}px` }" :title="row.key"
+            @click="row.isDir ? toggleExpand(row.key) : openFile(row.key)">
+            <GlyphIcon v-if="row.isDir" class="cfg-chevron" :class="{ open: expanded.has(row.key) }" name="chevron-down"
+              :size="11" :weight="2.4" />
+            <span v-else class="cfg-chevron"></span>
+            <span class="cfg-file-name">{{ row.name }}</span>
+          </button>
+          <p v-if="!rows.length" class="empty-tip">{{ emptyTip }}</p>
+        </div>
       </aside>
 
       <!-- 右：按类型选视图 -->
       <section class="cfg-view">
         <p v-if="!selected" class="empty-tip">{{ t("config.pickFile") }}</p>
-        <textarea v-else-if="isText" v-model="text" class="cfg-text" spellcheck="false" />
+        <MonacoText v-else-if="isText" v-model="text" :language="langOf(selected)" />
         <NbtTree v-else-if="selected.fileType === 'nbt'" :uuid="instanceUuid" :file="selected.name" />
         <McaTable v-else-if="selected.fileType === 'mca'" :uuid="instanceUuid" :file="selected.name" />
+        <ImageView v-else-if="selected.fileType === 'image'" :uuid="instanceUuid" :file="selected.name" />
         <HexView v-else :uuid="instanceUuid" :file="selected.name" />
       </section>
     </div>
@@ -208,39 +358,21 @@ useWindowRefresh(() => {
 </template>
 
 <style scoped>
-/* 工具条：一行放不下时也不换行，交给各控件自己缩 */
-.cfg-bar {
+/* 标题栏右侧：实例 chip + 来源下拉。这一排的通用标准在 styles/titlebar.css */
+.head-cfg {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-shrink: 0;
-  padding-bottom: 10px;
+  min-width: 0;
 }
 
-.cfg-inst {
-  flex-shrink: 0;
-  font-size: 13px;
-  color: var(--text);
-}
-
-/* 存档下拉：跟工具条一样高（.field-select 的表单规格是 42px，这里压矮一档） */
-.cfg-source {
-  width: auto;
-  min-width: 160px;
-  max-width: 260px;
-  min-height: 0;
-  padding: 6px 26px 6px 10px;
-  font-size: 12.5px;
-  background-position: right 6px center;
-}
-
-.cfg-dirty {
+.head-dirty {
   flex-shrink: 0;
   color: var(--yellow);
   font-size: 12px;
 }
 
-.cfg-readonly {
+.head-readonly {
   flex-shrink: 0;
   color: var(--text-dim);
   font-size: 12px;
@@ -254,23 +386,69 @@ useWindowRefresh(() => {
   min-height: 0;
 }
 
+/* 左栏：搜索固定在上，只有下面的树滚动 */
 .cfg-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  width: 250px;
+  gap: 6px;
+  /* 比原来宽 30px：树按层级缩进，路径又长，250px 下名字动不动就走省略号 */
+  width: 280px;
   flex-shrink: 0;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 6px;
   border: 1px solid var(--border);
   border-radius: 9px;
   background: var(--bg-solid, var(--bg-card));
 }
 
-.cfg-file {
+.cfg-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* 搜索框：清空按钮压在输入框右端 */
+.cfg-search {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.cfg-search .field-input {
+  width: 100%;
+  padding-right: 28px;
+}
+
+.cfg-search-clear {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.cfg-search-clear:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/* 树的一行：目录点开 / 收起，文件点开进右栏。缩进由模板按层级给 padding-left */
+.cfg-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 5px 8px;
   border: none;
   border-radius: 6px;
@@ -282,13 +460,27 @@ useWindowRefresh(() => {
   cursor: pointer;
 }
 
-.cfg-file:hover {
+.cfg-row:hover {
   background: var(--bg-hover);
 }
 
-.cfg-file.on {
+.cfg-row.on {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+/* 收起时箭头朝右，展开朝下 */
+.cfg-chevron {
+  flex-shrink: 0;
+  /* 文件行这里是占位：给同宽，同一层的文件名才和目录名对齐 */
+  width: 11px;
+  color: var(--text-dim);
+  transform: rotate(-90deg);
+  transition: transform 0.12s;
+}
+
+.cfg-chevron.open {
+  transform: rotate(0);
 }
 
 .cfg-file-name {
@@ -299,37 +491,11 @@ useWindowRefresh(() => {
   white-space: nowrap;
 }
 
-.cfg-file-type {
-  flex-shrink: 0;
-  color: var(--text-dim);
-  font-size: 10.5px;
-}
-
 .cfg-view {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-width: 0;
   min-height: 0;
-}
-
-/* 文本框：等宽、铺满、可纵向拉 */
-.cfg-text {
-  flex: 1;
-  min-height: 0;
-  resize: none;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--bg-solid, var(--bg-card));
-  color: var(--text);
-  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-  font-size: 12.5px;
-  line-height: 1.55;
-  outline: none;
-}
-
-.cfg-text:focus {
-  border-color: var(--accent);
 }
 </style>

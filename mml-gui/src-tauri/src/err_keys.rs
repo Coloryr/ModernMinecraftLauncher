@@ -94,6 +94,8 @@ pub const FILE_BINARY: &str = "err.fileBinary";
 pub const FILE_TOO_LARGE: &str = "err.fileTooLarge";
 /// 不是区域文件
 pub const NOT_MCA_FILE: &str = "err.notMcaFile";
+/// 不是图片文件
+pub const NOT_IMAGE_FILE: &str = "err.notImageFile";
 /// 没找到该存档
 pub const SAVE_NOT_FOUND: &str = "err.saveNotFound";
 /// 存档名字为空

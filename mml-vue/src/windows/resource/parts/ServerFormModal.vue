@@ -64,12 +64,14 @@ const emit = defineEmits<{
 }
 
 .form-input {
-  padding: 8px 10px;
+  padding: 3px 10px;
+  /* 尺寸与全 app 控件同档；只靠 padding 撑的话这里会比同排控件矮一头 */
+  min-height: var(--ctl-h);
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--bg-side);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--ctl-font);
   font-family: inherit;
   min-width: 0;
 }

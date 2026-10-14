@@ -243,7 +243,7 @@ function onMenuPick(id: string) {
 <!-- 浮层里的按钮是 Teleport 到 body 的，`.resource-layout` 前缀够不着，所以自带 scoped 样式 -->
 <style scoped>
 .mini-btn {
-  height: 28px;
+  height: var(--ctl-h);
   padding: 0 12px;
   border-radius: 7px;
   border: 1px solid rgb(255 255 255 / 25%);

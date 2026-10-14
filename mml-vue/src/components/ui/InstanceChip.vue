@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 标题栏上的当前实例：名字必给，版本可选（不传就只显示名字）。
-// 走 WindowFrame 的 head-right 槽渲染，资源管理 / 添加资源窗口与游戏日志窗口共用：
+// 走 WindowFrame 的 head-right 槽渲染，资源管理 / 添加资源 / 配置文件窗口与游戏日志窗口共用：
 // 自带 scoped 样式，标题栏不在各窗口自己的布局容器里，窗口级样式够不到它
 import { computed } from "vue";
 

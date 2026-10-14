@@ -1,16 +1,18 @@
 <script setup lang="ts">
 // 实例启动参数面板：
-//   启动参数：内存大小，最小 / 最大加右侧输入并显示本机总量与可用量；窗口大小带常用分辨率
-//            / 使用的 Java，自定义时显示路径 + 选择文件
+//   启动参数：窗口大小（分辨率预设 / 全屏 / 自定义）与内存（最小 / 最大）走预设下拉，
+//            数值框一直可改，改出下拉里没有的值会自动落到「自定义」；
+//            下拉各占一行、数值续一行；内存行带本机总量与可用量；
+//            Java 选「自定义」时显示路径 + 选择文件
 //   扩展参数：GC / 自定义主类 / 附加 JVM 参数 / 附加游戏参数 / 附加 classpath（多行列表）
 //            / 附加环境变量（键值对列表）
-import { ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { t } from "../lib/i18n";
 import { COMMON_MEMORY, COMMON_RESOLUTIONS } from "../lib/resolutions";
-import { useSystemMemory } from "../lib/systemMemory";
 import type { InstanceArgsDto, JavaInfoDto } from "../lib/bindings";
 import BaseButton from "./ui/BaseButton.vue";
 import GlyphIcon from "./ui/GlyphIcon.vue";
+import MemoryHint from "./MemoryHint.vue";
 import NumberStepper from "./ui/NumberStepper.vue";
 import CollapsePanel from "./ui/CollapsePanel.vue";
 
@@ -31,14 +33,53 @@ const emit = defineEmits<{
 const advancedOpen = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
 
-/** 本机内存参考值，与设置窗口的「游戏启动」共用同一份逻辑 */
-const { text: memoryText } = useSystemMemory();
+// 预设下拉与手输是同一件事的两种口径：**下拉**的手输态由「用户刚选过自定义」或「当前值不在预设里」
+// 决定。选了自定义但值恰好等于某档预设时（如从 1920×1080 起手微调），必须靠前者才停得住
+const resManual = ref(false);
+const memManual = ref(false);
+const minMemManual = ref(false);
 
-function applyResolution(w: number, h: number) {
-  update({ width: w, height: h });
-}
+/** 窗口大小下拉的当前项：全屏 / 预设的 `宽x高` / `custom`，三者互斥 */
+const resPick = computed(() => {
+  if (props.args.fullscreen) return "fullscreen";
+  const hit = COMMON_RESOLUTIONS.find((r) => r.w === props.args.width && r.h === props.args.height);
+  return !resManual.value && hit ? `${hit.w}x${hit.h}` : "custom";
+});
 
-/** 预设按钮上的文字：整数 GB 显示 `8 GB`，否则按 MB 显示 */
+/** 是否展开宽 / 高手输：非全屏一直可改（照着预设微调就不必先点一次「自定义」），全屏时尺寸无效 */
+const resInputs = computed(() => !props.args.fullscreen);
+
+/** 最大内存下拉的当前项：预设的 MB 字符串，手输或没匹配上预设都是 `custom` */
+const memPick = computed(() =>
+  !memManual.value && COMMON_MEMORY.includes(props.args.memory) ? String(props.args.memory) : "custom",
+);
+
+/** 最小内存下拉的当前项：与最大内存同一口径（默认值 512 不在预设里，显示为「自定义」） */
+const minMemPick = computed(() =>
+  !minMemManual.value && COMMON_MEMORY.includes(props.args.minMemory) ? String(props.args.minMemory) : "custom",
+);
+
+/** 当前选的 Java 不在候选列表里（被删了 / 还没扫到）：下拉要补一条同名的，否则显示成空白 */
+const missingJava = computed(
+  () =>
+    !!props.args.javaName &&
+    props.args.javaName !== "custom" &&
+    !props.javas.some((j) => j.name === props.args.javaName),
+);
+
+// 只在值真的变了时退出手输态：切实例 / 重置同样落回预设显示，
+// 而改别的字段（GC、扩展参数）会把整份 args 换新对象，那时不能把正在手输的框收走
+watch(() => `${props.args.width}x${props.args.height}`, () => {
+  resManual.value = false;
+});
+watch(() => props.args.memory, () => {
+  memManual.value = false;
+});
+watch(() => props.args.minMemory, () => {
+  minMemManual.value = false;
+});
+
+/** 预设档位的文字：整数 GB 显示 `8 GB`，否则按 MB 显示 */
 function memoryLabel(mib: number): string {
   return mib % 1024 === 0 ? `${mib / 1024} GB` : `${mib} MB`;
 }
@@ -46,6 +87,46 @@ function memoryLabel(mib: number): string {
 /** 应用一个内存预设：填最大内存；最小内存高于它时一并顶上去 */
 function applyMemory(mib: number) {
   update({ memory: mib, minMemory: Math.min(props.args.minMemory, mib) });
+}
+
+/** 分辨率下拉：全屏 / 预设 / 自定义 三选一；后两者都要退出全屏，否则选项与状态对不上 */
+function onResPick(e: Event) {
+  const v = (e.target as HTMLSelectElement).value;
+  if (v === "fullscreen") {
+    resManual.value = false;
+    update({ fullscreen: true });
+    return;
+  }
+  if (v === "custom") {
+    resManual.value = true;
+    update({ fullscreen: false });
+    return;
+  }
+  const [w, h] = v.split("x").map(Number);
+  resManual.value = false;
+  update({ width: w, height: h, fullscreen: false });
+}
+
+/** 最小内存下拉：选预设就填最小内存；预设高于当前上限时压到上限，与上限侧的夹取对称 */
+function onMinMemPick(e: Event) {
+  const v = (e.target as HTMLSelectElement).value;
+  if (v === "custom") {
+    minMemManual.value = true;
+    return;
+  }
+  minMemManual.value = false;
+  update({ minMemory: Math.min(Number(v), props.args.memory) });
+}
+
+/** 内存下拉：与上面同一口径，选预设就是应用一个最大内存预设 */
+function onMemPick(e: Event) {
+  const v = (e.target as HTMLSelectElement).value;
+  if (v === "custom") {
+    memManual.value = true;
+    return;
+  }
+  memManual.value = false;
+  applyMemory(Number(v));
 }
 
 function update(patch: Partial<InstanceArgsDto>) {
@@ -114,65 +195,69 @@ const gcOptions = [
   <div class="args-panel">
     <!-- 启动参数 -->
     <div class="args-block">
-      <!-- 窗口大小：宽 / 高 + 全屏（与内存行对齐） -->
+      <!-- 窗口大小：第一行是预设下拉（含全屏），第二行是宽 / 高；改成下拉里没有的值会自动
+           落到「自定义」。全屏时尺寸无效，第二行整行收起 -->
       <div class="args-row">
         <span class="args-label">{{ t("args.windowSize") }}</span>
+        <select class="field-select pick-select res-pick" :value="resPick" @change="onResPick">
+          <option v-for="r in COMMON_RESOLUTIONS" :key="`${r.w}x${r.h}`" :value="`${r.w}x${r.h}`">
+            {{ r.w }}×{{ r.h }}
+          </option>
+          <option value="fullscreen">{{ t("args.fullscreen") }}</option>
+          <option value="custom">{{ t("args.custom") }}</option>
+        </select>
+      </div>
+      <div v-if="resInputs" class="args-row sub-row">
         <span class="sub-tag">{{ t("args.width") }}</span>
         <NumberStepper :model-value="args.width" :min="0" :max="9999" :step="10"
           @update:model-value="(v: number) => update({ width: v })" />
         <span class="sub-tag">{{ t("args.height") }}</span>
         <NumberStepper :model-value="args.height" :min="0" :max="9999" :step="10"
           @update:model-value="(v: number) => update({ height: v })" />
-        <label class="chk">
-          <input type="checkbox" :checked="args.fullscreen"
-            @change="update({ fullscreen: ($event.target as HTMLInputElement).checked })" />
-          {{ t("args.fullscreen") }}
-        </label>
-      </div>
-      <!-- 常用分辨率：一点即填宽 / 高（当前值匹配时高亮） -->
-      <div class="args-hint res-hint">
-        <span class="res-label">{{ t("args.commonRes") }}</span>
-        <button v-for="r in COMMON_RESOLUTIONS" :key="`${r.w}x${r.h}`" type="button" class="res-btn"
-          :class="{ on: args.width === r.w && args.height === r.h }" @click="applyResolution(r.w, r.h)">
-          {{ r.w }}×{{ r.h }}
-        </button>
       </div>
 
-      <!-- 内存：最小 / 最大（输入框，与窗口行对齐） -->
+      <!-- 内存：最小一行、最大续一行，各自预设下拉 + 数值框，口径与窗口大小相同 -->
       <div class="args-row">
         <span class="args-label">{{ t("args.memory") }}</span>
         <span class="sub-tag">{{ t("args.minMemory") }}</span>
+        <select class="field-select pick-select" :value="minMemPick" @change="onMinMemPick">
+          <option v-for="m in COMMON_MEMORY" :key="m" :value="String(m)">{{ memoryLabel(m) }}</option>
+          <option value="custom">{{ t("args.custom") }}</option>
+        </select>
         <NumberStepper :model-value="args.minMemory" :min="512" :max="args.memory" :step="256"
           @update:model-value="(v: number) => update({ minMemory: v })" />
+        <span class="mem-unit">MB</span>
+      </div>
+      <div class="args-row sub-row">
         <span class="sub-tag">{{ t("args.maxMemory") }}</span>
+        <select class="field-select pick-select" :value="memPick" @change="onMemPick">
+          <option v-for="m in COMMON_MEMORY" :key="m" :value="String(m)">{{ memoryLabel(m) }}</option>
+          <option value="custom">{{ t("args.custom") }}</option>
+        </select>
         <NumberStepper :model-value="args.memory" :min="args.minMemory" :max="16384" :step="256"
           @update:model-value="(v: number) => update({ memory: v })" />
         <span class="mem-unit">MB</span>
       </div>
-      <!-- 本机内存参考值：给设最大内存一个依据（始终占一行，拿不到会写明原因） -->
-      <div class="args-hint mem-hint">{{ memoryText }}</div>
-      <!-- 常用内存：一点即填最大内存（当前值匹配时高亮），最小内存高于它时一并顶上去 -->
-      <div class="args-hint">
-        <span class="res-label">{{ t("args.commonMemory") }}</span>
-        <button v-for="m in COMMON_MEMORY" :key="m" type="button" class="res-btn" :class="{ on: args.memory === m }"
-          @click="applyMemory(m)">
-          {{ memoryLabel(m) }}
-        </button>
-      </div>
+      <!-- 本机内存参考值：给设最大内存一个依据（文字 + 可用占比的条，拿不到会写明原因） -->
+      <MemoryHint class="mem-line" />
 
       <div class="args-row">
         <span class="args-label">{{ t("args.java") }}</span>
+        <!-- 自动 = jvm_name 留空，启动时按版本要求的 Java 主版本挑（见 core 的取 Java 逻辑） -->
         <select class="field-select grow" :value="args.javaName"
           @change="update({ javaName: ($event.target as HTMLSelectElement).value })">
+          <option value="">{{ t("args.javaAuto") }}</option>
           <option v-for="j in javas" :key="j.name" :value="j.name">
             {{ j.name }}（Java {{ j.major }}）
           </option>
+          <!-- 选中的 Java 已不在列表里（删了 / 还没扫到）：补一条同名的，免得下拉一片空白 -->
+          <option v-if="missingJava" :value="args.javaName">{{ args.javaName }}</option>
           <option value="custom">{{ t("args.customJava") }}</option>
         </select>
       </div>
 
       <!-- 自定义 Java 路径 -->
-      <div v-if="args.javaName === 'custom'" class="args-row java-custom">
+      <div v-if="args.javaName === 'custom'" class="args-row">
         <span class="args-label">{{ t("args.javaPath") }}</span>
         <input class="field-input grow" :value="args.javaPath" placeholder="C:\Program Files\Java\jdk-21\bin\java.exe"
           spellcheck="false" @input="update({ javaPath: ($event.target as HTMLInputElement).value })" />
@@ -291,8 +376,16 @@ const gcOptions = [
 }
 
 .advanced {
+  /* 这块只有「折叠标题 + 面板」两个子项，间距不能走 gap：
+     收起时 CollapsePanel 高度为 0，gap 照样占 10px，标题下面就多出一截空白。
+     改成展开时才给上边距（与主窗口那三块折叠区同一个坑） */
+  gap: 0;
   border-top: 1px solid var(--border);
   padding-top: 10px;
+}
+
+.advanced :deep(.collapse.open) {
+  margin-top: 10px;
 }
 
 .args-row {
@@ -314,57 +407,31 @@ const gcOptions = [
   flex: none;
 }
 
-/* 与内存行对齐用的小标签（最小/最大/宽/高） */
+/* 与内存行对齐用的小标签（宽 / 高 / 最小 / 最大）：定宽 28px + 居中。
+   靠右对齐时单字标签（宽）会贴着右缘，和两字标签（最小）的左缘差一个字，看着没对齐；
+   居中之后两者中心落在同一条竖线上 */
 .sub-tag {
   flex: 0 0 28px;
   font-size: 12px;
   color: var(--text-dim);
   white-space: nowrap;
-  text-align: right;
+  text-align: center;
 }
 
-/* 字段下方的辅助行（内存参考值 / 常用分辨率），与 .args-label 的 84px 缩进对齐 */
-.args-hint {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
+/* 本机内存参考值：与上面那行控件的左边缘对齐（标签列 84 + 行内间距 12） */
+.mem-line {
+  padding-left: 96px;
   margin-top: 6px;
-  padding-left: 84px;
-  font-size: 12px;
-  color: var(--text-dim);
 }
 
-.mem-hint {
-  font-variant-numeric: tabular-nums;
-}
-
-.res-label {
-  flex: 0 0 auto;
-}
-
-/* 常用分辨率：小方块按钮，当前值匹配时高亮 */
-.res-btn {
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-dim);
-  font-family: inherit;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  padding: 3px 9px;
-  border-radius: 7px;
-  cursor: pointer;
-}
-
-.res-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-.res-btn.on {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+/* 预设下拉：尺寸（含高度）全走 .field-select —— 同一个元素上挂了两个类，
+   这里只按档位文字收窄宽度，并把箭头收小一档 */
+.pick-select {
+  width: auto;
+  min-width: 118px;
+  font-size: 12.5px;
+  background-position: right 6px center;
+  background-size: 11px;
 }
 
 .grow {
@@ -372,26 +439,35 @@ const gcOptions = [
   min-width: 120px;
 }
 
+/* 窗口分辨率这条比内存的两条长一些，档位文字居中。
+   base-select 下关闭态显示的内容在 ::selectedcontent 里，默认是收缩盒：只写 text-align
+   没有可分配的余量，字不会动；而弹层里的 option 是全宽的，反倒被继承成居中。
+   所以这里把内容撑满（父盒是 flex 还是块盒随版本，两条都留）再居中，选项钉回靠左 */
+.res-pick {
+  min-width: 200px;
+  text-align: center;
+}
+
+.res-pick::selectedcontent {
+  flex: 1;
+  width: 100%;
+  text-align: center;
+}
+
+.res-pick option {
+  text-align: left;
+}
+
+/* 续行：缩进到上一行控件的左边缘（标签列 84 + 行内间距 12）。
+   窗口大小的宽 / 高、内存的最大两处用它，别再加"把控件压窄"的第二个口径 */
+.sub-row {
+  padding-left: 96px;
+}
+
 .mem-unit {
   font-size: 12px;
   color: var(--text-dim);
   white-space: nowrap;
-}
-
-.chk {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12.5px;
-  color: var(--text);
-  cursor: pointer;
-  accent-color: var(--accent);
-  margin-left: 6px;
-  white-space: nowrap;
-}
-
-.java-custom {
-  padding-left: 96px;
 }
 
 .hidden-file {
@@ -435,7 +511,8 @@ const gcOptions = [
 .line-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  /* 与 .args-row 同一档：同一个卡片里不该有两种行内间距 */
+  gap: 12px;
 }
 
 .env-key {
@@ -443,8 +520,8 @@ const gcOptions = [
 }
 
 .line-del {
-  width: 28px;
-  height: 28px;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   /* 图标是 SVG：用 flex 精确居中（原来靠字形在行盒里居中） */
   display: inline-flex;
   align-items: center;
@@ -471,7 +548,7 @@ const gcOptions = [
   align-items: center;
   /* 图标是 SVG（原来是字形，靠一个空格隔开），间距改由 gap 给 */
   gap: 6px;
-  height: 28px;
+  height: var(--ctl-h);
   padding: 0 22px;
   border-radius: 9px;
   border: 1px dashed var(--border);

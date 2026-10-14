@@ -3,9 +3,9 @@
 //
 // **筛选不在这里**：等级 / 线程 / 分组都归日志窗口的工具栏管，筛完的行才传进来，
 // 免得同一套筛选条件在两边各存一份、还要互相同步。
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { onActivated, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { editor } from "monaco-editor/editor/editor.api";
-import { applyLogTheme, monaco } from "../lib/monacoLog";
+import { applyLogTheme, monaco } from "../lib/monaco";
 import type { LogLine } from "../lib/bindings";
 
 const props = defineProps<{
@@ -165,6 +165,9 @@ onMounted(() => {
   rebuild();
 });
 
+// Monaco 的主题是全局的：单窗口模式下配置窗口可能也还挂着，切回日志时把自己的那套刷回来
+onActivated(applyLogTheme);
+
 onBeforeUnmount(() => {
   themeWatcher.disconnect();
   monacoEditor?.dispose();
@@ -280,8 +283,8 @@ watch(() => props.wordWrap, (on) => {
    返回 TextEditorCursorBlinkingStyle.Solid，cursorBlinking 选项不起作用），日志区就少了
    一半"这是个编辑器"的观感。这里按 Monaco 自己的节奏补一个 1s 周期的闪烁。
    只覆盖 `cursor` 元素本身的 opacity，不影响它负责定位的 inline top / left；
-   日志视图是全仓唯一的 Monaco 实例，选择器不会波及别处 */
-.monaco-editor .cursors-layer > .cursor {
+   选择器限定在日志这块 —— 配置窗口那个编辑器是可写的，光标本来就闪，不用这条 */
+.monaco-log .monaco-editor .cursors-layer > .cursor {
   animation: mml-log-caret-blink 1s step-end infinite;
 }
 

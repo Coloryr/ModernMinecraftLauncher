@@ -35,10 +35,8 @@
 .sel-filter {
   flex: 0 1 150px;
   min-width: 150px;
-  /* 纵向内边距别改小：下拉的高度由 --field-h（42）兜底，比"行高 + 内边距"多出来的
-     那几px在 <select> 里会全沉到底部，文字看着偏上（不变量见 forms.css） */
-  padding: 10px;
-  font-size: 13px;
+  /* 纵向内边距与字号不写，交给 .field-select（5px + 行高 20 + 边框 2 = 32 = --ctl-h）：
+     原来写 padding: 10px 是配当年的 42px 档，会让这几个筛选下拉比同排搜索框高一头 */
 }
 
 /* field-select 的自定义箭头留位 */
@@ -51,12 +49,13 @@ select.sel-filter {
   flex: 1 1 110px;
 }
 
-/* 存档类型：源锁定为 CurseForge 的占位块（与页签同高） */
+/* 存档类型：源锁定为 CurseForge 的占位块（与同排的分段控件页签同高，全 app 那一档 32px） */
 .res-source-lock {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  height: var(--ctl-h);
+  padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 10px;
   font-size: 13px;
@@ -166,8 +165,8 @@ select.sel-filter {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   border: none;
   border-radius: 8px;
   background: transparent;
@@ -354,7 +353,7 @@ select.sel-filter {
 }
 
 .page-btn {
-  height: 28px;
+  height: var(--ctl-h);
   padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -554,14 +553,12 @@ select.sel-filter {
    给得宽一点：版本名可能很长（如 `0.6.13+1.21.4 · 2026-10-01`），
    原生下拉的宽度跟着它走，太窄会把选项文字切掉。
    左缘由上面那行的标签宽度顶到名字的位置，这里不再另外偏移；
-   高度按 forms.css 的不变量给：行高 20 + 上下内边距 5×2 + 边框 1×2 = 32 */
+   高度跟全 app 一样走 --ctl-h 那一档（32） */
 .dep-select {
   flex: 1;
   min-width: 200px;
   max-width: 430px;
-  height: 32px;
-  min-height: 0;
-  padding: 5px 26px 5px 8px;
+  padding: 3px 26px 3px 8px;
   font-size: 12px;
 }
 

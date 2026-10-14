@@ -391,7 +391,7 @@ function toggleSettings() {
   settingsOpen.value = !settingsOpen.value;
 }
 // 启动参数（懒加载骨架值 / 防抖写回）与启动统计（时长 / 次数）：见 composables/ 下的组合式函数
-const { argsMap, argsOf, updateArgs, onServerIp, onServerJoin } = useInstanceArgs({ selected });
+const { argsOf, updateArgs, onServerIp, onServerJoin } = useInstanceArgs({ selected });
 const { statsOf, playHoursOf, refresh: refreshStats } = useInstanceStats();
 
 /** 列表模式图标下那行：选中实例的启动统计；未选中实例时为空串，那一行不渲染 */
@@ -1258,13 +1258,8 @@ async function loadGroups() {
 async function loadJava() {
   try {
     javas.value = await api.getJavaList();
-    // 给每个实例的 Java 参数补默认值
-    for (const inst of instances.value) {
-      const args = argsMap.value[inst.uuid];
-      if (args && !args.javaName && javas.value.length) {
-        args.javaName = javas.value[0].name;
-      }
-    }
+    // 不给空的 javaName 补第一个 Java：空就是「自动」，由 core 按版本要求的
+    // Java 主版本去挑（比"列表里第一个"更对；这条以前会把刚扫到的 Java 顶上去）
   } catch {
     javas.value = [];
   }
@@ -1650,7 +1645,7 @@ onMounted(async () => {
 
                     <!-- 自定义执行 -->
                     <div class="args-section">
-                      <button class="args-toggle" @click="execOpen = !execOpen">
+                      <button class="args-toggle" :class="{ merged: execOpen }" @click="execOpen = !execOpen">
                         <span>
                           <GlyphIcon name="gear" :size="14" :weight="1.8" /> {{ t("exec.title") }}
                         </span>
@@ -1666,7 +1661,7 @@ onMounted(async () => {
 
                     <!-- 自定义服务器（自动加入 + MOTD 展示） -->
                     <div class="args-section">
-                      <button class="args-toggle" @click="serverOpen = !serverOpen">
+                      <button class="args-toggle" :class="{ merged: serverOpen }" @click="serverOpen = !serverOpen">
                         <span>
                           <GlyphIcon name="gear" :size="14" :weight="1.8" /> {{ t("server.title") }}
                         </span>
@@ -1703,7 +1698,7 @@ onMounted(async () => {
 
                     <!-- 游戏内代理 -->
                     <div class="args-section">
-                      <button class="args-toggle" @click="proxyOpen = !proxyOpen">
+                      <button class="args-toggle" :class="{ merged: proxyOpen }" @click="proxyOpen = !proxyOpen">
                         <span>
                           <GlyphIcon name="gear" :size="14" :weight="1.8" /> {{ t("proxy.title") }}
                         </span>

@@ -1,0 +1,103 @@
+// Monaco 环境：worker 分派 + 编辑器主题
+//
+// 主题两套来源：日志区用自己的控制台主题（applyLogTheme），代码编辑器用 Monaco 自带的
+// vs / vs-dark（applyCodeTheme，与官网示例一致）。Monaco 的主题是**全局**的，
+// 所以两个视图在挂载与激活时各刷一次自己的那套（单窗口模式下 KeepAlive 会同时留着两者）。
+//
+// 只加载 editor.api（不含 editor.main），语言包由用到的视图自己按需注册
+// （配置窗口那份在 lib/monacoCode.ts；日志是纯文本，什么都不用注册）。
+// vite 的 ?worker 导入在 dev / build 下都能正确打包。
+
+import EditorWorker from "monaco-editor/editor/editor.worker.js?worker";
+import * as monaco from "monaco-editor/editor/editor.api";
+import { resolvedTheme } from "./theme";
+
+declare global {
+  interface Window {
+    MonacoEnvironment?: monaco.Environment;
+  }
+}
+
+self.MonacoEnvironment = {
+  /**
+   * 按语言给 worker
+   *
+   * - `label`: Monaco 传进来的语言 id
+   *
+   * json 的语言服务有独立 worker，按需**异步**加载：日志视图用不到它，
+   * 静态 import 会把这份 worker 塞进日志那个包，白白多几百 KB。
+   */
+  getWorker(_id, label) {
+    if (label === "json") {
+      return import("monaco-editor/language/json/json.worker.js?worker").then(
+        (m) => new m.default(),
+      );
+    }
+    return new EditorWorker();
+  },
+};
+
+/** 日志控制台的暗色主题名 */
+const THEME_CONSOLE_DARK = "mml-console-dark";
+/** 日志控制台亮色主题名 */
+const THEME_CONSOLE_LIGHT = "mml-console-light";
+
+let themeDefined = false;
+
+/** 注册日志控制台的两套主题，在 `editor.create` 之前调一次 */
+export function ensureMonacoThemes() {
+  if (themeDefined) return;
+  themeDefined = true;
+
+  // 暗色：比卡片底色再深一档的控制台观感
+  monaco.editor.defineTheme(THEME_CONSOLE_DARK, {
+    base: "vs-dark",
+    inherit: true,
+    rules: [],
+    colors: {
+      "editor.background": "#0d0f12",
+      // 行号比正文暗一档、比底色亮：原来给的是 #3a4048，在 #0d0f12 上几乎看不见
+      "editorLineNumber.foreground": "#6b7280",
+      "editorGutter.background": "#0d0f12",
+      "scrollbarSlider.background": "#2a2f3880",
+      "scrollbarSlider.hover.background": "#3a404880",
+      "scrollbarSlider.active.background": "#4a515c80",
+    },
+  });
+
+  // 亮色：白底，即 themes.css 亮色的卡片色 --bg-card（#ffffff）。
+  // 日志区是一块带边框的面板，底色跟卡片走，不跟窗口底色 --bg（#eef1f5）
+  monaco.editor.defineTheme(THEME_CONSOLE_LIGHT, {
+    base: "vs",
+    inherit: true,
+    rules: [],
+    colors: {
+      "editor.background": "#ffffff",
+      // 行号：比正文浅、比白底深的一档灰，看得见但不抢正文
+      "editorLineNumber.foreground": "#98a1ad",
+      // 行号槽必须与正文同色，否则左边会多出一条色带
+      "editorGutter.background": "#ffffff",
+      "scrollbarSlider.background": "#c3c9d280",
+      "scrollbarSlider.hover.background": "#aab1bb80",
+      "scrollbarSlider.active.background": "#8f97a380",
+    },
+  });
+}
+
+/** 日志控制台上色：深色 / 白底那两套自定义主题 */
+export function applyLogTheme() {
+  ensureMonacoThemes();
+  monaco.editor.setTheme(resolvedTheme() === "Light" ? THEME_CONSOLE_LIGHT : THEME_CONSOLE_DARK);
+}
+
+/**
+ * 配置文件的代码编辑器上色
+ *
+ * 直接用 Monaco 自带的 `vs` / `vs-dark`，与官网示例（playground）同一套配色；
+ * 不要换成上面那两套控制台主题 —— 那是给日志区的，编辑代码时底色与行号槽都对不上。
+ */
+export function applyCodeTheme() {
+  monaco.editor.setTheme(resolvedTheme() === "Light" ? "vs" : "vs-dark");
+}
+
+export { monaco };

@@ -20,6 +20,7 @@ export type GlyphName =
   | "play"
   | "gear"
   | "document"
+  | "save"
   | "news"
   | "check-square"
   | "image"
@@ -73,6 +74,12 @@ withDefaults(
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
       <path d="M14 2v6h6" />
       <path d="M8 13h8M8 17h5" />
+    </g>
+    <!-- 保存：软盘轮廓 + 下沿标签 + 上沿滑盖。原来拿 check 代过，一眼看不出是"存" -->
+    <g v-else-if="name === 'save'">
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+      <path d="M17 21v-8H7v8" />
+      <path d="M7 3v5h8" />
     </g>
     <g v-else-if="name === 'news'">
       <path d="M4 6a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v13H6a2 2 0 0 1-2-2V6z" />

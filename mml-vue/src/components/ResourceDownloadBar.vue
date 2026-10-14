@@ -229,9 +229,9 @@ function progressText(group: ResourceGroupProgress): string {
   margin-top: 8px;
 }
 
-/* 尺寸与外观照整合包那条进度卡的 .mp-clear-btn：28px 高、左右 14px、细描边次级按钮 */
+/* 尺寸与外观照整合包那条进度卡的 .mp-clear-btn：32px 高、左右 14px、细描边次级按钮 */
 .res-clear-btn {
-  height: 28px;
+  height: var(--ctl-h);
   padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: 8px;

@@ -423,6 +423,11 @@ fn find_java() -> Option<Vec<JavaInfoObj>> {
 /// 此函数执行系统级的 Java 搜索：注册表、常见路径等。
 pub fn scan_java() {
     if let Some(list) = find_java() {
+        // 一个都没扫到：列表没变化，不必广播
+        if list.is_empty() {
+            return;
+        }
+
         let mut list1 = JVMS.write().unwrap();
         let mut config = mml_config::write_config();
 
@@ -444,8 +449,14 @@ pub fn scan_java() {
         }
 
         drop(config);
+        // 放掉列表锁再广播：事件回来时界面会立刻读这份列表
+        drop(list1);
 
         mml_config::save();
+
+        // 扫描会把扫到的 Java 写进列表：广播一次，界面才能跟着刷新。
+        // 少了这一句，设置窗口扫完，主窗口实例设置里的 Java 下拉仍是旧的
+        invoke_jvm_change();
     }
 }
 

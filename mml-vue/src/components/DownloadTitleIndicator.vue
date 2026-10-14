@@ -111,8 +111,8 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   /* 与顶栏其它入口按钮 .topbar-icon-btn 同规格：并排时行高与间距才对得上 */
-  width: 36px;
-  height: 36px;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   flex-shrink: 0;
   padding: 0;
   border: 1px solid transparent;

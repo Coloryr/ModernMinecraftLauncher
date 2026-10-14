@@ -736,34 +736,11 @@ function tokenLabel(acc: AccountStoreDto): string {
 }
 
 /* ===== 标题栏右侧控件（head-right 插槽）=====
-   标题栏里这几个控件统一 36px：比 --titlebar-h（64px）矮一截、上下留得出呼吸，
-   又不至于像 28px 那样局促。**36 是三个用 head-right 的窗口（账户 / 方块 / 设置）
-   共同的约定**，改这里记得同步另外两处，否则并排看时高度会参差 */
+   全 app 控件统一 32px（controls.css 的 --ctl-h），这一排不再各自定高 */
+/* 这一排的通用标准（宽度 170–280、省略号、按钮不缩、chip 可压）在 styles/titlebar.css；
+   这里只留账户窗口自己的例外：类型筛选比标准下拉窄一档，标题栏还要塞搜索框与分段控件 */
 .head-select {
-  /* 尺寸以外的一切都交给 .field-select（同一个元素上挂了两个类）：
-     不透明底、主题描边、共享箭头、聚焦色、以及 base-select 的页内弹层。
-     这里只写标题栏要的尺寸差异 */
-  width: auto;
   min-width: 128px;
-  /* 必须显式覆盖 .field-select 的 min-height: var(--field-h)（42px）——
-     min-height 优先于 height，不覆盖就会被撑到 42，比旁边的 36px 控件高一截 */
-  min-height: 0;
-  height: 36px;
-  /* 定高时高度要和"行高 + 上下内边距 + 上下边框"严格对上，即 36 = 18 + 8×2 + 1×2，
-     对不上文字就会偏离上下中心 */
-  line-height: 18px;
-  padding: 8px 28px 8px 12px;
-  border-radius: 9px;
-  font-size: 12.5px;
-  /* 箭头比标准下拉略小、离右边略近（标题栏空间紧） */
-  background-position: right 7px center;
-  background-size: 11px;
-}
-
-/* 视图切换 grid / list / detail：SegmentedTabs 默认 35px，即 27 + 3×2 + 1×2，
-   在标题栏里跟旁边的 36px 控件差 1px，单独拉齐 */
-.head-tabs :deep(.seg-btn) {
-  height: 28px;
 }
 
 .head-search {
@@ -771,12 +748,21 @@ function tokenLabel(acc: AccountStoreDto): string {
   align-items: center;
   gap: 6px;
   padding: 0 11px;
-  height: 36px;
-  border-radius: 9px;
+  height: var(--ctl-h);
+  border-radius: var(--ctl-radius);
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text-dim);
   width: 168px;
+}
+
+/* 与 .field-input 同一套反馈：悬停淡淡一档，里面有焦点就是满强调色 */
+.head-search:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+.head-search:focus-within {
+  border-color: var(--accent);
 }
 
 .head-search input {
@@ -785,19 +771,24 @@ function tokenLabel(acc: AccountStoreDto): string {
   border: none;
   background: transparent;
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--ctl-font);
   outline: none;
   font-family: inherit;
 }
 
+/* 清空键与配置文件窗口那一枚同口径：20px 方形热区，压在输入框右端 */
 .head-search-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
   border: none;
+  border-radius: 5px;
   background: transparent;
   color: var(--text-dim);
-  font-size: 12px;
   cursor: pointer;
-  padding: 0 2px;
-  line-height: 1;
 }
 
 .head-search-clear:hover {

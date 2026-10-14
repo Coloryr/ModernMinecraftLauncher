@@ -6,9 +6,9 @@
 import { nextTick, ref, watch } from "vue";
 import { t } from "../../../../lib/i18n";
 import { COMMON_MEMORY, COMMON_RESOLUTIONS } from "../../../../lib/resolutions";
-import { useSystemMemory } from "../../../../lib/systemMemory";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
 import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
+import MemoryHint from "../../../../components/MemoryHint.vue";
 import NumberStepper from "../../../../components/ui/NumberStepper.vue";
 import SegmentedTabs from "../../../../components/ui/SegmentedTabs.vue";
 import SettingsGroup from "../SettingsGroup.vue";
@@ -34,9 +34,6 @@ const {
   removeEnvLine,
   saveState,
 } = props.settings;
-
-/** 本机内存参考值，与实例设置的启动参数共用同一份逻辑 */
-const { text: memoryText } = useSystemMemory();
 
 /** 预设按钮上的文字：整数 GB 显示 `8 GB`，否则按 MB 显示 */
 function memoryLabel(mib: number): string {
@@ -99,8 +96,8 @@ watch(memoryConflict, async (bad) => {
           <NumberStepper v-model="run!.maxMemory" :min="256" :max="65536" :step="256" />
         </div>
       </div>
-      <!-- 本机内存参考值：给设最大内存一个依据；始终占一行，拿不到会写明原因 -->
-      <p class="mem-hint">{{ memoryText }}</p>
+      <!-- 本机内存参考值：给设最大内存一个依据（文字 + 可用占比的条，拿不到会写明原因） -->
+      <MemoryHint class="mem-hint" />
       <!-- 常用内存：一点即填「最大内存」（当前值匹配时高亮）。
            最小内存跟着顶上去，免得点了预设反而触发"最小 > 最大"的冲突 -->
       <div class="res-row">

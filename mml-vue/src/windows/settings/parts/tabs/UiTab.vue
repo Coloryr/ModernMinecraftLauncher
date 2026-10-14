@@ -4,6 +4,7 @@
 // 状态与保存逻辑在 composables/useSettingsUi，这里只负责排版与分组（SettingsGroup）。
 import { onMounted } from "vue";
 import { t } from "../../../../lib/i18n";
+import { fontStack } from "../../../../lib/fonts";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
 import SegmentedTabs from "../../../../components/ui/SegmentedTabs.vue";
@@ -82,7 +83,8 @@ onMounted(() => void loadFonts());
         <div class="font-row">
           <select v-model="fontPick" class="field-select font-select" @change="setFontFamily(fontPick)">
             <option value="">{{ t("winSettings.fontDefault") }}</option>
-            <option v-for="f in fonts" :key="f" :value="f">{{ f }}</option>
+            <!-- 每个名字用它自己的字体渲染：挑字体时直接看字形，不用先选中再试 -->
+            <option v-for="f in fonts" :key="f" :value="f" :style="{ fontFamily: fontStack(f) }">{{ f }}</option>
           </select>
         </div>
       </div>

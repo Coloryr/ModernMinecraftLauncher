@@ -78,12 +78,18 @@ const emit = defineEmits<{
 }
 
 .fp-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 与全 app 的图标按钮同尺寸 */
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   border: none;
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 6px;
+  padding: 0;
+  border-radius: var(--ctl-radius);
   line-height: 1;
   flex-shrink: 0;
 }

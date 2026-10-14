@@ -172,8 +172,8 @@ const emit = defineEmits<{
 }
 
 .topbar-icon-btn {
-  width: 36px;
-  height: 36px;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   border-radius: 10px;
   border: 1px solid transparent;
   background: transparent;

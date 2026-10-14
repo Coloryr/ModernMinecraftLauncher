@@ -464,28 +464,11 @@ onBeforeUnmount(() => {
   margin-bottom: 0;
 }
 
-/* 标题栏里的实例下拉：尺寸口径与账户 / 方块 / 设置三个窗口的标题栏控件保持一致，
-   改这里的 36px 要同步那几处。实例名比账户窗口那个筛选长，最小宽度按名字留够，
-   再长就省略号，别把导出按钮挤出去 */
+/* 这一排的通用标准在 styles/titlebar.css；这里只留导出窗口自己的例外：
+   实例名可能很长，比标准下拉宽一档，好让名字完整显示、别把导出按钮挤出去 */
 .head-select {
-  width: auto;
   min-width: 260px;
   max-width: 340px;
-  /* 必须显式覆盖 .field-select 的 min-height: var(--field-h)（42px），
-     不覆盖会被撑到 42，比旁边的控件高一截 */
-  min-height: 0;
-  height: 36px;
-  /* 定高时 36 = 行高 18 + 上下内边距 8×2 + 上下边框 1×2，对不上文字会偏离中心 */
-  line-height: 18px;
-  padding: 8px 28px 8px 12px;
-  border-radius: 9px;
-  font-size: 12.5px;
-  /* 箭头比标准下拉略小、离右边略近（标题栏空间紧） */
-  background-position: right 7px center;
-  background-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* 导出格式：标签与选择器同一行。选择器是 inline-flex，只包住自己的选项内容，

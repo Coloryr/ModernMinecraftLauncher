@@ -93,7 +93,7 @@ watch(
 /* 这个「整合包类型」下拉在卡片最底部，下方常常没空间：默认的"优先向下、
    放不下才翻转"在这里没兜住（底下就是窗口边），弹层会被切掉。
    改成按可用空间挑方向（most-block-size），空间在下面就往下、在上面就往上。
-   只作用于本页这一个下拉，forms.css 里那条全局的偏好不动 */
+   只作用于本页这一个下拉，controls.css 里那条全局的偏好不动 */
 select.field-select::picker(select) {
   position-try-order: most-block-size;
 }

@@ -2,7 +2,8 @@
 @import "./themes.css";
 @import "./base.css";
 @import "./decoration.css";
-@import "./forms.css";
+@import "./controls.css";
+@import "./titlebar.css";
 @import "./modal.css";
 @import "./skeleton.css";
 @import "./scrollbar.css";

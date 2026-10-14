@@ -177,11 +177,12 @@ async function apply() {
   background: var(--bg-side);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 3px;
+  padding: 2px;
 }
 
 .pick-size-opt {
-  height: 27px;
+  /* 与 SegmentedTabs 同一口径：内胆 = --ctl-h − 轨道 2×2 − 边框 1×2 */
+  height: calc(var(--ctl-h) - 6px);
   padding: 0 12px;
   border: none;
   border-radius: 7px;

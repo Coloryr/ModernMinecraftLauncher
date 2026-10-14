@@ -233,7 +233,8 @@ pub async fn block_set_icon_area(
     }
 
     image_manager::clear_instance_image(&core.uuid);
-    emit_instance_change(&app, "edit");
+    // 专用类型：图标换 / 清了才发它，界面里只有图标订阅（普通的 edit 不再触发重拉图）
+    emit_instance_change(&app, "icon");
     Ok(true)
 }
 
@@ -278,7 +279,7 @@ pub async fn block_set_icon(app: AppHandle, uuid: String, id: String) -> Result<
     }
 
     image_manager::clear_instance_image(&core.uuid);
-    emit_instance_change(&app, "edit");
+    emit_instance_change(&app, "icon");
     Ok(true)
 }
 

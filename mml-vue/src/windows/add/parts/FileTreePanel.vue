@@ -88,7 +88,7 @@ const total = computed(() => collectFileKeys(props.tree).length);
   font-size: 12px;
   font-family: inherit;
   cursor: pointer;
-  height: 28px;
+  height: var(--ctl-h);
   padding: 0 10px;
   transition: border-color 0.15s, background 0.15s;
 }

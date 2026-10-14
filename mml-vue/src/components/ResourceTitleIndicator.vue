@@ -92,8 +92,8 @@ const iconState = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   flex-shrink: 0;
   padding: 0;
   border: 1px solid transparent;

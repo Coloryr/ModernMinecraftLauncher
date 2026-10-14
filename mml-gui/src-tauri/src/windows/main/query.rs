@@ -3,7 +3,7 @@
 //! 从 `main/mod.rs` 拆出来的。命令带分组标记，值填原始组名 main，把组键钉回
 //! `main` —— 否则组键会跟着文件名变成 `query`，前端 `commands.main.*` 全断，见 AGENTS.md §4。
 
-use tauri::{AppHandle, WebviewWindow};
+use tauri::WebviewWindow;
 use uuid::Uuid;
 
 use mml_game::launcher::LogEncoding;
@@ -17,7 +17,7 @@ use crate::image_manager;
 
 use super::args::{apply_args_to_core, args_from_core, core_instance};
 use super::catalog::{VERSIONS_CACHE, fetch_versions, parse_motd_addr};
-use super::{emit_instance_change, model};
+use super::model;
 
 /// 获取实例列表，对接 mml-game::get_instances 并合并运行状态
 ///
@@ -142,7 +142,6 @@ pub fn main_get_instance_args(window: WebviewWindow, uuid: String) -> InstanceAr
 
 /// 更新实例启动参数，核心实例写配置并保存，遗留数据只更新内存缓存
 ///
-/// - `app`: 应用句柄，用于发变更事件
 /// - `window`: 调用方窗口，用于取本窗口模型存遗留参数
 /// - `uuid`: 实例 uuid
 /// - `args`: 前端提交的启动参数，整份覆盖
@@ -153,7 +152,6 @@ pub fn main_get_instance_args(window: WebviewWindow, uuid: String) -> InstanceAr
 #[gui_macros::ipc_group("main")]
 #[tauri::command]
 pub fn main_update_instance_args(
-    app: AppHandle,
     window: WebviewWindow,
     uuid: String,
     args: InstanceArgsDto,
@@ -164,7 +162,8 @@ pub fn main_update_instance_args(
             apply_args_to_core(&mut obj, &args);
             obj.save();
         }
-        emit_instance_change(&app, "edit");
+        // 这里**不发** instance-change：启动参数不进实例列表，也不需要刷新图标。
+        // 发了的后果是每改一次设置，图标就换 URL 重拉一次、列表也白刷一遍
         return Ok(true);
     }
     let store = model(&window)?;

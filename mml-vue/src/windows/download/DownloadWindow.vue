@@ -586,7 +586,7 @@ onUnmounted(() => {
 }
 
 .mini-btn {
-  height: 28px;
+  height: var(--ctl-h);
   padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: 7px;

@@ -114,6 +114,7 @@ export const commands = {
     getBytesSlice: (game: string, file: string, offset: number, length: number) => invoke<BytesSliceDto>("config_get_bytes_slice", { game, file, offset, length }),
     getFile: (game: string, file: string) => invoke<string>("config_get_file", { game, file }),
     getFiles: (game: string) => invoke<FileItemDto[]>("config_get_files", { game }),
+    getImage: (game: string, file: string) => invoke<string>("config_get_image", { game, file }),
     getMca: (game: string, file: string) => invoke<McaChunkDto[]>("config_get_mca", { game, file }),
     getNbt: (game: string, file: string) => invoke<NbtNodeDto>("config_get_nbt", { game, file }),
     saveFile: (game: string, file: string, data: string) => invoke<void>("config_save_file", { game, file, data }),

@@ -222,7 +222,7 @@ async function clearDone() {
 }
 
 .mp-clear-btn {
-  height: 28px;
+  height: var(--ctl-h);
   padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -327,7 +327,7 @@ async function clearDone() {
 .mp-cancel {
   display: inline-flex;
   align-items: center;
-  height: 28px;
+  height: var(--ctl-h);
   font-size: 12px;
   color: var(--red);
   background: var(--bg-raised);

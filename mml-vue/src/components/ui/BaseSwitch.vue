@@ -22,8 +22,9 @@ const emit = defineEmits<{
 
 <style scoped>
 .switch {
-  width: 40px;
-  height: 22px;
+  width: 48px;
+  /* 与全 app 控件同高；开关是自成一体的小控件，宽高比也在这一处定 */
+  height: var(--ctl-h);
   flex-shrink: 0;
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -43,8 +44,8 @@ const emit = defineEmits<{
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 16px;
-  height: 16px;
+  width: calc(var(--ctl-h) - 6px);
+  height: calc(var(--ctl-h) - 6px);
   border-radius: 50%;
   background: var(--text-dim);
   transition: transform 0.15s, background 0.15s;
@@ -56,7 +57,7 @@ const emit = defineEmits<{
 }
 
 .switch.on .knob {
-  transform: translateX(18px);
+  transform: translateX(calc(var(--ctl-h) - 8px));
   background: #fff;
 }
 </style>

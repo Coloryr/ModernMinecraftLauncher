@@ -238,11 +238,16 @@ function isGroupOpen(id: string) {
   align-items: center;
   gap: 6px;
   padding: 0 10px;
-  height: 34px;
-  border-radius: 9px;
+  height: var(--ctl-h);
+  border-radius: var(--ctl-radius);
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text-dim);
+}
+
+/* 与 .field-input 同一套反馈：悬停淡淡一档 */
+.search-box:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
 }
 
 .search-box:focus-within {
@@ -278,8 +283,8 @@ function isGroupOpen(id: string) {
 }
 
 .icon-btn {
-  width: 30px;
-  height: 30px;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--bg-card);

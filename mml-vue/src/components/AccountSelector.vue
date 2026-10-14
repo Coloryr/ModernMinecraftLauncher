@@ -229,7 +229,6 @@ function pick(account: AccountStoreDto) {
 .avatar-img {
   object-fit: cover;
   image-rendering: pixelated;
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.35));
 }
 
 /* 头像槽容器：相对定位，加载中时上面叠转圈 */

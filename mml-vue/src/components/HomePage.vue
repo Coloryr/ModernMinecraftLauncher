@@ -187,7 +187,7 @@ function entry(name: string) {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  height: 28px;
+  height: var(--ctl-h);
   padding: 0 13px 0 10px;
   border: 1px solid var(--accent-border);
   border-radius: 9px;
@@ -278,7 +278,7 @@ function entry(name: string) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 35px;
+  height: var(--ctl-h);
   padding: 0 20px;
   border: 1px solid var(--accent-border);
   border-radius: 10px;
@@ -329,7 +329,7 @@ function entry(name: string) {
 }
 
 .last-play {
-  height: 35px;
+  height: var(--ctl-h);
   padding: 0 18px;
   border-radius: 9px;
   border: none;
@@ -348,8 +348,8 @@ function entry(name: string) {
 }
 
 .last-open {
-  width: 35px;
-  height: 35px;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   border-radius: 9px;
   border: 1px solid var(--accent-border);
   background: var(--bg-raised);

@@ -51,8 +51,8 @@ const ICONS: Record<string, string> = {
   gap: 4px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 3px;
+  border-radius: calc(var(--ctl-radius) + 2px);
+  padding: 2px;
 }
 
 .seg-btn {
@@ -62,11 +62,11 @@ const ICONS: Record<string, string> = {
   border: none;
   background: transparent;
   color: var(--text-dim);
-  font-size: 12.5px;
-  /* 定高：27 + 上下 padding 3×2 + 边框 1×2 = 35，与 BaseButton 的 md 档齐平 */
-  height: 27px;
+  font-size: var(--ctl-font);
+  /* 内胆 = 控件高 − 上下 padding 2×2 − 边框 1×2，整轨就是 --ctl-h */
+  height: calc(var(--ctl-h) - 6px);
   padding: 0 12px;
-  border-radius: 7px;
+  border-radius: var(--ctl-radius);
   cursor: pointer;
   transition: all 0.15s;
   font-family: inherit;

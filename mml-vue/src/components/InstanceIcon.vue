@@ -101,9 +101,10 @@ onUnmounted(() => unlistenChange?.());
     base.value = "";
   }
 
-  // 实例图标被更换（edit）后刷新；事件无 uuid，低频操作统一刷新即可
+  // 只认 icon 类型：图标换 / 清了才重拉图。
+  // 别改回 edit —— 改实例设置、重命名、换分组都会发 edit，那样每动一次就白重载一次图标
   unlistenChange = await onInstanceChange((type) => {
-    if (type !== "edit") return;
+    if (type !== "icon") return;
     ver.value = Date.now();
     failed.value = false;
     // 换图期间先回到字母，新图到了再藏（否则旧图会一直挂着）

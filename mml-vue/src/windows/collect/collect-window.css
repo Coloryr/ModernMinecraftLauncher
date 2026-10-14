@@ -17,15 +17,12 @@
 }
 
 .collect-toolbar .collect-filters {
-  /* 标题栏高度有限，不能换行（换行会撑破标题栏） */
+  /* 标题栏高度有限，不能换行（换行会撑破标题栏）；间距与标题栏标准统一 8px */
   flex-wrap: nowrap;
-  gap: 12px;
+  gap: 8px;
 }
 
-/* 标题栏控件统一 36px：账户 / 方块 / 设置三个窗口共同的约定，见 BlockToolbar 的注释 */
-.collect-toolbar .multi-toggle {
-  height: 36px;
-}
+/* 标题栏控件高度全 app 统一 32px（controls.css 的 --ctl-h），这里不再单独覆盖 */
 
 .count {
   font-size: 12px;
@@ -35,7 +32,8 @@
 
 /* 多选模式入口（工具栏右端）：默认不进行多选，点这里才进 */
 .multi-toggle {
-  padding: 5px 12px;
+  height: var(--ctl-h);
+  padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 9px;
   background: var(--bg-card);
@@ -440,8 +438,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   padding: 0;
   border: none;
   border-radius: 6px;

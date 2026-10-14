@@ -7,7 +7,7 @@
  * 因此即使类名很通用，如 .switch-row / .grid-2 / .panel，也不会影响其它窗口里
  * 同名的 scoped 类。新增规则请保持这个前缀。
  *
- * 口径统一：控件高度用全局 `--field-h`（forms.css）与 BaseButton md 的 35px；
+ * 口径统一：控件高度一律用全局 `--ctl-h`（controls.css，全 app 一档 32px）；
  * 分组标题、设置行、说明文字只用这里的类，不在组件里另写一套。
  *
  * 垂直间距**只有这一处规则**，模板里不再写 margin / 间距类，见下面「组内垂直节奏」。
@@ -149,11 +149,9 @@
   width: 280px;
 }
 
-/* 标题栏高 64px（--titlebar-h）：输入框压到 32px，和标题、窗口按钮在同一视觉水平线上 */
+/* 高度走全 app 那一档（--ctl-h = 32px），标题栏里与标题、窗口按钮同一视觉水平线 */
 .frame-head .set-search-input {
-  height: 32px;
-  min-height: 0;
-  padding: 0 10px;
+  padding: 3px 10px;
   font-size: 12.5px;
 }
 
@@ -351,8 +349,8 @@
 }
 
 .settings-layout .accent-swatch {
-  width: 36px;
-  height: 36px;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   border-radius: 50%;
   border: 2px solid var(--border);
   cursor: pointer;
@@ -455,15 +453,11 @@
 
 /* ---------- 背景图 ---------- */
 
-/* 选图 / 清除 / 地址输入 / 加载 一行：输入框占满剩余空间，按钮与输入框等高 */
+/* 选图 / 清除 / 地址输入 / 加载 一行：输入框占满剩余空间，按钮与输入框同高（都是 32） */
 .settings-layout .bg-buttons {
   display: flex;
   align-items: stretch;
   gap: 10px;
-}
-
-.settings-layout .bg-buttons .ui-btn {
-  height: auto;
 }
 
 .settings-layout .bg-url-input {
@@ -490,7 +484,7 @@
   color: var(--text-dim);
 }
 
-/* 全局 forms.css 里已有 .range 的 width/accent-color；这里只补本窗口的 flex 布局，
+/* 全局 controls.css 里已有 .range 的 width/accent-color；这里只补本窗口的 flex 布局，
    并限定在 .range-row 内，避免影响其它窗口 */
 .settings-layout .range-row .range {
   flex: 1;
@@ -514,10 +508,7 @@
   gap: 12px 16px;
 }
 
-.settings-layout .dl-grid .seg-tabs,
-.settings-layout .dl-grid .stepper {
-  height: 35px;
-}
+/* 分段控件与步进器都已是全 app 那一档 32px（组件内定），这里不再单独拉高 */
 
 /* ---------- 登录方式锁定 ---------- */
 
@@ -598,7 +589,8 @@
   font-family: inherit;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-  padding: 3px 9px;
+  height: var(--ctl-h);
+  padding: 0 9px;
   border-radius: 7px;
   cursor: pointer;
 }
@@ -679,8 +671,8 @@
 }
 
 .settings-layout .line-del {
-  width: 28px;
-  height: 28px;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   /* 图标是 SVG：用 flex 精确居中（原来靠字形在行盒里居中） */
   display: inline-flex;
   align-items: center;
@@ -705,7 +697,7 @@
   align-items: center;
   /* 图标是 SVG（原来是字形，靠一个空格隔开），间距改由 gap 给 */
   gap: 6px;
-  height: 28px;
+  height: var(--ctl-h);
   padding: 0 22px;
   border-radius: 9px;
   border: 1px dashed var(--border);
@@ -828,7 +820,7 @@
 
 .settings-layout .java-add-row {
   display: flex;
-  /* 按钮与 42px 输入框等高：stretch 撑高，覆盖 BaseButton 定高 */
+  /* 按钮与同行的输入框一样高（都是 32）：stretch 兜一下，按钮自己不写高度 */
   align-items: stretch;
   gap: 8px;
 }

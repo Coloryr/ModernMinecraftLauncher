@@ -181,8 +181,8 @@ function isCurrent(acc: AccountStoreDto): boolean {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   padding: 0;
   border: 1px dashed currentColor;
   border-radius: 8px;

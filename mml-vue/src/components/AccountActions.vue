@@ -88,8 +88,8 @@ defineEmits<{
 }
 
 .icon-btn {
-  width: 28px;
-  height: 28px;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--bg-card);

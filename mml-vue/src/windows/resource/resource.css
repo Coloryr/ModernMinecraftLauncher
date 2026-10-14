@@ -170,10 +170,9 @@
   margin-left: auto;
 }
 
-/* 工具条里的控件统一 35px：视图切换（SegmentedTabs）就是 35，
-   而 .mini-btn 默认 28 —— 同一行里两种高度看着就是"没对齐"（用户点名） */
+/* 工具条里的按钮：高度与同行的视图切换（SegmentedTabs）一样是全 app 那一档 32px，
+   .mini-btn 的默认就是 32，这里只管横向留白 */
 .resource-layout .head-actions .mini-btn {
-  height: 35px;
   padding: 0 14px;
 }
 
@@ -321,7 +320,7 @@
 }
 
 .resource-layout .mini-btn {
-  height: 28px;
+  height: var(--ctl-h);
   padding: 0 12px;
   border-radius: 7px;
   border: 1px solid var(--border);
@@ -641,10 +640,10 @@
   background: var(--accent-soft);
 }
 
-/* 模组搜索框：工具条里的小号输入，与同一行的按钮同高 35px，见上面的说明 */
+/* 模组搜索框：工具条里的小号输入，高度与同一行的按钮一样走全 app 那一档 32px */
 .resource-layout .mod-search {
-  height: 35px;
   width: 140px;
+  height: var(--ctl-h);
   padding: 0 12px;
   border-radius: 8px;
   border: 1px solid var(--border);
@@ -765,7 +764,8 @@
 .resource-layout .row-selected-count {
   display: inline-flex;
   align-items: center;
-  height: 35px;
+  /* 工具条里的计数胶囊：跟同一行的按钮一样 32（全 app 那一档） */
+  height: var(--ctl-h);
   padding: 0 12px;
   border-radius: 8px;
   background: var(--accent-soft);
@@ -774,11 +774,8 @@
   white-space: nowrap;
 }
 
-/* 批量「移到分组」的按钮：与同一行的其它按钮同高 35px，见 .head-actions 的说明。
-   目标分组改成弹窗里选（见 ModPane 的 group-pick 弹窗），这里不再有下拉 */
-.resource-layout .head-actions .icon-btn {
-  height: 35px;
-}
+/* 批量「移到分组」的按钮：高度跟全 app 一样（.mini-btn / .icon-btn 的默认 32），
+   原来的 35px 覆盖已删。目标分组改成弹窗里选（见 ModPane 的 group-pick 弹窗），这里不再有下拉 */
 
 /* ---------- 模组：表格视图 ---------- */
 
@@ -1104,16 +1101,15 @@
   color: var(--text-dim);
 }
 
-/* 外观全部走 .field-select，挂两个类，见 DatapackPane：这里只把尺寸压小一号
+/* 外观全部走 .field-select，挂两个类，见 DatapackPane：这里只把横向尺寸收一下
    （原先自己抄了一整份外观，改一处漏一处），并把默认的 width: 100% 改回 auto —— 在
-   flex 行里 100% 会撑破这一行 */
+   flex 行里 100% 会撑破这一行；高度跟全 app 一样走 `--ctl-h` */
 .resource-layout .dp-select {
   flex: 1;
   width: auto;
   min-width: 0;
-  padding: 8px 28px 8px 10px;
+  padding: 3px 28px 3px 10px;
   font-size: 13px;
-  min-height: 0;
 }
 
 /* ---------- 右键菜单：RowMenu.vue（行）与 ModGroupMenu.vue（分组头）共用 ----------

@@ -394,11 +394,14 @@ function onPlatformChange(value: string) {
 </template>
 
 <style scoped>
-/* 4 列网格：标签 | 下拉 | 标签 | 下拉，保证各下拉框左对齐 */
+/* 4 列网格：标签 | 下拉 | 标签 | 下拉，保证各下拉框左对齐。
+   横向 12px 与启动参数面板的行内间距一致（两个卡片标签列都是 84，控件才能上下对齐）；
+   纵向仍是原来的 10px 节奏 */
 .meta-panel {
   display: grid;
   grid-template-columns: 84px 1fr 64px 1fr;
-  gap: 10px;
+  column-gap: 12px;
+  row-gap: 10px;
   align-items: center;
   background: var(--bg-card);
   border: 1px solid var(--border);

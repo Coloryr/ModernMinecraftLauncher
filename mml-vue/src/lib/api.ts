@@ -2343,6 +2343,19 @@ export function readConfigMca(uuid: string, file: string): Promise<McaChunkDto[]
   return commands.config.getMca(uuid, file);
 }
 /**
+ * 读取一个图片文件，给图片视图直接用
+ *
+ * - `uuid`: 实例 uuid
+ * - `file`: 相对游戏目录的路径
+ *
+ * # 返回值
+ *
+ * `data:<mime>;base64,<...>`，可直接塞进 `<img src>`；体积上限与文本一致
+ */
+export function readConfigImage(uuid: string, file: string): Promise<string> {
+  return commands.config.getImage(uuid, file);
+}
+/**
  * 读取任意文件的一段字节，给二进制视图翻页用
  *
  * - `uuid`: 实例 uuid

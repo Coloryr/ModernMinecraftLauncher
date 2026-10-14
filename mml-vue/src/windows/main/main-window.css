@@ -243,7 +243,9 @@
 .detail-instance {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  /* 底部这几块（实例设置 / 自定义执行 / 自定义服务器 / 游戏内代理）原本 16px，
+     连成一串后显得空，收到 10px */
+  gap: 10px;
 }
 
 .news-page {
@@ -345,8 +347,8 @@
 }
 
 .icon-btn {
-  width: 28px;
-  height: 28px;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--bg-card);
@@ -439,7 +441,21 @@
 .args-section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+}
+
+/* 展开时把内容并进标题，做成"标题 + 内容"一整块卡片：
+   标题只抹平下缘两个角，**四边描边都留着**（悬停时那圈强调色才是闭合的矩形），
+   分界线由标题的底边承担；内容抹平上缘两个角，上边改成透明让位，
+   否则标题底边 + 内容上边会叠成 2px。
+   `.merged` 由模板按各段展开状态绑在标题上 —— CSS 选不到前面的兄弟，所以不用 :has */
+.args-toggle.merged {
+  border-radius: 12px 12px 0 0;
+}
+
+.args-section :deep(.collapse.open > .collapse-inner > *:first-child) {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-top-color: transparent;
 }
 
 /* 实例设置：元信息 + 启动参数 直接展示 */
@@ -498,7 +514,9 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 11px 14px;
+  /* 与全 app 控件同高（原来靠 11px 纵向内边距撑到 40px，比所有控件都高一截） */
+  height: var(--ctl-h);
+  padding: 0 14px;
   border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--bg-card);
@@ -728,7 +746,6 @@
 
 .launch-sub-actions :deep(.ui-btn) {
   min-width: 120px;
-  height: 30px;
 }
 
 /* ================= 多选模式 ================= */

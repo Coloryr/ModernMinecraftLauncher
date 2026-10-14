@@ -547,41 +547,7 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
-/* 36px 是用 head-right 的几个窗口（账户 / 方块 / 设置 / 导出）共同的约定，改这里要同步那几处。
-   按钮不缩：宽度不够时优先压下拉，图标或文字被裁掉就看不出是什么了 */
-.head-log :deep(.ui-btn) {
-  height: 36px;
-  flex-shrink: 0;
-}
-
-/* 图标按钮做成偏方的：文字都在提示与 aria-label 里，不需要横向留白 */
-.head-log .icon-btn-head {
-  padding: 0 10px;
-}
-
-/* 实例 chip 也能被压：标题栏这一排控件多，窗口窄时先让名字走省略号 */
-.head-log :deep(.inst-chip) {
-  min-width: 0;
-}
-
-.head-select {
-  width: auto;
-  min-width: 170px;
-  max-width: 280px;
-  /* 必须显式覆盖 .field-select 的 min-height: var(--field-h)（42px），否则比旁边的 36px 高一截 */
-  min-height: 0;
-  height: 36px;
-  /* 定高时 36 = 行高 18 + 上下内边距 8×2 + 上下边框 1×2，对不上文字会偏离中心 */
-  line-height: 18px;
-  padding: 8px 28px 8px 12px;
-  border-radius: 9px;
-  font-size: 12.5px;
-  background-position: right 7px center;
-  background-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+/* 按钮不缩、图标键方正化、chip 可压、下拉宽度与省略号：都在 styles/titlebar.css 的标题栏标准里 */
 
 /* 开关 + 文案：文案跟着开关走，点哪都算切换 */
 .sw {

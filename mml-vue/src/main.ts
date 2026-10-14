@@ -1,10 +1,11 @@
 // 应用入口：禁用默认右键菜单，加载 GUI 配置后挂载根组件
-import { createApp } from "vue";
+import { createApp, watch } from "vue";
 import "./styles/index.css";
 import App from "./App.vue";
 import { loadGuiConfig } from "./lib/guiConfig";
 import { applyTheme, theme } from "./lib/theme";
 import { applyLocale, locale } from "./lib/i18n";
+import { applyMonacoNls } from "./lib/monacoNls";
 import { loadAccounts } from "./lib/accountStore";
 import {
   restoreCapeConfig,
@@ -89,6 +90,10 @@ async function bootstrap() {
 
   applyTheme();
   applyLocale();
+  // Monaco 的界面文案（查找框等）跟着界面语言走：包内没有语言包，表由我们自己挂。
+  // watch 是为了在设置里改语言时立刻跟上，不用重开窗口
+  applyMonacoNls(locale.value);
+  watch(locale, (now) => applyMonacoNls(now));
   loadAccounts(); // 账户列表由 Rust 提供（浏览器环境静默跳过）
   createApp(App).directive("tip", vTip).mount("#app");
 }

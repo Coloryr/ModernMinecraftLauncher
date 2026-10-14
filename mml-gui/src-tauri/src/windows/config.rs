@@ -418,6 +418,57 @@ pub fn config_get_bytes_slice(
     read_slice(&path, offset, length)
 }
 
+/// 图片文件扩展名 → MIME
+///
+/// 与 [`get_file_type`] 的 `Image` 分支同口径；认不出的按二进制流给，让浏览器自己判。
+fn image_mime(path: &Path) -> &'static str {
+    match path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        _ => "application/octet-stream",
+    }
+}
+
+/// 读取一个图片文件，转成可以直接塞进 `<img src>` 的 data URL
+///
+/// 配置目录里的图片都是图标 / 缩略图量级，一次 IPC 读完即可；体积上限沿用
+/// [`MAX_FILE_SIZE`]，再大就不是"看一眼"的用途了。
+///
+/// - `game`: 实例 uuid
+/// - `file`: 相对游戏目录的路径，取自 [`config_get_files`] 或 [`config_saves_get_file`]
+///
+/// # 返回值
+///
+/// `data:<mime>;base64,<...>`；路径非法返回 `err.fileName`，不是图片返回
+/// `err.notImageFile`，体积超过上限返回 `err.fileTooLarge`
+#[gui_macros::ipc_group("config")]
+#[tauri::command]
+pub fn config_get_image(game: String, file: String) -> Result<String, String> {
+    let game = instance_snapshot(&game)?;
+    let path = resolve_under(&game.get_game_path(), &file)?;
+    if get_file_type(&path) != FileItemType::Image {
+        return Err(String::from(err_keys::NOT_IMAGE_FILE));
+    }
+    check_size(&path)?;
+
+    let mut stream = path_helper::open_read(&path).map_err(|err| err.to_string())?;
+    let mut buf = Vec::new();
+    stream.read_to_end(&mut buf).map_err(|err| err.to_string())?;
+
+    Ok(format!(
+        "data:{};base64,{}",
+        image_mime(&path),
+        hash_helper::gen_base64_bytes(&buf)
+    ))
+}
+
 /// 获取一个存档目录下的文件列表
 ///
 /// 整个存档目录递归列出，含数据包、`level.dat` 与区域文件；类型标在 `fileType` 上，
