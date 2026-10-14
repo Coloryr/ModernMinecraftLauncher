@@ -337,11 +337,15 @@ pub fn replace_fabric_libraries(url: &str) -> String {
 
 /// 按游戏版本给出 Forge 下载地址里要用的版本后缀
 ///
+/// 只有 1.7.2 / 1.7.10 / 1.8.9 / 1.9 / 1.9.4 / 1.10 这几版的文件名带"-游戏版本"后缀，
+/// 其余版本（如 1.12.2、26.3）都不带。实测：
+/// `forge-1.12.2-14.23.5.2864-installer.jar` 是 200，带 `-1.12.2` 的那份是 404。
+///
 /// - `version`: 游戏版本
 ///
 /// # 返回值
 ///
-/// 返回拼接下载地址时使用的版本后缀，无特殊规则的版本原样返回
+/// 返回拼接下载地址时使用的版本后缀，无特殊规则的版本返回空串
 pub fn forge_url_fix(version: &str) -> String {
     if version.eq_ignore_ascii_case("1.7.2") {
         String::from("-mc172")
@@ -356,6 +360,8 @@ pub fn forge_url_fix(version: &str) -> String {
     } else if version.eq_ignore_ascii_case("1.10") {
         String::from("-1.10.0")
     } else {
-        String::from(version)
+        // 原来是 `String::from(version)`（既没连字符也不是空），拼出来是
+        // `14.23.5.28641.12.2` 这种畸形版本号，Forge 的所有文件都 404
+        String::new()
     }
 }

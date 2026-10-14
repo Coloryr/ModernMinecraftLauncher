@@ -221,26 +221,22 @@ public class MmlLaunchProbe {{
 
 /// 造一个待下载 / 待启动的实例
 ///
+/// **不指定 Java**：`jvm_local` 留空，让启动器按版本要求的 Java 主版本自己检测，
+/// 与用户点"启动游戏"时走的同一条路（这里只负责编译探针时才需要 javac）。
+///
 /// - `uuid`: 实例 UUID
 /// - `dir`: 实例目录名
-/// - `java`: 指定 Java 可执行文件，`None` 表示让启动器自己找
 /// - `probe`: 探针的主类名与类路径目录，给了就拿它当主类，`None` 表示用版本 json 里的主类
 ///
 /// # 返回值
 ///
 /// 返回实例配置
-fn make_instance(
-    uuid: Uuid,
-    dir: &str,
-    java: Option<&Path>,
-    probe: Option<(&str, &Path)>,
-) -> InstanceSettingObj {
+fn make_instance(uuid: Uuid, dir: &str, probe: Option<(&str, &Path)>) -> InstanceSettingObj {
     InstanceSettingObj {
         uuid,
         name: dir.to_string(),
         dir: dir.to_string(),
         version: VERSION.to_string(),
-        jvm_local: java.map(|path| path.to_string_lossy().to_string()),
         advance_jvm: probe.map(|(main, class_path)| AdvanceJvmObj {
             main_class: Some(main.to_string()),
             class_path: Some(class_path.to_string_lossy().to_string()),
@@ -272,7 +268,7 @@ fn make_launch_arg() -> GameLaunchArg {
 async fn real_download_prepares_game_files() {
     ensure_init();
     let base = mml_base::get_base_dir();
-    let instance = make_instance(Uuid::new_v4(), "real-download", None, None);
+    let instance = make_instance(Uuid::new_v4(), "real-download", None);
 
     let mut arg = make_launch_arg();
     let obj = instance
@@ -319,7 +315,7 @@ async fn real_download_prepares_game_files() {
 #[tokio::test]
 async fn real_launch_downloads_and_starts() {
     ensure_init();
-    let Some((java, javac)) = find_jdk() else {
+    let Some((_java, javac)) = find_jdk() else {
         eprintln!("跳过真实启动用例：本机没有可用的 JDK");
         return;
     };
@@ -329,7 +325,7 @@ async fn real_launch_downloads_and_starts() {
 
     // 探针：打印 JVM 的类路径与收到的游戏参数，两样都是"下载 + 拼装"的结果
     let (main, classes) = build_probe(&base, &javac);
-    let instance = make_instance(uuid, "real-launch", Some(&java), Some((&main, &classes)));
+    let instance = make_instance(uuid, "real-launch", Some((&main, &classes)));
 
     // 运行日志：只收进程的原始输出行
     let logs = Arc::new(Mutex::new(Vec::<String>::new()));

@@ -8,6 +8,16 @@
 //! 3. **启动游戏** —— 真起进程。主类换成探针（javac 现编译），所以不会真开游戏窗口，
 //!    但类路径、参数、Java、下载、日志、退出事件全是真的。
 //!
+//! # 想单跑一格 / 打断点
+//!
+//! 链路都在 [`launch`] 里，直接调它就行（`launch_one` 就是这么一个入口，把里面的参数
+//! 改成你要的那一格，在 `launch` 里下断点）：
+//!
+//! ```text
+//! launch("1.12.2", LoaderType::Forge, "14.23.5.2864").await
+//! launch_auto("26.3", LoaderType::NeoForge).await   // 加载器版本自己去上游查
+//! ```
+//!
 //! 记三种结果：
 //!
 //! - `不适用`：上游没有该组合（如 1.7.10 没有 Fabric），或查不到加载器版本；
@@ -16,6 +26,7 @@
 //! - `失败`：其它错误，算真失败，会汇总在末尾并让用例不通过。
 //!
 //! `#[ignore]`：联网 + 首次要下几百 MB，缓存落在 `target/temp/mml-launch-matrix`。
+//! 走本机代理（默认 `127.0.0.1:7890`），`MML_TEST_PROXY=off` 关掉。
 //!
 //! ```text
 //! cargo test -p mml-game --test launch_matrix -- --ignored --nocapture
@@ -25,7 +36,7 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::{Arc, Mutex, Once};
+use std::sync::{Arc, Mutex, Once, OnceLock};
 use std::time::{Duration, Instant};
 
 use mml_auth::LoginObj;
@@ -64,17 +75,27 @@ public class MmlLaunchProbe {
 "#;
 
 /// 一格的结论
-struct Outcome {
+pub struct Outcome {
     /// 加载器:版本
-    combo: String,
+    pub combo: String,
     /// 加载器版本，原版为空
-    loader_version: String,
+    pub loader_version: String,
     /// 下载与检查的结论
-    check: String,
+    pub check: String,
     /// 启动的结论
-    launch: String,
+    pub launch: String,
     /// 是否算真失败
-    failed: bool,
+    pub failed: bool,
+}
+
+/// 每进程一次的公共准备：内核、探针、退出事件收集
+struct Ctx {
+    /// 探针主类名
+    main: String,
+    /// 探针类路径目录
+    classes: PathBuf,
+    /// 已退出的实例 uuid
+    exited: Arc<Mutex<HashSet<Uuid>>>,
 }
 
 /// 下载回调：什么都不做
@@ -88,6 +109,33 @@ impl IDownloadGui for Quiet {
 /// 矩阵与实例文件都留在这个目录里，重复跑不必再下一遍
 fn run_dir() -> PathBuf {
     mml_testutil::temp_dir().join("mml-launch-matrix")
+}
+
+/// 公共准备，每进程一次
+///
+/// # 返回值
+///
+/// 没有可用 JDK 时返回 `None`，用例据此跳过
+fn ctx() -> Option<&'static Ctx> {
+    static CTX: OnceLock<Option<Ctx>> = OnceLock::new();
+    CTX.get_or_init(|| {
+        ensure_init();
+        let (_, javac) = find_jdk()?;
+        let (main, classes) = build_probe(&javac);
+
+        let exited: Arc<Mutex<HashSet<Uuid>>> = Arc::new(Mutex::new(HashSet::new()));
+        let sink = exited.clone();
+        mml_game::add_exit(move |event| {
+            sink.lock().unwrap().insert(event.uuid);
+        });
+
+        Some(Ctx {
+            main,
+            classes,
+            exited,
+        })
+    })
+    .as_ref()
 }
 
 /// 走本机代理：默认 `127.0.0.1:7890`
@@ -206,275 +254,199 @@ fn list_files(dir: &Path, acc: &mut Vec<PathBuf>) {
     }
 }
 
-/// 该不该跑这一格：`MML_MATRIX=loader:version,...` 过滤，没设就全跑
+/// 跑一格：下载 → 检查资源 → 启动
 ///
-/// - `loader`: 加载器
-/// - `version`: 游戏版本
+/// 想在某一格下断点，直接调它即可；实例目录按 `加载器-游戏版本` 复用，重复跑很快。
+///
+/// - `version`: 游戏版本，如 `1.12.2`
+/// - `loader`: 加载器；原版传 [`LoaderType::Normal`]
+/// - `loader_version`: 加载器版本，如 `14.23.5.2864`；原版传空串
 ///
 /// # 返回值
 ///
-/// 该跑返回 `true`
-fn wanted(loader: &LoaderType, version: &str) -> bool {
-    let Ok(filter) = std::env::var("MML_MATRIX") else {
-        return true;
+/// 见 [`Outcome`]
+pub async fn launch(version: &str, loader: LoaderType, loader_version: &str) -> Outcome {
+    let Some(ctx) = ctx() else {
+        return Outcome {
+            combo: format!("{}:{version}", loader.to_string()),
+            loader_version: loader_version.to_string(),
+            check: "跳过".into(),
+            launch: "跳过（本机没有可用的 JDK）".into(),
+            failed: false,
+        };
     };
-    let key = format!("{}:{version}", loader.to_string());
-    filter.split(',').any(|item| item.trim() == key)
-}
 
-/// 启动矩阵：下载 → 检查资源 → 启动，逐格跑完并汇总
-#[ignore = "在线矩阵测试：会下载各版本 / 各加载器的文件并真起进程，用 -- --ignored 显式跑"]
-#[tokio::test]
-async fn launch_matrix() {
-    ensure_init();
-    let Some((_java, javac)) = find_jdk() else {
-        eprintln!("跳过矩阵：本机没有可用的 JDK");
-        return;
-    };
-    let (main, classes) = build_probe(&javac);
     let base = mml_base::get_base_dir();
+    let uuid = Uuid::new_v4();
+    let dir = format!("{}-{version}", loader.to_string());
+    let instance = InstanceSettingObj {
+        uuid,
+        name: dir.clone(),
+        dir: dir.clone(),
+        version: version.to_string(),
+        loader,
+        loader_version: (!loader_version.is_empty()).then(|| loader_version.to_string()),
+        // 主类换探针：参数与类路径照旧，只是不真跑游戏
+        advance_jvm: Some(AdvanceJvmObj {
+            main_class: Some(ctx.main.clone()),
+            class_path: Some(ctx.classes.to_string_lossy().to_string()),
+        }),
+        jvm_arg: Some(RunArgObj {
+            min_memory: Some(256),
+            max_memory: Some(512),
+            gc_mode: Some(GCType::None),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
 
-    // 退出事件：收集本进程里所有实例的退出，按 uuid 判断是哪一格
-    let exited: Arc<Mutex<HashSet<Uuid>>> = Arc::new(Mutex::new(HashSet::new()));
-    let exited_sink = exited.clone();
-    let exit_id = mml_game::add_exit(move |event| {
-        exited_sink.lock().unwrap().insert(event.uuid);
-    });
+    // ---- 下载游戏 + 检查资源 ----
+    let mut arg = GameLaunchArg {
+        auth: LoginObj::default(),
+        auto: AutoJoinType::None,
+        admin: false,
+        mixin: None,
+        lang: None,
+    };
+    let check_started = Instant::now();
+    let check = match instance
+        .check_game_file(&mut arg, None, CancellationToken::new())
+        .await
+    {
+        Ok(obj) => {
+            let mut files = Vec::new();
+            list_files(&base, &mut files);
+            let client = files
+                .iter()
+                .any(|path| path.to_string_lossy().contains(&format!("client-{version}.jar")));
+            let index = files.iter().any(|path| {
+                path.components()
+                    .any(|part| part.as_os_str() == "indexes")
+            });
+            let objects = files
+                .iter()
+                .filter(|path| {
+                    path.components()
+                        .any(|part| part.as_os_str() == "objects")
+                })
+                .count();
+            let jars = files
+                .iter()
+                .filter(|path| path.extension().is_some_and(|ext| ext == "jar"))
+                .count();
 
-    let mut outcomes: Vec<Outcome> = Vec::new();
+            format!(
+                "ok（主类 {}，客户端 {}，索引 {}，jar {jars}，资源对象 {objects}，{:?}）",
+                obj.main_class,
+                if client { "在" } else { "缺" },
+                if index { "在" } else { "缺" },
+                check_started.elapsed()
+            )
+        }
+        Err(err) => {
+            let text = format!("失败 {err:?}");
+            return Outcome {
+                combo: format!("{}:{version}", loader.to_string()),
+                loader_version: loader_version.to_string(),
+                check: text,
+                launch: "未跑".into(),
+                failed: true,
+            };
+        }
+    };
 
-    for loader in LOADERS {
-        for version in VERSIONS {
-            let combo = format!("{}:{version}", loader.to_string());
-            if !wanted(&loader, version) {
-                continue;
+    // ---- 启动游戏 ----
+    let launched = Instant::now();
+    let (launch, failed) = match instance
+        .start_game(&mut arg, None, CancellationToken::new())
+        .await
+    {
+        Ok(()) => {
+            // 等这一格的进程退出：探针跑完就退，给 5 分钟
+            let deadline = Instant::now() + Duration::from_secs(300);
+            while !ctx.exited.lock().unwrap().contains(&uuid) && Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(200));
             }
 
-            eprintln!("[矩阵] ==== {combo} ====");
-
-            // 上游有没有这个组合：原版恒有，其余查加载器版本表，新版本在前
-            let loader_version = if loader == LoaderType::Normal {
-                String::new()
-            } else {
-                match get_loader_versions(&loader, version).await {
-                    Ok(list) if !list.is_empty() => list[0].clone(),
-                    Ok(_) => {
-                        eprintln!("[矩阵]   {combo}：上游没有该组合，记「不适用」");
-                        outcomes.push(Outcome {
-                            combo,
-                            loader_version: String::new(),
-                            check: "不适用".into(),
-                            launch: "不适用".into(),
-                            failed: false,
-                        });
-                        continue;
-                    }
-                    Err(err) => {
-                        eprintln!("[矩阵]   {combo}：查加载器版本失败 {err:?}，记「不适用」");
-                        outcomes.push(Outcome {
-                            combo,
-                            loader_version: String::new(),
-                            check: "不适用".into(),
-                            launch: "不适用".into(),
-                            failed: false,
-                        });
-                        continue;
-                    }
-                }
-            };
-            eprintln!("[矩阵]   加载器版本 {loader_version}");
-
-            let uuid = Uuid::new_v4();
-            let dir = format!("{}-{version}", loader.to_string());
-            let instance = InstanceSettingObj {
-                uuid,
-                name: dir.clone(),
-                dir: dir.clone(),
-                version: version.to_string(),
-                loader,
-                loader_version: (!loader_version.is_empty()).then(|| loader_version.clone()),
-                // 主类换探针：参数与类路径照旧，只是不真跑游戏
-                advance_jvm: Some(AdvanceJvmObj {
-                    main_class: Some(main.clone()),
-                    class_path: Some(classes.to_string_lossy().to_string()),
-                }),
-                jvm_arg: Some(RunArgObj {
-                    min_memory: Some(256),
-                    max_memory: Some(512),
-                    gc_mode: Some(GCType::None),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            };
-
-            // ---- 下载游戏 + 检查资源 ----
-            let mut arg = GameLaunchArg {
-                auth: LoginObj::default(),
-                auto: AutoJoinType::None,
-                admin: false,
-                mixin: None,
-                lang: None,
-            };
-            let check_started = Instant::now();
-            let check = match instance
-                .check_game_file(&mut arg, None, CancellationToken::new())
-                .await
-            {
-                Ok(obj) => {
-                    let mut files = Vec::new();
-                    list_files(&base, &mut files);
-                    let client = files
-                        .iter()
-                        .any(|path| path.to_string_lossy().contains(&format!("client-{version}.jar")));
-                    let index = files.iter().any(|path| {
-                        path.components()
-                            .any(|part| part.as_os_str() == "indexes")
-                    });
-                    let objects = files
-                        .iter()
-                        .filter(|path| {
-                            path.components()
-                                .any(|part| part.as_os_str() == "objects")
-                        })
-                        .count();
-                    let jars = files
-                        .iter()
-                        .filter(|path| path.extension().is_some_and(|ext| ext == "jar"))
-                        .count();
-
-                    format!(
-                        "ok（主类 {}，客户端 {}，索引 {}，jar {jars}，资源对象 {objects}，{:?}）",
-                        obj.main_class,
-                        if client { "在" } else { "缺" },
-                        if index { "在" } else { "缺" },
-                        check_started.elapsed()
+            let receipt = base
+                .join("minecraft/instances")
+                .join(&dir)
+                .join(".minecraft/probe-args.txt");
+            match std::fs::read_to_string(&receipt) {
+                Ok(text) => {
+                    let loader_mark = match loader {
+                        LoaderType::Forge => "forge",
+                        LoaderType::NeoForge => "neoforge",
+                        LoaderType::Fabric => "fabric",
+                        _ => "",
+                    };
+                    let loader_ok =
+                        loader_mark.is_empty() || text.to_lowercase().contains(loader_mark);
+                    // `--version` 的值：原版就是游戏版本，加载器是"加载器-游戏版本-加载器版本"
+                    // 一类的名字，所以只要求它带着游戏版本
+                    let version_ok =
+                        version_arg(&text).is_some_and(|value| value.contains(version));
+                    let exited_ok = ctx.exited.lock().unwrap().contains(&uuid);
+                    let ok = loader_ok && version_ok && exited_ok;
+                    (
+                        format!(
+                            "{}（版本参数 {}，加载器类路径 {}，退出事件 {}，{:?}）",
+                            if ok { "ok" } else { "参数不对" },
+                            if version_ok { "对" } else { "错" },
+                            if loader_ok { "有" } else { "无" },
+                            if exited_ok { "有" } else { "无" },
+                            launched.elapsed()
+                        ),
+                        !ok,
                     )
                 }
-                Err(err) => {
-                    let text = format!("失败 {err:?}");
-                    eprintln!("[矩阵]   {combo}：下载 / 检查{text}");
-                    outcomes.push(Outcome {
-                        combo,
-                        loader_version,
-                        check: text,
-                        launch: "未跑".into(),
-                        failed: true,
-                    });
-                    continue;
-                }
-            };
-            eprintln!("[矩阵]   下载 / 检查：{check}");
-
-            // ---- 启动游戏 ----
-            let launched = Instant::now();
-            let (launch, failed) = match instance
-                .start_game(&mut arg, None, CancellationToken::new())
-                .await
-            {
-                Ok(()) => {
-                    // 等这一格的进程退出：探针跑完就退，给 5 分钟
-                    let deadline = Instant::now() + Duration::from_secs(300);
-                    while !exited.lock().unwrap().contains(&uuid) && Instant::now() < deadline {
-                        std::thread::sleep(Duration::from_millis(200));
-                    }
-
-                    let receipt = base
-                        .join("minecraft/instances")
-                        .join(&dir)
-                        .join(".minecraft/probe-args.txt");
-                    match std::fs::read_to_string(&receipt) {
-                        Ok(text) => {
-                            let loader_mark = match loader {
-                                LoaderType::Forge => "forge",
-                                LoaderType::NeoForge => "neoforge",
-                                LoaderType::Fabric => "fabric",
-                                _ => "",
-                            };
-                            let loader_ok = loader_mark.is_empty()
-                                || text.to_lowercase().contains(loader_mark);
-                            // `--version` 的值：原版就是游戏版本，加载器是"加载器-游戏版本-加载器版本"
-                            // 一类的名字，所以只要求它带着游戏版本
-                            let version_ok = version_arg(&text)
-                                .is_some_and(|value| value.contains(version));
-                            let exited_ok = exited.lock().unwrap().contains(&uuid);
-                            let ok = loader_ok && version_ok && exited_ok;
-                            (
-                                format!(
-                                    "{}（版本参数 {}，加载器类路径 {}，退出事件 {}，{:?}）",
-                                    if ok { "ok" } else { "参数不对" },
-                                    if version_ok { "对" } else { "错" },
-                                    if loader_ok { "有" } else { "无" },
-                                    if exited_ok { "有" } else { "无" },
-                                    launched.elapsed()
-                                ),
-                                !ok,
-                            )
-                        }
-                        Err(err) => (format!("未读到凭据：{err}"), true),
-                    }
-                }
-                Err(ErrorType::JavaNotFound) => (
-                    format!("缺 Java（该版本要 Java {}）", loader_version_or_java(version)),
-                    false,
-                ),
-                Err(err) => (format!("失败 {err:?}"), true),
-            };
-
-            eprintln!("[矩阵]   启动：{launch}");
-            outcomes.push(Outcome {
-                combo,
-                loader_version,
-                check,
-                launch,
-                failed,
-            });
+                Err(err) => (format!("未读到凭据：{err}"), true),
+            }
         }
+        Err(ErrorType::JavaNotFound) => (
+            format!("缺 Java（该版本要 Java {}）", java_hint(version)),
+            false,
+        ),
+        Err(err) => (format!("失败 {err:?}"), true),
+    };
+
+    Outcome {
+        combo: format!("{}:{version}", loader.to_string()),
+        loader_version: loader_version.to_string(),
+        check,
+        launch,
+        failed,
+    }
+}
+
+/// 与 [`launch`] 相同，只是加载器版本自己去上游查
+///
+/// - `version`: 游戏版本
+/// - `loader`: 加载器；原版直接走 [`launch`]
+///
+/// # 返回值
+///
+/// 见 [`Outcome`]；上游没有该组合时是「不适用」，不算失败
+pub async fn launch_auto(version: &str, loader: LoaderType) -> Outcome {
+    if loader == LoaderType::Normal {
+        return launch(version, loader, "").await;
     }
 
-    mml_game::remove_exit(exit_id);
+    let combo = format!("{}:{version}", loader.to_string());
+    let not_applicable = |reason: String| Outcome {
+        combo: combo.clone(),
+        loader_version: String::new(),
+        check: "不适用".into(),
+        launch: reason,
+        failed: false,
+    };
 
-    // ---- 汇总 ----
-    eprintln!("\n[矩阵] 结果：");
-    eprintln!(
-        "{:<20} {:<24} {:<18} {}",
-        "组合", "加载器版本", "下载/检查", "启动"
-    );
-    for item in &outcomes {
-        eprintln!(
-            "{:<20} {:<24} {:<18} {}{}",
-            item.combo,
-            if item.loader_version.is_empty() {
-                "-".to_string()
-            } else {
-                item.loader_version.clone()
-            },
-            if item.check.len() > 16 {
-                format!("{}…", &item.check[..16])
-            } else {
-                item.check.clone()
-            },
-            item.launch,
-            if item.failed { "  ← 失败" } else { "" }
-        );
+    match get_loader_versions(&loader, version).await {
+        // 新版本在前，取最新的那个
+        Ok(list) if !list.is_empty() => launch(version, loader, &list[0]).await,
+        Ok(_) => not_applicable("上游没有该组合".into()),
+        Err(err) => not_applicable(format!("查加载器版本失败：{err:?}")),
     }
-
-    let launched = outcomes
-        .iter()
-        .filter(|item| item.launch.starts_with("ok"))
-        .count();
-    let failed: Vec<&str> = outcomes
-        .iter()
-        .filter(|item| item.failed)
-        .map(|item| item.combo.as_str())
-        .collect();
-    eprintln!(
-        "[矩阵] 共 {} 格：启动成功 {launched}，失败 {}",
-        outcomes.len(),
-        failed.len()
-    );
-
-    assert!(failed.is_empty(), "这些组合失败了：{failed:?}");
-    assert!(launched > 0, "至少有一格要能真启动起来（当前 0 格）");
 }
 
 /// 取命令行里 `--version` 后面那个值
@@ -501,9 +473,147 @@ fn version_arg(text: &str) -> Option<&str> {
 /// # 返回值
 ///
 /// 返回该版本惯用的 Java 主版本
-fn loader_version_or_java(version: &str) -> &'static str {
+fn java_hint(version: &str) -> &'static str {
     match version {
         "1.7.10" | "1.12.2" => "8",
         _ => "17+",
     }
+}
+
+/// 该不该跑这一格：`MML_MATRIX=loader:version,...` 过滤，没设就全跑
+///
+/// - `loader`: 加载器
+/// - `version`: 游戏版本
+///
+/// # 返回值
+///
+/// 该跑返回 `true`
+fn wanted(loader: &LoaderType, version: &str) -> bool {
+    let Ok(filter) = std::env::var("MML_MATRIX") else {
+        return true;
+    };
+    let key = format!("{}:{version}", loader.to_string());
+    filter.split(',').any(|item| item.trim() == key)
+}
+
+/// 单格调试入口（原版 26.3）：断点下在 [`launch`] 里
+#[ignore = "单格调试：只跑原版 26.3"]
+#[tokio::test]
+async fn launch_one_normal() {
+    report(launch("26.3", LoaderType::Normal, "").await);
+}
+
+/// 单格调试入口（Forge 1.12.2）
+#[ignore = "单格调试：只跑 Forge 1.12.2"]
+#[tokio::test]
+async fn launch_one_forge() {
+    report(launch("1.12.2", LoaderType::Forge, "14.23.5.2864").await);
+}
+
+/// 单格调试入口（Forge 1.7.10，取上游确实有安装器的那一版）
+#[ignore = "单格调试：只跑 Forge 1.7.10"]
+#[tokio::test]
+async fn launch_one_forge_old() {
+    report(launch("1.7.10", LoaderType::Forge, "10.13.4.1614").await);
+}
+
+/// 单格调试入口（Fabric 26.3）
+#[ignore = "单格调试：只跑 Fabric 26.3"]
+#[tokio::test]
+async fn launch_one_fabric() {
+    report(launch("26.3", LoaderType::Fabric, "0.19.5").await);
+}
+
+/// 单格调试入口（NeoForge 26.3）
+#[ignore = "单格调试：只跑 NeoForge 26.3"]
+#[tokio::test]
+async fn launch_one_neoforge() {
+    report(launch("26.3", LoaderType::NeoForge, "26.3.0.77").await);
+}
+
+/// 单格调试入口（加载器版本自己去上游查，与矩阵同一口径）
+///
+/// 不想手写加载器版本时用它；要钻某一版就把 [`launch`] 换进来看
+#[ignore = "单格调试：只跑一格，加载器版本自动查"]
+#[tokio::test]
+async fn launch_one_auto() {
+    report(launch_auto("26.3", LoaderType::NeoForge).await);
+}
+
+/// 打印一格的结论；算真失败就让用例不过
+///
+/// - `outcome`: [`launch`] / [`launch_auto`] 的结论
+fn report(outcome: Outcome) {
+    eprintln!(
+        "[矩阵] {}（加载器 {}）：下载/检查 {}；启动 {}",
+        outcome.combo, outcome.loader_version, outcome.check, outcome.launch
+    );
+    assert!(!outcome.failed, "{} 失败了", outcome.combo);
+}
+
+/// 启动矩阵：下载 → 检查资源 → 启动，逐格跑完并汇总
+#[ignore = "在线矩阵测试：会下载各版本 / 各加载器的文件并真起进程，用 -- --ignored 显式跑"]
+#[tokio::test]
+async fn launch_matrix() {
+    if ctx().is_none() {
+        eprintln!("跳过矩阵：本机没有可用的 JDK");
+        return;
+    }
+
+    let mut outcomes: Vec<Outcome> = Vec::new();
+    for loader in LOADERS {
+        for version in VERSIONS {
+            if !wanted(&loader, version) {
+                continue;
+            }
+            eprintln!("[矩阵] ==== {}:{version} ====", loader.to_string());
+            let outcome = launch_auto(version, loader).await;
+            eprintln!("[矩阵]   下载 / 检查：{}", outcome.check);
+            eprintln!("[矩阵]   启动：{}", outcome.launch);
+            outcomes.push(outcome);
+        }
+    }
+
+    // ---- 汇总 ----
+    eprintln!("\n[矩阵] 结果：");
+    eprintln!(
+        "{:<20} {:<24} {:<18} {}",
+        "组合", "加载器版本", "下载/检查", "启动"
+    );
+    for item in &outcomes {
+        eprintln!(
+            "{:<20} {:<24} {:<18} {}{}",
+            item.combo,
+            if item.loader_version.is_empty() {
+                "-".to_string()
+            } else {
+                item.loader_version.clone()
+            },
+            if item.check.chars().count() > 16 {
+                format!("{}…", item.check.chars().take(16).collect::<String>())
+            } else {
+                item.check.clone()
+            },
+            item.launch,
+            if item.failed { "  ← 失败" } else { "" }
+        );
+    }
+
+    let launched = outcomes
+        .iter()
+        .filter(|item| item.launch.starts_with("ok"))
+        .count();
+    let failed: Vec<&str> = outcomes
+        .iter()
+        .filter(|item| item.failed)
+        .map(|item| item.combo.as_str())
+        .collect();
+    eprintln!(
+        "[矩阵] 共 {} 格：启动成功 {launched}，失败 {}",
+        outcomes.len(),
+        failed.len()
+    );
+
+    assert!(failed.is_empty(), "这些组合失败了：{failed:?}");
+    assert!(launched > 0, "至少有一格要能真启动起来（当前 0 格）");
 }
