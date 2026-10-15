@@ -359,12 +359,12 @@ impl InstanceSettingObj {
         } else {
             let mut temp = HashMap::with_capacity(game_list.len() + loader_list.len());
 
-            if let Some(data) = &self.custom_loader {
-                // 是否删除原版库
-                if !data.remove_lib {
-                    for (key, value) in game_list {
-                        add_or_update_lib_kv(&mut temp, key, value);
-                    }
+            // 原版库默认都要带，加载器库随后覆盖同键冲突项；只有自定义加载器明确要求
+            // 删掉原版库时才不带。少了这个默认分支，Forge / Fabric / 原版实例的类路径里
+            // 就只剩加载器库与游戏 jar，guava、netty 这些原版依赖全不见
+            if !self.custom_loader.as_ref().is_some_and(|data| data.remove_lib) {
+                for (key, value) in game_list {
+                    add_or_update_lib_kv(&mut temp, key, value);
                 }
             }
 
@@ -557,5 +557,82 @@ pub async fn check_authlib(auth: &AuthType) -> CoreResult<Option<FileItemObj>> {
             read_authlib_injector().await
         }
         _ => Ok(None),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 造一个只有名字与落点的运行库项
+    fn lib(name: &str, file: &str) -> FileItemObj {
+        FileItemObj {
+            name: name.to_string(),
+            file: PathBuf::from(file),
+            ..Default::default()
+        }
+    }
+
+    /// 原版库必须进类路径，同键冲突时加载器库胜出
+    ///
+    /// 原版实例与带加载器的实例都没有 `custom_loader`；过去空加载器那段会把
+    /// `game_libs` 整个跳过，类路径里只剩加载器库与游戏 jar，guava、netty 这些
+    /// 原版依赖全不见，真起游戏立刻 NoClassDefFoundError。探针类测试测不出来：
+    /// 探针不加载游戏类。
+    #[test]
+    fn merges_game_libs_and_loader_libs() {
+        let instance = InstanceSettingObj {
+            loader: LoaderType::Forge,
+            ..Default::default()
+        };
+
+        let arg = GameLaunchObj {
+            game_libs: vec![
+                lib("com.google.guava:guava:21.0", "game/guava-21.0.jar"),
+                lib("net.minecraft:launchwrapper:1.12", "game/launchwrapper.jar"),
+            ],
+            loader_libs: vec![
+                lib(
+                    "net.minecraftforge:forge:1.12.2-14.23.5.2864",
+                    "loader/forge.jar",
+                ),
+                lib("com.google.guava:guava:32.0", "loader/guava-32.0.jar"),
+            ],
+            game_jar: lib("net.minecraft:client:1.12.2", "client.jar"),
+            ..Default::default()
+        };
+
+        let libs = instance.get_libs(&arg);
+        let paths: Vec<String> = libs
+            .iter()
+            .map(|item| item.to_string_lossy().to_string())
+            .collect();
+
+        assert!(
+            paths.iter().any(|item| item.ends_with("loader/forge.jar")),
+            "加载器库要在：{paths:?}"
+        );
+        assert!(
+            paths
+                .iter()
+                .any(|item| item.ends_with("game/launchwrapper.jar")),
+            "原版独有的库不能被丢掉：{paths:?}"
+        );
+        assert!(
+            paths
+                .iter()
+                .any(|item| item.ends_with("loader/guava-32.0.jar")),
+            "同键冲突时应保留加载器那版：{paths:?}"
+        );
+        assert!(
+            !paths
+                .iter()
+                .any(|item| item.ends_with("game/guava-21.0.jar")),
+            "被覆盖的原版库不该有第二份：{paths:?}"
+        );
+        assert!(
+            paths.iter().any(|item| item.ends_with("client.jar")),
+            "游戏 jar 要在：{paths:?}"
+        );
     }
 }

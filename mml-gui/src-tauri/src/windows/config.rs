@@ -2,23 +2,41 @@
 //!
 //! 「修改实例配置」用的文件清单与四种读法：文本全文、NBT 树、区域文件区块表、
 //! 任意文件的二进制分段。文件范围是 `.minecraft` 下的 options.txt 与
-//! `config` / `kubejs` / `local`，另加某个存档目录（含数据包）；
-//! 路径一律按「相对游戏目录」的口径传，读与写共用这一套。
+//! `config` / `kubejs` / `local`，另加某个存档目录（含数据包）。
+//!
+//! **路径一律按"相对所选来源"的口径传**：来源为空串是实例本身，即相对游戏目录；
+//! 否则是存档目录名，相对该存档目录。列表给出来的路径原样回传即可，
+//! 解析见 [`resolve_source`]。
+//!
+//! 文本的保存走**行级差异**而不是整份回传：前端算好"改了哪几行"（见
+//! `mml-vue/src/lib/textDiff.ts`），后端按 [`ConfigTextDto::sha1`] 核对磁盘上还是
+//! 打开时那一份，再套用差异，见 [`config_save_file`]。
+//!
+//! NBT 走的是另一条路：打开一个 NBT 文件就是**真的把它打开**（句柄与解析结果留在会话里，
+//! 见 [`nbt_session`]），之后的保存是"改值 / 新增 / 删除"三种操作，直接套在会话那份树上、
+//! 由同一个句柄写回，不再重新打开与重新读盘。
 
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};
 
-use mml_base::hash_helper;
+use mml_base::hash_helper::{self, HashType};
 use mml_names::names;
-use mml_nbt::NbtType;
 use mml_nbt::chunk::ChunkData;
-use mml_nbt::nbt_file::NbtFile;
+use mml_nbt::nbt_types;
+use mml_nbt::{NBT_END_ORDER, NbtType};
 use mml_sys::path_helper;
+use mml_sys::text_diff::{self, LineHunk};
 
-use crate::dtos::{BytesSliceDto, FileItemDto, FileItemType, McaChunkDto, NbtKindDto, NbtNodeDto};
+use crate::dtos::{
+    BytesSliceDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, FileItemDto, FileItemType,
+    McaChunkDto, NbtEditDto, NbtKindDto, NbtNodeDto, NbtOpDto,
+};
 use crate::err_keys;
 
 use super::instance_snapshot;
+use super::nbt_session;
+
+use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 
 /// 单个配置文件的可读上限，单位字节
 ///
@@ -30,6 +48,12 @@ const MAX_FILE_SIZE: u64 = 4 * 1024 * 1024;
 ///
 /// 一页给 64 KiB 足够铺满屏幕；再大只是让 IPC 白搬数据。
 const MAX_SLICE_SIZE: u32 = 64 * 1024;
+
+/// 数组（字节 / 整数 / 长整数）最多展开多少个元素给前端编辑
+///
+/// 短数组展开成元素行，一行一个下标；比这长的（高度图、位图之类）只报个数，也不接受增删，
+/// 免得一次 IPC 白搬几万个数。前端那份常量要与此一致。
+const MAX_ARRAY_EDIT: usize = 1024;
 
 /// 按扩展名认文件类型
 ///
@@ -92,12 +116,54 @@ pub(super) fn resolve_under(base: &Path, rel: &str) -> Result<PathBuf, String> {
     Ok(base.join(path))
 }
 
-/// 按「相对游戏目录的路径」把一个文件收进列表
+/// 按来源解析配置文件路径
+///
+/// 来源为空串表示实例本身，路径相对游戏目录；否则是存档目录名，路径相对该存档目录。
+/// **列表与读 / 写共用它**：列表给出来的相对路径，原样传回来必须解到同一个文件。
+///
+/// - `game`: 实例
+/// - `source`: 来源，空串为实例本身，否则是 saves 下的一级目录名
+/// - `file`: 来源内的相对路径
+///
+/// # 返回值
+///
+/// 解析出的绝对路径；来源或路径非法（绝对路径、`..` 穿越）时返回 `err.fileName`
+fn resolve_source(game: &InstanceSettingObj, source: &str, file: &str) -> Result<PathBuf, String> {
+    resolve_source_in(&game.get_game_path(), &game.get_saves_path(), source, file)
+}
+
+/// [`resolve_source`] 的纯版本：只吃两个基准目录，便于单测
+///
+/// - `game_path`: 游戏目录，即 `.minecraft`
+/// - `saves_path`: 存档根目录，即游戏目录下的 `saves`
+/// - `source`: 来源，空串为实例本身，否则是 `saves` 下的一级目录名
+/// - `file`: 来源内的相对路径
+///
+/// # 返回值
+///
+/// 解析出的绝对路径；来源或路径非法时返回 `err.fileName`
+fn resolve_source_in(
+    game_path: &Path,
+    saves_path: &Path,
+    source: &str,
+    file: &str,
+) -> Result<PathBuf, String> {
+    // 空来源就是实例本身，直接相对游戏目录解
+    if source.is_empty() {
+        return resolve_under(game_path, file);
+    }
+
+    // 存档来源：先把存档目录解出来，再在它下面解文件
+    let dir = resolve_under(saves_path, source)?;
+    resolve_under(&dir, file)
+}
+
+/// 按「相对该来源的路径」把一个文件收进列表
 ///
 /// 分隔符统一成 `/`：前端拿它拼树、再原样传回来，反斜杠在界面上只会是噪音。
 ///
 /// - `items`: 结果列表
-/// - `base`: 游戏目录，即 `.minecraft`
+/// - `base`: 来源目录，即实例的游戏目录或某个存档目录
 /// - `file`: 文件的绝对路径；不在 `base` 下时跳过
 fn push_file(items: &mut Vec<FileItemDto>, base: &Path, file: &Path) {
     let Ok(name) = file.strip_prefix(base) else {
@@ -142,7 +208,8 @@ fn check_size(path: &Path) -> Result<(), String> {
 
 /// 把一个 NBT 标签转成树上的节点
 ///
-/// 数组**只报元素个数**，不展开内容：一个高度图动辄上万项，铺开既慢也没人看，
+/// 数组在 [`MAX_ARRAY_EDIT`] 以内**展开成元素行**（元素不是独立标签，展开只是给前端一个
+/// 可编辑的入口），超过就只报个数：一个高度图动辄上万项，铺开既慢也没人看，
 /// 要看原始字节走二进制视图。
 ///
 /// - `name`: 键名；列表元素传下标字符串，根节点传空串
@@ -164,15 +231,28 @@ fn nbt_node(name: String, nbt: &NbtType) -> NbtNodeDto {
         }
     }
 
-    /// 数组节点：只有类型与元素个数
-    fn array(name: String, kind: NbtKindDto, length: usize) -> NbtNodeDto {
+    /// 数组节点：类型、元素个数，短数组连元素一起展开
+    fn array<T: ToString>(
+        name: String,
+        kind: NbtKindDto,
+        item_kind: NbtKindDto,
+        data: &[T],
+    ) -> NbtNodeDto {
+        let items = if data.len() > MAX_ARRAY_EDIT {
+            Vec::new()
+        } else {
+            data.iter()
+                .enumerate()
+                .map(|(index, item)| leaf(index.to_string(), item_kind, item.to_string()))
+                .collect()
+        };
         NbtNodeDto {
             name,
             kind,
             value: String::new(),
-            length: length as u32,
+            length: data.len() as u32,
             children: Vec::new(),
-            items: Vec::new(),
+            items,
         }
     }
 
@@ -185,9 +265,9 @@ fn nbt_node(name: String, nbt: &NbtType) -> NbtNodeDto {
         NbtType::Float(v) => leaf(name, NbtKindDto::Float, v.data.to_string()),
         NbtType::Double(v) => leaf(name, NbtKindDto::Double, v.data.to_string()),
         NbtType::String(v) => leaf(name, NbtKindDto::String, v.data.clone()),
-        NbtType::ByteArray(v) => array(name, NbtKindDto::ByteArray, v.data.len()),
-        NbtType::IntArray(v) => array(name, NbtKindDto::IntArray, v.data.len()),
-        NbtType::LongArray(v) => array(name, NbtKindDto::LongArray, v.data.len()),
+        NbtType::ByteArray(v) => array(name, NbtKindDto::ByteArray, NbtKindDto::Byte, &v.data),
+        NbtType::IntArray(v) => array(name, NbtKindDto::IntArray, NbtKindDto::Int, &v.data),
+        NbtType::LongArray(v) => array(name, NbtKindDto::LongArray, NbtKindDto::Long, &v.data),
         NbtType::List(v) => {
             let items: Vec<NbtNodeDto> = v
                 .iter()
@@ -259,20 +339,37 @@ fn read_slice(path: &Path, offset: u64, length: u32) -> Result<BytesSliceDto, St
 
 /// 获取实例可编辑的配置文件列表
 ///
-/// 收 options.txt 与 `config` / `kubejs` / `local` 下的全部文件，
-/// 名字都是**相对游戏目录**的路径，与下面几个读 / 写命令同一口径。
+/// 列出某个来源下可编辑的配置文件
+///
+/// 来源为空串时收 options.txt 与 `config` / `kubejs` / `local` 下的全部文件；
+/// 否则收该存档目录下的全部文件（含数据包、`level.dat` 与区域文件）。名字都是
+/// **相对该来源**的路径，与下面几个读 / 写命令同一口径。
 ///
 /// - `game`: 实例 uuid
+/// - `source`: 来源，空串为实例本身，否则是 saves 下的一级目录名
 ///
 /// # 返回值
 ///
-/// 文件条目列表；uuid 非法或实例不存在时返回错误串
+/// 文件条目列表；uuid 非法、实例不存在或存档目录不存在时返回错误串
 #[gui_macros::ipc_group("config")]
 #[tauri::command]
-pub fn config_get_files(game: String) -> Result<Vec<FileItemDto>, String> {
+pub fn config_get_files(game: String, source: String) -> Result<Vec<FileItemDto>, String> {
     let game = instance_snapshot(&game)?;
-    let base = game.get_game_path();
     let mut items = Vec::new();
+
+    // 存档来源：树根就是这个存档目录，名字不再带 `saves/<目录>/` 前缀
+    if !source.is_empty() {
+        let base = resolve_under(&game.get_saves_path(), &source)?;
+        if !base.is_dir() {
+            return Err(String::from(err_keys::SAVE_NOT_FOUND));
+        }
+        for file in path_helper::get_all_files(&base) {
+            push_file(&mut items, &base, &file);
+        }
+        return Ok(items);
+    }
+
+    let base = game.get_game_path();
 
     let option = game.get_option_file();
     if option.is_file() {
@@ -295,62 +392,554 @@ pub fn config_get_files(game: String) -> Result<Vec<FileItemDto>, String> {
 /// 读取一个文本配置文件的内容
 ///
 /// - `game`: 实例 uuid
-/// - `file`: 相对游戏目录的路径，取自 [`config_get_files`] 或 [`config_saves_get_file`]
+/// - `source`: 来源，空串为实例本身，否则是存档目录名
+/// - `file`: 来源内的相对路径，取自 [`config_get_files`]
 ///
 /// # 返回值
 ///
-/// 全文；路径非法返回 `err.fileName`，二进制文件返回 `err.fileBinary`，
+/// 见 [`ConfigTextDto`]；路径非法返回 `err.fileName`，二进制文件返回 `err.fileBinary`，
 /// 体积超过 [`MAX_FILE_SIZE`] 返回 `err.fileTooLarge`，读取失败返回内核错误串
 #[gui_macros::ipc_group("config")]
 #[tauri::command]
-pub fn config_get_file(game: String, file: String) -> Result<String, String> {
+pub fn config_get_file(
+    game: String,
+    source: String,
+    file: String,
+) -> Result<ConfigTextDto, String> {
     let game = instance_snapshot(&game)?;
-    let path = resolve_under(&game.get_game_path(), &file)?;
+    let path = resolve_source(&game, &source, &file)?;
     check_binary(&path)?;
     check_size(&path)?;
 
-    path_helper::read_text(&path).map_err(|err| err.to_string())
+    let text = path_helper::read_text(&path).map_err(|err| err.to_string())?;
+    Ok(ConfigTextDto {
+        sha1: text_sha1(&text),
+        text,
+    })
 }
 
-/// 保存文本配置文件，整份覆盖
+/// 保存文本配置文件，按前端算好的**行级差异**改盘上那一份
+///
+/// 差异相对打开时读到的原文，所以先核对磁盘上还是不是那一份；不是就拒绝，
+/// 免得把别的窗口（例如资源管理改 options.txt）的改动冲掉。
 ///
 /// - `game`: 实例 uuid
-/// - `file`: 相对游戏目录的路径，与 [`config_get_file`] 同一口径
-/// - `data`: 新的全文内容
+/// - `source`: 来源，空串为实例本身，否则是存档目录名
+/// - `file`: 来源内的相对路径，与 [`config_get_file`] 同一口径
+/// - `base_sha1`: 打开时那一份全文的 SHA1，即 [`ConfigTextDto::sha1`]
+/// - `expected_lines`: 改完后的总行数，按 `\n` 切成多少行；用来交叉校验差异算得对不对
+/// - `hunks`: 行替换列表，按 `start` 升序、互不重叠
 ///
 /// # 返回值
 ///
-/// 路径非法返回 `err.fileName`，二进制文件返回 `err.fileBinary`，写盘失败返回内核错误串
+/// 保存后全文的 SHA1，供前端接着改；路径非法返回 `err.fileName`，二进制文件返回
+/// `err.fileBinary`，磁盘上那一份已经变了返回 `err.fileChanged`，写盘失败返回内核错误串
 #[gui_macros::ipc_group("config")]
 #[tauri::command]
-pub fn config_save_file(game: String, file: String, data: String) -> Result<(), String> {
+pub fn config_save_file(
+    game: String,
+    source: String,
+    file: String,
+    base_sha1: String,
+    expected_lines: u32,
+    hunks: Vec<ConfigHunkDto>,
+) -> Result<String, String> {
     let game = instance_snapshot(&game)?;
-    let path = resolve_under(&game.get_game_path(), &file)?;
+    let path = resolve_source(&game, &source, &file)?;
     check_binary(&path)?;
 
-    path_helper::write_text(&path, &data).map_err(|err| err.to_string())
+    let now = path_helper::read_text(&path).map_err(|err| err.to_string())?;
+    if text_sha1(&now) != base_sha1 {
+        return Err(String::from(err_keys::FILE_CHANGED));
+    }
+
+    // 差异套不上（越界、交叉）或行数对不上一律按"磁盘上那份已经变了"处理：
+    // 两种都只说明这份差异不是对着现在这一份算的。`write_diff` 出错时不落盘
+    let hunks: Vec<LineHunk> = hunks
+        .iter()
+        .map(|hunk| {
+            LineHunk::new(
+                hunk.start as usize,
+                hunk.delete_count as usize,
+                hunk.lines.clone(),
+            )
+        })
+        .collect();
+
+    let text = text_diff::write_diff(&path, &now, &hunks, expected_lines as usize)
+        .map_err(|_| String::from(err_keys::FILE_CHANGED))?;
+    Ok(text_sha1(&text))
 }
 
-/// 读取一个 NBT 文件，转成可展示的树
+/// 文本全文的 SHA1，十六进制小写
+///
+/// 按**解码后文本**的 UTF-8 字节算：读与写都过同一套解码，前后自然同一口径
+fn text_sha1(text: &str) -> String {
+    hash_helper::gen_hash(HashType::Sha1, text.as_bytes())
+}
+
+/// 读取一个 NBT 文件，转成可展示、可编辑的树
 ///
 /// - `game`: 实例 uuid
-/// - `file`: 相对游戏目录的路径
+/// - `source`: 来源，空串为实例本身，否则是存档目录名
+/// - `file`: 来源内的相对路径
+///
+/// 打开一个 NBT 文件，转成可展示、可编辑的树
+///
+/// **打开就是真的打开**：文件句柄与解析出的内容都留在会话里（见 [`nbt_session`]），
+/// 之后的保存直接在那份状态上改、由同一个句柄写回。会话还在时再打开一次给的是会话里
+/// 那棵树，不碰磁盘；要重新读盘就先 [`config_close_nbt`]，再打开。
+///
+/// - `game`: 实例 uuid
+/// - `source`: 来源，空串为实例本身，否则是存档目录名
+/// - `file`: 来源内的相对路径
 ///
 /// # 返回值
 ///
-/// 见 [`NbtNodeDto`]；路径非法返回 `err.fileName`，体积超过 [`MAX_FILE_SIZE`] 返回
-/// `err.fileTooLarge`，不是 NBT 或解不开时返回内核错误串
+/// 见 [`ConfigNbtDto`]：树 + **文件字节**的 SHA1（保存时按它核对）；
+/// 路径非法返回 `err.fileName`，体积超过 [`MAX_FILE_SIZE`] 返回 `err.fileTooLarge`，
+/// 不是 NBT 或解不开时返回内核错误串
 #[gui_macros::ipc_group("config")]
 #[tauri::command]
-pub fn config_get_nbt(game: String, file: String) -> Result<NbtNodeDto, String> {
+pub fn config_open_nbt(game: String, source: String, file: String) -> Result<ConfigNbtDto, String> {
     let game = instance_snapshot(&game)?;
-    let path = resolve_under(&game.get_game_path(), &file)?;
+    let path = resolve_source(&game, &source, &file)?;
     check_size(&path)?;
 
-    let mut stream = path_helper::open_read(&path).map_err(|err| err.to_string())?;
-    let nbt = NbtFile::read(&mut stream).map_err(|err| err.to_string())?;
+    let (node, sha1) = nbt_session::open_with(&path, |nbt| nbt_node(String::new(), &nbt.nbt))?;
+    Ok(ConfigNbtDto { node, sha1 })
+}
 
-    Ok(nbt_node(String::new(), &nbt.nbt))
+/// 关掉一个 NBT 文件的会话，句柄跟着释放
+///
+/// 前端在切走配置窗口、或不想再保持这个文件打开时调用；下次打开就是重新读盘。
+///
+/// - `game`: 实例 uuid
+/// - `source`: 来源，空串为实例本身，否则是存档目录名
+/// - `file`: 来源内的相对路径，与 [`config_open_nbt`] 同一口径
+///
+/// # 返回值
+///
+/// 路径非法返回 `err.fileName`；没打开过的文件也当成功
+#[gui_macros::ipc_group("config")]
+#[tauri::command]
+pub fn config_close_nbt(game: String, source: String, file: String) -> Result<(), String> {
+    let game = instance_snapshot(&game)?;
+    let path = resolve_source(&game, &source, &file)?;
+
+    nbt_session::close(&path);
+    Ok(())
+}
+
+/// 按前端记下的一批改动改写 NBT 文件
+///
+/// 改动按顺序套用，见 [`NbtEditDto`]：改值 / 新增 / 删除三种。写回在**打开时那个句柄**上做
+/// （见 [`nbt_session::update_with`]），不重新打开也不重新读盘；压缩方式沿用原文件。
+/// 改之前核对前端那份基准 SHA1 与文件有没有被别处动过。
+///
+/// - `game`: 实例 uuid
+/// - `source`: 来源，空串为实例本身，否则是存档目录名
+/// - `file`: 来源内的相对路径，与 [`config_open_nbt`] 同一口径
+/// - `base_sha1`: 打开时那一份文件字节的 SHA1
+/// - `edits`: 要套的改动，按发生顺序
+///
+/// # 返回值
+///
+/// 写回后文件字节的 SHA1；路径非法返回 `err.fileName`，没打开过、基准对不上或文件被别处
+/// 改过返回 `err.fileChanged`，只读文件返回 `err.fileReadOnly`，路径对不上返回 `err.nbtPath`，
+/// 值解析不了或数组超上限返回 `err.nbtValue`
+#[gui_macros::ipc_group("config")]
+#[tauri::command]
+pub fn config_set_nbt(
+    game: String,
+    source: String,
+    file: String,
+    base_sha1: String,
+    edits: Vec<NbtEditDto>,
+) -> Result<String, String> {
+    let game = instance_snapshot(&game)?;
+    let path = resolve_source(&game, &source, &file)?;
+    check_size(&path)?;
+
+    nbt_session::update_with(&path, &base_sha1, |nbt| {
+        apply_nbt_edits(&mut nbt.nbt, &edits)
+    })
+}
+
+/// 依次套用一批改动
+///
+/// - `root`: 根标签
+/// - `edits`: 要套的改动，按发生顺序
+///
+/// # 返回值
+///
+/// 全部套成功返回 `Ok(())`；路径对不上返回 `err.nbtPath`，值解析不了返回 `err.nbtValue`
+fn apply_nbt_edits(root: &mut NbtType, edits: &[NbtEditDto]) -> Result<(), String> {
+    for edit in edits {
+        match edit.op {
+            NbtOpDto::Set => set_nbt_at(root, &edit.path, &edit.value)?,
+            NbtOpDto::Add => add_nbt_node(root, &edit.path, edit.kind, &edit.value)?,
+            NbtOpDto::Rename => rename_nbt_node(root, &edit.path, &edit.value)?,
+            NbtOpDto::Remove => remove_nbt_node(root, &edit.path)?,
+        }
+    }
+
+    Ok(())
+}
+
+/// 按路径改一处值
+///
+/// 复合取成员、列表与数组取下标的元素；路径为空就是根标签自己。数组元素不是独立标签，
+/// 只能在这里按下标落到具体的那一格上。
+///
+/// - `root`: 根标签
+/// - `path`: 逐层的键名或下标
+/// - `value`: 新值文本
+///
+/// # 返回值
+///
+/// 改成功返回 `Ok(())`；路径对不上返回 `err.nbtPath`，值解析不了返回 `err.nbtValue`
+fn set_nbt_at(root: &mut NbtType, path: &[String], value: &str) -> Result<(), String> {
+    let Some((last, parent_path)) = path.split_last() else {
+        return set_nbt_scalar(root, value);
+    };
+    let bad_path = || String::from(err_keys::NBT_PATH);
+
+    match nbt_at_mut(root, parent_path)? {
+        NbtType::Compound(compound) => {
+            let node = compound.data.get_mut(last).ok_or_else(bad_path)?;
+            set_nbt_scalar(node, value)
+        }
+        NbtType::List(list) => {
+            let node = list.get_item_mut(parse_index(last)?).ok_or_else(bad_path)?;
+            set_nbt_scalar(node, value)
+        }
+        NbtType::ByteArray(v) => set_array_item(&mut v.data, last, value),
+        NbtType::IntArray(v) => set_array_item(&mut v.data, last, value),
+        NbtType::LongArray(v) => set_array_item(&mut v.data, last, value),
+        _ => Err(bad_path()),
+    }
+}
+
+/// 路径里的一段下标：十进制，别的写法一律算路径对不上
+fn parse_index(segment: &str) -> Result<usize, String> {
+    segment
+        .parse::<usize>()
+        .map_err(|_| String::from(err_keys::NBT_PATH))
+}
+
+/// 改数组里的一个元素，值按元素类型解析
+///
+/// - `data`: 数组本体
+/// - `index`: 元素下标的十进制字符串
+/// - `value`: 新值文本
+///
+/// # 返回值
+///
+/// 改成功返回 `Ok(())`；下标越界返回 `err.nbtPath`，值解析不了返回 `err.nbtValue`
+fn set_array_item<T: std::str::FromStr>(data: &mut [T], index: &str, value: &str) -> Result<(), String> {
+    let slot = data
+        .get_mut(parse_index(index)?)
+        .ok_or_else(|| String::from(err_keys::NBT_PATH))?;
+    *slot = value
+        .trim()
+        .parse::<T>()
+        .map_err(|_| String::from(err_keys::NBT_VALUE))?;
+
+    Ok(())
+}
+
+/// 按路径走到要改的那个标签
+///
+/// 复合按键名、列表按下标；路径为空就是根标签自己。
+///
+/// - `root`: 根标签
+/// - `path`: 逐层的键名或列表下标
+///
+/// # 返回值
+///
+/// 目标标签的可变引用；走到非复合 / 非列表上、索引越界或下标不是整数时返回 `err.nbtPath`
+fn nbt_at_mut<'a>(root: &'a mut NbtType, path: &[String]) -> Result<&'a mut NbtType, String> {
+    let mut cur = root;
+    for segment in path {
+        cur = match cur {
+            NbtType::Compound(compound) => compound
+                .data
+                .get_mut(segment)
+                .ok_or_else(|| String::from(err_keys::NBT_PATH))?,
+            NbtType::List(list) => {
+                let index = segment
+                    .parse::<usize>()
+                    .map_err(|_| String::from(err_keys::NBT_PATH))?;
+                list.get_item_mut(index)
+                    .ok_or_else(|| String::from(err_keys::NBT_PATH))?
+            }
+            _ => return Err(String::from(err_keys::NBT_PATH)),
+        };
+    }
+
+    Ok(cur)
+}
+
+/// 按标签类型把文本解析成新值，只认标量
+///
+/// Byte 在本仓库里是 `u8`（0–255），与 `nbt_node` 的展示口径一致。
+///
+/// - `nbt`: 目标标签
+/// - `value`: 新值文本
+///
+/// # 返回值
+///
+/// 解析成功返回 `Ok(())`；不是标量返回 `err.nbtPath`，值解析不了返回 `err.nbtValue`
+fn set_nbt_scalar(nbt: &mut NbtType, value: &str) -> Result<(), String> {
+    let text = value.trim();
+    let bad = || String::from(err_keys::NBT_VALUE);
+
+    match nbt {
+        NbtType::Byte(v) => v.data = text.parse().map_err(|_| bad())?,
+        NbtType::Short(v) => v.data = text.parse().map_err(|_| bad())?,
+        NbtType::Int(v) => v.data = text.parse().map_err(|_| bad())?,
+        NbtType::Long(v) => v.data = text.parse().map_err(|_| bad())?,
+        NbtType::Float(v) => v.data = text.parse().map_err(|_| bad())?,
+        NbtType::Double(v) => v.data = text.parse().map_err(|_| bad())?,
+        NbtType::String(v) => v.data = value.to_string(),
+        _ => return Err(String::from(err_keys::NBT_PATH)),
+    }
+
+    Ok(())
+}
+
+/// 解析数组的值文本：逗号或空白分隔的一串数
+///
+/// 空串是空数组；元素个数超过 [`MAX_ARRAY_EDIT`] 直接拒掉，别让一次 IPC 塞进上万个数。
+///
+/// - `text`: 值文本，如 `1, 2, 3`
+///
+/// # 返回值
+///
+/// 解析出的元素；有解析不了的或超过上限时返回 `err.nbtValue`
+fn parse_array<T: std::str::FromStr>(text: &str) -> Result<Vec<T>, String> {
+    let mut out = Vec::new();
+    for item in text.split([',', ' ', '\t', '\r', '\n']) {
+        if item.is_empty() {
+            continue;
+        }
+        if out.len() >= MAX_ARRAY_EDIT {
+            return Err(String::from(err_keys::NBT_VALUE));
+        }
+        out.push(item.parse::<T>().map_err(|_| String::from(err_keys::NBT_VALUE))?);
+    }
+
+    Ok(out)
+}
+
+/// 按路径改一个复合成员的键名
+///
+/// 只换键名，标签本体（类型、值、子树）原样搬到新键下；列表与数组的元素按序号认，
+/// 没有键名可改，根标签自己也没有键名，三种都拒掉。
+///
+/// - `root`: 根标签
+/// - `path`: 目标标签的路径，至少一段
+/// - `new_name`: 新键名
+///
+/// # 返回值
+///
+/// 改成功返回 `Ok(())`；父容器不是复合、旧键不存在、新键已被占用或路径为空返回 `err.nbtPath`
+fn rename_nbt_node(root: &mut NbtType, path: &[String], new_name: &str) -> Result<(), String> {
+    let (last, parent_path) = path
+        .split_last()
+        .ok_or_else(|| String::from(err_keys::NBT_PATH))?;
+
+    match nbt_at_mut(root, parent_path)? {
+        NbtType::Compound(compound) => {
+            // 改成同名等于没改：别把它当成"新键已被占用"
+            if last == new_name {
+                return Ok(());
+            }
+            if compound.data.contains_key(new_name) {
+                return Err(String::from(err_keys::NBT_PATH));
+            }
+            let node = compound
+                .data
+                .remove(last)
+                .ok_or_else(|| String::from(err_keys::NBT_PATH))?;
+            compound.data.insert(new_name.to_string(), node);
+            Ok(())
+        }
+        _ => Err(String::from(err_keys::NBT_PATH)),
+    }
+}
+
+/// 按路径新建一个标签并挂进父容器
+///
+/// 路径的最后一段在复合里当键名、在列表与数组里当插入下标（等于长度就是追加），前面几段
+/// 照常走到父容器；空列表的元素类型跟随新元素，因为列表是同类型容器。数组的元素类型随
+/// 数组自己，不看 `kind`。
+///
+/// - `root`: 根标签
+/// - `path`: 新标签的路径，至少一段
+/// - `kind`: 新标签的类型；缺省或为 [`NbtKindDto::End`] 都报错，父容器是数组时忽略
+/// - `value`: 新标签的值文本
+///
+/// # 返回值
+///
+/// 挂上返回 `Ok(())`；父容器不是复合 / 列表 / 数组、键已存在、下标越界或元素类型对不上
+/// 返回 `err.nbtPath`，值解析不了返回 `err.nbtValue`
+fn add_nbt_node(
+    root: &mut NbtType,
+    path: &[String],
+    kind: Option<NbtKindDto>,
+    value: &str,
+) -> Result<(), String> {
+    let (last, parent_path) = path
+        .split_last()
+        .ok_or_else(|| String::from(err_keys::NBT_PATH))?;
+    let kind = kind.ok_or_else(|| String::from(err_keys::NBT_PATH))?;
+    let node = make_nbt_node(kind, value)?;
+
+    match nbt_at_mut(root, parent_path)? {
+        NbtType::Compound(compound) => {
+            if compound.data.contains_key(last) {
+                return Err(String::from(err_keys::NBT_PATH));
+            }
+            compound.data.insert(last.clone(), node);
+            Ok(())
+        }
+        NbtType::List(list) => {
+            let index = parse_index(last)?;
+            // 空列表还没有元素类型：跟着第一个元素定下来
+            if list.len() == 0 {
+                list.set_num(node.get_num());
+            }
+            if list.insert_item(index, node) {
+                Ok(())
+            } else {
+                Err(String::from(err_keys::NBT_PATH))
+            }
+        }
+        NbtType::ByteArray(v) => add_array_item(&mut v.data, last, value),
+        NbtType::IntArray(v) => add_array_item(&mut v.data, last, value),
+        NbtType::LongArray(v) => add_array_item(&mut v.data, last, value),
+        _ => Err(String::from(err_keys::NBT_PATH)),
+    }
+}
+
+/// 往数组里插一个元素，值按元素类型解析
+///
+/// 元素个数按 [`MAX_ARRAY_EDIT`] 封顶，别让界面上的数组长到展开不动。
+///
+/// - `data`: 数组本体
+/// - `index`: 插入下标的十进制字符串，等于长度就是追加
+/// - `value`: 新元素文本
+///
+/// # 返回值
+///
+/// 插上返回 `Ok(())`；下标越界或已到上限返回 `err.nbtPath`，值解析不了返回 `err.nbtValue`
+fn add_array_item<T: std::str::FromStr>(
+    data: &mut Vec<T>,
+    index: &str,
+    value: &str,
+) -> Result<(), String> {
+    let index = parse_index(index)?;
+    if index > data.len() || data.len() >= MAX_ARRAY_EDIT {
+        return Err(String::from(err_keys::NBT_PATH));
+    }
+    let item = value
+        .trim()
+        .parse::<T>()
+        .map_err(|_| String::from(err_keys::NBT_VALUE))?;
+    data.insert(index, item);
+
+    Ok(())
+}
+
+/// 按路径删掉一个标签
+///
+/// 路径的最后一段在复合里是键名、在列表与数组里是下标；根标签删不得，路径为空直接报错。
+///
+/// - `root`: 根标签
+/// - `path`: 目标标签的路径，至少一段
+///
+/// # 返回值
+///
+/// 删掉返回 `Ok(())`；父容器不是复合 / 列表 / 数组、键不存在或下标越界返回 `err.nbtPath`
+fn remove_nbt_node(root: &mut NbtType, path: &[String]) -> Result<(), String> {
+    let (last, parent_path) = path
+        .split_last()
+        .ok_or_else(|| String::from(err_keys::NBT_PATH))?;
+
+    match nbt_at_mut(root, parent_path)? {
+        NbtType::Compound(compound) => {
+            if compound.data.remove(last).is_some() {
+                Ok(())
+            } else {
+                Err(String::from(err_keys::NBT_PATH))
+            }
+        }
+        NbtType::List(list) => {
+            let index = parse_index(last)?;
+            if index >= list.len() {
+                return Err(String::from(err_keys::NBT_PATH));
+            }
+            list.remove(index);
+            Ok(())
+        }
+        NbtType::ByteArray(v) => remove_array_item(&mut v.data, last),
+        NbtType::IntArray(v) => remove_array_item(&mut v.data, last),
+        NbtType::LongArray(v) => remove_array_item(&mut v.data, last),
+        _ => Err(String::from(err_keys::NBT_PATH)),
+    }
+}
+
+/// 删掉数组里的一个元素
+///
+/// - `data`: 数组本体
+/// - `index`: 元素下标的十进制字符串
+///
+/// # 返回值
+///
+/// 删掉返回 `Ok(())`；下标越界返回 `err.nbtPath`
+fn remove_array_item<T>(data: &mut Vec<T>, index: &str) -> Result<(), String> {
+    let index = parse_index(index)?;
+    if index >= data.len() {
+        return Err(String::from(err_keys::NBT_PATH));
+    }
+    data.remove(index);
+
+    Ok(())
+}
+
+/// 按类型与值文本造一个新标签
+///
+/// 复合与列表造空的，值文本忽略，随后可以往里加成员 / 元素。
+///
+/// - `kind`: 标签类型，[`NbtKindDto::End`] 不可造
+/// - `value`: 值文本
+///
+/// # 返回值
+///
+/// 新建的标签；类型为 End 返回 `err.nbtPath`，值解析不了返回 `err.nbtValue`
+fn make_nbt_node(kind: NbtKindDto, value: &str) -> Result<NbtType, String> {
+    let text = value.trim();
+    let bad = || String::from(err_keys::NBT_VALUE);
+
+    let node = match kind {
+        NbtKindDto::End => return Err(String::from(err_keys::NBT_PATH)),
+        NbtKindDto::Byte => nbt_types::byte(text.parse().map_err(|_| bad())?).to_nbt(),
+        NbtKindDto::Short => nbt_types::short(text.parse().map_err(|_| bad())?).to_nbt(),
+        NbtKindDto::Int => nbt_types::int(text.parse().map_err(|_| bad())?).to_nbt(),
+        NbtKindDto::Long => nbt_types::long(text.parse().map_err(|_| bad())?).to_nbt(),
+        NbtKindDto::Float => nbt_types::float(text.parse().map_err(|_| bad())?).to_nbt(),
+        NbtKindDto::Double => nbt_types::double(text.parse().map_err(|_| bad())?).to_nbt(),
+        NbtKindDto::String => nbt_types::string(value).to_nbt(),
+        NbtKindDto::ByteArray => nbt_types::byte_array(parse_array(value)?).to_nbt(),
+        NbtKindDto::IntArray => nbt_types::int_array(parse_array(value)?).to_nbt(),
+        NbtKindDto::LongArray => nbt_types::long_array(parse_array(value)?).to_nbt(),
+        NbtKindDto::List => nbt_types::list(NBT_END_ORDER).to_nbt(),
+        NbtKindDto::Compound => nbt_types::compound().to_nbt(),
+    };
+
+    Ok(node)
 }
 
 /// 读取一个区域文件（`.mca`）的区块表
@@ -359,7 +948,8 @@ pub fn config_get_nbt(game: String, file: String) -> Result<NbtNodeDto, String> 
 /// 全解析一遍只为列个表不值当。要看某个区块的字节走 [`config_get_bytes_slice`]。
 ///
 /// - `game`: 实例 uuid
-/// - `file`: 相对游戏目录的路径
+/// - `source`: 来源，空串为实例本身，否则是存档目录名
+/// - `file`: 来源内的相对路径
 ///
 /// # 返回值
 ///
@@ -367,9 +957,13 @@ pub fn config_get_nbt(game: String, file: String) -> Result<NbtNodeDto, String> 
 /// 扩展名不是 `.mca` 返回 `err.notMcaFile`，文件头读不满返回内核错误串
 #[gui_macros::ipc_group("config")]
 #[tauri::command]
-pub fn config_get_mca(game: String, file: String) -> Result<Vec<McaChunkDto>, String> {
+pub fn config_get_mca(
+    game: String,
+    source: String,
+    file: String,
+) -> Result<Vec<McaChunkDto>, String> {
     let game = instance_snapshot(&game)?;
-    let path = resolve_under(&game.get_game_path(), &file)?;
+    let path = resolve_source(&game, &source, &file)?;
     if get_file_type(&path) != FileItemType::Mca {
         return Err(String::from(err_keys::NOT_MCA_FILE));
     }
@@ -397,7 +991,8 @@ pub fn config_get_mca(game: String, file: String) -> Result<Vec<McaChunkDto>, St
 /// 不过 [`check_binary`]：图片、压缩包就是靠这个看的，NBT 与区域文件也能拿它看原始字节。
 ///
 /// - `game`: 实例 uuid
-/// - `file`: 相对游戏目录的路径
+/// - `source`: 来源，空串为实例本身，否则是存档目录名
+/// - `file`: 来源内的相对路径
 /// - `offset`: 起始偏移，单位字节
 /// - `length`: 想要的字节数，单位字节；上限 [`MAX_SLICE_SIZE`]
 ///
@@ -408,12 +1003,13 @@ pub fn config_get_mca(game: String, file: String) -> Result<Vec<McaChunkDto>, St
 #[tauri::command]
 pub fn config_get_bytes_slice(
     game: String,
+    source: String,
     file: String,
     offset: u64,
     length: u32,
 ) -> Result<BytesSliceDto, String> {
     let game = instance_snapshot(&game)?;
-    let path = resolve_under(&game.get_game_path(), &file)?;
+    let path = resolve_source(&game, &source, &file)?;
 
     read_slice(&path, offset, length)
 }
@@ -442,7 +1038,8 @@ fn image_mime(path: &Path) -> &'static str {
 /// [`MAX_FILE_SIZE`]，再大就不是"看一眼"的用途了。
 ///
 /// - `game`: 实例 uuid
-/// - `file`: 相对游戏目录的路径，取自 [`config_get_files`] 或 [`config_saves_get_file`]
+/// - `source`: 来源，空串为实例本身，否则是存档目录名
+/// - `file`: 来源内的相对路径，取自 [`config_get_files`]
 ///
 /// # 返回值
 ///
@@ -450,9 +1047,9 @@ fn image_mime(path: &Path) -> &'static str {
 /// `err.notImageFile`，体积超过上限返回 `err.fileTooLarge`
 #[gui_macros::ipc_group("config")]
 #[tauri::command]
-pub fn config_get_image(game: String, file: String) -> Result<String, String> {
+pub fn config_get_image(game: String, source: String, file: String) -> Result<String, String> {
     let game = instance_snapshot(&game)?;
-    let path = resolve_under(&game.get_game_path(), &file)?;
+    let path = resolve_source(&game, &source, &file)?;
     if get_file_type(&path) != FileItemType::Image {
         return Err(String::from(err_keys::NOT_IMAGE_FILE));
     }
@@ -469,35 +1066,6 @@ pub fn config_get_image(game: String, file: String) -> Result<String, String> {
     ))
 }
 
-/// 获取一个存档目录下的文件列表
-///
-/// 整个存档目录递归列出，含数据包、`level.dat` 与区域文件；类型标在 `fileType` 上，
-/// 前端据此决定打开哪种视图。
-///
-/// - `game`: 实例 uuid
-/// - `save`: 存档目录名，即 saves 下的一级目录
-///
-/// # 返回值
-///
-/// 相对游戏目录的路径 + 类型；目录名非法返回 `err.fileName`，目录不存在返回 `err.saveNotFound`
-#[gui_macros::ipc_group("config_saves")]
-#[tauri::command]
-pub fn config_saves_get_file(game: String, save: String) -> Result<Vec<FileItemDto>, String> {
-    let game = instance_snapshot(&game)?;
-    let base = game.get_game_path();
-    let dir = resolve_under(&game.get_saves_path(), &save)?;
-    if !dir.is_dir() {
-        return Err(String::from(err_keys::SAVE_NOT_FOUND));
-    }
-
-    let mut items = Vec::new();
-    for file in path_helper::get_all_files(dir) {
-        push_file(&mut items, &base, &file);
-    }
-
-    Ok(items)
-}
-
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -508,7 +1076,392 @@ mod tests {
 
     use crate::dtos::{FileItemType, NbtKindDto};
 
-    use super::{MAX_SLICE_SIZE, check_binary, get_file_type, nbt_node, read_slice, resolve_under};
+    use super::{
+        MAX_ARRAY_EDIT, MAX_SLICE_SIZE, apply_nbt_edits, check_binary, get_file_type, nbt_at_mut,
+        nbt_node, read_slice, resolve_source_in, resolve_under,
+    };
+    use crate::dtos::{NbtEditDto, NbtOpDto};
+    use mml_nbt::nbt_types::{compound, int, list, string};
+    use mml_nbt::{NBT_END_ORDER, NbtType};
+
+    /// 造一个复合标签
+    fn compound_of(entries: Vec<(&str, NbtType)>) -> NbtType {
+        let mut obj = compound();
+        for (key, value) in entries {
+            obj.data.insert(key.to_string(), value);
+        }
+        obj.to_nbt()
+    }
+
+    /// 造一个列表标签；元素类型序号取第一个元素的，空列表用 END
+    fn list_of(items: Vec<NbtType>) -> NbtType {
+        let num = items.first().map(|item| item.get_num()).unwrap_or(NBT_END_ORDER);
+        let mut obj = list(num);
+        for item in items {
+            obj.add_item(item);
+        }
+        obj.to_nbt()
+    }
+
+    /// 造一份带复合与列表的样本
+    fn sample_nbt() -> NbtType {
+        compound_of(vec![
+            (
+                "Data",
+                compound_of(vec![
+                    ("GameType", int(1).to_nbt()),
+                    ("Name", string("x").to_nbt()),
+                ]),
+            ),
+            ("Items", list_of(vec![int(3).to_nbt(), int(4).to_nbt()])),
+        ])
+    }
+
+    /// 造一条"改值"的改动
+    fn set_at(path: &[&str], value: &str) -> NbtEditDto {
+        NbtEditDto {
+            op: NbtOpDto::Set,
+            path: path.iter().map(|item| item.to_string()).collect(),
+            kind: None,
+            value: value.to_string(),
+        }
+    }
+
+    /// 造一条"新增"的改动
+    fn add_at(path: &[&str], kind: NbtKindDto, value: &str) -> NbtEditDto {
+        NbtEditDto {
+            op: NbtOpDto::Add,
+            path: path.iter().map(|item| item.to_string()).collect(),
+            kind: Some(kind),
+            value: value.to_string(),
+        }
+    }
+
+    /// 造一条"改名"的改动
+    fn rename_at(path: &[&str], new_name: &str) -> NbtEditDto {
+        NbtEditDto {
+            op: NbtOpDto::Rename,
+            path: path.iter().map(|item| item.to_string()).collect(),
+            kind: None,
+            value: new_name.to_string(),
+        }
+    }
+
+    /// 造一条"删除"的改动
+    fn remove_at(path: &[&str]) -> NbtEditDto {
+        NbtEditDto {
+            op: NbtOpDto::Remove,
+            path: path.iter().map(|item| item.to_string()).collect(),
+            kind: None,
+            value: String::new(),
+        }
+    }
+
+    /// 按路径取一个标量标签
+    fn at<'a>(root: &'a mut NbtType, path: &[&str]) -> &'a mut NbtType {
+        let path: Vec<String> = path.iter().map(|item| item.to_string()).collect();
+        nbt_at_mut(root, &path).unwrap()
+    }
+
+    /// 标量按路径改：复合成员、列表元素都能走到
+    #[test]
+    fn apply_nbt_edits_changes_scalars() {
+        let mut root = sample_nbt();
+        apply_nbt_edits(
+            &mut root,
+            &[
+                set_at(&["Data", "GameType"], "2"),
+                set_at(&["Items", "1"], "9"),
+                set_at(&["Data", "Name"], " 前后有空格也照收 "),
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(at(&mut root, &["Data", "GameType"]).as_int().unwrap().data, 2);
+        assert_eq!(at(&mut root, &["Items", "1"]).as_int().unwrap().data, 9);
+
+        // 字符串只 trim 掉解析用的空白，存的是原样（前后空格保留）
+        assert_eq!(
+            at(&mut root, &["Data", "Name"]).as_string().unwrap().data,
+            " 前后有空格也照收 "
+        );
+    }
+
+    /// 路径对不上、值解析不了都要拒掉：宁可报错，也不能写坏文件
+    #[test]
+    fn apply_nbt_edits_rejects_bad_edits() {
+        let bad = [
+            // 键不存在
+            set_at(&["Nope"], "1"),
+            // 值不是整数
+            set_at(&["Data", "GameType"], "abc"),
+            // 指到了复合上（改值只认标量与数组）
+            set_at(&["Data"], "1"),
+            // 列表下标越界
+            set_at(&["Items", "9"], "1"),
+            // 列表下标不是整数
+            set_at(&["Items", "x"], "1"),
+        ];
+
+        for edit in bad {
+            assert!(
+                apply_nbt_edits(&mut sample_nbt(), &[edit]).is_err(),
+                "应当拒绝"
+            );
+        }
+    }
+
+    /// 数组元素按下标改：三种元素类型都认，越界与解析不了都拒掉
+    #[test]
+    fn apply_nbt_edits_edits_array_items() {
+        use mml_nbt::nbt_types::{byte_array, int_array, long_array};
+
+        let mut root = compound_of(vec![
+            ("Bytes", byte_array(vec![1, 2]).to_nbt()),
+            ("Ints", int_array(vec![7]).to_nbt()),
+            ("Longs", long_array(vec![9]).to_nbt()),
+        ]);
+
+        apply_nbt_edits(
+            &mut root,
+            &[
+                set_at(&["Bytes", "1"], "255"),
+                set_at(&["Ints", "0"], "-1"),
+                set_at(&["Longs", "0"], "9000000000"),
+            ],
+        )
+        .unwrap();
+
+        match at(&mut root, &["Bytes"]) {
+            NbtType::ByteArray(v) => assert_eq!(v.data, vec![1, 255]),
+            other => panic!("类型变了：{}", other),
+        }
+        match at(&mut root, &["Ints"]) {
+            NbtType::IntArray(v) => assert_eq!(v.data, vec![-1]),
+            other => panic!("类型变了：{}", other),
+        }
+        match at(&mut root, &["Longs"]) {
+            NbtType::LongArray(v) => assert_eq!(v.data, vec![9_000_000_000]),
+            other => panic!("类型变了：{}", other),
+        }
+
+        // 越界、解析不了、以及想整段替换数组（元素只能一个个改）都要拒
+        for edit in [
+            set_at(&["Bytes", "9"], "1"),
+            set_at(&["Bytes", "0"], "256"),
+            set_at(&["Ints", "0"], "x"),
+            set_at(&["Bytes", "x"], "1"),
+            set_at(&["Bytes"], "1, 2"),
+        ] {
+            assert!(
+                apply_nbt_edits(&mut sample_nbt(), &[edit]).is_err(),
+                "应当拒绝"
+            );
+        }
+    }
+
+    /// 数组与列表一样能增删元素：下标等于长度是追加，删一个后面的下标往前挪
+    #[test]
+    fn apply_nbt_edits_adds_and_removes_array_items() {
+        use mml_nbt::nbt_types::int_array;
+
+        let mut root = compound_of(vec![("Ints", int_array(vec![1, 2]).to_nbt())]);
+
+        apply_nbt_edits(
+            &mut root,
+            &[
+                add_at(&["Ints", "2"], NbtKindDto::Int, "3"),
+                add_at(&["Ints", "0"], NbtKindDto::Int, "0"),
+                remove_at(&["Ints", "1"]),
+            ],
+        )
+        .unwrap();
+
+        match at(&mut root, &["Ints"]) {
+            NbtType::IntArray(v) => assert_eq!(v.data, vec![0, 2, 3]),
+            other => panic!("类型变了：{}", other),
+        }
+
+        // 下标越界、值解析不了、加到上限之外都要拒
+        let full: Vec<i32> = (0..MAX_ARRAY_EDIT as i32).collect();
+        let mut full_root = compound_of(vec![("Ints", int_array(full).to_nbt())]);
+        assert!(
+            apply_nbt_edits(&mut full_root, &[add_at(&["Ints", "0"], NbtKindDto::Int, "1")]).is_err(),
+            "到上限后不该再加"
+        );
+        for edit in [
+            add_at(&["Ints", "9"], NbtKindDto::Int, "1"),
+            add_at(&["Ints", "2"], NbtKindDto::Int, "x"),
+            remove_at(&["Ints", "9"]),
+        ] {
+            let mut root = compound_of(vec![("Ints", int_array(vec![1, 2]).to_nbt())]);
+            assert!(apply_nbt_edits(&mut root, &[edit]).is_err(), "应当拒绝");
+        }
+    }
+
+    /// 增删：复合加成员、列表加元素、两处都能删，根标签删不得
+    #[test]
+    fn apply_nbt_edits_adds_and_removes() {
+        let mut root = sample_nbt();
+        apply_nbt_edits(
+            &mut root,
+            &[
+                // 复合加成员
+                add_at(&["Data", "New"], NbtKindDto::Int, "7"),
+                // 列表追加：下标等于长度
+                add_at(&["Items", "2"], NbtKindDto::Int, "5"),
+                // 复合删成员、列表删元素
+                remove_at(&["Data", "Name"]),
+                remove_at(&["Items", "0"]),
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(at(&mut root, &["Data", "New"]).as_int().unwrap().data, 7);
+        match at(&mut root, &["Items"]) {
+            NbtType::List(v) => {
+                assert_eq!(v.len(), 2);
+                assert_eq!(v.get_item(0).unwrap().as_int().unwrap().data, 4);
+                assert_eq!(v.get_item(1).unwrap().as_int().unwrap().data, 5);
+            }
+            other => panic!("类型变了：{}", other),
+        }
+        assert!(
+            nbt_at_mut(&mut root, &["Data".to_string(), "Name".to_string()]).is_err(),
+            "成员应当已删掉"
+        );
+
+        // 键已存在、下标越界、类型对不上、父容器不是容器、删根标签都要拒
+        for edit in [
+            add_at(&["Data", "GameType"], NbtKindDto::Int, "1"),
+            add_at(&["Items", "9"], NbtKindDto::Int, "1"),
+            add_at(&["Items", "0"], NbtKindDto::String, "x"),
+            add_at(&["Data", "GameType", "Deep"], NbtKindDto::Int, "1"),
+            add_at(&["Data", "Bad"], NbtKindDto::End, "1"),
+            remove_at(&["Data", "Nope"]),
+            remove_at(&["Items", "9"]),
+            remove_at(&[]),
+        ] {
+            assert!(
+                apply_nbt_edits(&mut sample_nbt(), &[edit]).is_err(),
+                "应当拒绝"
+            );
+        }
+    }
+
+    /// 改名：只换键名，标签本体连同子树原样搬过去
+    #[test]
+    fn apply_nbt_edits_renames_members() {
+        let mut root = sample_nbt();
+        apply_nbt_edits(
+            &mut root,
+            &[
+                // 标量改名：类型与值都不动
+                rename_at(&["Data", "Name"], "Title"),
+                // 复合改名：整棵子树跟着走
+                rename_at(&["Data"], "Info"),
+                // 改成同名：不动结构，也不算错
+                rename_at(&["Info", "GameType"], "GameType"),
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(at(&mut root, &["Info", "Title"]).as_string().unwrap().data, "x");
+        assert_eq!(at(&mut root, &["Info", "GameType"]).as_int().unwrap().data, 1);
+        assert!(
+            nbt_at_mut(&mut root, &["Data".to_string()]).is_err(),
+            "旧键应当已不在"
+        );
+
+        // 新键已被占用、旧键不存在、父容器不是复合（列表元素）、改根标签都要拒
+        for edit in [
+            rename_at(&["Data", "GameType"], "Name"),
+            rename_at(&["Data", "Nope"], "X"),
+            rename_at(&["Items", "0"], "X"),
+            rename_at(&[], "X"),
+        ] {
+            assert!(
+                apply_nbt_edits(&mut sample_nbt(), &[edit]).is_err(),
+                "应当拒绝"
+            );
+        }
+    }
+
+    /// 空列表由第一个元素定元素类型：加进去之后读得回来
+    #[test]
+    fn apply_nbt_edits_fills_empty_list() {
+        let mut root = compound_of(vec![("Empty", {
+            let mut obj = list(NBT_END_ORDER);
+            obj.to_nbt()
+        })]);
+
+        apply_nbt_edits(&mut root, &[add_at(&["Empty", "0"], NbtKindDto::String, "hi")]).unwrap();
+
+        match at(&mut root, &["Empty"]) {
+            NbtType::List(v) => {
+                assert_eq!(v.len(), 1);
+                assert_eq!(v.get_item(0).unwrap().as_string().unwrap().data, "hi");
+            }
+            other => panic!("类型变了：{}", other),
+        }
+    }
+
+    /// 改过标量后写回再读出来：值真的落到字节里，压缩方式沿用原文件
+    ///
+    /// 走的是 [`config_set_nbt`] 的那条链路：读 → 改 → 写；`NbtFile` 的读写往返
+    /// 只在 mml-nbt 里各自做过，这里钉住"改过的文件还能读回来"
+    #[test]
+    fn nbt_edits_survive_round_trip() {
+        use std::io::Cursor;
+
+        use mml_nbt::nbt_file::{CompressType, NbtFile};
+
+        let file = NbtFile::new(sample_nbt(), CompressType::GZip);
+        let mut bytes = Vec::new();
+        file.write(&mut bytes).unwrap();
+
+        let mut read = NbtFile::read(&mut Cursor::new(&bytes)).unwrap();
+        apply_nbt_edits(
+            &mut read.nbt,
+            &[
+                set_at(&["Data", "GameType"], "2"),
+                add_at(&["Data", "Added"], NbtKindDto::String, "加进来的"),
+            ],
+        )
+        .unwrap();
+        let mut out = Vec::new();
+        read.write(&mut out).unwrap();
+
+        // 写回的是另一份字节（压缩帧与哈希都会变），但必须读得回来
+        assert_ne!(out, bytes);
+        let mut back = NbtFile::read(&mut Cursor::new(&out)).unwrap();
+        assert_eq!(back.compress, CompressType::GZip);
+        assert_eq!(at(&mut back.nbt, &["Data", "GameType"]).as_int().unwrap().data, 2);
+        assert_eq!(
+            at(&mut back.nbt, &["Data", "Added"]).as_string().unwrap().data,
+            "加进来的"
+        );
+    }
+
+    /// 来源决定基准目录：空串相对游戏目录，存档名相对该存档目录，两处都挡穿越
+    #[test]
+    fn resolve_source_switches_base() {
+        let game_path = Path::new("D:/mml/inst/.minecraft");
+        let saves_path = Path::new("D:/mml/inst/.minecraft/saves");
+
+        // 实例来源：相对游戏目录
+        assert_eq!(
+            resolve_source_in(game_path, saves_path, "", "options.txt").unwrap(),
+            game_path.join("options.txt")
+        );
+        // 存档来源：相对该存档目录，**不再套** `saves/<目录>/` 前缀
+        assert_eq!(
+            resolve_source_in(game_path, saves_path, "world", "level.dat").unwrap(),
+            saves_path.join("world").join("level.dat")
+        );
+        assert!(resolve_source_in(game_path, saves_path, "world", "../options.txt").is_err());
+        assert!(resolve_source_in(game_path, saves_path, "../world", "level.dat").is_err());
+    }
 
     /// 相对路径要挡掉穿越：`..`、绝对路径、空串都不行，正反斜杠都认
     #[test]
@@ -673,6 +1626,12 @@ mod tests {
         assert_eq!(node.children[0].kind, NbtKindDto::ByteArray);
         assert_eq!(node.children[0].length, 3);
         assert!(node.children[0].value.is_empty());
+        // 短数组展开成元素行，元素类型是数组的元素类型、名字是下标
+        let items = &node.children[0].items;
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[1].name, "1");
+        assert_eq!(items[1].kind, NbtKindDto::Byte);
+        assert_eq!(items[1].value, "2");
 
         assert_eq!(node.children[1].kind, NbtKindDto::Byte);
         assert_eq!(node.children[1].value, "5");

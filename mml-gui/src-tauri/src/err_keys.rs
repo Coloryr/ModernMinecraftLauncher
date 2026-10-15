@@ -92,12 +92,20 @@ pub const FILE_NAME: &str = "err.fileName";
 pub const FILE_BINARY: &str = "err.fileBinary";
 /// 文件太大，打不开
 pub const FILE_TOO_LARGE: &str = "err.fileTooLarge";
+/// 磁盘上的那一份已经被改过，本次保存基于的版本过期了
+pub const FILE_CHANGED: &str = "err.fileChanged";
+/// 文件是只读的，写不回去
+pub const FILE_READ_ONLY: &str = "err.fileReadOnly";
 /// 不是区域文件
 pub const NOT_MCA_FILE: &str = "err.notMcaFile";
 /// 不是图片文件
 pub const NOT_IMAGE_FILE: &str = "err.notImageFile";
 /// 没找到该存档
 pub const SAVE_NOT_FOUND: &str = "err.saveNotFound";
+/// NBT 改动指向的路径对不上（结构变了，或指向的不是标量）
+pub const NBT_PATH: &str = "err.nbtPath";
+/// NBT 的新值按目标标签类型解析不了
+pub const NBT_VALUE: &str = "err.nbtValue";
 /// 存档名字为空
 pub const SAVE_NAME_EMPTY: &str = "err.saveNameEmpty";
 /// 地图种子不是整数

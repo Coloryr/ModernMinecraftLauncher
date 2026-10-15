@@ -12,7 +12,9 @@ import BaseButton from "../../../components/ui/BaseButton.vue";
 const props = defineProps<{
   /** 实例 uuid */
   uuid: string;
-  /** 相对游戏目录的文件路径 */
+  /** 来源，空串为实例本身，否则是存档目录名 */
+  source: string;
+  /** 来源内的相对文件路径 */
   file: string;
 }>();
 
@@ -63,7 +65,7 @@ function decode(base64: string): Uint8Array {
 async function load() {
   loading.value = true;
   try {
-    const slice = await readConfigBytes(props.uuid, props.file, offset.value, PAGE);
+    const slice = await readConfigBytes(props.uuid, props.source, props.file, offset.value, PAGE);
     offset.value = slice.offset;
     total.value = slice.total;
     bytes.value = decode(slice.data);
@@ -81,9 +83,9 @@ function turn(step: number) {
   void load();
 }
 
-// 换文件时回到开头；`immediate` 让首次打开就有内容
+// 换来源或换文件时回到开头；`immediate` 让首次打开就有内容
 watch(
-  () => [props.uuid, props.file],
+  () => [props.uuid, props.source, props.file],
   () => {
     offset.value = 0;
     void load();

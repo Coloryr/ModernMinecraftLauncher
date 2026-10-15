@@ -12,6 +12,9 @@ import type {
   ColorMcInfoDto,
   ColorMcProgressDto,
   ColorMcReportDto,
+  ConfigHunkDto,
+  ConfigNbtDto,
+  ConfigTextDto,
   DataPackItemDto,
   DetectedPackDto,
   LogLine,
@@ -44,7 +47,7 @@ import type {
   ModRenameDto,
   ModScanProgressDto,
   MotdDto,
-  NbtNodeDto,
+  NbtEditDto,
   ModPackStatusDto,
   NewsItem,
   PackItemDto,
@@ -2282,84 +2285,160 @@ export function openInstanceDir(uuid: string): Promise<void> {
   return commands.main.openInstanceDir(uuid);
 }
 /**
- * 实例可编辑的配置文件列表
+ * 列出某个来源下可编辑的配置文件
  *
  * - `uuid`: 实例 uuid
+ * - `source`: 来源，空串为实例本身，否则是存档目录名
  *
  * # 返回值
  *
- * options.txt 与 `config` / `kubejs` / `local` 下的全部文件，名字是**相对游戏目录**的路径
+ * 来源为空串时是 options.txt 与 `config` / `kubejs` / `local` 下的全部文件，
+ * 否则是该存档目录下的全部文件；名字都是**相对该来源**的路径
  */
-export function listConfigFiles(uuid: string): Promise<FileItemDto[]> {
-  return commands.config.getFiles(uuid);
+export function listConfigFiles(uuid: string, source = ""): Promise<FileItemDto[]> {
+  return commands.config.getFiles(uuid, source);
 }
 /**
  * 读取一个文本配置文件
  *
  * - `uuid`: 实例 uuid
- * - `file`: 相对游戏目录的路径，取自 `listConfigFiles` / `listConfigSaveFiles`
+ * - `source`: 来源，空串为实例本身，否则是存档目录名，与 `listConfigFiles` 一致
+ * - `file`: 来源内的相对路径，取自 `listConfigFiles`
  *
  * # 返回值
  *
- * 全文；二进制文件报 err.fileBinary，过大报 err.fileTooLarge
+ * 见 `ConfigTextDto`：全文 + 全文 SHA1；保存时要把这个 SHA1 一起交回去，
+ * 后端据此确认磁盘上还是打开时的这一份。二进制文件报 err.fileBinary，
+ * 过大报 err.fileTooLarge
  */
-export function readConfigFile(uuid: string, file: string): Promise<string> {
-  return commands.config.getFile(uuid, file);
+export function readConfigFile(
+  uuid: string,
+  source: string,
+  file: string,
+): Promise<ConfigTextDto> {
+  return commands.config.getFile(uuid, source, file);
 }
 /**
- * 保存文本配置文件，整份覆盖
+ * 按行级差异保存文本配置文件
  *
  * - `uuid`: 实例 uuid
- * - `file`: 相对游戏目录的路径
- * - `data`: 新的全文内容
- */
-export function writeConfigFile(uuid: string, file: string, data: string): Promise<void> {
-  return commands.config.saveFile(uuid, file, data);
-}
-/**
- * 读取 NBT 文件，转成可展示的树
- *
- * - `uuid`: 实例 uuid
- * - `file`: 相对游戏目录的路径
+ * - `source`: 来源，空串为实例本身，否则是存档目录名
+ * - `file`: 来源内的相对路径
+ * - `baseSha1`: 打开时那一份的 SHA1，见 `readConfigFile`
+ * - `expectedLines`: 改完后的总行数，按 `\n` 切；后端用它交叉校验差异
+ * - `hunks`: 行替换列表，行号相对原文，见 `lib/textDiff`
  *
  * # 返回值
  *
- * 见 `NbtNodeDto`；数组只报元素个数，不展开内容
+ * 保存后全文的 SHA1，供下一次保存接着用；磁盘上那一份已经变了报 err.fileChanged
  */
-export function readConfigNbt(uuid: string, file: string): Promise<NbtNodeDto> {
-  return commands.config.getNbt(uuid, file);
+export function writeConfigFile(
+  uuid: string,
+  source: string,
+  file: string,
+  baseSha1: string,
+  expectedLines: number,
+  hunks: ConfigHunkDto[],
+): Promise<string> {
+  return commands.config.saveFile(uuid, source, file, baseSha1, expectedLines, hunks);
+}
+/**
+ * 打开一个 NBT 文件，转成可展示、可编辑的树
+ *
+ * **打开就是真的打开**：文件句柄与解析出的内容留在后端会话里，之后的保存直接在那份状态上改、
+ * 由同一个句柄写回；会话还在时再打开一次给的是会话里那棵树，不碰磁盘。要重新读盘就先
+ * `closeConfigNbt` 再打开。
+ *
+ * - `uuid`: 实例 uuid
+ * - `source`: 来源，空串为实例本身，否则是存档目录名
+ * - `file`: 来源内的相对路径
+ *
+ * # 返回值
+ *
+ * 见 `ConfigNbtDto`：树 + **文件字节**的 SHA1；保存时要把这个 SHA1 一起交回去。
+ * 数组只展开不超过上限的那些，超长的只报个数
+ */
+export function openConfigNbt(
+  uuid: string,
+  source: string,
+  file: string,
+): Promise<ConfigNbtDto> {
+  return commands.config.openNbt(uuid, source, file);
+}
+/**
+ * 关掉一个 NBT 文件的后端会话，句柄跟着释放
+ *
+ * 切走配置窗口、或不想再保持这个文件打开时调用；下次打开就是重新读盘。
+ *
+ * - `uuid`: 实例 uuid
+ * - `source`: 来源，空串为实例本身，否则是存档目录名
+ * - `file`: 来源内的相对路径
+ */
+export function closeConfigNbt(uuid: string, source: string, file: string): Promise<void> {
+  return commands.config.closeNbt(uuid, source, file);
+}
+/**
+ * 按若干处标量修改改写 NBT 文件
+ *
+ * 只改标量的值，不动结构、不换类型；写回沿用原文件的压缩方式。
+ *
+ * - `uuid`: 实例 uuid
+ * - `source`: 来源，空串为实例本身，否则是存档目录名
+ * - `file`: 来源内的相对路径
+ * - `baseSha1`: 打开时那一份文件字节的 SHA1，见 `openConfigNbt`
+ * - `edits`: 要改的标量，路径相对根标签
+ *
+ * # 返回值
+ *
+ * 写回后文件字节的 SHA1，供下一次保存接着用；磁盘上那一份已经变了报 err.fileChanged
+ */
+export function writeConfigNbt(
+  uuid: string,
+  source: string,
+  file: string,
+  baseSha1: string,
+  edits: NbtEditDto[],
+): Promise<string> {
+  return commands.config.setNbt(uuid, source, file, baseSha1, edits);
 }
 /**
  * 读取区域文件（`.mca`）的区块表
  *
  * - `uuid`: 实例 uuid
- * - `file`: 相对游戏目录的路径
+ * - `source`: 来源，空串为实例本身，否则是存档目录名
+ * - `file`: 来源内的相对路径
  *
  * # 返回值
  *
  * 有数据的区块，按表项下标升序；只读 8 KiB 文件头，不解析区块内容
  */
-export function readConfigMca(uuid: string, file: string): Promise<McaChunkDto[]> {
-  return commands.config.getMca(uuid, file);
+export function readConfigMca(
+  uuid: string,
+  source: string,
+  file: string,
+): Promise<McaChunkDto[]> {
+  return commands.config.getMca(uuid, source, file);
 }
 /**
  * 读取一个图片文件，给图片视图直接用
  *
  * - `uuid`: 实例 uuid
- * - `file`: 相对游戏目录的路径
+ * - `source`: 来源，空串为实例本身，否则是存档目录名
+ * - `file`: 来源内的相对路径
  *
  * # 返回值
  *
  * `data:<mime>;base64,<...>`，可直接塞进 `<img src>`；体积上限与文本一致
  */
-export function readConfigImage(uuid: string, file: string): Promise<string> {
-  return commands.config.getImage(uuid, file);
+export function readConfigImage(uuid: string, source: string, file: string): Promise<string> {
+  return commands.config.getImage(uuid, source, file);
 }
 /**
  * 读取任意文件的一段字节，给二进制视图翻页用
  *
  * - `uuid`: 实例 uuid
- * - `file`: 相对游戏目录的路径
+ * - `source`: 来源，空串为实例本身，否则是存档目录名
+ * - `file`: 来源内的相对路径
  * - `offset`: 起始偏移，单位字节；越界会被夹到文件末尾
  * - `length`: 想要的字节数，上限 64 KiB
  *
@@ -2369,24 +2448,12 @@ export function readConfigImage(uuid: string, file: string): Promise<string> {
  */
 export function readConfigBytes(
   uuid: string,
+  source: string,
   file: string,
   offset: number,
   length: number,
 ): Promise<BytesSliceDto> {
-  return commands.config.getBytesSlice(uuid, file, offset, length);
-}
-/**
- * 某个存档目录下的文件列表
- *
- * - `uuid`: 实例 uuid
- * - `save`: 存档目录名，即 saves 下的一级目录
- *
- * # 返回值
- *
- * 该存档目录下递归列出的文件，名字同样是相对游戏目录的路径
- */
-export function listConfigSaveFiles(uuid: string, save: string): Promise<FileItemDto[]> {
-  return commands.configSaves.file(uuid, save);
+  return commands.config.getBytesSlice(uuid, source, file, offset, length);
 }
 
 // ==================== 数据包（存档子页） ====================

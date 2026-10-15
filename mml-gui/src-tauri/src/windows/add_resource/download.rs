@@ -4,7 +4,6 @@
 //! 占位去重 → 交给下载器；失败路径都要把占位从 `DOWNLOAD_NOW` 里摘掉。
 
 use std::path::PathBuf;
-use std::time::Duration;
 
 use mml_base::file_item::FileItemObj;
 use mml_game::launcher::file_online_info_obj::OnlineInfoObj;

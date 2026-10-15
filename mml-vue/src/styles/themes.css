@@ -37,6 +37,13 @@
   --red: #ff5f56;
   --yellow: #f5b944;
 
+  /* NBT 类型徽章：四个类型各一色。写成固定值而不是引用状态色 / 强调色 ——
+     强调色有十几个预设，跟了就会和用户选的那一色撞成一样，类型就分不出来了 */
+  --nbt-num: #6ea8ff;
+  --nbt-str: #3ecf8e;
+  --nbt-compound: #c9a7ff;
+  --nbt-list: #4fd6c8;
+
   /* 阴影 */
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
   --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
@@ -84,6 +91,12 @@
   --green: #16a34a;
   --red: #dc2626;
   --yellow: #d97706;
+
+  /* NBT 类型徽章：口径同暗色那份 */
+  --nbt-num: #2f6fe4;
+  --nbt-str: #16a34a;
+  --nbt-compound: #7c3aed;
+  --nbt-list: #0e7490;
 
   --shadow-md: 0 4px 14px rgba(30, 40, 60, 0.12);
   --shadow-lg: 0 16px 44px rgba(30, 40, 60, 0.2);

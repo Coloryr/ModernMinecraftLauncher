@@ -475,7 +475,7 @@ fn version_arg(text: &str) -> Option<&str> {
 /// 返回该版本惯用的 Java 主版本
 fn java_hint(version: &str) -> &'static str {
     match version {
-        "1.7.10" | "1.12.2" => "8",
+        "1.6.4" | "1.7.10" | "1.12.2" => "8",
         _ => "17+",
     }
 }
@@ -496,48 +496,82 @@ fn wanted(loader: &LoaderType, version: &str) -> bool {
     filter.split(',').any(|item| item.trim() == key)
 }
 
-/// 单格调试入口（原版 26.3）：断点下在 [`launch`] 里
-#[ignore = "单格调试：只跑原版 26.3"]
-#[tokio::test]
-async fn launch_one_normal() {
+/// 原版各版的执行体，给 [`launch_one_normal`] 与 [`launch_one_auto`] 共用
+async fn run_normal() {
     report(launch("26.3", LoaderType::Normal, "").await);
+    report(launch("1.21.1", LoaderType::Normal, "").await);
+    report(launch("1.16.5", LoaderType::Normal, "").await);
+    report(launch("1.12.2", LoaderType::Normal, "").await);
+    report(launch("1.7.10", LoaderType::Normal, "").await);
+    report(launch("1.6.4", LoaderType::Normal, "").await);
 }
 
-/// 单格调试入口（Forge 1.12.2）
-#[ignore = "单格调试：只跑 Forge 1.12.2"]
-#[tokio::test]
-async fn launch_one_forge() {
+/// 1.13 以上的 Forge 执行体
+async fn run_forge_new() {
+    report(launch("1.14.4", LoaderType::Forge, "28.2.30").await);
+    report(launch("1.16.5", LoaderType::Forge, "36.2.42").await);
+    report(launch("1.20.1", LoaderType::Forge, "47.4.28").await);
+    report(launch("1.20.6", LoaderType::Forge, "50.2.13").await);
+    report(launch("1.21.1", LoaderType::Forge, "52.1.19").await);
+    report(launch("1.21.6", LoaderType::Forge, "56.0.9").await);
+    report(launch("1.21.11", LoaderType::Forge, "61.2.3").await);
+    report(launch("26.1.2", LoaderType::Forge, "64.1.4").await);
+    report(launch("26.3", LoaderType::Forge, "66.0.11").await);
+}
+
+/// Forge 1.12.2 各版执行体
+async fn run_forge_1122() {
     report(launch("1.12.2", LoaderType::Forge, "14.23.5.2864").await);
+    report(launch("1.12.2", LoaderType::Forge, "14.23.5.2859").await);
+    report(launch("1.12.2", LoaderType::Forge, "14.23.1.2592").await);
+    report(launch("1.12.2", LoaderType::Forge, "14.23.0.2535").await);
+    report(launch("1.12.2", LoaderType::Forge, "14.23.0.2486").await);
 }
 
-/// 单格调试入口（Forge 1.7.10，取上游确实有安装器的那一版）
-#[ignore = "单格调试：只跑 Forge 1.7.10"]
-#[tokio::test]
-async fn launch_one_forge_old() {
+/// 1.12 以下的 Forge 执行体
+async fn run_forge_old() {
     report(launch("1.7.10", LoaderType::Forge, "10.13.4.1614").await);
+    report(launch("1.8", LoaderType::Forge, "11.14.4.1577").await);
+    report(launch("1.8.9", LoaderType::Forge, "11.15.1.2318").await);
+    report(launch("1.9.4", LoaderType::Forge, "12.17.0.2317").await);
+    report(launch("1.10.2", LoaderType::Forge, "12.18.3.2511").await);
 }
 
-/// 单格调试入口（Fabric 26.3）
-#[ignore = "单格调试：只跑 Fabric 26.3"]
-#[tokio::test]
-async fn launch_one_fabric() {
+/// Fabric 执行体
+async fn run_fabric() {
     report(launch("26.3", LoaderType::Fabric, "0.19.5").await);
+    report(launch("26.1", LoaderType::Fabric, "0.19.5").await);
+    report(launch("1.21.11", LoaderType::Fabric, "0.19.5").await);
+    report(launch("1.20.1", LoaderType::Fabric, "0.19.5").await);
+    report(launch("1.16.5", LoaderType::Fabric, "0.19.5").await);
 }
 
-/// 单格调试入口（NeoForge 26.3）
-#[ignore = "单格调试：只跑 NeoForge 26.3"]
-#[tokio::test]
-async fn launch_one_neoforge() {
-    report(launch("26.3", LoaderType::NeoForge, "26.3.0.77").await);
+/// NeoForge 执行体
+async fn run_neoforge() {
+    report(launch("26.3", LoaderType::NeoForge, "26.3.0.83").await);
+    report(launch("26.1.1", LoaderType::NeoForge, "26.1.1.15-beta").await);
+    report(launch("1.21.11", LoaderType::NeoForge, "21.11.48").await);
+    report(launch("1.21.6", LoaderType::NeoForge, "21.6.20-beta").await);
+    report(launch("1.21.1", LoaderType::NeoForge, "21.1.262").await);
+    report(launch("1.20.6", LoaderType::NeoForge, "20.6.144").await);
+    report(launch("1.20.4", LoaderType::NeoForge, "20.4.253").await);
+    report(launch("1.20.2", LoaderType::NeoForge, "20.2.93").await);
 }
 
-/// 单格调试入口（加载器版本自己去上游查，与矩阵同一口径）
+/// 单格调试总入口：把全部单格串起来跑一遍
 ///
-/// 不想手写加载器版本时用它；要钻某一版就把 [`launch`] 换进来看
-#[ignore = "单格调试：只跑一格，加载器版本自动查"]
+/// `#[tokio::test]` 宏把测试函数展开成同步函数，直接互相调用既不能
+/// `.await`、又会在运行时里再嵌一个运行时，所以这里只能串"执行体"；
+/// 想钻某一格先单独跑它的入口，能省前面格子的耗时
+#[ignore = "联网 + 首次要下几百 MB，串行跑全格"]
 #[tokio::test]
 async fn launch_one_auto() {
-    report(launch_auto("26.3", LoaderType::NeoForge).await);
+    run_normal().await;
+    run_forge_new().await;
+    run_forge_1122().await;
+    run_forge_old().await;
+    run_fabric().await;
+    run_neoforge().await;
 }
 
 /// 打印一格的结论；算真失败就让用例不过

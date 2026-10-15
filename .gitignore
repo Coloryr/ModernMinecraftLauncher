@@ -1,3 +1,6 @@
 /mml-core/mml-tex-draw/tests/out
+# 文本 diff 用例生成的样本：跑测试时现生成，不入库
+/mml-vue/tests/sample-*
+/mml-core/mml-sys/tests/text_diff_big*
 .DS_Store
 /target

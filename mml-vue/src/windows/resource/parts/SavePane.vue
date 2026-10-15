@@ -10,6 +10,7 @@ import { computed, ref } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { stripFormatting } from "../../../lib/formatting";
 import { showToast } from "../../../lib/toast";
+import { openWindow } from "../../windowManager";
 import {
   api,
   backupSave,
@@ -117,6 +118,9 @@ function itemMenuItems(item: SaveItemDto): RowMenuItem[] {
   // 损坏的存档置灰：它没有 `Data` 复合标签，后端 set_mode 必然返回 DataNotFound
   const items: RowMenuItem[] = [
     { id: "edit", label: t("resource.saveEdit"), disabled: item.broken },
+    // 「修改配置文件」开配置窗口，直接落到这个存档的文件树：
+    // 编辑弹窗只管 level.dat 那几项，这个存档下其它文件在那边看与改
+    { id: "config", label: t("actions.editConfig") },
     { id: "backup", label: t("resource.backup") },
   ];
   // 有备份才给还原入口：没有备份的存档点还原只会弹一句"还没有备份"
@@ -161,6 +165,10 @@ function onMenuPick(id: string) {
   switch (id) {
     case "edit":
       openEdit(item);
+      break;
+    case "config":
+      // 配置窗口直接落到这个存档；实例两边同一口径（gui_config 的 selectedInstance）
+      openWindow("config", { saveDir: item.dir });
       break;
     case "backup":
       backup(item);
@@ -435,7 +443,7 @@ function saveTip(item: SaveItemDto): string {
   </div>
   <div v-else class="item-list">
     <ResourceRow v-for="item in saves" :key="item.dir" :icon="item.icon" :name="item.levelName || item.dir"
-      v-tip="saveTip(item)" :class="{
+      v-tip.mouse="saveTip(item)" :class="{
         'row-selected': isSelected(item),
         'row-anchor': anchorKey === item.dir,
         'row-selecting': selected.size > 0,

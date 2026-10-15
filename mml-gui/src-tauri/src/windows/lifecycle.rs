@@ -522,6 +522,10 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
             {
                 model.lock().unwrap().reject_all_dialogs();
             }
+            // 配置窗口关了，它打开过的 NBT 文件也该放手：句柄不能留到下次开窗
+            if Some(uuid) == uuid_for_kind("config") {
+                super::nbt_session::close_all();
+            }
             OPEN_WINDOWS.write().unwrap().remove(&uuid);
             remove_window_model(&uuid);
         }

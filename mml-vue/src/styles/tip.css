@@ -2,7 +2,10 @@
 .app-tip {
   position: fixed;
   z-index: 9999;
-  max-width: 320px;
+  /* 宽度跟着内容走：一行放不下就整条折成两三行，读起来比宽一点更费劲，
+     所以**不自动折行**，只到屏幕边为止；真放不下时末尾省略号截断。
+     上限给 720px，NBT 那种长键名通常能整条显示出来 */
+  max-width: min(720px, calc(100vw - 16px));
   padding: 5px 10px;
   border-radius: 8px;
   border: 1px solid var(--border);
@@ -10,9 +13,10 @@
   color: var(--text);
   font-size: 12px;
   line-height: 1.5;
-  /* 多行提示（如存档那几条信息）按 `\n` 断行：textContent 里的换行默认会被折成空格 */
-  white-space: pre-line;
-  word-break: break-all;
+  /* `pre`：`\n` 仍是显式换行（如存档那几条信息），只是不再自动折行 */
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
   pointer-events: none;
   box-shadow: var(--shadow-lg);
   opacity: 0;

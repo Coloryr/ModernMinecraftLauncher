@@ -837,8 +837,11 @@ impl InstanceSettingObj {
         let game = self.check_version_update().await?;
         let v2 = game.is_game_version_v2();
 
-        obj.java_versions
-            .insert(game.java_version.as_ref().unwrap().major_version);
+        // 老版本清单没有 javaVersion 字段（如 1.6.4），什么都不插，
+        // 由组件选择处统一兜底到 Java 8
+        if let Some(java_ver) = &game.java_version {
+            obj.java_versions.insert(java_ver.major_version);
+        }
 
         // 处理运行库
         {

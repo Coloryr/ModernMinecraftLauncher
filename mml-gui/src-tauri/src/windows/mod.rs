@@ -39,6 +39,10 @@ mod lifecycle;
 mod modpack_task;
 mod registry;
 
+// 打开着的 NBT 文件：句柄与解析结果留在会话里，配置窗口关了才放手。
+// `pub(crate)`：配置窗口的读 / 写命令与窗口销毁时的兜底清理都要用它
+pub(crate) mod nbt_session;
+
 // Windows 文件拖放的"路径桥"：DOM 拖放 + 真实文件路径，见该模块头部说明。
 // pub(crate)：lib.rs 注册 on_webview_ready 时要调它
 #[cfg(windows)]

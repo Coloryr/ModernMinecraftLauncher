@@ -1506,7 +1506,7 @@ onMounted(async () => {
                   </BaseButton>
                   <!-- 实例日志：主页面不展示日志内容，直接开独立日志窗口 -->
                   <BaseButton size="sm" :disabled="!selected" @click="openLogWindow">
-                    <GlyphIcon name="document" :size="13" :weight="1.8" /> {{ t("detail.logs") }}
+                    <GlyphIcon name="terminal" :size="13" :weight="1.8" /> {{ t("detail.logs") }}
                   </BaseButton>
                   <!-- 资源管理：分组 / 平铺模式的右侧详情面板里有这个入口，而列表模式没有详情面板，
                      这里不补一个就进不去资源管理窗口；添加资源在资源窗口里有自己的入口 -->
@@ -1608,16 +1608,12 @@ onMounted(async () => {
                             <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
                           </svg>
                         </button>
-                        <!-- 实例日志窗口：与平铺模式的「日志」按钮同一个图标，两种模式里认得出来 -->
+                        <!-- 实例日志窗口：与列表模式的「日志」按钮同一个图标，两种模式里认得出来 -->
                         <button class="icon-btn" v-tip="t('actions.viewLog')" @click="onAction('viewLog')">
-                          <GlyphIcon name="document" :size="15" :weight="1.8" />
+                          <GlyphIcon name="terminal" :size="15" :weight="1.8" />
                         </button>
                         <button class="icon-btn" v-tip="t('actions.editConfig')" @click="onAction('editConfig')">
-                          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
-                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3" />
-                            <path d="M1 14h6M9 8h6M17 16h6" />
-                          </svg>
+                          <GlyphIcon name="wrench" :size="15" :weight="1.8" />
                         </button>
                         <button class="icon-btn" v-tip="t('actions.rename')" @click="onAction('rename')">
                           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"

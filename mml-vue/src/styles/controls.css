@@ -13,7 +13,7 @@
  *                 裸标签等价写法：<button class="ui-btn v-plain s-sm">
  *   图标按钮      <button class="ui-btn-icon">…</button>
  *   开关 / 分段 / 步进器 / 弹窗 / 窗口内容：用组件 BaseSwitch / SegmentedTabs / NumberStepper /
- *                 BaseModal / FloatingPanel / CollapsePanel
+ *                 BaseModal / CollapsePanel
  *   表单行        .field-label（标签）+ .field-hint（说明）+ .field-row-2（两列）+ .path-row（输入框与按钮同行）
  *   校验红边      .is-invalid
  *

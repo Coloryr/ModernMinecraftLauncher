@@ -8,16 +8,13 @@ import { api, onCloseBlocked } from "./lib/api";
 import {
   closeWindow,
   closeDownloadPopup,
-  closeLogPopup,
   closeModpackPopup,
   closeResourcePopup,
   currentKind,
   downloadPopupOpen,
-  logPopups,
   modpackPopupOpen,
   multiWindow,
   quitWindow,
-  raiseLogPopup,
   resourcePopupOpen,
 } from "./windows/windowManager";
 import type { WindowKind } from "./windows/registry";
@@ -37,14 +34,12 @@ applyAnimations();
 const DownloadWindow = defineAsyncComponent(() => import("./windows/download/DownloadWindow.vue"));
 
 /**
- * 游戏日志：只作浮动面板 / 独立窗口用，从来不是应用内的一页
+ * 游戏日志：**一个实例一个**的工具型窗口
  *
- * 它是"一个实例一个"的工具型窗口（多窗口模式下每个实例一个真实窗口，单窗口模式下叠在
- * 当前页面之上的浮动面板，可同时开多个），实例由 props 传进去且不可更改。
+ * 多窗口模式下每个实例一个真实窗口（标签 `mml-log-<实例uuid>`，身份由后端按实例派生，
+ * 实例不可更改）；单窗口模式下它像别的窗口一样应用内跳转，实例由 windowParams 带进来。
  */
 const LogWindow = defineAsyncComponent(() => import("./windows/log/LogWindow.vue"));
-/** 单窗口模式下的日志浮层：把上面那个组件按实例叠放，见该文件头部说明 */
-const LogPopups = defineAsyncComponent(() => import("./windows/log/LogPopups.vue"));
 
 // 各窗口按需加载：每个窗口编译为独立 chunk，打开时才拉取对应 JS
 const windowMap: Record<WindowKind, Component> = {
@@ -164,10 +159,6 @@ const closeAskButton = computed(() =>
   <!-- 单窗口模式：下载管理浮在当前页面之上，属工具窗口，见 windowManager 的
        openWindow 特例；关掉它只是收起弹窗，任务照跑，右下角的入口还在 -->
   <DownloadWindow v-if="!multiWindow && downloadPopupOpen && currentKind !== 'download'" @close="closeDownloadPopup" />
-  <!-- 单窗口模式：日志是**可叠放**的浮动面板，一个实例一个（点哪张哪张提到最前）。
-       多窗口模式下它是独立真实窗口，不在这里渲染 -->
-  <LogPopups v-if="!multiWindow && logPopups.length" :uuids="logPopups" @close="closeLogPopup"
-    @raise="raiseLogPopup" />
   <!-- 整合包安装进度弹窗：由标题栏上那个指示器点开。单窗口模式下是主窗口顶栏，
        多窗口模式下各窗口自己的标题栏里也有指示器，点开同一个弹窗。
        关掉它只是收起，安装照常跑 -->

@@ -21,6 +21,8 @@ export type GlyphName =
   | "play"
   | "gear"
   | "document"
+  | "terminal"
+  | "wrench"
   | "save"
   | "news"
   | "check-square"
@@ -80,6 +82,17 @@ withDefaults(
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
       <path d="M14 2v6h6" />
       <path d="M8 13h8M8 17h5" />
+    </g>
+    <!-- 终端（实例日志）：游戏跑起来是在看一份进程输出，>_ 提示符比纸页更贴 -->
+    <g v-else-if="name === 'terminal'">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="m7 9 3 3-3 3" />
+      <path d="M12 15h5" />
+    </g>
+    <!-- 扳手（修改配置文件）：调校实例的配置，与齿轮"设置"、铅笔"重命名"都区分得开 -->
+    <g v-else-if="name === 'wrench'">
+      <path
+        d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
     </g>
     <!-- 保存：软盘轮廓 + 下沿标签 + 上沿滑盖。原来拿 check 代过，一眼看不出是"存" -->
     <g v-else-if="name === 'save'">

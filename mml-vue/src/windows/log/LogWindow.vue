@@ -2,9 +2,8 @@
 // 游戏日志窗口：**一个实例一个**，打开时锁定，窗口内不再选择实例
 //
 // 多窗口模式下是独立真实窗口，标签形如 `mml-log-<实例uuid>`（身份由后端按实例派生，
-// 同一实例重复打开只聚焦）；单窗口模式下是叠在当前页面之上的浮动面板，实例由父组件传入
-// （见 LogPopups.vue），可以同时开多个。
-// 两种外壳同形：WindowFrame 与 FloatingPanel 都是 title + close 事件 + 默认插槽。
+// 同一实例重复打开只聚焦）；单窗口模式下与别的窗口一样是应用内的一页，实例由
+// windowParams 带进来，已在本页上时参数变化就是换实例，见 lockedUuid 的 watch。
 //
 // 布局照 ColorMC 的 GameLogControl：一行"日志文件 + 刷新 / 搜索 / 上传 / 测试启动"，
 // 一行"自动换行 / 自动下拉 + 五个等级"，一行"线程 / 分组"，最后是日志正文。
@@ -14,7 +13,6 @@
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
-import FloatingPanel from "../../components/ui/FloatingPanel.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import BaseSwitch from "../../components/ui/BaseSwitch.vue";
@@ -28,17 +26,12 @@ import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
 import { copyText } from "../../lib/clipboard";
 import { api, onGameExit, onGameLog, onLaunchState } from "../../lib/api";
-import { logInstanceFromLabel, multiWindow, targetUuid } from "../windowManager";
+import { logInstanceFromLabel, targetUuid } from "../windowManager";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import type { InstanceInfoDto, LogLine, LogSettingDto } from "../../lib/bindings";
 
 /** 请求关闭本窗口 / 收起面板 */
 defineEmits<{ (e: "close"): void }>();
-
-const props = defineProps<{
-  /** 锁定的实例 uuid；单窗口模式的浮动面板由父组件传，独立窗口留空、从窗口标签取 */
-  uuid?: string;
-}>();
 
 /** 每个实例的日志内存上限，与内核 InstanceRuntimeLog 保持一致 */
 const MAX_LOG_LINES = 10000;
@@ -46,10 +39,11 @@ const MAX_LOG_LINES = 10000;
 /**
  * 本窗口锁定的实例 uuid
  *
- * 浮动面板按父组件传入的参数；独立窗口按窗口标签，那是后端派生窗口身份时用的同一份实例；
- * 浏览器预览没有标签，退回 URL 上的参数。
+ * 多窗口模式按窗口标签，那是后端派生窗口身份时用的同一份实例；
+ * 单窗口模式按本次跳转带入的 windowParams，已在本页上换个实例打开时它就是新值。
+ * 浏览器预览没有标签，同样退回 URL / windowParams 上的参数。
  */
-const lockedUuid = computed(() => props.uuid ?? logInstanceFromLabel() ?? targetUuid() ?? "");
+const lockedUuid = computed(() => logInstanceFromLabel() ?? targetUuid() ?? "");
 
 /**
  * 锁定实例的信息，只用来在标题栏显示 chip
@@ -64,23 +58,6 @@ const instanceChip = computed(() => (instance.value ? { name: instance.value.nam
 
 /** 窗口标题：只有窗口名，实例在标题栏的 chip 上 */
 const title = computed(() => t("logWindow.title"));
-
-/**
- * 外壳两用：多窗口模式下是独立窗口 `WindowFrame`；单窗口模式下是**浮动面板**
- * `FloatingPanel`，无遮罩、不挡页面，可叠放多个，见 LogPopups.vue
- */
-const shell = computed(() => (multiWindow.value ? WindowFrame : FloatingPanel));
-const shellProps = computed(() =>
-  multiWindow.value
-    ? { title: title.value, bodyFill: true }
-    : {
-      title: title.value,
-      width: 820,
-      // 固定高度：日志行一直在增长，不锁的话面板会跟着长高；内容区自己滚，
-      // 视口太矮时由 FloatingPanel 的 max-height 兜住
-      height: "580px",
-    },
-);
 
 // ---------------- 设置：自动下拉 / 五个等级（换行是全局偏好，不在这里） ----------------
 
@@ -331,8 +308,21 @@ async function syncInstance() {
   await refreshRunning();
 }
 
-// 单窗口模式：面板被 KeepAlive 缓存，切回时补一次数据
+// 单窗口模式：本页被 KeepAlive 缓存，切回时补一次数据
 useWindowRefresh(syncInstance);
+
+// 单窗口模式：已停在本页时再开另一个实例就是换锁定对象 —— 会走这里。
+// 来源先清空（file 的 watch 会先拉一遍，syncInstance 再整补一次，读同一份数据幂等），
+// 否则换实例头一眼看到的还是上一个实例的正文
+watch(
+  lockedUuid,
+  (now, before) => {
+    if (!now || now === before) return;
+    file.value = "";
+    sourceLogs.value = [];
+    void syncInstance();
+  },
+);
 
 let unlistenGameLog: UnlistenFn | null = null;
 let unlistenLaunchState: UnlistenFn | null = null;
@@ -389,7 +379,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <component :is="shell" v-bind="shellProps" @close="$emit('close')">
+  <WindowFrame :title="title" body-fill @close="$emit('close')">
     <!-- 日志来源与操作都放标题栏：不占内容区高度；除「测试启动」外只留图标，文字进提示 -->
     <template #head-right>
       <div class="head-log">
@@ -437,7 +427,7 @@ onBeforeUnmount(() => {
       </div>
     </template>
 
-    <div class="log-window" :class="{ fill: !multiWindow }">
+    <div class="log-window">
       <!-- 第一行：换行 / 自动下拉 / 等级。等级也走开关，与旁边两个同款；
            "等级"这行标签与第二行的"线程 / 分组"同一套 -->
       <div class="bar">
@@ -512,7 +502,7 @@ onBeforeUnmount(() => {
         <BaseButton variant="danger" @click="doStop">{{ t("logWindow.stop") }}</BaseButton>
       </div>
     </BaseModal>
-  </component>
+  </WindowFrame>
 </template>
 
 <style scoped>
@@ -522,16 +512,10 @@ onBeforeUnmount(() => {
   gap: 10px;
   height: 100%;
   min-height: 0;
-  /* 四周留白交给外壳：独立窗口是 .frame-body（上下 22 / 左右 26），浮动面板是 .fp-body。
+  /* 四周留白交给外壳的 .frame-body（上下 22 / 左右 26），
      这里**不能再加一份 padding**，否则顶部 34、左右 40，比别的窗口鼓一圈
      —— 与导出窗口同一条规矩，见 ExportWindow 的 .export-window */
   box-sizing: border-box;
-}
-
-/* 浮动面板里高度由 .fp-body 的剩余空间给，不再是撑满父级的 100% */
-.log-window.fill {
-  flex: 1;
-  height: auto;
 }
 
 /* 工具条：内容不换行，宽度不够时下拉自己缩 */

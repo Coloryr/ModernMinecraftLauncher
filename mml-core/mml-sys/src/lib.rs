@@ -12,6 +12,7 @@
 //! | [`process_helper`] | 进程查询与命令执行 |
 //! | [`protocol_helper`] | URL 协议注册 |
 //! | [`shortcut_helper`] | 快捷方式创建 |
+//! | [`text_diff`] | 文本文件的行级差异 |
 
 use core::fmt;
 use std::sync::LazyLock;
@@ -24,6 +25,7 @@ pub mod path_helper;
 pub mod process_helper;
 pub mod protocol_helper;
 pub mod shortcut_helper;
+pub mod text_diff;
 
 /// 操作系统类型枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

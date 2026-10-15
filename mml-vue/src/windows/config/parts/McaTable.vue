@@ -12,7 +12,9 @@ import type { McaChunkDto } from "../../../lib/bindings";
 const props = defineProps<{
   /** 实例 uuid */
   uuid: string;
-  /** 相对游戏目录的文件路径 */
+  /** 来源，空串为实例本身，否则是存档目录名 */
+  source: string;
+  /** 来源内的相对文件路径 */
   file: string;
 }>();
 
@@ -23,7 +25,7 @@ const loading = ref(false);
 async function load() {
   loading.value = true;
   try {
-    rows.value = await readConfigMca(props.uuid, props.file);
+    rows.value = await readConfigMca(props.uuid, props.source, props.file);
   } catch (e) {
     rows.value = [];
     showToast(tErr(e));
@@ -38,9 +40,9 @@ function formatTime(seconds: number): string {
   return new Date(seconds * 1000).toLocaleString();
 }
 
-// 换文件就重拉；`immediate` 让首次打开就有内容
+// 换来源或换文件就重拉；`immediate` 让首次打开就有内容
 watch(
-  () => [props.uuid, props.file],
+  () => [props.uuid, props.source, props.file],
   () => void load(),
   { immediate: true },
 );

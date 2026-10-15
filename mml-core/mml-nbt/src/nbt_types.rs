@@ -653,6 +653,27 @@ impl NbtList {
         }
     }
 
+    /// 在指定位置插入一个元素
+    ///
+    /// 元素类型序号必须与列表一致：列表是同类型容器，混进别的类型就写不出合法 NBT。
+    /// 空列表（元素类型还是 `END`）要先由调用方用 [`NbtList::set_num`] 定好类型。
+    ///
+    /// - `index`: 插入位置，从 0 开始；等于元素个数就是追加
+    /// - `nbt`: 待插入的元素
+    ///
+    /// # 返回值
+    ///
+    /// 越界或类型不一致时返回 `false` 且不改动列表
+    pub fn insert_item(&mut self, index: usize, nbt: NbtType) -> bool {
+        if index > self.data.len() || nbt.get_num() != self.nbt_num {
+            false
+        } else {
+            self.data.insert(index, nbt);
+
+            true
+        }
+    }
+
     /// 移除并返回指定索引的元素
     ///
     /// - `index`: 元素索引，从 0 开始
@@ -673,6 +694,20 @@ impl NbtList {
     /// 索引越界时返回 `None`
     pub fn get_item(&self, index: usize) -> Option<&NbtType> {
         self.data.get(index)
+    }
+
+    /// 获取指定索引元素的可变引用，就地改某个元素的值
+    ///
+    /// 只改元素**内容**，不动元素类型：类型序号仍由列表的 `nbt_num` 统一决定，
+    /// 调用方不要在这里把元素换成别的类型。
+    ///
+    /// - `index`: 元素索引，从 0 开始
+    ///
+    /// # 返回值
+    ///
+    /// 索引越界时返回 `None`
+    pub fn get_item_mut(&mut self, index: usize) -> Option<&mut NbtType> {
+        self.data.get_mut(index)
     }
 
     /// 返回列表中的元素数量

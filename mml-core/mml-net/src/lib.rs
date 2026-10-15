@@ -502,6 +502,35 @@ impl Client {
         out
     }
 
+    /// 发送 GET 请求，只在响应成功时返回响应体文本
+    ///
+    /// 请求失败时的响应同样带正文，404 多数是一页 HTML 错误页，[`Self::get_text`] 会把它
+    /// 当成正常正文返回；只在"成功才有正文"的场合用本方法。
+    ///
+    /// - `url`: 请求地址
+    ///
+    /// # 返回值
+    ///
+    /// 返回响应体文本；HTTP 状态不是 2xx 时返回 [`ErrorType::HttpError`]
+    pub async fn get_text_success(&self, url: &str) -> CoreResult<String> {
+        let resp = self.get_with_retry(url).await?;
+        let status = resp.status();
+        if status.is_success() {
+            return abortable(async move { resp.text().await.map_err(map_err) }).await;
+        }
+
+        // 错误正文照旧取回来写进错误里，便于看清是哪个仓库回的什么
+        let url = resp.url().to_string();
+        let error = abortable(async move { resp.text().await.map_err(map_err) })
+            .await
+            .unwrap_or_default();
+        Err(ErrorType::HttpError(HttpErrorData {
+            error,
+            url,
+            status: Some(status.as_u16()),
+        }))
+    }
+
     /// 发送 GET 请求，返回响应体字节
     ///
     /// - `url`: 请求地址

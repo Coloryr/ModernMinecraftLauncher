@@ -8,23 +8,26 @@
 // 还没选文件时右栏是一个**禁用的空编辑器**，不是一句提示 —— 打开就是编辑器窗口的样子。
 //
 // - 文本（json / json5 / toml / yaml / properties / xml / js / snbt / 纯文本）→ Monaco 编辑（行号 + 着色）+ 保存
-// - NBT（.dat / .nbt / .rio）→ NBT 树
+// - NBT（.dat / .nbt / .rio）→ NBT 树，树上的标量就地改再保存
 // - 区域文件（.mca）→ 区块表
 // - 图片（png / jpg / gif / webp）→ 直接显示
 // - 其余（压缩包与别的二进制）→ 二进制视图（一页 4 KiB 的十六进制）
 //
 // 来源两条：实例自己的 options.txt 与 `config` / `kubejs` / `local`，或某个存档目录下的文件。
 // 实例取自 gui_config 的 `mainWindow.selectedInstance`（与资源管理窗口同一口径，窗口自己读）；
-// 后端只认"相对游戏目录的路径"，列表里给什么就原样回传。
+// 来源（空串 = 实例本身，否则是存档目录名）会一起交给后端，文件路径一律**相对该来源**，
+// 树根因此就是所选来源，存档来源下不会再套一层 `saves`。
+//
+// 保存两条：文本走**行级差异**（lib/textDiff），只回传改了的那几行；NBT 只回传改了的那几处
+// 标量（改动登记在 NbtTree 里）。两条都按打开时的 SHA1 先核对磁盘上还是不是那一份。
 // 标题栏跟日志窗口同一套：左边窗口名，右边实例 chip + 来源下拉，操作留在工具条。
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import {
   api,
   listConfigFiles,
-  listConfigSaveFiles,
   listSaves,
   openInstanceDir,
   readConfigFile,
@@ -32,6 +35,8 @@ import {
 } from "../../lib/api";
 import { loadGuiConfig } from "../../lib/guiConfig";
 import { buildTree, type FileNode } from "../../lib/fileTree";
+import { applyHunks, diffLines, joinLines, splitLines } from "../../lib/textDiff";
+import { multiWindow, targetSaveDir, windowParams } from "../windowManager";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
@@ -42,6 +47,7 @@ import HexView from "./parts/HexView.vue";
 import ImageView from "./parts/ImageView.vue";
 import McaTable from "./parts/McaTable.vue";
 import NbtTree from "./parts/NbtTree.vue";
+import { clearCleanSessions, closeSessions } from "./parts/nbtSession";
 import type { FileItemDto, SaveItemDto } from "../../lib/bindings";
 
 /** 请求关闭本窗口 */
@@ -83,10 +89,32 @@ const loading = ref(false);
 /** 文本内容与读进来的原文：两者不同就是"未保存" */
 const text = ref("");
 const origin = ref("");
+/**
+ * 打开时那一份全文的 SHA1
+ *
+ * 保存走的是行级差异（见 lib/textDiff），差异只对得上"打开时那一份"；
+ * 把它交给后端核对磁盘，变了就拒绝保存，免得冲掉别处（如资源管理改 options.txt）
+ * 的改动。
+ */
+const originSha1 = ref("");
 const saving = ref(false);
+
+/** NBT 视图里有没有未保存的改动，由 NbtTree 报上来 */
+const nbtDirty = ref(false);
+/** 正在保存 NBT */
+const nbtSaving = ref(false);
+/** NBT 视图实例，保存时要调它的 `save` */
+const nbtRef = ref<InstanceType<typeof NbtTree> | null>(null);
 
 const dirty = computed(() => text.value !== origin.value);
 const isText = computed(() => !!selected.value && TEXT_TYPES.includes(selected.value.fileType));
+const isNbt = computed(() => selected.value?.fileType === "nbt");
+/** 当前视图能不能保存：文本与 NBT 都是可改的 */
+const canSave = computed(() => isText.value || isNbt.value);
+/** 当前视图有没有未保存的改动 */
+const unsaved = computed(() => (isText.value ? dirty.value : nbtDirty.value));
+/** 正忙着落盘：保存键在这期间不能再点 */
+const busy = computed(() => saving.value || nbtSaving.value);
 
 /** 当前文件该用哪种 Monaco 语言 */
 function langOf(file: FileItemDto): string {
@@ -198,6 +226,19 @@ async function load() {
     instanceUuid.value = found?.uuid ?? "";
     instanceName.value = found?.name ?? "";
     worlds.value = found ? await listSaves(found.uuid) : [];
+
+    // "聚焦某个存档"的跳转（资源窗口右键存档 → 修改配置文件），跟世界名对上就套到来源上。
+    // 单窗口模式读完就地清掉，别让普通跳转再把它带回来；多窗口模式参数是本窗口 URL 的一
+    // 部分，随窗口留着。存档列表里没有的名字套不上，来源保持原样
+    const saveDir = targetSaveDir();
+    if (saveDir) {
+      if (!multiWindow.value) {
+        windowParams.value = { ...windowParams.value, saveDir: null };
+      }
+      if (worlds.value.some((w) => w.dir === saveDir)) {
+        source.value = saveDir;
+      }
+    }
   } catch (e) {
     showToast(tErr(e));
     instanceUuid.value = "";
@@ -214,9 +255,13 @@ async function loadFiles() {
   selected.value = null;
   text.value = "";
   origin.value = "";
+  nbtDirty.value = false;
   // 树与搜索都跟着这批文件走：换了来源 / 实例，旧的目录 key 与关键字都没意义了
   expanded.value = new Set();
   query.value = "";
+  // 盘上那一份可能已经不是会话里缓存的样子了：没改动的 NBT 会话就地丢掉（连后端的文件
+  // 句柄一起关，下次打开重读）。有未保存改动的留着，那是用户还没落盘的东西
+  await clearCleanSessions();
   if (!instanceUuid.value) {
     files.value = [];
     return;
@@ -224,9 +269,8 @@ async function loadFiles() {
 
   loading.value = true;
   try {
-    const list = source.value
-      ? await listConfigSaveFiles(instanceUuid.value, source.value)
-      : await listConfigFiles(instanceUuid.value);
+    // 来源直接交给后端：空串是实例本身，否则是存档目录，路径一律相对该来源
+    const list = await listConfigFiles(instanceUuid.value, source.value);
     // 顺序交给文件树统一给（每层目录在前）；这里只拷一份，不和 IPC 返回的数组共享引用
     files.value = [...list];
   } catch (e) {
@@ -242,13 +286,16 @@ async function open(file: FileItemDto) {
   selected.value = file;
   text.value = "";
   origin.value = "";
+  originSha1.value = "";
+  nbtDirty.value = false;
   if (!TEXT_TYPES.includes(file.fileType)) return;
 
   loading.value = true;
   try {
-    const data = await readConfigFile(instanceUuid.value, file.name);
-    text.value = data;
-    origin.value = data;
+    const data = await readConfigFile(instanceUuid.value, source.value, file.name);
+    text.value = data.text;
+    origin.value = data.text;
+    originSha1.value = data.sha1;
   } catch (e) {
     showToast(tErr(e));
   } finally {
@@ -256,15 +303,56 @@ async function open(file: FileItemDto) {
   }
 }
 
-/** 保存当前文本文件，整份覆盖 */
+/**
+ * 保存当前视图：文本走行级差异，NBT 交给树上的登记表
+ *
+ * 窗口自己不认识 NBT 的改动，只负责把标题栏那一颗保存键分发给对应视图。
+ */
 async function save() {
+  if (isNbt.value) {
+    const tree = nbtRef.value;
+    if (!tree || nbtSaving.value || !nbtDirty.value) return;
+    nbtSaving.value = true;
+    try {
+      await tree.save();
+    } finally {
+      nbtSaving.value = false;
+    }
+    return;
+  }
+  await saveText();
+}
+
+/**
+ * 保存当前文本文件：只回传**行级差异**，不再整份送回去
+ *
+ * 差异是相对打开时那一份算的，所以后端会先核对磁盘上的 SHA1。发出去之前先自检一遍：
+ * 把差异套回原文必须与编辑中的内容逐字相同，对不上就退回"整段替换"——
+ * 多发一次全文可以接受，按错的差异改盘上的文件不行。
+ */
+async function saveText() {
   const file = selected.value;
   if (!file || !isText.value || saving.value || !dirty.value) return;
 
   saving.value = true;
   try {
-    await writeConfigFile(instanceUuid.value, file.name, text.value);
+    const originLines = splitLines(origin.value);
+    const editedLines = splitLines(text.value);
+    let hunks = diffLines(originLines, editedLines);
+    if (joinLines(applyHunks(originLines, hunks)) !== text.value) {
+      hunks = [{ start: 0, deleteCount: originLines.length, lines: editedLines }];
+    }
+
+    const sha1 = await writeConfigFile(
+      instanceUuid.value,
+      source.value,
+      file.name,
+      originSha1.value,
+      editedLines.length,
+      hunks,
+    );
     origin.value = text.value;
+    originSha1.value = sha1;
     showToast(t("config.saved"));
   } catch (e) {
     showToast(tErr(e));
@@ -287,9 +375,12 @@ async function pickSource(value: string) {
 }
 
 onMounted(() => void load());
+// 本窗口走了（多窗口模式下就是窗口关闭，单窗口模式下是页面切走）：打开着的 NBT 文件都放手，
+// 后端那边的句柄跟着关掉，下次打开重新读盘
+onBeforeUnmount(closeSessions);
 // 单窗口模式切回本窗口时重读；有没保存的改动就不动，免得把编辑内容冲掉
 useWindowRefresh(() => {
-  if (!dirty.value) void load();
+  if (!dirty.value && !nbtDirty.value) void load();
 });
 </script>
 
@@ -308,8 +399,8 @@ useWindowRefresh(() => {
         </select>
 
         <!-- 保存状态：未保存时下面那颗保存键转强调色，工具条因此整行省掉 -->
-        <span v-if="isText && dirty" class="head-dirty">{{ t("config.unsaved") }}</span>
-        <span v-else-if="!isText && selected" class="head-readonly">{{ t("config.readonly") }}</span>
+        <span v-if="canSave && unsaved" class="head-dirty">{{ t("config.unsaved") }}</span>
+        <span v-else-if="selected && !canSave" class="head-readonly">{{ t("config.readonly") }}</span>
 
         <BaseButton size="sm" variant="ghost" class="icon-btn-head" :disabled="loading" v-tip="t('config.refresh')"
           :aria-label="t('config.refresh')" @click="loadFiles">
@@ -319,8 +410,8 @@ useWindowRefresh(() => {
           :aria-label="t('config.openDir')" @click="openDir">
           <GlyphIcon name="folder" :size="15" :weight="1.8" />
         </BaseButton>
-        <BaseButton v-if="isText" size="sm" :variant="dirty ? 'accent' : 'ghost'" class="icon-btn-head"
-          :disabled="saving || !dirty" v-tip="t('config.save')" :aria-label="t('config.save')" @click="save">
+        <BaseButton v-if="canSave" size="sm" :variant="unsaved ? 'accent' : 'ghost'" class="icon-btn-head"
+          :disabled="busy || !unsaved" v-tip="t('config.save')" :aria-label="t('config.save')" @click="save">
           <GlyphIcon name="save" :size="15" :weight="1.8" />
         </BaseButton>
       </div>
@@ -356,15 +447,18 @@ useWindowRefresh(() => {
 
       <!-- 右：按类型选视图。没选文件时也摆着文本编辑器，只是禁用 ——
            打开窗口就是"编辑器窗口"的样子，不再是中间一句提示 -->
-      <section class="cfg-view" :class="{ flush: !selected || isText }">
+      <section class="cfg-view" :class="{ flush: !selected || isText || selected.fileType === 'image' || selected.fileType === 'nbt' }">
         <!-- 与下面那个必须给不同的 key：同为 MonacoText，Vue 会复用实例，
              而只读是创建时的选项，复用后切不回可编辑 -->
         <MonacoText v-if="!selected" key="empty" :model-value="''" readonly />
         <MonacoText v-else-if="isText" key="file" v-model="text" :language="langOf(selected)" />
-        <NbtTree v-else-if="selected.fileType === 'nbt'" :uuid="instanceUuid" :file="selected.name" />
-        <McaTable v-else-if="selected.fileType === 'mca'" :uuid="instanceUuid" :file="selected.name" />
-        <ImageView v-else-if="selected.fileType === 'image'" :uuid="instanceUuid" :file="selected.name" />
-        <HexView v-else :uuid="instanceUuid" :file="selected.name" />
+        <NbtTree v-else-if="isNbt" ref="nbtRef" :uuid="instanceUuid" :source="source" :file="selected.name"
+          @dirty="nbtDirty = $event" />
+        <McaTable v-else-if="selected.fileType === 'mca'" :uuid="instanceUuid" :source="source"
+          :file="selected.name" />
+        <ImageView v-else-if="selected.fileType === 'image'" :uuid="instanceUuid" :source="source"
+          :file="selected.name" />
+        <HexView v-else :uuid="instanceUuid" :source="source" :file="selected.name" />
       </section>
     </div>
   </WindowFrame>
@@ -520,8 +614,8 @@ useWindowRefresh(() => {
   padding: 22px 26px;
 }
 
-/* 文本视图与默认态贴边满铺：编辑器自己那圈描边就是分界，再套一层外留白只是无谓的空。
-   卡片类视图（NBT / 区块 / 图片 / 二进制）自带圆角与描边，仍要上面那圈外留白 */
+/* 文本、图片、NBT 与默认态贴边满铺：编辑器自己那圈描边就是分界，图片与 NBT 树不套卡片、
+   也不该再留一圈空。卡片类视图（区块 / 二进制）自带圆角与描边，仍要上面那圈外留白 */
 .cfg-view.flush {
   padding: 0;
 }

@@ -1,6 +1,6 @@
 //! 配置编辑器 DTO —— 文件条目、NBT 树、区域文件区块表与二进制分段
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// 配置文件类型，前端据此选编辑器的语言、判断该走哪种视图
 #[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq)]
@@ -61,7 +61,7 @@ pub struct BytesSliceDto {
 /// NBT 标签类型
 ///
 /// 不加 `rename_all`：serde 与生成器都按变体名输出，与 `gui_config.rs` 的 `Theme` 同一写法。
-#[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NbtKindDto {
     /// TAG_End，只在文件头作结束标记
     End,
@@ -95,7 +95,7 @@ pub enum NbtKindDto {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NbtNodeDto {
-    /// 键名；列表元素是下标字符串，根节点是空串
+    /// 键名；列表与数组的元素是下标字符串，根节点是空串
     pub name: String,
     /// 标签类型，见 [`NbtKindDto`]
     pub kind: NbtKindDto,
@@ -105,8 +105,83 @@ pub struct NbtNodeDto {
     pub length: u32,
     /// 复合的成员，按键名排序
     pub children: Vec<NbtNodeDto>,
-    /// 列表的元素，按原顺序
+    /// 列表与数组的元素，按原顺序；数组超过编辑上限时为空，只有 [`NbtNodeDto::length`] 可用
     pub items: Vec<NbtNodeDto>,
+}
+
+/// 文本配置文件的内容与校验值
+///
+/// 校验值是**全文**的 SHA1，保存时按它核对磁盘上还是不是打开时的这一份，
+/// 避免把别的窗口（如资源管理改 options.txt）的改动冲掉。
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigTextDto {
+    /// 全文
+    pub text: String,
+    /// 全文的 SHA1，十六进制小写
+    pub sha1: String,
+}
+
+/// 一次行替换：把原文 `start` 起的 `delete_count` 行换成 `lines`
+///
+/// 行号一律**相对原文**，各段按 `start` 升序、互不重叠（可以同点插入）。
+/// 前端算差异用的是 Monaco 的 LcsDiff（`mml-vue/src/lib/textDiff.ts`），
+/// 后端套差异的是 `mml_sys::text_diff`。
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigHunkDto {
+    /// 原文里的起始行号，从 0 起
+    pub start: u32,
+    /// 要替换掉的行数；0 表示纯插入
+    pub delete_count: u32,
+    /// 替换成的新行；空表示纯删除
+    pub lines: Vec<String>,
+}
+
+/// NBT 文件的展示树与校验值
+///
+/// 校验值是**文件字节**的 SHA1（NBT 是二进制，不能像文本那样按解码后的文本算），
+/// 保存时按它核对磁盘上还是不是打开时的这一份。
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigNbtDto {
+    /// 根节点
+    pub node: NbtNodeDto,
+    /// 文件字节的 SHA1，十六进制小写
+    pub sha1: String,
+}
+
+/// NBT 改动的一次操作
+///
+/// 不加 `rename_all`：serde 与生成器都按变体名输出，与 [`NbtKindDto`] 同一写法。
+#[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NbtOpDto {
+    /// 改某个标签的值：标量按它自己的类型解析，数组按逗号分隔的一串数
+    Set,
+    /// 新建一个标签并挂进父容器：复合按路径最后一段当键名，列表按它当插入下标
+    Add,
+    /// 改复合成员的键名：`value` 是新键名，整棵子树原样搬过去
+    Rename,
+    /// 删掉一个标签：复合删成员，列表删元素
+    Remove,
+}
+
+/// NBT 树的一次改动
+///
+/// `path` 一律**相对当时的树**：同一批改动按顺序套用，后一条看得到前面几条的结果。
+/// 前端每做一步就记一条，保存时按发生顺序整批发过来，与它本地那棵树的结果一致。
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NbtEditDto {
+    /// 操作，见 [`NbtOpDto`]
+    pub op: NbtOpDto,
+    /// 从根往下的路径，逐层是键名或列表下标的十进制字符串；空路径就是根标签
+    pub path: Vec<String>,
+    /// `Add` 时新标签的类型；`Set` / `Rename` / `Remove` 不用，传 `null`
+    pub kind: Option<NbtKindDto>,
+    /// `Set` / `Add` 的新值文本：数字按目标类型解析，字符串原样，数组是逗号分隔的一串数；
+    /// `Rename` 时是新键名；`Remove` 与新建复合 / 列表时传空串
+    pub value: String,
 }
 
 /// 区域文件里的一项区块

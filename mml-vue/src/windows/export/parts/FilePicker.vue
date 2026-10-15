@@ -8,6 +8,7 @@ import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
 import { api } from "../../../lib/api";
 import type { ExportEntryDto } from "../../../lib/bindings";
+import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 
 const props = defineProps<{
   /** 实例 uuid */
@@ -98,7 +99,7 @@ watch(
     <p v-if="!rows.length" class="empty-tip">{{ t("winExport.noFiles") }}</p>
     <div v-for="row in rows" :key="row.entry.path" class="tree-row" :style="{ paddingLeft: `${6 + row.depth * 14}px` }">
       <span class="tree-caret" :class="{ open: opened.has(row.entry.path) }" @click="toggleDir(row.entry.path)">
-        {{ row.entry.dir ? "▸" : "" }}
+        <GlyphIcon v-if="row.entry.dir" name="chevron-down" :size="12" :weight="2.4" />
       </span>
       <input type="checkbox" class="tree-box" :checked="picked.has(row.entry.path)"
         @change="emit('toggle', row.entry)" />
@@ -133,18 +134,21 @@ watch(
   background: var(--bg-hover);
 }
 
-/* 箭头占位：文件行也要占同样的宽度，名字才对得齐 */
+/* 箭头占位：文件行也要占同样的宽度，名字才对得齐。收起朝右、展开朝下 */
 .tree-caret {
-  width: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
   flex-shrink: 0;
   color: var(--text-dim);
-  font-size: 10px;
   cursor: pointer;
+  transform: rotate(-90deg);
   transition: transform 0.12s;
 }
 
 .tree-caret.open {
-  transform: rotate(90deg);
+  transform: rotate(0);
 }
 
 .tree-box {
