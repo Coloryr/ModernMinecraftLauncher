@@ -462,14 +462,14 @@ pub async fn resource_mods_dep_test(uuid: String) -> Result<Vec<DepProblemDto>, 
 /// # 返回值
 ///
 /// 见 [`DepProblemDto`]
-fn dep_problem_dto(problem: DepProblem) -> DepProblemDto {
+fn dep_problem_dto(problem: DependantProblem) -> DepProblemDto {
     DepProblemDto {
         modid: problem.modid,
         kind: match problem.kind {
-            DepProblemKind::Missing => DepProblemKindDto::Missing,
-            DepProblemKind::Mismatch => DepProblemKindDto::Mismatch,
-            DepProblemKind::Disabled => DepProblemKindDto::Disabled,
-            DepProblemKind::Duplicate => DepProblemKindDto::Duplicate,
+            DependantProblemKind::Missing => DepProblemKindDto::Missing,
+            DependantProblemKind::Mismatch => DepProblemKindDto::Mismatch,
+            DependantProblemKind::Disabled => DepProblemKindDto::Disabled,
+            DependantProblemKind::Duplicate => DepProblemKindDto::Duplicate,
         },
         required: problem.required.to_string(),
         installed: problem.installed,

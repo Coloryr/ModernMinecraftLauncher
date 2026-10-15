@@ -122,36 +122,6 @@ impl DependantInfo {
     }
 }
 
-#[cfg(test)]
-mod range_tests {
-    use crate::game_mods::DependantInfo;
-    use mml_base::range_checker::VersionRange;
-
-    #[test]
-    fn parse_with_modid_prefix() {
-        let d = DependantInfo::parse_required_name("spongeapi@[7.0.0,)");
-        assert_eq!(d.modid, "spongeapi");
-        assert!(d.version.contains("7.0.0"));
-        assert!(!d.version.contains("6.9.9"));
-
-        let d = DependantInfo::parse_required_name("Forge@[9.10.1.850,)");
-        assert_eq!(d.modid, "Forge");
-        assert!(d.version.contains("9.10.1.850"));
-
-        let d = DependantInfo::parse_required_version("modid", ">=0.19.5");
-        assert_eq!(d.modid, "modid");
-        assert!(d.version.contains("0.20.0"));
-    }
-
-    /// 裸名字整串就是 modid、范围不限：当版本范围解析会让 modid 变空、依赖被丢掉
-    #[test]
-    fn parse_bare_name_is_modid() {
-        let d = DependantInfo::parse_required_name("spongeapi");
-        assert_eq!(d.modid, "spongeapi");
-        assert_eq!(d.version, VersionRange::Any);
-    }
-}
-
 /// 前置依赖的类型
 #[derive(Debug, Clone)]
 pub enum DependantType {
@@ -1185,121 +1155,6 @@ fn mcmod_logo_file_in(json: &str) -> Option<String> {
     None
 }
 
-/// 单个元数据文件坏了不该影响整包
-///
-/// 真实案例 `mekanism_lasers-1.1.10.3-a.jar` 里两个 toml 坏了一个，旧实现用 `?` 抛出后
-/// 整包判为"读取失败"、连名字都看不到；正确行为是坏的那个跳过并记一条日志，好的照常读。
-#[cfg(test)]
-mod meta_tests {
-    use super::*;
-    use crate::test_support::{TextEntry, text_entry};
-    use std::io::Write;
-    use zip::ZipWriter;
-    use zip::write::SimpleFileOptions;
-
-    /// 起日志系统：解析失败时**故意**要记一条日志，而 `mml_log` 没 start 过就会 panic，
-    /// 那是"日志系统还没起来"的前提问题，不是被测逻辑的问题。
-    ///
-    /// **走 crate 级的共用 boot**，见 [`crate::test_support::boot`]：`mml_log::STREAM` 是
-    /// `OnceLock`，各测试模块各写一份就会第二次 `start()` → panic，本模块与
-    /// `game_group::tests` 曾经互相踩挂就是这个原因。
-    fn boot_log() {
-        crate::test_support::boot();
-    }
-
-    /// 造一个只含指定条目的 jar
-    fn make_jar(entries: &[TextEntry]) -> PathBuf {
-        boot_log();
-        let path = mml_testutil::temp_dir().join(format!("mml-mod-{}.jar", Uuid::new_v4()));
-        let file = std::fs::File::create(&path).unwrap();
-        let mut writer = ZipWriter::new(file);
-        let options = SimpleFileOptions::default();
-        for e in entries {
-            writer.start_file(e.name, options).unwrap();
-            writer.write_all(e.text.as_bytes()).unwrap();
-        }
-        writer.finish().unwrap();
-        path
-    }
-
-    /// 两个 toml、其中一个非法：整包仍应读出**合法那个**的信息，而不是判失败
-    ///
-    /// 两个路径都必须是**会被扫描的**那三个之一，即 `META-INF/mods.toml` /
-    /// `META-INF/neoforge.mods.toml` / `neoforge.mods.toml`；
-    /// 放在别处的 toml 根本不进解析，拿它当样本是测不出问题的。
-    #[test]
-    fn broken_toml_does_not_fail_whole_jar() {
-        let path = make_jar(&[
-            text_entry(
-                names::NEO_TOML_FILE,
-                "modLoader=\"javafml\"\nloaderVersion=\"[1,)\"\nlicense=\"MIT\"\n\
-                 [[mods]]\nmodId=\"mekanism_lasers\"\ndisplayName=\"Mekanism Lasers\"\nversion=\"1.1.10.3\"\n",
-            ),
-            // 非法样本用**根目录的 neoforge.mods.toml**，即第三个扫描路径，`[[mods]` 少一个方括号；
-            // 这正是"一个包里两个 toml、坏的那个把整包带崩"的真实形态
-            text_entry(names::NEO_TOML1_FILE, "[[mods]\nmodId=\"whatever\"\n"),
-        ]);
-
-        let info = read_mod_info(&path).expect("坏 toml 不该让整包解析失败");
-        assert!(!info.fail, "不该被判为读取失败");
-        let first = info.info.first().expect("应读出合法 toml 的条目");
-        assert_eq!(first.mod_id, "mekanism_lasers");
-        assert_eq!(first.name, "Mekanism Lasers");
-        assert_eq!(first.version.as_deref(), Some("1.1.10.3"));
-    }
-
-    /// 只有非法 toml：当作"读不出元数据"，但不 panic、也不报错
-    #[test]
-    fn only_broken_toml_yields_empty_info() {
-        let path = make_jar(&[text_entry(names::MC_MOD_TOML_FILE, "[[mods]\n")]);
-
-        let info = read_mod_info(&path).expect("坏 toml 不该让整包解析失败");
-        assert!(info.info.is_empty(), "解析不出条目时 info 应为空");
-    }
-
-    /// MANIFEST.MF 里**没有** core mod 标记时，不该多出一条空 info
-    ///
-    /// `META-INF/MANIFEST.MF` 几乎每个 jar 都有，而 `read_core_mod` 以前无条件 push 一条
-    /// info，那条的加载器是枚举默认值 `Normal`；界面改成"汇总**所有**条目的加载器"之后，
-    /// 用户就会看到**每个模组都多出一个「原版」**。
-    #[test]
-    fn manifest_without_core_marker_adds_no_info() {
-        let path = make_jar(&[
-            text_entry(
-                names::FABRIC_MOD_FILE,
-                r#"{"id":"demo","name":"Demo","version":"1.0"}"#,
-            ),
-            text_entry(
-                "META-INF/MANIFEST.MF",
-                "Manifest-Version: 1.0\nCreated-By: Gradle\n",
-            ),
-        ]);
-
-        let info = read_mod_info(&path).expect("应能解析");
-        assert_eq!(info.info.len(), 1, "只该有 fabric 那一条，不该多出空条目");
-        assert_eq!(
-            info.info[0].loaders.to_string(),
-            "fabric",
-            "不该是默认的 normal"
-        );
-        assert!(!info.core, "没有 core mod 标记就不该判成 core");
-    }
-
-    /// 真的带 core mod 标记时，那条 info 仍要保留，别把功能一起改掉
-    #[test]
-    fn manifest_with_core_marker_keeps_info() {
-        let path = make_jar(&[text_entry(
-            "META-INF/MANIFEST.MF",
-            "Manifest-Version: 1.0\nFMLCorePlugin: com.example.CorePlugin\n",
-        )]);
-
-        let info = read_mod_info(&path).expect("应能解析");
-        assert!(info.core, "有 FMLCorePlugin 就该判成 core");
-        let first = info.info.first().expect("core mod 的 info 不该被丢掉");
-        assert_eq!(first.loaders.to_string(), "forge");
-    }
-}
-
 /// 读取模组信息
 ///
 /// - `path`: 模组文件路径
@@ -1848,9 +1703,125 @@ pub fn mods_dep_test(game: &InstanceSettingObj, mods: &[ModObj]) -> CoreResult<D
     Ok(DependantTest { problems })
 }
 
+// 本文件的测试：元数据解析 / 依赖范围与依赖检测 / 图标三组放在一起，
+// 共用一个 `use super::*`；元数据那组要起日志，见 `boot_log`。
 #[cfg(test)]
-mod dep_tests {
+mod tests {
     use super::*;
+    use crate::test_support::{TextEntry, text_entry};
+    use std::io::Write;
+    use zip::ZipWriter;
+    use zip::write::SimpleFileOptions;
+
+    // ==================== 元数据解析 ====================
+    //
+    // 单个元数据文件坏了不该影响整包：真实案例 `mekanism_lasers-1.1.10.3-a.jar` 里两个 toml
+    // 坏了一个，旧实现用 `?` 抛出后整包判为"读取失败"、连名字都看不到；正确行为是坏的那个
+    // 跳过并记一条日志，好的照常读。
+
+    /// 起日志系统：解析失败时**故意**要记一条日志，而 `mml_log` 没 start 过就会 panic，
+    /// 那是"日志系统还没起来"的前提问题，不是被测逻辑的问题。
+    ///
+    /// **走 crate 级的共用 boot**，见 [`crate::test_support::boot`]：`mml_log::STREAM` 是
+    /// `OnceLock`，各测试模块各写一份就会第二次 `start()` → panic，本模块与
+    /// `game_group::tests` 曾经互相踩挂就是这个原因。
+    fn boot_log() {
+        crate::test_support::boot();
+    }
+
+    /// 造一个只含指定条目的 jar
+    fn make_jar(entries: &[TextEntry]) -> PathBuf {
+        boot_log();
+        let path = mml_testutil::temp_dir().join(format!("mml-mod-{}.jar", Uuid::new_v4()));
+        let file = std::fs::File::create(&path).unwrap();
+        let mut writer = ZipWriter::new(file);
+        let options = SimpleFileOptions::default();
+        for e in entries {
+            writer.start_file(e.name, options).unwrap();
+            writer.write_all(e.text.as_bytes()).unwrap();
+        }
+        writer.finish().unwrap();
+        path
+    }
+
+    /// 两个 toml、其中一个非法：整包仍应读出**合法那个**的信息，而不是判失败
+    ///
+    /// 两个路径都必须是**会被扫描的**那三个之一，即 `META-INF/mods.toml` /
+    /// `META-INF/neoforge.mods.toml` / `neoforge.mods.toml`；
+    /// 放在别处的 toml 根本不进解析，拿它当样本是测不出问题的。
+    #[test]
+    fn broken_toml_does_not_fail_whole_jar() {
+        let path = make_jar(&[
+            text_entry(
+                names::NEO_TOML_FILE,
+                "modLoader=\"javafml\"\nloaderVersion=\"[1,)\"\nlicense=\"MIT\"\n\
+                 [[mods]]\nmodId=\"mekanism_lasers\"\ndisplayName=\"Mekanism Lasers\"\nversion=\"1.1.10.3\"\n",
+            ),
+            // 非法样本用**根目录的 neoforge.mods.toml**，即第三个扫描路径，`[[mods]` 少一个方括号；
+            // 这正是"一个包里两个 toml、坏的那个把整包带崩"的真实形态
+            text_entry(names::NEO_TOML1_FILE, "[[mods]\nmodId=\"whatever\"\n"),
+        ]);
+
+        let info = read_mod_info(&path).expect("坏 toml 不该让整包解析失败");
+        assert!(!info.fail, "不该被判为读取失败");
+        let first = info.info.first().expect("应读出合法 toml 的条目");
+        assert_eq!(first.mod_id, "mekanism_lasers");
+        assert_eq!(first.name, "Mekanism Lasers");
+        assert_eq!(first.version.as_deref(), Some("1.1.10.3"));
+    }
+
+    /// 只有非法 toml：当作"读不出元数据"，但不 panic、也不报错
+    #[test]
+    fn only_broken_toml_yields_empty_info() {
+        let path = make_jar(&[text_entry(names::MC_MOD_TOML_FILE, "[[mods]\n")]);
+
+        let info = read_mod_info(&path).expect("坏 toml 不该让整包解析失败");
+        assert!(info.info.is_empty(), "解析不出条目时 info 应为空");
+    }
+
+    /// MANIFEST.MF 里**没有** core mod 标记时，不该多出一条空 info
+    ///
+    /// `META-INF/MANIFEST.MF` 几乎每个 jar 都有，而 `read_core_mod` 以前无条件 push 一条
+    /// info，那条的加载器是枚举默认值 `Normal`；界面改成"汇总**所有**条目的加载器"之后，
+    /// 用户就会看到**每个模组都多出一个「原版」**。
+    #[test]
+    fn manifest_without_core_marker_adds_no_info() {
+        let path = make_jar(&[
+            text_entry(
+                names::FABRIC_MOD_FILE,
+                r#"{"id":"demo","name":"Demo","version":"1.0"}"#,
+            ),
+            text_entry(
+                "META-INF/MANIFEST.MF",
+                "Manifest-Version: 1.0\nCreated-By: Gradle\n",
+            ),
+        ]);
+
+        let info = read_mod_info(&path).expect("应能解析");
+        assert_eq!(info.info.len(), 1, "只该有 fabric 那一条，不该多出空条目");
+        assert_eq!(
+            info.info[0].loaders.to_string(),
+            "fabric",
+            "不该是默认的 normal"
+        );
+        assert!(!info.core, "没有 core mod 标记就不该判成 core");
+    }
+
+    /// 真的带 core mod 标记时，那条 info 仍要保留，别把功能一起改掉
+    #[test]
+    fn manifest_with_core_marker_keeps_info() {
+        let path = make_jar(&[text_entry(
+            "META-INF/MANIFEST.MF",
+            "Manifest-Version: 1.0\nFMLCorePlugin: com.example.CorePlugin\n",
+        )]);
+
+        let info = read_mod_info(&path).expect("应能解析");
+        assert!(info.core, "有 FMLCorePlugin 就该判成 core");
+        let first = info.info.first().expect("core mod 的 info 不该被丢掉");
+        assert_eq!(first.loaders.to_string(), "forge");
+    }
+
+    // ==================== 依赖范围与依赖检测 ====================
 
     /// 造一个装着元数据的模组条目
     ///
@@ -1872,7 +1843,9 @@ mod dep_tests {
         }
     }
 
-    /// 造一条强制前置
+    /// 造一条强制前置，按 1.12.2 的 `modid@版本范围` 写法
+    ///
+    /// - `spec`: 形如 `b@[1.0,)`；不带 `@` 时整串就是 modid
     fn need(spec: &str) -> DependantType {
         DependantType::Required(DependantInfo::parse_required_name(spec))
     }
@@ -1883,6 +1856,31 @@ mod dep_tests {
             loader: LoaderType::Forge,
             ..Default::default()
         }
+    }
+
+    /// 带 `modid@` 前缀的解析：modid 取出来、范围可用
+    #[test]
+    fn parse_with_modid_prefix() {
+        let d = DependantInfo::parse_required_name("spongeapi@[7.0.0,)");
+        assert_eq!(d.modid, "spongeapi");
+        assert!(d.version.contains("7.0.0"));
+        assert!(!d.version.contains("6.9.9"));
+
+        let d = DependantInfo::parse_required_name("Forge@[9.10.1.850,)");
+        assert_eq!(d.modid, "Forge");
+        assert!(d.version.contains("9.10.1.850"));
+
+        let d = DependantInfo::parse_required_version("modid", ">=0.19.5");
+        assert_eq!(d.modid, "modid");
+        assert!(d.version.contains("0.20.0"));
+    }
+
+    /// 裸名字整串就是 modid、范围不限：当版本范围解析会让 modid 变空、依赖被丢掉
+    #[test]
+    fn parse_bare_name_is_modid() {
+        let d = DependantInfo::parse_required_name("spongeapi");
+        assert_eq!(d.modid, "spongeapi");
+        assert_eq!(d.version, VersionRange::Any);
     }
 
     /// 缺前置：被依赖的包不在列表里 → Missing，并带上"谁要求它"
@@ -2025,11 +2023,8 @@ mod dep_tests {
 
         assert!(mods_dep_test(&forge_game(), &mods).unwrap().problems.is_empty());
     }
-}
 
-#[cfg(test)]
-mod icon_tests {
-    use super::*;
+    // ==================== 图标 ====================
 
     /// 模板里被注释掉的 logoFile 必须跳过，这是最常见的形态
     #[test]
