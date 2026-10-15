@@ -360,3 +360,35 @@ pub struct ResourceDropDto {
     /// 被跳过的名字，冲突时选了"跳过"
     pub skipped: Vec<String>,
 }
+
+/// 模组依赖检测发现的问题种类
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum DepProblemKindDto {
+    /// 缺失：装着的模组里没有这个前置
+    Missing,
+    /// 版本不符：装着了，但没有一个版本落在要求的范围内
+    Mismatch,
+    /// 前置被禁用：只有禁用状态的包提供它
+    Disabled,
+    /// 重复：同一个 modid 有两份及以上处于启用状态的包
+    Duplicate,
+}
+
+/// 模组依赖检测发现的一条问题
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DepProblemDto {
+    /// 出问题的前置 modid
+    pub modid: String,
+    /// 问题种类
+    pub kind: DepProblemKindDto,
+    /// 要求的版本范围，`*` 表示不限
+    pub required: String,
+    /// 已装着的版本，多个用 `, ` 连接；缺失时为空串
+    pub installed: String,
+    /// 有哪些模组要求它，重复那一档为空
+    pub required_by: Vec<String>,
+    /// 重复那一档里是哪几个文件，其余为空
+    pub files: Vec<String>,
+}

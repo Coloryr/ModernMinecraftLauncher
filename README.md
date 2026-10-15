@@ -7,6 +7,41 @@
 ## 未来计划
 - 主题包，安装后修改界面样式
 - cleanroom 原生支持
+- 实验性功能：模组映射
+- 跨版本迁移助手
+- 大屏手柄模式
+- 文件占用分析
+- 模组二分模式
+
+## 待完成列表
+- 资源窗口分类拖动浮动效果
+- 模组更新检查
+- 模组依赖检查
+- MCMOD搜索
+- 界面统一
+- 简易崩溃分析
+- 简易Mixin分析
+- 手柄模式
+- 存档云同步(ColorMC)
+- 背景音乐播放
+- 资源文件重命名
+- 截图复制
+- 服务器列表导入导出
+- 映射大厅 / 联机
+- 客户端导出
+- 服务器实例生成
+- 手柄设置
+- 启动器自更新
+- 手动标记模组
+- 自动标记模组
+- 地图查找
+- 管理员启动
+- 生成实例信息
+- 导入模组列表
+- 游戏时长统计
+- 启动时加载器检测
+- modid重复提示
+- 窗口透明
 
 ## 技术栈
 
@@ -56,6 +91,87 @@
 测试按改动范围只跑相关的那几个：`cargo test -p <crate>`（不要整仓全量测试）。
 
 协作约定（IPC 生成、窗口模型、临时目录、日志调试等）统一写在 [AGENTS.md](AGENTS.md)。
+
+## 开源许可与第三方组件
+
+本体以 **Apache-2.0** 发布（见下文[许可证](#许可证)）。安装包内含下列第三方组件；
+**许可全文不随安装包分发**，同一份清单与上游入口也放在应用内「帮助 → 开源许可」里；
+另有本项目会去调用的第三方服务，见文末[第三方服务与平台](#第三方服务与平台)。
+
+### 内嵌的 Java 组件
+
+| 组件 | 版本 | 许可 | 上游 |
+| --- | --- | --- | --- |
+| ColorASM | 1.1 | Apache-2.0，本项目作者作品 | [Coloryr/ColorMC](https://github.com/Coloryr/ColorMC) |
+| ForgeWrapper | prism-2025-12-07 | MIT | [ZekerZhayard/ForgeWrapper](https://github.com/ZekerZhayard/ForgeWrapper) |
+| OptifineWrapper | 1.1 | MIT | [Coloryr/OptifineWrapper](https://github.com/Coloryr/OptifineWrapper) |
+
+三个都是 `include_bytes!` 编进二进制的，首次使用时写到 `libraries/` 下。
+
+### 自绘标题栏插件
+
+| 组件 | 版本 | 许可 | 上游 |
+| --- | --- | --- | --- |
+| tauri-plugin-decoration | 3.0.5 | MIT | [oovz/tauri-plugin-decoration](https://github.com/oovz/tauri-plugin-decoration) |
+
+本仓库对它打了两个 patch（[mml-gui/vendor/patches/](mml-gui/vendor/patches/)），改动处已标
+「M²L 本地修改」；上游源码按固定 commit 拉到 `target/vendor/`，仓库里不存第三方源码副本。
+
+### 前端库（打进 `dist/`）
+
+| 组件 | 版本 | 许可 | 上游 |
+| --- | --- | --- | --- |
+| vue | 3.5.43 | MIT | [vuejs/core](https://github.com/vuejs/core) |
+| @tauri-apps/api | 2.12.2 | Apache-2.0 OR MIT | [tauri-apps/tauri](https://github.com/tauri-apps/tauri) |
+| @tauri-apps/plugin-dialog | 2.8.1 | MIT OR Apache-2.0 | [tauri-apps/plugins-workspace](https://github.com/tauri-apps/plugins-workspace) |
+| monaco-editor | 0.56.0 | MIT | [microsoft/monaco-editor](https://github.com/microsoft/monaco-editor) |
+| dompurify | 3.4.16 | Apache-2.0 | [cure53/DOMPurify](https://github.com/cure53/DOMPurify) |
+| marked | 18.1.0 | MIT | [markedjs/marked](https://github.com/markedjs/marked) |
+| three | 0.156.1 | MIT | [mrdoob/three.js](https://github.com/mrdoob/three.js) |
+| skinview3d | 3.4.2 | MIT | [bs-community/skinview3d](https://github.com/bs-community/skinview3d) |
+| skinview-utils | 0.7.1 | MIT | [bs-community/skinview-utils](https://github.com/bs-community/skinview-utils) |
+
+dompurify 上游是 `MPL-2.0 OR Apache-2.0`，本项目按 Apache-2.0 履行；
+monaco-editor 自身还打包了 marked 14.0.0（MIT）、dompurify 3.4.8（Apache-2.0）与 Codicon 字体（MIT）。
+
+### Rust 静态链接依赖
+
+`cargo metadata` 的非 dev 依赖闭包共 **475** 个 crate，全部为宽松许可，无 GPL / AGPL / LGPL：
+
+| 许可表达式 | 数量 | 许可表达式 | 数量 |
+| --- | --- | --- | --- |
+| MIT OR Apache-2.0 | 233 | Unlicense OR MIT | 10 |
+| MIT | 82 | BSD-3-Clause | 8 |
+| Apache-2.0 OR MIT | 39 | MPL-2.0 | 6 |
+| MIT/Apache-2.0 | 18 | ISC | 5 |
+| Unicode-3.0 | 18 | 其余 29 种表达式 | 46 |
+| Apache-2.0 | 10 | | |
+
+其中 6 个是 **MPL-2.0**（文件级弱 copyleft，本项目未修改其源码，按许可要求给出源码位置）：
+[cssparser](https://crates.io/crates/cssparser)、
+[cssparser-macros](https://crates.io/crates/cssparser-macros)、
+[dtoa-short](https://crates.io/crates/dtoa-short)、
+[dwrote](https://crates.io/crates/dwrote)、
+[option-ext](https://crates.io/crates/option-ext)、
+[selectors](https://crates.io/crates/selectors)。
+各许可原文见 [SPDX 许可列表](https://spdx.org/licenses/)。
+
+### 第三方服务与平台
+
+下列服务由第三方运营，本项目只是调用方，与它们没有隶属关系；使用对应功能要用你自己的账号。
+应用内同样在「帮助 → 第三方服务与平台」里给了这些入口。
+
+| 服务 | 用途 | 链接 |
+| --- | --- | --- |
+| Minecraft（Mojang / Microsoft） | 游戏本体与官方资源由 Mojang / Microsoft 分发；本启动器是第三方软件，与它们没有隶属关系 | [minecraft.net](https://www.minecraft.net/) |
+| SakuraFrp | 联机（内网穿透）平台，后端接口见 [sakurafrp_api.rs](mml-core/mml-net/src/sakurafrp_api.rs) | [用户中心](https://www.natfrp.com/user/) |
+| OpenFrp | 联机（内网穿透）平台，后端接口见 [openfrp_api.rs](mml-core/mml-net/src/openfrp_api.rs) | [控制台](https://console.openfrp.net/home/) · [API 文档](https://github.com/ZGIT-Network/OPENFRP-APIDOC) |
+
+### 测试样本
+
+`mml-core/mml-game/tests/` 与 `mml-gui/src-tauri/tests/` 下的样本（AllMusic 各加载器版本、
+各上游启动器的实例样本等）**只用于测试，不随发行包分发**；其中 AllMusic 与本项目的
+ColorASM 均为本项目作者的作品，样本文件由软件自身生成。
 
 ## 许可证
 

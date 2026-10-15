@@ -229,6 +229,31 @@ const addFormFields = computed(() =>
   ),
 );
 
+/** Nide8 注册页前缀与 LittleSkin 注册页；其余账户类型没有固定入口 */
+const NIDE8_REGISTER_URL = "https://login.mc-user.com:233/";
+const LITTLESKIN_REGISTER_URL = "https://littleskin.cn/auth/register";
+
+/**
+ * 注册页地址，空串表示这个类型没有现成入口、不显示按钮
+ *
+ * 统一通行证的注册页挂在**服务器 ID** 下，所以 ID 没填也没锁定条目时不给地址 ——
+ * 缺一段 ID 的地址只会打开一个 404。注意它属于 Nide8 的**网页站**，
+ * 与本项目做认证的 API 站 `auth.mc-user.com:233` 不是同一个主机。
+ */
+const registerUrl = computed(() => {
+  if (addType.value === "nide8") {
+    const id = (addFields.value.serverId ?? "").trim();
+    return id ? `${NIDE8_REGISTER_URL}${id}/loginreg` : "";
+  }
+  return addType.value === "littleskin" ? LITTLESKIN_REGISTER_URL : "";
+});
+
+/** 打开注册页：交给系统浏览器，失败静默 */
+function openRegister() {
+  if (!registerUrl.value) return;
+  commands.main.openUrl(registerUrl.value).catch(() => {});
+}
+
 function openAdd() {
   showAdd.value = true;
   // 锁定登录方式时默认第一个锁定条目的类型，并选中第一个登录模型
@@ -602,6 +627,10 @@ function tokenLabel(acc: AccountStoreDto): string {
       <p v-if="addType === 'microsoft'" class="hint">{{ t("account.loginHint") }}</p>
 
       <div class="modal-actions">
+        <!-- 统一通行证 / LittleSkin 有现成的注册页：没有账户时不必关掉弹窗再去开浏览器 -->
+        <BaseButton v-if="registerUrl" variant="ghost" class="reg-btn" @click="openRegister">
+          {{ t("account.register") }}
+        </BaseButton>
         <BaseButton @click="showAdd = false">{{ t("add.cancel") }}</BaseButton>
         <BaseButton variant="primary" @click="confirmAdd">{{ t("account.add") }}</BaseButton>
       </div>
@@ -725,6 +754,11 @@ function tokenLabel(acc: AccountStoreDto): string {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* 注册按钮靠左：它是"还没有账户"的旁路，不跟取消 / 添加挤在右端 */
+.reg-btn {
+  margin-right: auto;
 }
 
 /* ===== 标题栏右侧控件（head-right 插槽）=====

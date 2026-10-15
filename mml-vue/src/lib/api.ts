@@ -16,6 +16,7 @@ import type {
   ConfigNbtDto,
   ConfigTextDto,
   DataPackItemDto,
+  DepProblemDto,
   DetectedPackDto,
   LogLine,
   DownloadItemEvent,
@@ -1749,6 +1750,20 @@ export function getLoadState(): Promise<LoadState> {
  */
 export function listMods(uuid: string): Promise<ModItemDto[]> {
   return commands.resource.listMods(uuid);
+}
+/**
+ * 模组依赖检测：检查各包声明的强制前置是否齐全、版本是否满足
+ *
+ * - `uuid`: 实例 uuid
+ *
+ * # 返回值
+ *
+ * 逐条问题（缺前置 / 版本不符 / 前置被禁用 / 重复安装）；没有问题时空数组
+ *
+ * 要重新扫一遍 mods 目录，与打开模组分类同一代价，界面要给忙碌态
+ */
+export function modsDepTest(uuid: string): Promise<DepProblemDto[]> {
+  return commands.resource.modsDepTest(uuid);
 }
 /**
  * 模组扫描进度事件

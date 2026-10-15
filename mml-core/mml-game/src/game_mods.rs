@@ -12,6 +12,7 @@ use std::{
 use mml_base::{
     file_item::FileHash,
     hash_helper::{self, HashType},
+    range_checker::{self, VersionRange},
     serialize_tools::{MiniJsonObj, MiniTomlMap},
 };
 use mml_names::{
@@ -48,12 +49,116 @@ impl Default for LoadSideType {
     }
 }
 
+/// 依赖前置信息
+#[derive(Debug, Clone)]
+pub struct DependantInfo {
+    /// modid
+    pub modid: String,
+    /// 需求版本
+    pub version: VersionRange,
+}
+
+impl Default for DependantInfo {
+    fn default() -> Self {
+        Self {
+            modid: Default::default(),
+            version: VersionRange::Any,
+        }
+    }
+}
+
+impl DependantInfo {
+    /// 1.12.2旧版依赖解析：`modid@版本范围`，不带 `@` 时整串就是 modid
+    pub fn parse_required_name(input: &str) -> DependantInfo {
+        let input = input.trim();
+        if input.is_empty() {
+            return Default::default();
+        }
+
+        let (modid, range_str) = match input.split_once('@') {
+            Some((m, r)) => {
+                let m = m.trim();
+                if m.is_empty() {
+                    return Default::default();
+                }
+                (m.to_string(), r.trim())
+            }
+            // 1.12.2 的 dependants / dependencies 列表里裸 modid 很常见，不能当成版本范围
+            None => (input.to_string(), ""),
+        };
+
+        let range = if range_str.is_empty() {
+            VersionRange::Any
+        } else {
+            range_checker::parse_version_range(range_str).unwrap_or(VersionRange::Any)
+        };
+
+        DependantInfo {
+            modid,
+            version: range,
+        }
+    }
+
+    /// 新版依赖解析
+    pub fn parse_required_version(modid: &str, version: &str) -> DependantInfo {
+        let version_range = if version.is_empty() {
+            VersionRange::Any
+        } else {
+            range_checker::parse_version_range(version).unwrap_or(VersionRange::Any)
+        };
+
+        DependantInfo {
+            modid: modid.to_string(),
+            version: version_range,
+        }
+    }
+
+    /// 版本列表解析
+    pub fn parse_required_json(modid: &str, json: &MiniJsonObj) -> DependantInfo {
+        DependantInfo {
+            modid: modid.to_string(),
+            version: range_checker::parse_json_array_range(json).unwrap_or(VersionRange::Any),
+        }
+    }
+}
+
+#[cfg(test)]
+mod range_tests {
+    use crate::game_mods::DependantInfo;
+    use mml_base::range_checker::VersionRange;
+
+    #[test]
+    fn parse_with_modid_prefix() {
+        let d = DependantInfo::parse_required_name("spongeapi@[7.0.0,)");
+        assert_eq!(d.modid, "spongeapi");
+        assert!(d.version.contains("7.0.0"));
+        assert!(!d.version.contains("6.9.9"));
+
+        let d = DependantInfo::parse_required_name("Forge@[9.10.1.850,)");
+        assert_eq!(d.modid, "Forge");
+        assert!(d.version.contains("9.10.1.850"));
+
+        let d = DependantInfo::parse_required_version("modid", ">=0.19.5");
+        assert_eq!(d.modid, "modid");
+        assert!(d.version.contains("0.20.0"));
+    }
+
+    /// 裸名字整串就是 modid、范围不限：当版本范围解析会让 modid 变空、依赖被丢掉
+    #[test]
+    fn parse_bare_name_is_modid() {
+        let d = DependantInfo::parse_required_name("spongeapi");
+        assert_eq!(d.modid, "spongeapi");
+        assert_eq!(d.version, VersionRange::Any);
+    }
+}
+
 /// 前置依赖的类型
+#[derive(Debug, Clone)]
 pub enum DependantType {
-    /// 强制要求的前置 modid
-    Required(String),
+    /// 强制要求的前置
+    Required(DependantInfo),
     /// 推荐安装的前置 modid
-    Recommend(String),
+    Recommend(DependantInfo),
 }
 
 /// 一个包里的单份模组元数据，同一个 jar 可能有多条
@@ -348,20 +453,18 @@ fn read_forge_json(mut reader: impl Read, mod_info: &mut ModObj) -> CoreResult<(
                 info.loaders = LoaderType::Forge;
 
                 info.author = map.extract_strings("authorList");
+                info.dependants
+                    .extend(map.extract_strings("dependants").iter().map(|item| {
+                        DependantType::Recommend(DependantInfo::parse_required_name(item))
+                    }));
+                info.dependants
+                    .extend(map.extract_strings("dependencies").iter().map(|item| {
+                        DependantType::Recommend(DependantInfo::parse_required_name(item))
+                    }));
                 info.dependants.extend(
-                    map.extract_strings("dependants")
-                        .iter()
-                        .map(|item| DependantType::Recommend(item.clone())),
-                );
-                info.dependants.extend(
-                    map.extract_strings("dependencies")
-                        .iter()
-                        .map(|item| DependantType::Recommend(item.clone())),
-                );
-                info.dependants.extend(
-                    map.extract_strings("requiredMods")
-                        .iter()
-                        .map(|item| DependantType::Required(item.clone())),
+                    map.extract_strings("requiredMods").iter().map(|item| {
+                        DependantType::Required(DependantInfo::parse_required_name(item))
+                    }),
                 );
             }
 
@@ -393,7 +496,10 @@ fn read_forge_toml(
         for item in values.iter() {
             let mut info = ModItemObj::default();
 
-            info.mod_id = item.get_opt_string("modId").unwrap_or_default();
+            info.mod_id = item
+                .get_opt_string("modid")
+                .or(item.get_opt_string("modId"))
+                .unwrap_or_default();
             info.name = item
                 .get_opt_string("displayName")
                 .unwrap_or(info.mod_id.clone());
@@ -431,7 +537,7 @@ fn read_forge_toml(
                 continue;
             };
 
-            if let Some(modid) = map.get_opt_string("modid") {
+            if let Some(modid) = map.get_opt_string("modid").or(map.get_opt_string("modId")) {
                 if modid.eq_ignore_ascii_case("minecraft") {
                     if let Some(side) = map.get_opt_string("side") {
                         mod_item.side = match side.to_ascii_lowercase().as_str() {
@@ -441,17 +547,27 @@ fn read_forge_toml(
                             _ => mod_item.side,
                         };
                     }
+                    if let Some(version) = map.get_opt_string("versionRange") {
+                        mod_item.dependants.push(DependantType::Required(
+                            DependantInfo::parse_required_version(&modid, &version),
+                        ));
+                    }
                 } else {
                     let is_mandatory = map.get_bool("mandatory");
                     let is_required = map
                         .get_opt_string("type")
                         .map(|s| s.eq_ignore_ascii_case("required"))
                         .unwrap_or(false);
+                    let version = map.get_opt_string("versionRange").unwrap_or_default();
 
                     let dep_type = if is_required || !is_mandatory {
-                        DependantType::Required(modid.to_string())
+                        DependantType::Required(DependantInfo::parse_required_version(
+                            &modid, &version,
+                        ))
                     } else {
-                        DependantType::Recommend(modid.to_string())
+                        DependantType::Recommend(DependantInfo::parse_required_version(
+                            &modid, &version,
+                        ))
                     };
 
                     mod_item.dependants.push(dep_type);
@@ -515,16 +631,24 @@ fn read_fabric_json(reader: impl Read, mod_info: &mut ModObj) -> CoreResult<()> 
         }
 
         if let Some(str) = map.get_object("depends") {
-            for (key, _) in str.iter() {
-                info.dependants
-                    .push(DependantType::Required(key.to_string()));
+            for (key, version) in str.iter() {
+                info.dependants.push(DependantType::Required(
+                    DependantInfo::parse_required_version(
+                        key,
+                        &version.as_string().unwrap_or_default(),
+                    ),
+                ));
             }
         }
 
         if let Some(str) = map.get_object("suggests") {
-            for (key, _) in str.iter() {
-                info.dependants
-                    .push(DependantType::Recommend(key.to_string()));
+            for (key, version) in str.iter() {
+                info.dependants.push(DependantType::Recommend(
+                    DependantInfo::parse_required_version(
+                        key,
+                        &version.as_string().unwrap_or_default(),
+                    ),
+                ));
             }
         }
     }
@@ -572,9 +696,34 @@ fn read_quilt_json(reader: impl Read, mod_info: &mut ModObj) -> CoreResult<()> {
 
         if let Some(list) = map.get_object("depends") {
             for (_, value) in list.iter() {
-                if let Some(str) = value.as_object().map(|item| item.get_string("id")) {
-                    info.dependants
-                        .push(DependantType::Required(str.to_string()));
+                let Some(obj) = value.as_object() else {
+                    continue;
+                };
+
+                let str = obj.get_string("id");
+                if let Some(versions) = obj.get("versions") {
+                    if versions.is_str() {
+                        info.dependants.push(DependantType::Required(
+                            DependantInfo::parse_required_version(
+                                &str,
+                                &versions.as_string().unwrap_or_default(),
+                            ),
+                        ));
+                    } else if versions.is_list() {
+                        info.dependants.push(DependantType::Required(
+                            DependantInfo::parse_required_json(&str, versions),
+                        ));
+                    } else {
+                        info.dependants.push(DependantType::Required(DependantInfo {
+                            modid: str,
+                            version: VersionRange::Any,
+                        }));
+                    }
+                } else {
+                    info.dependants.push(DependantType::Required(DependantInfo {
+                        modid: str,
+                        version: VersionRange::Any,
+                    }));
                 }
             }
         }
@@ -1442,6 +1591,439 @@ impl InstanceSettingObj {
         })
         .await
         .unwrap_or_default()
+    }
+}
+
+fn get_jar_in_jar_list(item: &ModObj, deps: &mut HashMap<String, String>) {
+    for item in item.jar_in_jar.iter() {
+        for item in item.info.iter() {
+            deps.insert(
+                item.mod_id.clone(),
+                item.version.clone().unwrap_or_default(),
+            );
+        }
+
+        for item in item.jar_in_jar.iter() {
+            get_jar_in_jar_list(item, deps);
+        }
+    }
+}
+
+/// 依赖检测发现的一条问题
+#[derive(Debug, Clone)]
+pub struct DependantProblem {
+    /// 出问题的前置 modid
+    pub modid: String,
+    /// 问题种类
+    pub kind: DependantProblemKind,
+    /// 要求的版本范围；`Duplicate` 这一类不带要求，是 [`VersionRange::Any`]
+    pub required: VersionRange,
+    /// 已装着的版本，多个用 `, ` 连接；`Missing` 这一类为空串
+    pub installed: String,
+    /// 有哪些模组要求它，取模组的显示名；`Duplicate` 这一类为空
+    pub required_by: Vec<String>,
+    /// `Duplicate` 那一类里是哪几个文件；其余为空
+    pub files: Vec<String>,
+}
+
+/// 依赖检测发现的问题种类
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DependantProblemKind {
+    /// 缺失：装着的模组里没有这个前置
+    Missing,
+    /// 版本不符：装着了，但没有一个版本落在要求的范围内
+    Mismatch,
+    /// 前置被禁用：只有禁用状态的包提供它
+    Disabled,
+    /// 重复：同一个 modid 有两份及以上处于启用状态的顶层文件
+    Duplicate,
+}
+
+/// 依赖检测的结果
+#[derive(Debug, Clone)]
+pub struct DependantTest {
+    /// 检测到的问题，按种类与 modid 排序；没有问题时为空
+    pub problems: Vec<DependantProblem>,
+}
+
+/// 模组的显示名：优先元数据里的名字，退回 modid，再退回文件名
+fn mod_display_name(item: &ModObj) -> String {
+    item.info
+        .iter()
+        .map(|info| {
+            if !info.name.is_empty() {
+                info.name.clone()
+            } else {
+                info.mod_id.clone()
+            }
+        })
+        .find(|name| !name.is_empty())
+        .unwrap_or_else(|| mod_file_name(item))
+}
+
+/// 模组条目的文件名，不含目录
+fn mod_file_name(item: &ModObj) -> String {
+    item.file
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_default()
+}
+
+/// 该前置是否由加载器或游戏自身提供，如 Forge 实例里的 `forge` / `minecraft`
+///
+/// 不排掉这些，每个模组都会报一串"缺 minecraft"。
+/// 注意 `fabric` 不排：Fabric API 自己的 modid 就是它，正是最该报出来的那个前置。
+fn is_loader_provided(game: &InstanceSettingObj, modid: &str) -> bool {
+    let id = modid.to_ascii_lowercase();
+    match id.as_str() {
+        "minecraft" | "java" | "mcp" | "fml" => true,
+        _ => match game.loader {
+            LoaderType::Forge => matches!(id.as_str(), "forge" | "minecraftforge"),
+            LoaderType::NeoForge => matches!(id.as_str(), "neoforge" | "forge"),
+            LoaderType::Fabric => id == "fabricloader",
+            LoaderType::Quilt => matches!(id.as_str(), "quilt_loader" | "quilt_base" | "fabricloader"),
+            LoaderType::OptiFine => id == "optifine",
+            LoaderType::LiteLoader => id == "liteloader",
+            LoaderType::Normal | LoaderType::Custom => false,
+        },
+    }
+}
+
+/// 模组依赖检测：按各包声明的强制前置，检查是否齐全、版本是否满足
+///
+/// 口径：
+/// - 只看**启用状态**的顶层模组：禁用包声明的依赖不算，禁用的包也不能顶上依赖；
+/// - 内置 jar-in-jar 里的模组算"已提供"，Forge / NeoForge 会把它们加载起来，但不参与"重复"判定；
+/// - 加载器与游戏自身提供的前置跳过，见 [`is_loader_provided`]；
+/// - 版本范围为空或 `*` 时只查有没有，不比版本；装着的包没写版本号时同样不判版本不符；
+/// - 同一前置被多个模组要求时合并成一条，版本范围不同则各算一条；
+/// - 推荐安装的前置不报。
+///
+/// - `game`: 实例设置，只用来判断哪些前置由加载器提供
+/// - `mods`: 已经扫描出的模组列表，见 `InstanceSettingObj::read_mod`
+///
+/// # 返回值
+///
+/// 见 [`DependantTest`]
+pub fn mods_dep_test(game: &InstanceSettingObj, mods: &[ModObj]) -> CoreResult<DependantTest> {
+    // 装着的：modid → 各条元数据的（版本，是否启用）
+    let mut installed: HashMap<String, Vec<(String, bool)>> = HashMap::new();
+    // 内置模组：modid → 版本
+    let mut bundled: HashMap<String, String> = HashMap::new();
+    // 启用的顶层模组：modid → （文件名，版本），用来找"同一个包装了两份"
+    let mut top: HashMap<String, Vec<(String, String)>> = HashMap::new();
+
+    for item in mods.iter().filter(|item| !item.fail) {
+        for info in item.info.iter() {
+            if info.mod_id.is_empty() {
+                continue;
+            }
+            let version = info.version.clone().unwrap_or_default();
+            installed
+                .entry(info.mod_id.clone())
+                .or_default()
+                .push((version.clone(), !item.disable));
+            if !item.disable {
+                top.entry(info.mod_id.clone())
+                    .or_default()
+                    .push((mod_file_name(item), version));
+            }
+        }
+
+        // 禁用的包里那些内置模组不算提供
+        if !item.disable {
+            get_jar_in_jar_list(item, &mut bundled);
+        }
+    }
+
+    // 谁要求谁：键取「前置 modid + 版本范围」，同一个前置的不同范围各报一条
+    let mut requires: HashMap<(String, String), (VersionRange, Vec<String>)> = HashMap::new();
+    for item in mods.iter().filter(|item| !item.fail && !item.disable) {
+        let by = mod_display_name(item);
+        for info in item.info.iter() {
+            for dep in info.dependants.iter() {
+                let DependantType::Required(dep) = dep else {
+                    continue;
+                };
+                if dep.modid.is_empty() || is_loader_provided(game, &dep.modid) {
+                    continue;
+                }
+                let entry = requires
+                    .entry((dep.modid.clone(), dep.version.to_string()))
+                    .or_insert_with(|| (dep.version.clone(), Vec::new()));
+                if !entry.1.contains(&by) {
+                    entry.1.push(by.clone());
+                }
+            }
+        }
+    }
+
+    let mut problems = Vec::new();
+
+    for ((modid, _), (required, mut required_by)) in requires {
+        required_by.sort();
+
+        // 能顶上的：启用的顶层条目 + 内置条目
+        let mut providers: Vec<String> = installed
+            .get(&modid)
+            .map(|list| {
+                list.iter()
+                    .filter(|(_, enable)| *enable)
+                    .map(|(version, _)| version.clone())
+                    .collect()
+            })
+            .unwrap_or_default();
+        if let Some(version) = bundled.get(&modid) {
+            providers.push(version.clone());
+        }
+
+        let kind = if providers.is_empty() {
+            match installed.get(&modid).and_then(|list| list.first()) {
+                // 只有禁用状态的包提供它：与"缺失"分开报，用户才知道该去启用
+                Some((_, false)) => DependantProblemKind::Disabled,
+                _ => DependantProblemKind::Missing,
+            }
+        } else if required == VersionRange::Any
+            || providers
+                .iter()
+                .any(|version| version.is_empty() || required.contains(version))
+        {
+            continue;
+        } else {
+            DependantProblemKind::Mismatch
+        };
+
+        let installed = if providers.is_empty() {
+            installed
+                .get(&modid)
+                .and_then(|list| list.first().map(|(version, _)| version.clone()))
+                .unwrap_or_default()
+        } else {
+            providers.join(", ")
+        };
+
+        problems.push(DependantProblem {
+            modid,
+            kind,
+            required,
+            installed,
+            required_by,
+            files: Vec::new(),
+        });
+    }
+
+    // 重复：同一个 modid 有两份及以上处于启用状态的顶层文件
+    for (modid, list) in top {
+        if list.len() < 2 {
+            continue;
+        }
+        let mut versions: Vec<String> = list.iter().map(|(_, version)| version.clone()).collect();
+        versions.sort();
+        versions.dedup();
+        let mut files: Vec<String> = list.into_iter().map(|(file, _)| file).collect();
+        files.sort();
+        problems.push(DependantProblem {
+            modid,
+            kind: DependantProblemKind::Duplicate,
+            required: VersionRange::Any,
+            installed: versions.join(", "),
+            required_by: Vec::new(),
+            files,
+        });
+    }
+
+    // 排序：种类优先（缺失最要紧），同种类按 modid
+    problems.sort_by(|a, b| {
+        let rank = |kind: &DependantProblemKind| match kind {
+            DependantProblemKind::Missing => 0,
+            DependantProblemKind::Disabled => 1,
+            DependantProblemKind::Mismatch => 2,
+            DependantProblemKind::Duplicate => 3,
+        };
+        rank(&a.kind)
+            .cmp(&rank(&b.kind))
+            .then_with(|| a.modid.cmp(&b.modid))
+    });
+
+    Ok(DependantTest { problems })
+}
+
+#[cfg(test)]
+mod dep_tests {
+    use super::*;
+
+    /// 造一个装着元数据的模组条目
+    ///
+    /// - `file`: 文件名，重复安装那一档按它区分
+    /// - `modid`: 模组标识
+    /// - `version`: 版本号
+    /// - `deps`: 前置列表
+    fn mod_item(file: &str, modid: &str, version: &str, deps: Vec<DependantType>) -> ModObj {
+        ModObj {
+            file: PathBuf::from(file),
+            info: vec![ModItemObj {
+                mod_id: modid.to_string(),
+                name: modid.to_string(),
+                version: Some(version.to_string()),
+                dependants: deps,
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+    }
+
+    /// 造一条强制前置
+    fn need(spec: &str) -> DependantType {
+        DependantType::Required(DependantInfo::parse_required_name(spec))
+    }
+
+    /// 造一个 Forge 实例设置，用来验证"加载器提供的前置不报"
+    fn forge_game() -> InstanceSettingObj {
+        InstanceSettingObj {
+            loader: LoaderType::Forge,
+            ..Default::default()
+        }
+    }
+
+    /// 缺前置：被依赖的包不在列表里 → Missing，并带上"谁要求它"
+    #[test]
+    fn missing_dep_is_reported() {
+        let mods = vec![mod_item("a.jar", "a", "1.0", vec![need("b@[1.0,)")])];
+
+        let test = mods_dep_test(&forge_game(), &mods).unwrap();
+        assert_eq!(test.problems.len(), 1);
+        assert_eq!(test.problems[0].modid, "b");
+        assert_eq!(test.problems[0].kind, DependantProblemKind::Missing);
+        assert_eq!(test.problems[0].required_by, vec!["a".to_string()]);
+        assert!(test.problems[0].installed.is_empty());
+    }
+
+    /// 版本落在范围内 → 不报
+    #[test]
+    fn satisfied_dep_is_silent() {
+        let mods = vec![
+            mod_item("a.jar", "a", "1.0", vec![need("b@[1.0,)")]),
+            mod_item("b.jar", "b", "1.4", vec![]),
+        ];
+
+        assert!(mods_dep_test(&forge_game(), &mods).unwrap().problems.is_empty());
+    }
+
+    /// 装着了但版本不在范围内 → Mismatch，并报出实际版本
+    #[test]
+    fn version_mismatch_is_reported() {
+        let mods = vec![
+            mod_item("a.jar", "a", "1.0", vec![need("b@[2.0,)")]),
+            mod_item("b.jar", "b", "1.4", vec![]),
+        ];
+
+        let test = mods_dep_test(&forge_game(), &mods).unwrap();
+        assert_eq!(test.problems.len(), 1);
+        assert_eq!(test.problems[0].kind, DependantProblemKind::Mismatch);
+        assert_eq!(test.problems[0].installed, "1.4");
+    }
+
+    /// 加载器与游戏自身提供的前置不报：forge 实例里的 minecraft / forge 都不算缺失
+    #[test]
+    fn loader_provided_dep_is_silent() {
+        let mods = vec![mod_item(
+            "a.jar",
+            "a",
+            "1.0",
+            vec![need("minecraft@[1.20,)"), need("forge@[47,)")],
+        )];
+
+        assert!(mods_dep_test(&forge_game(), &mods).unwrap().problems.is_empty());
+    }
+
+    /// Fabric 的 `fabric` 不排：Fabric API 的 modid 就是它，缺了要报出来
+    #[test]
+    fn fabric_api_is_not_treated_as_loader() {
+        let game = InstanceSettingObj {
+            loader: LoaderType::Fabric,
+            ..Default::default()
+        };
+        let mods = vec![
+            mod_item("a.jar", "a", "1.0", vec![need("fabric")]),
+            // 加载器自己的 id 则要排掉
+            mod_item("b.jar", "b", "1.0", vec![need("fabricloader")]),
+        ];
+
+        let test = mods_dep_test(&game, &mods).unwrap();
+        assert_eq!(test.problems.len(), 1);
+        assert_eq!(test.problems[0].modid, "fabric");
+    }
+
+    /// 只有禁用状态的包提供它 → Disabled，与"缺失"分开
+    #[test]
+    fn disabled_dep_is_reported() {
+        let mut dep = mod_item("b.jar", "b", "1.4", vec![]);
+        dep.disable = true;
+        let mods = vec![mod_item("a.jar", "a", "1.0", vec![need("b")]), dep];
+
+        let test = mods_dep_test(&forge_game(), &mods).unwrap();
+        assert_eq!(test.problems.len(), 1);
+        assert_eq!(test.problems[0].kind, DependantProblemKind::Disabled);
+    }
+
+    /// 内置 jar-in-jar 里的模组能顶上依赖，不算缺失
+    #[test]
+    fn bundled_dep_is_satisfied() {
+        let mut a = mod_item("a.jar", "a", "1.0", vec![need("lib@[2.0,)")]);
+        a.jar_in_jar = vec![mod_item("lib.jar", "lib", "2.1", vec![])];
+
+        assert!(mods_dep_test(&forge_game(), &vec![a]).unwrap().problems.is_empty());
+    }
+
+    /// 同一个 modid 装了两份启用的包 → Duplicate，并列出文件名
+    #[test]
+    fn duplicate_modids_are_reported() {
+        let mods = vec![
+            mod_item("sodium-1.jar", "sodium", "0.5", vec![]),
+            mod_item("sodium-2.jar", "sodium", "0.6", vec![]),
+        ];
+
+        let test = mods_dep_test(&forge_game(), &mods).unwrap();
+        assert_eq!(test.problems.len(), 1);
+        assert_eq!(test.problems[0].kind, DependantProblemKind::Duplicate);
+        assert_eq!(test.problems[0].modid, "sodium");
+        assert_eq!(
+            test.problems[0].files,
+            vec!["sodium-1.jar".to_string(), "sodium-2.jar".to_string()]
+        );
+    }
+
+    /// 推荐前置不报，禁用包声明的依赖也不报
+    #[test]
+    fn recommend_and_disabled_requirer_are_silent() {
+        let mut disabled = mod_item(
+            "c.jar",
+            "c",
+            "1.0",
+            vec![DependantType::Required(DependantInfo::parse_required_name("d"))],
+        );
+        disabled.disable = true;
+        let mods = vec![
+            mod_item(
+                "a.jar",
+                "a",
+                "1.0",
+                vec![DependantType::Recommend(DependantInfo::parse_required_name("z"))],
+            ),
+            disabled,
+        ];
+
+        assert!(mods_dep_test(&forge_game(), &mods).unwrap().problems.is_empty());
+    }
+
+    /// 装了但没写版本号时不判版本不符，避免把"元数据没写"报成问题
+    #[test]
+    fn empty_installed_version_is_not_mismatch() {
+        let mut b = mod_item("b.jar", "b", "", vec![]);
+        b.info[0].version = None;
+        let mods = vec![mod_item("a.jar", "a", "1.0", vec![need("b@[2.0,)")]), b];
+
+        assert!(mods_dep_test(&forge_game(), &mods).unwrap().problems.is_empty());
     }
 }
 

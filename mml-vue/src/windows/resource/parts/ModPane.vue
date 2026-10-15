@@ -20,7 +20,7 @@ import ModList from "./mod/ModList.vue";
 import ModTable from "./mod/ModTable.vue";
 import ModGroupMenu, { type GroupMenuAction } from "./mod/ModGroupMenu.vue";
 import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
-import { deleteMod, disableMod, enableMod, setModNote } from "../../../lib/api";
+import { deleteMod, disableMod, enableMod, modsDepTest, setModNote } from "../../../lib/api";
 import { useReorderDrag } from "../composables/useReorderDrag";
 import { useRowSelect } from "../composables/useRowSelect";
 import {
@@ -32,7 +32,7 @@ import {
 import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceOps } from "../composables/useResourceOps";
 import type { useResourceView } from "../composables/useResourceView";
-import type { ModItemDto } from "../../../lib/bindings";
+import type { DepProblemDto, ModItemDto } from "../../../lib/bindings";
 import { modSelectKey, sortedMods, type ModStateGroup } from "../types";
 import { orderedMods } from "../modColumns";
 import type { ModView } from "../types";
@@ -48,6 +48,36 @@ const props = defineProps<{
 
 const { mods, instanceUuid, loading, modProgress } = props.data;
 const { busy, act, actLocal, askDelete, askConfirm, openFolder } = props.ops;
+
+/** 依赖检测结果弹窗是否打开 */
+const depOpen = ref(false);
+/** 依赖检测正在跑：要重扫一遍 mods 目录，几百个包要数秒 */
+const depBusy = ref(false);
+/** 依赖检测的结果，打开弹窗时才有意义 */
+const depProblems = ref<DepProblemDto[]>([]);
+
+/** 问题种类的 i18n 键，与后端 `DepProblemKindDto` 一一对应 */
+const DEP_KIND_LABEL: Record<DepProblemDto["kind"], string> = {
+  missing: "resource.depKindMissing",
+  mismatch: "resource.depKindMismatch",
+  disabled: "resource.depKindDisabled",
+  duplicate: "resource.depKindDuplicate",
+};
+
+/** 依赖检测：列出缺前置 / 版本不符 / 前置被禁用 / 重复安装 */
+async function runDepTest() {
+  const uuid = instanceUuid.value;
+  if (!uuid || depBusy.value) return;
+  depBusy.value = true;
+  try {
+    depProblems.value = await modsDepTest(uuid);
+    depOpen.value = true;
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    depBusy.value = false;
+  }
+}
 const { modView, setModView, colWidths, setColWidth, sort, setSort } = props.view;
 
 const groups = useModGroups(props.data);
@@ -993,6 +1023,11 @@ onMounted(() => void groups.load());
           <GlyphIcon name="folder-plus" :size="14" />
           {{ t("resource.groupAdd") }}
         </button>
+        <!-- 依赖检测要重扫一遍模组，跑的时候按钮置灰 -->
+        <button class="mini-btn icon-btn" :disabled="depBusy || loading" @click="runDepTest">
+          <GlyphIcon name="check" :size="14" />
+          {{ t("resource.depTest") }}
+        </button>
       </template>
     </template>
   </ContentHead>
@@ -1168,6 +1203,40 @@ onMounted(() => void groups.load());
   <!-- 模组行右键菜单：单行与批量共用 RowMenu，菜单项见 itemMenuItems / batchMenuItems -->
   <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title" @pick="onMenuPick"
     @close="rowMenu = null" />
+
+  <!--
+    依赖检测结果：按后端排好的顺序列（缺失 → 前置被禁用 → 版本不符 → 重复安装）。
+    没有问题就说一句"没有发现问题"，不要留一块空弹窗
+  -->
+  <BaseModal v-if="depOpen" :title="t('resource.depTitle')" @close="depOpen = false">
+    <p v-if="!depProblems.length" class="empty-tip">{{ t("resource.depNone") }}</p>
+    <div v-else class="dep-list">
+      <div v-for="(p, i) in depProblems" :key="`${p.kind}-${p.modid}-${i}`" class="dep-row">
+        <span class="dep-kind">{{ t(DEP_KIND_LABEL[p.kind]) }}</span>
+        <div class="dep-body">
+          <div class="dep-head">
+            <span class="dep-modid">{{ p.modid }}</span>
+            <span v-if="p.installed" class="dep-meta">
+              {{ t("resource.depInstalled", { version: p.installed }) }}
+            </span>
+            <span v-if="p.required !== '*'" class="dep-meta">
+              {{ t("resource.depRequired", { range: p.required }) }}
+            </span>
+          </div>
+          <div v-if="p.requiredBy.length" class="dep-note">
+            {{ t("resource.depBy", { list: p.requiredBy.join(", ") }) }}
+          </div>
+          <div v-if="p.files.length" class="dep-note">
+            {{ t("resource.depFiles", { list: p.files.join(", ") }) }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <BaseButton @click="depOpen = false">{{ t("resource.cancel") }}</BaseButton>
+    </div>
+  </BaseModal>
 </template>
 
 <!-- 备注弹窗的样式走 scoped：BaseModal 是 `Teleport to="body"` 的，弹窗不在
@@ -1249,5 +1318,62 @@ onMounted(() => void groups.load());
   flex-shrink: 0;
   color: var(--text-dim);
   font-size: 11.5px;
+}
+
+/* ---------- 依赖检测结果 ---------- */
+
+/* 问题多时弹窗自己滚，别把动作按钮顶出屏幕 */
+.dep-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 52vh;
+  overflow-y: auto;
+}
+
+.dep-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+/* 种类标签：四种问题用同一套中性外观，靠文字区分，避免再引一套主题色 */
+.dep-kind {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.dep-body {
+  min-width: 0;
+}
+
+.dep-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 10px;
+}
+
+.dep-modid {
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.dep-meta {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.dep-note {
+  color: var(--text-dim);
+  font-size: 11.5px;
+  word-break: break-all;
 }
 </style>

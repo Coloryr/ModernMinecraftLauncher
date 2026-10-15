@@ -20,6 +20,7 @@
 //! | [`archives`] | 压缩包处理 |
 //! | [`events`] | 事件发布订阅 |
 //! | [`inner_path`] | 内部数据存储路径 |
+//! | [`range_checker`] | 范围检查器 |
 //! | [`file_item`] | 文件下载项定义 |
 //! | [`tools`] | 字符串/路径/命令行参数工具 |
 //! | [`version_parse`] | Minecraft 版本号解析 |
@@ -29,6 +30,7 @@ pub mod events;
 pub mod file_item;
 pub mod hash_helper;
 pub mod inner_path;
+pub mod range_checker;
 pub mod serialize_tools;
 pub mod tools;
 pub mod version_parse;

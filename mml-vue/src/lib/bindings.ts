@@ -213,6 +213,7 @@ export const commands = {
     modGroups: (uuid: string) => invoke<ModGroupDto[]>("resource_mod_groups", { uuid }),
     modGroupsCollapsed: (uuid: string) => invoke<string[]>("resource_mod_groups_collapsed", { uuid }),
     modNoteSet: (uuid: string, file: string, note: string) => invoke<void>("resource_mod_note_set", { uuid, file, note }),
+    modsDepTest: (uuid: string) => invoke<DepProblemDto[]>("resource_mods_dep_test", { uuid }),
     openFolder: (uuid: string, kind: string, name: string | null, parent: string | null) => invoke<void>("resource_open_folder", { uuid, kind, name, parent }),
     resourcepackDisable: (uuid: string, file: string) => invoke<void>("resource_resourcepack_disable", { uuid, file }),
     resourcepackEnable: (uuid: string, file: string) => invoke<void>("resource_resourcepack_enable", { uuid, file }),
@@ -1099,6 +1100,17 @@ export type ResourceDropDto = {
   conflicts: string[],
   imported: string[],
   skipped: string[],
+};
+
+export type DepProblemKindDto = "missing" | "mismatch" | "disabled" | "duplicate";
+
+export type DepProblemDto = {
+  modid: string,
+  kind: DepProblemKindDto,
+  required: string,
+  installed: string,
+  requiredBy: string[],
+  files: string[],
 };
 
 export type RunArgSettingDto = {

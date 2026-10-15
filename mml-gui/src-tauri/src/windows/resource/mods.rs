@@ -13,13 +13,17 @@ use std::sync::Arc;
 
 use mml_base::file_item::FileHash;
 use mml_game::GameInstance;
-use mml_game::game_mods::{LoadSideType, ModObj};
+use mml_game::game_mods::{
+    DependantProblem, DependantProblemKind, LoadSideType, ModObj,
+};
 use mml_game::gui_hook::{IProgressGui, ProgressGui};
 use mml_names::names;
 use mml_sys::path_helper;
 use tauri::{Emitter, WebviewWindow};
 
-use crate::dtos::{ModItemDto, ModRenameDto, ModScanProgressDto};
+use crate::dtos::{
+    DepProblemDto, DepProblemKindDto, ModItemDto, ModRenameDto, ModScanProgressDto,
+};
 use crate::err_keys;
 use crate::listens;
 
@@ -426,4 +430,50 @@ pub async fn resource_delete_mod(uuid: String, mod_uuid: String) -> Result<(), S
     let instance = parse_instance(&uuid)?;
     let obj = find_mod(instance, &mod_uuid).await?;
     obj.delete().map_err(|err| err.to_string())
+}
+
+/// 模组依赖检测：检查各包声明的强制前置是否齐全、版本是否满足
+///
+/// **要重新扫一遍 mods 目录**（与打开模组分类同一代价）：依赖信息只存在于扫描结果里，
+/// 扫描结果不落盘。几百个包时界面要给忙碌态。
+///
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// 逐条问题，见 [`DepProblemDto`]；没有问题时空数组；实例不存在或扫描失败返回错误串
+#[gui_macros::ipc_group("resource")]
+#[tauri::command]
+pub async fn resource_mods_dep_test(uuid: String) -> Result<Vec<DepProblemDto>, String> {
+    let instance = parse_instance(&uuid)?;
+
+    block_on_instance(instance, move |game| {
+        let mods = tokio::runtime::Handle::current().block_on(async { game.read_mod(false, None).await });
+        let test = mml_game::game_mods::mods_dep_test(&game, &mods).map_err(|err| err.to_string())?;
+        Ok(test.problems.into_iter().map(dep_problem_dto).collect())
+    })
+    .await?
+}
+
+/// 内核的依赖问题 → 跨 IPC 的 DTO
+///
+/// - `problem`: 内核侧的一条问题
+///
+/// # 返回值
+///
+/// 见 [`DepProblemDto`]
+fn dep_problem_dto(problem: DepProblem) -> DepProblemDto {
+    DepProblemDto {
+        modid: problem.modid,
+        kind: match problem.kind {
+            DepProblemKind::Missing => DepProblemKindDto::Missing,
+            DepProblemKind::Mismatch => DepProblemKindDto::Mismatch,
+            DepProblemKind::Disabled => DepProblemKindDto::Disabled,
+            DepProblemKind::Duplicate => DepProblemKindDto::Duplicate,
+        },
+        required: problem.required.to_string(),
+        installed: problem.installed,
+        required_by: problem.required_by,
+        files: problem.files,
+    }
 }
