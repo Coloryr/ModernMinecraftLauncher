@@ -5,7 +5,10 @@
 //! 重新读、重新解析。同一份文件在会话还在时再打开一次，也是直接给会话里那棵树，不碰磁盘。
 //!
 //! 会话活到配置窗口关闭：前端切走页面时逐个 [`close`]，多窗口模式下窗口销毁由
-//! `lifecycle` 的 `Destroyed` 分支兜底 [`close_all`]。
+//! `lifecycle` 的 `Destroyed` 分支兜底 [`close_all_of`]。
+//!
+//! 会话按**实例**归属：配置窗口是一个实例一个，关掉某个实例的窗口时只该清它自己那几份，
+//! 否则另一个实例还开着的编辑器下次保存会报"文件已被改过"。
 //!
 //! 「别处改过」靠两个便宜的检查发现，都不重读文件：前端那份基准 SHA1 与打开的这份一致，
 //! 且文件的修改时间与长度没变过（[`Stamp`]）。拿着读写句柄也不会挡住别的程序读写，
@@ -21,11 +24,14 @@ use std::time::SystemTime;
 use mml_base::hash_helper::{self, HashType};
 use mml_nbt::nbt_file::NbtFile;
 use mml_sys::path_helper;
+use uuid::Uuid;
 
 use crate::err_keys;
 
 /// 一个打开着的 NBT 文件
 struct NbtSession {
+    /// 打开它的实例 uuid，即配置窗口的实例；关那个窗口时按它只清这一份
+    owner: Uuid,
     /// 文件句柄，读与写都走它
     file: File,
     /// 打开时读进来的内容；保存就在这上面套改动
@@ -67,6 +73,7 @@ fn stamp_of(file: &File) -> Result<Stamp, String> {
 
 /// 打开一个 NBT 文件并收进会话；已经在会话里就直接用会话里那份，不碰磁盘
 ///
+/// - `owner`: 打开它的实例 uuid，关窗时按它清理
 /// - `path`: 文件绝对路径
 /// - `use_nbt`: 拿到内容后的回调，用来把它转成前端要的树
 ///
@@ -74,6 +81,7 @@ fn stamp_of(file: &File) -> Result<Stamp, String> {
 ///
 /// 回调的结果，以及这一份文件字节的 SHA1；读不开或解析不了时返回错误文案
 pub(crate) fn open_with<T>(
+    owner: &Uuid,
     path: &Path,
     use_nbt: impl FnOnce(&NbtFile) -> T,
 ) -> Result<(T, String), String> {
@@ -99,6 +107,7 @@ pub(crate) fn open_with<T>(
     let value = use_nbt(&nbt);
     let sha1 = hash_helper::gen_hash(HashType::Sha1, &data);
     let session = NbtSession {
+        owner: *owner,
         stamp: stamp_of(&file)?,
         writable,
         sha1: sha1.clone(),
@@ -176,9 +185,11 @@ pub(crate) fn close(path: &Path) {
     SESSIONS.lock().unwrap().remove(&key_of(path));
 }
 
-/// 关掉全部会话：配置窗口没了，它打开过的文件都该放手
-pub(crate) fn close_all() {
-    SESSIONS.lock().unwrap().clear();
+/// 关掉某个实例的全部会话：它的配置窗口没了，它打开过的文件都该放手
+///
+/// - `owner`: 实例 uuid，见 [`open_with`]
+pub(crate) fn close_all_of(owner: &Uuid) {
+    SESSIONS.lock().unwrap().retain(|_, s| s.owner != *owner);
 }
 
 #[cfg(test)]
@@ -193,12 +204,17 @@ mod tests {
     use mml_nbt::NbtType;
     use uuid::Uuid;
 
-    use super::{close, close_all, open_with, update_with};
+    use super::{close, close_all_of, open_with, update_with};
     use crate::err_keys;
 
     /// 会话表是进程级的、用例之间共用：这些用例必须串行跑，
-    /// 否则一个用例的 `close_all` 会把另一个用例刚打开的会话清掉
+    /// 否则一个用例的 `close_all_of` 会把另一个用例刚打开的会话清掉
     static TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    /// 用例里的实例 uuid，即会话的归属；用例之间互不相同，清理不会串台
+    fn owner() -> Uuid {
+        Uuid::new_v4()
+    }
 
     /// 造一个样本根标签：{ GameType: 1 }
     fn sample_root() -> NbtType {
@@ -235,20 +251,45 @@ mod tests {
     fn open_keeps_the_file_open() {
         let _guard = TEST_LOCK.lock().unwrap();
         let path = write_sample("keep");
+        let owner = owner();
 
-        assert_eq!(open_with(&path, |nbt| game_type_of(nbt)).unwrap().0, 1);
+        assert_eq!(open_with(&owner, &path, |nbt| game_type_of(nbt)).unwrap().0, 1);
 
         // 绕过会话直接改盘上的字节：长度与修改时间都会变
         fs::write(&path, b"not nbt at all").unwrap();
 
         // 会话还在：再打开给的还是原来那份，说明没重新读
-        assert_eq!(open_with(&path, |nbt| game_type_of(nbt)).unwrap().0, 1);
+        assert_eq!(open_with(&owner, &path, |nbt| game_type_of(nbt)).unwrap().0, 1);
 
         // 关掉之后才是重新读 —— 这时盘上那份已经不是合法 NBT 了
         close(&path);
-        assert!(open_with(&path, |nbt| game_type_of(nbt)).is_err());
+        assert!(open_with(&owner, &path, |nbt| game_type_of(nbt)).is_err());
 
         let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    /// 会话按实例归属：关掉一个实例的窗口只清它那几份，别的实例还开着的不受影响
+    #[test]
+    fn close_all_of_keeps_other_owners() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let first = write_sample("owner-first");
+        let second = write_sample("owner-second");
+        let (owner_a, owner_b) = (owner(), owner());
+
+        open_with(&owner_a, &first, |_| ()).unwrap();
+        open_with(&owner_b, &second, |_| ()).unwrap();
+
+        close_all_of(&owner_a);
+        // 第一份会话没了：盘上写坏之后重新读会失败
+        fs::write(&first, b"not nbt at all").unwrap();
+        assert!(open_with(&owner_a, &first, |nbt| game_type_of(nbt)).is_err());
+        // 第二份还在：拿到的仍是会话里那份，说明没被一起清掉
+        fs::write(&second, b"not nbt at all").unwrap();
+        assert_eq!(open_with(&owner_b, &second, |nbt| game_type_of(nbt)).unwrap().0, 1);
+
+        for path in [&first, &second] {
+            let _ = fs::remove_dir_all(path.parent().unwrap());
+        }
     }
 
     /// 保存就在会话上套改动、由原句柄写回：盘上的字节与返回的 SHA1 都要对得上
@@ -256,7 +297,7 @@ mod tests {
     fn update_writes_through_the_same_handle() {
         let _guard = TEST_LOCK.lock().unwrap();
         let path = write_sample("update");
-        open_with(&path, |_| ()).unwrap();
+        open_with(&owner(), &path, |_| ()).unwrap();
         let sha1 = hash_helper::gen_hash(HashType::Sha1, &fs::read(&path).unwrap());
 
         let new_sha1 = update_with(&path, &sha1, |nbt| {
@@ -289,7 +330,8 @@ mod tests {
     fn update_rejects_stale_writes() {
         let _guard = TEST_LOCK.lock().unwrap();
         let path = write_sample("stale");
-        open_with(&path, |_| ()).unwrap();
+        let owner = owner();
+        open_with(&owner, &path, |_| ()).unwrap();
 
         // 基准 SHA1 不是这一份
         let err = update_with(&path, "deadbeef", |_| Ok(())).unwrap_err();
@@ -301,7 +343,7 @@ mod tests {
         assert_eq!(err, err_keys::FILE_CHANGED);
 
         // 没打开过就改：让他重新打开
-        close_all();
+        close_all_of(&owner);
         let err = update_with(&path, "deadbeef", |_| Ok(())).unwrap_err();
         assert_eq!(err, err_keys::FILE_CHANGED);
 
@@ -313,7 +355,8 @@ mod tests {
     fn failed_update_drops_the_session() {
         let _guard = TEST_LOCK.lock().unwrap();
         let path = write_sample("failed");
-        open_with(&path, |_| ()).unwrap();
+        let owner = owner();
+        open_with(&owner, &path, |_| ()).unwrap();
         let sha1 = hash_helper::gen_hash(HashType::Sha1, &fs::read(&path).unwrap());
 
         let err = update_with(&path, &sha1, |_| Err(String::from("boom"))).unwrap_err();
@@ -324,7 +367,7 @@ mod tests {
             update_with(&path, &sha1, |_| Ok(())).unwrap_err(),
             err_keys::FILE_CHANGED
         );
-        assert_eq!(open_with(&path, |nbt| game_type_of(nbt)).unwrap().0, 1);
+        assert_eq!(open_with(&owner, &path, |nbt| game_type_of(nbt)).unwrap().0, 1);
 
         let _ = fs::remove_dir_all(path.parent().unwrap());
     }

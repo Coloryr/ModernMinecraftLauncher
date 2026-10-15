@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use tauri::WebviewWindow;
 use uuid::Uuid;
 
-use super::registry::{MinSize, min_size_of};
+use super::registry::{MinSize, min_size_of_label};
 
 /// 窗口几何状态，落盘为 window_save.json
 ///
@@ -264,8 +264,13 @@ pub(super) fn save_window_state(
 
     let scale = window.scale_factor().unwrap_or(1.0);
     // 物理像素的最小客户区，夹取用。必须夹：窗口停在「外框 = 最小尺寸」上时，主窗口
-    // 920×600 的客户区只有 904×600，不收的话这个偏小的值会被一直写回、不收敛
-    let min = min_inner_physical(min_size_of(uuid).unwrap_or_default(), scale);
+    // 920×600 的客户区只有 904×600，不收的话这个偏小的值会被一直写回、不收敛。
+    // **按标签取而不是按 uuid**：窗口族的 uuid 是派生出来的，静态表里没有它，
+    // 按 uuid 查会静默退化成"没有下限"
+    let min = min_inner_physical(
+        min_size_of_label(window.label()).unwrap_or_default(),
+        scale,
+    );
 
     if !maximized {
         // 无装饰时标题栏被并进客户区，直接存 inner 每轮净增约 30px，即 639 → 669 → …；

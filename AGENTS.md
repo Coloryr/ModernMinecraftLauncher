@@ -143,9 +143,19 @@ windows/<窗口>/mod.rs 里：
 - **命令留在 `mod.rs` 最省事**；要下沉就必须带 `#[gui_macros::ipc_group("原组名")]`（见 §4），
   且子模块声明为 `pub(crate) mod`。
 - **窗口之间共用的东西往下沉到 `windows/` 顶层**，不要互相 `use` 成环：
-  `registry.rs`（窗口注册表：uuid / 标签 / 最小尺寸，唯一来源）、`geometry.rs`（几何口径与
+  `registry.rs`（窗口注册表：uuid / 标签 / 最小尺寸 / **一实例一窗的窗口族**，唯一来源）、
+  `geometry.rs`（几何口径与
   `window_save.json`）、`lifecycle.rs`（句柄表 / 模型表 / 建窗 / 关窗 / 窗口事件）、
   `modpack_task.rs`（整合包安装任务注册表，`add` 与 `add_modpack` 共用）。
+- **「一个实例一个窗口」走 `registry.rs` 的窗口族表** `WINDOW_FAMILIES`（日志 / 资源管理 /
+  添加资源 / 配置文件四族）：窗口 uuid = 该窗口**基准 uuid** 与实例 uuid 的 UUIDv5，
+  标签 `<前缀><实例uuid>`，前端认标签前缀表 `windowManager` 的 `FAMILY_LABEL_PREFIX`。
+  新加一族只需在两边各补一条，按标签反查 / 按实例派生 / 最小尺寸 / 开窗 / 关窗 / 重开都跟着通；
+  **尺寸只在静态条目里写一份**，族表不另存（另存就会出现"改了 `XXX_MIN_WIDTH` 而真实窗口
+  纹丝不动"）；**凡是要查窗口规格的地方一律按标签查**（`min_size_of_label`），
+  按 uuid 查在族内窗口上会静默退化成"查不到"。
+  **这类窗口的实例参数不能省**：Rust 侧 `kind_parse_check` 只放行窗口族与导出窗口带 instance。
+  窗口内全局状态要按实例归属（如 `nbt_session` 的会话），否则关一个实例的窗会打断另一个。
 - 拆分时按"**一个类型 + 它的所有 `impl`**"整体搬（含反向 `From`）；只搬 `struct` 会把
   `impl` 留在原地，编译报"找不到类型 / 没有 new"。
 - 被兄弟模块读到的**字段**与 **`impl` 方法**要显式 `pub(super)` / `pub(crate)`（E0616 / E0624）。

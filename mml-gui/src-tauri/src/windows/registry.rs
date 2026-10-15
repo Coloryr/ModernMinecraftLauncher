@@ -39,7 +39,7 @@ pub const DOWNLOAD_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-0000000000
 /// 下载整合包窗口固定 uuid
 pub(super) const ADD_MODPACK_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-00000000000a");
 
-/// 添加资源窗口固定 uuid
+/// 添加资源窗口
 pub(super) const ADD_RESOURCE_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-00000000000b");
 
 /// 收藏窗口固定 uuid
@@ -51,17 +51,13 @@ pub(super) const BLOCK_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000
 /// Java 下载窗口固定 uuid
 pub(super) const JAVA_DOWNLOAD_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-00000000000e");
 
-/// 游戏日志窗口的**基准** uuid
-///
-/// 日志窗口是一个实例一个的窗口族，真实窗口的 uuid 由实例 uuid 派生，见 [`log_window_id`]。
-/// 这一条只负责把 kind `log` 映射到尺寸与标签前缀，好让前端的 JS 回退路径与
-/// `window_get_window_sizes` 拿到日志窗口该有的宽高
+/// 游戏日志窗口
 pub(super) const LOG_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-00000000000f");
 
 /// 实例导出窗口固定 uuid
 pub(super) const EXPORT_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000010");
 
-/// 配置文件窗口固定 uuid
+/// 配置文件窗口
 pub(super) const CONFIG_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000011");
 
 /// 窗口注册表条目
@@ -109,6 +105,11 @@ pub(super) const ADD_MODPACK_MIN_WIDTH: f64 = 920.0;
 /// 下载整合包窗口最小高度
 pub(super) const ADD_MODPACK_MIN_HEIGHT: f64 = 600.0;
 
+/// 下载资源窗口最小宽度
+pub(super) const ADD_RESOURCE_MIN_WIDTH: f64 = 800.0;
+/// 下载资源窗口最小高度
+pub(super) const ADD_RESOURCE_MIN_HEIGHT: f64 = 510.0;
+
 /// 设置窗口最小宽度，左侧标签导航布局需要这么宽
 pub(super) const SETTINGS_MIN_WIDTH: f64 = 850.0;
 /// 设置窗口最小高度
@@ -124,13 +125,6 @@ pub(super) const LOG_MIN_WIDTH: f64 = 720.0;
 /// 游戏日志窗口最小高度
 pub(super) const LOG_MIN_HEIGHT: f64 = 480.0;
 
-/// 日志窗口族的 uuid 命名空间
-///
-/// 日志窗口是**一个实例一个**的窗口族，与"一个 kind 一个固定窗口"的其它窗口不同：
-/// 窗口 uuid 由实例 uuid 派生，同一实例无论打开多少次都落到同一个窗口，不同实例各开各的。
-/// 这个常量只用来派生，不要拿它当某个窗口的 uuid。
-const LOG_WINDOW_NS: Uuid = uuid!("b0f2c8d4-7a61-4e35-9c08-2d5b3e6f1a74");
-
 /// 实例导出窗口最小宽度，元数据表单加两侧勾选列表
 pub(super) const EXPORT_MIN_WIDTH: f64 = 780.0;
 /// 实例导出窗口最小高度
@@ -145,6 +139,118 @@ pub(super) const BLOCK_MIN_HEIGHT: f64 = 560.0;
 pub(super) const CONFIG_MIN_WIDTH: f64 = 820.0;
 /// 配置文件窗口最小高度
 pub(super) const CONFIG_MIN_HEIGHT: f64 = 560.0;
+
+/// 「一个实例一个窗口」的窗口族
+///
+/// 与"一个 kind 一个固定窗口"的静态窗口不同，这类窗口的 uuid 由**该窗口自己的基准 uuid**
+/// 与实例 uuid 混合而成、标签是 `<前缀><实例uuid>`：同一实例无论打开多少次都落到同一个窗口，
+/// 不同实例各开各的。能混合是因为基准 uuid 表里本来就有，不必另立命名空间常量。
+///
+/// **尺寸不在这里写第二份**：族内窗口的最小 / 默认尺寸仍从基准条目取，见 [`family_min_size`]。
+/// 各写一份的话改尺寸常量只有静态条目跟着变，真实窗口纹丝不动。
+pub(super) struct WindowFamily {
+    /// 窗口 kind，与前端 `registry.ts` 对应，也是标签前缀中间那一段
+    pub(super) kind: &'static str,
+    /// 窗口标签前缀，形如 `mml-log-`
+    prefix: &'static str,
+    /// 该窗口的基准 uuid，注册表静态表里那一条：既是派生窗口 uuid 的命名空间，
+    /// 也是族内窗口尺寸的来源
+    base: Uuid,
+}
+
+/// 全部窗口族
+///
+/// 新加一族只需在这里补一条：按标签反查、按实例派生、最小尺寸三处分支都在下面共用
+static WINDOW_FAMILIES: &[WindowFamily] = &[
+    WindowFamily {
+        kind: "log",
+        prefix: "mml-log-",
+        base: LOG_WINDOW_UUID,
+    },
+    WindowFamily {
+        kind: "resource",
+        prefix: "mml-resource-",
+        base: RESOURCE_WINDOW_UUID,
+    },
+    WindowFamily {
+        kind: "add_resource",
+        prefix: "mml-add_resource-",
+        base: ADD_RESOURCE_WINDOW_UUID,
+    },
+    WindowFamily {
+        kind: "config",
+        prefix: "mml-config-",
+        base: CONFIG_WINDOW_UUID,
+    },
+];
+
+/// 按 kind 取窗口族
+///
+/// - `kind`: 窗口类型，即标签去掉 `mml-` 前缀与末尾实例 uuid 后的那一段
+///
+/// # 返回值
+///
+/// 不是窗口族时返回 `None`
+pub(super) fn family_of_kind(kind: &str) -> Option<&'static WindowFamily> {
+    WINDOW_FAMILIES.iter().find(|item| item.kind == kind)
+}
+
+/// 窗口族里一个窗口的身份
+pub(super) struct FamilyWindowId {
+    /// 派生出的窗口 uuid；句柄表、几何、模型表都以它登记
+    pub(super) uuid: Uuid,
+    /// 窗口标签，形如 `mml-log-<实例uuid>`
+    pub(super) label: String,
+}
+
+/// 由实例 uuid 求窗口族里那个窗口的身份
+///
+/// 窗口 uuid 是"该窗口的基准 uuid"与实例 uuid 的 UUIDv5 哈希：基准 uuid 当命名空间，
+/// 实例 uuid 作名字。各族的基准 uuid 互不相同，所以同一个实例在不同族里得到不同窗口；
+/// 输出带 v5 的版本 / 变体位，也撞不上任何一条基准 uuid。
+///
+/// - `family`: 目标窗口族
+/// - `instance`: 目标实例 uuid
+///
+/// # 返回值
+///
+/// 见 [`FamilyWindowId`]；派生是纯函数，同一实例任何时候都得到同一个窗口
+pub(super) fn family_window_id(family: &WindowFamily, instance: &Uuid) -> FamilyWindowId {
+    FamilyWindowId {
+        uuid: Uuid::new_v5(&family.base, instance.as_bytes()),
+        label: format!("{}{instance}", family.prefix),
+    }
+}
+
+/// 从窗口标签认出它属于哪个窗口族、是哪个实例
+///
+/// - `label`: 窗口标签
+///
+/// # 返回值
+///
+/// 窗口族与该实例 uuid；不是窗口族的标签、或后缀不是合法 uuid 时返回 `None`
+pub(super) fn family_of_label(label: &str) -> Option<(&'static WindowFamily, Uuid)> {
+    for family in WINDOW_FAMILIES {
+        if let Some(instance) = label.strip_prefix(family.prefix) {
+            return Some((family, Uuid::parse_str(instance).ok()?));
+        }
+    }
+    None
+}
+
+/// 窗口族的最小客户区尺寸，注册表口径的逻辑像素
+///
+/// 取自该族**基准条目**的尺寸，不在族表里另存一份：族内窗口与静态条目同源，
+/// 改尺寸常量只改静态表那一处，窗口族的默认尺寸与下限都跟着变。
+///
+/// - `family`: 目标窗口族
+///
+/// # 返回值
+///
+/// 见 [`MinSize`]；基准条目未登记在 [`WINDOWS_INFO`] 里时给零值
+pub(super) fn family_min_size(family: &WindowFamily) -> MinSize {
+    min_size_of(&family.base).unwrap_or_default()
+}
 
 /// 窗口注册表：uuid → 窗口信息
 ///
@@ -184,8 +290,6 @@ pub(super) static WINDOWS_INFO: LazyLock<HashMap<Uuid, WindowEntry>> = LazyLock:
                 min_height: MIN_HEIGHT,
             },
         ),
-        // 帮助窗口是**纯前端静态页**：没有 IPC 命令、没有窗口模型、除了这条注册表项也没有
-        // 别的规格 —— 全仓只有这一个窗口是这样，所以 `windows/` 下没有 help.rs。
         (
             HELP_WINDOW_UUID,
             WindowEntry {
@@ -230,8 +334,8 @@ pub(super) static WINDOWS_INFO: LazyLock<HashMap<Uuid, WindowEntry>> = LazyLock:
             ADD_RESOURCE_WINDOW_UUID,
             WindowEntry {
                 label: "mml-add_resource",
-                min_width: MIN_WIDTH,
-                min_height: MIN_HEIGHT,
+                min_width: ADD_RESOURCE_MIN_WIDTH,
+                min_height: ADD_RESOURCE_MIN_HEIGHT,
             },
         ),
         (
@@ -334,55 +438,14 @@ pub(super) fn min_size_of_label(label: &str) -> Option<MinSize> {
     if let Some(uuid) = uuid_for_kind(kind) {
         return min_size_of(&uuid);
     }
-    // 日志窗口族：标签是 `mml-log-<实例uuid>`，尺寸与注册表里那条基准的日志窗口同源。
+    // 窗口族：标签是 `mml-<kind>-<实例uuid>`，尺寸与注册表里那条基准条目同源。
     // 建窗下限与运行时限宽都按标签取，所以这一支必须接上，否则族内窗口没有最小尺寸
-    log_instance_of_label(label).map(|_| log_min_size())
-}
-
-/// 日志窗口族的窗口身份
-pub(super) struct LogWindowId {
-    /// 派生出的窗口 uuid；句柄表、几何、模型表都以它登记
-    pub(super) uuid: Uuid,
-    /// 窗口标签，形如 `mml-log-<实例uuid>`
-    pub(super) label: String,
-}
-
-/// 由实例 uuid 求日志窗口身份
-///
-/// - `instance`: 目标实例 uuid
-///
-/// # 返回值
-///
-/// 见 [`LogWindowId`]；派生是纯函数，同一实例任何时候都得到同一个窗口
-pub(super) fn log_window_id(instance: &Uuid) -> LogWindowId {
-    LogWindowId {
-        uuid: Uuid::new_v5(&LOG_WINDOW_NS, instance.as_bytes()),
-        label: format!("mml-log-{instance}"),
-    }
-}
-
-/// 从日志窗口标签里取回实例 uuid
-///
-/// - `label`: 窗口标签，形如 `mml-log-<实例uuid>`
-///
-/// # 返回值
-///
-/// 实例 uuid；不是日志窗口族的标签、或后缀不是合法 uuid 时返回 `None`
-pub(super) fn log_instance_of_label(label: &str) -> Option<Uuid> {
-    Uuid::parse_str(label.strip_prefix("mml-log-")?).ok()
-}
-
-/// 日志窗口族的最小客户区尺寸，注册表口径的逻辑像素
-pub(super) fn log_min_size() -> MinSize {
-    MinSize {
-        width: LOG_MIN_WIDTH,
-        height: LOG_MIN_HEIGHT,
-    }
+    family_of_label(label).map(|(family, _)| family_min_size(family))
 }
 
 /// 按窗口标签求窗口 uuid
 ///
-/// 静态表按标签全等匹配；日志窗口族不在表里，按 `mml-log-<实例uuid>` 反推。
+/// 静态表按标签全等匹配；窗口族不在表里，按 `mml-<kind>-<实例uuid>` 反推。
 /// 生命周期里按标签找 uuid 的地方都要走这里，否则族内窗口的事件会被整段跳过。
 ///
 /// - `label`: 窗口标签
@@ -394,48 +457,136 @@ pub(super) fn uuid_of_label(label: &str) -> Option<Uuid> {
     if let Some((uuid, _)) = WINDOWS_INFO.iter().find(|(_, e)| e.label == label) {
         return Some(*uuid);
     }
-    log_instance_of_label(label).map(|instance| log_window_id(&instance).uuid)
+    family_of_label(label).map(|(family, instance)| family_window_id(family, &instance).uuid)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// 日志窗口身份：同一实例恒定、不同实例不同，且都不是基准 uuid
+    /// 每个 kind 一条基准 uuid，用于断言"派生 uuid 不撞基准"
+    const BASE_OF_KIND: [(&str, Uuid); 4] = [
+        ("log", LOG_WINDOW_UUID),
+        ("resource", RESOURCE_WINDOW_UUID),
+        ("add_resource", ADD_RESOURCE_WINDOW_UUID),
+        ("config", CONFIG_WINDOW_UUID),
+    ];
+
+    /// 测试里直接取族，省得到处 `family_of_kind(..).unwrap()`
+    fn family(kind: &str) -> &'static WindowFamily {
+        family_of_kind(kind).unwrap()
+    }
+
+    /// 窗口身份：同一实例恒定、不同实例不同，且都不是基准 uuid
     #[test]
-    fn log_window_id_is_per_instance() {
+    fn family_window_id_is_per_instance() {
         let first = Uuid::new_v4();
         let second = Uuid::new_v4();
-        let id = log_window_id(&first);
+        let id = family_window_id(family("log"), &first);
 
-        assert_eq!(id.uuid, log_window_id(&first).uuid, "同一实例应派生同一个窗口");
-        assert_ne!(id.uuid, log_window_id(&second).uuid, "不同实例应是不同窗口");
+        assert_eq!(
+            id.uuid,
+            family_window_id(family("log"), &first).uuid,
+            "同一实例应派生同一个窗口"
+        );
+        assert_ne!(
+            id.uuid,
+            family_window_id(family("log"), &second).uuid,
+            "不同实例应是不同窗口"
+        );
         assert_ne!(id.uuid, LOG_WINDOW_UUID, "派生 uuid 不能撞上基准条目");
         assert_eq!(id.label, format!("mml-log-{first}"));
     }
 
-    /// 标签 → 实例 / uuid / 尺寸三条反查都要认得出日志窗口族
+    /// 四族两两不共用 uuid：同一个实例在每族里都应是不同的窗口
     #[test]
-    fn log_label_resolves_back() {
+    fn families_do_not_share_uuid() {
         let instance = Uuid::new_v4();
-        let id = log_window_id(&instance);
+        let mut seen: Vec<(Uuid, &str)> = Vec::new();
 
-        assert_eq!(log_instance_of_label(&id.label), Some(instance));
-        assert_eq!(uuid_of_label(&id.label), Some(id.uuid));
-        assert_eq!(min_size_of_label(&id.label), Some(log_min_size()));
+        for (kind, base) in BASE_OF_KIND {
+            let id = family_window_id(family(kind), &instance);
+            assert_ne!(id.uuid, base, "{kind} 的派生 uuid 撞上了自己的基准 uuid");
+            assert_eq!(id.label, format!("mml-{kind}-{instance}"));
+            for (other, other_kind) in &seen {
+                assert_ne!(id.uuid, *other, "{kind} 与 {other_kind} 派生出同一个窗口");
+            }
+            seen.push((id.uuid, kind));
+        }
+    }
+
+    /// 每族的基准 uuid 都必须是注册表里的静态条目：族内窗口的尺寸与命名空间都从它取，
+    /// 写错一个字母就会静默退化成"没有最小尺寸"、而且派生出的窗口与别的族撞不上也认不出
+    #[test]
+    fn family_bases_are_registered() {
+        for (kind, base) in BASE_OF_KIND {
+            assert_eq!(
+                family(kind).base,
+                base,
+                "{kind} 的族表基准 uuid 与它的常量对不上"
+            );
+            let size = min_size_of(&base);
+            assert!(size.is_some(), "{kind} 的基准 uuid 没登记进 WINDOWS_INFO");
+            assert_eq!(family_min_size(family(kind)), size.unwrap());
+            assert!(size.unwrap().width > 0.0 && size.unwrap().height > 0.0);
+        }
+    }
+
+    /// 族内窗口的尺寸跟着**基准条目的常量**走
+    ///
+    /// 踩过：族表里另存了一份尺寸，改了 `ADD_RESOURCE_MIN_WIDTH` 而真实窗口纹丝不动
+    #[test]
+    fn family_size_follows_base_constants() {
+        let instance = Uuid::new_v4();
+        let id = family_window_id(family("add_resource"), &instance);
+
+        assert_eq!(
+            min_size_of_label(&id.label),
+            Some(MinSize {
+                width: ADD_RESOURCE_MIN_WIDTH,
+                height: ADD_RESOURCE_MIN_HEIGHT,
+            })
+        );
+    }
+
+    /// 标签 → 实例 / uuid / 尺寸三条反查都要认得出每一族
+    #[test]
+    fn family_label_resolves_back() {
+        let instance = Uuid::new_v4();
+
+        for (kind, _) in BASE_OF_KIND {
+            let family = family(kind);
+            let id = family_window_id(family, &instance);
+            assert_eq!(
+                family_of_label(&id.label).map(|(f, i)| (f.kind, i)),
+                Some((kind, instance))
+            );
+            assert_eq!(uuid_of_label(&id.label), Some(id.uuid));
+            assert_eq!(min_size_of_label(&id.label), Some(family_min_size(family)));
+        }
     }
 
     /// 静态窗口的标签解析不受窗口族影响
     #[test]
     fn static_labels_still_resolve() {
         assert_eq!(uuid_of_label("mml-download"), Some(DOWNLOAD_WINDOW_UUID));
-        assert_eq!(min_size_of_label("mml-download"), min_size_of(&DOWNLOAD_WINDOW_UUID));
-        // 基准条目本身不是窗口族的标签：`mml-log` 后面没有实例 uuid
-        assert_eq!(log_instance_of_label("mml-log"), None);
-        assert_eq!(uuid_of_label("mml-log"), Some(LOG_WINDOW_UUID));
-        assert_eq!(min_size_of_label("mml-log"), Some(log_min_size()));
-        // 后缀不是 uuid 的同类标签同样不认
-        assert_eq!(log_instance_of_label("mml-log-not-a-uuid"), None);
-        assert_eq!(uuid_of_label("mml-log-not-a-uuid"), None);
+        assert_eq!(
+            min_size_of_label("mml-download"),
+            min_size_of(&DOWNLOAD_WINDOW_UUID)
+        );
+        for (kind, base) in BASE_OF_KIND {
+            // 基准条目本身不是窗口族的标签：后面没有实例 uuid
+            let label = format!("mml-{kind}");
+            assert!(family_of_label(&label).is_none());
+            assert_eq!(uuid_of_label(&label), Some(base));
+            assert_eq!(min_size_of_label(&label), Some(family_min_size(family(kind))));
+            // 后缀不是 uuid 的同类标签同样不认
+            let bad = format!("mml-{kind}-not-a-uuid");
+            assert!(family_of_label(&bad).is_none());
+            assert_eq!(uuid_of_label(&bad), None);
+        }
+        // 不是窗口族的 kind 取不到族，不会误把静态窗口当族
+        assert!(family_of_kind("download").is_none());
+        assert!(family_of_kind("log").is_some());
     }
 }

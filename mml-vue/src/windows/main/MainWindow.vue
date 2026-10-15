@@ -860,12 +860,13 @@ function onAction(id: ActionId) {
       showDelete.value = true;
       break;
     case "manageResource":
-      // 跳转到资源管理窗口；当前实例已持久化在 gui_config.json，窗口自己读
-      openWindow("resource");
+      // 跳转到资源管理窗口；它是**一个实例一个**的窗口族，实例必须带上（窗口身份由它派生），
+      // 已经在时只聚焦，所以重复点不会开出第二个
+      openWindow("resource", { uuid: selected.value.uuid });
       break;
     case "addResource":
-      // 跳转到添加资源窗口；当前实例已持久化在 gui_config.json，窗口自己读
-      openWindow("add_resource");
+      // 跳转到添加资源窗口；它也是**一个实例一个**的窗口族，实例必须带上
+      openWindow("add_resource", { uuid: selected.value.uuid });
       break;
     case "viewLog":
       // 日志只在独立窗口里看（主页面不展示日志内容）
@@ -876,8 +877,8 @@ function onAction(id: ActionId) {
       void openInstanceDirOf(selected.value);
       break;
     case "editConfig":
-      // 配置文件窗口自己从 gui_config 读当前实例，与资源管理窗口同一口径
-      openWindow("config");
+      // 配置文件窗口也是**一个实例一个**的窗口族，实例必须带上
+      openWindow("config", { uuid: selected.value.uuid });
       break;
     default:
       showToast(t("actions.wip", { name: t(ACTION_LABELS[id]) }));

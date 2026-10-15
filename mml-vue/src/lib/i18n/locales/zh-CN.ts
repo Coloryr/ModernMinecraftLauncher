@@ -1290,7 +1290,7 @@ export default {
   "err.sourceType": "未知的下载源",
   "err.fileTypeNotFound": "未知的资源类型",
   "err.windowQuery": "窗口参数不合法",
-  "err.logInstanceMissing": "没指定实例，打不开日志窗口",
+  "err.windowInstanceMissing": "没指定实例，打不开这个窗口",
   "err.logEmpty": "没有可上传的日志内容",
   "err.logUpload": "日志上传失败",
   "err.sortTypeNotFound": "未知的排序方式",

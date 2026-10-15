@@ -14,7 +14,8 @@
 // - 其余（压缩包与别的二进制）→ 二进制视图（一页 4 KiB 的十六进制）
 //
 // 来源两条：实例自己的 options.txt 与 `config` / `kubejs` / `local`，或某个存档目录下的文件。
-// 实例取自 gui_config 的 `mainWindow.selectedInstance`（与资源管理窗口同一口径，窗口自己读）；
+// 实例是**窗口身份的一部分**：多窗口模式下一个实例一个窗口、打开时就锁定，单窗口模式按
+// 跳转参数，都没有时退回主窗口选中的那个；
 // 来源（空串 = 实例本身，否则是存档目录名）会一起交给后端，文件路径一律**相对该来源**，
 // 树根因此就是所选来源，存档来源下不会再套一层 `saves`。
 //
@@ -36,7 +37,7 @@ import {
 import { loadGuiConfig } from "../../lib/guiConfig";
 import { buildTree, type FileNode } from "../../lib/fileTree";
 import { applyHunks, diffLines, joinLines, splitLines } from "../../lib/textDiff";
-import { multiWindow, targetSaveDir, windowParams } from "../windowManager";
+import { familyInstanceFromLabel, multiWindow, targetSaveDir, targetUuid, windowParams } from "../windowManager";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
@@ -218,8 +219,11 @@ const emptyTip = computed(() => {
 async function load() {
   loading.value = true;
   try {
-    const [list, cfg] = await Promise.all([api.getInstances(), loadGuiConfig()]);
-    const uuid = cfg?.mainWindow.selectedInstance ?? "";
+    const list = await api.getInstances();
+    // 当前实例：多窗口模式按窗口标签，那是窗口身份的一部分；单窗口 / 浏览器按本次跳转
+    // 参数（锁定为空说明是从别的页面返回本页，参数已被清掉），退回主窗口选中的那个
+    const locked = familyInstanceFromLabel("config") ?? targetUuid() ?? "";
+    const uuid = locked || (await loadGuiConfig())?.mainWindow.selectedInstance || "";
     const found = list.find((i) => i.uuid === uuid) ?? null;
     // 换了实例就把来源退回"实例本身"：原来那个存档名在新实例里没有
     if (found?.uuid !== instanceUuid.value) source.value = "";

@@ -5,10 +5,14 @@
 // 拉过的分类留在窗口里、切回来不重读（模组那一档重扫一次要解析几百个 jar），
 // 见 loadedCats；要跟磁盘对齐走 reloadCurrent。
 //
+// 本窗口**一个实例一个**：实例是窗口身份的一部分，打开时就锁定、窗口内不再选实例。
+// 单窗口模式下从本页开出去的「配置文件」「添加资源」返回时跳转参数已被清掉，
+// 那时按主窗口当前选中的实例兜底，见 sync。
+//
 // 拆出来的原因：原先这 250 行和模板、样式挤在一个 1100 行的 SFC 里，
 // 列表组件想拿数据只能整份 prop 传下去；现在按 `windows/block` 的写法拆开 ——
 // 薄窗口 + parts/ + composables/，语义边界清楚。
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { locale, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
 import {
@@ -24,8 +28,9 @@ import {
   listSchematics,
   onModScanProgress,
 } from "../../../lib/api";
-import { loadGuiConfig } from "../../../lib/guiConfig";
 import { takeResourceListDirty } from "../../../lib/resourceTasks";
+import { loadGuiConfig } from "../../../lib/guiConfig";
+import { familyInstanceFromLabel, targetUuid } from "../../windowManager";
 import type {
   DataPackItemDto,
   ModItemDto,
@@ -71,6 +76,14 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
   const instance = ref<ResourceInstance | null>(null);
   /** 目标实例 uuid：后端每个命令都要它；没有实例时为空串，加载直接跳过 */
   const instanceUuid = ref("");
+
+  /**
+   * 本窗口锁定的实例 uuid，空串表示没有
+   *
+   * 多窗口模式按窗口标签，那是后端派生窗口身份时用的同一份实例；单窗口模式按本次跳转
+   * 带入的 windowParams；浏览器预览没有标签，同样退回 URL / windowParams 上的参数。
+   */
+  const lockedUuid = computed(() => familyInstanceFromLabel("resource") ?? targetUuid() ?? "");
 
   /** 有列表正在拉；模组那个分类要解析 jar 元数据，可能要几秒 */
   const loading = ref(false);
@@ -269,10 +282,13 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     // 换没换实例要在改写之前记下来，见下面"整份作废"
     const prevUuid = instanceUuid.value;
     try {
-      // 当前实例取自 gui_config.json（主窗口选中时写入），本窗口是独立 webview，需自己读一次
-      const [list, cfg] = await Promise.all([api.getInstances(), loadGuiConfig()]);
-      const uuid = cfg?.mainWindow.selectedInstance ?? "";
-      const found = list.find((i) => i.uuid === uuid) ?? list[0] ?? null;
+      const list = await api.getInstances();
+      // 锁定为空时退回主窗口当前选中的实例：单窗口模式下从本页开出去的「配置文件」
+      // 「添加资源」返回时跳转参数已被清掉，读它就是改造前的行为。
+      // 列表里**没有**这个实例时不再退到第一个实例：窗口锁到哪个实例就显示哪个，
+      // 实例被删掉时该显示"未选择"，而不是偷偷换成别人的数据
+      const uuid = lockedUuid.value || (await loadGuiConfig())?.mainWindow.selectedInstance || "";
+      const found = list.find((i) => i.uuid === uuid) ?? null;
       instance.value = found ? { name: found.name, version: found.version } : null;
       instanceUuid.value = found?.uuid ?? "";
       imgBase.value = await getImageBaseUrl();
@@ -328,6 +344,15 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     if (tab === "datapacks") void enterDatapackTab();
   });
   watch(dpSave, () => void loadDatapacks());
+
+  // 单窗口模式：已经停在本页上又开了另一个实例 —— 没有页面切换，也就没有 useWindowRefresh，
+  // 上一份列表属于别的实例，得在这儿整份作废重读。
+  // 只认"从一个有效实例换到另一个"：切走时跳转参数会被清空，lockedUuid 先变空、切回来再变
+  // 有效，这两拍都由 useWindowRefresh 负责，这里跟着跑一遍等于把模组列表重扫一次
+  watch(lockedUuid, (now, before) => {
+    if (!now || !before || now === before) return;
+    void sync();
+  });
 
   return {
     category,

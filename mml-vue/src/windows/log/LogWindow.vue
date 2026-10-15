@@ -26,7 +26,7 @@ import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
 import { copyText } from "../../lib/clipboard";
 import { api, onGameExit, onGameLog, onLaunchState } from "../../lib/api";
-import { logInstanceFromLabel, targetUuid } from "../windowManager";
+import { familyInstanceFromLabel, targetUuid } from "../windowManager";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import type { InstanceInfoDto, LogLine, LogSettingDto } from "../../lib/bindings";
 
@@ -43,7 +43,7 @@ const MAX_LOG_LINES = 10000;
  * 单窗口模式按本次跳转带入的 windowParams，已在本页上换个实例打开时它就是新值。
  * 浏览器预览没有标签，同样退回 URL / windowParams 上的参数。
  */
-const lockedUuid = computed(() => logInstanceFromLabel() ?? targetUuid() ?? "");
+const lockedUuid = computed(() => familyInstanceFromLabel("log") ?? targetUuid() ?? "");
 
 /**
  * 锁定实例的信息，只用来在标题栏显示 chip

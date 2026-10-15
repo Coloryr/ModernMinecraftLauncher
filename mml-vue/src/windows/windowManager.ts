@@ -21,12 +21,33 @@ const WIN_PARAM = "window";
 const UUID_PARAM = "uuid";
 
 /**
- * 日志窗口族的标签前缀，完整形式 `mml-log-<实例uuid>`
+ * 「一个实例一个窗口」的窗口族 → 标签前缀，完整形式 `<前缀><实例uuid>`
  *
- * 日志窗口是**一个实例一个**的窗口族，身份由后端按实例 uuid 派生，见 src-tauri 的
- * windows/registry.rs `log_window_id`。前端只按这个前缀认它，不再另立一套命名。
+ * 这类窗口的身份由后端按实例 uuid 派生，见 src-tauri 的 windows/registry.rs 窗口族
+ * `WINDOW_FAMILIES`。前端只按这些前缀认它们，不再另立一套命名。
  */
-const LOG_LABEL_PREFIX = "mml-log-";
+const FAMILY_LABEL_PREFIX: Partial<Record<WindowKind, string>> = {
+  log: "mml-log-",
+  resource: "mml-resource-",
+  add_resource: "mml-add_resource-",
+  config: "mml-config-",
+};
+
+/**
+ * 从窗口标签认出它属于哪个窗口族
+ *
+ * - `label`: 窗口标签，形如 `mml-log-<实例uuid>`
+ *
+ * # 返回值
+ *
+ * 窗口族的 kind；不是窗口族的标签时为 null
+ */
+function familyKindOfLabel(label: string): WindowKind | null {
+  for (const [kind, prefix] of Object.entries(FAMILY_LABEL_PREFIX)) {
+    if (prefix && label.startsWith(prefix)) return kind as WindowKind;
+  }
+  return null;
+}
 
 /** 是否多窗口模式（默认多窗口） */
 export const multiWindow = ref(readString(KEYS.windowMode) !== "Single");
@@ -81,7 +102,7 @@ export interface WindowDropParam {
 
 /** openWindow 带的参数；各字段按目标窗口需要填，不填的字段全部按"没给"处理 */
 export interface WindowOpenParams {
-  /** 目标实例 uuid；日志窗口靠它定位实例，导出窗口靠它切目标，其余窗口不传 */
+  /** 目标实例 uuid；窗口族靠它定位实例，导出窗口靠它切目标，其余窗口不传 */
   uuid?: string;
   /** 要直接打开的项目，下载整合包 / 下载资源窗口用 */
   project?: WindowProjectParam;
@@ -169,20 +190,24 @@ export function closeResourcePopup() {
 }
 
 /**
- * 取本窗口（日志窗口族）锁定的实例 uuid
+ * 取本窗口（窗口族）锁定的实例 uuid
  *
  * 多窗口模式下窗口标签是唯一权威来源——后端就是按实例派生出这个标签的；
  * 浏览器预览与单窗口模式没有这个标签，由调用方另给参数，见 [`targetUuid`]。
  *
+ * - `kind`: 窗口族的 kind，如 `log` / `resource`
+ *
  * # 返回值
  *
- * 标签不是日志窗口族时为 null
+ * 标签不属于该窗口族时为 null
  */
-export function logInstanceFromLabel(): string | null {
+export function familyInstanceFromLabel(kind: WindowKind): string | null {
   if (!isTauri()) return null;
+  const prefix = FAMILY_LABEL_PREFIX[kind];
+  if (!prefix) return null;
   try {
     const label = getCurrentWindow().label;
-    return label.startsWith(LOG_LABEL_PREFIX) ? label.slice(LOG_LABEL_PREFIX.length) : null;
+    return label.startsWith(prefix) ? label.slice(prefix.length) : null;
   } catch (e) {
     console.error("[windowManager] 读取窗口标签失败", e);
     return null;
@@ -276,8 +301,9 @@ function resolveKind(): WindowKind {
     try {
       // Tauri：用窗口标签识别，如 mml-settings → settings，main → main
       const label = getCurrentWindow().label;
-      // 日志窗口族先判：标签是 mml-log-<实例uuid>，去掉前缀不是任何一个 kind
-      if (label.startsWith(LOG_LABEL_PREFIX)) return "log";
+      // 窗口族先判：标签是 `mml-<kind>-<实例uuid>`，去掉 `mml-` 也不是任何一个 kind
+      const family = familyKindOfLabel(label);
+      if (family) return family;
       const kind = label.replace(/^mml-/, "");
       if (isWindowKind(kind)) return kind;
     } catch (e) {
@@ -470,6 +496,23 @@ export function projectParamToItem(p: WindowProjectParam): ProjectItemDto {
 }
 
 /**
+ * 报给后端的"是哪个实例"参数
+ *
+ * 只有窗口族与导出窗口认它：窗口族靠它定位到族里那一个窗口，导出窗口靠它在已开窗口上
+ * 切目标实例。其余窗口传了会被后端 `kind_parse_check` 拒掉，所以这里一律给 null。
+ *
+ * - `kind`: 窗口类型
+ * - `params`: 本次打开带入的参数
+ *
+ * # 返回值
+ *
+ * 实例 uuid；其余窗口为 null
+ */
+function instanceArgOf(kind: WindowKind, params?: WindowOpenParams): string | null {
+  return FAMILY_LABEL_PREFIX[kind] || kind === "export" ? (params?.uuid ?? null) : null;
+}
+
+/**
  * 打开一个窗口，功能入口与各处的跳转都走它
  *
  * - `kind`: 目标窗口
@@ -477,11 +520,11 @@ export function projectParamToItem(p: WindowProjectParam): ProjectItemDto {
  */
 export function openWindow(kind: WindowKind, params?: WindowOpenParams) {
   // 单窗口模式（浏览器 / Tauri 一致）：应用内页面切换。
-  // 日志窗口是"一个实例一个"：实例是它的窗口身份（后端按它派生 uuid 与标签），
+  // 窗口族是"一个实例一个"：实例是它的窗口身份（后端按它派生 uuid 与标签），
   // 没有实例就开不出正确的窗口，两种模式都直接作罢
-  const logUuid = kind === "log" ? (params?.uuid ?? null) : null;
-  if (kind === "log" && !logUuid) {
-    console.warn("[windowManager] 打开日志窗口缺少实例 uuid，已忽略");
+  const family = FAMILY_LABEL_PREFIX[kind] ? kind : null;
+  if (family && !params?.uuid) {
+    console.warn(`[windowManager] 打开 ${family} 窗口缺少实例 uuid，已忽略`);
     return;
   }
 
@@ -512,7 +555,7 @@ export function openWindow(kind: WindowKind, params?: WindowOpenParams) {
 
   if (isTauri()) {
     // 新窗口的目标参数只能靠 URL 送达：实例 uuid + "要打开哪个项目" + 拖入的路径 +
-    // 要聚焦的存档。而 Rust 那条命令原来只认 log / export 的 uuid。所以这里把组装好的
+    // 要聚焦的存档。而 Rust 那条命令只认窗口族与 export 的 uuid。所以这里把组装好的
     // query 一起交过去，由它拼进 WebviewUrl —— 建窗仍然走 Rust，
     // 几何恢复 / 句柄表 / 窗口模型都在那边。
     const query = new URL(urlFor(kind, params)).search.replace(/^\?/, "");
@@ -520,20 +563,19 @@ export function openWindow(kind: WindowKind, params?: WindowOpenParams) {
     // （只聚焦会把参数丢掉），所以走 reopen，Rust 侧已存在则 navigate；
     // 其余窗口维持"只聚焦、目标靠事件切换"
     if (params?.drop || params?.saveDir) {
-      commands.windows.reopenWindow(kind, query).catch((e) => {
-        console.error("[windowManager] Rust 重开窗口失败，回退 JS API", kind, e);
-        createViaJs(kind, params);
-      });
+      commands.windows
+        .reopenWindow(kind, instanceArgOf(kind, params), query)
+        .catch((e) => {
+          console.error("[windowManager] Rust 重开窗口失败，回退 JS API", kind, e);
+          createViaJs(kind, params);
+        });
       return;
     }
-    // `instance` 只对 log / export 有意义：日志窗口靠它派生出"实例专属"的窗口身份，
-    // 导出窗口靠它在已开窗口上切目标实例
-    const eventUuid = kind === "log" || kind === "export" ? (params?.uuid ?? null) : null;
     // 统一走 Rust 窗口管理器：创建 / 聚焦在 src-tauri 的 windows/mod.rs 处理。
     // open_window 是 async 命令，不在 Windows 主线程创建窗口，避免冻结。
     // 命令失败（例如窗口创建被拒）时回退到官方 JS API。
     commands.windows
-      .openWindow(kind, eventUuid, query)
+      .openWindow(kind, instanceArgOf(kind, params), query)
       .catch((e) => {
         console.error("[windowManager] Rust 打开窗口失败，回退 JS API", kind, e);
         createViaJs(kind, params);
@@ -547,10 +589,10 @@ export function openWindow(kind: WindowKind, params?: WindowOpenParams) {
 
 /** 回退路径：用官方 JS API 创建 / 聚焦真实 WebviewWindow */
 function createViaJs(kind: WindowKind, params?: WindowOpenParams) {
-  // 日志窗口族的标签带实例 uuid，与后端 log_window_id 同一口径：
+  // 窗口族的标签带实例 uuid，与后端 family_window_id 同一口径：
   // 少了这一段就会开出一个身份不对的窗口，跟 Rust 那条路开的也不是同一个
-  const label =
-    kind === "log" && params?.uuid ? `${LOG_LABEL_PREFIX}${params.uuid}` : `mml-${kind}`;
+  const prefix = FAMILY_LABEL_PREFIX[kind];
+  const label = prefix && params?.uuid ? `${prefix}${params.uuid}` : `mml-${kind}`;
   WebviewWindow.getByLabel(label).then(async (existing) => {
     if (existing) {
       // 窗口已存在则聚焦；导出窗口的目标实例靠 export-focus 事件链路自行同步
@@ -580,7 +622,7 @@ function createViaJs(kind: WindowKind, params?: WindowOpenParams) {
 /**
  * 关闭窗口时随 kind 一起报给后端的实例参数
  *
- * 只有日志窗口族需要：它的窗口身份由实例派生，光一个 `log` 定不下是哪一个窗口，
+ * 只有窗口族需要：它的窗口身份由实例派生，光一个 kind 定不下是哪一个窗口，
  * 见后端 `window_close_window`。
  *
  * - `kind`: 当前窗口类型
@@ -590,7 +632,7 @@ function createViaJs(kind: WindowKind, params?: WindowOpenParams) {
  * 实例 uuid；其余窗口为 null
  */
 function closeInstanceArg(kind: WindowKind): string | null {
-  return kind === "log" ? logInstanceFromLabel() : null;
+  return FAMILY_LABEL_PREFIX[kind] ? familyInstanceFromLabel(kind) : null;
 }
 
 /**

@@ -22,7 +22,7 @@ import { cardTags } from "../../lib/projectTags";
 import { showToast } from "../../lib/toast";
 import { loadGuiConfig } from "../../lib/guiConfig";
 import { useResourceStatus } from "../../lib/resourceTasks";
-import { projectParamToItem, targetProject, targetUuid, type WindowProjectParam } from "../windowManager";
+import { familyInstanceFromLabel, projectParamToItem, targetProject, targetUuid, type WindowProjectParam } from "../windowManager";
 import type {
   FileListItemDto,
   ProjectItemDto,
@@ -555,13 +555,24 @@ onMounted(async () => {
   const unlisten = await initResourceStatus();
   onUnmounted(unlisten);
 
+  await refreshInstance();
+  await loadSources();
+  consumeTargetProject();
+});
+
+/**
+ * 读本窗口该锁定的实例，更新 uuid 与标题栏 chip 用的名字 / 版本
+ *
+ * 多窗口模式按窗口标签，那是窗口身份的一部分；单窗口 / 浏览器按本次跳转参数，收藏窗口
+ * 点非整合包卡片时那边会先让用户选好实例再跳过来。都没有时退回主窗口选中的那个 ——
+ * 单窗口模式下从别的页面返回本页时跳转参数已被清掉，读它就是改造前的行为。
+ */
+async function refreshInstance() {
+  const locked = familyInstanceFromLabel("add_resource") ?? targetUuid() ?? "";
   try {
-    const cfg = await loadGuiConfig();
-    // 目标实例：openWindow 带进来的那个优先，收藏窗口点非整合包卡片时
-    // 那边会先让用户选好实例再跳过来；否则用主窗口选中的那个
-    instanceUuid.value = targetUuid() ?? cfg?.mainWindow.selectedInstance ?? "";
+    instanceUuid.value = locked || (await loadGuiConfig())?.mainWindow.selectedInstance || "";
   } catch {
-    instanceUuid.value = targetUuid() ?? "";
+    instanceUuid.value = locked;
   }
 
   if (instanceUuid.value) {
@@ -575,10 +586,7 @@ onMounted(async () => {
       instanceVersion.value = "";
     }
   }
-
-  await loadSources();
-  consumeTargetProject();
-});
+}
 
 /**
  * 收藏窗口点「下载」跳进来的项目
@@ -635,8 +643,11 @@ watch(instanceUuid, async () => {
   }
 });
 
-// 单窗口模式下本页被 KeepAlive 缓存：切回来不会重新挂载，得在激活时再取一次参数
-onActivated(consumeTargetProject);
+// 单窗口模式下本页被 KeepAlive 缓存：切回来不会重新挂载，锁定实例与目标项目都得再取一次
+onActivated(async () => {
+  await refreshInstance();
+  await consumeTargetProject();
+});
 </script>
 
 <template>

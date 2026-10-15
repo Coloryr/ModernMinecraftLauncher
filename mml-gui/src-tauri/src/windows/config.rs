@@ -1,5 +1,9 @@
 //! 游戏实例配置文件
 //!
+//! **一个实例一个窗口**：窗口身份由实例 uuid 派生、打开时就锁定，窗口内不再选择实例，
+//! 见 `windows/registry` 的窗口族。NBT 会话也按实例归属，关掉某个实例的窗口不会动
+//! 别的实例还开着的编辑器，见 [`nbt_session`]。
+//!
 //! 「修改实例配置」用的文件清单与四种读法：文本全文、NBT 树、区域文件区块表、
 //! 任意文件的二进制分段。文件范围是 `.minecraft` 下的 options.txt 与
 //! `config` / `kubejs` / `local`，另加某个存档目录（含数据包）。
@@ -26,6 +30,7 @@ use mml_nbt::nbt_types;
 use mml_nbt::{NBT_END_ORDER, NbtType};
 use mml_sys::path_helper;
 use mml_sys::text_diff::{self, LineHunk};
+use uuid::Uuid;
 
 use crate::dtos::{
     BytesSliceDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, FileItemDto, FileItemType,
@@ -502,11 +507,14 @@ fn text_sha1(text: &str) -> String {
 #[gui_macros::ipc_group("config")]
 #[tauri::command]
 pub fn config_open_nbt(game: String, source: String, file: String) -> Result<ConfigNbtDto, String> {
+    // 会话按实例归属，关那个实例的配置窗口时只清它这一份，见 nbt_session
+    let owner = Uuid::parse_str(&game).map_err(|_| err_keys::UUID.to_string())?;
     let game = instance_snapshot(&game)?;
     let path = resolve_source(&game, &source, &file)?;
     check_size(&path)?;
 
-    let (node, sha1) = nbt_session::open_with(&path, |nbt| nbt_node(String::new(), &nbt.nbt))?;
+    let (node, sha1) =
+        nbt_session::open_with(&owner, &path, |nbt| nbt_node(String::new(), &nbt.nbt))?;
     Ok(ConfigNbtDto { node, sha1 })
 }
 

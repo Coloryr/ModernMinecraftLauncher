@@ -1289,7 +1289,7 @@ export default {
   "err.sourceType": "Unknown source",
   "err.fileTypeNotFound": "Unknown resource type",
   "err.windowQuery": "Invalid window parameters",
-  "err.logInstanceMissing": "No instance specified, cannot open the log window",
+  "err.windowInstanceMissing": "No instance specified, cannot open this window",
   "err.logEmpty": "No log content to upload",
   "err.logUpload": "Log upload failed",
   "err.sortTypeNotFound": "Unknown sort type",

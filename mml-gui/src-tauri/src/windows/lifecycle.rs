@@ -27,7 +27,7 @@ use uuid::Uuid;
 use super::geometry::{remember_decorated_inset, save_window_state, window_state_for};
 use super::registry::{
     ADD_MODPACK_WINDOW_UUID, ADD_WINDOW_UUID, BLOCK_WINDOW_UUID, DOWNLOAD_WINDOW_UUID,
-    MAIN_WINDOW_UUID, WINDOWS_INFO, min_size_of_label, uuid_for_kind, uuid_of_label,
+    MAIN_WINDOW_UUID, WINDOWS_INFO, family_of_label, min_size_of_label, uuid_for_kind, uuid_of_label,
 };
 use super::{add_modpack, block};
 
@@ -257,7 +257,7 @@ pub(super) fn create_window(
 
     // 最小尺寸随注册表条目走，各窗口布局不同、可压缩程度不同；无历史几何时直接以最小尺寸
     // 居中打开，下限则在装饰激活后按它设，见 window_activate_decoration
-    // 按标签取：日志窗口族的标签不在静态表里，见 min_size_of_label
+    // 按标签取：窗口族的标签不在静态表里，见 min_size_of_label
     let (min_w, min_h) = min_size_of_label(label)
         .map(|m| (m.width, m.height))
         .unwrap_or((600.0, 400.0));
@@ -522,9 +522,12 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
             {
                 model.lock().unwrap().reject_all_dialogs();
             }
-            // 配置窗口关了，它打开过的 NBT 文件也该放手：句柄不能留到下次开窗
-            if Some(uuid) == uuid_for_kind("config") {
-                super::nbt_session::close_all();
+            // 配置窗口关了，它打开过的 NBT 文件也该放手：句柄不能留到下次开窗。
+            // 配置窗口是一个实例一个，只清本实例那一份 —— 别的实例的编辑器还开着
+            if let Some((family, instance)) = family_of_label(&label)
+                && family.kind == "config"
+            {
+                super::nbt_session::close_all_of(&instance);
             }
             OPEN_WINDOWS.write().unwrap().remove(&uuid);
             remove_window_model(&uuid);

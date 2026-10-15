@@ -67,7 +67,9 @@ use self::lifecycle::{
 };
 
 use self::geometry::{clamp_runtime_min_size, reconcile_min_size};
-use self::registry::{WINDOWS_INFO, log_window_id, min_size_of_label, uuid_for_kind};
+use self::registry::{
+    FamilyWindowId, WINDOWS_INFO, family_of_kind, family_window_id, min_size_of_label, uuid_for_kind,
+};
 
 use crate::listens;
 use uuid::Uuid;
@@ -147,14 +149,15 @@ pub fn window_get_window_sizes() -> Vec<WindowSizeDto> {
 ///
 /// - `app`: 应用句柄，建窗与发事件都用它
 /// - `kind`: 窗口类型
-/// - `instance`: 目标实例 UUID；日志窗口必须有它，窗口身份由实例 uuid 派生，
-///   同一实例只会有一个日志窗口，重复打开只是聚焦；窗口已存在时目标实例**不会**再切换
+/// - `instance`: 目标实例 UUID；窗口族，即日志 / 资源管理 / 添加资源 / 配置文件必须有它，
+///   窗口身份由实例 uuid 派生，同一实例只会有一个该族窗口，重复打开只是聚焦；
+///   窗口已存在时目标实例**不会**再切换
 /// - `query`: 新窗口 URL 上的 query，**不含 `?`**
 ///
 /// `query` 由前端 `windowManager` 组装 —— 目标窗口的实例与"要打开哪个项目"
 /// 的 `uuid` / `psource` / `ppid` … 都只能靠 URL 送达，而参数名在前端
 /// `PROJ_PARAMS` 里只有一份，读那边也用它，所以不在 Rust 侧另立一套。
-/// 传空 / 不传时退回下面按 kind 拼的老路子，只有 log / export 带 uuid。
+/// 传空 / 不传时退回下面按 kind 拼的老路子，只有窗口族与 export 带 uuid。
 ///
 /// # 返回值
 ///
@@ -168,7 +171,7 @@ pub async fn window_open_window(
 ) -> Result<(), String> {
     kind_parse_check(&kind, &instance)?;
     // 新窗口的目标参数只能靠 URL 送达：前端组装好了就用它，里面带 uuid / 项目参数；
-    // 没给就退回老路子 —— 只有 log / export 把 uuid 拼进去
+    // 没给就退回老路子 —— 只有窗口族与 export 把 uuid 拼进去
     let url_path = match query.as_deref().filter(|q| !q.is_empty()) {
         Some(query) => {
             // 前端那份 query 是 URLSearchParams 编出来的，不会出现裸 # / 控制字符；
@@ -178,21 +181,21 @@ pub async fn window_open_window(
             }
             format!("index.html?{query}")
         }
-        None => match (&kind[..], &instance) {
-            ("log", Some(instance)) | ("export", Some(instance)) => {
-                format!("index.html?window={kind}&uuid={instance}")
-            }
-            _ => String::from("index.html"),
+        // 只有窗口族与 export 能带 instance，上面校验过了；这里把实例写进 URL，
+        // 因为新窗口的实例身份只能靠 URL 送到前端
+        None => match &instance {
+            Some(instance) => format!("index.html?window={kind}&uuid={instance}"),
+            None => String::from("index.html"),
         },
     };
 
-    // 日志窗口是"一个实例一个"的窗口族：身份由实例 uuid 派生，没有实例就无从开窗
-    if kind == "log" {
+    // 窗口族是"一个实例一个"：身份由实例 uuid 派生，没有实例就无从开窗
+    if let Some(family) = family_of_kind(&kind) {
         let Some(instance) = instance.as_deref() else {
-            return Err(err_keys::LOG_INSTANCE_MISSING.to_string());
+            return Err(err_keys::WINDOW_INSTANCE_MISSING.to_string());
         };
         let instance = Uuid::parse_str(instance).map_err(|_| err_keys::UUID.to_string())?;
-        let id = log_window_id(&instance);
+        let id = family_window_id(family, &instance);
         // 目标实例已经写进窗口身份，已开的窗口不必、也不能再换实例
         return open_window(&app, &id.uuid, &id.label, &url_path);
     }
@@ -215,19 +218,20 @@ pub async fn window_open_window(
     Ok(())
 }
 
-/// 打开日志 / 导出窗口时的实例参数校验：kind 与 instance 要匹配
+/// 打开 / 关闭窗口时的实例参数校验：kind 与 instance 要匹配
 ///
-/// - `kind`: 窗口类型，只有 log 与 export 接受 instance
+/// - `kind`: 窗口类型，只有窗口族与 export 接受 instance
 /// - `instance`: 目标实例 UUID，其余 kind 传了即报错
 ///
 /// # 返回值
 ///
 /// 校验不通过返回错误文案，非法 uuid 为 `err.uuid`
 fn kind_parse_check(kind: &str, instance: &Option<String>) -> Result<(), String> {
-    if kind != "log" && kind != "export" && instance.is_some() {
+    let accepts_instance = kind == "export" || family_of_kind(kind).is_some();
+    if !accepts_instance && instance.is_some() {
         return Err(format!("kind {kind} 不接受 instance 参数"));
     }
-    if (kind == "log" || kind == "export")
+    if accepts_instance
         && let Some(instance) = instance
     {
         Uuid::parse_str(instance).map_err(|_| err_keys::UUID.to_string())?;
@@ -239,7 +243,7 @@ fn kind_parse_check(kind: &str, instance: &Option<String>) -> Result<(), String>
 ///
 /// - `app`: 应用句柄，取窗口与关闭都用它
 /// - `kind`: 窗口类型
-/// - `instance`: 目标实例 UUID；日志窗口必须有它，窗口身份由实例 uuid 派生，见 [`log_window_id`]
+/// - `instance`: 目标实例 UUID；窗口族必须有它，窗口身份由实例 uuid 派生，见 [`family_window_id`]
 ///
 /// # 返回值
 ///
@@ -251,12 +255,12 @@ pub fn window_close_window(
     instance: Option<String>,
 ) -> Result<(), String> {
     kind_parse_check(&kind, &instance)?;
-    if kind == "log" {
+    if let Some(family) = family_of_kind(&kind) {
         let Some(instance) = instance.as_deref() else {
-            return Err(err_keys::LOG_INSTANCE_MISSING.to_string());
+            return Err(err_keys::WINDOW_INSTANCE_MISSING.to_string());
         };
         let instance = Uuid::parse_str(instance).map_err(|_| err_keys::UUID.to_string())?;
-        let id = log_window_id(&instance);
+        let id = family_window_id(family, &instance);
         return close_window(&app, &id.uuid, &id.label);
     }
     let Some(uuid) = uuid_for_kind(&kind) else {
@@ -274,25 +278,20 @@ pub fn window_close_window(
 ///
 /// - `app`: 应用句柄，查已有窗口与建新窗口都用它
 /// - `kind`: 窗口类型
+/// - `instance`: 目标实例 UUID；窗口族必须有它，窗口身份由实例 uuid 派生，见 [`family_window_id`]
 /// - `query`: 新窗口 URL 上的 query，**不含 `?`**，空则退回裸 `index.html`
 ///
 /// # 返回值
 ///
-/// 导航或建窗成功返回 `Ok(())`；kind 未知、query 畸形、导航失败都返回错误文案
+/// 导航或建窗成功返回 `Ok(())`；kind 未知、参数不匹配、query 畸形、导航失败都返回错误文案
 #[tauri::command]
 pub async fn window_reopen_window(
     app: AppHandle,
     kind: String,
+    instance: Option<String>,
     query: Option<String>,
 ) -> Result<(), String> {
-    // 日志窗口是窗口族，身份由实例派生：这条路拿不到实例，定位不到是哪一个日志窗口。
-    // 前端只在带拖入路径时才走 reopen，而日志窗口不接受拖入，所以这里直接拒
-    if kind == "log" {
-        return Err(err_keys::LOG_INSTANCE_MISSING.to_string());
-    }
-    let Some(uuid) = uuid_for_kind(&kind) else {
-        return Err(format!("unknown window kind: {kind}"));
-    };
+    kind_parse_check(&kind, &instance)?;
     let query = query.unwrap_or_default();
     // 前端那份 query 是 URLSearchParams 编出来的，不会出现裸 # / 控制字符；
     // 这里只做一次兜底，别把畸形串拼进 URL，同 window_open_window
@@ -305,11 +304,30 @@ pub async fn window_reopen_window(
         format!("index.html?{query}")
     };
 
-    let label = WINDOWS_INFO
-        .get(&uuid)
-        .map(|entry| entry.label)
-        .unwrap_or_default();
-    if let Some(win) = app.get_webview_window(label) {
+    // 窗口族按实例定位到族里那一个；静态窗口按 kind 查表
+    let id = match family_of_kind(&kind) {
+        Some(family) => {
+            let Some(instance) = instance.as_deref() else {
+                return Err(err_keys::WINDOW_INSTANCE_MISSING.to_string());
+            };
+            let instance = Uuid::parse_str(instance).map_err(|_| err_keys::UUID.to_string())?;
+            family_window_id(family, &instance)
+        }
+        None => {
+            let Some(uuid) = uuid_for_kind(&kind) else {
+                return Err(format!("unknown window kind: {kind}"));
+            };
+            FamilyWindowId {
+                label: WINDOWS_INFO
+                    .get(&uuid)
+                    .map(|entry| entry.label.to_string())
+                    .unwrap_or_default(),
+                uuid,
+            }
+        }
+    };
+
+    if let Some(win) = app.get_webview_window(&id.label) {
         // 基准 URL 取窗口当前的：origin / devUrl 都一致，join 一个相对路径即可
         let base = win.url().map_err(|err| err.to_string())?;
         let url = base.join(&url_path).map_err(|err| err.to_string())?;
@@ -317,7 +335,7 @@ pub async fn window_reopen_window(
         win.set_focus().map_err(|err| err.to_string())?;
         return Ok(());
     }
-    open_window_from_uuid(&app, &uuid, &url_path)
+    open_window(&app, &id.uuid, &id.label, &url_path)
 }
 
 /// 拖入文件的真实路径，由 DOM 拖放的"路径桥"上报，见 [`file_drop`]

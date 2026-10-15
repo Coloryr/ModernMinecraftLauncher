@@ -2,6 +2,9 @@
 // 资源管理窗口：左侧分类导航 + 右侧内容区（存档分类下另有「数据包」子页）
 // 数据来自 resource_* 命令；删除进回收站，操作后重拉当前分类。
 //
+// **一个实例一个窗口**：实例是窗口身份的一部分，打开时就锁定、窗口内不再选择实例，
+// 见 useResourceData 的 lockedUuid。
+//
 // 这个文件只做编排：
 // - 数据与加载        → composables/useResourceData；分类 / 子页选择也在那儿，加载跟着它走
 // - 共用操作          → composables/useResourceOps；忙碌标记 / 确认弹窗 / 打开目录 / 重拉
@@ -118,7 +121,9 @@ const paneKey = computed(() =>
 
 /** 「下载资源」：开「添加资源」窗口，与主窗口侧边栏那个入口同一个去处 */
 function openDownload() {
-  openWindow("add_resource");
+  // 带上本窗口锁定的实例：添加资源窗口是固定窗口，不带就按主窗口当前选中的实例走，
+  // 与本窗口看的可能不是同一个。实例已被删掉时留空，由那边自己兜底
+  openWindow("add_resource", { uuid: instanceUuid.value || undefined });
 }
 
 // ================= 拖拽导入（落点 = 当前面板对应的目录） =================
@@ -251,7 +256,8 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
     <template #head-right>
       <InstanceChip :instance="instance" />
       <!-- BaseButton 本身就是 inline-flex + gap，图标与文字自然成一行，不用额外类 -->
-      <BaseButton size="sm" variant="accent" @click="openDownload">
+      <!-- 资源下载窗口也是一个实例一个，没有实例就无处可放，按钮跟着灰掉 -->
+      <BaseButton size="sm" variant="accent" :disabled="!instanceUuid" @click="openDownload">
         <GlyphIcon name="download" :size="14" />
         {{ t("resource.download") }}
       </BaseButton>

@@ -167,8 +167,8 @@ function onMenuPick(id: string) {
       openEdit(item);
       break;
     case "config":
-      // 配置窗口直接落到这个存档；实例两边同一口径（gui_config 的 selectedInstance）
-      openWindow("config", { saveDir: item.dir });
+      // 配置文件窗口直接落到这个存档；实例取本窗口锁定的那个，两边才看的是同一个实例
+      openWindow("config", { uuid: instanceUuid.value, saveDir: item.dir });
       break;
     case "backup":
       backup(item);
