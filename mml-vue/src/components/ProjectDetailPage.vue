@@ -10,6 +10,7 @@ import { computed, onUnmounted, ref, toRef, watch } from "vue";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import AsyncImage from "./ui/AsyncImage.vue";
+import AuthorTag from "./ui/AuthorTag.vue";
 import ImagePreview from "./ui/ImagePreview.vue";
 import { api } from "../lib/api";
 import { useDownloadBadges } from "../lib/downloadBadges";
@@ -17,7 +18,13 @@ import { t, tErr } from "../lib/i18n";
 import { svgIcon } from "../lib/modrinthIcon";
 import { usePageActive } from "../lib/pageActive";
 import { showToast } from "../lib/toast";
-import type { FileListItemDto, FileListDto, ProjectDetailDto, ProjectItemDto } from "../lib/bindings";
+import type {
+  FileListItemDto,
+  FileListDto,
+  PicDto,
+  ProjectDetailDto,
+  ProjectItemDto,
+} from "../lib/bindings";
 
 /** 任务条目与快照的最小契约，两个窗口的任务 DTO 都满足 */
 type TaskItem = { pid: string; fid: string; done: boolean; failed: boolean; cancelled?: boolean };
@@ -74,6 +81,20 @@ let detailSeq = 0;
 let fileSeq = 0;
 
 const isModrinth = computed(() => current.value?.source.source === "modrinth");
+
+/**
+ * 详情页头部显示的作者
+ *
+ * 优先用列表项带来的那份（与卡片上一致）；列表项没有时退回**详情接口**的那份。
+ * 从「资源收藏」进来的条目只有名字 / 图标 / 网址，作者是空的，而详情接口一直带着作者 ——
+ * 不回退的话详情页一个作者都不显示。空名字的条目直接丢掉，别画出空胶囊。
+ */
+const authorList = computed(() => {
+  /** 空名字的条目直接丢掉，别画出空胶囊 */
+  const pick = (list: PicDto[]) => list.filter((item) => !!item.name);
+  const fromItem = pick(current.value?.authors ?? []);
+  return fromItem.length ? fromItem : pick(detail.value?.authors ?? []);
+});
 
 const pageFiles = computed(() =>
   isModrinth.value
@@ -309,8 +330,11 @@ function scrollToVersions() {
                 }}</span>
               </div>
               <div class="detail-sub">
-                <span v-if="current.authors.length">{{current.authors.map((a) => a.name).join(", ")}}</span>
-                <span> · {{ t("modpack.downloads", { n: current.downloadCount.toLocaleString() }) }}</span>
+                <template v-if="authorList.length">
+                  <AuthorTag :authors="authorList" :max="4" />
+                  <span> · </span>
+                </template>
+                <span>{{ t("modpack.downloads", { n: current.downloadCount.toLocaleString() }) }}</span>
                 <span v-if="current.date"> · {{ formatDate(current.date) }}</span>
               </div>
               <div v-if="detail?.tag.length || current.tag.length" class="pack-tags detail-tags">

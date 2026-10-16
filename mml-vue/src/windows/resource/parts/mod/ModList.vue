@@ -114,6 +114,8 @@ function keyOf(item: ModViewProps["items"][number]): string {
         <span v-if="depth > 0 && !item.library" class="badge badge-dim">
           {{ t("resource.modBuiltin") }}
         </span>
+        <!-- 「有更新」：这一行在更新检查里查到了新版本；下不下由更新弹窗里勾 -->
+        <span v-if="updateKeys?.has(modSelectKey(item))" class="badge">{{ t("resource.updateTag") }}</span>
         <span v-if="item.disable" class="badge badge-off">{{ t("resource.modDisabled") }}</span>
         <span v-if="item.fail" class="badge badge-red">{{ t("resource.modFail") }}</span>
         <span v-if="item.core" class="badge">{{ t("resource.modCore") }}</span>

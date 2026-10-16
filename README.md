@@ -41,6 +41,7 @@
 - modid重复提示
 - 窗口透明
 - 窗口全屏和占满
+- 从存档启动游戏
 
 ## 技术栈
 
@@ -71,6 +72,7 @@
 | `mml-gui/` | Tauri 桌面壳；窗口规格与 IPC 命令在 `src-tauri/src/windows/`，IPC 类型由 `ipc-gen` 扫描 Rust 源码自动生成 |
 | `mml-vue/` | 前端（Vue3 + Vite）；窗口在 `src/windows/`，通用组件在 `src/components/` |
 | `mml-ui-demo/` | **独立**的 Vue3 + Vite 示例工程：给服主写「自定义主页面」用的样板，`npm run build` 产出可直接导入启动器的 zip（不进 Cargo workspace，也不挂进 `mml-vue` 的构建） |
+| `build/` | 构建脚本（正式发布 / 预发布 / 只跑前端），每个都有 PowerShell 版与 bash 版 |
 
 三个子项目各有 README：[mml-gui](mml-gui/README.md)、[mml-vue](mml-vue/README.md)、[mml-ui-demo](mml-ui-demo/README.md)。
 
@@ -81,11 +83,14 @@
 | 命令 | 说明 |
 | --- | --- |
 | `cd mml-gui && npm run tauri dev` | 桌面开发模式（会先还原 vendor 插件并起 vite，端口 1420 必须空闲） |
-| `dev-frontend.bat` | 只跑前端（vite，浏览器访问 `http://localhost:1420/?window=<kind>` 预览窗口，无 IPC 数据） |
-| `build-release.bat` | 正式发布构建（fat LTO，含安装包） |
-| `build-prerelease.bat` | 预发布构建（thin LTO，只出 exe，更快） |
+| `build/dev-frontend.ps1` | 只跑前端（vite，浏览器访问 `http://localhost:1420/?window=<kind>` 预览窗口，无 IPC 数据） |
+| `build/build-release.ps1` | 正式发布构建（fat LTO，含安装包） |
+| `build/build-prerelease.ps1` | 预发布构建（thin LTO，只出 exe，更快） |
 | `cd mml-gui && npm run gen` | 改过 Rust 侧命令 / DTO 后重新生成前端 `bindings.ts` |
 | `cd mml-ui-demo && npm run build` | 构建自定义主页面示例并打包成 `mml-ui-demo.zip`（用法见该目录的 README） |
+
+上面三个脚本都在 `build/` 下，各有一份 PowerShell 版（`.ps1`，Windows）与 bash 版
+（`.sh`，Linux / macOS / Git Bash），做的是同一件事。
 
 测试按改动范围只跑相关的那几个：`cargo test -p <crate>`（不要整仓全量测试）。
 

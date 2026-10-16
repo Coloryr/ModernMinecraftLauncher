@@ -5,6 +5,7 @@
 import { computed, nextTick, onActivated, onDeactivated, onMounted, ref, toRef, watch } from "vue";
 import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import AsyncImage from "../../components/ui/AsyncImage.vue";
+import AuthorTag from "../../components/ui/AuthorTag.vue";
 import ProjectDetailPage from "../../components/ProjectDetailPage.vue";
 import { api } from "../../lib/api";
 import { useDownloadBadges } from "../../lib/downloadBadges";
@@ -428,9 +429,8 @@ watch(source, loadSource);
             <div class="pack-info">
               <div class="pack-name">
                 <span>{{ item.name }}</span>
-                <span v-if="item.authors.length" class="pack-author">
-                  {{item.authors.map((a) => a.name).join(", ")}}
-                </span>
+                <!-- 作者：头像 + 名字的胶囊，与标题明确分开 -->
+                <AuthorTag v-if="item.authors.length" :authors="item.authors" />
                 <span v-if="projectInstalled(item)" class="pack-badge">{{ t("modpack.installed") }}</span>
                 <span v-else-if="projectRunning(item)" class="pack-badge busy">{{ t("modpack.downloading") }}</span>
               </div>

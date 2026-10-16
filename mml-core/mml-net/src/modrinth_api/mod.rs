@@ -11,6 +11,7 @@
 //! | [`project_obj`] | 项目详情 DTO |
 //! | [`search_obj`] | 搜索结果 DTO |
 //! | [`team_obj`] | 团队成员 DTO |
+//! | [`user_obj`] | 用户 DTO，按作者 ID 批量查头像用 |
 //! | [`version_obj`] | 版本与文件 DTO |
 
 use std::collections::HashMap;
@@ -24,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     modrinth_api::{
         project_obj::ModrinthProjectObj, search_obj::ModrinthSearchObj, team_obj::ModrinthTeamObj,
-        version_obj::ModrinthVersionObj,
+        user_obj::ModrinthUserObj, version_obj::ModrinthVersionObj,
     },
     urls,
 };
@@ -32,6 +33,7 @@ use crate::{
 pub mod project_obj;
 pub mod search_obj;
 pub mod team_obj;
+pub mod user_obj;
 pub mod version_obj;
 
 /// 项目类型：整合包
@@ -467,6 +469,38 @@ pub async fn get_team(id: &str) -> CoreResult<Vec<ModrinthTeamObj>> {
 
     crate::get_work_client()
         .get_json_limited(&url, LIMITE_PER_MIN)
+        .await
+}
+
+/// 获取指定项目的内容
+///
+/// - `id`: 项目编号
+///
+/// # 返回值
+///
+/// 返回项目详情
+/// 批量获取用户信息
+///
+/// 搜索结果只给作者名与作者 ID，没有头像；列表要显示作者头像就得按 ID 再查一次。
+/// 一批 ID 走一次请求（服务端上限 100 个），比逐个查省得多。
+///
+/// - `ids`: 用户 ID 列表；空列表不发请求
+///
+/// # 返回值
+///
+/// 查到的用户；请求失败返回对应错误
+pub async fn get_users(ids: &[String]) -> CoreResult<Vec<ModrinthUserObj>> {
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut url = reqwest::Url::parse(&format!("{}users", urls::MODRINTH_API)).unwrap();
+    // ids 是 JSON 数组字符串，方括号与引号都要经 URL 编码，交给 query_pairs_mut
+    url.query_pairs_mut()
+        .append_pair("ids", &serde_json::to_string(ids).unwrap_or_default());
+
+    crate::get_work_client()
+        .get_json_limited(url.as_str(), LIMITE_PER_MIN)
         .await
 }
 

@@ -65,9 +65,10 @@ pub use motd_dto::{MotdDto, MotdSegmentDto};
 pub use resource_dto::{
     DataPackItemDto, DepProblemDto, DepProblemKindDto, ModDependencyDto, ModDuplicateDto,
     ModDuplicateFileDto, ModGroupDto, ModItemDto, ModRenameDto, ModScanProgressDto,
-    ModUpdateCheckDto, ModUpdateDto, ModUpdateProgressDto, PackItemDto, ResourceDropDto,
-    ResourceViewDto, SaveBackupDto, SaveEditDto, SaveItemDto, SchematicBlockDto, SchematicDetailDto,
-    SchematicItemDto, ScreenshotItemDto, ServerItemDto, ShaderItemDto,
+    ModUpdateApplyDto, ModUpdateCheckDto, ModUpdateDoneDto, ModUpdateDto, ModUpdateProgressDto,
+    PackItemDto, ResourceDropDto, ResourceViewDto, SaveBackupDto, SaveEditDto, SaveItemDto,
+    SchematicBlockDto, SchematicDetailDto, SchematicItemDto, ScreenshotItemDto, ServerItemDto,
+    ShaderItemDto,
 };
 pub use settings_dto::{
     BgInfoDto, DnsSettingDto, GameCheckSettingDto, LaunchSettingDto, NetworkSettingDto,

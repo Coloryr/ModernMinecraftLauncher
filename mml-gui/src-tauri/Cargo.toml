@@ -64,3 +64,10 @@ mml-testutil = { path = "../../mml-core/mml-testutil" }
 webview2-com = "~0.39.1"
 # 与 tauri / webview2-com 同一个 windows 版本（0.62），PCWSTR / PWSTR 才通用
 windows.workspace = true
+
+[features]
+# 前端资源走内嵌 dist 而不是 devUrl。**直接 cargo build 必须显式打开**：
+# tauri 的 build.rs 用 `dev = !custom-protocol` 判定，不带这个 feature 时哪怕
+# profile 是 release-like 也会被当成 dev 构建 —— 那时 exe 会去连 localhost:1420，
+# 没起 vite 就是"进程在跑、窗口不出来"。tauri CLI 自己会带上，走 tauri build 不用管。
+custom-protocol = ["tauri/custom-protocol"]

@@ -343,6 +343,10 @@ pub async fn add_resource_list(
             }
             .map_err(|err| err.to_string())?;
 
+            // 搜索结果不给作者头像：按 author_id 批量查一次，一页一次请求；
+            // 查不到就让前端退回名字首字母的占位
+            let avatars = modrinth::author_avatars(&list.hits).await;
+
             let mut list1 = Vec::new();
             // 缓存先攒着，**构建 DTO 期间不持锁**：new_modrinth 里会 await 查
             // 标签图标，首次可能真发网络请求，持全局写锁跨 await 会把其它
@@ -361,6 +365,7 @@ pub async fn add_resource_list(
                     collect_utils::is_star(&pid),
                     check_download_now(&uuid, &pid),
                     None,
+                    avatars.get(&item.author_id).cloned(),
                 )
                 .await;
 

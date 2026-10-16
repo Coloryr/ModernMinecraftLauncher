@@ -78,8 +78,10 @@ npm run vendor -- -Force     # 强制重新拉取
 
 | 命令（仓库根目录） | 说明 |
 | --- | --- |
-| `build-release.bat` | 正式发布：fat LTO + `codegen-units = 1`，含安装包。末尾的跨 crate 优化是单线程的，**构建时只有一个核在跑** |
-| `build-prerelease.bat` | 预发布：thin LTO + 16 个 codegen unit，只出 exe，快很多 |
+| `build/build-release.ps1` | 正式发布：fat LTO + `codegen-units = 1`，含安装包。末尾的跨 crate 优化是单线程的，**构建时只有一个核在跑** |
+| `build/build-prerelease.ps1` | 预发布：thin LTO + 16 个 codegen unit，只出 exe，快很多 |
+
+两个脚本都有 bash 版（`build/*.sh`），做的是同一件事。
 
 两者 target 目录独立（`target\release` / `target\prerelease`），来回切不会互相刷缓存。
 预发布也要安装包时用

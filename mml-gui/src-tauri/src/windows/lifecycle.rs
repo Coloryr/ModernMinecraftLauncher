@@ -24,7 +24,10 @@ use crate::listens;
 use mml_names::names;
 use uuid::Uuid;
 
-use super::geometry::{remember_decorated_inset, save_window_state, window_state_for};
+use super::geometry::{
+    Placement, RectF, SizeF, center_placement, child_placement, remember_decorated_inset,
+    save_window_state, window_state_for,
+};
 use super::registry::{
     ADD_MODPACK_WINDOW_UUID, ADD_WINDOW_UUID, BLOCK_WINDOW_UUID, DOWNLOAD_WINDOW_UUID,
     MAIN_WINDOW_UUID, WINDOWS_INFO, family_of_label, min_size_of_label, uuid_for_kind, uuid_of_label,
@@ -231,6 +234,8 @@ pub(crate) fn emit_close_blocked(window: &tauri::Window<tauri::Wry>) {
 /// - `url_path`: webview 加载的路径，相对应用源，通常为 `index.html`；需要带参数时传
 ///   `index.html?...` —— tauri 对恰好 `index.html` 的路径走裸 app URL 分支，其余字符串经
 ///   `Url::join` 拼接，query 可随真实 URL 带给前端
+/// - `anchor`: 发起这次打开的那个窗口，**只在没有历史几何时**用来定子窗口的落点
+///   （叠在它那个角的内侧）；主窗口自己开、或没有锚点时居中
 ///
 /// # 返回值
 ///
@@ -240,6 +245,7 @@ pub(super) fn create_window(
     label: &str,
     uuid: &Uuid,
     url_path: &str,
+    anchor: Option<&WebviewWindow>,
 ) -> Result<WebviewWindow, String> {
     // 已存在则聚焦，避免重复窗口
     if let Some(win) = app.get_webview_window(label) {
@@ -321,7 +327,21 @@ pub(super) fn create_window(
                 .position(g.x as f64 / scale, g.y as f64 / scale)
                 .build()
         }
-        None => builder.inner_size(min_w, min_h).center().build(),
+        // 没有历史几何：主窗口在屏幕中心，子窗口叠在锚点窗口那个角的内侧
+        None => {
+            let size = SizeF {
+                width: min_w,
+                height: min_h,
+            };
+            match initial_placement(app, uuid, anchor, &size) {
+                Some(p) => builder
+                    .inner_size(min_w, min_h)
+                    .position(p.x, p.y)
+                    .build(),
+                // 拿不到显示器（几乎不可能）：退回 tao 自己的居中
+                None => builder.inner_size(min_w, min_h).center().build(),
+            }
+        }
     };
     let win = win.map_err(|e| e.to_string())?;
 
@@ -342,6 +362,72 @@ pub(super) fn create_window(
         let _ = win.maximize();
     }
     Ok(win)
+}
+
+/// 没有历史几何时的落点
+///
+/// 主窗口取所在显示器的**屏幕中心**；子窗口叠在锚点窗口某个角的**内侧**，见
+/// [`child_placement`]。保存过位置的窗口根本不走这里，见 [`create_window`]。
+///
+/// - `app`: 应用句柄，取显示器用
+/// - `uuid`: 目标窗口 uuid，用它认出主窗口
+/// - `anchor`: 发起这次打开的那个窗口；没有它（主窗口自己开、或窗口已不在）就居中
+/// - `size`: 目标窗口尺寸，逻辑像素
+///
+/// # 返回值
+///
+/// 见 [`Placement`]；拿不到显示器时返回 `None`，调用方退回居中
+fn initial_placement(
+    app: &AppHandle,
+    uuid: &Uuid,
+    anchor: Option<&WebviewWindow>,
+    size: &SizeF,
+) -> Option<Placement> {
+    // 换算用锚点所在显示器的缩放系数：窗口就开在那儿，与恢复历史几何那条路同一口径
+    let monitor = anchor
+        .and_then(|win| win.current_monitor().ok().flatten())
+        .or_else(|| app.primary_monitor().ok().flatten())?;
+    let scale = monitor.scale_factor();
+    let work = monitor.work_area();
+    let area = RectF {
+        x: work.position.x as f64 / scale,
+        y: work.position.y as f64 / scale,
+        width: work.size.width as f64 / scale,
+        height: work.size.height as f64 / scale,
+    };
+    let size = SizeF {
+        width: size.width,
+        height: size.height,
+    };
+
+    if *uuid == MAIN_WINDOW_UUID {
+        return Some(center_placement(area, size));
+    }
+
+    // 锚点窗口的外框也换到逻辑像素；取不到就居中
+    let Some(anchor_rect) = anchor.and_then(|win| window_rect(win, scale)) else {
+        return Some(center_placement(area, size));
+    };
+    Some(child_placement(anchor_rect, size, area))
+}
+
+/// 取窗口外框，换算成逻辑像素
+///
+/// - `win`: 目标窗口
+/// - `scale`: 该窗口所在显示器的缩放系数
+///
+/// # 返回值
+///
+/// 见 [`RectF`]；查询失败返回 `None`
+fn window_rect(win: &WebviewWindow, scale: f64) -> Option<RectF> {
+    let position = win.outer_position().ok()?;
+    let size = win.outer_size().ok()?;
+    Some(RectF {
+        x: position.x as f64 / scale,
+        y: position.y as f64 / scale,
+        width: size.width as f64 / scale,
+        height: size.height as f64 / scale,
+    })
 }
 
 /// WebView2 用户数据目录，EBWebView 的落点
@@ -419,6 +505,7 @@ pub(crate) fn close_window_from_uuid(app: &AppHandle, uuid: &Uuid) -> Result<(),
 /// - `uuid`: 窗口 uuid
 /// - `label`: 与 `uuid` 对应的窗口标签
 /// - `url_path`: 传给 [`create_window`] 的 webview 路径
+/// - `anchor`: 发起这次打开的那个窗口，见 [`create_window`]
 ///
 /// # 返回值
 ///
@@ -428,8 +515,9 @@ pub(crate) fn open_window(
     uuid: &Uuid,
     label: &str,
     url_path: &str,
+    anchor: Option<&WebviewWindow>,
 ) -> Result<(), String> {
-    create_window(app, label, uuid, url_path)?;
+    create_window(app, label, uuid, url_path, anchor)?;
     Ok(())
 }
 
@@ -438,6 +526,7 @@ pub(crate) fn open_window(
 /// - `app`: 应用句柄，建窗用
 /// - `uuid`: 窗口 uuid
 /// - `url_path`: 传给 [`create_window`] 的 webview 路径
+/// - `anchor`: 发起这次打开的那个窗口，见 [`create_window`]
 ///
 /// # 返回值
 ///
@@ -446,11 +535,12 @@ pub(crate) fn open_window_from_uuid(
     app: &AppHandle,
     uuid: &Uuid,
     url_path: &str,
+    anchor: Option<&WebviewWindow>,
 ) -> Result<(), String> {
     let Some(entry) = WINDOWS_INFO.get(uuid) else {
         return Err(WindowNotFound.to_string());
     };
-    open_window(app, uuid, entry.label, url_path)
+    open_window(app, uuid, entry.label, url_path, anchor)
 }
 
 /// 创建 / 聚焦主窗口，setup 阶段调用
@@ -461,7 +551,8 @@ pub(crate) fn open_window_from_uuid(
 ///
 /// 主窗口已打开返回 `Ok(())`，建窗失败返回错误文案
 pub fn show_main_window(app: &AppHandle) -> Result<(), String> {
-    open_window_from_uuid(app, &MAIN_WINDOW_UUID, "index.html")
+    // 主窗口是顶层：没有历史几何时走"屏幕中心"，见 initial_placement
+    open_window_from_uuid(app, &MAIN_WINDOW_UUID, "index.html", None)
 }
 
 /// 窗口事件处理，注册于 `Builder::on_window_event`

@@ -18,6 +18,7 @@ use mml_names::{
 use mml_net::{
     modrinth_api::{
         self, ModrinthCategoriesObj,
+        search_obj::HitObj,
         version_obj::{DependencieObj, ModrinthVersionObj},
     },
     urls,
@@ -223,6 +224,51 @@ pub async fn order_tags(names: &[String]) -> Vec<String> {
         names.iter().partition(|name| loaders.contains(*name));
 
     loader_tags.into_iter().chain(rest).cloned().collect()
+}
+
+/// 一批命中项里去重后的作者 ID
+///
+/// - `hits`: 搜索命中项
+///
+/// # 返回值
+///
+/// 按出现顺序去重的作者 ID；空 ID 跳过
+fn author_ids(hits: &[HitObj]) -> Vec<String> {
+    let mut ids: Vec<String> = Vec::new();
+    for hit in hits {
+        if !hit.author_id.is_empty() && !ids.contains(&hit.author_id) {
+            ids.push(hit.author_id.clone());
+        }
+    }
+    ids
+}
+
+/// 批量取一批搜索命中项的作者头像
+///
+/// Modrinth 的搜索结果只给作者名，不给头像；头像按作者 ID 另查一次，
+/// 一批 ID 走一次请求。查不到（接口出错等）就少几个头像，不影响列表本身。
+///
+/// - `hits`: 搜索命中项，只读其中的 `author_id`
+///
+/// # 返回值
+///
+/// 作者 ID → 头像 URL；一个都没查到或请求失败时是空表
+pub async fn author_avatars(hits: &[HitObj]) -> HashMap<String, String> {
+    let ids = author_ids(hits);
+    if ids.is_empty() {
+        return HashMap::new();
+    }
+
+    match modrinth_api::get_users(&ids).await {
+        Ok(list) => list
+            .into_iter()
+            .filter_map(|item| item.avatar_url.map(|url| (item.id, url)))
+            .collect(),
+        Err(err) => {
+            mml_log::error(format!("查 Modrinth 作者头像失败：{err}"));
+            HashMap::new()
+        }
+    }
 }
 
 /// 获取所有游戏版本
@@ -656,5 +702,26 @@ impl InstanceSettingObj {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 造一个只填了作者 ID 的命中项
+    fn hit(author_id: &str) -> HitObj {
+        HitObj {
+            author_id: author_id.to_string(),
+            ..Default::default()
+        }
+    }
+
+    /// 作者 ID 去重、空 ID 跳过
+    #[test]
+    fn author_ids_dedups_and_skips_empty() {
+        let hits = vec![hit("a"), hit("a"), hit(""), hit("b")];
+        assert_eq!(author_ids(&hits), vec!["a".to_string(), "b".to_string()]);
+        assert!(author_ids(&[]).is_empty());
     }
 }

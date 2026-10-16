@@ -73,6 +73,8 @@ pub const ALREADY_DOWNLOADING: &str = "err.alreadyDownloading";
 pub const TASK_NOT_FOUND: &str = "err.taskNotFound";
 /// Java 下载失败
 pub const DOWNLOAD_FAILED: &str = "err.downloadFailed";
+/// 模组更新下载失败
+pub const MOD_UPDATE_FAILED: &str = "err.modUpdateFailed";
 /// Java 信息不合法
 pub const JAVA_INVALID: &str = "err.javaInvalid";
 /// 下载项已失效

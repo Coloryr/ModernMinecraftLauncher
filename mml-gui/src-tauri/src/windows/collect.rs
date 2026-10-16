@@ -277,7 +277,9 @@ pub async fn collect_project_item(
                 ..Default::default()
             };
 
-            ProjectItemDto::new_modrinth(&hit, file_type, false, true, is_star, false, None).await
+            // 这里不发作者请求：条目只用来打开详情，详情页会拿详情接口的作者
+            ProjectItemDto::new_modrinth(&hit, file_type, false, true, is_star, false, None, None)
+                .await
         }
         _ => return Err(String::from(err_keys::SOURCE_TYPE)),
     };

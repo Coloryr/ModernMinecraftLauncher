@@ -30,6 +30,8 @@ pub struct HitObj {
     pub project_id: String,
     /// 作者名，可能为空串
     pub author: String,
+    /// 作者的用户 ID；搜索结果不给头像，头像要按它去 `users` 批量查
+    pub author_id: String,
     /// 项目名称
     pub title: String,
     /// 项目简介
@@ -52,6 +54,7 @@ impl Default for HitObj {
         Self {
             project_id: Default::default(),
             author: Default::default(),
+            author_id: Default::default(),
             title: Default::default(),
             description: Default::default(),
             categories: Default::default(),

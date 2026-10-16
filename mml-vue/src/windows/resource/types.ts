@@ -153,6 +153,13 @@ export interface ModViewProps {
    * 可空：还没点过任何一行时不标记。
    */
   anchorKey?: string | null;
+  /**
+   * 有更新的那些行的多选键，见 `modSelectKey`
+   *
+   * 命中的行上多一枚「有更新」标签；键与多选同一套，启用 / 禁用改文件名之后仍然对得上。
+   * 不传 = 没有可更新的。
+   */
+  updateKeys?: Set<string>;
 }
 
 /** 两种模组视图共用的行操作事件 */

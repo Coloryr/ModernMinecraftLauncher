@@ -13,21 +13,28 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use mml_game::game_mods::ModObj;
+use std::path::Path;
+
+use mml_game::GameInstance;
+use mml_game::game_mods::{ModObj, add_disable_suffix};
 use mml_game::launcher::file_online_info_obj::OnlineInfoObj;
 use mml_game::launcher::{ModPackType, get_source_type};
 use mml_game::loader::LoaderType;
 use mml_game::{curseforge, modrinth};
+use mml_names::names;
 use mml_net::curseforge_api::{self, CurseFogreArg, file_obj::CurseForgeFileDataObj};
 use mml_net::modrinth_api::{self, version_obj::ModrinthVersionObj};
 use tauri::{Emitter, WebviewWindow};
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
-use crate::dtos::{ModUpdateCheckDto, ModUpdateDto, ModUpdateProgressDto};
+use crate::dtos::{
+    ModUpdateApplyDto, ModUpdateCheckDto, ModUpdateDoneDto, ModUpdateDto, ModUpdateProgressDto,
+};
+use crate::err_keys;
 use crate::listens;
 
-use super::mods::sha1_of;
+use super::mods::{find_mod, sha1_of};
 use super::{block_on_instance, parse_instance};
 
 /// 同时在查的模组数上限
@@ -36,15 +43,28 @@ use super::{block_on_instance, parse_instance};
 /// 并发开多大都压在同一个限速器上，所以这个值只影响 CurseForge 那一半。
 const MAX_CONCURRENT: usize = 8;
 
-/// 更新检查进度事件，事件名 `resource-mods-update-progress`
+/// 更新进度事件，事件名 `resource-mods-update-progress`
 ///
-/// - `window`: 发起检查的那个资源窗口，由 Tauri 注入，进度只发给它
+/// - `window`: 发起更新的那个资源窗口，由 Tauri 注入，进度只发给它
 /// - `dto`: 进度载荷，已完成与总数
 ///
-/// 逐个问平台可能要一分钟（Modrinth 限 300 次 / 分钟），没有进度用户会以为卡死。
+/// 检查与下载两个阶段共用：检查逐个问平台可能要一分钟（Modrinth 限 300 次 / 分钟），
+/// 下载也要时间，没有进度用户都会以为卡死。
 #[gui_macros::emit]
 pub fn emit_resource_mods_update_progress(window: &WebviewWindow, dto: ModUpdateProgressDto) {
     let _ = window.emit(listens::RESOURCE_MODS_UPDATE_PROGRESS, dto);
+}
+
+/// 更新下载完成事件，事件名 `resource-mods-update-done`
+///
+/// - `window`: 发起更新的那个资源窗口，由 Tauri 注入
+/// - `dto`: 成功与失败的个数
+///
+/// 下载走全局下载器，进度在「下载」窗口里看得见；这个事件只用来告诉资源窗口
+/// "文件已经换过了，可以重拉列表" —— 不重拉的话界面上还是旧文件名、旧版本号。
+#[gui_macros::emit]
+pub fn emit_resource_mods_update_done(window: &WebviewWindow, dto: ModUpdateDoneDto) {
+    let _ = window.emit(listens::RESOURCE_MODS_UPDATE_DONE, dto);
 }
 
 /// 一个待检查的模组，即"有在线信息的顶层条目"
@@ -191,6 +211,164 @@ pub async fn resource_mods_update_check(
         failed: failed as u32,
         updates,
     })
+}
+
+/// 下载更新：把选中的模组换成平台上的新文件
+///
+/// 逐条处理：问平台拿新文件的下载地址与哈希 → 下载校验 → 删掉旧文件（进回收站）→
+/// 写回在线信息。**旧文件在下载成功之后才删**：下载失败时原文件原样留着，
+/// 免得更新一下反而没得用；原本禁用着的模组更新完仍是禁用状态，不会顺手被启用。
+///
+/// 下载走全局下载器，进度在「下载」窗口可见；本命令校验完参数就返回，
+/// 全部处理完再发完成事件，前端据此重拉列表。
+///
+/// - `window`: 发起更新的那个资源窗口，进度与完成事件只发给它
+/// - `uuid`: 实例 uuid
+/// - `items`: 勾选要更新的条目；空数组什么都不做
+///
+/// # 返回值
+///
+/// uuid 非法或实例不存在返回错误串；其余情况立即返回 `Ok(())`，
+/// 单条失败只计数、不让一条坏掉整批，结果在完成事件里
+#[gui_macros::ipc_group("resource")]
+#[tauri::command]
+pub async fn resource_mods_update_apply(
+    window: WebviewWindow,
+    uuid: String,
+    items: Vec<ModUpdateApplyDto>,
+) -> Result<(), String> {
+    if items.is_empty() {
+        return Ok(());
+    }
+    let instance = parse_instance(&uuid)?;
+    let total = items.len();
+    emit_resource_mods_update_progress(&window, ModUpdateProgressDto { done: 0, total });
+
+    tauri::async_runtime::spawn(async move {
+        let mut ok = 0u32;
+        let mut failed = 0u32;
+        for (index, item) in items.into_iter().enumerate() {
+            match apply_one(instance.clone(), &item).await {
+                Ok(()) => ok += 1,
+                Err(err) => {
+                    failed += 1;
+                    // 失败原因逐条记：用户报"更新不动"时这是唯一的线索
+                    mml_log::error(format!("模组更新失败 {}：{err}", item.project_id));
+                }
+            }
+            emit_resource_mods_update_progress(
+                &window,
+                ModUpdateProgressDto {
+                    done: index + 1,
+                    total,
+                },
+            );
+        }
+        emit_resource_mods_update_done(&window, ModUpdateDoneDto { ok, failed });
+    });
+
+    Ok(())
+}
+
+/// 换掉一个模组：下新文件、删旧文件、更新在线信息
+///
+/// - `instance`: 实例句柄
+/// - `item`: 要更新的那一条
+///
+/// # 返回值
+///
+/// 旧文件找不到、平台查不到新文件、下载校验失败或写盘失败返回错误串
+async fn apply_one(instance: GameInstance, item: &ModUpdateApplyDto) -> Result<(), String> {
+    let source = ModPackType::from_string(&item.source);
+    if !matches!(source, ModPackType::CurseForge | ModPackType::Modrinth) {
+        return Err(err_keys::SOURCE_TYPE.to_string());
+    }
+
+    // 旧文件按 uuid 定位；顺带记下它是不是禁用着，更新完要接着禁用
+    let old = find_mod(instance.clone(), &item.uuid).await?;
+    let dir = block_on_instance(instance.clone(), |game| game.get_mods_path()).await?;
+
+    let (obj, info) = match source {
+        ModPackType::CurseForge => {
+            let fid: u64 = item
+                .new_file_id
+                .parse()
+                .map_err(|_| err_keys::BAD_FILE_ID.to_string())?;
+            let mut list = curseforge_api::get_files(vec![fid])
+                .await
+                .map_err(|err| err.to_string())?;
+            let mut data = list
+                .pop()
+                .ok_or_else(|| err_keys::FILE_NOT_FOUND.to_string())?;
+            let obj = curseforge::make_file_item_obj(&mut data, &dir);
+            let info = curseforge::make_file_online_info_obj(&mut data, names::GAME_MODS_DIR);
+            (obj, info)
+        }
+        ModPackType::Modrinth => {
+            let data = modrinth_api::get_version(&item.project_id, &item.new_file_id)
+                .await
+                .map_err(|err| err.to_string())?;
+            // Modrinth 偶尔给一个 files 都不带的版本；下面两个构造函数都会直接取 files[0]
+            if data.files.is_empty() {
+                return Err(err_keys::FILE_NOT_FOUND.to_string());
+            }
+            let obj = modrinth::make_download_obj(&data, &dir);
+            let info = modrinth::make_file_online_obj(&data, names::GAME_MODS_DIR);
+            (obj, info)
+        }
+        _ => return Err(err_keys::SOURCE_TYPE.to_string()),
+    };
+
+    // 下载与哈希校验；没成功就到此为止，旧文件一个字都不动
+    let outcome = mml_downloader::start_download_task_outcome(vec![obj.clone()]).await;
+    if !outcome.is_done() {
+        return Err(err_keys::MOD_UPDATE_FAILED.to_string());
+    }
+
+    if let Some(stale) = stale_file(&old.file, &obj.file) {
+        old_delete(stale)?;
+    }
+    // 原本禁用着：给新文件补上后缀，别让更新把用户禁用的模组启用了
+    if old.disable {
+        add_disable_suffix(&obj.file).map_err(|err| err.to_string())?;
+    }
+
+    let game = instance.read().unwrap();
+    let mut online = game.read_online_info();
+    online.insert(item.project_id.clone(), info);
+    game.save_online_info(&online);
+    Ok(())
+}
+
+/// 更新完之后要删掉的旧文件，新旧同名时返回 `None`
+///
+/// 平台换了内容却没改名是有的：这时下载已经覆盖了同一个路径，
+/// 再删就是把刚下好的那份删掉。
+///
+/// - `old`: 旧文件路径
+/// - `new`: 新文件路径
+///
+/// # 返回值
+///
+/// 要删的旧文件；新旧同名时没有
+fn stale_file<'a>(old: &'a Path, new: &Path) -> Option<&'a Path> {
+    (old != new).then_some(old)
+}
+
+/// 把旧文件移进回收站
+///
+/// - `path`: 旧文件路径
+///
+/// # 返回值
+///
+/// 删除失败返回错误串
+fn old_delete(path: &Path) -> Result<(), String> {
+    ModObj {
+        file: path.to_path_buf(),
+        ..Default::default()
+    }
+    .delete()
+    .map_err(|err| err.to_string())
 }
 
 /// 查一个模组，判断装上的是不是最新
@@ -491,5 +669,16 @@ mod tests {
         assert_eq!(newest_modrinth(list).unwrap().file, "only.jar");
 
         assert!(newest_modrinth(Vec::new()).is_none());
+    }
+
+    /// 新旧文件同名时不删旧文件：下载已经覆盖了同一个路径
+    #[test]
+    fn stale_file_skips_same_path() {
+        let same = Path::new("mods/sodium.jar");
+        assert!(stale_file(same, same).is_none());
+
+        let old = Path::new("mods/sodium-0.5.jar");
+        let new = Path::new("mods/sodium-0.6.jar");
+        assert_eq!(stale_file(old, new), Some(old));
     }
 }

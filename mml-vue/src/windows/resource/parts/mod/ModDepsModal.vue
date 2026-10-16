@@ -81,13 +81,19 @@ const flowEdges = computed<Edge[]>(() =>
     target: edge.to,
     // 不指定 type 就是 vue-flow 的默认边，即贝塞尔曲线；
     // smoothstep 是直角折线（带圆角），之前误用它，整张图看着像电路图
-    markerEnd: MarkerType.ArrowClosed,
-    // 环上的回边走主色虚线、可选前置走点线；写在 style 里，免得被主题默认样式盖掉
-    style: edge.backward
-      ? { stroke: "var(--accent)", strokeDasharray: "6 4" }
-      : edge.optional
-        ? { strokeDasharray: "3 3" }
-        : undefined,
+    // 加载器 → minecraft 那条走黄色（与虚拟前置的边框同色）；环上的回边走主色虚线、
+    // 可选前置走点线。都写在 style 里，免得被主题默认样式盖掉
+    style: edge.loader
+      ? { stroke: "var(--yellow)" }
+      : edge.backward
+        ? { stroke: "var(--accent)", strokeDasharray: "6 4" }
+        : edge.optional
+          ? { strokeDasharray: "3 3" }
+          : undefined,
+    // 箭头颜色跟着线走：默认那枚是主题色，画在黄线上会很跳
+    markerEnd: edge.loader
+      ? { type: MarkerType.ArrowClosed, color: "var(--yellow)" }
+      : MarkerType.ArrowClosed,
     data: { edge },
   })),
 );

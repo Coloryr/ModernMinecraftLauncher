@@ -165,6 +165,37 @@ test("反过来那条边照样分可选 / 必装", () => {
   assert.equal(edge.optional, true);
 });
 
+test("加载器 → minecraft：两边都在图上时补一条黄线", () => {
+  const root = mod("Root", [dep("Minecraft"), dep("MinecraftForge")]);
+  const graph = buildDepGraph(
+    root,
+    providerMap([root]),
+    (id) => (id === "minecraft" ? "1.20.4" : id === "minecraftforge" ? "47.2.0" : null),
+    new Map(),
+    new Set(["forge", "minecraftforge"]),
+  );
+
+  const link = graph.edges.find((edge) => edge.from === "minecraftforge" && edge.to === "minecraft");
+  assert.ok(link, "应当补一条 加载器 → minecraft 的边");
+  assert.equal(link.loader, true);
+  // 模组自己声明的那条边不能带上这个标记
+  assert.equal(graph.edges.find((edge) => edge.from === "root" && edge.to === "minecraft").loader, false);
+});
+
+test("加载器 → minecraft：只声明了 minecraft 时不凭空补出加载器", () => {
+  const root = mod("Root", [dep("Minecraft")]);
+  const graph = buildDepGraph(
+    root,
+    providerMap([root]),
+    (id) => (id === "minecraft" ? "1.20.4" : null),
+    new Map(),
+    new Set(["forge"]),
+  );
+
+  assert.deepEqual(keysOf(graph), ["minecraft", "root"]);
+  assert.equal(graph.edges.some((edge) => edge.loader), false);
+});
+
 test("布局：每个节点都有坐标，画布把它们都包住", () => {
   const b = mod("B", [dep("D")]);
   const c = mod("C", [dep("D")]);

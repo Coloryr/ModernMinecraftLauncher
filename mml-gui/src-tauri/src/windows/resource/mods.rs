@@ -414,7 +414,7 @@ pub(super) fn sha1_of(hash: &FileHash) -> String {
 /// 以前这里走 `read_mod_fast`，那会把**每个 jar 完整读一遍算 SHA1** ——
 /// 几百个包要好几秒，而"禁用"只是给一个文件改名。用户要求"禁用之后不要重新读取"，
 /// 这条是后端那一半：真正贵的就是它。
-async fn find_mod(instance: GameInstance, mod_uuid: &str) -> Result<ModObj, String> {
+pub(super) async fn find_mod(instance: GameInstance, mod_uuid: &str) -> Result<ModObj, String> {
     let mod_uuid = mod_uuid.to_string();
     let found = block_on_instance(instance, move |game| {
         path_helper::get_files(game.get_mods_path())

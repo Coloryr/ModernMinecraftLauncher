@@ -135,6 +135,13 @@
   gap: 12px;
 }
 
+/* 工具条下面那条进度：右端要与顶栏按钮、下方卡片**同一条右边线**。
+   它是 .pane-swap 的直接子节点，默认铺满整宽（含滚动条槽位），条子会一路顶到窗口右边，
+   所以在窗口级补一份右边距，口径与 .content-head 的 padding-right 相同 */
+.resource-layout .load-progress {
+  padding-right: calc(26px + 9px);
+}
+
 .resource-layout .content-head {
   display: flex;
   align-items: center;

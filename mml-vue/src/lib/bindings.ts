@@ -216,6 +216,7 @@ export const commands = {
     modGroupsCollapsed: (uuid: string) => invoke<string[]>("resource_mod_groups_collapsed", { uuid }),
     modNoteSet: (uuid: string, file: string, note: string) => invoke<void>("resource_mod_note_set", { uuid, file, note }),
     modsDepTest: (uuid: string) => invoke<DepProblemDto[]>("resource_mods_dep_test", { uuid }),
+    modsUpdateApply: (uuid: string, items: ModUpdateApplyDto[]) => invoke<void>("resource_mods_update_apply", { uuid, items }),
     modsUpdateCheck: (uuid: string) => invoke<ModUpdateCheckDto>("resource_mods_update_check", { uuid }),
     openFolder: (uuid: string, kind: string, name: string | null, parent: string | null) => invoke<void>("resource_open_folder", { uuid, kind, name, parent }),
     resourcepackDisable: (uuid: string, file: string) => invoke<void>("resource_resourcepack_disable", { uuid, file }),
@@ -1168,6 +1169,18 @@ export type ModUpdateDto = {
   newVersion: string,
   newFile: string,
   date: string,
+};
+
+export type ModUpdateApplyDto = {
+  uuid: string,
+  source: string,
+  projectId: string,
+  newFileId: string,
+};
+
+export type ModUpdateDoneDto = {
+  ok: number,
+  failed: number,
 };
 
 export type RunArgSettingDto = {

@@ -141,7 +141,7 @@ impl ProjectItemDto {
     }
 
     /// 由 Modrinth 搜索命中项构造，对齐旧 C# GetModPackListAsync：只从 HitObj 构造，
-    /// 不发 project / team 请求，作者头像与截图留到项目详情 GetFileItemAsync 再补；
+    /// **不在这里发作者 / 项目请求** —— 作者头像由调用方批量查好后传进来；
     /// 分类 svg 走 OnceLock 缓存的 /tag/category，逐条取没有额外网络请求
     ///
     /// - `data`: Modrinth 搜索命中项
@@ -151,6 +151,8 @@ impl ProjectItemDto {
     /// - `is_star`: 是否已经收藏
     /// - `download_now`: 是否正在下载
     /// - `mcmod`: 百科翻译，无则 None
+    /// - `author_logo`: 作者头像地址，由 `mml_game::modrinth::author_avatars` 批量查得；
+    ///   没查到传 `None`，前端退回名字首字母的占位
     ///
     /// # 返回值
     ///
@@ -163,11 +165,18 @@ impl ProjectItemDto {
         is_star: bool,
         download_now: bool,
         mcmod: Option<McmodDto>,
+        author_logo: Option<String>,
     ) -> Self {
-        let authors = vec![PicDto {
-            name: data.author.clone(),
-            logo: None,
-        }];
+        // 命中项的 author 可能是空串（接口没给）；这时一个作者都不报，
+        // 免得前端画出一枚没有名字的空胶囊
+        let authors = if data.author.is_empty() {
+            Vec::new()
+        } else {
+            vec![PicDto {
+                name: data.author.clone(),
+                logo: author_logo.map(|url| image_manager::push_image_url(&url)),
+            }]
+        };
 
         let mut tag = Vec::new();
 

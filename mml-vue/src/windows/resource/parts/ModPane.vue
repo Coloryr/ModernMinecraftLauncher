@@ -29,7 +29,9 @@ import {
   disableMod,
   enableMod,
   modsDepTest,
+  modsUpdateApply,
   modsUpdateCheck,
+  onModsUpdateDone,
   onModsUpdateProgress,
   setModNote,
 } from "../../../lib/api";
@@ -46,7 +48,14 @@ import {
 import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceOps } from "../composables/useResourceOps";
 import type { useResourceView } from "../composables/useResourceView";
-import type { DepProblemDto, ModItemDto, ModUpdateCheckDto } from "../../../lib/bindings";
+import type {
+  DepProblemDto,
+  ModItemDto,
+  ModUpdateApplyDto,
+  ModUpdateCheckDto,
+  ModUpdateDoneDto,
+  ModUpdateDto,
+} from "../../../lib/bindings";
 import { modHit, modSelectKey, sortedMods, type ModStateGroup } from "../types";
 import { orderedMods } from "../modColumns";
 import type { ModView } from "../types";
@@ -79,12 +88,63 @@ const depBusy = ref(false);
 /** 依赖检测的结果，打开弹窗时才有意义 */
 const depProblems = ref<DepProblemDto[]>([]);
 
-/** 更新检查正在跑：要重扫一遍 mods 目录，再逐个问平台，大整合包要一分钟 */
+/** 更新流程正在跑：检查或下载，同一时刻只有一段，按钮统一置灰 */
 const updateBusy = ref(false);
-/** 更新检查进度；总数要等后端扫完 mods 目录才知道，在那之前一直是 0 */
+/** 现在跑的是哪一段：check = 逐个问平台，download = 下新文件；null = 没跑 */
+const updateStage = ref<"check" | "download" | null>(null);
+/** 更新进度；检查阶段的总数要等后端扫完 mods 目录才知道，在那之前一直是 0 */
 const updateProgress = ref({ done: 0, total: 0 });
-/** 更新检查结果，有更新才开弹窗；null = 不显示 */
+/** 更新检查结果；有更新才开弹窗，null = 没有可更新的 */
 const updateResult = ref<ModUpdateCheckDto | null>(null);
+/** 更新下载弹窗是否打开 */
+const updateOpen = ref(false);
+
+/**
+ * 「有更新」虚拟分组的固定 uuid
+ *
+ * 与三个状态分组同一套键空间，取尾号 3；但**不落盘也不进顺序表** ——
+ * 它只在这一轮检查有结果时存在，永远画在最前，位置不给用户拖。
+ */
+const UPDATE_GROUP_ID = "00000000-0000-0000-0000-000000000003";
+
+/**
+ * 去掉禁用后缀的文件名，用来把更新结果与列表里的行对上
+ *
+ * 更新结果记的是**检查那一刻**的文件名与 uuid，而启用 / 禁用会改文件名、uuid 跟着变；
+ * 文件名去掉后缀后不变，拿它当键才能让结果扛住一次切换。
+ *
+ * - `file`: mods 目录下的文件名
+ *
+ * # 返回值
+ *
+ * 去掉 `.disable` / `.disabled` 的文件名
+ */
+function baseModFile(file: string): string {
+  return file.replace(/\.disabled?$/i, "");
+}
+
+/** 更新结果按"去掉禁用后缀的文件名"索引 */
+const updatesByFile = computed(() => {
+  const map = new Map<string, ModUpdateDto>();
+  for (const item of updateResult.value?.updates ?? []) {
+    map.set(baseModFile(item.file), item);
+  }
+  return map;
+});
+
+/** 这一行有没有可更新的新版本 */
+function hasUpdate(item: ModItemDto): boolean {
+  return updatesByFile.value.has(baseModFile(item.file));
+}
+
+/** 有更新的那些行的多选键，两个视图靠它打「有更新」标签 */
+const updateKeys = computed(() => {
+  const keys = new Set<string>();
+  for (const item of mods.value) {
+    if (hasUpdate(item)) keys.add(modSelectKey(item));
+  }
+  return keys;
+});
 
 /** 问题种类的 i18n 键，与后端 `DepProblemKindDto` 一一对应 */
 const DEP_KIND_LABEL: Record<DepProblemDto["kind"], string> = {
@@ -147,11 +207,16 @@ async function runDepTest() {
   }
 }
 
-/** 更新检查：列出有在线信息、且平台上有新文件的模组 */
+/**
+ * 更新检查：列出有在线信息、且平台上有新文件的模组
+ *
+ * 查到更新就打开下载弹窗（勾选默认全给上），没查到只给一条轻提示，不留空窗。
+ */
 async function runUpdateCheck() {
   const uuid = instanceUuid.value;
   if (!uuid || updateBusy.value) return;
   updateBusy.value = true;
+  updateStage.value = "check";
   updateProgress.value = { done: 0, total: 0 };
   // 先订阅再调命令，否则可能漏掉最开始那几条进度
   const unlisten = await onModsUpdateProgress((e) => {
@@ -172,11 +237,76 @@ async function runUpdateCheck() {
       return;
     }
     updateResult.value = result;
+    updateOpen.value = true;
   } catch (e) {
     showToast(tErr(e));
   } finally {
     unlisten();
     updateBusy.value = false;
+    updateStage.value = null;
+    updateProgress.value = { done: 0, total: 0 };
+  }
+}
+
+/**
+ * 弹窗里点「下载」：把勾中的模组逐个换成平台上的新文件
+ *
+ * 下载参数里的 uuid 按**当前列表里的行**重算：检查之后用户可能启用 / 禁用过，
+ * 文件名一变 uuid 就变了，拿旧 uuid 后端定位不到文件。对不上时退回结果里那个。
+ * 下载是后台任务：进度走工具条下面那条，整批处理完由完成事件收尾。
+ *
+ * - `picked`: 弹窗里勾中的更新条目
+ */
+async function applyUpdates(picked: ModUpdateDto[]) {
+  const uuid = instanceUuid.value;
+  if (!uuid || updateBusy.value || !picked.length) return;
+
+  const items: ModUpdateApplyDto[] = picked
+    .map((item) => {
+      const key = baseModFile(item.file);
+      const current = mods.value.find((mod) => baseModFile(mod.file) === key);
+      return {
+        uuid: current?.uuid ?? item.uuid,
+        source: item.source,
+        projectId: item.projectId,
+        newFileId: item.newFileId,
+      };
+    })
+    .filter((item) => !!item.uuid);
+  if (!items.length) return;
+
+  updateBusy.value = true;
+  updateStage.value = "download";
+  updateProgress.value = { done: 0, total: items.length };
+  updateOpen.value = false;
+
+  let settle: (done: ModUpdateDoneDto) => void = () => {};
+  const finished = new Promise<ModUpdateDoneDto>((resolve) => {
+    settle = resolve;
+  });
+  // 先订阅再调命令，否则可能漏掉最开始那几条进度与完成事件
+  const unlistenProgress = await onModsUpdateProgress((e) => {
+    updateProgress.value = e;
+  });
+  const unlistenDone = await onModsUpdateDone((e) => settle(e));
+  try {
+    await modsUpdateApply(uuid, items);
+    const done = await finished;
+    // 换过的文件已经不是原来那一份了：结果作废并重拉列表，「有更新」分组随之消失
+    updateResult.value = null;
+    if (done.failed) {
+      showToast(t("resource.updateDone", { ok: done.ok, failed: done.failed }));
+    } else {
+      showToast(t("resource.updateOk", { n: done.ok }));
+    }
+    await props.data.reloadCurrent();
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    unlistenProgress();
+    unlistenDone();
+    updateBusy.value = false;
+    updateStage.value = null;
     updateProgress.value = { done: 0, total: 0 };
   }
 }
@@ -1012,15 +1142,27 @@ interface ModSection {
  */
 const sections = computed<ModSection[]>(() => {
   const of = groups.groupOfKey.value;
-  // 只在自建分组里的模组：剩下的才按状态分桶（同一个模组不会在两处出现）
-  const rest = matched.value.filter((item) => !item.sha1 || !of.has(item.sha1));
+  // 有更新的先挑走：「有更新」块优先于自建分组与状态分组，一个模组只出现在一处
+  const withUpdate = matched.value.filter(hasUpdate);
+  // 剩下的、又不属于任何自建分组的，才按状态分桶
+  const rest = matched.value.filter(
+    (item) => !hasUpdate(item) && (!item.sha1 || !of.has(item.sha1)),
+  );
 
   const byId = new Map<string, ModSection>();
+  byId.set(UPDATE_GROUP_ID, {
+    id: UPDATE_GROUP_ID,
+    label: t("resource.updateGroup"),
+    items: withUpdate,
+    custom: false,
+  });
   for (const group of groups.groups.value) {
     byId.set(group.uuid, {
       id: group.uuid,
       label: group.name,
-      items: matched.value.filter((item) => !!item.sha1 && of.get(item.sha1) === group.uuid),
+      items: matched.value.filter(
+        (item) => !hasUpdate(item) && !!item.sha1 && of.get(item.sha1) === group.uuid,
+      ),
       custom: true,
     });
   }
@@ -1036,14 +1178,20 @@ const sections = computed<ModSection[]>(() => {
   }
 
   const list: ModSection[] = [];
+  // 「有更新」不在顺序表里，按口径固定画在最前
+  const update = byId.get(UPDATE_GROUP_ID);
+  if (update && visible(update)) list.push(update);
   for (const key of groups.order.value) {
+    if (key === UPDATE_GROUP_ID) continue;
     const sec = byId.get(key);
     if (!sec || !visible(sec)) continue;
     list.push(sec);
   }
   // 兜底：分组是刚建的、顺序表还没回来时，别把它漏掉（后端也会在下次下发时补上）
   for (const [key, sec] of byId) {
-    if (!groups.order.value.includes(key) && visible(sec)) list.push(sec);
+    if (key !== UPDATE_GROUP_ID && !groups.order.value.includes(key) && visible(sec)) {
+      list.push(sec);
+    }
   }
   return list;
 });
@@ -1064,6 +1212,8 @@ function stateHit(item: ModItemDto, state: ModStateGroup): boolean {
  */
 function visible(sec: ModSection): boolean {
   if (query.value) return sec.items.length > 0;
+  // 「有更新」只在这一轮检查有结果时存在，没有更新就整块收起来
+  if (sec.id === UPDATE_GROUP_ID) return sec.items.length > 0;
   if (sec.custom) return true;
   return sec.state !== "fail" || sec.items.length > 0;
 }
@@ -1157,6 +1307,8 @@ const sectionGhostCount = computed(() => {
  * 落盘的就是**分组 uuid**；状态分组与自建分组同一套键空间，不用转换。
  */
 async function moveSection(from: string, insertAt: number) {
+  // 「有更新」固定在最前，拖它没有意义；也不让它混进顺序表
+  if (from === UPDATE_GROUP_ID) return;
   const ids = sectionIds.value;
   const index = ids.indexOf(from);
   if (index < 0) return;
@@ -1168,7 +1320,7 @@ async function moveSection(from: string, insertAt: number) {
   // 它们在顺序表里的位置由后端保留原样，这里按原顺序补回去
   const visible = new Set(ids);
   const hidden = groups.order.value.filter((id) => !visible.has(id));
-  await groups.setOrder([...next, ...hidden]);
+  await groups.setOrder([...next.filter((id) => id !== UPDATE_GROUP_ID), ...hidden]);
 }
 
 /** 插入线画不画在第 index 块之前 */
@@ -1376,19 +1528,25 @@ onMounted(() => void groups.load());
         <!-- 更新检查要重扫一遍模组、再逐个问平台；按钮只放图标，进度在工具条下方 -->
         <button class="mini-btn icon-btn icon-only" :disabled="updateBusy || loading"
           v-tip="t('resource.updateCheck')" :aria-label="t('resource.updateCheck')" @click="runUpdateCheck">
-          <GlyphIcon :name="updateBusy ? 'refresh' : 'update'" :size="14"
-            :class="{ 'dep-spin': updateBusy }" />
+          <GlyphIcon :name="updateStage === 'check' ? 'refresh' : 'update'" :size="14"
+            :class="{ 'dep-spin': updateStage === 'check' }" />
+        </button>
+        <!-- 下载更新：勾选要更新的模组再下；还没查出可更新的就无处可下，置灰 -->
+        <button class="mini-btn icon-btn icon-only" :disabled="busy || updateBusy || loading || !updateResult"
+          v-tip="t('resource.updateDownload')" :aria-label="t('resource.updateDownload')" @click="updateOpen = true">
+          <GlyphIcon name="download" :size="14" />
         </button>
       </template>
     </template>
   </ContentHead>
 
   <!--
-    更新检查进度：**整行显示在工具条下方**，不再挤在按钮右边。
-    后端要先扫一遍 mods 目录才知道总数，那之前走不确定滚动条，拿到总数后转成确定进度条
+    更新进度：**整行显示在工具条下方**，不再挤在按钮右边；检查与下载共用这一条。
+    检查阶段后端要先扫一遍 mods 目录才知道总数，那之前走不确定滚动条，拿到总数后转成确定进度条
   -->
   <LoaderQueryProgress :visible="updateBusy" kind="query" :step="updateProgress.done"
-    :total="updateProgress.total" :label="t('resource.updateChecking')" />
+    :total="updateProgress.total"
+    :label="t(updateStage === 'download' ? 'resource.updateDownloading' : 'resource.updateChecking')" />
 
   <!--
     加载中：与「下载整合包」窗口同一套骨架行，呼吸动画见 `styles/skeleton.css`
@@ -1423,7 +1581,8 @@ onMounted(() => void groups.load());
 
           <section :ref="(el) => bindSection(sec.id, el as Element | null)" class="mod-group mod-group-table"
             :class="{ 'mod-group-dragging': draggingSection === sec.id }">
-            <ModTable :items="sec.items" :busy="busy" :selected-keys="selected" :query="query" :group-label="sec.label"
+            <ModTable :items="sec.items" :busy="busy" :selected-keys="selected" :update-keys="updateKeys"
+              :query="query" :group-label="sec.label"
               :group-key="sec.id" :group-open="isOpen(sec.id)" :custom="sec.custom" :dragging-group="draggingSection"
               :hide-header="idx > 0" :col-widths="colWidths" :sort="sort" @col-resize="setColWidth"
               @sort-change="setSort" @group-menu="openGroupMenu" @toggle="toggle" @remove="remove"
@@ -1478,9 +1637,9 @@ onMounted(() => void groups.load());
           <p v-if="!sec.items.length" class="empty-tip">
             {{ t("resource.groupEmptyHint") }}
           </p>
-          <ModList :items="sec.items" :busy="busy" :selected-keys="selected" @toggle="toggle" @remove="remove"
-            @note="openNote" @open-folder="openFolder('mods', $event.file)" @select="toggleSelect"
-            @item-menu="openItemMenu" @row-click="onRowClick" :anchor-key="anchorKey" />
+          <ModList :items="sec.items" :busy="busy" :selected-keys="selected" :update-keys="updateKeys"
+            @toggle="toggle" @remove="remove" @note="openNote" @open-folder="openFolder('mods', $event.file)"
+            @select="toggleSelect" @item-menu="openItemMenu" @row-click="onRowClick" :anchor-key="anchorKey" />
         </div>
       </section>
 
@@ -1675,8 +1834,9 @@ onMounted(() => void groups.load());
     </div>
   </BaseModal>
 
-  <!-- 更新检查结果：有更新才开，没更新在 runUpdateCheck 里用一条轻提示 -->
-  <ModUpdateModal v-if="updateResult" :result="updateResult" @close="updateResult = null" />
+  <!-- 更新下载：有更新才开；没更新在 runUpdateCheck 里用一条轻提示，不留空窗 -->
+  <ModUpdateModal v-if="updateResult && updateOpen" :result="updateResult" @close="updateOpen = false"
+    @download="applyUpdates" />
 </template>
 
 <!-- 备注弹窗的样式走 scoped：BaseModal 是 `Teleport to="body"` 的，弹窗不在

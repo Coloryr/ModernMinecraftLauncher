@@ -56,13 +56,18 @@
   `cargo check --workspace --all-targets` / `cargo test --workspace` / 整仓全量测试；
   同一结论不要重复跑第二遍（改了代码再验一次除外）。
 - 桌面壳：`cd mml-gui && npm run tauri dev`（会先起 mml-vue 的 vite，**端口 1420 必须空闲**）。
-- 只跑前端：根目录 `dev-frontend.bat`（vite，1420）；
+- 只跑前端：`build/dev-frontend.ps1`（bash 版 `build/dev-frontend.sh`；vite，1420）；
   浏览器可访问 `http://localhost:1420/?window=<kind>` 预览某个窗口（无 IPC 数据）。
 - **出包两个 profile**（各自独立 target 目录，来回切不会互相刷缓存）：
-  - 正式发布：根目录 `build-release.bat`（= `cd mml-gui && npm run tauri build`）。
+  - 正式发布：`build/build-release.ps1`（bash 版 `build/build-release.sh`；
+    = `cd mml-gui && npm run tauri build`）。
     `[profile.release]` 是 fat LTO + `codegen-units = 1`：体积最小、运行最快，但末尾的
     跨 crate 优化是单线程的，**构建时会看到只有一个核在跑**，含安装包。
-  - 预发布：根目录 `build-prerelease.bat`（= `cd mml-gui/src-tauri && cargo build --profile prerelease`）。
+  - 预发布：`build/build-prerelease.ps1`（bash 版 `build/build-prerelease.sh`；
+    = `cd mml-gui/src-tauri && cargo build --profile prerelease --features custom-protocol`）。
+    **`--features custom-protocol` 不能漏**：tauri 用它决定前端走内嵌 dist 还是 devUrl，
+    漏了即使 profile 是 release-like 也会被当成 dev 构建，exe 去连 localhost:1420，
+    没起 vite 就是"进程在跑、窗口不出来"。
     `[profile.prerelease]` 是 thin LTO + `codegen-units = 16`：快很多，体积略大，只出 exe。
   - 预发布也要**安装包**时：`tauri` CLI 不认 `--profile`（`--` 透传给 cargo 会让它去
     `target/release` 找错文件），只能覆盖 release 的设置：

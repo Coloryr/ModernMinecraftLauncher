@@ -109,15 +109,16 @@ pub struct ModScanProgressDto {
     pub total: usize,
 }
 
-/// 模组更新检查的进度，即事件 `resource-mods-update-progress` 的负载
+/// 模组更新的进度，即事件 `resource-mods-update-progress` 的负载
 ///
-/// 逐个问平台可能要一分钟（Modrinth 限 300 次 / 分钟），没有进度用户会以为卡死。
+/// 检查与下载两个阶段共用：逐个问平台可能要一分钟（Modrinth 限 300 次 / 分钟），
+/// 下载也要时间，没有进度用户都会以为卡死。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModUpdateProgressDto {
-    /// 已经问完的模组数
+    /// 已经处理的模组数
     pub done: usize,
-    /// 有在线信息、要问的模组总数
+    /// 这一阶段要处理的模组总数
     pub total: usize,
 }
 
@@ -480,4 +481,30 @@ pub struct ModUpdateDto {
     pub new_file: String,
     /// 新文件发布时间，ISO 8601 字符串
     pub date: String,
+}
+
+/// 「下载更新」勾选的一条：把这个模组换成平台上的新文件
+///
+/// 只带定位要用的三件事，列表里的显示字段不用回传。
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModUpdateApplyDto {
+    /// 当前条目 uuid，文件路径的 v5，用来定位要替换掉的旧文件
+    pub uuid: String,
+    /// 下载源：curseforge / modrinth
+    pub source: String,
+    /// 项目编号
+    pub project_id: String,
+    /// 新文件编号
+    pub new_file_id: String,
+}
+
+/// 更新下载的结果，即事件 `resource-mods-update-done` 的负载
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModUpdateDoneDto {
+    /// 替换成功的个数
+    pub ok: u32,
+    /// 失败的个数：平台查询、下载或写盘出错
+    pub failed: u32,
 }

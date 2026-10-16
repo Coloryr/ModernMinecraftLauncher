@@ -7,6 +7,7 @@
 use std::collections::HashSet;
 
 use mml_game::launcher::{FileType, ModPackType};
+use mml_game::modrinth;
 use mml_net::curseforge_api::{self, CurseFogreArg, CurseForgeSortType};
 use mml_net::modrinth_api::{self, ModrinthSearchArg, ModrinthSortType};
 use tauri::WebviewWindow;
@@ -150,6 +151,10 @@ pub(super) async fn list_projects(
             let installed = installed_modpack_pids();
             let running = running_pids();
 
+            // 搜索结果不给作者头像：按 author_id 批量查一次，一页一次请求；
+            // 查不到就让前端退回名字首字母的占位
+            let avatars = modrinth::author_avatars(&list.hits).await;
+
             // 与上面 CurseForge 分支同理：构建 DTO 期间不持锁，new_modrinth 会
             // await 查标签图标；攒完一次性写入缓存。
             let mut cached = Vec::new();
@@ -164,6 +169,7 @@ pub(super) async fn list_projects(
                     collect_utils::is_star(&pid),
                     running.contains(&pid),
                     None,
+                    avatars.get(&item.author_id).cloned(),
                 )
                 .await;
 

@@ -49,7 +49,9 @@ import type {
   ModItemDto,
   ModRenameDto,
   ModScanProgressDto,
+  ModUpdateApplyDto,
   ModUpdateCheckDto,
+  ModUpdateDoneDto,
   ModUpdateProgressDto,
   MotdDto,
   NbtEditDto,
@@ -76,7 +78,7 @@ import type {
   VersionInfoDto,
   ViewMode,
 } from "./bindings";
-import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress, ResourceModsDepProblems, ResourceModsDuplicate, ResourceModsUpdateProgress } from "./listens";
+import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress, ResourceModsDepProblems, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress } from "./listens";
 
 export interface CreateInstanceOpts {
   loader?: string;
@@ -1808,6 +1810,22 @@ export function modsUpdateCheck(uuid: string): Promise<ModUpdateCheckDto> {
   return commands.resource.modsUpdateCheck(uuid);
 }
 /**
+ * 下载更新：把勾选的模组换成平台上的新文件
+ *
+ * - `uuid`: 实例 uuid
+ * - `items`: 要更新的条目，见 `ModUpdateApplyDto`
+ *
+ * # 返回值
+ *
+ * 参数校验通过就返回，单条成功 / 失败由完成事件报回来，见 `onModsUpdateDone`
+ *
+ * 逐条问平台、下载校验、删旧文件，可能要几分钟；下载进度在「下载」窗口可见，
+ * 逐条进度见 `onModsUpdateProgress`
+ */
+export function modsUpdateApply(uuid: string, items: ModUpdateApplyDto[]): Promise<void> {
+  return commands.resource.modsUpdateApply(uuid, items);
+}
+/**
  * 模组扫描进度事件
  *
  * - `cb`: 扫描期间回调，形如 `x/x`
@@ -1862,6 +1880,20 @@ export function onModsDepProblems(cb: (list: DepProblemDto[]) => void): Promise<
  */
 export function onModsUpdateProgress(cb: (e: ModUpdateProgressDto) => void): Promise<UnlistenFn> {
   return listen<ModUpdateProgressDto>(ResourceModsUpdateProgress, (e) => cb(e.payload));
+}
+/**
+ * 更新下载完成事件
+ *
+ * - `cb`: 整批处理完时回调，载荷是成功与失败的个数
+ *
+ * # 返回值
+ *
+ * 取消监听的函数
+ *
+ * 收到就说明磁盘上的文件已经换过了，该重拉模组列表 —— 否则界面上还是旧版本
+ */
+export function onModsUpdateDone(cb: (e: ModUpdateDoneDto) => void): Promise<UnlistenFn> {
+  return listen<ModUpdateDoneDto>(ResourceModsUpdateDone, (e) => cb(e.payload));
 }
 /**
  * 启用模组，去掉 .disable / .disabled 后缀

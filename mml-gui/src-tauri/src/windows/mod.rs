@@ -149,6 +149,7 @@ pub fn window_get_window_sizes() -> Vec<WindowSizeDto> {
 /// 导致整个应用冻结：新窗口白屏、无法点击。
 ///
 /// - `app`: 应用句柄，建窗与发事件都用它
+/// - `window`: 调用方窗口，由 tauri 注入；新窗口没有历史几何时叠在它那个角的内侧
 /// - `kind`: 窗口类型
 /// - `instance`: 目标实例 UUID；窗口族，即日志 / 资源管理 / 添加资源 / 配置文件必须有它，
 ///   窗口身份由实例 uuid 派生，同一实例只会有一个该族窗口，重复打开只是聚焦；
@@ -166,6 +167,7 @@ pub fn window_get_window_sizes() -> Vec<WindowSizeDto> {
 #[tauri::command]
 pub async fn window_open_window(
     app: AppHandle,
+    window: WebviewWindow,
     kind: String,
     instance: Option<String>,
     query: Option<String>,
@@ -198,13 +200,13 @@ pub async fn window_open_window(
         let instance = Uuid::parse_str(instance).map_err(|_| err_keys::UUID.to_string())?;
         let id = family_window_id(family, &instance);
         // 目标实例已经写进窗口身份，已开的窗口不必、也不能再换实例
-        return open_window(&app, &id.uuid, &id.label, &url_path);
+        return open_window(&app, &id.uuid, &id.label, &url_path, Some(&window));
     }
 
     let Some(uuid) = uuid_for_kind(&kind) else {
         return Err(format!("unknown window kind: {kind}"));
     };
-    open_window_from_uuid(&app, &uuid, &url_path)?;
+    open_window_from_uuid(&app, &uuid, &url_path, Some(&window))?;
     // 新创建的窗口靠 URL query 拿目标；已存在的窗口 URL 不变，靠事件切换
     if let Some(instance) = &instance
         && kind == "export"
@@ -278,6 +280,7 @@ pub fn window_close_window(
 /// 所以直接 `navigate` 到新 URL —— 页面重新挂载，`onMounted` 里即可读到新参数。
 ///
 /// - `app`: 应用句柄，查已有窗口与建新窗口都用它
+/// - `window`: 调用方窗口，由 tauri 注入；新建时没有历史几何就叠在它那个角的内侧
 /// - `kind`: 窗口类型
 /// - `instance`: 目标实例 UUID；窗口族必须有它，窗口身份由实例 uuid 派生，见 [`family_window_id`]
 /// - `query`: 新窗口 URL 上的 query，**不含 `?`**，空则退回裸 `index.html`
@@ -288,6 +291,7 @@ pub fn window_close_window(
 #[tauri::command]
 pub async fn window_reopen_window(
     app: AppHandle,
+    window: WebviewWindow,
     kind: String,
     instance: Option<String>,
     query: Option<String>,
@@ -336,7 +340,7 @@ pub async fn window_reopen_window(
         win.set_focus().map_err(|err| err.to_string())?;
         return Ok(());
     }
-    open_window(&app, &id.uuid, &id.label, &url_path)
+    open_window(&app, &id.uuid, &id.label, &url_path, Some(&window))
 }
 
 /// 拖入文件的真实路径，由 DOM 拖放的"路径桥"上报，见 [`file_drop`]
