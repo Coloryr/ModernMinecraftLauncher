@@ -2,6 +2,7 @@
 // 主窗口侧栏：搜索 / 分组列表（拖拽排序）/ 平铺
 // 状态与交互全部通过 props / emits 与 MainWindow 联通；
 // 分组 / 平铺 / 列表的切换入口不在这里，在设置窗口「界面 → 主窗口」
+import DragGhost from "../../../components/ui/DragGhost.vue";
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import InstanceIcon from "../../../components/InstanceIcon.vue";
 import { t } from "../../../lib/i18n";
@@ -32,6 +33,8 @@ const props = defineProps<{
   dragActive: DragCandidate | null;
   /** 正在拖的实例 uuid；那一行不渲染，位置交给插入占位 */
   draggingUuid: string | null;
+  /** 跟手浮起副本（被抓住的实例 / 分组 + 指针位置）；null 表示没在拖 */
+  ghost: { item: DragCandidate; x: number; y: number } | null;
   /** 分组是否收起 */
   isCollapsed: (id: string) => boolean;
   /** 实例行或分组标题按下，交给父组件起拖拽 */
@@ -168,6 +171,16 @@ function isGroupOpen(id: string) {
       <div v-if="isGroupInsert(filteredGroups.length)" class="drop-ghost-group">
         <span class="drop-ghost-group-name">{{ dragActive?.groupName }}</span>
       </div>
+      <!-- 跟手浮起副本：被抓住的实例 / 分组，跟着指针走 -->
+      <DragGhost v-if="ghost" :x="ghost.x" :y="ghost.y">
+        <InstanceIcon v-if="ghost.item.kind === 'instance'" :name="ghost.item.instance?.name ?? ''"
+          :uuid="ghost.item.instance?.uuid ?? '0'" :size="32" />
+        <GlyphIcon v-else name="folder" :size="16" />
+        <span>
+          {{ ghost.item.kind === "instance" ? (ghost.item.instance?.name ?? "") : (ghost.item.groupName ?? "") }}
+        </span>
+      </DragGhost>
+
       <div v-if="groups.length === 0" class="empty-tip">{{ t("list.empty") }}</div>
       <div v-else-if="filteredGroups.length === 0" class="empty-tip">{{ t("search.empty") }}</div>
 

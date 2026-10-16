@@ -5,6 +5,7 @@
 import { computed, onMounted, onUnmounted, ref, type Ref } from "vue";
 import { api } from "../lib/api";
 import type { InstanceInfoDto } from "../lib/bindings";
+import { elementBeneathShield, useDragGhost } from "./useDragGhost";
 
 export interface GroupView {
   /** 分组 uuid（身份） */
@@ -41,6 +42,7 @@ interface DragCandidate {
  * # 返回值
  *
  * - `dragActive`: 正在拖的候选，`null` 表示没在拖
+ * - `ghost`: 跟手浮起副本（候选 + 指针位置），`null` 表示没在拖
  * - `draggingUuid`: 正在拖的实例 uuid
  * - `dragInsert`: 实例的插入位置，分组 uuid + 组内下标
  * - `dragGroupInsert`: 分组的插入位置
@@ -63,6 +65,8 @@ export function useInstanceDrag(deps: DragDeps) {
   const dragInsert = ref<{ groupId: string; index: number } | null>(null);
   /** 分组拖拽插入位置 */
   const dragGroupInsert = ref<{ index: number } | null>(null);
+  /** 跟手浮起副本：内容由调用方按 `ghost.item` 渲染 */
+  const dragGhost = useDragGhost<DragCandidate>();
 
   let dragPointerId: number | null = null;
   let dragStartX = 0;
@@ -83,13 +87,15 @@ export function useInstanceDrag(deps: DragDeps) {
     if (dragPointerId === null || e.pointerId !== dragPointerId) return;
     if (!dragActive.value) {
       const d = Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY);
-      if (d > 5) {
-        dragActive.value = dragCandidate.value;
-        suppressClick = true;
-        document.body.classList.add("drag-active");
-      }
+      if (d <= 5) return;
+      const cand = dragCandidate.value;
+      if (!cand) return;
+      dragActive.value = cand;
+      dragGhost.startGhost(cand, e);
+      suppressClick = true;
+      document.body.classList.add("drag-active");
     }
-    if (!dragActive.value) return;
+    dragGhost.moveGhost(e);
     updateDragInsert(e);
   }
 
@@ -105,13 +111,14 @@ export function useInstanceDrag(deps: DragDeps) {
     dragActive.value = null;
     dragInsert.value = null;
     dragGroupInsert.value = null;
+    dragGhost.stopGhost();
     document.body.classList.remove("drag-active");
   }
 
   function updateDragInsert(e: PointerEvent) {
     const active = dragActive.value;
     if (!active) return;
-    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const el = elementBeneathShield(e.clientX, e.clientY);
     // 靠近分组列表边缘自动滚动，方便投放到远处的分组
     const listEl = el?.closest?.(".group-list") as HTMLElement | null;
     if (listEl) {
@@ -234,6 +241,7 @@ export function useInstanceDrag(deps: DragDeps) {
 
   return {
     dragActive,
+    ghost: dragGhost.ghost,
     draggingUuid,
     dragInsert,
     dragGroupInsert,

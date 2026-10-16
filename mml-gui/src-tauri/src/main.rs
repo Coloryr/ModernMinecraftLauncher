@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 
 use mml_core::CoreInitObj;
-use mml_gui_lib::{collect_utils, err_box, gui_config, image_manager, windows};
+use mml_gui_lib::{block_groups, collect_utils, err_box, gui_config, image_manager, windows};
 use mml_names::names;
 use mml_sys::path_helper;
 
@@ -29,6 +29,7 @@ fn main() {
     windows::init(&obj.path);
     gui_config::init(&obj.path);
     collect_utils::init(&obj.path);
+    block_groups::init(&obj.path);
 
     if let Err(e) = mml_core::init(obj) {
         err_box::fatal_error(e);

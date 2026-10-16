@@ -27,6 +27,8 @@ const props = defineProps<{
   skinCat: string;
   /** 是否处于筛选态，决定空状态要不要给「清除筛选」 */
   filtered: boolean;
+  /** 收藏判定：收藏过的方块在角上点一个小点 */
+  isFavorite?: (id: string) => boolean;
 }>();
 
 const emit = defineEmits<{
@@ -36,6 +38,8 @@ const emit = defineEmits<{
   (e: "remove-skin", b: BlockItemDto): void;
   /** 空状态里请求清掉搜索词与分类 */
   (e: "clear-filters"): void;
+  /** 右键某个方块：交给外壳弹收藏 / 分组菜单 */
+  (e: "item-menu", payload: { event: MouseEvent; item: BlockItemDto }): void;
 }>();
 
 /** 视口外上下各多渲染几行，滚动时不至于看到空白 */
@@ -237,7 +241,10 @@ function onCellKey(e: KeyboardEvent, i: number) {
         <button v-for="(b, k) in visible" :key="b.id" type="button" class="block-cell"
           :class="{ on: b.id === activeId }" :data-idx="startIndex + k"
           :tabindex="startIndex + k === tabbableIndex ? 0 : -1" @click="emit('open', b)"
-          @focus="focusIndex = startIndex + k" @keydown="onCellKey($event, startIndex + k)">
+          @focus="focusIndex = startIndex + k" @keydown="onCellKey($event, startIndex + k)"
+          @contextmenu.prevent="emit('item-menu', { event: $event, item: b })">
+          <!-- 收藏过：角上一个小点，列表里它们也排在最前 -->
+          <span v-if="isFavorite?.(b.id)" class="block-star" aria-hidden="true" />
           <!-- 玩家头颅：悬停角标删除 -->
           <span v-if="b.cat === skinCat" class="block-del" v-tip="t('blocks.skinRemove')"
             @click.stop="emit('remove-skin', b)">
@@ -289,6 +296,17 @@ function onCellKey(e: KeyboardEvent, i: number) {
      列数按这个更窄的宽度算，见 script 里的 gridW */
   right: 16px;
   display: grid;
+}
+
+/* 收藏角标：右下角一个小圆点，不抢方块图 */
+.block-star {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
 }
 
 .block-cell {

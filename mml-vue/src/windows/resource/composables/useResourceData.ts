@@ -27,12 +27,14 @@ import {
   listShaderpacks,
   listSchematics,
   onModScanProgress,
+  onModsDuplicate,
 } from "../../../lib/api";
 import { takeResourceListDirty } from "../../../lib/resourceTasks";
 import { loadGuiConfig } from "../../../lib/guiConfig";
 import { familyInstanceFromLabel, targetUuid } from "../../windowManager";
 import type {
   DataPackItemDto,
+  ModDuplicateDto,
   ModItemDto,
   PackItemDto,
   SaveItemDto,
@@ -43,12 +45,16 @@ import type {
 } from "../../../lib/bindings";
 import type { CategoryId, SaveTab } from "../types";
 
-/** 左侧导航上显示的当前实例（只需要名字与版本） */
+/** 左侧导航上显示的当前实例（名字、游戏版本与加载器） */
 export interface ResourceInstance {
   /** 实例名，来自内核的实例列表 */
   name: string;
   /** 游戏版本，如 `1.20.1` */
   version: string;
+  /** 加载器标识，如 `neoforge`；原版是 `normal` */
+  loader: string;
+  /** 加载器版本；原版 / 没记时是 `null` */
+  loaderVersion: string | null;
 }
 
 /**
@@ -62,9 +68,11 @@ export interface ResourceInstance {
  * - `instance` / `instanceUuid`: 当前实例的名字版本与 uuid
  * - `loading`: 有列表正在拉
  * - `modProgress`: 模组扫描进度
+ * - `modDuplicates`: 重复安装的模组，非空时模组面板自动弹窗
  * - `mods` / `packs` / `saves` / `shots` / `servers` / `shaders` / `schematics` / `datapacks`: 各分类的列表
  * - `dpSave`: 数据包子页当前选中的存档目录
  * - `reloadCurrent`: 重拉当前显示的那一份
+ * - `dismissModDuplicates`: 关掉重复安装弹窗
  * - `sync`: 读当前实例与视图偏好，必要时重读列表（换实例，或列表已被下载标记为过期）
  * - `setInstanceReadyHook`: 注册实例就绪回调，外壳用它先恢复视图偏好
  * - `shotUrl`: 拼某个截图的预览地址
@@ -132,13 +140,29 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
    */
   const modProgress = ref<{ done: number; total: number }>({ done: 0, total: 0 });
 
+  /**
+   * 重复安装的 modid，非空时模组面板自动弹窗
+   *
+   * 列表加载完成时由后端事件推来；用户关掉后清空，下次重拉列表时后端会再报一次
+   */
+  const modDuplicates = ref<ModDuplicateDto[]>([]);
+
+  /** 关掉重复安装弹窗 */
+  function dismissModDuplicates() {
+    modDuplicates.value = [];
+  }
+
   /** 模组扫描进度的退订函数；每次拉列表时挂上，拿到结果就摘掉 */
   let unlistenProgress: (() => void) | null = null;
+  /** 重复安装提示的退订函数，与进度同一发：拉列表时挂上，拿到结果就摘掉 */
+  let unlistenDuplicate: (() => void) | null = null;
 
-  function stopModProgress() {
+  function stopModScan() {
     modProgress.value = { done: 0, total: 0 };
     unlistenProgress?.();
     unlistenProgress = null;
+    unlistenDuplicate?.();
+    unlistenDuplicate = null;
   }
 
   /** 按分类拉列表；操作后重拉、点刷新都走这里，切分类走 loadIfNeeded */
@@ -152,18 +176,23 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     try {
       switch (target) {
         case "mods":
-          // 扫描开始才订阅进度，事件由后端在扫描期间逐文件发出；
+          // 扫描开始才订阅，事件由后端在扫描期间 / 结束时发出；
           // 先订阅再调命令，否则可能漏掉最开始那几条
           modProgress.value = { done: 0, total: 0 };
+          modDuplicates.value = [];
           unlistenProgress?.();
           unlistenProgress = await onModScanProgress((e) => {
             // 只认最新一发：旧的那一发回来晚了会把进度写回去（与 loadSeq 同一意图）
             if (seq === loadSeq) modProgress.value = e;
           });
+          unlistenDuplicate?.();
+          unlistenDuplicate = await onModsDuplicate((list) => {
+            if (seq === loadSeq) modDuplicates.value = list;
+          });
           try {
             mods.value = await listMods(instanceUuid.value);
           } finally {
-            stopModProgress();
+            stopModScan();
           }
           break;
         case "resourcepacks":
@@ -289,7 +318,14 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
       // 实例被删掉时该显示"未选择"，而不是偷偷换成别人的数据
       const uuid = lockedUuid.value || (await loadGuiConfig())?.mainWindow.selectedInstance || "";
       const found = list.find((i) => i.uuid === uuid) ?? null;
-      instance.value = found ? { name: found.name, version: found.version } : null;
+      instance.value = found
+        ? {
+            name: found.name,
+            version: found.version,
+            loader: found.loader,
+            loaderVersion: found.loaderVersion,
+          }
+        : null;
       instanceUuid.value = found?.uuid ?? "";
       imgBase.value = await getImageBaseUrl();
     } catch {
@@ -302,6 +338,7 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     if (instanceChanged) {
       loadedCats.clear();
       loadedDpSave = "";
+      modDuplicates.value = [];
     }
     try {
       // 先把该实例的视图偏好读回来，即分类顺序 / 上次类别 / 模组视图，再决定拉什么
@@ -361,6 +398,7 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     instanceUuid,
     loading,
     modProgress,
+    modDuplicates,
     mods,
     packs,
     saves,
@@ -371,6 +409,7 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     datapacks,
     dpSave,
     reloadCurrent,
+    dismissModDuplicates,
     sync,
     setInstanceReadyHook,
     shotUrl,

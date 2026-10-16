@@ -245,6 +245,24 @@ export function modSelectKey(item: ModItemDto): string {
 }
 
 /**
+ * 一个模组条目的搜索命中：**按展示方式选字段**
+ *
+ * - `item`: 模组条目
+ * - `q`: 已转小写的搜索词
+ * - `view`: 列表模式只认名字与文件名，一行里只显示了这两样；
+ *   表格模式还有 modid / 作者两列
+ *
+ * # 返回值
+ *
+ * 任一字段包含搜索词即为 `true`
+ */
+export function modHit(item: ModItemDto, q: string, view: ModView): boolean {
+  const fields =
+    view === "table" ? [item.name, item.modId, item.file, item.author] : [item.name, item.file];
+  return fields.some((value) => value.toLowerCase().includes(q));
+}
+
+/**
  * 模组的显示排序：**按 modid 正序**
  *
  * 列表与表格两个视图共用这一份 —— 各自写一遍的话迟早会漂移成两种顺序，

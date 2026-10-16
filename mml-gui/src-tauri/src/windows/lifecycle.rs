@@ -325,6 +325,9 @@ pub(super) fn create_window(
     };
     let win = win.map_err(|e| e.to_string())?;
 
+    // 系统材质：云母 / 亚克力 / 模糊按能力逐个降级，见 effects
+    super::effects::apply(&win);
+
     // 必须在**这一刻**量：此时窗口还是 decorations(true)，差值包含原生标题栏；插件激活摘掉
     // 装饰后标题栏并进客户区就再也量不到它，而关窗保存正发生在那个状态
     remember_decorated_inset(uuid, &win);

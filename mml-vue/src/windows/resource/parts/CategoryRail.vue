@@ -47,6 +47,12 @@ const dragging = ref<CategoryId | null>(null);
 /** 会插到第几项之前，`null` 表示还没算出来 */
 const insertAt = ref<number | null>(null);
 
+/** 跟着指针走的浮起副本位置，视口坐标 */
+const ghost = ref({ x: 0, y: 0 });
+
+/** 正在拖的那个分类；没在拖时是 `null` */
+const dragged = computed(() => items.value.find((c) => c.id === dragging.value) ?? null);
+
 let pointerId: number | null = null;
 let startX = 0;
 let startY = 0;
@@ -62,10 +68,12 @@ function onPointerDown(e: PointerEvent, id: CategoryId) {
   candidate = id;
   dragging.value = null;
   insertAt.value = null;
+  ghost.value = { x: e.clientX, y: e.clientY };
 }
 
 function onPointerMove(e: PointerEvent) {
   if (pointerId === null || e.pointerId !== pointerId || !candidate) return;
+  ghost.value = { x: e.clientX, y: e.clientY };
   if (!dragging.value) {
     if (Math.hypot(e.clientX - startX, e.clientY - startY) <= DRAG_THRESHOLD) return;
     dragging.value = candidate;
@@ -146,13 +154,52 @@ onUnmounted(() => {
   <aside ref="navEl" class="cat-nav">
     <template v-for="(c, idx) in items" :key="c.id">
       <!-- 插入线：松手后这一项会落到这里 -->
-      <span v-if="showLine(idx)" class="cat-insert" />
+      <div v-if="showLine(idx) && dragged" class="cat-insert">
+        <GlyphIcon :name="dragged.icon" :size="15" />
+        <span class="cat-name">{{ t(dragged.labelKey) }}</span>
+      </div>
       <button class="cat-item" :class="{ active: category === c.id, dragging: dragging === c.id }"
         @pointerdown="onPointerDown($event, c.id)" @click="onClick(c.id)">
         <GlyphIcon :name="c.icon" :size="15" />
         {{ t(c.labelKey) }}
       </button>
     </template>
-    <span v-if="showLine(items.length)" class="cat-insert" />
+    <div v-if="showLine(items.length) && dragged" class="cat-insert">
+        <GlyphIcon :name="dragged.icon" :size="15" />
+        <span class="cat-name">{{ t(dragged.labelKey) }}</span>
+      </div>
+
+    <!-- 拖动时的浮起副本：跟着指针走，位置见 ghost；列表里那一项留在原位淡出 -->
+    <Teleport to="body">
+      <div v-if="dragged" class="cat-ghost" :style="{ left: `${ghost.x}px`, top: `${ghost.y}px` }">
+        <GlyphIcon :name="dragged.icon" :size="15" />
+        {{ t(dragged.labelKey) }}
+      </div>
+    </Teleport>
   </aside>
 </template>
+
+<style scoped>
+/* 拖动时那份跟手的副本：底色 + 强调色描边 + 大阴影做出"被拿起来"的观感。
+   它 Teleport 到 body，摸不到 resource.css 里 .resource-layout 前缀那套，
+   尺寸与排版在这里自己写一份。
+   位置拿到的是**指针坐标**，所以整体往左上挪一截，别被光标盖住 */
+.cat-ghost {
+  position: fixed;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: calc(var(--rail-w) - 2px);
+  padding: 10px 12px;
+  border: 1px solid var(--accent-border);
+  border-radius: 9px;
+  background: var(--bg-modal);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: var(--shadow-lg);
+  transform: translate(-40%, -50%) scale(1.04);
+  pointer-events: none;
+}
+</style>

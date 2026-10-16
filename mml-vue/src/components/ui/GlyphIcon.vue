@@ -26,6 +26,7 @@ export type GlyphName =
   | "save"
   | "news"
   | "check-square"
+  | "puzzle"
   | "image"
   | "download"
   | "refresh"
@@ -108,6 +109,12 @@ withDefaults(
     <g v-else-if="name === 'check-square'">
       <rect x="3.5" y="3.5" width="17" height="17" rx="4" />
       <path d="m8.5 12.4 2.6 2.6 4.6-5.4" />
+    </g>
+    <!-- 依赖检测：拼图块（前置 / 依赖），与"确认"那类 check 区分开。
+         transform 把带凸起的图形摆回 24 视窗正中 -->
+    <g v-else-if="name === 'puzzle'" transform="translate(-1.25 .25)">
+      <path
+        d="M5 8a2 2 0 0 1 2-2h2.5a2.5 2.5 0 0 1 5 0H17a2 2 0 0 1 2 2v2.5a2.5 2.5 0 0 1 0 5V18a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8z" />
     </g>
     <!-- 无图占位：与 lib/imageFallback.ts 里那张破图占位同一套画法 -->
     <g v-else-if="name === 'image'">

@@ -5,6 +5,7 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { commands } from "./bindings";
 import type {
+  BlockGroupsDto,
   BlockItemDto,
   BlockStatusDto,
   BytesSliceDto,
@@ -43,6 +44,7 @@ import type {
   LogSettingDto,
   McaChunkDto,
   ModGroupDto,
+  ModDuplicateDto,
   ResourceViewDto,
   ModItemDto,
   ModRenameDto,
@@ -72,7 +74,7 @@ import type {
   VersionInfoDto,
   ViewMode,
 } from "./bindings";
-import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress } from "./listens";
+import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress, ResourceModsDuplicate } from "./listens";
 
 export interface CreateInstanceOpts {
   loader?: string;
@@ -1641,6 +1643,29 @@ export function getBlockStatus(): Promise<BlockStatusDto> {
 }
 
 /**
+ * 取方块窗口的用户数据（左栏顺序 / 自建分组 / 收藏）
+ *
+ * 这些是**用户数据**：按仓库约定由 Rust 存本地文件（`block_groups.json`），
+ * 不走前端 localStorage。
+ *
+ * # 返回值
+ *
+ * 见 `BlockGroupsDto`
+ */
+export function getBlockGroups(): Promise<BlockGroupsDto> {
+  return commands.block.getGroups();
+}
+
+/**
+ * 整份写回方块窗口的用户数据；落盘是后端异步做的
+ *
+ * - `data`: 新的完整数据
+ */
+export function setBlockGroups(data: BlockGroupsDto): Promise<void> {
+  return commands.block.setGroups(data);
+}
+
+/**
  * 开始渲染方块贴图
  *
  * - `force`: 是否忽略版本短路、强制全量重渲染
@@ -1758,7 +1783,7 @@ export function listMods(uuid: string): Promise<ModItemDto[]> {
  *
  * # 返回值
  *
- * 逐条问题（缺前置 / 版本不符 / 前置被禁用 / 重复安装）；没有问题时空数组
+ * 逐条问题（缺前置 / 版本不符 / 前置被禁用）；没有问题时空数组
  *
  * 要重新扫一遍 mods 目录，与打开模组分类同一代价，界面要给忙碌态
  */
@@ -1778,6 +1803,20 @@ export function modsDepTest(uuid: string): Promise<DepProblemDto[]> {
  */
 export function onModScanProgress(cb: (e: ModScanProgressDto) => void): Promise<UnlistenFn> {
   return listen<ModScanProgressDto>(ResourceListModsProgress, (e) => cb(e.payload));
+}
+/**
+ * 模组重复安装事件
+ *
+ * - `cb`: 模组列表加载完成时回调，载荷是重复的 modid 与涉及的文件；只有检测到重复才发
+ *
+ * # 返回值
+ *
+ * 取消监听的函数
+ *
+ * 重复不是依赖问题，列表加载完就报，前端据此自动弹窗
+ */
+export function onModsDuplicate(cb: (e: ModDuplicateDto[]) => void): Promise<UnlistenFn> {
+  return listen<ModDuplicateDto[]>(ResourceModsDuplicate, (e) => cb(e.payload));
 }
 /**
  * 启用模组，去掉 .disable / .disabled 后缀

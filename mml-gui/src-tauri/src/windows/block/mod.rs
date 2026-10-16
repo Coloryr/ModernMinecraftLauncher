@@ -10,7 +10,7 @@ use std::sync::{
 
 use tauri::{AppHandle, Emitter};
 
-use crate::dtos::{BlockItemDto, BlockStatusDto};
+use crate::dtos::{BlockGroupDto, BlockGroupsDto, BlockItemDto, BlockStatusDto};
 use crate::{image_manager, listens};
 use mml_game::gui_hook::IProgressGui;
 use mml_names::{Lang, i18_items::error_type::ErrorType};
@@ -190,6 +190,54 @@ pub fn block_list(lang: String) -> Vec<BlockItemDto> {
             }
         })
         .collect()
+}
+
+/// 取方块窗口的用户数据：左栏顺序 / 自建分组 / 收藏
+///
+/// # 返回值
+///
+/// 见 [`BlockGroupsDto`]
+#[tauri::command]
+pub fn block_get_groups() -> BlockGroupsDto {
+    let obj = crate::block_groups::get();
+    BlockGroupsDto {
+        order: obj.order,
+        groups: obj
+            .groups
+            .into_iter()
+            .map(|(uuid, group)| BlockGroupDto {
+                uuid,
+                name: group.name,
+            })
+            .collect(),
+        members: obj.members,
+        favorites: obj.favorites,
+    }
+}
+
+/// 整份写回方块窗口的用户数据
+///
+/// 界面一次只改一处（收藏 / 分组 / 顺序），整份都小，直接覆盖最省事；
+/// 落盘是异步的，见 [`crate::block_groups`]。
+///
+/// - `data`: 新的完整数据
+#[tauri::command]
+pub fn block_set_groups(data: BlockGroupsDto) {
+    crate::block_groups::set(crate::block_groups::BlockGroupsObj {
+        order: data.order,
+        groups: data
+            .groups
+            .into_iter()
+            .map(|group| {
+                (
+                    group.uuid,
+                    crate::block_groups::BlockGroupObj { name: group.name },
+                )
+            })
+            .collect(),
+        members: data.members,
+        favorites: data.favorites,
+    });
 }
 
 /// 获取方块贴图渲染状态

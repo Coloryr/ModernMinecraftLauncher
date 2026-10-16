@@ -14,6 +14,9 @@ enum Token {
 }
 
 fn tokenize(s: &str) -> Vec<Token> {
+    // SemVer 的构建元数据不参与版本比较：`9.5.1+1.21.1` 就是 `9.5.1`。
+    // 不切掉 `+` 后面那段会解析出 "1+1" 这种非数字记号，比 `[9.5.1,)` 时判成"小了"
+    let s = s.split('+').next().unwrap_or(s);
     s.split(|c| c == '.' || c == '-' || c == '_')
         .filter(|p| !p.is_empty())
         .map(|p| {
@@ -114,6 +117,15 @@ impl fmt::Display for Interval {
 
 impl Interval {
     pub fn contains(&self, version: &str) -> bool {
+        // 边界不是干净的版本号时比不准：`[1.21,1.21z)`、`[1.21-3.1.0c,)` 这类写法
+        // 各家实现给出的结论都不一样，而上游加载器是放行的 —— 这里也一律当"符合"，
+        // 免得报出一堆没有意义的版本不符
+        if self.lower.as_deref().is_some_and(|b| !is_plain_version(b))
+            || self.upper.as_deref().is_some_and(|b| !is_plain_version(b))
+        {
+            return true;
+        }
+
         if let Some(lower) = &self.lower {
             let ord = compare_versions(version, lower);
             let ok = if self.lower_inclusive {
@@ -154,7 +166,13 @@ impl VersionRange {
 
 /// 解析 Maven 风格的版本范围字符串。
 ///
-/// 例：`[7.0.0,)`、`[1.0.0,2.0.0)`、`(,1.0.0),[1.1.0,)`、`1.0.0`
+/// 支持的写法：
+/// - 区间：`[1.0.0,2.0.0)`、`(,1.0.0)`、`[7.0.0,)`
+/// - 精确版本：`[1.0.0]`
+/// - 多段：`[1.0],[2.0]` 是两段精确版本的并集；`[1.21,1.21.1,1.21.2]` 是作者
+///   把允许的版本逐个列了出来，同样按并集处理
+///
+/// 解析失败返回 `Err`，调用方按"不限版本"处理。
 pub fn parse_maven_version_range(s: &str) -> CoreResult<VersionRange> {
     let s = s.trim();
     if s.is_empty() {
@@ -164,26 +182,74 @@ pub fn parse_maven_version_range(s: &str) -> CoreResult<VersionRange> {
         return Ok(VersionRange::Exact(s.to_string()));
     }
 
-    let mut ranges = Vec::new();
+    let mut ranges: Vec<VersionRange> = Vec::new();
     let mut rest = s;
     while !rest.is_empty() {
-        let (interval, remaining) = parse_maven_interval(rest)?;
-        ranges.push(VersionRange::Interval(interval));
-        rest = remaining.trim_start();
+        let bytes = rest.as_bytes();
+        if bytes[0] != b'[' && bytes[0] != b'(' {
+            return Err(ErrorType::InvalidOperation);
+        }
+        let close = rest
+            .find(|c| c == ']' || c == ')')
+            .ok_or(ErrorType::InvalidOperation)?;
+        let parts: Vec<&str> = rest[1..close].split(',').map(str::trim).collect();
+
+        match parts.len() {
+            // `[1.0.0]`：Maven 的精确版本写法
+            1 => {
+                if let Some(version) = bound_of(parts[0]) {
+                    ranges.push(VersionRange::Exact(version));
+                }
+            }
+            // `[1.0.0,2.0.0)`：一个区间
+            2 => ranges.push(VersionRange::Interval(Interval {
+                lower: bound_of(parts[0]),
+                lower_inclusive: bytes[0] == b'[',
+                upper: bound_of(parts[1]),
+                upper_inclusive: bytes[close] == b']',
+            })),
+            // 三个及以上：逐个列的允许版本，按并集处理
+            _ => ranges.extend(
+                parts
+                    .iter()
+                    .filter_map(|part| bound_of(part))
+                    .map(VersionRange::Exact),
+            ),
+        }
+
+        rest = rest[close + 1..].trim_start();
         if rest.is_empty() {
             break;
         }
-        if let Some(r) = rest.strip_prefix(',') {
-            rest = r.trim_start();
-        } else {
-            return Err(ErrorType::InvalidOperation);
-        }
+        rest = rest
+            .strip_prefix(',')
+            .ok_or(ErrorType::InvalidOperation)?
+            .trim_start();
     }
-    if ranges.len() == 1 {
-        Ok(ranges.pop().unwrap())
+
+    match ranges.len() {
+        0 => Ok(VersionRange::Any),
+        1 => Ok(ranges.pop().unwrap()),
+        _ => Ok(VersionRange::Union(ranges)),
+    }
+}
+
+/// 区间的一段：空串表示这一侧不限
+fn bound_of(part: &str) -> Option<String> {
+    if part.is_empty() {
+        None
     } else {
-        Ok(VersionRange::Union(ranges))
+        Some(part.to_string())
     }
+}
+
+/// 是不是"干净的版本号"：去掉构建元数据后全是点分数字
+fn is_plain_version(version: &str) -> bool {
+    let core = version.split('+').next().unwrap_or(version);
+    !core.is_empty()
+        && core
+            .split('.')
+            .all(|part| part.parse::<u64>().is_ok())
 }
 
 /// 解析 JSON 字符串数组 `[ ">=1.18.1", "<1.19.3" ]`，每个元素单独解析后组合成 AND。
@@ -205,52 +271,6 @@ pub fn parse_json_array_range(s: &MiniJsonObj) -> CoreResult<VersionRange> {
     } else {
         Ok(VersionRange::All(ranges))
     }
-}
-
-fn parse_maven_interval(s: &str) -> CoreResult<(Interval, &str)> {
-    let s = s.trim_start();
-    let bytes = s.as_bytes();
-    if bytes.is_empty() {
-        return Err(ErrorType::ArgEmpty(ArgEmptyData::Name));
-    }
-    let lower_inclusive = match bytes[0] {
-        b'[' => true,
-        b'(' => false,
-        _ => return Err(ErrorType::InvalidOperation),
-    };
-
-    let comma_pos = s.find(',').ok_or_else(|| ErrorType::InvalidOperation)?;
-    let lower_str = s[1..comma_pos].trim();
-    let lower = if lower_str.is_empty() {
-        None
-    } else {
-        Some(lower_str.to_string())
-    };
-
-    let after_comma = &s[comma_pos + 1..];
-    let end_pos = after_comma
-        .find(|c| c == ']' || c == ')')
-        .ok_or_else(|| ErrorType::InvalidOperation)?;
-    let upper_str = after_comma[..end_pos].trim();
-    let upper = if upper_str.is_empty() {
-        None
-    } else {
-        Some(upper_str.to_string())
-    };
-    let upper_inclusive = after_comma.as_bytes()[end_pos] == b']';
-
-    let consumed = comma_pos + 1 + end_pos + 1;
-    let remaining = &s[consumed..];
-
-    Ok((
-        Interval {
-            lower,
-            lower_inclusive,
-            upper,
-            upper_inclusive,
-        },
-        remaining,
-    ))
 }
 
 /// 解析 Fabric 风格的版本范围字符串。
@@ -319,6 +339,14 @@ fn parse_fabric_conjunction(s: &str) -> CoreResult<VersionRange> {
 }
 
 fn parse_fabric_single(tok: &str) -> CoreResult<VersionRange> {
+    // 裸版本号（没有任何运算符）按"这一档版本"处理：`1.21` 也匹配 `1.21.1`。
+    // 要严格精确匹配请写 `=1.21`，那会走下面那条 Exact 分支
+    if is_bare_token(tok)
+        && let Some(range) = prefix_range(tok)
+    {
+        return Ok(range);
+    }
+
     let (lo, up) = token_to_bounds(tok)?;
     match (&lo, &up) {
         (Some((l, true)), Some((u, true))) if compare_versions(l, u) == Ordering::Equal => {
@@ -331,6 +359,33 @@ fn parse_fabric_single(tok: &str) -> CoreResult<VersionRange> {
             upper_inclusive: up.map(|(_, i)| i).unwrap_or(false),
         })),
     }
+}
+
+/// 是不是裸版本号：没有任何运算符前缀
+fn is_bare_token(tok: &str) -> bool {
+    const OPS: [&str; 8] = [">=", "<=", ">", "<", "=", "~", "^", "*"];
+    !OPS.iter().any(|op| tok.starts_with(op))
+}
+
+/// 裸版本号对应的区间：`[版本, 下一档)`
+///
+/// `1.21` → `[1.21,1.22)`、`1.21.1` → `[1.21.1,1.21.2)` —— 装补丁版也算符合。
+/// 只认纯数字点分的版本；带字母的（`1.0.0-beta`）返回 `None`，交给精确匹配那条路，
+/// 免得"下一档"算错。
+fn prefix_range(version: &str) -> Option<VersionRange> {
+    let mut parts: Vec<String> = version.split('.').map(str::to_string).collect();
+    if parts.iter().any(|part| part.parse::<u64>().is_err()) {
+        return None;
+    }
+    let last = parts.last_mut()?;
+    *last = (last.parse::<u64>().ok()? + 1).to_string();
+
+    Some(VersionRange::Interval(Interval {
+        lower: Some(version.to_string()),
+        lower_inclusive: true,
+        upper: Some(parts.join(".")),
+        upper_inclusive: false,
+    }))
 }
 
 fn token_to_bounds(tok: &str) -> CoreResult<(Option<(String, bool)>, Option<(String, bool)>)> {
@@ -408,11 +463,27 @@ fn expand_caret(v: &str) -> CoreResult<(String, String)> {
     Ok((v.to_string(), upper))
 }
 
-/// 自动识别语法并解析为 [`VersionRange`]。
+/// 版本范围字符串的写法
 ///
-/// - 以 `[` 或 `(` 开头 → Maven 语法
-/// - 其他 → Fabric 语法（裸版本号会变成 `Exact`）
-pub fn parse_version_range(s: &str) -> CoreResult<VersionRange> {
+/// 两种写法对**裸版本号**（没有运算符、没有方括号）的解释不同，解析入口因此要分开：
+/// Maven 把它当"推荐版本"、不限制任何版本，semver 则按精确匹配处理。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RangeSyntax {
+    /// Maven：`[1.0,2.0)`；裸版本不限制（Forge / NeoForge 的 `versionRange`、1.12.2 的 `@版本`）
+    Maven,
+    /// semver：`>=1.0`、`~1.2`；裸版本精确匹配（Fabric / Quilt）
+    Semver,
+}
+
+/// 按指定写法解析版本范围
+///
+/// - `s`: 范围字符串；空串报错，`*` 是不限版本
+/// - `syntax`: 见 [`RangeSyntax`]
+///
+/// # 返回值
+///
+/// 见 [`VersionRange`]
+pub fn parse_version_range_with(s: &str, syntax: RangeSyntax) -> CoreResult<VersionRange> {
     let s = s.trim();
     if s.is_empty() {
         return Err(ErrorType::ArgEmpty(ArgEmptyData::Name));
@@ -420,10 +491,40 @@ pub fn parse_version_range(s: &str) -> CoreResult<VersionRange> {
     if s == "*" {
         return Ok(VersionRange::Any);
     }
+    match syntax {
+        RangeSyntax::Maven => {
+            if s.starts_with('[') || s.starts_with('(') {
+                parse_maven_version_range(s)
+            } else {
+                // 裸版本号在 Maven 里是"推荐版本"，不限制任何版本；当成精确匹配会把
+                // 装了更新版本的实例全报成"版本不符"
+                Ok(VersionRange::Any)
+            }
+        }
+        // 方括号是 Maven 独有的写法：出现在 semver 那边也按 Maven 解析，
+        // 别把一个 `[1.21,1.22)` 当成"带方括号的版本号"
+        RangeSyntax::Semver => {
+            if s.starts_with('[') || s.starts_with('(') {
+                parse_maven_version_range(s)
+            } else {
+                parse_fabric_version_range(s)
+            }
+        }
+    }
+}
+
+/// 自动识别语法并解析为 [`VersionRange`]。
+///
+/// - 以 `[` 或 `(` 开头 → Maven 语法
+/// - 其他 → semver 语法（裸版本号会变成 `Exact`）
+///
+/// 裸版本号两种写法都有，**知道来源时请用 [`parse_version_range_with`]**，别依赖这里猜。
+pub fn parse_version_range(s: &str) -> CoreResult<VersionRange> {
+    let s = s.trim();
     if s.starts_with('[') || s.starts_with('(') {
-        parse_maven_version_range(s)
+        parse_version_range_with(s, RangeSyntax::Maven)
     } else {
-        parse_fabric_version_range(s)
+        parse_version_range_with(s, RangeSyntax::Semver)
     }
 }
 
@@ -456,6 +557,78 @@ mod tests {
         assert!(!r.contains("1.0.0"));
         assert!(r.contains("1.1.0"));
         assert!(r.contains("3.0.0"));
+    }
+
+    /// SemVer 的构建元数据（`+` 之后）不参与比较
+    #[test]
+    fn build_metadata_is_ignored() {
+        let r = parse_maven_version_range("[9.5.1,)").unwrap();
+        assert!(r.contains("9.5.1+1.21.1"));
+        assert!(!r.contains("9.5.0+1.21.1"));
+    }
+
+    /// Maven 里裸版本号是"推荐版本"，不限制任何版本
+    #[test]
+    fn maven_bare_version_is_any() {
+        assert_eq!(
+            parse_version_range_with("4.7.5.1", RangeSyntax::Maven).unwrap(),
+            VersionRange::Any
+        );
+        // semver 那边按"这一档"匹配，不是精确相等
+        let r = parse_version_range_with("4.7.5.1", RangeSyntax::Semver).unwrap();
+        assert!(r.contains("4.7.5.1"));
+        assert!(!r.contains("4.7.6"));
+    }
+
+    /// 闭区间上界要能装下同版本
+    #[test]
+    fn inclusive_upper_bound_matches() {
+        let r = parse_version_range_with("[1.21,1.21.1]", RangeSyntax::Maven).unwrap();
+        assert!(r.contains("1.21.1"));
+        assert!(r.contains("1.21"));
+        assert!(!r.contains("1.21.2"));
+    }
+
+    /// Forge 里常见的两种畸形写法：逐个列版本、多段并集
+    #[test]
+    fn maven_bracket_lists() {
+        // `[1.21,1.21.1,1.21.2]`：三个候选版本
+        let r = parse_maven_version_range("[1.21,1.21.1,1.21.2]").unwrap();
+        assert!(r.contains("1.21.1"));
+        assert!(!r.contains("1.21.3"));
+
+        // `[1.21],[1.21.1]`：两段精确版本的并集
+        let r = parse_maven_version_range("[1.21],[1.21.1]").unwrap();
+        assert!(r.contains("1.21"));
+        assert!(r.contains("1.21.1"));
+        assert!(!r.contains("1.22"));
+    }
+
+    /// 边界不是干净版本号时不比版本（上游加载器放行，别误报）
+    #[test]
+    fn odd_bounds_are_not_judged() {
+        assert!(
+            parse_maven_version_range("[1.21,1.21z)")
+                .unwrap()
+                .contains("1.21.1")
+        );
+        assert!(
+            parse_maven_version_range("[1.21-3.1.0c,)")
+                .unwrap()
+                .contains("1.21.1-3.6.8")
+        );
+    }
+
+    /// 不带逗号的 `[1.20.1]` 是精确版本，不能因为"解析不出区间"就退回不限版本
+    #[test]
+    fn maven_exact_bracket_range() {
+        let r = parse_maven_version_range("[1.20.1]").unwrap();
+        assert_eq!(r, VersionRange::Exact("1.20.1".into()));
+        assert!(r.contains("1.20.1"));
+        assert!(r.contains("1.20.1.0"));
+        assert!(!r.contains("1.20.2"));
+        // 精确就是精确：`[1.21]` 不吃 1.21.1；游戏版本那一档的放宽在 game_mods 里
+        assert!(!parse_maven_version_range("[1.21]").unwrap().contains("1.21.1"));
     }
 
     #[test]
@@ -500,9 +673,25 @@ mod tests {
             VersionRange::Interval(_)
         ));
         assert_eq!(parse_version_range("*").unwrap(), VersionRange::Any);
+        // 裸版本号走"这一档"：1.0.0 也匹配 1.0.0.1，但不吃 1.0.1
+        let r = parse_version_range("1.0.0").unwrap();
+        assert!(r.contains("1.0.0"));
+        assert!(r.contains("1.0.0.1"));
+        assert!(!r.contains("1.0.1"));
+    }
+
+    /// 裸版本号按"这一档"匹配：`1.21` 要能吃下 `1.21.1`
+    #[test]
+    fn bare_semver_matches_next_patch() {
+        let r = parse_version_range_with("1.21", RangeSyntax::Semver).unwrap();
+        assert!(r.contains("1.21"));
+        assert!(r.contains("1.21.1"));
+        assert!(!r.contains("1.22"));
+
+        // 显式精确匹配不受影响
         assert_eq!(
-            parse_version_range("1.0.0").unwrap(),
-            VersionRange::Exact("1.0.0".into())
+            parse_version_range_with("=1.21", RangeSyntax::Semver).unwrap(),
+            VersionRange::Exact("1.21".into())
         );
     }
 }

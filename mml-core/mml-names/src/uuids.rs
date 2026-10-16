@@ -36,6 +36,8 @@ pub const COLLECT_UUID: Uuid = uuid!("00000000-0000-0000-0000-00000000000c");
 /// 用 `...0011`：`...0001`~`...0010` 已被 GUI 各窗口的 uuid 占用，
 /// 见 mml-gui/src-tauri/src/windows/mod.rs 的 WINDOWS_INFO
 pub const GROUP_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000011");
+/// 方块窗口用户数据 block_groups.json 的保存任务
+pub const BLOCK_GROUPS_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000012");
 
 /// 全部内置保留 UUID，供 [`check_uuid`] 遍历
 static UUIDS: LazyLock<Vec<Uuid>> = LazyLock::new(|| {
@@ -53,6 +55,7 @@ static UUIDS: LazyLock<Vec<Uuid>> = LazyLock::new(|| {
         AUTH_SELECT_UUID,
         COLLECT_UUID,
         GROUP_UUID,
+        BLOCK_GROUPS_UUID,
     ]
 });
 

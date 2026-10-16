@@ -11,6 +11,7 @@ import BaseButton from "../../../components/ui/BaseButton.vue";
 import AsyncImage from "../../../components/ui/AsyncImage.vue";
 import HighlightText from "../../../components/ui/HighlightText.vue";
 import type { BlockItemDto } from "../../../lib/bindings";
+import type { BlockGroup } from "../composables/useBlockGroups";
 
 const props = defineProps<{
   /** 要展示的方块条目 */
@@ -21,6 +22,12 @@ const props = defineProps<{
   keyword: string;
   /** 玩家头颅（可删除） */
   removable: boolean;
+  /** 这个方块已收藏 */
+  favorite: boolean;
+  /** 全部自建分组 */
+  groups: BlockGroup[];
+  /** 这个方块所属的分组 uuid，可同时属于多个 */
+  memberOf: string[];
   /** 正在设图标（父级控制，禁用按钮防连点） */
   busy?: boolean;
 }>();
@@ -32,6 +39,10 @@ const emit = defineEmits<{
   (e: "remove"): void;
   /** 请求把它设为某个实例的图标，父级接着打开选实例弹窗 */
   (e: "set-icon"): void;
+  /** 收藏 / 取消收藏 */
+  (e: "toggle-favorite"): void;
+  /** 勾选某个分组：`on` 为真表示加进去 */
+  (e: "toggle-group", uuid: string, on: boolean): void;
 }>();
 
 useModalKeys((e) => {
@@ -66,6 +77,23 @@ async function copyId() {
         <div class="detail-row">
           <span class="detail-label">{{ t("blocks.detailCat") }}</span>
           <span class="cat-chip">{{ category }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">{{ t("blocks.detailFavorite") }}</span>
+          <BaseButton size="sm" :variant="favorite ? 'accent' : 'plain'" @click="emit('toggle-favorite')">
+            {{ favorite ? t("blocks.unfavorite") : t("blocks.favorite") }}
+          </BaseButton>
+        </div>
+        <div class="detail-row detail-row-top">
+          <span class="detail-label">{{ t("blocks.detailGroups") }}</span>
+          <div class="detail-groups">
+            <p v-if="!groups.length" class="detail-group-empty">{{ t("blocks.groupEmpty") }}</p>
+            <label v-for="g in groups" :key="g.uuid" class="detail-group">
+              <input type="checkbox" :checked="memberOf.includes(g.uuid)"
+                @change="emit('toggle-group', g.uuid, ($event.target as HTMLInputElement).checked)" />
+              <span>{{ g.name }}</span>
+            </label>
+          </div>
         </div>
       </div>
     </div>
@@ -106,6 +134,32 @@ async function copyId() {
   height: 132px;
   /* 同 BlockGrid 的 .block-img：256×256 的渲染图缩到 132px，用平滑插值，
      不要 pixelated，最近邻会把方块斜边采成锯齿 */
+}
+
+/* 分组那一行内容会换行，按顶部对齐 */
+.detail-row-top {
+  align-items: flex-start;
+}
+
+.detail-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.detail-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.detail-group-empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
 }
 
 .detail-info {

@@ -37,7 +37,7 @@ import {
   type ModCol,
   type ModSort,
 } from "../../modColumns";
-import { modRowKey, modSelectKey, type ModViewEmits, type ModViewProps } from "../../types";
+import { modHit, modRowKey, modSelectKey, type ModViewEmits, type ModViewProps } from "../../types";
 
 const props = withDefaults(
   defineProps<
@@ -60,6 +60,8 @@ const props = withDefaults(
       colWidths: Record<string, number>;
       /** 表头排序状态，`null` 表示不排序；同上，所有分组共用 */
       sort: ModSort | null;
+      /** 当前搜索词，已转小写；为空表示没在搜索。搜索时命中的内置行自动展开 */
+      query?: string;
     }
   >(),
   {
@@ -70,6 +72,7 @@ const props = withDefaults(
     draggingGroup: null,
     depth: 0,
     hideHeader: false,
+    query: "",
   },
 );
 
@@ -81,6 +84,8 @@ const emit = defineEmits<
     (e: "col-resize", key: string, width: number): void;
     /** 表头排序变化：正序 / 倒序 / 不排序 */
     (e: "sort-change", next: ModSort | null): void;
+    /** 点分组行最左的全选勾选框：整组全选 / 取消全选，由 ModPane 执行 */
+    (e: "select-group"): void;
     /** 右键分组行：交给 ModPane 弹分组菜单 */
     (e: "group-menu", payload: {
       /** 右键事件，菜单按它的坐标定位 */
@@ -110,6 +115,21 @@ function widthOf(col: ModCol): number {
 /** 栅格模板：24px 多选 + 各列固定宽，**全 px**；总宽超出时白底内部横向滚动 */
 const gridTemplate = computed(() =>
   ["24px", ...MOD_COLS.map((col) => `${widthOf(col)}px`)].join(" "),
+);
+
+// ---------- 分组行的全选勾选框 ----------
+
+/** 本组可多选的键；内置行（jar-in-jar）没有独立文件，不参与 */
+const groupKeys = computed(() => props.items.map(modSelectKey).filter((key) => !!key));
+
+/** 整组都已选中：勾选框实心 */
+const allSelected = computed(
+  () => groupKeys.value.length > 0 && groupKeys.value.every((key) => props.selectedKeys.has(key)),
+);
+
+/** 选了但没全选：勾选框显示成半选 */
+const someSelected = computed(
+  () => groupKeys.value.some((key) => props.selectedKeys.has(key)) && !allSelected.value,
 );
 
 /**
@@ -196,17 +216,27 @@ function toggleExpand(key: string) {
   expanded.value = next;
 }
 
-/** 这一行是不是展开的 */
-function isOpen(key: string): boolean {
-  return expanded.value.has(key);
+/**
+ * 这一行是不是展开的
+ *
+ * 搜索时，内置模组（含更深一层）里命中的行**自动展开** —— 否则父行虽然因为内置命中
+ * 被保留下来，命中的那一行却还收着，用户看不出搜到的是什么。
+ */
+function isOpen(item: ModItemDto): boolean {
+  if (props.query && hasHitChild(item, props.query)) return true;
+  return expanded.value.has(modRowKey(item));
+}
+
+/** 这一行的内置模组里（含更深一层）有没有命中搜索词的 */
+function hasHitChild(item: ModItemDto, q: string): boolean {
+  return item.jarInJar.some((child) => modHit(child, q, "table") || hasHitChild(child, q));
 }
 
 /** 拍平：父行 + **已展开**的内置模组行（每一层各自排序） */
 function flatten(items: ModItemDto[], depth: number, out: TableRow[]) {
   for (const item of orderedMods(items, props.sort)) {
     out.push({ item, depth });
-    const key = modRowKey(item);
-    if (item.jarInJar.length && isOpen(key)) flatten(item.jarInJar, depth + 1, out);
+    if (item.jarInJar.length && isOpen(item)) flatten(item.jarInJar, depth + 1, out);
   }
 }
 
@@ -321,7 +351,11 @@ function onNoteEnter(event: KeyboardEvent) {
       :class="{ 'mod-group-dragging': draggingGroup === groupKey }" @contextmenu.prevent="emit('group-menu', {
         event: $event, id: groupKey, label: groupLabel, custom, count: items.length,
       })">
-      <span class="mod-cell row-select-cell" />
+      <span class="mod-cell row-select-cell">
+        <!-- 整组全选 / 取消全选，与行勾选框同一个开关；空组不画 -->
+        <input v-if="items.length" type="checkbox" class="row-select group-select" :checked="allSelected"
+          :indeterminate="someSelected" @pointerdown.stop @change.stop="emit('select-group')" @click.stop />
+      </span>
       <span class="mod-cell mod-group-cell">
         <button class="mod-tree-caret" :class="{ collapsed: !groupOpen }" @click.stop="emit('toggle-group')">
           <GlyphIcon name="chevron-down" :size="13" :weight="2.4" />
@@ -359,7 +393,7 @@ function onNoteEnter(event: KeyboardEvent) {
       <span class="mod-cell mod-group-cell">
         <span class="mod-tree-indent" :style="{ width: `${(row.depth - 1) * 16}px` }" />
         <button v-if="row.item.jarInJar.length" class="mod-tree-caret"
-          :class="{ collapsed: !isOpen(modRowKey(row.item)) }" v-tip="isOpen(modRowKey(row.item))
+          :class="{ collapsed: !isOpen(row.item) }" v-tip="isOpen(row.item)
             ? t('resource.modBuiltinCollapse')
             : t('resource.modBuiltinExpand')
             " @click.stop="toggleExpand(modRowKey(row.item))" @pointerdown.stop>

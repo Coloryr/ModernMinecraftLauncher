@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 分组右键菜单：删除分组 / 启用所有 / 禁用所有 / 转移内容 / 移除分组 / 删除所有模组
+// 分组右键菜单：重命名 / 转移内容 / 清空分组 / 删除分组 / 启用所有 / 禁用所有 / 全选 / 删除所有模组
 //
 // 动作**全部抛给父组件**（ModPane）处理 —— 只有它认识分组、模组、确认弹窗与
 // "移到分组"弹窗。这里只管画菜单与定位。
@@ -12,6 +12,7 @@ import { t } from "../../../../lib/i18n";
 
 /** 菜单项（父组件按这个分发动作） */
 export type GroupMenuAction =
+  | "select-all"
   | "rename-group"
   | "delete-group"
   | "enable-all"
@@ -40,6 +41,8 @@ const props = defineProps<{
   canEnable: boolean;
   /** 组里**还有启用中的模组** → 才给"禁用所有" */
   canDisable: boolean;
+  /** 组里可多选的模组已全部选中 → 菜单项变"取消全选" */
+  allSelected: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -91,17 +94,22 @@ function pick(kind: GroupMenuAction) {
 <template>
   <div ref="el" class="row-ctx-menu" :style="{ left: `${pos.x}px`, top: `${pos.y}px` }" @pointerdown.stop
     @contextmenu.prevent>
-    <!-- 重命名 / 删除分组只给自建分组；已启用 / 已禁用 / 识别失败这三个状态分组是内核按状态
+    <!-- 组本身的操作：重命名 → 内容的去处（转移 / 清空）→ 删除分组。
+         重命名 / 清空 / 删组只给自建分组；已启用 / 已禁用 / 识别失败这三个状态分组是内核按状态
          分的，改不了名也删不掉。**空分组照样能删** —— 删掉一个空分组正是它最常见的用法 -->
-    <template v-if="custom">
-      <button class="row-ctx-menu-item" @click="pick('rename-group')">
-        {{ t("resource.groupRename") }}
-      </button>
-      <button class="row-ctx-menu-item danger" @click="pick('delete-group')">
-        {{ t("resource.groupDelete") }}
-      </button>
-      <span class="row-ctx-menu-sep" />
-    </template>
+    <button v-if="custom" class="row-ctx-menu-item" @click="pick('rename-group')">
+      {{ t("resource.groupRename") }}
+    </button>
+    <button class="row-ctx-menu-item" :disabled="empty" @click="pick('move-all')">
+      {{ t("resource.moveGroupItems") }}
+    </button>
+    <button v-if="custom" class="row-ctx-menu-item" :disabled="empty" @click="pick('move-out')">
+      {{ t("resource.ungroupGroup") }}
+    </button>
+    <button v-if="custom" class="row-ctx-menu-item danger" @click="pick('delete-group')">
+      {{ t("resource.groupDelete") }}
+    </button>
+    <span class="row-ctx-menu-sep" />
 
     <!-- 启用 / 禁用**按组内实际状态给**，用户口径是已启用分组只显示"禁用所有"，其它同理：
          组里还有禁用的模组才出现"启用所有"，还有启用的才出现"禁用所有"；
@@ -117,14 +125,13 @@ function pick(kind: GroupMenuAction) {
       <span class="row-ctx-menu-sep" />
     </template>
 
-    <button class="row-ctx-menu-item" :disabled="empty" @click="pick('move-all')">
-      {{ t("resource.moveGroupItems") }}
+    <!-- 全选 / 取消全选：整组加进多选，与表格里分组行的勾选框同一个开关。
+         空组没什么可选的，置灰 -->
+    <button class="row-ctx-menu-item" :disabled="empty" @click="pick('select-all')">
+      {{ t(allSelected ? "resource.deselectAll" : "resource.selectAll") }}
     </button>
-    <!-- 移除分组：把这一组的内容移出自建分组（分组本身留着）。状态分组不给 ——
-         它里面的模组本来就不在任何自建分组里，没有"移出"可言 -->
-    <button v-if="custom" class="row-ctx-menu-item" :disabled="empty" @click="pick('move-out')">
-      {{ t("resource.ungroupGroup") }}
-    </button>
+    <span class="row-ctx-menu-sep" />
+
     <button class="row-ctx-menu-item danger" :disabled="empty" @click="pick('delete-mods')">
       {{ t("resource.deleteGroupMods") }}
     </button>

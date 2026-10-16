@@ -203,6 +203,20 @@ windows/<窗口>/mod.rs 里：
   [System.IO.File]::WriteAllText($path, $json, $utf8)
   ```
 
+### 7.1 前端本地存储（localStorage）只放临时数据
+
+- **`mml-vue/src/lib/storage.ts` 只放临时数据**：浏览上下文、一次性开关、丢了也无所谓的缓存
+  （如上次停留的分类、搜索词、列宽）。
+- **永久数据一律由 Rust 落本地文件**：用户数据（分组 / 收藏 / 顺序 / 备注）、配置，
+  凡是"丢了用户会心疼"的东西都不能进 localStorage。
+  - 样板见 `mml-gui/src-tauri/src/collect_utils.rs`：内存一份 `RwLock` + `init/load/set` +
+    `config_save` 异步落盘，前端走一对命令整份读写。
+  - 新加这类数据时：文件名加进 `mml-names` 的 `names.rs`（并在其测试列表里登记），
+    落盘任务 uuid 加进 `uuids.rs`；模块放 `mml-gui/src-tauri/src/` 下（**不要**塞进 `dtos/`），
+    命令与 DTO 按 §4 走生成器。
+  - 理由：localStorage 跟着 webview 用户数据目录走，清缓存 / 迁移 / 换内核就没了；
+    文件在运行根目录，能备份、能被其它工具读，也和内核配置放在一起。
+
 ## 8. 网页获取
 
 - 获取网页内容一律使用 `python`（`urllib` / `requests`）或 `curl`，

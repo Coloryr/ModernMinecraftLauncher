@@ -57,15 +57,17 @@ pub use java_download_dto::{JavaDownloadItemDto, JavaDownloadOptionsDto, JavaTyp
 pub use java_dto::{JavaImportProgressDto, JavaInfoDto};
 pub use log_dto::{LogFocusDto, LogSettingDto};
 pub use main_dto::{
-    BlockItemDto, BlockStatusDto, ErrorEvent, ExitEvent, IconSourceDto, InstanceChangeEvent,
-    InstanceLangDto, InstancePatch, LogEvent, NewsItem, StateEvent, SystemMemoryDto,
+    BlockGroupDto, BlockGroupsDto, BlockItemDto, BlockStatusDto, ErrorEvent, ExitEvent,
+    IconSourceDto, InstanceChangeEvent, InstanceLangDto, InstancePatch, LogEvent, NewsItem,
+    StateEvent, SystemMemoryDto,
 };
 pub use motd_dto::{MotdDto, MotdSegmentDto};
 pub use resource_dto::{
-    DataPackItemDto, DepProblemDto, DepProblemKindDto, ModGroupDto, ModItemDto, ModRenameDto,
-    ModScanProgressDto, PackItemDto, ResourceDropDto, ResourceViewDto, SaveBackupDto, SaveEditDto,
-    SaveItemDto, SchematicBlockDto, SchematicDetailDto, SchematicItemDto, ScreenshotItemDto,
-    ServerItemDto, ShaderItemDto,
+    DataPackItemDto, DepProblemDto, DepProblemKindDto, ModDependencyDto, ModDuplicateDto,
+    ModDuplicateFileDto, ModGroupDto, ModItemDto, ModRenameDto, ModScanProgressDto, PackItemDto,
+    ResourceDropDto,
+    ResourceViewDto, SaveBackupDto, SaveEditDto, SaveItemDto, SchematicBlockDto, SchematicDetailDto,
+    SchematicItemDto, ScreenshotItemDto, ServerItemDto, ShaderItemDto,
 };
 pub use settings_dto::{
     BgInfoDto, DnsSettingDto, GameCheckSettingDto, LaunchSettingDto, NetworkSettingDto,

@@ -20,6 +20,7 @@ use tauri::Manager;
 
 use crate::windows::{block, download, main};
 
+pub mod block_groups;
 pub mod collect_utils;
 pub mod dtos;
 pub mod err_box;
@@ -116,6 +117,11 @@ pub fn run() {
 
             // 收藏数据与核心无关，但必须等 `mml_core::init` 里的日志系统起来后再读，
             // 否则解析失败会没有输出、看起来像没加载
+            // 方块窗口的用户数据，同样是启动时读一次
+            if let Err(err) = block_groups::load() {
+                mml_log::error_type(err);
+            }
+
             if let Err(err) = collect_utils::load() {
                 mml_log::error_type(err);
             }

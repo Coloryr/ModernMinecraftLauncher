@@ -27,8 +27,8 @@
 /* ---------- 左侧分类栏 ---------- */
 
 .resource-layout .cat-nav {
-  width: 190px;
-  min-width: 190px;
+  width: var(--rail-w);
+  min-width: var(--rail-w);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -67,13 +67,17 @@
   opacity: 0.45;
 }
 
-/* 拖拽插入线：一条 2px 的强调色横线，画在"松手后落到的位置" */
+/* 拖拽落点占位：虚线框 + 被拖分类的名字与数量，画在"松手后落到的位置" */
 .resource-layout .cat-insert {
-  display: block;
-  height: 2px;
-  margin: 1px 6px;
-  border-radius: 1px;
-  background: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 2px 0;
+  padding: 8px 11px;
+  border: 1px dashed var(--accent-border);
+  border-radius: var(--ctl-radius);
+  background: var(--accent-soft);
+  opacity: 0.7;
 }
 
 /* ---------- 右侧内容区 ---------- */
@@ -579,13 +583,21 @@
   opacity: 0.45;
 }
 
-/* 分组排序的插入线：一条 2px 强调色横线，与左侧分类栏的 .cat-insert 同一套 */
+/* 分组排序的落点占位：虚线框 + 组名 + 数量，与主页面拖实例的占位同一观感 */
 .resource-layout .mod-group-insert {
-  display: block;
-  height: 2px;
-  margin: 1px 6px;
-  border-radius: 1px;
-  background: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+  padding: 8px 12px;
+  border: 1px dashed var(--accent-border);
+  border-radius: 9px;
+  background: var(--accent-soft);
+}
+
+/* 占位整体压暗：它是"松手后这块会落在这儿"，不是真的分组 */
+.resource-layout .mod-group-insert>* {
+  opacity: 0.6;
 }
 
 .resource-layout .mod-group-name {

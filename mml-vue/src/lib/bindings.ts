@@ -83,10 +83,12 @@ export const commands = {
     status: () => invoke<ResourceStatusDto>("add_resource_status"),
   },
   block: {
+    getGroups: () => invoke<BlockGroupsDto>("block_get_groups"),
     list: (lang: string) => invoke<BlockItemDto[]>("block_list", { lang }),
     readIconSource: (path: string) => invoke<IconSourceDto>("block_read_icon_source", { path }),
     renderCancel: () => invoke<boolean>("block_render_cancel"),
     renderStart: (force: boolean) => invoke<boolean>("block_render_start", { force }),
+    setGroups: (data: BlockGroupsDto) => invoke<void>("block_set_groups", { data }),
     setIcon: (uuid: string, id: string) => invoke<boolean>("block_set_icon", { uuid, id }),
     setIconArea: (uuid: string, path: string, x: number, y: number, w: number, h: number, size: number) => invoke<boolean>("block_set_icon_area", { uuid, path, x, y, w, h, size }),
     skinAdd: (input: string) => invoke<string>("block_skin_add", { input }),
@@ -903,6 +905,18 @@ export type InstancePatch = {
   logEncoding?: string | null,
 };
 
+export type BlockGroupsDto = {
+  order: string[],
+  groups: BlockGroupDto[],
+  members: Record<string, string[]>,
+  favorites: string[],
+};
+
+export type BlockGroupDto = {
+  uuid: string,
+  name: string,
+};
+
 export type BlockItemDto = {
   id: string,
   name: string,
@@ -972,6 +986,13 @@ export type ModItemDto = {
   note: string,
   icon: string,
   jarInJar: ModItemDto[],
+  dependencies: ModDependencyDto[],
+};
+
+export type ModDependencyDto = {
+  modId: string,
+  required: string,
+  optional: boolean,
 };
 
 export type ModScanProgressDto = {
@@ -1102,7 +1123,7 @@ export type ResourceDropDto = {
   skipped: string[],
 };
 
-export type DepProblemKindDto = "missing" | "mismatch" | "disabled" | "duplicate";
+export type DepProblemKindDto = "missing" | "mismatch" | "disabled";
 
 export type DepProblemDto = {
   modid: string,
@@ -1110,7 +1131,16 @@ export type DepProblemDto = {
   required: string,
   installed: string,
   requiredBy: string[],
-  files: string[],
+};
+
+export type ModDuplicateDto = {
+  modid: string,
+  files: ModDuplicateFileDto[],
+};
+
+export type ModDuplicateFileDto = {
+  file: string,
+  version: string,
 };
 
 export type RunArgSettingDto = {

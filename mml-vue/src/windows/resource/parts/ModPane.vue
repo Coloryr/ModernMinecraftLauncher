@@ -13,14 +13,18 @@ import { showToast } from "../../../lib/toast";
 import SegmentedTabs from "../../../components/ui/SegmentedTabs.vue";
 import BaseButton from "../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../components/ui/BaseModal.vue";
+import DragGhost from "../../../components/ui/DragGhost.vue";
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import ContentHead from "./ContentHead.vue";
 import ListSkeleton from "./ListSkeleton.vue";
 import ModList from "./mod/ModList.vue";
 import ModTable from "./mod/ModTable.vue";
+import ModDepsModal from "./mod/ModDepsModal.vue";
 import ModGroupMenu, { type GroupMenuAction } from "./mod/ModGroupMenu.vue";
 import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
 import { deleteMod, disableMod, enableMod, modsDepTest, setModNote } from "../../../lib/api";
+import { copyText } from "../../../lib/clipboard";
+import { useModDeps } from "../composables/useModDeps";
 import { useReorderDrag } from "../composables/useReorderDrag";
 import { useRowSelect } from "../composables/useRowSelect";
 import {
@@ -33,7 +37,7 @@ import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceOps } from "../composables/useResourceOps";
 import type { useResourceView } from "../composables/useResourceView";
 import type { DepProblemDto, ModItemDto } from "../../../lib/bindings";
-import { modSelectKey, sortedMods, type ModStateGroup } from "../types";
+import { modHit, modSelectKey, sortedMods, type ModStateGroup } from "../types";
 import { orderedMods } from "../modColumns";
 import type { ModView } from "../types";
 
@@ -46,7 +50,8 @@ const props = defineProps<{
   view: ReturnType<typeof useResourceView>;
 }>();
 
-const { mods, instanceUuid, loading, modProgress } = props.data;
+const { mods, instance, instanceUuid, loading, modProgress, modDuplicates, dismissModDuplicates } =
+  props.data;
 const { busy, act, actLocal, askDelete, askConfirm, openFolder } = props.ops;
 
 /** 依赖检测结果弹窗是否打开 */
@@ -61,16 +66,54 @@ const DEP_KIND_LABEL: Record<DepProblemDto["kind"], string> = {
   missing: "resource.depKindMissing",
   mismatch: "resource.depKindMismatch",
   disabled: "resource.depKindDisabled",
-  duplicate: "resource.depKindDuplicate",
 };
 
-/** 依赖检测：列出缺前置 / 版本不符 / 前置被禁用 / 重复安装 */
+/** 弹窗里下拉组的顺序，与后端排序一致：缺失 → 前置被禁用 → 版本不符 */
+const DEP_KIND_ORDER: DepProblemDto["kind"][] = ["missing", "disabled", "mismatch"];
+
+/** 检测结果按种类分组，只留有问题的那几组 */
+const depGroups = computed(() =>
+  DEP_KIND_ORDER.map((kind) => ({
+    kind,
+    items: depProblems.value.filter((p) => p.kind === kind),
+  })).filter((group) => group.items.length > 0),
+);
+
+/** 展开着的下拉组；每次检测重新全展开 */
+const depOpenKinds = ref<Set<DepProblemDto["kind"]>>(new Set());
+
+/** 某个下拉组是不是展开的 */
+function isDepOpen(kind: DepProblemDto["kind"]): boolean {
+  return depOpenKinds.value.has(kind);
+}
+
+/** 收起 / 展开某个下拉组 */
+function toggleDepGroup(kind: DepProblemDto["kind"]) {
+  const next = new Set(depOpenKinds.value);
+  if (next.has(kind)) {
+    next.delete(kind);
+  } else {
+    next.add(kind);
+  }
+  depOpenKinds.value = next;
+}
+
+/** 依赖检测：列出缺前置 / 版本不符 / 前置被禁用 */
 async function runDepTest() {
   const uuid = instanceUuid.value;
   if (!uuid || depBusy.value) return;
   depBusy.value = true;
   try {
-    depProblems.value = await modsDepTest(uuid);
+    const problems = await modsDepTest(uuid);
+    // 没有问题就用一条轻提示，别弹一个空弹窗
+    if (!problems.length) {
+      depProblems.value = [];
+      showToast(t("resource.depNone"));
+      return;
+    }
+    depProblems.value = problems;
+    // 新结果全部展开，用户不用一个个点开
+    depOpenKinds.value = new Set(DEP_KIND_ORDER);
     depOpen.value = true;
   } catch (e) {
     showToast(tErr(e));
@@ -78,9 +121,103 @@ async function runDepTest() {
     depBusy.value = false;
   }
 }
+
+/**
+ * 导出文本的首行：实例名 + 游戏版本 + 加载器与加载器版本
+ *
+ * 贴给别人排查时这几项都要；缺的项自动跳过，还没有实例时返回 `null`。
+ *
+ * # 返回值
+ *
+ * 一行摘要；没有实例时为 `null`
+ */
+function instanceHeader(): string | null {
+  const inst = instance.value;
+  if (!inst) return null;
+  // 加载器走显示名（与新建实例那边同一个 i18n 键），原版就是"原版"
+  const loaderName = inst.loader ? t(`add.loader.${inst.loader}`) : "";
+  const loader = [loaderName, inst.loaderVersion].filter(Boolean).join(" ");
+  return [inst.name, inst.version, loader].filter(Boolean).join("  ");
+}
+
+/**
+ * 依赖检测结果的文本，供导出到剪贴板
+ *
+ * 按种类分组，与弹窗里看到的一致；每条把"装了什么 / 要求什么 / 谁需要"都带上，
+ * 贴给别人排查时不用再补上下文。首行见 `instanceHeader`。
+ *
+ * # 返回值
+ *
+ * 多行文本
+ */
+function depReportText(): string {
+  const lines: string[] = [];
+  const header = instanceHeader();
+  if (header) {
+    lines.push(header);
+  }
+  for (const group of depGroups.value) {
+    lines.push(`[${t(DEP_KIND_LABEL[group.kind])}]`);
+    for (const p of group.items) {
+      const parts = [p.modid];
+      if (p.installed) {
+        parts.push(t("resource.depInstalled", { version: p.installed }));
+      }
+      if (p.required !== "*") {
+        parts.push(t("resource.depRequired", { range: p.required }));
+      }
+      if (p.requiredBy.length) {
+        parts.push(t("resource.depBy", { list: p.requiredBy.join(", ") }));
+      }
+      lines.push(parts.join("  "));
+    }
+  }
+  return lines.join("\n");
+}
+
+/** 把依赖检测结果复制到剪贴板 */
+async function exportDepReport() {
+  const ok = await copyText(depReportText());
+  showToast(ok ? t("resource.copied") : t("resource.copyFail"));
+}
+
+/**
+ * 重复安装的文本，供导出到剪贴板
+ *
+ * 首行是实例名与版本，之后一行一个重复的 modid 及涉及的文件。
+ *
+ * # 返回值
+ *
+ * 多行文本
+ */
+function duplicateReportText(): string {
+  const lines: string[] = [];
+  const header = instanceHeader();
+  if (header) {
+    lines.push(header);
+  }
+  lines.push(`[${t("resource.modDupTitle")}]`);
+  for (const item of modDuplicates.value) {
+    lines.push(`${item.modid}  ${item.files.map((file) => file.file).join(", ")}`);
+  }
+  return lines.join("\n");
+}
+
+/** 把重复安装结果复制到剪贴板 */
+async function exportDuplicates() {
+  const ok = await copyText(duplicateReportText());
+  showToast(ok ? t("resource.copied") : t("resource.copyFail"));
+}
+
 const { modView, setModView, colWidths, setColWidth, sort, setSort } = props.view;
 
 const groups = useModGroups(props.data);
+
+/** 依赖关系：依赖树与"禁用前置时顺带禁用依赖方"都用它，见 useModDeps */
+const { treeOf, dependentsOf } = useModDeps(mods, instance);
+
+/** 打开着依赖树的那个模组；null = 没开 */
+const depTreeItem = ref<ModItemDto | null>(null);
 
 // ---------- 归组 / 改状态 ----------
 
@@ -96,7 +233,7 @@ async function enableAfterMove(keys: string[]) {
 }
 
 /**
- * 把若干模组改成目标启用状态
+ * 把若干模组的启用状态落盘
  *
  * `wantDisable = true` 禁用、`false` 启用；`picked` 里只放"当前状态与目标不同"的那些。
  *
@@ -105,8 +242,7 @@ async function enableAfterMove(keys: string[]) {
  * 后端会回**改名后的新身份**，即 uuid / 文件名 / 路径，就地改那一行即可；
  * `disable` 一改，`sections` 会把它挪到「已禁用 / 已启用」那一块去。
  */
-async function setState(picked: ModItemDto[], wantDisable: boolean) {
-  if (!picked.length) return;
+async function applyState(picked: ModItemDto[], wantDisable: boolean) {
   await actLocal(async () => {
     for (const item of picked) {
       const renamed = wantDisable
@@ -120,6 +256,74 @@ async function setState(picked: ModItemDto[], wantDisable: boolean) {
       item.disable = wantDisable;
     }
   });
+}
+
+/** 待确认的"要不要顺带把相关模组一起改"；null = 没在问 */
+const stateAsk = ref<{
+  /** 本次操作的模组 */
+  picked: ModItemDto[];
+  /** 要一起改的那些 */
+  related: ModItemDto[];
+  /** true = 这次是禁用（一起禁用依赖方）；false = 这次是启用（一起启用前置） */
+  wantDisable: boolean;
+} | null>(null);
+
+/**
+ * 这些模组的强制前置里，现在**处于禁用状态**的那些
+ *
+ * 只找"装了但被禁用"的：压根没装属于"缺前置"，不是这里能顺手解决的。
+ *
+ * - `picked`: 这次要启用的模组
+ *
+ * # 返回值
+ *
+ * 需要一起启用的条目，按列表顺序
+ */
+function disabledPrerequisites(picked: ModItemDto[]): ModItemDto[] {
+  const wanted = new Set<string>();
+  for (const item of picked) {
+    for (const dep of item.dependencies) {
+      if (!dep.optional) {
+        wanted.add(dep.modId.toLowerCase());
+      }
+    }
+  }
+  if (!wanted.size) return [];
+  const pickedKeys = new Set(picked.map((item) => modSelectKey(item)));
+  return mods.value.filter(
+    (item) =>
+      item.disable &&
+      !!item.modId &&
+      wanted.has(item.modId.toLowerCase()) &&
+      !pickedKeys.has(modSelectKey(item)),
+  );
+}
+
+/**
+ * 改启用状态；两个方向都先看有没有"相关模组"要一起改
+ *
+ * - **禁用**：还有别的启用模组依赖它 —— 少了前置轻则功能缺失、重则起不来，
+ *   问一句要不要一起禁用；
+ * - **启用**：它要的强制前置现在被禁用着 —— 问一句要不要一起启用，省得一个个找。
+ */
+async function setState(picked: ModItemDto[], wantDisable: boolean) {
+  if (!picked.length) return;
+  const related = wantDisable
+    ? dependentsOf(new Set(picked.map((item) => item.modId.toLowerCase()).filter((id) => !!id)))
+    : disabledPrerequisites(picked);
+  if (related.length) {
+    stateAsk.value = { picked, related, wantDisable };
+    return;
+  }
+  await applyState(picked, wantDisable);
+}
+
+/** 回答"要不要一起改"：`together = false` 就是只动点下去的那些 */
+function answerStateAsk(together: boolean) {
+  const ask = stateAsk.value;
+  stateAsk.value = null;
+  if (!ask) return;
+  void applyState(together ? [...ask.picked, ...ask.related] : ask.picked, ask.wantDisable);
 }
 
 /** 从分组表记的 SHA1 里挑出"当前状态与目标不同"的那些条目 */
@@ -150,6 +354,7 @@ const {
   count: selectedCount,
   isSelected,
   toggle: toggleSelect,
+  toggleMany: toggleSelectMany,
   onRowClick,
   clear: clearSelection,
 } = useRowSelect<ModItemDto>({
@@ -285,6 +490,8 @@ const groupMenu = ref<{
   canEnable: boolean;
   /** 组里还有启用的模组 → 菜单给"禁用所有" */
   canDisable: boolean;
+  /** 组里可多选的模组已全部选中 → 菜单给"取消全选" */
+  allSelected: boolean;
   x: number;
   y: number;
 } | null>(null);
@@ -292,6 +499,24 @@ const groupMenu = ref<{
 /** 分组里的模组；按 id 从当前 sections 里取那一批 */
 function groupItems(id: string): ModItemDto[] {
   return sections.value.find((sec) => sec.id === id)?.items ?? [];
+}
+
+/**
+ * 整组全选 / 取消全选
+ *
+ * 右键菜单的「全选」与表格里分组行的勾选框都是它：组内全部已选就整组取消，
+ * 否则整组选上，见 useRowSelect 的 `toggleMany`。
+ */
+function groupToggleSelect(id: string) {
+  toggleSelectMany(groupItems(id));
+}
+
+/** 组内可多选的模组是否已全部选中 */
+function groupAllSelected(id: string): boolean {
+  const keys = groupItems(id)
+    .map(modSelectKey)
+    .filter((key) => !!key);
+  return keys.length > 0 && keys.every((key) => selected.value.has(key));
 }
 
 /** 打开分组右键菜单；表格视图由 ModTable 抛上来，列表视图直接绑在分组头上 */
@@ -311,6 +536,7 @@ function openGroupMenu(payload: {
     // 识别失败的模组改不了启用状态（勾选框也是禁用的），所以不计入判断
     canEnable: groupItems(payload.id).some((item) => !item.fail && item.disable),
     canDisable: groupItems(payload.id).some((item) => !item.fail && !item.disable),
+    allSelected: groupAllSelected(payload.id),
     x: payload.event.clientX,
     y: payload.event.clientY,
   };
@@ -460,6 +686,9 @@ function onGroupMenuAction(kind: GroupMenuAction) {
     case "delete-group":
       removeGroup(menu.id, menu.label);
       break;
+    case "select-all":
+      groupToggleSelect(menu.id);
+      break;
     case "enable-all":
       void groupSetState(menu.id, false);
       break;
@@ -500,9 +729,22 @@ const rowMenu = ref<{
 /** 单行菜单项 */
 function itemMenuItems(item: ModItemDto): RowMenuItem[] {
   const items: RowMenuItem[] = [
+    // 启用 / 禁用放第一条：改状态是最常用的动作
+    {
+      id: item.disable ? "enable" : "disable",
+      label: item.disable ? t("resource.enable") : t("resource.disable"),
+      // 识别失败的模组改不了启用状态，勾选框也是禁用的
+      disabled: item.fail,
+    },
     { id: "note", label: t("resource.modNote") },
     { id: "open-folder", label: t("resource.openFolder") },
   ];
+  // 依赖树：没声明任何前置时没什么可展开的，置灰
+  items.push({
+    id: "dep-tree",
+    label: t("resource.depTree"),
+    disabled: !item.dependencies.length,
+  });
   // 分组那两条挨着：移到别的分组 / 移出分组，后者只在这一行确实在组里时才给
   items.push({
     id: "move",
@@ -512,13 +754,6 @@ function itemMenuItems(item: ModItemDto): RowMenuItem[] {
     separated: true,
   });
   if (isGrouped(item)) items.push({ id: "ungroup", label: t("resource.ungroup") });
-  items.push({
-    id: item.disable ? "enable" : "disable",
-    label: item.disable ? t("resource.enable") : t("resource.disable"),
-    // 识别失败的模组改不了启用状态，勾选框也是禁用的
-    disabled: item.fail,
-    separated: true,
-  });
   items.push({ id: "remove", label: t("resource.delete"), danger: true, separated: true });
   return items;
 }
@@ -615,6 +850,9 @@ function onMenuPick(id: string) {
     case "open-folder":
       openFolder("mods", item.file);
       break;
+    case "dep-tree":
+      depTreeItem.value = item;
+      break;
     case "remove":
       remove(item);
       break;
@@ -627,17 +865,32 @@ function onMenuPick(id: string) {
 const keyword = ref("");
 const query = computed(() => keyword.value.trim().toLowerCase());
 
-/** 命中判定：名字 / modid / 文件名 / 作者 / 版本 / 简介，任一包含即命中 */
-function hit(item: ModItemDto, q: string): boolean {
-  return [item.name, item.modId, item.file, item.author, item.version, item.description].some(
-    (value) => value.toLowerCase().includes(q),
-  );
+/**
+ * 命中判定：按展示方式选字段（见 `modHit`），表格模式**再往里看一层**
+ *
+ * 表格里内置模组（jar-in-jar）是独立的行，所以内置命中时也要保留父行 —— 否则搜
+ * 内置库的名字永远搜不出来；命中的内置行由 ModTable 自动展开显示。
+ * 列表模式不递归：内置行跟着父行一起出现，父行命中就够了。
+ *
+ * - `item`: 一个模组条目
+ * - `q`: 已转小写的搜索词
+ * - `view`: 当前展示方式
+ *
+ * # 返回值
+ *
+ * 本条或它的任一内置模组命中即为 `true`
+ */
+function hit(item: ModItemDto, q: string, view: ModView): boolean {
+  if (modHit(item, q, view)) return true;
+  return view === "table" && item.jarInJar.some((child) => hit(child, q, view));
 }
 
-/** 当前要显示的模组（搜索词为空时就是全部） */
+/** 当前要显示的模组（搜索词为空时就是全部）；两种模式搜的字段不同，见 `hit` */
 const matched = computed(() => {
   const q = query.value;
-  return q ? mods.value.filter((item) => hit(item, q)) : mods.value;
+  if (!q) return mods.value;
+  const view = modView.value;
+  return mods.value.filter((item) => hit(item, q, view));
 });
 
 /** 搜了但一个都没命中 */
@@ -802,12 +1055,25 @@ const sectionIds = computed(() => sections.value.map((sec) => sec.id));
 const {
   dragKey: draggingSection,
   insertAt: insertSectionAt,
+  ghost: sectionGhost,
   onPointerDown: onSectionPointerDown,
   consumeSuppressClick: consumeSectionClick,
 } = useReorderDrag({
   keys: () => sectionIds.value,
   rectOf: (key) => sectionEls.get(key)?.getBoundingClientRect() ?? null,
   onDrop: (from, insertAt) => void moveSection(from, insertAt),
+});
+
+/** 拖动副本与落点占位上显示的组名：被拖那一块的显示名 */
+const sectionGhostLabel = computed(() => {
+  const key = sectionGhost.value?.item;
+  return key ? (sections.value.find((sec) => sec.id === key)?.label ?? "") : "";
+});
+
+/** 落点占位上的数量：被拖那一块的条目数 */
+const sectionGhostCount = computed(() => {
+  const key = sectionGhost.value?.item;
+  return key ? (sections.value.find((sec) => sec.id === key)?.items.length ?? 0) : 0;
 });
 
 /**
@@ -981,7 +1247,7 @@ onMounted(() => void groups.load());
 </script>
 
 <template>
-  <ContentHead :data="data">
+  <ContentHead :data="data" :busy="depBusy">
     <template #actions>
       <!--
         有选中项时顶栏换成批量操作条，用户选的口径是"顶栏出现批量按钮"。
@@ -1023,9 +1289,9 @@ onMounted(() => void groups.load());
           <GlyphIcon name="folder-plus" :size="14" />
           {{ t("resource.groupAdd") }}
         </button>
-        <!-- 依赖检测要重扫一遍模组，跑的时候按钮置灰 -->
+        <!-- 依赖检测要重扫一遍模组，跑的时候按钮置灰并把图标转起来 -->
         <button class="mini-btn icon-btn" :disabled="depBusy || loading" @click="runDepTest">
-          <GlyphIcon name="check" :size="14" />
+          <GlyphIcon :name="depBusy ? 'refresh' : 'puzzle'" :size="14" :class="{ 'dep-spin': depBusy }" />
           {{ t("resource.depTest") }}
         </button>
       </template>
@@ -1058,17 +1324,21 @@ onMounted(() => void groups.load());
     <div class="mod-table-panel">
       <div class="mod-table-scroll">
         <template v-for="(sec, idx) in sections" :key="sec.id">
-          <span v-if="showSectionLine(idx)" class="mod-group-insert" />
+          <div v-if="showSectionLine(idx)" class="mod-group-insert">
+          <span class="mod-group-name">{{ sectionGhostLabel }}</span>
+          <span class="mod-group-count">{{ sectionGhostCount }}</span>
+        </div>
 
           <section :ref="(el) => bindSection(sec.id, el as Element | null)" class="mod-group mod-group-table"
             :class="{ 'mod-group-dragging': draggingSection === sec.id }">
-            <ModTable :items="sec.items" :busy="busy" :selected-keys="selected" :group-label="sec.label"
+            <ModTable :items="sec.items" :busy="busy" :selected-keys="selected" :query="query" :group-label="sec.label"
               :group-key="sec.id" :group-open="isOpen(sec.id)" :custom="sec.custom" :dragging-group="draggingSection"
               :hide-header="idx > 0" :col-widths="colWidths" :sort="sort" @col-resize="setColWidth"
               @sort-change="setSort" @group-menu="openGroupMenu" @toggle="toggle" @remove="remove"
               @toggle-group="onSectionToggle(sec.id)" @drag-group="onSectionPointerDown($event, sec.id)"
               @note-save="saveNoteInline" @open-folder="openFolder('mods', $event.file)" @select="toggleSelect"
-              @item-menu="openItemMenu" @row-click="onRowClick" :anchor-key="anchorKey" />
+              @select-group="groupToggleSelect(sec.id)" @item-menu="openItemMenu" @row-click="onRowClick"
+              :anchor-key="anchorKey" />
           </section>
         </template>
       </div>
@@ -1080,7 +1350,10 @@ onMounted(() => void groups.load());
     <!-- 按块渲染，不用 section 上的 v-for：插入线要画在"两块之间"，得有个兄弟节点 -->
     <template v-for="(sec, idx) in sections" :key="sec.id">
       <!-- 拖分组头时的插入线：松手后这一块会落到这里 -->
-      <span v-if="showSectionLine(idx)" class="mod-group-insert" />
+      <div v-if="showSectionLine(idx)" class="mod-group-insert">
+          <span class="mod-group-name">{{ sectionGhostLabel }}</span>
+          <span class="mod-group-count">{{ sectionGhostCount }}</span>
+        </div>
 
       <section :ref="(el) => bindSection(sec.id, el as Element | null)" class="mod-group" :class="{
         'mod-group-dragging': draggingSection === sec.id,
@@ -1120,7 +1393,10 @@ onMounted(() => void groups.load());
       </section>
 
       <!-- 尾部插入线：拖到最末一块之后 -->
-      <span v-if="idx === sections.length - 1 && showSectionLine(sections.length)" class="mod-group-insert" />
+      <div v-if="idx === sections.length - 1 && showSectionLine(sections.length)" class="mod-group-insert">
+          <span class="mod-group-name">{{ sectionGhostLabel }}</span>
+          <span class="mod-group-count">{{ sectionGhostCount }}</span>
+        </div>
     </template>
   </div>
 
@@ -1195,46 +1471,115 @@ onMounted(() => void groups.load());
     </div>
   </BaseModal>
 
+  <!-- 拖动分组时的跟手副本：被拖那一块的组名 -->
+  <DragGhost v-if="sectionGhost" :x="sectionGhost.x" :y="sectionGhost.y">
+    <GlyphIcon name="folder" :size="14" />
+    <span>{{ sectionGhostLabel }}</span>
+  </DragGhost>
+
+  <!-- 依赖树：选一个模组，展开它声明的强制 / 推荐前置 -->
+  <ModDepsModal v-if="depTreeItem" :item="depTreeItem" :tree="treeOf(depTreeItem)"
+    @close="depTreeItem = null" />
+
+  <!--
+    改启用状态时问一句要不要顺带处理相关模组：
+    禁用看"谁还需要它"，启用看"它要的前置是不是被禁用着"
+  -->
+  <BaseModal v-if="stateAsk" :width="460" :closable="false"
+    :title="t(stateAsk.wantDisable ? 'resource.disableDepsTitle' : 'resource.enableDepsTitle')"
+    @close="stateAsk = null">
+    <p class="dep-note">
+      {{ t(stateAsk.wantDisable ? "resource.disableDepsHint" : "resource.enableDepsHint", {
+        name: stateAsk.picked.map((item) => item.name || item.file).join(", "),
+        list: stateAsk.related.map((item) => item.name || item.file).join(", "),
+      }) }}
+    </p>
+    <div class="modal-actions">
+      <BaseButton @click="answerStateAsk(false)">
+        {{ t(stateAsk.wantDisable ? "resource.disableDepsOnly" : "resource.enableDepsOnly") }}
+      </BaseButton>
+      <BaseButton variant="accent" @click="answerStateAsk(true)">
+        {{ t(stateAsk.wantDisable ? "resource.disableDepsTogether" : "resource.enableDepsTogether") }}
+      </BaseButton>
+    </div>
+  </BaseModal>
+
   <!-- 分组右键菜单：只负责画与定位，动作全部抛回这里执行，见 onGroupMenuAction -->
   <ModGroupMenu v-if="groupMenu" :x="groupMenu.x" :y="groupMenu.y" :label="groupMenu.label" :custom="groupMenu.custom"
     :count="groupMenu.count" :can-enable="groupMenu.canEnable" :can-disable="groupMenu.canDisable"
-    @action="onGroupMenuAction" @close="groupMenu = null" />
+    :all-selected="groupMenu.allSelected" @action="onGroupMenuAction" @close="groupMenu = null" />
 
   <!-- 模组行右键菜单：单行与批量共用 RowMenu，菜单项见 itemMenuItems / batchMenuItems -->
   <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title" @pick="onMenuPick"
     @close="rowMenu = null" />
 
   <!--
-    依赖检测结果：按后端排好的顺序列（缺失 → 前置被禁用 → 版本不符 → 重复安装）。
-    没有问题就说一句"没有发现问题"，不要留一块空弹窗
+    依赖检测结果：按种类分成几个可收起的下拉组（缺失 → 前置被禁用 → 版本不符），默认全展开。
+    **有问题才开这个弹窗**，没问题在 runDepTest 里用一条轻提示，不留空弹窗
   -->
-  <BaseModal v-if="depOpen" :title="t('resource.depTitle')" @close="depOpen = false">
-    <p v-if="!depProblems.length" class="empty-tip">{{ t("resource.depNone") }}</p>
-    <div v-else class="dep-list">
-      <div v-for="(p, i) in depProblems" :key="`${p.kind}-${p.modid}-${i}`" class="dep-row">
-        <span class="dep-kind">{{ t(DEP_KIND_LABEL[p.kind]) }}</span>
-        <div class="dep-body">
-          <div class="dep-head">
-            <span class="dep-modid">{{ p.modid }}</span>
-            <span v-if="p.installed" class="dep-meta">
-              {{ t("resource.depInstalled", { version: p.installed }) }}
-            </span>
-            <span v-if="p.required !== '*'" class="dep-meta">
-              {{ t("resource.depRequired", { range: p.required }) }}
-            </span>
-          </div>
-          <div v-if="p.requiredBy.length" class="dep-note">
-            {{ t("resource.depBy", { list: p.requiredBy.join(", ") }) }}
-          </div>
-          <div v-if="p.files.length" class="dep-note">
-            {{ t("resource.depFiles", { list: p.files.join(", ") }) }}
+  <BaseModal v-if="depOpen" :title="t('resource.depTitle')" :closable="false" @close="depOpen = false">
+    <div class="dep-list">
+      <div v-for="g in depGroups" :key="g.kind" class="dep-group">
+        <button class="dep-group-head" :class="{ collapsed: !isDepOpen(g.kind) }"
+          @click="toggleDepGroup(g.kind)">
+          <GlyphIcon class="dep-group-caret" name="chevron-down" :size="13" :weight="2.4" />
+          <span class="dep-group-label">{{ t(DEP_KIND_LABEL[g.kind]) }}</span>
+          <span class="dep-group-count">{{ g.items.length }}</span>
+        </button>
+
+        <div v-show="isDepOpen(g.kind)" class="dep-rows">
+          <div v-for="(p, i) in g.items" :key="`${p.modid}-${i}`" class="dep-row">
+            <div class="dep-body">
+              <div class="dep-head">
+                <span class="dep-modid">{{ p.modid }}</span>
+                <span v-if="p.installed" class="dep-meta">
+                  {{ t("resource.depInstalled", { version: p.installed }) }}
+                </span>
+                <span v-if="p.required !== '*'" class="dep-meta">
+                  {{ t("resource.depRequired", { range: p.required }) }}
+                </span>
+              </div>
+              <div v-if="p.requiredBy.length" class="dep-note">
+                {{ t("resource.depBy", { list: p.requiredBy.join(", ") }) }}
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
     <div class="modal-actions">
-      <BaseButton @click="depOpen = false">{{ t("resource.cancel") }}</BaseButton>
+      <!-- 导出：把弹窗里这份结果整段复制走，方便贴给别人排查 -->
+      <BaseButton @click="exportDepReport">
+        <GlyphIcon name="document" :size="14" />
+        {{ t("resource.exportClipboard") }}
+      </BaseButton>
+      <BaseButton variant="accent" @click="depOpen = false">{{ t("actions.confirm") }}</BaseButton>
+    </div>
+  </BaseModal>
+
+  <!--
+    重复安装提示：列表加载完由后端事件推来，自动弹，与手动触发的依赖检测分开。
+    同名文件同时启用属安装冲突，不必等用户自己去点检测
+  -->
+  <BaseModal v-if="modDuplicates.length" :title="t('resource.modDupTitle')" :closable="false"
+    @close="dismissModDuplicates">
+    <p class="dep-note">{{ t("resource.modDupHint") }}</p>
+    <div class="dep-list mod-dup-list">
+      <div v-for="d in modDuplicates" :key="d.modid" class="dep-row">
+        <span class="dep-modid">{{ d.modid }}</span>
+        <div class="dep-body">
+          <div v-for="f in d.files" :key="f.file" class="dep-note">{{ f.file }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <BaseButton @click="exportDuplicates">
+        <GlyphIcon name="document" :size="14" />
+        {{ t("resource.exportClipboard") }}
+      </BaseButton>
+      <BaseButton variant="accent" @click="dismissModDuplicates">{{ t("actions.confirm") }}</BaseButton>
     </div>
   </BaseModal>
 </template>
@@ -1320,7 +1665,7 @@ onMounted(() => void groups.load());
   font-size: 11.5px;
 }
 
-/* ---------- 依赖检测结果 ---------- */
+/* ---------- 依赖检测 / 重复安装结果 ---------- */
 
 /* 问题多时弹窗自己滚，别把动作按钮顶出屏幕 */
 .dep-list {
@@ -1331,21 +1676,63 @@ onMounted(() => void groups.load());
   overflow-y: auto;
 }
 
+/* 重复那一档上面还有一行说明：列表再收一点，保证说明与按钮都留在视野里 */
+.mod-dup-list {
+  max-height: 46vh;
+}
+
+/* 依赖检测跑起来时图标转起来：要重扫一遍模组，几秒里得让人看出是在跑 */
+.dep-spin {
+  animation: dep-spin 0.8s linear infinite;
+}
+
+@keyframes dep-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .dep-row {
   display: flex;
   gap: 10px;
   align-items: flex-start;
 }
 
-/* 种类标签：四种问题用同一套中性外观，靠文字区分，避免再引一套主题色 */
-.dep-kind {
-  flex-shrink: 0;
-  padding: 1px 7px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+/* 下拉组的组头：箭头 + 种类名 + 条数；点整行收起 / 展开 */
+.dep-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.dep-group-caret {
+  transition: transform 0.12s;
+}
+
+.dep-group-head.collapsed .dep-group-caret {
+  transform: rotate(-90deg);
+}
+
+.dep-group-count {
   color: var(--text-dim);
   font-size: 11.5px;
-  white-space: nowrap;
+  font-weight: 400;
+}
+
+.dep-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 6px 0 2px 21px;
 }
 
 .dep-body {

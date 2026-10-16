@@ -10,6 +10,7 @@ import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import AsyncImage from "../../components/ui/AsyncImage.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
+import DragGhost from "../../components/ui/DragGhost.vue";
 import InstanceIcon from "../../components/InstanceIcon.vue";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import { useCollectDrag } from "../../composables/useCollectDrag";
@@ -466,7 +467,7 @@ function toggleCard(item: CollectItemDto) {
  * 与拖动游戏实例同一套做法：指针拖拽、落点用 `data-group` 反查、多选模式下拖已勾选的
  * 卡片整批一起走。收藏的分组没有组内次序，数据层是集合，所以只做归属、不做排序。
  */
-const { draggingUuids, dropGroup, onCardPointerDown, consumeSuppressClick } = useCollectDrag({
+const { draggingUuids, dropGroup, ghost: collectGhost, onCardPointerDown, consumeSuppressClick } = useCollectDrag({
   checked,
   multiSelect,
   // 传取值函数而不是 computed 本身：这里只在松手那一刻读一次，不需要是 Ref
@@ -479,6 +480,12 @@ function onCardClick(item: CollectItemDto) {
   if (consumeSuppressClick()) return;
   toggleCard(item);
 }
+
+/** 跟手浮起副本的内容：手里抓着的第一项（按下那张排最前） */
+const collectDragItem = computed(() => {
+  const uuid = collectGhost.value?.item.uuids[0];
+  return uuid ? (items.value.find((i) => i.uuid === uuid) ?? null) : null;
+});
 
 /**
  * 拖拽幽灵卡片的内容：与实例拖拽的 `.drop-ghost-row` 同一观感，图标 + 名字
@@ -752,6 +759,15 @@ function closeMenu() {
                   <div class="card-meta">{{ dragGhostCard?.meta }}</div>
                 </div>
               </div>
+
+              <!-- 跟手浮起副本：手里抓着的那一项，跟着指针走 -->
+              <DragGhost v-if="collectGhost && collectDragItem" :x="collectGhost.x" :y="collectGhost.y">
+                <div class="card-icon">
+                  <AsyncImage v-if="iconOf(collectDragItem)" :src="iconOf(collectDragItem)" />
+                  <GlyphIcon v-else class="card-icon-none" name="image" :size="22" :weight="1.6" />
+                </div>
+                <span class="card-name">{{ collectDragItem.name }}</span>
+              </DragGhost>
             </div>
           </div>
         </section>

@@ -17,6 +17,7 @@ import { t } from "../../lib/i18n";
 import { api, blockRenderCancel, onCloseBlocked } from "../../lib/api";
 import { loadGuiConfig } from "../../lib/guiConfig";
 import { useBlockList } from "./composables/useBlockList";
+import { useBlockGroups } from "./composables/useBlockGroups";
 import type { InstanceInfoDto } from "../../lib/bindings";
 
 const emit = defineEmits<{
@@ -24,8 +25,10 @@ const emit = defineEmits<{
   (e: "close"): void;
 }>();
 
-/** 方块列表状态（面板与标题栏工具条共用） */
-const list = useBlockList();
+/** 自建分组 / 收藏 / 左栏顺序（用户数据，存本地） */
+const groups = useBlockGroups();
+/** 方块列表状态（面板与标题栏工具条共用）；分组与收藏从这里接进列表 */
+const list = useBlockList({ inGroup: groups.inGroup, isFavorite: groups.isFavorite });
 const { rendered, keyword, size, running, startRender, addSkin } = list;
 
 const currentInstance = ref<InstanceInfoDto | null>(null);
@@ -94,7 +97,7 @@ async function confirmCloseRender() {
         @re-render="startRender(true)" />
     </template>
 
-    <BlockPanel :settings="list" :current-instance="currentInstance" />
+    <BlockPanel :settings="list" :groups="groups" :current-instance="currentInstance" />
 
     <!-- 添加玩家头颅（用户名或 UUID） -->
     <SkinAddModal v-if="skinOpen" :busy="skinBusy" @submit="onSkinSubmit" @close="skinOpen = false" />

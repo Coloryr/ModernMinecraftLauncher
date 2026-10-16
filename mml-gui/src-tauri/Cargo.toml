@@ -52,6 +52,7 @@ mml-nbt = { path = "../../mml-core/mml-nbt" }
 mml-skin = { path = "../../mml-core/mml-skin" }
 mml-skin-draw = { path = "../../mml-core/mml-skin-draw" }
 mml-tex-draw = { path = "../../mml-core/mml-tex-draw" }
+window-vibrancy = "0.8.1"
 
 [dev-dependencies]
 # 测试临时目录统一放 target/temp（AGENTS.md §6）：不要用系统 %TEMP%，也不要自己拼仓库根

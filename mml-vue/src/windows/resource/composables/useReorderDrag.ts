@@ -5,6 +5,8 @@
 // 用指针事件模拟，不用 HTML5 draggable：WebView2 里会出现"禁止"光标且投放不可靠。
 import { onMounted, onUnmounted, ref } from "vue";
 
+import { useDragGhost } from "../../../composables/useDragGhost";
+
 /**
  * 开始拖拽的位移阈值，单位像素
  *
@@ -30,6 +32,7 @@ const DRAG_THRESHOLD = 8;
  *
  * - `dragKey`: 真正在拖的项，`null` 表示还没超过阈值
  * - `dropAt`: 指针当前落点，`null` 表示无落点
+ * - `ghost`: 跟手浮起副本（被拖项的 key + 指针位置），`null` 表示没在拖
  * - `onPointerDown`: 按下某一项，开始一轮手势
  * - `consumeSuppressClick`: 取走"这次 click 要吞掉"的标记
  * - `reset`: 中止这一轮手势
@@ -42,6 +45,8 @@ export function useDragGesture<T>(deps: {
   const dragKey = ref<string | null>(null);
   /** 指针当前落点，`null` 表示无落点 */
   const dropAt = ref<T | null>(null);
+  /** 跟手浮起副本：跨过阈值后才有，内容由调用方按 `ghost.item`（被拖项的 key）渲染 */
+  const dragGhost = useDragGhost<string>();
 
   let candidate: string | null = null;
   let pointerId: number | null = null;
@@ -70,6 +75,7 @@ export function useDragGesture<T>(deps: {
     candidate = key;
     dragKey.value = null;
     dropAt.value = null;
+    dragGhost.stopGhost();
   }
 
   function onPointerMove(e: PointerEvent) {
@@ -78,6 +84,9 @@ export function useDragGesture<T>(deps: {
       if (Math.hypot(e.clientX - startX, e.clientY - startY) <= DRAG_THRESHOLD) return;
       dragKey.value = candidate;
       dragged = true;
+      dragGhost.startGhost(candidate, e);
+    } else {
+      dragGhost.moveGhost(e);
     }
     dropAt.value = deps.hitTest(e);
   }
@@ -87,6 +96,7 @@ export function useDragGesture<T>(deps: {
     candidate = null;
     dragKey.value = null;
     dropAt.value = null;
+    dragGhost.stopGhost();
     // 注意：**不清 `dragged`** —— 见它上面的说明，click 还没派发
   }
 
@@ -124,7 +134,7 @@ export function useDragGesture<T>(deps: {
     window.removeEventListener("pointercancel", reset);
   });
 
-  return { dragKey, dropAt, onPointerDown, consumeSuppressClick, reset };
+  return { dragKey, dropAt, ghost: dragGhost.ghost, onPointerDown, consumeSuppressClick, reset };
 }
 
 /**
@@ -141,6 +151,7 @@ export function useDragGesture<T>(deps: {
  *
  * - `dragKey`: 正在被拖的项 key，`null` 表示没在拖
  * - `insertAt`: 会插到第几项之前，`null` 表示无落点
+ * - `ghost`: 跟手浮起副本，见 [`useDragGesture`]
  * - `onPointerDown`: 在某一项上按下，开始一轮手势
  * - `consumeSuppressClick`: 取走"这次 click 要吞掉"的标记
  */
@@ -175,6 +186,7 @@ export function useReorderDrag(deps: {
   return {
     dragKey: gesture.dragKey,
     insertAt: gesture.dropAt,
+    ghost: gesture.ghost,
     onPointerDown: gesture.onPointerDown,
     consumeSuppressClick: gesture.consumeSuppressClick,
   };

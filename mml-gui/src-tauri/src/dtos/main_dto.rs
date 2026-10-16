@@ -3,6 +3,8 @@
 //! 从 `../windows/main.rs` 挪出：这些类型只用于跨 Tauri IPC，即事件 / 命令入参，
 //! 无业务方法、不参与磁盘持久化，归入 DTO 层。
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 /// 双层 Option 反序列化：区分"没传"与"清空"
@@ -196,6 +198,30 @@ pub struct InstancePatch {
     pub lang: Option<String>,
     /// 日志编码：utf8 / gbk
     pub log_encoding: Option<String>,
+}
+
+/// 方块窗口的用户数据：左栏顺序 / 自建分组 / 收藏
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlockGroupsDto {
+    /// 左栏顺序：游戏分类名与 `g:<uuid>` 混排
+    pub order: Vec<String>,
+    /// 自建分组
+    pub groups: Vec<BlockGroupDto>,
+    /// 分组 uuid → 成员方块 id
+    pub members: HashMap<String, Vec<String>>,
+    /// 收藏的方块 id
+    pub favorites: Vec<String>,
+}
+
+/// 一个自建分组
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlockGroupDto {
+    /// 分组标识
+    pub uuid: String,
+    /// 分组名
+    pub name: String,
 }
 
 /// 方块列表条目

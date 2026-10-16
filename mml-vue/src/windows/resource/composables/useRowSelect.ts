@@ -23,6 +23,7 @@ import { computed, ref } from "vue";
  * - `count`: 选中数量
  * - `isSelected`: 某一行是否选中
  * - `toggle`: 勾选框用，加选 / 移出，并把它记成锚点
+ * - `toggleMany`: 一组行全选 / 全取消，分组右键与分组行的勾选框用
  * - `onRowClick`: 整行左键用，Shift 是整段选中，否则只在多选状态下加选 / 反选
  * - `clear`: 清空选择与锚点
  */
@@ -54,6 +55,29 @@ export function useRowSelect<T>(options: {
     selected.value = next;
     // 记住"上次点（或勾选）的那一项"：Shift + 点的整段选择从这里算起
     anchorKey.value = key;
+  }
+
+  /**
+   * 一组行全选 / 全取消
+   *
+   * 组内**全部已选**就全部取消，否则全部选上 —— 分组右键的「全选」与表格里分组行的
+   * 勾选框共用这一个开关。锚点不动：整段选择仍从用户上次点的那一行算起。
+   *
+   * - `items`: 这一组行
+   */
+  function toggleMany(items: T[]) {
+    const keys = items.map(options.keyOf).filter((key) => !!key);
+    if (!keys.length) return;
+    const next = new Set(selected.value);
+    const all = keys.every((key) => next.has(key));
+    for (const key of keys) {
+      if (all) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+    }
+    selected.value = next;
   }
 
   /** 清空选择与锚点 */
@@ -107,5 +131,5 @@ export function useRowSelect<T>(options: {
     toggle(payload.item);
   }
 
-  return { selected, anchorKey, count, isSelected, toggle, onRowClick, clear };
+  return { selected, anchorKey, count, isSelected, toggle, toggleMany, onRowClick, clear };
 }

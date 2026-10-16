@@ -13,6 +13,7 @@ import { api } from "../lib/api";
 import { tErr } from "../lib/i18n";
 import { showToast } from "../lib/toast";
 import type { CollectItemDto } from "../lib/bindings";
+import { elementBeneathShield, useDragGhost } from "./useDragGhost";
 
 interface DragDeps {
   /** 当前勾选的收藏项 */
@@ -46,6 +47,7 @@ const SCROLL_STEP = 10;
  * # 返回值
  *
  * - `dragActive`: 正在拖的批次，`null` 表示没在拖
+ * - `ghost`: 跟手浮起副本（批次 + 指针位置），`null` 表示没在拖
  * - `draggingUuids`: 正在拖的项 uuid 集合，卡片据此变淡
  * - `dropGroup`: 指针当前落在的分组 key，`null` 表示不在任何分组上
  * - `onCardPointerDown`: 卡片按下时调用，记下拖拽候选
@@ -58,6 +60,8 @@ export function useCollectDrag(deps: DragDeps) {
   const dropGroup = ref<string | null>(null);
   /** 正在拖拽的收藏项（卡片据此变淡） */
   const draggingUuids = computed(() => new Set(dragActive.value?.uuids ?? []));
+  /** 跟手浮起副本：内容由调用方按 `ghost.item` 的 uuid 现查 */
+  const dragGhost = useDragGhost<DragCandidate>();
 
   let pointerId: number | null = null;
   let startX = 0;
@@ -90,8 +94,11 @@ export function useCollectDrag(deps: DragDeps) {
       if (Math.hypot(e.clientX - startX, e.clientY - startY) <= DRAG_THRESHOLD) return;
       dragActive.value = dragCandidate.value;
       if (!dragActive.value) return;
+      dragGhost.startGhost(dragActive.value, e);
       // 真拖起来了：这一串指针操作结束时的 click 不算"点卡片"，见 consumeSuppressClick
       suppressClick = true;
+    } else {
+      dragGhost.moveGhost(e);
     }
     updateDropGroup(e);
   }
@@ -111,11 +118,12 @@ export function useCollectDrag(deps: DragDeps) {
     dragCandidate.value = null;
     dragActive.value = null;
     dropGroup.value = null;
+    dragGhost.stopGhost();
   }
 
   /** 指针下方是哪个分组；用 DOM 反向查找，`data-group` 存分组 key，与实例拖拽同一做法 */
   function updateDropGroup(e: PointerEvent) {
-    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const el = elementBeneathShield(e.clientX, e.clientY);
 
     // 靠近内容区上下边缘自动滚动，方便投给远处的分组（分组多时不然够不到）
     const body = (el?.closest?.(".frame-body") ?? null) as HTMLElement | null;
@@ -188,6 +196,7 @@ export function useCollectDrag(deps: DragDeps) {
   // 拖拽一旦开始，紧随的 click 就不该再当成"点卡片"
   return {
     dragActive,
+    ghost: dragGhost.ghost,
     draggingUuids,
     dropGroup,
     onCardPointerDown,

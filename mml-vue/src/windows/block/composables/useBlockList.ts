@@ -25,12 +25,25 @@ import {
 } from "../../../lib/api";
 import { openWindow } from "../../windowManager";
 import type { BlockItemDto, BlockStatusDto } from "../../../lib/bindings";
-import { isBlockSize, type BlockSize } from "../types";
+import { GROUP_PREFIX, isBlockSize, type BlockSize } from "../types";
 
 interface ViewPref {
   cat: string;
   keyword: string;
   size: BlockSize;
+}
+
+/** 外部分组 / 收藏数据的接入点；不传就是"没有自建分组、没有收藏" */
+export interface BlockListHooks {
+  /**
+   * 自建分组成员判定
+   *
+   * - `uuid`: 分组标识（分类键去掉 `g:` 前缀）
+   * - `id`: 方块 id
+   */
+  inGroup?: (uuid: string, id: string) => boolean;
+  /** 收藏判定：收藏过的方块在列表里排到最前 */
+  isFavorite?: (id: string) => boolean;
 }
 
 function readPref(): Partial<ViewPref> {
@@ -48,7 +61,7 @@ function readPref(): Partial<ViewPref> {
  * - `detail` / `openDetail` / `closeDetail`: 详情选中，只存 id，列表刷新后按 id 现查
  * - `addSkin` / `removeSkin` / `setIcon`: 玩家头颅与设为实例图标，均返回是否成功
  */
-export function useBlockList() {
+export function useBlockList(hooks?: BlockListHooks) {
   const { track } = useUnlisteners();
 
   // ---------- 渲染状态与列表 ----------
@@ -216,9 +229,12 @@ export function useBlockList() {
     return map;
   });
 
-  // 当前分类消失时回到「全部」：重渲染换版本，或删掉最后一个玩家头颅
+  // 当前分类消失时回到「全部」：重渲染换版本，或删掉最后一个玩家头颅。
+  // 自建分组的键不在这份游戏分类里，删组时由上层自己清（见 BlockPanel）
   watch(cats, (list) => {
-    if (cat.value && !list.includes(cat.value)) cat.value = "";
+    if (cat.value && !cat.value.startsWith(GROUP_PREFIX) && !list.includes(cat.value)) {
+      cat.value = "";
+    }
   });
 
   /** 分类显示名：先查 i18n，miss 时回退原文（原版分组即游戏语言翻译结果） */
@@ -233,8 +249,15 @@ export function useBlockList() {
 
   const filtered = computed(() => {
     const kw = keyword.value.trim().toLowerCase();
-    return blocks.value.filter((b) => {
-      if (cat.value && b.cat !== cat.value) return false;
+    const list = blocks.value.filter((b) => {
+      if (cat.value) {
+        // 自建分组：成员表说了算；游戏分类按条目自己的 cat 比
+        if (cat.value.startsWith(GROUP_PREFIX)) {
+          if (!hooks?.inGroup?.(cat.value.slice(GROUP_PREFIX.length), b.id)) return false;
+        } else if (b.cat !== cat.value) {
+          return false;
+        }
+      }
       if (!kw) return true;
       return (
         b.id.toLowerCase().includes(kw) ||
@@ -242,6 +265,11 @@ export function useBlockList() {
         catLabel(b.cat).toLowerCase().includes(kw)
       );
     });
+
+    // 收藏置顶：稳定排序（Array.sort 稳定），其余保持内核给的顺序
+    const isFav = hooks?.isFavorite;
+    if (!isFav) return list;
+    return [...list].sort((a, b) => Number(isFav(b.id)) - Number(isFav(a.id)));
   });
 
   /** 清掉搜索词与分类，回到全部 */

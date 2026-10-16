@@ -49,3 +49,11 @@ export function isBlockSize(v: unknown): v is BlockSize {
  * 改名会让旧数据对不上，**只改显示文案**为「玩家头颅」。
  */
 export const SKIN_CAT = "playerSkin";
+
+/**
+ * 自建分组的分类键前缀
+ *
+ * 左栏选中的 `cat` 既可能是游戏创造分类名（如 `buildingBlocks`），也可能是自建分组，
+ * 用这个前缀区分，见 useBlockGroups 的 `groupKey`。
+ */
+export const GROUP_PREFIX = "g:";

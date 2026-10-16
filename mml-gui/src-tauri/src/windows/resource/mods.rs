@@ -14,15 +14,18 @@ use std::sync::Arc;
 use mml_base::file_item::FileHash;
 use mml_game::GameInstance;
 use mml_game::game_mods::{
-    DependantProblem, DependantProblemKind, LoadSideType, ModObj,
+    DependantProblem, DependantProblemKind, DependantType, LoadSideType, ModDuplicate, ModObj,
+    mods_duplicate_test,
 };
 use mml_game::gui_hook::{IProgressGui, ProgressGui};
+use mml_game::loader::LoaderType;
 use mml_names::names;
 use mml_sys::path_helper;
 use tauri::{Emitter, WebviewWindow};
 
 use crate::dtos::{
-    DepProblemDto, DepProblemKindDto, ModItemDto, ModRenameDto, ModScanProgressDto,
+    DepProblemDto, DepProblemKindDto, ModDependencyDto, ModDuplicateDto, ModDuplicateFileDto,
+    ModItemDto, ModRenameDto, ModScanProgressDto,
 };
 use crate::err_keys;
 use crate::listens;
@@ -73,6 +76,18 @@ pub fn emit_resource_list_mods_progress(window: &WebviewWindow, dto: ModScanProg
     let _ = window.emit(listens::RESOURCE_LIST_MODS_PROGRESS, dto);
 }
 
+/// 模组重复安装事件，事件名 `resource-mods-duplicate`
+///
+/// - `window`: 接收事件的那个资源窗口，由 Tauri 注入
+/// - `dto`: 重复的 modid 列表，非空
+///
+/// 重复不是依赖问题，列表加载完就报：前端自动弹窗列出每个 modid 与涉及的文件，
+/// 不必用户自己点「依赖检测」。
+#[gui_macros::emit]
+pub fn emit_resource_mods_duplicate(window: &WebviewWindow, dto: Vec<ModDuplicateDto>) {
+    let _ = window.emit(listens::RESOURCE_MODS_DUPLICATE, dto);
+}
+
 /// 模组列表：解析 jar 元数据，条目多时耗时数秒
 ///
 /// - `window`: 发起这次扫描的那个资源窗口，由 Tauri 注入。扫描进度 `x/x` 只发给它，
@@ -98,13 +113,14 @@ pub async fn resource_list_mods(
 
     // 四份附带数据一起读，省掉前端额外往返与按文件名 / SHA1 的合并：
     // 备注 `Mod.ModName`、在线信息 `online_info.json`、游戏根目录，后者用来算相对路径
-    let (list, notes, online, game_path) = block_on_instance(instance, move |game| {
+    let (list, notes, online, game_path, loader) = block_on_instance(instance, move |game| {
         let notes = crate::gui_setting::load(&game).mods.mod_name;
         let online = game.read_online_info();
         let game_path = game.get_game_path();
+        let loader = game.loader;
         let list =
             tokio::runtime::Handle::current().block_on(async { game.read_mod(false, gui).await });
-        (list, notes, online, game_path)
+        (list, notes, online, game_path, loader)
     })
     .await?;
 
@@ -120,7 +136,17 @@ pub async fn resource_list_mods(
         notes: &notes,
         online: &online_of,
         game_path: &game_path,
+        loader,
     };
+
+    // 重复安装与依赖分开：列表照常返回，重复项另发事件给前端自动弹窗
+    let duplicates: Vec<ModDuplicateDto> = mods_duplicate_test(&list)
+        .into_iter()
+        .map(mod_duplicate_dto)
+        .collect();
+    if !duplicates.is_empty() {
+        emit_resource_mods_duplicate(&window, duplicates);
+    }
 
     Ok(list
         .iter()
@@ -136,6 +162,8 @@ struct ModCtx<'a> {
     online: &'a HashMap<String, mml_game::launcher::file_online_info_obj::OnlineInfoObj>,
     /// 实例的游戏根目录 `.minecraft`，用来算相对路径
     game_path: &'a Path,
+    /// 实例的加载器：前置声明只收与它一致的那份元数据，与依赖检测同一口径
+    loader: LoaderType,
 }
 
 /// 一个模组条目转成 DTO，条目本身可能带内置模组
@@ -198,6 +226,32 @@ fn mod_item(item: &ModObj, ctx: &ModCtx, nested: bool) -> Option<ModItemDto> {
         mml_game::launcher::get_source_type(&project_id, &file_id).to_string()
     };
 
+    // 前置声明：只收当前加载器那份元数据，与依赖检测同一口径；
+    // 同一条前置可能被多份元数据重复声明，按 (modid, 范围, 是否可选) 去重
+    let mut dependencies: Vec<ModDependencyDto> = Vec::new();
+    for entry in item.info.iter().filter(|entry| entry.loaders == ctx.loader) {
+        for dependant in entry.dependants.iter() {
+            let (dep, optional) = match dependant {
+                DependantType::Required(dep) => (dep, false),
+                DependantType::Recommend(dep) => (dep, true),
+            };
+            if dep.modid.is_empty() {
+                continue;
+            }
+            let required = dep.version.to_string();
+            let exists = dependencies.iter().any(|each| {
+                each.mod_id == dep.modid && each.required == required && each.optional == optional
+            });
+            if !exists {
+                dependencies.push(ModDependencyDto {
+                    mod_id: dep.modid.clone(),
+                    required,
+                    optional,
+                });
+            }
+        }
+    }
+
     Some(ModItemDto {
         uuid: item.uuid.to_string(),
         sha1,
@@ -224,6 +278,7 @@ fn mod_item(item: &ModObj, ctx: &ModCtx, nested: bool) -> Option<ModItemDto> {
             .iter()
             .filter_map(|child| mod_item(child, ctx, true))
             .collect(),
+        dependencies,
         file,
     })
 }
@@ -448,8 +503,10 @@ pub async fn resource_mods_dep_test(uuid: String) -> Result<Vec<DepProblemDto>, 
     let instance = parse_instance(&uuid)?;
 
     block_on_instance(instance, move |game| {
-        let mods = tokio::runtime::Handle::current().block_on(async { game.read_mod(false, None).await });
-        let test = mml_game::game_mods::mods_dep_test(&game, &mods).map_err(|err| err.to_string())?;
+        let mods =
+            tokio::runtime::Handle::current().block_on(async { game.read_mod(false, None).await });
+        let test =
+            mml_game::game_mods::mods_dep_test(&game, &mods).map_err(|err| err.to_string())?;
         Ok(test.problems.into_iter().map(dep_problem_dto).collect())
     })
     .await?
@@ -469,11 +526,30 @@ fn dep_problem_dto(problem: DependantProblem) -> DepProblemDto {
             DependantProblemKind::Missing => DepProblemKindDto::Missing,
             DependantProblemKind::Mismatch => DepProblemKindDto::Mismatch,
             DependantProblemKind::Disabled => DepProblemKindDto::Disabled,
-            DependantProblemKind::Duplicate => DepProblemKindDto::Duplicate,
         },
         required: problem.required.to_string(),
         installed: problem.installed,
         required_by: problem.required_by,
-        files: problem.files,
+    }
+}
+
+/// 内核的重复项 → 跨 IPC 的 DTO
+///
+/// - `item`: 内核侧的一个重复 modid
+///
+/// # 返回值
+///
+/// 见 [`ModDuplicateDto`]
+fn mod_duplicate_dto(item: ModDuplicate) -> ModDuplicateDto {
+    ModDuplicateDto {
+        modid: item.modid,
+        files: item
+            .files
+            .into_iter()
+            .map(|file| ModDuplicateFileDto {
+                file: file.file,
+                version: file.version,
+            })
+            .collect(),
     }
 }

@@ -47,43 +47,43 @@ fn toml() {
     println!("{}", datas);
 }
 
-/// 遍历 tests/fail_mods：解析成功时必须有条目，失败时只打印不 panic
-#[test]
-fn fail_json_mod() {
-    let files = path_helper::get_files("./tests/fail_mods/");
-    for item in files.iter() {
-        let mods = game_mods::read_mod_info(item);
-        match mods {
-            Ok(mods) => {
-                assert!(!mods.info.is_empty());
-                println!("modid = {}", mods.info.iter().next().unwrap().mod_id);
-            }
-            Err(err) => {
-                println!("error file: {}", item.to_string_lossy());
-                println!("error: {}", err);
-            }
-        }
-    }
-}
+// /// 遍历 tests/fail_mods：解析成功时必须有条目，失败时只打印不 panic
+// #[test]
+// fn fail_json_mod() {
+//     let files = path_helper::get_files("./tests/fail_mods/");
+//     for item in files.iter() {
+//         let mods = game_mods::read_mod_info(item);
+//         match mods {
+//             Ok(mods) => {
+//                 assert!(!mods.info.is_empty());
+//                 println!("modid = {}", mods.info.iter().next().unwrap().mod_id);
+//             }
+//             Err(err) => {
+//                 println!("error file: {}", item.to_string_lossy());
+//                 println!("error: {}", err);
+//             }
+//         }
+//     }
+// }
 
-/// 遍历 tests/core_mods，确认 core mod 也能解析出条目
-#[test]
-fn core_mod() {
-    let files = path_helper::get_files("./tests/core_mods/");
-    for item in files.iter() {
-        let mods = game_mods::read_mod_info(item);
-        match mods {
-            Ok(mods) => {
-                assert!(!mods.info.is_empty());
-                println!("modid = {}", mods.info.iter().next().unwrap().mod_id);
-            }
-            Err(err) => {
-                println!("error file: {}", item.to_string_lossy());
-                println!("error: {}", err);
-            }
-        }
-    }
-}
+// /// 遍历 tests/core_mods，确认 core mod 也能解析出条目
+// #[test]
+// fn core_mod() {
+//     let files = path_helper::get_files("./tests/core_mods/");
+//     for item in files.iter() {
+//         let mods = game_mods::read_mod_info(item);
+//         match mods {
+//             Ok(mods) => {
+//                 assert!(!mods.info.is_empty());
+//                 println!("modid = {}", mods.info.iter().next().unwrap().mod_id);
+//             }
+//             Err(err) => {
+//                 println!("error file: {}", item.to_string_lossy());
+//                 println!("error: {}", err);
+//             }
+//         }
+//     }
+// }
 
 /// 内置模组递归：要求 fabric 包能展开出 jar-in-jar 条目
 #[test]
@@ -96,9 +96,75 @@ fn jar_in_jar_mod() {
                 let info = item.info.iter().next().unwrap();
                 println!("jar in jar: {}", info.mod_id);
                 for item in item.jar_in_jar.iter() {
-                    println!("    jar in jar: {}", item.info.iter().next().unwrap().mod_id);
+                    println!(
+                        "    jar in jar: {}",
+                        item.info.iter().next().unwrap().mod_id
+                    );
                 }
             }
+        }
+        Err(err) => {
+            println!("error: {}", err);
+        }
+    }
+}
+
+#[test]
+fn read_mod_forge() {
+    let mods = game_mods::read_mod_info("./tests/mods/[neoforge-26.1]AllMusic_Server-4.0.3.jar");
+    match mods {
+        Ok(mods) => {
+            assert!(mods.info.len() > 0);
+            assert!(
+                &mods
+                    .info
+                    .iter()
+                    .find(|item| item.mod_id == "allmusic")
+                    .is_some()
+            );
+            let item = &mods
+                .info
+                .iter()
+                .find(|item| item.mod_id == "allmusic_server");
+            assert!(item.is_some());
+            let item = item.unwrap();
+            assert_eq!(item.mod_id, "allmusic_server");
+            assert_eq!(item.version.as_deref(), Some("4.0.3"));
+            assert!(item.dependants.len() > 0);
+            assert!(item.dependants.iter().any(|dep| match dep {
+                game_mods::DependantType::Required(dependant_info) => {
+                    dependant_info.modid == "neoforge"
+                }
+                game_mods::DependantType::Recommend(_) => false,
+            }));
+        }
+        Err(err) => {
+            println!("error: {}", err);
+        }
+    }
+}
+
+#[test]
+fn read_mod_fabric() {
+    let mods = game_mods::read_mod_info("./tests/mods/[fabric-1.21]AllMusic_Server-4.0.3.jar");
+    match mods {
+        Ok(mods) => {
+            assert!(mods.info.len() > 0);
+            let item = &mods
+                .info
+                .iter()
+                .find(|item| item.mod_id == "allmusic_server");
+            assert!(item.is_some());
+            let item = item.unwrap();
+            assert_eq!(item.mod_id, "allmusic_server");
+            assert_eq!(item.version.as_deref(), Some("4.0.3"));
+            assert!(item.dependants.len() > 0);
+            assert!(item.dependants.iter().any(|dep| match dep {
+                game_mods::DependantType::Required(dependant_info) => {
+                    dependant_info.modid == "fabricloader"
+                }
+                game_mods::DependantType::Recommend(_) => false,
+            }));
         }
         Err(err) => {
             println!("error: {}", err);

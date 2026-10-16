@@ -204,6 +204,19 @@ export function useFileDrop(
     }
   }
 
+  /**
+   * 原生 dragstart 一律挡掉
+   *
+   * 本应用的拖动都走指针模拟；但**图片与文字默认能发起原生拖拽** —— 拖一行存档
+   * （起点落在图标上）就会触发它，窗口的 dragenter / dragover 随即把"拖入文件"的遮罩
+   * 亮出来。从窗口外拖进来的文件不经过 dragstart，不受影响。
+   *
+   * - `event`: 原生拖拽事件
+   */
+  function onDomDragStart(event: DragEvent) {
+    event.preventDefault();
+  }
+
   function onDomLeave(event: DragEvent) {
     // 在子元素之间移动也会派发 dragleave：relatedTarget 为 null 才是真的离开窗口
     if (event.relatedTarget) return;
@@ -257,6 +270,8 @@ export function useFileDrop(
   }
 
   onMounted(async () => {
+    // 挡在 dragenter 之前：不挡的话内部元素的原生拖拽会把"拖入文件"的遮罩带出来
+    window.addEventListener("dragstart", onDomDragStart);
     window.addEventListener("dragenter", onDomEnter);
     window.addEventListener("dragover", onDomOver);
     window.addEventListener("dragleave", onDomLeave);
@@ -276,6 +291,7 @@ export function useFileDrop(
   });
 
   onUnmounted(() => {
+    window.removeEventListener("dragstart", onDomDragStart);
     window.removeEventListener("dragenter", onDomEnter);
     window.removeEventListener("dragover", onDomOver);
     window.removeEventListener("dragleave", onDomLeave);

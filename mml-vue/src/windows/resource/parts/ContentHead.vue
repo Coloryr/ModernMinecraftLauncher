@@ -13,6 +13,8 @@ import type { useResourceData } from "../composables/useResourceData";
 const props = defineProps<{
   /** 数据层，顶栏只用它的加载态与重拉 */
   data: ReturnType<typeof useResourceData>;
+  /** 额外的禁用条件；置真时刷新也不可用，如模组在跑依赖检测，默认不禁用 */
+  busy?: boolean;
 }>();
 const { loading, reloadCurrent } = props.data;
 </script>
@@ -24,7 +26,7 @@ const { loading, reloadCurrent } = props.data;
     </div>
     <div class="head-actions">
       <slot name="actions" />
-      <button class="mini-btn icon-btn" :disabled="loading" @click="reloadCurrent">
+      <button class="mini-btn icon-btn" :disabled="busy || loading" @click="reloadCurrent">
         <GlyphIcon name="refresh" :size="14" />
         {{ t("resource.refresh") }}
       </button>

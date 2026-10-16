@@ -478,6 +478,7 @@ const {
 
 const {
   dragActive,
+  ghost: instanceGhost,
   draggingUuid,
   onDragPointerDown,
   isInstInsert,
@@ -1536,7 +1537,8 @@ onMounted(async () => {
             <MainSidebar :mode="effectiveMode" :search-text="searchText" :groups="groups"
               :filtered-groups="filteredGroups" :filtered-instances="filteredInstances" :searching="searching"
               :selected="selected" :multi-select="multiSelect" :selected-ids="selectedIds" :drag-active="dragActive"
-              :dragging-uuid="draggingUuid" :is-collapsed="isCollapsed" :on-drag-pointer-down="onDragPointerDown"
+              :dragging-uuid="draggingUuid" :ghost="instanceGhost" :is-collapsed="isCollapsed"
+              :on-drag-pointer-down="onDragPointerDown"
               :on-inst-click="onInstClick" :on-inst-context="onInstContext" :on-group-context="onGroupContext"
               :on-group-title-click="onGroupTitleClick" :is-inst-insert="isInstInsert"
               :is-inst-insert-end="isInstInsertEnd" :is-group-insert="isGroupInsert"

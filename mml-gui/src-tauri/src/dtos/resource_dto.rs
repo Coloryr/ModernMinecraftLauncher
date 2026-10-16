@@ -78,6 +78,22 @@ pub struct ModItemDto {
     ///
     /// 它们装在父 jar 里，没有独立文件：前端只展示，不提供启用 / 删除。
     pub jar_in_jar: Vec<ModItemDto>,
+    /// 该包声明的强制 / 推荐前置，依赖树与"禁用前置时顺带禁用依赖方"用
+    ///
+    /// 只收**当前加载器**那份元数据的声明，与依赖检测同一口径；内置条目的前置挂在自己身上。
+    pub dependencies: Vec<ModDependencyDto>,
+}
+
+/// 一个模组声明的前置
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModDependencyDto {
+    /// 前置的 modid
+    pub mod_id: String,
+    /// 版本要求，解析后的范围原文，如 `[1.21,)`；不限版本时是 `*`
+    pub required: String,
+    /// 推荐安装（非强制）
+    pub optional: bool,
 }
 
 /// 模组扫描进度，即事件 `resource-list-mods-progress` 的负载
@@ -371,8 +387,6 @@ pub enum DepProblemKindDto {
     Mismatch,
     /// 前置被禁用：只有禁用状态的包提供它
     Disabled,
-    /// 重复：同一个 modid 有两份及以上处于启用状态的包
-    Duplicate,
 }
 
 /// 模组依赖检测发现的一条问题
@@ -387,8 +401,26 @@ pub struct DepProblemDto {
     pub required: String,
     /// 已装着的版本，多个用 `, ` 连接；缺失时为空串
     pub installed: String,
-    /// 有哪些模组要求它，重复那一档为空
+    /// 有哪些模组要求它
     pub required_by: Vec<String>,
-    /// 重复那一档里是哪几个文件，其余为空
-    pub files: Vec<String>,
+}
+
+/// 重复安装的一个 modid
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModDuplicateDto {
+    /// 重复的 modid
+    pub modid: String,
+    /// 提供它的顶层文件，按文件名排序
+    pub files: Vec<ModDuplicateFileDto>,
+}
+
+/// 重复安装里涉及的一个文件
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModDuplicateFileDto {
+    /// 文件名，不含目录
+    pub file: String,
+    /// 该文件声明的版本；没写时为空串
+    pub version: String,
 }
