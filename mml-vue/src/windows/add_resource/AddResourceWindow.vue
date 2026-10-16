@@ -17,7 +17,7 @@ import AuthorTag from "../../components/ui/AuthorTag.vue";
 import ProjectDetailPage from "../../components/ProjectDetailPage.vue";
 import { api } from "../../lib/api";
 import { useDownloadBadges } from "../../lib/downloadBadges";
-import { t, tErr } from "../../lib/i18n";
+import { formatCount, t, tErr } from "../../lib/i18n";
 import { svgIcon } from "../../lib/modrinthIcon";
 import { cardTags } from "../../lib/projectTags";
 import { showToast } from "../../lib/toast";
@@ -757,7 +757,7 @@ onActivated(async () => {
                   <span v-if="cardTags(item.tag).more" class="pack-tag">…</span>
                 </div>
                 <div class="pack-meta">
-                  {{ t("modpack.downloads", { n: item.downloadCount.toLocaleString() }) }}
+                  {{ t("modpack.downloads", { n: formatCount(item.downloadCount) }) }}
                   <template v-if="item.date"> · {{ formatDate(item.date) }}</template>
                 </div>
               </div>

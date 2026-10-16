@@ -1,6 +1,7 @@
 // 国际化：zh_cn / en_us，状态持久化到 gui_config.json，与 core Lang 同名
 // 用法：模板中 {{ t("launch.play") }}；带参数 {{ t("detail.launchCount", { count: 3 }) }}
 import { ref } from "vue";
+import { formatCountIn } from "../countFormat";
 import zhCN from "./locales/zh-CN";
 import enUS from "./locales/en-US";
 import { KEYS, readString, writeString, onStorageChange } from "../storage";
@@ -75,12 +76,29 @@ export function tErr(e: unknown): string {
 }
 
 /**
+ * 按**当前语言**简化下载量这类大数字，见 [`formatCountIn`]
+ *
+ * 与 `t()` 同一处导入：界面里凡是显示下载量的地方都该用它，
+ * 各处自己拼"万 / K"迟早会拼出两套口径。
+ *
+ * - `n`: 原始数字
+ *
+ * # 返回值
+ *
+ * 形如 `1万+` / `10K+`
+ */
+export function formatCount(n: number): string {
+  return formatCountIn(n, locale.value);
+}
+
+/**
  * 取本模块的国际化入口
  *
  * # 返回值
  *
- * `t` / `tErr` 两个翻译函数，`locale` 是当前语言的 ref，`setLocale` 用来切换语言
+ * `t` / `tErr` 两个翻译函数、`formatCount` 大数字简化，
+ * `locale` 是当前语言的 ref，`setLocale` 用来切换语言
  */
 export function useI18n() {
-  return { t, tErr, locale, setLocale };
+  return { t, tErr, formatCount, locale, setLocale };
 }

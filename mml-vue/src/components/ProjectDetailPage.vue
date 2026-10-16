@@ -14,7 +14,7 @@ import AuthorTag from "./ui/AuthorTag.vue";
 import ImagePreview from "./ui/ImagePreview.vue";
 import { api } from "../lib/api";
 import { useDownloadBadges } from "../lib/downloadBadges";
-import { t, tErr } from "../lib/i18n";
+import { formatCount, t, tErr } from "../lib/i18n";
 import { svgIcon } from "../lib/modrinthIcon";
 import { usePageActive } from "../lib/pageActive";
 import { showToast } from "../lib/toast";
@@ -127,7 +127,7 @@ async function open(item: ProjectItemDto) {
   fileVersion.value = props.initialVersion;
   detailLoading.value = true;
 
-  void loadFiles(pid, 0);
+  void fetchFiles(pid, 0);
 
   try {
     const res = await props.loadDetail(pid);
@@ -141,7 +141,7 @@ async function open(item: ProjectItemDto) {
   }
 }
 
-async function loadFiles(pid: string, page: number) {
+async function fetchFiles(pid: string, page: number) {
   const mine = ++fileSeq;
   filesLoading.value = true;
   filesError.value = "";
@@ -175,7 +175,7 @@ async function loadFiles(pid: string, page: number) {
 /** 版本列表重试（失败提示里的按钮） */
 function reloadFiles() {
   if (current.value) {
-    loadFiles(current.value.source.pid, filePage.value);
+    fetchFiles(current.value.source.pid, filePage.value);
   }
 }
 
@@ -183,7 +183,7 @@ function reloadFiles() {
 function onFileVersionChange() {
   filePage.value = 0;
   if (current.value) {
-    loadFiles(current.value.source.pid, 0);
+    fetchFiles(current.value.source.pid, 0);
   }
 }
 
@@ -196,7 +196,7 @@ function turnFilePage(delta: number) {
   scrollToVersions();
   if (isModrinth.value || !current.value) return;
 
-  loadFiles(current.value.source.pid, next);
+  fetchFiles(current.value.source.pid, next);
 }
 
 /** 下载最新版本（page 0 的第一条） */
@@ -334,7 +334,7 @@ function scrollToVersions() {
                   <AuthorTag :authors="authorList" :max="4" />
                   <span> · </span>
                 </template>
-                <span>{{ t("modpack.downloads", { n: current.downloadCount.toLocaleString() }) }}</span>
+                <span>{{ t("modpack.downloads", { n: formatCount(current.downloadCount) }) }}</span>
                 <span v-if="current.date"> · {{ formatDate(current.date) }}</span>
               </div>
               <div v-if="detail?.tag.length || current.tag.length" class="pack-tags detail-tags">
@@ -442,7 +442,7 @@ function scrollToVersions() {
                         </span>
                         <span class="file-meta">
                           {{ t("modpack.fileMeta", {
-                            n: file.download.toLocaleString(),
+                            n: formatCount(file.download),
                             date: formatDate(file.time),
                             size: formatSize(file.size),
                           }) }}
