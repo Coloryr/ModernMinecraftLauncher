@@ -16,13 +16,23 @@ import BaseModal from "../../../components/ui/BaseModal.vue";
 import DragGhost from "../../../components/ui/DragGhost.vue";
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import ContentHead from "./ContentHead.vue";
+import LoaderQueryProgress from "../../../components/LoaderQueryProgress.vue";
 import ListSkeleton from "./ListSkeleton.vue";
 import ModList from "./mod/ModList.vue";
 import ModTable from "./mod/ModTable.vue";
 import ModDepsModal from "./mod/ModDepsModal.vue";
+import ModUpdateModal from "./mod/ModUpdateModal.vue";
 import ModGroupMenu, { type GroupMenuAction } from "./mod/ModGroupMenu.vue";
 import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
-import { deleteMod, disableMod, enableMod, modsDepTest, setModNote } from "../../../lib/api";
+import {
+  deleteMod,
+  disableMod,
+  enableMod,
+  modsDepTest,
+  modsUpdateCheck,
+  onModsUpdateProgress,
+  setModNote,
+} from "../../../lib/api";
 import { copyText } from "../../../lib/clipboard";
 import { useModDeps } from "../composables/useModDeps";
 import { useReorderDrag } from "../composables/useReorderDrag";
@@ -36,7 +46,7 @@ import {
 import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceOps } from "../composables/useResourceOps";
 import type { useResourceView } from "../composables/useResourceView";
-import type { DepProblemDto, ModItemDto } from "../../../lib/bindings";
+import type { DepProblemDto, ModItemDto, ModUpdateCheckDto } from "../../../lib/bindings";
 import { modHit, modSelectKey, sortedMods, type ModStateGroup } from "../types";
 import { orderedMods } from "../modColumns";
 import type { ModView } from "../types";
@@ -50,8 +60,16 @@ const props = defineProps<{
   view: ReturnType<typeof useResourceView>;
 }>();
 
-const { mods, instance, instanceUuid, loading, modProgress, modDuplicates, dismissModDuplicates } =
-  props.data;
+const {
+  mods,
+  instance,
+  instanceUuid,
+  loading,
+  modProgress,
+  modDuplicates,
+  modDepProblems,
+  dismissModDuplicates,
+} = props.data;
 const { busy, act, actLocal, askDelete, askConfirm, openFolder } = props.ops;
 
 /** 依赖检测结果弹窗是否打开 */
@@ -60,6 +78,13 @@ const depOpen = ref(false);
 const depBusy = ref(false);
 /** 依赖检测的结果，打开弹窗时才有意义 */
 const depProblems = ref<DepProblemDto[]>([]);
+
+/** 更新检查正在跑：要重扫一遍 mods 目录，再逐个问平台，大整合包要一分钟 */
+const updateBusy = ref(false);
+/** 更新检查进度；总数要等后端扫完 mods 目录才知道，在那之前一直是 0 */
+const updateProgress = ref({ done: 0, total: 0 });
+/** 更新检查结果，有更新才开弹窗；null = 不显示 */
+const updateResult = ref<ModUpdateCheckDto | null>(null);
 
 /** 问题种类的 i18n 键，与后端 `DepProblemKindDto` 一一对应 */
 const DEP_KIND_LABEL: Record<DepProblemDto["kind"], string> = {
@@ -119,6 +144,40 @@ async function runDepTest() {
     showToast(tErr(e));
   } finally {
     depBusy.value = false;
+  }
+}
+
+/** 更新检查：列出有在线信息、且平台上有新文件的模组 */
+async function runUpdateCheck() {
+  const uuid = instanceUuid.value;
+  if (!uuid || updateBusy.value) return;
+  updateBusy.value = true;
+  updateProgress.value = { done: 0, total: 0 };
+  // 先订阅再调命令，否则可能漏掉最开始那几条进度
+  const unlisten = await onModsUpdateProgress((e) => {
+    updateProgress.value = e;
+  });
+  try {
+    const result = await modsUpdateCheck(uuid);
+    // 没有更新就不弹空窗：按"一个都没查"与"只是都最新"给不同提示
+    if (!result.updates.length) {
+      updateResult.value = null;
+      if (!result.checked) {
+        showToast(t("resource.updateNoOnline"));
+      } else if (result.failed) {
+        showToast(t("resource.updateFailed", { n: result.failed }));
+      } else {
+        showToast(t("resource.updateNone"));
+      }
+      return;
+    }
+    updateResult.value = result;
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    unlisten();
+    updateBusy.value = false;
+    updateProgress.value = { done: 0, total: 0 };
   }
 }
 
@@ -213,11 +272,26 @@ const { modView, setModView, colWidths, setColWidth, sort, setSort } = props.vie
 
 const groups = useModGroups(props.data);
 
-/** 依赖关系：依赖树与"禁用前置时顺带禁用依赖方"都用它，见 useModDeps */
-const { treeOf, dependentsOf } = useModDeps(mods, instance);
+/** 依赖关系：依赖图与"禁用前置时顺带禁用依赖方"都用它，见 useModDeps */
+const { graphOf, dependentsOf, itemOf } = useModDeps(mods, instance);
 
-/** 打开着依赖树的那个模组；null = 没开 */
+/** 打开着依赖图的那个模组；null = 没开 */
 const depTreeItem = ref<ModItemDto | null>(null);
+
+/** 依赖图（含布局）：只在开着的时候算，别在模板里每次渲染重算一遍 */
+const depGraph = computed(() => (depTreeItem.value ? graphOf(depTreeItem.value) : null));
+
+/**
+ * 依赖图里双击某个节点：把这张图换成以它为目标
+ *
+ * 图上只有 modid，条目要回 useModDeps 查；缺失的前置与虚拟前置查不到，那就不动。
+ *
+ * - `key`: 被双击节点的 modid（小写）
+ */
+function rerootGraph(key: string) {
+  const item = itemOf(key);
+  if (item) depTreeItem.value = item;
+}
 
 // ---------- 归组 / 改状态 ----------
 
@@ -1247,34 +1321,39 @@ onMounted(() => void groups.load());
 </script>
 
 <template>
-  <ContentHead :data="data" :busy="depBusy">
+  <ContentHead :data="data" :busy="depBusy || updateBusy">
     <template #actions>
       <!--
         有选中项时顶栏换成批量操作条，用户选的口径是"顶栏出现批量按钮"。
-        整条替换而不是并列：搜索框 + 视图切换 + 新建分组本来就占满一行，
-        再挤进 4 个批量按钮会互相压。
+        整条替换而不是并列：选中之后的重点是"对这些项做什么"，
+        搜索框 / 视图切换 / 新建分组这时都不该再占着位置。
       -->
       <template v-if="selectedCount">
         <span class="row-selected-count">{{ t("resource.selectedCount", { n: selectedCount }) }}</span>
-        <button class="mini-btn" :disabled="busy" @click="batchSetState(false)">
-          {{ t("resource.enable") }}
+        <!-- 按钮统一纯图标：名称走悬浮提示与 aria-label，占位由 .icon-only 收成方形 -->
+        <button class="mini-btn icon-btn icon-only" :disabled="busy" v-tip="t('resource.enable')"
+          :aria-label="t('resource.enable')" @click="batchSetState(false)">
+          <GlyphIcon name="check" :size="14" />
         </button>
-        <button class="mini-btn" :disabled="busy" @click="batchSetState(true)">
-          {{ t("resource.disable") }}
+        <button class="mini-btn icon-btn icon-only" :disabled="busy" v-tip="t('resource.disable')"
+          :aria-label="t('resource.disable')" @click="batchSetState(true)">
+          <GlyphIcon name="ban" :size="14" />
         </button>
         <!-- 归组：开弹窗选目标，不用下拉 —— 下拉一次只看得见一项，
              而且"移到分组"会以占位项的形式混在选项里，看着像能选的东西。
-             按钮文字不带省略号（用户要求），与弹窗标题共用同一条文案。
+             提示与弹窗标题共用同一条文案（不带省略号）。
              选中项都在同一个分组里、又没别的分组可去时置灰，见 canMoveSelection -->
-        <button class="mini-btn icon-btn" :disabled="busy || !canMoveSelection" @click="groupPickOpen = true">
+        <button class="mini-btn icon-btn icon-only" :disabled="busy || !canMoveSelection"
+          v-tip="t('resource.batchMoveTo')" :aria-label="t('resource.batchMoveTo')" @click="groupPickOpen = true">
           <GlyphIcon name="folder" :size="14" />
-          {{ t("resource.batchMoveTo") }}
         </button>
-        <button class="mini-btn danger" :disabled="busy" @click="batchRemove">
-          {{ t("resource.delete") }}
+        <button class="mini-btn icon-btn icon-only danger" :disabled="busy" v-tip="t('resource.delete')"
+          :aria-label="t('resource.delete')" @click="batchRemove">
+          <GlyphIcon name="trash" :size="14" />
         </button>
-        <button class="mini-btn" :disabled="busy" @click="clearSelection">
-          {{ t("resource.clearSelection") }}
+        <button class="mini-btn icon-btn icon-only" :disabled="busy" v-tip="t('resource.clearSelection')"
+          :aria-label="t('resource.clearSelection')" @click="clearSelection">
+          <GlyphIcon name="close" :size="14" />
         </button>
       </template>
 
@@ -1285,18 +1364,31 @@ onMounted(() => void groups.load());
           { value: 'list', label: t('resource.viewList') },
           { value: 'table', label: t('resource.viewTable') },
         ]" @update:model-value="setModView($event as ModView)" />
-        <button class="mini-btn icon-btn" :disabled="busy" @click="openGroupForm()">
+        <button class="mini-btn icon-btn icon-only" :disabled="busy" v-tip="t('resource.groupAdd')"
+          :aria-label="t('resource.groupAdd')" @click="openGroupForm()">
           <GlyphIcon name="folder-plus" :size="14" />
-          {{ t("resource.groupAdd") }}
         </button>
         <!-- 依赖检测要重扫一遍模组，跑的时候按钮置灰并把图标转起来 -->
-        <button class="mini-btn icon-btn" :disabled="depBusy || loading" @click="runDepTest">
+        <button class="mini-btn icon-btn icon-only" :disabled="depBusy || loading" v-tip="t('resource.depTest')"
+          :aria-label="t('resource.depTest')" @click="runDepTest">
           <GlyphIcon :name="depBusy ? 'refresh' : 'puzzle'" :size="14" :class="{ 'dep-spin': depBusy }" />
-          {{ t("resource.depTest") }}
+        </button>
+        <!-- 更新检查要重扫一遍模组、再逐个问平台；按钮只放图标，进度在工具条下方 -->
+        <button class="mini-btn icon-btn icon-only" :disabled="updateBusy || loading"
+          v-tip="t('resource.updateCheck')" :aria-label="t('resource.updateCheck')" @click="runUpdateCheck">
+          <GlyphIcon :name="updateBusy ? 'refresh' : 'update'" :size="14"
+            :class="{ 'dep-spin': updateBusy }" />
         </button>
       </template>
     </template>
   </ContentHead>
+
+  <!--
+    更新检查进度：**整行显示在工具条下方**，不再挤在按钮右边。
+    后端要先扫一遍 mods 目录才知道总数，那之前走不确定滚动条，拿到总数后转成确定进度条
+  -->
+  <LoaderQueryProgress :visible="updateBusy" kind="query" :step="updateProgress.done"
+    :total="updateProgress.total" :label="t('resource.updateChecking')" />
 
   <!--
     加载中：与「下载整合包」窗口同一套骨架行，呼吸动画见 `styles/skeleton.css`
@@ -1477,9 +1569,9 @@ onMounted(() => void groups.load());
     <span>{{ sectionGhostLabel }}</span>
   </DragGhost>
 
-  <!-- 依赖树：选一个模组，展开它声明的强制 / 推荐前置 -->
-  <ModDepsModal v-if="depTreeItem" :item="depTreeItem" :tree="treeOf(depTreeItem)"
-    @close="depTreeItem = null" />
+  <!-- 依赖图：选一个模组，展开它声明的强制 / 推荐前置；共用前置只画一个节点 -->
+  <ModDepsModal v-if="depTreeItem && depGraph" :item="depTreeItem" :graph="depGraph"
+    :problems="modDepProblems" @target="rerootGraph" @close="depTreeItem = null" />
 
   <!--
     改启用状态时问一句要不要顺带处理相关模组：
@@ -1582,6 +1674,9 @@ onMounted(() => void groups.load());
       <BaseButton variant="accent" @click="dismissModDuplicates">{{ t("actions.confirm") }}</BaseButton>
     </div>
   </BaseModal>
+
+  <!-- 更新检查结果：有更新才开，没更新在 runUpdateCheck 里用一条轻提示 -->
+  <ModUpdateModal v-if="updateResult" :result="updateResult" @close="updateResult = null" />
 </template>
 
 <!-- 备注弹窗的样式走 scoped：BaseModal 是 `Teleport to="body"` 的，弹窗不在

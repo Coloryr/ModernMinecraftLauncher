@@ -54,8 +54,6 @@ const shellProps = computed(() =>
       fixedHeight: "520px",
       // 贴着自绘标题栏下沿，别盖住窗口按钮
       belowTitlebar: true,
-      // 点遮罩不关：正在下载时误触一下就把任务面板关了很烦，关它有右上角的 ✕
-      overlayClose: false,
     },
 );
 

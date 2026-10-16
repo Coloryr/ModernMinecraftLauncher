@@ -598,8 +598,8 @@ function tokenLabel(acc: AccountStoreDto): string {
         @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" />
     </div>
 
-    <!-- 添加账户弹窗（按类型显示不同输入框）：不遮标题栏、点空白不关闭 -->
-    <BaseModal v-if="showAdd" :title="t('account.addTitle')" :closable="false" below-titlebar :overlay-close="false"
+    <!-- 添加账户弹窗（按类型显示不同输入框）：不遮标题栏 -->
+    <BaseModal v-if="showAdd" :title="t('account.addTitle')" :closable="false" below-titlebar
       @close="showAdd = false">
       <label class="field-label">{{ t("account.type") }}</label>
       <select v-model="addType" class="field-select"
@@ -637,7 +637,7 @@ function tokenLabel(acc: AccountStoreDto): string {
     </BaseModal>
 
     <!-- 微软登录：请求码 + 地址 + 打开浏览器 / 取消 -->
-    <BaseModal v-if="showOauth" :title="t('account.oauthTitle')" :closable="false" below-titlebar :overlay-close="false"
+    <BaseModal v-if="showOauth" :title="t('account.oauthTitle')" :closable="false" below-titlebar
       @close="cancelLogin">
       <label class="field-label">{{ t("account.oauthCode") }}</label>
       <div class="oauth-code copyable" v-tip="t('account.copy')" @click="copyOauthValue(oauthCode)">
@@ -668,7 +668,7 @@ function tokenLabel(acc: AccountStoreDto): string {
     </BaseModal>
 
     <BaseModal v-if="showOauthRun" :title="t('account.oauthTitle')" :closable="false" below-titlebar
-      :overlay-close="false" @close="cancelLogin">
+      @close="cancelLogin">
       <p class="hint">{{ oauthState }}</p>
 
       <div class="modal-actions">
@@ -688,7 +688,7 @@ function tokenLabel(acc: AccountStoreDto): string {
 
     <!-- 重新登录（非微软账户）：重输密码重新认证，服务器地址预填 -->
     <BaseModal v-if="reloginTarget" :title="t('account.reloginTitle')" :closable="false" below-titlebar
-      :overlay-close="false" @close="reloginTarget = null">
+      @close="reloginTarget = null">
       <template v-if="reloginTarget.authType === 'nide8'">
         <label class="field-label">{{ t("account.serverId") }}</label>
         <input v-model="reloginFields.server" class="field-input" spellcheck="false" />
@@ -714,7 +714,7 @@ function tokenLabel(acc: AccountStoreDto): string {
 
     <!-- 编辑离线账户：改名 / 改 UUID -->
     <BaseModal v-if="editTarget" :title="t('account.editOffline')" :closable="false" below-titlebar
-      :overlay-close="false" @close="editTarget = null">
+      @close="editTarget = null">
       <label class="field-label">{{ t("account.name") }}</label>
       <input v-model="editFields.name" class="field-input" spellcheck="false" />
 

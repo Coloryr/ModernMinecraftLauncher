@@ -15,7 +15,7 @@ use mml_base::file_item::FileHash;
 use mml_game::GameInstance;
 use mml_game::game_mods::{
     DependantProblem, DependantProblemKind, DependantType, LoadSideType, ModDuplicate, ModObj,
-    mods_duplicate_test,
+    mods_dep_test, mods_duplicate_test,
 };
 use mml_game::gui_hook::{IProgressGui, ProgressGui};
 use mml_game::loader::LoaderType;
@@ -88,6 +88,19 @@ pub fn emit_resource_mods_duplicate(window: &WebviewWindow, dto: Vec<ModDuplicat
     let _ = window.emit(listens::RESOURCE_MODS_DUPLICATE, dto);
 }
 
+/// 模组依赖问题事件，事件名 `resource-mods-dep-problems`
+///
+/// - `window`: 接收事件的那个资源窗口，由 Tauri 注入
+/// - `dto`: 依赖问题列表，非空
+///
+/// 与重复安装同一发：列表加载完顺路报一次。**不自动弹窗**（要看的用户会点「依赖检测」），
+/// 前端留着给依赖图的节点打勾 / 打感叹号 —— 不报的话，图里只能看出"装没装"，
+/// 看不出"装的版本对不对"。
+#[gui_macros::emit]
+pub fn emit_resource_mods_dep_problems(window: &WebviewWindow, dto: Vec<DepProblemDto>) {
+    let _ = window.emit(listens::RESOURCE_MODS_DEP_PROBLEMS, dto);
+}
+
 /// 模组列表：解析 jar 元数据，条目多时耗时数秒
 ///
 /// - `window`: 发起这次扫描的那个资源窗口，由 Tauri 注入。扫描进度 `x/x` 只发给它，
@@ -113,16 +126,22 @@ pub async fn resource_list_mods(
 
     // 四份附带数据一起读，省掉前端额外往返与按文件名 / SHA1 的合并：
     // 备注 `Mod.ModName`、在线信息 `online_info.json`、游戏根目录，后者用来算相对路径
-    let (list, notes, online, game_path, loader) = block_on_instance(instance, move |game| {
-        let notes = crate::gui_setting::load(&game).mods.mod_name;
-        let online = game.read_online_info();
-        let game_path = game.get_game_path();
-        let loader = game.loader;
-        let list =
-            tokio::runtime::Handle::current().block_on(async { game.read_mod(false, gui).await });
-        (list, notes, online, game_path, loader)
-    })
-    .await?;
+    let (list, notes, online, game_path, loader, problems) =
+        block_on_instance(instance, move |game| {
+            let notes = crate::gui_setting::load(&game).mods.mod_name;
+            let online = game.read_online_info();
+            let game_path = game.get_game_path();
+            let loader = game.loader;
+            let list = tokio::runtime::Handle::current()
+                .block_on(async { game.read_mod(false, gui).await });
+            // 顺路跑一遍依赖检测：列表已经扫出来了，这一步是纯内存计算。
+            // 它失败不该拖垮列表本身，出错就当没有依赖问题
+            let problems = mods_dep_test(&game, &list)
+                .map(|test| test.problems)
+                .unwrap_or_default();
+            (list, notes, online, game_path, loader, problems)
+        })
+        .await?;
 
     // 按 SHA1 索引：在线信息表 OnlineInfoObj 的主键就是 SHA1，模组的 hash 正好是它
     let online_of: HashMap<String, mml_game::launcher::file_online_info_obj::OnlineInfoObj> =
@@ -146,6 +165,12 @@ pub async fn resource_list_mods(
         .collect();
     if !duplicates.is_empty() {
         emit_resource_mods_duplicate(&window, duplicates);
+    }
+
+    // 依赖问题与重复安装分开报：依赖图只拿它给节点打标记，界面不自动弹窗
+    let problems: Vec<DepProblemDto> = problems.into_iter().map(dep_problem_dto).collect();
+    if !problems.is_empty() {
+        emit_resource_mods_dep_problems(&window, problems);
     }
 
     Ok(list
@@ -365,7 +390,7 @@ pub(super) fn mod_note(notes: &HashMap<String, Option<String>>, file: &str) -> S
 ///
 /// 模组的自定义分组按 SHA1 记，与 `gui_setting.json` 的 `Mod.Groups` 一致：
 /// 它是**内容哈希**，启用 / 禁用改文件名之后不变，而 uuid 会跟着路径变。
-fn sha1_of(hash: &FileHash) -> String {
+pub(super) fn sha1_of(hash: &FileHash) -> String {
     match hash {
         FileHash::Sha1(value) | FileHash::Sha1Sha256(value, _) | FileHash::Sha1Sha512(value, _) => {
             value.clone()

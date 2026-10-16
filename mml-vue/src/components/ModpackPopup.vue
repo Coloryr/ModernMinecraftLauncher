@@ -20,7 +20,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <BaseModal :title="t('modpack.bar.title')" :width="560" fixed-height="420px" below-titlebar :overlay-close="false"
+  <BaseModal :title="t('modpack.bar.title')" :width="560" fixed-height="420px" below-titlebar
     @close="emit('close')">
     <!-- collapsible=false：弹窗是点开来看详情的，任务直接铺开，不再折一层。
          高度锁死（fixed-height）而不是随任务数长高：装多个整合包时高度一直跳很难看，

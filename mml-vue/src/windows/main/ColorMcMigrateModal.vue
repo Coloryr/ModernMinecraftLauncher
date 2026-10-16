@@ -91,7 +91,7 @@ async function restart() {
 </script>
 
 <template>
-  <BaseModal :title="t('colormc.title')" :width="480" :closable="!running" :overlay-close="!running"
+  <BaseModal :title="t('colormc.title')" :width="480" :closable="!running"
     @close="emit('close')">
     <!-- ---------- 1. 还没开始 ---------- -->
     <template v-if="!running && !report">

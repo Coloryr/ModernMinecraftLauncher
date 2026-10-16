@@ -155,6 +155,27 @@ export const THIRD_PARTY_GROUPS: ThirdPartyGroup[] = [
         url: "https://github.com/bs-community/skinview-utils",
         note: "",
       },
+      {
+        name: "@vue-flow/core",
+        version: "1.48.2",
+        license: "MIT",
+        url: "https://github.com/bcakmakoglu/vue-flow",
+        note: "",
+      },
+      {
+        name: "@vue-flow/background",
+        version: "1.3.2",
+        license: "MIT",
+        url: "https://github.com/bcakmakoglu/vue-flow",
+        note: "",
+      },
+      {
+        name: "@dagrejs/dagre",
+        version: "3.1.1",
+        license: "MIT",
+        url: "https://github.com/dagrejs/dagre",
+        note: "",
+      },
     ],
   },
 ];

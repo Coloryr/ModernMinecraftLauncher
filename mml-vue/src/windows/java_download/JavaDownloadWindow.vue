@@ -191,7 +191,7 @@ async function loadList() {
   <WindowFrame :title="t('winJavaDownload.title')" @close="$emit('close')">
     <div class="java-download-body">
       <!-- 切换搜索源 / 加载选项或列表时弹窗提示，加载完自动消失 -->
-      <BaseModal v-if="optionsLoading || listLoading" :width="300" :closable="false" :overlay-close="false">
+      <BaseModal v-if="optionsLoading || listLoading" :width="300" :closable="false">
         <div class="loading-modal">
           <span class="loading-spin" />
           <span>{{ t("winJavaDownload.loadingTitle") }}</span>

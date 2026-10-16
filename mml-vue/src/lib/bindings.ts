@@ -216,6 +216,7 @@ export const commands = {
     modGroupsCollapsed: (uuid: string) => invoke<string[]>("resource_mod_groups_collapsed", { uuid }),
     modNoteSet: (uuid: string, file: string, note: string) => invoke<void>("resource_mod_note_set", { uuid, file, note }),
     modsDepTest: (uuid: string) => invoke<DepProblemDto[]>("resource_mods_dep_test", { uuid }),
+    modsUpdateCheck: (uuid: string) => invoke<ModUpdateCheckDto>("resource_mods_update_check", { uuid }),
     openFolder: (uuid: string, kind: string, name: string | null, parent: string | null) => invoke<void>("resource_open_folder", { uuid, kind, name, parent }),
     resourcepackDisable: (uuid: string, file: string) => invoke<void>("resource_resourcepack_disable", { uuid, file }),
     resourcepackEnable: (uuid: string, file: string) => invoke<void>("resource_resourcepack_enable", { uuid, file }),
@@ -1000,6 +1001,11 @@ export type ModScanProgressDto = {
   total: number,
 };
 
+export type ModUpdateProgressDto = {
+  done: number,
+  total: number,
+};
+
 export type ResourceViewDto = {
   order: string[],
   category: string,
@@ -1141,6 +1147,27 @@ export type ModDuplicateDto = {
 export type ModDuplicateFileDto = {
   file: string,
   version: string,
+};
+
+export type ModUpdateCheckDto = {
+  checked: number,
+  failed: number,
+  updates: ModUpdateDto[],
+};
+
+export type ModUpdateDto = {
+  uuid: string,
+  file: string,
+  disable: boolean,
+  name: string,
+  version: string,
+  source: string,
+  projectId: string,
+  fileId: string,
+  newFileId: string,
+  newVersion: string,
+  newFile: string,
+  date: string,
 };
 
 export type RunArgSettingDto = {

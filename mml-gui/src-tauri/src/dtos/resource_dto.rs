@@ -109,6 +109,18 @@ pub struct ModScanProgressDto {
     pub total: usize,
 }
 
+/// 模组更新检查的进度，即事件 `resource-mods-update-progress` 的负载
+///
+/// 逐个问平台可能要一分钟（Modrinth 限 300 次 / 分钟），没有进度用户会以为卡死。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModUpdateProgressDto {
+    /// 已经问完的模组数
+    pub done: usize,
+    /// 有在线信息、要问的模组总数
+    pub total: usize,
+}
+
 /// 资源窗口的视图偏好，存在**实例**的 `gui_setting.json` 里，跟着实例走
 ///
 /// 与 `gui_config.json` 那份全局界面状态分开：这一份是"这个实例我习惯怎么看"，
@@ -423,4 +435,49 @@ pub struct ModDuplicateFileDto {
     pub file: String,
     /// 该文件声明的版本；没写时为空串
     pub version: String,
+}
+
+/// 模组更新检查的整份结果
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModUpdateCheckDto {
+    /// 参与检查的模组数，即项目号与文件号都非空、带在线信息的那些
+    pub checked: u32,
+    /// 查询失败的个数，网络或接口出错
+    ///
+    /// 失败不等于"已是最新"：这部分没查出来，界面要如实说出来，
+    /// 否则用户会以为它们都是最新的。
+    pub failed: u32,
+    /// 有新版本的条目
+    pub updates: Vec<ModUpdateDto>,
+}
+
+/// 模组更新检查里的一条可用更新
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModUpdateDto {
+    /// 当前模组条目的 uuid，文件路径的 v5，用来与列表那一行对齐
+    pub uuid: String,
+    /// 当前文件名，禁用状态下带 `.disabled` 后缀
+    pub file: String,
+    /// 是否被禁用
+    pub disable: bool,
+    /// 显示名，元数据缺失时为空，前端回退文件名
+    pub name: String,
+    /// 当前版本号，元数据里读到的；没写时为空串
+    pub version: String,
+    /// 下载源：curseforge / modrinth
+    pub source: String,
+    /// 项目编号，后续按它下新文件
+    pub project_id: String,
+    /// 当前文件编号
+    pub file_id: String,
+    /// 新文件的编号
+    pub new_file_id: String,
+    /// 新版本号；CurseForge 没有版本号字段，取文件的显示名
+    pub new_version: String,
+    /// 新文件名
+    pub new_file: String,
+    /// 新文件发布时间，ISO 8601 字符串
+    pub date: String,
 }

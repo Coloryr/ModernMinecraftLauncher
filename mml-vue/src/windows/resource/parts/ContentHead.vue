@@ -26,9 +26,9 @@ const { loading, reloadCurrent } = props.data;
     </div>
     <div class="head-actions">
       <slot name="actions" />
-      <button class="mini-btn icon-btn" :disabled="busy || loading" @click="reloadCurrent">
+      <button class="mini-btn icon-btn icon-only" :disabled="busy || loading" v-tip="t('resource.refresh')"
+        :aria-label="t('resource.refresh')" @click="reloadCurrent">
         <GlyphIcon name="refresh" :size="14" />
-        {{ t("resource.refresh") }}
       </button>
     </div>
   </div>

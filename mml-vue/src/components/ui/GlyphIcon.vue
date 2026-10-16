@@ -13,6 +13,11 @@ export type GlyphName =
   | "plus"
   | "minus"
   | "check"
+  // 模组顶栏的批量操作：启用 / 禁用 / 删除，见 windows/resource 的 ModPane
+  | "ban"
+  | "trash"
+  // 依赖图的节点标记：装着了但版本合不上
+  | "alert"
   | "close"
   | "search"
   | "chevron-left"
@@ -29,6 +34,7 @@ export type GlyphName =
   | "puzzle"
   | "image"
   | "download"
+  | "update"
   | "refresh"
   | "folder"
   | "folder-plus"
@@ -63,6 +69,24 @@ withDefaults(
     <path v-else-if="name === 'minus'" d="M5 12h14" />
     <path v-else-if="name === 'check'" d="m5 13 4 4L19 7" />
     <path v-else-if="name === 'close'" d="M6 6l12 12M18 6L6 18" />
+    <!-- 禁用：禁止符（圆圈 + 斜杠） -->
+    <g v-else-if="name === 'ban'">
+      <circle cx="12" cy="12" r="9" />
+      <path d="m5.6 5.6 12.8 12.8" />
+    </g>
+    <!-- 删除：垃圾桶（桶盖 + 桶身 + 两道竖线） -->
+    <g v-else-if="name === 'trash'">
+      <path d="M4 7h16" />
+      <path d="M9.5 7V5.5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1V7" />
+      <path d="m6.5 7 1 12a2 2 0 0 0 2 2h5a2 2 0 0 0 2-2l1-12" />
+      <path d="M10 11v6M14 11v6" />
+    </g>
+    <!-- 感叹号（圆圈 + 一竖一点）：依赖图里"装着了但版本合不上"那枚标记 -->
+    <g v-else-if="name === 'alert'">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7.5v5.5" />
+      <path d="M12 16.6h.01" />
+    </g>
     <!-- 放大镜：搜索框左端那枚 -->
     <g v-else-if="name === 'search'">
       <circle cx="11" cy="11" r="7" />
@@ -126,6 +150,11 @@ withDefaults(
       <path d="M12 3v12" />
       <path d="m7 10 5 5 5-5" />
       <path d="M4 20h16" />
+    </g>
+    <!-- 升级：向上的箭头（版本往上走），与"下载"那条向下的箭头区分开 -->
+    <g v-else-if="name === 'update'">
+      <path d="M12 20V5" />
+      <path d="m6 11 6-6 6 6" />
     </g>
     <!-- 刷新：一圈带缺口的圆 + 箭头（缺口在右上，箭头落在缺口处） -->
     <g v-else-if="name === 'refresh'">

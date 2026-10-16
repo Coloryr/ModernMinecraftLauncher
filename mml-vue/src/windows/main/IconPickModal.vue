@@ -111,7 +111,7 @@ async function apply() {
 
 <template>
   <!-- 不可关闭：遮罩点击与 Esc 都不关（见文件头注释），只认下面两个按钮 -->
-  <BaseModal :title="name" :closable="false" :overlay-close="false" :width="700">
+  <BaseModal :title="name" :closable="false" :width="700">
     <!-- 截图区；读图期间只留一行状态 -->
     <p v-if="reading" class="pick-loading">{{ t("iconPick.picking") }}</p>
     <template v-else-if="src">

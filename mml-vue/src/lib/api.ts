@@ -49,6 +49,8 @@ import type {
   ModItemDto,
   ModRenameDto,
   ModScanProgressDto,
+  ModUpdateCheckDto,
+  ModUpdateProgressDto,
   MotdDto,
   NbtEditDto,
   ModPackStatusDto,
@@ -74,7 +76,7 @@ import type {
   VersionInfoDto,
   ViewMode,
 } from "./bindings";
-import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress, ResourceModsDuplicate } from "./listens";
+import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress, ResourceModsDepProblems, ResourceModsDuplicate, ResourceModsUpdateProgress } from "./listens";
 
 export interface CreateInstanceOpts {
   loader?: string;
@@ -1791,6 +1793,21 @@ export function modsDepTest(uuid: string): Promise<DepProblemDto[]> {
   return commands.resource.modsDepTest(uuid);
 }
 /**
+ * 模组更新检查：查有在线信息的模组在平台上有没有新文件
+ *
+ * - `uuid`: 实例 uuid
+ *
+ * # 返回值
+ *
+ * 检查结果，见 `ModUpdateCheckDto`；只收带在线信息、项目号与文件号都非空的模组
+ *
+ * 要重新扫一遍 mods 目录，再逐个问平台（Modrinth 限 300 次 / 分钟），
+ * 大整合包可能要一分钟，界面要给忙碌态与进度，进度见 `onModsUpdateProgress`
+ */
+export function modsUpdateCheck(uuid: string): Promise<ModUpdateCheckDto> {
+  return commands.resource.modsUpdateCheck(uuid);
+}
+/**
  * 模组扫描进度事件
  *
  * - `cb`: 扫描期间回调，形如 `x/x`
@@ -1817,6 +1834,34 @@ export function onModScanProgress(cb: (e: ModScanProgressDto) => void): Promise<
  */
 export function onModsDuplicate(cb: (e: ModDuplicateDto[]) => void): Promise<UnlistenFn> {
   return listen<ModDuplicateDto[]>(ResourceModsDuplicate, (e) => cb(e.payload));
+}
+/**
+ * 模组依赖问题事件
+ *
+ * - `cb`: 模组列表加载完成时回调，载荷是缺前置 / 版本不符 / 前置被禁用；没有问题不发
+ *
+ * # 返回值
+ *
+ * 取消监听的函数
+ *
+ * 与重复安装同一发：列表加载完就报，界面不自动弹窗，留给依赖图给节点打标记
+ */
+export function onModsDepProblems(cb: (list: DepProblemDto[]) => void): Promise<UnlistenFn> {
+  return listen<DepProblemDto[]>(ResourceModsDepProblems, (e) => cb(e.payload));
+}
+/**
+ * 模组更新检查进度事件
+ *
+ * - `cb`: 逐个问平台期间回调，形如 `x/x`
+ *
+ * # 返回值
+ *
+ * 取消监听的函数
+ *
+ * 检查可能要一分钟，按钮上要显示进度，否则用户以为卡死了
+ */
+export function onModsUpdateProgress(cb: (e: ModUpdateProgressDto) => void): Promise<UnlistenFn> {
+  return listen<ModUpdateProgressDto>(ResourceModsUpdateProgress, (e) => cb(e.payload));
 }
 /**
  * 启用模组，去掉 .disable / .disabled 后缀

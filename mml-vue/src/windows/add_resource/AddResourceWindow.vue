@@ -780,7 +780,7 @@ onActivated(async () => {
       <!-- 存档选择弹窗（数据包下载前）：标题、提示、按钮栏都用全仓那套
            BaseModal + .modal-text + 全局 .modal-actions + BaseButton，与下面两个弹窗一致 -->
       <BaseModal v-if="savePickFile" :title="t('addResource.chooseSave')" :width="420" below-titlebar :closable="false"
-        :overlay-close="false" @close="savePickFile = null">
+        @close="savePickFile = null">
         <p class="modal-text">{{ t("addResource.chooseSaveHint") }}</p>
         <div class="save-list">
           <div v-if="savesLoading" class="empty-tip">{{ t("resource.loading") }}</div>
@@ -798,10 +798,9 @@ onActivated(async () => {
         </div>
       </BaseModal>
 
-      <!-- 前置勾选弹窗（下载模组前）：必选默认勾上且取消不了，可选的自己挑；
-           点遮罩不关闭，右上角有关闭按钮（BaseModal 的 title 那一档） -->
+      <!-- 前置勾选弹窗（下载模组前）：必选默认勾上且取消不了，可选的自己挑；右上角有关闭按钮 -->
       <BaseModal v-if="depFile" :title="t('addResource.depsTitle')" :width="640" fixed-height="520px" below-titlebar
-        :overlay-close="false" @close="closeDeps">
+        @close="closeDeps">
         <div class="deps-hint">{{ t("addResource.depsHint") }}</div>
         <div class="deps-list">
           <div v-if="depsLoading" class="deps-loading">
@@ -854,7 +853,7 @@ onActivated(async () => {
 
       <!-- 跳过前置的二次确认 -->
       <BaseModal v-if="depSkipAsk" :title="t('addResource.depsSkipTitle')" :width="380" below-titlebar :closable="false"
-        :overlay-close="false" @close="depSkipAsk = false">
+        @close="depSkipAsk = false">
         <p class="deps-hint">{{ t("addResource.depsSkipHint") }}</p>
         <div class="modal-actions">
           <BaseButton @click="depSkipAsk = false">{{ t("actions.cancel") }}</BaseButton>

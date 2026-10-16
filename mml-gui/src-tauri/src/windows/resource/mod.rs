@@ -22,6 +22,7 @@ pub(crate) mod schematics;
 pub(crate) mod screenshots;
 pub(crate) mod servers;
 pub(crate) mod shaders;
+pub(crate) mod update;
 pub(crate) mod view;
 
 use std::path::{Path, PathBuf};

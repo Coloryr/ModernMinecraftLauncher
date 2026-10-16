@@ -23,8 +23,6 @@ const props = withDefaults(
     /** 遮罩从自绘标题栏下方开始，让标题栏（可拖动 / 窗口按钮）保持可操作。
      *  默认开启：所有弹窗都不应挡住标题栏 */
     belowTitlebar?: boolean;
-    /** 点击遮罩空白处是否关闭；输入类弹窗建议关掉，避免误触丢内容 */
-    overlayClose?: boolean;
   }>(),
   {
     title: "",
@@ -32,12 +30,11 @@ const props = withDefaults(
     fixedHeight: "",
     closable: true,
     belowTitlebar: true,
-    overlayClose: true,
   },
 );
 
 const emit = defineEmits<{
-  /** 请求关闭；`overlayClose` 为假时点遮罩不发这条 */
+  /** 请求关闭；由右上角 ✕ 或弹窗自己的按钮发出，点遮罩不会发这条 */
   (e: "close"): void;
 }>();
 
@@ -47,8 +44,8 @@ const active = usePageActive();
 
 <template>
   <Teleport to="body">
-    <div v-if="active" class="modal-mask" :class="{ 'below-titlebar': props.belowTitlebar }"
-      @click.self="props.overlayClose && emit('close')">
+    <!-- 点遮罩空白处**不关**：误触一下就把弹窗收掉太容易丢东西，关它走右上角 ✕ 或弹窗自己的按钮 -->
+    <div v-if="active" class="modal-mask" :class="{ 'below-titlebar': props.belowTitlebar }">
       <div class="modal" :class="{ 'fixed-h': !!props.fixedHeight }"
         :style="{ width: width + 'px', height: props.fixedHeight || undefined }">
         <div v-if="title" class="modal-head">

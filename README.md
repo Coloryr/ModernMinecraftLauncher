@@ -14,9 +14,7 @@
 - 模组二分模式
 
 ## 待完成列表
-- 资源窗口分类拖动浮动效果
 - 模组更新检查
-- 模组依赖检查
 - MCMOD搜索
 - 界面统一
 - 简易崩溃分析
@@ -131,6 +129,9 @@
 | three | 0.156.1 | MIT | [mrdoob/three.js](https://github.com/mrdoob/three.js) |
 | skinview3d | 3.4.2 | MIT | [bs-community/skinview3d](https://github.com/bs-community/skinview3d) |
 | skinview-utils | 0.7.1 | MIT | [bs-community/skinview-utils](https://github.com/bs-community/skinview-utils) |
+| @vue-flow/core | 1.48.2 | MIT | [bcakmakoglu/vue-flow](https://github.com/bcakmakoglu/vue-flow) |
+| @vue-flow/background | 1.3.2 | MIT | [bcakmakoglu/vue-flow](https://github.com/bcakmakoglu/vue-flow) |
+| @dagrejs/dagre | 3.1.1 | MIT | [dagrejs/dagre](https://github.com/dagrejs/dagre) |
 
 dompurify 上游是 `MPL-2.0 OR Apache-2.0`，本项目按 Apache-2.0 履行；
 monaco-editor 自身还打包了 marked 14.0.0（MIT）、dompurify 3.4.8（Apache-2.0）与 Codicon 字体（MIT）。

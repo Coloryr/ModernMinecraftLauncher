@@ -180,6 +180,14 @@
   padding: 0 14px;
 }
 
+/* 纯图标按钮：只放一枚图标，收成方形 —— 留着左右 14px 的话它会变成一颗椭圆，
+   一排图标之间也松得看不出是一组 */
+.resource-layout .head-actions .mini-btn.icon-only {
+  padding: 0;
+  width: var(--ctl-h);
+  justify-content: center;
+}
+
 /* ---------- 列表与行 ---------- */
 
 /* 列表容器：只负责滚动与间距，**自己不画框** ——

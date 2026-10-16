@@ -116,7 +116,7 @@ useModalKeys((e) => {
     </SettingsGroup>
 
     <!-- 删除全部确认 -->
-    <BaseModal v-if="confirmRemoveAll" :title="t('winSettings.javaRemoveAll')" :overlay-close="false" below-titlebar
+    <BaseModal v-if="confirmRemoveAll" :title="t('winSettings.javaRemoveAll')" below-titlebar
       :closable="false" @close="confirmRemoveAll = false">
       <p class="field-desc">{{ t("winSettings.javaRemoveAllConfirm") }}</p>
       <div class="set-save-row">
@@ -126,7 +126,7 @@ useModalKeys((e) => {
     </BaseModal>
 
     <!-- 扫描 Java 加载弹窗：扫描期间显示，完成自动消失 -->
-    <BaseModal v-if="scanning || scanningDir" :width="300" :closable="false" :overlay-close="false">
+    <BaseModal v-if="scanning || scanningDir" :width="300" :closable="false">
       <div class="loading-modal">
         <span class="loading-spin" />
         <span>{{ t("winSettings.javaScanning") }}</span>
