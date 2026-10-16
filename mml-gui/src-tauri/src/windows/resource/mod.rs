@@ -15,6 +15,7 @@ pub(crate) mod datapacks;
 pub(crate) mod folder;
 pub(crate) mod groups;
 pub(crate) mod import;
+mod model;
 pub(crate) mod mods;
 pub(crate) mod packs;
 pub(crate) mod saves;
@@ -24,6 +25,9 @@ pub(crate) mod servers;
 pub(crate) mod shaders;
 pub(crate) mod update;
 pub(crate) mod view;
+
+/// 关窗前终止本窗口还在跑的操作，见 [`model::cancel_window`]
+pub(crate) use model::cancel_window;
 
 use std::path::{Path, PathBuf};
 

@@ -77,7 +77,11 @@ onMounted(async () => {
   max-height: 320px;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  /* 见 styles/scrollbar.css */
+  /* 行与滚动条之间留 8px：滚动容器向外借 8px、再用内边距收回 ——
+     行不往左缩（槽位由上面的 scrollbar-gutter 常驻），滚动条画在这 8px 上
+     （与项目列表 .res-list 同一做法，见 styles/scrollbar.css） */
+  margin-right: -8px;
+  padding-right: 8px;
 }
 
 .pick-item {

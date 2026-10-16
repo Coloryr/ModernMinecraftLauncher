@@ -134,34 +134,37 @@ fn collect_targets(list: &[ModObj], online: &HashMap<String, OnlineInfoObj>) -> 
 
 /// 模组更新检查：查有在线信息的模组在平台上有没有新文件
 ///
-/// 要重新扫一遍 mods 目录，与依赖检测 / 打开模组分类同一代价，界面要给忙碌态。
+/// **不重扫 mods 目录**：用的是列表命令留在窗口模型里的那份扫描结果，
+/// 检查只是拿它逐个问平台，点下去立刻就有总数。
 ///
 /// - `window`: 发起检查的那个资源窗口，由 Tauri 注入，进度只发给它
 /// - `uuid`: 实例 uuid
 ///
 /// # 返回值
 ///
-/// 见 [`ModUpdateCheckDto`]；实例不存在或扫描失败时返回错误串
+/// 见 [`ModUpdateCheckDto`]；实例不存在或模组列表还没加载时返回错误串
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub async fn resource_mods_update_check(
     window: WebviewWindow,
     uuid: String,
 ) -> Result<ModUpdateCheckDto, String> {
-    let instance = parse_instance(&uuid)?;
+    let model = super::model::window_model(&uuid)?;
+    let Some((targets, version, loader)) = model.with_cache(|cache| {
+        (
+            collect_targets(&cache.list, &cache.online),
+            cache.version.clone(),
+            cache.loader,
+        )
+    }) else {
+        // 模组列表还没加载过：没有"现有数据"可查，别去扫一遍凑数
+        return Err(err_keys::MODS_NOT_LOADED.to_string());
+    };
 
-    // 扫描与在线信息在同一个阻塞任务里取：两者都要实例快照，分开走反而多取一次锁
-    let (list, online, version, loader) = block_on_instance(instance, move |game| {
-        let online = game.read_online_info();
-        let version = game.version.clone();
-        let loader = game.loader;
-        let list =
-            tokio::runtime::Handle::current().block_on(async { game.read_mod(false, None).await });
-        (list, online, version, loader)
-    })
-    .await?;
+    // 关窗时要能收手：任务挂在这个窗口的模型上，见 super::model
+    let op = model.begin();
+    let token = op.token();
 
-    let targets = collect_targets(&list, &online);
     let total = targets.len();
     // 先把总数报出去：前端据此显示 `0/N`，否则第一次进度回来前只有一个转圈
     emit_resource_mods_update_progress(&window, ModUpdateProgressDto { done: 0, total });
@@ -184,20 +187,27 @@ pub async fn resource_mods_update_check(
     }
 
     let mut done = 0usize;
-    while let Some(joined) = set.join_next().await {
-        done += 1;
-        emit_resource_mods_update_progress(&window, ModUpdateProgressDto { done, total });
-        match joined {
-            Ok(Ok(Some(update))) => updates.push(update),
-            Ok(Ok(None)) => {}
-            // 单个模组查失败不影响其它：记个数，整份结果照常返回
-            Ok(Err(err)) => {
-                failed += 1;
-                first_error.get_or_insert(err);
-            }
-            Err(err) => {
-                failed += 1;
-                first_error.get_or_insert(err.to_string());
+    loop {
+        tokio::select! {
+            // 窗口关了：剩下的不再等；丢下 JoinSet 会把没跑完的请求一起 abort
+            _ = token.cancelled() => return Err(err_keys::CANCELLED.to_string()),
+            joined = set.join_next() => {
+                let Some(joined) = joined else { break };
+                done += 1;
+                emit_resource_mods_update_progress(&window, ModUpdateProgressDto { done, total });
+                match joined {
+                    Ok(Ok(Some(update))) => updates.push(update),
+                    Ok(Ok(None)) => {}
+                    // 单个模组查失败不影响其它：记个数，整份结果照常返回
+                    Ok(Err(err)) => {
+                        failed += 1;
+                        first_error.get_or_insert(err);
+                    }
+                    Err(err) => {
+                        failed += 1;
+                        first_error.get_or_insert(err.to_string());
+                    }
+                }
             }
         }
     }
@@ -241,13 +251,22 @@ pub async fn resource_mods_update_apply(
         return Ok(());
     }
     let instance = parse_instance(&uuid)?;
+    // 关窗时要能收手：任务挂在这个窗口的模型上
+    let op = super::model::window_model(&uuid)?.begin();
+    let token = op.token();
     let total = items.len();
     emit_resource_mods_update_progress(&window, ModUpdateProgressDto { done: 0, total });
 
     tauri::async_runtime::spawn(async move {
+        // 守卫跟着任务走：任务结束（或被丢掉）它才把令牌从模型里摘掉
+        let _op = op;
         let mut ok = 0u32;
         let mut failed = 0u32;
         for (index, item) in items.into_iter().enumerate() {
+            // 窗口关了：剩下的不再下，已经下完的保持原样
+            if token.is_cancelled() {
+                return;
+            }
             match apply_one(instance.clone(), &item).await {
                 Ok(()) => ok += 1,
                 Err(err) => {

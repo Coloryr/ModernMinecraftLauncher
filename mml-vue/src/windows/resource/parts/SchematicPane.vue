@@ -320,6 +320,11 @@ function metaLabel(item: SchematicItemDto): string {
   gap: 2px;
   max-height: 260px;
   overflow-y: auto;
+  /* 行与滚动条之间留 8px：滚动容器向外借 8px、再用内边距收回 ——
+     行的右边缘仍落在弹窗内容区里，滚动条画在这 8px 上
+     （与项目列表 .res-list 同一做法，见 styles/scrollbar.css） */
+  margin-right: -8px;
+  padding-right: 8px;
 }
 
 .schem-block {

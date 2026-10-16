@@ -602,10 +602,11 @@ function saveTip(item: SaveItemDto): string {
   /* 备份可能很多：给个上限自己滚，别把弹窗撑出屏幕 */
   max-height: 320px;
   overflow-y: auto;
-  /* 这里**不预留**滚动条槽位：预留的话行会整体缩进 9px，左端就与标题、
-     右端就与下面的按钮错开。槽位由 BaseModal 的 `.modal` 统一在两侧留，
-     所以行正好落在弹窗的内容区里，与标题 / 按钮对齐 */
-  /* 见 styles/scrollbar.css */
+  /* 行与滚动条之间留 8px：滚动容器向外借 8px、再用内边距收回 ——
+     行的右边缘仍落在弹窗内容区里，滚动条画在这 8px 上
+     （与项目列表 .res-list 同一做法，见 styles/scrollbar.css） */
+  margin-right: -8px;
+  padding-right: 8px;
 }
 
 /* 一行一个备份：整行可点，点下去弹确认框。

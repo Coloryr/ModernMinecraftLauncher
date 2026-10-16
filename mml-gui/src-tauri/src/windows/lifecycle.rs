@@ -32,7 +32,7 @@ use super::registry::{
     ADD_MODPACK_WINDOW_UUID, ADD_WINDOW_UUID, BLOCK_WINDOW_UUID, DOWNLOAD_WINDOW_UUID,
     MAIN_WINDOW_UUID, WINDOWS_INFO, family_of_label, min_size_of_label, uuid_for_kind, uuid_of_label,
 };
-use super::{add_modpack, block};
+use super::{add_modpack, block, resource};
 
 /// 已打开窗口的句柄表：uuid → 句柄
 pub(super) static OPEN_WINDOWS: LazyLock<RwLock<HashMap<Uuid, WebviewWindow<tauri::Wry>>>> =
@@ -85,6 +85,50 @@ pub(crate) fn window_model<T: Send + Sync + 'static>(window: &WebviewWindow) -> 
         remove_window_model(&uuid);
         return None;
     }
+    model.downcast::<T>().ok()
+}
+
+/// 按窗口 uuid 取模型，不检查窗口是否还开着
+///
+/// 窗口族的模型按**派生 uuid** 登记，命令侧手里只有实例 uuid，
+/// 换算出来的就是它，见 `windows::resource::model`。
+///
+/// - `uuid`: 窗口 uuid
+///
+/// # 返回值
+///
+/// 该 uuid 的模型；没有或类型不匹配时为 `None`
+pub(super) fn window_model_by_uuid<T: Send + Sync + 'static>(uuid: &Uuid) -> Option<Arc<T>> {
+    WINDOW_MODELS
+        .read()
+        .unwrap()
+        .get(uuid)?
+        .clone()
+        .downcast::<T>()
+        .ok()
+}
+
+/// 按窗口 uuid 取模型，没有就用 `make` 建一个
+///
+/// 资源窗口是"一个实例一个窗口"的族，模型没法像静态窗口那样在 `ensure_window_model`
+/// 里按常量认领 —— 由命令侧按实例 uuid 算好派生 uuid 后按需建立。
+/// 释放仍走窗口销毁那条路（`Destroyed` 里 `remove_window_model`）。
+///
+/// - `uuid`: 窗口 uuid
+/// - `make`: 模型不存在时的构造函数
+///
+/// # 返回值
+///
+/// 该 uuid 的模型；表里那条类型不匹配时为 `None`
+pub(super) fn window_model_or_insert<T: Send + Sync + 'static>(
+    uuid: &Uuid,
+    make: impl FnOnce() -> T,
+) -> Option<Arc<T>> {
+    let mut models = WINDOW_MODELS.write().unwrap();
+    let model = models
+        .entry(*uuid)
+        .or_insert_with(|| Arc::new(Mutex::new(make())))
+        .clone();
     model.downcast::<T>().ok()
 }
 
@@ -577,8 +621,9 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
                 emit_close_blocked(window);
                 return;
             }
-            // 关闭已放行：取消该窗口还在跑的整合包搜索
+            // 关闭已放行：终止该窗口还在跑的操作 —— 整合包搜索、模组扫描 / 更新检查 / 下载更新
             add_modpack::cancel_search(&label);
+            resource::cancel_window(&label);
             if let Some(win) = window.app_handle().get_webview_window(&label) {
                 // 最大化 / 全屏：只记标志、不覆盖几何，否则下次会开在另一块屏、而且不最大化
                 let maximized =
@@ -599,6 +644,7 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
                     // **不发 CloseRequested**，那条链路的收尾不会执行 —— 这里手动补上取消搜索、
                     // 记下最大化标志与几何，否则下次开窗既不是最大化、几何也停在旧值。
                     add_modpack::cancel_search(win.label());
+                    resource::cancel_window(win.label());
                     let maximized =
                         win.is_maximized().unwrap_or(false) || win.is_fullscreen().unwrap_or(false);
                     let _ = save_window_state(&other_uuid, &win, maximized);
@@ -623,6 +669,9 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
             {
                 super::nbt_session::close_all_of(&instance);
             }
+            // 模型这就被移出表了，先把它里面在跑的任务取消掉：
+            // 令牌被丢弃**不会**触发取消，任务会一直跑到自己结束
+            resource::cancel_window(&label);
             OPEN_WINDOWS.write().unwrap().remove(&uuid);
             remove_window_model(&uuid);
         }

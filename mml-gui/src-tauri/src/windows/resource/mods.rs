@@ -18,6 +18,7 @@ use mml_game::game_mods::{
     mods_dep_test, mods_duplicate_test,
 };
 use mml_game::gui_hook::{IProgressGui, ProgressGui};
+use mml_game::launcher::file_online_info_obj::OnlineInfoObj;
 use mml_game::loader::LoaderType;
 use mml_names::names;
 use mml_sys::path_helper;
@@ -27,9 +28,11 @@ use crate::dtos::{
     DepProblemDto, DepProblemKindDto, ModDependencyDto, ModDuplicateDto, ModDuplicateFileDto,
     ModItemDto, ModRenameDto, ModScanProgressDto,
 };
+
 use crate::err_keys;
 use crate::listens;
 
+use super::model::{ModCache, window_model};
 use super::{block_on_instance, data_url, parse_instance};
 
 // ==================== 模组 ====================
@@ -103,6 +106,9 @@ pub fn emit_resource_mods_dep_problems(window: &WebviewWindow, dto: Vec<DepProbl
 
 /// 模组列表：解析 jar 元数据，条目多时耗时数秒
 ///
+/// 扫描结果会存进**窗口模型**（见 [`super::model`]）：更新检查、依赖检测都按这份数据算，
+/// 所以一个窗口里真正扫 mods 目录的只有这里。
+///
 /// - `window`: 发起这次扫描的那个资源窗口，由 Tauri 注入。扫描进度 `x/x` 只发给它，
 ///   不用全局广播：主窗口等也会收到，白跑一遍状态更新
 /// - `uuid`: 实例 uuid
@@ -118,20 +124,27 @@ pub async fn resource_list_mods(
 ) -> Result<Vec<ModItemDto>, String> {
     let instance = parse_instance(&uuid)?;
 
+    // 窗口模型：这一趟的扫描结果存进去，更新检查 / 依赖检测直接读，不再重扫 mods 目录。
+    // 存不进去（注册表异常）也不该拖垮列表，这里允许没有模型
+    let model = window_model(&uuid).ok();
+    let op = model.as_ref().map(|model| model.begin());
+
     // 进度回调交给内核，与方块渲染同一套 gui_hook 接口；
     // 回调是同步的，直接 emit，不需要额外缓冲
     let gui: ProgressGui = Some(Arc::new(ModScanGui {
         window: window.clone(),
     }) as Arc<dyn IProgressGui>);
 
-    // 四份附带数据一起读，省掉前端额外往返与按文件名 / SHA1 的合并：
+    // 几份附带数据一起读，省掉前端额外往返与按文件名 / SHA1 的合并：
     // 备注 `Mod.ModName`、在线信息 `online_info.json`、游戏根目录，后者用来算相对路径
-    let (list, notes, online, game_path, loader, problems) =
+    let (list, notes, online, game_path, loader, version, problems) =
         block_on_instance(instance, move |game| {
             let notes = crate::gui_setting::load(&game).mods.mod_name;
             let online = game.read_online_info();
             let game_path = game.get_game_path();
             let loader = game.loader;
+            // 更新检查要按游戏版本与加载器过滤平台上的文件，一并存进缓存
+            let version = game.version.clone();
             let list = tokio::runtime::Handle::current()
                 .block_on(async { game.read_mod(false, gui).await });
             // 顺路跑一遍依赖检测：列表已经扫出来了，这一步是纯内存计算。
@@ -139,17 +152,22 @@ pub async fn resource_list_mods(
             let problems = mods_dep_test(&game, &list)
                 .map(|test| test.problems)
                 .unwrap_or_default();
-            (list, notes, online, game_path, loader, problems)
+            (list, notes, online, game_path, loader, version, problems)
         })
         .await?;
 
-    // 按 SHA1 索引：在线信息表 OnlineInfoObj 的主键就是 SHA1，模组的 hash 正好是它
-    let online_of: HashMap<String, mml_game::launcher::file_online_info_obj::OnlineInfoObj> =
-        online
-            .into_iter()
-            .filter(|(_, info)| !info.sha1.is_empty())
-            .map(|(_, info)| (info.sha1.clone(), info))
-            .collect();
+    // 扫描期间窗口被关了：不用再拼 DTO、也不必写缓存
+    if op.as_ref().is_some_and(|op| op.is_cancelled()) {
+        return Err(err_keys::CANCELLED.to_string());
+    }
+
+    // 按 SHA1 索引：在线信息表 OnlineInfoObj 的主键就是 SHA1，模组的 hash 正好是它。
+    // 这里克隆一份（条目不大），原始表要留给窗口模型
+    let online_of: HashMap<String, OnlineInfoObj> = online
+        .values()
+        .filter(|info| !info.sha1.is_empty())
+        .map(|info| (info.sha1.clone(), info.clone()))
+        .collect();
 
     let ctx = ModCtx {
         notes: &notes,
@@ -173,10 +191,22 @@ pub async fn resource_list_mods(
         emit_resource_mods_dep_problems(&window, problems);
     }
 
-    Ok(list
+    let items: Vec<ModItemDto> = list
         .iter()
         .filter_map(|item| mod_item(item, &ctx, false))
-        .collect())
+        .collect();
+
+    // 扫描结果存进窗口模型：更新检查这类"按现有数据检查"的操作直接用这份，不再重扫
+    if let Some(model) = &model {
+        model.set_cache(ModCache {
+            list,
+            online,
+            version,
+            loader,
+        });
+    }
+
+    Ok(items)
 }
 
 /// `mod_item` 需要的几份外部数据，打包传，省得一路加参数
@@ -476,6 +506,10 @@ pub async fn resource_mod_enable(uuid: String, mod_uuid: String) -> Result<ModRe
     let instance = parse_instance(&uuid)?;
     let obj = find_mod(instance.clone(), &mod_uuid).await?;
     let new_path = obj.enable().map_err(|err| err.to_string())?;
+    // 窗口模型里那一条跟着改名：文件名、启用状态、uuid 都变了
+    if let Ok(model) = window_model(&uuid) {
+        model.rename_mod(&mod_uuid, &new_path, false);
+    }
     mod_rename_dto(instance, new_path).await
 }
 
@@ -493,6 +527,10 @@ pub async fn resource_mod_disable(uuid: String, mod_uuid: String) -> Result<ModR
     let instance = parse_instance(&uuid)?;
     let obj = find_mod(instance.clone(), &mod_uuid).await?;
     let new_path = obj.disable().map_err(|err| err.to_string())?;
+    // 窗口模型里那一条跟着改名，同 enable
+    if let Ok(model) = window_model(&uuid) {
+        model.rename_mod(&mod_uuid, &new_path, true);
+    }
     mod_rename_dto(instance, new_path).await
 }
 
@@ -509,29 +547,36 @@ pub async fn resource_mod_disable(uuid: String, mod_uuid: String) -> Result<ModR
 pub async fn resource_delete_mod(uuid: String, mod_uuid: String) -> Result<(), String> {
     let instance = parse_instance(&uuid)?;
     let obj = find_mod(instance, &mod_uuid).await?;
-    obj.delete().map_err(|err| err.to_string())
+    obj.delete().map_err(|err| err.to_string())?;
+    // 窗口模型里那一条也去掉，别让更新检查再去查一个已经不存在的包
+    if let Ok(model) = window_model(&uuid) {
+        model.remove_mod(&mod_uuid);
+    }
+    Ok(())
 }
 
 /// 模组依赖检测：检查各包声明的强制前置是否齐全、版本是否满足
 ///
-/// **要重新扫一遍 mods 目录**（与打开模组分类同一代价）：依赖信息只存在于扫描结果里，
-/// 扫描结果不落盘。几百个包时界面要给忙碌态。
+/// **不重扫 mods 目录**：依赖信息只存在于扫描结果里，而窗口模型已经存了一份
+/// （见 [`super::model`]），这里直接拿它算，纯内存、点下去就出结果。
 ///
 /// - `uuid`: 实例 uuid
 ///
 /// # 返回值
 ///
-/// 逐条问题，见 [`DepProblemDto`]；没有问题时空数组；实例不存在或扫描失败返回错误串
+/// 逐条问题，见 [`DepProblemDto`]；没有问题时空数组；
+/// 实例不存在或模组列表还没加载时返回错误串
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub async fn resource_mods_dep_test(uuid: String) -> Result<Vec<DepProblemDto>, String> {
+    let model = window_model(&uuid)?;
     let instance = parse_instance(&uuid)?;
 
     block_on_instance(instance, move |game| {
-        let mods =
-            tokio::runtime::Handle::current().block_on(async { game.read_mod(false, None).await });
-        let test =
-            mml_game::game_mods::mods_dep_test(&game, &mods).map_err(|err| err.to_string())?;
+        let Some(result) = model.with_cache(|cache| mods_dep_test(&game, &cache.list)) else {
+            return Err(err_keys::MODS_NOT_LOADED.to_string());
+        };
+        let test = result.map_err(|err| err.to_string())?;
         Ok(test.problems.into_iter().map(dep_problem_dto).collect())
     })
     .await?

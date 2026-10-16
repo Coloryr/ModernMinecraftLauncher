@@ -116,12 +116,10 @@ function dateOf(iso: string): string {
       </label>
     </div>
 
-    <!-- 查了多少 / 几个没查出来：没查出来的不等于已是最新，必须说出来 -->
-    <p class="upd-foot">{{ t("resource.updateSummary", { n: props.result.checked }) }}</p>
+    <!-- 只在有查询失败时留一行：没查出来的不等于"已是最新"，这行不能省 -->
     <p v-if="props.result.failed" class="upd-foot">
       {{ t("resource.updateFailed", { n: props.result.failed }) }}
     </p>
-    <p class="upd-hint">{{ t("resource.updateHint") }}</p>
 
     <div class="modal-actions">
       <BaseButton @click="emit('close')">{{ t("resource.cancel") }}</BaseButton>
@@ -172,6 +170,11 @@ function dateOf(iso: string): string {
   gap: 8px;
   max-height: 52vh;
   overflow-y: auto;
+  /* 行与滚动条之间留 8px：滚动容器向外借 8px、再用内边距收回 ——
+     行的右边缘仍落在弹窗内容区里，滚动条画在这 8px 上
+     （与项目列表 .res-list 同一做法，见 styles/scrollbar.css） */
+  margin-right: -8px;
+  padding-right: 8px;
 }
 
 /* 一行一条：整行是 label，点哪儿都能勾 */
@@ -247,12 +250,6 @@ function dateOf(iso: string): string {
 
 .upd-foot {
   margin: 10px 0 0;
-  color: var(--text-dim);
-  font-size: 11.5px;
-}
-
-.upd-hint {
-  margin: 4px 0 0;
   color: var(--text-dim);
   font-size: 11.5px;
 }

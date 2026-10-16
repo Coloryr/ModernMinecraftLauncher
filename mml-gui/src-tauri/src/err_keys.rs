@@ -22,6 +22,8 @@ pub const CANCELLED: &str = "err.cancelled";
 pub const VARIANT_INVALID: &str = "err.variantInvalid";
 /// 窗口模型未初始化
 pub const MODEL_MISSING: &str = "err.modelMissing";
+/// 模组列表还没加载，没有可用的扫描数据
+pub const MODS_NOT_LOADED: &str = "err.modsNotLoaded";
 /// 窗口参数不合法
 pub const WINDOW_QUERY: &str = "err.windowQuery";
 /// 没给实例 uuid，日志窗口定不下是哪一个
