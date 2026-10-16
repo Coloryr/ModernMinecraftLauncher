@@ -1636,13 +1636,36 @@ fn is_unknown_version(version: &str) -> bool {
 ///
 /// `minecraft` 由游戏本体提供，`forge` / `fabricloader` 之类由加载器提供 —— 它们不是
 /// 模组包，但同样要参与版本检查，否则"给 1.20.1 装的模组放到 1.21 上"这类问题报不出来。
-enum ProvidedVersion<'a> {
+pub enum ProvidedVersion<'a> {
     /// 由游戏 / 加载器提供，版本已知
     Known(&'a str),
     /// 由游戏 / 加载器提供，但版本未知，只当"有"、不比版本
     Unknown,
     /// 与游戏 / 加载器无关，由模组包提供
     FromMods,
+}
+
+/// 某个加载器在模组元数据里可能写成哪些 modid
+///
+/// 一个加载器常有好几种写法（Forge 有 forge / minecraftforge，Quilt 会认 fabricloader）。
+/// 依赖检测按它认"由加载器提供"，依赖图按它补"加载器 → minecraft"那条边 —— 同一张表，
+/// 两处口径才不会漂。
+///
+/// - `loader`: 实例的加载器
+///
+/// # 返回值
+///
+/// 可能的 modid，小写；原版与自定义加载器没有对应写法，返回空数组
+pub fn loader_modids(loader: LoaderType) -> &'static [&'static str] {
+    match loader {
+        LoaderType::Forge => &["forge", "minecraftforge"],
+        LoaderType::NeoForge => &["neoforge", "forge"],
+        LoaderType::Fabric => &["fabricloader"],
+        LoaderType::Quilt => &["quilt_loader", "quilt_base", "fabricloader"],
+        LoaderType::OptiFine => &["optifine"],
+        LoaderType::LiteLoader => &["liteloader"],
+        LoaderType::Normal | LoaderType::Custom => &[],
+    }
 }
 
 /// 该前置是否由游戏 / 加载器提供，以及提供它的版本
@@ -1656,7 +1679,7 @@ enum ProvidedVersion<'a> {
 /// # 返回值
 ///
 /// 见 [`ProvidedVersion`]
-fn provided_version<'a>(game: &'a InstanceSettingObj, modid: &str) -> ProvidedVersion<'a> {
+pub fn provided_version<'a>(game: &'a InstanceSettingObj, modid: &str) -> ProvidedVersion<'a> {
     let id = modid.to_ascii_lowercase();
     if matches!(id.as_str(), "java" | "mcp" | "fml") {
         return ProvidedVersion::Unknown;
@@ -1669,16 +1692,7 @@ fn provided_version<'a>(game: &'a InstanceSettingObj, modid: &str) -> ProvidedVe
         };
     }
 
-    let from_loader = match game.loader {
-        LoaderType::Forge => matches!(id.as_str(), "forge" | "minecraftforge"),
-        LoaderType::NeoForge => matches!(id.as_str(), "neoforge" | "forge"),
-        LoaderType::Fabric => id == "fabricloader",
-        LoaderType::Quilt => matches!(id.as_str(), "quilt_loader" | "quilt_base" | "fabricloader"),
-        LoaderType::OptiFine => id == "optifine",
-        LoaderType::LiteLoader => id == "liteloader",
-        LoaderType::Normal | LoaderType::Custom => false,
-    };
-    if !from_loader {
+    if !loader_modids(game.loader).contains(&id.as_str()) {
         return ProvidedVersion::FromMods;
     }
 

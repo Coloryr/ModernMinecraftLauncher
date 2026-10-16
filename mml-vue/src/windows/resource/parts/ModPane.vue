@@ -76,7 +76,6 @@ const {
   loading,
   modProgress,
   modDuplicates,
-  modDepProblems,
   dismissModDuplicates,
 } = props.data;
 const { busy, act, actLocal, askDelete, askConfirm, openFolder } = props.ops;
@@ -402,14 +401,11 @@ const { modView, setModView, colWidths, setColWidth, sort, setSort } = props.vie
 
 const groups = useModGroups(props.data);
 
-/** 依赖关系：依赖图与"禁用前置时顺带禁用依赖方"都用它，见 useModDeps */
-const { graphOf, dependentsOf, itemOf } = useModDeps(mods, instance);
+/** 依赖关系：依赖图与"要和哪几个一起改"都在后端算，见 useModDeps */
+const { depTreeOf, relatedOf, itemOf } = useModDeps(mods, instanceUuid);
 
 /** 打开着依赖图的那个模组；null = 没开 */
 const depTreeItem = ref<ModItemDto | null>(null);
-
-/** 依赖图（含布局）：只在开着的时候算，别在模板里每次渲染重算一遍 */
-const depGraph = computed(() => (depTreeItem.value ? graphOf(depTreeItem.value) : null));
 
 /**
  * 依赖图里双击某个节点：把这张图换成以它为目标
@@ -473,48 +469,14 @@ const stateAsk = ref<{
 } | null>(null);
 
 /**
- * 这些模组的强制前置里，现在**处于禁用状态**的那些
- *
- * 只找"装了但被禁用"的：压根没装属于"缺前置"，不是这里能顺手解决的。
- *
- * - `picked`: 这次要启用的模组
- *
- * # 返回值
- *
- * 需要一起启用的条目，按列表顺序
- */
-function disabledPrerequisites(picked: ModItemDto[]): ModItemDto[] {
-  const wanted = new Set<string>();
-  for (const item of picked) {
-    for (const dep of item.dependencies) {
-      if (!dep.optional) {
-        wanted.add(dep.modId.toLowerCase());
-      }
-    }
-  }
-  if (!wanted.size) return [];
-  const pickedKeys = new Set(picked.map((item) => modSelectKey(item)));
-  return mods.value.filter(
-    (item) =>
-      item.disable &&
-      !!item.modId &&
-      wanted.has(item.modId.toLowerCase()) &&
-      !pickedKeys.has(modSelectKey(item)),
-  );
-}
-
-/**
  * 改启用状态；两个方向都先看有没有"相关模组"要一起改
  *
- * - **禁用**：还有别的启用模组依赖它 —— 少了前置轻则功能缺失、重则起不来，
- *   问一句要不要一起禁用；
- * - **启用**：它要的强制前置现在被禁用着 —— 问一句要不要一起启用，省得一个个找。
+ * 关系在后端算（见 useModDeps 的 `relatedOf`）：禁用看"谁还需要它"，启用看"它要的强制前置
+ * 里现在被禁用着的那些"。
  */
 async function setState(picked: ModItemDto[], wantDisable: boolean) {
   if (!picked.length) return;
-  const related = wantDisable
-    ? dependentsOf(new Set(picked.map((item) => item.modId.toLowerCase()).filter((id) => !!id)))
-    : disabledPrerequisites(picked);
+  const related = await relatedOf(picked, wantDisable);
   if (related.length) {
     stateAsk.value = { picked, related, wantDisable };
     return;
@@ -947,7 +909,7 @@ function itemMenuItems(item: ModItemDto): RowMenuItem[] {
   items.push({
     id: "dep-tree",
     label: t("resource.depTree"),
-    disabled: !item.dependencies.length,
+    disabled: !item.hasDependencies,
   });
   // 分组那两条挨着：移到别的分组 / 移出分组，后者只在这一行确实在组里时才给
   items.push({
@@ -1729,8 +1691,8 @@ onMounted(() => void groups.load());
   </DragGhost>
 
   <!-- 依赖图：选一个模组，展开它声明的强制 / 推荐前置；共用前置只画一个节点 -->
-  <ModDepsModal v-if="depTreeItem && depGraph" :item="depTreeItem" :graph="depGraph"
-    :problems="modDepProblems" @target="rerootGraph" @close="depTreeItem = null" />
+  <ModDepsModal v-if="depTreeItem" :item="depTreeItem" :load-tree="depTreeOf" @target="rerootGraph"
+    @close="depTreeItem = null" />
 
   <!--
     改启用状态时问一句要不要顺带处理相关模组：

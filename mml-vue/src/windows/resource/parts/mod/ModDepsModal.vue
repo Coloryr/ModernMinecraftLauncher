@@ -1,11 +1,12 @@
 <script setup lang="ts">
 // 依赖图弹窗：画与交互全部交给 @vue-flow/core —— 拖节点、滚轮缩放、拖画布平移、
-// 点连线都是它自带的；布局坐标由 dagre 算好，见 composables/modDepGraph.ts。
+// 点连线都是它自带的。
 //
-// 这里只做三件事：
-// - 把图翻译成 vue-flow 的 nodes / edges，并给节点带上"装没装"的标记
-//   （装了打勾、装着但版本合不上打感叹号，判定来自后端随列表推来的依赖问题）；
-// - 点连线时在底部说明"谁需要谁、要什么版本"；
+// **关系在后端**：节点与连线由 `resource_mods_dep_tree` 算好（见 AGENTS.md §12.1），
+// 这个组件打开 / 换目标时向后端要一张，交给 dagre 布局（composables/modDepGraph.ts）
+// 后翻成 vue-flow 的 nodes / edges。这里只做三件事：
+// - 取图、布局、翻成 vue-flow 的两张表，节点上的"装没装"标记直接读后端给的 problem；
+// - 点连线时在鼠标旁说明"谁需要谁、要什么版本"；
 // - 一个重置视图的按钮，拖乱了能一键回到全图可见。
 import { computed, nextTick, ref, watch } from "vue";
 import {
@@ -19,24 +20,18 @@ import {
 import { Background } from "@vue-flow/background";
 import "@vue-flow/core/dist/style.css";
 import "@vue-flow/core/dist/theme-default.css";
-import { t } from "../../../../lib/i18n";
+import { t, tErr } from "../../../../lib/i18n";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../../components/ui/BaseModal.vue";
-import type { DepProblemDto, ModItemDto } from "../../../../lib/bindings";
-import {
-  type ModDepGraph,
-  type ModDepGraphEdge,
-  type ModDepGraphNode,
-} from "../../composables/modDepGraph";
+import type { ModDepEdgeDto, ModItemDto } from "../../../../lib/bindings";
+import { type ModDepGraph, type ModDepGraphNode } from "../../composables/modDepGraph";
 import ModDepNode from "./ModDepNode.vue";
 
 const props = defineProps<{
   /** 图根对应的模组 */
   item: ModItemDto;
-  /** 依赖图，含布局坐标 */
-  graph: ModDepGraph;
-  /** 依赖检测的问题，给节点打标记用；没有就不打勾也不打感叹号 */
-  problems: DepProblemDto[];
+  /** 取依赖图：后端建图 + 本地布局，失败抛错 */
+  loadTree: (item: ModItemDto) => Promise<ModDepGraph>;
 }>();
 
 const emit = defineEmits<{
@@ -51,31 +46,32 @@ const { fitView } = useVueFlow();
 /** 所有节点是否都量好尺寸了；换目标后要等它，见 fitAfterLayout */
 const nodesReady = useNodesInitialized();
 
-/** modid 小写 → 问题种类 */
-const problemOf = computed(() => {
-  const map = new Map<string, DepProblemDto["kind"]>();
-  for (const problem of props.problems) map.set(problem.modid.toLowerCase(), problem.kind);
-  return map;
-});
+/** 当前这张图；还没取回来时是 null */
+const graph = ref<ModDepGraph | null>(null);
+/** 正在取图 */
+const loading = ref(false);
+/** 取图失败的原因，空串表示没失败 */
+const error = ref("");
+/** 取图代次：连续换目标时丢弃旧一发的返回 */
+let seq = 0;
 
 /** 节点标记：装了打勾；装着但版本合不上（或只有禁用包提供）打感叹号 */
 function markOf(node: ModDepGraphNode): "ok" | "warn" | "" {
   if (node.root || !node.installed) return "";
-  const kind = problemOf.value.get(node.key);
-  return kind === "mismatch" || kind === "disabled" ? "warn" : "ok";
+  return node.problem === "mismatch" || node.problem === "disabled" ? "warn" : "ok";
 }
 
 const flowNodes = computed<Node[]>(() =>
-  props.graph.nodes.map((node) => ({
+  (graph.value?.nodes ?? []).map((node) => ({
     id: node.key,
     type: "mod",
     position: { x: node.x, y: node.y },
-    data: { node, mark: markOf(node), problem: problemOf.value.get(node.key) },
+    data: { node, mark: markOf(node), problem: node.problem ?? undefined },
   })),
 );
 
 const flowEdges = computed<Edge[]>(() =>
-  props.graph.edges.map((edge) => ({
+  (graph.value?.edges ?? []).map((edge) => ({
     id: edge.id,
     source: edge.from,
     target: edge.to,
@@ -108,7 +104,16 @@ const popupEl = ref<HTMLElement | null>(null);
 /** 节点键 → 节点 */
 const nodeOf = computed(() => {
   const map = new Map<string, ModDepGraphNode>();
-  for (const node of props.graph.nodes) map.set(node.key, node);
+  for (const node of graph.value?.nodes ?? []) map.set(node.key, node);
+  return map;
+});
+
+/** 节点键 → 显示名 */
+const labelOf = computed(() => {
+  const map = new Map<string, string>();
+  for (const node of graph.value?.nodes ?? []) {
+    map.set(node.key, node.label || node.modId || node.key);
+  }
   return map;
 });
 
@@ -130,7 +135,7 @@ function versionPart(node: ModDepGraphNode): string {
  *
  * 一句话
  */
-function edgeTextOf(edge: ModDepGraphEdge): string {
+function edgeTextOf(edge: ModDepEdgeDto): string {
   const from = labelOf.value.get(edge.from) ?? edge.from;
   const to = nodeOf.value.get(edge.to);
 
@@ -148,13 +153,6 @@ function edgeTextOf(edge: ModDepGraphEdge): string {
 
   return edge.backward ? text + " " + t("resource.depGraphCycle") : text;
 }
-
-/** 节点键 → 显示名 */
-const labelOf = computed(() => {
-  const map = new Map<string, string>();
-  for (const node of props.graph.nodes) map.set(node.key, node.label || node.modId || node.key);
-  return map;
-});
 
 /** 指针落点：鼠标直接用 client 坐标，触摸用触点 */
 function pointerOf(event: MouseEvent | TouchEvent): { x: number; y: number } {
@@ -192,6 +190,24 @@ async function showPopup(event: MouseEvent | TouchEvent, text: string) {
   popupPos.value = { x: left, y: top };
 }
 
+/** 向后端取图并布局；连续换目标时只有最后一发的返回算数 */
+async function load(item: ModItemDto) {
+  const mine = ++seq;
+  loading.value = true;
+  error.value = "";
+  try {
+    const tree = await props.loadTree(item);
+    if (mine !== seq) return;
+    graph.value = tree;
+  } catch (e) {
+    if (mine !== seq) return;
+    graph.value = null;
+    error.value = tErr(e);
+  } finally {
+    if (mine === seq) loading.value = false;
+  }
+}
+
 /** 双击节点：换成以它为目标。虚拟前置与缺失的前置没有条目，不给换 */
 function onNodeDoubleClick(payload: { node: { id: string } }) {
   const node = nodeOf.value.get(payload.node.id);
@@ -202,7 +218,7 @@ function onNodeDoubleClick(payload: { node: { id: string } }) {
 
 /** 点连线：在鼠标旁边说清这条依赖 */
 function onEdgeClick(payload: { edge: Edge; event: MouseEvent | TouchEvent }) {
-  const edge = props.graph.edges.find((each) => each.id === payload.edge.id);
+  const edge = graph.value?.edges.find((each) => each.id === payload.edge.id);
   if (!edge) return;
   void showPopup(payload.event, edgeTextOf(edge));
 }
@@ -229,22 +245,36 @@ function resetView() {
   void fitAfterLayout();
 }
 
-// 换目标（双击某个节点）后图整张换掉，但画布的缩放 / 平移还留着上一张的值：
-// 按新图重摆一次，否则新节点可能整片落在视野外
+// 打开或换目标：向后端要图
 watch(
-  () => props.graph,
-  () => {
+  () => props.item,
+  (item) => {
     hidePopup();
-    void fitAfterLayout();
+    void load(item);
   },
+  { immediate: true },
 );
+
+// 换目标后图整张换掉，但画布的缩放 / 平移还留着上一张的值：
+// 按新图重摆一次，否则新节点可能整片落在视野外
+watch(graph, () => {
+  hidePopup();
+  void fitAfterLayout();
+});
 </script>
 
 <template>
   <!-- 没有前置时不锁高度：锁了会是一个空荡荡的大面板 -->
   <BaseModal :title="t('resource.depTreeTitle', { name: props.item.name || props.item.file })" :width="960"
-    :fixed-height="props.graph.edges.length ? '76vh' : undefined" :closable="false" @close="emit('close')">
-    <p v-if="!props.graph.edges.length" class="empty-tip">{{ t("resource.depTreeNone") }}</p>
+    :fixed-height="graph?.edges.length ? '76vh' : undefined" :closable="false" @close="emit('close')">
+    <div v-if="loading" class="empty-tip">{{ t("resource.loading") }}</div>
+
+    <div v-else-if="error" class="empty-tip">
+      <p>{{ error }}</p>
+      <BaseButton size="sm" @click="load(props.item)">{{ t("modpack.retry") }}</BaseButton>
+    </div>
+
+    <p v-else-if="!graph?.edges.length" class="empty-tip">{{ t("resource.depTreeNone") }}</p>
 
     <div v-else class="dep-flow">
       <!-- 拖节点、滚轮缩放、拖画布平移全是 vue-flow 的默认行为 -->

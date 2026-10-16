@@ -25,8 +25,8 @@ use mml_sys::path_helper;
 use tauri::{Emitter, WebviewWindow};
 
 use crate::dtos::{
-    DepProblemDto, DepProblemKindDto, ModDependencyDto, ModDuplicateDto, ModDuplicateFileDto,
-    ModItemDto, ModRenameDto, ModScanProgressDto,
+    DepProblemDto, DepProblemKindDto, ModDuplicateDto, ModDuplicateFileDto, ModItemDto,
+    ModRenameDto, ModScanProgressDto,
 };
 
 use crate::err_keys;
@@ -91,19 +91,6 @@ pub fn emit_resource_mods_duplicate(window: &WebviewWindow, dto: Vec<ModDuplicat
     let _ = window.emit(listens::RESOURCE_MODS_DUPLICATE, dto);
 }
 
-/// 模组依赖问题事件，事件名 `resource-mods-dep-problems`
-///
-/// - `window`: 接收事件的那个资源窗口，由 Tauri 注入
-/// - `dto`: 依赖问题列表，非空
-///
-/// 与重复安装同一发：列表加载完顺路报一次。**不自动弹窗**（要看的用户会点「依赖检测」），
-/// 前端留着给依赖图的节点打勾 / 打感叹号 —— 不报的话，图里只能看出"装没装"，
-/// 看不出"装的版本对不对"。
-#[gui_macros::emit]
-pub fn emit_resource_mods_dep_problems(window: &WebviewWindow, dto: Vec<DepProblemDto>) {
-    let _ = window.emit(listens::RESOURCE_MODS_DEP_PROBLEMS, dto);
-}
-
 /// 模组列表：解析 jar 元数据，条目多时耗时数秒
 ///
 /// 扫描结果会存进**窗口模型**（见 [`super::model`]）：更新检查、依赖检测都按这份数据算，
@@ -137,7 +124,7 @@ pub async fn resource_list_mods(
 
     // 几份附带数据一起读，省掉前端额外往返与按文件名 / SHA1 的合并：
     // 备注 `Mod.ModName`、在线信息 `online_info.json`、游戏根目录，后者用来算相对路径
-    let (list, notes, online, game_path, loader, version, problems) =
+    let (list, notes, online, game_path, loader, version) =
         block_on_instance(instance, move |game| {
             let notes = crate::gui_setting::load(&game).mods.mod_name;
             let online = game.read_online_info();
@@ -147,12 +134,7 @@ pub async fn resource_list_mods(
             let version = game.version.clone();
             let list = tokio::runtime::Handle::current()
                 .block_on(async { game.read_mod(false, gui).await });
-            // 顺路跑一遍依赖检测：列表已经扫出来了，这一步是纯内存计算。
-            // 它失败不该拖垮列表本身，出错就当没有依赖问题
-            let problems = mods_dep_test(&game, &list)
-                .map(|test| test.problems)
-                .unwrap_or_default();
-            (list, notes, online, game_path, loader, version, problems)
+            (list, notes, online, game_path, loader, version)
         })
         .await?;
 
@@ -185,12 +167,6 @@ pub async fn resource_list_mods(
         emit_resource_mods_duplicate(&window, duplicates);
     }
 
-    // 依赖问题与重复安装分开报：依赖图只拿它给节点打标记，界面不自动弹窗
-    let problems: Vec<DepProblemDto> = problems.into_iter().map(dep_problem_dto).collect();
-    if !problems.is_empty() {
-        emit_resource_mods_dep_problems(&window, problems);
-    }
-
     let items: Vec<ModItemDto> = list
         .iter()
         .filter_map(|item| mod_item(item, &ctx, false))
@@ -207,6 +183,54 @@ pub async fn resource_list_mods(
     }
 
     Ok(items)
+}
+
+/// 一个模组条目声明的依赖
+pub(super) struct ModDependencyRef {
+    /// 前置的 modid，原样大小写
+    pub(super) mod_id: String,
+    /// 推荐安装（非强制）
+    pub(super) optional: bool,
+    /// 版本要求原文，不限版本是 `*`
+    pub(super) required: String,
+}
+
+/// 取一个模组条目声明的依赖
+///
+/// 只收与实例加载器一致的那份元数据，与依赖检测同一口径；同一条前置可能被多份元数据
+/// 重复声明，按 (modid, 版本范围, 是否可选) 去重。
+///
+/// - `item`: 模组条目
+/// - `loader`: 实例的加载器
+///
+/// # 返回值
+///
+/// 依赖声明，按元数据顺序
+pub(super) fn mod_dependencies(item: &ModObj, loader: LoaderType) -> Vec<ModDependencyRef> {
+    let mut list: Vec<ModDependencyRef> = Vec::new();
+    for entry in item.info.iter().filter(|entry| entry.loaders == loader) {
+        for dependant in entry.dependants.iter() {
+            let (dep, optional) = match dependant {
+                DependantType::Required(dep) => (dep, false),
+                DependantType::Recommend(dep) => (dep, true),
+            };
+            if dep.modid.is_empty() {
+                continue;
+            }
+            let required = dep.version.to_string();
+            let exists = list.iter().any(|each| {
+                each.mod_id == dep.modid && each.required == required && each.optional == optional
+            });
+            if !exists {
+                list.push(ModDependencyRef {
+                    mod_id: dep.modid.clone(),
+                    optional,
+                    required,
+                });
+            }
+        }
+    }
+    list
 }
 
 /// `mod_item` 需要的几份外部数据，打包传，省得一路加参数
@@ -281,31 +305,8 @@ fn mod_item(item: &ModObj, ctx: &ModCtx, nested: bool) -> Option<ModItemDto> {
         mml_game::launcher::get_source_type(&project_id, &file_id).to_string()
     };
 
-    // 前置声明：只收当前加载器那份元数据，与依赖检测同一口径；
-    // 同一条前置可能被多份元数据重复声明，按 (modid, 范围, 是否可选) 去重
-    let mut dependencies: Vec<ModDependencyDto> = Vec::new();
-    for entry in item.info.iter().filter(|entry| entry.loaders == ctx.loader) {
-        for dependant in entry.dependants.iter() {
-            let (dep, optional) = match dependant {
-                DependantType::Required(dep) => (dep, false),
-                DependantType::Recommend(dep) => (dep, true),
-            };
-            if dep.modid.is_empty() {
-                continue;
-            }
-            let required = dep.version.to_string();
-            let exists = dependencies.iter().any(|each| {
-                each.mod_id == dep.modid && each.required == required && each.optional == optional
-            });
-            if !exists {
-                dependencies.push(ModDependencyDto {
-                    mod_id: dep.modid.clone(),
-                    required,
-                    optional,
-                });
-            }
-        }
-    }
+    // 前置本身不进前端，只报"有没有"：右键菜单靠它决定「依赖图」给不给点
+    let has_dependencies = !mod_dependencies(item, ctx.loader).is_empty();
 
     Some(ModItemDto {
         uuid: item.uuid.to_string(),
@@ -333,7 +334,7 @@ fn mod_item(item: &ModObj, ctx: &ModCtx, nested: bool) -> Option<ModItemDto> {
             .iter()
             .filter_map(|child| mod_item(child, ctx, true))
             .collect(),
-        dependencies,
+        has_dependencies,
         file,
     })
 }

@@ -216,6 +216,8 @@ export const commands = {
     modGroupsCollapsed: (uuid: string) => invoke<string[]>("resource_mod_groups_collapsed", { uuid }),
     modNoteSet: (uuid: string, file: string, note: string) => invoke<void>("resource_mod_note_set", { uuid, file, note }),
     modsDepTest: (uuid: string) => invoke<DepProblemDto[]>("resource_mods_dep_test", { uuid }),
+    modsDepTree: (uuid: string, modUuid: string) => invoke<ModDepTreeDto>("resource_mods_dep_tree", { uuid, modUuid }),
+    modsRelatedMods: (uuid: string, mods: string[], disable: boolean) => invoke<string[]>("resource_mods_related_mods", { uuid, mods, disable }),
     modsUpdateApply: (uuid: string, items: ModUpdateApplyDto[]) => invoke<void>("resource_mods_update_apply", { uuid, items }),
     modsUpdateCheck: (uuid: string) => invoke<ModUpdateCheckDto>("resource_mods_update_check", { uuid }),
     openFolder: (uuid: string, kind: string, name: string | null, parent: string | null) => invoke<void>("resource_open_folder", { uuid, kind, name, parent }),
@@ -988,13 +990,7 @@ export type ModItemDto = {
   note: string,
   icon: string,
   jarInJar: ModItemDto[],
-  dependencies: ModDependencyDto[],
-};
-
-export type ModDependencyDto = {
-  modId: string,
-  required: string,
-  optional: boolean,
+  hasDependencies: boolean,
 };
 
 export type ModScanProgressDto = {
@@ -1176,6 +1172,38 @@ export type ModUpdateApplyDto = {
   source: string,
   projectId: string,
   newFileId: string,
+};
+
+export type ModDepNodeDto = {
+  key: string,
+  label: string,
+  modId: string,
+  version: string,
+  icon: string,
+  root: boolean,
+  nested: boolean,
+  virtual: boolean,
+  installed: boolean,
+  missing: boolean,
+  disabled: boolean,
+  mandatory: boolean,
+  required: string[],
+  problem: DepProblemKindDto | null,
+};
+
+export type ModDepEdgeDto = {
+  id: string,
+  from: string,
+  to: string,
+  optional: boolean,
+  required: string,
+  backward: boolean,
+  loader: boolean,
+};
+
+export type ModDepTreeDto = {
+  nodes: ModDepNodeDto[],
+  edges: ModDepEdgeDto[],
 };
 
 export type ModUpdateDoneDto = {

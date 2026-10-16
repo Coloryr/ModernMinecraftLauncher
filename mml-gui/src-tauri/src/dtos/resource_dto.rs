@@ -78,22 +78,11 @@ pub struct ModItemDto {
     ///
     /// 它们装在父 jar 里，没有独立文件：前端只展示，不提供启用 / 删除。
     pub jar_in_jar: Vec<ModItemDto>,
-    /// 该包声明的强制 / 推荐前置，依赖树与"禁用前置时顺带禁用依赖方"用
+    /// 这个包有没有声明前置，右键菜单里「依赖图」靠它置灰
     ///
-    /// 只收**当前加载器**那份元数据的声明，与依赖检测同一口径；内置条目的前置挂在自己身上。
-    pub dependencies: Vec<ModDependencyDto>,
-}
-
-/// 一个模组声明的前置
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ModDependencyDto {
-    /// 前置的 modid
-    pub mod_id: String,
-    /// 版本要求，解析后的范围原文，如 `[1.21,)`；不限版本时是 `*`
-    pub required: String,
-    /// 推荐安装（非强制）
-    pub optional: bool,
+    /// **前置本身不进前端**：谁依赖谁在后端算（见 AGENTS.md §12.1），
+    /// 要看图走 `resource_mods_dep_tree`。只收**当前加载器**那份元数据，与依赖检测同一口径。
+    pub has_dependencies: bool,
 }
 
 /// 模组扫描进度，即事件 `resource-list-mods-progress` 的负载
@@ -497,6 +486,77 @@ pub struct ModUpdateApplyDto {
     pub project_id: String,
     /// 新文件编号
     pub new_file_id: String,
+}
+
+/// 依赖图里的一个节点，同一个 modid 只有一个
+///
+/// 口径与内核依赖检测（`mods_dep_test`）一致：装没装、缺没缺、是游戏 / 加载器提供
+/// 还是模组提供，都在后端算好；前端只负责画。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModDepNodeDto {
+    /// 唯一键：modid 小写；模组没有 modid 的极少数情况退回文件名
+    pub key: String,
+    /// 显示名：有条目用条目名，否则用 modid
+    pub label: String,
+    /// 原始大小写的 modid
+    pub mod_id: String,
+    /// 已装版本，多份提供者用 `, ` 连接；虚拟前置是它的版本；都没有时为空串
+    pub version: String,
+    /// 图标 data URL，没有时为空串
+    pub icon: String,
+    /// 是不是被选中的那个模组，即图的根
+    pub root: bool,
+    /// 由内置 jar（jar-in-jar）提供
+    pub nested: bool,
+    /// 由游戏本体 / 加载器 / 运行环境提供，即"虚拟前置"
+    pub r#virtual: bool,
+    /// 装了：有模组提供，或由游戏 / 加载器提供
+    pub installed: bool,
+    /// 缺失：有强制前置指向它，但既没有模组提供、也不是虚拟前置
+    pub missing: bool,
+    /// 只有禁用状态的包提供它
+    pub disabled: bool,
+    /// 必装：至少有一条强制边指向它；只有可选边指向它时为假
+    pub mandatory: bool,
+    /// 指向它的边声明的版本要求，去重后按出现顺序；不限版本的不收
+    pub required: Vec<String>,
+    /// 依赖检测出的问题种类，没有时为空
+    ///
+    /// 与「依赖检测」同一个口径，节点靠它决定打勾还是打感叹号。
+    pub problem: Option<DepProblemKindDto>,
+}
+
+/// 依赖图里的一条连线，同一对节点只会有一条
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModDepEdgeDto {
+    /// 唯一 id，前端靠它认边
+    pub id: String,
+    /// 起点节点键，即"谁需要"
+    pub from: String,
+    /// 终点节点键，即"需要谁"
+    pub to: String,
+    /// 推荐安装（非强制）
+    pub optional: bool,
+    /// 声明里的版本要求原文，不限版本是 `*`
+    pub required: String,
+    /// 环上的回边：终点是这次遍历里的上游祖先
+    pub backward: bool,
+    /// 由**加载器指向 minecraft** 的合成边，不是模组声明的
+    pub loader: bool,
+}
+
+/// 某个模组的依赖图
+///
+/// 只有节点与连线，**不带坐标**：布局是这一屏的事，由前端用 dagre 算。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModDepTreeDto {
+    /// 节点
+    pub nodes: Vec<ModDepNodeDto>,
+    /// 连线
+    pub edges: Vec<ModDepEdgeDto>,
 }
 
 /// 更新下载的结果，即事件 `resource-mods-update-done` 的负载

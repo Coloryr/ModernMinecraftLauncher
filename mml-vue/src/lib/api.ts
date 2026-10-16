@@ -43,6 +43,7 @@ import type {
   LogFocusDto,
   LogSettingDto,
   McaChunkDto,
+  ModDepTreeDto,
   ModGroupDto,
   ModDuplicateDto,
   ResourceViewDto,
@@ -78,7 +79,7 @@ import type {
   VersionInfoDto,
   ViewMode,
 } from "./bindings";
-import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress, ResourceModsDepProblems, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress } from "./listens";
+import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress } from "./listens";
 
 export interface CreateInstanceOpts {
   loader?: string;
@@ -1789,10 +1790,42 @@ export function listMods(uuid: string): Promise<ModItemDto[]> {
  *
  * 逐条问题（缺前置 / 版本不符 / 前置被禁用）；没有问题时空数组
  *
- * 要重新扫一遍 mods 目录，与打开模组分类同一代价，界面要给忙碌态
+ * 用窗口模型里那份扫描结果算，纯内存；模组列表还没加载时后端返回 err.modsNotLoaded
  */
 export function modsDepTest(uuid: string): Promise<DepProblemDto[]> {
   return commands.resource.modsDepTest(uuid);
+}
+/**
+ * 某个模组的依赖图
+ *
+ * - `uuid`: 实例 uuid
+ * - `modUuid`: 图根那个模组的 uuid
+ *
+ * # 返回值
+ *
+ * 见 `ModDepTreeDto`：节点与连线都由后端算好，**不带坐标**（布局是这一屏的事，
+ * 见 AGENTS.md §12.1）；模组列表还没加载时后端返回 err.modsNotLoaded
+ */
+export function modsDepTree(uuid: string, modUuid: string): Promise<ModDepTreeDto> {
+  return commands.resource.modsDepTree(uuid, modUuid);
+}
+/**
+ * 要和这几个模组一起改的条目
+ *
+ * - `uuid`: 实例 uuid
+ * - `mods`: 这次要改的模组 uuid
+ * - `disable`: true = 禁用（找"谁还需要它"），false = 启用（找"它要的强制前置里被禁用着的"）
+ *
+ * # 返回值
+ *
+ * 要一起改的条目 uuid，按列表顺序；关系在后端算，前端拿去对列表项
+ */
+export function modsRelatedMods(
+  uuid: string,
+  mods: string[],
+  disable: boolean,
+): Promise<string[]> {
+  return commands.resource.modsRelatedMods(uuid, mods, disable);
 }
 /**
  * 模组更新检查：查有在线信息的模组在平台上有没有新文件
@@ -1803,7 +1836,7 @@ export function modsDepTest(uuid: string): Promise<DepProblemDto[]> {
  *
  * 检查结果，见 `ModUpdateCheckDto`；只收带在线信息、项目号与文件号都非空的模组
  *
- * 要重新扫一遍 mods 目录，再逐个问平台（Modrinth 限 300 次 / 分钟），
+ * 用窗口模型里那份扫描结果逐个问平台（Modrinth 限 300 次 / 分钟），不重扫 mods 目录；
  * 大整合包可能要一分钟，界面要给忙碌态与进度，进度见 `onModsUpdateProgress`
  */
 export function modsUpdateCheck(uuid: string): Promise<ModUpdateCheckDto> {
@@ -1852,20 +1885,6 @@ export function onModScanProgress(cb: (e: ModScanProgressDto) => void): Promise<
  */
 export function onModsDuplicate(cb: (e: ModDuplicateDto[]) => void): Promise<UnlistenFn> {
   return listen<ModDuplicateDto[]>(ResourceModsDuplicate, (e) => cb(e.payload));
-}
-/**
- * 模组依赖问题事件
- *
- * - `cb`: 模组列表加载完成时回调，载荷是缺前置 / 版本不符 / 前置被禁用；没有问题不发
- *
- * # 返回值
- *
- * 取消监听的函数
- *
- * 与重复安装同一发：列表加载完就报，界面不自动弹窗，留给依赖图给节点打标记
- */
-export function onModsDepProblems(cb: (list: DepProblemDto[]) => void): Promise<UnlistenFn> {
-  return listen<DepProblemDto[]>(ResourceModsDepProblems, (e) => cb(e.payload));
 }
 /**
  * 模组更新检查进度事件

@@ -27,7 +27,6 @@ import {
   listShaderpacks,
   listSchematics,
   onModScanProgress,
-  onModsDepProblems,
   onModsDuplicate,
 } from "../../../lib/api";
 import { takeResourceListDirty } from "../../../lib/resourceTasks";
@@ -35,7 +34,6 @@ import { loadGuiConfig } from "../../../lib/guiConfig";
 import { familyInstanceFromLabel, targetUuid } from "../../windowManager";
 import type {
   DataPackItemDto,
-  DepProblemDto,
   ModDuplicateDto,
   ModItemDto,
   PackItemDto,
@@ -154,29 +152,16 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     modDuplicates.value = [];
   }
 
-  /**
-   * 依赖检测发现的问题，与列表同一发推来
-   *
-   * 界面不自动弹窗（那是「依赖检测」按钮干的事），依赖图靠它给节点打勾 / 打感叹号：
-   * 没有它就只能看出"装没装"，看不出"装的版本对不对"。
-   */
-  const modDepProblems = ref<DepProblemDto[]>([]);
-
   /** 模组扫描进度的退订函数；每次拉列表时挂上，拿到结果就摘掉 */
   let unlistenProgress: (() => void) | null = null;
   /** 重复安装提示的退订函数，与进度同一发：拉列表时挂上，拿到结果就摘掉 */
   let unlistenDuplicate: (() => void) | null = null;
-  /** 依赖问题的退订函数，与进度同一发 */
-  let unlistenProblems: (() => void) | null = null;
-
   function stopModScan() {
     modProgress.value = { done: 0, total: 0 };
     unlistenProgress?.();
     unlistenProgress = null;
     unlistenDuplicate?.();
     unlistenDuplicate = null;
-    unlistenProblems?.();
-    unlistenProblems = null;
   }
 
   /** 按分类拉列表；操作后重拉、点刷新都走这里，切分类走 loadIfNeeded */
@@ -194,7 +179,6 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
           // 先订阅再调命令，否则可能漏掉最开始那几条
           modProgress.value = { done: 0, total: 0 };
           modDuplicates.value = [];
-          modDepProblems.value = [];
           unlistenProgress?.();
           unlistenProgress = await onModScanProgress((e) => {
             // 只认最新一发：旧的那一发回来晚了会把进度写回去（与 loadSeq 同一意图）
@@ -203,10 +187,6 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
           unlistenDuplicate?.();
           unlistenDuplicate = await onModsDuplicate((list) => {
             if (seq === loadSeq) modDuplicates.value = list;
-          });
-          unlistenProblems?.();
-          unlistenProblems = await onModsDepProblems((list) => {
-            if (seq === loadSeq) modDepProblems.value = list;
           });
           try {
             mods.value = await listMods(instanceUuid.value);
@@ -418,7 +398,6 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     loading,
     modProgress,
     modDuplicates,
-    modDepProblems,
     mods,
     packs,
     saves,
