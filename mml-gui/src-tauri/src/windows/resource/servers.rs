@@ -21,6 +21,8 @@ use super::parse_instance;
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub fn resource_list_servers(uuid: String) -> Result<Vec<ServerItemDto>, String> {
+    // 读的过程中删实例会被拦住，见 resource::instance_busy
+    let _op = super::model::begin_if_open(&uuid);
     let instance = parse_instance(&uuid)?;
     let list = instance
         .read()

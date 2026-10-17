@@ -15,6 +15,7 @@
 import { computed, ref, watch } from "vue";
 import { t } from "../../../../lib/i18n";
 import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
+import HighlightText from "../../../../components/ui/HighlightText.vue";
 import ResourceRow from "../ResourceRow.vue";
 import { LIST_ROW_GAP, LIST_ROW_H, useVirtualRows } from "../../composables/useVirtualRows";
 import {
@@ -31,9 +32,11 @@ const props = withDefaults(
     ModViewProps & {
       /** 最外层的层级；本组件不再递归，只有 ModPane 直接调它，恒为 0 */
       depth?: number;
+      /** 当前搜索词，命中处加底色；空串表示没搜 */
+      query?: string;
     }
   >(),
-  { depth: 0 },
+  { depth: 0, query: "" },
 );
 const emit = defineEmits<ModViewEmits>();
 
@@ -178,6 +181,11 @@ const visible = computed(() => rows.value.slice(start.value, end.value));
         备注放在**名字前面**（用户要求），并且不再加「备注：」前缀 ——
         位置本身就说明了它是备注，前缀只是白占宽度。标签样式由 .mod-note 给
       -->
+      <!-- 名字走插槽才过得了高亮：命中搜索词的那一段加底色，与设置搜索同一观感 -->
+      <template #name>
+        <HighlightText :text="row.item.name || row.item.file" :query="props.query" />
+      </template>
+
       <template #name-lead>
         <span v-if="row.item.note" class="mod-note" :title="row.item.note">{{ row.item.note }}</span>
       </template>

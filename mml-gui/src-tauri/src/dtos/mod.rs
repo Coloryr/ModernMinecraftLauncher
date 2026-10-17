@@ -66,7 +66,9 @@ pub use resource_dto::{
     DataPackItemDto, DepProblemDto, DepProblemKindDto, ModAutoMarkDto, ModAutoMarkProgressDto,
     ModDepEdgeDto, ModDepNodeDto, ModDepTreeDto, ModDuplicateDto, ModDuplicateFileDto, ModGroupDto,
     ModItemDto, ModPackUpdateDto, ModRenameDto, ModScanProgressDto, ModUpdateApplyDto,
-    ModUpdateCheckDto, ModUpdateDoneDto, ModUpdateDto, ModUpdateProgressDto, PackItemDto,
+    ModUpdateCheckDto, ModUpdateDoneDto, ModUpdateDto, ModUpdateProgressDto, ModUpdateProjectDto,
+    ModUpdateRecordDto,
+    PackItemDto,
     ResourceDropDto, ResourceViewDto, SaveBackupDto, SaveEditDto, SaveItemDto, SchematicBlockDto,
     SchematicDetailDto, SchematicItemDto, ScreenshotItemDto, ServerItemDto, ShaderItemDto,
 };

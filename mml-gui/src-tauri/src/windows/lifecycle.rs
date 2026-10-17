@@ -495,6 +495,22 @@ pub(super) fn webview_data_dir() -> Option<PathBuf> {
     Some(cache.join(names::WEBVIEW_DIR))
 }
 
+/// 关掉挂在某个实例名下的所有窗口
+///
+/// 实例被删掉之后调用：那些窗口的模型还指着已经不存在的实例，留着只会点出错误。
+/// 资源管理 / 日志 / 添加资源 / 配置文件四族一起关，走 [`close_window`] 的正常流程
+/// （先存几何、各自的关闭保护与取消照旧）。
+///
+/// - `app`: 应用句柄
+/// - `instance`: 被删掉的实例 uuid
+pub(crate) fn close_instance_windows(app: &AppHandle, instance: &Uuid) {
+    for family in super::registry::families() {
+        let id = super::registry::family_window_id(family, instance);
+        // 没开的窗口返回"找不到"，逐个关、失败忽略
+        let _ = close_window(app, &id.uuid, &id.label);
+    }
+}
+
 /// 关闭指定窗口：先保存几何，再真正关闭窗口
 ///
 /// - `app`: 应用句柄，按标签补查窗口用

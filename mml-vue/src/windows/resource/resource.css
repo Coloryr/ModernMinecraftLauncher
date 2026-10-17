@@ -137,8 +137,12 @@
 
 /* 工具条下面那条进度：右端要与顶栏按钮、下方卡片**同一条右边线**。
    它是 .pane-swap 的直接子节点，默认铺满整宽（含滚动条槽位），条子会一路顶到窗口右边，
-   所以在窗口级补一份右边距，口径与 .content-head 的 padding-right 相同 */
-.resource-layout .load-progress {
+   所以在窗口级补一份右边距，口径与 .content-head 的 padding-right 相同。
+
+   **必须限定为直接子节点**：ListSkeleton 里的"读取模组"进度也是 .load-progress，
+   但它在 .item-list 里，已经吃到滚动容器的 padding-right 26px 与 scrollbar-gutter 9px；
+   用后代选择器会让它再叠一份 35px，右端比顶栏和下方骨架行多缩一倍（踩过）。 */
+.resource-layout .pane-swap > .load-progress {
   padding-right: calc(26px + 9px);
 }
 

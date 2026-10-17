@@ -22,6 +22,8 @@ use super::{KIND_SHADERPACKS, block_on_instance, parse_instance, resource_file};
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub async fn resource_list_shaderpacks(uuid: String) -> Result<Vec<ShaderItemDto>, String> {
+    // 读的过程中删实例会被拦住，见 resource::instance_busy
+    let _op = super::model::begin_if_open(&uuid);
     let instance = parse_instance(&uuid)?;
 
     block_on_instance(instance, |game| {

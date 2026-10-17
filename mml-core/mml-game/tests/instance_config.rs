@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 
 use mml_game::game_options::read_options_from_file;
 use mml_game::launcher::instance_setting_obj::{InstanceSettingObj, ProxyHostObj, ServerObj};
+use mml_game::launcher::mod_update_obj::ModUpdateRecordObj;
 use mml_game::launcher::{LogEncoding, ModPackType};
 use mml_game::loader::LoaderType;
 use mml_game::{get_instance_by_name, init as game_init, load as game_load};
@@ -242,4 +243,95 @@ fn game_options_missing_file_returns_empty() {
     // 不预先写盘，get_options 应返回空表
     let data = instance.get_options().unwrap();
     assert!(data.is_empty());
+}
+
+/// 模组更新记录：追加两条，读回来两条且保持追加顺序
+///
+/// 关键是**追加不能冲掉前一条**：这条链路是"读旧表 + 追加 + 写回"，
+/// 所以它走同步写盘而不是 config_save 队列。
+#[test]
+fn mod_update_appends_and_reads_back() {
+    init_all();
+
+    let dir = format!("mod-update-{}", Uuid::new_v4().simple());
+    let instance = make_instance(&dir);
+    // 记录落在实例目录里，目录得先存在（真实流程里实例建出来时就有了）
+    std::fs::create_dir_all(instance.get_base_path()).unwrap();
+
+    // 文件还不存在时视为空表，不是报错
+    assert!(instance.read_mod_update().is_empty());
+
+    instance
+        .append_mod_update(
+            "5123456",
+            "Sodium",
+            ModUpdateRecordObj {
+                file: "sodium-0.6.jar".to_string(),
+                old_version: "0.5.8".to_string(),
+                version: "0.6.9".to_string(),
+                old_file_id: "100".to_string(),
+                file_id: "200".to_string(),
+                time: chrono::Local::now().fixed_offset(),
+                sha1: "sha1-aaa".to_string(),
+            },
+        )
+        .unwrap();
+    // 同一个项目再追一条：名字传空，不该把已有的名字冲掉
+    instance
+        .append_mod_update(
+            "5123456",
+            "",
+            ModUpdateRecordObj {
+                file: "sodium-0.7.jar".to_string(),
+                time: chrono::Local::now().fixed_offset(),
+                sha1: "sha1-bbb".to_string(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    // 另一个项目是另一项
+    instance
+        .append_mod_update(
+            "AANobbMI",
+            "Lithium",
+            ModUpdateRecordObj {
+                file: "lithium-0.12.jar".to_string(),
+                time: chrono::Local::now().fixed_offset(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+    let path = instance.get_mod_update_file();
+    assert!(path.ends_with(mml_names::names::MOD_UPDATE_FILE));
+
+    let list = instance.read_mod_update();
+    assert_eq!(list.len(), 2, "两个项目应是两项");
+    let sodium = list.get("5123456").expect("应有 sodium 那一项");
+    assert_eq!(sodium.name, "Sodium", "名字传空时沿用原来记的");
+    assert_eq!(sodium.update.len(), 2, "两次追加应留下两条记录");
+    assert_eq!(sodium.update[0].file, "sodium-0.6.jar");
+    assert_eq!(sodium.update[0].sha1, "sha1-aaa");
+    assert_eq!(sodium.update[0].old_version, "0.5.8");
+    assert_eq!(sodium.update[0].version, "0.6.9");
+    assert_eq!(sodium.update[0].old_file_id, "100");
+    assert_eq!(sodium.update[0].file_id, "200");
+    assert_eq!(sodium.update[1].file, "sodium-0.7.jar");
+    // 时间由追加时打上，非零即说明确实写进去了
+    assert!(sodium.update[0].time.timestamp() > 0);
+    assert_eq!(
+        list.get("AANobbMI").expect("应有 lithium 那一项").name,
+        "Lithium"
+    );
+
+    // 删除走"整份覆盖写回"：留下哪几条由调用方给
+    let mut trimmed = list.clone();
+    trimmed.get_mut("5123456").unwrap().update.remove(0);
+    instance.save_mod_update(&trimmed).unwrap();
+    let left = instance.read_mod_update();
+    let left = left.get("5123456").expect("删除后另一项还在");
+    assert_eq!(left.update.len(), 1);
+    assert_eq!(left.update[0].file, "sodium-0.7.jar");
+    // 名字跟着项目项留着，删掉一条记录不影响它
+    assert_eq!(left.name, "Sodium");
 }

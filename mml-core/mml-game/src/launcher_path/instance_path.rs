@@ -18,6 +18,7 @@ use mml_sys::path_helper;
 use crate::launcher::{
     custom_game_arg_obj::CustomGameArgObj, file_online_info_obj::OnlineInfoObj,
     game_time_obj::GameTimeObj, instance_setting_obj::InstanceSettingObj,
+    mod_update_obj::{ModUpdateList, ModUpdateRecordObj},
 };
 
 /// 在线文件信息表，键为 mod_id
@@ -359,6 +360,15 @@ impl InstanceSettingObj {
             .join(names::SERVER_OLD_FILE)
     }
 
+    /// 获取模组更新记录文件
+    pub fn get_mod_update_file(&self) -> PathBuf {
+        BASE_DIR
+            .get()
+            .unwrap()
+            .join(&self.dir)
+            .join(names::MOD_UPDATE_FILE)
+    }
+
     /// 获取启动记录数据文件
     pub fn get_launch_file(&self) -> PathBuf {
         BASE_DIR
@@ -502,5 +512,66 @@ impl InstanceSettingObj {
             obj,
             &self.get_launch_file(),
         );
+    }
+
+    /// 读取模组更新记录
+    ///
+    /// # 返回值
+    ///
+    /// 项目编号到该项目更新历史的表；文件不存在或解析失败返回空表
+    ///
+    /// 早先根是数组，改成按项目编号分表之后旧文件解析失败即当空表，
+    /// 下一次追加会把整个文件按新格式重写；日志级别的东西不值当写迁移
+    pub fn read_mod_update(&self) -> ModUpdateList {
+        let file = self.get_mod_update_file();
+        if file.exists() && file.is_file() {
+            if let Ok(list) = serialize_tools::json_from_file::<ModUpdateList>(&file) {
+                return list;
+            }
+        }
+
+        HashMap::new()
+    }
+
+    /// 追加一条模组更新记录
+    ///
+    /// **同步写盘**，不走 `config_save` 队列：这里是"读旧表 + 追加 + 写回"，
+    /// 排队时连着换两个模组，后一次可能读到还没落盘的旧表，把前一条冲掉。
+    ///
+    /// - `project_id`: 项目编号，即表键；第一次见到的项目会新建一项
+    /// - `name`: 模组名字，非空时就更新表里记的那个（名字可能随版本变）
+    /// - `record`: 记录内容；时间由调用方打好
+    ///
+    /// # 返回值
+    ///
+    /// 写盘失败时返回对应错误
+    pub fn append_mod_update(
+        &self,
+        project_id: &str,
+        name: &str,
+        record: ModUpdateRecordObj,
+    ) -> CoreResult<()> {
+        let mut list = self.read_mod_update();
+        let entry = list.entry(project_id.to_string()).or_default();
+        if !name.is_empty() {
+            entry.name = name.to_string();
+        }
+        entry.update.push(record);
+
+        self.save_mod_update(&list)
+    }
+
+    /// 覆盖写入模组更新记录
+    ///
+    /// **同步写盘**，理由同 [`Self::append_mod_update`]：读旧表再整体写回，
+    /// 走队列会与并发的读改写抢。
+    ///
+    /// - `list`: 整份记录表
+    ///
+    /// # 返回值
+    ///
+    /// 写盘失败时返回对应错误
+    pub fn save_mod_update(&self, list: &ModUpdateList) -> CoreResult<()> {
+        serialize_tools::json_to_file(&list, self.get_mod_update_file())
     }
 }

@@ -13,6 +13,7 @@ import { showToast } from "../../../lib/toast";
 import SegmentedTabs from "../../../components/ui/SegmentedTabs.vue";
 import BaseButton from "../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../components/ui/BaseModal.vue";
+import BaseSwitch from "../../../components/ui/BaseSwitch.vue";
 import DragGhost from "../../../components/ui/DragGhost.vue";
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import ContentHead from "./ContentHead.vue";
@@ -21,10 +22,13 @@ import ListSkeleton from "./ListSkeleton.vue";
 import ModList from "./mod/ModList.vue";
 import ModTable from "./mod/ModTable.vue";
 import ModDepsModal from "./mod/ModDepsModal.vue";
+import ModReplaceModal from "./mod/ModReplaceModal.vue";
+import ModUpdateLogModal from "./mod/ModUpdateLogModal.vue";
 import ModUpdateModal from "./mod/ModUpdateModal.vue";
 import ModGroupMenu, { type GroupMenuAction } from "./mod/ModGroupMenu.vue";
 import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
 import {
+  api,
   deleteMod,
   disableMod,
   enableMod,
@@ -32,6 +36,8 @@ import {
   modsDepTest,
   modsUpdateApply,
   modsUpdateCheck,
+  modsUpdateLog,
+  modsUpdateLogRemove,
   onAddModpackStatus,
   onModsAutoMarkProgress,
   onModsUpdateDone,
@@ -55,6 +61,8 @@ import type { useResourceOps } from "../composables/useResourceOps";
 import type { useResourceView } from "../composables/useResourceView";
 import type {
   DepProblemDto,
+  FileListDto,
+  FileListItemDto,
   ModItemDto,
   ModAutoMarkDto,
   ModUpdateApplyDto,
@@ -98,11 +106,31 @@ const updateBusy = ref(false);
 /** 现在跑的是哪一段：check = 逐个问平台，download = 下新文件；null = 没跑 */
 const updateStage = ref<"check" | "download" | null>(null);
 /** 更新进度；检查阶段的总数要等后端扫完 mods 目录才知道，在那之前一直是 0 */
-const updateProgress = ref({ done: 0, total: 0 });
+const updateProgress = ref({ stage: "", done: 0, total: 0 });
+
+/**
+ * 当前进度的阶段文案
+ *
+ * 一次更新要经过获取、下载、收尾三段：「获取中」是在问平台拿下载项，
+ * 「下载中」才真在下文件，「收尾中」在写回在线信息与更新记录
+ */
+const updateLabel = computed(() => {
+  const stage = updateProgress.value.stage;
+  if (stage === "download") return t("resource.updateDownloading");
+  if (stage === "finish") return t("resource.updateFinishing");
+  if (stage === "check") return t("resource.updateChecking");
+  return t("resource.updateFetching");
+});
 /** 更新检查结果；有更新才开弹窗，null = 没有可更新的 */
 const updateResult = ref<ModUpdateCheckDto | null>(null);
 /** 更新下载弹窗是否打开 */
 const updateOpen = ref(false);
+/** 要替换版本的那个模组；null 表示弹窗关着 */
+const replaceTarget = ref<ModItemDto | null>(null);
+/** 更新记录弹窗是否打开 */
+const updateLogOpen = ref(false);
+/** 打开更新记录弹窗时要只看哪个项目；空串表示看全部 */
+const updateLogProject = ref("");
 
 /**
  * 「有更新」虚拟分组的固定 uuid
@@ -111,6 +139,15 @@ const updateOpen = ref(false);
  * 它只在这一轮检查有结果时存在，永远画在最前，位置不给用户拖。
  */
 const UPDATE_GROUP_ID = "00000000-0000-0000-0000-000000000003";
+
+/**
+ * 「modid 重复」虚拟分组的固定 uuid
+ *
+ * 与三个状态分组、「有更新」同一套键空间，取尾号 4；同样不落盘、不进顺序表，
+ * 只在真有重复 modid 时出现。画在「有更新」前面 —— 两份同一个 modid 的模组装在一起
+ * 是会出问题的，比"有更新"更该先看到。
+ */
+const DUPLICATE_GROUP_ID = "00000000-0000-0000-0000-000000000004";
 
 /**
  * 去掉禁用后缀的文件名，用来把更新结果与列表里的行对上
@@ -222,7 +259,7 @@ async function runUpdateCheck() {
   if (!uuid || updateBusy.value) return;
   updateBusy.value = true;
   updateStage.value = "check";
-  updateProgress.value = { done: 0, total: 0 };
+  updateProgress.value = { stage: "", done: 0, total: 0 };
   // 先订阅再调命令，否则可能漏掉最开始那几条进度
   const unlisten = await onModsUpdateProgress((e) => {
     updateProgress.value = e;
@@ -249,7 +286,7 @@ async function runUpdateCheck() {
     unlisten();
     updateBusy.value = false;
     updateStage.value = null;
-    updateProgress.value = { done: 0, total: 0 };
+    updateProgress.value = { stage: "", done: 0, total: 0 };
   }
 }
 
@@ -275,6 +312,11 @@ async function applyUpdates(picked: ModUpdateDto[]) {
         source: item.source,
         projectId: item.projectId,
         newFileId: item.newFileId,
+        // 下面三个只进更新记录：后端 `find_mod` 不读元数据，拿不到旧版本；
+        // 名字要的是模组名（元数据里那个），也从列表带下去
+        name: item.name,
+        oldVersion: item.version,
+        newVersion: item.newVersion,
       };
     })
     .filter((item) => !!item.uuid);
@@ -282,7 +324,7 @@ async function applyUpdates(picked: ModUpdateDto[]) {
 
   updateBusy.value = true;
   updateStage.value = "download";
-  updateProgress.value = { done: 0, total: items.length };
+  updateProgress.value = { stage: "fetch", done: 0, total: items.length };
   updateOpen.value = false;
 
   let settle: (done: ModUpdateDoneDto) => void = () => {};
@@ -312,10 +354,102 @@ async function applyUpdates(picked: ModUpdateDto[]) {
     unlistenDone();
     updateBusy.value = false;
     updateStage.value = null;
-    updateProgress.value = { done: 0, total: 0 };
+    updateProgress.value = { stage: "", done: 0, total: 0 };
   }
 }
 
+// ---------- 替换版本 ----------
+
+/** 能当平台过滤条件的模组加载器；原版等不在其中，传 `null` 表示不限 */
+const MOD_LOADERS = new Set(["forge", "fabric", "quilt", "neoforge"]);
+
+/**
+ * 取某个模组在平台上的版本列表
+ *
+ * 按**当前实例的游戏版本 + 加载器**过滤，与更新检查同一口径：不筛的话别的游戏版本的包
+ * 会混进来，换上跑不起来。加载器那一项要归一 —— 后端 CurseForge 侧把 `normal` 当"不限"，
+ * 但 Modrinth 侧是把字符串直接交给接口的，传 `normal` 会筛成空。
+ *
+ * - `item`: 目标模组
+ * - `page`: 页码，从 0 起
+ *
+ * # 返回值
+ *
+ * 该页版本列表与分页信息，见 `FileListDto`
+ */
+function loadReplaceFiles(item: ModItemDto, page: number): Promise<FileListDto> {
+  const loader = instance.value?.loader ?? "";
+  return api.getResourceFiles(
+    instanceUuid.value,
+    item.source,
+    item.projectId,
+    "mod",
+    page,
+    instance.value?.version || null,
+    MOD_LOADERS.has(loader) ? loader : null,
+  );
+}
+
+/**
+ * 选中某一版：把这个模组换成那一份文件
+ *
+ * 走与「更新下载」同一条链路（下载 → 校验 → 删旧文件 → 写回在线信息），
+ * 因此沿用那套进度条与完成提示。
+ *
+ * - `chosen`: 弹窗里选中的那一条文件
+ */
+async function replaceVersion(chosen: FileListItemDto) {
+  const item = replaceTarget.value;
+  replaceTarget.value = null;
+  if (!item) return;
+  await applyUpdates([{
+    uuid: item.uuid,
+    file: item.file,
+    disable: item.disable,
+    name: item.name,
+    version: item.version,
+    source: chosen.source.source,
+    projectId: chosen.source.pid,
+    fileId: item.fileId,
+    newFileId: chosen.source.fid,
+    newVersion: chosen.name,
+    newFile: chosen.name,
+    date: chosen.time,
+  }]);
+}
+
+// ---------- 更新记录 ----------
+
+/**
+ * 读这个实例的模组更新记录，交给「更新记录」弹窗
+ *
+ * # 返回值
+ *
+ * 新的在前的记录表，见后端 `resource_mods_update_log`
+ */
+function loadUpdateLog() {
+  return modsUpdateLog(instanceUuid.value);
+}
+
+/**
+ * 打开更新记录弹窗
+ *
+ * - `projectId`: 带上就只看这一个模组的记录；空串看全部
+ */
+function openUpdateLog(projectId = "") {
+  updateLogProject.value = projectId;
+  updateLogOpen.value = true;
+}
+
+/**
+ * 删掉一条更新记录
+ *
+ * - `projectId`: 项目编号，即记录表里的键
+ * - `index`: 该项目内的下标，按弹窗读到的那份顺序，即 0 是最近那一条
+ */
+function removeUpdateLog(projectId: string, index: number) {
+  return modsUpdateLogRemove(instanceUuid.value, projectId, index);
+}
 
 // ---------- 自动标记 ----------
 
@@ -1033,6 +1167,18 @@ function itemMenuItems(item: ModItemDto): RowMenuItem[] {
     },
     { id: "note", label: t("resource.modNote") },
     { id: "open-folder", label: t("resource.openFolder") },
+    // 替换版本：列出平台上的版本换掉当前 jar；没有在线信息就认不出项目，置灰
+    {
+      id: "replace-version",
+      label: t("resource.replaceVersion"),
+      disabled: !item.uuid || !item.source || !item.projectId,
+    },
+    // 更新记录：打开记录弹窗并只看这一个模组；没有项目号就无从筛选，置灰
+    {
+      id: "update-log",
+      label: t("resource.updateLog"),
+      disabled: !item.projectId,
+    },
   ];
   // 依赖树：没声明任何前置时没什么可展开的，置灰
   items.push({
@@ -1145,6 +1291,12 @@ function onMenuPick(id: string) {
     case "open-folder":
       openFolder("mods", item.file);
       break;
+    case "replace-version":
+      replaceTarget.value = item;
+      break;
+    case "update-log":
+      openUpdateLog(item.projectId);
+      break;
     case "dep-tree":
       depTreeItem.value = item;
       break;
@@ -1193,6 +1345,41 @@ const noMatch = computed(() => query.value !== "" && matched.value.length === 0)
 
 // ---------- 分组块 ----------
 
+/** 同一个 modid 下的那几条重复模组 */
+interface DuplicateGroup {
+  /** modid，即子分组的键与标题 */
+  id: string;
+  /** 这个 modid 下的条目，顺序沿用列表顺序 */
+  items: ModItemDto[];
+}
+
+/**
+ * 按 modid 收集重复的模组
+ *
+ * 只认**顶层**条目：内置（jar-in-jar）的那些装在父 jar 里，本身不是独立文件，
+ * 列出来也没法处理。modid 为空的跳过 —— 那是没读到元数据的坏包，
+ * 该由「识别失败」那一块负责。
+ */
+const duplicateGroups = computed<DuplicateGroup[]>(() => {
+  const byId = new Map<string, ModItemDto[]>();
+  for (const item of matched.value) {
+    const id = item.modId.trim();
+    if (!id) continue;
+    const list = byId.get(id);
+    if (list) {
+      list.push(item);
+    } else {
+      byId.set(id, [item]);
+    }
+  }
+  return [...byId.entries()]
+    .filter(([, items]) => items.length > 1)
+    .map(([id, items]) => ({ id, items }));
+});
+
+/** 重复的那些模组摊平：分组计数、整块操作与"一个模组只出现一处"的排除都用它 */
+const duplicates = computed(() => duplicateGroups.value.flatMap((group) => group.items));
+
 /**
  * 状态分组 → 固定 uuid / 文案键
  *
@@ -1220,6 +1407,18 @@ interface ModSection {
   custom: boolean;
   /** 状态分组的类型；自建分组没有 */
   state?: ModStateGroup;
+  /** 「modid 重复」块：按 modid 分好的子分区；其它块没有 */
+  subGroups?: DuplicateGroup[];
+}
+
+/** 一块里的一个分区：modid 重复块按 modid 分区，其它块只有一个不带标题的分区 */
+interface ModSectionPart {
+  /** 分区键，给 `v-for` 用 */
+  key: string;
+  /** 小标题；空串表示不画（普通块） */
+  label: string;
+  /** 这一区的模组 */
+  items: ModItemDto[];
 }
 
 /**
@@ -1233,14 +1432,28 @@ interface ModSection {
  */
 const sections = computed<ModSection[]>(() => {
   const of = groups.groupOfKey.value;
-  // 有更新的先挑走：「有更新」块优先于自建分组与状态分组，一个模组只出现在一处
-  const withUpdate = matched.value.filter(hasUpdate);
+  // 「modid 重复」最优先：一个模组只出现在一处，冲突的先去那一块
+  const dupKeys = new Set(duplicates.value.map(modSelectKey));
+  // 有更新的挑走：「有更新」块优先于自建分组与状态分组
+  const withUpdate = matched.value.filter(
+    (item) => !dupKeys.has(modSelectKey(item)) && hasUpdate(item),
+  );
   // 剩下的、又不属于任何自建分组的，才按状态分桶
   const rest = matched.value.filter(
-    (item) => !hasUpdate(item) && (!item.sha1 || !of.has(item.sha1)),
+    (item) =>
+      !dupKeys.has(modSelectKey(item)) &&
+      !hasUpdate(item) &&
+      (!item.sha1 || !of.has(item.sha1)),
   );
 
   const byId = new Map<string, ModSection>();
+  byId.set(DUPLICATE_GROUP_ID, {
+    id: DUPLICATE_GROUP_ID,
+    label: t("resource.duplicateGroup"),
+    items: duplicates.value,
+    custom: false,
+    subGroups: duplicateGroups.value,
+  });
   byId.set(UPDATE_GROUP_ID, {
     id: UPDATE_GROUP_ID,
     label: t("resource.updateGroup"),
@@ -1252,7 +1465,11 @@ const sections = computed<ModSection[]>(() => {
       id: group.uuid,
       label: group.name,
       items: matched.value.filter(
-        (item) => !hasUpdate(item) && !!item.sha1 && of.get(item.sha1) === group.uuid,
+        (item) =>
+          !dupKeys.has(modSelectKey(item)) &&
+          !hasUpdate(item) &&
+          !!item.sha1 &&
+          of.get(item.sha1) === group.uuid,
       ),
       custom: true,
     });
@@ -1269,7 +1486,9 @@ const sections = computed<ModSection[]>(() => {
   }
 
   const list: ModSection[] = [];
-  // 「有更新」不在顺序表里，按口径固定画在最前
+  // 「modid 重复」与「有更新」都不在顺序表里，固定画在最前，位置不给用户拖
+  const dup = byId.get(DUPLICATE_GROUP_ID);
+  if (dup && visible(dup)) list.push(dup);
   const update = byId.get(UPDATE_GROUP_ID);
   if (update && visible(update)) list.push(update);
   for (const key of groups.order.value) {
@@ -1278,9 +1497,11 @@ const sections = computed<ModSection[]>(() => {
     if (!sec || !visible(sec)) continue;
     list.push(sec);
   }
-  // 兜底：分组是刚建的、顺序表还没回来时，别把它漏掉（后端也会在下次下发时补上）
+  // 兜底：分组是刚建的、顺序表还没回来时，别把它漏掉（后端也会在下次下发时补上）。
+  // 两个固定块不在顺序表里，前面已经画过，这里要排除，否则会重复一遍
   for (const [key, sec] of byId) {
-    if (key !== UPDATE_GROUP_ID && !groups.order.value.includes(key) && visible(sec)) {
+    const fixed = key === UPDATE_GROUP_ID || key === DUPLICATE_GROUP_ID;
+    if (!fixed && !groups.order.value.includes(key) && visible(sec)) {
       list.push(sec);
     }
   }
@@ -1301,10 +1522,32 @@ function stateHit(item: ModItemDto, state: ModStateGroup): boolean {
  * **搜索时例外**：搜索是对"看得见的东西"做过滤，此时空分组（含状态分组）一律收起 ——
  * 否则一搜索满屏都是空的「已启用 / 已禁用」，命中的那几条反而要找。
  */
+/**
+ * 一块里的分区：普通块只有一区（不画小标题），「modid 重复」每个 modid 一区
+ *
+ * - `sec`: 要拆的块
+ *
+ * # 返回值
+ *
+ * 见 [`ModSectionPart`]；普通块返回一个 `label` 为空的分区
+ */
+function partsOf(sec: ModSection): ModSectionPart[] {
+  if (!sec.subGroups) {
+    return [{ key: sec.id, label: "", items: sec.items }];
+  }
+  return sec.subGroups.map((group) => ({
+    key: group.id,
+    label: group.id,
+    items: group.items,
+  }));
+}
+
 function visible(sec: ModSection): boolean {
   if (query.value) return sec.items.length > 0;
   // 「有更新」只在这一轮检查有结果时存在，没有更新就整块收起来
   if (sec.id === UPDATE_GROUP_ID) return sec.items.length > 0;
+  // 「modid 重复」同理：没有重复就整块收起来
+  if (sec.id === DUPLICATE_GROUP_ID) return sec.items.length > 0;
   if (sec.custom) return true;
   return sec.state !== "fail" || sec.items.length > 0;
 }
@@ -1636,8 +1879,9 @@ onBeforeUnmount(() => {
           <GlyphIcon :name="updateStage === 'check' ? 'refresh' : 'update'" :size="14"
             :class="{ 'dep-spin': updateStage === 'check' }" />
         </button>
-        <!-- 下载更新：勾选要更新的模组再下；还没查出可更新的就无处可下，置灰 -->
-        <button class="mini-btn icon-btn icon-only" :disabled="busy || updateBusy || loading || !updateResult"
+        <!-- 下载更新：勾选要更新的模组再下。**只在检查出可更新项之后出现** ——
+             没点过检查、或查完一个都没有时整颗不显示；下载完成后结果作废，按钮跟着消失 -->
+        <button v-if="updateResult" class="mini-btn icon-btn icon-only" :disabled="busy || updateBusy || loading"
           v-tip="t('resource.updateDownload')" :aria-label="t('resource.updateDownload')" @click="updateOpen = true">
           <GlyphIcon name="download" :size="14" />
         </button>
@@ -1646,6 +1890,11 @@ onBeforeUnmount(() => {
           v-tip="t('resource.autoMark')" :aria-label="t('resource.autoMark')" @click="markAsk = true">
           <GlyphIcon :name="markBusy ? 'refresh' : 'check-square'" :size="14"
             :class="{ 'dep-spin': markBusy }" />
+        </button>
+        <!-- 更新记录：这个实例换过的模组，新的在前；记录由后端在换文件成功时追加 -->
+        <button class="mini-btn icon-btn icon-only" v-tip="t('resource.updateLog')"
+          :aria-label="t('resource.updateLog')" @click="openUpdateLog()">
+          <GlyphIcon name="history" :size="14" />
         </button>
       </template>
     </template>
@@ -1657,7 +1906,7 @@ onBeforeUnmount(() => {
   -->
   <LoaderQueryProgress :visible="updateBusy" kind="query" :step="updateProgress.done"
     :total="updateProgress.total"
-    :label="t(updateStage === 'download' ? 'resource.updateDownloading' : 'resource.updateChecking')" />
+    :label="updateLabel" />
   <LoaderQueryProgress :visible="markBusy" kind="query" :step="markProgress.done" :total="markProgress.total"
     :label="t('resource.autoMarkRunning')" />
 
@@ -1751,9 +2000,17 @@ onBeforeUnmount(() => {
           <p v-if="!sec.items.length" class="empty-tip">
             {{ t("resource.groupEmptyHint") }}
           </p>
-          <ModList :items="sec.items" :busy="busy" :selected-keys="selected" :update-keys="updateKeys"
-            @toggle="toggle" @remove="remove" @note="openNote" @open-folder="openFolder('mods', $event.file)"
-            @select="toggleSelect" @item-menu="openItemMenu" @row-click="onRowClick" :anchor-key="anchorKey" />
+          <!-- 「modid 重复」块按 modid 分区，每个 modid 一个小标题；其它块只有一区、不画小标题 -->
+          <div v-for="part in partsOf(sec)" :key="part.key">
+            <div v-if="part.label" class="mod-part-head">
+              <span class="mod-part-name">{{ part.label }}</span>
+              <span class="mod-part-count">{{ part.items.length }}</span>
+            </div>
+            <ModList :items="part.items" :busy="busy" :selected-keys="selected" :update-keys="updateKeys"
+              :query="query"
+              @toggle="toggle" @remove="remove" @note="openNote" @open-folder="openFolder('mods', $event.file)"
+              @select="toggleSelect" @item-menu="openItemMenu" @row-click="onRowClick" :anchor-key="anchorKey" />
+          </div>
         </div>
       </section>
 
@@ -1953,12 +2210,8 @@ onBeforeUnmount(() => {
     没勾上就只补还没有在线信息的那批
   -->
   <BaseModal v-if="markAsk" :title="t('resource.autoMarkTitle')" :closable="false" @close="markAsk = false">
-    <p class="field-desc">{{ t("resource.autoMarkDesc") }}</p>
     <div class="switch-row">
-      <div class="switch-text">
-        <span class="switch-label">{{ t("resource.autoMarkOverwrite") }}</span>
-        <span class="switch-state">{{ t("resource.autoMarkOverwriteDesc") }}</span>
-      </div>
+      <span class="switch-label">{{ t("resource.autoMarkOverwrite") }}</span>
       <BaseSwitch v-model="markOverwrite" />
     </div>
     <div class="modal-actions">
@@ -1970,6 +2223,14 @@ onBeforeUnmount(() => {
   <!-- 更新下载：有更新才开；没更新在 runUpdateCheck 里用一条轻提示，不留空窗 -->
   <ModUpdateModal v-if="updateResult && updateOpen" :result="updateResult" @close="updateOpen = false"
     @download="applyUpdates" />
+
+  <!-- 替换版本：右键某一行点开，列表按当前实例的游戏版本与加载器筛，见 loadReplaceFiles -->
+  <ModReplaceModal v-if="replaceTarget" :target="replaceTarget" :load="loadReplaceFiles"
+    @close="replaceTarget = null" @pick="replaceVersion" />
+
+  <!-- 更新记录：入口是工具条上那颗时钟图标，列表由后端读实例目录的 mod_update.json -->
+  <ModUpdateLogModal v-if="updateLogOpen" :load="loadUpdateLog" :remove="removeUpdateLog"
+    :initial-project="updateLogProject" @close="updateLogOpen = false" />
 </template>
 
 <!-- 备注弹窗的样式走 scoped：BaseModal 是 `Teleport to="body"` 的，弹窗不在
@@ -2157,5 +2418,40 @@ onBeforeUnmount(() => {
   color: var(--text-dim);
   font-size: 11.5px;
   word-break: break-all;
+}
+
+/* ---------- 自动标记弹窗的开关行 ---------- */
+
+/* 弹窗 Teleport 到 body、不在 `.resource-layout` 里，窗口级 resource.css 的前缀规则够不着，
+   所以这里补一份；数值取 settings.css 里同名的那一套 */
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+  user-select: none;
+}
+
+.switch-label {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* ---------- 「modid 重复」块里的小标题 ---------- */
+
+/* 组内的组：比分组头轻一档，只把同一个 modid 的那几条框在一起 */
+.mod-part-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 8px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.mod-part-count {
+  font-weight: 400;
 }
 </style>

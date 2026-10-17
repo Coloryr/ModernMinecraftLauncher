@@ -24,6 +24,8 @@ use super::{KIND_SAVES, data_url, find_save, load_saves, parse_instance, resourc
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub async fn resource_list_saves(uuid: String) -> Result<Vec<SaveItemDto>, String> {
+    // 读的过程中删实例会被拦住，见 resource::instance_busy
+    let _op = super::model::begin_if_open(&uuid);
     let instance = parse_instance(&uuid)?;
     let list = load_saves(instance.clone()).await?;
 

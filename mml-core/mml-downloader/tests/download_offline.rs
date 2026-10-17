@@ -173,7 +173,7 @@ async fn offline_download_pipeline() {
         name: String::from("target.bin"),
         file: target.clone(),
         url: format!("http://127.0.0.1:{port}/target.bin"),
-        hash: FileHash::Sha256(sha256),
+        hash: FileHash::Sha256(sha256.clone()),
         later: LaterRun::None,
     };
 
@@ -185,6 +185,48 @@ async fn offline_download_pipeline() {
     // 文件内容与哈希一致，含大小写校验
     let downloaded = fs::read(&target).expect("下载后的文件应存在");
     assert_eq!(downloaded, body);
+
+    // ---- 目标已存在时再下一次：必须覆盖成功 ----
+    // Windows 的 `fs::rename` 不覆盖已存在的目标，而这里走的正是"同名但内容不同要重下"。
+    // 上层原先对搬运用了 `unwrap()`：失败就 panic 打死工作线程，这一项永远不会被标记，
+    // 任务永远等不到"全部记完"，调用方（乃至界面）就无限期停在下载中。
+    // 先写一份别的内容，等价于"上次没下完 / 旧的同名文件"
+    fs::write(&target, b"stale content").unwrap();
+    // mock 服务器只服务一次请求，这一趟要另起一个
+    let (port2, server2) = spawn_http_server(body.clone());
+    let again = FileItemObj {
+        name: String::from("target.bin"),
+        file: target.clone(),
+        url: format!("http://127.0.0.1:{port2}/target.bin"),
+        hash: FileHash::Sha256(sha256.clone()),
+        later: LaterRun::None,
+    };
+    let ok = mml_downloader::start_download_task(vec![again]).await;
+    assert!(ok, "目标已存在时也应覆盖成功");
+    assert_eq!(
+        fs::read(&target).expect("覆盖后文件应存在"),
+        body,
+        "覆盖后的内容应是新下的那一份"
+    );
+    server2.join().unwrap();
+
+    // ---- 搬运必然失败时：这一项记失败，任务仍要正常结束 ----
+    // 目标的父路径是个普通文件，`move_file` 里的 `create_dir_all` 必然失败。
+    // 以前这里对搬运结果 `unwrap()`：panic 打死工作线程、这一项永远不会被标记，
+    // 任务永远等不到"全部记完"，调用方就无限期挂住 —— 回归点在这里
+    let not_a_dir = dir.join("not-a-dir");
+    fs::write(&not_a_dir, b"x").unwrap();
+    let (port3, server3) = spawn_http_server(body.clone());
+    let blocked = FileItemObj {
+        name: String::from("blocked.bin"),
+        file: not_a_dir.join("target.bin"),
+        url: format!("http://127.0.0.1:{port3}/target.bin"),
+        hash: FileHash::Sha256(sha256.clone()),
+        later: LaterRun::None,
+    };
+    let ok = mml_downloader::start_download_task(vec![blocked]).await;
+    assert!(!ok, "搬运失败应记为该文件失败，但任务要能正常结束");
+    server3.join().unwrap();
 
     // ---- 任务快照：完成后任务已移除 ----
     assert!(

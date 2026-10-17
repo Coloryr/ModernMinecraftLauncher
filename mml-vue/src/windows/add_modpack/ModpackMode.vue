@@ -12,6 +12,7 @@ import { useDownloadBadges } from "../../lib/downloadBadges";
 import { formatCount, t, tErr } from "../../lib/i18n";
 import { svgIcon } from "../../lib/modrinthIcon";
 import { cardTags } from "../../lib/projectTags";
+import HighlightText from "../../components/ui/HighlightText.vue";
 import { showToast } from "../../lib/toast";
 import { projectParamToItem, targetProject } from "../windowManager";
 import type { FileListItemDto, GroupDto, ModPackStatusDto, ProjectItemDto } from "../../lib/bindings";
@@ -428,7 +429,7 @@ watch(source, loadSource);
             <div v-else class="pack-icon pack-icon-fallback">{{ item.name.slice(0, 1).toUpperCase() }}</div>
             <div class="pack-info">
               <div class="pack-name">
-                <span>{{ item.name }}</span>
+                <HighlightText :text="item.name" :query="filter" />
                 <!-- 作者：头像 + 名字的胶囊，与标题明确分开 -->
                 <AuthorTag v-if="item.authors.length" :authors="item.authors" />
                 <span v-if="projectInstalled(item)" class="pack-badge">{{ t("modpack.installed") }}</span>

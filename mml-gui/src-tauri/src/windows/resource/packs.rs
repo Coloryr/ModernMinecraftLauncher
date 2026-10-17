@@ -27,6 +27,8 @@ pub async fn resource_list_resourcepacks(
     uuid: String,
     lang: String,
 ) -> Result<Vec<PackItemDto>, String> {
+    // 读的过程中删实例会被拦住，见 resource::instance_busy
+    let _op = super::model::begin_if_open(&uuid);
     let instance = parse_instance(&uuid)?;
 
     let list = block_on_instance(instance, move |game| {

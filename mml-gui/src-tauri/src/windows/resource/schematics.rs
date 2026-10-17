@@ -36,6 +36,8 @@ fn schematic_type_name(schematic_type: &SchematicType) -> &'static str {
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub async fn resource_list_schematics(uuid: String) -> Result<Vec<SchematicItemDto>, String> {
+    // 读的过程中删实例会被拦住，见 resource::instance_busy
+    let _op = super::model::begin_if_open(&uuid);
     let instance = parse_instance(&uuid)?;
 
     let list = block_on_instance(instance, |game| {

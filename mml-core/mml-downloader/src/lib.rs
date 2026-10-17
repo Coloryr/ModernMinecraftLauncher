@@ -360,6 +360,21 @@ pub fn get_tasks() -> Vec<TaskSnapshot> {
         .collect()
 }
 
+/// 是否有下载任务的文件正落在某个目录下
+///
+/// 删实例前用它判断"这个实例还在不在下东西"，别把正在写的文件删掉。
+///
+/// - `dir`: 目录，比如某个实例的根目录
+///
+/// # 返回值
+///
+/// 有任务在跑、且它的文件目标路径在 `dir` 里时返回 `true`
+pub fn is_busy_under(dir: impl AsRef<std::path::Path>) -> bool {
+    let dir = dir.as_ref();
+    let tasks = TASKS.read().unwrap();
+    tasks.iter().any(|task| task.has_file_under(dir))
+}
+
 /// 暂停指定任务：不再分配新文件，在途文件阻塞等待恢复
 ///
 /// # 返回值
@@ -510,6 +525,25 @@ pub async fn start_download_task_cancellable(
     items: Vec<FileItemObj>,
     cancel: CancellationToken,
 ) -> TaskOutcome {
+    start_download_task_reporting(items, cancel, |_| {}).await
+}
+
+/// 创建新下载任务并开始下载，同时把任务编号交出去
+///
+/// 调用方拿这个编号去 [`get_tasks`] 里盯完成数，用于在别处同步下载进度。
+///
+/// - `items`: 需要下载的文件列表
+/// - `cancel`: 外部取消令牌
+/// - `on_start`: 任务入队、开始下载之前回调一次，参数是任务编号
+///
+/// # 返回值
+///
+/// 见 [`TaskOutcome`]；取消后任务会被移出队列
+pub async fn start_download_task_reporting(
+    items: Vec<FileItemObj>,
+    cancel: CancellationToken,
+    on_start: impl FnOnce(u64),
+) -> TaskOutcome {
     if STOP.load(Ordering::SeqCst) {
         return TaskOutcome::Cancelled;
     }
@@ -525,6 +559,8 @@ pub async fn start_download_task_cancellable(
     TASKS.write().unwrap().push(task);
 
     add_task(id);
+    // 入队之后再交编号：调用方拿去 [`get_tasks`] 查进度时任务一定已经在列表里
+    on_start(id);
 
     // 唤醒所有工作线程
     for item in THREADS.read().unwrap().iter() {

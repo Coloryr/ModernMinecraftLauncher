@@ -111,42 +111,53 @@ impl ModPackWorker for ModrinthPackWorker {
 
     /// 创建游戏实例
     ///
-    /// - `name`: 实例名，传 `None` 时用整合包名加版本号
+    /// - `name`: 实例名，传 `None` 时用 [`ModPackWorker::default_instance_name`]
     /// - `group`: 目标分组 uuid，`None` 表示不分组
     ///
     /// # 返回值
     ///
     /// 返回新实例的 UUID；创建失败返回对应错误
     async fn create_instance(&self, name: Option<String>, group: Option<Uuid>) -> CoreResult<Uuid> {
-        match &self.info {
-            Some(info) => {
-                let name = name.unwrap_or(format!("{}-{}", info.name, info.version_id));
-                let game = InstanceSettingObj {
-                    name,
-                    version: self.base.game_version.clone(),
-                    is_modpack: true,
-                    loader: self.base.loader,
-                    modpack_type: ModPackType::Modrinth,
-                    loader_version: Some(self.base.loader_version.clone()),
-                    ..Default::default()
-                };
-                // 分组不在实例配置里，创建时一并交给分组表，不存在的组会被建出来
-                let game = game
-                    .create_instance_in_group(self.base.instance_gui.clone(), group)
-                    .await?;
+        let name = match name {
+            Some(name) => name,
+            None => self
+                .default_instance_name()
+                .ok_or(ErrorType::DataNotFound(DataNotFoundData::Info))?,
+        };
+        let game = InstanceSettingObj {
+            name,
+            version: self.base.game_version.clone(),
+            is_modpack: true,
+            loader: self.base.loader,
+            modpack_type: ModPackType::Modrinth,
+            loader_version: Some(self.base.loader_version.clone()),
+            ..Default::default()
+        };
+        // 分组不在实例配置里，创建时一并交给分组表，不存在的组会被建出来
+        let game = game
+            .create_instance_in_group(self.base.instance_gui.clone(), group)
+            .await?;
 
-                if let Some(icon) = &self.base.icon {
-                    // 图标是装饰性的：写失败只记日志，不让整个安装失败，与 add_game 的处理一致
-                    if let Err(err) =
-                        InstanceSettingObj::save_icon(&game, InputFile::Url(icon.clone())).await
-                    {
-                        mml_log::error_type(err);
-                    }
-                }
-                Ok(game.read().unwrap().uuid)
+        if let Some(icon) = &self.base.icon {
+            // 图标是装饰性的：写失败只记日志，不让整个安装失败，与 add_game 的处理一致
+            if let Err(err) =
+                InstanceSettingObj::save_icon(&game, InputFile::Url(icon.clone())).await
+            {
+                mml_log::error_type(err);
             }
-            None => Err(ErrorType::DataNotFound(DataNotFoundData::Info)),
         }
+        Ok(game.read().unwrap().uuid)
+    }
+
+    /// 默认实例名，取整合包名与版本号拼出的那一个
+    ///
+    /// # 返回值
+    ///
+    /// 已读到整合包信息时返回 `{包名}-{版本号}`，否则返回 `None`
+    fn default_instance_name(&self) -> Option<String> {
+        self.info
+            .as_ref()
+            .map(|info| format!("{}-{}", info.name, info.version_id))
     }
 
     /// 解压整合包覆盖文件到游戏目录。

@@ -784,10 +784,19 @@ async function doMultiDelete() {
   const ids = [...selectedIds.value];
   multiDone.value = 0;
   multiTotal.value = ids.length;
+  // 逐条删：正忙（在下载 / 游戏在跑）的那几个会被后端拦住，先记下、删完一起提示，
+  // 一条被拒不该把后面几条一起带走
+  let failed = 0;
+  let reason = "";
   try {
     for (const uuid of ids) {
-      await api.deleteInstance(uuid);
-      multiDone.value += 1;
+      try {
+        await api.deleteInstance(uuid);
+        multiDone.value += 1;
+      } catch (e) {
+        failed += 1;
+        if (!reason) reason = tErr(e);
+      }
     }
   } finally {
     multiDeleteBusy.value = false;
@@ -796,7 +805,8 @@ async function doMultiDelete() {
   showMultiDelete.value = false;
   exitMultiSelect();
   await Promise.all([loadInstances(), loadGroups()]);
-  showToast(t("multi.deleted", { count: ids.length }));
+  showToast(t("multi.deleted", { count: ids.length - failed }));
+  if (failed) showToast(t("multi.deleteFailed", { count: failed, reason }));
 }
 
 /** 启动所有选中实例 */

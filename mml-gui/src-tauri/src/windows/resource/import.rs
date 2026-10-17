@@ -51,6 +51,8 @@ pub async fn resource_import_files(
     mode: String,
     parent: Option<String>,
 ) -> Result<ResourceDropDto, String> {
+    // 读的过程中删实例会被拦住，见 resource::instance_busy
+    let _op = super::model::begin_if_open(&uuid);
     let instance = parse_instance(&uuid)?;
     // 复制 / 解压都是磁盘活：放阻塞线程，别占住主线程，与 add_import_* 同一条路子
     tauri::async_runtime::spawn_blocking(move || import(instance, &kind, &paths, &mode, parent))

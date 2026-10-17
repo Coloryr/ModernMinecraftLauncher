@@ -160,6 +160,39 @@ pub fn main_create_instance(
     Ok(inst)
 }
 
+/// 实例正忙时给出要报给前端的错误
+///
+/// 删除与重命名都要过这一关：两种操作都动实例目录，而正在写的东西会跟着写到
+/// 已经删掉 / 改名的路径上，留下对不上的目录与注册表。
+///
+/// - `instance`: 实例 uuid
+///
+/// # 返回值
+///
+/// 忙时是给前端翻的错误键；空闲是 `Ok(())`
+fn ensure_idle(instance: &Uuid) -> Result<(), String> {
+    // 游戏进程还在跑
+    if mml_game::is_running(instance) {
+        return Err(err_keys::INSTANCE_RUNNING.to_string());
+    }
+    // 还有文件在往这个实例的目录里下（模组更新、资源下载等）
+    if let Some(game) = mml_game::get_instance(instance) {
+        let dir = game.read().unwrap().get_base_path();
+        if mml_downloader::is_busy_under(&dir) {
+            return Err(err_keys::INSTANCE_BUSY.to_string());
+        }
+    }
+    // 添加资源窗口还在往这个实例里下资源
+    if crate::windows::add_resource::instance_busy(instance) {
+        return Err(err_keys::INSTANCE_BUSY.to_string());
+    }
+    // 资源窗口里还有操作在跑：读取各分类、检查更新、下载更新、自动标记…
+    if crate::windows::resource::instance_busy(instance) {
+        return Err(err_keys::INSTANCE_BUSY.to_string());
+    }
+    Ok(())
+}
+
 /// 重命名实例，核心实例走 mml-game：重名报错、实例目录跟随改名
 ///
 /// - `app`: 应用句柄，用于发变更事件
@@ -181,6 +214,10 @@ pub fn main_rename_instance(
     let n = name.trim().to_string();
     if n.is_empty() {
         return Ok(false);
+    }
+    // 改名就是改实例目录名，正忙时同样不许，见 ensure_idle
+    if let Ok(id) = Uuid::parse_str(&uuid) {
+        ensure_idle(&id)?;
     }
     // 核心实例：mml-game 重命名，重名返回 Err 由前端提示
     if let Ok(id) = Uuid::parse_str(&uuid)
@@ -338,6 +375,14 @@ pub async fn main_delete_instance(
     window: WebviewWindow,
     uuid: String,
 ) -> Result<bool, String> {
+    // 正忙时不许删，见 ensure_idle
+    if let Ok(id) = Uuid::parse_str(&uuid) {
+        ensure_idle(&id)?;
+    }
+
+    // 删完之后要按它关窗口；uuid 马上会被 move 进闭包，先算好
+    let close_id = Uuid::parse_str(&uuid).ok();
+
     let ok = tauri::async_runtime::spawn_blocking(move || -> Result<bool, String> {
         // 核心实例：删除实例数据与文件
         let mut ok = false;
@@ -365,6 +410,10 @@ pub async fn main_delete_instance(
 
     if ok {
         emit_instance_change(&app, "remove");
+        // 实例没了，挂在它名下的窗口一并关掉：资源管理 / 日志 / 添加资源 / 配置文件
+        if let Some(id) = close_id {
+            crate::windows::lifecycle::close_instance_windows(&app, &id);
+        }
     }
     Ok(ok)
 }
@@ -414,6 +463,8 @@ pub fn main_move_instance(
 /// 落点是**实例目录**（`instances/<实例名>/`，里面有 game.json 等实例文件），
 /// 不是游戏目录 `.minecraft` —— 要开游戏目录用资源管理窗口的「打开文件夹」。
 ///
+/// 打开的是目录**本身**：进到里面直接看到那些文件，不是在上层 `instances/` 里选中它。
+///
 /// - `uuid`: 实例 uuid
 ///
 /// # 返回值
@@ -435,7 +486,7 @@ pub fn main_open_instance_dir(uuid: String) -> Result<(), String> {
         return Err(err_keys::GAME_NOT_FOUND.to_string());
     }
 
-    open_helper::open_file_with_explorer(&dir);
+    open_helper::open_dir(&dir);
     Ok(())
 }
 

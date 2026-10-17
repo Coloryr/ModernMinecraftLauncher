@@ -84,6 +84,20 @@ pub fn open_file<P: AsRef<Path>>(path: P) {
     open_url_inner(&path.as_ref().to_string_lossy());
 }
 
+/// 在文件管理器中打开目录本身
+///
+/// 与 [`open_file_with_explorer`] 的差别就在这一步：那个是"打开父目录并把这个路径选中"，
+/// 用来**定位**一个文件 / 文件夹；要**进到**目录里看里面的东西用这个 ——
+/// 否则用户看到的是上一层目录里选中着目标，而不是目录已经打开（实例目录踩过这个）。
+///
+/// - `path`: 目标目录路径
+#[inline(always)]
+pub fn open_dir<P: AsRef<Path>>(path: P) {
+    // 三个平台上"用默认程序打开目录"都是进到目录里：Windows 的 start 拉起资源管理器，
+    // Linux 走 xdg-open，macOS 走 open
+    open_file(path);
+}
+
 /// 在文件管理器中打开并选中指定的文件或文件夹，仅 Linux
 ///
 /// 模仿 opener::reveal 的行为：

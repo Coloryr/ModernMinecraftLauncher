@@ -56,6 +56,7 @@ import type {
   ModUpdateCheckDto,
   ModUpdateDoneDto,
   ModUpdateProgressDto,
+  ModUpdateProjectDto,
   ModPackUpdateDto,
   MotdDto,
   NbtEditDto,
@@ -1871,6 +1872,36 @@ export function modsUpdateCheck(uuid: string): Promise<ModUpdateCheckDto> {
  */
 export function modsUpdateApply(uuid: string, items: ModUpdateApplyDto[]): Promise<void> {
   return commands.resource.modsUpdateApply(uuid, items);
+}
+/**
+ * 读模组更新记录
+ *
+ * - `uuid`: 实例 uuid
+ *
+ * # 返回值
+ *
+ * 按项目分组的记录表，见 `ModUpdateProjectDto`；**组内与组间都是新的在前**，
+ * 从没更新过时是空表
+ *
+ * 记录由后端在换文件成功时追加到实例目录的 `mod_update.json`，
+ * 「下载更新」与「替换版本」共用同一处
+ */
+export function modsUpdateLog(uuid: string): Promise<ModUpdateProjectDto[]> {
+  return commands.resource.modsUpdateLog(uuid);
+}
+/**
+ * 删掉一条模组更新记录
+ *
+ * - `uuid`: 实例 uuid
+ * - `projectId`: 项目编号，即记录表里的键
+ * - `index`: 该项目内的记录下标，按 `modsUpdateLog` 的返回顺序，即 0 是最近那一条
+ *
+ * # 返回值
+ *
+ * 写盘成功即返回；项目不存在或下标越界时后端什么都不做
+ */
+export function modsUpdateLogRemove(uuid: string, projectId: string, index: number): Promise<void> {
+  return commands.resource.modsUpdateLogRemove(uuid, projectId, index);
 }
 /**
  * 查整合包有没有新版本

@@ -16,6 +16,8 @@ pub const UUID_CONFLICT: &str = "err.uuidConflict";
 pub const GAME_NOT_FOUND: &str = "err.gameNotFound";
 /// 实例已在运行中
 pub const INSTANCE_RUNNING: &str = "err.instanceRunning";
+/// 实例正在下载或处理任务，暂时不能删
+pub const INSTANCE_BUSY: &str = "err.instanceBusy";
 /// 操作已取消
 pub const CANCELLED: &str = "err.cancelled";
 /// 枚举取值不认识

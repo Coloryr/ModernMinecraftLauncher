@@ -657,6 +657,9 @@ pub async fn upgrade_modpack(
         game.save();
     }
 
+    // 实例名与目录跟着新版走，与安装时同一套规则；用户手动改过的名字也会被覆盖
+    crate::modpack::rename_after_upgrade(game, worker.default_instance_name());
+
     Ok(())
 }
 

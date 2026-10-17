@@ -100,14 +100,16 @@ pub struct ModScanProgressDto {
 
 /// 模组更新的进度，即事件 `resource-mods-update-progress` 的负载
 ///
-/// 检查与下载两个阶段共用：逐个问平台可能要一分钟（Modrinth 限 300 次 / 分钟），
-/// 下载也要时间，没有进度用户都会以为卡死。
+/// 一次更新要经过获取、下载、收尾三段，界面按 `stage` 换文案；
+/// 没有进度用户都会以为卡死，所以三段都要报。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModUpdateProgressDto {
-    /// 已经处理的模组数
+    /// 阶段：`check` 检查更新 / `fetch` 获取下载项 / `download` 下载 / `finish` 收尾写回
+    pub stage: String,
+    /// 这一阶段已处理的条目数
     pub done: usize,
-    /// 这一阶段要处理的模组总数
+    /// 这一阶段要处理的条目总数
     pub total: usize,
 }
 
@@ -472,9 +474,45 @@ pub struct ModUpdateDto {
     pub date: String,
 }
 
+/// 一个项目的全部更新记录，即实例 `mod_update.json` 里的一项
+///
+/// 由 `resource_mods_update_log` 读出；项目之间按各自最新一条的时间倒序
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModUpdateProjectDto {
+    /// 项目编号，即表键
+    pub project_id: String,
+    /// 模组名字；没记过时为空串，界面回退项目编号
+    pub name: String,
+    /// 该项目的更新历史，**新的在前**
+    pub update: Vec<ModUpdateRecordDto>,
+}
+
+/// 一条模组更新记录，即实例目录 `mod_update.json` 里的一项里的一条
+///
+/// 记录本身在后端换文件成功时追加，见 `InstanceSettingObj::append_mod_update`
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModUpdateRecordDto {
+    /// 换上去的文件名，即平台上的文件名
+    pub file: String,
+    /// 换之前的版本号；取不到时为空串
+    pub old_version: String,
+    /// 换之后的版本号
+    pub version: String,
+    /// 换之前的文件号；取不到时为空串
+    pub old_file_id: String,
+    /// 换之后的文件号
+    pub file_id: String,
+    /// 更新时间，epoch 毫秒
+    pub time: i64,
+    /// 换上去那份文件的 SHA1
+    pub sha1: String,
+}
+
 /// 「下载更新」勾选的一条：把这个模组换成平台上的新文件
 ///
-/// 只带定位要用的三件事，列表里的显示字段不用回传。
+/// 定位要用的三件事 + 更新记录要记的名字与两个版本号；列表里其余显示字段不用回传。
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModUpdateApplyDto {
@@ -486,6 +524,12 @@ pub struct ModUpdateApplyDto {
     pub project_id: String,
     /// 新文件编号
     pub new_file_id: String,
+    /// 模组名字，即界面上显示的那个，只进更新记录；为空时后端保留原有名字
+    pub name: String,
+    /// 换之前的版本号，即界面上显示的那个，只进更新记录
+    pub old_version: String,
+    /// 换之后的版本号，即平台上的版本号 / 显示名，只进更新记录
+    pub new_version: String,
 }
 
 /// 依赖图里的一个节点，同一个 modid 只有一个

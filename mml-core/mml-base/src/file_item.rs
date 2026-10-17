@@ -45,6 +45,8 @@ pub enum LaterRun {
     UnpackNative(PathBuf),
     /// 将下载到的 zip 解压到存档目录，携带存档目录
     UnpackSave(PathBuf),
+    /// 换掉旧文件：新文件搬到最终路径之后，把携带的这个旧文件挪进回收站
+    ReplaceOld(PathBuf),
 }
 
 impl Default for LaterRun {

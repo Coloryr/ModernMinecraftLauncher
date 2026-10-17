@@ -26,6 +26,7 @@
 import { computed, nextTick, ref, watch } from "vue";
 import { t } from "../../../../lib/i18n";
 import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
+import HighlightText from "../../../../components/ui/HighlightText.vue";
 import type { ModItemDto } from "../../../../lib/bindings";
 import {
   loaderNames,
@@ -493,7 +494,7 @@ function onNoteEnter(event: KeyboardEvent) {
 
       <span class="mod-cell mod-name-cell">
         <span class="mod-name" :title="row.item.name || row.item.file">
-          {{ row.item.name || row.item.file }}
+          <HighlightText :text="row.item.name || row.item.file" :query="props.query" />
         </span>
         <!-- 内置的**库**：没有模组元数据的内置 jar。它不是模组，与"内置"分开标 -->
         <span v-if="row.item.library" class="badge badge-dim">

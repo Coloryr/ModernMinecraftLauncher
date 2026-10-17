@@ -79,16 +79,27 @@ const DEFAULT_TIMEOUT: u64 = 10;
 /// 默认 User-Agent 标识
 const DEFAULT_USER_AGENT: &str = "mml/1.0.0";
 
-/// 将 reqwest 错误映射为项目统一的 ErrorType
+/// 记录一次失败的请求
+///
+/// 请求失败一律在这里落一条错误日志，`logs.log` 里就能看到地址与原因。
+///
+/// - `err`: 失败原因
+pub(crate) fn log_request_error(err: &ErrorType) {
+    mml_log::error_type(err.clone());
+}
+
+/// 将 reqwest 错误映射为项目统一的 ErrorType，并记一条日志
 fn map_err(error: reqwest::Error) -> ErrorType {
-    ErrorType::HttpError(HttpErrorData {
+    let err = ErrorType::HttpError(HttpErrorData {
         error: error.to_string(),
         url: match error.url() {
             Some(url) => url.to_string(),
             None => Default::default(),
         },
         status: None,
-    })
+    });
+    log_request_error(&err);
+    err
 }
 
 /// 请求速率限制器
@@ -245,21 +256,13 @@ impl Client {
         let mut rx = abort_rx();
         // 订阅前就已中断：立刻放弃，不用再等配额
         if *rx.borrow() != generation {
-            return Err(ErrorType::HttpError(HttpErrorData {
-                url: url.to_string(),
-                error: ABORT_MSG.to_string(),
-                status: None,
-            }));
+            return Err(abort_error(url));
         }
         tokio::select! {
             _ = limiter.acquire() => Ok(()),
             changed = rx.changed() => {
                 if changed.is_err() || *rx.borrow() != generation {
-                    Err(ErrorType::HttpError(HttpErrorData {
-                        url: url.to_string(),
-                        error: ABORT_MSG.to_string(),
-                        status: None,
-                    }))
+                    Err(abort_error(url))
                 } else {
                     // 无关通知：把配额等完，acquire 已消费一次，补一次等待即可
                     limiter.acquire().await;
@@ -524,11 +527,13 @@ impl Client {
         let error = abortable(async move { resp.text().await.map_err(map_err) })
             .await
             .unwrap_or_default();
-        Err(ErrorType::HttpError(HttpErrorData {
+        let err = ErrorType::HttpError(HttpErrorData {
             error,
             url,
             status: Some(status.as_u16()),
-        }))
+        });
+        log_request_error(&err);
+        Err(err)
     }
 
     /// 发送 GET 请求，返回响应体字节
@@ -826,6 +831,23 @@ fn abort_rx() -> tokio::sync::watch::Receiver<u64> {
 /// 被中断的请求返回的错误文案，[`is_aborted`] 按它判定中断
 pub const ABORT_MSG: &str = "请求已中断（代理/网络设置已更新）";
 
+/// 构造"请求已中断"错误，并记一条日志
+///
+/// - `url`: 请求地址；中断发生在请求任务内部时取不到，传空串
+///
+/// # 返回值
+///
+/// 返回 error 为 [`ABORT_MSG`] 的 HTTP 错误
+fn abort_error(url: &str) -> ErrorType {
+    let err = ErrorType::HttpError(HttpErrorData {
+        url: url.to_string(),
+        error: ABORT_MSG.to_string(),
+        status: None,
+    });
+    log_request_error(&err);
+    err
+}
+
 /// 自轮询间隔：请求每隔这么久自查一次世代号
 ///
 /// 取 100ms，用户点保存后 0.1 秒内所有在途请求都会停；定时器由各请求自己的
@@ -872,11 +894,7 @@ where
 
     // 进入时就已经过期，中断发生在提交之前：直接失败，不用起任务
     if ABORT_GEN.load(Ordering::SeqCst) != entered_gen {
-        return Err(ErrorType::HttpError(HttpErrorData {
-            url: String::new(),
-            error: ABORT_MSG.to_string(),
-            status: None,
-        }));
+        return Err(abort_error(""));
     }
 
     // 把请求放进独立任务：这样即使它卡住不让出，也能被 abort() 强制取消
@@ -893,20 +911,16 @@ where
                     res
                 }
                 // 被 abort()：JoinError::is_cancelled
-                Err(err) if err.is_cancelled() => {
-                    Err(ErrorType::HttpError(HttpErrorData {
-                        url: String::new(),
-                        error: ABORT_MSG.to_string(),
-                        status: None,
-                    }))
-                }
+                Err(err) if err.is_cancelled() => Err(abort_error("")),
                 Err(err) => {
                     // panic 等异常：当成请求失败，别把启动器带崩
-                    Err(ErrorType::HttpError(HttpErrorData {
+                    let mapped = ErrorType::HttpError(HttpErrorData {
                         url: String::new(),
                         error: err.to_string(),
                         status: None,
-                    }))
+                    });
+                    log_request_error(&mapped);
+                    Err(mapped)
                 }
             }
         }
@@ -914,11 +928,7 @@ where
         _ = wait_abort(entered_gen) => {
             abort_handle.abort();
             prune_tasks();
-            Err(ErrorType::HttpError(HttpErrorData {
-                url: String::new(),
-                error: ABORT_MSG.to_string(),
-                status: None,
-            }))
+            Err(abort_error(""))
         }
     };
 
@@ -1126,14 +1136,20 @@ pub async fn handle_response<T: DeserializeOwned>(resp: reqwest::Response) -> Co
     let url = resp.url().to_string();
     if !status.is_success() {
         let error = resp.text().await.unwrap_or_default();
-        return Err(ErrorType::HttpError(HttpErrorData {
+        let err = ErrorType::HttpError(HttpErrorData {
             error,
             url,
             status: Some(status.as_u16()),
-        }));
+        });
+        log_request_error(&err);
+        return Err(err);
     }
     let bytes = resp.bytes().await.map_err(map_err)?;
-    serialize_tools::json_from_bytes(&bytes).map_err(|err| serialize_err_context::<T>(err, &url))
+    serialize_tools::json_from_bytes(&bytes).map_err(|err| {
+        let err = serialize_err_context::<T>(err, &url);
+        log_request_error(&err);
+        err
+    })
 }
 
 /// 给 JSON 解析错误补上请求地址与目标解析类型

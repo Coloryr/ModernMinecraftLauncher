@@ -53,6 +53,12 @@ pub(crate) trait ModPackWorker {
     ///
     /// 新实例的 UUID；创建失败返回对应错误
     async fn create_instance(&self, name: Option<String>, group: Option<Uuid>) -> CoreResult<Uuid>;
+    /// 这次安装 / 升级对应的默认实例名，形如 `{整合包名}-{版本}`
+    ///
+    /// # 返回值
+    ///
+    /// 已读到整合包信息时返回该名字，否则返回 `None`
+    fn default_instance_name(&self) -> Option<String>;
     /// 解压整合包内的文件
     ///
     /// - `unselect`: 不解压的条目路径列表，`None` 表示全解压
@@ -79,6 +85,26 @@ pub(crate) trait ModPackWorker {
     ///
     /// 成功返回 `Ok(())`；查询失败返回对应错误
     async fn check_upgrade(&self) -> CoreResult<()>;
+}
+
+/// 升级成功后把实例名与实例目录改成新版整合包对应的默认名
+///
+/// 改名失败只记日志、不让升级失败：文件与 pid / fid 都已按新版本写好，名字是次要的。
+///
+/// - `game`: 目标实例
+/// - `name`: 新版整合包的默认实例名，来自 [`ModPackWorker::default_instance_name`]
+pub(crate) fn rename_after_upgrade(game: &GameInstance, name: Option<String>) {
+    let Some(name) = name else {
+        return;
+    };
+    // 先放开读锁再改名：rename_instance 会重新取同一实例的写锁，持锁调用会自锁
+    let uuid = {
+        let game = game.read().unwrap();
+        game.uuid
+    };
+    if let Err(err) = crate::rename_instance(&uuid, &name) {
+        mml_log::error_type(err);
+    }
 }
 
 /// 整合包安装器的公共状态，两条安装路径共用

@@ -36,19 +36,26 @@ pub fn resource_open_folder(
         instance_dir(&instance, &kind)?
     };
 
-    let target = match name.as_deref() {
-        Some(name) if !name.trim().is_empty() => resource_file(&instance, &kind, name)?,
-        _ => {
-            if !dir.exists() {
-                path_helper::create_dir_all(&dir).map_err(|err| err.to_string())?;
-            }
-            dir
+    // 给了名字是"定位这个文件"，没给是"打开这个目录"，两者打开方式不同，见末尾
+    let named = matches!(name.as_deref(), Some(name) if !name.trim().is_empty());
+    let target = if named {
+        resource_file(&instance, &kind, name.as_deref().unwrap_or_default())?
+    } else {
+        if !dir.exists() {
+            path_helper::create_dir_all(&dir).map_err(|err| err.to_string())?;
         }
+        dir
     };
     if !target.exists() {
         return Err(err_keys::FILE_NOT_FOUND.to_string());
     }
 
-    open_helper::open_file_with_explorer(&target);
+    if named {
+        // 定位文件：打开父目录并选中它
+        open_helper::open_file_with_explorer(&target);
+    } else {
+        // 打开目录本身：要进到里面去，只在上层选中它等于没打开
+        open_helper::open_dir(&target);
+    }
     Ok(())
 }

@@ -156,42 +156,53 @@ impl ModPackWorker for CurseForgeWorker {
 
     /// 创建游戏实例
     ///
-    /// - `name`: 实例名；`None` 时用整合包名与版本拼出
+    /// - `name`: 实例名；`None` 时用 [`ModPackWorker::default_instance_name`]
     /// - `group`: 所属分组 uuid；`None` 表示不分组
     ///
     /// # 返回值
     ///
     /// 返回新建实例的 uuid
     async fn create_instance(&self, name: Option<String>, group: Option<Uuid>) -> CoreResult<Uuid> {
-        match &self.info {
-            Some(info) => {
-                let name = name.unwrap_or(format!("{}-{}", info.name, info.version));
-                let game = InstanceSettingObj {
-                    name,
-                    version: self.base.game_version.clone(),
-                    is_modpack: true,
-                    loader: self.base.loader,
-                    modpack_type: ModPackType::CurseForge,
-                    loader_version: Some(self.base.loader_version.clone()),
-                    ..Default::default()
-                };
-                // 分组不在实例配置里，创建时一并交给分组表，不存在的组会被建出来
-                let game = game
-                    .create_instance_in_group(self.base.instance_gui.clone(), group)
-                    .await?;
+        let name = match name {
+            Some(name) => name,
+            None => self
+                .default_instance_name()
+                .ok_or(ErrorType::DataNotFound(DataNotFoundData::Info))?,
+        };
+        let game = InstanceSettingObj {
+            name,
+            version: self.base.game_version.clone(),
+            is_modpack: true,
+            loader: self.base.loader,
+            modpack_type: ModPackType::CurseForge,
+            loader_version: Some(self.base.loader_version.clone()),
+            ..Default::default()
+        };
+        // 分组不在实例配置里，创建时一并交给分组表，不存在的组会被建出来
+        let game = game
+            .create_instance_in_group(self.base.instance_gui.clone(), group)
+            .await?;
 
-                // 与 Modrinth 安装器同一套：图标在实例建好后立刻写，写失败只记日志
-                if let Some(icon) = &self.base.icon {
-                    if let Err(err) =
-                        InstanceSettingObj::save_icon(&game, InputFile::Url(icon.clone())).await
-                    {
-                        mml_log::error_type(err);
-                    }
-                }
-                Ok(game.read().unwrap().uuid)
+        // 与 Modrinth 安装器同一套：图标在实例建好后立刻写，写失败只记日志
+        if let Some(icon) = &self.base.icon {
+            if let Err(err) =
+                InstanceSettingObj::save_icon(&game, InputFile::Url(icon.clone())).await
+            {
+                mml_log::error_type(err);
             }
-            None => Err(ErrorType::DataNotFound(DataNotFoundData::Info)),
         }
+        Ok(game.read().unwrap().uuid)
+    }
+
+    /// 默认实例名，取整合包名与版本拼出的那一个
+    ///
+    /// # 返回值
+    ///
+    /// 已读到整合包信息时返回 `{包名}-{版本}`，否则返回 `None`
+    fn default_instance_name(&self) -> Option<String> {
+        self.info
+            .as_ref()
+            .map(|info| format!("{}-{}", info.name, info.version))
     }
 
     /// 解压整合包覆盖文件到游戏目录

@@ -34,6 +34,8 @@ export type GlyphName =
   | "save"
   | "news"
   | "check-square"
+  // 模组工具条的更新记录入口：时钟 + 回绕箭头，读作"历史"
+  | "history"
   | "puzzle"
   | "image"
   | "download"
@@ -139,6 +141,12 @@ withDefaults(
     <g v-else-if="name === 'check-square'">
       <rect x="3.5" y="3.5" width="17" height="17" rx="4" />
       <path d="m8.5 12.4 2.6 2.6 4.6-5.4" />
+    </g>
+    <!-- 更新记录：时钟 + 回绕箭头，读作"历史"，与"刷新"那种纯圈箭头区分开 -->
+    <g v-else-if="name === 'history'">
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M12 7v5l4 2" />
     </g>
     <!-- 依赖检测：拼图块（前置 / 依赖），与"确认"那类 check 区分开。
          transform 把带凸起的图形摆回 24 视窗正中 -->

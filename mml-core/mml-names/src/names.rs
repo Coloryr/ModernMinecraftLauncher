@@ -50,6 +50,7 @@ pub const LOCAL_DIR: &str = "local";
 pub const LOG_FILE: &str = "logs.log";
 pub const LANG_FILE: &str = "lang.txt";
 pub const MOD_INFO_FILE: &str = "modfileinfo.json";
+pub const MOD_UPDATE_FILE: &str = "mod_update.json";
 pub const GAME_FILE: &str = "game.json";
 pub const GUI_SETTING_FILE: &str = "gui_setting.json";
 pub const GROUP_FILE: &str = "group_save.json";
@@ -297,6 +298,7 @@ mod tests {
             LOG_FILE,
             LANG_FILE,
             MOD_INFO_FILE,
+            MOD_UPDATE_FILE,
             GAME_FILE,
             GUI_SETTING_FILE,
             GROUP_FILE,

@@ -157,6 +157,18 @@ impl ResourceWindowModel {
         }
     }
 
+    /// 现在有几个操作在跑
+    ///
+    /// 每个在跑的操作都挂着一个 [`OpGuard`]，守卫 Drop 时从表里摘掉，所以长度就是
+    /// "正在处理这个实例的操作数"。删实例前用它判断忙不忙。
+    ///
+    /// # 返回值
+    ///
+    /// 在跑的操作个数
+    pub(crate) fn in_flight(&self) -> usize {
+        self.cancels.lock().unwrap().len()
+    }
+
     /// 取消所有在跑的任务
     pub(crate) fn cancel_all(&self) {
         for (_, token) in self.cancels.lock().unwrap().iter() {
@@ -249,6 +261,35 @@ pub(crate) fn cancel_window(label: &str) {
     if let Some(model) = existing(&instance) {
         model.cancel_all();
     }
+}
+
+/// 取这个操作的守卫，窗口模型还没建起来时不挂
+///
+/// 各分类的读取命令用它：读的过程中删实例会被 [`instance_busy`] 拦住。
+/// 模型没建起来说明窗口还没打开过，这时也没有"读取中"可言，直接不挂。
+///
+/// - `uuid`: 实例 uuid 字符串，即命令的入参
+///
+/// # 返回值
+///
+/// 见 [`OpGuard`]；uuid 非法或模型没建起来时返回 `None`
+pub(crate) fn begin_if_open(uuid: &str) -> Option<OpGuard> {
+    let id = Uuid::parse_str(uuid).ok()?;
+    existing(&id).map(|model| model.begin())
+}
+
+/// 这个实例的资源窗口现在有没有在跑的操作
+///
+/// 刷新 / 读取模组、检查更新、下载更新、自动标记、整合包升级都挂着操作守卫，
+/// 删实例前用它把"正在处理这个实例"拦住 —— 删到一半那些操作会写到已删的目录里。
+///
+/// - `instance`: 实例 uuid
+///
+/// # 返回值
+///
+/// 有操作在跑时返回 `true`；窗口没开过、或没有在跑的操作时返回 `false`
+pub(crate) fn instance_busy(instance: &Uuid) -> bool {
+    existing(instance).is_some_and(|model| model.in_flight() > 0)
 }
 
 #[cfg(test)]

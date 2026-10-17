@@ -25,6 +25,8 @@ pub async fn resource_list_datapacks(
     uuid: String,
     dir: String,
 ) -> Result<Vec<DataPackItemDto>, String> {
+    // 读的过程中删实例会被拦住，见 resource::instance_busy
+    let _op = super::model::begin_if_open(&uuid);
     let instance = parse_instance(&uuid)?;
     let save = find_save(instance, &dir).await?;
 

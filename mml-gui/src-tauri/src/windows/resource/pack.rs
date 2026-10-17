@@ -86,6 +86,8 @@ pub async fn resource_modpack_update(
     uuid: String,
     file_id: String,
 ) -> Result<(), String> {
+    // 读的过程中删实例会被拦住，见 resource::instance_busy
+    let _op = super::model::begin_if_open(&uuid);
     let instance = parse_instance(&uuid)?;
     let (source, pid, _) = modpack_of(&instance)?;
     let (name, instance_uuid) = {

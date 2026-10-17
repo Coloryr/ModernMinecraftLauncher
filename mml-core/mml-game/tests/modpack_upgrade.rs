@@ -765,7 +765,7 @@ async fn pick_version_pair() -> Option<VersionPair> {
     None
 }
 
-/// 端到端：装旧版 → 升级新版 → 磁盘文件集合 == 新版清单，且实例元数据不被重建
+/// 端到端：装旧版 → 升级新版 → 磁盘文件集合 == 新版清单，实例名换成新版、图标与分组不动
 ///
 /// **这也是一个回归用例**：升级时 `extract` 若把包根清单写进实例 base 目录，就会覆盖
 /// `check_upgrade` 要读的"旧清单"，差异算成空，**既不下载也不删除**。断言 ① 抓的就是这个。
@@ -827,12 +827,11 @@ async fn upgrade_modpack_end_to_end_matches_new_manifest() {
         .await
         .expect("建实例失败");
     let uuid = game.read().unwrap().uuid;
-    let (game_path, base_path, name_before, icon_before) = {
+    let (game_path, base_path, icon_before) = {
         let read = game.read().unwrap();
         (
             read.get_game_path(),
             read.get_base_path(),
-            read.name.clone(),
             read.icon.clone(),
         )
     };
@@ -904,6 +903,12 @@ async fn upgrade_modpack_end_to_end_matches_new_manifest() {
     .expect("升级整合包失败");
     eprintln!("[e2e] 升级完成，开始断言");
 
+    // 升级会按新版整合包改名，实例目录跟着搬走：升级前抓的路径已指向不存在的旧目录
+    let (game_path, base_path) = {
+        let read = game.read().unwrap();
+        (read.get_game_path(), read.get_base_path())
+    };
+
     // ① 实例要记到新版本上：更新检查按 pid / fid 比对，不记的话下次还会报同一个更新
     {
         let installed = game.read().unwrap();
@@ -948,10 +953,14 @@ async fn upgrade_modpack_end_to_end_matches_new_manifest() {
     );
     eprintln!("[e2e] ③ 旧清单里已移除的文件都已删除");
 
-    // ④ 实例元数据没被重建：升级传的是 None，图标 / 名称 / 分组保持原样
+    // ④ 升级传的是 None，图标 / 分组保持原样；实例名换成新版整合包的默认名
     {
         let read = game.read().unwrap();
-        assert_eq!(read.name, name_before, "升级不该改实例名");
+        assert_eq!(
+            read.name,
+            format!("{}-{}", new_index.name, new_index.version_id),
+            "升级后实例名应换成新版整合包的默认名"
+        );
         assert_eq!(read.icon, icon_before, "升级不该改图标");
     }
     assert_eq!(
@@ -959,7 +968,7 @@ async fn upgrade_modpack_end_to_end_matches_new_manifest() {
         group_before,
         "升级不该改分组归属"
     );
-    eprintln!("[e2e] ④ 实例名 / 图标 / 分组保持原样");
+    eprintln!("[e2e] ④ 图标 / 分组保持原样，实例名已换成新版");
 
     // ⑤ 实例里的清单已写回新版，下次升级据此比对
     let written: ModrinthPackObj =
@@ -1289,9 +1298,9 @@ async fn upgrade_curseforge_pack_end_to_end_matches_new_manifest() {
     eprintln!("[e2e-cf] 旧版安装完成 uuid={uuid}");
 
     let game = mml_game::get_instance(&uuid).expect("安装后应能取到实例");
-    let (base_path, name_before, icon_before) = {
+    let (base_path, icon_before) = {
         let read = game.read().unwrap();
-        (read.get_base_path(), read.name.clone(), read.icon.clone())
+        (read.get_base_path(), read.icon.clone())
     };
     let group_before = mml_game::game_group::group_of(&uuid);
 
@@ -1313,6 +1322,9 @@ async fn upgrade_curseforge_pack_end_to_end_matches_new_manifest() {
     .await
     .expect("升级整合包失败");
     eprintln!("[e2e-cf] 升级完成，开始断言");
+
+    // 升级会按新版整合包改名，实例目录跟着搬走：升级前抓的 base_path 已指向旧目录
+    let base_path = game.read().unwrap().get_base_path();
 
     // ① 新版清单里的每个 project 都在实例的 online_info 里，且文件确实在磁盘上
     let online = game.read().unwrap().read_online_info();
@@ -1352,10 +1364,14 @@ async fn upgrade_curseforge_pack_end_to_end_matches_new_manifest() {
     );
     eprintln!("[e2e-cf] ② 旧清单里已移除的 project 都已清掉");
 
-    // ③ 实例元数据没被重建
+    // ③ 图标 / 分组没被重建；实例名换成新版整合包的默认名
     {
         let read = game.read().unwrap();
-        assert_eq!(read.name, name_before, "升级不该改实例名");
+        assert_eq!(
+            read.name,
+            format!("{}-{}", new_index.name, new_index.version),
+            "升级后实例名应换成新版整合包的默认名"
+        );
         assert_eq!(read.icon, icon_before, "升级不该改图标");
     }
     assert_eq!(
@@ -1363,7 +1379,7 @@ async fn upgrade_curseforge_pack_end_to_end_matches_new_manifest() {
         group_before,
         "升级不该改分组归属"
     );
-    eprintln!("[e2e-cf] ③ 实例名 / 图标 / 分组保持原样");
+    eprintln!("[e2e-cf] ③ 图标 / 分组保持原样，实例名已换成新版");
 
     // ④ 实例里的清单已写回新版，与新版包里的 manifest.json 逐条一致
     let written: CurseForgePackObj =

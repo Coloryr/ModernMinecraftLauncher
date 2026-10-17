@@ -188,11 +188,13 @@ async fn send_profile_json<T: Serialize>(
     if !status.is_success() {
         let url = res.url().to_string();
         let error = res.text().await.unwrap_or_default();
-        return Err(ErrorType::HttpError(HttpErrorData {
+        let err = ErrorType::HttpError(HttpErrorData {
             error,
             url,
             status: Some(status.as_u16()),
-        }));
+        });
+        crate::log_request_error(&err);
+        return Err(err);
     }
 
     Ok(())
@@ -272,11 +274,13 @@ pub async fn upload_minecraft_skin(
     if !status.is_success() {
         let url = res.url().to_string();
         let error = res.text().await.unwrap_or_default();
-        return Err(ErrorType::HttpError(HttpErrorData {
+        let err = ErrorType::HttpError(HttpErrorData {
             error,
             url,
             status: Some(status.as_u16()),
-        }));
+        });
+        crate::log_request_error(&err);
+        return Err(err);
     }
     Ok(())
 }

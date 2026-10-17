@@ -4,6 +4,7 @@
 // 分组 / 平铺 / 列表的切换入口不在这里，在设置窗口「界面 → 主窗口」
 import DragGhost from "../../../components/ui/DragGhost.vue";
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
+import HighlightText from "../../../components/ui/HighlightText.vue";
 import InstanceIcon from "../../../components/InstanceIcon.vue";
 import { t } from "../../../lib/i18n";
 import type { InstanceInfoDto } from "../../../lib/bindings";
@@ -116,7 +117,7 @@ function isGroupOpen(id: string) {
                 height="13" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="m6 9 6 6 6-6" />
               </svg>
-              <span>{{ g.name }}</span>
+              <span><HighlightText :text="g.name" :query="searchText" /></span>
               <span class="group-count">{{ g.items.length }}</span>
             </button>
           </div>
@@ -152,7 +153,7 @@ function isGroupOpen(id: string) {
                     <InstanceIcon :name="inst.name" :uuid="inst.uuid" :size="38" />
                     <span v-if="inst.loader !== 'normal'" class="loader-text" :class="`loader-${inst.loader}`">{{
                       t(`add.loader.${inst.loader}`) }}</span>
-                    <span class="inst-name">{{ inst.name }}</span>
+                    <span class="inst-name"><HighlightText :text="inst.name" :query="searchText" /></span>
                     <span v-if="inst.running" class="run-dot" v-tip="'running'"></span>
                   </div>
                 </template>
@@ -211,7 +212,7 @@ function isGroupOpen(id: string) {
         <InstanceIcon :name="inst.name" :uuid="inst.uuid" :size="44" />
         <span v-if="inst.loader !== 'normal'" class="loader-corner loader-text" :class="`loader-${inst.loader}`">{{
           t(`add.loader.${inst.loader}`) }}</span>
-        <span class="tile-name">{{ inst.name }}</span>
+        <span class="tile-name"><HighlightText :text="inst.name" :query="searchText" /></span>
         <span v-if="inst.running" class="run-dot" v-tip="'running'"></span>
       </div>
       <div v-if="filteredInstances.length === 0" class="empty-tip tile-empty">{{ t("search.empty") }}</div>

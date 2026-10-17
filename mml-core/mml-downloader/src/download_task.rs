@@ -154,6 +154,21 @@ impl DownloadTask {
         self.items.pop()
     }
 
+    /// 这个任务是否有文件的目标路径落在某个目录下
+    ///
+    /// 还在任务表里就说明任务没结束，所以不看单个文件的状态：一个任务总是属于同一个
+    /// 实例，它跑着的时候整批都算忙。
+    ///
+    /// - `dir`: 目录，比如某个实例的根目录
+    ///
+    /// # 返回值
+    ///
+    /// 有任一文件的目标路径在 `dir` 里时返回 `true`
+    pub(crate) fn has_file_under(&self, dir: &std::path::Path) -> bool {
+        let all = self.all.lock().unwrap();
+        all.iter().any(|item| item.base.file.starts_with(dir))
+    }
+
     /// 异步等待任务结束
     ///
     /// # 返回值

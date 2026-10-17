@@ -184,6 +184,15 @@ static WINDOW_FAMILIES: &[WindowFamily] = &[
     },
 ];
 
+/// 全部窗口族
+///
+/// # 返回值
+///
+/// 静态族表；调用方按实例派生出各族的窗口身份（比如删实例时逐个关窗）
+pub(super) fn families() -> &'static [WindowFamily] {
+    WINDOW_FAMILIES
+}
+
 /// 按 kind 取窗口族
 ///
 /// - `kind`: 窗口类型，即标签去掉 `mml-` 前缀与末尾实例 uuid 后的那一段

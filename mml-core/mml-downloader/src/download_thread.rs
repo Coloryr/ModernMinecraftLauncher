@@ -142,7 +142,17 @@ impl DownloadThread {
                     // 而线程其实已经拿着文件在跑了；顺带让文件名在取到的这一刻就换成新的
                     item.item.set_state(DownloadItemState::Init);
                     crate::update(index, &item.item);
-                    download(index, item);
+                    // panic 兜底：工作线程被打死的话，它手里那一项永远不会被标记，
+                    // 任务就永远等不到"全部记完"，调用方跟着无限期挂住。
+                    // 这里兜住并按失败记账，顺带把 panic 内容写进日志
+                    let task = item.task.clone();
+                    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        download(index, item)
+                    }));
+                    if let Err(payload) = res {
+                        mml_log::error(format!("下载线程异常：{}", panic_text(payload)));
+                        task.fail();
+                    }
                 }
             }
         });
@@ -167,6 +177,24 @@ impl DownloadThread {
         if let Some(handle) = self.handle.take() {
             let _ = handle.join();
         }
+    }
+}
+
+/// 从 panic 载荷里取一句可读的原因
+
+///
+/// - `payload`: `catch_unwind` 返回的载荷
+///
+/// # 返回值
+///
+/// panic 时给出的 `String` / `&str`；都不是时返回一句兜底文案
+fn panic_text(payload: Box<dyn std::any::Any + Send>) -> String {
+    match payload.downcast::<String>() {
+        Ok(text) => *text,
+        Err(payload) => match payload.downcast::<&'static str>() {
+            Ok(text) => (*text).to_string(),
+            Err(_) => String::from("未知 panic"),
+        },
     }
 }
 
@@ -389,10 +417,20 @@ fn download(index: u32, mut obj: DownloadObj) {
         return;
     }
 
-    path_helper::move_file(&temp_file, &obj.item.base.file).unwrap();
+    // 搬运失败（目标被别的进程占着、目标父路径不是目录……）也只是这一项失败，
+    // **不能 panic**：panic 打死工作线程后，它手里那一项永远不会被标记，
+    // 任务在"全部记完"那道门前卡死，调用方（乃至界面）永远等不到结束
+    if let Err(err) = path_helper::move_file(&temp_file, &obj.item.base.file) {
+        mml_log::error_type(err);
+        let _ = path_helper::delete(&temp_file);
+        obj.item.set_state(DownloadItemState::Error);
+        crate::update(index, &obj.item);
+        obj.task.fail();
+        return;
+    }
 
     // ============================================================
-    // 第五步：后处理，解压 native 库 / 存档
+    // 第五步：后处理，解压 native 库 / 存档、换掉旧文件
     // ============================================================
     let res: Result<(), ErrorType> = match &obj.item.base.later {
         LaterRun::None => Ok(()),
@@ -403,6 +441,9 @@ fn download(index: u32, mut obj: DownloadObj) {
         LaterRun::UnpackSave(path_buf) => {
             BaseArchive::decompress(ArchiveType::Zip, &obj.item.base.file, path_buf, None)
         }
+        // 换新版：新文件已经就位，把旧的挪进回收站。放在下载线程里做是为了"下完一个换一个"：
+        // 不用等整批下完，mods 目录里也不会新旧同名文件同时存在
+        LaterRun::ReplaceOld(old) => path_helper::move_to_trash(old),
     };
 
     if let Err(err) = res {

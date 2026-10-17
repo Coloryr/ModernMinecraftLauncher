@@ -225,6 +225,8 @@ export const commands = {
     modsRelatedMods: (uuid: string, mods: string[], disable: boolean) => invoke<string[]>("resource_mods_related_mods", { uuid, mods, disable }),
     modsUpdateApply: (uuid: string, items: ModUpdateApplyDto[]) => invoke<void>("resource_mods_update_apply", { uuid, items }),
     modsUpdateCheck: (uuid: string) => invoke<ModUpdateCheckDto>("resource_mods_update_check", { uuid }),
+    modsUpdateLog: (uuid: string) => invoke<ModUpdateProjectDto[]>("resource_mods_update_log", { uuid }),
+    modsUpdateLogRemove: (uuid: string, projectId: string, index: number) => invoke<void>("resource_mods_update_log_remove", { uuid, projectId, index }),
     openFolder: (uuid: string, kind: string, name: string | null, parent: string | null) => invoke<void>("resource_open_folder", { uuid, kind, name, parent }),
     rename: (uuid: string, kind: string, parent: string, name: string, newName: string) => invoke<void>("resource_rename", { uuid, kind, parent, name, newName }),
     resourcepackDisable: (uuid: string, file: string) => invoke<void>("resource_resourcepack_disable", { uuid, file }),
@@ -1010,6 +1012,7 @@ export type ModScanProgressDto = {
 };
 
 export type ModUpdateProgressDto = {
+  stage: string,
   done: number,
   total: number,
 };
@@ -1178,11 +1181,30 @@ export type ModUpdateDto = {
   date: string,
 };
 
+export type ModUpdateProjectDto = {
+  projectId: string,
+  name: string,
+  update: ModUpdateRecordDto[],
+};
+
+export type ModUpdateRecordDto = {
+  file: string,
+  oldVersion: string,
+  version: string,
+  oldFileId: string,
+  fileId: string,
+  time: number,
+  sha1: string,
+};
+
 export type ModUpdateApplyDto = {
   uuid: string,
   source: string,
   projectId: string,
   newFileId: string,
+  name: string,
+  oldVersion: string,
+  newVersion: string,
 };
 
 export type ModDepNodeDto = {

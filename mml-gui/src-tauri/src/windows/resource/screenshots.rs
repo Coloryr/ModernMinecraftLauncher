@@ -22,6 +22,8 @@ use super::{KIND_SCREENSHOTS, parse_instance, resource_file};
 #[gui_macros::ipc_group("resource")]
 #[tauri::command]
 pub fn resource_list_screenshots(uuid: String) -> Result<Vec<ScreenshotItemDto>, String> {
+    // 读的过程中删实例会被拦住，见 resource::instance_busy
+    let _op = super::model::begin_if_open(&uuid);
     let instance = parse_instance(&uuid)?;
     let list = instance.read().unwrap().get_screenshots();
 

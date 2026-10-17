@@ -51,6 +51,25 @@ pub(super) static DOWNLOAD_NOW: LazyLock<
     RwLock<HashMap<Uuid, HashMap<SourceInfo, SourceDownloadInfo>>>,
 > = LazyLock::new(|| RwLock::new(HashMap::new()));
 
+/// 这个实例有没有还没结束的资源下载
+///
+/// 添加资源窗口的下载按实例分表（见 [`DOWNLOAD_NOW`]）；"没结束"指还没落到
+/// done / failed / cancelled 三个终态之一 —— 下载完到写回在线信息之间也算忙。
+///
+/// - `instance`: 实例 uuid
+///
+/// # 返回值
+///
+/// 有未结束的条目时返回 `true`
+pub(crate) fn instance_busy(instance: &Uuid) -> bool {
+    let map = DOWNLOAD_NOW.read().unwrap();
+    map.get(instance).is_some_and(|entry| {
+        entry
+            .values()
+            .any(|info| !(info.done || info.failed || info.cancelled))
+    })
+}
+
 /// 下载源定位信息，pid + fid 唯一确定一个资源 / 文件
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct SourceInfo {
