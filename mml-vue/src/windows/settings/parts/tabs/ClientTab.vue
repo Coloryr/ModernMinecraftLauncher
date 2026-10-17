@@ -26,6 +26,7 @@ const {
   client,
   applyClient,
   serverAddr,
+  pickMusicFile,
   loginTypeLabel,
   addLockType,
   addLockName,
@@ -156,6 +157,32 @@ watch(lockServerError, async (msg) => {
           {{ t("winSettings.instanceLockMissing") }}
         </option>
       </select>
+    </div>
+  </SettingsGroup>
+
+  <SettingsGroup id="music" title-key="winSettings.secMusic" :flash="flashGroup === 'music'">
+    <p class="field-desc">{{ t("winSettings.musicDesc") }}</p>
+
+    <!-- 总开关：关掉就停播，标题栏那枚入口也不显示 -->
+    <div class="switch-row">
+      <div class="switch-text">
+        <span class="switch-label">{{ t("winSettings.musicOn") }}</span>
+        <span class="switch-state">{{ t("winSettings.musicOnDesc") }}</span>
+      </div>
+      <BaseSwitch v-model="client.musicOn" @update:model-value="applyClient" />
+    </div>
+
+    <!-- 来源：本地文件或 http(s) 直链；填完回车 / 失焦才落盘，别每敲一个字存一次 -->
+    <label class="field-label">{{ t("winSettings.musicSource") }}</label>
+    <div class="path-row">
+      <input v-model="client.musicSource" class="field-input" spellcheck="false" autocomplete="off"
+        :placeholder="t('winSettings.musicSourcePlaceholder')" @change="applyClient" />
+      <BaseButton size="sm" @click="pickMusicFile">{{ t("winSettings.musicPick") }}</BaseButton>
+    </div>
+    <p class="field-desc">{{ t("winSettings.musicSourceDesc") }}</p>
+
+    <div class="set-save-row right">
+      <SaveStateText :state="saveState" />
     </div>
   </SettingsGroup>
 

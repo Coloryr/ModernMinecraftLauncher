@@ -170,6 +170,15 @@ export interface ModViewEmits {
   /** 编辑备注：弹窗在 ModPane，三种视图只管把要编辑的那一条抛上来 */
   (e: "note", item: ModItemDto): void;
   /**
+   * 表格里改完在线信息：下载源 / 项目编号 / 文件编号
+   *
+   * 三格一起抛上来（后端一次改三样），由 ModPane 落盘并就地更新那一行。
+   */
+  (
+    e: "online-save",
+    payload: { item: ModItemDto; source: string; projectId: string; fileId: string },
+  ): void;
+  /**
    * 折叠 / 展开所在分组（表格视图的第一列有折叠箭头）
    *
    * 列表视图的折叠在分组头上、树形视图已并入列表，所以只有表格会发这个事件。

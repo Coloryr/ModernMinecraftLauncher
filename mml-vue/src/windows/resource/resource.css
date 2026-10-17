@@ -320,35 +320,38 @@
 }
 
 .resource-layout .badge-red {
-  background: rgba(220, 38, 38, 0.14);
+  background: color-mix(in srgb, var(--red) 14%, transparent);
   color: var(--red);
 }
 
 /* 「已禁用」徽标：暖色，与「识别失败」的红分开 —— 停用是用户自己按的，不是包坏了。
-   底色照 `.badge-red` 的写法写死一份浅色主题的暖色，字色跟主题走 */
+   底色与字色都跟主题走，见 controls.css 的说明 */
 .resource-layout .badge-off {
-  background: rgba(217, 119, 6, 0.14);
+  background: color-mix(in srgb, var(--yellow) 14%, transparent);
   color: var(--yellow);
 }
 
 /* 「已启用」徽标：绿色。数据包这类"开 / 关"两态用两种颜色分开，
    扫一眼就知道哪些是开着的（只有两态，没登记进 level.dat 的按开着算） */
 .resource-layout .badge-on {
-  background: rgba(22, 163, 74, 0.14);
+  background: color-mix(in srgb, var(--green) 14%, transparent);
   color: var(--green);
 }
 
 .resource-layout .mini-btn {
   height: var(--ctl-h);
-  padding: 0 12px;
+  padding: 0 14px;
   border-radius: var(--ctl-radius);
   border: 1px solid var(--border);
   background: var(--bg-raised);
   color: var(--text-dim);
-  font-size: 12px;
+  /* 字号 / 字重与 .ui-btn 同一档：同一根工具条上既有 .mini-btn 又有 BaseButton，
+     这里差 0.5px 字号、少一档字重，并排看就是两种按钮 */
+  font-size: var(--ctl-font);
+  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
-  transition: all 0.12s;
+  transition: all 0.15s;
 }
 
 .resource-layout .mini-btn:hover:not(:disabled) {
@@ -825,9 +828,20 @@
   border-top: 1px solid var(--border);
 }
 
+/* 其它分类的列表（存档 / 资源包 / 光影 / 结构 / 数据包 / 服务器）走通用 VirtualList：
+   行容器的类名是 `.vlist-rows`，行间距由组件内联给（各列表不一样），这里只管行高 */
+.resource-layout .vlist-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.resource-layout .vlist-rows .item-row {
+  height: 56px;
+}
+
 /* **行高必须一致**：虚拟窗口按下标算，被藏起来的行按行高估着撑高 —— 行高不一时，
    下边那些分组的落点会越算越偏、滚动条也会跳。
-   两个高度与 useVirtualRows 的 MOD_ROW_H / MOD_TR_H 同源，改一处要改两处。 */
+   两个高度与 useVirtualRows 的 LIST_ROW_H / TABLE_ROW_H 同源，改一处要改两处。 */
 .resource-layout .mod-rows .item-row {
   height: 56px;
 }

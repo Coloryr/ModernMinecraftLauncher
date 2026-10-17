@@ -5,6 +5,7 @@
 // 查询失败的个数在底部如实说明 —— 没查出来的不等于"已是最新"。
 import { computed, ref } from "vue";
 import { t } from "../../../../lib/i18n";
+import VirtualList from "../VirtualList.vue";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../../components/ui/BaseModal.vue";
 import type { ModUpdateCheckDto, ModUpdateDto } from "../../../../lib/bindings";
@@ -94,27 +95,29 @@ function dateOf(iso: string): string {
       <span class="upd-count">{{ t("resource.selectedCount", { n: checked.size }) }}</span>
     </div>
 
-    <div class="upd-list">
-      <!-- 整行可点：勾选框在左，与用户说的"左边勾选"一致 -->
-      <label v-for="u in updates" :key="u.uuid" class="upd-row" :class="{ 'upd-row-on': isChecked(u) }">
-        <input type="checkbox" class="upd-check" :checked="isChecked(u)" @change="toggle(u)" />
-        <span class="upd-body">
-          <span class="upd-head">
-            <span class="upd-name">{{ u.name || u.file }}</span>
-            <span v-if="u.disable" class="upd-tag">{{ t("resource.modDisabled") }}</span>
+    <!-- 更新条数可能上百：接虚拟列表，只渲染视口附近那几行；行高不齐（名字会换行），量第一行当估值 -->
+    <VirtualList class="upd-list" :count="updates.length" :row-gap="8" measure-row>
+      <template #default="{ start, end }">
+        <label v-for="u in updates.slice(start, end)" :key="u.uuid" class="upd-row" :class="{ 'upd-row-on': isChecked(u) }">
+          <input type="checkbox" class="upd-check" :checked="isChecked(u)" @change="toggle(u)" />
+          <span class="upd-body">
+            <span class="upd-head">
+              <span class="upd-name">{{ u.name || u.file }}</span>
+              <span v-if="u.disable" class="upd-tag">{{ t("resource.modDisabled") }}</span>
+            </span>
+            <span class="upd-meta">
+              <span>{{ t("resource.updateCurrent", { version: u.version || u.file }) }}</span>
+              <span class="upd-arrow">→</span>
+              <span class="upd-new">{{ t("resource.updateNew", { version: u.newVersion || u.newFile }) }}</span>
+            </span>
+            <span class="upd-note">
+              <span class="upd-file">{{ u.file }} → {{ u.newFile }}</span>
+              <span v-if="u.date">{{ t("resource.updateDate", { date: dateOf(u.date) }) }}</span>
+            </span>
           </span>
-          <span class="upd-meta">
-            <span>{{ t("resource.updateCurrent", { version: u.version || u.file }) }}</span>
-            <span class="upd-arrow">→</span>
-            <span class="upd-new">{{ t("resource.updateNew", { version: u.newVersion || u.newFile }) }}</span>
-          </span>
-          <span class="upd-note">
-            <span class="upd-file">{{ u.file }} → {{ u.newFile }}</span>
-            <span v-if="u.date">{{ t("resource.updateDate", { date: dateOf(u.date) }) }}</span>
-          </span>
-        </span>
-      </label>
-    </div>
+        </label>
+      </template>
+    </VirtualList>
 
     <!-- 只在有查询失败时留一行：没查出来的不等于"已是最新"，这行不能省 -->
     <p v-if="props.result.failed" class="upd-foot">

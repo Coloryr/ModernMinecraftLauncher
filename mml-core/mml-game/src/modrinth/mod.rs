@@ -648,6 +648,15 @@ pub async fn upgrade_modpack(
         gui.set_now(6, Some(6));
     }
 
+    // 记下装的是哪一份：更新检查按它比"有没有新版本"，不记的话每次都当有新版本。
+    // 只在走到这里才写 —— 取消或中途失败时实例仍指向旧版本，与旧 manifest 一致
+    {
+        let mut game = game.write().unwrap();
+        game.pid = Some(data.project_id.clone());
+        game.fid = Some(data.id.clone());
+        game.save();
+    }
+
     Ok(())
 }
 

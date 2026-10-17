@@ -85,11 +85,12 @@ const total = computed(() => collectFileKeys(props.tree).length);
   border-radius: var(--ctl-radius);
   background: var(--bg-raised);
   color: var(--accent);
-  font-size: 12px;
+  font-size: var(--ctl-font);
+  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   height: var(--ctl-h);
-  padding: 0 10px;
+  padding: 0 14px;
   transition: border-color 0.15s, background 0.15s;
 }
 

@@ -85,7 +85,7 @@ pub async fn add_modpack_install(
     let RegisteredTask {
         task,
         gui: pack_gui,
-    } = register_task(&app, key, &source, name, token.clone())?;
+    } = register_task(&app, key, &source, name, "install", token.clone())?;
 
     let gui = instance_gui(&window);
 

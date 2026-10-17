@@ -559,6 +559,55 @@ pub struct ModDepTreeDto {
     pub edges: Vec<ModDepEdgeDto>,
 }
 
+/// 整合包更新检查的结果
+///
+/// 实例里记着装的是哪一份（`pid` / `fid`），拿它与平台上的最新文件比；
+/// 比得上就是最新，比不上就把新文件的信息带回去，前端据此问一句要不要更新。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModPackUpdateDto {
+    /// 有没有新版本
+    pub has_update: bool,
+    /// 下载源：curseforge / modrinth
+    pub source: String,
+    /// 整合包项目编号
+    pub project_id: String,
+    /// 现在装着的那份文件编号
+    pub file_id: String,
+    /// 平台上的最新文件编号；接口没返回文件时为空串
+    pub new_file_id: String,
+    /// 新版本名；CurseForge 取文件显示名，Modrinth 取版本号
+    pub new_version: String,
+    /// 新文件名
+    pub new_file: String,
+    /// 新文件发布时间，ISO 8601 字符串
+    pub date: String,
+}
+
+/// 自动标记的进度，即事件 `resource-mods-auto-mark-progress` 的负载
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModAutoMarkProgressDto {
+    /// 已完成数
+    pub done: u32,
+    /// 总数
+    pub total: u32,
+}
+
+/// 自动标记的结果
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModAutoMarkDto {
+    /// 这次要标记的条目数
+    pub total: u32,
+    /// 认出来并写好在线信息的条数
+    pub marked: u32,
+    /// 没认出来的条数：不在 Modrinth 上，或哈希对不上
+    pub unknown: u32,
+    /// 读文件失败的条数
+    pub failed: u32,
+}
+
 /// 更新下载的结果，即事件 `resource-mods-update-done` 的负载
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]

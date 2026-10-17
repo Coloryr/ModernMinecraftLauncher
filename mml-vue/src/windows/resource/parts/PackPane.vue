@@ -15,6 +15,8 @@ import FormattedText from "../../../components/ui/FormattedText.vue";
 import ListSkeleton from "./ListSkeleton.vue";
 import ResourceRow from "./ResourceRow.vue";
 import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
+import VirtualList from "./VirtualList.vue";
+import { RESOURCE_ROW_GAP } from "../composables/useVirtualRows";
 import { useRowSelect } from "../composables/useRowSelect";
 import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceOps } from "../composables/useResourceOps";
@@ -136,6 +138,7 @@ function itemMenuItems(item: PackItemDto): RowMenuItem[] {
       id: "toggle",
       label: item.enable ? t("resource.disable") : t("resource.enable"),
     },
+    { id: "rename", label: t("resource.rename"), separated: true },
     { id: "open-folder", label: t("resource.openFolder"), separated: true },
     { id: "remove", label: t("resource.delete"), danger: true, separated: true },
   ];
@@ -188,6 +191,9 @@ function onMenuPick(id: string) {
     case "toggle":
       void toggle(item);
       break;
+    case "rename":
+      props.ops.askRename("resourcepacks", item.file);
+      break;
     case "open-folder":
       openFolder("resourcepacks", item.file);
       break;
@@ -228,31 +234,33 @@ function formatLabel(item: PackItemDto): string {
   <div v-if="loading" class="item-list">
     <ListSkeleton />
   </div>
-  <div v-else class="item-list">
-    <ResourceRow v-for="item in packs" :key="item.file" :icon="item.icon" :name="item.file" :class="{
-      'row-selected': isSelected(item),
-      'row-anchor': anchorKey === item.file,
-      'row-selecting': selected.size > 0,
-    }" @click="onRowClick({ event: $event, item })" @contextmenu.prevent="openMenu({ event: $event, item })">
-      <template #select>
-        <input type="checkbox" class="row-select" :checked="isSelected(item)" @pointerdown.stop
-          @change.stop="toggleSelect(item)" @click.stop />
-      </template>
-      <template #badges>
-        <span v-if="item.fail" class="badge badge-red">{{ t("resource.modFail") }}</span>
-        <span v-if="item.enable" class="badge">{{ t("resource.packOn") }}</span>
-      </template>
-      <!--
-        描述要过格式码，整合包作者常用 `§a` 这类上色；包格式那句不要 ——
-        所以两段分开渲染、中间自己接分隔符，不能先拼成一个字符串再整体格式化
-      -->
-      <template #sub>
-        <FormattedText v-if="item.description" :text="item.description" />
-        <template v-if="item.description"> · </template>{{ formatLabel(item) }}
-      </template>
-    </ResourceRow>
-    <div v-if="!packs.length" class="empty-tip">{{ t("resource.empty") }}</div>
-  </div>
+  <VirtualList v-else class="item-list" :count="packs.length" :row-gap="RESOURCE_ROW_GAP">
+    <template #default="{ start, end }">
+      <ResourceRow v-for="item in packs.slice(start, end)" :key="item.file" :icon="item.icon" :name="item.file" :class="{
+        'row-selected': isSelected(item),
+        'row-anchor': anchorKey === item.file,
+        'row-selecting': selected.size > 0,
+      }" @click="onRowClick({ event: $event, item })" @contextmenu.prevent="openMenu({ event: $event, item })">
+        <template #select>
+          <input type="checkbox" class="row-select" :checked="isSelected(item)" @pointerdown.stop
+            @change.stop="toggleSelect(item)" @click.stop />
+        </template>
+        <template #badges>
+          <span v-if="item.fail" class="badge badge-red">{{ t("resource.modFail") }}</span>
+          <span v-if="item.enable" class="badge">{{ t("resource.packOn") }}</span>
+        </template>
+        <!--
+          描述要过格式码，整合包作者常用 `§a` 这类上色；包格式那句不要 ——
+          所以两段分开渲染、中间自己接分隔符，不能先拼成一个字符串再整体格式化
+        -->
+        <template #sub>
+          <FormattedText v-if="item.description" :text="item.description" />
+          <template v-if="item.description"> · </template>{{ formatLabel(item) }}
+        </template>
+      </ResourceRow>
+      <div v-if="!packs.length" class="empty-tip">{{ t("resource.empty") }}</div>
+    </template>
+  </VirtualList>
 
   <!-- 行右键菜单：单行与批量共用，菜单项见 itemMenuItems / batchMenuItems -->
   <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title" @pick="onMenuPick"

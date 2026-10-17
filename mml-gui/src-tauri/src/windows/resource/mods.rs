@@ -124,9 +124,11 @@ pub async fn resource_list_mods(
 
     // 几份附带数据一起读，省掉前端额外往返与按文件名 / SHA1 的合并：
     // 备注 `Mod.ModName`、在线信息 `online_info.json`、游戏根目录，后者用来算相对路径
-    let (list, notes, online, game_path, loader, version) =
+    let (list, notes, sources, online, game_path, loader, version) =
         block_on_instance(instance, move |game| {
-            let notes = crate::gui_setting::load(&game).mods.mod_name;
+            let mods = crate::gui_setting::load(&game).mods;
+            let notes = mods.mod_name;
+            let sources = mods.mod_source;
             let online = game.read_online_info();
             let game_path = game.get_game_path();
             let loader = game.loader;
@@ -134,7 +136,7 @@ pub async fn resource_list_mods(
             let version = game.version.clone();
             let list = tokio::runtime::Handle::current()
                 .block_on(async { game.read_mod(false, gui).await });
-            (list, notes, online, game_path, loader, version)
+            (list, notes, sources, online, game_path, loader, version)
         })
         .await?;
 
@@ -153,6 +155,7 @@ pub async fn resource_list_mods(
 
     let ctx = ModCtx {
         notes: &notes,
+        sources: &sources,
         online: &online_of,
         game_path: &game_path,
         loader,
@@ -237,6 +240,8 @@ pub(super) fn mod_dependencies(item: &ModObj, loader: LoaderType) -> Vec<ModDepe
 struct ModCtx<'a> {
     /// `gui_setting.json` 的 `Mod.ModName`，文件名 → 说明
     notes: &'a HashMap<String, Option<String>>,
+    /// `gui_setting.json` 的 `Mod.ModSource`，文件名 → 手动指定的下载源
+    sources: &'a HashMap<String, String>,
     /// 实例的在线信息表，按 **SHA1** 索引
     online: &'a HashMap<String, mml_game::launcher::file_online_info_obj::OnlineInfoObj>,
     /// 实例的游戏根目录 `.minecraft`，用来算相对路径
@@ -297,13 +302,21 @@ fn mod_item(item: &ModObj, ctx: &ModCtx, nested: bool) -> Option<ModItemDto> {
     let online = ctx.online.get(&sha1);
     let project_id = online.map(|i| i.modid.clone()).unwrap_or_default();
     let file_id = online.map(|i| i.fileid.clone()).unwrap_or_default();
-    // 下载源由项目号 + 文件号的形态判定，见 mml_game::launcher::get_source_type：
-    // 两个都没有就是"不是从平台下的"，显示空串而不是硬判成 CurseForge
-    let source = if project_id.is_empty() && file_id.is_empty() {
-        String::new()
-    } else {
-        mml_game::launcher::get_source_type(&project_id, &file_id).to_string()
-    };
+    // 下载源：手动指定的优先（`gui_setting.json` 的 `Mod.ModSource`），没指定就按项目号 +
+    // 文件号的形态判定，见 mml_game::launcher::get_source_type —— 两边都有反例，
+    // 所以给用户留一个能盖住的地方；两个号都没有时是"不是从平台下的"，显示空串
+    let source = ctx
+        .sources
+        .get(mod_note_key(&file))
+        .filter(|s| !s.is_empty())
+        .cloned()
+        .unwrap_or_else(|| {
+            if project_id.is_empty() && file_id.is_empty() {
+                String::new()
+            } else {
+                mml_game::launcher::get_source_type(&project_id, &file_id).to_string()
+            }
+        });
 
     // 前置本身不进前端，只报"有没有"：右键菜单靠它决定「依赖图」给不给点
     let has_dependencies = !mod_dependencies(item, ctx.loader).is_empty();
@@ -623,4 +636,97 @@ fn mod_duplicate_dto(item: ModDuplicate) -> ModDuplicateDto {
             })
             .collect(),
     }
+}
+
+/// 手动改一条模组的在线信息：下载源 / 项目编号 / 文件编号
+///
+/// 三样东西落两处：**项目号与文件号**写 `online_info.json`（更新检查按它比对平台），
+/// **下载源**写实例的 `gui_setting.json`（`Mod.ModSource`，平时按项目号 / 文件号的形态判定，
+/// 两边都有反例，所以留了能手动盖住的地方）。
+///
+/// - `uuid`: 实例 uuid
+/// - `mod_uuid`: 模组的 uuid，即文件路径的 v5
+/// - `source`: 下载源，取值 `curseforge` / `modrinth` / 空串（等于不指定）
+/// - `project_id`: 项目编号；空串表示这条模组没有在线信息
+/// - `file_id`: 文件编号
+///
+/// # 返回值
+///
+/// 只表示成功 / 失败：模组不在列表里、下载源取值不认识或写盘失败返回错误串
+#[gui_macros::ipc_group("resource")]
+#[tauri::command]
+pub async fn resource_mod_online_set(
+    uuid: String,
+    mod_uuid: String,
+    source: String,
+    project_id: String,
+    file_id: String,
+) -> Result<(), String> {
+    let source = source.trim().to_string();
+    if !matches!(source.as_str(), "" | "curseforge" | "modrinth") {
+        return Err(err_keys::SOURCE_TYPE.to_string());
+    }
+    let project_id = project_id.trim().to_string();
+    let file_id = file_id.trim().to_string();
+
+    let model = super::model::window_model(&uuid)?;
+    // 拿不到这个条目就说不清改的是哪一个：列表还没加载或 uuid 已经过期
+    let Some((file, sha1)) = model
+        .with_cache(|cache| {
+            cache.list.iter().find_map(|item| {
+                (item.uuid.to_string() == mod_uuid).then(|| {
+                    (
+                        item.file
+                            .file_name()
+                            .map(|name| name.to_string_lossy().to_string())
+                            .unwrap_or_default(),
+                        sha1_of(&item.hash),
+                    )
+                })
+            })
+        })
+        .flatten()
+    else {
+        return Err(err_keys::MODS_NOT_LOADED.to_string());
+    };
+
+    let instance = parse_instance(&uuid)?;
+    let game = instance.read().unwrap();
+
+    // 1) 在线信息：按 SHA1 删掉旧条目（旧键是旧项目号），再按新项目号写入
+    let mut table = game.read_online_info();
+    table.retain(|_, item| item.sha1 != sha1);
+    let info = (!project_id.is_empty()).then(|| OnlineInfoObj {
+        path: names::GAME_MODS_DIR.to_string(),
+        // 显示名沿用模组列表里的那份，这里不知道也不需要知道
+        name: String::new(),
+        file: file.clone(),
+        sha1: sha1.clone(),
+        url: match source.as_str() {
+            "modrinth" => format!("https://modrinth.com/mod/{project_id}"),
+            "curseforge" => format!("https://www.curseforge.com/projects/{project_id}"),
+            _ => String::new(),
+        },
+        modid: project_id.clone(),
+        fileid: file_id.clone(),
+    });
+    if let Some(info) = &info {
+        table.insert(project_id.clone(), info.clone());
+    }
+    game.save_online_info(&table);
+
+    // 2) 下载源：进实例的 gui_setting，空串等于把这条覆盖删掉
+    let key = mod_note_key(&file).to_string();
+    let mut setting = crate::gui_setting::load(&game);
+    if source.is_empty() {
+        setting.mods.mod_source.remove(&key);
+    } else {
+        setting.mods.mod_source.insert(key, source);
+    }
+    crate::gui_setting::save(&game, &setting);
+    drop(game);
+
+    // 3) 窗口模型里那份同步换掉：更新检查直接读它，别回磁盘再读一遍
+    model.set_online(&sha1, &project_id, info.unwrap_or_default());
+    Ok(())
 }

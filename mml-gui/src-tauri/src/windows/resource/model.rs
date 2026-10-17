@@ -85,6 +85,27 @@ impl ResourceWindowModel {
         self.cache.lock().unwrap().as_ref().map(f)
     }
 
+    /// 改一条在线信息：先按 SHA1 删掉旧条目，再按项目号写入新条目
+    ///
+    /// - `sha1`: 目标模组的 SHA1，用来认旧条目（旧键是旧项目号，可能刚被改过）
+    /// - `key`: 新的项目号；空串表示这条在线信息不要了
+    /// - `info`: 新条目；`key` 为空时不看它
+    pub(crate) fn set_online(
+        &self,
+        sha1: &str,
+        key: &str,
+        info: mml_game::launcher::file_online_info_obj::OnlineInfoObj,
+    ) {
+        let mut guard = self.cache.lock().unwrap();
+        let Some(cache) = guard.as_mut() else {
+            return;
+        };
+        cache.online.retain(|_, item| item.sha1 != sha1);
+        if !key.is_empty() {
+            cache.online.insert(key.to_string(), info);
+        }
+    }
+
     /// 启用 / 禁用之后改掉缓存里那一条
     ///
     /// 改文件名会连 uuid（文件路径的 v5）一起变，缓存按 uuid 记，所以得换键。

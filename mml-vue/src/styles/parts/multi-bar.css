@@ -63,5 +63,5 @@
 
 .multi-exit:hover {
   color: var(--red);
-  background: rgba(255, 95, 86, 0.1);
+  background: color-mix(in srgb, var(--red) 10%, transparent);
 }

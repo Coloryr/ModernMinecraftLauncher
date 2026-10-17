@@ -91,11 +91,11 @@ function tagColor(tag: string) {
 
     <!-- 分页（页码从 1 开始） -->
     <div v-if="items.length > 0" class="news-pager">
-      <button class="pager-btn" :disabled="page <= 1 || loading" @click="emit('prev')">
+      <button class="page-btn" :disabled="page <= 1 || loading" @click="emit('prev')">
         {{ t("news.prev") }}
       </button>
       <span class="pager-info">{{ t("news.page", { n: page }) }}</span>
-      <button class="pager-btn" :disabled="!hasMore || loading" @click="emit('next')">
+      <button class="page-btn" :disabled="!hasMore || loading" @click="emit('next')">
         {{ t("news.next") }}
       </button>
     </div>
@@ -123,7 +123,7 @@ function tagColor(tag: string) {
 .refresh-btn {
   width: var(--ctl-h);
   height: var(--ctl-h);
-  border-radius: 8px;
+  border-radius: var(--ctl-radius);
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text-dim);
@@ -141,7 +141,7 @@ function tagColor(tag: string) {
 
 .refresh-btn:disabled {
   cursor: default;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .refresh-btn svg {
@@ -274,29 +274,6 @@ function tagColor(tag: string) {
   align-items: center;
   justify-content: center;
   gap: 14px;
-}
-
-.pager-btn {
-  height: var(--ctl-h);
-  padding: 0 16px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  color: var(--text-dim);
-  font-size: 12.5px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.pager-btn:hover:not(:disabled) {
-  color: var(--accent);
-  border-color: var(--accent);
-}
-
-.pager-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 
 .pager-info {

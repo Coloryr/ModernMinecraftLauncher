@@ -14,6 +14,8 @@ import ListSkeleton from "./ListSkeleton.vue";
 import ResourceRow from "./ResourceRow.vue";
 import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
 import SaveTabs from "./SaveTabs.vue";
+import VirtualList from "./VirtualList.vue";
+import { RESOURCE_ROW_GAP } from "../composables/useVirtualRows";
 import { useRowSelect } from "../composables/useRowSelect";
 import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceOps } from "../composables/useResourceOps";
@@ -117,6 +119,7 @@ function itemMenuItems(item: DataPackItemDto): RowMenuItem[] {
   return [
     // 与原来的行内按钮同一口径：只有明确"禁用中"的才给「启用」，其余给「禁用」
     { id: "toggle", label: item.enable === false ? t("resource.enable") : t("resource.disable") },
+    { id: "rename", label: t("resource.rename"), separated: true },
     { id: "open-folder", label: t("resource.openFolder"), separated: true },
     { id: "remove", label: t("resource.delete"), danger: true, separated: true },
   ];
@@ -168,6 +171,9 @@ function onMenuPick(id: string) {
   switch (id) {
     case "toggle":
       toggle(item);
+      break;
+    case "rename":
+      props.ops.askRename("datapacks", item.name, dpSave.value);
       break;
     case "open-folder":
       // 数据包目录是**整个存档**的数据包目录，与具体哪一条无关
@@ -223,23 +229,26 @@ function formatLabel(item: DataPackItemDto): string {
     </template>
   </ContentHead>
 
-  <div class="item-list">
+  <VirtualList class="item-list" :count="dpSave ? datapacks.length : 0" :row-gap="RESOURCE_ROW_GAP">
     <!-- 存档下拉：选完之后选中项只显示存档名，前面补一个常驻的标签说明这是什么。
-         标签与下拉同一行，下拉吃满剩余宽度 -->
-    <div class="dp-save-row">
-      <span class="dp-label">{{ t("resource.saveLabel") }}</span>
-      <select v-model="dpSave" class="field-select dp-select">
-        <option value="" disabled>{{ t("resource.selectSave") }}</option>
-        <option v-for="s in saves" :key="s.dir" :value="s.dir">
-          {{ stripFormatting(s.levelName || s.dir) }}
-        </option>
-      </select>
-    </div>
+         标签与下拉同一行，下拉吃满剩余宽度；固定在列表上方，不参与行虚拟化 -->
+    <template #header>
+      <div class="dp-save-row">
+        <span class="dp-label">{{ t("resource.saveLabel") }}</span>
+        <select v-model="dpSave" class="field-select dp-select">
+          <option value="" disabled>{{ t("resource.selectSave") }}</option>
+          <option v-for="s in saves" :key="s.dir" :value="s.dir">
+            {{ stripFormatting(s.levelName || s.dir) }}
+          </option>
+        </select>
+      </div>
+      <div v-if="!dpSave" class="empty-tip">{{ t("resource.selectSave") }}</div>
+    </template>
 
-    <template v-if="dpSave">
+    <template #default="{ start, end }">
       <!-- 加载中用骨架行占位：与其它分类同一套；这里只换行，存档下拉要一直留着 -->
       <ListSkeleton v-if="loading" />
-      <ResourceRow v-for="item in datapacks" :key="item.name" :name="name(item)" :class="{
+      <ResourceRow v-for="item in datapacks.slice(start, end)" :key="item.name" :name="name(item)" :class="{
         'row-selected': isSelected(item),
         'row-anchor': anchorKey === item.name,
         'row-selecting': selected.size > 0,
@@ -261,8 +270,7 @@ function formatLabel(item: DataPackItemDto): string {
       </ResourceRow>
       <div v-if="!datapacks.length && !loading" class="empty-tip">{{ t("resource.empty") }}</div>
     </template>
-    <div v-else class="empty-tip">{{ t("resource.selectSave") }}</div>
-  </div>
+  </VirtualList>
 
   <!-- 行右键菜单：单行与批量共用，菜单项见 itemMenuItems / batchMenuItems -->
   <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title" @pick="onMenuPick"

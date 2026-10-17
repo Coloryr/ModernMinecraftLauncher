@@ -454,11 +454,10 @@ const gcOptions = [
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: var(--ctl-radius);
   border: 1px solid var(--border);
   background: var(--bg-raised);
   color: var(--text-dim);
-  font-size: 12px;
   cursor: pointer;
   flex-shrink: 0;
   transition: all 0.12s;
@@ -467,7 +466,7 @@ const gcOptions = [
 .line-del:hover {
   color: var(--red);
   border-color: var(--red);
-  background: rgba(255, 95, 86, 0.1);
+  background: color-mix(in srgb, var(--red) 10%, transparent);
 }
 
 .line-add {
@@ -478,11 +477,11 @@ const gcOptions = [
   gap: 6px;
   height: var(--ctl-h);
   padding: 0 22px;
-  border-radius: 9px;
+  border-radius: var(--ctl-radius);
   border: 1px dashed var(--border);
   background: var(--bg-raised);
   color: var(--text-dim);
-  font-size: 13.5px;
+  font-size: var(--ctl-font);
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;

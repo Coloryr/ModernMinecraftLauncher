@@ -409,7 +409,7 @@
 }
 
 .badge.type {
-  background: rgba(62, 207, 142, 0.14);
+  background: color-mix(in srgb, var(--green) 14%, transparent);
   color: var(--green);
 }
 

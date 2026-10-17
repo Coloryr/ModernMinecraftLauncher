@@ -14,7 +14,7 @@
 import { computed, ref, watch } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
-import { addServer, deleteServer, getMotd, updateServer } from "../../../lib/api";
+import { addServer, deleteServer, exportServers, getMotd, importServers, updateServer } from "../../../lib/api";
 import { faviconOf } from "../../../lib/motd";
 import MotdCard from "../../../components/MotdCard.vue";
 import ContentHead from "./ContentHead.vue";
@@ -22,6 +22,8 @@ import ListSkeleton from "./ListSkeleton.vue";
 import ResourceRow from "./ResourceRow.vue";
 import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
 import ServerFormModal from "./ServerFormModal.vue";
+import VirtualList from "./VirtualList.vue";
+import { RESOURCE_ROW_GAP } from "../composables/useVirtualRows";
 import { useRowSelect } from "../composables/useRowSelect";
 import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceOps } from "../composables/useResourceOps";
@@ -342,6 +344,54 @@ function openMenu(payload: { event: MouseEvent; item: ServerItemDto }) {
   rowMenu.value = { x, y, items: itemMenuItems(), item: payload.item };
 }
 
+/**
+ * 导出服务器列表
+ *
+ * 走系统保存框选落点，默认文件名 `servers.dat`；导出的就是实例里那份 NBT，
+ * 换台机器 / 换个启动器都能直接放回去。
+ */
+async function exportList() {
+  try {
+    const { save } = await import("@tauri-apps/plugin-dialog");
+    const path = await save({
+      title: t("resource.serverExport"),
+      defaultPath: "servers.dat",
+      filters: [{ name: "servers.dat", extensions: ["dat"] }],
+    });
+    if (!path) return;
+    await act(async () => {
+      await exportServers(instanceUuid.value, path);
+      showToast(t("resource.serverExported"));
+    });
+  } catch (e) {
+    showToast(tErr(e));
+  }
+}
+
+/**
+ * 导入服务器列表
+ *
+ * 选中一个 `servers.dat` 替换实例里那份；后端先备份，解析不通过会自动还原，
+ * 所以选错了也不会把原列表弄丢。
+ */
+async function importList() {
+  try {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const picked = await open({
+      title: t("resource.serverImport"),
+      multiple: false,
+      filters: [{ name: "servers.dat", extensions: ["dat"] }],
+    });
+    if (typeof picked !== "string") return;
+    await act(async () => {
+      await importServers(instanceUuid.value, picked);
+      showToast(t("resource.serverImported"));
+    });
+  } catch (e) {
+    showToast(tErr(e));
+  }
+}
+
 /** 菜单动作分发 */
 function onMenuPick(id: string) {
   const menu = rowMenu.value;
@@ -377,9 +427,18 @@ function onMenuPick(id: string) {
           {{ t("resource.clearSelection") }}
         </button>
       </template>
-      <button v-else class="mini-btn" :disabled="busy" @click="openForm(null)">
-        {{ t("resource.serverAdd") }}
-      </button>
+      <template v-else>
+        <button class="mini-btn" :disabled="busy" @click="openForm(null)">
+          {{ t("resource.serverAdd") }}
+        </button>
+        <!-- 服务器列表就在 servers.dat 里：导出 / 导入都是整份换，与其它启动器互通 -->
+        <button class="mini-btn" :disabled="busy" @click="exportList">
+          {{ t("resource.serverExport") }}
+        </button>
+        <button class="mini-btn" :disabled="busy" @click="importList">
+          {{ t("resource.serverImport") }}
+        </button>
+      </template>
     </template>
   </ContentHead>
 
@@ -397,48 +456,50 @@ function onMenuPick(id: string) {
   <div v-if="loading" class="item-list">
     <ListSkeleton />
   </div>
-  <div v-else class="item-list">
-    <ResourceRow v-for="item in servers" :key="keyOf(item)" class="sv-row" :class="{
-      'sv-selected': keyOf(item) === selectedKey,
-      'row-selected': isSelected(item),
-      'row-anchor': anchorKey === keyOf(item),
-      'row-selecting': selection.size > 0,
-    }" :icon="iconOf(item)" :name="item.name" @click="onServerClick({ event: $event, item })"
-      @contextmenu.prevent="openMenu({ event: $event, item })">
-      <template #select>
-        <input type="checkbox" class="row-select" :checked="isSelected(item)" @pointerdown.stop
-          @change.stop="toggle(item)" @click.stop />
-      </template>
-      <template #badges>
-        <span v-if="item.acceptTextures" class="badge badge-dim">
-          {{ t("resource.acceptTextures") }}
-        </span>
-        <!-- 在线人数：查到了才显示；查不到时那一行下面会写连不上的原因 -->
-        <span v-if="isOnline(item)" class="badge">
-          {{
-            t("server.players", {
-              now: motdOf(item)?.playersOnline ?? 0,
-              max: motdOf(item)?.playersMax ?? 0,
-            })
-          }}
-        </span>
-      </template>
-
-      <!--
-        副标题：**这一行自己回答"能不能连上"** + 地址。
-        MOTD 搬去上方那张卡了，这里不再铺彩色分段 —— 一行只有一句话，扫一眼就分得清。
-        地址**始终留着**：它是这一行的定位信息，与连不连得上无关
-      -->
-      <template #sub>
-        <span v-if="isLoading(item)" class="sv-state wait">{{ t("server.refreshing") }}</span>
-        <span v-else-if="isOnline(item)" class="sv-state ok">{{ t("server.online") }}</span>
-        <span v-else class="sv-state off">{{ motdOf(item)?.message || t("server.offline") }}</span>
-        <span class="sep">·</span>
-        <span>{{ item.ip }}</span>
-      </template>
-    </ResourceRow>
-    <div v-if="!servers.length" class="empty-tip">{{ t("resource.empty") }}</div>
-  </div>
+  <VirtualList v-else class="item-list" :count="servers.length" :row-gap="RESOURCE_ROW_GAP">
+    <template #default="{ start, end }">
+      <ResourceRow v-for="item in servers.slice(start, end)" :key="keyOf(item)" class="sv-row" :class="{
+        'sv-selected': keyOf(item) === selectedKey,
+        'row-selected': isSelected(item),
+        'row-anchor': anchorKey === keyOf(item),
+        'row-selecting': selection.size > 0,
+      }" :icon="iconOf(item)" :name="item.name" @click="onServerClick({ event: $event, item })"
+        @contextmenu.prevent="openMenu({ event: $event, item })">
+        <template #select>
+          <input type="checkbox" class="row-select" :checked="isSelected(item)" @pointerdown.stop
+            @change.stop="toggle(item)" @click.stop />
+        </template>
+        <template #badges>
+          <span v-if="item.acceptTextures" class="badge badge-dim">
+            {{ t("resource.acceptTextures") }}
+          </span>
+          <!-- 在线人数：查到了才显示；查不到时那一行下面会写连不上的原因 -->
+          <span v-if="isOnline(item)" class="badge">
+            {{
+              t("server.players", {
+                now: motdOf(item)?.playersOnline ?? 0,
+                max: motdOf(item)?.playersMax ?? 0,
+              })
+            }}
+          </span>
+        </template>
+  
+        <!--
+          副标题：**这一行自己回答"能不能连上"** + 地址。
+          MOTD 搬去上方那张卡了，这里不再铺彩色分段 —— 一行只有一句话，扫一眼就分得清。
+          地址**始终留着**：它是这一行的定位信息，与连不连得上无关
+        -->
+        <template #sub>
+          <span v-if="isLoading(item)" class="sv-state wait">{{ t("server.refreshing") }}</span>
+          <span v-else-if="isOnline(item)" class="sv-state ok">{{ t("server.online") }}</span>
+          <span v-else class="sv-state off">{{ motdOf(item)?.message || t("server.offline") }}</span>
+          <span class="sep">·</span>
+          <span>{{ item.ip }}</span>
+        </template>
+      </ResourceRow>
+      <div v-if="!servers.length" class="empty-tip">{{ t("resource.empty") }}</div>
+    </template>
+  </VirtualList>
 
   <!-- 行右键菜单：单行与批量共用，菜单项见 itemMenuItems -->
   <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title" @pick="onMenuPick"

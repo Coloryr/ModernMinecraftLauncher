@@ -209,7 +209,7 @@
 }
 
 .group-act.danger:not(:disabled):hover {
-  background: rgba(255, 95, 86, 0.12);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
   color: var(--red);
 }
 
@@ -446,7 +446,7 @@
   height: var(--ctl-h);
   padding: 0;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--ctl-radius);
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
@@ -500,7 +500,7 @@
 }
 
 .ctx-item.danger:hover:not(:disabled) {
-  background: rgba(255, 95, 86, 0.12);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
 }
 
 /* 没有具名分组时"添加到分组"无处可加：置灰 + 悬停提示（见模板的 v-tip） */

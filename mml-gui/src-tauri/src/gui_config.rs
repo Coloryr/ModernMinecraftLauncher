@@ -315,6 +315,10 @@ pub struct ClientConfig {
     pub lock_instance: String,
     /// 自定义主页面：启用后主窗口的启动器主页换成 base_dir/custom_home 里的 index.html
     pub custom_home: bool,
+    /// 自定义音乐：启用后主窗口播放 `music_source`，标题栏给播放 / 暂停 / 停止入口
+    pub music_on: bool,
+    /// 自定义音乐来源：本地音频文件路径或 http(s) 直链；空串表示没配
+    pub music_source: String,
 }
 
 impl Default for ClientConfig {
@@ -330,6 +334,8 @@ impl Default for ClientConfig {
             motd_server: String::new(),
             lock_instance: String::new(),
             custom_home: false,
+            music_on: false,
+            music_source: String::new(),
         }
     }
 }

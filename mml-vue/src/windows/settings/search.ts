@@ -33,6 +33,7 @@ export const GROUP_TITLES: Record<string, string> = {
   loginLock: "winSettings.secLoginLock",
   instanceLock: "winSettings.secInstanceLock",
   customHome: "winSettings.secCustomHome",
+  music: "winSettings.secMusic",
   gameTitle: "winSettings.secGameTitle",
 };
 
@@ -168,6 +169,8 @@ const SETTINGS_INDEX: IndexEntry[] = [
   { tab: "client", group: "customHome", labelKey: "winSettings.customHomeImport", extra: ["zip", "导入"] },
   { tab: "client", group: "customHome", labelKey: "winSettings.customHomeOpenDir", extra: ["folder", "打开目录"] },
   { tab: "client", group: "customHome", labelKey: "winSettings.customHomeRemove", extra: ["remove", "删除"] },
+  { tab: "client", group: "music", labelKey: "winSettings.musicOn", extra: ["music", "bgm", "自定义音乐"] },
+  { tab: "client", group: "music", labelKey: "winSettings.musicSource", extra: ["music", "url", "音乐地址"] },
   { tab: "client", group: "gameTitle", labelKey: "winSettings.editTitle", extra: ["title", "标题"] },
   { tab: "client", group: "gameTitle", labelKey: "winSettings.randomTitle", extra: ["title", "随机标题"] },
   { tab: "client", group: "gameTitle", labelKey: "winSettings.cycleTitle", extra: ["title", "循环标题"] },
@@ -217,6 +220,7 @@ export const RESETTABLE_GROUPS = [
   "loginLock",
   "instanceLock",
   "customHome",
+  "music",
 ];
 
 /**

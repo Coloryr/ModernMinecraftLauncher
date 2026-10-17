@@ -173,6 +173,7 @@ export const commands = {
     loadState: () => invoke<LoadState>("main_load_state"),
     moveGroup: (uuid: string, index: number) => invoke<boolean>("main_move_group", { uuid, index }),
     moveInstance: (uuid: string, group: string | null, index: number) => invoke<boolean>("main_move_instance", { uuid, group, index }),
+    musicBaseUrl: () => invoke<string>("main_music_base_url"),
     openInstanceDir: (uuid: string) => invoke<void>("main_open_instance_dir", { uuid }),
     openUrl: (url: string) => invoke<void>("main_open_url", { url }),
     refreshVersions: () => invoke<VersionInfoDto[]>("main_refresh_versions"),
@@ -215,12 +216,17 @@ export const commands = {
     modGroups: (uuid: string) => invoke<ModGroupDto[]>("resource_mod_groups", { uuid }),
     modGroupsCollapsed: (uuid: string) => invoke<string[]>("resource_mod_groups_collapsed", { uuid }),
     modNoteSet: (uuid: string, file: string, note: string) => invoke<void>("resource_mod_note_set", { uuid, file, note }),
+    modOnlineSet: (uuid: string, modUuid: string, source: string, projectId: string, fileId: string) => invoke<void>("resource_mod_online_set", { uuid, modUuid, source, projectId, fileId }),
+    modpackCheck: (uuid: string) => invoke<ModPackUpdateDto>("resource_modpack_check", { uuid }),
+    modpackUpdate: (uuid: string, fileId: string) => invoke<void>("resource_modpack_update", { uuid, fileId }),
+    modsAutoMark: (uuid: string, overwrite: boolean) => invoke<ModAutoMarkDto>("resource_mods_auto_mark", { uuid, overwrite }),
     modsDepTest: (uuid: string) => invoke<DepProblemDto[]>("resource_mods_dep_test", { uuid }),
     modsDepTree: (uuid: string, modUuid: string) => invoke<ModDepTreeDto>("resource_mods_dep_tree", { uuid, modUuid }),
     modsRelatedMods: (uuid: string, mods: string[], disable: boolean) => invoke<string[]>("resource_mods_related_mods", { uuid, mods, disable }),
     modsUpdateApply: (uuid: string, items: ModUpdateApplyDto[]) => invoke<void>("resource_mods_update_apply", { uuid, items }),
     modsUpdateCheck: (uuid: string) => invoke<ModUpdateCheckDto>("resource_mods_update_check", { uuid }),
     openFolder: (uuid: string, kind: string, name: string | null, parent: string | null) => invoke<void>("resource_open_folder", { uuid, kind, name, parent }),
+    rename: (uuid: string, kind: string, parent: string, name: string, newName: string) => invoke<void>("resource_rename", { uuid, kind, parent, name, newName }),
     resourcepackDisable: (uuid: string, file: string) => invoke<void>("resource_resourcepack_disable", { uuid, file }),
     resourcepackEnable: (uuid: string, file: string) => invoke<void>("resource_resourcepack_enable", { uuid, file }),
     restoreSaveBackup: (uuid: string, dir: string, file: string) => invoke<void>("resource_restore_save_backup", { uuid, dir, file }),
@@ -229,6 +235,8 @@ export const commands = {
     serverAdd: (uuid: string, name: string, ip: string) => invoke<void>("resource_server_add", { uuid, name, ip }),
     serverDelete: (uuid: string, name: string, ip: string) => invoke<void>("resource_server_delete", { uuid, name, ip }),
     serverUpdate: (uuid: string, name: string, ip: string, newName: string, newIp: string, acceptTextures: boolean) => invoke<void>("resource_server_update", { uuid, name, ip, newName, newIp, acceptTextures }),
+    serversExport: (uuid: string, path: string) => invoke<void>("resource_servers_export", { uuid, path }),
+    serversImport: (uuid: string, path: string) => invoke<void>("resource_servers_import", { uuid, path }),
     shaderSet: (uuid: string, file: string | null) => invoke<void>("resource_shader_set", { uuid, file }),
     viewGet: (uuid: string) => invoke<ResourceViewDto>("resource_view_get", { uuid }),
     viewSet: (uuid: string, order: string[], category: string, modView: string, modColWidths: Record<string, number>) => invoke<void>("resource_view_set", { uuid, order, category, modView, modColWidths }),
@@ -332,6 +340,7 @@ export type ModPackTaskDto = {
   pid: string,
   fid: string,
   name: string,
+  kind: string,
   state: string,
   now: number,
   total: number,
@@ -741,6 +750,8 @@ export type ClientConfigDto = {
   motdServer: string,
   lockInstance: string,
   customHome: boolean,
+  musicOn: boolean,
+  musicSource: string,
 };
 
 export type GuiConfigDto = {
@@ -1204,6 +1215,29 @@ export type ModDepEdgeDto = {
 export type ModDepTreeDto = {
   nodes: ModDepNodeDto[],
   edges: ModDepEdgeDto[],
+};
+
+export type ModPackUpdateDto = {
+  hasUpdate: boolean,
+  source: string,
+  projectId: string,
+  fileId: string,
+  newFileId: string,
+  newVersion: string,
+  newFile: string,
+  date: string,
+};
+
+export type ModAutoMarkProgressDto = {
+  done: number,
+  total: number,
+};
+
+export type ModAutoMarkDto = {
+  total: number,
+  marked: number,
+  unknown: number,
+  failed: number,
 };
 
 export type ModUpdateDoneDto = {

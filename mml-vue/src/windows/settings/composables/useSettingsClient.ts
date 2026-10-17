@@ -33,6 +33,7 @@ const SERVER_LOCK_TYPES = ["authlib", "selflittleskin", "nide8"];
  * - `loginTypeLabel` / `addLock*` / `lockServerError` / `lockServerPlaceholder`: 登录方式锁定的添加表单
  * - `lockInstances` / `refreshLockInstances` / `lockMissing` / `onLockInstanceChange`: 实例锁定
  * - `customHome` / `importingCustomHome` / `customHomeState` / `refreshCustomHome` / `importCustomHome` / `openCustomHomeDir` / `removeCustomHome`: 自定义主页面
+ * - `pickMusicFile`: 选一个本地音频文件填进"自定义音乐"
  * - `load` / `applyClient` / `saveState` / `resetGroup`: 加载、落盘与分组级恢复默认
  */
 export function useSettingsClient() {
@@ -206,6 +207,19 @@ export function useSettingsClient() {
     }
   }
 
+  /** 选一个音频文件填进"自定义音乐"；只把路径写进配置，播放由标题栏那枚按钮管 */
+  async function pickMusicFile() {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const picked = await open({
+      title: t("winSettings.musicPick"),
+      multiple: false,
+      filters: [{ name: t("winSettings.musicFilter"), extensions: ["mp3", "m4a", "wav", "ogg", "flac"] }],
+    });
+    if (typeof picked !== "string") return;
+    client.value.musicSource = picked;
+    await applyClient();
+  }
+
   /** 在文件管理器里定位压缩包（还没导入时打开运行根目录） */
   async function openCustomHomeDir() {
     try {
@@ -250,6 +264,10 @@ export function useSettingsClient() {
         // 只把开关恢复成默认；导入的压缩包是用户的东西，恢复默认不动它
         client.value.customHome = d.customHome;
         break;
+      case "music":
+        client.value.musicOn = d.musicOn;
+        client.value.musicSource = d.musicSource;
+        break;
       default:
         return false;
     }
@@ -261,6 +279,7 @@ export function useSettingsClient() {
     client,
     applyClient,
     serverAddr,
+    pickMusicFile,
     LOGIN_TYPES,
     loginTypeLabel,
     addLockType,

@@ -305,7 +305,7 @@ pub async fn add_import_archive(
         let RegisteredTask {
             task,
             gui: progress,
-        } = register_task(&app, key, "local", display, token.clone())?;
+        } = register_task(&app, key, "local", display, "install", token.clone())?;
         (progress, Some(task))
     } else {
         (pack_gui(&window), None)

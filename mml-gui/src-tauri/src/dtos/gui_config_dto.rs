@@ -150,6 +150,10 @@ pub struct ClientConfigDto {
     pub lock_instance: String,
     /// 自定义主页面：启用后主窗口的启动器主页换成导入的页面
     pub custom_home: bool,
+    /// 自定义音乐：启用后主窗口播放 `music_source`
+    pub music_on: bool,
+    /// 自定义音乐来源：本地音频文件路径或 http(s) 直链，空串表示没配
+    pub music_source: String,
 }
 
 impl From<ClientConfig> for ClientConfigDto {
@@ -171,6 +175,8 @@ impl From<ClientConfig> for ClientConfigDto {
             motd_server: c.motd_server,
             lock_instance: c.lock_instance,
             custom_home: c.custom_home,
+            music_on: c.music_on,
+            music_source: c.music_source,
         }
     }
 }
@@ -194,6 +200,8 @@ impl From<ClientConfigDto> for ClientConfig {
             motd_server: c.motd_server,
             lock_instance: c.lock_instance,
             custom_home: c.custom_home,
+            music_on: c.music_on,
+            music_source: c.music_source,
         }
     }
 }
@@ -273,6 +281,8 @@ impl From<GuiConfig> for GuiConfigDto {
                 motd_server: c.client.motd_server,
                 lock_instance: c.client.lock_instance,
                 custom_home: c.client.custom_home,
+                music_on: c.client.music_on,
+                music_source: c.client.music_source,
             },
             font: c.font,
             skin: SkinConfigDto {
@@ -334,6 +344,8 @@ impl From<GuiConfigDto> for GuiConfig {
                 motd_server: d.client.motd_server,
                 lock_instance: d.client.lock_instance,
                 custom_home: d.client.custom_home,
+                music_on: d.client.music_on,
+                music_source: d.client.music_source,
             },
             font: d.font,
             skin: SkinConfig {

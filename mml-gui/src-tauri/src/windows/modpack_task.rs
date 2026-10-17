@@ -56,6 +56,8 @@ pub(super) struct ModPackTask {
     pub(super) fid: String,
     /// 显示名，安装开始时从列表缓存取
     pub(super) name: String,
+    /// 这次任务在干什么，取值 `install` / `upgrade`；前端据此换提示文案
+    pub(super) kind: String,
     /// 取消令牌
     pub(super) cancel: CancellationToken,
     /// 主/子进度快照
@@ -86,6 +88,7 @@ impl ModPackTask {
             pid: self.pid.clone(),
             fid: self.fid.clone(),
             name: self.name.clone(),
+            kind: self.kind.clone(),
             state: progress.state.clone(),
             now: progress.now,
             total: progress.total,
@@ -155,6 +158,7 @@ pub(crate) struct RegisteredTask {
 /// - `key`: 任务键，即下载源加项目与文件 ID；同键不重复安装
 /// - `source`: 整合包来源平台 ID
 /// - `name`: 显示名，取自整合包列表缓存
+/// - `kind`: 这次任务在干什么，取值 `install` / `upgrade`
 /// - `cancel`: 取消令牌，调用方持有同一份
 ///
 /// # 返回值
@@ -165,6 +169,7 @@ pub(crate) fn register_task(
     key: SourceInfo,
     source: &str,
     name: String,
+    kind: &str,
     cancel: CancellationToken,
 ) -> Result<RegisteredTask, String> {
     let task = Arc::new(ModPackTask {
@@ -173,6 +178,7 @@ pub(crate) fn register_task(
         pid: key.pid.clone(),
         fid: key.fid.clone(),
         name,
+        kind: kind.to_string(),
         cancel: cancel.clone(),
         progress: Mutex::new(ModPackProgress {
             state: pack_state_id(AddModPackState::DownloadPack).into(),

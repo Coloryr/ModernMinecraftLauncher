@@ -55,6 +55,8 @@ export interface ResourceInstance {
   loader: string;
   /** 加载器版本；原版 / 没记时是 `null` */
   loaderVersion: string | null;
+  /** 整合包来源：`curseforge` / `modrinth`；不是从平台装的整合包时是空串 */
+  modpackType: string;
 }
 
 /**
@@ -323,6 +325,7 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
             version: found.version,
             loader: found.loader,
             loaderVersion: found.loaderVersion,
+            modpackType: found.modpackType ?? "",
           }
         : null;
       instanceUuid.value = found?.uuid ?? "";

@@ -16,7 +16,7 @@ import { computed, ref, watch } from "vue";
 import { t } from "../../../../lib/i18n";
 import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
 import ResourceRow from "../ResourceRow.vue";
-import { MOD_ROW_GAP, MOD_ROW_H, useVirtualRows } from "../../composables/useVirtualRows";
+import { LIST_ROW_GAP, LIST_ROW_H, useVirtualRows } from "../../composables/useVirtualRows";
 import {
   modRowKey,
   modSub,
@@ -109,8 +109,8 @@ const root = ref<HTMLElement | null>(null);
 const { start, end, padTop, padBottom, remeasure } = useVirtualRows({
   root,
   count: () => rows.value.length,
-  rowH: MOD_ROW_H,
-  gap: MOD_ROW_GAP,
+  rowH: LIST_ROW_H,
+  gap: LIST_ROW_GAP,
 });
 
 // 展开 / 收起内置模组会改变本组乃至后面各组的高度：报一次布局变化（flush: post，等 DOM 更新完）

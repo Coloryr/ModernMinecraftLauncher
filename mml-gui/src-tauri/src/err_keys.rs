@@ -24,6 +24,8 @@ pub const VARIANT_INVALID: &str = "err.variantInvalid";
 pub const MODEL_MISSING: &str = "err.modelMissing";
 /// 模组列表还没加载，没有可用的扫描数据
 pub const MODS_NOT_LOADED: &str = "err.modsNotLoaded";
+/// 实例不是从平台安装的整合包，或实例里没记项目 / 文件编号，查不了整合包更新
+pub const NOT_ONLINE_MODPACK: &str = "err.notOnlineModpack";
 /// 窗口参数不合法
 pub const WINDOW_QUERY: &str = "err.windowQuery";
 /// 没给实例 uuid，日志窗口定不下是哪一个
@@ -92,6 +94,8 @@ pub const GROUP_NOT_FOUND: &str = "err.groupNotFound";
 
 /// 无效的文件名
 pub const FILE_NAME: &str = "err.fileName";
+/// 重命名时新名字已被占用
+pub const NAME_TAKEN: &str = "err.nameTaken";
 /// 二进制文件不能用文本方式编辑
 pub const FILE_BINARY: &str = "err.fileBinary";
 /// 文件太大，打不开

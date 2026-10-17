@@ -6,7 +6,7 @@
 import { ref } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
-import { openResourceFolder } from "../../../lib/api";
+import { openResourceFolder, renameResource } from "../../../lib/api";
 import type { useResourceData } from "./useResourceData";
 
 /** 确认弹窗的内容 */
@@ -49,6 +49,9 @@ export function useResourceOps(data: ReturnType<typeof useResourceData>) {
   /** 确认动作正在跑，防连点 */
   const confirmBusy = ref(false);
 
+  /** 待重命名的目标，`null` 表示没在问 */
+  const renameAsk = ref<{ kind: string; parent: string; name: string } | null>(null);
+
   /**
    * 弹一个确认框，确认后执行 `run`
    *
@@ -87,6 +90,31 @@ export function useResourceOps(data: ReturnType<typeof useResourceData>) {
     } finally {
       confirmBusy.value = false;
     }
+  }
+
+  /**
+   * 问一句新名字
+   *
+   * - `kind`: 资源类别，取值与 `resource_open_folder` 一致
+   * - `parent`: 数据包的存档目录名，其余类别传空串
+   * - `name`: 现在的名字
+   */
+  function askRename(kind: string, name: string, parent = "") {
+    renameAsk.value = { kind, parent, name };
+  }
+
+  /**
+   * 确认重命名：改名 + 重拉当前列表
+   *
+   * - `newName`: 用户填的新名字；与旧名字相同或为空时当作取消
+   */
+  async function doRename(newName: string) {
+    const ask = renameAsk.value;
+    renameAsk.value = null;
+    if (!ask) return;
+    const name = newName.trim();
+    if (!name || name === ask.name) return;
+    await act(() => renameResource(instanceUuid.value, ask.kind, ask.parent, ask.name, name));
   }
 
   /** 轻操作（备份 / 切换光影…）：串行化 + 失败提示 + 成功后重拉 */
@@ -142,8 +170,11 @@ export function useResourceOps(data: ReturnType<typeof useResourceData>) {
     busy,
     confirmBox,
     confirmBusy,
+    renameAsk,
     askConfirm,
     askDelete,
+    askRename,
+    doRename,
     runConfirm,
     act,
     actLocal,

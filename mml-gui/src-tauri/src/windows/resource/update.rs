@@ -34,7 +34,7 @@ use crate::dtos::{
 use crate::err_keys;
 use crate::listens;
 
-use super::mods::{find_mod, sha1_of};
+use super::mods::{find_mod, mod_note_key, sha1_of};
 use super::{block_on_instance, parse_instance};
 
 /// 同时在查的模组数上限
@@ -150,12 +150,23 @@ pub async fn resource_mods_update_check(
     uuid: String,
 ) -> Result<ModUpdateCheckDto, String> {
     let model = super::model::window_model(&uuid)?;
+    // 手动指定的下载源在实例的图形设置里，先读出来；没指定的按项目号 / 文件号形态判定
+    let sources = {
+        let instance = parse_instance(&uuid)?;
+        let game = instance.read().unwrap();
+        crate::gui_setting::load(&game).mods.mod_source
+    };
     let Some((targets, version, loader)) = model.with_cache(|cache| {
-        (
-            collect_targets(&cache.list, &cache.online),
-            cache.version.clone(),
-            cache.loader,
-        )
+        let mut targets = collect_targets(&cache.list, &cache.online);
+        for target in targets.iter_mut() {
+            if let Some(source) = sources
+                .get(mod_note_key(&target.file))
+                .filter(|s| !s.is_empty())
+            {
+                target.source = ModPackType::from_string(source);
+            }
+        }
+        (targets, cache.version.clone(), cache.loader)
     }) else {
         // 模组列表还没加载过：没有"现有数据"可查，别去扫一遍凑数
         return Err(err_keys::MODS_NOT_LOADED.to_string());
@@ -359,7 +370,7 @@ async fn apply_one(instance: GameInstance, item: &ModUpdateApplyDto) -> Result<(
     Ok(())
 }
 
-/// 更新完之后要删掉的旧文件，新旧同名时返回 `None`
+/// 更新完之后要删掉的旧文件，新旧同一个路径时返回 `None`
 ///
 /// 平台换了内容却没改名是有的：这时下载已经覆盖了同一个路径，
 /// 再删就是把刚下好的那份删掉。
@@ -369,9 +380,28 @@ async fn apply_one(instance: GameInstance, item: &ModUpdateApplyDto) -> Result<(
 ///
 /// # 返回值
 ///
-/// 要删的旧文件；新旧同名时没有
+/// 要删的旧文件；新旧同一个路径时没有
 fn stale_file<'a>(old: &'a Path, new: &Path) -> Option<&'a Path> {
-    (old != new).then_some(old)
+    (!same_path(old, new)).then_some(old)
+}
+
+/// 两个路径是不是同一个文件，只比字面、不碰文件系统
+///
+/// Windows 上大小写不敏感：新旧文件名只差大小写时是**同一个文件**，
+/// 下载已经把它换了内容，此时再按"旧路径"删一次就会把刚下好的那份删掉。
+///
+/// - `old`: 旧文件路径
+/// - `new`: 新文件路径
+///
+/// # 返回值
+///
+/// 是同一个文件返回 `true`
+fn same_path(old: &Path, new: &Path) -> bool {
+    if cfg!(windows) {
+        old.to_string_lossy().to_lowercase() == new.to_string_lossy().to_lowercase()
+    } else {
+        old == new
+    }
 }
 
 /// 把旧文件移进回收站
@@ -435,15 +465,15 @@ async fn check_one(
 }
 
 /// 平台上的一个候选新文件
-struct LatestFile {
+pub(super) struct LatestFile {
     /// 文件编号
-    id: String,
+    pub(super) id: String,
     /// 版本号；CurseForge 没有这个字段，取文件的显示名
-    version: String,
+    pub(super) version: String,
     /// 文件名
-    file: String,
+    pub(super) file: String,
     /// 发布时间，ISO 8601
-    date: String,
+    pub(super) date: String,
 }
 
 /// 取 CurseForge 上最新的那个文件
@@ -481,7 +511,7 @@ async fn latest_curseforge(
 /// # 返回值
 ///
 /// 见 [`LatestFile`]；空列表返回 `None`
-fn newest_curseforge(list: Vec<CurseForgeFileDataObj>) -> Option<LatestFile> {
+pub(super) fn newest_curseforge(list: Vec<CurseForgeFileDataObj>) -> Option<LatestFile> {
     list.into_iter()
         .max_by(|a, b| a.file_date.cmp(&b.file_date))
         .map(|item| LatestFile {
@@ -521,7 +551,7 @@ async fn latest_modrinth(
 /// # 返回值
 ///
 /// 见 [`LatestFile`]；空列表返回 `None`，版本里一个文件都没带时文件名是空串
-fn newest_modrinth(list: Vec<ModrinthVersionObj>) -> Option<LatestFile> {
+pub(super) fn newest_modrinth(list: Vec<ModrinthVersionObj>) -> Option<LatestFile> {
     list.into_iter()
         .max_by(|a, b| a.date_published.cmp(&b.date_published))
         .map(|item| {
@@ -684,7 +714,11 @@ mod tests {
     /// Modrinth：没有 primary 时退回第一个文件，空列表没有候选
     #[test]
     fn newest_modrinth_without_primary() {
-        let list = vec![mr_version("a", "2024-01-01T00:00:00Z", &[("only.jar", false)])];
+        let list = vec![mr_version(
+            "a",
+            "2024-01-01T00:00:00Z",
+            &[("only.jar", false)],
+        )];
         assert_eq!(newest_modrinth(list).unwrap().file, "only.jar");
 
         assert!(newest_modrinth(Vec::new()).is_none());
@@ -699,5 +733,18 @@ mod tests {
         let old = Path::new("mods/sodium-0.5.jar");
         let new = Path::new("mods/sodium-0.6.jar");
         assert_eq!(stale_file(old, new), Some(old));
+    }
+
+    /// 只差大小写的两个名字在 Windows 上是同一个文件，同样不能删
+    #[test]
+    fn stale_file_skips_case_only_change() {
+        let old = Path::new("mods/Sodium.jar");
+        let new = Path::new("mods/sodium.jar");
+
+        if cfg!(windows) {
+            assert!(stale_file(old, new).is_none());
+        } else {
+            assert_eq!(stale_file(old, new), Some(old));
+        }
     }
 }

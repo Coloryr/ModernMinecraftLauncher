@@ -107,6 +107,12 @@ pub struct GameModSettingObj {
     /// 备注：模组SHA1 → 用户写的说明
     #[serde(rename = "ModName")]
     pub mod_name: HashMap<String, Option<String>>,
+    /// 手动指定的下载源：模组文件名（归一后的键，见 `mod_note_key`）→ curseforge / modrinth
+    ///
+    /// 下载源平时按项目号 / 文件号的形态判定，但两边都有反例（Modrinth 的项目号也可能全是数字），
+    /// 所以留一个能手动盖住的地方：表里没有的按判定来。
+    #[serde(rename = "ModSource")]
+    pub mod_source: HashMap<String, String>,
     /// 分组块的显示顺序，存**分组 uuid**，含三个状态分组的固定 uuid
     ///
     /// `Groups` 是 `HashMap`、没有"建立顺序"可言，所以顺序单独存一份。

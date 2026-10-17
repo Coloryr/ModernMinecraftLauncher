@@ -10,6 +10,8 @@ import ContentHead from "./ContentHead.vue";
 import ListSkeleton from "./ListSkeleton.vue";
 import ResourceRow from "./ResourceRow.vue";
 import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
+import VirtualList from "./VirtualList.vue";
+import { RESOURCE_ROW_GAP } from "../composables/useVirtualRows";
 import { useRowSelect } from "../composables/useRowSelect";
 import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceOps } from "../composables/useResourceOps";
@@ -97,6 +99,7 @@ function itemMenuItems(item: ShaderItemDto): RowMenuItem[] {
       id: "toggle",
       label: item.selected ? t("resource.disable") : t("resource.enable"),
     },
+    { id: "rename", label: t("resource.rename"), separated: true },
     { id: "open-folder", label: t("resource.openFolder"), separated: true },
     { id: "remove", label: t("resource.delete"), danger: true, separated: true },
   ];
@@ -138,6 +141,9 @@ function onMenuPick(id: string) {
     case "toggle":
       toggle(item);
       break;
+    case "rename":
+      props.ops.askRename("shaderpacks", item.file);
+      break;
     case "open-folder":
       openFolder("shaderpacks", item.file);
       break;
@@ -172,23 +178,25 @@ function sub(item: ShaderItemDto): string {
   <div v-if="loading" class="item-list">
     <ListSkeleton />
   </div>
-  <div v-else class="item-list">
-    <ResourceRow v-for="item in shaders" :key="item.file" :name="item.name || item.file" :class="{
-      'row-selected': isSelected(item),
-      'row-anchor': anchorKey === item.file,
-      'row-selecting': selected.size > 0,
-    }" @click="onRowClick({ event: $event, item })" @contextmenu.prevent="openMenu({ event: $event, item })">
-      <template #select>
-        <input type="checkbox" class="row-select" :checked="isSelected(item)" @pointerdown.stop
-          @change.stop="toggleSelect(item)" @click.stop />
-      </template>
-      <template #badges>
-        <span v-if="item.selected" class="badge">{{ t("resource.shaderOn") }}</span>
-      </template>
-      <template #sub>{{ sub(item) }}</template>
-    </ResourceRow>
-    <div v-if="!shaders.length" class="empty-tip">{{ t("resource.empty") }}</div>
-  </div>
+  <VirtualList v-else class="item-list" :count="shaders.length" :row-gap="RESOURCE_ROW_GAP">
+    <template #default="{ start, end }">
+      <ResourceRow v-for="item in shaders.slice(start, end)" :key="item.file" :name="item.name || item.file" :class="{
+        'row-selected': isSelected(item),
+        'row-anchor': anchorKey === item.file,
+        'row-selecting': selected.size > 0,
+      }" @click="onRowClick({ event: $event, item })" @contextmenu.prevent="openMenu({ event: $event, item })">
+        <template #select>
+          <input type="checkbox" class="row-select" :checked="isSelected(item)" @pointerdown.stop
+            @change.stop="toggleSelect(item)" @click.stop />
+        </template>
+        <template #badges>
+          <span v-if="item.selected" class="badge">{{ t("resource.shaderOn") }}</span>
+        </template>
+        <template #sub>{{ sub(item) }}</template>
+      </ResourceRow>
+      <div v-if="!shaders.length" class="empty-tip">{{ t("resource.empty") }}</div>
+    </template>
+  </VirtualList>
 
   <!-- 行右键菜单：单行与批量共用，菜单项见 itemMenuItems -->
   <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title" @pick="onMenuPick"

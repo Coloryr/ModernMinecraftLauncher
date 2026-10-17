@@ -281,12 +281,12 @@ function hidePreview() {
 }
 
 .token-tag.valid {
-  background: rgba(62, 207, 142, 0.14);
+  background: color-mix(in srgb, var(--green) 14%, transparent);
   color: var(--green);
 }
 
 .token-tag.expired {
-  background: rgba(255, 95, 86, 0.14);
+  background: color-mix(in srgb, var(--red) 14%, transparent);
   color: var(--red);
 }
 

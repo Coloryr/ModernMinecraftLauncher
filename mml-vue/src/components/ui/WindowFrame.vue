@@ -8,6 +8,7 @@ import WindowControls from "./WindowControls.vue";
 import ModpackTitleIndicator from "../ModpackTitleIndicator.vue";
 import DownloadTitleIndicator from "../DownloadTitleIndicator.vue";
 import ResourceTitleIndicator from "../ResourceTitleIndicator.vue";
+import MusicTitleIndicator from "../MusicTitleIndicator.vue";
 import { onTitleBarPointerDown, titleBarStyle, useWindowTitle } from "../../lib/titlebar";
 import { useWindowDecoration } from "../../lib/useWindowDecoration";
 
@@ -95,6 +96,8 @@ const { decorated } = useWindowDecoration(rootEl);
       <ModpackTitleIndicator v-if="!hideModpackIndicator" />
       <DownloadTitleIndicator v-if="!hideDownloadIndicator" />
       <ResourceTitleIndicator />
+      <!-- 自定义音乐：只有持有播放器的那个窗口会画出来（多窗口模式 = 主窗口） -->
+      <MusicTitleIndicator />
 
       <!-- windows 样式：最小化 / 最大化 / 关闭在右端。
            插件不再画自己的按钮（vendor patch），热区按这三颗的位置摆，

@@ -20,6 +20,8 @@ pub struct ModPackTaskDto {
     pub fid: String,
     /// 显示名，取自整合包列表缓存
     pub name: String,
+    /// 这次任务在干什么：`install` 装新实例、`upgrade` 把已有实例升到新版本
+    pub kind: String,
     /// 当前安装阶段 ID
     pub state: String,
     /// 当前阶段进度

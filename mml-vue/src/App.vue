@@ -19,6 +19,7 @@ import {
 } from "./windows/windowManager";
 import type { WindowKind } from "./windows/registry";
 import { setModpackFallbackToast, useModpackStatus } from "./lib/modpackTasks";
+import { initMusic } from "./lib/music";
 import { useResourceStatus } from "./lib/resourceTasks";
 import AppToast from "./components/ui/AppToast.vue";
 import BaseButton from "./components/ui/BaseButton.vue";
@@ -96,6 +97,8 @@ const closeAsk = ref(false);
 /** 这次拦的是"退出应用"还是"关掉下载窗口"——只影响文案 */
 const closeAskQuit = ref(false);
 
+/** 自定义音乐的配置订阅（配了音乐才需要） */
+let unsubMusic: (() => void) | null = null;
 let unsubCloseBlocked: (() => void) | null = null;
 let unsubModpackStatus: (() => void) | null = null;
 let unsubResourceStatus: (() => void) | null = null;
@@ -112,9 +115,12 @@ onMounted(async () => {
   unsubModpackStatus = await initModpackStatus();
   // 资源下载同理：进度弹窗是全局浮层，下载跑在后台
   unsubResourceStatus = await initResourceStatus();
+  // 自定义音乐：读一遍配置，配了就起播（自动播放被拦时停在未播放，等标题栏那枚按钮）
+  unsubMusic = await initMusic();
 });
 
 onUnmounted(() => {
+  unsubMusic?.();
   unsubCloseBlocked?.();
   unsubModpackStatus?.();
   unsubResourceStatus?.();

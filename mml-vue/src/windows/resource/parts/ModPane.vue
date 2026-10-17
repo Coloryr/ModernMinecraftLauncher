@@ -7,7 +7,7 @@
 //
 // 数据：模组列表在 useResourceData，分组在 useModGroups（自己的 JSON），
 // 拖动分组头调整分组顺序在 useReorderDrag。
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
 import SegmentedTabs from "../../../components/ui/SegmentedTabs.vue";
@@ -28,12 +28,16 @@ import {
   deleteMod,
   disableMod,
   enableMod,
+  autoMarkMods,
   modsDepTest,
   modsUpdateApply,
   modsUpdateCheck,
+  onAddModpackStatus,
+  onModsAutoMarkProgress,
   onModsUpdateDone,
   onModsUpdateProgress,
   setModNote,
+  setModOnline,
 } from "../../../lib/api";
 import { copyText } from "../../../lib/clipboard";
 import { useModDeps } from "../composables/useModDeps";
@@ -52,6 +56,7 @@ import type { useResourceView } from "../composables/useResourceView";
 import type {
   DepProblemDto,
   ModItemDto,
+  ModAutoMarkDto,
   ModUpdateApplyDto,
   ModUpdateCheckDto,
   ModUpdateDoneDto,
@@ -308,6 +313,109 @@ async function applyUpdates(picked: ModUpdateDto[]) {
     updateBusy.value = false;
     updateStage.value = null;
     updateProgress.value = { done: 0, total: 0 };
+  }
+}
+
+
+// ---------- 自动标记 ----------
+
+/** 正在问"要不要覆盖已有在线信息" */
+const markAsk = ref(false);
+/** 这次允许覆盖已有在线信息 */
+const markOverwrite = ref(false);
+/** 标记正在跑（现读每个 jar 算 SHA512，要几秒） */
+const markBusy = ref(false);
+/** 标记进度，形如 done/total */
+const markProgress = ref({ done: 0, total: 0 });
+
+/**
+ * 自动标记：按文件 SHA512 去 Modrinth 认模组，认出来的写回在线信息
+ *
+ * 覆盖与否由弹窗里那个开关决定，见 markAsk。跑完重拉列表：项目号 / 文件号 /
+ * 下载源这三列是后端按在线信息算出来的，改了要重算才看得见。
+ */
+async function runAutoMark() {
+  const uuid = instanceUuid.value;
+  if (!uuid || markBusy.value) return;
+  markAsk.value = false;
+  markBusy.value = true;
+  markProgress.value = { done: 0, total: 0 };
+  // 先订阅再调命令，否则可能漏掉最开始那几条进度
+  const unlisten = await onModsAutoMarkProgress((e) => {
+    markProgress.value = e;
+  });
+  try {
+    const res: ModAutoMarkDto = await autoMarkMods(uuid, markOverwrite.value);
+    showToast(
+      t("resource.autoMarkDone", {
+        marked: res.marked,
+        unknown: res.unknown,
+        failed: res.failed,
+      }),
+    );
+    if (res.marked) await props.data.reloadCurrent();
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    unlisten();
+    markBusy.value = false;
+    markProgress.value = { done: 0, total: 0 };
+  }
+}
+
+/** 本实例整合包升级任务的退订函数 */
+let unlistenPack: (() => void) | null = null;
+/** 已经收过尾的升级任务 id，避免同一条任务重复刷新 */
+const packSeen = new Set<string>();
+
+/**
+ * 订阅整合包任务：本实例的升级任务跑完就刷新这一页
+ *
+ * 升级改了实例的游戏版本 / 加载器（头部要重读），也增删了模组目录里的文件（列表要重拉）。
+ * 提示由整合包任务那套统一弹，这里只做刷新。
+ */
+async function watchModpackTask(): Promise<() => void> {
+  const uuid = instanceUuid.value;
+  if (!uuid) return () => {};
+  return onAddModpackStatus((e) => {
+    for (const task of e.tasks) {
+      if (task.kind !== "upgrade" || task.instanceUuid !== uuid) continue;
+      if (!(task.done || task.failed || task.cancelled) || packSeen.has(task.uuid)) continue;
+      packSeen.add(task.uuid);
+      void props.data.sync();
+      void props.data.reloadCurrent();
+    }
+  });
+}
+
+/**
+ * 表格里改完在线信息：落盘并就地更新那一行
+ *
+ * 三格一起提交（后端一次改三样）。不重拉列表：那要重新解析每个 jar，
+ * 而这三格本来就是后端按在线信息算出来的，改完的现值就在手里。
+ *
+ * - `payload`: 改了哪一行、三个新值
+ */
+async function saveModOnline(payload: {
+  item: ModItemDto;
+  source: string;
+  projectId: string;
+  fileId: string;
+}) {
+  try {
+    await setModOnline(
+      instanceUuid.value,
+      payload.item.uuid,
+      payload.source,
+      payload.projectId,
+      payload.fileId,
+    );
+    payload.item.source = payload.source;
+    payload.item.projectId = payload.projectId;
+    payload.item.fileId = payload.fileId;
+    showToast(t("resource.onlineSaved"));
+  } catch (e) {
+    showToast(tErr(e));
   }
 }
 
@@ -1461,6 +1569,12 @@ function remove(item: ModItemDto) {
 }
 
 onMounted(() => void groups.load());
+onMounted(async () => {
+  unlistenPack = await watchModpackTask();
+});
+onBeforeUnmount(() => {
+  unlistenPack?.();
+});
 </script>
 
 <template>
@@ -1527,6 +1641,12 @@ onMounted(() => void groups.load());
           v-tip="t('resource.updateDownload')" :aria-label="t('resource.updateDownload')" @click="updateOpen = true">
           <GlyphIcon name="download" :size="14" />
         </button>
+        <!-- 自动标记：按 SHA512 去 Modrinth 认模组，回填项目号 / 文件号 / 下载源 -->
+        <button class="mini-btn icon-btn icon-only" :disabled="markBusy || busy || loading"
+          v-tip="t('resource.autoMark')" :aria-label="t('resource.autoMark')" @click="markAsk = true">
+          <GlyphIcon :name="markBusy ? 'refresh' : 'check-square'" :size="14"
+            :class="{ 'dep-spin': markBusy }" />
+        </button>
       </template>
     </template>
   </ContentHead>
@@ -1538,6 +1658,8 @@ onMounted(() => void groups.load());
   <LoaderQueryProgress :visible="updateBusy" kind="query" :step="updateProgress.done"
     :total="updateProgress.total"
     :label="t(updateStage === 'download' ? 'resource.updateDownloading' : 'resource.updateChecking')" />
+  <LoaderQueryProgress :visible="markBusy" kind="query" :step="markProgress.done" :total="markProgress.total"
+    :label="t('resource.autoMarkRunning')" />
 
   <!--
     加载中：与「下载整合包」窗口同一套骨架行，呼吸动画见 `styles/skeleton.css`
@@ -1580,6 +1702,7 @@ onMounted(() => void groups.load());
               @toggle-group="onSectionToggle(sec.id)" @drag-group="onSectionPointerDown($event, sec.id)"
               @note-save="saveNoteInline" @open-folder="openFolder('mods', $event.file)" @select="toggleSelect"
               @select-group="groupToggleSelect(sec.id)" @item-menu="openItemMenu" @row-click="onRowClick"
+              @online-save="saveModOnline"
               :anchor-key="anchorKey" />
           </section>
         </template>
@@ -1822,6 +1945,25 @@ onMounted(() => void groups.load());
         {{ t("resource.exportClipboard") }}
       </BaseButton>
       <BaseButton variant="accent" @click="dismissModDuplicates">{{ t("actions.confirm") }}</BaseButton>
+    </div>
+  </BaseModal>
+
+  <!--
+    自动标记：先问一句"允不允许覆盖已有在线信息"，再开始 —— 覆盖会重认所有模组，
+    没勾上就只补还没有在线信息的那批
+  -->
+  <BaseModal v-if="markAsk" :title="t('resource.autoMarkTitle')" :closable="false" @close="markAsk = false">
+    <p class="field-desc">{{ t("resource.autoMarkDesc") }}</p>
+    <div class="switch-row">
+      <div class="switch-text">
+        <span class="switch-label">{{ t("resource.autoMarkOverwrite") }}</span>
+        <span class="switch-state">{{ t("resource.autoMarkOverwriteDesc") }}</span>
+      </div>
+      <BaseSwitch v-model="markOverwrite" />
+    </div>
+    <div class="modal-actions">
+      <BaseButton @click="markAsk = false">{{ t("resource.cancel") }}</BaseButton>
+      <BaseButton variant="accent" @click="runAutoMark">{{ t("resource.autoMarkStart") }}</BaseButton>
     </div>
   </BaseModal>
 

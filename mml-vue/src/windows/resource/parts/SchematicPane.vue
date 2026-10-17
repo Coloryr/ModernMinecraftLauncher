@@ -25,6 +25,8 @@ import FormattedText from "../../../components/ui/FormattedText.vue";
 import ListSkeleton from "./ListSkeleton.vue";
 import ResourceRow from "./ResourceRow.vue";
 import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
+import VirtualList from "./VirtualList.vue";
+import { RESOURCE_ROW_GAP } from "../composables/useVirtualRows";
 import { useRowSelect } from "../composables/useRowSelect";
 import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceOps } from "../composables/useResourceOps";
@@ -110,6 +112,7 @@ const rowMenu = ref<{
 function itemMenuItems(): RowMenuItem[] {
   return [
     { id: "detail", label: t("resource.detail") },
+    { id: "rename", label: t("resource.rename"), separated: true },
     { id: "open-folder", label: t("resource.openFolder") },
     { id: "remove", label: t("resource.delete"), danger: true, separated: true },
   ];
@@ -150,6 +153,9 @@ function onMenuPick(id: string) {
   switch (id) {
     case "detail":
       openDetail(item);
+      break;
+    case "rename":
+      props.ops.askRename("schematics", item.file);
       break;
     case "open-folder":
       openFolder("schematics", item.file);
@@ -203,33 +209,35 @@ function metaLabel(item: SchematicItemDto): string {
   <div v-if="loading" class="item-list">
     <ListSkeleton />
   </div>
-  <div v-else class="item-list">
-    <ResourceRow v-for="item in schematics" :key="item.file" :name="titleOf(item)" :class="{
-      'row-selected': isSelected(item),
-      'row-anchor': anchorKey === item.file,
-      'row-selecting': selected.size > 0,
-    }" @click="onRowClick({ event: $event, item })" @contextmenu.prevent="openMenu({ event: $event, item })">
-      <template #select>
-        <input type="checkbox" class="row-select" :checked="isSelected(item)" @pointerdown.stop
-          @change.stop="toggleSelect(item)" @click.stop />
-      </template>
-      <template #badges>
-        <span class="badge badge-dim">{{ item.typeName }}</span>
-        <span v-if="item.fail" class="badge badge-red">{{ t("resource.modFail") }}</span>
-      </template>
-      <!--
-        描述单独铺在后面、且走 FormattedText：litematic 的 `Metadata.Description` 是作者
-        自己写的一句话，可能带 `§` 格式码，与材质包 / 数据包那两处同一套做法。
-        只有 litematic 会填它，其余格式为空、整段不渲染
-      -->
-      <template #sub>
-        <span>{{ metaLabel(item) }}</span>
-        <template v-if="item.description"> · </template>
-        <FormattedText v-if="item.description" :text="item.description" />
-      </template>
-    </ResourceRow>
-    <div v-if="!schematics.length" class="empty-tip">{{ t("resource.empty") }}</div>
-  </div>
+  <VirtualList v-else class="item-list" :count="schematics.length" :row-gap="RESOURCE_ROW_GAP">
+    <template #default="{ start, end }">
+      <ResourceRow v-for="item in schematics.slice(start, end)" :key="item.file" :name="titleOf(item)" :class="{
+        'row-selected': isSelected(item),
+        'row-anchor': anchorKey === item.file,
+        'row-selecting': selected.size > 0,
+      }" @click="onRowClick({ event: $event, item })" @contextmenu.prevent="openMenu({ event: $event, item })">
+        <template #select>
+          <input type="checkbox" class="row-select" :checked="isSelected(item)" @pointerdown.stop
+            @change.stop="toggleSelect(item)" @click.stop />
+        </template>
+        <template #badges>
+          <span class="badge badge-dim">{{ item.typeName }}</span>
+          <span v-if="item.fail" class="badge badge-red">{{ t("resource.modFail") }}</span>
+        </template>
+        <!--
+          描述单独铺在后面、且走 FormattedText：litematic 的 `Metadata.Description` 是作者
+          自己写的一句话，可能带 `§` 格式码，与材质包 / 数据包那两处同一套做法。
+          只有 litematic 会填它，其余格式为空、整段不渲染
+        -->
+        <template #sub>
+          <span>{{ metaLabel(item) }}</span>
+          <template v-if="item.description"> · </template>
+          <FormattedText v-if="item.description" :text="item.description" />
+        </template>
+      </ResourceRow>
+      <div v-if="!schematics.length" class="empty-tip">{{ t("resource.empty") }}</div>
+    </template>
+  </VirtualList>
 
   <!-- 行右键菜单：单行与批量共用，菜单项见 itemMenuItems -->
   <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title" @pick="onMenuPick"

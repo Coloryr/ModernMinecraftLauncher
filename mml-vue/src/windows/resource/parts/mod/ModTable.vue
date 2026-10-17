@@ -37,7 +37,7 @@ import {
   type ModCol,
   type ModSort,
 } from "../../modColumns";
-import { MOD_TR_H, useVirtualRows } from "../../composables/useVirtualRows";
+import { TABLE_ROW_H, useVirtualRows } from "../../composables/useVirtualRows";
 import { modHit, modRowKey, modSelectKey, type ModViewEmits, type ModViewProps } from "../../types";
 
 const props = withDefaults(
@@ -255,7 +255,7 @@ const rowsEl = ref<HTMLElement | null>(null);
 const { start, end, padTop, padBottom, remeasure } = useVirtualRows({
   root: rowsEl,
   count: () => rows.value.length,
-  rowH: MOD_TR_H,
+  rowH: TABLE_ROW_H,
   // 就地编辑备注时整列都渲染：被窗口裁掉的行连元素一起销毁，正在写的草稿就丢了
   whole: () => !!editing.value,
 });
@@ -280,6 +280,66 @@ const visibleRows = computed(() => rows.value.slice(start.value, end.value));
  * 取消（Esc）把原文写回去。
  */
 const editing = ref<{ key: string; item: ModItemDto } | null>(null);
+
+/** 正在就地编辑的在线信息格；一次只开一格 */
+const editingOnline = ref<{ key: string; field: "source" | "projectId" | "fileId"; item: ModItemDto } | null>(
+  null,
+);
+
+/** 这一格是不是正在就地编辑 */
+function isEditingOnline(row: TableRow, field: "source" | "projectId" | "fileId"): boolean {
+  return row.depth === 1 && editingOnline.value?.key === modRowKey(row.item) && editingOnline.value.field === field;
+}
+
+/**
+ * 双击某格：进入就地编辑
+ *
+ * 下载源是下拉，另两格是 contenteditable —— 与备注那一格同一套按键口径。
+ */
+async function startOnline(item: ModItemDto, field: "source" | "projectId" | "fileId", event: MouseEvent) {
+  if (props.busy || item.fail) return;
+  editingOnline.value = { key: modRowKey(item), field, item };
+  await nextTick();
+  const el = event.currentTarget as HTMLElement | null;
+  if (field !== "source") {
+    el?.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el!);
+    window.getSelection()?.removeAllRanges();
+    window.getSelection()?.addRange(range);
+  }
+}
+
+/** 收起编辑态，不发保存 */
+function cancelOnline() {
+  editingOnline.value = null;
+}
+
+/**
+ * 提交一格：三格一起抛给上层，由 ModPane 落盘
+ *
+ * - `field`: 改的是哪一格
+ * - `value`: 新值
+ * - `item`: 这一行的模组
+ */
+function commitOnline(field: "source" | "projectId" | "fileId", value: string, item: ModItemDto) {
+  editingOnline.value = null;
+  const next = value.trim();
+  const payload = {
+    item,
+    source: field === "source" ? next : item.source,
+    projectId: field === "projectId" ? next : item.projectId,
+    fileId: field === "fileId" ? next : item.fileId,
+  };
+  if (
+    payload.source === item.source &&
+    payload.projectId === item.projectId &&
+    payload.fileId === item.fileId
+  ) {
+    return;
+  }
+  emit("online-save", payload);
+}
 
 /** 这一行是不是正在编辑备注 */
 function isEditing(row: TableRow): boolean {
@@ -468,9 +528,34 @@ function onNoteEnter(event: KeyboardEvent) {
         {{ loaderNames(row.item.loaders) }}
       </span>
       <span class="mod-cell">{{ sideName(row.item.side) }}</span>
-      <span class="mod-cell">{{ sourceName(row.item.source) }}</span>
-      <span class="mod-cell" :title="row.item.projectId">{{ row.item.projectId }}</span>
-      <span class="mod-cell" :title="row.item.fileId">{{ row.item.fileId }}</span>
+      <!-- 下载源 / 项目编号 / 文件编号：双击就地改，见本文件 startOnline 的说明 -->
+      <span class="mod-cell mod-inline-cell" :title="row.depth === 1 ? t('resource.onlineDoubleClick') : ''"
+        @dblclick.stop="startOnline(row.item, 'source', $event)">
+        <select v-if="isEditingOnline(row, 'source')" class="field-select mod-inline-select" :value="row.item.source"
+          @change="commitOnline('source', ($event.target as HTMLSelectElement).value, row.item)" @blur="cancelOnline"
+          @keydown.esc.prevent="cancelOnline" @pointerdown.stop>
+          <option value="">—</option>
+          <option value="curseforge">CurseForge</option>
+          <option value="modrinth">Modrinth</option>
+        </select>
+        <template v-else>{{ sourceName(row.item.source) }}</template>
+      </span>
+      <span class="mod-cell mod-inline-cell"
+        :title="row.depth === 1 ? t('resource.onlineDoubleClick') : row.item.projectId"
+        :contenteditable="isEditingOnline(row, 'projectId') ? 'true' : undefined"
+        @dblclick.stop="startOnline(row.item, 'projectId', $event)"
+        @keydown.enter.prevent="commitOnline('projectId', ($event.target as HTMLElement).textContent ?? '', row.item)"
+        @keydown.esc.prevent="cancelOnline"
+        @blur="isEditingOnline(row, 'projectId') ? commitOnline('projectId', ($event.target as HTMLElement).textContent ?? '', row.item) : undefined"
+        @pointerdown.stop>{{ row.item.projectId }}</span>
+      <span class="mod-cell mod-inline-cell"
+        :title="row.depth === 1 ? t('resource.onlineDoubleClick') : row.item.fileId"
+        :contenteditable="isEditingOnline(row, 'fileId') ? 'true' : undefined"
+        @dblclick.stop="startOnline(row.item, 'fileId', $event)"
+        @keydown.enter.prevent="commitOnline('fileId', ($event.target as HTMLElement).textContent ?? '', row.item)"
+        @keydown.esc.prevent="cancelOnline"
+        @blur="isEditingOnline(row, 'fileId') ? commitOnline('fileId', ($event.target as HTMLElement).textContent ?? '', row.item) : undefined"
+        @pointerdown.stop>{{ row.item.fileId }}</span>
       <!-- 路径不挂 title：用户明确不要悬浮 -->
       <span class="mod-cell mod-path">{{ row.item.path }}</span>
       <span class="mod-cell" :title="row.item.author">{{ row.item.author }}</span>

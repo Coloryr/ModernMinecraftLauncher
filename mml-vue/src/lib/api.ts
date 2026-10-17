@@ -43,6 +43,8 @@ import type {
   LogFocusDto,
   LogSettingDto,
   McaChunkDto,
+  ModAutoMarkDto,
+  ModAutoMarkProgressDto,
   ModDepTreeDto,
   ModGroupDto,
   ModDuplicateDto,
@@ -54,6 +56,7 @@ import type {
   ModUpdateCheckDto,
   ModUpdateDoneDto,
   ModUpdateProgressDto,
+  ModPackUpdateDto,
   MotdDto,
   NbtEditDto,
   ModPackStatusDto,
@@ -79,7 +82,7 @@ import type {
   VersionInfoDto,
   ViewMode,
 } from "./bindings";
-import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress } from "./listens";
+import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress } from "./listens";
 
 export interface CreateInstanceOpts {
   loader?: string;
@@ -1755,6 +1758,17 @@ export function getImageBaseUrl(): Promise<string> {
 }
 
 /**
+ * mml-music 协议访问前缀
+ *
+ * # 返回值
+ *
+ * 自定义音乐协议的基础地址，配的是本地音频文件时拼给 `<audio>` 用（见 lib/music）
+ */
+export function getMusicBaseUrl(): Promise<string> {
+  return commands.main.musicBaseUrl();
+}
+
+/**
  * 核心加载状态
  *
  * # 返回值
@@ -1857,6 +1871,35 @@ export function modsUpdateCheck(uuid: string): Promise<ModUpdateCheckDto> {
  */
 export function modsUpdateApply(uuid: string, items: ModUpdateApplyDto[]): Promise<void> {
   return commands.resource.modsUpdateApply(uuid, items);
+}
+/**
+ * 查整合包有没有新版本
+ *
+ * - `uuid`: 实例 uuid
+ *
+ * # 返回值
+ *
+ * 见 `ModPackUpdateDto`；实例不是从平台安装的整合包时返回 err.notOnlineModpack
+ *
+ * 取项目下发布时间最晚的那份文件，**不按当前游戏版本过滤**：整合包升版常常连游戏版本
+ * 一起往上走，按现在的版本过滤会让这类升级永远查不出来
+ */
+export function modpackCheck(uuid: string): Promise<ModPackUpdateDto> {
+  return commands.resource.modpackCheck(uuid);
+}
+/**
+ * 把整合包升到平台上的新版本
+ *
+ * - `uuid`: 实例 uuid
+ * - `fileId`: 要升到的那份文件编号，取检查结果里的 `newFileId`
+ *
+ * # 返回值
+ *
+ * 任务登记成功就返回，升级在后台跑：进度走 `add-modpack-status` 事件
+ * （与「下载整合包」窗口同一套指示器与取消入口），跑完主窗口会刷新并选中这个实例
+ */
+export function modpackUpdate(uuid: string, fileId: string): Promise<void> {
+  return commands.resource.modpackUpdate(uuid, fileId);
 }
 /**
  * 模组扫描进度事件
@@ -2248,6 +2291,111 @@ export function listScreenshots(uuid: string): Promise<ScreenshotItemDto[]> {
  *
  * 文件进回收站
  */
+/**
+ * 重命名一个资源文件或目录
+ *
+ * - `uuid`: 实例 uuid
+ * - `kind`: 资源类别，见 useResourceOps 的 askRename
+ * - `parent`: 数据包的存档目录名，其余类别传空串
+ * - `name`: 现在的名字
+ * - `newName`: 新名字，只给名字本身
+ *
+ * # 返回值
+ *
+ * 名字非法、原目标不存在或新名字被占用时返回错误
+ */
+/**
+ * 导出服务器列表：把实例的 `servers.dat` 复制到指定位置
+ *
+ * - `uuid`: 实例 uuid
+ * - `path`: 导出到哪个文件
+ *
+ * # 返回值
+ *
+ * 源文件不存在或复制失败时返回错误
+ */
+export function exportServers(uuid: string, path: string): Promise<void> {
+  return commands.resource.serversExport(uuid, path);
+}
+
+/**
+ * 导入服务器列表：用选中的文件替换实例里那份
+ *
+ * - `uuid`: 实例 uuid
+ * - `path`: 要导入的文件
+ *
+ * # 返回值
+ *
+ * 文件不存在、复制失败或解析不通过时返回错误；后端会先备份，解析不通过自动还原
+ */
+export function importServers(uuid: string, path: string): Promise<void> {
+  return commands.resource.serversImport(uuid, path);
+}
+
+/**
+ * 手动改一条模组的在线信息：下载源 / 项目编号 / 文件编号
+ *
+ * - `uuid`: 实例 uuid
+ * - `modUuid`: 模组的 uuid
+ * - `source`: 下载源，取值 curseforge / modrinth / 空串（按项目号与文件号形态判定）
+ * - `projectId`: 项目编号，空串表示这条模组没有在线信息
+ * - `fileId`: 文件编号
+ *
+ * # 返回值
+ *
+ * 模组不在列表里、下载源取值不认识或写盘失败时返回错误
+ */
+/**
+ * 自动标记：按文件 SHA512 去 Modrinth 认模组，回填在线信息
+ *
+ * - `uuid`: 实例 uuid
+ * - `overwrite`: 是否连已有在线信息的模组一起重认
+ *
+ * # 返回值
+ *
+ * 见 `ModAutoMarkDto`：认出来的 / 没认出来的 / 读文件失败的条数
+ *
+ * 要现读每个 jar 算 SHA512（与扫描 mods 目录同一代价），进度见 `onModsAutoMarkProgress`
+ */
+export function autoMarkMods(uuid: string, overwrite: boolean): Promise<ModAutoMarkDto> {
+  return commands.resource.modsAutoMark(uuid, overwrite);
+}
+
+/**
+ * 自动标记进度事件
+ *
+ * - `cb`: 标记期间回调，形如 `x/x`
+ *
+ * # 返回值
+ *
+ * 取消监听的函数
+ */
+export function onModsAutoMarkProgress(
+  cb: (e: ModAutoMarkProgressDto) => void,
+): Promise<UnlistenFn> {
+  return listen<ModAutoMarkProgressDto>(ResourceModsAutoMarkProgress, (e) => cb(e.payload));
+}
+
+export function setModOnline(
+  uuid: string,
+  modUuid: string,
+  source: string,
+  projectId: string,
+  fileId: string,
+): Promise<void> {
+  return commands.resource.modOnlineSet(uuid, modUuid, source, projectId, fileId);
+}
+
+export function renameResource(
+  uuid: string,
+  kind: string,
+  parent: string,
+  name: string,
+  newName: string,
+): Promise<void> {
+  return commands.resource.rename(uuid, kind, parent, name, newName);
+}
+
 export function deleteScreenshot(uuid: string, name: string): Promise<void> {
   return commands.resource.deleteScreenshot(uuid, name);
 }

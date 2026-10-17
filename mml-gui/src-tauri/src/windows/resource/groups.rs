@@ -364,6 +364,7 @@ pub fn resource_mod_group_order_set(uuid: String, order: Vec<String>) {
         let probe = crate::gui_setting::GameModSettingObj {
             groups: mods.groups.clone(),
             mod_name: Default::default(),
+            mod_source: Default::default(),
             group_order: order,
             group_collapsed: Default::default(),
         };

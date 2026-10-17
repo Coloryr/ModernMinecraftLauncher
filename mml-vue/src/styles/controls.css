@@ -19,8 +19,12 @@
  *
  * 存量类名（各窗口手写的小按钮外观，与上面同一角色；改到所在文件时请换成上面的写法，
  * 新代码不要再出现）：
- *   .page-btn .mini-btn .files-btn .install-btn .mp-cancel .mp-clear-btn .res-clear-btn
- *   .refresh-btn .pager-btn .pack-star .retry-btn .line-add .line-del .icon-btn .card-act
+ *   .mini-btn .files-btn .install-btn .mp-cancel .mp-clear-btn .res-clear-btn
+ *   .refresh-btn .pack-star .retry-btn .line-add .line-del .icon-btn .card-act
+ *
+ * 它们**尺寸与字面已经对齐**（高度一律 --ctl-h，字号 --ctl-font，字重 600，圆角 --ctl-radius，
+ * 禁用 0.5），差的是悬停反馈：这一批走"描边变强调色"，.ui-btn 走"底色变 hover"。
+ * 分页按钮已收编：`.page-btn` 只在本文件定义一份（原先三个窗口各写一份，字号 / 圆角 / 禁用态都不同）。
  */
 
 /* 控件高度：全 app 一档 32px = 行高 20 + 上下内边距 5×2 + 上下边框 1×2。
@@ -354,6 +358,34 @@ select.field-select {
   padding: 13px 30px;
 }
 
+/* 分页按钮：列表分页条上的上一页 / 下一页。与 .ui-btn .v-plain .s-sm 同一副外观，
+   只是这里是裸 <button>；三个窗口共用这一份，别再各写一遍（曾经三份副本，
+   字号 12 / 圆角 8 / 禁用 0.4 各不相同） */
+.page-btn {
+  height: var(--ctl-h);
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--ctl-radius);
+  background: var(--bg-raised);
+  color: var(--text-dim);
+  font-size: var(--ctl-font);
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.page-btn:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* 图标按钮：方形、无边框，悬停才出底 */
 .ui-btn-icon {
   display: inline-flex;
@@ -379,7 +411,8 @@ select.field-select {
 .v-primary {
   background: var(--accent-grad);
   color: #fff;
-  box-shadow: 0 4px 14px rgba(79, 140, 255, 0.22);
+  /* 光晕跟着强调色走：写死默认蓝的话，换强调色主题（黄 / 绿 / 粉 …）就露馅 */
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .v-primary:hover {
@@ -413,13 +446,13 @@ select.field-select {
 }
 
 .v-danger {
-  background: rgba(255, 95, 86, 0.14);
+  background: color-mix(in srgb, var(--red) 14%, transparent);
   color: var(--red);
-  border: 1px solid rgba(255, 95, 86, 0.4);
+  border: 1px solid color-mix(in srgb, var(--red) 40%, transparent);
 }
 
 .v-danger:hover {
-  background: rgba(255, 95, 86, 0.24);
+  background: color-mix(in srgb, var(--red) 24%, transparent);
 }
 
 .v-ghost {

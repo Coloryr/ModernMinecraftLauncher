@@ -28,6 +28,8 @@ import ListSkeleton from "./ListSkeleton.vue";
 import ResourceRow from "./ResourceRow.vue";
 import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
 import SaveTabs from "./SaveTabs.vue";
+import VirtualList from "./VirtualList.vue";
+import { RESOURCE_ROW_GAP } from "../composables/useVirtualRows";
 import { useRowSelect } from "../composables/useRowSelect";
 import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceOps } from "../composables/useResourceOps";
@@ -125,6 +127,7 @@ function itemMenuItems(item: SaveItemDto): RowMenuItem[] {
   ];
   // 有备份才给还原入口：没有备份的存档点还原只会弹一句"还没有备份"
   if (item.backups) items.push({ id: "restore", label: t("resource.restore") });
+  items.push({ id: "rename", label: t("resource.rename"), separated: true });
   items.push({ id: "open-folder", label: t("resource.openFolder"), separated: true });
   items.push({ id: "remove", label: t("resource.delete"), danger: true, separated: true });
   return items;
@@ -175,6 +178,9 @@ function onMenuPick(id: string) {
       break;
     case "restore":
       openRestore(item);
+      break;
+    case "rename":
+      props.ops.askRename("saves", item.dir);
       break;
     case "open-folder":
       openFolder("saves", item.dir);
@@ -441,36 +447,38 @@ function saveTip(item: SaveItemDto): string {
   <div v-if="loading" class="item-list">
     <ListSkeleton />
   </div>
-  <div v-else class="item-list">
-    <ResourceRow v-for="item in saves" :key="item.dir" :icon="item.icon" :name="item.levelName || item.dir"
-      v-tip.mouse="saveTip(item)" :class="{
-        'row-selected': isSelected(item),
-        'row-anchor': anchorKey === item.dir,
-        'row-selecting': selected.size > 0,
-      }" @click="onRowClick({ event: $event, item })" @contextmenu.prevent="openMenu({ event: $event, item })">
-      <!-- 多选勾选框，与模组列表同一套，见 useRowSelect -->
-      <template #select>
-        <input type="checkbox" class="row-select" :checked="isSelected(item)" @pointerdown.stop
-          @change.stop="toggle(item)" @click.stop />
-      </template>
-      <!-- 存档名可以带 `§` 格式码（地图作者常用来上色），过一遍显示期解析 -->
-      <template #name>
-        <FormattedText :text="item.levelName || item.dir" />
-      </template>
-      <template #badges>
-        <span v-if="item.broken" class="badge badge-red">{{ t("resource.broken") }}</span>
-        <span v-if="item.hardCore" class="badge badge-red">Hardcore</span>
-        <!-- 有备份才给还原入口：没有备份的存档点还原只会弹一句"还没有备份" -->
-        <span v-if="item.backups" class="badge">
-          {{ t("resource.backupCount", { n: item.backups }) }}
-        </span>
-      </template>
-      <template #sub>
-        {{ item.dir }} · {{ t("resource.lastPlayed", { time: formatTime(item.lastPlayed) }) }}
-      </template>
-    </ResourceRow>
-    <div v-if="!saves.length" class="empty-tip">{{ t("resource.empty") }}</div>
-  </div>
+  <VirtualList v-else class="item-list" :count="saves.length" :row-gap="RESOURCE_ROW_GAP">
+    <template #default="{ start, end }">
+      <ResourceRow v-for="item in saves.slice(start, end)" :key="item.dir" :icon="item.icon" :name="item.levelName || item.dir"
+        v-tip.mouse="saveTip(item)" :class="{
+          'row-selected': isSelected(item),
+          'row-anchor': anchorKey === item.dir,
+          'row-selecting': selected.size > 0,
+        }" @click="onRowClick({ event: $event, item })" @contextmenu.prevent="openMenu({ event: $event, item })">
+        <!-- 多选勾选框，与模组列表同一套，见 useRowSelect -->
+        <template #select>
+          <input type="checkbox" class="row-select" :checked="isSelected(item)" @pointerdown.stop
+            @change.stop="toggle(item)" @click.stop />
+        </template>
+        <!-- 存档名可以带 `§` 格式码（地图作者常用来上色），过一遍显示期解析 -->
+        <template #name>
+          <FormattedText :text="item.levelName || item.dir" />
+        </template>
+        <template #badges>
+          <span v-if="item.broken" class="badge badge-red">{{ t("resource.broken") }}</span>
+          <span v-if="item.hardCore" class="badge badge-red">Hardcore</span>
+          <!-- 有备份才给还原入口：没有备份的存档点还原只会弹一句"还没有备份" -->
+          <span v-if="item.backups" class="badge">
+            {{ t("resource.backupCount", { n: item.backups }) }}
+          </span>
+        </template>
+        <template #sub>
+          {{ item.dir }} · {{ t("resource.lastPlayed", { time: formatTime(item.lastPlayed) }) }}
+        </template>
+      </ResourceRow>
+      <div v-if="!saves.length" class="empty-tip">{{ t("resource.empty") }}</div>
+    </template>
+  </VirtualList>
 
   <!-- 行右键菜单：单行与批量共用，菜单项见 itemMenuItems / batchMenuItems -->
   <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title" @pick="onMenuPick"

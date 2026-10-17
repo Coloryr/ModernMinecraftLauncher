@@ -2,15 +2,19 @@
 // 滚动条长度与滚动位置都不变。
 //
 // 不引现成库：这里的分组头、拖拽排序、右键菜单都是现成结构，需要的只是"少渲染几行"。
-// 窗口怎么算是纯算术（见 virtualWindow.ts），这一层只管 P 滚动状态与元素位置。
+// 窗口怎么算是纯算术（见 virtualWindow.ts），这一层只管滚动状态与元素位置。
+//
+// 两种用法：
+// - 资源窗口的模组页：一份滚动状态 provide 给同页各分组，每组各算各的窗口，见 `provideListScroll`
+// - 通用列表：容器与行都在组件自己手里，见 parts/VirtualList.vue，用 `createListScroll`
 import { computed, inject, onBeforeUnmount, provide, ref, shallowRef, type Ref } from "vue";
 
 import { visibleWindow, type VirtualWindow } from "./virtualWindow";
 
-export { MOD_ROW_GAP, MOD_ROW_H, MOD_TR_H, visibleWindow } from "./virtualWindow";
+export { LIST_ROW_GAP, LIST_ROW_H, RESOURCE_ROW_GAP, TABLE_ROW_H, visibleWindow } from "./virtualWindow";
 export type { VirtualWindow } from "./virtualWindow";
 
-/** 列表滚动状态，由资源窗口的模组页建立并 provide */
+/** 列表滚动状态：谁滚动谁持有，行虚拟化靠它重算窗口 */
 export interface ListScrollState {
   /** 滚动容器的滚动位置，单位 px */
   top: Ref<number>;
@@ -36,16 +40,16 @@ export interface ListScrollState {
 const LIST_SCROLL = Symbol("resource-list-scroll");
 
 /**
- * 建立列表滚动状态并 provide 给同页的各分组
+ * 建一份列表滚动状态，不 provide
  *
- * 滚动事件很密，一帧只同步一次：各组分的窗口计算都读同一个 `top`，
- * 免得每个分组各自监听、各自算一遍。
+ * 给"容器与行都在自己手里"的组件用（[VirtualList]）；模组页那种一份状态管多个分组、
+ * 靠 provide / inject 传的用法见 [`provideListScroll`]。
  *
  * # 返回值
  *
- * 见 [`ListScrollState`]；调用方把它绑到当前视图的滚动容器上
+ * 见 [`ListScrollState`]；调用方把它绑到当前那个滚动容器上
  */
-export function provideListScroll(): ListScrollState {
+export function createListScroll(): ListScrollState {
   const top = ref(0);
   const height = ref(0);
   const container = shallowRef<HTMLElement | null>(null);
@@ -88,9 +92,42 @@ export function provideListScroll(): ListScrollState {
   const bump = () => {
     version.value += 1;
   };
-  const state: ListScrollState = { top, height, container, version, attach, bump };
+  return { top, height, container, version, attach, bump };
+}
+
+/**
+ * 建立列表滚动状态并 provide 给同页的各分组
+ *
+ * 滚动事件很密，一帧只同步一次：各组分的窗口计算都读同一个 `top`，
+ * 免得每个分组各自监听、各自算一遍。
+ *
+ * # 返回值
+ *
+ * 见 [`ListScrollState`]；调用方把它绑到当前视图的滚动容器上
+ */
+export function provideListScroll(): ListScrollState {
+  const state = createListScroll();
   provide(LIST_SCROLL, state);
   return state;
+}
+
+/**
+ * 量一行的高度
+ *
+ * 行高不一致的列表（更新弹窗里名字会换行的那几条）用不了固定行高：渲染出来之后量第一行，
+ * 拿它当行高的估值，见 VirtualList 的 `measure-row`。
+ *
+ * - `root`: 行容器的根元素
+ * - `fallback`: 量不到时用的值，单位 px
+ *
+ * # 返回值
+ *
+ * 第一行的高度，单位 px
+ */
+export function measureRowHeight(root: HTMLElement | null, fallback: number): number {
+  const first = root?.firstElementChild as HTMLElement | null;
+  const height = first?.offsetHeight ?? 0;
+  return height > 0 ? height : fallback;
 }
 
 /**
@@ -101,10 +138,11 @@ export function provideListScroll(): ListScrollState {
  *
  * - `root`: 行容器的根元素
  * - `count`: 行数
- * - `rowH`: 行高，单位 px，与 CSS 里钉死的一致
- * - `gap`: 行间距，单位 px；默认 0
+ * - `rowH`: 行高，单位 px，与 CSS 里钉死的一致；给函数则每次重算时取一次（量出来的行高）
+ * - `gap`: 行间距，单位 px；默认 0，同样可以给函数
  * - `whole`: 返回 true 时**整列都渲染**（不做窗口）—— 表格里正在就地编辑备注时用：
  *   被窗口裁掉的那一行会连元素一起销毁，正在写的草稿就丢了
+ * - `scroll`: 滚动状态；不给就用上层 provide 的那份（模组页走 provide）
  *
  * # 返回值
  *
@@ -113,11 +151,13 @@ export function provideListScroll(): ListScrollState {
 export function useVirtualRows(options: {
   root: Ref<HTMLElement | null>;
   count: () => number;
-  rowH: number;
-  gap?: number;
+  rowH: number | (() => number);
+  gap?: number | (() => number);
   whole?: () => boolean;
+  scroll?: ListScrollState;
 }) {
-  const scroll = inject<ListScrollState | null>(LIST_SCROLL, null);
+  const injected = inject<ListScrollState | null>(LIST_SCROLL, null);
+  const scroll = options.scroll ?? injected;
 
   const win = computed<VirtualWindow>(() => {
     // 依赖布局代次：折叠 / 过滤 / 排序之后各组的位置变了，得重量
@@ -135,13 +175,15 @@ export function useVirtualRows(options: {
       rootEl.getBoundingClientRect().top -
       containerEl.getBoundingClientRect().top +
       containerEl.scrollTop;
+    const rowH = typeof options.rowH === "function" ? options.rowH() : options.rowH;
+    const gap = typeof options.gap === "function" ? options.gap() : (options.gap ?? 0);
     return visibleWindow({
       scrollTop: scroll.top.value,
       viewHeight: scroll.height.value,
       rootTop,
       count,
-      rowH: options.rowH,
-      gap: options.gap ?? 0,
+      rowH,
+      gap,
     });
   });
 

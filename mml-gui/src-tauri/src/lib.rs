@@ -29,6 +29,7 @@ pub mod gui_config;
 pub mod gui_setting;
 pub mod image_manager;
 pub mod log_text;
+pub mod music;
 pub mod windows;
 
 /// 单元测试的共用启动，内核单例每进程只 boot 一次，见 AGENTS.md §6
@@ -81,6 +82,13 @@ pub fn run() {
                 windows::custom_home::url_custom_home(request, responder).await;
             });
         })
+        // 自定义音乐：读文件是阻塞 IO，丢到阻塞线程，别占住协议回调
+        .register_asynchronous_uri_scheme_protocol(
+            music::MUSIC_SCHEME,
+            move |_app, request, responder| {
+                tauri::async_runtime::spawn_blocking(move || music::url_music(request, responder));
+            },
+        )
         .plugin(tauri_plugin_dialog::init())
         .on_window_event(windows::on_window_event)
         .setup(|app| {

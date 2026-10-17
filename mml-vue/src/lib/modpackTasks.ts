@@ -100,8 +100,11 @@ export function useModpackStatus(
         // 这里有多份订阅，各自判定稍有偏差就会弹两条。去重键带任务 uuid，
         // 同时装完两个同名整合包是两件事，不会被误吞
         if (shouldToast(own, e.windowOpen)) {
+          // 升级也是同一个任务表：换个说法，别把"更新完成"说成"安装完成"
           showToast(
-            t("modpack.installDone", { name: task.name }),
+            t(task.kind === "upgrade" ? "modpack.upgradeDone" : "modpack.installDone", {
+              name: task.name,
+            }),
             2200,
             `modpack-done:${task.uuid}`,
           );

@@ -3,11 +3,13 @@
 // 改动经 update 事件走 IPC 写入核心实例配置；刷新按钮与添加实例窗口同逻辑
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { t, tErr } from "../lib/i18n";
-import { api, onAddLoaderProgress } from "../lib/api";
+import { api, modpackCheck, modpackUpdate, onAddLoaderProgress } from "../lib/api";
 import { showToast } from "../lib/toast";
 import BaseButton from "./ui/BaseButton.vue";
+import GlyphIcon from "./ui/GlyphIcon.vue";
+import ModPackUpdateModal from "./ModPackUpdateModal.vue";
 import LoaderQueryProgress from "./LoaderQueryProgress.vue";
-import type { InstanceInfoDto, VersionInfoDto } from "../lib/bindings";
+import type { InstanceInfoDto, ModPackUpdateDto, VersionInfoDto } from "../lib/bindings";
 
 const props = defineProps<{
   /** 当前实例 */
@@ -50,6 +52,60 @@ function typeName(vt: string): string {
 // 版本清单里旧版拆成 old_beta / old_alpha，统一归并成 other
 function normType(vt: string): string {
   return vt === "old_beta" || vt === "old_alpha" ? "other" : vt;
+}
+
+// ================= 整合包更新 =================
+
+/** 这个实例是不是从平台安装的整合包：本地导入的包没有项目号，问不了平台 */
+const onlineModpack = computed(
+  () => props.instance.modpackType === "curseforge" || props.instance.modpackType === "modrinth",
+);
+
+/** 查更新 / 登记升级任务期间置真 */
+const packBusy = ref(false);
+/** 查到的新版本；null = 没在问 */
+const packResult = ref<ModPackUpdateDto | null>(null);
+
+/**
+ * 查整合包更新
+ *
+ * 查到就开确认弹窗（见 ModPackUpdateModal），没查到给一条轻提示，不留空窗。
+ * 入口在这一层而不是资源窗口：升级动的是整个实例。
+ */
+async function checkModpack() {
+  if (packBusy.value || !onlineModpack.value) return;
+  packBusy.value = true;
+  try {
+    const result = await modpackCheck(props.instance.uuid);
+    if (!result.hasUpdate) {
+      showToast(t("detail.modpackUpToDate"));
+      return;
+    }
+    packResult.value = result;
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    packBusy.value = false;
+  }
+}
+
+/**
+ * 确认更新：把任务登记到后端，进度在标题栏 / 整合包任务里看
+ *
+ * - `fileId`: 要升到的那份文件编号，取检查结果里的 `newFileId`
+ */
+async function applyModpackUpdate(fileId: string) {
+  if (packBusy.value) return;
+  packBusy.value = true;
+  try {
+    await modpackUpdate(props.instance.uuid, fileId);
+    packResult.value = null;
+    showToast(t("detail.modpackUpdating"));
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    packBusy.value = false;
+  }
 }
 
 // ================= 版本类型 + 版本 =================
@@ -382,13 +438,22 @@ function onPlatformChange(value: string) {
         <input class="field-input" :value="instance.serverUrl ?? ''" :placeholder="t('add.url')" spellcheck="false"
           @input="change({ serverUrl: ($event.target as HTMLInputElement).value || null })" />
       </div>
-      <!-- ID 平台：项目 / 文件 ID 等宽并排 -->
+      <!-- ID 平台：项目 / 文件 ID 与"检查整合包更新"同一行。
+           更新按钮只给从平台安装的整合包（本地导入的包没有项目号，问不了平台），
+           只有图标、文案走悬停提示，与这一栏的其它小按钮一致 -->
       <div v-else-if="instance.modpackType && instance.modpackType !== 'none'" class="modpack-ids">
         <input class="field-input" :value="instance.pid ?? ''" :placeholder="t('meta.pid')" spellcheck="false"
           @input="change({ pid: ($event.target as HTMLInputElement).value || null })" />
         <input class="field-input" :value="instance.fid ?? ''" :placeholder="t('meta.fid')" spellcheck="false"
           @input="change({ fid: ($event.target as HTMLInputElement).value || null })" />
+        <BaseButton v-if="onlineModpack" size="sm" variant="ghost" :disabled="packBusy"
+          v-tip="t('detail.modpackCheck')" :aria-label="t('detail.modpackCheck')" @click="checkModpack">
+          <GlyphIcon name="update" :size="14" :weight="1.8" />
+        </BaseButton>
       </div>
+      <!-- 整合包更新的确认窗：查到新版本才开 -->
+      <ModPackUpdateModal v-if="packResult" :result="packResult" @update="applyModpackUpdate"
+        @close="packResult = null" />
     </template>
   </div>
 </template>
@@ -458,6 +523,7 @@ function onPlatformChange(value: string) {
 }
 
 /* 在线网络整合包网址输入框 */
+
 .modpack-url {
   grid-column: 3 / 5;
   display: flex;

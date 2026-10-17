@@ -904,6 +904,16 @@ async fn upgrade_modpack_end_to_end_matches_new_manifest() {
     .expect("升级整合包失败");
     eprintln!("[e2e] 升级完成，开始断言");
 
+    // ① 实例要记到新版本上：更新检查按 pid / fid 比对，不记的话下次还会报同一个更新
+    {
+        let installed = game.read().unwrap();
+        let fid = installed.fid.clone();
+        let pid = installed.pid.clone();
+        assert_eq!(fid.as_deref(), Some(new_ver_mut.id.as_str()));
+        assert_eq!(pid.as_deref(), Some(new_ver_mut.project_id.as_str()));
+    }
+    eprintln!("[e2e] 实例已记到新版本 {}", new_ver_mut.id);
+
     // ② 新清单里的每个文件都在磁盘上，即该下的下了
     let mut missing = Vec::new();
     for path in index_paths(&new_index) {

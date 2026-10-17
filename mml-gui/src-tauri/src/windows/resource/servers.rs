@@ -2,6 +2,8 @@
 //!
 //! 读写 `servers.dat`，即 NBT 格式，由内核 `InstanceSettingObj` 的 server 方法承担。
 
+use std::path::Path;
+
 use crate::dtos::ServerItemDto;
 use crate::err_keys;
 
@@ -129,4 +131,65 @@ pub fn resource_server_delete(uuid: String, name: String, ip: String) -> Result<
         .unwrap()
         .remove_server(&name, &ip)
         .map_err(|err| err.to_string())
+}
+
+/// 导出服务器列表：把实例的 `servers.dat` 复制到指定位置
+///
+/// - `uuid`: 实例 uuid
+/// - `path`: 导出到哪个文件，由前端文件保存框给
+///
+/// # 返回值
+///
+/// 只表示成功 / 失败：源文件不存在或复制失败返回错误串
+#[gui_macros::ipc_group("resource")]
+#[tauri::command]
+pub fn resource_servers_export(uuid: String, path: String) -> Result<(), String> {
+    let instance = parse_instance(&uuid)?;
+    let source = instance.read().unwrap().get_servers_file();
+    if !source.exists() {
+        return Err(err_keys::FILE_NOT_FOUND.to_string());
+    }
+    std::fs::copy(&source, &path).map_err(|err| err.to_string())?;
+    Ok(())
+}
+
+/// 导入服务器列表：用选中的 `servers.dat` 替换实例里那份
+///
+/// **先备份再替换，解析不通过就还原**：导入的是外部文件，格式对不对只有解析一次才知道，
+/// 直接把用户原来的列表覆盖掉不太合适。备份落在同目录的 `servers.dat.bak`。
+///
+/// - `uuid`: 实例 uuid
+/// - `path`: 要导入的文件，由前端文件选择框给
+///
+/// # 返回值
+///
+/// 只表示成功 / 失败：源文件不存在、复制失败或解析不通过（已还原）返回错误串
+#[gui_macros::ipc_group("resource")]
+#[tauri::command]
+pub fn resource_servers_import(uuid: String, path: String) -> Result<(), String> {
+    let instance = parse_instance(&uuid)?;
+    let target = instance.read().unwrap().get_servers_file();
+    let source = Path::new(&path);
+    if !source.is_file() {
+        return Err(err_keys::FILE_NOT_FOUND.to_string());
+    }
+
+    // 备份旧文件；原来没有就不用备份，还原时删掉新文件即可
+    let backup = target.with_extension("dat.bak");
+    let had_old = target.exists();
+    if had_old {
+        std::fs::copy(&target, &backup).map_err(|err| err.to_string())?;
+    }
+
+    std::fs::copy(source, &target).map_err(|err| err.to_string())?;
+    // 解析一次，确认这份文件真的是服务器列表
+    if let Err(err) = instance.read().unwrap().get_server_infos() {
+        if had_old {
+            let _ = std::fs::copy(&backup, &target);
+        } else {
+            let _ = std::fs::remove_file(&target);
+        }
+        return Err(err.to_string());
+    }
+    Ok(())
 }

@@ -190,6 +190,10 @@ export interface ClientConfig {
   lockInstance: string;
   /** 自定义主页面：启用后主窗口的启动器主页换成导入的页面 */
   customHome: boolean;
+  /** 自定义音乐：启用后主窗口播放 `musicSource` */
+  musicOn: boolean;
+  /** 自定义音乐来源：本地音频文件路径或 http(s) 直链，空串表示没配 */
+  musicSource: string;
 }
 
 export interface GuiConfig {
@@ -366,6 +370,9 @@ export function defaultConfig(): GuiConfig {
       motdServer: readString(KEYS.motdServer),
       lockInstance: readString(KEYS.lockInstance),
       customHome: readFlag(KEYS.customHome),
+      // 自定义音乐：不给 localStorage 兜底，缺省就是没配
+      musicOn: false,
+      musicSource: "",
     },
     font: readString(KEYS.font),
     skin: {

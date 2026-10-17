@@ -292,6 +292,17 @@ pub fn main_image_base_url() -> String {
     image_manager::image_base_url().to_string()
 }
 
+/// `mml-music` 协议访问前缀，前端拼自定义音乐地址用
+///
+/// # 返回值
+///
+/// 自定义音乐协议的基础地址
+#[gui_macros::ipc_group("main")]
+#[tauri::command]
+pub fn main_music_base_url() -> String {
+    crate::music::music_base_url().to_string()
+}
+
 /// 核心加载状态，前端兜底：启动太快时 load-done 事件会先于页面监听发出而被错过
 ///
 /// # 返回值

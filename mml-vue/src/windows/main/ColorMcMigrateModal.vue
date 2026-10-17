@@ -281,12 +281,12 @@ async function restart() {
 }
 
 .tag.ok {
-  background: rgba(34, 197, 94, 0.14);
+  background: color-mix(in srgb, var(--green) 14%, transparent);
   color: var(--green);
 }
 
 .tag.partial {
-  background: rgba(234, 179, 8, 0.16);
+  background: color-mix(in srgb, var(--yellow) 16%, transparent);
   color: var(--yellow, var(--text));
 }
 
