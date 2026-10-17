@@ -239,6 +239,9 @@
 
 /* 实例详情分支的包裹层：复刻 .detail 的纵向 flex 间距，避免包一层后间距丢失 */
 .detail-content {
+  /* 撑满 .detail 剩下的高度：未选中实例时里面只有一个 .placeholder，
+     它靠 flex:1 上下居中 —— 这一层不撑开，提示语就贴在顶部 */
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 16px;

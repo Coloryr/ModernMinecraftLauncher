@@ -3,7 +3,7 @@
 // 头部整条可拖动，两端按平台样式放窗口按钮；「返回主页面」按钮只在单窗口模式下显示。
 import { computed, ref } from "vue";
 import { t } from "../../lib/i18n";
-import { multiWindow } from "../../windows/windowManager";
+import { currentKind, multiWindow } from "../../windows/windowManager";
 import WindowControls from "./WindowControls.vue";
 import ModpackTitleIndicator from "../ModpackTitleIndicator.vue";
 import DownloadTitleIndicator from "../DownloadTitleIndicator.vue";
@@ -37,6 +37,17 @@ const props = defineProps<{
   /** 是否显示下载进度指示（默认显示）。下载窗口整页就是下载管理，同样关掉 */
   hideDownloadIndicator?: boolean;
 }>();
+
+/**
+ * 下载 / 整合包两个进度指示器挂在下载整合包窗口与**资源管理窗口**
+ *
+ * 资源管理里的"更新模组"也要下载，在那里能直接看到进度；其它窗口没必要挂。
+ * 下载整合包窗口关掉之后它们回主页面，见 MainTopbar 的 modpackWindowOpen。
+ */
+const showTaskIndicators = computed(() => {
+  const kind = currentKind.value;
+  return kind === "add_modpack" || kind === "resource";
+});
 
 const emit = defineEmits<{
   /** 返回按钮：单窗口模式下回上一层 */
@@ -93,8 +104,8 @@ const { decorated } = useWindowDecoration(rootEl);
            标题栏，主页面才是 MainTopbar，所以这里照样得挂 —— 之前只在 multiWindow 时挂，
            结果从"下载整合包"返回"添加实例"后两个指示器都不见了。
            没有任务时各自整块不存在 -->
-      <ModpackTitleIndicator v-if="!hideModpackIndicator" />
-      <DownloadTitleIndicator v-if="!hideDownloadIndicator" />
+      <ModpackTitleIndicator v-if="showTaskIndicators && !hideModpackIndicator" />
+      <DownloadTitleIndicator v-if="showTaskIndicators && !hideDownloadIndicator" />
       <ResourceTitleIndicator />
       <!-- 自定义音乐：只有持有播放器的那个窗口会画出来（多窗口模式 = 主窗口） -->
       <MusicTitleIndicator />

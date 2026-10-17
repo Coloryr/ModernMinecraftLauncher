@@ -29,9 +29,8 @@ use super::geometry::{
     save_window_state, window_state_for,
 };
 use super::registry::{
-    ADD_MODPACK_WINDOW_UUID, ADD_WINDOW_UUID, BLOCK_WINDOW_UUID, DOWNLOAD_WINDOW_UUID,
-    MAIN_WINDOW_UUID, WINDOWS_INFO, family_of_label, min_size_of_label, uuid_for_kind,
-    uuid_of_label,
+    ADD_MODPACK_WINDOW_UUID, ADD_WINDOW_UUID, BLOCK_WINDOW_UUID, MAIN_WINDOW_UUID,
+    WINDOWS_INFO, family_of_label, min_size_of_label, uuid_for_kind, uuid_of_label,
 };
 use super::{add_modpack, block, resource};
 
@@ -236,10 +235,8 @@ pub(super) fn remove_window_model(uuid: &Uuid) {
 ///
 /// 拒绝本次关闭时为真
 pub(super) fn close_guarded(uuid: &Uuid) -> bool {
-    // 下载窗口：任务未清空时不让直接关，避免后台下载被静默中断
-    if *uuid == DOWNLOAD_WINDOW_UUID {
-        return !mml_downloader::get_tasks().is_empty();
-    }
+    // 下载窗口：**不拦**。它只是个查看器，关掉不影响下载（任务在后台跑），
+    // 进度从标题栏的下载指示器进来还能看；拦着只会让用户以为非关不可
 
     // 主窗口：关它就是退出应用。单窗口模式下主窗口是唯一的真实窗口，任何页面的 ✕
     // 最后都落到这里；多窗口模式下关主窗口同样是退出。两种情况都会连带停掉下载，
@@ -266,12 +263,25 @@ pub(super) fn close_guarded(uuid: &Uuid) -> bool {
     model.lock().unwrap().close_guard()
 }
 
+/// 下载整合包窗口开 / 关时广播一次整合包总览
+///
+/// 总览里的 `window_open` 决定主窗口标题栏还要不要挂下载 / 整合包那两个进度指示器：
+/// 那个窗口开着就只在它那边显示，关掉之后才回到主页面。
+///
+/// - `app`: 应用句柄，广播用它
+fn notify_modpack_window(app: &AppHandle) {
+    let dto = super::modpack_task::build_status(app);
+    super::modpack_task::emit_add_modpack_status(app, dto);
+}
+
 /// 关闭被拒绝事件：窗口处于关闭保护时前端弹提示说明原因
 ///
 /// - `window`: 被拒绝关闭的窗口，事件只发给它
 #[gui_macros::emit]
 pub(crate) fn emit_close_blocked(window: &tauri::Window<tauri::Wry>) {
-    let _ = window.emit_to(window.label(), listens::CLOSE_BLOCKED, ());
+    // 负载带上被拦窗口的标签：前端只认发给自己的那一条，别的窗口不该跟着弹
+    let label = window.label().to_string();
+    let _ = window.emit_to(window.label(), listens::CLOSE_BLOCKED, label);
 }
 
 /// 创建或聚焦一个窗口
@@ -401,6 +411,10 @@ pub(super) fn create_window(
 
     OPEN_WINDOWS.write().unwrap().insert(*uuid, win.clone());
     ensure_window_model(uuid);
+    // 下载整合包窗口开出来就广播一次总览：主窗口据此把下载 / 整合包两个进度指示器让给它
+    if *uuid == ADD_MODPACK_WINDOW_UUID {
+        notify_modpack_window(app);
+    }
     // 开窗即记录初始几何，文件始终反映当前所有窗口，后续缩放/移动会持续更新。
     // 带上 restore_maximized：下面 maximize() 触发的 Resized 会被跳过，最大化时不记几何，
     // 否则文件里的最大化标志会被这次初始保存清掉。
@@ -643,6 +657,10 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
             // 关闭已放行：终止该窗口还在跑的操作 —— 整合包搜索、模组扫描 / 更新检查 / 下载更新
             add_modpack::cancel_search(&label);
             resource::cancel_window(&label);
+            // 下载整合包窗口关掉：那两个进度指示器要回到主页面，广播一次让 `window_open` 变 false
+            if uuid == ADD_MODPACK_WINDOW_UUID {
+                notify_modpack_window(window.app_handle());
+            }
             if let Some(win) = window.app_handle().get_webview_window(&label) {
                 // 最大化 / 全屏：只记标志、不覆盖几何，否则下次会开在另一块屏、而且不最大化
                 let maximized =

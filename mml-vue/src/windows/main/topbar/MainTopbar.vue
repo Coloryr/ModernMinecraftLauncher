@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // 主窗口顶部栏：同时充当自绘标题栏（整条可拖动，两端放窗口按钮）
 // 布局：品牌 + 主页切换 + 功能入口 + 主题切换 + 账户选择
+import { computed, onMounted, onUnmounted } from "vue";
 import { t } from "../../../lib/i18n";
 import AccountSelector from "../../../components/AccountSelector.vue";
 import WindowControls from "../../../components/ui/WindowControls.vue";
@@ -8,6 +9,7 @@ import ModpackTitleIndicator from "../../../components/ModpackTitleIndicator.vue
 import DownloadTitleIndicator from "../../../components/DownloadTitleIndicator.vue";
 import ResourceTitleIndicator from "../../../components/ResourceTitleIndicator.vue";
 import { onTitleBarPointerDown, titleBarStyle } from "../../../lib/titlebar";
+import { useModpackStatus } from "../../../lib/modpackTasks";
 import { pluginDecorated } from "../../../lib/decoration";
 import type { AccountStoreDto } from "../../../lib/bindings";
 import type { FeatureId } from "../types";
@@ -22,6 +24,22 @@ defineProps<{
   /** 可切换的账户列表，来自共享存储 */
   accounts: AccountStoreDto[];
 }>();
+
+// 下载 / 整合包两个进度指示器默认挂在下载整合包窗口，那个窗口关着时才回到这里。
+// 单窗口模式下它只是应用内的一页，`windowOpen` 恒为 false，由那一页自己挂
+const { status: modpackStatus, init: initModpackStatus } = useModpackStatus(false);
+let unsubModpack: (() => void) | null = null;
+
+onMounted(async () => {
+  unsubModpack = await initModpackStatus();
+});
+
+onUnmounted(() => {
+  unsubModpack?.();
+});
+
+/** 下载整合包窗口是否还开着 */
+const modpackWindowOpen = computed(() => !!modpackStatus.value?.windowOpen);
 
 /** 顶栏动作，一律抛给主窗口执行 */
 const emit = defineEmits<{
@@ -53,8 +71,8 @@ const emit = defineEmits<{
            主页面在两种窗口模式下都是这个顶栏，所以两种模式都挂；
            功能页用的是 WindowFrame 那套标题栏，那边也有同名组件，跟着当时的标题栏走。
            没有任务时各自整块不存在，不留空位 -->
-      <ModpackTitleIndicator />
-      <DownloadTitleIndicator />
+      <ModpackTitleIndicator v-if="!modpackWindowOpen" />
+      <DownloadTitleIndicator v-if="!modpackWindowOpen" />
       <ResourceTitleIndicator />
 
       <!-- 启动器主页（切换按钮） -->

@@ -21,7 +21,7 @@ mod model;
 
 // 删实例前要问一句"这个实例的资源窗口还有没有在跑的操作"：model 是私有模块，
 // 这里再导出一份给 windows::main 用
-pub(crate) use self::model::{begin_if_open, instance_busy};
+pub(crate) use self::model::instance_busy;
 pub(crate) mod mods;
 pub(crate) mod pack;
 pub(crate) mod packs;

@@ -15,7 +15,7 @@ import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import AsyncImage from "../../components/ui/AsyncImage.vue";
 import AuthorTag from "../../components/ui/AuthorTag.vue";
 import ProjectDetailPage from "../../components/ProjectDetailPage.vue";
-import { api } from "../../lib/api";
+import { api, getAddResourceSource, setAddResourceSource } from "../../lib/api";
 import { useDownloadBadges } from "../../lib/downloadBadges";
 import { formatCount, t, tErr } from "../../lib/i18n";
 import { svgIcon } from "../../lib/modrinthIcon";
@@ -78,7 +78,36 @@ const instanceChip = computed(() =>
 
 const type = ref("mod");
 const sources = ref<Array<{ value: string; label: string }>>([]);
+/** 下载源；上次选的那个由后端落 gui_config.json，见 AddResourceSource */
+/** 上次选的源还没读回来之前不要写回，否则会用空串把它覆盖掉 */
+let sourceReady = false;
 const source = ref("");
+watch(source, (value) => {
+  if (sourceReady) {
+    void setAddResourceSource(value).catch(() => {});
+  }
+});
+
+// 读上次选的源：失败就当没选过
+(async () => {
+  try {
+    const saved = await getAddResourceSource();
+    if (saved) {
+      source.value = saved;
+    }
+  } catch {
+    // 读不到就用空串，由下面的 watcher 落回第一个
+  } finally {
+    sourceReady = true;
+  }
+})();
+
+// 上次存的源可能已经不在列表里（后端改了支持的平台）：落回第一个，免得筛出空列表
+watch(sources, (list) => {
+  if (list.length && !list.some((item) => item.value === source.value)) {
+    source.value = list[0].value;
+  }
+});
 
 const sorts = ref<string[]>([]);
 const sort = ref("");

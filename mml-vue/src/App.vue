@@ -5,6 +5,7 @@ import { applyTheme } from "./lib/theme";
 import { applyLocale, t } from "./lib/i18n";
 import { applyAnimations, bgImage, bgLayerStyle } from "./lib/appearance";
 import { api, onCloseBlocked } from "./lib/api";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   closeWindow,
   closeDownloadPopup,
@@ -93,6 +94,9 @@ const { status: resourceStatus, init: initResourceStatus } = useResourceStatus(t
  * 放在根组件而不是下载窗口里，是因为单窗口模式下任何页面点 ✕ 都算退出应用，
  * 而各窗口自己收不到这条事件（下载弹窗也可能根本没开着）。
  */
+/** 本窗口标签：关闭被拦截事件只认发给自己的那一条，否则别的窗口也会弹同一句话 */
+const myLabel = getCurrentWindow().label;
+
 const closeAsk = ref(false);
 /** 这次拦的是"退出应用"还是"关掉下载窗口"——只影响文案 */
 const closeAskQuit = ref(false);
@@ -104,9 +108,11 @@ let unsubModpackStatus: (() => void) | null = null;
 let unsubResourceStatus: (() => void) | null = null;
 
 onMounted(async () => {
-  unsubCloseBlocked = await onCloseBlocked(() => {
+  unsubCloseBlocked = await onCloseBlocked((blocked) => {
+    // 事件带的是被拦下的那个窗口的标签：不是自己就忽略，别在别的窗口也弹一遍
+    if (blocked && blocked !== myLabel) return;
     // 单窗口模式：唯一的真实窗口就是主窗口，任何页面都算退出；
-    // 多窗口模式：只有主窗口算退出，下载窗口被拦只是关它自己
+    // 多窗口模式：只有主窗口算退出
     closeAskQuit.value = !multiWindow.value || currentKind.value === "main";
     closeAsk.value = true;
   });

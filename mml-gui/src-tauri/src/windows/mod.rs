@@ -903,6 +903,8 @@ pub fn window_get_gui_config(window: WebviewWindow) -> GuiConfigDto {
 #[tauri::command]
 pub async fn window_save_gui_config(app: AppHandle, config: GuiConfigDto) -> Result<(), String> {
     let mut new_config: crate::gui_config::GuiConfig = config.into();
+    // 窗口浏览偏好不属于设置页：从旧配置整份带过来，免得存一次设置就把它们清掉
+    new_config.resource_window = crate::gui_config::get().resource_window;
     let skin_changed = {
         let old = crate::gui_config::get();
         old.skin != new_config.skin || old.head != new_config.head || old.cape != new_config.cape

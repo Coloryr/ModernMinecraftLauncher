@@ -1523,8 +1523,31 @@ export function onDownloadItem(cb: (e: DownloadItemEvent) => void): Promise<Unli
  *
  * 窗口处于关闭保护时触发，前端弹提示说明原因
  */
-export function onCloseBlocked(cb: () => void): Promise<UnlistenFn> {
-  return listen(CloseBlocked, () => cb());
+export function onCloseBlocked(cb: (label: string) => void): Promise<UnlistenFn> {
+  return listen<string>(CloseBlocked, (event) => cb(event.payload));
+}
+
+// ---------- 上次选的下载源 ----------
+// 用户偏好，落 gui_config.json，见 §7.1：不进 localStorage
+
+/** 下载整合包窗口上次选的下载源；空串表示没选过 */
+export function getAddModpackSource(): Promise<string> {
+  return commands.addModpack.lastSource();
+}
+
+/** 记住下载整合包窗口这次选的下载源 */
+export function setAddModpackSource(source: string): Promise<void> {
+  return commands.addModpack.setLastSource(source);
+}
+
+/** 添加资源窗口上次选的下载源；空串表示没选过 */
+export function getAddResourceSource(): Promise<string> {
+  return commands.addResource.lastSource();
+}
+
+/** 记住添加资源窗口这次选的下载源 */
+export function setAddResourceSource(source: string): Promise<void> {
+  return commands.addResource.setLastSource(source);
 }
 
 /**

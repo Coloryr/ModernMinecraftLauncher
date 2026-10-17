@@ -372,6 +372,8 @@ pub struct GuiConfig {
     pub bg_blur: u32,
     /// 背景图原始分辨率，单位百分比，取值 10 到 100；后端按此把源图缩放后落盘
     pub bg_native_size: u32,
+    /// 添加资源 / 下载整合包两个窗口的浏览偏好
+    pub resource_window: ResourceWindowConfig,
 }
 
 impl Default for GuiConfig {
@@ -392,8 +394,23 @@ impl Default for GuiConfig {
             bg_opacity: 100,
             bg_blur: 0,
             bg_native_size: 100,
+            resource_window: Default::default(),
         }
     }
+}
+
+/// 添加资源 / 下载整合包两个窗口的浏览偏好
+///
+/// 这两项是"上次选了哪个下载源"，属于用户偏好而不是设置页上的项：
+/// 由各自的窗口命令维护（`add_resource_*_last_source` / `add_modpack_*_last_source`），
+/// 设置页保存时从旧配置整份带过来，见 `window_save_gui_config`。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ResourceWindowConfig {
+    /// 添加资源窗口上次选的下载源；空串表示没选过，界面落回列表第一个
+    pub add_resource_source: String,
+    /// 下载整合包窗口上次选的下载源
+    pub add_modpack_source: String,
 }
 
 /// 配置文件路径，init 时设置

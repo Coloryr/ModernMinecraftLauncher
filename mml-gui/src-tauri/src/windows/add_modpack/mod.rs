@@ -22,6 +22,28 @@ use tokio_util::sync::CancellationToken;
 pub(crate) mod install;
 pub(crate) mod list;
 
+/// 下载整合包窗口上次选的下载源
+///
+/// # 返回值
+///
+/// 下载源线串；没选过时是空串，由界面落回列表第一个
+#[tauri::command]
+pub fn add_modpack_last_source() -> String {
+    crate::gui_config::get().resource_window.add_modpack_source
+}
+
+/// 记住这次选的下载源，落 `gui_config.json`
+///
+/// - `source`: 下载源线串，来自列表接口
+#[tauri::command]
+pub fn add_modpack_set_last_source(source: String) {
+    let mut config = crate::gui_config::get();
+    if config.resource_window.add_modpack_source == source {
+        return;
+    }
+    config.resource_window.add_modpack_source = source;
+    crate::gui_config::set(config);
+}
 /// CurseForge 项目列表缓存，pid → 项目数据，列表页请求时填充
 pub(super) static CURSEFOGRE_INFO: LazyLock<AsyncRwLock<HashMap<String, CurseForgeListDataObj>>> =
     LazyLock::new(|| AsyncRwLock::new(HashMap::new()));

@@ -29,6 +29,28 @@ pub(crate) mod status;
 // `add_resource::on_download_item`，搬进子模块后调用点不必跟着改
 pub(crate) use self::status::on_download_item;
 
+/// 添加资源窗口上次选的下载源
+///
+/// # 返回值
+///
+/// 下载源线串；没选过时是空串，由界面落回列表第一个
+#[tauri::command]
+pub fn add_resource_last_source() -> String {
+    crate::gui_config::get().resource_window.add_resource_source
+}
+
+/// 记住这次选的下载源，落 `gui_config.json`
+///
+/// - `source`: 下载源线串，来自列表接口
+#[tauri::command]
+pub fn add_resource_set_last_source(source: String) {
+    let mut config = crate::gui_config::get();
+    if config.resource_window.add_resource_source == source {
+        return;
+    }
+    config.resource_window.add_resource_source = source;
+    crate::gui_config::set(config);
+}
 /// CurseForge 项目列表缓存，pid 映射到项目数据，列表页请求时填充
 pub(super) static CURSEFOGRE_INFO: LazyLock<AsyncRwLock<HashMap<String, CurseForgeListDataObj>>> =
     LazyLock::new(|| AsyncRwLock::new(HashMap::new()));
