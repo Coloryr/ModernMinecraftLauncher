@@ -5,6 +5,7 @@
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 import { t } from "../../../lib/i18n";
 import BaseButton from "../../../components/ui/BaseButton.vue";
+import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import LoaderQueryProgress from "../../../components/LoaderQueryProgress.vue";
 import type { VersionInfoDto } from "../../../lib/bindings";
 
@@ -64,6 +65,15 @@ const emit = defineEmits<{
   (e: "refreshLoaderVersions"): void;
 }>();
 
+/**
+ * 版本相关的查询在跑：刷新版本 / 刷新加载器 / 刷新加载器版本 任一
+ *
+ * 这三种期间版本类型与版本都不给改 —— 列表正在换，改了就选在一个马上要消失的值上。
+ */
+const versionBusy = computed(
+  () => props.verLoading || props.loaderLoading || props.loaderVerLoading,
+);
+
 const loaderPathInput = ref<HTMLInputElement | null>(null);
 const versionSelect = ref<HTMLSelectElement | null>(null);
 
@@ -117,6 +127,20 @@ function toggleType(vt: string) {
   emit("update:verTypes", sel);
 }
 
+/**
+ * 换游戏版本：加载器类型回到原版
+ *
+ * 新版本下原来那个加载器多半不存在（加载器版本列表也是按版本拉的），一起清掉；
+ * 具体拉取由父组件 watch loader / newVersion 负责，见那边的说明。
+ *
+ * - `e`: 版本下拉的 change 事件
+ */
+function onVersionChange(e: Event) {
+  emit("update:newVersion", (e.target as HTMLSelectElement).value);
+  emit("update:loader", "normal");
+  emit("update:loaderVersion", "");
+}
+
 function onLoaderChange(e: Event) {
   // 加载器版本列表由父组件 watch loader/newVersion 变化后拉取
   emit("update:loader", (e.target as HTMLSelectElement).value);
@@ -138,12 +162,15 @@ function onLoaderPathPick(e: Event) {
       <label class="field-label">{{ t("add.verType") }}</label>
       <!-- 多选下拉：展开后是复选项，勾选不关闭，点外部关闭 -->
       <div ref="comboEl" class="type-combo">
-        <button type="button" class="field-select type-trigger" :aria-expanded="typeOpen" @click="typeOpen = !typeOpen">
+        <!-- 查询期间不给改：与版本下拉同一口径，见 versionBusy -->
+        <button type="button" class="field-select type-trigger" :aria-expanded="typeOpen" :disabled="versionBusy"
+          @click="typeOpen = !typeOpen">
           <span class="type-label">{{ typeLabel }}</span>
         </button>
         <div v-if="typeOpen" class="type-drop" role="listbox" aria-multiselectable="true">
           <button v-for="vt in versionTypes" :key="vt" type="button" class="type-opt" role="option"
-            :aria-selected="verTypes.includes(vt)" :class="{ selected: verTypes.includes(vt) }" @click="toggleType(vt)">
+            :aria-selected="verTypes.includes(vt)" :disabled="versionBusy"
+            :class="{ selected: verTypes.includes(vt) }" @click="toggleType(vt)">
             {{ t(`add.type.${vt}`) }}
           </button>
         </div>
@@ -153,20 +180,17 @@ function onLoaderPathPick(e: Event) {
       <label class="field-label">{{ t("add.version") }} <span class="req">*</span></label>
       <div class="path-row">
         <!-- 选中多个版本类型时按类型分组展示 -->
-        <select ref="versionSelect" :value="newVersion" class="field-select" :class="{ 'is-invalid': invalidVersion }"
-          @change="emit('update:newVersion', ($event.target as HTMLSelectElement).value)">
+        <!-- 版本改了加载器就回到原版，见 onVersionChange；三种刷新期间都不给改 -->
+        <select ref="versionSelect" :value="newVersion" class="field-select"
+          :class="{ 'is-invalid': invalidVersion }" :disabled="versionBusy" @change="onVersionChange">
           <optgroup v-for="grp in groupedVersions" :key="grp.type" :label="t(`add.type.${grp.type}`)">
             <option v-for="v in grp.items" :key="v.id" :value="v.id">{{ v.id }}</option>
           </optgroup>
         </select>
-        <BaseButton size="sm" variant="ghost" :disabled="verLoading" v-tip="t('add.versionRefresh')"
-          @click="emit('refreshVersions')">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-            <polyline points="21 3 21 9 15 9" />
-          </svg>
-        </BaseButton>
+        <button class="ui-btn-icon" :disabled="versionBusy" v-tip="t('add.versionRefresh')"
+          :aria-label="t('add.versionRefresh')" @click="emit('refreshVersions')">
+          <GlyphIcon name="refresh" :size="14" :weight="2" />
+        </button>
       </div>
       <div v-if="versions.length === 0" class="empty-tip">
         {{ versionsLoaded ? t("add.noVersion") : t("add.loading") }}
@@ -179,17 +203,14 @@ function onLoaderPathPick(e: Event) {
       <label class="field-label">{{ t("add.loader") }}</label>
       <div class="path-row">
         <!-- 未选中版本或查询支持列表期间禁用 -->
-        <select :value="loader" class="field-select" :disabled="!newVersion || loaderLoading" @change="onLoaderChange">
+        <select :value="loader" class="field-select" :disabled="!newVersion || loaderLoading || loaderVerLoading"
+          @change="onLoaderChange">
           <option v-for="l in loaders" :key="l" :value="l">{{ t(`add.loader.${l}`) }}</option>
         </select>
-        <BaseButton size="sm" variant="ghost" :disabled="!newVersion || loaderLoading" v-tip="t('add.loaderRefresh')"
-          @click="emit('refreshLoaders')">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-            <polyline points="21 3 21 9 15 9" />
-          </svg>
-        </BaseButton>
+        <button class="ui-btn-icon" :disabled="!newVersion || loaderLoading || loaderVerLoading" v-tip="t('add.loaderRefresh')"
+          :aria-label="t('add.loaderRefresh')" @click="emit('refreshLoaders')">
+          <GlyphIcon name="refresh" :size="14" :weight="2" />
+        </button>
       </div>
       <!-- 查询进度就地显示在这里：它属于"加载器类型"这个下拉，浮在窗口正上方离得太远 -->
       <LoaderQueryProgress v-if="loaderLoading" kind="query" :visible="true" :step="queryStep" :total="queryTotal" />
@@ -200,18 +221,15 @@ function onLoaderPathPick(e: Event) {
       <label class="field-label">{{ t("add.loaderVersion") }}</label>
       <div class="path-row">
         <!-- 始终显示：拉取中 / 原版、自定义等无版本列表的加载器置灰 -->
-        <select :value="loaderVersion" class="field-select" :disabled="loaderVerLoading || !loaderVersions.length"
+        <select :value="loaderVersion" class="field-select"
+          :disabled="loaderVerLoading || !loaderVersions.length || loaderLoading"
           @change="onLoaderVersionChange">
           <option v-for="lv in loaderVersions" :key="lv" :value="lv">{{ lv }}</option>
         </select>
-        <BaseButton size="sm" variant="ghost" :disabled="!newVersion || noLoaderVersion || loaderVerLoading"
-          v-tip="t('add.loaderVerRefresh')" @click="emit('refreshLoaderVersions')">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-            <polyline points="21 3 21 9 15 9" />
-          </svg>
-        </BaseButton>
+        <button class="ui-btn-icon" :disabled="!newVersion || noLoaderVersion || loaderVerLoading || loaderLoading" v-tip="t('add.loaderVerRefresh')"
+          :aria-label="t('add.loaderVerRefresh')" @click="emit('refreshLoaderVersions')">
+          <GlyphIcon name="refresh" :size="14" :weight="2" />
+        </button>
       </div>
       <!-- 拉取加载器版本：进度同样就地显示，别浮到窗口顶上 -->
       <LoaderQueryProgress v-if="loaderVerLoading" kind="versions" :visible="true" :step="0" :total="0" />

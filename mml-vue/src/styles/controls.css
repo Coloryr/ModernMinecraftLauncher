@@ -402,9 +402,16 @@ select.field-select {
   transition: all 0.12s;
 }
 
-.ui-btn-icon:hover {
+.ui-btn-icon:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text);
+}
+
+/* 图标按钮的禁用态：与 .ui-btn 同一档。少了这条，禁用的图标按钮与可点的长得一模一样，
+   用户只能靠"点了没反应"猜 —— 设置窗口的加载器版本刷新按钮就是这种情况 */
+.ui-btn-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* 变体 */

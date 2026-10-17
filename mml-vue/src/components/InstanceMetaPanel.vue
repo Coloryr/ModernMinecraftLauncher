@@ -130,12 +130,26 @@ const filteredVersions = computed(() =>
   props.versions.filter((v) => normType(v.versionType) === typeFilter.value),
 );
 
+/**
+ * 换游戏版本：加载器类型回到原版
+ *
+ * 新版本下原来那个加载器多半不存在（加载器版本列表也按版本拉），一起清掉并锁回未拉取状态。
+ *
+ * - `value`: 选中的版本 id
+ */
+function onVersionChange(value: string) {
+  lvLocked.value = true;
+  loaderVersions.value = [];
+  change({ version: value, loader: "normal", loaderVersion: null });
+}
+
 function onVersionTypeChange(value: string) {
   typeFilter.value = value;
-  // 当前版本不在该类型中时，切到该类型第一个版本
+  // 当前版本不在该类型中时，切到该类型第一个版本；换版本同样把加载器带回原版
   const target = props.versions.find((v) => normType(v.versionType) === value);
   if (target && target.id !== props.instance.version) {
-    change({ version: target.id, versionType: value });
+    onVersionChange(target.id);
+    change({ versionType: value });
   } else {
     change({ versionType: value });
   }
@@ -335,44 +349,38 @@ function onPlatformChange(value: string) {
     <template v-if="!locked && !isModpack">
       <!-- 版本类型 + 版本 -->
       <span class="meta-label">{{ t("meta.versionType") }}</span>
-      <select class="field-select" :value="typeFilter"
+      <select class="field-select" :value="typeFilter" :disabled="verLoading || loadersLoading || lvLoading"
         @change="onVersionTypeChange(($event.target as HTMLSelectElement).value)">
         <option v-for="vt in versionTypes" :key="vt" :value="vt">{{ typeName(vt) }}</option>
       </select>
       <span class="meta-label small">{{ t("meta.version") }}</span>
       <div class="select-row">
-        <select class="field-select" :value="instance.version"
-          @change="change({ version: ($event.target as HTMLSelectElement).value })">
+        <!-- 版本改了加载器就回到原版，见 onVersionChange；三种刷新期间都不给改 -->
+        <select class="field-select" :value="instance.version" :disabled="verLoading || loadersLoading || lvLoading"
+          @change="onVersionChange(($event.target as HTMLSelectElement).value)">
           <optgroup :label="typeName(typeFilter)">
             <option v-for="v in filteredVersions" :key="v.id" :value="v.id">{{ v.id }}</option>
           </optgroup>
         </select>
-        <BaseButton size="sm" variant="ghost" :disabled="verLoading" v-tip="t('add.versionRefresh')"
-          @click="onRefreshVersions">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-            <polyline points="21 3 21 9 15 9" />
-          </svg>
-        </BaseButton>
+        <button class="ui-btn-icon" :disabled="verLoading || loadersLoading || lvLoading"
+          v-tip="t('add.versionRefresh')"
+          :aria-label="t('add.versionRefresh')" @click="onRefreshVersions">
+          <GlyphIcon name="refresh" :size="14" :weight="2" />
+        </button>
       </div>
 
       <!-- 加载器类型 + 加载器版本 -->
       <span class="meta-label">{{ t("meta.loader") }}</span>
       <div class="select-row">
         <!-- 默认只有原版 / 当前 / 自定义，刷新后合并该版本支持的加载器；查询期间锁住 -->
-        <select class="field-select" :value="instance.loader" :disabled="loadersLoading"
+        <select class="field-select" :value="instance.loader" :disabled="loadersLoading || lvLoading"
           @change="onLoaderChange(($event.target as HTMLSelectElement).value)">
           <option v-for="l in loaderOptions" :key="l" :value="l">{{ loaderLabel(l) }}</option>
         </select>
-        <BaseButton size="sm" variant="ghost" :disabled="loadersLoading || !instance.version"
-          v-tip="t('add.loaderRefresh')" @click="onRefreshLoaders">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-            <polyline points="21 3 21 9 15 9" />
-          </svg>
-        </BaseButton>
+        <button class="ui-btn-icon" :disabled="loadersLoading || !instance.version" v-tip="t('add.loaderRefresh')"
+          :aria-label="t('add.loaderRefresh')" @click="onRefreshLoaders">
+          <GlyphIcon name="refresh" :size="14" :weight="2" />
+        </button>
       </div>
       <span class="meta-label small">{{ instance.loader === "custom" ? t("add.loaderPath") : t("meta.loaderVersion")
       }}</span>
@@ -385,18 +393,17 @@ function onPlatformChange(value: string) {
       </div>
       <div v-else class="select-row">
         <!-- 默认锁死；点刷新或切换加载器后自动拉取真实版本列表并解锁 -->
-        <select class="field-select" :value="instance.loaderVersion ?? ''" :disabled="lvLocked || lvLoading"
+        <select class="field-select" :value="instance.loaderVersion ?? ''"
+          :disabled="lvLocked || lvLoading || loadersLoading"
           @change="change({ loaderVersion: ($event.target as HTMLSelectElement).value || null })">
           <option v-for="lv in lvOptions" :key="lv" :value="lv">{{ lv }}</option>
         </select>
-        <BaseButton size="sm" variant="ghost" :disabled="lvLoading || !instance.version || instance.loader === 'normal'"
-          v-tip="t('add.loaderVerRefresh')" @click="onRefreshLoaderVersions">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-            <polyline points="21 3 21 9 15 9" />
-          </svg>
-        </BaseButton>
+        <button class="ui-btn-icon"
+          :disabled="lvLoading || !instance.version || instance.loader === 'normal' || loadersLoading"
+          v-tip="t('add.loaderVerRefresh')"
+          :aria-label="t('add.loaderVerRefresh')" @click="onRefreshLoaderVersions">
+          <GlyphIcon name="refresh" :size="14" :weight="2" />
+        </button>
       </div>
 
       <!-- 查询进度就地显示在字段下面，原来浮在窗口正上方。
@@ -446,10 +453,10 @@ function onPlatformChange(value: string) {
           @input="change({ pid: ($event.target as HTMLInputElement).value || null })" />
         <input class="field-input" :value="instance.fid ?? ''" :placeholder="t('meta.fid')" spellcheck="false"
           @input="change({ fid: ($event.target as HTMLInputElement).value || null })" />
-        <BaseButton v-if="onlineModpack" size="sm" variant="ghost" :disabled="packBusy"
-          v-tip="t('detail.modpackCheck')" :aria-label="t('detail.modpackCheck')" @click="checkModpack">
-          <GlyphIcon name="update" :size="14" :weight="1.8" />
-        </BaseButton>
+        <button class="ui-btn-icon" :disabled="packBusy" v-tip="t('detail.modpackCheck')"
+          :aria-label="t('detail.modpackCheck')" @click="checkModpack">
+          <GlyphIcon name="update" :size="14" :weight="2" />
+        </button>
       </div>
       <!-- 整合包更新的确认窗：查到新版本才开 -->
       <ModPackUpdateModal v-if="packResult" :result="packResult" @update="applyModpackUpdate"
@@ -513,11 +520,12 @@ function onPlatformChange(value: string) {
   display: none;
 }
 
-/* 项目 / 文件 ID 等宽并排（跨右侧两列） */
+/* 项目 / 文件 ID 与「检查整合包更新」图标按钮**同一行**（跨右侧两列）：
+   两个输入框等宽，按钮按自身宽度收在右端 —— 三列而不是两列，否则按钮会被挤到下一行 */
 .modpack-ids {
   grid-column: 3 / 5;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr auto;
   gap: 10px;
   min-width: 0;
 }
