@@ -328,4 +328,19 @@ mod tests {
         assert_eq!(model.cancels.lock().unwrap().len(), 2);
         assert!(!third.is_cancelled());
     }
+
+    /// 模型存进窗口表再取出来：存的是模型本体，取的时候类型要对得上
+    ///
+    /// 存成 `Arc<Mutex<模型>>` 而按 `Arc<模型>` 取，downcast 会失败，
+    /// 命令侧就报"窗口模型未初始化"。
+    #[test]
+    fn model_round_trips_through_window_table() {
+        let uuid = Uuid::new_v4();
+        let first = window_model_or_insert(&uuid, ResourceWindowModel::new).expect("应当建出模型");
+        let second = window_model_by_uuid::<ResourceWindowModel>(&uuid).expect("应当取到模型");
+        assert!(Arc::ptr_eq(&first, &second));
+
+        crate::windows::lifecycle::remove_window_model(&uuid);
+        assert!(window_model_by_uuid::<ResourceWindowModel>(&uuid).is_none());
+    }
 }

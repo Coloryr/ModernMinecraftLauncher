@@ -30,7 +30,8 @@ use super::geometry::{
 };
 use super::registry::{
     ADD_MODPACK_WINDOW_UUID, ADD_WINDOW_UUID, BLOCK_WINDOW_UUID, DOWNLOAD_WINDOW_UUID,
-    MAIN_WINDOW_UUID, WINDOWS_INFO, family_of_label, min_size_of_label, uuid_for_kind, uuid_of_label,
+    MAIN_WINDOW_UUID, WINDOWS_INFO, family_of_label, min_size_of_label, uuid_for_kind,
+    uuid_of_label,
 };
 use super::{add_modpack, block, resource};
 
@@ -110,6 +111,11 @@ pub(super) fn window_model_by_uuid<T: Send + Sync + 'static>(uuid: &Uuid) -> Opt
 
 /// 按窗口 uuid 取模型，没有就用 `make` 建一个
 ///
+/// 存的是**模型本体**（`Arc<T>`），不是 `ensure_window_model` 那套
+/// `Arc<Mutex<T>>`：带内部锁的模型（如资源窗口，读写散在多个方法里，还要在
+/// `spawn_blocking` 里用）这么放，命令侧拿到 `Arc<T>` 直接用，不必再套一层锁。
+/// **两者存进去的类型必须与取的时候一致**，错一层就是 `downcast` 失败、报"窗口模型未初始化"。
+///
 /// 资源窗口是"一个实例一个窗口"的族，模型没法像静态窗口那样在 `ensure_window_model`
 /// 里按常量认领 —— 由命令侧按实例 uuid 算好派生 uuid 后按需建立。
 /// 释放仍走窗口销毁那条路（`Destroyed` 里 `remove_window_model`）。
@@ -127,7 +133,7 @@ pub(super) fn window_model_or_insert<T: Send + Sync + 'static>(
     let mut models = WINDOW_MODELS.write().unwrap();
     let model = models
         .entry(*uuid)
-        .or_insert_with(|| Arc::new(Mutex::new(make())))
+        .or_insert_with(|| Arc::new(make()))
         .clone();
     model.downcast::<T>().ok()
 }
@@ -378,10 +384,7 @@ pub(super) fn create_window(
                 height: min_h,
             };
             match initial_placement(app, uuid, anchor, &size) {
-                Some(p) => builder
-                    .inner_size(min_w, min_h)
-                    .position(p.x, p.y)
-                    .build(),
+                Some(p) => builder.inner_size(min_w, min_h).position(p.x, p.y).build(),
                 // 拿不到显示器（几乎不可能）：退回 tao 自己的居中
                 None => builder.inner_size(min_w, min_h).center().build(),
             }

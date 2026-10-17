@@ -23,7 +23,7 @@
 //   分组名 | 启用 | 名字 | 备注 | modid | 版本 | 加载器类型 | 加载侧
 //          | 下载源 | 项目编号 | 文件编号 | 路径 | 作者 | 网页链接
 //   - 备注紧挨名字右边；没有操作列，删除 / 打开文件夹在列表视图里，备注双击就地编辑。
-import { computed, nextTick, ref } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { t } from "../../../../lib/i18n";
 import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
 import type { ModItemDto } from "../../../../lib/bindings";
@@ -37,6 +37,7 @@ import {
   type ModCol,
   type ModSort,
 } from "../../modColumns";
+import { MOD_TR_H, useVirtualRows } from "../../composables/useVirtualRows";
 import { modHit, modRowKey, modSelectKey, type ModViewEmits, type ModViewProps } from "../../types";
 
 const props = withDefaults(
@@ -247,6 +248,25 @@ const rows = computed(() => {
   return out;
 });
 
+/** 行容器：虚拟化要量它在滚动容器里的位置 */
+const rowsEl = ref<HTMLElement | null>(null);
+
+/** 只渲染视口附近那几行，其余用上下内边距撑住高度，见 useVirtualRows */
+const { start, end, padTop, padBottom, remeasure } = useVirtualRows({
+  root: rowsEl,
+  count: () => rows.value.length,
+  rowH: MOD_TR_H,
+  // 就地编辑备注时整列都渲染：被窗口裁掉的行连元素一起销毁，正在写的草稿就丢了
+  whole: () => !!editing.value,
+});
+
+// 展开 / 收起内置模组、进出就地编辑都会改变本组乃至后面各组的高度：
+// 报一次布局变化（flush: post，等 DOM 更新完）
+watch([rows, () => editing.value], () => remeasure(), { flush: "post" });
+
+/** 这一回真正渲染出来的那几行 */
+const visibleRows = computed(() => rows.value.slice(start.value, end.value));
+
 
 
 
@@ -367,7 +387,10 @@ function onNoteEnter(event: KeyboardEvent) {
       <span v-for="col in MOD_COLS.slice(1)" :key="col.key" class="mod-cell" />
     </div>
 
-    <div v-for="row in rows" :key="modRowKey(row.item)" class="mod-tr" :style="{
+    <!-- 数据行：行虚拟化，只渲染视口附近那几行，上下留白撑住总高度（见 composables/useVirtualRows） -->
+    <div ref="rowsEl" class="mod-rows"
+      :style="{ paddingTop: padTop + 'px', paddingBottom: padBottom + 'px' }">
+    <div v-for="row in visibleRows" :key="modRowKey(row.item)" class="mod-tr mod-virtual-row" :style="{
       gridTemplateColumns: gridTemplate,
       '--row-depth': row.depth - 1,
     }" :class="{
@@ -452,6 +475,7 @@ function onNoteEnter(event: KeyboardEvent) {
       <span class="mod-cell mod-path">{{ row.item.path }}</span>
       <span class="mod-cell" :title="row.item.author">{{ row.item.author }}</span>
       <span class="mod-cell" :title="row.item.url">{{ row.item.url }}</span>
+    </div>
     </div>
 
     <!--

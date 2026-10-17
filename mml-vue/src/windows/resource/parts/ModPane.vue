@@ -7,7 +7,7 @@
 //
 // 数据：模组列表在 useResourceData，分组在 useModGroups（自己的 JSON），
 // 拖动分组头调整分组顺序在 useReorderDrag。
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
 import SegmentedTabs from "../../../components/ui/SegmentedTabs.vue";
@@ -37,6 +37,7 @@ import {
 } from "../../../lib/api";
 import { copyText } from "../../../lib/clipboard";
 import { useModDeps } from "../composables/useModDeps";
+import { provideListScroll } from "../composables/useVirtualRows";
 import { useReorderDrag } from "../composables/useReorderDrag";
 import { useRowSelect } from "../composables/useRowSelect";
 import {
@@ -398,6 +399,26 @@ async function exportDuplicates() {
 }
 
 const { modView, setModView, colWidths, setColWidth, sort, setSort } = props.view;
+
+/**
+ * 列表的滚动状态：行虚拟化靠它算窗口，见 composables/useVirtualRows
+ *
+ * 列表视图滚的是 `.item-list`，表格视图滚的是白底里那层 `.mod-table-scroll` ——
+ * 换视图时把监听换到当前那个容器上（同一时刻只有一个存在）。
+ */
+const listScroll = provideListScroll();
+/** 列表视图的滚动容器 */
+const listEl = ref<HTMLElement | null>(null);
+/** 表格视图的滚动容器 */
+const tableScrollEl = ref<HTMLElement | null>(null);
+watch(
+  [listEl, tableScrollEl, modView],
+  () => {
+    listScroll.attach(modView.value === "table" ? tableScrollEl.value : listEl.value);
+  },
+  { immediate: true },
+);
+
 
 const groups = useModGroups(props.data);
 
@@ -1238,6 +1259,14 @@ function bindSection(id: string, el: Element | null) {
 /** 当前渲染的块 id；拖拽排序的坐标轴，与 DOM 里的顺序一致 */
 const sectionIds = computed(() => sections.value.map((sec) => sec.id));
 
+// 分组折叠 / 展开、搜索过滤、分组排序都会让各组整体挪位置，而挪位置不触发滚动事件：
+// 这些变化之后报一次"布局变了"，让各分组重新量位置（flush: post —— 等 DOM 更新完再量）
+watch(
+  [sections, modView, () => groups.collapsed.value, () => groups.order.value],
+  () => listScroll.bump(),
+  { flush: "post" },
+);
+
 const {
   dragKey: draggingSection,
   insertAt: insertSectionAt,
@@ -1534,7 +1563,7 @@ onMounted(() => void groups.load());
       滚动条因此落在白色底里面（用户口径）。
     -->
     <div class="mod-table-panel">
-      <div class="mod-table-scroll">
+      <div ref="tableScrollEl" class="mod-table-scroll">
         <template v-for="(sec, idx) in sections" :key="sec.id">
           <div v-if="showSectionLine(idx)" class="mod-group-insert">
           <span class="mod-group-name">{{ sectionGhostLabel }}</span>
@@ -1559,7 +1588,7 @@ onMounted(() => void groups.load());
   </div>
 
   <!-- 列表视图：按块渲染，自建分组与三个状态分组各一块 -->
-  <div v-else class="item-list mod-groups">
+  <div v-else ref="listEl" class="item-list mod-groups">
     <!-- 按块渲染，不用 section 上的 v-for：插入线要画在"两块之间"，得有个兄弟节点 -->
     <template v-for="(sec, idx) in sections" :key="sec.id">
       <!-- 拖分组头时的插入线：松手后这一块会落到这里 -->

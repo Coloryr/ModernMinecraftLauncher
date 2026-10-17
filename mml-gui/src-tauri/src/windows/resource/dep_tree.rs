@@ -367,6 +367,28 @@ fn problem_map(game: &InstanceSettingObj, list: &[ModObj]) -> HashMap<String, De
     map
 }
 
+/// 在扫描结果里按 uuid 找条目，内置的（jar-in-jar）一并往下找
+///
+/// 图上双击可以把内置模组换成根，而内置条目的 uuid 不在顶层列表里 —— 只查顶层会报"找不到文件"。
+///
+/// - `list`: 扫描结果
+/// - `uuid`: 目标条目 uuid
+///
+/// # 返回值
+///
+/// 找到的条目；没有时返回 `None`
+fn find_by_uuid<'a>(list: &'a [ModObj], uuid: &str) -> Option<&'a ModObj> {
+    for item in list {
+        if item.uuid.to_string() == uuid {
+            return Some(item);
+        }
+        if let Some(found) = find_by_uuid(&item.jar_in_jar, uuid) {
+            return Some(found);
+        }
+    }
+    None
+}
+
 /// 从一个模组出发建依赖图
 ///
 /// - `game`: 实例设置，取游戏版本 / 加载器，并跑一遍依赖检测
@@ -381,10 +403,7 @@ pub(super) fn build_tree(
     list: &[ModObj],
     root_uuid: &str,
 ) -> Result<ModDepTreeDto, String> {
-    let root = list
-        .iter()
-        .find(|item| item.uuid.to_string() == root_uuid)
-        .ok_or_else(|| err_keys::FILE_NOT_FOUND.to_string())?;
+    let root = find_by_uuid(list, root_uuid).ok_or_else(|| err_keys::FILE_NOT_FOUND.to_string())?;
 
     // modid 小写 → 提供它的条目：先铺顶层再铺内置，与列表里的先后一致
     let mut providers: HashMap<String, Vec<Provider>> = HashMap::new();
@@ -632,7 +651,6 @@ mod tests {
 
     use mml_base::range_checker::RangeSyntax;
     use mml_game::game_mods::{DependantInfo, DependantType, ModItemObj};
-    use uuid::Uuid;
 
     /// 造一条前置声明
     ///
@@ -885,6 +903,22 @@ mod tests {
         let found = node(&tree, "bundled");
         assert_eq!(found.label, "Bundled Lib");
         assert!(found.nested);
+    }
+
+    /// 根可以是内置模组：图上双击换到它时，uuid 不在顶层列表里
+    #[test]
+    fn root_can_be_a_nested_item() {
+        let nested = item("Bundled", &[("API", false, "*")]);
+        let api = item("API", &[]);
+        let mut parent = item("Parent", &[]);
+        parent.jar_in_jar = vec![nested];
+        let list = vec![parent, api];
+        let root_uuid = list[0].jar_in_jar[0].uuid.to_string();
+
+        let tree = build_tree(&forge(), &list, &root_uuid).unwrap();
+
+        assert!(tree.nodes.iter().any(|node| node.key == "bundled"));
+        assert!(tree.nodes.iter().any(|node| node.key == "api"));
     }
 
     /// 依赖方与前置：禁用方向找"谁还需要它"

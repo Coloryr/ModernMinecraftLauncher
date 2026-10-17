@@ -6,6 +6,8 @@
 //   启用方向找"它要的强制前置里现在被禁用着的"。
 import type { Ref } from "vue";
 import { modsDepTree, modsRelatedMods } from "../../../lib/api";
+import { tErr } from "../../../lib/i18n";
+import { showToast } from "../../../lib/toast";
 import type { ModItemDto } from "../../../lib/bindings";
 import { layoutDepGraph, type ModDepGraph } from "./modDepGraph";
 
@@ -69,14 +71,21 @@ export function useModDeps(mods: Ref<ModItemDto[]>, instanceUuid: Ref<string>) {
    */
   async function relatedOf(picked: ModItemDto[], disable: boolean): Promise<ModItemDto[]> {
     if (!picked.length || !instanceUuid.value) return [];
-    const uuids = await modsRelatedMods(
-      instanceUuid.value,
-      picked.map((item) => item.uuid),
-      disable,
-    );
-    return uuids
-      .map((uuid) => mods.value.find((item) => item.uuid === uuid))
-      .filter((item): item is ModItemDto => !!item);
+    try {
+      const uuids = await modsRelatedMods(
+        instanceUuid.value,
+        picked.map((item) => item.uuid),
+        disable,
+      );
+      return uuids
+        .map((uuid) => mods.value.find((item) => item.uuid === uuid))
+        .filter((item): item is ModItemDto => !!item);
+    } catch (e) {
+      // 这一问只是"要不要顺带一起改"，查不到就当没有相关模组：
+      // 别让它的失败把启用 / 禁用本身也挡掉
+      showToast(tErr(e));
+      return [];
+    }
   }
 
   return { depTreeOf, relatedOf, itemOf };

@@ -804,6 +804,38 @@
 /* 批量「移到分组」的按钮：高度跟全 app 一样（.mini-btn / .icon-btn 的默认 32），
    原来的 35px 覆盖已删。目标分组改成弹窗里选（见 ModPane 的 group-pick 弹窗），这里不再有下拉 */
 
+/* ---------- 模组：行的虚拟化 ---------- */
+
+/* 只渲染视口附近那几行，其余的行用**行容器的上下内边距**撑住高度（见 composables/useVirtualRows.ts）。
+   行容器就是包着行的那一层：它比原来多包一层，行本身仍是 flex 一列、行间距也不变。
+   两种视图共用这个类，表格那边把 gap 归零（分隔线就在行边界上）。 */
+.resource-layout .mod-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px; /* 与 useVirtualRows 的 MOD_ROW_GAP 同源 */
+}
+
+.resource-layout .mod-table .mod-rows {
+  gap: 0;
+}
+
+/* 表格里第一行数据行上面那条分隔线：原来靠 `.mod-tr + .mod-tr` 从前一行（分组行）拿到，
+   行包进 .mod-rows 之后前面的兄弟不在了，这里补回来 */
+.resource-layout .mod-table .mod-rows>.mod-tr:first-child {
+  border-top: 1px solid var(--border);
+}
+
+/* **行高必须一致**：虚拟窗口按下标算，被藏起来的行按行高估着撑高 —— 行高不一时，
+   下边那些分组的落点会越算越偏、滚动条也会跳。
+   两个高度与 useVirtualRows 的 MOD_ROW_H / MOD_TR_H 同源，改一处要改两处。 */
+.resource-layout .mod-rows .item-row {
+  height: 56px;
+}
+
+.resource-layout .mod-table .mod-virtual-row {
+  height: 32px;
+}
+
 /* ---------- 模组：表格视图 ---------- */
 
 .resource-layout .mod-table {
