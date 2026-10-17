@@ -8,6 +8,7 @@ import { api } from "../lib/api";
 import { t, tErr } from "../lib/i18n";
 import { showToast } from "../lib/toast";
 import type { ModPackStatusDto, ModPackTaskDto } from "../lib/bindings";
+import AsyncImage from "./ui/AsyncImage.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -107,6 +108,9 @@ async function clearDone() {
       <div class="mp-task-list">
         <div v-for="task in status.tasks" :key="task.uuid" class="mp-task">
           <div class="mp-task-head">
+            <!-- 整合包图标：一眼认出装的是哪个包；没有就用首字母占位 -->
+            <AsyncImage v-if="task.icon" class="mp-task-icon" :src="task.icon" alt="" />
+            <span v-else class="mp-task-icon mp-task-icon-fallback">{{ task.name.slice(0, 1).toUpperCase() }}</span>
             <span class="mp-task-name">{{ task.name }}</span>
             <span v-if="task.done" class="mp-tag done">{{ t("add.packState.done") }}</span>
             <span v-else-if="task.failed" class="mp-tag failed" v-tip="task.error || ''">{{ t("modpack.bar.failed")
@@ -370,5 +374,46 @@ async function clearDone() {
 
 .progress-track.sub {
   height: 6px;
+}
+
+/* ---------- 弹窗形态：任务排成项目列表，不再套"一个大框" ---------- */
+/* 只作用于 fill-h（弹窗那侧传的）；窗口里内嵌那张卡片仍保留底色与描边 */
+.mp-bar.fill-h {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+}
+
+.mp-bar.fill-h .mp-task-list {
+  gap: 0;
+  padding-top: 6px;
+}
+
+.mp-bar.fill-h .mp-task {
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mp-bar.fill-h .mp-task:last-child {
+  border-bottom: none;
+}
+.mp-task-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+/* 没有图标时用首字母占位，与实例图标的回退口径一致 */
+.mp-task-icon-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-hover);
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
 }
 </style>

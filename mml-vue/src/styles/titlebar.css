@@ -29,9 +29,15 @@
   flex-shrink: 0;
 }
 
-/* 纯图标按钮：文案都在提示与 aria-label 里，不需要横向留白 */
+/* 纯图标按钮：文案都在提示与 aria-label 里，不需要横向留白。
+   尺寸跟主窗口的方形图标键（下面那组）同一档 —— 以前这里是"内容 + 左右各 10px"，
+   换到子窗口时标题栏按钮比主页面宽一圈，看着像两套 UI */
 .frame-head .ui-btn.icon-btn-head {
-  padding: 0 10px;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
+  padding: 0;
+  border-radius: var(--ctl-radius);
+  flex-shrink: 0;
 }
 
 /* 实例 chip 也能被压：标题栏控件多，窗口窄时先让名字走省略号 */
@@ -40,8 +46,9 @@
 }
 
 /* 标题栏里的**方形**图标键：主窗口自绘顶栏的功能入口，加三个进度指示器。
- * 与槽里的 .icon-btn-head 是同一档，但那几个是 .ui-btn、宽度由内容撑，这几个自带描边、
- * 必须自己给尺寸。尺寸与圆角只留这一份 —— 顶栏那枚曾自造 10px 圆角，与槽里的 8px 不齐 */
+ * 与槽里的 .icon-btn-head 是同一档：两者都是 32px 见方（`--ctl-h`）、同一个圆角，
+ * 槽里那几个挂的是 .ui-btn、尺寸由上面那条规则统一给。
+ * 尺寸与圆角只留这一份 —— 顶栏那枚曾自造 10px 圆角，与槽里的 8px 不齐 */
 .topbar .topbar-icon-btn,
 .mp-indicator,
 .dl-indicator,

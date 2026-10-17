@@ -523,7 +523,7 @@ function onNoteEnter(event: KeyboardEvent) {
         @keydown.esc.prevent="cancelEdit($event)" @blur="commitEdit($event)" @pointerdown.stop>{{ row.item.note
         }}</span>
 
-      <span class="mod-cell" :title="row.item.modId">{{ row.item.modId }}</span>
+      <span class="mod-cell" :title="row.item.modId"><HighlightText :text="row.item.modId" :query="props.query" /></span>
       <span class="mod-cell" :title="row.item.version">{{ row.item.version }}</span>
       <span class="mod-cell" :title="loaderNames(row.item.loaders)">
         {{ loaderNames(row.item.loaders) }}
@@ -559,7 +559,7 @@ function onNoteEnter(event: KeyboardEvent) {
         @pointerdown.stop>{{ row.item.fileId }}</span>
       <!-- 路径不挂 title：用户明确不要悬浮 -->
       <span class="mod-cell mod-path">{{ row.item.path }}</span>
-      <span class="mod-cell" :title="row.item.author">{{ row.item.author }}</span>
+      <span class="mod-cell" :title="row.item.author"><HighlightText :text="row.item.author" :query="props.query" /></span>
       <span class="mod-cell" :title="row.item.url">{{ row.item.url }}</span>
     </div>
     </div>

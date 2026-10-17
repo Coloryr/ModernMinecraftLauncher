@@ -6,6 +6,7 @@
 // 口径见 lib/progress.ts：同一个项目下选了多个文件时按「项目数」推进，
 // 只有一个文件时用该文件自己的字节进度（单独下一个模组就是这一种）。
 import { computed } from "vue";
+import AsyncImage from "./ui/AsyncImage.vue";
 import { api } from "../lib/api";
 import { resourceGroups, resourceOverallPercent, type ResourceGroupProgress } from "../lib/progress";
 import type { ResourceStatusDto } from "../lib/bindings";
@@ -86,6 +87,9 @@ function progressText(group: ResourceGroupProgress): string {
     <div v-if="groups.length" class="res-task-list">
       <div v-for="group in groups" :key="group.pid" class="res-task">
         <div class="res-task-head">
+          <!-- 项目图标：一眼认出下的是哪个资源；没有就用首字母占位 -->
+          <AsyncImage v-if="group.icon" class="res-task-icon" :src="group.icon" alt="" />
+          <span v-else class="res-task-icon res-task-icon-fallback">{{ group.name.slice(0, 1).toUpperCase() }}</span>
           <span class="res-task-name">{{ group.name }}</span>
           <span v-if="stateTag(group)" class="res-tag"
             :class="{ done: group.done, failed: group.failed, cancelled: group.cancelled }">
@@ -251,5 +255,46 @@ function progressText(group: ResourceGroupProgress): string {
 .res-clear-btn:hover {
   color: var(--text);
   border-color: var(--accent);
+}
+
+/* ---------- 弹窗形态：任务排成项目列表，不再套"一个大框" ---------- */
+/* 只作用于 fill-h（弹窗那侧传的）；窗口里内嵌那张卡片仍保留底色与描边 */
+.res-bar.fill-h {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+}
+
+.res-bar.fill-h .res-task-list {
+  gap: 0;
+  padding-top: 6px;
+}
+
+.res-bar.fill-h .res-task {
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+.res-bar.fill-h .res-task:last-child {
+  border-bottom: none;
+}
+.res-task-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+/* 没有图标时用首字母占位 */
+.res-task-icon-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-hover);
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
 }
 </style>

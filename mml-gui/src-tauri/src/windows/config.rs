@@ -20,12 +20,13 @@
 //! 见 [`nbt_session`]），之后的保存是"改值 / 新增 / 删除"三种操作，直接套在会话那份树上、
 //! 由同一个句柄写回，不再重新打开与重新读盘。
 
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};
 
 use mml_base::hash_helper::{self, HashType};
 use mml_names::names;
 use mml_nbt::chunk::ChunkData;
+use mml_nbt::nbt_file::NbtFile;
 use mml_nbt::nbt_types;
 use mml_nbt::{NBT_END_ORDER, NbtType};
 use mml_sys::path_helper;
@@ -539,6 +540,74 @@ pub fn config_close_nbt(game: String, source: String, file: String) -> Result<()
     Ok(())
 }
 
+/// 配置文件窗口左栏的宽度，单位像素
+///
+/// # 返回值
+///
+/// 上次拖出来的宽度；没拖过时是默认的 300
+#[gui_macros::ipc_group("config")]
+#[tauri::command]
+pub fn config_tree_width() -> f64 {
+    crate::gui_config::get().config_window.tree_width
+}
+
+/// 记住左栏宽度，落 `gui_config.json`
+///
+/// - `width`: 宽度，单位像素；越界夹到 200 到 640
+#[gui_macros::ipc_group("config")]
+#[tauri::command]
+pub fn config_set_tree_width(width: f64) {
+    let width = width.clamp(200.0, 640.0);
+    let mut config = crate::gui_config::get();
+    if (config.config_window.tree_width - width).abs() < f64::EPSILON {
+        return;
+    }
+    config.config_window.tree_width = width;
+    crate::gui_config::set(config);
+}
+
+/// 在文件管理器里打开这个文件所在的目录，并把该文件**选中**
+///
+/// 只打开目录的话，同一目录下几十个文件还得让用户自己找那一份；
+/// 选中它一眼就能看到。
+///
+/// - `game`: 实例 uuid
+/// - `source`: 来源，空串为实例本身，否则是存档目录名
+/// - `file`: 来源内的相对路径，与 [`config_get_file`] 同一口径
+///
+/// # 返回值
+///
+/// 路径非法返回 `err.fileName`
+#[gui_macros::ipc_group("config")]
+#[tauri::command]
+pub fn config_open_file_dir(game: String, source: String, file: String) -> Result<(), String> {
+    let game = instance_snapshot(&game)?;
+    let path = resolve_source(&game, &source, &file)?;
+    mml_sys::open_helper::open_file_with_explorer(&path);
+    Ok(())
+}
+
+/// 删除一个配置文件，文件进回收站
+///
+/// 删之前先把这个文件的 NBT 会话关掉，否则句柄还指着已经没了的那一份。
+///
+/// - `game`: 实例 uuid
+/// - `source`: 来源，空串为实例本身，否则是存档目录名
+/// - `file`: 来源内的相对路径
+///
+/// # 返回值
+///
+/// 路径非法返回 `err.fileName`；删除失败返回内核错误串
+#[gui_macros::ipc_group("config")]
+#[tauri::command]
+pub fn config_delete_file(game: String, source: String, file: String) -> Result<(), String> {
+    let game = instance_snapshot(&game)?;
+    let path = resolve_source(&game, &source, &file)?;
+    nbt_session::close(&path);
+    path_helper::move_to_trash(&path).map_err(|err| err.to_string())?;
+    Ok(())
+}
+
 /// 按前端记下的一批改动改写 NBT 文件
 ///
 /// 改动按顺序套用，见 [`NbtEditDto`]：改值 / 新增 / 删除三种。写回在**打开时那个句柄**上做
@@ -992,6 +1061,79 @@ pub fn config_get_mca(
             time: item.time,
         })
         .collect())
+}
+
+/// 读取区域文件里某个区块的 NBT，给区块树展开用
+///
+/// 只 seek 到该表项读一个区块，不解析其它区块。
+///
+/// - `game`: 实例 uuid
+/// - `source`: 来源，空串为实例本身，否则是存档目录名
+/// - `file`: 来源内的相对路径
+/// - `index`: 表项下标，0–1023
+///
+/// # 返回值
+///
+/// 该区块根标签的成员节点，按键名排序；表项为空、下标越界或根标签不是复合
+/// 返回 `err.mcaChunkEmpty`，路径非法返回 `err.fileName`
+#[gui_macros::ipc_group("config")]
+#[tauri::command]
+pub fn config_get_mca_chunk(
+    game: String,
+    source: String,
+    file: String,
+    index: u32,
+) -> Result<Vec<NbtNodeDto>, String> {
+    let game = instance_snapshot(&game)?;
+    let path = resolve_source(&game, &source, &file)?;
+    if get_file_type(&path) != FileItemType::Mca {
+        return Err(String::from(err_keys::NOT_MCA_FILE));
+    }
+
+    let mut stream = path_helper::open_read(&path).map_err(|err| err.to_string())?;
+    let head = ChunkData::read_head(&mut stream).map_err(|err| err.to_string())?;
+    let item = head
+        .get(index as usize)
+        .filter(|item| item.count > 0)
+        .ok_or_else(|| String::from(err_keys::MCA_CHUNK_EMPTY))?;
+
+    // 前 4 字节是长度，第 5 字节是压缩代号，长度把代号也算在内
+    stream
+        .seek(SeekFrom::Start(item.pos as u64))
+        .map_err(|err| err.to_string())?;
+    let mut head_bytes = [0u8; 5];
+    stream
+        .read_exact(&mut head_bytes)
+        .map_err(|err| err.to_string())?;
+    let size = u32::from_be_bytes([
+        head_bytes[0],
+        head_bytes[1],
+        head_bytes[2],
+        head_bytes[3],
+    ]) as usize;
+    if size <= 1 {
+        return Err(String::from(err_keys::MCA_CHUNK_EMPTY));
+    }
+    let mut buffer = vec![0u8; size - 1];
+    stream
+        .read_exact(&mut buffer)
+        .map_err(|err| err.to_string())?;
+
+    let mut cursor = Cursor::new(buffer);
+    let mut nbt_file = NbtFile::read(&mut cursor).map_err(|err| err.to_string())?;
+    let root = nbt_file
+        .nbt
+        .as_compound()
+        .ok_or_else(|| String::from(err_keys::MCA_CHUNK_EMPTY))?;
+
+    let mut children: Vec<NbtNodeDto> = root
+        .data
+        .iter()
+        .map(|(name, value)| nbt_node(name.clone(), value))
+        .collect();
+    children.sort_by(|a, b| a.name.cmp(&b.name));
+
+    Ok(children)
 }
 
 /// 读取任意文件的一段字节，给二进制视图翻页用

@@ -28,10 +28,14 @@ import { showToast } from "../../lib/toast";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import {
   api,
+  deleteConfigFile,
+  getConfigTreeWidth,
   listConfigFiles,
   listSaves,
+  openConfigFileDir,
   openInstanceDir,
   readConfigFile,
+  setConfigTreeWidth,
   writeConfigFile,
 } from "../../lib/api";
 import { loadGuiConfig } from "../../lib/guiConfig";
@@ -49,6 +53,7 @@ import ImageView from "./parts/ImageView.vue";
 import McaTable from "./parts/McaTable.vue";
 import NbtTree from "./parts/NbtTree.vue";
 import { clearCleanSessions, closeSessions } from "./parts/nbtSession";
+import RowMenu, { type RowMenuItem } from "../resource/parts/RowMenu.vue";
 import type { FileItemDto, SaveItemDto } from "../../lib/bindings";
 
 /** 请求关闭本窗口 */
@@ -365,6 +370,93 @@ async function saveText() {
   }
 }
 
+/** 左栏宽度，单位像素；拖动中间那条分隔线改它 */
+const treeWidth = ref(300);
+
+/** 是否正在拖分隔线，用来给拖拽态加高亮 */
+const resizing = ref(false);
+
+/** 左栏宽度的上下限，单位像素 */
+const TREE_MIN_WIDTH = 200;
+const TREE_MAX_WIDTH = 640;
+
+/**
+ * 拖动分隔线改左栏宽度
+ *
+ * 拖动过程中只改本地宽度，松手才落盘 —— 每移动一像素写一次文件没有必要。
+ * 监听挂在 `window` 上：指针移出那条窄带也不会中断。
+ *
+ * - `event`: 分隔线上的按下事件
+ */
+function startResize(event: PointerEvent) {
+  event.preventDefault();
+  resizing.value = true;
+  const startX = event.clientX;
+  const startWidth = treeWidth.value;
+
+  function onMove(e: PointerEvent) {
+    const next = startWidth + e.clientX - startX;
+    treeWidth.value = Math.min(TREE_MAX_WIDTH, Math.max(TREE_MIN_WIDTH, next));
+  }
+
+  function onUp() {
+    resizing.value = false;
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    void setConfigTreeWidth(treeWidth.value);
+  }
+
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+}
+
+/** 文件行的右键菜单：点击处坐标 + 右键的那个相对路径 */
+const rowMenu = ref<{ x: number; y: number; name: string } | null>(null);
+
+/** 右键菜单项：打开所在目录 / 删除（进回收站） */
+const rowMenuItems = computed<RowMenuItem[]>(() => [
+  { id: "open-dir", label: t("config.openFileDir") },
+  { id: "delete", label: t("config.deleteFile"), danger: true, separated: true },
+]);
+
+/**
+ * 右键一个文件：记下坐标与路径，弹出菜单
+ *
+ * - `event`: 右键事件，取点击处坐标
+ * - `name`: 文件在来源内的相对路径
+ */
+function openRowMenu(event: MouseEvent, name: string) {
+  rowMenu.value = { x: event.clientX, y: event.clientY, name };
+}
+
+/**
+ * 执行右键菜单项
+ *
+ * - `id`: 菜单项 id，见 [`rowMenuItems`]
+ */
+async function onRowMenuPick(id: string) {
+  const target = rowMenu.value;
+  rowMenu.value = null;
+  if (!target || !instanceUuid.value) return;
+  try {
+    if (id === "open-dir") {
+      await openConfigFileDir(instanceUuid.value, source.value, target.name);
+      return;
+    }
+    if (id === "delete") {
+      await deleteConfigFile(instanceUuid.value, source.value, target.name);
+      // 删掉的正好是打开着的那份：右边清掉，免得对着一份已经不存在的文件
+      if (selected.value?.name === target.name) {
+        selected.value = null;
+      }
+      await loadFiles();
+      showToast(t("config.deleted"));
+    }
+  } catch (e) {
+    showToast(tErr(e));
+  }
+}
+
 /** 在文件管理器里打开这个实例的目录 */
 function openDir() {
   if (!instanceUuid.value) return;
@@ -378,7 +470,37 @@ async function pickSource(value: string) {
   await loadFiles();
 }
 
-onMounted(() => void load());
+/**
+ * Ctrl+S / Cmd+S 保存
+ *
+ * 有改动、且不是正在存的时候才真存；组合键一律吞掉，
+ * 免得浏览器预览下弹出"保存网页"。
+ *
+ * - `event`: 键盘事件
+ */
+function onSaveHotkey(event: KeyboardEvent) {
+  if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "s") {
+    return;
+  }
+  event.preventDefault();
+  if (!canSave.value || !unsaved.value || busy.value) {
+    return;
+  }
+  void save();
+}
+
+onMounted(() => {
+  void load();
+  // 左栏宽度是用户偏好，走后端落 gui_config.json
+  void getConfigTreeWidth().then((width) => {
+    treeWidth.value = Math.min(TREE_MAX_WIDTH, Math.max(TREE_MIN_WIDTH, width));
+  });
+  window.addEventListener("keydown", onSaveHotkey);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", onSaveHotkey);
+});
 // 本窗口走了（多窗口模式下就是窗口关闭，单窗口模式下是页面切走）：打开着的 NBT 文件都放手，
 // 后端那边的句柄跟着关掉，下次打开重新读盘
 onBeforeUnmount(closeSessions);
@@ -423,7 +545,7 @@ useWindowRefresh(() => {
 
     <div class="cfg-body">
       <!-- 左：与主窗口侧栏同一套，搜索固定在上，只有下面的树滚动 -->
-      <aside class="cfg-list">
+      <aside class="cfg-list" :style="{ width: `${treeWidth}px` }">
         <div class="cfg-list-head">
           <SearchBox v-model="query" :placeholder="t('config.search')" :clear-label="t('config.searchClear')"
             width="100%" />
@@ -433,14 +555,15 @@ useWindowRefresh(() => {
           <template v-for="row in rows" :key="row.key">
             <!-- 目录：按侧栏的分组标题写，缩进由层级给 -->
             <button v-if="row.isDir" class="cfg-dir" :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
-              @click="toggleExpand(row.key)">
+              @click="toggleExpand(row.key)" @contextmenu.prevent="openRowMenu($event, row.key)">
               <GlyphIcon class="cfg-chevron" :class="{ open: expanded.has(row.key) }" name="chevron-down" :size="13"
                 :weight="2.4" />
               <span class="cfg-dir-name" :title="row.key">{{ row.name }}</span>
             </button>
             <!-- 文件：按侧栏的实例行写 -->
             <button v-else class="cfg-row" :class="{ on: selected?.name === row.key }"
-              :style="{ paddingLeft: `${8 + row.depth * 14}px` }" :title="row.key" @click="openFile(row.key)">
+              :style="{ paddingLeft: `${8 + row.depth * 14}px` }" :title="row.key" @click="openFile(row.key)"
+              @contextmenu.prevent="openRowMenu($event, row.key)">
               <span class="cfg-chevron-spacer"></span>
               <span class="cfg-file-name">{{ row.name }}</span>
             </button>
@@ -449,9 +572,12 @@ useWindowRefresh(() => {
         </div>
       </aside>
 
+      <!-- 分隔线：拖动改左栏宽度。盖在左栏右边框上，所以看起来还是那一条细线 -->
+      <div class="cfg-split" :class="{ on: resizing }" @pointerdown="startResize" />
+
       <!-- 右：按类型选视图。没选文件时也摆着文本编辑器，只是禁用 ——
            打开窗口就是"编辑器窗口"的样子，不再是中间一句提示 -->
-      <section class="cfg-view" :class="{ flush: !selected || isText || selected.fileType === 'image' || selected.fileType === 'nbt' }">
+      <section class="cfg-view">
         <!-- 与下面那个必须给不同的 key：同为 MonacoText，Vue 会复用实例，
              而只读是创建时的选项，复用后切不回可编辑 -->
         <MonacoText v-if="!selected" key="empty" :model-value="''" readonly />
@@ -465,6 +591,10 @@ useWindowRefresh(() => {
         <HexView v-else :uuid="instanceUuid" :source="source" :file="selected.name" />
       </section>
     </div>
+
+    <!-- 文件行右键菜单：打开所在目录 / 删除 -->
+    <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenuItems"
+      @pick="onRowMenuPick" @close="rowMenu = null" />
   </WindowFrame>
 </template>
 
@@ -609,18 +739,38 @@ useWindowRefresh(() => {
 }
 
 /* 右栏：四周留白回到全 app 内容区那一档（窗口走了 body-flush，这里自己给） */
+/* 右栏：**四个编辑模式共用这一张卡片** —— 底色、描边、圆角只写这一处，
+   文本 / NBT / 区块 / 二进制各自铺满它，内边距由各视图按内容疏密自己给。
+   以前是"文本与 NBT 贴边、区块与二进制各带一张卡片"两套口径，切文件时边界会跳 */
 .cfg-view {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-width: 0;
   min-height: 0;
-  padding: 22px 26px;
+  /* 直接占满右栏：与左栏同一边界口径（左栏也是贴边 + 一条右边框），不要外留白 */
+  /* 不透明底：区块 / 二进制是密排文本，半透明底会和窗口背景图叠在一起 */
+  background: var(--bg-solid, var(--bg-card));
+  overflow: hidden;
 }
 
-/* 文本、图片、NBT 与默认态贴边满铺：编辑器自己那圈描边就是分界，图片与 NBT 树不套卡片、
-   也不该再留一圈空。卡片类视图（区块 / 二进制）自带圆角与描边，仍要上面那圈外留白 */
-.cfg-view.flush {
-  padding: 0;
+/* 视图自己铺满卡片：不漏白底，也不各自撑出自带的外留白 */
+.cfg-view > * {
+  flex: 1;
+  min-height: 0;
+}
+/* 分隔线：5px 的透明热区压着左栏那条右边框，看起来仍是一条细线 */
+.cfg-split {
+  flex: 0 0 5px;
+  margin-left: -3px;
+  cursor: col-resize;
+  z-index: 1;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.cfg-split:hover,
+.cfg-split.on {
+  background: var(--accent-soft);
 }
 </style>

@@ -44,6 +44,7 @@ import type {
   LogSettingDto,
   McaChunkDto,
   ModAutoMarkDto,
+  NbtNodeDto,
   ModAutoMarkProgressDto,
   ModDepTreeDto,
   ModGroupDto,
@@ -1525,6 +1526,38 @@ export function onDownloadItem(cb: (e: DownloadItemEvent) => void): Promise<Unli
  */
 export function onCloseBlocked(cb: (label: string) => void): Promise<UnlistenFn> {
   return listen<string>(CloseBlocked, (event) => cb(event.payload));
+}
+
+/** 读取区域文件里某个区块的 NBT 成员，区块树展开时按需调用 */
+export function readConfigMcaChunk(
+  game: string,
+  source: string,
+  file: string,
+  index: number,
+): Promise<NbtNodeDto[]> {
+  return commands.config.getMcaChunk(game, source, file, index);
+}
+
+// ---------- 配置文件的右键操作 ----------
+
+/** 在文件管理器里打开这个配置文件所在的目录 */
+export function openConfigFileDir(game: string, source: string, file: string): Promise<void> {
+  return commands.config.openFileDir(game, source, file);
+}
+
+/** 配置文件窗口左栏的宽度，单位像素 */
+export function getConfigTreeWidth(): Promise<number> {
+  return commands.config.treeWidth();
+}
+
+/** 记住配置文件窗口左栏的宽度，后端会夹到合法区间 */
+export function setConfigTreeWidth(width: number): Promise<void> {
+  return commands.config.setTreeWidth(width);
+}
+
+/** 删除一个配置文件（进回收站） */
+export function deleteConfigFile(game: string, source: string, file: string): Promise<void> {
+  return commands.config.deleteFile(game, source, file);
 }
 
 // ---------- 上次选的下载源 ----------

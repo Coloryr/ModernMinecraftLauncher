@@ -126,6 +126,7 @@ pub async fn add_resource_download(
             SourceDownloadInfo {
                 file: PathBuf::new(),
                 name: String::new(),
+                icon: String::new(),
                 now: 0.0,
                 done: false,
                 failed: false,
@@ -204,12 +205,29 @@ pub async fn add_resource_download(
         }
     };
 
+    // 图标从项目缓存取；缓存里没有就留空，界面用首字母占位
+    let project_icon = match source {
+        ModPackType::CurseForge => super::CURSEFOGRE_INFO
+            .read()
+            .await
+            .get(&pid)
+            .and_then(|item| item.logo.url.clone()),
+        ModPackType::Modrinth => super::MODRINTH_INFO
+            .read()
+            .await
+            .get(&pid)
+            .and_then(|item| item.icon_url.clone()),
+        _ => None,
+    }
+    .unwrap_or_default();
+
     // 补全条目的显示名与目标路径，进度回调按路径匹配
     {
         let mut map = DOWNLOAD_NOW.write().unwrap();
         if let Some(info) = map.get_mut(&uuid).and_then(|entry| entry.get_mut(&key)) {
             info.file = obj.file.clone();
             info.name = obj.name.clone();
+            info.icon = project_icon;
         }
     }
     emit_add_resource_status(&app, build_status(&app));

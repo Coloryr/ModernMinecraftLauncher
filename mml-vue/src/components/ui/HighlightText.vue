@@ -49,6 +49,8 @@ const parts = computed<Part[]>(() => {
 }
 
 .hl-hit {
+  /* 兜底先给一层半透明强调色，再叠 color-mix；不支持 color-mix 的 webview 也有底色 */
+  background: var(--accent-soft, rgba(63, 140, 255, 0.28));
   background: color-mix(in srgb, var(--accent) 30%, transparent);
   color: inherit;
   border-radius: 3px;

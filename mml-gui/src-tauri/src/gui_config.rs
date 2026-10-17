@@ -374,6 +374,8 @@ pub struct GuiConfig {
     pub bg_native_size: u32,
     /// 添加资源 / 下载整合包两个窗口的浏览偏好
     pub resource_window: ResourceWindowConfig,
+    /// 配置文件窗口的布局偏好
+    pub config_window: ConfigWindowConfig,
 }
 
 impl Default for GuiConfig {
@@ -395,6 +397,7 @@ impl Default for GuiConfig {
             bg_blur: 0,
             bg_native_size: 100,
             resource_window: Default::default(),
+            config_window: Default::default(),
         }
     }
 }
@@ -411,6 +414,24 @@ pub struct ResourceWindowConfig {
     pub add_resource_source: String,
     /// 下载整合包窗口上次选的下载源
     pub add_modpack_source: String,
+}
+
+/// 配置文件窗口的布局偏好
+///
+/// 属于用户偏好而不是设置页上的项：由窗口命令 `config_tree_width` / `config_set_tree_width`
+/// 维护，设置页保存时从旧配置整份带过来，见 `window_save_gui_config`。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ConfigWindowConfig {
+    /// 左侧文件树的宽度，单位像素；拖中间那条分隔线改的就是它
+    pub tree_width: f64,
+}
+
+impl Default for ConfigWindowConfig {
+    /// 默认左栏 300 像素，与主窗口侧栏同宽
+    fn default() -> Self {
+        Self { tree_width: 300.0 }
+    }
 }
 
 /// 配置文件路径，init 时设置

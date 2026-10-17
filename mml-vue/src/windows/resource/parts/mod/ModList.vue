@@ -190,8 +190,9 @@ const visible = computed(() => rows.value.slice(start.value, end.value));
         <span v-if="row.item.note" class="mod-note" :title="row.item.note">{{ row.item.note }}</span>
       </template>
 
+      <!-- 副标题含版本 / 作者 / 文件名：搜索也匹配文件名，命中就在这儿着色 -->
       <template #sub>
-        <span>{{ modSub(row.item) }}</span>
+        <span><HighlightText :text="modSub(row.item)" :query="props.query" /></span>
       </template>
     </ResourceRow>
   </div>

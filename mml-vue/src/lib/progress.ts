@@ -93,6 +93,8 @@ export interface ResourceGroupProgress {
   pid: string;
   /** 显示名（取组内第一条） */
   name: string;
+  /** 项目图标地址（取组内第一条）；空串表示没有，界面用首字母占位 */
+  icon: string;
   /** 组内文件数 */
   total: number;
   /** 组内已结束（完成 / 失败 / 取消）的文件数 */
@@ -138,6 +140,7 @@ export function resourceGroups(tasks: ResourceTaskDto[]): ResourceGroupProgress[
     return {
       pid,
       name: list[0].name,
+      icon: list[0].icon,
       total: list.length,
       finished,
       failed: list.some((task) => task.failed),

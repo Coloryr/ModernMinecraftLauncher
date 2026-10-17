@@ -40,30 +40,27 @@ pub fn open_file_with_explorer<P: AsRef<Path>>(path: P) {
     open_file_with_explorer_inner(path);
 }
 
-/// Windows 实现：用 Shell COM 打开父目录并选中该文件
+/// Windows 实现：用资源管理器打开父目录并选中该文件
+///
+/// 走 `explorer /select,<路径>`，不用 Shell 的 `SHOpenFolderAndSelectItems`：
+/// 那条 COM 路要求调用线程是 STA 且带消息泵，启动器主线程不满足时会**成功返回但
+/// 什么都不弹**；拉起 explorer 进程没有这些约束，也不会因为参数不合规把主线程打崩。
 #[cfg(target_os = "windows")]
 fn open_file_with_explorer_inner<P: AsRef<Path>>(path: P) {
-    unsafe {
-        use windows::{
-            Win32::{
-                System::Com::{CoInitialize, CoUninitialize},
-                UI::Shell::{ILCreateFromPathW, ILFree, SHOpenFolderAndSelectItems},
-            },
-            core::{HSTRING, PCWSTR},
-        };
+    use std::os::windows::process::CommandExt;
 
-        CoInitialize(None).unwrap();
+    let path = path.as_ref();
+    // 与 ColorMC 同一写法：整段 `/select,<路径>` 作为**原始参数**原样交给 explorer。
+    // 两处细节都不能省：
+    // - 分隔符先统一成反斜杠：配置窗口的相对路径是按 `/` 拼的，混着 `\` 和 `/` 的路径
+    //   explorer 解析不出来，会退回默认目录（表现就是"打开了但位置不对"）；
+    // - 用 `raw_arg` 而不是 `arg`：后者会给整段套引号（连 `/select,` 一起），选项就失效了。
+    let text = path.display().to_string().replace('/', "\\");
+    let arg = format!("/select,{text}");
 
-        let hstring = HSTRING::from(path.as_ref().as_os_str());
-        let pcwstr = PCWSTR(hstring.as_ptr());
-
-        let folder_pidl = ILCreateFromPathW(pcwstr);
-
-        SHOpenFolderAndSelectItems(folder_pidl, None, 0).unwrap();
-
-        ILFree(Some(folder_pidl));
-
-        CoUninitialize();
+    if Command::new("explorer").raw_arg(arg).spawn().is_err() {
+        // 拉不起来就退回"只打开目录"
+        open_dir(path.parent().unwrap_or(path));
     }
 }
 

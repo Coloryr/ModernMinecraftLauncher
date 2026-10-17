@@ -472,8 +472,9 @@ function saveTip(item: SaveItemDto): string {
             {{ t("resource.backupCount", { n: item.backups }) }}
           </span>
         </template>
+        <!-- 目录名也可能带 `§` 格式码（存档文件夹是玩家自己起的名），与名字同一套解析 -->
         <template #sub>
-          {{ item.dir }} · {{ t("resource.lastPlayed", { time: formatTime(item.lastPlayed) }) }}
+          <FormattedText :text="item.dir" /> · {{ t("resource.lastPlayed", { time: formatTime(item.lastPlayed) }) }}
         </template>
       </ResourceRow>
       <div v-if="!saves.length" class="empty-tip">{{ t("resource.empty") }}</div>

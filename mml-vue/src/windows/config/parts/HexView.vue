@@ -132,9 +132,7 @@ watch(
   min-height: 0;
   overflow: auto;
   padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--bg-solid, var(--bg-card));
+  /* 卡片由配置窗口右栏那张统一给，这里只剩内容与滚动 */
   font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
   font-size: 12px;
   line-height: 1.6;

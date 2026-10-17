@@ -103,7 +103,7 @@ pub async fn resource_modpack_update(
     let RegisteredTask {
         task,
         gui: pack_gui,
-    } = register_task(&app, key, source, name, "upgrade", token.clone())?;
+    } = register_task(&app, key, source, name, String::new(), "upgrade", token.clone())?;
     // 升级的是已有实例，目标从开始就记上：任务列表里点它要能回到那个实例
     *task.instance_uuid.lock().unwrap() = Some(uuid.clone());
 

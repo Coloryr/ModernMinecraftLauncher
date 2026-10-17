@@ -27,7 +27,7 @@ use flate2::{
     read::{GzDecoder, ZlibDecoder},
     write::{GzEncoder, ZlibEncoder},
 };
-use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType};
+use mml_names::i18_items::error_type::{CoreResult, ErrorType};
 
 use crate::nbt_types::NbtCompound;
 use crate::{NBT_BYTE_ORDER, NBT_END_ORDER, NbtType, io_error, nbt_types};
@@ -198,11 +198,7 @@ impl NbtFile {
             if len > 0 {
                 let mut temp = vec![0; len as usize];
                 stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
-                root_name = String::from_utf8(temp).map_err(|err| {
-                    ErrorType::StreamError(ErrorData {
-                        error: err.to_string(),
-                    })
-                })?;
+                root_name = crate::nbt_types::decode_string(temp);
             }
         }
         nbt_inner.read(&mut stream)?;

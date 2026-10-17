@@ -107,6 +107,8 @@ pub struct SourceDownloadInfo {
     pub file: PathBuf,
     /// 显示名
     pub name: String,
+    /// 项目图标地址；空串表示没有（缓存里查不到，或直接开的下载命令），界面用首字母占位
+    pub icon: String,
     /// 下载进度，取值 0.0–100.0
     pub now: f64,
     /// 下载完成，保留一段时间后从任务表移除

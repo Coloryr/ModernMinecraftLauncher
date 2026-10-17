@@ -26,6 +26,8 @@ pub struct ResourceTaskDto {
     pub fid: String,
     /// 显示名
     pub name: String,
+    /// 项目图标地址；空串表示没有，界面用首字母占位
+    pub icon: String,
     /// 下载进度，0–100
     pub progress: f64,
     /// 下载完成

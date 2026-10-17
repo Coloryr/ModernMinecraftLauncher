@@ -29,6 +29,7 @@ pub(super) fn build_status(app: &AppHandle) -> ResourceStatusDto {
                     pid: key.pid.clone(),
                     fid: key.fid.clone(),
                     name: info.name.clone(),
+                    icon: info.icon.clone(),
                     progress: info.now,
                     done: info.done,
                     failed: info.failed,

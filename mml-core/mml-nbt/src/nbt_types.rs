@@ -31,7 +31,7 @@ use std::{
     io::{Read, Write},
 };
 
-use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType};
+use mml_names::i18_items::error_type::{CoreResult, ErrorType};
 
 use crate::{NbtStream, NbtType, io_error, is_nbt_num};
 
@@ -547,6 +547,64 @@ impl NbtString {
     }
 }
 
+/// 解码 NBT 里的字符串字节
+///
+/// 标准 UTF-8 直接收；不合法时再按 **CESU-8** 试一次：Java 写的 NBT 会把 UTF-16 代理对
+/// 拆成两个 3 字节序列（`ED A0 BE ED BA 93` 之类），单看每个序列是合法编码单元、整体却
+/// 不是合法 UTF-8，`from_utf8` 一律拒绝。按代理对合回去才是作者想要的那个字符。
+/// 仍解不出来就按替换符处理，不因为一个字符串让整棵树读失败。
+///
+/// - `bytes`: 字符串原始字节
+///
+/// # 返回值
+///
+/// 解码后的字符串
+pub(crate) fn decode_string(bytes: Vec<u8>) -> String {
+    match String::from_utf8(bytes) {
+        Ok(text) => text,
+        Err(err) => {
+            let bytes = err.into_bytes();
+            match decode_cesu8(&bytes) {
+                Some(text) => text,
+                None => String::from_utf8_lossy(&bytes).into_owned(),
+            }
+        }
+    }
+}
+
+/// 把 CESU-8 解成字符串，遇到非法序列返回 `None`
+fn decode_cesu8(bytes: &[u8]) -> Option<String> {
+    let mut units: Vec<u16> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let head = bytes[i];
+        let (unit, size) = if head < 0x80 {
+            (u16::from(head), 1)
+        } else if head & 0xE0 == 0xC0 {
+            (decode_unit_2(bytes, i)?, 2)
+        } else if head & 0xF0 == 0xE0 {
+            (decode_unit_3(bytes, i)?, 3)
+        } else {
+            return None;
+        };
+        units.push(unit);
+        i += size;
+    }
+    // 落单的代理项这里会失败，交给调用方退回替换符
+    String::from_utf16(&units).ok()
+}
+
+fn decode_unit_2(bytes: &[u8], i: usize) -> Option<u16> {
+    let tail = *bytes.get(i + 1)?;
+    Some((u16::from(bytes[i] & 0x1F) << 6) | u16::from(tail & 0x3F))
+}
+
+fn decode_unit_3(bytes: &[u8], i: usize) -> Option<u16> {
+    let mid = *bytes.get(i + 1)?;
+    let tail = *bytes.get(i + 2)?;
+    Some((u16::from(bytes[i] & 0x0F) << 12) | (u16::from(mid & 0x3F) << 6) | u16::from(tail & 0x3F))
+}
+
 impl NbtStream for NbtString {
     /// 先读 2 字节长度，再读对应数量的 UTF-8 字节并解码
     fn read<R: Read>(&mut self, stream: &mut R) -> CoreResult<()> {
@@ -558,11 +616,7 @@ impl NbtStream for NbtString {
         let mut temp = vec![0; len as usize];
         stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
 
-        self.data = String::from_utf8(temp).map_err(|err| {
-            ErrorType::StreamError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        self.data = decode_string(temp);
 
         Ok(())
     }
@@ -1044,11 +1098,7 @@ impl NbtStream for NbtCompound {
             let mut temp = vec![0; len as usize];
             stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
 
-            let key = String::from_utf8(temp).map_err(|err| {
-                ErrorType::StreamError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            let key = decode_string(temp);
 
             let mut nbt = nbt.unwrap();
             nbt.read(stream)?;
@@ -1324,6 +1374,22 @@ pub fn long_array(data: Vec<i64>) -> NbtLongArray {
 mod tests {
     use std::io::Cursor;
 
+    /// Java 写的 NBT 会把补充平面字符拆成两个 3 字节序列，`from_utf8` 直接拒绝
+    #[test]
+    fn decode_string_accepts_cesu8_surrogate_pair() {
+        // ED A0 BE ED BA 93 = D83E DE93 = U+1FA93
+        let text = decode_string(vec![0xED, 0xA0, 0xBE, 0xED, 0xBA, 0x93]);
+        assert_eq!(text, "\u{1FA93}");
+    }
+
+    /// 合法 UTF-8 与落单代理项都要有结果，不能把整棵树读挂
+    #[test]
+    fn decode_string_keeps_plain_utf8_and_survives_broken_bytes() {
+        assert_eq!(decode_string("普通文本".as_bytes().to_vec()), "普通文本");
+        assert_eq!(decode_string(vec![0xFF, 0xFE]), "\u{FFFD}\u{FFFD}");
+    }
+
+
     use super::*;
     use crate::{
         NBT_BYTE_ARRAY_ORDER, NBT_BYTE_ORDER, NBT_COMPOUND_ORDER, NBT_INT_ARRAY_ORDER,
@@ -1476,12 +1542,13 @@ mod tests {
         assert_eq!(empty, vec![0, 0]);
     }
 
-    /// String 读取时遇到非法 UTF-8 应返回错误
+    /// String 读取遇到非法 UTF-8 不再整棵树失败，按替换符收下
     #[test]
-    fn string_invalid_utf8_returns_error() {
+    fn string_invalid_utf8_falls_back_to_replacement() {
         let mut nbt = NbtString::default();
         let mut cursor = Cursor::new([0u8, 1, 0xFF]);
-        assert!(nbt.read(&mut cursor).is_err());
+        assert!(nbt.read(&mut cursor).is_ok());
+        assert_eq!(nbt.data, "\u{FFFD}");
     }
 
     // ---------- List 类型 ----------

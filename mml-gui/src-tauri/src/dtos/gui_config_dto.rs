@@ -364,6 +364,7 @@ impl From<GuiConfigDto> for GuiConfig {
             bg_native_size: d.bg_native_size,
             // 不属于设置页，由各自的命令维护；保存设置时从旧配置整份带回来
             resource_window: Default::default(),
+            config_window: Default::default(),
         }
     }
 }

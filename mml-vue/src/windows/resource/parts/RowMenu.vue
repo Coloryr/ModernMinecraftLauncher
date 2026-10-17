@@ -93,3 +93,61 @@ function pick(id: string) {
     </template>
   </div>
 </template>
+
+<style scoped>
+/* 菜单外观自己带着：以前只在 resource.css 里按 `.resource-layout` 前缀写，
+   配置文件窗口没有那个容器，菜单就退化成窗口底下两个裸按钮 */
+.row-ctx-menu {
+  position: fixed;
+  z-index: 40;
+  min-width: 150px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-modal-raised);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.28);
+}
+
+/* 批量菜单顶部的"已选 n 项"（说明动作作用在这一批上） */
+.row-ctx-menu-title {
+  display: block;
+  padding: 4px 10px 6px;
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+
+.row-ctx-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12.5px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row-ctx-menu-item:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.row-ctx-menu-item.danger:hover:not(:disabled) {
+  color: var(--red);
+}
+
+.row-ctx-menu-item:disabled {
+  color: var(--text-dim);
+  cursor: default;
+  opacity: 0.55;
+}
+
+.row-ctx-menu-sep {
+  display: block;
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
+</style>
