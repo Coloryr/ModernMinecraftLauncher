@@ -44,7 +44,7 @@ pub use collect_dto::{CollectDataDto, CollectItemDto};
 pub use colormc_dto::{ColorMcCompatDto, ColorMcInfoDto, ColorMcProgressDto, ColorMcReportDto};
 pub use config_dto::{
     BytesSliceDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, FileItemDto, FileItemType,
-    McaChunkDto, NbtEditDto, NbtKindDto, NbtNodeDto, NbtOpDto,
+    ChunkFindDto, McaChunkDto, NbtEditDto, NbtKindDto, NbtNodeDto, NbtOpDto,
 };
 pub use custom_home_dto::CustomHomeInfoDto;
 pub use download_dto::{

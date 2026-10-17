@@ -117,18 +117,18 @@ export const commands = {
     skipColormc: () => invoke<void>("window_skip_colormc"),
   },
   config: {
-    closeNbt: (game: string, source: string, file: string) => invoke<void>("config_close_nbt", { game, source, file }),
+    closeNbt: (game: string, source: string, file: string, index: number | null) => invoke<void>("config_close_nbt", { game, source, file, index }),
     deleteFile: (game: string, source: string, file: string) => invoke<void>("config_delete_file", { game, source, file }),
+    findChunk: (game: string, source: string, file: string, x: number, z: number, kind: string, name: string) => invoke<ChunkFindDto>("config_find_chunk", { game, source, file, x, z, kind, name }),
     getBytesSlice: (game: string, source: string, file: string, offset: number, length: number) => invoke<BytesSliceDto>("config_get_bytes_slice", { game, source, file, offset, length }),
     getFile: (game: string, source: string, file: string) => invoke<ConfigTextDto>("config_get_file", { game, source, file }),
     getFiles: (game: string, source: string) => invoke<FileItemDto[]>("config_get_files", { game, source }),
     getImage: (game: string, source: string, file: string) => invoke<string>("config_get_image", { game, source, file }),
     getMca: (game: string, source: string, file: string) => invoke<McaChunkDto[]>("config_get_mca", { game, source, file }),
-    getMcaChunk: (game: string, source: string, file: string, index: number) => invoke<NbtNodeDto[]>("config_get_mca_chunk", { game, source, file, index }),
     openFileDir: (game: string, source: string, file: string) => invoke<void>("config_open_file_dir", { game, source, file }),
-    openNbt: (game: string, source: string, file: string) => invoke<ConfigNbtDto>("config_open_nbt", { game, source, file }),
+    openNbt: (game: string, source: string, file: string, index: number | null) => invoke<ConfigNbtDto>("config_open_nbt", { game, source, file, index }),
     saveFile: (game: string, source: string, file: string, baseSha1: string, expectedLines: number, hunks: ConfigHunkDto[]) => invoke<string>("config_save_file", { game, source, file, baseSha1, expectedLines, hunks }),
-    setNbt: (game: string, source: string, file: string, baseSha1: string, edits: NbtEditDto[]) => invoke<string>("config_set_nbt", { game, source, file, baseSha1, edits }),
+    setNbt: (game: string, source: string, file: string, index: number | null, baseSha1: string, edits: NbtEditDto[]) => invoke<string>("config_set_nbt", { game, source, file, index, baseSha1, edits }),
     setTreeWidth: (width: number) => invoke<void>("config_set_tree_width", { width }),
     treeWidth: () => invoke<number>("config_tree_width"),
   },
@@ -615,6 +615,11 @@ export type NbtEditDto = {
   path: string[],
   kind?: NbtKindDto | null,
   value: string,
+};
+
+export type ChunkFindDto = {
+  index: number,
+  path: string[],
 };
 
 export type McaChunkDto = {

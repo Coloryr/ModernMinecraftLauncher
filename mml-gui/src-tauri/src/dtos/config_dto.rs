@@ -184,6 +184,16 @@ pub struct NbtEditDto {
     pub value: String,
 }
 
+/// 「查找实体 / 方块」的命中结果，见 `config_find_chunk`
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChunkFindDto {
+    /// 命中的区块在文件头里的表项下标，0–1023
+    pub index: u32,
+    /// 命中节点从区块根往下的路径，逐层是键名或列表下标；没命中时为空
+    pub path: Vec<String>,
+}
+
 /// 区域文件里的一项区块
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

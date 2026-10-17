@@ -22,6 +22,7 @@ use std::sync::{LazyLock, Mutex};
 use std::time::SystemTime;
 
 use mml_base::hash_helper::{self, HashType};
+use mml_nbt::chunk::ChunkData;
 use mml_nbt::nbt_file::NbtFile;
 use mml_sys::path_helper;
 use uuid::Uuid;
@@ -57,9 +58,82 @@ struct Stamp {
 static SESSIONS: LazyLock<Mutex<HashMap<String, NbtSession>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-/// 会话的键：文件的绝对路径（调用方已经过 `resolve_under` 挡过穿越）
-fn key_of(path: &Path) -> String {
-    path.to_string_lossy().into_owned()
+/// 会话的键：普通 NBT 是文件绝对路径，区域文件里的区块是 `路径#表项下标`
+///
+/// - `path`: 文件绝对路径（调用方已经过 `resolve_under` 挡过穿越）
+/// - `chunk`: 区块表项下标；普通 NBT 文件传 `None`
+fn key_of(path: &Path, chunk: Option<u32>) -> String {
+    let base = path.to_string_lossy().into_owned();
+    match chunk {
+        Some(index) => format!("{base}#{index}"),
+        None => base,
+    }
+}
+
+/// 从区域文件字节里取出一个区块的压缩负载
+///
+/// - `data`: 整份区域文件的字节
+/// - `index`: 表项下标，0–1023
+///
+/// # 返回值
+///
+/// 该区块的负载字节，不含前面的长度与压缩代号；表项为空或越界返回 `err.mcaChunkEmpty`
+fn chunk_bytes(data: &[u8], index: u32) -> Result<Vec<u8>, String> {
+    let entry = (index as usize)
+        .checked_mul(4)
+        .ok_or_else(|| String::from(err_keys::MCA_CHUNK_EMPTY))?;
+    let head = data
+        .get(entry..entry + 4)
+        .ok_or_else(|| String::from(err_keys::MCA_CHUNK_EMPTY))?;
+    if head[3] == 0 {
+        return Err(String::from(err_keys::MCA_CHUNK_EMPTY));
+    }
+
+    let sector = ((head[0] as usize) << 16) | ((head[1] as usize) << 8) | head[2] as usize;
+    let pos = sector * 4096;
+    let block = data
+        .get(pos..pos + 5)
+        .ok_or_else(|| String::from(err_keys::MCA_CHUNK_EMPTY))?;
+    let size = u32::from_be_bytes([block[0], block[1], block[2], block[3]]) as usize;
+    if size <= 1 {
+        return Err(String::from(err_keys::MCA_CHUNK_EMPTY));
+    }
+
+    data.get(pos + 5..pos + 5 + (size - 1))
+        .map(|slice| slice.to_vec())
+        .ok_or_else(|| String::from(err_keys::MCA_CHUNK_EMPTY))
+}
+
+/// 把一个区块写回区域文件
+///
+/// 整份读出来、换上这一块、整份写回：扇区分配与文件头由 crate 负责，
+/// 代价是保存时要解析其它区块，正确性比那点时间重要。
+///
+/// - `file`: 区域文件的读写句柄
+/// - `index`: 表项下标
+/// - `payload`: 区块内容的压缩字节，即 `NbtFile::write` 的输出
+fn write_chunk_back(file: &mut File, index: u32, payload: &[u8]) -> Result<(), String> {
+    let mut cursor = Cursor::new(payload);
+    let nbt = NbtFile::read(&mut cursor).map_err(|err| err.to_string())?;
+
+    file.seek(SeekFrom::Start(0))
+        .map_err(|err| err.to_string())?;
+    let mut data = ChunkData::read_chunk(file).map_err(|err| err.to_string())?;
+    let item = data
+        .nbt
+        .get_mut(index as usize)
+        .and_then(|item| item.as_mut())
+        .ok_or_else(|| String::from(err_keys::MCA_CHUNK_EMPTY))?;
+    // 只换内容：坐标取自表项本身，改 xPos 不动表项位置
+    item.nbt = nbt;
+
+    file.seek(SeekFrom::Start(0))
+        .map_err(|err| err.to_string())?;
+    file.set_len(0).map_err(|err| err.to_string())?;
+    data.write_chunk(file).map_err(|err| err.to_string())?;
+    file.flush().map_err(|err| err.to_string())?;
+
+    Ok(())
 }
 
 /// 取文件当前的状态戳
@@ -83,9 +157,10 @@ fn stamp_of(file: &File) -> Result<Stamp, String> {
 pub(crate) fn open_with<T>(
     owner: &Uuid,
     path: &Path,
+    chunk: Option<u32>,
     use_nbt: impl FnOnce(&NbtFile) -> T,
 ) -> Result<(T, String), String> {
-    let key = key_of(path);
+    let key = key_of(path, chunk);
     if let Some(session) = SESSIONS.lock().unwrap().get(&key) {
         return Ok((use_nbt(&session.nbt), session.sha1.clone()));
     }
@@ -101,11 +176,17 @@ pub(crate) fn open_with<T>(
 
     let mut data = Vec::new();
     file.read_to_end(&mut data).map_err(|err| err.to_string())?;
-    let mut cursor = Cursor::new(&data);
+
+    // 区块会话只拿这一块的字节：SHA1 与解析都只针对它，整份区域文件不参与
+    let payload = match chunk {
+        Some(index) => chunk_bytes(&data, index)?,
+        None => data.clone(),
+    };
+    let mut cursor = Cursor::new(&payload);
     let nbt = NbtFile::read(&mut cursor).map_err(|err| err.to_string())?;
 
     let value = use_nbt(&nbt);
-    let sha1 = hash_helper::gen_hash(HashType::Sha1, &data);
+    let sha1 = hash_helper::gen_hash(HashType::Sha1, &payload);
     let session = NbtSession {
         owner: *owner,
         stamp: stamp_of(&file)?,
@@ -134,10 +215,11 @@ pub(crate) fn open_with<T>(
 /// 只读文件返回 `err.fileReadOnly`，套改动或写盘失败返回各自的错误文案
 pub(crate) fn update_with(
     path: &Path,
+    chunk: Option<u32>,
     base_sha1: &str,
     apply: impl FnOnce(&mut NbtFile) -> Result<(), String>,
 ) -> Result<String, String> {
-    let key = key_of(path);
+    let key = key_of(path, chunk);
     let mut sessions = SESSIONS.lock().unwrap();
     let session = sessions
         .get_mut(&key)
@@ -160,17 +242,23 @@ pub(crate) fn update_with(
     session.nbt.write(&mut out).map_err(|err| err.to_string())?;
     let sha1 = hash_helper::gen_hash(HashType::Sha1, &out);
 
-    // 就在这个句柄上写回：seek 回开头、先截断（写回的字节可能比原来少）再写
-    session
-        .file
-        .seek(SeekFrom::Start(0))
-        .map_err(|err| err.to_string())?;
-    session.file.set_len(0).map_err(|err| err.to_string())?;
-    session
-        .file
-        .write_all(&out)
-        .map_err(|err| err.to_string())?;
-    session.file.flush().map_err(|err| err.to_string())?;
+    match chunk {
+        // 区块：整份区域重写回去，扇区与文件头交给 crate 自己排
+        Some(index) => write_chunk_back(&mut session.file, index, &out)?,
+        None => {
+            // 就在这个句柄上写回：seek 回开头、先截断（写回的字节可能比原来少）再写
+            session
+                .file
+                .seek(SeekFrom::Start(0))
+                .map_err(|err| err.to_string())?;
+            session.file.set_len(0).map_err(|err| err.to_string())?;
+            session
+                .file
+                .write_all(&out)
+                .map_err(|err| err.to_string())?;
+            session.file.flush().map_err(|err| err.to_string())?;
+        }
+    }
 
     session.sha1 = sha1.clone();
     session.stamp = stamp_of(&session.file)?;
@@ -181,8 +269,8 @@ pub(crate) fn update_with(
 /// 关掉一个文件的会话，句柄跟着释放
 ///
 /// - `path`: 文件绝对路径；没有这份会话就什么也不做
-pub(crate) fn close(path: &Path) {
-    SESSIONS.lock().unwrap().remove(&key_of(path));
+pub(crate) fn close(path: &Path, chunk: Option<u32>) {
+    SESSIONS.lock().unwrap().remove(&key_of(path, chunk));
 }
 
 /// 关掉某个实例的全部会话：它的配置窗口没了，它打开过的文件都该放手

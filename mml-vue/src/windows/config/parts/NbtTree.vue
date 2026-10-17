@@ -15,6 +15,7 @@ import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
 import { openConfigNbt, writeConfigNbt } from "../../../lib/api";
 import SearchBox from "../../../components/ui/SearchBox.vue";
+import { KEYS, readNumber, writeNumber } from "../../../lib/storage";
 import NbtNode from "./NbtNode.vue";
 import { openSession, sessionKey, type NbtSession } from "./nbtSession";
 import {
@@ -35,6 +36,10 @@ const props = defineProps<{
   source: string;
   /** 来源内的相对文件路径 */
   file: string;
+  /** 区域文件里的区块表项下标；普通 NBT 文件不传 */
+  chunk?: number;
+  /** 打开后要定位到的节点路径，来自「查找实体 / 方块」；不传就正常展示整棵树 */
+  reveal?: string[];
 }>();
 
 const emit = defineEmits<{
@@ -50,6 +55,15 @@ const loading = ref(false);
 const saving = ref(false);
 /** 搜索词，空串 = 不过滤 */
 const query = ref("");
+
+/** 外部要求定位的节点路径；用户一动手搜索就清掉，交回正常筛选 */
+const focus = ref<string[] | null>(props.reveal?.length ? props.reveal : null);
+watch(
+  () => props.reveal,
+  (value) => {
+    focus.value = value?.length ? value : null;
+  },
+);
 
 /** 记一条改动 */
 function pushOp(op: NbtEditDto) {
@@ -168,6 +182,17 @@ provide(NBT_EDIT, editApi);
  * 交给行节点的是集合而不是搜索词，免得每个行节点各自再走一遍子树。
  */
 const hits = computed<Set<string> | null>(() => {
+  // 外部定位优先：只留目标那一支，各级祖先都收进来，目标那一行才会亮着
+  if (focus.value) {
+    const set = new Set<string>([pathKey([])]);
+    const path: string[] = [];
+    for (const name of focus.value) {
+      path.push(name);
+      set.add(pathKey(path));
+    }
+    return set;
+  }
+
   const q = query.value.trim().toLowerCase();
   if (q === "" || !session.value.tree) return null;
 
@@ -193,7 +218,7 @@ async function load() {
   loading.value = true;
   const now = session.value;
   try {
-    const data = await openConfigNbt(props.uuid, props.source, props.file);
+    const data = await openConfigNbt(props.uuid, props.source, props.file, props.chunk);
     now.tree = data.node;
     now.sha1 = data.sha1;
     now.ops = [];
@@ -226,7 +251,7 @@ async function save() {
 
   saving.value = true;
   try {
-    now.sha1 = await writeConfigNbt(props.uuid, props.source, props.file, now.sha1, ops);
+    now.sha1 = await writeConfigNbt(props.uuid, props.source, props.file, props.chunk, now.sha1, ops);
     await load();
     showToast(t("config.saved"));
   } catch (e) {
@@ -245,6 +270,56 @@ watch(
   { immediate: true },
 );
 
+/** 键列宽度，单位像素；0 表示按默认比例（42%） */
+const keyWidth = ref(readNumber(KEYS.nbtKeyWidth, 0));
+
+/** 是否正在拖中间那条竖线 */
+const resizing = ref(false);
+
+/** 键列宽度的上下限，单位像素 */
+const KEY_MIN_WIDTH = 140;
+const KEY_MAX_WIDTH = 720;
+
+/** 键列宽度绑到行上；0 时不写变量，走 CSS 里的 42% */
+const treeStyle = computed(() =>
+  keyWidth.value ? { "--nbt-key-w": `${keyWidth.value}px` } : {},
+);
+
+/**
+ * 拖动键值之间的竖线改键列宽度
+ *
+ * 按指针位移算，不读容器左缘 —— 树有内边距，用绝对坐标会差一截。
+ * 松手才写 localStorage：列宽属于允许放本地的临时数据，见 AGENTS.md §7.1。
+ *
+ * - `event`: 竖线上的按下事件
+ */
+function startResize(event: PointerEvent) {
+  event.preventDefault();
+  resizing.value = true;
+  const startX = event.clientX;
+  const startWidth = keyWidth.value || 0;
+
+  function onMove(e: PointerEvent) {
+    const next = Math.min(
+      KEY_MAX_WIDTH,
+      Math.max(KEY_MIN_WIDTH, startWidth + e.clientX - startX),
+    );
+    keyWidth.value = next;
+  }
+
+  function onUp() {
+    resizing.value = false;
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    if (keyWidth.value) {
+      writeNumber(KEYS.nbtKeyWidth, keyWidth.value);
+    }
+  }
+
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+}
+
 // 换来源或换文件就换会话；`immediate` 让首次打开就有内容
 watch(key, () => void activate(), { immediate: true });
 </script>
@@ -253,10 +328,12 @@ watch(key, () => void activate(), { immediate: true });
   <div class="nbt-view">
     <div class="nbt-head">
       <SearchBox v-model="query" :placeholder="t('config.nbtSearch')" :clear-label="t('config.nbtSearchClear')"
-        width="100%" />
+        width="100%" @update:model-value="focus = null" />
     </div>
 
-    <div class="nbt-tree">
+    <div class="nbt-tree" :style="treeStyle">
+      <!-- 键值之间的竖线：拖动改键列宽度 -->
+      <div class="nbt-split" :class="{ on: resizing }" @pointerdown="startResize" />
       <div v-if="loading" class="empty-tip">{{ t("config.loading") }}</div>
       <NbtNode v-else-if="session.tree && !searchEmpty" :node="session.tree" :depth="0" :path="[]" :hits="hits" />
       <p v-else class="empty-tip">{{ session.tree ? t("config.nbtSearchEmpty") : t("config.nbtEmpty") }}</p>
@@ -284,5 +361,26 @@ watch(key, () => void activate(), { immediate: true });
   min-height: 0;
   overflow: auto;
   padding: 0 10px 8px;
+}
+/* 热区要相对树定位 */
+.nbt-tree {
+  position: relative;
+}
+
+/* 键值之间那条竖线：6px 的透明热区压在上面，看起来仍是行与行画出来的那条细线 */
+.nbt-split {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  /* 10px 是 .nbt-tree 的左右内边距：竖线画在行内，热区得跟着内缩同样的距离 */
+  left: calc(10px + var(--nbt-key-w, 42%) - 3px);
+  width: 6px;
+  cursor: col-resize;
+  z-index: 1;
+}
+
+.nbt-split:hover,
+.nbt-split.on {
+  background: var(--accent-soft);
 }
 </style>

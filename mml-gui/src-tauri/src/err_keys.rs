@@ -111,6 +111,9 @@ pub const NOT_MCA_FILE: &str = "err.notMcaFile";
 
 /// 区域文件里这一项没有区块
 pub const MCA_CHUNK_EMPTY: &str = "err.mcaChunkEmpty";
+
+/// 区域文件为空或已损坏，连 8 KiB 文件头都不够
+pub const MCA_FILE_EMPTY: &str = "err.mcaFileEmpty";
 /// 不是图片文件
 pub const NOT_IMAGE_FILE: &str = "err.notImageFile";
 /// 没找到该存档

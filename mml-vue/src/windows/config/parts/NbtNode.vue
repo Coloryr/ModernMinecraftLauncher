@@ -340,7 +340,8 @@ const kindClass = computed(() => {
    分栏比例固定，所有行的竖线才对得上 —— 缩进只作用在键列里 */
 .nbt-row {
   display: grid;
-  grid-template-columns: minmax(0, 42%) minmax(0, 1fr);
+  /* 键列宽度由 NbtTree 的拖动结果给，缺省仍是 42% */
+  grid-template-columns: minmax(0, var(--nbt-key-w, 42%)) minmax(0, 1fr);
   align-items: stretch;
   height: 22px;
   border-radius: 5px;

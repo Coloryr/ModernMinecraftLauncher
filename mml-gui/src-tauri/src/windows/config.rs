@@ -20,13 +20,12 @@
 //! 见 [`nbt_session`]），之后的保存是"改值 / 新增 / 删除"三种操作，直接套在会话那份树上、
 //! 由同一个句柄写回，不再重新打开与重新读盘。
 
-use std::io::{Cursor, Read, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};
 
 use mml_base::hash_helper::{self, HashType};
 use mml_names::names;
 use mml_nbt::chunk::ChunkData;
-use mml_nbt::nbt_file::NbtFile;
 use mml_nbt::nbt_types;
 use mml_nbt::{NBT_END_ORDER, NbtType};
 use mml_sys::path_helper;
@@ -34,7 +33,7 @@ use mml_sys::text_diff::{self, LineHunk};
 use uuid::Uuid;
 
 use crate::dtos::{
-    BytesSliceDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, FileItemDto, FileItemType,
+    BytesSliceDto, ChunkFindDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, FileItemDto, FileItemType,
     McaChunkDto, NbtEditDto, NbtKindDto, NbtNodeDto, NbtOpDto,
 };
 use crate::err_keys;
@@ -507,15 +506,24 @@ fn text_sha1(text: &str) -> String {
 /// 不是 NBT 或解不开时返回内核错误串
 #[gui_macros::ipc_group("config")]
 #[tauri::command]
-pub fn config_open_nbt(game: String, source: String, file: String) -> Result<ConfigNbtDto, String> {
+pub fn config_open_nbt(
+    game: String,
+    source: String,
+    file: String,
+    index: Option<u32>,
+) -> Result<ConfigNbtDto, String> {
     // 会话按实例归属，关那个实例的配置窗口时只清它这一份，见 nbt_session
     let owner = Uuid::parse_str(&game).map_err(|_| err_keys::UUID.to_string())?;
     let game = instance_snapshot(&game)?;
     let path = resolve_source(&game, &source, &file)?;
-    check_size(&path)?;
+    // 上限是给"整份树要塞进一次 IPC"定的：区域文件里只装一个区块，不该按整份 mca 卡
+    if index.is_none() {
+        check_size(&path)?;
+    }
 
-    let (node, sha1) =
-        nbt_session::open_with(&owner, &path, |nbt| nbt_node(String::new(), &nbt.nbt))?;
+    let (node, sha1) = nbt_session::open_with(&owner, &path, index, |nbt| {
+        nbt_node(String::new(), &nbt.nbt)
+    })?;
     Ok(ConfigNbtDto { node, sha1 })
 }
 
@@ -532,11 +540,16 @@ pub fn config_open_nbt(game: String, source: String, file: String) -> Result<Con
 /// 路径非法返回 `err.fileName`；没打开过的文件也当成功
 #[gui_macros::ipc_group("config")]
 #[tauri::command]
-pub fn config_close_nbt(game: String, source: String, file: String) -> Result<(), String> {
+pub fn config_close_nbt(
+    game: String,
+    source: String,
+    file: String,
+    index: Option<u32>,
+) -> Result<(), String> {
     let game = instance_snapshot(&game)?;
     let path = resolve_source(&game, &source, &file)?;
 
-    nbt_session::close(&path);
+    nbt_session::close(&path, index);
     Ok(())
 }
 
@@ -603,7 +616,8 @@ pub fn config_open_file_dir(game: String, source: String, file: String) -> Resul
 pub fn config_delete_file(game: String, source: String, file: String) -> Result<(), String> {
     let game = instance_snapshot(&game)?;
     let path = resolve_source(&game, &source, &file)?;
-    nbt_session::close(&path);
+    // 普通文件的会话；区块会话跟着区域文件走，这里不去猜下标
+    nbt_session::close(&path, None);
     path_helper::move_to_trash(&path).map_err(|err| err.to_string())?;
     Ok(())
 }
@@ -631,14 +645,17 @@ pub fn config_set_nbt(
     game: String,
     source: String,
     file: String,
+    index: Option<u32>,
     base_sha1: String,
     edits: Vec<NbtEditDto>,
 ) -> Result<String, String> {
     let game = instance_snapshot(&game)?;
     let path = resolve_source(&game, &source, &file)?;
-    check_size(&path)?;
+    if index.is_none() {
+        check_size(&path)?;
+    }
 
-    nbt_session::update_with(&path, &base_sha1, |nbt| {
+    nbt_session::update_with(&path, index, &base_sha1, |nbt| {
         apply_nbt_edits(&mut nbt.nbt, &edits)
     })
 }
@@ -1046,6 +1063,11 @@ pub fn config_get_mca(
     }
 
     let mut stream = path_helper::open_read(&path).map_err(|err| err.to_string())?;
+    // 文件头固定 8 KiB：更短的文件连位置表都不完整，按"空区域文件"报
+    let len = std::fs::metadata(&path).map(|meta| meta.len()).unwrap_or(0);
+    if len < 8192 {
+        return Err(String::from(err_keys::MCA_FILE_EMPTY));
+    }
     let head = ChunkData::read_head(&mut stream).map_err(|err| err.to_string())?;
 
     Ok(head
@@ -1063,77 +1085,80 @@ pub fn config_get_mca(
         .collect())
 }
 
-/// 读取区域文件里某个区块的 NBT，给区块树展开用
+/// 在区域文件的某个区块里按 id 找实体或方块实体
 ///
-/// 只 seek 到该表项读一个区块，不解析其它区块。
+/// 区块按**绝对坐标**换算表项下标（`(x & 31) + (z & 31) * 32`），与列表上显示的坐标同一口径。
+/// `name` 为空时只定位区块、不挑具体条目。
 ///
 /// - `game`: 实例 uuid
 /// - `source`: 来源，空串为实例本身，否则是存档目录名
 /// - `file`: 来源内的相对路径
-/// - `index`: 表项下标，0–1023
+/// - `x`: 区块绝对坐标 X
+/// - `z`: 区块绝对坐标 Z
+/// - `kind`: 找哪一类，取值 `Entities` / `block_entities`
+/// - `name`: id 片段，空串表示只要区块
 ///
 /// # 返回值
 ///
-/// 该区块根标签的成员节点，按键名排序；表项为空、下标越界或根标签不是复合
-/// 返回 `err.mcaChunkEmpty`，路径非法返回 `err.fileName`
+/// 表项下标与命中节点路径；没有命中的条目时路径为空。路径非法返回 `err.fileName`，
+/// 不是区域文件返回 `err.notMcaFile`，这一类取错返回 `err.mcaChunkEmpty`
 #[gui_macros::ipc_group("config")]
 #[tauri::command]
-pub fn config_get_mca_chunk(
+pub fn config_find_chunk(
     game: String,
     source: String,
     file: String,
-    index: u32,
-) -> Result<Vec<NbtNodeDto>, String> {
+    x: i32,
+    z: i32,
+    kind: String,
+    name: String,
+) -> Result<ChunkFindDto, String> {
+    let owner = Uuid::parse_str(&game).map_err(|_| err_keys::UUID.to_string())?;
     let game = instance_snapshot(&game)?;
     let path = resolve_source(&game, &source, &file)?;
     if get_file_type(&path) != FileItemType::Mca {
         return Err(String::from(err_keys::NOT_MCA_FILE));
     }
-
-    let mut stream = path_helper::open_read(&path).map_err(|err| err.to_string())?;
-    let head = ChunkData::read_head(&mut stream).map_err(|err| err.to_string())?;
-    let item = head
-        .get(index as usize)
-        .filter(|item| item.count > 0)
-        .ok_or_else(|| String::from(err_keys::MCA_CHUNK_EMPTY))?;
-
-    // 前 4 字节是长度，第 5 字节是压缩代号，长度把代号也算在内
-    stream
-        .seek(SeekFrom::Start(item.pos as u64))
-        .map_err(|err| err.to_string())?;
-    let mut head_bytes = [0u8; 5];
-    stream
-        .read_exact(&mut head_bytes)
-        .map_err(|err| err.to_string())?;
-    let size = u32::from_be_bytes([
-        head_bytes[0],
-        head_bytes[1],
-        head_bytes[2],
-        head_bytes[3],
-    ]) as usize;
-    if size <= 1 {
+    if kind != "Entities" && kind != "block_entities" {
         return Err(String::from(err_keys::MCA_CHUNK_EMPTY));
     }
-    let mut buffer = vec![0u8; size - 1];
-    stream
-        .read_exact(&mut buffer)
-        .map_err(|err| err.to_string())?;
 
-    let mut cursor = Cursor::new(buffer);
-    let mut nbt_file = NbtFile::read(&mut cursor).map_err(|err| err.to_string())?;
-    let root = nbt_file
-        .nbt
-        .as_compound()
-        .ok_or_else(|| String::from(err_keys::MCA_CHUNK_EMPTY))?;
+    let index = ((x & 31) + (z & 31) * 32) as u32;
+    let (found, _) = nbt_session::open_with(&owner, &path, Some(index), |nbt| {
+        find_in_chunk(&nbt.nbt, &kind, &name)
+    })?;
 
-    let mut children: Vec<NbtNodeDto> = root
-        .data
-        .iter()
-        .map(|(name, value)| nbt_node(name.clone(), value))
-        .collect();
-    children.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(ChunkFindDto {
+        index,
+        path: found.unwrap_or_default(),
+    })
+}
 
-    Ok(children)
+/// 在区块的某一类列表里按 id 找第一个包含 `name` 的条目
+///
+/// - `nbt`: 区块根标签
+/// - `kind`: `Entities` 或 `block_entities`
+/// - `name`: id 片段；空串取第一个条目
+///
+/// # 返回值
+///
+/// 命中节点的路径，如 `["block_entities", "7"]`；没有这一列或没命中返回 `None`
+fn find_in_chunk(nbt: &NbtType, kind: &str, name: &str) -> Option<Vec<String>> {
+    let list = nbt.as_compound()?.data.get(kind)?.as_list()?;
+    for (index, item) in list.iter().enumerate() {
+        let Some(compound) = item.as_compound() else {
+            continue;
+        };
+        let hit = match compound.data.get("id").and_then(|value| value.as_string()) {
+            Some(id) => name.is_empty() || id.data.contains(name),
+            // 没有 id 的条目只在"只要区块"时算命中
+            None => name.is_empty(),
+        };
+        if hit {
+            return Some(vec![kind.to_string(), index.to_string()]);
+        }
+    }
+    None
 }
 
 /// 读取任意文件的一段字节，给二进制视图翻页用

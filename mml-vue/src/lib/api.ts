@@ -13,6 +13,7 @@ import type {
   ColorMcInfoDto,
   ColorMcProgressDto,
   ColorMcReportDto,
+  ChunkFindDto,
   ConfigHunkDto,
   ConfigNbtDto,
   ConfigTextDto,
@@ -44,7 +45,6 @@ import type {
   LogSettingDto,
   McaChunkDto,
   ModAutoMarkDto,
-  NbtNodeDto,
   ModAutoMarkProgressDto,
   ModDepTreeDto,
   ModGroupDto,
@@ -1528,14 +1528,23 @@ export function onCloseBlocked(cb: (label: string) => void): Promise<UnlistenFn>
   return listen<string>(CloseBlocked, (event) => cb(event.payload));
 }
 
-/** 读取区域文件里某个区块的 NBT 成员，区块树展开时按需调用 */
-export function readConfigMcaChunk(
-  game: string,
+/**
+ * 在区域文件的某个区块里按 id 找实体或方块实体
+ *
+ * - `x` / `z`: 区块**绝对坐标**，与列表上显示的一致
+ * - `kind`: `Entities` 或 `block_entities`
+ * - `name`: id 片段，空串表示只定位区块
+ */
+export function findConfigChunk(
+  uuid: string,
   source: string,
   file: string,
-  index: number,
-): Promise<NbtNodeDto[]> {
-  return commands.config.getMcaChunk(game, source, file, index);
+  x: number,
+  z: number,
+  kind: string,
+  name: string,
+): Promise<ChunkFindDto> {
+  return commands.config.findChunk(uuid, source, file, x, z, kind, name);
 }
 
 // ---------- 配置文件的右键操作 ----------
@@ -2747,8 +2756,9 @@ export function openConfigNbt(
   uuid: string,
   source: string,
   file: string,
+  chunk?: number,
 ): Promise<ConfigNbtDto> {
-  return commands.config.openNbt(uuid, source, file);
+  return commands.config.openNbt(uuid, source, file, chunk ?? null);
 }
 /**
  * 关掉一个 NBT 文件的后端会话，句柄跟着释放
@@ -2759,8 +2769,13 @@ export function openConfigNbt(
  * - `source`: 来源，空串为实例本身，否则是存档目录名
  * - `file`: 来源内的相对路径
  */
-export function closeConfigNbt(uuid: string, source: string, file: string): Promise<void> {
-  return commands.config.closeNbt(uuid, source, file);
+export function closeConfigNbt(
+  uuid: string,
+  source: string,
+  file: string,
+  chunk?: number,
+): Promise<void> {
+  return commands.config.closeNbt(uuid, source, file, chunk ?? null);
 }
 /**
  * 按若干处标量修改改写 NBT 文件
@@ -2781,10 +2796,11 @@ export function writeConfigNbt(
   uuid: string,
   source: string,
   file: string,
+  chunk: number | undefined,
   baseSha1: string,
   edits: NbtEditDto[],
 ): Promise<string> {
-  return commands.config.setNbt(uuid, source, file, baseSha1, edits);
+  return commands.config.setNbt(uuid, source, file, chunk ?? null, baseSha1, edits);
 }
 /**
  * 读取区域文件（`.mca`）的区块表
