@@ -21,6 +21,8 @@ import type { AccountStoreDto } from "../../../lib/bindings";
 const props = defineProps<{
   /** 要展示的账户，调用方已按锁定 / 筛选 / 搜索过滤好 */
   accounts: AccountStoreDto[];
+  /** 列表是不是被筛过：为真时不列「添加」入口，空结果给文案 */
+  filtering: boolean;
   /** 当前使用的账户 uuid，空串表示没有 */
   currentUuid: string;
 }>();
@@ -107,8 +109,8 @@ function hidePreview() {
 <template>
   <div class="acc-grid">
     <!-- 添加账户：作为网格的第一项，与账户卡片同一套尺寸和观感 -->
-    <button class="acc-card add-card" v-tip="t('account.addTitle')" :aria-label="t('account.addTitle')"
-      @click="emit('add')">
+    <button v-if="!filtering" class="acc-card add-card" v-tip="t('account.addTitle')"
+      :aria-label="t('account.addTitle')" @click="emit('add')">
       <span class="add-icon">
         <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round">
@@ -179,7 +181,7 @@ function hidePreview() {
           @delete="emit('delete', acc)" />
       </div>
     </div>
-    <div v-if="accounts.length === 0" class="empty-tip">{{ t("account.searchEmpty") }}</div>
+    <div v-if="accounts.length === 0 && filtering" class="empty-tip">{{ t("account.searchEmpty") }}</div>
 
     <!-- 悬停图片时的大图预览（跟随鼠标，不拦截事件），尺寸按图片类型区分 -->
     <Teleport to="body">
@@ -385,6 +387,9 @@ function hidePreview() {
   align-items: center;
   justify-content: center;
   gap: 10px;
+  /* 与账户卡片同高：没有账户时它单独占一行，不给最小高度就塌成图标那一条。
+     214 = 内边距 18×2 + 图片区 18×2 + 皮肤槽 96 + 间距 14 + 操作按钮 32 */
+  min-height: 214px;
   border-style: dashed;
   border-color: var(--accent-border);
   background: var(--bg-side);

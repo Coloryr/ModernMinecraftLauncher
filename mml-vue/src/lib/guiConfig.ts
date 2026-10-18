@@ -171,6 +171,18 @@ export interface LoginLockItem {
 }
 
 /** 客户端设置，对应 Rust ClientConfig，wire 为 client */
+/** 实验性功能开关，对应 Rust ExperimentalConfig，wire 为 experimental */
+export interface ExperimentalConfig {
+  /** 启动器自身以管理员身份运行 */
+  launcherAdmin: boolean;
+  /** 启动实例时提升到管理员身份 */
+  instanceAdmin: boolean;
+  /** 允许通过 URI 直接启动实例 */
+  uriLaunch: boolean;
+  /** 在沙盒里启动实例 */
+  sandboxLaunch: boolean;
+}
+
 export interface ClientConfig {
   /** 主窗口实例设置里显示 MOTD 卡片 */
   motdCard: boolean;
@@ -199,6 +211,10 @@ export interface ClientConfig {
 export interface GuiConfig {
   /** Dark / Light / System */
   theme: Theme;
+  /** 强调色：预设 id（blue / green / …）或 custom */
+  accent: string;
+  /** 自定义强调色，#rrggbb */
+  customAccent: string;
   /** zh_cn / en_us */
   locale: Locale;
   /** Multi / Single */
@@ -207,6 +223,8 @@ export interface GuiConfig {
   head: HeadConfig;
   collect: CollectConfig;
   client: ClientConfig;
+  /** 实验性功能开关（界面先行，行为未接线） */
+  experimental: ExperimentalConfig;
   /** 界面字体族名（空串 = 默认字体栈） */
   font: string;
   /** 皮肤显示设置：Skin2DA / Skin2DB / Skin3D / Skin3DD / Skin3DRotate 与旋转角度 */
@@ -257,7 +275,10 @@ export interface GuiConfigPatch {
   head?: Partial<HeadConfig>;
   collect?: Partial<CollectConfig>;
   client?: Partial<ClientConfig>;
+  experimental?: Partial<ExperimentalConfig>;
   font?: string;
+  accent?: string;
+  customAccent?: string;
   skin?: Partial<SkinConfig>;
   cape?: Partial<CapeConfig>;
   bgSource?: string;
@@ -283,6 +304,7 @@ export async function saveGuiConfig(patch: GuiConfigPatch): Promise<void> {
       head: { ...cur.head, ...patch.head },
       collect: { ...cur.collect, ...patch.collect },
       client: { ...cur.client, ...patch.client },
+      experimental: { ...cur.experimental, ...patch.experimental },
       skin: { ...cur.skin, ...patch.skin },
       cape: { ...cur.cape, ...patch.cape },
     });
@@ -338,6 +360,9 @@ export function defaultConfig(): GuiConfig {
         : matchMedia("(prefers-color-scheme: dark)").matches
           ? "Dark"
           : "Light",
+    // 与 theme.ts 的首绘兜底一致：没读到就用默认强调色
+    accent: readString(KEYS.accent) || "blue",
+    customAccent: readString(KEYS.accentCustom, "#4f8cff"),
     locale: readString(KEYS.locale) === "en_us" ? "en_us" : "zh_cn",
     windowMode: readString(KEYS.windowMode) === "Single" ? "Single" : "Multi",
     mainWindow: {
@@ -373,6 +398,12 @@ export function defaultConfig(): GuiConfig {
       // 自定义音乐：不给 localStorage 兜底，缺省就是没配
       musicOn: false,
       musicSource: "",
+    },
+    experimental: {
+      launcherAdmin: false,
+      instanceAdmin: false,
+      uriLaunch: false,
+      sandboxLaunch: false,
     },
     font: readString(KEYS.font),
     skin: {

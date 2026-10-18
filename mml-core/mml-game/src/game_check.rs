@@ -1,9 +1,11 @@
 //! 检查游戏实例文件
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
+
+use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 use mml_base::{
     file_item::{FileHash, FileItemObj},
@@ -110,32 +112,46 @@ impl InstanceSettingObj {
         if check_assets {
             let assets = obj.assets.clone();
             handles.push(task::spawn_blocking(move || {
-                let mut list = Vec::new();
-                if let Ok(assets) = assets_path::get_index(&assets) {
-                    for (name, asset) in &assets.objects {
+                let Ok(assets) = assets_path::get_index(&assets) else {
+                    return Vec::new();
+                };
+
+                // 一个版本几千个 object，逐个算 SHA1 是这趟检查最贵的一段 —— 并行扫它
+                // （ColorMC 同一处是 Parallel.ForEach，见 CheckHelpers.cs:251）
+                let entries = assets.objects.iter().collect::<Vec<_>>();
+                let found: Vec<FileItemObj> = entries
+                    .into_par_iter()
+                    .filter_map(|(name, asset)| {
                         let dir: String = asset.hash.chars().take(2).collect();
-                        let local = assets_path::get_obj_dir()
-                            .join(&dir)
-                            .with_file_name(&asset.hash);
+                        // 必须 join 两段：with_file_name 会**替换最后一段**，把 objects/80 变成 objects/，
+                        // 结果全平铺下到 objects/、游戏按 objects/<前两位>/<hash> 找不到（与 lib.rs / mojang 那两处口径一致）
+                        let local = assets_path::get_obj_dir().join(&dir).join(&asset.hash);
 
                         let need_add = if check_assets_sha1 {
                             !check_file_sha1(&local, &asset.hash)
                         } else {
                             !local.exists() || !local.is_file()
                         };
-
-                        if need_add {
-                            list.push(FileItemObj {
-                                name: name.clone(),
-                                file: local,
-                                url: mml_net::url_helper::get_download_assets(&asset.hash),
-                                hash: FileHash::Sha1(asset.hash.clone()),
-                                later: Default::default(),
-                            });
+                        if !need_add {
+                            return None;
                         }
-                    }
-                }
-                list
+
+                        Some(FileItemObj {
+                            name: name.clone(),
+                            file: local,
+                            url: mml_net::url_helper::get_download_assets(&asset.hash),
+                            hash: FileHash::Sha1(asset.hash.clone()),
+                            later: Default::default(),
+                        })
+                    })
+                    .collect();
+
+                // 同一个 object 被多个名字引用时只留一份：目标文件相同，重复任务会让两个线程写同一路径
+                let mut seen = HashSet::new();
+                found
+                    .into_iter()
+                    .filter(|item| seen.insert(item.file.clone()))
+                    .collect()
             }));
         }
 
@@ -145,22 +161,18 @@ impl InstanceSettingObj {
             let loader_libs = obj.loader_libs.clone();
             let installer_libs = obj.installer_libs.clone();
             handles.push(task::spawn_blocking(move || {
-                let mut list = Vec::new();
-                for item in &game_libs {
-                    if check_to_add(item, check_lib_sha1) {
-                        list.push(item.clone());
-                    }
-                }
-                for item in &loader_libs {
-                    if check_to_add(item, check_lib_sha1) {
-                        list.push(item.clone());
-                    }
-                }
-                for item in &installer_libs {
-                    if check_to_add(item, check_lib_sha1) {
-                        list.push(item.clone());
-                    }
-                }
+                // 三份运行库清单各自并行筛（ColorMC 同样用 Parallel.ForEach，见 CheckHelpers.cs:368/375/382）
+                let pick = |items: &[FileItemObj]| -> Vec<FileItemObj> {
+                    items
+                        .par_iter()
+                        .filter(|item| check_to_add(item, check_lib_sha1))
+                        .cloned()
+                        .collect()
+                };
+
+                let mut list = pick(&game_libs);
+                list.extend(pick(&loader_libs));
+                list.extend(pick(&installer_libs));
                 list
             }));
         }

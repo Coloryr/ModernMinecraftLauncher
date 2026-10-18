@@ -29,11 +29,11 @@ import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import {
   api,
   deleteConfigFile,
+  findConfigChunk,
   getConfigTreeWidth,
   listConfigFiles,
   listSaves,
   openConfigFileDir,
-  openInstanceDir,
   readConfigFile,
   setConfigTreeWidth,
   writeConfigFile,
@@ -45,6 +45,7 @@ import { familyInstanceFromLabel, multiWindow, targetSaveDir, targetUuid, window
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
+import HighlightText from "../../components/ui/HighlightText.vue";
 import SearchBox from "../../components/ui/SearchBox.vue";
 import InstanceChip from "../../components/ui/InstanceChip.vue";
 import MonacoText from "../../components/ui/MonacoText.vue";
@@ -54,6 +55,7 @@ import McaTable from "./parts/McaTable.vue";
 import NbtTree from "./parts/NbtTree.vue";
 import { clearCleanSessions, closeSessions } from "./parts/nbtSession";
 import RowMenu, { type RowMenuItem } from "../resource/parts/RowMenu.vue";
+import McaFindModal from "./parts/McaFindModal.vue";
 import type { FileItemDto, SaveItemDto } from "../../lib/bindings";
 
 /** 请求关闭本窗口 */
@@ -370,6 +372,57 @@ async function saveText() {
   }
 }
 
+/** 「查找实体 / 方块」弹窗开着没 */
+const findOpen = ref(false);
+
+/** 查到的区块与节点路径，交给 mca 视图翻页并定位 */
+const mcaTarget = ref<{ chunk: number; path: string[] } | null>(null);
+
+/** 当前来源里的区域文件，查找弹窗里选 */
+const mcaFiles = computed(() =>
+  files.value.filter((item) => item.fileType === "mca").map((item) => item.name),
+);
+
+/**
+ * 在存档里按坐标找实体 / 方块，命中就打开那个区域文件并定位
+ *
+ * - `form`: 弹窗填的那几项，坐标是字符串，这里解析
+ */
+async function onFindChunk(form: { kind: string; x: string; z: string; name: string }) {
+  if (!instanceUuid.value) return;
+  // 坐标可以都不填：那就是整份存档扫一遍
+  const hasPos = form.x !== "" && form.z !== "";
+  const x = hasPos ? Number(form.x) : null;
+  const z = hasPos ? Number(form.z) : null;
+  if ((x !== null && !Number.isFinite(x)) || (z !== null && !Number.isFinite(z))) {
+    showToast(t("config.mcaFindBadPos"));
+    return;
+  }
+  try {
+    const found = await findConfigChunk(
+      instanceUuid.value,
+      source.value,
+      form.kind,
+      x === null ? null : Math.trunc(x),
+      z === null ? null : Math.trunc(z),
+      form.name,
+    );
+    if (!found.file) {
+      showToast(t("config.mcaFindNone", { name: form.name }));
+      return;
+    }
+    findOpen.value = false;
+    // 文件名由后端按坐标算出来，直接切过去；mca 视图再按 chunk / reveal 翻到那一块
+    const target = files.value.find((item) => item.name === found.file);
+    if (target) {
+      selected.value = target;
+      mcaTarget.value = { chunk: found.index, path: found.path };
+    }
+  } catch (e) {
+    showToast(tErr(e));
+  }
+}
+
 /** 左栏宽度，单位像素；拖动中间那条分隔线改它 */
 const treeWidth = ref(300);
 
@@ -457,12 +510,6 @@ async function onRowMenuPick(id: string) {
   }
 }
 
-/** 在文件管理器里打开这个实例的目录 */
-function openDir() {
-  if (!instanceUuid.value) return;
-  void openInstanceDir(instanceUuid.value);
-}
-
 /** 换来源：存档下拉改了就重列 */
 async function pickSource(value: string) {
   if (value === source.value) return;
@@ -526,15 +573,18 @@ useWindowRefresh(() => {
 
         <!-- 保存状态：未保存时下面那颗保存键转强调色，工具条因此整行省掉 -->
         <span v-if="canSave && unsaved" class="head-dirty">{{ t("config.unsaved") }}</span>
-        <span v-else-if="selected && !canSave" class="head-readonly">{{ t("config.readonly") }}</span>
+        <!-- 区域文件也能改，只是保存键在区块页里，不在标题栏 -->
+        <span v-else-if="selected && !canSave && selected.fileType !== 'mca'" class="head-readonly">
+          {{ t("config.readonly") }}
+        </span>
 
         <BaseButton size="sm" variant="ghost" class="icon-btn-head" :disabled="loading" v-tip="t('config.refresh')"
           :aria-label="t('config.refresh')" @click="loadFiles">
           <GlyphIcon name="refresh" :size="15" :weight="1.8" />
         </BaseButton>
-        <BaseButton size="sm" variant="ghost" class="icon-btn-head" :disabled="!instanceUuid" v-tip="t('config.openDir')"
-          :aria-label="t('config.openDir')" @click="openDir">
-          <GlyphIcon name="folder" :size="15" :weight="1.8" />
+        <BaseButton v-if="source" size="sm" variant="ghost" class="icon-btn-head" :disabled="!mcaFiles.length"
+          v-tip="t('config.mcaFindTitle')" :aria-label="t('config.mcaFindTitle')" @click="findOpen = true">
+          <GlyphIcon name="search" :size="15" :weight="1.8" />
         </BaseButton>
         <BaseButton v-if="canSave" size="sm" :variant="unsaved ? 'accent' : 'ghost'" class="icon-btn-head"
           :disabled="busy || !unsaved" v-tip="t('config.save')" :aria-label="t('config.save')" @click="save">
@@ -558,14 +608,14 @@ useWindowRefresh(() => {
               @click="toggleExpand(row.key)" @contextmenu.prevent="openRowMenu($event, row.key)">
               <GlyphIcon class="cfg-chevron" :class="{ open: expanded.has(row.key) }" name="chevron-down" :size="13"
                 :weight="2.4" />
-              <span class="cfg-dir-name" :title="row.key">{{ row.name }}</span>
+              <span class="cfg-dir-name" :title="row.key"><HighlightText :text="row.name" :query="query" /></span>
             </button>
             <!-- 文件：按侧栏的实例行写 -->
             <button v-else class="cfg-row" :class="{ on: selected?.name === row.key }"
               :style="{ paddingLeft: `${8 + row.depth * 14}px` }" :title="row.key" @click="openFile(row.key)"
               @contextmenu.prevent="openRowMenu($event, row.key)">
               <span class="cfg-chevron-spacer"></span>
-              <span class="cfg-file-name">{{ row.name }}</span>
+              <span class="cfg-file-name"><HighlightText :text="row.name" :query="query" /></span>
             </button>
           </template>
           <p v-if="!rows.length" class="empty-tip">{{ emptyTip }}</p>
@@ -585,12 +635,15 @@ useWindowRefresh(() => {
         <NbtTree v-else-if="isNbt" ref="nbtRef" :uuid="instanceUuid" :source="source" :file="selected.name"
           @dirty="nbtDirty = $event" />
         <McaTable v-else-if="selected.fileType === 'mca'" :uuid="instanceUuid" :source="source"
-          :file="selected.name" />
+          :file="selected.name" :chunk="mcaTarget?.chunk" :reveal="mcaTarget?.path" />
         <ImageView v-else-if="selected.fileType === 'image'" :uuid="instanceUuid" :source="source"
           :file="selected.name" />
         <HexView v-else :uuid="instanceUuid" :source="source" :file="selected.name" />
       </section>
     </div>
+
+    <!-- 查找实体 / 方块：编辑存档时从标题栏打开 -->
+    <McaFindModal v-if="findOpen" @find="onFindChunk" @close="findOpen = false" />
 
     <!-- 文件行右键菜单：打开所在目录 / 删除 -->
     <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenuItems"

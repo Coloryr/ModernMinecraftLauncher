@@ -14,6 +14,8 @@ import type { AccountStoreDto } from "../../../lib/bindings";
 const props = defineProps<{
   /** 要展示的账户，调用方已按锁定 / 筛选 / 搜索过滤好 */
   accounts: AccountStoreDto[];
+  /** 列表是不是被筛过：为真时不列「添加」入口，空结果给文案 */
+  filtering: boolean;
   /** 当前使用的账户 uuid，空串表示没有 */
   currentUuid: string;
   /** 把账户的令牌状态翻成文案 */
@@ -63,7 +65,7 @@ function isCurrent(acc: AccountStoreDto): boolean {
         </thead>
         <tbody>
           <!-- 添加账户：作为表格的第一行 -->
-          <tr class="add-tr" @click="emit('add')">
+          <tr v-if="!filtering" class="add-tr" @click="emit('add')">
             <td class="col-actions">
               <button class="add-btn" v-tip="t('account.addTitle')" :aria-label="t('account.addTitle')">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"
@@ -105,7 +107,7 @@ function isCurrent(acc: AccountStoreDto): boolean {
         </tbody>
       </table>
     </div>
-    <div v-if="accounts.length === 0" class="empty-tip">{{ t("account.searchEmpty") }}</div>
+    <div v-if="accounts.length === 0 && filtering" class="empty-tip">{{ t("account.searchEmpty") }}</div>
   </div>
 </template>
 

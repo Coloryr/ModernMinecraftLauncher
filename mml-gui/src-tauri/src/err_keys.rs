@@ -43,6 +43,8 @@ pub const SORT_TYPE_NOT_FOUND: &str = "err.sortTypeNotFound";
 
 /// 没选账户
 pub const ACCOUNT_MISSING: &str = "err.accountMissing";
+/// 没登录过正版（微软）账户，不允许用离线账户启动
+pub const OFFLINE_NEED_PREMIUM: &str = "err.offlineNeedPremium";
 /// 账户名为空
 pub const NAME_EMPTY: &str = "err.nameEmpty";
 /// 登录方式被锁定

@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { KEYS, readString, writeString, onStorageChange } from "./storage";
 import { saveGuiConfig, type Theme } from "./guiConfig";
+import { onGuiThemeChange } from "./api";
 export type { Theme } from "./guiConfig";
 
 export type AccentId =
@@ -157,6 +158,7 @@ export function setAccent(a: AccentId) {
   accent.value = a;
   writeString(KEYS.accent, a);
   applyTheme();
+  void saveGuiConfig({ accent: a });
 }
 
 /**
@@ -170,7 +172,54 @@ export function setCustomAccent(hex: string) {
   accent.value = "custom";
   writeString(KEYS.accent, "custom");
   applyTheme();
+  saveCustomAccentLater();
 }
+
+/**
+ * 自定义色的落盘延后一拍
+ *
+ * `<input type="color">` 在系统取色器里拖动时连续发 input，每帧都存一次配置（读一次配置 +
+ * 写一次盘 + 广播一轮）太重。localStorage 那份仍是即时写的，首绘不受影响。
+ */
+let customAccentSaveTimer = 0;
+function saveCustomAccentLater() {
+  if (customAccentSaveTimer !== 0) clearTimeout(customAccentSaveTimer);
+  customAccentSaveTimer = window.setTimeout(() => {
+    customAccentSaveTimer = 0;
+    void saveGuiConfig({ accent: "custom", customAccent: customAccent.value });
+  }, 300);
+}
+
+/**
+ * 用配置里的强调色初始化（启动引导用）
+ *
+ * 只同步内存状态与首绘缓存，不回写配置。
+ *
+ * - `id`: 配置里的强调色 id，或 `custom`
+ * - `custom`: 配置里的自定义强调色，`#rrggbb`
+ */
+export function restoreAccent(id: string, custom: string) {
+  customAccent.value = /^#[0-9a-fA-F]{6}$/.test(custom) ? custom : customAccent.value;
+  writeString(KEYS.accentCustom, customAccent.value);
+  accent.value =
+    id === "custom" || ACCENTS.some((a) => a.id === id) ? (id as AccentId) : "blue";
+  writeString(KEYS.accent, accent.value);
+  applyTheme();
+}
+
+// 多窗口同步：设置窗口改完由壳层广播；浏览器预览没有 IPC，靠下面的 storage 事件兜底
+void onGuiThemeChange((d) => {
+  theme.value = d.theme;
+  customAccent.value = d.customAccent;
+  accent.value =
+    d.accent === "custom" || ACCENTS.some((a) => a.id === d.accent)
+      ? (d.accent as AccentId)
+      : "blue";
+  writeString(KEYS.theme, d.theme);
+  writeString(KEYS.accent, accent.value);
+  writeString(KEYS.accentCustom, d.customAccent);
+  applyTheme();
+});
 
 // 跨窗口同步：某个窗口改了主题/颜色后，其它已打开的窗口实时生效
 onStorageChange(KEYS.theme, (value) => {

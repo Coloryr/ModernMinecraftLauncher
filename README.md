@@ -119,6 +119,7 @@
 | @tauri-apps/api | 2.12.2 | Apache-2.0 OR MIT | [tauri-apps/tauri](https://github.com/tauri-apps/tauri) |
 | @tauri-apps/plugin-dialog | 2.8.1 | MIT OR Apache-2.0 | [tauri-apps/plugins-workspace](https://github.com/tauri-apps/plugins-workspace) |
 | monaco-editor | 0.56.0 | MIT | [microsoft/monaco-editor](https://github.com/microsoft/monaco-editor) |
+| vscode `extensions/log`（日志语法，本项目转写为 Monarch） | main | MIT | [microsoft/vscode](https://github.com/microsoft/vscode/blob/main/extensions/log/syntaxes/log.tmLanguage.json) |
 | dompurify | 3.4.16 | Apache-2.0 | [cure53/DOMPurify](https://github.com/cure53/DOMPurify) |
 | marked | 18.1.0 | MIT | [markedjs/marked](https://github.com/markedjs/marked) |
 | three | 0.156.1 | MIT | [mrdoob/three.js](https://github.com/mrdoob/three.js) |

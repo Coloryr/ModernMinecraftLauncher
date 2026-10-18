@@ -222,7 +222,7 @@ impl Default for MainWindowConfig {
 /// 收藏界面设置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
-pub struct CollectConfig {
+pub struct CollectWindowConfig {
     /// 显示整合包
     pub modpack: bool,
     /// 显示模组
@@ -233,7 +233,7 @@ pub struct CollectConfig {
     pub shaderpack: bool,
 }
 
-impl Default for CollectConfig {
+impl Default for CollectWindowConfig {
     /// 默认：四类资源都显示
     fn default() -> Self {
         Self {
@@ -257,41 +257,6 @@ pub struct LoginLockObj {
     pub server: String,
 }
 
-/// 旧版兼容：锁定列表曾是纯字符串数组，没有服务器信息
-#[derive(Deserialize)]
-#[serde(untagged)]
-enum LoginLockRaw {
-    /// 新格式：完整对象
-    Obj(LoginLockObj),
-    /// 旧格式：只有类型名的字符串
-    Str(String),
-}
-
-/// 反序列化登录方式锁定列表，兼容旧的纯字符串数组
-///
-/// - `d`: serde 反序列化器
-///
-/// # 返回值
-///
-/// 统一成 [`LoginLockObj`] 列表；旧格式只有类型名，名字与服务器留空
-fn de_login_lock<'de, D>(d: D) -> Result<Vec<LoginLockObj>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let raw = Vec::<LoginLockRaw>::deserialize(d)?;
-    Ok(raw
-        .into_iter()
-        .map(|r| match r {
-            LoginLockRaw::Obj(o) => o,
-            LoginLockRaw::Str(ty) => LoginLockObj {
-                ty,
-                name: String::new(),
-                server: String::new(),
-            },
-        })
-        .collect())
-}
-
 /// 客户端设置：主窗口 MOTD 卡片与登录方式限制
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
@@ -303,7 +268,6 @@ pub struct ClientConfig {
     /// 登录方式锁定总开关；false 时锁定列表不生效，任何类型都可添加
     pub login_lock_on: bool,
     /// 登录方式锁定列表；空表表示不锁定，可添加多个条目
-    #[serde(deserialize_with = "de_login_lock")]
     pub login_lock: Vec<LoginLockObj>,
     /// 游戏自动进服，启动时自动进入 `auto_join_server`
     pub auto_join: bool,
@@ -340,12 +304,33 @@ impl Default for ClientConfig {
     }
 }
 
+/// 实验性功能开关
+///
+/// **行为都还没接线**：这里只把用户的选择存下来，设置页客户端设置里的「实验性功能」组负责展示，
+/// 真正生效要等各自的实现（提权 / 自定义协议 / 沙盒）落地。
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct ExperimentalConfig {
+    /// 启动器自身以管理员身份运行
+    pub launcher_admin: bool,
+    /// 启动实例时提升到管理员身份
+    pub instance_admin: bool,
+    /// 允许通过 URI（自定义协议）直接启动实例
+    pub uri_launch: bool,
+    /// 在沙盒里启动实例
+    pub sandbox_launch: bool,
+}
+
 /// 界面设置，跨窗口共用的那份界面状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct GuiConfig {
     /// 主题：System / Light / Dark
     pub theme: Theme,
+    /// 强调色：预设 id（blue / green / …）或 custom
+    pub accent: String,
+    /// 自定义强调色，`#rrggbb`；`accent` 为 custom 时生效
+    pub custom_accent: String,
     /// 语言，取值是内核的 Lang：zh_cn / en_us
     pub locale: Lang,
     /// 窗口模式：Multi / Single
@@ -355,9 +340,11 @@ pub struct GuiConfig {
     /// 头像设置
     pub head: HeadConfig,
     /// 收藏界面设置
-    pub collect: CollectConfig,
+    pub collect_window: CollectWindowConfig,
     /// 客户端设置
     pub client: ClientConfig,
+    /// 实验性功能开关（界面先行，行为未接线）
+    pub experimental: ExperimentalConfig,
     /// 界面字体族名；空串表示用默认字体栈
     pub font: String,
     /// 皮肤显示设置：Skin2DA / Skin2DB / Skin3D / Skin3DD / Skin3DRotate 与旋转角度
@@ -383,12 +370,15 @@ impl Default for GuiConfig {
     fn default() -> Self {
         Self {
             theme: Default::default(),
+            accent: "blue".to_string(),
+            custom_accent: "#4f8cff".to_string(),
             locale: Lang::zh_cn,
             window_mode: Default::default(),
             main_window: Default::default(),
             head: Default::default(),
-            collect: Default::default(),
+            collect_window: Default::default(),
             client: Default::default(),
+            experimental: Default::default(),
             font: String::new(),
             skin: Default::default(),
             cape: Default::default(),

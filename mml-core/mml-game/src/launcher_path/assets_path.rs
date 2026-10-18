@@ -156,9 +156,7 @@ pub fn get_skin_object(sha1: &str) -> PathBuf {
 /// 文件文本内容；读取失败记录日志并返回 `None`
 pub fn read_assets_text(hash: String) -> Option<String> {
     let dir: String = hash.chars().take(2).collect();
-    let local = Path::new(&OBJECTS_DIR.get().unwrap())
-        .join(dir)
-        .with_file_name(hash);
+    let local = Path::new(&OBJECTS_DIR.get().unwrap()).join(dir).join(hash);
 
     let file = path_helper::read_text(&local);
     match file {
@@ -180,9 +178,7 @@ pub fn read_assets_text(hash: String) -> Option<String> {
 /// 文件读取流；读取失败记录日志并返回 `None`
 pub fn read_assets_stream(hash: String) -> Option<File> {
     let dir: String = hash.chars().take(2).collect();
-    let local = Path::new(&OBJECTS_DIR.get().unwrap())
-        .join(dir)
-        .with_file_name(hash);
+    let local = Path::new(&OBJECTS_DIR.get().unwrap()).join(dir).join(hash);
 
     let file = path_helper::open_read(&local);
     match file {

@@ -1,7 +1,7 @@
 // 打开过的 NBT 文件：树、SHA1 与未保存的改动都留在这一份会话里
 //
 // 切到别的文件再切回来不该重新读盘 —— 那等于把文件关掉再打开一遍，还没落盘的改动也跟着没了。
-// 会话按「实例 + 来源 + 文件」存，活到窗口的 JS 环境结束：多窗口模式就是这个窗口关掉，
+// 会话按「实例 + 来源 + 文件 + 区块」存，活到窗口的 JS 环境结束：多窗口模式就是这个窗口关掉，
 // 单窗口模式是整个应用退出。
 //
 // 后端另有一份"真的打开着"的会话（句柄 + 解析结果，见 windows/nbt_session.rs）：这边每扔掉
@@ -21,6 +21,8 @@ export interface NbtSession {
   source: string;
   /** 来源内的相对路径 */
   file: string;
+  /** 区域文件里的区块表项下标；普通 NBT 文件为 null */
+  chunk: number | null;
   /** 工作树；还没读到就是 null */
   tree: NbtTreeNode | null;
   /** 打开时那一份文件字节的 SHA1，保存时交给后端核对 */
@@ -41,17 +43,41 @@ const MAX_SESSIONS = 8;
 /** 会话表，键见 [`sessionKey`]；Map 的顺序就是打开顺序 */
 const sessions = new Map<string, NbtSession>();
 
-/** 会话的键：同一个文件在不同实例 / 来源下是两份 */
-export function sessionKey(uuid: string, source: string, file: string): string {
-  return `${uuid}|${source}|${file}`;
+/**
+ * 会话的键：同一个文件在不同实例 / 来源下是两份，区域文件里不同区块也各算一份
+ *
+ * 后端那份会话按「绝对路径 # 表项下标」存（见 windows/nbt_session.rs），这里必须同口径 ——
+ * 少一段，一个区块的会话就会被另一个区块拿去用。
+ *
+ * - `uuid` / `source` / `file`: 三段定位
+ * - `chunk`: 区域文件的区块表项下标；普通 NBT 文件传 null 或不传
+ *
+ * # 返回值
+ *
+ * 该文件的会话键
+ */
+export function sessionKey(
+  uuid: string,
+  source: string,
+  file: string,
+  chunk?: number | null,
+): string {
+  const base = `${uuid}|${source}|${file}`;
+  return chunk === undefined || chunk === null ? base : `${base}#${chunk}`;
 }
 
 /** 取一份空白会话 */
-function blankSession(uuid: string, source: string, file: string): NbtSession {
+function blankSession(
+  uuid: string,
+  source: string,
+  file: string,
+  chunk: number | null,
+): NbtSession {
   return {
     uuid,
     source,
     file,
+    chunk,
     tree: null,
     sha1: "",
     ops: [],
@@ -65,17 +91,23 @@ function blankSession(uuid: string, source: string, file: string): NbtSession {
  * 取某个文件的会话，没有就现建一份
  *
  * - `uuid` / `source` / `file`: 与 [`sessionKey`] 的三段一致
+ * - `chunk`: 区域文件的区块表项下标；普通 NBT 文件传 null 或不传
  *
  * # 返回值
  *
  * 该文件的会话；同一个文件多次调用给的是同一个对象，所以改动天然留在会话里
  */
-export function openSession(uuid: string, source: string, file: string): NbtSession {
-  const key = sessionKey(uuid, source, file);
+export function openSession(
+  uuid: string,
+  source: string,
+  file: string,
+  chunk?: number | null,
+): NbtSession {
+  const key = sessionKey(uuid, source, file, chunk);
   const found = sessions.get(key);
   if (found) return found;
 
-  const session = blankSession(uuid, source, file);
+  const session = blankSession(uuid, source, file, chunk ?? null);
   sessions.set(key, session);
   trimSessions();
   return session;
@@ -84,7 +116,7 @@ export function openSession(uuid: string, source: string, file: string): NbtSess
 /** 扔掉一份会话，并把后端那份打开着的会话一并关掉 */
 function dropSession(key: string, session: NbtSession): Promise<void> {
   sessions.delete(key);
-  return closeConfigNbt(session.uuid, session.source, session.file).catch(() => {
+  return closeConfigNbt(session.uuid, session.source, session.file, session.chunk ?? undefined).catch(() => {
     // 关不掉也就是个句柄留着；文件本身没动过，不值得打断用户
   });
 }

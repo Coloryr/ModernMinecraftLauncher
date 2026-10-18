@@ -1,13 +1,15 @@
 <script setup lang="ts">
-// 区域文件（`.mca`）视图：区块列表，点一条就**翻到该区块的 NBT 编辑器**
+// 区域文件（`.mca`）视图：区块列表，点一条就翻到该区块的 NBT 编辑器
 //
 // 区块内容直接复用 NBT 编辑器（NbtTree）：每个区块是一份独立的 NBT 会话，
 // 编辑、保存、基准 SHA1 核对都走编辑器自己那条路。区块列表的行沿用 NBT 树的口径
 // （左列键、右列值、中间一条竖线），进出两页观感是同一个编辑器。
+//
+// 「查找实体 / 方块」的入口在窗口标题栏，查到的区块通过 `chunk` 与 `reveal` 传进来。
 import { computed, ref, watch } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
-import { findConfigChunk, readConfigMca } from "../../../lib/api";
+import { readConfigMca } from "../../../lib/api";
 import NbtTree from "./NbtTree.vue";
 import type { McaChunkDto } from "../../../lib/bindings";
 
@@ -18,48 +20,22 @@ const props = defineProps<{
   source: string;
   /** 来源内的相对文件路径 */
   file: string;
+  /** 直接打开的区块下标，来自「查找实体 / 方块」；不传就停在列表 */
+  chunk?: number;
+  /** 打开后要定位的节点路径，同样是查找给的 */
+  reveal?: string[];
 }>();
 
 const rows = ref<McaChunkDto[]>([]);
 const loading = ref(false);
 /** 正在编辑的区块下标；null 表示停在区块列表 */
-const editing = ref<number | null>(null);
+const editing = ref<number | null>(props.chunk ?? null);
+/** 交给编辑器的定位路径 */
+const reveal = ref<string[] | null>(props.reveal ?? null);
 /** 编辑器有没有未保存的改动，决定返回条上要不要给保存键 */
 const dirty = ref(false);
 /** 区块编辑器实例，保存键按它调 save() */
 const treeRef = ref<InstanceType<typeof NbtTree> | null>(null);
-/** 查找命中后要定位的节点路径，交给编辑器 */
-const reveal = ref<string[] | null>(null);
-/** 查找表单：区块绝对坐标、找哪一类、名称片段 */
-const findForm = ref({ x: "", z: "", kind: "block_entities", name: "" });
-
-/** 按坐标与名称找实体 / 方块，命中就翻到那个区块并定位 */
-async function doFind() {
-  const x = Number(findForm.value.x);
-  const z = Number(findForm.value.z);
-  if (!Number.isFinite(x) || !Number.isFinite(z)) {
-    showToast(t("config.mcaFindBadPos"));
-    return;
-  }
-  try {
-    const found = await findConfigChunk(
-      props.uuid,
-      props.source,
-      props.file,
-      Math.trunc(x),
-      Math.trunc(z),
-      findForm.value.kind,
-      findForm.value.name.trim(),
-    );
-    reveal.value = found.path.length ? found.path : null;
-    editing.value = found.index;
-    if (found.path.length === 0 && findForm.value.name.trim()) {
-      showToast(t("config.mcaFindNone", { name: findForm.value.name.trim() }));
-    }
-  } catch (e) {
-    showToast(tErr(e));
-  }
-}
 
 /** 文件名，当列表标题 */
 const fileName = computed(() => props.file.split("/").pop() ?? props.file);
@@ -87,10 +63,7 @@ function formatTime(seconds: number): string {
 
 /** 右列的说明：扇区数与写入时间，位置表里那几项 */
 function chunkMeta(row: McaChunkDto): string {
-  return t("config.mcaChunkMeta", {
-    sectors: row.sectors,
-    time: formatTime(row.time),
-  });
+  return t("config.mcaChunkMeta", { sectors: row.sectors, time: formatTime(row.time) });
 }
 
 /** 正在编辑的区块坐标，返回条上显示 */
@@ -109,7 +82,6 @@ async function load() {
   loading.value = true;
   try {
     rows.value = await readConfigMca(props.uuid, props.source, props.file);
-    editing.value = null;
     dirty.value = false;
   } catch (e) {
     rows.value = [];
@@ -122,8 +94,21 @@ async function load() {
 // 换来源或换文件就重拉；`immediate` 让首次打开就有内容
 watch(
   () => [props.uuid, props.source, props.file],
-  () => void load(),
+  () => {
+    editing.value = props.chunk ?? null;
+    reveal.value = props.reveal ?? null;
+    void load();
+  },
   { immediate: true },
+);
+
+// 查找换了目标（同一份文件里再查一次）也要跟着翻页
+watch(
+  () => [props.chunk, props.reveal],
+  () => {
+    editing.value = props.chunk ?? null;
+    reveal.value = props.reveal ?? null;
+  },
 );
 </script>
 
@@ -132,21 +117,6 @@ watch(
     <!-- 区块列表：一行一个区块，键列是坐标、值列是扇区与写入时间 -->
     <div v-if="editing === null" class="mca-list">
       <div class="mca-head">{{ fileName }}</div>
-
-      <!-- 查找实体 / 方块：口径照 ColorMC 的查找弹窗，区块坐标按绝对坐标填 -->
-      <div class="mca-find">
-        <input v-model="findForm.x" class="mca-find-num" :placeholder="t('config.mcaFindX')"
-          inputmode="numeric" />
-        <input v-model="findForm.z" class="mca-find-num" :placeholder="t('config.mcaFindZ')"
-          inputmode="numeric" />
-        <select v-model="findForm.kind" class="mca-find-kind">
-          <option value="block_entities">{{ t("config.mcaFindBlock") }}</option>
-          <option value="Entities">{{ t("config.mcaFindEntity") }}</option>
-        </select>
-        <input v-model="findForm.name" class="mca-find-name" :placeholder="t('config.mcaFindName')"
-          spellcheck="false" @keydown.enter="doFind" />
-        <button class="mca-find-go" @click="doFind">{{ t("config.mcaFindGo") }}</button>
-      </div>
       <button v-for="row in rows" :key="row.index" class="mca-row"
         @click="reveal = null; editing = row.index">
         <span class="mca-key">
@@ -207,11 +177,9 @@ watch(
   display: grid;
   grid-template-columns: minmax(0, 42%) minmax(0, 1fr);
   align-items: center;
-  gap: 0;
   width: 100%;
   padding: 0;
   border: none;
-  border-bottom: 1px solid transparent;
   background: transparent;
   color: var(--text);
   font: inherit;
@@ -247,7 +215,7 @@ watch(
   font-size: 12px;
 }
 
-/* 返回条：贴顶部一条，与标题栏的按钮同一档高度 */
+/* 返回条：贴顶部一条 */
 .mca-bar {
   display: flex;
   align-items: center;
@@ -306,44 +274,5 @@ watch(
 .mca-view :deep(.nbt-view) {
   flex: 1;
   min-height: 0;
-}
-/* 查找条：一行控件 */
-.mca-find {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  padding: 0 10px 6px;
-}
-
-.mca-find-num,
-.mca-find-kind,
-.mca-find-name {
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-card);
-  color: var(--text);
-  font-size: 12px;
-}
-
-.mca-find-num {
-  width: 62px;
-}
-
-.mca-find-name {
-  flex: 1;
-  min-width: 90px;
-}
-
-.mca-find-go {
-  flex-shrink: 0;
-  padding: 4px 12px;
-  border: 1px solid var(--accent-border);
-  border-radius: 6px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 12px;
-  cursor: pointer;
 }
 </style>

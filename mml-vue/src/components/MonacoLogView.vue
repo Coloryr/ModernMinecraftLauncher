@@ -7,6 +7,7 @@
 import { onActivated, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { editor } from "monaco-editor/editor/editor.api";
 import { applyLogTheme, monaco } from "../lib/monaco";
+import { LOG_LANGUAGE, registerLog } from "../lib/monacoLog";
 import { toggleWordWrap, wordWrap } from "../lib/editorWrap";
 import type { LogLine } from "../lib/bindings";
 
@@ -30,48 +31,58 @@ const emit = defineEmits<{
 
 const hostEl = ref<HTMLElement | null>(null);
 let monacoEditor: editor.IStandaloneCodeEditor | null = null;
+/** 语言模型自己持有：隐式模型的归属不明确，卸载时也收不干净 */
+let logModel: editor.ITextModel | null = null;
 let decorations: editor.IEditorDecorationsCollection | null = null;
 /** 模型当前已应用的行数；用于追加式更新，避免整篇 setValue */
 let appliedCount = 0;
+/** 已经上过整行底色的行数；底色只补新增那一段 */
+let decoratedCount = 0;
 
 /** 跟随滚动的判定余量，单位 px：离底部这么近就算"停在底部" */
 const STICK_MARGIN = 40;
 
-/** 级别对应的着色类名；无需着色的级别返回 `null` */
+/**
+ * 级别对应的整行底色类名；无需底色的级别返回 `null`
+ *
+ * 只铺背景，正文颜色交给 log 语法（token 色）—— 整行改文字颜色会把 token 色盖住。
+ *
+ * - `level`: 内核解析出的级别，可能是空串
+ */
 function levelClass(level: string): string | null {
-  if (level === "Error" || level === "Fatal") return "mml-log-error";
-  if (level === "Warn") return "mml-log-warn";
-  if (level === "Debug") return "mml-log-debug";
+  if (level === "Error" || level === "Fatal") return "mml-log-line-error";
+  if (level === "Warn") return "mml-log-line-warn";
+  if (level === "Debug") return "mml-log-line-debug";
   return null;
 }
 
-/** 全量重建模型内容 + 着色 */
+/** 全量重建模型内容 + 底色 */
 function rebuild() {
-  if (!monacoEditor) return;
-  const model = monacoEditor.getModel();
-  if (!model) return;
+  if (!monacoEditor || !logModel) return;
   const value = props.logs.map((l) => l.text).join("\n");
   appliedCount = props.logs.length;
-  model.setValue(value);
+  logModel.setValue(value);
+  decorations?.clear();
+  decoratedCount = 0;
   applyDecorations();
   if (props.autoScroll) scrollBottom();
 }
 
 /** 追加新增行（日志只在尾部增长时的快路径） */
 function append() {
-  if (!monacoEditor) return;
-  const model = monacoEditor.getModel();
-  if (!model) return;
+  if (!monacoEditor || !logModel) return;
   const added = props.logs.slice(appliedCount);
   if (added.length === 0) {
     applyDecorations();
     return;
   }
-  const lineCount = model.getLineCount();
-  const lastLine = model.getLineContent(lineCount);
+  const lineCount = logModel.getLineCount();
+  const lastLine = logModel.getLineContent(lineCount);
   const text = added.map((l) => l.text).join("\n");
   appliedCount += added.length;
-  monacoEditor.executeEdits("mml-log", [
+  // 内容走模型，不走编辑器：编辑器是只读的，而 executeEdits 在只读编辑器上直接返回 false
+  // （见 Monaco codeEditorWidget.executeEdits 的 readOnly 分支），会被静默吞掉
+  logModel.applyEdits([
     {
       range: new monaco.Range(
         lineCount,
@@ -85,19 +96,21 @@ function append() {
   applyDecorations();
 }
 
-/** 按级别给行着色，Error 红 / Warn 黄 / Debug 暗 */
+/** 给新增行补整行底色 */
 function applyDecorations() {
-  if (!monacoEditor || !decorations) return;
+  if (!decorations) return;
   const items: editor.IModelDeltaDecoration[] = [];
-  for (let i = 0; i < props.logs.length; i++) {
+  // 只补新增那一段：日志是逐行追加的，每次都重建全量是 O(N²)
+  for (let i = decoratedCount; i < props.logs.length; i++) {
     const cls = levelClass(props.logs[i].level);
     if (!cls) continue;
     items.push({
       range: new monaco.Range(i + 1, 1, i + 1, 1),
-      options: { inlineClassName: cls },
+      options: { isWholeLine: true, className: cls },
     });
   }
-  decorations.set(items);
+  decoratedCount = props.logs.length;
+  if (items.length > 0) decorations.append(items);
 }
 
 function scrollBottom() {
@@ -129,9 +142,11 @@ const themeWatcher = new MutationObserver(() => applyLogTheme());
 onMounted(() => {
   if (!hostEl.value) return;
   applyLogTheme();
+  // 语法要在建模型之前注册；模型显式持有，卸载时自己 dispose
+  registerLog();
+  logModel = monaco.editor.createModel("", LOG_LANGUAGE);
   monacoEditor = monaco.editor.create(hostEl.value, {
-    value: "",
-    language: "plaintext",
+    model: logModel,
     readOnly: true,
     automaticLayout: true,
     wordWrap: wordWrap.value ? "on" : "off",
@@ -165,6 +180,7 @@ onMounted(() => {
     if (props.autoScroll && !atBottom()) emit("scroll-away");
   });
   rebuild();
+
 });
 
 // Monaco 的主题是全局的：单窗口模式下配置窗口可能也还挂着，切回日志时把自己的那套刷回来
@@ -174,19 +190,25 @@ onBeforeUnmount(() => {
   themeWatcher.disconnect();
   monacoEditor?.dispose();
   monacoEditor = null;
+  logModel?.dispose();
+  logModel = null;
   decorations = null;
 });
 
 watch(
   () => props.logs,
-  (now) => {
-    if (!monacoEditor) return;
-    // 行数变少：清空或筛选变化 → 全量重建；只在尾部增长 → 追加
-    if (now.length < appliedCount) {
+  (now, before) => {
+    if (!monacoEditor || !logModel) return;
+    // 首行是不是同一行，决定"只是尾部长了"还是"整窗换了内容"：
+    // 日志撞到行数上限后是抽掉最旧、补上最新（长度不变、首行变了），
+    // 只按长度判断的话这时既不追加也不重建，正文会定格在第一次满窗那一刻。
+    const sameHead = now.length > 0 && now[0] === before?.[0];
+    if (sameHead && now.length > appliedCount) {
+      append();
+    } else if (!sameHead || now.length < appliedCount) {
       rebuild();
       return;
     }
-    append();
     if (props.autoScroll) scrollBottom();
   },
 );
@@ -205,6 +227,7 @@ watch(wordWrap, (on) => {
       <div v-if="props.logs.length === 0 && props.emptyHint" class="log-empty">
         {{ props.emptyHint }}
       </div>
+
     </div>
   </div>
 </template>
@@ -241,6 +264,7 @@ watch(wordWrap, (on) => {
   inset: 0;
 }
 
+
 .log-empty {
   position: absolute;
   inset: 0;
@@ -256,29 +280,30 @@ watch(wordWrap, (on) => {
 
 <!-- 着色类供 monaco 内部渲染层使用，无 scope、全局生效 -->
 <style>
-.monaco-editor .mml-log-error {
-  color: #ff7b72;
+/* 整行底色：只铺背景，正文颜色交给 log 语法的 token 色 —— 整行改文字颜色会盖住 token */
+.monaco-editor .mml-log-line-error {
+  background: rgb(248 81 73 / 0.12);
 }
 
-.monaco-editor .mml-log-warn {
-  color: #e3b341;
+.monaco-editor .mml-log-line-warn {
+  background: rgb(210 153 34 / 0.12);
 }
 
-.monaco-editor .mml-log-debug {
-  color: #7d8590;
+.monaco-editor .mml-log-line-debug {
+  background: rgb(110 118 129 / 0.1);
 }
 
-/* 亮色底上上面那套会发白，换一档更深的红 / 黄 / 灰 */
-[data-theme="Light"] .monaco-editor .mml-log-error {
-  color: #cf222e;
+/* 亮色底上同浓度偏重，各降一档 */
+[data-theme="Light"] .monaco-editor .mml-log-line-error {
+  background: rgb(207 34 46 / 0.1);
 }
 
-[data-theme="Light"] .monaco-editor .mml-log-warn {
-  color: #9a6700;
+[data-theme="Light"] .monaco-editor .mml-log-line-warn {
+  background: rgb(154 103 0 / 0.12);
 }
 
-[data-theme="Light"] .monaco-editor .mml-log-debug {
-  color: #6e7781;
+[data-theme="Light"] .monaco-editor .mml-log-line-debug {
+  background: rgb(110 119 129 / 0.12);
 }
 
 /* 光标闪烁：Monaco 对**只读**编辑器一律走实心光标（源码 ViewCursors 里 readOnly 直接

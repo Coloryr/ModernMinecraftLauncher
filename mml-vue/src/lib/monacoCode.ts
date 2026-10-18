@@ -21,6 +21,13 @@ import "monaco-editor/editor/contrib/suggest/browser/suggestController.js";
 import "monaco-editor/editor/contrib/hover/browser/hoverContribution.js";
 import "monaco-editor/editor/contrib/wordHighlighter/browser/wordHighlighter.js";
 import "monaco-editor/editor/contrib/indentation/browser/indentation.js";
+// 右键菜单的剪切 / 复制 / 粘贴走 `editor.action.clipboard*` 三个动作，它们在剪贴板贡献里注册；
+// 原生 Ctrl+C / V 走输入层的 DOM 事件，不引这个也有，缺的只是那三个动作 id
+import "monaco-editor/editor/contrib/clipboard/browser/clipboard.js";
+// 格式化文档（Shift+Alt+F，右键菜单里那一项）：动作在这里注册，格式化器本身由语言包给 ——
+// 当前只有 json 带了（JSON worker 里就是 VS Code 用的那套 vscode-json-languageservice），
+// 其余语言包（toml / yaml / xml / ini / js）都只有着色，没有格式化器
+import "monaco-editor/editor/contrib/format/browser/formatActions.js";
 
 import "monaco-editor/languages/definitions/ini/register.js";
 import "monaco-editor/languages/definitions/javascript/register.js";

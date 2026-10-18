@@ -79,12 +79,15 @@ import type {
   SchematicDetailDto,
   SchematicItemDto,
   StatsDataDto,
+  CustomJsonItemDto,
+  StartArgDto,
   StateEvent,
   SystemMemoryDto,
   VersionInfoDto,
+  GuiThemeDto,
   ViewMode,
 } from "./bindings";
-import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress } from "./listens";
+import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiThemeChange, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress } from "./listens";
 
 export interface CreateInstanceOpts {
   loader?: string;
@@ -979,6 +982,30 @@ export const api = {
   },
 
   /**
+   * 取走启动参数带来的待办（命令行 / `mml:` 协议）
+   *
+   * # 返回值
+   *
+   * 有启动参数时返回它，否则 null；取过一次就没了
+   */
+  async takeStartArg(): Promise<StartArgDto | null> {
+    return commands.main.takeStartArg();
+  },
+
+  /**
+   * 读取实例的自定义启动配置（json/ 目录）
+   *
+   * - `uuid`: 实例 uuid
+   *
+   * # 返回值
+   *
+   * 配置摘要列表；目录不存在时为空
+   */
+  async getCustomJson(uuid: string): Promise<CustomJsonItemDto[]> {
+    return commands.main.getCustomJson(uuid);
+  },
+
+  /**
    * 停止游戏
    *
    * - `uuid`: 实例 uuid
@@ -1330,13 +1357,14 @@ export const api = {
 /**
  * 游戏日志事件
  *
- * - `cb`: 收到日志行时回调，含实例 uuid 与日志内容
+ * 壳层按 100ms 攒一批下发：`lines` 是一批日志行；`clear` 为 true 时先清屏，
+ * `lines` 是清屏之后新增的行。
+ *
+ * - `cb`: 收到一批日志时回调，含实例 uuid
  *
  * # 返回值
  *
  * 取消监听的函数
- *
- * `clear` 为 true 时前端清屏
  */
 export function onGameLog(cb: (e: LogEvent) => void): Promise<UnlistenFn> {
   return listen<LogEvent>(GameLog, (e) => cb(e.payload));
@@ -1382,6 +1410,20 @@ export function onClientConfigChange(cb: (e: ClientConfigDto) => void): Promise<
  */
 export function onGuiViewModeChange(cb: (mode: ViewMode) => void): Promise<UnlistenFn> {
   return listen<ViewMode>(GuiViewModeChange, (e) => cb(e.payload));
+}
+/**
+ * 主题 / 强调色变更事件
+ *
+ * 设置窗口改完由壳层广播，各已打开的窗口据此重新应用主题。
+ *
+ * - `cb`: 收到变更时回调，含主题、强调色 id 与自定义色值
+ *
+ * # 返回值
+ *
+ * 取消监听的函数
+ */
+export function onGuiThemeChange(cb: (d: GuiThemeDto) => void): Promise<UnlistenFn> {
+  return listen<GuiThemeDto>(GuiThemeChange, (e) => cb(e.payload));
 }
 /**
  * 实例导出进度事件
@@ -1538,13 +1580,12 @@ export function onCloseBlocked(cb: (label: string) => void): Promise<UnlistenFn>
 export function findConfigChunk(
   uuid: string,
   source: string,
-  file: string,
-  x: number,
-  z: number,
   kind: string,
+  x: number | null,
+  z: number | null,
   name: string,
 ): Promise<ChunkFindDto> {
-  return commands.config.findChunk(uuid, source, file, x, z, kind, name);
+  return commands.config.findChunk(uuid, source, kind, x, z, name);
 }
 
 // ---------- 配置文件的右键操作 ----------

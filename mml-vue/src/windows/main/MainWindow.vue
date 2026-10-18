@@ -20,6 +20,8 @@ import { commands } from "../../lib/bindings";
 import { loadGuiConfig, type ClientConfig } from "../../lib/guiConfig";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
+import { stateText } from "../../lib/launchState";
+import { useDownloadProgress } from "../../composables/useDownloadProgress";
 import { KEYS, onStorageChange } from "../../lib/storage";
 import { openWindow } from "../windowManager";
 import {
@@ -31,13 +33,14 @@ import {
   startupPage,
   viewMode,
 } from "../../lib/settings";
-import type { AccountStoreDto, CustomHomeInfoDto, GroupDto, InstanceInfoDto, JavaInfoDto, NewsItem, VersionInfoDto } from "../../lib/bindings";
+import type { AccountStoreDto, CustomHomeInfoDto, GroupDto, InstanceInfoDto, JavaInfoDto, NewsItem, StartArgDto, VersionInfoDto } from "../../lib/bindings";
 import InstanceIcon from "../../components/InstanceIcon.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import DropOverlay from "../../components/ui/DropOverlay.vue";
 import InstanceSelect from "../../components/InstanceSelect.vue";
 import InstanceMetaPanel from "../../components/InstanceMetaPanel.vue";
 import LaunchArgsPanel from "../../components/LaunchArgsPanel.vue";
+import CustomJsonPanel from "../../components/CustomJsonPanel.vue";
 import HomePage from "../../components/HomePage.vue";
 import MotdCard from "../../components/MotdCard.vue";
 import CustomHomePage from "../../components/CustomHomePage.vue";
@@ -48,6 +51,7 @@ import SplashScreen from "../../components/ui/SplashScreen.vue";
 import MainTopbar from "./topbar/MainTopbar.vue";
 import MainSidebar from "./sidebar/MainSidebar.vue";
 import MainCtxMenu from "./ctxmenu/MainCtxMenu.vue";
+import LaunchProgress from "../../components/LaunchProgress.vue";
 import IconPickModal from "./IconPickModal.vue";
 import ColorMcMigrateModal from "./ColorMcMigrateModal.vue";
 import { useInstanceDrag } from "../../composables/useInstanceDrag";
@@ -359,16 +363,23 @@ function onAccountChange(account: AccountStoreDto) {
 
 const statusText = ref(t("launch.ready"));
 
-function stateText(state: string): string {
-  const key = `state.${state}`;
-  const msg = t(key);
-  return msg === key ? state : msg;
-}
+
 
 // ================= 启动进度（顶部进度条） =================
 // 进度百分比由后端按 LaunchState 阶段随状态事件下发；无进度语义的状态走滚动条
 const launchStage = ref("");
-const launchPct = ref<number | null>(null);
+/** 内核给的阶段百分比：按 LaunchState 等权近似，下载阶段恒为 36 */
+const statePct = ref<number | null>(null);
+
+/** 下载队列的真实进度 */
+const downloadProgress = useDownloadProgress();
+
+/** 界面上的百分比：下载阶段用真实下载进度，其它阶段用内核的阶段近似值 */
+const launchPct = computed(() =>
+  launchStage.value === "download" && downloadProgress.hasTasks.value
+    ? Math.round(downloadProgress.percent.value)
+    : statePct.value,
+);
 
 const launchStageText = computed(() =>
   launchStage.value ? stateText(launchStage.value) : statusText.value,
@@ -381,6 +392,7 @@ const settingsOpen = ref(false);
 const execOpen = ref(false);
 const serverOpen = ref(false);
 const proxyOpen = ref(false);
+const jsonOpen = ref(false);
 
 /** 打开独立日志窗口；实例日志只在那个窗口里看，主页面不展示 */
 function openLogWindow() {
@@ -542,11 +554,12 @@ async function launchGroupAll(groupId?: string) {
   closeCtxMenu();
   if (!g || g.items.length === 0) return;
   for (const inst of g.items) {
+    markLaunching(inst.uuid);
     try {
       await api.launchGame(inst.uuid);
-      inst.running = true;
     } catch {
-      /* 忽略单个失败 */
+      // 单个失败：把它的按钮放开，别的照旧
+      clearLaunching(inst.uuid);
     }
   }
   showToast(t("multi.launched", { count: g.items.length }));
@@ -814,12 +827,12 @@ async function multiLaunch() {
   const ids = [...selectedIds.value];
   closeCtxMenu();
   for (const uuid of ids) {
-    const inst = instances.value.find((i) => i.uuid === uuid);
+    markLaunching(uuid);
     try {
       await api.launchGame(uuid);
-      if (inst) inst.running = true;
     } catch {
-      /* 忽略单个失败 */
+      // 单个失败：把它的按钮放开，别的照旧
+      clearLaunching(uuid);
     }
   }
   exitMultiSelect();
@@ -1121,16 +1134,17 @@ async function subscribeEvents() {
       if (e.uuid !== selected.value?.uuid) return;
       statusText.value = stateText(e.state);
       launchStage.value = e.state;
-      launchPct.value = e.progress ?? null;
+      statePct.value = e.progress ?? null;
     }),
     onGameExit((e) => {
       if (e.uuid !== selected.value?.uuid) return;
       statusText.value =
         e.code === 0 ? t("launch.exited") : t("launch.exitedCode", { code: e.code });
       launchStage.value = "";
-      launchPct.value = null;
-      const inst = instances.value.find((i) => i.uuid === e.uuid);
-      if (inst) inst.running = false;
+      statePct.value = null;
+      clearLaunching(e.uuid);
+      // 状态行只在运行中显示，退出之后界面上什么都不剩：非正常退出得说出来
+      if (e.code !== 0) showToast(t("launch.exitedCode", { code: e.code }));
       // 这一局的时长 / 次数刚记进内核统计，重拉一次，界面上那行不是启动前的旧值
       void refreshStats();
     }),
@@ -1138,11 +1152,10 @@ async function subscribeEvents() {
       if (e.uuid && e.uuid !== selected.value?.uuid) return;
       statusText.value = t("launch.failed");
       launchStage.value = "";
-      launchPct.value = null;
-      if (e.uuid) {
-        const inst = instances.value.find((i) => i.uuid === e.uuid);
-        if (inst) inst.running = false;
-      }
+      statePct.value = null;
+      if (e.uuid) clearLaunching(e.uuid);
+      // 同上：失败的结论不能只写在那行状态里，它随 running 一起消失
+      showToast(t("launch.error", { msg: e.message }));
     }),
     onInstanceChange(() => {
       loadInstances();
@@ -1227,6 +1240,8 @@ async function doInit() {
     // ColorMC 迁移在主页面**之前**：加载期间就弹了，这里等它答完再关启动页
     await colorMcReady;
     closeSplash();
+    // 启动参数（命令行 / 协议）留到实例表就绪之后再执行
+    void handleStartArg();
     loadVersions();
     loadNews();
   } catch (e) {
@@ -1243,7 +1258,10 @@ function openFeedback() {
 // ================= 数据加载 =================
 
 async function loadInstances() {
-  instances.value = await api.getInstances();
+  instances.value = (await api.getInstances()).map((i) =>
+    // 启动中的实例后端还没登记成运行中，别让它在这一刻变回可点
+    launching.value.has(i.uuid) ? { ...i, running: true } : i,
+  );
   instancesLoaded.value = true;
   // 保留当前选中；不自动选中实例（默认停在启动器主页）
   if (selected.value) {
@@ -1290,17 +1308,101 @@ async function loadVersions() {
 // ================= 启动 =================
 // 不弹窗：只有正在运行的实例的启动按钮显示加载态并禁用
 
+/**
+ * 正在启动中的实例 uuid
+ *
+ * 后端要到**进程真正起来**才把实例算作运行中（`is_running`），检查 / 下载那段窗口期它还是
+ * false；这期间只要列表刷新一次，按钮就会变回可点，于是能重复点出两次启动。界面靠这一份顶住：
+ * 启动失败、进程退出、IPC 报错时摘掉。
+ */
+const launching = ref<Set<string>>(new Set());
+
+/**
+ * 记下一次启动尝试，并把该实例的按钮按住
+ *
+ * - `uuid`: 实例 uuid
+ */
+function markLaunching(uuid: string) {
+  // Set 要整体换掉才会触发响应式
+  launching.value = new Set(launching.value).add(uuid);
+  const inst = instances.value.find((i) => i.uuid === uuid);
+  if (inst) inst.running = true;
+}
+
+/**
+ * 结束一次启动尝试：摘掉"启动中"，按钮恢复可点
+ *
+ * - `uuid`: 实例 uuid
+ */
+function clearLaunching(uuid: string) {
+  if (launching.value.has(uuid)) {
+    const next = new Set(launching.value);
+    next.delete(uuid);
+    launching.value = next;
+  }
+  const inst = instances.value.find((i) => i.uuid === uuid);
+  if (inst) inst.running = false;
+}
+
+/**
+ * 处理启动参数（命令行 / `mml:` 协议）：启动实例，或用文件 / 文件夹打开「添加实例」
+ *
+ * 参数由 Rust 在进程启动时先存下，这里在实例表加载完之后取走执行 ——
+ * 启动那一刻内核实例表还没加载，所以不能在后端直接动手。
+ */
+async function handleStartArg() {
+  let arg: StartArgDto | null = null;
+  try {
+    arg = await api.takeStartArg();
+  } catch {
+    return;
+  }
+  if (!arg) return;
+
+  if (arg.action === "install") {
+    // 与拖入文件同一个落点：先认类型，再交给「添加实例」
+    try {
+      const probe = await commands.windows.probeDrop(arg.value);
+      if (probe.kind === "shortcut" && probe.url) {
+        openWindow("account", { drop: { path: arg.value, kind: "shortcut", url: probe.url } });
+        return;
+      }
+      if (probe.kind !== "folder" && probe.kind !== "archive") {
+        showToast(t("drop.notModpack"));
+        return;
+      }
+      openWindow("add", { drop: { path: arg.value, kind: probe.kind } });
+    } catch (e) {
+      showToast(tErr(e));
+    }
+    return;
+  }
+
+  const inst = instances.value.find((i) => i.uuid === arg.value);
+  if (!inst) {
+    showToast(t("err.gameNotFound"));
+    return;
+  }
+  select(inst);
+  // 实例锁定生效时 select 会拒绝切换：这时候别顺手把锁定的那个实例启动了
+  if (selected.value?.uuid !== arg.value) {
+    showToast(t("err.gameNotFound"));
+    return;
+  }
+  await launch();
+}
+
 async function launch() {
   if (!selected.value || selected.value.running) return;
   const uuid = selected.value.uuid;
-  selected.value.running = true;
+  markLaunching(uuid);
   statusText.value = t("launch.launching");
   launchStage.value = "";
-  launchPct.value = null;
+  statePct.value = null;
   try {
     await api.launchGame(uuid);
   } catch (e) {
-    if (selected.value) selected.value.running = false;
+    clearLaunching(uuid);
     statusText.value = t("launch.failed");
     showToast(t("launch.error", { msg: tErr(e) }));
   }
@@ -1429,19 +1531,6 @@ onMounted(async () => {
       <!-- 资源下载进度同样改成了标题栏指示器 + 弹窗，即 ResourceTitleIndicator / ResourcePopup，
            主页面顶栏那份挂在 MainTopbar 上，这里不再内嵌卡片 -->
 
-      <!-- 启动进度：启动期间显示阶段文本 + 进度条，未知阶段走滚动条 -->
-      <div v-if="selected?.running" class="mpbar-in-main launch-progress">
-        <div class="launch-progress-head">
-          <span class="launch-spinner"></span>
-          <span class="launch-stage">{{ launchStageText }}</span>
-          <span v-if="launchPct !== null" class="launch-pct">{{ launchPct }}%</span>
-        </div>
-        <div class="launch-progress-track">
-          <div v-if="launchPct !== null" class="launch-progress-bar" :style="{ width: launchPct + '%' }"></div>
-          <div v-else class="launch-progress-bar rolling"></div>
-        </div>
-      </div>
-
       <!-- 主体 -->
       <main class="main" :class="{ 'side-right': sidebarSide === 'Right', 'sidebar-anim': sidebarAnim }">
         <!-- 多选模式浮动工具栏 -->
@@ -1509,9 +1598,12 @@ onMounted(async () => {
                    见 main-window.css .launch-actions -->
               <div class="launch-actions">
                 <BaseButton variant="primary" size="lg" class="launch-main-btn"
-                  :disabled="!selected || selected.running" @click="launch">
-                  <span v-if="selected?.running" class="btn-spinner"></span>
-                  <GlyphIcon v-else name="play" :size="15" /> {{ t("launch.play") }}
+                  :class="{ running: selected?.running }" :disabled="!selected || selected.running" @click="launch">
+                  <!-- 启动流程就在按钮里：阶段文本 + 贴着底边的进度条 -->
+                  <LaunchProgress v-if="selected?.running" :text="launchStageText" :percent="launchPct" />
+                  <template v-else>
+                    <GlyphIcon name="play" :size="15" /> {{ t("launch.play") }}
+                  </template>
                 </BaseButton>
                 <div class="launch-sub-actions">
                   <!-- 实例设置：含启动参数（与分组模式下的设置面板一致） -->
@@ -1590,10 +1682,13 @@ onMounted(async () => {
                       </div>
                       <!-- 右侧：启动游戏用大按钮，添加 / 管理资源用小按钮 -->
                       <div class="detail-side">
-                        <BaseButton variant="primary" size="lg" class="play-btn" :disabled="selected.running"
-                          @click="launch">
-                          <span v-if="selected.running" class="btn-spinner"></span>
-                          <GlyphIcon v-else name="play" :size="15" /> {{ t("launch.play") }}
+                        <BaseButton variant="primary" size="lg" class="play-btn"
+                          :class="{ running: selected.running }" :disabled="selected.running" @click="launch">
+                          <!-- 启动流程就在按钮里：阶段文本 + 贴着底边的进度条 -->
+                          <LaunchProgress v-if="selected.running" :text="launchStageText" :percent="launchPct" />
+                          <template v-else>
+                            <GlyphIcon name="play" :size="15" /> {{ t("launch.play") }}
+                          </template>
                         </BaseButton>
                         <div class="side-row">
                           <BaseButton size="sm" variant="accent" @click="onAction('addResource')">{{
@@ -1667,6 +1762,22 @@ onMounted(async () => {
                       </button>
                       <CollapsePanel :open="execOpen">
                         <CustomExecPanel :args="argsOf(selected.uuid)" @update:args="updateArgs" />
+                      </CollapsePanel>
+                    </div>
+
+                    <!-- 自定义启动配置（json/ 目录）：与 ColorMC 游戏编辑窗口 tab1 同一张表 -->
+                    <div class="args-section">
+                      <button class="args-toggle" :class="{ merged: jsonOpen }" @click="jsonOpen = !jsonOpen">
+                        <span>
+                          <GlyphIcon name="gear" :size="14" :weight="1.8" /> {{ t("customJson.title") }}
+                        </span>
+                        <svg class="args-chevron" :class="{ flip: jsonOpen }" viewBox="0 0 24 24" width="13"
+                          height="13" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="m6 9 6 6 6-6" />
+                        </svg>
+                      </button>
+                      <CollapsePanel :open="jsonOpen">
+                        <CustomJsonPanel :uuid="selected.uuid" />
                       </CollapsePanel>
                     </div>
 

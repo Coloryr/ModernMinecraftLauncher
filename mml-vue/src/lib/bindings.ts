@@ -119,7 +119,7 @@ export const commands = {
   config: {
     closeNbt: (game: string, source: string, file: string, index: number | null) => invoke<void>("config_close_nbt", { game, source, file, index }),
     deleteFile: (game: string, source: string, file: string) => invoke<void>("config_delete_file", { game, source, file }),
-    findChunk: (game: string, source: string, file: string, x: number, z: number, kind: string, name: string) => invoke<ChunkFindDto>("config_find_chunk", { game, source, file, x, z, kind, name }),
+    findChunk: (game: string, source: string, kind: string, x: number | null, z: number | null, name: string) => invoke<ChunkFindDto>("config_find_chunk", { game, source, kind, x, z, name }),
     getBytesSlice: (game: string, source: string, file: string, offset: number, length: number) => invoke<BytesSliceDto>("config_get_bytes_slice", { game, source, file, offset, length }),
     getFile: (game: string, source: string, file: string) => invoke<ConfigTextDto>("config_get_file", { game, source, file }),
     getFiles: (game: string, source: string) => invoke<FileItemDto[]>("config_get_files", { game, source }),
@@ -167,6 +167,7 @@ export const commands = {
     addGroup: (name: string) => invoke<string | null>("main_add_group", { name }),
     createInstance: (name: string, version: string, loader: string | null, loaderVersion: string | null, group: string | null, modpackType: string | null, source: string | null) => invoke<InstanceInfoDto>("main_create_instance", { name, version, loader, loaderVersion, group, modpackType, source }),
     deleteInstance: (uuid: string) => invoke<boolean>("main_delete_instance", { uuid }),
+    getCustomJson: (uuid: string) => invoke<CustomJsonItemDto[]>("main_get_custom_json", { uuid }),
     getGroups: () => invoke<GroupDto[]>("main_get_groups"),
     getInstanceArgs: (uuid: string) => invoke<InstanceArgsDto>("main_get_instance_args", { uuid }),
     getInstanceLangs: (uuid: string) => invoke<InstanceLangDto[]>("main_get_instance_langs", { uuid }),
@@ -189,6 +190,7 @@ export const commands = {
     removeGroup: (uuid: string) => invoke<boolean>("main_remove_group", { uuid }),
     renameInstance: (uuid: string, name: string) => invoke<boolean>("main_rename_instance", { uuid, name }),
     stopGame: (uuid: string) => invoke<void>("main_stop_game", { uuid }),
+    takeStartArg: () => invoke<StartArgDto | null>("main_take_start_arg"),
     updateInstance: (uuid: string, patch: InstancePatch) => invoke<boolean>("main_update_instance", { uuid, patch }),
     updateInstanceArgs: (uuid: string, args: InstanceArgsDto) => invoke<boolean>("main_update_instance_args", { uuid, args }),
   },
@@ -618,6 +620,7 @@ export type NbtEditDto = {
 };
 
 export type ChunkFindDto = {
+  file: string,
   index: number,
   path: string[],
 };
@@ -772,14 +775,24 @@ export type ClientConfigDto = {
   musicSource: string,
 };
 
+export type ExperimentalConfigDto = {
+  launcherAdmin: boolean,
+  instanceAdmin: boolean,
+  uriLaunch: boolean,
+  sandboxLaunch: boolean,
+};
+
 export type GuiConfigDto = {
   theme: Theme,
+  accent: string,
+  customAccent: string,
   locale: "zh_cn" | "en_us",
   windowMode: WindowMode,
   mainWindow: MainWindowConfigDto,
   head: HeadConfigDto,
   collect: CollectConfigDto,
   client: ClientConfigDto,
+  experimental: ExperimentalConfigDto,
   font: string,
   skin: SkinConfigDto,
   cape: CapeConfigDto,
@@ -787,6 +800,12 @@ export type GuiConfigDto = {
   bgOpacity: number,
   bgBlur: number,
   bgNativeSize: number,
+};
+
+export type GuiThemeDto = {
+  theme: Theme,
+  accent: string,
+  customAccent: string,
 };
 
 export type InstanceInfoDto = {
@@ -885,13 +904,22 @@ export type NewsItem = {
   url: string,
 };
 
+export type CustomJsonItemDto = {
+  file: string,
+  name: string,
+  uid: string,
+  version: string,
+  order: number,
+};
+
+export type StartArgDto = {
+  action: string,
+  value: string,
+};
+
 export type LogEvent = {
   uuid: string,
-  time: string,
-  text: string,
-  thread: string,
-  level: string,
-  category: string,
+  lines: LogLine[],
   clear: boolean,
 };
 

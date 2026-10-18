@@ -78,7 +78,7 @@ fn key_of(path: &Path, chunk: Option<u32>) -> String {
 /// # 返回值
 ///
 /// 该区块的负载字节，不含前面的长度与压缩代号；表项为空或越界返回 `err.mcaChunkEmpty`
-fn chunk_bytes(data: &[u8], index: u32) -> Result<Vec<u8>, String> {
+pub(crate) fn chunk_bytes(data: &[u8], index: u32) -> Result<Vec<u8>, String> {
     let entry = (index as usize)
         .checked_mul(4)
         .ok_or_else(|| String::from(err_keys::MCA_CHUNK_EMPTY))?;
@@ -341,17 +341,17 @@ mod tests {
         let path = write_sample("keep");
         let owner = owner();
 
-        assert_eq!(open_with(&owner, &path, |nbt| game_type_of(nbt)).unwrap().0, 1);
+        assert_eq!(open_with(&owner, &path, None, |nbt| game_type_of(nbt)).unwrap().0, 1);
 
         // 绕过会话直接改盘上的字节：长度与修改时间都会变
         fs::write(&path, b"not nbt at all").unwrap();
 
         // 会话还在：再打开给的还是原来那份，说明没重新读
-        assert_eq!(open_with(&owner, &path, |nbt| game_type_of(nbt)).unwrap().0, 1);
+        assert_eq!(open_with(&owner, &path, None, |nbt| game_type_of(nbt)).unwrap().0, 1);
 
         // 关掉之后才是重新读 —— 这时盘上那份已经不是合法 NBT 了
-        close(&path);
-        assert!(open_with(&owner, &path, |nbt| game_type_of(nbt)).is_err());
+        close(&path, None);
+        assert!(open_with(&owner, &path, None, |nbt| game_type_of(nbt)).is_err());
 
         let _ = fs::remove_dir_all(path.parent().unwrap());
     }
@@ -364,16 +364,16 @@ mod tests {
         let second = write_sample("owner-second");
         let (owner_a, owner_b) = (owner(), owner());
 
-        open_with(&owner_a, &first, |_| ()).unwrap();
-        open_with(&owner_b, &second, |_| ()).unwrap();
+        open_with(&owner_a, &first, None, |_| ()).unwrap();
+        open_with(&owner_b, &second, None, |_| ()).unwrap();
 
         close_all_of(&owner_a);
         // 第一份会话没了：盘上写坏之后重新读会失败
         fs::write(&first, b"not nbt at all").unwrap();
-        assert!(open_with(&owner_a, &first, |nbt| game_type_of(nbt)).is_err());
+        assert!(open_with(&owner_a, &first, None, |nbt| game_type_of(nbt)).is_err());
         // 第二份还在：拿到的仍是会话里那份，说明没被一起清掉
         fs::write(&second, b"not nbt at all").unwrap();
-        assert_eq!(open_with(&owner_b, &second, |nbt| game_type_of(nbt)).unwrap().0, 1);
+        assert_eq!(open_with(&owner_b, &second, None, |nbt| game_type_of(nbt)).unwrap().0, 1);
 
         for path in [&first, &second] {
             let _ = fs::remove_dir_all(path.parent().unwrap());
@@ -385,10 +385,10 @@ mod tests {
     fn update_writes_through_the_same_handle() {
         let _guard = TEST_LOCK.lock().unwrap();
         let path = write_sample("update");
-        open_with(&owner(), &path, |_| ()).unwrap();
+        open_with(&owner(), &path, None, |_| ()).unwrap();
         let sha1 = hash_helper::gen_hash(HashType::Sha1, &fs::read(&path).unwrap());
 
-        let new_sha1 = update_with(&path, &sha1, |nbt| {
+        let new_sha1 = update_with(&path, None, &sha1, |nbt| {
             match &mut nbt.nbt {
                 NbtType::Compound(root) => {
                     root.data.insert("GameType".to_string(), int(7).to_nbt());
@@ -404,7 +404,7 @@ mod tests {
         assert_eq!(new_sha1, hash_helper::gen_hash(HashType::Sha1, &on_disk));
 
         // 重新读一遍（关掉会话）确认值真的落到盘上，压缩方式也还是 gzip
-        close(&path);
+        close(&path, None);
         let mut cursor = Cursor::new(&on_disk);
         let back = NbtFile::read(&mut cursor).unwrap();
         assert_eq!(back.compress, CompressType::GZip);
@@ -419,20 +419,20 @@ mod tests {
         let _guard = TEST_LOCK.lock().unwrap();
         let path = write_sample("stale");
         let owner = owner();
-        open_with(&owner, &path, |_| ()).unwrap();
+        open_with(&owner, &path, None, |_| ()).unwrap();
 
         // 基准 SHA1 不是这一份
-        let err = update_with(&path, "deadbeef", |_| Ok(())).unwrap_err();
+        let err = update_with(&path, None, "deadbeef", |_| Ok(())).unwrap_err();
         assert_eq!(err, err_keys::FILE_CHANGED);
 
         // 盘上被别处改过：状态戳变了
         fs::write(&path, b"changed elsewhere").unwrap();
-        let err = update_with(&path, "deadbeef", |_| Ok(())).unwrap_err();
+        let err = update_with(&path, None, "deadbeef", |_| Ok(())).unwrap_err();
         assert_eq!(err, err_keys::FILE_CHANGED);
 
         // 没打开过就改：让他重新打开
         close_all_of(&owner);
-        let err = update_with(&path, "deadbeef", |_| Ok(())).unwrap_err();
+        let err = update_with(&path, None, "deadbeef", |_| Ok(())).unwrap_err();
         assert_eq!(err, err_keys::FILE_CHANGED);
 
         let _ = fs::remove_dir_all(path.parent().unwrap());
@@ -444,18 +444,18 @@ mod tests {
         let _guard = TEST_LOCK.lock().unwrap();
         let path = write_sample("failed");
         let owner = owner();
-        open_with(&owner, &path, |_| ()).unwrap();
+        open_with(&owner, &path, None, |_| ()).unwrap();
         let sha1 = hash_helper::gen_hash(HashType::Sha1, &fs::read(&path).unwrap());
 
-        let err = update_with(&path, &sha1, |_| Err(String::from("boom"))).unwrap_err();
+        let err = update_with(&path, None, &sha1, |_| Err(String::from("boom"))).unwrap_err();
         assert_eq!(err, "boom");
 
         // 会话没了：紧接着的保存应当按"重新打开"拒掉，而打开会重新读盘
         assert_eq!(
-            update_with(&path, &sha1, |_| Ok(())).unwrap_err(),
+            update_with(&path, None, &sha1, |_| Ok(())).unwrap_err(),
             err_keys::FILE_CHANGED
         );
-        assert_eq!(open_with(&owner, &path, |nbt| game_type_of(nbt)).unwrap().0, 1);
+        assert_eq!(open_with(&owner, &path, None, |nbt| game_type_of(nbt)).unwrap().0, 1);
 
         let _ = fs::remove_dir_all(path.parent().unwrap());
     }

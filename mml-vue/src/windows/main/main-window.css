@@ -4,92 +4,11 @@
   height: 100vh;
   /* 内容区左右内边距：四个内容分支（.detail / .news-page / .list-mode / .lock-error）共用一处 */
   --content-pad-x: 26px;
+  /* 滚动容器专用的右内边距：scrollbar-gutter 常驻的那 9px 也从内容盒里吃，
+     不减掉的话右缘比左缘多缩 9px、整片内容看着往左挤，见 styles/scrollbar.css 第 5 条 */
+  --content-pad-scroll: calc(var(--content-pad-x) - 9px);
   /* 内容区底部留白：给钉在窗口底部居中的 MOTD 悬浮卡让位，四处共用一处 */
   --content-pad-bottom: 130px;
-}
-
-/* 顶部整合包安装进度条：窗口内容有自身内边距，这里只加外边距 */
-.mpbar-in-main {
-  margin: 4px 12px 0;
-}
-
-/* 顶部启动进度条 */
-.launch-progress {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px 14px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-
-.launch-progress-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text);
-}
-
-.launch-spinner {
-  flex-shrink: 0;
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--border);
-  border-top-color: var(--blue, var(--accent));
-  border-radius: 50%;
-  animation: launch-spin 0.8s linear infinite;
-}
-
-@keyframes launch-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.launch-stage {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.launch-pct {
-  flex-shrink: 0;
-  font-size: 12px;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-}
-
-.launch-progress-track {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--bg-side);
-  overflow: hidden;
-}
-
-.launch-progress-bar {
-  height: 100%;
-  border-radius: 3px;
-  background: var(--blue, var(--accent));
-  transition: width 0.3s ease;
-}
-
-.launch-progress-bar.rolling {
-  width: 40%;
-  animation: launch-slide 1.1s ease-in-out infinite;
-}
-
-@keyframes launch-slide {
-  0% {
-    transform: translateX(-100%);
-  }
-
-  100% {
-    transform: translateX(350%);
-  }
 }
 
 /* 删除实例进度条（删除弹窗内） */
@@ -217,11 +136,12 @@
   /* 上内边距比别处紧一档：这一屏顶部就是工具栏 / 实例信息，不用再留 22px */
   --detail-pad-top: 16px;
   padding: var(--detail-pad-top) var(--content-pad-x) var(--content-pad-bottom);
+  /* 与 scrollbar-gutter 成对，见 styles/scrollbar.css */
+  padding-right: var(--content-pad-scroll);
   gap: 16px;
   min-width: 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  /* 见 styles/scrollbar.css */
 }
 
 /* 视图切换动画：启动器主页 ↔ 实例列表 / 实例详情，以及实例详情之间切换实例。
@@ -262,9 +182,10 @@
   flex-direction: column;
   gap: 16px;
   padding: 18px var(--content-pad-x) var(--content-pad-bottom);
+  /* 与 scrollbar-gutter 成对，见 styles/scrollbar.css */
+  padding-right: var(--content-pad-scroll);
   overflow-y: auto;
   scrollbar-gutter: stable;
-  /* 见 styles/scrollbar.css */
   min-width: 0;
 }
 
@@ -634,9 +555,10 @@
   /* 底部那 130px 是给 MOTD 悬浮卡让位的，卡片没开时纯属白留：最小窗口下会平白多出
      一条滚动条，所以它只在卡片显示时生效，见 .list-mode.has-motd */
   padding: 20px var(--content-pad-x) 30px;
+  /* 与 scrollbar-gutter 成对，见 styles/scrollbar.css */
+  padding-right: var(--content-pad-scroll);
   overflow-y: auto;
   scrollbar-gutter: stable;
-  /* 见 styles/scrollbar.css */
   min-width: 0;
 }
 
@@ -824,23 +746,6 @@
 /* ================= 拖拽文件遮罩层 ================= */
 
 /* 外观在 components/ui/DropOverlay.vue（四个落点共用同一个组件），这里不再定义 */
-
-/* 启动按钮加载态：与 ▶ 字号保持一致，避免按钮高度跳动 */
-.btn-spinner {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border-top-color: #fff;
-  animation: btn-spin 0.8s linear infinite;
-  flex-shrink: 0;
-}
-
-@keyframes btn-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 
 /* ================= 加载期间的标题栏 =================
    只显示关闭按钮：最小化 / 最大化两颗用 visibility 占位而不是 display: none ——

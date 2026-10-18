@@ -892,7 +892,8 @@ pub fn window_get_gui_config(window: WebviewWindow) -> GuiConfigDto {
 /// 皮肤显示模式 / 头像配置有变化时广播 `skin-config-change`：渲染缓存键里含这两项，
 /// 各窗口收到后按新模式重取头像 / 皮肤图；实例列表显示模式有变化时广播
 /// `gui-view-mode-change`，主窗口据此立即换视图；背景图的不透明度 / 模糊有变化时
-/// 广播 `bg-change`，各窗口重取背景状态
+/// 广播 `bg-change`，各窗口重取背景状态；主题 / 强调色有变化时广播
+/// `gui-theme-change`，各窗口重新应用主题
 ///
 /// - `app`: 应用句柄，广播变更事件用它
 /// - `config`: 前端提交的完整 GUI 状态，内部转成落盘用的 `GuiConfig`
@@ -924,6 +925,17 @@ pub async fn window_save_gui_config(app: AppHandle, config: GuiConfigDto) -> Res
         let old = crate::gui_config::get();
         old.bg_opacity != new_config.bg_opacity || old.bg_blur != new_config.bg_blur
     };
+    // 主题 / 强调色同理，而且它连 localStorage 都靠不住：多窗口模式下各窗口是不同 webview，
+    // storage 事件在它们之间不发，只有设置窗口自己会变
+    let theme_changed = {
+        let old = crate::gui_config::get();
+        old.theme != new_config.theme
+            || old.accent != new_config.accent
+            || old.custom_accent != new_config.custom_accent
+    };
+    let new_theme = new_config.theme;
+    let new_accent = new_config.accent.clone();
+    let new_custom_accent = new_config.custom_accent.clone();
     let new_client = new_config.client.clone();
     if client_changed {
         let uuid = new_client.lock_instance.clone();
@@ -947,6 +959,9 @@ pub async fn window_save_gui_config(app: AppHandle, config: GuiConfigDto) -> Res
     }
     if bg_view_changed {
         crate::windows::settings::bg::emit_bg_change(&app);
+    }
+    if theme_changed {
+        emit_gui_theme_change(&app, new_theme, new_accent, new_custom_accent);
     }
     Ok(())
 }
@@ -978,4 +993,30 @@ fn emit_client_config_change(app: &AppHandle, config: crate::dtos::ClientConfigD
 #[gui_macros::emit]
 fn emit_gui_view_mode_change(app: &AppHandle, mode: crate::gui_config::ViewMode) {
     let _ = app.emit(listens::GUI_VIEW_MODE_CHANGE, mode);
+}
+
+/// 主题 / 强调色变更事件，跨窗口同步
+///
+/// 切换入口在设置窗口：多窗口模式下其它窗口是不同的 webview，要靠这条事件重新应用主题
+/// （localStorage 的 storage 事件在 WebView2 的多 webview 之间不发，只能走壳层广播）。
+///
+/// - `app`: 应用句柄，广播用它
+/// - `theme`: 变更后的主题
+/// - `accent`: 变更后的强调色 id，或 `custom`
+/// - `custom_accent`: 自定义强调色，`#rrggbb`
+#[gui_macros::emit]
+fn emit_gui_theme_change(
+    app: &AppHandle,
+    theme: crate::gui_config::Theme,
+    accent: String,
+    custom_accent: String,
+) {
+    let _ = app.emit(
+        listens::GUI_THEME_CHANGE,
+        crate::dtos::GuiThemeDto {
+            theme,
+            accent,
+            custom_accent,
+        },
+    );
 }

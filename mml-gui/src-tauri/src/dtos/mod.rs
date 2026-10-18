@@ -51,7 +51,10 @@ pub use download_dto::{
     DownloadItemEvent, DownloadStatusDto, DownloadTaskDto, DownloadTaskEvent, DownloadThreadDto,
 };
 pub use export_dto::{ExportConfigDto, ExportEntryDto, ExportInfoDto, ExportProgressDto};
-pub use gui_config_dto::{ClientConfigDto, GuiConfigDto, LoginLockItemDto, MainWindowConfigDto};
+pub use gui_config_dto::{
+    ClientConfigDto, ExperimentalConfigDto, GuiConfigDto, GuiThemeDto, LoginLockItemDto,
+    MainWindowConfigDto,
+};
 pub use instance_dto::{GroupDto, InstanceInfoDto};
 pub use java_download_dto::{JavaDownloadItemDto, JavaDownloadOptionsDto, JavaTypes};
 pub use java_dto::{JavaImportProgressDto, JavaInfoDto};
@@ -59,7 +62,7 @@ pub use log_dto::{LogFocusDto, LogSettingDto};
 pub use main_dto::{
     BlockGroupDto, BlockGroupsDto, BlockItemDto, BlockStatusDto, ErrorEvent, ExitEvent,
     IconSourceDto, InstanceChangeEvent, InstanceLangDto, InstancePatch, LogEvent, NewsItem,
-    StateEvent, SystemMemoryDto,
+    CustomJsonItemDto, StartArgDto, StateEvent, SystemMemoryDto,
 };
 pub use motd_dto::{MotdDto, MotdSegmentDto};
 pub use resource_dto::{

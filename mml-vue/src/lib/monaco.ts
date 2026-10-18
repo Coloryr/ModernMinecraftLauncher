@@ -53,7 +53,19 @@ export function ensureMonacoThemes() {
   monaco.editor.defineTheme(THEME_CONSOLE_DARK, {
     base: "vs-dark",
     inherit: true,
-    rules: [],
+    // 日志语法的 token 色，对应 lib/monacoLog 里注册的 log 语言；整行底色在 MonacoLogView
+    rules: [
+      { token: "log.date", foreground: "6b7280" },
+      { token: "log.verbose", foreground: "6e7681" },
+      { token: "log.debug", foreground: "8b949e" },
+      { token: "log.info", foreground: "3fb950" },
+      { token: "log.warning", foreground: "d29922" },
+      { token: "log.error", foreground: "f85149" },
+      { token: "log.constant", foreground: "79c0ff" },
+      { token: "log.string", foreground: "a5d6ff" },
+      { token: "log.exception", foreground: "f0883e" },
+      { token: "log.exceptiontype", foreground: "f0883e" },
+    ],
     colors: {
       "editor.background": "#0d0f12",
       // 行号比正文暗一档、比底色亮：原来给的是 #3a4048，在 #0d0f12 上几乎看不见
@@ -70,7 +82,18 @@ export function ensureMonacoThemes() {
   monaco.editor.defineTheme(THEME_CONSOLE_LIGHT, {
     base: "vs",
     inherit: true,
-    rules: [],
+    rules: [
+      { token: "log.date", foreground: "8c959f" },
+      { token: "log.verbose", foreground: "8c959f" },
+      { token: "log.debug", foreground: "6e7781" },
+      { token: "log.info", foreground: "1a7f37" },
+      { token: "log.warning", foreground: "9a6700" },
+      { token: "log.error", foreground: "cf222e" },
+      { token: "log.constant", foreground: "0550ae" },
+      { token: "log.string", foreground: "0a3069" },
+      { token: "log.exception", foreground: "bc4c00" },
+      { token: "log.exceptiontype", foreground: "bc4c00" },
+    ],
     colors: {
       "editor.background": "#ffffff",
       // 行号：比正文浅、比白底深的一档灰，看得见但不抢正文

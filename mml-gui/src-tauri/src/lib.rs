@@ -10,6 +10,7 @@
 //! | [`gui_setting`] | 实例 GUI 设置读写，文件 gui_setting.json，归属 GUI 而非内核 |
 //! | [`image_manager`] | 图片资源加载，走 `mml-image://` 协议 |
 //! | [`log_text`] | 界面侧日志文案，中英两套，不进内核 i18n |
+//! | [`start_arg`] | 启动参数（命令行 / `mml:` 协议）解析，等前端初始化后取走执行 |
 //! | [`windows`] | 各窗口的规格 / IPC 命令 / 事件，窗口创建 / 聚焦 / 关闭统一处理 |
 //!
 //! 自定义主页面走 `mml-home://` 协议，其压缩包在运行根目录常驻，
@@ -30,6 +31,7 @@ pub mod gui_setting;
 pub mod image_manager;
 pub mod log_text;
 pub mod music;
+pub mod start_arg;
 pub mod windows;
 
 /// 单元测试的共用启动，内核单例每进程只 boot 一次，见 AGENTS.md §6
@@ -44,6 +46,9 @@ include!(concat!(env!("OUT_DIR"), "/invokes_gen.rs"));
 /// 注册全部 IPC 命令后进入事件循环。
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // 命令行 / 协议带来的启动请求先记下来，前端初始化完成后取走执行
+    start_arg::collect(std::env::args());
+
     tauri::Builder::default()
         // webview 就绪后的统一装配，都在 on_webview_ready 里拿 ICoreWebView2 做一次：
         // ① 文件拖放的"路径桥"，见 windows/file_drop.rs 头部说明
@@ -108,6 +113,19 @@ pub fn run() {
                 // 注意用全路径：闭包参数也叫 log，会遮住模块名
                 windows::log::forward_run_log(&handle, log);
             });
+
+            // 日志攒批：内核逐行推来，这里按固定周期成批发给前端。
+            // 单起一条线程，只在到点时看一眼缓冲，空的时候几乎不花什么
+            let handle = app.handle().clone();
+            std::thread::Builder::new()
+                .name("Mml Log Flush".to_string())
+                .spawn(move || loop {
+                    std::thread::sleep(std::time::Duration::from_millis(
+                        windows::log::LOG_FLUSH_INTERVAL_MS,
+                    ));
+                    windows::log::flush_pending_logs(&handle);
+                })
+                .ok();
 
             // 游戏退出：内核退出轮询线程发的事件 → 转发为前端 `game-exit` 事件
             let handle = app.handle().clone();

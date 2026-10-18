@@ -25,6 +25,8 @@ const props = defineProps<{
 const {
   client,
   applyClient,
+  experimental,
+  applyExperimental,
   serverAddr,
   pickMusicFile,
   loginTypeLabel,
@@ -239,5 +241,48 @@ watch(lockServerError, async (msg) => {
       <label class="field-label">{{ t("winSettings.titleDelay") }}</label>
       <NumberStepper v-model="win.titleDelay" :min="100" :max="600000" :step="100" />
     </template>
+  </SettingsGroup>
+
+  <!-- 实验性功能：还在验证中的开关集中放这一组，位置固定在客户端设置的最后一组。
+       开关只落盘、行为都没接线（见 gui_config 的 ExperimentalConfig）。
+       加开关时同步 search.ts 的 GROUP_TITLES（已有）与索引项、必要时再进 RESETTABLE_GROUPS -->
+  <SettingsGroup id="experimental" title-key="winSettings.secExperimental"
+    :flash="flashGroup === 'experimental'">
+    <p class="field-desc">{{ t("winSettings.experimentalDesc") }}</p>
+
+    <!-- 管理员启动：启动器自身与它启动的实例各一个开关 -->
+    <label class="field-label">{{ t("winSettings.adminLaunch") }}</label>
+    <div class="switch-row">
+      <div class="switch-text">
+        <span class="switch-label">{{ t("winSettings.launcherAdmin") }}</span>
+        <span class="switch-state">{{ t("winSettings.launcherAdminDesc") }}</span>
+      </div>
+      <BaseSwitch v-model="experimental.launcherAdmin" @update:model-value="applyExperimental" />
+    </div>
+    <div class="switch-row">
+      <div class="switch-text">
+        <span class="switch-label">{{ t("winSettings.instanceAdmin") }}</span>
+        <span class="switch-state">{{ t("winSettings.instanceAdminDesc") }}</span>
+      </div>
+      <BaseSwitch v-model="experimental.instanceAdmin" @update:model-value="applyExperimental" />
+    </div>
+
+    <!-- URI 启动与沙盒启动 -->
+    <div class="switch-row">
+      <div class="switch-text">
+        <span class="switch-label">{{ t("winSettings.uriLaunch") }}</span>
+        <span class="switch-state">{{ t("winSettings.uriLaunchDesc") }}</span>
+      </div>
+      <BaseSwitch v-model="experimental.uriLaunch" @update:model-value="applyExperimental" />
+    </div>
+    <div class="switch-row">
+      <div class="switch-text">
+        <span class="switch-label">{{ t("winSettings.sandboxLaunch") }}</span>
+        <span class="switch-state">{{ t("winSettings.sandboxLaunchDesc") }}</span>
+      </div>
+      <BaseSwitch v-model="experimental.sandboxLaunch" @update:model-value="applyExperimental" />
+    </div>
+
+    <p class="field-desc">{{ t("winSettings.experimentalWip") }}</p>
   </SettingsGroup>
 </template>

@@ -121,6 +121,13 @@ export const THIRD_PARTY_GROUPS: ThirdPartyGroup[] = [
         note: "winHelp.noteMonacoBundles",
       },
       {
+        name: "vscode extensions/log（日志语法，转写为 Monarch）",
+        version: "main",
+        license: "MIT",
+        url: "https://github.com/microsoft/vscode/blob/main/extensions/log/syntaxes/log.tmLanguage.json",
+        note: "",
+      },
+      {
         name: "dompurify",
         version: "3.4.16",
         license: "Apache-2.0",

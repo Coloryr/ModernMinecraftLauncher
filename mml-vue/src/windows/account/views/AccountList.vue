@@ -10,6 +10,8 @@ import type { AccountStoreDto } from "../../../lib/bindings";
 const props = defineProps<{
   /** 要展示的账户，调用方已按锁定 / 筛选 / 搜索过滤好 */
   accounts: AccountStoreDto[];
+  /** 列表是不是被筛过：为真时不列「添加」入口，空结果给文案 */
+  filtering: boolean;
   /** 当前使用的账户 uuid，空串表示没有 */
   currentUuid: string;
   /** 把账户的令牌状态翻成文案 */
@@ -64,8 +66,8 @@ function hidePreview() {
 <template>
   <div class="acc-list">
     <!-- 添加账户：作为列表的第一行，与账户行同一套布局 -->
-    <button class="acc-row add-row" v-tip="t('account.addTitle')" :aria-label="t('account.addTitle')"
-      @click="emit('add')">
+    <button v-if="!filtering" class="acc-row add-row" v-tip="t('account.addTitle')"
+      :aria-label="t('account.addTitle')" @click="emit('add')">
       <span class="add-icon">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round">
@@ -103,7 +105,7 @@ function hidePreview() {
         @refresh-skin="emit('refreshSkin', acc)" @relogin="emit('relogin', acc)" @edit="emit('edit', acc)"
         @delete="emit('delete', acc)" />
     </div>
-    <div v-if="accounts.length === 0" class="empty-tip">{{ t("account.searchEmpty") }}</div>
+    <div v-if="accounts.length === 0 && filtering" class="empty-tip">{{ t("account.searchEmpty") }}</div>
 
     <!-- 悬停头像时的头像大图 -->
     <Teleport to="body">

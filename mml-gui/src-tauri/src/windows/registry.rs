@@ -121,7 +121,7 @@ pub(super) const JAVA_DOWNLOAD_MIN_WIDTH: f64 = 520.0;
 pub(super) const JAVA_DOWNLOAD_MIN_HEIGHT: f64 = 420.0;
 
 /// 游戏日志窗口最小宽度，日志控制台加实例选择条
-pub(super) const LOG_MIN_WIDTH: f64 = 720.0;
+pub(super) const LOG_MIN_WIDTH: f64 = 800.0;
 /// 游戏日志窗口最小高度
 pub(super) const LOG_MIN_HEIGHT: f64 = 480.0;
 

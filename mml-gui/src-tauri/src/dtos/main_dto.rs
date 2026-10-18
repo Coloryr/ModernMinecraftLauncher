@@ -76,30 +76,66 @@ pub struct NewsItem {
     pub url: String,
 }
 
+/// 自定义启动配置条目，即实例 `json/` 目录下每个文件的摘要
+///
+/// 对应 ColorMC 游戏编辑窗口 tab1 的那张表：排序 / 名称 / UID / 版本 / 路径。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomJsonItemDto {
+    /// 文件名，即 `json/` 目录下的条目名
+    pub file: String,
+    /// 配置名
+    pub name: String,
+    /// 组件 uid
+    pub uid: String,
+    /// 版本号
+    pub version: String,
+    /// 加载顺序，小的先加载
+    pub order: i32,
+}
+
+/// 启动参数解析结果，前端初始化后取走执行
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartArgDto {
+    /// 动作：`game` 启动实例 / `install` 用路径打开添加实例
+    pub action: String,
+    /// `game` 是实例 uuid；`install` 是文件或文件夹路径
+    pub value: String,
+}
+
+impl StartArgDto {
+    /// 启动实例
+    pub fn game(uuid: &str) -> Self {
+        Self { action: "game".to_string(), value: uuid.to_string() }
+    }
+
+    /// 用文件 / 文件夹打开添加实例
+    pub fn install(path: &str) -> Self {
+        Self { action: "install".to_string(), value: path.to_string() }
+    }
+
+}
+
 /// 游戏日志事件
 ///
-/// thread / level / category 由核心的日志解析填充，与 InstanceRuntimeLog 同一套正则，
-/// 解析不出的行为空串，前端筛选器据此显示"全部"
+/// 内核逐行推日志，壳层按固定周期攒成一批再发（见 windows/log 的 flush_pending_logs）。
+/// 逐行发事件时，游戏一次性刷几千行就是几千次 IPC 往返，日志窗口会被刷到卡住。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LogEvent {
     /// 实例 UUID
     pub uuid: String,
-    /// 时间
-    pub time: String,
-    /// 日志原文
-    pub text: String,
-    /// 线程名，解析不出为空串
-    pub thread: String,
-    /// 级别，解析不出为空串
-    pub level: String,
-    /// 分类，解析不出为空串
-    pub category: String,
-    /// 是否清空日志，前端清屏
+    /// 这一批的日志行，按时间顺序
+    pub lines: Vec<LogLine>,
+    /// 为真时前端先清屏；lines 是清屏之后新增的行
     pub clear: bool,
 }
 
-/// 游戏日志行，即 `log_get_runtime` 返回的历史条目，字段同 LogEvent 去掉事件头
+/// 游戏日志行：`log_get_runtime` 返回的历史条目，也是 `game-log` 事件里的一行
+///
+/// thread / level / category 由核心的日志解析填充，与 InstanceRuntimeLog 同一套正则，
+/// 解析不出的行为空串，前端筛选器据此显示"全部"
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LogLine {

@@ -12,6 +12,7 @@ import {
   loadGuiConfig,
   saveGuiConfig,
   type ClientConfig,
+  type ExperimentalConfig,
 } from "../../../lib/guiConfig";
 import { typeLabelKey } from "../../../lib/accountStore";
 import { useSaveState } from "./useSaveState";
@@ -34,10 +35,13 @@ const SERVER_LOCK_TYPES = ["authlib", "selflittleskin", "nide8"];
  * - `lockInstances` / `refreshLockInstances` / `lockMissing` / `onLockInstanceChange`: 实例锁定
  * - `customHome` / `importingCustomHome` / `customHomeState` / `refreshCustomHome` / `importCustomHome` / `openCustomHomeDir` / `removeCustomHome`: 自定义主页面
  * - `pickMusicFile`: 选一个本地音频文件填进"自定义音乐"
+ * - `experimental` / `applyExperimental`: 实验性功能四开关（界面先行，行为未接线）
  * - `load` / `applyClient` / `saveState` / `resetGroup`: 加载、落盘与分组级恢复默认
  */
 export function useSettingsClient() {
   const client = ref<ClientConfig>({ ...defaultConfig().client });
+  /** 实验性功能四个开关：界面先行，行为未接线 */
+  const experimental = ref<ExperimentalConfig>({ ...defaultConfig().experimental });
   const { state, track } = useSaveState();
 
   // ---------- 加载 ----------
@@ -45,6 +49,7 @@ export function useSettingsClient() {
   async function load() {
     const cfg = await loadGuiConfig();
     if (cfg?.client) client.value = { ...cfg.client };
+    if (cfg?.experimental) experimental.value = { ...cfg.experimental };
   }
 
   // ---------- 即改即存 ----------
@@ -53,6 +58,15 @@ export function useSettingsClient() {
   async function applyClient() {
     try {
       await track(() => saveGuiConfig({ client: { ...client.value } }));
+    } catch (e) {
+      showToast(tErr(e));
+    }
+  }
+
+  /** 整份 experimental 提交；同样失败时把保存状态标红 */
+  async function applyExperimental() {
+    try {
+      await track(() => saveGuiConfig({ experimental: { ...experimental.value } }));
     } catch (e) {
       showToast(tErr(e));
     }
@@ -278,6 +292,8 @@ export function useSettingsClient() {
   return {
     client,
     applyClient,
+    experimental,
+    applyExperimental,
     serverAddr,
     pickMusicFile,
     LOGIN_TYPES,

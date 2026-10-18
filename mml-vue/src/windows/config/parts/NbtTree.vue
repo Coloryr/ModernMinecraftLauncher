@@ -47,10 +47,10 @@ const emit = defineEmits<{
   (e: "dirty", value: boolean): void;
 }>();
 
-/** 当前文件在会话表里的键 */
-const key = computed(() => sessionKey(props.uuid, props.source, props.file));
+/** 当前文件在会话表里的键；区域文件带上区块下标，一个区块一份会话 */
+const key = computed(() => sessionKey(props.uuid, props.source, props.file, props.chunk));
 /** 当前文件的会话；切文件就是换一份会话，读过的那些原样留着 */
-const session = ref<NbtSession>(openSession(props.uuid, props.source, props.file));
+const session = ref<NbtSession>(openSession(props.uuid, props.source, props.file, props.chunk));
 const loading = ref(false);
 const saving = ref(false);
 /** 搜索词，空串 = 不过滤 */
@@ -238,7 +238,7 @@ async function load() {
 
 /** 切到某个文件：换会话；读过的直接摆出来，没读过的才去打开 */
 async function activate() {
-  session.value = openSession(props.uuid, props.source, props.file);
+  session.value = openSession(props.uuid, props.source, props.file, props.chunk);
   if (!session.value.loaded) await load();
 }
 

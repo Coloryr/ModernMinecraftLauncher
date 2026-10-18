@@ -35,6 +35,7 @@ export const GROUP_TITLES: Record<string, string> = {
   customHome: "winSettings.secCustomHome",
   music: "winSettings.secMusic",
   gameTitle: "winSettings.secGameTitle",
+  experimental: "winSettings.secExperimental",
 };
 
 interface IndexEntry {

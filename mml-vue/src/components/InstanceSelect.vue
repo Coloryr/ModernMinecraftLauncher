@@ -164,7 +164,7 @@ function addNew() {
              每行只有文字：图标（实例头像 / 加号）在这个下拉里一律不画 -->
         <div class="menu-list" ref="listEl">
           <button v-for="inst in instances" :key="inst.uuid" class="option"
-            :class="{ active: inst.uuid === modelValue }" @click="pick(inst)">
+            :class="{ active: inst.uuid === modelValue, running: inst.running }" @click="pick(inst)">
             <span class="option-text">
               <span class="option-name">{{ inst.name }}</span>
               <span class="option-sub">
@@ -300,6 +300,7 @@ function addNew() {
 }
 
 .option {
+  position: relative;
   width: 100%;
   display: flex;
   align-items: center;
@@ -353,6 +354,19 @@ function addNew() {
 
 .option-sub .loader-text {
   font-size: 9.5px;
+}
+
+/* 运行中的绿点：贴右缘并**脱离文档流**，不给选项行带来任何尺寸影响 */
+.option.running .run-dot {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+}
+
+/* 给绿点让位：名字 / 副标题的省略号不会压到它 */
+.option.running .option-text {
+  padding-right: 16px;
 }
 
 .run-dot {

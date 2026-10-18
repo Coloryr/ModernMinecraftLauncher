@@ -895,6 +895,13 @@ impl InstanceSettingObj {
         crate::add_run_game(handel);
         crate::add_game_log_item(&self.uuid, GameLog::LaunchTime(time));
 
+        // 进程已经起来了：推一次 End，前端据此把"启动中"切成"运行中"（换成停止键等）。
+        // ColorMC 在同一位置推 LaunchState.End，见 GameLaunch.cs:555 —— 之前漏了这一条，
+        // 日志窗口那颗按钮因此永远收不到"已启动"，停在播放图标上。
+        if let Some(gui) = &gui {
+            gui.update_state(self, LaunchState::End);
+        }
+
         let post_run = run_arg
             .launch_post_run
             .unwrap_or(default.launch_post_run.clone().unwrap_or_default());

@@ -11,6 +11,7 @@
 //! 主窗口只负责按钮开窗这个"入口"与启动 / 退出时推一行状态，转换逻辑不跟着它走。
 
 use std::path::PathBuf;
+use std::sync::{LazyLock, Mutex};
 
 use mml_game::game_log::{GameLog, GameLogItemObj, InstanceRuntimeLog};
 use tauri::{AppHandle, Emitter};
@@ -92,6 +93,75 @@ fn emit_game_log(app: &AppHandle, event: LogEvent) {
     let _ = app.emit(listens::GAME_LOG, event);
 }
 
+/// 日志攒批周期，单位 ms；也是前端拿到日志的最大延迟
+pub(crate) const LOG_FLUSH_INTERVAL_MS: u64 = 100;
+
+/// 单个实例一批最多带多少行：一次性刷几万行时别把单个事件负载做大，剩下的下一轮再发
+const LOG_FLUSH_MAX_LINES: usize = 1000;
+
+/// 攒批缓冲上限：前端只留最近 10000 行，攒再多也是白占内存
+const LOG_PENDING_MAX_LINES: usize = 20_000;
+
+/// 待发日志：内核逐行推来，先攒在这里，由 flusher 按周期成批发出去
+static PENDING_LOG: LazyLock<Mutex<Vec<(String, LogLine)>>> = LazyLock::new(|| Mutex::new(Vec::new()));
+
+/// 一行日志放进攒批缓冲，超上限丢最旧的
+///
+/// - `uuid`: 日志所属实例 uuid
+/// - `line`: 已转换好的日志行
+fn queue_game_log(uuid: String, line: LogLine) {
+    let mut pending = PENDING_LOG.lock().unwrap();
+    pending.push((uuid, line));
+    if pending.len() > LOG_PENDING_MAX_LINES {
+        let drop = pending.len() - LOG_PENDING_MAX_LINES;
+        pending.drain(..drop);
+    }
+}
+
+/// 把攒下的日志按实例成批发给前端
+///
+/// 每个实例一个事件，单批最多 [`LOG_FLUSH_MAX_LINES`] 行，多出来的留到下一轮 ——
+/// 逐行发事件时，游戏一次性刷几千行就是几千次 IPC 往返，日志窗口会被刷到卡住。
+///
+/// - `app`: 应用句柄，广播用它
+pub(crate) fn flush_pending_logs(app: &AppHandle) {
+    let mut groups: Vec<(String, Vec<LogLine>)> = Vec::new();
+    let mut rest: Vec<(String, LogLine)> = Vec::new();
+    {
+        let mut pending = PENDING_LOG.lock().unwrap();
+        if pending.is_empty() {
+            return;
+        }
+        for (uuid, line) in pending.drain(..) {
+            // 日志基本来自同一个实例，线性找一下足够
+            let idx = match groups.iter().position(|(u, _)| u == &uuid) {
+                Some(idx) => idx,
+                None => {
+                    groups.push((uuid.clone(), Vec::new()));
+                    groups.len() - 1
+                }
+            };
+            if groups[idx].1.len() < LOG_FLUSH_MAX_LINES {
+                groups[idx].1.push(line);
+            } else {
+                rest.push((uuid, line));
+            }
+        }
+        *pending = rest;
+    }
+
+    for (uuid, lines) in groups {
+        emit_game_log(
+            app,
+            LogEvent {
+                uuid,
+                lines,
+                clear: false,
+            },
+        );
+    }
+}
+
 /// 发出一行游戏日志，自动解析 thread / level / category 筛选字段
 ///
 /// - `app`: 应用句柄，广播用它
@@ -103,16 +173,26 @@ fn emit_game_log(app: &AppHandle, event: LogEvent) {
 /// 保证事件里的字段与核心侧处理结果一致
 pub(crate) fn emit_log_line(app: &AppHandle, uuid: &str, text: &str, clear: bool) {
     let obj = mml_game::game_log::InstanceRuntimeLog::parse_game_log_line(text);
+    let line = LogLine {
+        time: now_time(),
+        text: text.to_string(),
+        thread: obj.thread,
+        level: obj.level.as_str().to_string(),
+        category: obj.category,
+    };
+    if !clear {
+        queue_game_log(uuid.to_string(), line);
+        return;
+    }
+
+    // 清空是分界线：先把已攒的行发出去，顺序反了会把清空之后的行一起清掉
+    flush_pending_logs(app);
     emit_game_log(
         app,
         LogEvent {
             uuid: uuid.to_string(),
-            time: now_time(),
-            text: text.to_string(),
-            thread: obj.thread,
-            level: obj.level.as_str().to_string(),
-            category: obj.category,
-            clear,
+            lines: vec![line],
+            clear: true,
         },
     );
 }
@@ -250,31 +330,15 @@ pub(crate) fn log_line_from_item(item: &GameLogItemObj) -> LogLine {
 pub(crate) fn forward_run_log(app: &AppHandle, log: &InstanceLog) {
     let uuid = log.uuid.to_string();
     match &log.log {
-        InstanceLogType::AddLog(item) => {
-            let line = log_line_from_item(item);
-            emit_game_log(
-                app,
-                LogEvent {
-                    uuid,
-                    time: line.time,
-                    text: line.text,
-                    thread: line.thread,
-                    level: line.level,
-                    category: line.category,
-                    clear: false,
-                },
-            );
-        }
+        InstanceLogType::AddLog(item) => queue_game_log(uuid, log_line_from_item(item)),
         InstanceLogType::ClearLog => {
+            // 同上：清空前先把已攒的行发出去
+            flush_pending_logs(app);
             emit_game_log(
                 app,
                 LogEvent {
                     uuid,
-                    time: String::new(),
-                    text: String::new(),
-                    thread: String::new(),
-                    level: String::new(),
-                    category: String::new(),
+                    lines: Vec::new(),
                     clear: true,
                 },
             );

@@ -20,12 +20,13 @@
 //! 见 [`nbt_session`]），之后的保存是"改值 / 新增 / 删除"三种操作，直接套在会话那份树上、
 //! 由同一个句柄写回，不再重新打开与重新读盘。
 
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};
 
 use mml_base::hash_helper::{self, HashType};
 use mml_names::names;
 use mml_nbt::chunk::ChunkData;
+use mml_nbt::nbt_file::NbtFile;
 use mml_nbt::nbt_types;
 use mml_nbt::{NBT_END_ORDER, NbtType};
 use mml_sys::path_helper;
@@ -1085,53 +1086,140 @@ pub fn config_get_mca(
         .collect())
 }
 
-/// 在区域文件的某个区块里按 id 找实体或方块实体
+/// 按方块坐标在存档里找实体或方块实体；不给坐标就整份存档扫一遍
 ///
-/// 区块按**绝对坐标**换算表项下标（`(x & 31) + (z & 31) * 32`），与列表上显示的坐标同一口径。
-/// `name` 为空时只定位区块、不挑具体条目。
+/// 文件名与表项下标都由坐标算出来，不需要用户自己挑区域文件：
+/// 方块 `(x, z)` → 区块 `(x >> 4, z >> 4)` → 区域 `(cx >> 5, cz >> 5)` 与表项 `(cx & 31) + (cz & 31) * 32`。
+/// 实体在 `entities/`、方块实体在 `region/`，两边的区域文件各自一套。
 ///
 /// - `game`: 实例 uuid
 /// - `source`: 来源，空串为实例本身，否则是存档目录名
-/// - `file`: 来源内的相对路径
-/// - `x`: 区块绝对坐标 X
-/// - `z`: 区块绝对坐标 Z
 /// - `kind`: 找哪一类，取值 `Entities` / `block_entities`
-/// - `name`: id 片段，空串表示只要区块
+/// - `x`: 方块坐标 X；与 `z` 都不给表示整份存档扫
+/// - `z`: 方块坐标 Z
+/// - `name`: id 片段；空串表示只定位区块
 ///
 /// # 返回值
 ///
-/// 表项下标与命中节点路径；没有命中的条目时路径为空。路径非法返回 `err.fileName`，
-/// 不是区域文件返回 `err.notMcaFile`，这一类取错返回 `err.mcaChunkEmpty`
+/// 命中的区域文件、表项下标与节点路径；没命中时 `file` 与 `path` 都为空。
+/// 路径非法返回 `err.fileName`，这一类取错返回 `err.mcaChunkEmpty`
 #[gui_macros::ipc_group("config")]
 #[tauri::command]
 pub fn config_find_chunk(
     game: String,
     source: String,
-    file: String,
-    x: i32,
-    z: i32,
     kind: String,
+    x: Option<i32>,
+    z: Option<i32>,
     name: String,
 ) -> Result<ChunkFindDto, String> {
-    let owner = Uuid::parse_str(&game).map_err(|_| err_keys::UUID.to_string())?;
     let game = instance_snapshot(&game)?;
-    let path = resolve_source(&game, &source, &file)?;
-    if get_file_type(&path) != FileItemType::Mca {
-        return Err(String::from(err_keys::NOT_MCA_FILE));
-    }
     if kind != "Entities" && kind != "block_entities" {
         return Err(String::from(err_keys::MCA_CHUNK_EMPTY));
     }
 
-    let index = ((x & 31) + (z & 31) * 32) as u32;
-    let (found, _) = nbt_session::open_with(&owner, &path, Some(index), |nbt| {
-        find_in_chunk(&nbt.nbt, &kind, &name)
-    })?;
+    // 实体与方块实体分开放：1.17 起实体在 entities/，方块实体还在 region/
+    let dir = if kind == "Entities" { "entities" } else { "region" };
+    let base = if source.is_empty() {
+        game.get_game_path()
+    } else {
+        resolve_under(&game.get_saves_path(), &source)?
+    };
+
+    let (files, index) = match (x, z) {
+        (Some(x), Some(z)) => {
+            let chunk_x = x >> 4;
+            let chunk_z = z >> 4;
+            let region_x = chunk_x >> 5;
+            let region_z = chunk_z >> 5;
+            let name = format!("{dir}/r.{region_x}.{region_z}.mca");
+            let index = ((chunk_x & 31) + (chunk_z & 31) * 32) as u32;
+            (vec![name], Some(index))
+        }
+        // 没给坐标：这一类下面的区域文件全扫
+        _ => {
+            let mut list: Vec<String> = Vec::new();
+            for file in path_helper::get_all_files(&base.join(dir)) {
+                if get_file_type(&file) != FileItemType::Mca {
+                    continue;
+                }
+                let Ok(rel) = file.strip_prefix(&base) else {
+                    continue;
+                };
+                list.push(rel.to_string_lossy().replace('\\', "/"));
+            }
+            list.sort();
+            (list, None)
+        }
+    };
+
+    for rel in files {
+        let path = resolve_under(&base, &rel)?;
+        if !path.is_file() {
+            continue;
+        }
+        if let Some((index, hit)) = find_in_file(&path, &kind, &name, index)? {
+            return Ok(ChunkFindDto {
+                file: rel,
+                index,
+                path: hit.unwrap_or_default(),
+            });
+        }
+    }
 
     Ok(ChunkFindDto {
-        index,
-        path: found.unwrap_or_default(),
+        file: String::new(),
+        index: 0,
+        path: Vec::new(),
     })
+}
+
+/// 在一个区域文件里找：给了表项下标就只看那一块，否则扫全部有数据的区块
+///
+/// 扫描直接读每块的字节、不建会话 —— 扫一遍可能在会话表里堆几百份用不上的句柄。
+///
+/// - `path`: 区域文件绝对路径
+/// - `kind`: `Entities` 或 `block_entities`
+/// - `name`: id 片段；空串表示只定位区块
+/// - `only`: 只看这一表项；`None` 表示扫全部
+///
+/// # 返回值
+///
+/// 命中的表项下标与节点路径（`None` 表示只定位到区块、没挑条目）；没命中返回 `None`
+fn find_in_file(
+    path: &Path,
+    kind: &str,
+    name: &str,
+    only: Option<u32>,
+) -> Result<Option<(u32, Option<Vec<String>>)>, String> {
+    let data = std::fs::read(path).map_err(|err| err.to_string())?;
+    if data.len() < 8192 {
+        return Err(String::from(err_keys::MCA_FILE_EMPTY));
+    }
+    let mut cursor = Cursor::new(data.as_slice());
+    let head = ChunkData::read_head(&mut cursor).map_err(|err| err.to_string())?;
+
+    for item in head.iter().filter(|item| item.count > 0) {
+        if let Some(only) = only {
+            if item.index != only {
+                continue;
+            }
+        }
+        let Ok(payload) = nbt_session::chunk_bytes(&data, item.index) else {
+            continue;
+        };
+        let mut cursor = Cursor::new(payload);
+        let Ok(nbt) = NbtFile::read(&mut cursor) else {
+            continue;
+        };
+        let hit = find_in_chunk(&nbt.nbt, kind, name);
+        // 只定位区块时不挑条目，命中即返回
+        if hit.is_some() || name.is_empty() {
+            return Ok(Some((item.index, hit)));
+        }
+    }
+
+    Ok(None)
 }
 
 /// 在区块的某一类列表里按 id 找第一个包含 `name` 的条目

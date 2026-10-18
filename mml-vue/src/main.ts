@@ -3,7 +3,7 @@ import { createApp, watch } from "vue";
 import "./styles/index.css";
 import App from "./App.vue";
 import { loadGuiConfig } from "./lib/guiConfig";
-import { applyTheme, theme } from "./lib/theme";
+import { applyTheme, restoreAccent, theme } from "./lib/theme";
 import { applyLocale, locale } from "./lib/i18n";
 import { applyMonacoNls } from "./lib/monacoNls";
 import { loadAccounts } from "./lib/accountStore";
@@ -69,6 +69,7 @@ async function bootstrap() {
   const cfg = await loadGuiConfig();
   if (cfg) {
     theme.value = cfg.theme;
+    restoreAccent(cfg.accent, cfg.customAccent);
     locale.value = cfg.locale;
     sidebarSide.value = cfg.mainWindow.sidebarSide;
     sidebarCollapsed.value = cfg.mainWindow.sidebarCollapsed;

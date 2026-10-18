@@ -146,7 +146,7 @@ impl Default for HttpObj {
     fn default() -> Self {
         Self {
             source: SourceLocal::Offical,
-            download_thread: 5,
+            download_thread: 10,
             proxy_ip: String::from("127.0.0.1"),
             proxy_port: 7890,
             proxy_user: String::new(),

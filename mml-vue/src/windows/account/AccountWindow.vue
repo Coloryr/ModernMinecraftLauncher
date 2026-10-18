@@ -137,6 +137,9 @@ const filtered = computed(() => {
   });
 });
 
+/** 列表是不是被筛过：搜索词或类型筛选生效。空结果文案与「添加」入口都看它 */
+const filtering = computed(() => searchText.value.trim() !== "" || typeFilter.value !== "all");
+
 // 添加账户弹窗（按类型显示不同输入框）
 const showAdd = ref(false);
 const addType = ref("offline");
@@ -587,13 +590,16 @@ function tokenLabel(acc: AccountStoreDto): string {
 
     <!-- 视图：平铺 / 列表 / 详情（见 views/ 目录）；详情模式下视图区自己管理滚动 -->
     <div class="view-area" :class="{ fill: view === 'detail' }">
-      <AccountGrid v-if="view === 'grid'" :accounts="filtered" :current-uuid="currentAccount?.uuid ?? ''" @add="openAdd"
+      <AccountGrid v-if="view === 'grid'" :accounts="filtered" :filtering="filtering"
+        :current-uuid="currentAccount?.uuid ?? ''" @add="openAdd"
         @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin" @refresh-skin="refreshSkin"
         @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" />
-      <AccountList v-else-if="view === 'list'" :accounts="filtered" :current-uuid="currentAccount?.uuid ?? ''"
+      <AccountList v-else-if="view === 'list'" :accounts="filtered" :filtering="filtering"
+        :current-uuid="currentAccount?.uuid ?? ''"
         :token-label="tokenLabel" @add="openAdd" @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin"
         @refresh-skin="refreshSkin" @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" />
-      <AccountDetail v-else :accounts="filtered" :current-uuid="currentAccount?.uuid ?? ''" :token-label="tokenLabel"
+      <AccountDetail v-else :accounts="filtered" :filtering="filtering" :current-uuid="currentAccount?.uuid ?? ''"
+        :token-label="tokenLabel"
         @add="openAdd" @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin" @refresh-skin="refreshSkin"
         @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" />
     </div>

@@ -145,6 +145,7 @@ function isGroupOpen(id: string) {
                   <div class="inst-row" :data-uuid="inst.uuid" :class="{
                     active: selected?.uuid === inst.uuid,
                     'multi-checked': multiSelect && selectedIds.has(inst.uuid),
+                    running: inst.running,
                   }" @pointerdown="onDragPointerDown($event, { kind: 'instance', instance: inst })"
                     @click="onInstClick(inst)" @contextmenu.prevent="onInstContext($event, inst)">
                     <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(inst.uuid) }">
@@ -154,7 +155,7 @@ function isGroupOpen(id: string) {
                     <span v-if="inst.loader !== 'normal'" class="loader-text" :class="`loader-${inst.loader}`">{{
                       t(`add.loader.${inst.loader}`) }}</span>
                     <span class="inst-name"><HighlightText :text="inst.name" :query="searchText" /></span>
-                    <span v-if="inst.running" class="run-dot" v-tip="'running'"></span>
+                    <span v-if="inst.running" class="run-dot" v-tip="t('launch.running')"></span>
                   </div>
                 </template>
               </template>
@@ -213,7 +214,7 @@ function isGroupOpen(id: string) {
         <span v-if="inst.loader !== 'normal'" class="loader-corner loader-text" :class="`loader-${inst.loader}`">{{
           t(`add.loader.${inst.loader}`) }}</span>
         <span class="tile-name"><HighlightText :text="inst.name" :query="searchText" /></span>
-        <span v-if="inst.running" class="run-dot" v-tip="'running'"></span>
+        <span v-if="inst.running" class="run-dot" v-tip="t('launch.running')"></span>
       </div>
       <div v-if="filteredInstances.length === 0" class="empty-tip tile-empty">{{ t("search.empty") }}</div>
     </div>
@@ -232,6 +233,10 @@ function isGroupOpen(id: string) {
   /* 侧栏一行的高度：实例行、拖拽占位、底部的「添加实例 / 添加分组」都取这一档，
      全列节奏才一致（原来 48 / 50 / 50 三处各写一个数） */
   --row-h: 48px;
+  /* 侧栏左右内边距：搜索行、分组列表、平铺网格共用一处 ——
+     三处各写一个数时搜索框 / 收起按钮与下面的实例对不齐。
+     取值以顶部那一行为准（收起按钮到右边的距离） */
+  --side-pad-x: 12px;
 }
 
 .main.side-right .sidebar {
@@ -244,7 +249,7 @@ function isGroupOpen(id: string) {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 12px 10px;
+  padding: 12px var(--side-pad-x) 10px;
 }
 
 /* 实例搜索框：吃掉按钮之外的那一段宽度 */
@@ -311,8 +316,9 @@ function isGroupOpen(id: string) {
   flex: 1;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  /* 见 styles/scrollbar.css */
-  padding: 2px 10px 14px;
+  padding: 2px var(--side-pad-x) 14px;
+  /* 与 scrollbar-gutter 成对：减掉常驻的那 9px，行才是左右各 10px，见 styles/scrollbar.css */
+  padding-right: calc(var(--side-pad-x) - 9px);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -391,13 +397,14 @@ function isGroupOpen(id: string) {
   min-height: 0;
 }
 
-/* 添加实例行（与实例行同尺寸，位于实例上方） */
+/* 添加实例行（与实例行同尺寸，位于实例上方）。
+   边框也占布局位置：内边距减掉那 1px，内容左右 / 上下才和**不带边框**的实例行对齐 */
 .add-inst-row {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 9px 12px;
+  padding: 8px 11px;
   border: 1px dashed var(--accent-border);
   border-radius: 10px;
   background: var(--bg-raised);
@@ -496,7 +503,9 @@ function isGroupOpen(id: string) {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 12px;
+  /* 同 .add-inst-row：内边距减掉边框那 1.5px，占位与它替换的实例行逐像素对齐
+     （否则拖动时整列会上下跳一下） */
+  padding: 7.5px 10.5px;
   min-height: var(--row-h);
   border-radius: 10px;
   border: 1.5px dashed var(--accent-border);
@@ -509,7 +518,8 @@ function isGroupOpen(id: string) {
 
 .drop-ghost-group {
   margin: 2px 0;
-  padding: 9px 12px;
+  /* 同上：减掉边框宽度，分组名与实例行的内容左缘对齐 */
+  padding: 7.5px 10.5px;
   border: 1.5px dashed var(--accent-border);
   border-radius: 10px;
   background: var(--accent-soft);
@@ -544,8 +554,9 @@ function isGroupOpen(id: string) {
   flex: 1;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  /* 见 styles/scrollbar.css */
-  padding: 6px 10px 14px;
+  padding: 6px var(--side-pad-x) 14px;
+  /* 同上：不然平铺网格整块偏左 */
+  padding-right: calc(var(--side-pad-x) - 9px);
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   gap: 10px;
@@ -628,6 +639,20 @@ function isGroupOpen(id: string) {
   position: absolute;
   top: 10px;
   right: 10px;
+}
+
+/* 运行中的绿点：贴行右缘并**脱离文档流**。
+   留在流里它会占一格（名字可用宽度跟着缩），行高也随它参与计算 */
+.inst-row.running .run-dot {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+}
+
+/* 给绿点让出位置：长名字的省略号不会压到它 */
+.inst-row.running .inst-name {
+  padding-right: 17px;
 }
 
 .run-dot {

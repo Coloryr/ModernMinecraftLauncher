@@ -10,12 +10,13 @@
 //!
 //! 命令带分组标记，值填原始组名 main，把组键钉回 `main`，见 AGENTS.md §4。
 
-use std::sync::Arc;
+use std::collections::HashSet;
+use std::sync::{Arc, LazyLock, Mutex};
 
-use mml_auth::auths;
+use mml_auth::{AuthType, auths};
 use mml_game::game_launch::{AutoJoinType, GameLaunchArg};
 use mml_game::gui_hook::{ILaunchGui, LaunchState, ProcessRunType};
-use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
+use mml_game::launcher::instance_setting_obj::{InstanceSettingObj, ServerObj};
 use mml_game::{InstanceExit, get_running_instances, is_running, stop_game};
 use tauri::{AppHandle, Emitter};
 use tokio_util::sync::CancellationToken;
@@ -31,6 +32,36 @@ use crate::windows::log::emit_log_line;
 use super::args::core_instance;
 use super::emit_launch_error;
 
+/// 正在启动中的实例：命令进后台线程时登记，线程收工时摘掉
+///
+/// 后端要到**进程真正起来**才算"运行中"（`is_running`），检查 / 下载那段窗口期它是 false ——
+/// 只靠 `is_running` 拦不住重复启动（主界面刷新一次、或从日志窗口再点一次"测试启动"）。
+static LAUNCHING: LazyLock<Mutex<HashSet<Uuid>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
+
+/// 设置里的全局"自动进服"：实例没配自己的加入服务器时用它
+///
+/// 对应 ColorMC 的 `ServerCustom.JoinServer`，实例级设置优先。
+///
+/// # 返回值
+///
+/// 开关开着且地址非空时给出服务器；否则 `None`
+fn global_auto_join() -> Option<ServerObj> {
+    let config = crate::gui_config::get();
+    if !config.client.auto_join {
+        return None;
+    }
+    // 地址允许写成 host 或 host:port，端口缺省 25565，与 MOTD 那个框同一套解析
+    let addr = super::catalog::parse_motd_addr(&config.client.auto_join_server);
+    if addr.host.is_empty() {
+        return None;
+    }
+    Some(ServerObj {
+        enable: true,
+        ip: Some(addr.host),
+        port: Some(addr.port),
+    })
+}
+
 /// 启动游戏
 ///
 /// 账户取后端记的"当前账户"，实例取核心实例表。启动本身在后台任务里跑，命令立刻返回。
@@ -40,7 +71,8 @@ use super::emit_launch_error;
 ///
 /// # 返回值
 ///
-/// 已交给后台任务时返回 `Ok(())`；实例不存在 / 没有当前账户 / 已在运行返回 `Err`
+/// 已交给后台任务时返回 `Ok(())`；实例不存在 / 没有当前账户 / 已在运行 /
+/// 没登录过正版账户却要用离线账户启动 返回 `Err`
 #[gui_macros::ipc_group("main")]
 #[tauri::command]
 pub async fn main_launch_game(app: AppHandle, uuid: String) -> Result<(), String> {
@@ -53,15 +85,35 @@ pub async fn main_launch_game(app: AppHandle, uuid: String) -> Result<(), String
         .and_then(|key| find_by_uuid(&key.uuid))
         .ok_or_else(|| err_keys::ACCOUNT_MISSING.to_string())?;
 
-    // 实例快照 + 自启参数：实例配了"加入服务器"就自动进服
+    // 离线账户的启动前提是本机登录过正版（微软）账户：皮肤站 / 外置登录不算证明，只认 OAuth。
+    // 与 ColorMC 同一处（GameBinding.LaunchAsync → UserBinding.GetLaunchUser），
+    // 那边拒绝时顺手把官网打开，引导用户去登录 / 购买
+    if auth.auth_type == AuthType::Offline
+        && !auths::get_all()
+            .iter()
+            .any(|account| account.auth_type == AuthType::OAuth)
+    {
+        mml_sys::open_helper::open_url("https://www.minecraft.net/");
+        return Err(err_keys::OFFLINE_NEED_PREMIUM.to_string());
+    }
+
+    // 实例快照 + 自启参数：实例配了"加入服务器"就自动进服；实例没配才看设置里的全局自动进服
     let (setting, auto) = {
         let inst = core.instance.read().unwrap();
         let auto = match &inst.start_server {
             Some(server) if server.enable => AutoJoinType::Server(Arc::new(server.clone())),
-            _ => AutoJoinType::None,
+            _ => match global_auto_join() {
+                Some(server) => AutoJoinType::Server(Arc::new(server)),
+                None => AutoJoinType::None,
+            },
         };
         (inst.clone(), auto)
     };
+
+    // 到线程收工之前都算"启动中"：重复调用直接拒掉，别下两份资源、起两个进程
+    if !LAUNCHING.lock().unwrap().insert(core.uuid) {
+        return Err(err_keys::INSTANCE_RUNNING.to_string());
+    }
 
     emit_launch_state(
         &app,
@@ -91,8 +143,9 @@ pub async fn main_launch_game(app: AppHandle, uuid: String) -> Result<(), String
     // 用独立线程 + 自己的 current-thread 运行时，而不是 tauri 的 async 运行时：
     // `start_game` 的 future 不是 `Send`（内核里跨 await 持有 std 锁的读守卫），
     // 进不了 `tauri::async_runtime::spawn`。线程名带上实例 uuid，排查时认得出来。
-    std::thread::Builder::new()
-        .name(format!("Mml Game Launch {}", core.uuid))
+    let launch_uuid = core.uuid;
+    let spawned = std::thread::Builder::new()
+        .name(format!("Mml Game Launch {launch_uuid}"))
         .spawn(move || {
             let runtime = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
                 Ok(runtime) => runtime,
@@ -123,8 +176,15 @@ pub async fn main_launch_game(app: AppHandle, uuid: String) -> Result<(), String
                     }
                 }
             });
-        })
-        .map_err(|err| err.to_string())?;
+
+            // 线程收工：成败都已定，把"启动中"摘掉（失败后要允许重试）
+            LAUNCHING.lock().unwrap().remove(&launch_uuid);
+        });
+
+    if let Err(err) = spawned {
+        LAUNCHING.lock().unwrap().remove(&launch_uuid);
+        return Err(err.to_string());
+    }
 
     Ok(())
 }

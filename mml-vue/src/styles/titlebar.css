@@ -40,6 +40,13 @@
   flex-shrink: 0;
 }
 
+/* 标题栏里的"启动中"按钮（日志窗口的测试启动）：要装下阶段文本，这一档放开方形定宽 */
+.frame-head .ui-btn.icon-btn-head.launch-live {
+  width: auto;
+  min-width: 108px;
+  padding: 0 10px;
+}
+
 /* 实例 chip 也能被压：标题栏控件多，窗口窄时先让名字走省略号 */
 .frame-head .inst-chip {
   min-width: 0;

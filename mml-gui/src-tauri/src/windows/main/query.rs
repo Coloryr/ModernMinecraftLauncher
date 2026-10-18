@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use mml_game::launcher::LogEncoding;
 
-use crate::dtos::main_dto::{LoadState, NewsItem};
+use crate::dtos::main_dto::{CustomJsonItemDto, LoadState, NewsItem, StartArgDto};
 use crate::dtos::{
     GroupDto, InstanceArgsDto, InstanceInfoDto, InstanceLangDto, JavaInfoDto, MotdDto,
     SystemMemoryDto, VersionInfoDto,
@@ -279,6 +279,50 @@ pub async fn main_get_news(page: Option<u32>) -> Result<Vec<NewsItem>, String> {
 #[tauri::command]
 pub fn main_open_url(url: String) {
     mml_sys::open_helper::open_url(&url);
+}
+
+/// 取走启动参数带来的待办（命令行 / `mml:` 协议）
+///
+/// 前端初始化完成后调一次：启动瞬间内核实例表还没加载，参数只能先存着等，
+/// 见 [`crate::start_arg`]。
+///
+/// # 返回值
+///
+/// 有启动参数时返回它，否则 `None`；取过一次就没了
+#[gui_macros::ipc_group("main")]
+#[tauri::command]
+pub fn main_take_start_arg() -> Option<StartArgDto> {
+    crate::start_arg::take()
+}
+
+/// 读取实例的自定义启动配置，即 `json/` 目录下每个文件的摘要
+///
+/// 对应 ColorMC 游戏编辑窗口 tab1 的那张表；按加载顺序排序，顺序相同再按文件名，
+/// 这样界面上的顺序与内核拼启动参数时的取用顺序一致。
+///
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// 配置摘要列表；目录不存在时为空列表。uuid 非法或实例不存在返回错误文案
+#[gui_macros::ipc_group("main")]
+#[tauri::command]
+pub fn main_get_custom_json(uuid: String) -> Result<Vec<CustomJsonItemDto>, String> {
+    let core = core_instance(&uuid).ok_or_else(|| crate::err_keys::GAME_NOT_FOUND.to_string())?;
+    let inst = core.instance.read().unwrap();
+    let mut list: Vec<CustomJsonItemDto> = inst
+        .read_custom_json()
+        .into_iter()
+        .map(|(file, obj)| CustomJsonItemDto {
+            file,
+            name: obj.name,
+            uid: obj.uid,
+            version: obj.version,
+            order: obj.order,
+        })
+        .collect();
+    list.sort_by(|a, b| a.order.cmp(&b.order).then_with(|| a.file.cmp(&b.file)));
+    Ok(list)
 }
 
 /// `mml-image` 协议访问前缀，前端拼实例图标等地址用

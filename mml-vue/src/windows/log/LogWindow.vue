@@ -19,13 +19,17 @@ import BaseSwitch from "../../components/ui/BaseSwitch.vue";
 import { toggleWordWrap, wordWrap } from "../../lib/editorWrap";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import InstanceChip from "../../components/ui/InstanceChip.vue";
+import LaunchProgress from "../../components/LaunchProgress.vue";
+import DownloadTitleIndicator from "../../components/DownloadTitleIndicator.vue";
 // Monaco 编辑器按需加载：它一块就是 ~2.6 MB（gzip 674 kB）。
 // 异步化不能省掉这次下载（打开就是要看日志），但能让窗口外壳与工具条先画出来。
 const MonacoLogView = defineAsyncComponent(() => import("../../components/MonacoLogView.vue"));
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
 import { copyText } from "../../lib/clipboard";
-import { api, onGameExit, onGameLog, onLaunchState } from "../../lib/api";
+import { api, onGameExit, onGameLog, onLaunchError, onLaunchState } from "../../lib/api";
+import { stateText } from "../../lib/launchState";
+import { useDownloadProgress } from "../../composables/useDownloadProgress";
 import { familyInstanceFromLabel, targetUuid } from "../windowManager";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import type { InstanceInfoDto, LogLine, LogSettingDto } from "../../lib/bindings";
@@ -180,7 +184,8 @@ async function refreshList() {
 /** 载入当前来源的全部日志行 */
 async function loadSource() {
   if (!lockedUuid.value) return;
-  // 换了来源，旧的筛选选项不再成立
+  // 换了来源，旧的筛选选项不再成立；待入列的实时行也不属于新来源
+  dropPending();
   thread.value = "";
   category.value = "";
   if (liveSource.value) {
@@ -210,11 +215,39 @@ watch(file, loadSource);
 
 const running = ref(false);
 
+/**
+ * 启动中：点了"测试启动"、进程还没起来的那一段
+ *
+ * 后端要到**进程真正起来**才把实例算作运行中（内核 add_run_game），这期间 getRunning() 还是
+ * false；所以"启动中"由这份本地状态顶住，"运行中"以后端为准（进程起来后内核推一次
+ * LaunchState::End，我们据此刷新，见 onLaunchState）。
+ */
+const launching = ref(false);
+/** 当前阶段名与进度，来自 launch-state 事件 */
+const stageKey = ref("");
+/** 内核给的阶段百分比：按 LaunchState 等权近似，下载阶段恒为 36 */
+const statePct = ref<number | null>(null);
+
+/** 下载队列的真实进度 */
+const downloadProgress = useDownloadProgress();
+
+/** 阶段文案；还没收到阶段就按"正在启动…" */
+const stageText = computed(() => (stageKey.value ? stateText(stageKey.value) : t("launch.launching")));
+
+/** 按钮上的百分比：下载阶段用真实下载进度，其它阶段用内核的阶段近似值 */
+const stagePct = computed(() =>
+  stageKey.value === "download" && downloadProgress.hasTasks.value
+    ? Math.round(downloadProgress.percent.value)
+    : statePct.value,
+);
+
 /** 拉一次该实例是否在运行 */
 async function refreshRunning() {
   if (!lockedUuid.value) return;
   try {
     running.value = (await api.getRunning()).includes(lockedUuid.value);
+    // 进程起来了：启动阶段结束，按钮该换成停止键
+    if (running.value) launching.value = false;
   } catch (e) {
     console.error("[LogWindow] 读取运行状态失败", e);
   }
@@ -222,12 +255,17 @@ async function refreshRunning() {
 
 /** 测试启动：与主页面同一个命令，日志会流进本窗口 */
 async function testLaunch() {
+  // 点了就先按住按钮：后端起进程之前 getRunning() 还是 false，光靠它按钮会一直像"可点"
+  launching.value = true;
+  stageKey.value = "";
+  statePct.value = null;
   try {
     await api.launchGame(lockedUuid.value);
     // 自己启动的实例就是要盯着它的输出，顺手把自动下拉打开（与参考实现一致）
     setting.value.auto = true;
     await refreshRunning();
   } catch (e) {
+    launching.value = false;
     showToast(tErr(e));
   }
 }
@@ -326,13 +364,45 @@ watch(
 
 let unlistenGameLog: UnlistenFn | null = null;
 let unlistenLaunchState: UnlistenFn | null = null;
+let unlistenLaunchError: UnlistenFn | null = null;
 let unlistenGameExit: UnlistenFn | null = null;
 
-/** 追加一行并裁到上限，超出丢最旧的 */
-function pushLine(line: LogLine) {
-  sourceLogs.value.push(line);
-  if (sourceLogs.value.length > MAX_LOG_LINES) {
-    sourceLogs.value.splice(0, sourceLogs.value.length - MAX_LOG_LINES);
+/** 攒批周期，单位 ms */
+const FLUSH_INTERVAL = 100;
+
+/** 还没并入 sourceLogs 的行
+ *
+ * 事件是**逐行**来的，收一行就 push 一次的话，一次渲染的活儿（筛选、线程 / 分组去重、
+ * Monaco 追加、滚到底）会跟着行数跑几千遍 —— 游戏一次性刷几千行时窗口就卡住了。
+ */
+let pendingLines: LogLine[] = [];
+let flushTimer = 0;
+
+/** 收一行：先攒着，到点一次性并入 */
+function enqueueLine(line: LogLine) {
+  pendingLines.push(line);
+  // 一次性灌几十万行时只留最近这一段：上限本来也是 MAX_LOG_LINES，攒太多只是白占内存
+  if (pendingLines.length > MAX_LOG_LINES * 2) {
+    pendingLines.splice(0, pendingLines.length - MAX_LOG_LINES * 2);
+  }
+  if (flushTimer === 0) flushTimer = window.setTimeout(flushPending, FLUSH_INTERVAL);
+}
+
+/** 把攒下的行一次并入，超出上限丢最旧的 */
+function flushPending() {
+  flushTimer = 0;
+  if (pendingLines.length === 0) return;
+  const merged = sourceLogs.value.concat(pendingLines);
+  pendingLines = [];
+  sourceLogs.value = merged.length > MAX_LOG_LINES ? merged.slice(-MAX_LOG_LINES) : merged;
+}
+
+/** 丢掉还没入列的行：清空、换实例、换来源时都要，别让旧行事后冒出来 */
+function dropPending() {
+  pendingLines = [];
+  if (flushTimer !== 0) {
+    clearTimeout(flushTimer);
+    flushTimer = 0;
   }
 }
 
@@ -343,24 +413,29 @@ onMounted(async () => {
     // 锁定了实例：只收它自己的日志行；看历史文件时不追加实时行
     if (e.uuid !== lockedUuid.value || !liveSource.value) return;
     if (e.clear) {
-      sourceLogs.value = [];
+      // 清屏并收下跟在清屏之后的行（"游戏启动中…"这类就在这批里）
+      dropPending();
+      sourceLogs.value = [...e.lines];
       return;
     }
-    pushLine({
-      time: e.time,
-      text: e.text,
-      thread: e.thread,
-      level: e.level,
-      category: e.category,
-    });
+    for (const line of e.lines) enqueueLine(line);
   });
 
   // 本实例的启停：切换「测试启动 / 停止」按钮
   unlistenLaunchState = await onLaunchState((e) => {
-    if (e.uuid === lockedUuid.value) void refreshRunning();
+    if (e.uuid !== lockedUuid.value) return;
+    stageKey.value = e.state;
+    statePct.value = e.progress ?? null;
+    void refreshRunning();
+  });
+  unlistenLaunchError = await onLaunchError((e) => {
+    if (e.uuid && e.uuid !== lockedUuid.value) return;
+    launching.value = false;
+    running.value = false;
   });
   unlistenGameExit = await onGameExit((e) => {
     if (e.uuid !== lockedUuid.value) return;
+    launching.value = false;
     running.value = false;
     // 非 0 退出：顺手刷一次文件列表（崩溃报告刚写出来），并问一句要不要把日志传出去
     if (e.code !== 0) {
@@ -372,14 +447,16 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  dropPending();
   unlistenGameLog?.();
   unlistenLaunchState?.();
+  unlistenLaunchError?.();
   unlistenGameExit?.();
 });
 </script>
 
 <template>
-  <WindowFrame :title="title" body-fill @close="$emit('close')">
+  <WindowFrame :title="title" body-fill hide-download-indicator @close="$emit('close')">
     <!-- 日志来源与操作都放标题栏：不占内容区高度；除「测试启动」外只留图标，文字进提示 -->
     <template #head-right>
       <div class="head-log">
@@ -390,6 +467,8 @@ onBeforeUnmount(() => {
           <option value="">{{ t("logWindow.runLog") }}</option>
           <option v-for="f in logFiles" :key="f" :value="f">{{ fileName(f) }}</option>
         </select>
+        <!-- 下载入口紧跟日志来源下拉框：从这儿测试启动时，缺文件的下载就在手边 -->
+        <DownloadTitleIndicator />
         <BaseButton size="sm" variant="ghost" class="icon-btn-head" v-tip="t('logWindow.refreshList')"
           :aria-label="t('logWindow.refreshList')" @click="refreshList">
           <GlyphIcon name="refresh" :size="15" :weight="1.8" />
@@ -420,9 +499,12 @@ onBeforeUnmount(() => {
             <rect x="6.5" y="6.5" width="11" height="11" rx="2" />
           </svg>
         </BaseButton>
-        <BaseButton v-else size="sm" variant="accent" class="icon-btn-head" v-tip="t('logWindow.testLaunch')"
-          :aria-label="t('logWindow.testLaunch')" @click="testLaunch">
-          <GlyphIcon name="play" :size="15" />
+        <BaseButton v-else size="sm" :variant="launching ? 'primary' : 'accent'" class="icon-btn-head"
+          :class="{ 'launch-live': launching }" :disabled="launching"
+          v-tip="launching ? stageText : t('logWindow.testLaunch')"
+          :aria-label="launching ? stageText : t('logWindow.testLaunch')" @click="testLaunch">
+          <LaunchProgress v-if="launching" :text="stageText" :percent="stagePct" />
+          <GlyphIcon v-else name="play" :size="15" />
         </BaseButton>
       </div>
     </template>

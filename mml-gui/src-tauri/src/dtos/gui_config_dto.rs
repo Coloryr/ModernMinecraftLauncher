@@ -11,9 +11,9 @@ use serde::{Deserialize, Serialize};
 use mml_names::Lang;
 
 use crate::gui_config::{
-    CapeConfig, CapeDisplay, ClientConfig, CollectConfig, GuiConfig, HeadConfig, HeadType,
-    LoginLockObj, MainWindowConfig, SidebarSide, SkinConfig, SkinDisplay, StartupPage, Theme,
-    ViewMode, WindowMode,
+    CapeConfig, CapeDisplay, ClientConfig, CollectWindowConfig, ExperimentalConfig, GuiConfig,
+    HeadConfig, HeadType, LoginLockObj, MainWindowConfig, SidebarSide, SkinConfig, SkinDisplay,
+    StartupPage, Theme, ViewMode, WindowMode,
 };
 
 /// 皮肤显示设置，前端 wire 为 camelCase，字段即 `skin`
@@ -206,12 +206,30 @@ impl From<ClientConfigDto> for ClientConfig {
     }
 }
 
+/// 实验性功能开关，wire 为 camelCase；行为未接线，只有选择落盘
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ExperimentalConfigDto {
+    /// 启动器自身以管理员身份运行
+    pub launcher_admin: bool,
+    /// 启动实例时提升到管理员身份
+    pub instance_admin: bool,
+    /// 允许通过 URI（自定义协议）直接启动实例
+    pub uri_launch: bool,
+    /// 在沙盒里启动实例
+    pub sandbox_launch: bool,
+}
+
 /// GUI 配置，前端 wire 为 camelCase，即 `window_get_gui_config` 的返回值
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct GuiConfigDto {
     /// 主题：Dark / Light
     pub theme: Theme,
+    /// 强调色：预设 id（blue / green / …）或 custom
+    pub accent: String,
+    /// 自定义强调色，`#rrggbb`
+    pub custom_accent: String,
     /// 语言：zh_cn / en_us
     pub locale: Lang,
     /// 窗口模式：Multi / Single
@@ -224,6 +242,8 @@ pub struct GuiConfigDto {
     pub collect: CollectConfigDto,
     /// 客户端设置
     pub client: ClientConfigDto,
+    /// 实验性功能开关
+    pub experimental: ExperimentalConfigDto,
     /// 界面字体族名，空串表示默认字体栈
     pub font: String,
     /// 皮肤显示设置：Skin2DA / Skin2DB / Skin3D / Skin3DD / Skin3DRotate 与旋转角度
@@ -240,6 +260,20 @@ pub struct GuiConfigDto {
     pub bg_native_size: u32,
 }
 
+/// 主题 / 强调色变更事件的负载
+///
+/// 设置窗口改完只影响它自己那个 webview，其它窗口靠这条事件跟上，见 `emit_gui_theme_change`
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GuiThemeDto {
+    /// 主题：System / Light / Dark
+    pub theme: Theme,
+    /// 强调色：预设 id（blue / green / …）或 custom
+    pub accent: String,
+    /// 自定义强调色，`#rrggbb`
+    pub custom_accent: String,
+}
+
 impl From<GuiConfig> for GuiConfigDto {
     /// 磁盘配置 → 前端 wire 形态
     ///
@@ -251,6 +285,8 @@ impl From<GuiConfig> for GuiConfigDto {
     fn from(c: GuiConfig) -> Self {
         Self {
             theme: c.theme,
+            accent: c.accent,
+            custom_accent: c.custom_accent,
             locale: c.locale,
             window_mode: c.window_mode,
             main_window: MainWindowConfigDto {
@@ -266,10 +302,10 @@ impl From<GuiConfig> for GuiConfigDto {
                 y: c.head.y,
             },
             collect: CollectConfigDto {
-                modpack: c.collect.modpack,
-                show_mod: c.collect.show_mod,
-                resource_pack: c.collect.resource_pack,
-                shaderpack: c.collect.shaderpack,
+                modpack: c.collect_window.modpack,
+                show_mod: c.collect_window.show_mod,
+                resource_pack: c.collect_window.resource_pack,
+                shaderpack: c.collect_window.shaderpack,
             },
             client: ClientConfigDto {
                 motd_card: c.client.motd_card,
@@ -283,6 +319,12 @@ impl From<GuiConfig> for GuiConfigDto {
                 custom_home: c.client.custom_home,
                 music_on: c.client.music_on,
                 music_source: c.client.music_source,
+            },
+            experimental: ExperimentalConfigDto {
+                launcher_admin: c.experimental.launcher_admin,
+                instance_admin: c.experimental.instance_admin,
+                uri_launch: c.experimental.uri_launch,
+                sandbox_launch: c.experimental.sandbox_launch,
             },
             font: c.font,
             skin: SkinConfigDto {
@@ -314,6 +356,8 @@ impl From<GuiConfigDto> for GuiConfig {
     fn from(d: GuiConfigDto) -> Self {
         Self {
             theme: d.theme,
+            accent: d.accent,
+            custom_accent: d.custom_accent,
             locale: d.locale,
             window_mode: d.window_mode,
             main_window: MainWindowConfig {
@@ -328,7 +372,7 @@ impl From<GuiConfigDto> for GuiConfig {
                 x: d.head.x,
                 y: d.head.y,
             },
-            collect: CollectConfig {
+            collect_window: CollectWindowConfig {
                 modpack: d.collect.modpack,
                 show_mod: d.collect.show_mod,
                 resource_pack: d.collect.resource_pack,
@@ -346,6 +390,12 @@ impl From<GuiConfigDto> for GuiConfig {
                 custom_home: d.client.custom_home,
                 music_on: d.client.music_on,
                 music_source: d.client.music_source,
+            },
+            experimental: ExperimentalConfig {
+                launcher_admin: d.experimental.launcher_admin,
+                instance_admin: d.experimental.instance_admin,
+                uri_launch: d.experimental.uri_launch,
+                sandbox_launch: d.experimental.sandbox_launch,
             },
             font: d.font,
             skin: SkinConfig {

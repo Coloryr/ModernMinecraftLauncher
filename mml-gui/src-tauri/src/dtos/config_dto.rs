@@ -188,6 +188,8 @@ pub struct NbtEditDto {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChunkFindDto {
+    /// 命中的区域文件，来源内的相对路径
+    pub file: String,
     /// 命中的区块在文件头里的表项下标，0–1023
     pub index: u32,
     /// 命中节点从区块根往下的路径，逐层是键名或列表下标；没命中时为空
