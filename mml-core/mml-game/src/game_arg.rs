@@ -380,8 +380,14 @@ impl InstanceSettingObj {
         match auto {
             AutoJoinType::None => {}
             AutoJoinType::Save(save_obj) => {
-                args.push("--quickPlaySingleplayer".to_string());
-                args.push(save_obj.level_name.clone());
+                // 只有 1.20 起有 quick play；它认的是**存档目录名**（level id），
+                // 不是 level.dat 里的显示名。低版本没有等价参数，只能不传
+                if self.is_game_version_120()
+                    && let Some(dir) = save_obj.path.file_name()
+                {
+                    args.push("--quickPlaySingleplayer".to_string());
+                    args.push(dir.to_string_lossy().to_string());
+                }
             }
             AutoJoinType::Server(server_obj) => {
                 if let Some(ip) = &server_obj.ip

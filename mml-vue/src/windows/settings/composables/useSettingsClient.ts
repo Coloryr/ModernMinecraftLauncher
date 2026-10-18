@@ -263,6 +263,8 @@ export function useSettingsClient() {
       case "servers":
         client.value.autoJoin = d.autoJoin;
         client.value.autoJoinServer = d.autoJoinServer;
+  client.value.windowEffect = d.windowEffect;
+  client.value.windowOpacity = d.windowOpacity;
         client.value.motdServer = d.motdServer;
         client.value.motdCard = d.motdCard;
         client.value.motdInterval = d.motdInterval;

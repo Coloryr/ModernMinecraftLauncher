@@ -196,6 +196,10 @@ export interface ClientConfig {
   autoJoin: boolean;
   /** 游戏自动进服地址：host 或 host:port，空表示不自动进服 */
   autoJoinServer: string;
+  /** 窗口材质：auto（云母→亚克力→模糊降级）/ mica / acrylic / blur / none */
+  windowEffect: string;
+  /** 窗口底色不透明度，单位百分比 60–100 */
+  windowOpacity: number;
   /** MOTD 显示地址：host 或 host:port，空表示不显示真实服务器信息 */
   motdServer: string;
   /** 实例锁定：锁定的实例 uuid（空 = 未锁定）；锁定时主窗口不允许切换到其它实例 */
@@ -392,6 +396,9 @@ export function defaultConfig(): GuiConfig {
       loginLock: safeLockList(readRaw(KEYS.loginLock)),
       autoJoin: readFlag(KEYS.autoJoin),
       autoJoinServer: readString(KEYS.autoJoinServer),
+      // 这两项不做 localStorage 首帧缓存：真值一律来自 gui_config.json
+      windowEffect: "auto",
+      windowOpacity: 85,
       motdServer: readString(KEYS.motdServer),
       lockInstance: readString(KEYS.lockInstance),
       customHome: readFlag(KEYS.customHome),

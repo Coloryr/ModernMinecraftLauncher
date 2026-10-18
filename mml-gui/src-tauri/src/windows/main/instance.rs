@@ -131,12 +131,14 @@ pub fn main_create_instance(
 ) -> Result<InstanceInfoDto, String> {
     let uuid = format!("mml-{}", uuid_short());
     let dir = name.clone();
+    let quick_play = mml_base::version_parse::is_game_version_120(&version);
     let inst = InstanceInfoDto {
         uuid: uuid.clone(),
         name,
         group,
         version,
         version_type: Some("release".into()),
+        quick_play,
         loader: loader.unwrap_or_else(|| "normal".into()),
         loader_version,
         dir,

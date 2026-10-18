@@ -154,6 +154,10 @@ pub struct ClientConfigDto {
     pub music_on: bool,
     /// 自定义音乐来源：本地音频文件路径或 http(s) 直链，空串表示没配
     pub music_source: String,
+    /// 窗口材质：auto / mica / acrylic / blur / none
+    pub window_effect: String,
+    /// 窗口底色不透明度，单位百分比
+    pub window_opacity: u8,
 }
 
 impl From<ClientConfig> for ClientConfigDto {
@@ -177,6 +181,8 @@ impl From<ClientConfig> for ClientConfigDto {
             custom_home: c.custom_home,
             music_on: c.music_on,
             music_source: c.music_source,
+            window_effect: c.window_effect,
+            window_opacity: c.window_opacity,
         }
     }
 }
@@ -202,6 +208,8 @@ impl From<ClientConfigDto> for ClientConfig {
             custom_home: c.custom_home,
             music_on: c.music_on,
             music_source: c.music_source,
+            window_effect: c.window_effect,
+            window_opacity: c.window_opacity,
         }
     }
 }
@@ -319,6 +327,8 @@ impl From<GuiConfig> for GuiConfigDto {
                 custom_home: c.client.custom_home,
                 music_on: c.client.music_on,
                 music_source: c.client.music_source,
+                window_effect: c.client.window_effect,
+                window_opacity: c.client.window_opacity,
             },
             experimental: ExperimentalConfigDto {
                 launcher_admin: c.experimental.launcher_admin,
@@ -390,6 +400,8 @@ impl From<GuiConfigDto> for GuiConfig {
                 custom_home: d.client.custom_home,
                 music_on: d.client.music_on,
                 music_source: d.client.music_source,
+                window_effect: d.client.window_effect,
+                window_opacity: d.client.window_opacity,
             },
             experimental: ExperimentalConfig {
                 launcher_admin: d.experimental.launcher_admin,

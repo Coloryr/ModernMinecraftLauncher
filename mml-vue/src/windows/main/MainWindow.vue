@@ -1045,6 +1045,8 @@ const clientConfig = ref<ClientConfig>({
   customHome: false,
   musicOn: false,
   musicSource: "",
+  windowEffect: "auto",
+  windowOpacity: 85,
 });
 
 // ---- 实例锁定：只允许使用锁定的那个实例，入口在设置窗口「客户端设置 → 实例锁定」 ----
@@ -1135,6 +1137,9 @@ const { init: initModpackStatus } = useModpackStatus(false, adoptAddedInstance);
 async function subscribeEvents() {
   const fns = await Promise.all([
     onLaunchState((e) => {
+      // 启动可能来自别处（资源窗口右键「进入世界」）：状态事件到了就置成启动中，
+      // 否则主界面不知道有人在启动，按钮一直停在「启动游戏」
+      markLaunching(e.uuid);
       if (e.uuid !== selected.value?.uuid) return;
       statusText.value = stateText(e.state);
       launchStage.value = e.state;

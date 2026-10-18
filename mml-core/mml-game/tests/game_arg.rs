@@ -155,12 +155,33 @@ fn game_arg_auto_join_save() {
 
     let instance = make_instance("1.20.4");
     let save = Arc::new(SaveObj {
-        level_name: "my-world".to_string(),
+        level_name: "显示名不影响参数".to_string(),
+        path: std::path::PathBuf::from("/saves/my-world"),
         ..Default::default()
     });
 
     let args = instance.make_game_arg(&AutoJoinType::Save(save));
+    // 传的是**存档目录名**（level id），不是 level.dat 里的显示名
     assert_eq!(args, vec!["--quickPlaySingleplayer", "my-world"]);
+}
+
+/// 自动进入存档：1.20 以下没有 quick play，不带这个参数
+#[test]
+fn game_arg_auto_join_save_before_120() {
+    init_all();
+    let _lock = lock_config();
+
+    let instance = make_instance("1.19.4");
+    let save = Arc::new(SaveObj {
+        path: std::path::PathBuf::from("/saves/my-world"),
+        ..Default::default()
+    });
+
+    let args = instance.make_game_arg(&AutoJoinType::Save(save));
+    assert!(
+        !args.iter().any(|arg| arg == "--quickPlaySingleplayer"),
+        "1.20 以下不该带 quick play: {args:?}"
+    );
 }
 
 /// 自动进入服务器：1.20 及以上用 quickPlayMultiplayer，端口缺省 25565

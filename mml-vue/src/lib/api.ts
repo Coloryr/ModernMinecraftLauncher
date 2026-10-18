@@ -974,11 +974,12 @@ export const api = {
    * 启动游戏
    *
    * - `uuid`: 实例 uuid
+   * - `world`: 存档目录名；给了就直接进这个世界（1.20+ 的 quick play），不给按实例配置来
    *
-   * 目前是占位实现：只标记运行并发事件；启动用户名由后端从当前账户解析
+   * 启动用户名由后端从当前账户解析
    */
-  async launchGame(uuid: string): Promise<void> {
-    return commands.main.launchGame(uuid);
+  async launchGame(uuid: string, world?: string): Promise<void> {
+    return commands.main.launchGame(uuid, world ?? null);
   },
 
   /**
@@ -2329,6 +2330,16 @@ export function enableResourcepack(uuid: string, file: string): Promise<void> {
  * - `uuid`: 实例 uuid
  * - `file`: 材质包文件名
  */
+/**
+ * 启动实例，可选直接进入某个存档（1.20+ 的 quick play）
+ *
+ * - `uuid`: 实例 uuid
+ * - `world`: 存档目录名；不传按实例自己的自启配置来
+ */
+export function launchGame(uuid: string, world?: string): Promise<void> {
+  return commands.main.launchGame(uuid, world ?? null);
+}
+
 export function disableResourcepack(uuid: string, file: string): Promise<void> {
   return commands.resource.resourcepackDisable(uuid, file);
 }

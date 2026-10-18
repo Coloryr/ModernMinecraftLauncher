@@ -153,6 +153,10 @@ pub struct InstanceSettingObj {
     /// 加入服务器设置
     #[serde(rename = "StartServer")]
     pub start_server: Option<ServerObj>,
+    /// 启动后自动进入的存档，值是存档**目录名**（不是 level.dat 里的显示名）；
+    /// 只有 1.20 及以上的版本会用它拼 `--quickPlaySingleplayer`
+    #[serde(rename = "AutoSave")]
+    pub auto_save: Option<String>,
     /// 端口代理设置
     #[serde(rename = "ProxyHost")]
     pub proxy_host: Option<ProxyHostObj>,
@@ -203,6 +207,7 @@ impl Default for InstanceSettingObj {
             jvm_local: Default::default(),
             window: Default::default(),
             start_server: Default::default(),
+            auto_save: Default::default(),
             proxy_host: Default::default(),
             advance_jvm: Default::default(),
             is_modpack: Default::default(),

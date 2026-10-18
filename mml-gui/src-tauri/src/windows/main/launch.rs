@@ -75,7 +75,11 @@ fn global_auto_join() -> Option<ServerObj> {
 /// 没登录过正版账户却要用离线账户启动 返回 `Err`
 #[gui_macros::ipc_group("main")]
 #[tauri::command]
-pub async fn main_launch_game(app: AppHandle, uuid: String) -> Result<(), String> {
+pub async fn main_launch_game(
+    app: AppHandle,
+    uuid: String,
+    world: Option<String>,
+) -> Result<(), String> {
     let core = core_instance(&uuid).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())?;
     if is_running(&core.uuid) {
         return Err(err_keys::INSTANCE_RUNNING.to_string());
@@ -97,18 +101,41 @@ pub async fn main_launch_game(app: AppHandle, uuid: String) -> Result<(), String
         return Err(err_keys::OFFLINE_NEED_PREMIUM.to_string());
     }
 
-    // 实例快照 + 自启参数：实例配了"加入服务器"就自动进服；实例没配才看设置里的全局自动进服
-    let (setting, auto) = {
-        let inst = core.instance.read().unwrap();
-        let auto = match &inst.start_server {
-            Some(server) if server.enable => AutoJoinType::Server(Arc::new(server.clone())),
-            _ => match global_auto_join() {
-                Some(server) => AutoJoinType::Server(Arc::new(server)),
-                None => AutoJoinType::None,
-            },
-        };
-        (inst.clone(), auto)
+    // 实例快照 + 自启参数。优先级：右键指定的存档 → 实例配的"加入服务器"
+    // → 实例配的"进入存档" → 设置里的全局自动进服
+    let inst = core.instance.read().unwrap().clone();
+    let explicit = world.filter(|dir| !dir.is_empty());
+    let wanted = explicit
+        .clone()
+        .or_else(|| inst.auto_save.clone().filter(|dir| !dir.is_empty()));
+    // 存档按目录名找回来：目录被删/改名时当作找不到，别让启动卡在一个不存在的存档上
+    let auto_save = match wanted {
+        Some(dir) => inst
+            .get_saves()
+            .await
+            .into_iter()
+            .find(|save| save.path.file_name().is_some_and(|name| name == dir.as_str())),
+        None => None,
     };
+    let auto = if explicit.is_some() {
+        // 明确点了"进入世界"就只认这个存档：找不到时直接报错，别悄悄换成进服 / 什么都不进
+        match auto_save {
+            Some(save) => AutoJoinType::Save(Arc::new(save)),
+            None => return Err(err_keys::WORLD_GONE.to_string()),
+        }
+    } else {
+        match &inst.start_server {
+            Some(server) if server.enable => AutoJoinType::Server(Arc::new(server.clone())),
+            _ => match auto_save {
+                Some(save) => AutoJoinType::Save(Arc::new(save)),
+                None => match global_auto_join() {
+                    Some(server) => AutoJoinType::Server(Arc::new(server)),
+                    None => AutoJoinType::None,
+                },
+            },
+        }
+    };
+    let setting = inst.clone();
 
     // 到线程收工之前都算"启动中"：重复调用直接拒掉，别下两份资源、起两个进程
     if !LAUNCHING.lock().unwrap().insert(core.uuid) {

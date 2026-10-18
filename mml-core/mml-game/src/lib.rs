@@ -1031,6 +1031,7 @@ impl InstanceSettingObj {
             jvm_local: self.jvm_local.clone(),
             window: self.window.clone(),
             start_server: self.start_server.clone(),
+            auto_save: self.auto_save.clone(),
             proxy_host: self.proxy_host.clone(),
             advance_jvm: self.advance_jvm.clone(),
             is_modpack: self.is_modpack,

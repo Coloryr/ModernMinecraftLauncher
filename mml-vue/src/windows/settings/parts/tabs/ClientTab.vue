@@ -2,7 +2,7 @@
 // 设置窗口 · 客户端设置标签：服务器 / MOTD / 登录方式锁定 / 实例锁定 / 自定义主页面 / 游戏标题
 //
 // 游戏标题那组的数据属于 `window`，由 useSettingsLaunch 持有，所以这里额外接一个 `win`。
-import { nextTick, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { t } from "../../../../lib/i18n";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
@@ -50,6 +50,14 @@ const {
   removeCustomHome,
   saveState,
 } = props.settings;
+
+/** 窗口毛玻璃开关：材质字段是多选一（auto/mica/acrylic/blur/none），界面先只给开 / 关 */
+const windowEffectOn = computed({
+  get: () => client.value.windowEffect !== "none",
+  set: (on: boolean) => {
+    client.value.windowEffect = on ? "auto" : "none";
+  },
+});
 
 /** 服务器信息校验失败时把焦点落到那个输入框（"就地标红并聚焦"） */
 const lockServerInput = ref<HTMLInputElement | null>(null);
@@ -241,6 +249,17 @@ watch(lockServerError, async (msg) => {
       <label class="field-label">{{ t("winSettings.titleDelay") }}</label>
       <NumberStepper v-model="win.titleDelay" :min="100" :max="600000" :step="100" />
     </template>
+  </SettingsGroup>
+
+  <!-- 窗口外观：材质由系统在窗口背后合成（Rust 侧 windows/effects.rs），开关落 gui_config.client.windowEffect -->
+  <SettingsGroup id="window-look" title-key="winSettings.secWindowLook">
+    <div class="switch-row">
+      <div class="switch-text">
+        <span class="switch-label">{{ t("winSettings.windowEffect") }}</span>
+        <span class="switch-state">{{ t("winSettings.windowEffectDesc") }}</span>
+      </div>
+      <BaseSwitch v-model="windowEffectOn" @update:model-value="applyClient" />
+    </div>
   </SettingsGroup>
 
   <!-- 实验性功能：还在验证中的开关集中放这一组，位置固定在客户端设置的最后一组。

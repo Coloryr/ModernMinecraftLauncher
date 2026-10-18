@@ -947,7 +947,15 @@ pub async fn window_save_gui_config(app: AppHandle, config: GuiConfigDto) -> Res
         }
     }
     let new_view_mode = new_config.main_window.view_mode;
+    let effect_before = crate::gui_config::get().client.window_effect;
     crate::gui_config::set(new_config);
+    // 材质是建窗那一刻铺上去的：设置里换了就地重铺一遍，否则得等下次开窗才看得到
+    let effect_now = crate::gui_config::get().client.window_effect;
+    if effect_before != effect_now {
+        for (_, win) in app.webview_windows() {
+            crate::windows::effects::apply(&win, &effect_now);
+        }
+    }
     if skin_changed {
         emit_skin_config_change(&app);
     }

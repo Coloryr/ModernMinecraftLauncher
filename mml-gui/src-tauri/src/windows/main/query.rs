@@ -39,6 +39,7 @@ pub fn main_get_instances() -> Vec<InstanceInfoDto> {
                 group: mml_game::get_instance_group(&inst.uuid).map(|g| g.to_string()),
                 version: inst.version.clone(),
                 version_type: Some(inst.game_type.id().to_string()),
+                quick_play: mml_base::version_parse::is_game_version_120(&inst.version),
                 loader: String::from(inst.loader.to_string()),
                 loader_version: inst.loader_version.clone(),
                 dir: inst.dir.clone(),

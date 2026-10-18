@@ -16,6 +16,7 @@ import {
   backupSave,
   deleteSave,
   editSave,
+  launchGame,
   listSaveBackups,
   restoreSaveBackup,
 } from "../../../lib/api";
@@ -119,6 +120,10 @@ function itemMenuItems(item: SaveItemDto): RowMenuItem[] {
   // 「编辑存档」放最前：改模式与难度是这个列表里唯一的"改内容"动作。
   // 损坏的存档置灰：它没有 `Data` 复合标签，后端 set_mode 必然返回 DataNotFound
   const items: RowMenuItem[] = [
+    // 「进入世界」= 1.20+ 的 quick play，直接进这个世界；低版本没有等价参数，不给入口
+    ...(props.data.instance.value?.quickPlay
+      ? [{ id: "enter-world", label: t("resource.enterWorld") }]
+      : []),
     { id: "edit", label: t("resource.saveEdit"), disabled: item.broken },
     // 「修改配置文件」开配置窗口，直接落到这个存档的文件树：
     // 编辑弹窗只管 level.dat 那几项，这个存档下其它文件在那边看与改
@@ -166,6 +171,9 @@ function onMenuPick(id: string) {
 
   const item = menu.item;
   switch (id) {
+    case "enter-world":
+      void enterWorld(item);
+      break;
     case "edit":
       openEdit(item);
       break;
@@ -189,6 +197,15 @@ function onMenuPick(id: string) {
       remove(item);
       break;
   }
+}
+
+/** 直接进这个世界：后端会把它拼成 `--quickPlaySingleplayer`（1.20+ 才有） */
+function enterWorld(item: SaveItemDto) {
+  actLocal(async () => {
+    await launchGame(instanceUuid.value, item.dir);
+    // 启动交给后台任务，这里立刻返回：说一句，别让人以为没反应
+    showToast(t("resource.enterWorldStarted"));
+  });
 }
 
 function openRestore(item: SaveItemDto) {

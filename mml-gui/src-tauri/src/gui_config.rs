@@ -283,6 +283,10 @@ pub struct ClientConfig {
     pub music_on: bool,
     /// 自定义音乐来源：本地音频文件路径或 http(s) 直链；空串表示没配
     pub music_source: String,
+    /// 窗口材质：`auto`（云母→亚克力→模糊逐个降级）/ `mica` / `acrylic` / `blur` / `none`
+    pub window_effect: String,
+    /// 窗口底色不透明度，单位百分比；界面底色按它混透明，材质才透得出来
+    pub window_opacity: u8,
 }
 
 impl Default for ClientConfig {
@@ -300,6 +304,8 @@ impl Default for ClientConfig {
             custom_home: false,
             music_on: false,
             music_source: String::new(),
+            window_effect: String::from("auto"),
+            window_opacity: 85,
         }
     }
 }
