@@ -1,17 +1,22 @@
 <!doctype html>
-<html lang="zh-CN" style="background: #14161a">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>M²L 启动器</title>
-    <!-- 首帧背景：Vue 挂载前先铺暗色底，避免窗口打开时白屏闪烁；颜色与暗色主题 --bg 一致 -->
+    <!-- 首帧背景：Vue 挂载前先铺一层主题底色，避免窗口打开时白屏闪烁；颜色与 themes.css 的 --bg 一致。
+         材质模式下必须让位：材质由 DWM 合成在窗口背后，html 不透明就把它整片盖住（窗口是装饰激活后
+         才显示的，那时这个类已挂好，所以不会闪） -->
     <style>
       html {
         background: #14161a;
       }
       html[data-theme="Light"] {
         background: #eef1f5;
+      }
+      html.has-material {
+        background: transparent;
       }
     </style>
   </head>

@@ -373,11 +373,11 @@ pub(super) fn create_window(
         None => builder,
     };
 
-    // 底色走透明、并打开窗口透明：毛玻璃是系统在窗口背后合成的，底色不透明就把它整个盖住。
-    // 界面自己的底色是半透明的（见 themes.css 的 mortar 规则），所以毛玻璃没生效时也看得清
-    let builder = builder
-        .transparent(true)
-        .background_color(tauri::window::Color(0x14, 0x16, 0x1a, 0x00));
+    // 只打开窗口透明，**不要**设 background_color：tao 在 WM_ERASEBKGND 里用 CreateSolidBrush
+    // 填客户区，alpha 会被丢掉 —— 设成 #14161a00 实际是刷一层不透明深色，把 DWM 合成在
+    // 窗口背后的材质整片盖住（实测窗内留白恒为 #14161a，与壁纸无关）。
+    // 界面自己的底色是半透明的（见 base.css 的 body），材质没生效时也看得清
+    let builder = builder.transparent(true);
     let win = match geom {
         Some(g) => {
             // 恢复端 builder.position / inner_size 用逻辑像素，保存端是物理像素：按目标
@@ -412,8 +412,8 @@ pub(super) fn create_window(
     };
     let win = win.map_err(|e| e.to_string())?;
 
-    // 系统材质：云母 / 亚克力 / 模糊按能力逐个降级，见 effects；挑哪一种由客户端设置决定
-    super::effects::apply(&win, &crate::gui_config::get().client.window_effect);
+    // 材质不在这里铺：此刻窗口还是隐藏的，随后 activate_decoration 还会改窗口样式。
+    // 按 demo 的做法等窗口显示出来再铺，见 window_activate_decoration
 
     // 必须在**这一刻**量：此时窗口还是 decorations(true)，差值包含原生标题栏；插件激活摘掉
     // 装饰后标题栏并进客户区就再也量不到它，而关窗保存正发生在那个状态

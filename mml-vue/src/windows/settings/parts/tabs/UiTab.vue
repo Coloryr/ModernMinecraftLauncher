@@ -1,19 +1,24 @@
 <script setup lang="ts">
 // 设置窗口 · 界面标签（含窗口设置）
 //
-// 状态与保存逻辑在 composables/useSettingsUi，这里只负责排版与分组（SettingsGroup）。
+// 状态与保存逻辑在 composables/useSettingsUi；窗口外观那组属于 gui_config.client（useSettingsClient），
+// 只是显示在这一页。这里只负责排版与分组（SettingsGroup）。
 import { onMounted } from "vue";
 import { t } from "../../../../lib/i18n";
 import { fontStack } from "../../../../lib/fonts";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
+import NumberStepper from "../../../../components/ui/NumberStepper.vue";
 import SegmentedTabs from "../../../../components/ui/SegmentedTabs.vue";
 import SettingsGroup from "../SettingsGroup.vue";
 import type { useSettingsUi } from "../../composables/useSettingsUi";
+import type { useSettingsClient } from "../../composables/useSettingsClient";
 
 const props = defineProps<{
   /** 界面标签的状态与保存方法，来自 useSettingsUi */
   settings: ReturnType<typeof useSettingsUi>;
+  /** 窗口外观（材质 / 透明度）的状态与保存方法，来自 useSettingsClient */
+  look: ReturnType<typeof useSettingsClient>;
   /** 需要高亮脉冲的分组 id（搜索命中 / 刚恢复默认） */
   flashGroup?: string;
 }>();
@@ -61,6 +66,9 @@ const {
   bgBlur,
   setBgBlur,
 } = props.settings;
+
+// 窗口外观的数据属于 gui_config.client，由 useSettingsClient 持有
+const { client, applyWindowEffect, applyWindowOpacity } = props.look;
 
 // 系统字体枚举是重活：进这个标签时才拉
 onMounted(() => void loadFonts());
@@ -148,6 +156,23 @@ onMounted(() => void loadFonts());
         @update:model-value="(v) => onModeChange(v ? 'Multi' : 'Single')" />
     </div>
     <p v-if="inTauri" class="hint">{{ t("winSettings.windowModeRestart") }}</p>
+  </SettingsGroup>
+
+  <!-- 窗口外观：材质由系统在窗口背后合成（Rust 侧 windows/effects.rs），落 gui_config.client.windowEffect -->
+  <SettingsGroup id="window-look" title-key="winSettings.secWindowLook" :flash="flashGroup === 'window-look'">
+    <label class="field-label">{{ t("winSettings.windowEffect") }}</label>
+    <p class="field-desc">{{ t("winSettings.windowEffectDesc") }}</p>
+    <select v-model="client.windowEffect" class="field-select" @change="applyWindowEffect">
+      <option value="auto">{{ t("winSettings.windowEffectAuto") }}</option>
+      <option value="mica">{{ t("winSettings.windowEffectMica") }}</option>
+      <option value="acrylic">{{ t("winSettings.windowEffectAcrylic") }}</option>
+      <option value="none">{{ t("winSettings.windowEffectNone") }}</option>
+    </select>
+
+    <label class="field-label">{{ t("winSettings.windowOpacity") }}</label>
+    <p class="field-desc">{{ t("winSettings.windowOpacityDesc") }}</p>
+    <NumberStepper v-model="client.windowOpacity" :min="60" :max="100" :step="5"
+      @update:model-value="applyWindowOpacity" />
   </SettingsGroup>
 
   <SettingsGroup id="mainWindow" title-key="winSettings.secMainWindow" :flash="flashGroup === 'mainWindow'">

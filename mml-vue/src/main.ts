@@ -17,7 +17,7 @@ import {
   sidebarSide,
   viewMode,
 } from "./lib/settings";
-import { restoreBg } from "./lib/appearance";
+import { applyWindowAlpha, applyWindowMaterial, restoreBg } from "./lib/appearance";
 import { setMultiWindow } from "./windows/windowManager";
 import { restoreFontFamily } from "./lib/fonts";
 import { installImageFallback } from "./lib/imageFallback";
@@ -69,8 +69,8 @@ async function bootstrap() {
   const cfg = await loadGuiConfig();
   if (cfg) {
     theme.value = cfg.theme;
-  // 窗口材质留多少不透明，见 base.css 的 body：材质由系统在窗口背后合成，底色越不透明越看不见
-  document.documentElement.style.setProperty("--window-alpha", `${cfg.client.windowOpacity}%`);
+    applyWindowAlpha(cfg.client.windowOpacity);
+    applyWindowMaterial(cfg.client.windowEffect);
     restoreAccent(cfg.accent, cfg.customAccent);
     locale.value = cfg.locale;
     sidebarSide.value = cfg.mainWindow.sidebarSide;

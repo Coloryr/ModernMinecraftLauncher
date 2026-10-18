@@ -2,9 +2,16 @@
 //
 // 标签清单是"唯一真源"：左侧导航、当前页大标题与说明、以及设置项搜索索引都从这里取。
 
-export type SettingsTab = "ui" | "java" | "network" | "launch" | "skin" | "client";
+export type SettingsTab = "ui" | "java" | "network" | "launch" | "skin" | "client" | "experimental";
 
-export type SettingsTabIcon = "palette" | "coffee" | "download" | "play" | "user" | "gear";
+export type SettingsTabIcon =
+  | "palette"
+  | "coffee"
+  | "download"
+  | "play"
+  | "user"
+  | "gear"
+  | "flask";
 
 export interface SettingsTabItem {
   id: SettingsTab;
@@ -19,6 +26,7 @@ export const SETTINGS_TABS: SettingsTabItem[] = [
   { id: "launch", icon: "play" },
   { id: "skin", icon: "user" },
   { id: "client", icon: "gear" },
+  { id: "experimental", icon: "flask" },
 ];
 
 /**
@@ -28,7 +36,7 @@ export const SETTINGS_TABS: SettingsTabItem[] = [
  *
  * # 返回值
  *
- * 命中六个标签之一时为 `true`
+ * 命中清单里的标签时为 `true`
  */
 export function isSettingsTab(v: unknown): v is SettingsTab {
   return SETTINGS_TABS.some((tab) => tab.id === v);

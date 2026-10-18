@@ -113,7 +113,6 @@ rquickjs = { version = "~0.14.0", default-features = false, features = [
     "futures",
 ] }
 tauri-plugin-dialog = "~2.8.1"
-# 窗口毛玻璃（Windows 的 Mica / Acrylic）；本地 registry 已有 0.8.1
 window-vibrancy = "~0.8.1"
 font-kit = "~0.14.3"
 dirs = "~7.0.0"

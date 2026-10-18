@@ -726,6 +726,7 @@ pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'stati
             reconcile_min_size(&window, min.width, min.height);
         }
         let _ = window.show();
+        self::effects::apply(&window, &crate::gui_config::get().client.window_effect);
         return Err(format!("decoration activate failed: {error}"));
     }
 
@@ -740,6 +741,9 @@ pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'stati
     }
 
     window.show().map_err(|err| err.to_string())?;
+    // 材质要在窗口显示之后铺：demo 也是拿到可见窗口才调（examples/tauri 的 main.rs），
+    // 隐藏状态下铺的会被随后 activate_decoration 改窗口样式一起丢掉
+    self::effects::apply(&window, &crate::gui_config::get().client.window_effect);
     Ok("custom")
 }
 
@@ -893,7 +897,8 @@ pub fn window_get_gui_config(window: WebviewWindow) -> GuiConfigDto {
 /// 各窗口收到后按新模式重取头像 / 皮肤图；实例列表显示模式有变化时广播
 /// `gui-view-mode-change`，主窗口据此立即换视图；背景图的不透明度 / 模糊有变化时
 /// 广播 `bg-change`，各窗口重取背景状态；主题 / 强调色有变化时广播
-/// `gui-theme-change`，各窗口重新应用主题
+/// `gui-theme-change`，各窗口重新应用主题；窗口材质变化时直接在这里重铺所有窗口，
+/// 透明度是前端 CSS 变量，随 `client-config-change` 由各窗口自己跟上
 ///
 /// - `app`: 应用句柄，广播变更事件用它
 /// - `config`: 前端提交的完整 GUI 状态，内部转成落盘用的 `GuiConfig`
@@ -982,7 +987,7 @@ fn emit_skin_config_change(app: &AppHandle) {
     let _ = app.emit(listens::SKIN_CONFIG_CHANGE, ());
 }
 
-/// 客户端设置变更事件，跨窗口同步，如主窗口 MOTD 卡片 / 登录锁定
+/// 客户端设置变更事件，跨窗口同步，如主窗口 MOTD 卡片 / 登录锁定 / 窗口透明度
 ///
 /// - `app`: 应用句柄，广播用它
 /// - `config`: 变更后的客户端设置

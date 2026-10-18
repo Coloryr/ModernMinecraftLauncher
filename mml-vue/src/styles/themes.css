@@ -373,3 +373,35 @@ html.has-bg .window-frame {
 html.has-bg .tab-content {
   background: var(--bg);
 }
+
+/* ============================================================
+   系统材质模式（<html class="has-material">，lib/appearance.ts 维护）：
+   云母 / 亚克力 / 模糊是 DWM 在窗口背后合成的，窗口底色必须让给它 ——
+   按 window-vibrancy 的 demo（examples/tauri/public/index.html），html / body 全透明，
+   只在面板上压一层色，留白处就是材质本身。
+   --bg-raised 不动：下拉 / 菜单这类浮层要压住下层文字，半透明会糊成一片。
+   ============================================================ */
+
+html.has-material body,
+html.has-material .window-frame {
+  background: transparent;
+}
+
+/* 设置窗内容区原本靠整窗 --bg 垫底；窗根透明后小字会直接压在材质上，补一层折过的底 */
+html.has-material .tab-content {
+  background: color-mix(in srgb, var(--bg) var(--window-alpha, 85%), transparent);
+}
+
+/* 面板：跟随「窗口透明度」原值。再折下去深色主题下会和浅色壁纸混成一片中灰，字就糊了
+   （取样实测过：压到 36% 时卡片是 RGB(123,124,128)） */
+html.has-material {
+  --bg-side: color-mix(in srgb, #1a1d23 var(--window-alpha, 85%), transparent);
+  --bg-card: color-mix(in srgb, #22262e var(--window-alpha, 85%), transparent);
+  --bg-hover: color-mix(in srgb, #2a2f38 var(--window-alpha, 85%), transparent);
+}
+
+html.has-material[data-theme="Light"] {
+  --bg-side: color-mix(in srgb, #f7f8fa var(--window-alpha, 85%), transparent);
+  --bg-card: color-mix(in srgb, #ffffff var(--window-alpha, 85%), transparent);
+  --bg-hover: color-mix(in srgb, #e9ecf1 var(--window-alpha, 85%), transparent);
+}

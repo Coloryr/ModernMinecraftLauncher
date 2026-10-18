@@ -7,9 +7,10 @@ import { computed, ref, watch } from "vue";
 import { listen } from "@tauri-apps/api/event";
 import { isTauri } from "../windows/windowManager";
 import { commands } from "./bindings";
+import type { ClientConfigDto } from "./bindings";
 import { saveGuiConfig } from "./guiConfig";
 import { KEYS, readFlag, readNumber, readString, writeFlag, writeString } from "./storage";
-import { BgChange } from "./listens";
+import { BgChange, ClientConfigChange } from "./listens";
 import { t } from "./i18n";
 import { showToast } from "./toast";
 
@@ -203,4 +204,44 @@ if (isTauri()) {
   void listen(BgChange, () => {
     void restoreBg();
   });
+}
+
+// ---------------- 窗口透明度 ----------------
+
+/**
+ * 窗口透明度写进 CSS 变量
+ *
+ * 材质是系统在窗口背后合成的，底色越不透明越看不见它，见 base.css 的 body。
+ *
+ * - `v`: 不透明度百分比，60–100
+ */
+export function applyWindowAlpha(v: number) {
+  document.documentElement.style.setProperty("--window-alpha", `${v}%`);
+}
+
+// 材质由壳层就地重铺所有窗口（见 windows/effects.rs），透明度与"表面透不透"是各窗口自己的
+// 样式：不跟着广播换，就只有设置窗口会变，主窗口要等下次启动
+if (isTauri()) {
+  void listen<ClientConfigDto>(ClientConfigChange, (e) => {
+    applyWindowAlpha(e.payload.windowOpacity);
+    applyWindowMaterial(e.payload.windowEffect);
+  });
+}
+
+// ---------------- 窗口材质 ----------------
+
+// 材质由系统在窗口背后合成：Linux 上没人给它做模糊（见 Rust 侧 windows/effects.rs），
+// 表面调半透明只会变成"透出桌面"，那就保持不透明
+const MATERIAL_PLATFORM = /Windows|Macintosh/.test(navigator.userAgent);
+
+/**
+ * 窗口材质开关写进 `<html class="has-material">`
+ *
+ * 材质躲在窗口背后，表面不透明就只在卡片之间的缝里透出来，看着像没生效，
+ * 所以材质开着时各表面转半透明，见 themes.css。
+ *
+ * - `effect`: 窗口材质，`auto` / `mica` / `acrylic` / `blur` / `none`
+ */
+export function applyWindowMaterial(effect: string) {
+  document.documentElement.classList.toggle("has-material", MATERIAL_PLATFORM && effect !== "none");
 }

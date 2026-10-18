@@ -27,12 +27,17 @@ body {
   /* --app-font 由设置窗口的字体选择写入（lib/fonts.ts），未设置时用默认栈 */
   font-family: var(--app-font, "Microsoft YaHei", "PingFang SC", "Segoe UI", system-ui, sans-serif);
   /* 半透明：窗口是 transparent(true) 建的，底下的系统材质（云母 / 亚克力 / 模糊，
-     见 Rust 侧 windows/effects.rs）由这里透出来。留 85% 不透明，效果失效时也不至于看不清 */
+     见 Rust 侧 windows/effects.rs）由这里透出来；开材质时这一层整个让位，见 themes.css */
   background: color-mix(in srgb, var(--bg) var(--window-alpha, 85%), transparent);
   color: var(--text);
   overflow: hidden;
   user-select: none;
   transition: background 0.2s, color 0.2s;
+}
+
+/* 没开材质、也没设背景图时窗口不能透：底下既没有模糊也没有底色，透出去就是未处理的桌面 */
+html:not(.has-material):not(.has-bg) body {
+  background: var(--bg);
 }
 
 :root[lang="en_us"] body {

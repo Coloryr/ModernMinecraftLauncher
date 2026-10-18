@@ -49,7 +49,12 @@ export type GlyphName =
   | "palette"
   | "server"
   | "sun"
-  | "cube";
+  | "cube"
+  // 实验性功能：锥形瓶
+  | "flask"
+  // 设置窗口左侧导航：人像（皮肤与头像）、咖啡杯（Java）
+  | "user"
+  | "coffee";
 
 withDefaults(
   defineProps<{
@@ -200,6 +205,12 @@ withDefaults(
       <path d="M4 7.4l8 4.6 8-4.6" />
       <path d="M12 12v9.2" />
     </g>
+    <!-- 实验性功能：锥形瓶（试管 + 液面，实验品的意思） -->
+    <g v-else-if="name === 'flask'">
+      <path d="M10 3h4" />
+      <path d="M10.8 3v5.4L5.6 17a2 2 0 0 0 1.7 3h9.4a2 2 0 0 0 1.7-3l-5.2-8.6V3" />
+      <path d="M8.3 14.2h7.4" />
+    </g>
     <!-- 资源包：调色盘（画材 = 材质 / 贴图） -->
     <g v-else-if="name === 'palette'">
       <path
@@ -223,6 +234,17 @@ withDefaults(
     <g v-else-if="name === 'cube'">
       <path d="M12 2.8 20 7.4v9.2L12 21.2 4 16.6V7.4z" />
       <path d="M4 7.4l8 4.6 8-4.6M12 12v9.2M8 5.1l8 4.6" />
+    </g>
+    <!-- 人像：皮肤与头像 -->
+    <g v-else-if="name === 'user'">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </g>
+    <!-- 咖啡杯：Java -->
+    <g v-else-if="name === 'coffee'">
+      <path d="M17 8h1a4 4 0 1 1 0 8h-1" />
+      <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" />
+      <path d="M6 2v2M10 2v2M14 2v2" />
     </g>
   </svg>
 </template>

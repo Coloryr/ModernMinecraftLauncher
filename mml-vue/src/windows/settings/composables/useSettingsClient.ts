@@ -14,6 +14,7 @@ import {
   type ClientConfig,
   type ExperimentalConfig,
 } from "../../../lib/guiConfig";
+import { applyWindowAlpha, applyWindowMaterial } from "../../../lib/appearance";
 import { typeLabelKey } from "../../../lib/accountStore";
 import { useSaveState } from "./useSaveState";
 
@@ -25,7 +26,7 @@ const LOGIN_TYPES = ["offline", "microsoft", "littleskin", "selflittleskin", "au
 const SERVER_LOCK_TYPES = ["authlib", "selflittleskin", "nide8"];
 
 /**
- * 客户端设置标签的状态与保存
+ * 客户端设置的共享状态与保存：客户端设置页与界面页的窗口外观都用这一份
  *
  * # 返回值
  *
@@ -36,6 +37,7 @@ const SERVER_LOCK_TYPES = ["authlib", "selflittleskin", "nide8"];
  * - `customHome` / `importingCustomHome` / `customHomeState` / `refreshCustomHome` / `importCustomHome` / `openCustomHomeDir` / `removeCustomHome`: 自定义主页面
  * - `pickMusicFile`: 选一个本地音频文件填进"自定义音乐"
  * - `experimental` / `applyExperimental`: 实验性功能四开关（界面先行，行为未接线）
+ * - `applyWindowOpacity`: 透明度写进 CSS 变量并落盘，界面页的窗口外观用
  * - `load` / `applyClient` / `saveState` / `resetGroup`: 加载、落盘与分组级恢复默认
  */
 export function useSettingsClient() {
@@ -61,6 +63,18 @@ export function useSettingsClient() {
     } catch (e) {
       showToast(tErr(e));
     }
+  }
+
+  /** 透明度改完立刻反映到本窗口，再落盘；别的窗口靠 client-config-change 自己跟上 */
+  function applyWindowOpacity(v: number) {
+    applyWindowAlpha(v);
+    void applyClient();
+  }
+
+  /** 材质改用同一个口径：本窗口先换表面透明度，再落盘广播 */
+  function applyWindowEffect() {
+    applyWindowMaterial(client.value.windowEffect);
+    void applyClient();
   }
 
   /** 整份 experimental 提交；同样失败时把保存状态标红 */
@@ -263,11 +277,13 @@ export function useSettingsClient() {
       case "servers":
         client.value.autoJoin = d.autoJoin;
         client.value.autoJoinServer = d.autoJoinServer;
-  client.value.windowEffect = d.windowEffect;
-  client.value.windowOpacity = d.windowOpacity;
         client.value.motdServer = d.motdServer;
         client.value.motdCard = d.motdCard;
         client.value.motdInterval = d.motdInterval;
+        break;
+      case "window-look":
+        client.value.windowEffect = d.windowEffect;
+        client.value.windowOpacity = d.windowOpacity;
         break;
       case "loginLock":
         client.value.loginLockOn = d.loginLockOn;
@@ -288,12 +304,19 @@ export function useSettingsClient() {
         return false;
     }
     await applyClient();
+    // 透明度是纯 CSS 变量，恢复默认后要把窗口里的实际效果一起改回来
+    if (id === "window-look") {
+      applyWindowAlpha(client.value.windowOpacity);
+      applyWindowMaterial(client.value.windowEffect);
+    }
     return true;
   }
 
   return {
     client,
     applyClient,
+    applyWindowOpacity,
+    applyWindowEffect,
     experimental,
     applyExperimental,
     serverAddr,

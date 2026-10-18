@@ -50,6 +50,15 @@ pub enum LogText {
         /// 失败原因
         error: String,
     },
+    /// 系统材质没铺上，窗口退回不透明底色
+    WindowEffectFailed {
+        /// 窗口标签，用来看是哪个窗口出的问题
+        label: String,
+        /// 请求的材质，`auto` / `mica` / `acrylic` / `blur`
+        mode: String,
+        /// 失败原因，库给的原文
+        error: String,
+    },
     /// 取 WebView2 设置失败，快捷键没能关掉
     WebviewSettingsFailed,
     /// 关 DevTools 失败
@@ -140,6 +149,9 @@ impl LogText {
             LogText::WebviewDataDirFailed { dir, error } => {
                 format!("[window] 创建 webview 数据目录失败，退回默认位置：{dir} ({error})")
             }
+            LogText::WindowEffectFailed { label, mode, error } => format!(
+                "[window] 铺系统材质失败，窗口退回不透明底色：mode={mode} 窗口={label} ({error})"
+            ),
             LogText::WebviewSettingsFailed => {
                 String::from("[webview] 取 WebView2 设置失败，快捷键未能关闭")
             }
@@ -197,6 +209,9 @@ impl LogText {
             LogText::WebviewDataDirFailed { dir, error } => format!(
                 "[window] failed to create the webview data directory, \
                  falling back to the default: {dir} ({error})"
+            ),
+            LogText::WindowEffectFailed { label, mode, error } => format!(
+                "[window] failed to apply the system backdrop, the window falls back to an opaque background: mode={mode} window={label} ({error})"
             ),
             LogText::WebviewSettingsFailed => String::from(
                 "[webview] failed to get WebView2 settings, browser shortcuts stay enabled",

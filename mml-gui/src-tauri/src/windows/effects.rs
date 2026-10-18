@@ -16,7 +16,7 @@ use tauri::WebviewWindow;
 /// 给窗口铺系统材质；不支持的平台什么都不做
 ///
 /// - `window`: 已建好的窗口
-/// - `mode`: 客户端设置里的窗口材质，`auto` / `mica` / `acrylic` / `blur` / `none`
+/// - `mode`: 客户端设置里的窗口材质，`auto` / `mica` / `acrylic` / `none`（老配置里的 `blur` 按亚克力铺）
 pub fn apply(window: &WebviewWindow, mode: &str) {
     #[cfg(target_os = "windows")]
     {
@@ -25,28 +25,30 @@ pub fn apply(window: &WebviewWindow, mode: &str) {
         let _ = window_vibrancy::clear_acrylic(window);
         let _ = window_vibrancy::clear_blur(window);
 
-        match mode {
-            "none" => {}
-            "mica" => {
-                let _ = window_vibrancy::apply_mica(window, None);
-            }
-            "acrylic" => {
-                let _ = window_vibrancy::apply_acrylic(window, None);
-            }
-            "blur" => {
-                let _ = window_vibrancy::apply_blur(window, None);
-            }
-            // auto：从新到旧逐个试。云母只有 Win11 认，亚克力要 Win10 1809+，
-            // 都没有时退回 Blur；按库的返回值降级比先探测系统版本稳
-            _ => {
-                if window_vibrancy::apply_mica(window, None).is_ok() {
-                    return;
+        let applied = match mode {
+            "none" => Ok(()),
+            "mica" => window_vibrancy::apply_mica(window, None),
+            "acrylic" => window_vibrancy::apply_acrylic(window, None),
+            // 模糊是 Win11 22H1 的老路径，22H2 起铺上去就是整窗全黑（crate 的 README 标着
+            // 22H1 only，我们在 build 26220 上实测过）。老配置里可能还留着 blur，按亚克力铺，
+            // 别让它把窗口变黑
+            "blur" => window_vibrancy::apply_acrylic(window, None),
+            // auto：从新到旧逐个试。云母只有 Win11 认，亚克力要 Win10 1809+，都没有就没救了；
+            // 不再退回 blur，理由同上。按库的返回值降级比先探测系统版本稳
+            _ => window_vibrancy::apply_mica(window, None)
+                .or_else(|_| window_vibrancy::apply_acrylic(window, None)),
+        };
+        // 铺不上就退回不透明底色：原因留给用户贴日志，光看界面分不清是系统不支持
+        // 还是「透明效果」被关了
+        if let Err(err) = applied {
+            mml_log::error(
+                crate::log_text::LogText::WindowEffectFailed {
+                    label: window.label().to_string(),
+                    mode: mode.to_string(),
+                    error: err.to_string(),
                 }
-                if window_vibrancy::apply_acrylic(window, None).is_ok() {
-                    return;
-                }
-                let _ = window_vibrancy::apply_blur(window, None);
-            }
+                .text(),
+            );
         }
     }
 

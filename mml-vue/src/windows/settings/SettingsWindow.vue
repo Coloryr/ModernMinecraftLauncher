@@ -17,6 +17,7 @@ import NetworkTab from "./parts/tabs/NetworkTab.vue";
 import LaunchTab from "./parts/tabs/LaunchTab.vue";
 import SkinTab from "./parts/tabs/SkinTab.vue";
 import ClientTab from "./parts/tabs/ClientTab.vue";
+import ExperimentalTab from "./parts/tabs/ExperimentalTab.vue";
 import { t } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
 import { KEYS, readString, writeString } from "../../lib/storage";
@@ -190,12 +191,14 @@ function onKeyDown(e: KeyboardEvent) {
         </header>
 
         <section class="set-panel">
-          <UiTab v-if="tab === 'ui'" :settings="ui" :flash-group="flashGroup" />
+          <UiTab v-if="tab === 'ui'" :settings="ui" :look="client" :flash-group="flashGroup" />
           <JavaTab v-else-if="tab === 'java'" :settings="java" :flash-group="flashGroup" />
           <NetworkTab v-else-if="tab === 'network'" :settings="network" :flash-group="flashGroup" />
           <LaunchTab v-else-if="tab === 'launch'" :settings="launch" :flash-group="flashGroup" />
           <SkinTab v-else-if="tab === 'skin'" :settings="skin" :flash-group="flashGroup" />
-          <ClientTab v-else :settings="client" :win="launchWin" :flash-group="flashGroup" />
+          <ClientTab v-else-if="tab === 'client'" :settings="client" :win="launchWin"
+            :flash-group="flashGroup" />
+          <ExperimentalTab v-else :settings="client" :flash-group="flashGroup" />
         </section>
       </div>
     </div>

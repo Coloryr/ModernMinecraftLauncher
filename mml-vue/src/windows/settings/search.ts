@@ -35,6 +35,7 @@ export const GROUP_TITLES: Record<string, string> = {
   customHome: "winSettings.secCustomHome",
   music: "winSettings.secMusic",
   gameTitle: "winSettings.secGameTitle",
+  "window-look": "winSettings.secWindowLook",
   experimental: "winSettings.secExperimental",
 };
 
@@ -56,6 +57,18 @@ const SETTINGS_INDEX: IndexEntry[] = [
   { tab: "ui", group: "theme", labelKey: "winSettings.theme", extra: ["theme", "dark", "light", "深色", "浅色"] },
   { tab: "ui", group: "theme", labelKey: "winSettings.accent", extra: ["accent", "color", "强调色", "主题色"] },
   { tab: "ui", group: "window", labelKey: "winSettings.windowMode", extra: ["window mode", "多窗口", "单窗口"] },
+  {
+    tab: "ui",
+    group: "window-look",
+    labelKey: "winSettings.windowEffect",
+    extra: ["window effect", "mica", "acrylic", "blur", "材质", "窗口效果"],
+  },
+  {
+    tab: "ui",
+    group: "window-look",
+    labelKey: "winSettings.windowOpacity",
+    extra: ["window opacity", "alpha", "透明度", "窗口透明"],
+  },
   { tab: "ui", group: "mainWindow", labelKey: "winSettings.startupPage", extra: ["startup", "home", "启动页", "主页", "项目列表"] },
   {
     tab: "ui",
@@ -202,6 +215,7 @@ export const RESETTABLE_GROUPS = [
   "general",
   "theme",
   "window",
+  "window-look",
   "mainWindow",
   "bgImage",
   "head",
