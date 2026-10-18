@@ -161,7 +161,6 @@ onMounted(() => void loadFonts());
   <!-- 窗口外观：材质由系统在窗口背后合成（Rust 侧 windows/effects.rs），落 gui_config.client.windowEffect -->
   <SettingsGroup id="window-look" title-key="winSettings.secWindowLook" :flash="flashGroup === 'window-look'">
     <label class="field-label">{{ t("winSettings.windowEffect") }}</label>
-    <p class="field-desc">{{ t("winSettings.windowEffectDesc") }}</p>
     <select v-model="client.windowEffect" class="field-select" @change="applyWindowEffect">
       <option value="auto">{{ t("winSettings.windowEffectAuto") }}</option>
       <option value="mica">{{ t("winSettings.windowEffectMica") }}</option>
@@ -170,8 +169,7 @@ onMounted(() => void loadFonts());
     </select>
 
     <label class="field-label">{{ t("winSettings.windowOpacity") }}</label>
-    <p class="field-desc">{{ t("winSettings.windowOpacityDesc") }}</p>
-    <NumberStepper v-model="client.windowOpacity" :min="60" :max="100" :step="5"
+    <NumberStepper v-model="client.windowOpacity" :min="0" :max="100" :step="5"
       @update:model-value="applyWindowOpacity" />
   </SettingsGroup>
 

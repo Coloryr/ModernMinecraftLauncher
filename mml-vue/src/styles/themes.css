@@ -398,10 +398,13 @@ html.has-material {
   --bg-side: color-mix(in srgb, #1a1d23 var(--window-alpha, 85%), transparent);
   --bg-card: color-mix(in srgb, #22262e var(--window-alpha, 85%), transparent);
   --bg-hover: color-mix(in srgb, #2a2f38 var(--window-alpha, 85%), transparent);
+  /* 下拉弹层 / 提示这类浮层必须不透明，半透明会透出下层内容，口径同 has-bg */
+  --bg-solid: #22262e;
 }
 
 html.has-material[data-theme="Light"] {
   --bg-side: color-mix(in srgb, #f7f8fa var(--window-alpha, 85%), transparent);
   --bg-card: color-mix(in srgb, #ffffff var(--window-alpha, 85%), transparent);
   --bg-hover: color-mix(in srgb, #e9ecf1 var(--window-alpha, 85%), transparent);
+  --bg-solid: #ffffff;
 }
