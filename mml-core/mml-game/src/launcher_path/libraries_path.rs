@@ -304,6 +304,11 @@ impl InstanceSettingObj {
     pub fn get_libs(&self, arg: &GameLaunchObj) -> Vec<PathBuf> {
         let mut game_list = Vec::new();
         for item in &arg.game_libs {
+            // 带后续动作的项（下载完解压 natives）不进 classpath：ColorMC 也按 Later 过滤，
+            // 这类 jar 里没有类，留在 classpath 里只是噪音
+            if !matches!(item.later, mml_base::file_item::LaterRun::None) {
+                continue;
+            }
             let key = LibVersionObj::new(&item.name);
             if let Some(pos) = game_list
                 .iter()
@@ -326,6 +331,10 @@ impl InstanceSettingObj {
 
         let mut loader_list = Vec::new();
         for item in &arg.loader_libs {
+            // 同上：解压项不进 classpath
+            if !matches!(item.later, mml_base::file_item::LaterRun::None) {
+                continue;
+            }
             let key = LibVersionObj::new(&item.name);
             if let Some(pos) = loader_list
                 .iter()

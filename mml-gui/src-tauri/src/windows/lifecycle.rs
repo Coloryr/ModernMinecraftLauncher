@@ -346,6 +346,12 @@ pub(super) fn create_window(
         .disable_drag_drop_handler()
         .visible(false);
 
+    // 拖放路径桥的脚本挂在**建窗期**：initialization_script 在导航开始前就注册好，每个新建
+    // 文档都会执行。放到 webview ready 回调里注入对初始文档无效 —— 那个 API 只对之后新建
+    // 的文档生效，初始文档已经建好，脚本永远不执行（文件拖入会一直拿不到路径）
+    #[cfg(windows)]
+    let builder = builder.initialization_script(super::file_drop::INJECT_SCRIPT);
+
     // 不指定 WebView2 用户数据目录时 Tauri 会强制落到 `%LOCALAPPDATA%\<identifier>\`，界面数据就
     // 散在系统盘；指到 `<cache>/webview` 后跟运行目录走，cache 已由下载器 init 建好，这里只兜一次
     let builder = match webview_data_dir() {

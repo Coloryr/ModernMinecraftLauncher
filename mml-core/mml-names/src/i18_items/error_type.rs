@@ -60,6 +60,19 @@ pub struct DownloadFileSizeErrorData {
     pub size: u64,
 }
 
+/// 单个文件下载失败的数据
+#[derive(Clone, Debug)]
+pub struct DownloadItemFailData {
+    /// 文件名，取下载项的显示名
+    pub name: String,
+    /// 第几次失败，从 1 开始
+    pub times: i32,
+    /// 失败原因，已按当前语言渲染
+    pub error: String,
+    /// 下载地址；下载项没给地址时为空串
+    pub url: String,
+}
+
 /// 下载文件覆盖失败的数据
 #[derive(Clone, Debug)]
 pub struct DownloadFileOverFailData {
@@ -211,6 +224,8 @@ pub enum ErrorType {
     DownloadFileSizeError(DownloadFileSizeErrorData),
     /// 下载文件校验失败
     DownloadFileHashError(DownloadFileHashErrorData),
+    /// 单个文件下载失败一次
+    DownloadItemFail(DownloadItemFailData),
     /// 文件下载失败
     DownloadFileFail,
 

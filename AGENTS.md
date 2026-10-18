@@ -405,4 +405,25 @@ defineProps<{
 </style>
 ```
 
+## 15. 文案与日志的国际化（硬性）
+
+**所有会被人看到的字都要能切语言**：前端界面文案、日志（`[TEMP]` 临时诊断除外）一律走各自的
+i18n 表，**不写死中文或英文字面量**。三张表各管一摊，改哪一层就改哪张表：
+
+| 层 | 表 | 写法 |
+| --- | --- | --- |
+| 前端界面 | `mml-vue/src/lib/i18n/locales/{zh-CN,en-US}.ts` | `t("winSettings.xxx")` |
+| 内核日志 / 错误 | `mml-core/mml-names/src/i18_items/` 与 `i18/{zh_cn,en_us}.rs` | `mml_log::info_type(InfoType::X)` / `error_type(ErrorType::X)` |
+| GUI 日志 | `mml-gui/src-tauri/src/log_text.rs`（自带中英两套） | `mml_log::info(LogText::X { .. }.text())` |
+
+- **两种语言一起加。** 内核的 `zh_cn.rs` / `en_us.rs` 与 `LogText` 的两个 match 都是穷尽的：
+  加了变体不加对应分支**编译不过**，所以别绕过它去写 `format!`。
+- **新加变体，不要往现成变体里塞别的语义。** 带数据的（文件名、地址、数量、次数）用结构体字段传进去，
+  别在调用处把数据拼成字符串再套一条通用文案。
+- **判据**：这条字会不会出现在用户界面上，或者会不会被用户贴进 issue 的 `logs.log` 里？
+  会 → 必须 i18n。只有 `[TEMP]` 临时诊断（§13）和 debug 级日志可以写字面量。
+- **不翻译机器标识**：URL、文件名、SHA1、JSON 字段名、协议名、异常原文原样进日志，翻了反而没法排查；
+  它们周围那句人话照样 i18n。
+- 前端**不要**在模板里写中文（`<button>启动</button>`），tooltip / 占位符 / aria-label 同样走 `t()`。
+
 

@@ -33,7 +33,6 @@
 use crate::log_text::LogText;
 use tauri::AppHandle;
 use webview2_com::{
-    AddScriptToExecuteOnDocumentCreatedCompletedHandler,
     Microsoft::Web::WebView2::Win32::{
         ICoreWebView2, ICoreWebView2File, ICoreWebView2WebMessageReceivedEventArgs,
         ICoreWebView2WebMessageReceivedEventArgs2,
@@ -41,7 +40,7 @@ use webview2_com::{
     WebMessageReceivedEventHandler,
 };
 use windows::Win32::System::Com::CoTaskMemFree;
-use windows::core::{Interface, PCWSTR, PWSTR};
+use windows::core::{Interface, PWSTR};
 
 use crate::dtos::FileDropDto;
 use crate::windows::emit_file_drop;
@@ -52,11 +51,16 @@ use crate::windows::emit_file_drop;
 /// 不认标记就会把它当 IPC 去解析。
 const MESSAGE: &str = "__MML_WINDOWS_FILE_DROP__";
 
-/// 注入到页面的脚本：DOM 的 `drop` 里把 `File` 对象交给原生
+/// 拖放脚本：DOM 的 `drop` 里把 `File` 对象交给原生
 ///
 /// 只在**有文件**时转发，文本 / 链接由前端自己处理，不必过桥；
 /// 用捕获阶段挂 `document`，先于页面自己的处理器拿到事件。
-const INJECT_SCRIPT: &str = r#"
+///
+/// 由建窗时的 `initialization_script` 注册，见 `windows/lifecycle.rs`：它在导航开始前
+/// 就挂好了，每个新建文档都会执行。**不能**改回在 webview ready 回调里调
+/// `AddScriptToExecuteOnDocumentCreated` —— 那个 API 只对之后新建的文档生效，
+/// 初始文档已经建好，脚本永远不执行（文件拖入会一直拿不到路径）。
+pub(crate) const INJECT_SCRIPT: &str = r#"
 (() => {
   const MESSAGE = "__MML_WINDOWS_FILE_DROP__";
   const handler = (event) => {
@@ -80,13 +84,12 @@ const INJECT_SCRIPT: &str = r#"
 /// - `label`: 窗口标签，事件只发给这个窗口
 /// - `webview2`: WebView2 的 `ICoreWebView2`，由 `on_webview_ready` 里取
 pub fn install(app: &AppHandle, label: String, webview2: &ICoreWebView2) {
-    inject_script(webview2);
 
     let mut token = 0;
     let handle = app.clone();
     let target = label;
     unsafe {
-        let _ = webview2.add_WebMessageReceived(
+        if let Err(err) = webview2.add_WebMessageReceived(
             &WebMessageReceivedEventHandler::create(Box::new(move |_webview, args| {
                 let Some(args) = args else {
                     return Ok(());
@@ -100,41 +103,23 @@ pub fn install(app: &AppHandle, label: String, webview2: &ICoreWebView2) {
                 }
 
                 let paths = file_paths(&args);
-                if !paths.is_empty() {
-                    emit_file_drop(&handle, &target, FileDropDto { paths });
+                if paths.is_empty() {
+                    // 过桥了却取不到路径：用户侧会看到"没拿到拖入文件的路径"的提示
+                    mml_log::error(LogText::FilePathBridgeNoPath { label: target.clone() }.text());
+                    return Ok(());
                 }
+                emit_file_drop(&handle, &target, FileDropDto { paths });
                 Ok(())
             })),
             &mut token,
-        );
-    }
-}
-
-/// 注入路径桥脚本；失败要能在日志里看见，没有它文件拖入只剩文件名
-///
-/// 用 `AddScriptToExecuteOnDocumentCreated` 而不是 `ExecuteScript`：后者只作用于**当前
-/// 文档**，窗口一旦被 `window_reopen_window` 导航重载，脚本就没了，文件拖入会静默失效。
-/// 前者对**每个新建文档**都执行，重载后依然在。
-fn inject_script(webview2: &ICoreWebView2) {
-    let script: Vec<u16> = INJECT_SCRIPT
-        .encode_utf16()
-        .chain(std::iter::once(0))
-        .collect();
-    unsafe {
-        let _ = webview2.AddScriptToExecuteOnDocumentCreated(
-            PCWSTR::from_raw(script.as_ptr()),
-            &AddScriptToExecuteOnDocumentCreatedCompletedHandler::create(Box::new(|error, _id| {
-                if error.is_err() {
-                    mml_log::error(
-                        LogText::FilePathBridgeInjectFailed {
-                            error: format!("{error:?}"),
-                        }
-                        .text(),
-                    );
+        ) {
+            mml_log::error(
+                LogText::FilePathBridgeFailed {
+                    error: format!("{err:?}"),
                 }
-                Ok(())
-            })),
-        );
+                .text(),
+            );
+        }
     }
 }
 

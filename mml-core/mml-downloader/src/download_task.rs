@@ -13,6 +13,7 @@ use std::{
 
 use crossbeam_queue::SegQueue;
 use mml_base::file_item::FileItemObj;
+use mml_names::i18_items::info_type::InfoType;
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
 
@@ -124,6 +125,12 @@ impl DownloadTask {
         let failed = self.failed_count.load(Ordering::SeqCst);
         let cancelled = self.cancelled_count.load(Ordering::SeqCst);
         if completed + failed + cancelled >= self.total_size {
+            // 失败明细在各个文件那行，这里补一句总数：否则要从几千行里数
+            mml_log::info_type(InfoType::DownloadTaskDone {
+                total: self.total_size,
+                completed,
+                failed,
+            });
             crate::task_done(self);
             self.sem.add_permits(1);
         }

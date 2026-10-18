@@ -533,8 +533,11 @@ impl InstanceSettingObj {
             crate::add_game_log_item(&self.uuid, GameLog::JavaLocalRedirect);
         }
 
+        // 从小往大取：声明的兼容集合是一个范围，取里面最低的那个最保守。
+        // 反过来的话，像 GTNH 声明 [17,21,23,24,25] 的包会挑到 25，
+        // 而 Forge 1.7.10 的 FMLTweaker 要设 SecurityManager —— 24 起已被移除，必崩
         let mut list: Vec<_> = obj.java_versions.clone().into_iter().collect();
-        list.sort_unstable_by(|a, b| b.cmp(a));
+        list.sort_unstable();
         for item in list.iter() {
             let jvm = mml_jvms::get_java(*item, true);
             if let Some(jvm) = jvm {
@@ -561,6 +564,33 @@ impl InstanceSettingObj {
     /// # 返回值
     ///
     /// 成功返回 `Ok(())`；程序不存在或启动失败返回对应错误
+    /// 老版本 Forge 的 FMLTweaker 要设 SecurityManager，Java 18 起默认禁止设置，得显式放行
+    ///
+    /// 只有 Java 24 以下认这个开关：24 起它本身是致命错误（VM 启动阶段直接失败，`System.initPhase3`）。
+    /// 所以按**实际选中的** Java 版本决定，取不到版本就不加 —— 宁可让老 Forge 报它自己的错，
+    /// 也不能把新 Java 弄得起不来
+    ///
+    /// - `obj`: 启动内容，`jvm_args` 在此补一项
+    /// - `java`: 实际要用的 Java 路径
+    fn allow_security_manager(obj: &mut GameLaunchObj, java: &std::path::Path) {
+        if obj
+            .jvm_args
+            .iter()
+            .any(|arg| arg.starts_with("-Djava.security.manager"))
+        {
+            return;
+        }
+
+        let major = mml_jvms::get_all_java()
+            .iter()
+            .find(|item| item.path.as_path() == java)
+            .map(|item| item.major_version);
+
+        if major.is_some_and(|major| major <= 23) {
+            obj.jvm_args.push("-Djava.security.manager=allow".to_string());
+        }
+    }
+
     fn cmd_run(
         &self,
         cmd: &str,
@@ -707,6 +737,7 @@ impl InstanceSettingObj {
             gui.update_state(&self, LaunchState::Jvm);
         }
 
+        InstanceSettingObj::allow_security_manager(&mut obj, &java.clone().unwrap());
         let args = self.make_run_arg(&arg, &mut obj, false);
         let env = self.make_env_arg();
 
@@ -803,6 +834,8 @@ impl InstanceSettingObj {
         if let Some(gui) = &gui {
             gui.update_state(self, LaunchState::Jvm);
         }
+
+        InstanceSettingObj::allow_security_manager(&mut obj, &jvm);
 
         // 创建启动参数
         // 完整命令行 = JVM 参数 + 主类 + 游戏参数；`check` 为真时跳过仍缺失的库文件。

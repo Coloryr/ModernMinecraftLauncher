@@ -27,14 +27,17 @@ defineProps<{
 
 <style scoped>
 /* 竖排两行：一行文字，进度条紧跟在文字下面。
-   不贴按钮底边：那里落在圆角上会被裁掉两端，观感也像贴在框上 */
+   不贴按钮底边：那里落在圆角上会被裁掉两端，观感也像贴在框上。
+   也不撑满按钮（不写 width: 100%）：整组按内容居中，进度条是**定宽**的（见 .launch-in-track）；
+   文字太长时受按钮宽度约束、由 .launch-stage 省略号收尾 */
 .launch-in {
   display: flex;
   flex-direction: column;
+  /* 进度条定宽后不再是 stretch，整组要在按钮里居中 */
+  align-items: center;
   justify-content: center;
   /* 2 + 3 正好压在按钮现有内容高度里，启动态不把按钮顶高 */
   gap: 2px;
-  width: 100%;
   min-width: 0;
   /* 按钮本体可能大几号（主界面那颗是 15/16px），流程按普通控件那一档走 */
   font-size: var(--ctl-font);
@@ -50,6 +53,9 @@ defineProps<{
 }
 
 .launch-in-track {
+  /* 定宽：跟着文字宽度走的话，阶段名一换长度就跳（"检查游戏文件"与"下载缺失文件"不一样长）。
+     要按使用处调整就覆盖 --launch-bar-w；定宽后容器宽度取两者的较大值，所以是居中不是拉伸 */
+  width: var(--launch-bar-w, 110px);
   height: 3px;
   border-radius: 2px;
   background: color-mix(in srgb, currentColor 25%, transparent);

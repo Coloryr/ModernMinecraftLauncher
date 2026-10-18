@@ -47,6 +47,7 @@ export default {
   "drop.titleLogin": "Drop to import a login",
   "drop.onlyFirst": "One item at a time — using the first",
   "drop.notModpack": "Unsupported file: modpacks, instance folders and login cards only",
+  "drop.noPath": "Could not read the dropped file path; use the import entry in the Add Instance window instead",
 
   // Multi-select
   "multi.selectAll": "Select all",

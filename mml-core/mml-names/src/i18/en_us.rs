@@ -28,6 +28,12 @@ impl I18Lang for EnUs {
             InfoType::CoreStart => format!("M²L started, version: {}", *VERSION),
             InfoType::CoreStop => String::from("M²L stopped"),
             InfoType::TempFile => String::from("Temporary files"),
+            InfoType::AdoptMmcInstance { name } => format!("adopted MMC instance: {name}"),
+            InfoType::DownloadTaskDone {
+                total,
+                completed,
+                failed,
+            } => format!("download task finished: {total} total, {completed} done, {failed} failed"),
             InfoType::ProxyUser {
                 kind,
                 ip,
@@ -69,13 +75,17 @@ impl I18Lang for EnUs {
                     data.error
                 )
             }
-            ErrorType::HttpError(data) => match data.status {
-                Some(status) => format!(
-                    "HTTP request {} failed: {} (status {})",
-                    data.url, data.error, status
-                ),
-                None => format!("HTTP request {} failed: {}", data.url, data.error),
-            },
+            ErrorType::HttpError(data) => {
+                // 构建阶段就失败时没有 URL，给个明确说法（与中文表同一处口径）
+                let url = if data.url.is_empty() { "(no URL)" } else { data.url.as_str() };
+                match data.status {
+                    Some(status) => format!(
+                        "HTTP request {} failed: {} (status {})",
+                        url, data.error, status
+                    ),
+                    None => format!("HTTP request {} failed: {}", url, data.error),
+                }
+            }
 
             ErrorType::SerializerError(data) => format!("JSON parse failed: {}", data.error),
             ErrorType::PathNotExists(data) => {
@@ -173,6 +183,13 @@ impl I18Lang for EnUs {
                     data.now
                 )
             }
+            ErrorType::DownloadItemFail(data) => format!(
+                "file {} failed {} time(s): {} (url {})",
+                data.name,
+                data.times,
+                data.error,
+                if data.url.is_empty() { "missing" } else { data.url.as_str() }
+            ),
             ErrorType::DownloadFileFail => String::from("File download failed"),
 
             ErrorType::InvalidOperation => String::from("Invalid operation"),

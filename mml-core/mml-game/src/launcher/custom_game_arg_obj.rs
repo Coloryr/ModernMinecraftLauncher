@@ -28,9 +28,12 @@ pub struct CustomGameArgObj {
     pub add_jvm_args: Option<Vec<String>>,
     /// 版本号
     pub version: String,
-    /// 附加主 Jar
-    #[serde(rename = "+mainJar")]
+    /// 这次使用的客户端 jar，替换语义
+    #[serde(rename = "mainJar")]
     pub main_jar: GameLibrariesObj,
+    /// MMC 的加号写法：追加进运行库，不替换客户端 jar
+    #[serde(rename = "+mainJar")]
+    pub add_main_jar: Option<GameLibrariesObj>,
     /// 对应的 Minecraft 版本
     #[serde(rename = "_minecraftVersion")]
     pub minecraft_version: Option<String>,
@@ -48,6 +51,7 @@ impl Default for CustomGameArgObj {
             add_jvm_args: Default::default(),
             version: Default::default(),
             main_jar: Default::default(),
+            add_main_jar: Default::default(),
             minecraft_version: Default::default(),
         }
     }

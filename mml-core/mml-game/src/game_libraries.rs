@@ -178,6 +178,31 @@ impl GameArgObj {
 /// - `natives_arm`: ARM 原生库键列表
 /// - `native`: 原生库解压路径
 /// - `game`: 游戏实例，目录回退查找用，可为 `None`
+/// MMC 本地库的文件名：`组:构件:版本[:分类]` → `构件-版本[-分类].jar`
+///
+/// 与 `maven_utils::version_name_to_path` 的区别是**不带目录**：MMC 的 `MMC-hint: local`
+/// 把文件平铺在实例目录的 `libraries/` 下，Labymod 的 `LabyMod-4.jar` 就是这样。
+///
+/// - `name`: Maven 坐标
+///
+/// # 返回值
+///
+/// 文件名；坐标段数不足时原样返回
+fn local_lib_name(name: &str) -> String {
+    let parts: Vec<&str> = name.split(':').collect();
+    if parts.len() < 3 {
+        return name.to_string();
+    }
+
+    let mut file = format!("{}-{}", parts[1], parts[2]);
+    if let Some(classifier) = parts.get(3) {
+        file.push('-');
+        file.push_str(classifier);
+    }
+    file.push_str(".jar");
+    file
+}
+
 fn process_one_library(
     item: &GameLibrariesObj,
     list: &Mutex<Vec<FileItemObj>>,
@@ -195,6 +220,27 @@ fn process_one_library(
     let mut isadd = false;
     let sys = mml_sys::get_system_info();
 
+    // MMC 的本地库（`MMC-hint: local`）：文件在**实例目录**的 libraries 下、按
+    // `构件-版本[-分类].jar` 平铺，不下载、只进 classpath。Labymod 就是这样挂 LabyMod-4.jar 的；
+    // 少了这一步它会按嵌套 maven 路径去找，找不到、也进不了 classpath。
+    // 文件不在就是真的缺（MMC 那边也是本地文件），这里不下也不报，留给启动时的 Java 去报
+    if item.mmc_hint.as_deref() == Some("local") {
+        if let Some(game) = game {
+            let dir = game.read().unwrap().get_libraries_path();
+            let file = dir.join(local_lib_name(&item.name));
+            if file.exists() && file.is_file() {
+                list.lock().unwrap().push(FileItemObj {
+                    name: item.name.clone(),
+                    file,
+                    url: Default::default(),
+                    hash: Default::default(),
+                    later: Default::default(),
+                });
+            }
+        }
+        return;
+    }
+
     // 旧版 - 直接使用 url 字段
     if !item.url.is_empty() {
         isadd = true;
@@ -211,11 +257,20 @@ fn process_one_library(
     }
 
     // 全系统 artifact 处理
-    if !item.downloads.artifact.path.is_empty() {
-        // SHA1 去重：如果已存在且没有 native 分类器则跳过
-        {
+    // 只要求 artifact 存在（path / url / sha1 任一非空）：MMC / Forge 的 profile 常只写 url + sha1，
+    // 路径靠 Maven 坐标推。ColorMC 判的也是"Downloads.Artifact != null"；
+    // 我们之前要求 path 非空，会把 org.lwjgl3.json 那类整批库丢掉（实测 72 个声明产出 0 个）
+    if !(item.downloads.artifact.path.is_empty()
+        && item.downloads.artifact.url.is_empty()
+        && item.downloads.artifact.sha1.is_empty())
+    {
+        // SHA1 去重：只在 sha1 有效时做，且没有 native 分类器才跳过。
+        // MMC 的 patch 里大量库不带 sha1（清一色空串），按"空 == 空"去重会把整个
+        // org.lwjgl3 这类库全丢掉 —— 表现就是启动时缺 org.lwjgl.system.Platform
+        if !item.downloads.artifact.sha1.is_empty() {
             let keys = keys.lock().unwrap();
-            if keys.contains(&item.downloads.artifact.sha1) && item.downloads.classifiers.is_none()
+            if keys.contains(&item.downloads.artifact.sha1)
+                && item.downloads.classifiers.is_none()
             {
                 return;
             }
@@ -249,13 +304,20 @@ fn process_one_library(
             name: item.name.clone(),
             file: libraries_path::get_lib_dir().join(&file),
             url,
-            hash: FileHash::Sha1(item.downloads.artifact.sha1.clone()),
+            // 没有 sha1 的项用 None：Sha1("") 会让校验永远不过、每次启动都重下
+            hash: if item.downloads.artifact.sha1.is_empty() {
+                Default::default()
+            } else {
+                FileHash::Sha1(item.downloads.artifact.sha1.clone())
+            },
             later: Default::default(),
         });
 
-        keys.lock()
-            .unwrap()
-            .insert(item.downloads.artifact.sha1.clone());
+        if !item.downloads.artifact.sha1.is_empty() {
+            keys.lock()
+                .unwrap()
+                .insert(item.downloads.artifact.sha1.clone());
+        }
     }
 
     // 分系统 classifiers (native) 处理

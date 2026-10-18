@@ -261,6 +261,10 @@ pub struct GameLibrariesObj {
     pub rules: Vec<GameRulesObj>,
     /// 下载源地址
     pub url: String,
+    /// MMC 的库提示，取值 `local`：文件在**实例目录**的 `libraries/` 下、按
+    /// `构件-版本.jar` 平铺，不下载
+    #[serde(rename = "MMC-hint")]
+    pub mmc_hint: Option<String>,
 }
 
 impl Default for GameLibrariesObj {
@@ -270,6 +274,7 @@ impl Default for GameLibrariesObj {
             name: Default::default(),
             rules: Default::default(),
             url: Default::default(),
+            mmc_hint: Default::default(),
         }
     }
 }

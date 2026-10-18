@@ -136,7 +136,7 @@ pub fn load() -> CoreResult<()> {
 
 /// 停止核心，触发停止事件，各子 crate 的清理回调随之执行
 pub fn stop() {
-    mml_log::info(String::from("M²L stop"));
+    mml_log::info_type(InfoType::CoreStop);
 
     invoke_core_stop();
 

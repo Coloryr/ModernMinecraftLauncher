@@ -33,10 +33,15 @@ pub enum LogText {
         /// 失败原因
         error: String,
     },
-    /// 注入文件拖放的路径桥脚本失败
-    FilePathBridgeInjectFailed {
-        /// WebView2 给的回调错误，已 Debug 展开
+    /// 装配文件拖放路径桥失败
+    FilePathBridgeFailed {
+        /// WebView2 给的错误，已 Debug 展开
         error: String,
+    },
+    /// 拖放路径桥收到了消息却取不到文件路径
+    FilePathBridgeNoPath {
+        /// 窗口标签，用来看是哪个窗口出的问题
+        label: String,
     },
     /// 建 WebView2 数据目录失败，退回默认位置
     WebviewDataDirFailed {
@@ -126,8 +131,11 @@ impl LogText {
             LogText::IconCacheSaveFailed { path, error } => {
                 format!("[image] 图标磁盘缓存落盘失败 {path}：{error}")
             }
-            LogText::FilePathBridgeInjectFailed { error } => {
-                format!("[drop] 注入文件路径桥脚本失败（文件拖入将只有文件名）: {error}")
+            LogText::FilePathBridgeFailed { error } => {
+                format!("[drop] 装配文件路径桥失败（文件拖入将拿不到路径）: {error}")
+            }
+            LogText::FilePathBridgeNoPath { label } => {
+                format!("[drop] 路径桥取不到路径（窗口 {label}）")
             }
             LogText::WebviewDataDirFailed { dir, error } => {
                 format!("[window] 创建 webview 数据目录失败，退回默认位置：{dir} ({error})")
@@ -179,9 +187,12 @@ impl LogText {
             LogText::IconCacheSaveFailed { path, error } => {
                 format!("[image] failed to write the icon disk cache {path}: {error}")
             }
-            LogText::FilePathBridgeInjectFailed { error } => format!(
-                "[drop] failed to inject the file path bridge script, \
-                 dropped files will only carry names: {error}"
+            LogText::FilePathBridgeFailed { error } => format!(
+                "[drop] failed to set up the file path bridge, \
+                 dropped files will not carry paths: {error}"
+            ),
+            LogText::FilePathBridgeNoPath { label } => format!(
+                "[drop] the path bridge returned no path (window {label})"
             ),
             LogText::WebviewDataDirFailed { dir, error } => format!(
                 "[window] failed to create the webview data directory, \

@@ -731,8 +731,11 @@ impl InstanceSettingObj {
         for item in &libs {
             // 存在即可，别只认文件：类路径里既有 jar，也有目录（编译输出目录、资源目录）
             if !check || item.exists() {
-                crate::add_game_log_item(&self.uuid, GameLog::RuntimeLib(item.clone()));
-                classpath_parts.push(item.to_string_lossy().to_string());
+                // 统一成平台分隔符：maven 坐标拼出来的那段是 `/`，与 Windows 的 `\` 混在同一条
+                // 路径里，classpath 与日志都不好读
+                let text = item.to_string_lossy().replace('/', std::path::MAIN_SEPARATOR_STR);
+                crate::add_game_log_item(&self.uuid, GameLog::RuntimeLib(PathBuf::from(&text)));
+                classpath_parts.push(text);
             }
         }
         let classpath = classpath_parts.join(&sep.to_string());
@@ -855,7 +858,10 @@ impl InstanceSettingObj {
                 && self.custom_loader.as_ref().is_some_and(|c| c.remove_lib);
 
             if !skip_game_libs {
-                let libs = game.build_game_libraries(&native_dir, None).await;
+                // 传实例：本地库（MMC 的 MMC-hint: local 与实例目录回退）要靠它找到
+                let libs = game
+                    .build_game_libraries(&native_dir, crate::get_instance(&self.uuid))
+                    .await;
                 for item in &libs {
                     do_lib_item(item, &mut obj.game_libs)?;
                 }
@@ -1002,8 +1008,25 @@ impl InstanceSettingObj {
         obj: &mut GameLaunchObj,
         game_args: Vec<String>,
     ) -> CoreResult<()> {
+        // 运行库三层叠加，后面的覆盖前面的：原版 → 加载器 → patch。
+        // get_libs 的去重是"后插入者胜"，所以顺序必须就是这个顺序，
+        // patch 的库留在下面 custom 循环里最后加。
+        // 原版这份先按实例版本号补齐：patch 通常不带客户端下载地址，
+        // 不补会缺 net.minecraft.client.main.Main。失败不拦启动，patch 也可能自带
+        let vanilla = self.check_version_update().await.ok();
+        if let Some(game) = &vanilla
+            && obj.game_jar.file.as_os_str().is_empty()
+        {
+            obj.game_jar = game.build_game_item();
+        }
+
+
         let mut log4j: Option<&LoggingObj> = None;
-        let custom = self.read_custom_json();
+        // 按 order 升序叠加：patch 是分层覆写，主类 / 运行库 / tweak / jvm 参数全靠这个顺序定胜负。
+        // read_custom_json 返回的是 HashMap，不排的话顺序随哈希走 —— 出现过主类被判成
+        // net.minecraft.json（order -2）里那个原版 net.minecraft.client.main.Main 的情况
+        let mut custom: Vec<_> = self.read_custom_json().into_iter().collect();
+        custom.sort_by(|a, b| a.1.order.cmp(&b.1.order).then_with(|| a.0.cmp(&b.0)));
         for (_, item) in custom.iter() {
             // 安全log4j
             if item.base.logging.is_some() {
@@ -1062,7 +1085,11 @@ impl InstanceSettingObj {
             // 运行库
             if item.base.libraries.is_some() {
                 let native_dir = obj.native_dir.clone();
-                let libs = item.base.build_game_libraries(&native_dir, None).await;
+                // 同上：MMC 的本地库就在实例目录的 libraries 下，Labymod 的 LabyMod-4.jar 是这种
+                let libs = item
+                    .base
+                    .build_game_libraries(&native_dir, crate::get_instance(&self.uuid))
+                    .await;
                 for lib_item in &libs {
                     do_lib_item(lib_item, &mut obj.game_libs)?;
                 }
@@ -1089,7 +1116,7 @@ impl InstanceSettingObj {
                 obj.jvm_args.extend(make_v2_jvm_arg(&item.base));
             }
 
-            // MMC特性：MainJar
+            // MMC特性：mainJar —— 这次使用的客户端 jar，替换语义（自定义 jar 就靠它顶掉原版）
             if !item.main_jar.name.is_empty() {
                 let allow = mojang::check_allow(&item.main_jar.rules);
                 if allow {
@@ -1104,10 +1131,41 @@ impl InstanceSettingObj {
                         url: mml_net::url_helper::replace_minecraft_libraries(
                             &item.main_jar.downloads.artifact.url,
                         ),
-                        hash: FileHash::Sha1(item.main_jar.downloads.artifact.sha1.clone()),
+                        hash: if item.main_jar.downloads.artifact.sha1.is_empty() {
+                            Default::default()
+                        } else {
+                            FileHash::Sha1(item.main_jar.downloads.artifact.sha1.clone())
+                        },
                         later: Default::default(),
                     };
                 }
+            }
+
+            // MMC特性：+mainJar —— 加号是追加语义，把它当一个库加进 classpath，不动客户端 jar
+            if let Some(add) = &item.add_main_jar
+                && mojang::check_allow(&add.rules)
+            {
+                let file = if add.downloads.artifact.path.is_empty() {
+                    mml_net::maven_utils::version_name_to_path(&add.name)
+                } else {
+                    add.downloads.artifact.path.clone()
+                };
+                do_lib_item(
+                    &FileItemObj {
+                        name: add.name.clone(),
+                        file: libraries_path::get_lib_dir().join(&file),
+                        url: mml_net::url_helper::replace_minecraft_libraries(
+                            &add.downloads.artifact.url,
+                        ),
+                        hash: if add.downloads.artifact.sha1.is_empty() {
+                            Default::default()
+                        } else {
+                            FileHash::Sha1(add.downloads.artifact.sha1.clone())
+                        },
+                        later: Default::default(),
+                    },
+                    &mut obj.game_libs,
+                )?;
             }
 
             // MMC特性：CompatibleJavaMajors
@@ -1130,6 +1188,51 @@ impl InstanceSettingObj {
             if let Some(tweakers) = &item.add_tweakers {
                 obj.game_args.push("--tweakClass".to_string());
                 obj.game_args.extend(tweakers.iter().cloned());
+            }
+        }
+
+
+        // 加载器层放在 patch 之后、并且只补 patch 完全没有的构件：
+        // MMC 实例的加载器本来就由 patches 描述（GTNH 的 Forge 就来自 net.minecraftforge.json），
+        // 先塞一遍加载器库会得到重复的 forge，还会把 patch 声明为 "Early Classpath" 的
+        // lwjgl3ify-forgePatches.jar 挤到 Forge 后面 —— RFB 的早期类覆盖就失效了
+        let loader_libs = match self.loader {
+            LoaderType::Forge | LoaderType::NeoForge => {
+                self.get_forge_libs().await.ok().map(|res| res.loaders)
+            }
+            LoaderType::Fabric => self.get_fabric_libs().await.ok(),
+            LoaderType::Quilt => self.get_quilt_libs().await.ok(),
+            LoaderType::OptiFine => self.get_optifine_libs().await.ok(),
+            _ => None,
+        };
+        if let Some(libs) = &loader_libs {
+            for item in libs {
+                let key = libraries_path::LibVersionObj::new(&item.name);
+                let exists = obj.game_libs.iter().any(|it| {
+                    libraries_path::LibVersionObj::new(&it.name).eq_without_version(&key)
+                });
+                if !exists {
+                    do_lib_item(item, &mut obj.game_libs)?;
+                }
+            }
+        }
+
+        // 原版运行库放最后：patch 与加载器都没给的构件才用原版的。
+        // 这里只补空缺、不靠 get_libs 的"后插入者胜"去覆盖 —— 实测那样会漏，
+        // 同一个构件多层都带时留下的可能是原版（gson 2.2.4 盖掉了 patch 的 2.10.1）
+        if let Some(game) = &vanilla {
+            let native_dir = obj.native_dir.clone();
+            let libs = game
+                .build_game_libraries(&native_dir, crate::get_instance(&self.uuid))
+                .await;
+            for item in &libs {
+                let key = libraries_path::LibVersionObj::new(&item.name);
+                let exists = obj.game_libs.iter().any(|it| {
+                    libraries_path::LibVersionObj::new(&it.name).eq_without_version(&key)
+                });
+                if !exists {
+                    do_lib_item(item, &mut obj.game_libs)?;
+                }
             }
         }
 
@@ -1190,6 +1293,7 @@ impl InstanceSettingObj {
         } else {
             self.make_custom_arg(arg, &mut obj, game_args).await?;
         }
+
 
         Ok(obj)
     }

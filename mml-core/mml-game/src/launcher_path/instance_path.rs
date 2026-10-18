@@ -10,13 +10,15 @@ use std::{
 use mml_base::serialize_tools;
 use mml_config::config_save;
 use mml_names::{
-    i18_items::error_type::{CoreResult, ErrorType, FileSystemErrorData},
+    i18_items::{error_type::{CoreResult, ErrorType, FileSystemErrorData}, info_type::InfoType},
     names, uuids,
 };
 use mml_sys::path_helper;
 
+use crate::other_launcher::{is_mmc_version, mmc_obj::MMCObj};
 use crate::launcher::{
     custom_game_arg_obj::CustomGameArgObj, file_online_info_obj::OnlineInfoObj,
+    instance_setting_obj::CustomLoaderObj,
     game_time_obj::GameTimeObj, instance_setting_obj::InstanceSettingObj,
     mod_update_obj::{ModUpdateList, ModUpdateRecordObj},
 };
@@ -73,13 +75,77 @@ pub(crate) fn load_instance_dir() -> CoreResult<Vec<InstanceSettingObj>> {
 
     for item in dirs {
         if let Ok(dir) = item
-            && let Some(instance) = load_instance(dir.path())
+            // 没有 game.json 时再试 MMC：Labymod 这类工具会直接按 MMC 格式在实例目录下建目录
+            && let Some(instance) = load_instance(dir.path()).or_else(|| adopt_mmc(&dir.path()))
         {
             list.push(instance);
         }
     }
 
     Ok(list)
+}
+
+/// 把标准的 MMC 实例目录接管成 mml 实例
+///
+/// Labymod 之类的工具会直接按 MMC 格式在 `instances/` 下建目录（`mmc-pack.json` + `instance.cfg`），
+/// 这种目录没有 `game.json`，正常加载会整个跳过 —— 用户看到的现象就是"实例没被识别"。
+/// 这里按 MMC 元数据补出实例配置并落盘：**目录原地保留、文件不动**，只多一个 `game.json`。
+///
+/// - `dir`: 实例目录
+///
+/// # 返回值
+
+///
+/// 补好配置的实例；不是 MMC 实例或元数据读不出来时返回 `None`
+/// 目录里有没有 MMC 补丁，即 `patches/*.json`
+///
+/// - `dir`: 实例目录
+///
+/// # 返回值
+///
+/// 至少有一个补丁文件返回 `true`
+fn has_patches(dir: &Path) -> bool {
+    fs::read_dir(dir.join(names::JSON_DIR))
+        .map(|items| {
+            items.flatten().any(|item| {
+                let path = item.path();
+                path.is_file() && path.extension().is_some_and(|ext| ext == names::JSON_EXT)
+            })
+        })
+        .unwrap_or(false)
+}
+
+fn adopt_mmc(dir: &Path) -> Option<InstanceSettingObj> {
+    if !is_mmc_version(dir) {
+        return None;
+    }
+
+    let mmc = serialize_tools::json_from_file::<MMCObj>(dir.join(names::MMCJSON_FILE)).ok()?;
+    let cfg =
+        crate::game_options::read_options_from_file(dir.join(names::MMCCFG_FILE), Some('=')).ok()?;
+
+    let mut instance = mmc.to_instance(cfg);
+    let name = dir.file_name().unwrap_or_default().to_string_lossy().to_string();
+    instance.dir = name.clone();
+    if instance.name.is_empty() {
+        instance.name = name;
+    }
+    // 目录里有 patches/*.json 就按 MMC 模式启动：补丁是 MMC 改启动配置的方式
+    // （Labymod 就靠它注入 launchwrapper + LabyMod-4.jar）。
+    // to_instance 只在碰到未知组件时才打开这个开关，而 Labymod 的 components 只有 net.minecraft，
+    // 不补这一步的话 patches 会被忽略、实例退化成原版
+    if has_patches(dir) {
+        instance.custom_loader = Some(CustomLoaderObj {
+            custom_json: true,
+            ..Default::default()
+        });
+    }
+
+    instance.save();
+    mml_log::info_type(InfoType::AdoptMmcInstance {
+        name: instance.name.clone(),
+    });
+    Some(instance)
 }
 
 /// 从文件夹路径加载实例

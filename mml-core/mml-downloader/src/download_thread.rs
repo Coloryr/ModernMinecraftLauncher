@@ -34,7 +34,7 @@ use mml_base::{
 };
 use mml_names::i18_items::error_type::{
     CoreResult, DownloadFileHashErrorData, DownloadFileOverFailData, DownloadFileSizeErrorData,
-    ErrorData,
+    DownloadItemFailData, ErrorData,
     ErrorType::{self, StreamError},
 };
 use mml_sys::path_helper;
@@ -198,22 +198,27 @@ fn panic_text(payload: Box<dyn std::any::Any + Send>) -> String {
     }
 }
 
-/// 检查错误次数是否超过阈值 5 次
+/// 记一条失败日志并累加重试次数
 ///
-/// - `err`: 错误信息
+/// 光记错误类型看不出是哪个文件、哪个地址；下载失败多半出在地址或网络上，
+/// 这两项必须跟着错误与重试次数一起落盘。
+///
+/// - `item`: 失败的文件项
+/// - `err`: 失败原因
 /// - `times`: 当前错误次数，可变引用，会自增
 ///
 /// # 返回值
 ///
 /// `true` — 应停止重试，`false` — 可继续重试
-fn is_need_err(err: ErrorType, times: &mut i32) -> bool {
+fn is_need_err(item: &mml_base::file_item::FileItemObj, err: ErrorType, times: &mut i32) -> bool {
     *times += 1;
-    mml_log::error_type(err);
-    if *times > 5 {
-        return true;
-    }
-
-    return false;
+    mml_log::error_type(ErrorType::DownloadItemFail(DownloadItemFailData {
+        name: item.name.clone(),
+        times: *times,
+        error: mml_names::i18::get_error(err),
+        url: item.url.clone(),
+    }));
+    *times > 5
 }
 
 /// 下载单个文件
@@ -286,7 +291,7 @@ fn download(index: u32, mut obj: DownloadObj) {
 
         if let Err(err) = file {
             obj.item.add_error();
-            if is_need_err(err, &mut times) {
+            if is_need_err(&obj.item.base, err, &mut times) {
                 is_fail = true;
                 break;
             } else {
@@ -315,7 +320,7 @@ fn download(index: u32, mut obj: DownloadObj) {
                     break;
                 }
                 obj.item.add_error();
-                if is_need_err(err, &mut times) {
+                if is_need_err(&obj.item.base, err, &mut times) {
                     is_fail = true;
                     break;
                 } else {
@@ -345,7 +350,7 @@ fn download(index: u32, mut obj: DownloadObj) {
                     break;
                 }
                 obj.item.add_error();
-                if is_need_err(err, &mut times) {
+                if is_need_err(&obj.item.base, err, &mut times) {
                     is_fail = true;
                     break;
                 } else {
@@ -385,7 +390,7 @@ fn download(index: u32, mut obj: DownloadObj) {
                 break;
             }
             obj.item.add_error();
-            if is_need_err(err, &mut times) {
+            if is_need_err(&obj.item.base, err, &mut times) {
                 is_fail = true;
                 break;
             } else {
@@ -783,9 +788,17 @@ mod tests {
     fn is_need_err_allows_under_threshold() {
         crate::test_util::ensure_env();
 
+        // 日志要文件名与地址，测试里给个空项就够
+        let item = mml_base::file_item::FileItemObj {
+            name: String::new(),
+            file: Default::default(),
+            url: String::new(),
+            hash: Default::default(),
+            later: Default::default(),
+        };
         let mut times = 0;
         for _ in 0..5 {
-            assert!(!is_need_err(ErrorType::TaskCancel, &mut times));
+            assert!(!is_need_err(&item, ErrorType::TaskCancel, &mut times));
         }
         assert_eq!(times, 5);
     }
@@ -795,8 +808,15 @@ mod tests {
     fn is_need_err_stops_over_threshold() {
         crate::test_util::ensure_env();
 
+        let item = mml_base::file_item::FileItemObj {
+            name: String::new(),
+            file: Default::default(),
+            url: String::new(),
+            hash: Default::default(),
+            later: Default::default(),
+        };
         let mut times = 5;
-        assert!(is_need_err(ErrorType::TaskCancel, &mut times));
+        assert!(is_need_err(&item, ErrorType::TaskCancel, &mut times));
         assert_eq!(times, 6);
     }
 

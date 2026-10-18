@@ -29,6 +29,11 @@ use crate::{
 ///
 /// 返回true表示文件缺失或校验失败，需要重新下载
 fn check_to_add(item: &FileItemObj, check_sha1: bool) -> bool {
+    // 没有地址的项是本地库（MMC 的 MMC-hint: local）或配置有问题的相对地址：
+    // 下不了，塞进队列只会得到一句 builder error，直接跳过
+    if !item.url.starts_with("http") {
+        return false;
+    }
     if check_sha1 {
         !item.check_hash()
     } else {

@@ -984,7 +984,11 @@ async function onFilesDropped(payload: FileDropPayload) {
   }
   // ② 文件：路径由路径桥补上，照旧认类型再开窗
   const first = payload.paths[0];
-  if (!first) return;
+  if (!first) {
+    // 路径桥没把真实路径送回来（文件拖入拿不到路径）：说一声，别静默什么都不做
+    showToast(t("drop.noPath"));
+    return;
+  }
   if (payload.paths.length > 1) showToast(t("drop.onlyFirst"));
   let probe: { kind: string; url: string };
   try {

@@ -39,8 +39,15 @@ let appliedCount = 0;
 /** 已经上过整行底色的行数；底色只补新增那一段 */
 let decoratedCount = 0;
 
-/** 跟随滚动的判定余量，单位 px：离底部这么近就算"停在底部" */
-const STICK_MARGIN = 40;
+/** 上一次看到的滚动位置，单位 px：只有它变小才说明用户在往上滚 */
+let lastScrollTop = 0;
+/** 这段时间内的滚动事件是程序化滚动/重建造成的，不算用户操作 */
+let ignoreScrollUntil = 0;
+
+/** 标记接下来的滚动事件不是用户操作 */
+function markProgrammatic() {
+  ignoreScrollUntil = Date.now() + 60;
+}
 
 /**
  * 级别对应的整行底色类名；无需底色的级别返回 `null`
@@ -61,6 +68,8 @@ function rebuild() {
   if (!monacoEditor || !logModel) return;
   const value = props.logs.map((l) => l.text).join("\n");
   appliedCount = props.logs.length;
+  // 整篇替换会把滚动位置清掉，别让那次事件被当成用户往上滚
+  markProgrammatic();
   logModel.setValue(value);
   decorations?.clear();
   decoratedCount = 0;
@@ -115,18 +124,11 @@ function applyDecorations() {
 
 function scrollBottom() {
   if (!monacoEditor) return;
+  markProgrammatic();
   monacoEditor.revealLine(monacoEditor.getModel()?.getLineCount() ?? 1);
   monacoEditor.setScrollTop(monacoEditor.getScrollHeight());
 }
 
-/** 用户是否停在底部 */
-function atBottom(): boolean {
-  if (!monacoEditor) return true;
-  return (
-    monacoEditor.getScrollTop() + monacoEditor.getDomNode()!.clientHeight >=
-    monacoEditor.getScrollHeight() - STICK_MARGIN
-  );
-}
 
 /** 打开页内查找框；日志窗口的「搜索」按钮用它（浏览器快捷键被壳层关掉了，只能按钮触发） */
 function openFind() {
@@ -176,8 +178,18 @@ onMounted(() => {
   monacoEditor.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.KeyZ, toggleWordWrap);
   themeWatcher.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
   monacoEditor.onDidScrollChange(() => {
-    // 自动下拉开着时用户往上滚：说明他在回头看历史，让调用方把开关关掉
-    if (props.autoScroll && !atBottom()) emit("scroll-away");
+    const top = monacoEditor?.getScrollTop() ?? 0;
+    // 判据只能是"滚动位置变小"：日志爆发时内容一次涨很多、重建整篇、我们自己下拉，
+    // 都会触发滚动事件但位置不变或变大。之前按"不在底部"判，这些情况都会被误判成
+    // 用户往上滚，于是自动下拉自己关掉
+    if (
+      props.autoScroll &&
+      Date.now() >= ignoreScrollUntil &&
+      top < lastScrollTop - 4
+    ) {
+      emit("scroll-away");
+    }
+    lastScrollTop = top;
   });
   rebuild();
 
@@ -210,6 +222,14 @@ watch(
       return;
     }
     if (props.autoScroll) scrollBottom();
+  },
+);
+
+// 重新打开自动下拉要立刻跟到末尾：不然得等下一行日志，日志一停就永远停在原处
+watch(
+  () => props.autoScroll,
+  (on) => {
+    if (on) scrollBottom();
   },
 );
 

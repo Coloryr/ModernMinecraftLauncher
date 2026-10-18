@@ -31,6 +31,12 @@ impl I18Lang for ZhCn {
             InfoType::CoreStart => format!("M²L启动，版本：{}", *VERSION),
             InfoType::CoreStop => format!("M²L停止"),
             InfoType::TempFile => format!("临时文件"),
+            InfoType::AdoptMmcInstance { name } => format!("检测到 MMC 实例并已接管：{name}"),
+            InfoType::DownloadTaskDone {
+                total,
+                completed,
+                failed,
+            } => format!("下载任务结束：共 {total} 个，成功 {completed}，失败 {failed}"),
             InfoType::ProxyUser {
                 kind,
                 ip,
@@ -72,13 +78,17 @@ impl I18Lang for ZhCn {
                     data.error
                 )
             }
-            ErrorType::HttpError(data) => match data.status {
-                Some(status) => format!(
-                    "网络请求 {} 失败：{}（状态码 {}）",
-                    data.url, data.error, status
-                ),
-                None => format!("网络请求 {} 失败：{}", data.url, data.error),
-            },
+            ErrorType::HttpError(data) => {
+                // 请求在构建阶段就失败时没有 URL（reqwest 的 error.url() 为空）：
+                // 给个明确说法，日志里不要留一段空白
+                let url = if data.url.is_empty() { "（无地址）" } else { data.url.as_str() };
+                match data.status {
+                    Some(status) => {
+                        format!("网络请求 {} 失败：{}（状态码 {}）", url, data.error, status)
+                    }
+                    None => format!("网络请求 {} 失败：{}", url, data.error),
+                }
+            }
 
             ErrorType::SerializerError(data) => format!("Json解析失败：{}", data.error),
             ErrorType::PathNotExists(data) => {
@@ -166,6 +176,13 @@ impl I18Lang for ZhCn {
                     data.now
                 )
             }
+            ErrorType::DownloadItemFail(data) => format!(
+                "文件 {} 第 {} 次下载失败：{}（地址 {}）",
+                data.name,
+                data.times,
+                data.error,
+                if data.url.is_empty() { "缺失" } else { data.url.as_str() }
+            ),
             ErrorType::DownloadFileFail => String::from("文件下载失败"),
 
             ErrorType::InvalidOperation => String::from("错误的操作"),

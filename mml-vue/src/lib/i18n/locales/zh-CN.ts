@@ -47,6 +47,7 @@ export default {
   "drop.titleLogin": "松开以导入登录方式",
   "drop.onlyFirst": "一次只能拖入一个，已取第一个",
   "drop.notModpack": "不支持的文件类型，仅支持整合包、实例文件夹与登录卡片",
+  "drop.noPath": "没拿到拖入文件的路径，请改用「添加实例」窗口里的导入",
 
   // 多选模式
   "multi.selectAll": "全选",

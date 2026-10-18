@@ -11,6 +11,22 @@ pub enum InfoType {
     /// 临时文件
     TempFile,
 
+    /// 接管了一个 MMC 实例，带实例名
+    AdoptMmcInstance {
+        /// 实例名，取 MMC 配置或目录名
+        name: String,
+    },
+
+    /// 下载任务结束：总数 / 成功数 / 失败数
+    DownloadTaskDone {
+        /// 文件总数
+        total: usize,
+        /// 成功数
+        completed: usize,
+        /// 失败数
+        failed: usize,
+    },
+
     /// 代理描述：手动代理，带类型 / 地址 / 端口与是否认证
     ProxyUser {
         /// 代理类型名，如 `http` / `socks5`
