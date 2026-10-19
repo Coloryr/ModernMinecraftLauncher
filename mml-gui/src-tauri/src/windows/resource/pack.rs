@@ -37,7 +37,7 @@ use super::update::{LatestFile, newest_curseforge, newest_modrinth};
 /// 见 [`ModPackUpdateDto`]；实例不是从平台安装的整合包（本地压缩包导入、手动建的）
 /// 或实例里没记项目 / 文件编号时返回 `err.notOnlineModpack`
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_modpack_check(uuid: String) -> Result<ModPackUpdateDto, String> {
     let instance = parse_instance(&uuid)?;
     let id = modpack_of(&instance)?;
@@ -80,7 +80,7 @@ pub async fn resource_modpack_check(uuid: String) -> Result<ModPackUpdateDto, St
 /// 任务登记成功即返回 `Ok(())`；实例不是从平台安装的整合包、项目 / 文件编号缺失、
 /// 同项目同文件的任务已在跑时返回错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_modpack_update(
     app: AppHandle,
     uuid: String,

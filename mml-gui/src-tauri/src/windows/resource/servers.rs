@@ -19,7 +19,7 @@ use super::parse_instance;
 ///
 /// 服务器条目，图标由 servers.dat 里存的 base64 拼成 data URL；实例不存在或读取失败返回错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_list_servers(uuid: String) -> Result<Vec<ServerItemDto>, String> {
     // 读的过程中删实例会被拦住，见 resource::instance_busy
     let _op = super::model::begin_if_open(&uuid);
@@ -55,7 +55,7 @@ pub fn resource_list_servers(uuid: String) -> Result<Vec<ServerItemDto>, String>
 ///
 /// 只表示成功 / 失败：名字或地址为空返回 `err.nameIp`，其余是写入失败的错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_server_add(uuid: String, name: String, ip: String) -> Result<(), String> {
     if name.trim().is_empty() || ip.trim().is_empty() {
         return Err(err_keys::NAME_IP.to_string());
@@ -82,7 +82,7 @@ pub fn resource_server_add(uuid: String, name: String, ip: String) -> Result<(),
 /// 只表示成功 / 失败：新名字 / 新地址为空返回 `err.nameIp`，
 /// 没找到原条目返回 `err.fileNotFound`，其余是写入失败的错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_server_update(
     uuid: String,
     name: String,
@@ -125,7 +125,7 @@ pub fn resource_server_update(
 ///
 /// 只表示成功 / 失败：实例不存在或删除失败返回错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_server_delete(uuid: String, name: String, ip: String) -> Result<(), String> {
     let instance = parse_instance(&uuid)?;
     instance
@@ -144,7 +144,7 @@ pub fn resource_server_delete(uuid: String, name: String, ip: String) -> Result<
 ///
 /// 只表示成功 / 失败：源文件不存在或复制失败返回错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_servers_export(uuid: String, path: String) -> Result<(), String> {
     let instance = parse_instance(&uuid)?;
     let source = instance.read().unwrap().get_servers_file();
@@ -167,7 +167,7 @@ pub fn resource_servers_export(uuid: String, path: String) -> Result<(), String>
 ///
 /// 只表示成功 / 失败：源文件不存在、复制失败或解析不通过（已还原）返回错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_servers_import(uuid: String, path: String) -> Result<(), String> {
     let instance = parse_instance(&uuid)?;
     let target = instance.read().unwrap().get_servers_file();

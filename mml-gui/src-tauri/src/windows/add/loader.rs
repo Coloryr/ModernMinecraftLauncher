@@ -47,7 +47,7 @@ pub(super) fn parse_pack_type(id: &str) -> Result<PackType, String> {
 ///
 /// 该加载器在 `mc` 下的版本号列表；加载器 ID 非法或查询失败返回 `Err`
 #[gui_macros::ipc_group("add")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_get_loader_versions(loader: String, mc: String) -> Result<Vec<String>, String> {
     let loader = parse_loader(&loader)?;
     mml_game::loader::loader_versions::get_loader_versions(&loader, &mc)
@@ -61,7 +61,7 @@ pub async fn add_get_loader_versions(loader: String, mc: String) -> Result<Vec<S
 ///
 /// 加载器 ID 列表，顺序由内核 `LoaderType::ids` 定
 #[gui_macros::ipc_group("add")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn add_get_loaders() -> Vec<&'static str> {
     LoaderType::ids()
 }
@@ -118,7 +118,7 @@ impl IProgressGui for SupportLoadersProgressGui {
 ///
 /// 该版本支持的加载器 ID 列表；查询失败返回 `Err`，失败结果不进缓存
 #[gui_macros::ipc_group("add")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_get_support_loaders(app: AppHandle, mc: String) -> Result<Vec<String>, String> {
     use std::sync::LazyLock;
     use tokio::sync::{Mutex, OnceCell};
@@ -192,7 +192,7 @@ pub async fn add_get_support_loaders(app: AppHandle, mc: String) -> Result<Vec<S
 ///
 /// 压缩包类型 ID 列表，顺序由内核 `PackType::ids` 定
 #[gui_macros::ipc_group("add")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn add_get_pack_types() -> Vec<&'static str> {
     PackType::ids()
 }
@@ -203,7 +203,7 @@ pub fn add_get_pack_types() -> Vec<&'static str> {
 ///
 /// 版本类型 ID 列表，顺序由内核 `get_version_types` 定
 #[gui_macros::ipc_group("add")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn add_get_version_types() -> Vec<&'static str> {
     mml_game::get_version_types()
 }

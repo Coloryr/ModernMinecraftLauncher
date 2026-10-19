@@ -73,7 +73,7 @@ export function registerToml() {
 
         [/\b(?:true|false)\b/, "keyword"],
         [/=/, "operator"],
-        [/[\[\]{}]/, "delimiter.bracket"],
+        [/[[\]{}]/, "delimiter.bracket"],
         [/,/, "delimiter"],
       ],
 

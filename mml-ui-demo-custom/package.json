@@ -1,0 +1,23 @@
+{
+  "name": "mml-ui-demo-custom",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build && node scripts/pack.mjs",
+    "build:only": "vite build",
+    "pack": "node scripts/pack.mjs",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "mml-ipc": "file:../mml-ipc",
+    "vue": "^3.5.41"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.8",
+    "typescript": "~6.0.3",
+    "vite": "^8.2.1",
+    "vue-tsc": "^3.3.10"
+  }
+}

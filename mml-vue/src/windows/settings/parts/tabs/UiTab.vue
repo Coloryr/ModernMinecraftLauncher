@@ -3,8 +3,17 @@
 //
 // 状态与保存逻辑在 composables/useSettingsUi；窗口外观那组属于 gui_config.client（useSettingsClient），
 // 只是显示在这一页。这里只负责排版与分组（SettingsGroup）。
-import { onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { t } from "../../../../lib/i18n";
+import {
+  customUiCss,
+  customUiMode,
+  customUiPageUrl,
+  setCustomUiCss,
+  setCustomUiMode,
+  setCustomUiPageUrl,
+  type CustomUiMode,
+} from "../../../../lib/customUi";
 import { fontStack } from "../../../../lib/fonts";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
@@ -72,6 +81,27 @@ const { client, applyWindowEffect, applyWindowOpacity } = props.look;
 
 // 系统字体枚举是重活：进这个标签时才拉
 onMounted(() => void loadFonts());
+
+/** 自定义界面：模式即时生效，CSS / 页面地址点「应用」才落 */
+const cssDraft = ref(customUiCss.value);
+const pageDraft = ref(customUiPageUrl.value);
+const uiModeOptions = computed(() => [
+  { value: "off", label: t("winSettings.customUiOff") },
+  { value: "css", label: t("winSettings.customUiCssMode") },
+  { value: "page", label: t("winSettings.customUiPageMode") },
+]);
+
+function onUiModeChange(value: string) {
+  setCustomUiMode(value as CustomUiMode);
+}
+
+function applyCssDraft() {
+  setCustomUiCss(cssDraft.value);
+}
+
+function applyPageDraft() {
+  setCustomUiPageUrl(pageDraft.value);
+}
 </script>
 
 <template>
@@ -142,6 +172,33 @@ onMounted(() => void loadFonts());
         <input type="color" :value="customAccent" @input="setCustomAccent(($event.target as HTMLInputElement).value)" />
       </label>
     </div>
+  </SettingsGroup>
+
+  <SettingsGroup id="customUi" title-key="winSettings.secCustomUi" :flash="flashGroup === 'customUi'">
+    <p class="field-desc">{{ t("winSettings.customUiDesc") }}</p>
+    <SegmentedTabs :model-value="customUiMode" :options="uiModeOptions"
+      @update:model-value="onUiModeChange" />
+
+    <template v-if="customUiMode === 'css'">
+      <label class="field-label">{{ t("winSettings.customUiCss") }}</label>
+      <textarea v-model="cssDraft" class="field-input custom-ui-css" spellcheck="false" rows="10"
+        :placeholder="t('winSettings.customUiCssPlaceholder')" />
+      <div class="custom-ui-actions">
+        <BaseButton size="sm" variant="accent" @click="applyCssDraft">
+          {{ t("winSettings.customUiApply") }}
+        </BaseButton>
+        <span class="field-desc">{{ t("winSettings.customUiCssHint") }}</span>
+      </div>
+    </template>
+
+    <template v-else-if="customUiMode === 'page'">
+      <label class="field-label">{{ t("winSettings.customUiPage") }}</label>
+      <input v-model="pageDraft" class="field-input" spellcheck="false" autocomplete="off"
+        :placeholder="t('winSettings.customUiPagePlaceholder')" @change="applyPageDraft" />
+      <p class="field-desc">{{ t("winSettings.customUiPageHint") }}</p>
+    </template>
+
+    <p class="field-desc">{{ t("winSettings.customUiPending") }}</p>
   </SettingsGroup>
 
   <SettingsGroup id="window" title-key="winSettings.secWindow" :flash="flashGroup === 'window'">
@@ -243,3 +300,28 @@ onMounted(() => void loadFonts());
     </template>
   </SettingsGroup>
 </template>
+
+<style scoped>
+/* 自定义 CSS 编辑区：用等宽字体，方便看选择器与缩进 */
+.custom-ui-css {
+  width: 100%;
+  min-height: 140px;
+  margin-top: 8px;
+  resize: vertical;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.custom-ui-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.custom-ui-actions .field-desc {
+  margin: 0;
+}
+</style>

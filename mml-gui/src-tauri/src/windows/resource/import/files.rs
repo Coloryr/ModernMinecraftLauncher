@@ -125,7 +125,7 @@ pub(super) fn copy_into(dir: &Path, files: &[PathBuf], mode: &str) -> Result<Res
 /// 本次结果：`imported` / `skipped` / `conflicts` 三个名单，`check` 模式下只有
 /// `conflicts`；拖入项全是目录时返回 `err.dropNoFile`
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_import_files(
     uuid: String,
     kind: String,

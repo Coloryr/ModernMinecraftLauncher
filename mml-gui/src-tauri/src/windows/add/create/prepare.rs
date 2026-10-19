@@ -78,7 +78,7 @@ pub(crate) fn pack_file_stem(path: &str) -> String {
 ///
 /// 直接子项列表，只含名字与是否目录；目录打不开返回 `Err`
 #[gui_macros::ipc_group("add")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn add_list_dir(path: String) -> Result<Vec<DirEntry>, String> {
     let mut entries = Vec::new();
     for entry in std::fs::read_dir(&path).map_err(|e| e.to_string())? {
@@ -111,7 +111,7 @@ pub fn add_list_dir(path: String) -> Result<Vec<DirEntry>, String> {
 ///
 /// 扫到的实例列表，每项含实例名与目录路径；扫描线程出错时返回 `Err`
 #[gui_macros::ipc_group("add")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_scan_folder(path: String) -> Result<Vec<FolderInstanceDto>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         mml_game::scan_game::scan_game_from_path(&path)
@@ -140,7 +140,7 @@ pub async fn add_scan_folder(path: String) -> Result<Vec<FolderInstanceDto>, Str
 ///
 /// 包内全部条目的名字；打不开压缩包返回 `Err`
 #[gui_macros::ipc_group("add")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_list_archive(path: String) -> Result<Vec<String>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let archive = mml_base::archives::BaseArchive::open(&path).map_err(|e| e.to_string())?;
@@ -164,7 +164,7 @@ pub async fn add_list_archive(path: String) -> Result<Vec<String>, String> {
 ///
 /// 探测结果；无法识别或读包失败返回 `Err`
 #[gui_macros::ipc_group("add")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_detect_archive(path: String) -> Result<DetectedPackDto, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let pack = mml_game::add_game::detect_pack(&path).map_err(|e| e.to_string())?;

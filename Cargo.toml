@@ -2,7 +2,8 @@
 #
 # 全部 Rust crate 收进一个 workspace：
 # - mml-core 与其 17 个子 crate（内核）
-# - mml-gui/src-tauri（Tauri 桌面壳）+ ipc-gen / macros（IPC 代码生成）
+# - mml-gui/src-tauri（Tauri 桌面壳）
+# - ipc-gen（IPC 代码生成）+ ipc-gen/macros（给命令 / 事件打标记的过程宏）
 # [workspace.dependencies] 与 [profile.*] 统一在此维护（成员清单里只写包自身定义）。
 # target 目录随之合并到根目录 target\（各 crate 原有的 target 不再使用）。
 
@@ -29,8 +30,8 @@ members = [
     "mml-core/mml-testutil",
     "mml-core/mml-analysis",
     "mml-gui/src-tauri",
-    "mml-gui/ipc-gen",
-    "mml-gui/macros", 
+    "ipc-gen",
+    "ipc-gen/macros",
 ]
 
 [workspace.dependencies]
@@ -54,6 +55,8 @@ chrono = { version = "~0.4.45", features = ["serde"] }
 serde = { version = "~1.0.229", features = ["derive"] }
 serde_json = "~1.0.151"
 serde_repr = "~0.1.21"
+proc-macro2 = "~1.0.107"
+quote = "~1.0.47"
 glow = "~0.18.0"
 glam = "~0.34.1"
 uuid = { version = "~1.27.0", features = ["v4", "v5", "serde"] }

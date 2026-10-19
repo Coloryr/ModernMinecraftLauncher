@@ -1,13 +1,16 @@
 //! 构建脚本：Tauri 胶水 + 调用 gui-ipc-gen 生成 IPC 绑定
 //!
-//! 扫描与生成逻辑全在 `mml-gui/ipc-gen/`，包名 `gui-ipc-gen`，有单测，
+//! 扫描与生成逻辑全在仓库根 ipc-gen/，包名 gui-ipc-gen，有单测，
 //! 这里只负责算路径、传配置、写文件、打 cargo 指令。
 //!
 //! 注意：vendor 插件的还原**不能**放这里 —— cargo 在解析依赖图时就要读
-//! `target/vendor/tauri-plugin-decoration/Cargo.toml`，那发生在任何 build script
-//! 之前。改由各构建入口在 cargo 之前跑 `vendor/prepare.ps1`，见 build-*.bat。
+//! target/vendor/tauri-plugin-decoration/Cargo.toml，那发生在任何 build script
+//! 之前。改由各构建入口在 cargo 之前跑 vendor/prepare.ps1，见 build-*.bat。
 
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::{Path, PathBuf},
+};
 
 /// 构建入口：Tauri 构建 + 生成 IPC 绑定文件
 fn main() {
@@ -18,7 +21,8 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
-    let ts_dir = manifest.join("../../mml-vue/src/lib");
+    // 前端契约落在独立的 mml-ipc npm 包，mml-vue 与 mml-ui-demo 都从那里取
+    let ts_dir = manifest.join("../../mml-ipc/src");
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
 
     let generated = gui_ipc_gen::generate(&gui_ipc_gen::GenConfig {
@@ -34,14 +38,54 @@ fn main() {
     .expect("生成 IPC 绑定失败");
 
     // 输出文件也登记 rerun-if-changed：删掉或手改后会重新生成
-    let outs = [
+    let mut outs: Vec<(PathBuf, &str)> = vec![
         (out_dir.join("invokes_gen.rs"), &generated.invokes_gen_rs),
         (ts_dir.join("listens.ts"), &generated.listens_ts),
         (ts_dir.join("bindings.ts"), &generated.bindings_ts),
     ];
+    for file in &generated.type_files {
+        outs.push((ts_dir.join(&file.rel_path), &file.content));
+    }
     for (path, content) in outs {
         println!("cargo:rerun-if-changed={}", path.display());
         gui_ipc_gen::write_if_changed(&path, content)
             .unwrap_or_else(|e| panic!("写入 {} 失败: {e}", path.display()));
+    }
+
+    // DTO 源文件删掉后，旧的 types/*.ts 要跟着清掉，否则包里留着没人引用的死文件
+    prune_types(&ts_dir.join("types"), &generated.type_files);
+}
+
+/// 删掉 types/ 下不在本次生成结果里的 .ts
+///
+/// - types_dir: types/ 目录，可能还不存在
+/// - files: 本次生成的文件，rel_path 相对 mml-ipc/src
+fn prune_types(types_dir: &Path, files: &[gui_ipc_gen::GeneratedFile]) {
+    let expected: BTreeSet<String> = files
+        .iter()
+        .filter_map(|f| f.rel_path.strip_prefix("types/"))
+        .map(|s| s.to_string())
+        .collect();
+    prune_dir(types_dir, types_dir, &expected);
+}
+
+/// 递归清理；base 保持不变，用来算相对路径
+fn prune_dir(base: &Path, dir: &Path, expected: &BTreeSet<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            prune_dir(base, &path, expected);
+            continue;
+        }
+        let rel = path
+            .strip_prefix(base)
+            .map(|p| p.to_string_lossy().replace('\\', "/"))
+            .unwrap_or_default();
+        if path.extension().is_some_and(|e| e == "ts") && !expected.contains(&rel) {
+            let _ = std::fs::remove_file(&path);
+        }
     }
 }

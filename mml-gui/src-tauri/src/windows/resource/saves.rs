@@ -22,7 +22,7 @@ use super::{KIND_SAVES, data_url, find_save, load_saves, parse_instance, resourc
 ///
 /// 存档列表，含备份数量与图标；实例不存在或扫描失败返回错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_list_saves(uuid: String) -> Result<Vec<SaveItemDto>, String> {
     // 读的过程中删实例会被拦住，见 resource::instance_busy
     let _op = super::model::begin_if_open(&uuid);
@@ -81,7 +81,7 @@ pub async fn resource_list_saves(uuid: String) -> Result<Vec<SaveItemDto>, Strin
 ///
 /// 备份列表，按修改时间倒序，最近的在最上面；索引里没有这个存档时返回空表
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_list_save_backups(uuid: String, dir: String) -> Result<Vec<SaveBackupDto>, String> {
     let instance = parse_instance(&uuid)?;
     let game = instance.read().unwrap();
@@ -124,7 +124,7 @@ pub fn resource_list_save_backups(uuid: String, dir: String) -> Result<Vec<SaveB
 ///
 /// 只表示成功 / 失败：索引里找不到该存档返回 `err.saveNotFound`，其余是内核错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_restore_save_backup(
     uuid: String,
     dir: String,
@@ -158,7 +158,7 @@ pub async fn resource_restore_save_backup(
 ///
 /// 只表示成功 / 失败：目录名非法返回 `err.fileName`，该名字不是目录返回 `err.saveNotFound`
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_delete_save(uuid: String, dir: String) -> Result<(), String> {
     let instance = parse_instance(&uuid)?;
     let file = resource_file(&instance, KIND_SAVES, &dir)?;
@@ -177,7 +177,7 @@ pub async fn resource_delete_save(uuid: String, dir: String) -> Result<(), Strin
 ///
 /// 该存档的显示名 `level_name`，前端拿去提示；找不到存档返回 `err.saveNotFound`
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_backup_save(uuid: String, dir: String) -> Result<String, String> {
     let instance = parse_instance(&uuid)?;
 
@@ -220,7 +220,7 @@ pub async fn resource_backup_save(uuid: String, dir: String) -> Result<String, S
 /// `err.saveNameEmpty`，种子不是整数返回 `err.saveSeed`，存档找不到返回
 /// `err.saveNotFound`，其余是内核错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_save_edit(
     uuid: String,
     dir: String,

@@ -30,7 +30,7 @@ fn emit_collect_change(app: &AppHandle) {
 /// # 返回值
 ///
 /// 收藏项与分组；失败返回错误文案
-#[tauri::command]
+#[gui_macros::command]
 pub fn collect_get_data() -> Result<CollectDataDto, String> {
     Ok(collect_utils::get().into())
 }
@@ -43,7 +43,7 @@ pub fn collect_get_data() -> Result<CollectDataDto, String> {
 /// # 返回值
 ///
 /// 添加成功返回 `Ok(())`；名称为空或已存在返回错误文案
-#[tauri::command]
+#[gui_macros::command]
 pub fn collect_add_group(app: AppHandle, name: String) -> Result<(), String> {
     let name = name.trim();
     if name.is_empty() {
@@ -63,7 +63,7 @@ pub fn collect_add_group(app: AppHandle, name: String) -> Result<(), String> {
 ///
 /// - `app`: 应用句柄，广播变更事件用
 /// - `name`: 分组名
-#[tauri::command]
+#[gui_macros::command]
 pub fn collect_remove_group(app: AppHandle, name: String) {
     collect_utils::remove_group(&name);
     emit_collect_change(&app);
@@ -74,7 +74,7 @@ pub fn collect_remove_group(app: AppHandle, name: String) {
 /// - `app`: 应用句柄，广播变更事件用
 /// - `group`: 目标分组名；`None` 表示清空全部收藏但保留分组，`Some` 只清空该分组的成员，
 ///   收藏条目本身都保留
-#[tauri::command]
+#[gui_macros::command]
 pub fn collect_clear(app: AppHandle, group: Option<String>) {
     match group {
         Some(name) => collect_utils::clear_group(&name),
@@ -89,7 +89,7 @@ pub fn collect_clear(app: AppHandle, group: Option<String>) {
 /// - `uuids`: 目标收藏项 uuid 列表
 /// - `group`: 目标分组名；`None` 表示从收藏中删除并从所有分组移除，`Some` 只从该分组移除，
 ///   条目仍在收藏里
-#[tauri::command]
+#[gui_macros::command]
 pub fn collect_remove_items(app: AppHandle, uuids: Vec<String>, group: Option<String>) {
     match group {
         Some(name) => collect_utils::remove_group_items(&name, &uuids),
@@ -107,7 +107,7 @@ pub fn collect_remove_items(app: AppHandle, uuids: Vec<String>, group: Option<St
 /// - `app`: 应用句柄，广播变更事件用
 /// - `group`: 目标分组名
 /// - `uuids`: 要加入该分组的收藏项 uuid 列表
-#[tauri::command]
+#[gui_macros::command]
 pub fn collect_set_group_items(app: AppHandle, group: String, uuids: Vec<String>) {
     collect_utils::set_group_items(&group, &uuids);
     emit_collect_change(&app);
@@ -130,7 +130,7 @@ pub fn collect_set_group_items(app: AppHandle, group: String, uuids: Vec<String>
 ///
 /// 收藏状态已更新返回 `Ok(())`；文件类型未知返回错误文案
 #[allow(clippy::too_many_arguments)]
-#[tauri::command]
+#[gui_macros::command]
 pub fn collect_star(
     app: AppHandle,
     source: String,
@@ -180,7 +180,7 @@ pub fn collect_star(
 /// # 返回值
 ///
 /// 转发后的图标地址；项目没有图标时返回 `None`，源不支持或请求失败返回错误文案
-#[tauri::command]
+#[gui_macros::command]
 pub async fn collect_project_icon(source: String, pid: String) -> Result<Option<String>, String> {
     match ModPackType::from_string(&source) {
         ModPackType::CurseForge => {
@@ -222,7 +222,7 @@ pub async fn collect_project_icon(source: String, pid: String) -> Result<Option<
 /// # 返回值
 ///
 /// 可直接渲染的图片地址
-#[tauri::command]
+#[gui_macros::command]
 pub fn collect_image_url(url: String) -> String {
     image_manager::push_image_url(&url)
 }
@@ -239,7 +239,7 @@ pub fn collect_image_url(url: String) -> String {
 /// # 返回值
 ///
 /// 下载窗口用的项目条目；文件类型未知、源不支持或请求失败返回错误文案
-#[tauri::command]
+#[gui_macros::command]
 pub async fn collect_project_item(
     source: String,
     pid: String,

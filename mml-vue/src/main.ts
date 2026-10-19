@@ -3,6 +3,7 @@ import { createApp, watch } from "vue";
 import "./styles/index.css";
 import App from "./App.vue";
 import { loadGuiConfig } from "./lib/guiConfig";
+import { initCustomUi } from "./lib/customUi";
 import { applyTheme, restoreAccent, theme } from "./lib/theme";
 import { applyLocale, locale } from "./lib/i18n";
 import { applyMonacoNls } from "./lib/monacoNls";
@@ -66,6 +67,9 @@ if (import.meta.env.PROD) {
 
 /** 启动引导：GUI 状态由 Rust 的 gui_config.json 提供，浏览器回退本地存储 */
 async function bootstrap() {
+  // 自定义界面先就位：CSS 注入 / 整页模式的地址都从本地状态与开发参数来
+  initCustomUi();
+
   const cfg = await loadGuiConfig();
   if (cfg) {
     theme.value = cfg.theme;

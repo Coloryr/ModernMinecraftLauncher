@@ -21,7 +21,7 @@ use crate::windows::main::model;
 ///
 /// 全部核心实例的 DTO 列表，分组归属与组内次序取自内核分组表
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_get_instances() -> Vec<InstanceInfoDto> {
     mml_game::get_instances()
         .into_iter()
@@ -70,7 +70,7 @@ pub fn main_get_instances() -> Vec<InstanceInfoDto> {
 ///
 /// 按分组表顺序排列的分组列表，含没有实例的空分组
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_get_groups() -> Vec<GroupDto> {
     mml_game::get_group_list()
         .into_iter()
@@ -95,7 +95,7 @@ pub fn main_get_groups() -> Vec<GroupDto> {
 ///
 /// 语言项列表，含代码与显示名；uuid 非法或资源未下载时为空列表
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn main_get_instance_langs(uuid: String) -> Vec<InstanceLangDto> {
     let res = tauri::async_runtime::spawn_blocking(move || {
         let Ok(id) = Uuid::parse_str(&uuid) else {
@@ -123,7 +123,7 @@ pub async fn main_get_instance_langs(uuid: String) -> Vec<InstanceLangDto> {
 ///
 /// 启动参数 DTO；两处都取不到时返回默认值
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_get_instance_args(window: WebviewWindow, uuid: String) -> InstanceArgsDto {
     if let Some(core) = core_instance(&uuid) {
         let obj = core.instance.read().unwrap();
@@ -147,7 +147,7 @@ pub fn main_get_instance_args(window: WebviewWindow, uuid: String) -> InstanceAr
 ///
 /// 写入成功返回 `true`；模型缺失返回 `Err`
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_update_instance_args(
     window: WebviewWindow,
     uuid: String,
@@ -174,7 +174,7 @@ pub fn main_update_instance_args(
 ///
 /// 加载状态：`ok` 表示核心是否已就绪，`error` 恒为 `None`，失败详情走事件
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_load_state() -> LoadState {
     LoadState {
         ok: mml_core::get_state(),

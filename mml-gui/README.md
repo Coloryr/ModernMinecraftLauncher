@@ -42,17 +42,17 @@ npm run tauri dev
 | `src/windows/custom_home.rs` | `mml-home://` 协议：自定义主页面（zip 常驻句柄、按条目现读，不落盘解压） |
 | `src/err_box.rs` | 致命错误弹窗 |
 | `resources/custom_home_bridge.js` | 注入自定义主页面的桥接脚本（内置资源，不在用户包里） |
-| `ipc-gen/` | IPC 代码生成器（`gui-ipc-gen`，有单测） |
-| `macros/` | `#[gui_macros::emit]` 事件宏（`gui-macros`） |
 
 ## IPC 代码生成
 
-**命令与 DTO 的唯一来源是 Rust 源码。** `src-tauri/build.rs` 调用 `ipc-gen` 扫描 `src/`，生成两个文件：
+**命令与 DTO 的唯一来源是 Rust 源码。** `src-tauri/build.rs` 调用仓库根的 `ipc-gen` 扫描 `src/`，
+产物落在独立的 npm 包 `mml-ipc/src/`：
 
-- `mml-vue/src/lib/bindings.ts`：命令的类型化包装（`commands.xxx(...)`）+ 跨 IPC 类型
-- `mml-vue/src/lib/listens.ts`：事件名常量
+- `bindings.ts`：`createCommands(invoke)` 命令包装 + 跨 IPC 类型
+- `listens.ts`：事件名常量
 
-**这两个文件是生成产物，不要手改。** 新增命令加 `#[tauri::command]`，新增事件加 `#[gui_macros::emit]`，然后重新生成：
+**生成物不要手改。** 新增命令加 `#[gui_macros::command]`，新增事件加 `#[gui_macros::emit]`，
+然后重新生成：
 
 ```bash
 npm run gen        # = npm run vendor && cargo check

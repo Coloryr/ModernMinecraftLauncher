@@ -20,7 +20,7 @@ use crate::err_keys;
 ///
 /// 只表示成功 / 失败：类别未知、名字非法、原目标不存在或新名字已被占用时返回对应错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_rename(
     uuid: String,
     kind: String,

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>M²L 自定义 CSS 示例</title>
+    <link rel="stylesheet" href="./custom.css" />
+    <style>
+      body { margin: 0; padding: 40px; background: var(--bg); color: var(--text); font: 14px/1.7 system-ui, sans-serif; }
+      main { max-width: 760px; margin: 0 auto; }
+      h1 { color: var(--accent); }
+      code, pre { font-family: Consolas, monospace; }
+      pre { padding: 14px 16px; overflow: auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; }
+      a { color: var(--accent); }
+      .demo { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+      .demo .ui-btn { padding: 7px 16px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); }
+      .demo .ui-btn.v-accent { color: #fff; }
+      .note { color: var(--text-dim); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>M²L 自定义 CSS 示例</h1>
+      <p>这份 CSS 的目标不是这个页面，而是启动器本身。它演示三件事：</p>
+      <ol>
+        <li>改主题变量（<code>--accent</code> / <code>--bg</code> / <code>--border</code> …），所有窗口一起变；</li>
+        <li>用选择器只改某类控件（按钮 / 输入框 / 侧栏 / 标题栏），不碰别的；</li>
+        <li>用 <code>::after</code> 这类选择器做局部装饰。</li>
+      </ol>
+
+      <div class="demo">
+        <button class="ui-btn">普通按钮</button>
+        <button class="ui-btn v-accent">强调按钮</button>
+        <input class="field-input" placeholder="输入框" style="padding: 7px 12px; background: var(--bg-card); color: var(--text); border: 1px solid var(--border)" />
+      </div>
+
+      <h2>预览</h2>
+      <p>先起启动器前端（mml-vue，端口 1420），然后打开：</p>
+      <pre>http://localhost:1420/?window=main&amp;customCss=http://127.0.0.1:1521/custom.css</pre>
+      <p class="note">或者把本文件的 CSS 粘进「设置 → 界面 → 自定义界面 → 自定义 CSS」。</p>
+    </main>
+  </body>
+</html>

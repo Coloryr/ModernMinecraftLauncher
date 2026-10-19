@@ -285,7 +285,7 @@ pub fn emit_download_item(app: &AppHandle, event: DownloadItemEvent) {
 /// # 返回值
 ///
 /// 任务列表、各线程状态、总体速度与全局暂停标志；速度单位字节每秒
-#[tauri::command]
+#[gui_macros::command]
 pub fn download_get_status() -> DownloadStatusDto {
     let tasks: Vec<DownloadTaskDto> = mml_downloader::get_tasks()
         .into_iter()
@@ -345,7 +345,7 @@ pub fn download_get_status() -> DownloadStatusDto {
 /// # 返回值
 ///
 /// 被暂停的任务数
-#[tauri::command]
+#[gui_macros::command]
 pub fn download_pause_all() -> usize {
     mml_downloader::pause_all()
 }
@@ -355,7 +355,7 @@ pub fn download_pause_all() -> usize {
 /// # 返回值
 ///
 /// 被恢复的任务数
-#[tauri::command]
+#[gui_macros::command]
 pub fn download_resume_all() -> usize {
     mml_downloader::resume_all()
 }
@@ -365,7 +365,7 @@ pub fn download_resume_all() -> usize {
 /// # 返回值
 ///
 /// 被停止的任务数
-#[tauri::command]
+#[gui_macros::command]
 pub fn download_cancel_all() -> usize {
     mml_downloader::cancel_all()
 }

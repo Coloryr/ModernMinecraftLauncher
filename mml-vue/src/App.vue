@@ -4,6 +4,7 @@ import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, type Compo
 import { applyTheme } from "./lib/theme";
 import { applyLocale, t } from "./lib/i18n";
 import { applyAnimations, bgImage, bgLayerStyle } from "./lib/appearance";
+import { customUiMode, customUiPageUrl } from "./lib/customUi";
 import { api, onCloseBlocked } from "./lib/api";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
@@ -27,6 +28,7 @@ import BaseButton from "./components/ui/BaseButton.vue";
 import BaseModal from "./components/ui/BaseModal.vue";
 import ModpackPopup from "./components/ModpackPopup.vue";
 import ResourcePopup from "./components/ResourcePopup.vue";
+import CustomUiPage from "./components/CustomUiPage.vue";
 
 applyTheme();
 applyLocale();
@@ -64,6 +66,15 @@ const windowMap: Record<WindowKind, Component> = {
 };
 
 const currentWindow = computed(() => windowMap[currentKind.value]);
+
+/**
+ * 整页重写只在主窗口生效
+ *
+ * 设置等工具窗口保留内置界面，否则用户改错页面地址后没有入口改回来。
+ */
+const customPage = computed(
+  () => customUiMode.value === "page" && customUiPageUrl.value !== "" && currentKind.value === "main",
+);
 
 /**
  * 整合包安装任务的全局状态
@@ -157,6 +168,10 @@ const closeAskButton = computed(() =>
 </script>
 
 <template>
+  <!-- 整页重写：主窗口整个交给自定义页面，内置界面与浮层都不渲染 -->
+  <CustomUiPage v-if="customPage" :url="customUiPageUrl" />
+
+  <template v-else>
   <!-- 背景图层：设置里选的本地图片，所有窗口共用 -->
   <div v-if="bgImage" class="app-bg" :style="bgLayerStyle" />
   <!-- 单窗口模式的页面切换动画：多窗口模式下每个窗口是独立 webview、组件不会变，
@@ -194,4 +209,5 @@ const closeAskButton = computed(() =>
       <BaseButton variant="danger" @click="stopDownloadsAndClose">{{ closeAskButton }}</BaseButton>
     </div>
   </BaseModal>
+  </template>
 </template>

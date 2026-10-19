@@ -135,7 +135,7 @@ pub(super) fn nbt_node(name: String, nbt: &NbtType) -> NbtNodeDto {
 /// 路径非法返回 `err.fileName`，体积超过 [`MAX_FILE_SIZE`] 返回 `err.fileTooLarge`，
 /// 不是 NBT 或解不开时返回内核错误串
 #[gui_macros::ipc_group("config")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn config_open_nbt(
     game: String,
     source: String,
@@ -173,7 +173,7 @@ pub fn config_open_nbt(
 ///
 /// 路径非法返回 `err.fileName`；没打开过的文件也当成功
 #[gui_macros::ipc_group("config")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn config_close_nbt(
     game: String,
     source: String,
@@ -206,7 +206,7 @@ pub fn config_close_nbt(
 /// 改过返回 `err.fileChanged`，只读文件返回 `err.fileReadOnly`，路径对不上返回 `err.nbtPath`，
 /// 值解析不了或数组超上限返回 `err.nbtValue`
 #[gui_macros::ipc_group("config")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn config_set_nbt(
     game: String,
     source: String,

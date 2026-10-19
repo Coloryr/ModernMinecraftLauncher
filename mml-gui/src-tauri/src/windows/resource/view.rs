@@ -22,7 +22,7 @@ use super::parse_instance;
 /// 的值**，可能是空数组或空串，排序与默认值由前端补 —— 后端不认识有哪几个分类，
 /// 硬编码一份的话新增分类就得改两处
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_view_get(uuid: String) -> Result<ResourceViewDto, String> {
     let instance = parse_instance(&uuid)?;
     let view = crate::gui_setting::load(&instance.read().unwrap()).view;
@@ -47,7 +47,7 @@ pub fn resource_view_get(uuid: String) -> Result<ResourceViewDto, String> {
 ///
 /// 只表示成功 / 失败：实例不存在返回 `err.gameNotFound`
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_view_set(
     uuid: String,
     order: Vec<String>,

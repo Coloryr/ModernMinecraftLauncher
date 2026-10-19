@@ -22,7 +22,7 @@ use super::{KIND_RESOURCEPACKS, block_on_instance, data_url, parse_instance, res
 ///
 /// 材质包列表；取不到文件名的条目已被过滤，实例不存在或解析失败返回错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_list_resourcepacks(
     uuid: String,
     lang: String,
@@ -66,7 +66,7 @@ pub async fn resource_list_resourcepacks(
 ///
 /// 只表示成功 / 失败：文件名非法返回 `err.fileName`，其余是内核错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_delete_resourcepack(uuid: String, file: String) -> Result<(), String> {
     let instance = parse_instance(&uuid)?;
     let file = resource_file(&instance, KIND_RESOURCEPACKS, &file)?;
@@ -89,7 +89,7 @@ pub async fn resource_delete_resourcepack(uuid: String, file: String) -> Result<
 ///
 /// 只表示成功 / 失败：文件名非法返回 `err.fileName`，其余是内核错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_resourcepack_enable(uuid: String, file: String) -> Result<(), String> {
     resourcepack_set(uuid, file, true).await
 }
@@ -105,7 +105,7 @@ pub async fn resource_resourcepack_enable(uuid: String, file: String) -> Result<
 ///
 /// 与 [`resource_resourcepack_enable`] 同一条路径，见那边的说明。
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_resourcepack_disable(uuid: String, file: String) -> Result<(), String> {
     resourcepack_set(uuid, file, false).await
 }

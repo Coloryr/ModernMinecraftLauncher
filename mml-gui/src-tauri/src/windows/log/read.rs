@@ -22,7 +22,7 @@ use crate::windows::instance_handle;
 ///
 /// 日志文件绝对路径列表；uuid 非法或实例不存在返回错误文案
 #[gui_macros::ipc_group("log")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn log_get_files(uuid: String) -> Result<Vec<String>, String> {
     let instance = instance_handle(&uuid)?;
     let game = instance.read().unwrap();
@@ -42,7 +42,7 @@ pub fn log_get_files(uuid: String) -> Result<Vec<String>, String> {
 ///
 /// 解析出的日志行；路径不在列表内或实例不存在返回错误文案
 #[gui_macros::ipc_group("log")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn log_read_file(uuid: String, path: String) -> Result<Vec<LogLine>, String> {
     let instance = instance_handle(&uuid)?;
     let game = instance.read().unwrap();

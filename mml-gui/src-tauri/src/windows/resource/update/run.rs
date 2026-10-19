@@ -62,7 +62,7 @@ pub(super) struct UpdateCounts {
 /// uuid 非法或实例不存在返回错误串；其余情况立即返回 `Ok(())`，
 /// 单条失败只计数、不让一条坏掉整批，结果在完成事件里
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_mods_update_apply(
     window: WebviewWindow,
     uuid: String,

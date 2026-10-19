@@ -27,7 +27,7 @@ use super::query::{ListQuery, parse_query, check_version_download_now};
 ///
 /// 项目详情；Modrinth 含 markdown 正文，CurseForge 只有简介；源不受支持或请求失败返回 `Err`
 #[gui_macros::ipc_group("add_resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_resource_detail(source: String, pid: String) -> Result<ProjectDetailDto, String> {
     let source = ModPackType::from_string(&source);
 
@@ -77,7 +77,7 @@ pub async fn add_resource_detail(source: String, pid: String) -> Result<ProjectD
 ///
 /// 该页文件列表、总数与最大页数、项目名；源不受支持、类型非法或实例不存在时返回 `Err`
 #[gui_macros::ipc_group("add_resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_resource_file(
     game: String,
     source: String,

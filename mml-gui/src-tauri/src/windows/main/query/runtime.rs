@@ -20,7 +20,7 @@ use super::instance::{java_list};
 ///
 /// Java 项列表；配置尚未加载完成时为空
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_get_java_list() -> Vec<JavaInfoDto> {
     java_list()
 }
@@ -34,7 +34,7 @@ pub fn main_get_java_list() -> Vec<JavaInfoDto> {
 ///
 /// 总内存与可用内存，单位 MiB；取不到时为 0
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_get_system_memory() -> SystemMemoryDto {
     let total = mml_sys::memory_helper::get_memory_size();
     let free = mml_sys::memory_helper::get_memory_free();
@@ -51,7 +51,7 @@ pub fn main_get_system_memory() -> SystemMemoryDto {
 ///
 /// 版本列表，缓存命中直接返回；拉取失败时为空列表，不返回 `Err`
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn main_get_versions() -> Result<Vec<VersionInfoDto>, String> {
     {
         let cache = VERSIONS_CACHE.read().unwrap();
@@ -70,7 +70,7 @@ pub async fn main_get_versions() -> Result<Vec<VersionInfoDto>, String> {
 ///
 /// 重新拉取到的版本列表；失败时为空列表
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn main_refresh_versions() -> Result<Vec<VersionInfoDto>, String> {
     VERSIONS_CACHE.write().unwrap().clear();
     main_get_versions().await
@@ -84,7 +84,7 @@ pub async fn main_refresh_versions() -> Result<Vec<VersionInfoDto>, String> {
 ///
 /// 该页的新闻条目，id 为页内序号，图片与原文链接已补成绝对地址；接口失败返回 `Err`
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn main_get_news(page: Option<u32>) -> Result<Vec<NewsItem>, String> {
     let page = page.unwrap_or(1);
     let news = mml_net::mojang_api::get_minecraft_news(page)
@@ -119,7 +119,7 @@ pub async fn main_get_news(page: Option<u32>) -> Result<Vec<NewsItem>, String> {
 ///
 /// - `url`: 要打开的完整网址
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_open_url(url: String) {
     mml_sys::open_helper::open_url(&url);
 }
@@ -133,7 +133,7 @@ pub fn main_open_url(url: String) {
 ///
 /// 有启动参数时返回它，否则 `None`；取过一次就没了
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_take_start_arg() -> Option<StartArgDto> {
     crate::start_arg::take()
 }
@@ -149,7 +149,7 @@ pub fn main_take_start_arg() -> Option<StartArgDto> {
 ///
 /// 配置摘要列表；目录不存在时为空列表。uuid 非法或实例不存在返回错误文案
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_get_custom_json(uuid: String) -> Result<Vec<CustomJsonItemDto>, String> {
     let core = core_instance(&uuid).ok_or_else(|| crate::err_keys::GAME_NOT_FOUND.to_string())?;
     let inst = core.instance.read().unwrap();
@@ -174,7 +174,7 @@ pub fn main_get_custom_json(uuid: String) -> Result<Vec<CustomJsonItemDto>, Stri
 ///
 /// 自定义图片协议的基础地址
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_image_base_url() -> String {
     image_manager::image_base_url().to_string()
 }
@@ -185,7 +185,7 @@ pub fn main_image_base_url() -> String {
 ///
 /// 自定义音乐协议的基础地址
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_music_base_url() -> String {
     crate::music::music_base_url().to_string()
 }
@@ -198,7 +198,7 @@ pub fn main_music_base_url() -> String {
 ///
 /// MOTD 查询结果；连不上或无数据时 `state` 为对应失败态，不返回 `Err`
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn main_get_motd(address: String) -> MotdDto {
     let addr = parse_motd_addr(&address);
     mml_game::game_motd::get_server_info(&addr.host, addr.port)

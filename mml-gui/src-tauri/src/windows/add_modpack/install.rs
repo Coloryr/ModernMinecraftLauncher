@@ -37,7 +37,7 @@ use super::{CURSEFOGRE_INFO, MODRINTH_INFO};
 ///
 /// 任务登记成功即返回 `Ok(())`，不等安装结束；下载源不支持、同 pid+fid 已在安装返回 `Err`
 #[gui_macros::ipc_group("add_modpack")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_modpack_install(
     window: WebviewWindow,
     app: AppHandle,
@@ -158,7 +158,7 @@ pub async fn add_modpack_install(
 ///
 /// 标记取消后返回 `Ok(())`；找不到该任务返回 `Err`
 #[gui_macros::ipc_group("add_modpack")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_modpack_cancel(app: AppHandle, pid: String, fid: String) -> Result<(), String> {
     let key = SourceInfo { pid, fid };
     let task = DOWNLOAD_NOW.read().unwrap().get(&key).cloned();
@@ -179,7 +179,7 @@ pub async fn add_modpack_cancel(app: AppHandle, pid: String, fid: String) -> Res
 ///
 /// 当前全部安装任务的快照
 #[gui_macros::ipc_group("add_modpack")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_modpack_status(app: AppHandle) -> Result<ModPackStatusDto, String> {
     Ok(build_status(&app))
 }
@@ -192,7 +192,7 @@ pub async fn add_modpack_status(app: AppHandle) -> Result<ModPackStatusDto, Stri
 ///
 /// 清完即返回 `Ok(())`
 #[gui_macros::ipc_group("add_modpack")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_modpack_clear_done(app: AppHandle) -> Result<(), String> {
     DOWNLOAD_NOW.write().unwrap().retain(|_, task| {
         !(task.done.load(Ordering::Acquire)

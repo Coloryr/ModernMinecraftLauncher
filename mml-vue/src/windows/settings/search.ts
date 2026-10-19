@@ -12,6 +12,7 @@ import { SETTINGS_TABS, type SettingsTab } from "./types";
 export const GROUP_TITLES: Record<string, string> = {
   general: "winSettings.secGeneral",
   theme: "winSettings.secTheme",
+  customUi: "winSettings.secCustomUi",
   window: "winSettings.secWindow",
   mainWindow: "winSettings.secMainWindow",
   bgImage: "winSettings.bgImage",
@@ -56,6 +57,8 @@ const SETTINGS_INDEX: IndexEntry[] = [
   { tab: "ui", group: "general", labelKey: "winSettings.animations", extra: ["animation", "动画"] },
   { tab: "ui", group: "theme", labelKey: "winSettings.theme", extra: ["theme", "dark", "light", "深色", "浅色"] },
   { tab: "ui", group: "theme", labelKey: "winSettings.accent", extra: ["accent", "color", "强调色", "主题色"] },
+  { tab: "ui", group: "customUi", labelKey: "winSettings.customUiCssMode", extra: ["custom ui", "custom css", "自定义界面", "css", "样式"] },
+  { tab: "ui", group: "customUi", labelKey: "winSettings.customUiPageMode", extra: ["custom page", "html", "整页重写"] },
   { tab: "ui", group: "window", labelKey: "winSettings.windowMode", extra: ["window mode", "多窗口", "单窗口"] },
   {
     tab: "ui",

@@ -22,7 +22,7 @@ use crate::windows::resource::{parse_instance};
 /// 见 [`ModUpdateProjectDto`]；**每个项目内部新的在前，项目之间按各自最新一条倒序**。
 /// 实例不存在返回错误串，从没更新过时返回空表
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_mods_update_log(uuid: String) -> Result<Vec<ModUpdateProjectDto>, String> {
     let instance = parse_instance(&uuid)?;
     let list = instance.read().unwrap().read_mod_update();
@@ -74,7 +74,7 @@ pub async fn resource_mods_update_log(uuid: String) -> Result<Vec<ModUpdateProje
 ///
 /// 实例不存在或写盘失败返回错误串；项目不存在或下标越界时什么都不做
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_mods_update_log_remove(
     uuid: String,
     project_id: String,

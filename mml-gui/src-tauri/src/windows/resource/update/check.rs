@@ -100,7 +100,7 @@ pub(super) fn collect_targets(list: &[ModObj], online: &HashMap<String, OnlineIn
 ///
 /// 见 [`ModUpdateCheckDto`]；实例不存在或模组列表还没加载时返回错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_mods_update_check(
     window: WebviewWindow,
     uuid: String,

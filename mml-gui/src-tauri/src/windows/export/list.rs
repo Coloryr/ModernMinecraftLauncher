@@ -129,7 +129,7 @@ pub(super) fn list_entries(
 ///
 /// 见 [`ExportInfoDto`]；uuid 非法或实例不存在返回错误文案
 #[gui_macros::ipc_group("export")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn export_get_info(uuid: String) -> Result<ExportInfoDto, String> {
     let game = instance_snapshot(&uuid)?;
     let online = online_of(&game);
@@ -151,7 +151,7 @@ pub fn export_get_info(uuid: String) -> Result<ExportInfoDto, String> {
 ///
 /// 该目录的直接子项；路径非法返回 `err.fileName`，目录不存在返回 `err.fileNotFound`
 #[gui_macros::ipc_group("export")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn export_list_dir(uuid: String, dir: String) -> Result<Vec<ExportEntryDto>, String> {
     let game = instance_snapshot(&uuid)?;
     let base = game.get_game_path();

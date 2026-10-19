@@ -104,6 +104,14 @@ export const KEYS = {
   /** 自定义主页面开关 */
   customHome: "mml.client.customHome",
 
+  // ---- 自定义界面（后端接入前的临时存储，见 task1.md） ----
+  /** 自定义界面模式：off / css / page */
+  customUiMode: "mml.customUi.mode",
+  /** 自定义 CSS 文本，css 模式生效 */
+  customUiCss: "mml.customUi.css",
+  /** 整页重写的页面地址，page 模式生效 */
+  customUiPage: "mml.customUi.page",
+
   // ---- 收藏窗口类型过滤（"0" = 不显示） ----
   collectModpack: "mml.collect.modpack",
   collectShowMod: "mml.collect.showMod",

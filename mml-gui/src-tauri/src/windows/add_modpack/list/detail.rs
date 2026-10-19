@@ -29,7 +29,7 @@ use super::installed::{installed_modpack_files, running_files};
 ///
 /// 项目详情，含简介、正文与截图；下载源非法或请求失败返回 `Err`
 #[gui_macros::ipc_group("add_modpack")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_modpack_detail(source: String, pid: String) -> Result<ProjectDetailDto, String> {
     let source = ModPackType::from_string(&source);
 
@@ -76,7 +76,7 @@ pub async fn add_modpack_detail(source: String, pid: String) -> Result<ProjectDe
 ///
 /// 该页文件列表、总数与项目名；下载源非法或请求失败返回 `Err`
 #[gui_macros::ipc_group("add_modpack")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_modpack_file(
     source: String,
     pid: String,

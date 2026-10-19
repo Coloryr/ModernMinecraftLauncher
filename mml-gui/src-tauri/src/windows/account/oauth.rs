@@ -175,7 +175,7 @@ pub(super) async fn get_oauth_profile(auth: &mut LoginObj) -> CoreResult<Minecra
 
 /// 取消进行中的微软登录轮询
 #[gui_macros::ipc_group("account")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn account_cancel_oauth() {
     if let Some(cancel) = OAUTH_NOW.write().unwrap().take() {
         cancel.cancel();

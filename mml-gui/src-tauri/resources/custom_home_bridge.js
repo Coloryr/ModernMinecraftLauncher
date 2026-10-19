@@ -238,8 +238,8 @@
 
   /**
    * 调用启动器命令
-   * @param {string} cmd 命令名（与 `#[tauri::command]` 函数名一致，如 main_get_instances）
-   * @param {any} [args] 命令参数对象（键名与 bindings.ts 里的一致）
+   * @param {string} cmd 命令名（与 Rust 侧命令函数名一致，如 main_get_instances）
+   * @param {any} [args] 命令参数对象（键名与 mml-ipc 的类型一致）
    * @returns {Promise<any>}
    */
   function invoke(cmd, args) {

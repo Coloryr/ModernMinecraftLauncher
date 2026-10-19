@@ -76,7 +76,7 @@ fn global_auto_join() -> Option<ServerObj> {
 /// 已交给后台任务时返回 `Ok(())`；实例不存在 / 没有当前账户 / 已在运行 /
 /// 没登录过正版账户却要用离线账户启动 返回 `Err`
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn main_launch_game(
     app: AppHandle,
     uuid: String,
@@ -235,7 +235,7 @@ pub async fn main_launch_game(
 ///
 /// 始终返回 `Ok(())`；uuid 非法返回 `Err`
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_stop_game(uuid: String) -> Result<(), String> {
     let id = Uuid::parse_str(&uuid).map_err(|_| err_keys::UUID.to_string())?;
     stop_game(&id);
@@ -248,7 +248,7 @@ pub fn main_stop_game(uuid: String) -> Result<(), String> {
 ///
 /// 运行中实例的 uuid 列表，取自内核的实例句柄表
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_get_running() -> Vec<String> {
     get_running_instances()
         .iter()

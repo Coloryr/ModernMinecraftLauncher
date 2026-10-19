@@ -34,7 +34,7 @@ fn schematic_type_name(schematic_type: &SchematicType) -> &'static str {
 ///
 /// 结构文件列表；取不到文件名的条目已被过滤，实例不存在或解析失败返回错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_list_schematics(uuid: String) -> Result<Vec<SchematicItemDto>, String> {
     // 读的过程中删实例会被拦住，见 resource::instance_busy
     let _op = super::model::begin_if_open(&uuid);
@@ -82,7 +82,7 @@ pub async fn resource_list_schematics(uuid: String) -> Result<Vec<SchematicItemD
 /// 见 [`SchematicDetailDto`]；文件名非法返回 `err.fileName`，打开失败返回内核错误串。
 /// 解析失败不返回错误，而是 `fail` 为真、其余字段为默认值，与列表条目同一口径
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_schematic_detail(
     uuid: String,
     file: String,
@@ -148,7 +148,7 @@ pub async fn resource_schematic_detail(
 ///
 /// 只表示成功 / 失败：文件名非法返回 `err.fileName`，其余是内核错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_delete_schematic(uuid: String, file: String) -> Result<(), String> {
     let instance = parse_instance(&uuid)?;
     let file = resource_file(&instance, KIND_SCHEMATICS, &file)?;

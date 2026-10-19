@@ -10,11 +10,11 @@
 //   - 启动器交互（拉实例、启动、状态）在 <script> 后半段，一般不用动；
 //   - 配色在 src/style.css，已经支持启动器的暗色 / 亮色跟随。
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import type { MmlInstance } from "./mml";
+import type { InstanceInfoDto } from "mml-ipc";
 import {
   STAGE_LABELS,
+  commands,
   getMml,
-  invoke,
   onGameExit,
   onLaunchError,
   onLaunchState,
@@ -60,7 +60,7 @@ const EVENTS = [
 
 /** 宿主状态：probing = 正在握手，ready = 在启动器里，absent = 不在启动器里（浏览器预览） */
 const host = ref<"probing" | "ready" | "absent">("probing");
-const instances = ref<MmlInstance[]>([]);
+const instances = ref<InstanceInfoDto[]>([]);
 const loading = ref(false);
 const error = ref("");
 /** 正在请求启动的实例 uuid（按钮转圈用） */
@@ -94,13 +94,14 @@ const serverInstance = computed(() => {
 });
 
 /** 浏览器预览用的示例数据：只在没连上启动器时显示，页面上会明确标注 */
-const DEMO_INSTANCES: MmlInstance[] = [
+const DEMO_INSTANCES: InstanceInfoDto[] = [
   {
     uuid: "demo-1",
     name: "暮色群岛 · 1.20.1",
     group: "服务器",
     version: "1.20.1",
     versionType: "release",
+    quickPlay: false,
     loader: "fabric",
     loaderVersion: "0.15.11",
     dir: "（示例数据）",
@@ -112,6 +113,7 @@ const DEMO_INSTANCES: MmlInstance[] = [
     lang: null,
     logEncoding: null,
     source: null,
+    order: 0,
   },
   {
     uuid: "demo-2",
@@ -119,6 +121,7 @@ const DEMO_INSTANCES: MmlInstance[] = [
     group: "服务器",
     version: "1.21.1",
     versionType: "release",
+    quickPlay: false,
     loader: "",
     loaderVersion: null,
     dir: "（示例数据）",
@@ -130,6 +133,7 @@ const DEMO_INSTANCES: MmlInstance[] = [
     lang: null,
     logEncoding: null,
     source: null,
+    order: 1,
   },
 ];
 
@@ -165,7 +169,7 @@ async function refreshInstances() {
   loading.value = true;
   error.value = "";
   try {
-    instances.value = await invoke<MmlInstance[]>("main_get_instances");
+    instances.value = await commands.main.getInstances();
   } catch (err) {
     error.value = messageOf(err);
   } finally {
@@ -174,12 +178,12 @@ async function refreshInstances() {
 }
 
 /** 启动游戏（main_launch_game，参数是实例 uuid） */
-async function launch(inst: MmlInstance | null) {
+async function launch(inst: InstanceInfoDto | null) {
   if (!inst || host.value !== "ready") return;
   launching.value = inst.uuid;
   error.value = "";
   try {
-    await invoke("main_launch_game", { uuid: inst.uuid });
+    await commands.main.launchGame(inst.uuid, null);
     inst.running = true;
     log(`已请求启动：${inst.name}`);
   } catch (err) {

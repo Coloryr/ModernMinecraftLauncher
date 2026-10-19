@@ -70,7 +70,7 @@ pub fn emit_resource_mods_duplicate(window: &WebviewWindow, dto: Vec<ModDuplicat
 ///
 /// 模组条目，含 jar-in-jar 内置项；实例不存在或扫描失败返回错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_list_mods(
     window: WebviewWindow,
     uuid: String,

@@ -57,7 +57,7 @@ pub fn emit_add_resource_status(app: &AppHandle, dto: ResourceStatusDto) {
 ///
 /// 当前所有实例的下载条目快照
 #[gui_macros::ipc_group("add_resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn add_resource_status(app: AppHandle) -> ResourceStatusDto {
     build_status(&app)
 }
@@ -72,7 +72,7 @@ pub fn add_resource_status(app: AppHandle) -> ResourceStatusDto {
 ///
 /// 清完即返回 `Ok(())`
 #[gui_macros::ipc_group("add_resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn add_resource_clear_done(app: AppHandle) -> Result<(), String> {
     DOWNLOAD_NOW.write().unwrap().retain(|_, entry| {
         entry.retain(|_, info| !(info.done || info.failed || info.cancelled));

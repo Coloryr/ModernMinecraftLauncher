@@ -115,7 +115,7 @@ pub(super) fn read_icon_preview(path: &str) -> Result<IconSourceDto, String> {
 ///
 /// 预览 data URL 与原图宽高；读不到 / 解不出时返回 `Err`，内容为 i18n 键
 #[gui_macros::ipc_group("block")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn block_read_icon_source(path: String) -> Result<IconSourceDto, String> {
     tauri::async_runtime::spawn_blocking(move || read_icon_preview(&path))
         .await
@@ -196,7 +196,7 @@ pub(super) fn render_icon_png(
 /// 成功写入返回 `Ok(true)`；图片无效、实例不存在或写盘失败时返回 `Err`，内容为 i18n 键
 #[allow(clippy::too_many_arguments)]
 #[gui_macros::ipc_group("block")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn block_set_icon_area(
     app: AppHandle,
     uuid: String,
@@ -255,7 +255,7 @@ pub async fn block_set_icon_area(
 ///
 /// 成功写入返回 `Ok(true)`；该 id 没有可用贴图或实例不存在时返回 `Err`，内容为 i18n 键
 #[gui_macros::ipc_group("block")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn block_set_icon(app: AppHandle, uuid: String, id: String) -> Result<bool, String> {
     // 方块优先，未作为方块出现的 id 回退物品贴图
     let Some(_) = mml_tex_draw::get_block_path(&id).or_else(|| mml_tex_draw::get_item_path(&id))
@@ -295,7 +295,7 @@ pub async fn block_set_icon(app: AppHandle, uuid: String, id: String) -> Result<
 ///
 /// 新皮肤方块的 id；输入解析不出玩家或皮肤下载 / 渲染失败时返回 `Err`，内容为 i18n 键
 #[gui_macros::ipc_group("block")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn block_skin_add(input: String) -> Result<String, String> {
     let skin = mml_game::player_skin::fetch_skin_by_input(&input)
         .await
@@ -316,7 +316,7 @@ pub async fn block_skin_add(input: String) -> Result<String, String> {
 ///
 /// 成功删除返回 `Ok(())`；没有这个皮肤方块时返回 `Err`，内容为 i18n 键
 #[gui_macros::ipc_group("block")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn block_skin_remove(name: String) -> Result<(), String> {
     mml_tex_draw::remove_skin_block(&name).map_err(|e| e.to_string())
 }

@@ -73,7 +73,7 @@ pub(super) fn read_slice(path: &Path, offset: u64, length: u32) -> Result<BytesS
 ///
 /// 文件条目列表；uuid 非法、实例不存在或存档目录不存在时返回错误串
 #[gui_macros::ipc_group("config")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn config_get_files(game: String, source: String) -> Result<Vec<FileItemDto>, String> {
     let game = instance_snapshot(&game)?;
     let mut items = Vec::new();
@@ -121,7 +121,7 @@ pub fn config_get_files(game: String, source: String) -> Result<Vec<FileItemDto>
 /// 见 [`ConfigTextDto`]；路径非法返回 `err.fileName`，二进制文件返回 `err.fileBinary`，
 /// 体积超过 [`MAX_FILE_SIZE`] 返回 `err.fileTooLarge`，读取失败返回内核错误串
 #[gui_macros::ipc_group("config")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn config_get_file(
     game: String,
     source: String,
@@ -156,7 +156,7 @@ pub fn config_get_file(
 /// 保存后全文的 SHA1，供前端接着改；路径非法返回 `err.fileName`，二进制文件返回
 /// `err.fileBinary`，磁盘上那一份已经变了返回 `err.fileChanged`，写盘失败返回内核错误串
 #[gui_macros::ipc_group("config")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn config_save_file(
     game: String,
     source: String,
@@ -212,7 +212,7 @@ pub(super) fn text_sha1(text: &str) -> String {
 ///
 /// 路径非法返回 `err.fileName`
 #[gui_macros::ipc_group("config")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn config_open_file_dir(game: String, source: String, file: String) -> Result<(), String> {
     let game = instance_snapshot(&game)?;
     let path = resolve_source(&game, &source, &file)?;
@@ -232,7 +232,7 @@ pub fn config_open_file_dir(game: String, source: String, file: String) -> Resul
 ///
 /// 路径非法返回 `err.fileName`；删除失败返回内核错误串
 #[gui_macros::ipc_group("config")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn config_delete_file(game: String, source: String, file: String) -> Result<(), String> {
     let game = instance_snapshot(&game)?;
     let path = resolve_source(&game, &source, &file)?;
@@ -256,7 +256,7 @@ pub fn config_delete_file(game: String, source: String, file: String) -> Result<
 ///
 /// 见 [`BytesSliceDto`]；路径非法返回 `err.fileName`，读取失败返回内核错误串
 #[gui_macros::ipc_group("config")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn config_get_bytes_slice(
     game: String,
     source: String,
@@ -302,7 +302,7 @@ pub(super) fn image_mime(path: &Path) -> &'static str {
 /// `data:<mime>;base64,<...>`；路径非法返回 `err.fileName`，不是图片返回
 /// `err.notImageFile`，体积超过上限返回 `err.fileTooLarge`
 #[gui_macros::ipc_group("config")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn config_get_image(game: String, source: String, file: String) -> Result<String, String> {
     let game = instance_snapshot(&game)?;
     let path = resolve_source(&game, &source, &file)?;

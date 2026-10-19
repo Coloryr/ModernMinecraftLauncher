@@ -20,7 +20,7 @@ use super::{KIND_SCREENSHOTS, parse_instance, resource_file};
 ///
 /// 截图文件名列表；实例不存在返回 `err.gameNotFound`
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_list_screenshots(uuid: String) -> Result<Vec<ScreenshotItemDto>, String> {
     // 读的过程中删实例会被拦住，见 resource::instance_busy
     let _op = super::model::begin_if_open(&uuid);
@@ -44,7 +44,7 @@ pub fn resource_list_screenshots(uuid: String) -> Result<Vec<ScreenshotItemDto>,
 ///
 /// 只表示成功 / 失败：文件名非法返回 `err.fileName`，其余是删除失败的错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_delete_screenshot(uuid: String, name: String) -> Result<(), String> {
     let instance = parse_instance(&uuid)?;
     let file = resource_file(&instance, KIND_SCREENSHOTS, &name)?;
@@ -59,7 +59,7 @@ pub async fn resource_delete_screenshot(uuid: String, name: String) -> Result<()
 ///
 /// 只表示成功 / 失败：实例不存在或删除失败返回错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_clear_screenshots(uuid: String) -> Result<(), String> {
     let instance = parse_instance(&uuid)?;
     tauri::async_runtime::spawn_blocking(move || {

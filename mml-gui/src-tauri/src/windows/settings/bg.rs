@@ -236,7 +236,7 @@ pub(super) fn cache_bg_original(source: &str, image: &ImageBytes) {
 ///
 /// 处理后的 dataURL 供前端立即显示；其他窗口经 `bg-change` 事件刷新
 #[gui_macros::ipc_group("settings")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn settings_set_bg(
     app: AppHandle,
     source: String,
@@ -267,7 +267,7 @@ pub async fn settings_set_bg(
 ///
 /// 处理后的 dataURL 供前端立即显示；没设置过背景图时返回 `no background image`
 #[gui_macros::ipc_group("settings")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn settings_resize_bg(app: AppHandle, percent: u32) -> Result<String, String> {
     let percent = percent.clamp(10, 100);
     let source = crate::gui_config::get().bg_source;
@@ -310,7 +310,7 @@ pub async fn settings_resize_bg(app: AppHandle, percent: u32) -> Result<String, 
 ///
 /// 恒为 `Ok(())`，删文件失败也按清除成功处理
 #[gui_macros::ipc_group("settings")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn settings_clear_bg(app: AppHandle) -> Result<(), String> {
     if let Some(dir) = crate::gui_config::dir() {
         let _ = tauri::async_runtime::spawn_blocking(move || {
@@ -331,7 +331,7 @@ pub async fn settings_clear_bg(app: AppHandle) -> Result<(), String> {
 ///
 /// 未设置背景图、或配置目录还没初始化时返回 `None`；读文件失败返回错误信息
 #[gui_macros::ipc_group("settings")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn settings_get_bg() -> Result<Option<BgInfoDto>, String> {
     use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 

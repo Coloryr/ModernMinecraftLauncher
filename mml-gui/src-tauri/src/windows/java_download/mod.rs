@@ -31,7 +31,7 @@ pub(super) static JAVA_ITEMS: LazyLock<RwLock<HashMap<Uuid, FileItemObj>>> =
 /// # 返回值
 ///
 /// 全部搜索源的枚举值，供前端下拉框使用；不会失败
-#[tauri::command]
+#[gui_macros::command]
 pub fn java_download_get_types() -> Vec<JavaTypes> {
     JavaTypes::all()
 }
@@ -49,7 +49,7 @@ pub fn java_download_get_types() -> Vec<JavaTypes> {
 /// # 返回值
 ///
 /// 该源的四个下拉框候选，即发行类型 / 主版本 / 系统 / 架构；网络失败时返回 `Err`
-#[tauri::command]
+#[gui_macros::command]
 pub async fn java_download_get_options(
     source: JavaTypes,
 ) -> Result<JavaDownloadOptionsDto, String> {
@@ -196,7 +196,7 @@ fn zulu_arch(arch: &str, bitness: &str) -> String {
 ///
 /// 下载并注册成功返回 `Ok(())`；uuid 非法、缓存里没有该项、下载或解包失败时
 /// 返回 `Err`，内容为 i18n 键
-#[tauri::command]
+#[gui_macros::command]
 pub async fn java_download_start(uuid: String) -> Result<(), String> {
     let Ok(uuid) = Uuid::parse_str(&uuid) else {
         return Err(err_keys::JAVA_ITEM_NOT_FOUND.to_string());

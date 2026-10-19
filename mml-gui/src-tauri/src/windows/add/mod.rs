@@ -20,7 +20,7 @@ use self::model::model;
 /// - `window`: 调用方窗口，用于取本窗口模型
 /// - `id`: 对话框事件 id，对应后端登记的应答通道
 /// - `answer`: 用户是否同意
-#[tauri::command]
+#[gui_macros::command]
 pub fn add_answer_name_conflict(window: WebviewWindow, id: u32, answer: bool) {
     if let Ok(store) = model(&window)
         && let Some(tx) = store.lock().unwrap().take_dialog(id)
@@ -36,7 +36,7 @@ pub fn add_answer_name_conflict(window: WebviewWindow, id: u32, answer: bool) {
 /// # 返回值
 ///
 /// 确实取消了返回 `true`；没有进行中的任务或模型缺失返回 `false`
-#[tauri::command]
+#[gui_macros::command]
 pub fn add_cancel(window: WebviewWindow) -> bool {
     let Ok(store) = model(&window) else {
         return false;
@@ -54,7 +54,7 @@ pub fn add_cancel(window: WebviewWindow) -> bool {
 ///
 /// - `window`: 调用方窗口，用于取本窗口模型
 /// - `enabled`: 是否开启关闭保护
-#[tauri::command]
+#[gui_macros::command]
 pub fn add_set_close_guard(window: WebviewWindow, enabled: bool) {
     if let Ok(store) = model(&window) {
         store.lock().unwrap().set_close_guard(enabled);

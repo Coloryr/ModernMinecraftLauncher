@@ -26,7 +26,7 @@ use crate::windows::main::{emit_instance_change, model};
 ///
 /// 返回新分组的 uuid；名字为空或重名返回 `None`，前端据此提示"已存在"
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_add_group(app: AppHandle, name: String) -> Result<Option<String>, String> {
     let Some(uuid) = mml_game::add_group(&name) else {
         return Ok(None);
@@ -44,7 +44,7 @@ pub fn main_add_group(app: AppHandle, name: String) -> Result<Option<String>, St
 ///
 /// 真删掉了返回 `true`；默认分组或分组不存在返回 `false`
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_remove_group(app: AppHandle, uuid: String) -> Result<bool, String> {
     // 空白 uuid 就是默认分组，不允许删除
     let Some(uuid) = windows::parse_group_id(Some(uuid)) else {
@@ -71,7 +71,7 @@ pub fn main_remove_group(app: AppHandle, uuid: String) -> Result<bool, String> {
 ///
 /// 挪成功返回 `true`；uuid 为空或不是 uuid、该组不在表里时返回 `Err`
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_move_group(app: AppHandle, uuid: String, index: i64) -> Result<bool, String> {
     // 这里**不**按 `parse_group_id` 的"非法 = 默认分组"兜底：空 / 非法的 uuid 指不到
     // 任何组，不像 `main_move_instance` 那样有默认分组这个有意义的落点，直接报错更安全
@@ -113,7 +113,7 @@ pub fn main_move_group(app: AppHandle, uuid: String, index: i64) -> Result<bool,
 ///
 /// 移动成功返回 `true`；uuid 非法或实例不存在返回 `Err`
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_move_instance(
     app: AppHandle,
     uuid: String,
@@ -147,7 +147,7 @@ pub fn main_move_instance(
 ///
 /// 核心实例或本地存储任一删掉了就返回 `true`；都没有则 `false`
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn main_delete_instance(
     app: AppHandle,
     window: WebviewWindow,

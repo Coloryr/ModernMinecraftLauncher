@@ -8,7 +8,8 @@ M²L 启动器可以把你自己的整页 HTML 当成「启动器主页」（顶
 `npm run build` 会产出静态站点，并顺手打成一个能直接在启动器里导入的 zip。
 
 > 这是**独立工程**：`node_modules` 独立，不属于启动器仓库的 Cargo workspace，也不挂进
-> `mml-vue` 的构建流程；**不要** import `mml-vue/src/` 下的任何代码。
+> `mml-vue` 的构建流程；**不要** import `mml-vue/src/` 下的代码。跨 IPC 的类型与命令包装
+> 用仓库根的 npm 包 [`mml-ipc`](../mml-ipc)，`npm install` 会按 `file:../mml-ipc` 链接进来。
 
 ## 快速开始
 
@@ -16,6 +17,9 @@ M²L 启动器可以把你自己的整页 HTML 当成「启动器主页」（顶
 npm install
 npm run build      # 产出 dist/ 与 mml-ui-demo.zip
 ```
+
+`npm install` 会把相邻的 `mml-ipc` 包按 `file:../mml-ipc` 链接进 `node_modules`；
+复制本工程单独用时，把 `mml-ipc/` 一起带走，并把路径改到实际位置。
 
 可用的 npm 脚本：
 
@@ -54,7 +58,7 @@ npm run build      # 产出 dist/ 与 mml-ui-demo.zip
 ## 页面能力：`window.mml`
 
 启动器会在返回的 HTML 的 `</head>` 前注入 `<script src="/__mml_bridge.js">`，
-页面里因此有：
+页面里因此有（类型就是 `mml-ipc` 导出的 `MmlApi`，导入本包即带全局声明）：
 
 ```js
 window.mml = {
@@ -66,26 +70,27 @@ window.mml = {
 };
 ```
 
-- **命令名** = 启动器 Rust 侧 `#[tauri::command]` 的函数名，如 `main_get_instances`；
-  参数是**原始 camelCase**（如 `{ uuid }`）。启动器前端那份 `bindings.ts` 只是启动器自己
-  页面的包装层，自定义页面用不到，也不需要它。
+- 底层 `window.mml.invoke` 收**原始命令名 + camelCase 参数**；本工程再套一层 `mml-ipc` 的
+  `createCommands`（`src/bridge.ts` 的 `commands`），命令名与参数类型都在编译期检查。
+- 事件订阅同理：`createEvents` 由 `mml-ipc` 生成，每个事件一个 `onXxx`，payload 类型跟着
+  事件名走；`src/bridge.ts` 只把它接到 `window.mml.on`，再导出 `onLaunchState` 等。
 - 本工程实际用到的三条：
 
-  ```js
-  const list = await window.mml.invoke("main_get_instances");
-  await window.mml.invoke("main_launch_game", { uuid });
-  window.mml.on("launch-state", (e) => console.log(e.state, e.progress));
+  ```ts
+  const list = await commands.main.getInstances();
+  await commands.main.launchGame(uuid, null);
+  onLaunchState((e) => console.log(e.state, e.progress)); // 事件名常量与 payload 类型来自 mml-ipc
   ```
 
-- 可订阅的事件**白名单**（只有这些，其余会被拒绝）：
+- 可订阅的事件**白名单**（只有这些，其余会被拒绝）；事件名常量与 payload 类型都在 `mml-ipc`：
 
   | 事件名 | payload |
   | --- | --- |
-  | `launch-state` | `{ uuid, state, progress }` |
-  | `launch-error` | `{ uuid, message }` |
-  | `game-exit` | `{ uuid, code }` |
-  | `game-log` | `{ uuid, time, text, thread, level, category, clear }`（流式、量大，注意节流） |
-  | `instance-change` | `{ type }` |
+  | `launch-state` | `StateEvent`，`{ uuid, state, progress }` |
+  | `launch-error` | `ErrorEvent`，`{ uuid, message }` |
+  | `game-exit` | `ExitEvent`，`{ uuid, code }` |
+  | `game-log` | `LogEvent`，`{ uuid, lines, clear }`（成批下发、量大，注意节流） |
+  | `instance-change` | `InstanceChangeEvent`，`{ type }` |
 
 ### 四个容易踩的坑
 
@@ -123,8 +128,7 @@ mml-ui-demo/
 ├── index.html          # 入口页模板；构建后 dist/index.html 就在根目录
 ├── src/
 │   ├── App.vue         # 示例页面（服务器内容集中在顶部 SERVER / EVENTS）
-│   ├── bridge.ts       # window.mml 的使用封装：宿主探测 / 带超时 invoke / 类型化订阅
-│   ├── mml.d.ts        # window.mml 的类型提示（本工程自己维护，不从启动器仓库引）
+│   ├── bridge.ts       # window.mml 的使用封装：宿主探测 / 带超时 invoke / 类型化命令与订阅
 │   ├── main.ts
 │   ├── style.css       # 全局样式与两套配色变量
 │   └── vite-env.d.ts

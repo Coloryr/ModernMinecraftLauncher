@@ -15,9 +15,6 @@ export default tseslint.config(
     ignores: [
       "dist/**",
       "node_modules/**",
-      // 两个生成文件（由 mml-gui/src-tauri/build.rs 经 ipc-gen 产出），手改无效、lint 无意义
-      "src/lib/bindings.ts",
-      "src/lib/listens.ts",
     ],
   },
   js.configs.recommended,

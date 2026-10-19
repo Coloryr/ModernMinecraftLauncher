@@ -20,7 +20,7 @@ use crate::err_keys;
 /// 只表示成功 / 失败：目标不存在返回 `err.fileNotFound`，
 /// 类别未知 / 名字不是纯文件名返回对应错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_open_folder(
     uuid: String,
     kind: String,

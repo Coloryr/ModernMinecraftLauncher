@@ -95,7 +95,7 @@ pub(super) struct ExportProgressGui {
 ///
 /// 任务已开始返回 `Ok(())`；已有导出在跑、uuid 非法、格式或文件名为空返回错误文案
 #[gui_macros::ipc_group("export")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Result<(), String> {
     if EXPORT_RUNNING.swap(true, Ordering::SeqCst) {
         return Err(err_keys::EXPORT_RUNNING.to_string());

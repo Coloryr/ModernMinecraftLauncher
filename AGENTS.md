@@ -44,7 +44,7 @@
     `CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 npm run tauri build`。
     代价是它与正式发布共用 target 目录，来回切会重编末尾那几个单元。
 - Rust workspace 在**仓库根目录**（根 `Cargo.toml` 收编 `mml-core/` 全部子 crate 与
-  `mml-gui/src-tauri` + `ipc-gen` / `macros`；`workspace.dependencies` 与 `[profile.*]`
+  `mml-gui/src-tauri` + `ipc-gen` / `ipc-gen/macros`；`workspace.dependencies` 与 `[profile.*]`
   也统一在根清单维护）。target 目录在根目录 `target\`（首次编译较慢）。
 
 ## 4. IPC 约定
@@ -52,20 +52,27 @@
 - 命令名 = 函数名 = **`窗口名_方法名`**，例如 `main_get_instances`、`account_add_account`、
   `window_open_window`、`add_list_dir`。
 - **命令与 DTO 的唯一来源是 Rust 源码**，全部由生成器产出。前端缺命令 / 缺字段时，
-  先在 Rust 侧补 `#[tauri::command]` 或改 DTO 结构，再跑生成；**不要**在 `bindings.ts`
+  先在 Rust 侧补 `#[gui_macros::command]` 或改 DTO 结构，再跑生成；**不要**在 `bindings.ts`
   或前端另写一套类型（下次生成会被覆盖，且与 Rust 侧脱节）。
   `src/lib/api.ts` 只是手写的便捷包装层，其中的类型一律 `import` 自 `./bindings`。
 - 事件名由 `emit_xxx_yyy` 推导：去掉 `emit_` 前缀、`_` 换成 `-`，例如
   `emit_account_change` → `account-change`。
-- 前端接口由 `mml-gui/src-tauri/build.rs`（逻辑在 `ipc-gen` 包）扫描 Rust 源码自动生成（**勿手改**）：
-  - `mml-vue/src/lib/bindings.ts`：命令的类型化包装（`commands.xxx(...)`）+ 跨 IPC 类型的
-    TS 定义。命令签名、DTO 结构、`#[serde(rename_all)]` 都是从 Rust 源码解析出来的
-  - `mml-vue/src/lib/listens.ts`：事件名常量
-  新增命令加 `#[tauri::command]`，新增事件加 `#[gui_macros::emit]`；单独重新生成可跑
+- 前端契约由 `mml-gui/src-tauri/build.rs`（逻辑在仓库根 `ipc-gen/`）扫描 Rust 源码自动生成，
+  产物在独立的 npm 包 `mml-ipc/src/`（**勿手改**）：
+  - `types/`：DTO，按来源 .rs 一个 .ts，`types/index.ts` 是 barrel；跨文件引用自动补 `import type`
+  - `bindings.ts`：`createCommands(invoke)` 命令包装，再导出 `types/`
+  - `listens.ts`：事件名常量、`EventPayloads` payload 映射与 `createEvents(on)` 订阅函数
+  命令签名、DTO 结构、`#[serde(rename_all)]` 与事件 payload 都从 Rust 源码解析（事件 payload
+  取的是发射函数体里 `emit` / `emit_to` 的实参，不是签名参数）。
+  自定义主页面的 `window.mml` 契约（`MmlApi`、可订阅事件与 payload 映射，与 mml-vue 的
+  `customHomeBridge.ts` 白名单对应）是手写的 `mml-ipc/src/home.ts`，不参与扫描。
+  `mml-vue/src/lib/bindings.ts` / `listens.ts` 只是兼容层：前者把 Tauri 的 invoke 绑到
+  `createCommands`，后者再导出事件名，既有导入路径不变；`mml-ui-demo` 直接引用 `mml-ipc`。
+  新增命令加 `#[gui_macros::command]`，新增事件加 `#[gui_macros::emit]`；单独重新生成可跑
   `cd mml-gui && npm run gen`（或任意 `cargo check`）。
-- 扫描与生成逻辑在 `mml-gui/ipc-gen/`（包名 `gui-ipc-gen`，有单测）：
-  `src-tauri/build.rs` 只是调用方（算路径、传 `GenConfig`、写文件、打 cargo 指令）；
-  改生成规则改那个包，跑 `cd mml-gui/ipc-gen && cargo test` 验证。
+- 扫描与生成逻辑在 `ipc-gen/`（包名 `gui-ipc-gen`，有单测），过程宏在 `ipc-gen/macros/`
+  （包名 `gui-macros`）：`src-tauri/build.rs` 只是调用方（算路径、传 `GenConfig`、写文件、
+  打 cargo 指令）；改生成规则改那个包，跑 `cd ipc-gen && cargo test` 验证。
 - 命令在 `bindings.ts` 里按**来源 .rs 模块**分组（组键取模块最后一段，如
   `windows::account` → `commands.account`），组内剥掉命令名的公共前段
   （`add_modpack_search` → `commands.addModpack.search`）。同一个名字的命令**不能定义两次**，
@@ -81,10 +88,12 @@
   前端 `vue-tsc` 报 TS1117（对象字面量重名属性）。正确写法是 `ipc_group("add_modpack")`
   （实测踩过：`java_download` 拆分后 `npm run build` 才暴露）。
   判据：拆完 `npm run build` 必须过，`bindings.ts` 里同一组只能出现一个对象。
-- 扫描是**裸文本**：注释里写出命令属性 / 事件属性的字面量，会让紧随其后的函数被误判成命令
-  （实测踩过：`generate_handler!` 里出现不存在的 `__cmd__xxx`，编译失败）。别在注释里写它们。
-- **命令的可见性不能降**：`#[tauri::command]` 生成的 `__cmd__xxx` / `__tauri_command_name_xxx`
-  会继承函数可见性，把命令写成 `pub(super)` 后 `generate_handler!` 从 crate 根引用不到
+- 扫描是**裸文本**：注释里写出 `#[gui_macros::command]` / `#[gui_macros::emit]` 的字面量，
+  会让紧随其后的函数被误判成命令（实测踩过：`generate_handler!` 里出现不存在的
+  `__cmd__xxx`，编译失败）。别在注释里写它们。
+- **命令的可见性不能降**：`#[gui_macros::command]` 展开成 `#[tauri::command]`，生成的
+  `__cmd__xxx` / `__tauri_command_name_xxx` 会继承函数可见性，把命令写成 `pub(super)` 后
+  `generate_handler!` 从 crate 根引用不到
   （E0603 "macro import is private"）。搬命令时统一 `pub(super) fn` 的脚本要把它排除掉。
 - **集成测试按原路径引用命令**：`src-tauri/tests/*.rs` 里 `use mml_gui_lib::windows::<窗口>::<命令>`
   的地方，命令拆进子模块后要在 `mod.rs` 再导出（`pub use self::<子模块>::<命令>;`），
@@ -102,6 +111,8 @@
 | `mml-core/` | 启动器内核（多 crate，隶属根目录 workspace） |
 | `mml-gui/` | Tauri 桌面壳；`src-tauri/src/windows/<窗口>.rs` 放该窗口的规格 / 模型 / IPC |
 | `mml-vue/` | 前端（Vue3 + Vite）；窗口在 `src/windows/<kind>/`，通用组件在 `src/components/` |
+| `ipc-gen/` | IPC 代码生成器（`gui-ipc-gen`）+ 过程宏（`ipc-gen/macros`，`gui-macros`） |
+| `mml-ipc/` | npm 契约包：按来源拆分的跨 IPC 类型、命令包装、事件订阅函数与自定义主页 `window.mml` 契约（`src/home.ts` 手写） |
 
 ### 5.1 窗口模块的拆分约定
 
@@ -139,7 +150,11 @@ windows/<窗口>/mod.rs 里：
 - `dtos/` 也可以按用途目录化，类型在 `mod.rs` 用 `pub use` 再导出，既有路径就不会变
   （注意 §4 里"生成物顺序会变"那条）。
 
-## 6. 临时文件
+## 6. 临时文件与缓存目录
+
+> 原 §11「缓存目录」已并入本节；本节之后各章的编号保持不变，引用仍写 §12.1 / §13 等。
+
+### 6.1 临时文件
 
 - 中间产物（下载、解包、日志、试验脚本）统一放根目录 `target/temp`（`target\` 已被 git
   忽略），不要写进版本控制；也不要放系统盘 `%TEMP%`（会被清理）。
@@ -156,7 +171,16 @@ windows/<窗口>/mod.rs 里：
     测试里不要各自写一份启动代码：`mml_log::STREAM` 是 `OnceLock`，第二次 `start()` 会
     **panic**。同一 crate 内共用一个 boot（见 `mml-game/src/test_support.rs`）。
 
-## 6.1 TASK.md（临时任务文件）
+### 6.2 缓存目录
+
+- 渲染测试的运行缓存（下载的客户端 jar 等）在 `mml-core/mml-tex-draw/tests/out/run`
+  （`render_all.rs` 的 `run_dir`，跨进程复用）。
+- 工作缓存（反编译 jar、提取脚本等）放根目录 `target/temp`，与其他临时文件同源，
+  不要另建目录，也不要放系统盘。
+- 判据：**`target/temp` 放这一轮用完就能删的；`tests/out/run` 放删了要重下一遍、
+  跨进程复用的。** 拿不准时按前者处理。
+
+### 6.3 TASK.md（临时任务文件）
 
 - **`TASK.md` 是临时的任务清单，不是仓库文档**：一轮任务做完就**删掉**，不要把它当交接文档
   长期维护，也不要往里写"已完成"记录。
@@ -208,25 +232,18 @@ windows/<窗口>/mod.rs 里：
 - **查找代码等探索类工作可以用子代理**（Explore 等，并行摸底、汇总结论）。
 - **写计划不能使用代理**：方案设计、计划文件必须由主会话自己完成，不派 Plan 代理。
 
-## 11. 缓存目录
-
-- 渲染测试的运行缓存（下载的客户端 jar 等）在 `mml-core/mml-tex-draw/tests/out/run`
-  （`render_all.rs` 的 `run_dir`，跨进程复用）。
-- Claude 的工作缓存（反编译 jar、提取脚本等）放根目录 `target/temp`（与 §6 同源，
-  不再放 H 盘）。
-
 ## 12. 前后端分工（默认只做前端，必要就一起改完）
 
 - **默认只做前端**：界面与接线任务只改 `mml-vue/`（UI、状态、调用 `commands.xxx` 的接线）。
   "默认"是省事的起点，不是禁令——**功能确实需要后端时，就把后端一起改完，不要只留骨架**。
 - **判据是"前端拿不到的能力"**：重启进程、直接读写磁盘文件、访问注册表、拉起外部程序、
-  拿本机信息之类，不写后端就根本跑不通。这种情况把 `#[tauri::command]` 连同**函数体**
+  拿本机信息之类，不写后端就根本跑不通。这种情况把 `#[gui_macros::command]` 连同**函数体**
   一起实现，改完跑 `cd mml-gui && npm run gen`（或任意 `cargo check`）重新生成
   `bindings.ts`。
   **不要留 `todo!()` / 空实现**：那会让用户点下去的那一刻 panic、或者毫无反应，
   比不改还糟（`window_restart_app` 就是这种"必须实现"的例子）。
 - **什么时候才只写骨架**：用户明确说了"只加接口 / 函数体我自己写"的时候——补
-  `#[tauri::command]` 声明与 DTO 定义（含注册进 `generate_handler!`），函数体留空，
+  `#[gui_macros::command]` 声明与 DTO 定义（含注册进 `generate_handler!`），函数体留空，
   跑生成让前端接线类型对得上。
 - **用户添加 DTO 后要同步前端**：用户在 Rust 侧添加 / 修改 DTO 模型时，读取对应源码，
   跑 `cd mml-gui && npm run gen` 重新生成 `bindings.ts`，并在前端接上新结构。
@@ -350,7 +367,7 @@ pub(super) fn parse_motd_addr(address: &str) -> MotdAddr { /* ... */ }
 
 ### 14.3 三条硬约束（写错会出事）
 
-- **别在注释里写出 `#[tauri::command]` / `#[gui_macros::emit]` 的字面量**（`//`、`///`、
+- **别在注释里写出 `#[gui_macros::command]` / `#[gui_macros::emit]` 的字面量**（`//`、`///`、
   `/* */` 都不行）：生成器是裸文本 `find(marker)`，会把注释后面第一个函数误判成命令（§4）。
 - **DTO 的 `///` 与 `#[serde(...)]` 之间别插普通 `//`**：生成器回溯属性块只认 `#[` / `///`
   开头的行，插一行 `//` 会让 `rename_all` 解析不到，`bindings.ts` 字段名静默退回 snake_case。
@@ -426,4 +443,116 @@ i18n 表，**不写死中文或英文字面量**。三张表各管一摊，改�
   它们周围那句人话照样 i18n。
 - 前端**不要**在模板里写中文（`<button>启动</button>`），tooltip / 占位符 / aria-label 同样走 `t()`。
 
+## 16. 前端样式统一（硬性）
 
+**一套外观只有一个来源。** 窗口的样式文件只写"这一屏怎么排"，不写"控件长什么样"。
+颜色、控件尺寸、圆角、字号全部取变量与 `styles/`，不要在窗口里就地发明一套。
+
+### 16.1 四个来源，各管一摊
+
+| 位置 | 管什么 |
+| --- | --- |
+| `styles/themes.css` | 颜色 / 阴影 / 遮罩 / 跨窗口共用的固定尺寸（`--titlebar-h`、`--rail-w`） |
+| `styles/controls.css` | 控件外观唯一来源：`--ctl-h` / `--ctl-radius` / `--ctl-font`，以及 `.field-*` / `.ui-btn` / `.ui-btn-icon` / `.page-btn` / `.empty-tip` |
+| `styles/` 其余（base / modal / titlebar / tip / scrollbar / skeleton / decoration） | 全局行为：重置、过渡、弹窗、标题栏、提示、滚动条、骨架 |
+| `windows/<窗口>/<窗口>.css`、组件 `<style scoped>` | 只放这一屏的排版与独有装饰 |
+
+- 新加全局样式写进对应文件，并在 `styles/index.css` 注册；不要"在某个窗口里定义，指望别的窗口也能用到"。
+- 跨窗口共用的尺寸（标题栏高度、分类栏宽度）必须提成 `themes.css` 的变量：两个窗口并排看，
+  数字不一致就是 bug。
+- 判断新样式该放哪：**换个窗口还用得上吗？** 用得上 → `styles/`；只属于这一屏 → 该窗口的 css。
+
+### 16.2 颜色只用变量
+
+- 除 `themes.css` 外**不写 `#rrggbb` / `rgb()` / `hsl()` 字面量**，一律 `var(--xxx)`。
+- 主题变量要**成对加**：Dark 与 Light 两块都写，并各补一行用途说明。只加一块，
+  另一套主题下就会静默取不到值。
+- 半透明表面用 `color-mix(in srgb, var(--bg) 85%, transparent)`，或现成的 `--accent-soft` /
+  `--overlay` / `--bg-modal` / `--bg-modal-raised`，不要自己调 rgba。
+- 状态色只有 `--green` / `--red` / `--yellow` 与 `--accent*` 几组；要新色先加进主题，
+  不要在窗口里写一个"差不多"的颜色。
+
+### 16.3 字号 / 圆角 / 间距只有这几档
+
+现状是字号出现 20 种取值、圆角 15 种。**新代码只用下表的值**；改到某个文件时，
+顺手把该文件里的零散值归并到档位上。
+
+字号：
+
+| 档 | 值 | 用途 |
+| --- | --- | --- |
+| caption | 10.5px | 角标、徽章 |
+| meta | 11.5px | 次要说明、表头、时间 |
+| body | 12.5px，即 `--ctl-font` | 正文、控件、列表项 |
+| title | 13px | 卡片名、小标题 |
+| heading | 15px | 页面标题、`lg` 主操作按钮 |
+| display | 18px | 只给空状态、首屏引导 |
+
+圆角：
+
+| 值 | 用途 |
+| --- | --- |
+| 8px，即 `--ctl-radius` | 控件：输入框、下拉、按钮 |
+| 10px | 卡片、列表项 |
+| 12px | 面板、弹窗、大容器 |
+| 999px | 胶囊：标签、开关滑块 |
+| 50% | 圆形：头像、状态点 |
+
+间距：2px 网格，只用 2 / 4 / 6 / 8 / 10 / 12 / 14 / 16 / 20 / 24 / 32。
+表格行那种密集处可以用 `4px 8px` 这样的组合，但每个数仍取上面的档。
+
+### 16.4 一个视觉角色只定义一次
+
+- 同一外观出现第二处就抽出来：控件类进 `controls.css`，整块界面进 `styles/parts/<域>.css`。
+  现状里 `.progress-track` / `.progress-fill` 有 5 份、`pack-*` 一整套在两个窗口各写一遍、
+  `.icon-btn` 有 3 份 —— 这类重复要收敛，**不要继续复制**。
+- 进度条统一 `.progress-track` + `.progress-fill`，**尺寸只允许两档**：8px（卡片、弹窗内）与
+  6px（表格行内等密集处）。要第三档先改本节。
+- 抽出来的类在定义处写一行用途与尺寸口径，别再让调用方自己猜。
+
+### 16.5 按钮与表单只用既有控件
+
+- 按钮 / 开关 / 分段 / 步进器 / 弹窗 / 折叠 / 搜索框：`BaseButton`、`BaseSwitch`、
+  `SegmentedTabs`、`NumberStepper`、`BaseModal`、`CollapsePanel`、`SearchBox`；
+  裸标签写 `.ui-btn` + `.v-*` + `.s-*`。
+- 表单行：`.field-label` / `.field-input` / `.field-select` / `.field-hint` /
+  `.field-row-2` / `.path-row` / `.is-invalid`。
+- **存量类名不许新增**：`.mini-btn`、`.icon-btn`、`.refresh-btn` 那一批已列在
+  `controls.css` 的头注释里。改到该文件时顺手换成上面的写法；某个类的最后一个使用点被换掉时，
+  把它的定义与清单条目一起删。
+- 悬停反馈只有两种：`.ui-btn` 的底色变化、存量类的描边变强调色。不要发明第三种。
+
+### 16.6 层级与动效
+
+- `z-index` 只用下表档位，不许就地写数字；出现新角色先加进这张表再写代码：
+
+| 值 | 用途 |
+| --- | --- |
+| -1 | 背景图层 |
+| 1–10 | 窗口内的粘性元素：表头、工具条 |
+| 20 / 40 | 窗口内浮层：下拉、右键菜单、浮动卡 |
+| 100 | 弹窗内的浮层 |
+| 200 | 模态遮罩与弹窗本体 |
+| 300 | 全局提示、tooltip |
+| 999 以上 | 只给必须压住一切的极少数，如启动画面，并在代码里写一行说明为什么 |
+
+- 过渡时长三档：`0.12s`（颜色、边框这类小反馈）、`0.15s`（背景、位移、缩放）、
+  `0.18s`（浮层展开）；宽度 / 高度这类形变用 `0.3s`。不要随手写 0.2s / 0.25s。
+- 关闭"界面动画"由 `base.css` 的 `html.no-anim *` 全局接管，组件里不要再写判断或自建开关。
+
+### 16.7 命名与作用域
+
+- 类名小写 kebab-case，按**角色**命名（`.pack-card`），不用 `.left`、`.red`、`.box2`。
+- 状态类 `is-*`（`.is-invalid`、`.is-active`），修饰类 `v-*`（`.v-primary`），
+  尺寸类 `s-*`（`.s-sm`）。
+- 组件样式默认 `<style scoped>`；要穿透子组件用 `:deep()`，并在旁边写一行说明为什么必须穿透。
+- 组件自己的样式跟着组件走，不要为了"好找"塞进窗口 css；窗口 css 只放多个组件共用的排版。
+- 内联 `:style` 只用于运行时算出来的值（进度宽度、拖拽位移）；静态外观一律进样式表。
+- `!important` 只允许出现在 `styles/` 的全局覆盖里（主题、`no-anim` 这类），组件里不许用。
+
+### 16.8 检查
+
+- `cd mml-vue && npm run lint` 必须 **0 error**。`vue/no-mutating-props` 是已知的共享设置对象
+  模式，不新增即可；其它新增 warning 不要放着不管。
+- 样式没有自动检查，靠本节加 review：改完对一眼该文件的字号 / 圆角 / 间距 / 颜色是否都在档位上，
+  有没有把同一套外观又抄了一遍。

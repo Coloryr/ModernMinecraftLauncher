@@ -7,7 +7,7 @@
 // 每条用例的期望文本都由测试自己按同一串编辑独立拼出来，不借 applyHunks —— 那样等于自己验自己。
 // 生成样本文件、查差异合理性那套流程在 textDiffSamples.test.mjs。
 import test from "node:test";
-import { applyHunks, diffLines, joinLines, splitLines } from "../src/lib/textDiff.ts";
+import { applyHunks, diffLines, joinLines } from "../src/lib/textDiff.ts";
 import { assertSameText, bigLines } from "./support.mjs";
 
 /**

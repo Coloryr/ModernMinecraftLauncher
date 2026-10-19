@@ -16,7 +16,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "~2.7.1", features = [] }
-gui-ipc-gen = { path = "../ipc-gen" }
+gui-ipc-gen = { path = "../../ipc-gen" }
 
 [dependencies]
 tauri = { version = "~2.12.2", features = [] }
@@ -24,7 +24,7 @@ base64.workspace = true
 tauri-plugin-dialog.workspace = true
 tauri-plugin-decoration = { path = "../../target/vendor/tauri-plugin-decoration" }
 async-trait.workspace = true
-gui-macros = { path = "../macros" }
+gui-macros = { path = "../../ipc-gen/macros" }
 serde.workspace = true
 serde_json.workspace = true
 font-kit.workspace = true

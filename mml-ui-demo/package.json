@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "mml-ipc": "file:../mml-ipc",
     "vue": "^3.5.41"
   },
   "devDependencies": {

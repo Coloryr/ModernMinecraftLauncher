@@ -28,7 +28,7 @@ use super::item::{mod_note_key, sha1_of, find_mod, mod_rename_dto};
 /// **改名后的新身份**，前端拿它就地更新那一行，不重扫整个 mods 目录；
 /// 找不到模组返回 `err.fileNotFound`，其余是改名失败的错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_mod_enable(uuid: String, mod_uuid: String) -> Result<ModRenameDto, String> {
     let instance = parse_instance(&uuid)?;
     let obj = find_mod(instance.clone(), &mod_uuid).await?;
@@ -49,7 +49,7 @@ pub async fn resource_mod_enable(uuid: String, mod_uuid: String) -> Result<ModRe
 ///
 /// 改名后的新身份，同上；已禁用或文件不存在时返回错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_mod_disable(uuid: String, mod_uuid: String) -> Result<ModRenameDto, String> {
     let instance = parse_instance(&uuid)?;
     let obj = find_mod(instance.clone(), &mod_uuid).await?;
@@ -70,7 +70,7 @@ pub async fn resource_mod_disable(uuid: String, mod_uuid: String) -> Result<ModR
 ///
 /// 只表示成功 / 失败：找不到模组返回 `err.fileNotFound`，其余是删除失败的错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_delete_mod(uuid: String, mod_uuid: String) -> Result<(), String> {
     let instance = parse_instance(&uuid)?;
     let obj = find_mod(instance, &mod_uuid).await?;
@@ -94,7 +94,7 @@ pub async fn resource_delete_mod(uuid: String, mod_uuid: String) -> Result<(), S
 /// 逐条问题，见 [`DepProblemDto`]；没有问题时空数组；
 /// 实例不存在或模组列表还没加载时返回错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_mods_dep_test(uuid: String) -> Result<Vec<DepProblemDto>, String> {
     let model = window_model(&uuid)?;
     let instance = parse_instance(&uuid)?;
@@ -167,7 +167,7 @@ pub(super) fn mod_duplicate_dto(item: ModDuplicate) -> ModDuplicateDto {
 ///
 /// 只表示成功 / 失败：模组不在列表里、下载源取值不认识或写盘失败返回错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_mod_online_set(
     uuid: String,
     mod_uuid: String,

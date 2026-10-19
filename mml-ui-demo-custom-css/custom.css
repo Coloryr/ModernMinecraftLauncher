@@ -1,0 +1,124 @@
+/* ============================================================
+ * M²L 自定义 CSS 示例
+ *
+ * 注入后对所有窗口生效，所以这里既改配色变量，也改具体控件：
+ * - 变量：主题表里定义过的那批，改完所有窗口一起变；
+ * - 选择器：只挑某一类控件（按钮 / 输入框 / 标题栏），局部修改；
+ * - !important：Vue 的 scoped 样式带 [data-v-xxx]，优先级比单类选择器高，
+ *   示例里用 !important 保证预览明显；实际使用可以改用更具体的选择器。
+ *
+ * 预览：
+ *   cd mml-ui-demo-custom-css && npm run dev
+ *   http://localhost:1420/?window=main&customCss=http://127.0.0.1:1521/custom.css
+ * ============================================================ */
+
+/* ---------- 1. 配色变量：暗色 / 亮色各一套 ---------- */
+html[data-theme="Dark"] {
+  --bg: #17121f;
+  --bg-side: #1e1729;
+  --bg-card: #261d33;
+  --bg-hover: #332545;
+  --bg-raised: #3b2b4f;
+  --border: #3d2c52;
+  --text: #f5edff;
+  --text-dim: #b7a6cd;
+
+  --accent: #e879f9;
+  --accent-hover: #d946ef;
+  --accent-grad: linear-gradient(120deg, #d946ef, #f472b6);
+  --accent-soft: rgba(232, 121, 249, 0.16);
+  --accent-border: rgba(232, 121, 249, 0.42);
+
+  --shadow-md: 0 6px 20px rgba(10, 4, 18, 0.5);
+  --shadow-lg: 0 20px 56px rgba(10, 4, 18, 0.62);
+}
+
+html[data-theme="Light"] {
+  --bg: #faf5ff;
+  --bg-side: #f3e8ff;
+  --bg-card: #ffffff;
+  --bg-hover: #efe0ff;
+  --bg-raised: #ffffff;
+  --border: #ddc9f2;
+  --text: #2a1b3d;
+  --text-dim: #74608c;
+
+  --accent: #c026d3;
+  --accent-hover: #a21caf;
+  --accent-grad: linear-gradient(120deg, #a21caf, #db2777);
+  --accent-soft: rgba(192, 38, 211, 0.12);
+  --accent-border: rgba(192, 38, 211, 0.35);
+}
+
+/* ---------- 2. 整个窗口：背景与标题栏 ---------- */
+.window-frame {
+  background:
+    radial-gradient(1000px 480px at 12% -10%, var(--accent-soft), transparent 70%),
+    var(--bg) !important;
+}
+
+.frame-head {
+  background: color-mix(in srgb, var(--bg-side) 78%, transparent) !important;
+  backdrop-filter: blur(14px);
+  border-bottom-color: color-mix(in srgb, var(--accent) 26%, var(--border)) !important;
+}
+
+.frame-head h1 {
+  letter-spacing: 0.06em;
+  font-weight: 650;
+}
+
+/* ---------- 3. 只改按钮：胶囊形 + 悬停高光 ---------- */
+.ui-btn {
+  border-radius: 999px !important;
+  transition: transform 0.15s ease, filter 0.15s ease !important;
+}
+
+.ui-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+/* 强调按钮：换成示例的紫色渐变（不动其它按钮） */
+.ui-btn.v-accent {
+  background: var(--accent-grad) !important;
+  border-color: transparent !important;
+}
+
+/* ---------- 4. 输入框 / 下拉：更圆的角 ---------- */
+.field-input,
+.field-select {
+  border-radius: 12px !important;
+}
+
+.field-input:focus,
+.field-select:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-soft) !important;
+}
+
+/* ---------- 5. 主窗口侧栏：只动左侧这一条 ---------- */
+.sidebar-slot {
+  background: color-mix(in srgb, var(--bg-side) 88%, transparent) !important;
+}
+
+.sidebar-slot .side-row {
+  border-radius: 10px;
+}
+
+.sidebar-slot .side-row:hover {
+  background: var(--bg-hover) !important;
+}
+
+/* ---------- 6. 选择器示例：只改标题栏里文字后的装饰 ---------- */
+/* 想验证“选择器能局部改控件”时看这里：只在窗口标题后加一个小圆点，别处不受影响 */
+.frame-head h1::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+}

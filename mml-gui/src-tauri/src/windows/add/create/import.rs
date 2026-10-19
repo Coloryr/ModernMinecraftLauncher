@@ -30,7 +30,7 @@ use super::prepare::{PreparedTask, prepare, is_modpack, pack_file_stem};
 ///
 /// 新实例的 uuid；模型缺失或导入失败返回 `Err`
 #[gui_macros::ipc_group("add")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_import_folder(
     window: WebviewWindow,
     app: AppHandle,
@@ -82,7 +82,7 @@ pub async fn add_import_folder(
 ///
 /// 新实例的 uuid 字符串；模型缺失或安装失败返回 `Err`
 #[gui_macros::ipc_group("add")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_import_archive(
     window: WebviewWindow,
     app: AppHandle,
@@ -171,7 +171,7 @@ pub async fn add_import_archive(
 ///
 /// 新实例的 uuid 字符串；模型缺失或安装失败返回 `Err`
 #[gui_macros::ipc_group("add")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_import_url(
     window: WebviewWindow,
     app: AppHandle,
@@ -224,7 +224,7 @@ pub async fn add_import_url(
 ///
 /// 新实例的 uuid；模型缺失或创建失败返回 `Err`
 #[gui_macros::ipc_group("add")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_create_new(
     window: WebviewWindow,
     app: AppHandle,

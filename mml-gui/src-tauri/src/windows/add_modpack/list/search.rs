@@ -33,7 +33,7 @@ use super::installed::{installed_modpack_pids, running_pids};
 ///
 /// 该页项目列表与总数；本发被新一发顶掉时返回 `err.cancelled`，下载源或排序非法返回 `Err`
 #[gui_macros::ipc_group("add_modpack")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_modpack_list(
     window: WebviewWindow,
     source: String,

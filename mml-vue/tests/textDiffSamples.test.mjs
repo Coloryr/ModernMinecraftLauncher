@@ -13,7 +13,7 @@
 // 这几份都是每次跑用例时现生成的，`.gitignore` 里已排除，不入库。
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applyHunks, diffLines, joinLines, splitLines } from "../src/lib/textDiff.ts";
+import { applyHunks, diffLines, joinLines } from "../src/lib/textDiff.ts";
 import { applyOps, assertSameText, edit, renderDiff, writeSample } from "./support.mjs";
 
 /** 每种格式生成多少行 */

@@ -18,6 +18,7 @@
     "@vue-flow/core": "^1.48.2",
     "dompurify": "^3.4.15",
     "marked": "^18.0.13",
+    "mml-ipc": "file:../mml-ipc",
     "monaco-editor": "^0.56.0",
     "skinview3d": "^3.4.2",
     "vue": "^3.5.41"

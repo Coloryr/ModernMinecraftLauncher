@@ -27,7 +27,7 @@ pub(crate) mod list;
 /// # 返回值
 ///
 /// 下载源线串；没选过时是空串，由界面落回列表第一个
-#[tauri::command]
+#[gui_macros::command]
 pub fn add_modpack_last_source() -> String {
     crate::gui_config::get().resource_window.add_modpack_source
 }
@@ -35,7 +35,7 @@ pub fn add_modpack_last_source() -> String {
 /// 记住这次选的下载源，落 `gui_config.json`
 ///
 /// - `source`: 下载源线串，来自列表接口
-#[tauri::command]
+#[gui_macros::command]
 pub fn add_modpack_set_last_source(source: String) {
     let mut config = crate::gui_config::get();
     if config.resource_window.add_modpack_source == source {

@@ -22,7 +22,7 @@
 - 存档云同步(ColorMC)
 - 服务器列表导入导出
 - 映射大厅 / 联机
-- 客户端导出
+- 客户端导出(服务器模式包)
 - 服务器实例生成
 - 启动器自更新
 - 管理员启动
@@ -36,6 +36,8 @@
 
 - **内核**：Rust workspace（`mml-core/` 本体 + 18 个子 crate，edition 2024）
 - **界面**：Tauri 2 桌面壳（`mml-gui/`）+ Vue 3 / Vite 前端（`mml-vue/`）
+- **IPC**：Rust 源码是命令与 DTO 的唯一来源，`ipc-gen` 生成独立的 npm 契约包 `mml-ipc`，
+  启动器前端与自定义主页面共用
 - **渲染**：wgpu（方块 / 物品图标、皮肤与披风 2D / 3D）+ glow（皮肤模型预览）
 
 ## 功能
@@ -51,23 +53,53 @@
 | 下载 | 多线程、断点续传、哈希校验，带独立的下载管理窗口 |
 | 渲染 | 从客户端 jar 离线渲染方块 / 物品图标；皮肤、披风、头像的 2D / 3D 绘制 |
 | 迁移 | 从 ColorMC / HMCL / MMC / 官方启动器导入数据 |
-| 界面 | 多窗口与单窗口两种模式，暗色 / 亮色 / 跟随系统，中英双语，可导入自定义主页面 |
+| 界面 | 多窗口与单窗口两种模式，暗色 / 亮色 / 跟随系统，中英双语；可导入自定义主页面、注入自定义 CSS，或整页重写主窗口 |
 
 ## 目录结构
 
 | 目录 | 职责 |
 | --- | --- |
 | `mml-core/` | 启动器内核，多 crate：游戏启动、版本管理、Mod 加载器、整合包、下载、认证、Java 管理、网络 API（Mojang / Modrinth / CurseForge / Fabric 等）、皮肤与贴图渲染、NBT 解析等 |
-| `mml-gui/` | Tauri 桌面壳；窗口规格与 IPC 命令在 `src-tauri/src/windows/`，IPC 类型由 `ipc-gen` 扫描 Rust 源码自动生成 |
+| `mml-gui/` | Tauri 桌面壳；窗口规格与 IPC 命令在 `src-tauri/src/windows/`，命令与 DTO 由 `ipc-gen` 扫描生成到 `mml-ipc` |
 | `mml-vue/` | 前端（Vue3 + Vite）；窗口在 `src/windows/`，通用组件在 `src/components/` |
-| `mml-ui-demo/` | **独立**的 Vue3 + Vite 示例工程：给服主写「自定义主页面」用的样板，`npm run build` 产出可直接导入启动器的 zip（不进 Cargo workspace，也不挂进 `mml-vue` 的构建） |
+| `ipc-gen/` | IPC 契约生成器（`gui-ipc-gen`）与过程宏（`ipc-gen/macros`，`gui-macros`） |
+| `mml-ipc/` | npm 契约包：按来源拆分的跨 IPC 类型、命令包装、事件订阅函数与自定义主页 `window.mml` 契约，`mml-vue` 与 `mml-ui-demo` 共用 |
+| `mml-ui-demo/` | Vue3 + Vite 示例工程：给服主写「自定义主页面」用的样板，引用 `mml-ipc`；`npm run build` 产出可直接导入启动器的 zip（不进 Cargo workspace，也不挂进 `mml-vue` 的构建） |
+| `mml-ui-demo-custom-css/` | 「自定义 CSS」示例：配色变量 + 选择器局部改控件，配一个零依赖静态服务器 |
+| `mml-ui-demo-custom/` | 「整页重写」示例：自绘标题栏 / 侧栏 / 实例列表，整个主窗口由页面接管 |
 | `build/` | 构建脚本（正式发布 / 预发布 / 只跑前端），每个都有 PowerShell 版与 bash 版 |
 
-三个子项目各有 README：[mml-gui](mml-gui/README.md)、[mml-vue](mml-vue/README.md)、[mml-ui-demo](mml-ui-demo/README.md)。
+各子项目各有 README：[mml-gui](mml-gui/README.md)、[mml-vue](mml-vue/README.md)、
+[mml-ui-demo](mml-ui-demo/README.md)、[mml-ui-demo-custom-css](mml-ui-demo-custom-css/README.md)、
+[mml-ui-demo-custom](mml-ui-demo-custom/README.md)、[mml-ipc](mml-ipc/README.md)。
+
+### IPC 契约：Rust 是唯一来源
+
+```text
+mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
+  命令 #[gui_macros::command] ──▶ 扫描 + 生成 ──▶ bindings.ts（createCommands + DTO）
+  事件 #[gui_macros::emit]                        listens.ts（事件名常量）
+                                                       │
+                                       ┌───────────────┴───────────────┐
+                                       ▼                               ▼
+                              mml-vue（Tauri invoke）      mml-ui-demo（window.mml 桥接）
+```
+
+- 新增命令加 `#[gui_macros::command]`（过程宏在 `ipc-gen/macros/`，展开成 Tauri 的命令宏），
+  新增事件加 `#[gui_macros::emit]`；改完跑 `cd mml-gui && npm run gen`（或任意 `cargo check`）。
+- `mml-ipc/src/` 下的 `types/`、`bindings.ts`、`listens.ts` 是生成产物，**不要手改**：DTO 按
+  来源 .rs 拆在 `types/` 下（`types/index.ts` 是 barrel），`bindings.ts` 是 `createCommands(invoke)`
+  命令包装，`listens.ts` 是事件名、payload 类型映射与 `createEvents(on)` 订阅函数。
+  命令与事件都不绑定传输层，调用方自己给 `invoke` / `on`；`mml-vue/src/lib/bindings.ts` 只是
+  绑定 Tauri `invoke` 的兼容层。
+- 自定义主页面的 `window.mml` 契约（`MmlApi`、白名单事件）在 `mml-ipc/src/home.ts`，手写、
+  不参与扫描；`mml-ui-demo` 从这里取类型、事件名与生成的 `onXxx` 函数，不再自建一份。
+- 生成规则、分组方式与常见坑见 [AGENTS.md](AGENTS.md) §4；包内用法见 [mml-ipc/README.md](mml-ipc/README.md)。
 
 ## 开发与构建
 
-依赖：Rust（含 cargo）、Node.js。
+依赖：Rust（含 cargo）、Node.js。`mml-vue/` 与 `mml-ui-demo/` 各自 `npm install`；
+两者通过 `file:../mml-ipc` 链接本地的契约包，不需要单独发布。
 
 | 命令 | 说明 |
 | --- | --- |
@@ -75,7 +107,7 @@
 | `build/dev-frontend.ps1` | 只跑前端（vite，浏览器访问 `http://localhost:1420/?window=<kind>` 预览窗口，无 IPC 数据） |
 | `build/build-release.ps1` | 正式发布构建（fat LTO，含安装包） |
 | `build/build-prerelease.ps1` | 预发布构建（thin LTO，只出 exe，更快） |
-| `cd mml-gui && npm run gen` | 改过 Rust 侧命令 / DTO 后重新生成前端 `bindings.ts` |
+| `cd mml-gui && npm run gen` | 改过 Rust 侧命令 / DTO 后重新生成 `mml-ipc` 契约 |
 | `cd mml-ui-demo && npm run build` | 构建自定义主页面示例并打包成 `mml-ui-demo.zip`（用法见该目录的 README） |
 
 上面三个脚本都在 `build/` 下，各有一份 PowerShell 版（`.ps1`，Windows）与 bash 版

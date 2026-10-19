@@ -32,11 +32,12 @@ http://localhost:1420/?window=settings
 | `src/composables/` | 通用组合式函数（拖拽、多选、文件拖放、事件退订等） |
 | `src/styles/` | 全局样式与主题变量 |
 
-## 两个生成文件：不要手改
+## IPC 契约：来自 mml-ipc
 
-`src/lib/bindings.ts`（命令类型化包装 + 跨 IPC 类型）与 `src/lib/listens.ts`（事件名常量）由
-`mml-gui/src-tauri/build.rs`（逻辑在 `ipc-gen`）扫描 Rust 源码生成。前端缺命令或字段时，
-先在 Rust 侧补 `#[tauri::command]` 或改 DTO，再重新生成：
+跨 IPC 的类型、命令包装与事件名由 `ipc-gen` 扫描 Rust 源码生成，放在独立的 npm 包
+[`mml-ipc`](../mml-ipc)。`src/lib/bindings.ts` 与 `src/lib/listens.ts` 只是兼容层：
+前者把 Tauri 的 `invoke` 绑到 `createCommands`，后者再导出事件名，既有导入路径不变。
+前端缺命令或字段时，先在 Rust 侧补 `#[gui_macros::command]` 或改 DTO，再重新生成：
 
 ```bash
 cd ../mml-gui && npm run gen

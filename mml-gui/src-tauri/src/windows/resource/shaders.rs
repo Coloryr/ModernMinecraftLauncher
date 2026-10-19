@@ -20,7 +20,7 @@ use super::{KIND_SHADERPACKS, block_on_instance, parse_instance, resource_file};
 ///
 /// 光影包列表，`selected` 标记当前启用中的那个；实例不存在或解析失败返回错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_list_shaderpacks(uuid: String) -> Result<Vec<ShaderItemDto>, String> {
     // 读的过程中删实例会被拦住，见 resource::instance_busy
     let _op = super::model::begin_if_open(&uuid);
@@ -68,7 +68,7 @@ pub async fn resource_list_shaderpacks(uuid: String) -> Result<Vec<ShaderItemDto
 ///
 /// 只表示成功 / 失败：文件名非法返回 `err.fileName`，其余是读写 options.txt 的错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_shader_set(uuid: String, file: Option<String>) -> Result<(), String> {
     if let Some(file) = file.as_ref() {
         let path = Path::new(file);
@@ -101,7 +101,7 @@ pub async fn resource_shader_set(uuid: String, file: Option<String>) -> Result<(
 ///
 /// 只表示成功 / 失败：文件名非法返回 `err.fileName`，其余是删除失败的错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_delete_shaderpack(uuid: String, file: String) -> Result<(), String> {
     let instance = parse_instance(&uuid)?;
     let file = resource_file(&instance, KIND_SHADERPACKS, &file)?;

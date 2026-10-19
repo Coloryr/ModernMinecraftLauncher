@@ -37,7 +37,7 @@ use super::query::{ListQuery, parse_query, check_download_now};
 /// 该页项目列表与命中总数；源 / 排序不受支持或实例不存在时返回 `Err`
 #[allow(clippy::too_many_arguments)]
 #[gui_macros::ipc_group("add_resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_resource_list(
     game: String,
     source: String,

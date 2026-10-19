@@ -146,7 +146,7 @@ pub fn set_gui_handel(app: &AppHandle) {
 /// # 返回值
 ///
 /// 方块与物品条目，含名称 / 分类 / 图标地址 / id，顺序即游戏创造栏顺序
-#[tauri::command]
+#[gui_macros::command]
 pub fn block_list(lang: String) -> Vec<BlockItemDto> {
     let lang = if lang == "en_us" {
         Lang::en_us
@@ -197,7 +197,7 @@ pub fn block_list(lang: String) -> Vec<BlockItemDto> {
 /// # 返回值
 ///
 /// 见 [`BlockGroupsDto`]
-#[tauri::command]
+#[gui_macros::command]
 pub fn block_get_groups() -> BlockGroupsDto {
     let obj = crate::block_groups::get();
     BlockGroupsDto {
@@ -221,7 +221,7 @@ pub fn block_get_groups() -> BlockGroupsDto {
 /// 落盘是异步的，见 [`crate::block_groups`]。
 ///
 /// - `data`: 新的完整数据
-#[tauri::command]
+#[gui_macros::command]
 pub fn block_set_groups(data: BlockGroupsDto) {
     crate::block_groups::set(crate::block_groups::BlockGroupsObj {
         order: data.order,
@@ -245,7 +245,7 @@ pub fn block_set_groups(data: BlockGroupsDto) {
 /// # 返回值
 ///
 /// 当前渲染状态快照
-#[tauri::command]
+#[gui_macros::command]
 pub fn block_status() -> BlockStatusDto {
     render_status()
 }
@@ -260,7 +260,7 @@ pub fn block_status() -> BlockStatusDto {
 /// # 返回值
 ///
 /// 成功启动返回 `Ok(true)`；已在渲染中返回 `Ok(false)`，前端据此提示
-#[tauri::command]
+#[gui_macros::command]
 pub async fn block_render_start(app: AppHandle, force: bool) -> Result<bool, String> {
     // 防重入查两处：GUI 的 running 标志 + 内核的 LOADING，后者可能由内核侧自发起一轮、不走 GUI 标志。
     // is_loading 必须先于 swap：它命中就直接返回，若先把 running 置 true 而本轮没有任务复位，标志会卡死
@@ -304,7 +304,7 @@ pub async fn block_render_start(app: AppHandle, force: bool) -> Result<bool, Str
 /// # 返回值
 ///
 /// 确实有渲染在进行、已发出取消时返回 `true`；没有可取消的返回 `false`
-#[tauri::command]
+#[gui_macros::command]
 pub fn block_render_cancel(app: AppHandle) -> bool {
     if !render_running() {
         return false;

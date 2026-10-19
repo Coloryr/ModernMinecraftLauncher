@@ -33,7 +33,7 @@ use super::oauth::get_oauth_profile;
 ///
 /// 皮肤与披风两个列表，离线账户两者都为空；账户不存在返回 `err.accountMissing`
 #[gui_macros::ipc_group("account")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn account_get_textures(
     account_type: String,
     uuid: String,
@@ -209,7 +209,7 @@ pub(super) async fn equip_texture(
 ///
 /// 与 [`equip_texture`] 相同：账户不存在 / 纹理不存在时返回对应错误键
 #[gui_macros::ipc_group("account")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn account_set_active_skin(
     app: AppHandle,
     account_type: String,
@@ -230,7 +230,7 @@ pub async fn account_set_active_skin(
 ///
 /// 与 [`equip_texture`] 相同：账户不存在 / 纹理不存在时返回对应错误键
 #[gui_macros::ipc_group("account")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn account_set_active_cape(
     app: AppHandle,
     account_type: String,
@@ -256,7 +256,7 @@ pub async fn account_set_active_cape(
 /// 型号非法返回 `err.variantInvalid`；文件不是 PNG 返回 `err.notPng`；
 /// 账户不存在返回 `err.accountMissing`；读取文件失败返回 IO 错误信息
 #[gui_macros::ipc_group("account")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn account_upload_skin(
     app: AppHandle,
     account_type: String,
@@ -307,7 +307,7 @@ pub async fn account_upload_skin(
 ///
 /// 账户不存在返回 `err.accountMissing`；服务器地址为空 / 不是 http 开头返回 `err.serverEmpty`
 #[gui_macros::ipc_group("account")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn account_open_skin_site(account_type: String, uuid: String) -> Result<(), String> {
     let auth_type = auth_type_from_str(&account_type);
     if auth_type == AuthType::Offline || auth_type.is_oauth() {

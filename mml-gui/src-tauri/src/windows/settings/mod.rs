@@ -24,7 +24,7 @@ use self::java::java_list;
 /// # 返回值
 ///
 /// 按小写字母序排好的字体族名；系统查询失败时返回空列表
-#[tauri::command]
+#[gui_macros::command]
 pub fn settings_get_system_fonts() -> Vec<String> {
     use font_kit::source::SystemSource;
 
@@ -44,7 +44,7 @@ pub fn settings_get_system_fonts() -> Vec<String> {
 /// # 返回值
 ///
 /// 缓存目录的绝对路径，非 UTF-8 字符按替换符处理
-#[tauri::command]
+#[gui_macros::command]
 pub fn settings_get_cache_path() -> String {
     mml_downloader::get_cache_path()
         .to_string_lossy()
@@ -60,7 +60,7 @@ pub fn settings_get_cache_path() -> String {
 /// # 返回值
 ///
 /// 网络 / 代理、DNS 与游戏文件检查三项当前配置
-#[tauri::command]
+#[gui_macros::command]
 pub fn settings_get_network() -> NetworkSettingDto {
     let config = mml_config::read_config();
     let mut dto = NetworkSettingDto::from(&config.http);
@@ -81,7 +81,7 @@ pub fn settings_get_network() -> NetworkSettingDto {
 /// 这样"卡在加载器列表时改代理"能立刻生效，不用关窗重开。
 ///
 /// - `dto`: 网络 / 代理、DNS 与游戏文件检查三项的新值，整体覆盖
-#[tauri::command]
+#[gui_macros::command]
 pub fn settings_save_network(dto: NetworkSettingDto) {
     // 记一行收到的代理配置，用来判断前端到底有没有把值送进来；代理字段是草稿，点保存才到这里
     mml_log::info(
@@ -113,7 +113,7 @@ pub fn settings_save_network(dto: NetworkSettingDto) {
 /// # 返回值
 ///
 /// 当前 Java 列表，由 `java_list` 现取；以及启动参数与窗口设置
-#[tauri::command]
+#[gui_macros::command]
 pub fn settings_get_launch() -> LaunchSettingDto {
     let config = mml_config::read_config();
     let mut dto = LaunchSettingDto {
@@ -129,7 +129,7 @@ pub fn settings_get_launch() -> LaunchSettingDto {
 ///
 /// - `run`: 启动参数新值
 /// - `window`: 窗口设置新值
-#[tauri::command]
+#[gui_macros::command]
 pub fn settings_save_launch(run: RunArgSettingDto, window: WindowSettingDto) {
     let mut config = mml_config::write_config();
     config.jvm_arg = run.into();
@@ -151,7 +151,7 @@ pub fn settings_save_launch(run: RunArgSettingDto, window: WindowSettingDto) {
 /// # 返回值
 ///
 /// 网络 / 代理、启动参数与窗口设置三项的出厂默认值
-#[tauri::command]
+#[gui_macros::command]
 pub fn settings_get_defaults() -> SettingsDefaultsDto {
     let mut network = NetworkSettingDto::from(&HttpObj::default());
     network.dns = DnsSettingDto::from(&DnsObj::default());

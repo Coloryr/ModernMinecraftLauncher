@@ -29,7 +29,7 @@ use crate::image_manager;
 /// 待用户勾选的前置列表，已剔除本实例已装的项目与指向自身的环；参数非法、
 /// 实例不存在或源不受支持返回 `Err`
 #[gui_macros::ipc_group("add_resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_resource_dependencies(
     game: String,
     source: String,

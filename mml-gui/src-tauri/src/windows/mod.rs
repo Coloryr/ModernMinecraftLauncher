@@ -32,7 +32,7 @@ pub mod stats;
 // 内部子模块：**只放实现细节**，IPC 命令一律留在本文件。
 // `bindings.ts` 的命令分组键取"来源 .rs 模块最后一段"，命令一搬组键就变，前端会断。
 //
-// 注意：`ipc-gen` 是**裸文本搜索**命令属性，见 ipc-gen/src/scan.rs 的 commands_in；
+// 注意：仓库根的 `ipc-gen` 是**裸文本搜索**命令属性，见 ipc-gen/src/scan.rs 的 commands_in；
 // 注释里写出那个属性字面量会让它把**紧随其后的函数**当成命令 —— 别在注释里写它。
 mod effects;
 mod geometry;
@@ -132,7 +132,7 @@ pub(crate) fn instance_snapshot(uuid: &str) -> Result<InstanceSettingObj, String
 ///
 /// 每个已注册窗口一条，含 `kind`、默认宽与默认高；`kind` 是窗口标签去掉 `mml-` 前缀，
 /// 宽高单位是逻辑像素的客户区尺寸
-#[tauri::command]
+#[gui_macros::command]
 pub fn window_get_window_sizes() -> Vec<WindowSizeDto> {
     WINDOWS_INFO
         .values()
@@ -165,7 +165,7 @@ pub fn window_get_window_sizes() -> Vec<WindowSizeDto> {
 /// # 返回值
 ///
 /// 窗口已打开或已聚焦时返回 `Ok(())`；kind 未知、参数不匹配、query 畸形都返回错误文案
-#[tauri::command]
+#[gui_macros::command]
 pub async fn window_open_window(
     app: AppHandle,
     window: WebviewWindow,
@@ -252,7 +252,7 @@ fn kind_parse_check(kind: &str, instance: &Option<String>) -> Result<(), String>
 /// # 返回值
 ///
 /// 关闭请求已发出即返回 `Ok(())`，是否真关由关闭保护决定；kind 未知或窗口不存在返回错误文案
-#[tauri::command]
+#[gui_macros::command]
 pub fn window_close_window(
     app: AppHandle,
     kind: String,
@@ -289,7 +289,7 @@ pub fn window_close_window(
 /// # 返回值
 ///
 /// 导航或建窗成功返回 `Ok(())`；kind 未知、参数不匹配、query 畸形、导航失败都返回错误文案
-#[tauri::command]
+#[gui_macros::command]
 pub async fn window_reopen_window(
     app: AppHandle,
     window: WebviewWindow,
@@ -368,7 +368,7 @@ fn emit_file_drop(app: &AppHandle, label: &str, payload: crate::dtos::FileDropDt
 /// # 返回值
 ///
 /// 规范化的 http(s) 地址；取不到返回空串
-#[tauri::command]
+#[gui_macros::command]
 pub fn window_url_of_text(text: String) -> String {
     let direct = clean_url(&text);
     if !direct.is_empty() {
@@ -395,7 +395,7 @@ pub fn window_url_of_text(text: String) -> String {
 /// # 返回值
 ///
 /// `kind` 取 `folder` / `archive` / `shortcut` / `other`；`shortcut` 时 `url` 为解析出的地址
-#[tauri::command]
+#[gui_macros::command]
 pub fn window_probe_drop(path: String) -> DropPathDto {
     let other = |kind: &str| DropPathDto {
         kind: kind.to_string(),
@@ -697,7 +697,7 @@ mod tests {
 /// # 返回值
 ///
 /// 已交给系统拖动返回 `Ok(())`，失败返回错误文案
-#[tauri::command]
+#[gui_macros::command]
 pub fn window_start_dragging(window: WebviewWindow) -> Result<(), String> {
     window.start_dragging().map_err(|err| err.to_string())
 }
@@ -715,7 +715,7 @@ pub fn window_start_dragging(window: WebviewWindow) -> Result<(), String> {
 /// # 返回值
 ///
 /// 成功返回 `"custom"`，表示自绘装饰已接管；失败返回带原因的 `Err`
-#[tauri::command]
+#[gui_macros::command]
 pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'static str, String> {
     use tauri_plugin_decoration::WebviewWindowExt;
 
@@ -755,7 +755,7 @@ pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'stati
 /// # 返回值
 ///
 /// 成功返回 `Ok(())`，失败返回错误文案
-#[tauri::command]
+#[gui_macros::command]
 pub fn window_minimize(window: WebviewWindow) -> Result<(), String> {
     window.minimize().map_err(|err| err.to_string())
 }
@@ -767,7 +767,7 @@ pub fn window_minimize(window: WebviewWindow) -> Result<(), String> {
 /// # 返回值
 ///
 /// 切换**之后**的最大化状态，`true` 表示已最大化；查询或切换失败返回错误文案
-#[tauri::command]
+#[gui_macros::command]
 pub fn window_toggle_maximize(window: WebviewWindow) -> Result<bool, String> {
     let maximized = window.is_maximized().map_err(|err| err.to_string())?;
     if maximized {
@@ -785,7 +785,7 @@ pub fn window_toggle_maximize(window: WebviewWindow) -> Result<bool, String> {
 /// # 返回值
 ///
 /// 是否最大化；查询失败按未最大化处理
-#[tauri::command]
+#[gui_macros::command]
 pub fn window_is_maximized(window: WebviewWindow) -> bool {
     window.is_maximized().unwrap_or(false)
 }
@@ -801,7 +801,7 @@ pub fn window_is_maximized(window: WebviewWindow) -> bool {
 /// # 返回值
 ///
 /// 设置成功返回 `Ok(())`，失败返回错误文案
-#[tauri::command]
+#[gui_macros::command]
 pub fn window_set_title(window: WebviewWindow, title: String) -> Result<(), String> {
     window.set_title(&title).map_err(|err| err.to_string())
 }
@@ -815,7 +815,7 @@ pub fn window_set_title(window: WebviewWindow, title: String) -> Result<(), Stri
 /// # 返回值
 ///
 /// 模型已就绪返回 `Ok(())`；kind 未知返回错误文案
-#[tauri::command]
+#[gui_macros::command]
 pub fn window_ensure_model(kind: String) -> Result<(), String> {
     ensure_model_for_kind(&kind)
 }
@@ -832,7 +832,7 @@ pub fn window_ensure_model(kind: String) -> Result<(), String> {
 /// # 返回值
 ///
 /// 模型已释放或本来就没有时返回 `Ok(())`；kind 未知返回错误文案
-#[tauri::command]
+#[gui_macros::command]
 pub fn window_drop_model(kind: String) -> Result<(), String> {
     drop_model_for_kind(&kind)
 }
@@ -849,7 +849,7 @@ pub fn window_drop_model(kind: String) -> Result<(), String> {
 /// 本命令一定结束当前进程，是否提示由调用方决定。
 ///
 /// - `app`: 应用句柄，退出当前进程用它
-#[tauri::command]
+#[gui_macros::command]
 pub fn window_restart_app(app: AppHandle) {
     mml_core::stop();
 
@@ -887,7 +887,7 @@ pub fn window_restart_app(app: AppHandle) {
 /// # 返回值
 ///
 /// 当前 GUI 状态；首次启动时 `theme` 已按系统深浅色填好
-#[tauri::command]
+#[gui_macros::command]
 pub fn window_get_gui_config(window: WebviewWindow) -> GuiConfigDto {
     let mut config = crate::gui_config::get();
     if crate::gui_config::is_fresh() {
@@ -914,7 +914,7 @@ pub fn window_get_gui_config(window: WebviewWindow) -> GuiConfigDto {
 /// # 返回值
 ///
 /// 保存成功返回 `Ok(())`；失败返回错误文案
-#[tauri::command]
+#[gui_macros::command]
 pub async fn window_save_gui_config(app: AppHandle, config: GuiConfigDto) -> Result<(), String> {
     let mut new_config: crate::gui_config::GuiConfig = config.into();
     // 窗口浏览偏好不属于设置页：从旧配置整份带过来，免得存一次设置就把它们清掉

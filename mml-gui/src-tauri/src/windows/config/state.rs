@@ -13,7 +13,7 @@
 ///
 /// 上次拖出来的宽度；没拖过时是默认的 300
 #[gui_macros::ipc_group("config")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn config_tree_width() -> f64 {
     crate::gui_config::get().config_window.tree_width
 }
@@ -22,7 +22,7 @@ pub fn config_tree_width() -> f64 {
 ///
 /// - `width`: 宽度，单位像素；越界夹到 200 到 640
 #[gui_macros::ipc_group("config")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn config_set_tree_width(width: f64) {
     let width = width.clamp(200.0, 640.0);
     let mut config = crate::gui_config::get();

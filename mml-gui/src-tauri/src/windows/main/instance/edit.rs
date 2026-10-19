@@ -36,7 +36,7 @@ use super::group::{ensure_idle, uuid_short};
 /// 新建实例的 DTO；模型缺失时返回 `Err`
 #[allow(clippy::too_many_arguments)]
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_create_instance(
     app: AppHandle,
     window: WebviewWindow,
@@ -92,7 +92,7 @@ pub fn main_create_instance(
 ///
 /// 改成功返回 `true`；名字为空或实例不存在返回 `false`；核心侧重名返回 `Err`
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_rename_instance(
     app: AppHandle,
     window: WebviewWindow,
@@ -138,7 +138,7 @@ pub fn main_rename_instance(
 ///
 /// 处理完成返回 `true`；模型缺失或核心侧改名失败返回 `Err`
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_update_instance(
     app: AppHandle,
     window: WebviewWindow,
@@ -259,7 +259,7 @@ pub fn main_update_instance(
 ///
 /// uuid 非法返回 `err.uuid`，实例不存在或目录已不在返回 `err.gameNotFound`
 #[gui_macros::ipc_group("main")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn main_open_instance_dir(uuid: String) -> Result<(), String> {
     let Ok(id) = Uuid::parse_str(&uuid) else {
         return Err(err_keys::UUID.to_string());

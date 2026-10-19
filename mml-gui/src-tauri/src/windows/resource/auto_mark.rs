@@ -57,7 +57,7 @@ pub fn emit_resource_mods_auto_mark_progress(window: &WebviewWindow, dto: ModAut
 /// 见 [`ModAutoMarkDto`]：认出来的 / 没认出来的 / 读文件失败的条数；
 /// 实例不存在、模组列表还没加载或期间窗口被关返回错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_mods_auto_mark(
     window: WebviewWindow,
     uuid: String,

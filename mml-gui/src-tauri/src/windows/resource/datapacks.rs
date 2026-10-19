@@ -20,7 +20,7 @@ use super::{find_save, parse_instance};
 ///
 /// 该存档的数据包列表；实例 / 存档找不到或读取失败返回错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_list_datapacks(
     uuid: String,
     dir: String,
@@ -62,7 +62,7 @@ pub async fn resource_list_datapacks(
 ///
 /// 只表示成功 / 失败：找不到同名包返回 `err.fileNotFound`，其余是内核错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_datapack_toggle(
     uuid: String,
     dir: String,
@@ -95,7 +95,7 @@ pub async fn resource_datapack_toggle(
 ///
 /// 只表示成功 / 失败：找不到同名包返回 `err.fileNotFound`，其余是内核错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_datapack_delete(
     uuid: String,
     dir: String,

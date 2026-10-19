@@ -31,7 +31,7 @@ use super::state::{default_group_order, group_order_of, mod_groups_of, edit_mod_
 ///
 /// 自建分组列表；实例不存在返回 `err.gameNotFound`
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_mod_groups(uuid: String) -> Result<Vec<ModGroupDto>, String> {
     let instance = parse_instance(&uuid)?;
     let game = instance.read().unwrap();
@@ -52,7 +52,7 @@ pub fn resource_mod_groups(uuid: String) -> Result<Vec<ModGroupDto>, String> {
 /// 里也没有它们。前端自己拼的话，永远拼不出"用户把「已启用」拖到了某个自建分组前面"
 /// 这件事 —— 表现就是拖完松手又弹回原位，也就是用户报的"模组分组无法移动顺序"。
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_mod_group_order(uuid: String) -> Result<Vec<String>, String> {
     let instance = parse_instance(&uuid)?;
     let mods = crate::gui_setting::load(&instance.read().unwrap()).mods;
@@ -71,7 +71,7 @@ pub fn resource_mod_group_order(uuid: String) -> Result<Vec<String>, String> {
 /// 单独一条命令而不是塞进 `ModGroupDto`：那一份是"分组 → 成员"的数据结构，
 /// 收起状态是窗口级的视图状态，混在一起会让 DTO 的语义变浑。
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_mod_groups_collapsed(uuid: String) -> Result<Vec<String>, String> {
     let instance = parse_instance(&uuid)?;
     let mods = crate::gui_setting::load(&instance.read().unwrap()).mods;
@@ -116,7 +116,7 @@ pub(super) fn collapsed_of(mods: &crate::gui_setting::GameModSettingObj) -> Vec<
 /// 不再像以前那样靠"组名"间接指代；名字为空返回 `err.groupEmpty`，
 /// 重名返回 `err.groupExists`
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_mod_group_add(uuid: String, name: String) -> Result<String, String> {
     let name = name.trim();
     if name.is_empty() {
@@ -151,7 +151,7 @@ pub fn resource_mod_group_add(uuid: String, name: String) -> Result<String, Stri
 /// - `uuid`: 实例 uuid
 /// - `group`: 分组 uuid
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_mod_group_remove(uuid: String, group: String) {
     let Ok(instance) = parse_instance(&uuid) else {
         return;
@@ -176,7 +176,7 @@ pub fn resource_mod_group_remove(uuid: String, group: String) {
 ///
 /// 只表示成功 / 失败：名字为空返回 `err.groupEmpty`，与别的分组重名返回 `err.groupExists`
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_mod_group_rename(
     uuid: String,
     group: String,
@@ -212,7 +212,7 @@ pub fn resource_mod_group_rename(
 ///   [`STATE_GROUP_ON`] 那几个固定 uuid。接进来先规范化一次再落盘：前端可能因为
 ///   版本差异多传 / 少传了键，存脏数据的话下次读出来还得再纠一遍
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_mod_group_order_set(uuid: String, order: Vec<String>) {
     let Ok(instance) = parse_instance(&uuid) else {
         return;
@@ -238,7 +238,7 @@ pub fn resource_mod_group_order_set(uuid: String, order: Vec<String>) {
 /// - `collapsed`: 收起的分组 uuid 数组，与 [`resource_mod_group_order_set`] 同一套口径。
 ///   与顺序一样按当前真实存在的分组过滤一遍：分组删了以后，它的键不该留在文件里
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_mod_group_collapsed_set(uuid: String, collapsed: Vec<String>) {
     let Ok(instance) = parse_instance(&uuid) else {
         return;
@@ -265,7 +265,7 @@ pub fn resource_mod_group_collapsed_set(uuid: String, collapsed: Vec<String>) {
 ///
 /// 移动语义：先从其它组里摘掉，再进目标组 —— 一个模组同时只属于一个组。
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_mod_group_set(uuid: String, group: Option<String>, keys: Vec<String>) {
     let Ok(instance) = parse_instance(&uuid) else {
         return;
@@ -318,7 +318,7 @@ pub fn resource_mod_group_set(uuid: String, group: Option<String>, keys: Vec<Str
 /// 归一前后的键都写不到旧值时，顺手把原始文件名下的那条一起清掉 ——
 /// 否则 ColorMC 在禁用状态下写的备注会和新写的并存，"看着改了其实没改"。
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn resource_mod_note_set(uuid: String, file: String, note: String) {
     let Ok(instance) = parse_instance(&uuid) else {
         return;

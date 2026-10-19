@@ -29,7 +29,7 @@ struct InstanceAgg {
 /// # 返回值
 ///
 /// 全局启动计数与每实例的启动次数 / 累计时长 / 最近启动；失败返回错误文案
-#[tauri::command]
+#[gui_macros::command]
 pub fn stats_get_data() -> Result<StatsDataDto, String> {
     let count = game_count::get_count();
     let count = count.read().unwrap();

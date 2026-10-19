@@ -97,7 +97,7 @@ pub(super) fn related_mods(
 ///
 /// 见 [`ModDepTreeDto`]；实例不存在、模组列表还没加载、或列表里没有这个模组时返回错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_mods_dep_tree(
     uuid: String,
     mod_uuid: String,
@@ -125,7 +125,7 @@ pub async fn resource_mods_dep_tree(
 ///
 /// 要一起改的条目 uuid，按列表顺序；实例不存在或模组列表还没加载时返回错误串
 #[gui_macros::ipc_group("resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn resource_mods_related_mods(
     uuid: String,
     mods: Vec<String>,

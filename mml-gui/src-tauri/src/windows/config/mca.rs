@@ -32,7 +32,7 @@ use super::source::{get_file_type, resolve_source, resolve_under};
 /// 有数据的区块，按表项下标升序；空表项不返回。路径非法返回 `err.fileName`，
 /// 扩展名不是 `.mca` 返回 `err.notMcaFile`，文件头读不满返回内核错误串
 #[gui_macros::ipc_group("config")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn config_get_mca(
     game: String,
     source: String,
@@ -85,7 +85,7 @@ pub fn config_get_mca(
 /// 命中的区域文件、表项下标与节点路径；没命中时 `file` 与 `path` 都为空。
 /// 路径非法返回 `err.fileName`，这一类取错返回 `err.mcaChunkEmpty`
 #[gui_macros::ipc_group("config")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn config_find_chunk(
     game: String,
     source: String,

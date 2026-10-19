@@ -16,7 +16,7 @@ use mml_net::modrinth_api::ModrinthSortType;
 ///
 /// 下载源的内部名列表，Modrinth 在前、CurseForge 在后；目前不会失败
 #[gui_macros::ipc_group("add_resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn add_resource_source_type() -> Result<Vec<String>, String> {
     Ok(vec![
         ModPackType::Modrinth.to_string(),
@@ -34,7 +34,7 @@ pub fn add_resource_source_type() -> Result<Vec<String>, String> {
 /// 分类名到显示名的映射；CurseForge 的数据包走固定 categoryId、不支持再按分类过滤，
 /// 这里返回空表；类型非法或源不受支持时返回 `Err`
 #[gui_macros::ipc_group("add_resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_resource_categories(
     source: String,
     file_type: String,
@@ -67,7 +67,7 @@ pub async fn add_resource_categories(
 ///
 /// 该源支持的排序方式内部名列表；源不受支持时返回 `Err`
 #[gui_macros::ipc_group("add_resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn add_resource_sort_type(source: String) -> Result<Vec<String>, String> {
     let source = ModPackType::from_string(&source);
 
@@ -98,7 +98,7 @@ pub fn add_resource_sort_type(source: String) -> Result<Vec<String>, String> {
 ///
 /// 该源支持的游戏版本字符串列表，走内核缓存；源不受支持时返回 `Err`
 #[gui_macros::ipc_group("add_resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_resource_game_versions(source: String) -> Result<Vec<String>, String> {
     let source = ModPackType::from_string(&source);
 

@@ -48,7 +48,7 @@ pub(super) fn find_by_uuid(uuid: &str) -> Option<LoginObj> {
 /// # 返回值
 ///
 /// 全部账户的 DTO 与当前账户的 UUID，未选任何账户时为 `None`
-#[tauri::command]
+#[gui_macros::command]
 pub fn account_get_accounts() -> AccountStoreViewDto {
     AccountStoreViewDto {
         accounts: auths::get_all()
@@ -74,7 +74,7 @@ pub fn account_get_accounts() -> AccountStoreViewDto {
 /// # 返回值
 ///
 /// 新建账户的 DTO；失败时返回前端 i18n 错误键，如 `err.loginLocked` / `err.serverEmpty` / `err.nameEmpty`
-#[tauri::command]
+#[gui_macros::command]
 pub async fn account_add_account(
     app: AppHandle,
     name: String,
@@ -172,7 +172,7 @@ pub async fn account_add_account(
 /// 用系统浏览器打开微软授权页面
 ///
 /// - `url`: 要打开的授权页地址，含设备码
-#[tauri::command]
+#[gui_macros::command]
 pub fn account_open_browser(url: String) {
     open_helper::open_url(&url);
 }
@@ -185,7 +185,7 @@ pub fn account_open_browser(url: String) {
 /// # 返回值
 ///
 /// 删掉返回 `Ok(true)`；该 UUID 不存在返回 `Ok(false)`
-#[tauri::command]
+#[gui_macros::command]
 pub fn account_remove_account(app: AppHandle, uuid: String) -> Result<bool, String> {
     let Some(login) = find_by_uuid(&uuid) else {
         return Ok(false);
@@ -206,7 +206,7 @@ pub fn account_remove_account(app: AppHandle, uuid: String) -> Result<bool, Stri
 /// # 返回值
 ///
 /// 刷新成功返回 `Ok(true)`；该 UUID 不存在返回 `Ok(false)`；刷新失败返回认证层错误信息
-#[tauri::command]
+#[gui_macros::command]
 pub async fn account_refresh_account_token(app: AppHandle, uuid: String) -> Result<bool, String> {
     let Some(mut login) = find_by_uuid(&uuid) else {
         return Ok(false);
@@ -231,7 +231,7 @@ pub async fn account_refresh_account_token(app: AppHandle, uuid: String) -> Resu
 /// # 返回值
 ///
 /// 账户不存在时返回 `err.accountMissing`
-#[tauri::command]
+#[gui_macros::command]
 pub fn account_refresh_skin(app: AppHandle, uuid: String) -> Result<(), String> {
     find_by_uuid(&uuid).ok_or(err_keys::ACCOUNT_MISSING)?;
     crate::image_manager::clear_texture_images();
@@ -247,7 +247,7 @@ pub fn account_refresh_skin(app: AppHandle, uuid: String) -> Result<(), String> 
 /// # 返回值
 ///
 /// 设置成功返回 `Ok(true)`，空串取消也算成功；该 UUID 不存在返回 `Ok(false)`
-#[tauri::command]
+#[gui_macros::command]
 pub fn account_set_current_account(app: AppHandle, uuid: String) -> Result<bool, String> {
     // 空串 = 取消选择；登录方式锁定把当前账户滤掉时前端调这个
     if uuid.is_empty() {
@@ -276,7 +276,7 @@ pub fn account_set_current_account(app: AppHandle, uuid: String) -> Result<bool,
 ///
 /// 失败时返回前端 i18n 错误键：`err.accountMissing` / `err.nameEmpty` /
 /// `err.uuidEmpty` / `err.uuidConflict`
-#[tauri::command]
+#[gui_macros::command]
 pub fn account_edit_offline(
     app: AppHandle,
     uuid: String,

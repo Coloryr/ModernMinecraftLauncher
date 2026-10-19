@@ -22,7 +22,7 @@ use crate::listens;
 ///
 /// 扫描后的完整 Java 列表
 #[gui_macros::ipc_group("settings")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn settings_scan_java() -> Vec<JavaInfoDto> {
     mml_jvms::scan_java();
     java_list()
@@ -37,7 +37,7 @@ pub fn settings_scan_java() -> Vec<JavaInfoDto> {
 ///
 /// 新增的 Java 项；路径无效返回 `err.javaInvalid`
 #[gui_macros::ipc_group("settings")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn settings_add_java(name: Option<String>, path: String) -> Result<JavaInfoDto, String> {
     if let Some(added) = mml_jvms::add_item(name, path) {
         Ok(JavaInfoDto {
@@ -57,14 +57,14 @@ pub fn settings_add_java(name: Option<String>, path: String) -> Result<JavaInfoD
 ///
 /// - `name`: 要移除项的显示名，也是列表里的唯一键
 #[gui_macros::ipc_group("settings")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn settings_remove_java(name: String) {
     mml_jvms::remove(&name);
 }
 
 /// 移除全部 Java
 #[gui_macros::ipc_group("settings")]
-#[tauri::command]
+#[gui_macros::command]
 pub fn settings_remove_all_java() {
     mml_jvms::remove_all();
 }
@@ -102,7 +102,7 @@ pub(super) struct JavaArchiveGui {
 ///
 /// 导入成功的 Java 项；包里没有可用的 Java 时返回 `None`；解包失败返回错误信息
 #[gui_macros::ipc_group("settings")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn settings_import_java(
     app: AppHandle,
     name: Option<String>,
@@ -137,7 +137,7 @@ pub async fn settings_import_java(
 ///
 /// 注册成功的 Java 项；目录里没找到 Java 时返回 `None`
 #[gui_macros::ipc_group("settings")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn settings_scan_java_dir(path: String) -> Result<Option<JavaInfoDto>, String> {
     let data = mml_jvms::find_java_from_path(Path::new(&path));
 
@@ -172,7 +172,7 @@ pub async fn settings_scan_java_dir(path: String) -> Result<Option<JavaInfoDto>,
 ///
 /// 识别到的显示名；探测不出 Java 时返回 `None`
 #[gui_macros::ipc_group("settings")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn settings_detect_java(path: String) -> Result<Option<String>, String> {
     let data = tauri::async_runtime::spawn(async move { java_helper::test_java(Path::new(&path)) })
         .await

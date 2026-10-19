@@ -133,7 +133,7 @@ fn current_info() -> CustomHomeInfoDto {
 /// # 返回值
 ///
 /// 与 `current_info` 相同的状态，目前不会失败
-#[tauri::command]
+#[gui_macros::command]
 pub fn custom_home_status() -> Result<CustomHomeInfoDto, String> {
     Ok(current_info())
 }
@@ -162,7 +162,7 @@ pub fn emit_custom_home_change(app: &AppHandle) {
 /// # 返回值
 ///
 /// 导入后的新状态；包里没有入口页返回 `err.customHomeNoIndex`
-#[tauri::command]
+#[gui_macros::command]
 pub async fn custom_home_import(app: AppHandle, path: String) -> Result<CustomHomeInfoDto, String> {
     let info = tauri::async_runtime::spawn_blocking(move || import_archive(Path::new(&path)))
         .await
@@ -178,7 +178,7 @@ pub async fn custom_home_import(app: AppHandle, path: String) -> Result<CustomHo
 /// # 返回值
 ///
 /// 删除文件失败返回 IO 错误信息
-#[tauri::command]
+#[gui_macros::command]
 pub fn custom_home_remove(app: AppHandle) -> Result<(), String> {
     let zip = zip_path();
     if zip.exists() {
@@ -197,7 +197,7 @@ pub fn custom_home_remove(app: AppHandle) -> Result<(), String> {
 /// # 返回值
 ///
 /// 建运行根目录失败返回 IO 错误信息
-#[tauri::command]
+#[gui_macros::command]
 pub fn custom_home_open_dir() -> Result<(), String> {
     let zip = zip_path();
     let target = if zip.is_file() {

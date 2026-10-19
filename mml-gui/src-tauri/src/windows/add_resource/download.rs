@@ -43,7 +43,7 @@ use super::{DOWNLOAD_NOW, SourceDownloadInfo, SourceInfo};
 /// 参数非法、类型不受支持或该文件已在下载中时返回 `Err`，内容为 i18n 键；
 /// 占位并交给下载器后立即返回 `Ok(())`，真实进度靠事件推
 #[gui_macros::ipc_group("add_resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_resource_download(
     app: AppHandle,
     game: String,
@@ -293,7 +293,7 @@ pub async fn add_resource_download(
 ///
 /// 未损坏的存档，含 `name` 显示名与 `dir` 目录名；uuid 非法或实例不存在时返回 `Err`
 #[gui_macros::ipc_group("add_resource")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn add_resource_saves(game: String) -> Result<Vec<ResourceSaveDto>, String> {
     let uuid = Uuid::parse_str(&game);
     if uuid.is_err() {

@@ -1,0 +1,9 @@
+{
+  "name": "mml-ui-demo-custom-css",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/serve.mjs"
+  }
+}

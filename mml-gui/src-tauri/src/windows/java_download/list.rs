@@ -26,7 +26,7 @@ use super::zulu_arch;
 /// 匹配到的包列表，每项含 uuid / 显示名 / 版本 / 文件名 / 大小，大小单位为字节、未知为 0；
 /// 每次调用先清空 `JAVA_ITEMS` 再填入本次结果，网络失败时返回 `Err`
 #[gui_macros::ipc_group("java_download")]
-#[tauri::command]
+#[gui_macros::command]
 pub async fn java_download_get_list(
     source: JavaTypes,
     java_type: String,
