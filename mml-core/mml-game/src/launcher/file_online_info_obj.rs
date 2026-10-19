@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// 文件在线信息
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct OnlineInfoObj {
     /// 游戏路径文件夹
@@ -25,19 +25,4 @@ pub struct OnlineInfoObj {
     /// 文件ID
     #[serde(rename = "FileId")]
     pub fileid: String,
-}
-
-impl Default for OnlineInfoObj {
-    /// 全字段取默认值：字符串为空串
-    fn default() -> Self {
-        Self {
-            path: Default::default(),
-            name: Default::default(),
-            file: Default::default(),
-            sha1: Default::default(),
-            url: Default::default(),
-            modid: Default::default(),
-            fileid: Default::default(),
-        }
-    }
 }

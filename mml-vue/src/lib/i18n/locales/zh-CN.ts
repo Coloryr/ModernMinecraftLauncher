@@ -17,6 +17,8 @@ export default {
   // 分组 / 列表
   // 跨窗口共用的界面文案
   "common.imagePreviewHint": "滚轮缩放 · 放大后可拖动",
+  "common.listSep": "、",
+  "common.detailSep": "：",
   "group.default": "默认分组",
   "group.add": "添加",
   "group.collapse": "收起 / 展开分组",
@@ -699,6 +701,7 @@ export default {
   "args.java": "使用的 Java",
   "args.javaAuto": "自动",
   "args.customJava": "自定义",
+  "args.javaEntry": "{name}（Java {major}）",
   "args.javaPath": "Java 路径",
   "args.browse": "选择文件",
   "args.advanced": "扩展参数",
@@ -1157,6 +1160,8 @@ export default {
   "winSettings.accent.custom": "自定义颜色",
   "winSettings.downloadSource": "下载源",
   "winSettings.language": "语言",
+  "winSettings.langZhCn": "简体中文",
+  "winSettings.langEnUs": "English",
   "winSettings.secGeneral": "通用",
   "winSettings.secTheme": "主题与颜色",
   "winSettings.secWindow": "窗口",
@@ -1314,6 +1319,8 @@ export default {
   "winHelp.noteEmbedded": "内嵌于二进制，首次使用时写到 libraries/ 下",
   "winHelp.noteLocalPatch": "本仓库对其打了两个 patch，改动处已标「M²L 本地修改」",
   "winHelp.noteMonacoBundles": "自身还打包了 marked 14.0.0、dompurify 3.4.8 与 Codicon 字体",
+  "winHelp.noteVscodeLog": "日志语法，转写为 Monarch",
+  "winHelp.licenseOtherExprs": "其余 29 种表达式",
   "winHelp.noteDualLicense": "上游为 MPL-2.0 OR Apache-2.0，本项目按 Apache-2.0 履行",
   "winHelp.noteSkin3d": "皮肤 3D 预览",
   "winHelp.services": "第三方服务与平台",
@@ -1462,9 +1469,21 @@ export default {
 
   // 窗口标题
   "winTitle.main": "ModernMinecraftLauncher",
+  "winTitle.settings": "启动器设置",
+  "winTitle.stats": "游戏统计",
+  "winTitle.help": "帮助手册",
+  "winTitle.resource": "资源管理",
+  "winTitle.account": "账户管理",
+  "winTitle.add": "添加实例",
   "winTitle.addModpack": "下载整合包",
   "winTitle.addResource": "添加资源",
   "winTitle.collect": "资源收藏",
+  "winTitle.download": "下载管理",
+  "winTitle.javaDownload": "下载 Java",
+  "winTitle.block": "方块列表",
+  "winTitle.log": "游戏日志",
+  "winTitle.export": "导出实例",
+  "winTitle.config": "配置文件",
 
   // 收藏窗口
   "collect.defaultGroup": "默认分组",
@@ -1568,6 +1587,9 @@ export default {
   "err.colormcBusy": "已经有一次迁移在进行中",
   // ColorMC 迁移任务失败：原始错误进日志，前端只显示这条
   "err.colormcTask": "ColorMC 迁移任务失败（详情见日志）",
+  "err.bgUnsupported": "不支持的图片格式",
+  "err.bgConfigDir": "配置目录还没初始化",
+  "err.bgNone": "当前没有设置背景图",
 
   // 从 ColorMC 迁移（加载期间问一次）
   "colormc.title": "发现 ColorMC 数据",

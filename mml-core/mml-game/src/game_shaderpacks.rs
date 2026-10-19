@@ -16,6 +16,7 @@ use zip::ZipArchive;
 use crate::{game_options, launcher::instance_setting_obj::InstanceSettingObj};
 
 /// 光影包
+#[derive(Default)]
 pub struct ShaderpackObj {
     /// 显示名，取自语言文件，取不到时回退成文件名
     pub name: String,
@@ -23,17 +24,6 @@ pub struct ShaderpackObj {
     pub comment: String,
     /// 光影包文件或目录的完整路径
     pub file: PathBuf,
-}
-
-impl Default for ShaderpackObj {
-    /// 全字段取默认值
-    fn default() -> Self {
-        Self {
-            name: Default::default(),
-            comment: Default::default(),
-            file: Default::default(),
-        }
-    }
 }
 
 impl ShaderpackObj {

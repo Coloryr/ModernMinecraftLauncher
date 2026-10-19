@@ -16,6 +16,7 @@ import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
 import HighlightText from "../../../../components/ui/HighlightText.vue";
 import SearchBox from "../../../../components/ui/SearchBox.vue";
 import type { ModUpdateProjectDto } from "../../../../lib/bindings";
+import { formatTime } from "../../../../lib/format";
 
 const props = defineProps<{
   /** 取分组好的记录，组内与组间都是新的在前；失败抛错 */
@@ -185,20 +186,6 @@ async function removeEntry(projectId: string, index: number) {
   } finally {
     busy.value = false;
   }
-}
-
-/**
- * 时间戳转本地时间文本
- *
- * - `ms`: epoch 毫秒；为 0 时没有可用时间
- *
- * # 返回值
- *
- * 形如 `2026/2/14 21:33:05`；`ms` 为 0 时是 `--`
- */
-function formatTime(ms: number): string {
-  if (!ms) return "--";
-  return new Date(ms).toLocaleString();
 }
 
 /**

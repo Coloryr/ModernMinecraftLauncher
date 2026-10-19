@@ -15,7 +15,7 @@ use mml_base::{
 use mml_config::config_save;
 use mml_names::{
     i18_items::error_type::{
-        CoreResult, DataNotFoundData, ErrorData, ErrorType, FileSystemErrorData,
+        CoreResult, DataNotFoundData, ErrorType, FileSystemErrorData,
     },
     names, uuids,
 };
@@ -30,9 +30,10 @@ use serde::{Deserialize, Serialize};
 use zip::ZipArchive;
 
 use crate::launcher::instance_setting_obj::InstanceSettingObj;
+use crate::error::{archive_read_err, serializer_err};
 
 /// 存档备份信息
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct SaveBackupObj {
     /// 存档目录名，相对实例的 saves 目录
@@ -41,17 +42,8 @@ pub struct SaveBackupObj {
     pub back: Vec<String>,
 }
 
-impl Default for SaveBackupObj {
-    /// 目录名与备份列表均为空
-    fn default() -> Self {
-        Self {
-            dir: Default::default(),
-            back: Default::default(),
-        }
-    }
-}
-
 /// 游戏存档，由 level.dat 解析而来
+#[derive(Default)]
 pub struct SaveObj {
     /// 地图种子
     pub random_seed: i64,
@@ -103,25 +95,6 @@ pub struct SaveEditObj {
     pub level_name: String,
     /// 地图种子
     pub seed: i64,
-}
-
-impl Default for SaveObj {
-    /// 所有字段取缺省值，`broken` 为 `false`、`icon` 为 `None`
-    fn default() -> Self {
-        Self {
-            random_seed: Default::default(),
-            game_type: Default::default(),
-            hard_core: Default::default(),
-            level_name: Default::default(),
-            difficulty: Default::default(),
-            generator_name: Default::default(),
-            path: Default::default(),
-            icon: Default::default(),
-            broken: Default::default(),
-            last_played: Default::default(),
-            nbt: Default::default(),
-        }
-    }
 }
 
 /// 读取存档文件
@@ -541,16 +514,12 @@ impl SaveObj {
                     let mut zip = zip.unwrap();
                     let meta = zip.by_name(names::PACK_META_FILE);
                     if let Err(err) = meta {
-                        mml_log::error_type(ErrorType::ArchiveReadError(ErrorData {
-                            error: err.to_string(),
-                        }));
+                        mml_log::error_type(archive_read_err(err));
                         return;
                     }
                     let json = MiniJsonObj::from_stream(meta.unwrap());
                     if let Err(err) = json {
-                        mml_log::error_type(ErrorType::SerializerError(ErrorData {
-                            error: err.to_string(),
-                        }));
+                        mml_log::error_type(serializer_err(err));
                         return;
                     }
                     let json = json.unwrap();
@@ -578,9 +547,7 @@ impl SaveObj {
                 }
                 let json = MiniJsonObj::from_stream(stream.unwrap());
                 if let Err(err) = json {
-                    mml_log::error_type(ErrorType::SerializerError(ErrorData {
-                        error: err.to_string(),
-                    }));
+                    mml_log::error_type(serializer_err(err));
                     return;
                 }
                 let json = json.unwrap();

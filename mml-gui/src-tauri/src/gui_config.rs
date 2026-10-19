@@ -476,6 +476,20 @@ pub fn get() -> GuiConfig {
         .unwrap_or_default()
 }
 
+/// 当前界面语言
+///
+/// 只要语言时走这条：它不克隆整份配置
+///
+/// # 返回值
+///
+/// 配置里的 locale；未初始化返回默认值
+pub fn locale() -> Lang {
+    CONFIG
+        .get()
+        .map(|c| c.read().unwrap().locale)
+        .unwrap_or_default()
+}
+
 /// 配置目录，背景图等派生文件放这里
 ///
 /// # 返回值
@@ -497,7 +511,12 @@ pub fn sync_core_lang(locale: Lang) {
     }
 
     if let Err(err) = mml_names::set_lang(locale) {
-        mml_log::error(format!("lang.txt 写入失败: {err:?}"));
+        mml_log::error(
+            crate::log_text::LogText::LangFileSaveFailed {
+                error: format!("{err:?}"),
+            }
+            .text(),
+        );
     }
 }
 

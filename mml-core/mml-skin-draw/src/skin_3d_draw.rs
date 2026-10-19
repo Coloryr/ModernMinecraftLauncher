@@ -15,7 +15,7 @@ use glam::{Mat4, Vec3, Vec4};
 use mml_skin::{SkinType, skin_type_checker};
 use tiny_skia::Pixmap;
 
-use crate::gpu_3d::{face_verts, render_3d};
+use crate::gpu_3d::{FaceCorner, face_verts, render_3d};
 use crate::skin_3d_gpu::SkinRenderWgpu;
 use crate::skin_3d_render::SkinRenderType;
 use crate::skin_draw::{BPP, draw, row_bytes};
@@ -153,14 +153,14 @@ pub(crate) mod face {
 ///
 /// # 返回值
 ///
-/// 返回四个 `(位置, uv)`；位置是相对部件中心的模型坐标偏移，
+/// 返回四个 [`FaceCorner`]；位置是相对部件中心的模型坐标偏移，
 /// uv 是 0..1 的块内比例，v=0 在贴图块顶部
 ///
 /// 顶点顺序与 uv 布局来自 [`crate::skin_3d_cube`] 的 CUBE 与 [`crate::skin_3d_texture`]
 /// 的 UV 表：正面 / 侧面 / 顶面 u 沿面向右、v 沿面向下；背面 / 底面 u 镜像。
-pub(crate) fn face_corners(h: [f32; 3], d: usize) -> [([f32; 3], [f32; 2]); 4] {
+pub(crate) fn face_corners(h: [f32; 3], d: usize) -> [FaceCorner; 4] {
     let (hx, hy, hz) = (h[0], h[1], h[2]);
-    match d {
+    let raw = match d {
         face::BACK => [
             ([hx, hy, -hz], [1.0, 0.0]),
             ([hx, -hy, -hz], [1.0, 1.0]),
@@ -197,7 +197,8 @@ pub(crate) fn face_corners(h: [f32; 3], d: usize) -> [([f32; 3], [f32; 2]); 4] {
             ([-hx, -hy, hz], [0.0, 1.0]),
             ([-hx, -hy, -hz], [0.0, 0.0]),
         ],
-    }
+    };
+    raw.map(|(pos, uv)| FaceCorner { pos, uv })
 }
 
 /// 一个面的贴图区域，按皮肤贴图上的 tx / ty / tw / th 排列
@@ -346,15 +347,13 @@ fn draw_skin_3d(
     for part in &part_list {
         for &d in &face::ALL {
             base.extend_from_slice(&face_verts(
-                face_corners(part.base_half, d).map(|(pos, uv)| {
-                    (
-                        [
-                            pos[0] + part.base_center[0],
-                            pos[1] + part.base_center[1],
-                            pos[2] + part.base_center[2],
-                        ],
-                        uv,
-                    )
+                face_corners(part.base_half, d).map(|c| FaceCorner {
+                    pos: [
+                        c.pos[0] + part.base_center[0],
+                        c.pos[1] + part.base_center[1],
+                        c.pos[2] + part.base_center[2],
+                    ],
+                    uv: c.uv,
                 }),
                 face_rect(
                     part.dims[0],
@@ -368,15 +367,13 @@ fn draw_skin_3d(
                 th,
             ));
             overlay.extend_from_slice(&face_verts(
-                face_corners(part.overlay_half, d).map(|(pos, uv)| {
-                    (
-                        [
-                            pos[0] + part.base_center[0],
-                            pos[1] + part.base_center[1],
-                            pos[2] + part.base_center[2],
-                        ],
-                        uv,
-                    )
+                face_corners(part.overlay_half, d).map(|c| FaceCorner {
+                    pos: [
+                        c.pos[0] + part.base_center[0],
+                        c.pos[1] + part.base_center[1],
+                        c.pos[2] + part.base_center[2],
+                    ],
+                    uv: c.uv,
                 }),
                 face_rect(
                     part.dims[0],

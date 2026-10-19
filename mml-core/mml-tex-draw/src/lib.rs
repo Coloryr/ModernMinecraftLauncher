@@ -73,6 +73,10 @@ pub fn set_gui_handel(gui: gui_hook::ProgressGui) {
 }
 
 /// 是否正在渲染，供界面层防重入查询
+///
+/// # 返回值
+///
+/// 正在渲染时返回 `true`
 pub fn is_loading() -> bool {
     LOADING.load(Ordering::Acquire)
 }
@@ -86,6 +90,10 @@ pub fn cancel() {
 }
 
 /// 本轮渲染是否已被取消
+///
+/// # 返回值
+///
+/// 本轮已请求取消时返回 `true`
 pub fn is_cancelled() -> bool {
     CANCEL.read().unwrap().is_cancelled()
 }
@@ -537,6 +545,10 @@ async fn download_langs(obj: &GameArgObj, cancel: &CancellationToken) -> CoreRes
 ///
 /// 底层是 `HashMap::keys()`，每次调用顺序都可能不同；要能直接展示的顺序用
 /// [`ordered_entries`]
+///
+/// # 返回值
+///
+/// 全部方块 ID 的列表，顺序不固定；没有渲染结果时为空列表
 pub fn blocks() -> Vec<String> {
     BLOCKS
         .read()
@@ -548,6 +560,10 @@ pub fn blocks() -> Vec<String> {
 }
 
 /// 方块数据的渲染版本，未渲染过为空串
+///
+/// # 返回值
+///
+/// 游戏版本号；未渲染过是空串
 pub fn block_version() -> String {
     BLOCKS.read().unwrap().id.clone()
 }
@@ -556,6 +572,10 @@ pub fn block_version() -> String {
 ///
 /// 给"只想知道有没有渲染过"的调用方用：[`blocks`] / [`items`] 都是整表克隆，
 /// 拿它们判空等于每次白拷两份全表，mml-gui 的方块状态快照就在每个进度回调里调
+///
+/// # 返回值
+///
+/// 方块或物品任一有结果时返回 `true`
 pub fn has_rendered() -> bool {
     !BLOCKS.read().unwrap().tex.is_empty() || !ITEMS.read().unwrap().tex.is_empty()
 }
@@ -563,11 +583,19 @@ pub fn has_rendered() -> bool {
 /// 方块 ID → 语言键，如 block.minecraft.stone，翻译经 `get_lang`
 ///
 /// - `id`: 方块 ID
+///
+/// # 返回值
+///
+/// 语言键，形如 `block.minecraft.stone`；ID 不在表里返回 `None`
 pub fn block_name_key(id: &str) -> Option<String> {
     BLOCKS.read().unwrap().name.get(id).cloned()
 }
 
 /// 物品数据的渲染版本，未渲染过为空串
+///
+/// # 返回值
+///
+/// 游戏版本号；未渲染过是空串
 pub fn item_version() -> String {
     ITEMS.read().unwrap().id.clone()
 }
@@ -575,6 +603,10 @@ pub fn item_version() -> String {
 /// 物品 ID → 语言键，如 item.minecraft.apple，翻译经 `get_lang`
 ///
 /// - `id`: 物品 ID
+///
+/// # 返回值
+///
+/// 语言键，形如 `item.minecraft.apple`；ID 不在表里返回 `None`
 pub fn item_name_key(id: &str) -> Option<String> {
     ITEMS.read().unwrap().name.get(id).cloned()
 }
@@ -607,6 +639,10 @@ pub fn get_item_path(id: &str) -> Option<PathBuf> {
 /// 获取方块创造分组，值为 itemGroup lang 键尾段，翻译经 `get_lang`
 ///
 /// - `id`: 方块 ID
+///
+/// # 返回值
+///
+/// 分组键尾段；ID 不在表里或没有分组返回 `None`
 pub fn block_cat(id: &str) -> Option<String> {
     BLOCKS.read().unwrap().cat.get(id).cloned()
 }
@@ -614,6 +650,10 @@ pub fn block_cat(id: &str) -> Option<String> {
 /// 获取物品创造分组，值与 `block_cat` 同一套
 ///
 /// - `id`: 物品 ID
+///
+/// # 返回值
+///
+/// 与 `block_cat` 同一套的分组键尾段；ID 不在表里或没有分组返回 `None`
 pub fn item_cat(id: &str) -> Option<String> {
     ITEMS.read().unwrap().cat.get(id).cloned()
 }
@@ -626,6 +666,10 @@ pub(crate) fn get_item_dir() -> Option<PathBuf> {
 /// 获取物品数据，集合语义，顺序无意义
 ///
 /// 同 [`blocks`]，要能直接展示的顺序用 [`ordered_entries`]
+///
+/// # 返回值
+///
+/// 全部物品 ID 的列表，顺序不固定；没有渲染结果时为空列表
 pub fn items() -> Vec<String> {
     ITEMS
         .read()

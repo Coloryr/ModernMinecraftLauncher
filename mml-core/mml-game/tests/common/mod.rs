@@ -9,7 +9,7 @@
 #![allow(dead_code)]
 
 use std::hash::{Hash, Hasher};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use mml_base::serialize_tools::json_from_bytes;
@@ -21,8 +21,8 @@ fn init_net() {
     NET.get_or_init(|| {
         let dir = mml_testutil::temp_dir().join("mml-test-net-init");
         std::fs::create_dir_all(&dir).ok();
-        mml_config::init(&dir);
-        mml_names::init(&dir);
+        let _ = mml_config::init(&dir);
+        let _ = mml_names::init(&dir);
         mml_net::init();
     });
 }

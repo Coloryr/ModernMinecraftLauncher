@@ -12,13 +12,14 @@ use std::{
     time::Duration,
 };
 
-use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType, FileSystemErrorData};
+use mml_names::i18_items::error_type::{CoreResult, ErrorType, FileSystemErrorData};
 use notify::{
     EventKind, RecursiveMode, Watcher,
     event::{CreateKind, RemoveKind},
 };
 
 use crate::launcher_path::instance_path;
+use crate::error::{task_err};
 
 /// 监听是否生效开关
 static ENABLE_WATCHER: AtomicBool = AtomicBool::new(false);
@@ -31,22 +32,14 @@ static ENABLE_WATCHER: AtomicBool = AtomicBool::new(false);
 pub(crate) fn init_watch() -> CoreResult<()> {
     let (tx, rx) = mpsc::channel();
 
-    let mut watcher = notify::recommended_watcher(tx).map_err(|err| {
-        ErrorType::TaskError(ErrorData {
-            error: err.to_string(),
-        })
-    })?;
+    let mut watcher = notify::recommended_watcher(tx).map_err(task_err)?;
 
     watcher
         .watch(
             &instance_path::get_instance_dir(),
             RecursiveMode::NonRecursive,
         )
-        .map_err(|err| {
-            ErrorType::TaskError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        .map_err(task_err)?;
 
     thread::spawn(move || {
         loop {

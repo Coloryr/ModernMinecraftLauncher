@@ -8,13 +8,15 @@ use std::{
 };
 
 use mml_names::i18_items::error_type::{
-    ArchiveErrorData, CoreResult, ErrorData, ErrorType, FileSystemErrorData,
+    CoreResult, 
 };
 use mml_sys::path_helper;
 use sevenz_rust2::{ArchiveEntry, ArchiveReader, ArchiveWriter, Password};
 
 use crate::archives::{
     self, ArchiveEntryInfo, ArchiveHandle, ArchiveProcess, BaseArchiveGui, IBaseArchiveGui,
+    open_error, root_path_or_pack, read_error, write_error,
+    fs_err, archive_err,
 };
 
 /// 保持打开文件句柄的 7z 读取句柄
@@ -50,23 +52,12 @@ impl R7zReader {
     /// 返回已定位到文件开头的读取器；克隆、定位或解析头部失败时返回相应错误
     fn reader(&self) -> CoreResult<ArchiveReader<fs::File>> {
         let mut file = self.file.try_clone().map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: self.path.clone(),
-                error: err.to_string(),
-            })
+            fs_err(self.path.clone(), err)
         })?;
         file.seek(SeekFrom::Start(0)).map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: self.path.clone(),
-                error: err.to_string(),
-            })
+            fs_err(self.path.clone(), err)
         })?;
-        ArchiveReader::new(file, Password::empty()).map_err(|err| {
-            ErrorType::ArchiveOpenError(FileSystemErrorData {
-                path: self.path.clone(),
-                error: err.to_string(),
-            })
-        })
+        ArchiveReader::new(file, Password::empty()).map_err(|err| open_error(&self.path, err))
     }
 
     /// 压缩目录为 7z 文件
@@ -88,11 +79,7 @@ impl R7zReader {
         gui: BaseArchiveGui,
     ) -> CoreResult<()> {
         let process = ArchiveProcess::new(gui);
-        let root_path = match root_path {
-            Some(path) => path,
-            None => pack_dir,
-        };
-        Self::r7z_compress(&process, archive_file, pack_dir, root_path, filter)
+        Self::r7z_compress(&process, archive_file, pack_dir, root_path_or_pack(root_path, pack_dir), filter)
     }
 
     /// 解压 7z 文件到指定目录
@@ -132,12 +119,7 @@ impl R7zReader {
         filter: &Option<Vec<String>>,
     ) -> CoreResult<()> {
         let file = path_helper::open_write(archive_file)?;
-        let mut archive = ArchiveWriter::new(file).map_err(|err| {
-            ErrorType::ArchiveOpenError(FileSystemErrorData {
-                path: archive_file.to_path_buf(),
-                error: err.to_string(),
-            })
-        })?;
+        let mut archive = ArchiveWriter::new(file).map_err(|err| open_error(archive_file, err))?;
 
         let entries = path_helper::get_all_files(pack_dir);
         process.set_count(entries.len());
@@ -162,19 +144,13 @@ impl R7zReader {
                     Some(buffer),
                 )
                 .map_err(|err| {
-                    ErrorType::ArchiveError(ArchiveErrorData {
-                        source: path.display().to_string(),
-                        target: tempfile,
-                        error: err.to_string(),
-                    })
+                    archive_err(path.display().to_string(), tempfile, err)
                 })?;
         }
 
         match archive.finish() {
             Ok(_) => Ok(()),
-            Err(err) => Err(ErrorType::ArchiveWriteError(ErrorData {
-                error: err.to_string(),
-            })),
+            Err(err) => Err(write_error(err)),
         }
     }
 
@@ -196,10 +172,7 @@ impl R7zReader {
         path_helper::create_dir_all(output_dir)?;
 
         let mut seven = ArchiveReader::new(file, Password::empty()).map_err(|err| {
-            ErrorType::ArchiveOpenError(FileSystemErrorData {
-                path: archive_file.to_path_buf(),
-                error: err.to_string(),
-            })
+            open_error(archive_file, err)
         })?;
 
         process.set_count(seven.archive().files.len());
@@ -227,9 +200,7 @@ impl R7zReader {
                 process.done();
                 Ok(())
             }
-            Err(err) => Err(ErrorType::ArchiveReadError(ErrorData {
-                error: err.to_string(),
-            })),
+            Err(err) => Err(read_error(err)),
         }
     }
 }
@@ -273,22 +244,14 @@ impl ArchiveHandle for R7zReader {
                     Ok(true)
                 }
             })
-            .map_err(|err| {
-                ErrorType::ArchiveReadError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            .map_err(read_error)?;
 
         if !found {
-            return Err(ErrorType::ArchiveReadError(ErrorData {
-                error: name.to_string(),
-            }));
+            return Err(read_error(name));
         }
 
         result.ok_or_else(|| {
-            ErrorType::ArchiveReadError(ErrorData {
-                error: name.to_string(),
-            })
+            read_error(name)
         })
     }
 
@@ -325,16 +288,10 @@ impl ArchiveHandle for R7zReader {
                     Ok(true)
                 }
             })
-            .map_err(|err| {
-                ErrorType::ArchiveReadError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            .map_err(read_error)?;
 
         if !found {
-            return Err(ErrorType::ArchiveReadError(ErrorData {
-                error: name.to_string(),
-            }));
+            return Err(read_error(name));
         }
 
         if let Some(gui) = gui {

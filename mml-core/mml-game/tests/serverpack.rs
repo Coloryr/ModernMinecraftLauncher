@@ -13,7 +13,6 @@
 //! 判定逻辑已抽到 [`mml_game::serverpack::plan`]，纯函数，无 IO 无网络，
 //! 所以"删错文件 / 下错地址"这类最危险的判定都能离线测。
 
-use std::path::{Path, PathBuf};
 use std::sync::{Mutex, Once};
 use std::time::{Duration, Instant};
 
@@ -56,17 +55,6 @@ fn wait_for<F: Fn() -> bool>(timeout: Duration, cond: F) -> bool {
         std::thread::sleep(Duration::from_millis(20));
     }
     false
-}
-
-/// 每个用例各用各的子目录，见 AGENTS.md §6：落盘是异步的，共用目录会互相踩
-fn case_dir(case: &str) -> PathBuf {
-    let dir = mml_testutil::temp_dir().join(format!(
-        "mml-serverpack-{case}-{}",
-        std::process::id()
-    ));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("建临时目录");
-    dir
 }
 
 // ===================== 构造器 =====================

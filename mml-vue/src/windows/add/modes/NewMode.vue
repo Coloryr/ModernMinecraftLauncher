@@ -104,7 +104,7 @@ onUnmounted(() => document.removeEventListener("mousedown", onDocMousedown));
 /** 触发按钮文字：已选类型名，未选时显示“全部类型” */
 const typeLabel = computed(() => {
   const names = props.verTypes.map((vt) => t(`add.type.${vt}`));
-  return names.length ? names.join("、") : t("add.typeAll");
+  return names.length ? names.join(t("common.listSep")) : t("add.typeAll");
 });
 
 /** 版本列表按类型分组（多个类型选中时分组合并展示） */

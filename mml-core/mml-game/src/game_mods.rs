@@ -16,7 +16,7 @@ use mml_base::{
     serialize_tools::{MiniJsonObj, MiniTomlMap},
 };
 use mml_names::{
-    i18_items::error_type::{CoreResult, ErrorData, ErrorType, FileSystemErrorData},
+    i18_items::error_type::{CoreResult, ErrorType, FileSystemErrorData},
     names,
 };
 use mml_sys::path_helper;
@@ -28,6 +28,7 @@ use crate::{
     class_scan, gui_hook::ProgressGui, launcher::instance_setting_obj::InstanceSettingObj,
     loader::LoaderType,
 };
+use crate::error::{archive_read_err};
 
 /// 模组的加载侧，来自元数据的 side 字段或注解扫描
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -71,6 +72,12 @@ impl DependantInfo {
     /// 1.12.2 旧版依赖解析：`modid@版本范围`，不带 `@` 时整串就是 modid
     ///
     /// 版本串来自 Forge，按 **Maven** 写法解析，见 [`RangeSyntax`]。
+    ///
+    /// - `input`: 依赖串，形如 `modid@版本范围`，前后空白会被去掉
+    ///
+    /// # 返回值
+    ///
+    /// 解析出的依赖信息；没有 `@` 时版本串为空
     pub fn parse_required_name(input: &str) -> DependantInfo {
         let input = input.trim();
         if input.is_empty() {
@@ -129,6 +136,13 @@ impl DependantInfo {
     }
 
     /// 版本列表解析
+    ///
+    /// - `modid`: 依赖项目的 `modid`
+    /// - `json`: 版本列表 JSON
+    ///
+    /// # 返回值
+    ///
+    /// 解析出的依赖信息
     pub fn parse_required_json(modid: &str, json: &MiniJsonObj) -> DependantInfo {
         DependantInfo {
             modid: modid.to_string(),
@@ -147,6 +161,7 @@ pub enum DependantType {
 }
 
 /// 一个包里的单份模组元数据，同一个 jar 可能有多条
+#[derive(Default)]
 pub struct ModItemObj {
     /// 模组标识，取自元数据；缺失时为空串
     pub mod_id: String,
@@ -170,25 +185,8 @@ pub struct ModItemObj {
     pub side: LoadSideType,
 }
 
-impl Default for ModItemObj {
-    /// 全字段取默认值
-    fn default() -> Self {
-        Self {
-            mod_id: Default::default(),
-            name: Default::default(),
-            description: Default::default(),
-            version: Default::default(),
-            author: Default::default(),
-            dependants: Default::default(),
-            loaders: Default::default(),
-            side: Default::default(),
-            url: Default::default(),
-            icon: Default::default(),
-        }
-    }
-}
-
 /// 模组目录里的一个文件及其解析结果
+#[derive(Default)]
 pub struct ModObj {
     /// 稳定标识，文件完整路径的 uuid v5，同一文件每次扫描结果一致
     pub uuid: Uuid,
@@ -206,22 +204,6 @@ pub struct ModObj {
     pub fail: bool,
     /// 文件完整路径；内置模组存的是包内条目名
     pub file: PathBuf,
-}
-
-impl Default for ModObj {
-    /// 全字段取默认值
-    fn default() -> Self {
-        Self {
-            uuid: Default::default(),
-            info: Default::default(),
-            disable: Default::default(),
-            core: Default::default(),
-            hash: Default::default(),
-            jar_in_jar: Default::default(),
-            fail: Default::default(),
-            file: Default::default(),
-        }
-    }
 }
 
 /// 字符串引号状态
@@ -402,11 +384,7 @@ fn sanitize_mcmod_json(json: &str) -> String {
 /// 成功返回 `Ok(())`；读取或解析失败返回对应错误
 fn read_forge_json(mut reader: impl Read, mod_info: &mut ModObj) -> CoreResult<()> {
     let mut json = String::new();
-    reader.read_to_string(&mut json).map_err(|err| {
-        ErrorType::ArchiveReadError(ErrorData {
-            error: err.to_string(),
-        })
-    })?;
+    reader.read_to_string(&mut json).map_err(archive_read_err)?;
 
     let obj = match MiniJsonObj::from_str(&json) {
         Ok(obj) => obj,
@@ -805,11 +783,7 @@ fn read_core_mod(
     let mut info = ModItemObj::default();
 
     let mut content = String::new();
-    manifest_file.read_to_string(&mut content).map_err(|err| {
-        ErrorType::ArchiveReadError(ErrorData {
-            error: err.to_string(),
-        })
-    })?;
+    manifest_file.read_to_string(&mut content).map_err(archive_read_err)?;
 
     let manifest = parse_manifest(&content);
 
@@ -890,20 +864,12 @@ fn read_jar_in_jar(
         .collect();
 
     for idx in jar_entries {
-        let mut entry = archive.by_index(idx).map_err(|err| {
-            ErrorType::ArchiveReadError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        let mut entry = archive.by_index(idx).map_err(archive_read_err)?;
         // 条目名要留着当身份用，先把它的借用结束掉再读内容
         let entry_name = entry.name().unwrap_or_default().to_string();
 
         let mut bytes = Vec::new();
-        entry.read_to_end(&mut bytes).map_err(|err| {
-            ErrorType::ArchiveReadError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        entry.read_to_end(&mut bytes).map_err(archive_read_err)?;
 
         let cursor = Cursor::new(bytes);
         let mut inner_zip = ZipArchive::new(cursor).map_err(|err| {
@@ -2014,7 +1980,7 @@ mod tests {
         let info = read_mod_info(&path).expect("应能解析");
         assert_eq!(info.info.len(), 1, "只该有 fabric 那一条，不该多出空条目");
         assert_eq!(
-            info.info[0].loaders.to_string(),
+            info.info[0].loaders.id(),
             "fabric",
             "不该是默认的 normal"
         );
@@ -2032,7 +1998,7 @@ mod tests {
         let info = read_mod_info(&path).expect("应能解析");
         assert!(info.core, "有 FMLCorePlugin 就该判成 core");
         let first = info.info.first().expect("core mod 的 info 不该被丢掉");
-        assert_eq!(first.loaders.to_string(), "forge");
+        assert_eq!(first.loaders.id(), "forge");
     }
 
     // ==================== 依赖范围与依赖检测 ====================

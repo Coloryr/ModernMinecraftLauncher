@@ -8,6 +8,7 @@ use mml_names::i18_items::error_type::{ArgEmptyData, CoreResult, ErrorType};
 use mml_sys::path_helper;
 
 /// 官方实例信息
+#[derive(Default)]
 pub struct OfficialObj {
     /// 版本 ID
     pub id: String,
@@ -19,19 +20,6 @@ pub struct OfficialObj {
     pub libraries: Vec<LibrarieObj>,
     /// 启动参数
     pub arguments: ArgumentsObj,
-}
-
-impl Default for OfficialObj {
-    /// 全字段取默认值：字符串为空串、列表为空
-    fn default() -> Self {
-        Self {
-            id: Default::default(),
-            inherits_from: Default::default(),
-            patches: Default::default(),
-            libraries: Default::default(),
-            arguments: Default::default(),
-        }
-    }
 }
 
 /// 补丁信息
@@ -49,18 +37,10 @@ pub struct LibrarieObj {
 }
 
 /// 启动参数
+#[derive(Default)]
 pub struct ArgumentsObj {
     /// 游戏参数，字符串或键值对象
     pub game: Vec<MiniJsonObj>,
-}
-
-impl Default for ArgumentsObj {
-    /// 全字段取默认值：列表为空
-    fn default() -> Self {
-        Self {
-            game: Default::default(),
-        }
-    }
 }
 
 impl OfficialObj {

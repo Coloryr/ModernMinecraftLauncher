@@ -3,6 +3,7 @@
 import { computed, ref, watch, nextTick } from "vue";
 import { t } from "../lib/i18n";
 import type { LogLine } from "../lib/bindings";
+import { uniq } from "../lib/util";
 
 const props = defineProps<{
   /** 日志行，按时间顺序 */
@@ -30,11 +31,6 @@ const ALL = "";
 const threadFilter = ref(ALL);
 const levelFilter = ref(ALL);
 const categoryFilter = ref(ALL);
-
-/** 去空去重排序 */
-function uniq(values: string[]): string[] {
-  return [...new Set(values.filter(Boolean))].sort();
-}
 
 const threadOptions = computed(() => uniq(props.logs.map((l) => l.thread)));
 const categoryOptions = computed(() => uniq(props.logs.map((l) => l.category)));

@@ -20,7 +20,7 @@ use mml_net::{
 use crate::{
     curseforge::pack_obj::{CurseForgePackObj, FilesObj, MinecraftObj, ModLoadersObj},
     launcher::{
-        self, file_online_info_obj::OnlineInfoObj, get_source_type,
+        self, file_online_info_obj::OnlineInfoObj,
         instance_setting_obj::InstanceSettingObj, project_save_obj::MmlProjectSaveObj,
     },
     loader::LoaderType,
@@ -230,7 +230,7 @@ async fn curseforge(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()>
         obj.minecraft.mod_loaders.push(ModLoadersObj {
             id: format!(
                 "{}-{}",
-                game.loader.to_string(),
+                game.loader.id(),
                 game.loader_version.clone().unwrap_or_default()
             ),
             primary: true,
@@ -617,7 +617,7 @@ fn hmcl(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
         manifest.minecraft.mod_loaders.push(ModLoadersObj {
             id: format!(
                 "{}-{}",
-                game.loader.to_string(),
+                game.loader.id(),
                 game.loader_version.clone().unwrap_or_default()
             ),
             primary: true,

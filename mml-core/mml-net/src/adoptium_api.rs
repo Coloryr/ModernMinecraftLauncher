@@ -39,7 +39,7 @@ impl Default for PackageObj {
 }
 
 /// 构建产物二进制信息，对应 `ADOPTIUM_URL` 的 `binary`
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct BinaryObj {
     /// 目标 CPU 架构，对应 `architecture`，如 `x64` / `aarch64`
@@ -56,52 +56,22 @@ pub struct BinaryObj {
     pub name: String,
 }
 
-impl Default for BinaryObj {
-    fn default() -> Self {
-        Self {
-            architecture: Default::default(),
-            image_type: Default::default(),
-            os: Default::default(),
-            package: Default::default(),
-            scm_ref: Default::default(),
-            name: Default::default(),
-        }
-    }
-}
-
 /// OpenJDK 版本信息，对应 `ADOPTIUM_URL` 的 `version`
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct AdoptiumVersionObj {
     /// OpenJDK 完整版本号，对应 `semver`
     pub semver: String,
 }
 
-impl Default for AdoptiumVersionObj {
-    fn default() -> Self {
-        Self {
-            semver: Default::default(),
-        }
-    }
-}
-
 /// Adoptium 单个 Java 发行项，对应版本列表响应 `[]` 的元素
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct AdoptiumObj {
     /// 二进制产物信息，对应 `binary`
     pub binary: BinaryObj,
     /// OpenJDK 版本信息，对应 `version`
     pub version: AdoptiumVersionObj,
-}
-
-impl Default for AdoptiumObj {
-    fn default() -> Self {
-        Self {
-            binary: Default::default(),
-            version: Default::default(),
-        }
-    }
 }
 
 /// Adoptium 可用版本信息，对应 `v3/info/available_releases` 的响应体

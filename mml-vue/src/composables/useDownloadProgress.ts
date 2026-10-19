@@ -13,6 +13,7 @@ import type { DownloadStatusDto } from "../lib/bindings";
  * # 返回值
  *
  * - `percent`: 队列总进度百分比，0–100
+ * - `tasks`: 队列里的任务快照，要按任务另算口径时用它
  * - `hasTasks`: 队列里当前有没有任务
  */
 export function useDownloadProgress() {
@@ -42,6 +43,7 @@ export function useDownloadProgress() {
   });
 
   return {
+    tasks: computed(() => status.value.tasks),
     percent: computed(() => downloadOverallPercent(status.value.tasks)),
     hasTasks: computed(() => status.value.tasks.length > 0),
   };

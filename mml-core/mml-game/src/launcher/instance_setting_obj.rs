@@ -9,7 +9,7 @@ use crate::{
 };
 
 /// 加入服务器设置
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct ServerObj {
     /// 是否在启动后自动加入该服务器
@@ -22,19 +22,8 @@ pub struct ServerObj {
     pub port: Option<u16>,
 }
 
-impl Default for ServerObj {
-    /// 默认不自动加入服务器，地址与端口为空
-    fn default() -> Self {
-        Self {
-            enable: Default::default(),
-            ip: Default::default(),
-            port: Default::default(),
-        }
-    }
-}
-
 /// 端口代理设置
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct ProxyHostObj {
     /// 服务器地址
@@ -52,20 +41,8 @@ pub struct ProxyHostObj {
     pub password: Option<String>,
 }
 
-impl Default for ProxyHostObj {
-    /// 地址、端口与认证信息均可缺省
-    fn default() -> Self {
-        Self {
-            ip: Default::default(),
-            port: Default::default(),
-            user: Default::default(),
-            password: Default::default(),
-        }
-    }
-}
-
 /// 高级 JVM 启动参数
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct AdvanceJvmObj {
     /// 自定义主类，覆盖版本 JSON 里的 mainClass
@@ -76,18 +53,8 @@ pub struct AdvanceJvmObj {
     pub class_path: Option<String>,
 }
 
-impl Default for AdvanceJvmObj {
-    /// 不覆盖主类、不追加类路径
-    fn default() -> Self {
-        Self {
-            main_class: Default::default(),
-            class_path: Default::default(),
-        }
-    }
-}
-
 /// 自定义模组加载器设置
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct CustomLoaderObj {
     /// 后加载原版运行库
@@ -104,20 +71,8 @@ pub struct CustomLoaderObj {
     pub remove_json: bool,
 }
 
-impl Default for CustomLoaderObj {
-    /// 四项开关全部关闭，即不改动原版运行库与启动配置
-    fn default() -> Self {
-        Self {
-            offset_lib: Default::default(),
-            remove_lib: Default::default(),
-            custom_json: Default::default(),
-            remove_json: Default::default(),
-        }
-    }
-}
-
 /// 游戏实例配置
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct InstanceSettingObj {
     /// 实例标识
@@ -190,35 +145,4 @@ pub struct InstanceSettingObj {
     /// 日志编码
     #[serde(rename = "Encoding")]
     pub encoding: LogEncoding,
-}
-
-impl Default for InstanceSettingObj {
-    /// 可缺省字段全为 `None`，uuid 与各枚举取各自缺省值
-    fn default() -> Self {
-        Self {
-            uuid: Default::default(),
-            name: Default::default(),
-            dir: Default::default(),
-            version: Default::default(),
-            loader: Default::default(),
-            loader_version: Default::default(),
-            jvm_arg: Default::default(),
-            jvm_name: Default::default(),
-            jvm_local: Default::default(),
-            window: Default::default(),
-            start_server: Default::default(),
-            auto_save: Default::default(),
-            proxy_host: Default::default(),
-            advance_jvm: Default::default(),
-            is_modpack: Default::default(),
-            modpack_type: Default::default(),
-            game_type: Default::default(),
-            pid: Default::default(),
-            fid: Default::default(),
-            icon: Default::default(),
-            server_url: Default::default(),
-            custom_loader: Default::default(),
-            encoding: Default::default(),
-        }
-    }
 }

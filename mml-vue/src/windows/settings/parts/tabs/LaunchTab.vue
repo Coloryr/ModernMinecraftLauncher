@@ -14,6 +14,7 @@ import SegmentedTabs from "../../../../components/ui/SegmentedTabs.vue";
 import SettingsGroup from "../SettingsGroup.vue";
 import SaveStateText from "../SaveStateText.vue";
 import type { useSettingsLaunch } from "../../composables/useSettingsLaunch";
+import { memoryLabel } from "../../../../lib/format";
 
 const props = defineProps<{
   /** 游戏启动标签的状态与保存方法，来自 useSettingsLaunch */
@@ -34,11 +35,6 @@ const {
   removeEnvLine,
   saveState,
 } = props.settings;
-
-/** 预设按钮上的文字：整数 GB 显示 `8 GB`，否则按 MB 显示 */
-function memoryLabel(mib: number): string {
-  return mib % 1024 === 0 ? `${mib / 1024} GB` : `${mib} MB`;
-}
 
 /** 应用一个内存预设：填最大内存；最小内存高于它时一并顶上去 */
 function applyMemory(mib: number) {

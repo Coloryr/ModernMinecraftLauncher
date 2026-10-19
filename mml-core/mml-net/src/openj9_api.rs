@@ -9,8 +9,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::urls;
 
+/// 任务出错转 TaskError
+fn task_err(err: impl std::fmt::Display) -> ErrorType {
+    ErrorType::TaskError(ErrorData::from_error(err))
+}
+
 /// Semeru 下载页接口返回的单条结果
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct ResultsObj {
     /// 页面 HTML 正文，用于解析主版本 / 系统 / 架构下拉框
@@ -19,17 +24,8 @@ pub struct ResultsObj {
     pub pagepost_custom_js_value: String,
 }
 
-impl Default for ResultsObj {
-    fn default() -> Self {
-        Self {
-            content: Default::default(),
-            pagepost_custom_js_value: Default::default(),
-        }
-    }
-}
-
 /// Semeru 下载页接口的响应
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct OpenJ9Obj {
     /// 接口是否报错，为 true 时 `results` 不可用
@@ -38,17 +34,8 @@ pub struct OpenJ9Obj {
     pub results: Vec<ResultsObj>,
 }
 
-impl Default for OpenJ9Obj {
-    fn default() -> Self {
-        Self {
-            error: Default::default(),
-            results: Default::default(),
-        }
-    }
-}
-
 /// 单个下载选项
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct OptObj {
     /// 下载直链
@@ -58,33 +45,16 @@ pub struct OptObj {
     pub checksum: String,
 }
 
-impl Default for OptObj {
-    fn default() -> Self {
-        Self {
-            download_link: Default::default(),
-            checksum: Default::default(),
-        }
-    }
-}
-
 /// 某一种包类型下的下载选项集合，字段名沿用页面里的 `opt1`
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct JdkObj {
     /// 页面中该包类型只给出 opt1 一个选项
     pub opt1: OptObj,
 }
 
-impl Default for JdkObj {
-    fn default() -> Self {
-        Self {
-            opt1: Default::default(),
-        }
-    }
-}
-
 /// 单条 Java 下载条目
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct DownloadObj {
     /// 条目名称，页面原文以 `<br>` 分三段，初始化时改写成 `{第二段}+{第三段}`
@@ -101,33 +71,12 @@ pub struct DownloadObj {
     pub jre: JdkObj,
 }
 
-impl Default for DownloadObj {
-    fn default() -> Self {
-        Self {
-            name: Default::default(),
-            version: Default::default(),
-            os: Default::default(),
-            arch: Default::default(),
-            jdk: Default::default(),
-            jre: Default::default(),
-        }
-    }
-}
-
 /// 页面 JS 里 `sourceDataJson` 的结构
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct OpenJ9FileObj {
     /// 全部下载条目
     pub downloads: Vec<DownloadObj>,
-}
-
-impl Default for OpenJ9FileObj {
-    fn default() -> Self {
-        Self {
-            downloads: Default::default(),
-        }
-    }
 }
 
 /// 解析后的 IBM Semeru 可下载列表
@@ -233,14 +182,10 @@ async fn init() -> CoreResult<OpenJ9ListObj> {
     data.push_str("JSON.stringify(sourceDataJson)");
 
     let rt = AsyncRuntime::new().map_err(|err| {
-        ErrorType::TaskError(ErrorData {
-            error: err.to_string(),
-        })
+        task_err(err)
     })?;
     let ctx = AsyncContext::full(&rt).await.map_err(|err| {
-        ErrorType::TaskError(ErrorData {
-            error: err.to_string(),
-        })
+        task_err(err)
     })?;
 
     let result: String = ctx.with(|ctx| ctx.eval(data).unwrap()).await;

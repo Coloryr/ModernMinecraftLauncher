@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::urls;
 
 /// Zulu 包列表接口返回的单个 Java 包
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct ZuluObj {
     /// 目标架构
@@ -27,22 +27,6 @@ pub struct ZuluObj {
     pub url: String,
     /// Zulu 自己的版本号分段
     pub zulu_version: Vec<i32>,
-}
-
-impl Default for ZuluObj {
-    fn default() -> Self {
-        Self {
-            arch: Default::default(),
-            bundle_type: Default::default(),
-            hw_bitness: Default::default(),
-            java_version: Default::default(),
-            name: Default::default(),
-            os: Default::default(),
-            sha256_hash: Default::default(),
-            url: Default::default(),
-            zulu_version: Default::default(),
-        }
-    }
 }
 
 /// 全部 Java 包缓存，首次查询后复用

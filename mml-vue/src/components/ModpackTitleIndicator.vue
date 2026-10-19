@@ -13,9 +13,8 @@
 // 自包含状态：自己订阅安装任务，不依赖父组件传参（两处挂载点都能直接放）。
 import { computed, onMounted, onUnmounted } from "vue";
 import { t } from "../lib/i18n";
-import { useModpackStatus } from "../lib/modpackTasks";
+import { isRunning, useModpackStatus } from "../lib/modpackTasks";
 import { openModpackPopup } from "../windows/windowManager";
-import type { ModPackTaskDto } from "../lib/bindings";
 
 const props = withDefaults(
   defineProps<{
@@ -45,11 +44,6 @@ onUnmounted(() => {
 });
 
 const tasks = computed(() => status.value?.tasks ?? []);
-
-/** 任务是否还在跑 */
-function isRunning(task: ModPackTaskDto): boolean {
-  return !task.done && !task.failed && !task.cancelled;
-}
 
 const running = computed(() => tasks.value.filter(isRunning));
 

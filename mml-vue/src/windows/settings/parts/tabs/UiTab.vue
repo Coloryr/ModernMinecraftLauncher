@@ -82,8 +82,8 @@ onMounted(() => void loadFonts());
         <label class="field-label">{{ t("winSettings.language") }}</label>
         <select class="field-select lang-select" :value="locale"
           @change="onLangChange(($event.target as HTMLSelectElement).value)">
-          <option value="zh_cn">简体中文</option>
-          <option value="en_us">English</option>
+          <option value="zh_cn">{{ t("winSettings.langZhCn") }}</option>
+          <option value="en_us">{{ t("winSettings.langEnUs") }}</option>
         </select>
       </div>
       <div class="general-col">

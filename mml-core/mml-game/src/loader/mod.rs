@@ -58,22 +58,13 @@ impl LoaderKey {
 }
 
 /// 运行库下载信息
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct LibrariesObj {
     /// Maven 坐标
     pub name: String,
     /// 下载源地址
     pub url: String,
-}
-
-impl Default for LibrariesObj {
-    fn default() -> Self {
-        Self {
-            name: Default::default(),
-            url: Default::default(),
-        }
-    }
 }
 
 /// 模组加载器类型，按变体顺序序列化为 `u8`
@@ -110,7 +101,7 @@ impl LoaderType {
     /// # 返回值
     ///
     /// 返回该加载器的 ID 字符串
-    pub fn to_string(&self) -> &'static str {
+    pub fn id(&self) -> &'static str {
         match self {
             LoaderType::Normal => "normal",
             LoaderType::Forge => "forge",
@@ -124,6 +115,8 @@ impl LoaderType {
     }
 
     /// 按 ID 解析加载器类型
+    ///
+    /// - `id`: 加载器 ID，形如 `normal`
     ///
     /// # 返回值
     ///

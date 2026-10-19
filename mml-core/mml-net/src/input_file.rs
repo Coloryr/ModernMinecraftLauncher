@@ -12,6 +12,11 @@ use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType};
 use mml_sys::path_helper;
 use tokio::io::{AsyncRead, AsyncWriteExt};
 
+/// 读流出错转 StreamError
+fn stream_err(err: impl std::fmt::Display) -> ErrorType {
+    ErrorType::StreamError(ErrorData::from_error(err))
+}
+
 /// 输入文件来源
 ///
 /// 封装了多种可能的文件输入形式，调用方可使用统一的 `save_file()`
@@ -46,6 +51,10 @@ impl InputFile {
     /// - `Data` → 直接写入字节
     /// - `Stream` → 同步流写入
     /// - `StreamAsync` → 异步流写入
+    ///
+    /// # 返回值
+    ///
+    /// 保存成功返回 `Ok(())`，源缺失、下载失败或写盘失败返回相应错误
     pub async fn save_file<P: AsRef<Path>>(self, path: P) -> CoreResult<()> {
         match self {
             InputFile::Path(path_buf) => {
@@ -61,15 +70,11 @@ impl InputFile {
                         Ok(Some(data)) => {
                             // 写入文件
                             file.write_all(&data).await.map_err(|err| {
-                                ErrorType::StreamError(ErrorData {
-                                    error: err.to_string(),
-                                })
+                                stream_err(err)
                             })?;
                         }
                         Err(e) => {
-                            return Err(ErrorType::StreamError(ErrorData {
-                                error: e.to_string(),
-                            }));
+                            return Err(stream_err(e));
                         }
                     }
                 }

@@ -165,6 +165,17 @@ pub fn warn(text: String) {
     SEM.get().unwrap().up();
 }
 
+/// 记录警告级别日志，内容取自国际化类型
+///
+/// - `info`: 预定义的国际化信息类型
+pub fn warn_type(info: InfoType) {
+    QUEUE
+        .write()
+        .unwrap()
+        .push(LogItem::new(i18::get_info(info), LogLevel::Warn));
+    SEM.get().unwrap().up();
+}
+
 /// 记录错误级别日志
 ///
 /// - `text`: 日志内容

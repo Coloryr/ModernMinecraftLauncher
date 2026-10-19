@@ -229,7 +229,7 @@ export function useSettingsClient() {
     try {
       customHome.value = await commands.customHome.import(picked);
     } catch (e) {
-      showToast(`${t("winSettings.customHomeImportFailed")}：${tErr(e)}`);
+      showToast(`${t("winSettings.customHomeImportFailed")}${t("common.detailSep")}${tErr(e)}`);
     } finally {
       importingCustomHome.value = false;
     }

@@ -21,6 +21,7 @@ import { formatCount, t, tErr } from "../../lib/i18n";
 import { svgIcon } from "../../lib/modrinthIcon";
 import { cardTags } from "../../lib/projectTags";
 import HighlightText from "../../components/ui/HighlightText.vue";
+import { toggleStar } from "../../lib/projectCollect";
 import { showToast } from "../../lib/toast";
 import { loadGuiConfig } from "../../lib/guiConfig";
 import { useResourceStatus } from "../../lib/resourceTasks";
@@ -32,6 +33,7 @@ import type {
   ResourceDependencyFileDto,
   ResourceSaveDto,
 } from "../../lib/bindings";
+import { formatDate } from "../../lib/format";
 
 defineEmits<{
   /** 请求关闭本窗口 */
@@ -373,6 +375,9 @@ async function download(file: FileListItemDto) {
   await openDeps(pid, file);
 }
 
+/** 前置解析代次：关掉弹窗或换一个前置时，旧一发的返回丢掉 */
+let depsSeq = 0;
+
 /**
  * 打开前置勾选弹窗
  *
@@ -383,9 +388,6 @@ async function download(file: FileListItemDto) {
  * - `pid`: 主文件的项目 ID
  * - `file`: 主文件
  */
-/** 前置解析代次：关掉弹窗或换一个前置时，旧一发的返回丢掉 */
-let depsSeq = 0;
-
 async function openDeps(pid: string, file: FileListItemDto) {
   const mine = ++depsSeq;
   depFile.value = file;
@@ -547,28 +549,7 @@ async function doDownload(pid: string, file: FileListItemDto, world: string | nu
   }
 }
 
-function formatDate(date: string): string {
-  return date ? date.slice(0, 10) : "";
-}
-
 /** 收藏 / 取消收藏 */
-async function toggleStar(item: ProjectItemDto) {
-  const star = !item.isStar;
-  try {
-    await api.collectStar(
-      item.source.source,
-      item.source.fileType,
-      item.source.pid,
-      item.name,
-      item.image,
-      item.url,
-      star,
-    );
-    item.isStar = star;
-  } catch (e) {
-    showToast(tErr(e));
-  }
-}
 
 /** 类型 / 下载源变化：换源重载；存档类型强制 CurseForge */
 watch([source, type], () => {

@@ -268,7 +268,7 @@ fn list_files(dir: &Path, acc: &mut Vec<PathBuf>) {
 pub async fn launch(version: &str, loader: LoaderType, loader_version: &str) -> Outcome {
     let Some(ctx) = ctx() else {
         return Outcome {
-            combo: format!("{}:{version}", loader.to_string()),
+            combo: format!("{}:{version}", loader.id()),
             loader_version: loader_version.to_string(),
             check: "跳过".into(),
             launch: "跳过（本机没有可用的 JDK）".into(),
@@ -278,7 +278,7 @@ pub async fn launch(version: &str, loader: LoaderType, loader_version: &str) -> 
 
     let base = mml_base::get_base_dir();
     let uuid = Uuid::new_v4();
-    let dir = format!("{}-{version}", loader.to_string());
+    let dir = format!("{}-{version}", loader.id());
     let instance = InstanceSettingObj {
         uuid,
         name: dir.clone(),
@@ -346,7 +346,7 @@ pub async fn launch(version: &str, loader: LoaderType, loader_version: &str) -> 
         Err(err) => {
             let text = format!("失败 {err:?}");
             return Outcome {
-                combo: format!("{}:{version}", loader.to_string()),
+                combo: format!("{}:{version}", loader.id()),
                 loader_version: loader_version.to_string(),
                 check: text,
                 launch: "未跑".into(),
@@ -411,7 +411,7 @@ pub async fn launch(version: &str, loader: LoaderType, loader_version: &str) -> 
     };
 
     Outcome {
-        combo: format!("{}:{version}", loader.to_string()),
+        combo: format!("{}:{version}", loader.id()),
         loader_version: loader_version.to_string(),
         check,
         launch,
@@ -432,7 +432,7 @@ pub async fn launch_auto(version: &str, loader: LoaderType) -> Outcome {
         return launch(version, loader, "").await;
     }
 
-    let combo = format!("{}:{version}", loader.to_string());
+    let combo = format!("{}:{version}", loader.id());
     let not_applicable = |reason: String| Outcome {
         combo: combo.clone(),
         loader_version: String::new(),
@@ -492,7 +492,7 @@ fn wanted(loader: &LoaderType, version: &str) -> bool {
     let Ok(filter) = std::env::var("MML_MATRIX") else {
         return true;
     };
-    let key = format!("{}:{version}", loader.to_string());
+    let key = format!("{}:{version}", loader.id());
     filter.split(',').any(|item| item.trim() == key)
 }
 
@@ -600,7 +600,7 @@ async fn launch_matrix() {
             if !wanted(&loader, version) {
                 continue;
             }
-            eprintln!("[矩阵] ==== {}:{version} ====", loader.to_string());
+            eprintln!("[矩阵] ==== {}:{version} ====", loader.id());
             let outcome = launch_auto(version, loader).await;
             eprintln!("[矩阵]   下载 / 检查：{}", outcome.check);
             eprintln!("[矩阵]   启动：{}", outcome.launch);

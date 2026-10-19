@@ -16,6 +16,10 @@ impl CubeModelItemObj {
     ///
     /// - `model`: 顶点坐标数据，每个顶点三个分量
     /// - `point`: 三角面索引数据
+    ///
+    /// # 返回值
+    ///
+    /// 新建的模型数据，直接持有传入的两个数组
     pub fn new(model: Vec<f32>, point: Vec<u16>) -> Self {
         Self { model, point }
     }
@@ -50,6 +54,10 @@ impl SteveModel {
     /// - `left_leg`: 左腿模型
     /// - `right_leg`: 右腿模型
     /// - `cape`: 披风模型
+    ///
+    /// # 返回值
+    ///
+    /// 新建的史蒂夫模型，各部件按传入的模型数据原样持有
     pub fn new(
         head: CubeModelItemObj,
         body: CubeModelItemObj,
@@ -94,6 +102,10 @@ pub struct SteveTexture {
 
 impl SteveTexture {
     /// 创建空的贴图数据
+    ///
+    /// # 返回值
+    ///
+    /// 新建的空贴图数据，各部件 UV 都是空数组
     pub fn new() -> Self {
         Self {
             head: Vec::new(),

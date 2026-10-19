@@ -169,15 +169,6 @@ impl GameArgObj {
     }
 }
 
-/// 处理单个运行库条目，把需要的下载项推进列表
-///
-/// - `item`: 运行库信息
-/// - `list`: 下载项列表，并发写入
-/// - `keys`: 已处理运行库的 SHA1 集合，用于去重
-/// - `natives`: 原生库键集合
-/// - `natives_arm`: ARM 原生库键列表
-/// - `native`: 原生库解压路径
-/// - `game`: 游戏实例，目录回退查找用，可为 `None`
 /// MMC 本地库的文件名：`组:构件:版本[:分类]` → `构件-版本[-分类].jar`
 ///
 /// 与 `maven_utils::version_name_to_path` 的区别是**不带目录**：MMC 的 `MMC-hint: local`
@@ -203,6 +194,15 @@ fn local_lib_name(name: &str) -> String {
     file
 }
 
+/// 处理单个运行库条目，把需要的下载项推进列表
+///
+/// - `item`: 运行库信息
+/// - `list`: 下载项列表，并发写入
+/// - `keys`: 已处理运行库的 SHA1 集合，用于去重
+/// - `natives`: 原生库键集合
+/// - `natives_arm`: ARM 原生库键列表
+/// - `native`: 原生库解压路径
+/// - `game`: 游戏实例，目录回退查找用，可为 `None`
 fn process_one_library(
     item: &GameLibrariesObj,
     list: &Mutex<Vec<FileItemObj>>,

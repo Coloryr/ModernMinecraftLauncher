@@ -20,7 +20,7 @@ fn init_config() -> std::path::PathBuf {
         std::process::id()
     ));
     std::fs::create_dir_all(&dir).expect("创建配置临时目录失败");
-    mml_config::init(&dir);
+    let _ = mml_config::init(&dir);
     dir
 }
 

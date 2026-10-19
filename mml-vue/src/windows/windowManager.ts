@@ -13,6 +13,7 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { commands } from "../lib/bindings";
 import type { ProjectItemDto } from "../lib/bindings";
 import { saveGuiConfig } from "../lib/guiConfig";
+import { t } from "../lib/i18n";
 import { KEYS, readString, writeString } from "../lib/storage";
 import { isTauri } from "../lib/util";
 import { isWindowKind, type WindowKind, WINDOW_REGISTRY } from "./registry";
@@ -605,7 +606,7 @@ function createViaJs(kind: WindowKind, params?: WindowOpenParams) {
     const info = WINDOW_REGISTRY.find((w) => w.kind === kind);
     const win = new WebviewWindow(label, {
       url: urlFor(kind, params).replace(window.location.origin, ""),
-      title: info?.title ?? kind,
+      title: info ? t(info.titleKey) : kind,
       width: size?.width ?? 900,
       height: size?.height ?? 620,
       resizable: true,

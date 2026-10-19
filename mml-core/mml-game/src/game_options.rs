@@ -6,10 +6,11 @@ use std::{
     path::Path,
 };
 
-use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType};
+use mml_names::i18_items::error_type::CoreResult;
 use mml_sys::path_helper;
 
 use crate::launcher::instance_setting_obj::InstanceSettingObj;
+use crate::error::{stream_err};
 
 /// 配置选项表，键 → 值
 pub type InstanceCfg = HashMap<String, String>;
@@ -44,11 +45,7 @@ pub fn read_options<R: Read>(buffer: R, sp: Option<char>) -> CoreResult<Instance
     let mut line = String::new();
     let sp = sp.unwrap_or(':');
     loop {
-        let size = reader.read_line(&mut line).map_err(|err| {
-            ErrorType::StreamError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        let size = reader.read_line(&mut line).map_err(stream_err)?;
         if size == 0 {
             break;
         }
@@ -119,11 +116,7 @@ impl InstanceSettingObj {
                     value,
                     mml_names::get_line_ending()
                 ))
-                .map_err(|err| {
-                    ErrorType::StreamError(ErrorData {
-                        error: err.to_string(),
-                    })
-                })?;
+                .map_err(stream_err)?;
         }
 
         Ok(())
@@ -162,11 +155,7 @@ impl InstanceSettingObj {
                     value,
                     mml_names::get_line_ending()
                 ))
-                .map_err(|err| {
-                    ErrorType::StreamError(ErrorData {
-                        error: err.to_string(),
-                    })
-                })?;
+                .map_err(stream_err)?;
         }
 
         Ok(())

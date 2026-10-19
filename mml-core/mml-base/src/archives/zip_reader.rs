@@ -8,7 +8,7 @@ use std::{
 };
 
 use mml_names::i18_items::error_type::{
-    ArchiveErrorData, CoreResult, ErrorData, ErrorType, FileSystemErrorData,
+    CoreResult, 
 };
 use mml_sys::path_helper;
 use zip::write::SimpleFileOptions;
@@ -17,6 +17,8 @@ use zip::{CompressionMethod, DateTime, ZipArchive, ZipWriter};
 use crate::archives::{
     self, ArchiveAddFile, ArchiveEntryInfo, ArchiveHandle, ArchiveProcess, BaseArchiveGui,
     IBaseArchiveGui,
+    open_error, root_path_or_pack, read_error, write_error,
+    fs_err, archive_err,
 };
 
 /// 保持打开的 Zip 读取句柄，缓存 [`ZipArchive`]，中央目录只解析一次
@@ -51,11 +53,7 @@ impl ZipReader {
         gui: BaseArchiveGui,
     ) -> CoreResult<()> {
         let process = ArchiveProcess::new(gui);
-        let root_path = match root_path {
-            Some(path) => path,
-            None => pack_dir,
-        };
-        Self::zip(&process, archive_file, pack_dir, root_path, filter)
+        Self::zip(&process, archive_file, pack_dir, root_path_or_pack(root_path, pack_dir), filter)
     }
 
     /// 解压 zip 文件到指定目录
@@ -120,30 +118,18 @@ impl ZipReader {
                 let tempfile = archives::normalize_path(relative_path);
 
                 zip.start_file(&tempfile, options).map_err(|err| {
-                    ErrorType::ArchiveError(ArchiveErrorData {
-                        source: path.to_string_lossy().to_string(),
-                        target: tempfile.clone(),
-                        error: err.to_string(),
-                    })
+                    archive_err(path.to_string_lossy().to_string(), tempfile.clone(), err)
                 })?;
 
                 std::io::copy(&mut buffer, &mut zip).map_err(|err| {
-                    ErrorType::ArchiveError(ArchiveErrorData {
-                        source: path.to_string_lossy().to_string(),
-                        target: tempfile.clone(),
-                        error: err.to_string(),
-                    })
+                    archive_err(path.to_string_lossy().to_string(), tempfile.clone(), err)
                 })?;
             } else {
                 let relative_path = path.strip_prefix(root_path).unwrap();
                 let tempfile = archives::normalize_path(relative_path);
 
                 zip.add_directory(&tempfile, options).map_err(|err| {
-                    ErrorType::ArchiveError(ArchiveErrorData {
-                        source: path.to_string_lossy().to_string(),
-                        target: tempfile.clone(),
-                        error: err.to_string(),
-                    })
+                    archive_err(path.to_string_lossy().to_string(), tempfile.clone(), err)
                 })?;
             }
         }
@@ -162,20 +148,12 @@ impl ZipReader {
     /// 解压失败时返回相应错误
     fn unzip(process: &ArchiveProcess, archive_file: &Path, output_dir: &Path) -> CoreResult<()> {
         let file = path_helper::open_read(archive_file)?;
-        let mut archive = ZipArchive::new(file).map_err(|err| {
-            ErrorType::ArchiveOpenError(FileSystemErrorData {
-                path: archive_file.to_path_buf(),
-                error: err.to_string(),
-            })
-        })?;
+        let mut archive = ZipArchive::new(file).map_err(|err| open_error(archive_file, err))?;
         process.set_count(archive.len());
 
         path_helper::create_dir_all(output_dir)?;
         let output_dir_canonical = output_dir.canonicalize().map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: output_dir.to_path_buf(),
-                error: err.to_string(),
-            })
+            fs_err(output_dir.to_path_buf(), err)
         })?;
 
         // 收集需要恢复权限的路径，Unix 下先设为可写，最后再改回只读
@@ -183,11 +161,7 @@ impl ZipReader {
         let mut unix_modes = Vec::new();
 
         for i in 0..archive.len() {
-            let mut file = archive.by_index(i).map_err(|err| {
-                ErrorType::ArchiveReadError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            let mut file = archive.by_index(i).map_err(read_error)?;
 
             // 安全检查：获取安全的输出路径
             let outpath = match file.enclosed_name() {
@@ -210,10 +184,7 @@ impl ZipReader {
 
                     use crate::archives::set_perms;
                     set_perms(&outpath, 0o700).map_err(|err| {
-                        ErrorType::FileSystemError(FileSystemErrorData {
-                            path: output_dir.to_path_buf(),
-                            error: err.to_string(),
-                        })
+                        fs_err(output_dir.to_path_buf(), err)
                     })?;
 
                     unix_modes.push((outpath, mode));
@@ -224,16 +195,8 @@ impl ZipReader {
             if file.is_symlink() {
                 // 读取链接目标
                 let mut target = Vec::new();
-                file.read_to_end(&mut target).map_err(|err| {
-                    ErrorType::ArchiveReadError(ErrorData {
-                        error: err.to_string(),
-                    })
-                })?;
-                let target_str = String::from_utf8(target).map_err(|err| {
-                    ErrorType::ArchiveReadError(ErrorData {
-                        error: err.to_string(),
-                    })
-                })?;
+                file.read_to_end(&mut target).map_err(read_error)?;
+                let target_str = String::from_utf8(target).map_err(read_error)?;
                 make_symlink(&outpath, &target_str)?;
                 continue;
             }
@@ -252,19 +215,12 @@ impl ZipReader {
             if let Some(parent) = outpath.parent() {
                 let res = fs::create_dir_all(parent);
                 if let Err(err) = res {
-                    return Err(ErrorType::FileSystemError(FileSystemErrorData {
-                        path: parent.to_path_buf(),
-                        error: err.to_string(),
-                    }));
+                    return Err(fs_err(parent.to_path_buf(), err));
                 }
             }
             let mut outfile = path_helper::open_write(&outpath)?;
             io::copy(&mut file, &mut outfile).map_err(|err| {
-                ErrorType::ArchiveError(ArchiveErrorData {
-                    source: file.name().unwrap_or_default().to_string(),
-                    target: outpath.display().to_string(),
-                    error: err.to_string(),
-                })
+                archive_err(file.name().unwrap_or_default().to_string(), outpath.display().to_string(), err)
             })?;
 
             // 保留 Unix 权限
@@ -273,10 +229,7 @@ impl ZipReader {
                 use crate::archives::set_perms;
 
                 set_perms(&outpath, mode).map_err(|err| {
-                    ErrorType::FileSystemError(FileSystemErrorData {
-                        path: outpath.to_path_buf(),
-                        error: err.to_string(),
-                    })
+                    fs_err(outpath.to_path_buf(), err)
                 })?;
             }
 
@@ -284,10 +237,7 @@ impl ZipReader {
             if let Some(last_modified) = file.last_modified() {
                 if let Some(system_time) = datetime_to_systemtime(&last_modified) {
                     outfile.set_modified(system_time).map_err(|err| {
-                        ErrorType::FileSystemError(FileSystemErrorData {
-                            path: outpath.to_path_buf(),
-                            error: err.to_string(),
-                        })
+                        fs_err(outpath.to_path_buf(), err)
                     })?;
                 }
             }
@@ -299,10 +249,7 @@ impl ZipReader {
             use crate::archives::set_perms;
 
             set_perms(&path, mode).map_err(|err| {
-                ErrorType::FileSystemError(FileSystemErrorData {
-                    path: path.clone(),
-                    error: err.to_string(),
-                })
+                fs_err(path.clone(), err)
             })?;
         }
 
@@ -321,17 +268,9 @@ impl ZipReader {
     /// 中央目录解析失败时返回相应错误
     pub(crate) fn new(file: fs::File, path: PathBuf) -> CoreResult<Self> {
         let zip = ZipArchive::new(file.try_clone().map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: path.clone(),
-                error: err.to_string(),
-            })
+            fs_err(path.clone(), err)
         })?)
-        .map_err(|err| {
-            ErrorType::ArchiveOpenError(FileSystemErrorData {
-                path: path.clone(),
-                error: err.to_string(),
-            })
-        })?;
+        .map_err(|err| open_error(&path, err))?;
         Ok(Self { file, zip, path })
     }
 
@@ -342,23 +281,12 @@ impl ZipReader {
     /// 重新解析失败时返回相应错误
     fn reload(&mut self) -> CoreResult<()> {
         let mut file = self.file.try_clone().map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: self.path.clone(),
-                error: err.to_string(),
-            })
+            fs_err(self.path.clone(), err)
         })?;
         file.seek(SeekFrom::Start(0)).map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: self.path.clone(),
-                error: err.to_string(),
-            })
+            fs_err(self.path.clone(), err)
         })?;
-        self.zip = ZipArchive::new(file).map_err(|err| {
-            ErrorType::ArchiveOpenError(FileSystemErrorData {
-                path: self.path.clone(),
-                error: err.to_string(),
-            })
-        })?;
+        self.zip = ZipArchive::new(file).map_err(|err| open_error(&self.path, err))?;
         Ok(())
     }
 }
@@ -368,11 +296,7 @@ impl ArchiveHandle for ZipReader {
     fn read_entries(&mut self) -> CoreResult<Vec<ArchiveEntryInfo>> {
         let mut entries = Vec::with_capacity(self.zip.len());
         for i in 0..self.zip.len() {
-            let entry = self.zip.by_index(i).map_err(|err| {
-                ErrorType::ArchiveReadError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            let entry = self.zip.by_index(i).map_err(read_error)?;
             entries.push(ArchiveEntryInfo {
                 name: entry.name().unwrap_or_default().to_string(),
                 is_dir: entry.is_dir(),
@@ -384,24 +308,14 @@ impl ArchiveHandle for ZipReader {
 
     /// 按名称读出条目内容，目录条目视为错误
     fn read(&mut self, name: &str) -> CoreResult<Vec<u8>> {
-        let mut entry = self.zip.by_name(name).map_err(|err| {
-            ErrorType::ArchiveReadError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        let mut entry = self.zip.by_name(name).map_err(read_error)?;
 
         if entry.is_dir() {
-            return Err(ErrorType::ArchiveReadError(ErrorData {
-                error: name.to_string(),
-            }));
+            return Err(read_error(name));
         }
 
         let mut buf = Vec::with_capacity(entry.size() as usize);
-        entry.read_to_end(&mut buf).map_err(|err| {
-            ErrorType::ArchiveReadError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        entry.read_to_end(&mut buf).map_err(read_error)?;
         Ok(buf)
     }
 
@@ -422,19 +336,11 @@ impl ArchiveHandle for ZipReader {
             gui.start(1);
         }
 
-        let mut entry = self.zip.by_name(name).map_err(|err| {
-            ErrorType::ArchiveReadError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        let mut entry = self.zip.by_name(name).map_err(read_error)?;
 
         let mut outfile = path_helper::open_write(output_path)?;
         std::io::copy(&mut entry, &mut outfile).map_err(|err| {
-            ErrorType::ArchiveError(ArchiveErrorData {
-                source: name.to_string(),
-                target: output_path.display().to_string(),
-                error: err.to_string(),
-            })
+            archive_err(name.to_string(), output_path.display().to_string(), err)
         })?;
 
         if let Some(gui) = gui {
@@ -449,17 +355,9 @@ impl ArchiveHandle for ZipReader {
         use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
         let file = self.file.try_clone().map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: self.path.clone(),
-                error: err.to_string(),
-            })
+            fs_err(self.path.clone(), err)
         })?;
-        let mut zip = ZipWriter::new_append(file).map_err(|err| {
-            ErrorType::ArchiveOpenError(FileSystemErrorData {
-                path: self.path.clone(),
-                error: err.to_string(),
-            })
-        })?;
+        let mut zip = ZipWriter::new_append(file).map_err(|err| open_error(&self.path, err))?;
 
         let options = SimpleFileOptions::default()
             .compression_method(CompressionMethod::Deflated)
@@ -470,24 +368,12 @@ impl ArchiveHandle for ZipReader {
             let mut reader = path_helper::open_read(&file.src)?;
 
             zip.start_file(internal_path.as_ref(), options)
-                .map_err(|err| {
-                    ErrorType::ArchiveWriteError(ErrorData {
-                        error: err.to_string(),
-                    })
-                })?;
+                .map_err(write_error)?;
 
-            std::io::copy(&mut reader, &mut zip).map_err(|err| {
-                ErrorType::ArchiveWriteError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            std::io::copy(&mut reader, &mut zip).map_err(write_error)?;
         }
 
-        zip.finish().map_err(|err| {
-            ErrorType::ArchiveWriteError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        zip.finish().map_err(write_error)?;
 
         self.reload()
     }
@@ -497,39 +383,19 @@ impl ArchiveHandle for ZipReader {
         use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
         let file = self.file.try_clone().map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: self.path.clone(),
-                error: err.to_string(),
-            })
+            fs_err(self.path.clone(), err)
         })?;
-        let mut zip = ZipWriter::new_append(file).map_err(|err| {
-            ErrorType::ArchiveOpenError(FileSystemErrorData {
-                path: self.path.clone(),
-                error: err.to_string(),
-            })
-        })?;
+        let mut zip = ZipWriter::new_append(file).map_err(|err| open_error(&self.path, err))?;
 
         let options = SimpleFileOptions::default()
             .compression_method(CompressionMethod::Deflated)
             .unix_permissions(0o644);
 
-        zip.start_file(name, options).map_err(|err| {
-            ErrorType::ArchiveWriteError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        zip.start_file(name, options).map_err(write_error)?;
 
-        zip.write_all(data).map_err(|err| {
-            ErrorType::ArchiveWriteError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        zip.write_all(data).map_err(write_error)?;
 
-        zip.finish().map_err(|err| {
-            ErrorType::ArchiveWriteError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        zip.finish().map_err(write_error)?;
 
         self.reload()
     }
@@ -585,10 +451,7 @@ fn make_symlink(target_path: &Path, link_target: &str) -> CoreResult<()> {
         std::os::windows::fs::symlink_file(target, target_path)
     }
     .map_err(|err| {
-        ErrorType::FileSystemError(FileSystemErrorData {
-            path: target_path.to_path_buf(),
-            error: err.to_string(),
-        })
+        fs_err(target_path.to_path_buf(), err)
     })
 }
 

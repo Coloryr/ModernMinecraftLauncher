@@ -65,6 +65,10 @@ impl ConfigSaveObj {
     }
 
     /// 执行文件写入
+    ///
+    /// # 返回值
+    ///
+    /// 写盘成功返回 `Ok(())`，失败返回相应错误
     pub fn save(&self) -> CoreResult<()> {
         path_helper::write_text(&self.file, &self.json)
     }

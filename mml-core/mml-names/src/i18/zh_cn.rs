@@ -57,6 +57,21 @@ impl I18Lang for ZhCn {
             InfoType::HttpClientRestartDone { work, login } => {
                 format!("HTTP 客户端重启完成：通用[{work}] 登录[{login}]")
             }
+            InfoType::IpcNotifyExisting { port } => {
+                format!("IPC：已通知运行中的实例，端口 {port}")
+            }
+            InfoType::IpcNotifyExistingFailed { port } => {
+                format!("IPC：通知运行中的实例失败，端口 {port}，改为启动新的服务")
+            }
+            InfoType::IpcServerStart { port } => {
+                format!("IPC：服务已启动，监听 127.0.0.1:{port}")
+            }
+            InfoType::IpcClientConnected { addr } => format!("IPC：客户端已连接 {addr}"),
+            InfoType::IpcUnknownMessageType { msg_type } => {
+                format!("IPC：未知的消息类型 {msg_type}")
+            }
+            InfoType::IpcLauncherShowWindow => String::from("IPC：已运行实例请求显示主窗口"),
+            InfoType::IpcGameChannelBound { guid } => format!("IPC：游戏通道已绑定 {guid}"),
         }
     }
 
@@ -90,6 +105,12 @@ impl I18Lang for ZhCn {
                 }
             }
 
+            ErrorType::Aborted { url } => {
+                // 与 HttpError 同一口径：拿不到地址时给个明确说法，别留空白
+                let url = if url.is_empty() { "（无地址）" } else { url.as_str() };
+                format!("网络请求 {url} 被中断：代理或网络设置已更新")
+            }
+
             ErrorType::SerializerError(data) => format!("Json解析失败：{}", data.error),
             ErrorType::PathNotExists(data) => {
                 format!("路径不存在：{}", data.path.display().to_string())
@@ -109,6 +130,11 @@ impl I18Lang for ZhCn {
                     data.error
                 )
             }
+            ErrorType::MoveToTrashError(data) => format!(
+                "把 {} 移到回收站失败，返回码 0x{:X}",
+                data.path.display().to_string(),
+                data.code
+            ),
             ErrorType::FileReadError(data) => format!("文件读取失败：{}", data.error),
 
             ErrorType::ArchiveOpenError(data) => {
@@ -188,11 +214,34 @@ impl I18Lang for ZhCn {
             ErrorType::InvalidOperation => String::from("错误的操作"),
 
             ErrorType::SocketError(data) => format!("Socket处理出错：{}", data.error),
+            ErrorType::MulticastAddrMissing => String::from("没有设置组播发送地址"),
+            ErrorType::MulticastSendFailed(data) => {
+                format!("向 {} 组播发送失败：{}", data.family, data.error)
+            }
             ErrorType::ThreadError(data) => format!("线程启动失败：{}", data.error),
             ErrorType::ProcessError(data) => format!("进程启动失败：{}", data.error),
+            ErrorType::ProcessElevationUnsupported => {
+                String::from("当前平台不支持管理员提权")
+            }
+            ErrorType::NamedPipeCreateFailed(data) => {
+                format!("创建命名管道失败：{}", data.error)
+            }
+            ErrorType::NamedPipeEventCreateFailed(data) => {
+                format!("创建命名管道事件失败：{}", data.error)
+            }
+            ErrorType::NamedPipeConnectTimeout => {
+                String::from("命名管道连接超时，可能是用户拒绝了 UAC 提权")
+            }
+            ErrorType::NamedPipeWaitFailed(data) => {
+                format!("等待命名管道连接失败：{}", data.error)
+            }
+            ErrorType::NamedPipeConnectFailed(data) => {
+                format!("连接命名管道失败：{}", data.error)
+            }
             ErrorType::InstanceVersionError => String::from("版本号错误"),
             ErrorType::Base64Error(data) => format!("BASE64处理失败：{}", data.error),
             ErrorType::StreamError(data) => format!("流处理异常：{}", data.error),
+            ErrorType::MotdVarintTooBig => String::from("MOTD 里的 varint 超过长度上限"),
 
             ErrorType::KeyIsNull => String::from("密钥未设置"),
 
@@ -210,6 +259,30 @@ impl I18Lang for ZhCn {
                 SkinBlockErrorData::RenderFail => String::from("皮肤方块渲染失败"),
                 SkinBlockErrorData::NotFound(id) => format!("皮肤方块不存在：{id}"),
             },
+            ErrorType::DownloadThreadPanic(data) => format!("下载线程异常：{}", data.error),
+            ErrorType::PanicPayloadUnknown => String::from("未知panic"),
+            ErrorType::ModrinthAvatarFailed(data) => {
+                format!("查Modrinth作者头像失败：{}", data.error)
+            }
+            ErrorType::McloUploadRejected(reason) => format!("mclo.gs拒绝上传：{reason}"),
+            ErrorType::MotdConnectTimeout { ip, port } => format!("连接超时：{ip}:{port}"),
+            ErrorType::MotdConnectFailed { ip, port, error } => {
+                format!("连接失败：{ip}:{port} {error}")
+            }
+            ErrorType::MotdBadResponseLen => String::from("响应长度异常"),
+            ErrorType::MotdBadPacketId { packet_id } => format!("响应包类型异常：{packet_id}"),
+            ErrorType::MotdResponseIncomplete => String::from("响应数据不完整"),
+            ErrorType::ApngEncodeFail { stage, error } => {
+                format!("方块动画图标APNG编码失败：{stage} {error}")
+            }
+            ErrorType::IpcRuntimeCreateError(data) => {
+                format!("IPC：创建异步运行时报错：{}", data.error)
+            }
+            ErrorType::IpcBindError(data) => format!("IPC：绑定端口失败：{}", data.error),
+            ErrorType::IpcAcceptError(data) => format!("IPC：接受连接失败：{}", data.error),
+            ErrorType::IpcWriteError(data) => format!("IPC：发送数据失败：{}", data.error),
+            ErrorType::IpcFrameTooLarge { len } => format!("IPC：数据帧过长，{len} 字节"),
+            ErrorType::IpcBufferOverrun => String::from("IPC：接收缓冲区溢出，断开连接"),
         }
     }
 

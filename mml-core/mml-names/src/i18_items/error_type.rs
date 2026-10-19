@@ -9,6 +9,21 @@ pub struct ErrorData {
     pub error: String,
 }
 
+impl ErrorData {
+    /// 由任意可显示的出错值构造错误数据
+    ///
+    /// - `error`: 出错原因，取它的 `Display` 输出
+    ///
+    /// # 返回值
+    ///
+    /// 见 [`ErrorData`]
+    pub fn from_error(error: impl std::fmt::Display) -> Self {
+        Self {
+            error: error.to_string(),
+        }
+    }
+}
+
 /// HTTP 请求错误信息
 #[derive(Clone, Debug)]
 pub struct HttpErrorData {
@@ -33,6 +48,24 @@ pub struct FileSystemErrorData {
     /// 出错的路径
     pub path: PathBuf,
     /// 错误描述
+    pub error: String,
+}
+
+/// 移动到回收站失败的数据
+#[derive(Clone, Debug)]
+pub struct MoveToTrashErrorData {
+    /// 出错的路径
+    pub path: PathBuf,
+    /// Windows 下的 SHFileOperationW 返回码，其它平台为 0
+    pub code: i32,
+}
+
+/// 组播发送失败的数据
+#[derive(Clone, Debug)]
+pub struct MulticastSendErrorData {
+    /// 地址族，`IPv4` 或 `IPv6`
+    pub family: String,
+    /// 失败原因
     pub error: String,
 }
 
@@ -158,6 +191,12 @@ pub enum ErrorType {
     /// Http请求出错
     HttpError(HttpErrorData),
 
+    /// 网络请求被中断：用户改了代理或网络设置，在途请求全部作废
+    Aborted {
+        /// 请求地址；中断发生在请求任务内部时取不到，为空串
+        url: String,
+    },
+
     /// 序列化处理错误
     SerializerError(ErrorData),
 
@@ -177,6 +216,8 @@ pub enum ErrorType {
 
     /// 文件系统处理错误
     FileSystemError(FileSystemErrorData),
+    /// 移动到回收站失败
+    MoveToTrashError(MoveToTrashErrorData),
     /// 文件获取错误
     FileReadError(ErrorData),
     /// 路径不存在
@@ -234,17 +275,93 @@ pub enum ErrorType {
 
     /// Socket处理出错
     SocketError(ErrorData),
+    /// 组播发送地址未设置
+    MulticastAddrMissing,
+    /// 组播发送失败
+    MulticastSendFailed(MulticastSendErrorData),
     /// 线程启动错误
     ThreadError(ErrorData),
     /// 进程启动错误
     ProcessError(ErrorData),
+    /// 当前平台不支持提权
+    ProcessElevationUnsupported,
+    /// 创建命名管道失败
+    NamedPipeCreateFailed(ErrorData),
+    /// 创建命名管道事件失败
+    NamedPipeEventCreateFailed(ErrorData),
+    /// 命名管道连接超时
+    NamedPipeConnectTimeout,
+    /// 等待命名管道连接失败
+    NamedPipeWaitFailed(ErrorData),
+    /// 连接命名管道失败
+    NamedPipeConnectFailed(ErrorData),
     /// 版本号错误
     InstanceVersionError,
     /// BASE64错误
     Base64Error(ErrorData),
     /// 流处理异常
     StreamError(ErrorData),
+    /// MOTD 里的 varint 超过长度上限
+    MotdVarintTooBig,
 
     /// 密钥未设置
     KeyIsNull,
+
+    /// 下载线程 panic，值 = panic 文本
+    DownloadThreadPanic(ErrorData),
+    /// panic 载荷既不是字符串也不是静态串，拿不到原文
+    PanicPayloadUnknown,
+    /// 查 Modrinth 作者头像失败
+    ModrinthAvatarFailed(ErrorData),
+    /// mclo.gs 拒绝上传，值 = 对方给的原因
+    McloUploadRejected(String),
+
+    /// MOTD 查询：连接超时
+    MotdConnectTimeout {
+        /// 服务器地址
+        ip: String,
+        /// 端口
+        port: u16,
+    },
+    /// MOTD 查询：连接失败
+    MotdConnectFailed {
+        /// 服务器地址
+        ip: String,
+        /// 端口
+        port: u16,
+        /// 底层网络错误
+        error: String,
+    },
+    /// MOTD 查询：响应长度非法
+    MotdBadResponseLen,
+    /// MOTD 查询：响应包类型不对
+    MotdBadPacketId {
+        /// 实际收到的包 id
+        packet_id: i32,
+    },
+    /// MOTD 查询：响应数据不完整
+    MotdResponseIncomplete,
+
+    /// 生成方块动画图标时 APNG 编码失败
+    ApngEncodeFail {
+        /// 失败的 png 编码步骤名，如 `set_animated`
+        stage: String,
+        /// 底层编码错误
+        error: String,
+    },
+    /// IPC：创建异步运行时失败
+    IpcRuntimeCreateError(ErrorData),
+    /// IPC：绑定端口失败
+    IpcBindError(ErrorData),
+    /// IPC：接受连接失败
+    IpcAcceptError(ErrorData),
+    /// IPC：发送数据失败
+    IpcWriteError(ErrorData),
+    /// IPC：数据帧超过长度上限
+    IpcFrameTooLarge {
+        /// 实际长度，单位字节
+        len: usize,
+    },
+    /// IPC：接收缓冲区溢出，断开连接
+    IpcBufferOverrun,
 }

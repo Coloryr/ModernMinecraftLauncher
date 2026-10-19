@@ -5,24 +5,15 @@ use serde::{Deserialize, Serialize};
 use crate::mojang::game_arg_obj::ArtifactObj;
 
 /// Forge 运行库下载信息
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ForgeDownloadsObj {
     /// 构件下载信息
     pub artifact: ArtifactObj,
 }
 
-impl Default for ForgeDownloadsObj {
-    /// 全字段取默认值：嵌套结构取默认值
-    fn default() -> Self {
-        Self {
-            artifact: Default::default(),
-        }
-    }
-}
-
 /// Forge 运行库
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ForgeLibrariesObj {
     /// Maven 坐标名
@@ -31,18 +22,8 @@ pub struct ForgeLibrariesObj {
     pub downloads: ForgeDownloadsObj,
 }
 
-impl Default for ForgeLibrariesObj {
-    /// 全字段取默认值：字符串为空串
-    fn default() -> Self {
-        Self {
-            name: Default::default(),
-            downloads: Default::default(),
-        }
-    }
-}
-
 /// Forge 启动参数
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ForgeArgumentsObj {
     /// 游戏参数
@@ -51,18 +32,8 @@ pub struct ForgeArgumentsObj {
     pub jvm: Vec<String>,
 }
 
-impl Default for ForgeArgumentsObj {
-    /// 全字段取默认值：参数列表为空
-    fn default() -> Self {
-        Self {
-            game: Default::default(),
-            jvm: Default::default(),
-        }
-    }
-}
-
 /// Forge 启动版本信息
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ForgeLaunchObj {
     /// 主类
@@ -75,16 +46,4 @@ pub struct ForgeLaunchObj {
     pub arguments: Option<ForgeArgumentsObj>,
     /// 运行库列表
     pub libraries: Vec<ForgeLibrariesObj>,
-}
-
-impl Default for ForgeLaunchObj {
-    /// 全字段取默认值：可选字段为 `None`、列表为空
-    fn default() -> Self {
-        Self {
-            main_class: Default::default(),
-            minecraft_arguments: Default::default(),
-            arguments: Default::default(),
-            libraries: Default::default(),
-        }
-    }
 }

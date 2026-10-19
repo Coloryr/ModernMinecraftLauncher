@@ -16,7 +16,7 @@ use mml_names::{
     names,
 };
 use mml_net::{
-    curseforge_api::file_obj::CurseForgeFileDataObj, input_file::InputFile,
+    curseforge_api::file_obj::CurseForgeFileDataObj,
     modrinth_api::version_obj::ModrinthVersionObj,
 };
 use mml_sys::path_helper;
@@ -46,6 +46,11 @@ use crate::{
         official_obj::OfficialObj,
     },
 };
+
+/// 路径不存在转 PathNotExists
+fn path_not_exists(path: PathBuf) -> ErrorType {
+    ErrorType::PathNotExists(PathNotExistsData { path })
+}
 
 /// 压缩包类型
 pub enum PackType {
@@ -248,9 +253,7 @@ pub async fn add_game_folder<P: AsRef<Path>>(
     cancel: CancellationToken,
 ) -> CoreResult<GameInstance> {
     if !dir.as_ref().exists() || !dir.as_ref().is_dir() {
-        return Err(ErrorType::PathNotExists(PathNotExistsData {
-            path: dir.as_ref().to_path_buf(),
-        }));
+        return Err(path_not_exists(dir.as_ref().to_path_buf()));
     }
 
     let mut instance: Option<InstanceSettingObj> = None;
@@ -344,9 +347,7 @@ async fn modpack<P: AsRef<Path>>(
     icon: Option<String>,
 ) -> CoreResult<Uuid> {
     if !file.as_ref().exists() || file.as_ref().is_dir() {
-        return Err(ErrorType::PathNotExists(PathNotExistsData {
-            path: file.as_ref().to_path_buf(),
-        }));
+        return Err(path_not_exists(file.as_ref().to_path_buf()));
     }
 
     if let Some(pack_gui) = &pack_gui {
@@ -499,9 +500,7 @@ async fn archive<P: AsRef<Path>>(
     cancel: CancellationToken,
 ) -> CoreResult<Uuid> {
     if !file.as_ref().exists() || file.as_ref().is_dir() {
-        return Err(ErrorType::PathNotExists(PathNotExistsData {
-            path: file.as_ref().to_path_buf(),
-        }));
+        return Err(path_not_exists(file.as_ref().to_path_buf()));
     }
 
     if let Some(pack_gui) = &pack_gui {
@@ -588,9 +587,7 @@ async fn mmc_archive<P: AsRef<Path>>(
     cancel: CancellationToken,
 ) -> CoreResult<Uuid> {
     if !file.as_ref().exists() || file.as_ref().is_dir() {
-        return Err(ErrorType::PathNotExists(PathNotExistsData {
-            path: file.as_ref().to_path_buf(),
-        }));
+        return Err(path_not_exists(file.as_ref().to_path_buf()));
     }
 
     if let Some(pack_gui) = &pack_gui {
@@ -715,9 +712,7 @@ async fn hmcl_archive<P: AsRef<Path>>(
     cancel: CancellationToken,
 ) -> CoreResult<Uuid> {
     if !file.as_ref().exists() || file.as_ref().is_dir() {
-        return Err(ErrorType::PathNotExists(PathNotExistsData {
-            path: file.as_ref().to_path_buf(),
-        }));
+        return Err(path_not_exists(file.as_ref().to_path_buf()));
     }
 
     if let Some(pack_gui) = &pack_gui {
@@ -844,9 +839,7 @@ async fn hmcl_server_archive<P: AsRef<Path>>(
     cancel: CancellationToken,
 ) -> CoreResult<Uuid> {
     if !file.as_ref().exists() || file.as_ref().is_dir() {
-        return Err(ErrorType::PathNotExists(PathNotExistsData {
-            path: file.as_ref().to_path_buf(),
-        }));
+        return Err(path_not_exists(file.as_ref().to_path_buf()));
     }
 
     if let Some(pack_gui) = &pack_gui {
@@ -1192,9 +1185,7 @@ async fn launcher_pack<P: AsRef<Path>>(
     cancel: CancellationToken,
 ) -> CoreResult<Uuid> {
     if !file.as_ref().exists() || file.as_ref().is_dir() {
-        return Err(ErrorType::PathNotExists(PathNotExistsData {
-            path: file.as_ref().to_path_buf(),
-        }));
+        return Err(path_not_exists(file.as_ref().to_path_buf()));
     }
 
     if let Some(pack_gui) = &pack_gui {

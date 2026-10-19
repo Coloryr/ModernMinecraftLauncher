@@ -53,7 +53,7 @@ pub struct ModItemDto {
     /// 一个 jar 里可以有多份元数据，例如同时带 `fabric.mod.json` 与 `META-INF/mods.toml`，
     /// 多加载器发布的包就是这么做的，每一份各自报一个加载器 —— 这里汇总去重后全给出来。
     ///
-    /// 取值是 `LoaderType::to_string()`：forge / fabric / quilt / neoforge / optifine /
+    /// 取值是 `LoaderType::id()`：forge / fabric / quilt / neoforge / optifine /
     /// liteloader / normal / custom；顺序按 `LoaderType` 的声明顺序，不是元数据出现顺序，
     /// 展示才稳定。读不出元数据时为空数组。
     pub loaders: Vec<String>,

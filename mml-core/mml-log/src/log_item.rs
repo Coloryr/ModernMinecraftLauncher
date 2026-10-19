@@ -37,6 +37,10 @@ impl LogItem {
     ///
     /// - `text`: 日志内容
     /// - `level`: 日志级别
+    ///
+    /// # 返回值
+    ///
+    /// 新建的日志条目，时间取当前系统时间
     pub fn new(text: String, level: LogLevel) -> Self {
         LogItem {
             log: text,
@@ -48,6 +52,10 @@ impl LogItem {
     /// 获取格式化的时间字符串
     ///
     /// 形如 `2026-1-1 12:0:0`，月 / 日 / 时 / 分 / 秒均不补零
+    ///
+    /// # 返回值
+    ///
+    /// 格式化后的时间串，用的是系统本地时区
     pub fn get_time(&self) -> String {
         let time: DateTime<Local> = self.time.into();
 
@@ -64,6 +72,10 @@ impl LogItem {
     }
 
     /// 获取日志级别的字符串表示
+    ///
+    /// # 返回值
+    ///
+    /// 级别对应的固定字符串，日志输出用
     pub fn get_level(&self) -> &str {
         match self.level {
             LogLevel::Info => "Info",

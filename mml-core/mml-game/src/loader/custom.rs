@@ -9,7 +9,7 @@ use mml_base::{
 };
 use mml_names::{
     i18_items::error_type::{
-        CoreResult, DataNotFoundData, ErrorData, ErrorType, FileSystemErrorData,
+        CoreResult, DataNotFoundData, ErrorType, FileSystemErrorData,
     },
     names,
 };
@@ -24,6 +24,7 @@ use crate::{
         forge_launch_obj::{ForgeLaunchObj, ForgeLibrariesObj},
     },
 };
+use crate::error::{archive_read_err};
 
 /// 自定义加载器 jar 的分析结果
 pub struct CutsomLoaderResObj {
@@ -68,11 +69,7 @@ impl InstanceSettingObj {
         let mut version_json = String::new();
         let version_ok = match zip.by_name(names::VERSION_FILE) {
             Ok(mut file) => {
-                file.read_to_string(&mut version_json).map_err(|err| {
-                    ErrorType::ArchiveReadError(ErrorData {
-                        error: err.to_string(),
-                    })
-                })?;
+                file.read_to_string(&mut version_json).map_err(archive_read_err)?;
                 true
             }
             Err(_) => false,
@@ -82,11 +79,7 @@ impl InstanceSettingObj {
         let mut install_json = String::new();
         let install_ok = match zip.by_name(names::FILE_INSTALL_PROFILE) {
             Ok(mut file) => {
-                file.read_to_string(&mut install_json).map_err(|err| {
-                    ErrorType::ArchiveReadError(ErrorData {
-                        error: err.to_string(),
-                    })
-                })?;
+                file.read_to_string(&mut install_json).map_err(archive_read_err)?;
                 true
             }
             Err(_) => false,

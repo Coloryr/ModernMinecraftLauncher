@@ -12,23 +12,15 @@ use serde::{Deserialize, Serialize};
 use crate::urls;
 
 /// 通道列表，对应 `OPENFRP` 取通道接口的响应体
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct OpenFrpChannelObj {
     /// 节点分组列表，对应 `data`
     pub data: Vec<OpenFrpChannelData>,
 }
 
-impl Default for OpenFrpChannelObj {
-    fn default() -> Self {
-        Self {
-            data: Default::default(),
-        }
-    }
-}
-
 /// 通道分组，对应 `data[]` 的元素
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct OpenFrpChannelData {
     /// 分组名称，对应 `name`
@@ -37,17 +29,8 @@ pub struct OpenFrpChannelData {
     pub proxies: Vec<ProxieObj>,
 }
 
-impl Default for OpenFrpChannelData {
-    fn default() -> Self {
-        Self {
-            name: Default::default(),
-            proxies: Default::default(),
-        }
-    }
-}
-
 /// 单个节点，对应 `proxies[]` 的元素
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ProxieObj {
     /// 节点名称，对应 `name`
@@ -61,51 +44,24 @@ pub struct ProxieObj {
     pub remote: String,
 }
 
-impl Default for ProxieObj {
-    fn default() -> Self {
-        Self {
-            name: Default::default(),
-            id: Default::default(),
-            p_type: Default::default(),
-            remote: Default::default(),
-        }
-    }
-}
-
 /// 通道配置信息，对应 `OPENFRP` 取节点配置接口的响应体
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct OpenFrpChannelInfoObj {
     /// 配置键值对，对应 `proxies`，直接落进 frpc 的 ini 配置
     pub proxies: HashMap<String, String>,
 }
 
-impl Default for OpenFrpChannelInfoObj {
-    fn default() -> Self {
-        Self {
-            proxies: Default::default(),
-        }
-    }
-}
-
 /// frpc 客户端下载信息，对应 `OPENFRP_DOWNLOAD` 的响应体
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct OpenFrpDownloadObj {
     /// 下载配置，对应 `data`
     pub data: OpenFrpDownloadItemObj,
 }
 
-impl Default for OpenFrpDownloadObj {
-    fn default() -> Self {
-        Self {
-            data: Default::default(),
-        }
-    }
-}
-
 /// frpc 下载配置，对应响应体的 `data`
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct OpenFrpDownloadItemObj {
     /// 最新版本号，对应 `latest`，是拼下载地址的路径段
@@ -116,30 +72,12 @@ pub struct OpenFrpDownloadItemObj {
     pub source: Vec<SourceObj>,
 }
 
-impl Default for OpenFrpDownloadItemObj {
-    fn default() -> Self {
-        Self {
-            latest: Default::default(),
-            latest_full: Default::default(),
-            source: Default::default(),
-        }
-    }
-}
-
 /// 下载源，对应 `source[]` 的元素
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct SourceObj {
     /// 源地址前缀，对应 `value`，下载地址 = 前缀 + 版本号 + 文件名
     pub value: String,
-}
-
-impl Default for SourceObj {
-    fn default() -> Self {
-        Self {
-            value: Default::default(),
-        }
-    }
 }
 
 /// 获取通道列表

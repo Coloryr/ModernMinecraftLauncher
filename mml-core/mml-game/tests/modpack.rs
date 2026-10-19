@@ -4,7 +4,7 @@
 //! `cargo test -p mml-game --test modpack -- --ignored --nocapture`
 //! 压缩包路径改源码里的 `PACK_FILE`，CurseForge key 由 GUI 正常注入，测试内为空
 
-use std::{env, path::Path, path::PathBuf, sync::Arc};
+use std::{path::{Path, PathBuf}, sync::Arc};
 
 use mml_game::add_game::{self, PackType};
 use mml_game::gui_hook::{AddInstanceGui, AddModPackGui, AddModPackState, IAddInstanceGui, IAddModPackGui};

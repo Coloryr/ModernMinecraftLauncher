@@ -65,6 +65,8 @@ pub const NAME_IP: &str = "err.nameIp";
 
 /// 未知的下载源
 pub const SOURCE_TYPE: &str = "err.sourceType";
+/// 存档下载只支持 CurseForge 源
+pub const SAVE_SOURCE_LIMIT: &str = "addResource.saveSourceLimit";
 /// 未知的整合包来源
 pub const UNKNOWN_SOURCE: &str = "err.unknownSource";
 /// 未知的加载器类型
@@ -170,6 +172,15 @@ pub const NOT_PNG: &str = "err.notPng";
 pub const IMAGE_INVALID: &str = "err.imageInvalid";
 /// 找不到皮肤 / 披风纹理
 pub const TEXTURE_MISSING: &str = "err.textureMissing";
+
+// ---------- 背景图 ----------
+
+/// 背景图格式不支持
+pub const BG_UNSUPPORTED: &str = "err.bgUnsupported";
+/// 配置目录还没初始化
+pub const BG_CONFIG_DIR: &str = "err.bgConfigDir";
+/// 当前没有设置背景图
+pub const BG_NONE: &str = "err.bgNone";
 
 #[cfg(test)]
 mod tests {

@@ -13,12 +13,14 @@
 //! 是 Microsoft OAuth 认证流程的最后两步。
 
 use mml_config::config_obj::SourceLocal;
-use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType, HttpErrorData};
+use mml_names::i18_items::error_type::{CoreResult, ErrorType};
 
 use reqwest::{Method, Request, Url, header::HeaderValue};
 use serde::{Deserialize, Serialize};
 
 use crate::{url_helper, urls};
+use crate::serializer_err;
+use crate::http_error;
 
 /// 直接下载资源
 ///
@@ -46,7 +48,7 @@ pub async fn get_versions(source: Option<SourceLocal>) -> CoreResult<Vec<u8>> {
 /// 档案里的单件皮肤 / 披风
 ///
 /// 皮肤项只有 `variant`；披风项多一个 `alias`，即披风名，如 `Migrator`
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct SkinObj {
     /// 纹理条目 UUID，对应档案 `skins[]` / `capes[]` 的 `id`
@@ -61,20 +63,8 @@ pub struct SkinObj {
     pub alias: Option<String>,
 }
 
-impl Default for SkinObj {
-    fn default() -> Self {
-        Self {
-            id: Default::default(),
-            state: Default::default(),
-            url: Default::default(),
-            variant: Default::default(),
-            alias: Default::default(),
-        }
-    }
-}
-
 /// Minecraft 玩家档案，对应 `MINECRAFT_SERVICES` 的响应体
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct MinecraftProfileObj {
     /// 玩家 UUID，对应 `id`
@@ -87,47 +77,20 @@ pub struct MinecraftProfileObj {
     pub capes: Vec<SkinObj>,
 }
 
-impl Default for MinecraftProfileObj {
-    fn default() -> Self {
-        Self {
-            id: Default::default(),
-            name: Default::default(),
-            skins: Default::default(),
-            capes: Default::default(),
-        }
-    }
-}
-
 /// 用户档案属性项，对应会话服务器 `properties[]` 的元素
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct UserProfilePropertiesObj {
     /// 属性值，对应 `value`，是 Base64 编码的皮肤 / 披风纹理信息
     pub value: String,
 }
 
-impl Default for UserProfilePropertiesObj {
-    fn default() -> Self {
-        Self {
-            value: Default::default(),
-        }
-    }
-}
-
 /// 用户档案，含纹理属性，对应会话服务器的响应体
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct UserProfileObj {
     /// 档案属性列表，对应 `properties`
     pub properties: Vec<UserProfilePropertiesObj>,
-}
-
-impl Default for UserProfileObj {
-    fn default() -> Self {
-        Self {
-            properties: Default::default(),
-        }
-    }
 }
 
 /// 获取账户信息
@@ -176,9 +139,7 @@ async fn send_profile_json<T: Serialize>(
     );
     let body = serde_json::to_vec(body)
         .map_err(|err| {
-            ErrorType::SerializerError(ErrorData {
-                error: err.to_string(),
-            })
+            serializer_err(err)
         })?
         .into();
     *req.body_mut() = Some(body);
@@ -188,11 +149,7 @@ async fn send_profile_json<T: Serialize>(
     if !status.is_success() {
         let url = res.url().to_string();
         let error = res.text().await.unwrap_or_default();
-        let err = ErrorType::HttpError(HttpErrorData {
-            error,
-            url,
-            status: Some(status.as_u16()),
-        });
+        let err = http_error(error, url, Some(status.as_u16()));
         crate::log_request_error(&err);
         return Err(err);
     }
@@ -246,6 +203,10 @@ pub async fn set_minecraft_cape(token: &str, cape_id: &str) -> CoreResult<()> {
 /// - `variant`: 皮肤型号，取值 `classic` 经典或 `slim` 纤细
 /// - `file_name`: 文件名，服务端记录来源用，取本地文件名即可
 /// - `data`: PNG 文件字节
+///
+/// # 返回值
+///
+/// 上传成功返回 `Ok(())`，服务端拒绝或网络失败返回相应错误
 pub async fn upload_minecraft_skin(
     token: &str,
     variant: &str,
@@ -260,9 +221,7 @@ pub async fn upload_minecraft_skin(
                 .file_name(file_name.to_string())
                 .mime_str("image/png")
                 .map_err(|err| {
-                    ErrorType::SerializerError(ErrorData {
-                        error: err.to_string(),
-                    })
+                    serializer_err(err)
                 })?,
         );
 
@@ -274,11 +233,7 @@ pub async fn upload_minecraft_skin(
     if !status.is_success() {
         let url = res.url().to_string();
         let error = res.text().await.unwrap_or_default();
-        let err = ErrorType::HttpError(HttpErrorData {
-            error,
-            url,
-            status: Some(status.as_u16()),
-        });
+        let err = http_error(error, url, Some(status.as_u16()));
         crate::log_request_error(&err);
         return Err(err);
     }
@@ -324,7 +279,7 @@ pub async fn get_profile_by_name(name: &str) -> CoreResult<MinecraftProfileObj> 
 }
 
 /// Minecraft Token 请求体，对应 `MINECRAFT_SERVICES_XBOX` 的请求体
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct MinecraftTokenObj {
     /// Xbox 身份令牌，对应 `identityToken`，形如 `XBL3.0 x=<uhs>;<token>`
@@ -332,31 +287,14 @@ pub struct MinecraftTokenObj {
     pub identity_token: String,
 }
 
-impl Default for MinecraftTokenObj {
-    fn default() -> Self {
-        Self {
-            identity_token: Default::default(),
-        }
-    }
-}
-
 /// Minecraft Token 响应，对应 `MINECRAFT_SERVICES_XBOX` 的响应体
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct MinecraftTokenResObj {
     /// 访问令牌，对应 `access_token`
     pub access_token: String,
     /// 令牌有效期，单位秒，对应 `expires_in`
     pub expires_in: i64,
-}
-
-impl Default for MinecraftTokenResObj {
-    fn default() -> Self {
-        Self {
-            access_token: Default::default(),
-            expires_in: Default::default(),
-        }
-    }
 }
 
 /// Minecraft 访问令牌及其有效期
@@ -399,7 +337,7 @@ pub async fn get_minecraft_token(uhs: &str, token: &str) -> CoreResult<Minecraft
 }
 
 /// 新闻配图，对应新闻接口的 `default_tile.image`
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ImageObj {
     /// 图片类型，对应 `content_type`
@@ -411,18 +349,8 @@ pub struct ImageObj {
     pub alt: String,
 }
 
-impl Default for ImageObj {
-    fn default() -> Self {
-        Self {
-            content_type: Default::default(),
-            image_url: Default::default(),
-            alt: Default::default(),
-        }
-    }
-}
-
 /// 新闻卡片，对应 `article_grid[]` 的 `default_tile`
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct DefaultTileObj {
     /// 新闻标题，对应 `title`
@@ -435,19 +363,8 @@ pub struct DefaultTileObj {
     pub image: ImageObj,
 }
 
-impl Default for DefaultTileObj {
-    fn default() -> Self {
-        Self {
-            title: Default::default(),
-            sub_header: Default::default(),
-            tile_size: Default::default(),
-            image: Default::default(),
-        }
-    }
-}
-
 /// 单条新闻，对应 `article_grid[]` 的元素
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ArticleGridObj {
     /// 新闻卡片内容，对应 `default_tile`
@@ -458,30 +375,12 @@ pub struct ArticleGridObj {
     pub article_url: String,
 }
 
-impl Default for ArticleGridObj {
-    fn default() -> Self {
-        Self {
-            default_tile: Default::default(),
-            primary_category: Default::default(),
-            article_url: Default::default(),
-        }
-    }
-}
-
 /// Minecraft 官方新闻，对应 `MINECRAFT_NEWS` 的响应体
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct MinecraftNewsObj {
     /// 新闻列表，对应 `article_grid`
     pub article_grid: Vec<ArticleGridObj>,
-}
-
-impl Default for MinecraftNewsObj {
-    fn default() -> Self {
-        Self {
-            article_grid: Default::default(),
-        }
-    }
 }
 
 /// 获取 Minecraft 新闻

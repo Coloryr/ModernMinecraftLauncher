@@ -18,6 +18,7 @@ use tauri::{Emitter, WebviewWindow};
 use crate::dtos::{ModAutoMarkDto, ModAutoMarkProgressDto};
 use crate::err_keys;
 use crate::listens;
+use crate::log_text::LogText;
 
 use super::mods::sha1_of;
 use super::parse_instance;
@@ -112,10 +113,13 @@ pub async fn resource_mods_auto_mark(
             }
             Err(err) => {
                 failed += 1;
-                mml_log::warn(format!(
-                    "自动标记：读文件失败 {}：{err}",
-                    target.path.display()
-                ));
+                mml_log::warn(
+                    LogText::AutoMarkReadFailed {
+                        path: target.path.display().to_string(),
+                        error: err.to_string(),
+                    }
+                    .text(),
+                );
             }
         }
         emit_resource_mods_auto_mark_progress(
@@ -129,7 +133,6 @@ pub async fn resource_mods_auto_mark(
 
     // 2) 分批问 Modrinth：一批 50 个哈希
     let mut marked = 0u32;
-    let mut unknown = 0u32;
     let mut online = {
         let game = instance.read().unwrap();
         game.read_online_info()
@@ -157,12 +160,17 @@ pub async fn resource_mods_auto_mark(
             }
             Err(err) => {
                 // 整批失败只当"这批没认出来"，不中断后面几批
-                mml_log::warn(format!("自动标记：查询 Modrinth 失败：{err}"));
+                mml_log::warn(
+                    LogText::AutoMarkQueryFailed {
+                        error: err.to_string(),
+                    }
+                    .text(),
+                );
             }
         }
     }
     // 没进结果的就是没认出来的（不在 Modrinth 上、或哈希对不上）
-    unknown = total.saturating_sub(marked).saturating_sub(failed);
+    let unknown = total.saturating_sub(marked).saturating_sub(failed);
 
     // 3) 写盘：整份在线信息覆盖一次即可
     if marked > 0 {

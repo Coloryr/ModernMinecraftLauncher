@@ -15,6 +15,16 @@ use tokio::io::{AsyncRead, AsyncReadExt};
 
 use digest::{Digest, DynDigest};
 
+/// 读流出错转 StreamError
+fn stream_err(err: impl std::fmt::Display) -> ErrorType {
+    ErrorType::StreamError(ErrorData::from_error(err))
+}
+
+/// base64 出错转 Base64Error
+fn base64_err(err: impl std::fmt::Display) -> ErrorType {
+    ErrorType::Base64Error(ErrorData::from_error(err))
+}
+
 /// 哈希算法类型，决定输出校验串的长度
 pub enum HashType {
     /// MD5，输出 32 位十六进制串
@@ -84,9 +94,7 @@ pub fn gen_hash_from_reader<R: Read>(hash_type: HashType, reader: &mut R) -> Cor
 
     loop {
         let len = reader.read(&mut buffer).map_err(|err| {
-            ErrorType::StreamError(ErrorData {
-                error: err.to_string(),
-            })
+            stream_err(err)
         })?;
 
         if len == 0 {
@@ -114,9 +122,7 @@ pub async fn gen_hash_from_reader_async<R: AsyncRead + Unpin>(
 
     loop {
         let len = reader.read(&mut buffer).await.map_err(|err| {
-            ErrorType::StreamError(ErrorData {
-                error: err.to_string(),
-            })
+            stream_err(err)
         })?;
 
         if len == 0 {
@@ -187,14 +193,10 @@ pub fn gen_base64_bytes(input: &[u8]) -> String {
 /// 返回解码后的文本；Base64 非法或结果不是合法 UTF-8 时返回相应错误
 pub fn de_base64(input: &str) -> CoreResult<String> {
     let bytes = BASE64.decode(input).map_err(|err| {
-        ErrorType::Base64Error(ErrorData {
-            error: err.to_string(),
-        })
+        base64_err(err)
     })?;
     Ok(String::from_utf8(bytes).map_err(|err| {
-        ErrorType::Base64Error(ErrorData {
-            error: err.to_string(),
-        })
+        base64_err(err)
     })?)
 }
 

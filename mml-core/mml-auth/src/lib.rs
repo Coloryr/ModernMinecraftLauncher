@@ -70,21 +70,37 @@ impl Default for AuthType {
 
 impl AuthType {
     /// 是否有可刷新的令牌；离线账户没有凭据，无令牌可刷新
+    ///
+    /// # 返回值
+    ///
+    /// 不是离线账户时返回 `true`
     pub fn can_refresh(&self) -> bool {
         !matches!(self, AuthType::Offline)
     }
 
     /// 是否支持重新登录，即重输密码重新认证；离线无令牌，OAuth 走静默刷新没有这一步
+    ///
+    /// # 返回值
+    ///
+    /// 不是离线、也不是 OAuth 账户时返回 `true`
     pub fn can_relogin(&self) -> bool {
         !matches!(self, AuthType::Offline | AuthType::OAuth)
     }
 
     /// 是否可编辑；离线账户没有服务器凭据，改名 / 改 UUID 即改账户本身
+    ///
+    /// # 返回值
+    ///
+    /// 离线账户返回 `true`
     pub fn can_edit(&self) -> bool {
         matches!(self, AuthType::Offline)
     }
 
     /// 是否微软正版账户
+    ///
+    /// # 返回值
+    ///
+    /// 是微软正版账户时返回 `true`
     pub fn is_oauth(&self) -> bool {
         matches!(self, AuthType::OAuth)
     }
@@ -119,7 +135,7 @@ impl AuthType {
 ///
 /// 存储一个 Minecraft 账户的完整凭据，用于序列化持久化和登录验证。
 /// 字段使用 PascalCase 命名以兼容 JSON 序列化格式。
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct LoginObj {
     /// 用户名
@@ -167,6 +183,10 @@ impl LoginObj {
     /// - `uuid`: 账户 UUID
     /// - `access_token`: 登录访问令牌
     /// - `client_token`: 客户端标识令牌
+    ///
+    /// # 返回值
+    ///
+    /// 新建的账户，最后登录时间为当前时间，扩展字段为空
     pub fn new(
         user_name: String,
         uuid: String,
@@ -195,18 +215,12 @@ impl LoginObj {
     ///
     /// - `user_name`: 玩家用户名
     /// - `uuid`: 账户 UUID
+    ///
+    /// # 返回值
+    ///
+    /// 新建的空白账户，只有用户名与 UUID，令牌与登录信息都为空
     pub fn new_empty(user_name: String, uuid: String) -> Self {
-        Self {
-            user_name,
-            uuid,
-            access_token: Default::default(),
-            client_token: Default::default(),
-            auth_type: Default::default(),
-            text1: Default::default(),
-            text2: Default::default(),
-            last_login: Default::default(),
-            expire_at: None,
-        }
+        Self { user_name, uuid, ..Default::default() }
     }
 
     /// 创建仅有令牌的账户，无用户名和 UUID
@@ -215,18 +229,12 @@ impl LoginObj {
     ///
     /// - `access_token`: 登录访问令牌
     /// - `client_token`: 客户端标识令牌
+    ///
+    /// # 返回值
+    ///
+    /// 新建的仅令牌账户，用户名与 UUID 为空
     pub fn new_token(access_token: String, client_token: String) -> Self {
-        Self {
-            user_name: Default::default(),
-            uuid: Default::default(),
-            access_token,
-            client_token,
-            auth_type: Default::default(),
-            text1: Default::default(),
-            text2: Default::default(),
-            last_login: Default::default(),
-            expire_at: None,
-        }
+        Self { access_token, client_token, ..Default::default() }
     }
 
     /// 记录访问令牌的有效期，单位秒，按当前时间换算为绝对过期时间
@@ -256,6 +264,10 @@ impl LoginObj {
     /// 获取账户的唯一键，由 UUID 与认证类型组合而成
     ///
     /// 用于在账户存储中索引和去重。
+    ///
+    /// # 返回值
+    ///
+    /// 见 [`UserKeyObj`]
     pub fn get_key(&self) -> UserKeyObj {
         UserKeyObj {
             uuid: self.uuid.clone(),
@@ -286,22 +298,6 @@ impl LoginObj {
                 self.refresh_littleskin(cancel).await
             }
             _ => Ok(()),
-        }
-    }
-}
-
-impl Default for LoginObj {
-    fn default() -> Self {
-        Self {
-            user_name: Default::default(),
-            uuid: Default::default(),
-            access_token: Default::default(),
-            client_token: Default::default(),
-            auth_type: Default::default(),
-            text1: Default::default(),
-            text2: Default::default(),
-            last_login: Default::default(),
-            expire_at: None,
         }
     }
 }

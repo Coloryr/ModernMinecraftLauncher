@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::url_helper;
 
 /// Authlib-Injector 元数据，对应元数据接口的响应体
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct AuthlibInjectorMetaObj {
     /// 最新构建号，对应 `latest_build_number`
@@ -20,33 +20,16 @@ pub struct AuthlibInjectorMetaObj {
     pub artifacts: Vec<ArtifactsObj>,
 }
 
-impl Default for AuthlibInjectorMetaObj {
-    fn default() -> Self {
-        Self {
-            latest_build_number: Default::default(),
-            artifacts: Default::default(),
-        }
-    }
-}
-
 /// 单个构建产物，对应 `artifacts[]` 的元素
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ArtifactsObj {
     /// 构建号，对应 `build_number`，与 `latest_build_number` 比对挑最新
     pub build_number: i32,
 }
 
-impl Default for ArtifactsObj {
-    fn default() -> Self {
-        Self {
-            build_number: Default::default(),
-        }
-    }
-}
-
 /// Authlib-Injector 下载信息，对应单个构建的详情接口响应
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct AuthlibInjectorObj {
     /// 构建号，对应 `build_number`
@@ -59,31 +42,12 @@ pub struct AuthlibInjectorObj {
     pub checksums: ChecksumsObj,
 }
 
-impl Default for AuthlibInjectorObj {
-    fn default() -> Self {
-        Self {
-            build_number: Default::default(),
-            version: Default::default(),
-            download_url: Default::default(),
-            checksums: Default::default(),
-        }
-    }
-}
-
 /// 校验值集合，对应详情接口的 `checksums`
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ChecksumsObj {
     /// SHA-256 哈希，对应 `sha256`，下载后校验用
     pub sha256: String,
-}
-
-impl Default for ChecksumsObj {
-    fn default() -> Self {
-        Self {
-            sha256: Default::default(),
-        }
-    }
 }
 
 /// 内置的 Authlib-Injector 兜底版本，元数据接口不可用时使用

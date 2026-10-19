@@ -285,6 +285,10 @@ impl RunArgObj {
     /// 创建带合理默认值的启动参数
     ///
     /// 内存 512–4096 MB，GC 自动，预启动命令与游戏同时运行
+    ///
+    /// # 返回值
+    ///
+    /// 新建的启动参数，各字段都是 `Some`，GC 模式为 `Auto`
     pub fn new() -> Self {
         RunArgObj {
             remove_jvm_arg: Option::Some(false),
@@ -339,6 +343,10 @@ pub struct WindowSettingObj {
 
 impl WindowSettingObj {
     /// 创建默认窗口设置：1280×720，窗口模式
+    ///
+    /// # 返回值
+    ///
+    /// 新建的窗口设置：窗口模式、1280×720，其余字段为 `None`
     pub fn new() -> Self {
         Self {
             full_screen: Some(false),

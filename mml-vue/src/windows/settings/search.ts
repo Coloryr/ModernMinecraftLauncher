@@ -44,7 +44,7 @@ interface IndexEntry {
   group: string;
   /** 设置项标题的 i18n 键 */
   labelKey: string;
-  /** 额外匹配词（术语 / 英文别名），可选 */
+  /** 额外匹配词，可选；中英别名都列进来，与界面语言无关 */
   extra?: string[];
 }
 

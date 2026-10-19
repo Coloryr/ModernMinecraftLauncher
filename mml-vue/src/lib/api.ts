@@ -1370,6 +1370,7 @@ export const api = {
 export function onGameLog(cb: (e: LogEvent) => void): Promise<UnlistenFn> {
   return listen<LogEvent>(GameLog, (e) => cb(e.payload));
 }
+
 /**
  * ColorMC 迁移进度事件
  *
@@ -1384,6 +1385,7 @@ export function onColormcProgress(
 ): Promise<UnlistenFn> {
   return listen<ColorMcProgressDto>(ColormcProgress, (e) => cb(e.payload));
 }
+
 /**
  * 客户端设置变更事件
  *
@@ -1398,6 +1400,7 @@ export function onColormcProgress(
 export function onClientConfigChange(cb: (e: ClientConfigDto) => void): Promise<UnlistenFn> {
   return listen<ClientConfigDto>(ClientConfigChange, (e) => cb(e.payload));
 }
+
 /**
  * 实例列表显示模式变更事件
  *
@@ -1412,6 +1415,7 @@ export function onClientConfigChange(cb: (e: ClientConfigDto) => void): Promise<
 export function onGuiViewModeChange(cb: (mode: ViewMode) => void): Promise<UnlistenFn> {
   return listen<ViewMode>(GuiViewModeChange, (e) => cb(e.payload));
 }
+
 /**
  * 主题 / 强调色变更事件
  *
@@ -1426,6 +1430,7 @@ export function onGuiViewModeChange(cb: (mode: ViewMode) => void): Promise<Unlis
 export function onGuiThemeChange(cb: (d: GuiThemeDto) => void): Promise<UnlistenFn> {
   return listen<GuiThemeDto>(GuiThemeChange, (e) => cb(e.payload));
 }
+
 /**
  * 实例导出进度事件
  *
@@ -1440,6 +1445,7 @@ export function onExportProgress(
 ): Promise<UnlistenFn> {
   return listen<ExportProgressDto>(ExportProgress, (e) => cb(e.payload));
 }
+
 /**
  * 导出窗口切换目标实例事件
  *
@@ -1454,6 +1460,7 @@ export function onExportProgress(
 export function onExportFocus(cb: (uuid: string) => void): Promise<UnlistenFn> {
   return listen<LogFocusDto>(ExportFocus, (e) => cb(e.payload.uuid));
 }
+
 /**
  * 启动状态事件
  *
@@ -1466,6 +1473,7 @@ export function onExportFocus(cb: (uuid: string) => void): Promise<UnlistenFn> {
 export function onLaunchState(cb: (e: StateEvent) => void): Promise<UnlistenFn> {
   return listen<StateEvent>(LaunchState, (e) => cb(e.payload));
 }
+
 /**
  * 游戏退出事件
  *
@@ -1478,6 +1486,7 @@ export function onLaunchState(cb: (e: StateEvent) => void): Promise<UnlistenFn> 
 export function onGameExit(cb: (e: ExitEvent) => void): Promise<UnlistenFn> {
   return listen<ExitEvent>(GameExit, (e) => cb(e.payload));
 }
+
 /**
  * 启动失败事件
  *
@@ -1490,6 +1499,7 @@ export function onGameExit(cb: (e: ExitEvent) => void): Promise<UnlistenFn> {
 export function onLaunchError(cb: (e: ErrorEvent) => void): Promise<UnlistenFn> {
   return listen<ErrorEvent>(LaunchError, (e) => cb(e.payload));
 }
+
 /**
  * 实例数据变更
  *
@@ -1502,6 +1512,7 @@ export function onLaunchError(cb: (e: ErrorEvent) => void): Promise<UnlistenFn> 
 export function onInstanceChange(cb: (type: string) => void): Promise<UnlistenFn> {
   return listen<{ type: string }>(InstanceChange, (e) => cb(e.payload.type));
 }
+
 /**
  * Java 列表变更事件
  *
@@ -1903,6 +1914,7 @@ export function getLoadState(): Promise<LoadState> {
 export function listMods(uuid: string): Promise<ModItemDto[]> {
   return commands.resource.listMods(uuid);
 }
+
 /**
  * 模组依赖检测：检查各包声明的强制前置是否齐全、版本是否满足
  *
@@ -1917,6 +1929,7 @@ export function listMods(uuid: string): Promise<ModItemDto[]> {
 export function modsDepTest(uuid: string): Promise<DepProblemDto[]> {
   return commands.resource.modsDepTest(uuid);
 }
+
 /**
  * 某个模组的依赖图
  *
@@ -1931,6 +1944,7 @@ export function modsDepTest(uuid: string): Promise<DepProblemDto[]> {
 export function modsDepTree(uuid: string, modUuid: string): Promise<ModDepTreeDto> {
   return commands.resource.modsDepTree(uuid, modUuid);
 }
+
 /**
  * 要和这几个模组一起改的条目
  *
@@ -1949,6 +1963,7 @@ export function modsRelatedMods(
 ): Promise<string[]> {
   return commands.resource.modsRelatedMods(uuid, mods, disable);
 }
+
 /**
  * 模组更新检查：查有在线信息的模组在平台上有没有新文件
  *
@@ -1964,6 +1979,7 @@ export function modsRelatedMods(
 export function modsUpdateCheck(uuid: string): Promise<ModUpdateCheckDto> {
   return commands.resource.modsUpdateCheck(uuid);
 }
+
 /**
  * 下载更新：把勾选的模组换成平台上的新文件
  *
@@ -1980,6 +1996,7 @@ export function modsUpdateCheck(uuid: string): Promise<ModUpdateCheckDto> {
 export function modsUpdateApply(uuid: string, items: ModUpdateApplyDto[]): Promise<void> {
   return commands.resource.modsUpdateApply(uuid, items);
 }
+
 /**
  * 读模组更新记录
  *
@@ -1996,6 +2013,7 @@ export function modsUpdateApply(uuid: string, items: ModUpdateApplyDto[]): Promi
 export function modsUpdateLog(uuid: string): Promise<ModUpdateProjectDto[]> {
   return commands.resource.modsUpdateLog(uuid);
 }
+
 /**
  * 删掉一条模组更新记录
  *
@@ -2010,6 +2028,7 @@ export function modsUpdateLog(uuid: string): Promise<ModUpdateProjectDto[]> {
 export function modsUpdateLogRemove(uuid: string, projectId: string, index: number): Promise<void> {
   return commands.resource.modsUpdateLogRemove(uuid, projectId, index);
 }
+
 /**
  * 查整合包有没有新版本
  *
@@ -2025,6 +2044,7 @@ export function modsUpdateLogRemove(uuid: string, projectId: string, index: numb
 export function modpackCheck(uuid: string): Promise<ModPackUpdateDto> {
   return commands.resource.modpackCheck(uuid);
 }
+
 /**
  * 把整合包升到平台上的新版本
  *
@@ -2039,6 +2059,7 @@ export function modpackCheck(uuid: string): Promise<ModPackUpdateDto> {
 export function modpackUpdate(uuid: string, fileId: string): Promise<void> {
   return commands.resource.modpackUpdate(uuid, fileId);
 }
+
 /**
  * 模组扫描进度事件
  *
@@ -2053,6 +2074,7 @@ export function modpackUpdate(uuid: string, fileId: string): Promise<void> {
 export function onModScanProgress(cb: (e: ModScanProgressDto) => void): Promise<UnlistenFn> {
   return listen<ModScanProgressDto>(ResourceListModsProgress, (e) => cb(e.payload));
 }
+
 /**
  * 模组重复安装事件
  *
@@ -2067,6 +2089,7 @@ export function onModScanProgress(cb: (e: ModScanProgressDto) => void): Promise<
 export function onModsDuplicate(cb: (e: ModDuplicateDto[]) => void): Promise<UnlistenFn> {
   return listen<ModDuplicateDto[]>(ResourceModsDuplicate, (e) => cb(e.payload));
 }
+
 /**
  * 模组更新检查进度事件
  *
@@ -2081,6 +2104,7 @@ export function onModsDuplicate(cb: (e: ModDuplicateDto[]) => void): Promise<Unl
 export function onModsUpdateProgress(cb: (e: ModUpdateProgressDto) => void): Promise<UnlistenFn> {
   return listen<ModUpdateProgressDto>(ResourceModsUpdateProgress, (e) => cb(e.payload));
 }
+
 /**
  * 更新下载完成事件
  *
@@ -2095,6 +2119,7 @@ export function onModsUpdateProgress(cb: (e: ModUpdateProgressDto) => void): Pro
 export function onModsUpdateDone(cb: (e: ModUpdateDoneDto) => void): Promise<UnlistenFn> {
   return listen<ModUpdateDoneDto>(ResourceModsUpdateDone, (e) => cb(e.payload));
 }
+
 /**
  * 启用模组，去掉 .disable / .disabled 后缀
  *
@@ -2110,6 +2135,7 @@ export function onModsUpdateDone(cb: (e: ModUpdateDoneDto) => void): Promise<Unl
 export function enableMod(uuid: string, modUuid: string): Promise<ModRenameDto> {
   return commands.resource.modEnable(uuid, modUuid);
 }
+
 /**
  * 禁用模组，追加 .disable 后缀
  *
@@ -2123,6 +2149,7 @@ export function enableMod(uuid: string, modUuid: string): Promise<ModRenameDto> 
 export function disableMod(uuid: string, modUuid: string): Promise<ModRenameDto> {
   return commands.resource.modDisable(uuid, modUuid);
 }
+
 /**
  * 删除模组
  *
@@ -2147,6 +2174,7 @@ export function deleteMod(uuid: string, modUuid: string): Promise<void> {
 export function getModGroups(uuid: string): Promise<ModGroupDto[]> {
   return commands.resource.modGroups(uuid);
 }
+
 /**
  * 新建模组分组
  *
@@ -2160,6 +2188,7 @@ export function getModGroups(uuid: string): Promise<ModGroupDto[]> {
 export function addModGroup(uuid: string, name: string): Promise<string> {
   return commands.resource.modGroupAdd(uuid, name);
 }
+
 /**
  * 删除模组分组
  *
@@ -2171,6 +2200,7 @@ export function addModGroup(uuid: string, name: string): Promise<string> {
 export function removeModGroup(uuid: string, group: string): Promise<void> {
   return commands.resource.modGroupRemove(uuid, group);
 }
+
 /**
  * 取分组块的完整顺序，含三个状态分组的固定 uuid
  *
@@ -2185,6 +2215,7 @@ export function removeModGroup(uuid: string, group: string): Promise<void> {
 export function getModGroupOrder(uuid: string): Promise<string[]> {
   return commands.resource.modGroupOrder(uuid);
 }
+
 /**
  * 取收起的分组块键集合
  *
@@ -2197,6 +2228,7 @@ export function getModGroupOrder(uuid: string): Promise<string[]> {
 export function getModGroupsCollapsed(uuid: string): Promise<string[]> {
   return commands.resource.modGroupsCollapsed(uuid);
 }
+
 /**
  * 保存收起的分组块键集合
  *
@@ -2206,6 +2238,7 @@ export function getModGroupsCollapsed(uuid: string): Promise<string[]> {
 export function setModGroupsCollapsed(uuid: string, collapsed: string[]): Promise<void> {
   return commands.resource.modGroupCollapsedSet(uuid, collapsed);
 }
+
 /**
  * 重命名模组分组
  *
@@ -2218,6 +2251,7 @@ export function setModGroupsCollapsed(uuid: string, collapsed: string[]): Promis
 export function renameModGroup(uuid: string, group: string, newName: string): Promise<void> {
   return commands.resource.modGroupRename(uuid, group, newName);
 }
+
 /**
  * 把若干模组移到某个分组
  *
@@ -2230,6 +2264,7 @@ export function renameModGroup(uuid: string, group: string, newName: string): Pr
 export function setModGroup(uuid: string, group: string | null, keys: string[]): Promise<void> {
   return commands.resource.modGroupSet(uuid, group, keys);
 }
+
 /**
  * 某实例的资源窗口视图偏好，含左侧分类顺序、上次类别、模组展示方式与表格列宽
  *
@@ -2244,6 +2279,7 @@ export function setModGroup(uuid: string, group: string | null, keys: string[]):
 export function getResourceView(uuid: string): Promise<ResourceViewDto> {
   return commands.resource.viewGet(uuid);
 }
+
 /**
  * 保存资源窗口视图偏好
  *
@@ -2264,6 +2300,7 @@ export function setResourceView(
 ): Promise<void> {
   return commands.resource.viewSet(uuid, order, category, modView, modColWidths);
 }
+
 /**
  * 保存分组块的显示顺序
  *
@@ -2274,6 +2311,7 @@ export function setResourceView(
 export function setModGroupOrder(uuid: string, order: string[]): Promise<void> {
   return commands.resource.modGroupOrderSet(uuid, order);
 }
+
 /**
  * 写模组备注
  *
@@ -2298,6 +2336,7 @@ export function setModNote(uuid: string, file: string, note: string): Promise<vo
 export function listResourcepacks(uuid: string, lang: string): Promise<PackItemDto[]> {
   return commands.resource.listResourcepacks(uuid, lang);
 }
+
 /**
  * 删除材质包
  *
@@ -2325,12 +2364,6 @@ export function enableResourcepack(uuid: string, file: string): Promise<void> {
 }
 
 /**
- * 禁用材质包，上面那条的反向操作，口径见 [`enableResourcepack`]
- *
- * - `uuid`: 实例 uuid
- * - `file`: 材质包文件名
- */
-/**
  * 启动实例，可选直接进入某个存档（1.20+ 的 quick play）
  *
  * - `uuid`: 实例 uuid
@@ -2340,6 +2373,12 @@ export function launchGame(uuid: string, world?: string): Promise<void> {
   return commands.main.launchGame(uuid, world ?? null);
 }
 
+/**
+ * 禁用材质包，上面那条的反向操作，口径见 [`enableResourcepack`]
+ *
+ * - `uuid`: 实例 uuid
+ * - `file`: 材质包文件名
+ */
 export function disableResourcepack(uuid: string, file: string): Promise<void> {
   return commands.resource.resourcepackDisable(uuid, file);
 }
@@ -2356,6 +2395,7 @@ export function disableResourcepack(uuid: string, file: string): Promise<void> {
 export function listSaves(uuid: string): Promise<SaveItemDto[]> {
   return commands.resource.listSaves(uuid);
 }
+
 /**
  * 删除存档
  *
@@ -2367,6 +2407,7 @@ export function listSaves(uuid: string): Promise<SaveItemDto[]> {
 export function deleteSave(uuid: string, dir: string): Promise<void> {
   return commands.resource.deleteSave(uuid, dir);
 }
+
 /**
  * 编辑存档：游戏模式 / 难度 / 极限模式 / 名字 / 地图种子
  *
@@ -2380,6 +2421,7 @@ export function deleteSave(uuid: string, dir: string): Promise<void> {
 export function editSave(uuid: string, dir: string, info: SaveEditDto): Promise<void> {
   return commands.resource.saveEdit(uuid, dir, info);
 }
+
 /**
  * 备份存档
  *
@@ -2393,6 +2435,7 @@ export function editSave(uuid: string, dir: string, info: SaveEditDto): Promise<
 export function backupSave(uuid: string, dir: string): Promise<string> {
   return commands.resource.backupSave(uuid, dir);
 }
+
 /**
  * 某个存档的备份列表
  *
@@ -2406,6 +2449,7 @@ export function backupSave(uuid: string, dir: string): Promise<string> {
 export function listSaveBackups(uuid: string, dir: string): Promise<SaveBackupDto[]> {
   return commands.resource.listSaveBackups(uuid, dir);
 }
+
 /**
  * 还原某个备份
  *
@@ -2431,27 +2475,7 @@ export function restoreSaveBackup(uuid: string, dir: string, file: string): Prom
 export function listScreenshots(uuid: string): Promise<ScreenshotItemDto[]> {
   return commands.resource.listScreenshots(uuid);
 }
-/**
- * 删除截图
- *
- * - `uuid`: 实例 uuid
- * - `name`: 截图文件名
- *
- * 文件进回收站
- */
-/**
- * 重命名一个资源文件或目录
- *
- * - `uuid`: 实例 uuid
- * - `kind`: 资源类别，见 useResourceOps 的 askRename
- * - `parent`: 数据包的存档目录名，其余类别传空串
- * - `name`: 现在的名字
- * - `newName`: 新名字，只给名字本身
- *
- * # 返回值
- *
- * 名字非法、原目标不存在或新名字被占用时返回错误
- */
+
 /**
  * 导出服务器列表：把实例的 `servers.dat` 复制到指定位置
  *
@@ -2480,19 +2504,6 @@ export function importServers(uuid: string, path: string): Promise<void> {
   return commands.resource.serversImport(uuid, path);
 }
 
-/**
- * 手动改一条模组的在线信息：下载源 / 项目编号 / 文件编号
- *
- * - `uuid`: 实例 uuid
- * - `modUuid`: 模组的 uuid
- * - `source`: 下载源，取值 curseforge / modrinth / 空串（按项目号与文件号形态判定）
- * - `projectId`: 项目编号，空串表示这条模组没有在线信息
- * - `fileId`: 文件编号
- *
- * # 返回值
- *
- * 模组不在列表里、下载源取值不认识或写盘失败时返回错误
- */
 /**
  * 自动标记：按文件 SHA512 去 Modrinth 认模组，回填在线信息
  *
@@ -2524,6 +2535,15 @@ export function onModsAutoMarkProgress(
   return listen<ModAutoMarkProgressDto>(ResourceModsAutoMarkProgress, (e) => cb(e.payload));
 }
 
+/**
+ * 手动盖住模组的在线来源，即下载源 / 项目编号 / 文件编号
+ *
+ * - `uuid`: 实例 uuid
+ * - `modUuid`: 模组的 uuid，即文件路径的 v5
+ * - `source`: 下载源，取值 `curseforge` / `modrinth`；空串等于不指定
+ * - `projectId`: 项目编号；空串表示这条模组没有在线信息
+ * - `fileId`: 文件编号
+ */
 export function setModOnline(
   uuid: string,
   modUuid: string,
@@ -2534,6 +2554,16 @@ export function setModOnline(
   return commands.resource.modOnlineSet(uuid, modUuid, source, projectId, fileId);
 }
 
+/**
+ * 重命名一个资源文件或目录
+ *
+ * - `uuid`: 实例 uuid
+ * - `kind`: 资源类别，取值 `saves` / `resourcepacks` / `screenshots` /
+ *   `shaderpacks` / `schematics` / `datapacks`
+ * - `parent`: 只有 `datapacks` 要传，即存档目录名；其余类别传空串
+ * - `name`: 现在的名字，文件名或目录名
+ * - `newName`: 新名字，只给名字本身，不含任何路径
+ */
 export function renameResource(
   uuid: string,
   kind: string,
@@ -2544,9 +2574,18 @@ export function renameResource(
   return commands.resource.rename(uuid, kind, parent, name, newName);
 }
 
+/**
+ * 删除截图
+ *
+ * - `uuid`: 实例 uuid
+ * - `name`: 截图文件名，不是完整路径
+ *
+ * 文件进回收站
+ */
 export function deleteScreenshot(uuid: string, name: string): Promise<void> {
   return commands.resource.deleteScreenshot(uuid, name);
 }
+
 /**
  * 清空全部截图
  *
@@ -2590,6 +2629,7 @@ export function openResourceFolder(
 export function listServers(uuid: string): Promise<ServerItemDto[]> {
   return commands.resource.listServers(uuid);
 }
+
 /**
  * 查询服务器 MOTD
  *
@@ -2615,6 +2655,7 @@ export function getMotd(address: string): Promise<MotdDto> {
 export function addServer(uuid: string, name: string, ip: string): Promise<void> {
   return commands.resource.serverAdd(uuid, name, ip);
 }
+
 /**
  * 编辑服务器
  *
@@ -2635,6 +2676,7 @@ export function updateServer(
 ): Promise<void> {
   return commands.resource.serverUpdate(uuid, name, ip, newName, newIp, acceptTextures);
 }
+
 /**
  * 删除服务器
  *
@@ -2660,6 +2702,7 @@ export function deleteServer(uuid: string, name: string, ip: string): Promise<vo
 export function listShaderpacks(uuid: string): Promise<ShaderItemDto[]> {
   return commands.resource.listShaderpacks(uuid);
 }
+
 /**
  * 启用或停用光影包
  *
@@ -2669,6 +2712,7 @@ export function listShaderpacks(uuid: string): Promise<ShaderItemDto[]> {
 export function setShader(uuid: string, file: string | null): Promise<void> {
   return commands.resource.shaderSet(uuid, file);
 }
+
 /**
  * 删除光影包
  *
@@ -2695,6 +2739,7 @@ export function deleteShaderpack(uuid: string, file: string): Promise<void> {
 export function listSchematics(uuid: string): Promise<SchematicItemDto[]> {
   return commands.resource.listSchematics(uuid);
 }
+
 /**
  * 结构文件详情
  *
@@ -2708,6 +2753,7 @@ export function listSchematics(uuid: string): Promise<SchematicItemDto[]> {
 export function getSchematicDetail(uuid: string, file: string): Promise<SchematicDetailDto> {
   return commands.resource.schematicDetail(uuid, file);
 }
+
 /**
  * 删除结构文件
  *
@@ -2719,6 +2765,7 @@ export function getSchematicDetail(uuid: string, file: string): Promise<Schemati
 export function deleteSchematic(uuid: string, file: string): Promise<void> {
   return commands.resource.deleteSchematic(uuid, file);
 }
+
 /**
  * 在文件管理器里打开实例目录
  *
@@ -2730,6 +2777,7 @@ export function deleteSchematic(uuid: string, file: string): Promise<void> {
 export function openInstanceDir(uuid: string): Promise<void> {
   return commands.main.openInstanceDir(uuid);
 }
+
 /**
  * 列出某个来源下可编辑的配置文件
  *
@@ -2744,6 +2792,7 @@ export function openInstanceDir(uuid: string): Promise<void> {
 export function listConfigFiles(uuid: string, source = ""): Promise<FileItemDto[]> {
   return commands.config.getFiles(uuid, source);
 }
+
 /**
  * 读取一个文本配置文件
  *
@@ -2764,6 +2813,7 @@ export function readConfigFile(
 ): Promise<ConfigTextDto> {
   return commands.config.getFile(uuid, source, file);
 }
+
 /**
  * 按行级差异保存文本配置文件
  *
@@ -2788,6 +2838,7 @@ export function writeConfigFile(
 ): Promise<string> {
   return commands.config.saveFile(uuid, source, file, baseSha1, expectedLines, hunks);
 }
+
 /**
  * 打开一个 NBT 文件，转成可展示、可编辑的树
  *
@@ -2812,6 +2863,7 @@ export function openConfigNbt(
 ): Promise<ConfigNbtDto> {
   return commands.config.openNbt(uuid, source, file, chunk ?? null);
 }
+
 /**
  * 关掉一个 NBT 文件的后端会话，句柄跟着释放
  *
@@ -2829,6 +2881,7 @@ export function closeConfigNbt(
 ): Promise<void> {
   return commands.config.closeNbt(uuid, source, file, chunk ?? null);
 }
+
 /**
  * 按若干处标量修改改写 NBT 文件
  *
@@ -2854,6 +2907,7 @@ export function writeConfigNbt(
 ): Promise<string> {
   return commands.config.setNbt(uuid, source, file, chunk ?? null, baseSha1, edits);
 }
+
 /**
  * 读取区域文件（`.mca`）的区块表
  *
@@ -2872,6 +2926,7 @@ export function readConfigMca(
 ): Promise<McaChunkDto[]> {
   return commands.config.getMca(uuid, source, file);
 }
+
 /**
  * 读取一个图片文件，给图片视图直接用
  *
@@ -2886,6 +2941,7 @@ export function readConfigMca(
 export function readConfigImage(uuid: string, source: string, file: string): Promise<string> {
   return commands.config.getImage(uuid, source, file);
 }
+
 /**
  * 读取任意文件的一段字节，给二进制视图翻页用
  *
@@ -2924,6 +2980,7 @@ export function readConfigBytes(
 export function listDatapacks(uuid: string, dir: string): Promise<DataPackItemDto[]> {
   return commands.resource.listDatapacks(uuid, dir);
 }
+
 /**
  * 切换数据包启用状态
  *
@@ -2934,6 +2991,7 @@ export function listDatapacks(uuid: string, dir: string): Promise<DataPackItemDt
 export function toggleDatapack(uuid: string, dir: string, name: string): Promise<void> {
   return commands.resource.datapackToggle(uuid, dir, name);
 }
+
 /**
  * 删除数据包
  *

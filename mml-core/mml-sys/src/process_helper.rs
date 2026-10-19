@@ -23,6 +23,11 @@ use std::{
 
 use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType};
 
+/// 出错原因转 ProcessError
+fn process_err(err: impl std::fmt::Display) -> ErrorType {
+    ErrorType::ProcessError(ErrorData::from_error(err))
+}
+
 /// 进程输出流统一封装
 ///
 /// 统一普通子进程的输出管道和提权进程的命名管道，对外提供统一的 `Read` 接口。
@@ -121,11 +126,7 @@ pub fn launch<P: AsRef<Path>>(
             cmd.arg(arg);
         }
 
-        let mut child = cmd.spawn().map_err(|err| {
-            ErrorType::ProcessError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        let mut child = cmd.spawn().map_err(process_err)?;
         let stdout = child.stdout.take().map(OutputStream::Stdout);
         let stderr = child.stderr.take().map(OutputStream::Stderr);
 
@@ -182,11 +183,7 @@ fn launch_with_elevation<P: AsRef<Path>>(
         }
 
         cmd.stdout(Stdio::piped()).stderr(Stdio::null());
-        let mut child = cmd.spawn().map_err(|err| {
-            ErrorType::ProcessError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        let mut child = cmd.spawn().map_err(process_err)?;
         let stdout = child.stdout.take().map(OutputStream::Stdout);
         Ok(LaunchResult {
             child,
@@ -212,11 +209,7 @@ fn launch_with_elevation<P: AsRef<Path>>(
         }
 
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
-        let mut child = cmd.spawn().map_err(|err| {
-            ErrorType::ProcessError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        let mut child = cmd.spawn().map_err(process_err)?;
         let stdout = child.stdout.take().map(OutputStream::Stdout);
         let stderr = child.stderr.take().map(OutputStream::Stderr);
         Ok(LaunchResult {
@@ -230,9 +223,7 @@ fn launch_with_elevation<P: AsRef<Path>>(
 
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     {
-        Err(ErrorType::ProcessError(ErrorData {
-            error: "Admin elevation not supported on this platform".to_string(),
-        }))
+        Err(ErrorType::ProcessElevationUnsupported)
     }
 }
 
@@ -242,7 +233,10 @@ fn launch_with_elevation<P: AsRef<Path>>(
 
 /// Windows 提权实现：PowerShell RunAs 起提权 helper，helper 经命名管道回传目标进程输出
 ///
-/// 参数含义同 [`launch`]。
+/// - `path`: 可执行文件路径
+/// - `args`: 程序参数
+/// - `env`: 环境变量
+/// - `working_dir`: 工作目录
 ///
 /// # 返回值
 ///
@@ -261,7 +255,6 @@ pub fn launch_with_elevation_windows<P: AsRef<Path>>(
 
     use windows::Win32::Foundation::HANDLE;
 
-    use mml_names::i18_items::error_type::{ErrorData, ErrorType};
 
     let id = uuid::Uuid::new_v4().to_string().replace('-', "");
     let stdout_pipe_name = format!("mml_stdout_{}", id);
@@ -330,11 +323,7 @@ pub fn launch_with_elevation_windows<P: AsRef<Path>>(
     cmd.arg("-Command").arg(&ps_cmd);
     cmd.stdout(Stdio::piped()).stderr(Stdio::null());
 
-    let mut launcher = cmd.spawn().map_err(|err| {
-        ErrorType::ProcessError(ErrorData {
-            error: err.to_string(),
-        })
-    })?;
+    let mut launcher = cmd.spawn().map_err(process_err)?;
 
     // 从初始 PowerShell stdout 读取 helper 的 PID
     let pid = launcher
@@ -448,12 +437,9 @@ pub fn create_named_pipe(name: &str) -> Result<windows::Win32::Foundation::HANDL
 
     // INVALID_HANDLE_VALUE 比较，HANDLE 是 *mut c_void，需要转为 usize
     if handle == INVALID_HANDLE_VALUE {
-        return Err(ErrorType::ProcessError(ErrorData {
-            error: format!(
-                "CreateNamedPipeW failed: {}",
-                std::io::Error::last_os_error()
-            ),
-        }));
+        return Err(ErrorType::NamedPipeCreateFailed(ErrorData::from_error(
+            std::io::Error::last_os_error(),
+        )));
     }
 
     Ok(handle)
@@ -488,8 +474,8 @@ pub fn connect_named_pipe_with_timeout(
     // 创建事件用于 Overlapped I/O
     let event = unsafe { CreateEventW(None, true, false, None) };
     if let Err(err) = event {
-        return Err(ErrorType::ProcessError(ErrorData {
-            error: format!("CreateEventW failed: {}", err.message()),
+        return Err(ErrorType::NamedPipeEventCreateFailed(ErrorData {
+            error: err.message(),
         }));
     }
     let event = event.unwrap();
@@ -518,16 +504,13 @@ pub fn connect_named_pipe_with_timeout(
                     })?;
                 }
                 // handle 被 drop，CloseHandle 会被调用
-                return Err(ErrorType::ProcessError(ErrorData {
-                    error: if wait_result == WAIT_TIMEOUT {
-                        "Named pipe connection timed out (UAC declined?)".to_string()
-                    } else {
-                        format!(
-                            "WaitForSingleObject failed: {}",
-                            std::io::Error::last_os_error()
-                        )
-                    },
-                }));
+                return Err(if wait_result == WAIT_TIMEOUT {
+                    ErrorType::NamedPipeConnectTimeout
+                } else {
+                    ErrorType::NamedPipeWaitFailed(ErrorData::from_error(
+                        std::io::Error::last_os_error(),
+                    ))
+                });
             }
         } else if err.code() == HRESULT(ERROR_PIPE_CONNECTED.0 as i32) {
             // 客户端在 ConnectNamedPipe 之前就已连接
@@ -539,9 +522,7 @@ pub fn connect_named_pipe_with_timeout(
                     })
                 })?;
             };
-            return Err(ErrorType::ProcessError(ErrorData {
-                error: format!("ConnectNamedPipe failed: error code {}", err),
-            }));
+            return Err(ErrorType::NamedPipeConnectFailed(ErrorData::from_error(err)));
         }
     }
     // result != 0 → 立即连接成功
@@ -568,11 +549,7 @@ pub fn connect_named_pipe_with_timeout(
 ///
 /// 启动器进程创建或等待失败时返回相应错误，成功返回 `Ok(())`
 pub fn launch_admin(args: &[String]) -> CoreResult<()> {
-    let current_exe = std::env::current_exe().map_err(|err| {
-        ErrorType::ProcessError(ErrorData {
-            error: err.to_string(),
-        })
-    })?;
+    let current_exe = std::env::current_exe().map_err(process_err)?;
 
     #[cfg(target_os = "windows")]
     {
@@ -589,16 +566,8 @@ pub fn launch_admin(args: &[String]) -> CoreResult<()> {
             .arg("-Command")
             .arg(ps_cmd)
             .spawn()
-            .map_err(|err| {
-                ErrorType::ProcessError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
-        child.wait().map_err(|err| {
-            ErrorType::ProcessError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+            .map_err(process_err)?;
+        child.wait().map_err(process_err)?;
         Ok(())
     }
 
@@ -647,11 +616,7 @@ pub fn launch_admin(args: &[String]) -> CoreResult<()> {
 ///
 /// 返回按行拆分、去空的 stdout；命令启动失败报错，非零退出码返回空列表
 pub fn run_command(command: &str) -> CoreResult<Vec<String>> {
-    let output = Command::new(command).output().map_err(|err| {
-        ErrorType::ProcessError(ErrorData {
-            error: err.to_string(),
-        })
-    })?;
+    let output = Command::new(command).output().map_err(process_err)?;
 
     if !output.status.success() {
         return Ok(Vec::new());
@@ -678,11 +643,7 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<std::ffi::OsStr>,
 {
-    let output = Command::new(command).args(args).output().map_err(|err| {
-        ErrorType::ProcessError(ErrorData {
-            error: err.to_string(),
-        })
-    })?;
+    let output = Command::new(command).args(args).output().map_err(process_err)?;
 
     if !output.status.success() {
         return Ok(Vec::new());

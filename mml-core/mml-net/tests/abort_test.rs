@@ -23,7 +23,7 @@ fn init() {
         let exe_dir = exe_path.parent().expect("Failed to get exe directory");
         let run_dir = exe_dir.parent().unwrap().to_path_buf();
 
-        mml_log::start(&run_dir);
+        let _ = mml_log::start(&run_dir);
         let _ = mml_config::init(&run_dir);
         mml_net::init();
     });

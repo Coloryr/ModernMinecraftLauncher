@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Modrinth 搜索返回，对应 `search` 接口
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ModrinthSearchObj {
     /// 命中的项目总数，对应响应键 `total_hits`，用于算总页数
@@ -12,18 +12,8 @@ pub struct ModrinthSearchObj {
     pub hits: Vec<HitObj>,
 }
 
-impl Default for ModrinthSearchObj {
-    /// 全字段取默认值，配合 `#[serde(default)]` 兜底缺失字段
-    fn default() -> Self {
-        Self {
-            total_hits: Default::default(),
-            hits: Default::default(),
-        }
-    }
-}
-
 /// 单条搜索结果，对应 `hits` 数组里的一项
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct HitObj {
     /// 项目 ID，形如 `1KVo5zza`
@@ -46,22 +36,4 @@ pub struct HitObj {
     pub icon_url: Option<String>,
     /// 最后更新时间，RFC 3339 字符串
     pub date_modified: String,
-}
-
-impl Default for HitObj {
-    /// 全字段取默认值，配合 `#[serde(default)]` 兜底缺失字段
-    fn default() -> Self {
-        Self {
-            project_id: Default::default(),
-            author: Default::default(),
-            author_id: Default::default(),
-            title: Default::default(),
-            description: Default::default(),
-            categories: Default::default(),
-            gallery: Default::default(),
-            downloads: Default::default(),
-            icon_url: Default::default(),
-            date_modified: Default::default(),
-        }
-    }
 }

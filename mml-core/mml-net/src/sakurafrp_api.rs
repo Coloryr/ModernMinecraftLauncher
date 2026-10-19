@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::urls;
 
 /// 单个通道，对应 `tunnels` 接口返回的一项
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct SakuraFrpChannelObj {
     /// 通道 ID，对应响应键 `id`
@@ -24,54 +24,24 @@ pub struct SakuraFrpChannelObj {
     pub remote: String,
 }
 
-impl Default for SakuraFrpChannelObj {
-    /// 全字段取默认值，配合 `#[serde(default)]` 兜底缺失字段
-    fn default() -> Self {
-        Self {
-            id: Default::default(),
-            name: Default::default(),
-            c_type: Default::default(),
-            remote: Default::default(),
-        }
-    }
-}
-
 /// 通道配置查询请求体，对应 `tunnel/config` 接口
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct SakuraFrpGetChannelObj {
     /// 查询的通道 ID，对应请求键 `query`
     pub query: i32,
 }
 
-impl Default for SakuraFrpGetChannelObj {
-    /// 全字段取默认值，配合 `#[serde(default)]` 兜底缺失字段
-    fn default() -> Self {
-        Self {
-            query: Default::default(),
-        }
-    }
-}
-
 /// frpc 客户端下载信息，对应 `system/clients` 接口
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct SakuraFrpDownloadObj {
     /// frpc 各架构下载项，对应响应键 `frpc`
     pub frpc: SakuraFrpDownloadItemObj,
 }
 
-impl Default for SakuraFrpDownloadObj {
-    /// 全字段取默认值，配合 `#[serde(default)]` 兜底缺失字段
-    fn default() -> Self {
-        Self {
-            frpc: Default::default(),
-        }
-    }
-}
-
 /// frpc 各架构下载信息
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct SakuraFrpDownloadItemObj {
     /// 各平台架构的下载项，对应响应键 `archs`
@@ -80,18 +50,8 @@ pub struct SakuraFrpDownloadItemObj {
     pub ver: String,
 }
 
-impl Default for SakuraFrpDownloadItemObj {
-    /// 全字段取默认值，配合 `#[serde(default)]` 兜底缺失字段
-    fn default() -> Self {
-        Self {
-            archs: Default::default(),
-            ver: Default::default(),
-        }
-    }
-}
-
 /// 各平台架构的下载项集合，键名即平台与架构
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ArchsObj {
     /// Windows amd64 的 frpc 下载项
@@ -108,22 +68,8 @@ pub struct ArchsObj {
     pub darwin_arm64: ArchItemObj,
 }
 
-impl Default for ArchsObj {
-    /// 全字段取默认值，配合 `#[serde(default)]` 兜底缺失字段
-    fn default() -> Self {
-        Self {
-            windows_amd64: Default::default(),
-            windows_arm64: Default::default(),
-            linux_amd64: Default::default(),
-            linux_arm64: Default::default(),
-            darwin_amd64: Default::default(),
-            darwin_arm64: Default::default(),
-        }
-    }
-}
-
 /// 单个架构的下载项
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ArchItemObj {
     /// 架构标题，用于拼下载任务名
@@ -132,17 +78,6 @@ pub struct ArchItemObj {
     pub url: String,
     /// 文件哈希，SHA1 十六进制
     pub hash: String,
-}
-
-impl Default for ArchItemObj {
-    /// 全字段取默认值，配合 `#[serde(default)]` 兜底缺失字段
-    fn default() -> Self {
-        Self {
-            title: Default::default(),
-            url: Default::default(),
-            hash: Default::default(),
-        }
-    }
 }
 
 /// 获取通道列表

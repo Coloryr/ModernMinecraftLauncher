@@ -5,14 +5,6 @@
 import { ref } from "vue";
 
 /**
- * 跟手浮起副本
- *
- * # 返回值
- *
- * - `ghost`: 副本状态（被抓住的项 + 指针位置），`null` 表示没在拖
- * - `startGhost` / `moveGhost` / `stopGhost`: 开始 / 跟随 / 结束
- */
-/**
  * 拖动遮罩下的最上层元素
  *
  * 拖动时 DragGhost 会铺一层 `.drag-shield` 挡住底下的界面（不然按钮会跟着悬停高亮、
@@ -31,6 +23,14 @@ export function elementBeneathShield(x: number, y: number): Element | null {
   );
 }
 
+/**
+ * 跟手浮起副本
+ *
+ * # 返回值
+ *
+ * - `ghost`: 副本状态（被抓住的项 + 指针位置），`null` 表示没在拖
+ * - `startGhost` / `moveGhost` / `stopGhost`: 开始 / 跟随 / 结束
+ */
 export function useDragGhost<T>() {
   const ghost = ref<{ item: T; x: number; y: number } | null>(null);
 

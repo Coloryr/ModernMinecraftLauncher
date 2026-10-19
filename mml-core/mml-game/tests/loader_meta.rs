@@ -15,7 +15,7 @@ fn loader_type_id_round_trip() {
 
     for id in ids {
         let loader = LoaderType::from_string(id).expect("ids() 里的 ID 必须能解析");
-        assert_eq!(loader.to_string(), id, "{id} 应与解析结果一致");
+        assert_eq!(loader.id(), id, "{id} 应与解析结果一致");
     }
 
     // 未知 ID 返回 None
@@ -29,7 +29,7 @@ fn loader_type_prefixes() {
     // 前缀 = id，保持与版本文件夹命名一致
     for id in LoaderType::ids() {
         let loader = LoaderType::from_string(id).unwrap();
-        assert_eq!(loader.to_string(), id);
+        assert_eq!(loader.id(), id);
     }
 }
 

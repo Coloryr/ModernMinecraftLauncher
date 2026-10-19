@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Modrinth 项目详情，对应项目详情接口的响应体
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ModrinthProjectObj {
     /// 项目 ID，对应 `id`
@@ -30,26 +30,8 @@ pub struct ModrinthProjectObj {
     pub gallery: Vec<GalleryObj>,
 }
 
-impl Default for ModrinthProjectObj {
-    fn default() -> Self {
-        Self {
-            id: Default::default(),
-            project_type: Default::default(),
-            title: Default::default(),
-            description: Default::default(),
-            body: Default::default(),
-            updated: Default::default(),
-            downloads: Default::default(),
-            loaders: Default::default(),
-            icon_url: Default::default(),
-            categories: Default::default(),
-            gallery: Default::default(),
-        }
-    }
-}
-
 /// 项目图库图片，对应 `gallery[]` 的元素
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct GalleryObj {
     /// 图片标题，对应 `title`，可缺省为 `null`
@@ -60,15 +42,4 @@ pub struct GalleryObj {
     pub description: Option<String>,
     /// 排序序号，对应 `ordering`，越小越靠前
     pub ordering: i32,
-}
-
-impl Default for GalleryObj {
-    fn default() -> Self {
-        Self {
-            title: Default::default(),
-            raw_url: Default::default(),
-            description: Default::default(),
-            ordering: Default::default(),
-        }
-    }
 }

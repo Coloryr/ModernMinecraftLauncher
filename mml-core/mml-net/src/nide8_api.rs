@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::urls;
 
 /// Nide8 认证 JAR 信息
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct Nide8Obj {
     /// JAR 版本号，对应响应键 `jarVersion`
@@ -18,16 +18,6 @@ pub struct Nide8Obj {
     /// JAR 文件哈希，对应响应键 `jarHash`
     #[serde(rename = "jarHash")]
     pub jar_hash: String,
-}
-
-impl Default for Nide8Obj {
-    /// 全字段取默认值，配合 `#[serde(default)]` 兜底缺失字段
-    fn default() -> Self {
-        Self {
-            jar_version: Default::default(),
-            jar_hash: Default::default(),
-        }
-    }
 }
 
 /// 获取 Nide8 认证 JAR 的最新版本信息和哈希

@@ -6,7 +6,7 @@
 //!
 //! 这里验证两个修复点：`is_aborted` 能认出中断错误，且中断后不会有人再发新请求。
 
-use std::io::{Read, Write};
+use std::io::Read;
 use std::net::TcpListener;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -120,11 +120,9 @@ fn aborted_request_is_not_retried_on_other_source() {
     );
 
     // 反向用例 2：真正的中断错误必须被认出，回退分支据此提前 return
-    let abort_err = ErrorType::HttpError(HttpErrorData {
+    let abort_err = ErrorType::Aborted {
         url: String::new(),
-        error: mml_net::ABORT_MSG.to_string(),
-        status: None,
-    });
+    };
     assert!(
         mml_net::is_aborted(&abort_err),
         "中断错误必须能被识别"

@@ -120,8 +120,8 @@ async function restart() {
       <p class="modal-text">{{ t("colormc.entriesDone", { n: report.entries }) }}</p>
 
       <div v-if="report.instancesOk.length" class="line ok">
-        {{ t("colormc.instOk", { n: report.instancesOk.length }) }}：{{
-          report.instancesOk.join("、")
+        {{ t("colormc.instOk", { n: report.instancesOk.length }) }}{{ t("common.detailSep") }}{{
+          report.instancesOk.join(t("common.listSep"))
         }}
       </div>
       <div v-if="report.instancesBad.length" class="line bad">
@@ -131,7 +131,7 @@ async function restart() {
         {{ t("colormc.instLegacyGui", { n: report.instancesLegacyGui.length }) }}
       </div>
       <div v-if="report.failed.length" class="line bad">
-        {{ t("colormc.failedHead", { n: report.failed.length }) }}{{ report.failed.join("、") }}
+        {{ t("colormc.failedHead", { n: report.failed.length }) }}{{ report.failed.join(t("common.listSep")) }}
       </div>
 
       <!-- 兼容性：只列条目名，说明挂在悬停提示上 -->

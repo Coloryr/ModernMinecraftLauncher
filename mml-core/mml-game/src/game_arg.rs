@@ -32,6 +32,7 @@ use crate::{
 };
 
 /// 游戏启动时的配置存储
+#[derive(Default)]
 pub struct GameLaunchObj {
     /// 游戏运行库
     pub game_libs: Vec<FileItemObj>,
@@ -57,25 +58,6 @@ pub struct GameLaunchObj {
     pub log4j_xml: Option<FileItemObj>,
     /// 是否使用ColorASM
     pub use_asm: bool,
-}
-
-impl Default for GameLaunchObj {
-    fn default() -> Self {
-        Self {
-            game_libs: Default::default(),
-            loader_libs: Default::default(),
-            installer_libs: Default::default(),
-            jvm_args: Default::default(),
-            game_args: Default::default(),
-            java_versions: Default::default(),
-            main_class: Default::default(),
-            native_dir: Default::default(),
-            assets: Default::default(),
-            game_jar: Default::default(),
-            log4j_xml: Default::default(),
-            use_asm: Default::default(),
-        }
-    }
 }
 
 /// V1启动Jvm参数
@@ -616,7 +598,7 @@ impl InstanceSettingObj {
             LoaderType::Custom => "custom".to_string(),
             _ => format!(
                 "{}-{}-{}",
-                self.loader.to_string(),
+                self.loader.id(),
                 self.version,
                 self.loader_version.as_ref().unwrap()
             ),
@@ -803,7 +785,6 @@ impl InstanceSettingObj {
             LoaderType::Quilt => self.get_quilt().unwrap().main_class.clone(),
             LoaderType::OptiFine => "com.coloryr.optifinewrapper.OptifineWrapper".to_string(),
             LoaderType::Custom => self.get_custom_loader_mainclass(),
-            LoaderType::LiteLoader => todo!(),
         })
     }
 

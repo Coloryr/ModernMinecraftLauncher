@@ -61,6 +61,8 @@ impl VersionType {
 
     /// 按 ID 解析版本类型
     ///
+    /// - `id`: 版本 ID，形如 `snapshot`
+    ///
     /// # 返回值
     ///
     /// 未知 ID 返回 `Release`

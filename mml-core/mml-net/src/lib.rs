@@ -35,7 +35,7 @@
 use mml_base::serialize_tools;
 use mml_config::config_obj::{HttpObj, ProxyState, ProxyType};
 use mml_names::i18;
-use mml_names::i18_items::error_type::{CoreResult, ErrorType, HttpErrorData};
+use mml_names::i18_items::error_type::{ErrorData, CoreResult, ErrorType, HttpErrorData};
 use mml_names::i18_items::info_type::InfoType;
 use reqwest::header::{ETAG, HeaderMap, HeaderValue, IF_NONE_MATCH, USER_AGENT};
 use reqwest::{Proxy, Request, Response, StatusCode};
@@ -121,6 +121,20 @@ fn map_err(error: reqwest::Error) -> ErrorType {
     });
     log_request_error(&err);
     err
+}
+
+/// 响应状态异常转 HttpError
+pub(crate) fn http_error(error: String, url: String, status: Option<u16>) -> ErrorType {
+    ErrorType::HttpError(HttpErrorData {
+        error,
+        url,
+        status,
+    })
+}
+
+/// 出错原因转 SerializerError
+pub(crate) fn serializer_err(err: impl std::fmt::Display) -> ErrorType {
+    ErrorType::SerializerError(ErrorData::from_error(err))
 }
 
 /// 请求速率限制器
@@ -548,11 +562,7 @@ impl Client {
         let error = abortable(async move { resp.text().await.map_err(map_err) })
             .await
             .unwrap_or_default();
-        let err = ErrorType::HttpError(HttpErrorData {
-            error,
-            url,
-            status: Some(status.as_u16()),
-        });
+        let err = http_error(error, url, Some(status.as_u16()));
         log_request_error(&err);
         Err(err)
     }
@@ -849,22 +859,17 @@ fn abort_rx() -> tokio::sync::watch::Receiver<u64> {
     abort_tx().subscribe()
 }
 
-/// 被中断的请求返回的错误文案，[`is_aborted`] 按它判定中断
-pub const ABORT_MSG: &str = "请求已中断（代理/网络设置已更新）";
-
 /// 构造"请求已中断"错误，并记一条日志
 ///
 /// - `url`: 请求地址；中断发生在请求任务内部时取不到，传空串
 ///
 /// # 返回值
 ///
-/// 返回 error 为 [`ABORT_MSG`] 的 HTTP 错误
+/// 返回 [`ErrorType::Aborted`]
 fn abort_error(url: &str) -> ErrorType {
-    let err = ErrorType::HttpError(HttpErrorData {
+    let err = ErrorType::Aborted {
         url: url.to_string(),
-        error: ABORT_MSG.to_string(),
-        status: None,
-    });
+    };
     log_request_error(&err);
     err
 }
@@ -886,18 +891,16 @@ const ABORT_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_milli
 ///
 /// # 返回值
 ///
-/// 错误文本等于 [`ABORT_MSG`] 时返回 `true`
+/// 错误是 [`ErrorType::Aborted`] 时返回 `true`
 pub fn is_aborted(err: &ErrorType) -> bool {
-    match err {
-        ErrorType::HttpError(data) => data.error == ABORT_MSG,
-        _ => false,
-    }
+    // 按变体判定而不是比文案：重建文案也不会漏判
+    matches!(err, ErrorType::Aborted { .. })
 }
 
 /// 把一次请求与"全局中断"绑在一起
 ///
 /// 请求正常完成返回其结果；中途 [`rebuild`] 被调用，即用户改了代理，则立刻返回
-/// [`ABORT_MSG`]。必须用 `spawn` + `AbortHandle`：写在 future 内部的检查都要求这个
+/// [`ErrorType::Aborted`]。必须用 `spawn` + `AbortHandle`：写在 future 内部的检查都要求这个
 /// future 还被 poll，而实测出现过请求从未被调度的情况，只有 runtime 层面的强制取消
 /// 能覆盖它。卡死兜底仍交给 builder 上的 `read_timeout`，不加请求总超时。
 ///
@@ -905,7 +908,7 @@ pub fn is_aborted(err: &ErrorType) -> bool {
 ///
 /// # 返回值
 ///
-/// 正常完成返回请求结果；收到中断或任务被强制取消时返回 [`ABORT_MSG`] 对应的错误
+/// 正常完成返回请求结果；收到中断或任务被强制取消时返回 [`ErrorType::Aborted`] 对应的错误
 async fn abortable<F, T>(fut: F) -> CoreResult<T>
 where
     F: std::future::Future<Output = CoreResult<T>> + Send + 'static,
@@ -935,11 +938,7 @@ where
                 Err(err) if err.is_cancelled() => Err(abort_error("")),
                 Err(err) => {
                     // panic 等异常：当成请求失败，别把启动器带崩
-                    let mapped = ErrorType::HttpError(HttpErrorData {
-                        url: String::new(),
-                        error: err.to_string(),
-                        status: None,
-                    });
+                    let mapped = http_error(err.to_string(), String::new(), None);
                     log_request_error(&mapped);
                     Err(mapped)
                 }
@@ -1095,7 +1094,7 @@ pub fn rebuild() {
 
 /// 中断所有在途请求
 ///
-/// 自增世代号并**广播**给所有正在等待的请求，被中断的请求返回 [`ABORT_MSG`]
+/// 自增世代号并**广播**给所有正在等待的请求，被中断的请求返回 [`ErrorType::Aborted`]
 /// 对应的错误，调用方按"请求失败"处理即可，用户改代理后重试就是想要的结果。
 /// 用 `watch` 广播存值、不丢信号，理由见 [`ABORT_GEN`]。
 ///
@@ -1157,11 +1156,7 @@ pub async fn handle_response<T: DeserializeOwned>(resp: reqwest::Response) -> Co
     let url = resp.url().to_string();
     if !status.is_success() {
         let error = resp.text().await.unwrap_or_default();
-        let err = ErrorType::HttpError(HttpErrorData {
-            error,
-            url,
-            status: Some(status.as_u16()),
-        });
+        let err = http_error(error, url, Some(status.as_u16()));
         log_request_error(&err);
         return Err(err);
     }

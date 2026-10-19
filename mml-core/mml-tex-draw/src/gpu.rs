@@ -118,7 +118,9 @@ impl GpuCtx {
     ///
     /// 返回初始化成功的上下文，失败时返回 `None`
     pub fn try_new_backend(name: &str, backends: wgpu::Backends) -> Option<GpuCtx> {
-        Some(Self::build(&mml_gpu::device_with_chain(&[(name, backends)])?))
+        Some(Self::build(&mml_gpu::device_with_chain(&[
+            mml_gpu::BackendChain { name, backends },
+        ])?))
     }
 
     /// 创建着色器与三条渲染管线：cutout、translucent、glint

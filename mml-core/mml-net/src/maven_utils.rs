@@ -39,6 +39,8 @@ const SHA512_HEX_LEN: usize = 128;
 /// // -> "com/example/artifact/1.0/artifact-1.0-sources.jar"
 /// ```
 ///
+/// - `name`: Maven 坐标，形如 `com.example:artifact:1.0`；段数不足 3 时按 `组.名` 直接换路径
+///
 /// # 返回值
 ///
 /// 返回 Maven 仓库内的相对路径

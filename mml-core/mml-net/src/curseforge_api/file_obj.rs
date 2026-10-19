@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::curseforge_api::list_obj::CurseForgeListPaginationObj;
 
 /// 文件列表接口 `/mods/{id}/files` 的响应
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct CurseFogreFilePageObj {
     /// 文件列表
@@ -14,33 +14,16 @@ pub struct CurseFogreFilePageObj {
     pub pagination: CurseForgeListPaginationObj,
 }
 
-impl Default for CurseFogreFilePageObj {
-    fn default() -> Self {
-        Self {
-            data: Default::default(),
-            pagination: Default::default(),
-        }
-    }
-}
-
 /// 单文件接口 `/mods/{pid}/files/{fid}` 的响应
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct CurseForgeFileObj {
     /// 文件数据
     pub data: CurseForgeFileDataObj,
 }
 
-impl Default for CurseForgeFileObj {
-    fn default() -> Self {
-        Self {
-            data: Default::default(),
-        }
-    }
-}
-
 /// 单个文件信息
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct CurseForgeFileDataObj {
     /// 文件 ID
@@ -73,25 +56,8 @@ pub struct CurseForgeFileDataObj {
     pub dependencies: Option<Vec<DependenciesObj>>,
 }
 
-impl Default for CurseForgeFileDataObj {
-    fn default() -> Self {
-        Self {
-            id: Default::default(),
-            mod_id: Default::default(),
-            display_name: Default::default(),
-            file_name: Default::default(),
-            hashes: Default::default(),
-            file_date: Default::default(),
-            file_length: Default::default(),
-            download_count: Default::default(),
-            download_url: Default::default(),
-            dependencies: Default::default(),
-        }
-    }
-}
-
 /// 文件哈希
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct HashesObj {
     /// 哈希值的十六进制小写字符串
@@ -100,17 +66,8 @@ pub struct HashesObj {
     pub algo: i32,
 }
 
-impl Default for HashesObj {
-    fn default() -> Self {
-        Self {
-            value: Default::default(),
-            algo: Default::default(),
-        }
-    }
-}
-
 /// 依赖文件信息
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct DependenciesObj {
     /// 依赖的模组 ID
@@ -119,13 +76,4 @@ pub struct DependenciesObj {
     /// 依赖关系类型，1=嵌入，2=可选，3=必选，4=工具，5=不兼容
     #[serde(rename = "relationType")]
     pub relation_type: i32,
-}
-
-impl Default for DependenciesObj {
-    fn default() -> Self {
-        Self {
-            mod_id: Default::default(),
-            relation_type: Default::default(),
-        }
-    }
 }

@@ -131,7 +131,7 @@ impl FileHash {
 }
 
 /// 一个待下载的文件条目，描述下载目标、来源与校验方式
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct FileItemObj {
     /// 文件名，仅作显示与标识
     pub name: String,
@@ -143,18 +143,6 @@ pub struct FileItemObj {
     pub hash: FileHash,
     /// 下载完成后的后续操作
     pub later: LaterRun,
-}
-
-impl Default for FileItemObj {
-    fn default() -> Self {
-        Self {
-            name: Default::default(),
-            file: Default::default(),
-            url: Default::default(),
-            hash: Default::default(),
-            later: Default::default(),
-        }
-    }
 }
 
 impl FileItemObj {

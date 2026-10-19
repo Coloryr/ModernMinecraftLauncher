@@ -55,6 +55,7 @@ struct ItemDefJson {
 }
 
 #[derive(Deserialize)]
+/// 物品模型定义，按 `type` 分派到不同子结构
 struct ItemModelJson {
     /// 类型：minecraft:model / composite / condition / select / range_dispatch /
     /// special / empty，缺省视为 model
@@ -116,7 +117,9 @@ struct EntryJson {
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum SelectWhen {
+    /// 单个条件
     One(String),
+    /// 多个条件，命中任一即可
     Many(Vec<String>),
 }
 

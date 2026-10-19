@@ -27,10 +27,25 @@ use std::path::{Path, PathBuf};
 
 use tokio::fs as tfs;
 
-use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType, FileSystemErrorData};
+use mml_names::i18_items::error_type::{
+    CoreResult, ErrorData, ErrorType, FileSystemErrorData, MoveToTrashErrorData,
+};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 
+/// 把底层 io 错误包成带路径的文件系统错误
+///
+/// - `path`: 出错的路径，用来定位是哪个文件
+/// - `err`: 底层错误，原文直接进 `error` 字段
+fn fs_error(path: &Path, err: impl std::fmt::Display) -> ErrorType {
+    ErrorType::FileSystemError(FileSystemErrorData {
+        path: path.to_path_buf(),
+        error: err.to_string(),
+    })
+}
+
 /// 提升权限
+///
+/// - `path`: 要加上可执行位的文件路径
 ///
 /// # 返回值
 ///
@@ -54,6 +69,8 @@ pub fn chmod(path: &str) -> io::Result<()> {
 }
 
 /// 提升 Java 文件夹权限
+///
+/// - `path`: Java 可执行文件路径，按它推出要放权的目录
 ///
 /// # 返回值
 ///
@@ -121,6 +138,8 @@ fn get_trash_info_path() -> PathBuf {
 }
 
 /// 将文件夹挪到回收站
+///
+/// - `dir`: 要挪入回收站的文件夹路径
 ///
 /// # 返回值
 ///
@@ -299,9 +318,9 @@ fn move_to_trash_windows<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
     match result {
         0 => Ok(()),
         0x71 => Err(ErrorType::TaskCancel), // 用户已取消
-        _ => Err(ErrorType::FileSystemError(FileSystemErrorData {
+        _ => Err(ErrorType::MoveToTrashError(MoveToTrashErrorData {
             path: err_path,
-            error: format!("SHFileOperationW failed with error code: 0x{:X}", result),
+            code: result,
         })),
     }
 }
@@ -378,31 +397,16 @@ pub fn get_files<P: AsRef<Path>>(path: P) -> Vec<PathBuf> {
 ///
 /// 返回最近写入的文件路径，目录为空时返回 `Ok(None)`
 pub fn get_last_written_file<P: AsRef<Path>>(path: P) -> CoreResult<Option<PathBuf>> {
-    let entries = fs::read_dir(&path).map_err(|err| {
-        ErrorType::FileSystemError(FileSystemErrorData {
-            path: path.as_ref().to_path_buf(),
-            error: err.to_string(),
-        })
-    })?;
+    let entries = fs::read_dir(&path).map_err(|err| fs_error(path.as_ref(), err))?;
 
     let mut files: Vec<(PathBuf, SystemTime)> = Vec::new();
 
     for entry in entries {
-        let entry = entry.map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: path.as_ref().to_path_buf(),
-                error: err.to_string(),
-            })
-        })?;
+        let entry = entry.map_err(|err| fs_error(path.as_ref(), err))?;
         let path = entry.path();
 
         if path.is_file() {
-            let metadata = fs::metadata(&path).map_err(|err| {
-                ErrorType::FileSystemError(FileSystemErrorData {
-                    path: path.clone(),
-                    error: err.to_string(),
-                })
-            })?;
+            let metadata = fs::metadata(&path).map_err(|err| fs_error(&path, err))?;
             if let Ok(modified) = metadata.modified() {
                 files.push((path, modified));
             }
@@ -469,12 +473,7 @@ pub fn get_dirs<P: AsRef<Path>>(path: P) -> Vec<PathBuf> {
 ///
 /// 复制成功返回 `Ok(())`，失败返回相应错误
 pub fn copy_file<P: AsRef<Path>>(input: P, output: P) -> CoreResult<()> {
-    fs::copy(&input, output).map_err(|err| {
-        ErrorType::FileSystemError(FileSystemErrorData {
-            path: input.as_ref().to_path_buf(),
-            error: err.to_string(),
-        })
-    })?;
+    fs::copy(&input, output).map_err(|err| fs_error(input.as_ref(), err))?;
     Ok(())
 }
 
@@ -487,12 +486,7 @@ pub fn copy_file<P: AsRef<Path>>(input: P, output: P) -> CoreResult<()> {
 ///
 /// 复制成功返回 `Ok(())`，失败返回相应错误
 pub async fn copy_file_async<P: AsRef<Path>>(input: P, output: P) -> CoreResult<()> {
-    tfs::copy(&input, output).await.map_err(|err| {
-        ErrorType::FileSystemError(FileSystemErrorData {
-            path: input.as_ref().to_path_buf(),
-            error: err.to_string(),
-        })
-    })?;
+    tfs::copy(&input, output).await.map_err(|err| fs_error(input.as_ref(), err))?;
     Ok(())
 }
 
@@ -517,10 +511,7 @@ pub fn move_file<P: AsRef<Path>>(input: P, output: P) -> CoreResult<()> {
                 delete(&input)?;
                 return Ok(());
             }
-            return Err(ErrorType::FileSystemError(FileSystemErrorData {
-                path: input.as_ref().to_path_buf(),
-                error: err.to_string(),
-            }));
+            return Err(fs_error(input.as_ref(), err));
         }
     }
 }
@@ -546,10 +537,7 @@ pub async fn move_file_async<P: AsRef<Path>>(input: P, output: P) -> CoreResult<
                 delete(&input)?;
                 return Ok(());
             }
-            return Err(ErrorType::FileSystemError(FileSystemErrorData {
-                path: input.as_ref().to_path_buf(),
-                error: err.to_string(),
-            }));
+            return Err(fs_error(input.as_ref(), err));
         }
     }
 }
@@ -565,12 +553,7 @@ pub async fn move_file_async<P: AsRef<Path>>(input: P, output: P) -> CoreResult<
 pub fn copy_dir<P: AsRef<Path>>(input: P, output: P) -> CoreResult<()> {
     create_dir_all(&output)?;
 
-    for entry in fs::read_dir(&input).map_err(|err| {
-        ErrorType::FileSystemError(FileSystemErrorData {
-            path: input.as_ref().to_path_buf(),
-            error: err.to_string(),
-        })
-    })? {
+    for entry in fs::read_dir(&input).map_err(|err| fs_error(input.as_ref(), err))? {
         let entry = entry.map_err(|err| {
             ErrorType::FileReadError(ErrorData {
                 error: err.to_string(),
@@ -600,12 +583,7 @@ pub fn copy_dir<P: AsRef<Path>>(input: P, output: P) -> CoreResult<()> {
 pub async fn copy_dir_async<P: AsRef<Path>>(from: P, to: P) -> CoreResult<()> {
     create_dir_all(&to)?;
 
-    let mut dir = tfs::read_dir(&from).await.map_err(|err| {
-        ErrorType::FileSystemError(FileSystemErrorData {
-            path: from.as_ref().to_path_buf(),
-            error: err.to_string(),
-        })
-    })?;
+    let mut dir = tfs::read_dir(&from).await.map_err(|err| fs_error(from.as_ref(), err))?;
 
     loop {
         let item = dir.next_entry().await.map_err(|err| {
@@ -655,10 +633,7 @@ pub fn search_file<P: AsRef<Path>>(path: P, name: &str) -> Option<PathBuf> {
 pub fn open_read<P: AsRef<Path>>(file: P) -> CoreResult<fs::File> {
     match fs::File::open(&file) {
         Ok(ok) => Ok(ok),
-        Err(err) => Err(ErrorType::FileSystemError(FileSystemErrorData {
-            path: file.as_ref().to_path_buf(),
-            error: err.to_string(),
-        })),
+        Err(err) => Err(fs_error(file.as_ref(), err)),
     }
 }
 
@@ -672,10 +647,7 @@ pub fn open_read<P: AsRef<Path>>(file: P) -> CoreResult<fs::File> {
 pub fn open_read_write<P: AsRef<Path>>(file: P) -> CoreResult<fs::File> {
     match fs::OpenOptions::new().read(true).write(true).open(&file) {
         Ok(ok) => Ok(ok),
-        Err(err) => Err(ErrorType::FileSystemError(FileSystemErrorData {
-            path: file.as_ref().to_path_buf(),
-            error: err.to_string(),
-        })),
+        Err(err) => Err(fs_error(file.as_ref(), err)),
     }
 }
 
@@ -689,10 +661,7 @@ pub fn open_read_write<P: AsRef<Path>>(file: P) -> CoreResult<fs::File> {
 pub async fn open_read_async<P: AsRef<Path>>(file: P) -> CoreResult<tfs::File> {
     match tfs::File::open(&file).await {
         Ok(ok) => Ok(ok),
-        Err(err) => Err(ErrorType::FileSystemError(FileSystemErrorData {
-            path: file.as_ref().to_path_buf(),
-            error: err.to_string(),
-        })),
+        Err(err) => Err(fs_error(file.as_ref(), err)),
     }
 }
 
@@ -706,10 +675,7 @@ pub async fn open_read_async<P: AsRef<Path>>(file: P) -> CoreResult<tfs::File> {
 pub fn open_write<P: AsRef<Path>>(file: P) -> CoreResult<fs::File> {
     if let Some(parent) = file.as_ref().parent() {
         if let Err(err) = fs::create_dir_all(parent) {
-            return Err(ErrorType::FileSystemError(FileSystemErrorData {
-                path: file.as_ref().to_path_buf(),
-                error: err.to_string(),
-            }));
+            return Err(fs_error(file.as_ref(), err));
         }
     }
 
@@ -721,12 +687,7 @@ pub fn open_write<P: AsRef<Path>>(file: P) -> CoreResult<fs::File> {
         // 否则残留旧尾巴会污染 JSON 等结构化文件
         .truncate(true)
         .open(&file)
-        .map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: file.as_ref().to_path_buf(),
-                error: err.to_string(),
-            })
-        })?)
+        .map_err(|err| fs_error(file.as_ref(), err))?)
 }
 
 /// 异步写文件
@@ -749,12 +710,7 @@ pub async fn open_write_async<P: AsRef<Path>>(file: P) -> CoreResult<tfs::File> 
         .truncate(true)
         .open(&file)
         .await
-        .map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: file.as_ref().to_path_buf(),
-                error: err.to_string(),
-            })
-        })?)
+        .map_err(|err| fs_error(file.as_ref(), err))?)
 }
 
 /// 创建所有目录
@@ -767,10 +723,7 @@ pub async fn open_write_async<P: AsRef<Path>>(file: P) -> CoreResult<tfs::File> 
 pub fn create_dir_all<P: AsRef<Path>>(path: P) -> CoreResult<()> {
     match fs::create_dir_all(&path) {
         Ok(_) => Ok(()),
-        Err(err) => Err(ErrorType::FileSystemError(FileSystemErrorData {
-            path: path.as_ref().to_path_buf(),
-            error: err.to_string(),
-        })),
+        Err(err) => Err(fs_error(path.as_ref(), err)),
     }
 }
 
@@ -789,12 +742,7 @@ pub fn open_append<P: AsRef<Path>>(file: P) -> CoreResult<fs::File> {
         .create(true)
         .append(true)
         .open(&file)
-        .map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: file.as_ref().to_path_buf(),
-                error: err.to_string(),
-            })
-        })?)
+        .map_err(|err| fs_error(file.as_ref(), err))?)
 }
 
 /// 写文本
@@ -807,12 +755,7 @@ pub fn open_append<P: AsRef<Path>>(file: P) -> CoreResult<fs::File> {
 /// 写入成功返回 `Ok(())`，失败返回相应错误
 pub fn write_text<P: AsRef<Path>>(file: P, text: &str) -> CoreResult<()> {
     let mut stream = open_write(&file)?;
-    stream.write_all(text.as_bytes()).map_err(|err| {
-        ErrorType::FileSystemError(FileSystemErrorData {
-            path: file.as_ref().to_path_buf(),
-            error: err.to_string(),
-        })
-    })?;
+    stream.write_all(text.as_bytes()).map_err(|err| fs_error(file.as_ref(), err))?;
 
     Ok(())
 }
@@ -828,12 +771,7 @@ pub fn write_text<P: AsRef<Path>>(file: P, text: &str) -> CoreResult<()> {
 pub async fn write_text_async<P: AsRef<Path>>(file: P, text: String) -> CoreResult<()> {
     let mut stream = open_write_async(&file).await?;
 
-    stream.write_all(text.as_bytes()).await.map_err(|err| {
-        ErrorType::FileSystemError(FileSystemErrorData {
-            path: file.as_ref().to_path_buf(),
-            error: err.to_string(),
-        })
-    })?;
+    stream.write_all(text.as_bytes()).await.map_err(|err| fs_error(file.as_ref(), err))?;
 
     Ok(())
 }
@@ -848,12 +786,7 @@ pub async fn write_text_async<P: AsRef<Path>>(file: P, text: String) -> CoreResu
 pub fn read_text<P: AsRef<Path>>(file: P) -> CoreResult<String> {
     let mut stream = open_read(&file)?;
     let mut content = String::new();
-    stream.read_to_string(&mut content).map_err(|err| {
-        ErrorType::FileSystemError(FileSystemErrorData {
-            path: file.as_ref().to_path_buf(),
-            error: err.to_string(),
-        })
-    })?;
+    stream.read_to_string(&mut content).map_err(|err| fs_error(file.as_ref(), err))?;
     Ok(content)
 }
 
@@ -867,12 +800,7 @@ pub fn read_text<P: AsRef<Path>>(file: P) -> CoreResult<String> {
 pub async fn read_text_async<P: AsRef<Path>>(file: P) -> CoreResult<String> {
     let mut stream = open_read_async(&file).await?;
     let mut content = String::new();
-    stream.read_to_string(&mut content).await.map_err(|err| {
-        ErrorType::FileSystemError(FileSystemErrorData {
-            path: file.as_ref().to_path_buf(),
-            error: err.to_string(),
-        })
-    })?;
+    stream.read_to_string(&mut content).await.map_err(|err| fs_error(file.as_ref(), err))?;
     Ok(content)
 }
 
@@ -886,12 +814,7 @@ pub async fn read_text_async<P: AsRef<Path>>(file: P) -> CoreResult<String> {
 pub fn read_byte<P: AsRef<Path>>(file: P) -> CoreResult<Vec<u8>> {
     let mut stream = open_read(&file)?;
     let mut buffer = Vec::new();
-    stream.read_to_end(&mut buffer).map_err(|err| {
-        ErrorType::FileSystemError(FileSystemErrorData {
-            path: file.as_ref().to_path_buf(),
-            error: err.to_string(),
-        })
-    })?;
+    stream.read_to_end(&mut buffer).map_err(|err| fs_error(file.as_ref(), err))?;
     Ok(buffer)
 }
 
@@ -905,12 +828,7 @@ pub fn read_byte<P: AsRef<Path>>(file: P) -> CoreResult<Vec<u8>> {
 pub async fn read_byte_async<P: AsRef<Path>>(file: P) -> CoreResult<Vec<u8>> {
     let mut stream = open_read(&file)?;
     let mut buffer = Vec::new();
-    stream.read_to_end(&mut buffer).map_err(|err| {
-        ErrorType::FileSystemError(FileSystemErrorData {
-            path: file.as_ref().to_path_buf(),
-            error: err.to_string(),
-        })
-    })?;
+    stream.read_to_end(&mut buffer).map_err(|err| fs_error(file.as_ref(), err))?;
     Ok(buffer)
 }
 
@@ -923,12 +841,7 @@ pub async fn read_byte_async<P: AsRef<Path>>(file: P) -> CoreResult<Vec<u8>> {
 /// 目标是文件时删除并返回 `Ok(())`，目录不做任何事；删除失败返回相应错误
 pub fn delete<P: AsRef<Path>>(file: P) -> CoreResult<()> {
     if file.as_ref().is_file() {
-        fs::remove_file(&file).map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: file.as_ref().to_path_buf(),
-                error: err.to_string(),
-            })
-        })?;
+        fs::remove_file(&file).map_err(|err| fs_error(file.as_ref(), err))?;
     }
     Ok(())
 }
@@ -942,12 +855,7 @@ pub fn delete<P: AsRef<Path>>(file: P) -> CoreResult<()> {
 /// 目标是文件时删除并返回 `Ok(())`，目录不做任何事；删除失败返回相应错误
 pub async fn delete_async<P: AsRef<Path>>(file: P) -> CoreResult<()> {
     if file.as_ref().is_file() {
-        tfs::remove_file(&file).await.map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: file.as_ref().to_path_buf(),
-                error: err.to_string(),
-            })
-        })?;
+        tfs::remove_file(&file).await.map_err(|err| fs_error(file.as_ref(), err))?;
     }
     Ok(())
 }
@@ -962,12 +870,7 @@ pub async fn delete_async<P: AsRef<Path>>(file: P) -> CoreResult<()> {
 /// 写入成功返回 `Ok(())`，失败返回相应错误
 pub fn write_bytes<P: AsRef<Path>>(file: P, data: &[u8]) -> CoreResult<()> {
     let mut stream = open_write(&file)?;
-    stream.write_all(data).map_err(|err| {
-        ErrorType::FileSystemError(FileSystemErrorData {
-            path: file.as_ref().to_path_buf(),
-            error: err.to_string(),
-        })
-    })
+    stream.write_all(data).map_err(|err| fs_error(file.as_ref(), err))
 }
 
 /// 异步写文件
@@ -980,12 +883,7 @@ pub fn write_bytes<P: AsRef<Path>>(file: P, data: &[u8]) -> CoreResult<()> {
 /// 写入成功返回 `Ok(())`，失败返回相应错误
 pub async fn write_bytes_async<P: AsRef<Path>>(file: P, data: &[u8]) -> CoreResult<()> {
     let mut stream = open_write_async(&file).await?;
-    stream.write_all(data).await.map_err(|err| {
-        ErrorType::FileSystemError(FileSystemErrorData {
-            path: file.as_ref().to_path_buf(),
-            error: err.to_string(),
-        })
-    })
+    stream.write_all(data).await.map_err(|err| fs_error(file.as_ref(), err))
 }
 
 /// 写文件
@@ -998,12 +896,7 @@ pub async fn write_bytes_async<P: AsRef<Path>>(file: P, data: &[u8]) -> CoreResu
 /// 写入成功返回 `Ok(())`，失败返回相应错误
 pub fn write_stream<P: AsRef<Path>, R: Read>(file: P, mut reader: R) -> CoreResult<()> {
     let mut stream = open_write(&file)?;
-    io::copy(&mut reader, &mut stream).map_err(|err| {
-        ErrorType::FileSystemError(FileSystemErrorData {
-            path: file.as_ref().to_path_buf(),
-            error: err.to_string(),
-        })
-    })?;
+    io::copy(&mut reader, &mut stream).map_err(|err| fs_error(file.as_ref(), err))?;
     Ok(())
 }
 
@@ -1022,16 +915,13 @@ pub async fn write_stream_async<P: AsRef<Path>, R: AsyncRead + Unpin>(
     let mut stream = open_write_async(&path).await?;
     tokio::io::copy(&mut reader, &mut stream)
         .await
-        .map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: path.as_ref().to_path_buf(),
-                error: err.to_string(),
-            })
-        })?;
+        .map_err(|err| fs_error(path.as_ref(), err))?;
     Ok(())
 }
 
 /// 替换文件名非法字符
+///
+/// - `name`: 原文件名
 ///
 /// # 返回值
 ///
@@ -1041,6 +931,8 @@ pub fn replace_file_name(name: &str) -> String {
 }
 
 /// 替换文件名非法字符
+///
+/// - `name`: 原路径名
 ///
 /// # 返回值
 ///

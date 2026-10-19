@@ -134,7 +134,7 @@ export async function setBgImageFromOriginal(source: string) {
     bgImage.value = dataUrl;
   } catch (err) {
     // 带上后端的具体错误，方便定位加载失败的原因
-    showToast(`${t("winSettings.bgLoadFailed")}：${String(err)}`);
+    showToast(`${t("winSettings.bgLoadFailed")}${t("common.detailSep")}${String(err)}`);
   } finally {
     bgLoading.value = false;
   }
@@ -155,7 +155,7 @@ export async function resizeBg(percent: number) {
   try {
     bgImage.value = await commands.settings.resizeBg(bgNativeSize.value);
   } catch (err) {
-    showToast(`${t("winSettings.bgResizeFailed")}：${String(err)}`);
+    showToast(`${t("winSettings.bgResizeFailed")}${t("common.detailSep")}${String(err)}`);
   } finally {
     bgLoading.value = false;
   }

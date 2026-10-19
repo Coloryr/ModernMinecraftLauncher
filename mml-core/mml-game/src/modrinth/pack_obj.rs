@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::launcher::project_save_obj::MmlProjectSaveObj;
 
 /// Modrinth 整合包索引，对应 `.mrpack` 内的 `modrinth.index.json`
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ModrinthPackObj {
     /// 索引格式版本，目前固定为 1
@@ -27,21 +27,8 @@ pub struct ModrinthPackObj {
     pub dependencies: HashMap<String, String>,
 }
 
-impl Default for ModrinthPackObj {
-    fn default() -> Self {
-        Self {
-            format_version: Default::default(),
-            version_id: Default::default(),
-            name: Default::default(),
-            summary: Default::default(),
-            files: Default::default(),
-            dependencies: Default::default(),
-        }
-    }
-}
-
 /// 整合包索引里的单个待下载文件
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ModrinthPackFileObj {
     /// 相对游戏目录的文件路径，用 `/` 分隔
@@ -56,16 +43,4 @@ pub struct ModrinthPackFileObj {
     /// 来源项目信息，私有扩展字段，仅本启动器写入；可缺省
     #[serde(rename = "_private_data", alias = "_colormc")]
     pub project: Option<MmlProjectSaveObj>,
-}
-
-impl Default for ModrinthPackFileObj {
-    fn default() -> Self {
-        Self {
-            path: Default::default(),
-            hashes: Default::default(),
-            downloads: Default::default(),
-            file_size: Default::default(),
-            project: Default::default(),
-        }
-    }
 }

@@ -62,4 +62,36 @@ pub enum InfoType {
         /// 登录客户端的代理描述
         login: String,
     },
+    /// 已通知运行中的启动器实例，带 IPC 端口
+    IpcNotifyExisting {
+        /// IPC 服务端口
+        port: u16,
+    },
+    /// 通知运行中的实例失败，改为启动新的 IPC 服务，带端口
+    IpcNotifyExistingFailed {
+        /// IPC 服务端口
+        port: u16,
+    },
+    /// IPC 服务已启动，带监听端口
+    IpcServerStart {
+        /// 监听端口
+        port: u16,
+    },
+    /// 有一个 IPC 客户端连上，带对端地址
+    IpcClientConnected {
+        /// 对端地址，形如 `127.0.0.1:12345`
+        addr: String,
+    },
+    /// 收到未知类型的 IPC 消息，带消息类型号
+    IpcUnknownMessageType {
+        /// 消息类型号
+        msg_type: i32,
+    },
+    /// 已运行实例请求显示主窗口
+    IpcLauncherShowWindow,
+    /// 游戏通道已绑定，带实例 ID
+    IpcGameChannelBound {
+        /// 实例 ID
+        guid: String,
+    },
 }

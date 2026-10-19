@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::launcher::ModPackType;
 
 /// 实例来源项目信息，记录整合包来源，用于更新等场景
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct MmlProjectSaveObj {
     /// 整合包来源类型
@@ -15,14 +15,4 @@ pub struct MmlProjectSaveObj {
     pub pid: String,
     /// 文件 ID
     pub fid: String,
-}
-
-impl Default for MmlProjectSaveObj {
-    fn default() -> Self {
-        Self {
-            source_type: Default::default(),
-            pid: Default::default(),
-            fid: Default::default(),
-        }
-    }
 }

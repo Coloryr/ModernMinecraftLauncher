@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::dtos::CustomHomeInfoDto;
 use crate::err_keys;
+use crate::log_text::LogText;
 
 use mml_base::archives::BaseArchive;
 
@@ -174,12 +175,17 @@ pub(crate) fn reload() {
                 if archive.entry_name(INDEX_FILE).is_some() {
                     Some(Arc::new(archive))
                 } else {
-                    eprintln!("[custom_home] 压缩包里没有 {INDEX_FILE}");
+                    mml_log::warn(
+                        LogText::ArchiveIndexMissing {
+                            name: INDEX_FILE.to_string(),
+                        }
+                        .text(),
+                    );
                     None
                 }
             }
             Err(err) => {
-                eprintln!("[custom_home] 打开压缩包失败：{err}");
+                mml_log::warn(LogText::ArchiveOpenFailed { error: err.to_string() }.text());
                 None
             }
         }

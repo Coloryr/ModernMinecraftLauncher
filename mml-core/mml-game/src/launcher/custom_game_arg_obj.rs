@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::mojang::game_arg_obj::{GameArgObj, GameLibrariesObj};
 
 /// 自定义游戏启动配置
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct CustomGameArgObj {
     /// 基础版本 JSON 字段，按扁平方式合并进本结构
@@ -37,22 +37,4 @@ pub struct CustomGameArgObj {
     /// 对应的 Minecraft 版本
     #[serde(rename = "_minecraftVersion")]
     pub minecraft_version: Option<String>,
-}
-
-impl Default for CustomGameArgObj {
-    fn default() -> Self {
-        Self {
-            base: Default::default(),
-            compatible_java_majors: Default::default(),
-            name: Default::default(),
-            order: Default::default(),
-            uid: Default::default(),
-            add_tweakers: Default::default(),
-            add_jvm_args: Default::default(),
-            version: Default::default(),
-            main_jar: Default::default(),
-            add_main_jar: Default::default(),
-            minecraft_version: Default::default(),
-        }
-    }
 }

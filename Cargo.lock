@@ -2893,6 +2893,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "mml-analysis"
+version = "0.1.0"
+
+[[package]]
 name = "mml-auth"
 version = "0.1.0"
 dependencies = [

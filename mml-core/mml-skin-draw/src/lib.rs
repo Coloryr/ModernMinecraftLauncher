@@ -34,13 +34,19 @@ use tiny_skia::{Pixmap, Point};
 
 /// 2D渲染模式
 pub enum Draw2DType {
+    /// 平铺且无外扩边距
     TypeA,
+    /// 带外扩边距的放大版
     TypeB,
 }
 
+/// 3D渲染模式
 pub enum Draw3DType {
+    /// 固定角度，从上往下看
     TypeAUp,
+    /// 固定角度，从下往上看
     TypeADown,
+    /// 指定俯仰角与偏航角，启用伪透视
     TypeBRotate(Point),
 }
 
@@ -52,6 +58,7 @@ pub enum DrawHeadType {
     Type3D(Draw3DType),
 }
 
+/// 皮肤的渲染模式
 pub enum DrawSkinType {
     /// 渲染2D
     Type2D(Draw2DType),
@@ -59,6 +66,7 @@ pub enum DrawSkinType {
     Type3D(Draw3DType),
 }
 
+/// 披风的朝向，正面或背面
 pub enum DrawCapeType {
     /// 披风正面
     Front,
@@ -125,6 +133,14 @@ pub fn draw_skin(
     }
 }
 
+/// 渲染披风
+///
+/// - `image`: 披风贴图
+/// - `mode`: 渲染模式
+///
+/// # 返回值
+///
+/// 返回渲染后的位图，贴图尺寸异常时返回 `None`
 pub fn draw_cape(image: &Pixmap, mode: DrawCapeType) -> Option<Pixmap> {
     match mode {
         DrawCapeType::Front => cape_2d_draw::front(image),

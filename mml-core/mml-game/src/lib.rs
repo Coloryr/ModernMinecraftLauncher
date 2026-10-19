@@ -86,6 +86,7 @@ pub mod add_game;
 pub mod class_scan;
 pub mod curseforge;
 pub mod data_res;
+mod error;
 pub mod game_arg;
 pub mod game_check;
 pub mod game_count;

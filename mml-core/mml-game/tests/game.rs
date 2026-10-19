@@ -7,7 +7,7 @@ struct GuiRun {}
 
 impl IDownloadGui for GuiRun {
     /// 单文件进度回调，测试里不输出
-    fn update(&self, thread: u32, file: &Arc<DownloadItem>) {
+    fn update(&self, _thread: u32, _file: &Arc<DownloadItem>) {
         // 需要看进度时打开：按线程号打印每个下载项的百分比
     }
 
@@ -34,8 +34,8 @@ impl IDownloadGui for GuiRun {
 ///
 /// - `run_dir`: 运行目录，日志与配置都落在它下面
 fn start(run_dir: &Path) {
-    mml_log::start(&run_dir);
-    mml_config::init(&run_dir);
+    let _ = mml_log::start(&run_dir);
+    let _ = mml_config::init(&run_dir);
     mml_net::init();
 
     let gui = GuiRun {};

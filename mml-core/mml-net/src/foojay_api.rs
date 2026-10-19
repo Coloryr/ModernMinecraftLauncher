@@ -29,7 +29,7 @@ pub struct FoojayOptionsObj {
 }
 
 /// `/parameters` 响应包装
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct FoojayParametersResultObj {
     /// `/parameters` 返回的参数集合，通常只取第一条
@@ -38,33 +38,16 @@ pub struct FoojayParametersResultObj {
     pub message: String,
 }
 
-impl Default for FoojayParametersResultObj {
-    fn default() -> Self {
-        Self {
-            result: Default::default(),
-            message: Default::default(),
-        }
-    }
-}
-
 /// `/parameters` 响应中的单条参数集合
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct FoojayParametersObj {
     /// `/packages` 各参数的合法取值
     pub packages: FoojayPackagesParamsObj,
 }
 
-impl Default for FoojayParametersObj {
-    fn default() -> Self {
-        Self {
-            packages: Default::default(),
-        }
-    }
-}
-
 /// `/packages` 各参数的合法取值，逗号分隔的字符串
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct FoojayPackagesParamsObj {
     /// 架构，对应查询参数 `architecture`
@@ -77,19 +60,8 @@ pub struct FoojayPackagesParamsObj {
     pub package_type: String,
 }
 
-impl Default for FoojayPackagesParamsObj {
-    fn default() -> Self {
-        Self {
-            architecture: Default::default(),
-            major_version: Default::default(),
-            operating_system: Default::default(),
-            package_type: Default::default(),
-        }
-    }
-}
-
 /// `/major_versions` 响应包装
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct FoojayMajorVersionsResultObj {
     /// `/major_versions` 返回的主版本列表
@@ -98,17 +70,8 @@ pub struct FoojayMajorVersionsResultObj {
     pub message: String,
 }
 
-impl Default for FoojayMajorVersionsResultObj {
-    fn default() -> Self {
-        Self {
-            result: Default::default(),
-            message: Default::default(),
-        }
-    }
-}
-
 /// `/major_versions` 里的单个主版本信息
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct FoojayMajorVersionObj {
     /// 主版本号
@@ -121,19 +84,8 @@ pub struct FoojayMajorVersionObj {
     pub early_access_only: bool,
 }
 
-impl Default for FoojayMajorVersionObj {
-    fn default() -> Self {
-        Self {
-            major_version: Default::default(),
-            term_of_support: Default::default(),
-            maintained: Default::default(),
-            early_access_only: Default::default(),
-        }
-    }
-}
-
 /// `/packages` 响应包装
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct FoojayResultObj {
     /// `/packages` 返回的包列表，无匹配时为空
@@ -142,17 +94,8 @@ pub struct FoojayResultObj {
     pub message: String,
 }
 
-impl Default for FoojayResultObj {
-    fn default() -> Self {
-        Self {
-            result: Default::default(),
-            message: Default::default(),
-        }
-    }
-}
-
 /// Foojay 单个 Java 包
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct FoojayObj {
     /// 包 ID，用于拼下载重定向地址
@@ -187,45 +130,14 @@ pub struct FoojayObj {
     pub links: FoojayLinksObj,
 }
 
-impl Default for FoojayObj {
-    fn default() -> Self {
-        Self {
-            id: Default::default(),
-            archive_type: Default::default(),
-            distribution: Default::default(),
-            major_version: Default::default(),
-            java_version: Default::default(),
-            distribution_version: Default::default(),
-            release_status: Default::default(),
-            operating_system: Default::default(),
-            architecture: Default::default(),
-            package_type: Default::default(),
-            javafx_bundled: Default::default(),
-            directly_downloadable: Default::default(),
-            filename: Default::default(),
-            size: Default::default(),
-            links: Default::default(),
-        }
-    }
-}
-
 /// 包的相关链接
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct FoojayLinksObj {
     /// 包详情页
     pub pkg_info_uri: String,
     /// 下载重定向地址，服务端 302 到发行方 CDN 直链
     pub pkg_download_redirect: String,
-}
-
-impl Default for FoojayLinksObj {
-    fn default() -> Self {
-        Self {
-            pkg_info_uri: Default::default(),
-            pkg_download_redirect: Default::default(),
-        }
-    }
 }
 
 /// 拆分逗号分隔的取值串，去空项

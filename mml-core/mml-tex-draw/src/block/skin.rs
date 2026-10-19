@@ -79,9 +79,7 @@ pub fn add_skin_block(name: &str, skin_png: &[u8]) -> CoreResult<String> {
             .write_header()
             .and_then(|mut w| w.write_image_data(&rgba))
             .map_err(|e| {
-                ErrorType::TaskError(ErrorData {
-                    error: e.to_string(),
-                })
+                ErrorType::TaskError(ErrorData::from_error(e))
             })?;
     }
 

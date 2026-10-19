@@ -48,6 +48,10 @@ impl Default for ModPackType {
 
 impl ModPackType {
     /// 独立 ID，跨进程传输用，显示名由前端 i18n 翻译
+    ///
+    /// # 返回值
+    ///
+    /// 该类型的独立 ID
     pub fn to_string(&self) -> String {
         String::from(match self {
             ModPackType::CurseForge => "curseforge",
@@ -59,6 +63,12 @@ impl ModPackType {
     }
 
     /// 按 ID 解析整合包类型
+    ///
+    /// - `id`: 独立 ID，形如 `curseforge`
+    ///
+    /// # 返回值
+    ///
+    /// 解析出的整合包类型
     pub fn from_string(id: &str) -> Self {
         match id {
             "curseforge" => ModPackType::CurseForge,

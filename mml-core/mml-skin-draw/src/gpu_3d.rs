@@ -26,9 +26,20 @@ pub(crate) struct Vert {
     pub uv: [f32; 2],
 }
 
+/// 立方体一个面的角：相对部件中心的模型坐标偏移加块内 uv
+///
+/// 顶点顺序与 uv 布局的来龙去脉见 [`crate::skin_3d_draw::face_corners`]。
+#[derive(Clone, Copy)]
+pub(crate) struct FaceCorner {
+    /// 相对部件中心的模型坐标偏移，单位皮肤像素
+    pub pos: [f32; 3],
+    /// 块内 uv，0..1 比例，v=0 在贴图块顶部
+    pub uv: [f32; 2],
+}
+
 /// 把一个面的四个角展开为 6 顶点，按三角形 0,1,2 与 0,2,3 排列
 ///
-/// - `corners`: 面四角，模型坐标加 0..1 的块内比例，v=0 在贴图块顶部
+/// - `corners`: 面四角，见 [`FaceCorner`]
 /// - `rect`: 贴图块，按 tx / ty / tw / th 排列，单位像素
 /// - `tex_w` / `tex_h`: 贴图宽高，单位像素，HD 皮肤按实际尺寸归一化
 ///
@@ -36,7 +47,7 @@ pub(crate) struct Vert {
 ///
 /// 返回 6 个顶点，uv 已按贴图尺寸归一化
 pub(crate) fn face_verts(
-    corners: [([f32; 3], [f32; 2]); 4],
+    corners: [FaceCorner; 4],
     rect: [i32; 4],
     tex_w: f32,
     tex_h: f32,
@@ -52,10 +63,10 @@ pub(crate) fn face_verts(
         uv: [0.0; 2],
     }; 6];
     for (i, &ci) in [0usize, 1, 2, 0, 2, 3].iter().enumerate() {
-        let (pos, uv) = corners[ci];
+        let c = corners[ci];
         out[i] = Vert {
-            pos,
-            uv: [(tx + uv[0] * tw) / tex_w, (ty + uv[1] * th) / tex_h],
+            pos: c.pos,
+            uv: [(tx + c.uv[0] * tw) / tex_w, (ty + c.uv[1] * th) / tex_h],
         };
     }
     out

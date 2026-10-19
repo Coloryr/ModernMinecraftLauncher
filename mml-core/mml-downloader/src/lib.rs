@@ -131,7 +131,11 @@ static DOWNLOAD_PATH: OnceLock<PathBuf> = OnceLock::new();
 
 /// 初始化下载文件夹
 ///
-/// - `dir`: 程序运行根目录，下载文件夹将创建在 `{dir}/downloads/` 下
+/// - `path`: 程序运行根目录，下载文件夹将创建在 `{path}/downloads/` 下
+///
+/// # 返回值
+///
+/// 初始化成功返回 `Ok(())`；创建目录失败返回对应错误
 pub fn init<P: AsRef<Path>>(path: P) -> CoreResult<()> {
     let cache = CACHE_PATH.get_or_init(|| path.as_ref().join(names::CACHE_DIR));
     if !cache.exists() {
@@ -164,11 +168,19 @@ pub fn init<P: AsRef<Path>>(path: P) -> CoreResult<()> {
 }
 
 /// 获取下载临时文件夹路径
+///
+/// # 返回值
+///
+/// 下载临时文件夹路径；未 `init` 会 panic
 pub fn get_cache_path() -> PathBuf {
     CACHE_PATH.get().unwrap().clone()
 }
 
 /// 获取下载文件夹路径
+///
+/// # 返回值
+///
+/// 下载文件夹路径；未 `init` 会 panic
 pub fn get_download_path() -> PathBuf {
     DOWNLOAD_PATH.get().unwrap().clone()
 }
@@ -191,6 +203,8 @@ pub fn gen_temp_file() -> PathBuf {
 /// 设置下载器 UI 回调
 ///
 /// 应在启动下载前调用一次。
+///
+/// - `gui`: 下载器 UI 回调实现，全局只认第一次传入的那个
 pub fn set_gui_handel(gui: Box<dyn IDownloadGui + Sync + Send>) {
     DOWNLOAD_GUI.get_or_init(|| gui);
 }
@@ -377,6 +391,8 @@ pub fn is_busy_under(dir: impl AsRef<std::path::Path>) -> bool {
 
 /// 暂停指定任务：不再分配新文件，在途文件阻塞等待恢复
 ///
+/// - `id`: 任务编号
+///
 /// # 返回值
 ///
 /// 成功返回 `true`，任务不存在、已完成或已取消时返回 `false`
@@ -392,6 +408,8 @@ pub fn pause_task(id: u64) -> bool {
 }
 
 /// 恢复指定任务并唤醒下载线程
+///
+/// - `id`: 任务编号
 ///
 /// # 返回值
 ///
@@ -413,6 +431,10 @@ pub fn resume_task(id: u64) -> bool {
 }
 
 /// 当前是否处于全局暂停
+///
+/// # 返回值
+///
+/// 全局暂停时为 `true`
 pub fn is_paused_all() -> bool {
     PAUSED.load(Ordering::SeqCst)
 }
@@ -472,6 +494,8 @@ pub fn cancel_all() -> usize {
 }
 
 /// 取消指定任务：移出队列并唤醒完成等待，在途文件自然结束，剩余文件不再下载
+///
+/// - `id`: 任务编号
 ///
 /// # 返回值
 ///

@@ -23,7 +23,9 @@ use std::{
 };
 
 use mml_names::{
-    i18_items::error_type::{CoreResult, ErrorType},
+    i18_items::error_type::{
+        ArchiveErrorData, CoreResult, ErrorData, ErrorType, FileSystemErrorData,
+    },
     names,
 };
 
@@ -144,6 +146,11 @@ impl TarMode {
     }
 }
 
+/// 未指定相对根路径时以包根目录为准
+pub(crate) fn root_path_or_pack<'a>(root_path: Option<&'a Path>, pack_dir: &'a Path) -> &'a Path {
+    root_path.unwrap_or(pack_dir)
+}
+
 /// 压缩/解压进度追踪器，各格式读取器共用
 pub(crate) struct ArchiveProcess {
     /// 进度回调，`None` 表示不通知 UI
@@ -158,6 +165,10 @@ impl ArchiveProcess {
     /// 创建进度追踪器
     ///
     /// - `gui`: 进度回调，`None` 表示不通知 UI
+    ///
+    /// # 返回值
+    ///
+    /// 新建的进度追踪器，总数与当前进度都从 0 起
     pub fn new(gui: BaseArchiveGui) -> Self {
         Self {
             gui,
@@ -311,6 +322,75 @@ fn should_exclude(path: &Path, patterns: &[String]) -> bool {
     patterns.iter().any(|pattern| {
         let normalized_pattern = pattern.replace('\\', "/");
         normalized_path.contains(&normalized_pattern)
+    })
+}
+
+/// 把出错原因包成归档读取错误
+///
+/// - `err`: 出错原因，取它的 `Display` 输出
+///
+/// # 返回值
+///
+/// 见 [`ErrorType`]
+pub(crate) fn read_error(err: impl std::fmt::Display) -> ErrorType {
+    ErrorType::ArchiveReadError(ErrorData::from_error(err))
+}
+
+/// 把出错原因包成归档写入错误
+///
+/// - `err`: 出错原因，取它的 `Display` 输出
+///
+/// # 返回值
+///
+/// 见 [`ErrorType`]
+pub(crate) fn write_error(err: impl std::fmt::Display) -> ErrorType {
+    ErrorType::ArchiveWriteError(ErrorData::from_error(err))
+}
+
+/// 把归档路径与出错原因包成打开失败错误
+///
+/// - `path`: 打不开的归档路径
+/// - `err`: 出错原因，取它的 `Display` 输出
+///
+/// # 返回值
+///
+/// 见 [`ErrorType`]
+pub(crate) fn open_error(path: impl Into<PathBuf>, err: impl std::fmt::Display) -> ErrorType {
+    ErrorType::ArchiveOpenError(FileSystemErrorData {
+        path: path.into(),
+        error: err.to_string(),
+    })
+}
+
+/// 把归档路径与出错原因包成文件系统错误
+///
+/// - `path`: 出错时用来说明位置的路径
+/// - `err`: 出错原因，取它的 `Display` 输出
+///
+/// # 返回值
+///
+/// 见 [`ErrorType`]
+pub(crate) fn fs_err(path: PathBuf, err: impl std::fmt::Display) -> ErrorType {
+    ErrorType::FileSystemError(FileSystemErrorData {
+        path,
+        error: err.to_string(),
+    })
+}
+
+/// 把条目来源、落地路径与出错原因包成压缩包错误
+///
+/// - `source`: 包内条目名或源路径
+/// - `target`: 落地的目标路径
+/// - `err`: 出错原因，取它的 `Display` 输出
+///
+/// # 返回值
+///
+/// 见 [`ErrorType`]
+pub(crate) fn archive_err(source: String, target: String, err: impl std::fmt::Display) -> ErrorType {
+    ErrorType::ArchiveError(ArchiveErrorData {
+        source,
+        target,
+        error: err.to_string(),
     })
 }
 

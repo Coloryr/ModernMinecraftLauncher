@@ -8,6 +8,7 @@ import { t, tErr } from "../../../../lib/i18n";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../../components/ui/BaseModal.vue";
 import type { FileListDto, FileListItemDto, ModItemDto } from "../../../../lib/bindings";
+import { formatSize } from "../../../../lib/format";
 
 const props = defineProps<{
   /** 要换版本的那个模组 */
@@ -82,20 +83,6 @@ function dateOf(iso: string): string {
   return /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : iso;
 }
 
-/**
- * 文件体积
- *
- * - `bytes`: 字节数
- *
- * # 返回值
- *
- * 人类可读的大小，如 `1.2 MB`
- */
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
 </script>
 
 <template>

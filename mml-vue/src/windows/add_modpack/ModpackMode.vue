@@ -13,9 +13,10 @@ import { formatCount, t, tErr } from "../../lib/i18n";
 import { svgIcon } from "../../lib/modrinthIcon";
 import { cardTags } from "../../lib/projectTags";
 import HighlightText from "../../components/ui/HighlightText.vue";
-import { showToast } from "../../lib/toast";
+import { toggleStar } from "../../lib/projectCollect";
 import { projectParamToItem, targetProject } from "../windowManager";
 import type { FileListItemDto, GroupDto, ModPackStatusDto, ProjectItemDto } from "../../lib/bindings";
+import { formatDate } from "../../lib/format";
 
 const props = defineProps<{
   /** 安装到的分组名；空 = 默认分组，提交时由上层转成分组 uuid */
@@ -313,27 +314,6 @@ function install(item: ProjectItemDto, file: FileListItemDto) {
 }
 
 /** 收藏 / 取消收藏（列表星标与详情页星标共用） */
-async function toggleStar(item: ProjectItemDto) {
-  const star = !item.isStar;
-  try {
-    await api.collectStar(
-      item.source.source,
-      item.source.fileType,
-      item.source.pid,
-      item.name,
-      item.image,
-      item.url,
-      star,
-    );
-    item.isStar = star;
-  } catch (e) {
-    showToast(tErr(e));
-  }
-}
-
-function formatDate(date: string): string {
-  return date ? date.slice(0, 10) : "";
-}
 
 onMounted(async () => {
   await loadSources();

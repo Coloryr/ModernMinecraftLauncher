@@ -11,25 +11,15 @@
 //
 // "动态"的落点：下载时图标**不转**，靠强调色 + 下方细条表达进度，
 // 与整合包那个同一套口径 —— 两个并排都不转，不至于晃眼。
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed } from "vue";
 import { t } from "../lib/i18n";
-import { api, onDownloadItem, onDownloadTask } from "../lib/api";
-import { downloadOverallPercent } from "../lib/progress";
+import { useDownloadProgress } from "../composables/useDownloadProgress";
 import { openWindow } from "../windows/windowManager";
-import type { DownloadStatusDto, DownloadTaskDto } from "../lib/bindings";
+import type { DownloadTaskDto } from "../lib/bindings";
 
-const status = ref<DownloadStatusDto>({ tasks: [], threads: [], speed: 0, paused: false });
+const { tasks, percent } = useDownloadProgress();
 
-/** 拉一次任务快照；失败时保留上次数据，入口闪一下比不更新更糟 */
-async function refresh() {
-  try {
-    status.value = await api.getDownloadStatus();
-  } catch {
-    /* 忽略：后端不可用时保留上次显示 */
-  }
-}
-
-const count = computed(() => status.value.tasks.length);
+const count = computed(() => tasks.value.length);
 
 /**
  * 任务是否还在下，与下载窗口的 taskState 同一口径
@@ -48,16 +38,13 @@ function isIncomplete(task: DownloadTaskDto): boolean {
 }
 
 /** 是否仍在下（决定图标转不转） */
-const busy = computed(() => status.value.tasks.some(isDownloading));
+const busy = computed(() => tasks.value.some(isDownloading));
 
 /** 进度条显示与否：只要还有没下完的（含暂停）就显示，别让暂停时进度凭空消失 */
-const showBar = computed(() => status.value.tasks.some(isIncomplete));
+const showBar = computed(() => tasks.value.some(isIncomplete));
 
 /** 有失败的任务（图标变警示色） */
-const hasFailed = computed(() => status.value.tasks.some((task) => task.failed > 0));
-
-/** 总体进度，与下载窗口同一口径；见 lib/progress.ts，多文件按项目数、单文件按字节 */
-const percent = computed(() => downloadOverallPercent(status.value.tasks));
+const hasFailed = computed(() => tasks.value.some((task) => task.failed > 0));
 
 const tipText = computed(() =>
   busy.value
@@ -71,19 +58,6 @@ const iconState = computed(() => {
   return hasFailed.value ? "failed" : "done";
 });
 
-let unsubs: Array<() => void> = [];
-
-onMounted(async () => {
-  await refresh();
-  // 任务 / 文件状态变化都会广播，跟着刷新即可（进度本身也是事件驱动的）
-  unsubs.push(await onDownloadTask(() => void refresh()));
-  unsubs.push(await onDownloadItem(() => void refresh()));
-});
-
-onUnmounted(() => {
-  unsubs.forEach((fn) => fn());
-  unsubs = [];
-});
 </script>
 
 <template>

@@ -281,33 +281,44 @@ fn encode_apng(size: u32, frames: Vec<ApngFrame>) -> Option<Vec<u8>> {
         encoder.set_color(png::ColorType::Rgba);
         encoder.set_depth(png::BitDepth::Eight);
         if let Err(e) = encoder.set_animated(frames.len() as u32, 0) {
-            eprintln!("set_animated失败: {e}");
+            log_apng_fail("set_animated", &e);
             return None;
         }
         let mut writer = match encoder.write_header() {
             Ok(writer) => writer,
             Err(e) => {
-                eprintln!("write_header失败: {e}");
+                log_apng_fail("write_header", &e);
                 return None;
             }
         };
         for frame in &frames {
             // 帧显示时长 = 持续刻数 / FRAME_RATE 秒，采样跨过的刻数一并计入
             if let Err(e) = writer.set_frame_delay(frame.ticks, FRAME_RATE) {
-                eprintln!("set_frame_delay失败: {e}");
+                log_apng_fail("set_frame_delay", &e);
                 return None;
             }
             if let Err(e) = writer.write_image_data(&frame.rgba) {
-                eprintln!("write_image_data失败: {e}");
+                log_apng_fail("write_image_data", &e);
                 return None;
             }
         }
         if let Err(e) = writer.finish() {
-            eprintln!("finish失败: {e}");
+            log_apng_fail("finish", &e);
             return None;
         }
     }
     Some(cursor.into_inner())
+}
+
+/// 记一条 APNG 编码失败日志
+///
+/// - `stage`: 失败的 png 编码步骤名，如 `set_animated`
+/// - `error`: 底层编码错误
+fn log_apng_fail(stage: &str, error: &dyn std::fmt::Display) {
+    mml_log::error_type(ErrorType::ApngEncodeFail {
+        stage: stage.to_string(),
+        error: error.to_string(),
+    });
 }
 
 /// textures 表的值：老版为字符串，新版可为对象，如 glass 的 force_translucent
@@ -1107,7 +1118,7 @@ mod icon_table_tests {
                 let alt = format!("{id}_{}", form.suffix());
                 let hit = BLOCK_ICONS
                     .iter()
-                    .any(|(name, c, spec)| *name == alt && matches!(spec, IconSpec::Form(..)));
+                    .any(|(name, _, spec)| *name == alt && matches!(spec, IconSpec::Form(..)));
                 assert!(hit, "形态图标缺失：{alt}（{cat}）");
             }
         }

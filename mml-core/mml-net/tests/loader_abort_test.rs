@@ -58,7 +58,7 @@ fn responsive_server() -> u16 {
 fn aborted_loader_query_surfaces_error_and_retries_fresh() {
     let exe = std::env::current_exe().unwrap();
     let run_dir = exe.parent().unwrap().parent().unwrap().to_path_buf();
-    mml_log::start(&run_dir);
+    let _ = mml_log::start(&run_dir);
     let _ = mml_config::init(&run_dir);
     mml_net::init();
 

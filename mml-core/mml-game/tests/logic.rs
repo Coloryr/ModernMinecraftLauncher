@@ -82,14 +82,14 @@ fn lib_version_obj() {
 /// 加载器类型前缀与键。
 #[test]
 fn loader_type_prefix() {
-    assert_eq!(LoaderType::Normal.to_string(), "normal");
-    assert_eq!(LoaderType::Forge.to_string(), "forge");
-    assert_eq!(LoaderType::Fabric.to_string(), "fabric");
-    assert_eq!(LoaderType::Quilt.to_string(), "quilt");
-    assert_eq!(LoaderType::NeoForge.to_string(), "neoforge");
-    assert_eq!(LoaderType::OptiFine.to_string(), "optifine");
-    assert_eq!(LoaderType::LiteLoader.to_string(), "liteloader");
-    assert_eq!(LoaderType::Custom.to_string(), "custom");
+    assert_eq!(LoaderType::Normal.id(), "normal");
+    assert_eq!(LoaderType::Forge.id(), "forge");
+    assert_eq!(LoaderType::Fabric.id(), "fabric");
+    assert_eq!(LoaderType::Quilt.id(), "quilt");
+    assert_eq!(LoaderType::NeoForge.id(), "neoforge");
+    assert_eq!(LoaderType::OptiFine.id(), "optifine");
+    assert_eq!(LoaderType::LiteLoader.id(), "liteloader");
+    assert_eq!(LoaderType::Custom.id(), "custom");
 
     let key = LoaderKey::new("1.20.4", "49.0.0");
     assert_eq!(key.mc, "1.20.4");

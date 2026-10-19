@@ -12,7 +12,7 @@ use mml_names::{
     names,
 };
 use mml_net::{
-    curseforge_api::{self, file_obj::CurseForgeFileDataObj},
+    curseforge_api,
     input_file::InputFile,
 };
 use mml_sys::path_helper;
@@ -55,39 +55,6 @@ impl CurseForgeWorker {
     pub fn new(base: BaseModPackWorker) -> Self {
         Self { info: None, base }
     }
-}
-
-/// 批量解析文件 ID 为 `CurseForgeFileDataObj`，优先走批量接口，失败则逐文件查询
-///
-/// - `file_ids`: 文件 ID 列表
-/// - `cancel`: 取消令牌，降级查询时逐个检查
-///
-/// # 返回值
-///
-/// 返回解析成功的文件信息列表，失败项被跳过
-async fn resolve_files(
-    file_ids: &[u64],
-    cancel: &Option<CancellationToken>,
-) -> Vec<CurseForgeFileDataObj> {
-    // 批量
-    if let Ok(items) = curseforge_api::get_files(file_ids.to_vec()).await {
-        return items;
-    }
-
-    // 逐文件降级
-    let mut items = Vec::new();
-    for &fid in file_ids {
-        if let Some(cancel) = cancel
-            && cancel.is_cancelled()
-        {
-            break;
-        }
-        let fid_str = fid.to_string();
-        if let Ok(data) = curseforge_api::get_mod(&fid_str, &fid_str).await {
-            items.push(data.data);
-        }
-    }
-    items
 }
 
 #[async_trait]

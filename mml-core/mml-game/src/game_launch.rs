@@ -20,7 +20,7 @@ use mml_base::{
     serialize_tools,
 };
 use mml_names::{
-    i18_items::error_type::{CoreResult, ErrorData, ErrorType, PathNotExistsData},
+    i18_items::error_type::{CoreResult, ErrorType, PathNotExistsData},
     names,
 };
 use mml_sys::{path_helper, process_helper};
@@ -40,6 +40,7 @@ use crate::{
     loader::LoaderType,
     serverpack::serverpack_obj::ServerPackObj,
 };
+use crate::error::{stream_err};
 
 /// 启动后自动操作
 pub enum AutoJoinType {
@@ -106,8 +107,6 @@ pub(crate) struct InstanceHandle {
     pub uuid: Uuid,
     /// 进程是否已经退出
     is_exit: Arc<AtomicBool>,
-    /// 是否为管理员启动
-    pub is_admin: bool,
     /// 退出码
     exit_code: i32,
     /// 提权启动时的目标进程 PID，用于强制结束目标进程
@@ -164,7 +163,6 @@ impl InstanceHandle {
             process,
             uuid: run.uuid,
             is_exit,
-            is_admin: result.is_admin,
             exit_code: 0,
             elevated_pid: result.pid,
         })
@@ -317,13 +315,7 @@ impl InstanceSettingObj {
                     arg.auth = LoginObj {
                         user_name: old.user_name.clone(),
                         uuid: old.uuid.clone(),
-                        access_token: Default::default(),
-                        client_token: Default::default(),
-                        auth_type: Default::default(),
-                        text1: Default::default(),
-                        text2: Default::default(),
-                        last_login: Default::default(),
-                        expire_at: None,
+                        ..Default::default()
                     };
                     Ok(())
                 } else {
@@ -591,6 +583,16 @@ impl InstanceSettingObj {
         }
     }
 
+    /// 按命令行文本启动一个进程，并把输出接到实例日志上
+    ///
+    /// - `cmd`: 命令行文本，首行是程序名，其余按空白拆成参数
+    /// - `env`: 额外环境变量
+    /// - `wait_run`: 是否等待执行完成
+    /// - `admin`: 是否以管理员方式启动
+    ///
+    /// # 返回值
+    ///
+    /// 程序找不到或启动失败时返回错误
     fn cmd_run(
         &self,
         cmd: &str,
@@ -657,11 +659,7 @@ impl InstanceSettingObj {
                     return Ok(());
                 }
 
-                result.child.wait().map_err(|e| {
-                    ErrorType::StreamError(ErrorData {
-                        error: e.to_string(),
-                    })
-                })?;
+                result.child.wait().map_err(stream_err)?;
 
                 Ok(())
             }
@@ -737,7 +735,7 @@ impl InstanceSettingObj {
             gui.update_state(&self, LaunchState::Jvm);
         }
 
-        InstanceSettingObj::allow_security_manager(&mut obj, &java.clone().unwrap());
+        InstanceSettingObj::allow_security_manager(&mut obj, java.as_ref().unwrap());
         let args = self.make_run_arg(&arg, &mut obj, false);
         let env = self.make_env_arg();
 
@@ -900,7 +898,7 @@ impl InstanceSettingObj {
                     gui.update_state(self, LaunchState::Pre);
                 }
                 let start = Instant::now();
-                let temp = self.replace_arg(&jvm.clone(), &jvm_arg, &pre_run_cmd);
+                let temp = self.replace_arg(&jvm, &jvm_arg, &pre_run_cmd);
                 self.cmd_run(&temp, &env, prerun, arg.admin)?;
                 let time = start.elapsed();
                 crate::add_game_log_item(&self.uuid, GameLog::CmdPreTime(time));
@@ -953,7 +951,7 @@ impl InstanceSettingObj {
                     gui.update_state(self, LaunchState::Post);
                 }
                 let start = Instant::now();
-                let temp = self.replace_arg(&jvm.clone(), &jvm_arg, &post_run_cmd);
+                let temp = self.replace_arg(&jvm, &jvm_arg, &post_run_cmd);
                 self.cmd_run(&temp, &env, false, arg.admin)?;
                 let time = start.elapsed();
                 crate::add_game_log_item(&self.uuid, GameLog::CmdPostTime(time));

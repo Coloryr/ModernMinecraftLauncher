@@ -9,7 +9,7 @@ use crate::{
 };
 
 /// 服务器实例
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ServerPackObj {
     /// 实例名
@@ -51,28 +51,8 @@ pub struct ServerPackObj {
     pub archive_list: Vec<ServerArchiveItemObj>,
 }
 
-impl Default for ServerPackObj {
-    /// 全字段取默认值：字符串为空串、列表为空、可选字段为 `None`
-    fn default() -> Self {
-        Self {
-            name: Default::default(),
-            version: Default::default(),
-            loader: Default::default(),
-            loader_version: Default::default(),
-            run_arg: Default::default(),
-            window: Default::default(),
-            start_server: Default::default(),
-            advance_jvm: Default::default(),
-            text: Default::default(),
-            pack_version: Default::default(),
-            online_list: Default::default(),
-            archive_list: Default::default(),
-        }
-    }
-}
-
 /// 服务器包里的配置文件压缩包条目
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ServerArchiveItemObj {
     /// 文件名
@@ -95,22 +75,8 @@ pub struct ServerArchiveItemObj {
     pub sha256: Option<String>,
 }
 
-impl Default for ServerArchiveItemObj {
-    /// 全字段取默认值：字符串为空串、可选字段为 `None`
-    fn default() -> Self {
-        Self {
-            file: Default::default(),
-            dir: Default::default(),
-            delete_old: Default::default(),
-            url: Default::default(),
-            sha1: Default::default(),
-            sha256: Default::default(),
-        }
-    }
-}
-
 /// 服务器包里的模组文件条目
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ServerItemObj {
     /// 游戏目录下的相对路径，如 `mods/foo.jar`、`config/bar.toml`
@@ -131,18 +97,4 @@ pub struct ServerItemObj {
     /// SHA256 校验
     #[serde(rename = "Sha256")]
     pub sha256: Option<String>,
-}
-
-impl Default for ServerItemObj {
-    /// 全字段取默认值：字符串为空串、可选字段为 `None`
-    fn default() -> Self {
-        Self {
-            file: Default::default(),
-            pid: Default::default(),
-            fid: Default::default(),
-            url: Default::default(),
-            sha1: Default::default(),
-            sha256: Default::default(),
-        }
-    }
 }

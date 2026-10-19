@@ -13,6 +13,7 @@ use mml_sys::path_helper;
 use crate::launcher::instance_setting_obj::InstanceSettingObj;
 
 /// 服务器列表里的单个条目，对应 `servers.dat` 里的一条记录
+#[derive(Default)]
 pub struct ServerInfoObj {
     /// 服务器地址，形如 `host:port`
     pub ip: String,
@@ -24,18 +25,6 @@ pub struct ServerInfoObj {
     pub accept_textures: bool,
     /// 所属实例
     pub instance: Arc<InstanceSettingObj>,
-}
-
-impl Default for ServerInfoObj {
-    fn default() -> Self {
-        Self {
-            ip: Default::default(),
-            name: Default::default(),
-            icon: Default::default(),
-            accept_textures: Default::default(),
-            instance: Default::default(),
-        }
-    }
 }
 
 impl InstanceSettingObj {

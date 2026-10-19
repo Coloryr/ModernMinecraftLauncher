@@ -7,7 +7,7 @@ use mml_downloader::{DownloadTaskState, IDownloadGui, download_item::DownloadIte
 struct GuiRun {}
 
 impl IDownloadGui for GuiRun {
-    fn update(&self, thread: u32, file: &Arc<DownloadItem>) {
+    fn update(&self, _thread: u32, _file: &Arc<DownloadItem>) {
         // let pro = file.progress() as u64;
         // if pro > 0 && pro % 10 == 0 {
         //     println!(
@@ -47,8 +47,8 @@ async fn test_download() {
     let exe_dir = exe_path.parent().expect("Failed to get exe directory");
     let run_dir = exe_dir.parent().unwrap().to_path_buf();
 
-    mml_log::start(&run_dir);
-    mml_config::init(&run_dir);
+    let _ = mml_log::start(&run_dir);
+    let _ = mml_config::init(&run_dir);
     mml_net::init();
 
     let gui = GuiRun {};

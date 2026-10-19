@@ -16,3 +16,16 @@
 export function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
+
+/**
+ * 去重并升序排序
+ *
+ * - `values`: 原始列表，空串会被丢掉
+ *
+ * # 返回值
+ *
+ * 去重后的新数组，按字典序
+ */
+export function uniq(values: string[]): string[] {
+  return [...new Set(values.filter(Boolean))].sort();
+}

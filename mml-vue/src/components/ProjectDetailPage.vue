@@ -17,7 +17,7 @@ import { useDownloadBadges } from "../lib/downloadBadges";
 import { formatCount, t, tErr } from "../lib/i18n";
 import { svgIcon } from "../lib/modrinthIcon";
 import { usePageActive } from "../lib/pageActive";
-import { showToast } from "../lib/toast";
+import { toggleStar } from "../lib/projectCollect";
 import type {
   FileListItemDto,
   FileListDto,
@@ -25,6 +25,7 @@ import type {
   ProjectDetailDto,
   ProjectItemDto,
 } from "../lib/bindings";
+import { formatDate } from "../lib/format";
 
 /** 任务条目与快照的最小契约，两个窗口的任务 DTO 都满足 */
 type TaskItem = { pid: string; fid: string; done: boolean; failed: boolean; cancelled?: boolean };
@@ -207,23 +208,6 @@ function downloadLatest() {
 }
 
 /** 收藏 / 取消收藏；`item` 与列表项是同一个对象，改它即改列表上的星标 */
-async function toggleStar(item: ProjectItemDto) {
-  const star = !item.isStar;
-  try {
-    await api.collectStar(
-      item.source.source,
-      item.source.fileType,
-      item.source.pid,
-      item.name,
-      item.image,
-      item.url,
-      star,
-    );
-    item.isStar = star;
-  } catch (e) {
-    showToast(tErr(e));
-  }
-}
 
 /** Modrinth 正文（markdown）渲染成 HTML；CurseForge 没有 body，显示简介 */
 const bodyHtml = computed(() => {
@@ -282,10 +266,6 @@ watch(
   },
   { immediate: true },
 );
-
-function formatDate(date: string): string {
-  return date ? date.slice(0, 10) : "";
-}
 
 function formatSize(size: number): string {
   if (!size) return t("modpack.unknownSize");

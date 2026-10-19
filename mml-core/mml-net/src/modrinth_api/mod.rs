@@ -17,7 +17,7 @@
 use std::collections::HashMap;
 
 use mml_names::{
-    i18_items::error_type::{CoreResult, ErrorData, ErrorType},
+    i18_items::error_type::{CoreResult},
     names,
 };
 use serde::{Deserialize, Serialize};
@@ -29,6 +29,7 @@ use crate::{
     },
     urls,
 };
+use crate::serializer_err;
 
 pub mod project_obj;
 pub mod search_obj;
@@ -115,6 +116,7 @@ impl ModrinthSortType {
 }
 
 /// Modrinth 搜索参数
+#[derive(Default)]
 pub struct ModrinthSearchArg {
     /// 游戏版本号，形如 `1.20.4`；`None` 表示不限
     pub version: Option<String>,
@@ -130,21 +132,6 @@ pub struct ModrinthSearchArg {
     pub category: Option<String>,
     /// 加载器筛选，如 `fabric` / `forge`；`None` 表示不限
     pub loader: Option<String>,
-}
-
-impl Default for ModrinthSearchArg {
-    /// 所有筛选条件留空，`sort` 取推荐
-    fn default() -> Self {
-        Self {
-            version: Default::default(),
-            query: Default::default(),
-            sort: Default::default(),
-            page: Default::default(),
-            page_size: Default::default(),
-            category: Default::default(),
-            loader: Default::default(),
-        }
-    }
 }
 
 /// 构建 facets 查询参数 JSON
@@ -444,9 +431,7 @@ pub async fn get_versions(ids: Vec<String>) -> CoreResult<Vec<ModrinthVersionObj
     // 用紧凑 JSON + URL 编码：`json_to_string` 输出 pretty 多行格式，
     // 直接拼进 URL 会带换行与缩进，服务端解析失败或必须依赖 reqwest 兜底清理
     let ids_json = serde_json::to_string(&ids).map_err(|err| {
-        ErrorType::SerializerError(ErrorData {
-            error: err.to_string(),
-        })
+        serializer_err(err)
     })?;
 
     let mut url = reqwest::Url::parse(&format!("{}versions", urls::MODRINTH_API)).unwrap();
@@ -563,20 +548,11 @@ pub async fn get_file_versions(
 }
 
 /// 游戏版本标签，对应 `tag/game_version` 接口
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ModrinthGameVersionObj {
     /// 游戏版本号，形如 `1.20.4`
     pub version: String,
-}
-
-impl Default for ModrinthGameVersionObj {
-    /// 全字段取默认值，配合 `#[serde(default)]` 兜底缺失字段
-    fn default() -> Self {
-        Self {
-            version: Default::default(),
-        }
-    }
 }
 
 /// 获取所有游戏版本
@@ -593,7 +569,7 @@ pub async fn get_game_versions() -> CoreResult<Vec<ModrinthGameVersionObj>> {
 }
 
 /// 分类标签，对应 `tag/category` 接口
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct ModrinthCategoriesObj {
     /// 分类图标 URL，可能为空串
@@ -604,18 +580,6 @@ pub struct ModrinthCategoriesObj {
     pub project_type: String,
     /// 所属分组标头：`categories` / `loaders` / `versions` 等
     pub header: String,
-}
-
-impl Default for ModrinthCategoriesObj {
-    /// 全字段取默认值，配合 `#[serde(default)]` 兜底缺失字段
-    fn default() -> Self {
-        Self {
-            icon: Default::default(),
-            name: Default::default(),
-            project_type: Default::default(),
-            header: Default::default(),
-        }
-    }
 }
 
 /// 获取所有类型
@@ -632,20 +596,11 @@ pub async fn get_categories() -> CoreResult<Vec<ModrinthCategoriesObj>> {
 }
 
 /// 加载器标签，对应 `tag/loader` 接口
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct ModrinthLoaderObj {
     /// 加载器名称，如 `fabric`，与搜索命中 `categories` 里的写法一致
     pub name: String,
-}
-
-impl Default for ModrinthLoaderObj {
-    /// 全字段取默认值，配合 `#[serde(default)]` 兜底缺失字段
-    fn default() -> Self {
-        Self {
-            name: Default::default(),
-        }
-    }
 }
 
 /// 获取所有加载器名
@@ -664,23 +619,13 @@ pub async fn get_loaders() -> CoreResult<Vec<ModrinthLoaderObj>> {
 }
 
 /// 按哈希反查版本的请求体，对应 `version_files` 接口
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 struct VersionHashObj {
     /// 文件哈希列表，算法由 `algorithm` 指定
     pub hashes: Vec<String>,
     /// 哈希算法：`sha1` / `sha512`
     pub algorithm: String,
-}
-
-impl Default for VersionHashObj {
-    /// 全字段取默认值，配合 `#[serde(default)]` 兜底缺失字段
-    fn default() -> Self {
-        Self {
-            hashes: Default::default(),
-            algorithm: Default::default(),
-        }
-    }
 }
 
 /// 从文件 SHA1 获取项目

@@ -12,13 +12,15 @@ use std::{
     },
 };
 
-use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType, FileSystemErrorData};
+use mml_names::i18_items::error_type::{CoreResult, ErrorType, FileSystemErrorData};
 use mml_sys::path_helper;
 use uuid::Uuid;
 
 use crate::archives::{
     ArchiveAddFile, ArchiveHandle, ArchiveType, BaseArchiveGui, IBaseArchiveGui, TarMode,
     r7z_reader::R7zReader, replace_invalid_name, tar_reader::TarReader, zip_reader::ZipReader,
+    write_error,
+    fs_err,
 };
 
 /// 压缩包条目信息
@@ -317,18 +319,11 @@ impl BaseArchive {
         use zip::ZipWriter;
 
         let file = fs::File::create(path).map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: path.to_path_buf(),
-                error: err.to_string(),
-            })
+            fs_err(path.to_path_buf(), err)
         })?;
 
         let zip = ZipWriter::new(file);
-        zip.finish().map_err(|err| {
-            ErrorType::ArchiveWriteError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        zip.finish().map_err(write_error)?;
 
         Ok(())
     }
@@ -344,18 +339,11 @@ impl BaseArchive {
         use tar::Builder;
 
         let file = fs::File::create(path).map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: path.to_path_buf(),
-                error: err.to_string(),
-            })
+            fs_err(path.to_path_buf(), err)
         })?;
 
         let mut builder = Builder::new(file);
-        builder.finish().map_err(|err| {
-            ErrorType::ArchiveWriteError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        builder.finish().map_err(write_error)?;
 
         Ok(())
     }
@@ -823,16 +811,10 @@ impl BaseArchive {
 
         // 用新压缩包替换原有压缩包
         fs::remove_file(&self.path).map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: self.path.clone(),
-                error: err.to_string(),
-            })
+            fs_err(self.path.clone(), err)
         })?;
         fs::rename(&temp_archive, &self.path).map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: self.path.clone(),
-                error: err.to_string(),
-            })
+            fs_err(self.path.clone(), err)
         })?;
 
         // 刷新内部条目列表
@@ -893,10 +875,7 @@ impl BaseArchive {
         }
         let mut file = path_helper::open_write(&dest_path)?;
         file.write_all(data).map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: dest_path.clone(),
-                error: err.to_string(),
-            })
+            fs_err(dest_path.clone(), err)
         })?;
 
         // 先压缩到临时文件，再原子替换
@@ -921,16 +900,10 @@ impl BaseArchive {
 
         // 用新压缩包替换原有压缩包
         fs::remove_file(&self.path).map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: self.path.clone(),
-                error: err.to_string(),
-            })
+            fs_err(self.path.clone(), err)
         })?;
         fs::rename(&temp_archive, &self.path).map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: self.path.clone(),
-                error: err.to_string(),
-            })
+            fs_err(self.path.clone(), err)
         })?;
 
         // 刷新内部条目列表
@@ -976,11 +949,7 @@ impl BaseArchive {
 
         let result = (|| -> CoreResult<()> {
             let mut file = path_helper::open_write(&temp_file)?;
-            std::io::copy(stream, &mut file).map_err(|err| {
-                ErrorType::ArchiveWriteError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            std::io::copy(stream, &mut file).map_err(write_error)?;
             drop(file);
             self.add_file(name, &temp_file)
         })();

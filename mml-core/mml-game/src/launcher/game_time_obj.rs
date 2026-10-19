@@ -183,7 +183,7 @@ fn parse_time_part(time_str: &str) -> Result<Duration, String> {
 }
 
 /// 单个实例的游戏时长统计，落盘在实例目录的统计文件里
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct GameTimeObj {
     /// 实例添加时间，带时区偏移
@@ -206,17 +206,6 @@ pub struct GameTimeObj {
         deserialize_with = "deserialize_duration"
     )]
     pub last_play: Duration,
-}
-
-impl Default for GameTimeObj {
-    fn default() -> Self {
-        Self {
-            add_time: Default::default(),
-            last_time: Default::default(),
-            game_time: Default::default(),
-            last_play: Default::default(),
-        }
-    }
 }
 
 impl GameTimeObj {

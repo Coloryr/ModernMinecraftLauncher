@@ -41,6 +41,13 @@ pub struct ServerPackRemovals<'a> {
 ///
 /// 注意：**路径变了就删旧路径**这条只对"同一项目"成立；不同项目但同一路径的文件不会被删，
 /// 由下载阶段直接覆盖；这是原实现的取舍，未改动。
+///
+/// - `old`: 升级前的服务器包
+/// - `new`: 升级后的服务器包
+///
+/// # 返回值
+///
+/// 要从旧包里删掉的文件与目录清单
 pub fn plan_removals<'a>(old: &'a ServerPackObj, new: &ServerPackObj) -> ServerPackRemovals<'a> {
     let mut out = ServerPackRemovals::default();
 
@@ -100,6 +107,9 @@ pub struct ServerPackDownloads<'a> {
 /// 地址规则与原内联逻辑一致：条目自带 `url` 优先，空串视为没有；为空时用 `resolved`
 /// 里的地址，即 `fid → url`，由 `resolve_download_urls` 解析；都拿不到就是空串，
 /// 下载阶段会因此失败并报 `DownloadFileFail`。
+///
+/// - `pack`: 服务器包清单，条目顺序即下载顺序
+/// - `resolved`: `fid → url` 的解析结果，条目自带地址时不查它
 ///
 /// # 返回值
 ///

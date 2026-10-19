@@ -7,12 +7,16 @@ use mml_names::i18_items::error_type::{ArgEmptyData, CoreResult, ErrorType};
 
 use crate::serialize_tools::MiniJsonObj;
 
+/// 版本号切出来的记号，数字段与字符串段分开比较
 #[derive(Debug, Clone, PartialEq)]
 enum Token {
+    /// 纯数字段
     Num(u64),
+    /// 非数字段，已转小写
     Str(String),
 }
 
+/// 把版本号切成可比较的记号，按 `.` `-` `_` 分段，纯数字段转数字
 fn tokenize(s: &str) -> Vec<Token> {
     // SemVer 的构建元数据不参与版本比较：`9.5.1+1.21.1` 就是 `9.5.1`。
     // 不切掉 `+` 后面那段会解析出 "1+1" 这种非数字记号，比 `[9.5.1,)` 时判成"小了"
@@ -29,6 +33,7 @@ fn tokenize(s: &str) -> Vec<Token> {
         .collect()
 }
 
+/// 比较两个记号的大小，数字段排在字符串段前面
 fn compare_token(a: &Token, b: &Token) -> Ordering {
     match (a, b) {
         (Token::Num(x), Token::Num(y)) => x.cmp(y),
@@ -39,6 +44,13 @@ fn compare_token(a: &Token, b: &Token) -> Ordering {
 }
 
 /// 简化版 Maven 版本比较。
+///
+/// - `a`: 左操作数版本串
+/// - `b`: 右操作数版本串
+///
+/// # 返回值
+///
+/// `a` 相对 `b` 的先后，逐段比较；`a` 小返回 `Ordering::Less`
 pub fn compare_versions(a: &str, b: &str) -> Ordering {
     let ta = tokenize(a);
     let tb = tokenize(b);
@@ -66,6 +78,7 @@ pub fn compare_versions(a: &str, b: &str) -> Ordering {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// 版本约束条件，写法沿用 Maven 版本范围
 pub enum VersionRange {
     /// 任意版本（`*`）
     Any,
@@ -79,11 +92,16 @@ pub enum VersionRange {
     All(Vec<VersionRange>),
 }
 
+/// 单区间，上下界各自可缺省
 #[derive(Debug, Clone, PartialEq)]
 pub struct Interval {
+    /// 下界版本号，`None` 表示不限
     pub lower: Option<String>,
+    /// 下界是否闭合
     pub lower_inclusive: bool,
+    /// 上界版本号，`None` 表示不限
     pub upper: Option<String>,
+    /// 上界是否闭合
     pub upper_inclusive: bool,
 }
 
@@ -115,7 +133,108 @@ impl fmt::Display for Interval {
     }
 }
 
+/// 区间的一侧边界
+struct Bound {
+    /// 版本号
+    version: String,
+    /// 是否闭合
+    inclusive: bool,
+}
+
+/// 一个记号换算出的区间边界
+struct Bounds {
+    /// 下界；`None` 表示不限
+    lower: Option<Bound>,
+    /// 上界；`None` 表示不限
+    upper: Option<Bound>,
+}
+
+impl Bounds {
+    /// 两侧都不限
+    ///
+    /// # 返回值
+    ///
+    /// 任意版本都命中的边界
+    fn unbounded() -> Self {
+        Bounds {
+            lower: None,
+            upper: None,
+        }
+    }
+
+    /// 只给下界
+    ///
+    /// - `version`: 下界版本号
+    /// - `inclusive`: 下界是否闭合
+    ///
+    /// # 返回值
+    ///
+    /// 上界不限的边界
+    fn lower_only(version: String, inclusive: bool) -> Self {
+        Bounds {
+            lower: Some(Bound { version, inclusive }),
+            upper: None,
+        }
+    }
+
+    /// 只给上界
+    ///
+    /// - `version`: 上界版本号
+    /// - `inclusive`: 上界是否闭合
+    ///
+    /// # 返回值
+    ///
+    /// 下界不限的边界
+    fn upper_only(version: String, inclusive: bool) -> Self {
+        Bounds {
+            lower: None,
+            upper: Some(Bound { version, inclusive }),
+        }
+    }
+
+    /// 上下界都给
+    ///
+    /// - `lower`: 下界版本号
+    /// - `lower_inclusive`: 下界是否闭合
+    /// - `upper`: 上界版本号
+    /// - `upper_inclusive`: 上界是否闭合
+    ///
+    /// # 返回值
+    ///
+    /// 双侧都限的边界
+    fn both(lower: String, lower_inclusive: bool, upper: String, upper_inclusive: bool) -> Self {
+        Bounds {
+            lower: Some(Bound {
+                version: lower,
+                inclusive: lower_inclusive,
+            }),
+            upper: Some(Bound {
+                version: upper,
+                inclusive: upper_inclusive,
+            }),
+        }
+    }
+}
+
+impl From<Bounds> for Interval {
+    fn from(bounds: Bounds) -> Self {
+        Interval {
+            lower: bounds.lower.as_ref().map(|b| b.version.clone()),
+            lower_inclusive: bounds.lower.as_ref().map(|b| b.inclusive).unwrap_or(false),
+            upper: bounds.upper.as_ref().map(|b| b.version.clone()),
+            upper_inclusive: bounds.upper.as_ref().map(|b| b.inclusive).unwrap_or(false),
+        }
+    }
+}
+
 impl Interval {
+    /// 判断版本号是否落在本区间内
+    ///
+    /// - `version`: 待判断的版本号
+    ///
+    /// # 返回值
+    ///
+    /// 在区间内返回 `true`；边界不是干净版本号时一律返回 `true`
     pub fn contains(&self, version: &str) -> bool {
         // 边界不是干净的版本号时比不准：`[1.21,1.21z)`、`[1.21-3.1.0c,)` 这类写法
         // 各家实现给出的结论都不一样，而上游加载器是放行的 —— 这里也一律当"符合"，
@@ -153,6 +272,13 @@ impl Interval {
 }
 
 impl VersionRange {
+    /// 判断版本号是否落在本范围内
+    ///
+    /// - `version`: 待判断的版本号
+    ///
+    /// # 返回值
+    ///
+    /// 在范围内返回 `true`
     pub fn contains(&self, version: &str) -> bool {
         match self {
             VersionRange::Any => true,
@@ -173,6 +299,12 @@ impl VersionRange {
 ///   把允许的版本逐个列了出来，同样按并集处理
 ///
 /// 解析失败返回 `Err`，调用方按"不限版本"处理。
+///
+/// - `s`: Maven 版本范围串，前后空白会被去掉
+///
+/// # 返回值
+///
+/// 解析后的范围；空串返回 [`VersionRange::Any`]，格式错误返回 `ErrorType::InvalidOperation`
 pub fn parse_maven_version_range(s: &str) -> CoreResult<VersionRange> {
     let s = s.trim();
     if s.is_empty() {
@@ -253,6 +385,12 @@ fn is_plain_version(version: &str) -> bool {
 }
 
 /// 解析 JSON 字符串数组 `[ ">=1.18.1", "<1.19.3" ]`，每个元素单独解析后组合成 AND。
+///
+/// - `s`: JSON 字符串数组，元素各自是一条版本条件
+///
+/// # 返回值
+///
+/// 各元素取 AND 的范围；空数组返回 [`VersionRange::Any`]，不是数组或元素非法返回 `ErrorType::InvalidOperation`
 pub fn parse_json_array_range(s: &MiniJsonObj) -> CoreResult<VersionRange> {
     if !s.is_list() {
         return Err(ErrorType::InvalidOperation);
@@ -276,6 +414,12 @@ pub fn parse_json_array_range(s: &MiniJsonObj) -> CoreResult<VersionRange> {
 /// 解析 Fabric 风格的版本范围字符串。
 ///
 /// 例：`*`、`>=0.19.5`、`~1.2.3`、`^1.2.3`、`>=1.0 <2.0`、`1.0 || 2.0`
+///
+/// - `s`: Fabric 版本条件串，前后空白会被去掉
+///
+/// # 返回值
+///
+/// 解析后的范围；空串与 `*` 返回 [`VersionRange::Any`]，`||` 多段合并成 [`VersionRange::Union`]，格式错误返回 `ErrorType::InvalidOperation`
 pub fn parse_fabric_version_range(s: &str) -> CoreResult<VersionRange> {
     let s = s.trim();
     if s.is_empty() || s == "*" {
@@ -294,6 +438,13 @@ pub fn parse_fabric_version_range(s: &str) -> CoreResult<VersionRange> {
     parse_fabric_conjunction(s)
 }
 
+/// 解析 Fabric 风格的合取范围，记号之间是"且"
+///
+/// - `s`: 范围字符串
+///
+/// # 返回值
+///
+/// 见 [`VersionRange`]
 fn parse_fabric_conjunction(s: &str) -> CoreResult<VersionRange> {
     let tokens: Vec<&str> = s.split_whitespace().collect();
     if tokens.is_empty() {
@@ -303,41 +454,49 @@ fn parse_fabric_conjunction(s: &str) -> CoreResult<VersionRange> {
         return parse_fabric_single(tokens[0]);
     }
 
-    let mut lower: Option<(String, bool)> = None;
-    let mut upper: Option<(String, bool)> = None;
+    let mut lower: Option<Bound> = None;
+    let mut upper: Option<Bound> = None;
 
     for tok in tokens {
-        let (lo, up) = token_to_bounds(tok)?;
-        if let Some((v, incl)) = lo {
+        let bounds = token_to_bounds(tok)?;
+        if let Some(b) = bounds.lower {
             lower = match lower {
-                None => Some((v, incl)),
-                Some((lv, li)) => match compare_versions(&v, &lv) {
-                    Ordering::Greater => Some((v, incl)),
-                    Ordering::Equal => Some((v, li && incl)),
-                    Ordering::Less => Some((lv, li)),
+                None => Some(b),
+                Some(cur) => match compare_versions(&b.version, &cur.version) {
+                    Ordering::Greater => Some(b),
+                    Ordering::Equal => Some(Bound {
+                        version: cur.version,
+                        inclusive: cur.inclusive && b.inclusive,
+                    }),
+                    Ordering::Less => Some(cur),
                 },
             };
         }
-        if let Some((v, incl)) = up {
+        if let Some(b) = bounds.upper {
             upper = match upper {
-                None => Some((v, incl)),
-                Some((uv, ui)) => match compare_versions(&v, &uv) {
-                    Ordering::Less => Some((v, incl)),
-                    Ordering::Equal => Some((v, ui && incl)),
-                    Ordering::Greater => Some((uv, ui)),
+                None => Some(b),
+                Some(cur) => match compare_versions(&b.version, &cur.version) {
+                    Ordering::Less => Some(b),
+                    Ordering::Equal => Some(Bound {
+                        version: cur.version,
+                        inclusive: cur.inclusive && b.inclusive,
+                    }),
+                    Ordering::Greater => Some(cur),
                 },
             };
         }
     }
 
-    Ok(VersionRange::Interval(Interval {
-        lower: lower.as_ref().map(|(v, _)| v.clone()),
-        lower_inclusive: lower.as_ref().map(|(_, i)| *i).unwrap_or(false),
-        upper: upper.as_ref().map(|(v, _)| v.clone()),
-        upper_inclusive: upper.as_ref().map(|(_, i)| *i).unwrap_or(false),
-    }))
+    Ok(VersionRange::Interval(Interval::from(Bounds { lower, upper })))
 }
 
+/// 解析单个 Fabric 记号
+///
+/// - `tok`: 单个记号，如 `>=1.21`
+///
+/// # 返回值
+///
+/// 见 [`VersionRange`]
 fn parse_fabric_single(tok: &str) -> CoreResult<VersionRange> {
     // 裸版本号（没有任何运算符）按"这一档版本"处理：`1.21` 也匹配 `1.21.1`。
     // 要严格精确匹配请写 `=1.21`，那会走下面那条 Exact 分支
@@ -347,18 +506,16 @@ fn parse_fabric_single(tok: &str) -> CoreResult<VersionRange> {
         return Ok(range);
     }
 
-    let (lo, up) = token_to_bounds(tok)?;
-    match (&lo, &up) {
-        (Some((l, true)), Some((u, true))) if compare_versions(l, u) == Ordering::Equal => {
-            Ok(VersionRange::Exact(l.clone()))
-        }
-        _ => Ok(VersionRange::Interval(Interval {
-            lower: lo.clone().map(|(v, _)| v),
-            lower_inclusive: lo.map(|(_, i)| i).unwrap_or(false),
-            upper: up.clone().map(|(v, _)| v),
-            upper_inclusive: up.map(|(_, i)| i).unwrap_or(false),
-        })),
+    let bounds = token_to_bounds(tok)?;
+    if let (Some(l), Some(u)) = (&bounds.lower, &bounds.upper)
+        && l.inclusive
+        && u.inclusive
+        && compare_versions(&l.version, &u.version) == Ordering::Equal
+    {
+        return Ok(VersionRange::Exact(l.version.clone()));
     }
+
+    Ok(VersionRange::Interval(bounds.into()))
 }
 
 /// 是不是裸版本号：没有任何运算符前缀
@@ -388,10 +545,17 @@ fn prefix_range(version: &str) -> Option<VersionRange> {
     }))
 }
 
-fn token_to_bounds(tok: &str) -> CoreResult<(Option<(String, bool)>, Option<(String, bool)>)> {
+/// 把一个记号换算成区间的上下界
+///
+/// - `tok`: 单个记号，如 `>=1.21`、`~1.21`
+///
+/// # 返回值
+///
+/// 见 [`Bounds`]；两侧都不限表示任意版本
+fn token_to_bounds(tok: &str) -> CoreResult<Bounds> {
     let tok = tok.trim();
     if tok.is_empty() || tok == "*" {
-        return Ok((None, None));
+        return Ok(Bounds::unbounded());
     }
 
     for (prefix, kind) in [
@@ -406,31 +570,32 @@ fn token_to_bounds(tok: &str) -> CoreResult<(Option<(String, bool)>, Option<(Str
         if let Some(rest) = tok.strip_prefix(prefix) {
             let v = rest.trim();
             if v.is_empty() || v == "*" {
-                return Ok((None, None));
+                return Ok(Bounds::unbounded());
             }
             return match kind {
-                "ge" => Ok((Some((v.to_string(), true)), None)),
-                "gt" => Ok((Some((v.to_string(), false)), None)),
-                "le" => Ok((None, Some((v.to_string(), true)))),
-                "lt" => Ok((None, Some((v.to_string(), false)))),
-                "eq" => Ok((Some((v.to_string(), true)), Some((v.to_string(), true)))),
-                "tilde" => {
-                    let (l, u) = expand_tilde(v)?;
-                    Ok((Some((l, true)), Some((u, false))))
-                }
-                "caret" => {
-                    let (l, u) = expand_caret(v)?;
-                    Ok((Some((l, true)), Some((u, false))))
-                }
+                "ge" => Ok(Bounds::lower_only(v.to_string(), true)),
+                "gt" => Ok(Bounds::lower_only(v.to_string(), false)),
+                "le" => Ok(Bounds::upper_only(v.to_string(), true)),
+                "lt" => Ok(Bounds::upper_only(v.to_string(), false)),
+                "eq" => Ok(Bounds::both(v.to_string(), true, v.to_string(), true)),
+                "tilde" => expand_tilde(v),
+                "caret" => expand_caret(v),
                 _ => unreachable!(),
             };
         }
     }
 
-    Ok((Some((tok.to_string(), true)), Some((tok.to_string(), true))))
+    Ok(Bounds::both(tok.to_string(), true, tok.to_string(), true))
 }
 
-fn expand_tilde(v: &str) -> CoreResult<(String, String)> {
+/// 把 `~` 展开成半开区间，只给主版本时上界到主版本 + 1
+///
+/// - `v`: `~` 后面的版本号
+///
+/// # 返回值
+///
+/// 见 [`Bounds`]；下界闭合、上界不闭
+fn expand_tilde(v: &str) -> CoreResult<Bounds> {
     let parts: Vec<&str> = v.split('.').collect();
     let major: u64 = parts[0].parse().map_err(|_| ErrorType::InvalidOperation)?;
     let upper = if parts.len() >= 2 {
@@ -439,10 +604,17 @@ fn expand_tilde(v: &str) -> CoreResult<(String, String)> {
     } else {
         format!("{}", major + 1)
     };
-    Ok((v.to_string(), upper))
+    Ok(Bounds::both(v.to_string(), true, upper, false))
 }
 
-fn expand_caret(v: &str) -> CoreResult<(String, String)> {
+/// 把 `^` 展开成半开区间，主版本非 0 时锁主版本，否则锁次版本
+///
+/// - `v`: `^` 后面的版本号
+///
+/// # 返回值
+///
+/// 见 [`Bounds`]；下界闭合、上界不闭
+fn expand_caret(v: &str) -> CoreResult<Bounds> {
     let parts: Vec<&str> = v.split('.').collect();
     let major: u64 = parts[0].parse().map_err(|_| ErrorType::InvalidOperation)?;
     let upper = if major > 0 {
@@ -460,7 +632,7 @@ fn expand_caret(v: &str) -> CoreResult<(String, String)> {
     } else {
         "1".to_string()
     };
-    Ok((v.to_string(), upper))
+    Ok(Bounds::both(v.to_string(), true, upper, false))
 }
 
 /// 版本范围字符串的写法
@@ -519,6 +691,12 @@ pub fn parse_version_range_with(s: &str, syntax: RangeSyntax) -> CoreResult<Vers
 /// - 其他 → semver 语法（裸版本号会变成 `Exact`）
 ///
 /// 裸版本号两种写法都有，**知道来源时请用 [`parse_version_range_with`]**，别依赖这里猜。
+///
+/// - `s`: 版本范围串，前后空白会被去掉
+///
+/// # 返回值
+///
+/// 解析后的范围；以 `[` 或 `(` 开头走 Maven 语法，其余走 semver 语法
 pub fn parse_version_range(s: &str) -> CoreResult<VersionRange> {
     let s = s.trim();
     if s.starts_with('[') || s.starts_with('(') {

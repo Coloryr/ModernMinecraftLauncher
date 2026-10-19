@@ -106,11 +106,23 @@ pub struct StartArgDto {
 
 impl StartArgDto {
     /// 启动实例
+    ///
+    /// - `uuid`: 实例 uuid
+    ///
+    /// # 返回值
+    ///
+    /// 见 [`Self`]；`action` 取 `game`，`value` 为实例 uuid
     pub fn game(uuid: &str) -> Self {
         Self { action: "game".to_string(), value: uuid.to_string() }
     }
 
     /// 用文件 / 文件夹打开添加实例
+    ///
+    /// - `path`: 整合包文件或实例文件夹路径
+    ///
+    /// # 返回值
+    ///
+    /// 见 [`Self`]；`action` 取 `install`，`value` 为该路径
     pub fn install(path: &str) -> Self {
         Self { action: "install".to_string(), value: path.to_string() }
     }

@@ -121,11 +121,11 @@ export const THIRD_PARTY_GROUPS: ThirdPartyGroup[] = [
         note: "winHelp.noteMonacoBundles",
       },
       {
-        name: "vscode extensions/log（日志语法，转写为 Monarch）",
+        name: "vscode extensions/log",
         version: "main",
         license: "MIT",
         url: "https://github.com/microsoft/vscode/blob/main/extensions/log/syntaxes/log.tmLanguage.json",
-        note: "",
+        note: "winHelp.noteVscodeLog",
       },
       {
         name: "dompurify",
@@ -190,8 +190,18 @@ export const THIRD_PARTY_GROUPS: ThirdPartyGroup[] = [
 /** Rust 静态链接依赖总数，口径见文件头 */
 export const RUST_TOTAL = 475;
 
+/** 许可分布的一行 */
+export interface LicenseCount {
+  /** SPDX 表达式；聚合行留空，内容改由 `key` 给 */
+  license: string;
+  /** 该行的 crate 数 */
+  count: number;
+  /** 聚合行的 i18n 键；普通 SPDX 表达式行没有 */
+  key?: string;
+}
+
 /** Rust 静态链接依赖按许可表达式的分布，尾部合成一行 */
-export const RUST_LICENSE_COUNTS: Array<{ license: string; count: number }> = [
+export const RUST_LICENSE_COUNTS: LicenseCount[] = [
   { license: "MIT OR Apache-2.0", count: 233 },
   { license: "MIT", count: 82 },
   { license: "Apache-2.0 OR MIT", count: 39 },
@@ -202,7 +212,7 @@ export const RUST_LICENSE_COUNTS: Array<{ license: string; count: number }> = [
   { license: "BSD-3-Clause", count: 8 },
   { license: "MPL-2.0", count: 6 },
   { license: "ISC", count: 5 },
-  { license: "其余 29 种表达式", count: 46 },
+  { license: "", count: 46, key: "winHelp.licenseOtherExprs" },
 ];
 
 /**

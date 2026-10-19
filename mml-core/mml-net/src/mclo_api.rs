@@ -44,8 +44,8 @@ pub async fn push(content: String) -> CoreResult<String> {
         .await?;
 
     if !obj.success || obj.url.is_empty() {
-        // 业务失败：把对方给的原因写进日志，界面只按"上传失败"报（错误类型带不了自定义文案）
-        mml_log::warn(format!("mclo.gs 拒绝上传: {}", obj.error));
+        // 业务失败：对方给的原因只进日志，界面按通用的"上传失败"报
+        mml_log::warn(ErrorType::McloUploadRejected(obj.error.clone()).to_string());
         return Err(ErrorType::InvalidOperation);
     }
 

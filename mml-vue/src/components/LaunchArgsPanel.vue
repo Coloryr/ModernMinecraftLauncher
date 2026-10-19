@@ -15,6 +15,7 @@ import GlyphIcon from "./ui/GlyphIcon.vue";
 import MemoryHint from "./MemoryHint.vue";
 import NumberStepper from "./ui/NumberStepper.vue";
 import CollapsePanel from "./ui/CollapsePanel.vue";
+import { memoryLabel } from "../lib/format";
 
 const props = defineProps<{
   /** 当前实例的启动参数 */
@@ -78,11 +79,6 @@ watch(() => props.args.memory, () => {
 watch(() => props.args.minMemory, () => {
   minMemManual.value = false;
 });
-
-/** 预设档位的文字：整数 GB 显示 `8 GB`，否则按 MB 显示 */
-function memoryLabel(mib: number): string {
-  return mib % 1024 === 0 ? `${mib / 1024} GB` : `${mib} MB`;
-}
 
 /** 应用一个内存预设：填最大内存；最小内存高于它时一并顶上去 */
 function applyMemory(mib: number) {
@@ -248,7 +244,7 @@ const gcOptions = [
           @change="update({ javaName: ($event.target as HTMLSelectElement).value })">
           <option value="">{{ t("args.javaAuto") }}</option>
           <option v-for="j in javas" :key="j.name" :value="j.name">
-            {{ j.name }}（Java {{ j.major }}）
+            {{ t("args.javaEntry", { name: j.name, major: j.major }) }}
           </option>
           <!-- 选中的 Java 已不在列表里（删了 / 还没扫到）：补一条同名的，免得下拉一片空白 -->
           <option v-if="missingJava" :value="args.javaName">{{ args.javaName }}</option>

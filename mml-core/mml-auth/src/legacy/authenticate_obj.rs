@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// 标识发起认证请求的启动器客户端。服务器可能根据此信息
 /// 进行版本兼容性判断或统计。
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct AgentObj {
     /// 启动器名称，如 "Minecraft" 或 "M²L"
@@ -25,6 +25,10 @@ impl AgentObj {
     /// - `use_minecraft`: 是否伪装为 Minecraft 原版启动器头
     ///   - `true` → 使用 "Minecraft" 名称和版本 1
     ///   - `false` → 使用本启动器名称和当前版本号
+    ///
+    /// # 返回值
+    ///
+    /// 新建的代理信息：`name` 与 `version` 按 `use_minecraft` 取原版或本启动器的值
     pub fn new(use_minecraft: bool) -> Self {
         AgentObj {
             name: String::from(if use_minecraft {
@@ -41,19 +45,10 @@ impl AgentObj {
     }
 }
 
-impl Default for AgentObj {
-    fn default() -> Self {
-        Self {
-            name: Default::default(),
-            version: Default::default(),
-        }
-    }
-}
-
 /// 认证请求对象
 ///
 /// 发送给 `/authserver/authenticate` 端点的登录请求体。
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct AuthenticateObj {
     /// 启动器代理信息
@@ -67,22 +62,11 @@ pub struct AuthenticateObj {
     pub client_token: String,
 }
 
-impl Default for AuthenticateObj {
-    fn default() -> Self {
-        Self {
-            agent: Default::default(),
-            username: Default::default(),
-            password: Default::default(),
-            client_token: Default::default(),
-        }
-    }
-}
-
 /// 认证响应对象
 ///
 /// `/authserver/authenticate` 和 `/authserver/refresh` 端点的响应体。
 /// 可能包含错误信息、选中的角色或可选角色列表。
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct AuthenticateResObj {
     /// 登录访问令牌，即 access token
@@ -102,22 +86,10 @@ pub struct AuthenticateResObj {
     pub error_message: Option<String>,
 }
 
-impl Default for AuthenticateResObj {
-    fn default() -> Self {
-        Self {
-            access_token: Default::default(),
-            client_token: Default::default(),
-            selected_profile: Default::default(),
-            available_profiles: Default::default(),
-            error_message: Default::default(),
-        }
-    }
-}
-
 /// 令牌刷新请求对象
 ///
 /// 发送给 `/authserver/refresh` 端点的刷新请求体。
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct RefreshObj {
     /// 当前登录访问令牌
@@ -131,35 +103,16 @@ pub struct RefreshObj {
     pub selected_profile: Option<SelectedProfileObj>,
 }
 
-impl Default for RefreshObj {
-    fn default() -> Self {
-        Self {
-            access_token: Default::default(),
-            client_token: Default::default(),
-            selected_profile: Default::default(),
-        }
-    }
-}
-
 /// 可选角色/账户信息
 ///
 /// 表示 Yggdrasil 认证服务器返回的一个 Minecraft 游戏角色。
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct SelectedProfileObj {
     /// 角色名称，即玩家用户名
     pub name: String,
     /// 角色 UUID，Minecraft 格式，含连字符
     pub id: String,
-}
-
-impl Default for SelectedProfileObj {
-    fn default() -> Self {
-        Self {
-            name: Default::default(),
-            id: Default::default(),
-        }
-    }
 }
 
 #[cfg(test)]

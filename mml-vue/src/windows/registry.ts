@@ -23,29 +23,29 @@ export type WindowKind =
 export interface WindowInfo {
   /** 窗口标识，与后端注册表、URL 上的 `window` 参数一致 */
   kind: WindowKind;
-  /** 窗口标题；多窗口模式下也是系统窗口标题 */
-  title: string;
+  /** 窗口标题的 i18n 键，取 `winTitle` 系列；多窗口模式下也是系统窗口标题 */
+  titleKey: string;
 }
 
 // 窗口宽高不在前端维护：唯一来源是后端 WINDOWS_INFO，由 window_get_window_sizes
 // 命令下发。真实窗口与 JS 回退路径都用后端的默认尺寸 + 历史几何
 export const WINDOW_REGISTRY: WindowInfo[] = [
-  { kind: "main", title: "ModernMinecraftLauncher" },
-  { kind: "settings", title: "启动器设置" },
-  { kind: "stats", title: "游戏统计" },
-  { kind: "help", title: "帮助手册" },
-  { kind: "resource", title: "资源管理" },
-  { kind: "account", title: "账户管理" },
-  { kind: "add", title: "添加实例" },
-  { kind: "add_modpack", title: "下载整合包" },
-  { kind: "add_resource", title: "添加资源" },
-  { kind: "collect", title: "资源收藏" },
-  { kind: "download", title: "下载管理" },
-  { kind: "java_download", title: "下载 Java" },
-  { kind: "block", title: "方块列表" },
-  { kind: "log", title: "游戏日志" },
-  { kind: "export", title: "导出实例" },
-  { kind: "config", title: "配置文件" },
+  { kind: "main", titleKey: "winTitle.main" },
+  { kind: "settings", titleKey: "winTitle.settings" },
+  { kind: "stats", titleKey: "winTitle.stats" },
+  { kind: "help", titleKey: "winTitle.help" },
+  { kind: "resource", titleKey: "winTitle.resource" },
+  { kind: "account", titleKey: "winTitle.account" },
+  { kind: "add", titleKey: "winTitle.add" },
+  { kind: "add_modpack", titleKey: "winTitle.addModpack" },
+  { kind: "add_resource", titleKey: "winTitle.addResource" },
+  { kind: "collect", titleKey: "winTitle.collect" },
+  { kind: "download", titleKey: "winTitle.download" },
+  { kind: "java_download", titleKey: "winTitle.javaDownload" },
+  { kind: "block", titleKey: "winTitle.block" },
+  { kind: "log", titleKey: "winTitle.log" },
+  { kind: "export", titleKey: "winTitle.export" },
+  { kind: "config", titleKey: "winTitle.config" },
 ];
 
 /**

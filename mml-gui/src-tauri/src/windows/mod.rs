@@ -77,6 +77,7 @@ use uuid::Uuid;
 
 use crate::dtos::{DropPathDto, GuiConfigDto, LogFocusDto, WindowSizeDto};
 use crate::err_keys;
+use crate::log_text::LogText;
 
 /// 解析前端传来的分组 uuid，空白 / 非法一律按"默认分组"处理
 ///
@@ -228,11 +229,11 @@ pub async fn window_open_window(
 ///
 /// # 返回值
 ///
-/// 校验不通过返回错误文案，非法 uuid 为 `err.uuid`
+/// 校验不通过返回 `err_keys` 里的键：kind 不匹配为 `err.windowQuery`，非法 uuid 为 `err.uuid`
 fn kind_parse_check(kind: &str, instance: &Option<String>) -> Result<(), String> {
     let accepts_instance = kind == "export" || family_of_kind(kind).is_some();
     if !accepts_instance && instance.is_some() {
-        return Err(format!("kind {kind} 不接受 instance 参数"));
+        return Err(err_keys::WINDOW_QUERY.to_string());
     }
     if accepts_instance
         && let Some(instance) = instance
@@ -856,10 +857,17 @@ pub fn window_restart_app(app: AppHandle) {
         match std::env::current_exe() {
             Ok(exe) => {
                 if let Err(err) = std::process::Command::new(exe).spawn() {
-                    mml_log::error(format!("restart launcher failed: {err}"));
+                    mml_log::error(
+                        LogText::RestartLauncherFailed {
+                            error: err.to_string(),
+                        }
+                        .text(),
+                    );
                 }
             }
-            Err(err) => mml_log::error(format!("restart launcher: {err}")),
+            Err(err) => {
+                mml_log::error(LogText::RestartLauncherError { error: err.to_string() }.text());
+            }
         }
 
         // debug 即 tauri dev 时，等新进程把页面从 vite 拉起来；release 下没有 dev server 这回事

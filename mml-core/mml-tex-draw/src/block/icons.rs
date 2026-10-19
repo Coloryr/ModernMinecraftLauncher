@@ -76,6 +76,10 @@ pub enum SpecialForm {
 
 impl SpecialForm {
     /// 形态后缀
+    ///
+    /// # 返回值
+    ///
+    /// 该形态的后缀，如 `pressed`
     pub fn suffix(self) -> &'static str {
         match self {
             SpecialForm::Pressed => "pressed",

@@ -8,11 +8,13 @@ use tiny_skia::Pixmap;
 
 use crate::skin_draw::{BPP, SCALE_TYPEA, draw, row_bytes, scale};
 
-/// 鞘翅翼外侧块的左上角，单位像素，即翼盒展开的后面
-const WING_BLOCK: (i32, i32) = (36, 2);
-/// 鞘翅翼的长宽，单位像素
+/// 鞘翅翼外侧块的左上角横坐标，单位像素，即翼盒展开的后面
+const WING_BLOCK_X: i32 = 36;
+/// 鞘翅翼外侧块的左上角纵坐标，单位像素
+const WING_BLOCK_Y: i32 = 2;
+/// 鞘翅翼的宽度，单位像素
 const WING_W: i32 = 10;
-/// 鞘翅翼的长宽，单位像素
+/// 鞘翅翼的高度，单位像素
 const WING_H: i32 = 20;
 /// 张开时两翼之间的间隔，单位像素，即两肩点之间的距离
 const WING_GAP: i32 = 10;
@@ -108,8 +110,9 @@ pub fn elytra_flying(image: &Pixmap) -> Option<Pixmap> {
 ///
 /// 取得到返回 `Some(())`，越界返回 `None`
 fn check_block(image: &Pixmap) -> Option<()> {
-    let (bx, by) = WING_BLOCK;
-    if bx + WING_W > image.width() as i32 || by + WING_H > image.height() as i32 {
+    if WING_BLOCK_X + WING_W > image.width() as i32
+        || WING_BLOCK_Y + WING_H > image.height() as i32
+    {
         return None;
     }
 
@@ -120,13 +123,12 @@ fn check_block(image: &Pixmap) -> Option<()> {
 ///
 /// 位图内部是预乘 BGRA，整字节复制即可，不涉及通道换算。
 fn copy_pixel(src: &Pixmap, src_x: i32, src_y: i32, dest: &mut Pixmap, dest_x: u32, dest_y: u32) {
-    let (bx, by) = WING_BLOCK;
-    let src_off = (by + src_y) as usize * row_bytes(src)
-        + (bx + src_x) as usize * BPP;
+    let src_off = (WING_BLOCK_Y + src_y) as usize * row_bytes(src)
+        + (WING_BLOCK_X + src_x) as usize * BPP;
     let dst_off = dest_y as usize * row_bytes(dest) + dest_x as usize * BPP;
 
-    let pixel = src.data()[src_off..src_off + BPP].to_vec();
-    dest.data_mut()[dst_off..dst_off + BPP].copy_from_slice(&pixel);
+    dest.data_mut()[dst_off..dst_off + BPP]
+        .copy_from_slice(&src.data()[src_off..src_off + BPP]);
 }
 
 #[cfg(test)]

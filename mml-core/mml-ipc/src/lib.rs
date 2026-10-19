@@ -53,8 +53,12 @@ use bytes::{Buf, BufMut, BytesMut};
 use mml_base::events::{EventArgHandler, EventHandler};
 use mml_names::i18_items::error_type::{
     CoreResult, ErrorData,
-    ErrorType::{SocketError, ThreadError},
+    ErrorType::{
+        IpcAcceptError, IpcBindError, IpcBufferOverrun, IpcFrameTooLarge, IpcRuntimeCreateError,
+        IpcWriteError, SocketError, ThreadError,
+    },
 };
+use mml_names::i18_items::info_type::InfoType;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
@@ -173,6 +177,10 @@ pub fn remove_ipc_arg_event(id: u64) {
 }
 
 /// 获取新启动实例传入的启动参数，用于防止多开时的参数转发
+///
+/// # 返回值
+///
+/// 新启动实例转发的参数列表；没有时为空列表
 pub fn get_run_arg() -> Vec<String> {
     RUN_ARG.read().unwrap().clone()
 }
@@ -200,6 +208,8 @@ pub fn get_window_size(uuid: Uuid) -> Option<WindowSize> {
 }
 
 /// 添加服务器信息，用于向游戏广播 MOTD
+///
+/// - `info`: 服务器信息，含地址、端口与 MOTD；重复添加不去重，按调用顺序累积
 pub fn add_server(info: ServerInfo) {
     SERVER_INFOS.write().unwrap().push(info);
 }
@@ -297,13 +307,10 @@ pub fn init(port: Option<u16>) -> CoreResult<Option<u16>> {
     if let Some(port) = port {
         let args: Vec<String> = std::env::args().skip(1).collect();
         if notify_existing(port, args) {
-            mml_log::info(format!("IPC: notify existing launcher on {}", port));
+            mml_log::info_type(InfoType::IpcNotifyExisting { port });
             return Ok(None);
         }
-        mml_log::warn(format!(
-            "IPC: notify existing launcher on {} failed, start new server",
-            port
-        ));
+        mml_log::warn_type(InfoType::IpcNotifyExistingFailed { port });
     }
 
     // 端口由服务线程绑定后回传。
@@ -315,20 +322,16 @@ pub fn init(port: Option<u16>) -> CoreResult<Option<u16>> {
         .name("Mml Ipc Server".to_string())
         .spawn(move || run_server(port_tx))
         .map_err(|err| {
-            ThreadError(ErrorData {
-                error: err.to_string(),
-            })
+            ThreadError(ErrorData::from_error(err))
         })?;
 
     // 等待服务绑定端口；若线程启动后立即失败、发送端被丢弃，则返回错误
     let port = port_rx.recv().map_err(|err| {
-        SocketError(ErrorData {
-            error: err.to_string(),
-        })
+        SocketError(ErrorData::from_error(err))
     })?;
 
     let _ = IPC_PORT.set(port);
-    mml_log::info(format!("IPC server start on 127.0.0.1:{}", port));
+    mml_log::info_type(InfoType::IpcServerStart { port });
 
     Ok(Some(port))
 }
@@ -343,7 +346,7 @@ fn run_server(port_tx: std::sync::mpsc::Sender<u16>) {
     {
         Ok(rt) => rt,
         Err(err) => {
-            mml_log::error(format!("IPC runtime create error: {}", err));
+            mml_log::error_type(IpcRuntimeCreateError(ErrorData::from_error(err)));
             return;
         }
     };
@@ -352,7 +355,7 @@ fn run_server(port_tx: std::sync::mpsc::Sender<u16>) {
         let listener = match tokio::net::TcpListener::bind("127.0.0.1:0").await {
             Ok(listener) => listener,
             Err(err) => {
-                mml_log::error(format!("IPC bind error: {}", err));
+                mml_log::error_type(IpcBindError(ErrorData::from_error(err)));
                 return;
             }
         };
@@ -373,12 +376,12 @@ async fn accept_loop(listener: TcpListener) -> CoreResult<()> {
         let (stream, addr) = match listener.accept().await {
             Ok(conn) => conn,
             Err(err) => {
-                mml_log::error(format!("IPC accept error: {}", err));
+                mml_log::error_type(IpcAcceptError(ErrorData::from_error(err)));
                 continue;
             }
         };
 
-        mml_log::info(format!("IPC client connected: {}", addr));
+        mml_log::info_type(InfoType::IpcClientConnected { addr: addr.to_string() });
         tokio::spawn(handle_client(stream));
     }
 }
@@ -398,7 +401,7 @@ async fn handle_client(stream: TcpStream) -> CoreResult<()> {
     let write_handle = tokio::spawn(async move {
         while let Some(msg) = write_rx.recv().await {
             if let Err(err) = writer.write_all(&msg).await {
-                mml_log::error(format!("IPC write error: {}", err));
+                mml_log::error_type(IpcWriteError(ErrorData::from_error(err)));
                 break;
             }
         }
@@ -409,7 +412,7 @@ async fn handle_client(stream: TcpStream) -> CoreResult<()> {
     loop {
         if let Some(msg_len) = message_len(&buf) {
             if msg_len > MAX_FRAME_SIZE {
-                mml_log::error(format!("IPC frame too large: {}", msg_len));
+                mml_log::error_type(IpcFrameTooLarge { len: msg_len });
                 break;
             }
 
@@ -422,13 +425,11 @@ async fn handle_client(stream: TcpStream) -> CoreResult<()> {
             // 缓冲区内数据不足一条完整消息：继续读取；
             // 缓冲区异常膨胀仍无法解析说明流失步/坏数据，断开连接
             if buf.len() > MAX_FRAME_SIZE {
-                mml_log::error("IPC: buffer overrun, drop connection".to_string());
+                mml_log::error_type(IpcBufferOverrun);
                 break;
             }
             let n = reader.read_buf(&mut buf).await.map_err(|err| {
-                SocketError(ErrorData {
-                    error: err.to_string(),
-                })
+                SocketError(ErrorData::from_error(err))
             })?;
             if n == 0 {
                 break;
@@ -453,7 +454,14 @@ fn message_len(buf: &[u8]) -> Option<usize> {
     let msg_type = i32::from_be_bytes([buf[0], buf[1], buf[2], buf[3]]);
     let mut offset = 4usize;
 
-    // 读取一个字符串字段的长度前缀与内容，数据不足返回 None
+    /// 读一个字符串字段的长度前缀与内容，只推进偏移不取值
+    ///
+    /// - `buf`: 响应数据
+    /// - `offset`: 当前读到的偏移，读到后推进
+    ///
+    /// # 返回值
+    ///
+    /// 数据不足返回 `None`
     fn string_field(buf: &[u8], offset: &mut usize) -> Option<()> {
         if buf.len() < *offset + 4 {
             return None;
@@ -496,7 +504,7 @@ fn message_len(buf: &[u8]) -> Option<usize> {
             offset += 8;
         }
         _ => {
-            mml_log::warn(format!("IPC: unknown message type {}", msg_type));
+            mml_log::warn_type(InfoType::IpcUnknownMessageType { msg_type });
             return Some(4);
         }
     }
@@ -521,15 +529,13 @@ async fn process_message(
         TYPE_GAME_MOUSE_STATE => {
             let uuid_str = data.read_string();
             let guid = Uuid::parse_str(&uuid_str).map_err(|err| {
-                SocketError(ErrorData {
-                    error: err.to_string(),
-                })
+                SocketError(ErrorData::from_error(err))
             })?;
             let value = data.read_bool();
             MOUSE_STATES.write().unwrap().insert(guid, value);
         }
         TYPE_LAUNCH_SHOW => {
-            mml_log::info("IPC: launcher show window".to_string());
+            mml_log::info_type(InfoType::IpcLauncherShowWindow);
             IPC_EVENT.emit();
         }
         TYPE_LAUNCH_ARG => {
@@ -542,22 +548,18 @@ async fn process_message(
         TYPE_GAME_CHANNEL => {
             let uuid_str = data.read_string();
             let guid = Uuid::parse_str(&uuid_str).map_err(|err| {
-                SocketError(ErrorData {
-                    error: err.to_string(),
-                })
+                SocketError(ErrorData::from_error(err))
             })?;
             GAME_CHANNELS
                 .write()
                 .unwrap()
                 .insert(guid, client_tx.clone());
-            mml_log::info(format!("IPC: game channel bound {}", guid));
+            mml_log::info_type(InfoType::IpcGameChannelBound { guid: guid.to_string() });
         }
         TYPE_GAME_WINDOW_SIZE => {
             let uuid_str = data.read_string();
             let guid = Uuid::parse_str(&uuid_str).map_err(|err| {
-                SocketError(ErrorData {
-                    error: err.to_string(),
-                })
+                SocketError(ErrorData::from_error(err))
             })?;
             let width = data.get_i32();
             let height = data.get_i32();
@@ -567,7 +569,7 @@ async fn process_message(
                 .insert(guid, WindowSize { width, height });
         }
         _ => {
-            mml_log::warn(format!("IPC: unknown message type {}", msg_type));
+            mml_log::warn_type(InfoType::IpcUnknownMessageType { msg_type });
         }
     }
 
@@ -760,7 +762,7 @@ mod tests {
         // 应先推算出第一条消息，4 字节
         assert_eq!(message_len(&buf), Some(4));
         // 消费掉第一条后应能推算出第二条
-        let mut rest = buf.split_off(4);
+        let rest = buf.split_off(4);
         assert_eq!(message_len(&rest), Some(rest.len()));
     }
 

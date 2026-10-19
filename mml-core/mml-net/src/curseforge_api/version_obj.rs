@@ -3,23 +3,15 @@
 use serde::{Deserialize, Serialize};
 
 /// 游戏版本列表接口 `/games/{id}/versions` 的响应
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct CurseForgeVersionObj {
     /// 版本类型数据列表
     pub data: Vec<CurseForgeVersionDataObj>,
 }
 
-impl Default for CurseForgeVersionObj {
-    fn default() -> Self {
-        Self {
-            data: Default::default(),
-        }
-    }
-}
-
 /// 单个版本类型分组
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct CurseForgeVersionDataObj {
     /// 版本类型 ID，与版本类型接口返回的 `id` 对应
@@ -29,46 +21,20 @@ pub struct CurseForgeVersionDataObj {
     pub versions: Vec<String>,
 }
 
-impl Default for CurseForgeVersionDataObj {
-    fn default() -> Self {
-        Self {
-            verion_type: Default::default(),
-            versions: Default::default(),
-        }
-    }
-}
-
 /// 版本类型列表接口 `/games/{id}/version-types` 的响应
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct CurseForgeVersionTypeObj {
     /// 版本类型列表
     pub data: Vec<CurseForgeVersionTypeDataObj>,
 }
 
-impl Default for CurseForgeVersionTypeObj {
-    fn default() -> Self {
-        Self {
-            data: Default::default(),
-        }
-    }
-}
-
 /// 单个版本类型，`id` 与 `name` 一一对应
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct CurseForgeVersionTypeDataObj {
     /// 类型 ID，用于按类型筛选游戏版本
     pub id: u32,
     /// 类型名称，如 Minecraft 1.20.4
     pub name: String,
-}
-
-impl Default for CurseForgeVersionTypeDataObj {
-    fn default() -> Self {
-        Self {
-            id: Default::default(),
-            name: Default::default(),
-        }
-    }
 }

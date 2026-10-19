@@ -15,7 +15,7 @@ import { t, tErr } from "./i18n";
 import { showToast } from "./toast";
 import { KEYS, emitChange, writeRaw } from "./storage";
 import { currentKind, multiWindow } from "../windows/windowManager";
-import type { ModPackStatusDto } from "./bindings";
+import type { ModPackStatusDto, ModPackTaskDto } from "./bindings";
 
 /** 单窗口模式下"下载整合包"这一页是否正显示在前台 */
 function modpackPageActive(): boolean {
@@ -133,4 +133,17 @@ export function useModpackStatus(
   }
 
   return { status, init };
+}
+
+/**
+ * 任务是否还在跑
+ *
+ * - `task`: 整合包安装任务
+ *
+ * # 返回值
+ *
+ * 已完成 / 已失败 / 已取消之外都算在跑
+ */
+export function isRunning(task: ModPackTaskDto): boolean {
+  return !task.done && !task.failed && !task.cancelled;
 }

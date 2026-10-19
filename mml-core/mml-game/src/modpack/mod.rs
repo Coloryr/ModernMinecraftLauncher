@@ -142,6 +142,10 @@ impl BaseModPackWorker {
     /// - `archive_gui`: 压缩包操作界面回调
     /// - `cancel`: 取消令牌
     /// - `icon`: 整合包图标 URL，在线安装时由调用方给，创建实例时写进实例，`None` 表示没有
+    ///
+    /// # 返回值
+    ///
+    /// 新建的安装器：加载器为 `Normal`、版本为空串，实例与待下载列表都还没建
     pub fn new(
         archive: BaseArchive,
         instance_gui: AddInstanceGui,

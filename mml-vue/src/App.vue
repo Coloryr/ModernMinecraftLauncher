@@ -86,14 +86,6 @@ const { status: modpackStatus, init: initModpackStatus } = useModpackStatus(fals
  */
 const { status: resourceStatus, init: initResourceStatus } = useResourceStatus(true);
 
-/**
- * 关闭被拦截：还有下载任务在跑
- *
- * Rust 侧对"下载窗口"和"主窗口"都设了关闭保护，见 src-tauri 的 `close_guarded` ——
- * 这两扇窗关掉都会连带停掉下载，所以它先拒绝、发一条 `close-blocked`，由这里问一句。
- * 放在根组件而不是下载窗口里，是因为单窗口模式下任何页面点 ✕ 都算退出应用，
- * 而各窗口自己收不到这条事件（下载弹窗也可能根本没开着）。
- */
 /** 本窗口标签：关闭被拦截事件只认发给自己的那一条，否则别的窗口也会弹同一句话 */
 const myLabel = getCurrentWindow().label;
 
@@ -108,6 +100,14 @@ let unsubModpackStatus: (() => void) | null = null;
 let unsubResourceStatus: (() => void) | null = null;
 
 onMounted(async () => {
+  /**
+   * 关闭被拦截：还有下载任务在跑
+   *
+   * Rust 侧对"下载窗口"和"主窗口"都设了关闭保护，见 src-tauri 的 `close_guarded` ——
+   * 这两扇窗关掉都会连带停掉下载，所以它先拒绝、发一条 `close-blocked`，由这里问一句。
+   * 放在根组件而不是下载窗口里，是因为单窗口模式下任何页面点 ✕ 都算退出应用，
+   * 而各窗口自己收不到这条事件（下载弹窗也可能根本没开着）。
+   */
   unsubCloseBlocked = await onCloseBlocked((blocked) => {
     // 事件带的是被拦下的那个窗口的标签：不是自己就忽略，别在别的窗口也弹一遍
     if (blocked && blocked !== myLabel) return;

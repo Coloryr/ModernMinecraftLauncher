@@ -35,6 +35,7 @@ import { useRowSelect } from "../composables/useRowSelect";
 import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceOps } from "../composables/useResourceOps";
 import type { SaveBackupDto, SaveItemDto } from "../../../lib/bindings";
+import { formatSize, formatTime } from "../../../lib/format";
 
 const props = defineProps<{
   /** 数据层，存档列表与加载态从这里取 */
@@ -385,19 +386,6 @@ async function saveEdit() {
   } finally {
     editBusy.value = false;
   }
-}
-
-/** 上次游玩时间；入参是 Unix 毫秒，未知时显示 -- */
-function formatTime(ms: number): string {
-  if (!ms) return "--";
-  return new Date(ms).toLocaleString();
-}
-
-/** 备份体积，输入字节，输出人类可读文本 */
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 /** 游戏模式的取值名，下标就是 level.dat 的 GameType */

@@ -150,71 +150,127 @@ impl NbtType {
     }
 
     /// 创建 End 类型 NBT 标签
+    ///
+    /// # 返回值
+    ///
+    /// 新建的 `NbtType::End` 变体
     pub fn end() -> NbtType {
         NbtType::End(Default::default())
     }
 
     /// 创建 Byte 类型 NBT 标签
+    ///
+    /// # 返回值
+    ///
+    /// 新建的 `NbtType::Byte` 变体
     pub fn byte() -> NbtType {
         NbtType::Byte(Default::default())
     }
 
     /// 创建 Short 类型 NBT 标签
+    ///
+    /// # 返回值
+    ///
+    /// 新建的 `NbtType::Short` 变体
     pub fn short() -> NbtType {
         NbtType::Short(Default::default())
     }
 
     /// 创建 Int 类型 NBT 标签
+    ///
+    /// # 返回值
+    ///
+    /// 新建的 `NbtType::Int` 变体
     pub fn int() -> NbtType {
         NbtType::Int(Default::default())
     }
 
     /// 创建 Long 类型 NBT 标签
+    ///
+    /// # 返回值
+    ///
+    /// 新建的 `NbtType::Long` 变体
     pub fn long() -> NbtType {
         NbtType::Long(Default::default())
     }
 
     /// 创建 Float 类型 NBT 标签
+    ///
+    /// # 返回值
+    ///
+    /// 新建的 `NbtType::Float` 变体
     pub fn float() -> NbtType {
         NbtType::Float(Default::default())
     }
 
     /// 创建 Double 类型 NBT 标签
+    ///
+    /// # 返回值
+    ///
+    /// 新建的 `NbtType::Double` 变体
     pub fn double() -> NbtType {
         NbtType::Double(Default::default())
     }
 
     /// 创建 ByteArray 类型 NBT 标签
+    ///
+    /// # 返回值
+    ///
+    /// 新建的 `NbtType::ByteArray` 变体
     pub fn byte_array() -> NbtType {
         NbtType::ByteArray(Default::default())
     }
 
     /// 创建 String 类型 NBT 标签
+    ///
+    /// # 返回值
+    ///
+    /// 新建的 `NbtType::String` 变体
     pub fn string() -> NbtType {
         NbtType::String(Default::default())
     }
 
     /// 创建 List 类型 NBT 标签
+    ///
+    /// # 返回值
+    ///
+    /// 新建的 `NbtType::List` 变体
     pub fn list() -> NbtType {
         NbtType::List(Default::default())
     }
 
     /// 创建 Compound 类型 NBT 标签
+    ///
+    /// # 返回值
+    ///
+    /// 新建的 `NbtType::Compound` 变体
     pub fn compound() -> NbtType {
         NbtType::Compound(Default::default())
     }
 
     /// 创建 IntArray 类型 NBT 标签
+    ///
+    /// # 返回值
+    ///
+    /// 新建的 `NbtType::IntArray` 变体
     pub fn int_array() -> NbtType {
         NbtType::IntArray(Default::default())
     }
 
     /// 创建 LongArray 类型 NBT 标签
+    ///
+    /// # 返回值
+    ///
+    /// 新建的 `NbtType::LongArray` 变体
     pub fn long_array() -> NbtType {
         NbtType::LongArray(Default::default())
     }
 
     /// 从NBT标签读对应的数字序号
+    ///
+    /// # 返回值
+    ///
+    /// 该标签的类型序号，取值 0–12
     pub fn get_num(&self) -> u8 {
         match self {
             NbtType::End(_) => NBT_END_ORDER,
@@ -234,6 +290,10 @@ impl NbtType {
     }
 
     /// 获取 End 标签的引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 End 类型时返回该引用，否则返回 `None`
     pub fn as_end(&self) -> Option<&NbtEnd> {
         if let NbtType::End(nbt) = self {
             Some(nbt)
@@ -243,6 +303,10 @@ impl NbtType {
     }
 
     /// 获取 End 标签的可变引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 End 类型时返回该可变引用，否则返回 `None`
     pub fn as_end_mut(&mut self) -> Option<&mut NbtEnd> {
         if let NbtType::End(nbt) = self {
             Some(nbt)
@@ -252,6 +316,10 @@ impl NbtType {
     }
 
     /// 获取 Byte 标签的引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 Byte 类型时返回该引用，否则返回 `None`
     pub fn as_byte(&self) -> Option<&NbtByte> {
         if let NbtType::Byte(nbt) = self {
             Some(nbt)
@@ -261,6 +329,10 @@ impl NbtType {
     }
 
     /// 获取 Byte 标签的可变引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 Byte 类型时返回该可变引用，否则返回 `None`
     pub fn as_byte_mut(&mut self) -> Option<&mut NbtByte> {
         if let NbtType::Byte(nbt) = self {
             Some(nbt)
@@ -270,6 +342,10 @@ impl NbtType {
     }
 
     /// 获取 Short 标签的引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 Short 类型时返回该引用，否则返回 `None`
     pub fn as_short(&self) -> Option<&NbtShort> {
         if let NbtType::Short(nbt) = self {
             Some(nbt)
@@ -279,6 +355,10 @@ impl NbtType {
     }
 
     /// 获取 Short 标签的可变引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 Short 类型时返回该可变引用，否则返回 `None`
     pub fn as_short_mut(&mut self) -> Option<&mut NbtShort> {
         if let NbtType::Short(nbt) = self {
             Some(nbt)
@@ -288,6 +368,10 @@ impl NbtType {
     }
 
     /// 获取 Int 标签的引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 Int 类型时返回该引用，否则返回 `None`
     pub fn as_int(&self) -> Option<&NbtInt> {
         if let NbtType::Int(nbt) = self {
             Some(nbt)
@@ -297,6 +381,10 @@ impl NbtType {
     }
 
     /// 获取 Int 标签的可变引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 Int 类型时返回该可变引用，否则返回 `None`
     pub fn as_int_mut(&mut self) -> Option<&mut NbtInt> {
         if let NbtType::Int(nbt) = self {
             Some(nbt)
@@ -306,6 +394,10 @@ impl NbtType {
     }
 
     /// 获取 Long 标签的引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 Long 类型时返回该引用，否则返回 `None`
     pub fn as_long(&self) -> Option<&NbtLong> {
         if let NbtType::Long(nbt) = self {
             Some(nbt)
@@ -315,6 +407,10 @@ impl NbtType {
     }
 
     /// 获取 Long 标签的可变引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 Long 类型时返回该可变引用，否则返回 `None`
     pub fn as_long_mut(&mut self) -> Option<&mut NbtLong> {
         if let NbtType::Long(nbt) = self {
             Some(nbt)
@@ -324,6 +420,10 @@ impl NbtType {
     }
 
     /// 获取 Float 标签的引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 Float 类型时返回该引用，否则返回 `None`
     pub fn as_float(&self) -> Option<&NbtFloat> {
         if let NbtType::Float(nbt) = self {
             Some(nbt)
@@ -333,6 +433,10 @@ impl NbtType {
     }
 
     /// 获取 Float 标签的可变引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 Float 类型时返回该可变引用，否则返回 `None`
     pub fn as_float_mut(&mut self) -> Option<&mut NbtFloat> {
         if let NbtType::Float(nbt) = self {
             Some(nbt)
@@ -342,6 +446,10 @@ impl NbtType {
     }
 
     /// 获取 Double 标签的引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 Double 类型时返回该引用，否则返回 `None`
     pub fn as_double(&self) -> Option<&NbtDouble> {
         if let NbtType::Double(nbt) = self {
             Some(nbt)
@@ -351,6 +459,10 @@ impl NbtType {
     }
 
     /// 获取 Double 标签的可变引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 Double 类型时返回该可变引用，否则返回 `None`
     pub fn as_double_mut(&mut self) -> Option<&mut NbtDouble> {
         if let NbtType::Double(nbt) = self {
             Some(nbt)
@@ -360,6 +472,10 @@ impl NbtType {
     }
 
     /// 获取 ByteArray 标签的引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 ByteArray 类型时返回该引用，否则返回 `None`
     pub fn as_byte_array(&self) -> Option<&NbtByteArray> {
         if let NbtType::ByteArray(nbt) = self {
             Some(nbt)
@@ -369,6 +485,10 @@ impl NbtType {
     }
 
     /// 获取 ByteArray 标签的可变引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 ByteArray 类型时返回该可变引用，否则返回 `None`
     pub fn as_byte_array_mut(&mut self) -> Option<&mut NbtByteArray> {
         if let NbtType::ByteArray(nbt) = self {
             Some(nbt)
@@ -378,6 +498,10 @@ impl NbtType {
     }
 
     /// 获取 String 标签的引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 String 类型时返回该引用，否则返回 `None`
     pub fn as_string(&self) -> Option<&NbtString> {
         if let NbtType::String(nbt) = self {
             Some(nbt)
@@ -387,6 +511,10 @@ impl NbtType {
     }
 
     /// 获取 String 标签的可变引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 String 类型时返回该可变引用，否则返回 `None`
     pub fn as_string_mut(&mut self) -> Option<&mut NbtString> {
         if let NbtType::String(nbt) = self {
             Some(nbt)
@@ -396,6 +524,10 @@ impl NbtType {
     }
 
     /// 获取 List 标签的引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 List 类型时返回该引用，否则返回 `None`
     pub fn as_list(&self) -> Option<&NbtList> {
         if let NbtType::List(nbt) = self {
             Some(nbt)
@@ -405,6 +537,10 @@ impl NbtType {
     }
 
     /// 获取 List 标签的可变引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 List 类型时返回该可变引用，否则返回 `None`
     pub fn as_list_mut(&mut self) -> Option<&mut NbtList> {
         if let NbtType::List(nbt) = self {
             Some(nbt)
@@ -414,6 +550,10 @@ impl NbtType {
     }
 
     /// 获取 Compound 标签的引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 Compound 类型时返回该引用，否则返回 `None`
     pub fn as_compound(&self) -> Option<&NbtCompound> {
         if let NbtType::Compound(nbt) = self {
             Some(nbt)
@@ -423,6 +563,10 @@ impl NbtType {
     }
 
     /// 获取 Compound 标签的可变引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 Compound 类型时返回该可变引用，否则返回 `None`
     pub fn as_compound_mut(&mut self) -> Option<&mut NbtCompound> {
         if let NbtType::Compound(nbt) = self {
             Some(nbt)
@@ -432,6 +576,10 @@ impl NbtType {
     }
 
     /// 获取 Compound 标签的所有权
+    ///
+    /// # 返回值
+    ///
+    /// 是 Compound 类型时返回它，否则返回 `None`
     pub fn get_compound(self) -> Option<NbtCompound> {
         if let NbtType::Compound(nbt) = self {
             Some(nbt)
@@ -441,6 +589,10 @@ impl NbtType {
     }
 
     /// 获取 IntArray 标签的引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 IntArray 类型时返回该引用，否则返回 `None`
     pub fn as_int_array(&self) -> Option<&NbtIntArray> {
         if let NbtType::IntArray(nbt) = self {
             Some(nbt)
@@ -450,6 +602,10 @@ impl NbtType {
     }
 
     /// 获取 IntArray 标签的可变引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 IntArray 类型时返回该可变引用，否则返回 `None`
     pub fn as_int_array_mut(&mut self) -> Option<&mut NbtIntArray> {
         if let NbtType::IntArray(nbt) = self {
             Some(nbt)
@@ -459,6 +615,10 @@ impl NbtType {
     }
 
     /// 获取 LongArray 标签的引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 LongArray 类型时返回该引用，否则返回 `None`
     pub fn as_long_array(&self) -> Option<&NbtLongArray> {
         if let NbtType::LongArray(nbt) = self {
             Some(nbt)
@@ -468,6 +628,10 @@ impl NbtType {
     }
 
     /// 获取 LongArray 标签的可变引用
+    ///
+    /// # 返回值
+    ///
+    /// 是 LongArray 类型时返回该可变引用，否则返回 `None`
     pub fn as_long_array_mut(&mut self) -> Option<&mut NbtLongArray> {
         if let NbtType::LongArray(nbt) = self {
             Some(nbt)
@@ -479,6 +643,10 @@ impl NbtType {
     /// 判断两个 NBT 标签是否类型与内容都一致
     ///
     /// - `nbt`: 待比较的另一个标签
+    ///
+    /// # 返回值
+    ///
+    /// 一致时返回 `true`，否则返回 `false`
     pub fn eq(&self, nbt: &NbtType) -> bool {
         match self {
             NbtType::End(nbt_end) => nbt_end.eq(nbt),
@@ -500,6 +668,10 @@ impl NbtType {
     /// 按变体分派到具体标签类型的读取实现
     ///
     /// - `stream`: 数据来源流
+    ///
+    /// # 返回值
+    ///
+    /// 读取成功返回 `Ok(())`，否则返回相应错误
     pub(crate) fn read<R: Read>(&mut self, stream: &mut R) -> CoreResult<()> {
         match self {
             NbtType::End(nbt_end) => nbt_end.read(stream),
@@ -523,6 +695,10 @@ impl NbtType {
     /// 按变体分派到具体标签类型的写入实现
     ///
     /// - `stream`: 目标流
+    ///
+    /// # 返回值
+    ///
+    /// 写入成功返回 `Ok(())`，否则返回相应错误
     pub(crate) fn write<W: Write>(&self, stream: &mut W) -> CoreResult<()> {
         match self {
             NbtType::End(nbt_end) => nbt_end.write(stream),
@@ -637,9 +813,7 @@ pub fn is_nbt_num(nbt_type: u8) -> bool {
 ///
 /// 携带原始错误描述的 `ErrorType::StreamError`
 pub(crate) fn io_error(e: std::io::Error) -> ErrorType {
-    ErrorType::StreamError(ErrorData {
-        error: e.to_string(),
-    })
+    ErrorType::StreamError(ErrorData::from_error(e))
 }
 
 #[cfg(test)]

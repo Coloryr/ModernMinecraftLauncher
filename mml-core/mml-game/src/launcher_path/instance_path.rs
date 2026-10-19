@@ -115,6 +115,13 @@ fn has_patches(dir: &Path) -> bool {
         .unwrap_or(false)
 }
 
+/// 把 MMC 实例目录读成 M²L 的实例配置
+///
+/// - `dir`: 实例目录
+///
+/// # 返回值
+///
+/// 不是 MMC 版本目录或配置读不出来时返回 `None`
 fn adopt_mmc(dir: &Path) -> Option<InstanceSettingObj> {
     if !is_mmc_version(dir) {
         return None;
@@ -187,11 +194,19 @@ impl InstanceSettingObj {
     }
 
     /// 获取基础路径
+    ///
+    /// # 返回值
+    ///
+    /// 实例根目录的绝对路径
     pub fn get_base_path(&self) -> PathBuf {
         BASE_DIR.get().unwrap().join(&self.dir)
     }
 
     /// 获取存档备份路径
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_backup_path(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -201,6 +216,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取临时文件路径
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_temp_path(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -210,6 +229,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取游戏缓存路径
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_cache_path(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -219,6 +242,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取自定义启动配置目录
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_json_path(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -228,6 +255,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取自定义加载器运行库路径
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_libraries_path(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -237,6 +268,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取游戏路径 .minecraft
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_game_path(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -246,6 +281,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取截图路径
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_screenshots_path(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -256,6 +295,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取资源包路径
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_resourcepacks_path(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -266,6 +309,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取光影包路径
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_shaderpacks_path(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -276,6 +323,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取模组路径
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_mods_path(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -286,6 +337,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取存档路径
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_saves_path(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -296,6 +351,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取结构文件路径
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_schematics_path(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -306,6 +365,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取配置文件路径
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_config_path(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -316,6 +379,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取日志路径
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_logs_path(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -326,6 +393,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取崩溃日志路径
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_crash_path(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -336,6 +407,10 @@ impl InstanceSettingObj {
     }
 
     /// kubejs路径
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_kubejs_path(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -346,6 +421,10 @@ impl InstanceSettingObj {
     }
 
     /// local路径
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_local_path(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -356,6 +435,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取储存文件
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_json_file(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -370,6 +453,10 @@ impl InstanceSettingObj {
     /// 排列顺序，是界面状态，内核不读也不写它，读写实现在
     /// `mml-gui/src-tauri/src/gui_setting.rs`。这里只提供路径：
     /// "实例目录在哪"是内核的知识，"目录里放什么 GUI 文件"不是。
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_gui_setting_file(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -382,6 +469,10 @@ impl InstanceSettingObj {
     ///
     /// 给"显示图标"用。配置里 `Icon` 就是个空字段，区分不出"没配"与"配了空值"，
     /// 所以这里一律给默认名，由调用方判断文件是否存在。
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_icon_file_or_default(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -391,6 +482,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取存档备份信息文件
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_backup_file(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -400,6 +495,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取在线文件信息文件
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_online_info_file(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -409,6 +508,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取服务器实例文件
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_server_pack_file(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -418,6 +521,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取旧服务器实例文件
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_server_pack_old_file(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -427,6 +534,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取模组更新记录文件
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_mod_update_file(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -436,6 +547,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取启动记录数据文件
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_launch_file(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -445,6 +560,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取安全Log4j文件
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_log4j_file(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -454,6 +573,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取自定义加载器文件
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_loader_file(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -463,6 +586,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取游戏配置文件
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_option_file(&self) -> PathBuf {
         BASE_DIR
             .get()
@@ -473,6 +600,10 @@ impl InstanceSettingObj {
     }
 
     /// 获取服务器储存文件
+    ///
+    /// # 返回值
+    ///
+    /// 实例目录下的绝对路径，不检查是否存在
     pub fn get_servers_file(&self) -> PathBuf {
         BASE_DIR
             .get()

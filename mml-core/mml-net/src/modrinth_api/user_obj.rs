@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Modrinth 用户，对应 `users?ids=` 返回数组里的元素
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ModrinthUserObj {
     /// 用户 ID，与搜索命中项里的 `author_id` 对应
@@ -14,14 +14,4 @@ pub struct ModrinthUserObj {
     pub username: String,
     /// 头像 URL，可缺省为 `null`
     pub avatar_url: Option<String>,
-}
-
-impl Default for ModrinthUserObj {
-    fn default() -> Self {
-        Self {
-            id: Default::default(),
-            username: Default::default(),
-            avatar_url: Default::default(),
-        }
-    }
 }

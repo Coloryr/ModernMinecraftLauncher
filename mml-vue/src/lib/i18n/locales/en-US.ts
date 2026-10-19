@@ -17,6 +17,8 @@ export default {
   // Groups / list
   // Shared UI text used across windows
   "common.imagePreviewHint": "Scroll to zoom · drag to pan when zoomed",
+  "common.listSep": ", ",
+  "common.detailSep": ": ",
   "group.default": "Default",
   "group.add": "Add",
   "group.collapse": "Collapse / expand group",
@@ -698,6 +700,7 @@ export default {
   "args.java": "Java",
   "args.javaAuto": "Auto",
   "args.customJava": "Custom",
+  "args.javaEntry": "{name} (Java {major})",
   "args.javaPath": "Java path",
   "args.browse": "Browse…",
   "args.advanced": "Advanced",
@@ -1156,6 +1159,8 @@ export default {
   "winSettings.accent.custom": "Custom color",
   "winSettings.downloadSource": "Download Source",
   "winSettings.language": "Language",
+  "winSettings.langZhCn": "Simplified Chinese",
+  "winSettings.langEnUs": "English",
   "winSettings.secGeneral": "General",
   "winSettings.secTheme": "Theme & Color",
   "winSettings.secWindow": "Window",
@@ -1313,6 +1318,8 @@ export default {
   "winHelp.noteEmbedded": "Embedded in the binary; written to libraries/ on first use",
   "winHelp.noteLocalPatch": "Patched twice in this repository; changes are marked “M²L 本地修改”",
   "winHelp.noteMonacoBundles": "Also bundles marked 14.0.0, dompurify 3.4.8 and the Codicon font",
+  "winHelp.noteVscodeLog": "log syntax, transcribed to Monarch",
+  "winHelp.licenseOtherExprs": "29 other expressions",
   "winHelp.noteDualLicense": "Upstream is MPL-2.0 OR Apache-2.0; this project uses it under Apache-2.0",
   "winHelp.noteSkin3d": "3D skin preview",
   "winHelp.services": "Third-party services",
@@ -1461,9 +1468,21 @@ export default {
 
   // Window titles
   "winTitle.main": "ModernMinecraftLauncher",
+  "winTitle.settings": "Launcher Settings",
+  "winTitle.stats": "Game Statistics",
+  "winTitle.help": "Help Manual",
+  "winTitle.resource": "Resource Manager",
+  "winTitle.account": "Account Manager",
+  "winTitle.add": "Add Instance",
   "winTitle.addModpack": "Download Modpacks",
   "winTitle.addResource": "Add Resources",
   "winTitle.collect": "Favourites",
+  "winTitle.download": "Downloads",
+  "winTitle.javaDownload": "Download Java",
+  "winTitle.block": "Block List",
+  "winTitle.log": "Game Log",
+  "winTitle.export": "Export Instance",
+  "winTitle.config": "Config Files",
 
   // Collect window
   "collect.defaultGroup": "Default Group",
@@ -1568,6 +1587,9 @@ export default {
   "err.colormcBusy": "A migration is already running",
   // ColorMC migration task failed: the raw error goes to the log
   "err.colormcTask": "ColorMC migration task failed (see the log for details)",
+  "err.bgUnsupported": "Unsupported image format",
+  "err.bgConfigDir": "The config directory is not ready yet",
+  "err.bgNone": "No background image is set",
 
   // Migrating from ColorMC (asked once while loading)
   "colormc.title": "ColorMC data found",

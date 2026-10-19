@@ -34,6 +34,12 @@ pub const CAT_ORDER: &[&str] = &[
 /// 分类的排序序号
 ///
 /// 不在表里的分类，即将来的新分组，排到所有已知分类之后，再按分类名排——顺序仍然稳定。
+///
+/// - `cat`: 分类名，即 itemGroup lang 键尾段
+///
+/// # 返回值
+///
+/// 在 `CAT_ORDER` 里的下标；不在表里时是该表的长度
 pub fn cat_index(cat: &str) -> usize {
     CAT_ORDER
         .iter()

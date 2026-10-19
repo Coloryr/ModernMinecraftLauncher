@@ -94,11 +94,19 @@ fn parts_of<'a>(shape: &'a SteveModel, tex: &'a SteveTexture) -> [PartRef<'a>; 6
     ]
 }
 
+/// 一组部件的网格
+struct MeshData {
+    /// 顶点，已按部件矩阵转到世界坐标
+    verts: Vec<Vert>,
+    /// 索引，指向 `verts`
+    indices: Vec<u16>,
+}
+
 /// 拼一组部件的顶点与索引
 ///
 /// 各部件顶点先乘自己的部件矩阵转到世界坐标，法线按 `w = 0` 变换，即只吃旋转不吃平移；
 /// 索引按已追加的顶点数整体偏移。空部件直接跳过。
-fn build_mesh(render: &SkinRenderWgpu, parts: &[PartRef<'_>]) -> (Vec<Vert>, Vec<u16>) {
+fn build_mesh(render: &SkinRenderWgpu, parts: &[PartRef<'_>]) -> MeshData {
     let mut verts = Vec::new();
     let mut indices = Vec::new();
 
@@ -129,7 +137,7 @@ fn build_mesh(render: &SkinRenderWgpu, parts: &[PartRef<'_>]) -> (Vec<Vert>, Vec
         indices.extend(part.shape.point.iter().map(|point| point + offset));
     }
 
-    (verts, indices)
+    MeshData { verts, indices }
 }
 
 /// 一份 GPU 网格：顶点缓冲、索引缓冲与索引数量
@@ -371,6 +379,10 @@ impl SkinRenderWgpu {
     /// 创建渲染器，默认画布 800x600、黑色背景、单采样
     ///
     /// 不碰 GPU：设备与管线在 [`SkinRenderWgpu::render`] 里按需取，取不到才报 `NoGpu`。
+    ///
+    /// # 返回值
+    ///
+    /// 尚无皮肤与披风的初始状态：画布 800x600、黑色背景、单采样
     pub fn new() -> Self {
         Self {
             enable_cape: false,
@@ -453,8 +465,8 @@ impl SkinRenderWgpu {
         // 顶点：本体六件、按开关的披风、按开关的顶层，全部按部件矩阵先转成世界坐标
         let shape = skin_3d_model::get_steve(self.skin_type);
         let tex = skin_3d_texture::get_steve_texture(self.skin_type);
-        let (verts, indices) = build_mesh(self, &parts_of(&shape, &tex));
-        let body = upload_mesh(device, "mml-skin-draw body", &verts, &indices);
+        let body_mesh = build_mesh(self, &parts_of(&shape, &tex));
+        let body = upload_mesh(device, "mml-skin-draw body", &body_mesh.verts, &body_mesh.indices);
 
         let cape = if self.have_cape && self.enable_cape {
             let part = PartRef {
@@ -462,8 +474,8 @@ impl SkinRenderWgpu {
                 shape: &shape.cape,
                 uv: &tex.cape,
             };
-            let (verts, indices) = build_mesh(self, &[part]);
-            upload_mesh(device, "mml-skin-draw cape", &verts, &indices)
+            let cape_mesh = build_mesh(self, &[part]);
+            upload_mesh(device, "mml-skin-draw cape", &cape_mesh.verts, &cape_mesh.indices)
         } else {
             None
         };
@@ -471,8 +483,8 @@ impl SkinRenderWgpu {
         let top = if self.enable_top {
             let shape = skin_3d_model::get_steve_top(self.skin_type);
             let tex = skin_3d_texture::get_steve_texture_top(self.skin_type);
-            let (verts, indices) = build_mesh(self, &parts_of(&shape, &tex));
-            upload_mesh(device, "mml-skin-draw top", &verts, &indices)
+            let top_mesh = build_mesh(self, &parts_of(&shape, &tex));
+            upload_mesh(device, "mml-skin-draw top", &top_mesh.verts, &top_mesh.indices)
         } else {
             None
         };

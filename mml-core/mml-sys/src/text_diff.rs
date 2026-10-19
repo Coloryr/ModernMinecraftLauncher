@@ -27,6 +27,10 @@ impl LineHunk {
     /// - `start`: 原文里的起始行号，从 0 起
     /// - `delete_count`: 要替换掉的行数；0 表示纯插入
     /// - `lines`: 替换成的新行；空表示纯删除
+    ///
+    /// # 返回值
+    ///
+    /// 见 [`Self`]
     pub fn new(start: usize, delete_count: usize, lines: Vec<String>) -> Self {
         Self {
             start,

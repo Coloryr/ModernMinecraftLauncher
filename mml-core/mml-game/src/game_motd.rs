@@ -19,8 +19,9 @@ use tokio::{
 
 use mml_names::{
     i18,
-    i18_items::error_type::{CoreResult, ErrorData, ErrorType},
+    i18_items::error_type::{CoreResult, ErrorType},
 };
+use crate::error::{serializer_err, socket_err};
 
 /// 连接与读包的超时
 const TIMEOUT: Duration = Duration::from_secs(5);
@@ -233,23 +234,15 @@ fn is_host_name(ip: &str) -> bool {
 async fn connect(ip: &str, port: u16) -> CoreResult<TcpStream> {
     timeout(TIMEOUT, TcpStream::connect((ip, port)))
         .await
-        .map_err(|_| {
-            ErrorType::SocketError(ErrorData {
-                error: format!("连接超时: {ip}:{port}"),
-            })
+        .map_err(|_| ErrorType::MotdConnectTimeout {
+            ip: ip.to_string(),
+            port,
         })?
-        .map_err(|err| {
-            ErrorType::SocketError(ErrorData {
-                error: format!("连接失败: {ip}:{port} {err}"),
-            })
+        .map_err(|err| ErrorType::MotdConnectFailed {
+            ip: ip.to_string(),
+            port,
+            error: err.to_string(),
         })
-}
-
-/// io 错误转 SocketError
-fn socket_err(err: std::io::Error) -> ErrorType {
-    ErrorType::SocketError(ErrorData {
-        error: err.to_string(),
-    })
 }
 
 /// 握手 + status request + 读响应
@@ -275,9 +268,7 @@ async fn query_status(mut stream: TcpStream, ip: &str, port: u16) -> CoreResult<
 
         let len = read_varint(&mut stream).await?;
         if len <= 0 {
-            return Err(ErrorType::StreamError(ErrorData {
-                error: "响应长度异常".to_string(),
-            }));
+            return Err(ErrorType::MotdBadResponseLen);
         }
         let mut data = vec![0u8; len as usize];
         stream.read_exact(&mut data).await.map_err(socket_err)?;
@@ -285,26 +276,14 @@ async fn query_status(mut stream: TcpStream, ip: &str, port: u16) -> CoreResult<
         let mut pos = 0;
         let packet_id = read_varint_from(&data, &mut pos);
         if packet_id != 0 {
-            return Err(ErrorType::StreamError(ErrorData {
-                error: format!("响应包类型异常: {packet_id}"),
-            }));
+            return Err(ErrorType::MotdBadPacketId { packet_id });
         }
         let str_len = read_varint_from(&data, &mut pos) as usize;
         if pos + str_len > data.len() {
-            return Err(ErrorType::StreamError(ErrorData {
-                error: "响应数据不完整".to_string(),
-            }));
+            return Err(ErrorType::MotdResponseIncomplete);
         }
-        let json = std::str::from_utf8(&data[pos..pos + str_len]).map_err(|err| {
-            ErrorType::SerializerError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
-        serde_json::from_str(json).map_err(|err| {
-            ErrorType::SerializerError(ErrorData {
-                error: err.to_string(),
-            })
-        })
+        let json = std::str::from_utf8(&data[pos..pos + str_len]).map_err(serializer_err)?;
+        serde_json::from_str(json).map_err(serializer_err)
     }
     .await
 }
@@ -334,9 +313,7 @@ async fn read_varint(stream: &mut TcpStream) -> CoreResult<i32> {
         }
         shift += 7;
         if shift >= 32 {
-            return Err(ErrorType::StreamError(ErrorData {
-                error: "varint too big".to_string(),
-            }));
+            return Err(ErrorType::MotdVarintTooBig);
         }
     }
 }

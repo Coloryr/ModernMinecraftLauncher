@@ -79,7 +79,7 @@ pub async fn get_loader_versions(loader: &LoaderType, mc: &str) -> CoreResult<Ve
 pub async fn get_support_loaders(mc: &str, gui: ProgressGui) -> CoreResult<Vec<String>> {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    let mut list = vec![LoaderType::Normal.to_string().to_string()];
+    let mut list = vec![LoaderType::Normal.id().to_string()];
 
     let done = AtomicUsize::new(0);
 
@@ -111,10 +111,9 @@ pub async fn get_support_loaders(mc: &str, gui: ProgressGui) -> CoreResult<Vec<S
         };
     }
     // 看门狗：独立任务，定期报告未完成的路；全部完成后自行退出
-    let watchdog = {
+    let _ = {
         let finished = std::sync::Arc::clone(&finished);
         tokio::spawn(async move {
-            let started = std::time::Instant::now();
             loop {
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                 let pending: Vec<&str> = NAMES
@@ -131,7 +130,6 @@ pub async fn get_support_loaders(mc: &str, gui: ProgressGui) -> CoreResult<Vec<S
     };
 
     let forge = async {
-        let t = std::time::Instant::now();
         let ok = match forge_versions(mc).await {
             Ok(v) => !v.is_empty(),
             // 被全局中断，用户改了代理：不能吞，要让整次查询立刻失败退出
@@ -139,42 +137,39 @@ pub async fn get_support_loaders(mc: &str, gui: ProgressGui) -> CoreResult<Vec<S
                 mark_done!(0);
                 return Err(err);
             }
-            Err(e) => false,
+            Err(_) => false,
         };
         mark_done!(0);
         bump(&done, &gui);
         Ok(ok)
     };
     let fabric = async {
-        let t = std::time::Instant::now();
         let ok = match fabric_versions().await {
             Ok(v) => !v.is_empty(),
             Err(err) if mml_net::is_aborted(&err) => {
                 mark_done!(1);
                 return Err(err);
             }
-            Err(e) => false,
+            Err(_) => false,
         };
         mark_done!(1);
         bump(&done, &gui);
         Ok(ok)
     };
     let quilt = async {
-        let t = std::time::Instant::now();
         let ok = match quilt_versions().await {
             Ok(v) => !v.is_empty(),
             Err(err) if mml_net::is_aborted(&err) => {
                 mark_done!(2);
                 return Err(err);
             }
-            Err(e) => false,
+            Err(_) => false,
         };
         mark_done!(2);
         bump(&done, &gui);
         Ok(ok)
     };
     let neoforge = async {
-        let t = std::time::Instant::now();
         let ok = if mml_net::url_helper::get_source() == SourceLocal::Offical {
             version_ge(mc, "1.20.1")
         } else {
@@ -184,7 +179,7 @@ pub async fn get_support_loaders(mc: &str, gui: ProgressGui) -> CoreResult<Vec<S
                     mark_done!(3);
                     return Err(err);
                 }
-                Err(e) => false,
+                Err(_) => false,
             }
         };
         mark_done!(3);
@@ -192,7 +187,6 @@ pub async fn get_support_loaders(mc: &str, gui: ProgressGui) -> CoreResult<Vec<S
         Ok(ok)
     };
     let optifine = async {
-        let t = std::time::Instant::now();
         let ok = match mml_net::optifine_api::get_support_version().await {
             Ok(Some(set)) => set.contains(mc),
             Ok(None) => false,
@@ -200,14 +194,13 @@ pub async fn get_support_loaders(mc: &str, gui: ProgressGui) -> CoreResult<Vec<S
                 mark_done!(4);
                 return Err(err);
             }
-            Err(e) => false,
+            Err(_) => false,
         };
         mark_done!(4);
         bump(&done, &gui);
         Ok(ok)
     };
     let liteloader = async {
-        let t = std::time::Instant::now();
         // liteloader_supports 内部把普通错误吞成 false，中断会向上抛
         let ok = match liteloader_supports(mc).await {
             Ok(ok) => ok,
@@ -233,25 +226,25 @@ pub async fn get_support_loaders(mc: &str, gui: ProgressGui) -> CoreResult<Vec<S
     );
 
     if forge_ok {
-        list.push(LoaderType::Forge.to_string().to_string());
+        list.push(LoaderType::Forge.id().to_string());
     }
     if fabric_ok {
-        list.push(LoaderType::Fabric.to_string().to_string());
+        list.push(LoaderType::Fabric.id().to_string());
     }
     if quilt_ok {
-        list.push(LoaderType::Quilt.to_string().to_string());
+        list.push(LoaderType::Quilt.id().to_string());
     }
     if neoforge_ok {
-        list.push(LoaderType::NeoForge.to_string().to_string());
+        list.push(LoaderType::NeoForge.id().to_string());
     }
     if optifine_ok {
-        list.push(LoaderType::OptiFine.to_string().to_string());
+        list.push(LoaderType::OptiFine.id().to_string());
     }
     if liteloader_ok {
-        list.push(LoaderType::LiteLoader.to_string().to_string());
+        list.push(LoaderType::LiteLoader.id().to_string());
     }
 
-    list.push(LoaderType::Custom.to_string().to_string());
+    list.push(LoaderType::Custom.id().to_string());
     Ok(list)
 }
 

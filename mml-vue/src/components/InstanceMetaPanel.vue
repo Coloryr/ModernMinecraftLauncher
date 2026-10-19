@@ -273,6 +273,7 @@ async function onLoaderChange(value: string) {
 
 // 语言列表从实例的资源索引 minecraft/lang/*.json 里查；
 // 资源未下载 / 查询失败时保留默认（简体中文 + English）
+// label 是语言自称，与界面语言无关，取的就是游戏资源里的原文，所以不进 i18n
 const DEFAULT_LANGS = [
   { value: "zh_cn", label: "简体中文" },
   { value: "en_us", label: "English" },

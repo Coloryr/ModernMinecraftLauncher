@@ -23,7 +23,7 @@ pub struct OAuthGetCodeResObj {
 /// OAuth 设备码获取请求的响应
 ///
 /// 来自 Microsoft 设备授权端点的原始 JSON 响应。
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct OAuthObj {
     /// 用户码，显示给用户，用于手动输入
@@ -38,23 +38,11 @@ pub struct OAuthObj {
     pub expires_in: i64,
 }
 
-impl Default for OAuthObj {
-    fn default() -> Self {
-        Self {
-            user_code: Default::default(),
-            error: Default::default(),
-            device_code: Default::default(),
-            verification_uri: Default::default(),
-            expires_in: Default::default(),
-        }
-    }
-}
-
 /// OAuth 令牌获取请求的响应
 ///
 /// 轮询 Microsoft 令牌端点后返回的结果。
 /// 成功时 `access_token` 和 `refresh_token` 非空，`error` 为 `None`。
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct OAuthGetCodeObj {
     /// 错误码：
@@ -66,16 +54,6 @@ pub struct OAuthGetCodeObj {
     pub access_token: String,
     /// Microsoft OAuth 刷新令牌，用于长期保持登录状态
     pub refresh_token: String,
-}
-
-impl Default for OAuthGetCodeObj {
-    fn default() -> Self {
-        Self {
-            error: Default::default(),
-            access_token: Default::default(),
-            refresh_token: Default::default(),
-        }
-    }
 }
 
 #[cfg(test)]

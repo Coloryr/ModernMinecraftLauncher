@@ -45,6 +45,16 @@ use crate::{
     DownloadObj, download_item::DownloadItemState, download_task::DownloadTask, later_tasks,
 };
 
+/// 读流出错转 StreamError
+fn stream_err(err: impl std::fmt::Display) -> ErrorType {
+    ErrorType::StreamError(ErrorData::from_error(err))
+}
+
+/// 文件哈希不匹配转 DownloadFileHashError
+fn hash_error(file: PathBuf, now: String, hash: String) -> ErrorType {
+    ErrorType::DownloadFileHashError(DownloadFileHashErrorData { file, now, hash })
+}
+
 /// 用于在下载线程中执行异步任务的 Tokio 运行时
 ///
 /// 全部下载线程共用 `OnceLock` 里这一份 `current_thread` 运行时，
@@ -111,6 +121,10 @@ impl DownloadThread {
     /// 创建并启动下载线程
     ///
     /// - `index`: 线程序号，用于 UI 更新标识
+    ///
+    /// # 返回值
+    ///
+    /// 新建的下载线程，后台线程已启动并在信号量上等待唤醒
     pub fn new(index: u32) -> Self {
         let sem = Arc::new(Sem::new(0).unwrap());
         let is_stop = Arc::new(AtomicBool::new(false));
@@ -150,7 +164,9 @@ impl DownloadThread {
                         download(index, item)
                     }));
                     if let Err(payload) = res {
-                        mml_log::error(format!("下载线程异常：{}", panic_text(payload)));
+                        mml_log::error_type(ErrorType::DownloadThreadPanic(ErrorData {
+                            error: panic_text(payload),
+                        }));
                         task.fail();
                     }
                 }
@@ -193,7 +209,7 @@ fn panic_text(payload: Box<dyn std::any::Any + Send>) -> String {
         Ok(text) => *text,
         Err(payload) => match payload.downcast::<&'static str>() {
             Ok(text) => (*text).to_string(),
-            Err(_) => String::from("未知 panic"),
+            Err(_) => ErrorType::PanicPayloadUnknown.to_string(),
         },
     }
 }
@@ -512,9 +528,7 @@ async fn write_file(
             Ok(None) => break,
             Ok(Some(data)) => {
                 file.write_all(&data).map_err(|err| {
-                    StreamError(ErrorData {
-                        error: err.to_string(),
-                    })
+                    StreamError(ErrorData::from_error(err))
                 })?;
 
                 obj.item.set_state(DownloadItemState::Download);
@@ -523,9 +537,7 @@ async fn write_file(
                 crate::update(index, &obj.item);
             }
             Err(e) => {
-                return Err(StreamError(ErrorData {
-                    error: e.to_string(),
-                }));
+                return Err(StreamError(ErrorData::from_error(e)));
             }
         }
     }
@@ -582,13 +594,7 @@ fn check_hash<R: Read + Seek>(file: &PathBuf, hash: &FileHash, stream: &mut R) -
                 if hash.eq_ignore_ascii_case(md5) {
                     Ok(())
                 } else {
-                    Err(ErrorType::DownloadFileHashError(
-                        DownloadFileHashErrorData {
-                            file: file.clone(),
-                            now: hash.clone(),
-                            hash: md5.clone(),
-                        },
-                    ))
+                    Err(hash_error(file.clone(), hash.clone(), md5.clone()))
                 }
             }
             Err(err) => Err(err),
@@ -598,13 +604,7 @@ fn check_hash<R: Read + Seek>(file: &PathBuf, hash: &FileHash, stream: &mut R) -
                 if hash.eq_ignore_ascii_case(sha1) {
                     Ok(())
                 } else {
-                    Err(ErrorType::DownloadFileHashError(
-                        DownloadFileHashErrorData {
-                            file: file.clone(),
-                            now: hash.clone(),
-                            hash: sha1.clone(),
-                        },
-                    ))
+                    Err(hash_error(file.clone(), hash.clone(), sha1.clone()))
                 }
             }
             Err(err) => Err(err),
@@ -615,13 +615,7 @@ fn check_hash<R: Read + Seek>(file: &PathBuf, hash: &FileHash, stream: &mut R) -
                     if hash.eq_ignore_ascii_case(sha256) {
                         Ok(())
                     } else {
-                        Err(ErrorType::DownloadFileHashError(
-                            DownloadFileHashErrorData {
-                                file: file.clone(),
-                                now: hash.clone(),
-                                hash: sha256.clone(),
-                            },
-                        ))
+                        Err(hash_error(file.clone(), hash.clone(), sha256.clone()))
                     }
                 }
                 Err(err) => Err(err),
@@ -633,13 +627,7 @@ fn check_hash<R: Read + Seek>(file: &PathBuf, hash: &FileHash, stream: &mut R) -
                     if hash.eq_ignore_ascii_case(sha1) {
                         Ok(())
                     } else {
-                        Err(ErrorType::DownloadFileHashError(
-                            DownloadFileHashErrorData {
-                                file: file.clone(),
-                                now: hash.clone(),
-                                hash: sha1.clone(),
-                            },
-                        ))
+                        Err(hash_error(file.clone(), hash.clone(), sha1.clone()))
                     }
                 }
                 Err(err) => Err(err),
@@ -650,9 +638,7 @@ fn check_hash<R: Read + Seek>(file: &PathBuf, hash: &FileHash, stream: &mut R) -
             }
 
             stream.seek(SeekFrom::Start(0)).map_err(|err| {
-                ErrorType::StreamError(ErrorData {
-                    error: err.to_string(),
-                })
+                stream_err(err)
             })?;
 
             let sha256 = match hash_helper::gen_hash_from_reader(HashType::Sha256, stream) {
@@ -660,13 +646,7 @@ fn check_hash<R: Read + Seek>(file: &PathBuf, hash: &FileHash, stream: &mut R) -
                     if hash.eq_ignore_ascii_case(sha256) {
                         Ok(())
                     } else {
-                        Err(ErrorType::DownloadFileHashError(
-                            DownloadFileHashErrorData {
-                                file: file.clone(),
-                                now: hash.clone(),
-                                hash: sha256.clone(),
-                            },
-                        ))
+                        Err(hash_error(file.clone(), hash.clone(), sha256.clone()))
                     }
                 }
                 Err(err) => Err(err),
@@ -684,13 +664,7 @@ fn check_hash<R: Read + Seek>(file: &PathBuf, hash: &FileHash, stream: &mut R) -
                     if hash.eq_ignore_ascii_case(sha512) {
                         Ok(())
                     } else {
-                        Err(ErrorType::DownloadFileHashError(
-                            DownloadFileHashErrorData {
-                                file: file.clone(),
-                                now: hash.clone(),
-                                hash: sha512.clone(),
-                            },
-                        ))
+                        Err(hash_error(file.clone(), hash.clone(), sha512.clone()))
                     }
                 }
                 Err(err) => Err(err),
@@ -702,13 +676,7 @@ fn check_hash<R: Read + Seek>(file: &PathBuf, hash: &FileHash, stream: &mut R) -
                     if hash.eq_ignore_ascii_case(sha1) {
                         Ok(())
                     } else {
-                        Err(ErrorType::DownloadFileHashError(
-                            DownloadFileHashErrorData {
-                                file: file.clone(),
-                                now: hash.clone(),
-                                hash: sha1.clone(),
-                            },
-                        ))
+                        Err(hash_error(file.clone(), hash.clone(), sha1.clone()))
                     }
                 }
                 Err(err) => Err(err),
@@ -719,9 +687,7 @@ fn check_hash<R: Read + Seek>(file: &PathBuf, hash: &FileHash, stream: &mut R) -
             }
 
             stream.seek(SeekFrom::Start(0)).map_err(|err| {
-                ErrorType::StreamError(ErrorData {
-                    error: err.to_string(),
-                })
+                stream_err(err)
             })?;
 
             let sha512 = match hash_helper::gen_hash_from_reader(HashType::Sha512, stream) {
@@ -729,13 +695,7 @@ fn check_hash<R: Read + Seek>(file: &PathBuf, hash: &FileHash, stream: &mut R) -
                     if hash.eq_ignore_ascii_case(sha512) {
                         Ok(())
                     } else {
-                        Err(ErrorType::DownloadFileHashError(
-                            DownloadFileHashErrorData {
-                                file: file.clone(),
-                                now: hash.clone(),
-                                hash: sha512.clone(),
-                            },
-                        ))
+                        Err(hash_error(file.clone(), hash.clone(), sha512.clone()))
                     }
                 }
                 Err(err) => Err(err),

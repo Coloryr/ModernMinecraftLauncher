@@ -5,7 +5,7 @@ use mml_net::optifine_api::GetOptifineObj;
 use serde::{Deserialize, Serialize};
 
 /// OptiFine 安装信息，落盘在实例目录
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct OptifineObj {
     /// OptiFine 版本号
@@ -52,22 +52,6 @@ impl From<GetOptifineObj> for OptifineObj {
             url1: value.url1,
             url2: value.url2,
             source: value.source,
-        }
-    }
-}
-
-impl Default for OptifineObj {
-    /// 全字段取默认值
-    fn default() -> Self {
-        Self {
-            version: Default::default(),
-            mc_version: Default::default(),
-            forge: Default::default(),
-            file_name: Default::default(),
-            date: Default::default(),
-            url1: Default::default(),
-            url2: Default::default(),
-            source: Default::default(),
         }
     }
 }

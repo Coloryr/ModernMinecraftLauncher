@@ -15,5 +15,5 @@ fn test_time() {
 #[tokio::test]
 #[ignore = "skip"]
 async fn oauth_test() {
-    let code = oauth::get_code().await.unwrap();
+    let _code = oauth::get_code().await.unwrap();
 }

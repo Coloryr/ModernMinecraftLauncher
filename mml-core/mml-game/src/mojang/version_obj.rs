@@ -3,23 +3,15 @@
 use serde::{Deserialize, Serialize};
 
 /// 版本清单里的 `latest` 字段
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct LastestObj {
     /// 最新正式版版本号，如 `1.21.4`
     pub release: String,
 }
 
-impl Default for LastestObj {
-    fn default() -> Self {
-        Self {
-            release: Default::default(),
-        }
-    }
-}
-
 /// 版本清单里的单个版本条目
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct VersionsObj {
     /// 版本 ID，如 `1.21.4` / `24w14a`
@@ -33,18 +25,7 @@ pub struct VersionsObj {
     pub sha1: String,
 }
 
-impl Default for VersionsObj {
-    fn default() -> Self {
-        Self {
-            id: Default::default(),
-            version_type: Default::default(),
-            url: Default::default(),
-            sha1: Default::default(),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 /// 版本清单根对象，对应 `version_manifest_v2.json`
 pub struct VersionObj {
@@ -52,13 +33,4 @@ pub struct VersionObj {
     pub latest: LastestObj,
     /// 全部版本条目，按发布时间从新到旧
     pub versions: Vec<VersionsObj>,
-}
-
-impl Default for VersionObj {
-    fn default() -> Self {
-        Self {
-            latest: Default::default(),
-            versions: Default::default(),
-        }
-    }
 }

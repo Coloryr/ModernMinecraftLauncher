@@ -16,35 +16,57 @@ static GPU: OnceLock<Option<GpuDevice>> = OnceLock::new();
 
 /// wgpu 逻辑设备 + 命令队列，跨 crate 共享一个实例
 pub struct GpuDevice {
+    /// 逻辑设备
     device: wgpu::Device,
+    /// 命令队列
     queue: wgpu::Queue,
 }
 
 impl GpuDevice {
     /// 逻辑设备
+    ///
+    /// # 返回值
+    ///
+    /// 用于创建 GPU 资源的设备引用，生命周期与全局设备一致
     pub fn device(&self) -> &wgpu::Device {
         &self.device
     }
 
     /// 命令队列
+    ///
+    /// # 返回值
+    ///
+    /// 用于提交命令的队列引用，生命周期与全局设备一致
     pub fn queue(&self) -> &wgpu::Queue {
         &self.queue
     }
 }
 
 /// 取全局设备；首次调用时按后端回退链初始化，之后所有调用方共用
+///
+/// # 返回值
+///
+/// 全局设备的引用；后端回退链全部初始化失败时返回 `None`
 pub fn device() -> Option<&'static GpuDevice> {
     GPU.get_or_init(|| block_on(init(default_chain()))).as_ref()
 }
 
+/// 回退链里的一档：显示名与后端位
+pub struct BackendChain<'a> {
+    /// 显示名，日志里用
+    pub name: &'a str,
+    /// 后端位
+    pub backends: wgpu::Backends,
+}
+
 /// 按给定回退链初始化一个设备，不占用也不读全局缓存，测试与调试用
 ///
-/// - `chain`: 回退链，每项为显示名与后端位，按优先级排列
+/// - `chain`: 回退链，按优先级排列，见 [`BackendChain`]
 ///
 /// # 返回值
 ///
 /// 返回首个成功的设备，全部失败时返回 `None`
-pub fn device_with_chain(chain: &[(&str, wgpu::Backends)]) -> Option<GpuDevice> {
+pub fn device_with_chain(chain: &[BackendChain<'_>]) -> Option<GpuDevice> {
     block_on(init(chain))
 }
 
@@ -52,40 +74,67 @@ pub fn device_with_chain(chain: &[(&str, wgpu::Backends)]) -> Option<GpuDevice> 
 /// - Windows：DX12 → VK → GL
 /// - macOS：Metal → VK → GL
 /// - Linux/其他 Unix：VK → GL
-fn default_chain() -> &'static [(&'static str, wgpu::Backends)] {
+fn default_chain() -> &'static [BackendChain<'static>] {
     #[cfg(windows)]
     return &[
-        ("DX12", wgpu::Backends::DX12),
-        ("VULKAN", wgpu::Backends::VULKAN),
-        ("GL", wgpu::Backends::GL),
+        BackendChain {
+            name: "DX12",
+            backends: wgpu::Backends::DX12,
+        },
+        BackendChain {
+            name: "VULKAN",
+            backends: wgpu::Backends::VULKAN,
+        },
+        BackendChain {
+            name: "GL",
+            backends: wgpu::Backends::GL,
+        },
     ];
     #[cfg(target_os = "macos")]
     return &[
-        ("METAL", wgpu::Backends::METAL),
-        ("VULKAN", wgpu::Backends::VULKAN),
-        ("GL", wgpu::Backends::GL),
+        BackendChain {
+            name: "METAL",
+            backends: wgpu::Backends::METAL,
+        },
+        BackendChain {
+            name: "VULKAN",
+            backends: wgpu::Backends::VULKAN,
+        },
+        BackendChain {
+            name: "GL",
+            backends: wgpu::Backends::GL,
+        },
     ];
     #[cfg(all(unix, not(target_os = "macos")))]
     return &[
-        ("VULKAN", wgpu::Backends::VULKAN),
-        ("GL", wgpu::Backends::GL),
+        BackendChain {
+            name: "VULKAN",
+            backends: wgpu::Backends::VULKAN,
+        },
+        BackendChain {
+            name: "GL",
+            backends: wgpu::Backends::GL,
+        },
     ];
     #[cfg(not(any(windows, unix)))]
-    return &[("GL", wgpu::Backends::GL)];
+    return &[BackendChain {
+        name: "GL",
+        backends: wgpu::Backends::GL,
+    }];
 }
 
 /// 按回退链逐个后端、逐个适配器尝试初始化，独显优先，全失败返回 `None`
 ///
-/// - `chain`: 回退链，每项为显示名与后端位，按优先级排列
-async fn init(chain: &[(&str, wgpu::Backends)]) -> Option<GpuDevice> {
-    for (name, backends) in chain {
+/// - `chain`: 回退链，按优先级排列，见 [`BackendChain`]
+async fn init(chain: &[BackendChain<'_>]) -> Option<GpuDevice> {
+    for entry in chain {
         let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
-        desc.backends = *backends;
+        desc.backends = entry.backends;
         let instance = wgpu::Instance::new(desc);
 
         // 独显优先：枚举适配器按 独显→其余 排序，离屏渲染无需管是否主显卡；
         // 逐个尝试建设备，建不成再退下一个适配器/后端
-        let mut adapters = block_on(instance.enumerate_adapters(*backends));
+        let mut adapters = block_on(instance.enumerate_adapters(entry.backends));
         adapters.sort_by_key(|a| match a.get_info().device_type {
             wgpu::DeviceType::DiscreteGpu => 0,
             _ => 1,
@@ -106,8 +155,8 @@ async fn init(chain: &[(&str, wgpu::Backends)]) -> Option<GpuDevice> {
                 continue;
             };
             println!(
-                "[渲染] GPU后端 {name}：{}（{:?}）",
-                info.name, info.device_type
+                "[渲染] GPU后端 {}：{}（{:?}）",
+                entry.name, info.name, info.device_type
             );
             return Some(GpuDevice { device, queue });
         }

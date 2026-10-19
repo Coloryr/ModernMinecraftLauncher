@@ -16,11 +16,12 @@ use regex::Regex;
 use mml_names::{
     i18,
     i18_items::{
-        error_type::{CoreResult, ErrorData, ErrorType},
+        error_type::{CoreResult, ErrorType, MulticastSendErrorData},
         thread_type::ThreadType,
     },
 };
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
+use crate::error::{socket_err, thread_err};
 
 /// 组播端口
 const PORT: u16 = 4445;
@@ -99,77 +100,37 @@ impl GameLan {
     ///
     /// 返回组播收发器；创建 socket 失败返回对应错误
     pub fn new_client() -> CoreResult<Self> {
-        let interfaces = if_addrs::get_if_addrs().map_err(|err| {
-            ErrorType::SocketError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        let interfaces = if_addrs::get_if_addrs().map_err(socket_err)?;
 
         let v6 = interfaces
             .iter()
             .any(|item| !item.is_loopback() && item.ip().is_ipv6());
 
         let socket_v4 =
-            Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP)).map_err(|err| {
-                ErrorType::SocketError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
-        socket_v4.set_reuse_address(true).map_err(|err| {
-            ErrorType::SocketError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+            Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP)).map_err(socket_err)?;
+        socket_v4.set_reuse_address(true).map_err(socket_err)?;
         let bind_addr_v4 = SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, PORT);
         socket_v4
             .bind(&SockAddr::from(bind_addr_v4))
-            .map_err(|err| {
-                ErrorType::SocketError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
-        let addr_v4 = IPV4.parse::<Ipv4Addr>().map_err(|err| {
-            ErrorType::SocketError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+            .map_err(socket_err)?;
+        let addr_v4 = IPV4.parse::<Ipv4Addr>().map_err(socket_err)?;
 
         let mut socket_v6 = None;
         if v6 {
             let sock_v6 =
-                Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP)).map_err(|err| {
-                    ErrorType::SocketError(ErrorData {
-                        error: err.to_string(),
-                    })
-                })?;
+                Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP)).map_err(socket_err)?;
 
-            sock_v6.set_reuse_address(true).map_err(|err| {
-                ErrorType::SocketError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            sock_v6.set_reuse_address(true).map_err(socket_err)?;
 
-            sock_v6.set_only_v6(true).map_err(|err| {
-                ErrorType::SocketError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            sock_v6.set_only_v6(true).map_err(socket_err)?;
 
             let bind_addr_v6 = SocketAddrV6::new(Ipv6Addr::UNSPECIFIED, PORT, 0, 0);
-            sock_v6.bind(&SockAddr::from(bind_addr_v6)).map_err(|err| {
-                ErrorType::SocketError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            sock_v6.bind(&SockAddr::from(bind_addr_v6)).map_err(socket_err)?;
 
             socket_v6 = Some(sock_v6);
         }
 
-        let addr_v6 = IPV6.parse::<Ipv6Addr>().map_err(|err| {
-            ErrorType::SocketError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        let addr_v6 = IPV6.parse::<Ipv6Addr>().map_err(socket_err)?;
 
         for interface in interfaces.iter() {
             if interface.is_loopback() {
@@ -180,22 +141,14 @@ impl GameLan {
                 IpAddr::V4(ipv4_addr) => {
                     socket_v4
                         .join_multicast_v4(&addr_v4, &ipv4_addr)
-                        .map_err(|err| {
-                            ErrorType::SocketError(ErrorData {
-                                error: err.to_string(),
-                            })
-                        })?;
+                        .map_err(socket_err)?;
                 }
                 IpAddr::V6(_ipv6_addr) => {
                     if v6 {
                         if let Some(sock_v6) = socket_v6.as_ref() {
                             sock_v6
                                 .join_multicast_v6(&addr_v6, interface.index.unwrap_or(0))
-                                .map_err(|err| {
-                                    ErrorType::SocketError(ErrorData {
-                                        error: err.to_string(),
-                                    })
-                                })?;
+                                .map_err(socket_err)?;
                         }
                     }
                 }
@@ -218,49 +171,25 @@ impl GameLan {
     ///
     /// 返回组播收发器；创建 socket 失败返回对应错误
     pub fn new_server() -> CoreResult<Self> {
-        let interfaces = if_addrs::get_if_addrs().map_err(|err| {
-            ErrorType::SocketError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        let interfaces = if_addrs::get_if_addrs().map_err(socket_err)?;
 
         let v6 = interfaces
             .iter()
             .any(|item| !item.is_loopback() && item.ip().is_ipv6());
 
         let socket_v4 =
-            Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP)).map_err(|err| {
-                ErrorType::SocketError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP)).map_err(socket_err)?;
 
-        socket_v4.set_reuse_address(true).map_err(|err| {
-            ErrorType::SocketError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        socket_v4.set_reuse_address(true).map_err(socket_err)?;
 
-        socket_v4.set_broadcast(true).map_err(|err| {
-            ErrorType::SocketError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        socket_v4.set_broadcast(true).map_err(socket_err)?;
 
         let bind_addr_v4 = SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0);
         socket_v4
             .bind(&SockAddr::from(bind_addr_v4))
-            .map_err(|err| {
-                ErrorType::SocketError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            .map_err(socket_err)?;
 
-        let ipv4 = IPV4.parse::<Ipv4Addr>().map_err(|err| {
-            ErrorType::SocketError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        let ipv4 = IPV4.parse::<Ipv4Addr>().map_err(socket_err)?;
         let addr_v4 = SocketAddr::V4(SocketAddrV4::new(ipv4, PORT));
 
         let mut socket_v6 = None;
@@ -268,36 +197,16 @@ impl GameLan {
 
         if v6 {
             let sock_v6 =
-                Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP)).map_err(|err| {
-                    ErrorType::SocketError(ErrorData {
-                        error: err.to_string(),
-                    })
-                })?;
+                Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP)).map_err(socket_err)?;
 
-            sock_v6.set_reuse_address(true).map_err(|err| {
-                ErrorType::SocketError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            sock_v6.set_reuse_address(true).map_err(socket_err)?;
 
-            sock_v6.set_only_v6(true).map_err(|err| {
-                ErrorType::SocketError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            sock_v6.set_only_v6(true).map_err(socket_err)?;
 
             let bind_addr_v6 = SocketAddrV6::new(Ipv6Addr::UNSPECIFIED, 0, 0, 0);
-            sock_v6.bind(&SockAddr::from(bind_addr_v6)).map_err(|err| {
-                ErrorType::SocketError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            sock_v6.bind(&SockAddr::from(bind_addr_v6)).map_err(socket_err)?;
 
-            let ipv6 = IPV6.parse::<Ipv6Addr>().map_err(|err| {
-                ErrorType::SocketError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            let ipv6 = IPV6.parse::<Ipv6Addr>().map_err(socket_err)?;
             addr_v6 = Some(SocketAddr::V6(SocketAddrV6::new(ipv6, PORT, 0, 0)));
 
             socket_v6 = Some(sock_v6);
@@ -353,11 +262,7 @@ impl GameLan {
         let socket_v4 = self.socket_v4.clone();
         let socket_v6 = self.socket_v6.clone();
 
-        let addr_v4 = self.send_v4.clone().ok_or_else(|| {
-            ErrorType::SocketError(ErrorData {
-                error: "IPv4 send address not set".to_string(),
-            })
-        })?;
+        let addr_v4 = self.send_v4.clone().ok_or(ErrorType::MulticastAddrMissing)?;
 
         let addr_v6 = self.send_v6.clone();
 
@@ -370,9 +275,12 @@ impl GameLan {
                 while run.load(Ordering::Acquire) {
                     // 发送 IPv4 组播
                     if let Err(err) = socket_v4.send_to(data, &addr_v4) {
-                        mml_log::error_type(ErrorType::SocketError(ErrorData {
-                            error: format!("Failed to send IPv4 multicast: {}", err),
-                        }));
+                        mml_log::error_type(ErrorType::MulticastSendFailed(
+                            MulticastSendErrorData {
+                                family: String::from("IPv4"),
+                                error: err.to_string(),
+                            },
+                        ));
                     }
 
                     // 发送 IPv6 组播
@@ -380,20 +288,19 @@ impl GameLan {
                         && let Some(addr) = addr_v6.as_ref()
                     {
                         if let Err(err) = sock_v6.send_to(data, addr) {
-                            mml_log::error_type(ErrorType::SocketError(ErrorData {
-                                error: format!("Failed to send IPv6 multicast: {}", err),
-                            }));
+                            mml_log::error_type(ErrorType::MulticastSendFailed(
+                                MulticastSendErrorData {
+                                    family: String::from("IPv6"),
+                                    error: err.to_string(),
+                                },
+                            ));
                         }
                     }
 
                     thread::sleep(std::time::Duration::from_secs(3));
                 }
             })
-            .map_err(|err| {
-                ErrorType::ThreadError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            .map_err(thread_err)?;
 
         Ok(())
     }
@@ -433,9 +340,7 @@ impl GameLan {
                             }
                         }
                         Err(err) => {
-                            mml_log::error_type(ErrorType::SocketError(ErrorData {
-                                error: err.to_string(),
-                            }));
+                            mml_log::error_type(socket_err(err));
                         }
                     }
                 }
@@ -444,11 +349,7 @@ impl GameLan {
                     buffer.assume_init_drop();
                 }
             })
-            .map_err(|err| {
-                ErrorType::ThreadError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            .map_err(thread_err)?;
 
         // IPv6 接收线程
         let run_v6 = self.is_run.clone();
@@ -478,9 +379,7 @@ impl GameLan {
                                 }
                             }
                             Err(err) => {
-                                mml_log::error_type(ErrorType::SocketError(ErrorData {
-                                    error: err.to_string(),
-                                }));
+                                mml_log::error_type(socket_err(err));
                             }
                         }
                     }
@@ -489,11 +388,7 @@ impl GameLan {
                         buffer.assume_init_drop();
                     }
                 })
-                .map_err(|err| {
-                    ErrorType::ThreadError(ErrorData {
-                        error: err.to_string(),
-                    })
-                })?;
+                .map_err(thread_err)?;
         }
 
         Ok(())

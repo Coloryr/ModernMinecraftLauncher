@@ -37,6 +37,7 @@ use crate::{
     modpack::{BaseModPackWorker, ModPackWorker, modrinth_worker::ModrinthPackWorker},
     modrinth::pack_obj::{ModrinthPackFileObj, ModrinthPackObj},
 };
+use crate::error::{modrinth_avatar_err};
 
 pub mod pack_obj;
 
@@ -56,10 +57,10 @@ static GAME_VERSIONS: OnceLock<Vec<String>> = OnceLock::new();
 /// 返回加载器 ID；该加载器不被 Modrinth 支持返回 `None`
 pub fn to_loader_id(loader: &LoaderType) -> Option<String> {
     match loader {
-        LoaderType::Forge => Some(loader.to_string().to_string()),
-        LoaderType::Fabric => Some(loader.to_string().to_string()),
-        LoaderType::Quilt => Some(loader.to_string().to_string()),
-        LoaderType::NeoForge => Some(loader.to_string().to_string()),
+        LoaderType::Forge => Some(loader.id().to_string()),
+        LoaderType::Fabric => Some(loader.id().to_string()),
+        LoaderType::Quilt => Some(loader.id().to_string()),
+        LoaderType::NeoForge => Some(loader.id().to_string()),
         _ => None,
     }
 }
@@ -265,7 +266,7 @@ pub async fn author_avatars(hits: &[HitObj]) -> HashMap<String, String> {
             .filter_map(|item| item.avatar_url.map(|url| (item.id, url)))
             .collect(),
         Err(err) => {
-            mml_log::error(format!("查 Modrinth 作者头像失败：{err}"));
+            mml_log::error_type(modrinth_avatar_err(err));
             HashMap::new()
         }
     }
@@ -386,7 +387,7 @@ pub async fn get_mod_info<P: AsRef<Path>>(
     }
 
     if !hash.is_empty() {
-        let ids = hash.keys().map(|item| item.clone()).collect();
+        let ids = hash.keys().cloned().collect();
         let data = modrinth_api::get_version_from_sha512(ids).await;
         if let Ok(data) = data {
             for (key, value) in data {
@@ -508,7 +509,7 @@ fn get_mod_dependencies_inner(
                         {
                             None
                         } else {
-                            Some(loader.to_string())
+                            Some(loader.id())
                         };
                         // 整份候选都带上：前端要让用户在这些版本里挑，不只用第一个
                         let data1 =

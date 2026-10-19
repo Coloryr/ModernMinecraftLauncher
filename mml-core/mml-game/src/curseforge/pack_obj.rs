@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 /// CurseForge 整合包 manifest.json 的顶层结构
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct CurseForgePackObj {
     /// Minecraft 段：游戏版本与加载器
@@ -26,24 +26,8 @@ pub struct CurseForgePackObj {
     pub overrides: String,
 }
 
-impl Default for CurseForgePackObj {
-    /// 全字段取默认值
-    fn default() -> Self {
-        Self {
-            minecraft: Default::default(),
-            manifest_type: Default::default(),
-            manifest_version: Default::default(),
-            name: Default::default(),
-            version: Default::default(),
-            author: Default::default(),
-            files: Default::default(),
-            overrides: Default::default(),
-        }
-    }
-}
-
 /// manifest 的 minecraft 段
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct MinecraftObj {
     /// 目标游戏版本，如 `1.21.1`
@@ -53,18 +37,8 @@ pub struct MinecraftObj {
     pub mod_loaders: Vec<ModLoadersObj>,
 }
 
-impl Default for MinecraftObj {
-    /// 全字段取默认值
-    fn default() -> Self {
-        Self {
-            version: Default::default(),
-            mod_loaders: Default::default(),
-        }
-    }
-}
-
 /// 单个模组加载器条目
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ModLoadersObj {
     /// 加载器 ID，如 `forge-14.23.5.2859`
@@ -73,18 +47,8 @@ pub struct ModLoadersObj {
     pub primary: bool,
 }
 
-impl Default for ModLoadersObj {
-    /// 全字段取默认值
-    fn default() -> Self {
-        Self {
-            id: Default::default(),
-            primary: Default::default(),
-        }
-    }
-}
-
 /// 整合包内需要下载的单个文件
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct FilesObj {
     /// CurseForge 项目 ID
@@ -95,15 +59,4 @@ pub struct FilesObj {
     pub file_id: u64,
     /// 是否必选，`false` 表示可选安装
     pub required: bool,
-}
-
-impl Default for FilesObj {
-    /// 全字段取默认值
-    fn default() -> Self {
-        Self {
-            project_id: Default::default(),
-            file_id: Default::default(),
-            required: Default::default(),
-        }
-    }
 }

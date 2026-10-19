@@ -44,11 +44,19 @@ pub enum TaskOutcome {
 
 impl TaskOutcome {
     /// 是否全部成功；只需要分"成没成"时用它
+    ///
+    /// # 返回值
+    ///
+    /// 状态是 `Done` 时返回 `true`
     pub fn is_done(&self) -> bool {
         matches!(self, TaskOutcome::Done)
     }
 
     /// 是否被取消
+    ///
+    /// # 返回值
+    ///
+    /// 状态是 `Cancelled` 时返回 `true`
     pub fn is_cancelled(&self) -> bool {
         matches!(self, TaskOutcome::Cancelled)
     }
@@ -88,6 +96,10 @@ impl DownloadTask {
     /// 创建下载任务
     ///
     /// - `items`: 需要下载的文件信息列表
+    ///
+    /// # 返回值
+    ///
+    /// 新建的任务，编号全局唯一，待下载队列即 `items`，各项计数从 0 起
     pub fn new(items: Vec<FileItemObj>) -> Self {
         let vec = SegQueue::new();
 
@@ -157,6 +169,10 @@ impl DownloadTask {
     }
 
     /// 从队列中取出一个待下载文件，无锁操作
+    ///
+    /// # 返回值
+    ///
+    /// 队列里的下一个待下载文件；队列已空时返回 `None`
     pub fn get_item(&self) -> Option<Arc<DownloadItem>> {
         self.items.pop()
     }
@@ -206,6 +222,10 @@ impl DownloadTask {
     }
 
     /// 此任务是否已被取消
+    ///
+    /// # 返回值
+    ///
+    /// 已请求取消时返回 `true`
     pub fn is_cancelled(&self) -> bool {
         self.cancel.is_cancelled()
     }
@@ -230,11 +250,19 @@ impl DownloadTask {
     }
 
     /// 此任务是否处于暂停状态
+    ///
+    /// # 返回值
+    ///
+    /// 处于暂停时返回 `true`
     pub fn is_paused(&self) -> bool {
         self.paused.load(Ordering::SeqCst)
     }
 
     /// 已进行时间，单位毫秒
+    ///
+    /// # 返回值
+    ///
+    /// 从任务创建到现在经过的毫秒数
     pub fn elapsed_ms(&self) -> u64 {
         self.start.elapsed().as_millis() as u64
     }

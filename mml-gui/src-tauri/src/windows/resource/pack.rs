@@ -40,11 +40,11 @@ use super::update::{LatestFile, newest_curseforge, newest_modrinth};
 #[tauri::command]
 pub async fn resource_modpack_check(uuid: String) -> Result<ModPackUpdateDto, String> {
     let instance = parse_instance(&uuid)?;
-    let (source, pid, fid) = modpack_of(&instance)?;
+    let id = modpack_of(&instance)?;
 
-    let latest = match source {
-        "curseforge" => latest_of_curseforge(&pid).await?,
-        _ => latest_of_modrinth(&pid).await?,
+    let latest = match id.platform {
+        "curseforge" => latest_of_curseforge(&id.pid).await?,
+        _ => latest_of_modrinth(&id.pid).await?,
     };
 
     let empty = LatestFile {
@@ -55,10 +55,10 @@ pub async fn resource_modpack_check(uuid: String) -> Result<ModPackUpdateDto, St
     };
     let latest = latest.unwrap_or(empty);
     Ok(ModPackUpdateDto {
-        has_update: !latest.id.is_empty() && latest.id != fid,
-        source: source.to_string(),
-        project_id: pid,
-        file_id: fid,
+        has_update: !latest.id.is_empty() && latest.id != id.fid,
+        source: id.platform.to_string(),
+        project_id: id.pid,
+        file_id: id.fid,
         new_file_id: latest.id,
         new_version: latest.version,
         new_file: latest.file,
@@ -89,21 +89,29 @@ pub async fn resource_modpack_update(
     // 读的过程中删实例会被拦住，见 resource::instance_busy
     let _op = super::model::begin_if_open(&uuid);
     let instance = parse_instance(&uuid)?;
-    let (source, pid, _) = modpack_of(&instance)?;
+    let id = modpack_of(&instance)?;
     let (name, instance_uuid) = {
         let game = instance.read().unwrap();
         (game.name.clone(), game.uuid)
     };
 
     let key = SourceInfo {
-        pid: pid.clone(),
+        pid: id.pid.clone(),
         fid: file_id.clone(),
     };
     let token = CancellationToken::new();
     let RegisteredTask {
         task,
         gui: pack_gui,
-    } = register_task(&app, key, source, name, String::new(), "upgrade", token.clone())?;
+    } = register_task(
+        &app,
+        key,
+        id.platform,
+        name,
+        String::new(),
+        "upgrade",
+        token.clone(),
+    )?;
     // 升级的是已有实例，目标从开始就记上：任务列表里点它要能回到那个实例
     *task.instance_uuid.lock().unwrap() = Some(uuid.clone());
 
@@ -114,8 +122,8 @@ pub async fn resource_modpack_update(
         let res = tauri::async_runtime::spawn_blocking(move || {
             tauri::async_runtime::block_on(upgrade_one(
                 instance,
-                source,
-                &pid,
+                id.platform,
+                &id.pid,
                 &file_id,
                 pack_gui,
                 update_token,
@@ -130,15 +138,25 @@ pub async fn resource_modpack_update(
     Ok(())
 }
 
-/// 读出实例的整合包身份：来源平台、项目编号、当前装着的那份文件编号
+/// 实例记着的整合包身份
+struct ModpackId {
+    /// 来源平台，取值 `curseforge` / `modrinth`
+    platform: &'static str,
+    /// 平台上的项目编号
+    pid: String,
+    /// 当前装着的文件编号
+    fid: String,
+}
+
+/// 读出实例的整合包身份
 ///
 /// - `instance`: 目标实例
 ///
 /// # 返回值
 ///
-/// `(来源平台, 项目编号, 文件编号)`；实例不是从平台安装的整合包、或项目 / 文件编号
-/// 缺一项时返回 `err.notOnlineModpack`
-fn modpack_of(instance: &GameInstance) -> Result<(&'static str, String, String), String> {
+/// 见 [`ModpackId`]；实例不是从平台安装的整合包、或项目 / 文件编号缺一项时返回
+/// `err.notOnlineModpack`
+fn modpack_of(instance: &GameInstance) -> Result<ModpackId, String> {
     let game = instance.read().unwrap();
     if !game.is_modpack {
         return Err(err_keys::NOT_ONLINE_MODPACK.to_string());
@@ -146,8 +164,16 @@ fn modpack_of(instance: &GameInstance) -> Result<(&'static str, String, String),
     let pid = game.pid.clone().filter(|id| !id.is_empty());
     let fid = game.fid.clone().filter(|id| !id.is_empty());
     match (game.modpack_type, pid, fid) {
-        (ModPackType::CurseForge, Some(pid), Some(fid)) => Ok(("curseforge", pid, fid)),
-        (ModPackType::Modrinth, Some(pid), Some(fid)) => Ok(("modrinth", pid, fid)),
+        (ModPackType::CurseForge, Some(pid), Some(fid)) => Ok(ModpackId {
+            platform: "curseforge",
+            pid,
+            fid,
+        }),
+        (ModPackType::Modrinth, Some(pid), Some(fid)) => Ok(ModpackId {
+            platform: "modrinth",
+            pid,
+            fid,
+        }),
         // 本地压缩包导入的实例也是整合包，但没有项目 / 文件编号，问不了平台
         _ => Err(err_keys::NOT_ONLINE_MODPACK.to_string()),
     }

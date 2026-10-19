@@ -12,7 +12,7 @@ use mml_base::{
 };
 use mml_config::{config_obj::SourceLocal, config_save};
 use mml_names::{
-    i18_items::error_type::{CoreResult, DataNotFoundData, ErrorData, ErrorType},
+    i18_items::error_type::{CoreResult, DataNotFoundData, ErrorType},
     names, uuids,
 };
 use mml_net::{mojang_api, url_helper};
@@ -36,6 +36,7 @@ use crate::{
         version_obj::{VersionObj, VersionsObj},
     },
 };
+use crate::error::{serializer_err};
 
 /// 版本根目录
 static BASE_DIR: OnceLock<PathBuf> = OnceLock::new();
@@ -249,11 +250,7 @@ async fn get_version_from_online() -> CoreResult<()> {
 
     // 获取失败再从官方源获取一次
     let data = mojang_api::get_versions(Some(SourceLocal::Offical)).await?;
-    let json = serialize_tools::json_from_bytes::<VersionObj>(&data).map_err(|err| {
-        ErrorType::SerializerError(ErrorData {
-            error: err.to_string(),
-        })
-    })?;
+    let json = serialize_tools::json_from_bytes::<VersionObj>(&data).map_err(serializer_err)?;
     *VERSION.write().unwrap() = Some(Arc::new(json));
     save_versions(&data);
 
@@ -604,7 +601,7 @@ pub fn get_version(version: &str) -> CoreResult<Arc<GameArgObj>> {
 
 /// 检查游戏版本更新
 ///
-/// - `version`: 游戏版本
+/// - `mc`: 游戏版本
 ///
 /// # 返回值
 ///
@@ -731,9 +728,7 @@ pub fn get_neoforge_install_obj(mc: &str, version: &str) -> Option<Arc<ForgeInst
             Some(list.entry(key).or_insert_with(|| temp.clone()).clone())
         }
         Err(err) => {
-            mml_log::error_type(ErrorType::SerializerError(ErrorData {
-                error: err.to_string(),
-            }));
+            mml_log::error_type(serializer_err(err));
 
             None
         }
@@ -768,9 +763,7 @@ pub fn get_neoforge(mc: &str, version: &str) -> Option<Arc<ForgeLaunchObj>> {
             Some(list.entry(key).or_insert_with(|| temp.clone()).clone())
         }
         Err(err) => {
-            mml_log::error_type(ErrorType::SerializerError(ErrorData {
-                error: err.to_string(),
-            }));
+            mml_log::error_type(serializer_err(err));
 
             None
         }
@@ -805,9 +798,7 @@ pub fn get_forge_install_obj(mc: &str, version: &str) -> Option<Arc<ForgeInstall
             Some(list.entry(key).or_insert_with(|| temp.clone()).clone())
         }
         Err(err) => {
-            mml_log::error_type(ErrorType::SerializerError(ErrorData {
-                error: err.to_string(),
-            }));
+            mml_log::error_type(serializer_err(err));
 
             None
         }
@@ -842,9 +833,7 @@ pub fn get_forge(mc: &str, version: &str) -> Option<Arc<ForgeLaunchObj>> {
             Some(list.entry(key).or_insert_with(|| temp.clone()).clone())
         }
         Err(err) => {
-            mml_log::error_type(ErrorType::SerializerError(ErrorData {
-                error: err.to_string(),
-            }));
+            mml_log::error_type(serializer_err(err));
 
             None
         }
@@ -880,9 +869,7 @@ pub fn get_fabric(mc: &str, version: &str) -> Option<Arc<FabricLoaderObj>> {
             Some(list.entry(key).or_insert_with(|| temp.clone()).clone())
         }
         Err(err) => {
-            mml_log::error_type(ErrorType::SerializerError(ErrorData {
-                error: err.to_string(),
-            }));
+            mml_log::error_type(serializer_err(err));
 
             None
         }
@@ -918,9 +905,7 @@ pub fn get_quilt(mc: &str, version: &str) -> Option<Arc<QuiltLoaderObj>> {
             Some(list.entry(key).or_insert_with(|| temp.clone()).clone())
         }
         Err(err) => {
-            mml_log::error_type(ErrorType::SerializerError(ErrorData {
-                error: err.to_string(),
-            }));
+            mml_log::error_type(serializer_err(err));
 
             None
         }
@@ -1049,7 +1034,7 @@ impl InstanceSettingObj {
         if self.loader != LoaderType::OptiFine || self.loader_version.is_none() {
             None
         } else {
-            get_optifine(&self.loader_version.clone().unwrap())
+            get_optifine(self.loader_version.as_deref().unwrap())
         }
     }
 

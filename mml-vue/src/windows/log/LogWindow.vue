@@ -33,6 +33,7 @@ import { useDownloadProgress } from "../../composables/useDownloadProgress";
 import { familyInstanceFromLabel, targetUuid } from "../windowManager";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import type { InstanceInfoDto, LogLine, LogSettingDto } from "../../lib/bindings";
+import { uniq } from "../../lib/util";
 
 /** 请求关闭本窗口 / 收起面板 */
 defineEmits<{ (e: "close"): void }>();
@@ -161,11 +162,6 @@ const shownLogs = computed(() =>
       (category.value === "" || l.category === category.value),
   ),
 );
-
-/** 去空去重排序 */
-function uniq(values: string[]): string[] {
-  return [...new Set(values.filter(Boolean))].sort();
-}
 
 const threads = computed(() => uniq(sourceLogs.value.map((l) => l.thread)));
 const categories = computed(() => uniq(sourceLogs.value.map((l) => l.category)));

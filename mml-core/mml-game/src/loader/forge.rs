@@ -12,7 +12,7 @@ use mml_base::{
 };
 use mml_names::{
     i18_items::error_type::{
-        CoreResult, DataNotFoundData, ErrorData, ErrorType, FileSystemErrorData,
+        CoreResult, DataNotFoundData, ErrorType, FileSystemErrorData,
     },
     names,
 };
@@ -33,6 +33,7 @@ use crate::{
     },
     mojang::game_arg_obj::ArtifactObj,
 };
+use crate::error::{archive_read_err};
 
 /// 根据名字构建运行库信息
 ///
@@ -594,11 +595,7 @@ async fn get_forge_libs(mc: &str, version: &str, neo: bool) -> CoreResult<ForgeG
     let mut version_json = String::new();
     let version_ok = match zip.by_name(names::VERSION_FILE) {
         Ok(mut file) => {
-            file.read_to_string(&mut version_json).map_err(|err| {
-                ErrorType::ArchiveReadError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            file.read_to_string(&mut version_json).map_err(archive_read_err)?;
             true
         }
         Err(_) => false,
@@ -608,11 +605,7 @@ async fn get_forge_libs(mc: &str, version: &str, neo: bool) -> CoreResult<ForgeG
     let mut install_json = String::new();
     let install_ok = match zip.by_name(names::FILE_INSTALL_PROFILE) {
         Ok(mut file) => {
-            file.read_to_string(&mut install_json).map_err(|err| {
-                ErrorType::ArchiveReadError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            file.read_to_string(&mut install_json).map_err(archive_read_err)?;
             true
         }
         Err(_) => false,

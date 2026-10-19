@@ -147,7 +147,7 @@ async fn versions_manifest_network() {
     // 初始化配置与 HTTP 客户端，用临时目录，测后清理
     let dir = mml_testutil::temp_dir().join(format!("mml-net-mojang-test-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("创建临时配置目录失败");
-    mml_config::init(&dir);
+    let _ = mml_config::init(&dir);
     mml_net::init();
 
     let data = get_versions(None).await.expect("版本清单请求失败");

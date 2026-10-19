@@ -21,6 +21,11 @@ use mml_sys::path_helper;
 use serde::{Serialize, de};
 use serde_json::Number;
 
+/// 出错原因转 SerializerError
+fn serializer_err(err: impl std::fmt::Display) -> ErrorType {
+    ErrorType::SerializerError(ErrorData::from_error(err))
+}
+
 /// 包装一个 JSON 值，提供类型安全的访问接口
 pub struct MiniJsonObj {
     /// 被包装的原始 JSON 值
@@ -28,6 +33,7 @@ pub struct MiniJsonObj {
 }
 
 /// JSON 对象的键值对视图，键为字段名
+#[derive(Default)]
 pub struct MiniJsonMap {
     /// 字段名到包装值的映射
     map: HashMap<String, MiniJsonObj>,
@@ -49,11 +55,7 @@ impl MiniJsonObj {
     ///
     /// JSON 非法时返回序列化错误
     pub fn from_str(str: &str) -> CoreResult<Self> {
-        let value = serde_json::from_str::<serde_json::Value>(str).map_err(|err| {
-            ErrorType::SerializerError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        let value = serde_json::from_str::<serde_json::Value>(str).map_err(serializer_err)?;
 
         Ok(Self { value })
     }
@@ -66,11 +68,7 @@ impl MiniJsonObj {
     ///
     /// JSON 非法时返回序列化错误
     pub fn from_stream<R: Read>(stream: R) -> CoreResult<Self> {
-        let value = serde_json::from_reader::<_, serde_json::Value>(stream).map_err(|err| {
-            ErrorType::SerializerError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        let value = serde_json::from_reader::<_, serde_json::Value>(stream).map_err(serializer_err)?;
 
         Ok(Self { value })
     }
@@ -264,14 +262,6 @@ impl MiniJsonMap {
     }
 }
 
-impl Default for MiniJsonMap {
-    fn default() -> Self {
-        Self {
-            map: Default::default(),
-        }
-    }
-}
-
 /// 包装一个 TOML 值，提供类型安全的访问接口
 pub struct MiniTomlObj {
     /// 被包装的原始 TOML 值
@@ -390,16 +380,10 @@ impl MiniTomlMap {
     pub fn from_stream<R: Read>(stream: &mut R) -> CoreResult<Self> {
         let mut toml = String::new();
         stream.read_to_string(&mut toml).map_err(|err| {
-            ErrorType::ArchiveReadError(ErrorData {
-                error: err.to_string(),
-            })
+            ErrorType::ArchiveReadError(ErrorData::from_error(err))
         })?;
 
-        let obj = toml::from_str::<toml::Table>(&toml).map_err(|err| {
-            ErrorType::SerializerError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        let obj = toml::from_str::<toml::Table>(&toml).map_err(serializer_err)?;
 
         Ok(Self::from_table(obj))
     }
@@ -479,11 +463,7 @@ impl MiniTomlMap {
 /// 文件无法打开或 JSON 非法时返回相应错误
 pub fn json_from_file<T: de::DeserializeOwned>(file: impl AsRef<Path>) -> CoreResult<T> {
     let temp = path_helper::open_read(&file)?;
-    Ok(serde_json::from_reader::<_, T>(temp).map_err(|err| {
-        ErrorType::SerializerError(ErrorData {
-            error: err.to_string(),
-        })
-    })?)
+    Ok(serde_json::from_reader::<_, T>(temp).map_err(serializer_err)?)
 }
 
 /// 从字节反序列化
@@ -494,11 +474,7 @@ pub fn json_from_file<T: de::DeserializeOwned>(file: impl AsRef<Path>) -> CoreRe
 ///
 /// JSON 非法时返回序列化错误
 pub fn json_from_bytes<T: de::DeserializeOwned>(data: &[u8]) -> CoreResult<T> {
-    Ok(serde_json::from_slice::<T>(&data).map_err(|err| {
-        ErrorType::SerializerError(ErrorData {
-            error: err.to_string(),
-        })
-    })?)
+    Ok(serde_json::from_slice::<T>(&data).map_err(serializer_err)?)
 }
 
 /// 从流中反序列化
@@ -509,11 +485,7 @@ pub fn json_from_bytes<T: de::DeserializeOwned>(data: &[u8]) -> CoreResult<T> {
 ///
 /// JSON 非法时返回序列化错误
 pub fn json_from_stream<T: de::DeserializeOwned>(stream: impl Read) -> CoreResult<T> {
-    Ok(serde_json::from_reader::<_, T>(stream).map_err(|err| {
-        ErrorType::SerializerError(ErrorData {
-            error: err.to_string(),
-        })
-    })?)
+    Ok(serde_json::from_reader::<_, T>(stream).map_err(serializer_err)?)
 }
 
 /// 从字符串反序列化
@@ -524,11 +496,7 @@ pub fn json_from_stream<T: de::DeserializeOwned>(stream: impl Read) -> CoreResul
 ///
 /// JSON 非法时返回序列化错误
 pub fn json_from_str<T: de::DeserializeOwned>(str: &str) -> CoreResult<T> {
-    Ok(serde_json::from_str::<T>(str).map_err(|err| {
-        ErrorType::SerializerError(ErrorData {
-            error: err.to_string(),
-        })
-    })?)
+    Ok(serde_json::from_str::<T>(str).map_err(serializer_err)?)
 }
 
 /// 将对象序列化为 JSON 并写入文件
@@ -541,11 +509,7 @@ pub fn json_from_str<T: de::DeserializeOwned>(str: &str) -> CoreResult<T> {
 /// 文件无法创建或序列化失败时返回相应错误
 pub fn json_to_file<T: Serialize>(obj: &T, file: impl AsRef<Path>) -> CoreResult<()> {
     let stream = path_helper::open_write(file)?;
-    serde_json::to_writer(stream, obj).map_err(|err| {
-        ErrorType::SerializerError(ErrorData {
-            error: err.to_string(),
-        })
-    })?;
+    serde_json::to_writer(stream, obj).map_err(serializer_err)?;
 
     Ok(())
 }
@@ -558,11 +522,7 @@ pub fn json_to_file<T: Serialize>(obj: &T, file: impl AsRef<Path>) -> CoreResult
 ///
 /// 序列化失败时返回相应错误
 pub fn json_to_string<T: Serialize>(obj: &T) -> CoreResult<String> {
-    serde_json::to_string_pretty(obj).map_err(|err| {
-        ErrorType::SerializerError(ErrorData {
-            error: err.to_string(),
-        })
-    })
+    serde_json::to_string_pretty(obj).map_err(serializer_err)
 }
 
 /// 转换为 JSON 字节
@@ -573,11 +533,7 @@ pub fn json_to_string<T: Serialize>(obj: &T) -> CoreResult<String> {
 ///
 /// 序列化失败时返回相应错误
 pub fn json_to_bytes<T: Serialize>(obj: &T) -> CoreResult<Vec<u8>> {
-    serde_json::to_vec(obj).map_err(|err| {
-        ErrorType::SerializerError(ErrorData {
-            error: err.to_string(),
-        })
-    })
+    serde_json::to_vec(obj).map_err(serializer_err)
 }
 
 /// 反序列化一个可以是数字或数字数组的 JSON 值，数组取最小值

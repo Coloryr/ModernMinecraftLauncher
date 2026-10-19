@@ -64,6 +64,10 @@ pub fn init<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
 ///
 /// 返回一个 RAII 守卫，持有期间阻塞写操作。
 /// 使用完毕后应尽快 drop，以免阻塞保存。
+///
+/// # 返回值
+///
+/// 配置的只读守卫；未初始化会 panic
 pub fn read_config() -> RwLockReadGuard<'static, ConfigObj> {
     CONFIG.get().unwrap().read().unwrap()
 }
@@ -72,6 +76,10 @@ pub fn read_config() -> RwLockReadGuard<'static, ConfigObj> {
 ///
 /// 返回一个 RAII 守卫，持有期间阻塞所有读写操作。
 /// 修改配置后，需调用 [`save()`] 将更改持久化。
+///
+/// # 返回值
+///
+/// 配置的读写守卫；未初始化会 panic
 pub fn write_config() -> RwLockWriteGuard<'static, ConfigObj> {
     CONFIG.get().unwrap().write().unwrap()
 }

@@ -3,23 +3,15 @@
 use serde::{Deserialize, Serialize};
 
 /// 项目详情接口 `/mods/{id}` 的响应
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct CurseForgeListObj {
     /// 项目列表
     pub data: CurseForgeListDataObj,
 }
 
-impl Default for CurseForgeListObj {
-    fn default() -> Self {
-        Self {
-            data: Default::default(),
-        }
-    }
-}
-
 /// 项目分页列表，搜索接口 `/mods/search` 与批量查询 `/mods` 共用
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct CurseForgeListPageObj {
     /// 项目列表
@@ -28,17 +20,8 @@ pub struct CurseForgeListPageObj {
     pub pagination: CurseForgeListPaginationObj,
 }
 
-impl Default for CurseForgeListPageObj {
-    fn default() -> Self {
-        Self {
-            data: Default::default(),
-            pagination: Default::default(),
-        }
-    }
-}
-
 /// 单个项目信息
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct CurseForgeListDataObj {
     /// 项目 ID
@@ -68,26 +51,8 @@ pub struct CurseForgeListDataObj {
     pub date_modified: String,
 }
 
-impl Default for CurseForgeListDataObj {
-    fn default() -> Self {
-        Self {
-            id: Default::default(),
-            class_id: Default::default(),
-            name: Default::default(),
-            links: Default::default(),
-            summary: Default::default(),
-            download_count: Default::default(),
-            categories: Default::default(),
-            authors: Default::default(),
-            logo: Default::default(),
-            screenshots: Default::default(),
-            date_modified: Default::default(),
-        }
-    }
-}
-
 /// 项目截图
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct ScreenshotsObj {
     /// 截图标题
@@ -98,34 +63,16 @@ pub struct ScreenshotsObj {
     pub url: String,
 }
 
-impl Default for ScreenshotsObj {
-    fn default() -> Self {
-        Self {
-            title: Default::default(),
-            description: Default::default(),
-            url: Default::default(),
-        }
-    }
-}
-
 /// 项目 Logo
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct LogoObj {
     /// Logo 图片地址，接口未提供时为 `None`
     pub url: Option<String>,
 }
 
-impl Default for LogoObj {
-    fn default() -> Self {
-        Self {
-            url: Default::default(),
-        }
-    }
-}
-
 /// 项目作者
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct AuthorsObj {
     /// 作者名称
@@ -135,17 +82,8 @@ pub struct AuthorsObj {
     pub avatar_url: Option<String>,
 }
 
-impl Default for AuthorsObj {
-    fn default() -> Self {
-        Self {
-            name: Default::default(),
-            avatar_url: Default::default(),
-        }
-    }
-}
-
 /// 项目分类标签
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct CategoriesObj {
     /// 分类名称
@@ -158,18 +96,8 @@ pub struct CategoriesObj {
     pub class_id: u32,
 }
 
-impl Default for CategoriesObj {
-    fn default() -> Self {
-        Self {
-            name: Default::default(),
-            icon_url: Default::default(),
-            class_id: Default::default(),
-        }
-    }
-}
-
 /// 项目相关链接
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct LinksObj {
     /// 官网地址
@@ -177,27 +105,11 @@ pub struct LinksObj {
     pub website_url: String,
 }
 
-impl Default for LinksObj {
-    fn default() -> Self {
-        Self {
-            website_url: Default::default(),
-        }
-    }
-}
-
 /// 分页信息
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct CurseForgeListPaginationObj {
     /// 结果总数，用于翻页
     #[serde(rename = "totalCount")]
     pub total_count: u64,
-}
-
-impl Default for CurseForgeListPaginationObj {
-    fn default() -> Self {
-        Self {
-            total_count: Default::default(),
-        }
-    }
 }

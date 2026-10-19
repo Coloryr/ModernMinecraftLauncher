@@ -54,6 +54,23 @@ impl I18Lang for EnUs {
             InfoType::HttpClientRestartDone { work, login } => {
                 format!("HTTP client restarted: work[{work}] login[{login}]")
             }
+            InfoType::IpcNotifyExisting { port } => {
+                format!("IPC: notified the running instance, port {port}")
+            }
+            InfoType::IpcNotifyExistingFailed { port } => {
+                format!("IPC: notify failed on port {port}, starting a new server")
+            }
+            InfoType::IpcServerStart { port } => {
+                format!("IPC: server started, listening on 127.0.0.1:{port}")
+            }
+            InfoType::IpcClientConnected { addr } => format!("IPC: client connected {addr}"),
+            InfoType::IpcUnknownMessageType { msg_type } => {
+                format!("IPC: unknown message type {msg_type}")
+            }
+            InfoType::IpcLauncherShowWindow => {
+                String::from("IPC: the running instance asked to show the main window")
+            }
+            InfoType::IpcGameChannelBound { guid } => format!("IPC: game channel bound to {guid}"),
         }
     }
 
@@ -87,6 +104,12 @@ impl I18Lang for EnUs {
                 }
             }
 
+            ErrorType::Aborted { url } => {
+                // 与中文表同一口径：拿不到地址时给个明确说法
+                let url = if url.is_empty() { "(no URL)" } else { url.as_str() };
+                format!("HTTP request {url} aborted: proxy or network settings changed")
+            }
+
             ErrorType::SerializerError(data) => format!("JSON parse failed: {}", data.error),
             ErrorType::PathNotExists(data) => {
                 format!("Path not found: {}", data.path.display().to_string())
@@ -112,6 +135,11 @@ impl I18Lang for EnUs {
                     data.error
                 )
             }
+            ErrorType::MoveToTrashError(data) => format!(
+                "Failed to move {} to trash, code 0x{:X}",
+                data.path.display().to_string(),
+                data.code
+            ),
             ErrorType::FileReadError(data) => format!("Failed to read file: {}", data.error),
 
             ErrorType::ArchiveOpenError(data) => {
@@ -195,11 +223,36 @@ impl I18Lang for EnUs {
             ErrorType::InvalidOperation => String::from("Invalid operation"),
 
             ErrorType::SocketError(data) => format!("Socket error: {}", data.error),
+            ErrorType::MulticastAddrMissing => {
+                String::from("The multicast send address is not set")
+            }
+            ErrorType::MulticastSendFailed(data) => {
+                format!("Failed to send {} multicast: {}", data.family, data.error)
+            }
             ErrorType::ThreadError(data) => format!("Failed to start thread: {}", data.error),
             ErrorType::ProcessError(data) => format!("Failed to start process: {}", data.error),
+            ErrorType::ProcessElevationUnsupported => {
+                String::from("Admin elevation is not supported on this platform")
+            }
+            ErrorType::NamedPipeCreateFailed(data) => {
+                format!("Failed to create the named pipe: {}", data.error)
+            }
+            ErrorType::NamedPipeEventCreateFailed(data) => {
+                format!("Failed to create the named pipe event: {}", data.error)
+            }
+            ErrorType::NamedPipeConnectTimeout => {
+                String::from("Named pipe connection timed out; UAC may have been declined")
+            }
+            ErrorType::NamedPipeWaitFailed(data) => {
+                format!("Failed while waiting for the named pipe connection: {}", data.error)
+            }
+            ErrorType::NamedPipeConnectFailed(data) => {
+                format!("Failed to connect the named pipe: {}", data.error)
+            }
             ErrorType::InstanceVersionError => String::from("Invalid version number"),
             ErrorType::Base64Error(data) => format!("Base64 processing failed: {}", data.error),
             ErrorType::StreamError(data) => format!("Stream processing error: {}", data.error),
+            ErrorType::MotdVarintTooBig => String::from("MOTD varint exceeds the length limit"),
 
             ErrorType::KeyIsNull => String::from("Key is not set"),
 
@@ -219,6 +272,48 @@ impl I18Lang for EnUs {
                 SkinBlockErrorData::RenderFail => String::from("Failed to render skin block"),
                 SkinBlockErrorData::NotFound(id) => format!("Skin block not found: {id}"),
             },
+            ErrorType::DownloadThreadPanic(data) => {
+                format!("Download thread panicked: {}", data.error)
+            }
+            ErrorType::PanicPayloadUnknown => String::from("unknown panic"),
+            ErrorType::ModrinthAvatarFailed(data) => {
+                format!("Failed to query Modrinth author avatars: {}", data.error)
+            }
+            ErrorType::McloUploadRejected(reason) => {
+                format!("mclo.gs rejected the upload: {reason}")
+            }
+            ErrorType::MotdConnectTimeout { ip, port } => {
+                format!("Connection timed out: {ip}:{port}")
+            }
+            ErrorType::MotdConnectFailed { ip, port, error } => {
+                format!("Connection failed: {ip}:{port} {error}")
+            }
+            ErrorType::MotdBadResponseLen => String::from("Unexpected response length"),
+            ErrorType::MotdBadPacketId { packet_id } => {
+                format!("Unexpected response packet type: {packet_id}")
+            }
+            ErrorType::MotdResponseIncomplete => String::from("Incomplete response data"),
+            ErrorType::ApngEncodeFail { stage, error } => {
+                format!("Failed to encode the block animation icon as APNG: {stage} {error}")
+            }
+            ErrorType::IpcRuntimeCreateError(data) => {
+                format!("IPC: failed to create the async runtime: {}", data.error)
+            }
+            ErrorType::IpcBindError(data) => {
+                format!("IPC: failed to bind the port: {}", data.error)
+            }
+            ErrorType::IpcAcceptError(data) => {
+                format!("IPC: failed to accept a connection: {}", data.error)
+            }
+            ErrorType::IpcWriteError(data) => {
+                format!("IPC: failed to send data: {}", data.error)
+            }
+            ErrorType::IpcFrameTooLarge { len } => {
+                format!("IPC: frame too large, {len} bytes")
+            }
+            ErrorType::IpcBufferOverrun => {
+                String::from("IPC: receive buffer overrun, dropping the connection")
+            }
         }
     }
 

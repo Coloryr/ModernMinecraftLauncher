@@ -20,7 +20,7 @@ use crate::{
 };
 
 /// BMCLAPI 返回的 OptiFine 版本条目
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct OptifineListObj {
     /// 对应的 Minecraft 版本
@@ -34,18 +34,6 @@ pub struct OptifineListObj {
     pub filename: String,
     /// 兼容的 Forge 版本
     pub forge: String,
-}
-
-impl Default for OptifineListObj {
-    fn default() -> Self {
-        Self {
-            mcversion: Default::default(),
-            patch: Default::default(),
-            rtype: Default::default(),
-            filename: Default::default(),
-            forge: Default::default(),
-        }
-    }
 }
 
 /// 高清修复信息

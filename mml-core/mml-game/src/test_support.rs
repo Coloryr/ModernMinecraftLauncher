@@ -23,6 +23,10 @@ use crate::game_log::GameLog;
 ///
 /// 幂等：重复调用只生效第一次，见 `Once`。**不清理目录** —— 日志流可能已经打开，
 /// 删掉会让后续写入失败；需要干净目录的用例请自己用独立子目录。
+///
+/// # 返回值
+///
+/// 本次测试运行使用的目录
 pub fn boot() -> PathBuf {
     static INIT: Once = Once::new();
     let run = mml_testutil::temp_dir().join(format!("mml-group-test-{}", std::process::id()));
@@ -77,6 +81,13 @@ pub struct TextEntry<'a> {
 }
 
 /// 造 [`TextEntry`]
+///
+/// - `name`: 条目名
+/// - `text`: 条目文本
+///
+/// # 返回值
+///
+/// 见 [`TextEntry`]
 pub fn text_entry<'a>(name: &'a str, text: &'a str) -> TextEntry<'a> {
     TextEntry { name, text }
 }

@@ -140,7 +140,7 @@ fn find_java_from_path_finds_executable() {
 /// add_item / remove：添加有效 Java、持久化到配置、再移除
 #[test]
 fn add_and_remove_item_roundtrip() {
-    let dir = setup();
+    let _dir = setup();
 
     let fake_dir = make_temp_dir("fake-java");
     let fake = create_fake_java(&fake_dir);
@@ -201,7 +201,7 @@ fn add_and_remove_item_roundtrip() {
 /// 检测完成后会触发变更事件
 #[tokio::test]
 async fn load_config_with_invalid_java_creates_placeholder() {
-    let dir = setup();
+    let _dir = setup();
 
     let fake_dir = make_temp_dir("invalid");
     let bad_file = fake_dir.join("broken-java.txt");

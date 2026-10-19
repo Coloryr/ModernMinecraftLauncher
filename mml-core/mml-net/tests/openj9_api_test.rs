@@ -19,5 +19,5 @@ fn init() {
 async fn test() {
     init();
 
-    let data = openj9_api::get_java_list().await.unwrap();
+    let _data = openj9_api::get_java_list().await.unwrap();
 }

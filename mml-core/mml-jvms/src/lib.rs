@@ -360,6 +360,10 @@ pub fn get_java(version: i32, over: bool) -> Option<Arc<JavaInfoObj>> {
 }
 
 /// 获取所有已配置的 Java 运行时列表
+///
+/// # 返回值
+///
+/// 所有已配置的 Java 运行时；一个都没有时为空列表
 pub fn get_all_java() -> Vec<Arc<JavaInfoObj>> {
     let read = JVMS.read().unwrap();
     let mut vec = Vec::new();

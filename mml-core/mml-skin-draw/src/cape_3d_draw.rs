@@ -44,8 +44,8 @@ const WING_SEPARATE: f32 = 0.01;
 ///
 /// 返回 `SIZE` 见方的透明底位图，无可用 GPU 时返回 `None`
 pub fn cape(image: &Pixmap, pitch: f32, yaw: f32) -> Option<Pixmap> {
-    let (tex_w, tex_h) = tex_size(image);
-    let base = box_faces(10, 16, 1, 0, 0, Mat4::IDENTITY, false, tex_w, tex_h);
+    let size = tex_size(image);
+    let base = box_faces(10, 16, 1, 0, 0, Mat4::IDENTITY, false, size.width, size.height);
 
     render_fitted(image, base, pitch, yaw)
 }
@@ -64,7 +64,7 @@ pub fn cape(image: &Pixmap, pitch: f32, yaw: f32) -> Option<Pixmap> {
 ///
 /// 返回 `SIZE` 见方的透明底位图，无可用 GPU 时返回 `None`
 pub fn elytra(image: &Pixmap, pitch: f32, yaw: f32) -> Option<Pixmap> {
-    let (tex_w, tex_h) = tex_size(image);
+    let size = tex_size(image);
 
     // 收拢姿态：翼盒绕自身 x / z 各转一点、挂在肩点下方，两片几乎叠成一片壳；
     // 先绕 y 翻 180 度让有图案的外侧朝向观察者，flip_u 再抵消盒展开对 -z 面的镜像
@@ -74,7 +74,7 @@ pub fn elytra(image: &Pixmap, pitch: f32, yaw: f32) -> Option<Pixmap> {
         * Mat4::from_rotation_y(WING_SEPARATE)
         * Mat4::from_rotation_z(WING_ROLL.to_radians())
         * Mat4::from_translation(Vec3::from(WING_OFFSET));
-    let wing = box_faces(10, 20, 2, 22, 0, place, true, tex_w, tex_h);
+    let wing = box_faces(10, 20, 2, 22, 0, place, true, size.width, size.height);
 
     let mut base = mirror_x(&wing);
     base.extend(wing);
@@ -82,9 +82,20 @@ pub fn elytra(image: &Pixmap, pitch: f32, yaw: f32) -> Option<Pixmap> {
     render_fitted(image, base, pitch, yaw)
 }
 
+/// 贴图宽高，单位像素
+struct TexSize {
+    /// 贴图宽度，单位像素
+    width: f32,
+    /// 贴图高度，单位像素
+    height: f32,
+}
+
 /// 贴图宽高，单位像素，按实际尺寸归一化 uv
-fn tex_size(image: &Pixmap) -> (f32, f32) {
-    (image.width() as f32, image.height() as f32)
+fn tex_size(image: &Pixmap) -> TexSize {
+    TexSize {
+        width: image.width() as f32,
+        height: image.height() as f32,
+    }
 }
 
 /// 把顶点集居中、按包围盒定好缩放再渲染
@@ -178,8 +189,8 @@ fn box_faces(
         let mut corners = face_corners(half, dir);
         if flip_u {
             // 块内比例取反即块内水平镜像，贴图跟着翻，几何不动
-            for (_, uv) in corners.iter_mut() {
-                uv[0] = 1.0 - uv[0];
+            for c in corners.iter_mut() {
+                c.uv[0] = 1.0 - c.uv[0];
             }
         }
 

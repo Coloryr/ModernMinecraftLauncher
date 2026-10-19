@@ -32,6 +32,10 @@ fn repo_root() -> PathBuf {
 ///
 /// 只返回路径，**不创建目录** —— 各用例本来就会 `create_dir_all`，
 /// 有些还要先 `remove_dir_all` 清掉上一次的残留，这里替它们建反而碍事。
+///
+/// # 返回值
+///
+/// `<仓库根>/target/temp`
 pub fn temp_dir() -> PathBuf {
     repo_root().join("target").join("temp")
 }
@@ -39,6 +43,12 @@ pub fn temp_dir() -> PathBuf {
 /// 测试临时目录下的一个路径，目录名 / 文件名由调用方给
 ///
 /// 一般用法：`mml_testutil::temp_path(format!("mml-xxx-{}", Uuid::new_v4()))`
+///
+/// - `name`: 目录名或文件名，相对临时目录
+///
+/// # 返回值
+///
+/// 临时目录下拼出来的路径，不创建目录
 pub fn temp_path(name: impl AsRef<Path>) -> PathBuf {
     temp_dir().join(name)
 }

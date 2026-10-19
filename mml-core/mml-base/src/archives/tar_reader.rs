@@ -9,7 +9,7 @@ use std::{
 use flate2::read::GzDecoder;
 use flate2::{Compression, write::GzEncoder};
 use mml_names::i18_items::error_type::{
-    ArchiveErrorData, CoreResult, ErrorData, ErrorType, FileSystemErrorData,
+    CoreResult, 
 };
 use mml_sys::path_helper;
 use tar::{Archive, Builder};
@@ -18,6 +18,9 @@ use xz2::{read::XzDecoder, write::XzEncoder};
 use crate::archives::{
     self, ArchiveAddFile, ArchiveEntryInfo, ArchiveHandle, ArchiveProcess, ArchiveType,
     BaseArchiveGui, IBaseArchiveGui, TarMode,
+    read_error, write_error,
+    root_path_or_pack,
+    fs_err, archive_err,
 };
 
 /// 保持打开文件句柄的 Tar/TarGz/TarXz 读取句柄
@@ -64,16 +67,10 @@ impl TarReader {
     /// 返回已定位到文件开头的读取器；克隆或定位失败时返回相应错误
     fn reader(&self) -> CoreResult<Archive<Box<dyn Read>>> {
         let mut file = self.file.try_clone().map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: self.path.clone(),
-                error: err.to_string(),
-            })
+            fs_err(self.path.clone(), err)
         })?;
         file.seek(SeekFrom::Start(0)).map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: self.path.clone(),
-                error: err.to_string(),
-            })
+            fs_err(self.path.clone(), err)
         })?;
         match self.archive_type {
             ArchiveType::Tar => Ok(Archive::new(Box::new(file))),
@@ -110,11 +107,7 @@ impl TarReader {
         gui: BaseArchiveGui,
     ) -> CoreResult<()> {
         let process = ArchiveProcess::new(gui);
-        let root_path = match root_path {
-            Some(path) => path,
-            None => pack_dir,
-        };
-        Self::tar(&process, archive_file, pack_dir, root_path, filter, mode)
+        Self::tar(&process, archive_file, pack_dir, root_path_or_pack(root_path, pack_dir), filter, mode)
     }
 
     /// 解压 tar/tar.gz/tar.xz 文件到指定目录
@@ -191,30 +184,18 @@ impl TarReader {
                 tar_builder
                     .append_file(&archive_path, &mut file_reader)
                     .map_err(|err| {
-                        ErrorType::ArchiveError(ArchiveErrorData {
-                            source: path.to_string_lossy().to_string(),
-                            target: archive_path.clone(),
-                            error: err.to_string(),
-                        })
+                        archive_err(path.to_string_lossy().to_string(), archive_path.clone(), err)
                     })?;
             } else if path.is_dir() {
                 tar_builder
                     .append_dir(&archive_path, &path)
                     .map_err(|err| {
-                        ErrorType::ArchiveError(ArchiveErrorData {
-                            source: path.to_string_lossy().to_string(),
-                            target: archive_path.clone(),
-                            error: err.to_string(),
-                        })
+                        archive_err(path.to_string_lossy().to_string(), archive_path.clone(), err)
                     })?;
             }
         }
 
-        tar_builder.finish().map_err(|err| {
-            ErrorType::ArchiveWriteError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        tar_builder.finish().map_err(write_error)?;
 
         Ok(())
     }
@@ -252,11 +233,7 @@ impl TarReader {
             };
             let count = archive
                 .entries()
-                .map_err(|err| {
-                    ErrorType::ArchiveReadError(ErrorData {
-                        error: err.to_string(),
-                    })
-                })?
+                .map_err(read_error)?
                 .count();
             process.set_count(count);
         }
@@ -274,25 +251,13 @@ impl TarReader {
             None => Archive::new(Box::new(file) as Box<dyn Read>),
         };
 
-        let items = archive.entries().map_err(|err| {
-            ErrorType::ArchiveReadError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        let items = archive.entries().map_err(read_error)?;
 
         for entry in items {
-            let mut entry = entry.map_err(|err| {
-                ErrorType::ArchiveReadError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            let mut entry = entry.map_err(read_error)?;
             let path = entry
                 .path()
-                .map_err(|err| {
-                    ErrorType::ArchiveReadError(ErrorData {
-                        error: err.to_string(),
-                    })
-                })?
+                .map_err(read_error)?
                 .to_path_buf();
             // 文件名非法时询问 GUI 是否替换
             let name = process.check_name(&path.to_string_lossy())?;
@@ -302,26 +267,15 @@ impl TarReader {
                 let dest = output_dir.join(name_path);
                 if let Some(parent) = dest.parent() {
                     std::fs::create_dir_all(parent).map_err(|err| {
-                        ErrorType::FileSystemError(FileSystemErrorData {
-                            path: parent.to_path_buf(),
-                            error: err.to_string(),
-                        })
+                        fs_err(parent.to_path_buf(), err)
                     })?;
                 }
                 entry.unpack(dest).map_err(|err| {
-                    ErrorType::ArchiveError(ArchiveErrorData {
-                        source: path.display().to_string(),
-                        target: output_dir.display().to_string(),
-                        error: err.to_string(),
-                    })
+                    archive_err(path.display().to_string(), output_dir.display().to_string(), err)
                 })?;
             } else {
                 entry.unpack_in(output_dir).map_err(|err| {
-                    ErrorType::ArchiveError(ArchiveErrorData {
-                        source: path.display().to_string(),
-                        target: output_dir.display().to_string(),
-                        error: err.to_string(),
-                    })
+                    archive_err(path.display().to_string(), output_dir.display().to_string(), err)
                 })?;
             }
         }
@@ -338,33 +292,17 @@ impl ArchiveHandle for TarReader {
         let mut archive = self.reader()?;
 
         let mut entries = Vec::new();
-        for entry in archive.entries().map_err(|err| {
-            ErrorType::ArchiveReadError(ErrorData {
-                error: err.to_string(),
-            })
-        })? {
-            let entry = entry.map_err(|err| {
-                ErrorType::ArchiveReadError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+        for entry in archive.entries().map_err(read_error)? {
+            let entry = entry.map_err(read_error)?;
             let header = entry.header();
             entries.push(ArchiveEntryInfo {
                 name: entry
                     .path()
-                    .map_err(|err| {
-                        ErrorType::ArchiveReadError(ErrorData {
-                            error: err.to_string(),
-                        })
-                    })?
+                    .map_err(read_error)?
                     .to_string_lossy()
                     .to_string(),
                 is_dir: header.entry_type() == tar::EntryType::Directory,
-                size: header.size().map_err(|err| {
-                    ErrorType::ArchiveReadError(ErrorData {
-                        error: err.to_string(),
-                    })
-                })?,
+                size: header.size().map_err(read_error)?,
             });
         }
         Ok(entries)
@@ -374,41 +312,21 @@ impl ArchiveHandle for TarReader {
     fn read(&mut self, name: &str) -> CoreResult<Vec<u8>> {
         let mut archive = self.reader()?;
 
-        for entry in archive.entries().map_err(|err| {
-            ErrorType::ArchiveReadError(ErrorData {
-                error: err.to_string(),
-            })
-        })? {
-            let mut entry = entry.map_err(|err| {
-                ErrorType::ArchiveReadError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
-            let entry_path = entry.path().map_err(|err| {
-                ErrorType::ArchiveReadError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+        for entry in archive.entries().map_err(read_error)? {
+            let mut entry = entry.map_err(read_error)?;
+            let entry_path = entry.path().map_err(read_error)?;
             if entry_path.to_string_lossy() == name {
                 let header = entry.header();
                 if header.entry_type() == tar::EntryType::Directory {
-                    return Err(ErrorType::ArchiveReadError(ErrorData {
-                        error: name.to_string(),
-                    }));
+                    return Err(read_error(name));
                 }
                 let mut buf = Vec::with_capacity(header.size().unwrap_or(0) as usize);
-                entry.read_to_end(&mut buf).map_err(|err| {
-                    ErrorType::ArchiveReadError(ErrorData {
-                        error: err.to_string(),
-                    })
-                })?;
+                entry.read_to_end(&mut buf).map_err(read_error)?;
                 return Ok(buf);
             }
         }
 
-        Err(ErrorType::ArchiveReadError(ErrorData {
-            error: name.to_string(),
-        }))
+        Err(read_error(name))
     }
 
     /// tar 无法真正流式读取，先整条读进内存再包成游标
@@ -431,39 +349,21 @@ impl ArchiveHandle for TarReader {
         let mut archive = self.reader()?;
 
         let mut found = false;
-        for entry in archive.entries().map_err(|err| {
-            ErrorType::ArchiveReadError(ErrorData {
-                error: err.to_string(),
-            })
-        })? {
-            let mut entry = entry.map_err(|err| {
-                ErrorType::ArchiveReadError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
-            let entry_path = entry.path().map_err(|err| {
-                ErrorType::ArchiveReadError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+        for entry in archive.entries().map_err(read_error)? {
+            let mut entry = entry.map_err(read_error)?;
+            let entry_path = entry.path().map_err(read_error)?;
             if entry_path.to_string_lossy() == name {
                 found = true;
                 let mut outfile = path_helper::open_write(output_path)?;
                 std::io::copy(&mut entry, &mut outfile).map_err(|err| {
-                    ErrorType::ArchiveError(ArchiveErrorData {
-                        source: name.to_string(),
-                        target: output_path.display().to_string(),
-                        error: err.to_string(),
-                    })
+                    archive_err(name.to_string(), output_path.display().to_string(), err)
                 })?;
                 break;
             }
         }
 
         if !found {
-            return Err(ErrorType::ArchiveReadError(ErrorData {
-                error: name.to_string(),
-            }));
+            return Err(read_error(name));
         }
 
         if let Some(gui) = gui {
@@ -478,28 +378,19 @@ impl ArchiveHandle for TarReader {
         use tar::Builder;
 
         let mut file = self.file.try_clone().map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: self.path.clone(),
-                error: err.to_string(),
-            })
+            fs_err(self.path.clone(), err)
         })?;
 
         // 跳过 tar 的 EOF 标记，两个 512 字节零块由 Builder 用新条目与新 EOF 覆盖
         let len = file
             .metadata()
             .map_err(|err| {
-                ErrorType::FileSystemError(FileSystemErrorData {
-                    path: self.path.clone(),
-                    error: err.to_string(),
-                })
+                fs_err(self.path.clone(), err)
             })?
             .len();
         if len >= 1024 {
             file.seek(SeekFrom::Start(len - 1024)).map_err(|err| {
-                ErrorType::FileSystemError(FileSystemErrorData {
-                    path: self.path.clone(),
-                    error: err.to_string(),
-                })
+                fs_err(self.path.clone(), err)
             })?;
         }
 
@@ -510,18 +401,10 @@ impl ArchiveHandle for TarReader {
 
             builder
                 .append_file(internal_path.as_ref(), &mut reader)
-                .map_err(|err| {
-                    ErrorType::ArchiveWriteError(ErrorData {
-                        error: err.to_string(),
-                    })
-                })?;
+                .map_err(write_error)?;
         }
 
-        builder.finish().map_err(|err| {
-            ErrorType::ArchiveWriteError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        builder.finish().map_err(write_error)?;
         Ok(())
     }
 
@@ -530,28 +413,19 @@ impl ArchiveHandle for TarReader {
         use tar::{Builder, Header};
 
         let mut file = self.file.try_clone().map_err(|err| {
-            ErrorType::FileSystemError(FileSystemErrorData {
-                path: self.path.clone(),
-                error: err.to_string(),
-            })
+            fs_err(self.path.clone(), err)
         })?;
 
         // 跳过 tar 的 EOF 标记，两个 512 字节零块由 Builder 用新条目与新 EOF 覆盖
         let len = file
             .metadata()
             .map_err(|err| {
-                ErrorType::FileSystemError(FileSystemErrorData {
-                    path: self.path.clone(),
-                    error: err.to_string(),
-                })
+                fs_err(self.path.clone(), err)
             })?
             .len();
         if len >= 1024 {
             file.seek(SeekFrom::Start(len - 1024)).map_err(|err| {
-                ErrorType::FileSystemError(FileSystemErrorData {
-                    path: self.path.clone(),
-                    error: err.to_string(),
-                })
+                fs_err(self.path.clone(), err)
             })?;
         }
 
@@ -563,17 +437,9 @@ impl ArchiveHandle for TarReader {
 
         builder
             .append_data(&mut header, name, data)
-            .map_err(|err| {
-                ErrorType::ArchiveWriteError(ErrorData {
-                    error: err.to_string(),
-                })
-            })?;
+            .map_err(write_error)?;
 
-        builder.finish().map_err(|err| {
-            ErrorType::ArchiveWriteError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        builder.finish().map_err(write_error)?;
         Ok(())
     }
 }

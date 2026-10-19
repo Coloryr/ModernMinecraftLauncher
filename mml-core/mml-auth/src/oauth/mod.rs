@@ -192,9 +192,7 @@ pub async fn run_get_code(
             })
         })?;
         let data: OAuthGetCodeObj = serde_json::from_str(&text).map_err(|err| {
-            ErrorType::OAuthGetTokenError(ErrorData {
-                error: format!("invalid response: {err}"),
-            })
+            ErrorType::OAuthGetTokenError(ErrorData::from_error(err))
         })?;
 
         if let Some(error) = data.error {

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 方块渲染结果数据
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct BlocksObj {
     /// 已经渲染好的游戏版本
@@ -20,19 +20,8 @@ pub struct BlocksObj {
     pub cat: HashMap<String, String>,
 }
 
-impl Default for BlocksObj {
-    fn default() -> Self {
-        Self {
-            id: Default::default(),
-            tex: Default::default(),
-            name: Default::default(),
-            cat: Default::default(),
-        }
-    }
-}
-
 /// 物品渲染结果数据
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct ItemsObj {
     /// 已经渲染好的游戏版本
@@ -47,15 +36,4 @@ pub struct ItemsObj {
     /// 创造模式分类，取 itemGroup lang键尾段，与BlocksObj.cat同一套
     #[serde(rename = "Cat")]
     pub cat: HashMap<String, String>,
-}
-
-impl Default for ItemsObj {
-    fn default() -> Self {
-        Self {
-            id: Default::default(),
-            tex: Default::default(),
-            name: Default::default(),
-            cat: Default::default(),
-        }
-    }
 }

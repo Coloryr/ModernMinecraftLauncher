@@ -84,7 +84,7 @@ pub async fn add_resource_download(
     }
     // 存档只有 CurseForge 有，Modrinth 没有 world 类型
     if file_type == FileType::Save && !matches!(source, ModPackType::CurseForge) {
-        return Err(String::from("addResource.saveSourceLimit"));
+        return Err(String::from(err_keys::SAVE_SOURCE_LIMIT));
     }
     let world = world
         .map(|item| item.trim().to_string())

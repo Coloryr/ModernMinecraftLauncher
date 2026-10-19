@@ -38,6 +38,10 @@ pub enum DownloadItemState {
 
 impl DownloadItemState {
     /// 将状态转换为整数，用于原子存储
+    ///
+    /// # 返回值
+    ///
+    /// 状态对应的整数编码，`Wait` 为 0，其余依次递增
     pub fn state_to_int(&self) -> u32 {
         match self {
             DownloadItemState::Wait => 0,
@@ -53,6 +57,8 @@ impl DownloadItemState {
     }
 
     /// 从整数恢复状态
+    ///
+    /// - `value`: 状态整数编码
     ///
     /// # 返回值
     ///
@@ -95,6 +101,10 @@ impl DownloadItem {
     /// 创建下载项目
     ///
     /// - `file`: 文件基本信息
+    ///
+    /// # 返回值
+    ///
+    /// 新建的下载项，大小为 0、状态为 `Wait`
     pub fn new(file: FileItemObj) -> Self {
         DownloadItem {
             base: file,

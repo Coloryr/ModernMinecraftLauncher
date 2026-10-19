@@ -27,9 +27,10 @@ members = [
     "mml-core/mml-skin-draw",
     "mml-core/mml-sys",
     "mml-core/mml-testutil",
+    "mml-core/mml-analysis",
     "mml-gui/src-tauri",
     "mml-gui/ipc-gen",
-    "mml-gui/macros",
+    "mml-gui/macros", 
 ]
 
 [workspace.dependencies]

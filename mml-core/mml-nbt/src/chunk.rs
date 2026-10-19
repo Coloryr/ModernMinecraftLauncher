@@ -36,7 +36,7 @@ pub struct ChunkNbt {
 }
 
 /// 文件头中的一项：该表项对应区块的位置、扇区数与写入时间
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Default)]
 pub struct ChunkInfo {
     /// 表项序号，取值 0–1023，与文件头位置表一一对应
     pub index: u32,
@@ -48,18 +48,6 @@ pub struct ChunkInfo {
     pub time: u32,
     /// 数据实际字节数；当前读写流程未回填，恒为 0
     pub size: u32,
-}
-
-impl Default for ChunkInfo {
-    fn default() -> Self {
-        Self {
-            index: Default::default(),
-            pos: Default::default(),
-            count: Default::default(),
-            time: Default::default(),
-            size: Default::default(),
-        }
-    }
 }
 
 /// 一个区域文件的全部区块
@@ -285,6 +273,10 @@ impl ChunkData {
     /// 先写数据区再回填文件头，写出的区域文件可被 `read_chunk` 读回
     ///
     /// - `stream`: 目标区域文件流，起始位置必须是文件开头
+    ///
+    /// # 返回值
+    ///
+    /// 写成功返回 `Ok(())`，否则返回相应错误
     pub fn write_chunk<W: Write + Seek>(&mut self, stream: &mut W) -> CoreResult<()> {
         self.write_chunk_data(stream)?;
         self.write_head(stream)?;

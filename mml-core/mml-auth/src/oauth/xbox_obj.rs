@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 /// Xbox Live 认证请求的属性部分
 ///
 /// 包含认证方法、站点名称和从 Microsoft Token 生成的 RPS 票据。
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct XBoxLoginPropertiesObj {
     /// 认证方法，固定为 "RPS"
@@ -33,20 +33,10 @@ pub struct XBoxLoginPropertiesObj {
     pub rps_ticket: String,
 }
 
-impl Default for XBoxLoginPropertiesObj {
-    fn default() -> Self {
-        Self {
-            auth_method: Default::default(),
-            site_name: Default::default(),
-            rps_ticket: Default::default(),
-        }
-    }
-}
-
 /// Xbox Live 认证请求
 ///
 /// 发送至 `https://user.auth.xboxlive.com/user/authenticate`。
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct XBoxLoginObj {
     /// 认证属性
@@ -60,20 +50,10 @@ pub struct XBoxLoginObj {
     pub token_type: String,
 }
 
-impl Default for XBoxLoginObj {
-    fn default() -> Self {
-        Self {
-            properties: Default::default(),
-            relying_party: Default::default(),
-            token_type: Default::default(),
-        }
-    }
-}
-
 /// XSTS 认证请求的属性部分
 ///
 /// 包含沙盒标识和从 XBL 获取的令牌。
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct XSTSLoginPropertiesObj {
     /// 沙盒标识，固定为 "RETAIL"，即零售版 Minecraft
@@ -84,19 +64,10 @@ pub struct XSTSLoginPropertiesObj {
     pub user_tokens: Vec<String>,
 }
 
-impl Default for XSTSLoginPropertiesObj {
-    fn default() -> Self {
-        Self {
-            sandbox_id: Default::default(),
-            user_tokens: Default::default(),
-        }
-    }
-}
-
 /// XSTS 认证请求
 ///
 /// 发送至 `https://xsts.auth.xboxlive.com/xsts/authorize`。
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct XSTSLoginObj {
     /// 认证属性
@@ -110,57 +81,31 @@ pub struct XSTSLoginObj {
     pub token_type: String,
 }
 
-impl Default for XSTSLoginObj {
-    fn default() -> Self {
-        Self {
-            properties: Default::default(),
-            relying_party: Default::default(),
-            token_type: Default::default(),
-        }
-    }
-}
-
 /// Xbox Live 显示声明中的 XUI 条目
 ///
 /// 包含认证返回的用户哈希，即 User Hash，在后续获取
 /// Minecraft Token 时需要用到。
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct XBoxLoginDisplayClaimsXuiObj {
     /// 用户哈希，即 User Hash，用于 Minecraft 认证
     pub uhs: String,
 }
 
-impl Default for XBoxLoginDisplayClaimsXuiObj {
-    fn default() -> Self {
-        Self {
-            uhs: Default::default(),
-        }
-    }
-}
-
 /// Xbox Live 认证响应中的显示声明部分
 ///
 /// 包含 XUI 条目列表，其中第一个条目包含用户哈希。
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct XBoxLoginDisplayClaimsObj {
     /// XUI 声明列表
     pub xui: Vec<XBoxLoginDisplayClaimsXuiObj>,
 }
 
-impl Default for XBoxLoginDisplayClaimsObj {
-    fn default() -> Self {
-        Self {
-            xui: Default::default(),
-        }
-    }
-}
-
 /// Xbox Live 和 XSTS 认证的统一响应结构
 ///
 /// 两个端点返回格式相同，因此共用此结构体。
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct XBoxLoginResObj {
     /// 认证令牌，JWT 格式
@@ -169,15 +114,6 @@ pub struct XBoxLoginResObj {
     /// 显示声明，包含用户哈希信息
     #[serde(rename = "DisplayClaims")]
     pub display_claims: XBoxLoginDisplayClaimsObj,
-}
-
-impl Default for XBoxLoginResObj {
-    fn default() -> Self {
-        Self {
-            token: Default::default(),
-            display_claims: Default::default(),
-        }
-    }
 }
 
 /// Xbox Live 认证成功后提取的结果

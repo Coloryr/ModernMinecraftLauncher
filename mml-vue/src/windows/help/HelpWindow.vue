@@ -17,6 +17,7 @@ import {
   SPDX_LICENSE_LIST,
   THIRD_PARTY_GROUPS,
   THIRD_PARTY_SERVICES,
+  type LicenseCount,
   type ThirdPartyGroup,
   type ThirdPartyItem,
 } from "./thirdParty";
@@ -57,7 +58,7 @@ interface LicenseSection {
   /** 标题下的说明行；没有时为空串 */
   lead: string;
   /** 许可分布，只有 Rust 那一节有；其余为空数组 */
-  counts: Array<{ license: string; count: number }>;
+  counts: LicenseCount[];
   /** 该节的组件 */
   items: ThirdPartyItem[];
 }
@@ -128,7 +129,9 @@ function openUrl(url: string) {
           <p class="lic-sub">{{ sec.title }}</p>
           <p v-if="sec.lead" class="lic-text">{{ sec.lead }}</p>
           <div v-if="sec.counts.length" class="lic-counts">
-            <span v-for="row in sec.counts" :key="row.license">{{ row.license }} · {{ row.count }}</span>
+            <span v-for="row in sec.counts" :key="row.license || row.key">
+              {{ row.key ? t(row.key) : row.license }} · {{ row.count }}
+            </span>
           </div>
           <div v-for="item in sec.items" :key="item.name" class="lic-row">
             <div class="lic-info">

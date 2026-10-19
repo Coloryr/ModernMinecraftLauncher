@@ -116,7 +116,13 @@ pub(crate) fn url_music(_request: Request<Vec<u8>>, responder: UriSchemeResponde
         Ok(data) => send_ok(responder, data, mime_of(Path::new(&source))),
         Err(err) => {
             // 文件被挪走 / 删掉是常事：记一条日志，前端那边表现为放不出来
-            mml_log::warn(format!("读取自定义音乐失败 {source}：{err}"));
+            mml_log::warn(
+                crate::log_text::LogText::MusicReadFailed {
+                    source,
+                    error: err.to_string(),
+                }
+                .text(),
+            );
             send_not_found(responder);
         }
     }

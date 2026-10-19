@@ -9,6 +9,7 @@ import { t, tErr } from "../lib/i18n";
 import { showToast } from "../lib/toast";
 import type { ModPackStatusDto, ModPackTaskDto } from "../lib/bindings";
 import AsyncImage from "./ui/AsyncImage.vue";
+import { isRunning } from "../lib/modpackTasks";
 
 const props = withDefaults(
   defineProps<{
@@ -48,11 +49,6 @@ const percent = computed(() => {
   );
   return sum / running.value.length;
 });
-
-/** 任务是否还在跑 */
-function isRunning(task: ModPackTaskDto): boolean {
-  return !task.done && !task.failed && !task.cancelled;
-}
 
 /** 单任务主进度，单位 %；总数未知时按 0 算，别凭"不是进行中"就当成完成 */
 function taskProgress(task: ModPackTaskDto): number {

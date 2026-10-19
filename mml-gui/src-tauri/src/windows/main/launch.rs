@@ -26,6 +26,7 @@ use crate::dtos::{ErrorEvent, ExitEvent, StateEvent};
 use crate::err_keys;
 use crate::i18;
 use crate::listens;
+use crate::log_text::LogText;
 use crate::windows::account::find_by_uuid;
 use crate::windows::log::emit_log_line;
 
@@ -68,6 +69,7 @@ fn global_auto_join() -> Option<ServerObj> {
 ///
 /// - `app`: 应用句柄，用于发启动状态 / 日志 / 退出事件
 /// - `uuid`: 实例 uuid
+/// - `world`: 启动后直接进入的存档目录名，空串或 `None` 为不自动进入
 ///
 /// # 返回值
 ///
@@ -150,7 +152,7 @@ pub async fn main_launch_game(
             progress: None,
         },
     );
-    emit_log_line(&app, &uuid, "游戏启动中…", true);
+    emit_log_line(&app, &uuid, &LogText::LaunchStarting.text(), true);
 
     let gui = Arc::new(LaunchGuiHook {
         app: app.clone(),
@@ -177,7 +179,12 @@ pub async fn main_launch_game(
             let runtime = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
                 Ok(runtime) => runtime,
                 Err(err) => {
-                    mml_log::error(format!("游戏启动运行时创建失败: {err}"));
+                    mml_log::error(
+                        LogText::LaunchRuntimeFailed {
+                            error: err.to_string(),
+                        }
+                        .text(),
+                    );
                     return;
                 }
             };
@@ -188,7 +195,9 @@ pub async fn main_launch_game(
                     .start_game(&mut arg, Some(gui), CancellationToken::new())
                     .await
                 {
-                    Ok(()) => emit_log_line(&app, &uuid, "游戏进程已启动", false),
+                    Ok(()) => {
+                        emit_log_line(&app, &uuid, &LogText::LaunchProcessStarted.text(), false)
+                    }
                     Err(err) => {
                         mml_log::error_type(err.clone());
                         let text = i18::get_error(err.clone());
@@ -300,7 +309,7 @@ impl ILaunchGui for LaunchGuiHook {
         emit_log_line(
             &self.app,
             &self.uuid.to_string(),
-            &format!("没有找到 Java {java}，请在实例设置里指定 Java 路径"),
+            &LogText::LaunchNoJava { java }.text(),
             false,
         );
     }

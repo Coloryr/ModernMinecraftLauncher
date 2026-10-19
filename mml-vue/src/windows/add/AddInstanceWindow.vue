@@ -498,6 +498,7 @@ const MOCK_ARCHIVE_FILES = [
   "minecraft/config/jei.toml",
   "overrides/",
 ];
+// 预览用的示例路径：让人看出"结构长什么样"即可，是数据不是界面文案
 const MOCK_FOLDER_FILES = [
   "options.txt",
   "servers.dat",

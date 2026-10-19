@@ -18,7 +18,7 @@
 
 use std::sync::OnceLock;
 
-use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType};
+use mml_names::i18_items::error_type::{CoreResult, ErrorType};
 use reqwest::{
     Method, Url,
     header::{CONTENT_TYPE, HeaderValue},
@@ -34,6 +34,7 @@ use crate::{
     },
     urls,
 };
+use crate::serializer_err;
 
 pub mod categories_obj;
 pub mod file_obj;
@@ -152,6 +153,7 @@ impl Default for CurseForgeSortType {
 }
 
 /// CurseForge 搜索/列表请求参数
+#[derive(Default)]
 pub struct CurseFogreArg {
     /// 项目编号；`None` 或空串表示不带
     pub id: Option<String>,
@@ -169,22 +171,6 @@ pub struct CurseFogreArg {
     pub category: Option<String>,
     /// 模组加载器类型，取值见 `MODLOADER_*` 常量；`None` 或 0 表示不限
     pub loader: Option<u32>,
-}
-
-impl Default for CurseFogreArg {
-    /// 所有筛选条件留空，`sort` 取流行度
-    fn default() -> Self {
-        Self {
-            id: Default::default(),
-            version: Default::default(),
-            page: Default::default(),
-            sort: Default::default(),
-            filter: Default::default(),
-            page_size: Default::default(),
-            category: Default::default(),
-            loader: Default::default(),
-        }
-    }
 }
 
 /// 设置 API Key，只在首次调用时生效
@@ -440,9 +426,7 @@ pub fn json<T: Serialize>(req: &mut reqwest::Request, json: &T) -> CoreResult<()
 
             Ok(())
         }
-        Err(err) => Err(ErrorType::SerializerError(ErrorData {
-            error: err.to_string(),
-        })),
+        Err(err) => Err(serializer_err(err)),
     }
 }
 

@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 pub type ModUpdateList = HashMap<String, ModUpdateProjectObj>;
 
 /// 一个项目的全部更新记录
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct ModUpdateProjectObj {
     /// 模组名字，取界面上显示的那个；取不到时为空串，界面回退项目编号
@@ -20,21 +20,11 @@ pub struct ModUpdateProjectObj {
     pub update: Vec<ModUpdateRecordObj>,
 }
 
-impl Default for ModUpdateProjectObj {
-    /// 名字为空串、历史为空表
-    fn default() -> Self {
-        Self {
-            name: Default::default(),
-            update: Default::default(),
-        }
-    }
-}
-
 /// 一条模组更新记录
 ///
 /// 「下载更新」与「替换版本」每换成功一个模组就追加一条；项目编号不在这里，
 /// 它是外层表的键
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct ModUpdateRecordObj {
     /// 换上去的文件名，即平台上的文件名；禁用状态下不带 `.disabled` 后缀
@@ -51,19 +41,4 @@ pub struct ModUpdateRecordObj {
     pub time: DateTime<FixedOffset>,
     /// 换上去那份文件的 SHA1
     pub sha1: String,
-}
-
-impl Default for ModUpdateRecordObj {
-    /// 全字段取默认值：字符串为空串、时间为零
-    fn default() -> Self {
-        Self {
-            file: Default::default(),
-            old_version: Default::default(),
-            version: Default::default(),
-            old_file_id: Default::default(),
-            file_id: Default::default(),
-            time: Default::default(),
-            sha1: Default::default(),
-        }
-    }
 }

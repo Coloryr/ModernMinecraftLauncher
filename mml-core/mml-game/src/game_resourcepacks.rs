@@ -12,7 +12,7 @@ use mml_base::{
     serialize_tools::{self, MiniJsonMap, MiniJsonObj},
 };
 use mml_names::{
-    i18_items::error_type::{CoreResult, ErrorData, ErrorType, FileSystemErrorData},
+    i18_items::error_type::{CoreResult, ErrorType, FileSystemErrorData},
     names,
 };
 use mml_sys::path_helper;
@@ -20,6 +20,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use zip::ZipArchive;
 
 use crate::launcher::instance_setting_obj::InstanceSettingObj;
+use crate::error::{archive_read_err};
 
 /// 解析 `pack.mcmeta` 的 JSON，取出版本区间与简介
 ///
@@ -341,6 +342,7 @@ fn read_lang_map<Z: Read + std::io::Seek>(
 }
 
 /// 资源包信息
+#[derive(Default)]
 pub struct ResourcepackObj {
     /// 来自 pack.mcmeta 的简介，已展平成纯文字
     pub description: String,
@@ -360,23 +362,6 @@ pub struct ResourcepackObj {
     pub fail: bool,
     /// 是否已在 options.txt 的 `resourcePacks` 里启用
     pub enable: bool,
-}
-
-impl Default for ResourcepackObj {
-    /// 文本与版本号为缺省值，`icon` 为 `None`，`fail` 与 `enable` 为 `false`
-    fn default() -> Self {
-        Self {
-            description: Default::default(),
-            pack_format: Default::default(),
-            min_format: Default::default(),
-            max_format: Default::default(),
-            hash: Default::default(),
-            path: Default::default(),
-            icon: Default::default(),
-            fail: Default::default(),
-            enable: Default::default(),
-        }
-    }
 }
 
 /// 解析材质包
@@ -403,11 +388,7 @@ pub fn process_resourcepack<P: AsRef<Path>>(path: P, lang: &str) -> CoreResult<R
 
     // 解析 pack.mcmeta
     let mut pack = {
-        let meta = zip.by_name(names::PACK_META_FILE).map_err(|err| {
-            ErrorType::ArchiveReadError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        let meta = zip.by_name(names::PACK_META_FILE).map_err(archive_read_err)?;
 
         // 按形状取值，走 `MiniJsonMap`，不做结构性反序列化：写法认不出来也只丢那一段
         match MiniJsonObj::from_stream(meta)
@@ -426,11 +407,7 @@ pub fn process_resourcepack<P: AsRef<Path>>(path: P, lang: &str) -> CoreResult<R
     if let Ok(mut icon) = zip.by_name(names::PACK_ICON_FILE) {
         let size = icon.size() as usize;
         let mut vec = Vec::with_capacity(size);
-        icon.read_to_end(&mut vec).map_err(|err| {
-            ErrorType::ArchiveReadError(ErrorData {
-                error: err.to_string(),
-            })
-        })?;
+        icon.read_to_end(&mut vec).map_err(archive_read_err)?;
         pack.icon = Some(vec);
     }
 
