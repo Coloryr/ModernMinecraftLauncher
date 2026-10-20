@@ -746,6 +746,9 @@ export default {
   "launch.instanceLockError": "实例错误，请联系整合包作者",
   "launch.ready": "就绪",
   "launch.launching": "正在启动…",
+  "launch.cancel": "取消启动",
+  "launch.stop": "关闭游戏",
+  "launch.stopConfirm": "强制结束这个实例的游戏进程？没保存的游戏进度会丢失。",
   "launch.running": "运行中",
   "launch.failed": "启动失败",
   "launch.exited": "已退出",
@@ -755,6 +758,7 @@ export default {
 
   // 启动状态
   "state.launching": "正在启动…",
+  "state.cancelled": "已取消启动",
   "state.login": "登录账户",
   "state.check": "检查游戏文件",
   "state.readinfo": "读取版本信息",

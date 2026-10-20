@@ -32,6 +32,8 @@ export type GlyphName =
   // 自定义音乐的标题栏入口：暂停与停止
   | "pause"
   | "stop"
+  // 启动按钮运行中悬停的「关闭游戏」
+  | "power"
   | "gear"
   | "document"
   | "terminal"
@@ -125,6 +127,11 @@ withDefaults(
     <!-- 暂停 / 停止：自定义音乐那两枚 -->
     <path v-else-if="name === 'pause'" d="M9.5 5v14M14.5 5v14" />
     <rect v-else-if="name === 'stop'" x="6.5" y="6.5" width="11" height="11" rx="1.6" />
+    <!-- 电源：启动按钮运行中悬停的「关闭游戏」 -->
+    <g v-else-if="name === 'power'">
+      <path d="M12 3v9" />
+      <path d="M18.36 6.64a9 9 0 1 1-12.72 0" />
+    </g>
     <!-- 齿轮与顶栏功能按钮上那个是同一个画法，见 MainTopbar 的 gear -->
     <g v-else-if="name === 'gear'">
       <circle cx="12" cy="12" r="3.2" />

@@ -451,6 +451,13 @@ onMounted(async () => {
   // 本实例的启停：切换「测试启动 / 停止」按钮
   unlistenLaunchState = await onLaunchState((e) => {
     if (e.uuid !== lockedUuid.value) return;
+    // 用户在主窗口点了「取消启动」：启动线程退出，收回启动态
+    if (e.state === "cancelled") {
+      launching.value = false;
+      stageKey.value = "";
+      statePct.value = null;
+      return;
+    }
     // 启动一开始（不管从主窗口还是这里的测试启动）就切回运行日志：
     // 停在历史文件上会看不到这次启动的输出
     if (!liveSource.value && !running.value) file.value = "";

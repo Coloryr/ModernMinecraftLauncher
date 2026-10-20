@@ -708,6 +708,7 @@ impl InstanceSettingObj {
                         &mml_base::get_base_dir().to_string_lossy(),
                     );
                 if let Ok(path) = soft_canonicalize::soft_canonicalize(path.trim()) {
+                    let path = strip_verbatim(path);
                     // 存在即可：这里既可能是 jar，也可能是一个类目录（advance_jvm 的 ClassPath
                     // 常被填成编译输出目录），只认 is_file 会把目录整条丢掉
                     if !check || path.exists() {
@@ -772,8 +773,8 @@ impl InstanceSettingObj {
         let v2 = version.is_game_version_v2();
 
         Ok(match self.loader {
-            // LiteLoader 走 tweak class 机制，不改主类
-            LoaderType::Normal | LoaderType::LiteLoader => version.main_class.clone(),
+            LoaderType::Normal => version.main_class.clone(),
+            LoaderType::LiteLoader => "net.minecraft.launchwrapper.Launch".to_string(),
             LoaderType::Forge | LoaderType::NeoForge => {
                 if v2 {
                     "io.github.zekerzhayard.forgewrapper.installer.Main".to_string()
@@ -853,6 +854,15 @@ impl InstanceSettingObj {
                     .build_game_libraries(&native_dir, crate::get_instance(&self.uuid))
                     .await;
                 for item in &libs {
+                    // Cleanroom 的 MMC 补丁用空 jar 顶掉原版 LWJGL 2，这里直接跳过；
+                    // 其余原版库要保留：Cleanroom 清单并不覆盖全部，缺了 ICU / patchy
+                    // 之类会连渲染初始化都走不完
+                    if self.loader == LoaderType::Cleanroom
+                        && (item.name.starts_with("org.lwjgl.lwjgl:")
+                            || !matches!(item.later, LaterRun::None))
+                    {
+                        continue;
+                    }
                     do_lib_item(item, &mut obj.game_libs)?;
                 }
             }
@@ -1298,6 +1308,21 @@ impl InstanceSettingObj {
 
         Ok(obj)
     }
+}
+
+/// 去掉 Windows 的 `\\?\` 逐字路径前缀
+///
+/// - `path`: 规范化后的路径
+///
+/// # 返回值
+///
+/// 返回去掉前缀的路径；非 Windows 或本来就没有前缀时原样返回
+fn strip_verbatim(path: PathBuf) -> PathBuf {
+    #[cfg(windows)]
+    if let Some(rest) = path.to_string_lossy().strip_prefix(r"\\?\") {
+        return PathBuf::from(rest);
+    }
+    path
 }
 
 /// 处理单个运行库项

@@ -1,4 +1,6 @@
-//! 启动矩阵测试：原版 / Forge / Fabric / NeoForge × 26.3 / 1.12.2 / 1.7.10
+//! 启动矩阵测试：原版 / Forge / Fabric / NeoForge / Cleanroom / LiteLoader × 26.3 / 1.12.2 / 1.7.10
+//!
+//! Cleanroom 只有 1.12.2、LiteLoader 只有 1.7.10 与 1.12.2，其余格子记「不适用」，不算失败。
 //!
 //! 每一格都走完整链路：
 //!
@@ -54,22 +56,25 @@ use uuid::Uuid;
 const VERSIONS: [&str; 3] = ["26.3", "1.12.2", "1.7.10"];
 
 /// 要覆盖的加载器
-const LOADERS: [LoaderType; 4] = [
+const LOADERS: [LoaderType; 6] = [
     LoaderType::Normal,
     LoaderType::Forge,
     LoaderType::Fabric,
     LoaderType::NeoForge,
+    LoaderType::Cleanroom,
+    LoaderType::LiteLoader,
 ];
 
 /// 探针：打印类路径与游戏参数，并同样写进工作目录
-const PROBE: &str = r#"import java.nio.file.Files;
-import java.nio.file.Path;
+const PROBE: &str = r#"import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 public class MmlLaunchProbe {
     public static void main(String[] args) throws Exception {
-        String line = "mml-probe-ok cp=" + System.getProperty("java.class.path") + " args=" + String.join(" ", args);
+        String line = "mml-probe-ok java=" + System.getProperty("java.version") + " cp=" + System.getProperty("java.class.path") + " args=" + String.join(" ", args);
         System.out.println(line);
-        Files.writeString(Path.of("probe-args.txt"), line);
+        Files.write(Paths.get("probe-args.txt"), line.getBytes(StandardCharsets.UTF_8));
     }
 }
 "#;
@@ -166,6 +171,12 @@ fn ensure_init() {
         let dir = run_dir();
         std::fs::create_dir_all(&dir).unwrap();
 
+        // 启动流程会走 auth_login → LoginObj::save()，账户落到 inner_path
+        // （LOCALAPPDATA 或 HOME）；不重定向就会把真实用户的 auth.json 覆盖成测试账户
+        let dir_str = dir.to_string_lossy().to_string();
+        unsafe { std::env::set_var("LOCALAPPDATA", &dir_str) };
+        unsafe { std::env::set_var("HOME", &dir_str) };
+
         mml_base::init(&dir);
         mml_names::init(mml_base::get_base_dir()).unwrap();
         mml_log::start(mml_base::get_base_dir()).unwrap();
@@ -199,6 +210,8 @@ fn build_probe(javac: &Path) -> (String, PathBuf) {
     let classes = base.join("probe-classes");
     std::fs::create_dir_all(&classes).unwrap();
     let out = Command::new(javac)
+        // 探针要能跟着 1.7.10 / 1.12.2 在 Java 8 上跑，所以按 Java 8 字节码编译
+        .args(["-source", "8", "-target", "8"])
         .arg("-d")
         .arg(&classes)
         .arg(&src)
@@ -357,6 +370,12 @@ pub async fn launch(version: &str, loader: LoaderType, loader_version: &str) -> 
 
     // ---- 启动游戏 ----
     let launched = Instant::now();
+    // 上一次运行的凭据不能当本次结果：否则进程根本没跑起来也会被旧文件蒙混过关
+    let receipt = base
+        .join("minecraft/instances")
+        .join(&dir)
+        .join(".minecraft/probe-args.txt");
+    let _ = std::fs::remove_file(&receipt);
     let (launch, failed) = match instance
         .start_game(&mut arg, None, CancellationToken::new())
         .await
@@ -368,16 +387,15 @@ pub async fn launch(version: &str, loader: LoaderType, loader_version: &str) -> 
                 std::thread::sleep(Duration::from_millis(200));
             }
 
-            let receipt = base
-                .join("minecraft/instances")
-                .join(&dir)
-                .join(".minecraft/probe-args.txt");
             match std::fs::read_to_string(&receipt) {
                 Ok(text) => {
                     let loader_mark = match loader {
                         LoaderType::Forge => "forge",
                         LoaderType::NeoForge => "neoforge",
                         LoaderType::Fabric => "fabric",
+                        LoaderType::Cleanroom => "cleanroom",
+                        // LiteLoader 的类路径里不一定带本体，但 --tweakClass 一定带包名
+                        LoaderType::LiteLoader => "liteloader",
                         _ => "",
                     };
                     let loader_ok =
@@ -404,7 +422,7 @@ pub async fn launch(version: &str, loader: LoaderType, loader_version: &str) -> 
             }
         }
         Err(ErrorType::JavaNotFound) => (
-            format!("缺 Java（该版本要 Java {}）", java_hint(version)),
+            format!("缺 Java（该版本要 Java {}）", java_hint(version, loader)),
             false,
         ),
         Err(err) => (format!("失败 {err:?}"), true),
@@ -428,6 +446,9 @@ pub async fn launch(version: &str, loader: LoaderType, loader_version: &str) -> 
 ///
 /// 见 [`Outcome`]；上游没有该组合时是「不适用」，不算失败
 pub async fn launch_auto(version: &str, loader: LoaderType) -> Outcome {
+    // 查加载器版本要联网，所以不能等 launch() 里的 ctx() 再初始化：
+    // 单跑 run_cleanroom / run_liteloader 时这里是第一条路径
+    ensure_init();
     if loader == LoaderType::Normal {
         return launch(version, loader, "").await;
     }
@@ -469,11 +490,15 @@ fn version_arg(text: &str) -> Option<&str> {
 /// 该版本要求的 Java 主版本，仅用于跳过时的提示文案
 ///
 /// - `version`: 游戏版本
+/// - `loader`: 加载器；Cleanroom 的清单要求 Java 25，覆盖 1.12.2 惯用的 8
 ///
 /// # 返回值
 ///
 /// 返回该版本惯用的 Java 主版本
-fn java_hint(version: &str) -> &'static str {
+fn java_hint(version: &str, loader: LoaderType) -> &'static str {
+    if loader == LoaderType::Cleanroom {
+        return "25";
+    }
     match version {
         "1.6.4" | "1.7.10" | "1.12.2" => "8",
         _ => "17+",
@@ -558,11 +583,36 @@ async fn run_neoforge() {
     report(launch("1.20.2", LoaderType::NeoForge, "20.2.93").await);
 }
 
+/// Cleanroom 的唯一一格，给单跑测试与总入口共用
+async fn cleanroom_cell() {
+    report(launch_auto("1.12.2", LoaderType::Cleanroom).await);
+}
+
+/// 只跑 Cleanroom：1.12.2
+#[ignore = "联网 + 会下载 / 启动 Cleanroom 实例"]
+#[tokio::test]
+async fn run_cleanroom() {
+    cleanroom_cell().await;
+}
+
+/// LiteLoader 的两格，给单跑测试与总入口共用
+async fn liteloader_cells() {
+    report(launch_auto("1.12.2", LoaderType::LiteLoader).await);
+    report(launch_auto("1.7.10", LoaderType::LiteLoader).await);
+}
+
+/// 只跑 LiteLoader：1.12.2 与 1.7.10
+#[ignore = "联网 + 会下载 / 启动 LiteLoader 实例"]
+#[tokio::test]
+async fn run_liteloader() {
+    liteloader_cells().await;
+}
+
 /// 单格调试总入口：把全部单格串起来跑一遍
 ///
 /// `#[tokio::test]` 宏把测试函数展开成同步函数，直接互相调用既不能
 /// `.await`、又会在运行时里再嵌一个运行时，所以这里只能串"执行体"；
-/// 想钻某一格先单独跑它的入口，能省前面格子的耗时
+/// 想钻某一格先单独跑它的测试入口（如 `run_cleanroom` / `run_liteloader`），能省前面格子的耗时
 #[ignore = "联网 + 首次要下几百 MB，串行跑全格"]
 #[tokio::test]
 async fn launch_one_auto() {
@@ -572,6 +622,8 @@ async fn launch_one_auto() {
     run_forge_old().await;
     run_fabric().await;
     run_neoforge().await;
+    cleanroom_cell().await;
+    liteloader_cells().await;
 }
 
 /// 打印一格的结论；算真失败就让用例不过

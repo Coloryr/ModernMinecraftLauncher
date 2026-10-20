@@ -602,8 +602,9 @@
   box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
-/* 悬停才跑 ① 渐变流动 + ② 呼吸光晕；:not(:disabled) 表示运行中不给动效 */
-.launch-actions .launch-main-btn:hover:not(:disabled) {
+/* 悬停才跑 ① 渐变流动 + ② 呼吸光晕；启动中 / 运行中（.running）不跑，
+   那一档悬停要显示取消 / 关闭动作，动效会抢眼 */
+.launch-actions .launch-main-btn:hover:not(:disabled):not(.running) {
   animation:
     launch-flow 6s ease-in-out infinite,
     launch-breath 3.2s ease-in-out infinite;
@@ -645,7 +646,7 @@
   transform: translateX(-130%);
 }
 
-.launch-actions .launch-main-btn:hover:not(:disabled)::after {
+.launch-actions .launch-main-btn:hover:not(:disabled):not(.running)::after {
   animation: launch-shine 0.75s ease-out;
 }
 
@@ -662,10 +663,65 @@
 /* 系统开了「减弱动效」：悬停也不动 */
 @media (prefers-reduced-motion: reduce) {
 
-  .launch-actions .launch-main-btn:hover:not(:disabled),
-  .launch-actions .launch-main-btn:hover:not(:disabled)::after {
+  .launch-actions .launch-main-btn:hover:not(:disabled):not(.running),
+  .launch-actions .launch-main-btn:hover:not(:disabled):not(.running)::after {
     animation: none;
   }
+}
+
+/* 启动中 / 运行中：按钮里平时是进度或「运行中」，悬停换成取消 / 关闭动作。
+   两层叠在同一位置，只切透明度，按钮尺寸不变 */
+.launch-busy {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.launch-busy > .launch-in,
+.launch-busy > .launch-running {
+  transition: opacity 0.12s;
+}
+
+.launch-running {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.launch-hover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  /* 点击交给按钮本身处理 */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+/* 启动中悬停是取消启动、运行中悬停是关闭游戏，两个都是危险动作：
+   按钮整颗转红底红字，图标跟 currentColor 一起变红 */
+.launch-main-btn.running:hover,
+.play-btn.running:hover {
+  background: color-mix(in srgb, var(--red) 20%, var(--bg-card));
+  color: var(--red);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--red) 28%, transparent);
+}
+
+.launch-main-btn:hover .launch-hover,
+.play-btn:hover .launch-hover {
+  opacity: 1;
+}
+
+.launch-main-btn:hover .launch-busy > .launch-in,
+.launch-main-btn:hover .launch-busy > .launch-running,
+.play-btn:hover .launch-busy > .launch-in,
+.play-btn:hover .launch-busy > .launch-running {
+  opacity: 0;
 }
 
 /* 次级操作（设置 / 日志 / 资源管理）：一行，各自按文案取宽；

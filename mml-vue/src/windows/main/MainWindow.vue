@@ -1152,9 +1152,24 @@ const { init: initModpackStatus } = useModpackStatus(false, adoptAddedInstance);
 async function subscribeEvents() {
   const fns = await Promise.all([
     onLaunchState((e) => {
-      // 启动可能来自别处（资源窗口右键「进入存档」）：状态事件到了就置成启动中，
+      // 用户取消：后端不算失败，只把启动态收回去
+      if (e.state === "cancelled") {
+        clearLaunching(e.uuid);
+        if (e.uuid === selected.value?.uuid) {
+          statusText.value = t("launch.ready");
+          launchStage.value = "";
+          statePct.value = null;
+        }
+        return;
+      }
+      // 进程起来之后推 end / post：按钮从「启动中」转「运行中」。
+      // 其余状态可能是别处发起的启动（资源窗口右键「进入存档」），要置成启动中，
       // 否则主界面不知道有人在启动，按钮一直停在「启动游戏」
-      markLaunching(e.uuid);
+      if (e.state === "end" || e.state === "post") {
+        markStarted(e.uuid);
+      } else {
+        markLaunching(e.uuid);
+      }
       if (e.uuid !== selected.value?.uuid) return;
       statusText.value = stateText(e.state);
       launchStage.value = e.state;
@@ -1330,7 +1345,8 @@ async function loadVersions() {
 }
 
 // ================= 启动 =================
-// 不弹窗：只有正在运行的实例的启动按钮显示加载态并禁用
+// 不弹窗：启动中按钮里是阶段 + 进度，运行中显示「运行中」；
+// 两种状态下悬停都会换成动作（取消启动 / 关闭游戏），点击即执行
 
 /**
  * 正在启动中的实例 uuid
@@ -1366,6 +1382,86 @@ function clearLaunching(uuid: string) {
   }
   const inst = instances.value.find((i) => i.uuid === uuid);
   if (inst) inst.running = false;
+}
+
+/**
+ * 进程已经起来了：从"启动中"转成"运行中"
+ *
+ * 按钮不再显示进度，悬停动作从「取消启动」换成「关闭游戏」。
+ *
+ * - `uuid`: 实例 uuid
+ */
+function markStarted(uuid: string) {
+  if (launching.value.has(uuid)) {
+    const next = new Set(launching.value);
+    next.delete(uuid);
+    launching.value = next;
+  }
+  const inst = instances.value.find((i) => i.uuid === uuid);
+  if (inst) inst.running = true;
+}
+
+/** 当前选中实例是否还在启动流程里（进程未起来） */
+const isLaunching = computed(() => {
+  const uuid = selected.value?.uuid;
+  return !!uuid && launching.value.has(uuid);
+});
+
+/** 启动中 / 运行中时，按钮上悬停显示的动作 */
+const launchActionText = computed(() =>
+  isLaunching.value ? t("launch.cancel") : t("launch.stop"),
+);
+
+/** 关闭游戏确认弹窗 */
+const stopAsk = ref(false);
+/** 关闭动作正在跑，防连点 */
+const stopBusy = ref(false);
+
+/**
+ * 把实例的启动取消掉
+ *
+ * - `uuid`: 实例 uuid
+ */
+async function cancelLaunch(uuid: string) {
+  try {
+    if (!(await api.cancelLaunch(uuid))) return;
+    clearLaunching(uuid);
+    if (selected.value?.uuid === uuid) {
+      statusText.value = t("launch.ready");
+      launchStage.value = "";
+      statePct.value = null;
+    }
+  } catch (e) {
+    showToast(tErr(e));
+  }
+}
+
+/** 启动按钮：忙时点它是取消 / 关闭游戏，闲时才是启动 */
+function onLaunchAction() {
+  const inst = selected.value;
+  if (!inst) return;
+  if (isLaunching.value) {
+    void cancelLaunch(inst.uuid);
+  } else if (inst.running) {
+    stopAsk.value = true;
+  } else {
+    void launch();
+  }
+}
+
+/** 确认关闭游戏：强制结束进程，界面等 game-exit 事件收尾 */
+async function doStop() {
+  const inst = selected.value;
+  if (!inst || stopBusy.value) return;
+  stopBusy.value = true;
+  try {
+    await api.stopGame(inst.uuid);
+    stopAsk.value = false;
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    stopBusy.value = false;
+  }
 }
 
 /**
@@ -1631,9 +1727,16 @@ onMounted(async () => {
                    见 main-window.css .launch-actions -->
               <div class="launch-actions">
                 <BaseButton variant="primary" size="lg" class="launch-main-btn"
-                  :class="{ running: selected?.running }" :disabled="!selected || selected.running" @click="launch">
-                  <!-- 启动流程就在按钮里：阶段文本 + 贴着底边的进度条 -->
-                  <LaunchProgress v-if="selected?.running" :text="launchStageText" :percent="launchPct" />
+                  :class="{ running: selected?.running }" :disabled="!selected" @click="onLaunchAction">
+                  <!-- 启动中：按钮里是阶段 + 进度；运行中：运行中。悬停两者都换成取消 / 关闭动作 -->
+                  <span v-if="selected?.running" class="launch-busy">
+                    <LaunchProgress v-if="isLaunching" :text="launchStageText" :percent="launchPct" />
+                    <span v-else class="launch-running">{{ t("launch.running") }}</span>
+                    <span class="launch-hover">
+                      <GlyphIcon :name="isLaunching ? 'close' : 'power'" :size="14" />
+                      {{ launchActionText }}
+                    </span>
+                  </span>
                   <template v-else>
                     <GlyphIcon name="play" :size="15" /> {{ t("launch.play") }}
                   </template>
@@ -1716,9 +1819,15 @@ onMounted(async () => {
                       <!-- 右侧：启动游戏用大按钮，添加 / 管理资源用小按钮 -->
                       <div class="detail-side">
                         <BaseButton variant="primary" size="lg" class="play-btn"
-                          :class="{ running: selected.running }" :disabled="selected.running" @click="launch">
-                          <!-- 启动流程就在按钮里：阶段文本 + 贴着底边的进度条 -->
-                          <LaunchProgress v-if="selected.running" :text="launchStageText" :percent="launchPct" />
+                          :class="{ running: selected.running }" @click="onLaunchAction">
+                          <span v-if="selected.running" class="launch-busy">
+                            <LaunchProgress v-if="isLaunching" :text="launchStageText" :percent="launchPct" />
+                            <span v-else class="launch-running">{{ t("launch.running") }}</span>
+                            <span class="launch-hover">
+                              <GlyphIcon :name="isLaunching ? 'close' : 'power'" :size="14" />
+                              {{ launchActionText }}
+                            </span>
+                          </span>
                           <template v-else>
                             <GlyphIcon name="play" :size="15" /> {{ t("launch.play") }}
                           </template>
@@ -1907,6 +2016,16 @@ onMounted(async () => {
     <!-- ===== 启动界面：已移除（启动按钮显示加载态，不弹窗） ===== -->
 
     <!-- ===== 添加实例：独立窗口（openAdd 打开） ===== -->
+
+    <!-- ===== 关闭游戏确认 ===== -->
+    <BaseModal v-if="stopAsk && selected" :title="t('launch.stop')" :closable="false"
+      @close="!stopBusy && (stopAsk = false)">
+      <p class="delete-tip">{{ t("launch.stopConfirm") }}</p>
+      <div class="modal-actions">
+        <BaseButton :disabled="stopBusy" @click="stopAsk = false">{{ t("add.cancel") }}</BaseButton>
+        <BaseButton variant="danger" :disabled="stopBusy" @click="doStop">{{ t("launch.stop") }}</BaseButton>
+      </div>
+    </BaseModal>
 
     <!-- ===== 重命名实例弹窗 ===== -->
     <BaseModal v-if="showRename && selected" :title="t('actions.renameTitle')" :closable="false"

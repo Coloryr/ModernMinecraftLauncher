@@ -54,15 +54,26 @@ const quickPlay = computed(() => props.data.instance.value?.quickPlay ?? false);
 const autoEnterDir = computed(() => saves.value.find((item) => item.autoEnter)?.dir ?? "");
 
 /**
+ * 设置 / 取消自动进入的存档
+ *
+ * - `dir`: 目标存档目录名；`null` 表示取消
+ */
+function setAutoEnter(dir: string | null) {
+  actLocal(async () => {
+    await api.updateInstance(instanceUuid.value, { autoSave: dir });
+    // 就地改标记：重拉列表要把每个存档的 level.dat 再解析一遍，为一行标记不值得
+    for (const item of saves.value) item.autoEnter = dir !== null && item.dir === dir;
+  });
+}
+
+/**
  * 在列表上方选自动进入的存档
  *
  * - `event`: 下拉的 change 事件，值是存档目录名，空串表示取消
  */
 function onAutoEnterChange(event: Event) {
   const dir = (event.target as HTMLSelectElement).value;
-  act(async () => {
-    await api.updateInstance(instanceUuid.value, { autoSave: dir || null });
-  });
+  setAutoEnter(dir || null);
 }
 
 function remove(item: SaveItemDto) {
@@ -242,9 +253,7 @@ function enterWorld(item: SaveItemDto) {
  * - `item`: 存档条目
  */
 function toggleAutoEnter(item: SaveItemDto) {
-  act(async () => {
-    await api.updateInstance(instanceUuid.value, { autoSave: item.autoEnter ? null : item.dir });
-  });
+  setAutoEnter(item.autoEnter ? null : item.dir);
 }
 
 function openRestore(item: SaveItemDto) {
@@ -738,11 +747,11 @@ function saveTip(item: SaveItemDto): string {
   color: var(--text-dim);
 }
 
+/* 只收横向尺寸：上下内边距与行高保持全局那一份（5px + 20px 行高，内容盒正好一行），
+   改了纵向内边距 <select> 的文字就会贴到上边 */
 .auto-enter-row .field-select.auto-enter-select {
   flex: 1;
   width: auto;
   min-width: 0;
-  padding: 3px 28px 3px 10px;
-  font-size: 13px;
 }
 </style>

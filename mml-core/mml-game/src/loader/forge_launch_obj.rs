@@ -56,6 +56,7 @@ pub struct ForgeLaunchObj {
     /// 运行库列表
     pub libraries: Vec<ForgeLibrariesObj>,
     /// 清单声明的 Java 版本；Cleanroom 的 version.json 带 `javaVersion`
+    #[serde(rename = "javaVersion")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub java_version: Option<ForgeJavaVersionObj>,
 }

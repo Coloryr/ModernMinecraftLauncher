@@ -745,6 +745,9 @@ export default {
   "launch.instanceLockError": "Instance error. Please contact the modpack author.",
   "launch.ready": "Ready",
   "launch.launching": "Launching…",
+  "launch.cancel": "Cancel launch",
+  "launch.stop": "Close game",
+  "launch.stopConfirm": "Force-close the game process? Unsaved progress will be lost.",
   "launch.running": "Running",
   "launch.failed": "Launch failed",
   "launch.exited": "Exited",
@@ -754,6 +757,7 @@ export default {
 
   // Launch states
   "state.launching": "Launching…",
+  "state.cancelled": "Launch cancelled",
   "state.login": "Signing in",
   "state.check": "Checking game files",
   "state.readinfo": "Reading version info",

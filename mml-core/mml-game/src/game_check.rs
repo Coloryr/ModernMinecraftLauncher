@@ -8,7 +8,7 @@ use std::{
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 use mml_base::{
-    file_item::{FileHash, FileItemObj},
+    file_item::{FileHash, FileItemObj, LaterRun},
     hash_helper::{self, HashType},
 };
 use mml_names::{i18_items::error_type::CoreResult, names};
@@ -34,11 +34,39 @@ fn check_to_add(item: &FileItemObj, check_sha1: bool) -> bool {
     if !item.url.starts_with("http") {
         return false;
     }
+    if !item.file.exists() || !item.file.is_file() {
+        return true;
+    }
+
+    // 下载失败时错误页也会被写成 .jar，哈希/大小都没有的库只能靠文件头识别。
+    // 下载线程看到文件存在且 FileHash::None 会直接跳过，所以这里必须先把坏文件删掉
+    if item.file.extension().is_some_and(|ext| ext == "jar") && !is_valid_jar(&item.file) {
+        let _ = std::fs::remove_file(&item.file);
+        return true;
+    }
+
     if check_sha1 {
         !item.check_hash()
     } else {
-        !item.file.exists() || !item.file.is_file()
+        false
     }
+}
+
+/// 文件是不是一个完整的 jar/zip
+///
+/// - `file`: 待检查文件
+///
+/// # 返回值
+///
+/// 文件头为 `PK` 时返回 `true`
+fn is_valid_jar(file: &Path) -> bool {
+    use std::io::Read;
+
+    let Ok(mut stream) = std::fs::File::open(file) else {
+        return false;
+    };
+    let mut magic = [0u8; 2];
+    stream.read_exact(&mut magic).is_ok() && &magic == b"PK"
 }
 
 /// 检查单个文件的SHA1是否匹配
@@ -59,6 +87,29 @@ fn check_file_sha1<P: AsRef<Path>>(file: P, sha1: &str) -> bool {
         return hash.eq_ignore_ascii_case(sha1);
     }
     false
+}
+
+/// 解压已经下载但还没展开的原生库
+///
+/// 下载线程只在"这次真的下载了"之后执行 `LaterRun`；原生库 jar 已存在、
+/// natives 目录却被清过时不会再解压，这里在启动前补一遍。
+///
+/// - `obj`: 启动配置
+pub fn unpack_existing_natives(obj: &GameLaunchObj) {
+    for item in obj.loader_libs.iter().chain(obj.installer_libs.iter()) {
+        let LaterRun::UnpackNative(dir) = &item.later else {
+            continue;
+        };
+        if !item.file.is_file() {
+            continue;
+        }
+        let Ok(file) = path_helper::open_read(&item.file) else {
+            continue;
+        };
+        if let Err(err) = mml_downloader::later_tasks::unpack_native(dir, file) {
+            mml_log::error_type(err);
+        }
+    }
 }
 
 impl InstanceSettingObj {

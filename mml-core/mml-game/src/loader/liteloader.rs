@@ -39,6 +39,27 @@ pub fn find_loader_obj<'a>(data: &'a LiteloaderVersionObj, version: &str) -> Opt
         .or_else(|| data.snapshots.loader.get(version))
 }
 
+/// LiteLoader 本体仓库：元数据里 1.12.2 的 `repo.url` 指向已下线的 mumfrey 仓库，
+/// 但同一个包在 dl.liteloader.com 的 versions 目录下仍然可用
+const LITELOADER_REPO: &str = "http://dl.liteloader.com/versions/";
+
+/// 元数据里 `url` 为空的库按包名选默认仓库
+///
+/// launchwrapper 在 Mojang 库；asm-all 5.2 只在 Maven Central，Mojang 库没有
+///
+/// - `name`: Maven 坐标
+///
+/// # 返回值
+///
+/// 返回该坐标应使用的仓库根地址
+fn default_repo(name: &str) -> &'static str {
+    if name.starts_with("net.minecraft:") {
+        "https://libraries.minecraft.net/"
+    } else {
+        "https://repo1.maven.org/maven2/"
+    }
+}
+
 /// 获取 LiteLoader 运行库列表
 ///
 /// - `mc`: 游戏版本号
@@ -67,11 +88,15 @@ pub async fn get_liteloader_lib(mc: &str, version: &str) -> CoreResult<Vec<FileI
     } else {
         return Err(ErrorType::DataNotFound(DataNotFoundData::Info));
     };
-
     let mut list = Vec::new();
 
     // 公共依赖运行库，元数据不带校验值
     for item in common_libs {
+        // LiteLoader 1.12.2 把 Mixin shade 进了本体（org/spongepowered/asm 共 494 个类），
+        // 元数据里那份 0.7.4-SNAPSHOT 仓库早已下线，硬下只会拿到 404 页面
+        if item.name.starts_with("org.spongepowered:mixin") {
+            continue;
+        }
         list.push(make_lib_item(&item.name, &item.url, FileHash::None));
     }
 
@@ -84,6 +109,14 @@ pub async fn get_liteloader_lib(mc: &str, version: &str) -> CoreResult<Vec<FileI
         };
         list.push(make_lib_item(&item.name, &item.url, hash));
     }
+
+    // LiteLoader 本体：元数据只给了文件名与 MD5，Maven 坐标用 LoaderObj.version 拼，
+    // 没有这一项主类换成 launchwrapper 也找不到 tweaker
+    list.push(make_lib_item(
+        &format!("com.mumfrey:liteloader:{}", loader.version),
+        LITELOADER_REPO,
+        FileHash::Md5(loader.md5.clone()),
+    ));
 
     Ok(list)
 }
@@ -99,6 +132,12 @@ pub async fn get_liteloader_lib(mc: &str, version: &str) -> CoreResult<Vec<FileI
 /// 返回下载项
 fn make_lib_item(name: &str, url: &str, hash: FileHash) -> FileItemObj {
     let path = version_name_to_path(name);
+    // 空 url 表示元数据没写仓库：按坐标选默认仓库
+    let url = if url.is_empty() {
+        default_repo(name)
+    } else {
+        url
+    };
     // 仓库根地址缺末尾分隔符时补上
     let url = if url.ends_with('/') {
         format!("{url}{path}")

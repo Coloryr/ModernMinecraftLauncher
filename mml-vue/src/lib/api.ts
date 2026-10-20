@@ -986,6 +986,19 @@ export const api = {
   },
 
   /**
+   * 取消正在启动中的实例
+   *
+   * - `uuid`: 实例 uuid
+   *
+   * # 返回值
+   *
+   * 已发出取消返回 `true`；进程已经起来或不在启动中返回 `false`
+   */
+  async cancelLaunch(uuid: string): Promise<boolean> {
+    return commands.main.cancelLaunch(uuid);
+  },
+
+  /**
    * 取实例配的自动进入存档，启动前弹窗确认用
    *
    * - `uuid`: 实例 uuid
@@ -2407,6 +2420,19 @@ export function launchGame(
   autoSave?: boolean,
 ): Promise<void> {
   return commands.main.launchGame(uuid, world ?? null, force ?? null, autoSave ?? null);
+}
+
+/**
+ * 取消正在启动中的实例
+ *
+ * - `uuid`: 实例 uuid
+ *
+ * # 返回值
+ *
+ * 已发出取消返回 `true`；进程已经起来或不在启动中返回 `false`
+ */
+export function cancelLaunch(uuid: string): Promise<boolean> {
+  return commands.main.cancelLaunch(uuid);
 }
 
 /**

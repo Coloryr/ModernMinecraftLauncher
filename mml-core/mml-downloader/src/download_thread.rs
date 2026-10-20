@@ -546,7 +546,8 @@ async fn write_file(
     let config = mml_config::read_config();
     if config.http.check_file {
         let now = file.stream_position().unwrap();
-        if now != obj.item.get_all_size() {
+        let all = obj.item.get_all_size();
+        if all > 0 && now != all {
             obj.item.set_state(DownloadItemState::Error);
 
             crate::update(index, &obj.item);
@@ -555,8 +556,8 @@ async fn write_file(
                 DownloadFileSizeErrorData {
                     file: obj.item.base.file.clone(),
                     url: obj.item.base.url.clone(),
-                    now: now,
-                    size: obj.item.get_all_size(),
+                    now,
+                    size: all,
                 },
             ));
         }

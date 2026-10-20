@@ -10,7 +10,7 @@
 //!
 //! 命令带分组标记，值填原始组名 main，把组键钉回 `main`，见 AGENTS.md §4。
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, LazyLock, Mutex};
 
 use mml_auth::{AuthType, auths, lock_user, locked_by_other, unlock_user};
@@ -18,6 +18,7 @@ use mml_game::game_launch::{AutoJoinType, GameLaunchArg};
 use mml_game::gui_hook::{ILaunchGui, LaunchState, ProcessRunType};
 use mml_game::launcher::instance_setting_obj::{InstanceSettingObj, ServerObj};
 use mml_game::{InstanceExit, game_count, get_running_instances, is_running, stop_game};
+use mml_names::i18_items::error_type::ErrorType;
 use tauri::{AppHandle, Emitter};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -39,6 +40,12 @@ use super::emit_launch_error;
 /// 后端要到**进程真正起来**才算"运行中"（`is_running`），检查 / 下载那段窗口期它是 false ——
 /// 只靠 `is_running` 拦不住重复启动（主界面刷新一次、或从日志窗口再点一次"测试启动"）。
 static LAUNCHING: LazyLock<Mutex<HashSet<Uuid>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
+
+/// 正在启动中的实例的取消令牌：界面点「取消启动」时置位，启动线程在检查点退出
+///
+/// 只覆盖"进程还没起来"那一段；进程起来后令牌就摘掉，要停游戏走 stop_game。
+static LAUNCH_CANCEL: LazyLock<Mutex<HashMap<Uuid, CancellationToken>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// 设置里的全局"自动进服"：实例没配自己的加入服务器时用它
 ///
@@ -195,6 +202,12 @@ pub async fn main_launch_game(
     // `start_game` 的 future 不是 `Send`（内核里跨 await 持有 std 锁的读守卫），
     // 进不了 `tauri::async_runtime::spawn`。线程名带上实例 uuid，排查时认得出来。
     let launch_uuid = core.uuid;
+    // 取消令牌与线程一起登记：界面上点「取消启动」时，命令拿到的就是这一份
+    let cancel = CancellationToken::new();
+    LAUNCH_CANCEL
+        .lock()
+        .unwrap()
+        .insert(launch_uuid, cancel.clone());
     let spawned = std::thread::Builder::new()
         .name(format!("Mml Game Launch {launch_uuid}"))
         .spawn(move || {
@@ -207,6 +220,7 @@ pub async fn main_launch_game(
                         }
                         .text(),
                     );
+                    LAUNCH_CANCEL.lock().unwrap().remove(&launch_uuid);
                     LAUNCHING.lock().unwrap().remove(&launch_uuid);
                     unlock_user(&launch_uuid);
                     return;
@@ -215,18 +229,32 @@ pub async fn main_launch_game(
 
             let uuid = core.uuid.to_string();
             runtime.block_on(async move {
-                match setting
-                    .start_game(&mut arg, Some(gui), CancellationToken::new())
-                    .await
-                {
+                match setting.start_game(&mut arg, Some(gui), cancel).await {
                     Ok(()) => {
                         emit_log_line(&app, &uuid, &LogText::LaunchProcessStarted.text(), false)
                     }
                     Err(err) => {
                         // 进程已经起来、只是启动后命令失败时不算启动失败，否则会多记一次
-                        if !is_running(&launch_uuid) {
-                            game_count::launch_error(&launch_uuid);
+                        let started = is_running(&launch_uuid);
+                        if !started {
                             unlock_user(&launch_uuid);
+                        }
+                        // 用户取消不算启动失败：不记统计、不弹错误，只推一条状态让各窗口收回启动态
+                        if matches!(err, ErrorType::TaskCancel) {
+                            if !started {
+                                emit_launch_state(
+                                    &app,
+                                    StateEvent {
+                                        uuid: uuid.clone(),
+                                        state: "cancelled".into(),
+                                        progress: None,
+                                    },
+                                );
+                            }
+                            return;
+                        }
+                        if !started {
+                            game_count::launch_error(&launch_uuid);
                         }
                         mml_log::error_type(err.clone());
                         let text = i18::get_error(err.clone());
@@ -242,17 +270,48 @@ pub async fn main_launch_game(
                 }
             });
 
-            // 线程收工：成败都已定，把"启动中"摘掉（失败后要允许重试）
+            // 线程收工：成败都已定，把"启动中"与取消令牌摘掉（失败后要允许重试）
+            LAUNCH_CANCEL.lock().unwrap().remove(&launch_uuid);
             LAUNCHING.lock().unwrap().remove(&launch_uuid);
         });
 
     if let Err(err) = spawned {
+        LAUNCH_CANCEL.lock().unwrap().remove(&launch_uuid);
         LAUNCHING.lock().unwrap().remove(&launch_uuid);
         unlock_user(&launch_uuid);
         return Err(err.to_string());
     }
 
     Ok(())
+}
+
+/// 取消正在启动中的实例
+///
+/// 只在进程起来之前有效：取消令牌在启动线程收工时就摘掉，进游戏后要停请用 main_stop_game。
+///
+/// - uuid: 实例 uuid
+///
+/// # 返回值
+///
+/// 已发出取消返回 true；进程已经起来或不在启动中返回 false，uuid 非法返回 Err
+#[gui_macros::ipc_group("main")]
+#[gui_macros::command]
+pub fn main_cancel_launch(uuid: String) -> Result<bool, String> {
+    let Ok(id) = Uuid::parse_str(&uuid) else {
+        return Err(err_keys::UUID.to_string());
+    };
+    // 进程已经起来就不叫"取消启动"了，前端应改用关闭游戏
+    if is_running(&id) {
+        return Ok(false);
+    }
+    let token = LAUNCH_CANCEL.lock().unwrap().get(&id).cloned();
+    match token {
+        Some(token) => {
+            token.cancel();
+            Ok(true)
+        }
+        None => Ok(false),
+    }
 }
 
 /// 启动前取实例配的自动进入存档，给前端弹窗确认用

@@ -349,6 +349,8 @@ impl InstanceSettingObj {
         let start = Instant::now();
         let authlib = libraries_path::check_authlib(&arg.auth.auth_type).await?;
         let obj = self.make_game_launch_obj(arg).await?;
+        // 原生库 jar 已存在时下载线程不会再跑解压，启动前补一遍
+        crate::game_check::unpack_existing_natives(&obj);
         let mut check = self.get_lost_game_file(&obj).await?;
         let time = start.elapsed();
         crate::add_game_log_item(&self.uuid, GameLog::CheckGameFileTime(time));
@@ -378,10 +380,13 @@ impl InstanceSettingObj {
                     gui.update_state(self, LaunchState::Download);
                 }
                 let start = Instant::now();
-                let res = mml_downloader::start_download_task(check).await;
+                let res =
+                    mml_downloader::start_download_task_cancellable(check, cancel.clone()).await;
                 let time = start.elapsed();
                 crate::add_game_log_item(&self.uuid, GameLog::DownloadFileTime(time));
-                if !res {
+                if res.is_cancelled() || cancel.is_cancelled() {
+                    Err(ErrorType::TaskCancel)
+                } else if !res.is_done() {
                     Err(ErrorType::DownloadFileFail)
                 } else {
                     Ok(obj)
@@ -531,7 +536,10 @@ impl InstanceSettingObj {
         let mut list: Vec<_> = obj.java_versions.clone().into_iter().collect();
         list.sort_unstable();
         for item in list.iter() {
-            let jvm = mml_jvms::get_java(*item, true);
+            // Java 8 没有跨大版本兼容：launchwrapper 在 9+ 上会
+            // ClassCastException（AppClassLoader 不是 URLClassLoader），
+            // 所以 8 必须精确命中，不能像 17+ 那样取更高版本
+            let jvm = mml_jvms::get_java(*item, *item > 8);
             if let Some(jvm) = jvm {
                 if jvm.path.exists() {
                     return Some(jvm.path.clone());
@@ -578,7 +586,8 @@ impl InstanceSettingObj {
             .find(|item| item.path.as_path() == java)
             .map(|item| item.major_version);
 
-        if major.is_some_and(|major| major <= 23) {
+        // 只有 Java 18–23 需要显式放行：8 没有这个开关，24 起 SecurityManager 已被移除
+        if major.is_some_and(|major| (18..=23).contains(&major)) {
             obj.jvm_args.push("-Djava.security.manager=allow".to_string());
         }
     }
