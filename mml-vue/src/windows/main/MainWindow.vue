@@ -198,7 +198,10 @@ const groups = computed<GroupView[]>(() => {
     // 组内次序由后端下发，见分组表 group_save.json 的 order；
     // 同值时按名字兜底，保证顺序确定而不是随 HashMap 抖动
     const items = [...(map.get(g.uuid) ?? [])].sort(
-      (a, b) => a.order - b.order || a.name.localeCompare(b.name),
+      (a, b) =>
+        a.order - b.order ||
+        a.name.localeCompare(b.name) ||
+        a.uuid.localeCompare(b.uuid),
     );
     return {
       id: g.uuid,
@@ -556,16 +559,18 @@ async function launchGroupAll(groupId?: string) {
   const g = groups.value.find((x) => x.id === groupId);
   closeCtxMenu();
   if (!g || g.items.length === 0) return;
+  let launched = 0;
   for (const inst of g.items) {
     markLaunching(inst.uuid);
     try {
-      await launchGame(inst.uuid);
+      if (await launchGame(inst.uuid)) launched += 1;
+      else clearLaunching(inst.uuid);
     } catch {
       // 单个失败：把它的按钮放开，别的照旧
       clearLaunching(inst.uuid);
     }
   }
-  showToast(t("multi.launched", { count: g.items.length }));
+  if (launched) showToast(t("multi.launched", { count: launched }));
 }
 
 /** 分组菜单“转移分组”：源分组就是当前右键的那个分组 */
@@ -829,17 +834,19 @@ async function doMultiDelete() {
 async function multiLaunch() {
   const ids = [...selectedIds.value];
   closeCtxMenu();
+  let launched = 0;
   for (const uuid of ids) {
     markLaunching(uuid);
     try {
-      await launchGame(uuid);
+      if (await launchGame(uuid)) launched += 1;
+      else clearLaunching(uuid);
     } catch {
       // 单个失败：把它的按钮放开，别的照旧
       clearLaunching(uuid);
     }
   }
   exitMultiSelect();
-  showToast(t("multi.launched", { count: ids.length }));
+  if (launched) showToast(t("multi.launched", { count: launched }));
 }
 
 // 点击空白处关闭菜单；Esc 依次关闭菜单 / 退出多选
@@ -1042,6 +1049,7 @@ const clientConfig = ref<ClientConfig>({
   loginLockOn: false,
   loginLock: [],
   autoJoin: false,
+  accountCheck: true,
   autoJoinServer: "",
   motdServer: "",
   lockInstance: "",
@@ -1415,7 +1423,11 @@ async function launch() {
   launchStage.value = "";
   statePct.value = null;
   try {
-    await launchGame(uuid);
+    if (!(await launchGame(uuid))) {
+      clearLaunching(uuid);
+      statusText.value = t("launch.ready");
+      return;
+    }
   } catch (e) {
     clearLaunching(uuid);
     statusText.value = t("launch.failed");

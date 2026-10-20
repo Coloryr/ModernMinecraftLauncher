@@ -26,7 +26,7 @@
 //! 账户通过 [`UserKeyObj`] 作为唯一键进行索引，键由 UUID 与认证类型组成。
 
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     sync::{LazyLock, RwLock},
 };
 
@@ -35,6 +35,7 @@ use mml_names::i18_items::error_type::CoreResult;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
 
 pub mod auths;
 pub mod legacy;
@@ -314,33 +315,68 @@ pub struct UserKeyObj {
     pub auth_type: AuthType,
 }
 
-/// 正在被登录流程占用的账户键，避免同一账户并发发起登录
-static USER_LOCK: LazyLock<RwLock<HashSet<UserKeyObj>>> =
-    LazyLock::new(|| RwLock::new(HashSet::new()));
+/// 正在被游戏实例占用的账户：账户键 → 占用它的实例 uuid 集合
+///
+/// 同一个账户允许被多个实例同时使用（用户选择继续启动、或关掉了占用检查），
+/// 所以值用集合；实例退出时只摘掉自己，集合空了才删除账户键。
+static USER_LOCK: LazyLock<RwLock<HashMap<UserKeyObj, HashSet<Uuid>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
-/// 该账户是否正被登录流程占用
+/// 该账户是否正被某个游戏实例占用
 ///
 /// - `user`: 账户唯一键
 ///
 /// # 返回值
 ///
-/// 已占用返回 `true`
+/// 已被占用返回 `true`
 pub fn have_lock(user: &UserKeyObj) -> bool {
-    USER_LOCK.read().unwrap().contains(user)
+    USER_LOCK.read().unwrap().contains_key(user)
 }
 
-/// 标记账户已被登录流程占用
+/// 该账户是否被 `instance` 之外的实例占用
+///
+/// 启动检查用：本次要启动的实例还没登记，把"自己"排除掉，
+/// 免得重入时把本实例的占用当成别的实例。
 ///
 /// - `user`: 账户唯一键
-pub fn lock_user(user: &UserKeyObj) {
-    USER_LOCK.write().unwrap().insert(user.clone());
+/// - `instance`: 本次要启动的实例
+///
+/// # 返回值
+///
+/// 有别的实例正在使用该账户时返回 `true`
+pub fn locked_by_other(user: &UserKeyObj, instance: &Uuid) -> bool {
+    if !have_lock(user) {
+        return false;
+    }
+    USER_LOCK
+        .read()
+        .unwrap()
+        .get(user)
+        .is_some_and(|set| set.iter().any(|id| id != instance))
 }
 
-/// 解除账户的登录占用标记
+/// 登记某个实例对账户的占用
 ///
 /// - `user`: 账户唯一键
-pub fn unlock_user(user: &UserKeyObj) {
-    USER_LOCK.write().unwrap().remove(user);
+/// - `instance`: 占用它的实例
+pub fn lock_user(user: &UserKeyObj, instance: Uuid) {
+    USER_LOCK
+        .write()
+        .unwrap()
+        .entry(user.clone())
+        .or_default()
+        .insert(instance);
+}
+
+/// 释放某个实例对账户的占用；实例退出或启动失败时调用
+///
+/// - `instance`: 实例 uuid
+pub fn unlock_user(instance: &Uuid) {
+    let mut map = USER_LOCK.write().unwrap();
+    map.retain(|_, set| {
+        set.remove(instance);
+        !set.is_empty()
+    });
 }
 
 #[cfg(test)]
@@ -529,5 +565,34 @@ mod tests {
             FAKE_CLIENT.to_string(),
         );
         obj.refresh(CancellationToken::new()).await.unwrap();
+    }
+
+    /// 账户占用锁按实例登记：别的实例还在用就算占用，自己退出只摘自己
+    #[test]
+    fn test_user_lock_tracks_instances() {
+        let key = UserKeyObj {
+            uuid: Uuid::new_v4().to_string(),
+            auth_type: AuthType::Offline,
+        };
+        let first = Uuid::new_v4();
+        let second = Uuid::new_v4();
+
+        assert!(!have_lock(&key));
+        lock_user(&key, first);
+        assert!(have_lock(&key));
+        assert!(!locked_by_other(&key, &first), "自己占用不算别人");
+        assert!(locked_by_other(&key, &second));
+
+        // 两个实例同时用同一账户：退掉一个仍然是占用
+        lock_user(&key, second);
+        unlock_user(&first);
+        assert!(have_lock(&key));
+        assert!(
+            locked_by_other(&key, &first),
+            "第二个实例还占着，对已退出的实例仍算别人"
+        );
+
+        unlock_user(&second);
+        assert!(!have_lock(&key), "最后一个实例退出后解锁");
     }
 }

@@ -192,7 +192,7 @@ export function createCommands(invoke: Invoke) {
       getSystemMemory: () => invoke<SystemMemoryDto>("main_get_system_memory"),
       getVersions: () => invoke<VersionInfoDto[]>("main_get_versions"),
       imageBaseUrl: () => invoke<string>("main_image_base_url"),
-      launchGame: (uuid: string, world: string | null) => invoke<void>("main_launch_game", { uuid, world }),
+      launchGame: (uuid: string, world: string | null, force: boolean | null) => invoke<void>("main_launch_game", { uuid, world, force }),
       loadState: () => invoke<LoadState>("main_load_state"),
       moveGroup: (uuid: string, index: number) => invoke<boolean>("main_move_group", { uuid, index }),
       moveInstance: (uuid: string, group: string | null, index: number) => invoke<boolean>("main_move_instance", { uuid, group, index }),

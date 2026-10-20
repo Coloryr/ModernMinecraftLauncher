@@ -32,6 +32,9 @@ impl I18Lang for ZhCn {
             InfoType::CoreStop => format!("M²L停止"),
             InfoType::TempFile => format!("临时文件"),
             InfoType::AdoptMmcInstance { name } => format!("检测到 MMC 实例并已接管：{name}"),
+            InfoType::ImportLegacyGroups { groups, instances } => format!(
+                "已把旧版分组文件 instgroups.json 并入分组表：新建 {groups} 个分组，归入 {instances} 个实例"
+            ),
             InfoType::DownloadTaskDone {
                 total,
                 completed,

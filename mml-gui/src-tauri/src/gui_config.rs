@@ -284,6 +284,8 @@ pub struct ClientConfig {
     pub login_lock: Vec<LoginLockObj>,
     /// 游戏自动进服，启动时自动进入 `auto_join_server`
     pub auto_join: bool,
+    /// 启动实例时检查账户是否已被其它运行中的实例占用
+    pub account_check: bool,
     /// 游戏自动进服地址，host 或 host:port；空串表示不自动进服
     pub auto_join_server: String,
     /// MOTD 显示地址，host 或 host:port；空串表示不显示真实服务器信息
@@ -317,6 +319,7 @@ impl Default for ClientConfig {
             login_lock_on: false,
             login_lock: Vec::new(),
             auto_join: false,
+            account_check: true,
             auto_join_server: String::new(),
             motd_server: String::new(),
             lock_instance: String::new(),

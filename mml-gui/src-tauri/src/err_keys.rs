@@ -51,6 +51,8 @@ pub const OFFLINE_NEED_PREMIUM: &str = "err.offlineNeedPremium";
 pub const NAME_EMPTY: &str = "err.nameEmpty";
 /// 登录方式被锁定
 pub const LOGIN_LOCKED: &str = "err.loginLocked";
+/// 账户正被其它运行中的实例占用
+pub const ACCOUNT_IN_USE: &str = "err.accountInUse";
 /// 该账户不是微软登录，刷不了 Token
 pub const NOT_OAUTH: &str = "err.notOauth";
 

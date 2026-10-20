@@ -978,8 +978,8 @@ export const api = {
    *
    * 启动用户名由后端从当前账户解析
    */
-  async launchGame(uuid: string, world?: string): Promise<void> {
-    return commands.main.launchGame(uuid, world ?? null);
+  async launchGame(uuid: string, world?: string, force?: boolean): Promise<void> {
+    return commands.main.launchGame(uuid, world ?? null, force ?? null);
   },
 
   /**
@@ -2384,8 +2384,8 @@ export function enableResourcepack(uuid: string, file: string): Promise<void> {
  * - `uuid`: 实例 uuid
  * - `world`: 存档目录名；不传按实例自己的自启配置来
  */
-export function launchGame(uuid: string, world?: string): Promise<void> {
-  return commands.main.launchGame(uuid, world ?? null);
+export function launchGame(uuid: string, world?: string, force?: boolean): Promise<void> {
+  return commands.main.launchGame(uuid, world ?? null, force ?? null);
 }
 
 /**

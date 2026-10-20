@@ -13,7 +13,7 @@
 use std::collections::HashSet;
 use std::sync::{Arc, LazyLock, Mutex};
 
-use mml_auth::{AuthType, auths};
+use mml_auth::{AuthType, auths, lock_user, locked_by_other, unlock_user};
 use mml_game::game_launch::{AutoJoinType, GameLaunchArg};
 use mml_game::gui_hook::{ILaunchGui, LaunchState, ProcessRunType};
 use mml_game::launcher::instance_setting_obj::{InstanceSettingObj, ServerObj};
@@ -24,6 +24,7 @@ use uuid::Uuid;
 
 use crate::dtos::{ErrorEvent, ExitEvent, StateEvent};
 use crate::err_keys;
+use crate::gui_config;
 use crate::i18;
 use crate::listens;
 use crate::log_text::LogText;
@@ -70,17 +71,19 @@ fn global_auto_join() -> Option<ServerObj> {
 /// - `app`: 应用句柄，用于发启动状态 / 日志 / 退出事件
 /// - `uuid`: 实例 uuid
 /// - `world`: 启动后直接进入的存档目录名，空串或 `None` 为不自动进入
+/// - `force`: 账户被占用时是否跳过占用检查，`Some(true)` 为用户在弹窗里选了继续
 ///
 /// # 返回值
 ///
 /// 已交给后台任务时返回 `Ok(())`；实例不存在 / 没有当前账户 / 已在运行 /
-/// 没登录过正版账户却要用离线账户启动 返回 `Err`
+/// 没登录过正版账户却要用离线账户启动 / 账户已被其它实例占用 返回 `Err`
 #[gui_macros::ipc_group("main")]
 #[gui_macros::command]
 pub async fn main_launch_game(
     app: AppHandle,
     uuid: String,
     world: Option<String>,
+    force: Option<bool>,
 ) -> Result<(), String> {
     let core = core_instance(&uuid).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())?;
     if is_running(&core.uuid) {
@@ -101,6 +104,17 @@ pub async fn main_launch_game(
     {
         mml_sys::open_helper::open_url("https://www.minecraft.net/");
         return Err(err_keys::OFFLINE_NEED_PREMIUM.to_string());
+    }
+
+    // 账户占用检查：同一账户同时开两个实例可能导致登录凭据互相顶掉。
+    // 用户可以在弹窗里选继续，并把检查关掉；`force` 是这一次的临时放行。
+    // 占用表在 `mml_auth`，键是账户、值是占用它的实例，登录流程也能看到同一份状态
+    let account = auth.get_key();
+    if force != Some(true)
+        && gui_config::get().client.account_check
+        && locked_by_other(&account, &core.uuid)
+    {
+        return Err(err_keys::ACCOUNT_IN_USE.to_string());
     }
 
     // 实例快照 + 自启参数。优先级：右键指定的存档 → 实例配的"加入服务器"
@@ -143,6 +157,7 @@ pub async fn main_launch_game(
     if !LAUNCHING.lock().unwrap().insert(core.uuid) {
         return Err(err_keys::INSTANCE_RUNNING.to_string());
     }
+    lock_user(&account, core.uuid);
 
     emit_launch_state(
         &app,
@@ -185,6 +200,8 @@ pub async fn main_launch_game(
                         }
                         .text(),
                     );
+                    LAUNCHING.lock().unwrap().remove(&launch_uuid);
+                    unlock_user(&launch_uuid);
                     return;
                 }
             };
@@ -202,6 +219,7 @@ pub async fn main_launch_game(
                         // 进程已经起来、只是启动后命令失败时不算启动失败，否则会多记一次
                         if !is_running(&launch_uuid) {
                             game_count::launch_error(&launch_uuid);
+                            unlock_user(&launch_uuid);
                         }
                         mml_log::error_type(err.clone());
                         let text = i18::get_error(err.clone());
@@ -223,6 +241,7 @@ pub async fn main_launch_game(
 
     if let Err(err) = spawned {
         LAUNCHING.lock().unwrap().remove(&launch_uuid);
+        unlock_user(&launch_uuid);
         return Err(err.to_string());
     }
 
@@ -267,6 +286,8 @@ pub fn main_get_running() -> Vec<String> {
 /// - `app`: 应用句柄，事件的发送方
 /// - `event`: 内核的实例退出事件
 pub(crate) fn forward_game_exit(app: &AppHandle, event: &InstanceExit) {
+    // 进程退出，账户不再被这个实例占用
+    unlock_user(&event.uuid);
     // 先结掉这一局的运行时长，再通知前端；退出轮询线程不是 tokio 线程，
     // 所以统计落盘走 game_count 自己的普通线程，见 save_async
     game_count::game_close(&event.uuid);

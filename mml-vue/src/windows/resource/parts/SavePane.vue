@@ -203,7 +203,7 @@ function onMenuPick(id: string) {
 /** 直接进这个世界：后端会把它拼成 `--quickPlaySingleplayer`（1.20+ 才有） */
 function enterWorld(item: SaveItemDto) {
   actLocal(async () => {
-    await launchGame(instanceUuid.value, item.dir);
+    if (!(await launchGame(instanceUuid.value, item.dir))) return;
     // 启动交给后台任务，这里立刻返回：说一句，别让人以为没反应
     showToast(t("resource.enterWorldStarted"));
   });

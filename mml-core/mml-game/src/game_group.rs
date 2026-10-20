@@ -26,14 +26,17 @@
 //! 靠在本表里查它的 uuid，见 [`group_of`]。
 
 use std::{
-    collections::{HashMap, HashSet},
-    path::PathBuf,
+    collections::{BTreeMap, HashMap, HashSet},
+    path::{Path, PathBuf},
     sync::{LazyLock, RwLock},
 };
 
 use mml_base::serialize_tools;
 use mml_config::config_save;
-use mml_names::{i18_items::error_type::CoreResult, names, uuids};
+use mml_names::{
+    i18_items::{error_type::CoreResult, info_type::InfoType},
+    names, uuids,
+};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -52,6 +55,87 @@ pub struct GroupInfoObj {
     pub uuid: Uuid,
     /// 分组显示名；默认分组是空白，由界面翻译成"默认分组"
     pub name: String,
+}
+
+/// 旧版分组文件里的一个实例条目
+///
+/// 旧文件只记实例目录名，迁进分组表要先换成 uuid，所以由调用方补上 uuid。
+pub struct LegacyInstance {
+    /// 实例目录名，即 `game.json` 的 `DirName`
+    pub dir: String,
+    /// 实例显示名，目录名对不上时用它兜底
+    pub name: String,
+    /// 实例 uuid
+    pub uuid: Uuid,
+}
+
+/// 旧版分组文件的内容
+///
+/// 只取 `groups`：`formatVersion` 与每组的 `hidden` 在新表里没有对应字段，
+/// 反序列化时忽略。
+#[derive(Debug, Deserialize)]
+struct LegacyGroups {
+    /// 组名 → 组内实例目录名
+    #[serde(default)]
+    groups: BTreeMap<String, LegacyGroup>,
+}
+
+/// 旧版分组条目
+#[derive(Debug, Deserialize)]
+struct LegacyGroup {
+    /// 组内实例的目录名，按旧版排好的顺序
+    #[serde(default)]
+    instances: Vec<String>,
+}
+
+/// 旧版分组的归并结果
+#[derive(Debug, Default, Clone, Copy)]
+struct LegacyImport {
+    /// 新建的分组数；与已有分组同名时不算新建
+    groups: usize,
+    /// 实际放进分组的实例数；认不出目录名的条目不算
+    instances: usize,
+}
+
+/// 旧版条目到实例 uuid 的映射
+#[derive(Default)]
+struct LegacyLookup {
+    /// 目录名 → 实例 uuid
+    dirs: HashMap<String, Uuid>,
+    /// 实例显示名 → 实例 uuid，重名时保留第一个
+    names: HashMap<String, Uuid>,
+}
+
+impl LegacyLookup {
+    /// 按当前加载到的实例建映射
+    ///
+    /// - `instances`: 实例列表
+    ///
+    /// # 返回值
+    ///
+    /// 见 [`LegacyLookup`]
+    fn new(instances: &[LegacyInstance]) -> Self {
+        let mut lookup = Self::default();
+        for item in instances {
+            lookup.dirs.entry(item.dir.clone()).or_insert(item.uuid);
+            lookup.names.entry(item.name.clone()).or_insert(item.uuid);
+        }
+        lookup
+    }
+
+    /// 旧文件里的一项对应哪个实例
+    ///
+    /// - `entry`: 旧文件记的实例目录名，可能是显示名
+    ///
+    /// # 返回值
+    ///
+    /// 对得上返回实例 uuid；实例已删时返回 `None`
+    fn find(&self, entry: &str) -> Option<Uuid> {
+        self.dirs
+            .get(entry)
+            .or_else(|| self.names.get(entry))
+            .copied()
+    }
 }
 
 /// 分组表：内存与磁盘共用同一个结构
@@ -204,6 +288,64 @@ impl GroupStore {
     /// 是否已经有同名的分组，组名保持唯一，免得界面上分不清
     fn has_name(&self, name: &str) -> bool {
         self.names.values().any(|n| n == name)
+    }
+
+    /// 按组名找分组
+    ///
+    /// - `name`: 分组名，调用方已去掉首尾空白
+    ///
+    /// # 返回值
+    ///
+    /// 找到返回分组 uuid；组名不存在返回 `None`
+    fn group_by_name(&self, name: &str) -> Option<Uuid> {
+        self.names
+            .iter()
+            .find(|(_, value)| value.as_str() == name)
+            .and_then(|(key, _)| Uuid::parse_str(key).ok())
+    }
+
+    /// 把旧版分组并进来：组名已存在就复用，成员按旧文件顺序追加到组末尾
+    ///
+    /// - `legacy`: 旧版分组文件
+    /// - `lookup`: 旧版实例名到 uuid 的映射
+    ///
+    /// # 返回值
+    ///
+    /// 见 [`LegacyImport`]，调用方据此决定要不要落盘
+    fn merge_legacy(&mut self, legacy: &LegacyGroups, lookup: &LegacyLookup) -> LegacyImport {
+        let mut result = LegacyImport::default();
+
+        for (name, group) in &legacy.groups {
+            let name = name.trim();
+            if name.is_empty() {
+                continue;
+            }
+            let target = match self.group_by_name(name) {
+                Some(uuid) => uuid,
+                None => match self.new_group(name) {
+                    Some(uuid) => {
+                        result.groups += 1;
+                        uuid
+                    }
+                    None => continue,
+                },
+            };
+
+            for entry in &group.instances {
+                let Some(uuid) = lookup.find(entry) else {
+                    continue;
+                };
+                // 已经在这一组里就不再动：旧文件删不掉时下次启动会再并一次，
+                // 重复追加会把组内顺序越拖越乱
+                if self.group_of(&uuid) == target {
+                    continue;
+                }
+                self.move_items(&[uuid], target);
+                result.instances += 1;
+            }
+        }
+
+        result
     }
 
     /// 某分组的成员，按组内次序排好
@@ -393,6 +535,53 @@ pub fn init(dir: PathBuf) -> CoreResult<()> {
     *STORE.write().unwrap() = store;
 
     Ok(())
+}
+
+/// 把旧版分组文件 `instgroups.json` 并入分组表，并删掉旧文件
+///
+/// 旧版按"组名 → 实例目录名"存分组，本启动器改用 uuid 为身份的
+/// [`names::GROUP_FILE`]。不迁移的话旧分组永远看不见，用户会以为分组丢了。
+///
+/// - `dir`: 实例根目录，旧文件与分组表都在这里
+/// - `instances`: 当前加载到的实例，用来把旧文件里的目录名换成 uuid
+pub fn import_legacy(dir: &Path, instances: &[LegacyInstance]) {
+    let file = dir.join(names::LEGACY_GROUP_FILE);
+    if !file.is_file() {
+        return;
+    }
+
+    // 读不出来就留着旧文件下次再试：分组是辅助数据，不能挡住实例加载
+    let Ok(legacy) = serialize_tools::json_from_file::<LegacyGroups>(&file) else {
+        return;
+    };
+    let lookup = LegacyLookup::new(instances);
+
+    // 先取路径再锁表：save 里是先读 GROUP_FILE 再读 STORE，反过来会死锁
+    let path = GROUP_FILE.read().unwrap().clone();
+    let Some(path) = path else {
+        return;
+    };
+
+    let result = {
+        let mut store = STORE.write().unwrap();
+        let result = store.merge_legacy(&legacy, &lookup);
+        if result.groups > 0 || result.instances > 0 {
+            store.normalize();
+            // 同步落盘：旧文件马上就要删，交给异步队列的话进程在写盘前退出就丢了
+            if serialize_tools::json_to_file(&*store, &path).is_err() {
+                return;
+            }
+        }
+        result
+    };
+
+    // 删不掉就留着，下次启动会再并一次；成员已在本组时 merge_legacy 会跳过
+    if std::fs::remove_file(&file).is_ok() && (result.groups > 0 || result.instances > 0) {
+        mml_log::info_type(InfoType::ImportLegacyGroups {
+            groups: result.groups,
+            instances: result.instances,
+        });
+    }
 }
 
 /// 保存分组表到磁盘，异步落盘
@@ -744,6 +933,22 @@ mod tests {
         assert_eq!(store.keys(), vec![c, DEFAULT_GROUP_UUID, a, b]);
     }
 
+    /// 新实例必须追加在目标组末尾，不能插到已有成员前面
+    #[test]
+    fn new_instance_appends_after_existing() {
+        let mut store = GroupStore::default();
+        store.normalize();
+
+        let first = Uuid::new_v4();
+        let second = Uuid::new_v4();
+        store.move_items(&[first], DEFAULT_GROUP_UUID);
+        store.move_items(&[second], DEFAULT_GROUP_UUID);
+
+        assert_eq!(store.position_of(&first), Some(0));
+        assert_eq!(store.position_of(&second), Some(1));
+        assert!(store.rank(second) > store.rank(first));
+    }
+
     /// 跨组移动必须从原组摘掉，并在目标组末尾拿到次序
     #[test]
     fn move_items_moves_out_of_the_old_group() {
@@ -795,6 +1000,94 @@ mod tests {
         assert_eq!(store.members(pack), vec![uuid], "实例必须真的进了目标组");
         assert!(store.groups[&DEFAULT_GROUP_UUID.to_string()].is_empty());
         assert_eq!(store.position_of(&uuid), Some(0));
+    }
+
+    /// 旧版分组并入：新分组追加在已有分组之后，成员按旧文件顺序进组
+    #[test]
+    fn merge_legacy_appends_groups_and_keeps_member_order() {
+        let a = Uuid::new_v4();
+        let b = Uuid::new_v4();
+        let c = Uuid::new_v4();
+
+        let mut store = GroupStore::default();
+        store.normalize();
+        store.move_items(&[a, b, c], DEFAULT_GROUP_UUID);
+
+        let legacy = LegacyGroups {
+            groups: BTreeMap::from([(
+                "旧组".to_string(),
+                LegacyGroup {
+                    instances: vec!["b".to_string(), "c".to_string(), "已删除".to_string()],
+                },
+            )]),
+        };
+        let lookup = LegacyLookup::new(&[
+            LegacyInstance {
+                dir: "a".to_string(),
+                name: String::from("A"),
+                uuid: a,
+            },
+            LegacyInstance {
+                dir: "b".to_string(),
+                name: String::from("B"),
+                uuid: b,
+            },
+            LegacyInstance {
+                dir: "c".to_string(),
+                name: String::from("C"),
+                uuid: c,
+            },
+        ]);
+
+        let result = store.merge_legacy(&legacy, &lookup);
+        let group = store.keys()[1];
+
+        assert_eq!(result.groups, 1);
+        assert_eq!(result.instances, 2, "认不出目录名的条目应忽略");
+        assert_eq!(
+            store.keys(),
+            vec![DEFAULT_GROUP_UUID, group],
+            "旧分组追加在已有分组之后"
+        );
+        assert_eq!(store.members(group), vec![b, c], "组内顺序按旧文件");
+        assert_eq!(
+            store.members(DEFAULT_GROUP_UUID),
+            vec![a],
+            "移走的实例要从默认分组摘掉"
+        );
+    }
+
+    /// 旧版分组与已有分组同名时复用，不建第二个同名组
+    #[test]
+    fn merge_legacy_reuses_group_with_same_name() {
+        let uuid = Uuid::new_v4();
+
+        let mut store = GroupStore::default();
+        store.normalize();
+        let group = store.new_group("整合包").expect("建组失败");
+        store.move_items(&[uuid], DEFAULT_GROUP_UUID);
+
+        let legacy = LegacyGroups {
+            groups: BTreeMap::from([(
+                String::from("整合包"),
+                LegacyGroup {
+                    instances: vec![String::from("dir")],
+                },
+            )]),
+        };
+        let lookup = LegacyLookup::new(&[LegacyInstance {
+            dir: String::from("dir"),
+            name: String::new(),
+            uuid,
+        }]);
+
+        let result = store.merge_legacy(&legacy, &lookup);
+
+        assert_eq!(result.groups, 0, "同名分组应复用");
+        assert_eq!(result.instances, 1);
+        assert_eq!(store.keys(), vec![DEFAULT_GROUP_UUID, group]);
+        assert_eq!(store.members(group), vec![uuid]);
+        assert!(store.members(DEFAULT_GROUP_UUID).is_empty());
     }
 
     /// 落盘 / 读盘类用例的**串行锁**
@@ -924,5 +1217,50 @@ mod tests {
             vec![custom, DEFAULT_GROUP_UUID],
             "重启后仍应保持用户排的位置"
         );
+    }
+
+    /// 旧版分组文件在启动时并入分组表并删除，重启后分组仍在
+    #[test]
+    fn import_legacy_merges_and_removes_file() {
+        let _guard = DISK_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        boot();
+
+        let dir = mml_testutil::temp_dir().join(format!("mml-group-legacy-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let uuid = Uuid::new_v4();
+        // 真实旧文件带 formatVersion 与 hidden，顺带验证多余字段会被忽略
+        std::fs::write(
+            dir.join(names::LEGACY_GROUP_FILE),
+            r#"{"formatVersion":"1","groups":{"整合包":{"hidden":true,"instances":["old-dir"]}}}"#,
+        )
+        .unwrap();
+
+        init(dir.clone()).unwrap();
+        import_legacy(
+            &dir,
+            &[LegacyInstance {
+                dir: String::from("old-dir"),
+                name: String::from("旧实例"),
+                uuid,
+            }],
+        );
+
+        assert!(
+            !dir.join(names::LEGACY_GROUP_FILE).exists(),
+            "旧文件应被删除"
+        );
+        let list = group_list();
+        assert_eq!(list.len(), 2);
+        assert_eq!(list[1].name, "整合包");
+        assert_eq!(group_items(&list[1].uuid), vec![uuid]);
+        assert_eq!(group_of(&uuid), list[1].uuid);
+
+        // 重启：并进来的分组应已落盘，导入走的是同步写，不等异步队列
+        init(dir.clone()).unwrap();
+        let list = group_list();
+        assert_eq!(list[1].name, "整合包");
+        assert_eq!(group_items(&list[1].uuid), vec![uuid]);
     }
 }

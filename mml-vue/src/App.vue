@@ -29,6 +29,7 @@ import BaseModal from "./components/ui/BaseModal.vue";
 import ModpackPopup from "./components/ModpackPopup.vue";
 import ResourcePopup from "./components/ResourcePopup.vue";
 import CustomUiPage from "./components/CustomUiPage.vue";
+import AccountLockModal from "./components/AccountLockModal.vue";
 
 applyTheme();
 applyLocale();
@@ -226,4 +227,7 @@ const closeAskButton = computed(() =>
     </div>
   </BaseModal>
   </template>
+
+  <!-- 账户占用确认：任何窗口里点启动都可能弹，所以挂在根上 -->
+  <AccountLockModal />
 </template>

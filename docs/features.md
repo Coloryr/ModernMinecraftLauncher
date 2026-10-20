@@ -78,7 +78,7 @@ M²L 是一个 Minecraft 启动器：内核 `mml-core/`（Rust workspace，17 �
 | `window_save.json` | 各窗口几何（位置 / 大小 / 最大化），键是窗口 uuid（含每个实例的族窗口） |
 | `config.json` | 内核配置：下载源与线程数、代理、DNS、检查与 SHA1 开关、游戏启动默认参数等 |
 | `collect.json` | 资源收藏（条目与分组） |
-| `group_save.json` | 实例分组 |
+| `group_save.json` | 实例分组；启动时会把旧版 `instgroups.json` 并入并删除旧文件 |
 | `count.dat` | 游戏统计（NBT；见 [§15](#15-游戏统计)，记录侧尚未接线） |
 | `block.json` / `items.json` | 方块与物品图标的渲染结果与版本号 |
 | `server.json` / `server.old.json` | 服务器包的远端清单与上一次的清单（按实例） |

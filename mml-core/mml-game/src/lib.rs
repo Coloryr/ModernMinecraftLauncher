@@ -91,7 +91,6 @@ pub mod game_arg;
 pub mod game_check;
 pub mod game_count;
 pub mod game_export;
-/// 分组表，独立于实例配置，详见模块文档
 pub mod game_group;
 pub mod game_lan;
 pub mod game_launch;
@@ -331,9 +330,30 @@ pub fn load() -> CoreResult<()> {
         }
     });
 
-    let installs = instance_path::load_instance_dir()?;
+    let mut installs = instance_path::load_instance_dir()?;
 
-    // 先把表里指向已删实例的悬空 uuid 清掉
+    // 分组表丢失 / 缺项时，登记次序决定组内位置：按目录创建时间从旧到新，
+    // 新实例才会排在末尾，而不是随 `read_dir` 的目录名顺序插到最前面
+    installs.sort_by(|a, b| {
+        let ta = instance_dir_time(a);
+        let tb = instance_dir_time(b);
+        ta.cmp(&tb).then_with(|| a.uuid.cmp(&b.uuid))
+    });
+
+    // 旧版分组文件 instgroups.json 记的是实例目录名，得等实例读完才拿得到 uuid 映射；
+    // 并入分组表后旧文件由 import_legacy 删掉。
+    // 必须排在 prune 前面：prune 可能排队一次异步落盘，先并完它写的就是合并后的表
+    let legacy: Vec<game_group::LegacyInstance> = installs
+        .iter()
+        .map(|item| game_group::LegacyInstance {
+            dir: item.dir.clone(),
+            name: item.name.clone(),
+            uuid: item.uuid,
+        })
+        .collect();
+    game_group::import_legacy(&instance_path::get_instance_dir(), &legacy);
+
+    // 再把表里指向已删实例的悬空 uuid 清掉
     let loaded: Vec<Uuid> = installs.iter().map(|i| i.uuid).collect();
     game_group::prune(&loaded);
 
@@ -342,6 +362,19 @@ pub fn load() -> CoreResult<()> {
     }
 
     Ok(())
+}
+
+/// 实例目录的创建时间；取不到时退回修改时间，再取不到按最早处理
+///
+/// - `item`: 实例配置
+///
+/// # 返回值
+///
+/// 实例目录的时间戳，用于分组表缺失时的稳定登记顺序
+fn instance_dir_time(item: &InstanceSettingObj) -> std::time::SystemTime {
+    std::fs::metadata(item.get_base_path())
+        .and_then(|meta| meta.created().or_else(|_| meta.modified()))
+        .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
 }
 
 /// 获取所有实例

@@ -261,7 +261,11 @@ async function testLaunch() {
   // 自己点的启动：立刻切回运行日志，不等第一阶段事件
   file.value = "";
   try {
-    await launchGame(lockedUuid.value);
+    const started = await launchGame(lockedUuid.value);
+    if (!started) {
+      launching.value = false;
+      return;
+    }
     // 自己启动的实例就是要盯着它的输出，顺手把自动下拉打开（与参考实现一致）
     setting.value.auto = true;
     await refreshRunning();

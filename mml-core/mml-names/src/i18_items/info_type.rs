@@ -17,6 +17,14 @@ pub enum InfoType {
         name: String,
     },
 
+    /// 旧版分组文件已并入分组表，带新建分组数 / 归入实例数
+    ImportLegacyGroups {
+        /// 新建的分组数
+        groups: usize,
+        /// 归入分组的实例数
+        instances: usize,
+    },
+
     /// 下载任务结束：总数 / 成功数 / 失败数
     DownloadTaskDone {
         /// 文件总数

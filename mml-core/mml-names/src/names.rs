@@ -54,6 +54,7 @@ pub const MOD_UPDATE_FILE: &str = "mod_update.json";
 pub const GAME_FILE: &str = "game.json";
 pub const GUI_SETTING_FILE: &str = "gui_setting.json";
 pub const GROUP_FILE: &str = "group_save.json";
+pub const LEGACY_GROUP_FILE: &str = "instgroups.json";
 pub const MOD_PACK_FILE: &str = "Modpack.json";
 pub const CONFIG_FILE: &str = "config.json";
 pub const SHA_FILE: &str = "sha1";
@@ -302,6 +303,7 @@ mod tests {
             GAME_FILE,
             GUI_SETTING_FILE,
             GROUP_FILE,
+            LEGACY_GROUP_FILE,
             MOD_PACK_FILE,
             CONFIG_FILE,
             SHA_FILE,

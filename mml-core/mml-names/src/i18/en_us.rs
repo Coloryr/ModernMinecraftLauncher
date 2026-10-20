@@ -29,6 +29,9 @@ impl I18Lang for EnUs {
             InfoType::CoreStop => String::from("M²L stopped"),
             InfoType::TempFile => String::from("Temporary files"),
             InfoType::AdoptMmcInstance { name } => format!("adopted MMC instance: {name}"),
+            InfoType::ImportLegacyGroups { groups, instances } => format!(
+                "imported legacy group file instgroups.json: {groups} new groups, {instances} instances"
+            ),
             InfoType::DownloadTaskDone {
                 total,
                 completed,
