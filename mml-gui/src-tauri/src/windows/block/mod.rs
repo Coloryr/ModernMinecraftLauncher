@@ -135,6 +135,22 @@ pub fn set_gui_handel(app: &AppHandle) {
     mml_tex_draw::set_gui_handel(Some(gui));
 }
 
+/// 分类的固定 uuid：自带分类按 `CAT_ORDER` 下标从全 0 开始编号
+///
+/// 不在表里的分类（将来的新标签页）用名字派生 UUIDv5，稳定且不会和已登记的撞上。
+///
+/// - `cat`: 分类原始 id，如 buildingBlocks / playerSkin
+///
+/// # 返回值
+///
+/// 形如 `00000000-0000-0000-0000-000000000000` 的 uuid 串
+fn cat_uuid(cat: &str) -> String {
+    match mml_tex_draw::order::CAT_ORDER.iter().position(|c| *c == cat) {
+        Some(index) => format!("00000000-0000-0000-0000-{index:012}"),
+        None => uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_OID, cat.as_bytes()).to_string(),
+    }
+}
+
 /// 获取方块与物品列表，按请求语言翻译；顺序＝游戏创造栏顺序
 ///
 /// 顺序完全由 crate 给的合并序列 `mml_tex_draw::ordered_entries` 决定：
@@ -160,12 +176,21 @@ pub fn block_list(lang: String) -> Vec<BlockItemDto> {
     // 分组名从游戏语言文件翻译，键为 itemGroup.<cat>，与方块名同一来源；
     // miss 时回退原值，比如自定义皮肤分组 playerSkin 不是游戏键，前端兜底
     let cat_name = |cat: String| -> String {
-        mml_tex_draw::get_lang(lang, &format!("itemGroup.{cat}")).unwrap_or(cat)
+        match mml_tex_draw::get_lang(lang, &format!("itemGroup.{cat}")) {
+            Some(name) if !name.is_empty() => name,
+            _ => cat,
+        }
     };
 
     mml_tex_draw::ordered_entries()
         .into_iter()
         .map(|entry| {
+            // 没有创造分类的条目（cat 为空）不进左栏分组，uuid 留空由前端跳过
+            let cat_uuid = if entry.cat.is_empty() {
+                String::new()
+            } else {
+                cat_uuid(&entry.cat)
+            };
             // 分类已在 ordered_entries 里算过，直接取，不再重复查 block_cat / item_cat；
             // 方块与物品只差名称语言键、图标目录与版本号
             let (name_key, dir, ver) = match entry.kind {
@@ -184,7 +209,9 @@ pub fn block_list(lang: String) -> Vec<BlockItemDto> {
                 .unwrap_or_else(|| entry.id.rsplit(':').next().unwrap_or(&entry.id).to_string());
             BlockItemDto {
                 name,
-                cat: cat_name(entry.cat),
+                cat: cat_name(entry.cat.clone()),
+                cat_id: entry.cat,
+                cat_uuid,
                 image: format!("{base}/{dir}/{}?v={ver}", entry.id),
                 id: entry.id,
             }

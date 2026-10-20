@@ -7,7 +7,7 @@
 //   1. bsdtar：Windows 10+ 自带的 tar.exe、macOS 自带的 tar 都是 bsdtar；
 //   2. PowerShell 的 Compress-Archive：Windows 一定有。
 import { spawnSync } from "node:child_process";
-import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -30,6 +30,11 @@ if (css) copyFileSync(join(themeDist, css), join(stage, "custom.css"));
 if (existsSync(join(themeDist, "assets"))) {
   cpSync(join(themeDist, "assets"), join(stage, "assets"), { recursive: true });
 }
+// 包根主题清单：导入时按它判定类型，免得包里带了 custom.css 就被当成样式包
+writeFileSync(
+  join(stage, "theme.json"),
+  JSON.stringify({ type: "page", name: "mml-ui-demo-custom", version: "1.0.0", api: 1 }, null, 2) + "\n",
+);
 
 const entries = readdirSync(stage).filter((name) => name !== "__MACOSX");
 rmSync(zipPath, { force: true });
@@ -85,5 +90,5 @@ if (!tool || !existsSync(zipPath)) {
 const kb = (statSync(zipPath).size / 1024).toFixed(1);
 console.log("");
 console.log("✓ 打包完成（" + tool + "）：" + zipPath);
-console.log("  " + entries.length + " 个顶层条目，" + kb + " KB，包根是 custom.js / custom.css");
-console.log("  导入：启动器 → 设置 → 界面 → 完全自定义界面，选上面这个 zip");
+console.log("  " + entries.length + " 个顶层条目，" + kb + " KB，包根是 theme.json / custom.js / custom.css");
+console.log("  导入：启动器 → 设置 → 界面 → 主题包，选上面这个 zip");

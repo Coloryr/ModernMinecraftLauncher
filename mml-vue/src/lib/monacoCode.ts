@@ -14,6 +14,8 @@
 // Ctrl+F 的查找框本体在 contrib/find，features/find 只是它依赖的共享查找特性：
 // 两个都要引（editor.main 也是这么引的），少引一个就只剩命令、没有界面
 import "monaco-editor/features/find/register.js";
+// 查找框 / 补全框的图标字体；现在靠 suggest 间接带进来，显式引一份免得以后拆掉 suggest 就变方框
+import "monaco-editor/features/codicon/register.js";
 import "monaco-editor/editor/contrib/find/browser/findController.js";
 import "monaco-editor/editor/contrib/folding/browser/folding.js";
 import "monaco-editor/editor/contrib/bracketMatching/browser/bracketMatching.js";

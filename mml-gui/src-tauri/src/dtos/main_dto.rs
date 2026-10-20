@@ -280,8 +280,12 @@ pub struct BlockItemDto {
     pub id: String,
     /// 显示名，按请求语言翻译，miss 时回退 id 尾段
     pub name: String,
-    /// 创造分组尾段，如 buildingBlocks / natural / …
+    /// 分类显示名，按请求语言翻译
     pub cat: String,
+    /// 分类原始 id，如 buildingBlocks / playerSkin；与界面语言无关
+    pub cat_id: String,
+    /// 分类的固定 uuid；自带分类按创造栏顺序从 0 编号，未知分类按名字派生
+    pub cat_uuid: String,
     /// 贴图地址，mml-image 完整 URL，带 ?v= 版本参数
     pub image: String,
 }

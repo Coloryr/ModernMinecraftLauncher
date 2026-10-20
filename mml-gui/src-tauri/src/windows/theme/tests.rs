@@ -162,10 +162,12 @@ fn page_accepts_entry_variants() {
     let dir = case("theme-page");
     let html: &[u8] = b"<html></html>";
     let js: &[u8] = b"module.exports = 1;";
-    let cases: [&[Spec]; 3] = [
+    let css: &[u8] = b"body{}";
+    let cases: [&[Spec]; 4] = [
         &[file("index.html", html)],
         &[file("custom.js", js)],
         &[file("index.html", html), file("custom.js", js)],
+        &[file("index.html", html), file("custom.css", css)],
     ];
     for (index, entries) in cases.iter().enumerate() {
         let path = write_package(&dir, &format!("page-{index}.zip"), entries);
@@ -181,15 +183,50 @@ fn css_accepts_entry_variants() {
     let dir = case("theme-css");
     let css: &[u8] = b"body{}";
     let js: &[u8] = b"module.exports = 1;";
-    let cases: [&[Spec]; 2] = [
-        &[file("custom.css", css)],
-        &[file("custom.css", css), file("custom.js", js)],
-    ];
-    for (index, entries) in cases.iter().enumerate() {
-        let path = write_package(&dir, &format!("css-{index}.zip"), entries);
-        let info = detect_theme(&path, Some(ThemeKind::Css)).unwrap();
-        assert_eq!(info.kind, ThemeKind::Css);
-    }
+    // 纯样式包没有清单也收
+    let plain = write_package(&dir, "css-0.zip", &[file("custom.css", css)]);
+    assert_eq!(
+        detect_theme(&plain, Some(ThemeKind::Css)).unwrap().kind,
+        ThemeKind::Css
+    );
+    // 带 custom.js 的与主页面 / 主题包重合，必须靠清单声明类型
+    let manifest = r#"{"type":"css"}"#;
+    let scripted = write_package(
+        &dir,
+        "css-1.zip",
+        &[
+            file("theme.json", manifest.as_bytes()),
+            file("custom.css", css),
+            file("custom.js", js),
+        ],
+    );
+    let info = detect_theme(&scripted, Some(ThemeKind::Css)).unwrap();
+    assert_eq!(info.kind, ThemeKind::Css);
+    assert!(info.declared);
+    crate::test_support::cleanup(&[&dir]);
+}
+
+#[test]
+fn unmarked_theme_package_rejected_as_css() {
+    let dir = case("theme-css-ambiguous");
+    let html = write_package(
+        &dir,
+        "home-page.zip",
+        &[file("index.html", b"x"), file("custom.css", b"y")],
+    );
+    assert_eq!(
+        detect_theme(&html, Some(ThemeKind::Css)).unwrap_err(),
+        err_keys::THEME_TYPE_UNKNOWN
+    );
+    let component = write_package(
+        &dir,
+        "home-component.zip",
+        &[file("custom.js", b"x"), file("custom.css", b"y")],
+    );
+    assert_eq!(
+        detect_theme(&component, Some(ThemeKind::Css)).unwrap_err(),
+        err_keys::THEME_TYPE_UNKNOWN
+    );
     crate::test_support::cleanup(&[&dir]);
 }
 
@@ -642,6 +679,33 @@ fn replace_atomic_keeps_old_on_failure() {
     let archive = WebArchive::open(&target).unwrap();
     assert_eq!(archive.read("index.html").unwrap(), b"new".to_vec());
     assert!(!target.with_file_name("package.zip.tmp").exists());
+    crate::test_support::cleanup(&[&dir]);
+}
+
+#[test]
+fn opens_archive_without_extension() {
+    let dir = case("theme-no-ext");
+    // 自定义主页面存成不带扩展名的 home，打开时不能靠后缀判断格式
+    let path = write_package(&dir, "home", &[file("index.html", b"x")]);
+    let archive = WebArchive::open(&path).unwrap();
+    assert_eq!(archive.read("index.html").unwrap(), b"x".to_vec());
+    crate::test_support::cleanup(&[&dir]);
+}
+
+#[test]
+fn replace_atomic_while_handle_is_open() {
+    let dir = case("theme-replace-open");
+    let target = dir.join("package.zip");
+    let old = write_package(&dir, "old.zip", &[file("index.html", b"old")]);
+    std::fs::copy(&old, &target).unwrap();
+    // 常驻句柄按整包只读打开：替换会覆盖正在被读的目标文件，不能因占用失败
+    let held = WebArchive::open(&target).unwrap();
+    let new = write_package(&dir, "new.zip", &[file("index.html", b"new")]);
+    replace_atomic(&new, &target).unwrap();
+    // 旧句柄仍指向被覆盖前的内容，重开之后才是新包
+    assert_eq!(held.read("index.html").unwrap(), b"old".to_vec());
+    let reopened = WebArchive::open(&target).unwrap();
+    assert_eq!(reopened.read("index.html").unwrap(), b"new".to_vec());
     crate::test_support::cleanup(&[&dir]);
 }
 

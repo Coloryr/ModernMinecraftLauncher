@@ -31,7 +31,9 @@ import { api, onGameExit, onGameLog, onLaunchError, onLaunchState } from "../../
 import { stateText } from "../../lib/launchState";
 import { useDownloadProgress } from "../../composables/useDownloadProgress";
 import { familyInstanceFromLabel, targetUuid } from "../windowManager";
+import { launchGame } from "../../lib/launch";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
+import { usePageActive } from "../../lib/pageActive";
 import type { InstanceInfoDto, LogLine, LogSettingDto } from "../../lib/bindings";
 import { uniq } from "../../lib/util";
 
@@ -71,6 +73,7 @@ const setting = ref<LogSettingDto>({
   // wordWrap 只为对齐后端结构留着：界面上的换行读全局偏好，不读它
   wordWrap: true,
   auto: false,
+  autoShow: false,
   enableNone: true,
   enableInfo: true,
   enableWarn: true,
@@ -255,8 +258,10 @@ async function testLaunch() {
   launching.value = true;
   stageKey.value = "";
   statePct.value = null;
+  // 自己点的启动：立刻切回运行日志，不等第一阶段事件
+  file.value = "";
   try {
-    await api.launchGame(lockedUuid.value);
+    await launchGame(lockedUuid.value);
     // 自己启动的实例就是要盯着它的输出，顺手把自动下拉打开（与参考实现一致）
     setting.value.auto = true;
     await refreshRunning();
@@ -285,10 +290,32 @@ async function doStop() {
 /** 日志视图的公开方法，见 MonacoLogView 的 defineExpose */
 const viewRef = ref<{ openFind: () => void } | null>(null);
 
-/** 打开页内查找框：浏览器的 Ctrl+F 被壳层关掉了，只能按钮触发 */
+/** 打开页内查找框：工具栏搜索按钮与 Ctrl+F 都走这里 */
 function onSearch() {
   viewRef.value?.openFind();
 }
+
+/** 本页是否在前台；单窗口模式切走时不能继续抢全局快捷键 */
+const active = usePageActive();
+
+/** Ctrl+F：焦点不在编辑器里时开 Monaco 的查找框，别落到浏览器自带的页内查找 */
+function onFindKey(e: KeyboardEvent) {
+  if (e.defaultPrevented) return;
+  if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+  if (e.key.toLowerCase() !== "f") return;
+  // 无论焦点在工具栏还是编辑器里，都先吃掉这次按键，再开编辑器自己的查找框
+  e.preventDefault();
+  onSearch();
+}
+
+watch(
+  active,
+  (on) => {
+    if (on) window.addEventListener("keydown", onFindKey, true);
+    else window.removeEventListener("keydown", onFindKey, true);
+  },
+  { immediate: true },
+);
 
 /** 上传确认弹窗 */
 const uploadAsk = ref(false);
@@ -420,6 +447,9 @@ onMounted(async () => {
   // 本实例的启停：切换「测试启动 / 停止」按钮
   unlistenLaunchState = await onLaunchState((e) => {
     if (e.uuid !== lockedUuid.value) return;
+    // 启动一开始（不管从主窗口还是这里的测试启动）就切回运行日志：
+    // 停在历史文件上会看不到这次启动的输出
+    if (!liveSource.value && !running.value) file.value = "";
     stageKey.value = e.state;
     statePct.value = e.progress ?? null;
     void refreshRunning();
@@ -444,6 +474,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   dropPending();
+  window.removeEventListener("keydown", onFindKey, true);
   unlistenGameLog?.();
   unlistenLaunchState?.();
   unlistenLaunchError?.();
@@ -517,6 +548,10 @@ onBeforeUnmount(() => {
         <label class="sw">
           <BaseSwitch v-model="setting.auto" />
           <span>{{ t("logWindow.autoScroll") }}</span>
+        </label>
+        <label class="sw">
+          <BaseSwitch v-model="setting.autoShow" />
+          <span>{{ t("logWindow.autoOpen") }}</span>
         </label>
         <span class="lbl">{{ t("logWindow.level") }}</span>
         <label v-for="lv in LEVELS" :key="lv.key" class="sw">

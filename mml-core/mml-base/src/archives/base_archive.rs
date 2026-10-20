@@ -126,7 +126,21 @@ impl BaseArchive {
                 error: String::new(),
             })
         })?;
+        Self::open_readonly_as(path, archive_type)
+    }
 
+    /// 以只读方式按指定格式打开压缩包，不按扩展名判断
+    ///
+    /// 给文件名不带压缩包扩展名的整包用，如自定义主页面存成 `home`。
+    ///
+    /// - `path`: 压缩包文件路径
+    /// - `archive_type`: 压缩包格式，由调用方保证与文件内容一致
+    ///
+    /// # 返回值
+    ///
+    /// 同 [`open_readonly`](Self::open_readonly)
+    pub fn open_readonly_as<P: AsRef<Path>>(path: P, archive_type: ArchiveType) -> CoreResult<Self> {
+        let path = path.as_ref().to_path_buf();
         let file = path_helper::open_read(&path)?;
         let mut handle = Self::make_handle(archive_type, &path, file)?;
         let entries = handle.read_entries()?;

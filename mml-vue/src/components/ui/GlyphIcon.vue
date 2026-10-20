@@ -13,6 +13,8 @@ export type GlyphName =
   | "plus"
   | "minus"
   | "check"
+  // 方块收藏：悬停露出的星框 / 已收藏的实心星
+  | "star"
   // 模组顶栏的批量操作：启用 / 禁用 / 删除，见 windows/resource 的 ModPane
   | "ban"
   | "trash"
@@ -23,6 +25,9 @@ export type GlyphName =
   | "chevron-left"
   | "chevron-right"
   | "chevron-down"
+  // 自定义 CSS 的顺序调整：上移 / 下移
+  | "arrow-up"
+  | "arrow-down"
   | "play"
   // 自定义音乐的标题栏入口：暂停与停止
   | "pause"
@@ -78,6 +83,8 @@ withDefaults(
     <path v-if="name === 'plus'" d="M12 5v14M5 12h14" />
     <path v-else-if="name === 'minus'" d="M5 12h14" />
     <path v-else-if="name === 'check'" d="m5 13 4 4L19 7" />
+    <path v-else-if="name === 'star'"
+      d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
     <path v-else-if="name === 'close'" d="M6 6l12 12M18 6L6 18" />
     <!-- 禁用：禁止符（圆圈 + 斜杠） -->
     <g v-else-if="name === 'ban'">
@@ -105,6 +112,15 @@ withDefaults(
     <path v-else-if="name === 'chevron-left'" d="m15 6-6 6 6 6" />
     <path v-else-if="name === 'chevron-right'" d="m9 6 6 6-6 6" />
     <path v-else-if="name === 'chevron-down'" d="m6 9 6 6 6-6" />
+    <!-- 顺序调整：带杆的箭头，与只有折线的 chevron 区分开 -->
+    <g v-else-if="name === 'arrow-up'">
+      <path d="M12 19V5" />
+      <path d="m6 11 6-6 6 6" />
+    </g>
+    <g v-else-if="name === 'arrow-down'">
+      <path d="M12 5v14" />
+      <path d="m6 13 6 6 6-6" />
+    </g>
     <path v-else-if="name === 'play'" d="M7.5 5.2v13.6L19 12 7.5 5.2z" />
     <!-- 暂停 / 停止：自定义音乐那两枚 -->
     <path v-else-if="name === 'pause'" d="M9.5 5v14M14.5 5v14" />

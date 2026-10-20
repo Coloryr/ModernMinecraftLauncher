@@ -25,7 +25,7 @@ import {
 } from "../../../lib/api";
 import { openWindow } from "../../windowManager";
 import type { BlockItemDto, BlockStatusDto } from "../../../lib/bindings";
-import { GROUP_PREFIX, isBlockSize, type BlockSize } from "../types";
+import { isBlockSize, type BlockSize } from "../types";
 
 interface ViewPref {
   cat: string;
@@ -33,15 +33,27 @@ interface ViewPref {
   size: BlockSize;
 }
 
+/** 一个游戏分类：左栏键、原始分类 id 与显示名 */
+export interface BlockCat {
+  /** 分类键，自带分类用后端给的固定 uuid */
+  uuid: string;
+  /** 原始分类 id，如 buildingBlocks / playerSkin */
+  id: string;
+  /** 后端翻译好的显示名 */
+  label: string;
+}
+
 /** 外部分组 / 收藏数据的接入点；不传就是"没有自建分组、没有收藏" */
 export interface BlockListHooks {
   /**
    * 自建分组成员判定
    *
-   * - `uuid`: 分组标识（分类键去掉 `g:` 前缀）
+   * - `uuid`: 分组 uuid
    * - `id`: 方块 id
    */
   inGroup?: (uuid: string, id: string) => boolean;
+  /** 这个键是不是自建分组；不是就按自带分类处理 */
+  isCustomGroup?: (uuid: string) => boolean;
   /** 收藏判定：收藏过的方块在列表里排到最前 */
   isFavorite?: (id: string) => boolean;
 }
@@ -217,14 +229,22 @@ export function useBlockList(hooks?: BlockListHooks) {
 
   // ---------- 分类与过滤 ----------
 
-  /** 出现过的分类（保持后端排序），原版分组后端已按游戏语言翻译，自定义分组走前端键 */
-  const cats = computed(() => [...new Set(blocks.value.map((b) => b.cat).filter(Boolean))]);
+  /** 出现过的游戏分类（保持后端顺序）；键是固定 uuid，显示名与语言无关地存一份 */
+  const cats = computed<BlockCat[]>(() => {
+    const map = new Map<string, BlockCat>();
+    for (const b of blocks.value) {
+      // 没有创造分类的条目（catId 为空）只出现在「全部」里
+      if (!b.catUuid || !b.catId || map.has(b.catUuid)) continue;
+      map.set(b.catUuid, { uuid: b.catUuid, id: b.catId, label: b.cat });
+    }
+    return [...map.values()];
+  });
 
   /** 各分类条目数（一次聚合，供左侧分类栏显示） */
   const catCounts = computed(() => {
     const map = new Map<string, number>();
     for (const b of blocks.value) {
-      if (b.cat) map.set(b.cat, (map.get(b.cat) ?? 0) + 1);
+      if (b.catUuid && b.catId) map.set(b.catUuid, (map.get(b.catUuid) ?? 0) + 1);
     }
     return map;
   });
@@ -232,16 +252,17 @@ export function useBlockList(hooks?: BlockListHooks) {
   // 当前分类消失时回到「全部」：重渲染换版本，或删掉最后一个玩家头颅。
   // 自建分组的键不在这份游戏分类里，删组时由上层自己清（见 BlockPanel）
   watch(cats, (list) => {
-    if (cat.value && !cat.value.startsWith(GROUP_PREFIX) && !list.includes(cat.value)) {
-      cat.value = "";
-    }
+    if (!cat.value || hooks?.isCustomGroup?.(cat.value)) return;
+    if (!list.some((each) => each.uuid === cat.value)) cat.value = "";
   });
 
-  /** 分类显示名：先查 i18n，miss 时回退原文（原版分组即游戏语言翻译结果） */
-  function catLabel(c: string): string {
-    const key = `blocks.cat.${c}`;
+  /** 分类显示名：先查 i18n（玩家头颅这类启动器自己的分类），miss 时用后端翻译好的名字 */
+  function catLabel(uuid: string): string {
+    const found = cats.value.find((each) => each.uuid === uuid);
+    if (!found) return uuid;
+    const key = `blocks.cat.${found.id}`;
     const text = t(key);
-    return text === key ? c : text;
+    return text === key ? found.label : text;
   }
 
   /** 是否处于筛选态（决定计数文案与空状态） */
@@ -251,10 +272,10 @@ export function useBlockList(hooks?: BlockListHooks) {
     const kw = keyword.value.trim().toLowerCase();
     const list = blocks.value.filter((b) => {
       if (cat.value) {
-        // 自建分组：成员表说了算；游戏分类按条目自己的 cat 比
-        if (cat.value.startsWith(GROUP_PREFIX)) {
-          if (!hooks?.inGroup?.(cat.value.slice(GROUP_PREFIX.length), b.id)) return false;
-        } else if (b.cat !== cat.value) {
+        // 自建分组：成员表说了算；自带分类按条目的 catUuid 比
+        if (hooks?.isCustomGroup?.(cat.value)) {
+          if (!hooks.inGroup?.(cat.value, b.id)) return false;
+        } else if (b.catUuid !== cat.value) {
           return false;
         }
       }
@@ -262,7 +283,7 @@ export function useBlockList(hooks?: BlockListHooks) {
       return (
         b.id.toLowerCase().includes(kw) ||
         b.name.toLowerCase().includes(kw) ||
-        catLabel(b.cat).toLowerCase().includes(kw)
+        catLabel(b.catUuid).toLowerCase().includes(kw)
       );
     });
 

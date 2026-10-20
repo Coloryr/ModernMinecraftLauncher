@@ -38,16 +38,24 @@
 
 /* 面板头部：固定在面板顶部，用分隔线与内容区分开；返回键在标题栏，这里不再是第一个控件。
    左右内边距与其它窗口的卡片边缘同值（26px）——详情是整页覆盖，这就是它那一层的边距 */
+/* 两行网格：第一行图标 / 标题 / 操作按钮，第二行标签单独占满一行。
+   标签不再被挤在标题那一列里，16 个标签只折两行，头部不会拉得很高 */
 .detail-head {
-  display: flex;
-  align-items: center;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "icon title actions"
+    "icon tags tags";
+  align-items: start;
+  column-gap: 14px;
+  row-gap: 10px;
   flex-shrink: 0;
   padding: 14px 26px;
   border-bottom: 1px solid var(--border);
 }
 
 .detail-icon {
+  grid-area: icon;
   width: 64px;
   height: 64px;
   border-radius: 12px;
@@ -67,17 +75,16 @@
 }
 
 .detail-title {
-  flex: 1;
+  grid-area: title;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
+/* 标题按行内流排版：角标紧跟在名字文字后面，名字换行时也跟着最后一个字，
+   不会像 flex 那样被推到标题列的最右边 */
 .detail-name {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   font-size: 18px;
   font-weight: 700;
   color: var(--text);
@@ -93,12 +100,14 @@
 
 /* 「已安装 / 下载中」角标，与列表卡片的同名样式一致 */
 .pack-badge {
+  display: inline-block;
   padding: 1px 7px;
   border-radius: 6px;
   background: var(--accent-soft);
   color: var(--accent);
   font-size: 10.5px;
   font-weight: 600;
+  vertical-align: middle;
   flex-shrink: 0;
 }
 
@@ -151,9 +160,24 @@
    这条**必须放在 .pack-tags 之后** —— 两者特异性相同，靠顺序让这条赢；
    放到前面的话基础规则反过来盖掉它，标签就只剩一行、超出的被裁掉 */
 .detail-tags {
+  grid-area: tags;
   flex-wrap: wrap;
   height: auto;
   overflow: visible;
+}
+
+/* 头部右侧的操作按钮组 */
+.detail-actions {
+  grid-area: actions;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* 已安装角标挪到作者 / 下载量那一行，标题不再为它让位或换行 */
+.detail-sub .pack-badge {
+  margin-right: 8px;
 }
 
 /* 详情页收藏星标：与外链按钮同规格，收藏后实心黄色（与列表星标一致） */
@@ -178,7 +202,7 @@
 }
 
 .detail-star.on {
-  color: #f6b500;
+  color: var(--star);
 }
 
 .detail-star.on svg {
@@ -187,7 +211,7 @@
 
 .detail-star:hover {
   background: var(--bg-hover);
-  color: #f6b500;
+  color: var(--star);
 }
 
 .detail-link {
@@ -286,10 +310,11 @@
   gap: 8px;
 }
 
-/* 版本筛选下拉：只收横向尺寸（max-width 与内边距），高度跟全 app 一样走 --ctl-h 那一档 */
+/* 版本筛选下拉：保留 .field-select 的纵向内边距，文字才会在 --ctl-h 里垂直居中；
+   横向给一个下限，窗口窄时也不会被挤到放不下「全部游戏版本」 */
 .sel-file-version {
+  min-width: 132px;
   max-width: 150px;
-  padding: 3px 8px;
   font-size: 12px;
   /* 选中的版本名可能很长：不让它在这条下拉里折成两行 */
   white-space: nowrap;

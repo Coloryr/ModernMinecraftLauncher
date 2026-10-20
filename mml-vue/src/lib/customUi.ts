@@ -167,6 +167,7 @@ function ensureLink(id: string, url: string) {
  * 把自定义 CSS 同步成一组 link，顺序即数组顺序
  *
  * 只留下这一轮要用的链接，href 没变就不动它，避免每次应用都重新拉一遍样式。
+ * 层叠顺序由 link 在 DOM 里的先后决定，所以顺序换了要把节点按新顺序挪一遍。
  *
  * - `items`: 要生效的包 id 与样式地址
  */
@@ -175,7 +176,21 @@ function syncLinks(items: Array<{ id: string; url: string }>) {
   for (const el of Array.from(document.querySelectorAll('link[id^="' + LINK_PREFIX + '"]'))) {
     if (!ids.has(el.id)) el.remove();
   }
-  for (const item of items) ensureLink(item.id, item.url);
+
+  const ordered: HTMLLinkElement[] = [];
+  for (const item of items) {
+    ensureLink(item.id, item.url);
+    const el = byId(LINK_PREFIX + item.id);
+    if (el) ordered.push(el as HTMLLinkElement);
+  }
+
+  // 顺序一致时不动节点：移动 link 会让浏览器重新应用样式
+  const current = Array.from(
+    document.querySelectorAll<HTMLLinkElement>('link[id^="' + LINK_PREFIX + '"]'),
+  );
+  if (current.length !== ordered.length || current.some((el, index) => el !== ordered[index])) {
+    for (const el of ordered) document.head.appendChild(el);
+  }
 }
 
 /** 执行一个包里排队中的入口函数 */

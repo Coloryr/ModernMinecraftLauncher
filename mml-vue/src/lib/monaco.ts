@@ -10,6 +10,13 @@
 
 import EditorWorker from "monaco-editor/editor/editor.worker.js?worker";
 import * as monaco from "monaco-editor/editor/editor.api";
+// 查找框与剪贴板命令不在 editor.api 里，要按需引入：没引 find 时日志区按 Ctrl+F
+// 会落到浏览器自带的页内查找，右键菜单里的「复制」也没有对应动作。
+// codicon 字体单独引一份 —— 查找框的图标全靠它，缺了就显示成方框
+import "monaco-editor/features/find/register.js";
+import "monaco-editor/features/codicon/register.js";
+import "monaco-editor/editor/contrib/find/browser/findController.js";
+import "monaco-editor/editor/contrib/clipboard/browser/clipboard.js";
 import { resolvedTheme } from "./theme";
 
 declare global {
@@ -17,6 +24,24 @@ declare global {
     MonacoEnvironment?: monaco.Environment;
   }
 }
+
+// 查找框按钮自带的悬停提示在 WebView2 里会反复显示 / 隐藏：Monaco 的悬停浮层带
+// IntersectionObserver，被判定不可见就立刻收起，鼠标还在按钮上又重新弹出。
+// 在捕获阶段截掉 .find-widget 内的 mouseover，改用 aria-label 当原生 title ——
+// 提示还在，但不会闪；CSS 的 :hover 反馈、按钮点击都不受影响。
+document.addEventListener(
+  "mouseover",
+  (e) => {
+    const el = e.target as Element | null;
+    if (!el?.closest(".find-widget")) return;
+    e.stopPropagation();
+    const button = el.closest("[aria-label]") as HTMLElement | null;
+    if (button && !button.title) {
+      button.title = button.getAttribute("aria-label") ?? "";
+    }
+  },
+  true,
+);
 
 self.MonacoEnvironment = {
   /**

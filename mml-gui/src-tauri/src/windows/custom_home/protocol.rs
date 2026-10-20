@@ -17,9 +17,6 @@ use crate::windows::web_assets::{
 
 use super::archive::{INDEX_FILE, open_handle};
 
-/// 持久压缩包名，在运行根目录下；前缀统一，改名时两处一起改
-pub(crate) const ZIP_PREFIX: &str = "custom_home";
-
 /// `mml-home` 协议入口：从常驻的压缩包里按条目读取，按 MIME 返回
 ///
 /// `/` 或空路径落到 `index.html`，含「整包套一层目录」的兜底；`/__mml_bridge.js`

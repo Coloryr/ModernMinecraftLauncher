@@ -1,0 +1,46 @@
+/* Monaco 文本视图的右键菜单：MonacoText（配置编辑器）与 MonacoLogView（日志）共用
+ *
+ * 固定定位、贴点击处弹出，越界由各自的 openMenu 夹回窗口里。
+ * 都是 scoped src 引入，类名随组件作用域，不会互相影响。 */
+
+.text-menu {
+  position: fixed;
+  z-index: 40;
+  min-width: 132px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-modal-raised);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.28);
+}
+
+.text-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12.5px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.text-menu-item:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.text-menu-item:disabled {
+  color: var(--text-dim);
+  cursor: default;
+  opacity: 0.55;
+}
+
+.text-menu-sep {
+  display: block;
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}

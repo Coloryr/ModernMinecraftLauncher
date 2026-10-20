@@ -2,7 +2,8 @@
 //!
 //! 三种换皮包（自定义主页面 / 自定义 CSS / 完全自定义界面）都是 zip，入口签名有重叠：
 //! Home 与 Page 都是 `index.html` 或 `custom.js`，单看文件分不出来。所以先看包根的
-//! `theme.json` 清单，没有清单再退回「导入入口」，只做入口文件匹配（兼容旧包）。
+//! `theme.json` 清单，没有清单再退回「导入入口」做兼容校验：样式包只收不带
+//! `index.html` / `custom.js` 的纯样式包，入口与其它类型重合时要求补清单。
 //!
 //! 校验在替换旧包之前完成，分三层：
 //! 1. 容器层：能否打开、加密条目、条目类型、条目数、解压后大小与压缩比；
@@ -154,13 +155,19 @@ pub(crate) fn detect_theme(path: &Path, expected: Option<ThemeKind>) -> Result<T
         });
     }
 
-    // 没有清单：类型取导入入口，只做入口文件匹配；Home 与 Page 仍然分不出来
-    let has_home = archive.locate(INDEX_FILE).is_some() || archive.locate(SCRIPT_FILE).is_some();
-    let has_css = archive.locate(CSS_FILE).is_some();
+    // 没有清单：类型取导入入口，只做入口文件匹配；Home 与 Page 仍然分不出来，
+    // 样式包与它们重合时直接要求补清单
+    let has_home = has_entry(&archive, INDEX_FILE) || has_entry(&archive, SCRIPT_FILE);
+    let has_css = has_entry(&archive, CSS_FILE);
     let kind = match expected {
         Some(ThemeKind::Css) => {
             if !has_css {
                 return Err(error(err_keys::THEME_MISSING_ENTRY));
+            }
+            // custom.js 与主页面 / 主题包重合：没有清单时只收纯样式包，
+            // 免得整页包因为多带了一个 custom.css 就被当成样式包导入
+            if has_home {
+                return Err(error(err_keys::THEME_TYPE_UNKNOWN));
             }
             ThemeKind::Css
         }
@@ -236,20 +243,36 @@ fn read_manifest(archive: &mut archive::Package) -> Result<Option<Manifest>, Str
     Ok(Some(manifest))
 }
 
-/// 确认该类型至少有一个入口文件，大小写不一致时按小写匹配并记一条日志
+/// 包里有没有这个入口，大小写不一致时按小写匹配并记一条日志
+///
+/// - `archive`: 已通过容器与路径校验的包
+/// - `name`: 约定的小写入口文件名
+///
+/// # 返回值
+///
+/// 命中时为 `true`
+fn has_entry(archive: &archive::Package, name: &str) -> bool {
+    match archive.locate(name) {
+        Some(found) => {
+            if found.case_mismatch {
+                warn_case(&found.name);
+            }
+            true
+        }
+        None => false,
+    }
+}
+
+/// 确认该类型至少有一个入口文件
 ///
 /// - `archive`: 已通过容器与路径校验的包
 /// - `kind`: 清单声明的类型
 fn ensure_entry(archive: &archive::Package, kind: ThemeKind) -> Result<(), String> {
-    for name in kind.entry_names() {
-        if let Some(found) = archive.locate(name) {
-            if found.case_mismatch {
-                warn_case(&found.name);
-            }
-            return Ok(());
-        }
+    if kind.entry_names().iter().any(|name| has_entry(archive, name)) {
+        Ok(())
+    } else {
+        Err(error(err_keys::THEME_MISSING_ENTRY))
     }
-    Err(error(err_keys::THEME_MISSING_ENTRY))
 }
 
 /// 从常驻句柄里找清单：先看包根，再看唯一顶层目录

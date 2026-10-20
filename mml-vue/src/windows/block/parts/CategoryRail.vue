@@ -12,7 +12,7 @@ import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 
 /** 左栏的一项 */
 export interface CatItem {
-  /** 分类 ID（自建分组是 `g:<uuid>`；「全部」不在这里，空串由外壳表示） */
+  /** 分类 uuid（自带分类是固定 uuid，自建分组是自己的 uuid；「全部」不在这里，空串由外壳表示） */
   id: string;
   /** 显示名 */
   label: string;

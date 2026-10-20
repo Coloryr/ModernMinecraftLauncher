@@ -269,50 +269,9 @@ watch(wordWrap, (on) => {
   min-width: 0;
   min-height: 0;
   border: 1px solid var(--border);
-  overflow: hidden;
-}
-
-/* 右键菜单：外观与资源窗口的 .row-ctx-menu 同一套（在 components/ui 里不能反向依赖那边）。
-   它固定定位，父级那条 .cfg-view > * 的 flex 规则落不到它身上 */
-.text-menu {
-  position: fixed;
-  z-index: 40;
-  min-width: 132px;
-  padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-modal-raised);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.28);
-}
-
-.text-menu-item {
-  display: block;
-  width: 100%;
-  padding: 6px 10px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text);
-  font-size: 12.5px;
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.text-menu-item:hover:not(:disabled) {
-  background: var(--bg-hover);
-}
-
-.text-menu-item:disabled {
-  color: var(--text-dim);
-  cursor: default;
-  opacity: 0.55;
-}
-
-.text-menu-sep {
-  display: block;
-  height: 1px;
-  margin: 4px 6px;
-  background: var(--border);
+  /* 不能裁：同上，查找框的悬停提示要能伸出编辑器之外 */
 }
 </style>
+
+<!-- 右键菜单的样式与日志视图共用，见 styles/parts/text-menu.css -->
+<style scoped src="../../styles/parts/text-menu.css"></style>

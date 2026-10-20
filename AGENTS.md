@@ -102,8 +102,8 @@
 - **DTO 换文件会改生成物的顺序**：生成器按**排序后的文件路径**遍历 `dtos/`，把一个 DTO 文件拆成
   目录后，`bindings.ts` 里类型声明的先后会变（内容不变）。判定"没改契约"要比对**类型块集合**
   （每个 `export type X = {...}` 归一化后按名字比），而不是看 diff 行数。
-- 磁盘配置用 Rust 命名（snake_case），跨 IPC 传输一律经 `src-tauri/src/dtos/` 转成
-  camelCase DTO。
+- 磁盘配置的 JSON 键统一用**大驼峰**（如 `MainWindow` / `SelectedInstance`），
+  跨 IPC 传输一律经 `src-tauri/src/dtos/` 转成 camelCase DTO。
 
 ## 5. 目录分工
 
@@ -270,7 +270,7 @@ windows/<窗口>/mod.rs 里：
 
 | 种 | 作用 | 产物 | 开关 | 设置位置 |
 | --- | --- | --- | --- | --- |
-| 1 自定义主页面 | 主窗口主页内容区 | `custom_home.zip`（`index.html` 或 `custom.js`） | `client.custom_home` | 客户端设置 |
+| 1 自定义主页面 | 主窗口主页内容区 | `home`（`index.html` 或 `custom.js`） | `client.custom_home` | 客户端设置 |
 | 2 自定义 CSS | 内置界面换皮，可装多份 | `custom_ui/css/<id>.zip`，包根 `custom.css`，可选 `custom.js` 入口 | `client.custom_css_on` 加每条 `enabled` | 界面 |
 | 3 完全自定义界面 | 整个主窗口换成整页 / 按 kind 换窗口组件 | `custom_ui/page.zip`（`index.html` 或 `custom.js`） | `client.custom_page_on` | 界面 |
 

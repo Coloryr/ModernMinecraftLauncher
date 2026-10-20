@@ -23,12 +23,18 @@ const props = defineProps<{
   size: BlockSize;
   /** 详情里正在看的方块（网格里高亮） */
   activeId: string | null;
-  /** 玩家头颅分类 ID：这类格子带悬停删除角标 */
+  /** 玩家头颅分类的原始 id：这类格子带悬停删除角标 */
   skinCat: string;
   /** 是否处于筛选态，决定空状态要不要给「清除筛选」 */
   filtered: boolean;
-  /** 收藏判定：收藏过的方块在角上点一个小点 */
+  /** 收藏判定：收藏过的方块在左上角常显实心星 */
   isFavorite?: (id: string) => boolean;
+  /** 切换收藏：点悬停露出的星框或已收藏的星标时调用 */
+  toggleFavorite?: (id: string) => void;
+  /** 多选模式：点击格子只切换勾选，不打开详情 */
+  selectMode?: boolean;
+  /** 某个方块当前是否被勾选 */
+  isSelected?: (id: string) => boolean;
 }>();
 
 const emit = defineEmits<{
@@ -40,7 +46,20 @@ const emit = defineEmits<{
   (e: "clear-filters"): void;
   /** 右键某个方块：交给外壳弹收藏 / 分组菜单 */
   (e: "item-menu", payload: { event: MouseEvent; item: BlockItemDto }): void;
+  /** 多选模式下点了一个方块：切换它的勾选状态 */
+  (e: "toggle-select", b: BlockItemDto): void;
 }>();
+
+/** 点击格子：多选模式下只切换勾选，否则打开详情 */
+function onCellClick(b: BlockItemDto) {
+  if (props.selectMode) emit("toggle-select", b);
+  else emit("open", b);
+}
+
+/** 右键格子：多选模式不弹单项菜单，批量操作走多选条 */
+function onCellMenu(event: MouseEvent, b: BlockItemDto) {
+  if (!props.selectMode) emit("item-menu", { event, item: b });
+}
 
 /** 视口外上下各多渲染几行，滚动时不至于看到空白 */
 const OVERSCAN = 2;
@@ -239,14 +258,22 @@ function onCellKey(e: KeyboardEvent, i: number) {
     <div v-if="items.length" class="grid-pad" :style="{ height: totalH + BOTTOM_SPACE + 'px' }">
       <div ref="gridEl" class="block-grid" :style="gridStyle">
         <button v-for="(b, k) in visible" :key="b.id" type="button" class="block-cell"
-          :class="{ on: b.id === activeId }" :data-idx="startIndex + k"
-          :tabindex="startIndex + k === tabbableIndex ? 0 : -1" @click="emit('open', b)"
-          @focus="focusIndex = startIndex + k" @keydown="onCellKey($event, startIndex + k)"
-          @contextmenu.prevent="emit('item-menu', { event: $event, item: b })">
-          <!-- 收藏过：角上一个小点，列表里它们也排在最前 -->
-          <span v-if="isFavorite?.(b.id)" class="block-star" aria-hidden="true" />
-          <!-- 玩家头颅：悬停角标删除 -->
-          <span v-if="b.cat === skinCat" class="block-del" v-tip="t('blocks.skinRemove')"
+          :class="{ on: b.id === activeId, 'multi-checked': selectMode && isSelected?.(b.id) }"
+          :data-idx="startIndex + k" :tabindex="startIndex + k === tabbableIndex ? 0 : -1"
+          @click="onCellClick(b)" @focus="focusIndex = startIndex + k"
+          @keydown="onCellKey($event, startIndex + k)" @contextmenu.prevent="onCellMenu($event, b)">
+          <!-- 多选模式：每格右上角一枚勾选圈，选定后填充强调色 -->
+          <span v-if="selectMode" class="row-check" :class="{ on: isSelected?.(b.id) }">
+            <GlyphIcon v-if="isSelected?.(b.id)" name="check" :size="11" :weight="3" />
+          </span>
+          <!-- 收藏：未收藏只在悬停 / 键盘聚焦时露出星框，收藏后常显实心星；多选时让位给勾选圈 -->
+          <span v-if="!selectMode" class="block-fav" :class="{ 'is-on': isFavorite?.(b.id) }"
+            v-tip="isFavorite?.(b.id) ? t('blocks.unfavorite') : t('blocks.favorite')"
+            @click.stop="toggleFavorite?.(b.id)">
+            <GlyphIcon name="star" :size="13" :weight="2" />
+          </span>
+          <!-- 玩家头颅：悬停角标删除；多选时同样让位 -->
+          <span v-if="!selectMode && b.catId === skinCat" class="block-del" v-tip="t('blocks.skinRemove')"
             @click.stop="emit('remove-skin', b)">
             <GlyphIcon name="close" :size="11" :weight="2.6" />
           </span>
@@ -266,6 +293,8 @@ function onCellKey(e: KeyboardEvent, i: number) {
     </div>
   </div>
 </template>
+
+<style scoped src="../../../styles/parts/instance-check.css"></style>
 
 <style scoped>
 .grid-scroll {
@@ -298,15 +327,51 @@ function onCellKey(e: KeyboardEvent, i: number) {
   display: grid;
 }
 
-/* 收藏角标：右下角一个小圆点，不抢方块图 */
-.block-star {
+/* 收藏角标：左上角，外观与资源窗口的星标一致 —— 透明底，未收藏是描边星，
+   收藏后填充成固定黄色；悬停 / 键盘聚焦时出现，收藏过的常显 */
+.block-fav {
   position: absolute;
-  right: 5px;
-  bottom: 5px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
+  top: 2px;
+  left: 2px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--border);
+  cursor: pointer;
+  opacity: 0;
+  /* 不可见时不吃点击：格子左上角仍可点开详情 */
+  pointer-events: none;
+  transition: opacity 0.12s ease, color 0.12s ease;
+}
+
+.block-cell:hover .block-fav,
+.block-cell:focus-visible .block-fav {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.block-fav:hover {
+  color: var(--star);
+}
+
+.block-fav.is-on {
+  opacity: 1;
+  pointer-events: auto;
+  color: var(--star);
+}
+
+.block-fav svg {
+  fill: none;
+  stroke: currentColor;
+}
+
+.block-fav.is-on svg {
+  fill: currentColor;
 }
 
 .block-cell {
@@ -338,7 +403,8 @@ function onCellKey(e: KeyboardEvent, i: number) {
   outline-offset: 1px;
 }
 
-.block-cell.on {
+.block-cell.on,
+.block-cell.multi-checked {
   border-color: var(--accent);
   background: var(--accent-soft);
 }

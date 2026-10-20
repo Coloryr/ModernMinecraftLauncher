@@ -24,8 +24,10 @@ pub struct ModrinthProjectObj {
     pub loaders: Vec<String>,
     /// 图标 URL，对应 `icon_url`
     pub icon_url: String,
-    /// 分类标签，对应 `categories`
+    /// 主分类标签，对应 `categories`
     pub categories: Vec<String>,
+    /// 次分类标签，对应 `additional_categories`；详情页的标签要把它一并列出
+    pub additional_categories: Vec<String>,
     /// 图库列表，对应 `gallery`
     pub gallery: Vec<GalleryObj>,
 }

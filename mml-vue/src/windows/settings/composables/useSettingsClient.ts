@@ -34,9 +34,9 @@ const SERVER_LOCK_TYPES = ["authlib", "selflittleskin", "nide8"];
  * - `serverAddr`: 自动进服与 MOTD 共用的服务器地址，可双向绑定
  * - `loginTypeLabel` / `addLock*` / `lockServerError` / `lockServerPlaceholder`: 登录方式锁定的添加表单
  * - `lockInstances` / `refreshLockInstances` / `lockMissing` / `onLockInstanceChange`: 实例锁定
- * - `customHome` / `importingCustomHome` / `customHomeState` / `refreshCustomHome` / `importCustomHome` / `openCustomHomeDir` / `removeCustomHome`: 自定义主页面
- * - `customUi` / `customPageState` / `customPageEntry` / `refreshCustomUi` / `importCustomPage` / `removeCustomPage`: 完全自定义界面的整页包
- * - `addCustomCss` / `setCustomCssEnabled` / `removeCustomCss` / `openCustomUiDir`: 自定义 CSS 的安装、启停与删除
+ * - `customHome` / `importingCustomHome` / `customHomeState` / `refreshCustomHome` / `importCustomHome` / `removeCustomHome`: 自定义主页面
+ * - `customUi` / `customPageState` / `refreshCustomUi` / `importCustomPage` / `removeCustomPage`: 完全自定义界面的整页包
+ * - `addCustomCss` / `setCustomCssEnabled` / `moveCustomCss` / `removeCustomCss` / `openCustomUiDir`: 自定义 CSS 的安装、启停、排序与删除
  * - `pickMusicFile`: 选一个本地音频文件填进"自定义音乐"
  * - `experimental` / `applyExperimental`: 实验性功能四开关（界面先行，行为未接线）
  * - `applyWindowOpacity`: 透明度写进 CSS 变量并落盘，界面页的窗口外观用
@@ -250,15 +250,6 @@ export function useSettingsClient() {
     await applyClient();
   }
 
-  /** 在文件管理器里定位压缩包（还没导入时打开运行根目录） */
-  async function openCustomHomeDir() {
-    try {
-      await commands.customHome.openDir();
-    } catch (e) {
-      showToast(tErr(e));
-    }
-  }
-
   /** 删除已保存的包；配置里的启用开关不动，主窗口会自动回落到内置主页 */
   async function removeCustomHome() {
     try {
@@ -285,11 +276,6 @@ export function useSettingsClient() {
     if (!info?.pageInstalled) return t("winSettings.customPageNone");
     return t("winSettings.customPageInstalled", { count: info.pageFileCount });
   });
-
-  /** 入口地址只读展示；未导入时给占位 */
-  const customPageEntry = computed(
-    () => customUi.value?.pageEntryUrl || t("winSettings.customPageEntryNone"),
-  );
 
   /** 重拉整页包状态：进页面、导入或删除之后调用 */
   async function refreshCustomUi() {
@@ -319,6 +305,23 @@ export function useSettingsClient() {
     client.value.customCss = client.value.customCss.map((item) =>
       item.id === id ? { ...item, enabled } : item,
     );
+    void applyClient();
+  }
+
+  /**
+   * 调整一份 CSS 的注入顺序，列表顺序就是注入顺序
+   *
+   * - `id`: 条目 id
+   * - `delta`: 正数往后、负数往前；越界时不动
+   */
+  function moveCustomCss(id: string, delta: number) {
+    const list = [...client.value.customCss];
+    const from = list.findIndex((item) => item.id === id);
+    const to = from + delta;
+    if (from < 0 || to < 0 || to >= list.length) return;
+    const [moved] = list.splice(from, 1);
+    list.splice(to, 0, moved);
+    client.value.customCss = list;
     void applyClient();
   }
 
@@ -452,15 +455,14 @@ export function useSettingsClient() {
     customHomeState,
     refreshCustomHome,
     importCustomHome,
-    openCustomHomeDir,
     removeCustomHome,
     customUi,
     importingCustomPage,
     customPageState,
-    customPageEntry,
     refreshCustomUi,
     addCustomCss,
     setCustomCssEnabled,
+    moveCustomCss,
     removeCustomCss,
     importCustomPage,
     removeCustomPage,

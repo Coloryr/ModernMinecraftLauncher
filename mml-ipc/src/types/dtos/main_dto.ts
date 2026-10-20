@@ -102,6 +102,8 @@ export type BlockItemDto = {
   id: string,
   name: string,
   cat: string,
+  catId: string,
+  catUuid: string,
   image: string,
 };
 

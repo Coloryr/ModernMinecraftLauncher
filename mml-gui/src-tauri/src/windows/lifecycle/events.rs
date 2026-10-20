@@ -52,6 +52,7 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
             }
             if uuid == MAIN_WINDOW_UUID {
                 mml_core::stop();
+                mml_game::game_count::stop();
                 let others: Vec<(Uuid, WebviewWindow<tauri::Wry>)> = OPEN_WINDOWS
                     .write()
                     .unwrap()

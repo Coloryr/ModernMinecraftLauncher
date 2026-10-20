@@ -10,7 +10,7 @@
 //   2. PowerShell 的 Compress-Archive：Windows 一定有（条目用反斜杠，
 //      zip crate 的 Utf8WindowsPath 两种分隔符都能还原）。
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, readdirSync, rmSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -41,10 +41,18 @@ function buildEntry(): boolean {
   return true;
 }
 
+/** 包根主题清单：打包时临时写出，导入时按它判定类型 */
+const MANIFEST = join(root, "theme.json");
+
 /** 删掉本次生成的 custom.js 与 dist，不留在工作区 */
 function cleanupEntry() {
   rmSync(ENTRY_OUTPUT, { force: true });
   rmSync(join(root, "dist"), { recursive: true, force: true });
+}
+
+/** 删掉打包期临时写的清单，不留在源码目录 */
+function cleanupManifest() {
+  rmSync(MANIFEST, { force: true });
 }
 
 // 不进包：工具、说明、依赖与旧包，包里只留 custom.css 和静态资源
@@ -55,9 +63,15 @@ if (!buildEntry()) {
   process.exit(1);
 }
 
+writeFileSync(
+  MANIFEST,
+  JSON.stringify({ type: "css", name: "mml-ui-demo-custom-css", version: "1.0.0", api: 1 }, null, 2) + "\n",
+);
+
 const entries = readdirSync(root).filter((name) => !SKIP.has(name) && !name.endsWith(".zip"));
 if (!entries.includes("custom.css")) {
   console.error("✗ 根目录没有 custom.css，打出来的包启动器认不了");
+  cleanupManifest();
   cleanupEntry();
   process.exit(1);
 }
@@ -118,6 +132,7 @@ if (!tool || !existsSync(zipPath)) {
       "  手工处理：把本目录下的 custom.css 与 custom.js（及静态资源）压成 zip，\n" +
       "  保证压缩包根目录下就是 custom.css，然后导入启动器。",
   );
+  cleanupManifest();
   cleanupEntry();
   process.exit(1);
 }
@@ -125,6 +140,7 @@ if (!tool || !existsSync(zipPath)) {
 const kb = (statSync(zipPath).size / 1024).toFixed(1);
 console.log("");
 console.log(`✓ 打包完成（${tool}）：${zipPath}`);
-console.log(`  ${entries.length} 个顶层条目，${kb} KB，zip 根目录即 custom.css 与 custom.js`);
-console.log("  导入：启动器 → 设置 → 界面 → 自定义 CSS → 导入 CSS 包");
+console.log(`  ${entries.length} 个顶层条目，${kb} KB，zip 根目录即 theme.json / custom.css 与 custom.js`);
+console.log("  导入：启动器 → 设置 → 界面 → 样式包 → 导入样式包");
+cleanupManifest();
 cleanupEntry();

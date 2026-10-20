@@ -4,9 +4,10 @@
 //
 // **筛选不在这里**：等级 / 线程 / 分组都归日志窗口的工具栏管，筛完的行才传进来，
 // 免得同一套筛选条件在两边各存一份、还要互相同步。
-import { onActivated, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { editor } from "monaco-editor/editor/editor.api";
 import { applyLogTheme, monaco } from "../lib/monaco";
+import { t } from "../lib/i18n";
 import { LOG_LANGUAGE, registerLog } from "../lib/monacoLog";
 import { toggleWordWrap, wordWrap } from "../lib/editorWrap";
 import type { LogLine } from "../lib/bindings";
@@ -137,6 +138,78 @@ function openFind() {
 
 defineExpose({ openFind });
 
+// ---------------- 右键菜单：只读日志的全选 / 复制 ----------------
+
+/** 日志是只读的，右键只留这两项 */
+const LOG_MENU = [
+  { label: "edit.copy", command: "editor.action.clipboardCopyAction" },
+  { label: "edit.selectAll", command: "editor.action.selectAll" },
+] as const;
+
+/** 右键菜单的视口坐标；null = 没开 */
+const menu = ref<{ x: number; y: number } | null>(null);
+const menuEl = ref<HTMLElement | null>(null);
+/** 有选区才让点「复制」 */
+const canCopy = ref(false);
+
+/** 在编辑器里右键：弹出自己的菜单，只认正文 */
+function onContextMenu(e: editor.IEditorMouseEvent) {
+  const kind = e.target.type;
+  if (
+    kind !== monaco.editor.MouseTargetType.CONTENT_TEXT &&
+    kind !== monaco.editor.MouseTargetType.CONTENT_EMPTY &&
+    kind !== monaco.editor.MouseTargetType.TEXTAREA
+  ) {
+    return;
+  }
+  e.event.preventDefault();
+  e.event.stopPropagation();
+  // 点在选区外先把光标挪过去，随后的复制 / 全选就作用在那个位置
+  const pos = e.target.position;
+  const sels = monacoEditor?.getSelections() ?? [];
+  if (pos && !sels.some((sel) => sel.containsPosition(pos))) {
+    monacoEditor?.setPosition(pos);
+  }
+  // 挪光标会清掉原选区，这里按挪完后的状态判断能否复制
+  canCopy.value = (monacoEditor?.getSelections() ?? []).some((sel) => !sel.isEmpty());
+  void openMenu(e.event.browserEvent.clientX, e.event.browserEvent.clientY);
+}
+
+/** 贴着点击处弹菜单；先画出来量宽高，再夹回窗口里 */
+async function openMenu(x: number, y: number) {
+  menu.value = { x, y };
+  await nextTick();
+  const box = menuEl.value?.getBoundingClientRect();
+  if (!box) return;
+  const pad = 8;
+  menu.value = {
+    x: Math.max(pad, Math.min(x, window.innerWidth - box.width - pad)),
+    y: Math.max(pad, Math.min(y, window.innerHeight - box.height - pad)),
+  };
+}
+
+/** 跑一项：先收起菜单、把焦点还给编辑器，再发命令 */
+function pick(command: string) {
+  menu.value = null;
+  monacoEditor?.focus();
+  monacoEditor?.trigger("mml-menu", command, null);
+}
+
+/** 点到菜单外面：收起 */
+function onOutside(e: Event) {
+  if (!menu.value || menuEl.value?.contains(e.target as Node)) return;
+  menu.value = null;
+}
+
+/** Esc 收起菜单；这一下不再往下传，免得顺手把窗口也关了 */
+function onMenuKey(e: KeyboardEvent) {
+  if (e.key !== "Escape" || !menu.value) return;
+  e.preventDefault();
+  e.stopPropagation();
+  menu.value = null;
+  monacoEditor?.focus();
+}
+
 // 主题落在 <html data-theme> 上，盯着这个属性比自己监听 theme ref 全面：
 // 设置窗口改主题、其它窗口同步过来的改动、跟随系统时系统切换，最终都只是改这个属性
 const themeWatcher = new MutationObserver(() => applyLogTheme());
@@ -174,10 +247,15 @@ onMounted(() => {
     guides: { indentation: false },
   });
   decorations = monacoEditor.createDecorationsCollection([]);
+  monacoEditor.onContextMenu(onContextMenu);
+  window.addEventListener("pointerdown", onOutside, true);
+  window.addEventListener("keydown", onMenuKey, true);
   // Alt+Z：与 VS Code 同键位，写的是全局偏好，配置编辑器与其它窗口跟着变
   monacoEditor.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.KeyZ, toggleWordWrap);
   themeWatcher.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
   monacoEditor.onDidScrollChange(() => {
+    // 菜单贴的是视口坐标，编辑器一滚就跟内容对不上了
+    menu.value = null;
     const top = monacoEditor?.getScrollTop() ?? 0;
     // 判据只能是"滚动位置变小"：日志爆发时内容一次涨很多、重建整篇、我们自己下拉，
     // 都会触发滚动事件但位置不变或变大。之前按"不在底部"判，这些情况都会被误判成
@@ -200,6 +278,8 @@ onActivated(applyLogTheme);
 
 onBeforeUnmount(() => {
   themeWatcher.disconnect();
+  window.removeEventListener("pointerdown", onOutside, true);
+  window.removeEventListener("keydown", onMenuKey, true);
   monacoEditor?.dispose();
   monacoEditor = null;
   logModel?.dispose();
@@ -247,7 +327,17 @@ watch(wordWrap, (on) => {
       <div v-if="props.logs.length === 0 && props.emptyHint" class="log-empty">
         {{ props.emptyHint }}
       </div>
+    </div>
 
+    <!-- 右键菜单：全选 / 复制，越界由 openMenu 夹回窗口里 -->
+    <div v-if="menu" ref="menuEl" class="text-menu" :style="{ left: menu.x + 'px', top: menu.y + 'px' }"
+      @pointerdown.stop @contextmenu.prevent>
+      <button class="text-menu-item" :disabled="!canCopy" @click="pick(LOG_MENU[0].command)">
+        {{ t(LOG_MENU[0].label) }}
+      </button>
+      <button class="text-menu-item" @click="pick(LOG_MENU[1].command)">
+        {{ t(LOG_MENU[1].label) }}
+      </button>
     </div>
   </div>
 </template>
@@ -269,8 +359,8 @@ watch(wordWrap, (on) => {
   height: 46vh;
   max-height: 480px;
   border: 1px solid var(--border);
-  /* 日志区是整块面板，四角不做圆角；overflow 仍要留着裁掉编辑器溢出的内容 */
-  overflow: hidden;
+  /* 不能裁：Monaco 的 .overflow-guard 自己会裁正文，这里再裁会把查找框的悬停提示
+     切成两半；提示被 IntersectionObserver 判成不可见，于是反复闪现 */
 }
 
 .monaco-log.fill .editor-host-wrap {
@@ -297,6 +387,9 @@ watch(wordWrap, (on) => {
   user-select: none;
 }
 </style>
+
+<!-- 右键菜单：与配置编辑器的 MonacoText 共用一份样式 -->
+<style scoped src="../styles/parts/text-menu.css"></style>
 
 <!-- 着色类供 monaco 内部渲染层使用，无 scope、全局生效 -->
 <style>

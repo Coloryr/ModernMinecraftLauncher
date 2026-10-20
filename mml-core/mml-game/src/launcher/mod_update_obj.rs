@@ -12,7 +12,7 @@ pub type ModUpdateList = HashMap<String, ModUpdateProjectObj>;
 
 /// 一个项目的全部更新记录
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-#[serde(default)]
+#[serde(default, rename_all = "PascalCase")]
 pub struct ModUpdateProjectObj {
     /// 模组名字，取界面上显示的那个；取不到时为空串，界面回退项目编号
     pub name: String,
@@ -25,7 +25,7 @@ pub struct ModUpdateProjectObj {
 /// 「下载更新」与「替换版本」每换成功一个模组就追加一条；项目编号不在这里，
 /// 它是外层表的键
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-#[serde(default)]
+#[serde(default, rename_all = "PascalCase")]
 pub struct ModUpdateRecordObj {
     /// 换上去的文件名，即平台上的文件名；禁用状态下不带 `.disabled` 后缀
     pub file: String,

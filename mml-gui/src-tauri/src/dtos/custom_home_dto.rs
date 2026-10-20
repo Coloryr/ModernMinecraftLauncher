@@ -1,6 +1,6 @@
 //! 自定义主页面 DTO：TS 命名，camelCase wire
 //!
-//! 自定义主页面的本体是 `base_dir/custom_home.zip`，即服主导入的整页 HTML 压缩包，
+//! 自定义主页面的本体是 `base_dir/home`，即服主导入的整页 HTML 压缩包，
 //! 启动时打开成常驻句柄、请求时按条目现读，磁盘上不存任何派生状态，
 //! 这里的状态每次都由 `custom_home_status` 现算。
 use serde::{Deserialize, Serialize};

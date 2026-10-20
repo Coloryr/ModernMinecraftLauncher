@@ -180,7 +180,7 @@ select.sel-category {
 }
 
 .pack-star:hover {
-  color: #f6b500;
+  color: var(--star);
 }
 
 .pack-item:hover .pack-star {
@@ -197,7 +197,7 @@ select.sel-category {
 }
 
 .pack-star.on {
-  color: #f6b500;
+  color: var(--star);
 }
 
 .pack-star.on svg {

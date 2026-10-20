@@ -11,7 +11,7 @@ use std::{
     time::Duration as StdDuration,
 };
 
-use chrono::{DateTime, Local, TimeDelta, Utc};
+use chrono::{DateTime, Local, LocalResult, TimeDelta, TimeZone, Utc};
 use mml_names::{
     i18,
     i18_items::{error_type::CoreResult, thread_type::ThreadType},
@@ -125,9 +125,23 @@ pub fn init<P: AsRef<Path>>(dir: P) {
 }
 
 /// 停止统计线程
+///
+/// 退出 / 重启时调用，必须**同步**落盘：异步线程可能还没写完就被进程结束，
+/// 直接写一半的 NBT 文件会坏。若已有一次异步保存在写，先等它收尾。
 pub fn stop() {
     IS_RUN.store(false, Ordering::Relaxed);
-    save_async();
+
+    // 还在跑的会话先结掉，否则落盘时 stop_time 会停在开始时间，这次运行等于没时长
+    let running: Vec<Uuid> = TIME_LIST.lock().unwrap().keys().copied().collect();
+    for uuid in running {
+        close_run(&uuid);
+    }
+
+    let start = std::time::Instant::now();
+    while IS_SAVE.load(Ordering::SeqCst) && start.elapsed() < StdDuration::from_secs(2) {
+        thread::sleep(StdDuration::from_millis(10));
+    }
+    save();
 }
 
 /// 获取统计数据
@@ -319,11 +333,16 @@ fn run() {
 }
 
 /// 异步保存统计数据
+///
+/// 用普通线程而不是 tokio 的 `spawn_blocking`：退出轮询线程与窗口关闭回调都是裸线程，
+/// 没有 tokio 运行时，在那里调 `spawn_blocking` 会直接 panic。
 pub fn save_async() {
     if IS_SAVE.load(Ordering::Relaxed) {
         return;
     }
-    tokio::task::spawn_blocking(save);
+    let _ = thread::Builder::new()
+        .name(i18::get_thread(ThreadType::GameCount))
+        .spawn(save);
 }
 
 /// 保存统计数据到 COUNT_DATA_FILE，重入时直接返回
@@ -446,9 +465,16 @@ pub fn launch_done(uuid: &Uuid) {
     }
     {
         let mut data_map = LAUNCH_DATA_MAP.lock().unwrap();
-        let data = get_instance(uuid)
-            .map(|game| game.read().unwrap().read_launch_count_data())
-            .unwrap_or_default();
+        let game = get_instance(uuid);
+        let mut data = match &game {
+            Some(game) => game.read().unwrap().read_launch_count_data(),
+            None => GameTimeObj::default(),
+        };
+        // 上次启动时间与 ColorMC 一致：LaunchDone 里先写 LastTime，再落一份实例统计
+        data.last_time = Local::now().fixed_offset();
+        if let Some(game) = &game {
+            game.read().unwrap().save_launch_count_data(&data);
+        }
         data_map.insert(*uuid, data);
     }
     {
@@ -498,6 +524,14 @@ pub fn launch_error(uuid: &Uuid) {
 ///
 /// - `uuid`: 游戏实例标识
 pub fn game_close(uuid: &Uuid) {
+    close_run(uuid);
+    save_async();
+}
+
+/// 结掉一局运行：只改内存与实例的最后游玩，不负责落盘
+///
+/// - `uuid`: 游戏实例标识
+fn close_run(uuid: &Uuid) {
     let now = Local::now();
     TIME_LIST.lock().unwrap().remove(uuid);
 
@@ -531,8 +565,6 @@ pub fn game_close(uuid: &Uuid) {
             }
         }
     }
-
-    save_async();
 }
 
 /// 复制一份启动数据
@@ -549,11 +581,15 @@ fn copy_game_time(data: &GameTimeObj) -> GameTimeObj {
 
 /// 将 .NET 刻度数转换为本地时间
 ///
+/// ColorMC 存的是 `DateTime.Now.Ticks`，刻度里记的是**本地墙上时间**，不带时区；
+/// 读回时先还原成同样的墙上时间，再挂到本地时区，不能再当 UTC 转一次 ——
+/// 否则 22 点之后的记录会整体跨到第二天。
+///
 /// - `ticks`: .NET 刻度数，单位 100 纳秒
 ///
 /// # 返回值
 ///
-/// 返回本地时间；无效值返回默认时间
+/// 返回本地时间；无效值返回当前时间
 fn ticks_to_date(ticks: i64) -> DateTime<Local> {
     let mut secs = ticks / 10_000_000 - 62135596800;
     let mut nanos = (ticks % 10_000_000) * 100;
@@ -561,12 +597,22 @@ fn ticks_to_date(ticks: i64) -> DateTime<Local> {
         secs -= 1;
         nanos += 1_000_000_000;
     }
-    DateTime::<Utc>::from_timestamp(secs, nanos as u32)
-        .unwrap_or_default()
-        .with_timezone(&Local)
+    let Some(utc) = DateTime::<Utc>::from_timestamp(secs, nanos as u32) else {
+        return Local::now();
+    };
+    let naive = utc.naive_utc();
+    match Local.from_local_datetime(&naive) {
+        LocalResult::Single(date) => date,
+        // 夏令时回拨的重叠时刻取较早的一次，与 .NET 的 DateTime 行为一致
+        LocalResult::Ambiguous(first, _) => first,
+        // 夏令时跳过的时刻在本地时区不存在：按 UTC 偏移兜底，至少不 panic
+        LocalResult::None => utc.with_timezone(&Local),
+    }
 }
 
 /// 将本地时间转换为 .NET 刻度数
+///
+/// 与 ColorMC 同一口径：写的是本地墙上时间，不是 UTC 时间戳。
 ///
 /// - `date`: 本地时间
 ///
@@ -574,7 +620,8 @@ fn ticks_to_date(ticks: i64) -> DateTime<Local> {
 ///
 /// 返回 .NET 刻度数，单位 100 纳秒
 fn date_to_ticks(date: DateTime<Local>) -> i64 {
-    (date.timestamp() + 62135596800) * 10_000_000 + date.timestamp_subsec_nanos() as i64 / 100
+    let local_secs = date.timestamp() + date.offset().local_minus_utc() as i64;
+    (local_secs + 62135596800) * 10_000_000 + date.timestamp_subsec_nanos() as i64 / 100
 }
 
 /// 将时长转换为 .NET 刻度数
@@ -602,4 +649,76 @@ fn duration_from_ticks(ticks: i64) -> TimeDelta {
     let secs = ticks / 10_000_000;
     let nanos = ((ticks % 10_000_000) * 100) as u32;
     TimeDelta::new(secs, nanos).unwrap_or(TimeDelta::zero())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    /// 跨零点的刻度往返：日期与时刻都不能被时区换算挪走
+    #[test]
+    fn ticks_round_trip_across_midnight() {
+        let before = Local
+            .with_ymd_and_hms(2026, 9, 19, 23, 59, 58)
+            .single()
+            .unwrap();
+        let after = Local
+            .with_ymd_and_hms(2026, 9, 20, 0, 0, 3)
+            .single()
+            .unwrap();
+
+        let back_before = ticks_to_date(date_to_ticks(before));
+        let back_after = ticks_to_date(date_to_ticks(after));
+
+        assert_eq!(back_before.naive_local(), before.naive_local());
+        assert_eq!(back_after.naive_local(), after.naive_local());
+        assert_eq!((back_after - back_before).num_seconds(), 5);
+    }
+
+    /// 读 ColorMC 生成的 count.dat：里面有一条 09-19 13:45 → 09-20 00:35 的记录，
+    /// 按时区换算成 UTC 再转回来会整体偏一天，必须按本地墙上时间原样还原
+    #[test]
+    fn reads_color_mc_count_across_midnight() {
+        let bytes = include_bytes!("../tests/count/count.dat");
+        let file = NbtFile::read(&mut Cursor::new(bytes.as_slice())).unwrap();
+        let nbt = file.nbt.as_compound().unwrap();
+
+        assert_eq!(nbt.get_long("LaunchCount"), Some(1533));
+
+        let runs = nbt.get_list("GameRuns").unwrap();
+        let mut cross = None;
+        for item in runs.iter() {
+            let Some(com) = item.as_compound() else {
+                continue;
+            };
+            if com.get_string("Key").as_deref() != Some("03962c67-c32d-40e8-81f3-42640ca062d4") {
+                continue;
+            }
+            let Some(list) = com.get_list("List") else {
+                continue;
+            };
+            for run in list.iter() {
+                let Some(com1) = run.as_compound() else {
+                    continue;
+                };
+                let start = ticks_to_date(com1.get_long("StartTime").unwrap_or(0));
+                let stop = ticks_to_date(com1.get_long("StopTime").unwrap_or(0));
+                if start.date_naive() != stop.date_naive() {
+                    cross = Some((start, stop));
+                }
+            }
+        }
+
+        let (start, stop) = cross.expect("fixture 应有一条跨天记录");
+        assert_eq!(
+            start.naive_local().format("%Y-%m-%d %H:%M:%S").to_string(),
+            "2026-09-19 13:45:58"
+        );
+        assert_eq!(
+            stop.naive_local().format("%Y-%m-%d %H:%M:%S").to_string(),
+            "2026-09-20 00:35:16"
+        );
+        assert!(stop > start);
+    }
 }

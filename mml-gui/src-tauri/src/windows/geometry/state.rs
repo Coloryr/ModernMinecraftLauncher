@@ -32,7 +32,7 @@ use super::size::{PhysicalDelta, min_inner_physical, decoration_growth};
 /// 而保存动作在两种状态下都会发生，直接存它会让窗口高度每次开关都涨一截。
 /// 所以存盘前统一折算回**带装饰口径**，见 [`decoration_growth`]。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, rename_all = "PascalCase")]
 pub(crate) struct WindowState {
     /// 外框 X，单位物理像素，与 `outer_position()` 同源
     pub x: i32,

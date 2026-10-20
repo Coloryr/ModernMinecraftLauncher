@@ -14,6 +14,8 @@ defineProps<{
   size: BlockSize;
   /** 渲染中：重新渲染禁用 */
   running: boolean;
+  /** 多选模式开着时按钮高亮 */
+  multiSelect: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -25,6 +27,8 @@ const emit = defineEmits<{
   (e: "add-skin"): void;
   /** 请求重新渲染，父级以 force 调 startRender */
   (e: "re-render"): void;
+  /** 切换多选模式 */
+  (e: "toggle-multi"): void;
 }>();
 
 const sizeOptions = computed(() =>
@@ -53,6 +57,11 @@ function onSize(v: string) {
     <SegmentedTabs :options="sizeOptions" :model-value="size" @update:model-value="onSize" />
 
     <!-- 图标按钮：标题栏里空间紧，文字放提示里，aria-label 给读屏 -->
+    <BaseButton size="sm" :variant="multiSelect ? 'accent' : 'ghost'" class="icon-btn-head"
+      v-tip="t('blocks.multiSelect')" :aria-label="t('blocks.multiSelect')"
+      @click="emit('toggle-multi')">
+      <GlyphIcon name="check-square" :size="15" :weight="1.8" />
+    </BaseButton>
     <BaseButton size="sm" variant="ghost" class="icon-btn-head" v-tip="t('blocks.addSkin')"
       :aria-label="t('blocks.addSkin')"
       @click="emit('add-skin')">

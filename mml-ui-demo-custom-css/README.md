@@ -1,7 +1,8 @@
 # mml-ui-demo-custom-css —— 自定义 CSS 示例
 
-启动器的「自定义 CSS」：导入一个 zip 给内置界面换皮。包根是 `custom.css`，可选再带一个
-`custom.js` 入口脚本；mml-vue 先挂样式、再加载脚本，挂载完成后调用入口函数。
+启动器的「样式包」：导入一个 zip 给内置界面换皮。包根是 `custom.css`，可选再带一个
+`custom.js` 入口脚本，另用 `theme.json` 声明 `type` 为 `css`；mml-vue 先挂样式、
+再加载脚本，挂载完成后调用入口函数。
 
 入口脚本可以只改 DOM，也可以直接挂一个 Vue 组件——示例里的启动按钮就是
 [`src/ReplaceButton.vue`](src/ReplaceButton.vue)，由入口用 `ctx.replace` 挂到原按钮位置。
@@ -96,10 +97,10 @@ npm run pack         # vite build 入口 + 打出 mml-ui-demo-custom-css.zip
 ```
 
 `npm run pack` 的流程：Vite 把 `src/replace.ts` + `ReplaceButton.vue` 打成 IIFE
-`dist/custom.js` → 复制到包根 → 和 `custom.css` 一起压 zip → 删掉 `custom.js` 与 `dist`。
+`dist/custom.js` → 复制到包根 → 写入声明 `type` 的 `theme.json` → 和 `custom.css` 一起压 zip
+→ 删掉 `custom.js`、`theme.json` 与 `dist`。
 
-然后「设置 → 界面 → 自定义 CSS → 导入 CSS 包」。可以装多份，每份单独开关，启用的按
-安装顺序叠加。
+然后「设置 → 界面 → 样式包 → 导入样式包」。可以装多份，每份单独开关，启用的按列表顺序叠加。
 
 ## 选择控件
 
@@ -120,6 +121,7 @@ npm run pack         # vite build 入口 + 打出 mml-ui-demo-custom-css.zip
 zip 根目录：
 
 - `custom.css`：必需，入口样式表
+- `theme.json`：声明 `type` 为 `css`；带 `custom.js` 的包没有它会被当成类型不明
 - `custom.js`：可选，入口脚本；IIFE，Vue 从页面全局 `__mmlVue` 取
 - 图片 / 字体放子目录，CSS 里用相对路径引用：
 

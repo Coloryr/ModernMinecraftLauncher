@@ -45,7 +45,6 @@ const {
   importingCustomHome,
   customHomeState,
   importCustomHome,
-  openCustomHomeDir,
   removeCustomHome,
   saveState,
 } = props.settings;
@@ -188,7 +187,6 @@ watch(lockServerError, async (msg) => {
   </SettingsGroup>
 
   <SettingsGroup id="customHome" title-key="winSettings.secCustomHome" :flash="flashGroup === 'customHome'">
-    <p class="field-desc">{{ t("winSettings.customHomeDesc") }}</p>
     <div class="switch-row">
       <div class="switch-text">
         <span class="switch-label">{{ t("winSettings.customHomeOn") }}</span>
@@ -200,7 +198,6 @@ watch(lockServerError, async (msg) => {
       <BaseButton size="sm" :disabled="importingCustomHome" @click="importCustomHome">
         {{ t("winSettings.customHomeImport") }}
       </BaseButton>
-      <BaseButton size="sm" @click="openCustomHomeDir">{{ t("winSettings.customHomeOpenDir") }}</BaseButton>
       <BaseButton size="sm" variant="danger" :disabled="!customHome?.installed" @click="removeCustomHome">
         {{ t("winSettings.customHomeRemove") }}
       </BaseButton>

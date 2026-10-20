@@ -26,8 +26,8 @@ const props = defineProps<{
   favorite: boolean;
   /** 全部自建分组 */
   groups: BlockGroup[];
-  /** 这个方块所属的分组 uuid，可同时属于多个 */
-  memberOf: string[];
+  /** 这个方块所属的分组 uuid；未分组时为 null */
+  group: string | null;
   /** 正在设图标（父级控制，禁用按钮防连点） */
   busy?: boolean;
 }>();
@@ -41,8 +41,8 @@ const emit = defineEmits<{
   (e: "set-icon"): void;
   /** 收藏 / 取消收藏 */
   (e: "toggle-favorite"): void;
-  /** 勾选某个分组：`on` 为真表示加进去 */
-  (e: "toggle-group", uuid: string, on: boolean): void;
+  /** 换分组：uuid 为 null 表示未分组 */
+  (e: "set-group", uuid: string | null): void;
 }>();
 
 useModalKeys((e) => {
@@ -84,16 +84,14 @@ async function copyId() {
             {{ favorite ? t("blocks.unfavorite") : t("blocks.favorite") }}
           </BaseButton>
         </div>
-        <div class="detail-row detail-row-top">
+        <div class="detail-row">
           <span class="detail-label">{{ t("blocks.detailGroups") }}</span>
-          <div class="detail-groups">
-            <p v-if="!groups.length" class="detail-group-empty">{{ t("blocks.groupEmpty") }}</p>
-            <label v-for="g in groups" :key="g.uuid" class="detail-group">
-              <input type="checkbox" :checked="memberOf.includes(g.uuid)"
-                @change="emit('toggle-group', g.uuid, ($event.target as HTMLInputElement).checked)" />
-              <span>{{ g.name }}</span>
-            </label>
-          </div>
+          <select class="field-select" :value="group ?? ''"
+            @change="emit('set-group', ($event.target as HTMLSelectElement).value || null)">
+            <option value="">{{ t("blocks.groupNone") }}</option>
+            <option v-for="g in groups" :key="g.uuid" :value="g.uuid">{{ g.name }}</option>
+          </select>
+          <p v-if="!groups.length" class="detail-group-empty">{{ t("blocks.groupEmpty") }}</p>
         </div>
       </div>
     </div>
@@ -134,26 +132,6 @@ async function copyId() {
   height: 132px;
   /* 同 BlockGrid 的 .block-img：256×256 的渲染图缩到 132px，用平滑插值，
      不要 pixelated，最近邻会把方块斜边采成锯齿 */
-}
-
-/* 分组那一行内容会换行，按顶部对齐 */
-.detail-row-top {
-  align-items: flex-start;
-}
-
-.detail-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.detail-group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12.5px;
-  cursor: pointer;
 }
 
 .detail-group-empty {

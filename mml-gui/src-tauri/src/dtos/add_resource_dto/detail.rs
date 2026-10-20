@@ -53,9 +53,20 @@ impl ProjectDetailDto {
             });
         }
 
+        // Modrinth 把分类拆成主 / 次两份，少一份就会比列表卡片少一堆标签；
+        // 合并后排序，顺序与搜索接口返回的 categories 一致
+        let mut categories: Vec<String> = data
+            .categories
+            .iter()
+            .chain(data.additional_categories.iter())
+            .cloned()
+            .collect();
+        categories.sort();
+        categories.dedup();
+
         let mut tag = Vec::new();
 
-        for item in data.loaders.iter().chain(data.categories.iter()) {
+        for item in data.loaders.iter().chain(categories.iter()) {
             tag.push(TagDto {
                 name: item.clone(),
                 logo: None,

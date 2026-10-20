@@ -28,11 +28,18 @@ const emit = defineEmits<{
 /** 自建分组 / 收藏 / 左栏顺序（用户数据，存本地） */
 const groups = useBlockGroups();
 /** 方块列表状态（面板与标题栏工具条共用）；分组与收藏从这里接进列表 */
-const list = useBlockList({ inGroup: groups.inGroup, isFavorite: groups.isFavorite });
+const list = useBlockList({
+  inGroup: groups.inGroup,
+  isCustomGroup: groups.isCustomGroup,
+  isFavorite: groups.isFavorite,
+});
 const { rendered, keyword, size, running, startRender, addSkin } = list;
 
 const currentInstance = ref<InstanceInfoDto | null>(null);
 let unlisten: (() => void) | null = null;
+
+/** 多选模式：标题栏工具条按钮切换，勾选与设置分组在 BlockPanel 里 */
+const multiSelect = ref(false);
 
 /** 关闭被渲染拦下时的二次确认框 */
 const confirmClose = ref(false);
@@ -93,11 +100,13 @@ async function confirmCloseRender() {
     <!-- 工具条放进标题栏：不占内容区高度，也不随内容滚动；未渲染时整条不出现 -->
     <template #head-right>
       <BlockToolbar v-if="rendered" :keyword="keyword" :size="size" :running="running"
-        @update:keyword="keyword = $event" @update:size="size = $event" @add-skin="skinOpen = true"
-        @re-render="startRender(true)" />
+        :multi-select="multiSelect" @update:keyword="keyword = $event" @update:size="size = $event"
+        @add-skin="skinOpen = true" @re-render="startRender(true)"
+        @toggle-multi="multiSelect = !multiSelect" />
     </template>
 
-    <BlockPanel :settings="list" :groups="groups" :current-instance="currentInstance" />
+    <BlockPanel :settings="list" :groups="groups" :current-instance="currentInstance"
+      :multi-select="multiSelect" @update:multi-select="multiSelect = $event" />
 
     <!-- 添加玩家头颅（用户名或 UUID） -->
     <SkinAddModal v-if="skinOpen" :busy="skinBusy" @submit="onSkinSubmit" @close="skinOpen = false" />

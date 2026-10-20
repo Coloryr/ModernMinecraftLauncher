@@ -4,9 +4,9 @@
 //
 // 状态在 BlockWindow：工具条在标题栏，两边要共用同一份状态，这里只做排版与局部交互；
 // 数据、事件订阅与操作在 composables/useBlockList，局部 UI 在 parts/。
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { t } from "../../lib/i18n";
-import { GROUP_PREFIX, SKIN_CAT } from "./types";
+import { SKIN_CAT } from "./types";
 import CategoryRail from "./parts/CategoryRail.vue";
 import BlockGrid from "./parts/BlockGrid.vue";
 import BlockDetailModal from "./parts/BlockDetailModal.vue";
@@ -15,7 +15,7 @@ import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import type { BlockItemDto, InstanceInfoDto } from "../../lib/bindings";
 import type { useBlockList } from "./composables/useBlockList";
-import { groupKey, isGroupKey, type useBlockGroups } from "./composables/useBlockGroups";
+import type { useBlockGroups } from "./composables/useBlockGroups";
 
 const props = defineProps<{
   /** 方块列表状态，在 BlockWindow 里创建：标题栏的工具条用的是同一份状态 */
@@ -24,6 +24,13 @@ const props = defineProps<{
   groups: ReturnType<typeof useBlockGroups>;
   /** 主窗口当前选中的实例；没有选中实例时为 null */
   currentInstance: InstanceInfoDto | null;
+  /** 多选模式：标题栏按钮切换，退出时清空勾选 */
+  multiSelect: boolean;
+}>();
+
+const emit = defineEmits<{
+  /** 退出多选：多选条的退出按钮发这个 */
+  (e: "update:multi-select", on: boolean): void;
 }>();
 
 const {
@@ -59,9 +66,9 @@ const {
   addGroup,
   renameGroup,
   removeGroup,
-  inGroup,
-  groupsOf,
-  setMember,
+  groupOf,
+  isCustomGroup,
+  setGroup,
   countOf,
   isFavorite,
   toggleFavorite,
@@ -70,21 +77,19 @@ const {
 /**
  * 分类栏条目：游戏分类与自建分组混排，顺序按用户拖出来的（没记过的追加在末尾）
  *
+ * 键统一是 uuid：自带分类用后端给的固定 uuid，自建分组用自己的 uuid。
  * 文案与计数在这里算好，侧栏只管渲染；「全部」由侧栏自己那份计数画，不参与排序。
  */
 const catItems = computed(() =>
-  orderedKeys([...cats.value, ...groupList.value.map((g) => groupKey(g.uuid))]).map((key) => {
-    if (isGroupKey(key)) {
-      const group = groupList.value.find((each) => groupKey(each.uuid) === key);
-      return {
-        id: key,
-        label: group?.name ?? key,
-        count: group ? countOf(group.uuid) : 0,
-        custom: true,
-      };
-    }
-    return { id: key, label: catLabel(key), count: catCounts.value.get(key) ?? 0 };
-  }),
+  orderedKeys([...cats.value.map((c) => c.uuid), ...groupList.value.map((g) => g.uuid)]).map(
+    (key) => {
+      const group = groupList.value.find((each) => each.uuid === key);
+      if (group) {
+        return { id: key, label: group.name, count: countOf(key), custom: true };
+      }
+      return { id: key, label: catLabel(key), count: catCounts.value.get(key) ?? 0 };
+    },
+  ),
 );
 
 // ---------- 自建分组的右键菜单与新建 / 改名 / 删除 ----------
@@ -113,7 +118,7 @@ function onGroupPick(kind: string) {
   const menu = groupMenu.value;
   groupMenu.value = null;
   if (!menu) return;
-  const uuid = menu.id.slice(GROUP_PREFIX.length);
+  const uuid = menu.id;
   if (kind === "rename") {
     groupForm.value = { uuid, name: menu.label };
   } else if (kind === "remove") {
@@ -121,9 +126,9 @@ function onGroupPick(kind: string) {
   }
 }
 
-/** 打开新建分组弹窗；从方块菜单进来时记下那个方块，建成后顺手放进去 */
-function openNewGroup(blockId: string | null = null) {
-  pendingGroupBlock.value = blockId;
+/** 打开新建分组弹窗；带上方块 id 时，建成后顺手把这些方块放进去 */
+function openNewGroup(targets: string[] = []) {
+  pendingGroupTargets.value = targets;
   groupForm.value = { uuid: "", name: "" };
 }
 
@@ -137,45 +142,120 @@ function saveGroupForm() {
     renameGroup(form.uuid, name);
   } else {
     const uuid = addGroup(name);
-    if (pendingGroupBlock.value) setMember(uuid, pendingGroupBlock.value, true);
+    for (const id of pendingGroupTargets.value) setGroup(id, uuid);
   }
-  pendingGroupBlock.value = null;
+  pendingGroupTargets.value = [];
   groupForm.value = null;
 }
 
-// ---------- 方块右键：收藏与分组 ----------
+// ---------- 方块右键：设置实例与设置分组 ----------
 
-/** 打开着的方块菜单；null = 没开 */
+/** 当前分类是不是自建分组：只有在这里右键才有「移出分组」，自带分类不展示 */
+const inCustomGroupView = computed(() => isCustomGroup(cat.value));
+
+/** 主菜单；null = 没开 */
 const blockMenu = ref<{ x: number; y: number; item: BlockItemDto } | null>(null);
 
-/** 从方块菜单新建分组时，建成后要把这个方块放进去 */
-const pendingGroupBlock = ref<string | null>(null);
+/** 设置分组弹窗里的方块 id；空数组表示没开（多选时一次设置多个） */
+const groupTargets = ref<string[]>([]);
+
+/** 从弹窗新建分组时，建成后要把这些方块放进去 */
+const pendingGroupTargets = ref<string[]>([]);
+
+/** 弹窗是否打开 */
+const groupPickOpen = computed(() => groupTargets.value.length > 0);
+
+/** 弹窗里显示的方块名；多选时显示选了几个 */
+const groupPickName = computed(() => {
+  if (groupTargets.value.length === 1) {
+    const id = groupTargets.value[0];
+    return blocks.value.find((b) => b.id === id)?.name ?? id;
+  }
+  return t("multi.selected", { count: groupTargets.value.length });
+});
+
+/** 多选的方块分组不一致；下拉单独显示「多个分组」占位，不冒充「未分组」 */
+const groupPickMixed = computed(() => {
+  const ids = groupTargets.value;
+  if (ids.length < 2) return false;
+  const first = groupOf(ids[0]) ?? "";
+  return !ids.every((id) => (groupOf(id) ?? "") === first);
+});
+
+/** 多选时共同的分组；不一致时由占位项接管 */
+const groupPickValue = computed(() => {
+  const ids = groupTargets.value;
+  if (!ids.length || groupPickMixed.value) return "";
+  return groupOf(ids[0]) ?? "";
+});
 
 function openBlockMenu(payload: { event: MouseEvent; item: BlockItemDto }) {
   blockMenu.value = {
     x: Math.min(payload.event.clientX, window.innerWidth - 200),
-    y: Math.min(payload.event.clientY, window.innerHeight - 220),
+    y: Math.min(payload.event.clientY, window.innerHeight - 160),
     item: payload.item,
   };
 }
 
-/** 菜单里收藏 / 取消收藏 */
-function menuToggleFavorite() {
+/** 设置实例：走详情那套选实例弹窗，目标是右键的这个方块 */
+function menuSetIcon() {
   const menu = blockMenu.value;
-  if (menu) toggleFavorite(menu.item.id);
-}
-
-/** 菜单里勾选分组：可以同时属于多个，点一下就是切换 */
-function menuToggleGroup(uuid: string) {
-  const menu = blockMenu.value;
-  if (menu) setMember(uuid, menu.item.id, !inGroup(uuid, menu.item.id));
-}
-
-/** 菜单里新建分组：建成后把当前方块放进去 */
-function menuNewGroup() {
-  const menu = blockMenu.value;
+  if (!menu) return;
   blockMenu.value = null;
-  openNewGroup(menu?.item.id ?? null);
+  openIconPick(menu.item);
+}
+
+/** 设置分组：主菜单收掉，弹窗里从下拉选一个分组 */
+function menuSetGroup() {
+  const menu = blockMenu.value;
+  if (!menu) return;
+  blockMenu.value = null;
+  groupTargets.value = [menu.item.id];
+}
+
+/** 弹窗下拉框换分组：空串表示未分组，一次应用到所有目标方块 */
+function onGroupPickChange(uuid: string) {
+  if (uuid === "__mixed__") return;
+  for (const id of groupTargets.value) setGroup(id, uuid || null);
+}
+
+// ---------- 多选：勾选与批量设置分组 ----------
+
+/** 多选模式里勾选的方块 id */
+const selectedIds = ref<Set<string>>(new Set());
+
+// 退出多选时清空勾选，免得下次进来还留着上一次的选择
+watch(
+  () => props.multiSelect,
+  (on) => {
+    if (!on) selectedIds.value = new Set();
+  },
+);
+
+/** 多选模式下点方块：切换勾选 */
+function toggleSelect(b: BlockItemDto) {
+  const next = new Set(selectedIds.value);
+  if (next.has(b.id)) next.delete(b.id);
+  else next.add(b.id);
+  selectedIds.value = next;
+}
+
+/** 多选条上的「设置分组」：把勾选的方块一起交给分组弹窗 */
+function openMultiGroup() {
+  if (selectedIds.value.size) groupTargets.value = [...selectedIds.value];
+}
+
+/** 退出多选 */
+function exitMultiSelect() {
+  emit("update:multi-select", false);
+}
+
+/** 右键菜单里删除分组：只断开这个方块的归属，分组本身保留 */
+function menuRemoveGroup() {
+  const menu = blockMenu.value;
+  if (!menu) return;
+  blockMenu.value = null;
+  setGroup(menu.item.id, null);
 }
 
 /** 删除分组：分组没了，方块本身不动；删的正好是当前分类时回到「全部」 */
@@ -184,7 +264,7 @@ function confirmRemoveGroup() {
   groupRemove.value = null;
   if (!target) return;
   removeGroup(target.uuid);
-  if (cat.value === groupKey(target.uuid)) cat.value = "";
+  if (cat.value === target.uuid) cat.value = "";
 }
 
 /** 详情里收藏 / 取消收藏 */
@@ -192,9 +272,9 @@ function onDetailFavorite() {
   if (detail.value) toggleFavorite(detail.value.id);
 }
 
-/** 详情里勾选分组：可同时属于多个 */
-function onDetailToggleGroup(uuid: string, on: boolean) {
-  if (detail.value) setMember(uuid, detail.value.id, on);
+/** 详情里换分组：空表示未分组 */
+function onDetailSetGroup(uuid: string | null) {
+  if (detail.value) setGroup(detail.value.id, uuid);
 }
 
 /**
@@ -209,20 +289,26 @@ const descText = computed(() =>
 
 // ---------- 设为实例图标 ----------
 
-const iconPick = ref(false);
+/** 正在选实例图标的方块；null = 没开 */
+const iconTarget = ref<BlockItemDto | null>(null);
 const iconBusy = ref(false);
 
-function openIconPick() {
-  if (detail.value) iconPick.value = true;
+function openIconPick(block: BlockItemDto) {
+  iconTarget.value = block;
+}
+
+/** 详情里点「设为实例图标」 */
+function openDetailIconPick() {
+  if (detail.value) openIconPick(detail.value);
 }
 
 async function onIconPick(inst: InstanceInfoDto) {
-  const b = detail.value;
+  const b = iconTarget.value;
   if (!b || iconBusy.value) return;
   iconBusy.value = true;
   try {
     if (await setIcon(inst.uuid, b.id, inst.name)) {
-      iconPick.value = false;
+      iconTarget.value = null;
       closeDetail();
     }
   } finally {
@@ -256,13 +342,25 @@ async function onDetailRemove() {
       </BaseButton>
     </div>
 
+    <!-- 多选工具条：与主窗口多选条同一套外观，浮在标题栏下方 -->
+    <div v-if="multiSelect" class="multi-bar">
+      <span class="multi-count">{{ t("multi.selected", { count: selectedIds.size }) }}</span>
+      <button class="multi-btn" :disabled="!selectedIds.size" @click="openMultiGroup">
+        {{ t("blocks.menuSetGroup") }}
+      </button>
+      <span class="multi-sep" />
+      <button class="multi-exit" @click="exitMultiSelect">{{ t("multi.exit") }}</button>
+    </div>
+
     <!-- 已渲染：分类栏 + 网格 -->
     <div v-if="rendered" class="block-main">
       <CategoryRail :all-count="blocks.length" :items="catItems" :active="cat" @pick="cat = $event"
         @reorder="setOrder" @group-menu="openGroupMenu" @new-group="openNewGroup()" />
-      <BlockGrid :items="filtered" :keyword="keyword" :size="size" :active-id="detail?.id ?? null" :skin-cat="SKIN_CAT"
-        :filtered="isFiltered" :is-favorite="isFavorite" @open="openDetail" @remove-skin="removeSkin"
-        @clear-filters="clearFilters" @item-menu="openBlockMenu" />
+      <BlockGrid :items="filtered" :keyword="keyword" :size="size" :active-id="detail?.id ?? null"
+        :skin-cat="SKIN_CAT" :filtered="isFiltered" :is-favorite="isFavorite" :toggle-favorite="toggleFavorite"
+        :select-mode="multiSelect" :is-selected="(id) => selectedIds.has(id)"
+        @open="openDetail" @remove-skin="removeSkin" @clear-filters="clearFilters"
+        @item-menu="openBlockMenu" @toggle-select="toggleSelect" />
     </div>
 
     <!-- 未渲染：提示卡；渲染中显示进度说明，不再给按钮 -->
@@ -285,14 +383,14 @@ async function onDetailRemove() {
     </div>
 
     <!-- 设为实例图标：选哪个实例（当前实例高亮，点条目即设） -->
-    <InstancePickModal v-if="iconPick" :current-uuid="currentInstance?.uuid ?? null" :busy="iconBusy" @pick="onIconPick"
-      @close="iconPick = false" />
+    <InstancePickModal v-if="iconTarget" :current-uuid="currentInstance?.uuid ?? null" :busy="iconBusy"
+      @pick="onIconPick" @close="iconTarget = null" />
 
     <!-- 方块详情：打开选实例弹窗时先让位，避免两层遮罩叠着 -->
-    <BlockDetailModal v-if="detail && !iconPick" :block="detail" :category="catLabel(detail.cat)" :keyword="keyword"
-      :removable="detail.cat === SKIN_CAT" :busy="iconBusy" :favorite="isFavorite(detail.id)"
-      :groups="groupList" :member-of="groupsOf(detail.id)" @close="closeDetail" @remove="onDetailRemove"
-      @set-icon="openIconPick" @toggle-favorite="onDetailFavorite" @toggle-group="onDetailToggleGroup" />
+    <BlockDetailModal v-if="detail && !iconTarget" :block="detail" :category="catLabel(detail.catUuid)" :keyword="keyword"
+      :removable="detail.catId === SKIN_CAT" :busy="iconBusy" :favorite="isFavorite(detail.id)"
+      :groups="groupList" :group="groupOf(detail.id)" @close="closeDetail" @remove="onDetailRemove"
+      @set-icon="openDetailIconPick" @toggle-favorite="onDetailFavorite" @set-group="onDetailSetGroup" />
 
     <!-- 分组右键菜单：改名 / 删除；点空白处关掉 -->
     <div v-if="groupMenu" class="menu-backdrop" @pointerdown="groupMenu = null" @contextmenu.prevent />
@@ -302,24 +400,37 @@ async function onDetailRemove() {
       <button class="group-menu-item danger" @click="onGroupPick('remove')">{{ t("blocks.groupRemove") }}</button>
     </div>
 
-    <!-- 方块右键菜单：收藏 + 逐个分组勾选 + 新建分组 -->
+    <!-- 方块右键菜单：设置实例 / 设置分组；自建分组视图里多一个「移出分组」 -->
     <div v-if="blockMenu" class="menu-backdrop" @pointerdown="blockMenu = null" @contextmenu.prevent />
     <div v-if="blockMenu" class="group-menu"
       :style="{ left: blockMenu.x + 'px', top: blockMenu.y + 'px' }" @pointerdown.stop @contextmenu.prevent>
-      <button class="group-menu-item" @click="menuToggleFavorite">
-        {{ isFavorite(blockMenu.item.id) ? t("blocks.unfavorite") : t("blocks.favorite") }}
+      <button class="group-menu-item" @click="menuSetIcon">{{ t("blocks.menuSetIcon") }}</button>
+      <button class="group-menu-item" @click="menuSetGroup">{{ t("blocks.menuSetGroup") }}</button>
+      <button v-if="inCustomGroupView && groupOf(blockMenu.item.id)" class="group-menu-item danger"
+        @click="menuRemoveGroup">
+        {{ t("blocks.groupDeassign") }}
       </button>
-      <!-- 分组那一段：一个分组都没有时不画，否则与下面那条分隔线会连成两条 -->
-      <template v-if="groupList.length">
-        <span class="group-menu-sep" />
-        <button v-for="g in groupList" :key="g.uuid" class="group-menu-item" @click="menuToggleGroup(g.uuid)">
-          <span class="group-menu-check">{{ inGroup(g.uuid, blockMenu.item.id) ? "✓" : "" }}</span>
-          {{ g.name }}
-        </button>
-      </template>
-      <span class="group-menu-sep" />
-      <button class="group-menu-item" @click="menuNewGroup">{{ t("blocks.groupAdd") }}</button>
     </div>
+
+    <!-- 设置分组：下拉选一个分组，空串表示未分组；多选时一次应用到所有勾选的方块 -->
+    <BaseModal v-if="groupPickOpen" :title="t('blocks.menuSetGroup')" :width="380" :closable="false"
+      @close="groupTargets = []">
+      <p class="group-pick-name">{{ groupPickName }}</p>
+      <label class="field-label">{{ t("blocks.detailGroups") }}</label>
+      <select class="field-select" :value="groupPickMixed ? '__mixed__' : groupPickValue"
+        @change="onGroupPickChange(($event.target as HTMLSelectElement).value)">
+        <option v-if="groupPickMixed" value="__mixed__" disabled>{{ t("blocks.groupMixed") }}</option>
+        <option value="">{{ t("blocks.groupNone") }}</option>
+        <option v-for="g in groupList" :key="g.uuid" :value="g.uuid">{{ g.name }}</option>
+      </select>
+      <p v-if="!groupList.length" class="group-pick-empty">{{ t("blocks.groupEmpty") }}</p>
+      <div class="modal-actions">
+        <BaseButton size="sm" class="group-pick-new" @click="openNewGroup(groupTargets)">
+          {{ t("blocks.groupAdd") }}
+        </BaseButton>
+        <BaseButton @click="groupTargets = []">{{ t("blocks.close") }}</BaseButton>
+      </div>
+    </BaseModal>
 
     <!-- 新建 / 改名分组 -->
     <BaseModal v-if="groupForm" :closable="false"
@@ -345,7 +456,26 @@ async function onDetailRemove() {
   </div>
 </template>
 
+<style scoped src="../../styles/parts/multi-bar.css"></style>
+
 <style scoped>
+/* 多选工具条：外观与主窗口同一套，浮在标题栏下方居中 */
+.multi-bar {
+  position: fixed;
+  top: calc(var(--titlebar-h) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--accent-border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-md);
+}
+
 .block-panel {
   display: flex;
   flex-direction: column;
@@ -375,11 +505,36 @@ async function onDetailRemove() {
   position: fixed;
   z-index: 401;
   min-width: 140px;
+  /* 分组多时在菜单内滚动，不把菜单撑出窗口 */
+  max-height: 70vh;
+  overflow-y: auto;
   padding: 4px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--bg-modal);
   box-shadow: var(--shadow-lg);
+}
+
+/* ---------- 设置分组弹窗 ---------- */
+
+/* 方块名跟在标题下面，与分组列表拉开一点 */
+.group-pick-name {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  word-break: break-all;
+}
+
+/* 还没有分组时，下拉框下面补一句怎么建 */
+.group-pick-empty {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* 新建分组靠左，其余操作留在右侧 */
+.group-pick-new {
+  margin-right: auto;
 }
 
 /* 菜单里的分隔线 */

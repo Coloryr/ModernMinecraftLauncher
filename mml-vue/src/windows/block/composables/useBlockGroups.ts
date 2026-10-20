@@ -5,11 +5,10 @@
 //
 // 口径（用户定的）：
 // - 收藏**不单独成分类**：收藏过的方块在列表里排到最前；
-// - 一个方块可以同时属于**多个**自建分组；
+// - 一个方块**只能属于一个**自建分组；
 // - 左栏把游戏分类与自建分组混在一起，按用户拖出来的顺序排。
 import { onMounted, ref } from "vue";
 import { getBlockGroups, setBlockGroups } from "../../../lib/api";
-import { GROUP_PREFIX } from "../types";
 
 /** 自建分组 */
 export interface BlockGroup {
@@ -19,45 +18,28 @@ export interface BlockGroup {
   name: string;
 }
 
-/**
- * 自建分组的分类键
- *
- * - `uuid`: 分组标识
- *
- * # 返回值
- *
- * 形如 `g:<uuid>`
- */
-export function groupKey(uuid: string): string {
-  return `${GROUP_PREFIX}${uuid}`;
-}
-
-/**
- * 分类键是不是自建分组
- *
- * - `key`: 左栏的分类键
- *
- * # 返回值
- *
- * 自建分组为 `true`
- */
-export function isGroupKey(key: string): boolean {
-  return key.startsWith(GROUP_PREFIX);
-}
-
-/** 新的分组 id；不用 crypto.randomUUID，浏览器预览里也稳 */
+/** 浏览器预览里也要能生成 uuid；没有 randomUUID 时手工拼一个 v4 */
 function newId(): string {
-  return `bg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (ch) => {
+    const r = (Math.random() * 16) | 0;
+    return (ch === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
 }
+
+/** uuid 形态检查；旧版本的分组 id（`bg-…`）不是 uuid，读入时换掉 */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * 方块窗口的用户数据
  *
  * # 返回值
  *
- * - `orderedKeys` / `setOrder`: 左栏顺序
+ * - `orderedKeys` / `setOrder`: 左栏顺序，键是分类 uuid
  * - `groups` / `addGroup` / `renameGroup` / `removeGroup`: 自建分组
- * - `inGroup` / `groupsOf` / `setMember` / `countOf`: 方块的归属，可属于多个组
+ * - `inGroup` / `groupOf` / `setGroup` / `countOf`: 方块的归属，一个方块只属于一个组
  * - `favorites` / `isFavorite` / `toggleFavorite`: 收藏
  */
 export function useBlockGroups() {
@@ -80,10 +62,43 @@ export function useBlockGroups() {
   onMounted(async () => {
     try {
       const data = await getBlockGroups();
-      order.value = data.order;
-      groups.value = data.groups;
-      members.value = data.members;
+      // 旧版本的分组 id 是 bg-…、顺序键带 g: 前缀，读入时统一成 uuid
+      const remap = new Map<string, string>();
+      const groupsNext: BlockGroup[] = data.groups.map((group) => {
+        const uuid = UUID_RE.test(group.uuid) ? group.uuid : newId();
+        if (uuid !== group.uuid) remap.set(group.uuid, uuid);
+        return { uuid, name: group.name };
+      });
+      // 旧数据允许多分组归属：按分组顺序只保留第一个，符合"一个方块一个分组"
+      const seen = new Set<string>();
+      const membersNext: Record<string, string[]> = {};
+      for (let i = 0; i < groupsNext.length; i++) {
+        const oldId = data.groups[i].uuid;
+        membersNext[groupsNext[i].uuid] = (data.members[oldId] ?? []).filter((id) => {
+          if (seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        });
+      }
+      const orderNext = data.order
+        .map((key) => {
+          const raw = key.startsWith("g:") ? key.slice(2) : key;
+          return remap.get(raw) ?? raw;
+        })
+        // 旧顺序里自带分类那一截是当时的显示名，没法可靠地换回 uuid，直接丢弃
+        .filter((key) => UUID_RE.test(key));
+      order.value = orderNext;
+      groups.value = groupsNext;
+      members.value = membersNext;
       favorites.value = data.favorites;
+      // 迁移过就写回，下次不用再转一遍
+      if (
+        JSON.stringify(orderNext) !== JSON.stringify(data.order) ||
+        JSON.stringify(groupsNext) !== JSON.stringify(data.groups) ||
+        JSON.stringify(membersNext) !== JSON.stringify(data.members)
+      ) {
+        save();
+      }
     } catch {
       /* 读不到就空着 */
     }
@@ -130,7 +145,7 @@ export function useBlockGroups() {
     const uuid = newId();
     groups.value = [...groups.value, { uuid, name }];
     members.value = { ...members.value, [uuid]: [] };
-    order.value = [...order.value, groupKey(uuid)];
+    order.value = [...order.value, uuid];
     save();
     return uuid;
   }
@@ -147,8 +162,13 @@ export function useBlockGroups() {
     const next = { ...members.value };
     delete next[uuid];
     members.value = next;
-    order.value = order.value.filter((key) => key !== groupKey(uuid));
+    order.value = order.value.filter((key) => key !== uuid);
     save();
+  }
+
+  /** 某个键是不是自建分组 */
+  function isCustomGroup(uuid: string): boolean {
+    return groups.value.some((group) => group.uuid === uuid);
   }
 
   /** 某个方块在不在这个分组里 */
@@ -156,20 +176,25 @@ export function useBlockGroups() {
     return (members.value[uuid] ?? []).includes(id);
   }
 
-  /** 某个方块属于哪些分组 */
-  function groupsOf(id: string): string[] {
-    return groups.value.filter((g) => inGroup(g.uuid, id)).map((g) => g.uuid);
+  /** 方块所属的分组 uuid；不在任何分组时返回 null */
+  function groupOf(id: string): string | null {
+    return groups.value.find((g) => inGroup(g.uuid, id))?.uuid ?? null;
   }
 
-  /** 把方块加进 / 移出某个分组；别的分组不受影响 */
-  function setMember(uuid: string, id: string, on: boolean) {
-    const list = new Set(members.value[uuid] ?? []);
-    if (on) {
-      list.add(id);
-    } else {
-      list.delete(id);
+  /**
+   * 设置方块所属的分组，一个方块只能属于一个
+   *
+   * - `id`: 方块 id
+   * - `uuid`: 目标分组；null 表示移出所有分组
+   */
+  function setGroup(id: string, uuid: string | null) {
+    const next: Record<string, string[]> = {};
+    for (const group of groups.value) {
+      const list = (members.value[group.uuid] ?? []).filter((each) => each !== id);
+      if (group.uuid === uuid) list.push(id);
+      next[group.uuid] = list;
     }
-    members.value = { ...members.value, [uuid]: [...list] };
+    members.value = next;
     save();
   }
 
@@ -203,9 +228,10 @@ export function useBlockGroups() {
     addGroup,
     renameGroup,
     removeGroup,
+    isCustomGroup,
     inGroup,
-    groupsOf,
-    setMember,
+    groupOf,
+    setGroup,
     countOf,
     favorites,
     isFavorite,

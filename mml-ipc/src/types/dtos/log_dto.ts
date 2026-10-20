@@ -12,5 +12,6 @@ export type LogSettingDto = {
   enableWarn: boolean,
   enableError: boolean,
   enableDebug: boolean,
+  autoShow: boolean,
 };
 

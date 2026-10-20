@@ -70,8 +70,7 @@ impl Package {
             return Err(error(err_keys::PAGE_ARCHIVE_LIMIT));
         }
         let file = std::fs::File::open(path).map_err(|_| error(err_keys::THEME_ZIP_INVALID))?;
-        let mut archive =
-            ZipArchive::new(file).map_err(|_| error(err_keys::THEME_ZIP_INVALID))?;
+        let archive = ZipArchive::new(file).map_err(|_| error(err_keys::THEME_ZIP_INVALID))?;
         if archive.len() > MAX_ENTRIES {
             return Err(error(err_keys::PAGE_ARCHIVE_LIMIT));
         }

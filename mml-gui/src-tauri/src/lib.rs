@@ -169,6 +169,8 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 match mml_core::load() {
                     Ok(()) => {
+                        // 统计要在实例表加载完之后读：read() 会拿当前实例刷新名字快照
+                        mml_game::game_count::init(mml_base::get_base_dir());
                         main::emit_load_done(&handle, None);
                     }
                     Err(err) => {

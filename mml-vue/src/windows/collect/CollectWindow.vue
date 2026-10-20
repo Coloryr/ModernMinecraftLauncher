@@ -10,6 +10,7 @@ import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import AsyncImage from "../../components/ui/AsyncImage.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
+import SearchBox from "../../components/ui/SearchBox.vue";
 import DragGhost from "../../components/ui/DragGhost.vue";
 import InstanceIcon from "../../components/InstanceIcon.vue";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
@@ -79,12 +80,18 @@ const groupedUuids = computed(() => new Set(groupOfUuid.value.keys()));
 /** 一个收藏都没有；这时只给一条引导文案，不铺一排空分组 */
 const isEmpty = computed(() => items.value.length === 0);
 
-/** 当前类型过滤下要显示的收藏；全不勾就是空列表，与旧启动器一致，没有「全选」兜底 */
+/** 搜索词：按收藏项名字过滤，不持久化 */
+const keyword = ref("");
+
+/** 当前类型过滤 + 搜索词下要显示的收藏；类型全不勾就是空列表，与旧启动器一致 */
 const shownItems = computed(() => {
   const on = new Set(
     FILTER_TYPES.filter((f) => filters.value[f.key]).flatMap((f) => f.types),
   );
-  return items.value.filter((item) => on.has(item.fileType));
+  const kw = keyword.value.trim().toLowerCase();
+  return items.value.filter(
+    (item) => on.has(item.fileType) && (!kw || item.name.toLowerCase().includes(kw)),
+  );
 });
 
 /** 「共 N 项」：当前过滤下所有分组合起来 */
@@ -684,8 +691,16 @@ function closeMenu() {
         <button class="multi-exit" @click="toggleMultiSelect">{{ t("multi.exit") }}</button>
       </div>
 
+      <!-- 搜索：按收藏项名字过滤，分组计数与「共 N 项」都跟着变 -->
+      <SearchBox v-if="!isEmpty" v-model="keyword" :placeholder="t('collect.search')"
+        :clear-label="t('collect.searchClear')" width="100%" />
+
       <!-- 一个收藏都没有：只给一条引导，不铺一排空分组 -->
       <p v-if="isEmpty" class="empty-tip collect-empty">{{ t("collect.empty") }}</p>
+      <!-- 搜索没有命中：不再铺一排 0 项的分组 -->
+      <p v-else-if="keyword.trim() && !shownItems.length" class="empty-tip collect-empty">
+        {{ t("collect.searchEmpty") }}
+      </p>
 
       <!-- 折叠分组列表：默认分组在前，最后一项是「添加分组」 -->
       <div v-else class="collect-groups">

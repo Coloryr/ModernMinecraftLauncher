@@ -178,7 +178,7 @@ select.sel-filter {
 }
 
 .pack-star:hover {
-  color: #f6b500;
+  color: var(--star);
 }
 
 .pack-item:hover .pack-star {
@@ -192,7 +192,7 @@ select.sel-filter {
 
 .pack-star.on {
   opacity: 1;
-  color: #f6b500;
+  color: var(--star);
 }
 
 .pack-star.on svg {

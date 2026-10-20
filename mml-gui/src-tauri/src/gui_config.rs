@@ -1,6 +1,6 @@
 //! GUI 状态，配置文件 gui_config.json
 //!
-//! 配置文件使用 Rust 命名：snake_case 字段 / PascalCase 枚举 / locale 变体名。
+//! 配置文件使用**大驼峰**字段名；枚举取变体名，locale 的值沿用内核 `Lang`。
 //! 仅当经 Tauri IPC 传输到前端时转成 `crate::dtos::GuiConfigDto`，TS 命名 camelCase。
 //! 读写统一走 [`init`] 初始化后的内存缓存，保存经 `config_save` 异步落盘。
 
@@ -91,7 +91,7 @@ pub enum SkinDisplay {
 
 /// 皮肤显示设置，账户列表与设置页预览共用
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(default)]
+#[serde(default, rename_all = "PascalCase")]
 pub struct SkinConfig {
     /// 显示模式：Skin2DA / Skin2DB / Skin3D / Skin3DD / Skin3DRotate
     pub display: SkinDisplay,
@@ -142,7 +142,7 @@ pub enum CapeDisplay {
 
 /// 披风渲染设置，账户列表与设置页预览共用
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(default)]
+#[serde(default, rename_all = "PascalCase")]
 pub struct CapeConfig {
     /// 显示模式：Cape2D / Cape3D / Elytra
     pub display: CapeDisplay,
@@ -165,7 +165,7 @@ impl Default for CapeConfig {
 
 /// 头像渲染设置，账户列表与设置页预览共用
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(default)]
+#[serde(default, rename_all = "PascalCase")]
 pub struct HeadConfig {
     /// 头像类型：Head2DA / Head2DB / Head3DA / Head3DB / Head3DC
     pub head_type: HeadType,
@@ -186,9 +186,9 @@ impl Default for HeadConfig {
     }
 }
 
-/// 主窗口配置；字段名即 wire 名，与前端同名
+/// 主窗口配置；落盘键为大驼峰，前端走 DTO 的 camelCase
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, rename_all = "PascalCase")]
 pub struct MainWindowConfig {
     /// 侧栏位置：Left / Right
     pub sidebar_side: SidebarSide,
@@ -221,7 +221,7 @@ impl Default for MainWindowConfig {
 
 /// 收藏界面设置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, rename_all = "PascalCase")]
 pub struct CollectWindowConfig {
     /// 显示整合包
     pub modpack: bool,
@@ -247,9 +247,10 @@ impl Default for CollectWindowConfig {
 
 /// 登录方式锁定的一个条目
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
-#[serde(default)]
+#[serde(default, rename_all = "PascalCase")]
 pub struct LoginLockObj {
     /// 账户添加类型：offline / microsoft / littleskin / selflittleskin / authlib / nide8
+    #[serde(rename = "Type")]
     pub ty: String,
     /// 登录模型名字，即添加账户时下拉里的显示名；空串表示用类型名或服务器地址显示
     pub name: String,
@@ -259,7 +260,7 @@ pub struct LoginLockObj {
 
 /// 一条已安装的自定义 CSS
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
-#[serde(default)]
+#[serde(default, rename_all = "PascalCase")]
 pub struct CustomCssItemObj {
     /// 条目 id，CSS 文件在 `custom_ui/css` 下叫 `<id>.css`
     pub id: String,
@@ -271,7 +272,7 @@ pub struct CustomCssItemObj {
 
 /// 客户端设置：主窗口 MOTD 卡片与登录方式限制
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(default)]
+#[serde(default, rename_all = "PascalCase")]
 pub struct ClientConfig {
     /// 主窗口实例设置里显示 MOTD 卡片
     pub motd_card: bool,
@@ -289,7 +290,7 @@ pub struct ClientConfig {
     pub motd_server: String,
     /// 实例锁定：锁定的实例 uuid，空串表示未锁定；锁定时主窗口不允许切换到其它实例
     pub lock_instance: String,
-    /// 自定义主页面：启用后主窗口的启动器主页换成 base_dir/custom_home 里的 index.html
+    /// 自定义主页面：启用后主窗口的启动器主页换成 base_dir/home 里的 index.html
     pub custom_home: bool,
     /// 自定义 CSS 总开关；关闭后已安装的样式保留但不生效
     pub custom_css_on: bool,
@@ -336,7 +337,7 @@ impl Default for ClientConfig {
 /// **行为都还没接线**：这里只把用户的选择存下来，设置页客户端设置里的「实验性功能」组负责展示，
 /// 真正生效要等各自的实现（提权 / 自定义协议 / 沙盒）落地。
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
-#[serde(default)]
+#[serde(default, rename_all = "PascalCase")]
 pub struct ExperimentalConfig {
     /// 启动器自身以管理员身份运行
     pub launcher_admin: bool,
@@ -350,7 +351,7 @@ pub struct ExperimentalConfig {
 
 /// 界面设置，跨窗口共用的那份界面状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, rename_all = "PascalCase")]
 pub struct GuiConfig {
     /// 主题：System / Light / Dark
     pub theme: Theme,
@@ -425,7 +426,7 @@ impl Default for GuiConfig {
 /// 由各自的窗口命令维护（`add_resource_*_last_source` / `add_modpack_*_last_source`），
 /// 设置页保存时从旧配置整份带过来，见 `window_save_gui_config`。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, rename_all = "PascalCase")]
 pub struct ResourceWindowConfig {
     /// 添加资源窗口上次选的下载源；空串表示没选过，界面落回列表第一个
     pub add_resource_source: String,
@@ -438,7 +439,7 @@ pub struct ResourceWindowConfig {
 /// 属于用户偏好而不是设置页上的项：由窗口命令 `config_tree_width` / `config_set_tree_width`
 /// 维护，设置页保存时从旧配置整份带过来，见 `window_save_gui_config`。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, rename_all = "PascalCase")]
 pub struct ConfigWindowConfig {
     /// 左侧文件树的宽度，单位像素；拖中间那条分隔线改的就是它
     pub tree_width: f64,

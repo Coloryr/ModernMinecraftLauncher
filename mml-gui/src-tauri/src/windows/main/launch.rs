@@ -17,7 +17,7 @@ use mml_auth::{AuthType, auths};
 use mml_game::game_launch::{AutoJoinType, GameLaunchArg};
 use mml_game::gui_hook::{ILaunchGui, LaunchState, ProcessRunType};
 use mml_game::launcher::instance_setting_obj::{InstanceSettingObj, ServerObj};
-use mml_game::{InstanceExit, get_running_instances, is_running, stop_game};
+use mml_game::{InstanceExit, game_count, get_running_instances, is_running, stop_game};
 use tauri::{AppHandle, Emitter};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -199,6 +199,10 @@ pub async fn main_launch_game(
                         emit_log_line(&app, &uuid, &LogText::LaunchProcessStarted.text(), false)
                     }
                     Err(err) => {
+                        // 进程已经起来、只是启动后命令失败时不算启动失败，否则会多记一次
+                        if !is_running(&launch_uuid) {
+                            game_count::launch_error(&launch_uuid);
+                        }
                         mml_log::error_type(err.clone());
                         let text = i18::get_error(err.clone());
                         emit_log_line(&app, &uuid, &text, false);
@@ -263,6 +267,9 @@ pub fn main_get_running() -> Vec<String> {
 /// - `app`: 应用句柄，事件的发送方
 /// - `event`: 内核的实例退出事件
 pub(crate) fn forward_game_exit(app: &AppHandle, event: &InstanceExit) {
+    // 先结掉这一局的运行时长，再通知前端；退出轮询线程不是 tokio 线程，
+    // 所以统计落盘走 game_count 自己的普通线程，见 save_async
+    game_count::game_close(&event.uuid);
     emit_game_exit(
         app,
         ExitEvent {
@@ -284,6 +291,11 @@ struct LaunchGuiHook {
 impl ILaunchGui for LaunchGuiHook {
     /// 阶段推进：转成前端认的状态名与进度
     fn update_state(&self, _setting: &InstanceSettingObj, state: LaunchState) {
+        // 进程真正起来时内核推 End；统计的「启动成功」以这一刻为准，
+        // 与 ColorMC 在拿到进程句柄后调 LaunchDone 同一位置
+        if matches!(&state, LaunchState::End) {
+            game_count::launch_done(&self.uuid);
+        }
         emit_launch_state(
             &self.app,
             StateEvent {

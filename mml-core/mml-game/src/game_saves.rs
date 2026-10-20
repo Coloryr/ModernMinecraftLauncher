@@ -34,7 +34,7 @@ use crate::error::{archive_read_err, serializer_err};
 
 /// 存档备份信息
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-#[serde(default)]
+#[serde(default, rename_all = "PascalCase")]
 pub struct SaveBackupObj {
     /// 存档目录名，相对实例的 saves 目录
     pub dir: String,

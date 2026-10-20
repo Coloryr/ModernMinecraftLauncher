@@ -291,6 +291,21 @@ fn append_commands(b: &mut String, sigs: &[Sig]) {
     b.push_str("  };\n}\n\n");
 }
 
+/// 变体名的 camelCase：只把首字母小写，与 serde 对变体的处理一致
+///
+/// - `name`: Rust 变体名，如 `Home` / `HomePage`
+///
+/// # 返回值
+///
+/// 首字母小写后的名字
+fn lower_first(name: &str) -> String {
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(first) => first.to_ascii_lowercase().to_string() + chars.as_str(),
+        None => String::new(),
+    }
+}
+
 /// 类型文件正文：枚举生成字符串联合，struct 逐字段转 TS，serde 命名风格生效
 ///
 /// - decls: 该文件里的类型声明
@@ -317,7 +332,8 @@ fn types_body(decls: &[Decl], ext: &BTreeMap<String, String>) -> String {
                     }
                     Some(match rename_all.as_deref() {
                         Some("lowercase") => name.to_ascii_lowercase(),
-                        Some("camelCase") => camel(&name),
+                        // serde 的 camelCase 对变体只把首字母小写，Home -> home，不是字段那套下划线转驼峰
+                        Some("camelCase") => lower_first(&name),
                         _ => name,
                     })
                 })
@@ -698,6 +714,27 @@ mod tests {
             map["types/gui_config.ts"].contains("export type HeadType = \"auto\" | \"head\";\n\n"),
             "{}",
             map["types/gui_config.ts"]
+        );
+    }
+
+    /// 枚举的 camelCase 只把变体首字母小写，与 serde 的变体规则一致
+    #[test]
+    fn test_enum_camel_case_variants() {
+        let groups = BTreeMap::from([(
+            "dtos/theme_dto.ts".to_string(),
+            vec![decl(
+                "ThemeKindDto",
+                "#[derive(Serialize)]\n#[serde(rename_all = \"camelCase\")]",
+                "\n    Home,\n    Css,\n    Page,\n",
+                true,
+            )],
+        )]);
+        let map = type_map(&type_files(&groups, &BTreeMap::new()));
+        assert!(
+            map["types/dtos/theme_dto.ts"]
+                .contains("export type ThemeKindDto = \"home\" | \"css\" | \"page\";\n\n"),
+            "{}",
+            map["types/dtos/theme_dto.ts"]
         );
     }
 

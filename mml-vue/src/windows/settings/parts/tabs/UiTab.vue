@@ -8,6 +8,7 @@ import { t } from "../../../../lib/i18n";
 import { fontStack } from "../../../../lib/fonts";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
+import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
 import NumberStepper from "../../../../components/ui/NumberStepper.vue";
 import SegmentedTabs from "../../../../components/ui/SegmentedTabs.vue";
 import SettingsGroup from "../SettingsGroup.vue";
@@ -76,11 +77,11 @@ const {
   customUi,
   importingCustomPage,
   customPageState,
-  customPageEntry,
   refreshCustomUi,
   addCustomCss,
   setCustomCssEnabled,
   removeCustomCss,
+  moveCustomCss,
   importCustomPage,
   removeCustomPage,
   openCustomUiDir,
@@ -185,12 +186,22 @@ function toggleCustomPage(on: boolean) {
       <BaseSwitch :model-value="client.customCssOn" @update:model-value="toggleCustomCss" />
     </div>
 
-    <!-- 已安装的样式：一行一条，开关 / 文件名 / 删除；顺序即注入顺序 -->
+    <!-- 已安装的样式：一行一条，开关 / 文件名 / 上移下移 / 删除；列表顺序即注入顺序 -->
     <ul v-if="client.customCss.length" class="custom-css-list">
-      <li v-for="item in client.customCss" :key="item.id" class="custom-css-item">
+      <li v-for="(item, index) in client.customCss" :key="item.id" class="custom-css-item">
         <BaseSwitch :model-value="item.enabled"
           @update:model-value="(v) => setCustomCssEnabled(item.id, v)" />
         <span class="custom-css-name" :title="item.name">{{ item.name }}</span>
+        <!-- 上移 / 下移：排在第一个 / 最后一个时对应的按钮禁用 -->
+        <button class="ui-btn-icon" :disabled="index === 0" v-tip="t('winSettings.customCssMoveUp')"
+          :aria-label="t('winSettings.customCssMoveUp')" @click="moveCustomCss(item.id, -1)">
+          <GlyphIcon name="arrow-up" :size="14" :weight="2" />
+        </button>
+        <button class="ui-btn-icon" :disabled="index === client.customCss.length - 1"
+          v-tip="t('winSettings.customCssMoveDown')" :aria-label="t('winSettings.customCssMoveDown')"
+          @click="moveCustomCss(item.id, 1)">
+          <GlyphIcon name="arrow-down" :size="14" :weight="2" />
+        </button>
         <BaseButton size="sm" variant="danger" @click="removeCustomCss(item.id)">
           {{ t("winSettings.customCssRemove") }}
         </BaseButton>
@@ -204,7 +215,6 @@ function toggleCustomPage(on: boolean) {
       </BaseButton>
       <BaseButton size="sm" @click="openCustomUiDir">{{ t("winSettings.customUiOpenDir") }}</BaseButton>
     </div>
-    <p class="field-desc">{{ t("winSettings.customCssHint") }}</p>
   </SettingsGroup>
 
   <SettingsGroup id="customPage" title-key="winSettings.secCustomPage" :flash="flashGroup === 'customPage'">
@@ -227,9 +237,6 @@ function toggleCustomPage(on: boolean) {
       <BaseButton size="sm" @click="openCustomUiDir">{{ t("winSettings.customUiOpenDir") }}</BaseButton>
       <span class="custom-ui-state">{{ customPageState }}</span>
     </div>
-    <p class="field-desc">{{ t("winSettings.customPageHint") }}</p>
-    <label class="field-label">{{ t("winSettings.customPageEntry") }}</label>
-    <p class="custom-ui-entry">{{ customPageEntry }}</p>
   </SettingsGroup>
 
   <SettingsGroup id="window" title-key="winSettings.secWindow" :flash="flashGroup === 'window'">
@@ -374,12 +381,4 @@ function toggleCustomPage(on: boolean) {
   color: var(--text-dim);
 }
 
-/* 入口地址是只读展示：URL 可能很长，用等宽字体并允许在任意位置断行 */
-.custom-ui-entry {
-  margin: 4px 0 0;
-  font-family: Consolas, "Cascadia Mono", monospace;
-  font-size: 11.5px;
-  color: var(--text-dim);
-  word-break: break-all;
-}
 </style>

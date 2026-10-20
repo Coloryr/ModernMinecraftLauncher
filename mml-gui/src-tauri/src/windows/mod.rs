@@ -857,6 +857,7 @@ pub fn window_drop_model(kind: String) -> Result<(), String> {
 #[gui_macros::command]
 pub fn window_restart_app(app: AppHandle) {
     mml_core::stop();
+    mml_game::game_count::stop();
 
     std::thread::spawn(move || {
         match std::env::current_exe() {

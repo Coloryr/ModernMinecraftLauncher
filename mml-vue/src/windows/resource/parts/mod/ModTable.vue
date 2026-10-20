@@ -249,6 +249,15 @@ const rows = computed(() => {
   return out;
 });
 
+/**
+ * 正在编辑的备注（同时只能有一个）
+ *
+ * **不弹输入框**：双击直接把这一格变成 `contenteditable` 的可书写区域，文字原地编辑 ——
+ * 用户口径"不需要显示输入框，直接可以写文字"。提交（回车 / 失焦）时从单元格读文本，
+ * 取消（Esc）把原文写回去。
+ */
+const editing = ref<{ key: string; item: ModItemDto } | null>(null);
+
 /** 行容器：虚拟化要量它在滚动容器里的位置 */
 const rowsEl = ref<HTMLElement | null>(null);
 
@@ -268,19 +277,7 @@ watch([rows, () => editing.value], () => remeasure(), { flush: "post" });
 /** 这一回真正渲染出来的那几行 */
 const visibleRows = computed(() => rows.value.slice(start.value, end.value));
 
-
-
-
 // ---------- 备注：双击就地编辑 ----------
-
-/**
- * 正在编辑的备注（同时只能有一个）
- *
- * **不弹输入框**：双击直接把这一格变成 `contenteditable` 的可书写区域，文字原地编辑 ——
- * 用户口径"不需要显示输入框，直接可以写文字"。提交（回车 / 失焦）时从单元格读文本，
- * 取消（Esc）把原文写回去。
- */
-const editing = ref<{ key: string; item: ModItemDto } | null>(null);
 
 /** 正在就地编辑的在线信息格；一次只开一格 */
 const editingOnline = ref<{ key: string; field: "source" | "projectId" | "fileId"; item: ModItemDto } | null>(

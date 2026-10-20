@@ -1,6 +1,6 @@
 //! 自定义主页面：服主导入的整页 HTML 或窗口组件替换启动器主页内容区
 //!
-//! **压缩包是唯一产物，全程不落盘解压**：服主导入的 zip 存放在 `base_dir/custom_home.zip`，
+//! **压缩包是唯一产物，全程不落盘解压**：服主导入的 zip 存成 `base_dir/home`，不带扩展名，
 //! 启动时打开成一个常驻句柄 [`HomeArchive`]，`mml-home` 协议的每个请求
 //! **直接从包内按条目读取**，即 [`BaseArchive::read`]，内部 seek 到条目偏移解压到内存，
 //! 不会把文件铺到磁盘上。页面经自定义协议 `mml-home` 供主窗口的 iframe 加载，
@@ -8,7 +8,7 @@
 //!
 //! | 部分 | 说明 |
 //! | --- | --- |
-//! | [`custom_home_import`] | 导入 zip：校验入口后原子替换 `custom_home.zip`，并重开句柄 |
+//! | [`custom_home_import`] | 导入 zip：校验入口后原子替换 `home`，并重开句柄 |
 //! | [`HomeArchive`] | 常驻的只读句柄，`BaseArchive` 内部用 `Mutex`，逐条目读取 |
 //! | [`custom_home_status`] | 现算状态：zip 的 mtime 即破缓存版本号，磁盘上不存派生状态 |
 //! | [`custom_home_remove`] | 删除 zip 并释放句柄 |
@@ -39,7 +39,7 @@ mod protocol;
 
 // 按原路径再导出：`lib.rs` 注册协议处理器、配置变更后重载，都用这两个
 pub(crate) use self::archive::{CSS_FILE, INDEX_FILE, SCRIPT_FILE, import_archive, open_handle, reload};
-pub(crate) use self::protocol::{ZIP_PREFIX, url_custom_home};
+pub(crate) use self::protocol::url_custom_home;
 
 // ================= 路径 =================
 
@@ -54,13 +54,16 @@ fn base_path(name: &str) -> PathBuf {
     mml_base::get_base_dir().join(name)
 }
 
-/// 持久压缩包的路径，带扩展名；zip 与 7z 都存成这个
+/// 持久压缩包的文件名，放运行根目录；刻意不带扩展名
+const HOME_FILE: &str = "home";
+
+/// 持久压缩包的路径
 ///
 /// # 返回值
 ///
-/// 运行根目录下的 `custom_home.zip`
+/// 运行根目录下的 `home`
 fn zip_path() -> PathBuf {
-    base_path(&format!("{ZIP_PREFIX}.zip"))
+    base_path(HOME_FILE)
 }
 
 /// `mml-home` 自定义协议的访问前缀

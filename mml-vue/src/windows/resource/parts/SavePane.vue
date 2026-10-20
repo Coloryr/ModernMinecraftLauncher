@@ -11,12 +11,12 @@ import { t, tErr } from "../../../lib/i18n";
 import { stripFormatting } from "../../../lib/formatting";
 import { showToast } from "../../../lib/toast";
 import { openWindow } from "../../windowManager";
+import { launchGame } from "../../../lib/launch";
 import {
   api,
   backupSave,
   deleteSave,
   editSave,
-  launchGame,
   listSaveBackups,
   restoreSaveBackup,
 } from "../../../lib/api";

@@ -1,0 +1,96 @@
+/* Monaco 查找框（Ctrl+F）的换肤：把 VS Code 那套配色换成启动器的卡片 / 输入框 / 图标按钮
+ *
+ * 查找框的 CSS 全部读 `--vscode-*` 变量，而这些变量由 Monaco 主题写在 .monaco-editor 上。
+ * 这里把它们在 .find-widget 这一层重新声明一遍：元素自身的声明优先于从祖先继承来的值，
+ * 所以不用逐条覆盖属性，也不会影响编辑器里的其它浮层。
+ * 少数几处（选中的 Aa/ab/.* 按钮）是内联样式，只能 !important 压过去。
+ */
+.monaco-editor .find-widget {
+  --vscode-editorWidget-background: var(--bg-card);
+  --vscode-editorWidget-foreground: var(--text);
+  --vscode-widget-border: var(--border);
+  --vscode-input-background: var(--bg-solid, var(--bg-card));
+  --vscode-input-foreground: var(--text);
+  --vscode-input-border: var(--border);
+  --vscode-input-placeholderForeground: var(--text-dim);
+  --vscode-focusBorder: var(--accent);
+  --vscode-toolbar-hoverBackground: var(--bg-hover);
+  --vscode-toolbar-activeBackground: var(--bg-hover);
+  --vscode-inputOption-activeBackground: var(--accent-soft);
+  --vscode-inputOption-activeBorder: var(--accent-border);
+  --vscode-inputOption-activeForeground: var(--accent);
+  --vscode-inputOption-hoverBackground: var(--bg-hover);
+  --vscode-errorForeground: var(--red);
+  --vscode-disabledForeground: var(--text-dim);
+  --vscode-cornerRadius-large: 10px;
+  --vscode-cornerRadius-small: 6px;
+  --vscode-shadow-lg: var(--shadow-md);
+  font-family: var(--app-font, "Microsoft YaHei", "PingFang SC", "Segoe UI", system-ui, sans-serif);
+}
+
+:root[lang="en_us"] .monaco-editor .find-widget {
+  font-family: var(--app-font-en, "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif);
+}
+
+/* 输入框：与 .field-input 同一套底色、描边与圆角。
+   Monaco 把底色与描边写成了元素内联样式，只能 !important 盖 */
+.monaco-editor .find-widget .monaco-inputbox {
+  background-color: var(--bg-solid, var(--bg-card)) !important;
+  border-radius: 6px;
+  border-color: var(--border) !important;
+}
+
+.monaco-editor .find-widget .monaco-inputbox.synthetic-focus {
+  outline-offset: -1px;
+  outline-color: var(--accent);
+}
+
+.monaco-editor .find-widget .monaco-inputbox .input {
+  color: var(--text);
+}
+
+.monaco-editor .find-widget .monaco-inputbox .input::placeholder {
+  color: var(--text-dim);
+}
+
+/* 字号跟启动器控件一档；Monaco 自己写的是 13px，后加载，只能 !important 盖 */
+.monaco-editor .find-widget .monaco-findInput .input {
+  font-size: 12.5px !important;
+}
+
+/* 关闭键对齐到查找行的中线：Monaco 默认 16×16 的盒子在圆角面板里看着偏低 */
+.monaco-editor .find-widget > .button.codicon-widget-close {
+  top: 3px;
+  right: 5px;
+  box-sizing: border-box;
+  width: 22px;
+  height: 25px;
+  padding: 0;
+}
+
+/* 结果计数用次要色；没结果时 Monaco 自己会用错误色，不动它 */
+.monaco-editor .find-widget .matchesCount {
+  color: var(--text-dim);
+}
+
+/* 箭头 / 关闭 / 查找范围：图标默认用次要色，悬停提到正文色。
+   Aa / ab / .* 的颜色是内联的（未选中时写死 inherit），要 !important 才压得住 */
+.monaco-editor .find-widget .button {
+  color: var(--text-dim);
+}
+
+.monaco-editor .find-widget .button:hover:not(.disabled),
+.monaco-editor .find-widget .monaco-custom-toggle:not(.checked):hover {
+  color: var(--text) !important;
+}
+
+.monaco-editor .find-widget .monaco-custom-toggle:not(.checked) {
+  color: var(--text-dim) !important;
+}
+
+/* Aa / ab / .* 选中态：Monaco 用内联样式写颜色，必须 !important 才盖得住 */
+.monaco-editor .find-widget .monaco-custom-toggle.checked {
+  color: var(--accent) !important;
+  background-color: var(--accent-soft) !important;
+  border-color: var(--accent-border) !important;
+}

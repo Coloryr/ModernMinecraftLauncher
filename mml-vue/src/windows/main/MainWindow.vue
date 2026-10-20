@@ -24,6 +24,7 @@ import { stateText } from "../../lib/launchState";
 import { useDownloadProgress } from "../../composables/useDownloadProgress";
 import { KEYS, onStorageChange } from "../../lib/storage";
 import { openWindow } from "../windowManager";
+import { launchGame } from "../../lib/launch";
 import {
   selectedInstance,
   setSelectedInstance,
@@ -558,7 +559,7 @@ async function launchGroupAll(groupId?: string) {
   for (const inst of g.items) {
     markLaunching(inst.uuid);
     try {
-      await api.launchGame(inst.uuid);
+      await launchGame(inst.uuid);
     } catch {
       // 单个失败：把它的按钮放开，别的照旧
       clearLaunching(inst.uuid);
@@ -831,7 +832,7 @@ async function multiLaunch() {
   for (const uuid of ids) {
     markLaunching(uuid);
     try {
-      await api.launchGame(uuid);
+      await launchGame(uuid);
     } catch {
       // 单个失败：把它的按钮放开，别的照旧
       clearLaunching(uuid);
@@ -1414,7 +1415,7 @@ async function launch() {
   launchStage.value = "";
   statePct.value = null;
   try {
-    await api.launchGame(uuid);
+    await launchGame(uuid);
   } catch (e) {
     clearLaunching(uuid);
     statusText.value = t("launch.failed");

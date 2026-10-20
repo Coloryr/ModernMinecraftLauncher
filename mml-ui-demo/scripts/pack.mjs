@@ -3,7 +3,7 @@
 // 只包含组件入口：custom.js（IIFE）+ custom.css（限定在 .mml-home 的样式）。
 // 没有 index.html，启动器走 window.__mmlHomePages 回调，不再使用 iframe。
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,6 +22,11 @@ mkdirSync(stage, { recursive: true });
 copyFileSync(join(themeDist, "custom.js"), join(stage, "custom.js"));
 const css = readdirSync(themeDist).find((name) => name.endsWith(".css"));
 if (css) copyFileSync(join(themeDist, css), join(stage, "custom.css"));
+// 包根主题清单：导入时按它判定类型，免得包里带了 custom.css 就被当成样式包
+writeFileSync(
+  join(stage, "theme.json"),
+  JSON.stringify({ type: "home", name: "mml-ui-demo", version: "1.0.0", api: 1 }, null, 2) + "\n",
+);
 
 const entries = readdirSync(stage).filter((name) => name !== "__MACOSX");
 rmSync(zipPath, { force: true });
@@ -77,5 +82,5 @@ if (!tool || !existsSync(zipPath)) {
 const kb = (statSync(zipPath).size / 1024).toFixed(1);
 console.log("");
 console.log("✓ 打包完成（" + tool + "）：" + zipPath);
-console.log("  " + entries.length + " 个顶层条目，" + kb + " KB，包根是 custom.js / custom.css");
+console.log("  " + entries.length + " 个顶层条目，" + kb + " KB，包根是 theme.json / custom.js / custom.css");
 console.log("  导入：启动器 → 设置 → 客户端设置 → 自定义主页面，选上面这个 zip");

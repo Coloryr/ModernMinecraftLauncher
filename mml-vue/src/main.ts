@@ -63,6 +63,8 @@ if (import.meta.env.PROD) {
       e.key === "F5" ||
       e.key === "F12" ||
       (ctrl && ["r", "R", "p", "P"].includes(e.key)) ||
+      // 页内查找也归启动器自己：日志窗口的 Ctrl+F 走 Monaco 的查找框
+      (ctrl && !e.shiftKey && (e.key === "f" || e.key === "F")) ||
       (ctrl && e.shiftKey && ["c", "C", "r", "R"].includes(e.key));
     if (blocked) {
       e.preventDefault();

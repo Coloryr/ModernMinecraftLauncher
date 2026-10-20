@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use mml_base::archives::BaseArchive;
+use mml_base::archives::{ArchiveType, BaseArchive};
 use tauri::UriSchemeResponder;
 use tauri::http::{Response, StatusCode};
 
@@ -57,7 +57,8 @@ impl WebArchive {
     /// 打开压缩包并建好条目索引，同时校验条目数与解压后大小
     ///
     /// 限额防的是 zip 炸弹：条目数、单条大小、总大小任一超限都拒绝，
-    /// 免得一次请求就把内存吃满。
+    /// 免得一次请求就把内存吃满。按 Zip 显式打开，不看扩展名：自定义主页面存成
+    /// 不带扩展名的 `home`。
     ///
     /// - `path`: 压缩包路径
     ///
@@ -65,7 +66,8 @@ impl WebArchive {
     ///
     /// 打开好的句柄；打不开时返回底层错误信息，超限时返回 `err.pageArchiveLimit`
     pub(crate) fn open(path: &Path) -> Result<Self, String> {
-        let archive = BaseArchive::open_readonly(path).map_err(|err| err.to_string())?;
+        let archive =
+            BaseArchive::open_readonly_as(path, ArchiveType::Zip).map_err(|err| err.to_string())?;
         let entries = archive.entries();
         if entries.len() > MAX_ENTRIES {
             return Err(String::from(crate::err_keys::PAGE_ARCHIVE_LIMIT));
@@ -423,11 +425,12 @@ pub(crate) fn inject_bridge(data: Vec<u8>, tag: &str) -> Vec<u8> {
 
 /// 把源压缩包原子地替换到目标位置
 ///
-/// 先复制到目标同目录的 `<目标>.tmp`，成功后再删旧包、改名上架；任何一步失败都删掉
-/// 临时文件，旧包保持原样。导入失败时旧包还能照常打开，靠的就是这里。
+/// 先复制到目标同目录的 `<目标>.tmp`，成功后再改名上架。`rename` 会覆盖已存在的
+/// 目标，所以不能先删旧包：万一改名失败，旧包还得原样留在那里。任何一步失败都只删
+/// 临时文件，常驻句柄在替换成功后才重开。
 ///
 /// - `src`: 用户选的压缩包
-/// - `dst`: 落盘位置，必须是 .zip 路径
+/// - `dst`: 落盘位置，带不带扩展名都行
 ///
 /// # 返回值
 ///
@@ -436,17 +439,15 @@ pub(crate) fn replace_atomic(src: &Path, dst: &Path) -> Result<(), String> {
     if let Some(parent) = dst.parent() {
         std::fs::create_dir_all(parent).map_err(|err| err.to_string())?;
     }
+    // 临时名直接在原名后加 .tmp：目标可能没有扩展名，set_extension 会拼出 home.zip.tmp
     let mut tmp = dst.to_path_buf();
-    tmp.set_extension("zip.tmp");
+    tmp.as_mut_os_string().push(".tmp");
     if tmp.exists() {
         std::fs::remove_file(&tmp).map_err(|err| err.to_string())?;
     }
 
     let result = (|| {
         std::fs::copy(src, &tmp).map_err(|err| err.to_string())?;
-        if dst.exists() {
-            std::fs::remove_file(dst).map_err(|err| err.to_string())?;
-        }
         std::fs::rename(&tmp, dst).map_err(|err| err.to_string())
     })();
     if result.is_err() {

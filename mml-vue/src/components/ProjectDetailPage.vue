@@ -273,6 +273,31 @@ function formatSize(size: number): string {
   return `${Math.max(1, Math.round(size / 1024))} KB`;
 }
 
+/**
+ * 详情页里的链接一律交给系统浏览器打开，webview 自己不许导航走
+ *
+ * Modrinth 正文是 markdown 渲染出来的 `<a href>`，直接点会把这个窗口换成网页、
+ * 整个启动器界面就回不来了。这里拦下默认跳转，再按原地址交给系统浏览器。
+ */
+function onDetailClick(e: MouseEvent) {
+  // auxclick 只处理鼠标中键；右键会触发 auxclick，不能顺手把链接打开
+  if (e.type === "auxclick" && e.button !== 1) return;
+  const anchor = (e.target as Element | null)?.closest("a[href]");
+  if (!anchor) return;
+  const href = anchor.getAttribute("href") ?? "";
+  // 页内锚点照常滚到对应位置
+  if (!href || href.startsWith("#")) return;
+  e.preventDefault();
+  let url = href;
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(href)) {
+    // 相对地址按 Modrinth 站点补全；正文只来自 Modrinth
+    url = new URL(href, "https://modrinth.com").toString();
+  } else if (!/^https?:/i.test(href)) {
+    return;
+  }
+  api.openUrl(url).catch(() => {});
+}
+
 /** 版本列表锚点：头部「版本列表」按钮滚动到这里 */
 const versionsRef = ref<HTMLElement | null>(null);
 
@@ -294,7 +319,8 @@ function scrollToVersions() {
       <!-- 显示与否跟父组件的 item 走：收起时立刻进退场动画。
            退场那一下的内容仍取 current —— 它留着最后一次打开的项目，
            所以动画期间画面不会变空；只按 current 判断的话详情页永远关不掉 -->
-      <div v-if="active && props.item && current" class="detail-page">
+      <div v-if="active && props.item && current" class="detail-page" @click="onDetailClick"
+        @auxclick="onDetailClick">
         <!-- 头部固定、内容滚动；没有外层卡片，直接用窗口底色 -->
         <div class="detail-panel">
           <div class="detail-head">
@@ -303,13 +329,11 @@ function scrollToVersions() {
               {{ current.name.slice(0, 1).toUpperCase() }}
             </div>
             <div class="detail-title">
-              <div class="detail-name">
-                {{ current.name }}
+              <div class="detail-name">{{ current.name }}</div>
+              <div class="detail-sub">
                 <span v-if="projectInstalled(current)" class="pack-badge">{{ t("modpack.installed") }}</span>
                 <span v-else-if="projectRunning(current)" class="pack-badge busy">{{ t("modpack.downloading")
                 }}</span>
-              </div>
-              <div class="detail-sub">
                 <template v-if="authorList.length">
                   <AuthorTag :authors="authorList" :max="4" />
                   <span> · </span>
@@ -317,36 +341,38 @@ function scrollToVersions() {
                 <span>{{ t("modpack.downloads", { n: formatCount(current.downloadCount) }) }}</span>
                 <span v-if="current.date"> · {{ formatDate(current.date) }}</span>
               </div>
-              <div v-if="detail?.tag.length || current.tag.length" class="pack-tags detail-tags">
-                <span v-for="tag in detail?.tag.length ? detail.tag : current.tag" :key="tag.name" class="pack-tag">
-                  <span v-if="tag.svg" class="tag-svg" v-html="svgIcon(tag.svg)"></span>
-                  <img v-else-if="tag.logo" class="pack-tag-icon" :src="tag.logo" loading="lazy" alt="" />
-                  {{ tag.name }}
-                </span>
-              </div>
             </div>
-            <button class="detail-jump" @click="scrollToVersions">
-              {{ t("modpack.versions") }}
-            </button>
-            <button class="detail-download" :disabled="filesLoading || !latestFile" @click="downloadLatest">
-              {{ t("modpack.download") }}
-            </button>
-            <button class="detail-star" :class="{ on: current.isStar }"
-              v-tip="current.isStar ? t('modpack.unstar') : t('modpack.star')" @click="toggleStar(current)">
-              <svg viewBox="0 0 24 24" width="20" height="20" stroke-width="2" stroke-linejoin="round">
-                <path
-                  d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-              </svg>
-            </button>
-            <button v-if="current.url" class="detail-link" v-tip="t('modpack.openPage')"
-              @click="api.openUrl(current.url)">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                <polyline points="15 3 21 3 21 9" />
-                <line x1="10" y1="14" x2="21" y2="3" />
-              </svg>
-            </button>
+            <div class="detail-actions">
+              <button class="detail-jump" @click="scrollToVersions">
+                {{ t("modpack.versions") }}
+              </button>
+              <button class="detail-download" :disabled="filesLoading || !latestFile" @click="downloadLatest">
+                {{ t("modpack.download") }}
+              </button>
+              <button class="detail-star" :class="{ on: current.isStar }"
+                v-tip="current.isStar ? t('modpack.unstar') : t('modpack.star')" @click="toggleStar(current)">
+                <svg viewBox="0 0 24 24" width="20" height="20" stroke-width="2" stroke-linejoin="round">
+                  <path
+                    d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                </svg>
+              </button>
+              <button v-if="current.url" class="detail-link" v-tip="t('modpack.openPage')"
+                @click="api.openUrl(current.url)">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  <polyline points="15 3 21 3 21 9" />
+                  <line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+              </button>
+            </div>
+            <div v-if="detail?.tag.length || current.tag.length" class="pack-tags detail-tags">
+              <span v-for="tag in detail?.tag.length ? detail.tag : current.tag" :key="tag.name" class="pack-tag">
+                <span v-if="tag.svg" class="tag-svg" v-html="svgIcon(tag.svg)"></span>
+                <img v-else-if="tag.logo" class="pack-tag-icon" :src="tag.logo" loading="lazy" alt="" />
+                {{ tag.name }}
+              </span>
+            </div>
           </div>
 
           <div class="detail-scroll">

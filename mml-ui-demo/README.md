@@ -4,8 +4,8 @@ M²L 启动器可以把你自己的 Vue 组件当成「启动器主页」（顶�
 本工程演示的就是**服务器主页**：公告 / 活动日历 / 进服必读 / 群号 / 开服时间 / 赞助名单，
 加上一个「一键进服」按钮——点下去真的会调启动器启动游戏，页面还能实时显示启动阶段。
 
-只保留组件入口，没有 `index.html` / `main.ts`：包根是 `custom.js` 与 `custom.css`，
-mml-vue 在挂载前加载并渲染组件，不再使用 iframe。
+只保留组件入口，没有 `index.html` / `main.ts`：包根是 `custom.js`、`custom.css`
+与声明类型的 `theme.json`，mml-vue 在挂载前加载并渲染组件，不再使用 iframe。
 
 ## 快速开始
 
@@ -18,9 +18,12 @@ npm run build      # vue-tsc + 组件入口构建 + 打包
 
 ```
 mml-ui-demo.zip
+├─ theme.json      主题清单，type 为 home
 ├─ custom.js       主页组件入口（IIFE，Vue 走 __mmlVue）
 └─ custom.css      限定在 .mml-home 内的样式
 ```
+
+包根的 `theme.json` 声明类型，导入时按它判定；没有清单的包与其它类型入口重合时会被拒绝。
 
 导入：启动器 → **设置 → 客户端设置 → 自定义主页面 → 导入**，选 `mml-ui-demo.zip`，
 再打开「启用自定义主页面」开关 → 回到主窗口主页即可看到。

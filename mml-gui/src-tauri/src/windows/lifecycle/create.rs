@@ -17,6 +17,27 @@ use crate::windows::registry::{ADD_MODPACK_WINDOW_UUID, BLOCK_WINDOW_UUID, MAIN_
 use crate::windows::{block};
 use super::models::{OPEN_WINDOWS, WINDOW_MODELS, ensure_window_model};
 
+/// 窗口内允许导航的地址：启动器自身页面与本地自定义协议
+///
+/// - `url`: 导航目标
+///
+/// # 返回值
+///
+/// 允许在 webview 内导航时为 `true`
+fn is_app_url(url: &tauri::Url) -> bool {
+    if matches!(url.scheme(), "tauri" | "about" | "data") {
+        return true;
+    }
+    if url.scheme() != "http" && url.scheme() != "https" {
+        return false;
+    }
+    let host = url.host_str().unwrap_or_default();
+    host == "localhost"
+        || host == "127.0.0.1"
+        || host == "tauri.localhost"
+        || host.ends_with(".localhost")
+}
+
 
 /// 窗口是否拒绝本次关闭
 ///
@@ -141,6 +162,14 @@ pub(crate) fn create_window(
         // 拖下来的卡片连 dragenter 都收不到。关掉后 DOM 拖放全功能，路径由 file_drop 补上
         .disable_drag_drop_handler()
         .visible(false);
+
+    // 下载资源 / 整合包两个窗口只承载启动器页面：正文里的外链由前端拦下转给系统浏览器，
+    // 这里再兜一层，任何外部导航都不允许把窗口带走
+    let builder = if matches!(label, "mml-add_resource" | "mml-add_modpack") {
+        builder.on_navigation(is_app_url)
+    } else {
+        builder
+    };
 
     // 拖放路径桥的脚本挂在**建窗期**：initialization_script 在导航开始前就注册好，每个新建
     // 文档都会执行。放到 webview ready 回调里注入对初始文档无效 —— 那个 API 只对之后新建

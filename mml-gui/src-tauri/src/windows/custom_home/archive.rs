@@ -42,12 +42,31 @@ pub(crate) fn open_handle() -> Option<Arc<HomeArchive>> {
     handle_cell().lock().ok()?.clone()
 }
 
+/// 旧版本把整包存成 `custom_home.zip`，新版换成不带扩展名的 `home`
+const LEGACY_FILE: &str = "custom_home.zip";
+
+/// 把旧版本留下的 `custom_home.zip` 搬到 `home`
+///
+/// 不搬的话升级后旧用户的包会被当成没导入；新文件已在时不动，改名失败就按没导入处理。
+///
+/// - `zip`: 新版整包路径
+fn migrate_legacy(zip: &Path) {
+    if zip.is_file() {
+        return;
+    }
+    let legacy = zip.with_file_name(LEGACY_FILE);
+    if legacy.is_file() {
+        let _ = std::fs::rename(&legacy, zip);
+    }
+}
+
 /// 打开或重开常驻句柄：zip 在就打开，不在就清空
 ///
 /// 导入 / 删除 / 启动时各调一次。包损坏、超出限额或没有入口页时句柄保持为 None，
 /// 协议层自然回 404，主窗口回落到内置主页。
 pub(crate) fn reload() {
     let zip = zip_path();
+    migrate_legacy(&zip);
     let loaded = if zip.is_file() {
         match HomeArchive::open(&zip) {
             Ok(archive) => {
@@ -78,10 +97,10 @@ pub(crate) fn reload() {
     }
 }
 
-/// 导入 zip：**不解压、不落任何目录**，先判定类型并校验整包，再存成 `custom_home.zip`
+/// 导入 zip：**不解压、不落任何目录**，先判定类型并校验整包，再存成 `home`
 ///
 /// 导入语义是全量替换，且中途失败不能破坏服主已有的包：校验全部通过后才经
-/// `custom_home.zip.tmp` 中转，最后删旧包 rename 上架并重开常驻句柄。
+/// `home.tmp` 中转，最后 rename 覆盖上架并重开常驻句柄。
 ///
 /// 之所以在替换前就把整包读一遍：类型判定与坏包校验必须发生在替换之前，否则一个
 /// 没有入口、带加密条目或路径越界的包会把服主原来能用的主页顶掉。

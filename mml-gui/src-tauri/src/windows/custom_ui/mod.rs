@@ -1,7 +1,7 @@
 //! 自定义界面：自定义 CSS 与完全自定义界面
 //!
 //! 三种「换皮」都打包成 zip 分发，各自独立，装一个不影响另外两个的开关：
-//! 1. 自定义主页面：产物 `custom_home.zip`，开关 `client.custom_home`，设置放客户端设置；
+//! 1. 自定义主页面：产物 `home`，开关 `client.custom_home`，设置放客户端设置；
 //! 2. 自定义 CSS：可装多份，产物 `custom_ui/css/<id>.zip`，包根要有 `custom.css`，
 //!    可选 `custom.js` 入口脚本，开关 `client.custom_css_on`；
 //! 3. 完全自定义界面：只装一份，产物 `custom_ui/page.zip`，包根要有 `index.html`

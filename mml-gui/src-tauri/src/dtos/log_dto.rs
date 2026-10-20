@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::gui_setting::GameLogSettingObj;
+use crate::gui_setting::{GameGuiSettingObj, GameLogSettingObj};
 
 /// 切换目标实例事件：导出窗口已存在时再次打开，壳层推送 `export-focus` 让已开窗口切换实例
 #[derive(Debug, Clone, Serialize)]
@@ -35,22 +35,27 @@ pub struct LogSettingDto {
     pub enable_error: bool,
     /// 显示调试级
     pub enable_debug: bool,
+    /// 启动游戏时自动打开该实例的日志窗口
+    pub auto_show: bool,
 }
 
-impl From<GameLogSettingObj> for LogSettingDto {
-    fn from(obj: GameLogSettingObj) -> Self {
+impl From<&GameGuiSettingObj> for LogSettingDto {
+    fn from(obj: &GameGuiSettingObj) -> Self {
+        let log = &obj.log;
         Self {
-            word_wrap: obj.word_wrap,
-            auto: obj.auto,
-            enable_none: obj.enable_none,
-            enable_info: obj.enable_info,
-            enable_warn: obj.enable_warn,
-            enable_error: obj.enable_error,
-            enable_debug: obj.enable_debug,
+            word_wrap: log.word_wrap,
+            auto: log.auto,
+            enable_none: log.enable_none,
+            enable_info: log.enable_info,
+            enable_warn: log.enable_warn,
+            enable_error: log.enable_error,
+            enable_debug: log.enable_debug,
+            auto_show: obj.log_auto_show,
         }
     }
 }
 
+// 只映射 `Log` 段里的字段；`auto_show` 在 `GameGuiSettingObj::log_auto_show`，由调用方单独写
 impl From<LogSettingDto> for GameLogSettingObj {
     fn from(obj: LogSettingDto) -> Self {
         Self {

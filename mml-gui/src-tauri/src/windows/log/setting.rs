@@ -24,7 +24,7 @@ use super::read::{join_log_lines, log_line_from_item};
 /// # 返回值
 ///
 /// 实时日志行；实例不存在或没在跑返回空列表
-#[gui_macros::ipc_group("log")]
+#[gui_macros::ipc_group("log")]
 #[gui_macros::command]
 pub fn log_get_runtime(uuid: String) -> Vec<LogLine> {
     let Ok(id) = Uuid::parse_str(&uuid) else {
@@ -47,12 +47,12 @@ pub fn log_get_runtime(uuid: String) -> Vec<LogLine> {
 /// # 返回值
 ///
 /// 见 [`LogSettingDto`]；文件缺失或解析失败时给默认值，实例不存在返回错误文案
-#[gui_macros::ipc_group("log")]
+#[gui_macros::ipc_group("log")]
 #[gui_macros::command]
 pub fn log_get_setting(uuid: String) -> Result<LogSettingDto, String> {
     let instance = instance_handle(&uuid)?;
     let game = instance.read().unwrap();
-    Ok(gui_setting::load(&game).log.into())
+    Ok(LogSettingDto::from(&gui_setting::load(&game)))
 }
 
 /// 保存实例的日志窗口设置，写入 `gui_setting.json` 的 `Log`
@@ -65,13 +65,15 @@ pub fn log_get_setting(uuid: String) -> Result<LogSettingDto, String> {
 /// # 返回值
 ///
 /// 已提交异步落盘返回 `Ok(())`；实例不存在返回错误文案
-#[gui_macros::ipc_group("log")]
+#[gui_macros::ipc_group("log")]
 #[gui_macros::command]
 pub fn log_set_setting(uuid: String, setting: LogSettingDto) -> Result<(), String> {
     let instance = instance_handle(&uuid)?;
     let game = instance.read().unwrap();
     let mut obj = gui_setting::load(&game);
+    let auto_show = setting.auto_show;
     obj.log = setting.into();
+    obj.log_auto_show = auto_show;
     gui_setting::save(&game, &obj);
     Ok(())
 }
@@ -87,7 +89,7 @@ pub fn log_set_setting(uuid: String, setting: LogSettingDto) -> Result<(), Strin
 /// # 返回值
 ///
 /// 成功返回分享网址；没有可上传的内容、路径非法、网络或对方拒绝都返回错误文案
-#[gui_macros::ipc_group("log")]
+#[gui_macros::ipc_group("log")]
 #[gui_macros::command]
 pub async fn log_upload(uuid: String, file: Option<String>) -> Result<String, String> {
     let instance = instance_handle(&uuid)?;
