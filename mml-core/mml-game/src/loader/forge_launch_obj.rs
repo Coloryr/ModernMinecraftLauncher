@@ -32,6 +32,15 @@ pub struct ForgeArgumentsObj {
     pub jvm: Vec<String>,
 }
 
+/// 加载器要求的 Java 版本
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(default)]
+pub struct ForgeJavaVersionObj {
+    /// 主版本号，如 25
+    #[serde(rename = "majorVersion")]
+    pub major_version: i32,
+}
+
 /// Forge 启动版本信息
 #[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
@@ -46,4 +55,7 @@ pub struct ForgeLaunchObj {
     pub arguments: Option<ForgeArgumentsObj>,
     /// 运行库列表
     pub libraries: Vec<ForgeLibrariesObj>,
+    /// 清单声明的 Java 版本；Cleanroom 的 version.json 带 `javaVersion`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub java_version: Option<ForgeJavaVersionObj>,
 }

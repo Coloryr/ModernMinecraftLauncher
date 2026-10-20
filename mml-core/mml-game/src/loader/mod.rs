@@ -6,7 +6,9 @@
 //! | --- | --- |
 //! | `custom` | 自定义加载器 |
 //! | `fabric` / `fabric_loader_obj` / `fabric_meta_obj` | Fabric 安装与元数据 |
-//! | `forge` / `forge_install_obj` / `forge_launch_obj` | Forge / NeoForge 安装与启动数据 |
+//! | `forge` / `forge_install_obj` / `forge_launch_obj` | Forge 安装与启动数据，以及三家共用的安装器解析 / 运行库合并 |
+//! | `neoforge` | NeoForge 下载项 |
+//! | `cleanroom` / `cleanroom_obj` | Cleanroom 下载项、分平台原生库与清单 DTO |
 //! | `liteloader` / `liteloader_meta_obj` | LiteLoader 安装与元数据 |
 //! | `optifine` / `optifine_obj` | OptiFine 安装与元数据 |
 //! | `quilt` / `quilt_loader_obj` / `quilt_meta_obj` | Quilt 安装与元数据 |
@@ -15,6 +17,8 @@
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
+pub mod cleanroom;
+pub mod cleanroom_obj;
 pub mod custom;
 pub mod fabric;
 pub mod fabric_loader_obj;
@@ -24,6 +28,7 @@ pub mod forge_install_obj;
 pub mod forge_launch_obj;
 pub mod liteloader;
 pub mod liteloader_meta_obj;
+pub mod neoforge;
 pub mod loader_versions;
 pub mod optifine;
 pub mod optifine_obj;
@@ -87,6 +92,8 @@ pub enum LoaderType {
     LiteLoader,
     /// 自定义
     Custom,
+    /// Cleanroom 加载器，1.12.2 的 Forge 分支
+    Cleanroom,
 }
 
 impl Default for LoaderType {
@@ -111,6 +118,7 @@ impl LoaderType {
             LoaderType::OptiFine => "optifine",
             LoaderType::LiteLoader => "liteloader",
             LoaderType::Custom => "custom",
+            LoaderType::Cleanroom => "cleanroom",
         }
     }
 
@@ -131,6 +139,7 @@ impl LoaderType {
             "optifine" => Some(LoaderType::OptiFine),
             "liteloader" => Some(LoaderType::LiteLoader),
             "custom" => Some(LoaderType::Custom),
+            "cleanroom" => Some(LoaderType::Cleanroom),
             _ => None,
         }
     }
@@ -147,6 +156,7 @@ impl LoaderType {
             "fabric",
             "quilt",
             "neoforge",
+            "cleanroom",
             "optifine",
             "liteloader",
             "custom",

@@ -61,6 +61,7 @@ pub fn to_loader_id(loader: &LoaderType) -> Option<String> {
         LoaderType::Fabric => Some(loader.id().to_string()),
         LoaderType::Quilt => Some(loader.id().to_string()),
         LoaderType::NeoForge => Some(loader.id().to_string()),
+        LoaderType::Cleanroom => Some(String::from("forge")),
         _ => None,
     }
 }
@@ -503,17 +504,10 @@ fn get_mod_dependencies_inner(
                             .map(|item| vec![item]),
                     ),
                     None => {
-                        let loader = if matches!(loader, LoaderType::Custom)
-                            || matches!(loader, LoaderType::Normal)
-                            || matches!(loader, LoaderType::OptiFine)
-                        {
-                            None
-                        } else {
-                            Some(loader.id())
-                        };
+                        let loader = to_loader_id(loader);
                         // 整份候选都带上：前端要让用户在这些版本里挑，不只用第一个
                         let data1 =
-                            modrinth_api::get_file_versions(project_id, Some(version), loader)
+                            modrinth_api::get_file_versions(project_id, Some(version), loader.as_deref())
                                 .await;
 
                         (Ok(data), data1)

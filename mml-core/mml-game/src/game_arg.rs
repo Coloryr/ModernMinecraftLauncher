@@ -110,11 +110,11 @@ fn make_v2_game_arg(game: &GameArgObj) -> Vec<String> {
 /// 返回加载器附加的游戏启动参数列表。
 fn make_loader_v1_game_arg(obj: &InstanceSettingObj, game: &GameArgObj) -> Vec<String> {
     match obj.loader {
-        LoaderType::Forge | LoaderType::NeoForge => {
-            let loader = if obj.loader == LoaderType::Forge {
-                obj.get_forge()
-            } else {
+        LoaderType::Forge | LoaderType::NeoForge | LoaderType::Cleanroom => {
+            let loader = if obj.loader == LoaderType::NeoForge {
                 obj.get_neoforge()
+            } else {
+                obj.get_forge()
             };
 
             if let Some(data) = loader
@@ -176,11 +176,11 @@ fn make_loader_v1_game_arg(obj: &InstanceSettingObj, game: &GameArgObj) -> Vec<S
 /// 返回加载器附加的游戏启动参数列表。
 fn make_loader_v2_game_arg(obj: &InstanceSettingObj) -> Vec<String> {
     match obj.loader {
-        LoaderType::Forge | LoaderType::NeoForge => {
-            let loader = if obj.loader == LoaderType::Forge {
-                obj.get_forge()
-            } else {
+        LoaderType::Forge | LoaderType::NeoForge | LoaderType::Cleanroom => {
+            let loader = if obj.loader == LoaderType::NeoForge {
                 obj.get_neoforge()
+            } else {
+                obj.get_forge()
             };
 
             loader
@@ -286,6 +286,8 @@ async fn make_loader_jvm_arg(v2: bool, obj: &InstanceSettingObj) -> Vec<String> 
             .map(|f| f.arguments.jvm.clone())
             .unwrap_or_default(),
         LoaderType::Quilt => Vec::new(),
+        // Cleanroom 是 1.12.2 的 V1 加载器，不需要 ForgeWrapper 那套 JVM 参数
+        LoaderType::Cleanroom => Vec::new(),
         LoaderType::OptiFine => {
             let mut list = vec![
                 format!(
@@ -781,6 +783,7 @@ impl InstanceSettingObj {
                     self.get_forge().unwrap().main_class.clone()
                 }
             }
+            LoaderType::Cleanroom => self.get_forge().unwrap().main_class.clone(),
             LoaderType::Fabric => self.get_fabric().unwrap().main_class.clone(),
             LoaderType::Quilt => self.get_quilt().unwrap().main_class.clone(),
             LoaderType::OptiFine => "com.coloryr.optifinewrapper.OptifineWrapper".to_string(),
@@ -859,10 +862,21 @@ impl InstanceSettingObj {
             let mut install_libs: Option<Vec<FileItemObj>> = None;
 
             match self.loader {
-                LoaderType::Forge | LoaderType::NeoForge => {
+                LoaderType::Forge | LoaderType::NeoForge | LoaderType::Cleanroom => {
                     let res = self.get_forge_libs().await?;
                     loader_libs = Some(res.loaders);
                     install_libs = Some(res.installs);
+
+                    // Cleanroom 的清单声明要 Java 25：覆盖原版 1.12.2 的 Java 8，
+                    // 否则自动选择会按最低版本挑到 8
+                    if self.loader == LoaderType::Cleanroom
+                        && let Some(java) = self
+                            .get_forge()
+                            .and_then(|loader| loader.java_version.as_ref().map(|j| j.major_version))
+                    {
+                        obj.java_versions.clear();
+                        obj.java_versions.insert(java);
+                    }
 
                     if v2 {
                         launcher_path::ready_forge_wrapper()?;
@@ -1184,7 +1198,7 @@ impl InstanceSettingObj {
         // 先塞一遍加载器库会得到重复的 forge，还会把 patch 声明为 "Early Classpath" 的
         // lwjgl3ify-forgePatches.jar 挤到 Forge 后面 —— RFB 的早期类覆盖就失效了
         let loader_libs = match self.loader {
-            LoaderType::Forge | LoaderType::NeoForge => {
+            LoaderType::Forge | LoaderType::NeoForge | LoaderType::Cleanroom => {
                 self.get_forge_libs().await.ok().map(|res| res.loaders)
             }
             LoaderType::Fabric => self.get_fabric_libs().await.ok(),

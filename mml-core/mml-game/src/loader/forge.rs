@@ -1,4 +1,7 @@
-//! Forge / NeoForge 加载器安装与运行库下载项构建
+//! Forge 加载器安装与运行库下载项构建
+//!
+//! NeoForge / Cleanroom 的下载项分别在 `neoforge` / `cleanroom`；三者共用这里的
+//! 安装器解析、内嵌运行库解包与运行库列表合并流程。
 
 use std::{
     collections::HashMap,
@@ -261,52 +264,6 @@ async fn build_forge_item(mc: &str, version: &str, jar_type: &str, hash: bool) -
     }
 }
 
-/// 创建 NeoForge 下载项目
-///
-/// - `mc`: 游戏版本号
-/// - `version`: NeoForge 版本号
-/// - `jar`: jar 类型，取 `installer`、`universal`、`client` 之一
-/// - `hash`: 是否联网获取文件哈希
-///
-/// # 返回值
-///
-/// 返回下载项
-async fn build_neoforge_item(mc: &str, version: &str, jar: &str, hash: bool) -> FileItemObj {
-    let v2222 = version_parse::is_game_version_1202(mc);
-    let name = if v2222 {
-        format!("neoforge-{version}-{jar}")
-    } else {
-        format!("forge-{mc}-{version}-{jar}")
-    };
-
-    let base_url = url_helper::get_neoforge_jar(v2222, mc, version);
-    let base_path = libraries_path::get_lib_dir().join("net").join("neoforged");
-
-    let url = format!("{base_url}{name}.jar");
-    let hash = if hash {
-        maven_utils::try_get_hash(&url).await
-    } else {
-        FileHash::None
-    };
-    FileItemObj {
-        name: format!("net.neoforged:{name}"),
-        file: if v2222 {
-            base_path
-                .join("neoforge")
-                .join(version)
-                .join(format!("{name}.jar"))
-        } else {
-            base_path
-                .join("forge")
-                .join(format!("{mc}-{version}"))
-                .join(format!("{name}.jar"))
-        },
-        url,
-        hash,
-        later: Default::default(),
-    }
-}
-
 /// 创建 Forge 安装器下载项目
 ///
 /// - `mc`: 游戏版本号
@@ -365,51 +322,13 @@ pub async fn build_forge_launcher(mc: &str, version: &str, hash: bool) -> FileIt
     item
 }
 
-/// 创建 NeoForge 安装器下载项目
-///
-/// - `mc`: 游戏版本号
-/// - `version`: NeoForge 版本号
-/// - `hash`: 是否联网获取文件哈希
-///
-/// # 返回值
-///
-/// 返回下载项
-pub async fn build_neoforge_installer(mc: &str, version: &str, hash: bool) -> FileItemObj {
-    build_neoforge_item(mc, version, names::FILE_INSTALLER, hash).await
-}
-
-/// 创建 NeoForge universal 包下载项目
-///
-/// - `mc`: 游戏版本号
-/// - `version`: NeoForge 版本号
-/// - `hash`: 是否联网获取文件哈希
-///
-/// # 返回值
-///
-/// 返回下载项
-pub async fn build_neoforge_universal(mc: &str, version: &str, hash: bool) -> FileItemObj {
-    build_neoforge_item(mc, version, names::FILE_UNIVERSAL, hash).await
-}
-
-/// 创建 NeoForge client 包下载项目
-///
-/// - `mc`: 游戏版本号
-/// - `version`: NeoForge 版本号
-/// - `hash`: 是否联网获取文件哈希
-///
-/// # 返回值
-///
-/// 返回下载项
-pub async fn build_neoforge_client(mc: &str, version: &str, hash: bool) -> FileItemObj {
-    build_neoforge_item(mc, version, names::FILE_CLIENT, hash).await
-}
-
 /// 构建 Forge 运行库下载项目列表
 ///
 /// - `info`: 运行库列表
 /// - `mc`: 游戏版本号
 /// - `version`: Forge 版本号
 /// - `neo`: 是否为 NeoForge
+/// - `cleanroom`: 是否为 Cleanroom
 /// - `v2`: 是否为 1.13 以上
 /// - `install`: 是否为安装器
 ///
@@ -421,6 +340,7 @@ pub async fn build_forge_libs(
     mc: &str,
     version: &str,
     neo: bool,
+    cleanroom: bool,
     v2: bool,
     install: bool,
 ) -> Vec<FileItemObj> {
@@ -466,8 +386,10 @@ pub async fn build_forge_libs(
     if !installer && install {
         list.insert(
             String::from(names::FILE_INSTALLER),
-            if neo {
-                build_neoforge_installer(mc, version, false).await
+            if cleanroom {
+                crate::loader::cleanroom::build_cleanroom_installer(version, false).await
+            } else if neo {
+                crate::loader::neoforge::build_neoforge_installer(mc, version, false).await
             } else {
                 build_forge_installer(mc, version, false).await
             },
@@ -475,11 +397,16 @@ pub async fn build_forge_libs(
     }
 
     if !universal {
-        if !neo || version_parse::is_game_version_1202(mc) {
+        if cleanroom {
+            list.insert(
+                String::from(names::FILE_UNIVERSAL),
+                crate::loader::cleanroom::build_cleanroom_universal(version, false).await,
+            );
+        } else if !neo || version_parse::is_game_version_1202(mc) {
             list.insert(
                 String::from(names::FILE_UNIVERSAL),
                 if neo {
-                    build_neoforge_universal(mc, version, false).await
+                    crate::loader::neoforge::build_neoforge_universal(mc, version, false).await
                 } else {
                     build_forge_universal(mc, version, false).await
                 },
@@ -560,18 +487,26 @@ fn extract_embedded_libs<R: Read + Seek>(
 /// 需要时先下载安装器，再从安装器内解析运行库列表。
 ///
 /// - `mc`: 游戏版本号
-/// - `version`: Forge 版本号
+/// - `version`: 加载器版本号
 /// - `neo`: 是否为 NeoForge
+/// - `cleanroom`: 是否为 Cleanroom
 ///
 /// # 返回值
 ///
 /// 返回加载器与安装器各自的下载项列表；下载或解析失败返回对应错误
-async fn get_forge_libs(mc: &str, version: &str, neo: bool) -> CoreResult<ForgeGetFilesObj> {
+async fn get_forge_libs(
+    mc: &str,
+    version: &str,
+    neo: bool,
+    cleanroom: bool,
+) -> CoreResult<ForgeGetFilesObj> {
     let ver = version_path::get_version(mc)?;
     let v2 = ver.is_game_version_v2();
 
-    let installer = if neo {
-        build_neoforge_installer(mc, version, true).await
+    let installer = if cleanroom {
+        crate::loader::cleanroom::build_cleanroom_installer(version, true).await
+    } else if neo {
+        crate::loader::neoforge::build_neoforge_installer(mc, version, true).await
     } else {
         build_forge_installer(mc, version, true).await
     };
@@ -614,11 +549,20 @@ async fn get_forge_libs(mc: &str, version: &str, neo: bool) -> CoreResult<ForgeG
     if version_ok && install_ok {
         // 两个文件都在，说明是 1.12.2 以上的新版 Forge
         let info = serialize_tools::json_from_str::<ForgeLaunchObj>(&version_json)?;
+        // 先解析原生库：add_forge 会消费 version_json
+        let native_items = if cleanroom {
+            crate::loader::cleanroom::build_cleanroom_natives(&version_json, mc)
+        } else {
+            Vec::new()
+        };
         let info = version_path::add_forge(info, &version_json.into_bytes(), mc, version, neo);
         // 两份清单都会把 url 为空的运行库指向安装器内部，先解到本地再构建下载列表
         extract_embedded_libs(&mut zip, &info.libraries)?;
 
-        let loaders = info.build_forge_libs(mc, version, neo, v2, false).await;
+        let mut loaders = info
+            .build_forge_libs(mc, version, neo, cleanroom, v2, false)
+            .await;
+        loaders.extend(native_items);
 
         let install_info = serialize_tools::json_from_str::<ForgeInstallObj>(&install_json)?;
         let install_info = version_path::add_forge_install(
@@ -631,7 +575,7 @@ async fn get_forge_libs(mc: &str, version: &str, neo: bool) -> CoreResult<ForgeG
         extract_embedded_libs(&mut zip, &install_info.libraries)?;
 
         let installs = install_info
-            .build_forge_libs(mc, version, neo, v2, true)
+            .build_forge_libs(mc, version, neo, cleanroom, v2, true)
             .await;
 
         Ok(ForgeGetFilesObj { loaders, installs })
@@ -671,7 +615,9 @@ async fn get_forge_libs(mc: &str, version: &str, neo: bool) -> CoreResult<ForgeG
         // install 传 false：安装器在函数第一步已下好，不该再进加载器库，
         // 否则它会跟着 loader_libs 上 classpath
         Ok(ForgeGetFilesObj {
-            loaders: info.build_forge_libs(mc, version, neo, v2, false).await,
+            loaders: info
+                .build_forge_libs(mc, version, neo, cleanroom, v2, false)
+                .await,
             installs: Vec::new(),
         })
     } else {
@@ -696,10 +642,11 @@ impl ForgeLaunchObj {
         mc: &str,
         version: &str,
         neo: bool,
+        cleanroom: bool,
         v2: bool,
         install: bool,
     ) -> Vec<FileItemObj> {
-        build_forge_libs(&self.libraries, mc, version, neo, v2, install).await
+        build_forge_libs(&self.libraries, mc, version, neo, cleanroom, v2, install).await
     }
 }
 
@@ -720,10 +667,11 @@ impl ForgeInstallObj {
         mc: &str,
         version: &str,
         neo: bool,
+        cleanroom: bool,
         v2: bool,
         install: bool,
     ) -> Vec<FileItemObj> {
-        build_forge_libs(&self.libraries, mc, version, neo, v2, install).await
+        build_forge_libs(&self.libraries, mc, version, neo, cleanroom, v2, install).await
     }
 }
 
@@ -738,6 +686,7 @@ impl InstanceSettingObj {
             &self.version,
             &self.loader_version.as_ref().unwrap(),
             self.loader == LoaderType::NeoForge,
+            self.loader == LoaderType::Cleanroom,
         )
         .await
     }
@@ -775,38 +724,6 @@ impl InstanceSettingObj {
         build_forge_client(&self.version, &self.loader_version.as_ref().unwrap(), hash).await
     }
 
-    /// 创建 NeoForge 安装器下载项目
-    ///
-    /// - `hash`: 是否联网获取文件哈希
-    ///
-    /// # 返回值
-    ///
-    /// 返回下载项
-    pub async fn build_neoforge_installer(&self, hash: bool) -> FileItemObj {
-        build_neoforge_installer(&self.version, &self.loader_version.as_ref().unwrap(), hash).await
-    }
-
-    /// 创建 NeoForge universal 包下载项目
-    ///
-    /// - `hash`: 是否联网获取文件哈希
-    ///
-    /// # 返回值
-    ///
-    /// 返回下载项
-    pub async fn build_neoforge_universal(&self, hash: bool) -> FileItemObj {
-        build_neoforge_universal(&self.version, &self.loader_version.as_ref().unwrap(), hash).await
-    }
-
-    /// 创建 NeoForge client 包下载项目
-    ///
-    /// - `hash`: 是否联网获取文件哈希
-    ///
-    /// # 返回值
-    ///
-    /// 返回下载项
-    pub async fn build_neoforge_client(&self, hash: bool) -> FileItemObj {
-        build_neoforge_client(&self.version, &self.loader_version.as_ref().unwrap(), hash).await
-    }
 }
 
 #[cfg(test)]
@@ -947,7 +864,7 @@ mod embedded_tests {
         let rel = format!("test/absent/{}/lib.jar", Uuid::new_v4().simple());
         let info = vec![embedded_lib(&rel, "00")];
 
-        let list = build_forge_libs(&info, "1.12.2", "14.23.5.2864", false, false, false).await;
+        let list = build_forge_libs(&info, "1.12.2", "14.23.5.2864", false, false, false, false).await;
 
         assert!(
             !list.iter().any(|item| item.url.is_empty()),
@@ -968,7 +885,7 @@ mod embedded_tests {
         std::fs::write(&local, data).unwrap();
 
         let info = vec![embedded_lib(&rel, &sha1)];
-        let list = build_forge_libs(&info, "1.12.2", "14.23.5.2864", false, false, false).await;
+        let list = build_forge_libs(&info, "1.12.2", "14.23.5.2864", false, false, false, false).await;
 
         assert!(
             list.iter().any(|item| item.file == local),
@@ -976,3 +893,4 @@ mod embedded_tests {
         );
     }
 }
+

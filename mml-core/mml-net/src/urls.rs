@@ -80,6 +80,9 @@ pub const FORGE: &str = "https://maven.minecraftforge.net/";
 /// NeoForge Maven 仓库
 pub const NEOFORGE: &str = "https://maven.neoforged.net/";
 
+/// Cleanroom Maven 仓库，安装器与运行库都在它下面
+pub const CLEANROOM: &str = "https://repo.cleanroommc.com/releases/";
+
 /// Fabric Maven 仓库
 pub const FABRIC: &str = "https://maven.fabricmc.net/";
 /// Fabric 元数据 API

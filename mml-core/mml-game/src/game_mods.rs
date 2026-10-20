@@ -1626,6 +1626,7 @@ pub fn loader_modids(loader: LoaderType) -> &'static [&'static str] {
     match loader {
         LoaderType::Forge => &["forge", "minecraftforge"],
         LoaderType::NeoForge => &["neoforge", "forge"],
+        LoaderType::Cleanroom => &["cleanroom", "forge", "minecraftforge"],
         LoaderType::Fabric => &["fabricloader"],
         LoaderType::Quilt => &["quilt_loader", "quilt_base", "fabricloader"],
         LoaderType::OptiFine => &["optifine"],

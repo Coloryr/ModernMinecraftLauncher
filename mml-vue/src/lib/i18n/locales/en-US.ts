@@ -786,6 +786,7 @@ export default {
   "add.loader.fabric": "Fabric",
   "add.loader.quilt": "Quilt",
   "add.loader.neoforge": "NeoForge",
+  "add.loader.cleanroom": "Cleanroom",
   "add.loader.optifine": "OptiFine",
   "add.loader.liteloader": "LiteLoader",
   "add.loader.custom": "Custom",

@@ -61,7 +61,7 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 /** 模组可按加载器过滤（normal = 全部） */
-const LOADERS = ["normal", "forge", "fabric", "quilt", "neoforge"];
+const LOADERS = ["normal", "forge", "fabric", "quilt", "neoforge", "cleanroom"];
 
 /** 目标实例（uuid + 显示名），空 = 未选择 */
 const instanceUuid = ref("");

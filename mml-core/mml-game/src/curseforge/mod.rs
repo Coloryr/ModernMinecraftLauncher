@@ -99,6 +99,7 @@ pub fn to_loader_id(loader: &LoaderType) -> Option<u32> {
         LoaderType::Fabric => Some(4),
         LoaderType::Quilt => Some(5),
         LoaderType::NeoForge => Some(6),
+        LoaderType::Cleanroom => Some(1),
         _ => None,
     }
 }

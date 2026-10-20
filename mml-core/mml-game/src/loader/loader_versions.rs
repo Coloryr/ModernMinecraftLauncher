@@ -28,6 +28,8 @@ static NEOFORGE_META_ALL: LazyLock<RwLock<Option<HashMap<String, Vec<String>>>>>
 /// NeoForge BMCLAPI 源按游戏版本的列表缓存
 static NEOFORGE_BMCLAPI: LazyLock<Mutex<HashMap<String, Vec<String>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
+/// Cleanroom 官方 maven 全量版本缓存；它只服务 1.12.2，列表不随游戏版本变化
+static CLEANROOM_LIST: LazyLock<RwLock<Option<Vec<String>>>> = LazyLock::new(|| RwLock::new(None));
 /// Fabric meta 列表缓存：通用列表，不随游戏版本变化
 static FABRIC_LIST: LazyLock<RwLock<Option<Vec<String>>>> = LazyLock::new(|| RwLock::new(None));
 /// Quilt meta 列表缓存：通用列表，不随游戏版本变化
@@ -47,6 +49,7 @@ pub async fn get_loader_versions(loader: &LoaderType, mc: &str) -> CoreResult<Ve
         LoaderType::NeoForge => neoforge_versions(mc).await,
         LoaderType::Fabric => fabric_versions().await,
         LoaderType::Quilt => quilt_versions().await,
+        LoaderType::Cleanroom => cleanroom_versions(mc).await,
         LoaderType::OptiFine => optifine_versions(mc).await,
         LoaderType::LiteLoader => liteloader_versions(mc).await,
         LoaderType::Normal | LoaderType::Custom => {
@@ -63,11 +66,12 @@ pub async fn get_loader_versions(loader: &LoaderType, mc: &str) -> CoreResult<Ve
 /// - NeoForge：官方源要求 1.20.1+；BMCLAPI 源按版本查询结果非空
 /// - OptiFine：官方支持版本表，见 [`mml_net::optifine_api::get_support_version`]
 /// - LiteLoader：meta 的版本键前缀匹配
+/// - Cleanroom：只支持 1.12.2，官方 maven 元数据非空即支持
 ///
 /// 各加载器的数据源失败时跳过该项而非整体报错，保证网络异常时仍返回
 /// 原版 + 自定义兜底。
 ///
-/// 六种加载器的数据源并发查询；每查完一个加载器通过 `gui` 回调一次，
+/// 七种加载器的数据源并发查询；每查完一个加载器通过 `gui` 回调一次，
 /// 参数为已完成步数与总步数 [`SUPPORT_LOAD_STEPS`]，进度按完成顺序递增。
 ///
 /// - `mc`: 游戏版本号
@@ -104,6 +108,7 @@ pub async fn get_support_loaders(mc: &str, gui: ProgressGui) -> CoreResult<Vec<S
         "neoforge",
         "optifine",
         "liteloader",
+        "cleanroom",
     ];
     macro_rules! mark_done {
         ($idx:expr) => {
@@ -213,17 +218,22 @@ pub async fn get_support_loaders(mc: &str, gui: ProgressGui) -> CoreResult<Vec<S
         bump(&done, &gui);
         Ok(ok)
     };
+    let cleanroom = async {
+        let ok = match cleanroom_versions(mc).await {
+            Ok(v) => !v.is_empty(),
+            Err(err) if mml_net::is_aborted(&err) => {
+                mark_done!(6);
+                return Err(err);
+            }
+            Err(_) => false,
+        };
+        mark_done!(6);
+        bump(&done, &gui);
+        Ok(ok)
+    };
 
-    let (forge_ok, fabric_ok, quilt_ok, neoforge_ok, optifine_ok, liteloader_ok) =
-        tokio::try_join!(forge, fabric, quilt, neoforge, optifine, liteloader)?;
-    let (forge_ok, fabric_ok, quilt_ok, neoforge_ok, optifine_ok, liteloader_ok) = (
-        forge_ok,
-        fabric_ok,
-        quilt_ok,
-        neoforge_ok,
-        optifine_ok,
-        liteloader_ok,
-    );
+    let (forge_ok, fabric_ok, quilt_ok, neoforge_ok, optifine_ok, liteloader_ok, cleanroom_ok) =
+        tokio::try_join!(forge, fabric, quilt, neoforge, optifine, liteloader, cleanroom)?;
 
     if forge_ok {
         list.push(LoaderType::Forge.id().to_string());
@@ -237,6 +247,9 @@ pub async fn get_support_loaders(mc: &str, gui: ProgressGui) -> CoreResult<Vec<S
     if neoforge_ok {
         list.push(LoaderType::NeoForge.id().to_string());
     }
+    if cleanroom_ok {
+        list.push(LoaderType::Cleanroom.id().to_string());
+    }
     if optifine_ok {
         list.push(LoaderType::OptiFine.id().to_string());
     }
@@ -248,8 +261,8 @@ pub async fn get_support_loaders(mc: &str, gui: ProgressGui) -> CoreResult<Vec<S
     Ok(list)
 }
 
-/// 支持列表查询总步数，即 Forge / Fabric / Quilt / NeoForge / OptiFine / LiteLoader 六路
-pub const SUPPORT_LOAD_STEPS: usize = 6;
+/// 支持列表查询总步数，即 Forge / Fabric / Quilt / NeoForge / OptiFine / LiteLoader / Cleanroom 七路
+pub const SUPPORT_LOAD_STEPS: usize = 7;
 
 /// LiteLoader 是否支持该版本：meta 的 versions 键为游戏版本前缀，如 "1.12"
 ///
@@ -334,6 +347,38 @@ async fn forge_versions(mc: &str) -> CoreResult<Vec<String>> {
             Err(_) => forge_versions_offical(mc).await,
         }
     }
+}
+
+/// Cleanroom 版本列表：只支持 1.12.2，版本号取自 Cleanroom 官方 maven 元数据
+///
+/// - `mc`: 游戏版本号
+///
+/// # 返回值
+///
+/// 新版本在前的版本号列表；不是 1.12.2 时为空，下载或解析失败返回对应错误
+async fn cleanroom_versions(mc: &str) -> CoreResult<Vec<String>> {
+    if mc != "1.12.2" {
+        return Ok(Vec::new());
+    }
+
+    if let Some(list) = CLEANROOM_LIST.read().unwrap().as_ref() {
+        return Ok(list.clone());
+    }
+
+    let url = format!(
+        "{}com/cleanroommc/cleanroom/maven-metadata.xml",
+        mml_net::urls::CLEANROOM
+    );
+    let data = mml_net::get_work_client().get_text(&url).await?;
+    let re = Regex::new(r"<version>([^<]+)</version>").unwrap();
+    let mut list: Vec<String> = re
+        .captures_iter(&data)
+        .filter_map(|c| c.get(1).map(|m| m.as_str().to_string()))
+        .collect();
+    list.reverse();
+
+    *CLEANROOM_LIST.write().unwrap() = Some(list.clone());
+    Ok(list)
 }
 
 /// 从 Forge 官方 maven 拉全量版本列表并按游戏版本筛选
