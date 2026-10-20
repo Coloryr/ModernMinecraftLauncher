@@ -183,6 +183,16 @@ export interface ExperimentalConfig {
   sandboxLaunch: boolean;
 }
 
+/** 一条已安装的自定义 CSS */
+export interface CustomCssItem {
+  /** 条目 id，CSS 包是 custom_ui/css/<id>.zip */
+  id: string;
+  /** 显示名，导入时的文件名 */
+  name: string;
+  /** 是否启用；停用的条目保留文件但不注入 */
+  enabled: boolean;
+}
+
 export interface ClientConfig {
   /** 主窗口实例设置里显示 MOTD 卡片 */
   motdCard: boolean;
@@ -206,6 +216,12 @@ export interface ClientConfig {
   lockInstance: string;
   /** 自定义主页面：启用后主窗口的启动器主页换成导入的页面 */
   customHome: boolean;
+  /** 自定义 CSS 总开关；关闭后已安装的样式保留但不生效 */
+  customCssOn: boolean;
+  /** 已安装的自定义 CSS，顺序即注入顺序 */
+  customCss: CustomCssItem[];
+  /** 完全自定义界面总开关；关闭后主窗口回内置界面，整页包保留 */
+  customPageOn: boolean;
   /** 自定义音乐：启用后主窗口播放 `musicSource` */
   musicOn: boolean;
   /** 自定义音乐来源：本地音频文件路径或 http(s) 直链，空串表示没配 */
@@ -402,6 +418,10 @@ export function defaultConfig(): GuiConfig {
       motdServer: readString(KEYS.motdServer),
       lockInstance: readString(KEYS.lockInstance),
       customHome: readFlag(KEYS.customHome),
+      // 自定义界面的开关与条目只认 gui_config，前端不给本地兜底
+      customCssOn: false,
+      customCss: [],
+      customPageOn: false,
       // 自定义音乐：不给 localStorage 兜底，缺省就是没配
       musicOn: false,
       musicSource: "",

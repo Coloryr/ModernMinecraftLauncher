@@ -13,6 +13,7 @@ pub mod collect_dto;
 pub mod colormc_dto;
 pub mod config_dto;
 pub mod custom_home_dto;
+pub mod custom_ui_dto;
 pub mod download_dto;
 pub mod export_dto;
 pub mod gui_config_dto;
@@ -26,6 +27,7 @@ pub mod resource_dto;
 pub mod settings_dto;
 pub mod skin_dto;
 pub mod stats_dto;
+pub mod theme_dto;
 pub mod version_dto;
 pub mod window_dto;
 
@@ -47,13 +49,14 @@ pub use config_dto::{
     ChunkFindDto, McaChunkDto, NbtEditDto, NbtKindDto, NbtNodeDto, NbtOpDto,
 };
 pub use custom_home_dto::CustomHomeInfoDto;
+pub use custom_ui_dto::{CustomUiCssDto, CustomUiInfoDto};
 pub use download_dto::{
     DownloadItemEvent, DownloadStatusDto, DownloadTaskDto, DownloadTaskEvent, DownloadThreadDto,
 };
 pub use export_dto::{ExportConfigDto, ExportEntryDto, ExportInfoDto, ExportProgressDto};
 pub use gui_config_dto::{
-    ClientConfigDto, ExperimentalConfigDto, GuiConfigDto, GuiThemeDto, LoginLockItemDto,
-    MainWindowConfigDto,
+    ClientConfigDto, CustomCssItemDto, ExperimentalConfigDto, GuiConfigDto, GuiThemeDto,
+    LoginLockItemDto, MainWindowConfigDto,
 };
 pub use instance_dto::{GroupDto, InstanceInfoDto};
 pub use java_download_dto::{JavaDownloadItemDto, JavaDownloadOptionsDto, JavaTypes};
@@ -80,5 +83,6 @@ pub use settings_dto::{
     RunArgSettingDto, SettingsDefaultsDto, WindowSettingDto,
 };
 pub use stats_dto::{StatsDataDto, StatsInstanceDto};
+pub use theme_dto::ThemeKindDto;
 pub use version_dto::VersionInfoDto;
 pub use window_dto::{DropPathDto, FileDropDto, WindowSizeDto};

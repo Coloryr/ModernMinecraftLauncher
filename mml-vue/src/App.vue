@@ -4,7 +4,7 @@ import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, type Compo
 import { applyTheme } from "./lib/theme";
 import { applyLocale, t } from "./lib/i18n";
 import { applyAnimations, bgImage, bgLayerStyle } from "./lib/appearance";
-import { customUiMode, customUiPageUrl } from "./lib/customUi";
+import { customPageOn, customUiPageUrl, resolveWindowPage, windowPageVersion } from "./lib/customUi";
 import { api, onCloseBlocked } from "./lib/api";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
@@ -67,14 +67,27 @@ const windowMap: Record<WindowKind, Component> = {
 
 const currentWindow = computed(() => windowMap[currentKind.value]);
 
+// 整页包里的组件可以直接复用内置窗口：ReplaceWindow 会从 window.__mmlWindows 取 main
+;(window as unknown as { __mmlWindows?: Record<string, Component> }).__mmlWindows = windowMap;
+
 /**
  * 整页重写只在主窗口生效
  *
  * 设置等工具窗口保留内置界面，否则用户改错页面地址后没有入口改回来。
  */
 const customPage = computed(
-  () => customUiMode.value === "page" && customUiPageUrl.value !== "" && currentKind.value === "main",
+  () => customPageOn.value && customUiPageUrl.value !== "" && currentKind.value === "main",
 );
+
+/**
+ * 整页包按窗口 kind 提供的替换组件
+ *
+ * 回调在挂载前由 initCustomUi 加载并注册，这里同步就能取到；取不到时继续用内置窗口。
+ */
+const windowPage = computed(() => {
+  void windowPageVersion.value;
+  return customPageOn.value ? resolveWindowPage(currentKind.value) : null;
+});
 
 /**
  * 整合包安装任务的全局状态
@@ -168,8 +181,11 @@ const closeAskButton = computed(() =>
 </script>
 
 <template>
-  <!-- 整页重写：主窗口整个交给自定义页面，内置界面与浮层都不渲染 -->
-  <CustomUiPage v-if="customPage" :url="customUiPageUrl" />
+  <!-- 整页包提供组件时，任何窗口都直接换成它 -->
+  <component :is="windowPage" :key="currentKind" v-if="windowPage" />
+
+  <!-- 否则主窗口仍可用 iframe 整页；内置界面与浮层都不渲染 -->
+  <CustomUiPage v-else-if="customPage" :url="customUiPageUrl" />
 
   <template v-else>
   <!-- 背景图层：设置里选的本地图片，所有窗口共用 -->

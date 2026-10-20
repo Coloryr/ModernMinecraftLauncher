@@ -15,6 +15,8 @@ export default tseslint.config(
     ignores: [
       "dist/**",
       "node_modules/**",
+      // scripts/gen-ui.ts 的生成物
+      "src/generated/**",
     ],
   },
   js.configs.recommended,

@@ -20,6 +20,7 @@ pub mod collect;
 pub mod colormc;
 pub mod config;
 pub mod custom_home;
+pub mod custom_ui;
 pub mod download;
 pub mod export;
 pub mod java_download;
@@ -39,6 +40,10 @@ mod geometry;
 mod lifecycle;
 mod modpack_task;
 mod registry;
+// 自定义整页站点的公共层：整包句柄、越界防护与协议响应，custom_home / custom_ui 共用
+mod web_assets;
+// 三种换皮包共用的类型判定与坏包校验，见 theme/mod.rs
+mod theme;
 
 // 打开着的 NBT 文件：句柄与解析结果留在会话里，配置窗口关了才放手。
 // `pub(crate)`：配置窗口的读 / 写命令与窗口销毁时的兜底清理都要用它

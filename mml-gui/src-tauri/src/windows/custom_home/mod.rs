@@ -1,4 +1,4 @@
-//! 自定义主页面：服主导入的整页 HTML 替换启动器主页
+//! 自定义主页面：服主导入的整页 HTML 或窗口组件替换启动器主页内容区
 //!
 //! **压缩包是唯一产物，全程不落盘解压**：服主导入的 zip 存放在 `base_dir/custom_home.zip`，
 //! 启动时打开成一个常驻句柄 [`HomeArchive`]，`mml-home` 协议的每个请求
@@ -15,9 +15,10 @@
 //! | [`custom_home_open_dir`] | 在文件管理器里定位压缩包，便于服主替换 / 备份 |
 //! | [`url_custom_home`] | `mml-home` 协议 handler，路径穿越防护的唯一强制安全项 |
 //!
-//! 桥接脚本 [`BRIDGE_JS`] 是内置资源，源码在 `src-tauri/resources/custom_home_bridge.js`，
+//! 桥接脚本是内置资源，源码在 `src-tauri/resources/custom_home_bridge.js`，
 //! 不在包里：返回 HTML 时注入 `<script src="/__mml_bridge.js">`，
-//! 页面据此拿到 `window.mml` 的 invoke / on / ready。
+//! 页面据此拿到 `window.mml` 的 invoke / on / ready。脚本与注入逻辑在
+//! `windows/web_assets.rs`，与自定义界面的整页包共用。
 //!
 //! **安全边界**：自定义页面通过 `invoke` 能调任意已注册命令，这与「服主给的整合包
 //! 本身就是代码」的信任级别一致，是确认过的设计；唯一的强制项是协议层的路径穿越防护。
@@ -31,12 +32,13 @@ use tauri::{AppHandle, Emitter};
 
 use crate::dtos::CustomHomeInfoDto;
 use crate::listens;
+use crate::windows::theme::{self, ThemeInfo, ThemeKind};
 
 mod archive;
 mod protocol;
 
 // 按原路径再导出：`lib.rs` 注册协议处理器、配置变更后重载，都用这两个
-pub(crate) use self::archive::{INDEX_FILE, import_archive, open_handle, reload};
+pub(crate) use self::archive::{CSS_FILE, INDEX_FILE, SCRIPT_FILE, import_archive, open_handle, reload};
 pub(crate) use self::protocol::{ZIP_PREFIX, url_custom_home};
 
 // ================= 路径 =================
@@ -103,27 +105,49 @@ fn zip_version(zip: &Path) -> String {
 ///
 /// # 返回值
 ///
-/// 已导入情况、启用开关、入口 URL、版本号与包内文件数
+/// 已导入情况、启用开关、类型与主题元数据、入口 / 脚本 / 样式 URL、
+/// 内容版本号与包内文件数
 fn current_info() -> CustomHomeInfoDto {
     let zip = zip_path();
     let handle = open_handle();
     // 句柄能读出来才算「已导入」：包损坏 / 没有入口页时这里就是 false，主窗口会回落
-    let installed = handle.as_ref().is_some_and(|h| h.has_entry());
-    let version = if installed {
+    let installed = handle
+        .as_ref()
+        .is_some_and(|h| h.has_entry(INDEX_FILE) || h.has_entry(SCRIPT_FILE));
+    let has_index = handle.as_ref().is_some_and(|h| h.has_entry(INDEX_FILE));
+    let content_version = if installed {
         zip_version(&zip)
     } else {
         String::new()
     };
-    let entry_url = if installed {
-        format!("{}/{INDEX_FILE}?v={version}", home_base_url())
+    let url_of = |name: &str| {
+        handle
+            .as_ref()
+            .filter(|h| h.has_entry(name))
+            .map(|_| format!("{}/{name}?v={content_version}", home_base_url()))
+            .unwrap_or_default()
+    };
+    let entry_url = if installed && has_index {
+        url_of(INDEX_FILE)
     } else {
         String::new()
     };
+    // 清单只在导入期校验，运行时读回不合法就按导入入口兜底，不能把状态查询变成错误
+    let meta = handle
+        .as_ref()
+        .map(|archive| theme::meta_of_archive(archive, ThemeKind::Home))
+        .unwrap_or_else(|| ThemeInfo::plain(ThemeKind::Home));
     CustomHomeInfoDto {
         installed,
         enabled: crate::gui_config::get().client.custom_home,
+        kind: meta.kind.into(),
+        name: meta.name,
+        version: meta.version,
+        declared: meta.declared,
         entry_url,
-        version,
+        script_url: url_of(SCRIPT_FILE),
+        style_url: url_of(CSS_FILE),
+        content_version,
         file_count: handle.as_ref().map(|h| h.file_count()).unwrap_or(0),
     }
 }
@@ -161,7 +185,7 @@ pub fn emit_custom_home_change(app: &AppHandle) {
 ///
 /// # 返回值
 ///
-/// 导入后的新状态；包里没有入口页返回 `err.customHomeNoIndex`
+/// 导入后的新状态；类型与入口不符或 zip 不合法时返回对应错误键
 #[gui_macros::command]
 pub async fn custom_home_import(app: AppHandle, path: String) -> Result<CustomHomeInfoDto, String> {
     let info = tauri::async_runtime::spawn_blocking(move || import_archive(Path::new(&path)))

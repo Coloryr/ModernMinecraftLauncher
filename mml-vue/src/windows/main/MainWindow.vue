@@ -257,7 +257,9 @@ const customHome = ref<CustomHomeInfoDto | null>(null);
 /** 是否用自定义页面顶替内置主页：启用 + 已导入 + 有入口 URL，任一不满足都回落，不白屏 */
 const useCustomHome = computed(
   () =>
-    !!customHome.value?.enabled && !!customHome.value.installed && !!customHome.value.entryUrl,
+    !!customHome.value?.enabled &&
+    !!customHome.value.installed &&
+    (!!customHome.value.entryUrl || !!customHome.value.scriptUrl),
 );
 
 /** 拉取自定义主页面状态；没导入过就是 installed=false，不报错 */
@@ -1043,6 +1045,9 @@ const clientConfig = ref<ClientConfig>({
   motdServer: "",
   lockInstance: "",
   customHome: false,
+  customCssOn: false,
+  customCss: [],
+  customPageOn: false,
   musicOn: false,
   musicSource: "",
   windowEffect: "auto",

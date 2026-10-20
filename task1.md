@@ -1,72 +1,255 @@
-# 自定义界面（task1）
+# 主题包：类型判定与 zip 合法性校验
 
-> 本轮先做**前端骨架 + 两个示例**，后端加载 / 导入 / 落盘留到下一轮。完成后删掉本文件，
-> 长期约定写进 AGENTS.md。
+## 1. 背景
 
-## 本轮已完成（前端）
+启动器现在有三种互相独立的主题包：
 
-- 两种模式的前端状态与注入：
-  - `mml-vue/src/lib/customUi.ts`
-    - `off` / `css` / `page`
-    - css 模式把 CSS 注入 `<head>` 的 `<style id="mml-custom-ui-css">`
-    - 开发参数：`?customCss=<url>`（`<link>` 加载）、`?customPage=<url>`
-    - 跨窗口同步：复用 `storage.ts` 的 `onStorageChange` / `emitChange`
-  - `mml-vue/src/components/CustomUiPage.vue`：整页 iframe，复用 `customHomeBridge` 的
-    `window.mml` 桥接；开发构建右下角有「退出整页界面」逃生按钮
-  - `mml-vue/src/App.vue`：`page` 模式只换**主窗口**，设置等工具窗口保留内置界面
-  - `mml-vue/src/main.ts`：启动时 `initCustomUi()`
-- 设置界面：`设置 → 界面 → 自定义界面`
-  - 模式三选一（关闭 / 自定义 CSS / 整页重写）
-  - CSS 文本框 + 应用；整页地址输入 + 失焦应用
-- 示例：
-  - `mml-ui-demo-custom-css/`：`custom.css` + 零依赖静态服务器（1521）
-  - `mml-ui-demo-custom/`：整页 Vue 示例（1522），含自绘标题栏、窗口按钮、实例列表、启动
-- 预览入口：
-  - css：`http://localhost:1420/?window=main&customCss=http://127.0.0.1:1521/custom.css`
-  - page：`http://localhost:1420/?window=main&customPage=http://localhost:1522/`
+| 种 | 设置位置 | 产物 | 现有导入命令 |
+| --- | --- | --- | --- |
+| 自定义主页面 | 客户端设置 | `custom_home.zip` | `custom_home_import` |
+| 自定义 CSS | 界面 | `custom_ui/css/<id>.zip` | `custom_ui_import_css` |
+| 完全自定义界面 | 界面 | `custom_ui/page.zip` | `custom_ui_import_page` |
 
-## 待做：后端加载
+目前类型由「用户点的是哪个导入按钮」决定，导入只检查入口文件是否存在，没有检查：
 
-1. **配置字段**
-   - `GuiConfigDto.client` 增加 `customUiMode: "off" | "css" | "page"`（磁盘配置 snake_case）。
-   - CSS 与整页包只存文件，不把整段 CSS 塞进 `gui_config.json`。
-2. **文件与导入**
-   - 目录：运行目录下 `custom_ui/`，放 `custom.css` 与 `page/<入口>` 或常驻 zip。
-   - 命令（按 §4 走生成器）：
-     - `custom_ui_status` -> 模式 / 是否已导入 / 文件数 / 入口地址
-     - `custom_ui_import_css`（选 .css）
-     - `custom_ui_import_page`（选 zip，校验根目录 index.html）
-     - `custom_ui_remove` / `custom_ui_open_dir`
-   - 事件：`custom-ui-change`，所有窗口重读并重新应用；主窗口据此换整页。
-3. **页面协议**
-   - 新增 `mml-ui://`（或复用 `mml-home://` 的读取逻辑），从 `custom_ui/page/` 现读，
-     不整包解压；路径穿越防护与 `mml-home` 同口径。
-   - 首屏：前端 `initCustomUi()` 之后要能拿到后端状态；启动时先读配置再挂载，
-     避免内置界面闪一下。
-4. **多窗口**
-   - css 模式：每个 webview 各自注入；设置窗口改完广播，所有窗口立即生效。
-   - page 模式：只换主窗口（当前前端已按此实现）；其它窗口保留内置界面作为退路。
-5. **持久化**
-   - 把 `storage.ts` 里的 `mml.customUi.*` 三个临时键迁到后端文件；迁移后前端只读后端 DTO。
-6. **安全**
-   - 整页 iframe 保持 `sandbox`、不给 `allow-same-origin`。
-   - 自定义 CSS 能加载远程资源（`url()`），说明里要写清楚；是否拦截由后续决定。
-   - 导入 zip 校验大小 / 条目数，防 zip 炸弹（与 custom_home 同口径）。
+- 包内容与导入类型是否匹配；
+- zip 本身是否合法（损坏、加密、路径穿越、重复条目、压缩炸弹等）；
+- 整包套目录后入口是否仍在根；
+- 失败时是否一定保留旧包。
 
-## 待完善（前端）
+目标：**先判定类型，再校验 zip，最后才替换**。任何一步失败都不改动用户正在用的包。
 
-- 设置项搜索已加两条；「恢复默认」分组未接（`RESETTABLE_GROUPS` 未加 `customUi`）。
-- CSS 导入目前只能粘贴文本；后端接入后加「选文件」按钮。
-- 整页地址目前是手填 URL；后端接入后换成导入包 + 只读展示入口。
-- 页面地址校验（必须 http(s) 或后端协议）未做，错了只能靠开发逃生按钮。
-- `mml-ui-demo-custom-css` 只有 CSS + 静态服务，没有打包脚本；后端定下包格式后补 zip。
-- 两个示例都没加自动化测试；至少补一条「配置变化后 style/iframe 跟着变」的单测。
+## 2. 类型定义
 
-## 已知限制（本轮）
+```rust
+pub(crate) enum ThemeKind {
+    /// 自定义主页面：只替换主窗口主页内容区
+    Home,
+    /// 自定义 CSS：多份，按条目启用
+    Css,
+    /// 完全自定义界面：整页 / 按 kind 替换窗口
+    Page,
+}
+```
 
-- 自定义 UI 配置只存在 localStorage，换机器 / 清缓存会丢。
-- 整页模式只在主窗口生效。
-- 没有 zip 导入，整页示例靠开发参数 / 手填 URL。
-- 自定义 CSS 直接作用于 DOM，升级后类名变化可能失效。
-- 多 WebView 下 localStorage 的 storage 事件不保证跨窗口；CSS 模式目前只在改设置的
-  那个窗口立即生效，其它窗口的实时同步要等后端 `custom-ui-change` 广播。
+三种包的入口签名：
+
+| 类型 | 包根必需 | 可选 |
+| --- | --- | --- |
+| `Home` | `index.html` 或 `custom.js` | `custom.css` |
+| `Css` | `custom.css` | `custom.js` |
+| `Page` | `index.html` 或 `custom.js` | `custom.css` |
+
+**Home 与 Page 的入口完全相同，单看文件无法区分。** 必须二选一：
+
+### 方案 A：根清单（推荐）
+
+包根放 `theme.json`：
+
+```json
+{
+  "type": "home",
+  "name": "Coloryr 服务器主页",
+  "version": "1.0.0",
+  "api": 1
+}
+```
+
+- `type`：`home` / `css` / `page`，必填；
+- `name` / `version`：可选，给设置页显示；
+- `api`：可选，主题接口版本，默认 1；
+- 文件必须在包根，整包套一层目录时先解开那层再找；
+- JSON 不允许注释、尾逗号，大小上限 64 KiB。
+
+### 方案 B：导入上下文（兼容旧包）
+
+没有 `theme.json` 时，类型取用户点的导入入口，只做「入口文件匹配」校验：
+
+- 导入 CSS：必须有 `custom.css`，忽略 `index.html`；
+- 导入 Home / Page：必须有 `index.html` 或 `custom.js`；
+- 如果同时有 `custom.css` 但没有 `index.html` / `custom.js`，判定为 CSS；
+- 仍然无法区分 Home 与 Page，按导入入口处理，并在设置页提示「未声明类型」。
+
+**最终决定：两种都支持。有清单以清单为准；没有清单按导入入口，且只能做兼容性校验。**
+
+### 类型不匹配
+
+- 清单声明 `type: "css"`，却从「完全自定义界面」导入：拒绝，报 `err.themeTypeMismatch`；
+- 清单声明 `home` / `page`，入口文件缺失：拒绝，报 `err.themeMissingEntry`；
+- 清单 JSON 非法 / `type` 未知：拒绝，报 `err.themeManifestInvalid`，不猜。
+
+## 3. zip 合法性校验
+
+校验分三层，全部在替换旧包之前完成。
+
+### 3.1 容器层
+
+- 文件存在、可读、非空；
+- 能作为 zip 打开，中央目录完整，非分卷 / 非多磁盘；
+- 不支持加密条目，发现任意加密条目直接拒绝；
+- 仅接受普通文件与目录，拒绝符号链接、设备、FIFO；
+- 条目名必须是合法 UTF-8；反斜杠统一成正斜杠后处理；
+- 压缩包文件本身大小上限，建议 256 MiB；
+- 条目数上限沿用 `MAX_ENTRIES = 4096`；
+- 单条目解压后上限沿用 `MAX_ENTRY_BYTES = 128 MiB`；
+- 总解压后上限沿用 `MAX_TOTAL_BYTES = 512 MiB`；
+- 压缩比上限，建议 200:1，防高压缩比炸弹；
+- 可选：逐条目读一遍校验 CRC；成本高时至少校验中央目录声明的尺寸是否可信。
+
+### 3.2 路径层
+
+对每个条目名做规范化后检查：
+
+- 不允许绝对路径（`/xxx`、`C:\xxx`、`\\server\share`）；
+- 不允许任何 `..` 段；`.` 段去掉；
+- 不允许 NUL、控制字符；
+- 不允许规范化后为空的路径；
+- 不允许大小写不敏感重名（Windows 上 `A.png` 与 `a.png` 只能留一个）；
+- 不允许规范化后重复的条目；
+- 目录条目可以存在，但不能作为入口。
+
+现有 `resolve_entry` 仍是请求期的最后一道防线；导入期校验是为了「坏包根本不入库」。
+
+### 3.3 布局层
+
+- 支持整包套一层目录：先找唯一顶层目录，后续入口 / 清单都相对它判断；
+- 顶层文件与顶层目录混放时，不认为有唯一顶层目录；
+- 入口文件必须在包根（或解开唯一顶层目录后的根）；
+- `theme.json` 同样按这个根查找；
+- 入口文件必须是普通文件，不能是目录；
+- `custom.js` / `custom.css` / `index.html` 名字大小写敏感，但 Windows 导入时按小写匹配一次并提示。
+
+### 3.4 导入原子性
+
+- 校验全部通过后才复制到临时文件；
+- 临时文件写完再 `rename` 替换；
+- 替换后重开常驻句柄；
+- 任一步失败：删除临时文件、旧包与旧句柄保持不变；
+- CSS 条目按 uuid 落盘时同样先写 `.tmp` 再替换。
+
+## 4. 接口与数据结构
+
+### 4.1 公共校验模块
+
+建议放在 `mml-gui/src-tauri/src/windows/web_assets.rs` 或同目录新文件：
+
+```rust
+pub(crate) struct ThemeArchive {
+    pub(crate) kind: ThemeKind,
+    pub(crate) name: Option<String>,
+    pub(crate) version: Option<String>,
+    // 现有 WebArchive 字段
+}
+
+pub(crate) fn detect_theme(
+    path: &Path,
+    expected: Option<ThemeKind>,
+) -> Result<ThemeInfo, String>;
+```
+
+- `detect_theme` 内部完成容器、路径、布局、清单校验；
+- 返回类型与展示信息；
+- 三种导入命令都调它，传各自的 `expected`；
+- 以后新增主题类型只改 `ThemeKind` 与签名表。
+
+### 4.2 DTO
+
+`CustomHomeInfoDto` / `CustomUiInfoDto` 增加：
+
+```rust
+/// 实际类型；没有清单时按导入入口推断
+pub kind: ThemeKindDto,
+/// 主题名，来自 theme.json；没有时为空串
+pub name: String,
+/// 主题版本，来自 theme.json；没有时为空串
+pub version: String,
+```
+
+`ThemeKindDto` 用 camelCase：`home` / `css` / `page`。
+
+### 4.3 错误键与 i18n
+
+新增（中英两套）：
+
+- `err.themeTypeMismatch`：包类型与导入入口不匹配
+- `err.themeTypeUnknown`：无法判定类型
+- `err.themeManifestInvalid`：`theme.json` 非法
+- `err.themeMissingEntry`：缺少该类型的入口文件
+- `err.themeZipInvalid`：不是合法 zip
+- `err.themeZipEncrypted`：包含加密条目
+- `err.themeZipEntryPath`：条目路径越界
+- `err.themeZipDuplicate`：条目重名
+- `err.themeZipUnsupported`：包含不支持的条目类型
+- `err.themeZipRatio`：压缩比异常
+
+现有 `err.pageArchiveLimit` 保留，用于条目数 / 单条 / 总量超限。
+
+## 5. 导入流程
+
+```text
+选择 zip
+  → detect_theme(path, expected)
+      → 打开 zip / 容器校验
+      → 路径校验
+      → 定位包根（唯一顶层目录）
+      → 读取 theme.json（可选）
+      → 类型判定 + 入口校验
+  → 通过后复制到 <目标>.tmp
+  → rename 替换
+  → reload 常驻句柄
+  → 广播 custom-home-change / custom-ui-change
+  → 返回新 DTO
+失败 → 删临时文件，旧包不动，返回错误键
+```
+
+- 三个导入命令仍分开，避免把 CSS 的「多份列表」和 Home / Page 的「单份覆盖」混在一起；
+- 自动路由（一个入口根据清单分到三个命令）可作为后续增强，不在本次范围。
+
+## 6. 测试
+
+### 6.1 合法包
+
+- Home：`index.html`、`custom.js`、两者都有、带 `custom.css`；
+- Page：同上；
+- CSS：`custom.css`、`custom.css + custom.js`；
+- 整包套一层目录；
+- 清单声明正确类型；
+- 清单缺失时按导入入口成功。
+
+### 6.2 非法包
+
+- 不是 zip / 空文件 / 截断；
+- 加密条目；
+- `../`、绝对路径、盘符、NUL、控制字符；
+- 大小写重名、规范化重名；
+- 符号链接 / 设备文件；
+- 超过 4096 条目、单条 128 MiB、总量 512 MiB、压缩比 200:1；
+- 入口缺失、入口是目录；
+- 清单 JSON 非法、`type` 未知；
+- 清单类型与导入入口不匹配；
+- Home / Page 互相导入（无清单时应成功，有清单时应拒绝）。
+
+测试 zip 用 `mml_testutil::temp_dir()` 在 `target/temp` 构造，不要用系统临时目录。
+
+### 6.3 回归
+
+- 现有 `resolve_entry` 路径穿越测试继续通过；
+- 导入失败后旧包仍能正常打开；
+- 协议请求仍能从新包读到资源。
+
+## 7. 不在本次范围
+
+- 主题包签名 / 可信来源校验；
+- 在线下载与更新；
+- 自动把 Home / Page 合并成同一种主题；
+- 解压到磁盘；
+- 允许主题包执行 Rust / 原生代码。
+
+## 8. 验收标准
+
+- 导入任一种包前都能给出明确的类型判定结果；
+- 类型不匹配、入口缺失、zip 非法时导入失败，旧包不丢；
+- 损坏 / 加密 / 路径穿越 / 重名 / 炸弹包在导入期被拒绝，而不是等请求时 404；
+- 错误提示走 i18n，中英两套齐全；
+- 现有三种主题的独立开关与导入流程不变；
+- 新增测试覆盖第 6 节的主要用例。

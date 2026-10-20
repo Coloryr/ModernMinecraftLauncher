@@ -5,11 +5,11 @@
 // custom_home_bridge.js 提供，父窗口侧处理复用 lib/customHomeBridge.ts。
 import { onMounted, onUnmounted, ref } from "vue";
 import { attachCustomHomeBridge } from "../lib/customHomeBridge";
-import { setCustomUiMode } from "../lib/customUi";
+import { exitCustomUi } from "../lib/customUi";
 import { t } from "../lib/i18n";
 
 defineProps<{
-  /** 自定义页面的入口地址；开发时是 http，后端接入后是 mml-* 协议 */
+  /** 自定义页面的入口地址：导入的整页包由 mml-ui 协议伺服，开发时也可是 http */
   url: string;
 }>();
 
@@ -33,7 +33,7 @@ const devEscape = import.meta.env.DEV;
   <iframe ref="frame" class="custom-ui-frame" :src="url"
     sandbox="allow-scripts allow-forms allow-popups allow-modals"></iframe>
   <!-- 开发期逃生口：生产构建里没有这一颗 -->
-  <button v-if="devEscape" class="ui-btn s-sm dev-escape" @click="setCustomUiMode('off')">
+  <button v-if="devEscape" class="ui-btn s-sm dev-escape" @click="exitCustomUi">
     {{ t("winSettings.customUiExit") }}
   </button>
 </template>

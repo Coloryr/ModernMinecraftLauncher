@@ -4,7 +4,7 @@
 // 传输层不在这里绑定：createCommands 接收调用方传入的 invoke。
 
 import type { Invoke } from "./invoke";
-import type { AccountStoreDto, AccountStoreViewDto, BgInfoDto, BlockGroupsDto, BlockItemDto, BlockStatusDto, BytesSliceDto, ChunkFindDto, CollectDataDto, ColorMcInfoDto, ColorMcReportDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, CustomHomeInfoDto, CustomJsonItemDto, DataPackItemDto, DepProblemDto, DetectedPackDto, DirEntry, DownloadStatusDto, DropPathDto, ExportConfigDto, ExportEntryDto, ExportInfoDto, FileItemDto, FileListDto, FolderInstanceDto, GroupDto, GuiConfigDto, IconSourceDto, InstanceArgsDto, InstanceInfoDto, InstanceLangDto, InstancePatch, JavaDownloadItemDto, JavaDownloadOptionsDto, JavaInfoDto, JavaTypes, LaunchSettingDto, LoadState, LogLine, LogSettingDto, McaChunkDto, ModAutoMarkDto, ModDepTreeDto, ModGroupDto, ModItemDto, ModPackStatusDto, ModPackUpdateDto, ModRenameDto, ModUpdateApplyDto, ModUpdateCheckDto, ModUpdateProjectDto, MotdDto, NbtEditDto, NetworkSettingDto, NewsItem, PackItemDto, ProjectDetailDto, ProjectDto, ProjectItemDto, ResourceDependencyDto, ResourceDropDto, ResourceSaveDto, ResourceStatusDto, ResourceViewDto, RunArgSettingDto, SaveBackupDto, SaveEditDto, SaveItemDto, SchematicDetailDto, SchematicItemDto, ScreenshotItemDto, ServerItemDto, SettingsDefaultsDto, ShaderItemDto, StartArgDto, StatsDataDto, SystemMemoryDto, TexturesDto, VersionInfoDto, WindowSettingDto, WindowSizeDto } from "./types";
+import type { AccountStoreDto, AccountStoreViewDto, BgInfoDto, BlockGroupsDto, BlockItemDto, BlockStatusDto, BytesSliceDto, ChunkFindDto, CollectDataDto, ColorMcInfoDto, ColorMcReportDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, CustomCssItemDto, CustomHomeInfoDto, CustomJsonItemDto, CustomUiInfoDto, DataPackItemDto, DepProblemDto, DetectedPackDto, DirEntry, DownloadStatusDto, DropPathDto, ExportConfigDto, ExportEntryDto, ExportInfoDto, FileItemDto, FileListDto, FolderInstanceDto, GroupDto, GuiConfigDto, IconSourceDto, InstanceArgsDto, InstanceInfoDto, InstanceLangDto, InstancePatch, JavaDownloadItemDto, JavaDownloadOptionsDto, JavaInfoDto, JavaTypes, LaunchSettingDto, LoadState, LogLine, LogSettingDto, McaChunkDto, ModAutoMarkDto, ModDepTreeDto, ModGroupDto, ModItemDto, ModPackStatusDto, ModPackUpdateDto, ModRenameDto, ModUpdateApplyDto, ModUpdateCheckDto, ModUpdateProjectDto, MotdDto, NbtEditDto, NetworkSettingDto, NewsItem, PackItemDto, ProjectDetailDto, ProjectDto, ProjectItemDto, ResourceDependencyDto, ResourceDropDto, ResourceSaveDto, ResourceStatusDto, ResourceViewDto, RunArgSettingDto, SaveBackupDto, SaveEditDto, SaveItemDto, SchematicDetailDto, SchematicItemDto, ScreenshotItemDto, ServerItemDto, SettingsDefaultsDto, ShaderItemDto, StartArgDto, StatsDataDto, SystemMemoryDto, TexturesDto, VersionInfoDto, WindowSettingDto, WindowSizeDto } from "./types";
 
 export * from "./types";
 
@@ -142,6 +142,14 @@ export function createCommands(invoke: Invoke) {
       openDir: () => invoke<void>("custom_home_open_dir"),
       remove: () => invoke<void>("custom_home_remove"),
       status: () => invoke<CustomHomeInfoDto>("custom_home_status"),
+    },
+    customUi: {
+      importCss: (path: string) => invoke<CustomCssItemDto>("custom_ui_import_css", { path }),
+      importPage: (path: string) => invoke<CustomUiInfoDto>("custom_ui_import_page", { path }),
+      openDir: () => invoke<void>("custom_ui_open_dir"),
+      removeCss: (id: string) => invoke<void>("custom_ui_remove_css", { id }),
+      removePage: () => invoke<CustomUiInfoDto>("custom_ui_remove_page"),
+      status: () => invoke<CustomUiInfoDto>("custom_ui_status"),
     },
     download: {
       cancelAll: () => invoke<number>("download_cancel_all"),

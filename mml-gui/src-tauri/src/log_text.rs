@@ -250,6 +250,21 @@ pub enum LogText {
         /// 失败原因
         error: String,
     },
+    /// 自定义界面压缩包里没有入口文件
+    CustomUiArchiveMissing {
+        /// 入口文件名
+        name: String,
+    },
+    /// 自定义界面压缩包打不开
+    CustomUiArchiveOpenFailed {
+        /// 失败原因
+        error: String,
+    },
+    /// 主题包入口文件名大小写与约定不一致，按小写匹配收下
+    ThemeEntryCaseMismatch {
+        /// 包里的实际条目名
+        name: String,
+    },
     /// panic 载荷既不是字符串也不是静态串
     UnknownPanic,
     /// 批量取 CurseForge 文件信息失败
@@ -538,6 +553,15 @@ impl LogText {
             LogText::ArchiveOpenFailed { error } => {
                 format!("[custom_home] 打开压缩包失败：{error}")
             }
+            LogText::CustomUiArchiveMissing { name } => {
+                format!("[custom_ui] 压缩包里没有 {name}")
+            }
+            LogText::CustomUiArchiveOpenFailed { error } => {
+                format!("[custom_ui] 打开压缩包失败：{error}")
+            }
+            LogText::ThemeEntryCaseMismatch { name } => {
+                format!("[theme] 入口文件名大小写不一致，按小写匹配：{name}")
+            }
             LogText::UnknownPanic => String::from("未知 panic"),
             LogText::FetchCurseForgeFailed { error } => {
                 format!("批量取 CurseForge 文件失败：{error}")
@@ -727,6 +751,15 @@ impl LogText {
             }
             LogText::ArchiveOpenFailed { error } => {
                 format!("[custom_home] failed to open the archive: {error}")
+            }
+            LogText::CustomUiArchiveMissing { name } => {
+                format!("[custom_ui] the archive has no {name}")
+            }
+            LogText::CustomUiArchiveOpenFailed { error } => {
+                format!("[custom_ui] failed to open the archive: {error}")
+            }
+            LogText::ThemeEntryCaseMismatch { name } => {
+                format!("[theme] entry name differs in case, matched case-insensitively: {name}")
             }
             LogText::UnknownPanic => String::from("unknown panic"),
             LogText::FetchCurseForgeFailed { error } => {

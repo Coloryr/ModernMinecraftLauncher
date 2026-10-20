@@ -11,9 +11,9 @@ use serde::{Deserialize, Serialize};
 use mml_names::Lang;
 
 use crate::gui_config::{
-    CapeConfig, CapeDisplay, ClientConfig, CollectWindowConfig, ExperimentalConfig, GuiConfig,
-    HeadConfig, HeadType, LoginLockObj, MainWindowConfig, SidebarSide, SkinConfig, SkinDisplay,
-    StartupPage, Theme, ViewMode, WindowMode,
+    CapeConfig, CapeDisplay, ClientConfig, CollectWindowConfig, CustomCssItemObj,
+    ExperimentalConfig, GuiConfig, HeadConfig, HeadType, LoginLockObj, MainWindowConfig,
+    SidebarSide, SkinConfig, SkinDisplay, StartupPage, Theme, ViewMode, WindowMode,
 };
 
 /// 皮肤显示设置，前端 wire 为 camelCase，字段即 `skin`
@@ -128,6 +128,52 @@ impl From<LoginLockItemDto> for LoginLockObj {
     }
 }
 
+/// 一条已安装的自定义 CSS，前端 wire 为 camelCase
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CustomCssItemDto {
+    /// 条目 id，CSS 文件在 `custom_ui/css` 下叫 `<id>.css`
+    pub id: String,
+    /// 显示名，导入时的文件名
+    pub name: String,
+    /// 是否启用
+    pub enabled: bool,
+}
+
+impl From<CustomCssItemObj> for CustomCssItemDto {
+    /// 磁盘上的自定义 CSS 条目 → 前端 wire 形态
+    ///
+    /// - `o`: 磁盘配置里的条目
+    ///
+    /// # 返回值
+    ///
+    /// 返回字段一一对应的 DTO
+    fn from(o: CustomCssItemObj) -> Self {
+        Self {
+            id: o.id,
+            name: o.name,
+            enabled: o.enabled,
+        }
+    }
+}
+
+impl From<CustomCssItemDto> for CustomCssItemObj {
+    /// 前端 wire 形态 → 磁盘上的自定义 CSS 条目，保存配置时用
+    ///
+    /// - `d`: 前端提交的条目
+    ///
+    /// # 返回值
+    ///
+    /// 返回字段一一对应的磁盘配置
+    fn from(d: CustomCssItemDto) -> Self {
+        Self {
+            id: d.id,
+            name: d.name,
+            enabled: d.enabled,
+        }
+    }
+}
+
 /// 客户端设置，前端 wire 为 camelCase，字段即 `client`
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
@@ -150,6 +196,12 @@ pub struct ClientConfigDto {
     pub lock_instance: String,
     /// 自定义主页面：启用后主窗口的启动器主页换成导入的页面
     pub custom_home: bool,
+    /// 自定义 CSS 总开关
+    pub custom_css_on: bool,
+    /// 已安装的自定义 CSS，顺序即注入顺序
+    pub custom_css: Vec<CustomCssItemDto>,
+    /// 完全自定义界面总开关
+    pub custom_page_on: bool,
     /// 自定义音乐：启用后主窗口播放 `music_source`
     pub music_on: bool,
     /// 自定义音乐来源：本地音频文件路径或 http(s) 直链，空串表示没配
@@ -179,6 +231,9 @@ impl From<ClientConfig> for ClientConfigDto {
             motd_server: c.motd_server,
             lock_instance: c.lock_instance,
             custom_home: c.custom_home,
+            custom_css_on: c.custom_css_on,
+            custom_css: c.custom_css.into_iter().map(Into::into).collect(),
+            custom_page_on: c.custom_page_on,
             music_on: c.music_on,
             music_source: c.music_source,
             window_effect: c.window_effect,
@@ -206,6 +261,9 @@ impl From<ClientConfigDto> for ClientConfig {
             motd_server: c.motd_server,
             lock_instance: c.lock_instance,
             custom_home: c.custom_home,
+            custom_css_on: c.custom_css_on,
+            custom_css: c.custom_css.into_iter().map(Into::into).collect(),
+            custom_page_on: c.custom_page_on,
             music_on: c.music_on,
             music_source: c.music_source,
             window_effect: c.window_effect,
@@ -325,6 +383,9 @@ impl From<GuiConfig> for GuiConfigDto {
                 motd_server: c.client.motd_server,
                 lock_instance: c.client.lock_instance,
                 custom_home: c.client.custom_home,
+                custom_css_on: c.client.custom_css_on,
+                custom_css: c.client.custom_css.into_iter().map(Into::into).collect(),
+                custom_page_on: c.client.custom_page_on,
                 music_on: c.client.music_on,
                 music_source: c.client.music_source,
                 window_effect: c.client.window_effect,
@@ -398,6 +459,9 @@ impl From<GuiConfigDto> for GuiConfig {
                 motd_server: d.client.motd_server,
                 lock_instance: d.client.lock_instance,
                 custom_home: d.client.custom_home,
+                custom_css_on: d.client.custom_css_on,
+                custom_css: d.client.custom_css.into_iter().map(Into::into).collect(),
+                custom_page_on: d.client.custom_page_on,
                 music_on: d.client.music_on,
                 music_source: d.client.music_source,
                 window_effect: d.client.window_effect,

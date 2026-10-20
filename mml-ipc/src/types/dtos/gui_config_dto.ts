@@ -41,6 +41,12 @@ export type LoginLockItemDto = {
   server: string,
 };
 
+export type CustomCssItemDto = {
+  id: string,
+  name: string,
+  enabled: boolean,
+};
+
 export type ClientConfigDto = {
   motdCard: boolean,
   motdInterval: number,
@@ -51,6 +57,9 @@ export type ClientConfigDto = {
   motdServer: string,
   lockInstance: string,
   customHome: boolean,
+  customCssOn: boolean,
+  customCss: CustomCssItemDto[],
+  customPageOn: boolean,
   musicOn: boolean,
   musicSource: string,
   windowEffect: string,

@@ -257,6 +257,18 @@ pub struct LoginLockObj {
     pub server: String,
 }
 
+/// 一条已安装的自定义 CSS
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct CustomCssItemObj {
+    /// 条目 id，CSS 文件在 `custom_ui/css` 下叫 `<id>.css`
+    pub id: String,
+    /// 显示名，导入时的文件名
+    pub name: String,
+    /// 是否启用；停用的条目保留文件但不注入
+    pub enabled: bool,
+}
+
 /// 客户端设置：主窗口 MOTD 卡片与登录方式限制
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
@@ -279,6 +291,12 @@ pub struct ClientConfig {
     pub lock_instance: String,
     /// 自定义主页面：启用后主窗口的启动器主页换成 base_dir/custom_home 里的 index.html
     pub custom_home: bool,
+    /// 自定义 CSS 总开关；关闭后已安装的样式保留但不生效
+    pub custom_css_on: bool,
+    /// 已安装的自定义 CSS，顺序即注入顺序；文件本身在 `custom_ui/css`
+    pub custom_css: Vec<CustomCssItemObj>,
+    /// 完全自定义界面总开关；关闭后主窗口回内置界面，整页包保留
+    pub custom_page_on: bool,
     /// 自定义音乐：启用后主窗口播放 `music_source`，标题栏给播放 / 暂停 / 停止入口
     pub music_on: bool,
     /// 自定义音乐来源：本地音频文件路径或 http(s) 直链；空串表示没配
@@ -290,7 +308,7 @@ pub struct ClientConfig {
 }
 
 impl Default for ClientConfig {
-    /// 默认：不开 MOTD 卡片、不锁登录方式、不自动进服、不启用自定义主页面
+    /// 默认：不开 MOTD 卡片、不锁登录方式、不自动进服、三种自定义界面都不启用
     fn default() -> Self {
         Self {
             motd_card: false,
@@ -302,6 +320,9 @@ impl Default for ClientConfig {
             motd_server: String::new(),
             lock_instance: String::new(),
             custom_home: false,
+            custom_css_on: false,
+            custom_css: Vec::new(),
+            custom_page_on: false,
             music_on: false,
             music_source: String::new(),
             window_effect: String::from("auto"),

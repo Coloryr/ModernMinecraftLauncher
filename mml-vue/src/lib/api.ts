@@ -87,7 +87,7 @@ import type {
   GuiThemeDto,
   ViewMode,
 } from "./bindings";
-import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiThemeChange, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress } from "./listens";
+import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, CustomUiChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiThemeChange, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress } from "./listens";
 
 export interface CreateInstanceOpts {
   loader?: string;
@@ -1539,6 +1539,21 @@ export function onJavaChange(cb: () => void): Promise<UnlistenFn> {
  */
 export function onCustomHomeChange(cb: () => void): Promise<UnlistenFn> {
   return listen(CustomHomeChange, () => cb());
+}
+
+/**
+ * 自定义界面内容变更
+ *
+ * - `cb`: 变更时回调
+ *
+ * # 返回值
+ *
+ * 取消监听的函数
+ *
+ * 导入或删除 CSS / 整页包后广播；模式切换走 `client-config-change`。
+ */
+export function onCustomUiChange(cb: () => void): Promise<UnlistenFn> {
+  return listen(CustomUiChange, () => cb());
 }
 
 /**

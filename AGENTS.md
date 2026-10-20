@@ -66,6 +66,7 @@
   取的是发射函数体里 `emit` / `emit_to` 的实参，不是签名参数）。
   自定义主页面的 `window.mml` 契约（`MmlApi`、可订阅事件与 payload 映射，与 mml-vue 的
   `customHomeBridge.ts` 白名单对应）是手写的 `mml-ipc/src/home.ts`，不参与扫描。
+  自定义主页面示例直接用 `mml-ipc`；已经依赖 mml-vue 的主题可从 `mml-vue/ipc` 取同一契约。
   `mml-vue/src/lib/bindings.ts` / `listens.ts` 只是兼容层：前者把 Tauri 的 invoke 绑到
   `createCommands`，后者再导出事件名，既有导入路径不变；`mml-ui-demo` 直接引用 `mml-ipc`。
   新增命令加 `#[gui_macros::command]`，新增事件加 `#[gui_macros::emit]`；单独重新生成可跑
@@ -110,9 +111,9 @@
 | --- | --- |
 | `mml-core/` | 启动器内核（多 crate，隶属根目录 workspace） |
 | `mml-gui/` | Tauri 桌面壳；`src-tauri/src/windows/<窗口>.rs` 放该窗口的规格 / 模型 / IPC |
-| `mml-vue/` | 前端（Vue3 + Vite）；窗口在 `src/windows/<kind>/`，通用组件在 `src/components/` |
+| `mml-vue/` | 前端（Vue3 + Vite）；窗口在 `src/windows/<kind>/`，通用组件在 `src/components/`；`scripts/gen-ui.ts` 生成 `src/generated` 的 UI 出口；mml-ipc 与 mml-vue 都发布到 npm |
 | `ipc-gen/` | IPC 代码生成器（`gui-ipc-gen`）+ 过程宏（`ipc-gen/macros`，`gui-macros`） |
-| `mml-ipc/` | npm 契约包：按来源拆分的跨 IPC 类型、命令包装、事件订阅函数与自定义主页 `window.mml` 契约（`src/home.ts` 手写） |
+| `mml-ipc/` | npm 契约包：按来源拆分的跨 IPC 类型、命令包装、事件订阅函数、自定义主页 `window.mml` 契约（`src/home.ts`）与自定义界面注册表 / 上下文（`src/customUi.ts`） |
 
 ### 5.1 窗口模块的拆分约定
 
@@ -264,6 +265,88 @@ windows/<窗口>/mod.rs 里：
   存一份，更新检查、依赖检测直接读，不重扫 `mods` 目录。
 - 窗口 model 跟窗口生命周期走：开窗后第一次用到时建立，**关窗前把里面在跑的任务全部取消**
   （扫描 / 网络 / 下载这类慢操作都要能在窗口关掉时收手），窗口销毁时释放。
+
+### 12.2 自定义界面（三种换皮，互相独立）
+
+| 种 | 作用 | 产物 | 开关 | 设置位置 |
+| --- | --- | --- | --- | --- |
+| 1 自定义主页面 | 主窗口主页内容区 | `custom_home.zip`（`index.html` 或 `custom.js`） | `client.custom_home` | 客户端设置 |
+| 2 自定义 CSS | 内置界面换皮，可装多份 | `custom_ui/css/<id>.zip`，包根 `custom.css`，可选 `custom.js` 入口 | `client.custom_css_on` 加每条 `enabled` | 界面 |
+| 3 完全自定义界面 | 整个主窗口换成整页 / 按 kind 换窗口组件 | `custom_ui/page.zip`（`index.html` 或 `custom.js`） | `client.custom_page_on` | 界面 |
+
+- **三者互不联锁**：装 1 不动 2 / 3 的开关，装 3 也不动 2；别把它们做成一个三选一模式。
+  3 开着时 1 的页面在它后面，属正常叠加；2 只作用于启动器内置界面，不进 iframe。
+- 1 的压缩包走 `mml-home`，2 的每份 CSS 与 3 的整页包走 `mml-ui`。整页包与 1 共用
+  `windows/web_assets.rs` 的整包句柄 / 越界防护 / 限额，新加协议直接复用，别另抄一遍
+  `..` 检查。
+- 2 的条目列表与两个开关都存 `gui_config.client`，列表只在设置窗口写；文件本身在
+  `custom_ui/`。**不要把 CSS 文本或整页 HTML 塞进配置文件**。
+- **三种都打包成 zip 分发**：1 的包根是 `index.html` 或 `custom.js`（可选 `custom.css`），
+  2 的包根是 `custom.css`（可选 `custom.js`），3 的包根是 `index.html` 或 `custom.js`；
+  整包套一层目录也认。
+- **导入先校验、再替换**：1 确认 `index.html` 或 `custom.js`，2 确认 `custom.css`，
+  3 确认 `index.html` 或 `custom.js`；
+  3 落盘走 `.tmp` 中转再 rename；
+  2 的每条按 uuid 落成 `css/<id>.zip`，删除时先删文件再动配置。
+- **包内静态资源同源伺服**：CSS 包的 `/css/<id>/<路径>` 与整页包共用 `resolve_entry`，
+  CSS 里用 `url(assets/bg.png)` 相对引用即可，不要求用户把图片塞进主题变量。
+- **可选入口脚本**：2 的包根可以有 `custom.js`，`custom_ui_status` 每条多给 `scriptUrl`
+  （没有就空串）。`lib/customUi.ts` 先挂 `<link>`，再把脚本作为 classic script 插进页面；
+  脚本执行时同步 `window.__mmlCustomCss.push(fn)` 注册，`document.currentScript` 的
+  `data-custom-ui-id` 决定属于哪个包。`main.ts` 在 `app.mount` 之后调 `startCustomCss()`
+  才执行入口，入口拿到 `loadCss / select / replace / onCleanup`；关包 / 换脚本时跑清理。
+  `replace` 除改文字 / 类名外还能给 `component` + `props`：原控件隐藏，用 `createApp`
+  把 Vue 组件挂到旁边，关包时 unmount 并还原。组件由 Vite 按 IIFE 打进 `custom.js`，
+  `vue` external 到 `window.__mmlVue`（`main.ts` 暴露），包里不重复打一份 Vue。
+  入口脚本本身仍不要用 `import` / `export`（构建产物是 IIFE），否则
+  `document.currentScript` 为 null，注册表分不清包。
+- **自定义主页组件回调**：1 的包根可以有 `custom.js`（返回主页内容组件的回调）与
+  `custom.css`（样式）；`custom_home_status` 多给 `scriptUrl` / `styleUrl`。
+  `lib/customHomeUi.ts` 只在主窗口、挂载前加载脚本并装 host 版 `window.mml`，脚本用
+  `window.__mmlHomePages.push(() => Component | null)` 注册；`CustomHomePage.vue` 有组件就
+  渲染组件，没有就回落到 iframe。组件样式由示例的 PostCSS 前缀限定在 `.mml-home` 内。
+- **自定义界面契约在 mml-ipc**：`WindowPageRegistry` / `HomePageRegistry` /
+  `CustomCssContext` / `CustomCssReplaceOptions` 的定义都在 `mml-ipc/src/customUi.ts`，
+  mml-vue 与三个示例都按 type-import 取，不各写一份。
+- **整页窗口回调**：3 的包根可以有 `custom.js`（窗口页面组件）与 `custom.css`（其样式）；
+  `custom_ui_status` 多给 `pageScriptUrl` / `pageStyleUrl`。`lib/customUi.ts` 在挂载前
+  **await** 加载脚本并装 host 版 `window.mml`（invoke / listen / theme），脚本用
+  `window.__mmlWindowPages.push((kind) => Component | null)` 注册；`App.vue` 先按 kind
+  取替换组件，取不到再走 iframe / 内置窗口。组件直接跑在 host 里，Vue 从 `__mmlVue` 取，
+  所以挂载前就能替换，不会先闪一下内置页面。关包 / 换包时移除脚本与样式、清回调。
+  `App.vue` 还把内置窗口表挂到 `window.__mmlWindows`，主题组件可以直接渲染
+  `window.__mmlWindows.main` 复用原始主窗口，再自己加内容，不必把 MainWindow 打进主题包。
+- **事件分工**：开关与列表变更走 `window_save_gui_config` → `client-config-change`；
+  文件导入 / 删除单发 `custom-ui-change`。前端 `lib/customUi.ts` 两边都监听后重拉
+  `custom_ui_status`。
+- **启动顺序**：`main.ts` 必须在 `createApp().mount()` 之前 `await initCustomUi()`，
+  否则整页模式会先闪一下内置界面。状态只来自后端，
+  **不要把开关 / 列表 / 地址写回 localStorage**。
+- **安全底线**：整页 iframe 保持 `sandbox` 且**不给 `allow-same-origin`**；`mml-ui` 只伺服
+  `custom_ui/` 与包内条目，CSS 路径的 id 必须是 uuid，整页路径走 `resolve_entry`。
+- **锁定功能预留**：后续要给服主 / 二次开发者一个锁住这三项的开关，加在 `ClientConfig`
+  即可；届时要拦两处 —— 改开关 / 列表走 `window_save_gui_config`，文件操作走
+  `custom_ui_*` 命令，别把判断散到前端。
+- **控件只有一个来源**：`mml-vue/scripts/gen-ui.ts` 在 `mml-vue/src/generated` 生成
+  `ui-kit.ts` / `ui-kit.css` / `controls.ts` / `windows.ts` / `components.ts`，由 `mml-vue`
+  的 exports 暴露成 `mml-vue/ui-kit`、`mml-vue/ui-kit.css`、`mml-vue/ui-kit/controls`、
+  `mml-vue/ui-kit/windows`、`mml-vue/ui-kit/components`。两个示例本地按 `file:../mml-vue` 依赖，
+  mml-ipc 与 mml-vue 都会发布到 npm。改完控件或样式重跑 `node mml-vue/scripts/gen-ui.ts`；
+  新加控件加进 `COMPONENTS`。`./controls` 单独一个入口，是为了让 Node 只取清单时
+  不必加载 `.vue`。
+- **两个示例怎么用 kit**：自定义 CSS 的 `scripts/controls.ts` 读 `CONTROLS` / `CSS_VARIABLES`
+  列选择器、生成覆盖骨架，`src/replace.ts` 是运行时入口源码（打包时编译成 `custom.js`），
+  演示「选一个控件并换掉文字与外观」；
+  整页示例 `import { KitButton, KitSearchBox, ... } from "mml-vue/ui-kit"`
+  并引 `mml-vue/ui-kit.css`，启动进度用 `KitLaunchProgress`，`v-tip` 直接用导出的真实指令；
+  自定义界面类型（`CustomCssContext` / `WindowPageRegistry` / `HomePageRegistry`）直接从 `mml-ipc` type-import。
+- **`mml-vue` 是 `file:` 符号链接**：整页示例用 `resolve.dedupe: ["vue"]` 加 tsconfig
+  `paths.vue`，所有 `.vue` 都用示例自己的 Vue；CSS 示例只取清单与类型。
+- **CSS 示例的源码不进包**：`src/` 与 `scripts/` 都不进 zip；`pack.ts` 先跑
+  `vite build` 把 `src/replace.ts` + `ReplaceButton.vue` 打成 IIFE `dist/custom.js`，
+  复制到包根后与 `custom.css` 一起打包，打完删掉 `custom.js` 与 `dist`。
+- **恢复路径**：整页页面自己挂掉时删掉 `custom_ui/page.zip` 或关掉 `customPageOn`；
+  开发构建的整页右下角另有「退出整页界面」按钮。
 
 ## 13. 复杂问题先写日志调试（硬性）
 

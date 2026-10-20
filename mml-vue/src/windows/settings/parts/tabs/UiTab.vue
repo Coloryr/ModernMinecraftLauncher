@@ -3,17 +3,8 @@
 //
 // 状态与保存逻辑在 composables/useSettingsUi；窗口外观那组属于 gui_config.client（useSettingsClient），
 // 只是显示在这一页。这里只负责排版与分组（SettingsGroup）。
-import { computed, onMounted, ref } from "vue";
+import { onMounted } from "vue";
 import { t } from "../../../../lib/i18n";
-import {
-  customUiCss,
-  customUiMode,
-  customUiPageUrl,
-  setCustomUiCss,
-  setCustomUiMode,
-  setCustomUiPageUrl,
-  type CustomUiMode,
-} from "../../../../lib/customUi";
 import { fontStack } from "../../../../lib/fonts";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
@@ -26,7 +17,7 @@ import type { useSettingsClient } from "../../composables/useSettingsClient";
 const props = defineProps<{
   /** 界面标签的状态与保存方法，来自 useSettingsUi */
   settings: ReturnType<typeof useSettingsUi>;
-  /** 窗口外观（材质 / 透明度）的状态与保存方法，来自 useSettingsClient */
+  /** 窗口外观、自定义 CSS 与整页包的状态与保存方法，来自 useSettingsClient */
   look: ReturnType<typeof useSettingsClient>;
   /** 需要高亮脉冲的分组 id（搜索命中 / 刚恢复默认） */
   flashGroup?: string;
@@ -76,31 +67,41 @@ const {
   setBgBlur,
 } = props.settings;
 
-// 窗口外观的数据属于 gui_config.client，由 useSettingsClient 持有
-const { client, applyWindowEffect, applyWindowOpacity } = props.look;
+// 窗口外观与自定义界面都属于 gui_config.client，由 useSettingsClient 持有
+const {
+  client,
+  applyClient,
+  applyWindowEffect,
+  applyWindowOpacity,
+  customUi,
+  importingCustomPage,
+  customPageState,
+  customPageEntry,
+  refreshCustomUi,
+  addCustomCss,
+  setCustomCssEnabled,
+  removeCustomCss,
+  importCustomPage,
+  removeCustomPage,
+  openCustomUiDir,
+} = props.look;
 
-// 系统字体枚举是重活：进这个标签时才拉
-onMounted(() => void loadFonts());
+// 系统字体枚举是重活：进这个标签时才拉；整页包的导入状态也在这时重拉
+onMounted(() => {
+  void loadFonts();
+  void refreshCustomUi();
+});
 
-/** 自定义界面：模式即时生效，CSS / 页面地址点「应用」才落 */
-const cssDraft = ref(customUiCss.value);
-const pageDraft = ref(customUiPageUrl.value);
-const uiModeOptions = computed(() => [
-  { value: "off", label: t("winSettings.customUiOff") },
-  { value: "css", label: t("winSettings.customUiCssMode") },
-  { value: "page", label: t("winSettings.customUiPageMode") },
-]);
-
-function onUiModeChange(value: string) {
-  setCustomUiMode(value as CustomUiMode);
+/** 自定义 CSS 总开关即改即存，各窗口靠 client-config-change 重新挂样式 */
+function toggleCustomCss(on: boolean) {
+  client.value.customCssOn = on;
+  void applyClient();
 }
 
-function applyCssDraft() {
-  setCustomUiCss(cssDraft.value);
-}
-
-function applyPageDraft() {
-  setCustomUiPageUrl(pageDraft.value);
+/** 完全自定义界面总开关同上；关掉后主窗口回内置界面，整页包保留 */
+function toggleCustomPage(on: boolean) {
+  client.value.customPageOn = on;
+  void applyClient();
 }
 </script>
 
@@ -174,31 +175,61 @@ function applyPageDraft() {
     </div>
   </SettingsGroup>
 
-  <SettingsGroup id="customUi" title-key="winSettings.secCustomUi" :flash="flashGroup === 'customUi'">
-    <p class="field-desc">{{ t("winSettings.customUiDesc") }}</p>
-    <SegmentedTabs :model-value="customUiMode" :options="uiModeOptions"
-      @update:model-value="onUiModeChange" />
-
-    <template v-if="customUiMode === 'css'">
-      <label class="field-label">{{ t("winSettings.customUiCss") }}</label>
-      <textarea v-model="cssDraft" class="field-input custom-ui-css" spellcheck="false" rows="10"
-        :placeholder="t('winSettings.customUiCssPlaceholder')" />
-      <div class="custom-ui-actions">
-        <BaseButton size="sm" variant="accent" @click="applyCssDraft">
-          {{ t("winSettings.customUiApply") }}
-        </BaseButton>
-        <span class="field-desc">{{ t("winSettings.customUiCssHint") }}</span>
+  <SettingsGroup id="customCss" title-key="winSettings.secCustomCss" :flash="flashGroup === 'customCss'">
+    <p class="field-desc">{{ t("winSettings.customCssDesc") }}</p>
+    <div class="switch-row">
+      <div class="switch-text">
+        <span class="switch-label">{{ t("winSettings.customCssOn") }}</span>
+        <span class="switch-state">{{ t("winSettings.customCssOnDesc") }}</span>
       </div>
-    </template>
+      <BaseSwitch :model-value="client.customCssOn" @update:model-value="toggleCustomCss" />
+    </div>
 
-    <template v-else-if="customUiMode === 'page'">
-      <label class="field-label">{{ t("winSettings.customUiPage") }}</label>
-      <input v-model="pageDraft" class="field-input" spellcheck="false" autocomplete="off"
-        :placeholder="t('winSettings.customUiPagePlaceholder')" @change="applyPageDraft" />
-      <p class="field-desc">{{ t("winSettings.customUiPageHint") }}</p>
-    </template>
+    <!-- 已安装的样式：一行一条，开关 / 文件名 / 删除；顺序即注入顺序 -->
+    <ul v-if="client.customCss.length" class="custom-css-list">
+      <li v-for="item in client.customCss" :key="item.id" class="custom-css-item">
+        <BaseSwitch :model-value="item.enabled"
+          @update:model-value="(v) => setCustomCssEnabled(item.id, v)" />
+        <span class="custom-css-name" :title="item.name">{{ item.name }}</span>
+        <BaseButton size="sm" variant="danger" @click="removeCustomCss(item.id)">
+          {{ t("winSettings.customCssRemove") }}
+        </BaseButton>
+      </li>
+    </ul>
+    <p v-else class="field-desc">{{ t("winSettings.customCssEmpty") }}</p>
 
-    <p class="field-desc">{{ t("winSettings.customUiPending") }}</p>
+    <div class="custom-ui-actions">
+      <BaseButton size="sm" variant="accent" @click="addCustomCss">
+        {{ t("winSettings.customCssImport") }}
+      </BaseButton>
+      <BaseButton size="sm" @click="openCustomUiDir">{{ t("winSettings.customUiOpenDir") }}</BaseButton>
+    </div>
+    <p class="field-desc">{{ t("winSettings.customCssHint") }}</p>
+  </SettingsGroup>
+
+  <SettingsGroup id="customPage" title-key="winSettings.secCustomPage" :flash="flashGroup === 'customPage'">
+    <p class="field-desc">{{ t("winSettings.customPageDesc") }}</p>
+    <div class="switch-row">
+      <div class="switch-text">
+        <span class="switch-label">{{ t("winSettings.customPageOn") }}</span>
+        <span class="switch-state">{{ t("winSettings.customPageOnDesc") }}</span>
+      </div>
+      <BaseSwitch :model-value="client.customPageOn" @update:model-value="toggleCustomPage" />
+    </div>
+
+    <div class="custom-ui-actions">
+      <BaseButton size="sm" variant="accent" :disabled="importingCustomPage" @click="importCustomPage">
+        {{ importingCustomPage ? t("winSettings.customUiImporting") : t("winSettings.customPageImport") }}
+      </BaseButton>
+      <BaseButton size="sm" variant="danger" :disabled="!customUi?.pageInstalled" @click="removeCustomPage">
+        {{ t("winSettings.customPageRemove") }}
+      </BaseButton>
+      <BaseButton size="sm" @click="openCustomUiDir">{{ t("winSettings.customUiOpenDir") }}</BaseButton>
+      <span class="custom-ui-state">{{ customPageState }}</span>
+    </div>
+    <p class="field-desc">{{ t("winSettings.customPageHint") }}</p>
+    <label class="field-label">{{ t("winSettings.customPageEntry") }}</label>
+    <p class="custom-ui-entry">{{ customPageEntry }}</p>
   </SettingsGroup>
 
   <SettingsGroup id="window" title-key="winSettings.secWindow" :flash="flashGroup === 'window'">
@@ -302,26 +333,53 @@ function applyPageDraft() {
 </template>
 
 <style scoped>
-/* 自定义 CSS 编辑区：用等宽字体，方便看选择器与缩进 */
-.custom-ui-css {
-  width: 100%;
-  min-height: 140px;
-  margin-top: 8px;
-  resize: vertical;
-  font-family: Consolas, "Cascadia Mono", monospace;
-  font-size: 12.5px;
-  line-height: 1.5;
+/* 已安装的样式：一行一条，开关 / 文件名 / 删除；顺序即注入顺序 */
+.custom-css-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
+.custom-css-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 文件名可能很长，占满剩余宽度并省略，不把删除按钮挤走 */
+.custom-css-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+
+/* 自定义界面：按钮一行排开，状态跟在后面，窄窗口自动换行 */
 .custom-ui-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 10px;
   flex-wrap: wrap;
 }
 
-.custom-ui-actions .field-desc {
-  margin: 0;
+/* 状态行是按钮的补充说明，不抢按钮的视觉重量 */
+.custom-ui-state {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+/* 入口地址是只读展示：URL 可能很长，用等宽字体并允许在任意位置断行 */
+.custom-ui-entry {
+  margin: 4px 0 0;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  word-break: break-all;
 }
 </style>

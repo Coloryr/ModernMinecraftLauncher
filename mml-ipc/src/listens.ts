@@ -17,6 +17,7 @@ export const CloseBlocked = "close-blocked"
 export const CollectChange = "collect-change"
 export const ColormcProgress = "colormc-progress"
 export const CustomHomeChange = "custom-home-change"
+export const CustomUiChange = "custom-ui-change"
 export const DownloadItem = "download-item"
 export const DownloadTask = "download-task"
 export const ExportFocus = "export-focus"
@@ -56,6 +57,7 @@ export interface EventPayloads {
   [CollectChange]: void;
   [ColormcProgress]: ColorMcProgressDto;
   [CustomHomeChange]: void;
+  [CustomUiChange]: void;
   [DownloadItem]: DownloadItemEvent;
   [DownloadTask]: DownloadTaskEvent;
   [ExportFocus]: LogFocusDto;
@@ -109,6 +111,7 @@ export function createEvents(on: EventOn) {
     onCollectChange: (cb: () => void) => on(CollectChange, cb),
     onColormcProgress: (cb: (payload: ColorMcProgressDto) => void) => on(ColormcProgress, cb),
     onCustomHomeChange: (cb: () => void) => on(CustomHomeChange, cb),
+    onCustomUiChange: (cb: () => void) => on(CustomUiChange, cb),
     onDownloadItem: (cb: (payload: DownloadItemEvent) => void) => on(DownloadItem, cb),
     onDownloadTask: (cb: (payload: DownloadTaskEvent) => void) => on(DownloadTask, cb),
     onExportFocus: (cb: (payload: LogFocusDto) => void) => on(ExportFocus, cb),

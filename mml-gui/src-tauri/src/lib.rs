@@ -15,6 +15,7 @@
 //!
 //! 自定义主页面走 `mml-home://` 协议，其压缩包在运行根目录常驻，
 //! 启动时打开成常驻句柄、请求时按条目现读，**全程不落盘解压**，见 [`windows::custom_home`]。
+//! 自定义界面的 CSS 与整页包走 `mml-ui://`，整页包同一套现读口径，见 [`windows::custom_ui`]。
 
 use mml_names::i18;
 use tauri::Manager;
@@ -87,6 +88,12 @@ pub fn run() {
                 windows::custom_home::url_custom_home(request, responder).await;
             });
         })
+        // 自定义界面：读 CSS 与解压包内条目都是阻塞 IO，丢到阻塞线程，别占住协议回调
+        .register_asynchronous_uri_scheme_protocol("mml-ui", move |_app, request, responder| {
+            tauri::async_runtime::spawn_blocking(move || {
+                windows::custom_ui::url_custom_ui(request, responder);
+            });
+        })
         // 自定义音乐：读文件是阻塞 IO，丢到阻塞线程，别占住协议回调
         .register_asynchronous_uri_scheme_protocol(
             music::MUSIC_SCHEME,
@@ -154,6 +161,9 @@ pub fn run() {
 
             // 自定义主页面：把压缩包打开成常驻句柄，不落盘解压，请求时按条目现读
             windows::custom_home::reload();
+
+            // 自定义界面的整页包同理；CSS 是普通文件，协议按请求现读
+            windows::custom_ui::reload();
 
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {

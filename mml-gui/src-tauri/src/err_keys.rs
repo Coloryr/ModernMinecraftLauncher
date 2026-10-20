@@ -140,10 +140,35 @@ pub const EXPORT_RUNNING: &str = "err.exportRunning";
 /// 不支持的整合包类型
 pub const EXPORT_PACK_TYPE: &str = "err.exportPackType";
 
-// ---------- 自定义主页面 ----------
+// ---------- 主题包 ----------
 
-/// 压缩包里没有 index.html
-pub const CUSTOM_HOME_NO_INDEX: &str = "err.customHomeNoIndex";
+/// 主题包声明的类型与导入入口不匹配
+pub const THEME_TYPE_MISMATCH: &str = "err.themeTypeMismatch";
+/// 没有清单且入口签名分不出 Home 与 Page
+pub const THEME_TYPE_UNKNOWN: &str = "err.themeTypeUnknown";
+/// theme.json 不是合法 JSON、类型不认识或 api 不支持
+pub const THEME_MANIFEST_INVALID: &str = "err.themeManifestInvalid";
+/// 缺该类型必需的入口文件
+pub const THEME_MISSING_ENTRY: &str = "err.themeMissingEntry";
+/// 不是合法 zip，或条目读不出来
+pub const THEME_ZIP_INVALID: &str = "err.themeZipInvalid";
+/// 包里含加密条目
+pub const THEME_ZIP_ENCRYPTED: &str = "err.themeZipEncrypted";
+/// 条目路径绝对、越界或含控制字符
+pub const THEME_ZIP_ENTRY_PATH: &str = "err.themeZipEntryPath";
+/// 条目重名，含只差大小写与规范化后重名
+pub const THEME_ZIP_DUPLICATE: &str = "err.themeZipDuplicate";
+/// 条目类型不支持，如符号链接、设备文件
+pub const THEME_ZIP_UNSUPPORTED: &str = "err.themeZipUnsupported";
+/// 压缩比异常，疑似 zip 炸弹
+pub const THEME_ZIP_RATIO: &str = "err.themeZipRatio";
+
+// ---------- 自定义界面 ----------
+
+/// 整页包条目太多或解压后太大，按 zip 炸弹拒绝
+pub const PAGE_ARCHIVE_LIMIT: &str = "err.pageArchiveLimit";
+/// 自定义界面条目 id 不合法
+pub const CUSTOM_UI_ID: &str = "err.customUiId";
 
 // ---------- ColorMC 迁移 ----------
 

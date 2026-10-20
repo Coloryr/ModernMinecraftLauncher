@@ -6,7 +6,7 @@
 import { computed, ref } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
-import { commands, type CustomHomeInfoDto, type InstanceInfoDto } from "../../../lib/bindings";
+import { commands, type CustomHomeInfoDto, type CustomUiInfoDto, type InstanceInfoDto } from "../../../lib/bindings";
 import {
   defaultConfig,
   loadGuiConfig,
@@ -35,6 +35,8 @@ const SERVER_LOCK_TYPES = ["authlib", "selflittleskin", "nide8"];
  * - `loginTypeLabel` / `addLock*` / `lockServerError` / `lockServerPlaceholder`: 登录方式锁定的添加表单
  * - `lockInstances` / `refreshLockInstances` / `lockMissing` / `onLockInstanceChange`: 实例锁定
  * - `customHome` / `importingCustomHome` / `customHomeState` / `refreshCustomHome` / `importCustomHome` / `openCustomHomeDir` / `removeCustomHome`: 自定义主页面
+ * - `customUi` / `customPageState` / `customPageEntry` / `refreshCustomUi` / `importCustomPage` / `removeCustomPage`: 完全自定义界面的整页包
+ * - `addCustomCss` / `setCustomCssEnabled` / `removeCustomCss` / `openCustomUiDir`: 自定义 CSS 的安装、启停与删除
  * - `pickMusicFile`: 选一个本地音频文件填进"自定义音乐"
  * - `experimental` / `applyExperimental`: 实验性功能四开关（界面先行，行为未接线）
  * - `applyWindowOpacity`: 透明度写进 CSS 变量并落盘，界面页的窗口外观用
@@ -267,6 +269,107 @@ export function useSettingsClient() {
     }
   }
 
+  // ---------- 自定义界面 ----------
+  //
+  // CSS 条目与两个开关都是 gui_config.client 的字段，由这里整份提交；后端只负责
+  // 它拿不到的文件读写。整页包的已导入情况要问后端，存在 customUi 里。
+
+  /** 整页包状态；CSS 条目的名字与开关直接看 client */
+  const customUi = ref<CustomUiInfoDto | null>(null);
+  /** 整页包导入进行中 */
+  const importingCustomPage = ref(false);
+
+  /** 整页包状态行：已导入（n 个文件）/ 未导入 */
+  const customPageState = computed(() => {
+    const info = customUi.value;
+    if (!info?.pageInstalled) return t("winSettings.customPageNone");
+    return t("winSettings.customPageInstalled", { count: info.pageFileCount });
+  });
+
+  /** 入口地址只读展示；未导入时给占位 */
+  const customPageEntry = computed(
+    () => customUi.value?.pageEntryUrl || t("winSettings.customPageEntryNone"),
+  );
+
+  /** 重拉整页包状态：进页面、导入或删除之后调用 */
+  async function refreshCustomUi() {
+    customUi.value = await commands.customUi.status().catch(() => null);
+  }
+
+  /** 选一个 CSS 包装上；文件由后端落盘，条目追加进配置并保存 */
+  async function addCustomCss() {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const picked = await open({
+      title: t("winSettings.customCssImport"),
+      multiple: false,
+      filters: [{ name: "Zip", extensions: ["zip"] }],
+    });
+    if (typeof picked !== "string") return;
+    try {
+      const item = await commands.customUi.importCss(picked);
+      client.value.customCss = [...client.value.customCss, item];
+      await applyClient();
+    } catch (e) {
+      showToast(`${t("winSettings.customUiImportFailed")}${t("common.detailSep")}${tErr(e)}`);
+    }
+  }
+
+  /** 改某条 CSS 的启用状态；停用的条目保留文件，只是不再注入 */
+  function setCustomCssEnabled(id: string, enabled: boolean) {
+    client.value.customCss = client.value.customCss.map((item) =>
+      item.id === id ? { ...item, enabled } : item,
+    );
+    void applyClient();
+  }
+
+  /** 删除一条 CSS：先删文件，再从配置里去掉；文件删失败就不动配置 */
+  async function removeCustomCss(id: string) {
+    try {
+      await commands.customUi.removeCss(id);
+      client.value.customCss = client.value.customCss.filter((item) => item.id !== id);
+      await applyClient();
+    } catch (e) {
+      showToast(tErr(e));
+    }
+  }
+
+  /** 导入整页包：只能有一份，再导入就是换掉旧的 */
+  async function importCustomPage() {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const picked = await open({
+      title: t("winSettings.customPageImport"),
+      multiple: false,
+      filters: [{ name: "Zip", extensions: ["zip"] }],
+    });
+    if (typeof picked !== "string") return;
+    importingCustomPage.value = true;
+    try {
+      customUi.value = await commands.customUi.importPage(picked);
+    } catch (e) {
+      showToast(`${t("winSettings.customUiImportFailed")}${t("common.detailSep")}${tErr(e)}`);
+    } finally {
+      importingCustomPage.value = false;
+    }
+  }
+
+  /** 删除整页包；开关不动，删掉后主窗口回内置界面 */
+  async function removeCustomPage() {
+    try {
+      customUi.value = await commands.customUi.removePage();
+    } catch (e) {
+      showToast(tErr(e));
+    }
+  }
+
+  /** 在文件管理器里打开 custom_ui/ */
+  async function openCustomUiDir() {
+    try {
+      await commands.customUi.openDir();
+    } catch (e) {
+      showToast(tErr(e));
+    }
+  }
+
   // ---------- 恢复默认 ----------
 
   /** 这一片全部属于 gui_config.client，默认值取前端镜像 guiConfig.defaultConfig */
@@ -299,6 +402,14 @@ export function useSettingsClient() {
       case "music":
         client.value.musicOn = d.musicOn;
         client.value.musicSource = d.musicSource;
+        break;
+      case "customCss":
+        // 只恢复开关；已安装的样式是用户的东西，恢复默认不动它
+        client.value.customCssOn = d.customCssOn;
+        break;
+      case "customPage":
+        // 同上：整页包保留，只把开关关掉
+        client.value.customPageOn = d.customPageOn;
         break;
       default:
         return false;
@@ -343,6 +454,17 @@ export function useSettingsClient() {
     importCustomHome,
     openCustomHomeDir,
     removeCustomHome,
+    customUi,
+    importingCustomPage,
+    customPageState,
+    customPageEntry,
+    refreshCustomUi,
+    addCustomCss,
+    setCustomCssEnabled,
+    removeCustomCss,
+    importCustomPage,
+    removeCustomPage,
+    openCustomUiDir,
     load,
     saveState: state,
     resetGroup,

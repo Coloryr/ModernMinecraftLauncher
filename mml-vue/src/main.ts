@@ -1,9 +1,11 @@
 // 应用入口：禁用默认右键菜单，加载 GUI 配置后挂载根组件
 import { createApp, watch } from "vue";
+import * as Vue from "vue";
 import "./styles/index.css";
 import App from "./App.vue";
 import { loadGuiConfig } from "./lib/guiConfig";
-import { initCustomUi } from "./lib/customUi";
+import { initCustomUi, startCustomCss } from "./lib/customUi";
+import { initCustomHome } from "./lib/customHomeUi";
 import { applyTheme, restoreAccent, theme } from "./lib/theme";
 import { applyLocale, locale } from "./lib/i18n";
 import { applyMonacoNls } from "./lib/monacoNls";
@@ -23,6 +25,9 @@ import { setMultiWindow } from "./windows/windowManager";
 import { restoreFontFamily } from "./lib/fonts";
 import { installImageFallback } from "./lib/imageFallback";
 import { vTip } from "./lib/tip";
+
+// 自定义 CSS 包的入口脚本按 IIFE 打包，Vue 从页面全局取，避免包里再打一份
+(window as Window & { __mmlVue?: typeof Vue }).__mmlVue = Vue;
 
 // 图片加载失败的统一兜底：装上要趁早，免得启动过程中先加载的那批图漏掉
 installImageFallback();
@@ -67,8 +72,11 @@ if (import.meta.env.PROD) {
 
 /** 启动引导：GUI 状态由 Rust 的 gui_config.json 提供，浏览器回退本地存储 */
 async function bootstrap() {
-  // 自定义界面先就位：CSS 注入 / 整页模式的地址都从本地状态与开发参数来
-  initCustomUi();
+  // 自定义界面先就位：模式与整页地址都来自后端，必须在挂载前拿到，
+  // 否则整页模式会先闪一下内置界面
+  await initCustomUi();
+  // 自定义主页的组件入口也要在挂载前加载，否则主页会先渲染 iframe / 内置页
+  await initCustomHome();
 
   const cfg = await loadGuiConfig();
   if (cfg) {
@@ -103,6 +111,8 @@ async function bootstrap() {
   watch(locale, (now) => applyMonacoNls(now));
   loadAccounts(); // 账户列表由 Rust 提供（浏览器环境静默跳过）
   createApp(App).directive("tip", vTip).mount("#app");
+  // 入口函数要查挂载后的控件，必须等 mount 完成再放行
+  startCustomCss();
 }
 
 bootstrap();

@@ -3,12 +3,21 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "exports": {
+    "./ui-kit": "./src/generated/ui-kit.ts",
+    "./ui-kit.css": "./src/generated/ui-kit.css",
+    "./ui-kit/controls": "./src/generated/controls.ts",
+    "./ui-kit/windows": "./src/generated/windows.ts",
+    "./ui-kit/components": "./src/generated/components.ts",
+    "./ipc": "./src/ipc.ts"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "lint": "eslint .",
     "test": "node --test \"tests/**/*.test.mjs\"",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "gen": "node scripts/gen-ui.ts"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",
@@ -18,7 +27,7 @@
     "@vue-flow/core": "^1.48.2",
     "dompurify": "^3.4.15",
     "marked": "^18.0.13",
-    "mml-ipc": "file:../mml-ipc",
+    "mml-ipc": "^0.1.0",
     "monaco-editor": "^0.56.0",
     "skinview3d": "^3.4.2",
     "vue": "^3.5.41"
