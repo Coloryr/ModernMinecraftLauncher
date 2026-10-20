@@ -1260,6 +1260,41 @@ impl InstanceSettingObj {
             .await?;
 
         obj.jvm_args.extend(jvm_args);
+
+        // MMC patch 可能没有 assetIndex（net.minecraft 组件没有展开成 patch）。
+        // 不补的话 --assetIndex 为空，游戏找不到资源索引，表现为黑屏 + 所有声音缺失
+        if obj.assets.id.is_empty()
+            && let Some(game) = &vanilla
+            && let Some(asset_index) = &game.asset_index
+        {
+            if assets_path::get_index(asset_index).is_err() {
+                let data = mojang_api::get_assets(&asset_index.url).await?;
+                let assets_obj: AssetsObj = serialize_tools::json_from_bytes(&data)?;
+                if assets_obj.objects.is_empty() {
+                    return Err(ErrorType::DataNotFound(DataNotFoundData::Version(
+                        asset_index.id.clone(),
+                    )));
+                }
+                assets_path::add_index(game, &mut Cursor::new(data));
+            }
+            obj.assets = asset_index.clone();
+        }
+
+        // MMC 的 Cleanroom patch 只提供 tweaker，基础参数（username / accessToken /
+        // gameDir / assets 等）由 net.minecraft 组件提供；导入的 MMC 实例没有把组件
+        // 展开成 patch 时，这里用原版版本补一份，否则 joptsimple 会报缺少 accessToken
+        let has_auth = obj
+            .game_args
+            .iter()
+            .any(|arg| arg == "--username" || arg == "--accessToken");
+        if !has_auth && let Some(game) = &vanilla {
+            if game.is_game_version_v2() {
+                obj.game_args.extend(make_v2_game_arg(game));
+            } else {
+                obj.game_args.extend(make_v1_game_arg(game));
+            }
+        }
+
         obj.game_args.extend(game_args);
 
         // log4j安全处理

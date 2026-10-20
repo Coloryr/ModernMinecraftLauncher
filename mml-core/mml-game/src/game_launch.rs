@@ -6,7 +6,7 @@ use std::{
     process::{Child, Stdio},
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicI32, Ordering},
     },
     thread,
     time::Instant,
@@ -107,8 +107,8 @@ pub(crate) struct InstanceHandle {
     pub uuid: Uuid,
     /// 进程是否已经退出
     is_exit: Arc<AtomicBool>,
-    /// 退出码
-    exit_code: i32,
+    /// 退出码；进程还没退出时是 0
+    exit_code: AtomicI32,
     /// 提权启动时的目标进程 PID，用于强制结束目标进程
     elevated_pid: Option<u32>,
 }
@@ -163,7 +163,7 @@ impl InstanceHandle {
             process,
             uuid: run.uuid,
             is_exit,
-            exit_code: 0,
+            exit_code: AtomicI32::new(0),
             elevated_pid: result.pid,
         })
     }
@@ -210,7 +210,8 @@ impl InstanceHandle {
         };
         if let Some(exit_status) = status {
             exit_clone.store(true, Ordering::SeqCst);
-            let _code = exit_status.code();
+            self.exit_code
+                .store(exit_status.code().unwrap_or(-1), Ordering::SeqCst);
             process_clone.lock().unwrap().take();
         }
     }
@@ -230,7 +231,7 @@ impl InstanceHandle {
     ///
     /// 返回进程退出码
     pub fn code(&self) -> i32 {
-        self.exit_code
+        self.exit_code.load(Ordering::SeqCst)
     }
 }
 

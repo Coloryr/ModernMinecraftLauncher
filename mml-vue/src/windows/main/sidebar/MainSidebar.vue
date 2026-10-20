@@ -685,8 +685,8 @@ function isGroupOpen(id: string) {
   line-height: 1.6;
 }
 
-/* 4 种加载器各一色：蓝 / 黄 / 紫 / 青（色相彼此拉开，一眼能分）。
-   黄是浅底 → 配深字；其余三个深底配白字。
+/* 6 种加载器各一色：蓝 / 黄 / 紫 / 青 / 橙 / 玫红（色相彼此拉开，一眼能分）。
+   黄是浅底 → 配深字；其余深底配白字。
    类名必须与模板里的 `loader-${inst.loader}` 一致（loader-forge / loader-fabric …） */
 .loader-text.loader-forge {
   background: #1d4ed8;
@@ -709,6 +709,18 @@ function isGroupOpen(id: string) {
 .loader-text.loader-neoforge {
   background: #0d9488;
   /* 青 */
+  color: #fff;
+}
+
+.loader-text.loader-cleanroom {
+  background: var(--loader-cleanroom);
+  /* 橙 */
+  color: #fff;
+}
+
+.loader-text.loader-liteloader {
+  background: var(--loader-liteloader);
+  /* 玫红 */
   color: #fff;
 }
 </style>

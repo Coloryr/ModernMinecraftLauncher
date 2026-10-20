@@ -1176,25 +1176,26 @@ async function subscribeEvents() {
       statePct.value = e.progress ?? null;
     }),
     onGameExit((e) => {
+      // 先收状态：后台实例退出时也要把按钮/绿点放开，不能只在选中时才清
+      clearLaunching(e.uuid);
       if (e.uuid !== selected.value?.uuid) return;
       statusText.value =
         e.code === 0 ? t("launch.exited") : t("launch.exitedCode", { code: e.code });
       launchStage.value = "";
       statePct.value = null;
-      clearLaunching(e.uuid);
       // 状态行只在运行中显示，退出之后界面上什么都不剩：非正常退出得说出来
       if (e.code !== 0) showToast(t("launch.exitedCode", { code: e.code }));
       // 这一局的时长 / 次数刚记进内核统计，重拉一次，界面上那行不是启动前的旧值
       void refreshStats();
     }),
     onLaunchError((e) => {
+      if (e.uuid) clearLaunching(e.uuid);
+      // 同上：失败的结论不能只写在那行状态里，它随 running 一起消失
+      showToast(t("launch.error", { msg: e.message }));
       if (e.uuid && e.uuid !== selected.value?.uuid) return;
       statusText.value = t("launch.failed");
       launchStage.value = "";
       statePct.value = null;
-      if (e.uuid) clearLaunching(e.uuid);
-      // 同上：失败的结论不能只写在那行状态里，它随 running 一起消失
-      showToast(t("launch.error", { msg: e.message }));
     }),
     onInstanceChange(() => {
       loadInstances();
@@ -1358,6 +1359,19 @@ async function loadVersions() {
 const launching = ref<Set<string>>(new Set());
 
 /**
+ * 同步实例的运行标记
+ *
+ * - `uuid`: 实例 uuid
+ * - `running`: 是否运行中
+ */
+function setInstanceRunning(uuid: string, running: boolean) {
+  const inst = instances.value.find((i) => i.uuid === uuid);
+  if (inst) inst.running = running;
+  // selected 可能是上一次列表刷新留下的旧对象，按钮读的是它
+  if (selected.value?.uuid === uuid) selected.value.running = running;
+}
+
+/**
  * 记下一次启动尝试，并把该实例的按钮按住
  *
  * - `uuid`: 实例 uuid
@@ -1365,8 +1379,7 @@ const launching = ref<Set<string>>(new Set());
 function markLaunching(uuid: string) {
   // Set 要整体换掉才会触发响应式
   launching.value = new Set(launching.value).add(uuid);
-  const inst = instances.value.find((i) => i.uuid === uuid);
-  if (inst) inst.running = true;
+  setInstanceRunning(uuid, true);
 }
 
 /**
@@ -1380,8 +1393,7 @@ function clearLaunching(uuid: string) {
     next.delete(uuid);
     launching.value = next;
   }
-  const inst = instances.value.find((i) => i.uuid === uuid);
-  if (inst) inst.running = false;
+  setInstanceRunning(uuid, false);
 }
 
 /**
@@ -1397,8 +1409,7 @@ function markStarted(uuid: string) {
     next.delete(uuid);
     launching.value = next;
   }
-  const inst = instances.value.find((i) => i.uuid === uuid);
-  if (inst) inst.running = true;
+  setInstanceRunning(uuid, true);
 }
 
 /** 当前选中实例是否还在启动流程里（进程未起来） */
