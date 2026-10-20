@@ -90,9 +90,10 @@ function psQuote(text: string): string {
 
 /** 用 PowerShell Compress-Archive 打包；返回是否成功 */
 function packWithPowerShell(bin: string): boolean {
+  const paths = entries.map((name) => psQuote(join(root, name))).join(", ");
   const script = [
     "$ErrorActionPreference = 'Stop'",
-    `Compress-Archive -Path ${psQuote(join(root, "*"))} -DestinationPath ${psQuote(zipPath)} -Force`,
+    `Compress-Archive -LiteralPath @(${paths}) -DestinationPath ${psQuote(zipPath)} -Force`,
   ].join("; ");
   return run(bin, ["-NoProfile", "-NonInteractive", "-Command", script]);
 }
