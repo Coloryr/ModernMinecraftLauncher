@@ -189,7 +189,7 @@ pub struct PackItemDto {
 pub struct SaveItemDto {
     /// saves 目录下的目录名，删除 / 备份按此定位
     pub dir: String,
-    /// 世界名字
+    /// 存档名字
     pub level_name: String,
     /// 上次游玩时间，Unix 毫秒，未知为 0
     pub last_played: i64,
@@ -227,7 +227,7 @@ pub struct SaveEditDto {
     pub difficulty: u8,
     /// 是否极限模式
     pub hard_core: bool,
-    /// 世界名字，去空白后不能为空，否则后端返回 `err.saveNameEmpty`
+    /// 存档名字，去空白后不能为空，否则后端返回 `err.saveNameEmpty`
     pub level_name: String,
     /// 地图种子，十进制整数、可带负号
     ///

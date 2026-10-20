@@ -51,7 +51,7 @@ export interface ResourceInstance {
   name: string;
   /** 游戏版本，如 `1.20.1` */
   version: string;
-  /** 是否支持 quick play（1.20+）：存档右键的「进入世界」按它决定给不给 */
+  /** 是否支持 quick play（1.20+）：存档右键的「进入存档」按它决定给不给 */
   quickPlay: boolean;
   /** 加载器标识，如 `neoforge`；原版是 `normal` */
   loader: string;

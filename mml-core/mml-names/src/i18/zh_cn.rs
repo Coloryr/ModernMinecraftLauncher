@@ -8,7 +8,10 @@ use crate::VERSION;
 use crate::{
     i18::I18Lang,
     i18_items::{
-        error_type::{ArgEmptyData, ArgErrorData, DataNotFoundData, ErrorType, SkinBlockErrorData},
+        error_type::{
+            ArgEmptyData, ArgErrorData, DataNotFoundData, ErrorType, NameInvalidData,
+            NameInvalidReason, SkinBlockErrorData,
+        },
         info_type::InfoType,
         panic_type::PanicType,
         thread_type::ThreadType,
@@ -181,6 +184,17 @@ impl I18Lang for ZhCn {
             ErrorType::JavaNotFound => String::from("找不到合适的Java"),
             ErrorType::GpuNotAvailable => String::from("没有可用的 GPU 后端，无法渲染图标"),
             ErrorType::InstanceNameExists(name) => format!("实例名字 {name} 已存在"),
+            ErrorType::NameInvalid(NameInvalidData { name, reason }) => match reason {
+                NameInvalidReason::Empty => String::from("名字不能为空"),
+                NameInvalidReason::IllegalChar(c) => {
+                    format!("名字「{name}」不能包含字符 {}", c.escape_default())
+                }
+                NameInvalidReason::TooLong { len, max } => {
+                    format!("名字「{name}」太长：{len} 个字符，最多 {max} 个")
+                }
+                NameInvalidReason::TrailingDot => format!("名字「{name}」不能以点结尾"),
+                NameInvalidReason::Reserved => format!("名字「{name}」是系统保留名，换一个吧"),
+            },
 
             ErrorType::DownloadFileOverFail(data) => {
                 format!(

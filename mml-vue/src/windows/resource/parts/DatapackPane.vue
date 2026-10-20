@@ -188,7 +188,7 @@ function onMenuPick(id: string) {
 /**
  * 启用状态的显示名：**只有两态**
  *
- * `null`（level.dat 的两个列表里都没有）按**开着**算：世界下次载入时 MC 会把它当启用，
+ * `null`（level.dat 的两个列表里都没有）按**开着**算：存档下次载入时 MC 会把它当启用，
  * 界面上因此不出现"未登记"这一态，只分已启用 / 未启用
  */
 function state(item: DataPackItemDto): string {

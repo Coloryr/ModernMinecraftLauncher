@@ -46,6 +46,7 @@
 //! | [`modpack`] | 整合包安装框架，含 Modrinth 与 CurseForge worker |
 //! | [`modrinth`] | Modrinth 整合包下载安装 |
 //! | [`mojang`] | Mojang 版本数据处理，含版本清单与下载项 |
+//! | [`name_check`] | 实例名 / 分组名的合法性校验 |
 //! | [`other_launcher`] | 其他启动器实例导入，覆盖 HMCL、PCL、官方、MMC |
 //! | [`path_watch`] | 实例目录文件监视 |
 //! | [`player_skin`] | 玩家皮肤获取 |
@@ -112,11 +113,14 @@ pub mod loader;
 pub mod modpack;
 pub mod modrinth;
 pub mod mojang;
+pub mod name_check;
 pub mod other_launcher;
 pub mod path_watch;
 pub mod player_skin;
 pub mod scan_game;
 pub mod serverpack;
+
+pub use name_check::check_name;
 
 #[cfg(test)]
 mod test_support;
@@ -802,12 +806,13 @@ pub(crate) fn remove_instance_record(uuid: &Uuid) {
 ///
 /// # 返回值
 ///
-/// 成功返回 `Ok(())`；名字为空、重复或目录改名失败返回对应错误
+/// 成功返回 `Ok(())`；名字为空、不合法、重复或目录改名失败返回对应错误
 pub fn rename_instance(uuid: &Uuid, name: &str) -> CoreResult<()> {
     let name = name.trim();
     if name.is_empty() {
         return Err(ErrorType::ArgEmpty(ArgEmptyData::Name));
     }
+    name_check::check_name(name)?;
 
     let instance = get_instance(uuid).ok_or(ErrorType::ArgEmpty(ArgEmptyData::UUID))?;
 
@@ -965,6 +970,9 @@ impl InstanceSettingObj {
         group: Option<Uuid>,
     ) -> CoreResult<GameInstance> {
         path_watch::stop_watch();
+
+        // 首尾空白不算名字的一部分，落盘与目录名都用去掉空白后的值
+        self.name = self.name.trim().to_string();
 
         let old = get_instance_by_name(&self.name);
         // 是否覆盖重名实例；无界面或用户拒绝覆盖时改为自动改名，保留原实例

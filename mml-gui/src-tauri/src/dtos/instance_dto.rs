@@ -15,7 +15,7 @@ pub struct InstanceInfoDto {
     pub version: String,
     /// 游戏版本类型：release / snapshot / other
     pub version_type: Option<String>,
-    /// 该版本是否支持 quick play（1.20 及以上）：前端据此决定要不要给「进入世界」入口
+    /// 该版本是否支持 quick play（1.20 及以上）：前端据此决定要不要给「进入存档」入口
     pub quick_play: bool,
     /// 启动后自动进入的存档目录名，即 saves 下的一级目录；`null` 表示没配
     pub auto_save: Option<String>,

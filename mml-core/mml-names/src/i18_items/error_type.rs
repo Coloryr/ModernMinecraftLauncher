@@ -126,6 +126,35 @@ pub struct DownloadFileHashErrorData {
     pub hash: String,
 }
 
+/// 名字不合法的原因
+#[derive(Clone, Debug)]
+pub enum NameInvalidReason {
+    /// 去掉首尾空白后为空
+    Empty,
+    /// 含不允许的字符，值 = 第一个非法字符
+    IllegalChar(char),
+    /// 字符数超过上限
+    TooLong {
+        /// 实际字符数
+        len: usize,
+        /// 允许的最大字符数
+        max: usize,
+    },
+    /// 以点结尾，Windows 会把结尾的点吃掉
+    TrailingDot,
+    /// Windows 保留设备名，如 CON / NUL / COM1
+    Reserved,
+}
+
+/// 名字不合法：实例名 / 分组名等在创建前校验
+#[derive(Clone, Debug)]
+pub struct NameInvalidData {
+    /// 用户输入的名字，原样
+    pub name: String,
+    /// 不合法的原因
+    pub reason: NameInvalidReason,
+}
+
 /// 输入参数为空的种类
 #[derive(Clone, Debug)]
 pub enum ArgEmptyData {
@@ -254,6 +283,8 @@ pub enum ErrorType {
     GpuNotAvailable,
     /// 实例名字已存在，值 = 名字
     InstanceNameExists(String),
+    /// 名字不合法，见 [`NameInvalidData`]
+    NameInvalid(NameInvalidData),
     /// 皮肤方块错误
     SkinBlockError(SkinBlockErrorData),
     /// 找不到合适的Java

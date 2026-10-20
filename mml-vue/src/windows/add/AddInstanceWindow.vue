@@ -508,7 +508,7 @@ const MOCK_FOLDER_FILES = [
   "mods/example-mod-1.0.0.jar",
   "resourcepacks/",
   "saves/",
-  "saves/新世界/level.dat",
+  "saves/新存档/level.dat",
   "logs/",
 ];
 

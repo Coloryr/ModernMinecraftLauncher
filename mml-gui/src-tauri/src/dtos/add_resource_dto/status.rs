@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceSaveDto {
-    /// 世界名，取自 level.dat 里的 LevelName
+    /// 存档名，取自 level.dat 里的 LevelName
     pub name: String,
     /// 存档文件夹名，即 saves/ 下的目录名
     pub dir: String,

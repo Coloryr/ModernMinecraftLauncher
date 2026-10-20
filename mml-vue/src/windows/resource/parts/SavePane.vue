@@ -47,6 +47,24 @@ const props = defineProps<{
 const { saves, instanceUuid, loading, reloadCurrent } = props.data;
 const { busy, act, actLocal, askConfirm, askDelete, openFolder } = props.ops;
 
+/** 1.20+ 才有 quick play，低版本设置了也进不去，列表上方不给这一行 */
+const quickPlay = computed(() => props.data.instance.value?.quickPlay ?? false);
+
+/** 当前配置的自动进入存档目录名；空串表示没配 */
+const autoEnterDir = computed(() => saves.value.find((item) => item.autoEnter)?.dir ?? "");
+
+/**
+ * 在列表上方选自动进入的存档
+ *
+ * - `event`: 下拉的 change 事件，值是存档目录名，空串表示取消
+ */
+function onAutoEnterChange(event: Event) {
+  const dir = (event.target as HTMLSelectElement).value;
+  act(async () => {
+    await api.updateInstance(instanceUuid.value, { autoSave: dir || null });
+  });
+}
+
 function remove(item: SaveItemDto) {
   // 确认框里用**去掉格式码**的名字：那里是纯文本，`§a` 只会显示成乱码
   askDelete(stripFormatting(item.levelName || item.dir), () =>
@@ -121,7 +139,7 @@ function itemMenuItems(item: SaveItemDto): RowMenuItem[] {
   // 「编辑存档」放最前：改模式与难度是这个列表里唯一的"改内容"动作。
   // 损坏的存档置灰：它没有 `Data` 复合标签，后端 set_mode 必然返回 DataNotFound
   const items: RowMenuItem[] = [
-    // 「进入世界」与「自动进入」都依赖 1.20+ 的 quick play，低版本没有等价参数，不给入口
+    // 「进入存档」与「自动进入」都依赖 1.20+ 的 quick play，低版本没有等价参数，不给入口
     ...(props.data.instance.value?.quickPlay
       ? [
           { id: "enter-world", label: t("resource.enterWorld") },
@@ -209,7 +227,7 @@ function onMenuPick(id: string) {
   }
 }
 
-/** 直接进这个世界：后端会把它拼成 `--quickPlaySingleplayer`（1.20+ 才有） */
+/** 直接进这个存档：后端会把它拼成 `--quickPlaySingleplayer`（1.20+ 才有） */
 function enterWorld(item: SaveItemDto) {
   actLocal(async () => {
     if (!(await launchGame(instanceUuid.value, item.dir))) return;
@@ -473,6 +491,19 @@ function saveTip(item: SaveItemDto): string {
     <ListSkeleton />
   </div>
   <VirtualList v-else class="item-list" :count="saves.length" :row-gap="RESOURCE_ROW_GAP">
+    <!-- 自动进入存档：整个实例只有一个目标，列表上方直接选；对应那行有「自动进入」徽标 -->
+    <template v-if="quickPlay && saves.length" #header>
+      <div class="auto-enter-row">
+        <span class="auto-enter-label">{{ t("resource.autoEnter") }}</span>
+        <select class="field-select auto-enter-select" :value="autoEnterDir" :disabled="busy"
+          @change="onAutoEnterChange">
+          <option value="">{{ t("resource.autoEnterNone") }}</option>
+          <option v-for="item in saves" :key="item.dir" :value="item.dir">
+            {{ stripFormatting(item.levelName || item.dir) }}
+          </option>
+        </select>
+      </div>
+    </template>
     <template #default="{ start, end }">
       <ResourceRow v-for="item in saves.slice(start, end)" :key="item.dir" :icon="item.icon" :name="item.levelName || item.dir"
         v-tip.mouse="saveTip(item)" :class="{
@@ -689,5 +720,29 @@ function saveTip(item: SaveItemDto): string {
   flex-shrink: 0;
   color: var(--text-dim);
   font-size: 11.5px;
+}
+
+/* 列表上方的「自动进入存档」选择行：标签不缩，下拉吃满剩余宽度。
+   .field-select 自带 width: 100%，用复合选择器压过它 */
+.auto-enter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.auto-enter-label {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.auto-enter-row .field-select.auto-enter-select {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  padding: 3px 28px 3px 10px;
+  font-size: 13px;
 }
 </style>

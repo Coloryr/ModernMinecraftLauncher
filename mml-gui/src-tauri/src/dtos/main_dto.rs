@@ -211,7 +211,7 @@ pub struct InstanceChangeEvent {
 pub struct AutoSaveTargetDto {
     /// 存档目录名，即 saves 下的一级目录，启动时原样当 quick play 的 level id
     pub dir: String,
-    /// 世界显示名，取 level.dat；读不出来时回落目录名
+    /// 存档显示名，取 level.dat；读不出来时回落目录名
     pub level_name: String,
 }
 

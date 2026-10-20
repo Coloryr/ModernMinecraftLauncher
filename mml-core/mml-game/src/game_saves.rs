@@ -53,7 +53,7 @@ pub struct SaveObj {
     pub game_type: i32,
     /// 是否极限模式，非 0 即开启
     pub hard_core: u8,
-    /// 世界名字，界面上的存档名
+    /// 存档名字，界面上显示它
     pub level_name: String,
     /// 难度：0 和平 / 1 简单 / 2 普通 / 3 困难
     pub difficulty: u8,
@@ -91,7 +91,7 @@ pub struct SaveEditObj {
     pub difficulty: u8,
     /// 是否极限模式
     pub hard_core: bool,
-    /// 世界名字，界面上的存档名
+    /// 存档名字，界面上显示它
     pub level_name: String,
     /// 地图种子
     pub seed: i64,

@@ -6,7 +6,10 @@ use crate::{
     VERSION,
     i18::I18Lang,
     i18_items::{
-        error_type::{ArgEmptyData, ArgErrorData, DataNotFoundData, ErrorType, SkinBlockErrorData},
+        error_type::{
+            ArgEmptyData, ArgErrorData, DataNotFoundData, ErrorType, NameInvalidData,
+            NameInvalidReason, SkinBlockErrorData,
+        },
         info_type::InfoType,
         panic_type::PanicType,
         thread_type::ThreadType,
@@ -190,6 +193,24 @@ impl I18Lang for EnUs {
                 String::from("No available GPU backend for icon rendering")
             }
             ErrorType::InstanceNameExists(name) => format!("Instance name {name} already exists"),
+            ErrorType::NameInvalid(NameInvalidData { name, reason }) => match reason {
+                NameInvalidReason::Empty => String::from("Name cannot be empty"),
+                NameInvalidReason::IllegalChar(c) => {
+                    format!(
+                        "Name \"{name}\" cannot contain the character {}",
+                        c.escape_default()
+                    )
+                }
+                NameInvalidReason::TooLong { len, max } => {
+                    format!("Name \"{name}\" is too long: {len} characters, at most {max}")
+                }
+                NameInvalidReason::TrailingDot => {
+                    format!("Name \"{name}\" cannot end with a dot")
+                }
+                NameInvalidReason::Reserved => {
+                    format!("Name \"{name}\" is reserved by the system; pick another one")
+                }
+            },
 
             ErrorType::DownloadFileOverFail(data) => {
                 format!(

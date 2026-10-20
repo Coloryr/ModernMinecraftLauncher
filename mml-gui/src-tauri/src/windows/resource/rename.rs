@@ -32,6 +32,9 @@ pub fn resource_rename(
     let new_name = new_name.trim().to_string();
     // 新名字也按"纯名字"挡一次，与旧名字同一口径：带分隔符、上跳或空的名字一律拒绝
     check_parent(&new_name)?;
+    // 再按文件名规则挡一次：Windows 非法字符、保留名、结尾的点在这里就报清楚，
+    // 别等 fs::rename 抛一句系统错误
+    mml_game::check_name(&new_name).map_err(|e| e.to_string())?;
     if new_name == name {
         return Ok(());
     }

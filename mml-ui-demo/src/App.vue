@@ -179,7 +179,7 @@ async function refreshInstances() {
   }
 }
 
-/** 启动游戏（main_launch_game；本示例只关心实例 uuid，世界 / 强开 / 自动存档都留空） */
+/** 启动游戏（main_launch_game；本示例只关心实例 uuid，存档目录 / 强开 / 自动存档都留空） */
 async function launch(inst: InstanceInfoDto | null) {
   if (!inst || host.value !== "ready") return;
   launching.value = inst.uuid;

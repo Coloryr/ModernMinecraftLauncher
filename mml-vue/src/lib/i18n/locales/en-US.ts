@@ -559,6 +559,7 @@ export default {
   "resource.saveEdit": "Edit world",
 "resource.enterWorld": "Enter world",
   "resource.autoEnter": "Auto enter",
+  "resource.autoEnterNone": "Don't auto enter",
   "resource.autoEnterOn": "Auto enter on launch",
   "resource.autoEnterOff": "Stop auto-entering",
 "resource.enterWorldStarted": "Starting the game; it will load that world",

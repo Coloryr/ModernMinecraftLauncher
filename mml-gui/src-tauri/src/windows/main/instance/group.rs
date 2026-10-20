@@ -20,14 +20,15 @@ use crate::windows::main::{emit_instance_change, model};
 /// 新建的空分组下一次 `getGroups` 就被内核列表覆盖掉了。
 ///
 /// - `app`: 应用句柄，用于发变更事件
-/// - `name`: 分组名；空名或重名都不建组
+/// - `name`: 分组名；重名不建组
 ///
 /// # 返回值
 ///
-/// 返回新分组的 uuid；名字为空或重名返回 `None`，前端据此提示"已存在"
+/// 返回新分组的 uuid；名字不合法返回 `Err`，重名返回 `None`，前端据此提示"已存在"
 #[gui_macros::ipc_group("main")]
 #[gui_macros::command]
 pub fn main_add_group(app: AppHandle, name: String) -> Result<Option<String>, String> {
+    mml_game::check_name(&name).map_err(|e| e.to_string())?;
     let Some(uuid) = mml_game::add_group(&name) else {
         return Ok(None);
     };

@@ -44,6 +44,11 @@ pub async fn add_import_folder(
     } = prepare(&window)?;
     // 前端传的是分组 uuid；空 / 非法 = 默认分组
     let group = crate::windows::parse_group_id(group);
+    // 用户填了名字就先挡一次：空名照旧交给内核按目录 / 包名定
+    let name = name.filter(|item| !item.trim().is_empty());
+    if let Some(name) = &name {
+        mml_game::check_name(name).map_err(|e| e.to_string())?;
+    }
     // 安装 future 非 Send：阻塞线程 block_on；读锁在块内释放后再发事件
     let gui = instance_gui(&window);
     let res = tauri::async_runtime::spawn_blocking(move || {
@@ -101,6 +106,9 @@ pub async fn add_import_archive(
     let pack = parse_pack_type(&pack_type)?;
     let gui = instance_gui(&window);
     let name = name.filter(|item| !item.trim().is_empty());
+    if let Some(name) = &name {
+        mml_game::check_name(name).map_err(|e| e.to_string())?;
+    }
 
     // 整合包：进度回调换成任务那一份 —— 本窗口的安装进度弹窗不再出现，
     // 进度改由标题栏的整合包指示器 / 进度弹窗显示，与在线安装一致
@@ -187,6 +195,10 @@ pub async fn add_import_url(
     let group = crate::windows::parse_group_id(group);
     let gui = instance_gui(&window);
     let progress = pack_gui(&window);
+    let name = name.filter(|item| !item.trim().is_empty());
+    if let Some(name) = &name {
+        mml_game::check_name(name).map_err(|e| e.to_string())?;
+    }
     let uuid = tauri::async_runtime::spawn_blocking(move || {
         tauri::async_runtime::block_on(async {
             add_game::install_archive_from_url(
@@ -214,7 +226,7 @@ pub async fn add_import_url(
 ///
 /// - `window`: 调用方窗口，用于取本窗口模型登记任务
 /// - `app`: 应用句柄，用于发实例变更事件
-/// - `name`: 实例名
+/// - `name`: 实例名，校验失败直接返回 `Err`
 /// - `version`: 游戏版本号
 /// - `loader`: 加载器 ID，取值见 `add_get_loaders`
 /// - `loader_version`: 加载器版本，缺省为无
@@ -234,6 +246,8 @@ pub async fn add_create_new(
     loader_version: Option<String>,
     group: Option<String>,
 ) -> Result<String, String> {
+    mml_game::check_name(&name).map_err(|e| e.to_string())?;
+
     let PreparedTask {
         model: _store,
         token: _token,

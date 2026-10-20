@@ -238,7 +238,7 @@ async function load() {
     instanceName.value = found?.name ?? "";
     worlds.value = found ? await listSaves(found.uuid) : [];
 
-    // "聚焦某个存档"的跳转（资源窗口右键存档 → 修改配置文件），跟世界名对上就套到来源上。
+    // "聚焦某个存档"的跳转（资源窗口右键存档 → 修改配置文件），跟存档名对上就套到来源上。
     // 单窗口模式读完就地清掉，别让普通跳转再把它带回来；多窗口模式参数是本窗口 URL 的一
     // 部分，随窗口留着。存档列表里没有的名字套不上，来源保持原样
     const saveDir = targetSaveDir();

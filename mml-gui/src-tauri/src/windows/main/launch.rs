@@ -141,7 +141,7 @@ pub async fn main_launch_game(
         None => None,
     };
     let auto = if explicit.is_some() {
-        // 明确点了"进入世界"就只认这个存档：找不到时直接报错，别悄悄换成进服 / 什么都不进
+        // 明确点了"进入存档"就只认这个存档：找不到时直接报错，别悄悄换成进服 / 什么都不进
         match save {
             Some(save) => AutoJoinType::Save(Arc::new(save)),
             None => return Err(err_keys::WORLD_GONE.to_string()),

@@ -1152,7 +1152,7 @@ const { init: initModpackStatus } = useModpackStatus(false, adoptAddedInstance);
 async function subscribeEvents() {
   const fns = await Promise.all([
     onLaunchState((e) => {
-      // 启动可能来自别处（资源窗口右键「进入世界」）：状态事件到了就置成启动中，
+      // 启动可能来自别处（资源窗口右键「进入存档」）：状态事件到了就置成启动中，
       // 否则主界面不知道有人在启动，按钮一直停在「启动游戏」
       markLaunching(e.uuid);
       if (e.uuid !== selected.value?.uuid) return;
@@ -1458,18 +1458,23 @@ async function createGroup() {
   }
   groupAdding.value = true;
   groupError.value = "";
-  const uuid = await api.addGroup(groupName.value.trim());
-  if (!uuid) {
-    groupError.value = t("group.exists");
+  try {
+    const uuid = await api.addGroup(groupName.value.trim());
+    if (!uuid) {
+      groupError.value = t("group.exists");
+      return;
+    }
+    groupName.value = "";
+    showAddGroup.value = false;
+    await loadGroups();
+    // 新组默认是展开的，别让用户以为没建上
+    collapsedGroups.value = { ...collapsedGroups.value, [uuid]: false };
+  } catch (e) {
+    // 名字不合法等后端校验失败，直接显示后端文案
+    groupError.value = tErr(e);
+  } finally {
     groupAdding.value = false;
-    return;
   }
-  groupAdding.value = false;
-  groupName.value = "";
-  showAddGroup.value = false;
-  await loadGroups();
-  // 新组默认是展开的，别让用户以为没建上
-  collapsedGroups.value = { ...collapsedGroups.value, [uuid]: false };
 }
 
 // ================= 生命周期 =================

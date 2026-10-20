@@ -5,7 +5,7 @@ use crate::urls;
 /// 生成 Chunkbase 网址
 ///
 /// - `version`: 游戏版本
-/// - `seed`: 世界种子
+/// - `seed`: 存档种子
 /// - `islb`: 是否为巨型生物群系
 ///
 /// # 返回值

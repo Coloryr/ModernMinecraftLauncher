@@ -104,6 +104,7 @@ pub fn main_rename_instance(
     if n.is_empty() {
         return Ok(false);
     }
+    mml_game::check_name(&n).map_err(|e| e.to_string())?;
     // 改名就是改实例目录名，正忙时同样不许，见 ensure_idle
     if let Ok(id) = Uuid::parse_str(&uuid) {
         ensure_idle(&id)?;
