@@ -209,7 +209,8 @@ function flush(pkg: PackageState) {
 /** 包被关闭 / 删除 / 换脚本时收尾：跑清理、移除脚本 */
 function teardown(pkg: PackageState) {
   pkg.pending.length = 0;
-  for (const fn of pkg.cleanups.splice(0)) {
+  // 同一控件可能被连续替换，按相反顺序撤销才能回到最初状态。
+  for (const fn of pkg.cleanups.splice(0).reverse()) {
     try {
       fn();
     } catch (err) {
@@ -251,13 +252,30 @@ function replaceControl(
     const textNode = Array.from(el.childNodes).find(
       (node) => node.nodeType === Node.TEXT_NODE && (node.textContent ?? "").trim() !== "",
     );
-    if (textNode) textNode.textContent = options.text;
-    else el.textContent = options.text;
+    if (textNode) {
+      const previous = textNode.textContent;
+      onCleanup(() => { textNode.textContent = previous; });
+      textNode.textContent = options.text;
+    } else {
+      // 保留原节点，恢复时不丢失子控件的事件监听与状态。
+      const children = Array.from(el.childNodes);
+      onCleanup(() => { el.replaceChildren(...children); });
+      el.textContent = options.text;
+    }
   }
   if (options.className) {
-    for (const name of options.className.split(/\s+/)) if (name) el.classList.add(name);
+    const added = options.className.split(/\s+/).filter((name) => name && !el.classList.contains(name));
+    onCleanup(() => { el.classList.remove(...added); });
+    el.classList.add(...added);
   }
-  if (options.style) Object.assign((el as HTMLElement).style, options.style);
+  if (options.style) {
+    const previous = el.getAttribute("style");
+    onCleanup(() => {
+      if (previous === null) el.removeAttribute("style");
+      else el.setAttribute("style", previous);
+    });
+    Object.assign((el as HTMLElement).style, options.style);
+  }
   return el;
 }
 
