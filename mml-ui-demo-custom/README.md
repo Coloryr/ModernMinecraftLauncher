@@ -13,8 +13,10 @@
 
 - 回调由 mml-vue 在 `createApp().mount()` 之前加载并注册，窗口第一帧就是替换后的。
 - `ReplaceWindow` 从 `window.__mmlWindows.main` 取宿主里的内置主窗口直接渲染，
-  不把 MainWindow 再打一份进主题包；`custom.js` 约 3 KB。
+  不把 MainWindow 再打一份进主题包；`custom.js` 约 26 KB。
 - 右下角按钮和面板是主题新增的内容；主窗口的数据、启动、标题栏拖动都还是内置实现。
+- 「主题按钮」通过 `createCommands` 调 `window_get_gui_config` / `window_save_gui_config`
+  切换亮 / 暗主题，按钮本身不是直接写 `window.mml.invoke`。
 - 只替换 `main`，设置 / 下载 / 资源管理等窗口返回 `null`，继续用内置页面。
 
 ## 构建
