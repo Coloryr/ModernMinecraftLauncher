@@ -59,7 +59,7 @@ const transport: Invoke = (cmd, args) => invoke(cmd, args ?? undefined);
  * 类型化命令表，按启动器窗口分组
  *
  * 用法与启动器自己的前端一致，如 `commands.main.getInstances()`、
- * `commands.main.launchGame(uuid, null)`；传错参数或缺参数会在编译期报错。
+ * `commands.main.launchGame(uuid, null, null, null)`；传错参数或缺参数会在编译期报错。
  */
 export const commands = createCommands(transport);
 

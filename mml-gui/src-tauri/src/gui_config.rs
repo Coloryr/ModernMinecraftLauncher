@@ -286,6 +286,8 @@ pub struct ClientConfig {
     pub auto_join: bool,
     /// 启动实例时检查账户是否已被其它运行中的实例占用
     pub account_check: bool,
+    /// 实例配了"启动后自动进入存档"时，启动前是否弹窗确认
+    pub auto_save_notice: bool,
     /// 游戏自动进服地址，host 或 host:port；空串表示不自动进服
     pub auto_join_server: String,
     /// MOTD 显示地址，host 或 host:port；空串表示不显示真实服务器信息
@@ -311,7 +313,8 @@ pub struct ClientConfig {
 }
 
 impl Default for ClientConfig {
-    /// 默认：不开 MOTD 卡片、不锁登录方式、不自动进服、三种自定义界面都不启用
+    /// 默认：不开 MOTD 卡片、不锁登录方式、不自动进服、三种自定义界面都不启用；
+    /// 自动进入存档的启动提醒默认开
     fn default() -> Self {
         Self {
             motd_card: false,
@@ -320,6 +323,7 @@ impl Default for ClientConfig {
             login_lock: Vec::new(),
             auto_join: false,
             account_check: true,
+            auto_save_notice: true,
             auto_join_server: String::new(),
             motd_server: String::new(),
             lock_instance: String::new(),

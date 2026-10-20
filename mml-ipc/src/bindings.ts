@@ -4,7 +4,7 @@
 // 传输层不在这里绑定：createCommands 接收调用方传入的 invoke。
 
 import type { Invoke } from "./invoke";
-import type { AccountStoreDto, AccountStoreViewDto, BgInfoDto, BlockGroupsDto, BlockItemDto, BlockStatusDto, BytesSliceDto, ChunkFindDto, CollectDataDto, ColorMcInfoDto, ColorMcReportDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, CustomCssItemDto, CustomHomeInfoDto, CustomJsonItemDto, CustomUiInfoDto, DataPackItemDto, DepProblemDto, DetectedPackDto, DirEntry, DownloadStatusDto, DropPathDto, ExportConfigDto, ExportEntryDto, ExportInfoDto, FileItemDto, FileListDto, FolderInstanceDto, GroupDto, GuiConfigDto, IconSourceDto, InstanceArgsDto, InstanceInfoDto, InstanceLangDto, InstancePatch, JavaDownloadItemDto, JavaDownloadOptionsDto, JavaInfoDto, JavaTypes, LaunchSettingDto, LoadState, LogLine, LogSettingDto, McaChunkDto, ModAutoMarkDto, ModDepTreeDto, ModGroupDto, ModItemDto, ModPackStatusDto, ModPackUpdateDto, ModRenameDto, ModUpdateApplyDto, ModUpdateCheckDto, ModUpdateProjectDto, MotdDto, NbtEditDto, NetworkSettingDto, NewsItem, PackItemDto, ProjectDetailDto, ProjectDto, ProjectItemDto, ResourceDependencyDto, ResourceDropDto, ResourceSaveDto, ResourceStatusDto, ResourceViewDto, RunArgSettingDto, SaveBackupDto, SaveEditDto, SaveItemDto, SchematicDetailDto, SchematicItemDto, ScreenshotItemDto, ServerItemDto, SettingsDefaultsDto, ShaderItemDto, StartArgDto, StatsDataDto, SystemMemoryDto, TexturesDto, VersionInfoDto, WindowSettingDto, WindowSizeDto } from "./types";
+import type { AccountStoreDto, AccountStoreViewDto, AutoSaveTargetDto, BgInfoDto, BlockGroupsDto, BlockItemDto, BlockStatusDto, BytesSliceDto, ChunkFindDto, CollectDataDto, ColorMcInfoDto, ColorMcReportDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, CustomCssItemDto, CustomHomeInfoDto, CustomJsonItemDto, CustomUiInfoDto, DataPackItemDto, DepProblemDto, DetectedPackDto, DirEntry, DownloadStatusDto, DropPathDto, ExportConfigDto, ExportEntryDto, ExportInfoDto, FileItemDto, FileListDto, FolderInstanceDto, GroupDto, GuiConfigDto, IconSourceDto, InstanceArgsDto, InstanceInfoDto, InstanceLangDto, InstancePatch, JavaDownloadItemDto, JavaDownloadOptionsDto, JavaInfoDto, JavaTypes, LaunchSettingDto, LoadState, LogLine, LogSettingDto, McaChunkDto, ModAutoMarkDto, ModDepTreeDto, ModGroupDto, ModItemDto, ModPackStatusDto, ModPackUpdateDto, ModRenameDto, ModUpdateApplyDto, ModUpdateCheckDto, ModUpdateProjectDto, MotdDto, NbtEditDto, NetworkSettingDto, NewsItem, PackItemDto, ProjectDetailDto, ProjectDto, ProjectItemDto, ResourceDependencyDto, ResourceDropDto, ResourceSaveDto, ResourceStatusDto, ResourceViewDto, RunArgSettingDto, SaveBackupDto, SaveEditDto, SaveItemDto, SchematicDetailDto, SchematicItemDto, ScreenshotItemDto, ServerItemDto, SettingsDefaultsDto, ShaderItemDto, StartArgDto, StatsDataDto, SystemMemoryDto, TexturesDto, VersionInfoDto, WindowSettingDto, WindowSizeDto } from "./types";
 
 export * from "./types";
 
@@ -178,6 +178,7 @@ export function createCommands(invoke: Invoke) {
     },
     main: {
       addGroup: (name: string) => invoke<string | null>("main_add_group", { name }),
+      autoSaveTarget: (uuid: string) => invoke<AutoSaveTargetDto | null>("main_auto_save_target", { uuid }),
       createInstance: (name: string, version: string, loader: string | null, loaderVersion: string | null, group: string | null, modpackType: string | null, source: string | null) => invoke<InstanceInfoDto>("main_create_instance", { name, version, loader, loaderVersion, group, modpackType, source }),
       deleteInstance: (uuid: string) => invoke<boolean>("main_delete_instance", { uuid }),
       getCustomJson: (uuid: string) => invoke<CustomJsonItemDto[]>("main_get_custom_json", { uuid }),
@@ -192,7 +193,7 @@ export function createCommands(invoke: Invoke) {
       getSystemMemory: () => invoke<SystemMemoryDto>("main_get_system_memory"),
       getVersions: () => invoke<VersionInfoDto[]>("main_get_versions"),
       imageBaseUrl: () => invoke<string>("main_image_base_url"),
-      launchGame: (uuid: string, world: string | null, force: boolean | null) => invoke<void>("main_launch_game", { uuid, world, force }),
+      launchGame: (uuid: string, world: string | null, force: boolean | null, autoSave: boolean | null) => invoke<void>("main_launch_game", { uuid, world, force, autoSave }),
       loadState: () => invoke<LoadState>("main_load_state"),
       moveGroup: (uuid: string, index: number) => invoke<boolean>("main_move_group", { uuid, index }),
       moveInstance: (uuid: string, group: string | null, index: number) => invoke<boolean>("main_move_instance", { uuid, group, index }),

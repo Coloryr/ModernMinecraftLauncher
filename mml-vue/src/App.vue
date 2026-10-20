@@ -30,6 +30,7 @@ import ModpackPopup from "./components/ModpackPopup.vue";
 import ResourcePopup from "./components/ResourcePopup.vue";
 import CustomUiPage from "./components/CustomUiPage.vue";
 import AccountLockModal from "./components/AccountLockModal.vue";
+import AutoSaveModal from "./components/AutoSaveModal.vue";
 
 applyTheme();
 applyLocale();
@@ -230,4 +231,6 @@ const closeAskButton = computed(() =>
 
   <!-- 账户占用确认：任何窗口里点启动都可能弹，所以挂在根上 -->
   <AccountLockModal />
+  <!-- 启动后自动进入存档的确认，与上面同理 -->
+  <AutoSaveModal />
 </template>

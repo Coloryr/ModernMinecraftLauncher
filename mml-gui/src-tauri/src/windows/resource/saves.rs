@@ -30,15 +30,17 @@ pub async fn resource_list_saves(uuid: String) -> Result<Vec<SaveItemDto>, Strin
     let list = load_saves(instance.clone()).await?;
 
     // 备份索引只读一次，不是每个存档读一遍：存档 → 备份数
-    let counts: HashMap<String, u32> = {
+    let (counts, auto_save) = {
         let game = instance.read().unwrap();
-        game.get_backups()
+        let counts: HashMap<String, u32> = game
+            .get_backups()
             .map(|info| {
                 info.values()
                     .map(|item| (item.dir.clone(), item.back.len() as u32))
                     .collect()
             })
-            .unwrap_or_default()
+            .unwrap_or_default();
+        (counts, game.auto_save.clone().unwrap_or_default())
     };
 
     Ok(list
@@ -64,6 +66,7 @@ pub async fn resource_list_saves(uuid: String) -> Result<Vec<SaveItemDto>, Strin
                 seed: item.random_seed.to_string(),
                 icon: data_url(icon.as_ref()),
                 backups: counts.get(&dir).copied().unwrap_or(0),
+                auto_enter: !auto_save.is_empty() && auto_save == dir,
             })
         })
         .collect())

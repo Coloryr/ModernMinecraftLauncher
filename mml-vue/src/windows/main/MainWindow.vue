@@ -1050,6 +1050,7 @@ const clientConfig = ref<ClientConfig>({
   loginLock: [],
   autoJoin: false,
   accountCheck: true,
+  autoSaveNotice: true,
   autoJoinServer: "",
   motdServer: "",
   lockInstance: "",

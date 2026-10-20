@@ -102,6 +102,7 @@ const DEMO_INSTANCES: InstanceInfoDto[] = [
     version: "1.20.1",
     versionType: "release",
     quickPlay: false,
+    autoSave: null,
     loader: "fabric",
     loaderVersion: "0.15.11",
     dir: "（示例数据）",
@@ -122,6 +123,7 @@ const DEMO_INSTANCES: InstanceInfoDto[] = [
     version: "1.21.1",
     versionType: "release",
     quickPlay: false,
+    autoSave: null,
     loader: "",
     loaderVersion: null,
     dir: "（示例数据）",
@@ -177,13 +179,13 @@ async function refreshInstances() {
   }
 }
 
-/** 启动游戏（main_launch_game，参数是实例 uuid） */
+/** 启动游戏（main_launch_game；本示例只关心实例 uuid，世界 / 强开 / 自动存档都留空） */
 async function launch(inst: InstanceInfoDto | null) {
   if (!inst || host.value !== "ready") return;
   launching.value = inst.uuid;
   error.value = "";
   try {
-    await commands.main.launchGame(inst.uuid, null);
+    await commands.main.launchGame(inst.uuid, null, null, null);
     inst.running = true;
     log(`已请求启动：${inst.name}`);
   } catch (err) {

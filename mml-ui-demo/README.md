@@ -62,7 +62,7 @@ window.mml = {
 
   ```ts
   const list = await commands.main.getInstances();
-  await commands.main.launchGame(uuid, null);
+  await commands.main.launchGame(uuid, null, null, null);
   onLaunchState((e) => { /* 启动阶段与进度 */ });
   ```
 

@@ -190,6 +190,8 @@ pub struct ClientConfigDto {
     pub auto_join: bool,
     /// 启动实例时检查账户是否已被其它实例占用
     pub account_check: bool,
+    /// 实例配了自动进入存档时，启动前是否弹窗确认
+    pub auto_save_notice: bool,
     /// 游戏自动进服地址，host 或 host:port，空串表示不自动进服
     pub auto_join_server: String,
     /// MOTD 显示地址，host 或 host:port，空串表示不显示真实服务器信息
@@ -230,6 +232,7 @@ impl From<ClientConfig> for ClientConfigDto {
             login_lock: c.login_lock.into_iter().map(Into::into).collect(),
             auto_join: c.auto_join,
             account_check: c.account_check,
+            auto_save_notice: c.auto_save_notice,
             auto_join_server: c.auto_join_server,
             motd_server: c.motd_server,
             lock_instance: c.lock_instance,
@@ -261,6 +264,7 @@ impl From<ClientConfigDto> for ClientConfig {
             login_lock: c.login_lock.into_iter().map(Into::into).collect(),
             auto_join: c.auto_join,
             account_check: c.account_check,
+            auto_save_notice: c.auto_save_notice,
             auto_join_server: c.auto_join_server,
             motd_server: c.motd_server,
             lock_instance: c.lock_instance,
@@ -384,6 +388,7 @@ impl From<GuiConfig> for GuiConfigDto {
                 login_lock: c.client.login_lock.into_iter().map(Into::into).collect(),
                 auto_join: c.client.auto_join,
                 account_check: c.client.account_check,
+                auto_save_notice: c.client.auto_save_notice,
                 auto_join_server: c.client.auto_join_server,
                 motd_server: c.client.motd_server,
                 lock_instance: c.client.lock_instance,
@@ -461,6 +466,7 @@ impl From<GuiConfigDto> for GuiConfig {
                 login_lock: d.client.login_lock.into_iter().map(Into::into).collect(),
                 auto_join: d.client.auto_join,
                 account_check: d.client.account_check,
+                auto_save_notice: d.client.auto_save_notice,
                 auto_join_server: d.client.auto_join_server,
                 motd_server: d.client.motd_server,
                 lock_instance: d.client.lock_instance,

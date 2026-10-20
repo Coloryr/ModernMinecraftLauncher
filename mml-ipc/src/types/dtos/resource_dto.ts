@@ -78,6 +78,7 @@ export type SaveItemDto = {
   seed: string,
   icon: string,
   backups: number,
+  autoEnter: boolean,
 };
 
 export type SaveEditDto = {

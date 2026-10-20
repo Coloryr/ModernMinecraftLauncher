@@ -559,6 +559,9 @@ export default {
   // 编辑存档弹窗：名字 / 模式 / 难度 / 极限 / 种子，写回该存档的 level.dat
   "resource.saveEdit": "编辑存档",
 "resource.enterWorld": "进入世界",
+  "resource.autoEnter": "自动进入",
+  "resource.autoEnterOn": "启动时自动进入",
+  "resource.autoEnterOff": "取消自动进入",
 "resource.enterWorldStarted": "正在启动游戏，稍后自动进入该存档",
   "resource.saveNameField": "名字",
   "resource.saveModeField": "游戏模式",
@@ -945,6 +948,12 @@ export default {
   "accountLock.keep": "继续检测账户占用",
   "accountLock.cancel": "取消启动",
   "accountLock.continue": "继续启动",
+  "autoSave.title": "启动后自动进入存档",
+  "autoSave.desc": "该实例配置了启动后自动进入存档「{name}」。这次要直接进入吗？",
+  "autoSave.notice": "不再提醒",
+  "autoSave.disable": "取消该实例自动进入存档",
+  "autoSave.skip": "不进入",
+  "autoSave.enter": "进入存档",
   "err.uuidEmpty": "UUID 不能为空",
   "err.uuidConflict": "UUID 与现有账户冲突",
   "account.noAvatar": "无头像",
@@ -1255,6 +1264,10 @@ export default {
   "winSettings.instanceLockOnDesc": "选定后玩家只能启动这个实例",
   "winSettings.instanceLockNone": "不锁定",
   "winSettings.instanceLockMissing": "锁定的实例已不存在",
+  // 自动进入存档
+  "winSettings.secAutoSave": "自动进入存档",
+  "winSettings.autoSaveNotice": "启动时提示",
+  "winSettings.autoSaveNoticeDesc": "实例配置了启动后自动进入某个存档时，先弹窗确认。关掉后启动直接进入，不再询问。",
   // 自定义音乐
   "winSettings.secMusic": "自定义音乐",
   "winSettings.musicDesc": "给启动器配一首自己的背景音乐；播放、暂停、停止的入口在标题栏。",

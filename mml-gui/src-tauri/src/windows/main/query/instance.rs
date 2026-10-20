@@ -36,6 +36,7 @@ pub fn main_get_instances() -> Vec<InstanceInfoDto> {
                 version: inst.version.clone(),
                 version_type: Some(inst.game_type.id().to_string()),
                 quick_play: mml_base::version_parse::is_game_version_120(&inst.version),
+                auto_save: inst.auto_save.clone(),
                 loader: String::from(inst.loader.id()),
                 loader_version: inst.loader_version.clone(),
                 dir: inst.dir.clone(),

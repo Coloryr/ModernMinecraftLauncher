@@ -205,6 +205,16 @@ pub struct InstanceChangeEvent {
     pub r#type: String,
 }
 
+/// 启动前确认的自动进入存档
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoSaveTargetDto {
+    /// 存档目录名，即 saves 下的一级目录，启动时原样当 quick play 的 level id
+    pub dir: String,
+    /// 世界显示名，取 level.dat；读不出来时回落目录名
+    pub level_name: String,
+}
+
 /// 实例更新补丁，即前端 Partial<InstanceInfoDto> 的 IPC 形态
 ///
 /// 字段缺失 = 不改；`null` = 清空，仅标注 `double_option` 的字段支持。
@@ -221,6 +231,12 @@ pub struct InstancePatch {
     pub group: Option<Option<String>>,
     /// 实例名
     pub name: Option<String>,
+    /// 启动后自动进入的存档目录名；`Some(None)` = 取消自动进入，字段缺失 = 不改
+    ///
+    /// **必须带 `double_option`**：否则前端发 `{ autoSave: null }` 表示"取消"时
+    /// 会被 serde 解成外层 `None`，被当成"这个字段不修改"，取消失效。
+    #[serde(default, deserialize_with = "double_option")]
+    pub auto_save: Option<Option<String>>,
     /// 游戏版本号
     pub version: Option<String>,
     /// 游戏版本类型

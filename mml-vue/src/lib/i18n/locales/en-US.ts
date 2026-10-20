@@ -558,6 +558,9 @@ export default {
   // Edit-world dialog: name / mode / difficulty / hardcore / seed, written back to level.dat
   "resource.saveEdit": "Edit world",
 "resource.enterWorld": "Enter world",
+  "resource.autoEnter": "Auto enter",
+  "resource.autoEnterOn": "Auto enter on launch",
+  "resource.autoEnterOff": "Stop auto-entering",
 "resource.enterWorldStarted": "Starting the game; it will load that world",
   "resource.saveNameField": "Name",
   "resource.saveModeField": "Game mode",
@@ -944,6 +947,12 @@ export default {
   "accountLock.keep": "Keep checking account usage",
   "accountLock.cancel": "Cancel launch",
   "accountLock.continue": "Continue",
+  "autoSave.title": "Auto enter a save",
+  "autoSave.desc": "This instance is set to enter the save \"{name}\" after launch. Enter it this time?",
+  "autoSave.notice": "Don't ask again",
+  "autoSave.disable": "Stop auto-entering for this instance",
+  "autoSave.skip": "Don't enter",
+  "autoSave.enter": "Enter save",
   "err.uuidEmpty": "UUID cannot be empty",
   "err.uuidConflict": "UUID conflicts with an existing account",
   "account.noAvatar": "No avatar",
@@ -1254,6 +1263,10 @@ export default {
   "winSettings.instanceLockOnDesc": "Players can only launch this instance",
   "winSettings.instanceLockNone": "No lock",
   "winSettings.instanceLockMissing": "The locked instance no longer exists",
+  // Auto enter save
+  "winSettings.secAutoSave": "Auto enter save",
+  "winSettings.autoSaveNotice": "Ask before entering",
+  "winSettings.autoSaveNoticeDesc": "Ask before entering the save an instance is set to open on launch. When off, the launcher enters it directly without asking.",
   // Custom music
   "winSettings.secMusic": "Custom music",
   "winSettings.musicDesc": "Play your own background music in the launcher; play, pause and stop live in the title bar.",

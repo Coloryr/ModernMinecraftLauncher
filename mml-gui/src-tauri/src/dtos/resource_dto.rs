@@ -213,6 +213,8 @@ pub struct SaveItemDto {
     /// 由后端从备份索引里数出来，一次 JSON 读取；前端据此决定**要不要显示「还原」按钮** ——
     /// 没有备份的存档给个点不动的还原按钮没有意义。
     pub backups: u32,
+    /// 是不是实例配置的"启动后自动进入"存档，列表里要给个标记
+    pub auto_enter: bool,
 }
 
 /// 「编辑存档」提交的新信息，见 `resource_save_edit`

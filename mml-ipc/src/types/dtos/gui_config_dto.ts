@@ -54,6 +54,7 @@ export type ClientConfigDto = {
   loginLock: LoginLockItemDto[],
   autoJoin: boolean,
   accountCheck: boolean,
+  autoSaveNotice: boolean,
   autoJoinServer: string,
   motdServer: string,
   lockInstance: string,

@@ -121,9 +121,15 @@ function itemMenuItems(item: SaveItemDto): RowMenuItem[] {
   // 「编辑存档」放最前：改模式与难度是这个列表里唯一的"改内容"动作。
   // 损坏的存档置灰：它没有 `Data` 复合标签，后端 set_mode 必然返回 DataNotFound
   const items: RowMenuItem[] = [
-    // 「进入世界」= 1.20+ 的 quick play，直接进这个世界；低版本没有等价参数，不给入口
+    // 「进入世界」与「自动进入」都依赖 1.20+ 的 quick play，低版本没有等价参数，不给入口
     ...(props.data.instance.value?.quickPlay
-      ? [{ id: "enter-world", label: t("resource.enterWorld") }]
+      ? [
+          { id: "enter-world", label: t("resource.enterWorld") },
+          {
+            id: "auto-enter",
+            label: item.autoEnter ? t("resource.autoEnterOff") : t("resource.autoEnterOn"),
+          },
+        ]
       : []),
     { id: "edit", label: t("resource.saveEdit"), disabled: item.broken },
     // 「修改配置文件」开配置窗口，直接落到这个存档的文件树：
@@ -175,6 +181,9 @@ function onMenuPick(id: string) {
     case "enter-world":
       void enterWorld(item);
       break;
+    case "auto-enter":
+      toggleAutoEnter(item);
+      break;
     case "edit":
       openEdit(item);
       break;
@@ -206,6 +215,17 @@ function enterWorld(item: SaveItemDto) {
     if (!(await launchGame(instanceUuid.value, item.dir))) return;
     // 启动交给后台任务，这里立刻返回：说一句，别让人以为没反应
     showToast(t("resource.enterWorldStarted"));
+  });
+}
+
+/**
+ * 把某个存档设为该实例的自动进入存档，已经是就取消
+ *
+ * - `item`: 存档条目
+ */
+function toggleAutoEnter(item: SaveItemDto) {
+  act(async () => {
+    await api.updateInstance(instanceUuid.value, { autoSave: item.autoEnter ? null : item.dir });
   });
 }
 
@@ -470,6 +490,8 @@ function saveTip(item: SaveItemDto): string {
           <FormattedText :text="item.levelName || item.dir" />
         </template>
         <template #badges>
+          <!-- 实例配了启动后自动进入这个存档，给个标记 -->
+          <span v-if="item.autoEnter" class="badge badge-on">{{ t("resource.autoEnter") }}</span>
           <span v-if="item.broken" class="badge badge-red">{{ t("resource.broken") }}</span>
           <span v-if="item.hardCore" class="badge badge-red">Hardcore</span>
           <!-- 有备份才给还原入口：没有备份的存档点还原只会弹一句"还没有备份" -->

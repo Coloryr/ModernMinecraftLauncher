@@ -71,9 +71,15 @@ export type InstanceChangeEvent = {
   type: string,
 };
 
+export type AutoSaveTargetDto = {
+  dir: string,
+  levelName: string,
+};
+
 export type InstancePatch = {
   group?: string | null,
   name?: string | null,
+  autoSave?: string | null,
   version?: string | null,
   versionType?: string | null,
   loader?: string | null,

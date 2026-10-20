@@ -22,7 +22,7 @@ use tauri::{AppHandle, Emitter};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use crate::dtos::{ErrorEvent, ExitEvent, StateEvent};
+use crate::dtos::{AutoSaveTargetDto, ErrorEvent, ExitEvent, StateEvent};
 use crate::err_keys;
 use crate::gui_config;
 use crate::i18;
@@ -72,6 +72,7 @@ fn global_auto_join() -> Option<ServerObj> {
 /// - `uuid`: 实例 uuid
 /// - `world`: 启动后直接进入的存档目录名，空串或 `None` 为不自动进入
 /// - `force`: 账户被占用时是否跳过占用检查，`Some(true)` 为用户在弹窗里选了继续
+/// - `auto_save`: 实例配的自动进入存档这次用不用，`Some(false)` 为用户在弹窗里选了不进入
 ///
 /// # 返回值
 ///
@@ -84,6 +85,7 @@ pub async fn main_launch_game(
     uuid: String,
     world: Option<String>,
     force: Option<bool>,
+    auto_save: Option<bool>,
 ) -> Result<(), String> {
     let core = core_instance(&uuid).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())?;
     if is_running(&core.uuid) {
@@ -121,28 +123,33 @@ pub async fn main_launch_game(
     // → 实例配的"进入存档" → 设置里的全局自动进服
     let inst = core.instance.read().unwrap().clone();
     let explicit = world.filter(|dir| !dir.is_empty());
-    let wanted = explicit
-        .clone()
-        .or_else(|| inst.auto_save.clone().filter(|dir| !dir.is_empty()));
+    let wanted = explicit.clone().or_else(|| {
+        // 用户在"自动进入存档"弹窗里选了这次不进入
+        if auto_save == Some(false) {
+            None
+        } else {
+            inst.auto_save.clone().filter(|dir| !dir.is_empty())
+        }
+    });
     // 存档按目录名找回来：目录被删/改名时当作找不到，别让启动卡在一个不存在的存档上
-    let auto_save = match wanted {
+    let save = match wanted {
         Some(dir) => inst
             .get_saves()
             .await
             .into_iter()
-            .find(|save| save.path.file_name().is_some_and(|name| name == dir.as_str())),
+            .find(|item| item.path.file_name().is_some_and(|name| name == dir.as_str())),
         None => None,
     };
     let auto = if explicit.is_some() {
         // 明确点了"进入世界"就只认这个存档：找不到时直接报错，别悄悄换成进服 / 什么都不进
-        match auto_save {
+        match save {
             Some(save) => AutoJoinType::Save(Arc::new(save)),
             None => return Err(err_keys::WORLD_GONE.to_string()),
         }
     } else {
         match &inst.start_server {
             Some(server) if server.enable => AutoJoinType::Server(Arc::new(server.clone())),
-            _ => match auto_save {
+            _ => match save {
                 Some(save) => AutoJoinType::Save(Arc::new(save)),
                 None => match global_auto_join() {
                     Some(server) => AutoJoinType::Server(Arc::new(server)),
@@ -246,6 +253,48 @@ pub async fn main_launch_game(
     }
 
     Ok(())
+}
+
+/// 启动前取实例配的自动进入存档，给前端弹窗确认用
+///
+/// 自动进入提醒被关掉、实例没配、版本低于 1.20（没有 quick play）、
+/// 或那个存档已经不在时都返回 `None`，前端直接启动即可。
+///
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// 需要确认时返回存档目录名与显示名；实例不存在返回 `err.gameNotFound`
+#[gui_macros::ipc_group("main")]
+#[gui_macros::command]
+pub async fn main_auto_save_target(uuid: String) -> Result<Option<AutoSaveTargetDto>, String> {
+    if !gui_config::get().client.auto_save_notice {
+        return Ok(None);
+    }
+    let core = core_instance(&uuid).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())?;
+    let inst = core.instance.read().unwrap().clone();
+    let Some(dir) = inst.auto_save.clone().filter(|dir| !dir.is_empty()) else {
+        return Ok(None);
+    };
+    // 低版本没有 --quickPlaySingleplayer，配置了也进不去，别白问一次
+    if !inst.is_game_version_120() {
+        return Ok(None);
+    }
+    let Some(save) = inst
+        .get_saves()
+        .await
+        .into_iter()
+        .find(|save| save.path.file_name().is_some_and(|name| name == dir.as_str()))
+    else {
+        return Ok(None);
+    };
+
+    let level_name = if save.level_name.is_empty() {
+        dir.clone()
+    } else {
+        save.level_name
+    };
+    Ok(Some(AutoSaveTargetDto { dir, level_name }))
 }
 
 /// 停止游戏

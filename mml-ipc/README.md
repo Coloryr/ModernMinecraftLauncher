@@ -42,7 +42,7 @@ import { createCommands } from "mml-ipc";
 import { invoke } from "./bridge";
 
 const commands = createCommands((cmd, args) => invoke(cmd, args ?? undefined));
-await commands.main.launchGame(uuid, null);
+await commands.main.launchGame(uuid, null, null, null);
 ```
 
 自定义主页面直接用包里的 `MmlApi` 类型，导入本包即带 `window.mml` 的全局声明：

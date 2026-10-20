@@ -398,6 +398,9 @@ export function useSettingsClient() {
       case "instanceLock":
         client.value.lockInstance = d.lockInstance;
         break;
+      case "autoSave":
+        client.value.autoSaveNotice = d.autoSaveNotice;
+        break;
       case "customHome":
         // 只把开关恢复成默认；导入的压缩包是用户的东西，恢复默认不动它
         client.value.customHome = d.customHome;

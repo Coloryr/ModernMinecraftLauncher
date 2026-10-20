@@ -58,6 +58,7 @@ pub fn main_create_instance(
         version,
         version_type: Some("release".into()),
         quick_play,
+        auto_save: None,
         loader: loader.unwrap_or_else(|| "normal".into()),
         loader_version,
         dir,
@@ -191,6 +192,10 @@ pub fn main_update_instance(
             if let Some(v) = patch.server_url.clone() {
                 obj.server_url = v;
             }
+            if let Some(v) = patch.auto_save.clone() {
+                // 空串 / 只有空白都按取消处理，别把空目录名当成有效配置
+                obj.auto_save = v.filter(|dir| !dir.trim().is_empty());
+            }
             if let Some(v) = &patch.log_encoding {
                 obj.encoding = match v.as_str() {
                     "gbk" => LogEncoding::GBK,
@@ -233,6 +238,9 @@ pub fn main_update_instance(
         }
         if let Some(v) = patch.server_url {
             inst.server_url = v;
+        }
+        if let Some(v) = patch.auto_save {
+            inst.auto_save = v.filter(|dir| !dir.trim().is_empty());
         }
         if let Some(v) = patch.lang {
             inst.lang = Some(v);

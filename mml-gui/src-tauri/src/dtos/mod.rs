@@ -63,9 +63,9 @@ pub use java_download_dto::{JavaDownloadItemDto, JavaDownloadOptionsDto, JavaTyp
 pub use java_dto::{JavaImportProgressDto, JavaInfoDto};
 pub use log_dto::{LogFocusDto, LogSettingDto};
 pub use main_dto::{
-    BlockGroupDto, BlockGroupsDto, BlockItemDto, BlockStatusDto, ErrorEvent, ExitEvent,
-    IconSourceDto, InstanceChangeEvent, InstanceLangDto, InstancePatch, LogEvent, NewsItem,
-    CustomJsonItemDto, StartArgDto, StateEvent, SystemMemoryDto,
+    AutoSaveTargetDto, BlockGroupDto, BlockGroupsDto, BlockItemDto, BlockStatusDto, ErrorEvent,
+    ExitEvent, IconSourceDto, InstanceChangeEvent, InstanceLangDto, InstancePatch, LogEvent,
+    NewsItem, CustomJsonItemDto, StartArgDto, StateEvent, SystemMemoryDto,
 };
 pub use motd_dto::{MotdDto, MotdSegmentDto};
 pub use resource_dto::{

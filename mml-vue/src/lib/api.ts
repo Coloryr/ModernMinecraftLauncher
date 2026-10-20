@@ -5,6 +5,7 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { commands } from "./bindings";
 import type {
+  AutoSaveTargetDto,
   BlockGroupsDto,
   BlockItemDto,
   BlockStatusDto,
@@ -975,11 +976,26 @@ export const api = {
    *
    * - `uuid`: 实例 uuid
    * - `world`: 存档目录名；给了就直接进这个世界（1.20+ 的 quick play），不给按实例配置来
+   * - `force`: 账户被其它实例占用时是否跳过检查
+   * - `autoSave`: 实例配的自动进入存档这次用不用；`false` = 用户选了不进入
    *
    * 启动用户名由后端从当前账户解析
    */
-  async launchGame(uuid: string, world?: string, force?: boolean): Promise<void> {
-    return commands.main.launchGame(uuid, world ?? null, force ?? null);
+  async launchGame(uuid: string, world?: string, force?: boolean, autoSave?: boolean): Promise<void> {
+    return commands.main.launchGame(uuid, world ?? null, force ?? null, autoSave ?? null);
+  },
+
+  /**
+   * 取实例配的自动进入存档，启动前弹窗确认用
+   *
+   * - `uuid`: 实例 uuid
+   *
+   * # 返回值
+   *
+   * 需要确认时返回目录名与显示名；没配、提醒已关、版本不支持或存档不在了返回 null
+   */
+  async autoSaveTarget(uuid: string): Promise<AutoSaveTargetDto | null> {
+    return commands.main.autoSaveTarget(uuid);
   },
 
   /**
@@ -2384,8 +2400,26 @@ export function enableResourcepack(uuid: string, file: string): Promise<void> {
  * - `uuid`: 实例 uuid
  * - `world`: 存档目录名；不传按实例自己的自启配置来
  */
-export function launchGame(uuid: string, world?: string, force?: boolean): Promise<void> {
-  return commands.main.launchGame(uuid, world ?? null, force ?? null);
+export function launchGame(
+  uuid: string,
+  world?: string,
+  force?: boolean,
+  autoSave?: boolean,
+): Promise<void> {
+  return commands.main.launchGame(uuid, world ?? null, force ?? null, autoSave ?? null);
+}
+
+/**
+ * 取实例配置的自动进入存档，启动前弹窗确认用
+ *
+ * - `uuid`: 实例 uuid
+ *
+ * # 返回值
+ *
+ * 需要确认时返回目录名与显示名；没配、提醒已关、版本不支持或存档不在了返回 null
+ */
+export function autoSaveTarget(uuid: string): Promise<AutoSaveTargetDto | null> {
+  return commands.main.autoSaveTarget(uuid);
 }
 
 /**

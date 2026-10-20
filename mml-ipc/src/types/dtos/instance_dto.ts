@@ -7,6 +7,7 @@ export type InstanceInfoDto = {
   version: string,
   versionType: string | null,
   quickPlay: boolean,
+  autoSave: string | null,
   loader: string,
   loaderVersion: string | null,
   dir: string,
