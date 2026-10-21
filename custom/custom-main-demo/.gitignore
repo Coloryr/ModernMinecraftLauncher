@@ -1,0 +1,6 @@
+node_modules/
+dist/
+dist-theme/
+*.zip
+# deps 脚本铺的依赖链接，重新 npm install 会重建
+.mml-deps/

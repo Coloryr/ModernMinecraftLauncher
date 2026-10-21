@@ -160,7 +160,11 @@ fn multi_item_task_completes() {
 
     for i in 0..COUNT {
         let path = dir.join(format!("out/item-{i}.bin"));
-        assert_eq!(fs::read(&path).expect("文件应已下好"), body, "第 {i} 个文件内容应一致");
+        assert_eq!(
+            fs::read(&path).expect("文件应已下好"),
+            body,
+            "第 {i} 个文件内容应一致"
+        );
     }
 
     server.join().unwrap();
@@ -269,7 +273,11 @@ fn existing_target_with_dual_hash_completes() {
 
     for i in 0..COUNT {
         let path = out_dir.join(format!("item-{i}.jar"));
-        assert_eq!(fs::read(&path).expect("文件应已下好"), body, "第 {i} 个文件应被覆盖成新内容");
+        assert_eq!(
+            fs::read(&path).expect("文件应已下好"),
+            body,
+            "第 {i} 个文件应被覆盖成新内容"
+        );
     }
 
     server.join().unwrap();

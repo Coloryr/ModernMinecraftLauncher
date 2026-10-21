@@ -221,7 +221,10 @@ mod tests {
         let want = Mat4::from_rotation_y(90f32.to_radians()).to_cols_array();
         let got = render.last.to_cols_array();
         for (a, b) in got.iter().zip(want.iter()) {
-            assert!((a - b).abs() < 1e-5, "两次 45 度应等于一次 90 度，实际 {got:?}");
+            assert!(
+                (a - b).abs() < 1e-5,
+                "两次 45 度应等于一次 90 度，实际 {got:?}"
+            );
         }
     }
 

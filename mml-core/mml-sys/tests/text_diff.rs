@@ -46,7 +46,9 @@ fn big_lines(count: usize) -> Vec<String> {
 
 /// 测试目录下的样本路径：生成的文本落在这里，跑完直接能看到
 fn sample_path(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join(name)
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join(name)
 }
 
 /// 在 `target/temp` 下给这条用例开一个自己的目录（只有需要一份可写副本时用）
@@ -55,8 +57,10 @@ fn case_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let dir =
-        mml_testutil::temp_dir().join(format!("mml-text-diff-{tag}-{}-{nanos}", std::process::id()));
+    let dir = mml_testutil::temp_dir().join(format!(
+        "mml-text-diff-{tag}-{}-{nanos}",
+        std::process::id()
+    ));
     fs::create_dir_all(&dir).unwrap();
     dir
 }
@@ -83,7 +87,10 @@ fn assert_same_text(got: &str, want: &str) {
             .map(|(byte, _)| byte)
             .unwrap_or(text.len());
         let start = text[..byte].rfind('\n').map(|i| i + 1).unwrap_or(0);
-        let end = text[byte..].find('\n').map(|i| byte + i).unwrap_or(text.len());
+        let end = text[byte..]
+            .find('\n')
+            .map(|i| byte + i)
+            .unwrap_or(text.len());
         format!(
             "第 {} 行 {:?}",
             text[..start].matches('\n').count() + 1,
@@ -234,14 +241,24 @@ fn crlf_and_blank_lines_survive() {
     let path = dir.join("old.properties");
 
     let original: Vec<String> = (0..5_000)
-        .map(|i| if i % 5 == 0 { String::new() } else { format!("行 {i}\r") })
+        .map(|i| {
+            if i % 5 == 0 {
+                String::new()
+            } else {
+                format!("行 {i}\r")
+            }
+        })
         .collect();
     let text = write_and_read(&path, &original.join("\n"));
 
     let mut want = original.clone();
     want.splice(
         1_000..1_003,
-        ["改过的\r".to_string(), String::new(), "又一行\r".to_string()],
+        [
+            "改过的\r".to_string(),
+            String::new(),
+            "又一行\r".to_string(),
+        ],
     );
     let want_text = want.join("\n");
     let hunks = [hunk(1_000, 3, &["改过的\r", "", "又一行\r"])];

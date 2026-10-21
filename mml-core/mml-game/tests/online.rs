@@ -41,8 +41,8 @@ async fn check_update_online() {
     assert!(!obj.main_class.is_empty());
 
     // 再次调用应命中本地缓存
-    let cached = mml_game::launcher_path::version_path::get_version("1.20.4")
-        .expect("本地缓存版本失败");
+    let cached =
+        mml_game::launcher_path::version_path::get_version("1.20.4").expect("本地缓存版本失败");
     assert_eq!(cached.id, "1.20.4");
 }
 

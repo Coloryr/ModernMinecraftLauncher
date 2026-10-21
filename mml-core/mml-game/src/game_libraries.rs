@@ -269,8 +269,7 @@ fn process_one_library(
         // org.lwjgl3 这类库全丢掉 —— 表现就是启动时缺 org.lwjgl.system.Platform
         if !item.downloads.artifact.sha1.is_empty() {
             let keys = keys.lock().unwrap();
-            if keys.contains(&item.downloads.artifact.sha1)
-                && item.downloads.classifiers.is_none()
+            if keys.contains(&item.downloads.artifact.sha1) && item.downloads.classifiers.is_none()
             {
                 return;
             }

@@ -9,10 +9,10 @@
 
 use mml_names::i18_items::error_type::ErrorType;
 use mml_net::curseforge_api::{
-    categories_obj::CurseForgeCategoriesObj, file_obj::CurseFogreFilePageObj,
-    file_obj::CurseForgeFileDataObj, file_obj::CurseForgeFileObj, list_obj::CurseForgeListObj,
-    list_obj::CurseForgeListPageObj, version_obj::CurseForgeVersionObj,
-    version_obj::CurseForgeVersionTypeObj, CLASS_MOD, CLASS_MODPACK, GAME_ID, get_key, set_key,
+    CLASS_MOD, CLASS_MODPACK, GAME_ID, categories_obj::CurseForgeCategoriesObj,
+    file_obj::CurseFogreFilePageObj, file_obj::CurseForgeFileDataObj, file_obj::CurseForgeFileObj,
+    get_key, list_obj::CurseForgeListObj, list_obj::CurseForgeListPageObj, set_key,
+    version_obj::CurseForgeVersionObj, version_obj::CurseForgeVersionTypeObj,
 };
 
 /// CurseForge 搜索接口 `/mods/search` 的真实响应结构
@@ -220,8 +220,14 @@ fn deserialize_search_page() {
     assert_eq!(item.categories[0].name, "Map and Information");
     assert_eq!(item.categories[0].class_id, 6);
     assert_eq!(item.authors[0].name, "mezz");
-    assert_eq!(item.logo.url, Some(String::from("https://media.forgecdn.net/avatars/456.png")));
-    assert_eq!(item.screenshots[0].url, "https://media.forgecdn.net/attachments/1/2/shot.png");
+    assert_eq!(
+        item.logo.url,
+        Some(String::from("https://media.forgecdn.net/avatars/456.png"))
+    );
+    assert_eq!(
+        item.screenshots[0].url,
+        "https://media.forgecdn.net/attachments/1/2/shot.png"
+    );
     assert_eq!(item.date_modified, "2026-01-01T00:00:00Z");
 
     assert_eq!(obj.pagination.total_count, 12345);

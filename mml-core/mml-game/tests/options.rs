@@ -61,7 +61,8 @@ fn empty_input_returns_empty_map() {
 /// 从文件读配置，结果与从 reader 读一致
 #[test]
 fn read_options_from_file_works() {
-    let file = mml_testutil::temp_dir().join(format!("mml-options-test-{}.txt", std::process::id()));
+    let file =
+        mml_testutil::temp_dir().join(format!("mml-options-test-{}.txt", std::process::id()));
     std::fs::write(&file, "width:1920\nheight:1080\n").unwrap();
 
     let data: InstanceCfg = read_options_from_file(&file, None).unwrap();

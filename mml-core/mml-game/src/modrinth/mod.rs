@@ -26,6 +26,7 @@ use mml_net::{
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use tokio_util::sync::CancellationToken;
 
+use crate::error::modrinth_avatar_err;
 use crate::{
     GameInstance,
     data_res::DownloadItemRes,
@@ -37,7 +38,6 @@ use crate::{
     modpack::{BaseModPackWorker, ModPackWorker, modrinth_worker::ModrinthPackWorker},
     modrinth::pack_obj::{ModrinthPackFileObj, ModrinthPackObj},
 };
-use crate::error::{modrinth_avatar_err};
 
 pub mod pack_obj;
 
@@ -506,9 +506,12 @@ fn get_mod_dependencies_inner(
                     None => {
                         let loader = to_loader_id(loader);
                         // 整份候选都带上：前端要让用户在这些版本里挑，不只用第一个
-                        let data1 =
-                            modrinth_api::get_file_versions(project_id, Some(version), loader.as_deref())
-                                .await;
+                        let data1 = modrinth_api::get_file_versions(
+                            project_id,
+                            Some(version),
+                            loader.as_deref(),
+                        )
+                        .await;
 
                         (Ok(data), data1)
                     }
@@ -522,7 +525,8 @@ fn get_mod_dependencies_inner(
         // 该项目在本版本 / 加载器下一个文件都没有：当作这条依赖解析失败，整条跳过
         let Some(first) = data1.first() else { return };
 
-        let sub_deps = get_mod_dependencies_inner(&first.dependencies, version, loader, ids, handle);
+        let sub_deps =
+            get_mod_dependencies_inner(&first.dependencies, version, loader, ids, handle);
 
         // 图标：项目接口给的是空串，按"没有"处理
         let icon = (!data.icon_url.is_empty()).then(|| data.icon_url.clone());

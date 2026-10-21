@@ -11,10 +11,7 @@ use mml_names::{
     i18_items::error_type::{CoreResult, DataNotFoundData, ErrorType},
     names,
 };
-use mml_net::{
-    curseforge_api,
-    input_file::InputFile,
-};
+use mml_net::{curseforge_api, input_file::InputFile};
 use mml_sys::path_helper;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -23,10 +20,7 @@ use super::diff;
 use super::manifest;
 use crate::{
     GameInstance,
-    curseforge::{
-        self,
-        pack_obj::CurseForgePackObj,
-    },
+    curseforge::{self, pack_obj::CurseForgePackObj},
     gui_hook::AddModPackGui,
     launcher::{
         ModPackType, file_online_info_obj::OnlineInfoObj, instance_setting_obj::InstanceSettingObj,
@@ -299,7 +293,10 @@ impl ModPackWorker for CurseForgeWorker {
         // 写入当前整合包 manifest，作为下一次升级比对用的旧清单
         // 放在最后一步：前面任何 `?` 提前返回都不会动到旧清单
         manifest::write_manifest(
-            game.read().unwrap().get_base_path().join(names::MANIFEST_FILE),
+            game.read()
+                .unwrap()
+                .get_base_path()
+                .join(names::MANIFEST_FILE),
             info,
         )?;
 

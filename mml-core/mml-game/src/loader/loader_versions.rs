@@ -232,8 +232,9 @@ pub async fn get_support_loaders(mc: &str, gui: ProgressGui) -> CoreResult<Vec<S
         Ok(ok)
     };
 
-    let (forge_ok, fabric_ok, quilt_ok, neoforge_ok, optifine_ok, liteloader_ok, cleanroom_ok) =
-        tokio::try_join!(forge, fabric, quilt, neoforge, optifine, liteloader, cleanroom)?;
+    let (forge_ok, fabric_ok, quilt_ok, neoforge_ok, optifine_ok, liteloader_ok, cleanroom_ok) = tokio::try_join!(
+        forge, fabric, quilt, neoforge, optifine, liteloader, cleanroom
+    )?;
 
     if forge_ok {
         list.push(LoaderType::Forge.id().to_string());

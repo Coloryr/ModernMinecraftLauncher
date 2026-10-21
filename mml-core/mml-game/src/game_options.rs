@@ -9,8 +9,8 @@ use std::{
 use mml_names::i18_items::error_type::CoreResult;
 use mml_sys::path_helper;
 
+use crate::error::stream_err;
 use crate::launcher::instance_setting_obj::InstanceSettingObj;
-use crate::error::{stream_err};
 
 /// 配置选项表，键 → 值
 pub type InstanceCfg = HashMap<String, String>;

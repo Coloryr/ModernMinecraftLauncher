@@ -169,7 +169,9 @@ pub fn download_latest(slug: &str) -> Option<PathBuf> {
 pub async fn project_versions_async(slug: &str) -> Option<Vec<ModrinthVersionObj>> {
     init_net();
     let data = mml_net::get_work_client()
-        .get_bytes(&format!("https://api.modrinth.com/v2/project/{slug}/version"))
+        .get_bytes(&format!(
+            "https://api.modrinth.com/v2/project/{slug}/version"
+        ))
         .await
         .ok()?;
     json_from_bytes(&data).ok()

@@ -13,6 +13,7 @@ use std::{
 use mml_base::events::EventArgHandler;
 use regex::Regex;
 
+use crate::error::{socket_err, thread_err};
 use mml_names::{
     i18,
     i18_items::{
@@ -21,7 +22,6 @@ use mml_names::{
     },
 };
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
-use crate::error::{socket_err, thread_err};
 
 /// 组播端口
 const PORT: u16 = 4445;
@@ -125,7 +125,9 @@ impl GameLan {
             sock_v6.set_only_v6(true).map_err(socket_err)?;
 
             let bind_addr_v6 = SocketAddrV6::new(Ipv6Addr::UNSPECIFIED, PORT, 0, 0);
-            sock_v6.bind(&SockAddr::from(bind_addr_v6)).map_err(socket_err)?;
+            sock_v6
+                .bind(&SockAddr::from(bind_addr_v6))
+                .map_err(socket_err)?;
 
             socket_v6 = Some(sock_v6);
         }
@@ -204,7 +206,9 @@ impl GameLan {
             sock_v6.set_only_v6(true).map_err(socket_err)?;
 
             let bind_addr_v6 = SocketAddrV6::new(Ipv6Addr::UNSPECIFIED, 0, 0, 0);
-            sock_v6.bind(&SockAddr::from(bind_addr_v6)).map_err(socket_err)?;
+            sock_v6
+                .bind(&SockAddr::from(bind_addr_v6))
+                .map_err(socket_err)?;
 
             let ipv6 = IPV6.parse::<Ipv6Addr>().map_err(socket_err)?;
             addr_v6 = Some(SocketAddr::V6(SocketAddrV6::new(ipv6, PORT, 0, 0)));
@@ -262,7 +266,10 @@ impl GameLan {
         let socket_v4 = self.socket_v4.clone();
         let socket_v6 = self.socket_v6.clone();
 
-        let addr_v4 = self.send_v4.clone().ok_or(ErrorType::MulticastAddrMissing)?;
+        let addr_v4 = self
+            .send_v4
+            .clone()
+            .ok_or(ErrorType::MulticastAddrMissing)?;
 
         let addr_v6 = self.send_v6.clone();
 

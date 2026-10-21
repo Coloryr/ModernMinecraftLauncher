@@ -20,8 +20,8 @@ use mml_net::{
 use crate::{
     curseforge::pack_obj::{CurseForgePackObj, FilesObj, MinecraftObj, ModLoadersObj},
     launcher::{
-        self, file_online_info_obj::OnlineInfoObj,
-        instance_setting_obj::InstanceSettingObj, project_save_obj::MmlProjectSaveObj,
+        self, file_online_info_obj::OnlineInfoObj, instance_setting_obj::InstanceSettingObj,
+        project_save_obj::MmlProjectSaveObj,
     },
     loader::LoaderType,
     modrinth::pack_obj::{ModrinthPackFileObj, ModrinthPackObj},
@@ -553,7 +553,14 @@ fn mmc(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
         instance_cfg(game).as_bytes(),
     )?;
 
-    add_game_files(&mut zip, &game.get_game_path(), &game_dir, &files, &arg.gui, 2)
+    add_game_files(
+        &mut zip,
+        &game.get_game_path(),
+        &game_dir,
+        &files,
+        &arg.gui,
+        2,
+    )
 }
 
 /// MMC 的 `instance.cfg` 内容：只写导入侧会读的几个键

@@ -22,10 +22,7 @@ use crate::{
     launcher_path::version_path,
     loader::LoaderType,
     modpack::{BaseModPackWorker, ModPackWorker},
-    modrinth::{
-        self,
-        pack_obj::ModrinthPackObj,
-    },
+    modrinth::{self, pack_obj::ModrinthPackObj},
 };
 
 /// Modrinth 整合包安装器
@@ -368,7 +365,10 @@ impl ModPackWorker for ModrinthPackWorker {
 
         // 写入当前整合包 manifest，放在最后一步：前面任何 `?` 提前返回都不会动到旧清单
         manifest::write_manifest(
-            game.read().unwrap().get_base_path().join(names::MODRINTH_FILE),
+            game.read()
+                .unwrap()
+                .get_base_path()
+                .join(names::MODRINTH_FILE),
             info,
         )?;
 

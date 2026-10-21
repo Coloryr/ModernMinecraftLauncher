@@ -159,8 +159,7 @@ async fn install_hmcl_pack() {
     ensure_init();
 
     let dir = pack_dir();
-    let packmeta =
-        r#"{"name":"HMCL测试包","files":[],"addons":[{"id":"game","version":"1.20.1"},{"id":"forge","version":"47.3.0"}]}"#;
+    let packmeta = r#"{"name":"HMCL测试包","files":[],"addons":[{"id":"game","version":"1.20.1"},{"id":"forge","version":"47.3.0"}]}"#;
     let manifest = r#"{"name":"HMCL测试包","manifestType":"minecraftModpack","manifestVersion":1,"overrides":"minecraft","files":[],"minecraft":{"version":"1.20.1","modLoaders":[]}}"#;
     let zip = make_zip(
         &dir,
@@ -188,7 +187,11 @@ async fn install_hmcl_pack() {
     assert_eq!(read.loader_version.as_deref(), Some("47.3.0"));
 
     // minecraft/ 层被剥离，文件落到实例基础目录
-    assert_file(read.get_base_path().join("options.txt"), b"lang:zh_cn\n", "options.txt 应解压");
+    assert_file(
+        read.get_base_path().join("options.txt"),
+        b"lang:zh_cn\n",
+        "options.txt 应解压",
+    );
     assert_file(
         read.get_base_path().join("mods").join("dummy.jar"),
         b"dummy mod jar",
@@ -295,7 +298,10 @@ async fn install_mmc_pack() {
         "options.txt 应解压",
     );
     assert_file(
-        read.get_base_path().join(".minecraft").join("mods").join("dummy.jar"),
+        read.get_base_path()
+            .join(".minecraft")
+            .join("mods")
+            .join("dummy.jar"),
         b"dummy mod jar",
         "mod 应解压",
     );
@@ -331,15 +337,23 @@ async fn install_game_json_archive() {
     assert!(matches!(detected.pack_type, PackType::ArchivePack));
 
     // 传入的名字覆盖包内配置的名字
-    let InstalledPack { uuid, recorder } =
-        install(&zip, Some("直接解压导入".to_string()), PackType::ArchivePack).await;
+    let InstalledPack { uuid, recorder } = install(
+        &zip,
+        Some("直接解压导入".to_string()),
+        PackType::ArchivePack,
+    )
+    .await;
 
     let game = mml_game::get_instance(&uuid).expect("安装后应能取到实例");
     let read = game.read().unwrap();
     assert_eq!(read.name, "直接解压导入");
 
     // pack/ 层被剥离
-    assert_file(read.get_base_path().join("options.txt"), b"lang:zh_cn\n", "options.txt 应解压");
+    assert_file(
+        read.get_base_path().join("options.txt"),
+        b"lang:zh_cn\n",
+        "options.txt 应解压",
+    );
     assert_file(
         read.get_base_path().join("mods").join("dummy.jar"),
         b"dummy mod jar",
@@ -395,7 +409,11 @@ async fn install_launcher_pack_isolated() {
     assert_eq!(read.version, version_name);
 
     // 版本文件夹内的游戏资源导入游戏目录
-    assert_file(read.get_game_path().join("options.txt"), b"lang:zh_cn\n", "options.txt 应导入");
+    assert_file(
+        read.get_game_path().join("options.txt"),
+        b"lang:zh_cn\n",
+        "options.txt 应导入",
+    );
     assert_file(
         read.get_game_path().join("mods").join("dummy.jar"),
         b"dummy mod jar",
@@ -440,7 +458,11 @@ async fn install_launcher_pack_not_isolated() {
     assert_eq!(read.name, "1.20.1");
     assert_eq!(read.version, "1.20.1");
 
-    assert_file(read.get_game_path().join("options.txt"), b"lang:zh_cn\n", "options.txt 应导入");
+    assert_file(
+        read.get_game_path().join("options.txt"),
+        b"lang:zh_cn\n",
+        "options.txt 应导入",
+    );
     assert_file(
         read.get_game_path().join("mods").join("dummy.jar"),
         b"dummy mod jar",

@@ -61,12 +61,7 @@ fn test_create_shortcut() {
     let lnk_path = lnk.clone();
     let work_path = work.clone();
     let handle = std::thread::spawn(move || {
-        mml_sys::shortcut_helper::create_shortcut(
-            "test-uuid",
-            None::<PathBuf>,
-            work_path,
-            lnk_path,
-        )
+        mml_sys::shortcut_helper::create_shortcut("test-uuid", None::<PathBuf>, work_path, lnk_path)
     });
     let result = handle.join().unwrap();
 

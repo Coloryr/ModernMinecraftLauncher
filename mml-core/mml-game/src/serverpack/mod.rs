@@ -179,7 +179,6 @@ impl InstanceSettingObj {
     }
 }
 
-
 /// 删除文件；若文件已被禁用，即追加了 `.disable`/`.disabled` 后缀，则一并删除
 ///
 /// - `file`: 文件路径
@@ -277,5 +276,3 @@ async fn resolve_download_urls(
 
     urls
 }
-
-

@@ -20,6 +20,7 @@ use mml_sys::path_helper;
 use tokio::task;
 use uuid::Uuid;
 
+use crate::error::serializer_err;
 use crate::{
     launcher::{custom_loader_obj::CustomLoaderType, instance_setting_obj::InstanceSettingObj},
     loader::{
@@ -36,7 +37,6 @@ use crate::{
         version_obj::{VersionObj, VersionsObj},
     },
 };
-use crate::error::{serializer_err};
 
 /// 版本根目录
 static BASE_DIR: OnceLock<PathBuf> = OnceLock::new();

@@ -27,6 +27,7 @@ use mml_sys::{path_helper, process_helper};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
+use crate::error::stream_err;
 use crate::{
     game_arg::GameLaunchObj,
     game_log::GameLog,
@@ -40,7 +41,6 @@ use crate::{
     loader::LoaderType,
     serverpack::serverpack_obj::ServerPackObj,
 };
-use crate::error::{stream_err};
 
 /// 启动后自动操作
 pub enum AutoJoinType {
@@ -589,7 +589,8 @@ impl InstanceSettingObj {
 
         // 只有 Java 18–23 需要显式放行：8 没有这个开关，24 起 SecurityManager 已被移除
         if major.is_some_and(|major| (18..=23).contains(&major)) {
-            obj.jvm_args.push("-Djava.security.manager=allow".to_string());
+            obj.jvm_args
+                .push("-Djava.security.manager=allow".to_string());
         }
     }
 
@@ -1000,11 +1001,17 @@ mod tests {
         #[cfg(windows)]
         {
             let exe = std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string());
-            (PathBuf::from(exe), vec!["/c".to_string(), format!("echo {MARK}")])
+            (
+                PathBuf::from(exe),
+                vec!["/c".to_string(), format!("echo {MARK}")],
+            )
         }
         #[cfg(not(windows))]
         {
-            (PathBuf::from("sh"), vec!["-c".to_string(), format!("echo {MARK}")])
+            (
+                PathBuf::from("sh"),
+                vec!["-c".to_string(), format!("echo {MARK}")],
+            )
         }
     }
 
@@ -1078,7 +1085,10 @@ mod tests {
         crate::remove_run_log(id);
 
         let seen = seen.lock().unwrap();
-        assert!(seen.contains(&"第一行".to_string()), "第一行应发事件，实际：{seen:?}");
+        assert!(
+            seen.contains(&"第一行".to_string()),
+            "第一行应发事件，实际：{seen:?}"
+        );
         assert!(
             seen.contains(&"第二行".to_string()),
             "日志已存在时也要发事件，实际：{seen:?}"

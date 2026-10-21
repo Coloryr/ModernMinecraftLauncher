@@ -2,13 +2,13 @@
 
 use mml_base::file_item::{FileHash, FileItemObj};
 use mml_game::curseforge::pack_obj::{CurseForgePackObj, FilesObj};
-use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 use mml_game::launcher::LogEncoding;
 use mml_game::launcher::ModPackType;
+use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 use mml_game::loader::LoaderType;
-use mml_game::mojang::VersionType;
 use mml_game::modrinth::make_pack_download_obj;
 use mml_game::modrinth::pack_obj::{ModrinthPackFileObj, ModrinthPackObj};
+use mml_game::mojang::VersionType;
 use mml_game::serverpack::serverpack_obj::ServerPackObj;
 use mml_net::modrinth_api::version_obj::HasheObj;
 use serde_json::json;
@@ -45,7 +45,10 @@ fn modrinth_pack_obj_parse() {
     assert_eq!(obj.version_id, "14.0.0-beta.3");
     assert_eq!(obj.name, "Fabulously Optimized");
     assert_eq!(obj.files.len(), 1);
-    assert_eq!(obj.dependencies.get("minecraft").map(String::as_str), Some("26.2"));
+    assert_eq!(
+        obj.dependencies.get("minecraft").map(String::as_str),
+        Some("26.2")
+    );
     assert_eq!(
         obj.dependencies.get("fabric-loader").map(String::as_str),
         Some("0.19.3")
@@ -92,7 +95,9 @@ fn make_pack_download_obj_hash() {
             sha1: "a".repeat(40),
             sha512: "b".repeat(128),
         },
-        downloads: vec!["https://cdn.modrinth.com/data/abc/versions/def/example-1.0.jar".to_string()],
+        downloads: vec![
+            "https://cdn.modrinth.com/data/abc/versions/def/example-1.0.jar".to_string(),
+        ],
         file_size: 1024,
         project: None,
     };
@@ -100,8 +105,13 @@ fn make_pack_download_obj_hash() {
     let item: FileItemObj = make_pack_download_obj(&obj, "game");
     assert_eq!(item.url, obj.downloads[0]);
     assert_eq!(item.name, obj.path);
-    assert_eq!(item.file, std::path::PathBuf::from("game/mods/example-1.0.jar"));
-    assert!(matches!(item.hash, FileHash::Sha1Sha512(ref s1, ref s512) if s1.len() == 40 && s512.len() == 128));
+    assert_eq!(
+        item.file,
+        std::path::PathBuf::from("game/mods/example-1.0.jar")
+    );
+    assert!(
+        matches!(item.hash, FileHash::Sha1Sha512(ref s1, ref s512) if s1.len() == 40 && s512.len() == 128)
+    );
 }
 
 /// CurseForge `manifest.json` 解析，字段名为驼峰式，含 projectID 与 fileID
@@ -180,7 +190,10 @@ fn server_pack_obj_parse() {
     assert_eq!(obj.online_list.len(), 1);
     assert_eq!(obj.online_list[0].file, "mods/foo.jar");
     assert_eq!(obj.online_list[0].pid.as_deref(), Some("abc"));
-    assert_eq!(obj.online_list[0].url.as_deref(), Some("https://example.com/foo.jar"));
+    assert_eq!(
+        obj.online_list[0].url.as_deref(),
+        Some("https://example.com/foo.jar")
+    );
     assert_eq!(obj.online_list[0].sha256.as_deref(), Some("bbb"));
 
     assert_eq!(obj.archive_list.len(), 1);

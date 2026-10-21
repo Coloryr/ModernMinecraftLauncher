@@ -145,7 +145,10 @@ fn find_jdk() -> Option<(PathBuf, PathBuf)> {
         let has_compiler = Command::new(&java)
             .arg("--list-modules")
             .output()
-            .map(|out| out.status.success() && String::from_utf8_lossy(&out.stdout).contains("jdk.compiler"))
+            .map(|out| {
+                out.status.success()
+                    && String::from_utf8_lossy(&out.stdout).contains("jdk.compiler")
+            })
             .unwrap_or(false);
         has_compiler.then_some((java, javac))
     })
@@ -288,7 +291,9 @@ async fn real_download_prepares_game_files() {
         .iter()
         .find(|path| path.ends_with(format!("client-{VERSION}.jar")))
         .unwrap_or_else(|| panic!("应下载出客户端 jar，实际文件 {} 个", files.len()));
-    let size = std::fs::metadata(client).map(|item| item.len()).unwrap_or(0);
+    let size = std::fs::metadata(client)
+        .map(|item| item.len())
+        .unwrap_or(0);
     assert!(size > 1024 * 1024, "客户端 jar 体积不对：{size} 字节");
 
     // 运行库与资源索引
@@ -299,13 +304,15 @@ async fn real_download_prepares_game_files() {
     assert!(libs > 3, "应下载出多个运行库 jar，实际 {libs} 个");
 
     assert!(
-        files.iter().any(|path| path.ends_with(format!("{VERSION}.json"))),
+        files
+            .iter()
+            .any(|path| path.ends_with(format!("{VERSION}.json"))),
         "版本 json 应已落盘"
     );
     assert!(
-        files.iter().any(|path| path
-            .components()
-            .any(|part| part.as_os_str() == "indexes")),
+        files
+            .iter()
+            .any(|path| path.components().any(|part| part.as_os_str() == "indexes")),
         "资源索引应已落盘"
     );
 }

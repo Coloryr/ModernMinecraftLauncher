@@ -4,11 +4,16 @@
 //! `cargo test -p mml-game --test modpack -- --ignored --nocapture`
 //! 压缩包路径改源码里的 `PACK_FILE`，CurseForge key 由 GUI 正常注入，测试内为空
 
-use std::{path::{Path, PathBuf}, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
-use mml_game::add_game::{self, PackType};
-use mml_game::gui_hook::{AddInstanceGui, AddModPackGui, AddModPackState, IAddInstanceGui, IAddModPackGui};
 use mml_game::GameInstance;
+use mml_game::add_game::{self, PackType};
+use mml_game::gui_hook::{
+    AddInstanceGui, AddModPackGui, AddModPackState, IAddInstanceGui, IAddModPackGui,
+};
 use tokio_util::sync::CancellationToken;
 
 /// 测试压缩包路径
@@ -49,7 +54,11 @@ impl IAddModPackGui for PackGui {
     }
 
     fn set_now(&self, value: usize, all: Option<usize>) {
-        println!("[安装] 进度 {}/{}", value, all.map(|v| v.to_string()).unwrap_or_else(|| "?".into()));
+        println!(
+            "[安装] 进度 {}/{}",
+            value,
+            all.map(|v| v.to_string()).unwrap_or_else(|| "?".into())
+        );
     }
 
     fn set_sub_text(&self, text: Option<String>) {
@@ -57,7 +66,11 @@ impl IAddModPackGui for PackGui {
     }
 
     fn set_sub_now(&self, value: usize, all: Option<usize>) {
-        println!("[安装] 子进度 {}/{}", value, all.map(|v| v.to_string()).unwrap_or_else(|| "?".into()));
+        println!(
+            "[安装] 子进度 {}/{}",
+            value,
+            all.map(|v| v.to_string()).unwrap_or_else(|| "?".into())
+        );
     }
 }
 
@@ -85,11 +98,7 @@ impl mml_downloader::IDownloadGui for TestDownloader {
     fn update(&self, thread: u32, file: &Arc<mml_downloader::download_item::DownloadItem>) {
         let pro = file.progress() as u64;
         if pro > 0 && pro % 25 == 0 {
-            println!(
-                "[下载] 线程 {thread} {} {}%",
-                file.base.name,
-                pro
-            );
+            println!("[下载] 线程 {thread} {} {}%", file.base.name, pro);
         }
     }
 
@@ -146,6 +155,10 @@ async fn install_curseforge_pack() {
 
     match res {
         Ok(uuid) => println!("安装成功: {uuid}"),
-        Err(e) => panic!("安装失败: {} ({:?})", mml_names::i18::get_error(e.clone()), e),
+        Err(e) => panic!(
+            "安装失败: {} ({:?})",
+            mml_names::i18::get_error(e.clone()),
+            e
+        ),
     }
 }

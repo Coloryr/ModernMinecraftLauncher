@@ -13,10 +13,7 @@ use mml_net::{
 
 /// 初始化全局配置到临时目录。
 fn init_config() {
-    let dir = mml_testutil::temp_dir().join(format!(
-        "mml-net-url-test-{}",
-        std::process::id()
-    ));
+    let dir = mml_testutil::temp_dir().join(format!("mml-net-url-test-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("创建配置临时目录失败");
     let _ = mml_config::init(&dir);
 }
@@ -126,9 +123,7 @@ fn url_builders_follow_selected_source() {
     );
 
     // 外置登录 artifact 元数据
-    let artifacts = ArtifactsObj {
-        build_number: 183,
-    };
+    let artifacts = ArtifactsObj { build_number: 183 };
     assert_eq!(
         url_helper::get_authlib_injector(&artifacts),
         "https://authlib-injector.yushi.moe/artifact/183.json"

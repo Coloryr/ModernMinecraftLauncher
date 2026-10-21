@@ -21,7 +21,7 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
-    // 前端契约落在独立的 mml-ipc npm 包，mml-vue 与 mml-ui-demo 都从那里取
+    // 前端契约落在独立的 mml-ipc npm 包，mml-vue 与 custom 下的示例都从那里取
     let ts_dir = manifest.join("../../mml-ipc/src");
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
 

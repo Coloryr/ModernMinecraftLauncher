@@ -400,10 +400,8 @@ fn mr_online_identical_and_empty() {
 
 /// 每个用例各用各的子目录，见 AGENTS.md §6：落盘是异步的，共用目录会互相踩
 fn case_dir(case: &str) -> PathBuf {
-    let dir = mml_testutil::temp_dir().join(format!(
-        "mml-modpack-upgrade-{case}-{}",
-        std::process::id()
-    ));
+    let dir =
+        mml_testutil::temp_dir().join(format!("mml-modpack-upgrade-{case}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("建临时目录");
     dir
@@ -432,7 +430,11 @@ fn manifest_write_then_read_back_overwrites() {
     };
     manifest::write_manifest(&path, &new).expect("覆盖写回新清单");
     let read: CurseForgePackObj = manifest::read_manifest(&path).expect("覆盖后应能读回");
-    let mut pairs: Vec<(u64, u64)> = read.files.iter().map(|f| (f.project_id, f.file_id)).collect();
+    let mut pairs: Vec<(u64, u64)> = read
+        .files
+        .iter()
+        .map(|f| (f.project_id, f.file_id))
+        .collect();
     pairs.sort_unstable();
     assert_eq!(pairs, vec![(1, 2), (2, 2)], "旧内容应被完全覆盖");
 }
@@ -522,10 +524,8 @@ const E2E_SLUG: &str = "optimized-fps";
 fn ensure_init() {
     static INIT: Once = Once::new();
     INIT.call_once(|| {
-        let dir = mml_testutil::temp_dir().join(format!(
-            "mml-modpack-upgrade-run-{}",
-            std::process::id()
-        ));
+        let dir = mml_testutil::temp_dir()
+            .join(format!("mml-modpack-upgrade-run-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
 
@@ -974,11 +974,7 @@ async fn upgrade_modpack_end_to_end_matches_new_manifest() {
     let written: ModrinthPackObj =
         manifest::read_manifest(base_path.join(mml_names::names::MODRINTH_FILE))
             .expect("升级后实例里应有 modrinth.index.json");
-    assert_eq!(
-        index_paths(&written),
-        new_paths,
-        "实例里的清单应被新版覆盖"
-    );
+    assert_eq!(index_paths(&written), new_paths, "实例里的清单应被新版覆盖");
     eprintln!("[e2e] ⑤ 实例里的清单已写回新版");
 
     // ⑥ 升级后新包的 overrides 覆盖到游戏目录：每个文件都应存在，不能被"删除旧清单里已移除
@@ -1041,7 +1037,9 @@ async fn upgrade_modpack_cancelled_keeps_old_manifest() {
         path: old_pack,
         ..
     } = pair.old;
-    let PackFiles { version: new_ver, .. } = pair.new;
+    let PackFiles {
+        version: new_ver, ..
+    } = pair.new;
 
     let uuid = mml_game::add_game::install_archive_from_file(
         &old_pack,
@@ -1070,7 +1068,8 @@ async fn upgrade_modpack_cancelled_keeps_old_manifest() {
     cancel.cancel();
     // ModrinthVersionObj 没有 Clone，直接按所有权传给要 &mut 的 upgrade_modpack
     let mut new_ver_mut = new_ver;
-    let res = mml_game::modrinth::upgrade_modpack(&game, &mut new_ver_mut, None, None, cancel).await;
+    let res =
+        mml_game::modrinth::upgrade_modpack(&game, &mut new_ver_mut, None, None, cancel).await;
     assert!(res.is_err(), "预取消的升级应当返回错误");
 
     let after = std::fs::read(&manifest_path).expect("再读旧清单字节");
@@ -1085,7 +1084,6 @@ async fn upgrade_modpack_cancelled_keeps_old_manifest() {
     let _ = mml_game::delete_instance(&uuid);
     let _ = std::fs::remove_dir_all(game.read().unwrap().get_base_path());
 }
-
 
 // ===================== extract 与实例清单的交互，离线回归 =====================
 //
@@ -1261,10 +1259,8 @@ async fn upgrade_curseforge_pack_end_to_end_matches_new_manifest() {
     let new_pack = {
         let url = files.data[new_idx].download_url.clone().unwrap_or_default();
         assert!(!url.is_empty(), "新版文件没有下载地址");
-        let cache = mml_testutil::temp_dir().join(format!(
-            "mml-cf-upgrade-{}.zip",
-            files.data[new_idx].id
-        ));
+        let cache =
+            mml_testutil::temp_dir().join(format!("mml-cf-upgrade-{}.zip", files.data[new_idx].id));
         if !cache.exists() {
             let data = mml_net::get_work_client()
                 .get_bytes(&url)

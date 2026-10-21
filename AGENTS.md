@@ -68,7 +68,7 @@
   `customHomeBridge.ts` 白名单对应）是手写的 `mml-ipc/src/home.ts`，不参与扫描。
   自定义主页面示例直接用 `mml-ipc`；已经依赖 mml-vue 的主题可从 `mml-vue/ipc` 取同一契约。
   `mml-vue/src/lib/bindings.ts` / `listens.ts` 只是兼容层：前者把 Tauri 的 invoke 绑到
-  `createCommands`，后者再导出事件名，既有导入路径不变；`mml-ui-demo` 直接引用 `mml-ipc`。
+  `createCommands`，后者再导出事件名，既有导入路径不变；`custom-main-demo` 直接引用 `mml-ipc`。
   新增命令加 `#[gui_macros::command]`，新增事件加 `#[gui_macros::emit]`；单独重新生成可跑
   `cd mml-gui && npm run gen`（或任意 `cargo check`）。
 - 扫描与生成逻辑在 `ipc-gen/`（包名 `gui-ipc-gen`，有单测），过程宏在 `ipc-gen/macros/`
@@ -307,7 +307,7 @@ windows/<窗口>/mod.rs 里：
   渲染组件，没有就回落到 iframe。组件样式由示例的 PostCSS 前缀限定在 `.mml-home` 内。
 - **自定义界面契约在 mml-ipc**：`WindowPageRegistry` / `HomePageRegistry` /
   `CustomCssContext` / `CustomCssReplaceOptions` 的定义都在 `mml-ipc/src/customUi.ts`，
-  mml-vue 与三个示例都按 type-import 取，不各写一份。
+  mml-vue 与前三个组件示例都按 type-import 取；整页 HTML 示例只用运行时 `window.mml`。
 - **整页窗口回调**：3 的包根可以有 `custom.js`（窗口页面组件）与 `custom.css`（其样式）；
   `custom_ui_status` 多给 `pageScriptUrl` / `pageStyleUrl`。`lib/customUi.ts` 在挂载前
   **await** 加载脚本并装 host 版 `window.mml`（invoke / listen / theme），脚本用
@@ -330,7 +330,8 @@ windows/<窗口>/mod.rs 里：
 - **控件只有一个来源**：`mml-vue/scripts/gen-ui.ts` 在 `mml-vue/src/generated` 生成
   `ui-kit.ts` / `ui-kit.css` / `controls.ts` / `windows.ts` / `components.ts`，由 `mml-vue`
   的 exports 暴露成 `mml-vue/ui-kit`、`mml-vue/ui-kit.css`、`mml-vue/ui-kit/controls`、
-  `mml-vue/ui-kit/windows`、`mml-vue/ui-kit/components`。两个示例本地按 `file:../mml-vue` 依赖，
+  `mml-vue/ui-kit/windows`、`mml-vue/ui-kit/components`。组件 / CSS 两个示例按
+  `file:.mml-deps/mml-vue` 依赖（`scripts/deps.mjs` 在 install 前链到仓库，仓库不在就浅克隆），
   mml-ipc 与 mml-vue 都会发布到 npm。改完控件或样式重跑 `node mml-vue/scripts/gen-ui.ts`；
   新加控件加进 `COMPONENTS`。`./controls` 单独一个入口，是为了让 Node 只取清单时
   不必加载 `.vue`。

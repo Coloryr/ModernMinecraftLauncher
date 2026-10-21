@@ -90,7 +90,9 @@ fn abort_never_lost_regardless_of_timing() {
             .recv_timeout(Duration::from_secs(5))
             .unwrap_or_else(|_| panic!("第 {round} 轮：中断后请求仍未返回（信号丢失）"));
         let lag = abort_at.elapsed();
-        println!("第 {round} 轮（中断于开始后 {delay_ms}ms）：总耗时 {elapsed:?}，中断后 {lag:?} 返回，aborted={aborted}");
+        println!(
+            "第 {round} 轮（中断于开始后 {delay_ms}ms）：总耗时 {elapsed:?}，中断后 {lag:?} 返回，aborted={aborted}"
+        );
 
         assert!(aborted, "第 {round} 轮：应返回中断错误");
         assert!(

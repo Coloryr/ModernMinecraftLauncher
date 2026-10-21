@@ -441,8 +441,7 @@ mod tests {
             }
         });
 
-        let out =
-            typea(&image, Some(SkinType::NewSlim)).expect("纤细皮肤 typea 展开应成功");
+        let out = typea(&image, Some(SkinType::NewSlim)).expect("纤细皮肤 typea 展开应成功");
         assert_eq!(out.width(), 128);
         assert_eq!(out.height(), 256);
 

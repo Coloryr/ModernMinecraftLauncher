@@ -1578,7 +1578,6 @@ mod tests {
         assert_eq!(decode_string(vec![0xFF, 0xFE]), "\u{FFFD}\u{FFFD}");
     }
 
-
     use super::*;
     use crate::{
         NBT_BYTE_ARRAY_ORDER, NBT_BYTE_ORDER, NBT_COMPOUND_ORDER, NBT_INT_ARRAY_ORDER,

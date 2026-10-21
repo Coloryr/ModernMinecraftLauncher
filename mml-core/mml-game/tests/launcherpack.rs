@@ -26,7 +26,8 @@ use common::{ZipEntry, entry};
 ///
 /// 生成的压缩包路径，落在测试临时目录
 fn make_zip(files: &[ZipEntry]) -> PathBuf {
-    let zip_path = mml_testutil::temp_dir().join(format!("mml-launcherpack-{}.zip", Uuid::new_v4()));
+    let zip_path =
+        mml_testutil::temp_dir().join(format!("mml-launcherpack-{}.zip", Uuid::new_v4()));
     let file = std::fs::File::create(&zip_path).expect("创建测试压缩包失败");
     let mut writer = ZipWriter::new(file);
     let options = SimpleFileOptions::default();

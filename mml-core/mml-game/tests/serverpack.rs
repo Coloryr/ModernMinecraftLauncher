@@ -25,10 +25,8 @@ use uuid::Uuid;
 fn ensure_init() {
     static INIT: Once = Once::new();
     INIT.call_once(|| {
-        let dir = mml_testutil::temp_dir().join(format!(
-            "mml-serverpack-run-{}",
-            std::process::id()
-        ));
+        let dir =
+            mml_testutil::temp_dir().join(format!("mml-serverpack-run-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
 
@@ -109,13 +107,19 @@ fn removed_dirs(removals: &plan::ServerPackRemovals<'_>) -> Vec<String> {
 /// `mod_key`：有 `pid` 用 `pid`，没有才退回文件名
 #[test]
 fn mod_key_prefers_pid_then_file() {
-    assert_eq!(plan::mod_key(&item("mods/a.jar", Some("123"), None, "")), "123");
+    assert_eq!(
+        plan::mod_key(&item("mods/a.jar", Some("123"), None, "")),
+        "123"
+    );
     assert_eq!(
         plan::mod_key(&item("mods/a.jar", None, Some("abc"), "")),
         "mods/a.jar",
         "没有 pid 时按文件名配对"
     );
-    assert_eq!(plan::mod_key(&item("mods/a.jar", None, None, "")), "mods/a.jar");
+    assert_eq!(
+        plan::mod_key(&item("mods/a.jar", None, None, "")),
+        "mods/a.jar"
+    );
 }
 
 /// `make_hash`：四种校验值组合
@@ -138,8 +142,18 @@ fn make_hash_covers_all_combinations() {
 #[test]
 fn is_curseforge_by_numeric_id() {
     // pid 数字 → CF；pid 非数字 → Modrinth
-    assert!(plan::is_curseforge(&item("m", Some("123"), Some("456"), "")));
-    assert!(!plan::is_curseforge(&item("m", Some("abc"), Some("def"), "")));
+    assert!(plan::is_curseforge(&item(
+        "m",
+        Some("123"),
+        Some("456"),
+        ""
+    )));
+    assert!(!plan::is_curseforge(&item(
+        "m",
+        Some("abc"),
+        Some("def"),
+        ""
+    )));
     // 没有 pid 时只看 fid
     assert!(plan::is_curseforge(&item("m", None, Some("456"), "")));
     assert!(!plan::is_curseforge(&item("m", None, Some("def"), "")));
@@ -239,7 +253,10 @@ fn removals_with_empty_lists() {
     assert!(r.files.is_empty() && r.dirs.is_empty());
 
     let r = plan::plan_removals(&empty, &some);
-    assert!(r.files.is_empty() && r.dirs.is_empty(), "旧清单为空 → 没东西可删");
+    assert!(
+        r.files.is_empty() && r.dirs.is_empty(),
+        "旧清单为空 → 没东西可删"
+    );
 
     let r = plan::plan_removals(&some, &empty);
     assert_eq!(removed_files(&r), vec!["mods/a.jar"], "新清单为空 → 全删");

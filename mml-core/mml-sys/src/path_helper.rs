@@ -486,7 +486,9 @@ pub fn copy_file<P: AsRef<Path>>(input: P, output: P) -> CoreResult<()> {
 ///
 /// 复制成功返回 `Ok(())`，失败返回相应错误
 pub async fn copy_file_async<P: AsRef<Path>>(input: P, output: P) -> CoreResult<()> {
-    tfs::copy(&input, output).await.map_err(|err| fs_error(input.as_ref(), err))?;
+    tfs::copy(&input, output)
+        .await
+        .map_err(|err| fs_error(input.as_ref(), err))?;
     Ok(())
 }
 
@@ -583,7 +585,9 @@ pub fn copy_dir<P: AsRef<Path>>(input: P, output: P) -> CoreResult<()> {
 pub async fn copy_dir_async<P: AsRef<Path>>(from: P, to: P) -> CoreResult<()> {
     create_dir_all(&to)?;
 
-    let mut dir = tfs::read_dir(&from).await.map_err(|err| fs_error(from.as_ref(), err))?;
+    let mut dir = tfs::read_dir(&from)
+        .await
+        .map_err(|err| fs_error(from.as_ref(), err))?;
 
     loop {
         let item = dir.next_entry().await.map_err(|err| {
@@ -755,7 +759,9 @@ pub fn open_append<P: AsRef<Path>>(file: P) -> CoreResult<fs::File> {
 /// 写入成功返回 `Ok(())`，失败返回相应错误
 pub fn write_text<P: AsRef<Path>>(file: P, text: &str) -> CoreResult<()> {
     let mut stream = open_write(&file)?;
-    stream.write_all(text.as_bytes()).map_err(|err| fs_error(file.as_ref(), err))?;
+    stream
+        .write_all(text.as_bytes())
+        .map_err(|err| fs_error(file.as_ref(), err))?;
 
     Ok(())
 }
@@ -771,7 +777,10 @@ pub fn write_text<P: AsRef<Path>>(file: P, text: &str) -> CoreResult<()> {
 pub async fn write_text_async<P: AsRef<Path>>(file: P, text: String) -> CoreResult<()> {
     let mut stream = open_write_async(&file).await?;
 
-    stream.write_all(text.as_bytes()).await.map_err(|err| fs_error(file.as_ref(), err))?;
+    stream
+        .write_all(text.as_bytes())
+        .await
+        .map_err(|err| fs_error(file.as_ref(), err))?;
 
     Ok(())
 }
@@ -786,7 +795,9 @@ pub async fn write_text_async<P: AsRef<Path>>(file: P, text: String) -> CoreResu
 pub fn read_text<P: AsRef<Path>>(file: P) -> CoreResult<String> {
     let mut stream = open_read(&file)?;
     let mut content = String::new();
-    stream.read_to_string(&mut content).map_err(|err| fs_error(file.as_ref(), err))?;
+    stream
+        .read_to_string(&mut content)
+        .map_err(|err| fs_error(file.as_ref(), err))?;
     Ok(content)
 }
 
@@ -800,7 +811,10 @@ pub fn read_text<P: AsRef<Path>>(file: P) -> CoreResult<String> {
 pub async fn read_text_async<P: AsRef<Path>>(file: P) -> CoreResult<String> {
     let mut stream = open_read_async(&file).await?;
     let mut content = String::new();
-    stream.read_to_string(&mut content).await.map_err(|err| fs_error(file.as_ref(), err))?;
+    stream
+        .read_to_string(&mut content)
+        .await
+        .map_err(|err| fs_error(file.as_ref(), err))?;
     Ok(content)
 }
 
@@ -814,7 +828,9 @@ pub async fn read_text_async<P: AsRef<Path>>(file: P) -> CoreResult<String> {
 pub fn read_byte<P: AsRef<Path>>(file: P) -> CoreResult<Vec<u8>> {
     let mut stream = open_read(&file)?;
     let mut buffer = Vec::new();
-    stream.read_to_end(&mut buffer).map_err(|err| fs_error(file.as_ref(), err))?;
+    stream
+        .read_to_end(&mut buffer)
+        .map_err(|err| fs_error(file.as_ref(), err))?;
     Ok(buffer)
 }
 
@@ -828,7 +844,9 @@ pub fn read_byte<P: AsRef<Path>>(file: P) -> CoreResult<Vec<u8>> {
 pub async fn read_byte_async<P: AsRef<Path>>(file: P) -> CoreResult<Vec<u8>> {
     let mut stream = open_read(&file)?;
     let mut buffer = Vec::new();
-    stream.read_to_end(&mut buffer).map_err(|err| fs_error(file.as_ref(), err))?;
+    stream
+        .read_to_end(&mut buffer)
+        .map_err(|err| fs_error(file.as_ref(), err))?;
     Ok(buffer)
 }
 
@@ -855,7 +873,9 @@ pub fn delete<P: AsRef<Path>>(file: P) -> CoreResult<()> {
 /// 目标是文件时删除并返回 `Ok(())`，目录不做任何事；删除失败返回相应错误
 pub async fn delete_async<P: AsRef<Path>>(file: P) -> CoreResult<()> {
     if file.as_ref().is_file() {
-        tfs::remove_file(&file).await.map_err(|err| fs_error(file.as_ref(), err))?;
+        tfs::remove_file(&file)
+            .await
+            .map_err(|err| fs_error(file.as_ref(), err))?;
     }
     Ok(())
 }
@@ -870,7 +890,9 @@ pub async fn delete_async<P: AsRef<Path>>(file: P) -> CoreResult<()> {
 /// 写入成功返回 `Ok(())`，失败返回相应错误
 pub fn write_bytes<P: AsRef<Path>>(file: P, data: &[u8]) -> CoreResult<()> {
     let mut stream = open_write(&file)?;
-    stream.write_all(data).map_err(|err| fs_error(file.as_ref(), err))
+    stream
+        .write_all(data)
+        .map_err(|err| fs_error(file.as_ref(), err))
 }
 
 /// 异步写文件
@@ -883,7 +905,10 @@ pub fn write_bytes<P: AsRef<Path>>(file: P, data: &[u8]) -> CoreResult<()> {
 /// 写入成功返回 `Ok(())`，失败返回相应错误
 pub async fn write_bytes_async<P: AsRef<Path>>(file: P, data: &[u8]) -> CoreResult<()> {
     let mut stream = open_write_async(&file).await?;
-    stream.write_all(data).await.map_err(|err| fs_error(file.as_ref(), err))
+    stream
+        .write_all(data)
+        .await
+        .map_err(|err| fs_error(file.as_ref(), err))
 }
 
 /// 写文件

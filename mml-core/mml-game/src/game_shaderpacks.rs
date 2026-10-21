@@ -92,7 +92,11 @@ pub fn read_shaderpacks<P: AsRef<Path>>(path: P) -> CoreResult<ShaderpackObj> {
             let temp = zip.by_index(index);
             if let Ok(file) = temp {
                 let lang = mml_names::get_lang(mml_names::get_lang_type());
-                if file.is_file() && file.name_raw().ends_with(format!("lang/{lang}.lang").as_bytes()) {
+                if file.is_file()
+                    && file
+                        .name_raw()
+                        .ends_with(format!("lang/{lang}.lang").as_bytes())
+                {
                     read_data(file, &mut obj);
                 } else if file.is_file() && file.name_raw().ends_with(b"lang/en_US.lang") {
                     read_data(file, &mut obj);

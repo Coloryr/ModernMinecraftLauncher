@@ -35,7 +35,7 @@
 use mml_base::serialize_tools;
 use mml_config::config_obj::{HttpObj, ProxyState, ProxyType};
 use mml_names::i18;
-use mml_names::i18_items::error_type::{ErrorData, CoreResult, ErrorType, HttpErrorData};
+use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType, HttpErrorData};
 use mml_names::i18_items::info_type::InfoType;
 use reqwest::header::{ETAG, HeaderMap, HeaderValue, IF_NONE_MATCH, USER_AGENT};
 use reqwest::{Proxy, Request, Response, StatusCode};
@@ -125,11 +125,7 @@ fn map_err(error: reqwest::Error) -> ErrorType {
 
 /// 响应状态异常转 HttpError
 pub(crate) fn http_error(error: String, url: String, status: Option<u16>) -> ErrorType {
-    ErrorType::HttpError(HttpErrorData {
-        error,
-        url,
-        status,
-    })
+    ErrorType::HttpError(HttpErrorData { error, url, status })
 }
 
 /// 出错原因转 SerializerError

@@ -75,13 +75,10 @@ fn read_timeout_kills_body_stall() {
                 detail.contains("Err"),
                 "应当以错误结束（超时），实际：{detail}"
             );
-            println!(
-                "→ read_timeout 生效（约 {:?} 后失败）",
-                elapsed
-            );
+            println!("→ read_timeout 生效（约 {:?} 后失败）", elapsed);
         }
-        Err(_) => panic!(
-            "✗ 20 秒内仍未结束：read_timeout 对'读 body 卡住'**没有生效**——需要另找兜底"
-        ),
+        Err(_) => {
+            panic!("✗ 20 秒内仍未结束：read_timeout 对'读 body 卡住'**没有生效**——需要另找兜底")
+        }
     }
 }

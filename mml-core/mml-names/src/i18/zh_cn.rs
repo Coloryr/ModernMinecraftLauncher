@@ -102,7 +102,11 @@ impl I18Lang for ZhCn {
             ErrorType::HttpError(data) => {
                 // 请求在构建阶段就失败时没有 URL（reqwest 的 error.url() 为空）：
                 // 给个明确说法，日志里不要留一段空白
-                let url = if data.url.is_empty() { "（无地址）" } else { data.url.as_str() };
+                let url = if data.url.is_empty() {
+                    "（无地址）"
+                } else {
+                    data.url.as_str()
+                };
                 match data.status {
                     Some(status) => {
                         format!("网络请求 {} 失败：{}（状态码 {}）", url, data.error, status)
@@ -113,7 +117,11 @@ impl I18Lang for ZhCn {
 
             ErrorType::Aborted { url } => {
                 // 与 HttpError 同一口径：拿不到地址时给个明确说法，别留空白
-                let url = if url.is_empty() { "（无地址）" } else { url.as_str() };
+                let url = if url.is_empty() {
+                    "（无地址）"
+                } else {
+                    url.as_str()
+                };
                 format!("网络请求 {url} 被中断：代理或网络设置已更新")
             }
 
@@ -224,7 +232,11 @@ impl I18Lang for ZhCn {
                 data.name,
                 data.times,
                 data.error,
-                if data.url.is_empty() { "缺失" } else { data.url.as_str() }
+                if data.url.is_empty() {
+                    "缺失"
+                } else {
+                    data.url.as_str()
+                }
             ),
             ErrorType::DownloadFileFail => String::from("文件下载失败"),
 
@@ -237,9 +249,7 @@ impl I18Lang for ZhCn {
             }
             ErrorType::ThreadError(data) => format!("线程启动失败：{}", data.error),
             ErrorType::ProcessError(data) => format!("进程启动失败：{}", data.error),
-            ErrorType::ProcessElevationUnsupported => {
-                String::from("当前平台不支持管理员提权")
-            }
+            ErrorType::ProcessElevationUnsupported => String::from("当前平台不支持管理员提权"),
             ErrorType::NamedPipeCreateFailed(data) => {
                 format!("创建命名管道失败：{}", data.error)
             }

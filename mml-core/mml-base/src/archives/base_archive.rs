@@ -17,10 +17,9 @@ use mml_sys::path_helper;
 use uuid::Uuid;
 
 use crate::archives::{
-    ArchiveAddFile, ArchiveHandle, ArchiveType, BaseArchiveGui, IBaseArchiveGui, TarMode,
-    r7z_reader::R7zReader, replace_invalid_name, tar_reader::TarReader, zip_reader::ZipReader,
-    write_error,
-    fs_err,
+    ArchiveAddFile, ArchiveHandle, ArchiveType, BaseArchiveGui, IBaseArchiveGui, TarMode, fs_err,
+    r7z_reader::R7zReader, replace_invalid_name, tar_reader::TarReader, write_error,
+    zip_reader::ZipReader,
 };
 
 /// 压缩包条目信息
@@ -139,7 +138,10 @@ impl BaseArchive {
     /// # 返回值
     ///
     /// 同 [`open_readonly`](Self::open_readonly)
-    pub fn open_readonly_as<P: AsRef<Path>>(path: P, archive_type: ArchiveType) -> CoreResult<Self> {
+    pub fn open_readonly_as<P: AsRef<Path>>(
+        path: P,
+        archive_type: ArchiveType,
+    ) -> CoreResult<Self> {
         let path = path.as_ref().to_path_buf();
         let file = path_helper::open_read(&path)?;
         let mut handle = Self::make_handle(archive_type, &path, file)?;
@@ -332,9 +334,7 @@ impl BaseArchive {
     fn create_empty_zip(path: &Path) -> CoreResult<()> {
         use zip::ZipWriter;
 
-        let file = fs::File::create(path).map_err(|err| {
-            fs_err(path.to_path_buf(), err)
-        })?;
+        let file = fs::File::create(path).map_err(|err| fs_err(path.to_path_buf(), err))?;
 
         let zip = ZipWriter::new(file);
         zip.finish().map_err(write_error)?;
@@ -352,9 +352,7 @@ impl BaseArchive {
     fn create_empty_tar(path: &Path) -> CoreResult<()> {
         use tar::Builder;
 
-        let file = fs::File::create(path).map_err(|err| {
-            fs_err(path.to_path_buf(), err)
-        })?;
+        let file = fs::File::create(path).map_err(|err| fs_err(path.to_path_buf(), err))?;
 
         let mut builder = Builder::new(file);
         builder.finish().map_err(write_error)?;
@@ -824,12 +822,8 @@ impl BaseArchive {
         }
 
         // 用新压缩包替换原有压缩包
-        fs::remove_file(&self.path).map_err(|err| {
-            fs_err(self.path.clone(), err)
-        })?;
-        fs::rename(&temp_archive, &self.path).map_err(|err| {
-            fs_err(self.path.clone(), err)
-        })?;
+        fs::remove_file(&self.path).map_err(|err| fs_err(self.path.clone(), err))?;
+        fs::rename(&temp_archive, &self.path).map_err(|err| fs_err(self.path.clone(), err))?;
 
         // 刷新内部条目列表
         self.refresh_after_modify()?;
@@ -888,9 +882,8 @@ impl BaseArchive {
             path_helper::create_dir_all(parent)?;
         }
         let mut file = path_helper::open_write(&dest_path)?;
-        file.write_all(data).map_err(|err| {
-            fs_err(dest_path.clone(), err)
-        })?;
+        file.write_all(data)
+            .map_err(|err| fs_err(dest_path.clone(), err))?;
 
         // 先压缩到临时文件，再原子替换
         let temp_archive = std::env::temp_dir().join(format!("mml_archive_{}.tmp", Uuid::new_v4()));
@@ -913,12 +906,8 @@ impl BaseArchive {
         }
 
         // 用新压缩包替换原有压缩包
-        fs::remove_file(&self.path).map_err(|err| {
-            fs_err(self.path.clone(), err)
-        })?;
-        fs::rename(&temp_archive, &self.path).map_err(|err| {
-            fs_err(self.path.clone(), err)
-        })?;
+        fs::remove_file(&self.path).map_err(|err| fs_err(self.path.clone(), err))?;
+        fs::rename(&temp_archive, &self.path).map_err(|err| fs_err(self.path.clone(), err))?;
 
         // 刷新内部条目列表
         self.refresh_after_modify()?;

@@ -7,16 +7,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use mml_names::i18_items::error_type::{
-    CoreResult, 
-};
+use mml_names::i18_items::error_type::CoreResult;
 use mml_sys::path_helper;
 use sevenz_rust2::{ArchiveEntry, ArchiveReader, ArchiveWriter, Password};
 
 use crate::archives::{
     self, ArchiveEntryInfo, ArchiveHandle, ArchiveProcess, BaseArchiveGui, IBaseArchiveGui,
-    open_error, root_path_or_pack, read_error, write_error,
-    fs_err, archive_err,
+    archive_err, fs_err, open_error, read_error, root_path_or_pack, write_error,
 };
 
 /// 保持打开文件句柄的 7z 读取句柄
@@ -51,12 +48,12 @@ impl R7zReader {
     ///
     /// 返回已定位到文件开头的读取器；克隆、定位或解析头部失败时返回相应错误
     fn reader(&self) -> CoreResult<ArchiveReader<fs::File>> {
-        let mut file = self.file.try_clone().map_err(|err| {
-            fs_err(self.path.clone(), err)
-        })?;
-        file.seek(SeekFrom::Start(0)).map_err(|err| {
-            fs_err(self.path.clone(), err)
-        })?;
+        let mut file = self
+            .file
+            .try_clone()
+            .map_err(|err| fs_err(self.path.clone(), err))?;
+        file.seek(SeekFrom::Start(0))
+            .map_err(|err| fs_err(self.path.clone(), err))?;
         ArchiveReader::new(file, Password::empty()).map_err(|err| open_error(&self.path, err))
     }
 
@@ -79,7 +76,13 @@ impl R7zReader {
         gui: BaseArchiveGui,
     ) -> CoreResult<()> {
         let process = ArchiveProcess::new(gui);
-        Self::r7z_compress(&process, archive_file, pack_dir, root_path_or_pack(root_path, pack_dir), filter)
+        Self::r7z_compress(
+            &process,
+            archive_file,
+            pack_dir,
+            root_path_or_pack(root_path, pack_dir),
+            filter,
+        )
     }
 
     /// 解压 7z 文件到指定目录
@@ -143,9 +146,7 @@ impl R7zReader {
                     ArchiveEntry::from_path(&path, tempfile.clone()),
                     Some(buffer),
                 )
-                .map_err(|err| {
-                    archive_err(path.display().to_string(), tempfile, err)
-                })?;
+                .map_err(|err| archive_err(path.display().to_string(), tempfile, err))?;
         }
 
         match archive.finish() {
@@ -171,9 +172,8 @@ impl R7zReader {
         let file = path_helper::open_read(archive_file)?;
         path_helper::create_dir_all(output_dir)?;
 
-        let mut seven = ArchiveReader::new(file, Password::empty()).map_err(|err| {
-            open_error(archive_file, err)
-        })?;
+        let mut seven = ArchiveReader::new(file, Password::empty())
+            .map_err(|err| open_error(archive_file, err))?;
 
         process.set_count(seven.archive().files.len());
 
@@ -250,9 +250,7 @@ impl ArchiveHandle for R7zReader {
             return Err(read_error(name));
         }
 
-        result.ok_or_else(|| {
-            read_error(name)
-        })
+        result.ok_or_else(|| read_error(name))
     }
 
     /// 7z 无法真正流式读取，先整条读进内存再包成游标

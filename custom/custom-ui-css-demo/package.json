@@ -1,0 +1,23 @@
+{
+  "name": "custom-ui-css-demo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "controls": "node scripts/controls.ts",
+    "pack": "node scripts/pack.ts",
+    "build": "node scripts/pack.ts",
+    "deps": "node scripts/deps.mjs",
+    "preinstall": "node scripts/deps.mjs"
+  },
+  "dependencies": {
+    "mml-vue": "file:.mml-deps/mml-vue",
+    "mml-ipc": "file:.mml-deps/mml-ipc"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "vite": "^8.2.1",
+    "vue": "^3.5.41"
+  }
+}

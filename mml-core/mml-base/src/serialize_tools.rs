@@ -68,7 +68,8 @@ impl MiniJsonObj {
     ///
     /// JSON 非法时返回序列化错误
     pub fn from_stream<R: Read>(stream: R) -> CoreResult<Self> {
-        let value = serde_json::from_reader::<_, serde_json::Value>(stream).map_err(serializer_err)?;
+        let value =
+            serde_json::from_reader::<_, serde_json::Value>(stream).map_err(serializer_err)?;
 
         Ok(Self { value })
     }
@@ -379,9 +380,9 @@ impl MiniTomlMap {
     /// 读取失败或 TOML 非法时返回相应错误
     pub fn from_stream<R: Read>(stream: &mut R) -> CoreResult<Self> {
         let mut toml = String::new();
-        stream.read_to_string(&mut toml).map_err(|err| {
-            ErrorType::ArchiveReadError(ErrorData::from_error(err))
-        })?;
+        stream
+            .read_to_string(&mut toml)
+            .map_err(|err| ErrorType::ArchiveReadError(ErrorData::from_error(err)))?;
 
         let obj = toml::from_str::<toml::Table>(&toml).map_err(serializer_err)?;
 

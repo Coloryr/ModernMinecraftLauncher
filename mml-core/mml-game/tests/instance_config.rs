@@ -113,7 +113,10 @@ fn instance_save_to_disk() {
     let value: serde_json::Value = serde_json::from_str(&text).unwrap();
 
     // 文件名与字段命名规范
-    assert_eq!(json_file.file_name().unwrap().to_string_lossy(), "game.json");
+    assert_eq!(
+        json_file.file_name().unwrap().to_string_lossy(),
+        "game.json"
+    );
     assert_eq!(value["Name"], format!("inst-{dir}"));
     assert_eq!(value["Version"], "1.20.4");
     assert_eq!(value["DirName"], dir);
@@ -179,7 +182,9 @@ fn game_options_save_and_read_round_trip() {
     .into_iter()
     .collect();
 
-    instance.save_options(&options, None).expect("写 options 失败");
+    instance
+        .save_options(&options, None)
+        .expect("写 options 失败");
 
     let file = instance.get_optifine_file();
     assert!(file.exists(), "options 文件应已写盘: {}", file.display());
@@ -207,7 +212,9 @@ fn game_options_line_endings() {
 
     // Windows 写 CRLF，Unix 写 LF
     let mut options: std::collections::HashMap<String, String> =
-        [("fov".to_string(), "1.0".to_string())].into_iter().collect();
+        [("fov".to_string(), "1.0".to_string())]
+            .into_iter()
+            .collect();
     instance.save_options(&options, None).unwrap();
 
     // 手工用另一种换行符写盘再读，键值分隔符仍是 :

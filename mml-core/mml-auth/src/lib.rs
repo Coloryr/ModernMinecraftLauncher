@@ -221,7 +221,11 @@ impl LoginObj {
     ///
     /// 新建的空白账户，只有用户名与 UUID，令牌与登录信息都为空
     pub fn new_empty(user_name: String, uuid: String) -> Self {
-        Self { user_name, uuid, ..Default::default() }
+        Self {
+            user_name,
+            uuid,
+            ..Default::default()
+        }
     }
 
     /// 创建仅有令牌的账户，无用户名和 UUID
@@ -235,7 +239,11 @@ impl LoginObj {
     ///
     /// 新建的仅令牌账户，用户名与 UUID 为空
     pub fn new_token(access_token: String, client_token: String) -> Self {
-        Self { access_token, client_token, ..Default::default() }
+        Self {
+            access_token,
+            client_token,
+            ..Default::default()
+        }
     }
 
     /// 记录访问令牌的有效期，单位秒，按当前时间换算为绝对过期时间

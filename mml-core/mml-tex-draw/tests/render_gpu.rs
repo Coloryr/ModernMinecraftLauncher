@@ -15,11 +15,13 @@ use mml_tex_draw::{
 
 /// 取参考客户端 jar 路径，环境变量 MML_TEST_JAR 优先
 fn ref_jar() -> PathBuf {
-    std::env::var("MML_TEST_JAR").map(PathBuf::from).unwrap_or_else(|_| {
-        PathBuf::from(std::env::var("TEMP").unwrap_or_default())
-            .join("mml-262-ref")
-            .join("client.jar")
-    })
+    std::env::var("MML_TEST_JAR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            PathBuf::from(std::env::var("TEMP").unwrap_or_default())
+                .join("mml-262-ref")
+                .join("client.jar")
+        })
 }
 
 /// 取 tests/out 目录，不存在时创建
@@ -80,8 +82,12 @@ fn print_quad_diag(model: &BakedModel) {
     println!(
         "furnace：{} quads，L0=({:.2},{:.2},{:.2}) L1=({:.2},{:.2},{:.2})",
         model.quads.len(),
-        light0[0], light0[1], light0[2],
-        light1[0], light1[1], light1[2],
+        light0[0],
+        light0[1],
+        light0[2],
+        light1[0],
+        light1[1],
+        light1[2],
     );
     for q in &model.quads {
         let mut min_x = f32::MAX;
@@ -104,9 +110,14 @@ fn print_quad_diag(model: &BakedModel) {
         println!(
             "  {:8} 屏幕x[{:.0},{:.0}] y[{:.0},{:.0}] depth={:.2} n=({:.2},{:.2},{:.2}) accum={:.3}",
             q.tex.split('/').next_back().unwrap_or(""),
-            min_x, max_x, min_y, max_y,
+            min_x,
+            max_x,
+            min_y,
+            max_y,
             z / 4.0,
-            n[0], n[1], n[2],
+            n[0],
+            n[1],
+            n[2],
             (d * 0.6 + 0.4).min(1.0),
         );
     }

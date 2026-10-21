@@ -15,8 +15,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use mml_tex_draw::init;
 use mml_names::names;
+use mml_tex_draw::init;
 
 /// 生成测试用的唯一临时目录路径，不自动创建
 ///

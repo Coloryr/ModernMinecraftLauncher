@@ -14,9 +14,7 @@ use mml_base::{
     serialize_tools, version_parse,
 };
 use mml_names::{
-    i18_items::error_type::{
-        CoreResult, DataNotFoundData, ErrorType, FileSystemErrorData,
-    },
+    i18_items::error_type::{CoreResult, DataNotFoundData, ErrorType, FileSystemErrorData},
     names,
 };
 use mml_net::{
@@ -26,6 +24,7 @@ use mml_net::{
 use mml_sys::path_helper;
 use zip::ZipArchive;
 
+use crate::error::archive_read_err;
 use crate::{
     launcher::instance_setting_obj::InstanceSettingObj,
     launcher_path::{libraries_path, version_path},
@@ -36,7 +35,6 @@ use crate::{
     },
     mojang::game_arg_obj::ArtifactObj,
 };
-use crate::error::{archive_read_err};
 
 /// 根据名字构建运行库信息
 ///
@@ -530,7 +528,8 @@ async fn get_forge_libs(
     let mut version_json = String::new();
     let version_ok = match zip.by_name(names::VERSION_FILE) {
         Ok(mut file) => {
-            file.read_to_string(&mut version_json).map_err(archive_read_err)?;
+            file.read_to_string(&mut version_json)
+                .map_err(archive_read_err)?;
             true
         }
         Err(_) => false,
@@ -540,7 +539,8 @@ async fn get_forge_libs(
     let mut install_json = String::new();
     let install_ok = match zip.by_name(names::FILE_INSTALL_PROFILE) {
         Ok(mut file) => {
-            file.read_to_string(&mut install_json).map_err(archive_read_err)?;
+            file.read_to_string(&mut install_json)
+                .map_err(archive_read_err)?;
             true
         }
         Err(_) => false,
@@ -723,7 +723,6 @@ impl InstanceSettingObj {
     pub async fn build_forge_client(&self, hash: bool) -> FileItemObj {
         build_forge_client(&self.version, &self.loader_version.as_ref().unwrap(), hash).await
     }
-
 }
 
 #[cfg(test)]
@@ -733,8 +732,8 @@ mod embedded_tests {
     use std::path::PathBuf;
     use std::sync::Once;
     use uuid::Uuid;
-    use zip::write::SimpleFileOptions;
     use zip::ZipWriter;
+    use zip::write::SimpleFileOptions;
 
     /// 起内核系统并初始化运行库目录，每进程一次
     ///
@@ -864,12 +863,15 @@ mod embedded_tests {
         let rel = format!("test/absent/{}/lib.jar", Uuid::new_v4().simple());
         let info = vec![embedded_lib(&rel, "00")];
 
-        let list = build_forge_libs(&info, "1.12.2", "14.23.5.2864", false, false, false, false).await;
+        let list =
+            build_forge_libs(&info, "1.12.2", "14.23.5.2864", false, false, false, false).await;
 
         assert!(
             !list.iter().any(|item| item.url.is_empty()),
             "下载列表里不该有空地址的条目：{:?}",
-            list.iter().map(|item| item.name.clone()).collect::<Vec<_>>()
+            list.iter()
+                .map(|item| item.name.clone())
+                .collect::<Vec<_>>()
         );
     }
 
@@ -885,7 +887,8 @@ mod embedded_tests {
         std::fs::write(&local, data).unwrap();
 
         let info = vec![embedded_lib(&rel, &sha1)];
-        let list = build_forge_libs(&info, "1.12.2", "14.23.5.2864", false, false, false, false).await;
+        let list =
+            build_forge_libs(&info, "1.12.2", "14.23.5.2864", false, false, false, false).await;
 
         assert!(
             list.iter().any(|item| item.file == local),
@@ -893,4 +896,3 @@ mod embedded_tests {
         );
     }
 }
-

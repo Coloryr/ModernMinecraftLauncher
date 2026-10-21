@@ -181,12 +181,8 @@ async fn init() -> CoreResult<OpenJ9ListObj> {
     data.push_str(&mml_names::get_line_ending());
     data.push_str("JSON.stringify(sourceDataJson)");
 
-    let rt = AsyncRuntime::new().map_err(|err| {
-        task_err(err)
-    })?;
-    let ctx = AsyncContext::full(&rt).await.map_err(|err| {
-        task_err(err)
-    })?;
+    let rt = AsyncRuntime::new().map_err(|err| task_err(err))?;
+    let ctx = AsyncContext::full(&rt).await.map_err(|err| task_err(err))?;
 
     let result: String = ctx.with(|ctx| ctx.eval(data).unwrap()).await;
 

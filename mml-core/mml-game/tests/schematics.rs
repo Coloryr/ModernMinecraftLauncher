@@ -5,11 +5,11 @@
 
 use std::path::{Path, PathBuf};
 
+use mml_nbt::NbtType;
 use mml_nbt::nbt_file::{CompressType, NbtFile};
 use mml_nbt::nbt_types::{
     NbtByteArray, NbtCompound, NbtInt, NbtList, NbtLongArray, NbtShort, NbtString,
 };
-use mml_nbt::NbtType;
 
 use mml_game::game_schematics::{self, SchematicType};
 
@@ -54,7 +54,10 @@ fn worldedit_sample() -> PathBuf {
     root.data.insert("Width".into(), short(3));
     root.data.insert("Height".into(), short(4));
     root.data.insert("Length".into(), short(5));
-    root.data.insert("BlockData".into(), NbtByteArray::new(vec![0, 0, 1]).to_nbt());
+    root.data.insert(
+        "BlockData".into(),
+        NbtByteArray::new(vec![0, 0, 1]).to_nbt(),
+    );
 
     let mut palette = NbtCompound::new();
     palette.data.insert("minecraft:air".into(), int(0));
@@ -101,7 +104,8 @@ fn litematic_sample() -> PathBuf {
     let mut meta = NbtCompound::new();
     meta.data.insert("Name".into(), string("test-litematic"));
     meta.data.insert("Author".into(), string("mml-test"));
-    meta.data.insert("Description".into(), string("generated in-test"));
+    meta.data
+        .insert("Description".into(), string("generated in-test"));
     let mut size = NbtCompound::new();
     size.data.insert("x".into(), int(3)); // 长
     size.data.insert("y".into(), int(2)); // 高
@@ -118,9 +122,11 @@ fn litematic_sample() -> PathBuf {
     let mut stone = NbtCompound::new();
     stone.data.insert("Name".into(), string("minecraft:stone"));
     palette.add_item(stone.to_nbt());
-    main.data.insert("BlockStatePalette".into(), palette.to_nbt());
+    main.data
+        .insert("BlockStatePalette".into(), palette.to_nbt());
     // 2 位打包：第 0 位方块 = 1 即 stone，第 1 位 = 0 即 air，共 2 个方块
-    main.data.insert("BlockStates".into(), NbtLongArray::new(vec![1]).to_nbt());
+    main.data
+        .insert("BlockStates".into(), NbtLongArray::new(vec![1]).to_nbt());
 
     let mut regions = NbtCompound::new();
     regions.data.insert("Main".into(), main.to_nbt());

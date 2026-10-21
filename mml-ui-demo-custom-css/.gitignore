@@ -1,5 +1,0 @@
-node_modules/
-*.zip
-# pack 时由 Vite 编出来的入口与中间目录，不提交
-/custom.js
-/dist/

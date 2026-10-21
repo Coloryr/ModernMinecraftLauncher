@@ -386,7 +386,11 @@ pub(crate) fn fs_err(path: PathBuf, err: impl std::fmt::Display) -> ErrorType {
 /// # 返回值
 ///
 /// 见 [`ErrorType`]
-pub(crate) fn archive_err(source: String, target: String, err: impl std::fmt::Display) -> ErrorType {
+pub(crate) fn archive_err(
+    source: String,
+    target: String,
+    err: impl std::fmt::Display,
+) -> ErrorType {
     ErrorType::ArchiveError(ArchiveErrorData {
         source,
         target,

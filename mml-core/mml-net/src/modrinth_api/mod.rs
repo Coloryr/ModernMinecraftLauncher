@@ -16,12 +16,10 @@
 
 use std::collections::HashMap;
 
-use mml_names::{
-    i18_items::error_type::{CoreResult},
-    names,
-};
+use mml_names::{i18_items::error_type::CoreResult, names};
 use serde::{Deserialize, Serialize};
 
+use crate::serializer_err;
 use crate::{
     modrinth_api::{
         project_obj::ModrinthProjectObj, search_obj::ModrinthSearchObj, team_obj::ModrinthTeamObj,
@@ -29,7 +27,6 @@ use crate::{
     },
     urls,
 };
-use crate::serializer_err;
 
 pub mod project_obj;
 pub mod search_obj;
@@ -430,9 +427,7 @@ pub async fn get_version(id: &str, version: &str) -> CoreResult<ModrinthVersionO
 pub async fn get_versions(ids: Vec<String>) -> CoreResult<Vec<ModrinthVersionObj>> {
     // 用紧凑 JSON + URL 编码：`json_to_string` 输出 pretty 多行格式，
     // 直接拼进 URL 会带换行与缩进，服务端解析失败或必须依赖 reqwest 兜底清理
-    let ids_json = serde_json::to_string(&ids).map_err(|err| {
-        serializer_err(err)
-    })?;
+    let ids_json = serde_json::to_string(&ids).map_err(|err| serializer_err(err))?;
 
     let mut url = reqwest::Url::parse(&format!("{}versions", urls::MODRINTH_API)).unwrap();
     url.query_pairs_mut().append_pair("ids", &ids_json);

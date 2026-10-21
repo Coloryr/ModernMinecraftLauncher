@@ -378,10 +378,7 @@ fn bound_of(part: &str) -> Option<String> {
 /// 是不是"干净的版本号"：去掉构建元数据后全是点分数字
 fn is_plain_version(version: &str) -> bool {
     let core = version.split('+').next().unwrap_or(version);
-    !core.is_empty()
-        && core
-            .split('.')
-            .all(|part| part.parse::<u64>().is_ok())
+    !core.is_empty() && core.split('.').all(|part| part.parse::<u64>().is_ok())
 }
 
 /// 解析 JSON 字符串数组 `[ ">=1.18.1", "<1.19.3" ]`，每个元素单独解析后组合成 AND。
@@ -487,7 +484,10 @@ fn parse_fabric_conjunction(s: &str) -> CoreResult<VersionRange> {
         }
     }
 
-    Ok(VersionRange::Interval(Interval::from(Bounds { lower, upper })))
+    Ok(VersionRange::Interval(Interval::from(Bounds {
+        lower,
+        upper,
+    })))
 }
 
 /// 解析单个 Fabric 记号
@@ -806,7 +806,11 @@ mod tests {
         assert!(r.contains("1.20.1.0"));
         assert!(!r.contains("1.20.2"));
         // 精确就是精确：`[1.21]` 不吃 1.21.1；游戏版本那一档的放宽在 game_mods 里
-        assert!(!parse_maven_version_range("[1.21]").unwrap().contains("1.21.1"));
+        assert!(
+            !parse_maven_version_range("[1.21]")
+                .unwrap()
+                .contains("1.21.1")
+        );
     }
 
     #[test]

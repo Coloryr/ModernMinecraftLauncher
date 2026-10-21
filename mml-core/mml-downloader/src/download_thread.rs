@@ -527,9 +527,8 @@ async fn write_file(
         match chunk {
             Ok(None) => break,
             Ok(Some(data)) => {
-                file.write_all(&data).map_err(|err| {
-                    StreamError(ErrorData::from_error(err))
-                })?;
+                file.write_all(&data)
+                    .map_err(|err| StreamError(ErrorData::from_error(err)))?;
 
                 obj.item.set_state(DownloadItemState::Download);
                 obj.item.add_progress(data.len() as u64);
@@ -638,9 +637,9 @@ fn check_hash<R: Read + Seek>(file: &PathBuf, hash: &FileHash, stream: &mut R) -
                 return sha1;
             }
 
-            stream.seek(SeekFrom::Start(0)).map_err(|err| {
-                stream_err(err)
-            })?;
+            stream
+                .seek(SeekFrom::Start(0))
+                .map_err(|err| stream_err(err))?;
 
             let sha256 = match hash_helper::gen_hash_from_reader(HashType::Sha256, stream) {
                 Ok(hash) => {
@@ -687,9 +686,9 @@ fn check_hash<R: Read + Seek>(file: &PathBuf, hash: &FileHash, stream: &mut R) -
                 return sha1;
             }
 
-            stream.seek(SeekFrom::Start(0)).map_err(|err| {
-                stream_err(err)
-            })?;
+            stream
+                .seek(SeekFrom::Start(0))
+                .map_err(|err| stream_err(err))?;
 
             let sha512 = match hash_helper::gen_hash_from_reader(HashType::Sha512, stream) {
                 Ok(hash) => {

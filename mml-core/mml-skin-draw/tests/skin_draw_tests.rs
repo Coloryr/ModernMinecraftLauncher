@@ -8,7 +8,13 @@ use tiny_skia::{Pixmap, Point};
 
 /// 比较两个位图的内容是否完全一致
 fn assert_bitmap_eq(a: &Pixmap, b: &Pixmap) {
-    assert_eq!(a.width(), b.width(), "bitmap width mismatch: {} != {}", a.width(), b.width());
+    assert_eq!(
+        a.width(),
+        b.width(),
+        "bitmap width mismatch: {} != {}",
+        a.width(),
+        b.width()
+    );
     assert_eq!(
         a.height(),
         b.height(),
@@ -16,7 +22,11 @@ fn assert_bitmap_eq(a: &Pixmap, b: &Pixmap) {
         a.height(),
         b.height()
     );
-    assert_eq!(a.data().len(), b.data().len(), "bitmap data length mismatch");
+    assert_eq!(
+        a.data().len(),
+        b.data().len(),
+        "bitmap data length mismatch"
+    );
     assert_eq!(a.data(), b.data(), "bitmap pixel data mismatch");
 }
 
@@ -170,7 +180,8 @@ fn test_elytra_2d_flying() {
 fn regen_3d_refs() {
     let image = load_skin("skin_slim.png");
 
-    let a = draw_head(&image, DrawHeadType::Type3D(Draw3DType::TypeADown)).expect("3d typea 应成功");
+    let a =
+        draw_head(&image, DrawHeadType::Type3D(Draw3DType::TypeADown)).expect("3d typea 应成功");
     mml_skin::save_bitmap(&a, Path::new("tests").join("out_head_3d_a.png").as_path());
 
     let b = draw_head(

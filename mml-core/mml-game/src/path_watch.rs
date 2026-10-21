@@ -18,8 +18,8 @@ use notify::{
     event::{CreateKind, RemoveKind},
 };
 
+use crate::error::task_err;
 use crate::launcher_path::instance_path;
-use crate::error::{task_err};
 
 /// 监听是否生效开关
 static ENABLE_WATCHER: AtomicBool = AtomicBool::new(false);

@@ -25,6 +25,7 @@ use reqwest::{
 };
 use serde::{Serialize, de::DeserializeOwned};
 
+use crate::serializer_err;
 use crate::{
     curseforge_api::{
         categories_obj::CurseForgeCategoriesObj,
@@ -34,7 +35,6 @@ use crate::{
     },
     urls,
 };
-use crate::serializer_err;
 
 pub mod categories_obj;
 pub mod file_obj;

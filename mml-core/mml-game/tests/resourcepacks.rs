@@ -14,8 +14,8 @@ use std::sync::Once;
 use mml_game::game_resourcepacks::{
     ResourcepackObj, process_resourcepack as process_resourcepack_raw,
 };
-use zip::write::SimpleFileOptions;
 use zip::ZipWriter;
+use zip::write::SimpleFileOptions;
 
 /// 测试里固定的界面语言，与前端 `locale` 同值
 const LANG: &str = "zh_cn";
@@ -302,7 +302,10 @@ fn read_translate_without_lang_falls_back() {
     // 连 fallback 都没有 → 把 key 原样给出来，比留空强
     let bare = make_resourcepack_with_lang(
         r#"{"pack":{"pack_format":15,"description":{"translate":"some.key"}}}"#.as_bytes(),
-        &[text_entry("assets/fo/lang/zh_cn.json", r#"{"other.key":"别的"}"#)],
+        &[text_entry(
+            "assets/fo/lang/zh_cn.json",
+            r#"{"other.key":"别的"}"#,
+        )],
     );
     assert_eq!(process_resourcepack(&bare).unwrap().description, "some.key");
 }

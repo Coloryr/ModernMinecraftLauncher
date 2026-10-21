@@ -1,6 +1,6 @@
 use std::{env, path::Path, sync::Arc};
 
-use mml_downloader::{IDownloadGui, DownloadTaskState, download_item::DownloadItem};
+use mml_downloader::{DownloadTaskState, IDownloadGui, download_item::DownloadItem};
 
 /// 下载回调的测试实现，只把状态打到标准输出
 struct GuiRun {}

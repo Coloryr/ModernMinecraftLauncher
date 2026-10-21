@@ -789,14 +789,16 @@ mod windows_pipe_tests {
         std::thread::spawn(move || {
             tx_out
                 .send(process_helper::connect_named_pipe_with_timeout(
-                    HANDLE(o_out.as_raw_handle()), 10_000,
+                    HANDLE(o_out.as_raw_handle()),
+                    10_000,
                 ))
                 .ok();
         });
         std::thread::spawn(move || {
             tx_err
                 .send(process_helper::connect_named_pipe_with_timeout(
-                    HANDLE(o_err.as_raw_handle()), 10_000,
+                    HANDLE(o_err.as_raw_handle()),
+                    10_000,
                 ))
                 .ok();
         });

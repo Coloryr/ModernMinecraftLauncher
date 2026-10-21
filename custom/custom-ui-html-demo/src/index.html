@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-CN" data-mml-theme="Dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>M²L · HTML 整页主题</title>
+  <link rel="stylesheet" href="./style.css" />
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <div class="page">
+    <!-- 整页主题自己画标题栏：iframe 里的页面拿不到启动器的窗口按钮 -->
+    <header class="titlebar" data-titlebar>
+      <div class="brand">
+        <span class="brand-mark">M²L</span>
+        <span class="brand-name">HTML 整页主题</span>
+        <span class="tag">index.html</span>
+      </div>
+
+      <div class="titlebar-actions">
+        <button class="icon-btn" id="theme-toggle" type="button" title="切换亮 / 暗主题" aria-label="切换亮 / 暗主题">
+          <svg class="icon icon-moon" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M13.2 9.6A5.6 5.6 0 0 1 6.4 2.8 5.6 5.6 0 1 0 13.2 9.6Z" />
+          </svg>
+          <svg class="icon icon-sun" viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="8" cy="8" r="3" />
+            <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9 13 13M13 3l-1.1 1.1M4.1 11.9 3 13" />
+          </svg>
+        </button>
+        <button class="win-btn" type="button" data-window="minimize" title="最小化" aria-label="最小化">
+          <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5h6" /></svg>
+        </button>
+        <button class="win-btn" type="button" data-window="maximize" title="最大化" aria-label="最大化">
+          <svg viewBox="0 0 10 10" aria-hidden="true"><rect x="2" y="2" width="6" height="6" rx="0.6" /></svg>
+        </button>
+        <button class="win-btn is-close" type="button" data-window="close" title="关闭" aria-label="关闭">
+          <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2.5 2.5l5 5M7.5 2.5l-5 5" /></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <h2>本地实例</h2>
+          <button class="ghost-btn" id="refresh" type="button">刷新</button>
+        </div>
+        <div class="instances" id="instances" role="listbox" aria-label="本地实例"></div>
+        <p class="empty-tip" id="instance-empty" hidden>没有找到实例，先去内置界面新建一个。</p>
+
+        <div class="sidebar-foot">
+          <strong>整页主题</strong>
+          <p>包根只有 <code>index.html</code>、<code>style.css</code>、<code>app.js</code>，没有 Vue，也没有构建步骤。</p>
+        </div>
+      </aside>
+
+      <main class="content">
+        <section class="hero">
+          <div class="hero-copy">
+            <p class="eyebrow">完全自定义界面 · 示例</p>
+            <h1>星野 <span>Server</span></h1>
+            <p class="hero-sub">一张 HTML 页面接管整个主窗口：自己的标题栏、自己的实例列表、自己的启动按钮，全部由这一页决定。</p>
+            <div class="hero-meta">
+              <span class="dot"></span>1.20.1 · Forge
+              <span class="dot"></span>正版 / 离线都能进
+              <span class="dot"></span>开服第 128 天
+            </div>
+          </div>
+          <div class="online-card">
+            <span class="online-num">24</span>
+            <span class="online-label">当前在线</span>
+            <span class="online-bar"><i></i></span>
+          </div>
+        </section>
+
+        <div class="grid">
+          <section class="card launch-card">
+            <div class="card-head">
+              <h2>启动游戏</h2>
+              <span class="chip" id="launch-state">待机</span>
+            </div>
+
+            <div class="selected">
+              <span class="avatar" id="selected-avatar">?</span>
+              <div class="selected-info">
+                <strong id="selected-name">未选择实例</strong>
+                <span class="muted" id="selected-meta">从左侧选一个实例</span>
+              </div>
+            </div>
+
+            <div class="progress" id="progress" hidden>
+              <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <p class="stage" id="stage-text">准备就绪</p>
+            <p class="error" id="error-text" hidden></p>
+
+            <button class="primary-btn" id="launch" type="button" disabled>
+              <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7-4.5-7-4.5Z" /></svg>
+              <span id="launch-label">开始冒险</span>
+            </button>
+
+            <p class="hint" id="host-hint" hidden>浏览器预览：没有 <code>window.mml</code>，实例与启动都是模拟的。</p>
+          </section>
+
+          <section class="card">
+            <div class="card-head">
+              <h2>服主公告</h2>
+              <span class="chip">今日</span>
+            </div>
+            <ul class="notice-list">
+              <li><span>01</span>周日 20:00 活动：末地龙速通，前三名有专属称号。</li>
+              <li><span>02</span>客户端已更新到 1.20.1-v3，旧整合包进服前请先更新。</li>
+              <li><span>03</span>遇到问题在群里 @ 管理，并附上启动器日志。</li>
+            </ul>
+          </section>
+
+          <section class="card about">
+            <div class="card-head">
+              <h2>这个示例演示了什么</h2>
+            </div>
+            <div class="about-grid">
+              <div>
+                <strong>window.mml</strong>
+                <p>启动器注入的桥接对象：拉实例、启动游戏、订阅启动阶段、切换主题。</p>
+              </div>
+              <div>
+                <strong>iframe 沙箱</strong>
+                <p>整页跑在 sandbox iframe 里，没有 allow-same-origin，拿不到启动器页面的 DOM。</p>
+              </div>
+              <div>
+                <strong>零依赖</strong>
+                <p>没有 npm 依赖，也没有打包器；改完 src 里的文件直接压 zip 就能导入。</p>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <footer class="footer">
+          <span>M²L · custom-ui-html-demo</span>
+          <span id="host-state">浏览器预览</span>
+        </footer>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

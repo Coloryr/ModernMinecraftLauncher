@@ -3,6 +3,7 @@
 // 桥接对象由启动器建立（Rust 侧 custom_home_bridge.js + 前端 customHomeBridge.ts）；
 // 命令、事件名与事件 payload 都复用包内生成物。本文件手写，不在 Rust 源码扫描范围内。
 
+import { createCommands } from "./bindings";
 import { GameExit, GameLog, InstanceChange, LaunchError, LaunchState, type EventPayloads } from "./listens";
 
 /** 主题：启动器把「跟随系统」解析成这两档后下发 */
@@ -63,6 +64,28 @@ export interface MmlApi {
    * 不要拿它判断是否在启动器里。
    */
   ready: Promise<void>;
+}
+
+/** 用 window.mml 建出的类型化命令表 */
+export type HostCommands = ReturnType<typeof createCommands>;
+
+/** 已建立的命令表；成功建立后复用，避免每个组件各建一份 */
+let hostCommands: HostCommands | null = null;
+
+/**
+ * 取宿主命令表
+ *
+ * 首次调用时用 `window.mml.invoke` 建立，之后复用同一份。
+ *
+ * # 返回值
+ *
+ * 见 [`HostCommands`]；浏览器预览等没有 `window.mml` 的环境返回 null
+ */
+export function getCommands(): HostCommands | null {
+  if (hostCommands) return hostCommands;
+  if (typeof window === "undefined" || !window.mml) return null;
+  hostCommands = createCommands(window.mml.invoke.bind(window.mml));
+  return hostCommands;
 }
 
 declare global {

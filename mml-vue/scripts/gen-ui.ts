@@ -10,7 +10,7 @@
 //   mml-vue/ui-kit/windows     全部窗口与窗口内部组件
 //   mml-vue/ui-kit/components  其余通用组件
 //
-// 两个示例按 file:../mml-vue 依赖，不再有单独的 kit 包；发布也只发 mml-vue。
+// custom/ 下的示例按 file:.mml-deps/mml-vue 依赖，不再有单独的 kit 包；发布也只发 mml-vue。
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, extname, join, relative, resolve } from "node:path";

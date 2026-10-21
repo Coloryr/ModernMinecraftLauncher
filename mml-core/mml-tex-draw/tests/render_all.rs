@@ -23,7 +23,9 @@ fn run_dir() -> PathBuf {
 
 /// 渲染输出目录，tests 文件夹下的 out 子目录
 fn out_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("out")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("out")
 }
 
 /// 初始化链，与 mml_core::init 相同，每进程一次

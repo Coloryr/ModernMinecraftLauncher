@@ -80,7 +80,9 @@ fn find_version_list() -> Option<PathBuf> {
     let dir = if dir.is_absolute() {
         dir
     } else {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").join(dir)
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join(dir)
     };
 
     let cached = dir.join("minecraft/versions/version.json");

@@ -139,8 +139,10 @@ impl GpuCtx {
         });
 
         // 绑定组布局与采样器是三类离屏渲染共用的形状，统一由 mml-gpu 提供
-        let bind_layout =
-            mml_gpu::texture_bind_layout(&device, wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT);
+        let bind_layout = mml_gpu::texture_bind_layout(
+            &device,
+            wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+        );
 
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("mml-tex-draw"),

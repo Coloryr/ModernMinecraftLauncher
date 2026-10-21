@@ -7,18 +7,14 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use mml_names::i18_items::error_type::{
-    CoreResult, 
-};
+use mml_names::i18_items::error_type::CoreResult;
 use mml_sys::path_helper;
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, DateTime, ZipArchive, ZipWriter};
 
 use crate::archives::{
     self, ArchiveAddFile, ArchiveEntryInfo, ArchiveHandle, ArchiveProcess, BaseArchiveGui,
-    IBaseArchiveGui,
-    open_error, root_path_or_pack, read_error, write_error,
-    fs_err, archive_err,
+    IBaseArchiveGui, archive_err, fs_err, open_error, read_error, root_path_or_pack, write_error,
 };
 
 /// 保持打开的 Zip 读取句柄，缓存 [`ZipArchive`]，中央目录只解析一次
@@ -53,7 +49,13 @@ impl ZipReader {
         gui: BaseArchiveGui,
     ) -> CoreResult<()> {
         let process = ArchiveProcess::new(gui);
-        Self::zip(&process, archive_file, pack_dir, root_path_or_pack(root_path, pack_dir), filter)
+        Self::zip(
+            &process,
+            archive_file,
+            pack_dir,
+            root_path_or_pack(root_path, pack_dir),
+            filter,
+        )
     }
 
     /// 解压 zip 文件到指定目录
@@ -152,9 +154,9 @@ impl ZipReader {
         process.set_count(archive.len());
 
         path_helper::create_dir_all(output_dir)?;
-        let output_dir_canonical = output_dir.canonicalize().map_err(|err| {
-            fs_err(output_dir.to_path_buf(), err)
-        })?;
+        let output_dir_canonical = output_dir
+            .canonicalize()
+            .map_err(|err| fs_err(output_dir.to_path_buf(), err))?;
 
         // 收集需要恢复权限的路径，Unix 下先设为可写，最后再改回只读
         #[cfg(unix)]
@@ -183,9 +185,8 @@ impl ZipReader {
                     // 临时设为 0o700 保证可写
 
                     use crate::archives::set_perms;
-                    set_perms(&outpath, 0o700).map_err(|err| {
-                        fs_err(output_dir.to_path_buf(), err)
-                    })?;
+                    set_perms(&outpath, 0o700)
+                        .map_err(|err| fs_err(output_dir.to_path_buf(), err))?;
 
                     unix_modes.push((outpath, mode));
                 }
@@ -220,7 +221,11 @@ impl ZipReader {
             }
             let mut outfile = path_helper::open_write(&outpath)?;
             io::copy(&mut file, &mut outfile).map_err(|err| {
-                archive_err(file.name().unwrap_or_default().to_string(), outpath.display().to_string(), err)
+                archive_err(
+                    file.name().unwrap_or_default().to_string(),
+                    outpath.display().to_string(),
+                    err,
+                )
             })?;
 
             // 保留 Unix 权限
@@ -228,17 +233,15 @@ impl ZipReader {
             if let Some(mode) = file.unix_mode() {
                 use crate::archives::set_perms;
 
-                set_perms(&outpath, mode).map_err(|err| {
-                    fs_err(outpath.to_path_buf(), err)
-                })?;
+                set_perms(&outpath, mode).map_err(|err| fs_err(outpath.to_path_buf(), err))?;
             }
 
             // 保留修改时间，需要 chrono feature
             if let Some(last_modified) = file.last_modified() {
                 if let Some(system_time) = datetime_to_systemtime(&last_modified) {
-                    outfile.set_modified(system_time).map_err(|err| {
-                        fs_err(outpath.to_path_buf(), err)
-                    })?;
+                    outfile
+                        .set_modified(system_time)
+                        .map_err(|err| fs_err(outpath.to_path_buf(), err))?;
                 }
             }
         }
@@ -248,9 +251,7 @@ impl ZipReader {
         for (path, mode) in unix_modes {
             use crate::archives::set_perms;
 
-            set_perms(&path, mode).map_err(|err| {
-                fs_err(path.clone(), err)
-            })?;
+            set_perms(&path, mode).map_err(|err| fs_err(path.clone(), err))?;
         }
 
         process.done();
@@ -267,10 +268,8 @@ impl ZipReader {
     ///
     /// 中央目录解析失败时返回相应错误
     pub(crate) fn new(file: fs::File, path: PathBuf) -> CoreResult<Self> {
-        let zip = ZipArchive::new(file.try_clone().map_err(|err| {
-            fs_err(path.clone(), err)
-        })?)
-        .map_err(|err| open_error(&path, err))?;
+        let zip = ZipArchive::new(file.try_clone().map_err(|err| fs_err(path.clone(), err))?)
+            .map_err(|err| open_error(&path, err))?;
         Ok(Self { file, zip, path })
     }
 
@@ -280,12 +279,12 @@ impl ZipReader {
     ///
     /// 重新解析失败时返回相应错误
     fn reload(&mut self) -> CoreResult<()> {
-        let mut file = self.file.try_clone().map_err(|err| {
-            fs_err(self.path.clone(), err)
-        })?;
-        file.seek(SeekFrom::Start(0)).map_err(|err| {
-            fs_err(self.path.clone(), err)
-        })?;
+        let mut file = self
+            .file
+            .try_clone()
+            .map_err(|err| fs_err(self.path.clone(), err))?;
+        file.seek(SeekFrom::Start(0))
+            .map_err(|err| fs_err(self.path.clone(), err))?;
         self.zip = ZipArchive::new(file).map_err(|err| open_error(&self.path, err))?;
         Ok(())
     }
@@ -339,9 +338,8 @@ impl ArchiveHandle for ZipReader {
         let mut entry = self.zip.by_name(name).map_err(read_error)?;
 
         let mut outfile = path_helper::open_write(output_path)?;
-        std::io::copy(&mut entry, &mut outfile).map_err(|err| {
-            archive_err(name.to_string(), output_path.display().to_string(), err)
-        })?;
+        std::io::copy(&mut entry, &mut outfile)
+            .map_err(|err| archive_err(name.to_string(), output_path.display().to_string(), err))?;
 
         if let Some(gui) = gui {
             gui.update(Some(name.to_string()), 1);
@@ -354,9 +352,10 @@ impl ArchiveHandle for ZipReader {
     fn add_files(&mut self, files: &[ArchiveAddFile]) -> CoreResult<()> {
         use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
-        let file = self.file.try_clone().map_err(|err| {
-            fs_err(self.path.clone(), err)
-        })?;
+        let file = self
+            .file
+            .try_clone()
+            .map_err(|err| fs_err(self.path.clone(), err))?;
         let mut zip = ZipWriter::new_append(file).map_err(|err| open_error(&self.path, err))?;
 
         let options = SimpleFileOptions::default()
@@ -382,9 +381,10 @@ impl ArchiveHandle for ZipReader {
     fn add_data(&mut self, name: &str, data: &[u8]) -> CoreResult<()> {
         use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
-        let file = self.file.try_clone().map_err(|err| {
-            fs_err(self.path.clone(), err)
-        })?;
+        let file = self
+            .file
+            .try_clone()
+            .map_err(|err| fs_err(self.path.clone(), err))?;
         let mut zip = ZipWriter::new_append(file).map_err(|err| open_error(&self.path, err))?;
 
         let options = SimpleFileOptions::default()
@@ -450,9 +450,7 @@ fn make_symlink(target_path: &Path, link_target: &str) -> CoreResult<()> {
     } else {
         std::os::windows::fs::symlink_file(target, target_path)
     }
-    .map_err(|err| {
-        fs_err(target_path.to_path_buf(), err)
-    })
+    .map_err(|err| fs_err(target_path.to_path_buf(), err))
 }
 
 /// 创建符号链接，不支持的平台退化为写普通文件

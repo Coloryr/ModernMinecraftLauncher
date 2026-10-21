@@ -52,11 +52,7 @@ pub fn plan_removals<'a>(old: &'a ServerPackObj, new: &ServerPackObj) -> ServerP
     let mut out = ServerPackRemovals::default();
 
     for item in &old.online_list {
-        match new
-            .online_list
-            .iter()
-            .find(|n| mod_key(n) == mod_key(item))
-        {
+        match new.online_list.iter().find(|n| mod_key(n) == mod_key(item)) {
             // 旧包中已移除的文件
             None => out.files.push(item),
             // 同一文件但路径改变，删除旧文件

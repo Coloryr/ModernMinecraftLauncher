@@ -134,7 +134,10 @@ mod tests {
     fn apply_hunks_splices_lines() {
         // 改中间一行
         let one = [hunk(1, 1, &["x", "y"])];
-        assert_eq!(apply_hunks("a\nb\nc", &one).unwrap().join("\n"), "a\nx\ny\nc");
+        assert_eq!(
+            apply_hunks("a\nb\nc", &one).unwrap().join("\n"),
+            "a\nx\ny\nc"
+        );
 
         // 两段：改第一行、删最后一行
         let two = [hunk(0, 1, &["A"]), hunk(2, 1, &[])];
@@ -142,11 +145,17 @@ mod tests {
 
         // 纯插入
         let insert = [hunk(1, 0, &["mid"])];
-        assert_eq!(apply_hunks("a\nb", &insert).unwrap().join("\n"), "a\nmid\nb");
+        assert_eq!(
+            apply_hunks("a\nb", &insert).unwrap().join("\n"),
+            "a\nmid\nb"
+        );
 
         // 末尾追加（行列表按 `\n` 切，末行是空串）
         let append = [hunk(2, 0, &["c"])];
-        assert_eq!(apply_hunks("a\nb\n", &append).unwrap().join("\n"), "a\nb\nc\n");
+        assert_eq!(
+            apply_hunks("a\nb\n", &append).unwrap().join("\n"),
+            "a\nb\nc\n"
+        );
     }
 
     /// 越界与交叉的差异要拒掉：宁可报错，也不能按错的差异改文件

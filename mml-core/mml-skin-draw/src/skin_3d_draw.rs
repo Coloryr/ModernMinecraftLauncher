@@ -438,12 +438,7 @@ pub fn typea_down(image: &Pixmap, skin_type: Option<SkinType>) -> Option<Pixmap>
 ///
 /// 返回 `SIZE_TYPEB` x `SIZE_TYPEB` 的渲染结果；贴图宽度不是 64、皮肤类型未知
 /// 或无可用 GPU 时返回 `None`
-pub fn typeb(
-    image: &Pixmap,
-    skin_type: Option<SkinType>,
-    pitch: f32,
-    yaw: f32,
-) -> Option<Pixmap> {
+pub fn typeb(image: &Pixmap, skin_type: Option<SkinType>, pitch: f32, yaw: f32) -> Option<Pixmap> {
     let st = skin_type.unwrap_or_else(|| skin_type_checker::get_skin_type(image));
 
     let mut render = SkinRenderWgpu::new();

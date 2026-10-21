@@ -120,13 +120,8 @@ fn aborted_request_is_not_retried_on_other_source() {
     );
 
     // 反向用例 2：真正的中断错误必须被认出，回退分支据此提前 return
-    let abort_err = ErrorType::Aborted {
-        url: String::new(),
-    };
-    assert!(
-        mml_net::is_aborted(&abort_err),
-        "中断错误必须能被识别"
-    );
+    let abort_err = ErrorType::Aborted { url: String::new() };
+    assert!(mml_net::is_aborted(&abort_err), "中断错误必须能被识别");
 
     println!("✓ 普通错误未被误判为中断（镜像回退仍可用）");
     println!("✓ 中断错误能被识别（回退分支会提前 return，不再发新请求）");

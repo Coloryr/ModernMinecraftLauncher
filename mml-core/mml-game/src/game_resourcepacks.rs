@@ -19,8 +19,8 @@ use mml_sys::path_helper;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use zip::ZipArchive;
 
+use crate::error::archive_read_err;
 use crate::launcher::instance_setting_obj::InstanceSettingObj;
-use crate::error::{archive_read_err};
 
 /// 解析 `pack.mcmeta` 的 JSON，取出版本区间与简介
 ///
@@ -388,7 +388,9 @@ pub fn process_resourcepack<P: AsRef<Path>>(path: P, lang: &str) -> CoreResult<R
 
     // 解析 pack.mcmeta
     let mut pack = {
-        let meta = zip.by_name(names::PACK_META_FILE).map_err(archive_read_err)?;
+        let meta = zip
+            .by_name(names::PACK_META_FILE)
+            .map_err(archive_read_err)?;
 
         // 按形状取值，走 `MiniJsonMap`，不做结构性反序列化：写法认不出来也只丢那一段
         match MiniJsonObj::from_stream(meta)

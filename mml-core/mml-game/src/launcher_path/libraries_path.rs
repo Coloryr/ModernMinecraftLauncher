@@ -371,7 +371,11 @@ impl InstanceSettingObj {
             // 原版库默认都要带，加载器库随后覆盖同键冲突项；只有自定义加载器明确要求
             // 删掉原版库时才不带。少了这个默认分支，Forge / Fabric / 原版实例的类路径里
             // 就只剩加载器库与游戏 jar，guava、netty 这些原版依赖全不见
-            if !self.custom_loader.as_ref().is_some_and(|data| data.remove_lib) {
+            if !self
+                .custom_loader
+                .as_ref()
+                .is_some_and(|data| data.remove_lib)
+            {
                 for (key, value) in game_list {
                     add_or_update_lib_kv(&mut temp, key, value);
                 }

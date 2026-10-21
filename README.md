@@ -28,7 +28,6 @@
 - 导出模组列表
 - 游戏时长统计
 - 窗口全屏和占满
-- 自定义样式的API需要调整
 
 ## 技术栈
 
@@ -61,15 +60,12 @@
 | `mml-gui/` | Tauri 桌面壳；窗口规格与 IPC 命令在 `src-tauri/src/windows/`，命令与 DTO 由 `ipc-gen` 扫描生成到 `mml-ipc` |
 | `mml-vue/` | 前端（Vue3 + Vite）；窗口在 `src/windows/`，通用组件在 `src/components/` |
 | `ipc-gen/` | IPC 契约生成器（`gui-ipc-gen`）与过程宏（`ipc-gen/macros`，`gui-macros`） |
-| `mml-ipc/` | npm 契约包：按来源拆分的跨 IPC 类型、命令包装、事件订阅函数与自定义主页 `window.mml` 契约，`mml-vue` 与 `mml-ui-demo` 共用 |
-| `mml-ui-demo/` | Vue3 + Vite 示例工程：给服主写「自定义主页面」用的样板，引用 `mml-ipc`；`npm run build` 产出可直接导入启动器的 zip（不进 Cargo workspace，也不挂进 `mml-vue` 的构建） |
-| `mml-ui-demo-custom-css/` | 「自定义 CSS」示例：配色变量 + 选择器局部改控件，配一个零依赖静态服务器 |
-| `mml-ui-demo-custom/` | 「整页重写」示例：自绘标题栏 / 侧栏 / 实例列表，整个主窗口由页面接管 |
+| `mml-ipc/` | npm 契约包：按来源拆分的跨 IPC 类型、命令包装、事件订阅函数与自定义主页 `window.mml` 契约，`mml-vue` 与 `custom/` 下的示例共用 |
+| `custom/` | 四个自定义界面示例：`custom-main-demo/`（自定义主页面）、`custom-ui-demo/`（整页主题 · 组件）、`custom-ui-html-demo/`（整页主题 · HTML）、`custom-ui-css-demo/`（自定义 CSS）；各自构建出可直接导入启动器的 zip，用法见 [custom/README.md](custom/README.md) |
 | `build/` | 构建脚本（正式发布 / 预发布 / 只跑前端），每个都有 PowerShell 版与 bash 版 |
 
 各子项目各有 README：[mml-gui](mml-gui/README.md)、[mml-vue](mml-vue/README.md)、
-[mml-ui-demo](mml-ui-demo/README.md)、[mml-ui-demo-custom-css](mml-ui-demo-custom-css/README.md)、
-[mml-ui-demo-custom](mml-ui-demo-custom/README.md)、[mml-ipc](mml-ipc/README.md)。
+[custom](custom/README.md)（四个示例各自的说明也在里面）、[mml-ipc](mml-ipc/README.md)。
 
 ### IPC 契约：Rust 是唯一来源
 
@@ -80,7 +76,7 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
                                                        │
                                        ┌───────────────┴───────────────┐
                                        ▼                               ▼
-                              mml-vue（Tauri invoke）      mml-ui-demo（window.mml 桥接）
+                              mml-vue（Tauri invoke）      custom-main-demo（window.mml 桥接）
 ```
 
 - 新增命令加 `#[gui_macros::command]`（过程宏在 `ipc-gen/macros/`，展开成 Tauri 的命令宏），
@@ -91,13 +87,14 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
   命令与事件都不绑定传输层，调用方自己给 `invoke` / `on`；`mml-vue/src/lib/bindings.ts` 只是
   绑定 Tauri `invoke` 的兼容层。
 - 自定义主页面的 `window.mml` 契约（`MmlApi`、白名单事件）在 `mml-ipc/src/home.ts`，手写、
-  不参与扫描；`mml-ui-demo` 从这里取类型、事件名与生成的 `onXxx` 函数，不再自建一份。
+  不参与扫描；`custom-main-demo` 从这里取类型、事件名与生成的 `onXxx` 函数，不再自建一份。
 - 生成规则、分组方式与常见坑见 [AGENTS.md](AGENTS.md) §4；包内用法见 [mml-ipc/README.md](mml-ipc/README.md)。
 
 ## 开发与构建
 
-依赖：Rust（含 cargo）、Node.js。`mml-vue/` 与 `mml-ui-demo/` 各自 `npm install`；
-两者通过 `file:../mml-ipc` 链接本地的契约包，不需要单独发布。
+依赖：Rust（含 cargo）、Node.js。`mml-vue/` 与前三个示例各自 `npm install`；
+示例的 `mml-ipc` / `mml-vue` 由 `scripts/deps.mjs` 在安装前链接到本仓库，仓库不在时
+自动浅克隆一份，不需要单独发布。`custom-ui-html-demo` 没有 npm 依赖，不用 install。
 
 | 命令 | 说明 |
 | --- | --- |
@@ -106,7 +103,7 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
 | `build/build-release.ps1` | 正式发布构建（fat LTO，含安装包） |
 | `build/build-prerelease.ps1` | 预发布构建（thin LTO，只出 exe，更快） |
 | `cd mml-gui && npm run gen` | 改过 Rust 侧命令 / DTO 后重新生成 `mml-ipc` 契约 |
-| `cd mml-ui-demo && npm run build` | 构建自定义主页面示例并打包成 `mml-ui-demo.zip`（用法见该目录的 README） |
+| `cd custom/custom-main-demo && npm run build` | 构建自定义主页面示例并打包成 `custom-main-demo.zip`（四个示例的用法见 [custom/README.md](custom/README.md)） |
 
 上面三个脚本都在 `build/` 下，各有一份 PowerShell 版（`.ps1`，Windows）与 bash 版
 （`.sh`，Linux / macOS / Git Bash），做的是同一件事。

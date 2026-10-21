@@ -255,7 +255,6 @@ pub fn launch_with_elevation_windows<P: AsRef<Path>>(
 
     use windows::Win32::Foundation::HANDLE;
 
-
     let id = uuid::Uuid::new_v4().to_string().replace('-', "");
     let stdout_pipe_name = format!("mml_stdout_{}", id);
     let stderr_pipe_name = format!("mml_stderr_{}", id);
@@ -522,7 +521,9 @@ pub fn connect_named_pipe_with_timeout(
                     })
                 })?;
             };
-            return Err(ErrorType::NamedPipeConnectFailed(ErrorData::from_error(err)));
+            return Err(ErrorType::NamedPipeConnectFailed(ErrorData::from_error(
+                err,
+            )));
         }
     }
     // result != 0 → 立即连接成功
@@ -643,7 +644,10 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<std::ffi::OsStr>,
 {
-    let output = Command::new(command).args(args).output().map_err(process_err)?;
+    let output = Command::new(command)
+        .args(args)
+        .output()
+        .map_err(process_err)?;
 
     if !output.status.success() {
         return Ok(Vec::new());

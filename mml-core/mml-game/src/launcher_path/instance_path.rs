@@ -10,18 +10,23 @@ use std::{
 use mml_base::serialize_tools;
 use mml_config::config_save;
 use mml_names::{
-    i18_items::{error_type::{CoreResult, ErrorType, FileSystemErrorData}, info_type::InfoType},
+    i18_items::{
+        error_type::{CoreResult, ErrorType, FileSystemErrorData},
+        info_type::InfoType,
+    },
     names, uuids,
 };
 use mml_sys::path_helper;
 
-use crate::other_launcher::{is_mmc_version, mmc_obj::MMCObj};
 use crate::launcher::{
-    custom_game_arg_obj::CustomGameArgObj, file_online_info_obj::OnlineInfoObj,
+    custom_game_arg_obj::CustomGameArgObj,
+    file_online_info_obj::OnlineInfoObj,
+    game_time_obj::GameTimeObj,
     instance_setting_obj::CustomLoaderObj,
-    game_time_obj::GameTimeObj, instance_setting_obj::InstanceSettingObj,
+    instance_setting_obj::InstanceSettingObj,
     mod_update_obj::{ModUpdateList, ModUpdateRecordObj},
 };
+use crate::other_launcher::{is_mmc_version, mmc_obj::MMCObj};
 
 /// 在线文件信息表，键为 mod_id
 pub type OnlineInfoList = HashMap<String, OnlineInfoObj>;
@@ -128,11 +133,15 @@ fn adopt_mmc(dir: &Path) -> Option<InstanceSettingObj> {
     }
 
     let mmc = serialize_tools::json_from_file::<MMCObj>(dir.join(names::MMCJSON_FILE)).ok()?;
-    let cfg =
-        crate::game_options::read_options_from_file(dir.join(names::MMCCFG_FILE), Some('=')).ok()?;
+    let cfg = crate::game_options::read_options_from_file(dir.join(names::MMCCFG_FILE), Some('='))
+        .ok()?;
 
     let mut instance = mmc.to_instance(cfg);
-    let name = dir.file_name().unwrap_or_default().to_string_lossy().to_string();
+    let name = dir
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
     instance.dir = name.clone();
     if instance.name.is_empty() {
         instance.name = name;

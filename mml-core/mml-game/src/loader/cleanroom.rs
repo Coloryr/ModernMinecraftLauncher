@@ -188,7 +188,10 @@ mod tests {
     fn parses_installer_profile() {
         let data = include_str!("../../tests/cleanroom/version.json");
         let version = serialize_tools::json_from_str::<ForgeLaunchObj>(data).unwrap();
-        assert_eq!(version.main_class, "top.outlands.foundation.boot.Foundation");
+        assert_eq!(
+            version.main_class,
+            "top.outlands.foundation.boot.Foundation"
+        );
         assert!(
             version
                 .minecraft_arguments

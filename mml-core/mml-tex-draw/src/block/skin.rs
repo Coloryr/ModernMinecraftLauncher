@@ -78,9 +78,7 @@ pub fn add_skin_block(name: &str, skin_png: &[u8]) -> CoreResult<String> {
         encoder
             .write_header()
             .and_then(|mut w| w.write_image_data(&rgba))
-            .map_err(|e| {
-                ErrorType::TaskError(ErrorData::from_error(e))
-            })?;
+            .map_err(|e| ErrorType::TaskError(ErrorData::from_error(e)))?;
     }
 
     let dir = crate::get_block_dir().ok_or(ErrorType::DownloadFileFail)?;

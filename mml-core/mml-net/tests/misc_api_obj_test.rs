@@ -222,8 +222,7 @@ fn deserialize_authlib_obj() {
     assert_eq!(obj.checksums.sha256.len(), 64);
 
     // ArtifactsObj 只有 build_number 一个字段
-    let artifacts: ArtifactsObj =
-        serde_json::from_str(r#"{ "build_number": 64 }"#).unwrap();
+    let artifacts: ArtifactsObj = serde_json::from_str(r#"{ "build_number": 64 }"#).unwrap();
     assert_eq!(artifacts.build_number, 64);
 }
 
@@ -254,6 +253,9 @@ fn deserialize_adoptium_assets() {
     let item = &obj[0];
     assert_eq!(item.binary.architecture, "x64");
     assert_eq!(item.binary.image_type, "jdk");
-    assert_eq!(item.binary.package.name, "OpenJDK21U-jdk_x64_windows_hotspot_21.0.5_11.zip");
+    assert_eq!(
+        item.binary.package.name,
+        "OpenJDK21U-jdk_x64_windows_hotspot_21.0.5_11.zip"
+    );
     // assert_eq!(item.version.openjdk_version, "21.0.5+11");
 }

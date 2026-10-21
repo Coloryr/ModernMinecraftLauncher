@@ -182,7 +182,10 @@ async fn delete_instance_removes_everywhere() {
     assert!(mml_game::get_instance(&uuid).is_none());
     // 实例从组里摘掉，但**空分组保留** —— 这正是分组独立存储的目的：
     // 归属挂在实例上时，删掉最后一个成员就再没有任何实例承载这个组，只能跟着消失
-    assert!(mml_game::get_group(&group).is_empty(), "被删实例不应还在组里");
+    assert!(
+        mml_game::get_group(&group).is_empty(),
+        "被删实例不应还在组里"
+    );
     assert!(
         mml_game::get_group_list().iter().any(|g| g.uuid == group),
         "空分组应当保留"
@@ -218,8 +221,16 @@ async fn move_instance_sets_group_and_order() {
     mml_game::move_instance(&ub, Some(group), 0);
 
     assert_eq!(mml_game::get_instance_group(&ua), Some(group));
-    assert_eq!(mml_game::get_instance_order(&ub), Some(0), "B 应排在第 0 位");
-    assert_eq!(mml_game::get_instance_order(&ua), Some(1), "A 应被挤到第 1 位");
+    assert_eq!(
+        mml_game::get_instance_order(&ub),
+        Some(0),
+        "B 应排在第 0 位"
+    );
+    assert_eq!(
+        mml_game::get_instance_order(&ua),
+        Some(1),
+        "A 应被挤到第 1 位"
+    );
 
     // 分组顺序可调：默认分组恒在首位，被提到的组紧跟其后
     mml_game::reorder_groups(&[group]);

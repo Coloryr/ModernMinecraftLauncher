@@ -93,9 +93,7 @@ pub fn gen_hash_from_reader<R: Read>(hash_type: HashType, reader: &mut R) -> Cor
     let mut buffer = [0u8; 1024];
 
     loop {
-        let len = reader.read(&mut buffer).map_err(|err| {
-            stream_err(err)
-        })?;
+        let len = reader.read(&mut buffer).map_err(|err| stream_err(err))?;
 
         if len == 0 {
             break;
@@ -121,9 +119,10 @@ pub async fn gen_hash_from_reader_async<R: AsyncRead + Unpin>(
     let mut buffer = [0u8; 1024];
 
     loop {
-        let len = reader.read(&mut buffer).await.map_err(|err| {
-            stream_err(err)
-        })?;
+        let len = reader
+            .read(&mut buffer)
+            .await
+            .map_err(|err| stream_err(err))?;
 
         if len == 0 {
             break;
@@ -192,12 +191,8 @@ pub fn gen_base64_bytes(input: &[u8]) -> String {
 ///
 /// 返回解码后的文本；Base64 非法或结果不是合法 UTF-8 时返回相应错误
 pub fn de_base64(input: &str) -> CoreResult<String> {
-    let bytes = BASE64.decode(input).map_err(|err| {
-        base64_err(err)
-    })?;
-    Ok(String::from_utf8(bytes).map_err(|err| {
-        base64_err(err)
-    })?)
+    let bytes = BASE64.decode(input).map_err(|err| base64_err(err))?;
+    Ok(String::from_utf8(bytes).map_err(|err| base64_err(err))?)
 }
 
 #[cfg(test)]

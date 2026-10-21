@@ -191,9 +191,8 @@ pub async fn run_get_code(
                 status: None,
             })
         })?;
-        let data: OAuthGetCodeObj = serde_json::from_str(&text).map_err(|err| {
-            ErrorType::OAuthGetTokenError(ErrorData::from_error(err))
-        })?;
+        let data: OAuthGetCodeObj = serde_json::from_str(&text)
+            .map_err(|err| ErrorType::OAuthGetTokenError(ErrorData::from_error(err)))?;
 
         if let Some(error) = data.error {
             if error == "authorization_pending" {

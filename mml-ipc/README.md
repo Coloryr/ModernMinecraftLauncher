@@ -1,7 +1,7 @@
 # mml-ipc —— M²L 的 IPC 契约（npm 包）
 
 跨 IPC 的类型、命令包装、事件名与自定义主页面的 `window.mml` 契约，供
-[mml-vue](../mml-vue) 与 [mml-ui-demo](../mml-ui-demo) 共用；类型与命令来自 Rust 源码生成。
+[mml-vue](../mml-vue) 与 [custom 下的示例](../custom) 共用；类型与命令来自 Rust 源码生成。
 
 > 本包只有 npm 内容，不含 Rust crate。生成器在仓库根 [`ipc-gen/`](../ipc-gen)。
 
@@ -13,7 +13,7 @@
 | `src/types/**` | 生成 | 跨 IPC 类型，按来源 .rs 一个文件；`types/index.ts` 是 barrel，跨文件引用自带 `import type` |
 | `src/listens.ts` | 生成 | 事件名常量、`EventPayloads` 类型映射与 `createEvents(on)` 订阅函数 |
 | `src/invoke.ts` | 手写 | 传输层类型 `Invoke`，把 Tauri / 自定义主页的差异挡在包外 |
-| `src/home.ts` | 手写 | 自定义主页契约：`MmlApi`（`window.mml`），白名单事件从 `EventPayloads` 里挑 |
+| `src/home.ts` | 手写 | 自定义主页契约：`MmlApi`（`window.mml`）与 `getCommands()`，白名单事件从 `EventPayloads` 里挑 |
 | `src/index.ts` | 手写 | 包入口，再导出上面几份 |
 
 **`src/bindings.ts`、`src/listens.ts` 与 `src/types/**` 都是生成产物，不要手改。**
@@ -37,12 +37,22 @@ await commands.main.getInstances();
 ```
 
 ```ts
-// 自定义主页面（mml-ui-demo）：window.mml 由启动器注入
+// 自定义主页面（custom-main-demo）：window.mml 由启动器注入
 import { createCommands } from "mml-ipc";
 import { invoke } from "./bridge";
 
 const commands = createCommands((cmd, args) => invoke(cmd, args ?? undefined));
 await commands.main.launchGame(uuid, null, null, null);
+```
+
+自定义界面包不用自己绑传输层，直接取宿主命令表：
+
+```ts
+// 整页主题 / 自定义 CSS 入口：不在启动器里时 getCommands() 返回 null
+import { getCommands } from "mml-ipc";
+
+const commands = getCommands();
+if (commands) await commands.windows.getGuiConfig();
 ```
 
 自定义主页面直接用包里的 `MmlApi` 类型，导入本包即带 `window.mml` 的全局声明：

@@ -97,10 +97,7 @@ fn abort_while_reading_body() {
             );
             println!("结果：{detail}");
             assert!(aborted, "读 body 阶段也应能被中断");
-            assert!(
-                abort_at.elapsed() < Duration::from_millis(500),
-                "中断太慢"
-            );
+            assert!(abort_at.elapsed() < Duration::from_millis(500), "中断太慢");
         }
         Err(_) => panic!("卡在读 body 的请求在中断后仍未返回 ✗ —— 复现了用户的问题"),
     }

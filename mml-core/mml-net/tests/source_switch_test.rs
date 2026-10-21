@@ -15,10 +15,8 @@ use mml_net::{url_helper, urls};
 ///
 /// 返回配置目录路径供测后清理；与其它测试文件互不冲突，每个测试二进制独立进程
 fn init_config() -> std::path::PathBuf {
-    let dir = mml_testutil::temp_dir().join(format!(
-        "mml-net-source-switch-test-{}",
-        std::process::id()
-    ));
+    let dir =
+        mml_testutil::temp_dir().join(format!("mml-net-source-switch-test-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("创建配置临时目录失败");
     let _ = mml_config::init(&dir);
     dir
@@ -47,14 +45,16 @@ fn source_switch_behaviour() {
     let mut url = String::from("https://launchermeta.mojang.com/v1/packages/x.json");
     url_helper::change_source(&mut url);
     assert_eq!(
-        url,
-        "https://launchermeta.mojang.com/v1/packages/x.json",
+        url, "https://launchermeta.mojang.com/v1/packages/x.json",
         "官方源下地址不应被改动"
     );
 
     // 各库地址替换函数应原样返回
     let minecraft = "https://piston-data.mojang.com/net/minecraft/a.jar";
-    assert_eq!(url_helper::replace_minecraft_libraries(minecraft), minecraft);
+    assert_eq!(
+        url_helper::replace_minecraft_libraries(minecraft),
+        minecraft
+    );
     let forge = "https://maven.minecraftforge.net/net/forge/a.jar";
     assert_eq!(url_helper::replace_forge_libraries(forge), forge);
     let neoforge = "https://maven.neoforged.net/net/neoforged/a.jar";

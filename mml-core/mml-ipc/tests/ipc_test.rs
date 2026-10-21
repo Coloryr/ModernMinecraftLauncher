@@ -41,8 +41,7 @@ fn ipc_port() -> u16 {
 
 /// 连接测试用的 TCP 流，统一设置读取超时，防止卡死
 fn connect(port: u16) -> std::net::TcpStream {
-    let stream = std::net::TcpStream::connect(("127.0.0.1", port))
-        .expect("connect to ipc server");
+    let stream = std::net::TcpStream::connect(("127.0.0.1", port)).expect("connect to ipc server");
     stream
         .set_read_timeout(Some(std::time::Duration::from_secs(5)))
         .expect("set read timeout");
@@ -149,7 +148,7 @@ fn test_motd_broadcast() {
     add_server(ServerInfo {
         ip: "127.0.0.1".to_string(),
         port: "25565".to_string(),
-        motd: "123".to_string()
+        motd: "123".to_string(),
     });
 
     let mut stream = connect(port);

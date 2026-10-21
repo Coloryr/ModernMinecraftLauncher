@@ -423,7 +423,9 @@ mod tests {
         let path = dir.join("2026-01-01-1.log.gz");
         let file = fs::File::create(&path).unwrap();
         let mut encoder = flate2::write::GzEncoder::new(file, flate2::Compression::default());
-        encoder.write_all(b"[12:00:00] [main/INFO]: hello gz\n").unwrap();
+        encoder
+            .write_all(b"[12:00:00] [main/INFO]: hello gz\n")
+            .unwrap();
         encoder.finish().unwrap();
 
         let log = InstanceRuntimeLog::from_file(&path, LogEncoding::UTF8);

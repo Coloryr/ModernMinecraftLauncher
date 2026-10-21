@@ -69,9 +69,7 @@ impl InputFile {
                         Ok(None) => break,
                         Ok(Some(data)) => {
                             // 写入文件
-                            file.write_all(&data).await.map_err(|err| {
-                                stream_err(err)
-                            })?;
+                            file.write_all(&data).await.map_err(|err| stream_err(err))?;
                         }
                         Err(e) => {
                             return Err(stream_err(e));

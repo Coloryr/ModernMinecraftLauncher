@@ -45,7 +45,17 @@ const WING_SEPARATE: f32 = 0.01;
 /// 返回 `SIZE` 见方的透明底位图，无可用 GPU 时返回 `None`
 pub fn cape(image: &Pixmap, pitch: f32, yaw: f32) -> Option<Pixmap> {
     let size = tex_size(image);
-    let base = box_faces(10, 16, 1, 0, 0, Mat4::IDENTITY, false, size.width, size.height);
+    let base = box_faces(
+        10,
+        16,
+        1,
+        0,
+        0,
+        Mat4::IDENTITY,
+        false,
+        size.width,
+        size.height,
+    );
 
     render_fitted(image, base, pitch, yaw)
 }

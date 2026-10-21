@@ -38,7 +38,9 @@ fn round_trip(nbt: NbtType, compress: CompressType) {
 /// 空 ByteArray、String、标量，以及各种数组。
 fn nested_sample() -> NbtType {
     let mut inner = nbt_types::compound();
-    inner.data.insert("count".into(), nbt_types::int(3).to_nbt());
+    inner
+        .data
+        .insert("count".into(), nbt_types::int(3).to_nbt());
     inner
         .data
         .insert("name".into(), nbt_types::string("nested").to_nbt());
@@ -58,7 +60,8 @@ fn nested_sample() -> NbtType {
 
     let mut root = nbt_types::compound();
     root.data.insert("inner".into(), inner.to_nbt());
-    root.data.insert("list_of_comp".into(), list_of_comp.to_nbt());
+    root.data
+        .insert("list_of_comp".into(), list_of_comp.to_nbt());
     root.data.insert("list_of_int".into(), list_of_int.to_nbt());
     root.data.insert(
         "byte_array".into(),
@@ -68,14 +71,18 @@ fn nested_sample() -> NbtType {
         "int_array".into(),
         nbt_types::int_array(vec![4, 5, 6]).to_nbt(),
     );
-    root.data
-        .insert("long_array".into(), nbt_types::long_array(vec![7, 8]).to_nbt());
+    root.data.insert(
+        "long_array".into(),
+        nbt_types::long_array(vec![7, 8]).to_nbt(),
+    );
     root.data.insert("byte".into(), nbt_types::byte(9).to_nbt());
-    root.data.insert("short".into(), nbt_types::short(10).to_nbt());
-    root.data.insert("long".into(), nbt_types::long(11).to_nbt());
-    root.data.insert("float".into(), nbt_types::float(1.5).to_nbt());
-    root
-        .data
+    root.data
+        .insert("short".into(), nbt_types::short(10).to_nbt());
+    root.data
+        .insert("long".into(), nbt_types::long(11).to_nbt());
+    root.data
+        .insert("float".into(), nbt_types::float(1.5).to_nbt());
+    root.data
         .insert("double".into(), nbt_types::double(2.5).to_nbt());
     root.to_nbt()
 }
@@ -133,15 +140,20 @@ fn compound_getters() {
 
     let mut com = nbt_types::compound();
     com.data.insert("byte".into(), nbt_types::byte(1).to_nbt());
-    com.data.insert("short".into(), nbt_types::short(2).to_nbt());
+    com.data
+        .insert("short".into(), nbt_types::short(2).to_nbt());
     com.data.insert("int".into(), nbt_types::int(3).to_nbt());
     com.data.insert("long".into(), nbt_types::long(4).to_nbt());
     com.data
         .insert("string".into(), nbt_types::string("hello").to_nbt());
-    com.data
-        .insert("byte_array".into(), nbt_types::byte_array(vec![5, 6]).to_nbt());
-    com.data
-        .insert("long_array".into(), nbt_types::long_array(vec![7, 8]).to_nbt());
+    com.data.insert(
+        "byte_array".into(),
+        nbt_types::byte_array(vec![5, 6]).to_nbt(),
+    );
+    com.data.insert(
+        "long_array".into(),
+        nbt_types::long_array(vec![7, 8]).to_nbt(),
+    );
     com.data.insert("list".into(), list.to_nbt());
     com.data.insert("inner".into(), inner.to_nbt());
 

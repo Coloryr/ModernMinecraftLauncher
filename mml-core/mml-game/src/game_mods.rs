@@ -24,11 +24,11 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use uuid::Uuid;
 use zip::ZipArchive;
 
+use crate::error::archive_read_err;
 use crate::{
     class_scan, gui_hook::ProgressGui, launcher::instance_setting_obj::InstanceSettingObj,
     loader::LoaderType,
 };
-use crate::error::{archive_read_err};
 
 /// 模组的加载侧，来自元数据的 side 字段或注解扫描
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -783,7 +783,9 @@ fn read_core_mod(
     let mut info = ModItemObj::default();
 
     let mut content = String::new();
-    manifest_file.read_to_string(&mut content).map_err(archive_read_err)?;
+    manifest_file
+        .read_to_string(&mut content)
+        .map_err(archive_read_err)?;
 
     let manifest = parse_manifest(&content);
 
@@ -1980,11 +1982,7 @@ mod tests {
 
         let info = read_mod_info(&path).expect("应能解析");
         assert_eq!(info.info.len(), 1, "只该有 fabric 那一条，不该多出空条目");
-        assert_eq!(
-            info.info[0].loaders.id(),
-            "fabric",
-            "不该是默认的 normal"
-        );
+        assert_eq!(info.info[0].loaders.id(), "fabric", "不该是默认的 normal");
         assert!(!info.core, "没有 core mod 标记就不该判成 core");
     }
 
@@ -2260,11 +2258,9 @@ mod tests {
             "a.jar",
             "a",
             "1.0",
-            vec![DependantType::Required(DependantInfo::parse_required_version(
-                "minecraft",
-                "1.21",
-                RangeSyntax::Semver,
-            ))],
+            vec![DependantType::Required(
+                DependantInfo::parse_required_version("minecraft", "1.21", RangeSyntax::Semver),
+            )],
         )];
 
         let test = mods_dep_test(&forge_game_at("1.21.1", "47.2.0"), &mods).unwrap();
@@ -2274,12 +2270,7 @@ mod tests {
     /// Forge 的裸版本要求（`minecraft@1.21`）按 Maven 的"推荐版本"处理，更宽松
     #[test]
     fn maven_bare_minecraft_requirement_is_silent() {
-        let mods = vec![mod_item(
-            "a.jar",
-            "a",
-            "1.0",
-            vec![need("minecraft@1.21")],
-        )];
+        let mods = vec![mod_item("a.jar", "a", "1.0", vec![need("minecraft@1.21")])];
 
         let test = mods_dep_test(&forge_game_at("1.21.1", "47.2.0"), &mods).unwrap();
         assert!(test.problems.is_empty());

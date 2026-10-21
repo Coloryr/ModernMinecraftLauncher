@@ -134,7 +134,10 @@ fn detect_mmc_name_from_instance_cfg() {
         "mmc-pack",
         &[
             entry("mmc-pack.json", br#"{"formatVersion":1,"components":[]}"#),
-            entry("mmc-root/instance.cfg", b"InstanceType=OneSix\nname=My MMC Inst\n"),
+            entry(
+                "mmc-root/instance.cfg",
+                b"InstanceType=OneSix\nname=My MMC Inst\n",
+            ),
         ],
     );
 
@@ -260,7 +263,11 @@ fn detect_archive_pack_fallback_name() {
 #[test]
 fn detect_empty_name_falls_back_to_stem() {
     let dir = work_dir();
-    let zip = make_zip(&dir, "no-name", &[entry("modrinth.index.json", br#"{"name":""}"#)]);
+    let zip = make_zip(
+        &dir,
+        "no-name",
+        &[entry("modrinth.index.json", br#"{"name":""}"#)],
+    );
 
     let detected = detect_pack(&zip).expect("检测失败");
     assert!(matches!(detected.pack_type, PackType::Modrinth));

@@ -301,9 +301,7 @@ struct ParsedConstantPool {
 /// # 返回值
 ///
 /// 见 [`ParsedConstantPool`]；解析越界返回对应错误
-fn parse_constant_pool(
-    bytes: &[u8],
-) -> Result<ParsedConstantPool, Box<dyn std::error::Error>> {
+fn parse_constant_pool(bytes: &[u8]) -> Result<ParsedConstantPool, Box<dyn std::error::Error>> {
     let pool_count = read_u16(bytes, 8)? as usize;
     // 索引 0 保留，实际条目从 1 到 pool_count-1
     let mut cp: ConstantPool = vec![None; pool_count];

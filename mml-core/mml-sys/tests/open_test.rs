@@ -8,7 +8,13 @@ use mml_sys::open_helper;
 pub fn open_file() {
     let exe_path = env::current_exe().expect("Failed to get exe path");
     let exe_dir = exe_path.parent().expect("Failed to get exe directory");
-    let dir = exe_dir.parent().unwrap().parent().unwrap().parent().unwrap();
+    let dir = exe_dir
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap();
 
     println!("{}", dir.to_string_lossy());
 

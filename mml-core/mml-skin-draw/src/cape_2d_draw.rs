@@ -110,8 +110,7 @@ pub fn elytra_flying(image: &Pixmap) -> Option<Pixmap> {
 ///
 /// 取得到返回 `Some(())`，越界返回 `None`
 fn check_block(image: &Pixmap) -> Option<()> {
-    if WING_BLOCK_X + WING_W > image.width() as i32
-        || WING_BLOCK_Y + WING_H > image.height() as i32
+    if WING_BLOCK_X + WING_W > image.width() as i32 || WING_BLOCK_Y + WING_H > image.height() as i32
     {
         return None;
     }
@@ -123,12 +122,11 @@ fn check_block(image: &Pixmap) -> Option<()> {
 ///
 /// 位图内部是预乘 BGRA，整字节复制即可，不涉及通道换算。
 fn copy_pixel(src: &Pixmap, src_x: i32, src_y: i32, dest: &mut Pixmap, dest_x: u32, dest_y: u32) {
-    let src_off = (WING_BLOCK_Y + src_y) as usize * row_bytes(src)
-        + (WING_BLOCK_X + src_x) as usize * BPP;
+    let src_off =
+        (WING_BLOCK_Y + src_y) as usize * row_bytes(src) + (WING_BLOCK_X + src_x) as usize * BPP;
     let dst_off = dest_y as usize * row_bytes(dest) + dest_x as usize * BPP;
 
-    dest.data_mut()[dst_off..dst_off + BPP]
-        .copy_from_slice(&src.data()[src_off..src_off + BPP]);
+    dest.data_mut()[dst_off..dst_off + BPP].copy_from_slice(&src.data()[src_off..src_off + BPP]);
 }
 
 #[cfg(test)]
@@ -214,7 +212,13 @@ mod tests {
     #[test]
     fn test_elytra_block_out_of_range() {
         let small = Pixmap::new(32, 32).unwrap();
-        assert!(elytra_folded(&small).is_none(), "32 宽的贴图放不下 (36,2) 的块");
-        assert!(elytra_flying(&small).is_none(), "32 宽的贴图放不下 (36,2) 的块");
+        assert!(
+            elytra_folded(&small).is_none(),
+            "32 宽的贴图放不下 (36,2) 的块"
+        );
+        assert!(
+            elytra_flying(&small).is_none(),
+            "32 宽的贴图放不下 (36,2) 的块"
+        );
     }
 }

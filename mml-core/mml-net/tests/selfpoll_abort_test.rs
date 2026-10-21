@@ -100,7 +100,10 @@ fn abort_effective_even_with_slow_polling() {
             }
         }
     }
-    println!("中断后统一耗时：{:?}（自轮询间隔上限 100ms）", abort_at.elapsed());
+    println!(
+        "中断后统一耗时：{:?}（自轮询间隔上限 100ms）",
+        abort_at.elapsed()
+    );
     assert!(ok, "所有卡住的请求都应被中断");
     assert!(
         abort_at.elapsed() < Duration::from_millis(1000),

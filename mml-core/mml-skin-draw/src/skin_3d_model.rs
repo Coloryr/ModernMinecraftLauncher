@@ -138,13 +138,28 @@ mod tests {
         assert_eq!(max_abs_axis(&m.body.model, 2), 0.5 * skin_3d_cube::VALUE);
 
         // 手臂：0.5 x 1.5 x 0.5，宽臂
-        assert_eq!(max_abs_axis(&m.left_arm.model, 0), 0.5 * skin_3d_cube::VALUE);
-        assert_eq!(max_abs_axis(&m.left_arm.model, 1), 1.5 * skin_3d_cube::VALUE);
-        assert_eq!(max_abs_axis(&m.right_arm.model, 0), 0.5 * skin_3d_cube::VALUE);
+        assert_eq!(
+            max_abs_axis(&m.left_arm.model, 0),
+            0.5 * skin_3d_cube::VALUE
+        );
+        assert_eq!(
+            max_abs_axis(&m.left_arm.model, 1),
+            1.5 * skin_3d_cube::VALUE
+        );
+        assert_eq!(
+            max_abs_axis(&m.right_arm.model, 0),
+            0.5 * skin_3d_cube::VALUE
+        );
 
         // 腿：0.5 x 1.5 x 0.5
-        assert_eq!(max_abs_axis(&m.left_leg.model, 0), 0.5 * skin_3d_cube::VALUE);
-        assert_eq!(max_abs_axis(&m.left_leg.model, 1), 1.5 * skin_3d_cube::VALUE);
+        assert_eq!(
+            max_abs_axis(&m.left_leg.model, 0),
+            0.5 * skin_3d_cube::VALUE
+        );
+        assert_eq!(
+            max_abs_axis(&m.left_leg.model, 1),
+            1.5 * skin_3d_cube::VALUE
+        );
 
         // 披风：1.25 x 2 x 0.1
         assert_eq!(max_abs_axis(&m.cape.model, 0), 1.25 * skin_3d_cube::VALUE);
@@ -160,8 +175,14 @@ mod tests {
     #[test]
     fn test_get_steve_slim_arm() {
         let slim = get_steve(SkinType::NewSlim);
-        assert_eq!(max_abs_axis(&slim.left_arm.model, 0), 0.375 * skin_3d_cube::VALUE);
-        assert_eq!(max_abs_axis(&slim.left_arm.model, 1), 1.5 * skin_3d_cube::VALUE);
+        assert_eq!(
+            max_abs_axis(&slim.left_arm.model, 0),
+            0.375 * skin_3d_cube::VALUE
+        );
+        assert_eq!(
+            max_abs_axis(&slim.left_arm.model, 1),
+            1.5 * skin_3d_cube::VALUE
+        );
 
         // slim 与宽臂的身体、头部相同
         let normal = get_steve(SkinType::New);
@@ -175,12 +196,24 @@ mod tests {
         let top = get_steve_top(SkinType::New);
 
         // 头部：1.125 倍 -> ±0.5625
-        assert_eq!(max_abs_axis(&top.head.model, 0), 1.125 * skin_3d_cube::VALUE);
-        assert_eq!(max_abs_axis(&top.head.model, 1), 1.125 * skin_3d_cube::VALUE);
+        assert_eq!(
+            max_abs_axis(&top.head.model, 0),
+            1.125 * skin_3d_cube::VALUE
+        );
+        assert_eq!(
+            max_abs_axis(&top.head.model, 1),
+            1.125 * skin_3d_cube::VALUE
+        );
 
         // 身体：1 x 1.5 x 0.5，放大 1.125
-        assert_eq!(max_abs_axis(&top.body.model, 1), 1.5 * 1.125 * skin_3d_cube::VALUE);
-        assert_eq!(max_abs_axis(&top.body.model, 2), 0.5 * 1.125 * skin_3d_cube::VALUE);
+        assert_eq!(
+            max_abs_axis(&top.body.model, 1),
+            1.5 * 1.125 * skin_3d_cube::VALUE
+        );
+        assert_eq!(
+            max_abs_axis(&top.body.model, 2),
+            0.5 * 1.125 * skin_3d_cube::VALUE
+        );
 
         // 顶层没有披风数据
         assert!(top.cape.model.is_empty());

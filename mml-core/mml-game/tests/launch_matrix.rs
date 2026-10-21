@@ -329,19 +329,16 @@ pub async fn launch(version: &str, loader: LoaderType, loader_version: &str) -> 
         Ok(obj) => {
             let mut files = Vec::new();
             list_files(&base, &mut files);
-            let client = files
-                .iter()
-                .any(|path| path.to_string_lossy().contains(&format!("client-{version}.jar")));
-            let index = files.iter().any(|path| {
-                path.components()
-                    .any(|part| part.as_os_str() == "indexes")
+            let client = files.iter().any(|path| {
+                path.to_string_lossy()
+                    .contains(&format!("client-{version}.jar"))
             });
+            let index = files
+                .iter()
+                .any(|path| path.components().any(|part| part.as_os_str() == "indexes"));
             let objects = files
                 .iter()
-                .filter(|path| {
-                    path.components()
-                        .any(|part| part.as_os_str() == "objects")
-                })
+                .filter(|path| path.components().any(|part| part.as_os_str() == "objects"))
                 .count();
             let jars = files
                 .iter()

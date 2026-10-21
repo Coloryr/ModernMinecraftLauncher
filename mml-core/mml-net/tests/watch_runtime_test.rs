@@ -12,7 +12,7 @@ use std::time::Duration;
 #[test]
 fn watch_wake_same_runtime() {
     let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
+        .enable_all()
         .build()
         .unwrap();
 
@@ -40,7 +40,7 @@ fn watch_wake_same_runtime() {
 #[test]
 fn watch_wake_across_threads() {
     let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
+        .enable_all()
         .build()
         .unwrap();
 
@@ -63,7 +63,10 @@ fn watch_wake_across_threads() {
     handle.join().unwrap();
 
     rt.block_on(receiver).unwrap();
-    println!("跨线程（裸 OS 线程发送）：唤醒={}", woke.load(Ordering::SeqCst));
+    println!(
+        "跨线程（裸 OS 线程发送）：唤醒={}",
+        woke.load(Ordering::SeqCst)
+    );
     assert!(
         woke.load(Ordering::SeqCst),
         "跨线程 send 应该也能唤醒——否则说明我的怀疑成立"
@@ -74,11 +77,11 @@ fn watch_wake_across_threads() {
 #[test]
 fn watch_wake_across_runtimes() {
     let rt_a = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
+        .enable_all()
         .build()
         .unwrap();
     let rt_b = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
+        .enable_all()
         .build()
         .unwrap();
 
@@ -99,7 +102,10 @@ fn watch_wake_across_runtimes() {
     });
 
     rt_a.block_on(receiver).unwrap();
-    println!("跨 runtime（B 里发送）：唤醒={}", woke.load(Ordering::SeqCst));
+    println!(
+        "跨 runtime（B 里发送）：唤醒={}",
+        woke.load(Ordering::SeqCst)
+    );
     assert!(
         woke.load(Ordering::SeqCst),
         "跨 runtime send 应该也能唤醒——否则说明我的怀疑成立"

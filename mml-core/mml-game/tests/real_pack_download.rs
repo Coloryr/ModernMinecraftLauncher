@@ -339,14 +339,13 @@ async fn install_real_curseforge_pack() {
     }
 
     // 搜索整合包并取其最新文件，体积较小的 Fabulously Optimized
-    let list =
-        mml_net::curseforge_api::get_modpack_list(mml_net::curseforge_api::CurseFogreArg {
-            filter: Some("Fabulously Optimized".to_string()),
-            page_size: Some(5),
-            ..Default::default()
-        })
-        .await
-        .expect("搜索 CurseForge 整合包失败");
+    let list = mml_net::curseforge_api::get_modpack_list(mml_net::curseforge_api::CurseFogreArg {
+        filter: Some("Fabulously Optimized".to_string()),
+        page_size: Some(5),
+        ..Default::default()
+    })
+    .await
+    .expect("搜索 CurseForge 整合包失败");
     let Some(item) = list.data.first() else {
         eprintln!("跳过: 搜索结果为空");
         return;

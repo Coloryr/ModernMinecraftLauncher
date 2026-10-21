@@ -1,0 +1,10 @@
+{
+  "name": "custom-ui-html-demo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/pack.mjs",
+    "pack": "node scripts/pack.mjs"
+  }
+}

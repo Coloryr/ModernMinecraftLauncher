@@ -321,14 +321,12 @@ pub fn init(port: Option<u16>) -> CoreResult<Option<u16>> {
     thread::Builder::new()
         .name("Mml Ipc Server".to_string())
         .spawn(move || run_server(port_tx))
-        .map_err(|err| {
-            ThreadError(ErrorData::from_error(err))
-        })?;
+        .map_err(|err| ThreadError(ErrorData::from_error(err)))?;
 
     // 等待服务绑定端口；若线程启动后立即失败、发送端被丢弃，则返回错误
-    let port = port_rx.recv().map_err(|err| {
-        SocketError(ErrorData::from_error(err))
-    })?;
+    let port = port_rx
+        .recv()
+        .map_err(|err| SocketError(ErrorData::from_error(err)))?;
 
     let _ = IPC_PORT.set(port);
     mml_log::info_type(InfoType::IpcServerStart { port });
@@ -381,7 +379,9 @@ async fn accept_loop(listener: TcpListener) -> CoreResult<()> {
             }
         };
 
-        mml_log::info_type(InfoType::IpcClientConnected { addr: addr.to_string() });
+        mml_log::info_type(InfoType::IpcClientConnected {
+            addr: addr.to_string(),
+        });
         tokio::spawn(handle_client(stream));
     }
 }
@@ -428,9 +428,10 @@ async fn handle_client(stream: TcpStream) -> CoreResult<()> {
                 mml_log::error_type(IpcBufferOverrun);
                 break;
             }
-            let n = reader.read_buf(&mut buf).await.map_err(|err| {
-                SocketError(ErrorData::from_error(err))
-            })?;
+            let n = reader
+                .read_buf(&mut buf)
+                .await
+                .map_err(|err| SocketError(ErrorData::from_error(err)))?;
             if n == 0 {
                 break;
             }
@@ -528,9 +529,8 @@ async fn process_message(
     match msg_type {
         TYPE_GAME_MOUSE_STATE => {
             let uuid_str = data.read_string();
-            let guid = Uuid::parse_str(&uuid_str).map_err(|err| {
-                SocketError(ErrorData::from_error(err))
-            })?;
+            let guid = Uuid::parse_str(&uuid_str)
+                .map_err(|err| SocketError(ErrorData::from_error(err)))?;
             let value = data.read_bool();
             MOUSE_STATES.write().unwrap().insert(guid, value);
         }
@@ -547,20 +547,20 @@ async fn process_message(
         }
         TYPE_GAME_CHANNEL => {
             let uuid_str = data.read_string();
-            let guid = Uuid::parse_str(&uuid_str).map_err(|err| {
-                SocketError(ErrorData::from_error(err))
-            })?;
+            let guid = Uuid::parse_str(&uuid_str)
+                .map_err(|err| SocketError(ErrorData::from_error(err)))?;
             GAME_CHANNELS
                 .write()
                 .unwrap()
                 .insert(guid, client_tx.clone());
-            mml_log::info_type(InfoType::IpcGameChannelBound { guid: guid.to_string() });
+            mml_log::info_type(InfoType::IpcGameChannelBound {
+                guid: guid.to_string(),
+            });
         }
         TYPE_GAME_WINDOW_SIZE => {
             let uuid_str = data.read_string();
-            let guid = Uuid::parse_str(&uuid_str).map_err(|err| {
-                SocketError(ErrorData::from_error(err))
-            })?;
+            let guid = Uuid::parse_str(&uuid_str)
+                .map_err(|err| SocketError(ErrorData::from_error(err)))?;
             let width = data.get_i32();
             let height = data.get_i32();
             WINDOW_SIZES

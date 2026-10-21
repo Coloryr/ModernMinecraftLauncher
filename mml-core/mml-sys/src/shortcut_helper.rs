@@ -66,41 +66,41 @@ fn create_shortcut_inner<P: AsRef<Path>>(
         let pcwstr = PCWSTR(hstring.as_ptr());
 
         // 目标路径，必须设置
-        shell_link.SetPath(pcwstr).map_err(|err| {
-            fs_err(file.as_ref().to_path_buf(), err.message())
-        })?;
+        shell_link
+            .SetPath(pcwstr)
+            .map_err(|err| fs_err(file.as_ref().to_path_buf(), err.message()))?;
 
         // 启动参数
         let hstring = HSTRING::from(format!("{} {uuid}", names::COMMAND_GAME));
         let pcwstr = PCWSTR(hstring.as_ptr());
-        shell_link.SetArguments(pcwstr).map_err(|err| {
-            fs_err(file.as_ref().to_path_buf(), err.message())
-        })?;
+        shell_link
+            .SetArguments(pcwstr)
+            .map_err(|err| fs_err(file.as_ref().to_path_buf(), err.message()))?;
 
         let hstring = HSTRING::from(work.as_ref().as_os_str());
         let pcwstr = PCWSTR(hstring.as_ptr());
-        shell_link.SetWorkingDirectory(pcwstr).map_err(|err| {
-            fs_err(file.as_ref().to_path_buf(), err.message())
-        })?;
+        shell_link
+            .SetWorkingDirectory(pcwstr)
+            .map_err(|err| fs_err(file.as_ref().to_path_buf(), err.message()))?;
 
         // 图标
         if let Some(icon) = icon {
             let hstring = HSTRING::from(icon.as_ref().as_os_str());
             let pcwstr = PCWSTR(hstring.as_ptr());
-            shell_link.SetIconLocation(pcwstr, 0).map_err(|err| {
-                fs_err(file.as_ref().to_path_buf(), err.message())
-            })?;
+            shell_link
+                .SetIconLocation(pcwstr, 0)
+                .map_err(|err| fs_err(file.as_ref().to_path_buf(), err.message()))?;
         }
 
-        let persist_file = shell_link.cast::<IPersistFile>().map_err(|err| {
-            fs_err(file.as_ref().to_path_buf(), err.message())
-        })?;
+        let persist_file = shell_link
+            .cast::<IPersistFile>()
+            .map_err(|err| fs_err(file.as_ref().to_path_buf(), err.message()))?;
 
         let hstring = HSTRING::from(file.as_ref().as_os_str());
         let pcwstr = PCWSTR(hstring.as_ptr());
-        persist_file.Save(pcwstr, true).map_err(|err| {
-            fs_err(file.as_ref().to_path_buf(), err.message())
-        })?;
+        persist_file
+            .Save(pcwstr, true)
+            .map_err(|err| fs_err(file.as_ref().to_path_buf(), err.message()))?;
 
         CoUninitialize();
         Ok(file.as_ref().to_path_buf())
@@ -121,9 +121,7 @@ fn create_shortcut_inner<P: AsRef<Path>>(
 
     use mml_names::names;
 
-    let exe = std::env::current_exe().map_err(|err| {
-        fs_err(file.as_ref().to_path_buf(), err)
-    })?;
+    let exe = std::env::current_exe().map_err(|err| fs_err(file.as_ref().to_path_buf(), err))?;
 
     // 显示名取快捷方式文件名，与 Windows 下 .lnk 的表现一致
     let name = file
@@ -145,9 +143,8 @@ fn create_shortcut_inner<P: AsRef<Path>>(
         content.push_str(&format!("Icon={}\n", icon.as_ref().display()));
     }
 
-    std::fs::write(file.as_ref(), content).map_err(|err| {
-        fs_err(file.as_ref().to_path_buf(), err)
-    })?;
+    std::fs::write(file.as_ref(), content)
+        .map_err(|err| fs_err(file.as_ref().to_path_buf(), err))?;
 
     // 桌面环境要求启动器文件带可执行位，否则会被标成"不受信任"
     if let Ok(meta) = std::fs::metadata(file.as_ref()) {

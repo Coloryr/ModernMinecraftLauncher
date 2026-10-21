@@ -16,8 +16,7 @@ use mml_names::{
     names,
 };
 use mml_net::{
-    curseforge_api::file_obj::CurseForgeFileDataObj,
-    modrinth_api::version_obj::ModrinthVersionObj,
+    curseforge_api::file_obj::CurseForgeFileDataObj, modrinth_api::version_obj::ModrinthVersionObj,
 };
 use mml_sys::path_helper;
 use tokio_util::sync::CancellationToken;

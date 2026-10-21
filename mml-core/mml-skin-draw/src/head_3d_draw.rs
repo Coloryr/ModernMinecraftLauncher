@@ -353,13 +353,10 @@ fn draw_texture_faces(
         let pos = face_pos[face];
 
         // 先把这个面的四个角都投影出来
-        let mut corners = [
-            Vertex {
-                screen: Vec2 { x: 0.0, y: 0.0 },
-                uv: Vec2 { x: 0.0, y: 0.0 },
-            };
-            4
-        ];
+        let mut corners = [Vertex {
+            screen: Vec2 { x: 0.0, y: 0.0 },
+            uv: Vec2 { x: 0.0, y: 0.0 },
+        }; 4];
         for (i, corner) in corners.iter_mut().enumerate() {
             let screen = project(tran, CUBE_VERTICES[indices[base + i]], enable_z);
             let src = SOURCE_VERTICES[base + i];

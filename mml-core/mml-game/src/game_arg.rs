@@ -724,7 +724,9 @@ impl InstanceSettingObj {
             if !check || item.exists() {
                 // 统一成平台分隔符：maven 坐标拼出来的那段是 `/`，与 Windows 的 `\` 混在同一条
                 // 路径里，classpath 与日志都不好读
-                let text = item.to_string_lossy().replace('/', std::path::MAIN_SEPARATOR_STR);
+                let text = item
+                    .to_string_lossy()
+                    .replace('/', std::path::MAIN_SEPARATOR_STR);
                 crate::add_game_log_item(&self.uuid, GameLog::RuntimeLib(PathBuf::from(&text)));
                 classpath_parts.push(text);
             }
@@ -880,9 +882,9 @@ impl InstanceSettingObj {
                     // Cleanroom 的清单声明要 Java 25：覆盖原版 1.12.2 的 Java 8，
                     // 否则自动选择会按最低版本挑到 8
                     if self.loader == LoaderType::Cleanroom
-                        && let Some(java) = self
-                            .get_forge()
-                            .and_then(|loader| loader.java_version.as_ref().map(|j| j.major_version))
+                        && let Some(java) = self.get_forge().and_then(|loader| {
+                            loader.java_version.as_ref().map(|j| j.major_version)
+                        })
                     {
                         obj.java_versions.clear();
                         obj.java_versions.insert(java);
@@ -1030,7 +1032,6 @@ impl InstanceSettingObj {
         {
             obj.game_jar = game.build_game_item();
         }
-
 
         let mut log4j: Option<&LoggingObj> = None;
         // 按 order 升序叠加：patch 是分层覆写，主类 / 运行库 / tweak / jvm 参数全靠这个顺序定胜负。
@@ -1202,7 +1203,6 @@ impl InstanceSettingObj {
             }
         }
 
-
         // 加载器层放在 patch 之后、并且只补 patch 完全没有的构件：
         // MMC 实例的加载器本来就由 patches 描述（GTNH 的 Forge 就来自 net.minecraftforge.json），
         // 先塞一遍加载器库会得到重复的 forge，还会把 patch 声明为 "Early Classpath" 的
@@ -1340,7 +1340,6 @@ impl InstanceSettingObj {
             self.make_custom_arg(arg, &mut obj, game_args).await?;
         }
 
-
         Ok(obj)
     }
 }
@@ -1465,10 +1464,19 @@ mod tests {
             ..Default::default()
         });
 
-        let args = obj.make_jvm_arg(&LoginObj::default(), 21, None).await.unwrap();
+        let args = obj
+            .make_jvm_arg(&LoginObj::default(), 21, None)
+            .await
+            .unwrap();
 
-        let min = args.iter().position(|a| a == "-Xms512m").expect("应生成 -Xms512m");
-        let max = args.iter().position(|a| a == "-Xmx4096m").expect("应生成 -Xmx4096m");
+        let min = args
+            .iter()
+            .position(|a| a == "-Xms512m")
+            .expect("应生成 -Xms512m");
+        let max = args
+            .iter()
+            .position(|a| a == "-Xmx4096m")
+            .expect("应生成 -Xmx4096m");
         assert!(min < max, "-Xms 应排在 -Xmx 之前");
     }
 
@@ -1483,10 +1491,19 @@ mod tests {
             ..Default::default()
         });
 
-        let args = obj.make_jvm_arg(&LoginObj::default(), 21, None).await.unwrap();
+        let args = obj
+            .make_jvm_arg(&LoginObj::default(), 21, None)
+            .await
+            .unwrap();
 
-        assert!(!args.iter().any(|a| a.starts_with("-Xms")), "0 不该生成 -Xms");
-        assert!(!args.iter().any(|a| a.starts_with("-Xmx")), "没设不该生成 -Xmx");
+        assert!(
+            !args.iter().any(|a| a.starts_with("-Xms")),
+            "0 不该生成 -Xms"
+        );
+        assert!(
+            !args.iter().any(|a| a.starts_with("-Xmx")),
+            "没设不该生成 -Xmx"
+        );
     }
 
     /// GC 档：自动档按 Java 版本挑，21 及以上走 ZGC、之下走 G1GC；显式指定时听指定的
@@ -1500,12 +1517,28 @@ mod tests {
         });
 
         let zgc = auto.make_jvm_arg(&auth, 21, None).await.unwrap();
-        assert!(names::GCZGC.iter().all(|item| zgc.contains(&item.to_string())), "Java 21 应走 ZGC");
-        assert!(!zgc.contains(&names::G1GC[0].to_string()), "自动档不该同时给 G1GC");
+        assert!(
+            names::GCZGC
+                .iter()
+                .all(|item| zgc.contains(&item.to_string())),
+            "Java 21 应走 ZGC"
+        );
+        assert!(
+            !zgc.contains(&names::G1GC[0].to_string()),
+            "自动档不该同时给 G1GC"
+        );
 
         let g1 = auto.make_jvm_arg(&auth, 17, None).await.unwrap();
-        assert!(names::G1GC.iter().all(|item| g1.contains(&item.to_string())), "Java 17 应走 G1GC");
-        assert!(!g1.contains(&names::GCZGC[0].to_string()), "低版本不该给 ZGC");
+        assert!(
+            names::G1GC
+                .iter()
+                .all(|item| g1.contains(&item.to_string())),
+            "Java 17 应走 G1GC"
+        );
+        assert!(
+            !g1.contains(&names::GCZGC[0].to_string()),
+            "低版本不该给 ZGC"
+        );
 
         // 显式档与自动判定不一致时按显式的来
         let forced = instance(RunArgObj {
@@ -1513,7 +1546,12 @@ mod tests {
             ..Default::default()
         });
         let forced = forced.make_jvm_arg(&auth, 21, None).await.unwrap();
-        assert!(names::G1GC.iter().all(|item| forced.contains(&item.to_string())), "显式 G1GC 应压过自动档");
+        assert!(
+            names::G1GC
+                .iter()
+                .all(|item| forced.contains(&item.to_string())),
+            "显式 G1GC 应压过自动档"
+        );
     }
 
     /// 自定义 JVM 参数：按行追加，首尾空白与空行都去掉
@@ -1526,9 +1564,15 @@ mod tests {
             ..Default::default()
         });
 
-        let args = obj.make_jvm_arg(&LoginObj::default(), 17, None).await.unwrap();
+        let args = obj
+            .make_jvm_arg(&LoginObj::default(), 17, None)
+            .await
+            .unwrap();
 
-        assert!(args.contains(&"-Dfoo=1".to_string()), "应保留自定义参数并去掉首尾空白");
+        assert!(
+            args.contains(&"-Dfoo=1".to_string()),
+            "应保留自定义参数并去掉首尾空白"
+        );
         assert!(args.contains(&"-Dbar=2".to_string()));
         assert!(!args.iter().any(|a| a.is_empty()), "空行不该留成空参数");
     }
@@ -1554,7 +1598,8 @@ mod tests {
                 .arg("--list-modules")
                 .output()
                 .map(|out| {
-                    out.status.success() && String::from_utf8_lossy(&out.stdout).contains("jdk.compiler")
+                    out.status.success()
+                        && String::from_utf8_lossy(&out.stdout).contains("jdk.compiler")
                 })
                 .unwrap_or(false)
         })
@@ -1597,7 +1642,10 @@ mod tests {
             jvm_args: Some("-Dmml.probe=1".to_string()),
             ..Default::default()
         });
-        let jvm = instance.make_jvm_arg(&LoginObj::default(), 21, None).await.unwrap();
+        let jvm = instance
+            .make_jvm_arg(&LoginObj::default(), 21, None)
+            .await
+            .unwrap();
 
         let mut obj = GameLaunchObj {
             jvm_args: jvm,
@@ -1613,8 +1661,14 @@ mod tests {
             lang: None,
         };
         let args = instance.make_run_arg(&launch_arg, &mut obj, false);
-        assert!(args.contains(&"-Xms256m".to_string()), "命令行里应有内存参数");
-        assert!(args.contains(&probe.to_string_lossy().to_string()), "命令行里应有主类");
+        assert!(
+            args.contains(&"-Xms256m".to_string()),
+            "命令行里应有内存参数"
+        );
+        assert!(
+            args.contains(&probe.to_string_lossy().to_string()),
+            "命令行里应有主类"
+        );
 
         // 真起进程：句柄负责读流进运行日志、tick 判退出
         let uuid = Uuid::new_v4();
@@ -1632,7 +1686,9 @@ mod tests {
 
         // 先等输出：源文件模式要先编译，给足 60 秒
         let deadline = Instant::now() + Duration::from_secs(60);
-        while run_log_texts(&uuid).iter().all(|line| !line.contains("mml-probe-ok"))
+        while run_log_texts(&uuid)
+            .iter()
+            .all(|line| !line.contains("mml-probe-ok"))
             && Instant::now() < deadline
         {
             thread::sleep(Duration::from_millis(50));
@@ -1645,8 +1701,14 @@ mod tests {
             .unwrap_or_else(|| panic!("运行日志里应出现探针输出，实际：{texts:?}"));
 
         // 三件事各证明一段链路：进程起来了、自定义 JVM 参数到了 JVM、游戏参数到了进程
-        assert!(line.contains("prop=1"), "自定义 JVM 参数应真的传给 JVM：{line}");
-        assert!(line.contains("args=--probe-arg"), "游戏参数应真的传给进程：{line}");
+        assert!(
+            line.contains("prop=1"),
+            "自定义 JVM 参数应真的传给 JVM：{line}"
+        );
+        assert!(
+            line.contains("args=--probe-arg"),
+            "游戏参数应真的传给进程：{line}"
+        );
 
         // 再等进程退出
         let deadline = Instant::now() + Duration::from_secs(30);

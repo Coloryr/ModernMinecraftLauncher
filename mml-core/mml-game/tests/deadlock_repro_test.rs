@@ -70,7 +70,14 @@ fn current_style_deadlocks() {
         },
         Duration::from_millis(800),
     );
-    println!("现写法（写锁内调 save）：{}", if done { "正常完成" } else { "卡死（符合预期）" });
+    println!(
+        "现写法（写锁内调 save）：{}",
+        if done {
+            "正常完成"
+        } else {
+            "卡死（符合预期）"
+        }
+    );
     assert!(
         !done,
         "现写法竟然没死锁？说明我对 RwLock 语义的判断有误，需重新分析"
@@ -90,7 +97,11 @@ fn fixed_style_does_not_deadlock() {
     );
     println!(
         "修复写法（先释放写锁再 save）：{}",
-        if done { "正常完成（符合预期）" } else { "卡死" }
+        if done {
+            "正常完成（符合预期）"
+        } else {
+            "卡死"
+        }
     );
     assert!(done, "修复写法不应死锁");
 }

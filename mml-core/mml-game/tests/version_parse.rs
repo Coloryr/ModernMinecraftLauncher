@@ -62,8 +62,8 @@ fn version_manifest_defaults() {
     assert!(obj.versions.is_empty());
 
     // versions 内条目缺 sha1 / url 时也应能解析
-    let obj: VersionObj = serde_json::from_str(r#"{"versions":[{"id":"1.20.4","type":"release"}]}"#)
-        .unwrap();
+    let obj: VersionObj =
+        serde_json::from_str(r#"{"versions":[{"id":"1.20.4","type":"release"}]}"#).unwrap();
     assert_eq!(obj.versions.len(), 1);
     assert_eq!(obj.versions[0].sha1, "");
     assert_eq!(obj.versions[0].url, "");
@@ -97,7 +97,10 @@ fn game_arg_obj_v1_parse() {
         obj.minecraft_arguments.as_deref(),
         Some("--username ${auth_player_name} --version ${version_name}")
     );
-    assert_eq!(obj.downloads.client.sha1, "0b8a76f11c41e6d15f1c3e2c9a9a1b2c");
+    assert_eq!(
+        obj.downloads.client.sha1,
+        "0b8a76f11c41e6d15f1c3e2c9a9a1b2c"
+    );
     // V1 格式没有 arguments 字段
     assert!(obj.arguments.is_none());
 }
@@ -180,7 +183,13 @@ fn game_arg_obj_v2_parse() {
     assert_eq!(libs[0].name, "org.lwjgl:lwjgl:3.3.1");
     assert_eq!(libs[0].downloads.artifact.sha1, "libsha1");
     assert_eq!(
-        libs[0].downloads.classifiers.as_ref().unwrap().natives_windows.sha1,
+        libs[0]
+            .downloads
+            .classifiers
+            .as_ref()
+            .unwrap()
+            .natives_windows
+            .sha1,
         "nsha1"
     );
 }
@@ -202,12 +211,10 @@ fn game_arg_obj_defaults() {
 /// 版本号判断，逻辑在 version_checker：V1/V2 与 1.17 / 1.20 / 1.20.2 阈值
 #[test]
 fn game_arg_version_checker() {
-    let make = |id: &str, min: i32| {
-        GameArgObj {
-            id: id.to_string(),
-            minimum_launcher_version: min,
-            ..Default::default()
-        }
+    let make = |id: &str, min: i32| GameArgObj {
+        id: id.to_string(),
+        minimum_launcher_version: min,
+        ..Default::default()
     };
 
     // 1.17 阈值，含 1.17

@@ -13,17 +13,19 @@ use mml_base::archives::BaseArchive;
 
 /// 取参考客户端 jar 路径，环境变量 MML_TEST_JAR 优先
 fn ref_jar() -> PathBuf {
-    std::env::var("MML_TEST_JAR").map(PathBuf::from).unwrap_or_else(|_| {
-        // 优先用渲染测试已下载的客户端 jar tests/out/run，其次 H 盘 Temp 的反编译参考 jar
-        let run_jar = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
-            "tests/out/run/minecraft/libraries/net/minecraft/client/26.3/client-26.3.jar",
-        );
-        if run_jar.exists() {
-            run_jar
-        } else {
-            PathBuf::from("H:/Temp/mml-262-ref/client.jar")
-        }
-    })
+    std::env::var("MML_TEST_JAR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            // 优先用渲染测试已下载的客户端 jar tests/out/run，其次 H 盘 Temp 的反编译参考 jar
+            let run_jar = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
+                "tests/out/run/minecraft/libraries/net/minecraft/client/26.3/client-26.3.jar",
+            );
+            if run_jar.exists() {
+                run_jar
+            } else {
+                PathBuf::from("H:/Temp/mml-262-ref/client.jar")
+            }
+        })
 }
 
 /// 取 tests/out 下的输出路径，目录不存在时创建
@@ -156,5 +158,9 @@ fn render_one_item() {
     let gpu = mml_tex_draw::gpu::GpuCtx::try_new();
     let out = mml_tex_draw::item::render_item(gpu.as_ref(), &archive, &mut cache, &id)
         .unwrap_or_else(|| panic!("render_item GPU失败：{id}"));
-    std::fs::copy(dir.join("items").join(&out.out_name), out_path(&format!("{name}_gpu.png"))).unwrap();
+    std::fs::copy(
+        dir.join("items").join(&out.out_name),
+        out_path(&format!("{name}_gpu.png")),
+    )
+    .unwrap();
 }

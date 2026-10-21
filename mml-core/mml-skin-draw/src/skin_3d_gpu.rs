@@ -127,10 +127,11 @@ fn build_mesh(render: &SkinRenderWgpu, parts: &[PartRef<'_>]) -> MeshData {
                     .truncate()
                     .to_array(),
                 uv: [part.uv[uv], part.uv[uv + 1]],
-                normal: (tran * Vec3::from_slice(&skin_3d_cube::VERTICES[src..src + 3]).extend(0.0))
-                    .truncate()
-                    .normalize()
-                    .to_array(),
+                normal: (tran
+                    * Vec3::from_slice(&skin_3d_cube::VERTICES[src..src + 3]).extend(0.0))
+                .truncate()
+                .normalize()
+                .to_array(),
             });
         }
 
@@ -151,7 +152,12 @@ struct Mesh {
 }
 
 /// 把 CPU 顶点与索引上传成网格，索引为空时返回 `None`，不建空缓冲
-fn upload_mesh(device: &wgpu::Device, label: &str, verts: &[Vert], indices: &[u16]) -> Option<Mesh> {
+fn upload_mesh(
+    device: &wgpu::Device,
+    label: &str,
+    verts: &[Vert],
+    indices: &[u16],
+) -> Option<Mesh> {
     if indices.is_empty() {
         return None;
     }
@@ -466,7 +472,12 @@ impl SkinRenderWgpu {
         let shape = skin_3d_model::get_steve(self.skin_type);
         let tex = skin_3d_texture::get_steve_texture(self.skin_type);
         let body_mesh = build_mesh(self, &parts_of(&shape, &tex));
-        let body = upload_mesh(device, "mml-skin-draw body", &body_mesh.verts, &body_mesh.indices);
+        let body = upload_mesh(
+            device,
+            "mml-skin-draw body",
+            &body_mesh.verts,
+            &body_mesh.indices,
+        );
 
         let cape = if self.have_cape && self.enable_cape {
             let part = PartRef {
@@ -475,7 +486,12 @@ impl SkinRenderWgpu {
                 uv: &tex.cape,
             };
             let cape_mesh = build_mesh(self, &[part]);
-            upload_mesh(device, "mml-skin-draw cape", &cape_mesh.verts, &cape_mesh.indices)
+            upload_mesh(
+                device,
+                "mml-skin-draw cape",
+                &cape_mesh.verts,
+                &cape_mesh.indices,
+            )
         } else {
             None
         };
@@ -484,7 +500,12 @@ impl SkinRenderWgpu {
             let shape = skin_3d_model::get_steve_top(self.skin_type);
             let tex = skin_3d_texture::get_steve_texture_top(self.skin_type);
             let top_mesh = build_mesh(self, &parts_of(&shape, &tex));
-            upload_mesh(device, "mml-skin-draw top", &top_mesh.verts, &top_mesh.indices)
+            upload_mesh(
+                device,
+                "mml-skin-draw top",
+                &top_mesh.verts,
+                &top_mesh.indices,
+            )
         } else {
             None
         };
@@ -568,8 +589,8 @@ impl SkinRenderWgpu {
 
         // 有 MSAA 时读解析目标，否则直接读颜色附件
         let source = target.resolve.as_ref().unwrap_or(&target.color);
-        let premul =
-            mml_gpu::readback(device, queue, source, width, height).ok_or(ErrorType::RenderError)?;
+        let premul = mml_gpu::readback(device, queue, source, width, height)
+            .ok_or(ErrorType::RenderError)?;
 
         mml_gpu::pixmap_from_premul_rgba(&premul, width, height).ok_or(ErrorType::RenderError)
     }
@@ -710,4 +731,3 @@ mod tests {
         assert_eq!(render.render(), Err(ErrorType::InvalidSize));
     }
 }
-

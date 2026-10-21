@@ -18,9 +18,9 @@ use mml_names::i18_items::error_type::{CoreResult, ErrorType};
 use reqwest::{Method, Request, Url, header::HeaderValue};
 use serde::{Deserialize, Serialize};
 
-use crate::{url_helper, urls};
-use crate::serializer_err;
 use crate::http_error;
+use crate::serializer_err;
+use crate::{url_helper, urls};
 
 /// 直接下载资源
 ///
@@ -138,9 +138,7 @@ async fn send_profile_json<T: Serialize>(
         HeaderValue::from_str(&format!("Bearer {token}")).unwrap(),
     );
     let body = serde_json::to_vec(body)
-        .map_err(|err| {
-            serializer_err(err)
-        })?
+        .map_err(|err| serializer_err(err))?
         .into();
     *req.body_mut() = Some(body);
     let res = client.send(req).await?;
@@ -220,9 +218,7 @@ pub async fn upload_minecraft_skin(
             reqwest::multipart::Part::bytes(data)
                 .file_name(file_name.to_string())
                 .mime_str("image/png")
-                .map_err(|err| {
-                    serializer_err(err)
-                })?,
+                .map_err(|err| serializer_err(err))?,
         );
 
     let res = crate::get_login_client()

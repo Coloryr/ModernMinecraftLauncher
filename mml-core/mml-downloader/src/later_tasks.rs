@@ -34,9 +34,9 @@ pub fn unpack_native<R: Read + Seek>(native: &Path, read: R) -> CoreResult<()> {
     })?;
 
     for i in 0..archive.len() {
-        let mut file = archive.by_index(i).map_err(|err| {
-            ErrorType::ArchiveReadError(ErrorData::from_error(err))
-        })?;
+        let mut file = archive
+            .by_index(i)
+            .map_err(|err| ErrorType::ArchiveReadError(ErrorData::from_error(err)))?;
 
         if file.is_dir() {
             continue;

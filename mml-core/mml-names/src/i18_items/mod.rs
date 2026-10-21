@@ -8,8 +8,7 @@ use core::fmt;
 use crate::{
     i18,
     i18_items::{
-        error_type::ErrorType, info_type::InfoType, panic_type::PanicType,
-        thread_type::ThreadType,
+        error_type::ErrorType, info_type::InfoType, panic_type::PanicType, thread_type::ThreadType,
     },
 };
 
@@ -45,4 +44,3 @@ impl fmt::Display for ThreadType {
         write!(f, "{}", i18::with_thread(self))
     }
 }
-

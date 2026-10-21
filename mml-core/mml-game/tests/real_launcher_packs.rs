@@ -18,8 +18,8 @@ use mml_game::add_game::{
 };
 use mml_game::game_export::{ExportArg, ExportPackType};
 use mml_game::gui_hook::{AddModPackState, IAddModPackGui};
-use mml_game::loader::LoaderType;
 use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
+use mml_game::loader::LoaderType;
 use mml_names::names as name_consts;
 use uuid::Uuid;
 
@@ -45,7 +45,10 @@ fn find_pack(file_name: &str, how_to_make: &str) -> Option<PathBuf> {
     if path.exists() {
         return Some(path);
     }
-    eprintln!("跳过: 缺少 {file_name}（{how_to_make}），放到 {}", path.display());
+    eprintln!(
+        "跳过: 缺少 {file_name}（{how_to_make}），放到 {}",
+        path.display()
+    );
     None
 }
 
@@ -155,11 +158,7 @@ struct InstalledPack {
 /// # 返回值
 ///
 /// 见 [`InstalledPack`]；安装失败会 panic
-async fn install(
-    zip: &PathBuf,
-    name: Option<String>,
-    pack_type: PackType,
-) -> InstalledPack {
+async fn install(zip: &PathBuf, name: Option<String>, pack_type: PackType) -> InstalledPack {
     let recorder = StateRecorder::default();
     let uuid = add_game::install_archive_from_file(
         zip,
@@ -541,16 +540,17 @@ async fn install_real_hmcl_modpack() {
     let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     ensure_init();
 
-    let Some(pack) = find_pack(
-        "hmcl-instance.zip",
-        "用 HMCL 的「导出整合包」生成",
-    ) else {
+    let Some(pack) = find_pack("hmcl-instance.zip", "用 HMCL 的「导出整合包」生成")
+    else {
         return;
     };
 
     // 类型检测
     let detected = detect_pack(&pack).expect("检测失败");
-    assert!(matches!(detected.pack_type, PackType::HMCL), "应识别为 HMCL 包");
+    assert!(
+        matches!(detected.pack_type, PackType::HMCL),
+        "应识别为 HMCL 包"
+    );
     assert!(!detected.name.is_empty(), "应从 packmeta 取到实例名");
 
     // 从包内元数据动态推导期望值
@@ -579,7 +579,8 @@ async fn install_real_hmcl_modpack() {
 
     // overrides 目录名取自随包 manifest.json，HMCL 导出必带
     let overrides = {
-        let cfg_data = read_entry(&archive, name_consts::MANIFEST_FILE).expect("HMCL 包应带 manifest.json");
+        let cfg_data =
+            read_entry(&archive, name_consts::MANIFEST_FILE).expect("HMCL 包应带 manifest.json");
         let cfg: mml_game::curseforge::pack_obj::CurseForgePackObj =
             mml_base::serialize_tools::json_from_bytes(&cfg_data).unwrap();
         cfg.overrides
@@ -592,7 +593,8 @@ async fn install_real_hmcl_modpack() {
         .filter(|e| !e.is_dir)
         .filter_map(|e| {
             let norm = e.name.replace('\\', "/");
-            norm.strip_prefix(&format!("{overrides}/")).map(String::from)
+            norm.strip_prefix(&format!("{overrides}/"))
+                .map(String::from)
         })
         .filter(|rel| !rel.is_empty())
         .take(5)
@@ -606,8 +608,8 @@ async fn install_real_hmcl_modpack() {
     assert_eq!(read.name, expect_name, "实例名应取自 packmeta");
     assert_eq!(read.version, expect_version, "游戏版本应取自 packmeta");
     assert!(
-        matches!(read.loader, LoaderType::Normal) || std::mem::discriminant(&read.loader)
-            == std::mem::discriminant(&expect_loader),
+        matches!(read.loader, LoaderType::Normal)
+            || std::mem::discriminant(&read.loader) == std::mem::discriminant(&expect_loader),
         "加载器类型应与 packmeta 一致"
     );
     if let Some(v) = &expect_loader_version {
@@ -703,8 +705,12 @@ async fn install_real_hmcl_portable_pack() {
         .collect();
     drop(archive);
 
-    let InstalledPack { uuid, recorder } =
-        install(&pack, Some("HMCL整包导入".to_string()), PackType::LauncherPack).await;
+    let InstalledPack { uuid, recorder } = install(
+        &pack,
+        Some("HMCL整包导入".to_string()),
+        PackType::LauncherPack,
+    )
+    .await;
 
     let game = mml_game::get_instance(&uuid).expect("安装后应能取到实例");
     let read = game.read().unwrap();
@@ -735,10 +741,8 @@ async fn install_real_mml_instance_archive() {
     let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     ensure_init();
 
-    let Some(pack) = find_pack(
-        "colormc-instance.zip",
-        "用 ColorMC/M²L 的实例导出生成",
-    ) else {
+    let Some(pack) = find_pack("colormc-instance.zip", "用 ColorMC/M²L 的实例导出生成")
+    else {
         return;
     };
 
@@ -804,22 +808,28 @@ async fn install_real_multimc_dir() {
     let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     ensure_init();
 
-    let Some(pack) = find_pack(
-        "MultiMC.zip",
-        "把 MultiMC 目录（含 instances）整体压缩",
-    ) else {
+    let Some(pack) = find_pack("MultiMC.zip", "把 MultiMC 目录（含 instances）整体压缩")
+    else {
         return;
     };
 
     let detected = detect_pack(&pack).expect("检测失败");
-    assert!(matches!(detected.pack_type, PackType::MMC), "应识别为 MMC 包");
+    assert!(
+        matches!(detected.pack_type, PackType::MMC),
+        "应识别为 MMC 包"
+    );
 
     // 包内第一个 mmc-pack.json 即导入目标
     let archive = BaseArchive::open(&pack).unwrap();
     let first = archive
         .entries()
         .iter()
-        .find(|e| !e.is_dir && e.name.replace('\\', "/").ends_with(name_consts::MMCJSON_FILE))
+        .find(|e| {
+            !e.is_dir
+                && e.name
+                    .replace('\\', "/")
+                    .ends_with(name_consts::MMCJSON_FILE)
+        })
         .expect("应有 mmc-pack.json")
         .name
         .replace('\\', "/");
@@ -857,8 +867,7 @@ async fn install_real_multimc_dir() {
         .filter(|e| !e.is_dir)
         .filter_map(|e| {
             let norm = e.name.replace('\\', "/");
-            norm
-                .strip_prefix(&inst_dir)
+            norm.strip_prefix(&inst_dir)
                 .filter(|rel| {
                     !rel.is_empty()
                         && *rel != name_consts::MMCJSON_FILE
@@ -869,7 +878,10 @@ async fn install_real_multimc_dir() {
         .take(5)
         .collect();
     drop(archive);
-    assert!(!expect_version.is_empty(), "mmc-pack.json 应有 net.minecraft 组件");
+    assert!(
+        !expect_version.is_empty(),
+        "mmc-pack.json 应有 net.minecraft 组件"
+    );
 
     let InstalledPack { uuid, recorder } = install(&pack, None, PackType::MMC).await;
 
@@ -878,8 +890,8 @@ async fn install_real_multimc_dir() {
     assert_eq!(read.name, detected.name, "实例名应取自第一个 instance.cfg");
     assert_eq!(read.version, expect_version, "游戏版本应取自 mmc-pack.json");
     assert!(
-        matches!(read.loader, LoaderType::Normal) || std::mem::discriminant(&read.loader)
-            == std::mem::discriminant(&expect_loader),
+        matches!(read.loader, LoaderType::Normal)
+            || std::mem::discriminant(&read.loader) == std::mem::discriminant(&expect_loader),
         "加载器类型应与 mmc-pack.json 一致"
     );
     if let Some(v) = &expect_loader_version {
@@ -909,15 +921,15 @@ async fn install_real_mmc_instance() {
     let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     ensure_init();
 
-    let Some(pack) = find_pack(
-        "mmc-instance.zip",
-        "把 Prism/MMC 实例目录压缩",
-    ) else {
+    let Some(pack) = find_pack("mmc-instance.zip", "把 Prism/MMC 实例目录压缩") else {
         return;
     };
 
     let detected = detect_pack(&pack).expect("检测失败");
-    assert!(matches!(detected.pack_type, PackType::MMC), "应识别为 MMC 包");
+    assert!(
+        matches!(detected.pack_type, PackType::MMC),
+        "应识别为 MMC 包"
+    );
     assert!(!detected.name.is_empty(), "应从 instance.cfg 取到实例名");
 
     // 动态推导期望：net.minecraft 版本与加载器组件
@@ -947,7 +959,10 @@ async fn install_real_mmc_instance() {
         }
     }
     drop(archive);
-    assert!(!expect_version.is_empty(), "mmc-pack.json 应有 net.minecraft 组件");
+    assert!(
+        !expect_version.is_empty(),
+        "mmc-pack.json 应有 net.minecraft 组件"
+    );
 
     let InstalledPack { uuid, recorder } = install(&pack, None, PackType::MMC).await;
 
@@ -956,8 +971,8 @@ async fn install_real_mmc_instance() {
     assert_eq!(read.name, detected.name, "实例名应取自 instance.cfg");
     assert_eq!(read.version, expect_version, "游戏版本应取自 mmc-pack.json");
     assert!(
-        matches!(read.loader, LoaderType::Normal) || std::mem::discriminant(&read.loader)
-            == std::mem::discriminant(&expect_loader),
+        matches!(read.loader, LoaderType::Normal)
+            || std::mem::discriminant(&read.loader) == std::mem::discriminant(&expect_loader),
         "加载器类型应与 mmc-pack.json 一致"
     );
     if let Some(v) = &expect_loader_version {

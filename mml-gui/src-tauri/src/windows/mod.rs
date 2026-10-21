@@ -795,6 +795,57 @@ pub fn window_is_maximized(window: WebviewWindow) -> bool {
     window.is_maximized().unwrap_or(false)
 }
 
+/// 设置窗口全屏，标题栏右键菜单的「全屏」用
+///
+/// 全屏盖住任务栏；退出时由系统恢复进入全屏之前的摆放，那时原本最大化的话仍最大化。
+///
+/// - `window`: 调用方窗口，由 tauri 注入
+/// - `fullscreen`: 目标状态，true 进入全屏，false 退出
+///
+/// # 返回值
+///
+/// 设置成功返回 `Ok(())`，失败返回错误文案
+#[gui_macros::command]
+pub fn window_set_fullscreen(window: WebviewWindow, fullscreen: bool) -> Result<(), String> {
+    window.set_fullscreen(fullscreen).map_err(|err| err.to_string())
+}
+
+/// 当前是否全屏，标题栏换图标用
+///
+/// - `window`: 调用方窗口，由 tauri 注入
+///
+/// # 返回值
+///
+/// 是否全屏；查询失败按未全屏处理
+#[gui_macros::command]
+pub fn window_is_fullscreen(window: WebviewWindow) -> bool {
+    window.is_fullscreen().unwrap_or(false)
+}
+
+/// 设置窗口最大化，标题栏右键菜单的「占满屏幕」用
+///
+/// 与 [window_toggle_maximize] 的区别是给定目标状态：菜单点的是「占满屏幕」，
+/// 目标由前端按当前状态算好，不靠后端取反。全屏时先退出全屏 —— Windows 会忽略
+/// 全屏窗口上的 maximize，不先退出就表现为点了没反应。
+///
+/// - `window`: 调用方窗口，由 tauri 注入
+/// - `maximized`: 目标状态，true 最大化，false 还原
+///
+/// # 返回值
+///
+/// 设置成功返回 `Ok(())`，失败返回错误文案
+#[gui_macros::command]
+pub fn window_set_maximized(window: WebviewWindow, maximized: bool) -> Result<(), String> {
+    if window.is_fullscreen().unwrap_or(false) {
+        window.set_fullscreen(false).map_err(|err| err.to_string())?;
+    }
+    if maximized {
+        window.maximize().map_err(|err| err.to_string())
+    } else {
+        window.unmaximize().map_err(|err| err.to_string())
+    }
+}
+
 /// 设置调用方窗口的原生标题，任务栏 / Alt+Tab 显示
 ///
 /// 窗口创建时统一叫 `names::MML`；自绘标题栏文案由前端持有，已 i18n，

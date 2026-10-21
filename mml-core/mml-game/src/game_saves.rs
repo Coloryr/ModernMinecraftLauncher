@@ -14,9 +14,7 @@ use mml_base::{
 };
 use mml_config::config_save;
 use mml_names::{
-    i18_items::error_type::{
-        CoreResult, DataNotFoundData, ErrorType, FileSystemErrorData,
-    },
+    i18_items::error_type::{CoreResult, DataNotFoundData, ErrorType, FileSystemErrorData},
     names, uuids,
 };
 use mml_nbt::{
@@ -29,8 +27,8 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use zip::ZipArchive;
 
-use crate::launcher::instance_setting_obj::InstanceSettingObj;
 use crate::error::{archive_read_err, serializer_err};
+use crate::launcher::instance_setting_obj::InstanceSettingObj;
 
 /// 存档备份信息
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]

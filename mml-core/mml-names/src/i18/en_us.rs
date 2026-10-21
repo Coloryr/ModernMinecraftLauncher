@@ -39,7 +39,9 @@ impl I18Lang for EnUs {
                 total,
                 completed,
                 failed,
-            } => format!("download task finished: {total} total, {completed} done, {failed} failed"),
+            } => {
+                format!("download task finished: {total} total, {completed} done, {failed} failed")
+            }
             InfoType::ProxyUser {
                 kind,
                 ip,
@@ -100,7 +102,11 @@ impl I18Lang for EnUs {
             }
             ErrorType::HttpError(data) => {
                 // 构建阶段就失败时没有 URL，给个明确说法（与中文表同一处口径）
-                let url = if data.url.is_empty() { "(no URL)" } else { data.url.as_str() };
+                let url = if data.url.is_empty() {
+                    "(no URL)"
+                } else {
+                    data.url.as_str()
+                };
                 match data.status {
                     Some(status) => format!(
                         "HTTP request {} failed: {} (status {})",
@@ -112,7 +118,11 @@ impl I18Lang for EnUs {
 
             ErrorType::Aborted { url } => {
                 // 与中文表同一口径：拿不到地址时给个明确说法
-                let url = if url.is_empty() { "(no URL)" } else { url.as_str() };
+                let url = if url.is_empty() {
+                    "(no URL)"
+                } else {
+                    url.as_str()
+                };
                 format!("HTTP request {url} aborted: proxy or network settings changed")
             }
 
@@ -240,7 +250,11 @@ impl I18Lang for EnUs {
                 data.name,
                 data.times,
                 data.error,
-                if data.url.is_empty() { "missing" } else { data.url.as_str() }
+                if data.url.is_empty() {
+                    "missing"
+                } else {
+                    data.url.as_str()
+                }
             ),
             ErrorType::DownloadFileFail => String::from("File download failed"),
 
@@ -268,7 +282,10 @@ impl I18Lang for EnUs {
                 String::from("Named pipe connection timed out; UAC may have been declined")
             }
             ErrorType::NamedPipeWaitFailed(data) => {
-                format!("Failed while waiting for the named pipe connection: {}", data.error)
+                format!(
+                    "Failed while waiting for the named pipe connection: {}",
+                    data.error
+                )
             }
             ErrorType::NamedPipeConnectFailed(data) => {
                 format!("Failed to connect the named pipe: {}", data.error)

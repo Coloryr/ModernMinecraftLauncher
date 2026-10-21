@@ -94,10 +94,7 @@ fn abort_interrupts_inflight_request() {
 
     // 前提：请求确实卡住了，本地服务不回响应
     std::thread::sleep(Duration::from_millis(600));
-    assert!(
-        rx.try_recv().is_err(),
-        "请求提前返回了，测试前提不成立"
-    );
+    assert!(rx.try_recv().is_err(), "请求提前返回了，测试前提不成立");
 
     // 触发全局中断
     let abort_at = Instant::now();
@@ -118,10 +115,7 @@ fn abort_interrupts_inflight_request() {
         lag < Duration::from_millis(500),
         "中断不够快：abort 后 {lag:?} 才返回"
     );
-    assert!(
-        detail.contains("已中断"),
-        "错误内容不是中断提示：{detail}"
-    );
+    assert!(detail.contains("已中断"), "错误内容不是中断提示：{detail}");
 }
 
 /// 中断之后发出的新请求不受上一轮中断影响
