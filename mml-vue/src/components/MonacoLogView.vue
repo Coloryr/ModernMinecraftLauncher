@@ -136,7 +136,7 @@ function openFind() {
   monacoEditor?.getAction("actions.find")?.run();
 }
 
-defineExpose({ openFind });
+defineExpose({ openFind, scrollBottom });
 
 // ---------------- 右键菜单：只读日志的全选 / 复制 ----------------
 

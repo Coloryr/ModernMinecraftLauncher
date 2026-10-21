@@ -1,7 +1,7 @@
 # M²L 工作区根清单
 #
 # 全部 Rust crate 收进一个 workspace：
-# - mml-core 与其 17 个子 crate（内核）
+# - mml-core 与其 18 个子 crate（内核）
 # - mml-gui/src-tauri（Tauri 桌面壳）
 # - ipc-gen（IPC 代码生成）+ ipc-gen/macros（给命令 / 事件打标记的过程宏）
 # [workspace.dependencies] 与 [profile.*] 统一在此维护（成员清单里只写包自身定义）。

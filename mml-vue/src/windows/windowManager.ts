@@ -111,6 +111,10 @@ export interface WindowOpenParams {
   drop?: WindowDropParam;
   /** 要聚焦的存档目录名，配置文件窗口"右键存档 → 修改配置文件"用 */
   saveDir?: string;
+  /** 要直接打开的日志文件绝对路径；日志窗口用 */
+  logFile?: string;
+  /** 打开日志窗口后滚到底部；日志窗口用 */
+  logBottom?: boolean;
 }
 
 /**
@@ -128,11 +132,17 @@ export const windowParams = ref<{
   drop: WindowDropParam | null;
   /** 要聚焦的存档目录名，配置文件窗口用 */
   saveDir: string | null;
+  /** 要直接打开的日志文件绝对路径 */
+  logFile: string | null;
+  /** 打开日志窗口后滚到底部 */
+  logBottom: boolean;
 }>({
   uuid: null,
   project: null,
   drop: null,
   saveDir: null,
+  logFile: null,
+  logBottom: false,
 });
 
 /**
@@ -271,6 +281,34 @@ export function targetSaveDir(): string | null {
 }
 
 /**
+ * 取本次要直接打开的日志文件
+ *
+ * 单窗口取 openWindow 带入的参数，多窗口取本窗口 URL 上的参数。
+ *
+ * # 返回值
+ *
+ * 没有指定文件时为 null，调用方按运行日志处理
+ */
+export function targetLogFile(): string | null {
+  if (!multiWindow.value) return windowParams.value.logFile;
+  return new URLSearchParams(window.location.search).get(LOG_PARAMS.file);
+}
+
+/**
+ * 本次打开是否要求日志滚到底
+ *
+ * 单窗口取 openWindow 带入的参数，多窗口取本窗口 URL 上的参数。
+ *
+ * # 返回值
+ *
+ * 要求滚到底时为 true
+ */
+export function targetLogBottom(): boolean {
+  if (!multiWindow.value) return windowParams.value.logBottom;
+  return new URLSearchParams(window.location.search).get(LOG_PARAMS.bottom) === "1";
+}
+
+/**
  * 切换单窗口 / 多窗口模式
  *
  * - `v`: true 为多窗口，false 为单窗口
@@ -283,7 +321,14 @@ export function setMultiWindow(v: boolean): Promise<void> {
   multiWindow.value = v;
   // 换了模式，之前的返回栈与带入参数都不再成立
   backStack.value = [];
-  windowParams.value = { uuid: null, project: null, drop: null, saveDir: null };
+  windowParams.value = {
+    uuid: null,
+    project: null,
+    drop: null,
+    saveDir: null,
+    logFile: null,
+    logBottom: false,
+  };
   writeString(KEYS.windowMode, v ? "Multi" : "Single");
   // 返回保存的 Promise：要紧接着重启进程的调用方必须等这次写入真的落盘。
   // 重启会立刻刷盘并退出，写请求还在路上就丢了，见 useSettingsUi 的窗口模式切换
@@ -336,6 +381,12 @@ const DROP_PARAMS = {
 /** 存档聚焦参数在 URL 上的键；配置文件窗口"右键存档 → 修改配置文件"用 */
 const SAVE_PARAM = "save";
 
+/** 日志窗口参数在 URL 上的键：要打开哪个文件、是否滚到底 */
+const LOG_PARAMS = {
+  file: "lfile",
+  bottom: "lbottom",
+} as const;
+
 /** 按 kind 与带入参数拼出目标窗口的 URL；多窗口模式下新窗口靠它取参数 */
 function urlFor(
   kind: WindowKind,
@@ -356,6 +407,16 @@ function urlFor(
     url.searchParams.set(SAVE_PARAM, params.saveDir);
   } else {
     url.searchParams.delete(SAVE_PARAM);
+  }
+  if (params?.logFile) {
+    url.searchParams.set(LOG_PARAMS.file, params.logFile);
+  } else {
+    url.searchParams.delete(LOG_PARAMS.file);
+  }
+  if (params?.logBottom) {
+    url.searchParams.set(LOG_PARAMS.bottom, "1");
+  } else {
+    url.searchParams.delete(LOG_PARAMS.bottom);
   }
   if (params?.drop) {
     url.searchParams.set(DROP_PARAMS.path, params.drop.path);
@@ -549,6 +610,8 @@ export function openWindow(kind: WindowKind, params?: WindowOpenParams) {
       project: params?.project ?? null,
       drop: params?.drop ?? null,
       saveDir: params?.saveDir ?? null,
+      logFile: params?.logFile ?? null,
+      logBottom: params?.logBottom ?? false,
     };
     if (!isTauri()) window.history.pushState({}, "", urlFor(kind, params));
     return;
@@ -563,7 +626,7 @@ export function openWindow(kind: WindowKind, params?: WindowOpenParams) {
     // 带拖入路径 / 目标存档的打开：窗口**已经开着**时必须重新加载才拿得到新参数
     // （只聚焦会把参数丢掉），所以走 reopen，Rust 侧已存在则 navigate；
     // 其余窗口维持"只聚焦、目标靠事件切换"
-    if (params?.drop || params?.saveDir) {
+    if (params?.drop || params?.saveDir || params?.logFile || params?.logBottom) {
       commands.windows
         .reopenWindow(kind, instanceArgOf(kind, params), query)
         .catch((e) => {
@@ -734,7 +797,14 @@ function goTo(kind: WindowKind) {
   currentKind.value = kind;
   // 返回后不再带着上一次的目标实例 / 目标项目 / 拖入路径 / 存档参数，
   // 避免窗口"记得"不该记的东西
-  windowParams.value = { uuid: null, project: null, drop: null, saveDir: null };
+  windowParams.value = {
+    uuid: null,
+    project: null,
+    drop: null,
+    saveDir: null,
+    logFile: null,
+    logBottom: false,
+  };
   if (!isTauri()) window.history.pushState({}, "", urlFor(kind));
 }
 

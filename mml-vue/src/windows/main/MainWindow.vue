@@ -25,6 +25,7 @@ import { stateText } from "../../lib/launchState";
 import { useDownloadProgress } from "../../composables/useDownloadProgress";
 import { KEYS, onStorageChange } from "../../lib/storage";
 import { openWindow } from "../windowManager";
+import { latestCrash } from "../../lib/crash";
 import { launchGame } from "../../lib/launch";
 import {
   selectedInstance,
@@ -404,6 +405,17 @@ const jsonOpen = ref(false);
 /** 打开独立日志窗口；实例日志只在那个窗口里看，主页面不展示 */
 function openLogWindow() {
   if (selected.value) openWindow("log", { uuid: selected.value.uuid });
+}
+
+/** 异常退出：自动开日志窗口，优先最新崩溃报告，没有就回运行日志并滚到底 */
+async function openLogForCrash(uuid: string) {
+  let crash: string | null = null;
+  try {
+    crash = latestCrash(await api.getLogFiles(uuid));
+  } catch (e) {
+    console.error("[MainWindow] 查找崩溃报告失败", e);
+  }
+  openWindow("log", { uuid, logFile: crash ?? undefined, logBottom: true });
 }
 
 function toggleSettings() {
@@ -1179,6 +1191,8 @@ async function subscribeEvents() {
     onGameExit((e) => {
       // 先收状态：后台实例退出时也要把按钮/绿点放开，不能只在选中时才清
       clearLaunching(e.uuid);
+      // 非 0 退出：不管退出的是不是当前选中的实例，都自动开日志看崩溃
+      if (e.code !== 0) void openLogForCrash(e.uuid);
       if (e.uuid !== selected.value?.uuid) return;
       statusText.value =
         e.code === 0 ? t("launch.exited") : t("launch.exitedCode", { code: e.code });

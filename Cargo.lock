@@ -2899,6 +2899,9 @@ dependencies = [
 [[package]]
 name = "mml-analysis"
 version = "0.1.0"
+dependencies = [
+ "regex",
+]
 
 [[package]]
 name = "mml-auth"
@@ -3063,10 +3066,13 @@ dependencies = [
  "base64 0.23.1",
  "chrono",
  "dirs 7.0.0",
+ "encoding_rs",
+ "flate2",
  "font-kit",
  "gui-ipc-gen",
  "gui-macros",
  "image",
+ "mml-analysis",
  "mml-auth",
  "mml-base",
  "mml-config",

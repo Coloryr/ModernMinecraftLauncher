@@ -9,6 +9,7 @@ export * from "./dtos/add_resource_dto/detail";
 export * from "./dtos/add_resource_dto/file";
 export * from "./dtos/add_resource_dto/project";
 export * from "./dtos/add_resource_dto/status";
+export * from "./dtos/analysis_dto";
 export * from "./dtos/args_dto";
 export * from "./dtos/collect_dto";
 export * from "./dtos/colormc_dto";

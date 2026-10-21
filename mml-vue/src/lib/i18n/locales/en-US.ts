@@ -131,6 +131,11 @@ export default {
   "logWindow.filterAll": "All",
   "logWindow.loading": "Loading…",
   "logWindow.close": "Close",
+  "logWindow.mixinFailure": "Mixin injection failed",
+  "logWindow.suspectMod": "Suspected mod: {mods}",
+  "logWindow.analysisNoMod": "Could not identify the mod from the log",
+  "logWindow.mixinConfig": "Mixin config: {config}",
+  "logWindow.analysisClose": "Close analysis",
 
   "winExport.title": "Export Instance",
   "winExport.instance": "Instance",

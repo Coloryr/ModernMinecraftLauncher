@@ -10,7 +10,7 @@
 // 等级与自动下拉存进实例的 `gui_setting.json`（一个实例一套）；**自动换行不跟实例走** ——
 // 它是全局偏好（lib/editorWrap），与配置编辑器共用一份，Alt+Z 在任一处都能切。
 // 线程与分组只筛当前这份日志，不落盘。
-import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
@@ -30,11 +30,12 @@ import { copyText } from "../../lib/clipboard";
 import { api, onGameExit, onGameLog, onLaunchError, onLaunchState } from "../../lib/api";
 import { stateText } from "../../lib/launchState";
 import { useDownloadProgress } from "../../composables/useDownloadProgress";
-import { familyInstanceFromLabel, targetUuid } from "../windowManager";
+import { familyInstanceFromLabel, targetLogBottom, targetLogFile, targetUuid } from "../windowManager";
+import { latestCrash } from "../../lib/crash";
 import { launchGame } from "../../lib/launch";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import { usePageActive } from "../../lib/pageActive";
-import type { InstanceInfoDto, LogLine, LogSettingDto } from "../../lib/bindings";
+import type { CrashAnalysisDto, InstanceInfoDto, LogLine, LogSettingDto } from "../../lib/bindings";
 import { uniq } from "../../lib/util";
 
 /** 请求关闭本窗口 / 收起面板 */
@@ -180,9 +181,61 @@ async function refreshList() {
   }
 }
 
+/** 本次打开是否还要滚到底；加载完成后消费 */
+let pendingBottom = false;
+
+/** 加载完当前来源后，若本次打开要求滚到底就滚一次 */
+async function scrollIfPending() {
+  if (!pendingBottom) return;
+  await nextTick();
+  // Monaco 视图是异步组件，还没挂上时先留着，等 viewRef 的 watch 再滚
+  if (!viewRef.value) return;
+  pendingBottom = false;
+  viewRef.value.scrollBottom();
+}
+
+/** 当前崩溃报告的分析结果；不是崩溃报告时为 null */
+const analysis = ref<CrashAnalysisDto | null>(null);
+/** 分析请求序号：换文件后旧请求的结果直接丢掉 */
+let analyzeSeq = 0;
+
+/** Mixin 相关结论；没有时不显示横幅 */
+const mixinFinding = computed(
+  () => analysis.value?.findings.find((f) => f.id === "mixin_failure") ?? null,
+);
+
+/** 横幅上显示的可疑模组，最多三个 */
+const mixinSuspects = computed(() => (mixinFinding.value?.mods ?? []).slice(0, 3).join(", "));
+
+/** 横幅上显示的 Mixin 配置名 */
+const mixinConfig = computed(() => {
+  const detail = mixinFinding.value?.details.find((d) => d.startsWith("mixin_config="));
+  return detail ? detail.slice("mixin_config=".length) : "";
+});
+
+/** 分析当前日志文件；运行日志不分析，历史文件打开时都跑一遍 */
+async function analyzeCurrent() {
+  const seq = ++analyzeSeq;
+  if (!lockedUuid.value || liveSource.value) {
+    analysis.value = null;
+    return;
+  }
+
+  try {
+    const result = await api.analyzeLog(lockedUuid.value, file.value);
+    if (seq === analyzeSeq) analysis.value = result;
+  } catch (e) {
+    console.error("[LogWindow] 分析崩溃报告失败", e);
+    if (seq === analyzeSeq) analysis.value = null;
+  }
+}
+
 /** 载入当前来源的全部日志行 */
 async function loadSource() {
   if (!lockedUuid.value) return;
+  // 换了来源，旧的分析结果与在途请求都作废
+  analyzeSeq += 1;
+  analysis.value = null;
   // 换了来源，旧的筛选选项不再成立；待入列的实时行也不属于新来源
   dropPending();
   thread.value = "";
@@ -194,6 +247,7 @@ async function loadSource() {
       console.error("[LogWindow] 加载运行日志失败", e);
       sourceLogs.value = [];
     }
+    await scrollIfPending();
     return;
   }
 
@@ -206,9 +260,40 @@ async function loadSource() {
   } finally {
     loadingSource.value = false;
   }
+  void analyzeCurrent();
+  await scrollIfPending();
 }
 
 watch(file, loadSource);
+
+/**
+ * 应用本次打开带入的日志参数
+ *
+ * 指定了文件且列表里有就切过去，没有就回运行日志；要求滚到底时等来源加载完再滚。
+ */
+async function applyOpenParams() {
+  await refreshList();
+
+  const wanted = targetLogFile();
+  if (targetLogBottom()) pendingBottom = true;
+
+  if (wanted && logFiles.value.includes(wanted)) {
+    if (file.value !== wanted) {
+      // 由 file 的 watch 负责加载，加载完消费 pendingBottom
+      file.value = wanted;
+    } else {
+      await scrollIfPending();
+    }
+    return;
+  }
+
+  if (file.value !== "") {
+    // 没有可用的崩溃文件：回运行日志，由 watch 加载
+    file.value = "";
+  } else {
+    await loadSource();
+  }
+}
 
 // ---------------- 运行状态：测试启动 / 停止 ----------------
 
@@ -292,7 +377,12 @@ async function doStop() {
 // ---------------- 搜索 / 上传 ----------------
 
 /** 日志视图的公开方法，见 MonacoLogView 的 defineExpose */
-const viewRef = ref<{ openFind: () => void } | null>(null);
+const viewRef = ref<{ openFind: () => void; scrollBottom: () => void } | null>(null);
+
+// Monaco 视图异步加载：挂上之后补一次待办的滚底
+watch(viewRef, (view) => {
+  if (view) void scrollIfPending();
+});
 
 /** 打开页内查找框：工具栏搜索按钮与 Ctrl+F 都走这里 */
 function onSearch() {
@@ -358,8 +448,12 @@ async function copyUrl() {
 
 // ---------------- 初始化 ----------------
 
-/** 补一次实例名、设置、文件列表与当前日志；首次挂载、单窗口模式下切回面板都用 */
-async function syncInstance() {
+/**
+ * 补一次实例名、设置、文件列表与当前日志
+ *
+ * - `applyParams`: 是否应用本次打开带入的文件 / 滚底参数；切回面板时只刷新当前来源
+ */
+async function syncInstance(applyParams = false) {
   if (!lockedUuid.value) return;
   try {
     const list: InstanceInfoDto[] = await api.getInstances();
@@ -368,13 +462,17 @@ async function syncInstance() {
     console.error("[LogWindow] 读取实例列表失败", e);
   }
   await loadSetting();
-  await refreshList();
-  await loadSource();
+  if (applyParams) {
+    await applyOpenParams();
+  } else {
+    await refreshList();
+    await loadSource();
+  }
   await refreshRunning();
 }
 
-// 单窗口模式：本页被 KeepAlive 缓存，切回时补一次数据
-useWindowRefresh(syncInstance);
+// 单窗口模式：本页被 KeepAlive 缓存，切回时补一次数据；只刷新当前来源，不重放打开参数
+useWindowRefresh(() => syncInstance(false));
 
 // 单窗口模式：已停在本页时再开另一个实例就是换锁定对象 —— 会走这里。
 // 来源先清空（file 的 watch 会先拉一遍，syncInstance 再整补一次，读同一份数据幂等），
@@ -383,9 +481,19 @@ watch(
   lockedUuid,
   (now, before) => {
     if (!now || now === before) return;
-    file.value = "";
     sourceLogs.value = [];
-    void syncInstance();
+    void syncInstance(true);
+  },
+);
+
+// 单窗口模式：已经停在日志页时 openWindow 换了文件 / 要求滚底，参数变化走这里。
+// 换实例由上面 lockedUuid 的 watch 整补，这里跳过，免得同一份数据拉两遍。
+watch(
+  () => [targetUuid(), targetLogFile(), targetLogBottom()] as const,
+  (now, before) => {
+    if (!now[0] || now[0] !== before?.[0]) return;
+    if (now[1] === before?.[1] && now[2] === before?.[2]) return;
+    void applyOpenParams();
   },
 );
 
@@ -434,7 +542,7 @@ function dropPending() {
 }
 
 onMounted(async () => {
-  await syncInstance();
+  await syncInstance(true);
 
   unlistenGameLog = await onGameLog((e) => {
     // 锁定了实例：只收它自己的日志行；看历史文件时不追加实时行
@@ -474,11 +582,24 @@ onMounted(async () => {
     if (e.uuid !== lockedUuid.value) return;
     launching.value = false;
     running.value = false;
-    // 非 0 退出：顺手刷一次文件列表（崩溃报告刚写出来），并问一句要不要把日志传出去
+    // 非 0 退出：刷一次文件列表（崩溃报告刚写出来），问一句要不要上传，
+    // 并切到最新崩溃报告；没有就回运行日志并滚到底
     if (e.code !== 0) {
       crashCode.value = e.code;
       crashAsk.value = true;
-      void refreshList();
+      void refreshList().then(() => {
+        // 主窗口已经带着崩溃文件重开时，URL 上会有滚底参数，这里不再抢着切
+        if (targetLogBottom()) return;
+        const crash = latestCrash(logFiles.value);
+        pendingBottom = true;
+        if (crash && crash !== file.value) {
+          file.value = crash;
+        } else if (!crash && file.value !== "") {
+          file.value = "";
+        } else {
+          void scrollIfPending();
+        }
+      });
     }
   });
 });
@@ -585,6 +706,25 @@ onBeforeUnmount(() => {
         </select>
       </div>
 
+      <!-- 崩溃分析：Mixin 错误直接点名可疑模组 -->
+      <div v-if="mixinFinding" class="analysis-card">
+        <GlyphIcon class="analysis-icon" name="alert" :size="15" :weight="2" />
+        <div class="analysis-body">
+          <div class="analysis-title">
+            {{ t("logWindow.mixinFailure") }}
+            <span v-if="mixinSuspects" class="analysis-suspect">
+              {{ t("logWindow.suspectMod", { mods: mixinSuspects }) }}
+            </span>
+            <span v-else class="analysis-suspect">{{ t("logWindow.analysisNoMod") }}</span>
+          </div>
+          <div v-if="mixinConfig" class="analysis-detail">
+            {{ t("logWindow.mixinConfig", { config: mixinConfig }) }}
+          </div>
+        </div>
+        <button class="analysis-close" :aria-label="t('logWindow.analysisClose')"
+          v-tip="t('logWindow.analysisClose')" @click="analysis = null">×</button>
+      </div>
+
       <!-- 日志正文 -->
       <MonacoLogView ref="viewRef" :logs="shownLogs" :auto-scroll="setting.auto"
         :empty-hint="loadingSource ? t('logWindow.loading') : undefined" fill
@@ -688,6 +828,61 @@ onBeforeUnmount(() => {
 .url {
   width: 100%;
   box-sizing: border-box;
+}
+
+/* 崩溃分析横幅：Mixin 错误时贴在日志正文上方 */
+.analysis-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--red);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--red) 8%, var(--bg));
+}
+
+.analysis-icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--red);
+}
+
+.analysis-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.analysis-title {
+  font-size: 12.5px;
+  color: var(--text);
+}
+
+.analysis-suspect {
+  margin-left: 6px;
+  color: var(--red);
+  font-weight: 600;
+}
+
+.analysis-detail {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  word-break: break-all;
+}
+
+.analysis-close {
+  flex: none;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.analysis-close:hover {
+  color: var(--text);
 }
 
 .modal-text {

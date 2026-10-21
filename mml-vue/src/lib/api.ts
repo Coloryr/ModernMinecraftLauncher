@@ -14,6 +14,7 @@ import type {
   ColorMcInfoDto,
   ColorMcProgressDto,
   ColorMcReportDto,
+  CrashAnalysisDto,
   ChunkFindDto,
   ConfigHunkDto,
   ConfigNbtDto,
@@ -1093,6 +1094,20 @@ export const api = {
    */
   async readLogFile(uuid: string, path: string): Promise<LogLine[]> {
     return commands.log.readFile(uuid, path);
+  },
+
+  /**
+   * 分析一份日志 / 崩溃报告
+   *
+   * - `uuid`: 实例 uuid
+   * - `path`: 文件绝对路径，取自 `getLogFiles`
+   *
+   * # 返回值
+   *
+   * 崩溃类型、异常、命中的结论与可疑模组；第一条结论是主因
+   */
+  async analyzeLog(uuid: string, path: string): Promise<CrashAnalysisDto> {
+    return commands.log.analyze(uuid, path);
   },
 
   /**

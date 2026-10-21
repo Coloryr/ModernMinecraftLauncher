@@ -131,6 +131,11 @@ export default {
   "logWindow.filterAll": "全部",
   "logWindow.loading": "正在读取…",
   "logWindow.close": "关闭",
+  "logWindow.mixinFailure": "Mixin 注入失败",
+  "logWindow.suspectMod": "疑似模组：{mods}",
+  "logWindow.analysisNoMod": "没能从日志里定位到具体模组",
+  "logWindow.mixinConfig": "Mixin 配置：{config}",
+  "logWindow.analysisClose": "关闭分析",
 
   "winExport.title": "导出实例",
   "winExport.instance": "实例",

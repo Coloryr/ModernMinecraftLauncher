@@ -5,6 +5,7 @@
 //! 如事件负载 / 命令入参。纯传输、无业务方法的窗口类型也集中在此。
 
 pub mod account_dto;
+pub mod analysis_dto;
 pub mod add_dto;
 pub mod add_modpack_dto;
 pub mod add_resource_dto;
@@ -32,6 +33,7 @@ pub mod version_dto;
 pub mod window_dto;
 
 pub use account_dto::{AccountStoreDto, AccountStoreViewDto};
+pub use analysis_dto::{CrashAnalysisDto, CrashFindingDto};
 pub use add_dto::{
     DetectedPackDto, DirEntry, FolderInstanceDto, LoaderProgressDto, NameConflictDto,
     PackProgressDto,

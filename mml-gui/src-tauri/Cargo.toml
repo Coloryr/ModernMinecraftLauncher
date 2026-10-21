@@ -38,6 +38,8 @@ rfd.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 zip.workspace = true
+encoding_rs.workspace = true
+flate2.workspace = true
 
 mml-core = { path = "../../mml-core" }
 mml-game = { path = "../../mml-core/mml-game" }
@@ -56,6 +58,7 @@ mml-nbt = { path = "../../mml-core/mml-nbt" }
 mml-skin = { path = "../../mml-core/mml-skin" }
 mml-skin-draw = { path = "../../mml-core/mml-skin-draw" }
 mml-tex-draw = { path = "../../mml-core/mml-tex-draw" }
+mml-analysis = { path = "../../mml-core/mml-analysis" }
 window-vibrancy.workspace = true
 
 [dev-dependencies]
