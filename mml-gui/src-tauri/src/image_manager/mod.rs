@@ -117,9 +117,20 @@ pub(super) struct IconCache {
 pub(super) static URL_IMAGE: LazyLock<RwLock<HashMap<String, String>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
+/// 图标磁盘缓存目录
+///
+/// # 返回值
+///
+/// `<运行目录>/cache/image`，首次调用时按下载缓存目录算出来
+pub fn icon_cache_dir() -> PathBuf {
+    ICON_DIR
+        .get_or_init(|| mml_downloader::get_cache_path().join(names::IMAGE_DIR))
+        .clone()
+}
+
 /// 初始化图标磁盘缓存目录，启动时调用
 pub fn init() {
-    ICON_DIR.get_or_init(|| mml_downloader::get_cache_path().join(names::IMAGE_DIR));
+    icon_cache_dir();
     // 登记表也读回来：没有它，收藏夹里存下来的 `.../icon/<sha>` 地址就找不回远程网址，
     // 既回不了源、也做不了过期校验，只能一直吃磁盘缓存
     load_url_image();

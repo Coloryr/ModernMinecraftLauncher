@@ -4,7 +4,7 @@
 // 传输层不在这里绑定：createCommands 接收调用方传入的 invoke。
 
 import type { Invoke } from "./invoke";
-import type { AccountStoreDto, AccountStoreViewDto, AutoSaveTargetDto, BgInfoDto, BlockGroupsDto, BlockItemDto, BlockStatusDto, BytesSliceDto, ChunkFindDto, CollectDataDto, ColorMcInfoDto, ColorMcReportDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, CustomCssItemDto, CustomHomeInfoDto, CustomJsonItemDto, CustomUiInfoDto, DataPackItemDto, DepProblemDto, DetectedPackDto, DirEntry, DownloadStatusDto, DropPathDto, ExportConfigDto, ExportEntryDto, ExportInfoDto, FileItemDto, FileListDto, FolderInstanceDto, GroupDto, GuiConfigDto, IconSourceDto, InstanceArgsDto, InstanceInfoDto, InstanceLangDto, InstancePatch, JavaDownloadItemDto, JavaDownloadOptionsDto, JavaInfoDto, JavaTypes, LaunchSettingDto, LoadState, LogLine, LogSettingDto, McaChunkDto, ModAutoMarkDto, ModDepTreeDto, ModGroupDto, ModItemDto, ModPackStatusDto, ModPackUpdateDto, ModRenameDto, ModUpdateApplyDto, ModUpdateCheckDto, ModUpdateProjectDto, MotdDto, NbtEditDto, NetworkSettingDto, NewsItem, PackItemDto, ProjectDetailDto, ProjectDto, ProjectItemDto, ResourceDependencyDto, ResourceDropDto, ResourceSaveDto, ResourceStatusDto, ResourceViewDto, RunArgSettingDto, SaveBackupDto, SaveEditDto, SaveItemDto, SchematicDetailDto, SchematicItemDto, ScreenshotItemDto, ServerItemDto, SettingsDefaultsDto, ShaderItemDto, StartArgDto, StatsDataDto, SystemMemoryDto, TexturesDto, VersionInfoDto, WindowSettingDto, WindowSizeDto } from "./types";
+import type { AccountStoreDto, AccountStoreViewDto, AutoSaveTargetDto, BgInfoDto, BlockGroupsDto, BlockItemDto, BlockStatusDto, BytesSliceDto, ChunkFindDto, CollectDataDto, ColorMcInfoDto, ColorMcReportDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, CustomCssItemDto, CustomHomeInfoDto, CustomJsonItemDto, CustomUiInfoDto, DataPackItemDto, DepProblemDto, DetectedPackDto, DirEntry, DownloadStatusDto, DropPathDto, ExportConfigDto, ExportEntryDto, ExportInfoDto, FileItemDto, FileListDto, FolderInstanceDto, GroupDto, GuiConfigDto, IconSourceDto, InstanceArgsDto, InstanceInfoDto, InstanceLangDto, InstancePatch, JavaDownloadItemDto, JavaDownloadOptionsDto, JavaInfoDto, JavaTypes, LaunchSettingDto, LoadState, LocalFileEntryDto, LogLine, LogSettingDto, McaChunkDto, ModAutoMarkDto, ModDepTreeDto, ModGroupDto, ModItemDto, ModPackStatusDto, ModPackUpdateDto, ModRenameDto, ModUpdateApplyDto, ModUpdateCheckDto, ModUpdateProjectDto, MotdDto, NbtEditDto, NetworkSettingDto, NewsItem, PackItemDto, ProjectDetailDto, ProjectDto, ProjectItemDto, ResourceDependencyDto, ResourceDropDto, ResourceSaveDto, ResourceStatusDto, ResourceViewDto, RunArgSettingDto, SaveBackupDto, SaveEditDto, SaveItemDto, SchematicDetailDto, SchematicItemDto, ScreenshotItemDto, ServerItemDto, SettingsDefaultsDto, ShaderItemDto, StartArgDto, StatsDataDto, SystemMemoryDto, TexturesDto, VersionInfoDto, WindowSettingDto, WindowSizeDto } from "./types";
 
 export * from "./types";
 
@@ -16,6 +16,7 @@ export function createCommands(invoke: Invoke) {
       closeWindow: (kind: string, instance: string | null) => invoke<void>("window_close_window", { kind, instance }),
       dropModel: (kind: string) => invoke<void>("window_drop_model", { kind }),
       ensureModel: (kind: string) => invoke<void>("window_ensure_model", { kind }),
+      fillScreen: () => invoke<void>("window_fill_screen"),
       getGuiConfig: () => invoke<GuiConfigDto>("window_get_gui_config"),
       getWindowSizes: () => invoke<WindowSizeDto[]>("window_get_window_sizes"),
       isFullscreen: () => invoke<boolean>("window_is_fullscreen"),
@@ -27,7 +28,6 @@ export function createCommands(invoke: Invoke) {
       restartApp: () => invoke<void>("window_restart_app"),
       saveGuiConfig: (config: GuiConfigDto) => invoke<void>("window_save_gui_config", { config }),
       setFullscreen: (fullscreen: boolean) => invoke<void>("window_set_fullscreen", { fullscreen }),
-      setMaximized: (maximized: boolean) => invoke<void>("window_set_maximized", { maximized }),
       setTitle: (title: string) => invoke<void>("window_set_title", { title }),
       startDragging: () => invoke<void>("window_start_dragging"),
       toggleMaximize: () => invoke<boolean>("window_toggle_maximize"),
@@ -275,14 +275,17 @@ export function createCommands(invoke: Invoke) {
     settings: {
       addJava: (name: string | null, path: string) => invoke<JavaInfoDto>("settings_add_java", { name, path }),
       clearBg: () => invoke<void>("settings_clear_bg"),
+      clearLocalFile: (id: string) => invoke<void>("settings_clear_local_file", { id }),
       detectJava: (path: string) => invoke<string | null>("settings_detect_java", { path }),
       getBg: () => invoke<BgInfoDto | null>("settings_get_bg"),
       getCachePath: () => invoke<string>("settings_get_cache_path"),
       getDefaults: () => invoke<SettingsDefaultsDto>("settings_get_defaults"),
       getLaunch: () => invoke<LaunchSettingDto>("settings_get_launch"),
+      getLocalFiles: () => invoke<LocalFileEntryDto[]>("settings_get_local_files"),
       getNetwork: () => invoke<NetworkSettingDto>("settings_get_network"),
       getSystemFonts: () => invoke<string[]>("settings_get_system_fonts"),
       importJava: (name: string | null, archivePath: string) => invoke<JavaInfoDto | null>("settings_import_java", { name, archivePath }),
+      openLocalFile: (id: string) => invoke<void>("settings_open_local_file", { id }),
       removeAllJava: () => invoke<void>("settings_remove_all_java"),
       removeJava: (name: string) => invoke<void>("settings_remove_java", { name }),
       resizeBg: (percent: number) => invoke<string>("settings_resize_bg", { percent }),

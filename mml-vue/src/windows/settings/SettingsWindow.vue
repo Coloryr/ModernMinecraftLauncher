@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 启动器设置窗口：左侧标签导航 + 右侧内容区
-// 标签：界面（含窗口设置）/ Java / 网络与下载 / 游戏启动 / 皮肤与头像 / 客户端设置
+// 标签：界面（含窗口设置）/ Java / 网络与下载 / 游戏启动 / 皮肤与头像 / 客户端设置 / 本地文件
 //
 // 这里只做编排：状态与保存逻辑全在 composables/（每个标签一份），
 // 排版在 parts/tabs/，每个标签一个组件；窗口级样式在 settings.css，非 scoped、子组件共用。
@@ -17,6 +17,7 @@ import NetworkTab from "./parts/tabs/NetworkTab.vue";
 import LaunchTab from "./parts/tabs/LaunchTab.vue";
 import SkinTab from "./parts/tabs/SkinTab.vue";
 import ClientTab from "./parts/tabs/ClientTab.vue";
+import LocalFilesTab from "./parts/tabs/LocalFilesTab.vue";
 import ExperimentalTab from "./parts/tabs/ExperimentalTab.vue";
 import { t } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
@@ -27,6 +28,7 @@ import { useSettingsNetwork } from "./composables/useSettingsNetwork";
 import { useSettingsLaunch } from "./composables/useSettingsLaunch";
 import { useSettingsJava } from "./composables/useSettingsJava";
 import { useSettingsClient } from "./composables/useSettingsClient";
+import { useSettingsLocalFiles } from "./composables/useSettingsLocalFiles";
 import { isSettingsTab, SETTINGS_TABS, type SettingsTab } from "./types";
 import { groupsOfTab, RESETTABLE_GROUPS, type SettingsHit } from "./search";
 import "./settings.css";
@@ -57,6 +59,8 @@ const network = useSettingsNetwork();
 const launch = useSettingsLaunch();
 const java = useSettingsJava();
 const client = useSettingsClient();
+// 本地文件的统计只在打开那一页时做，见 LocalFilesTab 的 onMounted
+const files = useSettingsLocalFiles();
 
 // 游戏标题那组显示在客户端设置页，但数据属于 window 设置：这里取出给 ClientTab
 const { win: launchWin } = launch;
@@ -198,6 +202,7 @@ function onKeyDown(e: KeyboardEvent) {
           <SkinTab v-else-if="tab === 'skin'" :settings="skin" :flash-group="flashGroup" />
           <ClientTab v-else-if="tab === 'client'" :settings="client" :win="launchWin"
             :flash-group="flashGroup" />
+          <LocalFilesTab v-else-if="tab === 'files'" :files="files" :flash-group="flashGroup" />
           <ExperimentalTab v-else :settings="client" :flash-group="flashGroup" />
         </section>
       </div>

@@ -10,12 +10,13 @@
  *
  * # 返回值
  *
- * 1024 以下按 B，之后按 KB / MB，各留一位小数
+ * 1024 以下按 B，之后按 KB / MB 留一位小数、GB 留两位（一位小数在 GB 上是 100MB 的粒度，太粗）
  */
 export function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
 /**

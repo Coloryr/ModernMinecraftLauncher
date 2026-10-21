@@ -872,3 +872,77 @@
     transform: rotate(360deg);
   }
 }
+
+/* ---------- 本地文件：占用列表 ---------- */
+
+.settings-layout .local-files-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-layout .local-files-total {
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.settings-layout .local-files-total b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-layout .local-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 一行 = 名字 / 路径 + 占用 + 操作；路径那行可能很长，压缩到省略号 */
+.settings-layout .local-file-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.settings-layout .local-file-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-layout .local-file-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-layout .local-file-path {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: "Cascadia Code", Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 宽度固定：各行的数字右缘对齐，扫一眼就能比大小 */
+.settings-layout .local-file-size {
+  flex-shrink: 0;
+  width: 88px;
+  text-align: right;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-layout .local-file-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

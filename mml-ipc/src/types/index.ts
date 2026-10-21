@@ -26,6 +26,7 @@ export * from "./dtos/main_dto";
 export * from "./dtos/motd_dto";
 export * from "./dtos/resource_dto";
 export * from "./dtos/settings_dto/launch";
+export * from "./dtos/settings_dto/local_files";
 export * from "./dtos/settings_dto/misc";
 export * from "./dtos/settings_dto/network";
 export * from "./dtos/skin_dto";

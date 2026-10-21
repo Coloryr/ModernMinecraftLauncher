@@ -165,3 +165,54 @@ export async function isWindowMaximized(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * 设置窗口全屏：盖住任务栏，退出时由系统恢复进入前的摆放
+ *
+ * - `fullscreen`: 目标状态，true 进入全屏，false 退出
+ */
+export async function setWindowFullscreen(fullscreen: boolean): Promise<void> {
+  if (!isTauri()) {
+    return;
+  }
+  try {
+    await commands.windows.setFullscreen(fullscreen);
+  } catch {
+    // 失败时保持原状，调用方随后的 refresh 会把图标纠正回来
+  }
+}
+
+/**
+ * 当前是否全屏
+ *
+ * # 返回值
+ *
+ * 非 Tauri 环境或调用失败时为 false
+ */
+export async function isWindowFullscreen(): Promise<boolean> {
+  if (!isTauri()) {
+    return false;
+  }
+  try {
+    return await commands.windows.isFullscreen();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 把窗口铺满当前显示器的工作区：左上角对齐，客户区取工作区尺寸
+ *
+ * 不是最大化 —— 不进入系统最大化状态，摆好之后照常能拖动 / 缩放；
+ * 原本全屏或最大化时后端会先退出来。
+ */
+export async function fillScreenWindow(): Promise<void> {
+  if (!isTauri()) {
+    return;
+  }
+  try {
+    await commands.windows.fillScreen();
+  } catch {
+    // 失败时保持原状
+  }
+}

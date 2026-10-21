@@ -86,6 +86,15 @@ pub(crate) fn invoke_jvm_change() {
     JVM_CHANGE_EVENT.emit();
 }
 
+/// 获取 Java 运行时根目录
+///
+/// # 返回值
+///
+/// `<运行目录>/java`；未初始化会 panic
+pub fn get_java_dir() -> PathBuf {
+    JAVA_DIR.get().unwrap().clone()
+}
+
 /// 初始化 Java 运行时管理
 ///
 /// 确定 Java 存放目录并在缺失时创建，仅在程序启动阶段调用一次。

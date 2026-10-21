@@ -79,8 +79,8 @@ pub use resource_dto::{
     SchematicDetailDto, SchematicItemDto, ScreenshotItemDto, ServerItemDto, ShaderItemDto,
 };
 pub use settings_dto::{
-    BgInfoDto, DnsSettingDto, GameCheckSettingDto, LaunchSettingDto, NetworkSettingDto,
-    RunArgSettingDto, SettingsDefaultsDto, WindowSettingDto,
+    BgInfoDto, DnsSettingDto, GameCheckSettingDto, LaunchSettingDto, LocalFileEntryDto,
+    NetworkSettingDto, RunArgSettingDto, SettingsDefaultsDto, WindowSettingDto,
 };
 pub use stats_dto::{StatsDataDto, StatsInstanceDto};
 pub use theme_dto::ThemeKindDto;

@@ -6,9 +6,11 @@
 
 mod conv;
 mod launch;
+mod local_files;
 mod misc;
 mod network;
 
 pub use self::launch::RunArgSettingDto;
+pub use self::local_files::LocalFileEntryDto;
 pub use self::misc::{BgInfoDto, LaunchSettingDto, SettingsDefaultsDto, WindowSettingDto};
 pub use self::network::{DnsSettingDto, GameCheckSettingDto, NetworkSettingDto};

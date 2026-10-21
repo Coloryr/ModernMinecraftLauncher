@@ -54,6 +54,8 @@ interface DecorationRuntime {
   externalControlHoverListener?: ((hovered: boolean) => void) | null;
   /** 插件转发的热区点击 */
   externalControlClickListener?: (() => void) | null;
+  /** 插件转发的热区右键 */
+  externalControlRightClickListener?: (() => void) | null;
 }
 
 function decorationRuntime(): DecorationRuntime | null {
@@ -104,11 +106,27 @@ export function registerSnapTarget(root: HTMLElement | null): () => void {
   runtime.externalControlClickListener = () => {
     findMaximizeBtn(root)?.click();
   };
+  // 右键：热区把 WM_NCRBUTTONUP 也吃掉了（见 vendor/patches/snap-right-click.patch），
+  // 这里补一个合成事件，让按钮上的 @contextmenu 照常走
+  runtime.externalControlRightClickListener = () => {
+    const btn = findMaximizeBtn(root);
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    btn.dispatchEvent(
+      new MouseEvent("contextmenu", {
+        bubbles: true,
+        cancelable: true,
+        clientX: Math.round(rect.left + rect.width / 2),
+        clientY: Math.round(rect.bottom),
+      }),
+    );
+  };
 
   return () => {
     runtime.setExternalControlProvider?.(null);
     runtime.externalControlHoverListener = null;
     runtime.externalControlClickListener = null;
+    runtime.externalControlRightClickListener = null;
     findMaximizeBtn(root)?.classList.remove("snap-hover");
     pluginDecorated.value = false;
   };

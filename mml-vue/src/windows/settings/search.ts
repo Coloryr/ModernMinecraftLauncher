@@ -39,6 +39,7 @@ export const GROUP_TITLES: Record<string, string> = {
   music: "winSettings.secMusic",
   gameTitle: "winSettings.secGameTitle",
   "window-look": "winSettings.secWindowLook",
+  localFiles: "winSettings.secLocalFiles",
   experimental: "winSettings.secExperimental",
 };
 
@@ -202,6 +203,11 @@ const SETTINGS_INDEX: IndexEntry[] = [
   { tab: "client", group: "gameTitle", labelKey: "winSettings.cycleTitle", extra: ["title", "循环标题"] },
   { tab: "client", group: "gameTitle", labelKey: "winSettings.gameTitle", extra: ["title", "标题文字"] },
   { tab: "client", group: "gameTitle", labelKey: "winSettings.titleDelay", extra: ["title", "间隔"] },
+
+  // ---- 本地文件 ----
+  { tab: "files", group: "localFiles", labelKey: "winSettings.localFile.cache", extra: ["cache", "cleanup", "disk", "缓存", "清理", "占用"] },
+  { tab: "files", group: "localFiles", labelKey: "winSettings.localFile.image", extra: ["image cache", "icon cache", "图片缓存", "图标缓存"] },
+  { tab: "files", group: "localFiles", labelKey: "winSettings.localFile.download", extra: ["download", "下载"] },
 ];
 
 export interface SettingsHit {

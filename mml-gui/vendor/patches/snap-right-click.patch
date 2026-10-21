@@ -7,7 +7,8 @@ Win11 的贴靠热区是一个盖在 webview 上的原生 WS_CHILD 窗口（见 
 改动：
 1. src/snap.rs：热区窗口处理 WM_NCRBUTTONDOWN（吞掉）/ WM_NCRBUTTONUP（派发事件）；
 2. src/snap_state.rs：新增 SnapEvent::RightClick 与右键计数，复用左键那条派发链路；
-3. src/js/controls.js / titlebar.js：外部提供者模式下把 snap-rightclick 转给应用。
+3. src/js/titlebar.js：事件白名单加 snap-rightclick，并加 externalControlRightClickListener；
+4. src/js/controls.js：外部提供者模式下把 snap-rightclick 转给应用。
 
 应用侧在 lib/decoration.ts 注册 externalControlRightClickListener，
 由 WindowControls.vue 弹「全屏 / 占满屏幕」菜单。
@@ -28,10 +29,19 @@ index 55003f2..4cfdd70 100644
                break;
            }
 diff --git a/src/js/titlebar.js b/src/js/titlebar.js
-index a4f2405..4e9f546 100644
+index a4f2405..bac9466 100644
 --- a/src/js/titlebar.js
 +++ b/src/js/titlebar.js
-@@ -743,6 +743,8 @@
+@@ -20,6 +20,8 @@
+     "snap-mousedown",
+     "snap-mouseup",
+     "snap-click",
++    // M²L 本地修改：热区右键（见 src/snap.rs 与 src/js/controls.js）
++    "snap-rightclick",
+     "macos-titlebar-state",
+     "window-state",
+   ]);
+@@ -743,6 +745,8 @@
      // （见 src/js/controls.js 的 handle()）
      externalControlHoverListener: null,
      externalControlClickListener: null,
@@ -40,7 +50,7 @@ index a4f2405..4e9f546 100644
      notifyExternalControlHover(hovered) {
        try {
          window[GLOBAL_NAME].externalControlHoverListener?.(Boolean(hovered));
-@@ -757,6 +759,14 @@
+@@ -757,6 +761,14 @@
          /* 同上 */
        }
      },
@@ -224,4 +234,3 @@ index 7d93393..5f4ca67 100644
 +        assert_eq!(SnapEvent::RightClick.as_str(), "snap-rightclick");
      }
  }
-

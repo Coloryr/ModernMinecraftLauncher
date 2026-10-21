@@ -33,6 +33,13 @@ pub enum LogText {
         /// 失败原因
         error: String,
     },
+    /// 设置窗口清理本地文件时删不掉某一项
+    LocalFileClearFailed {
+        /// 删不掉的路径
+        path: String,
+        /// 失败原因
+        error: String,
+    },
     /// 装配文件拖放路径桥失败
     FilePathBridgeFailed {
         /// WebView2 给的错误，已 Debug 展开
@@ -449,6 +456,9 @@ impl LogText {
             LogText::IconCacheSaveFailed { path, error } => {
                 format!("[image] 图标磁盘缓存落盘失败 {path}：{error}")
             }
+            LogText::LocalFileClearFailed { path, error } => {
+                format!("[settings] 清理本地文件失败 {path}：{error}")
+            }
             LogText::FilePathBridgeFailed { error } => {
                 format!("[drop] 装配文件路径桥失败（文件拖入将拿不到路径）: {error}")
             }
@@ -634,6 +644,9 @@ impl LogText {
             }
             LogText::IconCacheSaveFailed { path, error } => {
                 format!("[image] failed to write the icon disk cache {path}: {error}")
+            }
+            LogText::LocalFileClearFailed { path, error } => {
+                format!("[settings] failed to clear a local file {path}: {error}")
             }
             LogText::FilePathBridgeFailed { error } => format!(
                 "[drop] failed to set up the file path bridge, \

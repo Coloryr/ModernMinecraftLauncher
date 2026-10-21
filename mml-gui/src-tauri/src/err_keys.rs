@@ -200,6 +200,15 @@ pub const IMAGE_INVALID: &str = "err.imageInvalid";
 /// 找不到皮肤 / 披风纹理
 pub const TEXTURE_MISSING: &str = "err.textureMissing";
 
+// ---------- 本地文件 ----------
+
+/// 清理本地文件失败，可能有文件正被占用
+pub const LOCAL_FILE_CLEAR: &str = "err.localFileClear";
+/// 本地文件项 id 不认识
+pub const LOCAL_FILE_UNKNOWN: &str = "err.localFileUnknown";
+/// 这一项不允许清理
+pub const LOCAL_FILE_LOCKED: &str = "err.localFileLocked";
+
 // ---------- 背景图 ----------
 
 /// 背景图格式不支持

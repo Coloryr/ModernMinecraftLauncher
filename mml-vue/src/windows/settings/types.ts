@@ -2,7 +2,15 @@
 //
 // 标签清单是"唯一真源"：左侧导航、当前页大标题与说明、以及设置项搜索索引都从这里取。
 
-export type SettingsTab = "ui" | "java" | "network" | "launch" | "skin" | "client" | "experimental";
+export type SettingsTab =
+  | "ui"
+  | "java"
+  | "network"
+  | "launch"
+  | "skin"
+  | "client"
+  | "files"
+  | "experimental";
 
 export type SettingsTabIcon =
   | "palette"
@@ -11,6 +19,7 @@ export type SettingsTabIcon =
   | "play"
   | "user"
   | "gear"
+  | "folder"
   | "flask";
 
 export interface SettingsTabItem {
@@ -26,6 +35,7 @@ export const SETTINGS_TABS: SettingsTabItem[] = [
   { id: "launch", icon: "play" },
   { id: "skin", icon: "user" },
   { id: "client", icon: "gear" },
+  { id: "files", icon: "folder" },
   { id: "experimental", icon: "flask" },
 ];
 
