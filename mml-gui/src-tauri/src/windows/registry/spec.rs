@@ -105,6 +105,12 @@ pub(crate) const CONFIG_MIN_WIDTH: f64 = 820.0;
 /// 配置文件窗口最小高度
 pub(crate) const CONFIG_MIN_HEIGHT: f64 = 560.0;
 
+/// 游戏统计窗口最小宽度
+pub(crate) const STATS_MIN_WIDTH: f64 = 780.0;
+
+/// 游戏统计窗口最小高度
+pub(crate) const STATS_MIN_HEIGHT: f64 = 600.0;
+
 /// 窗口注册表：uuid → 窗口信息
 ///
 /// **必须是 `static`，不能是 `const`**：`const` 会在每个使用点各展开一份，
@@ -139,8 +145,8 @@ pub(crate) static WINDOWS_INFO: LazyLock<HashMap<Uuid, WindowEntry>> = LazyLock:
             STATS_WINDOW_UUID,
             WindowEntry {
                 label: "mml-stats",
-                min_width: MIN_WIDTH,
-                min_height: MIN_HEIGHT,
+                min_width: STATS_MIN_WIDTH,
+                min_height: STATS_MIN_HEIGHT,
             },
         ),
         (

@@ -22,6 +22,8 @@ pub const WORLD_GONE: &str = "err.worldGone";
 pub const INSTANCE_BUSY: &str = "err.instanceBusy";
 /// 操作已取消
 pub const CANCELLED: &str = "err.cancelled";
+/// 日期文本格式不对，如 `YYYY-MM-DD` 解析失败
+pub const DATE_INVALID: &str = "err.dateInvalid";
 /// 枚举取值不认识
 pub const VARIANT_INVALID: &str = "err.variantInvalid";
 /// 窗口模型未初始化

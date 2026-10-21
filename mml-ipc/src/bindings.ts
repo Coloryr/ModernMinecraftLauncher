@@ -299,7 +299,7 @@ export function createCommands(invoke: Invoke) {
     },
     stats: {
       data: () => invoke<StatsDataDto>("stats_get_data"),
-      playtime: (uuid: string | null, days: number) => invoke<StatsPlaytimeDto>("stats_get_playtime", { uuid, days }),
+      playtime: (uuid: string | null, from: string, to: string) => invoke<StatsPlaytimeDto>("stats_get_playtime", { uuid, from, to }),
     },
   };
 }

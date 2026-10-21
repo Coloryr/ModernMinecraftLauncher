@@ -757,9 +757,12 @@ fn add_to_group(obj: InstanceSettingObj, group: Option<Uuid>) -> GameInstance {
 
     obj.save();
     let key = obj.uuid.clone();
+    let name = obj.name.clone();
     let game: Arc<RwLock<InstanceSettingObj>> = Arc::new(RwLock::new(obj));
 
     INSTANCES.write().unwrap().insert(key, game.clone());
+    // 名字先记进统计快照：就算这个实例马上又被删掉，统计窗口也还叫得出名字
+    game_count::remember_name(&key, &name);
 
     // 登记到分组表；分组已独立存储，不存在的组会被自动创建
     game_group::register_instance(key, group);
@@ -789,6 +792,11 @@ pub fn delete_instance(uuid: &Uuid) -> CoreResult<()> {
 ///
 /// - `uuid`: 实例 UUID
 pub(crate) fn remove_instance_record(uuid: &Uuid) {
+    // 删除前把名字留一份，统计窗口里已删除的实例还得靠它显示
+    if let Some(game) = get_instance(uuid) {
+        let name = game.read().unwrap().name.clone();
+        game_count::remember_name(uuid, &name);
+    }
     INSTANCES.write().unwrap().remove(uuid);
     // 从分组表里摘掉它，但**不删空分组**：空分组是合法状态。
     // 这里以前有一句"顺手清掉空分组"，正是"空分组留不住"的原因
@@ -844,6 +852,7 @@ pub fn rename_instance(uuid: &Uuid, name: &str) -> CoreResult<()> {
         obj.dir = new_dir;
         obj.save();
     }
+    game_count::remember_name(uuid, name);
 
     // 重命名不改分组归属，分组表按 uuid 记录、与名字无关，
     // 但要让前端刷新那一行，所以照旧发一次带当前分组的变更事件

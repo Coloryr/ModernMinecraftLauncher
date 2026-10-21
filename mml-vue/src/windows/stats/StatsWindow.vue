@@ -5,11 +5,12 @@
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import InstanceIcon from "../../components/InstanceIcon.vue";
+import BaseSwitch from "../../components/ui/BaseSwitch.vue";
 import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import { api } from "../../lib/api";
 import { t } from "../../lib/i18n";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
-import type { StatsDataDto, StatsPlayDayDto, StatsPlaytimeDto } from "../../lib/bindings";
+import type { StatsDataDto, StatsInstanceDto, StatsPlayDayDto, StatsPlaytimeDto } from "../../lib/bindings";
 
 // 必须显式声明 close：不声明的话 Vue 会把父级的 @close 当 attrs 透传到根组件（WindowFrame），
 // 与模板里的 @close="$emit('close')" 合并成两个处理器 —— 一次返回会调两遍 closeWindow()，
@@ -27,10 +28,23 @@ const RANGE_DAYS = [7, 30, 90] as const;
 /** 当前时间段，取值为 RANGE_DAYS 里的字符串 */
 const range = ref("30");
 
+/** 是否走自定义日期范围；开着时隐藏 7 / 30 / 90 预设 */
+const customRange = ref(false);
+/** 自定义范围的起止日期，YYYY-MM-DD */
+const fromDate = ref("");
+const toDate = ref("");
+/** 今天的本地日期：结束日不能超过它；跨天后由刷新补上 */
+const todayDate = ref(localDate(new Date()));
+
 /** 时间段选项文案，语言切换后跟着重算 */
 const rangeOptions = computed(() =>
   RANGE_DAYS.map((days) => ({ value: String(days), label: t("winStats.range" + days) })),
 );
+
+/** 当前实例数，不含已删除的 */
+const currentCount = computed(() => data.value?.instances.filter((inst) => !inst.deleted).length ?? 0);
+/** 有历史统计、但实例已经删掉的个数 */
+const deletedCount = computed(() => data.value?.instances.filter((inst) => inst.deleted).length ?? 0);
 
 /** 图表选中的实例；空串表示全部实例 */
 const selectedUuid = ref("");
@@ -57,6 +71,9 @@ const dayCount = computed(() => playtime.value?.days.length ?? 0);
 
 /** 横轴网格列，天数变化时重算 */
 const chartColumns = computed(() => "repeat(" + Math.max(1, dayCount.value) + ", minmax(0, 1fr))");
+
+/** 柱状区最小宽度：自定义范围超过 90 天时横向滚动，别把柱子压成一条线 */
+const chartMinWidth = computed(() => (dayCount.value > 90 ? dayCount.value * 8 + "px" : "0px"));
 
 /** 图表选中实例的副标题；全部实例时说明合计口径 */
 const playSub = computed(() => {
@@ -93,11 +110,27 @@ async function load() {
   }
 }
 
-/** 拉一次当前实例与时间段内的每日游玩时长 */
+/** 拉一次当前实例与日期范围内的每日游玩时长 */
 async function loadPlaytime() {
+  let from: string;
+  let to: string;
+  if (customRange.value) {
+    if (!fromDate.value || !toDate.value) return;
+    from = fromDate.value;
+    to = toDate.value;
+    // 两端填反了也不报错，按用户想要的那段画
+    if (from > to) [from, to] = [to, from];
+  } else {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - (Number(range.value) - 1));
+    from = localDate(start);
+    to = localDate(end);
+  }
+
   const seq = ++playtimeSeq;
   try {
-    const result = await api.getStatsPlaytime(selectedUuid.value || null, Number(range.value));
+    const result = await api.getStatsPlaytime(selectedUuid.value || null, from, to);
     if (seq !== playtimeSeq) return;
     playtime.value = result;
     playtimeLoaded.value = true;
@@ -109,6 +142,7 @@ async function loadPlaytime() {
 
 /** 统计窗口的一次完整刷新：汇总表与图表一起更新 */
 async function refreshAll() {
+  todayDate.value = localDate(new Date());
   await load();
   await loadPlaytime();
 }
@@ -157,12 +191,35 @@ onBeforeUnmount(() => {
   document.removeEventListener("visibilitychange", onVisibilityChange);
 });
 
-// 换实例 / 换时间段只重拉图表，汇总表跟着 5 秒轮询，不用为这一下再拉一遍
-watch([selectedUuid, range], () => {
+// 换实例 / 换时间段 / 换自定义日期只重拉图表，汇总表跟着 5 秒轮询，不用为这一下再拉一遍
+watch([selectedUuid, range, customRange, fromDate, toDate], () => {
   void loadPlaytime();
 });
 
 // ---------------- 展示格式 ----------------
+
+/** 本地日期文本，YYYY-MM-DD；日期输入框与后端都用这个口径 */
+function localDate(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+
+/**
+ * 切换自定义日期范围
+ *
+ * - `on`: 是否启用自定义范围
+ */
+function setCustomRange(on: boolean) {
+  customRange.value = on;
+  // 第一次打开时用当前预设区间起手，用户不至于面对两个空日期框
+  if (on && (!fromDate.value || !toDate.value)) {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - (Number(range.value) - 1));
+    fromDate.value = localDate(start);
+    toDate.value = localDate(end);
+  }
+}
 
 /** 秒数折成小时数文本，保留一位小数；超过 100 小时不再留小数 */
 function hoursNum(seconds: number): string {
@@ -221,18 +278,32 @@ function showXLabel(index: number): boolean {
 function barTip(day: StatsPlayDayDto): string {
   return t("winStats.barTip", { date: xLabel(day.date), h: hoursNum(day.seconds) });
 }
+
+/** 实例下拉项文案：已删除的实例补一个标记，免得只剩 UUID 时分不清 */
+function instanceLabel(inst: StatsInstanceDto): string {
+  return inst.deleted ? t("winStats.deletedName", { name: inst.name }) : inst.name;
+}
 </script>
 
 <template>
   <WindowFrame :title="t('features.stats')" body-gutter @close="$emit('close')">
     <div class="summary">
       <div class="summary-card">
-        <span class="summary-num">{{ data?.instances.length ?? 0 }}</span>
+        <span class="summary-num">{{ currentCount }}</span>
         <span class="summary-label">{{ t("winStats.instances") }}</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-num">{{ deletedCount }}</span>
+        <span class="summary-label">{{ t("winStats.deletedInstances") }}</span>
       </div>
       <div class="summary-card">
         <span class="summary-num">{{ data?.launchCount ?? 0 }}</span>
         <span class="summary-label">{{ t("winStats.totalLaunch") }}</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-num" :class="{ danger: (data?.launchErrorCount ?? 0) > 0 }">{{
+          data?.launchErrorCount ?? 0 }}</span>
+        <span class="summary-label">{{ t("winStats.totalFailed") }}</span>
       </div>
       <div class="summary-card">
         <span class="summary-num">{{ totalPlay }}</span>
@@ -245,14 +316,28 @@ function barTip(day: StatsPlayDayDto): string {
       <div class="play-head">
         <div class="play-heading">
           <h2 class="play-title">{{ t("winStats.playTitle") }}</h2>
-          <p class="play-sub">{{ playSub }}</p>
+          <p class="play-sub">
+            {{ playSub }}
+            <span v-if="selectedInstance?.deleted" class="deleted-tag">{{ t("winStats.deleted") }}</span>
+          </p>
         </div>
         <div class="play-controls">
           <select v-model="selectedUuid" class="field-select inst-select" :aria-label="t('winStats.colInstance')">
             <option value="">{{ t("winStats.allInstances") }}</option>
-            <option v-for="inst in instanceOptions" :key="inst.uuid" :value="inst.uuid">{{ inst.name }}</option>
+            <option v-for="inst in instanceOptions" :key="inst.uuid" :value="inst.uuid">{{ instanceLabel(inst) }}</option>
           </select>
-          <SegmentedTabs v-model="range" :options="rangeOptions" />
+          <label class="range-custom">
+            <BaseSwitch :model-value="customRange" @update:model-value="setCustomRange" />
+            <span>{{ t("winStats.customRange") }}</span>
+          </label>
+          <SegmentedTabs v-if="!customRange" v-model="range" :options="rangeOptions" />
+          <template v-else>
+            <input v-model="fromDate" type="date" class="field-input range-date" :max="toDate || todayDate"
+              :aria-label="t('winStats.dateFrom')" />
+            <span class="range-sep">–</span>
+            <input v-model="toDate" type="date" class="field-input range-date" :min="fromDate" :max="todayDate"
+              :aria-label="t('winStats.dateTo')" />
+          </template>
         </div>
       </div>
 
@@ -279,7 +364,7 @@ function barTip(day: StatsPlayDayDto): string {
           <span>{{ axisBottom }}</span>
         </div>
         <div class="chart-main">
-          <div class="chart-body">
+          <div class="chart-body" :style="{ minWidth: chartMinWidth }">
             <div class="chart-lines" aria-hidden="true">
               <span></span>
               <span></span>
@@ -292,7 +377,7 @@ function barTip(day: StatsPlayDayDto): string {
               </div>
             </div>
           </div>
-          <div class="chart-x" :style="{ gridTemplateColumns: chartColumns }">
+          <div class="chart-x" :style="{ gridTemplateColumns: chartColumns, minWidth: chartMinWidth }">
             <span v-for="(day, index) in playtime.days" :key="day.date">{{ showXLabel(index) ? xLabel(day.date) : ""
             }}</span>
           </div>
@@ -307,6 +392,7 @@ function barTip(day: StatsPlayDayDto): string {
         <tr>
           <th>{{ t("winStats.colInstance") }}</th>
           <th>{{ t("winStats.colCount") }}</th>
+          <th>{{ t("winStats.colFailed") }}</th>
           <th>{{ t("winStats.colHours") }}</th>
           <th>{{ t("winStats.colLast") }}</th>
         </tr>
@@ -316,14 +402,16 @@ function barTip(day: StatsPlayDayDto): string {
           <td class="inst-cell">
             <InstanceIcon :name="inst.name" :uuid="inst.uuid" :size="30" />
             <span>{{ inst.name }}</span>
-            <span v-if="inst.running" class="running-tag">{{ t("winStats.running") }}</span>
+            <span v-if="inst.deleted" class="deleted-tag">{{ t("winStats.deleted") }}</span>
+            <span v-else-if="inst.running" class="running-tag">{{ t("winStats.running") }}</span>
           </td>
           <td>{{ inst.count }}</td>
+          <td :class="{ danger: inst.failed > 0 }">{{ inst.failed }}</td>
           <td>{{ hoursOf(inst.seconds) }}</td>
           <td>{{ fmtTime(inst.last) }}</td>
         </tr>
         <tr v-if="!data || data.instances.length === 0">
-          <td colspan="4" class="empty-cell">{{ t("winStats.noData") }}</td>
+          <td colspan="5" class="empty-cell">{{ t("winStats.noData") }}</td>
         </tr>
       </tbody>
     </table>
@@ -335,12 +423,14 @@ function barTip(day: StatsPlayDayDto): string {
 <style scoped>
 .summary {
   display: flex;
+  flex-wrap: wrap;
   gap: 14px;
   margin-bottom: 16px;
 }
 
 .summary-card {
   flex: 1;
+  min-width: 120px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -355,6 +445,12 @@ function barTip(day: StatsPlayDayDto): string {
   font-size: 18px;
   font-weight: 800;
   color: var(--accent);
+}
+
+/* 有失败时把这一个数字标红，扫一眼就知道统计里有失败 */
+.summary-num.danger,
+.stats-table td.danger {
+  color: var(--red);
 }
 
 .summary-label {
@@ -401,7 +497,28 @@ function barTip(day: StatsPlayDayDto): string {
 }
 
 .inst-select {
-  width: 180px;
+  width: 220px;
+  max-width: 100%;
+}
+
+/* 自定义时间段：开关 + 文案；选 preset 时这一对保留，7 / 30 / 90 隐藏 */
+.range-custom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text);
+  user-select: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.range-date {
+  width: 140px;
+}
+
+.range-sep {
+  color: var(--text-dim);
 }
 
 .play-stats {
@@ -448,6 +565,8 @@ function barTip(day: StatsPlayDayDto): string {
 .chart-main {
   flex: 1;
   min-width: 0;
+  /* 自定义范围很长时柱状区横向滚动，纵轴仍固定在左侧 */
+  overflow-x: auto;
 }
 
 .chart-body {
@@ -559,13 +678,22 @@ function barTip(day: StatsPlayDayDto): string {
   font-weight: 600;
 }
 
-.running-tag {
+.running-tag,
+.deleted-tag {
   font-size: 10.5px;
   font-weight: 600;
-  color: var(--accent);
-  border: 1px solid var(--accent);
   border-radius: 999px;
   padding: 2px 6px;
+}
+
+.running-tag {
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.deleted-tag {
+  color: var(--text-dim);
+  border: 1px solid var(--border);
 }
 
 .empty-cell {

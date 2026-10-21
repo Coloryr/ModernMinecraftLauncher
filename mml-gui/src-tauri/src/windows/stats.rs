@@ -16,8 +16,10 @@ use crate::err_keys;
 /// 单实例的统计汇总，聚合期间的中间值
 #[derive(Clone, Copy, Default)]
 struct InstanceAgg {
-    /// 启动次数
+    /// 启动次数，含成功与失败
     count: u64,
+    /// 启动失败次数
+    failed: u64,
     /// 累计运行时长，单位秒
     seconds: u64,
     /// 最近一次启动的时间戳，单位毫秒；没有记录时为 `None`
@@ -30,14 +32,14 @@ struct InstanceAgg {
 ///
 /// # 返回值
 ///
-/// 全局启动计数与每实例的启动次数 / 累计时长 / 最近启动；失败返回错误文案
+/// 全局启动计数与每实例的启动次数 / 失败次数 / 累计时长 / 最近启动；失败返回错误文案
 #[gui_macros::command]
 pub fn stats_get_data() -> Result<StatsDataDto, String> {
     let count = game_count::get_count();
     let count = count.read().unwrap();
 
-    // 每实例：启动次数 = game_runs 条数；时长 = 各次运行起止差之和；
-    // 正在运行的那次 stop_time 未更新，把从开始到现在的时长补上
+    // 每实例：先按 game_runs 算有效运行；启动次数稍后用启动日志补齐，
+    // 时长 = 各次运行起止差之和，正在运行的那次把从开始到现在的时长补上
     let now = Local::now();
     let mut agg: HashMap<Uuid, InstanceAgg> = HashMap::new();
     for (uuid, runs) in &count.game_runs {
@@ -60,11 +62,23 @@ pub fn stats_get_data() -> Result<StatsDataDto, String> {
             *uuid,
             InstanceAgg {
                 count: runs.len() as u64,
+                failed: 0,
                 seconds: secs,
                 last,
                 running,
             },
         );
+    }
+
+    // 启动日志一条对应一次启动（成功、失败都记），把它当总次数：
+    // 多出来的部分就是失败次数；没有成功运行的实例也能靠它出现在表里
+    for (uuid, logs) in &count.launch_logs {
+        let total = logs.len() as u64;
+        let entry = agg.entry(*uuid).or_default();
+        if total > entry.count {
+            entry.failed = total - entry.count;
+            entry.count = total;
+        }
     }
 
     // 实例列表 = 现有实例 ∪ 有历史记录的实例：已删除的实例保留历史，名字取 game_names
@@ -79,9 +93,11 @@ pub fn stats_get_data() -> Result<StatsDataDto, String> {
             uuid: g.uuid.to_string(),
             name: g.name.clone(),
             count: a.count,
+            failed: a.failed,
             seconds: a.seconds,
             last: a.last,
             running: a.running,
+            deleted: false,
         });
     }
     for uuid in agg.keys() {
@@ -95,11 +111,30 @@ pub fn stats_get_data() -> Result<StatsDataDto, String> {
                     .cloned()
                     .unwrap_or_else(|| uuid.to_string()),
                 count: a.count,
+                failed: a.failed,
                 seconds: a.seconds,
                 last: a.last,
                 running: a.running,
+                deleted: true,
             });
         }
+    }
+    // 只有名字快照、没有运行或启动记录的已删除实例也列出来：
+    // 名字是在创建/删除时写进 game_names 的，这里不读就永远不会显示
+    for (uuid, name) in &count.game_names {
+        if seen.contains(uuid) || agg.contains_key(uuid) {
+            continue;
+        }
+        items.push(StatsInstanceDto {
+            uuid: uuid.to_string(),
+            name: name.clone(),
+            count: 0,
+            failed: 0,
+            seconds: 0,
+            last: None,
+            running: false,
+            deleted: true,
+        });
     }
     // 最近游玩的排前面，没记录的按名字排
     items.sort_by(|a, b| b.last.cmp(&a.last).then_with(|| a.name.cmp(&b.name)));
@@ -113,39 +148,71 @@ pub fn stats_get_data() -> Result<StatsDataDto, String> {
     })
 }
 
-/// 获取某实例最近若干天的每日游玩时长
+/// 获取某实例在指定日期范围内的每日游玩时长
 ///
-/// 跨天的运行会按本地零点切开，分别计入两天。时间段包含今天，共 `days` 个桶；
-/// 没有记录的日期补 0，前端不用再补齐横轴。
+/// 跨天的运行会按本地零点切开，分别计入两天。范围包含 `from` / `to` 两天，
+/// 没有记录的日期补 0，前端不用再补齐横轴；范围上限十年，避免极端输入生成过长的横轴。
 ///
 /// - `uuid`: 实例 uuid；`None` 或空串表示所有实例
-/// - `days`: 统计天数，包含今天；超出 1..=3660 时按边界截断
+/// - `from`: 起始日期，`YYYY-MM-DD`
+/// - `to`: 结束日期，`YYYY-MM-DD`；超过今天时截到今天
 ///
 /// # 返回值
 ///
-/// 见 [`StatsPlaytimeDto`]；uuid 非法时返回错误文案
+/// 见 [`StatsPlaytimeDto`]；uuid 或日期非法时返回错误文案
 #[gui_macros::command]
-pub fn stats_get_playtime(uuid: Option<String>, days: u32) -> Result<StatsPlaytimeDto, String> {
+pub fn stats_get_playtime(
+    uuid: Option<String>,
+    from: String,
+    to: String,
+) -> Result<StatsPlaytimeDto, String> {
     let filter = match uuid.as_deref().filter(|s| !s.is_empty()) {
         Some(s) => Some(Uuid::parse_str(s).map_err(|_| err_keys::UUID.to_string())?),
         None => None,
     };
 
-    let days = days.clamp(1, 3660) as u64;
+    let mut from_date = NaiveDate::parse_from_str(&from, "%Y-%m-%d")
+        .map_err(|_| err_keys::DATE_INVALID.to_string())?;
+    let mut to_date = NaiveDate::parse_from_str(&to, "%Y-%m-%d")
+        .map_err(|_| err_keys::DATE_INVALID.to_string())?;
+    if from_date > to_date {
+        std::mem::swap(&mut from_date, &mut to_date);
+    }
+
     let now = Local::now().naive_local();
     let today = now.date();
-    let start_date = today - Days::new(days - 1);
-    let range_start = start_date.and_time(NaiveTime::MIN);
+    if from_date > today {
+        return Ok(StatsPlaytimeDto {
+            days: Vec::new(),
+            total_seconds: 0,
+            active_days: 0,
+        });
+    }
+    if to_date > today {
+        to_date = today;
+    }
+    // 上限十年：极端输入不至于生成几十年的横轴
+    if (to_date - from_date).num_days() > 3659 {
+        from_date = to_date - Days::new(3659);
+    }
 
-    let mut buckets: Vec<StatsPlayDayDto> = Vec::with_capacity(days as usize);
-    let mut index: HashMap<NaiveDate, usize> = HashMap::with_capacity(days as usize);
-    for offset in 0..days {
-        let date = start_date + Days::new(offset);
+    let day_count = (to_date - from_date).num_days() as u64 + 1;
+    let range_start = from_date.and_time(NaiveTime::MIN);
+    let range_end = (to_date + Days::new(1)).and_time(NaiveTime::MIN).min(now);
+
+    let mut buckets: Vec<StatsPlayDayDto> = Vec::with_capacity(day_count as usize);
+    let mut index: HashMap<NaiveDate, usize> = HashMap::with_capacity(day_count as usize);
+    let mut date = from_date;
+    loop {
         index.insert(date, buckets.len());
         buckets.push(StatsPlayDayDto {
             date: date.format("%Y-%m-%d").to_string(),
             seconds: 0,
         });
+        if date == to_date {
+            break;
+        }
+        date = date + Days::new(1);
     }
 
     let count = game_count::get_count();
@@ -160,15 +227,12 @@ pub fn stats_get_playtime(uuid: Option<String>, days: u32) -> Result<StatsPlayti
             } else {
                 run.stop_time.naive_local()
             };
-            let mut start = run.start_time.naive_local();
-            if end <= range_start || end <= start {
+            let start = run.start_time.naive_local();
+            if end <= range_start || start >= range_end || end <= start {
                 continue;
             }
-            if start < range_start {
-                start = range_start;
-            }
-            // 运行中的这次可能还在往前走；停止时间理论上不会超过现在，统一夹一下
-            let end = end.min(now);
+            let start = start.max(range_start);
+            let end = end.min(range_end);
             let mut cursor = start;
             while cursor < end {
                 let date = cursor.date();

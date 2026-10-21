@@ -153,6 +153,24 @@ pub fn get_count() -> GameCountObj {
     COUNT.clone()
 }
 
+/// 记住实例名，实例删除后统计窗口仍能显示原来的名字
+///
+/// - `uuid`: 实例 uuid
+/// - `name`: 实例名
+pub(crate) fn remember_name(uuid: &Uuid, name: &str) {
+    let mut count = COUNT.write().unwrap();
+    if count
+        .game_names
+        .get(uuid)
+        .is_some_and(|old| old.as_str() == name)
+    {
+        return;
+    }
+    count.game_names.insert(*uuid, name.to_string());
+    drop(count);
+    save_async();
+}
+
 /// 读取统计数据
 ///
 /// 文件不存在或解析失败时退回空统计，错误只记日志不向外抛。

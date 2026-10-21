@@ -10,14 +10,18 @@ pub struct StatsInstanceDto {
     pub uuid: String,
     /// 实例名字，已删除的实例取历史记录里的名字
     pub name: String,
-    /// 启动次数
+    /// 启动次数，含成功与失败
     pub count: u64,
+    /// 启动失败次数
+    pub failed: u64,
     /// 累计游玩秒数，含正在运行的本次时长
     pub seconds: u64,
     /// 最近一次启动时间，epoch 毫秒；无记录为 None
     pub last: Option<i64>,
     /// 是否正在运行
     pub running: bool,
+    /// 是否已删除：当前实例列表里没有它，只保留历史统计
+    pub deleted: bool,
 }
 
 /// 统计快照，全局计数 + 每实例汇总

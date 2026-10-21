@@ -167,8 +167,9 @@ async fn delete_instance_removes_everywhere() {
     ensure_init();
 
     let suffix = Uuid::new_v4().simple().to_string();
+    let name = format!("待删-{suffix}");
     let group = mml_game::add_group(&format!("删除组-{suffix}")).expect("建组失败");
-    let game = setting(&format!("待删-{suffix}"))
+    let game = setting(&name)
         .create_instance_in_group(None, Some(group))
         .await
         .unwrap();
@@ -191,6 +192,18 @@ async fn delete_instance_removes_everywhere() {
         "空分组应当保留"
     );
     assert!(!base.exists(), "实例目录应被清理（回收站）");
+
+    // 名字要留一份：统计窗口里已删除的实例还得靠它显示
+    assert_eq!(
+        mml_game::game_count::get_count()
+            .read()
+            .unwrap()
+            .game_names
+            .get(&uuid)
+            .map(String::as_str),
+        Some(name.as_str()),
+        "删除后统计里应保留实例名"
+    );
 
     // 重复删除 → 报错，uuid 已不存在
     assert!(mml_game::delete_instance(&uuid).is_err());

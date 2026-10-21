@@ -125,17 +125,18 @@ export const api = {
   },
 
   /**
-   * 获取最近若干天的每日游玩时长
+   * 获取指定日期范围内的每日游玩时长
    *
    * - `uuid`: 实例 uuid；`null` 表示所有实例
-   * - `days`: 天数，包含今天
+   * - `from`: 起始日期，`YYYY-MM-DD`
+   * - `to`: 结束日期，`YYYY-MM-DD`
    *
    * # 返回值
    *
    * 每天的游玩秒数（没有记录的日期补 0）、区间累计与有游玩的天数
    */
-  async getStatsPlaytime(uuid: string | null, days: number): Promise<StatsPlaytimeDto> {
-    return commands.stats.playtime(uuid, days);
+  async getStatsPlaytime(uuid: string | null, from: string, to: string): Promise<StatsPlaytimeDto> {
+    return commands.stats.playtime(uuid, from, to);
   },
 
   /**

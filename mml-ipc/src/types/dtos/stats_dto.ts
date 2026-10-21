@@ -4,9 +4,11 @@ export type StatsInstanceDto = {
   uuid: string,
   name: string,
   count: number,
+  failed: number,
   seconds: number,
   last: number | null,
   running: boolean,
+  deleted: boolean,
 };
 
 export type StatsDataDto = {
