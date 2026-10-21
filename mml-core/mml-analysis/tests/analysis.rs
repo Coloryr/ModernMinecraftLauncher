@@ -402,3 +402,263 @@ fn parse_exposes_exception_chain() {
     assert_eq!(report.causes.len(), 2);
     assert!(report.raw().contains("Mixin transformation"));
 }
+
+// ---------------- NeoForge 模组加载问题 ----------------
+
+const NEO_DEP_VERSION: &str = r#"---- Minecraft Crash Report ----
+// Hey, that tickles! Hehehe!
+
+Time: 2026-03-21 18:01:50
+Description: Mod loading failures have occurred; consult the issue messages for more details
+
+net.neoforged.neoforge.logging.CrashReportExtender$ModLoadingCrashException: Mod loading has failed
+
+-- Mod loading issue for: ferritecore --
+Details:
+	Mod file: /E:/Games/minecraft/.minecraft/mods/ferritecore-7.0.3-neoforge.jar
+	Failure message: Mod ferritecore requires neoforge 21.1.218 or above
+		Currently, neoforge is 21.1.216
+	Mod version: 7.0.3
+
+-- System Details --
+Details:
+	Minecraft Version: 1.21.1
+	Java Version: 24.0.1, Oracle Corporation
+"#;
+
+const NEO_DEP_MISSING: &str = r#"---- Minecraft Crash Report ----
+Description: Mod loading failures have occurred; consult the issue messages for more details
+
+net.neoforged.neoforge.logging.CrashReportExtender$ModLoadingCrashException: Mod loading has failed
+
+-- Mod loading issue for: continuity --
+Details:
+	Failure message: Mod continuity requires connector any
+"#;
+
+const NEO_WRONG_LOADER: &str = r#"---- Minecraft Crash Report ----
+Description: Mod loading failures have occurred; consult the issue messages for more details
+
+-- Mod loading issue for: indium --
+Details:
+	Failure message: File mods\indium-1.0.35+mc1.21.jar is a Fabric mod and cannot be loaded
+"#;
+
+const NEO_INCOMPATIBLE: &str = r#"---- Minecraft Crash Report ----
+Description: Mod loading failures have occurred; consult the issue messages for more details
+
+-- Mod loading issue for: colorwheel --
+Details:
+	Failure message: Mod colorwheel is incompatible with irisflw any
+"#;
+
+const WATCHDOG: &str = r#"---- Minecraft Crash Report ----
+// This is just a placeholder
+
+Time: 2026-08-25 19:28:29
+Description: Watching Server
+
+java.lang.Error: Watchdog
+	at java.base/java.io.FileOutputStream.writeBytes(Native Method)
+	at net.minecraft.server.dedicated.DedicatedServer.tickChildren(DedicatedServer.java:1)
+
+-- System Details --
+Details:
+	Minecraft Version: 1.21.1
+	Java Version: 21.0.1, Oracle Corporation
+"#;
+
+const RENDER: &str = r#"---- Minecraft Crash Report ----
+Time: 2026-08-23 16:36:35
+Description: Unexpected error
+
+java.lang.IllegalStateException: Not building!
+	at knot//net.minecraft.class_287.method_60802(class_287.java:76)
+	at knot//icyllis.modernui.mc.TooltipRenderer.drawRoundedBackground(TooltipRenderer.java:768)
+"#;
+
+const DIMENSION: &str = r#"---- Minecraft Crash Report ----
+Time: 2026-02-16 23:37:09
+Description: Unexpected error
+
+java.lang.IllegalArgumentException: Could not get provider type for dimension 190, does not exist
+	at net.minecraftforge.common.DimensionManager.getProviderType(DimensionManager.java:148)
+"#;
+
+const LOG_NOISE: &str = r#"---- Minecraft Crash Report ----
+// There are four lights!
+
+Time: 2026-10-20 20:22:02 CST
+Description: Encountered exception while building chunk meshes
+
+java.lang.StackOverflowError
+	at java.util.concurrent.locks.ReentrantReadWriteLock$Sync.tryAcquireShared(ReentrantReadWriteLock.java:480)
+	at com.gtnewhorizons.angelica.utils.ConcurrentTileEntityMap.get(ConcurrentTileEntityMap.java:108)
+
+-- System Details --
+Details:
+	Minecraft Version: 1.7.10
+	Memory: 3120312472 bytes (2975 MB) / 8120172544 bytes (7744 MB) up to 8589934592 bytes (8192 MB)
+
+[19:41:37] [RFB-Main/DEBUG] [LaunchWrapper/]: Registered class transformer org.spongepowered.asm.mixin.transformer.Proxy
+[19:41:40] [Client thread/TRACE] [mixin/]: Added class metadata for org/lwjgl/LWJGLException to metadata cache
+[19:42:08] [Client thread/TRACE] [mixin/]: Added class metadata for java/util/zip/ZipException to metadata cache
+java.lang.ClassNotFoundException: The specified class 'galaxyspace.systems.ChunkProviderKuiper' was not found
+"#;
+
+#[test]
+fn neoforge_dependency_version() {
+    let result = analyze(NEO_DEP_VERSION);
+
+    let primary = result.primary().expect("应命中依赖版本");
+    assert_eq!(primary.id, FindingId::DependencyVersion);
+    assert!(primary.mods.iter().any(|m| m == "ferritecore"));
+    assert!(primary.mods.iter().any(|m| m == "neoforge"));
+    assert!(
+        primary
+            .details
+            .iter()
+            .any(|d| d == "required_version=21.1.218")
+    );
+    assert!(
+        primary
+            .details
+            .iter()
+            .any(|d| d == "actual_version=neoforge 21.1.216")
+    );
+    assert!(
+        result
+            .environment
+            .mod_of("ferritecore")
+            .is_some_and(|m| m.version == "7.0.3"),
+        "NeoForge 报告没有 Mod List，模组要从问题段落里解析"
+    );
+}
+
+#[test]
+fn neoforge_missing_dependency() {
+    let result = analyze(NEO_DEP_MISSING);
+
+    let primary = result.primary().expect("应命中缺前置");
+    assert_eq!(primary.id, FindingId::MissingDependency);
+    assert!(primary.mods.iter().any(|m| m == "continuity"));
+    assert!(primary.mods.iter().any(|m| m == "connector"));
+}
+
+#[test]
+fn neoforge_wrong_loader() {
+    let result = analyze(NEO_WRONG_LOADER);
+
+    let primary = result.primary().expect("应命中加载器混装");
+    assert_eq!(primary.id, FindingId::WrongLoader);
+    assert!(primary.details.iter().any(|d| d == "loader=fabric"));
+}
+
+#[test]
+fn neoforge_incompatible() {
+    let result = analyze(NEO_INCOMPATIBLE);
+
+    let primary = result.primary().expect("应命中不兼容");
+    assert_eq!(primary.id, FindingId::IncompatibleModSet);
+    assert!(primary.mods.iter().any(|m| m == "colorwheel"));
+}
+
+#[test]
+fn watchdog_timeout() {
+    let result = analyze(WATCHDOG);
+
+    let primary = result.primary().expect("应命中看门狗");
+    assert_eq!(primary.id, FindingId::WatchdogTimeout);
+}
+
+#[test]
+fn render_failure() {
+    let result = analyze(RENDER);
+
+    let primary = result.primary().expect("应命中渲染崩溃");
+    assert_eq!(primary.id, FindingId::RenderFailure);
+}
+
+#[test]
+fn dimension_missing() {
+    let result = analyze(DIMENSION);
+
+    let primary = result.primary().expect("应命中维度缺失");
+    assert_eq!(primary.id, FindingId::DimensionMissing);
+}
+
+#[test]
+fn embedded_log_noise_is_ignored() {
+    let result = analyze(LOG_NOISE);
+
+    let primary = result.primary().expect("应命中栈溢出");
+    assert_eq!(primary.id, FindingId::StackOverflow);
+    assert!(
+        result
+            .findings
+            .iter()
+            .all(|f| f.id == FindingId::StackOverflow),
+        "夹带的日志行不应产生 Mixin / 驱动 / 损坏 / 缺类结论：{:?}",
+        result
+            .findings
+            .iter()
+            .map(|f| f.id.as_str())
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(result.environment.memory_max_mb, Some(8192), "1.7.10 的内存行是 MB");
+}
+
+const TRANSFORMER_FRAME: &str = r#"---- Minecraft Crash Report ----
+Description: Rendering screen
+
+java.lang.NullPointerException: Cannot enter synchronized block because "storage" is null
+	at TRANSFORMER/world_preview@1.3.1/com.caeruleusTait.world.preview.client.Preview.generate(Preview.java:1)
+	at net.minecraft.client.Minecraft.run(Minecraft.java:1)
+
+-- System Details --
+Details:
+	Minecraft Version: 1.21.1
+	Fabric Mods: 
+		world_preview: World Preview 1.3.1
+"#;
+
+const MIXIN_CLASS_CASE: &str = r#"---- Minecraft Crash Report ----
+Description: Initializing game
+
+org.spongepowered.asm.mixin.transformer.throwables.MixinTransformerError: An unexpected critical error was encountered
+Caused by: org.spongepowered.asm.mixin.injection.throwables.InjectionError: Critical injection failure: Variable modifier method injected(II)I in mixin.voxelmap.json:MixinInGameHud from mod voxelmap failed injection check
+	at org.spongepowered.asm.mixin.injection.struct.InjectionInfo.postInject(InjectionInfo.java:1)
+
+-- System Details --
+Details:
+	Minecraft Version: 1.21.1
+	Fabric Mods: 
+		voxelmap: VoxelMap 1.10.0
+"#;
+
+#[test]
+fn suspected_mod_from_transformer_frame() {
+    let result = analyze(TRANSFORMER_FRAME);
+
+    assert!(
+        result.suspected_mods.iter().any(|m| m == "world_preview"),
+        "NeoForge 栈帧里的 modid@版本 要能对上：{:?}",
+        result.suspected_mods
+    );
+}
+
+#[test]
+fn mixin_class_keeps_original_case() {
+    let result = analyze(MIXIN_CLASS_CASE);
+
+    let primary = result.primary().expect("应命中 Mixin");
+    assert_eq!(primary.id, FindingId::MixinFailure);
+    assert!(
+        primary
+            .details
+            .iter()
+            .any(|d| d == "mixin_class=MixinInGameHud"),
+        "{:?}",
+        primary.details
+    );
+}

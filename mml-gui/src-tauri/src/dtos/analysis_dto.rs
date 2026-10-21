@@ -23,8 +23,12 @@ pub struct CrashAnalysisDto {
     pub minecraft_version: Option<String>,
     /// 加载器 id：forge / neoforge / fabric / quilt
     pub loader: Option<String>,
+    /// 加载器版本
+    pub loader_version: Option<String>,
     /// Java 版本
     pub java_version: Option<String>,
+    /// 最大堆内存，单位 MiB
+    pub memory_max_mb: Option<u64>,
 }
 
 /// 一条分析结论
@@ -58,7 +62,9 @@ impl From<CrashAnalysis> for CrashAnalysisDto {
                 .environment
                 .loader
                 .map(|loader| loader.as_str().to_string()),
+            loader_version: value.environment.loader_version,
             java_version: value.environment.java_version,
+            memory_max_mb: value.environment.memory_max_mb,
         }
     }
 }

@@ -8,7 +8,9 @@ export type CrashAnalysisDto = {
   suspectedMods: string[],
   minecraftVersion: string | null,
   loader: string | null,
+  loaderVersion: string | null,
   javaVersion: string | null,
+  memoryMaxMb: number | null,
 };
 
 export type CrashFindingDto = {

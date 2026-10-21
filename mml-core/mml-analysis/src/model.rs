@@ -134,6 +134,8 @@ pub struct CrashReport {
     pub environment: Environment,
     /// 原始文本
     pub(crate) raw: String,
+    /// 原文的小写副本，规则匹配用；与 `raw` 的行一一对应
+    pub(crate) lower: String,
     /// 异常与栈帧所在的行，规则优先在这段里匹配
     pub(crate) detail: String,
 }
@@ -231,8 +233,12 @@ pub enum FindingId {
     JavaVersionTooOld,
     /// 模组缺少前置
     MissingDependency,
+    /// 依赖的版本不满足，如模组要求更高的加载器版本
+    DependencyVersion,
     /// 模组之间不兼容
     IncompatibleModSet,
+    /// 模组装错了加载器，如把 Fabric 模组放进 NeoForge
+    WrongLoader,
     /// 同一个模组装了多份
     DuplicateMod,
     /// Mixin 注入失败
@@ -255,6 +261,12 @@ pub enum FindingId {
     CorruptWorld,
     /// 栈溢出
     StackOverflow,
+    /// 渲染或区块构建崩溃
+    RenderFailure,
+    /// 服务端主线程卡死，被看门狗强制关服
+    WatchdogTimeout,
+    /// 维度注册缺失，通常是维度模组与存档不匹配
+    DimensionMissing,
     /// 模组初始化失败
     ModInitFailure,
     /// 安全管理器或权限问题
@@ -275,7 +287,9 @@ impl FindingId {
             FindingId::OutOfMemoryNativeThread => "out_of_memory_native_thread",
             FindingId::JavaVersionTooOld => "java_version_too_old",
             FindingId::MissingDependency => "missing_dependency",
+            FindingId::DependencyVersion => "dependency_version",
             FindingId::IncompatibleModSet => "incompatible_mod_set",
+            FindingId::WrongLoader => "wrong_loader",
             FindingId::DuplicateMod => "duplicate_mod",
             FindingId::MixinFailure => "mixin_failure",
             FindingId::ModEntrypointFailure => "mod_entrypoint_failure",
@@ -287,6 +301,9 @@ impl FindingId {
             FindingId::CorruptFile => "corrupt_file",
             FindingId::CorruptWorld => "corrupt_world",
             FindingId::StackOverflow => "stack_overflow",
+            FindingId::RenderFailure => "render_failure",
+            FindingId::WatchdogTimeout => "watchdog_timeout",
+            FindingId::DimensionMissing => "dimension_missing",
             FindingId::ModInitFailure => "mod_init_failure",
             FindingId::Security => "security",
             FindingId::Unclassified => "unclassified",

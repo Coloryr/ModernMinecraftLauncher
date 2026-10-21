@@ -14,9 +14,9 @@ static RE_EXCEPTION: LazyLock<Regex> = LazyLock::new(|| {
     .unwrap()
 });
 
-/// 崩溃报告里的内存行，取 `up to ... (N MiB)`
+/// 崩溃报告里的内存行，取 `up to ... (N MiB)`；1.7.10 的报告写的是 MB
 static RE_MEMORY: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)up to \d+ bytes \((\d+) MiB\)").unwrap());
+    LazyLock::new(|| Regex::new(r"(?i)up to \d+ bytes \((\d+) M(?:i)?B\)").unwrap());
 
 /// 游戏日志行首的时间戳
 static RE_LOG_TIME: LazyLock<Regex> =
@@ -46,6 +46,7 @@ pub(crate) fn parse(text: &str) -> CrashReport {
         exception,
         causes,
         environment,
+        lower: text.to_lowercase(),
         raw: text.to_string(),
         detail,
     }
@@ -176,6 +177,16 @@ fn parse_environment(text: &str, lines: &[&str]) -> Environment {
     }
 
     env.mods = parse_mods(lines);
+    // NeoForge 的崩溃报告没有 Mod List 表，只在正文里逐条列"模组加载问题"
+    for entry in parse_mod_issues(lines) {
+        if !env
+            .mods
+            .iter()
+            .any(|item| item.id.eq_ignore_ascii_case(&entry.id))
+        {
+            env.mods.push(entry);
+        }
+    }
     env.loader = detect_loader(text, &env.mods);
     env.loader_version = env.loader.and_then(|loader| {
         let id = match loader {
@@ -192,6 +203,45 @@ fn parse_environment(text: &str, lines: &[&str]) -> Environment {
     }
 
     env
+}
+
+/// 解析 NeoForge 的模组加载问题段落
+///
+/// 报告形如 `-- Mod loading issue for: ferritecore --`，段内的 `Mod version:` 给版本。
+/// NeoForge 的崩溃报告不带 Mod List 表，不解析这段就一个模组都拿不到。
+fn parse_mod_issues(lines: &[&str]) -> Vec<ModEntry> {
+    let mut mods: Vec<ModEntry> = Vec::new();
+    let mut current: Option<usize> = None;
+
+    for line in lines {
+        let trimmed = line.trim();
+
+        if let Some(id) = trimmed
+            .strip_prefix("-- Mod loading issue for: ")
+            .and_then(|rest| rest.strip_suffix(" --"))
+        {
+            let id = id.trim();
+            if id.is_empty() {
+                continue;
+            }
+            if let Some(index) = mods.iter().position(|item| item.id.eq_ignore_ascii_case(id)) {
+                current = Some(index);
+            } else {
+                mods.push(ModEntry {
+                    id: id.to_string(),
+                    name: id.to_string(),
+                    version: String::new(),
+                });
+                current = Some(mods.len() - 1);
+            }
+        } else if let Some(version) = trimmed.strip_prefix("Mod version: ")
+            && let Some(index) = current
+        {
+            mods[index].version = version.trim().to_string();
+        }
+    }
+
+    mods
 }
 
 /// 解析 `Fabric Mods:` / `Mod List:` / `Loaded Mods:` 段落

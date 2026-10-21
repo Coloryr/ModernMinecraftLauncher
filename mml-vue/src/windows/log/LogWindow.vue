@@ -20,6 +20,7 @@ import { toggleWordWrap, wordWrap } from "../../lib/editorWrap";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import InstanceChip from "../../components/ui/InstanceChip.vue";
 import LaunchProgress from "../../components/LaunchProgress.vue";
+import CrashAnalysisCard from "../../components/CrashAnalysisCard.vue";
 import DownloadTitleIndicator from "../../components/DownloadTitleIndicator.vue";
 // Monaco 编辑器按需加载：它一块就是 ~2.6 MB（gzip 674 kB）。
 // 异步化不能省掉这次下载（打开就是要看日志），但能让窗口外壳与工具条先画出来。
@@ -198,20 +199,6 @@ async function scrollIfPending() {
 const analysis = ref<CrashAnalysisDto | null>(null);
 /** 分析请求序号：换文件后旧请求的结果直接丢掉 */
 let analyzeSeq = 0;
-
-/** Mixin 相关结论；没有时不显示横幅 */
-const mixinFinding = computed(
-  () => analysis.value?.findings.find((f) => f.id === "mixin_failure") ?? null,
-);
-
-/** 横幅上显示的可疑模组，最多三个 */
-const mixinSuspects = computed(() => (mixinFinding.value?.mods ?? []).slice(0, 3).join(", "));
-
-/** 横幅上显示的 Mixin 配置名 */
-const mixinConfig = computed(() => {
-  const detail = mixinFinding.value?.details.find((d) => d.startsWith("mixin_config="));
-  return detail ? detail.slice("mixin_config=".length) : "";
-});
 
 /** 分析当前日志文件；运行日志不分析，历史文件打开时都跑一遍 */
 async function analyzeCurrent() {
@@ -706,24 +693,12 @@ onBeforeUnmount(() => {
         </select>
       </div>
 
-      <!-- 崩溃分析：Mixin 错误直接点名可疑模组 -->
-      <div v-if="mixinFinding" class="analysis-card">
-        <GlyphIcon class="analysis-icon" name="alert" :size="15" :weight="2" />
-        <div class="analysis-body">
-          <div class="analysis-title">
-            {{ t("logWindow.mixinFailure") }}
-            <span v-if="mixinSuspects" class="analysis-suspect">
-              {{ t("logWindow.suspectMod", { mods: mixinSuspects }) }}
-            </span>
-            <span v-else class="analysis-suspect">{{ t("logWindow.analysisNoMod") }}</span>
-          </div>
-          <div v-if="mixinConfig" class="analysis-detail">
-            {{ t("logWindow.mixinConfig", { config: mixinConfig }) }}
-          </div>
-        </div>
-        <button class="analysis-close" :aria-label="t('logWindow.analysisClose')"
-          v-tip="t('logWindow.analysisClose')" @click="analysis = null">×</button>
-      </div>
+      <!-- 崩溃分析：主因、可疑模组与证据，结论由后端规则给出 -->
+      <CrashAnalysisCard
+        v-if="analysis && analysis.findings.length"
+        :analysis="analysis"
+        @close="analysis = null"
+      />
 
       <!-- 日志正文 -->
       <MonacoLogView ref="viewRef" :logs="shownLogs" :auto-scroll="setting.auto"
@@ -828,61 +803,6 @@ onBeforeUnmount(() => {
 .url {
   width: 100%;
   box-sizing: border-box;
-}
-
-/* 崩溃分析横幅：Mixin 错误时贴在日志正文上方 */
-.analysis-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 8px 10px;
-  border: 1px solid var(--red);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--red) 8%, var(--bg));
-}
-
-.analysis-icon {
-  flex: none;
-  margin-top: 2px;
-  color: var(--red);
-}
-
-.analysis-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.analysis-title {
-  font-size: 12.5px;
-  color: var(--text);
-}
-
-.analysis-suspect {
-  margin-left: 6px;
-  color: var(--red);
-  font-weight: 600;
-}
-
-.analysis-detail {
-  margin-top: 2px;
-  font-size: 11.5px;
-  color: var(--text-dim);
-  word-break: break-all;
-}
-
-.analysis-close {
-  flex: none;
-  padding: 0 2px;
-  border: 0;
-  background: transparent;
-  color: var(--text-dim);
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.analysis-close:hover {
-  color: var(--text);
 }
 
 .modal-text {
