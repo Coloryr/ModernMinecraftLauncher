@@ -95,6 +95,11 @@
    2) 块轴居中兜底，窗口里改小了纵向内边距也不会再偏。 */
 select.field-select {
   align-content: center;
+  /* 选中项在 base-select 下是一个会换行的行盒：实例名 / 版本号一长，控件就被撑成
+     两行高，与同一行的开关、分段按钮对不齐。定死单行、超出裁掉，高度才稳定 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 原生下拉的自定义渲染（Chromium 135+）：弹层由系统原生弹窗变为页面内元素，
@@ -162,6 +167,8 @@ select.field-select {
     border-radius: 8px;
     font-size: 13px;
     color: var(--text);
+    /* 弹层里允许换行：列表比控件宽，长名字整条都看得到，不会撑宽弹层 */
+    white-space: normal;
   }
 
   select.field-select option:is(:hover, :focus) {

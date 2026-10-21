@@ -106,8 +106,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .on_window_event(windows::on_window_event)
         .setup(|app| {
-            // 托盘先建：建不起来的话关主窗口仍然退出应用，见 tray::is_ready
-            tray::init(app.handle());
+            // 托盘不在这里建：只有实例在运行时才出现，见 tray::sync
 
             // 单开与唤回：起 IPC 服务并记下端口，之后启动的实例会把请求交给本进程
             single_instance::start(app.handle());
@@ -195,14 +194,19 @@ pub fn run() {
         .expect("error while building tauri application");
 
     app.run(|_app, event| {
-        // 主窗口关掉只是退回托盘：后台还要继续给运行中的游戏计时。
-        // 托盘没建起来时不能这么干 —— 那样进程就没有任何唤回入口了，按老样子退出。
+        // 还有实例在跑时，关掉所有窗口只是退回后台：托盘可见，后台还要继续给游戏计时。
+        // 没有实例在跑就照常退出 —— 那时既没有托盘，也没有要留在后台干的事。
         // code 为 Some 的是 app.exit() 发起的真退出，不拦。
         if let tauri::RunEvent::ExitRequested { api, code, .. } = event
             && code.is_none()
-            && tray::is_ready()
         {
-            api.prevent_exit();
+            if tray::has_running_instance() {
+                api.prevent_exit();
+            } else if mml_core::get_state() {
+                // 兜底：关窗时实例恰好在退出，那条路径可能没来得及停核心
+                mml_core::stop();
+                mml_game::game_count::stop();
+            }
         }
     });
 }

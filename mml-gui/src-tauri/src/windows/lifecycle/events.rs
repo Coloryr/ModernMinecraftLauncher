@@ -51,9 +51,9 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
                 let _ = save_window_state(&uuid, &win, maximized);
             }
             if uuid == MAIN_WINDOW_UUID {
-                // 退回托盘：核心与统计继续跑 —— 运行中的游戏还要接着计时。
-                // 托盘没建起来时没有唤回入口，按老样子退出应用。
-                if !crate::tray::is_ready() {
+                // 有实例在跑：退回后台，托盘可见，核心与统计继续 —— 运行中的游戏还要接着计时。
+                // 没有实例在跑：后台没有留下的理由，关窗就是退出应用，先让核心与统计落盘。
+                if !crate::tray::has_running_instance() {
                     mml_core::stop();
                     mml_game::game_count::stop();
                 }
@@ -99,6 +99,11 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
             resource::cancel_window(&label);
             OPEN_WINDOWS.write().unwrap().remove(&uuid);
             remove_window_model(&uuid);
+            // 主界面关掉了：若此刻已经没有实例在跑，后台没有留下的理由。
+            // 与"最后一个实例退出"两处互相兜底，谁后发生谁收尾，见 tray::quit_idle
+            if uuid == MAIN_WINDOW_UUID && mml_core::get_state() {
+                crate::tray::quit_idle(window.app_handle());
+            }
         }
         // 缩放 / 移动：实时记录几何，不必等关窗，配置保存按文件去重合并写入
         // 最大化 / 全屏时不记，否则还原后会以最大化尺寸打开

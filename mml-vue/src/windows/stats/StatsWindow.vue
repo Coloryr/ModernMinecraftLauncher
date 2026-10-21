@@ -445,6 +445,8 @@ function instanceLabel(inst: StatsInstanceDto): string {
   font-size: 18px;
   font-weight: 800;
   color: var(--accent);
+  /* 数字每 5 秒刷新一次，等宽数字才不会让卡片跟着抖 */
+  font-variant-numeric: tabular-nums;
 }
 
 /* 有失败时把这一个数字标红，扫一眼就知道统计里有失败 */
@@ -474,6 +476,9 @@ function instanceLabel(inst: StatsInstanceDto): string {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  /* 筛选与数据之间留一道分隔：标题 / 筛选在上，统计数字与图表在下 */
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
 }
 
 .play-title {
@@ -497,7 +502,10 @@ function instanceLabel(inst: StatsInstanceDto): string {
 }
 
 .inst-select {
-  width: 220px;
+  /* 实例名 +「已删除」后缀比 220px 长，单行显示也放得下；再窄时由 controls.css
+     的单行裁切兜底，不会把控件撑高 */
+  width: 260px;
+  min-width: 180px;
   max-width: 100%;
 }
 
@@ -524,7 +532,7 @@ function instanceLabel(inst: StatsInstanceDto): string {
 .play-stats {
   display: flex;
   gap: 24px;
-  margin: 16px 0 12px;
+  margin: 14px 0 12px;
 }
 
 .play-stat {
@@ -537,6 +545,7 @@ function instanceLabel(inst: StatsInstanceDto): string {
   font-size: 18px;
   font-weight: 800;
   color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
 .play-cap {
@@ -606,14 +615,21 @@ function instanceLabel(inst: StatsInstanceDto): string {
 .chart-bar {
   width: 100%;
   max-width: 34px;
+  border-radius: 3px 3px 0 0;
   background: var(--accent);
-  transition: height 0.3s;
+  transition: height 0.3s, background-color 0.12s;
+}
+
+/* 悬停当天柱子提亮一档，与提示一起说明"这根柱子是哪天" */
+.chart-bar:not(.empty):hover {
+  background: var(--accent-hover);
 }
 
 /* 没记录的那天留一条基线，图里不至于看不出格子 */
 .chart-bar.empty {
   height: 2px;
   background: var(--border);
+  border-radius: 1px;
 }
 
 .chart-x {
@@ -627,6 +643,16 @@ function instanceLabel(inst: StatsInstanceDto): string {
   color: var(--text-dim);
   text-align: center;
   white-space: nowrap;
+}
+
+/* 标签比柱子宽，居中会让首尾两个探出容器——那部分算进滚动宽度，
+   于是 30 天也冒出一条横向滚动条，最后一个日期还被切掉。首尾贴边即可 */
+.chart-x span:first-child {
+  text-align: left;
+}
+
+.chart-x span:last-child {
+  text-align: right;
 }
 
 .chart-empty {
@@ -665,6 +691,7 @@ function instanceLabel(inst: StatsInstanceDto): string {
   padding: 10px 16px;
   font-size: 12.5px;
   border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
 }
 
 .stats-table tr:last-child td {

@@ -1,12 +1,15 @@
-//! 系统托盘：主窗口关掉后进程留在后台，托盘是唤回界面的入口之一（另一个是再启动一次 exe，
-//! 见 [`crate::single_instance`]），也是唯一的退出入口。
+//! 系统托盘：**只在有实例运行时显示** —— 这时关掉主窗口进程仍留在后台
+//! （给运行中的游戏计时、随时从托盘唤回界面），托盘是后台唯一的退出入口。
 //!
-//! 为什么要有它：关窗只是"收起界面"，后台还要继续给运行中的游戏计时
-//! （`mml_game::game_count` 的计时线程与界面无关）。没有托盘的话进程就成了
-//! 没有任何退出入口的幽灵进程，所以**托盘没建起来时关窗仍然按老样子退出应用**，
-//! 见 `windows::lifecycle::events` 的关闭处理与 `lib.rs` 的 ExitRequested。
+//! 没有实例在跑时既没有托盘，关窗就是退出启动器：后台没有要干的事，也不该留下
+//! 一个唤不回来的幽灵进程，见 windows::lifecycle::events 的关闭处理与
+//! lib.rs 的 ExitRequested。
+//!
+//! 托盘跟着运行态走：实例真正启动时 sync 把它建出来，最后一个实例退出时收掉；
+//! 若收掉的那一刻主界面也已经关掉，进程没有留下的理由，quit_idle 收工。
 
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 
 use mml_names::Lang;
 use tauri::menu::{Menu, MenuItem};
@@ -16,7 +19,7 @@ use tauri::AppHandle;
 use crate::gui_config;
 use crate::log_text::LogText;
 
-/// 托盘图标 id，刷新文案时按它取回句柄
+/// 托盘图标 id，刷新文案 / 显隐时按它取回句柄
 const TRAY_ID: &str = "mml-tray";
 
 /// 托盘菜单项 id：显示主界面
@@ -24,16 +27,25 @@ const MENU_SHOW: &str = "show";
 /// 托盘菜单项 id：退出启动器
 const MENU_QUIT: &str = "quit";
 
-/// 托盘是否已经建起来
-static READY: AtomicBool = AtomicBool::new(false);
+/// 托盘是否正在显示
+static SHOWN: AtomicBool = AtomicBool::new(false);
 
-/// 托盘是否可用
+/// 是否已经在退出流程里：最后一个实例退出与主窗口销毁两处都会触发，只执行一次
+static QUITTING: AtomicBool = AtomicBool::new(false);
+
+/// 显隐状态锁：实例启动线程与退出轮询线程都会调 sync，建图标不能并发
+static SYNC: Mutex<()> = Mutex::new(());
+
+/// 是否还有实例在运行
+///
+/// 托盘显隐与"关窗后是否留在后台"都以它为准，运行态的唯一来源是 mml_game，
+/// 这里不另记一份。
 ///
 /// # 返回值
 ///
-/// 图标建成功过为 true；为 false 时关主窗口必须退出应用，否则没有唤回入口
-pub fn is_ready() -> bool {
-    READY.load(Ordering::Relaxed)
+/// 至少有一个游戏实例在运行时为 true
+pub(crate) fn has_running_instance() -> bool {
+    !mml_game::get_running_instances().is_empty()
 }
 
 /// 托盘上要显示的几条文案
@@ -49,7 +61,7 @@ enum Text {
 /// 取当前语言的托盘文案
 ///
 /// 托盘是原生菜单，走不了前端的 i18n 表；条目只有三条，就近放这里，
-/// 与 `log_text` 一样中英各一套，切换语言时由 [`refresh_text`] 重建菜单。
+/// 与 log_text 一样中英各一套，切换语言时由 refresh_text 重建菜单。
 ///
 /// - `lang`: 界面语言
 /// - `which`: 要哪一条
@@ -82,17 +94,65 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     Menu::with_items(app, &[&show, &quit])
 }
 
-/// 建托盘图标与右键菜单，`setup` 阶段调用
+/// 按运行态同步托盘：有实例在跑就显示，没有就收起来
 ///
-/// 失败只记日志、不拦启动：`is_ready` 保持 false，关窗仍按老样子退出应用。
+/// 实例真正启动（LaunchState::End）与实例退出时各调一次，见 windows::main::launch。
 ///
-/// - `app`: 应用句柄，托盘挂在它上面
-pub fn init(app: &AppHandle) {
-    if let Err(err) = create(app) {
-        mml_log::error(LogText::TrayInitFailed { error: err }.text());
+/// - `app`: 应用句柄，建图标 / 取回图标都用它
+pub(crate) fn sync(app: &AppHandle) {
+    // 加锁时忽略中毒：这里只是串行化建图标，状态都在这几个原子量里
+    let _lock = SYNC.lock().unwrap_or_else(|err| err.into_inner());
+    if has_running_instance() {
+        show(app);
+    } else {
+        hide(app);
+    }
+}
+
+/// 显示托盘：还没建过就现在建
+///
+/// - `app`: 应用句柄
+fn show(app: &AppHandle) {
+    if SHOWN.load(Ordering::Relaxed) {
         return;
     }
-    READY.store(true, Ordering::Relaxed);
+    if let Some(tray) = app.tray_by_id(TRAY_ID) {
+        match tray.set_visible(true) {
+            Ok(()) => SHOWN.store(true, Ordering::Relaxed),
+            Err(err) => mml_log::error(
+                LogText::TrayVisibleFailed {
+                    visible: true,
+                    error: err.to_string(),
+                }
+                .text(),
+            ),
+        }
+        return;
+    }
+    match create(app) {
+        Ok(()) => SHOWN.store(true, Ordering::Relaxed),
+        Err(err) => mml_log::error(LogText::TrayInitFailed { error: err }.text()),
+    }
+}
+
+/// 收起托盘：图标留着，下次有实例启动时直接显示
+///
+/// - `app`: 应用句柄
+fn hide(app: &AppHandle) {
+    if !SHOWN.swap(false, Ordering::Relaxed) {
+        return;
+    }
+    if let Some(tray) = app.tray_by_id(TRAY_ID)
+        && let Err(err) = tray.set_visible(false)
+    {
+        mml_log::error(
+            LogText::TrayVisibleFailed {
+                visible: false,
+                error: err.to_string(),
+            }
+            .text(),
+        );
+    }
 }
 
 /// 实际建托盘，失败把原因交回调用方记日志
@@ -133,6 +193,7 @@ fn create(app: &AppHandle) -> Result<(), String> {
 /// 切换语言后重建托盘菜单与提示
 ///
 /// 托盘是原生菜单，前端切语言不会自动跟；设置页保存 GUI 配置时若语言变了就调这里。
+/// 没有实例在跑时托盘还不存在，直接返回即可 —— 下次建出来时用的就是新语言。
 ///
 /// - `app`: 应用句柄，按 id 取回托盘
 pub fn refresh_text(app: &AppHandle) {
@@ -146,10 +207,30 @@ pub fn refresh_text(app: &AppHandle) {
     let _ = tray.set_tooltip(Some(text(lang, Text::Tooltip)));
 }
 
+/// 没有实例在跑、主界面也已经关掉：后台没有留下的理由，退出启动器
+///
+/// 主窗口关掉与最后一个实例退出可能先后颠倒，两处都调这里兜底，
+/// 由 quit 保证只退一次。
+///
+/// - `app`: 应用句柄
+pub(crate) fn quit_idle(app: &AppHandle) {
+    // 刚有实例启动就别退
+    if has_running_instance() || QUITTING.load(Ordering::SeqCst) {
+        return;
+    }
+    mml_log::info(LogText::QuitAfterLastGame.text());
+    quit(app);
+}
+
 /// 退出启动器：先让内核与统计落盘，再结束进程
+///
+/// 托盘菜单与 quit_idle 都走这里，重复调用只执行一次。
 ///
 /// - `app`: 应用句柄
 fn quit(app: &AppHandle) {
+    if QUITTING.swap(true, Ordering::SeqCst) {
+        return;
+    }
     mml_core::stop();
     mml_game::game_count::stop();
     app.exit(0);

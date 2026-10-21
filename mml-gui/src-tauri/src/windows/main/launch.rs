@@ -19,7 +19,7 @@ use mml_game::gui_hook::{ILaunchGui, LaunchState, ProcessRunType};
 use mml_game::launcher::instance_setting_obj::{InstanceSettingObj, ServerObj};
 use mml_game::{InstanceExit, game_count, get_running_instances, is_running, stop_game};
 use mml_names::i18_items::error_type::ErrorType;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -406,6 +406,15 @@ pub(crate) fn forward_game_exit(app: &AppHandle, event: &InstanceExit) {
             code: event.code,
         },
     );
+    // 运行态变了：托盘跟着显隐。最后一个实例退出、主界面又已经关掉时，
+    // 托盘收掉之后就再没有唤回入口了，直接退出，见 tray::quit_idle
+    crate::tray::sync(app);
+    if app
+        .get_webview_window(crate::windows::main_window_label())
+        .is_none()
+    {
+        crate::tray::quit_idle(app);
+    }
 }
 
 /// 启动过程的界面回调：把内核的阶段推成 `launch-state`
@@ -424,6 +433,8 @@ impl ILaunchGui for LaunchGuiHook {
         // 与 ColorMC 在拿到进程句柄后调 LaunchDone 同一位置
         if matches!(&state, LaunchState::End) {
             game_count::launch_done(&self.uuid);
+            // 进程真正起来了：托盘这时才出现，关窗之后靠它唤回界面
+            crate::tray::sync(&self.app);
         }
         emit_launch_state(
             &self.app,

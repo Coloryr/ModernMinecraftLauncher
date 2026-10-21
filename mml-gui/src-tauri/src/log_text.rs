@@ -40,8 +40,15 @@ pub enum LogText {
         /// 失败原因
         error: String,
     },
-    /// 系统托盘建不起来，关窗仍会退出应用
+    /// 系统托盘建不起来，后台将没有托盘可用
     TrayInitFailed {
+        /// 失败原因
+        error: String,
+    },
+    /// 托盘显示或收起失败
+    TrayVisibleFailed {
+        /// true 为显示，false 为收起
+        visible: bool,
         /// 失败原因
         error: String,
     },
@@ -50,6 +57,8 @@ pub enum LogText {
         /// 失败原因
         error: String,
     },
+    /// 最后一个实例退出且主界面已关闭，启动器随之退出
+    QuitAfterLastGame,
     /// IPC 服务没起来，单开与唤回失效
     IpcStartFailed {
         /// 失败原因
@@ -482,10 +491,17 @@ impl LogText {
                 format!("[settings] 清理本地文件失败 {path}：{error}")
             }
             LogText::TrayInitFailed { error } => {
-                format!("[tray] 建系统托盘失败，关窗将直接退出：{error}")
+                format!("[tray] 建系统托盘失败，后台将没有托盘可用：{error}")
+            }
+            LogText::TrayVisibleFailed { visible, error } => {
+                let action = if *visible { "显示" } else { "收起" };
+                format!("[tray] {action}托盘失败：{error}")
             }
             LogText::TraySummonFailed { error } => {
                 format!("[tray] 从托盘唤回主窗口失败：{error}")
+            }
+            LogText::QuitAfterLastGame => {
+                String::from("[tray] 最后一个实例已退出且主界面已关闭，退出启动器")
             }
             LogText::IpcStartFailed { error } => {
                 format!("[ipc] 启动 IPC 服务失败，单开与唤回失效：{error}")
@@ -682,10 +698,19 @@ impl LogText {
             LogText::LocalFileClearFailed { path, error } => {
                 format!("[settings] failed to clear a local file {path}: {error}")
             }
-            LogText::TrayInitFailed { error } => format!("[tray] failed to create the tray icon, closing the window will quit: {error}"),
+            LogText::TrayInitFailed { error } => format!(
+                "[tray] failed to create the tray icon, there will be no tray in the background: {error}"
+            ),
+            LogText::TrayVisibleFailed { visible, error } => {
+                let action = if *visible { "show" } else { "hide" };
+                format!("[tray] failed to {action} the tray icon: {error}")
+            }
             LogText::TraySummonFailed { error } => {
                 format!("[tray] failed to summon the main window from the tray: {error}")
             }
+            LogText::QuitAfterLastGame => String::from(
+                "[tray] the last instance exited and the main window is closed, quitting the launcher",
+            ),
             LogText::IpcStartFailed { error } => {
                 format!("[ipc] failed to start the IPC server, single-instance and summon are disabled: {error}")
             }
