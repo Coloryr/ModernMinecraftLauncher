@@ -17,3 +17,14 @@ export type StatsDataDto = {
   instances: StatsInstanceDto[],
 };
 
+export type StatsPlayDayDto = {
+  date: string,
+  seconds: number,
+};
+
+export type StatsPlaytimeDto = {
+  days: StatsPlayDayDto[],
+  totalSeconds: number,
+  activeDays: number,
+};
+

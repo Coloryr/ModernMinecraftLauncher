@@ -1,4 +1,4 @@
-//! 统计窗口 DTO —— `stats_get_data` 的返回结构
+//! 统计窗口 DTO —— `stats_get_data` / `stats_get_playtime` 的返回结构
 
 use serde::Serialize;
 
@@ -34,4 +34,26 @@ pub struct StatsDataDto {
     pub total_seconds: u64,
     /// 每实例统计，现有实例 + 有历史记录的实例
     pub instances: Vec<StatsInstanceDto>,
+}
+
+/// 游玩时间图里的一天
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatsPlayDayDto {
+    /// 本地日期，格式 YYYY-MM-DD
+    pub date: String,
+    /// 当天游玩秒数
+    pub seconds: u64,
+}
+
+/// 游玩时间图：按天分桶，缺数据的日期补 0
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatsPlaytimeDto {
+    /// 每天的游玩时长，按日期升序；窗口内没有记录的日期也有一项
+    pub days: Vec<StatsPlayDayDto>,
+    /// 时间段内累计游玩秒数
+    pub total_seconds: u64,
+    /// 有游玩记录的天数
+    pub active_days: u32,
 }

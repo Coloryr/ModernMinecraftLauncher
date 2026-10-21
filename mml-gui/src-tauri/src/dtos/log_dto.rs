@@ -18,6 +18,7 @@ pub struct LogFocusDto {
 /// 日志窗口设置，即 `log_get_setting` 的返回值与 `log_set_setting` 的入参
 ///
 /// 落盘在**实例**的 `gui_setting.json` 里，见 [`GameLogSettingObj`]，所以是"一个实例一套"。
+/// `auto_show` 只由 `log_set_auto_show` 写：日志窗口整份回写设置时不碰它。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LogSettingDto {
@@ -55,7 +56,7 @@ impl From<&GameGuiSettingObj> for LogSettingDto {
     }
 }
 
-// 只映射 `Log` 段里的字段；`auto_show` 在 `GameGuiSettingObj::log_auto_show`，由调用方单独写
+// 只映射 `Log` 段里的字段；`auto_show` 在 `GameGuiSettingObj::log_auto_show`，只由日志设置以外的命令写
 impl From<LogSettingDto> for GameLogSettingObj {
     fn from(obj: LogSettingDto) -> Self {
         Self {

@@ -58,6 +58,8 @@ pub fn log_get_setting(uuid: String) -> Result<LogSettingDto, String> {
 /// 保存实例的日志窗口设置，写入 `gui_setting.json` 的 `Log`
 ///
 /// 界面上每改一项就整份回写：设置项少，读-改-写的代价可以忽略，省得前端攒状态。
+/// **不写** `auto_show`：那一项走 `log_set_auto_show`，这里保留磁盘上的值，
+/// 免得日志窗口打开时读到的旧快照把实例设置里刚改的开关盖回去。
 ///
 /// - `uuid`: 实例 uuid
 /// - `setting`: 新的日志设置
@@ -71,8 +73,27 @@ pub fn log_set_setting(uuid: String, setting: LogSettingDto) -> Result<(), Strin
     let instance = instance_handle(&uuid)?;
     let game = instance.read().unwrap();
     let mut obj = gui_setting::load(&game);
-    let auto_show = setting.auto_show;
     obj.log = setting.into();
+    gui_setting::save(&game, &obj);
+    Ok(())
+}
+
+/// 设置启动游戏后是否自动打开该实例的日志窗口
+///
+/// 存在 `gui_setting.json` 的 `LogAutoShow`；开关在实例设置里，日志窗口不再提供这一项。
+///
+/// - `uuid`: 实例 uuid
+/// - `auto_show`: 是否自动打开
+///
+/// # 返回值
+///
+/// 已提交异步落盘返回 `Ok(())`；实例不存在返回错误文案
+#[gui_macros::ipc_group("log")]
+#[gui_macros::command]
+pub fn log_set_auto_show(uuid: String, auto_show: bool) -> Result<(), String> {
+    let instance = instance_handle(&uuid)?;
+    let game = instance.read().unwrap();
+    let mut obj = gui_setting::load(&game);
     obj.log_auto_show = auto_show;
     gui_setting::save(&game, &obj);
     Ok(())

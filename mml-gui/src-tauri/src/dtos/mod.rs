@@ -84,7 +84,7 @@ pub use settings_dto::{
     BgInfoDto, DnsSettingDto, GameCheckSettingDto, LaunchSettingDto, LocalFileEntryDto,
     NetworkSettingDto, RunArgSettingDto, SettingsDefaultsDto, WindowSettingDto,
 };
-pub use stats_dto::{StatsDataDto, StatsInstanceDto};
+pub use stats_dto::{StatsDataDto, StatsInstanceDto, StatsPlayDayDto, StatsPlaytimeDto};
 pub use theme_dto::ThemeKindDto;
 pub use version_dto::VersionInfoDto;
 pub use window_dto::{DropPathDto, FileDropDto, WindowSizeDto};

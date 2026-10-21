@@ -1,15 +1,17 @@
 //! 统计窗口：规格 + 数据读取
 //!
 //! 统计数据由内核 `mml_game::game_count` 维护，落盘结构是 `CountObj`，走 NBT，
-//! 这里只做快照聚合：全局计数 + 每实例启动次数 / 累计时长 / 最近启动。
+//! 这里只做快照聚合：全局计数 + 每实例启动次数 / 累计时长 / 最近启动，
+//! 以及按实例与时间段聚合的每日游玩时长。
 
 use std::collections::{HashMap, HashSet};
 
-use chrono::Local;
+use chrono::{Days, Local, NaiveDate, NaiveTime};
 use mml_game::game_count;
 use uuid::Uuid;
 
-use crate::dtos::stats_dto::{StatsDataDto, StatsInstanceDto};
+use crate::dtos::stats_dto::{StatsDataDto, StatsInstanceDto, StatsPlayDayDto, StatsPlaytimeDto};
+use crate::err_keys;
 
 /// 单实例的统计汇总，聚合期间的中间值
 #[derive(Clone, Copy, Default)]
@@ -108,5 +110,83 @@ pub fn stats_get_data() -> Result<StatsDataDto, String> {
         launch_error_count: count.launch_error_count,
         total_seconds: count.all_time.num_seconds().max(0) as u64,
         instances: items,
+    })
+}
+
+/// 获取某实例最近若干天的每日游玩时长
+///
+/// 跨天的运行会按本地零点切开，分别计入两天。时间段包含今天，共 `days` 个桶；
+/// 没有记录的日期补 0，前端不用再补齐横轴。
+///
+/// - `uuid`: 实例 uuid；`None` 或空串表示所有实例
+/// - `days`: 统计天数，包含今天；超出 1..=3660 时按边界截断
+///
+/// # 返回值
+///
+/// 见 [`StatsPlaytimeDto`]；uuid 非法时返回错误文案
+#[gui_macros::command]
+pub fn stats_get_playtime(uuid: Option<String>, days: u32) -> Result<StatsPlaytimeDto, String> {
+    let filter = match uuid.as_deref().filter(|s| !s.is_empty()) {
+        Some(s) => Some(Uuid::parse_str(s).map_err(|_| err_keys::UUID.to_string())?),
+        None => None,
+    };
+
+    let days = days.clamp(1, 3660) as u64;
+    let now = Local::now().naive_local();
+    let today = now.date();
+    let start_date = today - Days::new(days - 1);
+    let range_start = start_date.and_time(NaiveTime::MIN);
+
+    let mut buckets: Vec<StatsPlayDayDto> = Vec::with_capacity(days as usize);
+    let mut index: HashMap<NaiveDate, usize> = HashMap::with_capacity(days as usize);
+    for offset in 0..days {
+        let date = start_date + Days::new(offset);
+        index.insert(date, buckets.len());
+        buckets.push(StatsPlayDayDto {
+            date: date.format("%Y-%m-%d").to_string(),
+            seconds: 0,
+        });
+    }
+
+    let count = game_count::get_count();
+    let count = count.read().unwrap();
+    for (inst_uuid, runs) in &count.game_runs {
+        if filter.is_some_and(|want| *inst_uuid != want) {
+            continue;
+        }
+        for run in runs {
+            let end = if run.now {
+                now
+            } else {
+                run.stop_time.naive_local()
+            };
+            let mut start = run.start_time.naive_local();
+            if end <= range_start || end <= start {
+                continue;
+            }
+            if start < range_start {
+                start = range_start;
+            }
+            // 运行中的这次可能还在往前走；停止时间理论上不会超过现在，统一夹一下
+            let end = end.min(now);
+            let mut cursor = start;
+            while cursor < end {
+                let date = cursor.date();
+                let next = (date + Days::new(1)).and_time(NaiveTime::MIN);
+                let chunk_end = end.min(next);
+                if let Some(i) = index.get(&date) {
+                    buckets[*i].seconds += (chunk_end - cursor).num_seconds().max(0) as u64;
+                }
+                cursor = chunk_end;
+            }
+        }
+    }
+
+    let total_seconds = buckets.iter().map(|day| day.seconds).sum();
+    let active_days = buckets.iter().filter(|day| day.seconds > 0).count() as u32;
+    Ok(StatsPlaytimeDto {
+        days: buckets,
+        total_seconds,
+        active_days,
     })
 }

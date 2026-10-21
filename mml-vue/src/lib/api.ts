@@ -81,6 +81,7 @@ import type {
   SchematicDetailDto,
   SchematicItemDto,
   StatsDataDto,
+  StatsPlaytimeDto,
   CustomJsonItemDto,
   StartArgDto,
   StateEvent,
@@ -121,6 +122,20 @@ export const api = {
    */
   async getStatsData(): Promise<StatsDataDto> {
     return commands.stats.data();
+  },
+
+  /**
+   * 获取最近若干天的每日游玩时长
+   *
+   * - `uuid`: 实例 uuid；`null` 表示所有实例
+   * - `days`: 天数，包含今天
+   *
+   * # 返回值
+   *
+   * 每天的游玩秒数（没有记录的日期补 0）、区间累计与有游玩的天数
+   */
+  async getStatsPlaytime(uuid: string | null, days: number): Promise<StatsPlaytimeDto> {
+    return commands.stats.playtime(uuid, days);
   },
 
   /**
@@ -1117,7 +1132,7 @@ export const api = {
    *
    * # 返回值
    *
-   * 自动换行 / 自动下拉 / 五个等级开关；存在实例的 `gui_setting.json` 里，没写过是默认值
+   * 自动换行 / 自动下拉 / 五个等级开关 / 自动打开日志窗口；存在实例的 `gui_setting.json` 里，没写过是默认值
    */
   async getLogSetting(uuid: string): Promise<LogSettingDto> {
     return commands.log.getSetting(uuid);
@@ -1127,10 +1142,20 @@ export const api = {
    * 保存实例的日志窗口设置
    *
    * - `uuid`: 实例 uuid
-   * - `setting`: 新的日志设置，整份回写
+   * - `setting`: 新的日志设置，整份回写；不含「自动打开日志窗口」，那一项走 `setLogAutoShow`
    */
   async setLogSetting(uuid: string, setting: LogSettingDto): Promise<void> {
     return commands.log.setSetting(uuid, setting);
+  },
+
+  /**
+   * 设置启动游戏后是否自动打开该实例的日志窗口
+   *
+   * - `uuid`: 实例 uuid
+   * - `autoShow`: 是否自动打开
+   */
+  async setLogAutoShow(uuid: string, autoShow: boolean): Promise<void> {
+    return commands.log.setAutoShow(uuid, autoShow);
   },
 
   /**

@@ -1,11 +1,13 @@
 <script setup lang="ts">
-// 实例元信息面板：版本类型+版本 / 加载器+加载器版本 / 游戏内语言+日志编码 / 整合包类型
-// 改动经 update 事件走 IPC 写入核心实例配置；刷新按钮与添加实例窗口同逻辑
+// 实例元信息面板：版本类型+版本 / 加载器+加载器版本 / 游戏内语言+日志编码 / 自动打开日志窗口 / 整合包类型
+// 元信息改动经 update 事件走 IPC 写入核心实例配置，日志窗口开关直接调日志设置命令；
+// 刷新按钮与添加实例窗口同逻辑
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { t, tErr } from "../lib/i18n";
 import { api, modpackCheck, modpackUpdate, onAddLoaderProgress } from "../lib/api";
 import { showToast } from "../lib/toast";
 import BaseButton from "./ui/BaseButton.vue";
+import BaseSwitch from "./ui/BaseSwitch.vue";
 import GlyphIcon from "./ui/GlyphIcon.vue";
 import ModPackUpdateModal from "./ModPackUpdateModal.vue";
 import LoaderQueryProgress from "./LoaderQueryProgress.vue";
@@ -302,6 +304,52 @@ async function refreshLangs() {
   }
 }
 
+// ================= 自动打开日志窗口 =================
+
+/** 启动游戏后自动打开该实例的日志窗口；存在实例的 `gui_setting.json` 里 */
+const logAutoShow = ref(false);
+/** 设置是否已读到：读到之前开关不可点，免得把默认值写回去 */
+const logAutoShowLoaded = ref(false);
+/** 保存中，避免连点 */
+const logAutoShowBusy = ref(false);
+/** 读取序号：切换实例后旧请求的结果直接丢掉 */
+let logAutoShowSeq = 0;
+
+/** 读一次日志设置，只取「自动打开」这一项 */
+async function refreshLogAutoShow() {
+  const seq = ++logAutoShowSeq;
+  logAutoShowLoaded.value = false;
+  try {
+    const setting = await api.getLogSetting(props.instance.uuid);
+    if (seq === logAutoShowSeq) logAutoShow.value = setting.autoShow;
+  } catch (e) {
+    console.error("[InstanceMetaPanel] 读取日志设置失败", e);
+    if (seq === logAutoShowSeq) logAutoShow.value = false;
+  } finally {
+    if (seq === logAutoShowSeq) logAutoShowLoaded.value = true;
+  }
+}
+
+/**
+ * 切换「自动打开日志窗口」
+ *
+ * - `on`: 新的开关状态
+ */
+async function onLogAutoShow(on: boolean) {
+  if (!logAutoShowLoaded.value || logAutoShowBusy.value) return;
+  const before = logAutoShow.value;
+  logAutoShow.value = on;
+  logAutoShowBusy.value = true;
+  try {
+    await api.setLogAutoShow(props.instance.uuid, on);
+  } catch (e) {
+    logAutoShow.value = before;
+    showToast(tErr(e));
+  } finally {
+    logAutoShowBusy.value = false;
+  }
+}
+
 // 切换实例：重置加载器查询状态并重新查询语言列表
 watch(
   () => props.instance.uuid,
@@ -311,6 +359,7 @@ watch(
     lvLocked.value = true;
     langs.value = [...DEFAULT_LANGS];
     refreshLangs();
+    refreshLogAutoShow();
   },
   { immediate: true },
 );
@@ -433,6 +482,14 @@ function onPlatformChange(value: string) {
       <option value="gbk">{{ t("meta.gbk") }}</option>
     </select>
 
+    <!-- 自动打开日志窗口：实例级行为，原先在日志窗口工具条里 -->
+    <span class="meta-label">{{ t("meta.logWindow") }}</span>
+    <label class="meta-switch">
+      <BaseSwitch :model-value="logAutoShow" :disabled="!logAutoShowLoaded || logAutoShowBusy"
+        @update:model-value="onLogAutoShow" />
+      <span>{{ t("meta.logAutoOpen") }}</span>
+    </label>
+
     <!-- 整合包类型：同样是整合包作者的设定，锁定时整块隐藏 -->
     <template v-if="!locked">
       <!-- 整合包类型：最底部，不占整行；ID 平台填项目 / 文件 ID，在线平台填网址 -->
@@ -491,6 +548,18 @@ function onPlatformChange(value: string) {
 
 .meta-label.small {
   text-align: right;
+}
+
+/* 自动打开日志窗口：开关与文案同一行，跨过右侧三列 */
+.meta-switch {
+  grid-column: 2 / 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text);
+  user-select: none;
+  cursor: pointer;
 }
 
 /* 加载器查询进度所在的那一行：跨满整行，跟在字段下面 */

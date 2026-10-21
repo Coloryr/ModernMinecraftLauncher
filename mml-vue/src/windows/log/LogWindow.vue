@@ -7,9 +7,9 @@
 //
 // 布局照 ColorMC 的 GameLogControl：一行"日志文件 + 刷新 / 搜索 / 上传 / 测试启动"，
 // 一行"自动换行 / 自动下拉 + 五个等级"，一行"线程 / 分组"，最后是日志正文。
-// 等级与自动下拉存进实例的 `gui_setting.json`（一个实例一套）；**自动换行不跟实例走** ——
-// 它是全局偏好（lib/editorWrap），与配置编辑器共用一份，Alt+Z 在任一处都能切。
-// 线程与分组只筛当前这份日志，不落盘。
+// 等级与自动下拉存进实例的 `gui_setting.json`（一个实例一套）；自动打开日志窗口也存在那里，
+// 但开关在实例设置里，本窗口不再提供。**自动换行不跟实例走** —— 它是全局偏好（lib/editorWrap），
+// 与配置编辑器共用一份，Alt+Z 在任一处都能切。线程与分组只筛当前这份日志，不落盘。
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
@@ -75,6 +75,7 @@ const setting = ref<LogSettingDto>({
   // wordWrap 只为对齐后端结构留着：界面上的换行读全局偏好，不读它
   wordWrap: true,
   auto: false,
+  // 自动打开日志窗口：开关在实例设置，这里只为对齐 DTO 保留
   autoShow: false,
   enableNone: true,
   enableInfo: true,
@@ -667,10 +668,6 @@ onBeforeUnmount(() => {
         <label class="sw">
           <BaseSwitch v-model="setting.auto" />
           <span>{{ t("logWindow.autoScroll") }}</span>
-        </label>
-        <label class="sw">
-          <BaseSwitch v-model="setting.autoShow" />
-          <span>{{ t("logWindow.autoOpen") }}</span>
         </label>
         <span class="lbl">{{ t("logWindow.level") }}</span>
         <label v-for="lv in LEVELS" :key="lv.key" class="sw">
