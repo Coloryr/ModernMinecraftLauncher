@@ -14,6 +14,7 @@ import {
   onJavaChange,
   onLaunchError,
   onLaunchState,
+  onStartArg,
   openInstanceDir,
 } from "../../lib/api";
 import { commands } from "../../lib/bindings";
@@ -1196,6 +1197,11 @@ async function subscribeEvents() {
       statusText.value = t("launch.failed");
       launchStage.value = "";
       statePct.value = null;
+    }),
+    // 关窗后进程留在后台，再启动一次 exe 会把参数转过来：窗口已经开着不会重新初始化，
+    // 只能在这里再取一次待办
+    onStartArg(() => {
+      void handleStartArg();
     }),
     onInstanceChange(() => {
       loadInstances();

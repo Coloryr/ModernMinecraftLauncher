@@ -88,7 +88,7 @@ import type {
   GuiThemeDto,
   ViewMode,
 } from "./bindings";
-import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, CustomUiChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiThemeChange, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress } from "./listens";
+import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, CustomUiChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiThemeChange, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress, StartArg } from "./listens";
 
 export interface CreateInstanceOpts {
   loader?: string;
@@ -1527,6 +1527,22 @@ export function onGameExit(cb: (e: ExitEvent) => void): Promise<UnlistenFn> {
  */
 export function onLaunchError(cb: (e: ErrorEvent) => void): Promise<UnlistenFn> {
   return listen<ErrorEvent>(LaunchError, (e) => cb(e.payload));
+}
+
+/**
+ * 新实例转来了启动参数：主界面该重新取一次待办
+ *
+ * 关窗后进程留在后台时，再启动一次 exe 会把参数转给本进程；
+ * 窗口已经开着就不会重新初始化，只能靠这条事件通知前端。
+ *
+ * - `cb`: 参数已记下时回调，取参数走 `takeStartArg`
+ *
+ * # 返回值
+ *
+ * 取消监听的函数
+ */
+export function onStartArg(cb: () => void): Promise<UnlistenFn> {
+  return listen(StartArg, () => cb());
 }
 
 /**

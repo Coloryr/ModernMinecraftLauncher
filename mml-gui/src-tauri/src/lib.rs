@@ -32,7 +32,9 @@ pub mod gui_setting;
 pub mod image_manager;
 pub mod log_text;
 pub mod music;
+pub mod single_instance;
 pub mod start_arg;
+pub mod tray;
 pub mod windows;
 
 /// 单元测试的共用启动，内核单例每进程只 boot 一次，见 AGENTS.md §6
@@ -50,7 +52,7 @@ pub fn run() {
     // 命令行 / 协议带来的启动请求先记下来，前端初始化完成后取走执行
     start_arg::collect(std::env::args());
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         // webview 就绪后的统一装配，都在 on_webview_ready 里拿 ICoreWebView2 做一次：
         // ① 文件拖放的"路径桥"，见 windows/file_drop.rs 头部说明
         // ② 发布模式下关掉浏览器快捷键与 DevTools，如 F5 / F12，见 windows/webview_keys.rs
@@ -104,6 +106,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .on_window_event(windows::on_window_event)
         .setup(|app| {
+            // 托盘先建：建不起来的话关主窗口仍然退出应用，见 tray::is_ready
+            tray::init(app.handle());
+
+            // 单开与唤回：起 IPC 服务并记下端口，之后启动的实例会把请求交给本进程
+            single_instance::start(app.handle());
+
             if let Err(e) = windows::show_main_window(app.handle()) {
                 err_box::fatal_error_text(&e);
             }
@@ -183,6 +191,18 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri_commands!())
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|_app, event| {
+        // 主窗口关掉只是退回托盘：后台还要继续给运行中的游戏计时。
+        // 托盘没建起来时不能这么干 —— 那样进程就没有任何唤回入口了，按老样子退出。
+        // code 为 Some 的是 app.exit() 发起的真退出，不拦。
+        if let tauri::RunEvent::ExitRequested { api, code, .. } = event
+            && code.is_none()
+            && tray::is_ready()
+        {
+            api.prevent_exit();
+        }
+    });
 }

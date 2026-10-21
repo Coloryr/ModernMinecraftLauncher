@@ -39,6 +39,7 @@ export const ResourceModsUpdateDone = "resource-mods-update-done"
 export const ResourceModsUpdateProgress = "resource-mods-update-progress"
 export const SettingsJavaProgress = "settings-java-progress"
 export const SkinConfigChange = "skin-config-change"
+export const StartArg = "start-arg"
 
 /** 事件名 -> payload 类型；无 payload 的事件是 void */
 export interface EventPayloads {
@@ -79,6 +80,7 @@ export interface EventPayloads {
   [ResourceModsUpdateProgress]: ModUpdateProgressDto;
   [SettingsJavaProgress]: JavaImportProgressDto;
   [SkinConfigChange]: void;
+  [StartArg]: void;
 }
 
 /** 订阅传输层：命令的 invoke 对应这里的 on，由调用方给 */
@@ -133,5 +135,6 @@ export function createEvents(on: EventOn) {
     onResourceModsUpdateProgress: (cb: (payload: ModUpdateProgressDto) => void) => on(ResourceModsUpdateProgress, cb),
     onSettingsJavaProgress: (cb: (payload: JavaImportProgressDto) => void) => on(SettingsJavaProgress, cb),
     onSkinConfigChange: (cb: () => void) => on(SkinConfigChange, cb),
+    onStartArg: (cb: () => void) => on(StartArg, cb),
   };
 }

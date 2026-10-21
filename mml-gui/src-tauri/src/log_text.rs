@@ -40,6 +40,28 @@ pub enum LogText {
         /// 失败原因
         error: String,
     },
+    /// 系统托盘建不起来，关窗仍会退出应用
+    TrayInitFailed {
+        /// 失败原因
+        error: String,
+    },
+    /// 从托盘唤回主窗口失败
+    TraySummonFailed {
+        /// 失败原因
+        error: String,
+    },
+    /// IPC 服务没起来，单开与唤回失效
+    IpcStartFailed {
+        /// 失败原因
+        error: String,
+    },
+    /// IPC 端口没记下来，下一次启动找不到本进程
+    IpcPortSaveFailed {
+        /// 端口文件路径
+        path: String,
+        /// 失败原因
+        error: String,
+    },
     /// 装配文件拖放路径桥失败
     FilePathBridgeFailed {
         /// WebView2 给的错误，已 Debug 展开
@@ -459,6 +481,18 @@ impl LogText {
             LogText::LocalFileClearFailed { path, error } => {
                 format!("[settings] 清理本地文件失败 {path}：{error}")
             }
+            LogText::TrayInitFailed { error } => {
+                format!("[tray] 建系统托盘失败，关窗将直接退出：{error}")
+            }
+            LogText::TraySummonFailed { error } => {
+                format!("[tray] 从托盘唤回主窗口失败：{error}")
+            }
+            LogText::IpcStartFailed { error } => {
+                format!("[ipc] 启动 IPC 服务失败，单开与唤回失效：{error}")
+            }
+            LogText::IpcPortSaveFailed { path, error } => {
+                format!("[ipc] 端口文件写入失败 {path}：{error}")
+            }
             LogText::FilePathBridgeFailed { error } => {
                 format!("[drop] 装配文件路径桥失败（文件拖入将拿不到路径）: {error}")
             }
@@ -647,6 +681,16 @@ impl LogText {
             }
             LogText::LocalFileClearFailed { path, error } => {
                 format!("[settings] failed to clear a local file {path}: {error}")
+            }
+            LogText::TrayInitFailed { error } => format!("[tray] failed to create the tray icon, closing the window will quit: {error}"),
+            LogText::TraySummonFailed { error } => {
+                format!("[tray] failed to summon the main window from the tray: {error}")
+            }
+            LogText::IpcStartFailed { error } => {
+                format!("[ipc] failed to start the IPC server, single-instance and summon are disabled: {error}")
+            }
+            LogText::IpcPortSaveFailed { path, error } => {
+                format!("[ipc] failed to write the port file {path}: {error}")
             }
             LogText::FilePathBridgeFailed { error } => format!(
                 "[drop] failed to set up the file path bridge, \

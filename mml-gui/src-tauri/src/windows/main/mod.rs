@@ -41,6 +41,16 @@ pub fn emit_load_done(app: &AppHandle, data: Option<String>) {
     );
 }
 
+/// 新实例转来的启动参数已经记下：让已打开的主界面再取一次
+///
+/// 只在窗口已经开着时有用 —— 窗口是关着的话前端重新初始化时会自己取，见 `start_arg`。
+///
+/// - `app`: 应用句柄，事件的发送方
+#[gui_macros::emit]
+pub fn emit_start_arg(app: &AppHandle) {
+    let _ = app.emit(listens::START_ARG, ());
+}
+
 /// 主窗口数据存储：实例 / 启动参数 / 运行状态 / 日志
 pub struct MainWindowModel {
     /// 实例列表，遗留数据的兜底存储；核心实例以 mml-game 为准

@@ -3073,6 +3073,7 @@ dependencies = [
  "mml-core",
  "mml-downloader",
  "mml-game",
+ "mml-ipc",
  "mml-jvms",
  "mml-log",
  "mml-names",

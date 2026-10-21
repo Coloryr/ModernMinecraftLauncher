@@ -51,8 +51,12 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
                 let _ = save_window_state(&uuid, &win, maximized);
             }
             if uuid == MAIN_WINDOW_UUID {
-                mml_core::stop();
-                mml_game::game_count::stop();
+                // 退回托盘：核心与统计继续跑 —— 运行中的游戏还要接着计时。
+                // 托盘没建起来时没有唤回入口，按老样子退出应用。
+                if !crate::tray::is_ready() {
+                    mml_core::stop();
+                    mml_game::game_count::stop();
+                }
                 let others: Vec<(Uuid, WebviewWindow<tauri::Wry>)> = OPEN_WINDOWS
                     .write()
                     .unwrap()

@@ -60,6 +60,7 @@ pub(crate) mod webview_keys;
 
 use mml_game::GameInstance;
 use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
+use mml_names::names;
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
 pub use self::geometry::init;
@@ -74,7 +75,8 @@ use self::lifecycle::{
 
 use self::geometry::{clamp_runtime_min_size, reconcile_min_size};
 use self::registry::{
-    FamilyWindowId, WINDOWS_INFO, family_of_kind, family_window_id, min_size_of_label, uuid_for_kind,
+    FamilyWindowId, MAIN_WINDOW_UUID, WINDOWS_INFO, family_of_kind, family_window_id,
+    min_size_of_label, uuid_for_kind,
 };
 
 use crate::listens;
@@ -83,6 +85,40 @@ use uuid::Uuid;
 use crate::dtos::{DropPathDto, GuiConfigDto, LogFocusDto, WindowSizeDto};
 use crate::err_keys;
 use crate::log_text::LogText;
+
+/// 主窗口的标签，托盘与新实例唤回时按它找窗口
+///
+/// # 返回值
+///
+/// 形如 `mml-main`，取自窗口注册表，别处不要另写字面量
+pub(crate) fn main_window_label() -> &'static str {
+    WINDOWS_INFO
+        .get(&MAIN_WINDOW_UUID)
+        .map(|entry| entry.label)
+        .unwrap_or("mml-main")
+}
+
+/// 唤出主窗口：还在就显示并聚焦，已经关掉就按上次几何重建一个
+///
+/// 托盘点击与新实例请求「显示主窗口」都走这里。建窗是阻塞操作，不能在主线程
+/// 直接做（托盘事件就在主线程），所以丢给异步运行时。
+///
+/// - `app`: 应用句柄
+pub(crate) fn summon_main_window(app: &AppHandle) {
+    if let Some(win) = app.get_webview_window(main_window_label()) {
+        let _ = win.show();
+        let _ = win.unminimize();
+        let _ = win.set_focus();
+        return;
+    }
+
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(err) = show_main_window(&app) {
+            mml_log::error(LogText::TraySummonFailed { error: err }.text());
+        }
+    });
+}
 
 /// 解析前端传来的分组 uuid，空白 / 非法一律按"默认分组"处理
 ///
@@ -930,10 +966,17 @@ pub fn window_restart_app(app: AppHandle) {
     mml_core::stop();
     mml_game::game_count::stop();
 
+    // 先让出端口文件：新进程带 --restart 直接锁它，晚一步就会锁不上
+    crate::single_instance::release_port_file();
+
     std::thread::spawn(move || {
         match std::env::current_exe() {
             Ok(exe) => {
-                if let Err(err) = std::process::Command::new(exe).spawn() {
+                // 带上 --restart：新进程跳过单开检查，否则会把请求交回本进程（马上要退的那个）
+                if let Err(err) = std::process::Command::new(exe)
+                    .arg(names::COMMAND_RESTART)
+                    .spawn()
+                {
                     mml_log::error(
                         LogText::RestartLauncherFailed {
                             error: err.to_string(),
@@ -1037,6 +1080,7 @@ pub async fn window_save_gui_config(app: AppHandle, config: GuiConfigDto) -> Res
         }
     }
     let new_view_mode = new_config.main_window.view_mode;
+    let locale_changed = crate::gui_config::get().locale != new_config.locale;
     let effect_before = crate::gui_config::get().client.window_effect;
     crate::gui_config::set(new_config);
     // 材质是建窗那一刻铺上去的：设置里换了就地重铺一遍，否则得等下次开窗才看得到
@@ -1060,6 +1104,10 @@ pub async fn window_save_gui_config(app: AppHandle, config: GuiConfigDto) -> Res
     }
     if theme_changed {
         emit_gui_theme_change(&app, new_theme, new_accent, new_custom_accent);
+    }
+    if locale_changed {
+        // 托盘是原生菜单，前端切语言带不动它，只能在这里重建一遍
+        crate::tray::refresh_text(&app);
     }
     Ok(())
 }

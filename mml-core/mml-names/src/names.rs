@@ -47,6 +47,7 @@ pub const IMAGE_DIR: &str = "image";
 pub const KUBEJS_DIR: &str = "kubejs";
 pub const LOCAL_DIR: &str = "local";
 
+pub const IPC_PORT_FILE: &str = "temp";
 pub const LOG_FILE: &str = "logs.log";
 pub const LANG_FILE: &str = "lang.txt";
 pub const MOD_INFO_FILE: &str = "modfileinfo.json";
@@ -235,10 +236,17 @@ pub const LANG_EN_US: &str = "en_US";
 
 pub const NOW_VERSION: &str = "26.3";
 
+/// 安装
 pub const COMMAND_INSTALL: &str = "--install";
+/// 启动实例
 pub const COMMAND_GAME: &str = "--game";
+/// 导入
 pub const COMMAND_IMPORT: &str = "--import";
+/// 重启
+pub const COMMAND_RESTART: &str = "--restart";
+/// 注册uri
 pub const COMMAND_REGISTER: &str = "--register";
+/// 覆盖uri
 pub const COMMAND_REMAP: &str = "--remap_modrinth";
 
 #[cfg(test)]
@@ -345,6 +353,7 @@ mod tests {
             GUI_CONFIG_FILE,
             BLOCK_GROUPS_FILE,
             COLORMC_MIGRATE_FILE,
+            IPC_PORT_FILE,
         ] {
             assert!(!name.is_empty(), "文件常量不应为空: {name:?}");
             assert!(!name.contains('/'), "{name:?} 不应包含 '/'");
