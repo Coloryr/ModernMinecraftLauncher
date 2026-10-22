@@ -47,7 +47,10 @@ export function useSettingsLocalFiles() {
   }
 
   /**
-   * 清理一项：只删内容、保留文件夹，完成后重新统计
+   * 清理一项：只删内容、保留文件夹，重新统计完再提示结果
+   *
+   * `clearing` 一直挂到重新统计结束：这段时间界面上那一行在转圈，
+   * 数字也还是旧的，提前弹「已清理」等于抢在结果前面报喜。
    *
    * - `id`: 文件夹 id，取自 `entries`
    */
@@ -56,15 +59,20 @@ export function useSettingsLocalFiles() {
     if (downloading.value) return;
 
     clearing.value = id;
+    let cleared = false;
     try {
       await commands.settings.clearLocalFile(id);
-      showToast(t("winSettings.localFileCleared"));
+      cleared = true;
+      // 界面数据由 WebView2 异步回收，删完不会立刻反映到目录大小上
+      if (id === "webview") await new Promise((resolve) => setTimeout(resolve, 1200));
     } catch (e) {
       showToast(tErr(e));
     } finally {
-      clearing.value = "";
       await load();
+      clearing.value = "";
     }
+
+    if (cleared) showToast(t("winSettings.localFileCleared"));
   }
 
   /**

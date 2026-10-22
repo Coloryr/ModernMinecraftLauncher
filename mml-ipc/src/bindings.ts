@@ -120,7 +120,7 @@ export function createCommands(invoke: Invoke) {
       removeGroup: (name: string) => invoke<void>("collect_remove_group", { name }),
       removeItems: (uuids: string[], group: string | null) => invoke<void>("collect_remove_items", { uuids, group }),
       setGroupItems: (group: string, uuids: string[]) => invoke<void>("collect_set_group_items", { group, uuids }),
-      star: (source: string, fileType: string, pid: string, name: string, icon: string | null, url: string, star: boolean) => invoke<void>("collect_star", { source, fileType, pid, name, icon, url, star }),
+      star: (source: string, fileType: string, pid: string, name: string, icon: string | null, url: string, star: boolean, group: string | null) => invoke<void>("collect_star", { source, fileType, pid, name, icon, url, star, group }),
     },
     colormc: {
       checkColormc: () => invoke<ColorMcInfoDto | null>("window_check_colormc"),

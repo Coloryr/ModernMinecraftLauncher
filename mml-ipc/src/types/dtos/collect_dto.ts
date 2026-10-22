@@ -8,6 +8,9 @@ export type CollectItemDto = {
   pid: string,
   icon: string | null,
   url: string,
+  favTime: number,
+  loaders: string[],
+  gameVersions: string[],
 };
 
 export type CollectDataDto = {

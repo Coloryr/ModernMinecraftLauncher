@@ -11,13 +11,15 @@ import BaseModal from "../../components/ui/BaseModal.vue";
 import AsyncImage from "../../components/ui/AsyncImage.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import SearchBox from "../../components/ui/SearchBox.vue";
+import HighlightText from "../../components/ui/HighlightText.vue";
 import DragGhost from "../../components/ui/DragGhost.vue";
-import InstanceIcon from "../../components/InstanceIcon.vue";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import { useCollectDrag } from "../../composables/useCollectDrag";
 import { api, onCollectChange } from "../../lib/api";
 import { loadGuiConfig, saveGuiConfig, type CollectConfig } from "../../lib/guiConfig";
 import { t, tErr } from "../../lib/i18n";
+import { typeGroupName } from "../../lib/collectGroups";
+import { formatMinute } from "../../lib/format";
 import { showToast } from "../../lib/toast";
 import type { CollectItemDto, InstanceInfoDto } from "../../lib/bindings";
 import { openWindow } from "../windowManager";
@@ -74,8 +76,6 @@ const groupOfUuid = computed(() => {
   return map;
 });
 
-/** 已经归入具名分组的收藏 uuid（默认分组 = 这批之外的） */
-const groupedUuids = computed(() => new Set(groupOfUuid.value.keys()));
 
 /** 一个收藏都没有；这时只给一条引导文案，不铺一排空分组 */
 const isEmpty = computed(() => items.value.length === 0);
@@ -98,25 +98,18 @@ const shownItems = computed(() => {
 const shownCount = computed(() => shownItems.value.length);
 
 /**
- * 折叠分组列表：默认分组在前，其余按名字排序
+ * 折叠分组列表：只有具名分组，按名字排序
  *
- * 「默认分组」是**真正的一个组**：还没归入任何具名分组的收藏 —— 收藏时（星标）没有
- * 分组参数，所以新收藏天然落在这一组里。每组只带当前类型过滤下属于自己的项。
+ * 不再有「默认分组」那一栏：新收藏在星标那一刻就按资源类型归组（见 lib/collectGroups），
+ * 组名就是「整合包 / 模组 / 资源包 / 光影包」。每组只带当前类型过滤下属于自己的项。
  */
-const groupSections = computed(() => [
-  {
-    key: DEFAULT_GROUP,
-    label: t("collect.defaultGroup"),
-    isDefault: true,
-    items: shownItems.value.filter((i) => !groupedUuids.value.has(i.uuid)),
-  },
-  ...groupNames.value.map((name) => ({
+const groupSections = computed(() =>
+  groupNames.value.map((name) => ({
     key: name,
     label: name,
-    isDefault: false,
     items: shownItems.value.filter((i) => groupOfUuid.value.get(i.uuid) === name),
   })),
-]);
+);
 
 /** 分组的实例列表是否展开；存的是"折叠"状态，所以默认展开 */
 function isGroupOpen(key: string): boolean {
@@ -133,6 +126,7 @@ async function reload() {
   const data = await api.collectGetData();
   items.value = data.items;
   groups.value = data.groups;
+  void backfillGroups();
   // 丢掉已不存在的勾选
   const alive = new Set(data.items.map((i) => i.uuid));
   checked.value = new Set([...checked.value].filter((u) => alive.has(u)));
@@ -229,6 +223,8 @@ onMounted(async () => {
   if (cfg) {
     filters.value = cfg.collect;
   }
+  void loadInstances();
+
   // 赋值与注册分开：onUnmounted 只能在 setup 的同步阶段注册，
   // 写在 await 之后就注册不上了（监听会一直挂着，卸载时摘不掉）
   unlistenCollect = await onCollectChange(() => {
@@ -241,12 +237,14 @@ onMounted(async () => {
 onUnmounted(() => {
   unlistenCollect?.();
   document.removeEventListener("keydown", onDocKeyDown);
+  document.removeEventListener("scroll", closeInstPick, true);
 });
 
-/** 重拉收藏列表；首次挂载与切回本窗口都走这里 */
+/** 重拉收藏列表与实例列表；首次挂载与切回本窗口都走这里 */
 function refresh() {
-  // 收藏数据可能被别的窗口（整合包 / 资源窗口的星标）改过
+  // 收藏数据可能被别的窗口（整合包 / 资源窗口的星标）改过，实例也可能刚增删过
   reload().catch((e) => showToast(tErr(e)));
+  void loadInstances();
 }
 
 // 单窗口模式：窗口被 KeepAlive 缓存，切回不会重新挂载 → 自己补一次
@@ -257,6 +255,10 @@ useWindowRefresh(refresh);
 /** Esc：先收右键菜单，再逐层关掉打开的弹窗（与其它窗口的逐级关闭一致） */
 function onDocKeyDown(e: KeyboardEvent) {
   if (e.key !== "Escape") return;
+  if (instPick.value) {
+    closeInstPick();
+    return;
+  }
   if (menu.value) {
     closeMenu();
     return;
@@ -283,6 +285,8 @@ function onDocKeyDown(e: KeyboardEvent) {
 }
 
 document.addEventListener("keydown", onDocKeyDown);
+// 捕获阶段听：滚的是 WindowFrame 的正文容器，scroll 不冒泡到 .collect-body
+document.addEventListener("scroll", closeInstPick, true);
 
 // ---------------- 类型过滤 ----------------
 
@@ -312,8 +316,8 @@ const deleteGroupTarget = ref("");
 const clearOpen = ref(false);
 /** 删除确认弹窗是否打开 */
 const removeOpen = ref(false);
-/** 清空目标：null = 全部，否则为分组名 */
-const clearGroup = ref<string | null>(null);
+/** 清空目标：分组名，空串表示没有目标 */
+const clearGroup = ref("");
 const addToGroupTarget = ref("");
 
 async function confirmAddGroup() {
@@ -344,15 +348,17 @@ async function confirmDeleteGroup() {
 async function confirmClear() {
   const target = clearGroup.value;
   clearOpen.value = false;
+  if (!target) {
+    return;
+  }
   // 只清这一组里当前看得见的那些（与按钮的可用条件一致）
-  const section = groupSections.value.find((s) => s.key === (target ?? DEFAULT_GROUP));
+  const section = groupSections.value.find((s) => s.key === target);
   const uuids = (section?.items ?? []).map((i) => i.uuid);
   if (uuids.length === 0) {
     return;
   }
   try {
-    // 默认分组（null）：这些是未归组的收藏 → 从收藏里删除；
-    // 具名分组：只把它们移出该分组，收藏本身保留（之后回到默认分组）
+    // 清空一个分组只把它们移出该分组，收藏本身保留
     await api.collectRemoveItems(uuids, target);
     checked.value = new Set();
   } catch (e) {
@@ -360,18 +366,11 @@ async function confirmClear() {
   }
 }
 
-/** 某个分组标题上的「清空」：默认分组删掉未归组的收藏，具名分组只清空该组 */
+/** 某个分组标题上的「清空」：只清空该组的归属，收藏本身保留 */
 function askClear(groupKey: string) {
-  clearGroup.value = groupKey === DEFAULT_GROUP ? null : groupKey;
+  clearGroup.value = groupKey;
   clearOpen.value = true;
 }
-
-/** 清空确认里那句"清掉 N 项"的 N：当前清空目标那一组里看得见的项数 */
-const clearCount = computed(
-  () =>
-    groupSections.value.find((s) => s.key === (clearGroup.value ?? DEFAULT_GROUP))?.items
-      .length ?? 0,
-);
 
 /** 「移动到分组」：先记下目标再开弹窗；没有具名分组时按钮已置灰，这里兜底 */
 function askAddToGroup() {
@@ -458,12 +457,12 @@ function openUrl(item: CollectItemDto) {
  *
  * 下载分两条路，见 [`startDownload`]：整合包不需要实例，其余资源要先选实例。
  */
-function toggleCard(item: CollectItemDto) {
+function toggleCard(item: CollectItemDto, at?: { x: number; y: number }) {
   if (multiSelect.value) {
     toggleCheck(item.uuid, !checked.value.has(item.uuid));
     return;
   }
-  startDownload(item);
+  startDownload(item, at);
 }
 
 // ---------------- 拖拽改分组 ----------------
@@ -483,9 +482,52 @@ const { draggingUuids, dropGroup, ghost: collectGhost, onCardPointerDown, consum
 });
 
 /** 卡片点击：刚拖完的那一下不算点击，否则一松手就顺手打开了下载窗口 */
-function onCardClick(item: CollectItemDto) {
+function onCardClick(item: CollectItemDto, ev?: MouseEvent) {
+  closeInstPick();
   if (consumeSuppressClick()) return;
-  toggleCard(item);
+  const rect = (ev?.currentTarget as HTMLElement | null)?.getBoundingClientRect();
+  toggleCard(item, rect ? { x: rect.left, y: rect.bottom + 4 } : undefined);
+}
+
+/** 补组进行中：避免 reload → 补组 → reload 转圈 */
+let backfilling = false;
+
+/**
+ * 把没有归组的收藏按类型补进默认分组
+ *
+ * 没有这一栏的收藏在界面上根本不会出现（分组列表只列具名分组），所以这次补组属于
+ * "不能省"：老收藏、以及用户删掉分组后留下的条目，都在这里归位。
+ */
+async function backfillGroups() {
+  if (backfilling) return;
+  const grouped = new Set(Object.values(groups.value).flat());
+  const byGroup = new Map<string, string[]>();
+  for (const item of items.value) {
+    if (grouped.has(item.uuid)) continue;
+    const name = typeGroupName(item.fileType);
+    if (!name) continue;
+    const list = byGroup.get(name) ?? [];
+    list.push(item.uuid);
+    byGroup.set(name, list);
+  }
+  if (byGroup.size === 0) return;
+
+  backfilling = true;
+  try {
+    for (const [name, uuids] of byGroup) {
+      if (!groups.value[name]) await api.collectAddGroup(name);
+      await api.collectSetGroupItems(name, uuids);
+    }
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    backfilling = false;
+  }
+  await reload();
+}
+/** 收起选实例下拉（点别处、按 Esc、再点一张卡片都会走这里） */
+function closeInstPick() {
+  instPick.value = null;
 }
 
 /** 跟手浮起副本的内容：手里抓着的第一项（按下那张排最前） */
@@ -556,45 +598,138 @@ function openDownloadWindow(item: CollectItemDto, uuid?: string) {
  * 点卡片后的分流
  *
  * - **整合包**：目标窗口自己就是"下载并新建实例"，不需要先有实例，直接跳详情；
- * - **其余资源**：模组 / 资源包 / 光影包要装进某个已有实例，所以**先让用户选实例**
- *   再跳。在那边选不了 —— 下载资源窗口只有一行只读的实例名，没有选择器。
- *   选定后把 uuid 一并带过去，目标窗口就不会再退回主窗口选中的那个。
+ * - **其余资源**：模组 / 资源包 / 光影包要装进某个已有实例。先按收藏时记下的
+ *   加载器 / 游戏版本筛出兼容的实例 ——
+ *   1. 「安装到」里那个正合适，直接走；
+ *   2. 不合适就从卡片下弹出下拉，只列兼容的那几个；
+ *   3. 一个都不兼容就只提示，不打开下载窗口。
+ *
+ * 在下载资源窗口里选不了实例：那边只有一行只读的实例名、没有选择器，
+ * 所以 uuid 必须从这里带过去，见 openDownloadWindow。
  */
-function startDownload(item: CollectItemDto) {
+function startDownload(item: CollectItemDto, at?: { x: number; y: number }) {
   if (item.fileType === "modpack") {
     openDownloadWindow(item);
     return;
   }
-  pickItem.value = item;
-  void loadInstances();
-}
-
-/** 正在选实例的那一项（null = 没开选实例弹窗） */
-const pickItem = ref<CollectItemDto | null>(null);
-const pickInstances = ref<InstanceInfoDto[]>([]);
-/** 实例列表拉取中：先别显示「还没有游戏实例」，否则会闪一下错提示 */
-const pickLoading = ref(true);
-/** 主窗口当前选中的实例（列表里高亮它） */
-const currentUuid = ref("");
-
-async function loadInstances() {
-  pickLoading.value = true;
-  try {
-    const [list, cfg] = await Promise.all([api.getInstances(), loadGuiConfig()]);
-    pickInstances.value = list;
-    currentUuid.value = cfg?.mainWindow.selectedInstance ?? "";
-  } catch {
-    pickInstances.value = [];
-  } finally {
-    pickLoading.value = false;
+  if (instancesLoading.value) {
+    showToast(t("resource.loading"));
+    return;
   }
+  if (!instances.value.length) {
+    showToast(t("collect.pickInstanceNone"));
+    return;
+  }
+
+  // 先按收藏时记下的加载器 / 游戏版本筛：对得上的才列进下拉
+  const fitsList = instances.value.filter((inst) => fits(item, inst));
+  if (!fitsList.length) {
+    showToast(t("collect.noFitInstance", { need: requirement(item) }));
+    return;
+  }
+
+  openInstPick(item, fitsList, at);
 }
 
-/** 选定实例：带着它跳过去，下载资源窗口会优先用这个 uuid */
-function pickInstance(inst: InstanceInfoDto) {
-  const item = pickItem.value;
-  pickItem.value = null;
-  if (item) openDownloadWindow(item, inst.uuid);
+/**
+ * 资源与实例是否兼容
+ *
+ * 收藏时记下的加载器与游戏版本都对得上才装。老收藏没记支持信息（空列表），
+ * 这时不筛 —— 与其猜，不如让用户进版本列表自己看。
+ *
+ * - `item`: 收藏项
+ * - `inst`: 候选实例
+ */
+function fits(item: CollectItemDto, inst: InstanceInfoDto): boolean {
+  return (
+    (!item.loaders.length || item.loaders.includes(inst.loader)) &&
+    (!item.gameVersions.length || item.gameVersions.includes(inst.version))
+  );
+}
+
+/**
+ * 支持信息的简短描述，用于"没有兼容实例"的提示与下拉标题
+ *
+ * 游戏版本可能几十个，只列前三个，多的用省略号带过 —— 它只是让人认出
+ * 差在哪儿，不是给人逐个核对的口径表。
+ *
+ * - `item`: 收藏项
+ *
+ * # 返回值
+ *
+ * 形如 `fabric · 1.20.1 / 1.20.4 / 1.21.1 …`；没有支持信息时为空串
+ */
+function requirement(item: CollectItemDto): string {
+  const parts: string[] = [];
+  if (item.loaders.length) {
+    parts.push(item.loaders.join(" / "));
+  }
+  if (item.gameVersions.length) {
+    const head = item.gameVersions.slice(0, 3).join(" / ");
+    parts.push(item.gameVersions.length > 3 ? `${head} …` : head);
+  }
+  return parts.join(" · ");
+}
+
+/** 点卡片时弹出的选实例下拉；null = 没开 */
+const instPick = ref<{ x: number; y: number; item: CollectItemDto; list: InstanceInfoDto[] } | null>(
+  null,
+);
+
+/** 下拉尺寸估值：钳边用，宽度与高度 */
+const INST_PICK_W = 260;
+const INST_PICK_H = 96;
+
+/**
+ * 在卡片位置弹出可选实例的下拉
+ *
+ * 位置沿用右键菜单那套钳边规则：贴着窗口右 / 下边缘时不能露到可视区外面。
+ *
+ * - `item`: 要装的那一项
+ * - `list`: 已筛过的兼容实例
+ * - `at`: 触发位置，缺省取窗口中间偏上
+ */
+function openInstPick(item: CollectItemDto, list: InstanceInfoDto[], at?: { x: number; y: number }) {
+  const x = at?.x ?? window.innerWidth / 2 - 110;
+  const y = at?.y ?? 120;
+  instPick.value = {
+    x: Math.max(8, Math.min(x, window.innerWidth - INST_PICK_W - 8)),
+    y: Math.max(8, Math.min(y, window.innerHeight - INST_PICK_H - 8)),
+    item,
+    list,
+  };
+}
+
+/**
+ * 下拉里选了实例：直接装进去，并把它记成下次的预选项
+ *
+ * - `ev`: 下拉的 change 事件，取当前选中值
+ */
+function pickInstanceFromMenu(ev: Event) {
+  const uuid = (ev.target as HTMLSelectElement).value;
+  const pick = instPick.value;
+  if (!pick) return;
+  const inst = pick.list.find((item) => item.uuid === uuid);
+  instPick.value = null;
+  if (!inst) return;
+  openDownloadWindow(pick.item, inst.uuid);
+}
+
+/** 可选的目标实例，即「安装到」下拉的选项 */
+const instances = ref<InstanceInfoDto[]>([]);
+/** 实例列表拉取中：这段时间点卡片先别弹下拉，否则只有一行"还没有实例" */
+const instancesLoading = ref(true);
+
+/** 拉实例列表；挂载与每次切回窗口都走一次，实例可能刚增删过 */
+async function loadInstances() {
+  instancesLoading.value = true;
+  try {
+    instances.value = await api.getInstances();
+  } catch {
+    instances.value = [];
+  } finally {
+    instancesLoading.value = false;
+  }
 }
 
 /** 开关多选模式；退出时清空勾选（卡片上的勾选框也跟着消失） */
@@ -666,14 +801,15 @@ function closeMenu() {
           </label>
         </div>
         <span class="count">{{ t("collect.count", { n: shownCount }) }}</span>
-        <!-- 多选模式的入口：默认不进行多选，点这里才进（进去后由多选条负责退出） -->
-        <button v-if="!multiSelect" class="multi-toggle" @click="toggleMultiSelect">
+        <!-- 多选模式的入口：默认不进行多选，点这里才进（进去后由多选条负责退出）。
+             当前过滤下一项都没有时没有可勾的东西，按钮不出现 -->
+        <button v-if="!multiSelect && shownCount > 0" class="multi-toggle" @click="toggleMultiSelect">
           {{ t("collect.multiSelect") }}
         </button>
       </div>
     </template>
 
-    <div class="collect-body" @click="closeMenu">
+    <div class="collect-body" @click="closeMenu(); closeInstPick()">
       <!-- 多选条：只有多选模式下才出现 -->
       <div v-if="multiSelect" class="multi-bar">
         <span class="multi-count">{{ t("collect.multiSelected", { count: checked.size }) }}</span>
@@ -695,8 +831,18 @@ function closeMenu() {
       <SearchBox v-if="!isEmpty" v-model="keyword" :placeholder="t('collect.search')"
         :clear-label="t('collect.searchClear')" width="100%" />
 
-      <!-- 一个收藏都没有：只给一条引导，不铺一排空分组 -->
-      <p v-if="isEmpty" class="empty-tip collect-empty">{{ t("collect.empty") }}</p>
+      <!-- 一个收藏都没有：不铺一排空分组，给两个入口直接去挑资源 -->
+      <div v-if="isEmpty" class="collect-empty">
+        <p class="empty-tip">{{ t("collect.empty") }}</p>
+        <div class="collect-empty-acts">
+          <BaseButton variant="accent" @click="openWindow('add_modpack')">
+            {{ t("collect.addModpack") }}
+          </BaseButton>
+          <BaseButton @click="openWindow('add_resource')">
+            {{ t("collect.addResource") }}
+          </BaseButton>
+        </div>
+      </div>
       <!-- 搜索没有命中：不再铺一排 0 项的分组 -->
       <p v-else-if="keyword.trim() && !shownItems.length" class="empty-tip collect-empty">
         {{ t("collect.searchEmpty") }}
@@ -718,7 +864,7 @@ function closeMenu() {
               <button class="group-act" :disabled="!g.items.length" @click.stop="askClear(g.key)">
                 {{ t("collect.clear") }}
               </button>
-              <button v-if="!g.isDefault" class="group-act danger" @click.stop="deleteGroupTarget = g.key">
+              <button class="group-act danger" @click.stop="deleteGroupTarget = g.key">
                 {{ t("collect.deleteGroup") }}
               </button>
             </span>
@@ -727,12 +873,13 @@ function closeMenu() {
           <div v-show="isGroupOpen(g.key)" class="group-items">
             <!-- 空分组：只有"没有收藏、也没有拖过来的幽灵卡片"时才只给提示 -->
             <p v-if="!g.items.length && !isGhostGroup(g.key)" class="empty-tip">
-              {{ g.isDefault ? t("collect.emptyDefault") : t("collect.emptyGroup") }}
+              {{ t("collect.emptyGroup") }}
             </p>
             <div v-if="g.items.length || isGhostGroup(g.key)" class="collect-grid">
               <div v-for="item in g.items" :key="item.uuid" class="collect-card"
                 :class="{ active: checked.has(item.uuid), dragging: draggingUuids.has(item.uuid) }"
-                @pointerdown="onCardPointerDown($event, item)" @click="onCardClick(item)" @mouseenter="focus = item"
+                @pointerdown="onCardPointerDown($event, item)" @click="onCardClick(item, $event)"
+                @mouseenter="focus = item"
                 @mouseleave="focus = null" @contextmenu.prevent="openMenu($event, item)">
                 <span v-if="multiSelect" class="card-box" @click.stop @pointerdown.stop>
                   <input type="checkbox" class="card-check" :checked="checked.has(item.uuid)" @click.stop
@@ -748,8 +895,18 @@ function closeMenu() {
                   <GlyphIcon v-else class="card-icon-none" name="image" :size="22" :weight="1.6" />
                 </div>
                 <div class="card-text">
-                  <div class="card-name" v-tip="item.name">{{ item.name }}</div>
+                  <!-- 搜索命中的那截给底色：看不出"为什么这条被搜出来"最难用 -->
+                  <div class="card-name" v-tip="item.name">
+                    <HighlightText :text="item.name" :query="keyword" />
+                  </div>
                   <div class="card-meta">{{ item.source }} · {{ item.fileType }}</div>
+                  <!-- 项目 ID 与收藏时间：ID 用来回源对项目，时间是"多早收的"的线索 -->
+                  <div class="card-sub">
+                    <span class="card-pid" v-tip="item.pid">{{ item.pid }}</span>
+                    <span v-if="item.favTime" class="card-time">
+                      {{ t("collect.favTime", { time: formatMinute(item.favTime) }) }}
+                    </span>
+                  </div>
                 </div>
                 <span v-if="focus?.uuid === item.uuid || checked.has(item.uuid)" class="card-acts" @pointerdown.stop>
                   <button class="card-act" v-tip="t('collect.openUrl')" @click.stop="openUrl(item)">
@@ -794,6 +951,22 @@ function closeMenu() {
         </button>
       </div>
 
+      <!-- 选实例下拉：点卡片时弹在卡片下方，只列兼容的实例。
+           外壳复用右键菜单（.ctx-menu），两者不会同时打开 -->
+      <div v-if="instPick" class="ctx-menu inst-menu"
+        :style="{ left: instPick.x + 'px', top: instPick.y + 'px' }" @click.stop>
+        <div class="inst-menu-title">
+          {{ t("collect.installTo") }}
+          <span v-if="requirement(instPick.item)" class="inst-menu-need">{{ requirement(instPick.item) }}</span>
+        </div>
+        <select class="field-select inst-menu-select" @change="pickInstanceFromMenu">
+          <option value="" selected disabled>{{ t("collect.chooseInstance") }}</option>
+          <option v-for="inst in instPick.list" :key="inst.uuid" :value="inst.uuid">
+            {{ inst.name }} · {{ inst.version }}
+          </option>
+        </select>
+      </div>
+
       <!-- 右键菜单 -->
       <div v-if="menu" class="ctx-menu" :style="{ left: menu.x + 'px', top: menu.y + 'px' }" @click.stop>
         <button class="ctx-item" @click="openUrl(menu.item); closeMenu()">
@@ -832,7 +1005,7 @@ function closeMenu() {
       </div>
     </BaseModal>
 
-    <!-- 删除收藏确认：多选条与卡片菜单共用，多选条上会更正标题里的数量 -->
+    <!-- 删除收藏确认：多选条与卡片菜单共用，只问一句"删几项" -->
     <BaseModal v-if="removeOpen" :title="t('collect.multiDelete')" :closable="false" @close="removeOpen = false">
       <p class="delete-tip">{{ t("collect.removeConfirm", { count: actionUuids.length }) }}</p>
       <div class="modal-actions">
@@ -843,13 +1016,7 @@ function closeMenu() {
 
     <!-- 清空确认 -->
     <BaseModal v-if="clearOpen" :title="t('collect.clear')" :closable="false" @close="clearOpen = false">
-      <p class="delete-tip">
-        {{
-          clearGroup === null
-            ? t("collect.clearDefaultConfirm", { n: clearCount })
-            : t("collect.clearGroupConfirm", { name: clearGroup })
-        }}
-      </p>
+      <p class="delete-tip">{{ t("collect.clearGroupConfirm", { name: clearGroup }) }}</p>
       <div class="modal-actions">
         <BaseButton @click="clearOpen = false">{{ t("add.no") }}</BaseButton>
         <BaseButton variant="primary" @click="confirmClear">{{ t("add.yes") }}</BaseButton>
@@ -868,36 +1035,6 @@ function closeMenu() {
       </div>
     </BaseModal>
 
-    <!--
-      选实例再下载，非整合包专用，见 startDownload
-
-      模组 / 资源包 / 光影包都得装进某个已有实例，而"下载资源"窗口里只有一行只读的实例名、
-      没有选择器，所以实例只能在这儿先选好，再连同 uuid 一起带过去。
-    -->
-    <BaseModal v-if="pickItem" :title="t('collect.pickInstanceTitle')" :width="430" :closable="false"
-      @close="pickItem = null">
-      <p class="delete-tip">{{ t("collect.pickInstanceDesc", { name: pickItem.name }) }}</p>
-
-      <div v-if="pickInstances.length" class="pick-list">
-        <button v-for="inst in pickInstances" :key="inst.uuid" type="button" class="pick-item"
-          :class="{ on: inst.uuid === currentUuid }" @click="pickInstance(inst)">
-          <InstanceIcon :name="inst.name" :uuid="inst.uuid" :size="30" />
-          <span class="pick-text">
-            <span class="pick-name">{{ inst.name }}</span>
-            <span class="pick-sub">{{ inst.version }}</span>
-          </span>
-          <span v-if="inst.uuid === currentUuid" class="pick-cur">
-            {{ t("collect.pickInstanceCurrent") }}
-          </span>
-        </button>
-      </div>
-      <div v-else-if="pickLoading" class="empty-tip">{{ t("resource.loading") }}</div>
-      <div v-else class="empty-tip">{{ t("collect.pickInstanceNone") }}</div>
-
-      <div class="modal-actions">
-        <BaseButton @click="pickItem = null">{{ t("add.cancel") }}</BaseButton>
-      </div>
-    </BaseModal>
   </WindowFrame>
 </template>
 

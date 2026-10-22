@@ -22,12 +22,14 @@ import { svgIcon } from "../../lib/modrinthIcon";
 import { cardTags } from "../../lib/projectTags";
 import HighlightText from "../../components/ui/HighlightText.vue";
 import { toggleStar } from "../../lib/projectCollect";
+import { useCollectStars } from "../../lib/useCollectStars";
 import { showToast } from "../../lib/toast";
 import { loadGuiConfig } from "../../lib/guiConfig";
 import { useResourceStatus } from "../../lib/resourceTasks";
 import { familyInstanceFromLabel, projectParamToItem, targetProject, targetUuid, type WindowProjectParam } from "../windowManager";
 import type {
   FileListItemDto,
+  InstanceInfoDto,
   ProjectItemDto,
   ResourceDependencyDto,
   ResourceDependencyFileDto,
@@ -71,12 +73,18 @@ const instanceVersion = ref("");
 /** 详情是否展开：详情铺满窗口后，返回键放到标题栏 */
 const detailOpen = ref(false);
 
-/** 标题栏 chip 的数据；没有目标实例时标题栏换成一句提示 */
+/** 标题栏 chip 的数据；锁定了实例才显示，没锁定时标题栏换成下拉 */
 const instanceChip = computed(() =>
   instanceUuid.value
     ? { name: instanceName.value || instanceUuid.value, version: instanceVersion.value }
     : null,
 );
+
+/** 标题栏下拉的候选实例：从收藏窗口这类入口进来时没有锁定实例，得让用户当场选 */
+const pickableInstances = ref<InstanceInfoDto[]>([]);
+
+/** 实例是否由窗口上下文锁定：多窗口按标签、单窗口按本次跳转参数；锁定后不给换 */
+const lockedInstance = computed(() => !!(familyInstanceFromLabel("add_resource") ?? targetUuid()));
 
 const type = ref("mod");
 const sources = ref<Array<{ value: string; label: string }>>([]);
@@ -138,6 +146,9 @@ const error = ref("");
 
 /** 详情页展示的项目；null = 收起。详情与版本列表的状态都在共用组件里 */
 const detailItem = ref<ProjectItemDto | null>(null);
+
+// 收藏在别处被改（收藏窗口删掉一条）时，这里的星标跟着重算
+useCollectStars(() => (detailItem.value ? [...items.value, detailItem.value] : items.value));
 
 /** 存档选择弹窗，数据包下载前用：待装的文件 + 存档列表 */
 const savePickFile = ref<FileListItemDto | null>(null);
@@ -587,6 +598,15 @@ async function refreshInstance() {
     instanceUuid.value = locked;
   }
 
+  // 没锁定实例：标题栏换成下拉，先把候选拉回来
+  if (!locked) {
+    try {
+      pickableInstances.value = await api.getInstances();
+    } catch {
+      pickableInstances.value = [];
+    }
+  }
+
   if (instanceUuid.value) {
     try {
       const list = await api.getInstances();
@@ -647,6 +667,17 @@ async function consumeTargetProject() {
 }
 
 watch(instanceUuid, async () => {
+  // 标题栏下拉换了一个实例：版本号变了，游戏版本默认值跟着重选
+  const found = pickableInstances.value.find((inst) => inst.uuid === instanceUuid.value);
+  if (found) {
+    instanceName.value = found.name;
+    instanceVersion.value = found.version;
+    // 游戏版本跟着落到实例的版本上，与进来时定默认值的口径一致；候选里没有就留着「全部版本」
+    if (versions.value.includes(found.version)) {
+      version.value = found.version;
+    }
+  }
+
   if (instanceUuid.value && pendingProject.value) {
     const p = pendingProject.value;
     pendingProject.value = null;
@@ -667,8 +698,17 @@ onActivated(async () => {
     @close="$emit('close')" @back="closeDetail()">
     <!-- 标题栏：目标实例。本窗口是"装进哪个实例"的上下文，没实例就直说 -->
     <template #head-right>
-      <InstanceChip v-if="instanceChip" :instance="instanceChip" />
-      <span v-else class="head-warn">{{ t("addResource.noInstance") }}</span>
+      <InstanceChip v-if="instanceChip && lockedInstance" :instance="instanceChip" />
+      <!-- 没有锁定实例（从收藏窗口的"添加资源收藏"这类入口进来）：当场选，
+           资源都是按实例取数的，不选就搜不出东西 -->
+      <select v-else class="field-select head-select" :value="instanceUuid" :disabled="!pickableInstances.length"
+        :title="t('addResource.pickInstance')"
+        @change="instanceUuid = ($event.target as HTMLSelectElement).value">
+        <option value="" disabled>{{ t("addResource.pickInstance") }}</option>
+        <option v-for="inst in pickableInstances" :key="inst.uuid" :value="inst.uuid">
+          {{ inst.name }} · {{ inst.version }}
+        </option>
+      </select>
     </template>
 
     <div class="res-mode" ref="bodyRef">

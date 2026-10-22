@@ -5,6 +5,7 @@
 //! 分组与过滤都在前端算，数据一次性给全，所以切分组 / 切过滤不需要往返。
 
 use mml_game::launcher::{FileType, ModPackType};
+use mml_game::loader::LoaderType;
 use mml_net::curseforge_api;
 use mml_net::modrinth_api;
 use mml_net::modrinth_api::search_obj::HitObj;
@@ -123,6 +124,7 @@ pub fn collect_set_group_items(app: AppHandle, group: String, uuids: Vec<String>
 /// - `icon`: 图标网址，可缺省
 /// - `url`: 项目网页地址
 /// - `star`: 为真加入收藏，重复收藏忽略；为假按下载源加项目 ID 移除
+/// - `group`: 新收藏归到哪个分组，一般是按资源类型分的默认分组；取消收藏时忽略
 ///
 /// 参数是 IPC 契约，`bindings.ts` 由 Rust 源码生成，见 AGENTS.md §4，不能合并成结构体。
 ///
@@ -140,6 +142,7 @@ pub fn collect_star(
     icon: Option<String>,
     url: String,
     star: bool,
+    group: Option<String>,
 ) -> Result<(), String> {
     let source = ModPackType::from_string(&source);
     let file_type = match FileType::from_string(&file_type) {
@@ -147,11 +150,14 @@ pub fn collect_star(
         None => return Err(String::from(err_keys::FILE_TYPE_NOT_FOUND)),
     };
 
+    // 先问一遍是否已收藏：pid 接下来要跟着条目走，后台补支持信息还要用一份
+    let existed = collect_utils::is_star(&pid);
+
     let item = CollectItemObj {
         source,
         file_type,
         name,
-        pid,
+        pid: pid.clone(),
         // 落盘存**原始图片网址**：本地协议地址 `.../icon/<sha>` 的登记只在内存里，
         // 存下来重启后就解析不了，既回不了源、也没法做过期校验
         icon: icon.map(|url| image_manager::remote_url(&url).unwrap_or(url)),
@@ -160,13 +166,109 @@ pub fn collect_star(
     };
 
     if star {
-        collect_utils::add_item(item);
+        // 新收藏顺手归到按资源类型分的默认分组里；已经在收藏里的不动它（用户可能已手工挪过）
+        if let Some(uuid) = collect_utils::add_item(item) {
+            if let Some(group) = group {
+                collect_utils::add_to_group(&group, &uuid);
+            }
+            // 支持信息要一次网络请求，放到后台补：收藏这个动作不该等它
+            if !existed {
+                spawn_support_lookup(app.clone(), source, pid);
+            }
+        }
     } else {
         collect_utils::remove_item(item);
     }
     emit_collect_change(&app);
 
     Ok(())
+}
+
+/// 后台查一个项目支持的加载器与游戏版本，查到就写回收藏并广播
+///
+/// - `app`: 应用句柄，写入成功后广播收藏变更
+/// - `source`: 下载源
+/// - `pid`: 项目 ID
+fn spawn_support_lookup(app: AppHandle, source: ModPackType, pid: String) {
+    tauri::async_runtime::spawn(async move {
+        let Some((loaders, game_versions)) = project_support(source, &pid).await else {
+            return;
+        };
+        if collect_utils::set_support(source, &pid, loaders, game_versions) {
+            emit_collect_change(&app);
+        }
+    });
+}
+
+/// 按下载源查项目支持的加载器与游戏版本
+///
+/// 加载器一律过一遍 `LoaderType`：Modrinth 给资源包填的是 `minecraft`，
+/// CurseForge 给的是数字 ID，两边都得归一成启动器自己的 ID 才能和实例比。
+///
+/// - `source`: 下载源
+/// - `pid`: 项目 ID
+///
+/// # 返回值
+///
+/// 查到返回（加载器 ID 列表，游戏版本列表）；源不支持或请求失败返回 `None`
+async fn project_support(source: ModPackType, pid: &str) -> Option<(Vec<String>, Vec<String>)> {
+    match source {
+        ModPackType::Modrinth => {
+            let data = modrinth_api::get_project(pid).await.ok()?;
+            let loaders = data
+                .loaders
+                .into_iter()
+                .filter_map(|id| LoaderType::from_string(&id))
+                .map(|loader| loader.id().to_string())
+                .collect();
+            Some((loaders, dedup(data.game_versions)))
+        }
+        ModPackType::CurseForge => {
+            let data = curseforge_api::get_mod_info(pid).await.ok()?;
+            let mut loaders: Vec<String> = Vec::new();
+            let mut versions: Vec<String> = Vec::new();
+
+            for index in data.data.latest_files_indexes {
+                versions.push(index.game_version);
+                if let Some(id) = index.mod_loader.and_then(curseforge_loader) {
+                    loaders.push(id.to_string());
+                }
+            }
+
+            Some((dedup(loaders), dedup(versions)))
+        }
+        _ => None,
+    }
+}
+
+/// CurseForge 的 modLoader 数字 ID → 启动器加载器 ID
+///
+/// - `id`: CurseForge 的 `modLoader` 取值
+///
+/// # 返回值
+///
+/// 认得的 ID 返回加载器 ID；其它（含 2 Cauldron）返回 `None`
+fn curseforge_loader(id: u32) -> Option<&'static str> {
+    match id {
+        1 => Some("forge"),
+        3 => Some("liteloader"),
+        4 => Some("fabric"),
+        5 => Some("quilt"),
+        6 => Some("neoforge"),
+        _ => None,
+    }
+}
+
+/// 去重并保持首次出现的顺序
+///
+/// - `list`: 原始列表
+///
+/// # 返回值
+///
+/// 去重后的列表；顺序与入参一致
+fn dedup(list: Vec<String>) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    list.into_iter().filter(|item| seen.insert(item.clone())).collect()
 }
 
 /// 取项目图标地址，供收藏时没存到图标的老条目回源用

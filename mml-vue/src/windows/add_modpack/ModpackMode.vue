@@ -14,6 +14,7 @@ import { svgIcon } from "../../lib/modrinthIcon";
 import { cardTags } from "../../lib/projectTags";
 import HighlightText from "../../components/ui/HighlightText.vue";
 import { toggleStar } from "../../lib/projectCollect";
+import { useCollectStars } from "../../lib/useCollectStars";
 import { projectParamToItem, targetProject } from "../windowManager";
 import type { FileListItemDto, GroupDto, ModPackStatusDto, ProjectItemDto } from "../../lib/bindings";
 import { formatDate } from "../../lib/format";
@@ -271,6 +272,9 @@ function turnPage(delta: number) {
 
 /** 列表卡片上的「已安装 / 下载中」角标，与资源窗口、详情页共用一份判定 */
 const { projectInstalled, projectRunning } = useDownloadBadges(toRef(props, "status"));
+
+// 收藏在别处被改（收藏窗口删掉一条）时，这里的星标跟着重算
+useCollectStars(() => (detailItem.value ? [...items.value, detailItem.value] : items.value));
 
 /** 打开详情：正文 / 截图与版本列表由共用组件并行加载 */
 function openDetail(item: ProjectItemDto) {

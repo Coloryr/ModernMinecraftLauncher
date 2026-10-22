@@ -1375,6 +1375,7 @@ export const api = {
    * - `icon`: 图标网址，可缺省
    * - `url`: 项目网页地址
    * - `star`: 为真加入收藏，为假按下载源加项目 ID 移除
+   * - `group`: 新收藏归到哪个分组，一般是按资源类型分的默认分组；取消收藏时忽略
    *
    * 整合包与资源窗口的列表和详情星标都走它
    */
@@ -1386,8 +1387,9 @@ export const api = {
     icon: string | null,
     url: string,
     star: boolean,
+    group: string | null = null,
   ): Promise<void> {
-    return commands.collect.star(source, fileType, pid, name, icon, url, star);
+    return commands.collect.star(source, fileType, pid, name, icon, url, star, group);
   },
 
   // ---------------- 从 ColorMC 迁移：首次启动，见 windows/colormc.rs ----------------

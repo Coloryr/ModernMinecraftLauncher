@@ -34,6 +34,28 @@ export function formatTime(ms: number): string {
 }
 
 /**
+ * 时间戳转"年月日 时:分"，不含秒
+ *
+ * 卡片里那类一行放不下的地方用它，口径与 `formatTime` 一致，0 与缺失同样是 `--`。
+ *
+ * - `ms`: Unix 毫秒时间戳
+ *
+ * # 返回值
+ *
+ * 形如 `2026/10/22 22:48`；没有时间时是 `--`
+ */
+export function formatMinute(ms: number): string {
+  if (!ms) return "--";
+  return new Date(ms).toLocaleString(undefined, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/**
  * 日期文本取年月日
  *
  * - `date`: 形如 `2024-05-01T12:00:00Z` 的日期文本

@@ -623,10 +623,19 @@ export function openWindow(kind: WindowKind, params?: WindowOpenParams) {
     // query 一起交过去，由它拼进 WebviewUrl —— 建窗仍然走 Rust，
     // 几何恢复 / 句柄表 / 窗口模型都在那边。
     const query = new URL(urlFor(kind, params)).search.replace(/^\?/, "");
-    // 带拖入路径 / 目标存档的打开：窗口**已经开着**时必须重新加载才拿得到新参数
+    // 带拖入路径 / 目标存档 / 要打开的项目：窗口**已经开着**时必须重新加载才拿得到新参数
     // （只聚焦会把参数丢掉），所以走 reopen，Rust 侧已存在则 navigate；
-    // 其余窗口维持"只聚焦、目标靠事件切换"
-    if (params?.drop || params?.saveDir || params?.logFile || params?.logBottom) {
+    // 其余窗口维持"只聚焦"
+    //
+    // project 也在这里面：从收藏窗口点一个已收藏的项目，目标窗口若正开着，
+    // 只聚焦的话它还停在原列表上，看不到该项目详情 —— 这正是"点了没反应"的由来
+    if (
+      params?.drop ||
+      params?.saveDir ||
+      params?.logFile ||
+      params?.logBottom ||
+      params?.project
+    ) {
       commands.windows
         .reopenWindow(kind, instanceArgOf(kind, params), query)
         .catch((e) => {

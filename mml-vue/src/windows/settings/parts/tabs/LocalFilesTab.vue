@@ -76,14 +76,19 @@ async function onConfirmClear() {
         </div>
       </div>
     </div>
-    <!-- 重新统计：旧数据压暗不可点，避免拿着过期结果去清理 -->
-    <div v-else class="local-files-list" :class="{ 'is-loading-dim': loading }">
+    <!-- 重新统计：旧数据压暗不可点，避免拿着过期结果去清理。
+         清理流程里不压暗 —— 那一行自己有转圈，压暗只会把它一起糊掉 -->
+    <div v-else class="local-files-list" :class="{ 'is-loading-dim': loading && !clearing }">
       <div v-for="e in entries" :key="e.id" class="local-file-row">
         <div class="local-file-main">
           <span class="local-file-name">{{ t(`winSettings.localFile.${e.id}`) }}</span>
           <span class="local-file-path" :title="e.path">{{ e.path }}</span>
         </div>
-        <span class="local-file-size">{{ formatSize(e.size) }}</span>
+        <!-- 清理中：数字让位给转圈，删完且重新统计完才换回新数字 -->
+        <span class="local-file-size">
+          <span v-if="clearing === e.id" class="loading-spin sm" />
+          <template v-else>{{ formatSize(e.size) }}</template>
+        </span>
         <div class="local-file-actions">
           <BaseButton size="sm" @click="open(e.id)">{{ t("winSettings.localFileOpen") }}</BaseButton>
           <BaseButton v-if="e.deletable" size="sm" variant="danger"

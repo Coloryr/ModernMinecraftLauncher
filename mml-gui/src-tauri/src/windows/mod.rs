@@ -768,6 +768,8 @@ pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'stati
             reconcile_min_size(&window, min.width, min.height);
         }
         let _ = window.show();
+        // 显示不等于到前台：不抢一次焦点，新窗会压在发起它的那个窗口后面，看着像点了没反应
+        let _ = window.set_focus();
         self::effects::apply(&window, &crate::gui_config::get().client.window_effect);
         return Err(format!("decoration activate failed: {error}"));
     }
@@ -783,6 +785,8 @@ pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'stati
     }
 
     window.show().map_err(|err| err.to_string())?;
+    // 同上：show 之后补一次焦点，新窗才不会开在发起窗口后面
+    window.set_focus().map_err(|err| err.to_string())?;
     // 材质要在窗口显示之后铺：demo 也是拿到可见窗口才调（examples/tauri 的 main.rs），
     // 隐藏状态下铺的会被随后 activate_decoration 改窗口样式一起丢掉
     self::effects::apply(&window, &crate::gui_config::get().client.window_effect);

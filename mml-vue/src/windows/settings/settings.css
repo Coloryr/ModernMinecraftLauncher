@@ -985,13 +985,27 @@
   white-space: nowrap;
 }
 
-/* 宽度固定：各行的数字右缘对齐，扫一眼就能比大小 */
+/* 宽度固定：各行的数字右缘对齐，扫一眼就能比大小。
+   flex 是为了清理中那枚小转圈能落到同一位置，数字照旧贴右 */
 .settings-layout .local-file-size {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   width: 88px;
   text-align: right;
   font-size: 12.5px;
   font-variant-numeric: tabular-nums;
+}
+
+/* 行内小号转圈：塞进占用那一格。轨道用窗口底色而不是 --border ——
+   卡片底本来就亮，--border 的轨道在 15px 上根本看不出是个圈 */
+.settings-layout .loading-spin.sm {
+  width: 16px;
+  height: 16px;
+  border-width: 2.5px;
+  border-color: var(--bg);
+  border-top-color: var(--accent);
 }
 
 .settings-layout .local-file-actions {

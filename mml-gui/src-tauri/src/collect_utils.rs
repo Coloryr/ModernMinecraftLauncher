@@ -4,6 +4,7 @@ use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     sync::{LazyLock, OnceLock, RwLock},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use mml_base::serialize_tools;
@@ -38,6 +39,15 @@ pub struct CollectItemObj {
     /// 网址
     #[serde(rename = "Url")]
     pub url: String,
+    /// 收藏时间，Unix 毫秒；早期条目没有这个字段，读到 0
+    #[serde(rename = "FavTime")]
+    pub fav_time: i64,
+    /// 支持的加载器 ID，如 `fabric`；资源包 / 光影包与查不到的老条目为空
+    #[serde(rename = "Loaders")]
+    pub loaders: Vec<String>,
+    /// 支持的游戏版本，如 `1.21.1`；查不到的老条目为空
+    #[serde(rename = "GameVersions")]
+    pub game_versions: Vec<String>,
 }
 
 /// 资源收藏
@@ -156,8 +166,12 @@ pub fn remove_uuid(uuid: &str) {
 /// 添加收藏条目，同下载源同项目 ID 已存在时忽略
 ///
 /// - `obj`: 收藏条目，uuid 由这里生成
-pub fn add_item(obj: CollectItemObj) {
-    {
+///
+/// # 返回值
+///
+/// 新条目的 uuid；已收藏过返回 `None`（收藏后按类型归组要用它）
+pub fn add_item(mut obj: CollectItemObj) -> Option<String> {
+    let uuid = {
         let mut collect = COLLECT.write().unwrap();
 
         let have = collect
@@ -166,14 +180,54 @@ pub fn add_item(obj: CollectItemObj) {
             .any(|(_, value)| value.source == obj.source && value.pid == obj.pid);
 
         if have {
-            return;
+            return None;
         }
 
+        // 收藏时间由这里落，调用方不必各自取时钟；重复收藏已在上面提前返回，不会刷新时间
+        obj.fav_time = now_ms();
+
         let uuid = Uuid::new_v4().to_string();
-        collect.items.insert(uuid, obj);
+        collect.items.insert(uuid.clone(), obj);
+        uuid
+    };
+
+    save();
+    Some(uuid)
+}
+
+/// 把一条收藏放进分组，分组不存在时顺手建出来
+///
+/// 「默认分组」不是这里的具名分组，而是"不在任何具名分组里"的那批收藏。一项只能属于
+/// 一个具名分组，所以这里先把 uuid 从别的组里摘掉，与 [`set_group_items`] 同一语义。
+///
+/// - `group`: 分组名，新收藏按资源类型归类时用的就是它
+/// - `uuid`: 收藏条目 uuid
+pub fn add_to_group(group: &str, uuid: &str) {
+    {
+        let mut collect = COLLECT.write().unwrap();
+
+        for (name, value) in collect.groups.iter_mut() {
+            if name != group {
+                value.remove(uuid);
+            }
+        }
+
+        collect
+            .groups
+            .entry(group.to_string())
+            .or_default()
+            .insert(uuid.to_string());
     }
 
     save();
+}
+
+/// 当前时间，Unix 毫秒
+fn now_ms() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|value| value.as_millis() as i64)
+        .unwrap_or(0)
 }
 
 /// 添加收藏分组，同名已存在时忽略
@@ -287,6 +341,43 @@ pub fn set_group_items(group: &str, uuids: &[String]) {
     }
 
     save();
+}
+
+/// 补上收藏项的支持信息：加载器与游戏版本
+///
+/// 收藏那一刻只有列表里现成的字段，支持信息要一次网络请求，所以由调用方在后台补。
+/// 条目在这期间被取消收藏就什么都不做，别把信息写回一个不存在的位置。
+///
+/// - `source`: 下载源
+/// - `pid`: 项目 ID
+/// - `loaders`: 支持的加载器 ID，见 `LoaderType::id`
+/// - `game_versions`: 支持的游戏版本
+///
+/// # 返回值
+///
+/// 写入成功返回 `true`；条目已不在收藏里返回 `false`
+pub fn set_support(
+    source: ModPackType,
+    pid: &str,
+    loaders: Vec<String>,
+    game_versions: Vec<String>,
+) -> bool {
+    {
+        let mut collect = COLLECT.write().unwrap();
+        let Some(item) = collect
+            .items
+            .values_mut()
+            .find(|item| item.source == source && item.pid == pid)
+        else {
+            return false;
+        };
+
+        item.loaders = loaders;
+        item.game_versions = game_versions;
+    }
+
+    save();
+    true
 }
 
 /// 项目是否已收藏；`items` 以收藏条目 uuid 为键，这里按值里的项目 ID 匹配

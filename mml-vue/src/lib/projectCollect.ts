@@ -1,5 +1,6 @@
 import { api } from "./api";
 import { tErr } from "./i18n";
+import { typeGroupName } from "./collectGroups";
 import { showToast } from "./toast";
 import type { ProjectItemDto } from "./bindings";
 
@@ -21,6 +22,7 @@ export async function toggleStar(item: ProjectItemDto): Promise<void> {
       item.image,
       item.url,
       star,
+      star ? typeGroupName(item.source.fileType) : null,
     );
     item.isStar = star;
   } catch (e) {

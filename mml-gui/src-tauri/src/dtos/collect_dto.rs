@@ -28,6 +28,12 @@ pub struct CollectItemDto {
     pub icon: Option<String>,
     /// 项目网页地址
     pub url: String,
+    /// 收藏时间，Unix 毫秒；早期收藏没有记录，读出来是 0
+    pub fav_time: i64,
+    /// 支持的加载器 ID 列表，如 `fabric`；空表示不限
+    pub loaders: Vec<String>,
+    /// 支持的游戏版本列表，如 `1.21.1`；空表示不限
+    pub game_versions: Vec<String>,
 }
 
 impl CollectItemDto {
@@ -48,6 +54,9 @@ impl CollectItemDto {
             pid: data.pid.clone(),
             icon: data.icon.clone(),
             url: data.url.clone(),
+            fav_time: data.fav_time,
+            loaders: data.loaders.clone(),
+            game_versions: data.game_versions.clone(),
         }
     }
 }

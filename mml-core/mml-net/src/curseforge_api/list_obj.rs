@@ -49,6 +49,22 @@ pub struct CurseForgeListDataObj {
     /// 最后更新时间，ISO 8601 UTC 字符串
     #[serde(rename = "dateModified")]
     pub date_modified: String,
+    /// 最近若干文件的索引：项目支持哪些游戏版本与加载器都在这里，搜索接口不返回
+    #[serde(rename = "latestFilesIndexes")]
+    pub latest_files_indexes: Vec<CurseForgeFileIndexObj>,
+}
+
+/// 项目文件的索引项，即 `latestFilesIndexes` 的元素
+#[derive(Serialize, Deserialize, Debug, Default)]
+#[serde(default)]
+pub struct CurseForgeFileIndexObj {
+    /// 该文件支持的游戏版本，如 `1.21.1`
+    #[serde(rename = "gameVersion")]
+    pub game_version: String,
+    /// 模组加载器 ID：1 Forge / 3 LiteLoader / 4 Fabric / 5 Quilt / 6 NeoForge；
+    /// 资源包 / 光影包为 `None`
+    #[serde(rename = "modLoader")]
+    pub mod_loader: Option<u32>,
 }
 
 /// 项目截图

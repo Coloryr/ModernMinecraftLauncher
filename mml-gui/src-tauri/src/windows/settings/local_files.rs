@@ -9,6 +9,7 @@ use std::path::PathBuf;
 
 use mml_names::names;
 use mml_sys::{open_helper, path_helper};
+use tauri::{AppHandle, Manager};
 
 use crate::dtos::LocalFileEntryDto;
 use crate::err_keys;
@@ -20,7 +21,7 @@ struct LocalFileKind {
     id: &'static str,
     /// 目录绝对路径
     dir: PathBuf,
-    /// 是否允许清理；界面数据、游戏实例、Java 只统计不动
+    /// 是否允许清理；游戏实例与 Java 只统计不动
     deletable: bool,
 }
 
@@ -53,7 +54,8 @@ fn kinds() -> Vec<LocalFileKind> {
         LocalFileKind {
             id: "webview",
             dir: cache.join(names::WEBVIEW_DIR),
-            deletable: false,
+            // 目录本身删不得：WebView2 运行时一直占着它，走浏览数据接口清，见 clear_webview_data
+            deletable: true,
         },
         LocalFileKind {
             id: "instances",
@@ -126,16 +128,39 @@ pub async fn settings_get_local_files() -> Vec<LocalFileEntryDto> {
 /// 清理成功返回 `Ok(())`；id 不认识、这一项不允许清理、或部分文件删不掉时返回错误键
 #[gui_macros::ipc_group("settings")]
 #[gui_macros::command]
-pub async fn settings_clear_local_file(id: String) -> Result<(), String> {
+pub async fn settings_clear_local_file(app: AppHandle, id: String) -> Result<(), String> {
     let Some(kind) = kinds().into_iter().find(|kind| kind.id == id) else {
         return Err(err_keys::LOCAL_FILE_UNKNOWN.to_string());
     };
     if !kind.deletable {
         return Err(err_keys::LOCAL_FILE_LOCKED.to_string());
     }
+    if kind.id == "webview" {
+        return clear_webview_data(&app);
+    }
     tauri::async_runtime::spawn_blocking(move || clear(&kind))
         .await
         .map_err(|_| err_keys::LOCAL_FILE_CLEAR.to_string())?
+}
+
+/// 清掉 WebView2 的用户数据，即「界面数据」那一行
+///
+/// 浏览器数据由 WebView2 自己回收：直接删目录只会删掉没被占用的那部分，
+/// 还把正在运行的 profile 拆成半套。
+///
+/// - `app`: 应用句柄，用来取任意一个 webview
+///
+/// # 返回值
+///
+/// 成功返回 `Ok(())`；没有窗口或运行时太旧不支持时返回错误键
+fn clear_webview_data(app: &AppHandle) -> Result<(), String> {
+    let Some(webview) = app.webview_windows().into_values().next() else {
+        return Err(err_keys::LOCAL_FILE_CLEAR.to_string());
+    };
+
+    webview
+        .clear_all_browsing_data()
+        .map_err(|_| err_keys::LOCAL_FILE_CLEAR.to_string())
 }
 
 /// 删掉目录里的内容，跳过该行承诺保留的子目录

@@ -20,8 +20,10 @@ pub struct ModrinthProjectObj {
     pub updated: String,
     /// 下载量，对应 `downloads`
     pub downloads: u64,
-    /// 支持的加载器列表，对应 `loaders`
+    /// 支持的加载器列表，对应 `loaders`；资源包 / 光影包可能是 `minecraft`，收录时按加载器表过滤
     pub loaders: Vec<String>,
+    /// 支持的游戏版本列表，对应 `game_versions`
+    pub game_versions: Vec<String>,
     /// 图标 URL，对应 `icon_url`
     pub icon_url: String,
     /// 主分类标签，对应 `categories`
