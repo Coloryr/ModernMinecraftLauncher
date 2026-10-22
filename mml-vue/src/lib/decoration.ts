@@ -14,7 +14,7 @@
 //   - 用它按钮 → 就得接受它的外观。
 //
 // 解法：给插件的本地 vendor 版加了一个「外部控件提供者」接口
-// 见 mml-gui/vendor/patches/external-controls.patch 里的 `M²L 本地修改` 注释。
+// 见 mml-gui/vendor/patches/tauri-plugin-decoration.patch 里的 `M²L 本地修改` 注释。
 // 注册之后，插件不再要求自己那套按钮存在，直接用**我们给出的矩形**摆那个
 // 原生命中区。外观完全由我们掌控。
 //
@@ -106,7 +106,7 @@ export function registerSnapTarget(root: HTMLElement | null): () => void {
   runtime.externalControlClickListener = () => {
     findMaximizeBtn(root)?.click();
   };
-  // 右键：热区把 WM_NCRBUTTONUP 也吃掉了（见 vendor/patches/snap-right-click.patch），
+  // 右键：热区把 WM_NCRBUTTONUP 也吃掉了（见 vendor/patches/tauri-plugin-decoration.patch），
   // 这里补一个合成事件，让按钮上的 @contextmenu 照常走
   runtime.externalControlRightClickListener = () => {
     const btn = findMaximizeBtn(root);

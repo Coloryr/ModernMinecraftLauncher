@@ -139,7 +139,7 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
 | --- | --- | --- | --- |
 | tauri-plugin-decoration | 3.0.5 | MIT | [oovz/tauri-plugin-decoration](https://github.com/oovz/tauri-plugin-decoration) |
 
-本仓库对它打了两个 patch（[mml-gui/vendor/patches/](mml-gui/vendor/patches/)），改动处已标
+本仓库对它只维护一个 patch（[mml-gui/vendor/patches/](mml-gui/vendor/patches/)），改动处已标
 「M²L 本地修改」；上游源码按固定 commit 拉到 `target/vendor/`，仓库里不存第三方源码副本。
 
 ### 前端库（打进 `dist/`）

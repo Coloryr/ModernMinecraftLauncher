@@ -1,5 +1,40 @@
+本地修改 tauri-plugin-decoration（v3.0.5，全部改动都在这一个补丁里）
+
+仓库里不存第三方源码副本：vendor/prepare.ps1 按固定 commit 从上游克隆到 target/vendor/
+再打本补丁，改动处一律标「M²L 本地修改」。上游升级时改 prepare.ps1 的 $Ref，按下面的小节
+逐段重放即可。
+
+一、窗口按钮外观归应用，插件只摆热区（src/js/controls.js、src/js/titlebar.js、src/snap.rs）
+    应用通过 externalControlProvider 注册自己的按钮提供者；registerWindowControls 注册后
+    不再创建插件那套窗口按钮（建了只会和应用画的按钮重叠，少一套 DOM 也就没有样式覆盖之争），
+    titlebar.js 与 snap.rs 改为按应用上报的矩形摆 Windows 的原生贴靠热区。
+
+二、根节点不插进页面（src/js/titlebar.js）
+    titlebar.js 会在 document.body 最前面 prepend 一个
+    <div data-tauri-plugin-decoration-root>，里面装它自己那套窗口按钮。M²L 的窗口按钮
+    一律自己画（主窗口 MainTopbar、子窗口 WindowControls），Windows 的贴靠热区由
+    lib/decoration.ts 把按钮矩形报给插件来摆按钮矩形，macOS 用插件画的原生红黄绿 ——
+    所以这层 DOM 在页面里没有任何该显示的东西，露出来就是多余的“第二套窗口按钮”。
+    改动只有一处：createRoot 里那行 document.body.prepend(root) 不再执行。仍然创建一个
+    游离元素而不是干脆不建：插件后面还会对它 setAttribute / appendChild / observe /
+    remove，拿 null 会一路抛异常；游离节点上这些操作都安全，唯一代价是
+    getBoundingClientRect 全 0，而那条测量只在“用插件自己按钮”的兜底分支上走到。
+
+三、热区右键转给应用（src/snap.rs、src/snap_state.rs、src/js/controls.js、src/js/titlebar.js）
+    Win11 的贴靠热区是一个盖在 webview 上的原生 WS_CHILD 窗口，它吃掉热区内的全部鼠标
+    消息 —— 左键已经靠 externalControlClickListener 转给应用，右键没有：应用自己的最大化
+    按钮收不到 DOM contextmenu，弹不出菜单。热区窗口现在处理 WM_NCRBUTTONDOWN（吞掉）与
+    WM_NCRBUTTONUP（派发事件），snap_state.rs 新增 SnapEvent::RightClick 与右键计数、复用
+    左键那条派发链路，事件白名单加 snap-rightclick。应用侧在 lib/decoration.ts 注册
+    externalControlRightClickListener，由 WindowControls.vue 弹「全屏 / 占满屏幕」菜单。
+
+四、跟上新编译器：fetch_update → try_update（src/snap_state.rs）
+    AtomicU32::fetch_update 在 Rust 1.99 被改名成 try_update 并标记弃用，不改的话每次
+    cargo check 都会打四条 deprecated 警告，而这些警告来自 target/vendor 下的第三方源码。
+    这里直接换用新名字，签名与行为不变；代价是要求 rustc ≥ 1.99。
+
 diff --git a/src/js/controls.js b/src/js/controls.js
-index 511ab31..55003f2 100644
+index 511ab31..4cfdd70 100644
 --- a/src/js/controls.js
 +++ b/src/js/controls.js
 @@ -67,20 +67,28 @@
@@ -120,7 +155,7 @@ index 511ab31..55003f2 100644
      context.addDisposer(() => {
        geometryDeliveryActive = false;
        pendingActivationMeasurement = null;
-@@ -473,6 +533,30 @@
+@@ -473,6 +533,34 @@
        },
        snapGeometry: initialGeometryState,
        handle(event, payload) {
@@ -144,6 +179,10 @@ index 511ab31..55003f2 100644
 +            case "snap-click":
 +              runtime.notifyExternalControlClick?.();
 +              return true;
++            // M²L 本地修改：右键由应用弹自己的菜单（全屏 / 占满屏幕）
++            case "snap-rightclick":
++              runtime.notifyExternalControlRightClick?.();
++              return true;
 +            default:
 +              break;
 +          }
@@ -152,10 +191,33 @@ index 511ab31..55003f2 100644
            case "snap-mouseenter":
            case "snap-mousedown":
 diff --git a/src/js/titlebar.js b/src/js/titlebar.js
-index b51bf6f..a4f2405 100644
+index b51bf6f..c7c3bdb 100644
 --- a/src/js/titlebar.js
 +++ b/src/js/titlebar.js
-@@ -694,6 +694,69 @@
+@@ -20,6 +20,8 @@
+     "snap-mousedown",
+     "snap-mouseup",
+     "snap-click",
++    // M²L 本地修改：热区右键（见 src/snap.rs 与 src/js/controls.js）
++    "snap-rightclick",
+     "macos-titlebar-state",
+     "window-state",
+   ]);
+@@ -166,7 +168,12 @@
+     root.setAttribute("data-tauri-plugin-decoration-root", "");
+     root.setAttribute("data-tauri-plugin-decoration-owned", "root");
+ 
+-    document.body.prepend(root);
++    // ==== M²L 本地修改：根节点不插进页面 ====
++    // 这层 DOM 装的是插件自己那套窗口按钮，而 M²L 的按钮一律自己画（主窗口 MainTopbar、
++    // 子窗口 WindowControls），Windows 的贴靠热区由 lib/decoration.ts 上报矩形。所以这里只创建不插入。
++    // 保留游离元素：插件后续仍会 setAttribute / appendChild / observe / remove，
++    // 拿 null 会抛异常；游离节点上这些操作都安全，只有 getBoundingClientRect 全 0，
++    // 而那条测量只在"用插件自己按钮"的兜底分支上走到。
+     installation.root = root;
+     return root;
+   };
+@@ -694,6 +701,79 @@
      dispatch,
      install,
      installForDocument,
@@ -208,6 +270,8 @@ index b51bf6f..a4f2405 100644
 +    // （见 src/js/controls.js 的 handle()）
 +    externalControlHoverListener: null,
 +    externalControlClickListener: null,
++    // M²L 本地修改：热区上的右键（原生命中区吃掉 WM_NCRBUTTONUP，见 src/snap.rs）
++    externalControlRightClickListener: null,
 +    notifyExternalControlHover(hovered) {
 +      try {
 +        window[GLOBAL_NAME].externalControlHoverListener?.(Boolean(hovered));
@@ -222,14 +286,44 @@ index b51bf6f..a4f2405 100644
 +        /* 同上 */
 +      }
 +    },
++    // M²L 本地修改：右键通知，应用用它弹自己的菜单
++    notifyExternalControlRightClick() {
++      try {
++        window[GLOBAL_NAME].externalControlRightClickListener?.();
++      } catch {
++        /* 同上 */
++      }
++    },
      status() {
        return { ...lastStatus };
      },
 diff --git a/src/snap.rs b/src/snap.rs
-index 115a578..18cc450 100644
+index 115a578..044031c 100644
 --- a/src/snap.rs
 +++ b/src/snap.rs
-@@ -238,9 +238,27 @@ fn trusted_caption_region(
+@@ -21,7 +21,8 @@ use windows_sys::Win32::{
+             CreateWindowExW, DefWindowProcW, DestroyWindow, GetClientRect, RegisterClassExW,
+             SetWindowPos, ShowWindow, CS_HREDRAW, CS_VREDRAW, HTMAXBUTTON, HWND_TOP,
+             SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_HIDE, WM_DPICHANGED, WM_NCDESTROY, WM_NCHITTEST,
+-            WM_NCLBUTTONDOWN, WM_NCLBUTTONUP, WM_NCMOUSELEAVE, WM_NCMOUSEMOVE, WM_SIZE,
++            WM_NCLBUTTONDOWN, WM_NCLBUTTONUP, WM_NCMOUSELEAVE, WM_NCMOUSEMOVE, WM_NCRBUTTONDOWN,
++            WM_NCRBUTTONUP, WM_SIZE,
+             WNDCLASSEXW, WS_CHILD, WS_CLIPSIBLINGS, WS_VISIBLE,
+         },
+     },
+@@ -132,6 +133,11 @@ pub(crate) fn install<R: Runtime>(
+             for _ in 0..snapshot.clicks() {
+                 dispatch(SnapEvent::Click);
+             }
++            // M²L 本地修改：右键同样一次最多派发 MAX_CLICK_EDGES_PER_FLUSH 条，
++            // 与左键走同一条等待 / 派发链路
++            for _ in 0..snapshot.right_clicks() {
++                dispatch(SnapEvent::RightClick);
++            }
+         }
+     });
+ 
+@@ -238,9 +244,27 @@ fn trusted_caption_region(
      }
      let top = u64::try_from(geometry.y).unwrap_or(u64::MAX);
      let distance_from_right = u64::try_from(i64::from(client_right) - right).unwrap_or(u64::MAX);
@@ -258,7 +352,7 @@ index 115a578..18cc450 100644
  }
  
  pub(crate) fn apply_update<R: Runtime>(
-@@ -305,6 +323,16 @@ unsafe fn install_hwnd(
+@@ -305,6 +329,16 @@ unsafe fn install_hwnd(
              0,
              SNAP_CLASS.as_ptr(),
              SNAP_CLASS.as_ptr(),
@@ -275,3 +369,156 @@ index 115a578..18cc450 100644
              WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
              0,
              0,
+@@ -599,6 +633,16 @@ unsafe fn handle_overlay_message(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: L
+             effects.dispatch();
+             return 0;
+         }
++        // ==== M²L 本地修改：右键转给应用 ====
++        //
++        // 热区盖住应用自己的最大化按钮，右键同样到不了 webview（与 WM_NCMOUSEMOVE 同理）。
++        // 应用用它弹「全屏 / 占满屏幕」菜单。按下时先吞掉，免得 DefWindowProc 走系统菜单。
++        WM_NCRBUTTONDOWN => return 0,
++        WM_NCRBUTTONUP => {
++            let effects = with_registry(|registry| registry.mouse_right_click(hwnd as isize));
++            effects.dispatch();
++            return 0;
++        }
+         WM_NCDESTROY => {
+             let parent = with_registry(|registry| registry.mark_overlay_destroyed(hwnd as isize));
+             if let Some(parent) = parent {
+diff --git a/src/snap_state.rs b/src/snap_state.rs
+index 7d93393..072feaf 100644
+--- a/src/snap_state.rs
++++ b/src/snap_state.rs
+@@ -14,6 +14,10 @@ pub(crate) enum SnapEvent {
+     MouseDown,
+     MouseUp,
+     Click,
++    // ==== M²L 本地修改：右键 ====
++    // 热区盖住应用自己的最大化按钮，右键同样到不了 DOM（见 snap.rs 的
++    // WM_NCRBUTTONUP 分支），由这里单独派发一条事件给应用弹菜单。
++    RightClick,
+ }
+ 
+ impl SnapEvent {
+@@ -24,6 +28,8 @@ impl SnapEvent {
+             Self::MouseDown => "snap-mousedown",
+             Self::MouseUp => "snap-mouseup",
+             Self::Click => "snap-click",
++            // M²L 本地修改：右键事件名
++            Self::RightClick => "snap-rightclick",
+         }
+     }
+ }
+@@ -38,6 +44,8 @@ const MAX_CLICK_EDGES_PER_FLUSH: u32 = 32;
+ pub(crate) struct EventBridge {
+     state: AtomicU8,
+     clicks: AtomicU32,
++    // M²L 本地修改：右键次数。与 clicks 分开累计，左键的 press/click 状态机不受影响
++    right_clicks: AtomicU32,
+     closed: AtomicBool,
+     notify: Notify,
+ }
+@@ -47,6 +55,8 @@ pub(crate) struct EventSnapshot {
+     hovered: bool,
+     pressed: bool,
+     clicks: u32,
++    // M²L 本地修改：这一轮要派发的右键次数
++    right_clicks: u32,
+ }
+ 
+ impl EventSnapshot {
+@@ -61,6 +71,10 @@ impl EventSnapshot {
+     pub(crate) fn clicks(self) -> u32 {
+         self.clicks
+     }
++
++    pub(crate) fn right_clicks(self) -> u32 {
++        self.right_clicks
++    }
+ }
+ 
+ impl EventBridge {
+@@ -68,6 +82,7 @@ impl EventBridge {
+         Self {
+             state: AtomicU8::new(0),
+             clicks: AtomicU32::new(0),
++            right_clicks: AtomicU32::new(0),
+             closed: AtomicBool::new(false),
+             notify: Notify::new(),
+         }
+@@ -91,7 +106,15 @@ impl EventBridge {
+             SnapEvent::Click => {
+                 let _ = self
+                     .clicks
+-                    .fetch_update(Ordering::Release, Ordering::Relaxed, |clicks| {
++                    .try_update(Ordering::Release, Ordering::Relaxed, |clicks| {
++                        Some(clicks.saturating_add(1))
++                    });
++            }
++            // M²L 本地修改：右键只累计次数，不参与 hover / pressed 状态
++            SnapEvent::RightClick => {
++                let _ = self
++                    .right_clicks
++                    .try_update(Ordering::Release, Ordering::Relaxed, |clicks| {
+                         Some(clicks.saturating_add(1))
+                     });
+             }
+@@ -117,17 +140,28 @@ impl EventBridge {
+         let state = self.state.load(Ordering::Acquire);
+         let clicks = self
+             .clicks
+-            .fetch_update(Ordering::Acquire, Ordering::Relaxed, |clicks| {
++            .try_update(Ordering::Acquire, Ordering::Relaxed, |clicks| {
+                 Some(clicks.saturating_sub(MAX_CLICK_EDGES_PER_FLUSH))
+             })
+             .unwrap_or(0);
+         if clicks > MAX_CLICK_EDGES_PER_FLUSH {
+             self.notify.notify_one();
+         }
++        // M²L 本地修改：右键次数同样一次最多取 MAX_CLICK_EDGES_PER_FLUSH 条
++        let right_clicks = self
++            .right_clicks
++            .try_update(Ordering::Acquire, Ordering::Relaxed, |clicks| {
++                Some(clicks.saturating_sub(MAX_CLICK_EDGES_PER_FLUSH))
++            })
++            .unwrap_or(0);
++        if right_clicks > MAX_CLICK_EDGES_PER_FLUSH {
++            self.notify.notify_one();
++        }
+         EventSnapshot {
+             hovered: state & HOVERED != 0,
+             pressed: state & PRESSED != 0,
+             clicks: clicks.min(MAX_CLICK_EDGES_PER_FLUSH),
++            right_clicks: right_clicks.min(MAX_CLICK_EDGES_PER_FLUSH),
+         }
+     }
+ }
+@@ -479,6 +513,20 @@ impl Registry {
+         }
+         effects
+     }
++
++    // M²L 本地修改：右键不参与 pressed 状态，只派发一条事件
++    pub(crate) fn mouse_right_click(&mut self, overlay: isize) -> Effects {
++        let Some(parent) = self.parent_for_overlay(overlay) else {
++            return Effects::default();
++        };
++        let entry = self
++            .entries
++            .get_mut(&parent)
++            .expect("overlay lookup returned an existing parent");
++        let mut effects = Effects::default();
++        effects.event(&entry.callbacks, SnapEvent::RightClick);
++        effects
++    }
+ }
+ 
+ #[cfg(test)]
+@@ -789,5 +837,6 @@ mod tests {
+         assert_eq!(SnapEvent::MouseDown.as_str(), "snap-mousedown");
+         assert_eq!(SnapEvent::MouseUp.as_str(), "snap-mouseup");
+         assert_eq!(SnapEvent::Click.as_str(), "snap-click");
++        assert_eq!(SnapEvent::RightClick.as_str(), "snap-rightclick");
+     }
+ }
