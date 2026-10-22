@@ -26,7 +26,7 @@ import ListSkeleton from "./ListSkeleton.vue";
 import ResourceRow from "./ResourceRow.vue";
 import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
 import VirtualList from "./VirtualList.vue";
-import { RESOURCE_ROW_GAP } from "../composables/useVirtualRows";
+import { RESOURCE_ROW_GAP } from "../../../composables/useVirtualRows";
 import { useRowSelect } from "../composables/useRowSelect";
 import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceOps } from "../composables/useResourceOps";

@@ -19,7 +19,7 @@ const props = defineProps<{
   flashGroup?: string;
 }>();
 
-const { entries, loading, clearing, total, load, clear, open } = props.files;
+const { entries, loading, downloading, clearing, total, load, clear, open } = props.files;
 
 /** 等待确认清理的项 id；空串表示没有弹窗 */
 const pending = ref("");
@@ -51,18 +51,33 @@ async function onConfirmClear() {
     <div class="local-files-head">
       <span class="local-files-total">
         {{ t("winSettings.localFilesTotal") }}
-        <b>{{ loading && entries.length === 0 ? t("winSettings.localFilesScanning") : formatSize(total) }}</b>
+        <b :class="{ 'is-scanning': loading }">
+          {{ loading && entries.length === 0 ? t("winSettings.localFilesScanning") : formatSize(total) }}
+        </b>
       </span>
       <BaseButton size="sm" :disabled="loading" @click="load">
-        <GlyphIcon name="refresh" :size="13" />
+        <GlyphIcon name="refresh" :size="13" :class="{ 'is-spinning': loading }" />
         {{ t("winSettings.localFilesRefresh") }}
       </BaseButton>
     </div>
 
-    <p v-if="loading && entries.length === 0" class="field-desc">
-      {{ t("winSettings.localFilesScanning") }}
-    </p>
-    <div v-else class="local-files-list">
+    <!-- 首次统计：骨架行占位，形状贴着真行，数完直接换内容不跳版。
+         行数固定为后端那六项，高度一致，换内容时整页不会上下跳 -->
+    <div v-if="loading && entries.length === 0" class="local-files-list">
+      <div v-for="n in 6" :key="n" class="local-file-row">
+        <div class="local-file-main">
+          <span class="sk sk-name" />
+          <span class="sk sk-path" />
+        </div>
+        <span class="sk sk-size" />
+        <div class="local-file-actions">
+          <span class="sk sk-btn" />
+          <span class="sk sk-btn" />
+        </div>
+      </div>
+    </div>
+    <!-- 重新统计：旧数据压暗不可点，避免拿着过期结果去清理 -->
+    <div v-else class="local-files-list" :class="{ 'is-loading-dim': loading }">
       <div v-for="e in entries" :key="e.id" class="local-file-row">
         <div class="local-file-main">
           <span class="local-file-name">{{ t(`winSettings.localFile.${e.id}`) }}</span>
@@ -72,14 +87,13 @@ async function onConfirmClear() {
         <div class="local-file-actions">
           <BaseButton size="sm" @click="open(e.id)">{{ t("winSettings.localFileOpen") }}</BaseButton>
           <BaseButton v-if="e.deletable" size="sm" variant="danger"
-            :disabled="!!clearing || loading || e.size === 0" @click="pending = e.id">
+            :disabled="!!clearing || loading || downloading || e.size === 0"
+            :title="downloading ? t('winSettings.localFileClearBlocked') : undefined" @click="pending = e.id">
             {{ t("winSettings.localFileClear") }}
           </BaseButton>
         </div>
       </div>
     </div>
-
-    <p class="field-desc">{{ t("winSettings.localFilesHint") }}</p>
   </SettingsGroup>
 
   <BaseModal v-if="pending" :title="t('winSettings.localFileClearTitle')" @close="pending = ''">
@@ -88,7 +102,7 @@ async function onConfirmClear() {
     </p>
     <div class="modal-actions">
       <BaseButton @click="pending = ''">{{ t("actions.cancel") }}</BaseButton>
-      <BaseButton variant="danger" @click="onConfirmClear">
+      <BaseButton variant="danger" :disabled="downloading" @click="onConfirmClear">
         {{ t("winSettings.localFileClear") }}
       </BaseButton>
     </div>

@@ -2,6 +2,7 @@
 //!
 //! | 模块 | 说明 |
 //! | --- | --- |
+//! | [`build_info`] | 版本号与构建通道，主页面据此提示测试版 / 预发布版 |
 //! | [`collect_utils`] | 收藏数据读写 |
 //! | [`dtos`] | 跨 IPC DTO，Rust 结构转 camelCase |
 //! | [`err_box`] | 致命错误弹窗 |
@@ -23,6 +24,7 @@ use tauri::Manager;
 use crate::windows::{block, download, main};
 
 pub mod block_groups;
+pub mod build_info;
 pub mod collect_utils;
 pub mod dtos;
 pub mod err_box;

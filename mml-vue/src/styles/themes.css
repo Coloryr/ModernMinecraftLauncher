@@ -25,6 +25,10 @@
      改色时两套主题一起改（亮色那份在下面的 [data-theme="Light"] 里） */
   --select-arrow: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 
+  /* 日期框的日历图标：同 --select-arrow 的做法，独立背景图拿不到 currentColor，
+     按主题各嵌一份；改色时两套主题一起改 */
+  --date-icon: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M8 3v4M16 3v4M3 11h18'/%3E%3C/svg%3E");
+
   /* 强调色 */
   --accent: #4f8cff;
   --accent-hover: #3d7af5;
@@ -91,6 +95,9 @@
 
   /* 下拉框箭头：同暗色那份，只换成本主题的 --text-dim */
   --select-arrow: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236a7480' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+
+  /* 日期框的日历图标：口径同暗色那份，只换成本主题的 --text-dim */
+  --date-icon: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236a7480' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M8 3v4M16 3v4M3 11h18'/%3E%3C/svg%3E");
 
   --accent: #2f6fe4;
   --accent-hover: #275fc4;

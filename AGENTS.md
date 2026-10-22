@@ -34,14 +34,20 @@
     `[profile.release]` 是 fat LTO + `codegen-units = 1`：体积最小、运行最快，但末尾的
     跨 crate 优化是单线程的，**构建时会看到只有一个核在跑**，含安装包。
   - 预发布：`build/build-prerelease.ps1`（bash 版 `build/build-prerelease.sh`；
-    = `cd mml-gui/src-tauri && cargo build --profile prerelease --features custom-protocol`）。
+    = `cd mml-gui/src-tauri && cargo build --profile prerelease --features custom-protocol,prerelease`）。
+    **`prerelease` feature 也不能漏**：主页面据它显示「预发布版」提示，见 `src-tauri/src/build_info.rs`。
+    三个通道的界面口径：直接拉源码启动（`cargo run` / `tauri dev`，`debug_assertions`）是
+    「测试版」，带 `prerelease` feature 的是「预发布版」，正式发布不提示。
     **`--features custom-protocol` 不能漏**：tauri 用它决定前端走内嵌 dist 还是 devUrl，
     漏了即使 profile 是 release-like 也会被当成 dev 构建，exe 去连 localhost:1420，
     没起 vite 就是"进程在跑、窗口不出来"。
     `[profile.prerelease]` 是 thin LTO + `codegen-units = 16`：快很多，体积略大，只出 exe。
   - 预发布也要**安装包**时：`tauri` CLI 不认 `--profile`（`--` 透传给 cargo 会让它去
     `target/release` 找错文件），只能覆盖 release 的设置：
-    `CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 npm run tauri build`。
+    `CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 npm run tauri build -- --features prerelease`。
+    PowerShell 里环境变量写成 `$env:CARGO_PROFILE_RELEASE_LTO = 'thin'` 单独两行再跑
+    `npm run tauri build -- --features prerelease`；`--features prerelease` 不能省，
+    否则这样出的包与正式版一模一样，主页面不会提示「预发布版」。
     代价是它与正式发布共用 target 目录，来回切会重编末尾那几个单元。
 - Rust workspace 在**仓库根目录**（根 `Cargo.toml` 收编 `mml-core/` 全部子 crate 与
   `mml-gui/src-tauri` + `ipc-gen` / `ipc-gen/macros`；`workspace.dependencies` 与 `[profile.*]`
@@ -617,6 +623,7 @@ i18n 表，**不写死中文或英文字面量**。三张表各管一摊，改�
 | 20 / 40 | 窗口内浮层：下拉、右键菜单、浮动卡 |
 | 100 | 弹窗内的浮层 |
 | 200 | 模态遮罩与弹窗本体 |
+| 250 | 挂在 body 上的弹层（如日期选择器月历）：要盖过模态里的控件 |
 | 300 | 全局提示、tooltip |
 | 999 以上 | 只给必须压住一切的极少数，如启动画面，并在代码里写一行说明为什么 |
 

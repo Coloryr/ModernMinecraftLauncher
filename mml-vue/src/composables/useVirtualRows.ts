@@ -6,7 +6,7 @@
 //
 // 两种用法：
 // - 资源窗口的模组页：一份滚动状态 provide 给同页各分组，每组各算各的窗口，见 `provideListScroll`
-// - 通用列表：容器与行都在组件自己手里，见 parts/VirtualList.vue，用 `createListScroll`
+// - 通用列表：容器与行都在组件自己手里，见 windows/resource/parts/VirtualList.vue，用 `createListScroll`
 import { computed, inject, onBeforeUnmount, provide, ref, shallowRef, type Ref } from "vue";
 
 import { visibleWindow, type VirtualWindow } from "./virtualWindow";
@@ -36,7 +36,7 @@ export interface ListScrollState {
   bump: () => void;
 }
 
-/** 注入键；只有资源窗口的模组页会 provide */
+/** 注入键；只有资源窗口的模组页会 provide，其它窗口直接用 `scroll` 参数传 */
 const LIST_SCROLL = Symbol("resource-list-scroll");
 
 /**

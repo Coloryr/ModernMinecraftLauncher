@@ -38,7 +38,7 @@ import {
   type ModCol,
   type ModSort,
 } from "../../modColumns";
-import { TABLE_ROW_H, useVirtualRows } from "../../composables/useVirtualRows";
+import { TABLE_ROW_H, useVirtualRows } from "../../../../composables/useVirtualRows";
 import { modHit, modRowKey, modSelectKey, type ModViewEmits, type ModViewProps } from "../../types";
 
 const props = withDefaults(

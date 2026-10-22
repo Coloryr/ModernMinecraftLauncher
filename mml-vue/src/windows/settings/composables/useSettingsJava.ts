@@ -177,9 +177,10 @@ export function useSettingsJava() {
     try {
       const found = await commands.settings.scanJavaDir(picked);
       await load();
-      // 后端返回该文件夹下识别到的单个 Java，null 表示没扫到
-      if (found) showToast(t("winSettings.javaScanDirDone", { name: found.name }));
-      else showToast(t("winSettings.javaScanDirNone"));
+      // 一个目录下可能有多套 JDK，全部导入后按数量提示
+      if (found.length === 0) showToast(t("winSettings.javaScanDirNone"));
+      else if (found.length === 1) showToast(t("winSettings.javaScanDirDone", { name: found[0].name }));
+      else showToast(t("winSettings.javaScanDirDoneMany", { n: found.length }));
     } catch (e) {
       showToast(tErr(e));
     } finally {

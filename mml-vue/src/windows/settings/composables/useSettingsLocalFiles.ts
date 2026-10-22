@@ -6,6 +6,7 @@ import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
 import { commands } from "../../../lib/bindings";
 import type { LocalFileEntryDto } from "../../../lib/bindings";
+import { useDownloadProgress } from "../../../composables/useDownloadProgress";
 
 /**
  * 本地文件标签的状态与操作
@@ -15,6 +16,7 @@ import type { LocalFileEntryDto } from "../../../lib/bindings";
  * - `entries`: 各文件夹的路径与占用，顺序由后端给
  * - `total`: 合计字节数
  * - `loading`: 正在统计
+ * - `downloading`: 下载队列里还有没下完的任务，此时禁止清理
  * - `clearing`: 正在清理哪一项的 id，空串表示没有任务
  * - `load`: 重新统计一遍
  * - `clear`: 清理某一项并重新统计
@@ -26,6 +28,12 @@ export function useSettingsLocalFiles() {
   const clearing = ref("");
 
   const total = computed(() => entries.value.reduce((sum, entry) => sum + entry.size, 0));
+
+  // 清理就是把缓存目录删空：正在写文件的下载会被打断，还可能留下半截文件
+  const { tasks } = useDownloadProgress();
+  const downloading = computed(() =>
+    tasks.value.some((task) => task.total === 0 || task.completed + task.failed < task.total),
+  );
 
   async function load() {
     loading.value = true;
@@ -44,6 +52,9 @@ export function useSettingsLocalFiles() {
    * - `id`: 文件夹 id，取自 `entries`
    */
   async function clear(id: string) {
+    // 下载进行中一律不删：界面上按钮已禁用，这里再兜一次
+    if (downloading.value) return;
+
     clearing.value = id;
     try {
       await commands.settings.clearLocalFile(id);
@@ -69,5 +80,5 @@ export function useSettingsLocalFiles() {
     }
   }
 
-  return { entries, loading, clearing, total, load, clear, open };
+  return { entries, loading, downloading, clearing, total, load, clear, open };
 }

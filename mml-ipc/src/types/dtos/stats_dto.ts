@@ -22,11 +22,22 @@ export type StatsDataDto = {
 export type StatsPlayDayDto = {
   date: string,
   seconds: number,
+  count: number,
+  failed: number,
+};
+
+export type StatsDayInstanceDto = {
+  uuid: string,
+  name: string,
+  seconds: number,
+  count: number,
+  failed: number,
 };
 
 export type StatsPlaytimeDto = {
   days: StatsPlayDayDto[],
   totalSeconds: number,
   activeDays: number,
+  byInstance: StatsDayInstanceDto[],
 };
 

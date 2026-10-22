@@ -72,6 +72,11 @@ useWindowTitle(() => props.title);
 // 每个功能窗口都要做，放这里统一处理，见 lib/useWindowDecoration.ts
 const rootEl = ref<HTMLElement | null>(null);
 const { decorated } = useWindowDecoration(rootEl);
+
+// 内容区元素：整页滚动的窗口（如统计窗口）把它交给行虚拟化当滚动容器，
+// 表格只渲染视口附近那几行，页面整体滚动的行为不变
+const bodyEl = ref<HTMLElement | null>(null);
+defineExpose({ bodyEl });
 </script>
 
 <template>
@@ -116,7 +121,7 @@ const { decorated } = useWindowDecoration(rootEl);
            所以这里照常渲染，悬停反馈由插件转发的事件驱动 -->
       <WindowControls v-if="titleBarStyle === 'windows'" :style="titleBarStyle" />
     </header>
-    <div class="frame-body" :class="{ fill: props.bodyFill, gutter: props.bodyGutter, flush: props.bodyFlush }">
+    <div ref="bodyEl" class="frame-body" :class="{ fill: props.bodyFill, gutter: props.bodyGutter, flush: props.bodyFlush }">
       <slot />
     </div>
   </div>

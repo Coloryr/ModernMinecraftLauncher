@@ -186,15 +186,15 @@ pub(super) fn count_instances(root: &Path) -> u32 {
         .count() as u32
 }
 
-/// 实例目录名，已排序
+/// 实例根目录下的实例目录名，已排序
 ///
-/// - `root`: ColorMC 工作目录
+/// - `root`: 实例根目录，即工作目录下的 `minecraft/instances`
 ///
 /// # 返回值
 ///
 /// 排好序的实例目录名；目录读不到返回空表
-pub(super) fn list_instances(root: &Path) -> Vec<String> {
-    let Ok(reader) = fs::read_dir(instance_root(root)) else {
+pub(super) fn list_instance_dirs(root: &Path) -> Vec<String> {
+    let Ok(reader) = fs::read_dir(root) else {
         return Vec::new();
     };
     let mut list: Vec<String> = reader

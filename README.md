@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="design/icon/f-tech-grass-new.svg" width="128" alt="M²L 程序图标">
+  <img src="design/icon/f-blend.svg" width="128" alt="M²L 程序图标">
 </p>
 
 # ModernMinecraftLauncher (M²L)
@@ -107,7 +107,7 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
 | `build/build-release.ps1` | 正式发布构建（fat LTO，含安装包） |
 | `build/build-prerelease.ps1` | 预发布构建（thin LTO，只出 exe，更快） |
 | `cd mml-gui && npm run gen` | 改过 Rust 侧命令 / DTO 后重新生成 `mml-ipc` 契约 |
-| `cd mml-gui && npx tauri icon ../design/icon/f-tech-grass-new.svg` | 改过程序图标后重新生成 `src-tauri/icons/`；会顺带产出 `android/` 与 `ios/`，桌面端用不到可删 |
+| `cd mml-gui && npx tauri icon ../design/icon/f-blend.svg` | 改过程序图标后重新生成 `src-tauri/icons/`；会顺带产出 `android/` 与 `ios/`，桌面端用不到可删 |
 | `cd custom/custom-main-demo && npm run build` | 构建自定义主页面示例并打包成 `custom-main-demo.zip`（四个示例的用法见 [custom/README.md](custom/README.md)） |
 
 上面三个脚本都在 `build/` 下，各有一份 PowerShell 版（`.ps1`，Windows）与 bash 版

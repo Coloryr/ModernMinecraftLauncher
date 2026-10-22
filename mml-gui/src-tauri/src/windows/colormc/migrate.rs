@@ -2,19 +2,27 @@
 //!
 //! 从 `colormc/mod.rs` 拆出来的。**原样文件夹搬运**，不做字段级转换；单个文件失败不中断
 //! 整次迁移，记进报告的 `failed` 里。
+//!
+//! 唯一的例外是 `minecraft/instances`：实例不能原样覆盖，见 [`super::import`]。
+//! 重名时导入的那个改名、两份都留；uuid 冲突只给导入的那个换新；
+//! ColorMC 的组名并进 `group_save.json`。
 
 use std::fs;
 use std::io;
 use std::path::Path;
 
+use mml_game::game_group::ImportedGroup;
+use mml_names::names;
 use mml_sys::path_helper;
 use tauri::AppHandle;
 
 use crate::dtos::ColorMcReportDto;
 use crate::err_keys;
+use crate::log_text::LogText;
 
 use super::check::check;
-use super::detect::{auth_file, list_instances, looks_like_colormc, top_entries};
+use super::detect::{auth_file, instance_root, looks_like_colormc, top_entries};
+use super::import::{self, InstancePlan};
 use super::progress;
 
 /// 迁移主流程，同步执行，由调用方放到阻塞线程里跑
@@ -49,19 +57,23 @@ pub(super) fn migrate(
         return Err(String::from(err_keys::COLORMC_NESTED));
     }
 
-    // 实例名要在搬运前收集：移动模式下源目录随后就没了
-    let src_instances = list_instances(src);
     let src_entries = top_entries(src);
     if src_entries.is_empty() {
         return Err(String::from(err_keys::COLORMC_EMPTY));
     }
 
-    mml_log::info(format!(
-        "colormc migrate start: {} -> {} (mode={})",
-        src.display(),
-        dst.display(),
-        if moved { "move" } else { "copy" }
-    ));
+    // 实例计划必须在搬运前算：移动模式下源目录随后就没了，而且重名改名、uuid 换新
+    // 都要在落盘前定下来
+    let plans = import::plan_instances(&instance_root(src), &instance_root(dst));
+
+    mml_log::info(
+        LogText::ColormcMigrateStart {
+            source: src.display().to_string(),
+            target: dst.display().to_string(),
+            mode: String::from(if moved { "move" } else { "copy" }),
+        }
+        .text(),
+    );
 
     // ---- 1. 搬运 ----
     // `failed` 里可能有**嵌套**的失败项，比如某个文件被占用，所以成功条目数单独数，
@@ -69,62 +81,77 @@ pub(super) fn migrate(
     let mut failed: Vec<String> = Vec::new();
     let mut ok_entries: u32 = 0;
 
-    if moved {
-        // 移动：按顶层条目重命名，跨盘时回退成复制 + 删源
-        let total = src_entries.len() as u32;
-        progress(app, "move", 0, total, "");
-        let mut done: u32 = 0;
-        for name in &src_entries {
-            let from = src.join(name);
-            let to = dst.join(name);
-            match move_entry(app, &from, &to, name, &mut done, total) {
-                Ok(()) => ok_entries += 1,
-                Err(err) => {
-                    mml_log::error(format!("colormc move failed: {name} ({err})"));
-                    failed.push(name.clone());
-                }
-            }
-        }
-        // 全部条目都搬完、源目录空了才删掉它；有失败就留着
-        let empty = fs::read_dir(src)
-            .map(|mut reader| reader.next().is_none())
-            .unwrap_or(false);
-        if empty {
-            if let Err(err) = fs::remove_dir_all(src) {
-                mml_log::error(format!("colormc remove source failed: {err}"));
-            }
-        } else {
-            mml_log::info(String::from("colormc move: source kept (not empty)"));
-        }
+    // 复制的进度总量按文件数算；移动按顶层条目算，但 `minecraft` 是拆成子条目搬的，
+    // 要把它换成"一个占位 + 实际子条目数"，否则搬完 done 会超过 total
+    let total = if moved {
+        src_entries.len() as u32 + minecraft_children(src)
     } else {
-        // 复制：先数一遍文件数供进度用，再逐文件复制
         progress(app, "scan", 0, 0, "");
-        let total = count_files(src);
-        progress(app, "copy", 0, total, "");
-        let mut done: u32 = 0;
-        for name in &src_entries {
-            let from = src.join(name);
-            let to = dst.join(name);
-            match copy_entry(app, "copy", &from, &to, name, &mut done, total, &mut failed) {
-                Ok(()) => ok_entries += 1,
-                Err(err) => {
-                    mml_log::error(format!("colormc copy failed: {name} ({err})"));
-                    failed.push(name.clone());
-                }
+        count_files(src)
+    };
+    progress(app, if moved { "move" } else { "copy" }, 0, total, "");
+
+    let mut done: u32 = 0;
+    for name in &src_entries {
+        let from = src.join(name);
+        let to = dst.join(name);
+        let result = if name == names::MINECRAFT_DIR {
+            migrate_minecraft(
+                app,
+                &from,
+                &to,
+                moved,
+                &plans,
+                &mut done,
+                total,
+                &mut failed,
+            )
+        } else if moved {
+            move_entry(app, &from, &to, name, &mut done, total)
+        } else {
+            copy_entry(app, "copy", &from, &to, name, &mut done, total, &mut failed)
+        };
+
+        match result {
+            Ok(()) => ok_entries += 1,
+            Err(err) => {
+                mml_log::error(entry_failed(moved, name, err).text());
+                failed.push(name.clone());
             }
         }
     }
 
-    // ---- 2. 兼容性检测 ----
-    progress(app, "check", 0, src_instances.len() as u32, "");
-    let checked = check(app, &src_entries, &src_instances, dst);
+    // 移动：全部条目都搬完、源目录空了才删掉它；有失败就留着
+    if moved {
+        if is_empty(src) {
+            if let Err(err) = fs::remove_dir_all(src) {
+                mml_log::error(
+                    LogText::ColormcRemoveSourceFailed {
+                        error: err.to_string(),
+                    }
+                    .text(),
+                );
+            }
+        } else {
+            mml_log::info(LogText::ColormcSourceKept.text());
+        }
+    }
 
-    mml_log::info(format!(
-        "colormc migrate done: entries={ok_entries} failed={} instances={}/{}",
-        failed.len(),
-        checked.instances_ok.len(),
-        checked.instances_ok.len() + checked.instances_bad.len()
-    ));
+    // ---- 2. 兼容性检测 ----
+    // 检测按**落地后**的目录名走：重名实例已经改过名，拿源目录名会验错位置
+    let targets: Vec<String> = plans.iter().map(|plan| plan.dir.clone()).collect();
+    progress(app, "check", 0, targets.len() as u32, "");
+    let checked = check(app, &src_entries, &targets, dst);
+
+    mml_log::info(
+        LogText::ColormcMigrateDone {
+            ok: ok_entries as usize,
+            failed: failed.len(),
+            instances: checked.instances_ok.len(),
+            total: checked.instances_ok.len() + checked.instances_bad.len(),
+        }
+        .text(),
+    );
 
     Ok(ColorMcReportDto {
         moved,
@@ -137,6 +164,265 @@ pub(super) fn migrate(
         compat: checked.compat,
         auth_outside: auth_file().is_some(),
     })
+}
+
+/// 搬 `minecraft/`：普通子条目照旧覆盖，`instances` 走实例导入
+///
+/// 子条目级别的失败只记进 `failed` 并继续，返回 `Ok(())` 表示这个顶层条目处理完了。
+///
+/// - `app`: 窗口句柄，`None` 表示不报进度
+/// - `from`: 源 `minecraft` 目录
+/// - `to`: 目标 `minecraft` 目录
+/// - `moved`: `true` 走移动、`false` 走复制
+/// - `plans`: 实例导入计划
+/// - `done`: 已完成数，按引用累加
+/// - `total`: 进度总量，`0` 表示未知
+/// - `failed`: 失败项收集表
+///
+/// # 返回值
+///
+/// 源目录读不到时返回 `Err`，内容为错误原文
+#[allow(clippy::too_many_arguments)]
+fn migrate_minecraft(
+    app: Option<&AppHandle>,
+    from: &Path,
+    to: &Path,
+    moved: bool,
+    plans: &[InstancePlan],
+    done: &mut u32,
+    total: u32,
+    failed: &mut Vec<String>,
+) -> Result<(), String> {
+    let reader = fs::read_dir(from).map_err(|err| err.to_string())?;
+    path_helper::create_dir_all(to).map_err(|err| err.to_string())?;
+
+    let mut entries: Vec<String> = reader
+        .flatten()
+        .map(|entry| entry.file_name().to_string_lossy().to_string())
+        .collect();
+    entries.sort();
+
+    for name in entries {
+        let from = from.join(&name);
+        let to = to.join(&name);
+        let rel = format!("{}/{}", names::MINECRAFT_DIR, name);
+
+        if name == names::INSTANCE_DIR {
+            if let Err(err) = migrate_instances(app, &from, &to, moved, plans, done, total, failed)
+            {
+                mml_log::error(LogText::ColormcInstancesFailed { error: err }.text());
+                failed.push(rel);
+            }
+            continue;
+        }
+
+        let result = if moved {
+            move_entry(app, &from, &to, &rel, done, total)
+        } else {
+            copy_entry(app, "copy", &from, &to, &rel, done, total, failed)
+        };
+        if let Err(err) = result {
+            mml_log::error(entry_failed(moved, &rel, err).text());
+            failed.push(rel);
+        }
+    }
+
+    // 移动：子条目都搬走了才删源目录，有失败就留着
+    if moved {
+        if is_empty(from)
+            && let Err(err) = fs::remove_dir(from)
+        {
+            mml_log::error(
+                LogText::ColormcRemoveSourceFailed {
+                    error: err.to_string(),
+                }
+                .text(),
+            );
+        }
+        *done += 1;
+        progress(app, "move", *done, total, names::MINECRAFT_DIR);
+    }
+
+    Ok(())
+}
+
+/// 搬实例目录：按计划改名落位，写回 `game.json`，最后合并分组
+///
+/// - `app`: 窗口句柄，`None` 表示不报进度
+/// - `from`: 源 `minecraft/instances`
+/// - `to`: 目标 `minecraft/instances`
+/// - `moved`: `true` 走移动、`false` 走复制
+/// - `plans`: 实例导入计划
+/// - `done`: 已完成数，按引用累加
+/// - `total`: 进度总量，`0` 表示未知
+/// - `failed`: 失败项收集表
+///
+/// # 返回值
+///
+/// 源目录读不到时返回 `Err`，内容为错误原文
+#[allow(clippy::too_many_arguments)]
+fn migrate_instances(
+    app: Option<&AppHandle>,
+    from: &Path,
+    to: &Path,
+    moved: bool,
+    plans: &[InstancePlan],
+    done: &mut u32,
+    total: u32,
+    failed: &mut Vec<String>,
+) -> Result<(), String> {
+    if !from.is_dir() {
+        return Ok(());
+    }
+    path_helper::create_dir_all(to).map_err(|err| err.to_string())?;
+
+    let mut groups: Vec<ImportedGroup> = Vec::new();
+
+    for plan in plans {
+        let source = from.join(&plan.source);
+        let target = to.join(&plan.dir);
+        let rel = format!(
+            "{}/{}/{}",
+            names::MINECRAFT_DIR,
+            names::INSTANCE_DIR,
+            plan.source
+        );
+
+        let result = if moved {
+            move_entry(app, &source, &target, &rel, done, total)
+        } else {
+            copy_entry(app, "copy", &source, &target, &rel, done, total, failed)
+        };
+
+        match result {
+            Ok(()) => match import::write_back(&target, plan) {
+                // 写回成功（或本来就不用改）才登记分组：uuid 没落进 game.json 的话，
+                // 分组表里这一条会在下次启动 prune 时被清掉
+                Ok(true) => {
+                    if plan.group.is_some() {
+                        groups.push(ImportedGroup {
+                            uuid: plan.uuid,
+                            group: plan.group.clone(),
+                        });
+                    }
+                }
+                Ok(false) => {}
+                Err(err) => {
+                    mml_log::error(
+                        LogText::ColormcInstancePatchFailed {
+                            name: rel.clone(),
+                            error: err,
+                        }
+                        .text(),
+                    );
+                    failed.push(format!("{rel}/{}", names::GAME_FILE));
+                }
+            },
+            Err(err) => {
+                mml_log::error(entry_failed(moved, &rel, err).text());
+                failed.push(rel);
+            }
+        }
+    }
+
+    // 实例根目录下的零碎文件；分组表是 M²L 自己的，哪怕源里也有也不能盖
+    let reader = fs::read_dir(from).map_err(|err| err.to_string())?;
+    let mut files: Vec<String> = reader
+        .flatten()
+        .filter(|entry| entry.path().is_file())
+        .map(|entry| entry.file_name().to_string_lossy().to_string())
+        .filter(|name| name != names::GROUP_FILE && name != names::LEGACY_GROUP_FILE)
+        .collect();
+    files.sort();
+
+    for name in files {
+        let source = from.join(&name);
+        let target = to.join(&name);
+        let rel = format!("{}/{}/{}", names::MINECRAFT_DIR, names::INSTANCE_DIR, name);
+        let result = if moved {
+            move_entry(app, &source, &target, &rel, done, total)
+        } else {
+            copy_entry(app, "copy", &source, &target, &rel, done, total, failed)
+        };
+        if let Err(err) = result {
+            mml_log::error(entry_failed(moved, &rel, err).text());
+            failed.push(rel);
+        }
+    }
+
+    if let Err(err) = import::merge_groups(to, &groups) {
+        mml_log::error(LogText::ColormcGroupMergeFailed { error: err }.text());
+        failed.push(format!(
+            "{}/{}/{}",
+            names::MINECRAFT_DIR,
+            names::INSTANCE_DIR,
+            names::GROUP_FILE
+        ));
+    }
+
+    if moved {
+        if is_empty(from)
+            && let Err(err) = fs::remove_dir(from)
+        {
+            mml_log::error(
+                LogText::ColormcRemoveSourceFailed {
+                    error: err.to_string(),
+                }
+                .text(),
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// 构造"某个条目搬运失败"的日志文案
+///
+/// - `moved`: `true` 表示移动、`false` 表示复制
+/// - `name`: 条目名，相对迁移根目录
+/// - `error`: 错误原文
+///
+/// # 返回值
+///
+/// 移动 / 复制各自对应的日志文案
+fn entry_failed(moved: bool, name: &str, error: String) -> LogText {
+    if moved {
+        LogText::ColormcMoveFailed {
+            name: name.to_string(),
+            error,
+        }
+    } else {
+        LogText::ColormcCopyFailed {
+            name: name.to_string(),
+            error,
+        }
+    }
+}
+
+/// `minecraft/` 下的子条目数，移动模式的进度总量用它替换掉 `minecraft` 那一个占位
+///
+/// - `src`: 源工作目录
+///
+/// # 返回值
+///
+/// 子条目数；目录读不到返回 0
+fn minecraft_children(src: &Path) -> u32 {
+    fs::read_dir(src.join(names::MINECRAFT_DIR))
+        .map(|reader| reader.flatten().count() as u32)
+        .unwrap_or(0)
+}
+
+/// 目录是否为空；读不到按"不空"处理，宁可留着也不误删
+///
+/// - `dir`: 要检查的目录
+///
+/// # 返回值
+///
+/// 目录存在且没有任何条目时返回 `true`
+fn is_empty(dir: &Path) -> bool {
+    fs::read_dir(dir)
+        .map(|mut reader| reader.next().is_none())
+        .unwrap_or(false)
 }
 
 /// 递归数文件，复制模式拿它当进度总量
@@ -223,7 +509,13 @@ pub(super) fn copy_entry(
                 total,
                 failed,
             ) {
-                mml_log::error(format!("colormc copy skip: {child_rel} ({err})"));
+                mml_log::error(
+                    LogText::ColormcCopySkip {
+                        path: child_rel.clone(),
+                        error: err,
+                    }
+                    .text(),
+                );
                 failed.push(child_rel.clone());
             }
         }

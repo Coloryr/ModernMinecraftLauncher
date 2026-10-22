@@ -48,6 +48,26 @@ pub struct StatsPlayDayDto {
     pub date: String,
     /// 当天游玩秒数
     pub seconds: u64,
+    /// 当天启动次数，含成功与失败
+    pub count: u32,
+    /// 当天启动失败次数
+    pub failed: u32,
+}
+
+/// 单日里一个实例的统计
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatsDayInstanceDto {
+    /// 实例标识
+    pub uuid: String,
+    /// 实例名字，已删除的实例取历史记录里的名字
+    pub name: String,
+    /// 当天游玩秒数
+    pub seconds: u64,
+    /// 当天启动次数，含成功与失败
+    pub count: u32,
+    /// 当天启动失败次数
+    pub failed: u32,
 }
 
 /// 游玩时间图：按天分桶，缺数据的日期补 0
@@ -60,4 +80,6 @@ pub struct StatsPlaytimeDto {
     pub total_seconds: u64,
     /// 有游玩记录的天数
     pub active_days: u32,
+    /// 单日范围时各实例当天的时长，按时长降序；多天范围时为空
+    pub by_instance: Vec<StatsDayInstanceDto>,
 }

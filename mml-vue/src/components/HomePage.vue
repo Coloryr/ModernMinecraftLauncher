@@ -2,6 +2,7 @@
 // 启动器主页：上次启动实例 / 联机大厅 / 方块列表 入口 + Minecraft 新闻
 // empty=true 时顶部展示空实例引导块，含添加实例按钮；此时一个实例都没有
 import { t } from "../lib/i18n";
+import { buildChannel, buildNoticeKey, isTestBuild } from "../lib/buildInfo";
 import { showToast } from "../lib/toast";
 import { openWindow } from "../windows/windowManager";
 import type { InstanceInfoDto, NewsItem } from "../lib/bindings";
@@ -69,6 +70,15 @@ function entry(name: string) {
 
 <template>
   <div class="home-page">
+    <!-- 测试版 / 预发布版提示：压在主页最上方，打开启动器第一眼就能看到 -->
+    <div v-if="isTestBuild" class="build-notice" :class="buildChannel">
+      <svg class="build-notice-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round">
+        <path d="M12 8v5M12 16.5h.01" />
+        <path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+      </svg>
+      <span>{{ t(buildNoticeKey) }}</span>
+    </div>
     <!-- 页头：主页标题 + 返回，主页自己的页面级控件，不占卡片槽位。
          按钮文案随视图模式变，返回的去处见 backLabelKey 的说明 -->
     <div v-if="!empty" class="page-head">
@@ -163,6 +173,32 @@ function entry(name: string) {
 </template>
 
 <style scoped>
+/* 构建通道提示：整条铺满内容区，预发布版黄、测试版强调色，与顶栏徽章同一套色 */
+.build-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  border: 1px solid currentColor;
+}
+
+.build-notice.prerelease {
+  color: var(--yellow);
+  background: color-mix(in srgb, var(--yellow) 12%, transparent);
+}
+
+.build-notice.debug {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.build-notice-icon {
+  flex-shrink: 0;
+}
+
 .home-page {
   display: flex;
   flex-direction: column;

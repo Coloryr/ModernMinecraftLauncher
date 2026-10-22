@@ -11,6 +11,7 @@ export * from "./dtos/add_resource_dto/project";
 export * from "./dtos/add_resource_dto/status";
 export * from "./dtos/analysis_dto";
 export * from "./dtos/args_dto";
+export * from "./dtos/build_info_dto";
 export * from "./dtos/collect_dto";
 export * from "./dtos/colormc_dto";
 export * from "./dtos/config_dto";

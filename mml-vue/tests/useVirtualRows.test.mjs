@@ -7,7 +7,7 @@ import {
   LIST_ROW_GAP,
   LIST_ROW_H,
   visibleWindow,
-} from "../src/windows/resource/composables/virtualWindow.ts";
+} from "../src/composables/virtualWindow.ts";
 
 const SLOT = LIST_ROW_H + LIST_ROW_GAP;
 

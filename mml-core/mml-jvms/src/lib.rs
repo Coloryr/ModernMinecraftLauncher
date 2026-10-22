@@ -215,7 +215,12 @@ pub fn add_item(name: Option<String>, file: String) -> Option<Arc<JavaInfoObj>> 
     match info {
         None => None,
         Some(info) => {
-            let name = name.unwrap_or(info.name.clone());
+            // 名字是列表的唯一键，回填进条目里，界面上显示的才是这个名字
+            let info = JavaInfoObj {
+                name: name.unwrap_or_else(|| info.name.clone()),
+                ..info
+            };
+            let name = info.name.clone();
 
             // 先移除同名旧条目
             remove(&name);
@@ -252,31 +257,110 @@ pub fn add_item(name: Option<String>, file: String) -> Option<Arc<JavaInfoObj>> 
 ///
 /// 存入全局列表后的 Java 信息
 pub fn add_info_item(info: JavaInfoObj) -> Arc<JavaInfoObj> {
-    let name = info.name.clone();
+    let mut added = add_info_items(vec![info]);
+    added.pop().unwrap()
+}
 
-    // 先移除同名旧条目
-    remove(&name);
-
-    let info = Arc::new(info);
+/// 批量添加已知的 Java 信息，跳过可执行文件有效性测试
+///
+/// 名称与已有条目重名但路径不同时，用 Java 目录路径做后缀区分，避免互相覆盖。
+///
+/// - `list`: 待添加的 Java 信息
+///
+/// # 返回值
+///
+/// 存入全局列表后的 Java 信息，顺序与入参一致
+pub fn add_info_items(list: Vec<JavaInfoObj>) -> Vec<Arc<JavaInfoObj>> {
+    let mut added = Vec::with_capacity(list.len());
 
     {
-        let mut list = JVMS.write().unwrap();
-        list.insert(name.clone(), info.clone());
-    }
-
-    invoke_jvm_change();
-
-    {
+        let mut jvms = JVMS.write().unwrap();
         let mut config = mml_config::write_config();
-        let javas = &mut config.java_list;
-        javas.push(JvmConfigObj {
-            name: name.clone(),
-            local: info.path.to_string_lossy().to_string(),
-        });
+
+        for item in list {
+            let name = unique_java_name(&jvms, &item);
+
+            jvms.remove(&name);
+            config
+                .java_list
+                .retain(|saved| !saved.name.eq_ignore_ascii_case(&name));
+
+            let info = Arc::new(JavaInfoObj {
+                name: name.clone(),
+                ..item
+            });
+            jvms.insert(name.clone(), info.clone());
+            config.java_list.push(JvmConfigObj {
+                name,
+                local: info.path.to_string_lossy().to_string(),
+            });
+            added.push(info);
+        }
     }
+
+    // 事件回调会读 JVMS，save() 要拿配置读锁，都得在锁释放后触发
+    invoke_jvm_change();
     mml_config::save();
 
-    info.clone()
+    added
+}
+
+/// 取一个不与列表里其它路径冲突的名称
+///
+/// - `jvms`: 当前 Java 列表
+/// - `info`: 待添加的 Java 信息
+///
+/// # 返回值
+///
+/// 与已有条目同路径时原样返回，即覆盖导入；否则加目录路径或序号区分
+fn unique_java_name(jvms: &HashMap<String, Arc<JavaInfoObj>>, info: &JavaInfoObj) -> String {
+    let taken = |name: &str| match jvms.get(name) {
+        Some(exists) => exists.path != info.path,
+        None => false,
+    };
+
+    if !taken(&info.name) {
+        return info.name.clone();
+    }
+
+    // 用 Java 目录的尾部路径区分，越短越好：jdk-17 再用 openjdk-jdk-17
+    let parts = java_home_parts(&info.path);
+    for start in (0..parts.len()).rev() {
+        let name = format!("{}-{}", info.name, parts[start..].join("-"));
+        if !taken(&name) {
+            return name;
+        }
+    }
+
+    // 兜底：尾部路径也撞上时追加序号
+    let mut index = 2;
+    loop {
+        let name = format!("{}-{}", info.name, index);
+        if !taken(&name) {
+            return name;
+        }
+        index += 1;
+    }
+}
+
+/// Java 可执行文件所在目录的路径分段
+///
+/// - `path`: Java 可执行文件路径，形如 `Program Files/Java/openjdk/jdk-17/bin/javaw.exe`
+///
+/// # 返回值
+///
+/// 去掉 `bin` 之后的各段目录名，如 `["Program Files", "Java", "openjdk", "jdk-17"]`
+fn java_home_parts(path: &Path) -> Vec<String> {
+    let Some(home) = path.parent().and_then(|bin| bin.parent()) else {
+        return Vec::new();
+    };
+
+    home.components()
+        .filter_map(|part| match part {
+            std::path::Component::Normal(name) => Some(name.to_string_lossy().to_string()),
+            _ => None,
+        })
+        .collect()
 }
 
 /// 从配置列表批量测试并添加 Java
@@ -397,6 +481,80 @@ pub fn find_java_from_path<P: AsRef<Path>>(dir: P) -> Option<PathBuf> {
         Os::Windows => path_helper::search_file(dir, names::JAVAW_FILE),
         Os::Linux | Os::MacOS => path_helper::search_file(dir, names::JAVA_FILE),
         _ => None,
+    }
+}
+
+/// 目录树递归深度上限，够覆盖 `Java/jdk-17/bin` 这类布局
+const JAVA_SCAN_MAX_DEPTH: usize = 8;
+
+/// 平台对应的 Java 可执行文件名
+///
+/// # 返回值
+///
+/// Windows 为 `javaw.exe`，Linux / macOS 为 `java`；其它系统返回 `None`
+fn java_exe_name() -> Option<&'static str> {
+    let sys = mml_sys::get_system_info();
+    match sys.os {
+        Os::Windows => Some(names::JAVAW_FILE),
+        Os::Linux | Os::MacOS => Some(names::JAVA_FILE),
+        _ => None,
+    }
+}
+
+/// 在目录树里查找全部 Java 可执行文件
+///
+/// 目录本身、或任一子目录的 `bin` 下有 Java 可执行文件即算一个 Java。
+/// 命中后不再深入该目录，免得把 JDK 自带的 jre 重复算一个。
+///
+/// - `dir`: 要扫描的根目录
+///
+/// # 返回值
+///
+/// 排序去重后的可执行文件路径；目录里没有 Java 时为空列表
+pub fn find_all_java_from_path<P: AsRef<Path>>(dir: P) -> Vec<PathBuf> {
+    let Some(exe) = java_exe_name() else {
+        return Vec::new();
+    };
+
+    let mut found = Vec::new();
+    collect_java_exe(dir.as_ref(), exe, 0, &mut found);
+    found.sort();
+    found.dedup();
+    found
+}
+
+/// 递归收集 Java 可执行文件，命中即停
+///
+/// - `dir`: 当前目录
+/// - `exe`: Java 可执行文件名
+/// - `depth`: 当前深度，超过上限即返回
+/// - `out`: 收集结果
+fn collect_java_exe(dir: &Path, exe: &str, depth: usize, out: &mut Vec<PathBuf>) {
+    if depth > JAVA_SCAN_MAX_DEPTH {
+        return;
+    }
+
+    // 用户可能直接选中了 bin 目录
+    let direct = dir.join(exe);
+    if direct.is_file() {
+        out.push(direct);
+        return;
+    }
+
+    let home = dir.join("bin").join(exe);
+    if home.is_file() {
+        out.push(home);
+        return;
+    }
+
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+
+    for path in entries.flatten().map(|entry| entry.path()) {
+        if path.is_dir() {
+            collect_java_exe(&path, exe, depth + 1, out);
+        }
     }
 }
 

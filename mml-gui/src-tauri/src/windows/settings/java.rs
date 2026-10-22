@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use mml_base::archives::IBaseArchiveGui;
-use mml_jvms::java_helper;
+use mml_jvms::{JavaInfoObj, java_helper};
 use tauri::{AppHandle, Emitter};
 
 use crate::dtos::{JavaImportProgressDto, JavaInfoDto};
@@ -39,17 +39,9 @@ pub fn settings_scan_java() -> Vec<JavaInfoDto> {
 #[gui_macros::ipc_group("settings")]
 #[gui_macros::command]
 pub fn settings_add_java(name: Option<String>, path: String) -> Result<JavaInfoDto, String> {
-    if let Some(added) = mml_jvms::add_item(name, path) {
-        Ok(JavaInfoDto {
-            name: added.name.clone(),
-            path: added.path.to_string_lossy().to_string(),
-            version: added.version.clone(),
-            major: added.major_version.max(0),
-            java_type: added.java_type.clone(),
-            arch: added.arch.to_string(),
-        })
-    } else {
-        Err(err_keys::JAVA_INVALID.to_string())
+    match mml_jvms::add_item(name, path) {
+        Some(added) => Ok(info_dto(&added)),
+        None => Err(err_keys::JAVA_INVALID.to_string()),
     }
 }
 
@@ -115,53 +107,47 @@ pub async fn settings_import_java(
     )
     .await
     .map_err(|err| err.to_string())?;
-    if let Some(data) = data {
-        Ok(Some(JavaInfoDto {
-            name: data.name.clone(),
-            path: data.path.to_string_lossy().to_string(),
-            version: data.version.clone(),
-            major: data.major_version,
-            java_type: data.java_type.clone(),
-            arch: data.arch.to_string(),
-        }))
-    } else {
-        Ok(None)
-    }
+    Ok(data.map(|info| info_dto(&info)))
 }
 
 /// 扫描指定文件夹里的 Java 并注册，含子目录
+///
+/// 一个目录下可能装着好几个 JDK，每个都要单独探测再入列表。
 ///
 /// - `path`: 要扫描的目录路径
 ///
 /// # 返回值
 ///
-/// 注册成功的 Java 项；目录里没找到 Java 时返回 `None`
+/// 注册成功的 Java 列表；目录里没找到 Java 时为空列表
 #[gui_macros::ipc_group("settings")]
 #[gui_macros::command]
-pub async fn settings_scan_java_dir(path: String) -> Result<Option<JavaInfoDto>, String> {
-    let data = mml_jvms::find_java_from_path(Path::new(&path));
-
-    let Some(data) = data else {
-        return Ok(None);
-    };
-
-    let data = tauri::async_runtime::spawn(async move { java_helper::test_java(Path::new(&data)) })
-        .await
-        .map_err(|err| err.to_string())?;
-
-    if let Some(info) = data {
-        let info = mml_jvms::add_info_item(info);
-        Ok(Some(JavaInfoDto {
-            name: info.name.clone(),
-            path: info.path.to_string_lossy().to_string(),
-            version: info.version.clone(),
-            major: info.major_version,
-            java_type: info.java_type.clone(),
-            arch: info.arch.to_string(),
-        }))
-    } else {
-        Ok(None)
+pub async fn settings_scan_java_dir(path: String) -> Result<Vec<JavaInfoDto>, String> {
+    let files = mml_jvms::find_all_java_from_path(Path::new(&path));
+    if files.is_empty() {
+        return Ok(Vec::new());
     }
+
+    // 每个都要跑一次 java -version，并行探完再一起入库
+    let mut tasks = Vec::with_capacity(files.len());
+    for file in files {
+        tasks.push(tauri::async_runtime::spawn_blocking(move || {
+            java_helper::test_java(file)
+        }));
+    }
+
+    let mut infos = Vec::with_capacity(tasks.len());
+    for task in tasks {
+        match task.await {
+            Ok(Some(info)) => infos.push(info),
+            Ok(None) => {}
+            Err(err) => return Err(err.to_string()),
+        }
+    }
+
+    Ok(mml_jvms::add_info_items(infos)
+        .iter()
+        .map(info_dto)
+        .collect())
 }
 
 /// 探测路径指向的 Java，只取信息不注册
@@ -191,17 +177,25 @@ pub async fn settings_detect_java(path: String) -> Result<Option<String>, String
 ///
 /// 当前全部 Java 的 DTO，与 windows::main 的 java_list 同构
 pub(super) fn java_list() -> Vec<JavaInfoDto> {
-    mml_jvms::get_all_java()
-        .iter()
-        .map(|j| JavaInfoDto {
-            name: j.name.clone(),
-            path: j.path.to_string_lossy().to_string(),
-            version: j.version.clone(),
-            major: j.major_version.max(0),
-            java_type: j.java_type.clone(),
-            arch: j.arch.to_string(),
-        })
-        .collect()
+    mml_jvms::get_all_java().iter().map(info_dto).collect()
+}
+
+/// 内核 Java 信息 → 前端 DTO
+///
+/// - `info`: `mml-jvms` 持有的 Java 信息
+///
+/// # 返回值
+///
+/// 占位条目的主版本号在 DTO 里归零
+fn info_dto(info: &Arc<JavaInfoObj>) -> JavaInfoDto {
+    JavaInfoDto {
+        name: info.name.clone(),
+        path: info.path.to_string_lossy().to_string(),
+        version: info.version.clone(),
+        major: info.major_version.max(0),
+        java_type: info.java_type.clone(),
+        arch: info.arch.to_string(),
+    }
 }
 
 impl JavaArchiveGui {

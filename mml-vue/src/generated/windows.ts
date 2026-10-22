@@ -89,7 +89,9 @@ export { default as WinSettingsPartsTabsClientTab } from "../windows/settings/pa
 export { default as WinSettingsPartsTabsExperimentalTab } from "../windows/settings/parts/tabs/ExperimentalTab.vue";
 export { default as WinSettingsPartsTabsJavaTab } from "../windows/settings/parts/tabs/JavaTab.vue";
 export { default as WinSettingsPartsTabsLaunchTab } from "../windows/settings/parts/tabs/LaunchTab.vue";
+export { default as WinSettingsPartsTabsLocalFilesTab } from "../windows/settings/parts/tabs/LocalFilesTab.vue";
 export { default as WinSettingsPartsTabsNetworkTab } from "../windows/settings/parts/tabs/NetworkTab.vue";
 export { default as WinSettingsPartsTabsSkinTab } from "../windows/settings/parts/tabs/SkinTab.vue";
 export { default as WinSettingsPartsTabsUiTab } from "../windows/settings/parts/tabs/UiTab.vue";
 export { default as StatsWindow } from "../windows/stats/StatsWindow.vue";
+export { default as WinStatsPartsDaySharePie } from "../windows/stats/parts/DaySharePie.vue";

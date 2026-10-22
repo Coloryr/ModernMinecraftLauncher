@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # 预发布构建：thin LTO + 16 个代码生成单元，能并行，出包快很多。
+# 带 prerelease feature：主页面会提示「预发布版」，见 mml-gui/src-tauri/src/build_info.rs。
 # 只产出可执行文件，不打安装包，产物在 <仓库>/target/prerelease/mml-gui.exe。
 # 用的是根 Cargo.toml 里的 [profile.prerelease]，与 release 各有独立 target 子目录，
 # 两个模式来回切不会互相刷缓存。正式发布用 build/build-release.sh。
@@ -28,7 +29,7 @@ cd "$root/mml-gui/src-tauri"
 echo '正在构建 prerelease（thin LTO）...'
 # 必须带 custom-protocol：不带的话 tauri 把这次构建当成 dev，
 # 前端去连 localhost:1420 而不是内嵌 dist，窗口永远不出来（见 Cargo.toml 的 [features]）
-cargo build --profile prerelease --features custom-protocol
+cargo build --profile prerelease --features custom-protocol,prerelease
 
 echo
 echo "产物: $root/target/prerelease/mml-gui.exe"

@@ -4,13 +4,16 @@
 // 传输层不在这里绑定：createCommands 接收调用方传入的 invoke。
 
 import type { Invoke } from "./invoke";
-import type { AccountStoreDto, AccountStoreViewDto, AutoSaveTargetDto, BgInfoDto, BlockGroupsDto, BlockItemDto, BlockStatusDto, BytesSliceDto, ChunkFindDto, CollectDataDto, ColorMcInfoDto, ColorMcReportDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, CrashAnalysisDto, CustomCssItemDto, CustomHomeInfoDto, CustomJsonItemDto, CustomUiInfoDto, DataPackItemDto, DepProblemDto, DetectedPackDto, DirEntry, DownloadStatusDto, DropPathDto, ExportConfigDto, ExportEntryDto, ExportInfoDto, FileItemDto, FileListDto, FolderInstanceDto, GroupDto, GuiConfigDto, IconSourceDto, InstanceArgsDto, InstanceInfoDto, InstanceLangDto, InstancePatch, JavaDownloadItemDto, JavaDownloadOptionsDto, JavaInfoDto, JavaTypes, LaunchSettingDto, LoadState, LocalFileEntryDto, LogLine, LogSettingDto, McaChunkDto, ModAutoMarkDto, ModDepTreeDto, ModGroupDto, ModItemDto, ModPackStatusDto, ModPackUpdateDto, ModRenameDto, ModUpdateApplyDto, ModUpdateCheckDto, ModUpdateProjectDto, MotdDto, NbtEditDto, NetworkSettingDto, NewsItem, PackItemDto, ProjectDetailDto, ProjectDto, ProjectItemDto, ResourceDependencyDto, ResourceDropDto, ResourceSaveDto, ResourceStatusDto, ResourceViewDto, RunArgSettingDto, SaveBackupDto, SaveEditDto, SaveItemDto, SchematicDetailDto, SchematicItemDto, ScreenshotItemDto, ServerItemDto, SettingsDefaultsDto, ShaderItemDto, StartArgDto, StatsDataDto, StatsPlaytimeDto, SystemMemoryDto, TexturesDto, VersionInfoDto, WindowSettingDto, WindowSizeDto } from "./types";
+import type { AccountStoreDto, AccountStoreViewDto, AutoSaveTargetDto, BgInfoDto, BlockGroupsDto, BlockItemDto, BlockStatusDto, BuildInfoDto, BytesSliceDto, ChunkFindDto, CollectDataDto, ColorMcInfoDto, ColorMcReportDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, CrashAnalysisDto, CustomCssItemDto, CustomHomeInfoDto, CustomJsonItemDto, CustomUiInfoDto, DataPackItemDto, DepProblemDto, DetectedPackDto, DirEntry, DownloadStatusDto, DropPathDto, ExportConfigDto, ExportEntryDto, ExportInfoDto, FileItemDto, FileListDto, FolderInstanceDto, GroupDto, GuiConfigDto, IconSourceDto, InstanceArgsDto, InstanceInfoDto, InstanceLangDto, InstancePatch, JavaDownloadItemDto, JavaDownloadOptionsDto, JavaInfoDto, JavaTypes, LaunchSettingDto, LoadState, LocalFileEntryDto, LogLine, LogSettingDto, McaChunkDto, ModAutoMarkDto, ModDepTreeDto, ModGroupDto, ModItemDto, ModPackStatusDto, ModPackUpdateDto, ModRenameDto, ModUpdateApplyDto, ModUpdateCheckDto, ModUpdateProjectDto, MotdDto, NbtEditDto, NetworkSettingDto, NewsItem, PackItemDto, ProjectDetailDto, ProjectDto, ProjectItemDto, ResourceDependencyDto, ResourceDropDto, ResourceSaveDto, ResourceStatusDto, ResourceViewDto, RunArgSettingDto, SaveBackupDto, SaveEditDto, SaveItemDto, SchematicDetailDto, SchematicItemDto, ScreenshotItemDto, ServerItemDto, SettingsDefaultsDto, ShaderItemDto, StartArgDto, StatsDataDto, StatsPlaytimeDto, SystemMemoryDto, TexturesDto, VersionInfoDto, WindowSettingDto, WindowSizeDto } from "./types";
 
 export * from "./types";
 
 /** 创建命令包装：传入传输层的 invoke，Tauri 页面与自定义主页各用各的 */
 export function createCommands(invoke: Invoke) {
   return {
+    buildInfo: {
+      info: () => invoke<BuildInfoDto>("app_build_info"),
+    },
     windows: {
       activateDecoration: () => invoke<string>("window_activate_decoration"),
       closeWindow: (kind: string, instance: string | null) => invoke<void>("window_close_window", { kind, instance }),
@@ -294,7 +297,7 @@ export function createCommands(invoke: Invoke) {
       saveLaunch: (run: RunArgSettingDto, window: WindowSettingDto) => invoke<void>("settings_save_launch", { run, window }),
       saveNetwork: (dto: NetworkSettingDto) => invoke<void>("settings_save_network", { dto }),
       scanJava: () => invoke<JavaInfoDto[]>("settings_scan_java"),
-      scanJavaDir: (path: string) => invoke<JavaInfoDto | null>("settings_scan_java_dir", { path }),
+      scanJavaDir: (path: string) => invoke<JavaInfoDto[]>("settings_scan_java_dir", { path }),
       setBg: (source: string, percent: number) => invoke<string>("settings_set_bg", { source, percent }),
     },
     stats: {

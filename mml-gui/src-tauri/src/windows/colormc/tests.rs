@@ -26,6 +26,9 @@ use super::migrate::migrate;
 use std::fs;
 use std::path::Path;
 
+use serde_json::{Value, json};
+use uuid::Uuid;
+
 use mml_base::serialize_tools;
 use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 use mml_names::names;
@@ -40,6 +43,89 @@ fn fixture() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
         .join("colormc")
+}
+
+/// 现场造一个最小实例：目录 + `game.json`
+///
+/// - `root`: 工作目录，实例落在 `minecraft/instances/<dir>`
+/// - `dir`: 实例目录名
+/// - `uuid`: 实例 uuid
+/// - `name`: 实例显示名
+/// - `group`: ColorMC 的组名，`None` 表示没有
+///
+/// # 返回值
+///
+/// 实例目录路径
+fn write_instance(root: &Path, dir: &str, uuid: Uuid, name: &str, group: Option<&str>) -> PathBuf {
+    let path = root
+        .join(names::MINECRAFT_DIR)
+        .join(names::INSTANCE_DIR)
+        .join(dir);
+    fs::create_dir_all(&path).unwrap();
+
+    let mut game = json!({
+        "UUID": uuid.to_string(),
+        "Name": name,
+        "DirName": dir,
+        "Version": "1.20.4",
+        "Loader": 0,
+        "Encoding": 0,
+    });
+    if let Some(group) = group {
+        game["GroupName"] = json!(group);
+    }
+    fs::write(
+        path.join(names::GAME_FILE),
+        serde_json::to_string_pretty(&game).unwrap(),
+    )
+    .unwrap();
+
+    path
+}
+
+/// 读实例目录里的 `game.json`
+///
+/// - `dir`: 实例目录
+///
+/// # 返回值
+///
+/// 解析出的 JSON
+fn read_instance(dir: &Path) -> Value {
+    serde_json::from_str(&fs::read_to_string(dir.join(names::GAME_FILE)).unwrap()).unwrap()
+}
+
+/// 取实例配置里的字符串字段
+fn field<'a>(game: &'a Value, key: &str) -> Option<&'a str> {
+    game.get(key).and_then(Value::as_str)
+}
+
+/// 取实例配置里的 uuid
+fn uuid_of(game: &Value) -> Option<Uuid> {
+    field(game, "UUID").and_then(|uuid| Uuid::parse_str(uuid).ok())
+}
+
+/// 按组名找分组 uuid，找不到返回空串
+fn group_key(saved: &Value, name: &str) -> String {
+    saved["Names"]
+        .as_object()
+        .map(|names| names.iter())
+        .into_iter()
+        .flatten()
+        .find(|(_, value)| value.as_str() == Some(name))
+        .map(|(key, _)| key.clone())
+        .unwrap_or_default()
+}
+
+/// 某分组里的实例 uuid
+fn members(saved: &Value, key: &str) -> Vec<String> {
+    saved["Groups"][key]
+        .as_array()
+        .map(|items| items.iter())
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::to_string)
+        .collect()
 }
 
 /// 兼容性结论的查表助手
@@ -63,7 +149,7 @@ fn real_fixture_is_recognized_and_readable() {
     assert!(looks_like_colormc(&src));
 
     // 三个真实实例都在
-    let instances = list_instances(&src);
+    let instances = list_instance_dirs(&instance_root(&src));
     assert_eq!(instances.len(), 3, "实际：{instances:?}");
     assert!(
         instances.contains(&String::from("1.21.11-NeoForge-21.11.38-beta")),
@@ -188,7 +274,15 @@ fn copy_real_fixture_keeps_source_and_instances_usable() {
         .join("1.21.11-NeoForge-21.11.38-beta")
         .join(names::GAME_FILE);
     assert!(game.is_file());
-    assert!(serialize_tools::json_from_file::<InstanceSettingObj>(&game).is_ok());
+    let source_game = fixture()
+        .join(names::MINECRAFT_DIR)
+        .join(names::INSTANCE_DIR)
+        .join("1.21.11-NeoForge-21.11.38-beta")
+        .join(names::GAME_FILE);
+    let before: InstanceSettingObj = serialize_tools::json_from_file(&source_game).unwrap();
+    let after: InstanceSettingObj = serialize_tools::json_from_file(&game).unwrap();
+    // 没有重名、也没有 uuid 冲突时，实例身份原样保留
+    assert_eq!(after.uuid, before.uuid, "普通迁移不该改实例 uuid");
 
     cleanup(&[&dst]);
 }
@@ -316,4 +410,178 @@ fn skip_writes_marker_and_stops_asking() {
 
     let _ = fs::remove_file(&file);
     assert!(!asked(), "删掉标记就该重新问");
+}
+
+/// 同名实例不覆盖：导入的那个改名保留两份，uuid 冲突只换导入的
+#[test]
+fn same_named_instance_is_renamed_and_kept() {
+    ensure_boot();
+    let src = temp_dir("inst-src");
+    let dst = temp_dir("inst-dst");
+
+    let old = Uuid::new_v4();
+    write_instance(&src, "共享", old, "共享", Some("导入组"));
+    // 目标里已经有一个同名实例，uuid 还与源里的一样
+    write_instance(&dst, "共享", old, "共享", None);
+
+    migrate(None, &src, &dst, false).unwrap();
+
+    let root = dst.join(names::MINECRAFT_DIR).join(names::INSTANCE_DIR);
+
+    // 原有的那份原封不动
+    let kept = read_instance(&root.join("共享"));
+    assert_eq!(uuid_of(&kept), Some(old), "原有实例的 uuid 不该改");
+
+    // 导入的那份改名保留，uuid 换新
+    let imported_dir = root.join("共享1");
+    assert!(
+        imported_dir.join(names::GAME_FILE).is_file(),
+        "重名实例应改名保留：{}",
+        imported_dir.display()
+    );
+    let imported = read_instance(&imported_dir);
+    assert_eq!(field(&imported, "Name"), Some("共享1"));
+    assert_eq!(field(&imported, "DirName"), Some("共享1"));
+    let imported_uuid = uuid_of(&imported).expect("导入的实例该有 uuid");
+    assert_ne!(Some(imported_uuid), Some(old), "uuid 冲突时只换导入的那个");
+
+    // ColorMC 的组名跟着导入的实例走：进组的是换过的新 uuid
+    let saved: Value =
+        serde_json::from_str(&fs::read_to_string(root.join(names::GROUP_FILE)).unwrap()).unwrap();
+    let key = group_key(&saved, "导入组");
+    assert!(!key.is_empty(), "导入的组该建出来");
+    assert!(
+        members(&saved, &key).contains(&imported_uuid.to_string()),
+        "导入的实例该进「导入组」"
+    );
+
+    cleanup(&[&src, &dst]);
+}
+
+/// 只是 uuid 冲突、目录不重名：目录不动，只给导入的实例换 uuid
+#[test]
+fn uuid_conflict_only_replaces_imported_uuid() {
+    ensure_boot();
+    let src = temp_dir("uuid-src");
+    let dst = temp_dir("uuid-dst");
+
+    let old = Uuid::new_v4();
+    write_instance(&src, "导入", old, "导入", None);
+    write_instance(&dst, "原有", old, "原有", None);
+
+    migrate(None, &src, &dst, false).unwrap();
+
+    let root = dst.join(names::MINECRAFT_DIR).join(names::INSTANCE_DIR);
+    assert!(root.join("导入").is_dir(), "目录不重名时不该改名");
+
+    let imported = read_instance(&root.join("导入"));
+    assert_ne!(
+        uuid_of(&imported),
+        Some(old),
+        "uuid 冲突时要给导入的实例换新"
+    );
+    assert_eq!(
+        field(&imported, "Name"),
+        Some("导入"),
+        "没重名就不该改显示名"
+    );
+
+    let kept = read_instance(&root.join("原有"));
+    assert_eq!(uuid_of(&kept), Some(old), "原有实例的 uuid 不该改");
+
+    cleanup(&[&src, &dst]);
+}
+
+/// 移动模式同样保留同名实例
+#[test]
+fn move_keeps_same_named_instance() {
+    ensure_boot();
+    let src = temp_dir("move-inst-src");
+    let dst = temp_dir("move-inst-dst");
+
+    let kept_uuid = Uuid::new_v4();
+    let moved_uuid = Uuid::new_v4();
+    write_instance(&src, "共享", moved_uuid, "共享", None);
+    write_instance(&dst, "共享", kept_uuid, "共享", None);
+
+    migrate(None, &src, &dst, true).unwrap();
+
+    let root = dst.join(names::MINECRAFT_DIR).join(names::INSTANCE_DIR);
+    assert_eq!(uuid_of(&read_instance(&root.join("共享"))), Some(kept_uuid));
+    let imported_dir = root.join("共享1");
+    assert!(imported_dir.join(names::GAME_FILE).is_file());
+    assert_eq!(uuid_of(&read_instance(&imported_dir)), Some(moved_uuid));
+    assert!(!src.exists(), "搬空后源目录该被删掉");
+
+    cleanup(&[&dst]);
+}
+
+/// ColorMC 的 GroupName 合并进 group_save.json：同名组复用，没有的新建
+#[test]
+fn group_names_merge_into_group_save() {
+    ensure_boot();
+    let src = temp_dir("group-src");
+    let dst = temp_dir("group-dst");
+
+    let uuid_a = Uuid::new_v4();
+    let uuid_b = Uuid::new_v4();
+    let uuid_c = Uuid::new_v4();
+    write_instance(&src, "A", uuid_a, "A", Some(" 经典 "));
+    write_instance(&src, "B", uuid_b, "B", Some("新组"));
+    write_instance(&src, "C", uuid_c, "C", None);
+
+    // 目标里已经有一组「经典」：导入的应复用它，而不是再建一个同名组
+    let root = dst.join(names::MINECRAFT_DIR).join(names::INSTANCE_DIR);
+    fs::create_dir_all(&root).unwrap();
+    let exist = Uuid::new_v4();
+    let default_key = Uuid::nil().to_string();
+    let exist_key = exist.to_string();
+    let mut names = serde_json::Map::new();
+    names.insert(default_key.clone(), json!(""));
+    names.insert(exist_key.clone(), json!("经典"));
+    let mut groups = serde_json::Map::new();
+    groups.insert(default_key.clone(), json!([]));
+    groups.insert(exist_key.clone(), json!([]));
+    let before = json!({
+        "GroupOrder": [default_key.clone(), exist_key.clone()],
+        "Names": Value::Object(names),
+        "Groups": Value::Object(groups),
+        "Order": {},
+    });
+    fs::write(
+        root.join(names::GROUP_FILE),
+        serde_json::to_string_pretty(&before).unwrap(),
+    )
+    .unwrap();
+
+    migrate(None, &src, &dst, false).unwrap();
+
+    let saved: Value =
+        serde_json::from_str(&fs::read_to_string(root.join(names::GROUP_FILE)).unwrap()).unwrap();
+
+    // 同名组复用
+    assert_eq!(group_key(&saved, "经典"), exist_key, "同名组该复用");
+    assert!(
+        members(&saved, &exist_key).contains(&uuid_a.to_string()),
+        "导入的实例该进「经典」"
+    );
+    // 新组按需创建
+    let new_key = group_key(&saved, "新组");
+    assert!(!new_key.is_empty(), "没有的组该新建");
+    assert!(
+        members(&saved, &new_key).contains(&uuid_b.to_string()),
+        "导入的实例该进「新组」"
+    );
+    // 没有组名的实例不进任何非默认组
+    for key in saved["Groups"].as_object().unwrap().keys() {
+        if key != &default_key {
+            assert!(
+                !members(&saved, key).contains(&uuid_c.to_string()),
+                "没有组名的实例不该被塞进「{}」",
+                saved["Names"][key]
+            );
+        }
+    }
+
+    cleanup(&[&src, &dst]);
 }

@@ -57,6 +57,17 @@ pub struct GroupInfoObj {
     pub name: String,
 }
 
+/// 从别处导入的一个实例的分组归属
+///
+/// 迁移时实例目录刚搬过来、核心还没登记，只能先把归属写进分组表；
+/// 重启加载实例时按 uuid 对上，实例就落在这一组里。
+pub struct ImportedGroup {
+    /// 导入的实例 uuid
+    pub uuid: Uuid,
+    /// 原来的组名，调用方已去首尾空白；`None` 或空白表示默认分组
+    pub group: Option<String>,
+}
+
 /// 旧版分组文件里的一个实例条目
 ///
 /// 旧文件只记实例目录名，迁进分组表要先换成 uuid，所以由调用方补上 uuid。
@@ -582,6 +593,87 @@ pub fn import_legacy(dir: &Path, instances: &[LegacyInstance]) {
             instances: result.instances,
         });
     }
+}
+
+/// 把迁移导入的分组归属合并进指定的分组表文件
+///
+/// 迁移发生在核心加载之后，导入的实例还没登记进内存表，所以这里只改表。
+/// 若 `file` 正是本进程在用的那份表，直接在内存表上合并 —— 否则之后任何分组操作
+/// 都会拿旧表把刚合并的组覆盖掉。导入的实例在下次启动按 uuid 对上归属。
+///
+/// - `file`: `group_save.json` 的路径
+/// - `items`: 每条含实例 uuid 与组名；组名为 `None` 或空白表示默认分组，不写进表
+///
+/// # 返回值
+///
+/// 读写失败时返回对应错误；没有任何带名字的组时不写盘
+pub fn merge_imported(file: &Path, items: &[ImportedGroup]) -> CoreResult<()> {
+    let live = GROUP_FILE.read().unwrap().clone();
+
+    if live.as_deref() == Some(file) {
+        let merged = {
+            let mut store = STORE.write().unwrap();
+            let merged = merge_store(&mut store, items);
+            if merged {
+                store.normalize();
+                serialize_tools::json_to_file(&*store, file)?;
+            }
+            merged
+        };
+
+        // 同步写盘之外再走一次异步保存：config_save 按 uuid 去重，
+        // 这样队列里更早那份旧表落盘任务会被替换掉
+        if merged {
+            save();
+        }
+        return Ok(());
+    }
+
+    let mut store: GroupStore = if file.is_file() {
+        serialize_tools::json_from_file(file).unwrap_or_default()
+    } else {
+        GroupStore::default()
+    };
+    store.normalize();
+
+    if merge_store(&mut store, items) {
+        store.normalize();
+        serialize_tools::json_to_file(&store, file)?;
+    }
+
+    Ok(())
+}
+
+/// 把一批导入归属放进分组表：同名组复用，没有才新建
+///
+/// - `store`: 目标分组表
+/// - `items`: 每条含实例 uuid 与组名；空白组名跳过
+///
+/// # 返回值
+///
+/// 至少落了一条归属时返回 `true`
+fn merge_store(store: &mut GroupStore, items: &[ImportedGroup]) -> bool {
+    let mut merged = false;
+    for item in items {
+        let Some(name) = item
+            .group
+            .as_deref()
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+        else {
+            continue;
+        };
+
+        // ColorMC 的组名就是 M²L 这边的组名：同名组直接复用，别建出两个一样的组
+        let target = store.group_by_name(name).or_else(|| store.new_group(name));
+        let Some(target) = target else {
+            continue;
+        };
+        store.move_items(&[item.uuid], target);
+        merged = true;
+    }
+
+    merged
 }
 
 /// 保存分组表到磁盘，异步落盘

@@ -17,7 +17,7 @@ import { t } from "../../../../lib/i18n";
 import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
 import HighlightText from "../../../../components/ui/HighlightText.vue";
 import ResourceRow from "../ResourceRow.vue";
-import { LIST_ROW_GAP, LIST_ROW_H, useVirtualRows } from "../../composables/useVirtualRows";
+import { LIST_ROW_GAP, LIST_ROW_H, useVirtualRows } from "../../../../composables/useVirtualRows";
 import {
   modRowKey,
   modSub,

@@ -15,6 +15,7 @@ import BaseModal from "../../../../components/ui/BaseModal.vue";
 import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
 import HighlightText from "../../../../components/ui/HighlightText.vue";
 import SearchBox from "../../../../components/ui/SearchBox.vue";
+import BaseDatePicker from "../../../../components/ui/BaseDatePicker.vue";
 import type { ModUpdateProjectDto } from "../../../../lib/bindings";
 import { formatTime } from "../../../../lib/format";
 
@@ -220,11 +221,9 @@ function dash(value: string): string {
         <div v-if="!onlyProjectId" class="log-search">
           <SearchBox v-model="keyword" :placeholder="t('resource.updateLogSearch')" width="100%" />
         </div>
-        <input v-model="from" type="date" class="field-input log-date"
-          :aria-label="t('resource.updateLogDateFrom')" />
+        <BaseDatePicker v-model="from" class="log-date" :aria-label="t('resource.updateLogDateFrom')" />
         <span class="log-sep">–</span>
-        <input v-model="to" type="date" class="field-input log-date"
-          :aria-label="t('resource.updateLogDateTo')" />
+        <BaseDatePicker v-model="to" class="log-date" :aria-label="t('resource.updateLogDateTo')" />
       </div>
 
       <!-- 只看一个模组时给一条可关掉的提示，否则用户不知道列表为什么只剩一组 -->

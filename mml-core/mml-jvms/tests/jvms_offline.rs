@@ -137,6 +137,41 @@ fn find_java_from_path_finds_executable() {
     assert!(mml_jvms::find_java_from_path(&empty).is_none());
 }
 
+/// find_all_java_from_path：一个目录下有多套 JDK 时全部返回
+#[test]
+fn find_all_java_from_path_finds_every_home() {
+    let dir = make_temp_dir("find-all");
+    let exe = java_file_name();
+
+    let mut expected = Vec::new();
+    for home in ["jdk-17", "jdk-21"] {
+        let file = dir.join(home).join("bin").join(exe);
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        fs::write(&file, b"fake").unwrap();
+        expected.push(file);
+    }
+
+    // JDK 自带的 jre 与 JDK 同属一套，命中 jdk 目录后不再深入
+    let inner = dir.join("jdk-17").join("jre").join("bin").join(exe);
+    fs::create_dir_all(inner.parent().unwrap()).unwrap();
+    fs::write(&inner, b"fake").unwrap();
+
+    expected.sort();
+    let found = mml_jvms::find_all_java_from_path(&dir);
+    assert_eq!(found, expected);
+
+    // 直接选中 bin 目录也要认
+    let bin = dir.join("jdk-21").join("bin");
+    assert_eq!(
+        mml_jvms::find_all_java_from_path(&bin),
+        vec![bin.join(exe)]
+    );
+
+    let empty = make_temp_dir("find-all-empty");
+    fs::write(empty.join("readme.txt"), b"nothing here").unwrap();
+    assert!(mml_jvms::find_all_java_from_path(&empty).is_empty());
+}
+
 /// add_item / remove：添加有效 Java、持久化到配置、再移除
 #[test]
 fn add_and_remove_item_roundtrip() {
@@ -248,6 +283,44 @@ async fn load_config_with_invalid_java_creates_placeholder() {
         config.java_list.clear();
     }
     let _ = fs::remove_dir_all(&fake_dir);
+}
+
+/// add_info_items：同版本同发行版的两套 JDK 各自入库，不互相覆盖
+#[test]
+fn add_info_items_keeps_same_version_java_apart() {
+    let _dir = setup();
+
+    let make = |path: PathBuf| mml_jvms::JavaInfoObj {
+        name: "ut-dup-17".to_string(),
+        path,
+        version: "17.0.2".to_string(),
+        major_version: 17,
+        java_type: "openjdk".to_string(),
+        arch: ArchEnum::X86_64,
+    };
+    let exe_in = |home: &str| make_temp_dir(home).join("bin").join(java_file_name());
+
+    let path_a = exe_in("dup-a");
+    let path_b = exe_in("dup-b");
+    let added = mml_jvms::add_info_items(vec![make(path_a.clone()), make(path_b.clone())]);
+    assert_eq!(added.len(), 2);
+
+    let names: Vec<&str> = added.iter().map(|item| item.name.as_str()).collect();
+    assert_ne!(names[0], names[1], "同名不同路径应各自保留");
+    for name in &names {
+        assert!(name.starts_with("ut-dup-17"), "名称应保留原有前缀");
+    }
+
+    for name in &names {
+        assert!(mml_jvms::get_java_info(name).is_some());
+        mml_jvms::remove(name);
+    }
+
+    // 同路径重复导入仍是覆盖，名称不变
+    let again = mml_jvms::add_info_items(vec![make(path_a.clone()), make(path_a.clone())]);
+    assert_eq!(again.len(), 2);
+    assert_eq!(again[0].name, again[1].name);
+    mml_jvms::remove(&again[0].name);
 }
 
 // 说明：RUN_DIR 由后台保存线程异步写入 config.json，无法在用例结束时安全删除，

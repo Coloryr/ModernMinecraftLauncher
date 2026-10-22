@@ -3,6 +3,7 @@
 // 按 uuid 取色的渐变底 + 实例名首字母
 import { computed, onUnmounted, ref, watch } from "vue";
 import { getImageBaseUrl, onInstanceChange } from "../lib/api";
+import { instanceGradient } from "../lib/instanceColor";
 
 const props = withDefaults(
   defineProps<{
@@ -16,23 +17,8 @@ const props = withDefaults(
   { size: 48 },
 );
 
-// 根据 uuid 稳定取色，保证同一实例图标一致；图标缺失 / 加载失败时就用它回退
-const gradients = [
-  "linear-gradient(135deg, #3f8cff, #5f6cff)",
-  "linear-gradient(135deg, #34d399, #22d3ee)",
-  "linear-gradient(135deg, #f59e0b, #ef4444)",
-  "linear-gradient(135deg, #a855f7, #ec4899)",
-  "linear-gradient(135deg, #14b8a6, #3b82f6)",
-  "linear-gradient(135deg, #f97316, #f43f5e)",
-  "linear-gradient(135deg, #84cc16, #22c55e)",
-  "linear-gradient(135deg, #06b6d4, #6366f1)",
-];
-
-const palette = computed(() => {
-  let h = 0;
-  for (const c of props.uuid) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return gradients[h % gradients.length];
-});
+// 取色在 lib/instanceColor：统计窗口的单日饼图用同一套，颜色才能和图标对上
+const palette = computed(() => instanceGradient(props.uuid));
 
 const char = computed(() => props.name.trim().charAt(0).toUpperCase() || "M");
 

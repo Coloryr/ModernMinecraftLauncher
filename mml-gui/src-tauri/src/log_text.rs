@@ -379,6 +379,23 @@ pub enum LogText {
         /// 失败原因
         error: String,
     },
+    /// ColorMC 迁移时处理实例目录失败
+    ColormcInstancesFailed {
+        /// 失败原因
+        error: String,
+    },
+    /// ColorMC 迁移时写回实例配置失败
+    ColormcInstancePatchFailed {
+        /// 实例路径，相对迁移根目录
+        name: String,
+        /// 失败原因
+        error: String,
+    },
+    /// ColorMC 迁移时合并分组失败
+    ColormcGroupMergeFailed {
+        /// 失败原因
+        error: String,
+    },
     /// 探测到旧版 ColorMC 数据
     ColormcDetected {
         /// 数据目录
@@ -654,6 +671,15 @@ impl LogText {
             LogText::ColormcCopySkip { path, error } => {
                 format!("[colormc] 跳过复制失败的文件 {path}：{error}")
             }
+            LogText::ColormcInstancesFailed { error } => {
+                format!("[colormc] 处理实例目录失败：{error}")
+            }
+            LogText::ColormcInstancePatchFailed { name, error } => {
+                format!("[colormc] 写回实例配置 {name} 失败：{error}")
+            }
+            LogText::ColormcGroupMergeFailed { error } => {
+                format!("[colormc] 合并分组失败：{error}")
+            }
             LogText::ColormcDetected { dir, from } => {
                 format!("[colormc] 探测到旧版数据：{dir}（from={from}）")
             }
@@ -878,6 +904,15 @@ impl LogText {
             ),
             LogText::ColormcCopySkip { path, error } => {
                 format!("[colormc] skipping a file that failed to copy {path}: {error}")
+            }
+            LogText::ColormcInstancesFailed { error } => {
+                format!("[colormc] failed to handle the instances directory: {error}")
+            }
+            LogText::ColormcInstancePatchFailed { name, error } => {
+                format!("[colormc] failed to write back the instance config {name}: {error}")
+            }
+            LogText::ColormcGroupMergeFailed { error } => {
+                format!("[colormc] failed to merge groups: {error}")
             }
             LogText::ColormcDetected { dir, from } => {
                 format!("[colormc] found legacy data: {dir} (from={from})")

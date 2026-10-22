@@ -47,7 +47,7 @@ import {
 } from "../../../lib/api";
 import { copyText } from "../../../lib/clipboard";
 import { useModDeps } from "../composables/useModDeps";
-import { provideListScroll } from "../composables/useVirtualRows";
+import { provideListScroll } from "../../../composables/useVirtualRows";
 import { useReorderDrag } from "../composables/useReorderDrag";
 import { useRowSelect } from "../composables/useRowSelect";
 import {

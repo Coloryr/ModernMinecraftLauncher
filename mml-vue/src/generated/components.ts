@@ -3,8 +3,11 @@
 // 8 个已导出控件之外的其余通用组件
 
 export { default as CompAccountActions } from "../components/AccountActions.vue";
+export { default as CompAccountLockModal } from "../components/AccountLockModal.vue";
 export { default as CompAccountSelector } from "../components/AccountSelector.vue";
 export { default as CompAccountTypeBadge } from "../components/AccountTypeBadge.vue";
+export { default as CompAutoSaveModal } from "../components/AutoSaveModal.vue";
+export { default as CompCrashAnalysisCard } from "../components/CrashAnalysisCard.vue";
 export { default as CompCustomExecPanel } from "../components/CustomExecPanel.vue";
 export { default as CompCustomHomePage } from "../components/CustomHomePage.vue";
 export { default as CompCustomJsonPanel } from "../components/CustomJsonPanel.vue";
@@ -35,6 +38,7 @@ export { default as CompResourceTitleIndicator } from "../components/ResourceTit
 export { default as CompUiAppToast } from "../components/ui/AppToast.vue";
 export { default as CompUiAsyncImage } from "../components/ui/AsyncImage.vue";
 export { default as CompUiAuthorTag } from "../components/ui/AuthorTag.vue";
+export { default as CompUiBaseDatePicker } from "../components/ui/BaseDatePicker.vue";
 export { default as CompUiBaseModal } from "../components/ui/BaseModal.vue";
 export { default as CompUiDragGhost } from "../components/ui/DragGhost.vue";
 export { default as CompUiDropOverlay } from "../components/ui/DropOverlay.vue";

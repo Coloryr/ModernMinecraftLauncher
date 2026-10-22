@@ -19,7 +19,7 @@ use super::progress;
 ///
 /// - `app`: 窗口句柄，`None` 表示不报进度
 /// - `src_entries`: 源工作目录的顶层条目名
-/// - `src_instances`: 源目录里的实例目录名
+/// - `targets`: 落地后的实例目录名；重名改过的以它为准
 /// - `dst`: 目标目录，实例就在这里逐个验
 ///
 /// 顶层条目查 [`COMPAT_TABLE`]，没列进去的按 `extra` 处理。
@@ -35,7 +35,7 @@ use super::progress;
 pub(super) fn check(
     app: Option<&AppHandle>,
     src_entries: &[String],
-    src_instances: &[String],
+    targets: &[String],
     dst: &Path,
 ) -> Checked {
     let mut checked = Checked {
@@ -61,8 +61,8 @@ pub(super) fn check(
 
     // 实例逐个验：能不能被 M²L 读出来
     let root = instance_root(dst);
-    let total = src_instances.len() as u32;
-    for (index, name) in src_instances.iter().enumerate() {
+    let total = targets.len() as u32;
+    for (index, name) in targets.iter().enumerate() {
         let dir = root.join(name);
         let game = dir.join(names::GAME_FILE);
         if serialize_tools::json_from_file::<InstanceSettingObj>(&game).is_ok() {

@@ -72,7 +72,7 @@ useModalKeys((e) => {
           {{ t("winSettings.javaScanDir") }}
         </BaseButton>
         <BaseButton size="sm" @click="importJavaArchive">{{ t("winSettings.javaImport") }}</BaseButton>
-        <BaseButton size="sm" @click="downloadJava">{{ t("winSettings.javaDownload") }}</BaseButton>
+        <BaseButton size="sm" variant="primary" @click="downloadJava">{{ t("winSettings.javaDownload") }}</BaseButton>
         <BaseButton size="sm" variant="danger" :disabled="javaList.length === 0" @click="confirmRemoveAll = true">
           {{ t("winSettings.javaRemoveAll") }}
         </BaseButton>
@@ -91,12 +91,12 @@ useModalKeys((e) => {
       </div>
 
       <div v-if="javaList.length === 0" class="java-empty">{{ t("winSettings.javaNone") }}</div>
-      <!-- 按发行类型（JDK / JRE）分组：类型行展开后，该类型的 Java 以卡片网格平铺 -->
-      <div v-for="g in javaGroups" :key="g.type" class="java-type">
-        <button class="java-type-head" @click="toggleType(g.type)">
-          <GlyphIcon class="chev" :class="{ up: typeOpen(g.type) }" name="chevron-down" :size="11" :weight="2.4" />
+      <!-- 按发行类型（JDK / JRE）分组：头行是一条面板条，展开后该类型的 Java 在面板里平铺 -->
+      <div v-for="g in javaGroups" :key="g.type" class="java-type" :class="{ 'is-open': typeOpen(g.type) }">
+        <button class="java-type-head" :aria-expanded="typeOpen(g.type)" @click="toggleType(g.type)">
           <span class="java-type-name">{{ g.type }}</span>
           <span class="java-count">{{ g.items.length }}</span>
+          <GlyphIcon class="chev" :class="{ up: typeOpen(g.type) }" name="chevron-down" :size="11" :weight="2.4" />
         </button>
         <CollapsePanel :open="typeOpen(g.type)">
           <div class="java-grid">

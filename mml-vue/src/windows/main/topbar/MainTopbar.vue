@@ -11,6 +11,7 @@ import ResourceTitleIndicator from "../../../components/ResourceTitleIndicator.v
 import { onTitleBarPointerDown, titleBarStyle } from "../../../lib/titlebar";
 import { useModpackStatus } from "../../../lib/modpackTasks";
 import { pluginDecorated } from "../../../lib/decoration";
+import { buildBadgeKey, buildChannel, isTestBuild, loadBuildInfo } from "../../../lib/buildInfo";
 import type { AccountStoreDto } from "../../../lib/bindings";
 import type { FeatureId } from "../types";
 
@@ -31,6 +32,7 @@ const { status: modpackStatus, init: initModpackStatus } = useModpackStatus(fals
 let unsubModpack: (() => void) | null = null;
 
 onMounted(async () => {
+  void loadBuildInfo();
   unsubModpack = await initModpackStatus();
 });
 
@@ -61,7 +63,11 @@ const emit = defineEmits<{
 
     <div class="brand">
       <div class="brand-text">
-        <div class="brand-name">{{ t("app.name") }}</div>
+        <div class="brand-name">
+          {{ t("app.name") }}
+          <!-- 测试版 / 预发布版徽章：顶栏一直可见，切到实例列表时也知道自己在用什么版本 -->
+          <span v-if="isTestBuild" class="build-badge" :class="buildChannel">{{ t(buildBadgeKey) }}</span>
+        </div>
         <div class="brand-sub">{{ t("app.sub") }}</div>
       </div>
     </div>
@@ -168,6 +174,26 @@ const emit = defineEmits<{
   display: flex;
   flex-direction: column;
   line-height: 1.2;
+}
+
+/* 构建通道徽章：预发布版用黄色、测试版用强调色，与状态色的用法一致 */
+.build-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  vertical-align: 2px;
+  border: 1px solid currentColor;
+}
+
+.build-badge.prerelease {
+  color: var(--yellow);
+}
+
+.build-badge.debug {
+  color: var(--accent);
 }
 
 .brand-name {

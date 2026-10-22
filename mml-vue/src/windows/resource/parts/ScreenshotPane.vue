@@ -17,7 +17,7 @@ import { clearScreenshots, deleteScreenshot } from "../../../lib/api";
 import ContentHead from "./ContentHead.vue";
 import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
 import { useRowSelect } from "../composables/useRowSelect";
-import { createListScroll, visibleWindow } from "../composables/useVirtualRows";
+import { createListScroll, visibleWindow } from "../../../composables/useVirtualRows";
 import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceOps } from "../composables/useResourceOps";
 import type { ScreenshotItemDto } from "../../../lib/bindings";

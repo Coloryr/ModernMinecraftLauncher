@@ -21,7 +21,7 @@ import {
   createListScroll,
   measureRowHeight,
   useVirtualRows,
-} from "../composables/useVirtualRows";
+} from "../../../composables/useVirtualRows";
 
 const props = withDefaults(
   defineProps<{

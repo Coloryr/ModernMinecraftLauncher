@@ -10,7 +10,7 @@ use chrono::{Days, Local, NaiveDate, NaiveTime};
 use mml_game::game_count;
 use uuid::Uuid;
 
-use crate::dtos::stats_dto::{StatsDataDto, StatsInstanceDto, StatsPlayDayDto, StatsPlaytimeDto};
+use crate::dtos::stats_dto::{StatsDataDto, StatsDayInstanceDto, StatsInstanceDto, StatsPlayDayDto, StatsPlaytimeDto};
 use crate::err_keys;
 
 /// 单实例的统计汇总，聚合期间的中间值
@@ -186,6 +186,7 @@ pub fn stats_get_playtime(
             days: Vec::new(),
             total_seconds: 0,
             active_days: 0,
+            by_instance: Vec::new(),
         });
     }
     if to_date > today {
@@ -208,6 +209,8 @@ pub fn stats_get_playtime(
         buckets.push(StatsPlayDayDto {
             date: date.format("%Y-%m-%d").to_string(),
             seconds: 0,
+            count: 0,
+            failed: 0,
         });
         if date == to_date {
             break;
@@ -217,11 +220,27 @@ pub fn stats_get_playtime(
 
     let count = game_count::get_count();
     let count = count.read().unwrap();
+    // 单日范围额外按实例拆分：饼图要看这一天各实例的占比
+    let single_day = day_count == 1;
+    let mut per_instance: HashMap<Uuid, u64> = HashMap::new();
+    // 当天各实例的启动次数与成功次数；launch_error 不会 push game_run，两者相减即失败数
+    let mut starts_per_instance: HashMap<Uuid, u32> = HashMap::new();
+    let mut dones_per_instance: HashMap<Uuid, u32> = HashMap::new();
+
+    // 每天的成功启动次数：launch_done 会 push 一条 game_run，launch_error 不会，
+    // 所以「启动日志条数 − 成功次数」就是当天的失败次数
+    let mut done_per_day = vec![0u32; day_count as usize];
     for (inst_uuid, runs) in &count.game_runs {
         if filter.is_some_and(|want| *inst_uuid != want) {
             continue;
         }
         for run in runs {
+            if let Some(i) = index.get(&run.start_time.naive_local().date()) {
+                done_per_day[*i] += 1;
+                if single_day {
+                    *dones_per_instance.entry(*inst_uuid).or_default() += 1;
+                }
+            }
             let end = if run.now {
                 now
             } else {
@@ -238,12 +257,60 @@ pub fn stats_get_playtime(
                 let date = cursor.date();
                 let next = (date + Days::new(1)).and_time(NaiveTime::MIN);
                 let chunk_end = end.min(next);
+                let secs = (chunk_end - cursor).num_seconds().max(0) as u64;
                 if let Some(i) = index.get(&date) {
-                    buckets[*i].seconds += (chunk_end - cursor).num_seconds().max(0) as u64;
+                    buckets[*i].seconds += secs;
+                    if single_day {
+                        *per_instance.entry(*inst_uuid).or_default() += secs;
+                    }
                 }
                 cursor = chunk_end;
             }
         }
+    }
+
+    // 启动次数按天分桶，日期取日志的记录时间
+    for (inst_uuid, logs) in &count.launch_logs {
+        if filter.is_some_and(|want| *inst_uuid != want) {
+            continue;
+        }
+        for log in logs {
+            if let Some(i) = index.get(&log.time.naive_local().date()) {
+                buckets[*i].count += 1;
+                if single_day {
+                    *starts_per_instance.entry(*inst_uuid).or_default() += 1;
+                }
+            }
+        }
+    }
+    for (i, day) in buckets.iter_mut().enumerate() {
+        day.failed = day.count.saturating_sub(done_per_day[i]);
+    }
+
+    // 单日时补实例名：现有实例取当前名字，已删除的取历史快照
+    let mut by_instance: Vec<StatsDayInstanceDto> = Vec::new();
+    if single_day && !per_instance.is_empty() {
+        let mut names: HashMap<Uuid, String> = count.game_names.clone();
+        for game in mml_game::get_instances() {
+            let g = game.read().unwrap();
+            names.insert(g.uuid, g.name.clone());
+        }
+        by_instance = per_instance
+            .into_iter()
+            .filter(|(_, seconds)| *seconds > 0)
+            .map(|(uuid, seconds)| {
+                let count = starts_per_instance.get(&uuid).copied().unwrap_or(0);
+                let done = dones_per_instance.get(&uuid).copied().unwrap_or(0);
+                StatsDayInstanceDto {
+                    uuid: uuid.to_string(),
+                    name: names.get(&uuid).cloned().unwrap_or_else(|| uuid.to_string()),
+                    seconds,
+                    count,
+                    failed: count.saturating_sub(done),
+                }
+            })
+            .collect();
+        by_instance.sort_by(|a, b| b.seconds.cmp(&a.seconds));
     }
 
     let total_seconds = buckets.iter().map(|day| day.seconds).sum();
@@ -252,5 +319,6 @@ pub fn stats_get_playtime(
         days: buckets,
         total_seconds,
         active_days,
+        by_instance,
     })
 }

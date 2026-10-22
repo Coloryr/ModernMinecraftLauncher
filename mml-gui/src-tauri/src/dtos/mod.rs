@@ -4,6 +4,7 @@
 //! 仅当跨 Tauri IPC 传输到前端时才转成 DTO，或 DTO 本身即 wire 形态，
 //! 如事件负载 / 命令入参。纯传输、无业务方法的窗口类型也集中在此。
 
+pub mod build_info_dto;
 pub mod account_dto;
 pub mod analysis_dto;
 pub mod add_dto;
@@ -33,6 +34,7 @@ pub mod version_dto;
 pub mod window_dto;
 
 pub use account_dto::{AccountStoreDto, AccountStoreViewDto};
+pub use build_info_dto::{BuildChannel, BuildInfoDto};
 pub use analysis_dto::{CrashAnalysisDto, CrashFindingDto};
 pub use add_dto::{
     DetectedPackDto, DirEntry, FolderInstanceDto, LoaderProgressDto, NameConflictDto,
