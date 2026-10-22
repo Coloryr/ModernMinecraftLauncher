@@ -97,7 +97,7 @@ pub async fn add_resource_list(
                     info.is_some(),
                     true,
                     collect_utils::is_star(&pid),
-                    check_download_now(&uuid, &item.id.to_string()),
+                    check_download_now(uuid.as_ref(), &item.id.to_string()),
                     None,
                 );
 
@@ -158,7 +158,7 @@ pub async fn add_resource_list(
                     info.is_some(),
                     true,
                     collect_utils::is_star(&pid),
-                    check_download_now(&uuid, &pid),
+                    check_download_now(uuid.as_ref(), &pid),
                     None,
                     avatars.get(&item.author_id).cloned(),
                 )

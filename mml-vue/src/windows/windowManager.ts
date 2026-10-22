@@ -585,7 +585,9 @@ export function openWindow(kind: WindowKind, params?: WindowOpenParams) {
   // 窗口族是"一个实例一个"：实例是它的窗口身份（后端按它派生 uuid 与标签），
   // 没有实例就开不出正确的窗口，两种模式都直接作罢
   const family = FAMILY_LABEL_PREFIX[kind] ? kind : null;
-  if (family && !params?.uuid) {
+  // 「下载资源」例外：没有实例时开那个静态窗口（标签 `mml-add_resource`），
+  // 实例在窗口标题栏里选，见 AddResourceWindow 的 refreshInstance
+  if (family && !params?.uuid && kind !== "add_resource") {
     console.warn(`[windowManager] 打开 ${family} 窗口缺少实例 uuid，已忽略`);
     return;
   }

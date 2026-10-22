@@ -1637,7 +1637,8 @@ export default {
   "addResource.bar.cancelled": "已取消",
   "addResource.bar.finished": "已结束 {count} 个资源",
   "addResource.noInstance": "未选择实例",
-  "addResource.pickInstance": "选择实例",
+  "addResource.chooseInstance": "选择实例",
+  "addResource.chooseInstanceHint": "这个资源装进哪个实例？选定后开始下载。",
   "addResource.saveSourceLimit": "存档下载仅支持 CurseForge 源",
   "err.saveNotFound": "请先选择一个存档",
 
@@ -1690,6 +1691,8 @@ export default {
   "collect.typeGroup.mod": "模组",
   "collect.typeGroup.resourcepack": "资源包",
   "collect.typeGroup.shaderpack": "光影包",
+  "collect.typeGroup.save": "存档",
+  "collect.typeGroup.dataPacks": "数据包",
   "collect.addModpack": "添加整合包收藏",
   "collect.addResource": "添加游戏资源收藏",
   "collect.chooseInstance": "选择实例",
@@ -1697,6 +1700,7 @@ export default {
   "collect.favTime": "收藏于 {time}",
   "collect.deleteFav": "删除收藏",
   "collect.removeFromGroup": "移出分组",
+  "collect.removeFromGroupConfirm": "确定把选中的 {count} 项移出分组吗？收藏会保留。",
   "collect.pickInstanceNone": "还没有游戏实例 —— 先建一个实例再来下载资源",
 
   // 占位窗口

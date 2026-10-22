@@ -15,9 +15,9 @@ use crate::windows::add_resource::{DOWNLOAD_NOW};
 
 /// 列表与详情命令共用的入参解析结果
 pub(super) struct ListQuery {
-    /// 实例 uuid，用来查"已下载 / 正在下载"
-    pub(super) uuid: Uuid,
-    /// 实例的在线信息，按项目 ID 查下载状态
+    /// 实例 uuid，用来查"已下载 / 正在下载"；浏览模式（还没选实例）为 None
+    pub(super) uuid: Option<Uuid>,
+    /// 实例的在线信息，按项目 ID 查下载状态；没有实例时是空表
     pub(super) info: OnlineInfoList,
     /// 下载源
     pub(super) source: ModPackType,
@@ -43,13 +43,20 @@ pub(super) fn parse_query(
     file_type: &str,
     loader: Option<&str>,
 ) -> Result<ListQuery, String> {
-    let Ok(uuid) = Uuid::parse_str(game) else {
-        return Err(String::from(err_keys::UUID));
+    // 空串 = 还没选实例：照常搜索，只是没有"装没装过"的标记。
+    // 收藏窗口那个入口就是这么用的 —— 实例在点下载时才选，见 AddResourceWindow。
+    let (uuid, info) = if game.is_empty() {
+        (None, OnlineInfoList::default())
+    } else {
+        let Ok(uuid) = Uuid::parse_str(game) else {
+            return Err(String::from(err_keys::UUID));
+        };
+        let Some(instance) = mml_game::get_instance(&uuid) else {
+            return Err(String::from(err_keys::GAME_NOT_FOUND));
+        };
+        let info = instance.read().unwrap().read_online_info();
+        (Some(uuid), info)
     };
-    let Some(instance) = mml_game::get_instance(&uuid) else {
-        return Err(String::from(err_keys::GAME_NOT_FOUND));
-    };
-    let info = instance.read().unwrap().read_online_info();
     let source = ModPackType::from_string(source);
     let Some(file_type) = FileType::from_string(file_type) else {
         return Err(String::from(err_keys::FILE_TYPE_NOT_FOUND));
@@ -79,7 +86,10 @@ pub(super) fn parse_query(
 /// # 返回值
 ///
 /// 该项目下有任一文件在下载即为 `true`
-pub(super) fn check_download_now(game: &Uuid, pid: &str) -> bool {
+pub(super) fn check_download_now(game: Option<&Uuid>, pid: &str) -> bool {
+    let Some(game) = game else {
+        return false;
+    };
     let read = DOWNLOAD_NOW.read().unwrap();
     let list = read.get(game);
     if list.is_none() {
@@ -104,7 +114,10 @@ pub(super) fn check_download_now(game: &Uuid, pid: &str) -> bool {
 /// # 返回值
 ///
 /// 该项目下这个文件正在下载即为 `true`
-pub(super) fn check_version_download_now(game: &Uuid, pid: &str, fid: &str) -> bool {
+pub(super) fn check_version_download_now(game: Option<&Uuid>, pid: &str, fid: &str) -> bool {
+    let Some(game) = game else {
+        return false;
+    };
     let read = DOWNLOAD_NOW.read().unwrap();
     let list = read.get(game);
     if list.is_none() {

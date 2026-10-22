@@ -57,11 +57,31 @@ impl ConfigSaveObj {
     ///
     /// 序列化成功返回任务对象，失败返回相应错误
     pub fn new<T: Serialize>(obj: &T, file: PathBuf, uuid: Uuid) -> CoreResult<Self> {
-        Ok(ConfigSaveObj {
-            json: serialize_tools::json_to_string(obj)?,
-            file,
-            uuid,
-        })
+        Self::build(obj, file, uuid, true)
+    }
+
+    /// 创建**紧凑**序列化的保存任务（不缩进）
+    ///
+    /// - `obj`: 需要序列化保存的对象
+    /// - `file`: 目标文件路径
+    /// - `uuid`: 任务唯一标识，相同 uuid 的后继任务会替换旧任务
+    ///
+    /// # 返回值
+    ///
+    /// 序列化成功返回任务对象，失败返回相应错误
+    pub fn new_compact<T: Serialize>(obj: &T, file: PathBuf, uuid: Uuid) -> CoreResult<Self> {
+        Self::build(obj, file, uuid, false)
+    }
+
+    /// 按是否缩进构造任务
+    fn build<T: Serialize>(obj: &T, file: PathBuf, uuid: Uuid, pretty: bool) -> CoreResult<Self> {
+        let json = if pretty {
+            serialize_tools::json_to_string(obj)?
+        } else {
+            serialize_tools::json_to_string_compact(obj)?
+        };
+
+        Ok(ConfigSaveObj { json, file, uuid })
     }
 
     /// 执行文件写入
@@ -91,9 +111,29 @@ static HANDLE: Mutex<Option<JoinHandle<()>>> = Mutex::new(None);
 /// - `obj`: 需要保存的对象
 /// - `file`: 目标文件路径
 pub fn save<T: Serialize>(uuid: Uuid, obj: &T, file: impl AsRef<Path>) {
+    enqueue(ConfigSaveObj::new(obj, file.as_ref().to_path_buf(), uuid).unwrap());
+}
+
+/// 将对象以**紧凑** JSON 加入保存队列，与 [`save`] 的区别只有不缩进
+///
+/// 条目多的数据文件（收藏、分组这类按条写盘的东西）用它：缩进会让文件大出好几倍，
+/// 而这些文件没人手读。
+///
+/// - `uuid`: 任务标识，相同标识会去重
+/// - `obj`: 需要保存的对象
+/// - `file`: 目标文件路径
+pub fn save_compact<T: Serialize>(uuid: Uuid, obj: &T, file: impl AsRef<Path>) {
+    enqueue(ConfigSaveObj::new_compact(obj, file.as_ref().to_path_buf(), uuid).unwrap());
+}
+
+/// 把一个任务塞进队列并唤醒保存线程
+///
+/// - `task`: 已经序列化好的保存任务
+fn enqueue(task: ConfigSaveObj) {
+    let uuid = task.uuid;
     let mut queue = QUEUE.lock().unwrap();
-    queue.retain(|obj| obj.uuid != uuid);
-    queue.push(ConfigSaveObj::new(obj, file.as_ref().to_path_buf(), uuid).unwrap());
+    queue.retain(|item| item.uuid != uuid);
+    queue.push(task);
 
     SEM.get().unwrap().up();
 }

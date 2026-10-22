@@ -1636,7 +1636,8 @@ export default {
   "addResource.bar.cancelled": "Cancelled",
   "addResource.bar.finished": "{count} resources finished",
   "addResource.noInstance": "No instance selected",
-  "addResource.pickInstance": "Choose an instance",
+  "addResource.chooseInstance": "Choose an instance",
+  "addResource.chooseInstanceHint": "Which instance should this go into? Download starts right after you pick.",
   "addResource.saveSourceLimit": "World downloads are only available on CurseForge",
   "err.saveNotFound": "Choose a world first",
 
@@ -1689,6 +1690,8 @@ export default {
   "collect.typeGroup.mod": "Mods",
   "collect.typeGroup.resourcepack": "Resource packs",
   "collect.typeGroup.shaderpack": "Shaders",
+  "collect.typeGroup.save": "Worlds",
+  "collect.typeGroup.dataPacks": "Data packs",
   "collect.addModpack": "Add a modpack favourite",
   "collect.addResource": "Add a resource favourite",
   "collect.chooseInstance": "Choose an instance",
@@ -1696,6 +1699,7 @@ export default {
   "collect.favTime": "Favorited {time}",
   "collect.deleteFav": "Delete favourite",
   "collect.removeFromGroup": "Remove from group",
+  "collect.removeFromGroupConfirm": "Remove the {count} selected favourites from their group? They stay in your favourites.",
   "collect.pickInstanceNone": "No game instances yet — create one before downloading resources",
 
   // Placeholder windows

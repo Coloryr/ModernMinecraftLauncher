@@ -127,7 +127,7 @@ pub async fn add_resource_file(
                         &item,
                         file_type,
                         download,
-                        check_version_download_now(&uuid, &pid, &item.id.to_string()),
+                        check_version_download_now(uuid.as_ref(), &pid, &item.id.to_string()),
                     ));
                     list2.insert(item.id.to_string(), item);
                 }
@@ -179,7 +179,7 @@ pub async fn add_resource_file(
                         &item,
                         file_type,
                         download,
-                        check_version_download_now(&uuid, &pid, &item.id),
+                        check_version_download_now(uuid.as_ref(), &pid, &item.id),
                     ) {
                         list1.push(dto);
                     }

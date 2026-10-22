@@ -230,13 +230,23 @@
   text-align: left;
 }
 
-/* 分组列表末尾的「添加分组」：整体走强调色，比灰虚线显眼也好搭。
-   整行添加键，高度由 padding 撑出（与侧栏的「添加实例」行同角色），不按控件档定高 */
+/* 分组列表末尾那一行：新建分组 + 两个"去挑资源"入口，三个等宽的整行按钮 */
+.collect-acts-row {
+  display: flex;
+  gap: 8px;
+}
+
+/* 整行添加键：整体走强调色，比灰虚线显眼也好搭。
+   高度由 padding 撑出（与侧栏的「添加实例」行同角色），不按控件档定高 */
 .add-group-row {
+  /* 三个均分整行宽度；min-width 0 让窄窗时能一起缩，谁都不单独溢出 */
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
+  white-space: nowrap;
   padding: 10px;
   border: 1px dashed var(--accent-border);
   border-radius: 10px;
@@ -482,26 +492,16 @@
   color: var(--accent);
 }
 
+/* 空状态那句提示：做成一块面板，别让它孤零零浮在空页面中间。
+   底色与列表卡片同一档，描边用分隔线色，读起来是"这里本来是列表" */
 .collect-empty {
-  /* 与账户窗口的空状态同规格：整块居中留白 */
-  padding: 48px 0;
+  padding: 28px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
   text-align: center;
 }
 
-/* 空状态的两个入口：去"下载整合包 / 下载资源"里挑，收藏是在那边点星星完成的 */
-.collect-empty-acts {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 14px;
-}
-
-/* 两个按钮等宽：flex-basis 0 让它们均分，宽度由文字最长的那条决定，
-   不会因为"整合包 / 游戏资源"字数不同而一长一短 */
-.collect-empty-acts > * {
-  flex: 1 1 0;
-  max-width: 200px;
-}
 
 .ctx-menu {
   position: fixed;

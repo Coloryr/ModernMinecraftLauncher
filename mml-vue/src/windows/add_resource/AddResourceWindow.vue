@@ -24,7 +24,6 @@ import HighlightText from "../../components/ui/HighlightText.vue";
 import { toggleStar } from "../../lib/projectCollect";
 import { useCollectStars } from "../../lib/useCollectStars";
 import { showToast } from "../../lib/toast";
-import { loadGuiConfig } from "../../lib/guiConfig";
 import { useResourceStatus } from "../../lib/resourceTasks";
 import { familyInstanceFromLabel, projectParamToItem, targetProject, targetUuid, type WindowProjectParam } from "../windowManager";
 import type {
@@ -80,11 +79,8 @@ const instanceChip = computed(() =>
     : null,
 );
 
-/** 标题栏下拉的候选实例：从收藏窗口这类入口进来时没有锁定实例，得让用户当场选 */
+/** 下载时那一下的候选实例：窗口可以不带实例打开，点下载才选 */
 const pickableInstances = ref<InstanceInfoDto[]>([]);
-
-/** 实例是否由窗口上下文锁定：多窗口按标签、单窗口按本次跳转参数；锁定后不给换 */
-const lockedInstance = computed(() => !!(familyInstanceFromLabel("add_resource") ?? targetUuid()));
 
 const type = ref("mod");
 const sources = ref<Array<{ value: string; label: string }>>([]);
@@ -258,10 +254,7 @@ async function loadSource() {
 let searchSeq = 0;
 
 async function search() {
-  if (!instanceUuid.value) {
-    error.value = t("addResource.noInstance");
-    return;
-  }
+  // 没有实例也照搜：那是"先逛、下载时再选实例"的模式，后端按空实例处理（没有已装标记）
   // 排序列表还没拉回来时别发请求：换下载源 / 换类型时它是**异步**拉回来的
   // loadSource 里 await 三个请求，这中间发出去必然带不上合法排序
   // —— 空串后端也不认，报 err.sortTypeNotFound。那次 loadSource 拉完会自己再搜一次。
@@ -357,9 +350,19 @@ function loadFiles(pid: string, pageNo: number, fileVersion: string | null) {
   );
 }
 
-/** 详情页点下载：数据包先选存档，模组先解析前置，其余类型直接下载 */
+/**
+ * 详情页点下载
+ *
+ * 实例是**在这时候**才定的：窗口可以不带实例打开（先逛），点下载才问装进哪个实例；
+ * 打开时带过实例 uuid 的窗口直接用它，不再多问一步。
+ * 定了实例之后：数据包先选存档，模组先解析前置，其余类型直接下载。
+ */
 async function download(file: FileListItemDto) {
-  if (!detailItem.value || !instanceUuid.value) return;
+  if (!detailItem.value) return;
+  if (!instanceUuid.value) {
+    askInstance(file);
+    return;
+  }
   const pid = detailItem.value.source.pid;
 
   if (type.value === "dataPacks") {
@@ -384,6 +387,42 @@ async function download(file: FileListItemDto) {
   }
 
   await openDeps(pid, file);
+}
+
+/** 待下载的文件：实例还没选时先存着，选完再接着走 download */
+const pendingFile = ref<FileListItemDto | null>(null);
+/** 选择框里选中的实例 uuid */
+const pickInstanceUuid = ref("");
+
+/** 点下载时还没选实例：弹选择框；列表里一个实例都没有就只提示 */
+async function askInstance(file: FileListItemDto) {
+  if (!pickableInstances.value.length) {
+    try {
+      pickableInstances.value = await api.getInstances();
+    } catch {
+      pickableInstances.value = [];
+    }
+  }
+  if (!pickableInstances.value.length) {
+    showToast(t("addResource.noInstance"));
+    return;
+  }
+  pendingFile.value = file;
+  pickInstanceUuid.value = pickableInstances.value[0].uuid;
+}
+
+/** 选择框里定了实例：把它作为本窗口的目标实例，然后接着下载 */
+async function confirmInstance() {
+  const file = pendingFile.value;
+  pendingFile.value = null;
+  if (!file || !pickInstanceUuid.value) return;
+  instanceUuid.value = pickInstanceUuid.value;
+  await download(file);
+}
+
+/** 收起选择框：什么都不下 */
+function cancelInstance() {
+  pendingFile.value = null;
 }
 
 /** 前置解析代次：关掉弹窗或换一个前置时，旧一发的返回丢掉 */
@@ -592,20 +631,9 @@ onMounted(async () => {
  */
 async function refreshInstance() {
   const locked = familyInstanceFromLabel("add_resource") ?? targetUuid() ?? "";
-  try {
-    instanceUuid.value = locked || (await loadGuiConfig())?.mainWindow.selectedInstance || "";
-  } catch {
-    instanceUuid.value = locked;
-  }
+  // 只认"传进来的"实例：没传就是浏览模式，实例等点下载时再选
+  instanceUuid.value = locked;
 
-  // 没锁定实例：标题栏换成下拉，先把候选拉回来
-  if (!locked) {
-    try {
-      pickableInstances.value = await api.getInstances();
-    } catch {
-      pickableInstances.value = [];
-    }
-  }
 
   if (instanceUuid.value) {
     try {
@@ -683,6 +711,13 @@ watch(instanceUuid, async () => {
     pendingProject.value = null;
     await nextTick();
     openDetail(projectParamToItem(p));
+    return;
+  }
+
+  // 刚在标题栏选好实例：立刻搜一次，否则列表还停在「未选择实例」那行提示上
+  if (instanceUuid.value) {
+    await nextTick();
+    void search();
   }
 });
 
@@ -698,17 +733,7 @@ onActivated(async () => {
     @close="$emit('close')" @back="closeDetail()">
     <!-- 标题栏：目标实例。本窗口是"装进哪个实例"的上下文，没实例就直说 -->
     <template #head-right>
-      <InstanceChip v-if="instanceChip && lockedInstance" :instance="instanceChip" />
-      <!-- 没有锁定实例（从收藏窗口的"添加资源收藏"这类入口进来）：当场选，
-           资源都是按实例取数的，不选就搜不出东西 -->
-      <select v-else class="field-select head-select" :value="instanceUuid" :disabled="!pickableInstances.length"
-        :title="t('addResource.pickInstance')"
-        @change="instanceUuid = ($event.target as HTMLSelectElement).value">
-        <option value="" disabled>{{ t("addResource.pickInstance") }}</option>
-        <option v-for="inst in pickableInstances" :key="inst.uuid" :value="inst.uuid">
-          {{ inst.name }} · {{ inst.version }}
-        </option>
-      </select>
+      <InstanceChip v-if="instanceChip" :instance="instanceChip" />
     </template>
 
     <div class="res-mode" ref="bodyRef">
@@ -844,6 +869,23 @@ onActivated(async () => {
         <div class="modal-actions">
           <BaseButton @click="savePickFile = null">{{ t("actions.cancel") }}</BaseButton>
           <BaseButton variant="accent" :disabled="!pickedSave || savesLoading" @click="confirmSave">
+            {{ t("addResource.download") }}
+          </BaseButton>
+        </div>
+      </BaseModal>
+
+      <!-- 实例选择弹窗（点下载时还没选实例）：窗口可以不带实例打开先逛，装进哪个实例在这儿定 -->
+      <BaseModal v-if="pendingFile" :title="t('addResource.chooseInstance')" :width="420" below-titlebar
+        :closable="false" @close="cancelInstance">
+        <p class="modal-text">{{ t("addResource.chooseInstanceHint") }}</p>
+        <select v-model="pickInstanceUuid" class="field-select">
+          <option v-for="inst in pickableInstances" :key="inst.uuid" :value="inst.uuid">
+            {{ inst.name }} · {{ inst.version }}
+          </option>
+        </select>
+        <div class="modal-actions">
+          <BaseButton @click="cancelInstance">{{ t("actions.cancel") }}</BaseButton>
+          <BaseButton variant="accent" :disabled="!pickInstanceUuid" @click="confirmInstance">
             {{ t("addResource.download") }}
           </BaseButton>
         </div>

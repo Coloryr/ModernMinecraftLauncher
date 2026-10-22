@@ -526,6 +526,19 @@ pub fn json_to_string<T: Serialize>(obj: &T) -> CoreResult<String> {
     serde_json::to_string_pretty(obj).map_err(serializer_err)
 }
 
+/// 转换为**紧凑**的 JSON 字符串（不缩进）
+///
+/// 给条目多、没人手读的数据文件用；给人看的配置文件仍走 [`json_to_string`]。
+///
+/// - `obj`: 需要序列化的内容
+///
+/// # 返回值
+///
+/// 序列化失败时返回相应错误
+pub fn json_to_string_compact<T: Serialize>(obj: &T) -> CoreResult<String> {
+    serde_json::to_string(obj).map_err(serializer_err)
+}
+
 /// 转换为 JSON 字节
 ///
 /// - `obj`: 需要序列化的内容
@@ -788,6 +801,33 @@ port = 25565
         assert!(json_from_str::<Data>("{").is_err());
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// json_to_string 缩进、json_to_string_compact 不缩进
+    #[test]
+    fn test_json_to_string_compact() {
+        #[derive(Serialize)]
+        struct Data {
+            /// 字符串字段
+            name: String,
+            /// 整数字段
+            value: i64,
+        }
+
+        let data = Data {
+            name: String::from("x"),
+            value: 1,
+        };
+
+        let compact = json_to_string_compact(&data).unwrap();
+        assert_eq!(compact, r#"{"name":"x","value":1}"#);
+
+        let pretty = json_to_string(&data).unwrap();
+        assert!(pretty.contains('\n'));
+        assert_eq!(
+            json_from_str::<serde_json::Value>(&compact).unwrap(),
+            json_from_str::<serde_json::Value>(&pretty).unwrap()
+        );
     }
 
     /// deserialize_number_or_min / deserialize_number_or_max

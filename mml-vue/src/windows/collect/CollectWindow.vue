@@ -18,7 +18,7 @@ import { useCollectDrag } from "../../composables/useCollectDrag";
 import { api, onCollectChange } from "../../lib/api";
 import { loadGuiConfig, saveGuiConfig, type CollectConfig } from "../../lib/guiConfig";
 import { t, tErr } from "../../lib/i18n";
-import { typeGroupName } from "../../lib/collectGroups";
+import { isDefaultGroupName, typeGroupName } from "../../lib/collectGroups";
 import { formatMinute } from "../../lib/format";
 import { showToast } from "../../lib/toast";
 import type { CollectItemDto, InstanceInfoDto } from "../../lib/bindings";
@@ -83,14 +83,22 @@ const isEmpty = computed(() => items.value.length === 0);
 /** 搜索词：按收藏项名字过滤，不持久化 */
 const keyword = ref("");
 
-/** 当前类型过滤 + 搜索词下要显示的收藏；类型全不勾就是空列表，与旧启动器一致 */
+/**
+ * 当前类型过滤 + 搜索词下要显示的收藏
+ *
+ * 勾选框只覆盖模组 / 资源包 / 光影包 / 整合包四类；存档与数据包没有勾选框，
+ * 它们（以及将来别的类型）不受类型过滤约束，照常显示 —— 否则收藏了却看不见。
+ */
 const shownItems = computed(() => {
+  const limited = new Set(FILTER_TYPES.flatMap((f) => f.types));
   const on = new Set(
     FILTER_TYPES.filter((f) => filters.value[f.key]).flatMap((f) => f.types),
   );
   const kw = keyword.value.trim().toLowerCase();
   return items.value.filter(
-    (item) => on.has(item.fileType) && (!kw || item.name.toLowerCase().includes(kw)),
+    (item) =>
+      (!limited.has(item.fileType) || on.has(item.fileType)) &&
+      (!kw || item.name.toLowerCase().includes(kw)),
   );
 });
 
@@ -104,11 +112,15 @@ const shownCount = computed(() => shownItems.value.length);
  * 组名就是「整合包 / 模组 / 资源包 / 光影包」。每组只带当前类型过滤下属于自己的项。
  */
 const groupSections = computed(() =>
-  groupNames.value.map((name) => ({
-    key: name,
-    label: name,
-    items: shownItems.value.filter((i) => groupOfUuid.value.get(i.uuid) === name),
-  })),
+  groupNames.value
+    // 默认分组空了就不显示（删掉最后一条收藏之后它还留在数据里）；
+    // 用户自建的分组即使空着也留着，那是给拖放准备的落点
+    .filter((name) => !isDefaultGroupName(name) || (groups.value[name]?.length ?? 0) > 0)
+    .map((name) => ({
+      key: name,
+      label: name,
+      items: shownItems.value.filter((i) => groupOfUuid.value.get(i.uuid) === name),
+    })),
 );
 
 /** 分组的实例列表是否展开；存的是"折叠"状态，所以默认展开 */
@@ -358,8 +370,9 @@ async function confirmClear() {
     return;
   }
   try {
-    // 清空一个分组只把它们移出该分组，收藏本身保留
-    await api.collectRemoveItems(uuids, target);
+    // 用户自建分组：只把它们移出该分组，收藏本身保留；
+    // 默认分组：移出会被补组再归回来，所以这里就是删掉这些收藏
+    await api.collectRemoveItems(uuids, isDefaultGroupName(target) ? null : target);
     checked.value = new Set();
   } catch (e) {
     showToast(tErr(e));
@@ -371,6 +384,11 @@ function askClear(groupKey: string) {
   clearGroup.value = groupKey;
   clearOpen.value = true;
 }
+
+/** 清空确认里那句"N 项"的 N：当前清空目标那一组里看得见的项数 */
+const clearCount = computed(
+  () => groupSections.value.find((s) => s.key === clearGroup.value)?.items.length ?? 0,
+);
 
 /** 「移动到分组」：先记下目标再开弹窗；没有具名分组时按钮已置灰，这里兜底 */
 function askAddToGroup() {
@@ -399,6 +417,20 @@ async function confirmAddToGroup() {
 
 // ---------------- 条目操作 ----------------
 
+/**
+ * 这一项是否落在「按类型自动分的默认分组」里
+ *
+ * 那种分组不是用户建的（整合包 / 模组 / 资源包 / 光影包），从里面"移出分组"没有意义 ——
+ * 下次打开窗口补组时又会被归回去。所以在这些分组里，菜单该给的是"删除收藏"。
+ *
+ * - `item`: 收藏项
+ */
+function inTypeGroup(item: CollectItemDto): boolean {
+  const group = groupOfUuid.value.get(item.uuid);
+  const auto = typeGroupName(item.fileType);
+  return !!auto && group === auto;
+}
+
 /** 「删除」：先记下目标再开确认弹窗 */
 function askRemove() {
   actionUuids.value = takeTargets();
@@ -409,7 +441,12 @@ function askRemove() {
   removeOpen.value = true;
 }
 
-/** 删除目标项：已归组的只从该组移除（收藏保留），未归组的从收藏里删除 */
+/**
+ * 删除目标项
+ *
+ * 逐项分流：未归组的、以及只在类型默认分组里的**从收藏里删除**；
+ * 用户自建分组里的只从该分组移出，收藏保留。勾选可以跨分组，所以不能整批一刀切。
+ */
 async function confirmRemove() {
   const uuids = actionUuids.value;
   removeOpen.value = false;
@@ -417,31 +454,42 @@ async function confirmRemove() {
   if (uuids.length === 0) {
     return;
   }
-  // 勾选可以跨分组（所有分组同时可见），所以逐项按归属分流
+
   const byGroup = new Map<string, string[]>();
-  const ungrouped: string[] = [];
+  const removing: string[] = [];
   for (const uuid of uuids) {
     const name = groupOfUuid.value.get(uuid);
-    if (name === undefined) {
-      ungrouped.push(uuid);
-    } else {
-      const list = byGroup.get(name) ?? [];
-      list.push(uuid);
-      byGroup.set(name, list);
+    const item = items.value.find((i) => i.uuid === uuid);
+    if (name === undefined || (item && inTypeGroup(item))) {
+      removing.push(uuid);
+      continue;
     }
+    const list = byGroup.get(name) ?? [];
+    list.push(uuid);
+    byGroup.set(name, list);
   }
   try {
     for (const [name, list] of byGroup) {
       await api.collectRemoveItems(list, name);
     }
-    if (ungrouped.length > 0) {
-      await api.collectRemoveItems(ungrouped, null);
+    if (removing.length > 0) {
+      await api.collectRemoveItems(removing, null);
     }
     checked.value = new Set();
   } catch (e) {
     showToast(tErr(e));
   }
 }
+
+/** 这次操作其实只是把收藏移出分组（没有真删）：确认弹窗换成对应的说法 */
+const removeOnlyLeavesGroup = computed(
+  () =>
+    actionUuids.value.length > 0 &&
+    actionUuids.value.every((uuid) => {
+      const item = items.value.find((i) => i.uuid === uuid);
+      return item !== undefined && !inTypeGroup(item) && groupOfUuid.value.has(uuid);
+    }),
+);
 
 /** 打开项目页面（网址） */
 function openUrl(item: CollectItemDto) {
@@ -484,6 +532,10 @@ const { draggingUuids, dropGroup, ghost: collectGhost, onCardPointerDown, consum
 /** 卡片点击：刚拖完的那一下不算点击，否则一松手就顺手打开了下载窗口 */
 function onCardClick(item: CollectItemDto, ev?: MouseEvent) {
   closeInstPick();
+  // 右键菜单原本靠 .collect-body 那一下收；这里挡住了冒泡，得自己收
+  closeMenu();
+  // 别让这次点击冒到 .collect-body：那里负责"点外面收起下拉"，会把刚打开的下拉立刻关掉
+  ev?.stopPropagation();
   if (consumeSuppressClick()) return;
   const rect = (ev?.currentTarget as HTMLElement | null)?.getBoundingClientRect();
   toggleCard(item, rect ? { x: rect.left, y: rect.bottom + 4 } : undefined);
@@ -675,7 +727,6 @@ function requirement(item: CollectItemDto): string {
 const instPick = ref<{ x: number; y: number; item: CollectItemDto; list: InstanceInfoDto[] } | null>(
   null,
 );
-
 /** 下拉尺寸估值：钳边用，宽度与高度 */
 const INST_PICK_W = 260;
 const INST_PICK_H = 96;
@@ -701,7 +752,7 @@ function openInstPick(item: CollectItemDto, list: InstanceInfoDto[], at?: { x: n
 }
 
 /**
- * 下拉里选了实例：直接装进去，并把它记成下次的预选项
+ * 下拉里选了实例：安装模式就装进去，浏览模式就打开该实例的「下载资源」窗口
  *
  * - `ev`: 下拉的 change 事件，取当前选中值
  */
@@ -715,6 +766,15 @@ function pickInstanceFromMenu(ev: Event) {
   openDownloadWindow(pick.item, inst.uuid);
 }
 
+/**
+ * 打开「下载资源」窗口
+ *
+ * 不带实例：那是一个"还没选实例"的浏览窗口，实例在它标题栏的下拉里选。
+ * 窗口族的窗口才要实例 uuid 才能开，这个静态窗口不需要。
+ */
+function openAddResource() {
+  openWindow("add_resource");
+}
 /** 可选的目标实例，即「安装到」下拉的选项 */
 const instances = ref<InstanceInfoDto[]>([]);
 /** 实例列表拉取中：这段时间点卡片先别弹下拉，否则只有一行"还没有实例" */
@@ -757,8 +817,6 @@ function takeTargets(): string[] {
 // ---------------- 右键菜单 ----------------
 
 const menu = ref<{ x: number; y: number; item: CollectItemDto } | null>(null);
-/** 右键点中、当前要操作的条目（卡片按钮也用它） */
-const focus = ref<CollectItemDto | null>(null);
 
 /** 菜单尺寸估值（钳边用；三项 + 内边距） */
 const MENU_W = 170;
@@ -806,6 +864,7 @@ function closeMenu() {
         <button v-if="!multiSelect && shownCount > 0" class="multi-toggle" @click="toggleMultiSelect">
           {{ t("collect.multiSelect") }}
         </button>
+
       </div>
     </template>
 
@@ -831,24 +890,14 @@ function closeMenu() {
       <SearchBox v-if="!isEmpty" v-model="keyword" :placeholder="t('collect.search')"
         :clear-label="t('collect.searchClear')" width="100%" />
 
-      <!-- 一个收藏都没有：不铺一排空分组，给两个入口直接去挑资源 -->
-      <div v-if="isEmpty" class="collect-empty">
-        <p class="empty-tip">{{ t("collect.empty") }}</p>
-        <div class="collect-empty-acts">
-          <BaseButton variant="accent" @click="openWindow('add_modpack')">
-            {{ t("collect.addModpack") }}
-          </BaseButton>
-          <BaseButton @click="openWindow('add_resource')">
-            {{ t("collect.addResource") }}
-          </BaseButton>
-        </div>
-      </div>
+      <!-- 一个收藏都没有：只给一条引导，不铺一排空分组 -->
+      <p v-if="isEmpty" class="empty-tip collect-empty">{{ t("collect.empty") }}</p>
       <!-- 搜索没有命中：不再铺一排 0 项的分组 -->
       <p v-else-if="keyword.trim() && !shownItems.length" class="empty-tip collect-empty">
         {{ t("collect.searchEmpty") }}
       </p>
 
-      <!-- 折叠分组列表：默认分组在前，最后一项是「添加分组」 -->
+      <!-- 折叠分组列表：按名字排序，每个分组自带计数与操作 -->
       <div v-else class="collect-groups">
         <section v-for="g in groupSections" :key="g.key" class="group-block"
           :class="{ 'drop-target': dropGroup === g.key }" :data-group="g.key">
@@ -864,7 +913,8 @@ function closeMenu() {
               <button class="group-act" :disabled="!g.items.length" @click.stop="askClear(g.key)">
                 {{ t("collect.clear") }}
               </button>
-              <button class="group-act danger" @click.stop="deleteGroupTarget = g.key">
+              <button v-if="!isDefaultGroupName(g.key)" class="group-act danger"
+                @click.stop="deleteGroupTarget = g.key">
                 {{ t("collect.deleteGroup") }}
               </button>
             </span>
@@ -879,8 +929,7 @@ function closeMenu() {
               <div v-for="item in g.items" :key="item.uuid" class="collect-card"
                 :class="{ active: checked.has(item.uuid), dragging: draggingUuids.has(item.uuid) }"
                 @pointerdown="onCardPointerDown($event, item)" @click="onCardClick(item, $event)"
-                @mouseenter="focus = item"
-                @mouseleave="focus = null" @contextmenu.prevent="openMenu($event, item)">
+                @contextmenu.prevent="openMenu($event, item)">
                 <span v-if="multiSelect" class="card-box" @click.stop @pointerdown.stop>
                   <input type="checkbox" class="card-check" :checked="checked.has(item.uuid)" @click.stop
                     @change="toggleCheck(item.uuid, ($event.target as HTMLInputElement).checked)" />
@@ -908,7 +957,7 @@ function closeMenu() {
                     </span>
                   </div>
                 </div>
-                <span v-if="focus?.uuid === item.uuid || checked.has(item.uuid)" class="card-acts" @pointerdown.stop>
+                <span class="card-acts" @pointerdown.stop>
                   <button class="card-act" v-tip="t('collect.openUrl')" @click.stop="openUrl(item)">
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"
                       stroke-linecap="round" stroke-linejoin="round">
@@ -944,10 +993,20 @@ function closeMenu() {
           </div>
         </section>
 
-        <!-- 最后一项：添加分组 -->
-        <button class="add-group-row" @click="showAddGroup = true">
+      </div>
+
+      <!-- 最后一行：新建分组 + 去挑资源收藏，三个同款整行按钮。
+           放在分组列表**外面**：一个收藏都没有时也要能从这里去挑 -->
+      <div class="collect-acts-row">
+        <button v-if="!isEmpty" class="add-group-row" @click="showAddGroup = true">
           <GlyphIcon name="plus" :size="14" :weight="2.2" />
           {{ t("collect.addGroup") }}
+        </button>
+        <button class="add-group-row" @click="openWindow('add_modpack')">
+          {{ t("collect.addModpack") }}
+        </button>
+        <button class="add-group-row" @click.stop="openAddResource">
+          {{ t("collect.addResource") }}
         </button>
       </div>
 
@@ -973,7 +1032,7 @@ function closeMenu() {
           {{ t("collect.openUrl") }}
         </button>
         <button class="ctx-item danger" @click="askRemove">
-          {{ groupOfUuid.has(menu.item.uuid) ? t("collect.removeFromGroup") : t("collect.deleteFav") }}
+          {{ groupOfUuid.has(menu.item.uuid) && !inTypeGroup(menu.item) ? t("collect.removeFromGroup") : t("collect.deleteFav") }}
         </button>
         <button class="ctx-item" :disabled="groupNames.length === 0"
           v-tip="groupNames.length === 0 ? t('collect.addToGroupNone') : ''" @click="askAddToGroup">
@@ -1006,8 +1065,16 @@ function closeMenu() {
     </BaseModal>
 
     <!-- 删除收藏确认：多选条与卡片菜单共用，只问一句"删几项" -->
-    <BaseModal v-if="removeOpen" :title="t('collect.multiDelete')" :closable="false" @close="removeOpen = false">
-      <p class="delete-tip">{{ t("collect.removeConfirm", { count: actionUuids.length }) }}</p>
+    <BaseModal v-if="removeOpen"
+      :title="removeOnlyLeavesGroup ? t('collect.removeFromGroup') : t('collect.multiDelete')"
+      :closable="false" @close="removeOpen = false">
+      <p class="delete-tip">
+        {{
+          removeOnlyLeavesGroup
+            ? t("collect.removeFromGroupConfirm", { count: actionUuids.length })
+            : t("collect.removeConfirm", { count: actionUuids.length })
+        }}
+      </p>
       <div class="modal-actions">
         <BaseButton @click="removeOpen = false">{{ t("add.no") }}</BaseButton>
         <BaseButton variant="primary" @click="confirmRemove">{{ t("add.yes") }}</BaseButton>
@@ -1016,7 +1083,13 @@ function closeMenu() {
 
     <!-- 清空确认 -->
     <BaseModal v-if="clearOpen" :title="t('collect.clear')" :closable="false" @close="clearOpen = false">
-      <p class="delete-tip">{{ t("collect.clearGroupConfirm", { name: clearGroup }) }}</p>
+      <p class="delete-tip">
+        {{
+          isDefaultGroupName(clearGroup)
+            ? t("collect.removeConfirm", { count: clearCount })
+            : t("collect.clearGroupConfirm", { name: clearGroup })
+        }}
+      </p>
       <div class="modal-actions">
         <BaseButton @click="clearOpen = false">{{ t("add.no") }}</BaseButton>
         <BaseButton variant="primary" @click="confirmClear">{{ t("add.yes") }}</BaseButton>

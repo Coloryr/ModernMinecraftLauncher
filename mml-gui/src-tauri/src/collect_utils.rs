@@ -112,8 +112,10 @@ pub fn load() -> CoreResult<()> {
 }
 
 /// 保存收藏数据，异步落盘
+///
+/// 用紧凑 JSON：收藏条目多起来以后缩进会让文件大出好几倍，而它没人手读。
 pub fn save() {
-    config_save::save(
+    config_save::save_compact(
         uuids::COLLECT_UUID,
         &*COLLECT.read().unwrap(),
         FILE.get().unwrap(),

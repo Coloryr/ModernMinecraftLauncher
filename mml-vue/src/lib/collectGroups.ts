@@ -18,3 +18,22 @@ export function typeGroupName(fileType: string): string | null {
   const name = t(key);
   return name === key ? null : name;
 }
+
+/** 有默认分组的资源类型，顺序即收藏窗口类型过滤的顺序 */
+const DEFAULT_GROUP_TYPES = ["modpack", "mod", "resourcepack", "shaderpack", "save", "dataPacks"];
+
+/**
+ * 这个分组名是不是按类型自动分的默认分组
+ *
+ * 默认分组由收藏动作自动维护，删掉也会被补组再建回来，所以界面不给"删除分组"；
+ * 组里的条目也就是"这一类收藏"，清空它等于删掉这些收藏。
+ *
+ * - `name`: 分组名
+ *
+ * # 返回值
+ *
+ * 是四个默认分组之一时为 true
+ */
+export function isDefaultGroupName(name: string): boolean {
+  return DEFAULT_GROUP_TYPES.some((fileType) => typeGroupName(fileType) === name);
+}

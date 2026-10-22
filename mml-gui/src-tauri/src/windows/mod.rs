@@ -234,6 +234,16 @@ pub async fn window_open_window(
         },
     };
 
+    // 「下载资源」允许**不带实例**打开：那是"还没选实例"的浏览窗口，静态标签
+    // `mml-add_resource`，实例在窗口标题栏里选（见 AddResourceWindow）。
+    // 带实例时仍走窗口族，一实例一窗。
+    if kind == "add_resource" && instance.is_none() {
+        let Some(uuid) = uuid_for_kind(&kind) else {
+            return Err(format!("unknown window kind: {kind}"));
+        };
+        return open_window_from_uuid(&app, &uuid, &url_path, Some(&window));
+    }
+
     // 窗口族是"一个实例一个"：身份由实例 uuid 派生，没有实例就无从开窗
     if let Some(family) = family_of_kind(&kind) {
         let Some(instance) = instance.as_deref() else {
@@ -300,6 +310,13 @@ pub fn window_close_window(
     instance: Option<String>,
 ) -> Result<(), String> {
     kind_parse_check(&kind, &instance)?;
+    // 不带实例的「下载资源」窗口是静态标签那个，与 window_open_window 的分支对应
+    if kind == "add_resource" && instance.is_none() {
+        let Some(uuid) = uuid_for_kind(&kind) else {
+            return Err(format!("unknown window kind: {kind}"));
+        };
+        return close_window_from_uuid(&app, &uuid);
+    }
     if let Some(family) = family_of_kind(&kind) {
         let Some(instance) = instance.as_deref() else {
             return Err(err_keys::WINDOW_INSTANCE_MISSING.to_string());
