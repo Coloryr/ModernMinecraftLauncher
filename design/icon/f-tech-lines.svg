@@ -1,0 +1,50 @@
+<!--
+  M²L 程序图标 · 方案 F「拼接」· 科技整块 · 两面各自一条线
+
+  在 f-tech-grass 的基础上去掉左面那块草皮，左面改用右面的底色（同一套暗面板渐变），
+  整块只剩科技材质；草皮底缘那条蓝线留着，于是两面各有一条沿台阶走的线：
+    - 左面：草皮底缘的形状（方案 F 左半那条像素台阶），从中心前棱往左上走；
+    - 右面：原来的台阶折线，从中心前棱往右上走。
+  两条线位置、台阶都不同，在中心前棱处各走各的，不连成对称图形。
+
+  其余照旧：整块顶面用 tech-top，外轮廓、前棱、两条顶棱带 13px / 13px / 9px 的光晕，
+  两条台阶线 6px、0.95 不透明、不发光。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="tech-top" gradientUnits="userSpaceOnUse" x1="0" y1="46" x2="0" y2="256">
+      <stop offset="0" stop-color="#224c6a" />
+      <stop offset="1" stop-color="#193f59" />
+    </linearGradient>
+    <linearGradient id="tech-face-right" gradientUnits="userSpaceOnUse" x1="0" y1="151" x2="0" y2="466">
+      <stop offset="0" stop-color="#173a52" />
+      <stop offset="1" stop-color="#0f2737" />
+    </linearGradient>
+    <linearGradient id="wire-grad" gradientUnits="userSpaceOnUse" x1="0" y1="46" x2="0" y2="466">
+      <stop offset="0" stop-color="#3ee0c6" />
+      <stop offset="0.55" stop-color="#24c4ff" />
+      <stop offset="1" stop-color="#4f8cff" />
+    </linearGradient>
+    <filter id="wire-glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="6" />
+    </filter>
+  </defs>
+
+  <!-- 整块：顶面 + 左右两面同底色（右面那套暗面板） -->
+  <polygon points="256,46 438,151 256,256 74,151" fill="url(#tech-top)" />
+  <polygon points="74,151 256,256 256,466 74,361" fill="url(#tech-face-right)" />
+  <polygon points="256,256 438,151 438,361 256,466" fill="url(#tech-face-right)" />
+
+  <g fill="none" stroke="url(#wire-grad)" stroke-linecap="round" stroke-linejoin="round">
+    <g opacity="0.30" filter="url(#wire-glow)">
+      <path d="M256,46 L438,151 L438,361 L256,466 L74,361 L74,151 Z" stroke-width="13" />
+      <path d="M256,256 L256,466" stroke-width="13" />
+      <path d="M74,151 L256,256 L438,151" stroke-width="9" />
+    </g>
+    <path d="M256,308.5 L244.62,301.94 L244.62,315.06 L233.25,308.5 L233.25,321.62 L221.88,315.06 L221.88,288.81 L210.5,282.25 L199.12,275.69 L199.12,301.94 L187.75,295.38 L187.75,282.25 L176.38,275.69 L176.38,262.56 L165,256 L165,269.12 L153.62,262.56 L153.62,275.69 L142.25,269.12 L142.25,242.88 L130.88,236.31 L130.88,249.44 L119.5,242.88 L119.5,229.75 L108.12,223.19 L108.12,249.44 L96.75,242.88 L96.75,216.62 L85.38,210.06 L74,203.5" stroke-width="6" opacity="0.95" />
+    <path d="M256,321.62 L267.38,315.06 L267.38,328.19 L278.75,321.62 L290.12,315.06 L290.12,288.81 L301.5,282.25 L301.5,308.5 L312.88,301.94 L324.25,295.38 L324.25,282.25 L335.62,275.69 L347,269.12 L347,282.25 L358.38,275.69 L369.75,269.12 L369.75,256 L381.12,249.44 L392.5,242.88 L392.5,256 L403.88,249.44 L415.25,242.88 L415.25,216.62 L426.62,210.06 L438,203.5" stroke-width="6" opacity="0.95" />
+    <path d="M256,46 L438,151 L438,361 L256,466 L74,361 L74,151 Z" stroke-width="7" />
+    <path d="M256,256 L256,466" stroke-width="7" />
+    <path d="M74,151 L256,256 L438,151" stroke-width="5" />
+  </g>
+</svg>

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="design/icon/f-blend.svg" width="128" alt="M²L 程序图标">
+</p>
+
 # ModernMinecraftLauncher (M²L)
 
 [ColorMC](https://github.com/Coloryr/ColorMC) 的迭代软件，一个 Minecraft 启动器。
@@ -62,6 +66,7 @@
 | `mml-ipc/` | npm 契约包：按来源拆分的跨 IPC 类型、命令包装、事件订阅函数与自定义主页 `window.mml` 契约，`mml-vue` 与 `custom/` 下的示例共用 |
 | `custom/` | 四个自定义界面示例：`custom-main-demo/`（自定义主页面）、`custom-ui-demo/`（整页主题 · 组件）、`custom-ui-html-demo/`（整页主题 · HTML）、`custom-ui-css-demo/`（自定义 CSS）；各自构建出可直接导入启动器的 zip，用法见 [custom/README.md](custom/README.md) |
 | `build/` | 构建脚本（正式发布 / 预发布 / 只跑前端），每个都有 PowerShell 版与 bash 版 |
+| `design/` | 程序图标的 SVG 源文件；改完用 `tauri icon` 重新生成各平台图标 |
 
 各子项目各有 README：[mml-gui](mml-gui/README.md)、[mml-vue](mml-vue/README.md)、
 [custom](custom/README.md)（四个示例各自的说明也在里面）、[mml-ipc](mml-ipc/README.md)。
@@ -102,6 +107,7 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
 | `build/build-release.ps1` | 正式发布构建（fat LTO，含安装包） |
 | `build/build-prerelease.ps1` | 预发布构建（thin LTO，只出 exe，更快） |
 | `cd mml-gui && npm run gen` | 改过 Rust 侧命令 / DTO 后重新生成 `mml-ipc` 契约 |
+| `cd mml-gui && npx tauri icon ../design/icon/f-blend.svg` | 改过程序图标后重新生成 `src-tauri/icons/`；会顺带产出 `android/` 与 `ios/`，桌面端用不到可删 |
 | `cd custom/custom-main-demo && npm run build` | 构建自定义主页面示例并打包成 `custom-main-demo.zip`（四个示例的用法见 [custom/README.md](custom/README.md)） |
 
 上面三个脚本都在 `build/` 下，各有一份 PowerShell 版（`.ps1`，Windows）与 bash 版
