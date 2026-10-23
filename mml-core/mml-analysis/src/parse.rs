@@ -22,6 +22,16 @@ static RE_MEMORY: LazyLock<Regex> =
 static RE_LOG_TIME: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^\[\d{2}:\d{2}:\d{2}\]").unwrap());
 
+/// Forge 1.7 的状态、id、版本和显示名。
+static RE_LEGACY_MOD: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^[UDLCHIJAE]+\s+([A-Za-z0-9_.-]+)\{([^}]*)\}\s+\[([^]]*)\]").unwrap()
+});
+
+/// Forge 1.12 的状态表，排除表头和分隔行。
+static RE_LEGACY_TABLE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^\|\s*[UDLCHIJAE]+\s*\|\s*([A-Za-z0-9_.-]+)\s*\|\s*([^|]*?)\s*\|").unwrap()
+});
+
 /// 解析一份崩溃报告或日志
 ///
 /// - `text`: 日志全文
@@ -305,6 +315,30 @@ fn parse_mod_issues(lines: &[&str]) -> Vec<ModEntry> {
 fn parse_mods(lines: &[&str]) -> Vec<ModEntry> {
     let mut mods: Vec<ModEntry> = Vec::new();
     let mut index = 0;
+
+    for line in lines {
+        let line = line.trim();
+        let entry = if let Some(captures) = RE_LEGACY_MOD.captures(line) {
+            Some(ModEntry {
+                id: captures[1].to_string(),
+                name: captures[3].to_string(),
+                version: captures[2].to_string(),
+            })
+        } else {
+            RE_LEGACY_TABLE.captures(line).map(|captures| ModEntry {
+                id: captures[1].to_string(),
+                name: captures[1].to_string(),
+                version: captures[2].trim().to_string(),
+            })
+        };
+        if let Some(entry) = entry
+            && !mods
+                .iter()
+                .any(|item| item.id.eq_ignore_ascii_case(&entry.id))
+        {
+            mods.push(entry);
+        }
+    }
 
     while index < lines.len() {
         let line = lines[index];

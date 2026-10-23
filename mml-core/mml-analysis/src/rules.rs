@@ -1334,6 +1334,14 @@ fn collect_suspected(report: &CrashReport, findings: &[Finding], detail_lower: &
 fn is_loader_mod(id: &str) -> bool {
     matches!(
         id.to_lowercase().as_str(),
-        "minecraft" | "forge" | "neoforge" | "fabricloader" | "quilt_loader" | "java" | "mixin"
+        "minecraft"
+            | "mcp"
+            | "fml"
+            | "forge"
+            | "neoforge"
+            | "fabricloader"
+            | "quilt_loader"
+            | "java"
+            | "mixin"
     ) || id.eq_ignore_ascii_case("mixinextras")
 }
