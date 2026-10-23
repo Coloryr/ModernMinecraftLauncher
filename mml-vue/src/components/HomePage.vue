@@ -3,8 +3,7 @@
 // empty=true 时顶部展示空实例引导块，含添加实例按钮；此时一个实例都没有
 import { t } from "../lib/i18n";
 import { buildChannel, buildNoticeKey, isTestBuild } from "../lib/buildInfo";
-import { showToast } from "../lib/toast";
-import { openWindow } from "../windows/windowManager";
+import { lobbyOpening, openWindow } from "../windows/windowManager";
 import type { InstanceInfoDto, NewsItem } from "../lib/bindings";
 import NewsPanel from "./NewsPanel.vue";
 import InstanceIcon from "./InstanceIcon.vue";
@@ -62,10 +61,6 @@ const emit = defineEmits<{
   (e: "open", url: string): void;
 }>();
 
-/** 未实现功能的占位提示 */
-function entry(name: string) {
-  showToast(t("actions.wip", { name }));
-}
 </script>
 
 <template>
@@ -132,7 +127,7 @@ function entry(name: string) {
 
     <div class="entry-cards">
       <!-- 联机大厅 -->
-      <button class="entry-card lobby" @click="entry(t('home.lobby'))">
+      <button class="entry-card lobby" :disabled="lobbyOpening" @click="openWindow('lobby')">
         <span class="entry-icon">
           <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8"
             stroke-linecap="round" stroke-linejoin="round">
@@ -142,7 +137,7 @@ function entry(name: string) {
           </svg>
         </span>
         <span class="entry-text">
-          <span class="entry-title">{{ t("home.lobby") }}</span>
+          <span class="entry-title">{{ t(lobbyOpening ? "lobby.verifying" : "home.lobby") }}</span>
           <span class="entry-desc">{{ t("home.lobbyDesc") }}</span>
         </span>
         <GlyphIcon class="entry-arrow" name="chevron-right" :size="18" />

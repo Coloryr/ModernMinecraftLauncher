@@ -29,7 +29,6 @@ use crate::gui_config;
 use crate::i18;
 use crate::listens;
 use crate::log_text::LogText;
-use crate::windows::account::find_by_uuid;
 use crate::windows::log::emit_log_line;
 
 use super::args::core_instance;
@@ -101,13 +100,21 @@ pub async fn main_launch_game(
     force: Option<bool>,
     auto_save: Option<bool>,
 ) -> Result<(), String> {
+    launch_game(app, uuid, world, force, auto_save, None).await
+}
+
+/// 大厅的临时进服参数只作用于本次启动，不改实例配置。
+pub(crate) async fn launch_game(
+    app: AppHandle, uuid: String, world: Option<String>, force: Option<bool>, auto_save: Option<bool>,
+    lobby: Option<(mml_auth::UserKeyObj, AutoJoinType)>,
+) -> Result<(), String> {
     let core = core_instance(&uuid).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())?;
     if is_running(&core.uuid) {
         return Err(err_keys::INSTANCE_RUNNING.to_string());
     }
 
-    let auth = auths::get_current()
-        .and_then(|key| find_by_uuid(&key.uuid))
+    let auth = lobby.as_ref().map(|(key, _)| key.clone()).or_else(auths::get_current)
+        .and_then(|key| auths::get(&key.uuid, key.auth_type))
         .ok_or_else(|| err_keys::ACCOUNT_MISSING.to_string())?;
 
     // 离线账户的启动前提是本机登录过正版（微软）账户：皮肤站 / 外置登录不算证明，只认 OAuth。
@@ -172,6 +179,7 @@ pub async fn main_launch_game(
             },
         }
     };
+    let auto = lobby.map(|(_, auto)| auto).unwrap_or(auto);
     let setting = inst.clone();
 
     // 到线程收工之前都算"启动中"：重复调用直接拒掉，别下两份资源、起两个进程

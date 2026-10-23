@@ -23,6 +23,7 @@ export * from "./dtos/gui_config_dto";
 export * from "./dtos/instance_dto";
 export * from "./dtos/java_download_dto";
 export * from "./dtos/java_dto";
+export * from "./dtos/lobby_dto";
 export * from "./dtos/log_dto";
 export * from "./dtos/main_dto";
 export * from "./dtos/mod_export_dto";

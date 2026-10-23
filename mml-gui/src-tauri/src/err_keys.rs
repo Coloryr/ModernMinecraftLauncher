@@ -231,7 +231,14 @@ pub const BG_CONFIG_DIR: &str = "err.bgConfigDir";
 /// 当前没有设置背景图
 pub const BG_NONE: &str = "err.bgNone";
 
+pub const LOBBY_ACCOUNT: &str = "err.lobbyAccount";
 pub const LOBBY_ACCOUNT_LOCKED: &str = "err.lobbyAccountLocked";
+pub const LOBBY_CLOSED: &str = "err.lobbyClosed";
+pub const LOBBY_PLATFORM: &str = "err.lobbyPlatform";
+pub const LOBBY_DOWNLOAD: &str = "err.lobbyDownload";
+pub const LOBBY_START: &str = "err.lobbyStart";
+pub const LOBBY_STATE: &str = "err.lobbyState";
+pub const LOBBY_MAPPING: &str = "err.lobbyMapping";
 
 #[cfg(test)]
 mod tests {

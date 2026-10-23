@@ -40,6 +40,7 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
             // 关闭已放行：终止该窗口还在跑的操作 —— 整合包搜索、模组扫描 / 更新检查 / 下载更新
             add_modpack::cancel_search(&label);
             resource::cancel_window(&label);
+            if label == "mml-lobby" { crate::windows::lobby::cancel(); }
             // 下载整合包窗口关掉：那两个进度指示器要回到主页面，广播一次让 `window_open` 变 false
             if uuid == ADD_MODPACK_WINDOW_UUID {
                 notify_modpack_window(window.app_handle());

@@ -91,3 +91,6 @@ pub use stats_dto::{StatsDataDto, StatsInstanceDto, StatsPlayDayDto, StatsPlayti
 pub use theme_dto::ThemeKindDto;
 pub use version_dto::VersionInfoDto;
 pub use window_dto::{DropPathDto, FileDropDto, WindowSizeDto};
+
+mod lobby_dto;
+pub use lobby_dto::{LobbyProfileDto, LobbyStateDto, LobbyViewDto, MappingRoomDto, MappingLobbyDto};

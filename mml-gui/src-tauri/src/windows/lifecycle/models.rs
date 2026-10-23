@@ -197,5 +197,8 @@ pub(crate) fn app_has_window(label: &str) -> bool {
 ///
 /// - `uuid`: 窗口 uuid
 pub(crate) fn remove_window_model(uuid: &Uuid) {
-    WINDOW_MODELS.write().unwrap().remove(uuid);
+    let model = WINDOW_MODELS.write().unwrap().remove(uuid);
+    if let Some(model) = model.and_then(|m| m.downcast::<crate::windows::lobby::model::LobbyModel>().ok()) {
+        model.close();
+    }
 }

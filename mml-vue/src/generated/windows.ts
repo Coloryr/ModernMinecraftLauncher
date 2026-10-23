@@ -45,6 +45,8 @@ export { default as WinExportPartsFilePicker } from "../windows/export/parts/Fil
 export { default as WinExportPartsInfoExportButton } from "../windows/export/parts/InfoExportButton.vue";
 export { default as HelpWindow } from "../windows/help/HelpWindow.vue";
 export { default as JavaDownloadWindow } from "../windows/java_download/JavaDownloadWindow.vue";
+export { default as LobbyWindow } from "../windows/lobby/LobbyWindow.vue";
+export { default as WinLobbyMappingLobby } from "../windows/lobby/MappingLobby.vue";
 export { default as LogWindow } from "../windows/log/LogWindow.vue";
 export { default as WinMainColorMcMigrateModal } from "../windows/main/ColorMcMigrateModal.vue";
 export { default as WinMainIconCropStage } from "../windows/main/IconCropStage.vue";

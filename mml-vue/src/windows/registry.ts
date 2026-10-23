@@ -3,6 +3,7 @@
 // 单窗口模式下这些窗口在应用内切换展示。
 
 export type WindowKind =
+  | "lobby"
   | "main"
   | "settings"
   | "stats"
@@ -30,6 +31,7 @@ export interface WindowInfo {
 // 窗口宽高不在前端维护：唯一来源是后端 WINDOWS_INFO，由 window_get_window_sizes
 // 命令下发。真实窗口与 JS 回退路径都用后端的默认尺寸 + 历史几何
 export const WINDOW_REGISTRY: WindowInfo[] = [
+  { kind: "lobby", titleKey: "winTitle.lobby" },
   { kind: "main", titleKey: "winTitle.main" },
   { kind: "settings", titleKey: "winTitle.settings" },
   { kind: "stats", titleKey: "winTitle.stats" },
