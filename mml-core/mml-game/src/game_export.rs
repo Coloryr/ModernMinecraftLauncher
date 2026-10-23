@@ -1,5 +1,8 @@
 //! 实例导出为整合包
 
+#[cfg(test)]
+mod tests;
+
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -365,7 +368,7 @@ async fn modrinth(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
             };
 
             obj.files.push(ModrinthPackFileObj {
-                path: rel.to_string_lossy().to_string(),
+                path: rel.to_string_lossy().replace('\\', "/"),
                 hashes: HasheObj {
                     sha1: item.hash.get_sha1().unwrap_or_default(),
                     sha512: item.hash.get_sha512().unwrap_or_default(),
@@ -391,7 +394,7 @@ async fn modrinth(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
         };
 
         obj.files.push(ModrinthPackFileObj {
-            path: rel.to_string_lossy().to_string(),
+            path: rel.to_string_lossy().replace('\\', "/"),
             hashes: HasheObj {
                 sha1: item.hash.get_sha1().unwrap_or_default(),
                 sha512: item.hash.get_sha512().unwrap_or_default(),

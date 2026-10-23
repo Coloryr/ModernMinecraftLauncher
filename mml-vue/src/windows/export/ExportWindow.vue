@@ -35,6 +35,7 @@ const instances = ref<InstanceInfoDto[]>([]);
 const currentUuid = ref("");
 const info = ref<ExportInfoDto | null>(null);
 const loadingInfo = ref(false);
+let infoRequest = 0;
 
 // ---------------- 导出配置 ----------------
 
@@ -121,25 +122,33 @@ const tabOptions = computed<
 
 /** 拉选中实例的导出信息，实例名作为包名默认值 */
 async function loadInfo() {
-  if (!currentUuid.value) return;
+  const request = ++infoRequest;
+  const uuid = currentUuid.value;
+  info.value = null;
+  pickedMods.value = new Map();
+  pickedFiles.value = new Map();
+  urls.value = new Map();
+  if (!uuid) { loadingInfo.value = false; return; }
   loadingInfo.value = true;
   try {
-    const data = await api.getExportInfo(currentUuid.value);
+    const data = await api.getExportInfo(uuid);
+    if (request !== infoRequest || uuid !== currentUuid.value) return;
     info.value = data;
     // 元数据默认值跟实例走（用户可改）
     packName.value = data.name;
     summary.value = "";
-    applyDefaults(data);
+    await applyDefaults(data, uuid, request);
   } catch (e) {
-    console.error("[ExportWindow] 加载导出信息失败", e);
+    if (request !== infoRequest || uuid !== currentUuid.value) return;
+    showToast(tErr(e));
     info.value = null;
   } finally {
-    loadingInfo.value = false;
+    if (request === infoRequest) loadingInfo.value = false;
   }
 }
 
 /** 勾选状态的初始值：模组全勾、三个常规目录勾上，模组的下载地址按来源预填 */
-async function applyDefaults(data: ExportInfoDto) {
+async function applyDefaults(data: ExportInfoDto, uuid: string, request: number) {
   pickedMods.value = new Map(data.mods.map((x) => [x.path, x]));
   pickedFiles.value = new Map();
   urls.value = new Map();
@@ -149,14 +158,15 @@ async function applyDefaults(data: ExportInfoDto) {
   }
 
   try {
-    const root = await api.listExportDir(currentUuid.value, "");
+    const root = await api.listExportDir(uuid, "");
+    if (request !== infoRequest || uuid !== currentUuid.value) return;
     for (const entry of root) {
       if (entry.dir && DEFAULT_DIRS.includes(entry.path)) {
         pickedFiles.value.set(entry.path, entry);
       }
     }
   } catch (e) {
-    console.error("[ExportWindow] 读取实例目录失败", e);
+    if (request === infoRequest && uuid === currentUuid.value) showToast(tErr(e));
   }
 }
 
@@ -211,6 +221,8 @@ watch(currentUuid, loadInfo);
 
 const progress = ref<ExportProgressDto | null>(null);
 const running = computed(() => progress.value?.state === "running");
+const preparing = ref(false);
+const busy = computed(() => running.value || preparing.value);
 
 /** 进度百分比：仅在 running 且 total 有效时有意义 */
 const percent = computed(() => {
@@ -226,12 +238,17 @@ function picksOf(picked: Map<string, ExportEntryDto>) {
 
 /** 选保存位置后交给 Rust 侧后台导出，进度走 export-progress 事件 */
 async function startExport() {
-  if (!currentUuid.value || running.value) return;
+  if (!currentUuid.value || busy.value || loadingInfo.value || !info.value) return;
   if (!inTauri) return;
-
-  // 选保存位置（文件名带格式后缀）
-  const { save } = await import("@tauri-apps/plugin-dialog");
-  const picked = await save({
+  const uuid = currentUuid.value;
+  const config = {
+    pack: pack.value,
+    includeLauncher: pack.value === "server" && !!info.value.canBundleLauncher && includeLauncher.value,
+    mods: picksOf(pickedMods.value), files: picksOf(pickedFiles.value),
+    name: packName.value, author: author.value, version: version.value, summary: summary.value,
+  };
+  const warnCustomLoader = customLoaderLost.value;
+  const dialogOptions = {
     title: t("winExport.pickSave"),
     defaultPath: `${packName.value || info.value?.name || "modpack"}.${fileExt.value}`,
     filters: [
@@ -240,28 +257,20 @@ async function startExport() {
         extensions: [fileExt.value],
       },
     ],
-  });
-  if (!picked) return;
-
-  // 选完保存位置再提醒一次：这一条决定了收包的人能不能直接跑起来
-  if (customLoaderLost.value) showToast(t("winExport.customLoaderWarn"), 4000);
-
-  progress.value = { state: "running", now: 0, total: 0, text: "", error: null, file: picked };
+  };
+  preparing.value = true;
   try {
-    await api.runExport(currentUuid.value, {
-      pack: pack.value,
-      includeLauncher: pack.value === "server" && !!info.value?.canBundleLauncher && includeLauncher.value,
-      file: picked,
-      mods: picksOf(pickedMods.value),
-      files: picksOf(pickedFiles.value),
-      name: packName.value,
-      author: author.value,
-      version: version.value,
-      summary: summary.value,
-    });
+    const { save } = await import("@tauri-apps/plugin-dialog");
+    const picked = await save(dialogOptions);
+    if (!picked) return;
+    if (warnCustomLoader) showToast(t("winExport.customLoaderWarn"), 4000);
+    progress.value = { state: "running", now: 0, total: 0, text: "", error: null, file: picked };
+    await api.runExport(uuid, { ...config, file: picked });
   } catch (e) {
     showToast(tErr(e));
     progress.value = null;
+  } finally {
+    preparing.value = false;
   }
 }
 
@@ -324,13 +333,13 @@ onBeforeUnmount(() => {
   <WindowFrame body-fill :title="t('winExport.title')" @close="$emit('close')">
     <!-- 实例选择与导出按钮放进标题栏：不占内容区高度，也不随选项卡滚动 -->
     <template #head-right>
-      <select v-model="currentUuid" class="field-select head-select" :disabled="running">
+      <select v-model="currentUuid" class="field-select head-select" :disabled="busy">
         <!-- 标题栏里位置窄，占位用短文案；内容区的空态另有一句更长的提示 -->
         <option value="" disabled>{{ t("winExport.instance") }}</option>
         <option v-for="i in instances" :key="i.uuid" :value="i.uuid">{{ i.name }}</option>
       </select>
-      <InfoExportButton :uuid="currentUuid" :name="info?.name ?? ''" :disabled="running || loadingInfo || !info" />
-      <BaseButton size="sm" variant="primary" :disabled="running || loadingInfo || !info" @click="startExport">
+      <InfoExportButton :uuid="currentUuid" :name="info?.name ?? ''" :disabled="busy || loadingInfo || !info" />
+      <BaseButton size="sm" variant="primary" :disabled="busy || loadingInfo || !info" @click="startExport">
         {{ running ? t("winExport.exporting") : t("winExport.exportBtn") }}
       </BaseButton>
     </template>
@@ -340,7 +349,7 @@ onBeforeUnmount(() => {
         <!-- 概况整段不显示了：版本与加载器在主页面上都有，导出窗口里不必重复 -->
         <div class="row">
           <label class="field-label">{{ t("winExport.format") }}</label>
-          <select v-model="pack" class="field-select" :disabled="running"><option v-for="option in packOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select>
+          <select v-model="pack" class="field-select" :disabled="busy"><option v-for="option in packOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select>
         </div>
 
         <!-- 这层限制在选择格式时就说清楚，别让用户以为包里带了自定义加载器 -->
@@ -351,7 +360,7 @@ onBeforeUnmount(() => {
         <p v-else-if="pack === 'server'" class="sec-hint">{{ t("winExport.serverHint") }}</p>
         <IconTabs v-else v-model="tab" :tabs="tabOptions" />
 
-        <label v-if="pack === 'server' && info.canBundleLauncher" class="row"><input v-model="includeLauncher" type="checkbox" :disabled="running" />{{ t("winExport.includeLauncher") }}</label>
+        <label v-if="pack === 'server' && info.canBundleLauncher" class="row"><input v-model="includeLauncher" type="checkbox" :disabled="busy" />{{ t("winExport.includeLauncher") }}</label>
         <div v-if="pack !== 'mml' && pack !== 'server'" class="tab-body">
           <!-- 整合包信息：写进清单的元数据，配着上面的格式一起看 -->
           <template v-if="tab === 'meta'">
@@ -516,7 +525,7 @@ onBeforeUnmount(() => {
 /* 会丢东西的提示：与设置页里那些"改了要重启"的提示同一档观感 */
 .warn-hint {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--ctl-font);
   color: var(--yellow);
 }
 
@@ -541,7 +550,7 @@ onBeforeUnmount(() => {
   overflow-y: auto;
   padding: 6px;
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 10px;
   background: var(--bg-solid, var(--bg-card));
 }
 
@@ -549,8 +558,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 3px 6px;
-  border-radius: 5px;
+  padding: 4px 6px;
+  border-radius: 10px;
   font-size: 12.5px;
 }
 
@@ -570,7 +579,7 @@ onBeforeUnmount(() => {
 .mod-tag {
   flex-shrink: 0;
   padding: 0 6px;
-  border-radius: 4px;
+  border-radius: 999px;
   background: var(--bg-hover);
   color: var(--text-dim);
   font-size: 10.5px;
@@ -622,7 +631,7 @@ onBeforeUnmount(() => {
   overflow-y: auto;
   padding: 8px;
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 10px;
   background: var(--bg-solid, var(--bg-card));
 }
 
@@ -661,7 +670,7 @@ onBeforeUnmount(() => {
 }
 
 .progress-text {
-  font-size: 12px;
+  font-size: var(--ctl-font);
   color: var(--text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -670,14 +679,14 @@ onBeforeUnmount(() => {
 
 .progress-track {
   height: 6px;
-  border-radius: 3px;
+  border-radius: 999px;
   background: var(--bg-raised);
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: 999px;
   background: var(--accent);
   transition: width 0.2s ease;
 }

@@ -37,6 +37,7 @@ pub mod stats;
 // 注意：仓库根的 `ipc-gen` 是**裸文本搜索**命令属性，见 ipc-gen/src/scan.rs 的 commands_in；
 // 注释里写出那个属性字面量会让它把**紧随其后的函数**当成命令 —— 别在注释里写它。
 mod effects;
+mod export_file;
 mod geometry;
 mod lifecycle;
 mod modpack_task;

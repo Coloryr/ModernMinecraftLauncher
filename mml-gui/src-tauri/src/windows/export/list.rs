@@ -11,7 +11,6 @@ use mml_base::{file_item::FileHash, hash_helper::{self, HashType}};
 use mml_game::launcher::file_online_info_obj::OnlineInfoObj;
 use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 use mml_game::loader::LoaderType;
-use mml_sys::path_helper;
 use tauri::{AppHandle, Emitter};
 
 use crate::{dtos::export_dto::{ExportEntryDto, ExportInfoDto, ExportProgressDto}, dtos::log_dto::LogFocusDto, listens};
@@ -40,21 +39,15 @@ pub(super) fn emit_export_progress(app: &AppHandle, event: ExportProgressDto) {
     let _ = app.emit(listens::EXPORT_PROGRESS, event);
 }
 
-/// 目录是否含至少一个文件，递归统计
-///
 /// 收集目录下全部文件
 ///
 /// - `path`: 待收集的目录
 ///
 /// # 返回值
 ///
-/// 目录下的全部文件；目录不存在时返回空表
-pub(super) fn collect_files(path: &PathBuf) -> Vec<PathBuf> {
-    if path.is_dir() {
-        path_helper::get_all_files(path)
-    } else {
-        Vec::new()
-    }
+/// 目录下的全部文件；读取失败或遇到链接时终止导出。
+pub(super) fn collect_files(path: &Path) -> Result<Vec<PathBuf>, String> {
+    super::archive::files_under(path)
 }
 
 /// 读 mod_info.json 里带在线来源的那些，键是文件名
@@ -190,13 +183,13 @@ pub(super) struct ExportMeta {
 ///
 /// # 返回值
 ///
-/// 见 [`ExportMeta`]；读不到文件返回 `None`
-pub(super) fn export_meta(file: &Path) -> Option<ExportMeta> {
-    let meta = std::fs::metadata(file).ok()?;
-    let sha1 = hash_helper::gen_hash_from_file(HashType::Sha1, file).unwrap_or_default();
-    let sha512 = hash_helper::gen_hash_from_file(HashType::Sha512, file).unwrap_or_default();
+/// 见 [`ExportMeta`]；元数据或哈希读取失败时返回错误。
+pub(super) fn export_meta(file: &Path) -> Result<ExportMeta, String> {
+    let meta = std::fs::metadata(file).map_err(|e| e.to_string())?;
+    let sha1 = hash_helper::gen_hash_from_file(HashType::Sha1, file).map_err(|e| e.to_string())?;
+    let sha512 = hash_helper::gen_hash_from_file(HashType::Sha512, file).map_err(|e| e.to_string())?;
 
-    Some(ExportMeta {
+    Ok(ExportMeta {
         size: meta.len() as usize,
         hash: FileHash::Sha1Sha512(sha1, sha512),
     })

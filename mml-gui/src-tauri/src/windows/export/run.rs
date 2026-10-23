@@ -8,14 +8,13 @@ use std::{path::{PathBuf}, sync::{Arc, atomic::{AtomicBool, Ordering}}};
 use crate::err_keys;
 
 use mml_base::{archives::{ArchiveType, IBaseArchiveGui}};
-use mml_game::game_export::{ExportArg, ExportPackType, OnlineFileExport};
-use mml_game::launcher::file_online_info_obj::OnlineInfoObj;
+use mml_game::game_export::{ExportArg, ExportPackType};
 use tauri::{AppHandle};
 
 use crate::{dtos::export_dto::{ExportConfigDto, ExportProgressDto}};
 
-use crate::windows::{config::resolve_under, instance_snapshot};
-use super::list::{EXPORT_RUNNING, emit_export_progress, collect_files, online_of, export_meta};
+use crate::windows::instance_snapshot;
+use super::list::{EXPORT_RUNNING, emit_export_progress, online_of};
 
 /// 校验失败或后台任务退出时都释放导出占用。
 struct ExportPermit<'a>(&'a AtomicBool);
@@ -34,59 +33,6 @@ impl Drop for ExportPermit<'_> {
     }
 }
 
-/// 在线模组 → 导出条目：带上项目号，供 CurseForge manifest / Modrinth index 使用
-///
-/// - `file`: 模组文件路径
-/// - `info`: 该文件在 mod_info.json 里的来源信息
-/// - `pack`: 目标整合包格式
-/// - `url`: 下载地址，前端可以改，所以不直接取 `info.url`
-///
-/// # 返回值
-///
-/// 导出条目；文件元数据读不到时返回 `None`
-pub(super) fn make_online_export(
-    file: PathBuf,
-    info: OnlineInfoObj,
-    pack: ExportPackType,
-    url: String,
-) -> Option<OnlineFileExport> {
-    let meta = export_meta(&file)?;
-
-    Some(OnlineFileExport {
-        file,
-        size: meta.size,
-        pack,
-        url,
-        hash: meta.hash,
-        info: Some(info),
-    })
-}
-
-/// 只有下载地址、没有在线来源的条目
-///
-/// Modrinth index 里 `project` 留空、`downloads` 给这份地址；CurseForge 的清单格式
-/// 没有下载地址，所以只在 Modrinth 用得上
-///
-/// - `file`: 文件路径
-/// - `pack`: 目标整合包格式
-/// - `url`: 下载地址
-///
-/// # 返回值
-///
-/// 导出条目；文件元数据读不到时返回 `None`
-pub(super) fn make_plain_export(file: PathBuf, pack: ExportPackType, url: String) -> Option<OnlineFileExport> {
-    let meta = export_meta(&file)?;
-
-    Some(OnlineFileExport {
-        file,
-        size: meta.size,
-        pack,
-        url,
-        hash: meta.hash,
-        info: None,
-    })
-}
-
 /// 进度回调：内核 `IBaseArchiveGui` → `export-progress` 事件
 pub(super) struct ExportProgressGui {
     /// 应用句柄，事件经它转发到前端
@@ -98,7 +44,7 @@ pub(super) struct ExportProgressGui {
 /// 发起导出：后台任务，进度经 export-progress 事件上报
 ///
 /// 勾选条目的去向按格式分：
-/// - CurseForge：对得上 mod_info.json 的按项目号 / 文件号写进 manifest，其余整份进 overrides。
+/// - CurseForge：正整数项目号与文件号写进 manifest，其余整份进 overrides。
 ///   它的清单格式里没有下载地址，所以前端填的 URL 在这个格式下用不上
 /// - Modrinth：填了下载地址的写进 index 的 files，有在线来源的再补上项目号；
 ///   没填地址的和目录展开出来的文件一并进 overrides
@@ -128,8 +74,6 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
             return Err(err_keys::EXPORT_PACK_TYPE.to_string());
         }
     };
-    // 整包格式（MMC / HMCL）没有下载清单，选中的一律进包，前端填的地址在这两种下不作数
-    let whole_pack = matches!(pack, ExportPackType::MMC | ExportPackType::HMCL);
     if config.file.trim().is_empty() {
         // 这里校验的是**导出文件名**，原来报的是 err.serverEmpty，即服务器为空，
         // 前端弹出来的文案牛头不对马嘴
@@ -140,68 +84,16 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
     let base = game.get_game_path();
     let online = online_of(&game);
 
-    let mut mods = Vec::new();
-    let mut files = Vec::new();
-    let mut select = Vec::new();
-
-    // 模组与文件走同一套路由，只是前端分了两块勾选
-    for pick in config.mods.iter().chain(config.files.iter()).filter(|_| pack != ExportPackType::MML) {
-        let path = resolve_under(&base, &pick.path)?;
-
-        // 目录整份进 overrides：里面每个文件的下载地址不会一致，填了也不作数
-        if !path.is_file() {
-            select.extend(collect_files(&path));
-            continue;
-        }
-
-        // 整包格式：没有下载清单，文件一律进包
-        if whole_pack {
-            select.push(path);
-            continue;
-        }
-
-        let name = path
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_default();
-        let url = pick.url.trim().to_string();
-        let mut indexed = false;
-
-        if let Some(info) = online.get(&name) {
-            // 前端改过地址就用它，没填则退回来源里记的那个
-            let url = if url.is_empty() {
-                info.url.clone()
-            } else {
-                url
-            };
-            // CurseForge 只认项目号 / 文件号；Modrinth 还得有一个能下载的地址
-            if pack != ExportPackType::Modrinth || !url.is_empty() {
-                if let Some(item) = make_online_export(path.clone(), info.clone(), pack, url) {
-                    mods.push(item);
-                    indexed = true;
-                }
-            }
-        } else if pack == ExportPackType::Modrinth && !url.is_empty() {
-            // 本地来源但填了地址：Modrinth 也能当下载项写，不占 overrides 体积
-            if let Some(item) = make_plain_export(path.clone(), pack, url) {
-                files.push(item);
-                indexed = true;
-            }
-        }
-
-        if !indexed {
-            select.push(path);
-        }
-    }
+    let selected = super::selection::collect(&base, config.mods.iter().chain(config.files.iter()), &online, pack)?;
 
     let arg = ExportArg {
         file: PathBuf::from(&config.file),
         pack,
         archive: ArchiveType::Zip,
-        mods,
-        files,
+        mods: selected.mods,
+        files: selected.files,
         unselect: Vec::new(),
-        select,
+        select: selected.local,
         name: config.name,
         author: config.author,
         version: config.version,
@@ -221,7 +113,13 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
                 else { super::archive::native_instance(&game, &arg.file) }
             })
                 .await.map_err(|e| e.to_string()).and_then(|result| result)
-        } else { game.export(arg).await.map_err(|e| e.to_string()) };
+        } else {
+            crate::windows::export_file::write_async(std::path::Path::new(&save_file), |file| async move {
+                let mut arg = arg;
+                arg.file = file;
+                game.export(arg).await.map_err(|e| e.to_string())
+            }).await
+        };
         let event = match res {
             Ok(()) => ExportProgressDto {
                 state: "done".to_string(),
