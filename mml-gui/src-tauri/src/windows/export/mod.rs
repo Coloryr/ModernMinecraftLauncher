@@ -7,6 +7,7 @@ mod archive;
 pub(crate) mod info;
 pub(crate) mod list;
 pub(crate) mod run;
+mod selection;
 pub(crate) mod server_pack;
 
 pub use self::list::{emit_export_focus};
