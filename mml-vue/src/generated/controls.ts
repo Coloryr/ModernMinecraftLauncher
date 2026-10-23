@@ -408,7 +408,7 @@ export const CONTROLS: ControlEntry[] = [
   { className: "res-list", category: "窗口：add_resource", count: 1, sources: ["windows/add_resource/add-resource-window.css"] },
   { className: "res-mode", category: "窗口：add_resource", count: 1, sources: ["windows/add_resource/add-resource-window.css"] },
   { className: "res-page", category: "窗口：add_resource", count: 1, sources: ["windows/add_resource/add-resource-window.css"] },
-  { className: "res-pick", category: "部件", count: 3, sources: ["styles/parts/args-row.css"] },
+  { className: "res-pick", category: "部件", count: 2, sources: ["styles/parts/args-row.css"] },
   { className: "res-search", category: "窗口：add_resource", count: 1, sources: ["windows/add_resource/add-resource-window.css"] },
   { className: "res-source-hint", category: "窗口：add_resource", count: 1, sources: ["windows/add_resource/add-resource-window.css"] },
   { className: "res-source-lock", category: "窗口：add_resource", count: 1, sources: ["windows/add_resource/add-resource-window.css"] },
