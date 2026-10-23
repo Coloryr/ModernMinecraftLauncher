@@ -20,6 +20,8 @@ const props = withDefaults(
     fixedHeight?: string;
     /** 是否画右上角关闭按钮 */
     closable?: boolean;
+    /** 关闭按钮是否禁用：按钮还在，只是点不动。上传这类"开始后不能中断"的流程用 */
+    closeDisabled?: boolean;
     /** 遮罩从自绘标题栏下方开始，让标题栏（可拖动 / 窗口按钮）保持可操作。
      *  默认开启：所有弹窗都不应挡住标题栏 */
     belowTitlebar?: boolean;
@@ -29,6 +31,7 @@ const props = withDefaults(
     width: 420,
     fixedHeight: "",
     closable: true,
+    closeDisabled: false,
     belowTitlebar: true,
   },
 );
@@ -50,7 +53,7 @@ const active = usePageActive();
         :style="{ width: width + 'px', height: props.fixedHeight || undefined }">
         <div v-if="title" class="modal-head">
           <h3>{{ title }}</h3>
-          <button v-if="closable" class="modal-x" @click="emit('close')">
+          <button v-if="closable" class="modal-x" :disabled="closeDisabled" @click="emit('close')">
             <GlyphIcon name="close" :size="14" :weight="2.2" />
           </button>
         </div>
@@ -139,8 +142,14 @@ const active = usePageActive();
   line-height: 1;
 }
 
-.modal-x:hover {
+.modal-x:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text);
+}
+
+/* 禁用态：按钮留在原位，只是点不动，别让人以为卡住了 */
+.modal-x:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 </style>

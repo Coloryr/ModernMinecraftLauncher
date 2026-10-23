@@ -5,7 +5,7 @@
 // 同一实例重复打开只聚焦）；单窗口模式下与别的窗口一样是应用内的一页，实例由
 // windowParams 带进来，已在本页上时参数变化就是换实例，见 lockedUuid 的 watch。
 //
-// 布局照 ColorMC 的 GameLogControl：一行"日志文件 + 刷新 / 搜索 / 上传 / 测试启动"，
+// 布局照 ColorMC 的 GameLogControl：一行"日志文件 + 刷新 / 崩溃分析 / 搜索 / 上传 / 测试启动"，
 // 一行"自动换行 / 自动下拉 + 五个等级"，一行"线程 / 分组"，最后是日志正文。
 // 等级与自动下拉存进实例的 `gui_setting.json`（一个实例一套）；自动打开日志窗口也存在那里，
 // 但开关在实例设置里，本窗口不再提供。**自动换行不跟实例走** —— 它是全局偏好（lib/editorWrap），
@@ -32,7 +32,7 @@ import { api, onGameExit, onGameLog, onLaunchError, onLaunchState } from "../../
 import { stateText } from "../../lib/launchState";
 import { useDownloadProgress } from "../../composables/useDownloadProgress";
 import { familyInstanceFromLabel, targetLogBottom, targetLogFile, targetUuid } from "../windowManager";
-import { latestCrash } from "../../lib/crash";
+import { crashTimeOf, latestCrash } from "../../lib/crash";
 import { launchGame } from "../../lib/launch";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import { usePageActive } from "../../lib/pageActive";
@@ -57,13 +57,15 @@ const lockedUuid = computed(() => familyInstanceFromLabel("log") ?? targetUuid()
 /**
  * 锁定实例的信息，只用来在标题栏显示 chip
  *
- * 与资源管理 / 添加资源窗口同一个 chip，但**只给名字不给版本**：日志窗口里版本没有用，
- * 标题栏这一排控件本来就多。所以窗口标题里也不再重复实例名。
+ * 与资源管理 / 添加资源 / 配置文件窗口同一个 chip：名字后面带游戏版本，几处窗口口径一致。
+ * 窗口标题里不再重复实例名。
  */
 const instance = ref<InstanceInfoDto | null>(null);
 
-/** 标题栏 chip 的数据；只取名字，见上面 */
-const instanceChip = computed(() => (instance.value ? { name: instance.value.name } : null));
+/** 标题栏 chip 的数据：名字 + 游戏版本，见上面 */
+const instanceChip = computed(() =>
+  instance.value ? { name: instance.value.name, version: instance.value.version } : null,
+);
 
 /** 窗口标题：只有窗口名，实例在标题栏的 chip 上 */
 const title = computed(() => t("logWindow.title"));
@@ -196,26 +198,51 @@ async function scrollIfPending() {
   viewRef.value.scrollBottom();
 }
 
-/** 当前崩溃报告的分析结果；不是崩溃报告时为 null */
+/** 当前日志的崩溃分析结果；没有结果时为 null */
 const analysis = ref<CrashAnalysisDto | null>(null);
 /** 分析请求序号：换文件后旧请求的结果直接丢掉 */
 let analyzeSeq = 0;
+/** 正在分析当前文件：标题栏那颗按钮在这期间不能再点 */
+const analyzing = ref(false);
 
-/** 分析当前日志文件；运行日志不分析，历史文件打开时都跑一遍 */
-async function analyzeCurrent() {
+/**
+ * 分析当前日志文件
+ *
+ * - `notifyError`: 手动触发时把失败提示出来，自动分析只在控制台留一行
+ *
+ * # 返回值
+ *
+ * 拿到分析结果时为 true；运行日志、请求被后来的分析取代或后端报错时为 false
+ */
+async function analyzeCurrent(notifyError = false): Promise<boolean> {
   const seq = ++analyzeSeq;
   if (!lockedUuid.value || liveSource.value) {
     analysis.value = null;
-    return;
+    return false;
   }
-
+  analyzing.value = true;
   try {
     const result = await api.analyzeLog(lockedUuid.value, file.value);
-    if (seq === analyzeSeq) analysis.value = result;
+    if (seq !== analyzeSeq) return false;
+    analysis.value = result;
+    return true;
   } catch (e) {
-    console.error("[LogWindow] 分析崩溃报告失败", e);
-    if (seq === analyzeSeq) analysis.value = null;
+    console.error("[LogWindow] 分析日志失败", e);
+    if (seq === analyzeSeq) {
+      analysis.value = null;
+      if (notifyError) showToast(tErr(e));
+    }
+    return false;
+  } finally {
+    if (seq === analyzeSeq) analyzing.value = false;
   }
+}
+
+/** 手动分析当前文件；没识别出结论时也给一句提示，否则点了像没反应 */
+async function analyzeManually() {
+  if (analyzing.value) return;
+  if (!(await analyzeCurrent(true))) return;
+  if (!analysis.value?.findings.length) showToast(t("analysis.noFinding"));
 }
 
 /** 载入当前来源的全部日志行 */
@@ -224,6 +251,7 @@ async function loadSource() {
   // 换了来源，旧的分析结果与在途请求都作废
   analyzeSeq += 1;
   analysis.value = null;
+  analyzing.value = false;
   // 换了来源，旧的筛选选项不再成立；待入列的实时行也不属于新来源
   dropPending();
   thread.value = "";
@@ -248,7 +276,8 @@ async function loadSource() {
   } finally {
     loadingSource.value = false;
   }
-  void analyzeCurrent();
+  // 只有崩溃报告自动分析；其它日志要看结论，点标题栏上的「崩溃分析」
+  if (crashTimeOf(file.value) !== null) void analyzeCurrent();
   await scrollIfPending();
 }
 
@@ -408,14 +437,17 @@ const uploadUrl = ref("");
 
 /** 上传的是**整份日志**（当前来源），不是界面上筛过的那几行 */
 async function doUpload() {
-  uploadAsk.value = false;
-  crashAsk.value = false;
+  if (uploading.value) return;
   uploading.value = true;
   try {
     uploadUrl.value = await api.uploadLog(lockedUuid.value, liveSource.value ? null : file.value);
+    // 成功才收起确认框；结果框由 uploadUrl 打开，两者不能同时挂着
+    uploadAsk.value = false;
+    crashAsk.value = false;
     // 与参考实现一致：结果框弹出的同时就把地址放进剪贴板，省得再点一次
     await copyUrl();
   } catch (e) {
+    // 失败时确认框留着，按钮恢复可点，用户可以直接重试
     showToast(tErr(e));
   } finally {
     uploading.value = false;
@@ -607,7 +639,7 @@ onBeforeUnmount(() => {
     <!-- 日志来源与操作都放标题栏：不占内容区高度；除「测试启动」外只留图标，文字进提示 -->
     <template #head-right>
       <div class="head-log">
-        <!-- 当前实例：与资源管理窗口同一个 chip，只是不带版本 -->
+        <!-- 当前实例：与资源管理窗口同一个 chip，名字后面带游戏版本 -->
         <InstanceChip :instance="instanceChip" />
         <select v-model="file" class="field-select head-select" v-tip="t('logWindow.sourceTip')"
           :aria-label="t('logWindow.sourceTip')">
@@ -619,6 +651,11 @@ onBeforeUnmount(() => {
         <BaseButton size="sm" variant="ghost" class="icon-btn-head" v-tip="t('logWindow.refreshList')"
           :aria-label="t('logWindow.refreshList')" @click="refreshList">
           <GlyphIcon name="refresh" :size="15" :weight="1.8" />
+        </BaseButton>
+        <BaseButton v-if="!liveSource" size="sm" variant="ghost" class="icon-btn-head" :disabled="analyzing"
+          v-tip="analyzing ? t('logWindow.analyzing') : t('logWindow.analyze')"
+          :aria-label="analyzing ? t('logWindow.analyzing') : t('logWindow.analyze')" @click="analyzeManually">
+          <GlyphIcon name="alert" :size="15" :weight="1.8" />
         </BaseButton>
         <BaseButton size="sm" variant="ghost" class="icon-btn-head" v-tip="t('logWindow.search')"
           :aria-label="t('logWindow.search')" @click="onSearch">
@@ -703,21 +740,30 @@ onBeforeUnmount(() => {
         @scroll-away="setting.auto = false" />
     </div>
 
-    <!-- 上传确认：日志会发到第三方站点，先问一句 -->
-    <BaseModal v-if="uploadAsk" :title="t('logWindow.upload')" @close="uploadAsk = false">
+    <!-- 上传确认：日志会发到第三方站点，先问一句。上传期间弹窗不关，
+         关闭键与按钮都禁用，上传键原位换成转圈 + 上传中 -->
+    <BaseModal v-if="uploadAsk" :title="t('logWindow.upload')" :close-disabled="uploading"
+      @close="uploadAsk = false">
       <p class="modal-text">{{ t("logWindow.uploadConfirm") }}</p>
       <div class="modal-actions">
-        <BaseButton @click="uploadAsk = false">{{ t("actions.cancel") }}</BaseButton>
-        <BaseButton variant="primary" @click="doUpload">{{ t("logWindow.upload") }}</BaseButton>
+        <BaseButton :disabled="uploading" @click="uploadAsk = false">{{ t("actions.cancel") }}</BaseButton>
+        <BaseButton variant="primary" :disabled="uploading" @click="doUpload">
+          <GlyphIcon v-if="uploading" class="upload-spin" name="refresh" :size="15" :weight="2" />
+          {{ t(uploading ? "logWindow.uploading" : "logWindow.upload") }}
+        </BaseButton>
       </div>
     </BaseModal>
 
-    <!-- 异常退出：多半就是来找日志的，直接问一句要不要传 -->
-    <BaseModal v-if="crashAsk" :title="t('logWindow.crashTitle')" @close="crashAsk = false">
+    <!-- 异常退出：多半就是来找日志的，直接问一句要不要传；上传期间同上传确认框 -->
+    <BaseModal v-if="crashAsk" :title="t('logWindow.crashTitle')" :close-disabled="uploading"
+      @close="crashAsk = false">
       <p class="modal-text">{{ t("logWindow.crashUpload", { code: crashCode }) }}</p>
       <div class="modal-actions">
-        <BaseButton @click="crashAsk = false">{{ t("actions.cancel") }}</BaseButton>
-        <BaseButton variant="primary" @click="doUpload">{{ t("logWindow.upload") }}</BaseButton>
+        <BaseButton :disabled="uploading" @click="crashAsk = false">{{ t("actions.cancel") }}</BaseButton>
+        <BaseButton variant="primary" :disabled="uploading" @click="doUpload">
+          <GlyphIcon v-if="uploading" class="upload-spin" name="refresh" :size="15" :weight="2" />
+          {{ t(uploading ? "logWindow.uploading" : "logWindow.upload") }}
+        </BaseButton>
       </div>
     </BaseModal>
 
@@ -812,5 +858,17 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* 上传中：上传键里的图标转圈，颜色跟随按钮文字，动画与其它按钮里的转圈同一档 */
+.upload-spin {
+  flex-shrink: 0;
+  animation: upload-spin 0.8s linear infinite;
+}
+
+@keyframes upload-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>
