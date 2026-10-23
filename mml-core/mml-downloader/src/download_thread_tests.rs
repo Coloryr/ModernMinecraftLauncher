@@ -120,3 +120,36 @@ fn resume_rejects_wrong_range() {
     assert_eq!(item.get_state(), DownloadItemState::Done);
     assert_eq!(fs::read(target).unwrap(), b"abcdefghij");
 }
+
+#[test]
+fn http_error_bodies_never_complete_a_download() {
+    setup();
+    for status in ["404 Not Found", "500 Internal Server Error"] {
+        let response =
+            format!("HTTP/1.1 {status}\r\nContent-Length: 5\r\nConnection: close\r\n\r\nerror");
+        let (url, handle) = server(vec![response; 6]);
+        let (target, task, item) = run_download(url, "http-error", FileHash::None, LaterRun::None);
+        assert_eq!(handle.join().unwrap().len(), 6);
+        assert_eq!(item.get_state(), DownloadItemState::Error);
+        assert_eq!(task.failed_count.load(Ordering::SeqCst), 1);
+        assert_eq!(task.completed_count.load(Ordering::SeqCst), 0);
+        assert!(!target.exists());
+    }
+}
+
+#[test]
+fn http_range_error_retries_as_a_full_download() {
+    setup();
+    let (url, handle) = server(vec![
+        "HTTP/1.1 200 OK\r\nAccept-Ranges: bytes\r\nContent-Length: 10\r\nConnection: close\r\n\r\nabc".into(),
+        "HTTP/1.1 416 Range Not Satisfiable\r\nContent-Length: 5\r\nConnection: close\r\n\r\nerror".into(),
+        "HTTP/1.1 200 OK\r\nContent-Length: 10\r\nConnection: close\r\n\r\nabcdefghij".into(),
+    ]);
+    let (target, task, item) = run_download(url, "range-error", FileHash::None, LaterRun::None);
+    let requests = handle.join().unwrap();
+    assert!(requests[1].contains("range: bytes=3-"));
+    assert!(!requests[2].contains("range:"));
+    assert_eq!(item.get_state(), DownloadItemState::Done);
+    assert_eq!(task.completed_count.load(Ordering::SeqCst), 1);
+    assert_eq!(fs::read(target).unwrap(), b"abcdefghij");
+}

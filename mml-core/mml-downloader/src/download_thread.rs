@@ -36,6 +36,7 @@ use mml_names::i18_items::error_type::{
     CoreResult, DownloadFileHashErrorData, DownloadFileOverFailData, DownloadFileSizeErrorData,
     DownloadItemFailData, ErrorData,
     ErrorType::{self, StreamError},
+    HttpErrorData,
 };
 use mml_sys::path_helper;
 use reqwest::Response;
@@ -334,6 +335,23 @@ fn download(index: u32, mut obj: DownloadObj) {
                 continue;
             }
         };
+
+        if !resp.status().is_success() {
+            if offset > 0 {
+                server_ranges = false;
+            }
+            obj.item.add_error();
+            let err = ErrorType::HttpError(HttpErrorData {
+                url: obj.item.base.url.clone(),
+                error: resp.status().canonical_reason().unwrap_or_default().into(),
+                status: Some(resp.status().as_u16()),
+            });
+            if is_need_err(&obj.item.base, err, &mut times) {
+                is_fail = true;
+                break;
+            }
+            continue;
+        }
 
         let append = if resp.status() == reqwest::StatusCode::PARTIAL_CONTENT {
             let Some(total) = resumed_total(&resp, offset) else {
