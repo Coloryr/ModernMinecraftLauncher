@@ -41,6 +41,13 @@ use super::emit_launch_error;
 /// 只靠 `is_running` 拦不住重复启动（主界面刷新一次、或从日志窗口再点一次"测试启动"）。
 static LAUNCHING: LazyLock<Mutex<HashSet<Uuid>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
 
+/// 导入覆盖期间阻止新启动，也拒绝覆盖正在准备启动的实例。
+pub(crate) fn import_guard() -> Result<std::sync::MutexGuard<'static, HashSet<Uuid>>, String> {
+    let guard = LAUNCHING.lock().unwrap();
+    if !guard.is_empty() { return Err(err_keys::SERVER_PACK_BUSY.into()); }
+    Ok(guard)
+}
+
 /// 正在启动中的实例的取消令牌：界面点「取消启动」时置位，启动线程在检查点退出
 ///
 /// 只覆盖"进程还没起来"那一段；进程起来后令牌就摘掉，要停游戏走 stop_game。

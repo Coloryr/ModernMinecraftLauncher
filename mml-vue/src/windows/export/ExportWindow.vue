@@ -39,9 +39,10 @@ const loadingInfo = ref(false);
 // ---------------- 导出配置 ----------------
 
 /** 导出格式 id */
-type PackId = "curseforge" | "modrinth" | "mmc" | "hmcl" | "mml";
+type PackId = "curseforge" | "modrinth" | "mmc" | "hmcl" | "mml" | "server";
 
 const pack = ref<PackId>("mml");
+const includeLauncher = ref(false);
 const packName = ref("");
 const author = ref("");
 const version = ref("1.0.0");
@@ -62,6 +63,7 @@ const tab = ref<ExportTab>("meta");
 /** 格式选项：两种通用清单格式，加两种整包实例格式（供别的启动器导入） */
 const packOptions = [
   { value: "mml", label: "M²L" },
+  { value: "server", label: t("winExport.serverPack") },
   { value: "curseforge", label: "CurseForge" },
   { value: "modrinth", label: "Modrinth (.mrpack)" },
   { value: "mmc", label: "MMC" },
@@ -248,6 +250,7 @@ async function startExport() {
   try {
     await api.runExport(currentUuid.value, {
       pack: pack.value,
+      includeLauncher: pack.value === "server" && !!info.value?.canBundleLauncher && includeLauncher.value,
       file: picked,
       mods: picksOf(pickedMods.value),
       files: picksOf(pickedFiles.value),
@@ -345,9 +348,11 @@ onBeforeUnmount(() => {
 
         <!-- 选项卡：与「添加实例」窗口同一套图标页签 -->
         <p v-if="pack === 'mml'" class="sec-hint">{{ t("winExport.nativeHint") }}</p>
+        <p v-else-if="pack === 'server'" class="sec-hint">{{ t("winExport.serverHint") }}</p>
         <IconTabs v-else v-model="tab" :tabs="tabOptions" />
 
-        <div v-if="pack !== 'mml'" class="tab-body">
+        <label v-if="pack === 'server' && info.canBundleLauncher" class="row"><input v-model="includeLauncher" type="checkbox" :disabled="running" />{{ t("winExport.includeLauncher") }}</label>
+        <div v-if="pack !== 'mml' && pack !== 'server'" class="tab-body">
           <!-- 整合包信息：写进清单的元数据，配着上面的格式一起看 -->
           <template v-if="tab === 'meta'">
             <p class="sec-hint">

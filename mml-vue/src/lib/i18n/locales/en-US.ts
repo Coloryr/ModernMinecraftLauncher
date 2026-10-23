@@ -1,5 +1,12 @@
 // English (US) language pack
 export default {
+  "winExport.serverPack": "Server package",
+  "winExport.serverHint": "Includes launcher settings and the complete instance. Import overwrites matching files and restarts the launcher. The optional exe is for portable use and does not replace the running launcher.",
+  "winExport.includeLauncher": "Include launcher exe",
+  "err.serverPackInvalid": "Invalid server package or disallowed files.",
+  "err.serverPackPlatform": "Bundling the launcher executable is only supported on Windows.",
+  "err.serverPackBusy": "Stop all games and wait for launch tasks before importing a server package.",
+  "serverPack.importing": "Validating and importing the server package. The launcher will restart when done.",
   "winExport.generateInfo": "Export instance info",
   "winExport.nativeHint": "Export the complete instance and its settings. Drop the package into the launcher to import it.",
   "err.exportDestination": "Save the archive outside the instance directory",

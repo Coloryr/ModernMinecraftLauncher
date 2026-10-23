@@ -1,5 +1,12 @@
 // 中文（简体）语言包
 export default {
+  "winExport.serverPack": "服务器包",
+  "winExport.serverHint": "包含启动器配置和完整实例。拖入启动器后强制覆盖同名文件并重启；附带的 exe 仅供便携启动，导入时不替换当前程序。",
+  "winExport.includeLauncher": "附带启动器 exe",
+  "err.serverPackInvalid": "服务器包格式无效或含不允许的文件。",
+  "err.serverPackPlatform": "当前系统不支持将启动器程序加入服务器包。",
+  "err.serverPackBusy": "请停止游戏并等待启动任务结束后再导入服务器包。",
+  "serverPack.importing": "正在校验和导入服务器包，完成后将重启启动器。",
   "winExport.generateInfo": "生成实例信息",
   "winExport.nativeHint": "完整导出实例及其配置，可拖入启动器导入。",
   "err.exportDestination": "请将导出文件保存在实例目录之外",

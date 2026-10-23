@@ -141,6 +141,7 @@ pub fn export_get_info(uuid: String) -> Result<ExportInfoDto, String> {
     };
 
     Ok(ExportInfoDto {
+        can_bundle_launcher: cfg!(windows),
         name: game.name.clone(),
         custom_loader: game.loader == LoaderType::Custom,
         mods,

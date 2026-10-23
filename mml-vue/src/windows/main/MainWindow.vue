@@ -1024,6 +1024,11 @@ async function onFilesDropped(payload: FileDropPayload) {
     openWindow("account", { drop: { path: first, kind: "shortcut", url: probe.url } });
     return;
   }
+  if (probe.kind === "serverPack") {
+    showToast(t("serverPack.importing"));
+    try { await commands.export.importServerPack(first); } catch (e) { showToast(tErr(e)); }
+    return;
+  }
   if (probe.kind !== "folder" && probe.kind !== "archive") {
     showToast(t("drop.notModpack"));
     return;
@@ -1516,6 +1521,11 @@ async function handleStartArg() {
       const probe = await commands.windows.probeDrop(arg.value);
       if (probe.kind === "shortcut" && probe.url) {
         openWindow("account", { drop: { path: arg.value, kind: "shortcut", url: probe.url } });
+        return;
+      }
+      if (probe.kind === "serverPack") {
+        showToast(t("serverPack.importing"));
+        await commands.export.importServerPack(arg.value);
         return;
       }
       if (probe.kind !== "folder" && probe.kind !== "archive") {

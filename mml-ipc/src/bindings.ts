@@ -166,6 +166,7 @@ export function createCommands(invoke: Invoke) {
     export: {
       generateInfo: (uuid: string, file: string) => invoke<void>("export_generate_info", { uuid, file }),
       getInfo: (uuid: string) => invoke<ExportInfoDto>("export_get_info", { uuid }),
+      importServerPack: (file: string) => invoke<void>("export_import_server_pack", { file }),
       listDir: (uuid: string, dir: string) => invoke<ExportEntryDto[]>("export_list_dir", { uuid, dir }),
       run: (uuid: string, config: ExportConfigDto) => invoke<void>("export_run", { uuid, config }),
     },

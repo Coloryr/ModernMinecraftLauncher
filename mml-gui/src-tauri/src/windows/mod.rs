@@ -472,6 +472,7 @@ pub fn window_probe_drop(path: String) -> DropPathDto {
         .rsplit_once('.')
         .map(|(_, ext)| ext)
     {
+        Some("zip") if export::server_pack::is_server_pack(std::path::Path::new(&path)) => other("serverPack"),
         Some("zip" | "mrpack" | "modpack") => other("archive"),
         Some("url" | "webloc" | "website") => shortcut_of(&path),
         // 卡片拖到桌面后不一定是 `.url`：有的站点给的是 `.json` / `.txt`。

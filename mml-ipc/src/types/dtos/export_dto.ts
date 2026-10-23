@@ -10,6 +10,7 @@ export type ExportEntryDto = {
 };
 
 export type ExportInfoDto = {
+  canBundleLauncher: boolean,
   name: string,
   customLoader: boolean,
   mods: ExportEntryDto[],
@@ -21,6 +22,7 @@ export type ExportPickDto = {
 };
 
 export type ExportConfigDto = {
+  includeLauncher: boolean,
   pack: string,
   file: string,
   mods: ExportPickDto[],

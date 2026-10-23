@@ -145,6 +145,9 @@ pub const MOD_EXPORT_SCAN: &str = "err.modExportScan";
 /// 导出字段无效。
 /// 导出路径不能位于实例内。
 pub const EXPORT_DESTINATION: &str = "err.exportDestination";
+pub const SERVER_PACK_INVALID: &str = "err.serverPackInvalid";
+pub const SERVER_PACK_PLATFORM: &str = "err.serverPackPlatform";
+pub const SERVER_PACK_BUSY: &str = "err.serverPackBusy";
 /// 实例内的链接不能打包。
 pub const EXPORT_LINK: &str = "err.exportLink";
 pub const EXPORT_FIELDS: &str = "err.exportFields";

@@ -102,6 +102,8 @@ static IS_RUN: AtomicBool = AtomicBool::new(true);
 static SEM: OnceLock<Arc<Semaphore>> = OnceLock::new();
 /// 后台保存线程句柄，stop 时 join，确保最后一次保存落盘后才返回
 static HANDLE: Mutex<Option<JoinHandle<()>>> = Mutex::new(None);
+/// 文件替换与后台保存共用的写入屏障。
+static WRITE_LOCK: Mutex<()> = Mutex::new(());
 
 /// 将对象加入保存队列
 ///
@@ -140,6 +142,11 @@ fn enqueue(task: ConfigSaveObj) {
 
 /// 执行一次保存：取出队列中所有任务并写入磁盘
 fn save_now() {
+    let _guard = WRITE_LOCK.lock().unwrap();
+    flush_queue();
+}
+
+fn flush_queue() {
     let items = {
         let mut queue = QUEUE.lock().unwrap();
         mem::take(&mut *queue)
@@ -149,6 +156,16 @@ fn save_now() {
             mml_log::error_type(err);
         }
     }
+}
+
+/// 写完已排队配置后独占执行文件替换。
+/// - `action`: 替换文件并更新配置内存的操作，不得等待保存线程。
+/// # 返回值
+/// 操作返回值。
+pub fn with_flushed<T>(action: impl FnOnce() -> T) -> T {
+    let _guard = WRITE_LOCK.lock().unwrap();
+    flush_queue();
+    action()
 }
 
 /// 启动后台配置保存线程

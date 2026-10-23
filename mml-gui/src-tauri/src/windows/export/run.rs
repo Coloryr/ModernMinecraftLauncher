@@ -117,12 +117,13 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
     let permit = ExportPermit::acquire(&EXPORT_RUNNING)?;
 
     let game = instance_snapshot(&uuid)?;
+    let server_pack = config.pack == "server";
     let pack = match config.pack.as_str() {
         "curseforge" => ExportPackType::CurseForge,
         "modrinth" => ExportPackType::Modrinth,
         "mmc" => ExportPackType::MMC,
         "hmcl" => ExportPackType::HMCL,
-        "mml" => ExportPackType::MML,
+        "mml" | "server" => ExportPackType::MML,
         _ => {
             return Err(err_keys::EXPORT_PACK_TYPE.to_string());
         }
@@ -215,7 +216,10 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
     tokio::spawn(async move {
         let _permit = permit;
         let res = if pack == ExportPackType::MML {
-            tokio::task::spawn_blocking(move || super::archive::native_instance(&game, &arg.file))
+            tokio::task::spawn_blocking(move || {
+                if server_pack { super::server_pack::export_pack(&game, &arg.file, config.include_launcher) }
+                else { super::archive::native_instance(&game, &arg.file) }
+            })
                 .await.map_err(|e| e.to_string()).and_then(|result| result)
         } else { game.export(arg).await.map_err(|e| e.to_string()) };
         let event = match res {
