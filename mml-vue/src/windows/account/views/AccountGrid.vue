@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // 账户平铺视图：皮肤 / 头像 / 披风 三图卡片
 import { computed, ref } from "vue";
+import { accountLocked } from "../../../lib/accountStore";
 import { t } from "../../../lib/i18n";
 import {
   accountAvatarUrl,
@@ -121,7 +122,7 @@ function hidePreview() {
     </button>
 
     <div v-for="acc in accounts" :key="acc.uuid" class="acc-card" :class="{ current: isCurrent(acc) }"
-      @dblclick="emit('switch', acc)">
+      @dblclick="!accountLocked && emit('switch', acc)">
       <div class="acc-images"
         :class="{ empty: imageFailed(acc, 'avatar') && imageFailed(acc, 'skin') && imageFailed(acc, 'cape') }">
         <span v-if="isCurrent(acc)" class="current-badge">{{ t("account.current") }}</span>
@@ -175,7 +176,7 @@ function hidePreview() {
       <div class="acc-head">
         <span class="acc-name">{{ acc.userName }}</span>
         <AccountTypeBadge :auth-type="acc.authType" />
-        <AccountActions :can-refresh="acc.canRefresh" :can-relogin="acc.canRelogin" :can-edit="acc.canEdit"
+        <AccountActions :locked="accountLocked && acc.uuid === currentUuid" :can-refresh="acc.canRefresh" :can-relogin="acc.canRelogin" :can-edit="acc.canEdit"
           :has-skin="!hasNoSkin(acc)" @refresh="emit('refresh', acc)" @view-skin="emit('viewSkin', acc)"
           @refresh-skin="emit('refreshSkin', acc)" @relogin="emit('relogin', acc)" @edit="emit('edit', acc)"
           @delete="emit('delete', acc)" />

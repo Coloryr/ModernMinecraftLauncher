@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // 账户列表视图：头像 / 名字 / 类型 / UUID + 操作
 import { ref } from "vue";
+import { accountLocked } from "../../../lib/accountStore";
 import { t } from "../../../lib/i18n";
 import { accountAvatarUrl, hasNoSkin, imageFailed, imageLoading, markImageFailed, markImageLoaded } from "../../../lib/accountImages";
 import AccountActions from "../../../components/AccountActions.vue";
@@ -78,7 +79,7 @@ function hidePreview() {
     </button>
 
     <div v-for="acc in accounts" :key="acc.uuid" class="acc-row" :class="{ current: isCurrent(acc) }"
-      @dblclick="emit('switch', acc)">
+      @dblclick="!accountLocked && emit('switch', acc)">
       <!-- 加载中：图上叠转圈，onload 后消失 -->
       <div v-if="!imageFailed(acc, 'avatar')" class="row-avatar-box">
         <img :src="acc.avatar || accountAvatarUrl(acc)" class="row-avatar"
@@ -100,7 +101,7 @@ function hidePreview() {
       </div>
       <span v-if="isCurrent(acc)" class="current-tag">{{ t("account.current") }}</span>
       <span class="token-tag" :class="acc.tokenStatus">{{ tokenLabel(acc) }}</span>
-      <AccountActions :can-refresh="acc.canRefresh" :can-relogin="acc.canRelogin" :can-edit="acc.canEdit"
+      <AccountActions :locked="accountLocked && acc.uuid === currentUuid" :can-refresh="acc.canRefresh" :can-relogin="acc.canRelogin" :can-edit="acc.canEdit"
         :has-skin="!hasNoSkin(acc)" @refresh="emit('refresh', acc)" @view-skin="emit('viewSkin', acc)"
         @refresh-skin="emit('refreshSkin', acc)" @relogin="emit('relogin', acc)" @edit="emit('edit', acc)"
         @delete="emit('delete', acc)" />

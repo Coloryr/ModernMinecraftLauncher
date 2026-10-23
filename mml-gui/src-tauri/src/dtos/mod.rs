@@ -18,6 +18,7 @@ pub mod custom_home_dto;
 pub mod custom_ui_dto;
 pub mod download_dto;
 pub mod export_dto;
+pub mod mod_export_dto;
 pub mod gui_config_dto;
 pub mod instance_dto;
 pub mod java_download_dto;
@@ -90,3 +91,6 @@ pub use stats_dto::{StatsDataDto, StatsInstanceDto, StatsPlayDayDto, StatsPlayti
 pub use theme_dto::ThemeKindDto;
 pub use version_dto::VersionInfoDto;
 pub use window_dto::{DropPathDto, FileDropDto, WindowSizeDto};
+
+mod lobby_dto;
+pub use lobby_dto::{LobbyProfileDto, LobbyStateDto, LobbyViewDto, MappingRoomDto, MappingLobbyDto};

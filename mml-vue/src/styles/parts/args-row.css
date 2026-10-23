@@ -49,19 +49,11 @@
   background-size: 11px;
 }
 
-/* 窗口分辨率这条比内存的两条长一些，档位文字居中。
-   base-select 下关闭态显示的内容在 ::selectedcontent 里，默认是收缩盒：只写 text-align
-   没有可分配的余量，字不会动；而弹层里的 option 是全宽的，反倒被继承成居中。
-   所以这里把内容撑满（父盒是 flex 还是块盒随版本，两条都留）再居中，选项钉回靠左 */
+/* 分辨率预设居中，展开后的选项保持左对齐。 */
 .res-pick {
   min-width: 200px;
   text-align: center;
-}
-
-.res-pick::selectedcontent {
-  flex: 1;
-  width: 100%;
-  text-align: center;
+  text-align-last: center;
 }
 
 .res-pick option {

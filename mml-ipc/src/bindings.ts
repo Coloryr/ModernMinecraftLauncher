@@ -4,7 +4,7 @@
 // 传输层不在这里绑定：createCommands 接收调用方传入的 invoke。
 
 import type { Invoke } from "./invoke";
-import type { AccountStoreDto, AccountStoreViewDto, AutoSaveTargetDto, BgInfoDto, BlockGroupsDto, BlockItemDto, BlockStatusDto, BuildInfoDto, BytesSliceDto, ChunkFindDto, CollectDataDto, ColorMcInfoDto, ColorMcReportDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, CrashAnalysisDto, CustomCssItemDto, CustomHomeInfoDto, CustomJsonItemDto, CustomUiInfoDto, DataPackItemDto, DepProblemDto, DetectedPackDto, DirEntry, DownloadStatusDto, DropPathDto, ExportConfigDto, ExportEntryDto, ExportInfoDto, FileItemDto, FileListDto, FolderInstanceDto, GroupDto, GuiConfigDto, IconSourceDto, InstanceArgsDto, InstanceInfoDto, InstanceLangDto, InstancePatch, JavaDownloadItemDto, JavaDownloadOptionsDto, JavaInfoDto, JavaTypes, LaunchSettingDto, LoadState, LocalFileEntryDto, LogLine, LogSettingDto, McaChunkDto, ModAutoMarkDto, ModDepTreeDto, ModGroupDto, ModItemDto, ModPackStatusDto, ModPackUpdateDto, ModRenameDto, ModUpdateApplyDto, ModUpdateCheckDto, ModUpdateProjectDto, MotdDto, NbtEditDto, NetworkSettingDto, NewsItem, PackItemDto, ProjectDetailDto, ProjectDto, ProjectItemDto, ResourceDependencyDto, ResourceDropDto, ResourceSaveDto, ResourceStatusDto, ResourceViewDto, RunArgSettingDto, SaveBackupDto, SaveEditDto, SaveItemDto, SchematicDetailDto, SchematicItemDto, ScreenshotItemDto, ServerItemDto, SettingsDefaultsDto, ShaderItemDto, StartArgDto, StatsDataDto, StatsPlaytimeDto, SystemMemoryDto, TexturesDto, VersionInfoDto, WindowSettingDto, WindowSizeDto } from "./types";
+import type { AccountStoreDto, AccountStoreViewDto, AutoSaveTargetDto, BgInfoDto, BlockGroupsDto, BlockItemDto, BlockStatusDto, BuildInfoDto, BytesSliceDto, ChunkFindDto, CollectDataDto, ColorMcInfoDto, ColorMcReportDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, CrashAnalysisDto, CustomCssItemDto, CustomHomeInfoDto, CustomJsonItemDto, CustomUiInfoDto, DataPackItemDto, DepProblemDto, DetectedPackDto, DirEntry, DownloadStatusDto, DropPathDto, ExportConfigDto, ExportEntryDto, ExportInfoDto, FileItemDto, FileListDto, FolderInstanceDto, GroupDto, GuiConfigDto, IconSourceDto, InstanceArgsDto, InstanceInfoDto, InstanceLangDto, InstancePatch, JavaDownloadItemDto, JavaDownloadOptionsDto, JavaInfoDto, JavaTypes, LaunchSettingDto, LoadState, LobbyViewDto, LocalFileEntryDto, LogLine, LogSettingDto, MappingLobbyDto, McaChunkDto, ModAutoMarkDto, ModDepTreeDto, ModExportDto, ModGroupDto, ModItemDto, ModPackStatusDto, ModPackUpdateDto, ModRenameDto, ModUpdateApplyDto, ModUpdateCheckDto, ModUpdateProjectDto, MotdDto, NbtEditDto, NetworkSettingDto, NewsItem, PackItemDto, ProjectDetailDto, ProjectDto, ProjectItemDto, ResourceDependencyDto, ResourceDropDto, ResourceSaveDto, ResourceStatusDto, ResourceViewDto, RunArgSettingDto, SaveBackupDto, SaveEditDto, SaveItemDto, SchematicDetailDto, SchematicItemDto, ScreenshotItemDto, ServerItemDto, SettingsDefaultsDto, ShaderItemDto, StartArgDto, StatsDataDto, StatsPlaytimeDto, SystemMemoryDto, TexturesDto, VersionInfoDto, WindowSettingDto, WindowSizeDto } from "./types";
 
 export * from "./types";
 
@@ -164,7 +164,9 @@ export function createCommands(invoke: Invoke) {
       resumeAll: () => invoke<number>("download_resume_all"),
     },
     export: {
+      generateInfo: (uuid: string, file: string) => invoke<void>("export_generate_info", { uuid, file }),
       getInfo: (uuid: string) => invoke<ExportInfoDto>("export_get_info", { uuid }),
+      importServerPack: (file: string) => invoke<void>("export_import_server_pack", { file }),
       listDir: (uuid: string, dir: string) => invoke<ExportEntryDto[]>("export_list_dir", { uuid, dir }),
       run: (uuid: string, config: ExportConfigDto) => invoke<void>("export_run", { uuid, config }),
     },
@@ -173,6 +175,16 @@ export function createCommands(invoke: Invoke) {
       getOptions: (source: JavaTypes) => invoke<JavaDownloadOptionsDto>("java_download_get_options", { source }),
       getTypes: () => invoke<JavaTypes[]>("java_download_get_types"),
       start: (uuid: string) => invoke<void>("java_download_start", { uuid }),
+    },
+    lobby: {
+      close: () => invoke<void>("lobby_close"),
+      launchGame: (uuid: string) => invoke<void>("lobby_launch_game", { uuid }),
+      mappingAction: (action: string, room: string) => invoke<void>("lobby_mapping_action", { action, room }),
+      mappingList: () => invoke<MappingLobbyDto>("lobby_mapping_list"),
+      prepare: () => invoke<LobbyViewDto>("lobby_prepare"),
+      roomAction: (action: string, room: string, nodes: string[]) => invoke<void>("lobby_room_action", { action, room, nodes }),
+      start: () => invoke<LobbyViewDto>("lobby_start"),
+      status: () => invoke<LobbyViewDto>("lobby_status"),
     },
     log: {
       analyze: (uuid: string, path: string) => invoke<CrashAnalysisDto>("log_analyze", { uuid, path }),
@@ -228,6 +240,7 @@ export function createCommands(invoke: Invoke) {
       deleteSchematic: (uuid: string, file: string) => invoke<void>("resource_delete_schematic", { uuid, file }),
       deleteScreenshot: (uuid: string, name: string) => invoke<void>("resource_delete_screenshot", { uuid, name }),
       deleteShaderpack: (uuid: string, file: string) => invoke<void>("resource_delete_shaderpack", { uuid, file }),
+      exportMods: (uuid: string, config: ModExportDto) => invoke<number>("resource_export_mods", { uuid, config }),
       importFiles: (uuid: string, kind: string, paths: string[], mode: string, parent: string | null) => invoke<ResourceDropDto>("resource_import_files", { uuid, kind, paths, mode, parent }),
       listDatapacks: (uuid: string, dir: string) => invoke<DataPackItemDto[]>("resource_list_datapacks", { uuid, dir }),
       listMods: (uuid: string) => invoke<ModItemDto[]>("resource_list_mods", { uuid }),

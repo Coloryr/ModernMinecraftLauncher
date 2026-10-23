@@ -414,6 +414,11 @@ async function onFilesDropped(payload: FileDropPayload) {
     showToast(tErr(e));
     return;
   }
+  if (probe.kind === "serverPack") {
+    showToast(t("serverPack.importing"));
+    try { await commands.export.importServerPack(first); } catch (e) { showToast(tErr(e)); }
+    return;
+  }
   if (probe.kind !== "folder" && probe.kind !== "archive") {
     showToast(t("drop.notModpack"));
     return;

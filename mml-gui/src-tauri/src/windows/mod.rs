@@ -25,6 +25,7 @@ pub mod download;
 pub mod export;
 pub mod java_download;
 pub mod log;
+pub mod lobby;
 pub mod main;
 pub mod resource;
 pub mod settings;
@@ -258,7 +259,11 @@ pub async fn window_open_window(
     let Some(uuid) = uuid_for_kind(&kind) else {
         return Err(format!("unknown window kind: {kind}"));
     };
-    open_window_from_uuid(&app, &uuid, &url_path, Some(&window))?;
+    if kind == "lobby" { lobby::lobby_prepare(app.clone()).await?; }
+    if let Err(error) = open_window_from_uuid(&app, &uuid, &url_path, Some(&window)) {
+        if kind == "lobby" { lobby::lobby_close(); }
+        return Err(error);
+    }
     // 新创建的窗口靠 URL query 拿目标；已存在的窗口 URL 不变，靠事件切换
     if let Some(instance) = &instance
         && kind == "export"
@@ -356,6 +361,9 @@ pub async fn window_reopen_window(
     query: Option<String>,
 ) -> Result<(), String> {
     kind_parse_check(&kind, &instance)?;
+    if kind == "lobby" {
+        return window_open_window(app, window, kind, instance, query).await;
+    }
     let query = query.unwrap_or_default();
     // 前端那份 query 是 URLSearchParams 编出来的，不会出现裸 # / 控制字符；
     // 这里只做一次兜底，别把畸形串拼进 URL，同 window_open_window
@@ -472,6 +480,7 @@ pub fn window_probe_drop(path: String) -> DropPathDto {
         .rsplit_once('.')
         .map(|(_, ext)| ext)
     {
+        Some("zip") if export::server_pack::is_server_pack(std::path::Path::new(&path)) => other("serverPack"),
         Some("zip" | "mrpack" | "modpack") => other("archive"),
         Some("url" | "webloc" | "website") => shortcut_of(&path),
         // 卡片拖到桌面后不一定是 `.url`：有的站点给的是 `.json` / `.txt`。
@@ -996,6 +1005,8 @@ pub fn window_restart_app(app: AppHandle) {
                 // 带上 --restart：新进程跳过单开检查，否则会把请求交回本进程（马上要退的那个）
                 if let Err(err) = std::process::Command::new(exe)
                     .arg(names::COMMAND_RESTART)
+                    .arg("--run-dir")
+                    .arg(crate::gui_config::dir().unwrap())
                     .spawn()
                 {
                     mml_log::error(

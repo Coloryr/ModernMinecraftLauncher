@@ -133,9 +133,15 @@ pub(super) fn list_entries(
 pub fn export_get_info(uuid: String) -> Result<ExportInfoDto, String> {
     let game = instance_snapshot(&uuid)?;
     let online = online_of(&game);
-    let mods = list_entries(&game.get_mods_path(), &game.get_game_path(), &online)?;
+    let mods_path = game.get_mods_path();
+    let mods = if mods_path.exists() {
+        list_entries(&mods_path, &game.get_game_path(), &online)?
+    } else {
+        Vec::new()
+    };
 
     Ok(ExportInfoDto {
+        can_bundle_launcher: cfg!(windows),
         name: game.name.clone(),
         custom_loader: game.loader == LoaderType::Custom,
         mods,

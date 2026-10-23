@@ -419,7 +419,7 @@ mod macos_admin_tests {
 #[cfg(target_os = "windows")]
 mod windows_pipe_tests {
     use std::io::{BufRead, Read, Write};
-    use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
+    use std::os::windows::io::{IntoRawHandle, FromRawHandle, OwnedHandle};
     use std::sync::Arc;
     use std::time::Duration;
 
@@ -449,11 +449,8 @@ mod windows_pipe_tests {
         }
     }
 
-    // 已知 src bug：`err.code() == HRESULT(ERROR_IO_PENDING.0 as i32)` 的比较方式有误，
-    // 实际错误码是 HRESULT 包装的 997，恒不相等，两条本应成功的路径都被判失败；修复后移除 ignore
     /// 命名管道连接后可读到客户端写入的数据
     #[test]
-    #[ignore = "受 connect_named_pipe_with_timeout 的 ERROR_IO_PENDING 比较错误阻塞，详见 src bug 记录"]
     fn test_named_pipe_connect_and_read() {
         let name = format!("test_pipe_rw_{}", std::process::id());
 
@@ -477,7 +474,6 @@ mod windows_pipe_tests {
 
     /// 无客户端连接时按超时返回错误
     #[test]
-    #[ignore = "受 connect_named_pipe_with_timeout 的 ERROR_IO_PENDING 比较错误阻塞，详见 src bug 记录"]
     fn test_named_pipe_timeout() {
         let name = format!("test_pipe_timeout_{}", std::process::id());
 
@@ -487,7 +483,7 @@ mod windows_pipe_tests {
         assert!(result.is_err(), "should timeout with no client");
         let err_msg = format!("{:?}", result.unwrap_err());
         assert!(
-            err_msg.contains("timed out"),
+            err_msg.contains("NamedPipeConnectTimeout"),
             "error should mention timeout: {}",
             err_msg
         );
@@ -512,7 +508,6 @@ mod windows_pipe_tests {
 
     /// 管道可完整传输 64 KiB 数据
     #[test]
-    #[ignore = "受 connect_named_pipe_with_timeout 的 ERROR_IO_PENDING 比较错误阻塞，详见 src bug 记录"]
     fn test_named_pipe_large_data() {
         let name = format!("test_pipe_large_{}", std::process::id());
 
@@ -539,7 +534,6 @@ mod windows_pipe_tests {
 
     /// 客户端先连接时服务端仍能连上并读到数据
     #[test]
-    #[ignore = "受 connect_named_pipe_with_timeout 的 ERROR_IO_PENDING 比较错误阻塞，详见 src bug 记录"]
     fn test_named_pipe_client_first_connect() {
         let name = format!("test_pipe_early_{}", std::process::id());
 
@@ -578,6 +572,7 @@ mod windows_pipe_tests {
     /// 命名管道 → 提权 helper NamedPipeClientStream → .NET Process.Start → 输出抄送 → 管道读取；
     /// UAC 接受时验证 stdout 内容，UAC 拒绝时 stdout/stderr 为 None 但不 panic
     #[test]
+    #[ignore = "需要人工确认 UAC，自动验证使用不提权的辅助进程测试"]
     fn test_launch_with_elevation_windows_e2e() {
         use std::collections::HashMap;
 
@@ -622,6 +617,7 @@ mod windows_pipe_tests {
     /// Java 将版本信息输出到 **stderr** 而非 stdout，可验证 stderr 管道是否正常工作；
     /// 需要已安装 Java 且 UAC 可交互，或当前已是管理员
     #[test]
+    #[ignore = "需要人工确认 UAC，自动验证使用不提权的辅助进程测试"]
     fn test_launch_java_version_via_elevation() {
         use std::collections::HashMap;
         use std::process::Command;
@@ -712,7 +708,7 @@ mod windows_pipe_tests {
         std::thread::spawn(move || {
             tx_out
                 .send(process_helper::connect_named_pipe_with_timeout(
-                    HANDLE(o_out.as_raw_handle()),
+                    HANDLE(o_out.into_raw_handle()),
                     5_000,
                 ))
                 .ok();
@@ -763,7 +759,6 @@ mod windows_pipe_tests {
     /// 通过 .NET `Process.Start` + `NamedPipeClientStream` 这套与提权 helper 完全相同的组合，
     /// 验证管道能收到真实进程的输出
     #[test]
-    #[ignore = "受 connect_named_pipe_with_timeout 的 ERROR_IO_PENDING 比较错误阻塞，详见 src bug 记录"]
     fn test_real_child_process_data_through_pipe() {
         use std::process::{Command, Stdio};
         use std::sync::atomic::{AtomicU64, Ordering};
@@ -789,7 +784,7 @@ mod windows_pipe_tests {
         std::thread::spawn(move || {
             tx_out
                 .send(process_helper::connect_named_pipe_with_timeout(
-                    HANDLE(o_out.as_raw_handle()),
+                    HANDLE(o_out.into_raw_handle()),
                     10_000,
                 ))
                 .ok();
@@ -797,7 +792,7 @@ mod windows_pipe_tests {
         std::thread::spawn(move || {
             tx_err
                 .send(process_helper::connect_named_pipe_with_timeout(
-                    HANDLE(o_err.as_raw_handle()),
+                    HANDLE(o_err.into_raw_handle()),
                     10_000,
                 ))
                 .ok();

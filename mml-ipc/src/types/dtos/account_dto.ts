@@ -3,6 +3,7 @@
 export type AccountStoreViewDto = {
   accounts: AccountStoreDto[],
   currentUuid: string | null,
+  locked: boolean,
 };
 
 export type AccountStoreDto = {

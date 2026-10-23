@@ -3165,9 +3165,12 @@ dependencies = [
  "mml-sys",
  "mml-testutil",
  "mml-tex-draw",
+ "reqwest",
  "rfd 0.17.2",
  "serde",
  "serde_json",
+ "sha2 0.11.1",
+ "tar",
  "tauri",
  "tauri-build",
  "tauri-plugin-decoration",
@@ -3284,6 +3287,7 @@ dependencies = [
 name = "mml-sys"
 version = "0.1.0"
 dependencies = [
+ "base64 0.23.1",
  "clipboard-rs",
  "dbus",
  "mml-names",

@@ -40,6 +40,9 @@ tokio-util.workspace = true
 zip.workspace = true
 encoding_rs.workspace = true
 flate2.workspace = true
+tar.workspace = true
+sha2.workspace = true
+reqwest.workspace = true
 
 mml-core = { path = "../../mml-core" }
 mml-game = { path = "../../mml-core/mml-game" }

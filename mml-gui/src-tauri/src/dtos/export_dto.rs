@@ -28,6 +28,8 @@ pub struct ExportEntryDto {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportInfoDto {
+    /// 当前平台是否允许将启动器程序放入服务器包。
+    pub can_bundle_launcher: bool,
     /// 实例名
     pub name: String,
     /// 实例用的是自定义加载器：MMC / HMCL 的包内没有它的组件位，导出的包里只有游戏版本
@@ -50,6 +52,9 @@ pub struct ExportPickDto {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportConfigDto {
+    /// Windows 服务器包是否附带启动器程序。
+    #[serde(default)]
+    pub include_launcher: bool,
     /// 导出格式：curseforge / modrinth
     pub pack: String,
     /// 保存位置，前端 save 对话框选好的完整路径

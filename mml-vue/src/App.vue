@@ -64,6 +64,7 @@ const windowMap: Record<WindowKind, Component> = {
   block: defineAsyncComponent(() => import("./windows/block/BlockWindow.vue")),
   log: LogWindow,
   export: defineAsyncComponent(() => import("./windows/export/ExportWindow.vue")),
+  lobby: defineAsyncComponent(() => import("./windows/lobby/LobbyWindow.vue")),
   config: defineAsyncComponent(() => import("./windows/config/ConfigWindow.vue")),
 };
 

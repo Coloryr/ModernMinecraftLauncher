@@ -13,7 +13,8 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { commands } from "../lib/bindings";
 import type { ProjectItemDto } from "../lib/bindings";
 import { saveGuiConfig } from "../lib/guiConfig";
-import { t } from "../lib/i18n";
+import { t, tErr } from "../lib/i18n";
+import { showToast } from "../lib/toast";
 import { KEYS, readString, writeString } from "../lib/storage";
 import { isTauri } from "../lib/util";
 import { isWindowKind, type WindowKind, WINDOW_REGISTRY } from "./registry";
@@ -574,13 +575,35 @@ function instanceArgOf(kind: WindowKind, params?: WindowOpenParams): string | nu
   return FAMILY_LABEL_PREFIX[kind] || kind === "export" ? (params?.uuid ?? null) : null;
 }
 
+/** 大厅验证期间防止重复打开。 */
+export const lobbyOpening = ref(false);
+let lobbyClosing: Promise<void> = Promise.resolve();
+
+/** 等待上一页释放账户后，再验证本次大厅会话。 */
+export async function prepareLobby() {
+  await lobbyClosing;
+  return commands.lobby.prepare();
+}
+
+/** 单窗口模式先释放旧会话，再允许下一次打开。 */
+export function releaseLobby() {
+  lobbyClosing = commands.lobby.close().catch(error => console.error("[lobby] 释放会话失败", error));
+}
+
 /**
  * 打开一个窗口，功能入口与各处的跳转都走它
  *
  * - `kind`: 目标窗口
  * - `params`: 见 [`WindowOpenParams`]，各字段按目标窗口需要填
  */
-export function openWindow(kind: WindowKind, params?: WindowOpenParams) {
+export async function openWindow(kind: WindowKind, params?: WindowOpenParams) {
+  if (kind === "lobby" && isTauri()) {
+    if (lobbyOpening.value) return;
+    lobbyOpening.value = true;
+    try { await prepareLobby(); }
+    catch (error) { showToast(tErr(error)); return; }
+    finally { lobbyOpening.value = false; }
+  }
   // 单窗口模式（浏览器 / Tauri 一致）：应用内页面切换。
   // 窗口族是"一个实例一个"：实例是它的窗口身份（后端按它派生 uuid 与标签），
   // 没有实例就开不出正确的窗口，两种模式都直接作罢
@@ -641,6 +664,7 @@ export function openWindow(kind: WindowKind, params?: WindowOpenParams) {
       commands.windows
         .reopenWindow(kind, instanceArgOf(kind, params), query)
         .catch((e) => {
+          if (kind === "lobby") { releaseLobby(); showToast(tErr(e)); return; }
           console.error("[windowManager] Rust 重开窗口失败，回退 JS API", kind, e);
           createViaJs(kind, params);
         });
@@ -652,6 +676,7 @@ export function openWindow(kind: WindowKind, params?: WindowOpenParams) {
     commands.windows
       .openWindow(kind, instanceArgOf(kind, params), query)
       .catch((e) => {
+        if (kind === "lobby") { releaseLobby(); showToast(tErr(e)); return; }
         console.error("[windowManager] Rust 打开窗口失败，回退 JS API", kind, e);
         createViaJs(kind, params);
       });

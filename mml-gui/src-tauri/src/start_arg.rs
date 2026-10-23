@@ -39,14 +39,21 @@ static PENDING: LazyLock<Mutex<Option<StartArgDto>>> = LazyLock::new(|| Mutex::n
 /// - `args`: 进程参数，第 0 项是可执行文件本身，从第 1 项开始认
 pub fn collect<I: IntoIterator<Item = String>>(args: I) {
     let args: Vec<String> = args.into_iter().collect();
-    let Some(first) = args.get(1) else {
-        return;
-    };
+    if let Some(parsed) = parse(args.get(1..).unwrap_or_default()) {
+        *PENDING.lock().unwrap() = Some(parsed);
+    }
+}
 
-    let parsed = if first == CMD_GAME {
-        args.get(2).map(|uuid| StartArgDto::game(uuid))
+fn parse(args: &[String]) -> Option<StartArgDto> {
+    let first = args.first()?;
+
+    if first == "--run-dir" { return parse(args.get(2..)?); }
+    if first == mml_names::names::COMMAND_RESTART { return parse(&args[1..]); }
+
+    if first == CMD_GAME {
+        args.get(1).map(|uuid| StartArgDto::game(uuid))
     } else if first == CMD_INSTALL || first == CMD_IMPORT {
-        args.get(2).map(|path| StartArgDto::install(path))
+        args.get(1).map(|path| StartArgDto::install(path))
     } else if let Some(rest) = first.strip_prefix(URL_PREFIX) {
         if let Some(uuid) = rest.strip_prefix(URL_RUN) {
             Some(StartArgDto::game(uuid))
@@ -54,12 +61,45 @@ pub fn collect<I: IntoIterator<Item = String>>(args: I) {
             rest.strip_prefix(URL_INSTALL)
                 .map(|path| StartArgDto::install(path))
         }
+    } else if std::path::Path::new(first).is_file() {
+        Some(StartArgDto::install(first))
     } else {
         None
-    };
+    }
+}
 
-    if let Some(parsed) = parsed {
-        *PENDING.lock().unwrap() = Some(parsed);
+/// 读取提权和重启时传递的数据目录。
+/// - `args`: 不含可执行文件的参数列表。
+/// # 返回值
+/// 首个显式数据目录，没有指定时返回空。
+pub fn run_dir(args: impl IntoIterator<Item = String>) -> Option<std::path::PathBuf> {
+    let mut args = args.into_iter();
+    while let Some(arg) = args.next() {
+        if arg == "--run-dir" {
+            return args.next().map(std::path::PathBuf::from);
+        }
+        if arg == CMD_INSTALL || arg == CMD_IMPORT || arg == CMD_GAME { args.next(); }
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn dropped_zip_and_install_flag_use_same_request() {
+        let dir = crate::test_support::temp_dir("dropped-server-pack");
+        let zip = dir.join("server pack.zip");
+        std::fs::write(&zip, b"zip").unwrap();
+        let path = zip.to_string_lossy().to_string();
+        let dropped = super::parse(&[path.clone()]).unwrap();
+        let flagged = super::parse(&["--install".into(), path.clone()]).unwrap();
+        assert_eq!(dropped.action, "install");
+        assert_eq!(dropped.value, flagged.value);
+        assert_eq!(dropped.value, path);
+        let restarted = super::parse(&["--restart".into(), "--run-dir".into(), dir.to_string_lossy().into_owned(), path.clone()]).unwrap();
+        assert_eq!(restarted.value, path);
+        assert_eq!(super::run_dir(["--run-dir".into(), dir.to_string_lossy().into_owned()]), Some(dir.clone()));
+        crate::test_support::cleanup(&[&dir]);
     }
 }
 

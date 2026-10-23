@@ -378,7 +378,7 @@ pub struct GuiConfig {
     pub collect_window: CollectWindowConfig,
     /// 客户端设置
     pub client: ClientConfig,
-    /// 实验性功能开关（界面先行，行为未接线）
+    /// 实验性功能开关
     pub experimental: ExperimentalConfig,
     /// 界面字体族名；空串表示用默认字体栈
     pub font: String,

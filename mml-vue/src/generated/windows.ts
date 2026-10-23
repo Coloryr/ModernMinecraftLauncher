@@ -42,8 +42,11 @@ export { default as WinConfigPartsNbtTree } from "../windows/config/parts/NbtTre
 export { default as DownloadWindow } from "../windows/download/DownloadWindow.vue";
 export { default as ExportWindow } from "../windows/export/ExportWindow.vue";
 export { default as WinExportPartsFilePicker } from "../windows/export/parts/FilePicker.vue";
+export { default as WinExportPartsInfoExportButton } from "../windows/export/parts/InfoExportButton.vue";
 export { default as HelpWindow } from "../windows/help/HelpWindow.vue";
 export { default as JavaDownloadWindow } from "../windows/java_download/JavaDownloadWindow.vue";
+export { default as LobbyWindow } from "../windows/lobby/LobbyWindow.vue";
+export { default as WinLobbyMappingLobby } from "../windows/lobby/MappingLobby.vue";
 export { default as LogWindow } from "../windows/log/LogWindow.vue";
 export { default as WinMainColorMcMigrateModal } from "../windows/main/ColorMcMigrateModal.vue";
 export { default as WinMainIconCropStage } from "../windows/main/IconCropStage.vue";
@@ -74,6 +77,7 @@ export { default as WinResourcePartsShaderPane } from "../windows/resource/parts
 export { default as WinResourcePartsVirtualList } from "../windows/resource/parts/VirtualList.vue";
 export { default as WinResourcePartsModModDepNode } from "../windows/resource/parts/mod/ModDepNode.vue";
 export { default as WinResourcePartsModModDepsModal } from "../windows/resource/parts/mod/ModDepsModal.vue";
+export { default as WinResourcePartsModModExportModal } from "../windows/resource/parts/mod/ModExportModal.vue";
 export { default as WinResourcePartsModModGroupMenu } from "../windows/resource/parts/mod/ModGroupMenu.vue";
 export { default as WinResourcePartsModModList } from "../windows/resource/parts/mod/ModList.vue";
 export { default as WinResourcePartsModModReplaceModal } from "../windows/resource/parts/mod/ModReplaceModal.vue";

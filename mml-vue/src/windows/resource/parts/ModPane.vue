@@ -19,6 +19,7 @@ import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import ContentHead from "./ContentHead.vue";
 import LoaderQueryProgress from "../../../components/LoaderQueryProgress.vue";
 import ListSkeleton from "./ListSkeleton.vue";
+import ModExportModal from "./mod/ModExportModal.vue";
 import ModList from "./mod/ModList.vue";
 import ModTable from "./mod/ModTable.vue";
 import ModDepsModal from "./mod/ModDepsModal.vue";
@@ -797,6 +798,7 @@ const {
 });
 
 /** 选中的那些条目；批量操作要 uuid 去调命令，选中键只是身份 */
+const exportOpen = ref(false);
 const selectedItems = computed<ModItemDto[]>(() => mods.value.filter(isSelected));
 
 /** 批量改启用状态：`wantDisable = true` 禁用、`false` 启用 */
@@ -1821,8 +1823,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <ModExportModal v-if="exportOpen" :uuid="instanceUuid" :selected-ids="selectedItems.map(item => item.uuid)" @close="exportOpen = false" />
   <ContentHead :data="data" :busy="depBusy || updateBusy">
     <template #actions>
+      <BaseButton size="sm" :disabled="busy || loading" @click="exportOpen = true">{{ t("modExport.title") }}</BaseButton>
       <!--
         有选中项时顶栏换成批量操作条，用户选的口径是"顶栏出现批量按钮"。
         整条替换而不是并列：选中之后的重点是"对这些项做什么"，

@@ -57,6 +57,8 @@ pub(crate) const EXPORT_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-00000
 /// 配置文件窗口
 pub(crate) const CONFIG_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000011");
 
+pub(crate) const LOBBY_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000012");
+
 /// 前端窗口 kind → uuid，标签去 `mml-` 前缀匹配
 ///
 /// - `kind`: 窗口类型，即标签去掉 `mml-` 前缀后的那一段

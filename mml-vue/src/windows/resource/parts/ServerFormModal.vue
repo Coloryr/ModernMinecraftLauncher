@@ -11,18 +11,23 @@ import BaseModal from "../../../components/ui/BaseModal.vue";
 import { t } from "../../../lib/i18n";
 import type { ServerFormDraft } from "../types";
 
-defineProps<{
+const props = defineProps<{
   /** 表单草稿；`edit` 为真时按原 name/ip 定位改那一条 */
   form: ServerFormDraft;
   /** 正在保存：按钮置灰，防连点 */
   busy: boolean;
 }>();
 const emit = defineEmits<{
+  (e: "update:form", value: ServerFormDraft): void;
   /** 提交表单，保存逻辑在 ServerPane */
   (e: "submit"): void;
   /** 取消，收起弹窗 */
   (e: "close"): void;
 }>();
+
+function updateForm<K extends keyof ServerFormDraft>(key: K, value: ServerFormDraft[K]) {
+  emit("update:form", { ...props.form, [key]: value });
+}
 </script>
 
 <template>
@@ -30,13 +35,16 @@ const emit = defineEmits<{
     @close="emit('close')">
     <div class="form-grid">
       <label class="form-label">{{ t("resource.serverName") }}</label>
-      <input v-model="form.name" class="form-input" type="text" />
+      <input :value="form.name" class="form-input" type="text"
+        @input="updateForm('name', ($event.target as HTMLInputElement).value)" />
       <label class="form-label">{{ t("resource.serverIp") }}</label>
-      <input v-model="form.ip" class="form-input" type="text" />
+      <input :value="form.ip" class="form-input" type="text"
+        @input="updateForm('ip', ($event.target as HTMLInputElement).value)" />
       <!-- 接受材质是客户端选项，只在编辑已有条目时出现（新增走客户端默认） -->
       <template v-if="form.edit">
         <label class="form-label">{{ t("resource.acceptTextures") }}</label>
-        <input v-model="form.acceptTextures" class="form-check" type="checkbox" />
+        <input :checked="form.acceptTextures" class="form-check" type="checkbox"
+          @change="updateForm('acceptTextures', ($event.target as HTMLInputElement).checked)" />
       </template>
     </div>
     <div class="modal-actions">

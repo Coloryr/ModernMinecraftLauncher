@@ -140,6 +140,17 @@ pub const SAVE_SEED: &str = "err.saveSeed";
 // ---------- 导出 ----------
 
 /// 已有导出任务在跑
+/// 模组清单尚未扫描或已变化。
+pub const MOD_EXPORT_SCAN: &str = "err.modExportScan";
+/// 导出字段无效。
+/// 导出路径不能位于实例内。
+pub const EXPORT_DESTINATION: &str = "err.exportDestination";
+pub const SERVER_PACK_INVALID: &str = "err.serverPackInvalid";
+pub const SERVER_PACK_PLATFORM: &str = "err.serverPackPlatform";
+pub const SERVER_PACK_BUSY: &str = "err.serverPackBusy";
+/// 实例内的链接不能打包。
+pub const EXPORT_LINK: &str = "err.exportLink";
+pub const EXPORT_FIELDS: &str = "err.exportFields";
 pub const EXPORT_RUNNING: &str = "err.exportRunning";
 /// 不支持的整合包类型
 pub const EXPORT_PACK_TYPE: &str = "err.exportPackType";
@@ -219,6 +230,15 @@ pub const BG_UNSUPPORTED: &str = "err.bgUnsupported";
 pub const BG_CONFIG_DIR: &str = "err.bgConfigDir";
 /// 当前没有设置背景图
 pub const BG_NONE: &str = "err.bgNone";
+
+pub const LOBBY_ACCOUNT: &str = "err.lobbyAccount";
+pub const LOBBY_ACCOUNT_LOCKED: &str = "err.lobbyAccountLocked";
+pub const LOBBY_CLOSED: &str = "err.lobbyClosed";
+pub const LOBBY_PLATFORM: &str = "err.lobbyPlatform";
+pub const LOBBY_DOWNLOAD: &str = "err.lobbyDownload";
+pub const LOBBY_START: &str = "err.lobbyStart";
+pub const LOBBY_STATE: &str = "err.lobbyState";
+pub const LOBBY_MAPPING: &str = "err.lobbyMapping";
 
 #[cfg(test)]
 mod tests {

@@ -10,7 +10,7 @@
 //!
 //! 命令带分组标记，值填原始组名 main，把组键钉回 `main`，见 AGENTS.md §4。
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
 
 use mml_auth::{AuthType, auths, lock_user, locked_by_other, unlock_user};
@@ -29,17 +29,11 @@ use crate::gui_config;
 use crate::i18;
 use crate::listens;
 use crate::log_text::LogText;
-use crate::windows::account::find_by_uuid;
 use crate::windows::log::emit_log_line;
 
 use super::args::core_instance;
-use super::emit_launch_error;
-
-/// 正在启动中的实例：命令进后台线程时登记，线程收工时摘掉
-///
-/// 后端要到**进程真正起来**才算"运行中"（`is_running`），检查 / 下载那段窗口期它是 false ——
-/// 只靠 `is_running` 拦不住重复启动（主界面刷新一次、或从日志窗口再点一次"测试启动"）。
-static LAUNCHING: LazyLock<Mutex<HashSet<Uuid>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
+use super::{emit_launch_error, launch_gate};
+pub(crate) use launch_gate::import_guard;
 
 /// 正在启动中的实例的取消令牌：界面点「取消启动」时置位，启动线程在检查点退出
 ///
@@ -94,13 +88,20 @@ pub async fn main_launch_game(
     force: Option<bool>,
     auto_save: Option<bool>,
 ) -> Result<(), String> {
-    let core = core_instance(&uuid).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())?;
-    if is_running(&core.uuid) {
-        return Err(err_keys::INSTANCE_RUNNING.to_string());
-    }
+    launch_game(app, uuid, world, force, auto_save, None).await
+}
 
-    let auth = auths::get_current()
-        .and_then(|key| find_by_uuid(&key.uuid))
+/// 大厅的临时进服参数只作用于本次启动，不改实例配置。
+pub(crate) async fn launch_game(
+    app: AppHandle, uuid: String, world: Option<String>, force: Option<bool>, auto_save: Option<bool>,
+    lobby: Option<(mml_auth::UserKeyObj, AutoJoinType)>,
+) -> Result<(), String> {
+    let id = Uuid::parse_str(&uuid).map_err(|_| err_keys::GAME_NOT_FOUND.to_string())?;
+    let reservation = launch_gate::begin_launch(id)?;
+    let core = core_instance(&uuid).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())?;
+
+    let auth = lobby.as_ref().map(|(key, _)| key.clone()).or_else(auths::get_current)
+        .and_then(|key| auths::get(&key.uuid, key.auth_type))
         .ok_or_else(|| err_keys::ACCOUNT_MISSING.to_string())?;
 
     // 离线账户的启动前提是本机登录过正版（微软）账户：皮肤站 / 外置登录不算证明，只认 OAuth。
@@ -165,12 +166,9 @@ pub async fn main_launch_game(
             },
         }
     };
+    let auto = lobby.map(|(_, auto)| auto).unwrap_or(auto);
     let setting = inst.clone();
 
-    // 到线程收工之前都算"启动中"：重复调用直接拒掉，别下两份资源、起两个进程
-    if !LAUNCHING.lock().unwrap().insert(core.uuid) {
-        return Err(err_keys::INSTANCE_RUNNING.to_string());
-    }
     lock_user(&account, core.uuid);
 
     emit_launch_state(
@@ -190,7 +188,7 @@ pub async fn main_launch_game(
     let mut arg = GameLaunchArg {
         auth,
         auto,
-        admin: false,
+        admin: gui_config::get().experimental.instance_admin,
         mixin: None,
         lang: None,
     };
@@ -211,6 +209,7 @@ pub async fn main_launch_game(
     let spawned = std::thread::Builder::new()
         .name(format!("Mml Game Launch {launch_uuid}"))
         .spawn(move || {
+            let _reservation = reservation;
             let runtime = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
                 Ok(runtime) => runtime,
                 Err(err) => {
@@ -221,7 +220,6 @@ pub async fn main_launch_game(
                         .text(),
                     );
                     LAUNCH_CANCEL.lock().unwrap().remove(&launch_uuid);
-                    LAUNCHING.lock().unwrap().remove(&launch_uuid);
                     unlock_user(&launch_uuid);
                     return;
                 }
@@ -272,12 +270,10 @@ pub async fn main_launch_game(
 
             // 线程收工：成败都已定，把"启动中"与取消令牌摘掉（失败后要允许重试）
             LAUNCH_CANCEL.lock().unwrap().remove(&launch_uuid);
-            LAUNCHING.lock().unwrap().remove(&launch_uuid);
         });
 
     if let Err(err) = spawned {
         LAUNCH_CANCEL.lock().unwrap().remove(&launch_uuid);
-        LAUNCHING.lock().unwrap().remove(&launch_uuid);
         unlock_user(&launch_uuid);
         return Err(err.to_string());
     }
