@@ -1,6 +1,6 @@
 //! 按目标格式将所选文件分配到下载清单或本地覆盖文件。
 
-use std::{collections::HashMap, path::{Path, PathBuf}};
+use std::{collections::{HashMap, HashSet}, path::{Path, PathBuf}};
 use mml_game::{game_export::{ExportPackType, OnlineFileExport}, launcher::file_online_info_obj::OnlineInfoObj};
 use crate::dtos::export_dto::ExportPickDto;
 use super::{archive, list::{collect_files, export_meta}};
@@ -28,12 +28,14 @@ pub(super) fn collect<'a>(
     online: &HashMap<String, OnlineInfoObj>, pack: ExportPackType,
 ) -> Result<Selection, String> {
     let mut result = Selection::default();
+    let mut explicit = HashSet::new();
     for pick in picks.filter(|_| pack != ExportPackType::MML) {
         let path = archive::selected_path(base, &pick.path)?;
         if path.is_dir() {
             result.local.extend(collect_files(&path)?);
             continue;
         }
+        if !explicit.insert(path.clone()) { continue; }
         if matches!(pack, ExportPackType::MMC | ExportPackType::HMCL) {
             result.local.push(path);
             continue;
@@ -58,12 +60,46 @@ pub(super) fn collect<'a>(
             else { result.files.push(item); }
         } else { result.local.push(path); }
     }
+    // 文件既能在模组页选中，也能从目录展开；下载项优先，每个路径只导出一次。
+    let indexed: HashSet<_> = result.mods.iter().chain(&result.files).map(|item| &item.file).collect();
+    result.local.retain(|path| !indexed.contains(path));
+    result.local.sort();
+    result.local.dedup();
     Ok(result)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn overlapping_directories_and_files_are_written_once() {
+        let dir = crate::test_support::temp_dir("export-overlap");
+        std::fs::create_dir_all(dir.join("config/nested")).unwrap();
+        std::fs::write(dir.join("config/nested/settings.toml"), "enabled = true").unwrap();
+        let picks: Vec<_> = ["config", "config/nested", "config/nested/settings.toml", "config/nested/settings.toml"]
+            .into_iter().map(|path| ExportPickDto { path: path.into(), url: "".into() }).collect();
+        let result = collect(&dir, picks.iter(), &HashMap::new(), ExportPackType::HMCL).unwrap();
+        assert_eq!(result.local, [dir.join("config/nested/settings.toml")]);
+        crate::test_support::cleanup(&[&dir]);
+    }
+
+    #[test]
+    fn indexed_file_is_not_duplicated_in_overrides() {
+        let dir = crate::test_support::temp_dir("export-index-overlap");
+        std::fs::create_dir(dir.join("mods")).unwrap();
+        std::fs::write(dir.join("mods/a.jar"), b"a").unwrap();
+        std::fs::write(dir.join("mods/b.jar"), b"b").unwrap();
+        let picks: Vec<_> = ["mods", "mods/a.jar", "mods/a.jar"]
+            .into_iter().map(|path| ExportPickDto { path: path.into(), url: "https://example.invalid/a".into() }).collect();
+        for picks in [picks.clone(), picks.into_iter().rev().collect()] {
+            let result = collect(&dir, picks.iter(), &HashMap::new(), ExportPackType::Modrinth).unwrap();
+            assert_eq!(result.local, [dir.join("mods/b.jar")]);
+            assert_eq!(result.files.len(), 1);
+            assert_eq!(result.files[0].file, dir.join("mods/a.jar"));
+        }
+        crate::test_support::cleanup(&[&dir]);
+    }
 
     #[test]
     fn curseforge_keeps_foreign_or_invalid_ids_as_local_files() {
