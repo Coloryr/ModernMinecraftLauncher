@@ -18,7 +18,8 @@ fn main() {
         oauth_key: "aa0dd576-d717-4950-b257-a478d2c20968".to_string(),
     };
 
-    let path = get_run_path();
+    let path = mml_gui_lib::start_arg::run_dir(std::env::args().skip(1))
+        .unwrap_or_else(get_run_path);
 
     println!("Run path: {}", path.display());
 
@@ -26,6 +27,20 @@ fn main() {
     let temp = path.join("test");
     let res = path_helper::write_text(temp, "test write");
     obj.path = if res.is_err() { get_save_path() } else { path };
+
+    // 提权前固定数据目录，避免 Linux 的 HOME 变化后读到另一套配置。
+    let elevated = std::fs::read(obj.path.join(names::GUI_CONFIG_FILE))
+        .ok()
+        .and_then(|data| serde_json::from_slice::<gui_config::GuiConfig>(&data).ok())
+        .is_some_and(|config| config.experimental.launcher_admin);
+    if elevated && !mml_sys::process_helper::is_run_as_admin() {
+        let mut args = vec!["--run-dir".to_string(), obj.path.to_string_lossy().into_owned()];
+        args.extend(std::env::args().skip(1));
+        if let Err(error) = mml_sys::process_helper::launch_admin(&args) {
+            err_box::fatal_error_text(&format!("Administrator startup failed: {error}"));
+        }
+        return;
+    }
 
     // 可以写入后，查找名为 temp 的端口文件：能独占打开说明没有别的实例；
     // 打不开说明已经有一个在跑 —— 读出端口，通过 mml-ipc 把这次启动交给它：

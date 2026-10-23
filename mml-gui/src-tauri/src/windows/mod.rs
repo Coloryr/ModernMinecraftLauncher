@@ -997,6 +997,8 @@ pub fn window_restart_app(app: AppHandle) {
                 // 带上 --restart：新进程跳过单开检查，否则会把请求交回本进程（马上要退的那个）
                 if let Err(err) = std::process::Command::new(exe)
                     .arg(names::COMMAND_RESTART)
+                    .arg("--run-dir")
+                    .arg(crate::gui_config::dir().unwrap())
                     .spawn()
                 {
                     mml_log::error(

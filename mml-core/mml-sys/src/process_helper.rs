@@ -196,17 +196,7 @@ fn launch_with_elevation<P: AsRef<Path>>(
 
     #[cfg(target_os = "linux")]
     {
-        // pkexec 作为目标进程的父进程，直接转发 stdin/stdout/stderr
-        let mut cmd = Command::new("pkexec");
-        cmd.arg(path.as_ref());
-        for arg in &args {
-            cmd.arg(arg);
-        }
-        cmd.current_dir(working_dir);
-
-        for (key, value) in env {
-            cmd.env(key, value);
-        }
+        let mut cmd = linux_elevation::command(path.as_ref(), &args, env, working_dir.as_ref());
 
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
         let mut child = cmd.spawn().map_err(process_err)?;
@@ -229,6 +219,8 @@ fn launch_with_elevation<P: AsRef<Path>>(
 
 #[cfg(windows)]
 mod windows_elevation;
+#[cfg(any(target_os = "linux", test))]
+mod linux_elevation;
 #[cfg(windows)]
 pub use windows_elevation::{create_named_pipe, connect_named_pipe_with_timeout, launch_with_elevation_windows};
 
@@ -267,13 +259,10 @@ pub fn launch_admin(args: &[String]) -> CoreResult<()> {
 
     #[cfg(target_os = "linux")]
     {
-        let mut cmd = Command::new("pkexec");
-        cmd.arg(&current_exe);
-        for arg in args {
-            cmd.arg(arg);
-        }
-        let mut child = cmd.spawn()?;
-        child.wait()?;
+        let mut cmd = linux_elevation::command(&current_exe, args, HashMap::new(),
+            &std::env::current_dir().map_err(process_err)?);
+        let status = cmd.status().map_err(process_err)?;
+        if !status.success() { return Err(process_err(format!("pkexec: {status}"))); }
         Ok(())
     }
 
