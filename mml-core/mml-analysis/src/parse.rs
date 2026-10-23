@@ -34,21 +34,51 @@ pub(crate) fn parse(text: &str) -> CrashReport {
     let lines: Vec<&str> = text.lines().collect();
 
     let kind = detect_kind(text, &lines);
-    let description = find_value(&lines, "Description:");
-    let time = find_value(&lines, "Time:");
-    let (exception, causes, detail) = parse_exceptions(&lines);
-    let environment = parse_environment(text, &lines);
+    let report_lines = if kind == LogKind::CrashReport {
+        // 部分模组会在报告末尾附上整份运行日志，环境与因果链都不能从中补值。
+        let end = lines
+            .iter()
+            .position(|line| RE_LOG_TIME.is_match(line.trim_start()));
+        &lines[..end.unwrap_or(lines.len())]
+    } else {
+        &lines[..]
+    };
+    let description = find_value(report_lines, "Description:");
+    let time = find_value(report_lines, "Time:");
+    let diagnostic_end = if kind == LogKind::CrashReport {
+        report_lines
+            .iter()
+            .position(|line| matches!(line.trim(), "-- System Details --" | "-- Thread Dump --"))
+            .unwrap_or(report_lines.len())
+    } else {
+        report_lines.len()
+    };
+    let diagnostic = report_lines[..diagnostic_end].join("\n");
+    let exception_end = if kind == LogKind::CrashReport {
+        report_lines
+            .iter()
+            .position(|line| {
+                let line = line.trim();
+                line.starts_with("A detailed walkthrough") || line.starts_with("-- ")
+            })
+            .unwrap_or(diagnostic_end)
+    } else {
+        diagnostic_end
+    };
+    let parsed = parse_exceptions(&report_lines[..exception_end]);
+    let environment = parse_environment(&report_lines.join("\n"), report_lines);
 
     CrashReport {
         kind,
         description,
         time,
-        exception,
-        causes,
+        exception: parsed.exception,
+        causes: parsed.causes,
         environment,
-        lower: text.to_lowercase(),
+        lower: diagnostic.to_lowercase(),
+        diagnostic,
         raw: text.to_string(),
-        detail,
+        detail: parsed.detail,
     }
 }
 
@@ -91,13 +121,26 @@ fn find_value(lines: &[&str], key: &str) -> Option<String> {
 /// # 返回值
 ///
 /// 最外层异常、`Caused by:` 链与规则匹配用的正文
-fn parse_exceptions(lines: &[&str]) -> (Option<ExceptionFrame>, Vec<ExceptionFrame>, String) {
+fn parse_exceptions(lines: &[&str]) -> ParsedExceptions {
     let mut exception = None;
     let mut causes = Vec::new();
     let mut detail = Vec::new();
+    let mut suppressed_indent = None;
 
     for line in lines {
         let content = strip_log_prefix(line);
+        let indent = indent_of(content);
+        let content = content.trim();
+        if content.starts_with("Suppressed:") {
+            suppressed_indent = Some(indent);
+            continue;
+        }
+        if let Some(level) = suppressed_indent {
+            if content.is_empty() || indent >= level {
+                continue;
+            }
+            suppressed_indent = None;
+        }
 
         if let Some(captures) = RE_EXCEPTION.captures(content) {
             let class = captures.get(1).map(|m| m.as_str()).unwrap_or_default();
@@ -107,7 +150,7 @@ fn parse_exceptions(lines: &[&str]) -> (Option<ExceptionFrame>, Vec<ExceptionFra
                 message: message.trim().to_string(),
             };
 
-            if content.starts_with("Caused by:") || content.starts_with("Suppressed:") {
+            if content.starts_with("Caused by:") {
                 causes.push(frame);
             } else if exception.is_none() {
                 exception = Some(frame);
@@ -129,7 +172,21 @@ fn parse_exceptions(lines: &[&str]) -> (Option<ExceptionFrame>, Vec<ExceptionFra
         }
     }
 
-    (exception, causes, detail.join("\n"))
+    ParsedExceptions {
+        exception,
+        causes,
+        detail: detail.join("\n"),
+    }
+}
+
+/// 仅保留本次故障的主异常链与栈帧。
+struct ParsedExceptions {
+    /// 最外层异常。
+    exception: Option<ExceptionFrame>,
+    /// 按外到内排列的因果链，不含清理阶段的抑制异常。
+    causes: Vec<ExceptionFrame>,
+    /// 异常和栈帧原文。
+    detail: String,
 }
 
 /// 去掉游戏日志行首的 `[时间] [线程/级别]:` 前缀

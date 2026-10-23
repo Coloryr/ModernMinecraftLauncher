@@ -115,7 +115,7 @@ impl Scan<'_> {
 /// 见 CrashAnalysis
 pub(crate) fn analyze(report: &CrashReport) -> CrashAnalysis {
     let scan = Scan {
-        raw: report.raw(),
+        raw: &report.diagnostic,
         lower: &report.lower,
         detail_lower: report.detail.to_lowercase(),
     };

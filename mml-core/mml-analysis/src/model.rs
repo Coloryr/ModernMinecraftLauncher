@@ -134,7 +134,9 @@ pub struct CrashReport {
     pub environment: Environment,
     /// 原始文本
     pub(crate) raw: String,
-    /// 原文的小写副本，规则匹配用；与 `raw` 的行一一对应
+    /// 本次故障的诊断正文，不含系统信息、线程转储和附带日志
+    pub(crate) diagnostic: String,
+    /// 诊断正文的小写副本，与 `diagnostic` 的行一一对应
     pub(crate) lower: String,
     /// 异常与栈帧所在的行，规则优先在这段里匹配
     pub(crate) detail: String,
