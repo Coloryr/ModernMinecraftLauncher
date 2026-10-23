@@ -265,11 +265,20 @@ impl TarReader {
             let mut entry = entry.map_err(read_error)?;
             let path = entry.path().map_err(read_error)?.to_path_buf();
             // 文件名非法时询问 GUI 是否替换
+            path_helper::safe_join(output_dir, &path.to_string_lossy())?;
             let name = process.check_name(&path.to_string_lossy())?;
             let name_path = Path::new(&name).to_path_buf();
             process.add_now(&name_path);
             if name_path != path {
-                let dest = output_dir.join(name_path);
+                let dest = path_helper::safe_join(output_dir, &name)?;
+                // 改名后的链接无法交给 unpack_in 校验，拒绝绕过链接目标检查。
+                let kind = entry.header().entry_type();
+                if kind.is_symlink() || kind.is_hard_link() {
+                    return Err(mml_names::i18_items::error_type::ErrorType::UnsafePath {
+                        root: output_dir.to_path_buf(),
+                        path,
+                    });
+                }
                 if let Some(parent) = dest.parent() {
                     std::fs::create_dir_all(parent)
                         .map_err(|err| fs_err(parent.to_path_buf(), err))?;

@@ -35,3 +35,35 @@ fn seven_zip_rejects_escaping_paths() {
         assert!(!root.join("escaped.txt").exists());
     }
 }
+
+#[test]
+fn tar_rename_stays_inside_output() {
+    for name in [
+        "../escaped?.txt",
+        "/escaped?.txt",
+        "nested/../../escaped?.txt",
+        "nested/valid?.txt",
+    ] {
+        let root = root("tar_rename");
+        let archive = root.join("input.tar");
+        let mut writer = tar::Builder::new(fs::File::create(&archive).unwrap());
+        let mut header = tar::Header::new_gnu();
+        header.set_size(7);
+        header.set_mode(0o644);
+        header.set_entry_type(tar::EntryType::Regular);
+        header.as_mut_bytes()[..name.len()].copy_from_slice(name.as_bytes());
+        header.set_cksum();
+        writer.append(&header, Cursor::new(b"payload")).unwrap();
+        writer.finish().unwrap();
+        drop(writer);
+        let out = root.join("out");
+        let result = BaseArchive::decompress(ArchiveType::Tar, &archive, &out, None);
+        if name == "nested/valid?.txt" {
+            result.unwrap();
+            assert_eq!(fs::read(out.join("nested/valid_.txt")).unwrap(), b"payload");
+        } else {
+            assert!(result.is_err(), "{name}");
+            assert!(!root.join("escaped_.txt").exists());
+        }
+    }
+}
