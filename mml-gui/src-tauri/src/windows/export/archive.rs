@@ -80,9 +80,16 @@ pub(super) fn native_instance(
     game: &mml_game::launcher::instance_setting_obj::InstanceSettingObj, file: &Path,
 ) -> Result<(), String> {
     let root = game.get_base_path();
-    check_destination(file, &root)?;
-    let files = files_under(&root)?.into_iter().filter_map(|path| {
-        let name = path.strip_prefix(&root).ok()?.to_string_lossy().replace('\\', "/");
+    native_archive(game, &root, file)
+}
+
+/// 归档实例目录，并用当前配置快照替换磁盘上尚未更新的配置。
+fn native_archive(
+    game: &mml_game::launcher::instance_setting_obj::InstanceSettingObj, root: &Path, file: &Path,
+) -> Result<(), String> {
+    check_destination(file, root)?;
+    let files = files_under(root)?.into_iter().filter_map(|path| {
+        let name = path.strip_prefix(root).ok()?.to_string_lossy().replace('\\', "/");
         (name != mml_names::names::GAME_FILE).then_some((name, path))
     }).collect::<Vec<_>>();
     let data = serde_json::to_vec_pretty(game).map_err(|e| e.to_string())?;
@@ -93,6 +100,44 @@ pub(super) fn native_instance(
 mod tests {
     use super::*;
     use std::io::Read;
+
+    #[test]
+    fn native_archive_contains_all_files_and_current_instance_snapshot() {
+        let dir = crate::test_support::temp_dir("native-roundtrip");
+        let root = dir.join("source");
+        fs::create_dir_all(root.join(".minecraft/config")).unwrap();
+        fs::write(root.join(".minecraft/config/中文.toml"), "enabled = true").unwrap();
+        fs::write(root.join("notes.txt"), "user notes").unwrap();
+        fs::write(root.join(mml_names::names::GAME_FILE), "stale config").unwrap();
+        let game = serde_json::from_value(serde_json::json!({"Name":"当前实例", "Version":"1.21.1"})).unwrap();
+        let output = dir.join("instance.zip");
+        native_archive(&game, &root, &output).unwrap();
+        let mut zip = zip::ZipArchive::new(File::open(&output).unwrap()).unwrap();
+        assert_eq!(zip.len(), 3);
+        let mut text = String::new();
+        zip.by_name(".minecraft/config/中文.toml").unwrap().read_to_string(&mut text).unwrap();
+        assert_eq!(text, "enabled = true");
+        let json: serde_json::Value = serde_json::from_reader(zip.by_name(mml_names::names::GAME_FILE).unwrap()).unwrap();
+        assert_eq!(json["Name"], "当前实例");
+        assert_eq!(json["Version"], "1.21.1");
+        assert!(zip.file_names().all(|name| !name.unwrap().contains('\\')));
+        drop(zip);
+        crate::test_support::cleanup(&[&dir]);
+    }
+
+    #[test]
+    fn archive_read_failure_preserves_existing_archive_and_removes_partial_file() {
+        let dir = crate::test_support::temp_dir("native-write-failure");
+        let source = dir.join("source.txt");
+        fs::write(&source, "content").unwrap();
+        let output = dir.join("instance.zip");
+        fs::write(&output, "previous archive").unwrap();
+        let files = [("valid.txt".into(), source), ("missing.txt".into(), dir.join("missing"))];
+        assert!(write_zip(&output, &files, &[]).is_err());
+        assert_eq!(fs::read_to_string(&output).unwrap(), "previous archive");
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 2);
+        crate::test_support::cleanup(&[&dir]);
+    }
 
     #[test]
     fn archive_replaces_destination_without_including_itself() {
