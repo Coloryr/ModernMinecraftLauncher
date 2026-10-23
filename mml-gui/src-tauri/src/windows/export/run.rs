@@ -14,7 +14,7 @@ use tauri::{AppHandle};
 
 use crate::{dtos::export_dto::{ExportConfigDto, ExportProgressDto}};
 
-use crate::windows::{config::resolve_under, instance_snapshot};
+use crate::windows::instance_snapshot;
 use super::list::{EXPORT_RUNNING, emit_export_progress, collect_files, online_of, export_meta};
 
 /// 校验失败或后台任务退出时都释放导出占用。
@@ -146,11 +146,11 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
 
     // 模组与文件走同一套路由，只是前端分了两块勾选
     for pick in config.mods.iter().chain(config.files.iter()).filter(|_| pack != ExportPackType::MML) {
-        let path = resolve_under(&base, &pick.path)?;
+        let path = super::archive::selected_path(&base, &pick.path)?;
 
         // 目录整份进 overrides：里面每个文件的下载地址不会一致，填了也不作数
         if !path.is_file() {
-            select.extend(collect_files(&path));
+            select.extend(collect_files(&path)?);
             continue;
         }
 

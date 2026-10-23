@@ -28,6 +28,23 @@ pub(super) fn reject_link(path: &Path) -> Result<fs::Metadata, String> {
     Ok(meta)
 }
 
+/// 解析所选路径并逐级拒绝链接，防止中间目录跳出实例。
+/// - `root`: 游戏目录。
+/// - `relative`: 前端选择的相对路径。
+/// # 返回值
+/// 已验证存在的普通文件或目录路径。
+pub(super) fn selected_path(root: &Path, relative: &str) -> Result<PathBuf, String> {
+    let path = crate::windows::config::resolve_under(root, relative)?;
+    reject_link(root)?;
+    let mut current = root.to_path_buf();
+    for part in path.strip_prefix(root).map_err(|e| e.to_string())?.components() {
+        current.push(part);
+        let meta = reject_link(&current)?;
+        if !meta.is_file() && !meta.is_dir() { return Err(err_keys::FILE_NAME.into()); }
+    }
+    Ok(path)
+}
+
 pub(super) fn check_destination(file: &Path, source: &Path) -> Result<(), String> {
     let parent = file.parent().ok_or(err_keys::FILE_NAME)?
         .canonicalize().map_err(|e| e.to_string())?;
@@ -116,7 +133,34 @@ mod tests {
         assert!(status.success());
         assert!(files_under(&source).is_err());
         assert!(files_under(&link).is_err());
+        assert!(selected_path(&source, "linked/private.txt").is_err());
+        assert!(selected_path(&source, "linked").is_err());
         fs::remove_dir(&link).unwrap();
+        crate::test_support::cleanup(&[&dir]);
+    }
+
+    #[test]
+    fn selected_paths_reject_missing_and_traversal_without_dropping_files() {
+        let dir = crate::test_support::temp_dir("export-selection");
+        let config = dir.join("config");
+        fs::create_dir(&config).unwrap();
+        fs::write(config.join("中文.toml"), "enabled = true").unwrap();
+        assert_eq!(selected_path(&dir, "config/中文.toml").unwrap(), config.join("中文.toml"));
+        assert_eq!(files_under(&selected_path(&dir, "config").unwrap()).unwrap(), [config.join("中文.toml")]);
+        for path in ["missing", "../outside", "/outside", "config/../../outside"] {
+            assert!(selected_path(&dir, path).is_err(), "{path}");
+        }
+        crate::test_support::cleanup(&[&dir]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn selected_paths_refuse_file_and_directory_symlinks() {
+        let dir = crate::test_support::temp_dir("export-symlink");
+        fs::write(dir.join("original"), "private").unwrap();
+        std::os::unix::fs::symlink(dir.join("original"), dir.join("linked")).unwrap();
+        assert!(selected_path(&dir, "linked").is_err());
+        assert!(files_under(&dir).is_err());
         crate::test_support::cleanup(&[&dir]);
     }
 
