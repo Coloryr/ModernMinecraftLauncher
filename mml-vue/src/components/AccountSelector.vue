@@ -5,7 +5,7 @@ import { t } from "../lib/i18n";
 import { openWindow } from "../windows/windowManager";
 import type { AccountStoreDto } from "../lib/bindings";
 import { accountAvatarUrl, imageFailed, imageLoading, markImageFailed, markImageLoaded } from "../lib/accountImages";
-import { typeLabelKey } from "../lib/accountStore";
+import { accountLocked, typeLabelKey } from "../lib/accountStore";
 
 const props = defineProps<{
   /** 当前账户；`null` 表示还没选账户 */
@@ -34,10 +34,12 @@ const typeClass = computed(() =>
 );
 
 function toggle() {
+  if (accountLocked.value) return;
   open.value = !open.value;
 }
 
 function pick(account: AccountStoreDto) {
+  if (accountLocked.value) return;
   emit("update:account", account);
   open.value = false;
 }
@@ -45,7 +47,7 @@ function pick(account: AccountStoreDto) {
 
 <template>
   <div class="account-wrap">
-    <button class="account-btn" @click="toggle">
+    <button class="account-btn" :disabled="accountLocked" v-tip="accountLocked ? t('err.lobbyAccountLocked') : ''" @click="toggle">
       <template v-if="account">
         <!-- 加载中：头像上叠转圈，onload 后消失 -->
         <span v-if="!imageFailed(account, 'avatar')" class="avatar-box">
@@ -93,7 +95,7 @@ function pick(account: AccountStoreDto) {
         <div class="menu-title">{{ t("account.switch") }}</div>
         <div v-if="accounts.length === 0" class="empty-tip">{{ t("account.noAccount") }}</div>
         <button v-for="acc in accounts" :key="acc.uuid" class="menu-item"
-          :class="{ active: acc.uuid === account?.uuid }" @click="pick(acc)">
+          :disabled="accountLocked" :class="{ active: acc.uuid === account?.uuid }" @click="pick(acc)">
           <span v-if="!imageFailed(acc, 'avatar')" class="avatar-box">
             <img class="avatar small avatar-img" :class="{ pending: imageLoading(acc, 'avatar') }"
               :src="accountAvatarUrl(acc)" alt="" data-no-fallback @load="markImageLoaded(acc, 'avatar')"

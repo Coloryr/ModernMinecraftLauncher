@@ -10,6 +10,8 @@ defineProps<{
   canRelogin?: boolean;
   /** 是否可编辑，对应 AccountStoreDto.canEdit */
   canEdit?: boolean;
+  /** 当前账户被联机会话锁定时禁用删除。 */
+  locked?: boolean;
   /** 该账户是否有皮肤：false 时隐藏「查看皮肤 / 刷新皮肤」两个按钮；
    *  没皮肤时两个按钮点了也没内容，留着只是噪音 */
   hasSkin?: boolean;
@@ -70,7 +72,7 @@ defineEmits<{
         <path d="M10 17l5-5-5-5M15 12H3" />
       </svg>
     </button>
-    <button class="icon-btn danger" v-tip="t('account.delete')" @click="$emit('delete')">
+    <button class="icon-btn danger" :disabled="locked" v-tip="t(locked ? 'err.lobbyAccountLocked' : 'account.delete')" @click="$emit('delete')">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"
         stroke-linecap="round" stroke-linejoin="round">
         <path

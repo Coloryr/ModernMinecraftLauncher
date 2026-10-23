@@ -1,13 +1,16 @@
 // 账户共享存储：主窗口、账户选择器、账户窗口共用
-// 数据由 Rust 提供，见 windows/account.rs，持久化到 accounts.json，
+// 数据由 Rust 提供，账户列表与当前选择分别由内核持久化，
 // 操作通过 IPC；跨窗口通过 account-change 事件同步。
 import { ref } from "vue";
 import { listen } from "@tauri-apps/api/event";
 import type { AccountStoreDto } from "./bindings";
 import { AccountChange } from "./listens";
 import { commands } from "./bindings";
+import { tErr } from "./i18n";
+import { showToast } from "./toast";
 
 export const accounts = ref<AccountStoreDto[]>([]);
+export const accountLocked = ref(false);
 export const currentAccount = ref<AccountStoreDto | null>(null);
 
 /** 账户类型显示名 */
@@ -38,6 +41,7 @@ export async function loadAccounts(): Promise<void> {
   try {
     const view = await commands.account.getAccounts();
     accounts.value = view.accounts;
+    accountLocked.value = view.locked;
     // currentUuid 为 null = 后端明确记录了"未选择"（登录方式锁定清除后），
     // 不能再回退到第一个账户，否则取消选择会被撤销
     currentAccount.value =
@@ -46,51 +50,36 @@ export async function loadAccounts(): Promise<void> {
     /* 浏览器环境：保持为空 */
   }
 }
-
-
-/**
- * 设置当前使用账户
- *
- * 乐观更新：本地状态先改，后端失败也不回滚 —— 失败时后端不会再广播
- * `account-change`，界面与后端的不一致会持续到下一次重拉。
- *
- * - `acc`: 目标账户
- */
-export async function setCurrentAccount(acc: AccountStoreDto) {
-  try {
-    await commands.account.setCurrentAccount(acc.uuid);
-  } catch {
-    /* 忽略 */
-  }
-  currentAccount.value = acc;
+/** 设置当前账户；后端拒绝时保持原选择。 */
+export async function setCurrentAccount(acc: AccountStoreDto): Promise<boolean> {
+  return updateSelection(acc.uuid);
 }
 
-/** 取消当前选择，后端清空记录并广播 account-change */
-export async function clearCurrentAccount() {
-  try {
-    await commands.account.setCurrentAccount("");
-  } catch {
-    /* 忽略 */
-  }
-  currentAccount.value = null;
+/** 清除当前选择，联机大厅锁定期间由后端拒绝。 */
+export async function clearCurrentAccount(): Promise<boolean> {
+  return updateSelection("");
 }
 
-/**
- * 删除账户
- *
- * - `uuid`: 目标账户 uuid
- */
-export async function removeAccount(uuid: string) {
+async function updateSelection(uuid: string): Promise<boolean> {
   try {
-    await commands.account.removeAccount(uuid);
-  } catch {
-    /* 忽略 */
+    const changed = await commands.account.setCurrentAccount(uuid);
+    await loadAccounts();
+    return changed;
+  } catch (error) {
+    showToast(tErr(error));
+    return false;
   }
-  const idx = accounts.value.findIndex((a) => a.uuid === uuid);
-  if (idx >= 0) accounts.value.splice(idx, 1);
-  if (currentAccount.value?.uuid === uuid) {
-    // 删掉的正是当前账户：回退到第一个剩余账户，与后端 account_remove_account 同一口径
-    currentAccount.value = accounts.value[0] ?? null;
+}
+
+/** 删除成功后重拉账户，保持选择与后端一致。 */
+export async function removeAccount(uuid: string): Promise<boolean> {
+  try {
+    const removed = await commands.account.removeAccount(uuid);
+    await loadAccounts();
+    return removed;
+  } catch (error) {
+    showToast(tErr(error));
+    return false;
   }
 }
 

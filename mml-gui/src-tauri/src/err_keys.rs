@@ -231,6 +231,8 @@ pub const BG_CONFIG_DIR: &str = "err.bgConfigDir";
 /// 当前没有设置背景图
 pub const BG_NONE: &str = "err.bgNone";
 
+pub const LOBBY_ACCOUNT_LOCKED: &str = "err.lobbyAccountLocked";
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;

@@ -1,5 +1,6 @@
 // 中文（简体）语言包
 export default {
+  "err.lobbyAccountLocked": "联机大厅已锁定当前账户，请关闭大厅后再切换或删除。",
   "winExport.serverPack": "服务器包",
   "winExport.serverHint": "包含启动器配置和完整实例。拖入启动器后强制覆盖同名文件并重启；附带的 exe 仅供便携启动，导入时不替换当前程序。",
   "winExport.includeLauncher": "附带启动器 exe",

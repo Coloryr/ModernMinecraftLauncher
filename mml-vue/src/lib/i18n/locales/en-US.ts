@@ -1,5 +1,6 @@
 // English (US) language pack
 export default {
+  "err.lobbyAccountLocked": "The multiplayer lobby has locked the current account. Close it before switching or deleting this account.",
   "winExport.serverPack": "Server package",
   "winExport.serverHint": "Includes launcher settings and the complete instance. Import overwrites matching files and restarts the launcher. The optional exe is for portable use and does not replace the running launcher.",
   "winExport.includeLauncher": "Include launcher exe",

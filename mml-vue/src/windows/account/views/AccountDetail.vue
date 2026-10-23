@@ -1,5 +1,6 @@
 <script setup lang="ts">
 // 账户详情视图：全账户表格，操作按钮在左侧
+import { accountLocked } from "../../../lib/accountStore";
 import { t } from "../../../lib/i18n";
 import {
   accountSkinUrl,
@@ -77,14 +78,14 @@ function isCurrent(acc: AccountStoreDto): boolean {
             <td class="cell-name add-text" colspan="7">{{ t("account.add") }}</td>
           </tr>
           <tr v-for="acc in accounts" :key="acc.uuid" :class="{ current: isCurrent(acc) }"
-            @dblclick="emit('switch', acc)">
+            @dblclick="!accountLocked && emit('switch', acc)">
             <td class="col-actions">
               <!-- 不可见的皮肤探测图：表格不展示皮肤，但「查看皮肤 / 刷新皮肤」要知道有没有皮肤。
                  没有它就永远不会产生 skin 的失败标记，那俩按钮在没皮肤的账户上照样显示。
                  1px + opacity 0：不占位、不可见，只为了让 @error / @load 能触发 -->
               <img class="skin-probe" :src="accountSkinUrl(acc)" alt="" aria-hidden="true" data-no-fallback
                 @error="markImageFailed(acc, 'skin')" @load="markImageLoaded(acc, 'skin')" />
-              <AccountActions :can-refresh="acc.canRefresh" :can-relogin="acc.canRelogin" :can-edit="acc.canEdit"
+              <AccountActions :locked="accountLocked && acc.uuid === currentUuid" :can-refresh="acc.canRefresh" :can-relogin="acc.canRelogin" :can-edit="acc.canEdit"
                 :has-skin="!hasNoSkin(acc)" @refresh="emit('refresh', acc)" @view-skin="emit('viewSkin', acc)"
                 @refresh-skin="emit('refreshSkin', acc)" @relogin="emit('relogin', acc)" @edit="emit('edit', acc)"
                 @delete="emit('delete', acc)" />

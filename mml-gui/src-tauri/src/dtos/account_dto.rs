@@ -15,6 +15,8 @@ pub struct AccountStoreViewDto {
     pub accounts: Vec<AccountStoreDto>,
     /// 当前选中账户 UUID
     pub current_uuid: Option<String>,
+    /// 联机大厅已锁定当前账户。
+    pub locked: bool,
 }
 
 /// 单个账户，前端 wire 为 camelCase，字段即 `mml-vue/src/lib/types.ts` 的 Account

@@ -421,9 +421,8 @@ async function copyOauthValue(value: string) {
 }
 
 /** 双击切换当前账户 */
-function switchAccount(acc: AccountStoreDto) {
-  setCurrentAccount(acc);
-  showToast(t("account.switched", { name: acc.userName }));
+async function switchAccount(acc: AccountStoreDto) {
+  if (await setCurrentAccount(acc)) showToast(t("account.switched", { name: acc.userName }));
 }
 
 // 操作
@@ -499,9 +498,9 @@ async function cancelLogin() {
 
 const deleteTarget = ref<AccountStoreDto | null>(null);
 
-function confirmDelete() {
+async function confirmDelete() {
   if (!deleteTarget.value) return;
-  removeAccount(deleteTarget.value.uuid);
+  if (!await removeAccount(deleteTarget.value.uuid)) return;
   showToast(t("account.removed"));
   deleteTarget.value = null;
 }
