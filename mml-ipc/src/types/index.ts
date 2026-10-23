@@ -25,6 +25,7 @@ export * from "./dtos/java_download_dto";
 export * from "./dtos/java_dto";
 export * from "./dtos/log_dto";
 export * from "./dtos/main_dto";
+export * from "./dtos/mod_export_dto";
 export * from "./dtos/motd_dto";
 export * from "./dtos/resource_dto";
 export * from "./dtos/settings_dto/launch";

@@ -18,6 +18,7 @@ pub mod custom_home_dto;
 pub mod custom_ui_dto;
 pub mod download_dto;
 pub mod export_dto;
+pub mod mod_export_dto;
 pub mod gui_config_dto;
 pub mod instance_dto;
 pub mod java_download_dto;

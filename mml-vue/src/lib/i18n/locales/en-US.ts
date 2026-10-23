@@ -1,5 +1,28 @@
 // English (US) language pack
 export default {
+  "modExport.name": "Name",
+  "modExport.modId": "Mod ID",
+  "modExport.version": "Version",
+  "modExport.file": "File name",
+  "modExport.author": "Author",
+  "modExport.description": "Description",
+  "modExport.url": "URL",
+  "modExport.source": "Source",
+  "modExport.projectId": "Project ID",
+  "modExport.fileId": "File ID",
+  "modExport.sha1": "SHA1",
+  "modExport.disable": "Disabled",
+  "modExport.side": "Side",
+  "modExport.loaders": "Loaders",
+  "modExport.note": "Note",
+  "modExport.title": "Export mod list",
+  "modExport.format": "Format",
+  "modExport.fields": "Fields",
+  "modExport.selected": "Selected mods only",
+  "modExport.done": "Exported {count} mods: {file}",
+  "err.modExportScan": "Refresh the mod list and try again",
+  "err.exportFields": "Select valid, distinct export fields",
+
   // App
   "app.name": "MML Launcher",
   "app.sub": "Modern Minecraft Launcher",

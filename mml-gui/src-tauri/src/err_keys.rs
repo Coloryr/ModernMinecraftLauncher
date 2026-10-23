@@ -140,6 +140,10 @@ pub const SAVE_SEED: &str = "err.saveSeed";
 // ---------- 导出 ----------
 
 /// 已有导出任务在跑
+/// 模组清单尚未扫描或已变化。
+pub const MOD_EXPORT_SCAN: &str = "err.modExportScan";
+/// 导出字段无效。
+pub const EXPORT_FIELDS: &str = "err.exportFields";
 pub const EXPORT_RUNNING: &str = "err.exportRunning";
 /// 不支持的整合包类型
 pub const EXPORT_PACK_TYPE: &str = "err.exportPackType";

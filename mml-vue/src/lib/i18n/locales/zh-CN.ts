@@ -1,5 +1,28 @@
 // 中文（简体）语言包
 export default {
+  "modExport.name": "名称",
+  "modExport.modId": "模组 ID",
+  "modExport.version": "版本",
+  "modExport.file": "文件名",
+  "modExport.author": "作者",
+  "modExport.description": "简介",
+  "modExport.url": "网址",
+  "modExport.source": "来源",
+  "modExport.projectId": "项目 ID",
+  "modExport.fileId": "文件 ID",
+  "modExport.sha1": "SHA1",
+  "modExport.disable": "已禁用",
+  "modExport.side": "运行侧",
+  "modExport.loaders": "加载器",
+  "modExport.note": "备注",
+  "modExport.title": "导出模组列表",
+  "modExport.format": "格式",
+  "modExport.fields": "导出字段",
+  "modExport.selected": "仅选中的模组",
+  "modExport.done": "已导出 {count} 个模组：{file}",
+  "err.modExportScan": "请刷新模组列表后重试",
+  "err.exportFields": "请选择有效且不重复的导出字段",
+
   // 应用
   "app.name": "M²L 启动器",
   "app.sub": "Modern Minecraft Launcher",
