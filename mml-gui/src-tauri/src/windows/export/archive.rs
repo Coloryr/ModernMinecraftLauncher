@@ -6,16 +6,26 @@ use zip::{ZipWriter, write::SimpleFileOptions};
 use crate::err_keys;
 
 pub(super) fn files_under(root: &Path) -> Result<Vec<PathBuf>, String> {
+    reject_link(root)?;
     let mut files = Vec::new();
     for entry in fs::read_dir(root).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
-        let meta = fs::symlink_metadata(entry.path()).map_err(|e| e.to_string())?;
-        if meta.file_type().is_symlink() { return Err(err_keys::EXPORT_LINK.to_string()); }
+        let meta = reject_link(&entry.path())?;
         if meta.is_dir() { files.extend(files_under(&entry.path())?); }
         else if meta.is_file() { files.push(entry.path()); }
     }
     files.sort();
     Ok(files)
+}
+
+pub(super) fn reject_link(path: &Path) -> Result<fs::Metadata, String> {
+    let meta = fs::symlink_metadata(path).map_err(|e| e.to_string())?;
+    if meta.file_type().is_symlink() { return Err(err_keys::EXPORT_LINK.into()); }
+    #[cfg(windows)] {
+        use std::os::windows::fs::MetadataExt;
+        if meta.file_attributes() & 0x400 != 0 { return Err(err_keys::EXPORT_LINK.into()); }
+    }
+    Ok(meta)
 }
 
 pub(super) fn check_destination(file: &Path, source: &Path) -> Result<(), String> {
@@ -87,4 +97,27 @@ mod tests {
         drop(archive);
         crate::test_support::cleanup(&[&dir]);
     }
+    #[cfg(windows)]
+    #[test]
+    fn refuses_windows_junctions_in_export_tree() {
+        use std::os::windows::process::CommandExt;
+        let dir = crate::test_support::temp_dir("export-junction");
+        let source = dir.join("instance");
+        let outside = dir.join("outside");
+        fs::create_dir(&source).unwrap();
+        fs::create_dir(&outside).unwrap();
+        fs::write(outside.join("private.txt"), "private").unwrap();
+        let link = source.join("linked");
+        let quoted = |path: &Path| path.to_string_lossy().replace('\'', "''");
+        let status = std::process::Command::new("powershell.exe")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &format!(
+                "New-Item -ItemType Junction -Path '{}' -Target '{}' -ErrorAction Stop | Out-Null", quoted(&link), quoted(&outside))])
+            .creation_flags(0x08000000).status().unwrap();
+        assert!(status.success());
+        assert!(files_under(&source).is_err());
+        assert!(files_under(&link).is_err());
+        fs::remove_dir(&link).unwrap();
+        crate::test_support::cleanup(&[&dir]);
+    }
+
 }
