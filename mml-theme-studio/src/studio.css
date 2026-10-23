@@ -14,6 +14,8 @@ small { font-size: 11.5px; }
 .brand small { color: var(--text-dim); }
 .toolbar, .action-bar, .preview-options { display: flex; align-items: center; gap: 8px; }
 .toolbar .language-select { width: 110px; }
+.theme-control { display: flex; align-items: center; gap: 6px; white-space: nowrap; color: var(--text-dim); }
+.toolbar .theme-select { width: 84px; }
 .action-bar { padding: 10px 16px; border-bottom: 1px solid var(--border); }
 .grow { flex: 1; }
 .status { color: var(--green); white-space: nowrap; font-size: 11.5px; }

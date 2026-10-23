@@ -10,6 +10,7 @@
     "build": "vue-tsc --noEmit && vite build",
     "test": "node --test tests/*.test.mjs",
     "smoke": "node scripts/launch.mjs tests/electron-smoke.mjs",
+    "smoke:theme": "node scripts/launch.mjs tests/appearance-smoke.mjs",
     "pack": "npm run build && node scripts/package.mjs",
     "lint": "eslint . --max-warnings 0"
   },

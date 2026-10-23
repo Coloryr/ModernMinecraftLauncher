@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { call, type Catalog, type CreateProject, type Project, type SourceFile } from './api';
+import { call, type Catalog, type CreateProject, type Project, type SourceFile, type Theme } from './api';
 import { locale, t } from './i18n';
 import EditorPane from './EditorPane.vue';
 import ProjectDialog from './ProjectDialog.vue';
@@ -33,6 +33,7 @@ const editor = ref<InstanceType<typeof EditorPane>>();
 const outputHost = ref<HTMLPreElement>();
 const ratio = ref(50);
 const env = ref('');
+const studioTheme = ref<Theme>(new URLSearchParams(location.search).get('theme') === 'Light' ? 'Light' : 'Dark');
 const kinds = ['main', 'settings', 'account', 'add', 'resource', 'download', 'log'];
 let observer: ResizeObserver;
 let unsubscribe: () => void;
@@ -123,12 +124,18 @@ function updateBounds() {
 async function updatePreviewOptions() {
   await call('previewOptions', { kind: previewKind.value, theme: previewTheme.value });
 }
+async function updateStudioTheme(event: Event) {
+  const select = event.target as HTMLSelectElement;
+  try { studioTheme.value = await call('theme', select.value as Theme); }
+  finally { select.value = studioTheme.value; }
+}
 function keydown(event: KeyboardEvent) {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); void save(); }
   if (event.key === 'Escape' && !working.value) { newProject.value = false; newFile.value = false; if (confirming.value) answer(false); }
 }
 
 watch(dirty, (value) => { void call('dirty', value).catch(showError); });
+watch(studioTheme, (value) => { document.documentElement.dataset.theme = value; }, { immediate: true });
 watch(modal, () => { void nextTick(updateBounds); });
 watch(previewUrl, () => { void nextTick(updateBounds); });
 watch(output, () => { void nextTick(() => { if (outputHost.value) outputHost.value.scrollTop = outputHost.value.scrollHeight; }); });
@@ -144,6 +151,7 @@ onMounted(async () => {
   try {
     const state = await call('state');
     locale.value = state.locale;
+    studioTheme.value = state.theme;
     recent.value = state.recent;
     env.value = state.environment.error || `Node.js ${state.environment.nodeVersion} · ${state.environment.git}`;
     if (state.project) await loadProject(state.project);
@@ -159,7 +167,8 @@ onBeforeUnmount(() => { observer?.disconnect(); unsubscribe?.(); window.removeEv
       <div class="toolbar">
         <button class="ui-btn v-plain s-sm" :disabled="working" @click="run(() => showNew('project'))">{{ t('new') }}</button>
         <button class="ui-btn v-plain s-sm" :disabled="working" @click="run(() => openProject())">{{ t('open') }}</button>
-        <select v-model="locale" class="field-select language-select" :aria-label="t('language')" @change="call('locale', locale).catch(showError)"><option value="zh-CN">中文</option><option value="en-US">English</option></select>
+        <label class="theme-control" for="studio-theme"><span>{{ t('studioTheme') }}</span><select id="studio-theme" :value="studioTheme" class="field-select theme-select" :disabled="working" @change="run(() => updateStudioTheme($event))"><option value="Light">{{ t('light') }}</option><option value="Dark">{{ t('dark') }}</option></select></label>
+        <select v-model="locale" class="field-select language-select" :aria-label="t('language')" :disabled="working" @change="call('locale', locale).catch(showError)"><option value="zh-CN">中文</option><option value="en-US">English</option></select>
       </div>
     </header>
     <nav class="action-bar" :aria-label="t('title')">
@@ -184,7 +193,7 @@ onBeforeUnmount(() => { observer?.disconnect(); unsubscribe?.(); window.removeEv
       </aside>
       <section class="code-pane">
         <div class="panel-head"><span class="file-title">{{ active?.path || t('chooseFile') }}</span><span v-if="dirty" class="dirty-mark" :title="t('unsaved')">●</span><span class="grow" /><button class="ui-btn v-ghost s-sm" :disabled="!active || working" :title="t('reopenFile')" @click="run(() => loadFile(active!.path))">↻</button></div>
-        <EditorPane v-if="active" ref="editor" v-model="draft" :path="project!.root + '/' + active.path" :read-only="working" @save="save" />
+        <EditorPane v-if="active" ref="editor" v-model="draft" :path="project!.root + '/' + active.path" :read-only="working" :theme="studioTheme" @save="save" />
         <div v-else class="empty-pane"><span class="empty-symbol">{ }</span><p>{{ t('chooseFile') }}</p><p class="muted">CSS · Vue · HTML · TypeScript</p></div>
       </section>
       <section class="preview-pane">

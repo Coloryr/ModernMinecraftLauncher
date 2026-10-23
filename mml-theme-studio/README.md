@@ -19,7 +19,7 @@ npm start
 1. 点「新建项目」，选择 demo 类型、父目录和项目名。默认自动从官方仓库下载 demo 以及同一提交的 `mml-ipc`、`mml-vue`；也可选择本地启动器源码仓库。
 2. 工具复制源码、安装依赖并打开预览。SDK 快照保存在项目的 `.mml-deps`，后续安装不会悄悄换成另一个版本。
 3. 在文件树选择文件，在 Monaco 中编辑。`Ctrl+S` 保存后自动重建预览；外部编辑器改过同一文件时，会阻止覆盖，可用编辑区右上角「从磁盘重新打开」读取新版本。
-4. 右侧可选择内置窗口、深浅色以及代码与预览的宽度比例。F12 或 `Ctrl+Shift+I` 打开开发者工具，在 Elements 中选取控件、查看样式，在 Console、Sources、Network 调试。
+4. 顶部「界面配色」切换工具、代码编辑器与原生标题栏的亮色 / 暗色，重启后保留选择。右侧的预览配色独立切换，可选择内置窗口以及代码与预览的宽度比例。F12 或 `Ctrl+Shift+I` 打开开发者工具，在 Elements 中选取控件、查看样式，在 Console、Sources、Network 调试。
 5. 「CSS 控件 / CSS 变量」读取项目 SDK 生成的清单。点击一项会在当前光标处插入选择器骨架或变量引用。
 6. 保存后点「构建 ZIP」，输出日志会给出产物路径。把 ZIP 导入启动器验证实际功能。F12 中临时修改的 DOM / CSS 不会自动写回源码。
 
@@ -32,7 +32,7 @@ npm start
 
 三个组件类 demo 在项目快照中的真实 `mml-vue` 宿主上预览，CSS 和组件加载方式与启动器相同。HTML demo 使用其内置浏览器预览。预览没有启动器后端，登录、游戏启动、实例文件等操作需要导入启动器验证；需要实例参数的窗口只能展示无实例时的界面。代码与预览分栏支持实时迭代，暂不提供拖拽生成 Vue 布局。
 
-关闭工具会回收安装、构建及预览子进程；有未保存内容或任务运行时先确认。项目源码留在所选目录，最近项目与语言写入工具自己的 `studio.json`。源码运行的下载、构建缓存放在仓库 `target/temp/theme-studio`；分发版放在用户数据目录的 `target/temp`。SDK 缓存和预览临时文件不进入主题 ZIP。
+关闭工具会回收安装、构建及预览子进程；有未保存内容或任务运行时先确认。项目源码留在所选目录，最近项目、语言与界面配色写入工具自己的 `studio.json`。源码运行的下载、构建缓存放在仓库 `target/temp/theme-studio`；分发版放在用户数据目录的 `target/temp`。SDK 缓存和预览临时文件不进入主题 ZIP。
 
 ## 分发
 
@@ -49,6 +49,7 @@ npm run lint
 npm test
 npm run build
 npm run smoke
+npm run smoke:theme
 # 对已安装依赖的真实 demo 进一步验证组件加载、配色与源码实时重建：
 npm run smoke -- D:/themes/css D:/themes/page D:/themes/home
 ```
@@ -57,6 +58,6 @@ Smoke 测试启动隐藏的 Electron 编辑器与预览视图，通过 DOM、IPC
 
 ## English
 
-An independent desktop theme editor with a project tree, Monaco editor, live preview and full Chromium DevTools. Install Node.js 24+, npm and Git, then run `npm install` and `npm start` in this directory. Choose English in the top-right language selector.
+An independent desktop theme editor with a project tree, Monaco editor, live preview and full Chromium DevTools. Install Node.js 24+, npm and Git, then run `npm install` and `npm start` in this directory. Choose English in the top-right language selector. Appearance switches the editor and native window between Light and Dark, remembers your choice, and stays independent of preview colors.
 
 Create a project from one of the four official demos; the tool downloads a matching SDK snapshot, installs dependencies and starts preview. Save with Ctrl+S to rebuild, press F12 to inspect the preview, and use Build ZIP to produce a launcher-importable theme. DevTools edits are temporary. Game launch, login and instance file operations require validation in the launcher. The editor does not generate layouts by dragging controls.

@@ -1,4 +1,5 @@
 export type Locale = 'zh-CN' | 'en-US';
+export type Theme = 'Dark' | 'Light';
 export type Template = 'css' | 'page' | 'home' | 'html';
 export interface Project { root: string; name: string; template: Template; revision: string }
 export interface SourceFile { path: string; text: string; hash: string }
@@ -10,6 +11,7 @@ export interface Catalog {
 export interface StudioState {
   project: Project | null;
   locale: Locale;
+  theme: Theme;
   recent: string[];
   environment: { nodeVersion?: string; git?: string; error?: string };
 }
@@ -38,6 +40,7 @@ interface Actions {
   bounds: { input: { x: number; y: number; width: number; height: number; visible: boolean }; output: undefined };
   previewOptions: { input: { kind: string; theme: string }; output: undefined };
   locale: { input: Locale; output: undefined };
+  theme: { input: Theme; output: Theme };
   dirty: { input: boolean; output: undefined };
   reveal: { input: undefined; output: string };
 }

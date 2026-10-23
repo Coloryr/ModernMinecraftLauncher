@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import type { Theme } from './api';
 import * as monaco from 'monaco-editor/editor/editor.api';
 import EditorWorker from 'monaco-editor/editor/editor.worker.js?worker';
 import JsonWorker from 'monaco-editor/language/json/json.worker.js?worker';
@@ -15,7 +16,7 @@ import 'monaco-editor/languages/definitions/html/register.js';
 import 'monaco-editor/languages/definitions/css/register.js';
 import 'monaco-editor/languages/definitions/markdown/register.js';
 
-const props = defineProps<{ path: string; modelValue: string; readOnly: boolean }>();
+const props = defineProps<{ path: string; modelValue: string; readOnly: boolean; theme: Theme }>();
 const emit = defineEmits<{ 'update:modelValue': [value: string]; save: [] }>();
 const host = ref<HTMLDivElement>();
 let editor: monaco.editor.IStandaloneCodeEditor | undefined;
@@ -39,7 +40,7 @@ function replaceModel() {
 
 onMounted(() => {
   editor = monaco.editor.create(host.value!, {
-    automaticLayout: true, theme: 'vs-dark', fontSize: 13, tabSize: 2,
+    automaticLayout: true, theme: props.theme === 'Light' ? 'vs' : 'vs-dark', fontSize: 13, tabSize: 2,
     minimap: { enabled: false }, scrollBeyondLastLine: false, wordWrap: 'on',
     readOnly: props.readOnly, accessibilitySupport: 'auto',
   });
@@ -55,6 +56,7 @@ watch(() => props.modelValue, (value) => {
   syncing = false;
 });
 watch(() => props.readOnly, (value) => editor?.updateOptions({ readOnly: value }));
+watch(() => props.theme, (value) => monaco.editor.setTheme(value === 'Light' ? 'vs' : 'vs-dark'));
 onBeforeUnmount(() => { listener?.dispose(); editor?.getModel()?.dispose(); editor?.dispose(); });
 
 defineExpose({ insert(value: string) {

@@ -1,4 +1,4 @@
-import { BrowserWindow, WebContentsView, ipcMain, dialog, shell, Menu } from 'electron';
+import { BrowserWindow, WebContentsView, ipcMain, dialog, shell, Menu, nativeTheme } from 'electron';
 import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,19 +9,28 @@ import { writeJson } from '../lib/files.mjs';
 import { environment } from '../lib/process.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
+const backgrounds = { Dark: '#14161a', Light: '#eef1f5' };
 
 export async function createStudioWindow({ dataRoot, cache, show = true }) {
   await mkdir(dataRoot, { recursive: true });
   const configPath = join(dataRoot, 'studio.json');
-  const config = { locale: 'zh-CN', recent: [] };
+  const config = { locale: 'zh-CN', recent: [], theme: 'Dark' };
   try {
     const saved = JSON.parse(await readFile(configPath, 'utf8'));
-    if (['zh-CN', 'en-US'].includes(saved?.locale)) config.locale = saved.locale;
-    if (Array.isArray(saved?.recent)) config.recent = saved.recent.filter((path) => typeof path === 'string').slice(0, 8);
+    // 兼容首版的小驼峰键，后续落盘统一使用项目约定的大驼峰键。
+    const locale = saved?.Locale ?? saved?.locale;
+    const recent = saved?.Recent ?? saved?.recent;
+    const theme = saved?.Theme ?? saved?.theme;
+    if (['zh-CN', 'en-US'].includes(locale)) config.locale = locale;
+    if (Array.isArray(recent)) config.recent = recent.filter((path) => typeof path === 'string').slice(0, 8);
+    if (['Dark', 'Light'].includes(theme)) config.theme = theme;
   } catch { /* 首次启动使用默认值。 */ }
+  const saveConfig = (value = config) => writeJson(configPath, { Locale: value.locale, Recent: value.recent, Theme: value.theme });
+  nativeTheme.themeSource = config.theme === 'Light' ? 'light' : 'dark';
   const window = new BrowserWindow({
     width: 1440, height: 920, minWidth: 1000, minHeight: 640, show: false,
     title: text(config.locale, 'title'),
+    backgroundColor: backgrounds[config.theme],
     webPreferences: { preload: join(root, 'electron/preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
   const view = new WebContentsView({
@@ -86,7 +95,7 @@ export async function createStudioWindow({ dataRoot, cache, show = true }) {
 
   async function remember(project) {
     config.recent = [project.root, ...config.recent.filter((path) => path !== project.root)].slice(0, 8);
-    await writeJson(configPath, config);
+    await saveConfig();
     return project;
   }
 
@@ -95,7 +104,7 @@ export async function createStudioWindow({ dataRoot, cache, show = true }) {
     try {
       let value;
       switch (action) {
-        case 'state': value = { project: studio.project, locale: studio.locale, recent: config.recent, environment: await environment().catch((error) => ({ error: text(studio.locale, error.key, error.values) })) }; break;
+        case 'state': value = { project: studio.project, locale: studio.locale, recent: config.recent, theme: config.theme, environment: await environment().catch((error) => ({ error: text(studio.locale, error.key, error.values) })) }; break;
         case 'pick': {
           const key = input === 'source' ? 'chooseRepo' : input === 'parent' ? 'chooseParent' : 'chooseProject';
           const result = await dialog.showOpenDialog(window, { title: text(studio.locale, key), properties: ['openDirectory', 'createDirectory'] });
@@ -125,7 +134,14 @@ export async function createStudioWindow({ dataRoot, cache, show = true }) {
         case 'locale':
           if (!['zh-CN', 'en-US'].includes(input)) throw new StudioError('invalidProject');
           studio.locale = input; config.locale = input;
-          await writeJson(configPath, config); break;
+          await saveConfig(); break;
+        case 'theme':
+          if (!['Dark', 'Light'].includes(input)) throw new StudioError('invalidTheme');
+          await saveConfig({ ...config, theme: input });
+          config.theme = input;
+          nativeTheme.themeSource = input === 'Light' ? 'light' : 'dark';
+          window.setBackgroundColor(backgrounds[input]);
+          value = input; break;
         default: throw new StudioError('invalidProject');
       }
       return { ok: true, value };
@@ -165,7 +181,7 @@ export async function createStudioWindow({ dataRoot, cache, show = true }) {
     })();
   });
   window.on('closed', () => ipcMain.removeHandler('studio:call'));
-  await window.loadFile(join(root, 'dist/index.html'));
+  await window.loadFile(join(root, 'dist/index.html'), { query: { theme: config.theme } });
   if (show) window.show();
   return { window, view, studio, dispose };
 }
