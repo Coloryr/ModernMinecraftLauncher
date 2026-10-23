@@ -235,6 +235,8 @@ fn parse_environment(text: &str, lines: &[&str]) -> Environment {
             }
         } else if let Some(value) = trimmed.strip_prefix("Operating System: ") {
             env.os = Some(value.trim().to_string());
+        } else if let Some(value) = trimmed.strip_prefix("Type: ") {
+            env.dedicated_server = value.starts_with("Dedicated Server");
         } else if let Some(value) = trimmed.strip_prefix("Memory: ")
             && let Some(captures) = RE_MEMORY.captures(value)
             && let Some(mib) = captures.get(1)
