@@ -1,10 +1,10 @@
 //! 先解包，再逐文件替换；中途失败时恢复已替换文件。
 
-use std::{fs::{self, File}, io, path::{Path, PathBuf}};
+use std::{collections::{HashMap, HashSet}, fs::{self, File}, io::{self, Read}, path::{Path, PathBuf}};
 use mml_config::config_obj::ConfigObj;
 use zip::ZipArchive;
 use crate::{err_keys, gui_config::GuiConfig};
-use super::{CONFIG, GUI_CONFIG, LAUNCHER, MANIFEST, format};
+use super::{CONFIG, GUI_CONFIG, INSTANCES, LAUNCHER, MANIFEST, Manifest, archive, format};
 
 fn destination(root: &Path, relative: &Path) -> Result<PathBuf, String> {
     let mut path = root.to_path_buf();
@@ -24,10 +24,11 @@ fn destination(root: &Path, relative: &Path) -> Result<PathBuf, String> {
 
 pub(crate) fn import_pack(file: &Path, root: &Path) -> Result<(ConfigObj, GuiConfig), String> {
     let mut zip = ZipArchive::new(File::open(file).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
-    let _manifest = format::validate(&mut zip)?;
+    let manifest = format::validate(&mut zip)?;
     let config = format::read_json(&mut zip, CONFIG)?;
     let gui = format::read_json(&mut zip, GUI_CONFIG)?;
     let root = root.canonicalize().map_err(|e| e.to_string())?;
+    let directories = instance_directories(&root, &manifest)?;
     let stage = root.join(format!(".server-import-{}", uuid::Uuid::new_v4()));
     fs::create_dir(&stage).map_err(|e| e.to_string())?;
     let result = (|| {
@@ -36,12 +37,27 @@ pub(crate) fn import_pack(file: &Path, root: &Path) -> Result<(ConfigObj, GuiCon
             let mut entry = zip.by_index(index).map_err(|e| e.to_string())?;
             let name = entry.name().map_err(|e| e.to_string())?;
             if entry.is_dir() || matches!(name.as_ref(), MANIFEST | LAUNCHER) { continue; }
-            let relative = PathBuf::from(name.strip_prefix("mml/").ok_or(err_keys::SERVER_PACK_INVALID)?);
+            let name = name.into_owned();
+            let (relative, game_directory) = if let Some(rest) = name.strip_prefix(INSTANCES) {
+                let (directory, suffix) = rest.split_once('/').ok_or(err_keys::SERVER_PACK_INVALID)?;
+                let target = directories.get(directory).ok_or(err_keys::SERVER_PACK_INVALID)?;
+                (PathBuf::from(format!("minecraft/instances/{target}/{suffix}")),
+                    (suffix == "game.json").then_some(target))
+            } else {
+                (PathBuf::from(name.strip_prefix("mml/").ok_or(err_keys::SERVER_PACK_INVALID)?), None)
+            };
             let target = destination(&root, &relative)?;
             let staged = stage.join("files").join(&relative);
             fs::create_dir_all(staged.parent().unwrap()).map_err(|e| e.to_string())?;
             let mut output = File::create_new(&staged).map_err(|e| e.to_string())?;
-            io::copy(&mut entry, &mut output).map_err(|e| e.to_string())?;
+            if let Some(directory) = game_directory {
+                let mut game: mml_game::launcher::instance_setting_obj::InstanceSettingObj =
+                    serde_json::from_reader(&mut entry).map_err(|_| err_keys::SERVER_PACK_INVALID)?;
+                game.dir = directory.clone();
+                serde_json::to_writer_pretty(&mut output, &game).map_err(|e| e.to_string())?;
+            } else {
+                io::copy(&mut entry, &mut output).map_err(|e| e.to_string())?;
+            }
             output.sync_all().map_err(|e| e.to_string())?;
             files.push((relative, target, staged));
         }
@@ -79,6 +95,37 @@ pub(crate) fn import_pack(file: &Path, root: &Path) -> Result<(ConfigObj, GuiCon
     result
 }
 
+// 同 UUID 已经安装时覆盖原目录，避免重启扫描出两个相同实例。
+fn instance_directories(root: &Path, manifest: &Manifest) -> Result<HashMap<String, String>, String> {
+    let mut existing = HashMap::new();
+    let base = root.join("minecraft/instances");
+    if base.exists() {
+        destination(root, Path::new("minecraft/instances"))?;
+        for entry in fs::read_dir(&base).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            if !archive::reject_link(&entry.path()).is_ok_and(|meta| meta.is_dir()) { continue; }
+            let file = entry.path().join("game.json");
+            if !archive::reject_link(&file).is_ok_and(|meta| meta.is_file() && meta.len() <= 4 * 1024 * 1024) { continue; }
+            let Ok(file) = File::open(file) else { continue; };
+            let Ok(game) = serde_json::from_reader::<_, mml_game::launcher::instance_setting_obj::InstanceSettingObj>(file.take(4 * 1024 * 1024)) else { continue; };
+            if manifest.instances.iter().any(|item| item.uuid == game.uuid) {
+                let directory = entry.file_name().to_string_lossy().into_owned();
+                if !format::safe_component(&directory) || existing.insert(game.uuid, directory).is_some() {
+                    return Err(err_keys::SERVER_PACK_INVALID.into());
+                }
+            }
+        }
+    }
+    let mut used = HashSet::new();
+    let mut result = HashMap::new();
+    for instance in &manifest.instances {
+        let target = existing.get(&instance.uuid).unwrap_or(&instance.directory).clone();
+        if !used.insert(target.to_lowercase()) { return Err(err_keys::SERVER_PACK_INVALID.into()); }
+        result.insert(instance.directory.clone(), target);
+    }
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -89,7 +136,7 @@ mod tests {
         let file = dir.join("pack.zip");
         let uuid = uuid::Uuid::new_v4();
         let manifest = Manifest { format: "mml-server-pack".into(), version: 1,
-            instances: vec![Instance { uuid, directory: "test".into() }], launcher: false };
+            instances: vec![Instance { uuid, directory: "test".into() }], launcher: extra.is_some_and(|(name, _)| name == LAUNCHER) };
         let mut data = vec![
             (MANIFEST.into(), serde_json::to_vec(&manifest).unwrap()),
             (CONFIG.into(), b"{}".to_vec()), (GUI_CONFIG.into(), b"{}".to_vec()),
@@ -126,4 +173,24 @@ mod tests {
             crate::test_support::cleanup(&[&dir]);
         }
     }
+    #[test]
+    fn reimport_follows_instance_uuid_and_never_replaces_launcher() {
+        let (dir, file) = fixture(Some((LAUNCHER, b"bundled launcher")));
+        let root = dir.join("runtime");
+        fs::create_dir(&root).unwrap();
+        import_pack(&file, &root).unwrap();
+        let original = root.join("minecraft/instances/test");
+        let renamed = root.join("minecraft/instances/renamed");
+        fs::rename(&original, &renamed).unwrap();
+        fs::write(renamed.join(".minecraft/options.txt"), "old").unwrap();
+        fs::write(root.join(LAUNCHER), "running launcher").unwrap();
+        import_pack(&file, &root).unwrap();
+        assert!(!original.exists());
+        assert_eq!(fs::read_to_string(renamed.join(".minecraft/options.txt")).unwrap(), "new");
+        let game: serde_json::Value = serde_json::from_slice(&fs::read(renamed.join("game.json")).unwrap()).unwrap();
+        assert_eq!(game["DirName"], "renamed");
+        assert_eq!(fs::read_to_string(root.join(LAUNCHER)).unwrap(), "running launcher");
+        crate::test_support::cleanup(&[&dir]);
+    }
+
 }
