@@ -29,6 +29,8 @@ pub struct LobbyViewDto {
     pub account: String,
     pub account_uuid: String,
     pub version: String,
+    /// 陶瓦重建时递增，用于丢弃旧会话的迟到响应。
+    pub session_generation: u32,
     pub ready: bool,
     pub downloading: bool,
     pub download_percent: u32,

@@ -31,8 +31,11 @@ const stateText = computed(() => t(`lobby.state.${state.value}`));
 
 function applyView(next: LobbyViewDto) {
   const previous = view.value;
+  if (previous && next.sessionGeneration < previous.sessionGeneration) return;
   // 同一会话中的慢轮询不能覆盖更新的房间状态。
-  if (previous && next.state.index < previous.state.index) next.state = previous.state;
+  if (previous && next.sessionGeneration === previous.sessionGeneration && next.state.index < previous.state.index) {
+    next.state = previous.state;
+  }
   if (!previous?.nodes.length && next.nodes.length) selectedNodes.value = [...next.nodes];
   else selectedNodes.value = selectedNodes.value.filter((node) => next.nodes.includes(node));
   view.value = next;

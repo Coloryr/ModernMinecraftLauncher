@@ -1,7 +1,10 @@
 //! 大厅会话随窗口释放，下载、HTTP 请求和账户锁同寿命。
 
 use super::runtime::Session;
-use crate::{dtos::LobbyViewDto, err_keys};
+use crate::{
+    dtos::{LobbyStateDto, LobbyViewDto},
+    err_keys,
+};
 use std::sync::{Arc, Mutex};
 use tauri::AppHandle;
 use tokio_util::sync::CancellationToken;
@@ -54,4 +57,29 @@ impl Drop for LobbyModel {
 
 pub(super) fn get() -> Result<Arc<LobbyModel>, String> {
     crate::windows::lifecycle::model_for_kind("lobby").ok_or_else(|| err_keys::LOBBY_CLOSED.into())
+}
+
+/// 只接受当前连接的状态，旧轮询不能更新刚重建的会话。
+pub(super) fn accept_state(
+    current: Option<&Arc<Session>>,
+    source: &Arc<Session>,
+    view: &mut LobbyViewDto,
+    state: LobbyStateDto,
+) {
+    if current.is_some_and(|current| Arc::ptr_eq(current, source))
+        && state.index >= view.state.index
+    {
+        view.state = state;
+    }
+}
+
+/// 新工作进程的状态序号从零开始，连同前端世代一起重置。
+pub(super) fn reset_view(view: &mut LobbyViewDto) {
+    view.session_generation += 1;
+    view.ready = false;
+    view.version.clear();
+    view.state = LobbyStateDto {
+        state: "stopped".into(),
+        ..Default::default()
+    };
 }

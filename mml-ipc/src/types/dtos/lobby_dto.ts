@@ -21,6 +21,7 @@ export type LobbyViewDto = {
   account: string,
   accountUuid: string,
   version: string,
+  sessionGeneration: number,
   ready: boolean,
   downloading: boolean,
   downloadPercent: number,

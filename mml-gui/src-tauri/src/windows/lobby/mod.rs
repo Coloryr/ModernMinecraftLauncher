@@ -76,10 +76,9 @@ pub async fn lobby_status() -> Result<LobbyViewDto, String> {
             _ = model.cancel.cancelled() => return Err(err_keys::LOBBY_CLOSED.into()),
             state = session.state() => state?,
         };
+        let current = model.session.lock().unwrap();
         let mut view = model.view.lock().unwrap();
-        if state.index >= view.state.index {
-            view.state = state;
-        }
+        model::accept_state(current.as_ref(), &session, &mut view, state);
     }
     let view = model.view.lock().unwrap().clone();
     Ok(view)
@@ -93,7 +92,18 @@ pub async fn lobby_start() -> Result<LobbyViewDto, String> {
     let model = model::get()?;
     let _operation = model.gate.lock().await;
     model.check()?;
+    let current = model.session.lock().unwrap().clone();
+    if let Some(current) = current {
+        let status = tokio::select! {
+            _ = model.cancel.cancelled() => return Err(err_keys::LOBBY_CLOSED.into()),
+            state = current.state() => state,
+        };
+        if status.is_err() {
+            model.session.lock().unwrap().take();
+        }
+    }
     if model.session.lock().unwrap().is_none() {
+        model::reset_view(&mut model.view.lock().unwrap());
         let (session, version) = runtime::Session::start(&model).await?;
         {
             let mut current = model.session.lock().unwrap();

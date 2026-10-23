@@ -1,5 +1,56 @@
 use super::*;
 
+#[test]
+fn restarted_worker_accepts_new_indices_and_rejects_old_poll_results() {
+    use super::super::model::{accept_state, reset_view};
+    use crate::dtos::LobbyViewDto;
+    let make = || {
+        Arc::new(Session {
+            client: reqwest::Client::new(),
+            base: "http://127.0.0.1:1".into(),
+            owned: false,
+            room_owned: AtomicBool::new(false),
+            worker: None,
+        })
+    };
+    let old = make();
+    let new = make();
+    let mut view = LobbyViewDto {
+        ready: true,
+        state: LobbyStateDto {
+            index: 100,
+            state: "guest-ok".into(),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    reset_view(&mut view);
+    assert!(!view.ready);
+    assert_eq!(view.session_generation, 1);
+    accept_state(
+        Some(&new),
+        &new,
+        &mut view,
+        LobbyStateDto {
+            index: 1,
+            state: "waiting".into(),
+            ..Default::default()
+        },
+    );
+    accept_state(
+        Some(&new),
+        &old,
+        &mut view,
+        LobbyStateDto {
+            index: 101,
+            state: "guest-ok".into(),
+            ..Default::default()
+        },
+    );
+    assert_eq!(view.state.state, "waiting");
+    assert_eq!(view.state.index, 1);
+}
+
 #[tokio::test]
 async fn leaving_ignores_stale_nodes_and_does_not_require_a_state_request() {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
