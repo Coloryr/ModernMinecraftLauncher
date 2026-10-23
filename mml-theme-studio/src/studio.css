@@ -1,0 +1,62 @@
+/* 工具布局；控件和颜色沿用启动器的样式变量。 */
+* { box-sizing: border-box; }
+body { margin: 0; font: 13px/1.5 "Segoe UI", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); }
+button, input, select { font-family: inherit; }
+button { cursor: pointer; }
+h1, h2, p { margin: 0; }
+h1 { font-size: 18px; }
+h2 { font-size: 15px; margin-bottom: 16px; }
+small { font-size: 11.5px; }
+.studio-shell { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+.studio-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 16px 20px; background: var(--bg-side); border-bottom: 1px solid var(--border); }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-mark { padding: 10px; color: var(--accent); border: 1px solid var(--accent-border); border-radius: 10px; font-size: 18px; font-weight: 700; background: var(--accent-soft); }
+.brand small { color: var(--text-dim); }
+.toolbar, .action-bar, .preview-options { display: flex; align-items: center; gap: 8px; }
+.toolbar .language-select { width: 110px; }
+.action-bar { padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.grow { flex: 1; }
+.status { color: var(--green); white-space: nowrap; font-size: 11.5px; }
+.status.pending, .dirty-mark { color: var(--yellow); }
+.workspace { display: grid; grid-template-columns: 220px minmax(240px, var(--editor-ratio)) minmax(280px, var(--preview-ratio)); grid-template-rows: minmax(0, 1fr) 180px; min-height: 0; flex: 1; }
+.sidebar { grid-row: 1 / 3; background: var(--bg-side); display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border); }
+.panel-head { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--border); min-height: 44px; flex-shrink: 0; }
+.panel-head strong { font-size: 12.5px; }
+.sidebar > .panel-head strong { flex: 1; }
+.file-list { flex: 1; overflow: auto; padding: 8px; min-height: 100px; }
+.file-list .file-entry { width: 100%; display: flex; justify-content: start; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: normal; text-align: left; }
+.file-entry span { color: var(--text-dim); }
+.file-list .selected, .catalog .selected { color: var(--accent); background: var(--accent-soft); }
+.file-list .recent-entry { width: 100%; white-space: normal; height: auto; word-break: break-all; text-align: left; }
+.file-list p { margin: 8px 4px 16px; }
+.code-pane, .preview-pane { display: flex; flex-direction: column; min-height: 0; min-width: 0; border-right: 1px solid var(--border); }
+.file-title { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; font-family: Consolas, monospace; font-size: 12.5px; }
+.editor-host { flex: 1; min-height: 0; }
+.empty-pane { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; flex: 1; text-align: center; gap: 12px; padding: 20px; color: var(--text-dim); }
+.empty-symbol { font-size: 18px; color: var(--accent); padding: 20px; border: 1px dashed var(--border); border-radius: 12px; }
+.preview-options { padding: 8px; border-bottom: 1px solid var(--border); }
+.preview-options .field-select { min-width: 0; flex: 1; }
+.preview-options input { width: 64px; accent-color: var(--accent); }
+.preview-host { flex: 1; min-height: 0; position: relative; background: var(--bg-card); }
+.preview-hint { padding: 8px 10px; color: var(--text-dim); font-size: 10.5px; border-top: 1px solid var(--border); }
+.output-pane { grid-column: 2 / 4; display: flex; flex-direction: column; min-height: 0; border-top: 1px solid var(--border); }
+.output-log { overflow: auto; margin: 0; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; font: 11.5px/1.5 Consolas, monospace; flex: 1; }
+.status-bar { display: flex; justify-content: space-between; gap: 16px; padding: 4px 12px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 10.5px; }
+.status-bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.error-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 16px; color: var(--red); background: var(--bg-card); border-bottom: 1px solid var(--red); }
+.muted { color: var(--text-dim); font-size: 11.5px; }
+.form-error { color: var(--red); overflow-wrap: anywhere; }
+.catalog { border-top: 1px solid var(--border); display: flex; flex-direction: column; max-height: 42%; min-height: 180px; }
+.catalog > input { margin: 8px; width: calc(100% - 16px); }
+.catalog-list { overflow: auto; padding: 0 8px 8px; }
+.catalog-list .catalog-entry { width: 100%; height: auto; display: flex; flex-direction: column; align-items: start; font-weight: normal; text-align: left; }
+.catalog-entry code { word-break: break-all; white-space: normal; }
+.catalog-entry small { color: var(--text-dim); max-width: 100%; text-overflow: ellipsis; overflow: hidden; }
+.modal-shade { position: fixed; inset: 0; z-index: 100; background: var(--overlay); display: flex; align-items: center; justify-content: center; padding: 32px; }
+.modal { width: 520px; max-height: 90vh; overflow: auto; padding: 24px; border-radius: 12px; background: var(--bg-modal); border: 1px solid var(--border); box-shadow: var(--shadow-lg); }
+.modal > p { margin-top: 12px; }
+.modal-actions { display: flex; justify-content: end; gap: 8px; margin-top: 24px; }
+.path-line { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.path-line output { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--text-dim); font-size: 11.5px; }
+/* 预览使用原生子视图；下拉沿用系统弹层，避免被该视图遮挡。 */
+select.field-select, select.field-select::picker(select) { appearance: auto; background-image: none; }
