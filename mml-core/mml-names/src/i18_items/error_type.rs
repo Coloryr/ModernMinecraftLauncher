@@ -281,6 +281,8 @@ pub enum ErrorType {
     NbtReadError,
     /// NBT 字符串超出无符号 16 位字节长度。
     NbtStringTooLong(usize),
+    /// 下载服务器返回了与续传请求不匹配的字节范围。
+    DownloadRangeError(String),
 
     /// 输入参数为空
     ArgEmpty(ArgEmptyData),

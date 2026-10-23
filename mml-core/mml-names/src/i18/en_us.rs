@@ -187,6 +187,7 @@ impl I18Lang for EnUs {
 
             ErrorType::NbtTypeError => String::from("NBT type error"),
             ErrorType::NbtReadError => String::from("Failed to read NBT"),
+            ErrorType::DownloadRangeError(url) => format!("Invalid download byte range: {url}"),
             ErrorType::NbtStringTooLong(size) => {
                 format!("NBT string is {size} bytes; maximum is 65535")
             }

@@ -45,6 +45,10 @@ use crate::{
     DownloadObj, download_item::DownloadItemState, download_task::DownloadTask, later_tasks,
 };
 
+#[cfg(test)]
+#[path = "download_thread_tests.rs"]
+mod transfer_tests;
+
 /// 读流出错转 StreamError
 fn stream_err(err: impl std::fmt::Display) -> ErrorType {
     ErrorType::StreamError(ErrorData::from_error(err))
@@ -282,55 +286,42 @@ fn download(index: u32, mut obj: DownloadObj) {
     let mut times = 0;
     let mut use_break = false;
     let mut server_ranges = true;
-    let mut is_keep = false;
     // 重试次数耗尽后放弃此文件，不能把残缺的临时文件移到目标路径
     let mut is_fail = false;
     // 任务被取消：与失败分开，见循环末尾的收尾
     let mut is_cancel = false;
 
-    let mut temp_file;
+    let temp_file = crate::gen_temp_file();
 
     loop {
-        temp_file = crate::gen_temp_file();
-
         // 任务已被取消：立即放弃，不再重试；stop 时下载线程要 join，取消必须尽快打断在途下载
         if obj.task.is_cancelled() {
             is_cancel = true;
             break;
         }
 
-        let file = if is_keep {
-            path_helper::open_append(&temp_file)
-        } else {
-            path_helper::open_write(&temp_file)
-        };
-
-        if let Err(err) = file {
-            obj.item.add_error();
-            if is_need_err(&obj.item.base, err, &mut times) {
-                is_fail = true;
-                break;
-            } else {
-                continue;
-            }
-        }
-
-        let mut file = file.unwrap();
-
         // 发起 HTTP 请求，支持断点续传。客户端先落成局部变量：请求 Future 借用它，
         // 写成 `get_work_client().get(..)` 的话临时 Arc 活不过这个 Future
         let client = mml_net::get_work_client();
-        let mut resp = if use_break && server_ranges {
-            let result = block_on_cancellable(
-                &obj.task,
-                client.get_ranges(&obj.item.base.url, obj.item.get_now_size()),
-            );
-            // 取消优先于重试：请求是被取消打断的，不是网络故障
-            let Some(result) = result else {
-                is_cancel = true;
-                break;
-            };
-            if let Err(err) = result {
+        let offset = if use_break && server_ranges {
+            std::fs::metadata(&temp_file)
+                .map(|meta| meta.len())
+                .unwrap_or(0)
+        } else {
+            0
+        };
+        let result = if offset > 0 {
+            block_on_cancellable(&obj.task, client.get_ranges(&obj.item.base.url, offset))
+        } else {
+            block_on_cancellable(&obj.task, client.get(&obj.item.base.url))
+        };
+        let Some(result) = result else {
+            is_cancel = true;
+            break;
+        };
+        let mut resp = match result {
+            Ok(resp) => resp,
+            Err(err) => {
                 if obj.task.is_cancelled() {
                     is_cancel = true;
                     break;
@@ -339,58 +330,65 @@ fn download(index: u32, mut obj: DownloadObj) {
                 if is_need_err(&obj.item.base, err, &mut times) {
                     is_fail = true;
                     break;
-                } else {
-                    continue;
                 }
+                continue;
             }
+        };
 
-            let resp = result.unwrap();
-
-            if !resp.status().is_success() {
+        let append = if resp.status() == reqwest::StatusCode::PARTIAL_CONTENT {
+            let Some(total) = resumed_total(&resp, offset) else {
+                server_ranges = false;
+                obj.item.add_error();
+                if is_need_err(
+                    &obj.item.base,
+                    ErrorType::DownloadRangeError(obj.item.base.url.clone()),
+                    &mut times,
+                ) {
+                    is_fail = true;
+                    break;
+                }
+                continue;
+            };
+            obj.item.set_now_size(offset);
+            obj.item.set_all_size(total);
+            offset > 0
+        } else {
+            if offset > 0 && resp.status() != reqwest::StatusCode::OK {
                 server_ranges = false;
                 continue;
             }
+            obj.item.set_now_size(0);
+            obj.item.set_all_size(resp.content_length().unwrap_or(0));
+            false
+        };
 
-            is_keep = true;
-
-            resp
+        // 收到完整响应时重新截断；只有确认 Range 起点后才保留原文件。
+        let file = if append {
+            path_helper::open_read_write(&temp_file).and_then(|mut file| {
+                file.seek(SeekFrom::End(0)).map_err(stream_err)?;
+                Ok(file)
+            })
         } else {
-            let result = block_on_cancellable(&obj.task, client.get(&obj.item.base.url));
-            let Some(result) = result else {
-                is_cancel = true;
-                break;
-            };
-            if let Err(err) = result {
-                if obj.task.is_cancelled() {
-                    is_cancel = true;
-                    break;
-                }
+            path_helper::open_write(&temp_file)
+        };
+        let mut file = match file {
+            Ok(file) => file,
+            Err(err) => {
                 obj.item.add_error();
                 if is_need_err(&obj.item.base, err, &mut times) {
                     is_fail = true;
                     break;
-                } else {
-                    continue;
                 }
+                continue;
             }
-
-            let resp = result.unwrap();
-
-            obj.item.set_now_size(0);
-            obj.item.set_all_size(match resp.content_length() {
-                Some(data) => data,
-                None => 0,
-            });
-
-            resp
         };
 
-        // 检测服务器是否支持断点续传
-        if let Some(range) = resp.headers().get("Accept-Ranges")
-            && range.to_str().unwrap().starts_with("bytes")
-        {
-            use_break = true;
-        }
+        use_break = resp.status() == reqwest::StatusCode::PARTIAL_CONTENT
+            || resp
+                .headers()
+                .get("Accept-Ranges")
+                .and_then(|value| value.to_str().ok())
+                == Some("bytes");
 
         obj.item.set_state(DownloadItemState::GetInfo);
         crate::update(index, &obj.item);
@@ -400,6 +398,12 @@ fn download(index: u32, mut obj: DownloadObj) {
         // ============================================================
         let result = block_on(write_file(index, &mut obj, &mut resp, &mut file));
         if let Err(err) = result {
+            if matches!(
+                &err,
+                ErrorType::DownloadFileHashError(_) | ErrorType::DownloadFileSizeError(_)
+            ) {
+                server_ranges = false;
+            }
             // 取消是 write_file 自己报出来的，优先于失败判定
             if obj.task.is_cancelled() {
                 is_cancel = true;
@@ -474,6 +478,30 @@ fn download(index: u32, mut obj: DownloadObj) {
     obj.item.set_state(DownloadItemState::Done);
     crate::update(index, &obj.item);
     obj.task.done();
+}
+
+/// 校验开放式 Range 响应的起点、终点与响应体长度。
+fn resumed_total(resp: &Response, offset: u64) -> Option<u64> {
+    let range = resp
+        .headers()
+        .get("Content-Range")?
+        .to_str()
+        .ok()?
+        .strip_prefix("bytes ")?;
+    let (bounds, total) = range.split_once('/')?;
+    let (start, end) = bounds.split_once('-')?;
+    let start: u64 = start.parse().ok()?;
+    let end: u64 = end.parse().ok()?;
+    let total: u64 = total.parse().ok()?;
+    if start != offset || end < start || end.checked_add(1)? != total {
+        return None;
+    }
+    if let Some(length) = resp.content_length() {
+        if length != total - start {
+            return None;
+        }
+    }
+    Some(total)
 }
 
 /// 流式写入下载数据到文件

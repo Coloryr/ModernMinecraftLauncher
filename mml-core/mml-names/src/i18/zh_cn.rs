@@ -178,6 +178,7 @@ impl I18Lang for ZhCn {
 
             ErrorType::NbtTypeError => String::from("NBT类型错误"),
             ErrorType::NbtReadError => String::from("NBT读取失败"),
+            ErrorType::DownloadRangeError(url) => format!("下载响应的字节范围不匹配：{url}"),
             ErrorType::NbtStringTooLong(size) => {
                 format!("NBT 字符串为 {size} 字节，最多允许 65535 字节")
             }
