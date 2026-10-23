@@ -367,25 +367,30 @@ async function saveText() {
   const file = selected.value;
   if (!file || !isText.value || saving.value || !dirty.value) return;
 
+  const submitted = text.value;
+  const uuid = instanceUuid.value;
+  const from = source.value;
   saving.value = true;
   try {
     const originLines = splitLines(origin.value);
-    const editedLines = splitLines(text.value);
+    const editedLines = splitLines(submitted);
     let hunks = diffLines(originLines, editedLines);
-    if (joinLines(applyHunks(originLines, hunks)) !== text.value) {
+    if (joinLines(applyHunks(originLines, hunks)) !== submitted) {
       hunks = [{ start: 0, deleteCount: originLines.length, lines: editedLines }];
     }
 
     const sha1 = await writeConfigFile(
-      instanceUuid.value,
-      source.value,
+      uuid,
+      from,
       file.name,
       originSha1.value,
       editedLines.length,
       hunks,
     );
-    origin.value = text.value;
-    originSha1.value = sha1;
+    if (selected.value === file && instanceUuid.value === uuid && source.value === from) {
+      origin.value = submitted;
+      originSha1.value = sha1;
+    }
     showToast(t("config.saved"));
   } catch (e) {
     showToast(tErr(e));
