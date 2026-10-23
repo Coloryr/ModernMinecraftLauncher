@@ -1,6 +1,6 @@
 //! 从资源窗口的扫描缓存导出模组清单。
 
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}, io::Write, path::Path};
 
 use serde_json::{Map, Value};
 
@@ -50,7 +50,11 @@ pub async fn resource_export_mods(uuid: String, config: ModExportDto) -> Result<
     let count = rows.len();
     tokio::task::spawn_blocking(move || {
         if op.is_cancelled() { return Err(err_keys::CANCELLED.to_string()); }
-        std::fs::write(&config.file, text).map_err(|e| e.to_string())?;
+        crate::windows::export_file::write(Path::new(&config.file), |output| {
+            output.write_all(text.as_bytes()).map_err(|e| e.to_string())?;
+            if op.is_cancelled() { return Err(err_keys::CANCELLED.to_string()); }
+            Ok(())
+        })?;
         Ok(count)
     }).await.map_err(|e| e.to_string())?
 }

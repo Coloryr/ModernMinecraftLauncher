@@ -1,7 +1,7 @@
 //! 可分享的实例信息，不包含账户、环境变量和代理凭据。
 
 use serde::Serialize;
-use std::{fs, io::ErrorKind, path::Path};
+use std::{fs, io::{ErrorKind, Write}, path::Path};
 use mml_game::{launcher::instance_setting_obj::InstanceSettingObj, loader::LoaderType};
 use mml_names::names;
 
@@ -71,7 +71,8 @@ pub async fn export_generate_info(uuid: String, file: String) -> Result<(), Stri
     tokio::task::spawn_blocking(move || {
         let report = report(&game, &game.get_mods_path())?;
         let bytes = serde_json::to_vec_pretty(&report).map_err(|e| e.to_string())?;
-        std::fs::write(file, bytes).map_err(|e| e.to_string())
+        crate::windows::export_file::write(Path::new(&file), |output|
+            output.write_all(&bytes).map_err(|e| e.to_string()))
     }).await.map_err(|e| e.to_string())?
 }
 
