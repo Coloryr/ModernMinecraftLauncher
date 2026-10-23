@@ -182,23 +182,7 @@ fn launch_with_elevation<P: AsRef<Path>>(
 
     #[cfg(target_os = "macos")]
     {
-        // osascript 的 do shell script 只返回 stdout；用 2>&1 将 stderr 合并到 stdout
-        let script = format!(
-            "do shell script \"'{}' {} 2>&1\" with administrator privileges",
-            path.as_ref().display(),
-            args.iter()
-                .map(|a| format!("\\\"{}\\\"", a))
-                .collect::<Vec<_>>()
-                .join(" ")
-        );
-
-        let mut cmd = Command::new("osascript");
-        cmd.arg("-e").arg(script);
-        cmd.current_dir(working_dir);
-
-        for (key, value) in env {
-            cmd.env(key, value);
-        }
+        let mut cmd = macos_elevation::command(path.as_ref(), &args, env, working_dir.as_ref());
 
         cmd.stdout(Stdio::piped()).stderr(Stdio::null());
         let mut child = cmd.spawn().map_err(process_err)?;
@@ -241,6 +225,8 @@ fn launch_with_elevation<P: AsRef<Path>>(
 mod windows_elevation;
 #[cfg(any(target_os = "linux", test))]
 mod linux_elevation;
+#[cfg(any(target_os = "macos", test))]
+mod macos_elevation;
 #[cfg(windows)]
 pub use windows_elevation::{create_named_pipe, connect_named_pipe_with_timeout, launch_with_elevation_windows};
 
@@ -263,17 +249,10 @@ pub fn launch_admin(args: &[String]) -> CoreResult<()> {
 
     #[cfg(target_os = "macos")]
     {
-        let script = format!(
-            "do shell script \"'{}' {}\" with administrator privileges",
-            current_exe.display(),
-            args.iter()
-                .map(|a| format!("\\\"{}\\\"", a))
-                .collect::<Vec<_>>()
-                .join(" ")
-        );
-
-        let mut child = Command::new("osascript").arg("-e").arg(script).spawn()?;
-        child.wait()?;
+        let status = macos_elevation::command(&current_exe, args, HashMap::new(),
+            &std::env::current_dir().map_err(process_err)?)
+            .status().map_err(process_err)?;
+        if !status.success() { return Err(process_err(format!("osascript: {status}"))); }
         Ok(())
     }
 
