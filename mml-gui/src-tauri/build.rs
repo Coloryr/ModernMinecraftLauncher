@@ -16,12 +16,14 @@ use std::{
 fn main() {
     tauri_build::build();
 
-    // Tauri 只给应用附带清单；测试链接到 rfd 时也需要 v6 的 TaskDialogIndirect。
+    // 单元测试需要链接器生成清单，才能从 v6 控件库加载 TaskDialogIndirect。
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows")
         && std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc")
     {
         println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
         println!("cargo:rustc-link-arg=/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'");
+        // 应用已由 Tauri 嵌入完整清单，此参数必须在 EMBED 后，避免资源重复。
+        println!("cargo:rustc-link-arg-bins=/MANIFEST:NO");
     }
 
     // src 下任何文件变动都触发重新扫描；单独重生成可跑 npm run gen
