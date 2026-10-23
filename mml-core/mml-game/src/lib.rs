@@ -860,6 +860,60 @@ pub fn rename_instance(uuid: &Uuid, name: &str) -> CoreResult<()> {
     Ok(())
 }
 
+/// 复制实例：整份实例目录复制到新名字下，再登记成新实例
+///
+/// 复制的是目录的完整内容（游戏文件、模组、存档、配置），新实例沿用源实例的分组；
+/// 新实例的 uuid 重新生成，目录名由新名字派生。
+///
+/// - `uuid`: 源实例 UUID
+/// - `name`: 新实例名，前后空白会被去掉
+///
+/// # 返回值
+///
+/// 返回新实例句柄；名字为空、不合法、重名、源实例不存在或复制失败返回对应错误
+pub fn copy_instance(uuid: &Uuid, name: &str) -> CoreResult<GameInstance> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err(ErrorType::ArgEmpty(ArgEmptyData::Name));
+    }
+    name_check::check_name(name)?;
+    if have_instance_name(name) {
+        return Err(ErrorType::InstanceNameExists(name.to_string()));
+    }
+
+    let instance = get_instance(uuid).ok_or(ErrorType::ArgEmpty(ArgEmptyData::UUID))?;
+    let (src, mut obj) = {
+        let src = instance.read().unwrap();
+        (src.get_base_path(), src.clone())
+    };
+
+    let dir = path_helper::replace_path_name(name);
+    let dest = instance_path::get_instance_dir().join(&dir);
+    if dest.exists() {
+        return Err(ErrorType::InstanceNameExists(name.to_string()));
+    }
+
+    // 监视一直停到新实例登记完成：中途恢复的话，复制出来的目录会被当成外部导入，
+    // 带着源实例的 uuid 再登记一遍
+    path_watch::stop_watch();
+    let copied = path_helper::copy_dir(&src, &dest);
+    if let Err(e) = copied {
+        // 失败留下的半份目录要清掉：里面已经有一份 game.json，下次启动会被当成实例导入
+        let _ = std::fs::remove_dir_all(&dest);
+        path_watch::start_watch();
+        return Err(e);
+    }
+
+    obj.uuid = Uuid::new_v4();
+    obj.name = name.to_string();
+    obj.dir = dir;
+    obj.save();
+
+    let game = add_to_group(obj, get_instance_group(uuid));
+    path_watch::start_watch();
+    Ok(game)
+}
+
 /// 添加运行日志
 ///
 /// - `uuid`: 实例 UUID

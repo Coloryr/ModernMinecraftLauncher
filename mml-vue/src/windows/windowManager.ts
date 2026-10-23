@@ -116,6 +116,8 @@ export interface WindowOpenParams {
   logFile?: string;
   /** 打开日志窗口后滚到底部；日志窗口用 */
   logBottom?: boolean;
+  /** 要直接打开的类别 id，资源管理窗口用；"右键实例 → 查看模组"靠它落到模组页 */
+  category?: string;
 }
 
 /**
@@ -137,6 +139,8 @@ export const windowParams = ref<{
   logFile: string | null;
   /** 打开日志窗口后滚到底部 */
   logBottom: boolean;
+  /** 要直接打开的资源类别 id */
+  category: string | null;
 }>({
   uuid: null,
   project: null,
@@ -144,6 +148,7 @@ export const windowParams = ref<{
   saveDir: null,
   logFile: null,
   logBottom: false,
+  category: null,
 });
 
 /**
@@ -282,6 +287,36 @@ export function targetSaveDir(): string | null {
 }
 
 /**
+ * 取本次要直接打开的资源类别 id
+ *
+ * 单窗口取 openWindow 带入的参数，多窗口取本窗口 URL 上的参数。
+ * 资源管理窗口据此落到指定分类，见「右键实例 → 查看模组」。
+ *
+ * # 返回值
+ *
+ * 没有指定类别时为 null，调用方按上次打开的分类处理
+ */
+export function targetCategory(): string | null {
+  return multiWindow.value
+    ? new URLSearchParams(window.location.search).get(CATEGORY_PARAM)
+    : windowParams.value.category;
+}
+
+/**
+ * 用掉本次的资源类别参数
+ *
+ * 目标窗口在第一次打开时按它落类别，之后用户在窗口里怎么切都不该被参数拽回去，
+ * 所以读完就清：单窗口清内存，多窗口把它从本窗口 URL 上摘掉。
+ */
+export function clearTargetCategory() {
+  windowParams.value = { ...windowParams.value, category: null };
+  if (!multiWindow.value) return;
+  const url = new URL(window.location.href);
+  url.searchParams.delete(CATEGORY_PARAM);
+  window.history.replaceState({}, "", url);
+}
+
+/**
  * 取本次要直接打开的日志文件
  *
  * 单窗口取 openWindow 带入的参数，多窗口取本窗口 URL 上的参数。
@@ -329,6 +364,7 @@ export function setMultiWindow(v: boolean): Promise<void> {
     saveDir: null,
     logFile: null,
     logBottom: false,
+    category: null,
   };
   writeString(KEYS.windowMode, v ? "Multi" : "Single");
   // 返回保存的 Promise：要紧接着重启进程的调用方必须等这次写入真的落盘。
@@ -388,6 +424,9 @@ const LOG_PARAMS = {
   bottom: "lbottom",
 } as const;
 
+/** 资源类别参数在 URL 上的键；资源管理窗口用 */
+const CATEGORY_PARAM = "rcat";
+
 /** 按 kind 与带入参数拼出目标窗口的 URL；多窗口模式下新窗口靠它取参数 */
 function urlFor(
   kind: WindowKind,
@@ -418,6 +457,11 @@ function urlFor(
     url.searchParams.set(LOG_PARAMS.bottom, "1");
   } else {
     url.searchParams.delete(LOG_PARAMS.bottom);
+  }
+  if (params?.category) {
+    url.searchParams.set(CATEGORY_PARAM, params.category);
+  } else {
+    url.searchParams.delete(CATEGORY_PARAM);
   }
   if (params?.drop) {
     url.searchParams.set(DROP_PARAMS.path, params.drop.path);
@@ -561,8 +605,9 @@ export function projectParamToItem(p: WindowProjectParam): ProjectItemDto {
 /**
  * 报给后端的"是哪个实例"参数
  *
- * 只有窗口族与导出窗口认它：窗口族靠它定位到族里那一个窗口，导出窗口靠它在已开窗口上
- * 切目标实例。其余窗口传了会被后端 `kind_parse_check` 拒掉，所以这里一律给 null。
+ * 只有窗口族、导出窗口与服务器包窗口认它：窗口族靠它定位到族里那一个窗口，
+ * 导出 / 服务器包窗口靠它在已开窗口上切目标实例。其余窗口传了会被后端
+ * `kind_parse_check` 拒掉，所以这里一律给 null。
  *
  * - `kind`: 窗口类型
  * - `params`: 本次打开带入的参数
@@ -572,7 +617,9 @@ export function projectParamToItem(p: WindowProjectParam): ProjectItemDto {
  * 实例 uuid；其余窗口为 null
  */
 function instanceArgOf(kind: WindowKind, params?: WindowOpenParams): string | null {
-  return FAMILY_LABEL_PREFIX[kind] || kind === "export" ? (params?.uuid ?? null) : null;
+  return FAMILY_LABEL_PREFIX[kind] || kind === "export" || kind === "server_pack"
+    ? (params?.uuid ?? null)
+    : null;
 }
 
 /** 大厅验证期间防止重复打开。 */
@@ -637,6 +684,7 @@ export async function openWindow(kind: WindowKind, params?: WindowOpenParams) {
       saveDir: params?.saveDir ?? null,
       logFile: params?.logFile ?? null,
       logBottom: params?.logBottom ?? false,
+      category: params?.category ?? null,
     };
     if (!isTauri()) window.history.pushState({}, "", urlFor(kind, params));
     return;
@@ -659,7 +707,9 @@ export async function openWindow(kind: WindowKind, params?: WindowOpenParams) {
       params?.saveDir ||
       params?.logFile ||
       params?.logBottom ||
-      params?.project
+      params?.category ||
+      params?.project ||
+      (kind === "server_pack" && !!params?.uuid)
     ) {
       commands.windows
         .reopenWindow(kind, instanceArgOf(kind, params), query)
@@ -840,6 +890,7 @@ function goTo(kind: WindowKind) {
     saveDir: null,
     logFile: null,
     logBottom: false,
+    category: null,
   };
   if (!isTauri()) window.history.pushState({}, "", urlFor(kind));
 }

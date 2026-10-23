@@ -267,7 +267,7 @@ function onCellKey(e: KeyboardEvent, i: number) {
             <GlyphIcon v-if="isSelected?.(b.id)" name="check" :size="11" :weight="3" />
           </span>
           <!-- 收藏：未收藏只在悬停 / 键盘聚焦时露出星框，收藏后常显实心星；多选时让位给勾选圈 -->
-          <span v-if="!selectMode" class="block-fav" :class="{ 'is-on': isFavorite?.(b.id) }"
+          <span v-if="!selectMode && toggleFavorite" class="block-fav" :class="{ 'is-on': isFavorite?.(b.id) }"
             v-tip="isFavorite?.(b.id) ? t('blocks.unfavorite') : t('blocks.favorite')"
             @click.stop="toggleFavorite?.(b.id)">
             <GlyphIcon name="star" :size="13" :weight="2" />

@@ -916,6 +916,20 @@ export const api = {
   },
 
   /**
+   * 复制实例：整份实例目录复制到新名字下
+   *
+   * - `uuid`: 源实例 uuid
+   * - `name`: 新实例名，重名会抛错
+   *
+   * # 返回值
+   *
+   * 复制成功返回 true；目录很大时这一调用会等较久，调用方要给"正在复制"的反馈
+   */
+  async copyInstance(uuid: string, name: string): Promise<boolean> {
+    return commands.main.copyInstance(uuid, name);
+  },
+
+  /**
    * 更新实例元信息
    *
    * - `uuid`: 实例 uuid

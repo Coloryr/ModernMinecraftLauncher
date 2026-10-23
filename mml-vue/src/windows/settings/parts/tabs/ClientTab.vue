@@ -10,6 +10,8 @@ import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
 import NumberStepper from "../../../../components/ui/NumberStepper.vue";
 import SettingsGroup from "../SettingsGroup.vue";
 import SaveStateText from "../SaveStateText.vue";
+import { selectedInstance } from "../../../../lib/settings";
+import { openWindow } from "../../../../windows/windowManager";
 import type { useSettingsClient } from "../../composables/useSettingsClient";
 import type { WindowSettingDto } from "../../../../lib/bindings";
 
@@ -55,6 +57,11 @@ const {
   removeCustomHome,
   saveState,
 } = props.settings;
+
+/** 打开服务器包导出窗口：带上主页面当前选中的实例，没选就让窗口里自己挑 */
+function openServerPack() {
+  openWindow("server_pack", selectedInstance.value ? { uuid: selectedInstance.value } : undefined);
+}
 
 /** 服务器信息校验失败时把焦点落到那个输入框（"就地标红并聚焦"） */
 const lockServerInput = ref<HTMLInputElement | null>(null);
@@ -257,6 +264,14 @@ watch(lockServerError, async (msg) => {
       <NumberStepper :model-value="win.titleDelay" :min="100" :max="600000" :step="100"
         @update:model-value="updateWindow('titleDelay', $event)" />
     </template>
+  </SettingsGroup>
+
+  <!-- 服务器包：把实例与启动器配置打成可分发的一包，玩家导入后重载并进入该实例 -->
+  <SettingsGroup id="serverPack" title-key="winSettings.secServerPack" :flash="flashGroup === 'serverPack'">
+    <p class="field-desc">{{ t("winSettings.serverPackDesc") }}</p>
+    <BaseButton size="sm" variant="accent" @click="openServerPack">
+      {{ t("winSettings.serverPackExport") }}
+    </BaseButton>
   </SettingsGroup>
 
 </template>

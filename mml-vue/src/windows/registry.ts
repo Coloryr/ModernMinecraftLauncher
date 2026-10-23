@@ -19,7 +19,8 @@ export type WindowKind =
   | "block"
   | "log"
   | "export"
-  | "config";
+  | "config"
+  | "server_pack";
 
 export interface WindowInfo {
   /** 窗口标识，与后端注册表、URL 上的 `window` 参数一致 */
@@ -48,6 +49,7 @@ export const WINDOW_REGISTRY: WindowInfo[] = [
   { kind: "log", titleKey: "winTitle.log" },
   { kind: "export", titleKey: "winTitle.export" },
   { kind: "config", titleKey: "winTitle.config" },
+  { kind: "server_pack", titleKey: "winTitle.serverPack" },
 ];
 
 /**

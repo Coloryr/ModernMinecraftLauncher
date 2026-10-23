@@ -7,7 +7,7 @@
 // 渲染时永远轮不到它，表现就是"点了转移分组没反应"——所以改成了弹窗。
 //
 // 定位：`position: fixed` 钉在点击处，但**渲染后要量一次并收进窗口**——
-// 否则靠近窗口下/右边缘点开时，菜单会超出可视区被裁掉 —— 实例菜单 6 项约 285px 高。
+// 否则靠近窗口下/右边缘点开时，菜单会超出可视区被裁掉 —— 实例菜单 10 项，比分组菜单高一截。
 import { computed, nextTick, ref, watchEffect } from "vue";
 import { t } from "../../../lib/i18n";
 import type { CtxMenuState, GroupView, InstMenuAction } from "../types";
@@ -43,8 +43,8 @@ const canMoveGroup = computed(() => {
   return props.groups.some((g) => g.id !== source.id);
 });
 
-/** 多选"修改分组"：表里只有默认分组一个组时同样无处可去 */
-const canMultiMove = computed(() => props.groups.length > 1);
+/** 改分组（多选菜单与实例菜单共用）：表里只有默认分组一个组时无处可去 */
+const canChangeGroup = computed(() => props.groups.length > 1);
 
 /** 菜单动作，一律抛给父组件执行 */
 const emit = defineEmits<{
@@ -115,11 +115,15 @@ watchEffect(async () => {
       </button>
     </template>
 
-    <!-- 实例菜单：启动 / 打开文件夹 / 日志 / 修改图标 / 重命名 / 删除
+    <!-- 实例菜单：启动 / 看模组 / 文件夹 / 日志 / 图标 / 导出 / 复制 / 改名 / 改分组，
+         删除单独隔开。
          （「修改实例配置」已去掉：右侧面板本来就有设置区） -->
     <template v-else-if="menu.kind === 'instance'">
       <button class="ctx-item" @click="emit('inst-action', 'launch')">
         {{ t("launch.play") }}
+      </button>
+      <button class="ctx-item" @click="emit('inst-action', 'viewMods')">
+        {{ t("actions.viewMods") }}
       </button>
       <button class="ctx-item" @click="emit('inst-action', 'openFolder')">
         {{ t("actions.openFolder") }}
@@ -128,10 +132,19 @@ watchEffect(async () => {
         {{ t("actions.viewLog") }}
       </button>
       <button class="ctx-item" @click="emit('inst-action', 'changeIcon')">
-        {{ t("actions.pickImage") }}
+        {{ t("actions.changeIcon") }}
+      </button>
+      <button class="ctx-item" @click="emit('inst-action', 'export')">
+        {{ t("actions.export") }}
+      </button>
+      <button class="ctx-item" @click="emit('inst-action', 'copy')">
+        {{ t("actions.copyInstance") }}
       </button>
       <button class="ctx-item" @click="emit('inst-action', 'rename')">
         {{ t("actions.rename") }}
+      </button>
+      <button class="ctx-item" :disabled="!canChangeGroup" @click="emit('inst-action', 'moveGroup')">
+        {{ t("multi.moveGroup") }}
       </button>
       <div class="ctx-sep"></div>
       <button class="ctx-item danger" @click="emit('inst-action', 'delete')">
@@ -141,7 +154,7 @@ watchEffect(async () => {
 
     <!-- 多选实例操作菜单 -->
     <template v-else>
-      <button class="ctx-item" :disabled="!canMultiMove" @click="emit('multi-move')">
+      <button class="ctx-item" :disabled="!canChangeGroup" @click="emit('multi-move')">
         {{ t("multi.moveGroup") }}
       </button>
       <button class="ctx-item danger" @click="emit('multi-delete')">

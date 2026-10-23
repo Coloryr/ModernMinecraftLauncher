@@ -113,6 +113,8 @@ watch(
       @load="onLoad" @error="onError" />
     <!-- 字母只是回退：真图加载成功后必须移除，透明处不会再透出占位 -->
     <span v-if="!loaded" class="inst-icon-char">{{ char }}</span>
+    <!-- 悬停浮层（如"改图标"入口）：放在图标内部才被圆角与 overflow 裁住 -->
+    <slot />
   </div>
 </template>
 

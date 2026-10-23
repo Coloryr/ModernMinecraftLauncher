@@ -216,6 +216,51 @@
   gap: 18px;
 }
 
+/* 实例图标：悬停时整块压暗，中间露出改图标入口（列表模式与详情模式共用）。
+   浮层放在 InstanceIcon 的插槽里，圆角与 overflow 裁切跟着图标走 */
+.icon-edit-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--overlay);
+  /* 压在占位态的高光 ::after 之上（无真图时那层白高光会盖住按钮） */
+  z-index: 1;
+  opacity: 0;
+  /* 看不见时不吃点击：图标本身没有动作 */
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+
+.inst-icon:hover .icon-edit-overlay,
+.icon-edit-overlay:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 浮层上的小键：底用抬升色，压在压暗的图标上也看得清 */
+.icon-edit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--ctl-radius);
+  background: var(--bg-modal-raised);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.icon-edit:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
 .detail-info {
   flex: 1;
   min-width: 0;

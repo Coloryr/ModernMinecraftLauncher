@@ -123,6 +123,7 @@ export default {
   "group.pickTitle": "Choose target group",
   "group.pickGroupDesc": "Move {count} instances from “{name}” to:",
   "group.pickMultiDesc": "Move the {count} selected instances to:",
+  "group.pickInstanceDesc": "Move instance “{name}” to:",
   "group.pickOption": "{name} ({count} instances)",
   "group.pickNone": "No other group to choose — add one first",
   "group.delete": "Delete group",
@@ -463,6 +464,7 @@ export default {
   "blocks.detailId": "Block ID",
   "blocks.detailCat": "Category",
   "blocks.setIcon": "Set as instance icon",
+  "blocks.pickIconTitle": "Choose block icon",
   "blocks.close": "Close",
   "blocks.cancelRender": "Cancel render",
   "blocks.cancelling": "Cancelling…",
@@ -929,16 +931,28 @@ export default {
   "actions.viewLog": "View Instance Logs",
   "actions.editConfig": "Edit Config File",
   "actions.pickImage": "Choose Image",
+  "actions.blockIcon": "Choose from block list",
+  "actions.viewMods": "View Mods",
+  "actions.changeIcon": "Change Icon",
+  "actions.copyInstance": "Copy Instance",
   "actions.rename": "Rename",
   "actions.delete": "Delete Instance",
   "actions.deleting": "Deleting…",
   "actions.saving": "Saving…",
   "actions.wip": "“{name}” is under development",
   "actions.renameTitle": "Rename Instance",
+  "actions.nameExists": "An instance with this name already exists",
   "actions.deleteTitle": "Delete Instance",
   "actions.deleteConfirm": "Delete instance “{name}”? This cannot be undone.",
   "actions.confirm": "Confirm",
   "actions.cancel": "Cancel",
+
+  // Copy instance
+  "copy.nameLabel": "New instance name",
+  "copy.defaultName": "{name} copy",
+  "copy.hint": "Copies the whole instance folder, including game files, mods and saves",
+  "copy.copying": "Copying…",
+  "copy.done": "Copied instance “{name}”",
 
   // Launch args
   "args.memory": "Memory",
@@ -1540,6 +1554,9 @@ export default {
   "winSettings.autoSaveNotice": "Ask before entering",
   "winSettings.autoSaveNoticeDesc": "Ask before entering the save an instance is set to open on launch. When off, the launcher enters it directly without asking.",
   // Custom music
+  "winSettings.secServerPack": "Server package",
+  "winSettings.serverPackDesc": "Bundle the instance and launcher settings (optionally with the launcher exe) into a server package. Players import it and the launcher reloads straight into the instance.",
+  "winSettings.serverPackExport": "Export server package",
   "winSettings.secMusic": "Custom music",
   "winSettings.musicDesc": "Play your own background music in the launcher; play, pause and stop live in the title bar.",
   "winSettings.musicOn": "Enable custom music",
@@ -1859,6 +1876,7 @@ export default {
   "winTitle.log": "Game Log",
   "winTitle.export": "Export Instance",
   "winTitle.config": "Config Files",
+  "winTitle.serverPack": "Export Server Pack",
 
   // Collect window
   "collect.addGroup": "Add Group",

@@ -2,9 +2,10 @@
 // 主窗口：实例列表（分组 / 平铺 / 搜索）、实例详情与设置、启动流程与日志、启动器主页
 // 子组件在 topbar / sidebar / ctxmenu/；拖拽、多选、文件拖放逻辑在 composables/
 // 显示模式的切换入口不在这里，在设置窗口「界面 → 主窗口」
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onActivated, onMounted, onUnmounted, ref, watch } from "vue";
 import {
   api,
+  getBlockStatus,
   getLoadState,
   onClientConfigChange,
   onCustomHomeChange,
@@ -56,6 +57,7 @@ import MainSidebar from "./sidebar/MainSidebar.vue";
 import MainCtxMenu from "./ctxmenu/MainCtxMenu.vue";
 import LaunchProgress from "../../components/LaunchProgress.vue";
 import IconPickModal from "./IconPickModal.vue";
+import BlockIconPickModal from "./BlockIconPickModal.vue";
 import ColorMcMigrateModal from "./ColorMcMigrateModal.vue";
 import { useInstanceDrag } from "../../composables/useInstanceDrag";
 import { useMultiSelect } from "../../composables/useMultiSelect";
@@ -540,6 +542,10 @@ const showMoveGroupPick = ref(false);
 const groupMoveSource = ref<string | null>(null);
 /** 弹窗下拉框里选中的目标分组 uuid */
 const moveGroupTarget = ref("");
+/** 只移动这些实例；空数组表示"当前多选的实例" */
+const moveInstanceIds = ref<string[]>([]);
+/** 单个实例移动时弹窗里显示的名字；空串表示多选 */
+const moveSingleName = ref("");
 
 function openCtxMenu(e: MouseEvent, payload: Omit<CtxMenuState, "x" | "y">) {
   // 简单边界钳制，避免菜单超出窗口
@@ -593,11 +599,19 @@ function onMoveGroupClick() {
   if (id) openMoveGroupPicker(id);
 }
 
-/** 打开"选择目标分组"弹窗；`sourceId` 为 null 表示移动当前多选的实例 */
-function openMoveGroupPicker(sourceId: string | null) {
+/**
+ * 打开"选择目标分组"弹窗
+ *
+ * - `sourceId`: 源分组 uuid；null 表示移动实例
+ * - `instances`: 要移动的实例 uuid；不传表示当前多选的实例
+ * - `singleName`: 只移动一个实例时用于弹窗说明的实例名
+ */
+function openMoveGroupPicker(sourceId: string | null, instances: string[] = [], singleName = "") {
   // 顺序有讲究：closeCtxMenu 之后才记源分组，否则会被菜单的复位清掉
   closeCtxMenu();
   groupMoveSource.value = sourceId;
+  moveInstanceIds.value = instances;
+  moveSingleName.value = singleName;
   // 预设第一个候选（候选里已经排掉了源分组本身），免得"确定"下去等于没动
   moveGroupTarget.value = movePickOptions.value[0]?.id ?? "";
   showMoveGroupPick.value = true;
@@ -630,12 +644,15 @@ const movePickOptions = computed(() => {
   return list.filter((o) => o.id !== groupMoveSource.value);
 });
 
-/** 弹窗里那句说明：按"转移整个分组"或"移动选中实例"两种来源取文案 */
+/** 弹窗里那句说明：按"转移整个分组" / "移动单个实例" / "移动选中实例"三种来源取文案 */
 const movePickDesc = computed(() => {
   const source = groupMoveSource.value;
-  if (!source) return t("group.pickMultiDesc", { count: selectedIds.value.size });
-  const g = groups.value.find((x) => x.id === source);
-  return t("group.pickGroupDesc", { name: g?.name ?? "", count: g?.items.length ?? 0 });
+  if (source) {
+    const g = groups.value.find((x) => x.id === source);
+    return t("group.pickGroupDesc", { name: g?.name ?? "", count: g?.items.length ?? 0 });
+  }
+  if (moveSingleName.value) return t("group.pickInstanceDesc", { name: moveSingleName.value });
+  return t("group.pickMultiDesc", { count: selectedIds.value.size });
 });
 
 /** 弹窗里点"确定"：把下拉框选中的目标交出去 */
@@ -649,10 +666,13 @@ async function confirmMoveTarget() {
 /** 弹窗里选定目标分组 */
 async function pickMoveTarget(targetId: string | null) {
   const source = groupMoveSource.value;
+  const ids = moveInstanceIds.value.length ? [...moveInstanceIds.value] : [...selectedIds.value];
   showMoveGroupPick.value = false;
   groupMoveSource.value = null;
+  moveInstanceIds.value = [];
+  moveSingleName.value = "";
   if (source) await moveGroupTo(source, targetId);
-  else await moveSelectedToGroup(targetId);
+  else await moveInstancesToGroup(ids, targetId);
 }
 
 /** 把源分组的全部实例合并到目标分组（null = 默认分组），保留空分组 */
@@ -726,15 +746,28 @@ function onInstContext(e: MouseEvent, inst: InstanceInfoDto) {
 
 /** 实例右键菜单动作（与详情面板一致） */
 function onInstMenuAction(id: InstMenuAction) {
-  // 菜单一关 ctxMenu 就清空，右键目标要在这之前取出来（"修改图标"要用）
+  // 菜单一关 ctxMenu 就清空，右键目标要在这之前取出来（"修改图标"、查看模组等都要用）
   const target = ctxMenu.value?.instance ?? null;
   closeCtxMenu();
   switch (id) {
     case "launch":
       launch();
       break;
+    case "viewMods":
+      // 资源管理窗口是"一个实例一个"的窗口族；带上类别，进去直接停在模组页
+      if (target) openWindow("resource", { uuid: target.uuid, category: "mods" });
+      break;
     case "changeIcon":
       if (target) void pickIconFile(target);
+      break;
+    case "export":
+      openExportWindow();
+      break;
+    case "copy":
+      if (target) openCopy(target);
+      break;
+    case "moveGroup":
+      if (target) openMoveGroupPicker(null, [target.uuid], target.name);
       break;
     case "rename":
       onAction("rename");
@@ -750,6 +783,39 @@ function onInstMenuAction(id: InstMenuAction) {
 /** "修改图标"的目标实例与已选图片（弹窗只在选到图之后才开） */
 const iconPickInst = ref<InstanceInfoDto | null>(null);
 const iconPickPath = ref("");
+
+/** 方块列表是否已渲染：有渲染结果才给"用方块改图标"的第二个入口 */
+const blocksRendered = ref(false);
+/** 正在从方块列表挑图标的实例；null 表示弹窗没开 */
+const blockIconInst = ref<InstanceInfoDto | null>(null);
+
+/** 问一次方块列表是否可用；渲染完方块窗口回来后要重问，见下面的 onActivated */
+async function refreshBlocksRendered() {
+  try {
+    blocksRendered.value = (await getBlockStatus()).rendered;
+  } catch {
+    blocksRendered.value = false;
+  }
+}
+
+/**
+ * 打开方块图标选择弹窗
+ *
+ * - `inst`: 要改图标的实例
+ */
+function openBlockIconPick(inst: InstanceInfoDto) {
+  blockIconInst.value = inst;
+}
+
+/**
+ * 悬停图标时补查一次方块列表
+ *
+ * 方块窗口可能刚渲染完，而多窗口模式下主窗口收不到它的通知；单窗口模式下
+ * onActivated 已经覆盖，这里只在还没有结果时补一发。
+ */
+function onIconHover() {
+  if (!blocksRendered.value) void refreshBlocksRendered();
+}
 
 /**
  * 右键菜单「选择图片」：**直接开系统文件对话框**，不先弹一层自己的窗口
@@ -773,14 +839,70 @@ async function pickIconFile(inst: InstanceInfoDto) {
   }
 }
 
+// ---------- 复制实例 ----------
+
+/** 正在复制 / 待复制的实例；null 表示弹窗没开 */
+const copyInst = ref<InstanceInfoDto | null>(null);
+/** 新实例名，默认「原名 副本」 */
+const copyName = ref("");
+
+/** 新名字与已有实例重名：忽略大小写与首尾空白 */
+const copyConflict = computed(() => {
+  const name = copyName.value.trim().toLowerCase();
+  if (!name) return false;
+  return instances.value.some((i) => i.name.trim().toLowerCase() === name);
+});
+/** 正在复制：弹窗不关，按钮全部禁用 */
+const copyBusy = ref(false);
+
+/**
+ * 打开复制弹窗并预填新名字
+ *
+ * - `inst`: 要复制的实例
+ */
+function openCopy(inst: InstanceInfoDto) {
+  copyInst.value = inst;
+  copyName.value = t("copy.defaultName", { name: inst.name });
+}
+
+/** 关复制弹窗；复制中不许关 */
+function closeCopy() {
+  if (copyBusy.value) return;
+  copyInst.value = null;
+  copyName.value = "";
+}
+
+/** 整份复制实例目录；成功后刷新列表并提示 */
+async function doCopy() {
+  const inst = copyInst.value;
+  const name = copyName.value.trim();
+  if (!inst || !name || copyBusy.value || copyConflict.value) return;
+  copyBusy.value = true;
+  try {
+    await api.copyInstance(inst.uuid, name);
+    copyInst.value = null;
+    copyName.value = "";
+    await loadInstances();
+    showToast(t("copy.done", { name }));
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    copyBusy.value = false;
+  }
+}
+
 /** 顶部工具栏的“修改分组”：直接开目标分组弹窗（源 = 当前多选的实例） */
 function openMoveFromBar() {
   openMoveGroupPicker(null);
 }
 
-/** 把选中的实例移动到指定分组（null = 默认分组） */
-async function moveSelectedToGroup(targetId: string | null) {
-  const ids = [...selectedIds.value];
+/**
+ * 把给定的实例移动到指定分组（null = 默认分组）
+ *
+ * - `ids`: 要移动的实例 uuid
+ * - `targetId`: 目标分组 uuid；null 表示默认分组
+ */
+async function moveInstancesToGroup(ids: string[], targetId: string | null) {
   const target = targetId ?? defaultGroupId.value;
   for (const uuid of ids) {
     const inst = instances.value.find((i) => i.uuid === uuid);
@@ -892,6 +1014,14 @@ let unlistenAdded: (() => void) | null = null;
 // 轻提示统一使用全局 showToast
 const showRename = ref(false);
 const renameName = ref("");
+
+/** 新名字与已有实例重名：自己不算，忽略大小写与首尾空白 */
+const renameConflict = computed(() => {
+  const name = renameName.value.trim().toLowerCase();
+  const self = selected.value;
+  if (!name || !self) return false;
+  return instances.value.some((i) => i.uuid !== self.uuid && i.name.trim().toLowerCase() === name);
+});
 const renameBusy = ref(false);
 const showDelete = ref(false);
 const deleteBusy = ref(false);
@@ -943,7 +1073,7 @@ async function openInstanceDirOf(instance: InstanceInfoDto | null) {
 }
 
 async function doRename() {
-  if (!selected.value) return;
+  if (!selected.value || renameConflict.value) return;
   renameBusy.value = true;
   try {
     const ok = await api.renameInstance(selected.value.uuid, renameName.value);
@@ -1624,8 +1754,12 @@ const rootEl = ref<HTMLElement | null>(null);
 // waitForSnapTarget 会一直等到那时，所以这里无需额外处理
 useWindowDecoration(rootEl);
 
+// 从方块窗口渲染完回来时刷新一次：这个入口只在方块列表可用时出现
+onActivated(() => void refreshBlocksRendered());
+
 onMounted(async () => {
   subscribeEvents();
+  void refreshBlocksRendered();
   initModpackStatus().then((unlisten) => unlistens.push(unlisten));
   document.addEventListener("click", onDocClick);
   document.addEventListener("keydown", onDocKeyDown);
@@ -1753,7 +1887,20 @@ onMounted(async () => {
             </section>
 
             <section v-else key="list" class="list-mode" :class="{ 'has-motd': motdCardVisible }">
-              <InstanceIcon :name="selected?.name ?? '—'" :uuid="selected?.uuid ?? '0'" :size="120" />
+              <!-- 实例图标：悬停压暗并露出改图标入口；方块列表渲染过时多给一个"用方块"的入口 -->
+              <InstanceIcon :name="selected?.name ?? '—'" :uuid="selected?.uuid ?? '0'" :size="120"
+                @mouseenter="onIconHover">
+                <div v-if="selected" class="icon-edit-overlay">
+                  <button type="button" class="icon-edit" v-tip="t('actions.pickImage')"
+                    :aria-label="t('actions.pickImage')" @click="pickIconFile(selected)">
+                    <GlyphIcon name="image" :size="15" :weight="1.8" />
+                  </button>
+                  <button v-if="blocksRendered" type="button" class="icon-edit" v-tip="t('actions.blockIcon')"
+                    :aria-label="t('actions.blockIcon')" @click="openBlockIconPick(selected)">
+                    <GlyphIcon name="cube" :size="15" :weight="1.8" />
+                  </button>
+                </div>
+              </InstanceIcon>
 
               <!-- 图标下面这行是**启动统计**（实例名在下拉框里已经有一份，不重复）；
                    一个实例都没选时整行不渲染，免得与下拉框的「选择游戏实例」说两遍 -->
@@ -1789,7 +1936,7 @@ onMounted(async () => {
                   </BaseButton>
                   <!-- 实例日志：主页面不展示日志内容，直接开独立日志窗口 -->
                   <BaseButton size="sm" :disabled="!selected" @click="openLogWindow">
-                    <GlyphIcon name="terminal" :size="13" :weight="1.8" /> {{ t("detail.logs") }}
+                    <GlyphIcon name="log" :size="13" :weight="1.8" /> {{ t("detail.logs") }}
                   </BaseButton>
                   <!-- 资源管理：分组 / 平铺模式的右侧详情面板里有这个入口，而列表模式没有详情面板，
                      这里不补一个就进不去资源管理窗口；添加资源在资源窗口里有自己的入口 -->
@@ -1853,7 +2000,19 @@ onMounted(async () => {
                 <Transition name="view-swap" mode="out-in">
                   <div v-if="selected" :key="selected.uuid" class="detail-instance">
                     <div class="detail-top">
-                      <InstanceIcon :name="selected.name" :uuid="selected.uuid" :size="84" />
+                      <!-- 实例图标：悬停压暗并露出改图标入口，与列表模式同一套 -->
+                      <InstanceIcon :name="selected.name" :uuid="selected.uuid" :size="84" @mouseenter="onIconHover">
+                        <div class="icon-edit-overlay">
+                          <button type="button" class="icon-edit" v-tip="t('actions.pickImage')"
+                            :aria-label="t('actions.pickImage')" @click="pickIconFile(selected)">
+                            <GlyphIcon name="image" :size="15" :weight="1.8" />
+                          </button>
+                          <button v-if="blocksRendered" type="button" class="icon-edit" v-tip="t('actions.blockIcon')"
+                            :aria-label="t('actions.blockIcon')" @click="openBlockIconPick(selected)">
+                            <GlyphIcon name="cube" :size="15" :weight="1.8" />
+                          </button>
+                        </div>
+                      </InstanceIcon>
                       <div class="detail-info">
                         <h2>{{ selected.name }}</h2>
                       </div>
@@ -1888,6 +2047,12 @@ onMounted(async () => {
                       <span>{{ t("detail.launchCount", { count: statsOf(selected.uuid)?.count ?? 0 }) }}</span>
                       <!-- 小图标快捷操作（单色 SVG） -->
                       <div class="meta-actions">
+                        <button class="icon-btn" v-tip="t('actions.openFolder')" @click="onAction('openFolder')">
+                          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+                          </svg>
+                        </button>
                         <button class="icon-btn" v-tip="t('actions.export')" @click="openExportWindow">
                           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
                             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -1895,18 +2060,12 @@ onMounted(async () => {
                             <path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5" />
                           </svg>
                         </button>
-                        <button class="icon-btn" v-tip="t('actions.openFolder')" @click="onAction('openFolder')">
-                          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
-                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
-                          </svg>
-                        </button>
                         <!-- 实例日志窗口：与列表模式的「日志」按钮同一个图标，两种模式里认得出来 -->
                         <button class="icon-btn" v-tip="t('actions.viewLog')" @click="onAction('viewLog')">
-                          <GlyphIcon name="terminal" :size="15" :weight="1.8" />
+                          <GlyphIcon name="log" :size="15" :weight="1.8" />
                         </button>
                         <button class="icon-btn" v-tip="t('actions.editConfig')" @click="onAction('editConfig')">
-                          <GlyphIcon name="wrench" :size="15" :weight="1.8" />
+                          <GlyphIcon name="sliders" :size="15" :weight="1.8" />
                         </button>
                         <button class="icon-btn" v-tip="t('actions.rename')" @click="onAction('rename')">
                           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
@@ -2072,12 +2231,36 @@ onMounted(async () => {
     <BaseModal v-if="showRename && selected" :title="t('actions.renameTitle')" :closable="false"
       @close="showRename = false">
       <label class="field-label">{{ t("add.name") }}</label>
-      <input v-model="renameName" class="field-input" @keyup.enter="doRename" spellcheck="false" />
+      <input v-model="renameName" class="field-input" :class="{ 'is-invalid': renameConflict }"
+        @keyup.enter="doRename" spellcheck="false" />
+      <p v-if="renameConflict" class="error-text" role="alert">{{ t("actions.nameExists") }}</p>
 
       <div class="modal-actions">
         <BaseButton @click="showRename = false">{{ t("add.cancel") }}</BaseButton>
-        <BaseButton variant="primary" :disabled="renameBusy" @click="doRename">
+        <BaseButton variant="primary" :disabled="renameBusy || renameConflict || !renameName.trim()" @click="doRename">
           {{ t("actions.confirm") }}
+        </BaseButton>
+      </div>
+    </BaseModal>
+
+    <!-- ===== 复制实例：整份实例目录复制到新名字下 ===== -->
+    <BaseModal v-if="copyInst" :title="t('actions.copyInstance')" :closable="false" @close="closeCopy">
+      <label class="field-label">{{ t("copy.nameLabel") }}</label>
+      <input v-model="copyName" class="field-input" :class="{ 'is-invalid': copyConflict }"
+        :disabled="copyBusy" @keyup.enter="doCopy" spellcheck="false" />
+      <p v-if="copyConflict" class="error-text" role="alert">{{ t("actions.nameExists") }}</p>
+      <p v-else class="field-hint">{{ t("copy.hint") }}</p>
+
+      <!-- 要复制多少文件事先不知道，只给滚动动画条 -->
+      <div v-if="copyBusy" class="delete-progress">
+        <div class="delete-progress-bar rolling"></div>
+      </div>
+      <p v-if="copyBusy" class="delete-progress-text">{{ t("copy.copying") }}</p>
+
+      <div class="modal-actions">
+        <BaseButton :disabled="copyBusy" @click="closeCopy">{{ t("add.cancel") }}</BaseButton>
+        <BaseButton variant="primary" :disabled="copyBusy || !copyName.trim() || copyConflict" @click="doCopy">
+          {{ copyBusy ? t("copy.copying") : t("actions.copyInstance") }}
         </BaseButton>
       </div>
     </BaseModal>
@@ -2125,6 +2308,10 @@ onMounted(async () => {
     <!-- ===== 修改实例图标：右键实例 → 选择图片 → 截图范围 ===== -->
     <IconPickModal v-if="iconPickInst" :uuid="iconPickInst.uuid" :name="iconPickInst.name" :path="iconPickPath"
       @close="((iconPickInst = null), (iconPickPath = ''))" />
+
+    <!-- ===== 用方块列表里的图当实例图标（只有渲染过方块列表时才入口） ===== -->
+    <BlockIconPickModal v-if="blockIconInst" :uuid="blockIconInst.uuid" :name="blockIconInst.name"
+      @close="blockIconInst = null" />
 
     <!-- ===== 首次启动：把 ColorMC 的数据搬过来（见 doInit 的探测）===== -->
     <ColorMcMigrateModal v-if="colorMcInfo" :info="colorMcInfo" @close="onColorMcClosed" @done="onColorMcDone" />

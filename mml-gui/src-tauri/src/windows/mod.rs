@@ -203,7 +203,7 @@ pub fn window_get_window_sizes() -> Vec<WindowSizeDto> {
 /// `query` 由前端 `windowManager` 组装 —— 目标窗口的实例与"要打开哪个项目"
 /// 的 `uuid` / `psource` / `ppid` … 都只能靠 URL 送达，而参数名在前端
 /// `PROJ_PARAMS` 里只有一份，读那边也用它，所以不在 Rust 侧另立一套。
-/// 传空 / 不传时退回下面按 kind 拼的老路子，只有窗口族与 export 带 uuid。
+/// 传空 / 不传时退回下面按 kind 拼的老路子，只有窗口族、export 与 server_pack 带 uuid。
 ///
 /// # 返回值
 ///
@@ -282,13 +282,13 @@ pub async fn window_open_window(
 /// 打开 / 关闭窗口时的实例参数校验：kind 与 instance 要匹配
 ///
 /// - `kind`: 窗口类型，只有窗口族与 export 接受 instance
-/// - `instance`: 目标实例 UUID，其余 kind 传了即报错
+/// - `instance`: 目标实例 UUID；窗口族、导出与服务器包之外传了即报错
 ///
 /// # 返回值
 ///
 /// 校验不通过返回 `err_keys` 里的键：kind 不匹配为 `err.windowQuery`，非法 uuid 为 `err.uuid`
 fn kind_parse_check(kind: &str, instance: &Option<String>) -> Result<(), String> {
-    let accepts_instance = kind == "export" || family_of_kind(kind).is_some();
+    let accepts_instance = kind == "export" || kind == "server_pack" || family_of_kind(kind).is_some();
     if !accepts_instance && instance.is_some() {
         return Err(err_keys::WINDOW_QUERY.to_string());
     }

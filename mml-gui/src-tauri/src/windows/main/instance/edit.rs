@@ -129,6 +129,39 @@ pub fn main_rename_instance(
     Ok(true)
 }
 
+/// 复制实例：整份实例目录复制到新名字下，再登记成新实例
+///
+/// - `app`: 应用句柄，用于发变更事件
+/// - `uuid`: 源实例 uuid
+/// - `name`: 新实例名，前后空白会被去掉
+///
+/// # 返回值
+///
+/// 复制成功返回 `true`；名字为空返回 `false`；名字不合法 / 重名、实例不存在或复制失败返回 `Err`
+#[gui_macros::ipc_group("main")]
+#[gui_macros::command]
+pub async fn main_copy_instance(app: AppHandle, uuid: String, name: String) -> Result<bool, String> {
+    let n = name.trim().to_string();
+    if n.is_empty() {
+        return Ok(false);
+    }
+    let id = Uuid::parse_str(&uuid).map_err(|_| err_keys::UUID.to_string())?;
+    if mml_game::get_instance(&id).is_none() {
+        return Err(err_keys::GAME_NOT_FOUND.to_string());
+    }
+    // 复制要读整份实例目录，游戏在跑 / 有任务时会复制到写了一半的文件，见 ensure_idle
+    ensure_idle(&id)?;
+    mml_game::check_name(&n).map_err(|e| e.to_string())?;
+
+    // 目录可能很大，放阻塞线程里复制，别占着异步运行时
+    tauri::async_runtime::spawn_blocking(move || mml_game::copy_instance(&id, &n).map(|_| ()))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
+    emit_instance_change(&app, "add");
+    Ok(true)
+}
+
 /// 更新实例元信息，补丁式；核心实例直接写配置并保存，遗留数据只改本地存储
 ///
 /// - `app`: 应用句柄，用于发变更事件

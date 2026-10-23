@@ -13,13 +13,14 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import IconTabs from "../../components/ui/IconTabs.vue";
+import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import FilePicker from "./parts/FilePicker.vue";
 import InfoExportButton from "./parts/InfoExportButton.vue";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
 import { api, onExportFocus, onExportProgress } from "../../lib/api";
-import { isTauri, targetUuid, windowParams } from "../windowManager";
+import { currentKind, isTauri, targetUuid, windowParams } from "../windowManager";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import type { ExportEntryDto, ExportInfoDto, ExportProgressDto, InstanceInfoDto } from "../../lib/bindings";
 
@@ -42,7 +43,10 @@ let infoRequest = 0;
 /** 导出格式 id */
 type PackId = "curseforge" | "modrinth" | "mmc" | "hmcl" | "mml" | "server";
 
-const pack = ref<PackId>("mml");
+/** 服务器包窗口与实例导出共用一个组件：这个 kind 下锁死成服务器包，不出现格式页签 */
+const serverPack = computed(() => currentKind.value === "server_pack");
+
+const pack = ref<PackId>(serverPack.value ? "server" : "mml");
 const includeLauncher = ref(false);
 const packName = ref("");
 const author = ref("");
@@ -62,17 +66,26 @@ const modKeyword = ref("");
 const tab = ref<ExportTab>("meta");
 
 /** 格式选项：两种通用清单格式，加两种整包实例格式（供别的启动器导入） */
-const packOptions = [
+const packOptions: Array<{ value: PackId; label: string }> = [
   { value: "mml", label: "M²L" },
-  { value: "server", label: t("winExport.serverPack") },
   { value: "curseforge", label: "CurseForge" },
   { value: "modrinth", label: "Modrinth (.mrpack)" },
   { value: "mmc", label: "MMC" },
   { value: "hmcl", label: "HMCL" },
 ];
 
-/** 存盘对话框里的格式名 */
-const packLabel = computed(() => packOptions.find((x) => x.value === pack.value)?.label ?? "Modpack");
+/** 分段控件给出的是 string，收口成 PackId */
+function onPackChange(value: string) {
+  const option = packOptions.find((x) => x.value === value);
+  if (option) pack.value = option.value;
+}
+
+/** 存盘对话框里的格式名；服务器包不在页签里，单独取名字 */
+const packLabel = computed(() =>
+  pack.value === "server"
+    ? t("winExport.serverPack")
+    : (packOptions.find((x) => x.value === pack.value)?.label ?? "Modpack"),
+);
 
 /** 导出文件名后缀（按格式） */
 const fileExt = computed(() => (pack.value === "modrinth" ? "mrpack" : "zip"));
@@ -330,7 +343,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <WindowFrame body-fill :title="t('winExport.title')" @close="$emit('close')">
+  <WindowFrame body-fill :title="t(serverPack ? 'winTitle.serverPack' : 'winExport.title')" @close="$emit('close')">
     <!-- 实例选择与导出按钮放进标题栏：不占内容区高度，也不随选项卡滚动 -->
     <template #head-right>
       <select v-model="currentUuid" class="field-select head-select" :disabled="busy">
@@ -338,7 +351,8 @@ onBeforeUnmount(() => {
         <option value="" disabled>{{ t("winExport.instance") }}</option>
         <option v-for="i in instances" :key="i.uuid" :value="i.uuid">{{ i.name }}</option>
       </select>
-      <InfoExportButton :uuid="currentUuid" :name="info?.name ?? ''" :disabled="busy || loadingInfo || !info" />
+      <InfoExportButton v-if="!serverPack" :uuid="currentUuid" :name="info?.name ?? ''"
+        :disabled="busy || loadingInfo || !info" />
       <BaseButton size="sm" variant="primary" :disabled="busy || loadingInfo || !info" @click="startExport">
         {{ running ? t("winExport.exporting") : t("winExport.exportBtn") }}
       </BaseButton>
@@ -346,10 +360,11 @@ onBeforeUnmount(() => {
 
     <div class="export-window">
       <template v-if="info">
-        <!-- 概况整段不显示了：版本与加载器在主页面上都有，导出窗口里不必重复 -->
-        <div class="row">
+        <!-- 格式用分段页签：一览可选格式，切换不用展开下拉；服务器包是独立窗口，这里没有它 -->
+        <div v-if="!serverPack" class="row">
           <label class="field-label">{{ t("winExport.format") }}</label>
-          <select v-model="pack" class="field-select" :disabled="busy"><option v-for="option in packOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select>
+          <SegmentedTabs :options="packOptions" :model-value="pack" :disabled="busy"
+            @update:model-value="onPackChange" />
         </div>
 
         <!-- 这层限制在选择格式时就说清楚，别让用户以为包里带了自定义加载器 -->

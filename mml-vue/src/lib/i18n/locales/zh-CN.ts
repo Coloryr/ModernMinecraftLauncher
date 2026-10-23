@@ -123,6 +123,7 @@ export default {
   "group.pickTitle": "选择目标分组",
   "group.pickGroupDesc": "把分组「{name}」里的 {count} 个实例移入：",
   "group.pickMultiDesc": "把选中的 {count} 个实例移入：",
+  "group.pickInstanceDesc": "把实例「{name}」移入：",
   "group.pickOption": "{name}（{count} 个实例）",
   "group.pickNone": "没有其它分组可选，请先添加分组",
   "group.delete": "删除分组",
@@ -463,6 +464,7 @@ export default {
   "blocks.detailId": "方块 ID",
   "blocks.detailCat": "分类",
   "blocks.setIcon": "设为实例图标",
+  "blocks.pickIconTitle": "选择方块图标",
   "blocks.close": "关闭",
   "blocks.cancelRender": "取消渲染",
   "blocks.cancelling": "取消中…",
@@ -930,16 +932,28 @@ export default {
   "actions.viewLog": "查看实例日志",
   "actions.editConfig": "修改配置文件",
   "actions.pickImage": "选择图片",
+  "actions.blockIcon": "从方块列表选择",
+  "actions.viewMods": "查看模组",
+  "actions.changeIcon": "修改图标",
+  "actions.copyInstance": "复制实例",
   "actions.rename": "重命名",
   "actions.delete": "删除实例",
   "actions.deleting": "正在删除…",
   "actions.saving": "正在保存…",
   "actions.wip": "「{name}」功能开发中",
   "actions.renameTitle": "重命名实例",
+  "actions.nameExists": "已有同名实例，换一个名字",
   "actions.deleteTitle": "删除实例",
   "actions.deleteConfirm": "确定删除实例「{name}」？此操作不可恢复。",
   "actions.confirm": "确定",
   "actions.cancel": "取消",
+
+  // 复制实例
+  "copy.nameLabel": "新实例名",
+  "copy.defaultName": "{name} 副本",
+  "copy.hint": "整份复制实例目录，包括游戏文件、模组与存档",
+  "copy.copying": "正在复制…",
+  "copy.done": "已复制实例「{name}」",
 
   // 启动参数
   "args.memory": "内存大小",
@@ -1541,6 +1555,9 @@ export default {
   "winSettings.autoSaveNotice": "启动时提示",
   "winSettings.autoSaveNoticeDesc": "实例配置了启动后自动进入某个存档时，先弹窗确认。关掉后启动直接进入，不再询问。",
   // 自定义音乐
+  "winSettings.secServerPack": "服务器包",
+  "winSettings.serverPackDesc": "把实例与启动器配置（可选附带启动器 exe）打成服务器包，玩家导入后启动器会重载并进入该实例。",
+  "winSettings.serverPackExport": "导出服务器包",
   "winSettings.secMusic": "自定义音乐",
   "winSettings.musicDesc": "给启动器配一首自己的背景音乐；播放、暂停、停止的入口在标题栏。",
   "winSettings.musicOn": "启用自定义音乐",
@@ -1860,6 +1877,7 @@ export default {
   "winTitle.log": "游戏日志",
   "winTitle.export": "导出实例",
   "winTitle.config": "配置文件",
+  "winTitle.serverPack": "导出服务器包",
 
   // 收藏窗口
   "collect.addGroup": "添加分组",

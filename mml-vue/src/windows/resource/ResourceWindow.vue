@@ -21,7 +21,7 @@ import { useFileDrop } from "../../composables/useFileDrop";
 import type { FileDropPayload } from "../../composables/useFileDrop";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import { useResourceStatus } from "../../lib/resourceTasks";
-import { openWindow } from "../windowManager";
+import { clearTargetCategory, openWindow, targetCategory } from "../windowManager";
 import { useResourceData } from "./composables/useResourceData";
 import { useResourceOps } from "./composables/useResourceOps";
 import { useResourceView } from "./composables/useResourceView";
@@ -66,8 +66,13 @@ const { load: loadView } = view;
 
 data.setInstanceReadyHook(async () => {
   await loadView();
-  // 读回来的"上次类别"要落到当前选择上；数据层的 watch 会跟着拉对应列表
-  category.value = view.initialCategory.value;
+  // 本次打开指定了类别（「右键实例 → 查看模组」）就按它来，否则回到上次打开的那一类；
+  // 单窗口模式的参数用完即清，多窗口时它是这个窗口 URL 身份的一部分
+  const wanted = targetCategory();
+  const wantedCategory = RESOURCE_CATEGORIES.find((c) => c.id === wanted)?.id;
+  category.value = wantedCategory ?? view.initialCategory.value;
+  // 用完即清：之后在窗口里切分类不会被这一个参数拽回来
+  if (wanted) clearTargetCategory();
 });
 
 // 记住这次看的是哪一类：下次打开直接停在这儿
