@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "vendor": "powershell -NoProfile -ExecutionPolicy Bypass -File vendor/prepare.ps1",
+    "vendor": "node vendor/prepare.mjs",
     "tauri": "npm run vendor && tauri",
     "gen": "npm run vendor && cargo check --manifest-path src-tauri/Cargo.toml"
   },
