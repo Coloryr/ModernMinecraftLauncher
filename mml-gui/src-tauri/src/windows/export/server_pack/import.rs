@@ -6,6 +6,34 @@ use zip::ZipArchive;
 use crate::{err_keys, gui_config::GuiConfig};
 use super::{CONFIG, GUI_CONFIG, INSTANCES, LAUNCHER, MANIFEST, Manifest, archive, format};
 
+/// 导入成功后替换进程内配置的数据。
+pub(crate) struct ImportedPack {
+    /// 导入后的内核配置。
+    pub config: ConfigObj,
+    /// 导入后的界面配置。
+    pub gui: GuiConfig,
+}
+
+/// 已解包并等待替换的文件。
+struct StagedFile {
+    /// 相对运行目录的路径。
+    relative: PathBuf,
+    /// 安装位置。
+    target: PathBuf,
+    /// 暂存文件。
+    staged: PathBuf,
+}
+
+/// 回滚时需要恢复的目标与备份。
+struct AppliedFile {
+    /// 已替换的目标文件。
+    target: PathBuf,
+    /// 原文件的备份位置。
+    backup: PathBuf,
+    /// 替换前是否有文件。
+    existed: bool,
+}
+
 fn destination(root: &Path, relative: &Path) -> Result<PathBuf, String> {
     let mut path = root.to_path_buf();
     for component in relative.components() {
@@ -22,7 +50,7 @@ fn destination(root: &Path, relative: &Path) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-pub(crate) fn import_pack(file: &Path, root: &Path) -> Result<(ConfigObj, GuiConfig), String> {
+pub(crate) fn import_pack(file: &Path, root: &Path) -> Result<mml_config::config_save::ReplacedFiles<ImportedPack>, String> {
     let mut zip = ZipArchive::new(File::open(file).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     let manifest = format::validate(&mut zip)?;
     let config = format::read_json(&mut zip, CONFIG)?;
@@ -59,10 +87,10 @@ pub(crate) fn import_pack(file: &Path, root: &Path) -> Result<(ConfigObj, GuiCon
                 io::copy(&mut entry, &mut output).map_err(|e| e.to_string())?;
             }
             output.sync_all().map_err(|e| e.to_string())?;
-            files.push((relative, target, staged));
+            files.push(StagedFile { relative, target, staged });
         }
         let mut applied = Vec::new();
-        for (relative, target, staged) in files {
+        for StagedFile { relative, target, staged } in files {
             let backup = stage.join("backup").join(&relative);
             let replace = (|| -> Result<(), String> {
                 destination(&root, &relative)?;
@@ -73,12 +101,12 @@ pub(crate) fn import_pack(file: &Path, root: &Path) -> Result<(ConfigObj, GuiCon
                     fs::create_dir_all(backup.parent().unwrap()).map_err(|e| e.to_string())?;
                     fs::rename(&target, &backup).map_err(|e| e.to_string())?;
                 }
-                applied.push((target.clone(), backup, existed));
+                applied.push(AppliedFile { target: target.clone(), backup, existed });
                 fs::rename(staged, &target).map_err(|e| e.to_string())
             })();
             if let Err(error) = replace {
                 let mut rollback_failed = false;
-                for (path, backup, existed) in applied.into_iter().rev() {
+                for AppliedFile { target: path, backup, existed } in applied.into_iter().rev() {
                     if path.exists() && fs::remove_file(&path).is_err() { rollback_failed = true; continue; }
                     if existed && fs::rename(&backup, &path).is_err() { rollback_failed = true; }
                 }
@@ -86,7 +114,10 @@ pub(crate) fn import_pack(file: &Path, root: &Path) -> Result<(ConfigObj, GuiCon
                 return Err(error);
             }
         }
-        Ok((config, gui))
+        Ok(mml_config::config_save::ReplacedFiles {
+            files: applied.into_iter().map(|file| file.target).collect(),
+            value: ImportedPack { config, gui },
+        })
     })();
     // 恢复失败时保留备份，避免丢掉旧文件。
     if !result.as_ref().err().is_some_and(|e: &String| e.contains("; backup:")) {
@@ -172,6 +203,23 @@ mod tests {
             assert_eq!(fs::read_to_string(dir.join("config.json")).unwrap(), "original");
             crate::test_support::cleanup(&[&dir]);
         }
+    }
+
+    #[test]
+    fn failed_overwrite_restores_configs_and_removes_new_files() {
+        let (dir, file) = fixture(None);
+        let root = dir.join("runtime");
+        let conflict = root.join("minecraft/instances/test/.minecraft/options.txt");
+        fs::create_dir_all(&conflict).unwrap();
+        fs::write(root.join("config.json"), "original core").unwrap();
+        fs::write(root.join("gui_config.json"), "original gui").unwrap();
+        assert!(import_pack(&file, &root).is_err());
+        assert_eq!(fs::read_to_string(root.join("config.json")).unwrap(), "original core");
+        assert_eq!(fs::read_to_string(root.join("gui_config.json")).unwrap(), "original gui");
+        assert!(!root.join("minecraft/instances/test/game.json").exists());
+        assert!(conflict.is_dir());
+        assert!(fs::read_dir(&root).unwrap().all(|entry| !entry.unwrap().file_name().to_string_lossy().starts_with(".server-import-")));
+        crate::test_support::cleanup(&[&dir]);
     }
     #[test]
     fn reimport_follows_instance_uuid_and_never_replaces_launcher() {

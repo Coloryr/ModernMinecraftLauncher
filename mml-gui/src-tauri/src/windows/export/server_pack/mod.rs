@@ -77,13 +77,9 @@ pub async fn export_import_server_pack(app: AppHandle, file: String) -> Result<(
         let _launch_guard = crate::windows::main::launch::import_guard()?;
         if !mml_game::get_running_instances().is_empty() { return Err(err_keys::SERVER_PACK_BUSY.to_string()); }
         let root = gui_config::dir().ok_or(err_keys::SERVER_PACK_INVALID)?;
-        mml_config::config_save::with_flushed(|| {
-            let (config, gui) = import_pack(Path::new(&file), &root)?;
-            *mml_config::write_config() = config;
-            mml_config::save();
-            gui_config::set(gui);
-            Ok::<_, String>(())
-        })?;
+        let imported = mml_config::config_save::replace_before_restart(|| import_pack(Path::new(&file), &root))?;
+        *mml_config::write_config() = imported.config;
+        gui_config::set(imported.gui);
         crate::windows::window_restart_app(app);
         Ok(())
     }).await.map_err(|e| e.to_string())?

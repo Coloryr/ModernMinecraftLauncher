@@ -95,7 +95,25 @@ impl ConfigSaveObj {
 }
 
 /// 全局保存任务队列
-static QUEUE: Mutex<Vec<ConfigSaveObj>> = Mutex::new(Vec::new());
+static QUEUE: std::sync::LazyLock<Mutex<SaveQueue>> =
+    std::sync::LazyLock::new(|| Mutex::new(SaveQueue::default()));
+
+/// 保存队列及导入后禁止回写的文件集合。
+#[derive(Default)]
+struct SaveQueue {
+    /// 等待写入的配置快照。
+    pending: Vec<ConfigSaveObj>,
+    /// 导入完成后由新进程接管的文件，本进程不再写入。
+    replaced: std::collections::HashSet<PathBuf>,
+}
+
+/// 已替换的文件及调用方需要的结果。
+pub struct ReplacedFiles<T> {
+    /// 成功覆盖的文件路径。
+    pub files: Vec<PathBuf>,
+    /// 文件替换的返回数据。
+    pub value: T,
+}
 /// 后台保存线程是否运行中
 static IS_RUN: AtomicBool = AtomicBool::new(true);
 /// 信号量，用于唤醒保存线程
@@ -134,8 +152,11 @@ pub fn save_compact<T: Serialize>(uuid: Uuid, obj: &T, file: impl AsRef<Path>) {
 fn enqueue(task: ConfigSaveObj) {
     let uuid = task.uuid;
     let mut queue = QUEUE.lock().unwrap();
-    queue.retain(|item| item.uuid != uuid);
-    queue.push(task);
+    if !queue.replaced.is_empty() && queue.replaced.contains(&file_identity(&task.file)) {
+        return;
+    }
+    queue.pending.retain(|item| item.uuid != uuid);
+    queue.pending.push(task);
 
     SEM.get().unwrap().up();
 }
@@ -149,7 +170,7 @@ fn save_now() {
 fn flush_queue() {
     let items = {
         let mut queue = QUEUE.lock().unwrap();
-        mem::take(&mut *queue)
+        mem::take(&mut queue.pending)
     };
     for save_obj in items {
         if let Err(err) = save_obj.save() {
@@ -158,14 +179,25 @@ fn flush_queue() {
     }
 }
 
-/// 写完已排队配置后独占执行文件替换。
-/// - `action`: 替换文件并更新配置内存的操作，不得等待保存线程。
+/// 写完旧配置后独占替换文件，成功覆盖的文件在重启前不再接受旧快照。
+/// - `action`: 替换操作，失败时须自行回滚，不得等待保存线程。
 /// # 返回值
-/// 操作返回值。
-pub fn with_flushed<T>(action: impl FnOnce() -> T) -> T {
+/// 替换结果；失败时继续接受原有配置保存。
+pub fn replace_before_restart<T, E>(
+    action: impl FnOnce() -> Result<ReplacedFiles<T>, E>,
+) -> Result<T, E> {
     let _guard = WRITE_LOCK.lock().unwrap();
     flush_queue();
-    action()
+    let result = action()?;
+    let mut queue = QUEUE.lock().unwrap();
+    queue.replaced.extend(result.files.iter().map(|path| file_identity(path)));
+    let SaveQueue { pending, replaced } = &mut *queue;
+    pending.retain(|task| !replaced.contains(&file_identity(&task.file)));
+    Ok(result.value)
+}
+
+fn file_identity(path: &Path) -> PathBuf {
+    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
 }
 
 /// 启动后台配置保存线程
@@ -207,5 +239,39 @@ pub fn stop() {
     // 等待线程执行完最后一次保存
     if let Some(handle) = HANDLE.lock().unwrap().take() {
         let _ = handle.join();
+    }
+}
+
+#[cfg(test)]
+mod replacement_tests {
+    use super::*;
+
+    #[test]
+    fn queued_snapshot_must_not_undo_file_replacement() {
+        SEM.get_or_init(|| Arc::new(Semaphore::new(0)));
+        let dir = mml_testutil::temp_path(format!("replacement-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("game.json");
+        let other = dir.join("accounts.json");
+        replace_before_restart(|| {
+            save(Uuid::new_v4(), &"stale", &path);
+            save(Uuid::new_v4(), &"account update", &other);
+            std::fs::write(&path, "\"imported\"").unwrap();
+            Ok::<_, ()>(ReplacedFiles { files: vec![path.canonicalize().unwrap()], value: () })
+        }).unwrap();
+        save(Uuid::new_v4(), &"late stale snapshot", &path);
+        save_now();
+        let actual = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(actual, "\"imported\"");
+        assert_eq!(std::fs::read_to_string(&other).unwrap(), "\"account update\"");
+
+        let result = replace_before_restart::<(), _>(|| {
+            save(Uuid::new_v4(), &"preserved after rollback", &other);
+            Err("replacement failed")
+        });
+        assert!(result.is_err());
+        save_now();
+        assert_eq!(std::fs::read_to_string(&other).unwrap(), "\"preserved after rollback\"");
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }
