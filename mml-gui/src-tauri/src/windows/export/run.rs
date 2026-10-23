@@ -113,7 +113,13 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
                 else { super::archive::native_instance(&game, &arg.file) }
             })
                 .await.map_err(|e| e.to_string()).and_then(|result| result)
-        } else { game.export(arg).await.map_err(|e| e.to_string()) };
+        } else {
+            crate::windows::export_file::write_async(std::path::Path::new(&save_file), |file| async move {
+                let mut arg = arg;
+                arg.file = file;
+                game.export(arg).await.map_err(|e| e.to_string())
+            }).await
+        };
         let event = match res {
             Ok(()) => ExportProgressDto {
                 state: "done".to_string(),
