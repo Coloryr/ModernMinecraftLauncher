@@ -358,6 +358,7 @@ impl I18Lang for EnUs {
             ErrorType::IpcWriteError(data) => {
                 format!("IPC: failed to send data: {}", data.error)
             }
+            ErrorType::IpcInvalidFrame => "IPC: invalid frame length".to_string(),
             ErrorType::IpcFrameTooLarge { len } => {
                 format!("IPC: frame too large, {len} bytes")
             }

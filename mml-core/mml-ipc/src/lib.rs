@@ -54,8 +54,8 @@ use mml_base::events::{EventArgHandler, EventHandler};
 use mml_names::i18_items::error_type::{
     CoreResult, ErrorData,
     ErrorType::{
-        IpcAcceptError, IpcBindError, IpcBufferOverrun, IpcFrameTooLarge, IpcRuntimeCreateError,
-        IpcWriteError, SocketError, ThreadError,
+        IpcAcceptError, IpcBindError, IpcBufferOverrun, IpcFrameTooLarge, IpcInvalidFrame,
+        IpcRuntimeCreateError, IpcWriteError, SocketError, ThreadError,
     },
 };
 use mml_names::i18_items::info_type::InfoType;
@@ -410,12 +410,14 @@ async fn handle_client(stream: TcpStream) -> CoreResult<()> {
     // 读取循环：消息无总长度前缀，按类型自定界解析，与 ColorMC 一致
     let mut buf = BytesMut::with_capacity(1024);
     loop {
-        if let Some(msg_len) = message_len(&buf) {
-            if msg_len > MAX_FRAME_SIZE {
-                mml_log::error_type(IpcFrameTooLarge { len: msg_len });
+        let msg_len = match message_len(&buf) {
+            Ok(length) => length,
+            Err(err) => {
+                mml_log::error_type(err);
                 break;
             }
-
+        };
+        if let Some(msg_len) = msg_len {
             let mut msg = buf.split_to(msg_len);
             if let Err(err) = process_message(&mut msg, &write_tx).await {
                 mml_log::error_type(err);
@@ -446,71 +448,82 @@ async fn handle_client(stream: TcpStream) -> CoreResult<()> {
 /// 计算缓冲区首条消息的完整长度，单位字节，不消费数据
 ///
 /// 消息无总长度前缀，按类型读取字段推算边界，字符串与列表自带长度；
-/// 缓冲区中数据不足一条完整消息时返回 `None`。未知类型无法确定长度，
+/// 缓冲区中数据不足一条完整消息时返回 `Ok(None)`，无效长度立即报错。未知类型无法确定长度，
 /// 按一条仅含类型头的 4 字节消息处理。
-fn message_len(buf: &[u8]) -> Option<usize> {
+fn message_len(buf: &[u8]) -> CoreResult<Option<usize>> {
     if buf.len() < 4 {
-        return None;
+        return Ok(None);
     }
     let msg_type = i32::from_be_bytes([buf[0], buf[1], buf[2], buf[3]]);
     let mut offset = 4usize;
 
-    /// 读一个字符串字段的长度前缀与内容，只推进偏移不取值
-    ///
-    /// - `buf`: 响应数据
-    /// - `offset`: 当前读到的偏移，读到后推进
-    ///
-    /// # 返回值
-    ///
-    /// 数据不足返回 `None`
-    fn string_field(buf: &[u8], offset: &mut usize) -> Option<()> {
-        if buf.len() < *offset + 4 {
-            return None;
+    /// 在消息限额内推进偏移，数据不足时返回 false。
+    fn advance(buf: &[u8], offset: &mut usize, len: usize) -> CoreResult<bool> {
+        let end = offset
+            .checked_add(len)
+            .ok_or(IpcFrameTooLarge { len: usize::MAX })?;
+        if end > MAX_FRAME_SIZE {
+            return Err(IpcFrameTooLarge { len: end });
         }
-        let len = i32::from_be_bytes(buf[*offset..*offset + 4].try_into().unwrap()) as usize;
-        *offset += 4 + len;
-        if *offset > buf.len() {
-            return None;
+        if end > buf.len() {
+            return Ok(false);
         }
-        Some(())
+        *offset = end;
+        Ok(true)
+    }
+
+    /// 拒绝负数字符串长度，再检查内容是否完整。
+    fn string_field(buf: &[u8], offset: &mut usize) -> CoreResult<bool> {
+        if !advance(buf, offset, 4)? {
+            return Ok(false);
+        }
+        let len = i32::from_be_bytes(buf[*offset - 4..*offset].try_into().unwrap());
+        let len = usize::try_from(len).map_err(|_| IpcInvalidFrame)?;
+        advance(buf, offset, len)
     }
 
     match msg_type {
         TYPE_LAUNCH_SHOW => {}
         TYPE_GAME_MOUSE_STATE => {
-            string_field(buf, &mut offset)?;
-            if buf.len() < offset + 1 {
-                return None;
+            if !string_field(buf, &mut offset)? || !advance(buf, &mut offset, 1)? {
+                return Ok(None);
             }
-            offset += 1;
         }
         TYPE_LAUNCH_ARG => {
-            if buf.len() < offset + 4 {
-                return None;
+            if !advance(buf, &mut offset, 4)? {
+                return Ok(None);
             }
-            let count = i32::from_be_bytes(buf[offset..offset + 4].try_into().unwrap()) as usize;
-            offset += 4;
+            let count = i32::from_be_bytes(buf[offset - 4..offset].try_into().unwrap());
+            let count = usize::try_from(count).map_err(|_| IpcInvalidFrame)?;
+            // 每个字符串至少占四字节长度头，提前拒绝不可能容纳的列表。
+            if count > (MAX_FRAME_SIZE - offset) / 4 {
+                return Err(IpcFrameTooLarge {
+                    len: offset.saturating_add(count.saturating_mul(4)),
+                });
+            }
             for _ in 0..count {
-                string_field(buf, &mut offset)?;
+                if !string_field(buf, &mut offset)? {
+                    return Ok(None);
+                }
             }
         }
         TYPE_GAME_CHANNEL => {
-            string_field(buf, &mut offset)?;
+            if !string_field(buf, &mut offset)? {
+                return Ok(None);
+            }
         }
         TYPE_GAME_WINDOW_SIZE => {
-            string_field(buf, &mut offset)?;
-            if buf.len() < offset + 8 {
-                return None;
+            if !string_field(buf, &mut offset)? || !advance(buf, &mut offset, 8)? {
+                return Ok(None);
             }
-            offset += 8;
         }
         _ => {
             mml_log::warn_type(InfoType::IpcUnknownMessageType { msg_type });
-            return Some(4);
+            return Ok(Some(4));
         }
     }
 
-    Some(offset)
+    Ok(Some(offset))
 }
 
 /// 处理一条消息
@@ -672,14 +685,14 @@ mod tests {
     fn test_message_len_launch_show() {
         let mut buf = BytesMut::new();
         buf.put_i32(TYPE_LAUNCH_SHOW);
-        assert_eq!(message_len(&buf), Some(4));
+        assert_eq!(message_len(&buf).unwrap(), Some(4));
     }
 
     /// 数据不足 4 字节，类型头不完整时应返回 None
     #[test]
     fn test_message_len_too_short() {
         let buf = BytesMut::from(&[0u8, 0, 0][..]);
-        assert_eq!(message_len(&buf), None);
+        assert_eq!(message_len(&buf).unwrap(), None);
     }
 
     /// 鼠标状态消息：类型 + uuid 字符串 + 1 字节布尔
@@ -692,15 +705,15 @@ mod tests {
         buf.put_u8(1);
         let full = buf.clone();
 
-        assert_eq!(message_len(&buf), Some(full.len()));
+        assert_eq!(message_len(&buf).unwrap(), Some(full.len()));
 
         // 去掉末尾布尔字节后应判定为消息不完整
         buf.truncate(full.len() - 1);
-        assert_eq!(message_len(&buf), None);
+        assert_eq!(message_len(&buf).unwrap(), None);
 
         // 去掉字符串内容的一部分同样不完整
         buf.truncate(full.len() - 3);
-        assert_eq!(message_len(&buf), None);
+        assert_eq!(message_len(&buf).unwrap(), None);
     }
 
     /// 启动参数消息：类型 + 数量 + N 个字符串
@@ -709,19 +722,19 @@ mod tests {
         let mut buf = BytesMut::new();
         buf.put_i32(TYPE_LAUNCH_ARG);
         buf.write_string_list(&["--open".to_string(), "abc".to_string()]);
-        assert_eq!(message_len(&buf), Some(buf.len()));
+        assert_eq!(message_len(&buf).unwrap(), Some(buf.len()));
 
         // 数量声明为 2 但只有 1 个字符串：不完整
         let mut bad = buf.clone();
         bad.truncate(bad.len() - 3);
-        assert_eq!(message_len(&bad), None);
+        assert_eq!(message_len(&bad).unwrap(), None);
     }
 
     /// 游戏通道消息：类型 + uuid 字符串
     #[test]
     fn test_message_len_game_channel() {
         let buf = msg_with_string(TYPE_GAME_CHANNEL, &Uuid::new_v4().to_string());
-        assert_eq!(message_len(&buf), Some(buf.len()));
+        assert_eq!(message_len(&buf).unwrap(), Some(buf.len()));
     }
 
     /// 窗口大小消息：类型 + uuid 字符串 + 宽高各 4 字节
@@ -732,12 +745,12 @@ mod tests {
         buf.write_string(&Uuid::new_v4().to_string());
         buf.put_i32(1920);
         buf.put_i32(1080);
-        assert_eq!(message_len(&buf), Some(buf.len()));
+        assert_eq!(message_len(&buf).unwrap(), Some(buf.len()));
 
         // 缺少高字段时不完整
         let mut bad = buf.clone();
         bad.truncate(bad.len() - 2);
-        assert_eq!(message_len(&bad), None);
+        assert_eq!(message_len(&bad).unwrap(), None);
     }
 
     /// 未知类型无法确定边界，按仅含类型头的 4 字节处理，文档化现有行为
@@ -747,7 +760,7 @@ mod tests {
         buf.put_i32(99);
         buf.write_string("extra");
         ensure_log();
-        assert_eq!(message_len(&buf), Some(4));
+        assert_eq!(message_len(&buf).unwrap(), Some(4));
     }
 
     /// 同一缓冲区内连续两条消息的边界推算
@@ -760,13 +773,54 @@ mod tests {
         buf.extend_from_slice(&second);
 
         // 应先推算出第一条消息，4 字节
-        assert_eq!(message_len(&buf), Some(4));
+        assert_eq!(message_len(&buf).unwrap(), Some(4));
         // 消费掉第一条后应能推算出第二条
         let rest = buf.split_off(4);
-        assert_eq!(message_len(&rest), Some(rest.len()));
+        assert_eq!(message_len(&rest).unwrap(), Some(rest.len()));
     }
 
     /// ---- process_message：消息处理与全局状态 ----
+
+    /// 字符串和列表的负长度必须报错，超限声明不等待响应体。
+    #[test]
+    fn test_message_len_rejects_invalid_lengths() {
+        for msg_type in [
+            TYPE_GAME_CHANNEL,
+            TYPE_GAME_MOUSE_STATE,
+            TYPE_GAME_WINDOW_SIZE,
+            TYPE_LAUNCH_ARG,
+        ] {
+            for length in [i32::MIN, -1] {
+                let mut frame = BytesMut::new();
+                frame.put_i32(msg_type);
+                frame.put_i32(length);
+                assert!(matches!(message_len(&frame), Err(IpcInvalidFrame)));
+            }
+            for length in [MAX_FRAME_SIZE as i32, i32::MAX] {
+                let mut frame = BytesMut::new();
+                frame.put_i32(msg_type);
+                frame.put_i32(length);
+                assert!(matches!(message_len(&frame), Err(IpcFrameTooLarge { .. })));
+            }
+        }
+
+        let mut list = BytesMut::new();
+        list.put_i32(TYPE_LAUNCH_ARG);
+        list.put_i32(1);
+        list.put_i32(-1);
+        assert!(matches!(message_len(&list), Err(IpcInvalidFrame)));
+    }
+
+    /// 限额包含类型头、字符串头和固定字段，恰好等于限额时可接收。
+    #[test]
+    fn test_message_len_enforces_whole_frame_limit() {
+        let mut frame = msg_with_string(TYPE_GAME_CHANNEL, &"x".repeat(MAX_FRAME_SIZE - 8));
+        assert_eq!(message_len(&frame).unwrap(), Some(MAX_FRAME_SIZE));
+        frame[..4].copy_from_slice(&TYPE_GAME_MOUSE_STATE.to_be_bytes());
+        assert!(matches!(message_len(&frame), Err(IpcFrameTooLarge { .. })));
+        frame[..4].copy_from_slice(&TYPE_GAME_WINDOW_SIZE.to_be_bytes());
+        assert!(matches!(message_len(&frame), Err(IpcFrameTooLarge { .. })));
+    }
 
     /// 鼠标状态消息应记录到全局表
     #[tokio::test]

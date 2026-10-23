@@ -399,6 +399,8 @@ pub enum ErrorType {
     IpcAcceptError(ErrorData),
     /// IPC：发送数据失败
     IpcWriteError(ErrorData),
+    /// IPC 长度字段为负数，无法确定消息边界。
+    IpcInvalidFrame,
     /// IPC：数据帧超过长度上限
     IpcFrameTooLarge {
         /// 实际长度，单位字节

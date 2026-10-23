@@ -317,6 +317,7 @@ impl I18Lang for ZhCn {
             ErrorType::IpcBindError(data) => format!("IPC：绑定端口失败：{}", data.error),
             ErrorType::IpcAcceptError(data) => format!("IPC：接受连接失败：{}", data.error),
             ErrorType::IpcWriteError(data) => format!("IPC：发送数据失败：{}", data.error),
+            ErrorType::IpcInvalidFrame => "IPC：数据帧长度无效".to_string(),
             ErrorType::IpcFrameTooLarge { len } => format!("IPC：数据帧过长，{len} 字节"),
             ErrorType::IpcBufferOverrun => String::from("IPC：接收缓冲区溢出，断开连接"),
         }
