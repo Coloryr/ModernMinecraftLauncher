@@ -197,7 +197,7 @@ pub async fn main_launch_game(
     let mut arg = GameLaunchArg {
         auth,
         auto,
-        admin: false,
+        admin: gui_config::get().experimental.instance_admin,
         mixin: None,
         lang: None,
     };
