@@ -1,6 +1,45 @@
 use super::*;
 
 #[tokio::test]
+async fn leaving_ignores_stale_nodes_and_does_not_require_a_state_request() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let mut request = [0; 1024];
+        let count = stream.read(&mut request).await.unwrap();
+        assert!(String::from_utf8_lossy(&request[..count]).starts_with("GET /state/ide "));
+        stream
+            .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            .await
+            .unwrap();
+    });
+    let session = Session {
+        client: reqwest::Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_secs(3))
+            .build()
+            .unwrap(),
+        base: format!("http://{address}"),
+        owned: false,
+        room_owned: AtomicBool::new(true),
+        worker: None,
+    };
+    super::super::room::perform(
+        &session,
+        &crate::dtos::LobbyViewDto::default(),
+        "leave",
+        "invalid room",
+        &vec!["tcp://expired:1234".into(); 65],
+    )
+    .await
+    .unwrap();
+    assert!(!session.room_owned.load(Ordering::Acquire));
+    server.await.unwrap();
+}
+
+#[tokio::test]
 async fn rejected_room_requests_preserve_external_room_ownership() {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -195,10 +234,22 @@ async fn http_adapter_encodes_room_nodes_checks_status_and_closes_owned_worker()
         .action(
             "/state/guesting",
             &[
-                ("room".into(), "U/TEST+CODE".into()),
-                ("player".into(), "玩家 name".into()),
-                ("public_nodes".into(), "tcp://one:1234".into()),
-                ("public_nodes".into(), "wss://two/ws".into()),
+                QueryParameter {
+                    name: "room",
+                    value: "U/TEST+CODE".into(),
+                },
+                QueryParameter {
+                    name: "player",
+                    value: "玩家 name".into(),
+                },
+                QueryParameter {
+                    name: "public_nodes",
+                    value: "tcp://one:1234".into(),
+                },
+                QueryParameter {
+                    name: "public_nodes",
+                    value: "wss://two/ws".into(),
+                },
             ],
         )
         .await

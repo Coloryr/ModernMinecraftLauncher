@@ -2,6 +2,7 @@
 
 mod install;
 pub(crate) mod model;
+mod room;
 mod runtime;
 
 use crate::{
@@ -137,30 +138,10 @@ pub async fn lobby_room_action(
     let model = model::get()?;
     let _operation = model.gate.lock().await;
     let session = session(&model)?;
-    let operation = async {
-        let state = session.state().await?;
-        let path = match action.as_str() {
-            "host" if state.state == "waiting" => "/state/scanning",
-            "join" if state.state == "waiting" && !room.trim().is_empty() => "/state/guesting",
-            "leave" => "/state/ide",
-            _ => return Err(err_keys::LOBBY_STATE.to_string()),
-        };
-        let mut query = {
-            let view = model.view.lock().unwrap();
-            if nodes.len() > 64 || nodes.iter().any(|n| !view.nodes.contains(n)) {
-                return Err(err_keys::LOBBY_STATE.into());
-            }
-            vec![("player".into(), view.account.clone())]
-        };
-        if action == "join" {
-            query.push(("room".into(), room.trim().into()));
-        }
-        query.extend(nodes.into_iter().map(|node| ("public_nodes".into(), node)));
-        session.action(path, &query).await
-    };
+    let view = model.view.lock().unwrap().clone();
     tokio::select! {
         _ = model.cancel.cancelled() => Err(err_keys::LOBBY_CLOSED.into()),
-        result = operation => result,
+        result = room::perform(&session, &view, &action, &room, &nodes) => result,
     }
 }
 

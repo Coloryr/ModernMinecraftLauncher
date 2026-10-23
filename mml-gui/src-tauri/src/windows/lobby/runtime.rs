@@ -20,6 +20,14 @@ use tokio_util::sync::CancellationToken;
 
 static WORKER: LazyLock<Arc<Mutex<()>>> = LazyLock::new(|| Arc::new(Mutex::new(())));
 
+/// 陶瓦控制接口的查询参数，允许公共节点同名重复。
+pub(super) struct QueryParameter {
+    /// 协议参数名。
+    pub name: &'static str,
+    /// 尚未进行 URL 编码的参数值。
+    pub value: String,
+}
+
 /// 从安装到退出清理独占陶瓦进程，阻止新大厅越过旧会话的后台任务。
 pub(super) struct WorkerLease {
     /// 解包线程和退出任务全部结束后才释放。
@@ -243,14 +251,16 @@ impl Session {
         })
     }
 
-    pub async fn action(&self, path: &str, query: &[(String, String)]) -> Result<(), String> {
+    pub async fn action(&self, path: &str, query: &[QueryParameter]) -> Result<(), String> {
         let mut url =
             reqwest::Url::parse(&format!("{}{path}", self.base)).map_err(|e| e.to_string())?;
-        url.query_pairs_mut().extend_pairs(
-            query
-                .iter()
-                .map(|(key, value)| (key.as_str(), value.as_str())),
-        );
+        if !query.is_empty() {
+            url.query_pairs_mut().extend_pairs(
+                query
+                    .iter()
+                    .map(|parameter| (parameter.name, parameter.value.as_str())),
+            );
+        }
         let was_owned = self.room_owned.load(Ordering::Acquire);
         if path != "/state/ide" {
             // 请求途中取消时仍需清理；明确被拒绝才恢复原有归属。
