@@ -4,12 +4,12 @@
 //!
 //! # 下载流程
 //!
-//! 1. **检查已存在文件** — 文件已存在且哈希匹配 → 跳过
+//! 1. **检查已存在文件** — 文件已存在且哈希匹配 → 直接后处理
 //! 2. **发起 HTTP 请求** — 支持 Range 断点续传，需服务器返回 `Accept-Ranges: bytes`
 //! 3. **流式写入临时文件** — 边下载边写入，实时更新进度
 //! 4. **下载后校验** — 检查文件大小和哈希值
-//! 5. **后处理** — 解压 native 库 / 存档文件
-//! 6. **移至目标路径** — 校验通过后原子移动临时文件到最终位置
+//! 5. **移至目标路径** — 校验通过后移动临时文件到最终位置
+//! 6. **后处理** — 解压 native 库 / 存档文件，成功后才记为完成
 //!
 //! # 重试策略
 //!
@@ -264,17 +264,25 @@ fn download(index: u32, mut obj: DownloadObj) {
                 return;
             }
         } else {
-            let config = mml_config::read_config();
-            let mut file = path_helper::open_read(&obj.item.base.file).unwrap();
-            if config.http.check_file {
+            let check_file = mml_config::read_config().http.check_file;
+            if check_file {
+                let mut file = match path_helper::open_read(&obj.item.base.file) {
+                    Ok(file) => file,
+                    Err(err) => {
+                        mml_log::error_type(err);
+                        obj.item.set_state(DownloadItemState::Error);
+                        crate::update(index, &obj.item);
+                        obj.task.fail();
+                        return;
+                    }
+                };
                 let check = check_hash(&obj.item.base.file, &obj.item.base.hash, &mut file);
                 if let Err(err) = check {
                     mml_log::error_type(err);
                 } else {
-                    // 文件已存在且哈希匹配，直接跳过
-                    obj.item.set_state(DownloadItemState::Done);
-                    crate::update(index, &obj.item);
-                    obj.task.done();
+                    // 后处理可能在上一次下载后失败，复用文件时仍须执行。
+                    drop(file);
+                    finish_download(index, &obj);
                     return;
                 }
             }
@@ -472,9 +480,13 @@ fn download(index: u32, mut obj: DownloadObj) {
         return;
     }
 
-    // ============================================================
-    // 第五步：后处理，解压 native 库 / 存档、换掉旧文件
-    // ============================================================
+    finish_download(index, &obj);
+}
+
+/// 后处理成功才完成下载项，失败保留文件供下一次重试。
+fn finish_download(index: u32, obj: &DownloadObj) {
+    obj.item.set_state(DownloadItemState::Action);
+    crate::update(index, &obj.item);
     let res: Result<(), ErrorType> = match &obj.item.base.later {
         LaterRun::None => Ok(()),
         LaterRun::UnpackNative(path_buf) => match path_helper::open_read(&obj.item.base.file) {
@@ -491,6 +503,10 @@ fn download(index: u32, mut obj: DownloadObj) {
 
     if let Err(err) = res {
         mml_log::error_type(err);
+        obj.item.set_state(DownloadItemState::Error);
+        crate::update(index, &obj.item);
+        obj.task.fail();
+        return;
     }
 
     obj.item.set_state(DownloadItemState::Done);

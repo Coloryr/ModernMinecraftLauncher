@@ -38,6 +38,7 @@ fn server(responses: Vec<String>) -> (String, JoinHandle<Vec<String>>) {
                 assert!(Instant::now() < deadline, "下载器没有发出预期请求");
                 thread::sleep(Duration::from_millis(10));
             };
+            stream.set_nonblocking(false).unwrap();
             stream
                 .set_read_timeout(Some(Duration::from_secs(3)))
                 .unwrap();
@@ -152,4 +153,97 @@ fn http_range_error_retries_as_a_full_download() {
     assert_eq!(item.get_state(), DownloadItemState::Done);
     assert_eq!(task.completed_count.load(Ordering::SeqCst), 1);
     assert_eq!(fs::read(target).unwrap(), b"abcdefghij");
+}
+
+#[test]
+fn postprocessing_errors_fail_downloads_and_cached_retries() {
+    setup();
+    for native in [false, true] {
+        let output = crate::test_util::make_temp_dir("unpack-error").join("unpacked");
+        let later = if native {
+            LaterRun::UnpackNative(output)
+        } else {
+            LaterRun::UnpackSave(output)
+        };
+        let (url, handle) = server(vec![
+            "HTTP/1.1 200 OK\r\nContent-Length: 3\r\nConnection: close\r\n\r\nbad".into(),
+        ]);
+        let (target, task, item) = run_download(url, "unpack-error", FileHash::None, later);
+        assert_eq!(handle.join().unwrap().len(), 1);
+        assert_eq!(fs::read(target).unwrap(), b"bad");
+        assert_eq!(item.get_state(), DownloadItemState::Error);
+        assert_eq!(task.failed_count.load(Ordering::SeqCst), 1);
+        assert_eq!(task.completed_count.load(Ordering::SeqCst), 0);
+
+        let retry = Arc::new(DownloadTask::new(vec![item.base.clone()]));
+        let retry_item = retry.get_item().unwrap();
+        download(
+            0,
+            DownloadObj {
+                task: retry.clone(),
+                item: retry_item.clone(),
+            },
+        );
+        assert_eq!(retry_item.get_state(), DownloadItemState::Error);
+        assert_eq!(retry.failed_count.load(Ordering::SeqCst), 1);
+        assert_eq!(retry.completed_count.load(Ordering::SeqCst), 0);
+    }
+}
+
+#[test]
+fn postprocessing_runs_for_a_valid_cached_archive() {
+    setup();
+    let root = crate::test_util::make_temp_dir("cached-unpack");
+    let target = root.join("cached.zip");
+    let output = root.join("unpacked");
+    let mut writer = zip::ZipWriter::new(fs::File::create(&target).unwrap());
+    writer
+        .start_file("data.txt", zip::write::SimpleFileOptions::default())
+        .unwrap();
+    writer.write_all(b"cached-data").unwrap();
+    writer.finish().unwrap();
+    let task = Arc::new(DownloadTask::new(vec![FileItemObj {
+        name: "cached-unpack".into(),
+        file: target,
+        url: "http://127.0.0.1:1/unused".into(),
+        hash: FileHash::None,
+        later: LaterRun::UnpackSave(output.clone()),
+    }]));
+    let item = task.get_item().unwrap();
+    download(
+        0,
+        DownloadObj {
+            task: task.clone(),
+            item: item.clone(),
+        },
+    );
+    assert_eq!(fs::read(output.join("data.txt")).unwrap(), b"cached-data");
+    assert_eq!(item.get_state(), DownloadItemState::Done);
+    assert_eq!(task.completed_count.load(Ordering::SeqCst), 1);
+    assert_eq!(task.failed_count.load(Ordering::SeqCst), 0);
+}
+
+#[cfg(windows)]
+#[test]
+fn postprocessing_unreadable_cached_file_fails_without_panicking() {
+    setup();
+    let root = crate::test_util::make_temp_dir("cached-read-error");
+    let task = Arc::new(DownloadTask::new(vec![FileItemObj {
+        name: "cached-read-error".into(),
+        file: root,
+        url: "http://127.0.0.1:1/unused".into(),
+        hash: FileHash::None,
+        later: LaterRun::None,
+    }]));
+    let item = task.get_item().unwrap();
+    download(
+        0,
+        DownloadObj {
+            task: task.clone(),
+            item: item.clone(),
+        },
+    );
+    assert_eq!(item.get_state(), DownloadItemState::Error);
+    assert_eq!(task.failed_count.load(Ordering::SeqCst), 1);
+    assert_eq!(task.completed_count.load(Ordering::SeqCst), 0);
 }
