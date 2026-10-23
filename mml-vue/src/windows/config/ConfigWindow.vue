@@ -1,27 +1,8 @@
 <script setup lang="ts">
-// 配置文件窗口：左侧是可搜索的文件树，右侧按类型给四种视图
-//
-// 左栏与主窗口的侧栏是同一套皮肤：--bg-side 底、右侧描边、贴窗口的上 / 下 / 左缘；
-// 目录当"分组标题"、文件当"实例行"，两种行同高一档 --row-h: 24px。
-// 窗口因此走 body-flush，右栏只有卡片类视图留 22/26 外留白。
-//
-// 还没选文件时右栏是一个**禁用的空编辑器**，不是一句提示 —— 打开就是编辑器窗口的样子。
-//
-// - 文本（json / json5 / toml / yaml / properties / xml / js / snbt / 纯文本）→ Monaco 编辑（行号 + 着色）+ 保存
-// - NBT（.dat / .nbt / .rio）→ NBT 树，树上的标量就地改再保存
-// - 区域文件（.mca）→ 区块表
-// - 图片（png / jpg / gif / webp）→ 直接显示
-// - 其余（压缩包与别的二进制）→ 二进制视图（一页 4 KiB 的十六进制）
-//
-// 来源两条：实例自己的 options.txt 与 `config` / `kubejs` / `local`，或某个存档目录下的文件。
-// 实例是**窗口身份的一部分**：多窗口模式下一个实例一个窗口、打开时就锁定，单窗口模式按
-// 跳转参数，都没有时退回主窗口选中的那个；
-// 来源（空串 = 实例本身，否则是存档目录名）会一起交给后端，文件路径一律**相对该来源**，
-// 树根因此就是所选来源，存档来源下不会再套一层 `saves`。
-//
-// 保存两条：文本走**行级差异**（lib/textDiff），只回传改了的那几行；NBT 只回传改了的那几处
-// 标量（改动登记在 NbtTree 里）。两条都按打开时的 SHA1 先核对磁盘上还是不是那一份。
-// 标题栏跟日志窗口同一套：左边窗口名，右边实例 chip + 来源下拉，操作留在工具条。
+// 配置文件窗口：左侧文件树，右侧按类型显示文本、NBT、区块、图片或二进制视图。
+// 实例由窗口身份或跳转参数确定；文件路径相对于实例配置目录或选定存档。
+// 文本提交行级差异，NBT 会话记录编辑操作；保存前均用基线 SHA1 检查磁盘冲突。
+// 两栏贴满内容区；未选文件时保留只读空编辑器，实例、来源与操作放在标题栏。
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
@@ -62,15 +43,11 @@ import type { FileItemDto, SaveItemDto } from "../../lib/bindings";
 /** 请求关闭本窗口 */
 const emit = defineEmits<{ (e: "close"): void }>();
 
-/** 文本类文件：能编能存；其余走只读的结构 / 二进制视图 */
+/** 使用文本编辑器的文件类型；NBT 与区域文件由各自视图编辑 */
 const TEXT_TYPES = ["json", "json5", "toml", "yaml", "properties", "xml", "javascript", "snbt", "text"];
 
 /**
- * 文件类型 → Monaco 语言 id
- *
- * 没有对应语言包的一律退回纯文本。两处近似：
- * toml 用仓库里自己注册的那份着色器，见 lib/monacoToml；
- * snbt 长得像 JSON 但键不带引号，借 javascript 的着色器只上色、不做 JSON 校验，免得满屏红线
+ * Monaco 语言映射；TOML 使用本地着色器，SNBT 借用 JavaScript 着色以避开 JSON 校验
  */
 const LANG_OF_TYPE: Record<string, string> = {
   json: "json",
@@ -97,16 +74,10 @@ const loading = ref(false);
 /** 只允许最近一次读请求回写当前编辑上下文。 */
 let requestGeneration = 0;
 
-/** 文本内容与读进来的原文：两者不同就是"未保存" */
+/** 编辑内容与最近一次读取或保存成功的基线；两者不同即未保存 */
 const text = ref("");
 const origin = ref("");
-/**
- * 打开时那一份全文的 SHA1
- *
- * 保存走的是行级差异（见 lib/textDiff），差异只对得上"打开时那一份"；
- * 把它交给后端核对磁盘，变了就拒绝保存，免得冲掉别处（如资源管理改 options.txt）
- * 的改动。
- */
+/** 基线文本的 SHA1，每次保存成功后更新，用于检测外部修改 */
 const originSha1 = ref("");
 const saving = ref(false);
 /** 删除期间锁定编辑上下文，避免完成后的刷新丢掉新输入。 */
@@ -131,7 +102,7 @@ const busy = computed(() => saving.value || nbtSaving.value || deleting.value);
 
 const pendingDiscard = ref<((discard: boolean) => void) | null>(null);
 
-/** 清空文本前确认；保存中不允许切换，避免提交尚未完成就丢掉编辑上下文。 */
+/** 确认是否放弃文本改动；保存、删除或等待确认时拒绝切换 */
 async function allowTextLoss(): Promise<boolean> {
   if (busy.value || pendingDiscard.value) return false;
   if (!isText.value || !dirty.value) return true;
@@ -215,9 +186,7 @@ async function load() {
     instanceName.value = found?.name ?? "";
     worlds.value = nextWorlds;
 
-    // "聚焦某个存档"的跳转（资源窗口右键存档 → 修改配置文件），跟存档名对上就套到来源上。
-    // 单窗口模式读完就地清掉，别让普通跳转再把它带回来；多窗口模式参数是本窗口 URL 的一
-    // 部分，随窗口留着。存档列表里没有的名字套不上，来源保持原样
+    // 单窗口跳转参数消费后清除，多窗口 URL 参数随窗口保留。
     const saveDir = targetSaveDir();
     if (saveDir) {
       if (!multiWindow.value) {
@@ -254,8 +223,7 @@ async function loadFiles(confirmed = false) {
   // 树与搜索都跟着这批文件走：换了来源 / 实例，旧的目录 key 与关键字都没意义了
   expanded.value = new Set();
   query.value = "";
-  // 盘上那一份可能已经不是会话里缓存的样子了：没改动的 NBT 会话就地丢掉（连后端的文件
-  // 句柄一起关，下次打开重读）。有未保存改动的留着，那是用户还没落盘的东西
+  // 关闭干净的 NBT 会话以便重读磁盘，保留会话中尚未保存的编辑。
   await clearCleanSessions();
   if (!current()) return;
   if (!instanceUuid.value) {
@@ -312,11 +280,7 @@ async function open(file: FileItemDto) {
   return true;
 }
 
-/**
- * 保存当前视图：文本走行级差异，NBT 交给树上的登记表
- *
- * 窗口自己不认识 NBT 的改动，只负责把标题栏那一颗保存键分发给对应视图。
- */
+/** 将保存操作分发给文本编辑器或 NBT 视图 */
 async function save() {
   if (busy.value) return;
   if (isNbt.value) {
@@ -333,13 +297,7 @@ async function save() {
   await saveText();
 }
 
-/**
- * 保存当前文本文件：只回传**行级差异**，不再整份送回去
- *
- * 差异是相对打开时那一份算的，所以后端会先核对磁盘上的 SHA1。发出去之前先自检一遍：
- * 把差异套回原文必须与编辑中的内容逐字相同，对不上就退回"整段替换"——
- * 多发一次全文可以接受，按错的差异改盘上的文件不行。
- */
+/** 保存提交瞬间的文本快照，保留等待响应期间的新编辑 */
 async function saveText() {
   const file = selected.value;
   if (!file || !isText.value || busy.value || !dirty.value) return;
@@ -352,6 +310,7 @@ async function saveText() {
     const originLines = splitLines(origin.value);
     const editedLines = splitLines(submitted);
     let hunks = diffLines(originLines, editedLines);
+    // 差异回放必须还原提交内容，否则退回整段替换。
     if (joinLines(applyHunks(originLines, hunks)) !== submitted) {
       hunks = [{ start: 0, deleteCount: originLines.length, lines: editedLines }];
     }
@@ -382,7 +341,7 @@ const findOpen = ref(false);
 /** 查到的区块与节点路径，交给 mca 视图翻页并定位 */
 const mcaTarget = ref<{ chunk: number; path: string[] } | null>(null);
 
-/** 当前来源里的区域文件，查找弹窗里选 */
+/** 当前来源的区域文件，用于判断是否开放实体与方块查找 */
 const mcaFiles = computed(() =>
   files.value.filter((item) => item.fileType === "mca").map((item) => item.name),
 );
@@ -436,14 +395,7 @@ const resizing = ref(false);
 const TREE_MIN_WIDTH = 200;
 const TREE_MAX_WIDTH = 640;
 
-/**
- * 拖动分隔线改左栏宽度
- *
- * 拖动过程中只改本地宽度，松手才落盘 —— 每移动一像素写一次文件没有必要。
- * 监听挂在 `window` 上：指针移出那条窄带也不会中断。
- *
- * - `event`: 分隔线上的按下事件
- */
+/** 拖动时更新侧栏宽度，松手后保存偏好 */
 function startResize(event: PointerEvent) {
   event.preventDefault();
   resizing.value = true;
@@ -535,14 +487,7 @@ function onSourceChange(event: Event) {
   void pickSource(value);
 }
 
-/**
- * Ctrl+S / Cmd+S 保存
- *
- * 有改动、且不是正在存的时候才真存；组合键一律吞掉，
- * 免得浏览器预览下弹出"保存网页"。
- *
- * - `event`: 键盘事件
- */
+/** 用 Ctrl+S 或 Cmd+S 保存，并阻止浏览器默认的保存网页操作 */
 function onSaveHotkey(event: KeyboardEvent) {
   if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "s") {
     return;
@@ -568,8 +513,7 @@ onBeforeUnmount(() => {
   answerDiscard(false);
   window.removeEventListener("keydown", onSaveHotkey);
 });
-// 本窗口走了（多窗口模式下就是窗口关闭，单窗口模式下是页面切走）：打开着的 NBT 文件都放手，
-// 后端那边的句柄跟着关掉，下次打开重新读盘
+// 组件卸载时关闭 NBT 会话；单窗口模式的 KeepAlive 切页不会触发卸载。
 onBeforeUnmount(closeSessions);
 // 单窗口模式切回本窗口时重读；有没保存的改动就不动，免得把编辑内容冲掉
 useWindowRefresh(() => {
@@ -663,7 +607,7 @@ useWindowRefresh(() => {
       </section>
     </div>
 
-    <!-- 查找实体 / 方块：编辑存档时从标题栏打开 -->
+    <!-- 切换上下文前确认是否放弃文本改动 -->
     <BaseModal v-if="pendingDiscard" :title="t('config.unsaved')" @close="answerDiscard(false)">
       <p>{{ t("config.discardChanges") }}</p>
       <div class="modal-actions">
@@ -707,8 +651,7 @@ useWindowRefresh(() => {
   min-height: 0;
 }
 
-/* 左栏：主窗口侧栏那一套 —— --bg-side 底 + 右侧描边 + 贴窗口的上 / 下 / 左缘，宽 300px。
-   窗口走 body-flush，所以这里不再是自己一张"卡片"，而是真的侧栏 */
+/* 侧栏贴窗口边缘，宽度由用户偏好与拖动状态决定 */
 .cfg-list {
   display: flex;
   flex-direction: column;
@@ -718,8 +661,7 @@ useWindowRefresh(() => {
   overflow: hidden;
   background: var(--bg-side);
   border-right: 1px solid var(--border);
-  /* 左栏一行的高度：目录行与文件行同取这一档。比全 app 控件那一档（32px）矮，
-     树里一行就一个名字，24px 一屏能多看几条 */
+  /* 密集文件树使用统一行高，单位像素 */
   --row-h: 24px;
 }
 
@@ -745,8 +687,7 @@ useWindowRefresh(() => {
   padding: 2px 10px 14px;
 }
 
-/* 目录行与文件行同高同圆角：一棵树里两种行的尺寸不一致，扫起来会一跳一跳。
-   行高取左栏自己的 --row-h，比全 app 控件那一档矮：树里条密，一行一个名字就够 */
+/* 目录与文件同高，展开目录时保持行距稳定 */
 .cfg-dir,
 .cfg-row {
   display: flex;
@@ -754,8 +695,7 @@ useWindowRefresh(() => {
   gap: 8px;
   width: 100%;
   height: var(--row-h);
-  /* 必须不缩：.cfg-tree 是 flex 列，条目一多就会被压扁（展开后行高比折叠时矮一半就是这么来的），
-     该滚动的是容器 */
+  /* 条目多时由容器滚动，不能压缩行高 */
   flex-shrink: 0;
   padding: 0 12px;
   border: none;
@@ -819,23 +759,19 @@ useWindowRefresh(() => {
   white-space: nowrap;
 }
 
-/* 右栏：四周留白回到全 app 内容区那一档（窗口走了 body-flush，这里自己给） */
-/* 右栏：**四个编辑模式共用这一张卡片** —— 底色、描边、圆角只写这一处，
-   文本 / NBT / 区块 / 二进制各自铺满它，内边距由各视图按内容疏密自己给。
-   以前是"文本与 NBT 贴边、区块与二进制各带一张卡片"两套口径，切文件时边界会跳 */
+/* 各类视图共用贴边容器，切换文件类型时保持相同边界 */
 .cfg-view {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-width: 0;
   min-height: 0;
-  /* 直接占满右栏：与左栏同一边界口径（左栏也是贴边 + 一条右边框），不要外留白 */
   /* 不透明底：区块 / 二进制是密排文本，半透明底会和窗口背景图叠在一起 */
   background: var(--bg-solid, var(--bg-card));
   overflow: hidden;
 }
 
-/* 视图自己铺满卡片：不漏白底，也不各自撑出自带的外留白 */
+/* 视图占满容器，滚动交给各视图内部 */
 .cfg-view > * {
   flex: 1;
   min-height: 0;

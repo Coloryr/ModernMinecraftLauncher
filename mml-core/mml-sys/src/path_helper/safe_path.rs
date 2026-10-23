@@ -2,12 +2,13 @@
 
 use super::{CoreResult, ErrorType, Path, PathBuf, fs, fs_error, io};
 
-/// 将不可信相对路径限制在指定目录，拒绝父目录、根路径和已有链接。
+/// 将不可信相对路径限制在指定目录，拒绝父目录、绝对路径及相对路径上的已有链接。
 ///
 /// - `root`: 可信根目录，可以尚未创建
 /// - `name`: 相对路径，同时识别两种平台的分隔符
 ///
 /// # 返回值
+///
 /// 返回安全目标路径；路径越界、经过链接或无法检查时返回错误。
 pub fn safe_join(root: &Path, name: &str) -> CoreResult<PathBuf> {
     let reject = || ErrorType::UnsafePath {

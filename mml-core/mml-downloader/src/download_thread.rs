@@ -5,15 +5,15 @@
 //! # 下载流程
 //!
 //! 1. **检查已存在文件** — 文件已存在且哈希匹配 → 直接后处理
-//! 2. **发起 HTTP 请求** — 支持 Range 断点续传，需服务器返回 `Accept-Ranges: bytes`
+//! 2. **发起 HTTP 请求** — 成功响应才落盘；续传需校验 206 响应的 `Content-Range`
 //! 3. **流式写入临时文件** — 边下载边写入，实时更新进度
-//! 4. **下载后校验** — 检查文件大小和哈希值
+//! 4. **下载后校验** — 开启文件检查时核对大小与已知哈希值
 //! 5. **移至目标路径** — 校验通过后移动临时文件到最终位置
 //! 6. **后处理** — 解压 native 库 / 存档文件，成功后才记为完成
 //!
 //! # 重试策略
 //!
-//! 单文件最多重试 5 次，超过后放弃。
+//! 单文件最多重试 5 次；流读取失败可保留已下载数据，范围或内容校验失败则重新下载。
 
 use std::{
     fs::File,
@@ -247,9 +247,6 @@ fn is_need_err(item: &mml_base::file_item::FileItemObj, err: ErrorType, times: &
 /// - `index`: 下载线程序号
 /// - `obj`: 下载项目，包含任务和文件信息
 fn download(index: u32, mut obj: DownloadObj) {
-    // ============================================================
-    // 第一步：检查文件是否已存在
-    // ============================================================
     if obj.item.base.file.exists() {
         if obj.item.overwrite {
             if let Err(err) = path_helper::delete(&obj.item.base.file) {
@@ -289,9 +286,6 @@ fn download(index: u32, mut obj: DownloadObj) {
         }
     }
 
-    // ============================================================
-    // 第二步：循环下载，失败时重试
-    // ============================================================
     let mut times = 0;
     let mut use_break = false;
     let mut server_ranges = true;
@@ -419,9 +413,6 @@ fn download(index: u32, mut obj: DownloadObj) {
         obj.item.set_state(DownloadItemState::GetInfo);
         crate::update(index, &obj.item);
 
-        // ============================================================
-        // 第三步：流式写入文件
-        // ============================================================
         let result = block_on(write_file(index, &mut obj, &mut resp, &mut file));
         if let Err(err) = result {
             if matches!(
@@ -447,9 +438,6 @@ fn download(index: u32, mut obj: DownloadObj) {
         break;
     }
 
-    // ============================================================
-    // 第四步：移动到最终路径
-    // ============================================================
     if is_cancel {
         // 取消不是失败：状态记"已取消"、不计入任务失败数，残缺的临时文件也不留在缓存里
         let _ = path_helper::delete(&temp_file);
@@ -468,9 +456,7 @@ fn download(index: u32, mut obj: DownloadObj) {
         return;
     }
 
-    // 搬运失败（目标被别的进程占着、目标父路径不是目录……）也只是这一项失败，
-    // **不能 panic**：panic 打死工作线程后，它手里那一项永远不会被标记，
-    // 任务在"全部记完"那道门前卡死，调用方（乃至界面）永远等不到结束
+    // 移动失败也必须记录任务终态，避免调用方一直等待完成。
     if let Err(err) = path_helper::move_file(&temp_file, &obj.item.base.file) {
         mml_log::error_type(err);
         let _ = path_helper::delete(&temp_file);
@@ -496,8 +482,7 @@ fn finish_download(index: u32, obj: &DownloadObj) {
         LaterRun::UnpackSave(path_buf) => {
             BaseArchive::decompress(ArchiveType::Zip, &obj.item.base.file, path_buf, None)
         }
-        // 换新版：新文件已经就位，把旧的挪进回收站。放在下载线程里做是为了"下完一个换一个"：
-        // 不用等整批下完，mods 目录里也不会新旧同名文件同时存在
+        // 新文件就位后立即回收旧版本，无需等待整批下载完成。
         LaterRun::ReplaceOld(old) => path_helper::move_to_trash(old),
     };
 
@@ -514,7 +499,7 @@ fn finish_download(index: u32, obj: &DownloadObj) {
     obj.task.done();
 }
 
-/// 校验开放式 Range 响应的起点、终点与响应体长度。
+/// 校验开放式 Range 的起止位置及已知响应长度，成功时返回完整文件大小。
 fn resumed_total(resp: &Response, offset: u64) -> Option<u64> {
     let range = resp
         .headers()

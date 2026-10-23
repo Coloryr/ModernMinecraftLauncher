@@ -177,7 +177,7 @@ impl R7zReader {
 
         process.set_count(seven.archive().files.len());
 
-        // 预计算所有条目的目标路径，文件名非法时替换为 `_`，GUI 不同意则取消
+        // 写入前校验全部条目的原路径与重命名结果，任一越界即拒绝解压。
         let dest_map: HashMap<String, PathBuf> = seven
             .archive()
             .files
