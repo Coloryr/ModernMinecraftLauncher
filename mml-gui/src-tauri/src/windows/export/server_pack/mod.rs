@@ -74,12 +74,12 @@ pub(super) fn export_pack(
 pub async fn export_import_server_pack(app: AppHandle, file: String) -> Result<(), String> {
     tokio::task::spawn_blocking(move || {
         let _guard = IMPORTING.try_lock().map_err(|_| err_keys::SERVER_PACK_BUSY.to_string())?;
-        let _launch_guard = crate::windows::main::launch::import_guard()?;
-        if !mml_game::get_running_instances().is_empty() { return Err(err_keys::SERVER_PACK_BUSY.to_string()); }
+        let mut launch_guard = crate::windows::main::launch::import_guard()?;
         let root = gui_config::dir().ok_or(err_keys::SERVER_PACK_INVALID)?;
         let imported = mml_config::config_save::replace_before_restart(|| import_pack(Path::new(&file), &root))?;
         *mml_config::write_config() = imported.config;
         gui_config::set(imported.gui);
+        launch_guard.commit();
         crate::windows::window_restart_app(app);
         Ok(())
     }).await.map_err(|e| e.to_string())?
