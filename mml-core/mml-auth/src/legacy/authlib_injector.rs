@@ -44,17 +44,19 @@ pub async fn authenticate(
     auth.auth_type = AuthType::AuthlibInjector;
     auth.text1 = Some(server.clone());
 
-    let need_select = false;
+    let need_select = obj.needs_selection;
 
     if let Some(list) = obj.logins {
         match gui {
             Some(gui) => {
                 let auths: Vec<String> = list.iter().map(|x| x.user_name.clone()).collect();
                 let index = gui.select_auth(auths);
-                if let Some(item) = list.get(index as usize) {
-                    auth.uuid = item.uuid.clone();
-                    auth.user_name = item.user_name.clone();
-                }
+                let item = usize::try_from(index)
+                    .ok()
+                    .and_then(|index| list.get(index))
+                    .ok_or(ErrorType::TaskCancel)?;
+                auth.uuid = item.uuid.clone();
+                auth.user_name = item.user_name.clone();
             }
             None => {
                 let item = &list[0];

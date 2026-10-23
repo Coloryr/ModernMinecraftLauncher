@@ -62,6 +62,8 @@ pub struct LegacyLoginRes {
     pub auth: LoginObj,
     /// 可选的账户列表，服务器返回多个角色时为 `Some`
     pub logins: Option<Vec<LoginObj>>,
+    /// 服务器尚未绑定角色，刷新时需提交本地选中的角色。
+    pub needs_selection: bool,
 }
 
 /// 把 Yggdrasil 服务器的 HTTP 错误响应转成可读的登录失败原因
@@ -129,6 +131,7 @@ pub async fn authenticate(
         Ok(LegacyLoginRes {
             auth: LoginObj::new(data.name, data.id, obj.access_token, obj.client_token),
             logins: None,
+            needs_selection: false,
         })
     } else if let Some(list) = obj.available_profiles {
         if list.len() == 0 {
@@ -145,6 +148,7 @@ pub async fn authenticate(
                     obj.client_token,
                 ),
                 logins: None,
+                needs_selection: true,
             })
         } else {
             // 多个角色，优先按用户名匹配
@@ -160,6 +164,7 @@ pub async fn authenticate(
                         obj.client_token,
                     ),
                     logins: None,
+                    needs_selection: true,
                 })
             } else {
                 // 无一匹配，返回可选列表让用户自行选择
@@ -171,6 +176,7 @@ pub async fn authenticate(
                 Ok(LegacyLoginRes {
                     auth: LoginObj::new_token(obj.access_token, obj.client_token),
                     logins: Some(logins),
+                    needs_selection: true,
                 })
             }
         }
