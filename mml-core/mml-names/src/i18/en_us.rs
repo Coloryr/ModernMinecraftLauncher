@@ -151,6 +151,11 @@ impl I18Lang for EnUs {
                     data.error
                 )
             }
+            ErrorType::UnsafePath { root, path } => format!(
+                "Rejected unsafe path {} within {}",
+                path.display(),
+                root.display()
+            ),
             ErrorType::MoveToTrashError(data) => format!(
                 "Failed to move {} to trash, code 0x{:X}",
                 data.path.display().to_string(),
@@ -182,6 +187,10 @@ impl I18Lang for EnUs {
 
             ErrorType::NbtTypeError => String::from("NBT type error"),
             ErrorType::NbtReadError => String::from("Failed to read NBT"),
+            ErrorType::DownloadRangeError(url) => format!("Invalid download byte range: {url}"),
+            ErrorType::NbtStringTooLong(size) => {
+                format!("NBT string is {size} bytes; maximum is 65535")
+            }
 
             ErrorType::ArgEmpty(data) => match data {
                 ArgEmptyData::Name => String::from("Name argument is empty"),
@@ -349,6 +358,7 @@ impl I18Lang for EnUs {
             ErrorType::IpcWriteError(data) => {
                 format!("IPC: failed to send data: {}", data.error)
             }
+            ErrorType::IpcInvalidFrame => "IPC: invalid frame length".to_string(),
             ErrorType::IpcFrameTooLarge { len } => {
                 format!("IPC: frame too large, {len} bytes")
             }

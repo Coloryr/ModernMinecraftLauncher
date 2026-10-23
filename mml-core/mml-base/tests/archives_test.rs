@@ -11,7 +11,7 @@ use std::{
     io::{Cursor, Read},
     path::{Path, PathBuf},
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
     },
 };
@@ -76,6 +76,9 @@ fn all_types() -> Vec<ArchiveType> {
 struct TestGui {
     /// `start` 回调调用次数
     start: AtomicUsize,
+    /// 本轮条目总数与逐次进度。
+    total: AtomicUsize,
+    currents: Mutex<Vec<usize>>,
     /// `update` 回调调用次数
     update: AtomicUsize,
     /// `done` 回调调用次数
@@ -87,11 +90,14 @@ struct TestGui {
 }
 
 impl IBaseArchiveGui for TestGui {
-    fn start(&self, _total: usize) {
+    fn start(&self, total: usize) {
         self.start.fetch_add(1, Ordering::SeqCst);
+        self.total.store(total, Ordering::SeqCst);
+        self.currents.lock().unwrap().clear();
     }
-    fn update(&self, _filename: Option<String>, _current: usize) {
+    fn update(&self, _filename: Option<String>, current: usize) {
         self.update.fetch_add(1, Ordering::SeqCst);
+        self.currents.lock().unwrap().push(current);
     }
     fn done(&self) {
         self.done.fetch_add(1, Ordering::SeqCst);
@@ -462,6 +468,13 @@ fn test_gui_callback() {
     .unwrap();
     assert!(gui.start.load(Ordering::SeqCst) >= 2);
     assert_eq!(gui.done.load(Ordering::SeqCst), 1);
+    let total = BaseArchive::open(&archive_file).unwrap().entries().len();
+    assert_eq!(gui.total.load(Ordering::SeqCst), total);
+    assert_eq!(
+        *gui.currents.lock().unwrap(),
+        (1..=total).collect::<Vec<_>>()
+    );
+    assert_roundtrip_output(&out_dir);
 
     let _ = fs::remove_dir_all(&root);
 }

@@ -44,6 +44,7 @@ import { applyHunks, diffLines, joinLines, splitLines } from "../../lib/textDiff
 import { familyInstanceFromLabel, multiWindow, targetSaveDir, targetUuid, windowParams } from "../windowManager";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
+import BaseModal from "../../components/ui/BaseModal.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import HighlightText from "../../components/ui/HighlightText.vue";
 import SearchBox from "../../components/ui/SearchBox.vue";
@@ -93,6 +94,8 @@ const source = ref("");
 const files = ref<FileItemDto[]>([]);
 const selected = ref<FileItemDto | null>(null);
 const loading = ref(false);
+/** 只允许最近一次读请求回写当前编辑上下文。 */
+let requestGeneration = 0;
 
 /** 文本内容与读进来的原文：两者不同就是"未保存" */
 const text = ref("");
@@ -106,6 +109,8 @@ const origin = ref("");
  */
 const originSha1 = ref("");
 const saving = ref(false);
+/** 删除期间锁定编辑上下文，避免完成后的刷新丢掉新输入。 */
+const deleting = ref(false);
 
 /** NBT 视图里有没有未保存的改动，由 NbtTree 报上来 */
 const nbtDirty = ref(false);
@@ -122,7 +127,23 @@ const canSave = computed(() => isText.value || isNbt.value);
 /** 当前视图有没有未保存的改动 */
 const unsaved = computed(() => (isText.value ? dirty.value : nbtDirty.value));
 /** 正忙着落盘：保存键在这期间不能再点 */
-const busy = computed(() => saving.value || nbtSaving.value);
+const busy = computed(() => saving.value || nbtSaving.value || deleting.value);
+
+const pendingDiscard = ref<((discard: boolean) => void) | null>(null);
+
+/** 清空文本前确认；保存中不允许切换，避免提交尚未完成就丢掉编辑上下文。 */
+async function allowTextLoss(): Promise<boolean> {
+  if (busy.value || pendingDiscard.value) return false;
+  if (!isText.value || !dirty.value) return true;
+  return new Promise((resolve) => { pendingDiscard.value = resolve; });
+}
+
+function answerDiscard(discard: boolean) {
+  if (discard && busy.value) return;
+  const resolve = pendingDiscard.value;
+  pendingDiscard.value = null;
+  resolve?.(discard);
+}
 
 /** 当前文件该用哪种 Monaco 语言 */
 function langOf(file: FileItemDto): string {
@@ -224,6 +245,8 @@ const emptyTip = computed(() => {
 
 /** 读当前实例与它的存档列表，再列文件 */
 async function load() {
+  if (!(await allowTextLoss())) return;
+  const generation = ++requestGeneration;
   loading.value = true;
   try {
     const list = await api.getInstances();
@@ -232,11 +255,13 @@ async function load() {
     const locked = familyInstanceFromLabel("config") ?? targetUuid() ?? "";
     const uuid = locked || (await loadGuiConfig())?.mainWindow.selectedInstance || "";
     const found = list.find((i) => i.uuid === uuid) ?? null;
+    const nextWorlds = found ? await listSaves(found.uuid) : [];
+    if (generation !== requestGeneration) return;
     // 换了实例就把来源退回"实例本身"：原来那个存档名在新实例里没有
     if (found?.uuid !== instanceUuid.value) source.value = "";
     instanceUuid.value = found?.uuid ?? "";
     instanceName.value = found?.name ?? "";
-    worlds.value = found ? await listSaves(found.uuid) : [];
+    worlds.value = nextWorlds;
 
     // "聚焦某个存档"的跳转（资源窗口右键存档 → 修改配置文件），跟存档名对上就套到来源上。
     // 单窗口模式读完就地清掉，别让普通跳转再把它带回来；多窗口模式参数是本窗口 URL 的一
@@ -251,18 +276,25 @@ async function load() {
       }
     }
   } catch (e) {
+    if (generation !== requestGeneration) return;
     showToast(tErr(e));
     instanceUuid.value = "";
     instanceName.value = "";
     worlds.value = [];
   } finally {
-    loading.value = false;
+    if (generation === requestGeneration) loading.value = false;
   }
-  await loadFiles();
+  if (generation === requestGeneration) await loadFiles(true);
 }
 
 /** 按当前来源列文件 */
-async function loadFiles() {
+async function loadFiles(confirmed = false) {
+  if (!confirmed && !(await allowTextLoss())) return;
+  const generation = ++requestGeneration;
+  const uuid = instanceUuid.value;
+  const from = source.value;
+  const current = () => generation === requestGeneration && uuid === instanceUuid.value && from === source.value;
+  loading.value = true;
   selected.value = null;
   text.value = "";
   origin.value = "";
@@ -273,45 +305,59 @@ async function loadFiles() {
   // 盘上那一份可能已经不是会话里缓存的样子了：没改动的 NBT 会话就地丢掉（连后端的文件
   // 句柄一起关，下次打开重读）。有未保存改动的留着，那是用户还没落盘的东西
   await clearCleanSessions();
+  if (!current()) return;
   if (!instanceUuid.value) {
     files.value = [];
+    loading.value = false;
     return;
   }
 
-  loading.value = true;
   try {
     // 来源直接交给后端：空串是实例本身，否则是存档目录，路径一律相对该来源
-    const list = await listConfigFiles(instanceUuid.value, source.value);
+    const list = await listConfigFiles(uuid, from);
+    if (!current()) return;
     // 顺序交给文件树统一给（每层目录在前）；这里只拷一份，不和 IPC 返回的数组共享引用
     files.value = [...list];
   } catch (e) {
+    if (!current()) return;
     files.value = [];
     showToast(tErr(e));
   } finally {
-    loading.value = false;
+    if (current()) loading.value = false;
   }
 }
 
 /** 选中一个文件：文本类顺手把内容拉下来，其余交给各自的视图组件 */
 async function open(file: FileItemDto) {
+  if (selected.value?.name === file.name) return true;
+  if (!(await allowTextLoss())) return false;
+  const generation = ++requestGeneration;
+  const uuid = instanceUuid.value;
+  const from = source.value;
+  const current = () => generation === requestGeneration && uuid === instanceUuid.value && from === source.value;
   selected.value = file;
   text.value = "";
   origin.value = "";
   originSha1.value = "";
   nbtDirty.value = false;
-  if (!TEXT_TYPES.includes(file.fileType)) return;
+  if (!TEXT_TYPES.includes(file.fileType)) {
+    loading.value = false;
+    return true;
+  }
 
   loading.value = true;
   try {
-    const data = await readConfigFile(instanceUuid.value, source.value, file.name);
+    const data = await readConfigFile(uuid, from, file.name);
+    if (!current()) return false;
     text.value = data.text;
     origin.value = data.text;
     originSha1.value = data.sha1;
   } catch (e) {
-    showToast(tErr(e));
+    if (current()) showToast(tErr(e));
   } finally {
-    loading.value = false;
+    if (current()) loading.value = false;
   }
+  return true;
 }
 
 /**
@@ -320,6 +366,7 @@ async function open(file: FileItemDto) {
  * 窗口自己不认识 NBT 的改动，只负责把标题栏那一颗保存键分发给对应视图。
  */
 async function save() {
+  if (busy.value) return;
   if (isNbt.value) {
     const tree = nbtRef.value;
     if (!tree || nbtSaving.value || !nbtDirty.value) return;
@@ -343,27 +390,32 @@ async function save() {
  */
 async function saveText() {
   const file = selected.value;
-  if (!file || !isText.value || saving.value || !dirty.value) return;
+  if (!file || !isText.value || busy.value || !dirty.value) return;
 
+  const submitted = text.value;
+  const uuid = instanceUuid.value;
+  const from = source.value;
   saving.value = true;
   try {
     const originLines = splitLines(origin.value);
-    const editedLines = splitLines(text.value);
+    const editedLines = splitLines(submitted);
     let hunks = diffLines(originLines, editedLines);
-    if (joinLines(applyHunks(originLines, hunks)) !== text.value) {
+    if (joinLines(applyHunks(originLines, hunks)) !== submitted) {
       hunks = [{ start: 0, deleteCount: originLines.length, lines: editedLines }];
     }
 
     const sha1 = await writeConfigFile(
-      instanceUuid.value,
-      source.value,
+      uuid,
+      from,
       file.name,
       originSha1.value,
       editedLines.length,
       hunks,
     );
-    origin.value = text.value;
-    originSha1.value = sha1;
+    if (selected.value === file && instanceUuid.value === uuid && source.value === from) {
+      origin.value = submitted;
+      originSha1.value = sha1;
+    }
     showToast(t("config.saved"));
   } catch (e) {
     showToast(tErr(e));
@@ -414,8 +466,7 @@ async function onFindChunk(form: { kind: string; x: string; z: string; name: str
     findOpen.value = false;
     // 文件名由后端按坐标算出来，直接切过去；mca 视图再按 chunk / reveal 翻到那一块
     const target = files.value.find((item) => item.name === found.file);
-    if (target) {
-      selected.value = target;
+    if (target && await open(target)) {
       mcaTarget.value = { chunk: found.index, path: found.path };
     }
   } catch (e) {
@@ -497,13 +548,19 @@ async function onRowMenuPick(id: string) {
       return;
     }
     if (id === "delete") {
-      await deleteConfigFile(instanceUuid.value, source.value, target.name);
-      // 删掉的正好是打开着的那份：右边清掉，免得对着一份已经不存在的文件
-      if (selected.value?.name === target.name) {
-        selected.value = null;
+      if (loading.value || !(await allowTextLoss())) return;
+      const generation = ++requestGeneration;
+      const uuid = instanceUuid.value;
+      const from = source.value;
+      deleting.value = true;
+      try {
+        await deleteConfigFile(uuid, from, target.name);
+        if (generation !== requestGeneration || uuid !== instanceUuid.value || from !== source.value) return;
+        await loadFiles(true);
+        showToast(t("config.deleted"));
+      } finally {
+        deleting.value = false;
       }
-      await loadFiles();
-      showToast(t("config.deleted"));
     }
   } catch (e) {
     showToast(tErr(e));
@@ -513,8 +570,17 @@ async function onRowMenuPick(id: string) {
 /** 换来源：存档下拉改了就重列 */
 async function pickSource(value: string) {
   if (value === source.value) return;
+  if (!(await allowTextLoss())) return;
   source.value = value;
-  await loadFiles();
+  await loadFiles(true);
+}
+
+/** 原生 select 已改了显示值，先还原，确认后再由响应式来源更新。 */
+function onSourceChange(event: Event) {
+  const select = event.target as HTMLSelectElement;
+  const value = select.value;
+  select.value = source.value;
+  void pickSource(value);
 }
 
 /**
@@ -546,6 +612,8 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  requestGeneration += 1;
+  answerDiscard(false);
   window.removeEventListener("keydown", onSaveHotkey);
 });
 // 本窗口走了（多窗口模式下就是窗口关闭，单窗口模式下是页面切走）：打开着的 NBT 文件都放手，
@@ -563,8 +631,8 @@ useWindowRefresh(() => {
     <template #head-right>
       <div class="head-cfg">
         <InstanceChip :instance="instanceChip" />
-        <select class="field-select head-select" :value="source" :disabled="loading" v-tip="t('config.sourceTip')"
-          :aria-label="t('config.sourceTip')" @change="pickSource(($event.target as HTMLSelectElement).value)">
+        <select class="field-select head-select" :value="source" :disabled="loading || busy" v-tip="t('config.sourceTip')"
+          :aria-label="t('config.sourceTip')" @change="onSourceChange">
           <option value="">{{ t("config.instance") }}</option>
           <option v-for="world in worlds" :key="world.dir" :value="world.dir">
             {{ world.levelName || world.dir }}
@@ -578,8 +646,8 @@ useWindowRefresh(() => {
           {{ t("config.readonly") }}
         </span>
 
-        <BaseButton size="sm" variant="ghost" class="icon-btn-head" :disabled="loading" v-tip="t('config.refresh')"
-          :aria-label="t('config.refresh')" @click="loadFiles">
+        <BaseButton size="sm" variant="ghost" class="icon-btn-head" :disabled="loading || busy" v-tip="t('config.refresh')"
+          :aria-label="t('config.refresh')" @click="loadFiles()">
           <GlyphIcon name="refresh" :size="15" :weight="1.8" />
         </BaseButton>
         <BaseButton v-if="source" size="sm" variant="ghost" class="icon-btn-head" :disabled="!mcaFiles.length"
@@ -630,7 +698,7 @@ useWindowRefresh(() => {
       <section class="cfg-view">
         <!-- 与下面那个必须给不同的 key：同为 MonacoText，Vue 会复用实例，
              而只读是创建时的选项，复用后切不回可编辑 -->
-        <MonacoText v-if="!selected" key="empty" :model-value="''" readonly />
+        <MonacoText v-if="!selected || (isText && (loading || deleting))" key="empty" :model-value="deleting ? text : ''" readonly />
         <MonacoText v-else-if="isText" key="file" v-model="text" :language="langOf(selected)" />
         <NbtTree v-else-if="isNbt" ref="nbtRef" :uuid="instanceUuid" :source="source" :file="selected.name"
           @dirty="nbtDirty = $event" />
@@ -643,6 +711,13 @@ useWindowRefresh(() => {
     </div>
 
     <!-- 查找实体 / 方块：编辑存档时从标题栏打开 -->
+    <BaseModal v-if="pendingDiscard" :title="t('config.unsaved')" @close="answerDiscard(false)">
+      <p>{{ t("config.discardChanges") }}</p>
+      <div class="modal-actions">
+        <BaseButton @click="answerDiscard(false)">{{ t("config.keepEditing") }}</BaseButton>
+        <BaseButton variant="danger" :disabled="busy" @click="answerDiscard(true)">{{ t("config.discard") }}</BaseButton>
+      </div>
+    </BaseModal>
     <McaFindModal v-if="findOpen" @find="onFindChunk" @close="findOpen = false" />
 
     <!-- 文件行右键菜单：打开所在目录 / 删除 -->

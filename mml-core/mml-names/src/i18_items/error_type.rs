@@ -245,6 +245,13 @@ pub enum ErrorType {
 
     /// 文件系统处理错误
     FileSystemError(FileSystemErrorData),
+    /// 路径越界或经过不允许跟随的链接
+    UnsafePath {
+        /// 允许操作的根目录
+        root: PathBuf,
+        /// 被拒绝的路径
+        path: PathBuf,
+    },
     /// 移动到回收站失败
     MoveToTrashError(MoveToTrashErrorData),
     /// 文件获取错误
@@ -272,6 +279,10 @@ pub enum ErrorType {
     NbtTypeError,
     /// NBT读取失败
     NbtReadError,
+    /// NBT 字符串超出无符号 16 位字节长度。
+    NbtStringTooLong(usize),
+    /// 下载服务器返回了与续传请求不匹配的字节范围。
+    DownloadRangeError(String),
 
     /// 输入参数为空
     ArgEmpty(ArgEmptyData),
@@ -388,6 +399,8 @@ pub enum ErrorType {
     IpcAcceptError(ErrorData),
     /// IPC：发送数据失败
     IpcWriteError(ErrorData),
+    /// IPC 长度字段为负数，无法确定消息边界。
+    IpcInvalidFrame,
     /// IPC：数据帧超过长度上限
     IpcFrameTooLarge {
         /// 实际长度，单位字节

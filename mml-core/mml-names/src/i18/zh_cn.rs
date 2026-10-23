@@ -144,6 +144,11 @@ impl I18Lang for ZhCn {
                     data.error
                 )
             }
+            ErrorType::UnsafePath { root, path } => format!(
+                "拒绝不安全路径 {}，操作范围为 {}",
+                path.display(),
+                root.display()
+            ),
             ErrorType::MoveToTrashError(data) => format!(
                 "把 {} 移到回收站失败，返回码 0x{:X}",
                 data.path.display().to_string(),
@@ -173,6 +178,10 @@ impl I18Lang for ZhCn {
 
             ErrorType::NbtTypeError => String::from("NBT类型错误"),
             ErrorType::NbtReadError => String::from("NBT读取失败"),
+            ErrorType::DownloadRangeError(url) => format!("下载响应的字节范围不匹配：{url}"),
+            ErrorType::NbtStringTooLong(size) => {
+                format!("NBT 字符串为 {size} 字节，最多允许 65535 字节")
+            }
 
             ErrorType::ArgEmpty(data) => match data {
                 ArgEmptyData::Name => String::from("名字参数为空"),
@@ -308,6 +317,7 @@ impl I18Lang for ZhCn {
             ErrorType::IpcBindError(data) => format!("IPC：绑定端口失败：{}", data.error),
             ErrorType::IpcAcceptError(data) => format!("IPC：接受连接失败：{}", data.error),
             ErrorType::IpcWriteError(data) => format!("IPC：发送数据失败：{}", data.error),
+            ErrorType::IpcInvalidFrame => "IPC：数据帧长度无效".to_string(),
             ErrorType::IpcFrameTooLarge { len } => format!("IPC：数据帧过长，{len} 字节"),
             ErrorType::IpcBufferOverrun => String::from("IPC：接收缓冲区溢出，断开连接"),
         }

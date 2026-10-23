@@ -4,10 +4,9 @@ use std::{
     fs,
     io::{self, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
-    sync::atomic::Ordering,
 };
 
-use mml_names::i18_items::error_type::CoreResult;
+use mml_names::i18_items::error_type::{CoreResult, ErrorType};
 use mml_sys::path_helper;
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, DateTime, ZipArchive, ZipWriter};
@@ -172,8 +171,10 @@ impl ZipReader {
             };
 
             // 文件名非法时询问 GUI 是否替换
-            let outpath =
-                output_dir_canonical.join(process.check_name(&outpath.to_string_lossy())?);
+            let outpath = path_helper::safe_join(
+                &output_dir_canonical,
+                &process.check_name(&outpath.to_string_lossy())?,
+            )?;
 
             process.add_now(&outpath);
 
@@ -198,21 +199,15 @@ impl ZipReader {
                 let mut target = Vec::new();
                 file.read_to_end(&mut target).map_err(read_error)?;
                 let target_str = String::from_utf8(target).map_err(read_error)?;
-                make_symlink(&outpath, &target_str)?;
+                let resolved = resolve_link_target(&output_dir_canonical, &outpath, &target_str)?;
+                if let Some(parent) = outpath.parent() {
+                    path_helper::create_dir_all(parent)?;
+                }
+                make_symlink(&outpath, &target_str, &resolved)?;
                 continue;
             }
 
             // 普通文件
-            let now = process.now.fetch_add(1, Ordering::SeqCst) + 1;
-
-            if let Some(gui) = &process.gui {
-                let filename = outpath
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_default();
-                gui.update(Some(filename), now);
-            }
-
             if let Some(parent) = outpath.parent() {
                 let res = fs::create_dir_all(parent);
                 if let Err(err) = res {
@@ -437,15 +432,16 @@ fn datetime_to_systemtime(time: &DateTime) -> Option<std::time::SystemTime> {
 ///
 /// 创建失败时返回相应错误
 #[cfg(unix)]
-fn make_symlink(target_path: &Path, link_target: &str) -> io::Result<()> {
+fn make_symlink(target_path: &Path, link_target: &str, _resolved: &Path) -> CoreResult<()> {
     std::os::unix::fs::symlink(link_target, target_path)
+        .map_err(|err| fs_err(target_path.to_path_buf(), err))
 }
 
 /// 创建符号链接，Windows 下按目标类型选择目录或文件链接
 #[cfg(windows)]
-fn make_symlink(target_path: &Path, link_target: &str) -> CoreResult<()> {
+fn make_symlink(target_path: &Path, link_target: &str, resolved: &Path) -> CoreResult<()> {
     let target = Path::new(link_target);
-    if target.is_dir() {
+    if resolved.is_dir() {
         std::os::windows::fs::symlink_dir(target, target_path)
     } else {
         std::os::windows::fs::symlink_file(target, target_path)
@@ -455,11 +451,47 @@ fn make_symlink(target_path: &Path, link_target: &str) -> CoreResult<()> {
 
 /// 创建符号链接，不支持的平台退化为写普通文件
 #[cfg(not(any(unix, windows)))]
-fn make_symlink(target_path: &Path, link_target: &str) -> io::Result<()> {
+fn make_symlink(target_path: &Path, link_target: &str, _resolved: &Path) -> CoreResult<()> {
     // 不支持符号链接的平台：写为普通文件，内容为链接目标
-    let mut f = File::create(target_path)?;
-    f.write_all(link_target.as_bytes())?;
+    let mut f =
+        fs::File::create(target_path).map_err(|err| fs_err(target_path.to_path_buf(), err))?;
+    f.write_all(link_target.as_bytes())
+        .map_err(|err| fs_err(target_path.to_path_buf(), err))?;
     Ok(())
+}
+
+/// 按链接所在目录解析目标，允许包内的父目录引用，拒绝逃逸和链接链。
+fn resolve_link_target(root: &Path, link: &Path, target: &str) -> CoreResult<PathBuf> {
+    let reject = || ErrorType::UnsafePath {
+        root: root.to_path_buf(),
+        path: PathBuf::from(target),
+    };
+    let target = target.replace('\\', "/");
+    if target.starts_with('/') || target.is_empty() {
+        return Err(reject());
+    }
+    let mut relative = link
+        .strip_prefix(root)
+        .map_err(|_| reject())?
+        .parent()
+        .unwrap_or(Path::new(""))
+        .to_path_buf();
+    for part in target
+        .split('/')
+        .filter(|part| !part.is_empty() && *part != ".")
+    {
+        if part == ".." {
+            if !relative.pop() {
+                return Err(reject());
+            }
+        } else {
+            if part.as_bytes().get(1) == Some(&b':') {
+                return Err(reject());
+            }
+            relative.push(part);
+        }
+    }
+    path_helper::safe_join(root, &relative.to_string_lossy())
 }
 
 /// 设置文件或目录的 Unix 权限，仅 Unix 下编译

@@ -24,6 +24,7 @@ use crate::{
     serverpack::serverpack_obj::{ServerArchiveItemObj, ServerItemObj, ServerPackObj},
 };
 
+mod paths;
 pub mod plan;
 pub mod serverpack_obj;
 
@@ -82,6 +83,11 @@ impl InstanceSettingObj {
         let old = self.get_old_serverpack()?;
 
         let game_path = self.get_game_path();
+        let temp_path = self.get_temp_path();
+        paths::validate_pack(&new_pack, &game_path, &temp_path)?;
+        if let Some(old) = &old {
+            paths::validate_pack(old, &game_path, &temp_path)?;
+        }
 
         if let Some(old) = &old {
             // 删什么由纯函数算，见 `serverpack::plan`，这里只负责执行
@@ -92,7 +98,7 @@ impl InstanceSettingObj {
                 if cancel.is_cancelled() {
                     return Err(ErrorType::TaskCancel);
                 }
-                delete_with_disabled(game_path.join(&item.file));
+                delete_with_disabled(paths::file_path(&game_path, &item.file)?);
             }
 
             // 删除已移除的配置文件，仅删除由该配置独享的目录
@@ -100,7 +106,7 @@ impl InstanceSettingObj {
                 if cancel.is_cancelled() {
                     return Err(ErrorType::TaskCancel);
                 }
-                path_helper::move_to_trash(game_path.join(&item.dir))?;
+                path_helper::move_to_trash(paths::file_path(&game_path, &item.dir)?)?;
             }
         }
 
@@ -126,14 +132,14 @@ impl InstanceSettingObj {
             downloads.push(FileItemObj {
                 url: planned.url.clone(),
                 name: planned.item.file.clone(),
-                file: game_path.join(&planned.item.file),
+                file: paths::file_path(&game_path, &planned.item.file)?,
                 hash: plan::make_hash(&planned.item.sha1, &planned.item.sha256),
                 later: LaterRun::None,
             });
         }
 
         for planned in &plan.archives {
-            let temp = self.get_temp_path().join(&planned.item.file);
+            let temp = paths::file_path(&temp_path, &planned.item.file)?;
             downloads.push(FileItemObj {
                 url: planned.url.clone(),
                 name: planned.item.file.clone(),
@@ -153,7 +159,7 @@ impl InstanceSettingObj {
                 return Err(ErrorType::TaskCancel);
             }
 
-            let output = game_path.join(&item.dir);
+            let output = path_helper::safe_join(&game_path, &item.dir)?;
             // 覆盖解压时先删除旧目录
             if item.delete_old && output.exists() {
                 path_helper::move_to_trash(&output)?;

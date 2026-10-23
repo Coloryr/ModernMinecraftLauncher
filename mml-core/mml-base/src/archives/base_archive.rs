@@ -666,19 +666,21 @@ impl BaseArchive {
 
         // 需要剥离目录或存在排除项时逐条提取，批量解压路径无法调整条目位置
         if strip_dir.is_some() || unselect.is_some() {
-            return self.extract_where(
+            return self.extract_mapped(
                 |entry| {
                     if let Some(patterns) = &unselect {
                         if patterns.iter().any(|u| u == &entry.name) {
-                            return None;
+                            return Ok(None);
                         }
                     }
+                    path_helper::safe_join(output_dir, &entry.name)?;
                     let rel = match &strip_dir {
                         Some(dir) => strip_dir_prefix(&entry.name, dir),
                         None => entry.name.clone(),
                     };
-                    Some(output_dir.join(rel))
+                    path_helper::safe_join(output_dir, &rel).map(Some)
                 },
+                Some(output_dir),
                 gui.as_deref(),
             );
         }
@@ -706,14 +708,34 @@ impl BaseArchive {
         mut map: F,
         gui: Option<&dyn IBaseArchiveGui>,
     ) -> CoreResult<()> {
+        self.extract_mapped(|entry| Ok(map(entry)), None, gui)
+    }
+
+    /// 收集提取路径；指定根目录时，重命名后的最终路径也必须留在目录内。
+    fn extract_mapped<F: FnMut(&ArchiveEntryInfo) -> CoreResult<Option<PathBuf>>>(
+        &self,
+        mut map: F,
+        root: Option<&Path>,
+        gui: Option<&dyn IBaseArchiveGui>,
+    ) -> CoreResult<()> {
         // 顺序阶段：计算目标路径，文件名非法时的 GUI 询问保持串行
         let mut tasks: Vec<ExtractTask> = Vec::new();
         for entry in &self.entries {
             if entry.is_dir {
                 continue;
             }
-            if let Some(base) = map(entry) {
+            if let Some(base) = map(entry)? {
                 let output = self.resolve_output_path(&entry.name, base, gui)?;
+                if let Some(root) = root {
+                    let relative =
+                        output
+                            .strip_prefix(root)
+                            .map_err(|_| ErrorType::UnsafePath {
+                                root: root.to_path_buf(),
+                                path: output.clone(),
+                            })?;
+                    path_helper::safe_join(root, &relative.to_string_lossy())?;
+                }
                 tasks.push(ExtractTask {
                     name: entry.name.clone(),
                     output_path: output,
@@ -802,7 +824,9 @@ impl BaseArchive {
         }
 
         // 先压缩到临时文件，再原子替换
-        let temp_archive = std::env::temp_dir().join(format!("mml_archive_{}.tmp", Uuid::new_v4()));
+        let temp_archive = self
+            .path
+            .with_file_name(format!(".mml_archive_{}.tmp", Uuid::new_v4()));
 
         let compress_result = Self::compress_inner(
             self.archive_type,
@@ -822,8 +846,7 @@ impl BaseArchive {
         }
 
         // 用新压缩包替换原有压缩包
-        fs::remove_file(&self.path).map_err(|err| fs_err(self.path.clone(), err))?;
-        fs::rename(&temp_archive, &self.path).map_err(|err| fs_err(self.path.clone(), err))?;
+        replace_archive(&temp_archive, &self.path)?;
 
         // 刷新内部条目列表
         self.refresh_after_modify()?;
@@ -886,7 +909,9 @@ impl BaseArchive {
             .map_err(|err| fs_err(dest_path.clone(), err))?;
 
         // 先压缩到临时文件，再原子替换
-        let temp_archive = std::env::temp_dir().join(format!("mml_archive_{}.tmp", Uuid::new_v4()));
+        let temp_archive = self
+            .path
+            .with_file_name(format!(".mml_archive_{}.tmp", Uuid::new_v4()));
 
         let compress_result = Self::compress_inner(
             self.archive_type,
@@ -906,8 +931,7 @@ impl BaseArchive {
         }
 
         // 用新压缩包替换原有压缩包
-        fs::remove_file(&self.path).map_err(|err| fs_err(self.path.clone(), err))?;
-        fs::rename(&temp_archive, &self.path).map_err(|err| fs_err(self.path.clone(), err))?;
+        replace_archive(&temp_archive, &self.path)?;
 
         // 刷新内部条目列表
         self.refresh_after_modify()?;
@@ -990,4 +1014,32 @@ fn strip_dir_prefix(name: &str, dir: &str) -> String {
         .or_else(|| name.strip_prefix(&format!("{dir}\\")))
         .map(str::to_string)
         .unwrap_or_else(|| name.to_string())
+}
+
+/// 同目录重命名覆盖，失败时保留原包并清理临时包。
+fn replace_archive(replacement: &Path, original: &Path) -> CoreResult<()> {
+    fs::rename(replacement, original).map_err(|err| {
+        let _ = fs::remove_file(replacement);
+        fs_err(original.to_path_buf(), err)
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn replacement_failure_keeps_original() {
+        let root = mml_testutil::temp_path(format!("archive_replace_{}", Uuid::new_v4()));
+        fs::create_dir_all(&root).unwrap();
+        let original = root.join("original.tar.gz");
+        fs::write(&original, b"original").unwrap();
+        assert!(replace_archive(&root.join("missing.tmp"), &original).is_err());
+        assert_eq!(fs::read(&original).unwrap(), b"original");
+        let replacement = root.join("replacement.tmp");
+        fs::write(&replacement, b"replacement").unwrap();
+        replace_archive(&replacement, &original).unwrap();
+        assert_eq!(fs::read(&original).unwrap(), b"replacement");
+        assert!(!replacement.exists());
+    }
 }
