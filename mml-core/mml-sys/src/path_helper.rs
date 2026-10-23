@@ -13,12 +13,14 @@
 //! 所有函数均提供同步版与 Tokio 异步版。
 //! 回收站操作自动根据编译目标选择 Windows/Linux/macOS 实现。
 
-#[cfg(not(windows))]
+#[cfg(any(not(windows), test))]
 use std::env;
+#[cfg(any(not(windows), test))]
+use std::process::Command;
 #[cfg(not(windows))]
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::time::SystemTime;
-#[cfg(not(windows))]
+#[cfg(any(not(windows), test))]
 use std::time::UNIX_EPOCH;
 
 use std::fs::{self};
@@ -107,7 +109,7 @@ pub fn per_java_chmod(path: &str) -> io::Result<()> {
 /// # 返回值
 ///
 /// 返回回收站 files 目录路径，不存在时自动创建
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", test))]
 fn get_trash_files_path() -> PathBuf {
     let data_home = env::var("XDG_DATA_HOME")
         .map(PathBuf::from)
@@ -126,7 +128,7 @@ fn get_trash_files_path() -> PathBuf {
 /// # 返回值
 ///
 /// 返回回收站 info 目录路径，不存在时自动创建
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", test))]
 fn get_trash_info_path() -> PathBuf {
     let data_home = env::var("XDG_DATA_HOME")
         .map(PathBuf::from)
@@ -161,17 +163,20 @@ pub fn move_to_trash<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
 
     #[cfg(target_os = "linux")]
     {
-        move_to_trash_linux(dir)
+        move_to_trash_linux(dir.as_ref())
     }
 
     #[cfg(target_os = "macos")]
     {
-        move_to_trash_macos(dir)
+        move_to_trash_macos(dir.as_ref())
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
     {
-        Ok(false)
+        Err(ErrorType::MoveToTrashError(MoveToTrashErrorData {
+            path: dir.as_ref().to_path_buf(),
+            code: 0,
+        }))
     }
 }
 
@@ -179,9 +184,9 @@ pub fn move_to_trash<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
 ///
 /// # 返回值
 ///
-/// 移动成功返回 `Ok(true)`，IO 失败时返回相应错误
-#[cfg(target_os = "linux")]
-fn move_to_trash_linux(dir: &str) -> io::Result<bool> {
+/// 移动成功返回 `Ok(())`，IO 失败时返回带路径的错误
+#[cfg(any(target_os = "linux", test))]
+fn move_to_trash_linux(dir: &Path) -> CoreResult<()> {
     use std::time::SystemTime;
 
     let trash_files_path = get_trash_files_path();
@@ -222,30 +227,37 @@ fn move_to_trash_linux(dir: &str) -> io::Result<bool> {
     );
     let trash_info_content = format!(
         "[Trash Info]\nPath={}\nDeletionDate={}\n",
-        dir, datetime_str
+        dir.display(),
+        datetime_str
     );
 
-    fs::write(&trash_info_file, trash_info_content)?;
+    fs::write(&trash_info_file, trash_info_content)
+        .map_err(|err| fs_error(&trash_info_file, err))?;
 
     // 移动文件或目录
-    let path = Path::new(dir);
-    if path.is_file() {
-        fs::rename(path, &dest_path)?;
-    } else if path.is_dir() {
-        fs::rename(path, &dest_path)?;
+    if let Err(err) = fs::rename(dir, &dest_path) {
+        let _ = fs::remove_file(&trash_info_file);
+        return Err(fs_error(dir, err));
     }
 
-    Ok(true)
+    Ok(())
 }
 
 /// 将文件夹挪到回收站
 ///
 /// # 返回值
 ///
-/// osascript 执行成功返回 `Ok(true)`，失败返回 `Ok(false)` 或相应错误
-#[cfg(target_os = "macos")]
-fn move_to_trash_macos(dir: &str) -> io::Result<bool> {
+/// osascript 执行成功返回 `Ok(())`，失败返回相应错误
+#[cfg(any(target_os = "macos", test))]
+fn move_to_trash_macos(dir: &Path) -> CoreResult<()> {
     let escaped_dir = dir
+        .to_str()
+        .ok_or_else(|| {
+            ErrorType::MoveToTrashError(MoveToTrashErrorData {
+                path: dir.to_path_buf(),
+                code: 0,
+            })
+        })?
         .replace('\\', "\\\\")
         .replace('"', "\\\"")
         .replace('\n', "\\n")
@@ -259,9 +271,17 @@ fn move_to_trash_macos(dir: &str) -> io::Result<bool> {
 
     let output = Command::new("osascript")
         .args(["-e", &apple_script])
-        .output()?;
+        .output()
+        .map_err(|err| fs_error(dir, err))?;
 
-    Ok(output.status.success())
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(ErrorType::MoveToTrashError(MoveToTrashErrorData {
+            path: dir.to_path_buf(),
+            code: 0,
+        }))
+    }
 }
 
 /// 将文件夹挪到回收站
@@ -981,6 +1001,15 @@ pub fn replace_path_name(name: &str) -> String {
 mod tests {
     use super::*;
     use std::io::Cursor;
+
+    #[test]
+    fn trash_backends_share_path_result_contract() {
+        // 只编译并核对各平台接口，不调用系统回收站或启动 Finder。
+        let _: fn(&Path) -> CoreResult<()> = move_to_trash_linux;
+        let _: fn(&Path) -> CoreResult<()> = move_to_trash_macos;
+        let missing = mml_testutil::temp_path(format!("trash_missing_{}", uuid::Uuid::new_v4()));
+        assert!(move_to_trash(missing).is_ok());
+    }
 
     /// 在临时目录创建本轮测试唯一目录
     fn make_test_root(tag: &str) -> PathBuf {
