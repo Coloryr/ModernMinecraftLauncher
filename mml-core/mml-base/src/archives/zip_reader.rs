@@ -4,7 +4,6 @@ use std::{
     fs,
     io::{self, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
-    sync::atomic::Ordering,
 };
 
 use mml_names::i18_items::error_type::{CoreResult, ErrorType};
@@ -209,16 +208,6 @@ impl ZipReader {
             }
 
             // 普通文件
-            let now = process.now.fetch_add(1, Ordering::SeqCst) + 1;
-
-            if let Some(gui) = &process.gui {
-                let filename = outpath
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_default();
-                gui.update(Some(filename), now);
-            }
-
             if let Some(parent) = outpath.parent() {
                 let res = fs::create_dir_all(parent);
                 if let Err(err) = res {
