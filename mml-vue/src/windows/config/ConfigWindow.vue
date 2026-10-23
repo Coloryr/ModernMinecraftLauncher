@@ -44,6 +44,7 @@ import { applyHunks, diffLines, joinLines, splitLines } from "../../lib/textDiff
 import { familyInstanceFromLabel, multiWindow, targetSaveDir, targetUuid, windowParams } from "../windowManager";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
+import BaseModal from "../../components/ui/BaseModal.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import HighlightText from "../../components/ui/HighlightText.vue";
 import SearchBox from "../../components/ui/SearchBox.vue";
@@ -123,6 +124,22 @@ const canSave = computed(() => isText.value || isNbt.value);
 const unsaved = computed(() => (isText.value ? dirty.value : nbtDirty.value));
 /** 正忙着落盘：保存键在这期间不能再点 */
 const busy = computed(() => saving.value || nbtSaving.value);
+
+const pendingDiscard = ref<((discard: boolean) => void) | null>(null);
+
+/** 清空文本前确认；保存中不允许切换，避免提交尚未完成就丢掉编辑上下文。 */
+async function allowTextLoss(): Promise<boolean> {
+  if (busy.value || pendingDiscard.value) return false;
+  if (!isText.value || !dirty.value) return true;
+  return new Promise((resolve) => { pendingDiscard.value = resolve; });
+}
+
+function answerDiscard(discard: boolean) {
+  if (discard && busy.value) return;
+  const resolve = pendingDiscard.value;
+  pendingDiscard.value = null;
+  resolve?.(discard);
+}
 
 /** 当前文件该用哪种 Monaco 语言 */
 function langOf(file: FileItemDto): string {
@@ -224,6 +241,7 @@ const emptyTip = computed(() => {
 
 /** 读当前实例与它的存档列表，再列文件 */
 async function load() {
+  if (!(await allowTextLoss())) return;
   loading.value = true;
   try {
     const list = await api.getInstances();
@@ -258,11 +276,12 @@ async function load() {
   } finally {
     loading.value = false;
   }
-  await loadFiles();
+  await loadFiles(true);
 }
 
 /** 按当前来源列文件 */
-async function loadFiles() {
+async function loadFiles(confirmed = false) {
+  if (!confirmed && !(await allowTextLoss())) return;
   selected.value = null;
   text.value = "";
   origin.value = "";
@@ -294,12 +313,14 @@ async function loadFiles() {
 
 /** 选中一个文件：文本类顺手把内容拉下来，其余交给各自的视图组件 */
 async function open(file: FileItemDto) {
+  if (selected.value?.name === file.name) return true;
+  if (!(await allowTextLoss())) return false;
   selected.value = file;
   text.value = "";
   origin.value = "";
   originSha1.value = "";
   nbtDirty.value = false;
-  if (!TEXT_TYPES.includes(file.fileType)) return;
+  if (!TEXT_TYPES.includes(file.fileType)) return true;
 
   loading.value = true;
   try {
@@ -312,6 +333,7 @@ async function open(file: FileItemDto) {
   } finally {
     loading.value = false;
   }
+  return true;
 }
 
 /**
@@ -414,8 +436,7 @@ async function onFindChunk(form: { kind: string; x: string; z: string; name: str
     findOpen.value = false;
     // 文件名由后端按坐标算出来，直接切过去；mca 视图再按 chunk / reveal 翻到那一块
     const target = files.value.find((item) => item.name === found.file);
-    if (target) {
-      selected.value = target;
+    if (target && await open(target)) {
       mcaTarget.value = { chunk: found.index, path: found.path };
     }
   } catch (e) {
@@ -497,12 +518,13 @@ async function onRowMenuPick(id: string) {
       return;
     }
     if (id === "delete") {
+      if (!(await allowTextLoss())) return;
       await deleteConfigFile(instanceUuid.value, source.value, target.name);
       // 删掉的正好是打开着的那份：右边清掉，免得对着一份已经不存在的文件
       if (selected.value?.name === target.name) {
         selected.value = null;
       }
-      await loadFiles();
+      await loadFiles(true);
       showToast(t("config.deleted"));
     }
   } catch (e) {
@@ -513,8 +535,17 @@ async function onRowMenuPick(id: string) {
 /** 换来源：存档下拉改了就重列 */
 async function pickSource(value: string) {
   if (value === source.value) return;
+  if (!(await allowTextLoss())) return;
   source.value = value;
-  await loadFiles();
+  await loadFiles(true);
+}
+
+/** 原生 select 已改了显示值，先还原，确认后再由响应式来源更新。 */
+function onSourceChange(event: Event) {
+  const select = event.target as HTMLSelectElement;
+  const value = select.value;
+  select.value = source.value;
+  void pickSource(value);
 }
 
 /**
@@ -546,6 +577,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  answerDiscard(false);
   window.removeEventListener("keydown", onSaveHotkey);
 });
 // 本窗口走了（多窗口模式下就是窗口关闭，单窗口模式下是页面切走）：打开着的 NBT 文件都放手，
@@ -563,8 +595,8 @@ useWindowRefresh(() => {
     <template #head-right>
       <div class="head-cfg">
         <InstanceChip :instance="instanceChip" />
-        <select class="field-select head-select" :value="source" :disabled="loading" v-tip="t('config.sourceTip')"
-          :aria-label="t('config.sourceTip')" @change="pickSource(($event.target as HTMLSelectElement).value)">
+        <select class="field-select head-select" :value="source" :disabled="loading || busy" v-tip="t('config.sourceTip')"
+          :aria-label="t('config.sourceTip')" @change="onSourceChange">
           <option value="">{{ t("config.instance") }}</option>
           <option v-for="world in worlds" :key="world.dir" :value="world.dir">
             {{ world.levelName || world.dir }}
@@ -578,8 +610,8 @@ useWindowRefresh(() => {
           {{ t("config.readonly") }}
         </span>
 
-        <BaseButton size="sm" variant="ghost" class="icon-btn-head" :disabled="loading" v-tip="t('config.refresh')"
-          :aria-label="t('config.refresh')" @click="loadFiles">
+        <BaseButton size="sm" variant="ghost" class="icon-btn-head" :disabled="loading || busy" v-tip="t('config.refresh')"
+          :aria-label="t('config.refresh')" @click="loadFiles()">
           <GlyphIcon name="refresh" :size="15" :weight="1.8" />
         </BaseButton>
         <BaseButton v-if="source" size="sm" variant="ghost" class="icon-btn-head" :disabled="!mcaFiles.length"
@@ -643,6 +675,13 @@ useWindowRefresh(() => {
     </div>
 
     <!-- 查找实体 / 方块：编辑存档时从标题栏打开 -->
+    <BaseModal v-if="pendingDiscard" :title="t('config.unsaved')" @close="answerDiscard(false)">
+      <p>{{ t("config.discardChanges") }}</p>
+      <div class="modal-actions">
+        <BaseButton @click="answerDiscard(false)">{{ t("config.keepEditing") }}</BaseButton>
+        <BaseButton variant="danger" :disabled="busy" @click="answerDiscard(true)">{{ t("config.discard") }}</BaseButton>
+      </div>
+    </BaseModal>
     <McaFindModal v-if="findOpen" @find="onFindChunk" @close="findOpen = false" />
 
     <!-- 文件行右键菜单：打开所在目录 / 删除 -->
