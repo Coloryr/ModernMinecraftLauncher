@@ -51,7 +51,8 @@ pub(super) fn collect<'a>(
             ExportPackType::Modrinth => !url.is_empty(),
             _ => false,
         };
-        if can_index && let Some(meta) = export_meta(&path) {
+        if can_index {
+            let meta = export_meta(&path)?;
             let item = OnlineFileExport {
                 file: path, size: meta.size, pack, url: url.to_string(),
                 hash: meta.hash, info: source.cloned(),
@@ -71,6 +72,26 @@ pub(super) fn collect<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(windows)]
+    #[test]
+    fn unreadable_indexed_file_fails_instead_of_emitting_empty_hashes() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let dir = crate::test_support::temp_dir("export-locked-download");
+        let path = dir.join("mod.jar");
+        std::fs::write(&path, b"mod").unwrap();
+        let locked = std::fs::OpenOptions::new().read(true).share_mode(0).open(&path).unwrap();
+        assert!(std::fs::metadata(&path).is_ok());
+        let picks = [ExportPickDto { path: "mod.jar".into(), url: "https://example.invalid/mod.jar".into() }];
+        let online = HashMap::from([("mod.jar".into(), OnlineInfoObj {
+            modid: "123".into(), fileid: "456".into(), ..Default::default()
+        })]);
+        for pack in [ExportPackType::CurseForge, ExportPackType::Modrinth] {
+            assert!(collect(&dir, picks.iter(), &online, pack).is_err());
+        }
+        drop(locked);
+        crate::test_support::cleanup(&[&dir]);
+    }
 
     #[test]
     fn overlapping_directories_and_files_are_written_once() {

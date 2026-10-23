@@ -183,13 +183,13 @@ pub(super) struct ExportMeta {
 ///
 /// # 返回值
 ///
-/// 见 [`ExportMeta`]；读不到文件返回 `None`
-pub(super) fn export_meta(file: &Path) -> Option<ExportMeta> {
-    let meta = std::fs::metadata(file).ok()?;
-    let sha1 = hash_helper::gen_hash_from_file(HashType::Sha1, file).unwrap_or_default();
-    let sha512 = hash_helper::gen_hash_from_file(HashType::Sha512, file).unwrap_or_default();
+/// 见 [`ExportMeta`]；元数据或哈希读取失败时返回错误。
+pub(super) fn export_meta(file: &Path) -> Result<ExportMeta, String> {
+    let meta = std::fs::metadata(file).map_err(|e| e.to_string())?;
+    let sha1 = hash_helper::gen_hash_from_file(HashType::Sha1, file).map_err(|e| e.to_string())?;
+    let sha512 = hash_helper::gen_hash_from_file(HashType::Sha512, file).map_err(|e| e.to_string())?;
 
-    Some(ExportMeta {
+    Ok(ExportMeta {
         size: meta.len() as usize,
         hash: FileHash::Sha1Sha512(sha1, sha512),
     })
