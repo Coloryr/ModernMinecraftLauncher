@@ -14,6 +14,8 @@ use regex::Regex;
 
 use crate::model::{Confidence, CrashAnalysis, CrashReport, Finding, FindingId, Severity};
 
+mod runtime;
+
 /// 类文件版本，如 class file version 65.0
 static RE_CLASS_VERSION: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)class file version (\d+)").unwrap());
@@ -115,7 +117,7 @@ impl Scan<'_> {
 /// 见 CrashAnalysis
 pub(crate) fn analyze(report: &CrashReport) -> CrashAnalysis {
     let scan = Scan {
-        raw: report.raw(),
+        raw: &report.diagnostic,
         lower: &report.lower,
         detail_lower: report.detail.to_lowercase(),
     };
@@ -156,9 +158,10 @@ pub(crate) fn analyze(report: &CrashReport) -> CrashAnalysis {
     check_wrong_loader(&scan, &mut findings);
     check_duplicate(&scan, &mut findings);
     check_mixin(report, &scan, &mut findings);
-    check_entrypoint(&scan, &mut findings);
+    runtime::check(report, &scan, &mut findings);
     check_missing_class(report, &scan, &mut findings);
     check_missing_method(report, &scan, &mut findings);
+    check_entrypoint(&scan, &mut findings);
     check_graphics(report, &scan, &mut findings);
     check_missing_native(report, &scan, &mut findings);
     check_access_denied(&scan, &mut findings);
@@ -192,6 +195,7 @@ pub(crate) fn analyze(report: &CrashReport) -> CrashAnalysis {
         });
     }
 
+    runtime::enrich(report, &mut findings);
     let suspected_mods = collect_suspected(report, &findings, &scan.detail_lower);
 
     CrashAnalysis {
@@ -215,7 +219,7 @@ fn chain_has(report: &CrashReport, class: &str) -> bool {
 }
 
 /// 取顶层异常与 Caused by 链
-fn frames(report: &CrashReport) -> impl Iterator<Item = &crate::model::ExceptionFrame> {
+fn frames(report: &CrashReport) -> impl DoubleEndedIterator<Item = &crate::model::ExceptionFrame> {
     report.exception.iter().chain(report.causes.iter())
 }
 
@@ -847,6 +851,14 @@ fn check_entrypoint(scan: &Scan, out: &mut Vec<Finding>) {
 
 /// 找不到类
 fn check_missing_class(report: &CrashReport, scan: &Scan, out: &mut Vec<Finding>) {
+    if out.iter().any(|finding| {
+        matches!(
+            finding.id,
+            FindingId::ClassInitialization | FindingId::ClientOnlyClass
+        )
+    }) {
+        return;
+    }
     if !chain_has(report, "NoClassDefFoundError") && !chain_has(report, "ClassNotFoundException") {
         return;
     }
@@ -1020,18 +1032,17 @@ fn check_world(scan: &Scan, out: &mut Vec<Finding>) {
     });
 }
 
-/// jar 或类文件损坏
+/// 压缩包结构损坏，不用类校验或字节码格式异常推断磁盘文件损坏。
 fn check_corrupt_file(report: &CrashReport, scan: &Scan, out: &mut Vec<Finding>) {
     let needles = [
         "invalid loc header",
         "invalid cen header",
-        "crc32",
+        "invalid entry crc",
+        "crc mismatch",
         "invalid jar",
         "corrupt jar",
     ];
     if !chain_has(report, "ZipException")
-        && !chain_has(report, "ClassFormatError")
-        && !chain_has(report, "VerifyError")
         && !needles
             .iter()
             .any(|needle| scan.detail_lower.contains(needle))
@@ -1046,9 +1057,10 @@ fn check_corrupt_file(report: &CrashReport, scan: &Scan, out: &mut Vec<Finding>)
         evidence: scan.evidence(
             &[
                 "zipexception",
-                "classformaterror",
-                "verifyerror",
                 "invalid loc header",
+                "invalid cen header",
+                "invalid entry crc",
+                "crc mismatch",
                 "corrupt jar",
             ],
             6,
@@ -1334,6 +1346,14 @@ fn collect_suspected(report: &CrashReport, findings: &[Finding], detail_lower: &
 fn is_loader_mod(id: &str) -> bool {
     matches!(
         id.to_lowercase().as_str(),
-        "minecraft" | "forge" | "neoforge" | "fabricloader" | "quilt_loader" | "java" | "mixin"
+        "minecraft"
+            | "mcp"
+            | "fml"
+            | "forge"
+            | "neoforge"
+            | "fabricloader"
+            | "quilt_loader"
+            | "java"
+            | "mixin"
     ) || id.eq_ignore_ascii_case("mixinextras")
 }

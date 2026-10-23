@@ -69,6 +69,8 @@ pub struct Environment {
     pub os: Option<String>,
     /// 最大堆内存，单位 MiB
     pub memory_max_mb: Option<u64>,
+    /// 报告明确标记为独立服务端。
+    pub dedicated_server: bool,
     /// 崩溃报告里列出的模组
     pub mods: Vec<ModEntry>,
 }
@@ -134,7 +136,9 @@ pub struct CrashReport {
     pub environment: Environment,
     /// 原始文本
     pub(crate) raw: String,
-    /// 原文的小写副本，规则匹配用；与 `raw` 的行一一对应
+    /// 本次故障的诊断正文，不含系统信息、线程转储和附带日志
+    pub(crate) diagnostic: String,
+    /// 诊断正文的小写副本，与 `diagnostic` 的行一一对应
     pub(crate) lower: String,
     /// 异常与栈帧所在的行，规则优先在这段里匹配
     pub(crate) detail: String,
@@ -249,6 +253,24 @@ pub enum FindingId {
     MissingClass,
     /// 找不到方法或字段
     MissingMethod,
+    /// 类存在但静态初始化失败。
+    ClassInitialization,
+    /// JVM 字节码校验失败，不等同于文件损坏。
+    BytecodeVerification,
+    /// 类文件格式非法，可能来自错误的字节码转换。
+    ClassFormat,
+    /// 运行时对象不能转换为目标类型。
+    ClassCast,
+    /// 访问了空对象。
+    NullPointer,
+    /// 算术运算失败。
+    Arithmetic,
+    /// 数组或集合访问越界。
+    IndexOutOfBounds,
+    /// 独立服务端加载了仅客户端存在的类。
+    ClientOnlyClass,
+    /// 断开连接期间试图返回游戏界面。
+    DisconnectedScreen,
     /// 图形驱动或 OpenGL 上下文问题
     GraphicsDriver,
     /// 本地库缺失或架构不匹配
@@ -295,6 +317,15 @@ impl FindingId {
             FindingId::ModEntrypointFailure => "mod_entrypoint_failure",
             FindingId::MissingClass => "missing_class",
             FindingId::MissingMethod => "missing_method",
+            FindingId::ClassInitialization => "class_initialization",
+            FindingId::BytecodeVerification => "bytecode_verification",
+            FindingId::ClassFormat => "class_format",
+            FindingId::ClassCast => "class_cast",
+            FindingId::NullPointer => "null_pointer",
+            FindingId::Arithmetic => "arithmetic",
+            FindingId::IndexOutOfBounds => "index_out_of_bounds",
+            FindingId::ClientOnlyClass => "client_only_class",
+            FindingId::DisconnectedScreen => "disconnected_screen",
             FindingId::GraphicsDriver => "graphics_driver",
             FindingId::MissingNative => "missing_native",
             FindingId::AccessDenied => "access_denied",

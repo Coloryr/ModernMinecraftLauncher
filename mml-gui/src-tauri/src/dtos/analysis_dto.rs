@@ -15,9 +15,11 @@ pub struct CrashAnalysisDto {
     pub description: Option<String>,
     /// 最外层异常的一行文本
     pub exception: Option<String>,
+    /// 从外到内的 Caused by 异常链，不含其他线程或清理阶段的异常
+    pub causes: Vec<String>,
     /// 命中的结论，第一条是主因
     pub findings: Vec<CrashFindingDto>,
-    /// 可疑模组，按可疑程度排序
+    /// 在故障链中出现的模组，仅作为排查线索
     pub suspected_mods: Vec<String>,
     /// Minecraft 版本
     pub minecraft_version: Option<String>,
@@ -43,7 +45,7 @@ pub struct CrashFindingDto {
     pub confidence: String,
     /// 命中的原始行
     pub evidence: Vec<String>,
-    /// 涉及的模组 id，第一个最可疑
+    /// 涉及的模组 id，出现不代表该模组有缺陷
     pub mods: Vec<String>,
     /// 机器可读细节，如 mixin_config=xxx.mixins.json
     pub details: Vec<String>,
@@ -55,6 +57,7 @@ impl From<CrashAnalysis> for CrashAnalysisDto {
             kind: value.kind.as_str().to_string(),
             description: value.description,
             exception: value.exception.map(|frame| frame.line()),
+            causes: value.causes.into_iter().map(|frame| frame.line()).collect(),
             findings: value.findings.into_iter().map(Into::into).collect(),
             suspected_mods: value.suspected_mods,
             minecraft_version: value.environment.minecraft_version,

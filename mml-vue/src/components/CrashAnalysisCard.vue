@@ -1,10 +1,11 @@
 <script setup lang="ts">
-// 崩溃分析卡片：贴在日志正文上方，给出主因、可疑模组、细节与证据
-//
-// 结论的文案按后端给的稳定 id 取，规则新增 id 时只补 i18n，不动这里。
-import { computed, ref } from "vue";
+// 崩溃分析卡片：先展示解释和操作建议，再展开原始证据与完整异常链。
+import { computed, ref, watch } from "vue";
 import GlyphIcon from "./ui/GlyphIcon.vue";
-import type { CrashAnalysisDto, CrashFindingDto } from "../lib/bindings";
+import BaseButton from "./ui/BaseButton.vue";
+import CollapsePanel from "./ui/CollapsePanel.vue";
+import type { CrashAnalysisDto } from "../lib/bindings";
+import { presentFinding } from "../lib/crashAnalysisPresentation";
 import { t } from "../lib/i18n";
 
 const props = defineProps<{
@@ -12,18 +13,27 @@ const props = defineProps<{
   analysis: CrashAnalysisDto;
 }>();
 
-defineEmits<{ (e: "close"): void }>();
+defineEmits<{
+  /** 用户关闭本次分析卡片。 */
+  (e: "close"): void;
+}>();
 
-/** 主因，后端已按相关性排好序 */
 const primary = computed(() => props.analysis.findings[0] ?? null);
-/** 其余结论 */
-const others = computed(() => props.analysis.findings.slice(1));
-/** 可疑模组，最多列六个 */
+const presentation = computed(() => primary.value ? presentFinding(primary.value, t) : null);
+const others = computed(() => props.analysis.findings.slice(1).map((finding) => ({
+  finding,
+  presentation: presentFinding(finding, t),
+})));
 const suspects = computed(() => props.analysis.suspectedMods.slice(0, 6));
-/** 证据默认收起：日志行很长，展开会把正文挤下去 */
 const showEvidence = ref(false);
+const showOthers = ref(false);
 
-/** 卡片配色跟着主因的严重程度走 */
+// 切换日志后收起旧展开状态，避免长异常链直接挤占新日志正文。
+watch(() => props.analysis, () => {
+  showEvidence.value = false;
+  showOthers.value = false;
+});
+
 const tone = computed(() => {
   const severity = primary.value?.severity ?? "error";
   if (severity === "fatal" || severity === "error") return "error";
@@ -31,85 +41,24 @@ const tone = computed(() => {
   return "info";
 });
 
-/**
- * 结论 id 转文案
- *
- * - finding: 一条结论
- *
- * # 返回值
- *
- * 译文；不认识的 id 原样显示
- */
-function findingTitle(finding: CrashFindingDto): string {
-  const key = "analysis.finding." + finding.id;
-  const text = t(key);
-  return text === key ? finding.id : text;
-}
-
-/** 把握程度转文案 */
-function confidenceLabel(finding: CrashFindingDto): string {
-  return t("analysis.confidence." + finding.confidence);
-}
-
-/** 环境摘要，如 1.20.1 · forge 47.2.0 · Java 17 */
 const envLine = computed(() => {
   const parts: string[] = [];
   const analysis = props.analysis;
   if (analysis.minecraftVersion) parts.push(analysis.minecraftVersion);
   if (analysis.loader) {
-    parts.push(
-      analysis.loaderVersion
-        ? analysis.loader + " " + analysis.loaderVersion
-        : analysis.loader,
-    );
+    parts.push(analysis.loaderVersion ? analysis.loader + " " + analysis.loaderVersion : analysis.loader);
   }
   if (analysis.javaVersion) parts.push("Java " + analysis.javaVersion);
   if (analysis.memoryMaxMb) parts.push(analysis.memoryMaxMb + " MiB");
   return parts.join(" · ");
 });
 
-/**
- * 把后端的机器可读细节翻成人话
- *
- * - finding: 一条结论
- *
- * # 返回值
- *
- * 按原顺序排好的细节行；不认识的键原样保留
- */
-function detailLines(finding: CrashFindingDto): string[] {
-  return finding.details.map((line) => {
-    const at = line.indexOf("=");
-    if (at < 0) return line;
-    const key = line.slice(0, at);
-    const value = line.slice(at + 1);
-    switch (key) {
-      case "mixin_config":
-        return t("analysis.detail.mixinConfig", { value });
-      case "mixin_class":
-        return t("analysis.detail.mixinClass", { value });
-      case "requires":
-        return t("analysis.detail.requires", { value });
-      case "required_version":
-        return t("analysis.detail.requiredVersion", { value });
-      case "actual_version":
-        return t("analysis.detail.actualVersion", { value });
-      case "memory_max_mb":
-        return t("analysis.detail.memory", { value });
-      case "class_file_version":
-        return t("analysis.detail.classFile", { value });
-      case "required_java":
-        return t("analysis.detail.requiredJava", { value });
-      case "loader":
-        return t("analysis.detail.loader", { value });
-      default:
-        return line;
-    }
-  });
-}
-
-/** 主因的细节行 */
-const primaryDetails = computed(() => (primary.value ? detailLines(primary.value) : []));
+const exceptionChain = computed(() => {
+  const analysis = props.analysis;
+  const lines = analysis.exception ? [t("analysis.outerException", { value: analysis.exception })] : [];
+  for (const value of analysis.causes) lines.push(t("analysis.causedBy", { value }));
+  return lines.join("\n");
+});
 </script>
 
 <template>
@@ -117,52 +66,70 @@ const primaryDetails = computed(() => (primary.value ? detailLines(primary.value
     <GlyphIcon class="analysis-icon" name="alert" :size="15" :weight="2" />
     <div class="analysis-body">
       <div class="analysis-head">
-        <span class="analysis-title">
-          {{ primary ? findingTitle(primary) : t("analysis.noFinding") }}
+        <span class="analysis-title">{{ presentation?.title ?? t("analysis.noFinding") }}</span>
+        <span v-if="primary" class="analysis-badge" :title="t('analysis.confidenceHelp')">
+          {{ t("analysis.confidence." + primary.confidence) }}
         </span>
-        <span v-if="primary" class="analysis-badge">{{ confidenceLabel(primary) }}</span>
         <span v-if="envLine" class="analysis-env">{{ envLine }}</span>
+      </div>
+
+      <div v-if="presentation" class="analysis-explanation">
+        <p><strong>{{ t("analysis.reason") }}：</strong>{{ presentation.reason }}</p>
+        <p><strong>{{ t("analysis.advice") }}：</strong>{{ presentation.advice }}</p>
+        <p v-for="hint in presentation.hints" :key="hint">{{ hint }}</p>
+        <ul v-if="presentation.details.length" class="analysis-details">
+          <li v-for="(line, index) in presentation.details" :key="index">{{ line }}</li>
+        </ul>
       </div>
 
       <div v-if="suspects.length" class="analysis-suspects">
         <span class="analysis-label">{{ t("analysis.suspects") }}</span>
         <span class="analysis-suspect">{{ suspects.join(", ") }}</span>
+        <p class="analysis-help">{{ t("analysis.suspectsHelp") }}</p>
       </div>
 
-      <ul v-if="primaryDetails.length" class="analysis-details">
-        <li v-for="line in primaryDetails" :key="line">{{ line }}</li>
-      </ul>
-
-      <div v-if="primary && primary.evidence.length" class="analysis-evidence">
-        <button class="analysis-toggle" @click="showEvidence = !showEvidence">
-          {{
-            showEvidence
-              ? t("analysis.hideEvidence")
-              : t("analysis.showEvidence", { count: primary.evidence.length })
-          }}
-        </button>
-        <pre v-if="showEvidence" class="analysis-pre">{{ primary.evidence.join("\n") }}</pre>
+      <div class="analysis-actions">
+        <BaseButton
+          v-if="primary?.evidence.length || exceptionChain"
+          variant="ghost" size="sm" :aria-expanded="showEvidence"
+          @click="showEvidence = !showEvidence"
+        >
+          {{ showEvidence ? t("analysis.hideEvidence") : t("analysis.showEvidence", { count: primary?.evidence.length ?? 0 }) }}
+        </BaseButton>
+        <BaseButton v-if="others.length" variant="ghost" size="sm" :aria-expanded="showOthers" @click="showOthers = !showOthers">
+          {{ showOthers ? t("analysis.hideOthers") : t("analysis.showOthers") }}
+        </BaseButton>
       </div>
-
-      <div v-if="others.length" class="analysis-others">
-        <div class="analysis-label">{{ t("analysis.others", { count: others.length }) }}</div>
-        <div v-for="(finding, index) in others" :key="index" class="analysis-other">
-          <span class="analysis-other-title">{{ findingTitle(finding) }}</span>
-          <span class="analysis-other-meta">{{ confidenceLabel(finding) }}</span>
-          <span v-if="finding.mods.length" class="analysis-other-mods">
-            {{ finding.mods.slice(0, 8).join(", ") }}{{ finding.mods.length > 8 ? " …" : "" }}
-          </span>
+      <CollapsePanel :open="showEvidence">
+        <div v-if="showEvidence" class="analysis-evidence">
+          <pre v-if="primary?.evidence.length" class="analysis-pre">{{ primary.evidence.join("\n") }}</pre>
+          <template v-if="exceptionChain">
+            <p class="analysis-label">{{ t("analysis.exceptionChain") }}</p>
+            <pre class="analysis-pre">{{ exceptionChain }}</pre>
+          </template>
         </div>
-      </div>
+      </CollapsePanel>
+      <CollapsePanel :open="showOthers">
+        <div v-if="showOthers" class="analysis-others">
+          <div class="analysis-label">{{ t("analysis.others", { count: others.length }) }}</div>
+          <div v-for="item in others" :key="item.finding.id" class="analysis-other">
+            <span class="analysis-other-title">{{ item.presentation.title }}</span>
+            <span class="analysis-other-meta">{{ t("analysis.confidence." + item.finding.confidence) }}</span>
+            <p>{{ item.presentation.reason }}</p>
+            <p><strong>{{ t("analysis.advice") }}：</strong>{{ item.presentation.advice }}</p>
+            <p v-for="hint in item.presentation.hints" :key="hint">{{ hint }}</p>
+            <p v-if="item.finding.mods.length">{{ t("analysis.suspects") }}：{{ item.finding.mods.join(", ") }}</p>
+            <ul v-if="item.presentation.details.length" class="analysis-details">
+              <li v-for="(line, index) in item.presentation.details" :key="index">{{ line }}</li>
+            </ul>
+            <pre v-if="item.finding.evidence.length" class="analysis-pre">{{ item.finding.evidence.join("\n") }}</pre>
+          </div>
+        </div>
+      </CollapsePanel>
     </div>
-    <button
-      class="analysis-close"
-      :aria-label="t('analysis.close')"
-      v-tip="t('analysis.close')"
-      @click="$emit('close')"
-    >
-      ×
-    </button>
+    <BaseButton class="analysis-close" variant="ghost" size="sm" :aria-label="t('analysis.close')" v-tip="t('analysis.close')" @click="$emit('close')">
+      <GlyphIcon name="close" :size="15" />
+    </BaseButton>
   </section>
 </template>
 
@@ -280,21 +247,32 @@ const primaryDetails = computed(() => (primary.value ? detailLines(primary.value
   word-break: break-all;
 }
 
-.analysis-evidence {
+.analysis-evidence,
+.analysis-explanation {
   margin-top: 4px;
 }
 
-.analysis-toggle {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--accent);
-  font-size: 11.5px;
-  cursor: pointer;
+.analysis-explanation {
+  font-size: 12.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
-.analysis-toggle:hover {
-  text-decoration: underline;
+.analysis-explanation p {
+  margin: 4px 0;
+}
+
+.analysis-help {
+  margin: 2px 0;
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+
+.analysis-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
 }
 
 .analysis-pre {
@@ -315,39 +293,26 @@ const primaryDetails = computed(() => (primary.value ? detailLines(primary.value
 }
 
 .analysis-other {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 2px;
+  margin-top: 8px;
   font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+
+.analysis-other p {
+  margin: 4px 0;
 }
 
 .analysis-other-title {
   color: var(--text);
+  font-weight: 600;
 }
 
 .analysis-other-meta {
+  margin-left: 6px;
   color: var(--text-dim);
-}
-
-.analysis-other-mods {
-  color: var(--text-dim);
-  word-break: break-all;
 }
 
 .analysis-close {
   flex: none;
-  padding: 0 2px;
-  border: 0;
-  background: transparent;
-  color: var(--text-dim);
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.analysis-close:hover {
-  color: var(--text);
 }
 </style>
