@@ -1,27 +1,8 @@
 <script setup lang="ts">
-// 配置文件窗口：左侧是可搜索的文件树，右侧按类型给四种视图
-//
-// 左栏与主窗口的侧栏是同一套皮肤：--bg-side 底、右侧描边、贴窗口的上 / 下 / 左缘；
-// 目录当"分组标题"、文件当"实例行"，两种行同高一档 --row-h: 24px。
-// 窗口因此走 body-flush，右栏只有卡片类视图留 22/26 外留白。
-//
-// 还没选文件时右栏是一个**禁用的空编辑器**，不是一句提示 —— 打开就是编辑器窗口的样子。
-//
-// - 文本（json / json5 / toml / yaml / properties / xml / js / snbt / 纯文本）→ Monaco 编辑（行号 + 着色）+ 保存
-// - NBT（.dat / .nbt / .rio）→ NBT 树，树上的标量就地改再保存
-// - 区域文件（.mca）→ 区块表
-// - 图片（png / jpg / gif / webp）→ 直接显示
-// - 其余（压缩包与别的二进制）→ 二进制视图（一页 4 KiB 的十六进制）
-//
-// 来源两条：实例自己的 options.txt 与 `config` / `kubejs` / `local`，或某个存档目录下的文件。
-// 实例是**窗口身份的一部分**：多窗口模式下一个实例一个窗口、打开时就锁定，单窗口模式按
-// 跳转参数，都没有时退回主窗口选中的那个；
-// 来源（空串 = 实例本身，否则是存档目录名）会一起交给后端，文件路径一律**相对该来源**，
-// 树根因此就是所选来源，存档来源下不会再套一层 `saves`。
-//
-// 保存两条：文本走**行级差异**（lib/textDiff），只回传改了的那几行；NBT 只回传改了的那几处
-// 标量（改动登记在 NbtTree 里）。两条都按打开时的 SHA1 先核对磁盘上还是不是那一份。
-// 标题栏跟日志窗口同一套：左边窗口名，右边实例 chip + 来源下拉，操作留在工具条。
+// 配置文件窗口：左侧文件树，右侧按类型显示文本、NBT、区块、图片或二进制视图。
+// 实例由窗口身份或跳转参数确定；文件路径相对于实例配置目录或选定存档。
+// 文本提交行级差异，NBT 会话记录编辑操作；保存前均用基线 SHA1 检查磁盘冲突。
+// 来源与查找放在文件树上方，文件路径、保存状态与保存操作放在编辑区上方。
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
@@ -39,7 +20,7 @@ import {
   writeConfigFile,
 } from "../../lib/api";
 import { loadGuiConfig } from "../../lib/guiConfig";
-import { buildTree, type FileNode } from "../../lib/fileTree";
+import { buildConfigTree, visibleConfigRows } from "./configTree";
 import { applyHunks, diffLines, joinLines, splitLines } from "../../lib/textDiff";
 import { familyInstanceFromLabel, multiWindow, targetSaveDir, targetUuid, windowParams } from "../windowManager";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
@@ -62,15 +43,11 @@ import type { FileItemDto, SaveItemDto } from "../../lib/bindings";
 /** 请求关闭本窗口 */
 const emit = defineEmits<{ (e: "close"): void }>();
 
-/** 文本类文件：能编能存；其余走只读的结构 / 二进制视图 */
+/** 使用文本编辑器的文件类型；NBT 与区域文件由各自视图编辑 */
 const TEXT_TYPES = ["json", "json5", "toml", "yaml", "properties", "xml", "javascript", "snbt", "text"];
 
 /**
- * 文件类型 → Monaco 语言 id
- *
- * 没有对应语言包的一律退回纯文本。两处近似：
- * toml 用仓库里自己注册的那份着色器，见 lib/monacoToml；
- * snbt 长得像 JSON 但键不带引号，借 javascript 的着色器只上色、不做 JSON 校验，免得满屏红线
+ * Monaco 语言映射；TOML 使用本地着色器，SNBT 借用 JavaScript 着色以避开 JSON 校验
  */
 const LANG_OF_TYPE: Record<string, string> = {
   json: "json",
@@ -97,16 +74,10 @@ const loading = ref(false);
 /** 只允许最近一次读请求回写当前编辑上下文。 */
 let requestGeneration = 0;
 
-/** 文本内容与读进来的原文：两者不同就是"未保存" */
+/** 编辑内容与最近一次读取或保存成功的基线；两者不同即未保存 */
 const text = ref("");
 const origin = ref("");
-/**
- * 打开时那一份全文的 SHA1
- *
- * 保存走的是行级差异（见 lib/textDiff），差异只对得上"打开时那一份"；
- * 把它交给后端核对磁盘，变了就拒绝保存，免得冲掉别处（如资源管理改 options.txt）
- * 的改动。
- */
+/** 基线文本的 SHA1，每次保存成功后更新，用于检测外部修改 */
 const originSha1 = ref("");
 const saving = ref(false);
 /** 删除期间锁定编辑上下文，避免完成后的刷新丢掉新输入。 */
@@ -131,7 +102,7 @@ const busy = computed(() => saving.value || nbtSaving.value || deleting.value);
 
 const pendingDiscard = ref<((discard: boolean) => void) | null>(null);
 
-/** 清空文本前确认；保存中不允许切换，避免提交尚未完成就丢掉编辑上下文。 */
+/** 确认是否放弃文本改动；保存、删除或等待确认时拒绝切换 */
 async function allowTextLoss(): Promise<boolean> {
   if (busy.value || pendingDiscard.value) return false;
   if (!isText.value || !dirty.value) return true;
@@ -163,59 +134,11 @@ const expanded = ref<Set<string>>(new Set());
 /** 路径 → 文件条目：树节点只带路径，打开文件与取类型都要回查 */
 const fileByPath = computed(() => new Map(files.value.map((f) => [f.name, f])));
 
-/** 每层目录在前、文件在后，各自按名字排；`buildTree` 只按插入顺序给 */
-function sortDirsFirst(nodes: FileNode[]) {
-  nodes.sort((a, b) => (a.isDir === b.isDir ? a.name.localeCompare(b.name) : a.isDir ? -1 : 1));
-  for (const n of nodes) {
-    if (n.isDir) sortDirsFirst(n.children);
-  }
-}
+/** 搜索和展开只改变可见行，文件树仅在文件列表变化时重建 */
+const tree = computed(() => buildConfigTree(files.value.map((file) => file.name)));
+const rows = computed(() => visibleConfigRows(tree.value, expanded.value, query.value));
 
-/** 文件树；多层路径由 buildTree 合并出目录节点，顺序由这里统一给 */
-const tree = computed(() => {
-  const nodes = buildTree(files.value.map((f) => f.name));
-  sortDirsFirst(nodes);
-  return nodes;
-});
-
-/** 展开后的一行 */
-interface TreeRow {
-  /** 完整路径，与 `FileItemDto.name` 一致 */
-  key: string;
-  /** 显示名，只有最后一段 */
-  name: string;
-  /** 是否目录 */
-  isDir: boolean;
-  /** 层级，从 0 起，用来算缩进 */
-  depth: number;
-}
-
-/** 自身或后代是否命中关键字 */
-function subtreeHit(node: FileNode, q: string): boolean {
-  if (node.key.toLowerCase().includes(q)) return true;
-  return node.children.some((c) => subtreeHit(c, q));
-}
-
-/**
- * 把树按展开状态摊平成可见行
- *
- * 有搜索词时不看展开状态：命中的目录一律展开，否则搜到的东西藏在收起的分支里看不见
- */
-const rows = computed<TreeRow[]>(() => {
-  const q = query.value.trim().toLowerCase();
-  const out: TreeRow[] = [];
-  const walk = (nodes: FileNode[], depth: number) => {
-    for (const n of nodes) {
-      if (q && !subtreeHit(n, q)) continue;
-      out.push({ key: n.key, name: n.name, isDir: n.isDir, depth });
-      if (n.isDir && (q || expanded.value.has(n.key))) walk(n.children, depth + 1);
-    }
-  };
-  walk(tree.value, 0);
-  return out;
-});
-
-/** 展开 / 收起一个目录；Set 整体换掉才会触发更新 */
+/** 展开或收起目录，保留其他目录的展开状态 */
 function toggleExpand(key: string) {
   const next = new Set(expanded.value);
   if (next.has(key)) next.delete(key);
@@ -239,7 +162,7 @@ function openFile(key: string) {
 const emptyTip = computed(() => {
   if (loading.value) return t("config.loading");
   if (!instanceUuid.value) return t("config.noInstance");
-  if (query.value) return t("config.searchEmpty");
+  if (query.value.trim()) return t("config.searchEmpty");
   return t("config.noFiles");
 });
 
@@ -263,9 +186,7 @@ async function load() {
     instanceName.value = found?.name ?? "";
     worlds.value = nextWorlds;
 
-    // "聚焦某个存档"的跳转（资源窗口右键存档 → 修改配置文件），跟存档名对上就套到来源上。
-    // 单窗口模式读完就地清掉，别让普通跳转再把它带回来；多窗口模式参数是本窗口 URL 的一
-    // 部分，随窗口留着。存档列表里没有的名字套不上，来源保持原样
+    // 单窗口跳转参数消费后清除，多窗口 URL 参数随窗口保留。
     const saveDir = targetSaveDir();
     if (saveDir) {
       if (!multiWindow.value) {
@@ -302,8 +223,7 @@ async function loadFiles(confirmed = false) {
   // 树与搜索都跟着这批文件走：换了来源 / 实例，旧的目录 key 与关键字都没意义了
   expanded.value = new Set();
   query.value = "";
-  // 盘上那一份可能已经不是会话里缓存的样子了：没改动的 NBT 会话就地丢掉（连后端的文件
-  // 句柄一起关，下次打开重读）。有未保存改动的留着，那是用户还没落盘的东西
+  // 关闭干净的 NBT 会话以便重读磁盘，保留会话中尚未保存的编辑。
   await clearCleanSessions();
   if (!current()) return;
   if (!instanceUuid.value) {
@@ -360,11 +280,7 @@ async function open(file: FileItemDto) {
   return true;
 }
 
-/**
- * 保存当前视图：文本走行级差异，NBT 交给树上的登记表
- *
- * 窗口自己不认识 NBT 的改动，只负责把标题栏那一颗保存键分发给对应视图。
- */
+/** 将保存操作分发给文本编辑器或 NBT 视图 */
 async function save() {
   if (busy.value) return;
   if (isNbt.value) {
@@ -381,13 +297,7 @@ async function save() {
   await saveText();
 }
 
-/**
- * 保存当前文本文件：只回传**行级差异**，不再整份送回去
- *
- * 差异是相对打开时那一份算的，所以后端会先核对磁盘上的 SHA1。发出去之前先自检一遍：
- * 把差异套回原文必须与编辑中的内容逐字相同，对不上就退回"整段替换"——
- * 多发一次全文可以接受，按错的差异改盘上的文件不行。
- */
+/** 保存提交瞬间的文本快照，保留等待响应期间的新编辑 */
 async function saveText() {
   const file = selected.value;
   if (!file || !isText.value || busy.value || !dirty.value) return;
@@ -400,6 +310,7 @@ async function saveText() {
     const originLines = splitLines(origin.value);
     const editedLines = splitLines(submitted);
     let hunks = diffLines(originLines, editedLines);
+    // 差异回放必须还原提交内容，否则退回整段替换。
     if (joinLines(applyHunks(originLines, hunks)) !== submitted) {
       hunks = [{ start: 0, deleteCount: originLines.length, lines: editedLines }];
     }
@@ -430,7 +341,7 @@ const findOpen = ref(false);
 /** 查到的区块与节点路径，交给 mca 视图翻页并定位 */
 const mcaTarget = ref<{ chunk: number; path: string[] } | null>(null);
 
-/** 当前来源里的区域文件，查找弹窗里选 */
+/** 当前来源的区域文件，用于判断是否开放实体与方块查找 */
 const mcaFiles = computed(() =>
   files.value.filter((item) => item.fileType === "mca").map((item) => item.name),
 );
@@ -476,6 +387,7 @@ async function onFindChunk(form: { kind: string; x: string; z: string; name: str
 
 /** 左栏宽度，单位像素；拖动中间那条分隔线改它 */
 const treeWidth = ref(300);
+const configBody = ref<HTMLElement | null>(null);
 
 /** 是否正在拖分隔线，用来给拖拽态加高亮 */
 const resizing = ref(false);
@@ -483,35 +395,84 @@ const resizing = ref(false);
 /** 左栏宽度的上下限，单位像素 */
 const TREE_MIN_WIDTH = 200;
 const TREE_MAX_WIDTH = 640;
+const bodyWidth = ref(TREE_MAX_WIDTH * 2);
+/** 缩窄窗口时给编辑区保留至少一半空间，不改写已保存的宽度偏好 */
+const treeMaxWidth = computed(() => Math.min(TREE_MAX_WIDTH, Math.floor(bodyWidth.value / 2)));
+const treeMinWidth = computed(() => Math.min(TREE_MIN_WIDTH, treeMaxWidth.value));
+const visibleTreeWidth = computed(() => clampTreeWidth(treeWidth.value));
+let resizeObserver: ResizeObserver | null = null;
+let stopResize: (() => void) | null = null;
 
-/**
- * 拖动分隔线改左栏宽度
- *
- * 拖动过程中只改本地宽度，松手才落盘 —— 每移动一像素写一次文件没有必要。
- * 监听挂在 `window` 上：指针移出那条窄带也不会中断。
- *
- * - `event`: 分隔线上的按下事件
- */
+function clampTreeWidth(width: number): number {
+  return Math.min(treeMaxWidth.value, Math.max(treeMinWidth.value, width));
+}
+
+function persistTreeWidth() {
+  void setConfigTreeWidth(treeWidth.value).catch((error) => showToast(tErr(error)));
+}
+
+/** 拖动时更新侧栏宽度，松手后保存偏好 */
 function startResize(event: PointerEvent) {
+  if (event.button !== 0 || !event.isPrimary) return;
   event.preventDefault();
+  stopResize?.();
   resizing.value = true;
   const startX = event.clientX;
-  const startWidth = treeWidth.value;
+  const startWidth = visibleTreeWidth.value;
+  const preferredWidth = treeWidth.value;
 
   function onMove(e: PointerEvent) {
-    const next = startWidth + e.clientX - startX;
-    treeWidth.value = Math.min(TREE_MAX_WIDTH, Math.max(TREE_MIN_WIDTH, next));
+    if (e.pointerId !== event.pointerId) return;
+    treeWidth.value = clampTreeWidth(startWidth + e.clientX - startX);
   }
 
-  function onUp() {
+  function cleanup() {
     resizing.value = false;
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
-    void setConfigTreeWidth(treeWidth.value);
+    window.removeEventListener("pointercancel", onCancel);
+    window.removeEventListener("blur", cancel);
+    stopResize = null;
   }
 
+  function onUp(e: PointerEvent) {
+    if (e.pointerId !== event.pointerId) return;
+    cleanup();
+    if (treeWidth.value !== preferredWidth) persistTreeWidth();
+  }
+
+  function cancel() {
+    treeWidth.value = preferredWidth;
+    cleanup();
+  }
+
+  function onCancel(e: PointerEvent) {
+    if (e.pointerId === event.pointerId) cancel();
+  }
+
+  stopResize = cleanup;
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onUp);
+  window.addEventListener("pointercancel", onCancel);
+  window.addEventListener("blur", cancel);
+}
+
+/** 分隔线获得焦点时可用方向键调整宽度，Home 与 End 到达边界 */
+function onResizeKeydown(event: KeyboardEvent) {
+  if (resizing.value) return;
+  let width = visibleTreeWidth.value;
+  switch (event.key) {
+    case "ArrowLeft": width -= 16; break;
+    case "ArrowRight": width += 16; break;
+    case "Home": width = treeMinWidth.value; break;
+    case "End": width = treeMaxWidth.value; break;
+    default: return;
+  }
+  event.preventDefault();
+  const next = clampTreeWidth(width);
+  if (next === visibleTreeWidth.value) return;
+  treeWidth.value = next;
+  persistTreeWidth();
 }
 
 /** 文件行的右键菜单：点击处坐标 + 右键的那个相对路径 */
@@ -583,14 +544,7 @@ function onSourceChange(event: Event) {
   void pickSource(value);
 }
 
-/**
- * Ctrl+S / Cmd+S 保存
- *
- * 有改动、且不是正在存的时候才真存；组合键一律吞掉，
- * 免得浏览器预览下弹出"保存网页"。
- *
- * - `event`: 键盘事件
- */
+/** 用 Ctrl+S 或 Cmd+S 保存，并阻止浏览器默认的保存网页操作 */
 function onSaveHotkey(event: KeyboardEvent) {
   if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "s") {
     return;
@@ -607,17 +561,23 @@ onMounted(() => {
   // 左栏宽度是用户偏好，走后端落 gui_config.json
   void getConfigTreeWidth().then((width) => {
     treeWidth.value = Math.min(TREE_MAX_WIDTH, Math.max(TREE_MIN_WIDTH, width));
+  }).catch((error) => showToast(tErr(error)));
+  resizeObserver = new ResizeObserver(([entry]) => {
+    // KeepAlive 隐藏时宽度可能归零，保留最后一次可见尺寸。
+    if (entry && entry.contentRect.width > 0) bodyWidth.value = entry.contentRect.width;
   });
+  if (configBody.value) resizeObserver.observe(configBody.value);
   window.addEventListener("keydown", onSaveHotkey);
 });
 
 onBeforeUnmount(() => {
   requestGeneration += 1;
   answerDiscard(false);
+  stopResize?.();
+  resizeObserver?.disconnect();
   window.removeEventListener("keydown", onSaveHotkey);
 });
-// 本窗口走了（多窗口模式下就是窗口关闭，单窗口模式下是页面切走）：打开着的 NBT 文件都放手，
-// 后端那边的句柄跟着关掉，下次打开重新读盘
+// 组件卸载时关闭 NBT 会话；单窗口模式的 KeepAlive 切页不会触发卸载。
 onBeforeUnmount(closeSessions);
 // 单窗口模式切回本窗口时重读；有没保存的改动就不动，免得把编辑内容冲掉
 useWindowRefresh(() => {
@@ -627,59 +587,51 @@ useWindowRefresh(() => {
 
 <template>
   <WindowFrame :title="t('config.title')" body-fill body-flush @close="emit('close')">
-    <!-- 实例、来源与操作都放标题栏，与日志窗口同一套；内容区整块留给文件树 -->
     <template #head-right>
       <div class="head-cfg">
         <InstanceChip :instance="instanceChip" />
-        <select class="field-select head-select" :value="source" :disabled="loading || busy" v-tip="t('config.sourceTip')"
-          :aria-label="t('config.sourceTip')" @change="onSourceChange">
-          <option value="">{{ t("config.instance") }}</option>
-          <option v-for="world in worlds" :key="world.dir" :value="world.dir">
-            {{ world.levelName || world.dir }}
-          </option>
-        </select>
-
-        <!-- 保存状态：未保存时下面那颗保存键转强调色，工具条因此整行省掉 -->
-        <span v-if="canSave && unsaved" class="head-dirty">{{ t("config.unsaved") }}</span>
-        <!-- 区域文件也能改，只是保存键在区块页里，不在标题栏 -->
-        <span v-else-if="selected && !canSave && selected.fileType !== 'mca'" class="head-readonly">
-          {{ t("config.readonly") }}
-        </span>
-
-        <BaseButton size="sm" variant="ghost" class="icon-btn-head" :disabled="loading || busy" v-tip="t('config.refresh')"
-          :aria-label="t('config.refresh')" @click="loadFiles()">
-          <GlyphIcon name="refresh" :size="15" :weight="1.8" />
-        </BaseButton>
-        <BaseButton v-if="source" size="sm" variant="ghost" class="icon-btn-head" :disabled="!mcaFiles.length"
-          v-tip="t('config.mcaFindTitle')" :aria-label="t('config.mcaFindTitle')" @click="findOpen = true">
-          <GlyphIcon name="search" :size="15" :weight="1.8" />
-        </BaseButton>
-        <BaseButton v-if="canSave" size="sm" :variant="unsaved ? 'accent' : 'ghost'" class="icon-btn-head"
-          :disabled="busy || !unsaved" v-tip="t('config.save')" :aria-label="t('config.save')" @click="save">
-          <GlyphIcon name="save" :size="15" :weight="1.8" />
-        </BaseButton>
       </div>
     </template>
 
-    <div class="cfg-body">
-      <!-- 左：与主窗口侧栏同一套，搜索固定在上，只有下面的树滚动 -->
-      <aside class="cfg-list" :style="{ width: `${treeWidth}px` }">
+    <div ref="configBody" class="cfg-body">
+      <!-- 来源与搜索固定在上，文件树独立滚动 -->
+      <aside id="config-file-tree" class="cfg-list" :style="{ width: `${visibleTreeWidth}px` }">
         <div class="cfg-list-head">
+          <div class="cfg-source-row">
+            <select class="field-select" :value="source" :disabled="loading || busy || !instanceUuid"
+              v-tip="t('config.sourceTip')" :aria-label="t('config.sourceTip')" @change="onSourceChange">
+              <option value="">{{ t("config.instance") }}</option>
+              <option v-for="world in worlds" :key="world.dir" :value="world.dir">
+                {{ world.levelName || world.dir }}
+              </option>
+            </select>
+            <button type="button" class="ui-btn-icon" :disabled="loading || busy || !instanceUuid"
+              v-tip="t('config.refresh')" :aria-label="t('config.refresh')" @click="loadFiles()">
+              <GlyphIcon name="refresh" :size="16" :weight="1.8" />
+            </button>
+          </div>
           <SearchBox v-model="query" :placeholder="t('config.search')" :clear-label="t('config.searchClear')"
             width="100%" />
+          <BaseButton v-if="source" size="sm" variant="ghost" block
+            :disabled="loading || busy || !mcaFiles.length" @click="findOpen = true">
+            <GlyphIcon name="search" :size="16" :weight="1.8" />
+            {{ t("config.mcaFindTitle") }}
+          </BaseButton>
         </div>
 
-        <div class="cfg-tree">
+        <div class="cfg-tree" :aria-busy="loading">
           <template v-for="row in rows" :key="row.key">
             <!-- 目录：按侧栏的分组标题写，缩进由层级给 -->
             <button v-if="row.isDir" class="cfg-dir" :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
+              :aria-expanded="row.expanded"
               @click="toggleExpand(row.key)" @contextmenu.prevent="openRowMenu($event, row.key)">
-              <GlyphIcon class="cfg-chevron" :class="{ open: expanded.has(row.key) }" name="chevron-down" :size="13"
+              <GlyphIcon class="cfg-chevron" :class="{ 'is-expanded': row.expanded }" name="chevron-down" :size="14"
                 :weight="2.4" />
               <span class="cfg-dir-name" :title="row.key"><HighlightText :text="row.name" :query="query" /></span>
             </button>
             <!-- 文件：按侧栏的实例行写 -->
-            <button v-else class="cfg-row" :class="{ on: selected?.name === row.key }"
+            <button v-else class="cfg-row" :class="{ 'is-active': selected?.name === row.key }"
+              :aria-current="selected?.name === row.key ? 'true' : undefined"
               :style="{ paddingLeft: `${8 + row.depth * 14}px` }" :title="row.key" @click="openFile(row.key)"
               @contextmenu.prevent="openRowMenu($event, row.key)">
               <span class="cfg-chevron-spacer"></span>
@@ -690,27 +642,48 @@ useWindowRefresh(() => {
         </div>
       </aside>
 
-      <!-- 分隔线：拖动改左栏宽度。盖在左栏右边框上，所以看起来还是那一条细线 -->
-      <div class="cfg-split" :class="{ on: resizing }" @pointerdown="startResize" />
+      <div class="cfg-split" :class="{ 'is-resizing': resizing }" role="separator" tabindex="0"
+        aria-orientation="vertical" aria-controls="config-file-tree" :aria-label="t('config.treeResize')"
+        :aria-valuemin="treeMinWidth" :aria-valuemax="treeMaxWidth" :aria-valuenow="visibleTreeWidth"
+        @pointerdown="startResize" @keydown="onResizeKeydown" />
 
-      <!-- 右：按类型选视图。没选文件时也摆着文本编辑器，只是禁用 ——
-           打开窗口就是"编辑器窗口"的样子，不再是中间一句提示 -->
-      <section class="cfg-view">
-        <!-- 与下面那个必须给不同的 key：同为 MonacoText，Vue 会复用实例，
-             而只读是创建时的选项，复用后切不回可编辑 -->
-        <MonacoText v-if="!selected || (isText && (loading || deleting))" key="empty" :model-value="deleting ? text : ''" readonly />
-        <MonacoText v-else-if="isText" key="file" v-model="text" :language="langOf(selected)" />
-        <NbtTree v-else-if="isNbt" ref="nbtRef" :uuid="instanceUuid" :source="source" :file="selected.name"
-          @dirty="nbtDirty = $event" />
-        <McaTable v-else-if="selected.fileType === 'mca'" :uuid="instanceUuid" :source="source"
-          :file="selected.name" :chunk="mcaTarget?.chunk" :reveal="mcaTarget?.path" />
-        <ImageView v-else-if="selected.fileType === 'image'" :uuid="instanceUuid" :source="source"
-          :file="selected.name" />
-        <HexView v-else :uuid="instanceUuid" :source="source" :file="selected.name" />
+      <section class="cfg-editor">
+        <div class="cfg-editor-head">
+          <span class="cfg-path" :class="{ 'is-placeholder': !selected }" :title="selected?.name">
+            {{ selected?.name || t("config.pickFile") }}
+          </span>
+          <div class="cfg-editor-actions">
+            <span class="cfg-status" :class="{ 'is-dirty': canSave && unsaved }" role="status">
+              <template v-if="loading">{{ t("config.loading") }}</template>
+              <template v-else-if="canSave && unsaved">{{ t("config.unsaved") }}</template>
+              <!-- 区域文件在区块视图内保存，不属于只读视图 -->
+              <template v-else-if="selected && !canSave && selected.fileType !== 'mca'">
+                {{ t("config.readonly") }}
+              </template>
+            </span>
+            <BaseButton v-if="canSave" size="sm" :variant="unsaved ? 'accent' : 'ghost'"
+              :disabled="loading || busy || !unsaved" @click="save">
+              <GlyphIcon name="save" :size="16" :weight="1.8" />
+              {{ t(saving || nbtSaving ? "config.saving" : "config.save") }}
+            </BaseButton>
+          </div>
+        </div>
+        <div class="cfg-view" :aria-busy="loading || deleting">
+          <!-- 占位编辑器与文件编辑器使用独立实例，隔离只读状态 -->
+          <MonacoText v-if="!selected || (isText && (loading || deleting))" key="empty" :model-value="deleting ? text : ''" readonly />
+          <MonacoText v-else-if="isText" key="file" v-model="text" :language="langOf(selected)" />
+          <NbtTree v-else-if="isNbt" ref="nbtRef" :uuid="instanceUuid" :source="source" :file="selected.name"
+            @dirty="nbtDirty = $event" />
+          <McaTable v-else-if="selected.fileType === 'mca'" :uuid="instanceUuid" :source="source"
+            :file="selected.name" :chunk="mcaTarget?.chunk" :reveal="mcaTarget?.path" />
+          <ImageView v-else-if="selected.fileType === 'image'" :uuid="instanceUuid" :source="source"
+            :file="selected.name" />
+          <HexView v-else :uuid="instanceUuid" :source="source" :file="selected.name" />
+        </div>
       </section>
     </div>
 
-    <!-- 查找实体 / 方块：编辑存档时从标题栏打开 -->
+    <!-- 切换上下文前确认是否放弃文本改动 -->
     <BaseModal v-if="pendingDiscard" :title="t('config.unsaved')" @close="answerDiscard(false)">
       <p>{{ t("config.discardChanges") }}</p>
       <div class="modal-actions">
@@ -727,56 +700,55 @@ useWindowRefresh(() => {
 </template>
 
 <style scoped>
-/* 标题栏右侧：实例 chip + 来源下拉。这一排的通用标准在 styles/titlebar.css */
 .head-cfg {
   display: flex;
   align-items: center;
-  gap: 8px;
   min-width: 0;
 }
 
-.head-dirty {
-  flex-shrink: 0;
-  color: var(--yellow);
-  font-size: 12px;
-}
-
-.head-readonly {
-  flex-shrink: 0;
-  color: var(--text-dim);
-  font-size: 12px;
-}
-
-/* 两栏：左固定宽、右吃掉剩余；两层都要 min-height: 0，不然子元素滚不动 */
+/* 两栏均需允许收缩，滚动才会留在文件树与编辑器内部 */
 .cfg-body {
   display: flex;
   flex: 1;
+  min-width: 0;
   min-height: 0;
 }
 
-/* 左栏：主窗口侧栏那一套 —— --bg-side 底 + 右侧描边 + 贴窗口的上 / 下 / 左缘，宽 300px。
-   窗口走 body-flush，所以这里不再是自己一张"卡片"，而是真的侧栏 */
+/* 侧栏贴窗口边缘，宽度由用户偏好与拖动状态决定 */
 .cfg-list {
   display: flex;
   flex-direction: column;
-  width: 300px;
+  max-width: 50%;
   flex-shrink: 0;
   min-height: 0;
   overflow: hidden;
   background: var(--bg-side);
   border-right: 1px solid var(--border);
-  /* 左栏一行的高度：目录行与文件行同取这一档。比全 app 控件那一档（32px）矮，
-     树里一行就一个名字，24px 一屏能多看几条 */
+  /* 密集文件树使用统一行高，单位像素 */
   --row-h: 24px;
 }
 
-/* 搜索固定在上：内边距与侧栏的 .sidebar-head 一致 */
 .cfg-list-head {
   flex-shrink: 0;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
   padding: 12px 12px 10px;
+}
+
+.cfg-source-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cfg-source-row .field-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.cfg-source-row .ui-btn-icon {
+  flex-shrink: 0;
 }
 
 /* 树的滚动区：内边距与侧栏的 .group-list 一致 */
@@ -792,8 +764,7 @@ useWindowRefresh(() => {
   padding: 2px 10px 14px;
 }
 
-/* 目录行与文件行同高同圆角：一棵树里两种行的尺寸不一致，扫起来会一跳一跳。
-   行高取左栏自己的 --row-h，比全 app 控件那一档矮：树里条密，一行一个名字就够 */
+/* 目录与文件同高，展开目录时保持行距稳定 */
 .cfg-dir,
 .cfg-row {
   display: flex;
@@ -801,8 +772,7 @@ useWindowRefresh(() => {
   gap: 8px;
   width: 100%;
   height: var(--row-h);
-  /* 必须不缩：.cfg-tree 是 flex 列，条目一多就会被压扁（展开后行高比折叠时矮一半就是这么来的），
-     该滚动的是容器 */
+  /* 条目多时由容器滚动，不能压缩行高 */
   flex-shrink: 0;
   padding: 0 12px;
   border: none;
@@ -833,7 +803,7 @@ useWindowRefresh(() => {
 }
 
 /* 选中态：强调色底 + 一圈描边 */
-.cfg-row.on {
+.cfg-row.is-active {
   background: var(--accent-soft);
   color: var(--accent);
   outline: 1px solid var(--accent-border);
@@ -847,14 +817,14 @@ useWindowRefresh(() => {
   transition: transform 0.12s;
 }
 
-.cfg-chevron.open {
+.cfg-chevron.is-expanded {
   transform: rotate(0);
 }
 
 /* 文件行里占住箭头那一格：同一层的文件名才与目录名对齐 */
 .cfg-chevron-spacer {
   flex-shrink: 0;
-  width: 13px;
+  width: 14px;
 }
 
 .cfg-dir-name,
@@ -866,39 +836,86 @@ useWindowRefresh(() => {
   white-space: nowrap;
 }
 
-/* 右栏：四周留白回到全 app 内容区那一档（窗口走了 body-flush，这里自己给） */
-/* 右栏：**四个编辑模式共用这一张卡片** —— 底色、描边、圆角只写这一处，
-   文本 / NBT / 区块 / 二进制各自铺满它，内边距由各视图按内容疏密自己给。
-   以前是"文本与 NBT 贴边、区块与二进制各带一张卡片"两套口径，切文件时边界会跳 */
+/* 工具栏独立于视图的滚动区域，长路径可省略、操作区可换行 */
+.cfg-editor,
 .cfg-view {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-width: 0;
   min-height: 0;
-  /* 直接占满右栏：与左栏同一边界口径（左栏也是贴边 + 一条右边框），不要外留白 */
   /* 不透明底：区块 / 二进制是密排文本，半透明底会和窗口背景图叠在一起 */
   background: var(--bg-solid, var(--bg-card));
   overflow: hidden;
 }
 
-/* 视图自己铺满卡片：不漏白底，也不各自撑出自带的外留白 */
+.cfg-editor-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-height: calc(var(--ctl-h) + 24px + 1px);
+  flex-shrink: 0;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cfg-path {
+  flex: 1 1 160px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: var(--ctl-font);
+}
+
+.cfg-path.is-placeholder,
+.cfg-status {
+  color: var(--text-dim);
+}
+
+.cfg-editor-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.cfg-status {
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.cfg-status.is-dirty {
+  color: var(--yellow);
+}
+
+/* 视图占满容器，滚动交给各视图内部 */
 .cfg-view > * {
   flex: 1;
   min-height: 0;
 }
-/* 分隔线：5px 的透明热区压着左栏那条右边框，看起来仍是一条细线 */
+/* 透明热区覆盖侧栏边框，不占用两栏的可见空间 */
 .cfg-split {
-  flex: 0 0 5px;
-  margin-left: -3px;
+  flex: 0 0 6px;
+  margin: 0 -2px 0 -4px;
   cursor: col-resize;
+  touch-action: none;
   z-index: 1;
   background: transparent;
   transition: background 0.15s;
 }
 
 .cfg-split:hover,
-.cfg-split.on {
+.cfg-split:focus-visible,
+.cfg-split.is-resizing {
   background: var(--accent-soft);
+}
+
+.cfg-split:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -2px;
 }
 </style>

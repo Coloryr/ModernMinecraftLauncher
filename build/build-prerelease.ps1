@@ -41,7 +41,7 @@ Push-Location (Join-Path $root 'mml-gui\src-tauri')
 try {
     Write-Host '正在构建 prerelease（thin LTO）...'
     # 必须带 custom-protocol：不带的话 tauri 把这次构建当成 dev，
-    # 前端去连 localhost:1420 而不是内嵌 dist，窗口永远不出来（见 Cargo.toml 的 [features]）
+    # 前端会连接 localhost:1420；未启动开发服务时无法加载页面。
     cargo build --profile prerelease --features custom-protocol,prerelease
     if ($LASTEXITCODE -ne 0) { throw "构建失败（退出码 $LASTEXITCODE）" }
 }

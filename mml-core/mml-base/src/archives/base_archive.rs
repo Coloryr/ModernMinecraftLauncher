@@ -697,7 +697,7 @@ impl BaseArchive {
     /// Zip 格式下并行解压，每个线程持有独立读取句柄随机访问，其余格式流式解压保持顺序。
     /// 文件名非法时的 GUI 询问发生在任务收集阶段，保持串行
     ///
-    /// - `map`: 将每个条目映射为可选输出路径的闭包
+    /// - `map`: 将条目映射为可信输出路径；调用方负责限制输出目录
     /// - `gui`: 可选的进度回调，每提取完一个文件触发一次
     ///
     /// # 返回值
@@ -711,7 +711,7 @@ impl BaseArchive {
         self.extract_mapped(|entry| Ok(map(entry)), None, gui)
     }
 
-    /// 收集提取路径；指定根目录时，重命名后的最终路径也必须留在目录内。
+    /// 收集并提取条目；指定根目录时同时校验重命名后的最终路径。
     fn extract_mapped<F: FnMut(&ArchiveEntryInfo) -> CoreResult<Option<PathBuf>>>(
         &self,
         mut map: F,
@@ -823,7 +823,7 @@ impl BaseArchive {
             }
         }
 
-        // 先压缩到临时文件，再原子替换
+        // 临时包与原包放在同一目录，确保重命名替换不跨文件系统。
         let temp_archive = self
             .path
             .with_file_name(format!(".mml_archive_{}.tmp", Uuid::new_v4()));
@@ -908,7 +908,7 @@ impl BaseArchive {
         file.write_all(data)
             .map_err(|err| fs_err(dest_path.clone(), err))?;
 
-        // 先压缩到临时文件，再原子替换
+        // 临时包与原包放在同一目录，确保重命名替换不跨文件系统。
         let temp_archive = self
             .path
             .with_file_name(format!(".mml_archive_{}.tmp", Uuid::new_v4()));
@@ -1016,7 +1016,7 @@ fn strip_dir_prefix(name: &str, dir: &str) -> String {
         .unwrap_or_else(|| name.to_string())
 }
 
-/// 同目录重命名覆盖，失败时保留原包并清理临时包。
+/// 同目录重命名覆盖，失败时保留原包并尝试清理临时包。
 fn replace_archive(replacement: &Path, original: &Path) -> CoreResult<()> {
     fs::rename(replacement, original).map_err(|err| {
         let _ = fs::remove_file(replacement);

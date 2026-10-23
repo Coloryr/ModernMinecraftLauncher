@@ -264,7 +264,7 @@ impl TarReader {
         for entry in items {
             let mut entry = entry.map_err(read_error)?;
             let path = entry.path().map_err(read_error)?.to_path_buf();
-            // 文件名非法时询问 GUI 是否替换
+            // 先拒绝越界路径，再处理平台不支持的文件名。
             path_helper::safe_join(output_dir, &path.to_string_lossy())?;
             let name = process.check_name(&path.to_string_lossy())?;
             let name_path = Path::new(&name).to_path_buf();

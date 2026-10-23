@@ -142,16 +142,15 @@ fn get_trash_info_path() -> PathBuf {
     trash_info_path
 }
 
-/// 将文件夹挪到回收站
+/// 将文件或目录移入系统回收站
 ///
-/// - `dir`: 要挪入回收站的文件夹路径
+/// - `dir`: 要移入回收站的文件或目录路径
 ///
 /// # 返回值
 ///
 /// 路径不存在时直接返回 `Ok(())`；挪入回收站成功返回 `Ok(())`；
 /// 用户中止返回 `ErrorType::TaskCancel`，其他失败返回相应错误
 pub fn move_to_trash<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
-    // 检查路径是否存在
     if !dir.as_ref().exists() {
         return Ok(());
     }
@@ -180,11 +179,7 @@ pub fn move_to_trash<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
     }
 }
 
-/// 将文件夹挪到回收站
-///
-/// # 返回值
-///
-/// 移动成功返回 `Ok(())`，IO 失败时返回带路径的错误
+/// 将文件或目录移入 Linux 回收站，并写入恢复信息
 #[cfg(any(target_os = "linux", test))]
 fn move_to_trash_linux(dir: &Path) -> CoreResult<()> {
     use std::time::SystemTime;
@@ -243,11 +238,7 @@ fn move_to_trash_linux(dir: &Path) -> CoreResult<()> {
     Ok(())
 }
 
-/// 将文件夹挪到回收站
-///
-/// # 返回值
-///
-/// osascript 执行成功返回 `Ok(())`，失败返回相应错误
+/// 通过 Finder 将文件或目录移入 macOS 回收站
 #[cfg(any(target_os = "macos", test))]
 fn move_to_trash_macos(dir: &Path) -> CoreResult<()> {
     let escaped_dir = dir
@@ -284,11 +275,7 @@ fn move_to_trash_macos(dir: &Path) -> CoreResult<()> {
     }
 }
 
-/// 将文件夹挪到回收站
-///
-/// # 返回值
-///
-/// 成功返回 `Ok(())`，用户取消返回 `ErrorType::TaskCancel`，其他失败返回相应错误
+/// 通过 Windows Shell 将文件或目录移入回收站
 #[cfg(target_os = "windows")]
 fn move_to_trash_windows<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
     use std::os::windows::ffi::OsStrExt;

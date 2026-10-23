@@ -2,13 +2,13 @@
 //!
 //! Authlib-Injector 是一种允许使用自定义认证服务器的 Minecraft 登录方式。
 //! 启动器通过向指定的 Yggdrasil 兼容 API 服务器进行认证，
-//! 配合游戏端的 authlib-injector 模组实现外置登录。
+//! 配合游戏进程加载的 authlib-injector Java Agent 实现外置登录。
 //!
 //! # 认证流程
 //!
 //! 1. 向用户指定的服务器地址发起 Yggdrasil 认证
-//! 2. 处理多角色选择，通过 GUI 回调或自动选择第一个
-//! 3. 刷新令牌并保存账户
+//! 2. 优先采用服务器已绑定或用户名匹配的角色，其余交给 GUI 选择；无 GUI 时取首个
+//! 3. 刷新令牌，在服务器尚未绑定角色时提交所选角色，返回账户信息
 
 use mml_names::i18_items::error_type::{CoreResult, ErrorType};
 use tokio_util::sync::CancellationToken;
@@ -20,7 +20,7 @@ use crate::{
 
 /// 外置登录认证
 ///
-/// `gui` 为 `None` 时自动选择第一个角色
+/// 需要从候选列表选择且 `gui` 为 `None` 时，自动选择第一个角色
 ///
 /// - `client_token`: 客户端标识令牌
 /// - `user`: 用户名
@@ -30,7 +30,7 @@ use crate::{
 ///
 /// # 返回值
 ///
-/// 已认证并刷新令牌的 [`LoginObj`]，服务器地址存入 `text1`
+/// 已认证并绑定角色的 [`LoginObj`]，服务器地址存入 `text1`；选择取消或索引无效时返回取消错误
 pub async fn authenticate(
     client_token: String,
     user: String,

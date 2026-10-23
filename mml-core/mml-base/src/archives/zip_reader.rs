@@ -170,12 +170,13 @@ impl ZipReader {
                 None => continue, // 跳过不安全的路径
             };
 
-            // 文件名非法时询问 GUI 是否替换
+            // 文件名替换后再次校验目录边界，防止目标路径经过已有链接。
             let outpath = path_helper::safe_join(
                 &output_dir_canonical,
                 &process.check_name(&outpath.to_string_lossy())?,
             )?;
 
+            // 文件、目录与链接均在此计数一次。
             process.add_now(&outpath);
 
             if file.is_dir() {
@@ -460,7 +461,7 @@ fn make_symlink(target_path: &Path, link_target: &str, _resolved: &Path) -> Core
     Ok(())
 }
 
-/// 按链接所在目录解析目标，允许包内的父目录引用，拒绝逃逸和链接链。
+/// 按链接所在目录解析目标，允许包内父目录引用，拒绝越界及经过已有链接的目标。
 fn resolve_link_target(root: &Path, link: &Path, target: &str) -> CoreResult<PathBuf> {
     let reject = || ErrorType::UnsafePath {
         root: root.to_path_buf(),
