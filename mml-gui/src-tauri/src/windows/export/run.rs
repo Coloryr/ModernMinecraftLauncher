@@ -110,7 +110,8 @@ pub(super) struct ExportProgressGui {
 /// # 返回值
 ///
 /// 任务已开始返回 `Ok(())`；已有导出在跑、uuid 非法、格式或文件名为空返回错误文案
-#[gui_macros::ipc_group("export")]
+#[gui_macros::ipc_group("export")]
+
 #[gui_macros::command]
 pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Result<(), String> {
     let permit = ExportPermit::acquire(&EXPORT_RUNNING)?;
@@ -121,6 +122,7 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
         "modrinth" => ExportPackType::Modrinth,
         "mmc" => ExportPackType::MMC,
         "hmcl" => ExportPackType::HMCL,
+        "mml" => ExportPackType::MML,
         _ => {
             return Err(err_keys::EXPORT_PACK_TYPE.to_string());
         }
@@ -133,6 +135,7 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
         return Err(err_keys::FILE_NAME.to_string());
     }
 
+    super::archive::check_destination(std::path::Path::new(&config.file), &game.get_base_path())?;
     let base = game.get_game_path();
     let online = online_of(&game);
 
@@ -141,7 +144,7 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
     let mut select = Vec::new();
 
     // 模组与文件走同一套路由，只是前端分了两块勾选
-    for pick in config.mods.iter().chain(config.files.iter()) {
+    for pick in config.mods.iter().chain(config.files.iter()).filter(|_| pack != ExportPackType::MML) {
         let path = resolve_under(&base, &pick.path)?;
 
         // 目录整份进 overrides：里面每个文件的下载地址不会一致，填了也不作数
@@ -211,7 +214,10 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
     let save_file = config.file.clone();
     tokio::spawn(async move {
         let _permit = permit;
-        let res = game.export(arg).await;
+        let res = if pack == ExportPackType::MML {
+            tokio::task::spawn_blocking(move || super::archive::native_instance(&game, &arg.file))
+                .await.map_err(|e| e.to_string()).and_then(|result| result)
+        } else { game.export(arg).await.map_err(|e| e.to_string()) };
         let event = match res {
             Ok(()) => ExportProgressDto {
                 state: "done".to_string(),

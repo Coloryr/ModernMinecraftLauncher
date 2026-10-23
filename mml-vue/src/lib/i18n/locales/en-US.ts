@@ -1,5 +1,9 @@
 // English (US) language pack
 export default {
+  "winExport.nativeHint": "Export the complete instance and its settings. Drop the package into the launcher to import it.",
+  "err.exportDestination": "Save the archive outside the instance directory",
+  "err.exportLink": "The instance contains symbolic links; remove them before exporting",
+
   "modExport.name": "Name",
   "modExport.modId": "Mod ID",
   "modExport.version": "Version",

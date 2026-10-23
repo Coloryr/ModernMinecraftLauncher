@@ -143,6 +143,10 @@ pub const SAVE_SEED: &str = "err.saveSeed";
 /// 模组清单尚未扫描或已变化。
 pub const MOD_EXPORT_SCAN: &str = "err.modExportScan";
 /// 导出字段无效。
+/// 导出路径不能位于实例内。
+pub const EXPORT_DESTINATION: &str = "err.exportDestination";
+/// 实例内的链接不能打包。
+pub const EXPORT_LINK: &str = "err.exportLink";
 pub const EXPORT_FIELDS: &str = "err.exportFields";
 pub const EXPORT_RUNNING: &str = "err.exportRunning";
 /// 不支持的整合包类型

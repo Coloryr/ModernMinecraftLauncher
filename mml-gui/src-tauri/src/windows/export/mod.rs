@@ -1,9 +1,9 @@
-//! 实例导出窗口：导出为 CurseForge / Modrinth 标准整合包
+//! 实例导出窗口：本地实例归档与通用整合包导出。
 //!
-//! 打包逻辑在内核 `mml_game::game_export` 的 `InstanceSettingObj::export`，
-//! 这里只做实例文件到在线清单 / overrides 的收集与任务托管：
+//! 通用格式调用内核导出，本地格式保留实例配置与全部文件。
 //! `export_run` 后台跑导出，进度经 `export-progress` 事件上报前端。
 
+mod archive;
 pub(crate) mod list;
 pub(crate) mod run;
 

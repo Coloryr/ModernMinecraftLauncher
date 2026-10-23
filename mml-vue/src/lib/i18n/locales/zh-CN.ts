@@ -1,5 +1,9 @@
 // 中文（简体）语言包
 export default {
+  "winExport.nativeHint": "完整导出实例及其配置，可拖入启动器导入。",
+  "err.exportDestination": "请将导出文件保存在实例目录之外",
+  "err.exportLink": "实例中包含符号链接，请移除链接后再导出",
+
   "modExport.name": "名称",
   "modExport.modId": "模组 ID",
   "modExport.version": "版本",

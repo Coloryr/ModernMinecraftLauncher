@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 实例导出窗口：把游戏实例打包为通用标准整合包，格式为 CurseForge zip 或 Modrinth .mrpack
+// 实例导出窗口：完整 M²L 实例包与通用整合包。
 //
 // 目标实例按优先级取：openWindow 带入的目标参数 → `export-focus` 事件 → 实例下拉。
 // 目标参数单窗口模式走 windowParams，多窗口走 URL uuid；
@@ -12,7 +12,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
-import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import IconTabs from "../../components/ui/IconTabs.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import FilePicker from "./parts/FilePicker.vue";
@@ -39,9 +38,9 @@ const loadingInfo = ref(false);
 // ---------------- 导出配置 ----------------
 
 /** 导出格式 id */
-type PackId = "curseforge" | "modrinth" | "mmc" | "hmcl";
+type PackId = "curseforge" | "modrinth" | "mmc" | "hmcl" | "mml";
 
-const pack = ref<PackId>("curseforge");
+const pack = ref<PackId>("mml");
 const packName = ref("");
 const author = ref("");
 const version = ref("1.0.0");
@@ -61,6 +60,7 @@ const tab = ref<ExportTab>("meta");
 
 /** 格式选项：两种通用清单格式，加两种整包实例格式（供别的启动器导入） */
 const packOptions = [
+  { value: "mml", label: "M²L" },
   { value: "curseforge", label: "CurseForge" },
   { value: "modrinth", label: "Modrinth (.mrpack)" },
   { value: "mmc", label: "MMC" },
@@ -320,7 +320,7 @@ onBeforeUnmount(() => {
   <WindowFrame body-fill :title="t('winExport.title')" @close="$emit('close')">
     <!-- 实例选择与导出按钮放进标题栏：不占内容区高度，也不随选项卡滚动 -->
     <template #head-right>
-      <select v-model="currentUuid" class="field-select head-select">
+      <select v-model="currentUuid" class="field-select head-select" :disabled="running">
         <!-- 标题栏里位置窄，占位用短文案；内容区的空态另有一句更长的提示 -->
         <option value="" disabled>{{ t("winExport.instance") }}</option>
         <option v-for="i in instances" :key="i.uuid" :value="i.uuid">{{ i.name }}</option>
@@ -335,16 +335,17 @@ onBeforeUnmount(() => {
         <!-- 概况整段不显示了：版本与加载器在主页面上都有，导出窗口里不必重复 -->
         <div class="row">
           <label class="field-label">{{ t("winExport.format") }}</label>
-          <SegmentedTabs v-model="pack" :options="packOptions" />
+          <select v-model="pack" class="field-select" :disabled="running"><option v-for="option in packOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select>
         </div>
 
         <!-- 这层限制在选择格式时就说清楚，别让用户以为包里带了自定义加载器 -->
         <p v-if="customLoaderLost" class="warn-hint">{{ t("winExport.customLoaderWarn") }}</p>
 
         <!-- 选项卡：与「添加实例」窗口同一套图标页签 -->
-        <IconTabs v-model="tab" :tabs="tabOptions" />
+        <p v-if="pack === 'mml'" class="sec-hint">{{ t("winExport.nativeHint") }}</p>
+        <IconTabs v-else v-model="tab" :tabs="tabOptions" />
 
-        <div class="tab-body">
+        <div v-if="pack !== 'mml'" class="tab-body">
           <!-- 整合包信息：写进清单的元数据，配着上面的格式一起看 -->
           <template v-if="tab === 'meta'">
             <p class="sec-hint">
