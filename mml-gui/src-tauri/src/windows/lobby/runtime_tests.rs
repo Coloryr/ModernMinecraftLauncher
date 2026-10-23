@@ -1,6 +1,47 @@
 use super::*;
 
 #[tokio::test]
+async fn rejected_room_requests_preserve_external_room_ownership() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        for status in ["400 Bad Request", "200 OK", "400 Bad Request", "200 OK"] {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut request = [0; 1024];
+            assert!(stream.read(&mut request).await.unwrap() > 0);
+            stream
+                .write_all(
+                    format!("HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                        .as_bytes(),
+                )
+                .await
+                .unwrap();
+        }
+    });
+    let session = Session {
+        client: reqwest::Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_secs(3))
+            .build()
+            .unwrap(),
+        base: format!("http://{address}"),
+        owned: false,
+        room_owned: AtomicBool::new(false),
+        worker: None,
+    };
+    assert!(session.action("/state/guesting", &[]).await.is_err());
+    assert!(!session.room_owned.load(Ordering::Acquire));
+    session.action("/state/guesting", &[]).await.unwrap();
+    assert!(session.room_owned.load(Ordering::Acquire));
+    assert!(session.action("/state/ide", &[]).await.is_err());
+    assert!(session.room_owned.load(Ordering::Acquire));
+    session.action("/state/ide", &[]).await.unwrap();
+    assert!(!session.room_owned.load(Ordering::Acquire));
+    server.await.unwrap();
+}
+
+#[tokio::test]
 async fn reopening_waits_for_previous_room_cleanup() {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

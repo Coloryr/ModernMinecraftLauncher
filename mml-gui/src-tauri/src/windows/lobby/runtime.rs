@@ -251,16 +251,21 @@ impl Session {
                 .iter()
                 .map(|(key, value)| (key.as_str(), value.as_str())),
         );
+        let was_owned = self.room_owned.load(Ordering::Acquire);
         if path != "/state/ide" {
+            // 请求途中取消时仍需清理；明确被拒绝才恢复原有归属。
             self.room_owned.store(true, Ordering::Release);
         }
-        self.client
+        let response = self
+            .client
             .get(url)
             .send()
             .await
-            .map_err(|e| e.to_string())?
-            .error_for_status()
             .map_err(|e| e.to_string())?;
+        if let Err(error) = response.error_for_status_ref() {
+            self.room_owned.store(was_owned, Ordering::Release);
+            return Err(error.to_string());
+        }
         self.room_owned
             .store(path != "/state/ide", Ordering::Release);
         Ok(())
