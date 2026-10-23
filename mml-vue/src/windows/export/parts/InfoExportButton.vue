@@ -9,12 +9,13 @@ const props = defineProps<{ uuid: string; name: string; disabled: boolean }>();
 const busy = ref(false);
 
 async function saveInfo() {
-  if (busy.value || props.disabled) return;
+  if (busy.value || props.disabled || !props.uuid) return;
+  const uuid = props.uuid;
+  const name = props.name;
   busy.value = true;
   try {
     const { save } = await import("@tauri-apps/plugin-dialog");
-    const uuid = props.uuid;
-    const file = await save({ defaultPath: `${props.name}-info.json`, filters: [{ name: "JSON", extensions: ["json"] }] });
+    const file = await save({ defaultPath: `${name}-info.json`, filters: [{ name: "JSON", extensions: ["json"] }] });
     if (!file) return;
     await commands.export.generateInfo(uuid, file);
     showToast(t("winExport.done", { file }));

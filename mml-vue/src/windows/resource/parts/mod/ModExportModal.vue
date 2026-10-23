@@ -15,16 +15,15 @@ const busy = ref(false);
 const options = ["name", "modId", "version", "file", "author", "description", "url", "source", "projectId", "fileId", "sha1", "disable", "side", "loaders", "note"];
 
 async function saveList() {
-  if (busy.value || !fields.value.length) return;
+  if (busy.value || !fields.value.length || (onlySelected.value && !props.selectedIds.length)) return;
+  const uuid = props.uuid;
+  const config = { format: format.value, fields: [...fields.value], ids: onlySelected.value ? [...props.selectedIds] : [] };
   busy.value = true;
   try {
     const { save } = await import("@tauri-apps/plugin-dialog");
-    const file = await save({ defaultPath: `mods.${format.value}`, filters: [{ name: format.value.toUpperCase(), extensions: [format.value] }] });
+    const file = await save({ defaultPath: `mods.${config.format}`, filters: [{ name: config.format.toUpperCase(), extensions: [config.format] }] });
     if (!file) return;
-    const count = await commands.resource.exportMods(props.uuid, {
-      file, format: format.value, fields: fields.value,
-      ids: onlySelected.value ? props.selectedIds : [],
-    });
+    const count = await commands.resource.exportMods(uuid, { ...config, file });
     showToast(t("modExport.done", { count, file }));
     emit("close");
   } catch (error) {
@@ -41,10 +40,10 @@ async function saveList() {
       <label>{{ t('modExport.format') }}
         <select v-model="format" class="field-select"><option value="txt">TXT</option><option value="csv">CSV</option><option value="json">JSON</option></select>
       </label>
-      <label v-if="selectedIds.length"><input v-model="onlySelected" type="checkbox" />{{ t('modExport.selected') }}</label>
+      <label v-if="selectedIds.length || onlySelected"><input v-model="onlySelected" type="checkbox" />{{ t('modExport.selected') }}</label>
       <p>{{ t('modExport.fields') }}</p>
       <div class="export-fields"><label v-for="field in options" :key="field"><input v-model="fields" type="checkbox" :value="field" />{{ t(`modExport.${field}`) }}</label></div>
-      <BaseButton variant="primary" :disabled="!fields.length || busy" @click="saveList">{{ t('winExport.exportBtn') }}</BaseButton>
+      <BaseButton variant="primary" :disabled="!fields.length || busy || (onlySelected && !selectedIds.length)" @click="saveList">{{ t('winExport.exportBtn') }}</BaseButton>
     </fieldset>
   </BaseModal>
 </template>
