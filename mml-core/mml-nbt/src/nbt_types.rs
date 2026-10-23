@@ -35,6 +35,65 @@ use mml_names::i18_items::error_type::{CoreResult, ErrorType};
 
 use crate::{NbtStream, NbtType, io_error, is_nbt_num};
 
+/// 校验数组长度，并按实际读到的数据增长内存，避免伪造长度触发巨额分配。
+fn read_array_bytes<R: Read>(stream: &mut R, count: i32, width: usize) -> CoreResult<Vec<u8>> {
+    let len = usize::try_from(count)
+        .ok()
+        .and_then(|count| count.checked_mul(width))
+        .filter(|len| *len <= isize::MAX as usize)
+        .ok_or(ErrorType::NbtReadError)?;
+    let mut data = Vec::new();
+    let mut chunk = [0u8; 8192];
+    while data.len() < len {
+        let size = (len - data.len()).min(chunk.len());
+        stream.read_exact(&mut chunk[..size]).map_err(io_error)?;
+        data.try_reserve(size)
+            .map_err(|_| ErrorType::NbtReadError)?;
+        data.extend_from_slice(&chunk[..size]);
+    }
+    Ok(data)
+}
+
+#[cfg(test)]
+mod length_tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn array_lengths_reject_negative_overflow_and_truncation() {
+        for count in [-1i32, i32::MIN, i32::MAX, i32::MAX / 4 + 1, 1] {
+            let bytes = count.to_be_bytes();
+            assert!(
+                NbtByteArray::default()
+                    .read(&mut Cursor::new(bytes))
+                    .is_err()
+            );
+            assert!(
+                NbtIntArray::default()
+                    .read(&mut Cursor::new(bytes))
+                    .is_err()
+            );
+            assert!(
+                NbtLongArray::default()
+                    .read(&mut Cursor::new(bytes))
+                    .is_err()
+            );
+        }
+        let arrays = [
+            NbtByteArray::new(vec![0, 255]).to_nbt(),
+            NbtIntArray::new(vec![i32::MIN, i32::MAX]).to_nbt(),
+            NbtLongArray::new(vec![i64::MIN, i64::MAX]).to_nbt(),
+        ];
+        for original in arrays {
+            let mut bytes = Vec::new();
+            original.write(&mut bytes).unwrap();
+            let mut result = NbtType::get_nbt(original.get_num()).unwrap();
+            result.read(&mut Cursor::new(bytes)).unwrap();
+            assert!(original.eq(&result));
+        }
+    }
+}
+
 /// NBT 结束标记，对应 TAG_End
 ///
 /// 无数据负载，只用于标识 Compound 标签中键值对列表的结束。
@@ -533,12 +592,7 @@ impl NbtStream for NbtByteArray {
         let mut temp = [0u8; 4];
         stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
 
-        let len = i32::from_be_bytes(temp);
-
-        let mut temp = vec![0; len as usize];
-        stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
-
-        self.data = temp;
+        self.data = read_array_bytes(stream, i32::from_be_bytes(temp), 1)?;
 
         Ok(())
     }
@@ -1310,11 +1364,7 @@ impl NbtStream for NbtIntArray {
         let mut temp = [0u8; 4];
         stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
 
-        // 长度字段表示元素个数，总字节数 = 元素个数 × 4
-        let len = i32::from_be_bytes(temp) * 4;
-
-        let mut temp = vec![0; len as usize];
-        stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
+        let temp = read_array_bytes(stream, i32::from_be_bytes(temp), 4)?;
 
         self.data = temp
             .chunks_exact(4)
@@ -1391,11 +1441,7 @@ impl NbtStream for NbtLongArray {
         let mut temp = [0u8; 4];
         stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
 
-        // 长度字段表示元素个数，总字节数 = 元素个数 × 8
-        let len = i32::from_be_bytes(temp) * 8;
-
-        let mut temp = vec![0; len as usize];
-        stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
+        let temp = read_array_bytes(stream, i32::from_be_bytes(temp), 8)?;
 
         self.data = temp
             .chunks_exact(8)
