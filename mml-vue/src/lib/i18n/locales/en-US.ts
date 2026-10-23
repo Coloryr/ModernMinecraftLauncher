@@ -653,7 +653,7 @@ export default {
   "edit.selectAll": "Select All",
   "edit.format": "Format Document",
   "edit.find": "Find",
-  // Config window: file list on the left, type-specific view on the right
+  // 配置文件窗口：左侧文件列表 + 右侧按类型切换的视图
   "config.title": "Config Files",
   "config.instance": "Instance config",
   "config.noInstance": "No instance selected",
@@ -668,8 +668,10 @@ export default {
   "config.searchClear": "Clear search",
   "config.searchEmpty": "No matching files",
   "config.sourceTip": "Switch config source",
+  "config.treeResize": "Resize file tree",
   "config.readonly": "Read-only",
   "config.save": "Save",
+  "config.saving": "Saving…",
   "config.saved": "Saved",
   "config.unsaved": "Unsaved",
   "config.discardChanges": "This file has unsaved changes. Discard them and continue?",

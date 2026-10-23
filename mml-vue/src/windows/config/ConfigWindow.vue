@@ -2,7 +2,7 @@
 // 配置文件窗口：左侧文件树，右侧按类型显示文本、NBT、区块、图片或二进制视图。
 // 实例由窗口身份或跳转参数确定；文件路径相对于实例配置目录或选定存档。
 // 文本提交行级差异，NBT 会话记录编辑操作；保存前均用基线 SHA1 检查磁盘冲突。
-// 两栏贴满内容区；未选文件时保留只读空编辑器，实例、来源与操作放在标题栏。
+// 来源与查找放在文件树上方，文件路径、保存状态与保存操作放在编辑区上方。
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
@@ -387,6 +387,7 @@ async function onFindChunk(form: { kind: string; x: string; z: string; name: str
 
 /** 左栏宽度，单位像素；拖动中间那条分隔线改它 */
 const treeWidth = ref(300);
+const configBody = ref<HTMLElement | null>(null);
 
 /** 是否正在拖分隔线，用来给拖拽态加高亮 */
 const resizing = ref(false);
@@ -394,28 +395,84 @@ const resizing = ref(false);
 /** 左栏宽度的上下限，单位像素 */
 const TREE_MIN_WIDTH = 200;
 const TREE_MAX_WIDTH = 640;
+const bodyWidth = ref(TREE_MAX_WIDTH * 2);
+/** 缩窄窗口时给编辑区保留至少一半空间，不改写已保存的宽度偏好 */
+const treeMaxWidth = computed(() => Math.min(TREE_MAX_WIDTH, Math.floor(bodyWidth.value / 2)));
+const treeMinWidth = computed(() => Math.min(TREE_MIN_WIDTH, treeMaxWidth.value));
+const visibleTreeWidth = computed(() => clampTreeWidth(treeWidth.value));
+let resizeObserver: ResizeObserver | null = null;
+let stopResize: (() => void) | null = null;
+
+function clampTreeWidth(width: number): number {
+  return Math.min(treeMaxWidth.value, Math.max(treeMinWidth.value, width));
+}
+
+function persistTreeWidth() {
+  void setConfigTreeWidth(treeWidth.value).catch((error) => showToast(tErr(error)));
+}
 
 /** 拖动时更新侧栏宽度，松手后保存偏好 */
 function startResize(event: PointerEvent) {
+  if (event.button !== 0 || !event.isPrimary) return;
   event.preventDefault();
+  stopResize?.();
   resizing.value = true;
   const startX = event.clientX;
-  const startWidth = treeWidth.value;
+  const startWidth = visibleTreeWidth.value;
+  const preferredWidth = treeWidth.value;
 
   function onMove(e: PointerEvent) {
-    const next = startWidth + e.clientX - startX;
-    treeWidth.value = Math.min(TREE_MAX_WIDTH, Math.max(TREE_MIN_WIDTH, next));
+    if (e.pointerId !== event.pointerId) return;
+    treeWidth.value = clampTreeWidth(startWidth + e.clientX - startX);
   }
 
-  function onUp() {
+  function cleanup() {
     resizing.value = false;
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
-    void setConfigTreeWidth(treeWidth.value);
+    window.removeEventListener("pointercancel", onCancel);
+    window.removeEventListener("blur", cancel);
+    stopResize = null;
   }
 
+  function onUp(e: PointerEvent) {
+    if (e.pointerId !== event.pointerId) return;
+    cleanup();
+    if (treeWidth.value !== preferredWidth) persistTreeWidth();
+  }
+
+  function cancel() {
+    treeWidth.value = preferredWidth;
+    cleanup();
+  }
+
+  function onCancel(e: PointerEvent) {
+    if (e.pointerId === event.pointerId) cancel();
+  }
+
+  stopResize = cleanup;
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onUp);
+  window.addEventListener("pointercancel", onCancel);
+  window.addEventListener("blur", cancel);
+}
+
+/** 分隔线获得焦点时可用方向键调整宽度，Home 与 End 到达边界 */
+function onResizeKeydown(event: KeyboardEvent) {
+  if (resizing.value) return;
+  let width = visibleTreeWidth.value;
+  switch (event.key) {
+    case "ArrowLeft": width -= 16; break;
+    case "ArrowRight": width += 16; break;
+    case "Home": width = treeMinWidth.value; break;
+    case "End": width = treeMaxWidth.value; break;
+    default: return;
+  }
+  event.preventDefault();
+  const next = clampTreeWidth(width);
+  if (next === visibleTreeWidth.value) return;
+  treeWidth.value = next;
+  persistTreeWidth();
 }
 
 /** 文件行的右键菜单：点击处坐标 + 右键的那个相对路径 */
@@ -504,13 +561,20 @@ onMounted(() => {
   // 左栏宽度是用户偏好，走后端落 gui_config.json
   void getConfigTreeWidth().then((width) => {
     treeWidth.value = Math.min(TREE_MAX_WIDTH, Math.max(TREE_MIN_WIDTH, width));
+  }).catch((error) => showToast(tErr(error)));
+  resizeObserver = new ResizeObserver(([entry]) => {
+    // KeepAlive 隐藏时宽度可能归零，保留最后一次可见尺寸。
+    if (entry && entry.contentRect.width > 0) bodyWidth.value = entry.contentRect.width;
   });
+  if (configBody.value) resizeObserver.observe(configBody.value);
   window.addEventListener("keydown", onSaveHotkey);
 });
 
 onBeforeUnmount(() => {
   requestGeneration += 1;
   answerDiscard(false);
+  stopResize?.();
+  resizeObserver?.disconnect();
   window.removeEventListener("keydown", onSaveHotkey);
 });
 // 组件卸载时关闭 NBT 会话；单窗口模式的 KeepAlive 切页不会触发卸载。
@@ -523,60 +587,51 @@ useWindowRefresh(() => {
 
 <template>
   <WindowFrame :title="t('config.title')" body-fill body-flush @close="emit('close')">
-    <!-- 实例、来源与操作都放标题栏，与日志窗口同一套；内容区整块留给文件树 -->
     <template #head-right>
       <div class="head-cfg">
         <InstanceChip :instance="instanceChip" />
-        <select class="field-select head-select" :value="source" :disabled="loading || busy" v-tip="t('config.sourceTip')"
-          :aria-label="t('config.sourceTip')" @change="onSourceChange">
-          <option value="">{{ t("config.instance") }}</option>
-          <option v-for="world in worlds" :key="world.dir" :value="world.dir">
-            {{ world.levelName || world.dir }}
-          </option>
-        </select>
-
-        <!-- 保存状态：未保存时下面那颗保存键转强调色，工具条因此整行省掉 -->
-        <span v-if="canSave && unsaved" class="head-dirty">{{ t("config.unsaved") }}</span>
-        <!-- 区域文件也能改，只是保存键在区块页里，不在标题栏 -->
-        <span v-else-if="selected && !canSave && selected.fileType !== 'mca'" class="head-readonly">
-          {{ t("config.readonly") }}
-        </span>
-
-        <BaseButton size="sm" variant="ghost" class="icon-btn-head" :disabled="loading || busy" v-tip="t('config.refresh')"
-          :aria-label="t('config.refresh')" @click="loadFiles()">
-          <GlyphIcon name="refresh" :size="15" :weight="1.8" />
-        </BaseButton>
-        <BaseButton v-if="source" size="sm" variant="ghost" class="icon-btn-head" :disabled="!mcaFiles.length"
-          v-tip="t('config.mcaFindTitle')" :aria-label="t('config.mcaFindTitle')" @click="findOpen = true">
-          <GlyphIcon name="search" :size="15" :weight="1.8" />
-        </BaseButton>
-        <BaseButton v-if="canSave" size="sm" :variant="unsaved ? 'accent' : 'ghost'" class="icon-btn-head"
-          :disabled="busy || !unsaved" v-tip="t('config.save')" :aria-label="t('config.save')" @click="save">
-          <GlyphIcon name="save" :size="15" :weight="1.8" />
-        </BaseButton>
       </div>
     </template>
 
-    <div class="cfg-body">
-      <!-- 左：与主窗口侧栏同一套，搜索固定在上，只有下面的树滚动 -->
-      <aside class="cfg-list" :style="{ width: `${treeWidth}px` }">
+    <div ref="configBody" class="cfg-body">
+      <!-- 来源与搜索固定在上，文件树独立滚动 -->
+      <aside id="config-file-tree" class="cfg-list" :style="{ width: `${visibleTreeWidth}px` }">
         <div class="cfg-list-head">
+          <div class="cfg-source-row">
+            <select class="field-select" :value="source" :disabled="loading || busy || !instanceUuid"
+              v-tip="t('config.sourceTip')" :aria-label="t('config.sourceTip')" @change="onSourceChange">
+              <option value="">{{ t("config.instance") }}</option>
+              <option v-for="world in worlds" :key="world.dir" :value="world.dir">
+                {{ world.levelName || world.dir }}
+              </option>
+            </select>
+            <button type="button" class="ui-btn-icon" :disabled="loading || busy || !instanceUuid"
+              v-tip="t('config.refresh')" :aria-label="t('config.refresh')" @click="loadFiles()">
+              <GlyphIcon name="refresh" :size="16" :weight="1.8" />
+            </button>
+          </div>
           <SearchBox v-model="query" :placeholder="t('config.search')" :clear-label="t('config.searchClear')"
             width="100%" />
+          <BaseButton v-if="source" size="sm" variant="ghost" block
+            :disabled="loading || busy || !mcaFiles.length" @click="findOpen = true">
+            <GlyphIcon name="search" :size="16" :weight="1.8" />
+            {{ t("config.mcaFindTitle") }}
+          </BaseButton>
         </div>
 
-        <div class="cfg-tree">
+        <div class="cfg-tree" :aria-busy="loading">
           <template v-for="row in rows" :key="row.key">
             <!-- 目录：按侧栏的分组标题写，缩进由层级给 -->
             <button v-if="row.isDir" class="cfg-dir" :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
               :aria-expanded="row.expanded"
               @click="toggleExpand(row.key)" @contextmenu.prevent="openRowMenu($event, row.key)">
-              <GlyphIcon class="cfg-chevron" :class="{ open: row.expanded }" name="chevron-down" :size="13"
+              <GlyphIcon class="cfg-chevron" :class="{ 'is-expanded': row.expanded }" name="chevron-down" :size="14"
                 :weight="2.4" />
               <span class="cfg-dir-name" :title="row.key"><HighlightText :text="row.name" :query="query" /></span>
             </button>
             <!-- 文件：按侧栏的实例行写 -->
-            <button v-else class="cfg-row" :class="{ on: selected?.name === row.key }"
+            <button v-else class="cfg-row" :class="{ 'is-active': selected?.name === row.key }"
+              :aria-current="selected?.name === row.key ? 'true' : undefined"
               :style="{ paddingLeft: `${8 + row.depth * 14}px` }" :title="row.key" @click="openFile(row.key)"
               @contextmenu.prevent="openRowMenu($event, row.key)">
               <span class="cfg-chevron-spacer"></span>
@@ -587,23 +642,44 @@ useWindowRefresh(() => {
         </div>
       </aside>
 
-      <!-- 分隔线：拖动改左栏宽度。盖在左栏右边框上，所以看起来还是那一条细线 -->
-      <div class="cfg-split" :class="{ on: resizing }" @pointerdown="startResize" />
+      <div class="cfg-split" :class="{ 'is-resizing': resizing }" role="separator" tabindex="0"
+        aria-orientation="vertical" aria-controls="config-file-tree" :aria-label="t('config.treeResize')"
+        :aria-valuemin="treeMinWidth" :aria-valuemax="treeMaxWidth" :aria-valuenow="visibleTreeWidth"
+        @pointerdown="startResize" @keydown="onResizeKeydown" />
 
-      <!-- 右：按类型选视图。没选文件时也摆着文本编辑器，只是禁用 ——
-           打开窗口就是"编辑器窗口"的样子，不再是中间一句提示 -->
-      <section class="cfg-view">
-        <!-- 与下面那个必须给不同的 key：同为 MonacoText，Vue 会复用实例，
-             而只读是创建时的选项，复用后切不回可编辑 -->
-        <MonacoText v-if="!selected || (isText && (loading || deleting))" key="empty" :model-value="deleting ? text : ''" readonly />
-        <MonacoText v-else-if="isText" key="file" v-model="text" :language="langOf(selected)" />
-        <NbtTree v-else-if="isNbt" ref="nbtRef" :uuid="instanceUuid" :source="source" :file="selected.name"
-          @dirty="nbtDirty = $event" />
-        <McaTable v-else-if="selected.fileType === 'mca'" :uuid="instanceUuid" :source="source"
-          :file="selected.name" :chunk="mcaTarget?.chunk" :reveal="mcaTarget?.path" />
-        <ImageView v-else-if="selected.fileType === 'image'" :uuid="instanceUuid" :source="source"
-          :file="selected.name" />
-        <HexView v-else :uuid="instanceUuid" :source="source" :file="selected.name" />
+      <section class="cfg-editor">
+        <div class="cfg-editor-head">
+          <span class="cfg-path" :class="{ 'is-placeholder': !selected }" :title="selected?.name">
+            {{ selected?.name || t("config.pickFile") }}
+          </span>
+          <div class="cfg-editor-actions">
+            <span class="cfg-status" :class="{ 'is-dirty': canSave && unsaved }" role="status">
+              <template v-if="loading">{{ t("config.loading") }}</template>
+              <template v-else-if="canSave && unsaved">{{ t("config.unsaved") }}</template>
+              <!-- 区域文件在区块视图内保存，不属于只读视图 -->
+              <template v-else-if="selected && !canSave && selected.fileType !== 'mca'">
+                {{ t("config.readonly") }}
+              </template>
+            </span>
+            <BaseButton v-if="canSave" size="sm" :variant="unsaved ? 'accent' : 'ghost'"
+              :disabled="loading || busy || !unsaved" @click="save">
+              <GlyphIcon name="save" :size="16" :weight="1.8" />
+              {{ t(saving || nbtSaving ? "config.saving" : "config.save") }}
+            </BaseButton>
+          </div>
+        </div>
+        <div class="cfg-view" :aria-busy="loading || deleting">
+          <!-- 占位编辑器与文件编辑器使用独立实例，隔离只读状态 -->
+          <MonacoText v-if="!selected || (isText && (loading || deleting))" key="empty" :model-value="deleting ? text : ''" readonly />
+          <MonacoText v-else-if="isText" key="file" v-model="text" :language="langOf(selected)" />
+          <NbtTree v-else-if="isNbt" ref="nbtRef" :uuid="instanceUuid" :source="source" :file="selected.name"
+            @dirty="nbtDirty = $event" />
+          <McaTable v-else-if="selected.fileType === 'mca'" :uuid="instanceUuid" :source="source"
+            :file="selected.name" :chunk="mcaTarget?.chunk" :reveal="mcaTarget?.path" />
+          <ImageView v-else-if="selected.fileType === 'image'" :uuid="instanceUuid" :source="source"
+            :file="selected.name" />
+          <HexView v-else :uuid="instanceUuid" :source="source" :file="selected.name" />
+        </div>
       </section>
     </div>
 
@@ -624,30 +700,17 @@ useWindowRefresh(() => {
 </template>
 
 <style scoped>
-/* 标题栏右侧：实例 chip + 来源下拉。这一排的通用标准在 styles/titlebar.css */
 .head-cfg {
   display: flex;
   align-items: center;
-  gap: 8px;
   min-width: 0;
 }
 
-.head-dirty {
-  flex-shrink: 0;
-  color: var(--yellow);
-  font-size: 12px;
-}
-
-.head-readonly {
-  flex-shrink: 0;
-  color: var(--text-dim);
-  font-size: 12px;
-}
-
-/* 两栏：左固定宽、右吃掉剩余；两层都要 min-height: 0，不然子元素滚不动 */
+/* 两栏均需允许收缩，滚动才会留在文件树与编辑器内部 */
 .cfg-body {
   display: flex;
   flex: 1;
+  min-width: 0;
   min-height: 0;
 }
 
@@ -655,7 +718,7 @@ useWindowRefresh(() => {
 .cfg-list {
   display: flex;
   flex-direction: column;
-  width: 300px;
+  max-width: 50%;
   flex-shrink: 0;
   min-height: 0;
   overflow: hidden;
@@ -665,13 +728,27 @@ useWindowRefresh(() => {
   --row-h: 24px;
 }
 
-/* 搜索固定在上：内边距与侧栏的 .sidebar-head 一致 */
 .cfg-list-head {
   flex-shrink: 0;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
   padding: 12px 12px 10px;
+}
+
+.cfg-source-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cfg-source-row .field-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.cfg-source-row .ui-btn-icon {
+  flex-shrink: 0;
 }
 
 /* 树的滚动区：内边距与侧栏的 .group-list 一致 */
@@ -726,7 +803,7 @@ useWindowRefresh(() => {
 }
 
 /* 选中态：强调色底 + 一圈描边 */
-.cfg-row.on {
+.cfg-row.is-active {
   background: var(--accent-soft);
   color: var(--accent);
   outline: 1px solid var(--accent-border);
@@ -740,14 +817,14 @@ useWindowRefresh(() => {
   transition: transform 0.12s;
 }
 
-.cfg-chevron.open {
+.cfg-chevron.is-expanded {
   transform: rotate(0);
 }
 
 /* 文件行里占住箭头那一格：同一层的文件名才与目录名对齐 */
 .cfg-chevron-spacer {
   flex-shrink: 0;
-  width: 13px;
+  width: 14px;
 }
 
 .cfg-dir-name,
@@ -759,7 +836,8 @@ useWindowRefresh(() => {
   white-space: nowrap;
 }
 
-/* 各类视图共用贴边容器，切换文件类型时保持相同边界 */
+/* 工具栏独立于视图的滚动区域，长路径可省略、操作区可换行 */
+.cfg-editor,
 .cfg-view {
   display: flex;
   flex-direction: column;
@@ -771,23 +849,73 @@ useWindowRefresh(() => {
   overflow: hidden;
 }
 
+.cfg-editor-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-height: calc(var(--ctl-h) + 24px + 1px);
+  flex-shrink: 0;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cfg-path {
+  flex: 1 1 160px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: var(--ctl-font);
+}
+
+.cfg-path.is-placeholder,
+.cfg-status {
+  color: var(--text-dim);
+}
+
+.cfg-editor-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.cfg-status {
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.cfg-status.is-dirty {
+  color: var(--yellow);
+}
+
 /* 视图占满容器，滚动交给各视图内部 */
 .cfg-view > * {
   flex: 1;
   min-height: 0;
 }
-/* 分隔线：5px 的透明热区压着左栏那条右边框，看起来仍是一条细线 */
+/* 透明热区覆盖侧栏边框，不占用两栏的可见空间 */
 .cfg-split {
-  flex: 0 0 5px;
-  margin-left: -3px;
+  flex: 0 0 6px;
+  margin: 0 -2px 0 -4px;
   cursor: col-resize;
+  touch-action: none;
   z-index: 1;
   background: transparent;
   transition: background 0.15s;
 }
 
 .cfg-split:hover,
-.cfg-split.on {
+.cfg-split:focus-visible,
+.cfg-split.is-resizing {
   background: var(--accent-soft);
+}
+
+.cfg-split:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -2px;
 }
 </style>
