@@ -505,7 +505,7 @@ function onMenuPick(id: string) {
   <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title" @pick="onMenuPick"
     @close="rowMenu = null" />
 
-  <ServerFormModal v-if="form" :form="form" :busy="saving" @submit="save" @close="form = null" />
+  <ServerFormModal v-if="form" v-model:form="form" :busy="saving" @submit="save" @close="form = null" />
 </template>
 
 <!-- 副标题里的分隔号：与模组行的 `·` 同一套观感；行内间距靠 CSS，不靠空格 -->
