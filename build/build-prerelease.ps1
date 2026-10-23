@@ -27,6 +27,16 @@ $env:TEMP = $buildTmp
 powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'mml-gui\vendor\prepare.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'vendor 插件还原失败，已中止构建。' }
 
+# 直接调用 cargo 不会执行 Tauri 的 beforeBuildCommand，须先生成内嵌前端。
+Push-Location (Join-Path $root 'mml-vue')
+try {
+    npm run build
+    if ($LASTEXITCODE -ne 0) { throw '前端构建失败，已中止预发布构建。' }
+}
+finally {
+    Pop-Location
+}
+
 Push-Location (Join-Path $root 'mml-gui\src-tauri')
 try {
     Write-Host '正在构建 prerelease（thin LTO）...'

@@ -25,6 +25,9 @@ export TEMP="$build_tmp"
 # 脚本幂等，已还原过会直接跳过
 bash "$root/mml-gui/vendor/prepare.sh"
 
+# 直接调用 cargo 不会执行 Tauri 的 beforeBuildCommand，须先生成内嵌前端。
+npm --prefix "$root/mml-vue" run build
+
 cd "$root/mml-gui/src-tauri"
 echo '正在构建 prerelease（thin LTO）...'
 # 必须带 custom-protocol：不带的话 tauri 把这次构建当成 dev，
