@@ -1,6 +1,6 @@
 //! 陶瓦官方 v0.4.2 发布包；固定摘要避免下载到错误平台或未验证的程序。
 
-use super::model::LobbyModel;
+use super::{model::LobbyModel, runtime::WorkerLease};
 use crate::err_keys;
 use sha2::{Digest, Sha256};
 use std::{
@@ -41,7 +41,10 @@ fn asset() -> Result<(&'static str, &'static str), String> {
     }
 }
 
-pub(super) async fn executable(model: &Arc<LobbyModel>) -> Result<PathBuf, String> {
+pub(super) async fn executable(
+    model: &Arc<LobbyModel>,
+    worker: Arc<WorkerLease>,
+) -> Result<PathBuf, String> {
     let (platform, digest) = asset()?;
     let folder = crate::gui_config::dir()
         .ok_or(err_keys::LOBBY_CLOSED)?
@@ -101,6 +104,8 @@ pub(super) async fn executable(model: &Arc<LobbyModel>) -> Result<PathBuf, Strin
         let folder = folder.clone();
         let token = cancel.clone();
         tauri::async_runtime::spawn_blocking(move || {
+            // 取消 HTTP 等待不会停止阻塞解包，目录仍须由旧任务独占。
+            let _worker = worker;
             unpack(&bytes, &folder, &name, digest, &token)
         })
         .await

@@ -10,17 +10,47 @@ use std::{
     path::PathBuf,
     process::{Command, Stdio},
     sync::{
-        Arc,
+        Arc, LazyLock,
         atomic::{AtomicBool, Ordering},
     },
     time::Duration,
 };
+use tokio::sync::{Mutex, OwnedMutexGuard};
+use tokio_util::sync::CancellationToken;
 
+static WORKER: LazyLock<Arc<Mutex<()>>> = LazyLock::new(|| Arc::new(Mutex::new(())));
+
+/// 从安装到退出清理独占陶瓦进程，阻止新大厅越过旧会话的后台任务。
+pub(super) struct WorkerLease {
+    /// 解包线程和退出任务全部结束后才释放。
+    _guard: OwnedMutexGuard<()>,
+}
+
+impl WorkerLease {
+    async fn acquire(
+        gate: Arc<Mutex<()>>,
+        cancel: &CancellationToken,
+    ) -> Result<Arc<Self>, String> {
+        tokio::select! {
+            biased;
+            _ = cancel.cancelled() => Err(err_keys::LOBBY_CLOSED.into()),
+            guard = gate.lock_owned() => Ok(Arc::new(Self { _guard: guard })),
+        }
+    }
+}
+
+/// 大厅持有的陶瓦 HTTP 会话及退出责任。
 pub(super) struct Session {
+    /// 不经过代理的本机 HTTP 客户端。
     client: reqwest::Client,
+    /// 陶瓦回环地址。
     base: String,
+    /// 是否由本次会话新建工作进程。
     owned: bool,
+    /// 是否由本大厅发起了尚未退出的房间请求。
     room_owned: AtomicBool,
+    /// 释放会话时移交后台清理任务。
+    worker: Option<Arc<WorkerLease>>,
 }
 
 #[derive(Deserialize)]
@@ -64,7 +94,8 @@ impl Drop for PortGuard {
 
 impl Session {
     pub async fn start(model: &Arc<LobbyModel>) -> Result<(Arc<Self>, String), String> {
-        let executable = super::install::executable(model).await?;
+        let worker = WorkerLease::acquire(WORKER.clone(), &model.cancel).await?;
+        let executable = super::install::executable(model, worker.clone()).await?;
         model.check()?;
         let client = reqwest::Client::builder()
             .no_proxy()
@@ -132,18 +163,18 @@ impl Session {
             Err(error) => {
                 let cleanup_client = client.clone();
                 tauri::async_runtime::spawn(async move {
+                    let _worker = worker;
                     for _ in 0..80 {
                         if let Ok(data) = std::fs::read(&port_file.0)
                             && let Ok(port) = serde_json::from_slice::<PortFile>(&data)
                         {
                             if port.port != 0 && existing != Some(port.port) {
-                                let _ = cleanup_client
-                                    .get(format!(
-                                        "http://127.0.0.1:{}/panic?peaceful=true",
-                                        port.port
-                                    ))
-                                    .send()
-                                    .await;
+                                cleanup(
+                                    &cleanup_client,
+                                    &format!("http://127.0.0.1:{}", port.port),
+                                    true,
+                                )
+                                .await;
                             }
                             break;
                         }
@@ -163,6 +194,7 @@ impl Session {
             base: format!("http://127.0.0.1:{port}"),
             owned: existing != Some(port),
             room_owned: AtomicBool::new(false),
+            worker: Some(worker),
         });
         let meta: Meta = session
             .client
@@ -241,18 +273,31 @@ impl Drop for Session {
             return;
         }
         let client = self.client.clone();
-        let url = format!(
-            "{}{}",
-            self.base,
-            if self.owned {
-                "/panic?peaceful=true"
-            } else {
-                "/state/ide"
-            }
-        );
+        let base = self.base.clone();
+        let owned = self.owned;
+        let worker = self.worker.take();
         tauri::async_runtime::spawn(async move {
-            let _ = client.get(url).send().await;
+            let _worker = worker;
+            cleanup(&client, &base, owned).await;
         });
+    }
+}
+
+/// 退出请求完成后再等待自有进程释放 HTTP 端口。
+async fn cleanup(client: &reqwest::Client, base: &str, owned: bool) {
+    let path = if owned {
+        "/panic?peaceful=true"
+    } else {
+        "/state/ide"
+    };
+    let _ = client.get(format!("{base}{path}")).send().await;
+    if owned {
+        let wait = async {
+            while client.get(format!("{base}/meta")).send().await.is_ok() {
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+        };
+        let _ = tokio::time::timeout(Duration::from_secs(3), wait).await;
     }
 }
 
@@ -313,107 +358,5 @@ pub(super) fn join_server(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn room_state_and_local_join_address_follow_protocol() {
-        let state: State = serde_json::from_str(r#"{"state":"guest-ok","index":7,"url":"127.0.0.1:30000","profiles":[{"machine_id":"one","name":"player","kind":"LOCAL","vendor":"Terracotta"}]}"#).unwrap();
-        assert_eq!(state.index, 7);
-        assert_eq!(
-            join_server(state.url.as_deref().unwrap()).unwrap().port,
-            Some(30000)
-        );
-        assert_eq!(join_server("127.0.0.1").unwrap().port, Some(25565));
-        for address in [
-            "example.com",
-            "127.0.0.1:0",
-            "127.0.0.1:65536",
-            "127.0.0.1:22/path",
-        ] {
-            assert!(join_server(address).is_err());
-        }
-    }
-    #[tokio::test]
-    async fn http_adapter_encodes_room_nodes_checks_status_and_closes_owned_worker() {
-        use std::io::{BufRead, BufReader, Write};
-        use std::net::TcpListener;
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let address = listener.local_addr().unwrap();
-        listener.set_nonblocking(true).unwrap();
-        let worker = std::thread::spawn(move || {
-            for step in 0..4 {
-                let deadline = std::time::Instant::now() + Duration::from_secs(5);
-                let (mut stream, _) = loop {
-                    match listener.accept() {
-                        Ok(connection) => break connection,
-                        Err(error)
-                            if error.kind() == std::io::ErrorKind::WouldBlock
-                                && std::time::Instant::now() < deadline =>
-                        {
-                            std::thread::sleep(Duration::from_millis(10))
-                        }
-                        Err(error) => panic!("HTTP request {step} missing: {error}"),
-                    }
-                };
-                stream
-                    .set_read_timeout(Some(Duration::from_secs(5)))
-                    .unwrap();
-                let mut reader = BufReader::new(stream.try_clone().unwrap());
-                let mut line = String::new();
-                reader.read_line(&mut line).unwrap();
-                let target = line.split_whitespace().nth(1).unwrap();
-                let url = reqwest::Url::parse(&format!("http://localhost{target}")).unwrap();
-                let (status, body) = match step {
-                    0 => {
-                        assert_eq!(url.path(), "/state");
-                        (
-                            "200 OK",
-                            r#"{"state":"guest-ok","index":8,"url":"127.0.0.1:30000","profiles":[]}"#,
-                        )
-                    }
-                    1 => {
-                        assert_eq!(url.path(), "/state/guesting");
-                        let pairs = url.query_pairs().collect::<Vec<_>>();
-                        assert!(pairs.iter().any(|(k, v)| k == "room" && v == "U/TEST+CODE"));
-                        assert!(pairs.iter().any(|(k, v)| k == "player" && v == "玩家 name"));
-                        assert_eq!(pairs.iter().filter(|(k, _)| k == "public_nodes").count(), 2);
-                        ("200 OK", "")
-                    }
-                    2 => ("400 Bad Request", "invalid room"),
-                    _ => {
-                        assert_eq!(target, "/panic?peaceful=true");
-                        ("200 OK", "")
-                    }
-                };
-                write!(stream, "HTTP/1.1 {status}\r\nContent-Length: {}\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
-            }
-        });
-        let session = Session {
-            client: reqwest::Client::builder().no_proxy().build().unwrap(),
-            base: format!("http://{address}"),
-            owned: true,
-            room_owned: AtomicBool::new(false),
-        };
-        assert_eq!(
-            session.state().await.unwrap().address.as_deref(),
-            Some("127.0.0.1:30000")
-        );
-        session
-            .action(
-                "/state/guesting",
-                &[
-                    ("room".into(), "U/TEST+CODE".into()),
-                    ("player".into(), "玩家 name".into()),
-                    ("public_nodes".into(), "tcp://one:1234".into()),
-                    ("public_nodes".into(), "wss://two/ws".into()),
-                ],
-            )
-            .await
-            .unwrap();
-        assert!(session.action("/state/guesting", &[]).await.is_err());
-        drop(session);
-        tokio::task::spawn_blocking(move || worker.join().unwrap())
-            .await
-            .unwrap();
-    }
-}
+#[path = "runtime_tests.rs"]
+mod tests;
