@@ -39,7 +39,7 @@ import {
   writeConfigFile,
 } from "../../lib/api";
 import { loadGuiConfig } from "../../lib/guiConfig";
-import { buildTree, type FileNode } from "../../lib/fileTree";
+import { buildConfigTree, visibleConfigRows } from "./configTree";
 import { applyHunks, diffLines, joinLines, splitLines } from "../../lib/textDiff";
 import { familyInstanceFromLabel, multiWindow, targetSaveDir, targetUuid, windowParams } from "../windowManager";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
@@ -163,59 +163,11 @@ const expanded = ref<Set<string>>(new Set());
 /** 路径 → 文件条目：树节点只带路径，打开文件与取类型都要回查 */
 const fileByPath = computed(() => new Map(files.value.map((f) => [f.name, f])));
 
-/** 每层目录在前、文件在后，各自按名字排；`buildTree` 只按插入顺序给 */
-function sortDirsFirst(nodes: FileNode[]) {
-  nodes.sort((a, b) => (a.isDir === b.isDir ? a.name.localeCompare(b.name) : a.isDir ? -1 : 1));
-  for (const n of nodes) {
-    if (n.isDir) sortDirsFirst(n.children);
-  }
-}
+/** 搜索和展开只改变可见行，文件树仅在文件列表变化时重建 */
+const tree = computed(() => buildConfigTree(files.value.map((file) => file.name)));
+const rows = computed(() => visibleConfigRows(tree.value, expanded.value, query.value));
 
-/** 文件树；多层路径由 buildTree 合并出目录节点，顺序由这里统一给 */
-const tree = computed(() => {
-  const nodes = buildTree(files.value.map((f) => f.name));
-  sortDirsFirst(nodes);
-  return nodes;
-});
-
-/** 展开后的一行 */
-interface TreeRow {
-  /** 完整路径，与 `FileItemDto.name` 一致 */
-  key: string;
-  /** 显示名，只有最后一段 */
-  name: string;
-  /** 是否目录 */
-  isDir: boolean;
-  /** 层级，从 0 起，用来算缩进 */
-  depth: number;
-}
-
-/** 自身或后代是否命中关键字 */
-function subtreeHit(node: FileNode, q: string): boolean {
-  if (node.key.toLowerCase().includes(q)) return true;
-  return node.children.some((c) => subtreeHit(c, q));
-}
-
-/**
- * 把树按展开状态摊平成可见行
- *
- * 有搜索词时不看展开状态：命中的目录一律展开，否则搜到的东西藏在收起的分支里看不见
- */
-const rows = computed<TreeRow[]>(() => {
-  const q = query.value.trim().toLowerCase();
-  const out: TreeRow[] = [];
-  const walk = (nodes: FileNode[], depth: number) => {
-    for (const n of nodes) {
-      if (q && !subtreeHit(n, q)) continue;
-      out.push({ key: n.key, name: n.name, isDir: n.isDir, depth });
-      if (n.isDir && (q || expanded.value.has(n.key))) walk(n.children, depth + 1);
-    }
-  };
-  walk(tree.value, 0);
-  return out;
-});
-
-/** 展开 / 收起一个目录；Set 整体换掉才会触发更新 */
+/** 展开或收起目录，保留其他目录的展开状态 */
 function toggleExpand(key: string) {
   const next = new Set(expanded.value);
   if (next.has(key)) next.delete(key);
@@ -239,7 +191,7 @@ function openFile(key: string) {
 const emptyTip = computed(() => {
   if (loading.value) return t("config.loading");
   if (!instanceUuid.value) return t("config.noInstance");
-  if (query.value) return t("config.searchEmpty");
+  if (query.value.trim()) return t("config.searchEmpty");
   return t("config.noFiles");
 });
 
@@ -673,8 +625,9 @@ useWindowRefresh(() => {
           <template v-for="row in rows" :key="row.key">
             <!-- 目录：按侧栏的分组标题写，缩进由层级给 -->
             <button v-if="row.isDir" class="cfg-dir" :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
+              :aria-expanded="row.expanded"
               @click="toggleExpand(row.key)" @contextmenu.prevent="openRowMenu($event, row.key)">
-              <GlyphIcon class="cfg-chevron" :class="{ open: expanded.has(row.key) }" name="chevron-down" :size="13"
+              <GlyphIcon class="cfg-chevron" :class="{ open: row.expanded }" name="chevron-down" :size="13"
                 :weight="2.4" />
               <span class="cfg-dir-name" :title="row.key"><HighlightText :text="row.name" :query="query" /></span>
             </button>
