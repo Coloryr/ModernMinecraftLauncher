@@ -144,6 +144,9 @@ impl I18Lang for ZhCn {
                     data.error
                 )
             }
+            ErrorType::UnsafePath { root, path } => format!(
+                "拒绝不安全路径 {}，操作范围为 {}", path.display(), root.display()
+            ),
             ErrorType::MoveToTrashError(data) => format!(
                 "把 {} 移到回收站失败，返回码 0x{:X}",
                 data.path.display().to_string(),

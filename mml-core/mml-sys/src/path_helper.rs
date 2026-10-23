@@ -32,6 +32,9 @@ use mml_names::i18_items::error_type::{
 };
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 
+mod safe_path;
+pub use safe_path::safe_join;
+
 /// 把底层 io 错误包成带路径的文件系统错误
 ///
 /// - `path`: 出错的路径，用来定位是哪个文件

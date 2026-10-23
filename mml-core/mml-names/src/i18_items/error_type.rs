@@ -245,6 +245,13 @@ pub enum ErrorType {
 
     /// 文件系统处理错误
     FileSystemError(FileSystemErrorData),
+    /// 路径越界或经过不允许跟随的链接
+    UnsafePath {
+        /// 允许操作的根目录
+        root: PathBuf,
+        /// 被拒绝的路径
+        path: PathBuf,
+    },
     /// 移动到回收站失败
     MoveToTrashError(MoveToTrashErrorData),
     /// 文件获取错误

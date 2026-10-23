@@ -151,6 +151,9 @@ impl I18Lang for EnUs {
                     data.error
                 )
             }
+            ErrorType::UnsafePath { root, path } => format!(
+                "Rejected unsafe path {} within {}", path.display(), root.display()
+            ),
             ErrorType::MoveToTrashError(data) => format!(
                 "Failed to move {} to trash, code 0x{:X}",
                 data.path.display().to_string(),

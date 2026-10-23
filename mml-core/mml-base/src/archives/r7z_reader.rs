@@ -183,16 +183,17 @@ impl R7zReader {
             .files
             .iter()
             .map(|f| {
+                path_helper::safe_join(output_dir, f.name())?;
                 let name = process.check_name(f.name())?;
-                Ok((f.name().to_string(), output_dir.join(name)))
+                Ok((
+                    f.name().to_string(),
+                    path_helper::safe_join(output_dir, &name)?,
+                ))
             })
             .collect::<CoreResult<_>>()?;
 
         match seven.for_each_entries(|entry, reader| {
-            let dest_path = dest_map
-                .get(entry.name())
-                .cloned()
-                .unwrap_or_else(|| output_dir.join(entry.name()));
+            let dest_path = &dest_map[entry.name()];
             process.add_now(&dest_path);
             sevenz_rust2::default_entry_extract_fn(entry, reader, &dest_path)
         }) {
