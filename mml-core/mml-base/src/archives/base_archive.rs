@@ -666,19 +666,21 @@ impl BaseArchive {
 
         // 需要剥离目录或存在排除项时逐条提取，批量解压路径无法调整条目位置
         if strip_dir.is_some() || unselect.is_some() {
-            return self.extract_where(
+            return self.extract_mapped(
                 |entry| {
                     if let Some(patterns) = &unselect {
                         if patterns.iter().any(|u| u == &entry.name) {
-                            return None;
+                            return Ok(None);
                         }
                     }
+                    path_helper::safe_join(output_dir, &entry.name)?;
                     let rel = match &strip_dir {
                         Some(dir) => strip_dir_prefix(&entry.name, dir),
                         None => entry.name.clone(),
                     };
-                    Some(output_dir.join(rel))
+                    path_helper::safe_join(output_dir, &rel).map(Some)
                 },
+                Some(output_dir),
                 gui.as_deref(),
             );
         }
@@ -706,14 +708,34 @@ impl BaseArchive {
         mut map: F,
         gui: Option<&dyn IBaseArchiveGui>,
     ) -> CoreResult<()> {
+        self.extract_mapped(|entry| Ok(map(entry)), None, gui)
+    }
+
+    /// 收集提取路径；指定根目录时，重命名后的最终路径也必须留在目录内。
+    fn extract_mapped<F: FnMut(&ArchiveEntryInfo) -> CoreResult<Option<PathBuf>>>(
+        &self,
+        mut map: F,
+        root: Option<&Path>,
+        gui: Option<&dyn IBaseArchiveGui>,
+    ) -> CoreResult<()> {
         // 顺序阶段：计算目标路径，文件名非法时的 GUI 询问保持串行
         let mut tasks: Vec<ExtractTask> = Vec::new();
         for entry in &self.entries {
             if entry.is_dir {
                 continue;
             }
-            if let Some(base) = map(entry) {
+            if let Some(base) = map(entry)? {
                 let output = self.resolve_output_path(&entry.name, base, gui)?;
+                if let Some(root) = root {
+                    let relative =
+                        output
+                            .strip_prefix(root)
+                            .map_err(|_| ErrorType::UnsafePath {
+                                root: root.to_path_buf(),
+                                path: output.clone(),
+                            })?;
+                    path_helper::safe_join(root, &relative.to_string_lossy())?;
+                }
                 tasks.push(ExtractTask {
                     name: entry.name.clone(),
                     output_path: output,

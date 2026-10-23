@@ -1,7 +1,11 @@
 //! 归档解压的目录边界回归测试。
 
 use mml_base::archives::{ArchiveType, BaseArchive};
-use std::{fs, io::Cursor, path::PathBuf};
+use std::{
+    fs,
+    io::{Cursor, Write},
+    path::PathBuf,
+};
 
 fn root(case: &str) -> PathBuf {
     let root = mml_testutil::temp_path(format!("archive_{case}_{}", uuid::Uuid::new_v4()));
@@ -65,5 +69,50 @@ fn tar_rename_stays_inside_output() {
             assert!(result.is_err(), "{name}");
             assert!(!root.join("escaped_.txt").exists());
         }
+    }
+}
+
+#[test]
+fn zip_rejects_escaping_symlink_targets() {
+    for target in ["../outside", "/outside", "C:/outside", "\\outside"] {
+        let root = root("zip_link");
+        let archive = root.join("input.zip");
+        let mut writer = zip::ZipWriter::new(fs::File::create(&archive).unwrap());
+        writer
+            .add_symlink("link", target, zip::write::SimpleFileOptions::default())
+            .unwrap();
+        writer.finish().unwrap();
+        let result = BaseArchive::decompress(ArchiveType::Zip, &archive, &root.join("out"), None);
+        assert!(
+            matches!(
+                result,
+                Err(mml_names::i18_items::error_type::ErrorType::UnsafePath { .. })
+            ),
+            "{target}: {result:?}"
+        );
+        assert!(!root.join("out/link").exists());
+    }
+}
+
+#[test]
+fn filtered_extraction_rejects_escaping_paths() {
+    for strip in [false, true] {
+        let root = root("filtered_escape");
+        let archive = root.join("input.zip");
+        let mut writer = zip::ZipWriter::new(fs::File::create(&archive).unwrap());
+        writer
+            .start_file("../escaped.txt", zip::write::SimpleFileOptions::default())
+            .unwrap();
+        writer.write_all(b"payload").unwrap();
+        writer.finish().unwrap();
+        let archive = BaseArchive::open_readonly(archive).unwrap();
+        let result = archive.extract_all(
+            root.join("out"),
+            (!strip).then(Vec::new),
+            strip.then(|| "wrapped".into()),
+            None,
+        );
+        assert!(result.is_err(), "strip={strip}: {result:?}");
+        assert!(!root.join("escaped.txt").exists());
     }
 }
