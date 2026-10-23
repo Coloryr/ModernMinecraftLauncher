@@ -4,6 +4,7 @@ export type CrashAnalysisDto = {
   kind: string,
   description: string | null,
   exception: string | null,
+  causes: string[],
   findings: CrashFindingDto[],
   suspectedMods: string[],
   minecraftVersion: string | null,
