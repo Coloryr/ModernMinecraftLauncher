@@ -164,6 +164,7 @@ export function createCommands(invoke: Invoke) {
       resumeAll: () => invoke<number>("download_resume_all"),
     },
     export: {
+      generateInfo: (uuid: string, file: string) => invoke<void>("export_generate_info", { uuid, file }),
       getInfo: (uuid: string) => invoke<ExportInfoDto>("export_get_info", { uuid }),
       listDir: (uuid: string, dir: string) => invoke<ExportEntryDto[]>("export_list_dir", { uuid, dir }),
       run: (uuid: string, config: ExportConfigDto) => invoke<void>("export_run", { uuid, config }),

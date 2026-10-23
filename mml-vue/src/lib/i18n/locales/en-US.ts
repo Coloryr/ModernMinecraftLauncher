@@ -1,5 +1,6 @@
 // English (US) language pack
 export default {
+  "winExport.generateInfo": "Export instance info",
   "winExport.nativeHint": "Export the complete instance and its settings. Drop the package into the launcher to import it.",
   "err.exportDestination": "Save the archive outside the instance directory",
   "err.exportLink": "The instance contains symbolic links; remove them before exporting",

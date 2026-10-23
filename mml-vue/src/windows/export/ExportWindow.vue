@@ -15,6 +15,7 @@ import WindowFrame from "../../components/ui/WindowFrame.vue";
 import IconTabs from "../../components/ui/IconTabs.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import FilePicker from "./parts/FilePicker.vue";
+import InfoExportButton from "./parts/InfoExportButton.vue";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
 import { api, onExportFocus, onExportProgress } from "../../lib/api";
@@ -325,6 +326,7 @@ onBeforeUnmount(() => {
         <option value="" disabled>{{ t("winExport.instance") }}</option>
         <option v-for="i in instances" :key="i.uuid" :value="i.uuid">{{ i.name }}</option>
       </select>
+      <InfoExportButton :uuid="currentUuid" :name="info?.name ?? ''" :disabled="running || loadingInfo || !info" />
       <BaseButton size="sm" variant="primary" :disabled="running || loadingInfo || !info" @click="startExport">
         {{ running ? t("winExport.exporting") : t("winExport.exportBtn") }}
       </BaseButton>

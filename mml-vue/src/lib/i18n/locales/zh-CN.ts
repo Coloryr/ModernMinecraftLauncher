@@ -1,5 +1,6 @@
 // 中文（简体）语言包
 export default {
+  "winExport.generateInfo": "生成实例信息",
   "winExport.nativeHint": "完整导出实例及其配置，可拖入启动器导入。",
   "err.exportDestination": "请将导出文件保存在实例目录之外",
   "err.exportLink": "实例中包含符号链接，请移除链接后再导出",

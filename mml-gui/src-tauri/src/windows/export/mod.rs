@@ -4,6 +4,7 @@
 //! `export_run` 后台跑导出，进度经 `export-progress` 事件上报前端。
 
 mod archive;
+pub(crate) mod info;
 pub(crate) mod list;
 pub(crate) mod run;
 
