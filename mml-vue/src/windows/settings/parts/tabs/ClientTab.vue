@@ -22,6 +22,13 @@ const props = defineProps<{
   flashGroup?: string;
 }>();
 
+const emit = defineEmits<{
+  (e: "update:win", value: WindowSettingDto): void;
+}>();
+
+function updateWindow<K extends keyof WindowSettingDto>(key: K, value: WindowSettingDto[K]) {
+  if (props.win) emit("update:win", { ...props.win, [key]: value });
+}
 
 const {
   client,
@@ -229,24 +236,26 @@ watch(lockServerError, async (msg) => {
     <div class="switch-list">
       <div class="switch-row">
         <span>{{ t("winSettings.editTitle") }}</span>
-        <BaseSwitch v-model="win.editTitle" />
+        <BaseSwitch :model-value="win.editTitle" @update:model-value="updateWindow('editTitle', $event)" />
       </div>
       <div class="switch-row">
         <span>{{ t("winSettings.randomTitle") }}</span>
-        <BaseSwitch v-model="win.randomTitle" />
+        <BaseSwitch :model-value="win.randomTitle" @update:model-value="updateWindow('randomTitle', $event)" />
       </div>
       <div class="switch-row">
         <span>{{ t("winSettings.cycleTitle") }}</span>
-        <BaseSwitch v-model="win.cycleTitle" />
+        <BaseSwitch :model-value="win.cycleTitle" @update:model-value="updateWindow('cycleTitle', $event)" />
       </div>
     </div>
     <template v-if="win.editTitle">
       <label class="field-label">{{ t("winSettings.gameTitle") }}</label>
-      <input v-model="win.gameTitle" class="field-input" spellcheck="false" autocomplete="off" />
+      <input :value="win.gameTitle" class="field-input" spellcheck="false" autocomplete="off"
+        @input="updateWindow('gameTitle', ($event.target as HTMLInputElement).value)" />
     </template>
     <template v-if="win.cycleTitle">
       <label class="field-label">{{ t("winSettings.titleDelay") }}</label>
-      <NumberStepper v-model="win.titleDelay" :min="100" :max="600000" :step="100" />
+      <NumberStepper :model-value="win.titleDelay" :min="100" :max="600000" :step="100"
+        @update:model-value="updateWindow('titleDelay', $event)" />
     </template>
   </SettingsGroup>
 

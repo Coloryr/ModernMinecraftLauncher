@@ -200,7 +200,7 @@ function onKeyDown(e: KeyboardEvent) {
           <NetworkTab v-else-if="tab === 'network'" :settings="network" :flash-group="flashGroup" />
           <LaunchTab v-else-if="tab === 'launch'" :settings="launch" :flash-group="flashGroup" />
           <SkinTab v-else-if="tab === 'skin'" :settings="skin" :flash-group="flashGroup" />
-          <ClientTab v-else-if="tab === 'client'" :settings="client" :win="launchWin"
+          <ClientTab v-else-if="tab === 'client'" :settings="client" v-model:win="launchWin"
             :flash-group="flashGroup" />
           <LocalFilesTab v-else-if="tab === 'files'" :files="files" :flash-group="flashGroup" />
           <ExperimentalTab v-else :settings="client" :flash-group="flashGroup" />
