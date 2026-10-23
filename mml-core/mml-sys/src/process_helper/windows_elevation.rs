@@ -8,7 +8,7 @@ use windows::{core::{HSTRING, HRESULT}, Win32::{Foundation::{HANDLE, INVALID_HAN
     Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES,
     System::Pipes::{CreateNamedPipeW, ConnectNamedPipe, SetNamedPipeHandleState, NAMED_PIPE_MODE}}};
 use mml_names::i18_items::error_type::{CoreResult, ErrorType};
-use super::{LaunchResult, OutputStream, process_err};
+use super::{ElevationControl, LaunchResult, OutputStream, process_err};
 
 const NO_WINDOW: u32 = 0x08000000;
 
@@ -107,16 +107,19 @@ fn launch_helper(path: &Path, args: Vec<String>, env: HashMap<String, String>, w
     let id = uuid::Uuid::new_v4();
     let output_name = format!("mml-out-{id}");
     let error_name = format!("mml-err-{id}");
+    let control_name = format!("mml-control-{id}");
     let output = unsafe { OwnedHandle::from_raw_handle(create_named_pipe(&output_name)?.0) };
     let error = unsafe { OwnedHandle::from_raw_handle(create_named_pipe(&error_name)?.0) };
+    let control = unsafe { OwnedHandle::from_raw_handle(create_named_pipe(&control_name)?.0) };
     let args = args.iter().map(|s| quote_arg(s)).collect::<Vec<_>>().join(" ");
     let environment = env.iter().map(|(key, value)| format!("$si.EnvironmentVariables[{}]={};", ps_literal(key), ps_literal(value))).collect::<String>();
     let script = format!(r#"$ErrorActionPreference='Stop'
 $op = [IO.Pipes.NamedPipeClientStream]::new('.', '{output_name}', [IO.Pipes.PipeDirection]::Out)
 $ep = [IO.Pipes.NamedPipeClientStream]::new('.', '{error_name}', [IO.Pipes.PipeDirection]::Out)
+$cp = [IO.Pipes.NamedPipeClientStream]::new('.', '{control_name}', [IO.Pipes.PipeDirection]::In)
 $code = 1
 try {{
-  $op.Connect(15000); $ep.Connect(15000)
+  $op.Connect(15000); $ep.Connect(15000); $cp.Connect(15000)
   $si = [Diagnostics.ProcessStartInfo]::new()
   $si.FileName={path}; $si.Arguments={args}; $si.WorkingDirectory={working_dir}
   $si.UseShellExecute=$false; $si.CreateNoWindow=$true
@@ -125,12 +128,25 @@ try {{
   $p = [Diagnostics.Process]::Start($si)
   $outTask = $p.StandardOutput.BaseStream.CopyToAsync($op)
   $errTask = $p.StandardError.BaseStream.CopyToAsync($ep)
-  $p.WaitForExit()
+  $stopTask = $cp.ReadAsync([byte[]]::new(1), 0, 1)
+  while (!$p.WaitForExit(100)) {{
+    if ($stopTask.IsCompleted) {{
+      $stop = [Diagnostics.ProcessStartInfo]::new()
+      $stop.FileName = [IO.Path]::Combine($env:SystemRoot, 'System32', 'taskkill.exe')
+      $stop.Arguments = '/PID ' + $p.Id + ' /T /F'
+      $stop.UseShellExecute = $false; $stop.CreateNoWindow = $true
+      $killer = [Diagnostics.Process]::Start($stop)
+      $killer.WaitForExit(); $killer.Dispose()
+      if (!$p.HasExited) {{ $p.Kill() }}
+      $p.WaitForExit()
+      break
+    }}
+  }}
   [Threading.Tasks.Task]::WaitAll([Threading.Tasks.Task[]]@($outTask, $errTask))
   $code = $p.ExitCode
 }} catch {{
   if ($ep.IsConnected) {{ $bytes=[Text.Encoding]::UTF8.GetBytes($_.ToString()); $ep.Write($bytes,0,$bytes.Length) }}
-}} finally {{ $op.Dispose(); $ep.Dispose() }}
+}} finally {{ $op.Dispose(); $ep.Dispose(); $cp.Dispose() }}
 exit $code
 "#, path=ps_literal(&path.to_string_lossy()), args=ps_literal(&args), working_dir=ps_literal(&working_dir.to_string_lossy()));
     #[cfg(test)]
@@ -160,19 +176,57 @@ exit $code
             .map_err(process_err)?.ok_or_else(|| process_err("Elevation cancelled or helper failed"))?;
         let stdout = connect_named_pipe_with_timeout(HANDLE(output.into_raw_handle()), 15000)?;
         let stderr = connect_named_pipe_with_timeout(HANDLE(error.into_raw_handle()), 15000)?;
-        Ok::<_, ErrorType>((pid, stdout, stderr))
+        let control = connect_named_pipe_with_timeout(HANDLE(control.into_raw_handle()), 15000)?;
+        Ok::<_, ErrorType>(ConnectedHelper { pid, stdout, stderr, control })
     })();
     match connected {
-        Ok((pid, stdout, stderr)) => Ok(LaunchResult { child, is_admin: true, pid: Some(pid),
-            stdout: Some(OutputStream::File(stdout)), stderr: Some(OutputStream::File(stderr)) }),
+        Ok(pipes) => Ok(LaunchResult { child, is_admin: true, pid: Some(pipes.pid),
+            control: Some(ElevationControl { pipe: pipes.control }),
+            stdout: Some(OutputStream::File(pipes.stdout)), stderr: Some(OutputStream::File(pipes.stderr)) }),
         Err(error) => { let _ = child.kill(); let _ = child.wait(); Err(error) }
     }
+}
+
+/// 完成连接的辅助进程及三条独占管道。
+struct ConnectedHelper {
+    /// 提权辅助进程标识。
+    pid: u32,
+    /// 游戏标准输出。
+    stdout: File,
+    /// 游戏错误输出。
+    stderr: File,
+    /// 发送停止请求的管道。
+    control: File,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::io::Read;
+
+    #[test]
+    fn stop_channel_terminates_target_before_wrapper_exits() {
+        let script = "[Console]::Out.WriteLine('ready'); Start-Sleep -Seconds 2; [Console]::Out.WriteLine('target-still-running')";
+        let mut result = launch_helper(Path::new("powershell.exe"), vec!["-NoProfile".into(), "-NonInteractive".into(),
+            "-EncodedCommand".into(), encoded(script)], HashMap::new(), &std::env::current_dir().unwrap(), false).unwrap();
+        let mut reader = BufReader::new(result.stdout.take().unwrap());
+        let mut ready = String::new();
+        reader.read_line(&mut ready).unwrap();
+        assert_eq!(ready.trim(), "ready");
+        result.control.as_ref().unwrap().request_stop().unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            if let Some(status) = result.child.try_wait().unwrap() {
+                assert!(!status.success());
+                break;
+            }
+            assert!(Instant::now() < deadline, "停止请求必须在目标进程退出后完成");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let mut remaining = String::new();
+        reader.read_to_string(&mut remaining).unwrap();
+        assert!(!remaining.contains("target-still-running"));
+    }
 
     #[test]
     fn helper_preserves_environment_and_drains_both_streams() {

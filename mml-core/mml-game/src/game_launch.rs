@@ -3,7 +3,7 @@ use std::{
     collections::HashMap,
     io::{BufRead, BufReader},
     path::PathBuf,
-    process::{Child, Stdio},
+    process::Child,
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, AtomicI32, Ordering},
@@ -109,8 +109,8 @@ pub(crate) struct InstanceHandle {
     is_exit: Arc<AtomicBool>,
     /// 退出码；进程还没退出时是 0
     exit_code: AtomicI32,
-    /// 提权启动时的目标进程 PID，用于强制结束目标进程
-    elevated_pid: Option<u32>,
+    /// 通过已提权的辅助进程停止游戏。
+    elevation_control: Option<process_helper::ElevationControl>,
 }
 
 impl InstanceHandle {
@@ -164,7 +164,7 @@ impl InstanceHandle {
             uuid: run.uuid,
             is_exit,
             exit_code: AtomicI32::new(0),
-            elevated_pid: result.pid,
+            elevation_control: result.control,
         })
     }
 
@@ -172,20 +172,16 @@ impl InstanceHandle {
     ///
     /// 结束失败时静默忽略。
     pub fn kill(&self) {
-        // 提权启动时提权 helper 才是游戏进程的父进程，必须 /T 连整棵进程树一起结束，仅 Windows
-        #[cfg(target_os = "windows")]
-        if let Some(pid) = self.elevated_pid {
-            let _ = std::process::Command::new("taskkill")
-                .args(["/PID", &pid.to_string(), "/T", "/F"])
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .spawn();
+        if let Some(control) = &self.elevation_control {
+            let _ = control.request_stop();
+            // 保留等待句柄，由 tick 确认游戏及辅助进程真正退出。
+            return;
         }
-        // 结束启动器进程，所有平台都走这条；提权启动时启动器退出会连带终止目标进程
         if let Ok(mut guard) = self.process.lock() {
             if let Some(ref mut child) = *guard {
-                let _ = child.kill();
-                self.is_exit.store(true, Ordering::SeqCst);
+                if child.kill().is_ok() {
+                    self.is_exit.store(true, Ordering::SeqCst);
+                }
             }
         }
     }

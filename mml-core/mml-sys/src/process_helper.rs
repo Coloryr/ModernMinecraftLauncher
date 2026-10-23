@@ -16,7 +16,7 @@
 
 use std::{
     collections::HashMap,
-    io::{self, Read},
+    io::{self, Read, Write},
     path::Path,
     process::{Child, Command, Stdio},
 };
@@ -60,12 +60,29 @@ pub struct LaunchResult {
     pub child: Child,
     /// 是否为提权启动：通过外部启动器启动，非直接子进程
     pub is_admin: bool,
-    /// 提权 helper 的 PID，Windows 提权时用于 taskkill /T 结束整棵进程树；其余情况为 `None`
+    /// Windows 提权辅助进程的 PID，其余情况为 `None`
     pub pid: Option<u32>,
+    /// 通知已提权的辅助进程停止游戏，避免普通权限进程跨权限结束目标。
+    pub control: Option<ElevationControl>,
     /// 目标进程 stdout，普通启动为管道，提权为命名管道或 pkexec 转发
     pub stdout: Option<OutputStream>,
     /// 目标进程 stderr，合并策略同 stdout
     pub stderr: Option<OutputStream>,
+}
+
+/// 提权辅助进程的专用停止通道。
+pub struct ElevationControl {
+    /// 创建启动任务时独占的控制管道。
+    pipe: std::fs::File,
+}
+
+impl ElevationControl {
+    /// 请求辅助进程结束目标进程树。
+    /// # 返回值
+    /// 请求写入成功或管道已经断开的错误。
+    pub fn request_stop(&self) -> io::Result<()> {
+        (&self.pipe).write_all(&[1])
+    }
 }
 
 /// 检查当前进程是否以管理员/root 权限运行
@@ -134,6 +151,7 @@ pub fn launch<P: AsRef<Path>>(
             child,
             is_admin: false,
             pid: None,
+            control: None,
             stdout,
             stderr,
         })
@@ -189,6 +207,7 @@ fn launch_with_elevation<P: AsRef<Path>>(
             child,
             is_admin: true,
             pid: None,
+            control: None,
             stdout,
             stderr: None, // stderr 已由 2>&1 合并到 stdout
         })
@@ -206,6 +225,7 @@ fn launch_with_elevation<P: AsRef<Path>>(
             child,
             is_admin: true,
             pid: None,
+            control: None,
             stdout,
             stderr,
         })
