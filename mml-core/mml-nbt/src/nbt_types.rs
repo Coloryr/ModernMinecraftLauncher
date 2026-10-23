@@ -60,6 +60,32 @@ mod length_tests {
     use std::io::Cursor;
 
     #[test]
+    fn string_lengths_use_unsigned_bytes() {
+        for len in [32767, 32768, 65535] {
+            let value = "x".repeat(len);
+            let mut compound = NbtCompound::new();
+            compound
+                .data
+                .insert(value.clone(), NbtString::new(value.clone()).to_nbt());
+            let mut bytes = Vec::new();
+            compound.write(&mut bytes).unwrap();
+            let mut decoded = NbtCompound::new();
+            decoded.read(&mut Cursor::new(bytes)).unwrap();
+            assert!(compound.eq(&decoded.to_nbt()));
+        }
+        for value in ["x".repeat(65536), "界".repeat(21846)] {
+            assert!(
+                NbtString::new(value.clone())
+                    .write(&mut Vec::new())
+                    .is_err()
+            );
+            let mut compound = NbtCompound::new();
+            compound.data.insert(value, NbtByte::new(1).to_nbt());
+            assert!(compound.write(&mut Vec::new()).is_err());
+        }
+    }
+
+    #[test]
     fn array_lengths_reject_negative_overflow_and_truncation() {
         for count in [-1i32, i32::MIN, i32::MAX, i32::MAX / 4 + 1, 1] {
             let bytes = count.to_be_bytes();
@@ -609,7 +635,7 @@ impl NbtStream for NbtByteArray {
 
 /// NBT 字符串类型，对应 TAG_String
 ///
-/// 二进制流格式为 2 字节长度，大端序 i16，后跟 UTF-8 字节序列。
+/// 二进制流格式为 2 字节长度，大端序 u16，后跟 UTF-8 字节序列。
 /// 长度字段记录的是**字节数**，不是字符数。
 #[derive(Default)]
 pub struct NbtString {
@@ -719,7 +745,7 @@ impl NbtStream for NbtString {
         let mut temp = [0u8; 2];
         stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
 
-        let len = i16::from_be_bytes(temp);
+        let len = u16::from_be_bytes(temp);
 
         let mut temp = vec![0; len as usize];
         stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
@@ -731,7 +757,9 @@ impl NbtStream for NbtString {
 
     /// 先写 2 字节的字节数，再写 UTF-8 字节
     fn write<W: Write>(&self, stream: &mut W) -> CoreResult<()> {
-        let temp = i16::to_be_bytes(self.data.len() as i16);
+        let len = u16::try_from(self.data.len())
+            .map_err(|_| ErrorType::NbtStringTooLong(self.data.len()))?;
+        let temp = len.to_be_bytes();
         stream.write_all(&temp).map_err(|err| io_error(err))?;
         stream
             .write_all(&self.data.as_bytes())
@@ -1274,7 +1302,7 @@ impl NbtStream for NbtCompound {
             let mut temp = [0u8; 2];
             stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
 
-            let len = i16::from_be_bytes(temp);
+            let len = u16::from_be_bytes(temp);
 
             let mut temp = vec![0; len as usize];
             stream.read_exact(&mut temp).map_err(|err| io_error(err))?;
@@ -1296,7 +1324,9 @@ impl NbtStream for NbtCompound {
 
             // End 变体只占 1 字节类型序号，后面没有键名和值
             if !matches!(nbt, NbtType::End(_)) {
-                let temp = i16::to_be_bytes(key.len() as i16);
+                let len =
+                    u16::try_from(key.len()).map_err(|_| ErrorType::NbtStringTooLong(key.len()))?;
+                let temp = len.to_be_bytes();
                 stream.write_all(&temp).map_err(|err| io_error(err))?;
                 stream
                     .write_all(key.as_bytes())

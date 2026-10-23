@@ -279,6 +279,8 @@ pub enum ErrorType {
     NbtTypeError,
     /// NBT读取失败
     NbtReadError,
+    /// NBT 字符串超出无符号 16 位字节长度。
+    NbtStringTooLong(usize),
 
     /// 输入参数为空
     ArgEmpty(ArgEmptyData),

@@ -145,7 +145,9 @@ impl I18Lang for ZhCn {
                 )
             }
             ErrorType::UnsafePath { root, path } => format!(
-                "拒绝不安全路径 {}，操作范围为 {}", path.display(), root.display()
+                "拒绝不安全路径 {}，操作范围为 {}",
+                path.display(),
+                root.display()
             ),
             ErrorType::MoveToTrashError(data) => format!(
                 "把 {} 移到回收站失败，返回码 0x{:X}",
@@ -176,6 +178,9 @@ impl I18Lang for ZhCn {
 
             ErrorType::NbtTypeError => String::from("NBT类型错误"),
             ErrorType::NbtReadError => String::from("NBT读取失败"),
+            ErrorType::NbtStringTooLong(size) => {
+                format!("NBT 字符串为 {size} 字节，最多允许 65535 字节")
+            }
 
             ErrorType::ArgEmpty(data) => match data {
                 ArgEmptyData::Name => String::from("名字参数为空"),

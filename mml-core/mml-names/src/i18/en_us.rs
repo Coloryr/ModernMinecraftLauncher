@@ -152,7 +152,9 @@ impl I18Lang for EnUs {
                 )
             }
             ErrorType::UnsafePath { root, path } => format!(
-                "Rejected unsafe path {} within {}", path.display(), root.display()
+                "Rejected unsafe path {} within {}",
+                path.display(),
+                root.display()
             ),
             ErrorType::MoveToTrashError(data) => format!(
                 "Failed to move {} to trash, code 0x{:X}",
@@ -185,6 +187,9 @@ impl I18Lang for EnUs {
 
             ErrorType::NbtTypeError => String::from("NBT type error"),
             ErrorType::NbtReadError => String::from("Failed to read NBT"),
+            ErrorType::NbtStringTooLong(size) => {
+                format!("NBT string is {size} bytes; maximum is 65535")
+            }
 
             ErrorType::ArgEmpty(data) => match data {
                 ArgEmptyData::Name => String::from("Name argument is empty"),
