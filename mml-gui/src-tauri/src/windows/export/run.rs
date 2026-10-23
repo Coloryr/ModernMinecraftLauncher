@@ -3,7 +3,7 @@
 //! 在线导出按项目编号拉文件，普通导出直接打包本地目录；
 //! 全程报进度，跑着的时候不重复入队。
 
-use std::{path::{PathBuf}, sync::{Arc, atomic::{Ordering}}};
+use std::{path::{PathBuf}, sync::{Arc, atomic::{AtomicBool, Ordering}}};
 
 use crate::err_keys;
 
@@ -17,6 +17,22 @@ use crate::{dtos::export_dto::{ExportConfigDto, ExportProgressDto}};
 use crate::windows::{config::resolve_under, instance_snapshot};
 use super::list::{EXPORT_RUNNING, emit_export_progress, collect_files, online_of, export_meta};
 
+/// 校验失败或后台任务退出时都释放导出占用。
+struct ExportPermit<'a>(&'a AtomicBool);
+
+impl<'a> ExportPermit<'a> {
+    fn acquire(flag: &'a AtomicBool) -> Result<Self, String> {
+        flag.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .map(|_| Self(flag))
+            .map_err(|_| err_keys::EXPORT_RUNNING.to_string())
+    }
+}
+
+impl Drop for ExportPermit<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
+}
 
 /// 在线模组 → 导出条目：带上项目号，供 CurseForge manifest / Modrinth index 使用
 ///
@@ -97,9 +113,7 @@ pub(super) struct ExportProgressGui {
 #[gui_macros::ipc_group("export")]
 #[gui_macros::command]
 pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Result<(), String> {
-    if EXPORT_RUNNING.swap(true, Ordering::SeqCst) {
-        return Err(err_keys::EXPORT_RUNNING.to_string());
-    }
+    let permit = ExportPermit::acquire(&EXPORT_RUNNING)?;
 
     let game = instance_snapshot(&uuid)?;
     let pack = match config.pack.as_str() {
@@ -108,14 +122,12 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
         "mmc" => ExportPackType::MMC,
         "hmcl" => ExportPackType::HMCL,
         _ => {
-            EXPORT_RUNNING.store(false, Ordering::SeqCst);
             return Err(err_keys::EXPORT_PACK_TYPE.to_string());
         }
     };
     // 整包格式（MMC / HMCL）没有下载清单，选中的一律进包，前端填的地址在这两种下不作数
     let whole_pack = matches!(pack, ExportPackType::MMC | ExportPackType::HMCL);
     if config.file.trim().is_empty() {
-        EXPORT_RUNNING.store(false, Ordering::SeqCst);
         // 这里校验的是**导出文件名**，原来报的是 err.serverEmpty，即服务器为空，
         // 前端弹出来的文案牛头不对马嘴
         return Err(err_keys::FILE_NAME.to_string());
@@ -198,8 +210,8 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
 
     let save_file = config.file.clone();
     tokio::spawn(async move {
+        let _permit = permit;
         let res = game.export(arg).await;
-        EXPORT_RUNNING.store(false, Ordering::SeqCst);
         let event = match res {
             Ok(()) => ExportProgressDto {
                 state: "done".to_string(),
@@ -222,6 +234,23 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
     });
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn export_permit_releases_after_error() {
+        let busy = AtomicBool::new(false);
+        let failed = || -> Result<(), String> {
+            let _permit = ExportPermit::acquire(&busy)?;
+            assert!(ExportPermit::acquire(&busy).is_err());
+            Err("invalid path".to_string())
+        };
+        assert!(failed().is_err());
+        assert!(ExportPermit::acquire(&busy).is_ok());
+    }
 }
 
 impl IBaseArchiveGui for ExportProgressGui {
