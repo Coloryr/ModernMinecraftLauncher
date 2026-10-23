@@ -14,18 +14,22 @@ function editor(overrides = {}) {
   const state = {
     selected: ref({ name: "first.json", fileType: "json" }),
     text: ref("edited"), origin: ref("original"), originSha1: ref("old-hash"),
-    isText: ref(true), saving: ref(false), nbtSaving: ref(false), nbtDirty: ref(false),
+    isText: ref(true), saving: ref(false), nbtSaving: ref(false), nbtDirty: ref(false), deleting: ref(false),
     pendingDiscard: ref(null), loading: ref(false), instanceUuid: ref("instance"),
     source: ref(""), expanded: ref(new Set()), query: ref(""), files: ref([]),
     TEXT_TYPES: ["json"], clearCleanSessions: async () => {},
+    requestGeneration: 0,
+    rowMenu: ref(null), deleteConfigFile: async () => {},
     listConfigFiles: async () => [], readConfigFile: async () => ({ text: "second", sha1: "new-hash" }),
     showToast: () => {}, t: (key) => key, tErr: (error) => String(error),
     applyHunks, diffLines, joinLines, splitLines,
     ...overrides,
   };
   state.dirty = computed(() => state.text.value !== state.origin.value);
-  state.busy = computed(() => state.saving.value || state.nbtSaving.value);
-  const names = ["allowTextLoss", "answerDiscard", "open", "loadFiles", "pickSource", "saveText"];
+  const busy = parsed.statements.filter(ts.isVariableStatement).flatMap((node) => node.declarationList.declarations)
+    .find((node) => node.name.getText(parsed) === "busy").initializer.getText(parsed);
+  state.busy = new Function("computed", ...Object.keys(state), `return ${busy}`)(computed, ...Object.values(state));
+  const names = ["allowTextLoss", "answerDiscard", "open", "loadFiles", "pickSource", "saveText", "onRowMenuPick"];
   const code = parsed.statements.filter((node) => ts.isFunctionDeclaration(node) && names.includes(node.name?.text))
     .map((node) => node.getText(parsed)).join("\n");
   const js = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -90,4 +94,78 @@ test("保存期间变更了上下文，旧响应不覆盖新文件基线", async
   await saving;
   assert.equal(e.state.origin.value, "other file");
   assert.equal(e.state.originSha1.value, "other-hash");
+});
+
+test("文件响应倒序返回只显示最后选中的文件", async () => {
+  const reads = new Map();
+  const e = editor({ readConfigFile: (_uuid, _source, name) => new Promise((resolve) => reads.set(name, resolve)) });
+  e.state.text.value = e.state.origin.value;
+  const first = e.open({ name: "slow.json", fileType: "json" });
+  await Promise.resolve();
+  const last = e.open({ name: "fast.json", fileType: "json" });
+  await Promise.resolve();
+  reads.get("fast.json")({ text: "fast", sha1: "fast-hash" });
+  await last;
+  reads.get("slow.json")({ text: "slow", sha1: "slow-hash" });
+  await first;
+  assert.equal(e.state.selected.value.name, "fast.json");
+  assert.equal(e.state.text.value, "fast");
+  assert.equal(e.state.originSha1.value, "fast-hash");
+});
+
+test("旧文件读失败不清掉新请求的 loading，刷新也使旧响应失效", async () => {
+  const reads = [];
+  const toasts = [];
+  const e = editor({
+    readConfigFile: () => new Promise((resolve, reject) => reads.push({ resolve, reject })),
+    showToast: (message) => toasts.push(message),
+  });
+  e.state.text.value = e.state.origin.value;
+  const first = e.open({ name: "slow.json", fileType: "json" });
+  await Promise.resolve();
+  const last = e.open({ name: "pending.json", fileType: "json" });
+  await Promise.resolve();
+  reads[0].reject(new Error("old failure"));
+  await first;
+  assert.equal(e.state.loading.value, true);
+  assert.deepEqual(toasts, []);
+  await e.loadFiles();
+  reads[1].resolve({ text: "stale", sha1: "stale-hash" });
+  await last;
+  assert.equal(e.state.selected.value, null);
+  assert.equal(e.state.text.value, "");
+});
+
+test("删除等待期间阻止切换和保存，完成后释放忙碌状态", async () => {
+  let complete;
+  let writes = 0;
+  const e = editor({
+    deleteConfigFile: () => new Promise((resolve) => { complete = resolve; }),
+    writeConfigFile: async () => { writes += 1; return "hash"; },
+  });
+  e.state.text.value = e.state.origin.value;
+  e.state.rowMenu.value = { name: "first.json" };
+  const deleting = e.onRowMenuPick("delete");
+  await Promise.resolve();
+  assert.equal(e.state.busy.value, true);
+  await e.open({ name: "second.json", fileType: "json" });
+  assert.equal(e.state.selected.value.name, "first.json");
+  e.state.text.value = "unsaved";
+  await e.saveText();
+  assert.equal(writes, 0);
+  complete();
+  await deleting;
+  assert.equal(e.state.selected.value, null);
+  assert.equal(e.state.busy.value, false);
+});
+
+test("删除失败保留当前编辑文本并释放忙碌状态", async () => {
+  const e = editor({ deleteConfigFile: async () => { throw new Error("delete failed"); } });
+  e.state.rowMenu.value = { name: "first.json" };
+  const deleting = e.onRowMenuPick("delete");
+  e.answerDiscard(true);
+  await deleting;
+  assert.equal(e.state.text.value, "edited");
+  assert.equal(e.state.selected.value.name, "first.json");
+  assert.equal(e.state.busy.value, false);
 });
