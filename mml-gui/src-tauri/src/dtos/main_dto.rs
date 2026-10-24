@@ -38,6 +38,24 @@ pub struct InstanceLangDto {
     pub name: String,
 }
 
+/// 启动前检查：模组数、加载器与最大内存，以及两项检查开关
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LaunchPrecheckDto {
+    /// `mods` 目录里启用的 jar 数量
+    pub mods: u32,
+    /// 加载器是不是原版；原版带模组时模组不会生效
+    pub loader_normal: bool,
+    /// 当前生效的最大内存，单位 MB
+    pub max_memory: u32,
+    /// 按 ColorMC 阈值判断最大内存是否偏低
+    pub memory_low: bool,
+    /// 启动器设置里的「检查加载器」开关
+    pub check_loader: bool,
+    /// 启动器设置里的「检查内存」开关
+    pub check_memory: bool,
+}
+
 /// 本机内存，单位 MiB，供启动参数里的内存设置作参考值
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]

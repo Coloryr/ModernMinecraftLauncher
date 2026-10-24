@@ -356,6 +356,23 @@ pub struct ExperimentalConfig {
     pub sandbox_launch: bool,
 }
 
+/// 启动前检查开关
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct LaunchCheckConfig {
+    /// 实例有模组、加载器却是原版时提醒
+    pub check_loader: bool,
+    /// 模组偏多、最大内存偏低时提醒
+    pub check_memory: bool,
+}
+
+impl Default for LaunchCheckConfig {
+    /// 两项检查默认都开
+    fn default() -> Self {
+        Self { check_loader: true, check_memory: true }
+    }
+}
+
 /// 界面设置，跨窗口共用的那份界面状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "PascalCase")]
@@ -380,6 +397,8 @@ pub struct GuiConfig {
     pub client: ClientConfig,
     /// 实验性功能开关
     pub experimental: ExperimentalConfig,
+    /// 启动前检查
+    pub launch_check: LaunchCheckConfig,
     /// 界面字体族名；空串表示用默认字体栈
     pub font: String,
     /// 皮肤显示设置：Skin2DA / Skin2DB / Skin3D / Skin3DD / Skin3DRotate 与旋转角度
@@ -414,6 +433,7 @@ impl Default for GuiConfig {
             collect_window: Default::default(),
             client: Default::default(),
             experimental: Default::default(),
+            launch_check: Default::default(),
             font: String::new(),
             skin: Default::default(),
             cape: Default::default(),

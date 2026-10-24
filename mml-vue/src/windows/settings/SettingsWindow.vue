@@ -309,7 +309,8 @@ function onKeyDown(e: KeyboardEvent) {
           <UiTab v-if="tab === 'ui'" :settings="ui" :look="client" :locked="locked" :flash-group="flashGroup" />
           <JavaTab v-else-if="tab === 'java'" :settings="java" :flash-group="flashGroup" />
           <NetworkTab v-else-if="tab === 'network'" :settings="network" :flash-group="flashGroup" />
-          <LaunchTab v-else-if="tab === 'launch'" :settings="launch" :locked="locked" :flash-group="flashGroup" />
+          <LaunchTab v-else-if="tab === 'launch'" :settings="launch" :look="client" :locked="locked"
+            :flash-group="flashGroup" />
           <SkinTab v-else-if="tab === 'skin'" :settings="skin" :flash-group="flashGroup" />
           <ClientTab v-else-if="tab === 'client' && (clientUnlocked || !clientLocked)" :settings="client"
             v-model:win="launchWin" :flash-group="flashGroup" />

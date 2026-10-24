@@ -31,6 +31,7 @@ import ResourcePopup from "./components/ResourcePopup.vue";
 import CustomUiPage from "./components/CustomUiPage.vue";
 import AccountLockModal from "./components/AccountLockModal.vue";
 import AutoSaveModal from "./components/AutoSaveModal.vue";
+import LaunchCheckModal from "./components/LaunchCheckModal.vue";
 
 applyTheme();
 applyLocale();
@@ -239,4 +240,6 @@ const closeAskButton = computed(() =>
   <AccountLockModal />
   <!-- 启动后自动进入存档的确认，与上面同理 -->
   <AutoSaveModal />
+  <!-- 启动前检查：加载器没启用 / 模组多而内存低时问一次 -->
+  <LaunchCheckModal />
 </template>

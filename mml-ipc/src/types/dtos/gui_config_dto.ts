@@ -76,6 +76,11 @@ export type ExperimentalConfigDto = {
   sandboxLaunch: boolean,
 };
 
+export type LaunchCheckConfigDto = {
+  checkLoader: boolean,
+  checkMemory: boolean,
+};
+
 export type GuiConfigDto = {
   theme: Theme,
   accent: string,
@@ -87,6 +92,7 @@ export type GuiConfigDto = {
   collect: CollectConfigDto,
   client: ClientConfigDto,
   experimental: ExperimentalConfigDto,
+  launchCheck: LaunchCheckConfigDto,
   font: string,
   skin: SkinConfigDto,
   cape: CapeConfigDto,

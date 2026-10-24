@@ -23,6 +23,14 @@ static REGEX_LOG: LazyLock<Regex> =
 static REGEX_LOG_OLD: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\[(.*?)\] \[(.*?)(?:\/(.*?))?\]:?").unwrap());
 
+/// 取一个捕获组；可选组没参与匹配时返回空串
+///
+/// - `captures`: 日志正则的捕获结果
+/// - `index`: 组号
+fn group<'a>(captures: &'a regex::Captures<'_>, index: usize) -> &'a str {
+    captures.get(index).map_or("", |m| m.as_str())
+}
+
 /// 日志级别，由日志行里的级别文本解析得出
 #[derive(Clone)]
 pub enum LogLevel {
@@ -207,21 +215,21 @@ impl InstanceRuntimeLog {
             && captures.len() == 6
         {
             GameLog::GameLog(GameLogObj {
-                level: get_level(&captures[3]),
+                level: get_level(group(&captures, 3)),
                 log: String::from(log),
-                thread: String::from(&captures[2]),
-                category: String::from(&captures[4]),
-                time: String::from(&captures[1]),
+                thread: String::from(group(&captures, 2)),
+                category: String::from(group(&captures, 4)),
+                time: String::from(group(&captures, 1)),
             })
         } else if let Some(captures) = REGEX_LOG_OLD.captures(temp)
             && captures.len() == 4
         {
             GameLog::GameLog(GameLogObj {
-                level: get_level(&captures[3]),
+                level: get_level(group(&captures, 3)),
                 log: String::from(log),
-                thread: String::from(&captures[2]),
+                thread: String::from(group(&captures, 2)),
                 category: Default::default(),
-                time: String::from(&captures[1]),
+                time: String::from(group(&captures, 1)),
             })
         } else {
             GameLog::Text(String::from(log))
@@ -246,21 +254,21 @@ impl InstanceRuntimeLog {
             && captures.len() == 6
         {
             GameLogObj {
-                level: get_level(&captures[3]),
+                level: get_level(group(&captures, 3)),
                 log: String::from(log),
-                thread: String::from(&captures[2]),
-                category: String::from(&captures[4]),
-                time: String::from(&captures[1]),
+                thread: String::from(group(&captures, 2)),
+                category: String::from(group(&captures, 4)),
+                time: String::from(group(&captures, 1)),
             }
         } else if let Some(captures) = REGEX_LOG_OLD.captures(temp)
             && captures.len() == 4
         {
             GameLogObj {
-                level: get_level(&captures[3]),
+                level: get_level(group(&captures, 3)),
                 log: String::from(log),
-                thread: String::from(&captures[2]),
+                thread: String::from(group(&captures, 2)),
                 category: Default::default(),
-                time: String::from(&captures[1]),
+                time: String::from(group(&captures, 1)),
             }
         } else {
             GameLogObj {
@@ -441,5 +449,16 @@ mod tests {
 
         drop(logs);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 没有 `/级别` 的行：可选组不参与匹配，按下标取会 panic
+    #[test]
+    fn parses_line_without_level() {
+        let line = "[12:00:00] [main]: hello";
+        let parsed = InstanceRuntimeLog::parse_game_log_line(line);
+        assert_eq!(parsed.thread, "main");
+        assert_eq!(parsed.time, "12:00:00");
+        assert_eq!(parsed.log, line);
+        assert!(matches!(parsed.level, LogLevel::None));
     }
 }

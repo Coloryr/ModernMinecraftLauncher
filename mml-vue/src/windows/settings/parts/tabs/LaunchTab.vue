@@ -14,6 +14,7 @@ import SegmentedTabs from "../../../../components/ui/SegmentedTabs.vue";
 import SettingsGroup from "../SettingsGroup.vue";
 import SaveStateText from "../SaveStateText.vue";
 import type { useSettingsLaunch } from "../../composables/useSettingsLaunch";
+import type { useSettingsClient } from "../../composables/useSettingsClient";
 import { memoryLabel } from "../../../../lib/format";
 
 const props = defineProps<{
@@ -21,6 +22,8 @@ const props = defineProps<{
   settings: ReturnType<typeof useSettingsLaunch>;
   /** 锁定时隐藏 JVM / 游戏参数 / 启动命令分组 */
   locked?: boolean;
+  /** 启动前检查开关，属 GUI 配置，由 useSettingsClient 持有 */
+  look: ReturnType<typeof useSettingsClient>;
   /** 需要高亮脉冲的分组 id（搜索命中） */
   flashGroup?: string;
 }>();
@@ -37,6 +40,8 @@ const {
   removeEnvLine,
   saveState,
 } = props.settings;
+
+const { launchCheck, applyLaunchCheck } = props.look;
 
 /** 应用一个内存预设：填最大内存；最小内存高于它时一并顶上去 */
 function applyMemory(mib: number) {
@@ -272,6 +277,24 @@ watch(memoryConflict, async (bad) => {
         <label class="field-label">{{ t("winSettings.postCmd") }}</label>
         <input v-model="run!.postRunArg" class="field-input" spellcheck="false" autocomplete="off" />
       </template>
+    </SettingsGroup>
+
+    <!-- 启动前检查：加载器与内存，开关存 gui_config -->
+    <SettingsGroup id="launchCheck" title-key="winSettings.secLaunchCheck" :flash="flashGroup === 'launchCheck'">
+      <div class="switch-row">
+        <div class="switch-text">
+          <span class="switch-label">{{ t("winSettings.checkLoader") }}</span>
+          <span class="switch-state">{{ t("winSettings.checkLoaderDesc") }}</span>
+        </div>
+        <BaseSwitch v-model="launchCheck.checkLoader" @update:model-value="applyLaunchCheck" />
+      </div>
+      <div class="switch-row">
+        <div class="switch-text">
+          <span class="switch-label">{{ t("winSettings.checkMemory") }}</span>
+          <span class="switch-state">{{ t("winSettings.checkMemoryDesc") }}</span>
+        </div>
+        <BaseSwitch v-model="launchCheck.checkMemory" @update:model-value="applyLaunchCheck" />
+      </div>
     </SettingsGroup>
   </template>
   <p v-else class="field-desc">{{ t("winSettings.tauriOnly") }}</p>

@@ -30,6 +30,7 @@ export const GROUP_TITLES: Record<string, string> = {
   jvm: "winSettings.secJvm",
   gameArgs: "winSettings.secGameArgs",
   launchCmd: "winSettings.secLaunchCmd",
+  launchCheck: "winSettings.secLaunchCheck",
   javaAdd: "winSettings.javaAdd",
   servers: "winSettings.secServers",
   loginLock: "winSettings.secLoginLock",
@@ -171,6 +172,8 @@ const SETTINGS_INDEX: IndexEntry[] = [
   { tab: "launch", group: "launchCmd", labelKey: "winSettings.postLaunch", extra: ["post launch", "后置"] },
   { tab: "launch", group: "launchCmd", labelKey: "winSettings.preCmd", extra: ["command", "命令"] },
   { tab: "launch", group: "launchCmd", labelKey: "winSettings.postCmd", extra: ["command", "命令"] },
+  { tab: "launch", group: "launchCheck", labelKey: "winSettings.checkLoader", extra: ["loader", "mod", "加载器", "模组"] },
+  { tab: "launch", group: "launchCheck", labelKey: "winSettings.checkMemory", extra: ["memory", "mod", "内存", "模组"] },
 
   // ---- Java ----
   { tab: "java", group: "javaAdd", labelKey: "winSettings.javaAdd", extra: ["java", "添加"] },
@@ -258,6 +261,7 @@ export const RESETTABLE_GROUPS = [
   "jvm",
   "gameArgs",
   "launchCmd",
+  "launchCheck",
   "gameTitle",
   "servers",
   "loginLock",

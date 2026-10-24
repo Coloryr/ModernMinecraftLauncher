@@ -13,6 +13,7 @@ import {
   saveGuiConfig,
   type ClientConfig,
   type ExperimentalConfig,
+  type LaunchCheckConfig,
 } from "../../../lib/guiConfig";
 import { applyWindowAlpha, applyWindowMaterial } from "../../../lib/appearance";
 import { typeLabelKey } from "../../../lib/accountStore";
@@ -46,6 +47,8 @@ export function useSettingsClient() {
   const client = ref<ClientConfig>({ ...defaultConfig().client });
   /** 实验性功能四个开关：界面先行，行为未接线 */
   const experimental = ref<ExperimentalConfig>({ ...defaultConfig().experimental });
+  /** 启动前检查开关：加载器 / 内存 */
+  const launchCheck = ref<LaunchCheckConfig>({ ...defaultConfig().launchCheck });
   const { state, track } = useSaveState();
 
   // ---------- 加载 ----------
@@ -54,6 +57,7 @@ export function useSettingsClient() {
     const cfg = await loadGuiConfig();
     if (cfg?.client) client.value = { ...cfg.client };
     if (cfg?.experimental) experimental.value = { ...cfg.experimental };
+    if (cfg?.launchCheck) launchCheck.value = { ...cfg.launchCheck };
   }
 
   // ---------- 即改即存 ----------
@@ -110,6 +114,15 @@ export function useSettingsClient() {
   async function applyExperimental() {
     try {
       await track(() => saveGuiConfig({ experimental: { ...experimental.value } }));
+    } catch (e) {
+      showToast(tErr(e));
+    }
+  }
+
+  /** 整份启动前检查开关提交 */
+  async function applyLaunchCheck() {
+    try {
+      await track(() => saveGuiConfig({ launchCheck: { ...launchCheck.value } }));
     } catch (e) {
       showToast(tErr(e));
     }
@@ -444,6 +457,9 @@ export function useSettingsClient() {
         // 同上：整页包保留，只把开关关掉
         client.value.customPageOn = d.customPageOn;
         break;
+      case "launchCheck":
+        launchCheck.value = { ...defaultConfig().launchCheck };
+        break;
       default:
         return false;
     }
@@ -466,6 +482,8 @@ export function useSettingsClient() {
     applyWindowEffect,
     experimental,
     applyExperimental,
+    launchCheck,
+    applyLaunchCheck,
     serverAddr,
     pickMusicFile,
     LOGIN_TYPES,

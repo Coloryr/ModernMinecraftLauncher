@@ -234,6 +234,14 @@ export interface ClientConfig {
   musicSource: string;
 }
 
+/** 启动前检查开关 */
+export interface LaunchCheckConfig {
+  /** 实例有模组、加载器却是原版时提醒 */
+  checkLoader: boolean;
+  /** 模组偏多、最大内存偏低时提醒 */
+  checkMemory: boolean;
+}
+
 export interface GuiConfig {
   /** Dark / Light / System */
   theme: Theme;
@@ -251,6 +259,8 @@ export interface GuiConfig {
   client: ClientConfig;
   /** 实验性功能开关（界面先行，行为未接线） */
   experimental: ExperimentalConfig;
+  /** 启动前检查开关 */
+  launchCheck: LaunchCheckConfig;
   /** 界面字体族名（空串 = 默认字体栈） */
   font: string;
   /** 皮肤显示设置：Skin2DA / Skin2DB / Skin3D / Skin3DD / Skin3DRotate 与旋转角度 */
@@ -302,6 +312,7 @@ export interface GuiConfigPatch {
   collect?: Partial<CollectConfig>;
   client?: Partial<ClientConfig>;
   experimental?: Partial<ExperimentalConfig>;
+  launchCheck?: Partial<LaunchCheckConfig>;
   font?: string;
   accent?: string;
   customAccent?: string;
@@ -331,6 +342,7 @@ export async function saveGuiConfig(patch: GuiConfigPatch): Promise<void> {
       collect: { ...cur.collect, ...patch.collect },
       client: { ...cur.client, ...patch.client },
       experimental: { ...cur.experimental, ...patch.experimental },
+      launchCheck: { ...cur.launchCheck, ...patch.launchCheck },
       skin: { ...cur.skin, ...patch.skin },
       cape: { ...cur.cape, ...patch.cape },
     });
@@ -442,6 +454,10 @@ export function defaultConfig(): GuiConfig {
       instanceAdmin: false,
       uriLaunch: false,
       sandboxLaunch: false,
+    },
+    launchCheck: {
+      checkLoader: true,
+      checkMemory: true,
     },
     font: readString(KEYS.font),
     skin: {

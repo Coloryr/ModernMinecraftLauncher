@@ -12,7 +12,8 @@ use mml_names::Lang;
 
 use crate::gui_config::{
     CapeConfig, CapeDisplay, ClientConfig, CollectWindowConfig, CustomCssItemObj,
-    ExperimentalConfig, GuiConfig, HeadConfig, HeadType, LoginLockObj, MainWindowConfig,
+    ExperimentalConfig, GuiConfig, HeadConfig, HeadType, LaunchCheckConfig, LoginLockObj,
+    MainWindowConfig,
     SidebarSide, SkinConfig, SkinDisplay, StartupPage, Theme, ViewMode, WindowMode,
 };
 
@@ -297,6 +298,16 @@ pub struct ExperimentalConfigDto {
     pub sandbox_launch: bool,
 }
 
+/// 启动前检查开关，wire 为 camelCase
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct LaunchCheckConfigDto {
+    /// 实例有模组、加载器却是原版时提醒
+    pub check_loader: bool,
+    /// 模组偏多、最大内存偏低时提醒
+    pub check_memory: bool,
+}
+
 /// GUI 配置，前端 wire 为 camelCase，即 `window_get_gui_config` 的返回值
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
@@ -321,6 +332,8 @@ pub struct GuiConfigDto {
     pub client: ClientConfigDto,
     /// 实验性功能开关
     pub experimental: ExperimentalConfigDto,
+    /// 启动前检查
+    pub launch_check: LaunchCheckConfigDto,
     /// 界面字体族名，空串表示默认字体栈
     pub font: String,
     /// 皮肤显示设置：Skin2DA / Skin2DB / Skin3D / Skin3DD / Skin3DRotate 与旋转角度
@@ -411,6 +424,10 @@ impl From<GuiConfig> for GuiConfigDto {
                 uri_launch: c.experimental.uri_launch,
                 sandbox_launch: c.experimental.sandbox_launch,
             },
+            launch_check: LaunchCheckConfigDto {
+                check_loader: c.launch_check.check_loader,
+                check_memory: c.launch_check.check_memory,
+            },
             font: c.font,
             skin: SkinConfigDto {
                 display: c.skin.display,
@@ -488,6 +505,10 @@ impl From<GuiConfigDto> for GuiConfig {
                 instance_admin: d.experimental.instance_admin,
                 uri_launch: d.experimental.uri_launch,
                 sandbox_launch: d.experimental.sandbox_launch,
+            },
+            launch_check: LaunchCheckConfig {
+                check_loader: d.launch_check.check_loader,
+                check_memory: d.launch_check.check_memory,
             },
             font: d.font,
             skin: SkinConfig {

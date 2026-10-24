@@ -41,6 +41,7 @@ import type {
   InstanceInfoDto,
   InstanceLangDto,
   JavaInfoDto,
+  LaunchPrecheckDto,
   LoadState,
   LogEvent,
   LogFocusDto,
@@ -968,6 +969,19 @@ export const api = {
    */
   async updateInstanceArgs(uuid: string, args: InstanceArgsDto): Promise<boolean> {
     return commands.main.updateInstanceArgs(uuid, args);
+  },
+
+  /**
+   * 启动前检查加载器与最大内存
+   *
+   * - `uuid`: 实例 uuid
+   *
+   * # 返回值
+   *
+   * 模组数、加载器是否原版、最大内存与两项检查开关；实例不存在时 null
+   */
+  async checkLaunch(uuid: string): Promise<LaunchPrecheckDto | null> {
+    return commands.main.checkLaunch(uuid);
   },
 
   /**

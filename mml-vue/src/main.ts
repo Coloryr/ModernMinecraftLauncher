@@ -25,12 +25,16 @@ import { setMultiWindow } from "./windows/windowManager";
 import { restoreFontFamily } from "./lib/fonts";
 import { installImageFallback } from "./lib/imageFallback";
 import { vTip } from "./lib/tip";
+import { initSelectDirection } from "./lib/selectDirection";
 
 // 自定义 CSS 包的入口脚本按 IIFE 打包，Vue 从页面全局取，避免包里再打一份
 (window as Window & { __mmlVue?: typeof Vue }).__mmlVue = Vue;
 
 // 图片加载失败的统一兜底：装上要趁早，免得启动过程中先加载的那批图漏掉
 installImageFallback();
+
+// 下拉方向：窗口底部的 <select> 打开前改成向上，避免弹层被截掉
+initSelectDirection();
 
 // 禁用右键默认菜单，包括 WebView2 / 浏览器自带的“刷新、返回、打印”等。
 // 文本输入框 input / textarea / contenteditable 保留原生菜单，方便复制粘贴。

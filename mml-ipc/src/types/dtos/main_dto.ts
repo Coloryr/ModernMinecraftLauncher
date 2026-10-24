@@ -5,6 +5,15 @@ export type InstanceLangDto = {
   name: string,
 };
 
+export type LaunchPrecheckDto = {
+  mods: number,
+  loaderNormal: boolean,
+  maxMemory: number,
+  memoryLow: boolean,
+  checkLoader: boolean,
+  checkMemory: boolean,
+};
+
 export type SystemMemoryDto = {
   total: number,
   free: number,

@@ -5,6 +5,7 @@
 import { api } from "./api";
 import { askAccountLock } from "./accountLock";
 import { askAutoSave } from "./autoSavePrompt";
+import { askLaunchCheck } from "./launchCheck";
 import { saveGuiConfig } from "./guiConfig";
 import { openWindow } from "../windows/windowManager";
 
@@ -16,10 +17,29 @@ import { openWindow } from "../windows/windowManager";
  *
  * # 返回值
  *
- * 启动请求已交给后端时返回 `true`；用户在账户占用弹窗里取消返回 `false`；
+ * 启动请求已交给后端时返回 `true`；用户在内存提醒或账户占用弹窗里取消返回 `false`；
  * 其它失败抛出后端错误文案
  */
 export async function launchGame(uuid: string, world?: string): Promise<boolean> {
+  // 启动前检查：有模组却用原版加载器、模组多而最大内存偏低时各问一次
+  const check = await api.checkLaunch(uuid).catch(() => null);
+  if (check) {
+    if (check.checkLoader && check.mods > 0 && check.loaderNormal) {
+      const answer = await askLaunchCheck("loader", check);
+      if (!answer.ok) return false;
+      if (answer.disable) {
+        await saveGuiConfig({ launchCheck: { checkLoader: false } }).catch(() => {});
+      }
+    }
+    if (check.checkMemory && !check.loaderNormal && check.memoryLow) {
+      const answer = await askLaunchCheck("memory", check);
+      if (!answer.ok) return false;
+      if (answer.disable) {
+        await saveGuiConfig({ launchCheck: { checkMemory: false } }).catch(() => {});
+      }
+    }
+  }
+
   let autoShow = false;
   try {
     autoShow = (await api.getLogSetting(uuid)).autoShow;
