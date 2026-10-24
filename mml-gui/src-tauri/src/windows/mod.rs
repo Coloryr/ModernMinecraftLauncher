@@ -1211,64 +1211,34 @@ pub fn window_get_gui_config(window: WebviewWindow) -> GuiConfigDto {
     config.into()
 }
 
-/// 锁定客户端设置的密码哈希：PBKDF2-HMAC-SHA256，盐为随机 UUID
-///
-/// - `password`: 明文密码
-/// - `salt`: 十六进制盐
-///
-/// # 返回值
-///
-/// 三十二字节哈希的十六进制文本
-fn client_lock_hash(password: &str, salt: &str) -> String {
-    let hash = pbkdf2::pbkdf2_hmac_array::<sha2::Sha256, 32>(
-        password.as_bytes(),
-        salt.as_bytes(),
-        120_000,
-    );
-    hash.iter().map(|byte| format!("{byte:02x}")).collect()
-}
-
 /// 设置密码并锁定客户端设置
+///
+/// 盐与哈希写运行目录的隐藏文件，见 client_lock 模块。
 ///
 /// - `app`: 应用句柄，变更后广播 `client-config-change`
 /// - `password`: 新密码，不能为空
 ///
 /// # 返回值
 ///
-/// 成功返回 `Ok(())`；密码为空返回错误键
+/// 成功返回 `Ok(())`；密码为空或两份锁文件都写不进去时返回错误
 #[gui_macros::command]
 pub fn window_client_lock_set(app: AppHandle, password: String) -> Result<(), String> {
-    if password.is_empty() {
-        return Err(err_keys::CLIENT_LOCK_EMPTY.to_string());
-    }
-    let salt = Uuid::new_v4().simple().to_string();
-    let hash = client_lock_hash(&password, &salt);
-    let mut config = crate::gui_config::get();
-    config.client.lock_client = true;
-    config.client.client_lock_salt = salt;
-    config.client.client_lock_hash = hash;
-    let client = config.client.clone();
-    crate::gui_config::set(config);
-    emit_client_config_change(&app, client.into());
+    crate::client_lock::set(&password)?;
+    emit_client_config_change(&app, crate::gui_config::get().client.into());
     Ok(())
 }
 
-/// 解除客户端设置锁定，清掉密码哈希
+/// 解除客户端设置锁定，删除隐藏的锁文件
 ///
 /// - `app`: 应用句柄，变更后广播 `client-config-change`
 ///
 /// # 返回值
 ///
-/// 保存成功返回 `Ok(())`
+/// 成功返回 `Ok(())`；删不掉锁文件时返回错误
 #[gui_macros::command]
 pub fn window_client_lock_clear(app: AppHandle) -> Result<(), String> {
-    let mut config = crate::gui_config::get();
-    config.client.lock_client = false;
-    config.client.client_lock_salt.clear();
-    config.client.client_lock_hash.clear();
-    let client = config.client.clone();
-    crate::gui_config::set(config);
-    emit_client_config_change(&app, client.into());
+    crate::client_lock::clear()?;
+    emit_client_config_change(&app, crate::gui_config::get().client.into());
     Ok(())
 }
 
@@ -1281,14 +1251,7 @@ pub fn window_client_lock_clear(app: AppHandle) -> Result<(), String> {
 /// 密码正确或根本没有锁定时返回 `true`
 #[gui_macros::command]
 pub fn window_client_lock_verify(password: String) -> bool {
-    let config = crate::gui_config::get();
-    if !config.client.lock_client {
-        return true;
-    }
-    if config.client.client_lock_salt.is_empty() || config.client.client_lock_hash.is_empty() {
-        return false;
-    }
-    client_lock_hash(&password, &config.client.client_lock_salt) == config.client.client_lock_hash
+    crate::client_lock::verify(&password)
 }
 
 /// 保存 GUI 状态到 gui_config.json，前端 DTO 转内部 GuiConfig

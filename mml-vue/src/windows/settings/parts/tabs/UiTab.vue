@@ -20,6 +20,8 @@ const props = defineProps<{
   settings: ReturnType<typeof useSettingsUi>;
   /** 窗口外观、自定义 CSS 与整页包的状态与保存方法，来自 useSettingsClient */
   look: ReturnType<typeof useSettingsClient>;
+  /** 锁定时隐藏服主定制与外观分组 */
+  locked?: boolean;
   /** 需要高亮脉冲的分组 id（搜索命中 / 刚恢复默认） */
   flashGroup?: string;
 }>();
@@ -142,7 +144,7 @@ function toggleCustomPage(on: boolean) {
     </div>
   </SettingsGroup>
 
-  <SettingsGroup id="theme" title-key="winSettings.secTheme" :flash="flashGroup === 'theme'">
+  <SettingsGroup v-if="!locked" id="theme" title-key="winSettings.secTheme" :flash="flashGroup === 'theme'">
     <!-- 主题：跟随系统 / 浅色 / 深色 -->
     <label class="field-label">{{ t("winSettings.theme") }}</label>
     <SegmentedTabs :model-value="themeValue" :options="[
@@ -176,7 +178,7 @@ function toggleCustomPage(on: boolean) {
     </div>
   </SettingsGroup>
 
-  <SettingsGroup id="customCss" title-key="winSettings.secCustomCss" :flash="flashGroup === 'customCss'">
+  <SettingsGroup v-if="!locked" id="customCss" title-key="winSettings.secCustomCss" :flash="flashGroup === 'customCss'">
     <p class="field-desc">{{ t("winSettings.customCssDesc") }}</p>
     <div class="switch-row">
       <div class="switch-text">
@@ -217,7 +219,7 @@ function toggleCustomPage(on: boolean) {
     </div>
   </SettingsGroup>
 
-  <SettingsGroup id="customPage" title-key="winSettings.secCustomPage" :flash="flashGroup === 'customPage'">
+  <SettingsGroup v-if="!locked" id="customPage" title-key="winSettings.secCustomPage" :flash="flashGroup === 'customPage'">
     <p class="field-desc">{{ t("winSettings.customPageDesc") }}</p>
     <div class="switch-row">
       <div class="switch-text">
@@ -254,7 +256,7 @@ function toggleCustomPage(on: boolean) {
   </SettingsGroup>
 
   <!-- 窗口外观：材质由系统在窗口背后合成（Rust 侧 windows/effects.rs），落 gui_config.client.windowEffect -->
-  <SettingsGroup id="window-look" title-key="winSettings.secWindowLook" :flash="flashGroup === 'window-look'">
+  <SettingsGroup v-if="!locked" id="window-look" title-key="winSettings.secWindowLook" :flash="flashGroup === 'window-look'">
     <label class="field-label">{{ t("winSettings.windowEffect") }}</label>
     <select v-model="client.windowEffect" class="field-select" @change="applyWindowEffect">
       <option value="auto">{{ t("winSettings.windowEffectAuto") }}</option>
@@ -294,7 +296,7 @@ function toggleCustomPage(on: boolean) {
     <p class="field-desc">{{ t("winSettings.sidebarDesc") }}</p>
   </SettingsGroup>
 
-  <SettingsGroup id="bgImage" title-key="winSettings.bgImage" :flash="flashGroup === 'bgImage'">
+  <SettingsGroup v-if="!locked" id="bgImage" title-key="winSettings.bgImage" :flash="flashGroup === 'bgImage'">
     <p class="field-desc">{{ t("winSettings.bgImageDesc") }}</p>
     <div class="bg-buttons">
       <!-- 图片地址：本地文件路径或网址 -->

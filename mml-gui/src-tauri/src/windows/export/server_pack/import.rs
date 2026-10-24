@@ -50,7 +50,13 @@ fn destination(root: &Path, relative: &Path) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-pub(crate) fn import_pack(file: &Path, root: &Path) -> Result<mml_config::config_save::ReplacedFiles<ImportedPack>, String> {
+/// 解包并逐文件替换
+///
+/// - `file`: 服务器包
+/// - `root`: 运行目录
+pub(crate) fn import_pack(
+    file: &Path, root: &Path,
+) -> Result<mml_config::config_save::ReplacedFiles<ImportedPack>, String> {
     let mut zip = ZipArchive::new(File::open(file).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     let manifest = format::validate(&mut zip)?;
     let config = if zip.by_name(CONFIG).is_ok() {
@@ -82,11 +88,18 @@ pub(crate) fn import_pack(file: &Path, root: &Path) -> Result<mml_config::config
             } else {
                 (PathBuf::from(name.strip_prefix("mml/").ok_or(err_keys::SERVER_PACK_INVALID)?), None)
             };
+            let is_lock = relative == Path::new(crate::client_lock::FILE_NAME);
             let target = destination(&root, &relative)?;
             let staged = stage.join("files").join(&relative);
             fs::create_dir_all(staged.parent().unwrap()).map_err(|e| e.to_string())?;
             let mut output = File::create_new(&staged).map_err(|e| e.to_string())?;
-            if let Some(directory) = game_directory {
+            if is_lock {
+                // 锁文件先读进内存校验：坏包不该把玩家锁在一个乱码密码上
+                let mut data = Vec::new();
+                entry.read_to_end(&mut data).map_err(|e| e.to_string())?;
+                if !crate::client_lock::parse_ok(&data) { return Err(err_keys::SERVER_PACK_INVALID.into()); }
+                io::copy(&mut data.as_slice(), &mut output).map_err(|e| e.to_string())?;
+            } else if let Some(directory) = game_directory {
                 let mut game: mml_game::launcher::instance_setting_obj::InstanceSettingObj =
                     serde_json::from_reader(&mut entry).map_err(|_| err_keys::SERVER_PACK_INVALID)?;
                 game.dir = directory.clone();
@@ -100,6 +113,7 @@ pub(crate) fn import_pack(file: &Path, root: &Path) -> Result<mml_config::config
         let mut applied = Vec::new();
         for StagedFile { relative, target, staged } in files {
             let backup = stage.join("backup").join(&relative);
+            let is_lock = relative == Path::new(crate::client_lock::FILE_NAME);
             let replace = (|| -> Result<(), String> {
                 destination(&root, &relative)?;
                 fs::create_dir_all(target.parent().unwrap()).map_err(|e| e.to_string())?;
@@ -110,7 +124,10 @@ pub(crate) fn import_pack(file: &Path, root: &Path) -> Result<mml_config::config
                     fs::rename(&target, &backup).map_err(|e| e.to_string())?;
                 }
                 applied.push(AppliedFile { target: target.clone(), backup, existed });
-                fs::rename(staged, &target).map_err(|e| e.to_string())
+                fs::rename(&staged, &target).map_err(|e| e.to_string())?;
+                // 锁文件落到运行目录后补回隐藏属性
+                if is_lock { crate::client_lock::hide(&target); }
+                Ok(())
             })();
             if let Err(error) = replace {
                 let mut rollback_failed = false;
@@ -281,6 +298,66 @@ mod tests {
         assert_eq!(fs::read_to_string(root.join("config.json")).unwrap(), "keep-core");
         assert_eq!(fs::read_to_string(root.join("gui_config.json")).unwrap(), "keep-gui");
         assert!(root.join("custom_ui/page.zip").is_file());
+        crate::test_support::cleanup(&[&dir]);
+    }
+
+    #[test]
+    fn installs_client_lock_in_run_dir() {
+        crate::test_support::ensure_boot();
+        let dir = crate::test_support::temp_dir("server-pack-lock");
+        let file = dir.join("pack.zip");
+        let uuid = uuid::Uuid::new_v4();
+        let manifest = Manifest {
+            format: "mml-server-pack".into(),
+            version: 1,
+            instances: vec![Instance { uuid, directory: "test".into() }],
+            launcher: false,
+        };
+        let data = vec![
+            (MANIFEST.into(), serde_json::to_vec(&manifest).unwrap()),
+            ("mml/.client_lock.json".into(), br#"{"Password":"$pbkdf2-sha256$120000$aa$bb"}"#.to_vec()),
+            ("mml/minecraft/instances/test/game.json".into(),
+                format!(r#"{{"UUID":"{uuid}","DirName":"test","Name":"Test"}}"#).into_bytes()),
+        ];
+        archive::write_zip(&file, &[], &data, &None, &std::sync::atomic::AtomicBool::new(false)).unwrap();
+
+        let root = dir.join("runtime");
+        fs::create_dir_all(&root).unwrap();
+        import_pack(&file, &root).unwrap();
+        // 锁文件落在运行目录，跟 gui_config.json 同级
+        assert!(root.join(".client_lock.json").is_file());
+        crate::test_support::cleanup(&[&dir]);
+    }
+
+    #[test]
+    fn failed_import_restores_previous_lock() {
+        crate::test_support::ensure_boot();
+        let dir = crate::test_support::temp_dir("server-pack-lock-rollback");
+        let file = dir.join("pack.zip");
+        let uuid = uuid::Uuid::new_v4();
+        let manifest = Manifest {
+            format: "mml-server-pack".into(),
+            version: 1,
+            instances: vec![Instance { uuid, directory: "test".into() }],
+            launcher: false,
+        };
+        let data = vec![
+            (MANIFEST.into(), serde_json::to_vec(&manifest).unwrap()),
+            ("mml/.client_lock.json".into(), br#"{"Salt":"new","Hash":"new"}"#.to_vec()),
+            ("mml/minecraft/instances/test/game.json".into(),
+                format!(r#"{{"UUID":"{uuid}","DirName":"test","Name":"Test"}}"#).into_bytes()),
+            ("mml/minecraft/instances/test/.minecraft/options.txt".into(), b"new".to_vec()),
+        ];
+        archive::write_zip(&file, &[], &data, &None, &std::sync::atomic::AtomicBool::new(false)).unwrap();
+
+        let root = dir.join("runtime");
+        let conflict = root.join("minecraft/instances/test/.minecraft/options.txt");
+        fs::create_dir_all(&conflict).unwrap();
+        let old = br#"{"Salt":"old","Hash":"old"}"#;
+        fs::write(root.join(".client_lock.json"), old).unwrap();
+        assert!(import_pack(&file, &root).is_err());
+        // 文件回滚的同时，锁也要回到导入前那份
+        assert_eq!(fs::read(root.join(".client_lock.json")).unwrap(), old.to_vec());
         crate::test_support::cleanup(&[&dir]);
     }
 

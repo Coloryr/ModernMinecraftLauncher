@@ -1588,7 +1588,7 @@ export default {
   "winSettings.autoSaveNoticeDesc": "实例配置了启动后自动进入某个存档时，先弹窗确认。关掉后启动直接进入，不再询问。",
   // 自定义音乐
   "winSettings.secClientLock": "锁定客户端设置",
-  "winSettings.clientLockDesc": "锁定后设置页隐藏客户端设置，需要密码才能重新打开。",
+  "winSettings.clientLockDesc": "锁定后隐藏客户端设置页、主题 / 背景 / 自定义界面、JVM 与启动参数、实验性功能，需要密码才能重新打开。",
   "winSettings.clientLockOn": "已锁定",
   "winSettings.clientLockOff": "未锁定",
   "winSettings.clientLockSet": "设置密码并锁定",
@@ -1602,6 +1602,7 @@ export default {
   "winSettings.clientLockUnlockTitle": "解锁客户端设置",
   "winSettings.clientLockUnlockPrompt": "输入密码以显示客户端设置。",
   "winSettings.clientLockUnlocked": "本次已解锁",
+  "winSettings.lockedHint": "部分设置已被锁定，解锁后显示；入口在「实验性功能」页。",
   "winSettings.clientLockNoLockHint": "当前未锁定实例或登录方式；锁定客户端设置只隐藏设置页，玩家仍可切换实例和账户。",
   "winSettings.secServerPack": "服务器包",
   "winSettings.serverPackDesc": "选择配置、自定义主题 / 样式 / 主页面与实例，打成服务器包；玩家导入后启动器会重载并进入该实例。",

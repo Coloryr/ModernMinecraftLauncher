@@ -1587,7 +1587,7 @@ export default {
   "winSettings.autoSaveNoticeDesc": "Ask before entering the save an instance is set to open on launch. When off, the launcher enters it directly without asking.",
   // Custom music
   "winSettings.secClientLock": "Lock client settings",
-  "winSettings.clientLockDesc": "When locked, the client settings tab is hidden until the password is entered.",
+  "winSettings.clientLockDesc": "When locked, the client settings page, theme / background / custom UI, JVM and launch arguments, and experimental switches are hidden until the password is entered.",
   "winSettings.clientLockOn": "Locked",
   "winSettings.clientLockOff": "Unlocked",
   "winSettings.clientLockSet": "Set password and lock",
@@ -1601,6 +1601,7 @@ export default {
   "winSettings.clientLockUnlockTitle": "Unlock client settings",
   "winSettings.clientLockUnlockPrompt": "Enter the password to show client settings.",
   "winSettings.clientLockUnlocked": "Unlocked for this session",
+  "winSettings.lockedHint": "Some settings are locked and hidden until unlocked; the unlock entry is on the Experimental page.",
   "winSettings.clientLockNoLockHint": "No instance or login lock is set; locking client settings only hides this tab, players can still switch instances and accounts.",
   "winSettings.secServerPack": "Server package",
   "winSettings.serverPackDesc": "Pick configs, custom theme / styles / home page and an instance; importing it reloads the launcher into that instance.",

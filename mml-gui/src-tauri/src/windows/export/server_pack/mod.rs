@@ -94,6 +94,12 @@ pub(super) fn export_pack(
     if page_on { files.push(("mml/custom_ui/page.zip".into(), page)); }
     files.extend(css_packages);
     if home_on { files.push(("mml/home".into(), home)); }
+    // 客户端设置锁也在界面配置里：不带上，玩家导入后就变成未锁定
+    if options.gui_config
+        && let Some(lock) = crate::client_lock::read_bytes()
+    {
+        data.push((format!("mml/{}", crate::client_lock::FILE_NAME), lock));
+    }
 
     let manifest = Manifest {
         format: "mml-server-pack".into(), version: 1, instances, launcher: include_launcher,

@@ -1217,8 +1217,6 @@ const clientConfig = ref<ClientConfig>({
   motdServer: "",
   lockInstance: "",
   lockClient: false,
-  clientLockSalt: "",
-  clientLockHash: "",
   customHome: false,
   customCssOn: false,
   customCss: [],

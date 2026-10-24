@@ -25,6 +25,7 @@ use crate::windows::{block, download, main};
 
 pub mod block_groups;
 pub mod build_info;
+pub(crate) mod client_lock;
 pub mod collect_utils;
 pub mod dtos;
 pub mod err_box;

@@ -19,6 +19,8 @@ import { memoryLabel } from "../../../../lib/format";
 const props = defineProps<{
   /** 游戏启动标签的状态与保存方法，来自 useSettingsLaunch */
   settings: ReturnType<typeof useSettingsLaunch>;
+  /** 锁定时隐藏 JVM / 游戏参数 / 启动命令分组 */
+  locked?: boolean;
   /** 需要高亮脉冲的分组 id（搜索命中） */
   flashGroup?: string;
 }>();
@@ -192,7 +194,7 @@ watch(memoryConflict, async (bad) => {
       </div>
     </SettingsGroup>
 
-    <SettingsGroup id="jvm" title-key="winSettings.secJvm" :flash="flashGroup === 'jvm'">
+    <SettingsGroup v-if="!locked" id="jvm" title-key="winSettings.secJvm" :flash="flashGroup === 'jvm'">
       <div class="grid-2">
         <div>
           <label class="field-label">{{ t("winSettings.gcMode") }}</label>
@@ -230,7 +232,7 @@ watch(memoryConflict, async (bad) => {
       <textarea v-model="run!.jvmArgs" class="field-input args-input" spellcheck="false" />
     </SettingsGroup>
 
-    <SettingsGroup id="gameArgs" title-key="winSettings.secGameArgs" :flash="flashGroup === 'gameArgs'">
+    <SettingsGroup v-if="!locked" id="gameArgs" title-key="winSettings.secGameArgs" :flash="flashGroup === 'gameArgs'">
       <div class="switch-row">
         <span>{{ t("winSettings.removeGameArg") }}</span>
         <BaseSwitch v-model="run!.removeGameArg" />
@@ -239,7 +241,7 @@ watch(memoryConflict, async (bad) => {
       <textarea v-model="run!.gameArgs" class="field-input args-input" spellcheck="false" />
     </SettingsGroup>
 
-    <SettingsGroup id="launchCmd" title-key="winSettings.secLaunchCmd" :flash="flashGroup === 'launchCmd'">
+    <SettingsGroup v-if="!locked" id="launchCmd" title-key="winSettings.secLaunchCmd" :flash="flashGroup === 'launchCmd'">
       <div class="switch-list">
         <div class="switch-row">
           <span>{{ t("winSettings.preLaunch") }}</span>

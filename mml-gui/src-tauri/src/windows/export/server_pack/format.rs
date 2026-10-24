@@ -55,7 +55,8 @@ pub(super) fn validate<R: Read + Seek>(zip: &mut ZipArchive<R>) -> Result<Manife
             || manifest.instances.iter().any(|i| format!("{INSTANCES}{}/", i.directory).starts_with(name)));
         let custom = name.trim_end_matches('/') == "mml/home"
             || name.trim_end_matches('/') == "mml/custom_ui"
-            || name.starts_with("mml/custom_ui/");
+            || name.starts_with("mml/custom_ui/")
+            || name.trim_end_matches('/') == format!("mml/{}", crate::client_lock::FILE_NAME);
         if !(instance_file || directory || custom || matches!(name, MANIFEST | CONFIG | GUI_CONFIG)
             || (name == LAUNCHER && manifest.launcher)) { return Err(bad()); }
         total = total.checked_add(file.size()).ok_or_else(bad)?;

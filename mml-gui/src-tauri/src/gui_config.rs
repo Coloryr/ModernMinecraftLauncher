@@ -294,12 +294,6 @@ pub struct ClientConfig {
     pub motd_server: String,
     /// 实例锁定：锁定的实例 uuid，空串表示未锁定；锁定时主窗口不允许切换到其它实例
     pub lock_instance: String,
-    /// 锁定客户端设置：开启后设置页隐藏「客户端设置」，需要密码解锁
-    pub lock_client: bool,
-    /// 锁定客户端设置的盐，随机 16 字节的十六进制
-    pub client_lock_salt: String,
-    /// 锁定客户端设置的 PBKDF2 哈希，十六进制
-    pub client_lock_hash: String,
     /// 自定义主页面：启用后主窗口的启动器主页换成 base_dir/home 里的 index.html
     pub custom_home: bool,
     /// 自定义 CSS 总开关；关闭后已安装的样式保留但不生效
@@ -333,9 +327,6 @@ impl Default for ClientConfig {
             auto_join_server: String::new(),
             motd_server: String::new(),
             lock_instance: String::new(),
-            lock_client: false,
-            client_lock_salt: String::new(),
-            client_lock_hash: String::new(),
             custom_home: false,
             custom_css_on: false,
             custom_css: Vec::new(),

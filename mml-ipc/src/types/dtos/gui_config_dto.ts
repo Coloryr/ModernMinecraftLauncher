@@ -59,8 +59,6 @@ export type ClientConfigDto = {
   motdServer: string,
   lockInstance: string,
   lockClient: boolean,
-  clientLockSalt: string,
-  clientLockHash: string,
   customHome: boolean,
   customCssOn: boolean,
   customCss: CustomCssItemDto[],

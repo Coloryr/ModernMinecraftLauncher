@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // 设置窗口 · 实验性功能页：管理员启动已接线；URI / 沙盒启动尚未实现，开关禁用。
-// 客户端设置被锁定时，解锁入口也在这里：那一页会被隐藏，得先在这输密码。
+// 客户端设置被锁定时，开关同样隐藏，这一页只剩解锁入口。
+import { computed } from "vue";
 import { t } from "../../../../lib/i18n";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
@@ -22,10 +23,13 @@ const emit = defineEmits<{
 }>();
 
 const { client, experimental, applyExperimental } = props.settings;
+
+/** 开关属于锁定范围：锁着且本次未解锁时整组隐藏，只留解锁入口 */
+const locked = computed(() => client.value.lockClient && !props.clientUnlocked);
 </script>
 
 <template>
-  <SettingsGroup id="experimental" title-key="winSettings.secExperimental"
+  <SettingsGroup v-if="!locked" id="experimental" title-key="winSettings.secExperimental"
     :flash="flashGroup === 'experimental'">
     <div class="switch-row">
       <div class="switch-text">

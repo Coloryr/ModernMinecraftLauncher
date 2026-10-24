@@ -69,11 +69,34 @@ const clientUnlocked = ref(false);
 const unlockOpen = ref(false);
 const unlockPassword = ref("");
 const unlockError = ref("");
-/** 搜索命中客户端设置时，解锁成功后再跳过去 */
+/** 搜索命中锁定分组时，解锁成功后再跳过去 */
 const pendingHit = ref<SettingsHit | null>(null);
 
 /** 客户端设置是否被锁定 */
 const clientLocked = computed(() => client.client.value.lockClient);
+
+/** 锁定时要隐藏的设置分组：服主定制内容 + 高级 / 危险项，见 docs 的锁定说明 */
+const LOCKED_GROUPS = [
+  "servers", "loginLock", "instanceLock", "autoSave", "customHome",
+  "customCss", "customPage", "music", "gameTitle", "serverPack",
+  "theme", "window-look", "bgImage", "jvm", "gameArgs", "launchCmd", "experimental",
+];
+
+/** 本次是否处于锁定状态；解锁后本次设置窗口全部放开 */
+const locked = computed(() => clientLocked.value && !clientUnlocked.value);
+
+/**
+ * 这个分组本次是否隐藏
+ *
+ * - `id`: 分组 id，见 search.ts 的索引
+ *
+ * # 返回值
+ *
+ * 锁着且属于锁定范围时返回 `true`
+ */
+function isLockedGroup(id: string): boolean {
+  return locked.value && LOCKED_GROUPS.includes(id);
+}
 
 /** 左侧导航：未锁定，或本次已解锁时才显示「客户端设置」 */
 const visibleTabs = computed(() =>
@@ -87,8 +110,8 @@ let loadingConfig = true;
 
 watch(
   () => client.client.value.lockClient,
-  (locked) => {
-    if (loadingConfig || !locked) return;
+  (value) => {
+    if (loadingConfig || !value) return;
     // 刚在本页设置完密码：本次留在客户端设置页，让用户能看到「已锁定 / 解除」
     clientUnlocked.value = true;
   },
@@ -149,8 +172,10 @@ function handlers() {
   return [ui, skin, network, launch, java, client];
 }
 
-/** 本页包含哪些分组；由搜索索引派生，能搜到的分组就是会被重置的分组 */
-const pageGroups = computed(() => groupsOfTab(tab.value));
+/** 本页包含哪些分组；由搜索索引派生，锁定中的分组不参与"恢复本页默认" */
+const pageGroups = computed(() =>
+  groupsOfTab(tab.value).filter((id) => !isLockedGroup(id)),
+);
 
 /** 本页有没有可恢复的默认值；Java 页没有，列表是系统扫描出来的 */
 const canResetPage = computed(() => pageGroups.value.some((id) => RESETTABLE_GROUPS.includes(id)));
@@ -177,8 +202,8 @@ async function onResetPage() {
 
 /** 命中搜索项：切到它的标签页，滚到分组锚点，短暂高亮 */
 async function onSearchSelect(hit: SettingsHit) {
-  // 客户端设置锁着：先要密码，解锁后再跳转
-  if (hit.tab === "client" && clientLocked.value && !clientUnlocked.value) {
+  // 目标分组或整个客户端设置页锁着：先要密码，解锁后再跳转
+  if (locked.value && (hit.tab === "client" || LOCKED_GROUPS.includes(hit.group))) {
     openUnlock(hit);
     return;
   }
@@ -272,6 +297,7 @@ function onKeyDown(e: KeyboardEvent) {
           <div>
             <h2 class="set-content-title">{{ t(`winSettings.tab.${tab}`) }}</h2>
             <p class="set-content-sub">{{ t(`winSettings.tabDesc.${tab}`) }}</p>
+            <p v-if="locked && tab !== 'experimental'" class="locked-hint">{{ t("winSettings.lockedHint") }}</p>
           </div>
           <BaseButton v-if="canResetPage" size="sm" v-tip="t('winSettings.resetPageHint')"
             @click="confirmResetPage = true">
@@ -280,10 +306,10 @@ function onKeyDown(e: KeyboardEvent) {
         </header>
 
         <section class="set-panel">
-          <UiTab v-if="tab === 'ui'" :settings="ui" :look="client" :flash-group="flashGroup" />
+          <UiTab v-if="tab === 'ui'" :settings="ui" :look="client" :locked="locked" :flash-group="flashGroup" />
           <JavaTab v-else-if="tab === 'java'" :settings="java" :flash-group="flashGroup" />
           <NetworkTab v-else-if="tab === 'network'" :settings="network" :flash-group="flashGroup" />
-          <LaunchTab v-else-if="tab === 'launch'" :settings="launch" :flash-group="flashGroup" />
+          <LaunchTab v-else-if="tab === 'launch'" :settings="launch" :locked="locked" :flash-group="flashGroup" />
           <SkinTab v-else-if="tab === 'skin'" :settings="skin" :flash-group="flashGroup" />
           <ClientTab v-else-if="tab === 'client' && (clientUnlocked || !clientLocked)" :settings="client"
             v-model:win="launchWin" :flash-group="flashGroup" />
