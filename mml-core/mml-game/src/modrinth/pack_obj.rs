@@ -14,6 +14,8 @@ pub struct ModrinthPackObj {
     /// 索引格式版本，目前固定为 1
     #[serde(rename = "formatVersion")]
     pub format_version: i32,
+    /// 游戏标识，Modrinth 规范固定为 `minecraft`；缺了导入方会直接拒绝
+    pub game: String,
     /// 整合包版本 ID，由整合包作者给出
     #[serde(rename = "versionId")]
     pub version_id: String,

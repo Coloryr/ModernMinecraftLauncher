@@ -466,6 +466,33 @@ pub enum LogText {
         /// 失败原因
         error: String,
     },
+    /// 导出耗时总览：准备、打包与合计
+    ExportTime {
+        /// 压缩档位，`fast` / `normal` / `solid`
+        level: String,
+        /// 准备阶段：解析勾选、统计在线来源，单位秒
+        prepare: f64,
+        /// 打包阶段：建包到写完文件，单位秒
+        pack: f64,
+        /// 合计，单位秒
+        total: f64,
+        /// 导出的目标文件路径，原样打印
+        file: String,
+    },
+    /// 导出打包明细：建包、写条目、收尾、改名
+    ExportPackDetail {
+        /// 建包并把清单写好，单位秒；内核格式这一段还含联网查项目名
+        open: f64,
+        /// 逐条写入压缩包，单位秒
+        write: f64,
+        /// 收尾：写完目录并刷盘，单位秒；内核格式的进度记在写文件之前，
+        /// 最后一个文件的写入时长会算进这一段
+        finish: f64,
+        /// 改名替换目标文件，单位秒；内核格式把这一步并在收尾里，取 `None`
+        commit: Option<f64>,
+        /// 写进压缩包的条目数
+        entries: usize,
+    },
 }
 
 impl LogText {
@@ -618,6 +645,21 @@ impl LogText {
             LogText::LogLaunchTime { secs } => format!("启动用时：{secs:.2}s"),
             LogText::LogCmdPreTime { secs } => format!("启动前执行用时：{secs:.2}s"),
             LogText::LogCmdPostTime { secs } => format!("启动后执行用时：{secs:.2}s"),
+            LogText::ExportTime { level, prepare, pack, total, file } => format!(
+                "[export] 导出耗时：准备 {}、打包 {}、合计 {}，压缩档位 {level}，文件 {file}",
+                time_text(*prepare), time_text(*pack), time_text(*total)
+            ),
+            LogText::ExportPackDetail { open, write, finish, commit, entries } => {
+                let mut text = format!(
+                    "[export] 打包明细：建包 {}、写入 {}、收尾 {}",
+                    time_text(*open), time_text(*write), time_text(*finish)
+                );
+                if let Some(commit) = commit {
+                    text.push_str(&format!("、改名 {}", time_text(*commit)));
+                }
+                text.push_str(&format!("，共 {entries} 个条目"));
+                text
+            }
             LogText::LogJavaPath { path } => format!("Java 路径：{path}"),
             LogText::LaunchStarting => String::from("游戏启动中…"),
             LogText::LaunchProcessStarted => String::from("游戏进程已启动"),
@@ -848,6 +890,21 @@ impl LogText {
             LogText::LogLaunchTime { secs } => format!("launch took {secs:.2}s"),
             LogText::LogCmdPreTime { secs } => format!("pre-launch command took {secs:.2}s"),
             LogText::LogCmdPostTime { secs } => format!("post-launch command took {secs:.2}s"),
+            LogText::ExportTime { level, prepare, pack, total, file } => format!(
+                "[export] export took {} in total: preparing {}, packing {} (compression {level}, file {file})",
+                time_text(*total), time_text(*prepare), time_text(*pack)
+            ),
+            LogText::ExportPackDetail { open, write, finish, commit, entries } => {
+                let mut text = format!(
+                    "[export] packing detail: opening {}, writing {}, finishing {}",
+                    time_text(*open), time_text(*write), time_text(*finish)
+                );
+                if let Some(commit) = commit {
+                    text.push_str(&format!(", renaming {}", time_text(*commit)));
+                }
+                text.push_str(&format!(" ({entries} entries)"));
+                text
+            }
             LogText::LogJavaPath { path } => format!("Java path: {path}"),
             LogText::LaunchStarting => String::from("launching the game…"),
             LogText::LaunchProcessStarted => String::from("the game process has started"),
@@ -1042,6 +1099,33 @@ mod tests {
         assert!(set.text_in(&Lang::en_us).contains("50%"));
         assert!(set.text_in(&Lang::en_us).contains("a.png"));
 
+        // 耗时条目：一秒以内用毫秒；没有改名那一段时不要留空壳
+        let detail = LogText::ExportPackDetail {
+            open: 0.012,
+            write: 2.5,
+            finish: 0.3,
+            commit: None,
+            entries: 7,
+        };
+        assert!(detail.text_in(&Lang::zh_cn).contains("12 ms"));
+        assert!(detail.text_in(&Lang::zh_cn).contains("2.50 s"));
+        assert!(detail.text_in(&Lang::zh_cn).contains("共 7 个条目"));
+        assert!(!detail.text_in(&Lang::zh_cn).contains("改名"));
+        assert!(detail.text_in(&Lang::en_us).contains("12 ms"));
+        assert!(detail.text_in(&Lang::en_us).contains("(7 entries)"));
+
+        let overview = LogText::ExportTime {
+            level: String::from("fast"),
+            prepare: 0.05,
+            pack: 12.34,
+            total: 12.5,
+            file: String::from("a.zip"),
+        };
+        assert!(overview.text_in(&Lang::zh_cn).contains("50 ms"));
+        assert!(overview.text_in(&Lang::zh_cn).contains("12.34 s"));
+        assert!(overview.text_in(&Lang::zh_cn).contains("a.zip"));
+        assert!(overview.text_in(&Lang::en_us).contains("fast"));
+
         // 没有参数的条目也两边都有字
         assert!(
             !LogText::WebviewSettingsFailed
@@ -1054,3 +1138,19 @@ mod tests {
         );
     }
 }
+
+/// 耗时文本：1 秒以内用毫秒，超过用秒
+///
+/// - `secs`: 秒数
+///
+/// # 返回值
+///
+/// 形如 `12 ms` 或 `3.45 s`
+fn time_text(secs: f64) -> String {
+    if secs < 1.0 {
+        format!("{:.0} ms", secs * 1000.0)
+    } else {
+        format!("{:.2} s", secs)
+    }
+}
+

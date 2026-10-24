@@ -11,7 +11,7 @@ M²L 的界面有三种互相独立的换皮方式，这里给四个能直接导
 | [custom-ui-css-demo](custom-ui-css-demo/README.md) | 内置界面的样式，可装多份叠加 | `custom.css`（可选 `custom.js`） | `css` | 界面 → 样式包 | `custom-ui-css-demo.zip` |
 
 三种方式**互不联锁**：装哪一种都不动另外两种的开关；整页主题开着时自定义主页仍在它
-后面，属正常叠加。机制细节见 [AGENTS.md](../AGENTS.md) §12.2。
+后面，属正常叠加。
 
 ## 快速开始
 

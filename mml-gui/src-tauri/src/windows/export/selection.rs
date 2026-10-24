@@ -1,6 +1,7 @@
 //! 按目标格式将所选文件分配到下载清单或本地覆盖文件。
 
 use std::{collections::{HashMap, HashSet}, path::{Path, PathBuf}};
+use mml_base::file_item::FileHash;
 use mml_game::{game_export::{ExportPackType, OnlineFileExport}, launcher::file_online_info_obj::OnlineInfoObj};
 use crate::dtos::export_dto::ExportPickDto;
 use super::{archive, list::{collect_files, export_meta}};
@@ -27,16 +28,34 @@ pub(super) fn collect<'a>(
     base: &Path, picks: impl Iterator<Item = &'a ExportPickDto>,
     online: &HashMap<String, OnlineInfoObj>, pack: ExportPackType,
 ) -> Result<Selection, String> {
+    collect_reporting(base, picks, online, pack, &|_| {})
+}
+
+/// 同 [`collect`]，每开始处理一条勾选回报一次进度
+///
+/// 模组要算哈希，几百个文件读下来要一会儿，界面上得看得见在动。
+///
+/// - `progress`: 处理到第几条，从 0 开始
+pub(super) fn collect_reporting<'a>(
+    base: &Path, picks: impl Iterator<Item = &'a ExportPickDto>,
+    online: &HashMap<String, OnlineInfoObj>, pack: ExportPackType,
+    progress: &dyn Fn(usize),
+) -> Result<Selection, String> {
     let picks: Vec<&ExportPickDto> = picks.collect();
     let decisions = decisions_of(base, &picks)?;
     let mut result = Selection::default();
     let mut explicit = HashSet::new();
     // MML（直接压缩）也认勾选：勾了什么就只压什么，见 native_instance_selected
-    for pick in picks {
+    for (index, pick) in picks.into_iter().enumerate() {
+        progress(index);
         if pick.exclude { continue; }
         let path = archive::selected_path(base, &pick.path)?;
-        // 同一个路径既勾又取消时以判定表里最后一条为准
-        if is_excluded(&decisions, &path) { continue; }
+        // 同一个路径既勾又取消时以判定表里最后一条为准；但模组页明确填了编号 / 地址的
+        // 条目例外：文件树那边的排除只表示"不按文件打包"，不能让它连清单一起落空
+        let explicit_source = !pick.url.trim().is_empty()
+            || pick.mod_id.as_deref().is_some_and(|id| !id.trim().is_empty())
+            || pick.file_id.as_deref().is_some_and(|id| !id.trim().is_empty());
+        if !explicit_source && is_excluded(&decisions, &path) { continue; }
         if path.is_dir() {
             let files = collect_files(&path)?;
             result.local.extend(files.into_iter().filter(|file| !is_excluded(&decisions, file)));
@@ -65,15 +84,21 @@ pub(super) fn collect<'a>(
             _ => false,
         };
         if can_index {
-            let meta = export_meta(&path)?;
+            // CurseForge 的清单只写项目号 / 文件号，不用读内容：省掉整份 SHA1 + SHA512
+            let (size, hash) = if pack == ExportPackType::CurseForge {
+                let size = std::fs::metadata(&path).map(|meta| meta.len() as usize).unwrap_or(0);
+                (size, FileHash::Sha1Sha512(String::new(), String::new()))
+            } else {
+                let meta = export_meta(&path)?;
+                (meta.size, meta.hash)
+            };
             // 有项目号 / 文件号才进下载清单，否则按 overrides 整包带着
             let info = indexed.then(|| OnlineInfoObj {
                 file: name.to_string(), modid: modid.clone(), fileid: fileid.clone(),
                 url: url.to_string(), ..Default::default()
             });
             let item = OnlineFileExport {
-                file: path, size: meta.size, pack, url: url.to_string(),
-                hash: meta.hash, info,
+                file: path, size, pack, url: url.to_string(), hash, info,
             };
             if indexed { result.mods.push(item); }
             else { result.files.push(item); }
@@ -139,7 +164,7 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn unreadable_indexed_file_fails_instead_of_emitting_empty_hashes() {
+    fn unreadable_indexed_mod_is_listed_for_curseforge_but_fails_for_modrinth() {
         use std::os::windows::fs::OpenOptionsExt;
         let dir = crate::test_support::temp_dir("export-locked-download");
         let path = dir.join("mod.jar");
@@ -150,9 +175,11 @@ mod tests {
         let online = HashMap::from([("mod.jar".into(), OnlineInfoObj {
             modid: "123".into(), fileid: "456".into(), ..Default::default()
         })]);
-        for pack in [ExportPackType::CurseForge, ExportPackType::Modrinth] {
-            assert!(collect(&dir, picks.iter(), &online, pack).is_err());
-        }
+        // CurseForge 的清单只写编号，不读文件内容：锁着的模组照样能列进清单
+        let result = collect(&dir, picks.iter(), &online, ExportPackType::CurseForge).unwrap();
+        assert_eq!(result.mods.len(), 1);
+        // Modrinth 的清单要 sha1 / sha512，读不了就报错，别写出空哈希
+        assert!(collect(&dir, picks.iter(), &online, ExportPackType::Modrinth).is_err());
         drop(locked);
         crate::test_support::cleanup(&[&dir]);
     }
@@ -218,6 +245,29 @@ mod tests {
         assert_eq!(result.local, [dir.join("mod.jar")]);
         crate::test_support::cleanup(&[&dir]);
     }
+
+    #[test]
+    fn mod_pick_with_ids_still_indexes_when_the_file_pick_excludes_it() {
+        let dir = crate::test_support::temp_dir("export-mod-excluded");
+        std::fs::create_dir_all(dir.join("mods")).unwrap();
+        std::fs::write(dir.join("mods/a.jar"), b"a").unwrap();
+        // 模组页按清单勾上，文件页又报了一条排除：不能两边都落空
+        let picks = [
+            ExportPickDto {
+                path: "mods/a.jar".into(), url: "".into(),
+                mod_id: Some("123".into()), file_id: Some("456".into()), exclude: false,
+            },
+            ExportPickDto {
+                path: "mods/a.jar".into(), url: "".into(),
+                mod_id: None, file_id: None, exclude: true,
+            },
+        ];
+        let result = collect(&dir, picks.iter(), &HashMap::new(), ExportPackType::CurseForge).unwrap();
+        assert_eq!(result.mods.len(), 1);
+        assert!(result.local.is_empty());
+        crate::test_support::cleanup(&[&dir]);
+    }
+
     #[test]
     fn indexed_file_is_not_duplicated_in_overrides() {
         let dir = crate::test_support::temp_dir("export-index-overlap");

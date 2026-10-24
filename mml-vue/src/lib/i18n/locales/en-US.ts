@@ -135,8 +135,8 @@ export default {
   "list.empty": "No instances, click add",
   "empty.title": "No instances yet",
   "empty.desc": "Create your first instance and start your Minecraft journey",
+  "empty.addInstance": "Add game instance",
   "empty.addAccount": "Add account",
-  "empty.setJava": "Set Java",
 
   // Drag & drop overlay: title only (depends on what is being dragged)
   "drop.titleFiles": "Drop to import a modpack or folder",
@@ -1018,6 +1018,8 @@ export default {
 
   // Launch
   "launch.play": "Play",
+  "launch.premiumOfflineBlocked": "Microsoft account required to launch offline accounts",
+  "launch.premiumOfflineHint": "Add and sign in a Microsoft account first; offline accounts become available after that.",
   "launch.filterAll": "All",
   "launch.filterThread": "Thread",
   "launch.filterLevel": "Level",
@@ -1360,7 +1362,7 @@ export default {
 "winSettings.windowEffectNone": "Off",
 "winSettings.windowOpacity": "Window opacity",
 "winSettings.tab.experimental": "Experimental",
-"winSettings.tabDesc.experimental": "Switches still being validated; behaviour is not wired yet",
+"winSettings.tabDesc.experimental": "Switches still being validated",
 "winSettings.secExperimental": "Experimental",
   "winSettings.experimentalDesc": "Options still being validated; they may change or be removed",
   "winSettings.adminLaunch": "Run as administrator",
@@ -1372,7 +1374,7 @@ export default {
   "winSettings.uriLaunchDesc": "Allow starting instances from a link",
   "winSettings.sandboxLaunch": "Sandboxed instance",
   "winSettings.sandboxLaunchDesc": "Start the instance in an isolated environment",
-  "winSettings.experimentalWip": "These switches only store your choice for now; nothing is wired up yet",
+  "winSettings.experimentalWip": "URI and sandbox launch currently only save the toggle; administrator launch is active",
   "winSettings.gcMode": "GC mode",
   "winSettings.gcAuto": "Auto",
   "winSettings.gcG1gc": "G1",
@@ -2066,7 +2068,7 @@ export default {
 export const faqs: Array<{ q: string; a: string }> = [
   {
     q: "How do I create a new instance?",
-    a: "Click “Add” in the instance list on the main screen, enter a name and choose a game version (requires network to download version info).",
+    a: "Click “Add game instance” on the main screen, enter a name and choose a game version (requires network to download version info).",
   },
   {
     q: "Java not found when launching?",
@@ -2078,6 +2080,6 @@ export const faqs: Array<{ q: string; a: string }> = [
   },
   {
     q: "Does it support Microsoft accounts?",
-    a: "Currently offline mode only. Microsoft (OAuth) and third-party login (LittleSkin etc.) are planned for later releases.",
+    a: "Yes. Microsoft accounts use OAuth device-code login; LittleSkin, Authlib-Injector and Nide8 are also supported. Offline accounts require at least one Microsoft account to have been signed in on this machine.",
   },
 ];

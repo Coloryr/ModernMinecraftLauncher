@@ -3,9 +3,9 @@
 //! 在线导出按项目编号拉文件，普通导出直接打包本地目录；
 //! 全程报进度，跑着的时候不重复入队。
 
-use std::{path::{PathBuf}, sync::{Arc, Mutex, atomic::{AtomicBool, AtomicUsize, Ordering}}};
+use std::{path::PathBuf, sync::{Arc, Mutex, atomic::{AtomicBool, AtomicUsize, Ordering}}, time::{Duration, Instant}};
 
-use crate::err_keys;
+use crate::{err_keys, log_text::LogText};
 
 use mml_base::{archives::{ArchiveType, IBaseArchiveGui}};
 use mml_game::game_export::{ExportArg, ExportPackType};
@@ -45,14 +45,84 @@ impl Drop for ExportPermit<'_> {
     }
 }
 
+/// 进度时间戳：导出结束后据此拆出建包、写入、收尾三段
+pub(super) struct ExportClock {
+    /// 任务开始的时刻
+    started: Instant,
+    /// 第一条进度：建包与清单已经写完
+    first: Mutex<Option<Instant>>,
+    /// 最后一条进度
+    last: Mutex<Option<Instant>>,
+    /// 最近一次进度报的条目总数
+    total: AtomicUsize,
+}
+
+impl ExportClock {
+    fn new() -> Self {
+        Self {
+            started: Instant::now(),
+            first: Mutex::new(None),
+            last: Mutex::new(None),
+            total: AtomicUsize::new(0),
+        }
+    }
+
+    /// 任务开始的时刻
+    fn started(&self) -> Instant {
+        self.started
+    }
+
+    /// 收到 `start`：建包与清单已写完，记下第一条进度
+    ///
+    /// - `total`: 本次要写的条目总数
+    fn mark_start(&self, total: usize) {
+        self.total.store(total, Ordering::Relaxed);
+        let mut first = self.first.lock().unwrap();
+        if first.is_none() {
+            *first = Some(Instant::now());
+        }
+    }
+
+    /// 收到一条文件进度
+    fn mark_update(&self) {
+        *self.last.lock().unwrap() = Some(Instant::now());
+    }
+
+    /// 进度里记下的条目总数
+    fn total(&self) -> usize {
+        self.total.load(Ordering::Relaxed)
+    }
+
+    /// 按结束时刻拆出建包、写入、收尾，单位秒
+    ///
+    /// - `end`: 导出的结束时刻
+    ///
+    /// # 返回值
+    ///
+    /// 依次为建包、写入、收尾的秒数
+    fn spans(&self, end: Instant) -> (f64, f64, f64) {
+        let first = self.first.lock().unwrap().unwrap_or(end);
+        let last = self.last.lock().unwrap().unwrap_or(first);
+        (
+            (first - self.started).as_secs_f64(),
+            (last - first).as_secs_f64(),
+            (end - last).as_secs_f64(),
+        )
+    }
+}
+
 /// 进度回调：内核 `IBaseArchiveGui` → `export-progress` 事件
 pub(super) struct ExportProgressGui {
     /// 应用句柄，事件经它转发到前端
     pub(super) app: AppHandle,
     /// 导出目标文件名，随每条进度一起下发
     pub(super) file: String,
-    /// 总计条目数，由 `start` 记下：更新事件也带着它，前端才能算百分比
-    pub(super) total: AtomicUsize,
+    /// 时间戳：各环节耗时与总条目数都记在里面
+    pub(super) clock: Arc<ExportClock>,
+    /// 取消令牌：内核逐条写入时问它要不要停
+    pub(super) cancel: Arc<AtomicBool>,
+    /// 上一条进度事件的时刻，用来限流
+    pub(super) last_emit: Mutex<Option<Instant>>,
 }
 
 /// 发起导出：后台任务，进度经 export-progress 事件上报
@@ -73,7 +143,8 @@ pub(super) struct ExportProgressGui {
 #[gui_macros::ipc_group("export")]
 
 #[gui_macros::command]
-pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Result<(), String> {
+pub async fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Result<(), String> {
+    let began = Instant::now();
     let permit = ExportPermit::acquire(&EXPORT_RUNNING)?;
 
     let game = instance_snapshot(&uuid)?;
@@ -107,11 +178,20 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
 
     // 直接压缩的勾选相对实例目录（含 .minecraft 那一段），其余格式相对游戏目录
     let pick_base = if pack == ExportPackType::MML { game.get_base_path() } else { base.clone() };
-    let selected = super::selection::collect(&pick_base, config.mods.iter().chain(config.files.iter()), &online, pack)?;
+    // 收集勾选要遍历目录、给在线模组算 SHA1/SHA512，大实例上很慢；放到阻塞线程，别卡住 UI 线程
+    let picks: Vec<_> = config.mods.iter().chain(&config.files).cloned().collect();
+    let selected = tokio::task::spawn_blocking(move || {
+        super::selection::collect(&pick_base, picks.iter(), &online, pack)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    let prepared = began.elapsed();
 
     // 取消令牌：关窗时前端调 export_cancel 置位，写文件的循环看到就收手
     let cancel = Arc::new(AtomicBool::new(false));
     *EXPORT_CANCEL.lock().unwrap() = Some(cancel.clone());
+    let clock = Arc::new(ExportClock::new());
+    let level = config.compress.clone();
 
     let arg = ExportArg {
         file: PathBuf::from(&config.file),
@@ -129,7 +209,9 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
         gui: Some(Arc::new(ExportProgressGui {
             app: app.clone(),
             file: config.file.clone(),
-            total: AtomicUsize::new(0),
+            clock: clock.clone(),
+            cancel: cancel.clone(),
+            last_emit: Mutex::new(None),
         })),
     };
 
@@ -162,6 +244,26 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
             let mut slot = EXPORT_CANCEL.lock().unwrap();
             if slot.as_ref().is_some_and(|flag| Arc::ptr_eq(flag, &cancel)) { *slot = None; }
         }
+        // 耗时统计：直接压缩的四段明细在 write_zip 里已经打过，这里只补其它格式的
+        let end = Instant::now();
+        if pack != ExportPackType::MML {
+            let (open, write, finish) = clock.spans(end);
+            mml_log::info(LogText::ExportPackDetail {
+                open,
+                write,
+                finish,
+                commit: None,
+                entries: clock.total(),
+            }.text());
+        }
+        mml_log::info(LogText::ExportTime {
+            level,
+            prepare: prepared.as_secs_f64(),
+            pack: (end - clock.started()).as_secs_f64(),
+            total: began.elapsed().as_secs_f64(),
+            file: save_file.clone(),
+        }.text());
+
         let event = match res {
             Ok(()) => ExportProgressDto {
                 state: "done".to_string(),
@@ -233,7 +335,7 @@ impl IBaseArchiveGui for ExportProgressGui {
     ///
     /// - `total`: 总计需要打包的文件数
     fn start(&self, total: usize) {
-        self.total.store(total, Ordering::Relaxed);
+        self.clock.mark_start(total);
         emit_export_progress(
             &self.app,
             ExportProgressDto {
@@ -252,12 +354,15 @@ impl IBaseArchiveGui for ExportProgressGui {
     /// - `filename`: 当前文件名
     /// - `current`: 已处理数量
     fn update(&self, filename: Option<String>, current: usize) {
+        self.clock.mark_update();
+        // 条目上千时逐条发事件会把主线程压在序列化与重渲染上，压到 25 条/秒
+        if !self.emit_due() { return; }
         emit_export_progress(
             &self.app,
             ExportProgressDto {
                 state: "running".to_string(),
                 now: current as u64,
-                total: self.total.load(Ordering::Relaxed) as u64,
+                total: self.clock.total() as u64,
                 text: filename.unwrap_or_default(),
                 error: None,
                 file: self.file.clone(),
@@ -268,6 +373,15 @@ impl IBaseArchiveGui for ExportProgressGui {
     /// 打包完成：终态由 `export_run` 统一发，这里不做处理
     fn done(&self) {}
 
+    /// 关窗取消时叫停批量写入，不用等整批写完
+    ///
+    /// # 返回值
+    ///
+    /// 取消位置位后返回 `true`
+    fn cancelled(&self) -> bool {
+        self.cancel.load(Ordering::Relaxed)
+    }
+
     /// 文件名含非法字符时一律同意替换，导出侧不拦
     ///
     /// - `_name`: 原始文件名，这里不看
@@ -276,6 +390,25 @@ impl IBaseArchiveGui for ExportProgressGui {
     ///
     /// 恒为 `true`，即同意替换
     fn file_rename(&self, _name: &str) -> bool {
+        true
+    }
+}
+
+/// 进度事件的最小间隔
+const EMIT_INTERVAL: Duration = Duration::from_millis(40);
+
+impl ExportProgressGui {
+    /// 这一条进度该不该发出去
+    ///
+    /// # 返回值
+    ///
+    /// 距上一条超过 [`EMIT_INTERVAL`] 时返回 `true`
+    fn emit_due(&self) -> bool {
+        let mut last = self.last_emit.lock().unwrap();
+        if last.is_some_and(|last| last.elapsed() < EMIT_INTERVAL) {
+            return false;
+        }
+        *last = Some(Instant::now());
         true
     }
 }

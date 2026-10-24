@@ -1,0 +1,167 @@
+name: 构建与发布
+
+on:
+  push:
+    branches:
+      - 'releases/**'
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mml-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: true
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: 校验 build/version 与标签
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          version="$(tr -d '\r\n' < build/version)"
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "build/version 是 ${version}，标签是 ${GITHUB_REF_NAME}，两者不一致。"
+            exit 1
+          fi
+          echo "版本 ${version} 与标签一致。"
+
+  build-windows:
+    needs: check-version
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            mml-gui/package-lock.json
+            mml-vue/package-lock.json
+      - name: 设置 Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: 缓存 Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .
+      - name: 安装依赖
+        run: pwsh -NoProfile -File build/init.ps1
+      - name: 构建并打包
+        run: pwsh -NoProfile -File build/build-release.ps1
+      - name: 上传 Windows 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: mml-windows-${{ runner.arch }}
+          path: build_out/*
+          if-no-files-found: error
+
+  build-linux:
+    needs: check-version
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            mml-gui/package-lock.json
+            mml-vue/package-lock.json
+      - name: 设置 Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: 缓存 Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .
+      - name: 安装 Linux 依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential curl wget file \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf libxdo-dev libssl-dev \
+            libgtk-3-dev libfuse2 rpm
+      - name: 安装依赖
+        run: bash build/init.sh
+      - name: 构建并打包
+        run: bash build/build-release.sh
+      - name: 上传 Linux 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: mml-linux-${{ runner.arch }}
+          path: build_out/*
+          if-no-files-found: error
+
+  build-macos:
+    needs: check-version
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            mml-gui/package-lock.json
+            mml-vue/package-lock.json
+      - name: 设置 Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: 缓存 Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .
+      - name: 安装依赖
+        run: bash build/init.sh
+      - name: 构建并打包
+        run: bash build/build-release.sh
+      - name: 上传 macOS 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: mml-macos-${{ runner.arch }}
+          path: build_out/*
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [check-version, build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: 下载全部产物
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: 列出产物
+        run: find artifacts -maxdepth 2 -type f -print
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: M²L ${{ github.ref_name }}
+          body: |
+            M²L ${{ github.ref_name }} 构建产物
+
+            - Windows：MSI / NSIS
+            - Linux：deb / rpm / AppImage
+            - macOS：dmg / app.tar.gz
+          files: artifacts/*
+          fail_on_unmatched_files: true
+          draft: false
+          prerelease: false

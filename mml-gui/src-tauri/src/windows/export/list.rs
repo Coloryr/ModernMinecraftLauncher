@@ -7,7 +7,7 @@ use std::{collections::HashMap, path::{Path, PathBuf}, sync::{atomic::{AtomicBoo
 
 use crate::err_keys;
 
-use mml_base::{file_item::FileHash, hash_helper::{self, HashType}};
+use mml_base::{file_item::FileHash, hash_helper};
 use mml_game::launcher::file_online_info_obj::OnlineInfoObj;
 use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 use mml_game::loader::LoaderType;
@@ -96,6 +96,7 @@ fn dir_size(path: &Path) -> u64 {
 /// - `dir`: 待列的目录
 /// - `base`: 游戏目录，即 `.minecraft`
 /// - `online`: 在线来源表，见 [`online_of`]
+/// - `deep_size`: 是否递归统计目录大小；根目录传 `false`，避免打开文件树时扫遍整个实例
 ///
 /// # 返回值
 ///
@@ -104,6 +105,7 @@ pub(super) fn list_entries(
     dir: &Path,
     base: &Path,
     online: &HashMap<String, OnlineInfoObj>,
+    deep_size: bool,
 ) -> Result<Vec<ExportEntryDto>, String> {
     let mut list = Vec::new();
 
@@ -121,8 +123,9 @@ pub(super) fn list_entries(
         list.push(ExportEntryDto {
             path: rel.to_string_lossy().replace('\\', "/"),
             dir: is_dir,
+            // 根目录不递归统计大小：大实例上这一趟会扫全部文件，导出窗口打开就卡住
             size: if is_dir {
-                dir_size(&path)
+                if deep_size { dir_size(&path) } else { 0 }
             } else {
                 item.metadata().map(|meta| meta.len()).unwrap_or(0)
             },
@@ -145,22 +148,26 @@ pub(super) fn list_entries(
 /// 见 [`ExportInfoDto`]；uuid 非法或实例不存在返回错误文案
 #[gui_macros::ipc_group("export")]
 #[gui_macros::command]
-pub fn export_get_info(uuid: String) -> Result<ExportInfoDto, String> {
-    let game = instance_snapshot(&uuid)?;
-    let online = online_of(&game);
-    let mods_path = game.get_mods_path();
-    let mods = if mods_path.exists() {
-        list_entries(&mods_path, &game.get_game_path(), &online)?
-    } else {
-        Vec::new()
-    };
+pub async fn export_get_info(uuid: String) -> Result<ExportInfoDto, String> {
+    tokio::task::spawn_blocking(move || {
+        let game = instance_snapshot(&uuid)?;
+        let online = online_of(&game);
+        let mods_path = game.get_mods_path();
+        let mods = if mods_path.exists() {
+            list_entries(&mods_path, &game.get_game_path(), &online, true)?
+        } else {
+            Vec::new()
+        };
 
-    Ok(ExportInfoDto {
-        can_bundle_launcher: cfg!(windows),
-        name: game.name.clone(),
-        custom_loader: game.loader == LoaderType::Custom,
-        mods,
+        Ok(ExportInfoDto {
+            can_bundle_launcher: cfg!(windows),
+            name: game.name.clone(),
+            custom_loader: game.loader == LoaderType::Custom,
+            mods,
+        })
     })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// 浏览游戏目录下的一个目录，给"文件选择"当懒加载的树用
@@ -173,22 +180,26 @@ pub fn export_get_info(uuid: String) -> Result<ExportInfoDto, String> {
 /// 该目录的直接子项；路径非法返回 `err.fileName`，目录不存在返回 `err.fileNotFound`
 #[gui_macros::ipc_group("export")]
 #[gui_macros::command]
-pub fn export_list_dir(uuid: String, dir: String) -> Result<Vec<ExportEntryDto>, String> {
-    let game = instance_snapshot(&uuid)?;
-    let base = game.get_game_path();
+pub async fn export_list_dir(uuid: String, dir: String) -> Result<Vec<ExportEntryDto>, String> {
+    tokio::task::spawn_blocking(move || {
+        let game = instance_snapshot(&uuid)?;
+        let base = game.get_game_path();
 
-    // 根目录不走路径守卫：那里允许空串
-    let path = if dir.trim().is_empty() {
-        base.clone()
-    } else {
-        resolve_under(&base, &dir)?
-    };
-    if !path.is_dir() {
-        return Err(err_keys::FILE_NOT_FOUND.to_string());
-    }
+        // 根目录不走路径守卫：那里允许空串
+        let path = if dir.trim().is_empty() {
+            base.clone()
+        } else {
+            resolve_under(&base, &dir)?
+        };
+        if !path.is_dir() {
+            return Err(err_keys::FILE_NOT_FOUND.to_string());
+        }
 
-    let online = online_of(&game);
-    list_entries(&path, &base, &online)
+        let online = online_of(&game);
+        list_entries(&path, &base, &online, !dir.trim().is_empty())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// 浏览实例目录下的一个目录，给「直接压缩」的文件树用
@@ -204,20 +215,24 @@ pub fn export_list_dir(uuid: String, dir: String) -> Result<Vec<ExportEntryDto>,
 /// 该目录的直接子项；路径非法返回 `err.fileName`，目录不存在返回 `err.fileNotFound`
 #[gui_macros::ipc_group("export")]
 #[gui_macros::command]
-pub fn export_list_instance_dir(uuid: String, dir: String) -> Result<Vec<ExportEntryDto>, String> {
-    let game = instance_snapshot(&uuid)?;
-    let base = game.get_base_path();
-    let path = if dir.trim().is_empty() {
-        base.clone()
-    } else {
-        resolve_under(&base, &dir)?
-    };
-    if !path.is_dir() {
-        return Err(err_keys::FILE_NOT_FOUND.to_string());
-    }
+pub async fn export_list_instance_dir(uuid: String, dir: String) -> Result<Vec<ExportEntryDto>, String> {
+    tokio::task::spawn_blocking(move || {
+        let game = instance_snapshot(&uuid)?;
+        let base = game.get_base_path();
+        let path = if dir.trim().is_empty() {
+            base.clone()
+        } else {
+            resolve_under(&base, &dir)?
+        };
+        if !path.is_dir() {
+            return Err(err_keys::FILE_NOT_FOUND.to_string());
+        }
 
-    let online = online_of(&game);
-    list_entries(&path, &base, &online)
+        let online = online_of(&game);
+        list_entries(&path, &base, &online, !dir.trim().is_empty())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// 导出条目的文件元数据
@@ -237,12 +252,12 @@ pub(super) struct ExportMeta {
 /// 见 [`ExportMeta`]；元数据或哈希读取失败时返回错误。
 pub(super) fn export_meta(file: &Path) -> Result<ExportMeta, String> {
     let meta = std::fs::metadata(file).map_err(|e| e.to_string())?;
-    let sha1 = hash_helper::gen_hash_from_file(HashType::Sha1, file).map_err(|e| e.to_string())?;
-    let sha512 = hash_helper::gen_hash_from_file(HashType::Sha512, file).map_err(|e| e.to_string())?;
+    // 两种校验合在一次读里：分开算要把整份文件读两遍，几百个模组就是几分钟
+    let hash = hash_helper::gen_sha1_sha512_from_file(file).map_err(|e| e.to_string())?;
 
     Ok(ExportMeta {
         size: meta.len() as usize,
-        hash: FileHash::Sha1Sha512(sha1, sha512),
+        hash,
     })
 }
 #[cfg(test)]

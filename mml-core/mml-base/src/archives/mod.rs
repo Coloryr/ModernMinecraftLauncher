@@ -128,6 +128,17 @@ pub trait IBaseArchiveGui: Send + Sync {
     fn update(&self, filename: Option<String>, current: usize);
     /// 解压完成
     fn done(&self);
+    /// 处理中途问一句要不要停下来
+    ///
+    /// 逐条写入的循环每写一条问一次，回应 `true` 时调用方以 `TaskCancel` 收尾。
+    /// 默认不停，普通的进度回调不用实现。
+    ///
+    /// # 返回值
+    ///
+    /// `true` 表示应立即停止
+    fn cancelled(&self) -> bool {
+        false
+    }
     /// 条目名含非法字符时询问用户是否同意替换
     ///
     /// - `name`: 原始条目名
@@ -367,6 +378,25 @@ pub(crate) trait ArchiveHandle: Send {
     /// 不支持的格式返回 `InvalidOperation`
     fn add_files(&mut self, _files: &[ArchiveAddFile]) -> CoreResult<()> {
         Err(ErrorType::InvalidOperation)
+    }
+    /// 就地追加文件并逐条回调进度，仅支持随机可写的格式
+    ///
+    /// 与 `add_files` 的区别只在回调：每写一条前先问 `cancelled`，写完报 `update`。
+    ///
+    /// - `files`: 待追加的文件列表，见 [`ArchiveAddFile`]
+    /// - `gui`: 进度回调，`None` 时不上报也不检查取消
+    /// - `offset`: 进度起点，回调里的序号要加在它上面
+    ///
+    /// # 返回值
+    ///
+    /// 不支持的格式退回 [`add_files`](Self::add_files)
+    fn add_files_reporting(
+        &mut self,
+        files: &[ArchiveAddFile],
+        _gui: &BaseArchiveGui,
+        _offset: usize,
+    ) -> CoreResult<()> {
+        self.add_files(files)
     }
     /// 就地追加内存数据，仅支持随机可写的格式
     ///

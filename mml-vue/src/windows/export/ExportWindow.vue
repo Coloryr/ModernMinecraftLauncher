@@ -193,6 +193,11 @@ function isOnlineMod(path: string): boolean {
   return !!ids && isOnlineId(ids.modId, ids.fileId);
 }
 
+/** CurseForge 下这一条是不是因为编号不是数字而落在线外 */
+function cfIdInvalid(path: string): boolean {
+  return pack.value === "curseforge" && !isOnlineMod(path);
+}
+
 /** 有在线来源的模组：模组页只列这些，标签上的分母也用它 */
 const onlineMods = computed(() => (info.value?.mods ?? []).filter((x) => isOnlineMod(x.path)));
 
@@ -474,10 +479,22 @@ function picksOf(picked: Map<string, ExportEntryDto>) {
   }));
 }
 
-/** 文件页的勾选 → 后端入参：勾上的在前，取消掉的作为排除项跟在后面 */
+/**
+ * 文件页的勾选 → 后端入参
+ *
+ * 勾上的在前，取消掉的作为排除项跟在后面。文件页的条目一律不带在线来源：下载清单只由
+ * 模组页决定；已按模组勾上的也不再报排除，否则后端只会看到它被取消，清单和包两边都落空。
+ */
 function filePicks() {
-  const picks = picksOf(pickedFiles.value);
+  const picks = [...pickedFiles.value.keys()].map((path) => ({
+    path,
+    url: "",
+    modId: null,
+    fileId: null,
+    exclude: false,
+  }));
   for (const path of unpickedFiles.value) {
+    if (pickedMods.value.has(path)) continue;
     picks.push({ path, url: "", modId: null, fileId: null, exclude: true });
   }
   return picks;
@@ -713,12 +730,12 @@ onBeforeUnmount(() => {
                 :class="{ 'is-local': !isOnlineMod(mod.path) }">
                 <input type="checkbox" :checked="pickedMods.has(mod.path)"
                   :disabled="!isOnlineMod(mod.path)"
-                  :title="isOnlineMod(mod.path) ? undefined : t('winExport.idNotNumeric')"
+                  :title="cfIdInvalid(mod.path) ? t('winExport.idNotNumeric') : undefined"
                   @change="toggleMod(mod)" />
                 <span class="mod-name-cell">
                   <span class="mod-name" :title="mod.path">{{ mod.path.split("/").pop() }}</span>
                   <!-- 编号不成立的在 CF 里点不动：就地标出来，别让人以为是漏掉了 -->
-                  <span v-if="!isOnlineMod(mod.path)" class="mod-tag" v-tip="t('winExport.idNotNumeric')">
+                  <span v-if="cfIdInvalid(mod.path)" class="mod-tag" v-tip="t('winExport.idNotNumeric')">
                     {{ t("winExport.notCfMod") }}
                   </span>
                 </span>

@@ -186,7 +186,7 @@ impl BaseArchive {
             filter,
             gui,
         )?;
-        Self::open(output_file)
+        Self::open_read_write_as(output_file.as_ref(), archive_type)
     }
 
     /// 创建一个不含条目的空压缩包并返回已打开的状态
@@ -218,7 +218,32 @@ impl BaseArchive {
                 res?;
             }
         }
-        Self::open(output_file)
+        Self::open_read_write_as(output_file, archive_type)
+    }
+
+    /// 按给定格式以读写方式打开压缩包，不看扩展名
+    ///
+    /// 导出先把内容写进「xxx.part」这类临时文件，写的时候还没有正式名字，
+    /// 按扩展名判断格式会把临时文件当成不支持的格式。
+    ///
+    /// - `path`: 压缩包文件路径
+    /// - `archive_type`: 压缩包格式，由调用方保证与文件内容一致
+    ///
+    /// # 返回值
+    ///
+    /// 同 [`open`](Self::open)
+    fn open_read_write_as(path: &Path, archive_type: ArchiveType) -> CoreResult<Self> {
+        let path = path.to_path_buf();
+        let file = path_helper::open_read_write(&path)?;
+        let mut handle = Self::make_handle(archive_type, &path, file)?;
+        let entries = handle.read_entries()?;
+
+        Ok(Self {
+            path,
+            archive_type,
+            entries,
+            handle: Mutex::new(handle),
+        })
     }
 
     /// 解压压缩包到指定目录，无需构造 [`BaseArchive`] 实例
@@ -786,6 +811,38 @@ impl BaseArchive {
         }
     }
 
+    /// 批量追加磁盘文件，逐条报进度并随时可取消
+    ///
+    /// 与一条条调 [`add_file`](Self::add_file) 的区别在开销：zip 每追加一条都要重写一次
+    /// 中央目录并重读一遍，上千个文件就是平方级的开销；这里一次打开、写完、收尾。
+    ///
+    /// - `files`: 待追加的文件列表，见 [`ArchiveAddFile`]
+    /// - `gui`: 进度回调，`None` 时不上报也不检查取消
+    /// - `offset`: 进度起点，回调里的序号加在它上面
+    ///
+    /// # 返回值
+    ///
+    /// 写入失败或被取消时返回相应错误
+    pub fn add_files_reporting(
+        &mut self,
+        files: &[ArchiveAddFile],
+        gui: BaseArchiveGui,
+        offset: usize,
+    ) -> CoreResult<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
+        match self.archive_type {
+            ArchiveType::Zip => {
+                let mut handle = self.handle.lock().unwrap();
+                handle.add_files_reporting(files, &gui, offset)?;
+                self.entries = handle.read_entries()?;
+                Ok(())
+            }
+            _ => self.add_files(files, gui),
+        }
+    }
+
     /// 7z / tar.gz / tar.xz 的后备路径：解压到临时目录，写入文件后重压缩
     ///
     /// - `files`: 待追加的文件列表，见 [`ArchiveAddFile`]
@@ -1041,5 +1098,20 @@ mod tests {
         replace_archive(&replacement, &original).unwrap();
         assert_eq!(fs::read(&original).unwrap(), b"replacement");
         assert!(!replacement.exists());
+    }
+
+    #[test]
+    fn created_archive_opens_by_type_even_with_temp_file_name() {
+        let root = mml_testutil::temp_path(format!("archive_part_{}", Uuid::new_v4()));
+        fs::create_dir_all(&root).unwrap();
+        // 导出写的是 xxx.part：扩展名认不出格式，仍要能按 zip 继续写
+        let path = root.join("pack.zip.1234.part");
+        let mut archive = BaseArchive::create_empty(ArchiveType::Zip, &path).unwrap();
+        archive.add_data("manifest.json", b"{}").unwrap();
+        assert_eq!(archive.entries().len(), 1);
+        drop(archive);
+        let reopened = BaseArchive::open_readonly_as(&path, ArchiveType::Zip).unwrap();
+        assert_eq!(reopened.entries().len(), 1);
+        fs::remove_dir_all(&root).unwrap();
     }
 }

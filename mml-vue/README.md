@@ -46,7 +46,7 @@ cd ../mml-gui && npm run gen
 - `src/lib/api.ts` 是**手写**的便捷包装层，其中的类型一律 `import` 自 `./bindings`；
   不要在这里另写一套类型（下次生成会被覆盖，也与 Rust 侧脱节）。
 - 命令名 = 函数名 = `窗口名_方法名`（如 `main_get_instances`）；事件名由 `emit_xxx_yyy`
-  去掉 `emit_` 前缀、下划线换成 `-` 推导。完整约定见仓库根 [AGENTS.md](../AGENTS.md) §4。
+  去掉 `emit_` 前缀、下划线换成 `-` 推导。完整约定见仓库根 [`ipc-gen/`](../ipc-gen/) 的扫描实现。
 
 ## 界面约定
 

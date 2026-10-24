@@ -365,6 +365,12 @@ import type { LoadState } from "../../lib/bindings";
 const accounts = storeAccounts;
 const currentAccount = storeCurrentAccount;
 
+/** 当前是离线账户，且本机没有登录过微软正版账户：禁止启动 */
+const offlineLaunchBlocked = computed(() =>
+  currentAccount.value?.authType === "offline" &&
+  !accounts.value.some((account) => account.authType === "microsoft")
+);
+
 function onAccountChange(account: AccountStoreDto) {
   setCurrentAccount(account);
 }
@@ -575,6 +581,10 @@ function onGroupSelectAll(groupId?: string) {
 
 /** 分组菜单“启动全部”：启动该分组全部实例 */
 async function launchGroupAll(groupId?: string) {
+  if (offlineLaunchBlocked.value) {
+    showToast(t("err.offlineNeedPremium"));
+    return;
+  }
   const g = groups.value.find((x) => x.id === groupId);
   closeCtxMenu();
   if (!g || g.items.length === 0) return;
@@ -967,6 +977,10 @@ async function doMultiDelete() {
 
 /** 启动所有选中实例 */
 async function multiLaunch() {
+  if (offlineLaunchBlocked.value) {
+    showToast(t("err.offlineNeedPremium"));
+    return;
+  }
   const ids = [...selectedIds.value];
   closeCtxMenu();
   let launched = 0;
@@ -1685,6 +1699,10 @@ async function handleStartArg() {
 
 async function launch() {
   if (!selected.value || selected.value.running) return;
+  if (offlineLaunchBlocked.value) {
+    showToast(t("err.offlineNeedPremium"));
+    return;
+  }
   const uuid = selected.value.uuid;
   markLaunching(uuid);
   statusText.value = t("launch.launching");
@@ -1828,6 +1846,18 @@ onMounted(async () => {
     <!-- ===== 主界面 ===== -->
     <template v-else>
 
+      <!-- 离线启动限制：未登录过微软正版账户时，离线账户不能启动 -->
+      <section v-if="offlineLaunchBlocked" class="premium-lock" role="alert">
+        <GlyphIcon class="premium-lock-icon" name="alert" :size="16" :weight="2" />
+        <div class="premium-lock-text">
+          <strong>{{ t("launch.premiumOfflineBlocked") }}</strong>
+          <span>{{ t("launch.premiumOfflineHint") }}</span>
+        </div>
+        <BaseButton size="sm" variant="accent" @click="openWindow('account')">
+          {{ t("empty.addAccount") }}
+        </BaseButton>
+      </section>
+
       <!-- 整合包安装进度不再内嵌在这里：它改成了标题栏上的指示器 + 弹窗，
            即 ModpackTitleIndicator / ModpackPopup，否则这条卡片会一直占着内容区的高度、把列表顶下去。
            状态订阅在各处自己拿，标题栏指示器自包含；弹窗由 App.vue 渲染 -->
@@ -1843,7 +1873,7 @@ onMounted(async () => {
           <button class="multi-btn" :disabled="!canChangeGroup" v-tip="canChangeGroup ? '' : t('group.pickNone')"
             @click="openMoveFromBar">{{ t("multi.moveGroup") }}</button>
           <button class="multi-btn danger" @click="onMultiDelete">{{ t("multi.delete") }}</button>
-          <button class="multi-btn" @click="multiLaunch">{{ t("multi.launch") }}</button>
+          <button class="multi-btn" :disabled="offlineLaunchBlocked" @click="multiLaunch">{{ t("multi.launch") }}</button>
           <span class="multi-sep"></span>
           <button class="multi-exit" @click="exitMultiSelect">{{ t("multi.exit") }}</button>
         </div>
@@ -1865,8 +1895,7 @@ onMounted(async () => {
           <section v-else class="news-page">
             <HomePage :items="news" :loading="newsLoading" @refresh="fetchNews(newsPage)" :page="newsPage"
               :has-more="newsHasMore" @prev="prevNewsPage" @next="nextNewsPage" @open="openNews"
-              :current-instance="null" :empty="true" @add-instance="openAdd" @add-account="openWindow('account')"
-              @add-java="openWindow('settings')" />
+              :current-instance="null" :empty="true" @add-instance="openAdd" @add-account="openWindow('account')" />
           </section>
         </template>
 
@@ -1915,7 +1944,8 @@ onMounted(async () => {
                    见 main-window.css .launch-actions -->
               <div class="launch-actions">
                 <BaseButton variant="primary" size="lg" class="launch-main-btn"
-                  :class="{ running: selected?.running }" :disabled="!selected" @click="onLaunchAction">
+                  :class="{ running: selected?.running }" :disabled="!selected || (!selected.running && offlineLaunchBlocked)"
+                  @click="onLaunchAction">
                   <!-- 启动中：按钮里是阶段 + 进度；运行中：运行中。悬停两者都换成取消 / 关闭动作 -->
                   <span v-if="selected?.running" class="launch-busy">
                     <LaunchProgress v-if="isLaunching" :text="launchStageText" :percent="launchPct" />
@@ -2019,7 +2049,8 @@ onMounted(async () => {
                       <!-- 右侧：启动游戏用大按钮，添加 / 管理资源用小按钮 -->
                       <div class="detail-side">
                         <BaseButton variant="primary" size="lg" class="play-btn"
-                          :class="{ running: selected.running }" @click="onLaunchAction">
+                          :class="{ running: selected.running }" :disabled="!selected.running && offlineLaunchBlocked"
+                          @click="onLaunchAction">
                           <span v-if="selected.running" class="launch-busy">
                             <LaunchProgress v-if="isLaunching" :text="launchStageText" :percent="launchPct" />
                             <span v-else class="launch-running">{{ t("launch.running") }}</span>

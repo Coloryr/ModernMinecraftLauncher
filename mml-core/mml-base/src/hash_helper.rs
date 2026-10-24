@@ -15,6 +15,8 @@ use tokio::io::{AsyncRead, AsyncReadExt};
 
 use digest::{Digest, DynDigest};
 
+use crate::file_item::FileHash;
+
 /// 读流出错转 StreamError
 fn stream_err(err: impl std::fmt::Display) -> ErrorType {
     ErrorType::StreamError(ErrorData::from_error(err))
@@ -143,6 +145,36 @@ pub async fn gen_hash_from_reader_async<R: AsyncRead + Unpin>(
 pub fn gen_hash_from_file<P: AsRef<Path>>(hash_type: HashType, file: P) -> CoreResult<String> {
     let mut file = path_helper::open_read(file)?;
     gen_hash_from_reader(hash_type, &mut file)
+}
+
+/// 读一遍文件，同时算出 SHA1 与 SHA512
+///
+/// 两种校验各读一遍整份文件是导出时的瓶颈，合在一次读里
+///
+/// - `file`: 文件路径
+///
+/// # 返回值
+///
+/// 见 [`FileHash`]，恒为 [`FileHash::Sha1Sha512`]；文件无法打开或读取失败时返回相应错误
+pub fn gen_sha1_sha512_from_file<P: AsRef<Path>>(file: P) -> CoreResult<FileHash> {
+    let mut file = path_helper::open_read(file)?;
+    let mut sha1 = create_hasher(HashType::Sha1);
+    let mut sha512 = create_hasher(HashType::Sha512);
+    let mut buffer = vec![0u8; 256 * 1024];
+
+    loop {
+        let len = file.read(&mut buffer).map_err(stream_err)?;
+        if len == 0 {
+            break;
+        }
+        sha1.update(&buffer[..len]);
+        sha512.update(&buffer[..len]);
+    }
+
+    Ok(FileHash::Sha1Sha512(
+        bytes_to_hex(&sha1.finalize()).to_ascii_lowercase(),
+        bytes_to_hex(&sha512.finalize()).to_ascii_lowercase(),
+    ))
 }
 
 /// 异步从文件生成校验值

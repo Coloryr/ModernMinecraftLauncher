@@ -79,4 +79,4 @@ const off = onLaunchState((e) => console.log(e.uuid, e.state, e.progress));
 import type { ChunkFindDto, InstanceInfoDto, StateEvent } from "mml-ipc";
 ```
 
-命令 / 事件名、分组与 DTO 的生成规则见仓库根 [AGENTS.md](../AGENTS.md) §4。
+命令 / 事件名、分组与 DTO 的生成规则见仓库根 [`ipc-gen/`](../ipc-gen/) 的扫描实现。

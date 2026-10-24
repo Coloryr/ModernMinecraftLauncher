@@ -163,6 +163,7 @@ mod tests {
     use super::super::{archive, Manifest, Instance};
 
     fn fixture(extra: Option<(&str, &[u8])>) -> (PathBuf, PathBuf) {
+        crate::test_support::ensure_boot();
         let dir = crate::test_support::temp_dir("server-pack");
         let file = dir.join("pack.zip");
         let uuid = uuid::Uuid::new_v4();

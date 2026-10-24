@@ -135,8 +135,8 @@ export default {
   "list.empty": "暂无实例，点击添加",
   "empty.title": "还没有游戏实例",
   "empty.desc": "创建你的第一个游戏实例，开启 Minecraft 之旅",
+  "empty.addInstance": "添加游戏实例",
   "empty.addAccount": "添加账户",
-  "empty.setJava": "设置 Java",
 
   // 拖拽导入遮罩：只有标题（按拖入类型分）
   "drop.titleFiles": "松开以导入整合包或文件夹",
@@ -1019,6 +1019,8 @@ export default {
 
   // 启动
   "launch.play": "启动游戏",
+  "launch.premiumOfflineBlocked": "未登录微软正版账户，不能启动离线账户",
+  "launch.premiumOfflineHint": "请先在账户窗口添加并登录一个微软账户；登录过之后才能使用离线账户启动。",
   "launch.filterAll": "全部",
   "launch.filterThread": "线程",
   "launch.filterLevel": "级别",
@@ -1361,7 +1363,7 @@ export default {
 "winSettings.windowEffectNone": "关闭",
 "winSettings.windowOpacity": "窗口不透明度",
 "winSettings.tab.experimental": "实验性功能",
-"winSettings.tabDesc.experimental": "还在验证中的开关，行为未接线",
+"winSettings.tabDesc.experimental": "还在验证中的开关",
 "winSettings.secExperimental": "实验性功能",
   "winSettings.experimentalDesc": "这一组是还在验证中的开关，可能随版本变化或被移除",
   "winSettings.adminLaunch": "管理员启动",
@@ -1373,7 +1375,7 @@ export default {
   "winSettings.uriLaunchDesc": "允许通过链接直接启动实例",
   "winSettings.sandboxLaunch": "沙盒启动实例",
   "winSettings.sandboxLaunchDesc": "在隔离环境里启动实例",
-  "winSettings.experimentalWip": "以上开关目前只保存选择，功能尚未实现",
+  "winSettings.experimentalWip": "URI 启动与沙盒启动目前只保存选择；管理员启动已生效",
   "winSettings.gcMode": "GC 模式",
   "winSettings.gcAuto": "自动",
   "winSettings.gcG1gc": "G1",
@@ -2065,7 +2067,7 @@ export default {
 export const faqs: Array<{ q: string; a: string }> = [
   {
     q: "如何创建一个新的游戏实例？",
-    a: "在主界面点击列表中的“添加”，输入实例名称并选择游戏版本即可创建（需要网络下载版本信息）。",
+    a: "在主界面点「添加游戏实例」，输入实例名称并选择游戏版本即可创建（需要网络下载版本信息）。",
   },
   {
     q: "启动时提示找不到 Java 怎么办？",
@@ -2077,6 +2079,6 @@ export const faqs: Array<{ q: string; a: string }> = [
   },
   {
     q: "支持正版登录吗？",
-    a: "当前版本为离线模式启动，正版（微软）登录与第三方登录（LittleSkin 等）将在后续版本支持。",
+    a: "支持。微软正版账户走 OAuth 设备码登录，也支持 LittleSkin、外置登录、统一通行证等第三方账户；离线账户需要本机至少登录过一个微软正版账户后才能启动。",
   },
 ];

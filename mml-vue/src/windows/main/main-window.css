@@ -63,6 +63,42 @@
   flex-direction: row-reverse;
 }
 
+/* 离线启动限制：横贯内容区顶部的提示条，未登录微软账户时一直显示 */
+.premium-lock {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 18px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--yellow);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--yellow) 12%, transparent);
+  color: var(--text);
+}
+
+.premium-lock-icon {
+  flex-shrink: 0;
+  color: var(--yellow);
+}
+
+.premium-lock-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 12.5px;
+}
+
+.premium-lock-text strong {
+  font-size: 13px;
+}
+
+.premium-lock-text span {
+  color: var(--text-dim);
+}
+
 /* 侧栏槽位：展开 300px ↔ 收起 24px。
    收窄时用 overflow 裁掉侧栏内容（而非把内容压扁），停靠模式下内容区因此平滑跟随。
    宽度过渡只在用户主动收起 / 展开时挂上（.main.sidebar-anim，见 MainWindow 的 collapseSidebar）——

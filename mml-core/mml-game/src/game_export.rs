@@ -10,7 +10,7 @@ use std::{
 };
 
 use mml_base::{
-    archives::{ArchiveType, BaseArchive, BaseArchiveGui},
+    archives::{ArchiveAddFile, ArchiveType, BaseArchive, BaseArchiveGui},
     file_item::FileHash,
     serialize_tools,
 };
@@ -267,17 +267,31 @@ async fn curseforge(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()>
         }
     }
 
-    let data =
-        curseforge_api::get_mods_info(obj.files.iter().map(|item| item.project_id).collect())
-            .await?;
+    // modlist.html 只是给人看的索引，项目名与链接要联网查：查不到就写个空列表，
+    // 没有可索引的模组时干脆不查，别让网络问题把整个导出卡住
+    let mut project_ids = obj
+        .files
+        .iter()
+        .map(|item| item.project_id)
+        .filter(|id| *id > 0)
+        .collect::<Vec<_>>();
+    project_ids.sort_unstable();
+    project_ids.dedup();
     let mut html = String::from("<ul>");
-    for item in data.data {
-        html.push_str(&format!(
-            "<li><a href=\"{}\"{} (by {})</a></li>",
-            item.links.website_url,
-            item.name,
-            get_author_string(&item.authors)
-        ));
+    if !project_ids.is_empty() {
+        match curseforge_api::get_mods_info(project_ids).await {
+            Ok(data) => {
+                for item in data.data {
+                    html.push_str(&format!(
+                        "<li><a href=\"{}\"{} (by {})</a></li>",
+                        item.links.website_url,
+                        item.name,
+                        get_author_string(&item.authors)
+                    ));
+                }
+            }
+            Err(err) => mml_log::error_type(err),
+        }
     }
     html.push_str("</ul>");
 
@@ -300,7 +314,7 @@ async fn curseforge(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()>
     zip.add_data(names::MOD_LIST_FILE, &html.as_bytes())?;
 
     let path = game.get_game_path();
-    let mut index = 0;
+    let mut pending = Vec::with_capacity(arg.select.len());
 
     for item in &arg.select {
         check_cancel(&arg.cancel)?;
@@ -317,13 +331,11 @@ async fn curseforge(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()>
             format!("{}/{}", names::OVERRIDE_DIR, rel_str)
         };
 
-        if let Some(gui) = &arg.gui {
-            gui.update(Some(name.clone()), 2 + index);
-        }
-
-        zip.add_file(&name, item)?;
-        index += 1;
+        pending.push(ArchiveAddFile { src: item.clone(), dest: PathBuf::from(name) });
     }
+
+    // 一次写完：逐条 add_file 每写一条都要重写一遍中央目录
+    zip.add_files_reporting(&pending, arg.gui.clone(), 2)?;
 
     Ok(())
 }
@@ -339,6 +351,7 @@ async fn curseforge(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()>
 async fn modrinth(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
     let mut obj = ModrinthPackObj {
         format_version: 1,
+        game: String::from(names::MINECRAFT_KEY),
         version_id: arg.version,
         name: arg.name,
         summary: arg.summary,
@@ -435,7 +448,7 @@ async fn modrinth(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
 
     zip.add_data(names::MODRINTH_FILE, &serialize_tools::json_to_bytes(&obj)?)?;
 
-    let mut index = 0;
+    let mut pending = Vec::with_capacity(arg.select.len());
 
     for item in &arg.select {
         check_cancel(&arg.cancel)?;
@@ -452,13 +465,11 @@ async fn modrinth(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
             format!("{}/{}", names::OVERRIDE_DIR, rel_str)
         };
 
-        if let Some(gui) = &arg.gui {
-            gui.update(Some(name.clone()), 1 + index);
-        }
-
-        zip.add_file(&name, item)?;
-        index += 1;
+        pending.push(ArchiveAddFile { src: item.clone(), dest: PathBuf::from(name) });
     }
+
+    // 一次写完：逐条 add_file 每写一条都要重写一遍中央目录
+    zip.add_files_reporting(&pending, arg.gui.clone(), 1)?;
 
     Ok(())
 }
@@ -487,22 +498,19 @@ fn add_game_files(
     offset: usize,
     cancel: &Option<Arc<AtomicBool>>,
 ) -> CoreResult<()> {
-    for (index, item) in files.iter().enumerate() {
+    let mut pending = Vec::with_capacity(files.len());
+    for item in files {
         check_cancel(cancel)?;
         // 不在游戏目录下的文件直接跳过：包内路径只能相对它算
         let Ok(rel) = item.strip_prefix(base) else {
             continue;
         };
         let name = format!("{}/{}", prefix, rel.to_string_lossy().replace('\\', "/"));
-
-        if let Some(gui) = gui {
-            gui.update(Some(name.clone()), offset + index);
-        }
-
-        zip.add_file(&name, item)?;
+        pending.push(ArchiveAddFile { src: item.clone(), dest: PathBuf::from(name) });
     }
 
-    Ok(())
+    // 一次写完：逐条 add_file 每写一条都要重写一遍中央目录
+    zip.add_files_reporting(&pending, gui.clone(), offset)
 }
 
 /// 整包格式要打包的文件：没有下载清单，模组与文件一律进包

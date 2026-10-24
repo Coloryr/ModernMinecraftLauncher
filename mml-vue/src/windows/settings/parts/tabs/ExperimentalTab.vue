@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 设置窗口 · 实验性功能页：还在验证中的开关集中在这里，行为都没接线，只落 gui_config.experimental。
+// 设置窗口 · 实验性功能页：还在验证中的开关集中在这里；管理员启动已接线，URI / 沙盒只落配置。
 // 单独成栏（侧栏在客户端设置下面），不再挂在客户端设置页末尾。
 import { t } from "../../../../lib/i18n";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";

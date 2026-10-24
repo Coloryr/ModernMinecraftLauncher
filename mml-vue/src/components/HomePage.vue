@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 启动器主页：上次启动实例 / 联机大厅 / 方块列表 入口 + Minecraft 新闻
-// empty=true 时顶部展示空实例引导块，含添加实例按钮；此时一个实例都没有
+// empty=true 时顶部展示空实例引导块，含添加账户 / 添加游戏实例两个按钮；此时一个实例都没有
 import { t } from "../lib/i18n";
 import { buildChannel, buildNoticeKey, isTestBuild } from "../lib/buildInfo";
 import { lobbyOpening, openWindow } from "../windows/windowManager";
@@ -49,8 +49,6 @@ const emit = defineEmits<{
   (e: "add-instance"): void;
   /** 空实例引导块里的"添加账户" */
   (e: "add-account"): void;
-  /** 空实例引导块里的"设置 Java" */
-  (e: "add-java"): void;
   /** 重新拉取新闻 */
   (e: "refresh"): void;
   /** 新闻上一页 */
@@ -102,13 +100,10 @@ const emit = defineEmits<{
       <p class="empty-block-desc">{{ t("empty.desc") }}</p>
       <div class="empty-block-actions">
         <button class="empty-block-btn primary" @click="emit('add-instance')">
-          <GlyphIcon name="plus" :size="14" :weight="2.2" /> {{ t("list.add") }}
+          <GlyphIcon name="plus" :size="14" :weight="2.2" /> {{ t("empty.addInstance") }}
         </button>
         <button class="empty-block-btn" @click="emit('add-account')">
           {{ t("empty.addAccount") }}
-        </button>
-        <button class="empty-block-btn" @click="emit('add-java')">
-          {{ t("empty.setJava") }}
         </button>
       </div>
     </div>

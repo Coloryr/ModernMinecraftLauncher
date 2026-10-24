@@ -21,6 +21,9 @@ export MML_BUILD_TMP="$build_tmp"
 export TMP="$build_tmp"
 export TEMP="$build_tmp"
 
+# 版本以 build/version 为准，先同步到应用清单
+node "$root/build/set-version.mjs"
+
 # vendor 插件要先还原（cargo 解析依赖图时就要读它的 Cargo.toml，早于构建脚本）；
 # 脚本幂等，已还原过会直接跳过
 bash "$root/mml-gui/vendor/prepare.sh"

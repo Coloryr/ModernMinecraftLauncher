@@ -58,7 +58,7 @@ npm run tauri dev
 npm run gen        # = npm run vendor && cargo check
 ```
 
-命名、分组、事件名推导等规则见仓库根 [AGENTS.md](../AGENTS.md) §4。
+命名、分组、事件名推导等规则见仓库根 [`ipc-gen/`](../ipc-gen/) 的扫描实现。
 
 ## vendor：第三方插件还原
 
@@ -94,7 +94,7 @@ npm run vendor -- -Force     # 强制重新拉取
 cargo test -p mml-gui
 ```
 
-- 内核那几个系统是进程级单例，测试共用 `src/test_support.rs` 里的一份 boot（原因见 AGENTS.md §6）。
+- 内核那几个系统是进程级单例，测试共用 `src/test_support.rs` 里的一份 boot。
 - 测试的临时目录统一走 `mml-testutil`（落到根目录 `target/temp`），不要用系统 `%TEMP%`。
 - `tests/colormc/` 是从真实 ColorMC 工作目录裁出的迁移测试样本（用例在 `src/windows/colormc.rs`），
   见该目录的 [README](src-tauri/tests/colormc/README.md)。

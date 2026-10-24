@@ -22,6 +22,10 @@ $env:MML_BUILD_TMP = $buildTmp
 $env:TMP = $buildTmp
 $env:TEMP = $buildTmp
 
+# 版本以 build/version 为准，先同步到应用清单
+node (Join-Path $root 'build\set-version.mjs')
+if ($LASTEXITCODE -ne 0) { throw '版本同步失败，已中止构建。' }
+
 # vendor 插件要先还原（cargo 解析依赖图时就要读它的 Cargo.toml，早于构建脚本）；
 # 脚本幂等，已还原过会直接跳过
 powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'mml-gui\vendor\prepare.ps1')
@@ -51,4 +55,4 @@ finally {
 
 Write-Host "产物: $(Join-Path $root 'target\prerelease\mml-gui.exe')"
 
-if (-not [Console]::IsInputRedirected) { Read-Host '按回车关闭' }
+if (-not [Console]::IsInputRedirected -and -not $env:CI) { Read-Host '按回车关闭' }

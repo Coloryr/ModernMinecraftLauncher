@@ -26,8 +26,9 @@
   `cargo check --workspace --all-targets` / `cargo test --workspace` / 整仓全量测试；
   同一结论不要重复跑第二遍（改了代码再验一次除外）。
 - 桌面壳：`cd mml-gui && npm run tauri dev`（会先起 mml-vue 的 vite，**端口 1420 必须空闲**）。
-- 只跑前端：`build/dev-frontend.ps1`（bash 版 `build/dev-frontend.sh`；vite，1420）；
-  浏览器可访问 `http://localhost:1420/?window=<kind>` 预览某个窗口（无 IPC 数据）。
+- 只跑前端：`build/dev-frontend.ps1`（bash 版 `build/dev-frontend.sh`；vite，1420）。
+  只在 Rust 后端以 debug 模式单独运行（`cargo run`）时配合使用；`tauri dev` 已自带 vite，
+  不要同时起。浏览器直连只能看到无 IPC 数据的空状态。
 - **出包两个 profile**（各自独立 target 目录，来回切不会互相刷缓存）：
   - 正式发布：`build/build-release.ps1`（bash 版 `build/build-release.sh`；
     = `cd mml-gui && npm run tauri build`）。

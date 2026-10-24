@@ -23,6 +23,10 @@ $env:MML_BUILD_TMP = $buildTmp
 $env:TMP = $buildTmp
 $env:TEMP = $buildTmp
 
+# 发布版本以 build/version 为准，先同步到应用清单
+node (Join-Path $root 'build\set-version.mjs')
+if ($LASTEXITCODE -ne 0) { throw '版本同步失败，已中止构建。' }
+
 # vendor 插件（tauri-plugin-decoration）要先还原：它由 patch 打到上游源码上，
 # 而 cargo 解析依赖图时就要读它的 Cargo.toml，早于任何构建脚本，必须在这里先跑。
 # 脚本幂等，已还原过会直接跳过。
@@ -39,6 +43,11 @@ finally {
     Pop-Location
 }
 
+# 把 Tauri 的安装包按 build/version 重命名后集中到 build_out/
+Write-Host '正在收集安装包到 build_out ...'
+node (Join-Path $root 'build\package-release.mjs')
+if ($LASTEXITCODE -ne 0) { throw "安装包收集失败（退出码 $LASTEXITCODE）" }
+
 # 右键「使用 PowerShell 运行」时窗口会在结束时关掉，停一下看输出；
 # 非交互（管道 / 自动化）不问，免得卡住
-if (-not [Console]::IsInputRedirected) { Read-Host '按回车关闭' }
+if (-not [Console]::IsInputRedirected -and -not $env:CI) { Read-Host '按回车关闭' }

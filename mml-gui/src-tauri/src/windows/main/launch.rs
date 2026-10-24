@@ -107,11 +107,7 @@ pub(crate) async fn launch_game(
     // 离线账户的启动前提是本机登录过正版（微软）账户：皮肤站 / 外置登录不算证明，只认 OAuth。
     // 与 ColorMC 同一处（GameBinding.LaunchAsync → UserBinding.GetLaunchUser），
     // 那边拒绝时顺手把官网打开，引导用户去登录 / 购买
-    if auth.auth_type == AuthType::Offline
-        && !auths::get_all()
-            .iter()
-            .any(|account| account.auth_type == AuthType::OAuth)
-    {
+    if offline_needs_premium(auth.auth_type, auths::check_online_user()) {
         mml_sys::open_helper::open_url("https://www.minecraft.net/");
         return Err(err_keys::OFFLINE_NEED_PREMIUM.to_string());
     }
@@ -507,4 +503,29 @@ fn emit_launch_state(app: &AppHandle, event: StateEvent) {
 #[gui_macros::emit]
 fn emit_game_exit(app: &AppHandle, event: ExitEvent) {
     let _ = app.emit(listens::GAME_EXIT, event);
+}
+
+/// 离线账户是否缺少正版登录前提
+///
+/// - `auth_type`: 本次启动使用的账户类型
+/// - `has_premium`: 本机是否至少登录过一个微软正版账户
+///
+/// # 返回值
+///
+/// 离线账户且没有正版登录记录时返回 `true`
+fn offline_needs_premium(auth_type: AuthType, has_premium: bool) -> bool {
+    auth_type == AuthType::Offline && !has_premium
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn offline_launch_requires_a_premium_login() {
+        assert!(offline_needs_premium(AuthType::Offline, false));
+        assert!(!offline_needs_premium(AuthType::Offline, true));
+        assert!(!offline_needs_premium(AuthType::OAuth, false));
+        assert!(!offline_needs_premium(AuthType::Nide8, false));
+    }
 }

@@ -79,7 +79,11 @@ for p in "${PATCHES[@]}"; do
 
     # 逐个文件确认 patch **真的**改了东西。
     # 之前踩过：git apply 报 "Skipped patch" 却退出码 0，什么都没改 —— 靠这个兜住。
-    mapfile -t touched < <(sed -n 's|^+++ b/||p' "$p")
+    # 不用 mapfile：macOS 自带的 bash 3.2 没有它，CI 上会直接失败
+    touched=()
+    while IFS= read -r touched_file; do
+        touched+=("$touched_file")
+    done < <(sed -n 's|^+++ b/||p' "$p")
 
     # 产物落在 target/ 下 —— 那属于**本仓库**。git apply 在仓库内会以仓库根为
     # 基准解析补丁路径（src/js/... → <repoRoot>/src/js/...，不存在），

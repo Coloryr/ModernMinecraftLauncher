@@ -151,7 +151,7 @@ watch(
         @click="row.entry.dir ? toggleDir(row.entry.path) : toggleRow(row.entry)">{{
           row.entry.path.split("/").pop()
         }}</span>
-      <span class="tree-size">{{ sizeText(row.entry.size) }}</span>
+      <span class="tree-size">{{ row.entry.dir ? "—" : sizeText(row.entry.size) }}</span>
     </div>
   </div>
 </template>

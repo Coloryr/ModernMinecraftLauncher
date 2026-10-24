@@ -4,3 +4,5 @@
 /mml-core/mml-sys/tests/text_diff_big*
 .DS_Store
 /target
+# 发布产物：build-release 按 build/version 重命名后集中到这里
+/build_out

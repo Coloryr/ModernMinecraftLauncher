@@ -8,216 +8,244 @@
 
 **未完成，请勿使用任何东西~~也不要催~~**
 
-## 未来计划
-- 实验性功能：模组映射
-- 跨版本迁移助手
-- 大屏手柄模式
-- 文件占用分析
-- 手柄设置
-- 模组二分模式
+> **重要限制**：未登录过微软正版账户时，启动器禁止启动离线账户。请先添加并登录一个微软账户。
 
-## 待完成列表
-- MCMOD搜索
-- 简易崩溃分析
-- 简易Mixin分析
-- 手柄模式
-- 存档云同步(ColorMC)
-- 服务器列表导入导出
-- 映射大厅 / 联机
-- 客户端导出(服务器模式包)
-- 服务器实例生成
-- 启动器自更新
-- 管理员启动
-- 生成实例信息
-- 导出模组列表
-- 窗口全屏和占满
-
-## 技术栈
-
-- **内核**：Rust workspace（`mml-core/` 本体 + 18 个子 crate，edition 2024）
-- **界面**：Tauri 2 桌面壳（`mml-gui/`）+ Vue 3 / Vite 前端（`mml-vue/`）
-- **IPC**：Rust 源码是命令与 DTO 的唯一来源，`ipc-gen` 生成独立的 npm 契约包 `mml-ipc`，
-  启动器前端与自定义主页面共用
-- **渲染**：wgpu（方块 / 物品图标、皮肤与披风 2D / 3D）+ glow（皮肤模型预览）
+<p align="center">
+  <img src="pics/image.png" width="900" alt="M²L 主界面">
+</p>
 
 ## 功能
 
 | 模块 | 说明 |
 | --- | --- |
-| 实例 | 新建、导入（文件夹 / 压缩包 / URL）、重命名、分组排序、导出为 CurseForge / Modrinth 整合包、删除；多个实例可同时运行 |
-| 加载器 | Forge、NeoForge、Fabric、Quilt、OptiFine、LiteLoader，以及自定义加载器 |
+| 实例 | 新建、导入（文件夹 / 压缩包 / URL）、重命名、分组排序、删除；多个实例可同时运行 |
+| 加载器 | Forge、NeoForge、Fabric、Quilt、Cleanroom、OptiFine、LiteLoader，以及自定义加载器 |
 | 整合包 | CurseForge / Modrinth 搜索、详情、按文件安装（带进度与取消） |
 | 资源管理 | 模组（分组 / 启用停用 / 备注）、资源包、光影包、存档（备份与还原）、截图、结构文件、数据包、服务器列表 |
-| 账户 | 离线、微软 OAuth、Nide8、Authlib-Injector、LittleSkin、自建 LittleSkin 六种认证 |
+| 账户 | 离线（需先登录过微软账户）、微软 OAuth、Nide8、Authlib-Injector、LittleSkin、自建 LittleSkin 六种认证 |
 | Java | 扫描本机 Java；从 Adoptium / Zulu / OpenJ9 / Foojay 下载 JRE / JDK |
 | 下载 | 多线程、断点续传、哈希校验，带独立的下载管理窗口 |
 | 渲染 | 从客户端 jar 离线渲染方块 / 物品图标；皮肤、披风、头像的 2D / 3D 绘制 |
-| 迁移 | 从 ColorMC / HMCL / MMC / 官方启动器导入数据 |
-| 界面 | 多窗口与单窗口两种模式，暗色 / 亮色 / 跟随系统，中英双语；可导入自定义主页面、注入自定义 CSS，或整页重写主窗口 |
+| 迁移 | 从 ColorMC 迁移数据；HMCL / MMC / 官方启动器通过实例导入 |
+| 联机 | 陶瓦联机：正版账户验证、创建 / 加入房间、邀请码与直连地址；映射大厅预留 |
+| 统计 | 每日游玩时间图、实例明细、启动次数与失败统计 |
+| 分发 | 实例导出（直接压缩 / CurseForge / Modrinth / MMC / HMCL）、生成实例信息、服务器包 |
+| 界面 | 多窗口与单窗口两种模式，暗色 / 亮色 / 跟随系统，中英双语；可导入自定义主页面、样式包，或整页重写主窗口 |
 
-## 目录结构
+## 快速上手
 
-| 目录 | 职责 |
-| --- | --- |
-| `mml-core/` | 启动器内核，多 crate：游戏启动、版本管理、Mod 加载器、整合包、下载、认证、Java 管理、网络 API（Mojang / Modrinth / CurseForge / Fabric 等）、皮肤与贴图渲染、NBT 解析等 |
-| `mml-gui/` | Tauri 桌面壳；窗口规格与 IPC 命令在 `src-tauri/src/windows/`，命令与 DTO 由 `ipc-gen` 扫描生成到 `mml-ipc` |
-| `mml-vue/` | 前端（Vue3 + Vite）；窗口在 `src/windows/`，通用组件在 `src/components/` |
-| `ipc-gen/` | IPC 契约生成器（`gui-ipc-gen`）与过程宏（`ipc-gen/macros`，`gui-macros`） |
-| `mml-ipc/` | npm 契约包：按来源拆分的跨 IPC 类型、命令包装、事件订阅函数与自定义主页 `window.mml` 契约，`mml-vue` 与 `custom/` 下的示例共用 |
-| `custom/` | 四个自定义界面示例：`custom-main-demo/`（自定义主页面）、`custom-ui-demo/`（整页主题 · 组件）、`custom-ui-html-demo/`（整页主题 · HTML）、`custom-ui-css-demo/`（自定义 CSS）；各自构建出可直接导入启动器的 zip，用法见 [custom/README.md](custom/README.md) |
-| `build/` | 构建脚本（正式发布 / 预发布 / 只跑前端），每个都有 PowerShell 版与 bash 版 |
-| `design/` | 程序图标的 SVG 源文件；改完用 `tauri icon` 重新生成各平台图标 |
+从源码构建后运行程序，首次使用建议按这个顺序：
 
-各子项目各有 README：[mml-gui](mml-gui/README.md)、[mml-vue](mml-vue/README.md)、
-[custom](custom/README.md)（四个示例各自的说明也在里面）、[mml-ipc](mml-ipc/README.md)。
+1. 在顶栏的账户选择器里添加账户；离线账户填名字即可，微软账户走设备码登录。
+2. 点「添加游戏实例」新建实例，或导入压缩包 / 文件夹 / 在线地址。
+3. 选中实例点启动；启动时自动扫描 Java 并按版本挑选，首次启动还会补全核心、运行库与资源文件。
 
-### IPC 契约：Rust 是唯一来源
+完整说明见[软件手册](docs/README.md)。
 
-```text
-mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
-  命令 #[gui_macros::command] ──▶ 扫描 + 生成 ──▶ bindings.ts（createCommands + DTO）
-  事件 #[gui_macros::emit]                        listens.ts（事件名常量）
-                                                       │
-                                       ┌───────────────┴───────────────┐
-                                       ▼                               ▼
-                              mml-vue（Tauri invoke）      custom-main-demo（window.mml 桥接）
+## 构建与运行
+
+### 环境要求
+
+- **通用**：Rust stable（edition 2024，需 1.85+）、Node.js 20.19+ 或 22.12+（Vite 8 要求，建议 LTS）。
+- **Windows**：Rust 的 MSVC 工具链、Visual Studio 生成工具（勾选「使用 C++ 的桌面开发」）、
+  WebView2 运行时（Windows 11 和较新的 Windows 10 已自带）。
+- **Linux**：Tauri 2 需要的 WebKitGTK 4.1 等系统依赖。
+- **macOS**：Xcode Command Line Tools。
+
+Rust workspace 在仓库根目录，首次构建会编译全部内核与桌面壳，耗时较长。克隆仓库后先跑一次
+初始化脚本装依赖：
+
+```bash
+build/init.ps1      # Windows
+bash build/init.sh  # Linux / macOS / Git Bash
 ```
 
-- 新增命令加 `#[gui_macros::command]`（过程宏在 `ipc-gen/macros/`，展开成 Tauri 的命令宏），
-  新增事件加 `#[gui_macros::emit]`；改完跑 `cd mml-gui && npm run gen`（或任意 `cargo check`）。
-- `mml-ipc/src/` 下的 `types/`、`bindings.ts`、`listens.ts` 是生成产物，**不要手改**：DTO 按
-  来源 .rs 拆在 `types/` 下（`types/index.ts` 是 barrel），`bindings.ts` 是 `createCommands(invoke)`
-  命令包装，`listens.ts` 是事件名、payload 类型映射与 `createEvents(on)` 订阅函数。
-  命令与事件都不绑定传输层，调用方自己给 `invoke` / `on`；`mml-vue/src/lib/bindings.ts` 只是
-  绑定 Tauri `invoke` 的兼容层。
-- 自定义主页面的 `window.mml` 契约（`MmlApi`、白名单事件）在 `mml-ipc/src/home.ts`，手写、
-  不参与扫描；`custom-main-demo` 从这里取类型、事件名与生成的 `onXxx` 函数，不再自建一份。
-- 生成规则、分组方式与常见坑见 [AGENTS.md](AGENTS.md) §4；包内用法见 [mml-ipc/README.md](mml-ipc/README.md)。
+脚本只装 `mml-vue` 与 `mml-gui` 的 npm 依赖，不构建、不启动程序。
 
-## 开发与构建
+### 开发运行
 
-依赖：Rust（含 cargo）、Node.js。`mml-vue/` 与前三个示例各自 `npm install`；
-示例的 `mml-ipc` / `mml-vue` 由 `scripts/deps.mjs` 在安装前链接到本仓库，仓库不在时
-自动浅克隆一份，不需要单独发布。`custom-ui-html-demo` 没有 npm 依赖，不用 install。
+```bash
+cd mml-gui
+npm run tauri dev
+```
+
+`npm run tauri` 会先还原本地 vendor 插件（`tauri-plugin-decoration` 的 patch），再启动
+`mml-vue` 的 Vite 服务器并打开桌面窗口。**端口 1420 必须空闲**；改前端会热更新，改 Rust 会重新编译。
+
+`build/dev-frontend` 只启动 Vite，不启动桌面壳。它只在 **Rust 后端以 debug 模式单独运行** 时
+配合使用：先跑这个脚本起前端，另开终端在 `mml-gui` 里 `npm run vendor` 还原插件，再到
+`mml-gui/src-tauri` 用 `cargo run` 启动 debug 后端（debug 构建会连 `devUrl`）。
+
+```bash
+build/dev-frontend.ps1    # Windows
+build/dev-frontend.sh     # Linux / macOS / Git Bash
+```
+
+`npm run tauri dev` 已经自带 Vite，不要再同时运行这个脚本，否则端口 1420 会冲突。
+直接在浏览器打开 `http://localhost:1420/?window=<kind>` 只能看到没有 IPC 数据的空状态，
+不能替代桌面调试。
+
+### 出包
+
+| 目标 | 命令 | 产物 |
+| --- | --- | --- |
+| 正式发布 | `build/build-release.ps1`（或 `.sh`） | `build_out/` 下带版本号的安装包；Tauri 原始产物在 `target/release/bundle/` |
+| 预发布 | `build/build-prerelease.ps1`（或 `.sh`） | `target/prerelease/mml-gui.exe` |
+
+- 正式发布用 fat LTO + `codegen-units = 1`，体积最小、运行最快；末尾的跨 crate 优化只能单线程跑，
+  构建期间只会看到一个核在工作。
+- 预发布用 thin LTO + `codegen-units = 16`，快很多，体积略大；主界面会显示「预发布版」。
+- 两个 profile 各有独立 target 子目录（`target/release` / `target/prerelease`），来回切不会互相刷缓存。
+
+两个出包脚本都有 PowerShell 版与 bash 版，做的是同一件事。预发布也要安装包、或想调整 profile，
+见[开发与构建](docs/development.md)。
+
+### 版本与发布
+
+发布版本从 **v0.0.1** 开始。版本号的唯一来源是 [`build/version`](build/version)：文件里写
+数字版本 `0.0.1`，Git 标签写 `v0.0.1`。
+
+1. 改 `build/version`。
+2. 跑 `build/build-release.ps1`（Windows）或 `bash build/build-release.sh`（Linux / macOS）。
+   脚本会先把版本同步到 `mml-gui/src-tauri/Cargo.toml`、`tauri.conf.json` 与 `mml-gui/package.json`，
+   再开始构建。
+3. 安装包会按版本重命名后集中到 `build_out/`，该目录不入库：
+
+| 平台 | 产物示例 |
+| --- | --- |
+| Windows | `mml-windows-x64-0.0.1.msi`、`mml-windows-x64-0.0.1-setup.exe` |
+| Linux | `mml-linux-x64-0.0.1.deb`、`mml-linux-x64-0.0.1.rpm`、`mml-linux-x64-0.0.1.AppImage` |
+| macOS | `mml-macos-arm64-0.0.1.dmg` |
+
+本地只会构建当前系统，三平台齐全靠 GitHub Actions：
+[`.github/workflows/release.yml`](.github/workflows/release.yml)。
+
+| 触发 | 行为 |
+| --- | --- |
+| 推送 `v*` 标签（如 `v0.0.1`） | 先校验 `build/version` 与标签一致，再并行构建 Windows / Linux / macOS，最后汇总成一个 GitHub Release |
+| 推送 `releases/**` 分支 | 只构建并把产物传成 Actions artifact，不发 Release，用于验证 |
+| Actions 页面手动 `workflow_dispatch` | 同上，验证用 |
+
+走 CI 发版只要三步：改 `build/version`、提交、`git tag v0.0.1 && git push origin v0.0.1`。
+CI 每个平台都走同一套脚本（`build/init.*` 装依赖、`build/build-release.*` 出包），
+产物名与本地一致。细节见[开发与构建](docs/development.md#自动化构建github-actions)。
+
+### 其它常用命令
 
 | 命令 | 说明 |
 | --- | --- |
-| `cd mml-gui && npm run tauri dev` | 桌面开发模式（会先还原 vendor 插件并起 vite，端口 1420 必须空闲） |
-| `build/dev-frontend.ps1` | 只跑前端（vite，浏览器访问 `http://localhost:1420/?window=<kind>` 预览窗口，无 IPC 数据） |
-| `build/build-release.ps1` | 正式发布构建（fat LTO，含安装包） |
-| `build/build-prerelease.ps1` | 预发布构建（thin LTO，只出 exe，更快） |
 | `cd mml-gui && npm run gen` | 改过 Rust 侧命令 / DTO 后重新生成 `mml-ipc` 契约 |
-| `cd mml-gui && npx tauri icon ../design/icon/f-blend.svg` | 改过程序图标后重新生成 `src-tauri/icons/`；会顺带产出 `android/` 与 `ios/`，桌面端用不到可删 |
-| `cd custom/custom-main-demo && npm run build` | 构建自定义主页面示例并打包成 `custom-main-demo.zip`（四个示例的用法见 [custom/README.md](custom/README.md)） |
+| `cd mml-vue && npm run build` | 只构建前端到 `mml-vue/dist/` |
+| `cd mml-vue && npm run lint` | 前端 lint |
+| `cd mml-vue && npm test` | 前端单测 |
+| `cargo test -p <crate>` | 只跑改动相关的 Rust 测试，不要整仓全量测试 |
+| `cd mml-gui && npx tauri icon ../design/icon/f-blend.svg` | 改过程序图标后重新生成各平台图标 |
 
-上面三个脚本都在 `build/` 下，各有一份 PowerShell 版（`.ps1`，Windows）与 bash 版
-（`.sh`，Linux / macOS / Git Bash），做的是同一件事。
+IPC 生成规则与构建配置细节见[开发与构建](docs/development.md)。
 
-测试按改动范围只跑相关的那几个：`cargo test -p <crate>`（不要整仓全量测试）。
+## 项目结构
 
-协作约定（IPC 生成、窗口模型、临时目录、日志调试等）统一写在 [AGENTS.md](AGENTS.md)。
+```text
+ModernColoryrMinecraftLauncher/
+├─ Cargo.toml                      Rust workspace 清单（收编内核、桌面壳与 ipc-gen）
+├─ mml-core/                       启动器内核，Rust workspace 主体
+│  ├─ src/                         内核总入口：init / load / stop
+│  ├─ mml-base/                    基础库：JSON/TOML、哈希、压缩包、事件、版本号
+│  ├─ mml-config/                  全局配置读写、延迟保存与版本迁移
+│  ├─ mml-log/                     异步日志
+│  ├─ mml-names/                   目录 / 文件名常量、保留 uuid、i18n
+│  ├─ mml-game/                    实例创建 / 导入 / 启动、版本与加载器、整合包
+│  ├─ mml-downloader/              多线程下载、断点续传、哈希校验
+│  ├─ mml-auth/                    离线 / 微软 OAuth / Nide8 / Authlib-Injector 认证
+│  ├─ mml-jvms/                    Java 扫描、版本与架构匹配
+│  ├─ mml-net/                     HTTP 客户端与 Mojang / Modrinth / CurseForge 等 API
+│  ├─ mml-ipc/                     启动器与游戏进程的本机 IPC
+│  ├─ mml-nbt/                     NBT 与区块读写
+│  ├─ mml-analysis/                崩溃日志分析
+│  ├─ mml-skin/                    皮肤类型识别与位图读写
+│  ├─ mml-skin-draw/               皮肤 / 披风 / 头像的 2D / 3D 渲染
+│  ├─ mml-tex-draw/                方块 / 物品图标离线渲染
+│  ├─ mml-gpu/                     公共 wgpu 离屏渲染后端
+│  ├─ mml-sys/                     进程 / 路径 / 内存 / 剪贴板等系统交互
+│  └─ mml-testutil/                测试临时目录工具
+├─ mml-gui/                        Tauri 2 桌面壳
+│  ├─ src-tauri/src/windows/       各窗口规格、模型与 IPC；registry / geometry / lifecycle 是共用窗口逻辑
+│  ├─ src-tauri/src/dtos/          跨 IPC 的 DTO
+│  ├─ src-tauri/src/               入口、GUI 配置、托盘、图片 / 自定义页面协议
+│  ├─ src-tauri/tests/             集成测试与迁移样本
+│  ├─ src-tauri/capabilities/      Tauri 权限
+│  └─ vendor/                      tauri-plugin-decoration 的 patch 与还原脚本
+├─ mml-vue/                        前端（Vue 3 + Vite + TypeScript）
+│  ├─ src/windows/                 各窗口页面，与后端窗口一一对应
+│  ├─ src/components/              跨窗口组件；ui/ 是基础控件
+│  ├─ src/lib/                     命令包装、i18n、主题、自定义界面等
+│  ├─ src/styles/                  全局样式与主题变量
+│  ├─ src/composables/             通用组合式函数
+│  ├─ src/generated/               gen-ui 生成的控件清单与样式出口
+│  └─ scripts/gen-ui.ts            生成 UI 出口
+├─ mml-ipc/                        npm 契约包
+│  └─ src/
+│     ├─ types/                    生成的 DTO，按来源 .rs 拆分
+│     ├─ bindings.ts               生成的命令包装
+│     ├─ listens.ts                生成的事件名、payload 映射与订阅函数
+│     ├─ home.ts                   自定义主页 window.mml 契约（手写）
+│     └─ customUi.ts               自定义界面类型与上下文（手写）
+├─ ipc-gen/                        IPC 代码生成器
+│  ├─ src/                         扫描 Rust 源码并生成 TypeScript
+│  └─ macros/                      命令 / 事件标记过程宏（gui-macros）
+├─ custom/                         四种自定义界面示例，各自构建成可导入的 zip
+│  ├─ custom-main-demo/            自定义主页面（home）
+│  ├─ custom-ui-demo/              整页主题 · Vue 组件（page）
+│  ├─ custom-ui-html-demo/         整页主题 · HTML（page）
+│  └─ custom-ui-css-demo/          自定义 CSS（css）
+├─ mml-theme-studio/               独立的主题开发工具（Tauri + Vue + Monaco）
+│  ├─ src/                         编辑器界面
+│  ├─ src-tauri/src/               项目 / 文件 / 子进程 / 预览服务
+│  └─ preview/                     预览脚本
+├─ .github/workflows/              GitHub Actions：三平台构建与发版
+├─ build/
+│  ├─ version                      发布版本，发版时只改这里
+│  ├─ set-version.mjs              把版本同步到应用清单
+│  ├─ package-release.mjs          安装包按版本重命名后收集到 build_out/
+│  └─ *.ps1 / *.sh                 初始化、开发、正式发布与预发布脚本
+├─ design/                         程序图标 SVG 源文件
+├─ docs/                           软件手册、开发与构建、开源许可
+└─ pics/                           README 截图
+```
 
-## 开源许可与第三方组件
+各子项目的详细说明见其 README：[mml-gui](mml-gui/README.md)、[mml-vue](mml-vue/README.md)、
+[mml-ipc](mml-ipc/README.md)、[custom](custom/README.md)、[mml-theme-studio](mml-theme-studio/README.md)。
 
-本体以 **Apache-2.0** 发布（见下文[许可证](#许可证)）。安装包内含下列第三方组件；
-**许可全文不随安装包分发**，同一份清单与上游入口也放在应用内「帮助 → 开源许可」里；
-另有本项目会去调用的第三方服务，见文末[第三方服务与平台](#第三方服务与平台)。
+## 文档
 
-### 内嵌的 Java 组件
+| 文档 | 内容 |
+| --- | --- |
+| [软件手册](docs/README.md) | 完整软件手册：第一次启动、实例、资源、账户、Java、联机、设置、数据备份与排错 |
+| [开发与构建](docs/development.md) | 技术栈、IPC 契约、构建配置、GitHub Actions 发版 |
+| [开源许可](docs/licensing.md) | 内嵌组件、前端库、Rust 依赖、第三方服务与许可说明 |
 
-| 组件 | 版本 | 许可 | 上游 |
-| --- | --- | --- | --- |
-| ColorASM | 1.1 | Apache-2.0，本项目作者作品 | [Coloryr/ColorMC](https://github.com/Coloryr/ColorMC) |
-| ForgeWrapper | prism-2025-12-07 | MIT | [ZekerZhayard/ForgeWrapper](https://github.com/ZekerZhayard/ForgeWrapper) |
-| OptifineWrapper | 1.1 | MIT | [Coloryr/OptifineWrapper](https://github.com/Coloryr/OptifineWrapper) |
+## 未来计划
+- 实验性功能：模组映射
+- 跨版本迁移助手
+- 大屏手柄模式
+- 手柄设置
+- 模组二分模式
 
-三个都是 `include_bytes!` 编进二进制的，首次使用时写到 `libraries/` 下。
+## 待完成列表
+- MCMOD搜索
+- 手柄模式
+- 存档云同步(ColorMC)
+- 映射大厅 / 联机
+- 客户端导出(服务器模式包)
+- 服务器实例生成
+- 启动器自更新
 
-### 自绘标题栏插件
+## 反馈
 
-| 组件 | 版本 | 许可 | 上游 |
-| --- | --- | --- | --- |
-| tauri-plugin-decoration | 3.0.5 | MIT | [oovz/tauri-plugin-decoration](https://github.com/oovz/tauri-plugin-decoration) |
-
-本仓库对它只维护一个 patch（[mml-gui/vendor/patches/](mml-gui/vendor/patches/)），改动处已标
-「M²L 本地修改」；上游源码按固定 commit 拉到 `target/vendor/`，仓库里不存第三方源码副本。
-
-### 前端库（打进 `dist/`）
-
-| 组件 | 版本 | 许可 | 上游 |
-| --- | --- | --- | --- |
-| vue | 3.5.43 | MIT | [vuejs/core](https://github.com/vuejs/core) |
-| @tauri-apps/api | 2.12.2 | Apache-2.0 OR MIT | [tauri-apps/tauri](https://github.com/tauri-apps/tauri) |
-| @tauri-apps/plugin-dialog | 2.8.1 | MIT OR Apache-2.0 | [tauri-apps/plugins-workspace](https://github.com/tauri-apps/plugins-workspace) |
-| monaco-editor | 0.56.0 | MIT | [microsoft/monaco-editor](https://github.com/microsoft/monaco-editor) |
-| vscode `extensions/log`（日志语法，本项目转写为 Monarch） | main | MIT | [microsoft/vscode](https://github.com/microsoft/vscode/blob/main/extensions/log/syntaxes/log.tmLanguage.json) |
-| dompurify | 3.4.16 | Apache-2.0 | [cure53/DOMPurify](https://github.com/cure53/DOMPurify) |
-| marked | 18.1.0 | MIT | [markedjs/marked](https://github.com/markedjs/marked) |
-| three | 0.156.1 | MIT | [mrdoob/three.js](https://github.com/mrdoob/three.js) |
-| skinview3d | 3.4.2 | MIT | [bs-community/skinview3d](https://github.com/bs-community/skinview3d) |
-| skinview-utils | 0.7.1 | MIT | [bs-community/skinview-utils](https://github.com/bs-community/skinview-utils) |
-| @vue-flow/core | 1.48.2 | MIT | [bcakmakoglu/vue-flow](https://github.com/bcakmakoglu/vue-flow) |
-| @vue-flow/background | 1.3.2 | MIT | [bcakmakoglu/vue-flow](https://github.com/bcakmakoglu/vue-flow) |
-| @dagrejs/dagre | 3.1.1 | MIT | [dagrejs/dagre](https://github.com/dagrejs/dagre) |
-
-dompurify 上游是 `MPL-2.0 OR Apache-2.0`，本项目按 Apache-2.0 履行；
-monaco-editor 自身还打包了 marked 14.0.0（MIT）、dompurify 3.4.8（Apache-2.0）与 Codicon 字体（MIT）。
-
-### Rust 静态链接依赖
-
-`cargo metadata` 的非 dev 依赖闭包共 **475** 个 crate，全部为宽松许可，无 GPL / AGPL / LGPL：
-
-| 许可表达式 | 数量 | 许可表达式 | 数量 |
-| --- | --- | --- | --- |
-| MIT OR Apache-2.0 | 233 | Unlicense OR MIT | 10 |
-| MIT | 82 | BSD-3-Clause | 8 |
-| Apache-2.0 OR MIT | 39 | MPL-2.0 | 6 |
-| MIT/Apache-2.0 | 18 | ISC | 5 |
-| Unicode-3.0 | 18 | 其余 29 种表达式 | 46 |
-| Apache-2.0 | 10 | | |
-
-其中 6 个是 **MPL-2.0**（文件级弱 copyleft，本项目未修改其源码，按许可要求给出源码位置）：
-[cssparser](https://crates.io/crates/cssparser)、
-[cssparser-macros](https://crates.io/crates/cssparser-macros)、
-[dtoa-short](https://crates.io/crates/dtoa-short)、
-[dwrote](https://crates.io/crates/dwrote)、
-[option-ext](https://crates.io/crates/option-ext)、
-[selectors](https://crates.io/crates/selectors)。
-各许可原文见 [SPDX 许可列表](https://spdx.org/licenses/)。
-
-### 第三方服务与平台
-
-下列服务由第三方运营，本项目只是调用方，与它们没有隶属关系；使用对应功能要用你自己的账号。
-应用内同样在「帮助 → 第三方服务与平台」里给了这些入口。
-
-| 服务 | 用途 | 链接 |
-| --- | --- | --- |
-| Minecraft（Mojang / Microsoft） | 游戏本体与官方资源由 Mojang / Microsoft 分发；本启动器是第三方软件，与它们没有隶属关系 | [minecraft.net](https://www.minecraft.net/) |
-| SakuraFrp | 联机（内网穿透）平台，后端接口见 [sakurafrp_api.rs](mml-core/mml-net/src/sakurafrp_api.rs) | [用户中心](https://www.natfrp.com/user/) |
-| OpenFrp | 联机（内网穿透）平台，后端接口见 [openfrp_api.rs](mml-core/mml-net/src/openfrp_api.rs) | [控制台](https://console.openfrp.net/home/) · [API 文档](https://github.com/ZGIT-Network/OPENFRP-APIDOC) |
-
-### 测试样本
-
-`mml-core/mml-game/tests/` 与 `mml-gui/src-tauri/tests/` 下的样本（AllMusic 各加载器版本、
-各上游启动器的实例样本等）**只用于测试，不随发行包分发**；其中 AllMusic 与本项目的
-ColorASM 均为本项目作者的作品，样本文件由软件自身生成。
+遇到问题请带上运行目录下的 `logs.log` 与复现步骤，提交到
+[GitHub Issues](https://github.com/Coloryr/ModernMinecraftLauncher/issues)。
 
 ## 许可证
 
-Apache 2.0
-
-```
-Copyright 2026 coloryr
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-```
+本项目以 **Apache-2.0** 发布，全文见 [LICENSE](LICENSE)。
+随包分发的第三方组件与它们各自的许可见[开源许可](docs/licensing.md)。

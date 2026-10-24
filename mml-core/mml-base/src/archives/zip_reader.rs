@@ -364,6 +364,45 @@ impl ArchiveHandle for ZipReader {
         self.reload()
     }
 
+    /// 一批文件只打开、收尾各一次，逐条报进度并响应取消
+    fn add_files_reporting(
+        &mut self,
+        files: &[ArchiveAddFile],
+        gui: &BaseArchiveGui,
+        offset: usize,
+    ) -> CoreResult<()> {
+        use zip::ZipWriter;
+
+        let file = self
+            .file
+            .try_clone()
+            .map_err(|err| fs_err(self.path.clone(), err))?;
+        let mut zip = ZipWriter::new_append(file).map_err(|err| open_error(&self.path, err))?;
+
+        for (index, item) in files.iter().enumerate() {
+            if gui.as_ref().is_some_and(|gui| gui.cancelled()) {
+                return Err(ErrorType::TaskCancel);
+            }
+            let internal_path = item.dest.to_string_lossy();
+            if let Some(gui) = gui {
+                gui.update(Some(internal_path.to_string()), offset + index);
+            }
+
+            let mut reader = path_helper::open_read(&item.src)?;
+            zip.start_file(
+                internal_path.as_ref(),
+                archives::zip_entry_options(&internal_path, 0o644),
+            )
+            .map_err(write_error)?;
+
+            std::io::copy(&mut reader, &mut zip).map_err(write_error)?;
+        }
+
+        zip.finish().map_err(write_error)?;
+
+        self.reload()
+    }
+
     /// 用 `new_append` 就地追加内存数据，再重解析中央目录
     fn add_data(&mut self, name: &str, data: &[u8]) -> CoreResult<()> {
         use zip::ZipWriter;

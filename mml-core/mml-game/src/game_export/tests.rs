@@ -29,6 +29,9 @@ async fn modrinth_archive_uses_portable_paths_for_both_download_sources() {
     }).await.unwrap();
     let mut zip = zip::ZipArchive::new(fs::File::open(&output).unwrap()).unwrap();
     let index: serde_json::Value = serde_json::from_reader(zip.by_name(names::MODRINTH_FILE).unwrap()).unwrap();
+    // Modrinth 规范要求有 game 字段，缺了导入方会拒绝
+    assert_eq!(index["game"], "minecraft");
+    assert_eq!(index["formatVersion"], 1);
     assert_eq!(index["files"][0]["path"], "mods/线上.jar");
     assert_eq!(index["files"][1]["path"], "mods/本地.jar");
     assert_eq!(index["files"][0]["hashes"]["sha1"], "sha1");

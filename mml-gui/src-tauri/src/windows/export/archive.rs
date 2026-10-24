@@ -1,11 +1,11 @@
 //! 本地实例归档；不追随链接，写完后才替换目标文件。
 
-use std::{fs::{self, File}, io::{Read, Write}, path::{Path, PathBuf}, sync::atomic::{AtomicBool, Ordering}};
+use std::{fs::{self, File}, io::{Read, Write}, path::{Path, PathBuf}, sync::atomic::{AtomicBool, Ordering}, time::Instant};
 use zip::ZipWriter;
 
 use mml_base::archives::BaseArchiveGui;
 
-use crate::err_keys;
+use crate::{err_keys, log_text::LogText};
 
 pub(super) fn files_under(root: &Path) -> Result<Vec<PathBuf>, String> {
     reject_link(root)?;
@@ -63,9 +63,12 @@ pub(super) fn write_zip(
     gui: &BaseArchiveGui, cancel: &AtomicBool,
 ) -> Result<(), String> {
     let temp = file.with_extension(format!("{}.part", uuid::Uuid::new_v4()));
+    // 分四段计时：建包、写条目、收尾、改名，结束时一次打进日志
+    let started = Instant::now();
     let result = (|| -> Result<(), String> {
         let handle = File::create_new(&temp).map_err(|e| e.to_string())?;
         let mut zip = ZipWriter::new(handle);
+        let opened = Instant::now();
         let mut buffer = vec![0u8; COPY_BUF];
         if let Some(gui) = gui { gui.start(files.len() + data.len()); }
         let mut index = 0;
@@ -88,9 +91,19 @@ pub(super) fn write_zip(
             zip.write_all(bytes).map_err(|e| e.to_string())?;
             index += 1;
         }
+        let written = Instant::now();
         zip.finish().map_err(|e| e.to_string())?.sync_all().map_err(|e| e.to_string())?;
+        let finished = Instant::now();
         if let Some(gui) = gui { gui.done(); }
-        fs::rename(&temp, file).map_err(|e| e.to_string())
+        fs::rename(&temp, file).map_err(|e| e.to_string())?;
+        mml_log::info(LogText::ExportPackDetail {
+            open: (opened - started).as_secs_f64(),
+            write: (written - opened).as_secs_f64(),
+            finish: (finished - written).as_secs_f64(),
+            commit: Some(Instant::now().duration_since(finished).as_secs_f64()),
+            entries: files.len() + data.len(),
+        }.text());
+        Ok(())
     })();
     if result.is_err() { let _ = fs::remove_file(&temp); }
     result
@@ -164,6 +177,7 @@ mod tests {
 
     #[test]
     fn native_archive_contains_all_files_and_current_instance_snapshot() {
+        crate::test_support::ensure_boot();
         let dir = crate::test_support::temp_dir("native-roundtrip");
         let root = dir.join("source");
         fs::create_dir_all(root.join(".minecraft/config")).unwrap();
@@ -188,6 +202,7 @@ mod tests {
 
     #[test]
     fn native_selected_archive_keeps_only_checked_files() {
+        crate::test_support::ensure_boot();
         let dir = crate::test_support::temp_dir("native-selected");
         let root = dir.join("source");
         fs::create_dir_all(root.join(".minecraft/config")).unwrap();
@@ -210,6 +225,7 @@ mod tests {
 
     #[test]
     fn archive_read_failure_preserves_existing_archive_and_removes_partial_file() {
+        crate::test_support::ensure_boot();
         let dir = crate::test_support::temp_dir("native-write-failure");
         let source = dir.join("source.txt");
         fs::write(&source, "content").unwrap();
@@ -224,6 +240,7 @@ mod tests {
 
     #[test]
     fn archive_replaces_destination_without_including_itself() {
+        crate::test_support::ensure_boot();
         let dir = crate::test_support::temp_dir("native-export");
         let source = dir.join("instance");
         fs::create_dir(&source).unwrap();
@@ -246,6 +263,7 @@ mod tests {
     #[test]
     fn refuses_windows_junctions_in_export_tree() {
         use std::os::windows::process::CommandExt;
+        crate::test_support::ensure_boot();
         let dir = crate::test_support::temp_dir("export-junction");
         let source = dir.join("instance");
         let outside = dir.join("outside");
@@ -269,6 +287,7 @@ mod tests {
 
     #[test]
     fn selected_paths_reject_missing_and_traversal_without_dropping_files() {
+        crate::test_support::ensure_boot();
         let dir = crate::test_support::temp_dir("export-selection");
         let config = dir.join("config");
         fs::create_dir(&config).unwrap();
@@ -283,6 +302,7 @@ mod tests {
 
     #[test]
     fn already_compressed_entries_are_stored_and_text_is_deflated() {
+        crate::test_support::ensure_boot();
         let dir = crate::test_support::temp_dir("zip-entry-method");
         let jar = dir.join("a.jar");
         let text = dir.join("b.txt");
@@ -303,6 +323,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn selected_paths_refuse_file_and_directory_symlinks() {
+        crate::test_support::ensure_boot();
         let dir = crate::test_support::temp_dir("export-symlink");
         fs::write(dir.join("original"), "private").unwrap();
         std::os::unix::fs::symlink(dir.join("original"), dir.join("linked")).unwrap();
