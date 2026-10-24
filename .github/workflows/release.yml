@@ -93,11 +93,18 @@ jobs:
             build-essential curl wget file \
             libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
             librsvg2-dev patchelf libxdo-dev libssl-dev \
-            libgtk-3-dev libfuse2 rpm
+            libgtk-3-dev libfuse2 rpm libdbus-1-dev \
+            libarchive-tools zstd
       - name: 安装依赖
         run: bash build/init.sh
       - name: 构建并打包
         run: bash build/build-release.sh
+      - name: 打 Flatpak 包
+        run: |
+          sudo apt-get install -y flatpak
+          bash build/package-flatpak.sh
+      - name: 打 Arch 包
+        run: bash build/package-arch.sh
       - name: 上传 Linux 产物
         uses: actions/upload-artifact@v4
         with:

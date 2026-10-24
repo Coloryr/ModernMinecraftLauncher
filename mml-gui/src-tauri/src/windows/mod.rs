@@ -618,7 +618,9 @@ fn find_http(text: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{clean_url, find_http, read_shortcut_url, window_probe_drop};
+    use super::{
+        clean_url, find_http, read_shortcut_url, window_probe_drop, work_area_is_full_monitor,
+    };
     use crate::test_support::{cleanup, temp_dir};
 
     /// 写一个临时文件并读回它的地址
@@ -748,6 +750,28 @@ mod tests {
         assert_eq!(clean_url("http://a.com/x/"), "http://a.com/x");
         assert_eq!(clean_url("https://"), "");
         assert_eq!(clean_url("ftp://a.com"), "");
+    }
+
+    /// 工作区与显示器完全重合时判定为「平台没给任务栏信息」，交给最大化
+    #[test]
+    fn full_work_area_matches_monitor() {
+        let position = tauri::PhysicalPosition::new(0, 0);
+        let size = tauri::PhysicalSize::new(1920, 1080);
+
+        let full = tauri::PhysicalRect { position, size };
+        assert!(work_area_is_full_monitor(&full, &position, &size));
+
+        let bottom_bar = tauri::PhysicalRect {
+            position,
+            size: tauri::PhysicalSize::new(1920, 1032),
+        };
+        assert!(!work_area_is_full_monitor(&bottom_bar, &position, &size));
+
+        let left_bar = tauri::PhysicalRect {
+            position: tauri::PhysicalPosition::new(72, 0),
+            size: tauri::PhysicalSize::new(1848, 1080),
+        };
+        assert!(!work_area_is_full_monitor(&left_bar, &position, &size));
     }
 }
 
@@ -889,12 +913,33 @@ pub fn window_is_fullscreen(window: WebviewWindow) -> bool {
     window.is_fullscreen().unwrap_or(false)
 }
 
+/// 工作区是否与显示器整块重合
+///
+/// 平台不提供任务栏 / Dock 占用信息时两者完全一致（Wayland 的 GDK workarea 就是这样），
+/// 此时手动按工作区摆放没有意义，只能交给系统最大化。
+///
+/// - `work`: 当前显示器的工作区
+/// - `position`: 显示器在虚拟桌面里的左上角
+/// - `size`: 显示器的像素尺寸
+///
+/// # 返回值
+///
+/// 两者位置与尺寸都相同时为 `true`
+fn work_area_is_full_monitor(
+    work: &tauri::PhysicalRect<i32, u32>,
+    position: &tauri::PhysicalPosition<i32>,
+    size: &tauri::PhysicalSize<u32>,
+) -> bool {
+    work.position == *position && work.size == *size
+}
+
 /// 把窗口铺满当前显示器的工作区：客户区左上角对齐工作区原点，尺寸取工作区
 ///
 /// 与最大化不是一回事：这里**不进入系统最大化状态**，只是把窗口摆好，之后照常可拖动 / 缩放。
 /// 工作区是屏幕去掉任务栏那一条；尺寸按**客户区**算，那圈系统阴影边框从外框让出去，
 /// 所以窗口内容正好贴住工作区四边，不额外含标题栏。
 /// 原本全屏或最大化时先退出来，否则系统会按那两个状态把窗口改回去。
+/// Wayland 拿不到任务栏 / Dock 占用的区域，此时退化为系统最大化。
 ///
 /// - `window`: 调用方窗口，由 tauri 注入
 ///
@@ -906,14 +951,24 @@ pub fn window_fill_screen(window: WebviewWindow) -> Result<(), String> {
     if window.is_fullscreen().unwrap_or(false) {
         window.set_fullscreen(false).map_err(|err| err.to_string())?;
     }
-    if window.is_maximized().unwrap_or(false) {
-        window.unmaximize().map_err(|err| err.to_string())?;
-    }
     let monitor = window
         .current_monitor()
         .map_err(|err| err.to_string())?
         .ok_or_else(|| "window has no current monitor".to_string())?;
     let work = monitor.work_area();
+
+    // Wayland 的 workarea 就是整块屏幕，左侧 Dock / 任务栏没有被扣掉；
+    // 硬按 workarea 摆会把栏盖住，交给系统最大化让合成器自己算工作区
+    if work_area_is_full_monitor(work, monitor.position(), monitor.size()) {
+        if !window.is_maximized().unwrap_or(false) {
+            window.maximize().map_err(|err| err.to_string())?;
+        }
+        return Ok(());
+    }
+
+    if window.is_maximized().unwrap_or(false) {
+        window.unmaximize().map_err(|err| err.to_string())?;
+    }
 
     // 无边框窗口仍带一圈系统阴影边框：外框比客户区大，且左边、上边各是一段。
     // 按客户区对齐，把外框往左上让出这两段，客户区才正好落在工作区原点上

@@ -144,6 +144,16 @@ opt-level = 3
 [profile.dev.package.crc32fast]
 opt-level = 3
 
+# 导出要给几百个模组算 SHA1 / SHA512：哈希在不优化时慢一两个数量级，dev 下也要开优化
+[profile.dev.package.sha1]
+opt-level = 3
+
+[profile.dev.package.sha2]
+opt-level = 3
+
+[profile.dev.package.digest]
+opt-level = 3
+
 # 正式发布：fat LTO + 单代码生成单元，体积最小、运行最快，但出包慢（单线程合并优化）
 # 命令：cargo build --release / npm run build:release
 [profile.release]

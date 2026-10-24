@@ -49,7 +49,16 @@
 - **通用**：Rust stable（edition 2024，需 1.85+）、Node.js 20.19+ 或 22.12+（Vite 8 要求，建议 LTS）。
 - **Windows**：Rust 的 MSVC 工具链、Visual Studio 生成工具（勾选「使用 C++ 的桌面开发」）、
   WebView2 运行时（Windows 11 和较新的 Windows 10 已自带）。
-- **Linux**：Tauri 2 需要的 WebKitGTK 4.1 等系统依赖。
+- **Linux**：Tauri 2 需要的 WebKitGTK 4.1、GTK 3、libappindicator、librsvg、patchelf、libxdo，
+  以及 `mml-sys`「在文件管理器中显示」用的 D-Bus 开发包；Debian / Ubuntu 上：
+
+  ```bash
+  sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+      librsvg2-dev patchelf libxdo-dev libdbus-1-dev rpm
+  ```
+
+  打 AppImage 还要 FUSE 2 运行库（Ubuntu 24.04 起包名是 `libfuse2t64`）；
+  打 Flatpak 需要 `flatpak`；Arch 包由脚本直接组装，不依赖 `makepkg`。
 - **macOS**：Xcode Command Line Tools。
 
 Rust workspace 在仓库根目录，首次构建会编译全部内核与桌面壳，耗时较长。克隆仓库后先跑一次
@@ -91,6 +100,7 @@ build/dev-frontend.sh     # Linux / macOS / Git Bash
 | --- | --- | --- |
 | 正式发布 | `build/build-release.ps1`（或 `.sh`） | `build_out/` 下带版本号的安装包；Tauri 原始产物在 `target/release/bundle/` |
 | 预发布 | `build/build-prerelease.ps1`（或 `.sh`） | `target/prerelease/mml-gui.exe` |
+| Linux 附加包 | `bash build/package-flatpak.sh` / `bash build/package-arch.sh` | `build_out/` 下的 `.flatpak` 与 `.pkg.tar.zst` |
 
 - 正式发布用 fat LTO + `codegen-units = 1`，体积最小、运行最快；末尾的跨 crate 优化只能单线程跑，
   构建期间只会看到一个核在工作。
@@ -99,6 +109,10 @@ build/dev-frontend.sh     # Linux / macOS / Git Bash
 
 两个出包脚本都有 PowerShell 版与 bash 版，做的是同一件事。预发布也要安装包、或想调整 profile，
 见[开发与构建](docs/development.md)。
+
+Linux 还有两个附加包，都拿已构建的 `target/release/mml-gui` 直接封装、不重新编译：
+`package-flatpak.sh` 需要 `flatpak`；`package-arch.sh` 直接按 Arch 包格式组装
+tar.zst，不依赖 `makepkg`，Ubuntu 上也能打。CI 会分别执行这两个脚本。
 
 ### 版本与发布
 
@@ -115,6 +129,8 @@ build/dev-frontend.sh     # Linux / macOS / Git Bash
 | --- | --- |
 | Windows | `mml-windows-x64-0.0.1.msi`、`mml-windows-x64-0.0.1-setup.exe` |
 | Linux | `mml-linux-x64-0.0.1.deb`、`mml-linux-x64-0.0.1.rpm`、`mml-linux-x64-0.0.1.AppImage` |
+| Linux（Flatpak） | `mml-linux-x64-0.0.1.flatpak` |
+| Arch Linux | `mml-arch-x64-0.0.1.pkg.tar.zst` |
 | macOS | `mml-macos-arm64-0.0.1.dmg` |
 
 本地只会构建当前系统，三平台齐全靠 GitHub Actions：
@@ -207,7 +223,8 @@ ModernColoryrMinecraftLauncher/
 │  ├─ version                      发布版本，发版时只改这里
 │  ├─ set-version.mjs              把版本同步到应用清单
 │  ├─ package-release.mjs          安装包按版本重命名后收集到 build_out/
-│  └─ *.ps1 / *.sh                 初始化、开发、正式发布与预发布脚本
+│  ├─ linux/                       桌面文件与 AppStream 元数据
+│  └─ *.ps1 / *.sh                 初始化、开发、正式发布、预发布、Flatpak / Arch 打包脚本
 ├─ design/                         程序图标 SVG 源文件
 ├─ docs/                           软件手册、开发与构建、开源许可
 └─ pics/                           README 截图

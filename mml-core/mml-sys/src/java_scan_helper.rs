@@ -147,7 +147,7 @@ pub fn find_java_inner(java_paths: &mut HashSet<PathBuf>) {
 ///
 /// - `java_paths`: 搜索结果集合，就地插入发现的 java 路径
 #[cfg(target_os = "linux")]
-pub(crate) fn find_java_inner(java_paths: &mut HashSet<PathBuf>) {
+pub fn find_java_inner(java_paths: &mut HashSet<PathBuf>) {
     use std::path::Path;
 
     use crate::process_helper;
@@ -244,7 +244,7 @@ pub(crate) fn find_java_inner(java_paths: &mut HashSet<PathBuf>) {
 ///
 /// - `java_paths`: 搜索结果集合，就地插入发现的 java 路径
 #[cfg(target_os = "macos")]
-pub(crate) fn find_java_inner(java_paths: &mut HashSet<PathBuf>) {
+pub fn find_java_inner(java_paths: &mut HashSet<PathBuf>) {
     use std::path::Path;
     use std::process::Command;
 

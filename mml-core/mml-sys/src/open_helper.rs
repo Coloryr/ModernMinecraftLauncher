@@ -103,48 +103,49 @@ pub fn open_dir<P: AsRef<Path>>(path: P) {
 /// - 最后回退到 `xdg-open` 打开父目录，不会选中目标。
 #[cfg(target_os = "linux")]
 fn open_file_with_explorer_inner<P: AsRef<Path>>(path: P) {
-    let abs_path = Path::new(path.as_ref()).canonicalize()?;
-    let abs_path_str = abs_path.to_str().ok_or("路径包含非 UTF-8 字符")?;
+    let path = path.as_ref();
+    // 路径不存在时不 panic：退回打开父目录
+    let Ok(abs_path) = path.canonicalize() else {
+        open_dir(path);
+        return;
+    };
+    let Some(abs_path_str) = abs_path.to_str() else {
+        open_dir(&abs_path);
+        return;
+    };
 
-    if let Ok(_) = try_dbus_filemanager1(abs_path_str) {
+    if try_dbus_filemanager1(abs_path_str).is_ok() {
         return;
     }
 
-    if let Ok(_) = try_dbus_openuri(abs_path_str) {
+    if try_dbus_openuri(abs_path_str).is_ok() {
         return;
     }
 
     let parent = abs_path.parent().unwrap_or(Path::new("/"));
-    Command::new("xdg-open")
-        .arg(parent)
-        .spawn()
-        .map_err(|e| format!("无法打开父文件夹: {}", e))
-        .unwrap();
+    let _ = Command::new("xdg-open").arg(parent).spawn();
 }
 
 /// 通过 `org.freedesktop.FileManager1` 接口显示并选中
 #[cfg(target_os = "linux")]
 fn try_dbus_filemanager1(path: &str) -> Result<(), Box<dyn std::error::Error>> {
-    use dbus::{BusType, Connection, Message, Path as DbusPath};
-    use std::path::Path;
-    use std::process::Command;
-    use url::Url;
+    use dbus::blocking::Connection;
+    use std::time::Duration;
 
     let uri = url_to_file_uri(path)?;
-    let conn = Connection::get_private(BusType::Session)?;
+    let conn = Connection::new_session()?;
     let proxy = conn.with_proxy(
         "org.freedesktop.FileManager1",
         "/org/freedesktop/FileManager1",
-        std::time::Duration::from_millis(5000),
+        Duration::from_millis(5000),
     );
 
-    // 构造参数：要选中的 URI 列表 + 启动目录，启动目录传空字符串
+    // 参数：要选中的 URI 列表 + 启动目录，启动目录传空字符串
     let items: Vec<&str> = vec![&uri];
-    let startup_dir = "";
     let (): () = proxy.method_call(
         "org.freedesktop.FileManager1",
         "ShowItems",
-        (items, startup_dir),
+        (items, ""),
     )?;
     Ok(())
 }
@@ -152,26 +153,25 @@ fn try_dbus_filemanager1(path: &str) -> Result<(), Box<dyn std::error::Error>> {
 /// 通过 `org.freedesktop.portal.OpenURI` 接口打开，可能不选中
 #[cfg(target_os = "linux")]
 fn try_dbus_openuri(path: &str) -> Result<(), Box<dyn std::error::Error>> {
-    use dbus::{BusType, Connection, Message, Path as DbusPath};
-    use std::path::Path;
-    use std::process::Command;
-    use url::Url;
+    use dbus::arg::Variant;
+    use dbus::blocking::Connection;
+    use std::collections::HashMap;
+    use std::time::Duration;
 
     let uri = url_to_file_uri(path)?;
-    let conn = Connection::get_private(BusType::Session)?;
+    let conn = Connection::new_session()?;
     let proxy = conn.with_proxy(
-        "org.freedesktop.portal.OpenURI",
+        "org.freedesktop.portal.Desktop",
         "/org/freedesktop/portal/desktop",
-        std::time::Duration::from_millis(5000),
+        Duration::from_millis(5000),
     );
 
-    // 参数：父窗口句柄传 0，URI，选项传空字典
-    let parent_window = "";
-    let options: std::collections::HashMap<&str, &str> = std::collections::HashMap::new();
+    // 参数：父窗口句柄、URI、选项字典；这里留空
+    let options: HashMap<&str, Variant<&str>> = HashMap::new();
     let (): () = proxy.method_call(
         "org.freedesktop.portal.OpenURI",
         "OpenURI",
-        (parent_window, uri, options),
+        ("", uri, options),
     )?;
     Ok(())
 }

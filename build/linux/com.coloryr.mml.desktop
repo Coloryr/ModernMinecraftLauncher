@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=M²L
+GenericName=Minecraft Launcher
+Comment=Modern Minecraft Launcher
+Exec=mml-gui
+Icon=com.coloryr.mml
+Terminal=false
+Categories=Game;
+Keywords=minecraft;launcher;
+StartupWMClass=mml-gui

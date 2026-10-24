@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.coloryr.mml</id>
+  <name>M²L</name>
+  <summary>Minecraft Launcher</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+  <description>
+    <p>M²L 是一个 Minecraft 启动器，支持实例管理、模组加载器、资源下载与联机。</p>
+  </description>
+  <launchable type="desktop-id">com.coloryr.mml.desktop</launchable>
+  <url type="homepage">https://github.com/Coloryr/ModernMinecraftLauncher</url>
+  <url type="bugtracker">https://github.com/Coloryr/ModernMinecraftLauncher/issues</url>
+  <content_rating type="oars-1.1"/>
+</component>

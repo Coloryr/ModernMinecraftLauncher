@@ -68,12 +68,25 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
 | `build/dev-frontend.ps1` | 只起 Vite，配合 debug 版 Rust 后端单独运行；`tauri dev` 已自带 Vite，不要重复起 |
 | `build/build-release.ps1` | 正式发布构建（fat LTO，含安装包，按版本收集到 `build_out/`） |
 | `build/build-prerelease.ps1` | 预发布构建（thin LTO，只出 exe，更快） |
+| `bash build/package-flatpak.sh` | 用已构建的二进制打 `.flatpak`，需要 `flatpak`，不重新编译 |
+| `bash build/package-arch.sh` | 用已构建的二进制打 `.pkg.tar.zst`，不依赖 `makepkg`，任一 Linux 可跑 |
 | `cd mml-gui && npm run gen` | 改过 Rust 侧命令 / DTO 后重新生成 `mml-ipc` 契约 |
 | `cd mml-gui && npx tauri icon ../design/icon/f-blend.svg` | 改过程序图标后重新生成 `src-tauri/icons/`；会顺带产出 `android/` 与 `ios/`，桌面端用不到可删 |
 | `cd custom/custom-main-demo && npm run build` | 构建自定义主页面示例并打包成 `custom-main-demo.zip`（四个示例的用法见 [custom/README.md](../custom/README.md)） |
 
 `build/` 下带 PowerShell 版（`.ps1`，Windows）与 bash 版（`.sh`，Linux / macOS / Git Bash）的脚本
 做的是同一件事；`build/*.mjs` 是版本同步与产物打包用的跨平台辅助脚本。
+
+Flatpak 与 Arch 包不在 `build-release` 里自动跑，由 `build/package-flatpak.sh`、
+`build/package-arch.sh` 单独完成，输入都是 `target/release/mml-gui`：
+Flatpak 走 `flatpak build-export` + `build-bundle`，不依赖 SDK / runtime；
+Arch 包按 `.PKGINFO` + `tar.zst` 直接组装，不依赖 `makepkg`，有 `bsdtar` 时顺带生成 `.MTREE`。
+桌面文件与 AppStream 元数据在 `build/linux/`。
+
+Flatpak 默认声明 `org.freedesktop.Platform//25.08`，安装时由 Flathub 提供运行时：
+`flatpak install --user ./mml-linux-x64-0.0.1.flatpak`。本地系统比 25.08 新时（例如 Ubuntu 26.04），
+编出的二进制可能要求更高版本的 glibc，只有 CI 在 `ubuntu-22.04` 上编的包才与 25.08 匹配；
+要换运行时用 `MML_FLATPAK_RUNTIME=26.08 bash build/package-flatpak.sh`。
 
 发布版本从 `0.0.1` 开始，唯一来源是 `build/version`；`build-release` 先把版本同步到
 `mml-gui/src-tauri/Cargo.toml`、`tauri.conf.json` 与 `mml-gui/package.json`，再把 Tauri 产物
@@ -113,15 +126,23 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
    `dtolnay/rust-toolchain@stable` + `Swatinem/rust-cache@v2`；
 2. Windows 跑 `build/init.ps1` / `build/build-release.ps1`，
    Linux 与 macOS 跑 `bash build/init.sh` / `bash build/build-release.sh`；
-3. 脚本把安装包按版本改名到 `build_out/`，`actions/upload-artifact@v4` 收走；
+3. Linux 额外跑 `build/package-flatpak.sh` 与 `build/package-arch.sh`，
+   把 `.flatpak` 与 `.pkg.tar.zst` 也放进 `build_out/`；
+4. 脚本把安装包按版本改名到 `build_out/`，`actions/upload-artifact@v4` 收走；
    发版 job 用 `actions/download-artifact@v4`（`merge-multiple: true`）合并，
    再交给 `softprops/action-gh-release@v2`。
 
 - Linux runner 固定 `ubuntu-22.04` 作为 glibc 基线，并预装 Tauri 需要的
   `libwebkit2gtk-4.1-dev` / `libayatana-appindicator3-dev` / `librsvg2-dev` /
-  `patchelf` / `libxdo-dev` / `libfuse2` / `rpm`。
+  `patchelf` / `libxdo-dev` / `libfuse2` / `rpm` / `libdbus-1-dev` /
+  `libarchive-tools` / `zstd`。`libdbus-1-dev` 是 `mml-sys` 在 Linux 上
+  「在文件管理器中显示」用的 D-Bus 绑定，缺了会编译失败；`libarchive-tools` 用来给 Arch 包生成 `.MTREE`。
 - 产物名与本地一致：`mml-windows-x64-0.0.1.msi`、`mml-linux-x64-0.0.1.deb`、
+  `mml-linux-x64-0.0.1.flatpak`、`mml-arch-x64-0.0.1.pkg.tar.zst`、
   `mml-macos-arm64-0.0.1.dmg` 等，架构取自 `runner.arch`。
+- Flatpak 不需要在 runner 上装 `org.freedesktop.Platform`：封装只做 OSTree 提交与 bundle，
+  runtime 是安装时由用户从 Flathub 获取的依赖。Arch 包只是把二进制与 `.PKGINFO` 打成 tar.zst，
+  不需要装 `base-devel` 或 WebKitGTK。
 - 脚本里的交互式暂停靠 `CI` 环境变量跳过（工作流顶层设 `CI: true`）；
   给脚本喂 stdin 会在无终端环境下卡住，不要那么做。
 - 版本号只在 `build/version` 改：标签与文件不一致时 `check-version` 直接失败，

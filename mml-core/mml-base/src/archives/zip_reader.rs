@@ -180,8 +180,6 @@ impl ZipReader {
                 #[cfg(unix)]
                 if let Some(mode) = file.unix_mode() {
                     // 临时设为 0o700 保证可写
-
-                    use crate::archives::set_perms;
                     set_perms(&outpath, 0o700)
                         .map_err(|err| fs_err(output_dir.to_path_buf(), err))?;
 
@@ -222,8 +220,6 @@ impl ZipReader {
             // 保留 Unix 权限
             #[cfg(unix)]
             if let Some(mode) = file.unix_mode() {
-                use crate::archives::set_perms;
-
                 set_perms(&outpath, mode).map_err(|err| fs_err(outpath.to_path_buf(), err))?;
             }
 
@@ -240,8 +236,6 @@ impl ZipReader {
         // 恢复所有目录的最终权限，Unix 下最后才设为只读
         #[cfg(unix)]
         for (path, mode) in unix_modes {
-            use crate::archives::set_perms;
-
             set_perms(&path, mode).map_err(|err| fs_err(path.clone(), err))?;
         }
 
