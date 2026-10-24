@@ -160,6 +160,7 @@ const SETTINGS_INDEX: IndexEntry[] = [
   { tab: "launch", group: "memory", labelKey: "winSettings.maxMemory", extra: ["memory", "内存", "xmx"] },
   { tab: "launch", group: "jvm", labelKey: "winSettings.gcMode", extra: ["gc", "g1gc", "zgc"] },
   { tab: "launch", group: "jvm", labelKey: "winSettings.colorasm", extra: ["asmtools", "彩色日志"] },
+  { tab: "launch", group: "jvm", labelKey: "winSettings.isolateHome", extra: ["home", "isolate", "user profile", "隔离", "用户目录"] },
   { tab: "launch", group: "jvm", labelKey: "winSettings.removeJvmArg", extra: ["jvm args"] },
   { tab: "launch", group: "jvm", labelKey: "winSettings.jvmEnv", extra: ["env", "环境变量"] },
   { tab: "launch", group: "jvm", labelKey: "winSettings.jvmArgs", extra: ["jvm args", "启动参数"] },

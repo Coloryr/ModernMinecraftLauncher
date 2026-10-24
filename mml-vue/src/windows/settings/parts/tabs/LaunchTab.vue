@@ -195,6 +195,14 @@ watch(memoryConflict, async (bad) => {
     </SettingsGroup>
 
     <SettingsGroup v-if="!locked" id="jvm" title-key="winSettings.secJvm" :flash="flashGroup === 'jvm'">
+      <div class="switch-row">
+        <div class="switch-text">
+          <span class="switch-label">{{ t("winSettings.isolateHome") }}</span>
+          <span class="switch-state">{{ t("winSettings.isolateHomeDesc") }}</span>
+        </div>
+        <BaseSwitch v-model="run!.isolateHome" />
+      </div>
+
       <div class="grid-2">
         <div>
           <label class="field-label">{{ t("winSettings.gcMode") }}</label>

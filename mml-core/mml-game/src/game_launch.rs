@@ -394,13 +394,58 @@ impl InstanceSettingObj {
         }
     }
 
+    /// 是否把 HOME / APPDATA / XDG 等系统目录隔离到实例目录
+    ///
+    /// 实例没有单独设置时跟随启动器设置，缺省按启用处理。
+    ///
+    /// # 返回值
+    ///
+    /// 启用返回 `true`
+    pub(crate) fn isolate_home(&self) -> bool {
+        self.jvm_arg
+            .as_ref()
+            .and_then(|item| item.isolate_home)
+            .unwrap_or_else(|| mml_config::read_config().jvm_arg.isolate_home.unwrap_or(true))
+    }
+
+    /// 隔离时使用的用户目录：实例目录本身
+    ///
+    /// # 返回值
+    ///
+    /// 实例根目录的绝对路径
+    pub(crate) fn isolated_home(&self) -> PathBuf {
+        self.get_base_path()
+    }
+
     /// 创建环境变量
     ///
     /// # 返回值
     ///
     /// 返回启动进程使用的环境变量表
-    fn make_env_arg(&self) -> HashMap<String, String> {
+    pub(crate) fn make_env_arg(&self) -> HashMap<String, String> {
         let mut env = HashMap::new();
+        // 先铺隔离路径，用户自己写的环境变量随后覆盖，手动指定优先
+        if self.isolate_home() {
+            let home = self.isolated_home();
+            let home_str = home.to_string_lossy().into_owned();
+            for key in ["HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA"] {
+                env.insert(key.to_string(), home_str.clone());
+            }
+            let config = home.join(".config");
+            let data = home.join(".local").join("share");
+            let cache = home.join(".cache");
+            for dir in [&config, &data, &cache] {
+                let _ = std::fs::create_dir_all(dir);
+            }
+            env.insert("XDG_CONFIG_HOME".to_string(), config.to_string_lossy().into_owned());
+            env.insert("XDG_DATA_HOME".to_string(), data.to_string_lossy().into_owned());
+            env.insert("XDG_CACHE_HOME".to_string(), cache.to_string_lossy().into_owned());
+            #[cfg(windows)]
+            if let Some((drive, rest)) = home_str.split_once(':') {
+                env.insert("HOMEDRIVE".to_string(), format!("{drive}:"));
+                env.insert("HOMEPATH".to_string(), rest.to_string());
+            }
+        }
         let envstr = self
             .jvm_arg
             .clone()

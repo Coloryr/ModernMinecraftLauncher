@@ -43,6 +43,8 @@ pub struct InstanceArgsDto {
     pub class_path: Vec<String>,
     /// 附加环境变量
     pub env_vars: Vec<EnvVarLineDto>,
+    /// 是否把 HOME / APPDATA / XDG 等系统目录隔离到实例目录
+    pub isolate_home: bool,
     /// 游戏内语言
     pub lang: String,
     /// 日志编码：utf8 / gbk
@@ -93,6 +95,7 @@ impl Default for InstanceArgsDto {
             game_args: Vec::new(),
             class_path: Vec::new(),
             env_vars: Vec::new(),
+            isolate_home: true,
             lang: "zh_cn".into(),
             log_encoding: "utf8".into(),
             pre_enabled: false,

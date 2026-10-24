@@ -230,6 +230,10 @@ pub struct RunArgObj {
     /// 自定义 JVM 环境变量，对应 JSON 键 `JvmEnv`，缺省为 `None`
     #[serde(rename = "JvmEnv")]
     pub jvm_env: Option<String>,
+    /// 是否把 HOME / APPDATA / XDG 等系统目录隔离到实例目录，对应 JSON 键 `IsolateHome`，
+    /// 缺省为 `None`（按启用处理）
+    #[serde(rename = "IsolateHome")]
+    pub isolate_home: Option<bool>,
     /// GC 模式，对应 JSON 键 `GC`，缺省为 `None`
     #[serde(rename = "GC")]
     pub gc_mode: Option<GCType>,
@@ -268,6 +272,7 @@ impl Default for RunArgObj {
             jvm_args: Option::None,
             game_args: Option::None,
             jvm_env: Option::None,
+            isolate_home: Option::None,
             gc_mode: Option::None,
             max_memory: Option::None,
             min_memory: Option::None,
@@ -296,6 +301,7 @@ impl RunArgObj {
             jvm_args: Option::Some(String::new()),
             game_args: Option::Some(String::new()),
             jvm_env: Option::Some(String::new()),
+            isolate_home: Option::Some(true),
             gc_mode: Option::Some(GCType::Auto),
             max_memory: Option::Some(4096),
             min_memory: Option::Some(512),

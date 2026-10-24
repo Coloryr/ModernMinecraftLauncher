@@ -20,6 +20,7 @@ export type InstanceArgsDto = {
   gameArgs: string[],
   classPath: string[],
   envVars: EnvVarLineDto[],
+  isolateHome: boolean,
   lang: string,
   logEncoding: string,
   preEnabled: boolean,

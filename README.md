@@ -253,7 +253,6 @@ ModernColoryrMinecraftLauncher/
 - 手柄模式
 - 存档云同步(ColorMC)
 - 映射大厅 / 联机
-- 客户端导出(服务器模式包)
 - 服务器实例生成
 - 启动器自更新
 

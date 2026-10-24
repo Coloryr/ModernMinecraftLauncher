@@ -11,6 +11,7 @@ import { t } from "../lib/i18n";
 import { COMMON_MEMORY, COMMON_MIN_MEMORY, COMMON_RESOLUTIONS } from "../lib/resolutions";
 import type { InstanceArgsDto, JavaInfoDto } from "../lib/bindings";
 import BaseButton from "./ui/BaseButton.vue";
+import BaseSwitch from "./ui/BaseSwitch.vue";
 import GlyphIcon from "./ui/GlyphIcon.vue";
 import MemoryHint from "./MemoryHint.vue";
 import NumberStepper from "./ui/NumberStepper.vue";
@@ -333,6 +334,13 @@ const gcOptions = [
           <button class="line-add" @click="addLine('classPath')">
             <GlyphIcon name="plus" :size="13" :weight="2.2" /> {{ t("args.addLine") }}
           </button>
+
+          <!-- 隔离用户目录：HOME / APPDATA / XDG 等指到实例目录 -->
+          <div class="args-row">
+            <span class="args-label" v-tip="t('args.isolateHomeDesc')">{{ t("args.isolateHome") }}</span>
+            <BaseSwitch :model-value="args.isolateHome"
+              @update:model-value="update({ isolateHome: $event })" />
+          </div>
 
           <!-- 附加环境变量（键值对） -->
           <label class="args-label">{{ t("args.env") }}</label>

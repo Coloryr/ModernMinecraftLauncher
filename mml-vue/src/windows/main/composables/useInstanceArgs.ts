@@ -30,6 +30,7 @@ const ARGS_DEFAULTS: InstanceArgsDto = {
   gameArgs: [],
   classPath: [],
   envVars: [],
+  isolateHome: true,
   lang: "zh_cn",
   logEncoding: "utf8",
   preEnabled: false,

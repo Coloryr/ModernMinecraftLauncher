@@ -172,6 +172,7 @@ export function useSettingsLaunch() {
       case "jvm":
         if (!run.value) return false;
         run.value.gcMode = d.run.gcMode;
+        run.value.isolateHome = d.run.isolateHome;
         run.value.colorasm = d.run.colorasm;
         run.value.removeJvmArg = d.run.removeJvmArg;
         run.value.jvmArgs = d.run.jvmArgs;

@@ -470,6 +470,11 @@ impl InstanceSettingObj {
 
         let mut args = Vec::new();
 
+        if self.isolate_home() {
+            // Windows 上 JVM 的 user.home 不跟环境变量走，单独补一条属性
+            args.push(format!("-Duser.home={}", self.isolated_home().to_string_lossy()));
+        }
+
         if colorasm && let Some(port) = mixin {
             args.push(format!("-Dcolormc.mixin.port={}", port));
             args.push(format!("-Dcolormc.mixin.uuid={}", self.uuid));
@@ -1450,6 +1455,25 @@ mod tests {
             jvm_arg: Some(jvm),
             ..Default::default()
         }
+    }
+
+    /// 隔离用户目录：HOME / APPDATA 指到实例目录，并补 `user.home`
+    #[tokio::test]
+    async fn isolate_home_paths() {
+        let _guard = setup();
+        let obj = instance(RunArgObj { isolate_home: Some(true), ..Default::default() });
+        let home = obj.get_base_path().to_string_lossy().into_owned();
+        let env = obj.make_env_arg();
+        assert_eq!(env.get("HOME"), Some(&home));
+        assert_eq!(env.get("USERPROFILE"), Some(&home));
+        assert!(env["XDG_CONFIG_HOME"].ends_with(".config"));
+        let args = obj.make_jvm_arg(&LoginObj::default(), 21, None).await.unwrap();
+        assert!(args.iter().any(|a| a == &format!("-Duser.home={home}")));
+
+        let off = instance(RunArgObj { isolate_home: Some(false), ..Default::default() });
+        assert!(!off.make_env_arg().contains_key("HOME"));
+        let args = off.make_jvm_arg(&LoginObj::default(), 21, None).await.unwrap();
+        assert!(!args.iter().any(|a| a.starts_with("-Duser.home=")));
     }
 
     /// 内存：最小填 `-Xms`、最大填 `-Xmx`，且 `-Xms` 排在前面

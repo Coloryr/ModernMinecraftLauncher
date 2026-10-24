@@ -64,6 +64,13 @@ pub(super) fn args_from_core(inst: &InstanceSettingObj) -> InstanceArgsDto {
             a.post_cmd = s.clone();
         }
     }
+    // 没写就是跟随启动器设置，界面上展示实际生效值
+    let global_isolate = mml_config::read_config().jvm_arg.isolate_home.unwrap_or(true);
+    a.isolate_home = inst
+        .jvm_arg
+        .as_ref()
+        .and_then(|jvm| jvm.isolate_home)
+        .unwrap_or(global_isolate);
     if let Some(w) = &inst.window {
         if let Some(v) = w.full_screen {
             a.fullscreen = v;
@@ -130,6 +137,7 @@ pub(super) fn apply_args_to_core(inst: &mut InstanceSettingObj, a: &InstanceArgs
             .collect::<Vec<_>>()
             .join("\n"),
     );
+    jvm.isolate_home = Some(a.isolate_home);
     jvm.launch_pre_run = Some(a.pre_enabled);
     jvm.pre_run_arg = Some(a.pre_cmd.clone());
     jvm.launch_post_run = Some(a.post_enabled);
