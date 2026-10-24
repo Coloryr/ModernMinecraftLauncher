@@ -68,6 +68,11 @@ window-vibrancy.workspace = true
 # 测试临时目录统一放 target/temp（AGENTS.md §6）：不要用系统 %TEMP%，也不要自己拼仓库根
 mml-testutil = { path = "../../mml-core/mml-testutil" }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+# Wayland 会话里 GDK 的 workarea 是整块屏幕；读 XWayland 根窗口的 _NET_WORKAREA
+# 才能拿到左侧 Dock / 顶栏扣掉后的工作区
+x11-dl = "2"
+
 [target.'cfg(windows)'.dependencies]
 # 文件拖放的"路径桥"（见 src/windows/file_drop.rs）：
 # 用 WebView2 的"附加对象"通道把 DOM 拖入的文件真实路径捞回来

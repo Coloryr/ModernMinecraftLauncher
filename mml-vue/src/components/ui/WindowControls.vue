@@ -133,7 +133,7 @@ async function onMenuFullscreen() {
   await refresh();
 }
 
-/** 菜单「占满屏幕」：窗口挪到工作区左上角并拉到工作区大小；Wayland 没有工作区信息时退化为系统最大化 */
+/** 菜单「占满屏幕」：窗口挪到工作区左上角并拉到工作区大小，不进入最大化状态 */
 async function onMenuFillScreen() {
   closeMenu();
   await fillScreenWindow();
