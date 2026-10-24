@@ -4,8 +4,7 @@
 // - windows 样式：右端三个小图标按钮（最小化 / 最大化 / 关闭），参照网易云音乐
 // - macos 样式：左端三个圆点（关闭 / 最小化 / 最大化），符号只在悬停整组时显示
 //
-// 最大化按钮右键弹「全屏 / 占满屏幕」菜单：两者都是铺满屏幕，区别在任务栏 ——
-// 全屏连任务栏一起盖住，占满屏幕是系统最大化、留出任务栏。
+// 最大化按钮右键菜单：全屏连任务栏一起盖住，占满屏幕只铺工作区、留出任务栏
 //
 // 自包含：命令与 quitWindow() 都在内部调用，宿主只需传 style。
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
@@ -213,8 +212,7 @@ onUnmounted(() => {
     </button>
   </div>
 
-  <!-- 最大化按钮的右键菜单：全屏 / 占满屏幕两种铺满方式。
-       Teleport 到 body，免得被标题栏那一层的层叠上下文裁掉 -->
+  <!-- 最大化按钮右键菜单：全屏 / 占满屏幕；Teleport 到 body 避免被标题栏裁切 -->
   <Teleport to="body">
     <div v-if="menuOpen" class="wc-menu-layer" @pointerdown.self="closeMenu" @contextmenu.prevent>
       <div ref="menuEl" class="wc-menu" :style="{ left: menuPos.x + 'px', top: menuPos.y + 'px' }" role="menu">

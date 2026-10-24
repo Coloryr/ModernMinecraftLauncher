@@ -67,6 +67,33 @@ export function useSettingsClient() {
     }
   }
 
+  /** 设置密码并锁定客户端设置 */
+  async function setClientLock(password: string) {
+    try {
+      await commands.windows.clientLockSet(password);
+      await load();
+    } catch (e) {
+      showToast(tErr(e));
+      throw e;
+    }
+  }
+
+  /** 解除客户端设置锁定 */
+  async function clearClientLock() {
+    try {
+      await commands.windows.clientLockClear();
+      await load();
+    } catch (e) {
+      showToast(tErr(e));
+      throw e;
+    }
+  }
+
+  /** 校验解锁密码；命令失败按不通过处理 */
+  async function verifyClientLock(password: string) {
+    return commands.windows.clientLockVerify(password).catch(() => false);
+  }
+
   /** 透明度改完立刻反映到本窗口，再落盘；别的窗口靠 client-config-change 自己跟上 */
   function applyWindowOpacity(v: number) {
     applyWindowAlpha(v);
@@ -432,6 +459,9 @@ export function useSettingsClient() {
   return {
     client,
     applyClient,
+    setClientLock,
+    clearClientLock,
+    verifyClientLock,
     applyWindowOpacity,
     applyWindowEffect,
     experimental,

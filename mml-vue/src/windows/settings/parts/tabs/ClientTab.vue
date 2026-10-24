@@ -6,6 +6,7 @@
 import { nextTick, ref, watch } from "vue";
 import { t } from "../../../../lib/i18n";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
+import BaseModal from "../../../../components/ui/BaseModal.vue";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
 import NumberStepper from "../../../../components/ui/NumberStepper.vue";
 import SettingsGroup from "../SettingsGroup.vue";
@@ -56,7 +57,50 @@ const {
   importCustomHome,
   removeCustomHome,
   saveState,
+  setClientLock,
+  clearClientLock,
 } = props.settings;
+
+/** 锁定客户端设置的密码弹窗 */
+const lockOpen = ref(false);
+const lockPassword = ref("");
+const lockConfirm = ref("");
+const lockError = ref("");
+
+/** 打开设置 / 修改密码弹窗 */
+function openLock() {
+  lockPassword.value = "";
+  lockConfirm.value = "";
+  lockError.value = "";
+  lockOpen.value = true;
+}
+
+/** 校验两次输入后调用命令锁定 */
+async function saveLock() {
+  if (!lockPassword.value) {
+    lockError.value = t("winSettings.clientLockWrong");
+    return;
+  }
+  if (lockPassword.value !== lockConfirm.value) {
+    lockError.value = t("winSettings.clientLockMismatch");
+    return;
+  }
+  try {
+    await setClientLock(lockPassword.value);
+    lockOpen.value = false;
+  } catch {
+    /* 错误提示已由 composable 弹出 */
+  }
+}
+
+/** 解除锁定，清掉密码哈希 */
+async function clearLock() {
+  try {
+    await clearClientLock();
+  } catch {
+    /* 错误提示已由 composable 弹出 */
+  }
+}
 
 /** 打开服务器包导出窗口：带上主页面当前选中的实例，没选就让窗口里自己挑 */
 function openServerPack() {
@@ -266,6 +310,24 @@ watch(lockServerError, async (msg) => {
     </template>
   </SettingsGroup>
 
+  <!-- 锁定客户端设置：锁定后设置页隐藏本页，需要密码才能进来 -->
+  <SettingsGroup id="clientLock" title-key="winSettings.secClientLock" :flash="flashGroup === 'clientLock'">
+    <p class="field-desc">{{ t("winSettings.clientLockDesc") }}</p>
+    <div class="switch-row">
+      <div class="switch-text">
+        <span class="switch-label">
+          {{ client.lockClient ? t("winSettings.clientLockOn") : t("winSettings.clientLockOff") }}
+        </span>
+      </div>
+      <BaseButton size="sm" @click="openLock">
+        {{ client.lockClient ? t("winSettings.clientLockChange") : t("winSettings.clientLockSet") }}
+      </BaseButton>
+    </div>
+    <BaseButton v-if="client.lockClient" size="sm" variant="danger" @click="clearLock">
+      {{ t("winSettings.clientLockClear") }}
+    </BaseButton>
+  </SettingsGroup>
+
   <!-- 服务器包：把实例与启动器配置打成可分发的一包，玩家导入后重载并进入该实例 -->
   <SettingsGroup id="serverPack" title-key="winSettings.secServerPack" :flash="flashGroup === 'serverPack'">
     <p class="field-desc">{{ t("winSettings.serverPackDesc") }}</p>
@@ -273,5 +335,22 @@ watch(lockServerError, async (msg) => {
       {{ t("winSettings.serverPackExport") }}
     </BaseButton>
   </SettingsGroup>
+
+  <!-- 设置 / 修改解锁密码 -->
+  <BaseModal v-if="lockOpen" :title="t('winSettings.clientLockSet')" @close="lockOpen = false">
+    <p v-if="!client.loginLockOn || !client.lockInstance" class="field-desc">
+      {{ t("winSettings.clientLockNoLockHint") }}
+    </p>
+    <label class="field-label">{{ t("winSettings.clientLockPassword") }}</label>
+    <input v-model="lockPassword" class="field-input" type="password" spellcheck="false" autocomplete="new-password" />
+    <label class="field-label">{{ t("winSettings.clientLockConfirm") }}</label>
+    <input v-model="lockConfirm" class="field-input" type="password" spellcheck="false" autocomplete="new-password"
+      @keyup.enter="saveLock" />
+    <p v-if="lockError" class="error-text">{{ lockError }}</p>
+    <div class="modal-actions">
+      <BaseButton @click="lockOpen = false">{{ t("actions.cancel") }}</BaseButton>
+      <BaseButton variant="primary" @click="saveLock">{{ t("winSettings.clientLockSet") }}</BaseButton>
+    </div>
+  </BaseModal>
 
 </template>

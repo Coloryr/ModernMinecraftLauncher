@@ -8,10 +8,10 @@ use super::{CONFIG, GUI_CONFIG, INSTANCES, LAUNCHER, MANIFEST, Manifest, archive
 
 /// 导入成功后替换进程内配置的数据。
 pub(crate) struct ImportedPack {
-    /// 导入后的内核配置。
-    pub config: ConfigObj,
-    /// 导入后的界面配置。
-    pub gui: GuiConfig,
+    /// 导入后的内核配置；服务器包没带这一份时为 `None`。
+    pub config: Option<ConfigObj>,
+    /// 导入后的界面配置；服务器包没带这一份时为 `None`。
+    pub gui: Option<GuiConfig>,
 }
 
 /// 已解包并等待替换的文件。
@@ -53,8 +53,16 @@ fn destination(root: &Path, relative: &Path) -> Result<PathBuf, String> {
 pub(crate) fn import_pack(file: &Path, root: &Path) -> Result<mml_config::config_save::ReplacedFiles<ImportedPack>, String> {
     let mut zip = ZipArchive::new(File::open(file).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     let manifest = format::validate(&mut zip)?;
-    let config = format::read_json(&mut zip, CONFIG)?;
-    let gui = format::read_json(&mut zip, GUI_CONFIG)?;
+    let config = if zip.by_name(CONFIG).is_ok() {
+        Some(format::read_json(&mut zip, CONFIG)?)
+    } else {
+        None
+    };
+    let gui = if zip.by_name(GUI_CONFIG).is_ok() {
+        Some(format::read_json(&mut zip, GUI_CONFIG)?)
+    } else {
+        None
+    };
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     let directories = instance_directories(&root, &manifest)?;
     let stage = root.join(format!(".server-import-{}", uuid::Uuid::new_v4()));
@@ -239,6 +247,40 @@ mod tests {
         let game: serde_json::Value = serde_json::from_slice(&fs::read(renamed.join("game.json")).unwrap()).unwrap();
         assert_eq!(game["DirName"], "renamed");
         assert_eq!(fs::read_to_string(root.join(LAUNCHER)).unwrap(), "running launcher");
+        crate::test_support::cleanup(&[&dir]);
+    }
+
+    #[test]
+    fn imports_without_configs_and_keeps_existing_ones() {
+        crate::test_support::ensure_boot();
+        let dir = crate::test_support::temp_dir("server-pack-partial");
+        let file = dir.join("pack.zip");
+        let uuid = uuid::Uuid::new_v4();
+        let manifest = Manifest {
+            format: "mml-server-pack".into(),
+            version: 1,
+            instances: vec![Instance { uuid, directory: "test".into() }],
+            launcher: false,
+        };
+        let data = vec![
+            (MANIFEST.into(), serde_json::to_vec(&manifest).unwrap()),
+            ("mml/minecraft/instances/test/game.json".into(),
+                format!(r#"{{"UUID":"{uuid}","DirName":"test","Name":"Test"}}"#).into_bytes()),
+            ("mml/minecraft/instances/test/.minecraft/options.txt".into(), b"new".to_vec()),
+            ("mml/custom_ui/page.zip".into(), b"page".to_vec()),
+        ];
+        archive::write_zip(&file, &[], &data, &None, &std::sync::atomic::AtomicBool::new(false)).unwrap();
+
+        let root = dir.join("runtime");
+        fs::create_dir_all(root.join("minecraft/instances/test/.minecraft")).unwrap();
+        fs::write(root.join("config.json"), "keep-core").unwrap();
+        fs::write(root.join("gui_config.json"), "keep-gui").unwrap();
+        let imported = import_pack(&file, &root).unwrap();
+        assert!(imported.value.config.is_none());
+        assert!(imported.value.gui.is_none());
+        assert_eq!(fs::read_to_string(root.join("config.json")).unwrap(), "keep-core");
+        assert_eq!(fs::read_to_string(root.join("gui_config.json")).unwrap(), "keep-gui");
+        assert!(root.join("custom_ui/page.zip").is_file());
         crate::test_support::cleanup(&[&dir]);
     }
 

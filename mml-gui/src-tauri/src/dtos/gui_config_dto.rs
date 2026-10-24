@@ -198,6 +198,12 @@ pub struct ClientConfigDto {
     pub motd_server: String,
     /// 实例锁定：锁定的实例 uuid，空串表示未锁定；锁定时主窗口不允许切换到其它实例
     pub lock_instance: String,
+    /// 锁定客户端设置：开启后设置页隐藏「客户端设置」
+    pub lock_client: bool,
+    /// 锁定客户端设置的盐，十六进制
+    pub client_lock_salt: String,
+    /// 锁定客户端设置的 PBKDF2 哈希，十六进制
+    pub client_lock_hash: String,
     /// 自定义主页面：启用后主窗口的启动器主页换成导入的页面
     pub custom_home: bool,
     /// 自定义 CSS 总开关
@@ -236,6 +242,9 @@ impl From<ClientConfig> for ClientConfigDto {
             auto_join_server: c.auto_join_server,
             motd_server: c.motd_server,
             lock_instance: c.lock_instance,
+            lock_client: c.lock_client,
+            client_lock_salt: c.client_lock_salt,
+            client_lock_hash: c.client_lock_hash,
             custom_home: c.custom_home,
             custom_css_on: c.custom_css_on,
             custom_css: c.custom_css.into_iter().map(Into::into).collect(),
@@ -268,6 +277,9 @@ impl From<ClientConfigDto> for ClientConfig {
             auto_join_server: c.auto_join_server,
             motd_server: c.motd_server,
             lock_instance: c.lock_instance,
+            lock_client: c.lock_client,
+            client_lock_salt: c.client_lock_salt,
+            client_lock_hash: c.client_lock_hash,
             custom_home: c.custom_home,
             custom_css_on: c.custom_css_on,
             custom_css: c.custom_css.into_iter().map(Into::into).collect(),
@@ -392,6 +404,9 @@ impl From<GuiConfig> for GuiConfigDto {
                 auto_join_server: c.client.auto_join_server,
                 motd_server: c.client.motd_server,
                 lock_instance: c.client.lock_instance,
+                lock_client: c.client.lock_client,
+                client_lock_salt: c.client.client_lock_salt,
+                client_lock_hash: c.client.client_lock_hash,
                 custom_home: c.client.custom_home,
                 custom_css_on: c.client.custom_css_on,
                 custom_css: c.client.custom_css.into_iter().map(Into::into).collect(),
@@ -470,6 +485,9 @@ impl From<GuiConfigDto> for GuiConfig {
                 auto_join_server: d.client.auto_join_server,
                 motd_server: d.client.motd_server,
                 lock_instance: d.client.lock_instance,
+                lock_client: d.client.lock_client,
+                client_lock_salt: d.client.client_lock_salt,
+                client_lock_hash: d.client.client_lock_hash,
                 custom_home: d.client.custom_home,
                 custom_css_on: d.client.custom_css_on,
                 custom_css: d.client.custom_css.into_iter().map(Into::into).collect(),

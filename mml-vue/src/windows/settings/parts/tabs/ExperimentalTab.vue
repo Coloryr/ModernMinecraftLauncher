@@ -1,59 +1,72 @@
 <script setup lang="ts">
-// 设置窗口 · 实验性功能页：还在验证中的开关集中在这里；管理员启动已接线，URI / 沙盒只落配置。
-// 单独成栏（侧栏在客户端设置下面），不再挂在客户端设置页末尾。
+// 设置窗口 · 实验性功能页：管理员启动已接线；URI / 沙盒启动尚未实现，开关禁用。
+// 客户端设置被锁定时，解锁入口也在这里：那一页会被隐藏，得先在这输密码。
 import { t } from "../../../../lib/i18n";
+import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
 import SettingsGroup from "../SettingsGroup.vue";
 import type { useSettingsClient } from "../../composables/useSettingsClient";
 
 const props = defineProps<{
-  /** 客户端设置的状态与保存方法，实验性开关挂在它上面 */
+  /** 客户端设置的状态与保存方法，实验性开关与锁定状态都在它上面 */
   settings: ReturnType<typeof useSettingsClient>;
+  /** 本次设置窗口是否已解锁客户端设置 */
+  clientUnlocked: boolean;
   /** 需要高亮脉冲的分组 id（搜索命中） */
   flashGroup?: string;
 }>();
 
-const { experimental, applyExperimental } = props.settings;
+const emit = defineEmits<{
+  /** 请求输入密码解锁客户端设置，弹框由设置窗口统一管 */
+  (e: "unlock"): void;
+}>();
+
+const { client, experimental, applyExperimental } = props.settings;
 </script>
 
 <template>
   <SettingsGroup id="experimental" title-key="winSettings.secExperimental"
     :flash="flashGroup === 'experimental'">
-    <p class="field-desc">{{ t("winSettings.experimentalDesc") }}</p>
-
-    <!-- 管理员启动：启动器自身与它启动的实例各一个开关 -->
-    <label class="field-label">{{ t("winSettings.adminLaunch") }}</label>
     <div class="switch-row">
       <div class="switch-text">
         <span class="switch-label">{{ t("winSettings.launcherAdmin") }}</span>
-        <span class="switch-state">{{ t("winSettings.launcherAdminDesc") }}</span>
       </div>
       <BaseSwitch v-model="experimental.launcherAdmin" @update:model-value="applyExperimental" />
     </div>
     <div class="switch-row">
       <div class="switch-text">
         <span class="switch-label">{{ t("winSettings.instanceAdmin") }}</span>
-        <span class="switch-state">{{ t("winSettings.instanceAdminDesc") }}</span>
       </div>
       <BaseSwitch v-model="experimental.instanceAdmin" @update:model-value="applyExperimental" />
     </div>
 
-    <!-- URI 启动与沙盒启动 -->
-    <div class="switch-row">
+    <!-- 还没实现的开关：只置灰，不写额外说明 -->
+    <div class="switch-row dim">
       <div class="switch-text">
         <span class="switch-label">{{ t("winSettings.uriLaunch") }}</span>
-        <span class="switch-state">{{ t("winSettings.uriLaunchDesc") }}</span>
       </div>
-      <BaseSwitch v-model="experimental.uriLaunch" @update:model-value="applyExperimental" />
+      <BaseSwitch v-model="experimental.uriLaunch" disabled />
     </div>
-    <div class="switch-row">
+    <div class="switch-row dim">
       <div class="switch-text">
         <span class="switch-label">{{ t("winSettings.sandboxLaunch") }}</span>
-        <span class="switch-state">{{ t("winSettings.sandboxLaunchDesc") }}</span>
       </div>
-      <BaseSwitch v-model="experimental.sandboxLaunch" @update:model-value="applyExperimental" />
+      <BaseSwitch v-model="experimental.sandboxLaunch" disabled />
     </div>
+  </SettingsGroup>
 
-    <p class="field-desc">{{ t("winSettings.experimentalWip") }}</p>
+  <!-- 锁定客户端设置：那一页在锁定时隐藏，解锁入口放这里 -->
+  <SettingsGroup v-if="client.lockClient" id="clientLock" title-key="winSettings.secClientLock"
+    :flash="flashGroup === 'clientLock'">
+    <p class="field-desc">{{ t("winSettings.clientLockDesc") }}</p>
+    <div class="switch-row">
+      <div class="switch-text">
+        <span class="switch-label">{{ t("winSettings.clientLockOn") }}</span>
+        <span v-if="clientUnlocked" class="switch-state">{{ t("winSettings.clientLockUnlocked") }}</span>
+      </div>
+      <BaseButton v-if="!clientUnlocked" size="sm" @click="emit('unlock')">
+        {{ t("winSettings.clientLockUnlock") }}
+      </BaseButton>
+    </div>
   </SettingsGroup>
 </template>

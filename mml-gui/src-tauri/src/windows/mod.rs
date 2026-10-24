@@ -752,7 +752,7 @@ mod tests {
         assert_eq!(clean_url("ftp://a.com"), "");
     }
 
-    /// 工作区与显示器完全重合时判定为「平台没给任务栏信息」，交给最大化
+    /// 工作区与显示器完全重合时判定为「平台没给任务栏信息」
     #[test]
     fn full_work_area_matches_monitor() {
         let position = tauri::PhysicalPosition::new(0, 0);
@@ -915,8 +915,7 @@ pub fn window_is_fullscreen(window: WebviewWindow) -> bool {
 
 /// 工作区是否与显示器整块重合
 ///
-/// 平台不提供任务栏 / Dock 占用信息时两者完全一致（Wayland 的 GDK workarea 就是这样），
-/// 此时手动按工作区摆放没有意义，只能交给系统最大化。
+/// 平台不提供任务栏 / Dock 占用信息时两者完全一致（Wayland 的 GDK workarea 就是这样）
 ///
 /// - `work`: 当前显示器的工作区
 /// - `position`: 显示器在虚拟桌面里的左上角
@@ -935,11 +934,9 @@ fn work_area_is_full_monitor(
 
 /// 取当前显示器真正可用的工作区
 ///
-/// Wayland 下 GDK 给的是整块屏幕；启动器跑在 XWayland 上，改用 X 根窗口的
-/// `_NET_WORKAREA`（只在单显示器时）才能扣掉左侧 Dock / 顶栏。
+/// Wayland 下 GDK 只给整屏；走 XWayland 时读 `_NET_WORKAREA` 才能扣掉 Dock / 顶栏（仅单显示器）。
 ///
-/// 原生 Wayland 窗口不能自己绝对定位，也没有工作区协议；当前 Tauri/tao 在 Linux 上
-/// 只有 X11 后端，所以实际走不到那条路。
+/// 原生 Wayland 不能绝对定位、也没有工作区协议；当前 Tauri 在 Linux 上只有 X11 后端。
 ///
 /// - `window`: 调用方窗口，用来判断显示器数量
 /// - `monitor`: 当前显示器
@@ -1212,6 +1209,86 @@ pub fn window_get_gui_config(window: WebviewWindow) -> GuiConfigDto {
         };
     }
     config.into()
+}
+
+/// 锁定客户端设置的密码哈希：PBKDF2-HMAC-SHA256，盐为随机 UUID
+///
+/// - `password`: 明文密码
+/// - `salt`: 十六进制盐
+///
+/// # 返回值
+///
+/// 三十二字节哈希的十六进制文本
+fn client_lock_hash(password: &str, salt: &str) -> String {
+    let hash = pbkdf2::pbkdf2_hmac_array::<sha2::Sha256, 32>(
+        password.as_bytes(),
+        salt.as_bytes(),
+        120_000,
+    );
+    hash.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// 设置密码并锁定客户端设置
+///
+/// - `app`: 应用句柄，变更后广播 `client-config-change`
+/// - `password`: 新密码，不能为空
+///
+/// # 返回值
+///
+/// 成功返回 `Ok(())`；密码为空返回错误键
+#[gui_macros::command]
+pub fn window_client_lock_set(app: AppHandle, password: String) -> Result<(), String> {
+    if password.is_empty() {
+        return Err(err_keys::CLIENT_LOCK_EMPTY.to_string());
+    }
+    let salt = Uuid::new_v4().simple().to_string();
+    let hash = client_lock_hash(&password, &salt);
+    let mut config = crate::gui_config::get();
+    config.client.lock_client = true;
+    config.client.client_lock_salt = salt;
+    config.client.client_lock_hash = hash;
+    let client = config.client.clone();
+    crate::gui_config::set(config);
+    emit_client_config_change(&app, client.into());
+    Ok(())
+}
+
+/// 解除客户端设置锁定，清掉密码哈希
+///
+/// - `app`: 应用句柄，变更后广播 `client-config-change`
+///
+/// # 返回值
+///
+/// 保存成功返回 `Ok(())`
+#[gui_macros::command]
+pub fn window_client_lock_clear(app: AppHandle) -> Result<(), String> {
+    let mut config = crate::gui_config::get();
+    config.client.lock_client = false;
+    config.client.client_lock_salt.clear();
+    config.client.client_lock_hash.clear();
+    let client = config.client.clone();
+    crate::gui_config::set(config);
+    emit_client_config_change(&app, client.into());
+    Ok(())
+}
+
+/// 校验解锁密码
+///
+/// - `password`: 用户输入的密码
+///
+/// # 返回值
+///
+/// 密码正确或根本没有锁定时返回 `true`
+#[gui_macros::command]
+pub fn window_client_lock_verify(password: String) -> bool {
+    let config = crate::gui_config::get();
+    if !config.client.lock_client {
+        return true;
+    }
+    if config.client.client_lock_salt.is_empty() || config.client.client_lock_hash.is_empty() {
+        return false;
+    }
+    client_lock_hash(&password, &config.client.client_lock_salt) == config.client.client_lock_hash
 }
 
 /// 保存 GUI 状态到 gui_config.json，前端 DTO 转内部 GuiConfig

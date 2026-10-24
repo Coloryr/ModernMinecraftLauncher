@@ -218,6 +218,12 @@ export interface ClientConfig {
   motdServer: string;
   /** 实例锁定：锁定的实例 uuid（空 = 未锁定）；锁定时主窗口不允许切换到其它实例 */
   lockInstance: string;
+  /** 锁定客户端设置：设置页隐藏客户端设置，需要密码解锁 */
+  lockClient: boolean;
+  /** 锁定客户端设置的盐，十六进制 */
+  clientLockSalt: string;
+  /** 锁定客户端设置的 PBKDF2 哈希，十六进制 */
+  clientLockHash: string;
   /** 自定义主页面：启用后主窗口的启动器主页换成导入的页面 */
   customHome: boolean;
   /** 自定义 CSS 总开关；关闭后已安装的样式保留但不生效 */
@@ -425,6 +431,9 @@ export function defaultConfig(): GuiConfig {
       windowOpacity: 85,
       motdServer: readString(KEYS.motdServer),
       lockInstance: readString(KEYS.lockInstance),
+      lockClient: false,
+      clientLockSalt: "",
+      clientLockHash: "",
       customHome: readFlag(KEYS.customHome),
       // 自定义界面的开关与条目只认 gui_config，前端不给本地兜底
       customCssOn: false,

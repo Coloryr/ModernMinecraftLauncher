@@ -62,6 +62,8 @@ pub const NOT_OAUTH: &str = "err.notOauth";
 
 /// 服务器地址为空
 pub const SERVER_EMPTY: &str = "err.serverEmpty";
+/// 锁定客户端设置的密码为空
+pub const CLIENT_LOCK_EMPTY: &str = "err.clientLockEmpty";
 /// 服务器名称与地址都要填
 pub const NAME_IP: &str = "err.nameIp";
 

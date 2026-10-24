@@ -55,6 +55,35 @@ pub struct ExportPickDto {
     pub exclude: bool,
 }
 
+/// 服务器包要带哪些内容，即 `ExportConfigDto.server`
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ServerPackOptionsDto {
+    /// 是否导出启动器配置 config.json
+    pub config: bool,
+    /// 是否导出界面配置 gui_config.json
+    pub gui_config: bool,
+    /// 是否导出整页主题 custom_ui/page.zip
+    pub page: bool,
+    /// 是否导出全部自定义样式 custom_ui/css/*.zip
+    pub css: bool,
+    /// 是否导出自定义主页面 home
+    pub home: bool,
+}
+
+impl Default for ServerPackOptionsDto {
+    /// 默认带两份配置，自定义内容不选
+    fn default() -> Self {
+        Self {
+            config: true,
+            gui_config: true,
+            page: false,
+            css: false,
+            home: false,
+        }
+    }
+}
+
 /// 前端提交的导出配置，即 `export_run` 的入参
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -81,6 +110,12 @@ pub struct ExportConfigDto {
     pub version: String,
     /// 简介
     pub summary: String,
+    /// 服务器包要带上的实例 uuid；空表示只带 `export_run` 传进来的那一个，其它格式不看
+    #[serde(default)]
+    pub instances: Vec<String>,
+    /// 服务器包选项；其它格式不看这个字段
+    #[serde(default)]
+    pub server: ServerPackOptionsDto,
 }
 
 /// 导出进度事件，事件名为 `export-progress`

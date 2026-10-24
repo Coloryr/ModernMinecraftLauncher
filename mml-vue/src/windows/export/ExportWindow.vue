@@ -9,7 +9,7 @@
 // 勾选分两块：**模组**（`mods` 目录，来自 export_get_info）与**文件**（游戏目录下的懒加载树）。
 // 每一条都能填下载地址：Modrinth 格式下填了地址的写进 index 的下载清单，没填的与目录一起打进
 // overrides；CurseForge 的清单格式里只有项目号 / 文件号，地址那一块在那个格式下不作数。
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import IconTabs from "../../components/ui/IconTabs.vue";
@@ -25,7 +25,16 @@ import { api, onCloseBlocked, onExportFocus, onExportProgress } from "../../lib/
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { currentKind, isTauri, multiWindow, targetUuid, windowParams } from "../windowManager";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
-import type { ExportEntryDto, ExportInfoDto, ExportProgressDto, InstanceInfoDto } from "../../lib/bindings";
+import {
+  commands,
+  type CustomHomeInfoDto,
+  type CustomUiInfoDto,
+  type ExportEntryDto,
+  type ExportInfoDto,
+  type ExportProgressDto,
+  type GuiConfigDto,
+  type InstanceInfoDto,
+} from "../../lib/bindings";
 
 /** 请求关闭本窗口 */
 const emit = defineEmits<{ (e: "close"): void }>();
@@ -54,6 +63,50 @@ const serverPack = computed(() => currentKind.value === "server_pack");
 
 const pack = ref<PackId>(serverPack.value ? "server" : "mml");
 const includeLauncher = ref(false);
+
+/** 服务器包的三组选择：配置 → 自定义内容 → 实例 */
+const serverOptions = reactive({
+  config: true,
+  guiConfig: true,
+  page: false,
+  css: false,
+  home: false,
+});
+/** 已安装的整页主题 / 自定义样式 */
+const customUi = ref<CustomUiInfoDto | null>(null);
+/** 已安装的自定义主页面 */
+const customHome = ref<CustomHomeInfoDto | null>(null);
+/** GUI 配置，导出前检查实例 / 登录方式锁定用 */
+const guiConfig = ref<GuiConfigDto | null>(null);
+/** 没锁实例或登录方式时的询问弹窗 */
+const lockWarnOpen = ref(false);
+/** 服务器包多选的实例 uuid，按实例列表顺序 */
+const serverPicked = ref<string[]>([]);
+
+/** 读已安装的自定义主题 / 样式 / 主页面，服务器包窗口用 */
+async function loadCustomAssets() {
+  if (!serverPack.value) return;
+  const [ui, home, gui] = await Promise.all([
+    commands.customUi.status().catch(() => null),
+    commands.customHome.status().catch(() => null),
+    commands.windows.getGuiConfig().catch(() => null),
+  ]);
+  customUi.value = ui;
+  customHome.value = home;
+  guiConfig.value = gui;
+}
+
+// 界面配置不导出时，自定义内容没有开关可落，顺手清掉选择
+watch(
+  () => serverOptions.guiConfig,
+  (on) => {
+    if (!on) {
+      serverOptions.page = false;
+      serverOptions.css = false;
+      serverOptions.home = false;
+    }
+  },
+);
 const packName = ref("");
 const author = ref("");
 const version = ref("1.0.0");
@@ -496,6 +549,52 @@ function setUrl(path: string, value: string) {
 
 watch(currentUuid, loadInfo);
 
+/** 切换服务器包里的一个实例；至少保留一个，当前实例被取消时顺延到第一个 */
+function toggleServerInstance(uuid: string) {
+  if (busy.value) return;
+  const picked = serverPicked.value.includes(uuid)
+    ? serverPicked.value.filter((item) => item !== uuid)
+    : [...serverPicked.value, uuid];
+  if (!picked.length) return;
+  // 统一按实例列表顺序存，勾选顺序与导出顺序都跟列表一致
+  serverPicked.value = instances.value
+    .filter((item) => picked.includes(item.uuid))
+    .map((item) => item.uuid);
+  if (!serverPicked.value.includes(currentUuid.value)) currentUuid.value = serverPicked.value[0];
+}
+
+/** 把某个实例设为当前实例；服务器包里同时保证它在多选里 */
+function focusInstance(uuid: string) {
+  currentUuid.value = uuid;
+  if (!serverPack.value || serverPicked.value.includes(uuid)) return;
+  serverPicked.value = instances.value
+    .filter((item) => item.uuid === uuid || serverPicked.value.includes(item.uuid))
+    .map((item) => item.uuid);
+}
+
+/** 列表刷新后同步多选：去掉已删除的实例，至少留一个 */
+function syncServerPicked() {
+  const available = new Set(instances.value.map((item) => item.uuid));
+  const picked = serverPicked.value.filter((uuid) => available.has(uuid));
+  if (!picked.length && instances.value.length) picked.push(instances.value[0].uuid);
+  serverPicked.value = instances.value
+    .filter((item) => picked.includes(item.uuid))
+    .map((item) => item.uuid);
+  if (!serverPicked.value.includes(currentUuid.value)) {
+    currentUuid.value = serverPicked.value[0] ?? "";
+  }
+}
+
+/** 这个实例是不是唯一勾选的那个：唯一的不能取消，至少留一个 */
+function isOnlyPicked(uuid: string): boolean {
+  return serverPicked.value.length === 1 && serverPicked.value.includes(uuid);
+}
+
+/** 加载器显示名，走 add.loader.* 的既有映射 */
+function loaderLabel(id: string): string {
+  return t(`add.loader.${id}`);
+}
+
 // ---------------- 导出执行 ----------------
 
 const progress = ref<ExportProgressDto | null>(null);
@@ -549,9 +648,30 @@ function filePicks() {
   return picks;
 }
 
+/** 导出界面配置时，如果实例或登录方式没锁，先问一句 */
+function needsLockWarn() {
+  const c = guiConfig.value?.client;
+  if (!c) return false;
+  if (!c.loginLockOn || !c.lockInstance.trim()) return true;
+  // 实例锁定只能锁一个：包里不止一个实例，或锁的不是包里的实例时，玩家仍能切走
+  return serverPicked.value.length > 1 || !serverPicked.value.includes(c.lockInstance);
+}
+
+/** 询问后继续导出 */
+function continueExport() {
+  lockWarnOpen.value = false;
+  void startExport(true);
+}
+
 /** 选保存位置后交给 Rust 侧后台导出，进度走 export-progress 事件 */
-async function startExport() {
+async function startExport(confirmed = false) {
+  if (serverPack.value && !guiConfig.value) await loadCustomAssets();
+  if (!confirmed && serverPack.value && serverOptions.guiConfig && needsLockWarn()) {
+    lockWarnOpen.value = true;
+    return;
+  }
   if (!currentUuid.value || busy.value || loadingInfo.value || !info.value) return;
+  if (serverPack.value && !serverPicked.value.length) return;
   if (!inTauri) return;
   const uuid = currentUuid.value;
   const config = {
@@ -560,6 +680,14 @@ async function startExport() {
     includeLauncher: pack.value === "server" && !!info.value.canBundleLauncher && includeLauncher.value,
     mods: pack.value === "mml" ? [] : picksOf(pickedMods.value), files: filePicks(),
     name: packName.value, author: author.value, version: version.value, summary: summary.value,
+    instances: serverPack.value ? [...serverPicked.value] : [],
+    server: {
+      config: serverOptions.config,
+      guiConfig: serverOptions.guiConfig,
+      page: serverOptions.page,
+      css: serverOptions.css,
+      home: serverOptions.home,
+    },
   };
   const warnCustomLoader = customLoaderLost.value;
   const dialogOptions = {
@@ -629,7 +757,7 @@ let unlistenCloseBlocked: UnlistenFn | null = null;
 function applyTarget() {
   const uuid = targetUuid();
   if (uuid && instances.value.some((i) => i.uuid === uuid)) {
-    currentUuid.value = uuid;
+    focusInstance(uuid);
   }
 }
 
@@ -637,7 +765,10 @@ function applyTarget() {
 async function syncInstances() {
   try {
     instances.value = await api.getInstances();
-    applyTarget();
+    // 服务器包已经选过实例时不再按打开参数覆盖，避免切回窗口时把手动取消的实例又勾回来
+    if (!serverPack.value || !serverPicked.value.length) applyTarget();
+    // 服务器包多选：没有目标参数时默认带上第一个，表单才不会只剩一句提示
+    if (serverPack.value) syncServerPicked();
   } catch (e) {
     console.error("[ExportWindow] 初始化失败", e);
   }
@@ -647,6 +778,8 @@ async function syncInstances() {
 useWindowRefresh(() => {
   // 上一轮的结果弹窗别留到下一次打开；还在跑就让它继续显示进度
   if (!running.value) progress.value = null;
+  // 设置窗口可能刚改过自定义内容与锁定，切回来重读一次
+  if (serverPack.value) void loadCustomAssets();
   return syncInstances();
 });
 
@@ -655,6 +788,7 @@ watch(() => windowParams.value.uuid, applyTarget);
 
 onMounted(async () => {
   await syncInstances();
+  void loadCustomAssets();
 
   unlistenProgress = await onExportProgress((p) => {
     progress.value = p;
@@ -663,7 +797,7 @@ onMounted(async () => {
   // 窗口已存在时再次打开：壳层推送新的目标实例
   unlistenFocus = await onExportFocus((uuid) => {
     if (instances.value.some((i) => i.uuid === uuid)) {
-      currentUuid.value = uuid;
+      focusInstance(uuid);
     }
   });
 
@@ -688,22 +822,98 @@ onBeforeUnmount(() => {
   <WindowFrame body-fill :title="t(serverPack ? 'winTitle.serverPack' : 'winExport.title')" @close="askClose">
     <!-- 实例选择与导出按钮放进标题栏：不占内容区高度，也不随选项卡滚动 -->
     <template #head-right>
-      <select v-model="currentUuid" class="field-select head-select" :disabled="busy">
+      <select v-if="!serverPack" v-model="currentUuid" class="field-select head-select" :disabled="busy">
         <!-- 标题栏里位置窄，占位用短文案；内容区的空态另有一句更长的提示 -->
         <option value="" disabled>{{ t("winExport.instance") }}</option>
         <option v-for="i in instances" :key="i.uuid" :value="i.uuid">{{ i.name }}</option>
       </select>
       <InfoExportButton v-if="!serverPack" :uuid="currentUuid" :name="info?.name ?? ''"
         :disabled="busy || loadingInfo || !info" />
-      <BaseButton size="sm" variant="primary" :disabled="busy || loadingInfo || !info" @click="startExport">
+      <BaseButton size="sm" variant="primary" :disabled="busy || loadingInfo || !info" @click="startExport()">
         {{ running ? t("winExport.exporting") : t("winExport.exportBtn") }}
       </BaseButton>
     </template>
 
     <div class="export-window">
       <template v-if="info">
-        <!-- 格式用分段页签：一览可选格式，切换不用展开下拉；服务器包是独立窗口，这里没有它 -->
-        <div v-if="!serverPack" class="row">
+        <!-- 服务器包：配置 → 自定义内容 → 实例 -->
+        <template v-if="serverPack">
+          <!-- 配置：跟包一起带走的启动器设置，不带就保留玩家原来的 -->
+          <section class="pack-card">
+            <header class="pack-card-head">
+              <span class="pack-card-title">{{ t("winExport.serverConfig") }}</span>
+              <span class="pack-card-hint">{{ t("winExport.serverConfigHint") }}</span>
+            </header>
+            <label class="check-row">
+              <input v-model="serverOptions.config" type="checkbox" :disabled="busy" />
+              {{ t("winExport.serverConfigCore") }}
+            </label>
+            <label class="check-row">
+              <input v-model="serverOptions.guiConfig" type="checkbox" :disabled="busy" />
+              {{ t("winExport.serverConfigGui") }}
+            </label>
+          </section>
+
+          <!-- 自定义内容：依赖界面配置，没导入的置灰 -->
+          <section class="pack-card">
+            <header class="pack-card-head">
+              <span class="pack-card-title">{{ t("winExport.serverCustom") }}</span>
+              <span class="pack-card-hint">
+                {{ serverOptions.guiConfig ? t("winExport.serverCustomHint") : t("winExport.serverCustomNeedsGui") }}
+              </span>
+            </header>
+            <label class="check-row" :class="{ 'is-disabled': !serverOptions.guiConfig || !customUi?.pageInstalled }">
+              <input v-model="serverOptions.page" type="checkbox"
+                :disabled="busy || !serverOptions.guiConfig || !customUi?.pageInstalled" />
+              {{ t("winExport.serverCustomPage") }}
+            </label>
+            <label class="check-row" :class="{ 'is-disabled': !serverOptions.guiConfig || !customUi?.css.length }">
+              <input v-model="serverOptions.css" type="checkbox"
+                :disabled="busy || !serverOptions.guiConfig || !customUi?.css.length" />
+              {{ t("winExport.serverCustomCss") }}
+            </label>
+            <label class="check-row" :class="{ 'is-disabled': !serverOptions.guiConfig || !customHome?.installed }">
+              <input v-model="serverOptions.home" type="checkbox"
+                :disabled="busy || !serverOptions.guiConfig || !customHome?.installed" />
+              {{ t("winExport.serverCustomHome") }}
+            </label>
+          </section>
+
+          <!-- 实例：可多选，每个实例在包里各占一份 -->
+          <section class="pack-card">
+            <header class="pack-card-head">
+              <span class="pack-card-title">{{ t("winExport.serverInstance") }}</span>
+              <span class="pack-card-hint">
+                {{ t("winExport.serverInstanceHint", { count: serverPicked.length }) }}
+              </span>
+            </header>
+            <div class="instance-list">
+              <label v-for="i in instances" :key="i.uuid" class="instance-row"
+                :class="{ 'is-on': serverPicked.includes(i.uuid) }"
+                :title="isOnlyPicked(i.uuid) ? t('winExport.serverInstanceKeepOne') : undefined">
+                <input type="checkbox" :checked="serverPicked.includes(i.uuid)"
+                  :disabled="busy || isOnlyPicked(i.uuid)" @change="toggleServerInstance(i.uuid)" />
+                <span class="instance-name" :title="i.name">{{ i.name }}</span>
+                <span v-if="i.running" class="instance-tag">{{ t("launch.running") }}</span>
+                <span class="instance-meta">{{ i.version }} · {{ loaderLabel(i.loader) }}</span>
+              </label>
+            </div>
+            <label v-if="info.canBundleLauncher" class="check-row">
+              <input v-model="includeLauncher" type="checkbox" :disabled="busy" />
+              {{ t("winExport.includeLauncher") }}
+            </label>
+          </section>
+
+          <div class="row">
+            <label class="field-label" v-tip="t('winExport.zipLevelTip')">{{ t("winExport.zipLevel") }}</label>
+            <SegmentedTabs :options="zipOptions" :model-value="zipLevel" :disabled="busy"
+              @update:model-value="onZipLevelChange" />
+          </div>
+        </template>
+
+        <template v-else>
+        <!-- 格式用分段页签：一览可选格式，切换不用展开下拉 -->
+        <div class="row">
           <label class="field-label">{{ t("winExport.format") }}</label>
           <SegmentedTabs :options="packOptions" :model-value="pack" :disabled="busy"
             @update:model-value="onPackChange" />
@@ -721,11 +931,9 @@ onBeforeUnmount(() => {
 
         <!-- 选项卡：与「添加实例」窗口同一套图标页签 -->
         <p v-if="pack === 'mml'" class="sec-hint">{{ t("winExport.nativeHint") }}</p>
-        <p v-else-if="pack === 'server'" class="sec-hint">{{ t("winExport.serverHint") }}</p>
         <IconTabs v-else v-model="tab" :tabs="tabOptions" />
 
-        <label v-if="pack === 'server' && info.canBundleLauncher" class="row"><input v-model="includeLauncher" type="checkbox" :disabled="busy" />{{ t("winExport.includeLauncher") }}</label>
-        <div v-if="pack !== 'server'" class="tab-body">
+        <div class="tab-body">
           <!-- 整合包信息：写进清单的元数据，配着上面的格式一起看 -->
           <template v-if="shownTab === 'meta'">
             <p class="sec-hint">
@@ -810,10 +1018,20 @@ onBeforeUnmount(() => {
             </div>
           </template>
         </div>
+        </template>
       </template>
       <div v-else-if="loadingInfo" class="hint-full">{{ t("winExport.loading") }}</div>
       <div v-else class="hint-full">{{ t("winExport.pickInstance") }}</div>
     </div>
+
+    <!-- 服务器包：实例 / 登录方式没锁时先问一句，避免玩家拿到包后还能随意切换 -->
+    <BaseModal v-if="lockWarnOpen" :title="t('winExport.lockWarnTitle')" @close="lockWarnOpen = false">
+      <p class="modal-text">{{ t("winExport.lockWarnText") }}</p>
+      <div class="modal-actions">
+        <BaseButton @click="lockWarnOpen = false">{{ t("winExport.lockWarnCancel") }}</BaseButton>
+        <BaseButton variant="primary" @click="continueExport">{{ t("winExport.lockWarnContinue") }}</BaseButton>
+      </div>
+    </BaseModal>
 
     <!-- 导出进度：任务在后台跑，进度靠弹窗盖住整页，免得被选项卡切走看不见 -->
     <BaseModal v-if="progress && !confirmClose" :title="progressTitle" :width="460" :closable="false"
@@ -892,6 +1110,100 @@ onBeforeUnmount(() => {
 /* .field-label 默认是块级、上下都带外边距（12 / 6），并排时会把这一行顶歪 */
 .row .field-label {
   margin: 0;
+}
+
+/* 服务器包里的勾选项 */
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.check-row.is-disabled {
+  color: var(--text-dim);
+  cursor: default;
+}
+
+/* 服务器包的三段：配置 / 自定义内容 / 实例，每段一张卡片 */
+.pack-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card);
+}
+
+.pack-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pack-card-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pack-card-hint {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+/* 实例多选：超过一屏自己滚，行高按列表项，不按控件 32px */
+.instance-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0 -4px;
+}
+
+.instance-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.instance-row:hover {
+  background: var(--bg-hover);
+}
+
+.instance-row.is-on {
+  background: var(--accent-soft);
+}
+
+.instance-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+
+.instance-meta {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.instance-tag {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  color: var(--text-dim);
+  font-size: 10.5px;
+  line-height: 16px;
 }
 
 .grid-2 {

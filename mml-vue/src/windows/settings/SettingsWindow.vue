@@ -62,6 +62,72 @@ const client = useSettingsClient();
 // 本地文件的统计只在打开那一页时做，见 LocalFilesTab 的 onMounted
 const files = useSettingsLocalFiles();
 
+// ================= 锁定客户端设置 =================
+
+/** 本次打开设置窗口是否已用密码解锁；不跨窗口、不落盘 */
+const clientUnlocked = ref(false);
+const unlockOpen = ref(false);
+const unlockPassword = ref("");
+const unlockError = ref("");
+/** 搜索命中客户端设置时，解锁成功后再跳过去 */
+const pendingHit = ref<SettingsHit | null>(null);
+
+/** 客户端设置是否被锁定 */
+const clientLocked = computed(() => client.client.value.lockClient);
+
+/** 左侧导航：未锁定，或本次已解锁时才显示「客户端设置」 */
+const visibleTabs = computed(() =>
+  SETTINGS_TABS.filter(
+    (item) => item.id !== "client" || !clientLocked.value || clientUnlocked.value,
+  ),
+);
+
+/** 第一次加载配置期间不把「刚锁定」误判成需要踢回首页 */
+let loadingConfig = true;
+
+watch(
+  () => client.client.value.lockClient,
+  (locked) => {
+    if (loadingConfig || !locked) return;
+    // 刚在本页设置完密码：本次留在客户端设置页，让用户能看到「已锁定 / 解除」
+    clientUnlocked.value = true;
+  },
+  // 加载配置时同步触发，避免 loadingConfig 复位后才跑到回调、把初始锁定误判成刚解锁
+  { flush: "sync" },
+);
+
+/** 打开解锁弹窗 */
+function openUnlock(hit: SettingsHit | null = null) {
+  pendingHit.value = hit;
+  unlockPassword.value = "";
+  unlockError.value = "";
+  unlockOpen.value = true;
+}
+
+/** 校验密码并放行本次设置窗口 */
+async function unlockClientSettings() {
+  if (!unlockPassword.value) {
+    unlockError.value = t("winSettings.clientLockWrong");
+    return;
+  }
+  const ok = await client.verifyClientLock(unlockPassword.value);
+  if (!ok) {
+    unlockError.value = t("winSettings.clientLockWrong");
+    return;
+  }
+  clientUnlocked.value = true;
+  unlockOpen.value = false;
+  unlockPassword.value = "";
+  unlockError.value = "";
+  const hit = pendingHit.value;
+  pendingHit.value = null;
+  if (hit) {
+    await onSearchSelect(hit);
+  } else {
+    tab.value = "client";
+  }
+}
+
 // 游戏标题那组显示在客户端设置页，但数据属于 window 设置：这里取出给 ClientTab
 const { win: launchWin } = launch;
 
@@ -111,6 +177,11 @@ async function onResetPage() {
 
 /** 命中搜索项：切到它的标签页，滚到分组锚点，短暂高亮 */
 async function onSearchSelect(hit: SettingsHit) {
+  // 客户端设置锁着：先要密码，解锁后再跳转
+  if (hit.tab === "client" && clientLocked.value && !clientUnlocked.value) {
+    openUnlock(hit);
+    return;
+  }
   tab.value = hit.tab;
   // 目标标签页是 v-if 挂上来的：等它渲染完再找锚点
   await nextTick();
@@ -142,11 +213,25 @@ onMounted(async () => {
     client.refreshLockInstances(),
     client.refreshCustomHome(),
   ]);
+  loadingConfig = false;
+  if (clientLocked.value && tab.value === "client") {
+    tab.value = "ui";
+  }
 });
 
 // 单窗口模式：切走卸掉键盘监听，切回再装上；onActivated 首次挂载也会跑，重复 add 同一函数无副作用
-onActivated(bindKeys);
-onDeactivated(unbindKeys);
+onActivated(() => {
+  bindKeys();
+  // 单窗口模式下组件被缓存：切走再回来要重新锁上
+  if (clientLocked.value && tab.value === "client") tab.value = "ui";
+});
+onDeactivated(() => {
+  unbindKeys();
+  clientUnlocked.value = false;
+  unlockOpen.value = false;
+  unlockPassword.value = "";
+  unlockError.value = "";
+});
 
 onUnmounted(() => {
   unbindKeys();
@@ -178,7 +263,7 @@ function onKeyDown(e: KeyboardEvent) {
     </template>
 
     <div class="settings-layout">
-      <SettingsRail v-model="tab" :tabs="SETTINGS_TABS" />
+      <SettingsRail v-model="tab" :tabs="visibleTabs" />
 
       <!-- 右侧内容区：每个标签一个面板，独立滚动 -->
       <div class="tab-content">
@@ -200,13 +285,28 @@ function onKeyDown(e: KeyboardEvent) {
           <NetworkTab v-else-if="tab === 'network'" :settings="network" :flash-group="flashGroup" />
           <LaunchTab v-else-if="tab === 'launch'" :settings="launch" :flash-group="flashGroup" />
           <SkinTab v-else-if="tab === 'skin'" :settings="skin" :flash-group="flashGroup" />
-          <ClientTab v-else-if="tab === 'client'" :settings="client" v-model:win="launchWin"
-            :flash-group="flashGroup" />
+          <ClientTab v-else-if="tab === 'client' && (clientUnlocked || !clientLocked)" :settings="client"
+            v-model:win="launchWin" :flash-group="flashGroup" />
           <LocalFilesTab v-else-if="tab === 'files'" :files="files" :flash-group="flashGroup" />
-          <ExperimentalTab v-else :settings="client" :flash-group="flashGroup" />
+          <ExperimentalTab v-else :settings="client" :client-unlocked="clientUnlocked" :flash-group="flashGroup"
+            @unlock="openUnlock()" />
         </section>
       </div>
     </div>
+
+    <!-- 解锁客户端设置：密码错误只在本弹窗里提示，不关窗 -->
+    <BaseModal v-if="unlockOpen" :title="t('winSettings.clientLockUnlockTitle')" @close="unlockOpen = false">
+      <p class="modal-text">{{ t("winSettings.clientLockUnlockPrompt") }}</p>
+      <input v-model="unlockPassword" class="field-input" type="password" spellcheck="false"
+        @keyup.enter="unlockClientSettings" />
+      <p v-if="unlockError" class="error-text">{{ unlockError }}</p>
+      <div class="modal-actions">
+        <BaseButton @click="unlockOpen = false">{{ t("actions.cancel") }}</BaseButton>
+        <BaseButton variant="primary" @click="unlockClientSettings">
+          {{ t("winSettings.clientLockUnlock") }}
+        </BaseButton>
+      </div>
+    </BaseModal>
 
     <!-- 恢复本页默认：只影响当前页，仍先确认一次 -->
     <BaseModal v-if="confirmResetPage" :title="t('winSettings.resetPageTitle')" @close="confirmResetPage = false">

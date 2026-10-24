@@ -62,7 +62,7 @@ const HOME_FILE: &str = "home";
 /// # 返回值
 ///
 /// 运行根目录下的 `home`
-fn zip_path() -> PathBuf {
+pub(crate) fn zip_path() -> PathBuf {
     base_path(HOME_FILE)
 }
 

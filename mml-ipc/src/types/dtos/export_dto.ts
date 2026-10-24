@@ -24,6 +24,14 @@ export type ExportPickDto = {
   exclude: boolean,
 };
 
+export type ServerPackOptionsDto = {
+  config: boolean,
+  guiConfig: boolean,
+  page: boolean,
+  css: boolean,
+  home: boolean,
+};
+
 export type ExportConfigDto = {
   includeLauncher: boolean,
   pack: string,
@@ -35,6 +43,8 @@ export type ExportConfigDto = {
   author: string,
   version: string,
   summary: string,
+  instances: string[],
+  server: ServerPackOptionsDto,
 };
 
 export type ExportProgressDto = {

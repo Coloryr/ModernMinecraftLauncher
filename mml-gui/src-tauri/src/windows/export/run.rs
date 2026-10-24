@@ -147,8 +147,18 @@ pub async fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -
     let began = Instant::now();
     let permit = ExportPermit::acquire(&EXPORT_RUNNING)?;
 
-    let game = instance_snapshot(&uuid)?;
     let server_pack = config.pack == "server";
+    // 服务器包可以一次带多个实例；其余格式始终只用传进来的那一个
+    let uuids = if server_pack && !config.instances.is_empty() {
+        config.instances.clone()
+    } else {
+        vec![uuid.clone()]
+    };
+    let games = uuids
+        .iter()
+        .map(|item| instance_snapshot(item))
+        .collect::<Result<Vec<_>, _>>()?;
+    let game = games[0].clone();
     let pack = match config.pack.as_str() {
         "curseforge" => ExportPackType::CurseForge,
         "modrinth" => ExportPackType::Modrinth,
@@ -203,6 +213,7 @@ pub async fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -
     .await
     .map_err(|e| e.to_string())??;
     let prepared = began.elapsed();
+    let server_options = config.server.clone();
 
     let arg = ExportArg {
         file: PathBuf::from(&config.file),
@@ -228,7 +239,9 @@ pub async fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -
             let flag = cancel.clone();
             tokio::task::spawn_blocking(move || {
                 if server_pack {
-                    super::server_pack::export_pack(&game, &arg.file, config.include_launcher, &arg.gui, &flag)
+                    super::server_pack::export_pack(
+                        &games, &arg.file, config.include_launcher, &server_options, &arg.gui, &flag,
+                    )
                 } else if arg.select.is_empty() {
                     // 一个文件都没勾：保持老行为，整份实例压缩
                     super::archive::native_instance(&game, &arg.file, &arg.gui, &flag)

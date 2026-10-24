@@ -38,6 +38,7 @@ export const GROUP_TITLES: Record<string, string> = {
   customHome: "winSettings.secCustomHome",
   music: "winSettings.secMusic",
   serverPack: "winSettings.secServerPack",
+  clientLock: "winSettings.secClientLock",
   gameTitle: "winSettings.secGameTitle",
   "window-look": "winSettings.secWindowLook",
   localFiles: "winSettings.secLocalFiles",
@@ -188,6 +189,12 @@ const SETTINGS_INDEX: IndexEntry[] = [
   { tab: "client", group: "loginLock", labelKey: "winSettings.loginLockOn", extra: ["login lock", "登录方式锁定"] },
   { tab: "client", group: "loginLock", labelKey: "winSettings.loginLockAdd", extra: ["login lock", "添加"] },
   { tab: "client", group: "instanceLock", labelKey: "winSettings.instanceLockOn", extra: ["instance lock", "实例锁定"] },
+  {
+    tab: "client",
+    group: "clientLock",
+    labelKey: "winSettings.secClientLock",
+    extra: ["lock client", "unlock", "password", "锁定客户端设置", "解锁", "密码"],
+  },
   {
     tab: "client",
     group: "autoSave",

@@ -53,7 +53,10 @@ pub(super) fn validate<R: Read + Seek>(zip: &mut ZipArchive<R>) -> Result<Manife
         let instance_file = manifest.instances.iter().any(|i| name.starts_with(&format!("{INSTANCES}{}/", i.directory)));
         let directory = file.is_dir() && (INSTANCES.starts_with(name)
             || manifest.instances.iter().any(|i| format!("{INSTANCES}{}/", i.directory).starts_with(name)));
-        if !(instance_file || directory || matches!(name, MANIFEST | CONFIG | GUI_CONFIG)
+        let custom = name.trim_end_matches('/') == "mml/home"
+            || name.trim_end_matches('/') == "mml/custom_ui"
+            || name.starts_with("mml/custom_ui/");
+        if !(instance_file || directory || custom || matches!(name, MANIFEST | CONFIG | GUI_CONFIG)
             || (name == LAUNCHER && manifest.launcher)) { return Err(bad()); }
         total = total.checked_add(file.size()).ok_or_else(bad)?;
         if total > 128 * 1024 * 1024 * 1024 { return Err(bad()); }
