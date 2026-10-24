@@ -13,7 +13,7 @@ use mml_names::names;
 use uuid::Uuid;
 
 use crate::windows::geometry::{Placement, RectF, SizeF, center_placement, child_placement, remember_decorated_inset, save_window_state, window_state_for};
-use crate::windows::registry::{ADD_MODPACK_WINDOW_UUID, BLOCK_WINDOW_UUID, MAIN_WINDOW_UUID, min_size_of_label};
+use crate::windows::registry::{ADD_MODPACK_WINDOW_UUID, BLOCK_WINDOW_UUID, EXPORT_WINDOW_UUID, MAIN_WINDOW_UUID, SERVER_PACK_WINDOW_UUID, min_size_of_label};
 use crate::windows::{block};
 use super::models::{OPEN_WINDOWS, WINDOW_MODELS, ensure_window_model};
 
@@ -44,6 +44,7 @@ fn is_app_url(url: &tauri::Url) -> bool {
 /// - 主窗口：没有实例在跑时关窗就是退出应用，仍有下载任务时拒绝，
 ///   前端弹确认框，确认后停止下载再退出
 /// - 添加实例 / 下载整合包窗口：模型侧关闭保护，查询数据期间拒绝
+/// - 导出 / 服务器包窗口：打包进行中拒绝
 ///
 /// 其余窗口不保护。下载窗口本身也不拦。
 ///
@@ -66,6 +67,11 @@ pub(crate) fn close_guarded(uuid: &Uuid) -> bool {
     // 但关窗后进度无从展示，用户也会误以为渲染被中断
     if *uuid == BLOCK_WINDOW_UUID {
         return block::render_running();
+    }
+
+    // 导出窗口：打包进行中拒绝关闭，由前端问一句"取消导出并关窗"
+    if *uuid == EXPORT_WINDOW_UUID || *uuid == SERVER_PACK_WINDOW_UUID {
+        return crate::windows::export::run::running();
     }
 
     let binding = WINDOW_MODELS.read().unwrap();

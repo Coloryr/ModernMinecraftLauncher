@@ -58,13 +58,6 @@ watch(() => props.modelValue, (value) => {
 watch(() => props.readOnly, (value) => editor?.updateOptions({ readOnly: value }));
 watch(() => props.theme, (value) => monaco.editor.setTheme(value === 'Light' ? 'vs' : 'vs-dark'));
 onBeforeUnmount(() => { listener?.dispose(); editor?.getModel()?.dispose(); editor?.dispose(); });
-
-defineExpose({ insert(value: string) {
-  const selection = editor?.getSelection();
-  if (!editor || !selection || props.readOnly) return;
-  editor.executeEdits('catalog', [{ range: selection, text: value }]);
-  editor.focus();
-} });
 </script>
 
 <template><div ref="host" class="editor-host" /></template>

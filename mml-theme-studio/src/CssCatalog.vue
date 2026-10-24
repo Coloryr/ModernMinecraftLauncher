@@ -9,7 +9,7 @@ const tab = ref<'controls' | 'variables'>('controls');
 const search = ref('');
 const items = computed(() => (tab.value === 'controls'
   ? props.catalog.controls.map((entry) => ({ name: '.' + entry.className, detail: entry.category, code: `\n.${entry.className} {\n  \n}\n` }))
-  : props.catalog.variables.map((entry) => ({ name: entry.name, detail: entry.description, code: `var(${entry.name})` })))
+  : props.catalog.variables.map((entry) => ({ name: entry.name, detail: entry.description, code: `\n:root {\n  ${entry.name}: ;\n}\n` })))
   .filter((entry) => (entry.name + entry.detail).toLowerCase().includes(search.value.toLowerCase())).slice(0, 150));
 </script>
 

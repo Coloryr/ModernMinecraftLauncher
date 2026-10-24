@@ -1,0 +1,40 @@
+[package]
+name = "mml-theme-studio"
+version = "0.1.0"
+description = "M²L Theme Studio"
+authors = ["coloryr"]
+edition = "2024"
+
+[lib]
+# 与 bin 同名时 Windows 上会冲突，见 rust-lang/cargo#8519
+name = "mml_theme_studio_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "~2.7.4", features = [] }
+
+[dependencies]
+# devtools：正式版也要能打开预览页的开发者工具，F12 才不是只在 dev 里可用
+tauri = { version = "~2.12.5", features = ["devtools"] }
+tauri-plugin-dialog.workspace = true
+tokio = { workspace = true, features = ["sync", "time"] }
+tokio-util.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+uuid.workspace = true
+url.workspace = true
+
+[features]
+# 前端资源走内嵌 dist。tauri CLI 会自己打开；直接 cargo build 时要显式带上，
+# 否则 exe 会去连 devUrl（127.0.0.1:1421）。
+custom-protocol = ["tauri/custom-protocol"]
+
+[target.'cfg(windows)'.dependencies]
+# 关掉 WebView2 自带的 F12 / Ctrl+Shift+I 等浏览器快捷键，把 F12 留给预览和 Monaco
+webview2-com = "~0.39.1"
+windows.workspace = true
+
+[dev-dependencies]
+# 测试临时目录统一放 target/temp（AGENTS.md §6）
+mml-testutil = { path = "../../mml-core/mml-testutil" }

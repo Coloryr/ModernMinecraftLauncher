@@ -18,7 +18,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         Arc,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicU8, AtomicUsize, Ordering},
     },
 };
 
@@ -28,6 +28,7 @@ use mml_names::{
     },
     names,
 };
+use zip::{CompressionMethod, write::SimpleFileOptions};
 
 pub mod base_archive;
 pub mod r7z_reader;
@@ -36,6 +37,80 @@ pub mod zip_reader;
 
 pub use base_archive::{ArchiveEntryInfo, BaseArchive};
 use mml_sys::path_helper;
+
+/// 已经是压缩格式的后缀：再压一遍又慢又不省空间，写包时直接存
+const STORED_EXT: &[&str] = &[
+    "jar", "zip", "mrpack", "7z", "rar", "gz", "tgz", "xz", "bz2", "zst", "lz4",
+    "png", "jpg", "jpeg", "webp", "gif", "ogg", "oga", "mp3", "m4a", "flac",
+    "mp4", "webm", "mkv", "ttf", "otf", "woff", "woff2", "mca", "mcr", "dat", "nbt",
+];
+
+/// 写 zip 的压缩档位
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum ZipLevel {
+    /// 轻量：已压缩的后缀原样存，文本走 1 档，最快
+    Fast = 0,
+    /// 默认：已压缩的后缀原样存，文本走默认 6 档
+    Normal = 1,
+    /// 固实：不看后缀全部重压 9 档，体积最小、最慢
+    Solid = 2,
+}
+
+/// 当前档位；导出开始时由调用方设定，写包时读它
+static ZIP_LEVEL: AtomicU8 = AtomicU8::new(ZipLevel::Fast as u8);
+
+/// 设定 write 时的 zip 压缩档位
+///
+/// - `level`: 目标档位
+pub fn set_zip_level(level: ZipLevel) {
+    ZIP_LEVEL.store(level as u8, Ordering::Relaxed);
+}
+
+/// 取当前 zip 压缩档位
+///
+/// # 返回值
+///
+/// 见 [`ZipLevel`]；未设定过时是轻量
+pub fn zip_level() -> ZipLevel {
+    match ZIP_LEVEL.load(Ordering::Relaxed) {
+        1 => ZipLevel::Normal,
+        2 => ZipLevel::Solid,
+        _ => ZipLevel::Fast,
+    }
+}
+
+/// 一条条目该怎么写进 zip
+///
+/// 模型 / 材质 / 存档这些内容本身就是压缩过的，再压一遍只是白烧 CPU，轻量与默认档直接存；
+/// 固实档不看后缀，一律重压到最紧。
+///
+/// - `name`: 包内路径，带后缀，如 `mods/xxx.jar`
+/// - `permissions`: 写进条目的 Unix 权限位
+///
+/// # 返回值
+///
+/// 该条目要用的写入参数
+pub fn zip_entry_options(name: &str, permissions: u32) -> SimpleFileOptions {
+    let options = SimpleFileOptions::default().unix_permissions(permissions);
+    let level = zip_level();
+    if level == ZipLevel::Solid {
+        return options
+            .compression_method(CompressionMethod::Deflated)
+            .compression_level(Some(9));
+    }
+    let stored = Path::new(name)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| STORED_EXT.iter().any(|known| known.eq_ignore_ascii_case(ext)));
+    if stored {
+        return options.compression_method(CompressionMethod::Stored);
+    }
+    let grade = if level == ZipLevel::Normal { 6 } else { 1 };
+    options
+        .compression_method(CompressionMethod::Deflated)
+        .compression_level(Some(grade))
+}
 
 /// 压缩包进度回调句柄，`None` 表示不通知 UI
 pub type BaseArchiveGui = Option<Arc<dyn IBaseArchiveGui>>;

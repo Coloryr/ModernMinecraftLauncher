@@ -38,7 +38,8 @@ struct Instance {
 
 pub(super) fn export_pack(
     game: &mml_game::launcher::instance_setting_obj::InstanceSettingObj,
-    file: &Path, include_launcher: bool,
+    file: &Path, include_launcher: bool, gui: &mml_base::archives::BaseArchiveGui,
+    cancel: &std::sync::atomic::AtomicBool,
 ) -> Result<(), String> {
     if !format::safe_component(&game.dir) { return Err(err_keys::SERVER_PACK_INVALID.into()); }
     if include_launcher && !cfg!(windows) { return Err(err_keys::SERVER_PACK_PLATFORM.into()); }
@@ -61,7 +62,7 @@ pub(super) fn export_pack(
         (GUI_CONFIG.into(), serde_json::to_vec_pretty(&gui_config::get()).map_err(|e| e.to_string())?),
         (format!("{prefix}{}", names::GAME_FILE), serde_json::to_vec_pretty(game).map_err(|e| e.to_string())?),
     ];
-    archive::write_zip(file, &files, &data)
+    archive::write_zip(file, &files, &data, gui, cancel)
 }
 
 /// 导入服务器包并重新载入启动器。

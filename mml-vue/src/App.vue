@@ -141,6 +141,8 @@ onMounted(async () => {
   unsubCloseBlocked = await onCloseBlocked((blocked) => {
     // 事件带的是被拦下的那个窗口的标签：不是自己就忽略，别在别的窗口也弹一遍
     if (blocked && blocked !== myLabel) return;
+    // 导出窗口自己处理：导出中它拦下关闭并问"取消导出并关窗"，这里不再插一句
+    if (currentKind.value === "export" || currentKind.value === "server_pack") return;
     // 单窗口模式：唯一的真实窗口就是主窗口，任何页面都算退出；
     // 多窗口模式：只有主窗口算退出
     closeAskQuit.value = !multiWindow.value || currentKind.value === "main";

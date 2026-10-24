@@ -1,7 +1,9 @@
 //! 本地实例归档；不追随链接，写完后才替换目标文件。
 
-use std::{fs::{self, File}, io::{self, Write}, path::{Path, PathBuf}};
-use zip::{ZipWriter, write::SimpleFileOptions};
+use std::{fs::{self, File}, io::{Read, Write}, path::{Path, PathBuf}, sync::atomic::{AtomicBool, Ordering}};
+use zip::ZipWriter;
+
+use mml_base::archives::BaseArchiveGui;
 
 use crate::err_keys;
 
@@ -53,23 +55,41 @@ pub(super) fn check_destination(file: &Path, source: &Path) -> Result<(), String
     Ok(())
 }
 
+/// 单次读写的块大小；`io::copy` 的 8KB 在写压缩包时系统调用开销明显
+const COPY_BUF: usize = 256 * 1024;
+
 pub(super) fn write_zip(
     file: &Path, files: &[(String, PathBuf)], data: &[(String, Vec<u8>)],
+    gui: &BaseArchiveGui, cancel: &AtomicBool,
 ) -> Result<(), String> {
     let temp = file.with_extension(format!("{}.part", uuid::Uuid::new_v4()));
     let result = (|| -> Result<(), String> {
         let handle = File::create_new(&temp).map_err(|e| e.to_string())?;
         let mut zip = ZipWriter::new(handle);
-        let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        let mut buffer = vec![0u8; COPY_BUF];
+        if let Some(gui) = gui { gui.start(files.len() + data.len()); }
+        let mut index = 0;
         for (name, path) in files {
-            zip.start_file(name, options).map_err(|e| e.to_string())?;
-            io::copy(&mut File::open(path).map_err(|e| e.to_string())?, &mut zip).map_err(|e| e.to_string())?;
+            // 每写一个文件看一次取消：一个文件内部的复制无法打断
+            if cancel.load(Ordering::Relaxed) { return Err(err_keys::CANCELLED.to_string()); }
+            if let Some(gui) = gui { gui.update(Some(name.clone()), index); }
+            zip.start_file(name, mml_base::archives::zip_entry_options(name, 0o644)).map_err(|e| e.to_string())?;
+            let mut source = File::open(path).map_err(|e| e.to_string())?;
+            loop {
+                let read = source.read(&mut buffer).map_err(|e| e.to_string())?;
+                if read == 0 { break; }
+                zip.write_all(&buffer[..read]).map_err(|e| e.to_string())?;
+            }
+            index += 1;
         }
         for (name, bytes) in data {
-            zip.start_file(name, options).map_err(|e| e.to_string())?;
+            if let Some(gui) = gui { gui.update(Some(name.clone()), index); }
+            zip.start_file(name, mml_base::archives::zip_entry_options(name, 0o644)).map_err(|e| e.to_string())?;
             zip.write_all(bytes).map_err(|e| e.to_string())?;
+            index += 1;
         }
         zip.finish().map_err(|e| e.to_string())?.sync_all().map_err(|e| e.to_string())?;
+        if let Some(gui) = gui { gui.done(); }
         fs::rename(&temp, file).map_err(|e| e.to_string())
     })();
     if result.is_err() { let _ = fs::remove_file(&temp); }
@@ -78,14 +98,55 @@ pub(super) fn write_zip(
 
 pub(super) fn native_instance(
     game: &mml_game::launcher::instance_setting_obj::InstanceSettingObj, file: &Path,
+    gui: &BaseArchiveGui, cancel: &AtomicBool,
 ) -> Result<(), String> {
     let root = game.get_base_path();
-    native_archive(game, &root, file)
+    native_archive(game, &root, file, gui, cancel)
+}
+
+/// 只归档勾选的文件，外加当前实例配置快照
+///
+/// 与 [`native_instance`] 的区别只在文件集合：勾选为空时调用方应回退到整份归档，
+/// 这里假定 selected 非空。归档名相对**实例根目录**，即 `.minecraft/...` 那一段。
+///
+/// - `game`: 实例配置，包里的 game.json 用当前快照
+/// - `selected`: 勾选的文件绝对路径，必须都在实例目录内
+/// - `file`: 输出 zip
+///
+/// # 返回值
+///
+/// 写盘成功返回 `Ok(())`；路径越界、读文件或压缩失败返回错误文案
+pub(super) fn native_instance_selected(
+    game: &mml_game::launcher::instance_setting_obj::InstanceSettingObj,
+    selected: &[std::path::PathBuf], file: &Path, gui: &BaseArchiveGui, cancel: &AtomicBool,
+) -> Result<(), String> {
+    let root = game.get_base_path();
+    native_archive_selected(game, &root, selected, file, gui, cancel)
+}
+
+/// 归档勾选文件的实现；root 显式传入，测试可以不初始化实例根目录
+fn native_archive_selected(
+    game: &mml_game::launcher::instance_setting_obj::InstanceSettingObj,
+    root: &Path, selected: &[std::path::PathBuf], file: &Path, gui: &BaseArchiveGui,
+    cancel: &AtomicBool,
+) -> Result<(), String> {
+    check_destination(file, root)?;
+    let mut files = Vec::with_capacity(selected.len());
+    for path in selected {
+        let rel = path.strip_prefix(&root).map_err(|_| err_keys::FILE_NAME.to_string())?;
+        let name = rel.to_string_lossy().replace('\\', "/");
+        if name == mml_names::names::GAME_FILE { continue; }
+        files.push((name, path.clone()));
+    }
+    files.sort_by(|a, b| a.0.cmp(&b.0));
+    let data = serde_json::to_vec_pretty(game).map_err(|e| e.to_string())?;
+    write_zip(file, &files, &[(mml_names::names::GAME_FILE.to_string(), data)], gui, cancel)
 }
 
 /// 归档实例目录，并用当前配置快照替换磁盘上尚未更新的配置。
 fn native_archive(
     game: &mml_game::launcher::instance_setting_obj::InstanceSettingObj, root: &Path, file: &Path,
+    gui: &BaseArchiveGui, cancel: &AtomicBool,
 ) -> Result<(), String> {
     check_destination(file, root)?;
     let files = files_under(root)?.into_iter().filter_map(|path| {
@@ -93,7 +154,7 @@ fn native_archive(
         (name != mml_names::names::GAME_FILE).then_some((name, path))
     }).collect::<Vec<_>>();
     let data = serde_json::to_vec_pretty(game).map_err(|e| e.to_string())?;
-    write_zip(file, &files, &[(mml_names::names::GAME_FILE.to_string(), data)])
+    write_zip(file, &files, &[(mml_names::names::GAME_FILE.to_string(), data)], gui, cancel)
 }
 
 #[cfg(test)]
@@ -111,7 +172,7 @@ mod tests {
         fs::write(root.join(mml_names::names::GAME_FILE), "stale config").unwrap();
         let game = serde_json::from_value(serde_json::json!({"Name":"当前实例", "Version":"1.21.1"})).unwrap();
         let output = dir.join("instance.zip");
-        native_archive(&game, &root, &output).unwrap();
+        native_archive(&game, &root, &output, &None, &AtomicBool::new(false)).unwrap();
         let mut zip = zip::ZipArchive::new(File::open(&output).unwrap()).unwrap();
         assert_eq!(zip.len(), 3);
         let mut text = String::new();
@@ -126,6 +187,28 @@ mod tests {
     }
 
     #[test]
+    fn native_selected_archive_keeps_only_checked_files() {
+        let dir = crate::test_support::temp_dir("native-selected");
+        let root = dir.join("source");
+        fs::create_dir_all(root.join(".minecraft/config")).unwrap();
+        fs::write(root.join(".minecraft/config/keep.toml"), "keep").unwrap();
+        fs::write(root.join(".minecraft/config/skip.toml"), "skip").unwrap();
+        fs::write(root.join(mml_names::names::GAME_FILE), "stale config").unwrap();
+        let game = serde_json::from_value(serde_json::json!({"Name":"勾选实例", "Version":"1.21.1"})).unwrap();
+        let output = dir.join("selected.zip");
+        let selected = vec![root.join(".minecraft/config/keep.toml")];
+        native_archive_selected(&game, &root, &selected, &output, &None, &AtomicBool::new(false)).unwrap();
+        let mut zip = zip::ZipArchive::new(File::open(&output).unwrap()).unwrap();
+        let mut names: Vec<String> = zip.file_names().map(|n| n.unwrap_or_default().to_string()).collect();
+        names.sort();
+        assert_eq!(names, [".minecraft/config/keep.toml", mml_names::names::GAME_FILE]);
+        let json: serde_json::Value = serde_json::from_reader(zip.by_name(mml_names::names::GAME_FILE).unwrap()).unwrap();
+        assert_eq!(json["Name"], "勾选实例");
+        drop(zip);
+        crate::test_support::cleanup(&[&dir]);
+    }
+
+    #[test]
     fn archive_read_failure_preserves_existing_archive_and_removes_partial_file() {
         let dir = crate::test_support::temp_dir("native-write-failure");
         let source = dir.join("source.txt");
@@ -133,7 +216,7 @@ mod tests {
         let output = dir.join("instance.zip");
         fs::write(&output, "previous archive").unwrap();
         let files = [("valid.txt".into(), source), ("missing.txt".into(), dir.join("missing"))];
-        assert!(write_zip(&output, &files, &[]).is_err());
+        assert!(write_zip(&output, &files, &[], &None, &AtomicBool::new(false)).is_err());
         assert_eq!(fs::read_to_string(&output).unwrap(), "previous archive");
         assert_eq!(fs::read_dir(&dir).unwrap().count(), 2);
         crate::test_support::cleanup(&[&dir]);
@@ -150,7 +233,7 @@ mod tests {
         fs::write(&output, "old archive").unwrap();
         assert!(check_destination(&source.join("bad.zip"), &source).is_err());
         write_zip(&output, &[(".minecraft/options.txt".into(), config)],
-            &[("game.json".into(), br#"{"Name":"test","Version":"1.21.1"}"#.to_vec())]).unwrap();
+            &[("game.json".into(), br#"{"Name":"test","Version":"1.21.1"}"#.to_vec())], &None, &AtomicBool::new(false)).unwrap();
         let mut archive = zip::ZipArchive::new(File::open(&output).unwrap()).unwrap();
         assert_eq!(archive.len(), 2);
         let mut contents = String::new();
@@ -195,6 +278,25 @@ mod tests {
         for path in ["missing", "../outside", "/outside", "config/../../outside"] {
             assert!(selected_path(&dir, path).is_err(), "{path}");
         }
+        crate::test_support::cleanup(&[&dir]);
+    }
+
+    #[test]
+    fn already_compressed_entries_are_stored_and_text_is_deflated() {
+        let dir = crate::test_support::temp_dir("zip-entry-method");
+        let jar = dir.join("a.jar");
+        let text = dir.join("b.txt");
+        // jar 换成本来就压不动的字节，txt 用高重复内容让 deflate 一定赢
+        let bytes: Vec<u8> = (0..4096u32).map(|i| (i.wrapping_mul(2654435761) >> 13) as u8).collect();
+        fs::write(&jar, &bytes).unwrap();
+        fs::write(&text, "a".repeat(64 * 1024)).unwrap();
+        let output = dir.join("methods.zip");
+        let files = vec![("mods/a.jar".to_string(), jar), ("config/b.txt".to_string(), text)];
+        write_zip(&output, &files, &[], &None, &AtomicBool::new(false)).unwrap();
+        let mut zip = zip::ZipArchive::new(File::open(&output).unwrap()).unwrap();
+        assert_eq!(zip.by_name("mods/a.jar").unwrap().compression(), zip::CompressionMethod::Stored);
+        assert_eq!(zip.by_name("config/b.txt").unwrap().compression(), zip::CompressionMethod::Deflated);
+        drop(zip);
         crate::test_support::cleanup(&[&dir]);
     }
 

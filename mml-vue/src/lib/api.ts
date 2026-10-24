@@ -1215,6 +1215,20 @@ export const api = {
   },
 
   /**
+   * 浏览实例目录下的一个目录，给「直接压缩」的文件树用
+   *
+   * - `uuid`: 实例 uuid
+   * - `dir`: 相对实例目录的路径；空串表示实例目录本身
+   *
+   * # 返回值
+   *
+   * 该目录的直接子项，路径相对实例目录（含 `.minecraft` 那一段）
+   */
+  async listExportInstanceDir(uuid: string, dir: string): Promise<ExportEntryDto[]> {
+    return commands.export.listInstanceDir(uuid, dir);
+  },
+
+  /**
    * 发起导出
    *
    * - `uuid`: 实例 uuid
@@ -1224,6 +1238,15 @@ export const api = {
    */
   async runExport(uuid: string, config: ExportConfigDto): Promise<void> {
     return commands.export.run(uuid, config);
+  },
+
+  /**
+   * 取消正在跑的导出
+   *
+   * 等后台任务收手才返回：调用方接着关窗口，关窗保护要等它停下才放行
+   */
+  async cancelExport(): Promise<void> {
+    return commands.export.cancel();
   },
 
   /**

@@ -291,6 +291,7 @@ async fn mmc_and_hmcl_export_roundtrip() {
                 unselect: Vec::new(),
                 // 整包格式没有下载清单，选中的文件直接进包
                 select: vec![mod_file.clone()],
+                cancel: None,
                 name: "整包导出测试".to_string(),
                 author: "mml".to_string(),
                 version: "1.0.0".to_string(),
@@ -359,6 +360,7 @@ async fn zip_export_packs_instance_dir() {
             files: Vec::new(),
             unselect: Vec::new(),
             select: Vec::new(),
+            cancel: None,
             name: "纯压缩包导出测试".to_string(),
             author: "mml".to_string(),
             version: "1.0.0".to_string(),
@@ -444,6 +446,7 @@ async fn mml_instance_archive_roundtrip() {
             files: Vec::new(),
             unselect: Vec::new(),
             select: Vec::new(),
+            cancel: None,
             name: "导出测试实例".to_string(),
             author: String::new(),
             version: String::new(),

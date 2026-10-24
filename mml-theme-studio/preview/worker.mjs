@@ -1,4 +1,4 @@
-// 预览构建在外部 Node.js 中运行，Electron 不执行项目脚本，也不承载 Vite。
+// 预览构建在外部 Node.js 中运行，桌面壳不执行项目脚本，也不承载 Vite。
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -7,8 +7,10 @@ import { existsSync } from 'node:fs';
 import { htmlPreview } from './html.mjs';
 import { asset, respond } from './assets.mjs';
 import { themeStatus, homeStatus } from './status.mjs';
+import { DEVTOOLS_SCRIPT } from './shortcut.mjs';
 import { text } from '../lib/messages.mjs';
 
+const READY = '@@mml-studio@@';
 const [root, template, cache, locale = 'zh-CN'] = process.argv.slice(2);
 let close = async () => {};
 
@@ -77,6 +79,7 @@ async function vuePreview() {
               const color=new URLSearchParams(location.search).get('theme');
               if(color==='Dark'||color==='Light') writeString(KEYS.theme,color);
               ${template === 'home' ? "writeString(KEYS.startupPage,'Home');" : ''}
+              ${DEVTOOLS_SCRIPT}
               await import('/src/main.ts');` });
             return;
           }
@@ -111,16 +114,23 @@ async function vuePreview() {
   };
 }
 
+// 父进程通过 stdin 生命周期感知：Rust 侧退出时管道断开，这里顺手收掉 Vite。
+let closing = false;
+async function shutdown() {
+  if (closing) return;
+  closing = true;
+  try { await close(); } finally { process.exit(0); }
+}
+process.stdin.resume();
+process.stdin.on('end', shutdown);
+process.stdin.on('close', shutdown);
+process.on('SIGTERM', shutdown);
+
 try {
   const preview = template === 'html' ? await htmlPreview(root) : await vuePreview();
   close = preview.close;
-  process.send?.({ type: 'ready', url: preview.url });
+  process.stdout.write(READY + JSON.stringify({ type: 'ready', url: preview.url }) + '\n');
 } catch (error) {
   console.error(error);
-  process.send?.({ type: 'failed', error: String(error) });
-  process.exitCode = 1;
-  process.disconnect?.();
+  process.stdout.write(READY + JSON.stringify({ type: 'failed', error: String(error) }) + '\n', () => process.exit(1));
 }
-
-process.on('message', async (message) => { if (message === 'stop') { await close(); process.exit(0); } });
-process.on('disconnect', async () => { await close(); process.exit(); });

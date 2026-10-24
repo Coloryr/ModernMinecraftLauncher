@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { watch } from 'node:fs';
 import { join } from 'node:path';
 import { asset, respond } from './assets.mjs';
+import { DEVTOOLS_SCRIPT } from './shortcut.mjs';
 
 export async function htmlPreview(root) {
   const clients = new Set();
@@ -15,7 +16,7 @@ export async function htmlPreview(root) {
       return;
     }
     const file = await asset(join(root, 'src'), path === '/' ? 'index.html' : path.slice(1));
-    if (file?.mime.startsWith('text/html')) file.data = Buffer.from(file.data.toString('utf8').replace(/<\/head>/i, '<script>new EventSource("/__reload").onmessage=()=>location.reload()</script></head>'));
+    if (file?.mime.startsWith('text/html')) file.data = Buffer.from(file.data.toString('utf8').replace(/<\/head>/i, `<script>new EventSource("/__reload").onmessage=()=>location.reload();${DEVTOOLS_SCRIPT}</script></head>`));
     respond(response, file);
   });
   const watcher = watch(join(root, 'src'), { recursive: true }, () => { for (const client of clients) client.write('data: reload\n\n'); });

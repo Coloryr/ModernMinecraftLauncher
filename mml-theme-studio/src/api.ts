@@ -1,3 +1,6 @@
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+
 export type Locale = 'zh-CN' | 'en-US';
 export type Theme = 'Dark' | 'Light';
 export type Template = 'css' | 'page' | 'home' | 'html';
@@ -14,6 +17,7 @@ export interface StudioState {
   theme: Theme;
   recent: string[];
   environment: { nodeVersion?: string; git?: string; error?: string };
+  windowMinSizes: Record<string, { width: number; height: number }>;
 }
 export type StudioEvent =
   | { type: 'log'; text: string }
@@ -35,27 +39,59 @@ interface Actions {
   preview: { input: undefined; output: string };
   stop: { input: undefined; output: undefined };
   cancel: { input: undefined; output: undefined };
-  reload: { input: undefined; output: undefined };
   devtools: { input: undefined; output: undefined };
-  bounds: { input: { x: number; y: number; width: number; height: number; visible: boolean }; output: undefined };
-  previewOptions: { input: { kind: string; theme: string }; output: undefined };
   locale: { input: Locale; output: undefined };
   theme: { input: Theme; output: Theme };
   dirty: { input: boolean; output: undefined };
   reveal: { input: undefined; output: string };
 }
 
-declare global {
-  interface Window {
-    studio: {
-      call(action: string, input?: unknown): Promise<{ ok: boolean; value?: unknown; error?: string }>;
-      onEvent(callback: (event: StudioEvent) => void): () => void;
-    };
-  }
+// 动作名 = 命令名去掉 studio_ 前缀；多词动作按小驼峰转下划线。
+const command = (action: string) => 'studio_' + action.replace(/[A-Z]/g, (letter) => '_' + letter.toLowerCase());
+
+/**
+ * 调用主进程动作
+ *
+ * - `action`: 动作名，与 Rust 命令一一对应
+ * - `input`: 动作参数，无参数时省略
+ *
+ * # 返回值
+ *
+ * 动作结果；失败时抛出主进程给的本地化文案
+ */
+export async function call<K extends keyof Actions>(action: K, ...args: undefined extends Actions[K]['input'] ? [input?: Actions[K]['input']] : [input: Actions[K]['input']]): Promise<Actions[K]['output']> {
+  const input = args[0];
+  return invoke<Actions[K]['output']>(command(action), input === undefined ? {} : { input });
 }
 
-export async function call<K extends keyof Actions>(action: K, ...args: undefined extends Actions[K]['input'] ? [input?: Actions[K]['input']] : [input: Actions[K]['input']]): Promise<Actions[K]['output']> {
-  const result = await window.studio.call(action, args[0]);
-  if (!result.ok) throw new Error(result.error);
-  return result.value as Actions[K]['output'];
+let bootstrapping: Promise<StudioState> | undefined;
+
+/**
+ * 首次启动状态，只请求一次
+ *
+ * # 返回值
+ *
+ * 项目、语言、配色、最近项目与外部环境
+ */
+export function bootstrap(): Promise<StudioState> {
+  bootstrapping ??= invoke<StudioState>('studio_state');
+  return bootstrapping;
+}
+
+/**
+ * 订阅主进程事件
+ *
+ * - `callback`: 日志、忙状态、预览地址回调
+ *
+ * # 返回值
+ *
+ * 取消订阅函数
+ */
+export async function onEvent(callback: (event: StudioEvent) => void): Promise<() => void> {
+  const unlisten = await Promise.all([
+    listen<string>('studio-log', (event) => callback({ type: 'log', text: event.payload })),
+    listen<boolean>('studio-busy', (event) => callback({ type: 'busy', value: event.payload })),
+    listen<string>('studio-preview', (event) => callback({ type: 'preview', url: event.payload })),
+  ]);
+  return () => { for (const stop of unlisten) stop(); };
 }

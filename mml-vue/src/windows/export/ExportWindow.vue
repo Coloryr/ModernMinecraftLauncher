@@ -15,17 +15,23 @@ import WindowFrame from "../../components/ui/WindowFrame.vue";
 import IconTabs from "../../components/ui/IconTabs.vue";
 import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
+import BaseModal from "../../components/ui/BaseModal.vue";
 import FilePicker from "./parts/FilePicker.vue";
+import { isPickedPath } from "./picked";
 import InfoExportButton from "./parts/InfoExportButton.vue";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
-import { api, onExportFocus, onExportProgress } from "../../lib/api";
-import { currentKind, isTauri, targetUuid, windowParams } from "../windowManager";
+import { api, onCloseBlocked, onExportFocus, onExportProgress } from "../../lib/api";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { currentKind, isTauri, multiWindow, targetUuid, windowParams } from "../windowManager";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import type { ExportEntryDto, ExportInfoDto, ExportProgressDto, InstanceInfoDto } from "../../lib/bindings";
 
 /** 请求关闭本窗口 */
-defineEmits<{ (e: "close"): void }>();
+const emit = defineEmits<{ (e: "close"): void }>();
+
+/** 本窗口标签：关闭被拦截事件只认发给自己的那一条 */
+const myLabel = getCurrentWindow().label;
 
 /** 页签 id：模组 / 文件 / 整合包信息 */
 type ExportTab = "mods" | "files" | "meta";
@@ -57,17 +63,26 @@ const summary = ref("");
 const pickedMods = ref(new Map<string, ExportEntryDto>());
 /** 勾选的文件与目录 */
 const pickedFiles = ref(new Map<string, ExportEntryDto>());
+/** 取消勾选的路径：父目录勾着时单独去掉某一条 */
+const unpickedFiles = ref(new Set<string>());
+/** 因为模组已勾选而自动取消的文件：取消勾选模组时按这份表还原 */
+const autoExcluded = ref(new Set<string>());
 /** 路径 → 下载地址；空串表示没填，按 overrides 打包 */
 const urls = ref(new Map<string, string>());
+/** 路径 → 项目号 / 文件号；模组页可改，改了以后端为准 */
+const modIds = ref(new Map<string, { modId: string; fileId: string }>());
 /** 模组搜索词 */
 const modKeyword = ref("");
 
 /** 当前选项卡：整合包信息 / 模组 / 文件 */
 const tab = ref<ExportTab>("meta");
 
+/** 实际展示的页签：「直接压缩」没有整合包信息与模组页，只列实例文件 */
+const shownTab = computed<ExportTab>(() => (pack.value === "mml" ? "files" : tab.value));
+
 /** 格式选项：两种通用清单格式，加两种整包实例格式（供别的启动器导入） */
 const packOptions: Array<{ value: PackId; label: string }> = [
-  { value: "mml", label: "M²L" },
+  { value: "mml", label: t("winExport.directZip") },
   { value: "curseforge", label: "CurseForge" },
   { value: "modrinth", label: "Modrinth (.mrpack)" },
   { value: "mmc", label: "MMC" },
@@ -78,6 +93,23 @@ const packOptions: Array<{ value: PackId; label: string }> = [
 function onPackChange(value: string) {
   const option = packOptions.find((x) => x.value === value);
   if (option) pack.value = option.value;
+}
+
+/** 压缩档位：轻量最快，固实最紧 */
+type ZipLevel = "fast" | "normal" | "solid";
+
+const zipOptions: Array<{ value: ZipLevel; label: string }> = [
+  { value: "fast", label: t("winExport.zipFast") },
+  { value: "normal", label: t("winExport.zipNormal") },
+  { value: "solid", label: t("winExport.zipSolid") },
+];
+
+const zipLevel = ref<ZipLevel>("fast");
+
+/** 压缩档位切换：分段控件给 string，收口成档位 */
+function onZipLevelChange(value: string) {
+  const option = zipOptions.find((x) => x.value === value);
+  if (option) zipLevel.value = option.value;
 }
 
 /** 存盘对话框里的格式名；服务器包不在页签里，单独取名字 */
@@ -98,12 +130,84 @@ const customLoaderLost = computed(
   () => !!info.value?.customLoader && (pack.value === "mmc" || pack.value === "hmcl"),
 );
 
-/** 默认勾选的目录：就是导出一直以来的那三块，重建同名前先保持行为不变 */
-const DEFAULT_DIRS = ["config", "resourcepacks", "shaderpacks"];
+/** 实例目录下的游戏目录名；「直接压缩」以实例目录为根，需要它来展开子项 */
+const GAME_DIR = ".minecraft";
 
-/** 过滤后的模组列表 */
+/** 默认跳过的目录名：运行期产物，打进包里没用还占体积；其余默认全勾 */
+const DEFAULT_SKIP = new Set([
+  "logs",
+  "crash-reports",
+  "cache",
+  ".cache",
+  "temp",
+  "backup",
+  "backups",
+]);
+
+/** 文件树的根：直接压缩看实例目录，其余格式看游戏目录 */
+const fileBase = computed<"game" | "instance">(() => (pack.value === "mml" ? "instance" : "game"));
+
+/** 直接压缩时把 .minecraft 展开：默认勾的是它的子项，不展开看不见 */
+const fileExpand = computed(() => (pack.value === "mml" ? [GAME_DIR] : []));
+
+/**
+ * 直接压缩时实例根上的条目是否必选
+ *
+ * 实例根目录里除 `.minecraft` 之外的东西属于实例本身，少一份导入后就不是同一个实例，
+ * 所以固定勾上、不给取消；运行期目录走默认跳过那一套，不强制。
+ *
+ * - `path`: 相对实例根目录的路径
+ *
+ * # 返回值
+ *
+ * 必选返回 `true`；在 `.minecraft` 里、属于运行期目录、非直接压缩格式返回 `false`
+ */
+function isLockedFile(path: string): boolean {
+  if (pack.value !== "mml") return false;
+  const [top] = path.split("/");
+  return top !== GAME_DIR && !DEFAULT_SKIP.has(top);
+}
+
+/**
+ * 项目号 / 文件号算不算这个格式认可的在线来源
+ *
+ * CurseForge 的清单里只有数字编号，别的写法（Modrinth 的 slug）写进去也下载不到，
+ * 按不是在线模组处理，让它随 mods 目录打进包。
+ *
+ * - `modId`: 项目号
+ * - `fileId`: 文件号
+ *
+ * # 返回值
+ *
+ * 两个编号都成立返回 `true`
+ */
+function isOnlineId(modId: string, fileId: string): boolean {
+  if (!modId || !fileId) return false;
+  if (pack.value !== "curseforge") return true;
+  return /^\d+$/.test(modId) && /^\d+$/.test(fileId) && Number(modId) > 0 && Number(fileId) > 0;
+}
+
+/** 某条模组当前（以改过的编号为准）算不算在线模组 */
+function isOnlineMod(path: string): boolean {
+  const ids = modIds.value.get(path);
+  return !!ids && isOnlineId(ids.modId, ids.fileId);
+}
+
+/** 有在线来源的模组：模组页只列这些，标签上的分母也用它 */
+const onlineMods = computed(() => (info.value?.mods ?? []).filter((x) => isOnlineMod(x.path)));
+
+/** 有在线来源的模组数 */
+const onlineModCount = computed(() => onlineMods.value.length);
+
+/**
+ * 过滤后的模组列表
+ *
+ * 编号不成立的也列出来（灰着不能勾），好让人看见并改对；它们的文件照常打进包。
+ */
 const mods = computed(() => {
-  const list = info.value?.mods ?? [];
+  const list = (info.value?.mods ?? []).filter(
+    (x) => (!!x.modId && !!x.fileId) || isOnlineMod(x.path),
+  );
   const keyword = modKeyword.value.trim().toLowerCase();
   if (!keyword) return list;
   return list.filter((x) => x.path.toLowerCase().includes(keyword));
@@ -126,7 +230,7 @@ const tabOptions = computed<
     id: "mods",
     labelKey: "winExport.tabMods",
     icon: "cube",
-    suffix: `${pickedMods.value.size}/${info.value?.mods.length ?? 0}`,
+    suffix: `${pickedMods.value.size}/${onlineModCount.value}`,
   },
   { id: "files", labelKey: "winExport.tabFiles", icon: "folder", suffix: `${pickedFiles.value.size}` },
 ]);
@@ -140,7 +244,10 @@ async function loadInfo() {
   info.value = null;
   pickedMods.value = new Map();
   pickedFiles.value = new Map();
+  unpickedFiles.value = new Set();
+  autoExcluded.value = new Set();
   urls.value = new Map();
+  modIds.value = new Map();
   if (!uuid) { loadingInfo.value = false; return; }
   loadingInfo.value = true;
   try {
@@ -160,45 +267,125 @@ async function loadInfo() {
   }
 }
 
-/** 勾选状态的初始值：模组全勾、三个常规目录勾上，模组的下载地址按来源预填 */
+/** 勾选状态的初始值：能走在线来源的模组与文件全勾（运行期目录除外），下载地址按来源预填 */
 async function applyDefaults(data: ExportInfoDto, uuid: string, request: number) {
-  pickedMods.value = new Map(data.mods.map((x) => [x.path, x]));
+  const picked = new Map<string, ExportEntryDto>();
   pickedFiles.value = new Map();
   urls.value = new Map();
 
   for (const mod of data.mods) {
+    const ids = { modId: mod.modId ?? "", fileId: mod.fileId ?? "" };
     if (mod.url) urls.value.set(mod.path, mod.url);
+    modIds.value.set(mod.path, ids);
+    // 只勾编号成立的模组；其余随 mods 目录打进包，不在这里单独勾
+    if (isOnlineId(ids.modId, ids.fileId)) picked.set(mod.path, mod);
   }
+  pickedMods.value = picked;
 
+  if (request !== infoRequest) return;
+  await reseedFilePicks(uuid);
+}
+
+/** 文件默认勾选的请求序号：换实例 / 换格式时，旧的异步结果直接丢掉 */
+let picksSeq = 0;
+
+/**
+ * 按当前格式铺文件树的默认勾选
+ *
+ * 先全勾、再把运行期目录单独取消：直接压缩以实例目录为根，`.minecraft` 整目录勾上，
+ * 里面的内容靠继承一起算上；其余格式以游戏目录为根，根下逐项勾。
+ *
+ * - `uuid`: 目标实例
+ */
+async function reseedFilePicks(uuid: string) {
+  const seq = ++picksSeq;
+  const picked = new Map<string, ExportEntryDto>();
+  const unpicked = new Set<string>();
   try {
-    const root = await api.listExportDir(uuid, "");
-    if (request !== infoRequest || uuid !== currentUuid.value) return;
-    for (const entry of root) {
-      if (entry.dir && DEFAULT_DIRS.includes(entry.path)) {
-        pickedFiles.value.set(entry.path, entry);
+    if (pack.value === "mml") {
+      // 实例根上全勾，运行期目录随后单独排除；`.minecraft` 里面的内容靠继承算上
+      for (const entry of await api.listExportInstanceDir(uuid, "")) picked.set(entry.path, entry);
+      for (const name of DEFAULT_SKIP) {
+        unpicked.add(name);
+        unpicked.add(`${GAME_DIR}/${name}`);
+      }
+    } else {
+      for (const entry of await api.listExportDir(uuid, "")) {
+        if (!DEFAULT_SKIP.has(entry.path)) picked.set(entry.path, entry);
       }
     }
+    if (seq !== picksSeq || uuid !== currentUuid.value) return;
+    pickedFiles.value = picked;
+    unpickedFiles.value = unpicked;
+    syncModExclusions();
   } catch (e) {
-    if (request === infoRequest && uuid === currentUuid.value) showToast(tErr(e));
+    if (seq === picksSeq && uuid === currentUuid.value) showToast(tErr(e));
   }
 }
 
-/** 勾选 / 取消一个模组 */
+// 两种格式的文件根不同（实例目录 / 游戏目录），切过去时旧的路径不能带过去，重新铺默认
+watch(pack, () => {
+  pickedFiles.value = new Map();
+  if (currentUuid.value) void reseedFilePicks(currentUuid.value);
+});
+
+/** 直接压缩没有模组页，模组文件必须随实例一起打进包 */
+const modsInManifest = computed(() => pack.value !== "mml");
+
+/**
+ * 模组勾选联动文件树：勾了模组就走清单下载，同名文件不能再打进 overrides
+ *
+ * - `path`: 模组在游戏目录下的路径
+ * - `excluded`: 这次是排除文件（勾上模组）还是放回文件（取消勾选）
+ */
+function setModExcluded(path: string, excluded: boolean) {
+  if (!modsInManifest.value) return;
+  if (excluded) {
+    // 记下来的只是"这次改的"：本来就手动画掉的不算，取消勾选时不该被还原
+    if (isPickedPath(path, pickedFiles.value, unpickedFiles.value)) autoExcluded.value.add(path);
+    unpickedFiles.value.add(path);
+    pickedFiles.value.delete(path);
+  } else if (autoExcluded.value.delete(path)) {
+    unpickedFiles.value.delete(path);
+  }
+}
+
+/** 换实例 / 换格式后重新铺一遍联动：已勾的在线模组对应的文件要重新排除 */
+function syncModExclusions() {
+  autoExcluded.value = new Set();
+  if (!modsInManifest.value) return;
+  for (const path of pickedMods.value.keys()) {
+    if (!isOnlineMod(path)) continue;
+    autoExcluded.value.add(path);
+    unpickedFiles.value.add(path);
+    pickedFiles.value.delete(path);
+  }
+}
+
+/** 勾选 / 取消一个模组；编号不成立的不给勾，它按本地模组打包 */
 function toggleMod(entry: ExportEntryDto) {
+  if (!isOnlineMod(entry.path)) return;
   if (pickedMods.value.has(entry.path)) {
     pickedMods.value.delete(entry.path);
+    setModExcluded(entry.path, false);
   } else {
     pickedMods.value.set(entry.path, entry);
+    setModExcluded(entry.path, true);
     // 有在线来源的顺手把地址填上，用户可改可清
     if (entry.url && !urls.value.has(entry.path)) urls.value.set(entry.path, entry.url);
   }
 }
 
-/** 勾选 / 取消一个文件或目录 */
+/** 勾选 / 取消一个文件或目录；取消记成排除项，父目录勾着也能单独去掉，必选条目不动 */
 function toggleFile(entry: ExportEntryDto) {
-  if (pickedFiles.value.has(entry.path)) {
+  if (isLockedFile(entry.path)) return;
+  if (isPickedPath(entry.path, pickedFiles.value, unpickedFiles.value)) {
     pickedFiles.value.delete(entry.path);
+    unpickedFiles.value.add(entry.path);
   } else {
+    // 手动把它勾回来：同一个模组不能既走清单又从文件里打一遍，把模组也跟着取消
+    if (autoExcluded.value.delete(entry.path)) pickedMods.value.delete(entry.path);
+    unpickedFiles.value.delete(entry.path);
     pickedFiles.value.set(entry.path, entry);
   }
 }
@@ -206,13 +393,43 @@ function toggleFile(entry: ExportEntryDto) {
 /** 全选 / 全不选当前过滤出来的模组 */
 function pickAllMods(all: boolean) {
   for (const mod of mods.value) {
+    // 编号不成立的不能进清单，全选时跳过
+    if (all && !isOnlineMod(mod.path)) continue;
     if (all) {
       pickedMods.value.set(mod.path, mod);
     } else {
       pickedMods.value.delete(mod.path);
     }
+    setModExcluded(mod.path, all);
   }
 }
+
+/** 读某条模组的项目号或文件号 */
+function modIdOf(path: string, key: "modId" | "fileId"): string {
+  return modIds.value.get(path)?.[key] ?? "";
+}
+
+/** 改某条模组的项目号或文件号；导出时以这里的值为准 */
+function setModId(path: string, key: "modId" | "fileId", value: string) {
+  // CurseForge 只认纯数字，粘进来的别的字符直接丢掉
+  const next = pack.value === "curseforge" ? value.replace(/\D/g, "") : value.trim();
+  const current = modIds.value.get(path) ?? { modId: "", fileId: "" };
+  modIds.value.set(path, { ...current, [key]: next });
+}
+
+// 编号改到不成立（清空，或者换成 CurseForge 后不是数字）：不再是在线模组，
+// 勾选撤掉、文件回到包里，否则这份模组会从清单和压缩包两边一起消失
+watch(
+  [pack, modIds],
+  () => {
+    for (const path of [...pickedMods.value.keys()]) {
+      if (isOnlineMod(path)) continue;
+      pickedMods.value.delete(path);
+      setModExcluded(path, false);
+    }
+  },
+  { deep: true },
+);
 
 /** 填 / 清某条的下载地址 */
 function setUrl(path: string, value: string) {
@@ -221,11 +438,6 @@ function setUrl(path: string, value: string) {
   } else {
     urls.value.delete(path);
   }
-}
-
-/** 从已选里去掉一条，文件页右侧的移除按钮用 */
-function removePick(path: string) {
-  pickedFiles.value.delete(path);
 }
 
 watch(currentUuid, loadInfo);
@@ -237,6 +449,13 @@ const running = computed(() => progress.value?.state === "running");
 const preparing = ref(false);
 const busy = computed(() => running.value || preparing.value);
 
+/** 进度弹窗标题：跟着状态走 */
+const progressTitle = computed(() => {
+  if (progress.value?.state === "done") return t("winExport.progressDoneTitle");
+  if (progress.value?.state === "failed") return t("winExport.progressFailedTitle");
+  return t("winExport.progressTitle");
+});
+
 /** 进度百分比：仅在 running 且 total 有效时有意义 */
 const percent = computed(() => {
   const p = progress.value;
@@ -246,7 +465,22 @@ const percent = computed(() => {
 
 /** 勾选表 → 后端要的入参：路径 + 下载地址 */
 function picksOf(picked: Map<string, ExportEntryDto>) {
-  return [...picked.keys()].map((path) => ({ path, url: urls.value.get(path) ?? "" }));
+  return [...picked.keys()].map((path) => ({
+    path,
+    url: urls.value.get(path) ?? "",
+    modId: modIds.value.get(path)?.modId || null,
+    fileId: modIds.value.get(path)?.fileId || null,
+    exclude: false,
+  }));
+}
+
+/** 文件页的勾选 → 后端入参：勾上的在前，取消掉的作为排除项跟在后面 */
+function filePicks() {
+  const picks = picksOf(pickedFiles.value);
+  for (const path of unpickedFiles.value) {
+    picks.push({ path, url: "", modId: null, fileId: null, exclude: true });
+  }
+  return picks;
 }
 
 /** 选保存位置后交给 Rust 侧后台导出，进度走 export-progress 事件 */
@@ -256,8 +490,9 @@ async function startExport() {
   const uuid = currentUuid.value;
   const config = {
     pack: pack.value,
+    compress: zipLevel.value,
     includeLauncher: pack.value === "server" && !!info.value.canBundleLauncher && includeLauncher.value,
-    mods: picksOf(pickedMods.value), files: picksOf(pickedFiles.value),
+    mods: pack.value === "mml" ? [] : picksOf(pickedMods.value), files: filePicks(),
     name: packName.value, author: author.value, version: version.value, summary: summary.value,
   };
   const warnCustomLoader = customLoaderLost.value;
@@ -287,10 +522,42 @@ async function startExport() {
   }
 }
 
+/** 导出中点了关窗：问一句要不要取消 */
+const confirmClose = ref(false);
+
+/** 关窗：正在导出时先问，别把后台任务晾在那儿 */
+function askClose() {
+  if (running.value) {
+    confirmClose.value = true;
+    return;
+  }
+  emit("close");
+}
+
+/** 确认取消：等任务收手再关；导出在这期间自己跑完了就只关窗 */
+async function cancelAndClose() {
+  confirmClose.value = false;
+  try {
+    await api.cancelExport();
+  } catch (e) {
+    showToast(tErr(e));
+  }
+  emit("close");
+}
+
+// 问着的时候导出自己结束了：不用再答，直接关
+watch(running, (value) => {
+  if (!value && confirmClose.value) {
+    confirmClose.value = false;
+    emit("close");
+  }
+});
+
 // ---------------- 事件 ----------------
 
 let unlistenProgress: UnlistenFn | null = null;
 let unlistenFocus: UnlistenFn | null = null;
+let unlistenCloseBlocked: UnlistenFn | null = null;
 
 /** 定位到 openWindow 带入的目标实例；没有或不存在就保持下拉默认值 */
 function applyTarget() {
@@ -311,7 +578,11 @@ async function syncInstances() {
 }
 
 // 单窗口模式：窗口被 KeepAlive 缓存，切回不会重新挂载，自己补一次列表与定位
-useWindowRefresh(syncInstances);
+useWindowRefresh(() => {
+  // 上一轮的结果弹窗别留到下一次打开；还在跑就让它继续显示进度
+  if (!running.value) progress.value = null;
+  return syncInstances();
+});
 
 // 已经停在本窗口时又被打开：openWindow 只更新参数、不换组件，跟着参数换实例
 watch(() => windowParams.value.uuid, applyTarget);
@@ -321,11 +592,6 @@ onMounted(async () => {
 
   unlistenProgress = await onExportProgress((p) => {
     progress.value = p;
-    if (p.state === "done") {
-      showToast(t("winExport.done", { file: p.file }));
-    } else if (p.state === "failed") {
-      showToast(t("winExport.failed") + (p.error ? `: ${p.error}` : ""));
-    }
   });
 
   // 窗口已存在时再次打开：壳层推送新的目标实例
@@ -334,16 +600,26 @@ onMounted(async () => {
       currentUuid.value = uuid;
     }
   });
+
+  // 多窗口：原生关窗（Alt+F4 / 任务栏）由 Rust 拦下并发 close-blocked。
+  // 单窗口模式下页面是在主窗口里切换，关页面走标题栏 ✕，看到的是同一条 askClose
+  if (multiWindow.value) {
+    unlistenCloseBlocked = await onCloseBlocked((label) => {
+      if (label && label !== myLabel) return;
+      confirmClose.value = true;
+    });
+  }
 });
 
 onBeforeUnmount(() => {
   unlistenProgress?.();
   unlistenFocus?.();
+  unlistenCloseBlocked?.();
 });
 </script>
 
 <template>
-  <WindowFrame body-fill :title="t(serverPack ? 'winTitle.serverPack' : 'winExport.title')" @close="$emit('close')">
+  <WindowFrame body-fill :title="t(serverPack ? 'winTitle.serverPack' : 'winExport.title')" @close="askClose">
     <!-- 实例选择与导出按钮放进标题栏：不占内容区高度，也不随选项卡滚动 -->
     <template #head-right>
       <select v-model="currentUuid" class="field-select head-select" :disabled="busy">
@@ -367,6 +643,13 @@ onBeforeUnmount(() => {
             @update:model-value="onPackChange" />
         </div>
 
+        <!-- 压缩等级：对整份导出生效，直接压缩与其它格式都走它 -->
+        <div class="row">
+          <label class="field-label" v-tip="t('winExport.zipLevelTip')">{{ t("winExport.zipLevel") }}</label>
+          <SegmentedTabs :options="zipOptions" :model-value="zipLevel" :disabled="busy"
+            @update:model-value="onZipLevelChange" />
+        </div>
+
         <!-- 这层限制在选择格式时就说清楚，别让用户以为包里带了自定义加载器 -->
         <p v-if="customLoaderLost" class="warn-hint">{{ t("winExport.customLoaderWarn") }}</p>
 
@@ -376,9 +659,9 @@ onBeforeUnmount(() => {
         <IconTabs v-else v-model="tab" :tabs="tabOptions" />
 
         <label v-if="pack === 'server' && info.canBundleLauncher" class="row"><input v-model="includeLauncher" type="checkbox" :disabled="busy" />{{ t("winExport.includeLauncher") }}</label>
-        <div v-if="pack !== 'mml' && pack !== 'server'" class="tab-body">
+        <div v-if="pack !== 'server'" class="tab-body">
           <!-- 整合包信息：写进清单的元数据，配着上面的格式一起看 -->
-          <template v-if="tab === 'meta'">
+          <template v-if="shownTab === 'meta'">
             <p class="sec-hint">
               {{
                 t("winExport.summaryLine", {
@@ -409,68 +692,94 @@ onBeforeUnmount(() => {
           </template>
 
           <!-- 模组 -->
-          <template v-else-if="tab === 'mods'">
+          <template v-else-if="shownTab === 'mods'">
             <div class="sec-bar">
               <input v-model="modKeyword" class="field-input search" spellcheck="false"
                 :placeholder="t('winExport.searchMods')" />
               <BaseButton size="sm" @click="pickAllMods(true)">{{ t("winExport.selectAll") }}</BaseButton>
               <BaseButton size="sm" @click="pickAllMods(false)">{{ t("winExport.selectNone") }}</BaseButton>
             </div>
-            <div class="mod-list">
-              <p v-if="!mods.length" class="empty-tip">{{ t("winExport.noMods") }}</p>
-              <div v-for="mod in mods" :key="mod.path" class="mod-row">
-                <input type="checkbox" :checked="pickedMods.has(mod.path)" @change="toggleMod(mod)" />
-                <span class="mod-name" :title="mod.path">{{ mod.path.split("/").pop() }}</span>
-                <span class="mod-tag" :class="{ online: !!mod.modId }">
-                  {{ mod.modId ? t("winExport.online") : t("winExport.local") }}
+            <!-- 表格列跟着格式走：只有 Modrinth 的清单带下载地址，多一列它就够宽 -->
+            <div class="mod-table" :class="{ 'with-url': withUrls }">
+              <div class="mod-head">
+                <span />
+                <span>{{ t("winExport.modFile") }}</span>
+                <span>{{ t("winExport.projectId") }}</span>
+                <span>{{ t("winExport.fileId") }}</span>
+                <span v-if="withUrls">{{ t("winExport.downloadUrl") }}</span>
+              </div>
+              <p v-if="!mods.length" class="empty-tip">{{ t("winExport.noOnlineMods") }}</p>
+              <div v-for="mod in mods" :key="mod.path" class="mod-line"
+                :class="{ 'is-local': !isOnlineMod(mod.path) }">
+                <input type="checkbox" :checked="pickedMods.has(mod.path)"
+                  :disabled="!isOnlineMod(mod.path)"
+                  :title="isOnlineMod(mod.path) ? undefined : t('winExport.idNotNumeric')"
+                  @change="toggleMod(mod)" />
+                <span class="mod-name-cell">
+                  <span class="mod-name" :title="mod.path">{{ mod.path.split("/").pop() }}</span>
+                  <!-- 编号不成立的在 CF 里点不动：就地标出来，别让人以为是漏掉了 -->
+                  <span v-if="!isOnlineMod(mod.path)" class="mod-tag" v-tip="t('winExport.idNotNumeric')">
+                    {{ t("winExport.notCfMod") }}
+                  </span>
                 </span>
-                <input v-if="withUrls && pickedMods.has(mod.path)" class="field-input mod-url"
-                  spellcheck="false" :value="urls.get(mod.path) ?? ''"
-                  :placeholder="t('winExport.urlPlaceholder')"
+                <input class="field-input" spellcheck="false" :value="modIdOf(mod.path, 'modId')"
+                  @input="setModId(mod.path, 'modId', ($event.target as HTMLInputElement).value)" />
+                <input class="field-input" spellcheck="false" :value="modIdOf(mod.path, 'fileId')"
+                  @input="setModId(mod.path, 'fileId', ($event.target as HTMLInputElement).value)" />
+                <input v-if="withUrls" class="field-input" spellcheck="false"
+                  :value="urls.get(mod.path) ?? ''" :placeholder="t('winExport.urlPlaceholder')"
                   @input="setUrl(mod.path, ($event.target as HTMLInputElement).value)" />
               </div>
             </div>
           </template>
 
-          <!-- 文件：左边树、右边已选，地址填在右边的条目上 -->
+          <!-- 文件：只有一棵树，勾选即打包，取消勾选就排除 -->
           <template v-else>
             <div class="files-pane">
-              <div class="files-left">
-                <p class="sec-hint">{{ t("winExport.dirHint") }}</p>
-                <FilePicker :uuid="currentUuid" :picked="pickedFilePaths" @toggle="toggleFile" />
-              </div>
-              <div class="files-right">
-                <p class="sec-hint">
-                  {{ withUrls ? t("winExport.urlsHint") : t("winExport.pickedHint") }}
-                </p>
-                <div class="picked-list">
-                  <p v-if="!pickedFiles.size" class="empty-tip">{{ t("winExport.selectedNone") }}</p>
-                  <div v-for="row in [...pickedFiles.values()]" :key="row.path" class="picked-row">
-                    <span class="url-path" :title="row.path">{{ row.path }}</span>
-                    <div class="picked-line">
-                      <input v-if="withUrls && !row.dir" class="field-input url-input" spellcheck="false"
-                        :value="urls.get(row.path) ?? ''" :placeholder="t('winExport.urlPlaceholder')"
-                        @input="setUrl(row.path, ($event.target as HTMLInputElement).value)" />
-                      <BaseButton size="sm" @click="removePick(row.path)">{{ t("winExport.remove") }}</BaseButton>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <p class="sec-hint">{{ pack === "mml" ? t("winExport.dirHintZip") : t("winExport.dirHint") }}</p>
+              <FilePicker :uuid="currentUuid" :picked="pickedFilePaths" :unpicked="unpickedFiles"
+                :base="fileBase" :expand="fileExpand" :locked="isLockedFile" @toggle="toggleFile" />
             </div>
           </template>
-        </div>
-
-        <!-- 导出进度：固定在底部，不随选项卡滚动 -->
-        <div v-if="running" class="progress-row">
-          <span class="progress-text" v-tip="progress?.text">{{ progress?.text }}</span>
-          <div class="progress-track">
-            <div class="progress-fill" :style="{ width: percent + '%' }" />
-          </div>
         </div>
       </template>
       <div v-else-if="loadingInfo" class="hint-full">{{ t("winExport.loading") }}</div>
       <div v-else class="hint-full">{{ t("winExport.pickInstance") }}</div>
     </div>
+
+    <!-- 导出进度：任务在后台跑，进度靠弹窗盖住整页，免得被选项卡切走看不见 -->
+    <BaseModal v-if="progress && !confirmClose" :title="progressTitle" :width="460" :closable="false"
+      @close="progress = null">
+      <!-- 只有跑着的时候才有一行当前文件；结束后下面那行已写明保存位置，不必重复 -->
+      <p v-if="running" class="prog-file" :title="progress.text">
+        {{ progress.text || t("winExport.progressPreparing") }}
+      </p>
+      <div class="progress-track">
+        <div class="progress-fill" :style="{ width: percent + '%' }" />
+      </div>
+      <p v-if="progress.state === 'running'" class="prog-count">
+        {{ progress.total > 0 ? t("winExport.progressCount", { now: progress.now, total: progress.total }) : percent + "%" }}
+      </p>
+      <p v-else-if="progress.state === 'done'" class="prog-note">
+        {{ t("winExport.progressSaved", { file: progress.file }) }}
+      </p>
+      <p v-else class="error-text">{{ progress.error || t("winExport.failed") }}</p>
+      <div class="prog-actions">
+        <BaseButton v-if="!running" size="sm" variant="primary" @click="progress = null">
+          {{ t("winExport.close") }}
+        </BaseButton>
+      </div>
+    </BaseModal>
+
+    <!-- 导出中关窗：确认后取消导出再关 -->
+    <BaseModal v-if="confirmClose" :title="t('winExport.closeRunningTitle')" :closable="false"
+      @close="confirmClose = false">
+      <p class="delete-tip">{{ t("winExport.closeRunningConfirm") }}</p>
+      <div class="prog-actions">
+        <BaseButton @click="confirmClose = false">{{ t("winExport.keepExporting") }}</BaseButton>
+        <BaseButton variant="danger" @click="cancelAndClose">{{ t("winExport.cancelExport") }}</BaseButton>
+      </div>
+    </BaseModal>
   </WindowFrame>
 </template>
 
@@ -486,7 +795,8 @@ onBeforeUnmount(() => {
   min-height: 0;
   box-sizing: border-box;
   overflow-y: auto;
-  scrollbar-gutter: stable;
+  /* 两侧都留滚动条槽：只留一侧时右侧会凭空多出一截，和左边不一样宽 */
+  scrollbar-gutter: stable both-edges;
   /* 见 styles/scrollbar.css */
 }
 
@@ -555,31 +865,72 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
-/* 模组列表：内容多时自己滚，别把窗口撑长 */
-.mod-list {
+/* 模组表：表头吸顶、内容多时自己滚，别把窗口撑长。列宽走同一套 grid，表头与行才对得齐 */
+.mod-table {
   display: flex;
   flex-direction: column;
-  gap: 2px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 6px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--bg-solid, var(--bg-card));
 }
 
-.mod-row {
-  display: flex;
+.mod-head,
+.mod-line {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 120px 120px;
   align-items: center;
-  gap: 8px;
-  padding: 4px 6px;
-  border-radius: 10px;
+  gap: 10px;
+  padding: 4px 10px;
+}
+
+/* Modrinth 多一列下载地址：地址比编号长，给它更宽的弹性列 */
+.mod-table.with-url .mod-head,
+.mod-table.with-url .mod-line {
+  grid-template-columns: 22px minmax(0, 1fr) 110px 110px minmax(0, 1.4fr);
+}
+
+.mod-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  min-height: 30px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+
+.mod-line {
+  min-height: 34px;
+  border-bottom: 1px solid var(--border);
   font-size: 12.5px;
 }
 
-.mod-row:hover {
+.mod-line:last-child {
+  border-bottom: none;
+}
+
+.mod-line:hover {
   background: var(--bg-hover);
+}
+
+/* 表格里一行只有这么高：收紧内边距与行高，别按常规控件的 32px 把行撑开 */
+.mod-line .field-input {
+  padding: 2px 8px;
+  min-height: 24px;
+  height: 24px;
+  line-height: 18px;
+}
+
+/* 文件名旁边还能挂一个标签，超出部分截断 */
+.mod-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .mod-name {
@@ -590,7 +941,11 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-/* 在线 / 本地标签：在线走强调色，本地是中性灰 */
+/* 编号不成立的行：不是在线模组，勾不动，压暗一档 */
+.mod-line.is-local .mod-name {
+  color: var(--text-dim);
+}
+
 .mod-tag {
   flex-shrink: 0;
   padding: 0 6px;
@@ -598,102 +953,51 @@ onBeforeUnmount(() => {
   background: var(--bg-hover);
   color: var(--text-dim);
   font-size: 10.5px;
+  line-height: 16px;
 }
 
-.mod-tag.online {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-/* 模组行里的地址：固定宽度，不给它抢文件名的位置 */
-.mod-url {
-  width: 260px;
-  flex-shrink: 0;
-}
-
-/* 文件页：左边树吃掉剩余宽度，右边已选固定宽度 */
+/* 文件页：只剩一棵树，占满整宽 */
 .files-pane {
   display: flex;
-  gap: 12px;
-  flex: 1;
-  min-height: 0;
-}
-
-.files-left {
-  display: flex;
   flex-direction: column;
   gap: 6px;
   flex: 1;
-  min-width: 0;
   min-height: 0;
 }
 
-.files-right {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 330px;
-  flex-shrink: 0;
-  min-height: 0;
-}
-
-.picked-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-solid, var(--bg-card));
-}
-
-/* 一条已选：路径一行，地址与移除按钮一行 */
-.picked-row {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.url-path {
+/* 进度弹窗：当前文件一行、进度条一行、结果另起一行 */
+.prog-file {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.prog-count {
+  margin: 8px 0 0;
   font-size: 11.5px;
   color: var(--text-dim);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
-.picked-line {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.url-input {
-  flex: 1;
-  min-width: 0;
-}
-
-/* 进度：文件名一行、进度条一行，都不随选项卡滚动 */
-.progress-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.progress-text {
-  font-size: var(--ctl-font);
+.prog-note {
+  margin: 10px 0 0;
+  font-size: 12.5px;
   color: var(--text-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: break-all;
+}
+
+.prog-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
 
 .progress-track {
-  height: 6px;
+  height: 8px;
   border-radius: 999px;
   background: var(--bg-raised);
   overflow: hidden;
@@ -703,7 +1007,7 @@ onBeforeUnmount(() => {
   height: 100%;
   border-radius: 999px;
   background: var(--accent);
-  transition: width 0.2s ease;
+  transition: width 0.3s ease;
 }
 
 .hint-full {

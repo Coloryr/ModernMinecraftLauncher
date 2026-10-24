@@ -175,7 +175,7 @@ mod tests {
             ("mml/minecraft/instances/test/.minecraft/options.txt".into(), b"new".to_vec()),
         ];
         if let Some((name, content)) = extra { data.push((name.into(), content.to_vec())); }
-        archive::write_zip(&file, &[], &data).unwrap();
+        archive::write_zip(&file, &[], &data, &None, &std::sync::atomic::AtomicBool::new(false)).unwrap();
         (dir, file)
     }
 

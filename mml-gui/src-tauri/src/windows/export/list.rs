@@ -69,6 +69,28 @@ pub(crate) fn online_of(game: &InstanceSettingObj) -> HashMap<String, OnlineInfo
     map
 }
 
+/// 递归累加目录里所有文件的大小
+///
+/// - `path`: 目录
+///
+/// # 返回值
+///
+/// 字节数；读不到的条目略过，链接不跟进，免得绕圈或算进别的目录
+fn dir_size(path: &Path) -> u64 {
+    let Ok(items) = std::fs::read_dir(path) else { return 0 };
+    let mut total = 0;
+    for item in items.flatten() {
+        let Ok(kind) = item.file_type() else { continue };
+        if kind.is_symlink() { continue; }
+        if kind.is_dir() {
+            total += dir_size(&item.path());
+        } else if kind.is_file() {
+            total += item.metadata().map(|meta| meta.len()).unwrap_or(0);
+        }
+    }
+    total
+}
+
 /// 列一个目录的直接子项，路径转成相对游戏目录，顺带补上在线来源
 ///
 /// - `dir`: 待列的目录
@@ -100,7 +122,7 @@ pub(super) fn list_entries(
             path: rel.to_string_lossy().replace('\\', "/"),
             dir: is_dir,
             size: if is_dir {
-                0
+                dir_size(&path)
             } else {
                 item.metadata().map(|meta| meta.len()).unwrap_or(0)
             },
@@ -121,7 +143,7 @@ pub(super) fn list_entries(
 /// # 返回值
 ///
 /// 见 [`ExportInfoDto`]；uuid 非法或实例不存在返回错误文案
-#[gui_macros::ipc_group("export")]
+#[gui_macros::ipc_group("export")]
 #[gui_macros::command]
 pub fn export_get_info(uuid: String) -> Result<ExportInfoDto, String> {
     let game = instance_snapshot(&uuid)?;
@@ -149,13 +171,42 @@ pub fn export_get_info(uuid: String) -> Result<ExportInfoDto, String> {
 /// # 返回值
 ///
 /// 该目录的直接子项；路径非法返回 `err.fileName`，目录不存在返回 `err.fileNotFound`
-#[gui_macros::ipc_group("export")]
+#[gui_macros::ipc_group("export")]
 #[gui_macros::command]
 pub fn export_list_dir(uuid: String, dir: String) -> Result<Vec<ExportEntryDto>, String> {
     let game = instance_snapshot(&uuid)?;
     let base = game.get_game_path();
 
     // 根目录不走路径守卫：那里允许空串
+    let path = if dir.trim().is_empty() {
+        base.clone()
+    } else {
+        resolve_under(&base, &dir)?
+    };
+    if !path.is_dir() {
+        return Err(err_keys::FILE_NOT_FOUND.to_string());
+    }
+
+    let online = online_of(&game);
+    list_entries(&path, &base, &online)
+}
+
+/// 浏览实例目录下的一个目录，给「直接压缩」的文件树用
+///
+/// 与 [`export_list_dir`] 的区别只在根：这里从实例目录（含 `.minecraft`、`game.json`）起，
+/// 返回的路径也相对实例目录，导出时按同一口径解回绝对路径。
+///
+/// - `uuid`: 实例 uuid
+/// - `dir`: 相对实例目录的路径；空串表示实例目录本身
+///
+/// # 返回值
+///
+/// 该目录的直接子项；路径非法返回 `err.fileName`，目录不存在返回 `err.fileNotFound`
+#[gui_macros::ipc_group("export")]
+#[gui_macros::command]
+pub fn export_list_instance_dir(uuid: String, dir: String) -> Result<Vec<ExportEntryDto>, String> {
+    let game = instance_snapshot(&uuid)?;
+    let base = game.get_base_path();
     let path = if dir.trim().is_empty() {
         base.clone()
     } else {
@@ -194,3 +245,19 @@ pub(super) fn export_meta(file: &Path) -> Result<ExportMeta, String> {
         hash: FileHash::Sha1Sha512(sha1, sha512),
     })
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn directory_size_sums_nested_files() {
+        let dir = crate::test_support::temp_dir("export-dir-size");
+        std::fs::create_dir_all(dir.join("config/nested")).unwrap();
+        std::fs::write(dir.join("config/a.txt"), b"abc").unwrap();
+        std::fs::write(dir.join("config/nested/b.txt"), b"defgh").unwrap();
+        assert_eq!(dir_size(&dir.join("config")), 8);
+        assert_eq!(dir_size(&dir.join("missing")), 0);
+        crate::test_support::cleanup(&[&dir]);
+    }
+}
+

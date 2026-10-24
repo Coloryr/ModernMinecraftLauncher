@@ -6,6 +6,7 @@ mod tests;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
+    sync::{atomic::{AtomicBool, Ordering}, Arc},
 };
 
 use mml_base::{
@@ -13,7 +14,7 @@ use mml_base::{
     file_item::FileHash,
     serialize_tools,
 };
-use mml_names::{i18_items::error_type::CoreResult, names};
+use mml_names::{i18_items::error_type::{CoreResult, ErrorType}, names};
 
 use mml_net::{
     curseforge_api::{self, list_obj::AuthorsObj},
@@ -83,6 +84,8 @@ pub struct ExportArg {
     pub unselect: Vec<PathBuf>,
     /// 一起打包的文件
     pub select: Vec<PathBuf>,
+    /// 取消令牌，置位后在写下一个文件前收手；`None` 表示不中途取消
+    pub cancel: Option<Arc<AtomicBool>>,
     /// 整合包名字
     pub name: String,
     /// 整合包作者
@@ -113,6 +116,20 @@ impl InstanceSettingObj {
             ExportPackType::Zip => zip_pack(self, arg),
         }
     }
+}
+
+/// 导出是否已被取消
+///
+/// - `cancel`: 取消令牌，`None` 表示不中途取消
+///
+/// # 返回值
+///
+/// 已置位时返回任务取消错误，调用方据此停下
+fn check_cancel(cancel: &Option<Arc<AtomicBool>>) -> CoreResult<()> {
+    if cancel.as_ref().is_some_and(|flag| flag.load(Ordering::Relaxed)) {
+        return Err(ErrorType::TaskCancel);
+    }
+    Ok(())
 }
 
 /// 将作者列表拼接为字符串
@@ -285,7 +302,8 @@ async fn curseforge(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()>
     let path = game.get_game_path();
     let mut index = 0;
 
-    for item in arg.select {
+    for item in &arg.select {
+        check_cancel(&arg.cancel)?;
         let rel = match item.strip_prefix(&path) {
             Ok(p) => p,
             Err(_) => continue,
@@ -303,7 +321,7 @@ async fn curseforge(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()>
             gui.update(Some(name.clone()), 2 + index);
         }
 
-        zip.add_file(&name, &item)?;
+        zip.add_file(&name, item)?;
         index += 1;
     }
 
@@ -419,7 +437,8 @@ async fn modrinth(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
 
     let mut index = 0;
 
-    for item in arg.select {
+    for item in &arg.select {
+        check_cancel(&arg.cancel)?;
         let rel = match item.strip_prefix(&path) {
             Ok(p) => p,
             Err(_) => continue,
@@ -437,7 +456,7 @@ async fn modrinth(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
             gui.update(Some(name.clone()), 1 + index);
         }
 
-        zip.add_file(&name, &item)?;
+        zip.add_file(&name, item)?;
         index += 1;
     }
 
@@ -454,10 +473,11 @@ async fn modrinth(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
 /// - `files`: 待打包的文件
 /// - `gui`: 进度回调，`None` 时不上报
 /// - `offset`: 进度起点，回调里的序号加在它上面
+/// - `cancel`: 取消令牌，见 [`check_cancel`]
 ///
 /// # 返回值
 ///
-/// 打包失败返回对应错误
+/// 打包失败或被取消时返回对应错误
 fn add_game_files(
     zip: &mut BaseArchive,
     base: &Path,
@@ -465,8 +485,10 @@ fn add_game_files(
     files: &[PathBuf],
     gui: &BaseArchiveGui,
     offset: usize,
+    cancel: &Option<Arc<AtomicBool>>,
 ) -> CoreResult<()> {
     for (index, item) in files.iter().enumerate() {
+        check_cancel(cancel)?;
         // 不在游戏目录下的文件直接跳过：包内路径只能相对它算
         let Ok(rel) = item.strip_prefix(base) else {
             continue;
@@ -563,6 +585,7 @@ fn mmc(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
         &files,
         &arg.gui,
         2,
+        &arg.cancel,
     )
 }
 
@@ -660,6 +683,7 @@ fn hmcl(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
         &files,
         &arg.gui,
         2,
+        &arg.cancel,
     )
 }
 

@@ -24,7 +24,7 @@ async fn modrinth_archive_uses_portable_paths_for_both_download_sources() {
     game.export(ExportArg {
         file: output.clone(), pack: ExportPackType::Modrinth, archive: ArchiveType::Zip,
         mods: vec![online("mods/线上.jar", Some(OnlineInfoObj { modid: "project".into(), fileid: "version".into(), ..Default::default() }))],
-        files: vec![online("mods/本地.jar", None)], select: vec![config], unselect: vec![],
+        files: vec![online("mods/本地.jar", None)], select: vec![config], unselect: vec![], cancel: None,
         name: "整合包".into(), version: "1".into(), author: "author".into(), summary: "summary".into(), gui: None,
     }).await.unwrap();
     let mut zip = zip::ZipArchive::new(fs::File::open(&output).unwrap()).unwrap();

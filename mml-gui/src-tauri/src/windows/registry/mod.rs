@@ -14,7 +14,7 @@ mod spec;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use self::uuids::{MAIN_WINDOW_UUID, ADD_WINDOW_UUID, ADD_MODPACK_WINDOW_UUID, BLOCK_WINDOW_UUID, uuid_for_kind, uuid_of_label};
+pub(crate) use self::uuids::{MAIN_WINDOW_UUID, ADD_WINDOW_UUID, ADD_MODPACK_WINDOW_UUID, BLOCK_WINDOW_UUID, EXPORT_WINDOW_UUID, SERVER_PACK_WINDOW_UUID, uuid_for_kind, uuid_of_label};
 
 pub(crate) use self::family::{families, family_of_kind, FamilyWindowId, family_window_id, family_of_label};
 

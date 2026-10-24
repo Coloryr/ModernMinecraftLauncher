@@ -46,6 +46,13 @@ pub struct ExportPickDto {
     pub path: String,
     /// 下载地址；Modrinth 格式下填了才写进 index，空串进 overrides
     pub url: String,
+    /// 项目号；模组页可改，给了就以它为准，不给用实例里的在线信息
+    pub mod_id: Option<String>,
+    /// 文件号；同上
+    pub file_id: Option<String>,
+    /// 这一条是取消勾选，把该目录或文件从勾选里去掉；默认是勾选
+    #[serde(default)]
+    pub exclude: bool,
 }
 
 /// 前端提交的导出配置，即 `export_run` 的入参
@@ -57,11 +64,14 @@ pub struct ExportConfigDto {
     pub include_launcher: bool,
     /// 导出格式：curseforge / modrinth
     pub pack: String,
+    /// 压缩档位：fast / normal / solid，见 `ZipLevel`；缺省按 fast
+    #[serde(default)]
+    pub compress: String,
     /// 保存位置，前端 save 对话框选好的完整路径
     pub file: String,
     /// 勾选的模组
     pub mods: Vec<ExportPickDto>,
-    /// 勾选的文件与目录
+    /// 勾选的文件与目录，以及父目录勾着时单独取消掉的条目
     pub files: Vec<ExportPickDto>,
     /// 整合包名
     pub name: String,

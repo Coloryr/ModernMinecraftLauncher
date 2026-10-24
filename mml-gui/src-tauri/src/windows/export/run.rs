@@ -3,7 +3,7 @@
 //! 在线导出按项目编号拉文件，普通导出直接打包本地目录；
 //! 全程报进度，跑着的时候不重复入队。
 
-use std::{path::{PathBuf}, sync::{Arc, atomic::{AtomicBool, Ordering}}};
+use std::{path::{PathBuf}, sync::{Arc, Mutex, atomic::{AtomicBool, AtomicUsize, Ordering}}};
 
 use crate::err_keys;
 
@@ -15,6 +15,18 @@ use crate::{dtos::export_dto::{ExportConfigDto, ExportProgressDto}};
 
 use crate::windows::instance_snapshot;
 use super::list::{EXPORT_RUNNING, emit_export_progress, online_of};
+
+/// 当前导出任务的取消令牌；置位后写文件的循环会在下一条收手
+static EXPORT_CANCEL: Mutex<Option<Arc<AtomicBool>>> = Mutex::new(None);
+
+/// 是否正在导出，关窗保护与取消命令都用它
+///
+/// # 返回值
+///
+/// 有任务在跑时为 `true`
+pub(crate) fn running() -> bool {
+    EXPORT_RUNNING.load(Ordering::SeqCst)
+}
 
 /// 校验失败或后台任务退出时都释放导出占用。
 struct ExportPermit<'a>(&'a AtomicBool);
@@ -39,6 +51,8 @@ pub(super) struct ExportProgressGui {
     pub(super) app: AppHandle,
     /// 导出目标文件名，随每条进度一起下发
     pub(super) file: String,
+    /// 总计条目数，由 `start` 记下：更新事件也带着它，前端才能算百分比
+    pub(super) total: AtomicUsize,
 }
 
 /// 发起导出：后台任务，进度经 export-progress 事件上报
@@ -74,6 +88,13 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
             return Err(err_keys::EXPORT_PACK_TYPE.to_string());
         }
     };
+    // 压缩档位对整份导出生效：本地 zip 与内核写包读的是同一个设置
+    mml_base::archives::set_zip_level(match config.compress.as_str() {
+        "normal" => mml_base::archives::ZipLevel::Normal,
+        "solid" => mml_base::archives::ZipLevel::Solid,
+        _ => mml_base::archives::ZipLevel::Fast,
+    });
+
     if config.file.trim().is_empty() {
         // 这里校验的是**导出文件名**，原来报的是 err.serverEmpty，即服务器为空，
         // 前端弹出来的文案牛头不对马嘴
@@ -84,7 +105,13 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
     let base = game.get_game_path();
     let online = online_of(&game);
 
-    let selected = super::selection::collect(&base, config.mods.iter().chain(config.files.iter()), &online, pack)?;
+    // 直接压缩的勾选相对实例目录（含 .minecraft 那一段），其余格式相对游戏目录
+    let pick_base = if pack == ExportPackType::MML { game.get_base_path() } else { base.clone() };
+    let selected = super::selection::collect(&pick_base, config.mods.iter().chain(config.files.iter()), &online, pack)?;
+
+    // 取消令牌：关窗时前端调 export_cancel 置位，写文件的循环看到就收手
+    let cancel = Arc::new(AtomicBool::new(false));
+    *EXPORT_CANCEL.lock().unwrap() = Some(cancel.clone());
 
     let arg = ExportArg {
         file: PathBuf::from(&config.file),
@@ -94,6 +121,7 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
         files: selected.files,
         unselect: Vec::new(),
         select: selected.local,
+        cancel: Some(cancel.clone()),
         name: config.name,
         author: config.author,
         version: config.version,
@@ -101,16 +129,25 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
         gui: Some(Arc::new(ExportProgressGui {
             app: app.clone(),
             file: config.file.clone(),
+            total: AtomicUsize::new(0),
         })),
     };
 
     let save_file = config.file.clone();
-    tokio::spawn(async move {
+    // 同步命令跑在主线程上，没有 tokio reactor：必须借 tauri 的运行时
+    tauri::async_runtime::spawn(async move {
         let _permit = permit;
         let res = if pack == ExportPackType::MML {
+            let flag = cancel.clone();
             tokio::task::spawn_blocking(move || {
-                if server_pack { super::server_pack::export_pack(&game, &arg.file, config.include_launcher) }
-                else { super::archive::native_instance(&game, &arg.file) }
+                if server_pack {
+                    super::server_pack::export_pack(&game, &arg.file, config.include_launcher, &arg.gui, &flag)
+                } else if arg.select.is_empty() {
+                    // 一个文件都没勾：保持老行为，整份实例压缩
+                    super::archive::native_instance(&game, &arg.file, &arg.gui, &flag)
+                } else {
+                    super::archive::native_instance_selected(&game, &arg.select, &arg.file, &arg.gui, &flag)
+                }
             })
                 .await.map_err(|e| e.to_string()).and_then(|result| result)
         } else {
@@ -120,6 +157,11 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
                 game.export(arg).await.map_err(|e| e.to_string())
             }).await
         };
+        // 任务收尾：摘掉取消令牌，别让下一轮导出看见上一轮的取消位
+        {
+            let mut slot = EXPORT_CANCEL.lock().unwrap();
+            if slot.as_ref().is_some_and(|flag| Arc::ptr_eq(flag, &cancel)) { *slot = None; }
+        }
         let event = match res {
             Ok(()) => ExportProgressDto {
                 state: "done".to_string(),
@@ -141,6 +183,31 @@ pub fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Resu
         emit_export_progress(&app, event);
     });
 
+    Ok(())
+}
+
+/// 取消正在跑的导出
+///
+/// 置位后等任务收尾再返回：调用方接着要关窗口，关窗保护要等取消生效才放行。
+///
+/// # 返回值
+///
+/// 没有导出在跑时立即返回；等满 5 秒还没停也不报错，任务会在处理完当前文件后收手
+#[gui_macros::ipc_group("export")]
+#[gui_macros::command]
+pub async fn export_cancel() -> Result<(), String> {
+    if let Some(flag) = EXPORT_CANCEL.lock().unwrap().clone() {
+        flag.store(true, Ordering::SeqCst);
+    }
+    tauri::async_runtime::spawn_blocking(|| {
+        // 一个文件内部的复制打断不了，等它写完再看一次
+        for _ in 0..100 {
+            if !running() { break; }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -166,6 +233,7 @@ impl IBaseArchiveGui for ExportProgressGui {
     ///
     /// - `total`: 总计需要打包的文件数
     fn start(&self, total: usize) {
+        self.total.store(total, Ordering::Relaxed);
         emit_export_progress(
             &self.app,
             ExportProgressDto {
@@ -189,7 +257,7 @@ impl IBaseArchiveGui for ExportProgressGui {
             ExportProgressDto {
                 state: "running".to_string(),
                 now: current as u64,
-                total: 0,
+                total: self.total.load(Ordering::Relaxed) as u64,
                 text: filename.unwrap_or_default(),
                 error: None,
                 file: self.file.clone(),

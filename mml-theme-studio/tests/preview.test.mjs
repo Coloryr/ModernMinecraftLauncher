@@ -1,12 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFile, symlink } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { htmlPreview } from '../preview/html.mjs';
 import { asset } from '../preview/assets.mjs';
-import { Studio } from '../lib/studio.mjs';
-import { run } from '../lib/process.mjs';
 import { fixture, temp } from './helpers.mjs';
+
+const READY = '@@mml-studio@@';
 
 test('HTML 实时预览与静态资源不能越出 src', async () => {
   const root = await fixture(await temp('html'));
@@ -33,22 +36,41 @@ test('HTML 实时预览与静态资源不能越出 src', async () => {
   } finally { await preview.close(); }
 });
 
-test('执行错误可见、任务取消释放忙状态、关闭回收预览进程', async () => {
-  const root = await fixture(await temp('lifecycle'));
-  await writeFile(join(root, 'src/index.html'), '<head></head>');
-  const events = [];
-  const studio = new Studio({ cache: join(root, 'cache'), emit: (event) => events.push(event) });
-  await studio.open(root);
-  await assert.rejects(run(process.execPath, ['-e', 'process.exit(5)']), { key: 'commandFailed' });
-  const task = studio.perform(({ signal }) => run(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { signal }));
-  await assert.rejects(studio.perform(() => {}), { key: 'busy' });
-  await studio.cancel();
-  await assert.rejects(task, { key: 'cancelled' });
-  assert.equal(studio.task, null);
-  const url = await studio.startPreview();
-  assert.equal((await fetch(url)).status, 200);
-  await studio.close();
-  assert.equal(studio.preview, null);
-  assert.equal(events.at(-1).url, '');
-  await assert.rejects(fetch(url));
+test('预览 worker 通过 stdout 报告就绪，stdin 关闭后退出', async () => {
+  const root = await fixture(await temp('worker'));
+  await writeFile(join(root, 'src/index.html'), '<html><head></head><body>Worker preview</body></html>');
+  const worker = fileURLToPath(new URL('../preview/worker.mjs', import.meta.url));
+  const child = spawn(process.execPath, [worker, root, 'html', join(root, 'cache')], { stdio: ['pipe', 'pipe', 'pipe'] });
+  let stderr = '';
+  child.stderr.on('data', (value) => { stderr += value; });
+  try {
+    const url = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('timeout: ' + stderr)), 30000);
+      let buffer = '';
+      const onData = (value) => {
+        buffer += value.toString();
+        for (;;) {
+          const index = buffer.indexOf('\n');
+          if (index < 0) return;
+          const line = buffer.slice(0, index);
+          buffer = buffer.slice(index + 1);
+          if (!line.startsWith(READY)) continue;
+          const message = JSON.parse(line.slice(READY.length));
+          clearTimeout(timer);
+          child.stdout.off('data', onData);
+          if (message.type === 'ready') resolve(message.url);
+          else reject(new Error(message.error));
+          return;
+        }
+      };
+      child.stdout.on('data', onData);
+      child.once('exit', () => { clearTimeout(timer); reject(new Error('worker exited: ' + stderr)); });
+    });
+    assert.match(await (await fetch(url)).text(), /Worker preview/);
+  } finally {
+    if (child.exitCode === null) {
+      child.stdin.end();
+      await once(child, 'exit');
+    }
+  }
 });

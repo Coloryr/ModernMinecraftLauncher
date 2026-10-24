@@ -8,8 +8,7 @@ use std::{
 
 use mml_names::i18_items::error_type::{CoreResult, ErrorType};
 use mml_sys::path_helper;
-use zip::write::SimpleFileOptions;
-use zip::{CompressionMethod, DateTime, ZipArchive, ZipWriter};
+use zip::{DateTime, ZipArchive, ZipWriter};
 
 use crate::archives::{
     self, ArchiveAddFile, ArchiveEntryInfo, ArchiveHandle, ArchiveProcess, BaseArchiveGui,
@@ -99,10 +98,6 @@ impl ZipReader {
 
         process.set_count(files.len());
 
-        let options = SimpleFileOptions::default()
-            .compression_method(CompressionMethod::Deflated)
-            .unix_permissions(0o755);
-
         for path in files {
             process.add_now(&path);
 
@@ -118,7 +113,7 @@ impl ZipReader {
                 let relative_path = path.strip_prefix(root_path).unwrap();
                 let tempfile = archives::normalize_path(relative_path);
 
-                zip.start_file(&tempfile, options).map_err(|err| {
+                zip.start_file(&tempfile, archives::zip_entry_options(&tempfile, 0o755)).map_err(|err| {
                     archive_err(path.to_string_lossy().to_string(), tempfile.clone(), err)
                 })?;
 
@@ -129,7 +124,7 @@ impl ZipReader {
                 let relative_path = path.strip_prefix(root_path).unwrap();
                 let tempfile = archives::normalize_path(relative_path);
 
-                zip.add_directory(&tempfile, options).map_err(|err| {
+                zip.add_directory(&tempfile, archives::zip_entry_options(&tempfile, 0o755)).map_err(|err| {
                     archive_err(path.to_string_lossy().to_string(), tempfile.clone(), err)
                 })?;
             }
@@ -346,7 +341,7 @@ impl ArchiveHandle for ZipReader {
 
     /// 用 `new_append` 就地追加磁盘文件，再重解析中央目录
     fn add_files(&mut self, files: &[ArchiveAddFile]) -> CoreResult<()> {
-        use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
+        use zip::ZipWriter;
 
         let file = self
             .file
@@ -354,15 +349,11 @@ impl ArchiveHandle for ZipReader {
             .map_err(|err| fs_err(self.path.clone(), err))?;
         let mut zip = ZipWriter::new_append(file).map_err(|err| open_error(&self.path, err))?;
 
-        let options = SimpleFileOptions::default()
-            .compression_method(CompressionMethod::Deflated)
-            .unix_permissions(0o644);
-
         for file in files {
             let internal_path = file.dest.to_string_lossy();
             let mut reader = path_helper::open_read(&file.src)?;
 
-            zip.start_file(internal_path.as_ref(), options)
+            zip.start_file(internal_path.as_ref(), archives::zip_entry_options(&internal_path, 0o644))
                 .map_err(write_error)?;
 
             std::io::copy(&mut reader, &mut zip).map_err(write_error)?;
@@ -375,7 +366,7 @@ impl ArchiveHandle for ZipReader {
 
     /// 用 `new_append` 就地追加内存数据，再重解析中央目录
     fn add_data(&mut self, name: &str, data: &[u8]) -> CoreResult<()> {
-        use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
+        use zip::ZipWriter;
 
         let file = self
             .file
@@ -383,11 +374,7 @@ impl ArchiveHandle for ZipReader {
             .map_err(|err| fs_err(self.path.clone(), err))?;
         let mut zip = ZipWriter::new_append(file).map_err(|err| open_error(&self.path, err))?;
 
-        let options = SimpleFileOptions::default()
-            .compression_method(CompressionMethod::Deflated)
-            .unix_permissions(0o644);
-
-        zip.start_file(name, options).map_err(write_error)?;
+        zip.start_file(name, archives::zip_entry_options(name, 0o644)).map_err(write_error)?;
 
         zip.write_all(data).map_err(write_error)?;
 

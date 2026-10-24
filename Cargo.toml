@@ -3,6 +3,7 @@
 # 全部 Rust crate 收进一个 workspace：
 # - mml-core 与其 18 个子 crate（内核）
 # - mml-gui/src-tauri（Tauri 桌面壳）
+# - mml-theme-studio/src-tauri（主题开发工具的 Tauri 桌面壳）
 # - ipc-gen（IPC 代码生成）+ ipc-gen/macros（给命令 / 事件打标记的过程宏）
 # [workspace.dependencies] 与 [profile.*] 统一在此维护（成员清单里只写包自身定义）。
 # target 目录随之合并到根目录 target\（各 crate 原有的 target 不再使用）。
@@ -30,6 +31,7 @@ members = [
     "mml-core/mml-testutil",
     "mml-core/mml-analysis",
     "mml-gui/src-tauri",
+    "mml-theme-studio/src-tauri",
     "ipc-gen",
     "ipc-gen/macros",
 ]
@@ -127,6 +129,20 @@ image = { version = "~0.25.10", default-features = false, features = [
     "webp",
 ] }
 rfd = "~0.17.2"
+
+# dev 下也把压缩相关依赖优化掉：默认全不优化，导出 / 解包能慢一个数量级
+# 只点名这几个 crate，其余依赖照旧不优化，首次构建的额外耗时很小
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+
+[profile.dev.package.flate2]
+opt-level = 3
+
+[profile.dev.package.zip]
+opt-level = 3
+
+[profile.dev.package.crc32fast]
+opt-level = 3
 
 # 正式发布：fat LTO + 单代码生成单元，体积最小、运行最快，但出包慢（单线程合并优化）
 # 命令：cargo build --release / npm run build:release

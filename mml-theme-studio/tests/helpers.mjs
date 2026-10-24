@@ -1,12 +1,15 @@
-import { mkdir, mkdtemp } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { join } from 'node:path';
-import { writeJson } from '../lib/files.mjs';
+import { dirname, join } from 'node:path';
 
 export const tempRoot = fileURLToPath(new URL('../../target/temp/theme-studio-tests/', import.meta.url));
 export async function temp(name) {
   await mkdir(tempRoot, { recursive: true });
   return mkdtemp(join(tempRoot, name + '-'));
+}
+export async function writeJson(path, value) {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, JSON.stringify(value, null, 2) + '\n');
 }
 export async function fixture(root, type = 'page') {
   await writeJson(join(root, 'package.json'), { type: 'module', scripts: { build: 'node build.mjs' } });

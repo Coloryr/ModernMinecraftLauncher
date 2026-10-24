@@ -19,11 +19,15 @@ export type ExportInfoDto = {
 export type ExportPickDto = {
   path: string,
   url: string,
+  modId?: string | null,
+  fileId?: string | null,
+  exclude: boolean,
 };
 
 export type ExportConfigDto = {
   includeLauncher: boolean,
   pack: string,
+  compress: string,
   file: string,
   mods: ExportPickDto[],
   files: ExportPickDto[],
