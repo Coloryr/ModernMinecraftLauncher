@@ -77,8 +77,15 @@ const modKeyword = ref("");
 /** 当前选项卡：整合包信息 / 模组 / 文件 */
 const tab = ref<ExportTab>("meta");
 
-/** 实际展示的页签：「直接压缩」没有整合包信息与模组页，只列实例文件 */
-const shownTab = computed<ExportTab>(() => (pack.value === "mml" ? "files" : tab.value));
+/** 模组页只给能写下载清单的格式：整包格式的模组随文件一起打进去，不需要单独挑 */
+const showModsTab = computed(() => pack.value === "curseforge" || pack.value === "modrinth");
+
+/** 实际展示的页签：「直接压缩」只列实例文件；整包格式没有模组页，落到整合包信息 */
+const shownTab = computed<ExportTab>(() => {
+  if (pack.value === "mml") return "files";
+  if (tab.value === "mods" && !showModsTab.value) return "meta";
+  return tab.value;
+});
 
 /** 格式选项：两种通用清单格式，加两种整包实例格式（供别的启动器导入） */
 const packOptions: Array<{ value: PackId; label: string }> = [
@@ -226,19 +233,36 @@ const urlRows = computed(() =>
 /** 文件树的勾选表按路径判在不在，交给子组件只看键 */
 const pickedFilePaths = computed(() => new Map([...pickedFiles.value].map(([path]) => [path, true])));
 
+/** 文件页的说明：三种去向（实例目录 / overrides / 整包实例）各一句 */
+const fileHint = computed(() => {
+  if (pack.value === "mml") return t("winExport.dirHintZip");
+  if (showModsTab.value) return t("winExport.dirHint");
+  return t("winExport.dirHintPack");
+});
+
 /** 选项卡标签：整合包信息在最前，两个勾选区把已选数量挂在标签尾巴上 */
 const tabOptions = computed<
   Array<{ id: ExportTab; labelKey: string; icon: string; suffix?: string }>
->(() => [
-  { id: "meta", labelKey: "winExport.tabMeta", icon: "box" },
-  {
-    id: "mods",
-    labelKey: "winExport.tabMods",
-    icon: "cube",
-    suffix: `${pickedMods.value.size}/${onlineModCount.value}`,
-  },
-  { id: "files", labelKey: "winExport.tabFiles", icon: "folder", suffix: `${pickedFiles.value.size}` },
-]);
+>(() => {
+  const options: Array<{ id: ExportTab; labelKey: string; icon: string; suffix?: string }> = [
+    { id: "meta", labelKey: "winExport.tabMeta", icon: "box" },
+  ];
+  if (showModsTab.value) {
+    options.push({
+      id: "mods",
+      labelKey: "winExport.tabMods",
+      icon: "cube",
+      suffix: `${pickedMods.value.size}/${onlineModCount.value}`,
+    });
+  }
+  options.push({
+    id: "files",
+    labelKey: "winExport.tabFiles",
+    icon: "folder",
+    suffix: `${pickedFiles.value.size}`,
+  });
+  return options;
+});
 
 // ---------------- 实例切换 ----------------
 
@@ -274,7 +298,6 @@ async function loadInfo() {
 
 /** 勾选状态的初始值：能走在线来源的模组与文件全勾（运行期目录除外），下载地址按来源预填 */
 async function applyDefaults(data: ExportInfoDto, uuid: string, request: number) {
-  const picked = new Map<string, ExportEntryDto>();
   pickedFiles.value = new Map();
   urls.value = new Map();
 
@@ -282,13 +305,32 @@ async function applyDefaults(data: ExportInfoDto, uuid: string, request: number)
     const ids = { modId: mod.modId ?? "", fileId: mod.fileId ?? "" };
     if (mod.url) urls.value.set(mod.path, mod.url);
     modIds.value.set(mod.path, ids);
-    // 只勾编号成立的模组；其余随 mods 目录打进包，不在这里单独勾
-    if (isOnlineId(ids.modId, ids.fileId)) picked.set(mod.path, mod);
   }
-  pickedMods.value = picked;
+  pickedMods.value = seedModPicks();
 
   if (request !== infoRequest) return;
   await reseedFilePicks(uuid);
+}
+
+/**
+ * 按当前格式挑出能走下载清单的模组
+ *
+ * 只有 CurseForge / Modrinth 有清单；整包格式（直接压缩、MMC、HMCL）里模组就是普通文件，
+ * 由文件树决定，这里不给勾选。
+ *
+ * # 返回值
+ *
+ * 路径 → 模组条目；不是清单格式时为空表
+ */
+function seedModPicks(): Map<string, ExportEntryDto> {
+  const picked = new Map<string, ExportEntryDto>();
+  if (!modsInManifest.value) return picked;
+  for (const mod of info.value?.mods ?? []) {
+    const ids = modIds.value.get(mod.path) ?? { modId: mod.modId ?? "", fileId: mod.fileId ?? "" };
+    // 只勾编号成立的模组；其余随 mods 目录打进包
+    if (isOnlineId(ids.modId, ids.fileId)) picked.set(mod.path, mod);
+  }
+  return picked;
 }
 
 /** 文件默认勾选的请求序号：换实例 / 换格式时，旧的异步结果直接丢掉 */
@@ -328,14 +370,21 @@ async function reseedFilePicks(uuid: string) {
   }
 }
 
+// 切到整包格式时模组页会消失，把当前页签挪回整合包信息
+watch(showModsTab, (value) => {
+  if (!value && tab.value === "mods") tab.value = "meta";
+});
+
 // 两种格式的文件根不同（实例目录 / 游戏目录），切过去时旧的路径不能带过去，重新铺默认
 watch(pack, () => {
   pickedFiles.value = new Map();
+  // 模组勾选跟着格式重算：整包格式没有清单，全部按文件打包
+  pickedMods.value = seedModPicks();
   if (currentUuid.value) void reseedFilePicks(currentUuid.value);
 });
 
-/** 直接压缩没有模组页，模组文件必须随实例一起打进包 */
-const modsInManifest = computed(() => pack.value !== "mml");
+/** 这个格式有没有下载清单：只有两种清单格式会把模组列进去，其余整包打进去 */
+const modsInManifest = computed(() => showModsTab.value);
 
 /**
  * 模组勾选联动文件树：勾了模组就走清单下载，同名文件不能再打进 overrides
@@ -681,11 +730,13 @@ onBeforeUnmount(() => {
           <template v-if="shownTab === 'meta'">
             <p class="sec-hint">
               {{
-                t("winExport.summaryLine", {
-                  mods: pickedMods.size,
-                  files: pickedFiles.size,
-                  urls: urlRows.filter((x) => (urls.get(x.path) ?? "").length > 0).length,
-                })
+                showModsTab
+                  ? t("winExport.summaryLine", {
+                      mods: pickedMods.size,
+                      files: pickedFiles.size,
+                      urls: urlRows.filter((x) => (urls.get(x.path) ?? "").length > 0).length,
+                    })
+                  : t("winExport.summaryFiles", { files: pickedFiles.size })
               }}
             </p>
             <div class="grid-2">
@@ -753,7 +804,7 @@ onBeforeUnmount(() => {
           <!-- 文件：只有一棵树，勾选即打包，取消勾选就排除 -->
           <template v-else>
             <div class="files-pane">
-              <p class="sec-hint">{{ pack === "mml" ? t("winExport.dirHintZip") : t("winExport.dirHint") }}</p>
+              <p class="sec-hint">{{ fileHint }}</p>
               <FilePicker :uuid="currentUuid" :picked="pickedFilePaths" :unpicked="unpickedFiles"
                 :base="fileBase" :expand="fileExpand" :locked="isLockedFile" @toggle="toggleFile" />
             </div>

@@ -174,24 +174,35 @@ pub async fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -
 
     super::archive::check_destination(std::path::Path::new(&config.file), &game.get_base_path())?;
     let base = game.get_game_path();
-    let online = online_of(&game);
-
-    // 直接压缩的勾选相对实例目录（含 .minecraft 那一段），其余格式相对游戏目录
-    let pick_base = if pack == ExportPackType::MML { game.get_base_path() } else { base.clone() };
-    // 收集勾选要遍历目录、给在线模组算 SHA1/SHA512，大实例上很慢；放到阻塞线程，别卡住 UI 线程
-    let picks: Vec<_> = config.mods.iter().chain(&config.files).cloned().collect();
-    let selected = tokio::task::spawn_blocking(move || {
-        super::selection::collect(&pick_base, picks.iter(), &online, pack)
-    })
-    .await
-    .map_err(|e| e.to_string())??;
-    let prepared = began.elapsed();
 
     // 取消令牌：关窗时前端调 export_cancel 置位，写文件的循环看到就收手
     let cancel = Arc::new(AtomicBool::new(false));
     *EXPORT_CANCEL.lock().unwrap() = Some(cancel.clone());
     let clock = Arc::new(ExportClock::new());
     let level = config.compress.clone();
+    let gui = Arc::new(ExportProgressGui {
+        app: app.clone(),
+        file: config.file.clone(),
+        clock: clock.clone(),
+        cancel: cancel.clone(),
+        last_emit: Mutex::new(None),
+    });
+
+    let online = online_of(&game);
+    // 直接压缩的勾选相对实例目录（含 .minecraft 那一段），其余格式相对游戏目录
+    let pick_base = if pack == ExportPackType::MML { game.get_base_path() } else { base.clone() };
+    // 收集勾选要遍历目录、给在线模组算哈希，大实例上要读几百 MB：放到阻塞线程，并逐条报进度
+    let picks: Vec<_> = config.mods.iter().chain(&config.files).cloned().collect();
+    let total_picks = picks.len();
+    let prepare_gui = gui.clone();
+    let selected = tokio::task::spawn_blocking(move || {
+        super::selection::collect_reporting(&pick_base, picks.iter(), &online, pack, &|index| {
+            prepare_gui.prepare(index, total_picks);
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    let prepared = began.elapsed();
 
     let arg = ExportArg {
         file: PathBuf::from(&config.file),
@@ -206,13 +217,7 @@ pub async fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -
         author: config.author,
         version: config.version,
         summary: config.summary,
-        gui: Some(Arc::new(ExportProgressGui {
-            app: app.clone(),
-            file: config.file.clone(),
-            clock: clock.clone(),
-            cancel: cancel.clone(),
-            last_emit: Mutex::new(None),
-        })),
+        gui: Some(gui),
     };
 
     let save_file = config.file.clone();
@@ -398,6 +403,27 @@ impl IBaseArchiveGui for ExportProgressGui {
 const EMIT_INTERVAL: Duration = Duration::from_millis(40);
 
 impl ExportProgressGui {
+    /// 准备阶段的进度：只推进数字，界面沿用固定的「正在准备」文案
+    ///
+    /// 这一段在算模组哈希，没有文件名可报，所以 `text` 留空。
+    ///
+    /// - `now`: 已处理的勾选条数
+    /// - `total`: 勾选总条数
+    fn prepare(&self, now: usize, total: usize) {
+        if !self.emit_due() { return; }
+        emit_export_progress(
+            &self.app,
+            ExportProgressDto {
+                state: "running".to_string(),
+                now: now as u64,
+                total: total as u64,
+                text: String::new(),
+                error: None,
+                file: self.file.clone(),
+            },
+        );
+    }
+
     /// 这一条进度该不该发出去
     ///
     /// # 返回值

@@ -24,6 +24,7 @@ pub(super) struct Selection {
 /// - `pack`: 导出格式。
 /// # 返回值
 /// 各类导出条目；路径不可读或含链接时失败。
+#[cfg(test)]
 pub(super) fn collect<'a>(
     base: &Path, picks: impl Iterator<Item = &'a ExportPickDto>,
     online: &HashMap<String, OnlineInfoObj>, pack: ExportPackType,
