@@ -1621,7 +1621,6 @@ export default {
   "winSettings.clientLockUnlockTitle": "解锁客户端设置",
   "winSettings.clientLockUnlockPrompt": "输入密码以显示客户端设置。",
   "winSettings.clientLockUnlocked": "本次已解锁",
-  "winSettings.lockedHint": "部分设置已被锁定，解锁后显示；入口在「实验性功能」页。",
   "winSettings.clientLockNoLockHint": "当前未锁定实例或登录方式；锁定客户端设置只隐藏设置页，玩家仍可切换实例和账户。",
   "winSettings.secServerPack": "服务器包",
   "winSettings.serverPackDesc": "选择配置、自定义主题 / 样式 / 主页面与实例，打成服务器包；玩家导入后启动器会重载并进入该实例。",

@@ -206,13 +206,6 @@
   margin-top: 3px;
 }
 
-/* 锁定时标题下的一行：说明有分组被隐藏 */
-.settings-layout .locked-hint {
-  margin-top: 10px;
-  font-size: 11.5px;
-  color: var(--yellow);
-}
-
 /* ---------- 分组标题：左侧强调色竖条 + 底部分隔线 ---------- */
 
 .settings-layout .group-title {

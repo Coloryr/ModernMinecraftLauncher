@@ -297,7 +297,6 @@ function onKeyDown(e: KeyboardEvent) {
           <div>
             <h2 class="set-content-title">{{ t(`winSettings.tab.${tab}`) }}</h2>
             <p class="set-content-sub">{{ t(`winSettings.tabDesc.${tab}`) }}</p>
-            <p v-if="locked && tab !== 'experimental'" class="locked-hint">{{ t("winSettings.lockedHint") }}</p>
           </div>
           <BaseButton v-if="canResetPage" size="sm" v-tip="t('winSettings.resetPageHint')"
             @click="confirmResetPage = true">

@@ -1620,7 +1620,6 @@ export default {
   "winSettings.clientLockUnlockTitle": "Unlock client settings",
   "winSettings.clientLockUnlockPrompt": "Enter the password to show client settings.",
   "winSettings.clientLockUnlocked": "Unlocked for this session",
-  "winSettings.lockedHint": "Some settings are locked and hidden until unlocked; the unlock entry is on the Experimental page.",
   "winSettings.clientLockNoLockHint": "No instance or login lock is set; locking client settings only hides this tab, players can still switch instances and accounts.",
   "winSettings.secServerPack": "Server package",
   "winSettings.serverPackDesc": "Pick configs, custom theme / styles / home page and an instance; importing it reloads the launcher into that instance.",

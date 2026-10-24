@@ -335,6 +335,12 @@ impl InstanceSettingObj {
             if !matches!(item.later, mml_base::file_item::LaterRun::None) {
                 continue;
             }
+            // NeoForge 1.20.2+ 由 FML 自己按 maven 坐标把 universal 包加成 mod。它留在
+            // classpath 上会先变成自动模块，FML 的 PathBasedLocator 判定已定位就直接跳过，
+            // neoforge 模组随之缺失，早期窗口链接 NeoForgeLoadingOverlay 时找不到 game 层
+            if self.loader == LoaderType::NeoForge && is_neoforge_universal(item) {
+                continue;
+            }
             let key = LibVersionObj::new(&item.name);
             if let Some(pos) = loader_list
                 .iter()
@@ -395,6 +401,25 @@ impl InstanceSettingObj {
 
         output
     }
+}
+
+/// 判断是否为 NeoForge 1.20.2+ 的 universal 包
+///
+/// - `item`: 运行库项；名字有 `...:universal` 与 `...-universal` 两种写法，
+///   落点则统一是 `neoforge-<ver>-universal.jar`，两边都认
+///
+/// # 返回值
+///
+/// 是 1.20.2+ 的 universal 包返回 `true`
+fn is_neoforge_universal(item: &FileItemObj) -> bool {
+    let by_name = item.name.starts_with("net.neoforged:neoforge")
+        && (item.name.ends_with(":universal") || item.name.ends_with("-universal"));
+    let by_file = item
+        .file
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.starts_with("neoforge-") && name.ends_with("-universal.jar"));
+    by_name || by_file
 }
 
 /// 删除冲突的库
@@ -646,6 +671,56 @@ mod tests {
         assert!(
             paths.iter().any(|item| item.ends_with("client.jar")),
             "游戏 jar 要在：{paths:?}"
+        );
+    }
+
+    /// NeoForge 1.20.2+ 的 universal 包必须留在类路径外
+    ///
+    /// FML 会自己把它加成 neoforge 模组；跟着 classpath 走会先成为自动模块，
+    /// FML 判定已定位后跳过，neoforge 模组缺失，早期窗口崩在 LoadingOverlay。
+    #[test]
+    fn excludes_neoforge_universal_from_classpath() {
+        let instance = InstanceSettingObj {
+            loader: LoaderType::NeoForge,
+            version: String::from("1.21.1"),
+            ..Default::default()
+        };
+
+        // 补齐出来的名字是单段形式，清单里的则是带 classifier 的坐标，两种都要挡
+        let arg = GameLaunchObj {
+            loader_libs: vec![
+                lib(
+                    "net.neoforged:neoforge-21.1.259-universal",
+                    "loader/neoforge-21.1.259-universal.jar",
+                ),
+                lib(
+                    "net.neoforged:neoforge:21.1.259:universal",
+                    "loader/neoforge-21.1.259-universal-2.jar",
+                ),
+                lib(
+                    "net.neoforged:neoforge:21.1.259",
+                    "loader/neoforge-21.1.259-universal.jar",
+                ),
+                lib("net.neoforged:bus:8.0.5", "loader/bus-8.0.5.jar"),
+            ],
+            ..Default::default()
+        };
+
+        let libs = instance.get_libs(&arg);
+        let paths: Vec<String> = libs
+            .iter()
+            .map(|item| item.to_string_lossy().to_string())
+            .collect();
+
+        assert!(
+            !paths
+                .iter()
+                .any(|item| item.contains("universal")),
+            "universal 包不该进类路径：{paths:?}"
+        );
+        assert!(
+            paths.iter().any(|item| item.ends_with("bus-8.0.5.jar")),
+            "其余加载器库照旧要在：{paths:?}"
         );
     }
 }

@@ -62,7 +62,6 @@ const locked = computed(() => client.value.lockClient && !props.clientUnlocked);
   <!-- 锁定客户端设置：那一页在锁定时隐藏，解锁入口放这里 -->
   <SettingsGroup v-if="client.lockClient" id="clientLock" title-key="winSettings.secClientLock"
     :flash="flashGroup === 'clientLock'">
-    <p class="field-desc">{{ t("winSettings.clientLockDesc") }}</p>
     <div class="switch-row">
       <div class="switch-text">
         <span class="switch-label">{{ t("winSettings.clientLockOn") }}</span>
