@@ -16,4 +16,6 @@ pub struct QuiltMetaLoaderObj {
 pub struct QuiltMetaObj {
     /// 可用的 Loader 版本列表
     pub loader: Vec<QuiltMetaLoaderObj>,
+    /// 支持的游戏版本列表，能装哪些版本由它决定
+    pub game: Vec<QuiltMetaLoaderObj>,
 }

@@ -27,9 +27,9 @@
 //!    抵消而不删 → 新清单里的那个路径**永远不会被创建**，实例缺文件。按路径配对后路径与
 //!    `sha1` 都相同才算不动，改名 = 删旧路径 + 下新路径。
 //! 3. **两条"在线信息"路径**，即 CF SHA1 与 Modrinth 无 manifest：补上"旧有新无 → 删除"。
-//!    只更新与新增会留下垃圾文件。已确认 `online_info` 只由整合包
-//!    路径写入，`update_online` 只清理、`copy_to_other` 只复制，`make_file_online_*` 无调用者，
-//!    所以删除它记录的文件不会误伤用户自己装的模组。
+//!    只更新与新增会留下垃圾文件。`online_info` 只由整合包与服务器包两条路径写入，
+//!    两者都是按自己的清单接管文件；`update_online` 只清理、`copy_to_other` 只复制，
+//!    `make_file_online_*` 无调用者，所以删除它记录的文件不会误伤用户自己装的模组。
 
 use std::collections::HashMap;
 

@@ -76,6 +76,8 @@ pub(crate) mod file_drop;
 #[cfg(windows)]
 pub(crate) mod webview_keys;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use mml_game::GameInstance;
 use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 use mml_names::names;
@@ -636,7 +638,8 @@ fn find_http(text: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        clean_url, find_http, read_shortcut_url, window_probe_drop, work_area_is_full_monitor,
+        clean_url, find_http, main_window_label, read_shortcut_url, take_startup_quiet,
+        window_probe_drop, work_area_is_full_monitor,
     };
     use crate::test_support::{cleanup, temp_dir};
 
@@ -769,6 +772,18 @@ mod tests {
         assert_eq!(clean_url("ftp://a.com"), "");
     }
 
+    /// 只有主窗口的第一次显示不抢前台，其余照常
+    #[test]
+    fn startup_quiet_only_for_first_main_show() {
+        crate::windows::quiet_main_window_startup();
+        assert!(
+            !take_startup_quiet("mml-log-x"),
+            "别的窗口不该走不抢前台"
+        );
+        assert!(take_startup_quiet(main_window_label()), "主窗口第一次要走");
+        assert!(!take_startup_quiet(main_window_label()), "第二次起照常拿焦点");
+    }
+
     /// 工作区与显示器完全重合时判定为「平台没给任务栏信息」
     #[test]
     fn full_work_area_matches_monitor() {
@@ -811,6 +826,80 @@ pub fn window_start_dragging(window: WebviewWindow) -> Result<(), String> {
     window.start_dragging().map_err(|err| err.to_string())
 }
 
+// ---------------- 启动时的显示 ----------------
+
+/// 启动后主窗口第一次显示时不要抢前台
+///
+/// 应用由系统、脚本或开发期的 watcher 拉起来时，把前台从用户正在用的窗口抢走会打断操作，
+/// 所以**进程启动后的第一次**主窗口显示只显示、不激活；之后（托盘点开、重开窗口）照常拿焦点。
+static QUIET_STARTUP: AtomicBool = AtomicBool::new(false);
+
+/// 标记"下一次显示主窗口不要抢前台"，setup 阶段建主窗口之前调一次
+pub(crate) fn quiet_main_window_startup() {
+    QUIET_STARTUP.store(true, Ordering::SeqCst);
+}
+
+/// 显示窗口：启动时的第一扇主窗口只显示、不激活，其余照旧显示并拿焦点
+///
+/// - `window`: 要显示的窗口
+///
+/// # 返回值
+///
+/// 显示成功返回 `Ok(())`，失败返回错误文案
+fn show_window(window: &WebviewWindow) -> Result<(), String> {
+    if take_startup_quiet(window.label()) {
+        return show_without_activate(window);
+    }
+    window.show().map_err(|err| err.to_string())?;
+    // 显示不等于到前台：不抢一次焦点，新窗会压在发起它的那个窗口后面，看着像点了没反应
+    window.set_focus().map_err(|err| err.to_string())
+}
+
+/// 这一次显示要不要走"不抢前台"
+///
+/// 只有**进程启动后主窗口的第一次**显示算数；问过一次就把标记消费掉，
+/// 其它窗口（以及之后同一次运行里再显示的主窗口）照常拿焦点。
+///
+/// - `label`: 要显示的窗口标签
+///
+/// # 返回值
+///
+/// 要走"不抢前台"返回 `true`
+fn take_startup_quiet(label: &str) -> bool {
+    label == main_window_label() && QUIET_STARTUP.swap(false, Ordering::SeqCst)
+}
+
+/// 显示窗口但不激活：Windows 走 `SW_SHOWNOACTIVATE`，前台窗口保持不动
+///
+/// - `window`: 要显示的窗口
+///
+/// # 返回值
+///
+/// 显示成功返回 `Ok(())`，取窗口句柄失败返回错误文案
+#[cfg(windows)]
+fn show_without_activate(window: &WebviewWindow) -> Result<(), String> {
+    use windows::Win32::UI::WindowsAndMessaging::{SW_SHOWNOACTIVATE, ShowWindow};
+
+    let hwnd = window.hwnd().map_err(|err| err.to_string())?;
+    // SAFETY: 句柄取自本窗口，调用期间窗口仍然存活；只改显示状态，不解引用其它指针
+    unsafe {
+        let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+    }
+    Ok(())
+}
+
+/// 其它平台没有"显示但不激活"的等价开关，退化成只显示、不主动拿焦点
+///
+/// - `window`: 要显示的窗口
+///
+/// # 返回值
+///
+/// 显示成功返回 `Ok(())`，失败返回错误文案
+#[cfg(not(windows))]
+fn show_without_activate(window: &WebviewWindow) -> Result<(), String> {
+    window.show().map_err(|err| err.to_string())
+}
+
 /// 激活插件装饰并显示窗口；所有窗口都走插件装饰，见 [`create_window`]
 ///
 /// 窗口建出来时是 `decorations: true` + 隐藏的，见 `create_window`；
@@ -835,9 +924,7 @@ pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'stati
         if let Some(min) = min_size_of_label(window.label()) {
             reconcile_min_size(&window, min.width, min.height);
         }
-        let _ = window.show();
-        // 显示不等于到前台：不抢一次焦点，新窗会压在发起它的那个窗口后面，看着像点了没反应
-        let _ = window.set_focus();
+        let _ = show_window(&window);
         self::effects::apply(&window, &crate::gui_config::get().client.window_effect);
         return Err(format!("decoration activate failed: {error}"));
     }
@@ -852,9 +939,7 @@ pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'stati
         clamp_runtime_min_size(&window, min);
     }
 
-    window.show().map_err(|err| err.to_string())?;
-    // 同上：show 之后补一次焦点，新窗才不会开在发起窗口后面
-    window.set_focus().map_err(|err| err.to_string())?;
+    show_window(&window)?;
     // 材质要在窗口显示之后铺：demo 也是拿到可见窗口才调（examples/tauri 的 main.rs），
     // 隐藏状态下铺的会被随后 activate_decoration 改窗口样式一起丢掉
     self::effects::apply(&window, &crate::gui_config::get().client.window_effect);

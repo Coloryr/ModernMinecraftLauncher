@@ -1,16 +1,16 @@
 <!--
-  M²L 程序图标 · 方案 F「拼接」· 草方块整块
+  M²L 程序图标 · 方案 F「拼接」镜像版
 
-  方案 F 的左半是草方块、右半是科技方块。这一版只取左半，补成一整块草方块：
-  左面与草皮带照抄 f-blend 左半，右面按右面的草皮台阶补出来，顶面铺满。
-  两面不做镜像复制：右面基色压暗一档，草皮带也是右面自己的深浅。
+  与 f-blend.svg 是同一份几何，沿中轴线 x=256 左右镜像：
+  左半变成科技方块，右半变成原始草方块。
 
-  左半：顶面 #7db63e / 左面 #835f42 / 草皮带 #74a632
-  右半：右面 #76543a / 草皮带 #5f8a28
-  颗粒沿用 f-blend 的 grain-top / grain-side-left / grain-side-right 三套。
+  中线单独画一条，居中于 x=256，左右各 7px：它不属于任何一半，所以两条边
+  一样宽，不受右半裁剪。冷白渐变像一道光缝，在草皮与暗面板上都够亮。
 
-  台阶边沿：左面那条就是 f-blend 左半的草皮底缘，右面那条是草方块右面的原版，
-  两条在中心前棱处各走各的，不对齐成一条线。
+  做法是给整个图形套一层 matrix(-1 0 0 1 512 0)，一个顶点都不重算，
+  所以接缝、外轮廓、发光裁剪的位置与 f-blend 严格左右对称。
+  defs 里的渐变、颗粒 pattern、right-clip 都是 userSpaceOnUse，
+  会跟着这层变换一起镜像，右半的科技线照样只落在轮廓内。
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
@@ -170,19 +170,63 @@
         M108.125 538.188l-11.375 6.562 l-11.375 19.688l11.375 -6.562z" />
 
       </pattern>
+    <linearGradient id="tech-top" gradientUnits="userSpaceOnUse" x1="0" y1="46" x2="0" y2="256">
+      <stop offset="0" stop-color="#224c6a" />
+      <stop offset="1" stop-color="#193f59" />
+    </linearGradient>
+    <linearGradient id="tech-face" gradientUnits="userSpaceOnUse" x1="0" y1="151" x2="0" y2="466">
+      <stop offset="0" stop-color="#173a52" />
+      <stop offset="1" stop-color="#0f2737" />
+    </linearGradient>
+    <linearGradient id="wire-grad" gradientUnits="userSpaceOnUse" x1="0" y1="46" x2="0" y2="466">
+      <stop offset="0" stop-color="#3ee0c6" />
+      <stop offset="0.55" stop-color="#24c4ff" />
+      <stop offset="1" stop-color="#4f8cff" />
+    </linearGradient>
+    <filter id="wire-glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="6" />
+    </filter>
+    <linearGradient id="seam-grad" gradientUnits="userSpaceOnUse" x1="0" y1="46" x2="0" y2="466">
+      <stop offset="0" stop-color="#f6fcff" />
+      <stop offset="0.5" stop-color="#cfeaff" />
+      <stop offset="1" stop-color="#8fd2f2" />
+    </linearGradient>
+    <clipPath id="right-clip">
+      <path d="M256,46 L438,151 L438,361 L256,466 Z" />
+    </clipPath>
+    <!-- 立方体整体轮廓，用来切掉中线在顶点处分头的圆头 -->
+    <clipPath id="cube-clip">
+      <path d="M74,151 L256,46 L438,151 L438,361 L256,466 L74,361 Z" />
+    </clipPath>
   </defs>
 
-  <!-- 左半：照抄 f-blend 左半 -->
-  <polygon points="74,151 256,256 256,466 74,361" fill="#835f42" />
-  <polygon points="74.00,151.00 256.00,256.00 256.00,308.50 244.62,301.94 244.62,315.06 233.25,308.50 233.25,321.62 221.88,315.06 221.88,288.81 210.50,282.25 199.12,275.69 199.12,301.94 187.75,295.38 187.75,282.25 176.38,275.69 176.38,262.56 165.00,256.00 165.00,269.12 153.62,262.56 153.62,275.69 142.25,269.12 142.25,242.88 130.88,236.31 130.88,249.44 119.50,242.88 119.50,229.75 108.12,223.19 108.12,249.44 96.75,242.88 96.75,216.62 85.38,210.06 74.00,203.50" fill="#74a632" />
-  <polygon points="74,151 256,256 256,466 74,361" fill="url(#grain-side-left)" />
+  <g transform="matrix(-1 0 0 1 512 0)">
+    <!-- 左半：原始草方块 -->
+    <polygon points="74,151 256,256 256,466 74,361" fill="#835f42" />
+    <polygon points="74.00,151.00 256.00,256.00 256.00,308.50 244.62,301.94 244.62,315.06 233.25,308.50 233.25,321.62 221.88,315.06 221.88,288.81 210.50,282.25 199.12,275.69 199.12,301.94 187.75,295.38 187.75,282.25 176.38,275.69 176.38,262.56 165.00,256.00 165.00,269.12 153.62,262.56 153.62,275.69 142.25,269.12 142.25,242.88 130.88,236.31 130.88,249.44 119.50,242.88 119.50,229.75 108.12,223.19 108.12,249.44 96.75,242.88 96.75,216.62 85.38,210.06 74.00,203.50" fill="#74a632" />
+    <polygon points="74,151 256,256 256,466 74,361" fill="url(#grain-side-left)" />
+    <polygon points="256,46 256,256 74,151" fill="#7db63e" />
+    <polygon points="256,46 256,256 74,151" fill="url(#grain-top)" />
 
-  <!-- 右半：同构补全，基色与草皮带压深一档 -->
-  <polygon points="438,151 256,256 256,466 438,361" fill="#76543a" />
-  <polygon points="438.00,151.00 256.00,256.00 256.00,321.62 267.38,315.06 267.38,328.19 278.75,321.62 290.12,315.06 290.12,288.81 301.50,282.25 301.50,308.50 312.88,301.94 324.25,295.38 324.25,282.25 335.62,275.69 347.00,269.12 347.00,282.25 358.38,275.69 369.75,269.12 369.75,256.00 381.12,249.44 392.50,242.88 392.50,256.00 403.88,249.44 415.25,242.88 415.25,216.62 426.62,210.06 438.00,203.50" fill="#5f8a28" />
-  <polygon points="438,151 256,256 256,466 438,361" fill="url(#grain-side-right)" />
+    <!-- 右半：科技方块（只在右半轮廓内） -->
+    <g clip-path="url(#right-clip)">
+      <polygon points="256,46 438,151 256,256" fill="url(#tech-top)" />
+      <polygon points="438,151 256,256 256,466 438,361" fill="url(#tech-face)" />
+      <g fill="none" stroke="url(#wire-grad)" stroke-linecap="round" stroke-linejoin="round">
+        <g opacity="0.30" filter="url(#wire-glow)">
+          <path d="M256,46 L438,151 L438,361 L256,466 Z" stroke-width="13" />
+          <path d="M438,151 L256,256" stroke-width="9" />
+        </g>
+        <path d="M256,321.62 L267.38,315.06 L267.38,328.19 L278.75,321.62 L290.12,315.06 L290.12,288.81 L301.5,282.25 L301.5,308.5 L312.88,301.94 L324.25,295.38 L324.25,282.25 L335.62,275.69 L347,269.12 L347,282.25 L358.38,275.69 L369.75,269.12 L369.75,256 L381.12,249.44 L392.5,242.88 L392.5,256 L403.88,249.44 L415.25,242.88 L415.25,216.62 L426.62,210.06 L438,203.5" stroke-width="6" opacity="0.95" />
+        <path d="M256,46 L438,151 L438,361 L256,466 Z" stroke-width="7" />
+        <path d="M438,151 L256,256" stroke-width="5" />
+      </g>
+    </g>
 
-  <!-- 顶面：整块草色 + 颗粒 -->
-  <polygon points="256,46 438,151 256,256 74,151" fill="#7db63e" />
-  <polygon points="256,46 438,151 256,256 74,151" fill="url(#grain-top)" />
+    <!-- 中线：居中于接缝，左右各 7px；画在裁剪组之外，不受右半裁剪 -->
+    <g clip-path="url(#cube-clip)" fill="none" stroke="url(#seam-grad)" stroke-linecap="round">
+      <path d="M256,46 L256,466" stroke-width="22" opacity="0.32" filter="url(#wire-glow)" />
+      <path d="M256,46 L256,466" stroke-width="14" />
+    </g>
+  </g>
 </svg>

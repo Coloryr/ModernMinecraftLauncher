@@ -71,7 +71,7 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
 | `bash build/package-flatpak.sh` | 用已构建的二进制打 `.flatpak`，需要 `flatpak`，不重新编译 |
 | `bash build/package-arch.sh` | 用已构建的二进制打 `.pkg.tar.zst`，不依赖 `makepkg`，任一 Linux 可跑 |
 | `cd mml-gui && npm run gen` | 改过 Rust 侧命令 / DTO 后重新生成 `mml-ipc` 契约 |
-| `cd mml-gui && npx tauri icon ../design/icon/f-blend.svg` | 改过程序图标后重新生成 `src-tauri/icons/`；会顺带产出 `android/` 与 `ios/`，桌面端用不到可删 |
+| `cd mml-gui && npx tauri icon ../design/icon/f-blend-gear.svg` | 改过程序图标后重新生成 `src-tauri/icons/`；会顺带产出 `android/` 与 `ios/`，桌面端用不到可删 |
 | `cd custom/custom-main-demo && npm run build` | 构建自定义主页面示例并打包成 `custom-main-demo.zip`（四个示例的用法见 [custom/README.md](../custom/README.md)） |
 
 `build/` 下带 PowerShell 版（`.ps1`，Windows）与 bash 版（`.sh`，Linux / macOS / Git Bash）的脚本

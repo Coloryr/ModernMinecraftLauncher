@@ -62,7 +62,7 @@ const SOURCE_LABELS: Record<string, string> = {
   modrinth: "modpack.modrinth",
 };
 
-/** 模组可按加载器过滤（normal = 全部） */
+/** 模组可按加载器过滤（normal = 全部）；实际选项按目标实例的版本收窄，见 `loaderChoices` */
 const LOADERS = ["normal", "forge", "fabric", "quilt", "neoforge", "cleanroom"];
 
 /** 目标实例（uuid + 显示名），空 = 未选择 */
@@ -126,6 +126,34 @@ const category = ref("");
 /** 加载器，仅模组类型有意义；normal 表示全部 */
 const loader = ref("normal");
 const filter = ref("");
+/** 目标实例版本支持的加载器 ID；null = 还没查到（或没选实例），按全量显示 */
+const supportedLoaders = ref<string[] | null>(null);
+/** 筛选下拉的选项：按实例版本收窄，给 1.12.2 列 Fabric / NeoForge 只是噪音 */
+const loaderChoices = computed(() =>
+  supportedLoaders.value
+    ? LOADERS.filter((item) => (supportedLoaders.value as string[]).includes(item))
+    : LOADERS,
+);
+
+// 换实例（版本跟着变）就重查一次：内核按版本缓存，同一版本只查一趟
+watch(
+  instanceVersion,
+  async (mc) => {
+    supportedLoaders.value = null;
+    if (!mc) return;
+    try {
+      const list = await api.addGetSupportLoaders(mc);
+      if (instanceVersion.value !== mc) return;
+      supportedLoaders.value = list;
+      // 原先选的加载器不在新列表里就退回「全部」，否则下拉会显示一个不存在的值
+      if (!loaderChoices.value.includes(loader.value)) loader.value = "normal";
+    } catch {
+      // 查询失败就按全量显示，筛选器不该因此罢工
+    }
+  },
+  { immediate: true },
+);
+
 
 // 离开本窗口时清掉搜索词：来源 / 类型 / 版本等**筛选**留着，那是浏览上下文，
 // 搜索词只是"找某样东西"的一次性输入。
@@ -774,7 +802,7 @@ onActivated(async () => {
           </select>
           <select v-if="type === 'mod'" v-model="loader" class="field-select sel-filter" :disabled="searching"
             @change="submitSearch">
-            <option v-for="l in LOADERS" :key="l" :value="l">
+            <option v-for="l in loaderChoices" :key="l" :value="l">
               {{ l === "normal" ? t("addResource.loader.normal") : l }}
             </option>
           </select>

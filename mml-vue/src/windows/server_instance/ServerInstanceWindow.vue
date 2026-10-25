@@ -48,6 +48,9 @@ const SKIP_DIRS = [
   ".cache", "temp", "versions", "libraries", "assets", "resources", "natives", "downloads",
 ];
 
+/** 默认逐文件下发的目录：kubejs 是几千个小脚本，服主要逐个比对，打成压缩包反而没法看 */
+const FILES_DIRS = ["kubejs"];
+
 const instances = ref<InstanceInfoDto[]>([]);
 const currentUuid = ref("");
 const section = ref<Section>("general");
@@ -187,7 +190,8 @@ function pickAllPacks(all: boolean) {
 function addConfig() {
   const dir = newDir.value;
   if (!dir || configs.value.some((item) => item.dir === dir)) return;
-  configs.value = [...configs.value, { dir, mode: newMode.value }];
+  const mode = FILES_DIRS.includes(dir) ? "files" : newMode.value;
+  configs.value = [...configs.value, { dir, mode }];
   newDir.value = "";
 }
 
@@ -232,7 +236,10 @@ async function loadInstance(uuid: string) {
   // 默认把所有能同步的文件夹都加上，用户再按需改方式或删掉
   configs.value = topDirs.value
     .filter((entry) => entry.dir && !SKIP_DIRS.includes(entry.path))
-    .map((entry) => ({ dir: entry.path, mode: "archive" as ConfigMode }));
+    .map((entry) => ({
+      dir: entry.path,
+      mode: (FILES_DIRS.includes(entry.path) ? "files" : "archive") as ConfigMode,
+    }));
   newDir.value = "";
   newMode.value = "archive";
   result.value = null;
@@ -362,6 +369,11 @@ useInstanceChange(syncInstances);
 
 // 已经停在本窗口时又被打开：openWindow 只更新参数、不换组件，跟着参数换实例
 watch(() => windowParams.value.uuid, applyTarget);
+
+// 下拉换目录时把同步方式拨到该目录的常见做法，用户仍可自己改
+watch(newDir, (dir) => {
+  if (dir) newMode.value = FILES_DIRS.includes(dir) ? "files" : "archive";
+});
 
 onMounted(async () => {
   await syncInstances();

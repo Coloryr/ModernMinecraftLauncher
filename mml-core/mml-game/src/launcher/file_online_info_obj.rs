@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// 文件在线信息
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
 #[serde(default)]
 pub struct OnlineInfoObj {
     /// 游戏路径文件夹

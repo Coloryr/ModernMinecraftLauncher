@@ -20,9 +20,17 @@
 //! |------|----|------|--------|
 //! | 鼠标状态 | 1 | 游戏 -> 启动器 | uuid(String) + 状态(bool) |
 //! | 服务器 MOTD | 2 | 启动器 -> 游戏 | ip(String) + 端口(String) + MOTD(String) |
+//! | 鼠标移动 | 5 | 启动器 -> 游戏 | dx(f64) + dy(f64) |
+//! | 鼠标按键 | 6 | 启动器 -> 游戏 | button(i32) + down(bool) |
+//! | 键盘按键 | 7 | 启动器 -> 游戏 | key(i32) + down(bool) |
+//! | 鼠标滚轮 | 8 | 启动器 -> 游戏 | amount(i32) |
 //! | 游戏通道 | 9 | 游戏 -> 启动器 | uuid(String) |
 //! | 设置标题 | 10 | 启动器 -> 游戏 | 标题(String) |
 //! | 窗口大小 | 11 | 游戏 -> 启动器 | uuid(String) + 宽(i32) + 高(i32) |
+//!
+//! 输入类消息由启动器按游戏通道定向发送，消息体不含 uuid。
+//! 键盘与鼠标按键使用 GLFW 编码，鼠标移动是相对位移，单位像素，正数向右或向下；
+//! 滚轮正数向上。游戏未抓取鼠标时，鼠标移动不会改变视角。
 //!
 //! ## 启动器 -> 启动器，防止多开
 //!
@@ -75,6 +83,10 @@ const TYPE_GAME_MOUSE_STATE: i32 = 1;
 const TYPE_GAME_MOTD: i32 = 2;
 const TYPE_LAUNCH_SHOW: i32 = 3;
 const TYPE_LAUNCH_ARG: i32 = 4;
+const TYPE_MOUSE_MOVE: i32 = 5;
+const TYPE_MOUSE_BUTTON: i32 = 6;
+const TYPE_KEYBOARD_KEY: i32 = 7;
+const TYPE_MOUSE_SCROLL: i32 = 8;
 const TYPE_GAME_CHANNEL: i32 = 9;
 const TYPE_SET_TITLE: i32 = 10;
 const TYPE_GAME_WINDOW_SIZE: i32 = 11;
@@ -232,6 +244,73 @@ pub fn set_title(uuid: Uuid, title: &str) -> bool {
     let mut content = BytesMut::new();
     content.put_i32(TYPE_SET_TITLE);
     content.write_string(title);
+    send_to_game(uuid, content)
+}
+
+/// 向指定游戏实例发送鼠标相对移动
+///
+/// - `uuid`: 游戏实例 ID
+/// - `dx`: 水平相对位移，单位像素，正数向右
+/// - `dy`: 垂直相对位移，单位像素，正数向下
+///
+/// # 返回值
+///
+/// 发送成功返回 `true`，游戏实例未注册通道时返回 `false`；
+/// 游戏未抓取鼠标时该消息不会改变视角
+pub fn send_mouse_move(uuid: Uuid, dx: f64, dy: f64) -> bool {
+    let mut content = BytesMut::new();
+    content.put_i32(TYPE_MOUSE_MOVE);
+    content.put_f64(dx);
+    content.put_f64(dy);
+    send_to_game(uuid, content)
+}
+
+/// 向指定游戏实例发送鼠标按键
+///
+/// - `uuid`: 游戏实例 ID
+/// - `button`: 鼠标按键，与 GLFW 一致，0 左键、1 右键、2 中键
+/// - `down`: `true` 按下，`false` 抬起
+///
+/// # 返回值
+///
+/// 发送成功返回 `true`，游戏实例未注册通道时返回 `false`
+pub fn send_mouse_button(uuid: Uuid, button: i32, down: bool) -> bool {
+    let mut content = BytesMut::new();
+    content.put_i32(TYPE_MOUSE_BUTTON);
+    content.put_i32(button);
+    content.put_u8(if down { 1 } else { 0 });
+    send_to_game(uuid, content)
+}
+
+/// 向指定游戏实例发送键盘按键
+///
+/// - `uuid`: 游戏实例 ID
+/// - `key`: GLFW 键码，例如 W 为 87
+/// - `down`: `true` 按下，`false` 抬起
+///
+/// # 返回值
+///
+/// 发送成功返回 `true`，游戏实例未注册通道时返回 `false`
+pub fn send_key(uuid: Uuid, key: i32, down: bool) -> bool {
+    let mut content = BytesMut::new();
+    content.put_i32(TYPE_KEYBOARD_KEY);
+    content.put_i32(key);
+    content.put_u8(if down { 1 } else { 0 });
+    send_to_game(uuid, content)
+}
+
+/// 向指定游戏实例发送鼠标滚轮
+///
+/// - `uuid`: 游戏实例 ID
+/// - `amount`: 滚轮格数，正数向上
+///
+/// # 返回值
+///
+/// 发送成功返回 `true`，游戏实例未注册通道时返回 `false`
+pub fn send_mouse_scroll(uuid: Uuid, amount: i32) -> bool {
+    let mut content = BytesMut::new();
+    content.put_i32(TYPE_MOUSE_SCROLL);
+    content.put_i32(amount);
     send_to_game(uuid, content)
 }
 

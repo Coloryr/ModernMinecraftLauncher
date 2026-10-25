@@ -6,10 +6,18 @@ import { t } from "../../../lib/i18n";
 import BaseModal from "../../../components/ui/BaseModal.vue";
 import type { PackProgressDto } from "../../../lib/bindings";
 
-const props = defineProps<{
-  /** 安装进度快照，由 add-pack-progress 事件推送 */
-  progress: PackProgressDto;
-}>();
+const props = withDefaults(
+  defineProps<{
+    /** 安装进度快照，由 add-pack-progress 事件推送 */
+    progress: PackProgressDto;
+    /** 弹窗标题：安装整合包与下载在线实例两种场景不同；不传时按安装整合包 */
+    title?: string;
+  }>(),
+  { title: "" },
+);
+
+/** 实际显示的标题：调用方没给就退回"安装整合包" */
+const shownTitle = computed(() => props.title || t("add.installing"));
 
 const percent = computed(() =>
   props.progress.total ? (props.progress.now / props.progress.total) * 100 : 0,
@@ -20,7 +28,7 @@ const subPercent = computed(() =>
 </script>
 
 <template>
-  <BaseModal :title="t('add.installing')" :closable="false">
+  <BaseModal :title="shownTitle" :closable="false">
     <div class="install-progress">
       <div class="install-state">{{ t(`add.packState.${progress.state}`) }}</div>
 

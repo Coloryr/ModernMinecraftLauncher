@@ -1,7 +1,7 @@
 //! 服务器整合包管理
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -9,6 +9,7 @@ use std::{
 use mml_base::{
     archives::{ArchiveType, BaseArchive},
     file_item::{FileItemObj, LaterRun},
+    hash_helper::{gen_hash_from_file, HashType},
     serialize_tools,
 };
 use mml_config::config_save;
@@ -21,7 +22,10 @@ use mml_sys::path_helper;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    launcher::instance_setting_obj::InstanceSettingObj,
+    launcher::{
+        file_online_info_obj::OnlineInfoObj,
+        instance_setting_obj::InstanceSettingObj,
+    },
     serverpack::serverpack_obj::{ServerArchiveItemObj, ServerItemObj, ServerPackObj},
 };
 
@@ -206,7 +210,125 @@ impl InstanceSettingObj {
         self.save_serverpack(&new_pack);
         path_helper::delete(self.get_server_pack_old_file())?;
 
+        // 清单里带项目号的文件回写在线信息，导入后才能当平台来源用
+        self.sync_online_info(&new_pack, &game_path);
+
         Ok(())
+    }
+
+    /// 用清单里的项目号 / 文件号刷新实例的在线信息
+    ///
+    /// 表里只放**本地真的存在**的文件：清单里有编号但没落盘的不记，用户自己加的模组原样留着。
+    /// 只收项目号与文件号都有的条目 —— 这张表的下游（更新检查、依赖检测、项目编号列、
+    /// 生成服务器实例）全都按编号查平台，只有下载地址的配置文件记进来只是噪音。
+    ///
+    /// - `new_pack`: 本次同步的清单
+    /// - `game_path`: 游戏目录
+    fn sync_online_info(&self, new_pack: &ServerPackObj, game_path: &Path) {
+        let old = self.read_online_info();
+        let mut info = old.clone();
+
+        // 清单接管的文件先按文件名摘掉旧记录，再按本次的编号重建
+        let owned: HashSet<String> = new_pack
+            .online_list
+            .iter()
+            .filter_map(|item| file_name_of(&item.file))
+            .collect();
+        info.retain(|_, item| !owned.contains(&item.file) && local_file(game_path, item).is_file());
+
+        for item in &new_pack.online_list {
+            let (Some(pid), Some(fid)) = (trimmed(item.pid.as_deref()), trimmed(item.fid.as_deref()))
+            else {
+                continue;
+            };
+            // 本地没有这个文件就没什么可记的
+            let Ok(local) = paths::file_path(game_path, &item.file) else {
+                continue;
+            };
+            if !local.is_file() {
+                continue;
+            }
+
+            // 表的主键是 SHA1，按本地文件为准：清单没给校验值就现算
+            let sha1 = match trimmed(item.sha1.as_deref()) {
+                Some(value) => value.to_string(),
+                None => match gen_hash_from_file(HashType::Sha1, &local) {
+                    Ok(value) => value,
+                    Err(_) => continue,
+                },
+            };
+
+            let entry = OnlineInfoObj {
+                path: dir_of(&item.file),
+                name: file_name_of(&item.file).unwrap_or_default(),
+                file: file_name_of(&item.file).unwrap_or_default(),
+                sha1: sha1.clone(),
+                url: item.url.clone().unwrap_or_default(),
+                modid: pid.to_string(),
+                fileid: fid.to_string(),
+            };
+            info.insert(sha1, entry);
+        }
+
+        // 内容没变就别写盘：每次启动都会同步，白写一遍十几万字节没意义
+        if info != old {
+            self.save_online_info(&info);
+        }
+    }
+}
+
+/// 去掉首尾空白，空串按没有处理
+///
+/// - `value`: 原始值
+///
+/// # 返回值
+///
+/// 去空白后的值；空串或 `None` 返回 `None`
+fn trimmed(value: Option<&str>) -> Option<&str> {
+    value.map(str::trim).filter(|item| !item.is_empty())
+}
+
+/// 清单里的相对路径对应的文件名
+///
+/// - `rel`: 游戏目录下的相对路径，如 `mods/foo.jar`
+///
+/// # 返回值
+///
+/// 文件名；路径为空时返回 `None`
+fn file_name_of(rel: &str) -> Option<String> {
+    Path::new(rel)
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+}
+
+/// 清单里的相对路径对应的目录
+///
+/// - `rel`: 游戏目录下的相对路径，如 `mods/foo.jar`
+///
+/// # 返回值
+///
+/// 目录部分，如 `mods`；顶层文件返回空串
+fn dir_of(rel: &str) -> String {
+    Path::new(rel)
+        .parent()
+        .map(|dir| dir.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_default()
+}
+
+/// 在线信息记录指向的本地文件
+///
+/// - `game_path`: 游戏目录
+/// - `info`: 在线信息
+///
+/// # 返回值
+///
+/// 记录的绝对路径，不检查是否存在
+fn local_file(game_path: &Path, info: &OnlineInfoObj) -> PathBuf {
+    let dir = info.path.trim();
+    if dir.is_empty() {
+        game_path.join(&info.file)
+    } else {
+        game_path.join(dir).join(&info.file)
     }
 }
 

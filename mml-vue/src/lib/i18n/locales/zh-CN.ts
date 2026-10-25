@@ -1846,6 +1846,7 @@ export default {
 
   // 整合包模式（添加实例窗口）
   "add.installing": "正在安装整合包",
+  "add.downloadingOnline": "正在下载在线实例",
   "add.packState.downloadPack": "下载整合包",
   "add.packState.readInfo": "读取信息",
   "add.packState.getInfo": "获取文件信息",

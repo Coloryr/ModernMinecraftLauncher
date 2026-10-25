@@ -1181,11 +1181,6 @@ mod tests {
     #[test]
     fn copy_icon_follows_instance_icon() {
         crate::test_support::ensure_boot();
-        // 实例路径要 mml-game 的运行目录：本 crate 的 boot 只起 mml_base / 日志
-        static GAME: std::sync::Once = std::sync::Once::new();
-        GAME.call_once(|| {
-            mml_game::init(mml_base::get_base_dir()).unwrap();
-        });
         let dir = crate::test_support::temp_dir("icon-src");
         let out = crate::test_support::temp_dir("icon-out");
 

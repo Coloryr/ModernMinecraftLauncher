@@ -3,8 +3,8 @@
 //! 添加实例窗口的"加载器版本"下拉数据源：按加载器类型，可选按游戏版本，
 //! 拉取可用版本号列表，全部来自 mml-net 的对应 API / 镜像源。
 
-use std::collections::HashMap;
-use std::sync::{LazyLock, Mutex, RwLock};
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, LazyLock, Mutex, RwLock};
 
 use regex::Regex;
 
@@ -30,10 +30,35 @@ static NEOFORGE_BMCLAPI: LazyLock<Mutex<HashMap<String, Vec<String>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 /// Cleanroom 官方 maven 全量版本缓存；它只服务 1.12.2，列表不随游戏版本变化
 static CLEANROOM_LIST: LazyLock<RwLock<Option<Vec<String>>>> = LazyLock::new(|| RwLock::new(None));
-/// Fabric meta 列表缓存：通用列表，不随游戏版本变化
-static FABRIC_LIST: LazyLock<RwLock<Option<Vec<String>>>> = LazyLock::new(|| RwLock::new(None));
-/// Quilt meta 列表缓存：通用列表，不随游戏版本变化
-static QUILT_LIST: LazyLock<RwLock<Option<Vec<String>>>> = LazyLock::new(|| RwLock::new(None));
+/// Fabric meta 缓存：加载器版本与支持的游戏版本
+static FABRIC_META: LazyLock<RwLock<Option<Arc<LoaderMeta>>>> = LazyLock::new(|| RwLock::new(None));
+/// Quilt meta 缓存：加载器版本与支持的游戏版本
+static QUILT_META: LazyLock<RwLock<Option<Arc<LoaderMeta>>>> = LazyLock::new(|| RwLock::new(None));
+
+/// 按 meta 判断加载器是否支持该游戏版本
+///
+/// 只看 `game` 数组：加载器版本列表任何游戏版本都非空，拿它当判据会误报。
+///
+/// - `meta`: 加载器 meta
+/// - `mc`: 游戏版本号
+///
+/// # 返回值
+///
+/// 该版本是否在支持列表里
+fn meta_supports(meta: &LoaderMeta, mc: &str) -> bool {
+    meta.games.contains(mc)
+}
+
+/// 加载器 meta 里跟"哪个游戏版本能用"有关的两份数据
+///
+/// Fabric / Quilt 的加载器版本列表不随游戏版本变化，只看它非空就当成"支持所有版本"，
+/// 会给 1.12.2 也列出 Fabric。真正能装哪些版本看 meta 的 `game` 数组。
+struct LoaderMeta {
+    /// 加载器版本号，新版本在前
+    loaders: Vec<String>,
+    /// 支持的游戏版本
+    games: HashSet<String>,
+}
 
 /// 获取加载器的可用版本列表，新版本在前
 ///
@@ -62,7 +87,7 @@ pub async fn get_loader_versions(loader: &LoaderType, mc: &str) -> CoreResult<Ve
 ///
 /// 原版 / 自定义恒可用，其余按各加载器的支持数据判断：
 /// - Forge：官方源为全量元数据；BMCLAPI 源按版本查询结果非空
-/// - Fabric / Quilt：meta 通用，非空即支持
+/// - Fabric / Quilt：meta 的 `game` 数组里有没有这个版本
 /// - NeoForge：官方源要求 1.20.1+；BMCLAPI 源按版本查询结果非空
 /// - OptiFine：官方支持版本表，见 [`mml_net::optifine_api::get_support_version`]
 /// - LiteLoader：meta 的版本键前缀匹配
@@ -149,8 +174,8 @@ pub async fn get_support_loaders(mc: &str, gui: ProgressGui) -> CoreResult<Vec<S
         Ok(ok)
     };
     let fabric = async {
-        let ok = match fabric_versions().await {
-            Ok(v) => !v.is_empty(),
+        let ok = match fabric_supports(mc).await {
+            Ok(ok) => ok,
             Err(err) if mml_net::is_aborted(&err) => {
                 mark_done!(1);
                 return Err(err);
@@ -162,8 +187,8 @@ pub async fn get_support_loaders(mc: &str, gui: ProgressGui) -> CoreResult<Vec<S
         Ok(ok)
     };
     let quilt = async {
-        let ok = match quilt_versions().await {
-            Ok(v) => !v.is_empty(),
+        let ok = match quilt_supports(mc).await {
+            Ok(ok) => ok,
             Err(err) if mml_net::is_aborted(&err) => {
                 mark_done!(2);
                 return Err(err);
@@ -561,9 +586,29 @@ async fn neoforge_versions(mc: &str) -> CoreResult<Vec<String>> {
 ///
 /// 返回版本号列表；下载或解析失败返回对应错误
 async fn fabric_versions() -> CoreResult<Vec<String>> {
-    // 命中缓存：meta 是通用列表，直接返回
-    if let Some(list) = FABRIC_LIST.read().unwrap().as_ref() {
-        return Ok(list.clone());
+    Ok(fabric_meta().await?.loaders.clone())
+}
+
+/// Fabric 是否支持该游戏版本
+///
+/// - `mc`: 游戏版本号
+///
+/// # 返回值
+///
+/// meta 的 `game` 数组是否包含该版本；下载或解析失败返回对应错误
+async fn fabric_supports(mc: &str) -> CoreResult<bool> {
+    let meta = fabric_meta().await?;
+    Ok(meta_supports(&meta, mc))
+}
+
+/// 取 Fabric meta，首次调用拉取并缓存
+///
+/// # 返回值
+///
+/// 加载器版本与支持的游戏版本；下载或解析失败返回对应错误
+async fn fabric_meta() -> CoreResult<Arc<LoaderMeta>> {
+    if let Some(hit) = FABRIC_META.read().unwrap().as_ref() {
+        return Ok(hit.clone());
     }
 
     let meta = mml_net::fabric_api::get_meta().await?;
@@ -581,8 +626,11 @@ async fn fabric_versions() -> CoreResult<Vec<String>> {
             list.push(item.version.clone());
         }
     }
-    *FABRIC_LIST.write().unwrap() = Some(list.clone());
-    Ok(list)
+    let games = obj.game.iter().map(|item| item.version.clone()).collect();
+
+    let meta = Arc::new(LoaderMeta { loaders: list, games });
+    *FABRIC_META.write().unwrap() = Some(meta.clone());
+    Ok(meta)
 }
 
 /// Quilt：meta 的 loader 数组，meta 从旧到新，倒转为新在前
@@ -591,9 +639,29 @@ async fn fabric_versions() -> CoreResult<Vec<String>> {
 ///
 /// 返回版本号列表；下载或解析失败返回对应错误
 async fn quilt_versions() -> CoreResult<Vec<String>> {
-    // 命中缓存：meta 是通用列表，直接返回
-    if let Some(list) = QUILT_LIST.read().unwrap().as_ref() {
-        return Ok(list.clone());
+    Ok(quilt_meta().await?.loaders.clone())
+}
+
+/// Quilt 是否支持该游戏版本
+///
+/// - `mc`: 游戏版本号
+///
+/// # 返回值
+///
+/// meta 的 `game` 数组是否包含该版本；下载或解析失败返回对应错误
+async fn quilt_supports(mc: &str) -> CoreResult<bool> {
+    let meta = quilt_meta().await?;
+    Ok(meta_supports(&meta, mc))
+}
+
+/// 取 Quilt meta，首次调用拉取并缓存
+///
+/// # 返回值
+///
+/// 加载器版本与支持的游戏版本；下载或解析失败返回对应错误
+async fn quilt_meta() -> CoreResult<Arc<LoaderMeta>> {
+    if let Some(hit) = QUILT_META.read().unwrap().as_ref() {
+        return Ok(hit.clone());
     }
 
     let meta = mml_net::quilt_api::get_meta().await?;
@@ -602,8 +670,11 @@ async fn quilt_versions() -> CoreResult<Vec<String>> {
 
     let mut list: Vec<String> = obj.loader.iter().map(|item| item.version.clone()).collect();
     list.reverse();
-    *QUILT_LIST.write().unwrap() = Some(list.clone());
-    Ok(list)
+    let games = obj.game.iter().map(|item| item.version.clone()).collect();
+
+    let meta = Arc::new(LoaderMeta { loaders: list, games });
+    *QUILT_META.write().unwrap() = Some(meta.clone());
+    Ok(meta)
 }
 
 /// OptiFine：按游戏版本过滤，官方源版本号形如 `HD_U_I6`
@@ -673,4 +744,28 @@ fn value_versions(value: &serde_json::Value) -> Vec<String> {
             _ => None,
         })
         .collect()
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 能不能装只看 `game` 数组，加载器版本列表非空不代表支持
+    #[test]
+    fn support_follows_game_list() {
+        let meta = LoaderMeta {
+            loaders: vec!["0.16.0".to_string()],
+            games: ["1.20.1".to_string()].into_iter().collect(),
+        };
+
+        assert!(meta_supports(&meta, "1.20.1"));
+        assert!(!meta_supports(&meta, "1.12.2"));
+    }
+
+    /// 版本号按段落比大小，1.12.2 不该被当成 1.20.1 以上
+    #[test]
+    fn version_ge_compares_by_segment() {
+        assert!(version_ge("1.20.1", "1.20.1"));
+        assert!(version_ge("1.21", "1.20.1"));
+        assert!(!version_ge("1.12.2", "1.20.1"));
+    }
 }

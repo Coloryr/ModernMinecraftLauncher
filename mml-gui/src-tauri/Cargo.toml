@@ -78,8 +78,9 @@ x11-dl = "2"
 # 文件拖放的"路径桥"（见 src/windows/file_drop.rs）：
 # 用 WebView2 的"附加对象"通道把 DOM 拖入的文件真实路径捞回来
 webview2-com = "~0.39.1"
-# 与 tauri / webview2-com 同一个 windows 版本（0.62），PCWSTR / PWSTR 才通用
-windows.workspace = true
+# 与 tauri / webview2-com 同一个 windows 版本（0.62），PCWSTR / PWSTR 才通用；
+# Win32_UI_WindowsAndMessaging 是"启动时不抢前台"要用的 ShowWindow
+windows = { workspace = true, features = ["Win32_UI_WindowsAndMessaging"] }
 
 [features]
 # 前端资源走内嵌 dist 而不是 devUrl。**直接 cargo build 必须显式打开**：

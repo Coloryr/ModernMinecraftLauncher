@@ -126,12 +126,16 @@ pub(crate) fn open_window_from_uuid(
 
 /// 创建 / 聚焦主窗口，setup 阶段调用
 ///
+/// 主窗口**第一次显示时不抢前台**：程序由系统、脚本或开发期 watcher 拉起来时，
+/// 把用户正在用的窗口顶掉会打断操作，见 `quiet_main_window_startup`。
+///
 /// - `app`: 应用句柄，建窗用
 ///
 /// # 返回值
 ///
 /// 主窗口已打开返回 `Ok(())`，建窗失败返回错误文案
 pub fn show_main_window(app: &AppHandle) -> Result<(), String> {
+    crate::windows::quiet_main_window_startup();
     // 主窗口是顶层：没有历史几何时走"屏幕中心"，见 initial_placement
     open_window_from_uuid(app, &MAIN_WINDOW_UUID, "index.html", None)
 }

@@ -27,6 +27,7 @@
 //! |------|------|
 //! | [`DownloadItem`] | 单个下载文件的状态跟踪 |
 //! | [`DownloadTask`] | 一组下载文件的批量任务管理 |
+//! | [`DownloadHandle`] | 任务句柄：查状态 / 取结果 / 取消 |
 //! | [`DownloadThread`] | 下载工作线程封装 |
 //! | [`IDownloadGui`] | UI 更新回调接口 |
 //!
@@ -547,7 +548,8 @@ pub async fn start_download_task_cancellable(
 /// 不用再去 [`get_tasks`] 里按编号找。
 ///
 /// - `items`: 需要下载的文件列表
-/// - `cancel`: 外部取消令牌，与 [`DownloadHandle::cancel`] 是同一批任务的两个叫停入口
+/// - `cancel`: 外部取消令牌，与 [`DownloadHandle::cancel`] 是同一批任务的两个叫停入口；
+///   它只在 [`DownloadHandle::wait`] 期间生效，只查状态不等待时请用 `cancel` 叫停
 ///
 /// # 返回值
 ///

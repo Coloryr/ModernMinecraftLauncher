@@ -27,6 +27,8 @@ pub fn ensure_boot() {
         mml_base::init(&dir);
         mml_names::init(&dir).unwrap();
         mml_log::start(&dir).unwrap();
+        // 实例路径是 mml-game 自己的 `BASE_DIR`，不起它 `get_icon_file_or_default` 这类会 unwrap 失败
+        mml_game::init(&dir).unwrap();
     });
 }
 

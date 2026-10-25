@@ -328,6 +328,71 @@ fn empty_url_is_rejected() {
     assert!(res.is_err());
 }
 
+/// 清单里带项目号的文件会写进实例的在线信息表，没有编号的不记
+#[test]
+fn import_records_online_info() {
+    ensure_init();
+    let (port, slot) = json_server_slot();
+    *slot.lock().unwrap() = manifest_with_indexed_file(port);
+
+    let uuid = block_on(mml_game::add_game::install_server_pack_from_url(
+        &format!("http://127.0.0.1:{port}/pack"),
+        None,
+        None,
+        None,
+        None,
+        CancellationToken::new(),
+    ))
+    .expect("导入应成功");
+
+    let instance = mml_game::get_instance(&uuid).expect("实例应已登记");
+    let instance = instance.read().unwrap();
+
+    // 落盘走后台保存线程，等它写完再看
+    let file = instance.get_online_info_file();
+    let mut info = instance.read_online_info();
+    for _ in 0..100 {
+        if !info.is_empty() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+        info = instance.read_online_info();
+    }
+
+    assert!(file.exists(), "在线信息应落盘");
+    assert_eq!(info.len(), 1, "只有带编号的那条该被记录：{info:?}");
+    let entry = info.values().next().unwrap();
+    assert_eq!(entry.file, "tiny.jar");
+    assert_eq!(entry.path, "mods");
+    assert_eq!(entry.modid, "111");
+    assert_eq!(entry.fileid, "222");
+    assert_eq!(entry.sha1, sha1_of_tiny());
+}
+
+/// 一份清单：一个带项目号与文件号的文件，一个只有下载地址的文件
+fn manifest_with_indexed_file(port: u16) -> String {
+    let mut pack = decode_manifest();
+    pack.online_list.push(ServerItemObj {
+        file: "mods/tiny.jar".to_string(),
+        pid: Some("111".to_string()),
+        fid: Some("222".to_string()),
+        url: Some(format!("http://127.0.0.1:{port}/pack/mods/tiny.jar")),
+        sha1: Some(sha1_of_tiny()),
+        ..Default::default()
+    });
+    pack.online_list.push(ServerItemObj {
+        file: "mods/plain.jar".to_string(),
+        url: Some(format!("http://127.0.0.1:{port}/pack/mods/plain.jar")),
+        ..Default::default()
+    });
+    serde_json::to_string(&pack).unwrap()
+}
+
+/// 假模组的 SHA1
+fn sha1_of_tiny() -> String {
+    mml_base::hash_helper::gen_hash(mml_base::hash_helper::HashType::Sha1, TINY_JAR)
+}
+
 /// 只记录进度的假界面：验证导入时进度真的在往前走
 #[derive(Default)]
 struct ProgressSink(Mutex<Vec<(usize, Option<usize>)>>);

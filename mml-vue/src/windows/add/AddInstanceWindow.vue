@@ -662,6 +662,8 @@ async function create() {
   const group = addGroup.value;
   addError.value = "";
   addErrorField.value = "";
+  // 先复位：上一条在线实例失败后留下的「下载」标题不能带到压缩包安装里
+  packTitleKey.value = "add.installing";
   creating.value = true;
   try {
     let uuid: string;
@@ -702,7 +704,10 @@ async function create() {
     } else {
       // 在线实例：压缩包走压缩包导入，其余按服务器包清单（server.json）登记
       const target = addUrl.value.trim();
-      uuid = isArchiveUrl(target)
+      const archive = isArchiveUrl(target);
+      // 标题跟着实际走的那条路：在线实例是"下载"，压缩包地址仍是"安装整合包"
+      packTitleKey.value = archive ? "add.installing" : "add.downloadingOnline";
+      uuid = archive
         ? await api.addImportUrl(target, name, groupId)
         : await api.addImportServerPack(serverPackUrl(target), name, groupId);
     }
@@ -724,6 +729,9 @@ async function create() {
 
 /** 安装进度，由 add-pack-progress 事件驱动；null 表示未在安装 */
 const packProgress = ref<PackProgressDto | null>(null);
+
+/** 进度弹窗的标题键：导入在线实例是「下载在线实例」，其余是「安装整合包」 */
+const packTitleKey = ref<"add.installing" | "add.downloadingOnline">("add.installing");
 
 // ================= 创建成功后的继续添加询问 =================
 
@@ -969,7 +977,7 @@ onUnmounted(() => {
     <ContinueModal v-if="askContinue" :name="addedName" @continue="continueAdding" @finish="finishAdding" />
 
     <!-- 整合包安装进度 -->
-    <PackProgressModal v-if="packProgress" :progress="packProgress" />
+    <PackProgressModal v-if="packProgress" :progress="packProgress" :title="t(packTitleKey)" />
 
     <!-- 加载器查询进度不再浮在窗口正上方：两条查询都改成就地显示在各自字段下面了，
          见 NewMode 里的 LoaderQueryProgress -->

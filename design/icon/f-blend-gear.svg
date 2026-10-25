@@ -3,11 +3,13 @@
 
   一个方块，沿中轴线 x=256 一分为二，硬接缝：左半是原始草方块，右半是科技方块。
 
-  分工很硬：科技感的线只属于右半。
+  科技感的线只属于右半：
     - 科技半整体裁到 right-clip（T → R → BR → B 这个四边形，就是右半的轮廓），
-      所以接缝那条 7px 的线只留下右半侧的 3.5px，不会有一丝青色压到左边。
-    - 同理，外轮廓、光晕全在右半以内，两半看起来一样大。
+      所以外轮廓、光晕全在右半以内，两半看起来一样大。
     - 左半只有纯色面 + 草皮台阶 + 颗粒，没有任何描边或发光。
+
+  中线单独画一条，居中于 x=256，左右各 7px：它不属于任何一半，所以两条边
+  一样宽，不受右半裁剪。冷白渐变像一道光缝，在草皮与暗面板上都够亮。
 
   左半：顶 #7db63e / 左面 #835f42。
   右半：暗面板 + 草皮台阶折线 + 发光棱线。
@@ -193,6 +195,15 @@
     <clipPath id="right-clip">
       <path d="M256,46 L438,151 L438,361 L256,466 Z" />
     </clipPath>
+    <!-- 立方体整体轮廓，用来切掉中线在顶点处分头的圆头 -->
+    <clipPath id="cube-clip">
+      <path d="M74,151 L256,46 L438,151 L438,361 L256,466 L74,361 Z" />
+    </clipPath>
+    <linearGradient id="seam-grad" gradientUnits="userSpaceOnUse" x1="0" y1="46" x2="0" y2="466">
+      <stop offset="0" stop-color="#f6fcff" />
+      <stop offset="0.5" stop-color="#cfeaff" />
+      <stop offset="1" stop-color="#8fd2f2" />
+    </linearGradient>
     <radialGradient id="gear-back" cx="0.5" cy="0.38" r="0.75">
       <stop offset="0" stop-color="#143346" />
       <stop offset="1" stop-color="#08161f" />
@@ -223,12 +234,10 @@
     <g fill="none" stroke="url(#wire-grad)" stroke-linecap="round" stroke-linejoin="round">
       <g opacity="0.30" filter="url(#wire-glow)">
         <path d="M256,46 L438,151 L438,361 L256,466 Z" stroke-width="13" />
-        <path d="M256,46 L256,466" stroke-width="13" />
         <path d="M438,151 L256,256" stroke-width="9" />
       </g>
       <path d="M256,321.62 L267.38,315.06 L267.38,328.19 L278.75,321.62 L290.12,315.06 L290.12,288.81 L301.5,282.25 L301.5,308.5 L312.88,301.94 L324.25,295.38 L324.25,282.25 L335.62,275.69 L347,269.12 L347,282.25 L358.38,275.69 L369.75,269.12 L369.75,256 L381.12,249.44 L392.5,242.88 L392.5,256 L403.88,249.44 L415.25,242.88 L415.25,216.62 L426.62,210.06 L438,203.5" stroke-width="6" opacity="0.95" />
       <path d="M256,46 L438,151 L438,361 L256,466 Z" stroke-width="7" />
-      <path d="M256,46 L256,466" stroke-width="7" />
       <path d="M438,151 L256,256" stroke-width="5" />
     </g>
     <!-- 齿轮徽章：压在科技半的右下角，像一枚嵌进面板的设置标记 -->
@@ -239,5 +248,11 @@
       <circle cx="350" cy="312" r="28" fill="none" stroke="#8a4c0f" stroke-width="2" opacity="0.55" />
       <circle cx="350" cy="312" r="16" fill="#08161f" stroke="url(#gear-wire)" stroke-width="4" />
     </g>
+  </g>
+
+  <!-- 中线：居中于接缝，左右各 7px；画在裁剪组之外，不受右半裁剪 -->
+  <g clip-path="url(#cube-clip)" fill="none" stroke="url(#seam-grad)" stroke-linecap="round">
+    <path d="M256,46 L256,466" stroke-width="22" opacity="0.32" filter="url(#wire-glow)" />
+    <path d="M256,46 L256,466" stroke-width="14" />
   </g>
 </svg>

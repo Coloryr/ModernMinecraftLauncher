@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="design/icon/f-blend.svg" width="128" alt="M²L 程序图标">
+  <img src="design/icon/f-blend-gear.svg" width="128" alt="M²L 程序图标">
 </p>
 
 # ModernMinecraftLauncher (M²L)
@@ -155,7 +155,7 @@ CI 每个平台都走同一套脚本（`build/init.*` 装依赖、`build/build-r
 | `cd mml-vue && npm run lint` | 前端 lint |
 | `cd mml-vue && npm test` | 前端单测 |
 | `cargo test -p <crate>` | 只跑改动相关的 Rust 测试，不要整仓全量测试 |
-| `cd mml-gui && npx tauri icon ../design/icon/f-blend.svg` | 改过程序图标后重新生成各平台图标 |
+| `cd mml-gui && npx tauri icon ../design/icon/f-blend-gear.svg` | 改过程序图标后重新生成各平台图标 |
 
 IPC 生成规则与构建配置细节见[开发与构建](docs/development.md)。
 

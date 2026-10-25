@@ -1845,6 +1845,7 @@ export default {
 
   // Modpack mode (add instance window)
   "add.installing": "Installing Modpack",
+  "add.downloadingOnline": "Downloading online instance",
   "add.packState.downloadPack": "Downloading modpack",
   "add.packState.readInfo": "Reading info",
   "add.packState.getInfo": "Fetching file info",

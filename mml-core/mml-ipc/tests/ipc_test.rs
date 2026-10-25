@@ -19,7 +19,8 @@ use std::sync::{
 use bytes::Buf;
 use mml_ipc::{
     ServerInfo, WindowSize, add_server, clear_servers, get_mouse_state, get_run_arg,
-    get_window_size, init, notify_existing, register_ipc_event, remove_ipc_event, set_title,
+    get_window_size, init, notify_existing, register_ipc_event, remove_ipc_event, send_key,
+    send_mouse_button, send_mouse_move, send_mouse_scroll, set_title,
 };
 use uuid::Uuid;
 
@@ -64,10 +65,25 @@ fn read_frame(stream: &mut std::net::TcpStream) -> Vec<u8> {
             read_string_into(stream, &mut frame);
             read_string_into(stream, &mut frame);
         }
+        // 鼠标移动(5): dx(f64) + dy(f64)
+        5 => read_bytes_into(stream, &mut frame, 16),
+        // 鼠标按键(6) / 键盘按键(7): i32 + 布尔
+        6 | 7 => read_bytes_into(stream, &mut frame, 5),
+        // 鼠标滚轮(8): i32
+        8 => read_bytes_into(stream, &mut frame, 4),
         // 其它类型没有消息体
         _ => {}
     }
     frame
+}
+
+/// 读取固定长度的消息体并追加到输出
+///
+/// - `len`: 消息体的字节数
+fn read_bytes_into(stream: &mut std::net::TcpStream, out: &mut Vec<u8>, len: usize) {
+    let mut bytes = vec![0u8; len];
+    stream.read_exact(&mut bytes).unwrap();
+    out.extend_from_slice(&bytes);
 }
 
 /// 读取一个字符串字段，含 i32 长度前缀与 UTF-8 内容，并追加到输出
@@ -277,4 +293,74 @@ fn test_set_title_unknown_uuid() {
     ensure_log();
     ipc_port();
     assert!(!set_title(Uuid::new_v4(), "nobody"));
+}
+
+/// 游戏注册通道后，输入类消息应能按类型定向送达并保持字段布局
+#[test]
+fn test_send_input() {
+    ensure_log();
+    let port = ipc_port();
+    let uuid = Uuid::new_v4();
+
+    let mut stream = connect(port);
+
+    // 发送 GAME_CHANNEL(9): uuid
+    let mut content = Vec::new();
+    content.extend_from_slice(&9i32.to_be_bytes());
+    let uuid_str = uuid.to_string();
+    content.extend_from_slice(&(uuid_str.len() as i32).to_be_bytes());
+    content.extend_from_slice(uuid_str.as_bytes());
+    write_frame(&mut stream, &content);
+
+    // 等到通道注册成功；成功的那次 send_key 已经把 KEYBOARD_KEY(7) 排入队列
+    let mut sent = false;
+    for _ in 0..100 {
+        if send_key(uuid, 87, true) {
+            sent = true;
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    assert!(sent, "game channel not registered");
+
+    let payload = read_frame_of(&mut stream, 7);
+    let mut body = payload.as_slice();
+    assert_eq!(body.get_i32(), 7);
+    assert_eq!(body.get_i32(), 87);
+    assert_eq!(body.get_u8(), 1);
+
+    // 鼠标移动是相对位移，负数表示向左或向上
+    assert!(send_mouse_move(uuid, 12.5, -3.25));
+    let payload = read_frame_of(&mut stream, 5);
+    let mut body = payload.as_slice();
+    assert_eq!(body.get_i32(), 5);
+    assert_eq!(body.get_f64(), 12.5);
+    assert_eq!(body.get_f64(), -3.25);
+
+    // 鼠标按键抬起
+    assert!(send_mouse_button(uuid, 2, false));
+    let payload = read_frame_of(&mut stream, 6);
+    let mut body = payload.as_slice();
+    assert_eq!(body.get_i32(), 6);
+    assert_eq!(body.get_i32(), 2);
+    assert_eq!(body.get_u8(), 0);
+
+    // 滚轮向下
+    assert!(send_mouse_scroll(uuid, -2));
+    let payload = read_frame_of(&mut stream, 8);
+    let mut body = payload.as_slice();
+    assert_eq!(body.get_i32(), 8);
+    assert_eq!(body.get_i32(), -2);
+}
+
+/// 向未注册通道的游戏发送输入应返回 false，不依赖网络返回
+#[test]
+fn test_send_input_unknown_uuid() {
+    ensure_log();
+    ipc_port();
+    let uuid = Uuid::new_v4();
+    assert!(!send_mouse_move(uuid, 1.0, -1.0));
+    assert!(!send_mouse_button(uuid, 0, true));
+    assert!(!send_key(uuid, 87, true));
+    assert!(!send_mouse_scroll(uuid, 1));
 }
