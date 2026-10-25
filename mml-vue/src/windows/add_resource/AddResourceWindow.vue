@@ -27,6 +27,8 @@ import { showToast } from "../../lib/toast";
 import { useResourceStatus } from "../../lib/resourceTasks";
 import { familyInstanceFromLabel, projectParamToItem, targetProject, targetUuid, type WindowProjectParam } from "../windowManager";
 import { useInstanceChange } from "../../composables/useInstanceChange";
+import { useRefreshKey } from "../../composables/useRefreshKey";
+import { usePageKeys } from "../../composables/usePageKeys";
 import type {
   FileListItemDto,
   InstanceInfoDto,
@@ -331,6 +333,19 @@ async function search() {
     if (mine === searchSeq) searching.value = false;
   }
 }
+
+// F5 重跑当前搜索；详情页打开时 F5 交给详情页自己的版本列表
+useRefreshKey(() => {
+  if (detailOpen.value) return;
+  submitSearch();
+});
+
+// 鼠标侧键：后退 = 上一页，前进 = 下一页（详情页打开时由详情页自己接）
+usePageKeys({
+  prev: () => turnPage(-1),
+  next: () => turnPage(1),
+  enabled: () => !detailOpen.value,
+});
 
 function submitSearch() {
   page.value = 0;

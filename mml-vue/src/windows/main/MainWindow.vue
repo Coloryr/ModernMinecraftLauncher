@@ -25,6 +25,7 @@ import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
 import { stateText } from "../../lib/launchState";
 import { useDownloadProgress } from "../../composables/useDownloadProgress";
+import { useRefreshKey } from "../../composables/useRefreshKey";
 import { KEYS, onStorageChange } from "../../lib/storage";
 import { openWindow } from "../windowManager";
 import { latestCrash } from "../../lib/crash";
@@ -1572,6 +1573,11 @@ async function loadVersions() {
     versions.value = [];
   }
 }
+
+// F5：重拉实例、分组与版本列表；启动状态与日志不走这里（那是运行时状态，不是"数据"）
+useRefreshKey(async () => {
+  await Promise.all([loadInstances(), loadGroups(), loadVersions()]);
+});
 
 // ================= 启动 =================
 // 不弹窗：启动中按钮里是阶段 + 进度，运行中显示「运行中」；

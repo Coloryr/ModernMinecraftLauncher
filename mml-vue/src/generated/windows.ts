@@ -32,6 +32,7 @@ export { default as WinBlockPartsCategoryRail } from "../windows/block/parts/Cat
 export { default as WinBlockPartsInstancePickModal } from "../windows/block/parts/InstancePickModal.vue";
 export { default as WinBlockPartsSkinAddModal } from "../windows/block/parts/SkinAddModal.vue";
 export { default as CollectWindow } from "../windows/collect/CollectWindow.vue";
+export { default as WinCollectPartsInstallModal } from "../windows/collect/parts/InstallModal.vue";
 export { default as ConfigWindow } from "../windows/config/ConfigWindow.vue";
 export { default as WinConfigPartsHexView } from "../windows/config/parts/HexView.vue";
 export { default as WinConfigPartsImageView } from "../windows/config/parts/ImageView.vue";

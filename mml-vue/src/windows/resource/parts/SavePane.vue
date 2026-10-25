@@ -515,7 +515,7 @@ function saveTip(item: SaveItemDto): string {
     </template>
     <template #default="{ start, end }">
       <ResourceRow v-for="item in saves.slice(start, end)" :key="item.dir" :icon="item.icon" :name="item.levelName || item.dir"
-        v-tip.mouse="saveTip(item)" :class="{
+        v-tip="saveTip(item)" :class="{
           'row-selected': isSelected(item),
           'row-anchor': anchorKey === item.dir,
           'row-selecting': selected.size > 0,

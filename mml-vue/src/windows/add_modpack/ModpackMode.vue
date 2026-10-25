@@ -15,6 +15,8 @@ import { cardTags } from "../../lib/projectTags";
 import HighlightText from "../../components/ui/HighlightText.vue";
 import { toggleStar } from "../../lib/projectCollect";
 import { useCollectStars } from "../../lib/useCollectStars";
+import { useRefreshKey } from "../../composables/useRefreshKey";
+import { usePageKeys } from "../../composables/usePageKeys";
 import { projectParamToItem, targetProject } from "../windowManager";
 import type { FileListItemDto, GroupDto, ModPackStatusDto, ProjectItemDto } from "../../lib/bindings";
 import { formatDate } from "../../lib/format";
@@ -207,6 +209,19 @@ async function loadSource() {
 let searchSeq = 0;
 
 /** 搜索期间置 `searching`（弹窗锁住窗口），成败都清掉 */
+// F5 重跑当前搜索；详情页打开时让位给详情页自己的版本列表
+useRefreshKey(() => {
+  if (detailItem.value) return;
+  void search();
+});
+
+// 鼠标侧键：后退 = 上一页，前进 = 下一页（详情页自己接它那份版本列表）
+usePageKeys({
+  prev: () => turnPage(-1),
+  next: () => turnPage(1),
+  enabled: () => !detailItem.value,
+});
+
 async function search() {
   // 排序列表还没拉回来时别发请求：换下载源时它是**异步**拉回来的
   // loadSource 里 await 若干请求，这中间发出去必然带不上合法排序

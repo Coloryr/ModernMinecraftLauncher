@@ -17,6 +17,7 @@ import { useDownloadBadges } from "../lib/downloadBadges";
 import { formatCount, t, tErr } from "../lib/i18n";
 import { svgIcon } from "../lib/modrinthIcon";
 import { usePageActive } from "../lib/pageActive";
+import { usePageKeys } from "../composables/usePageKeys";
 import { toggleStar } from "../lib/projectCollect";
 import type {
   FileListItemDto,
@@ -187,6 +188,13 @@ function onFileVersionChange() {
     fetchFiles(current.value.source.pid, 0);
   }
 }
+
+// 鼠标侧键翻版本列表：后退 = 上一页，前进 = 下一页
+usePageKeys({
+  prev: () => turnFilePage(-1),
+  next: () => turnFilePage(1),
+  enabled: () => !filesLoading.value && fileMaxPage.value > 1,
+});
 
 /** 版本列表翻页：Modrinth 本地切片，CurseForge 向后端取页 */
 function turnFilePage(delta: number) {
