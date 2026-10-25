@@ -17,6 +17,7 @@ import { toggleStar } from "../../lib/projectCollect";
 import { useCollectStars } from "../../lib/useCollectStars";
 import { useRefreshKey } from "../../composables/useRefreshKey";
 import { usePageKeys } from "../../composables/usePageKeys";
+import { scrollToContentTop } from "../../lib/scrollTop";
 import { projectParamToItem, targetProject } from "../windowManager";
 import type { FileListItemDto, GroupDto, ModPackStatusDto, ProjectItemDto } from "../../lib/bindings";
 import { formatDate } from "../../lib/format";
@@ -280,8 +281,8 @@ function turnPage(delta: number) {
   const next = page.value + delta;
   if (next < 0 || next > maxPage.value) return;
   page.value = next;
-  // 翻页先回到内容顶部，与资源窗口同一口径：不拉回去就停在列表底部，看不到新一页的头几条
-  bodyRef.value?.scrollIntoView({ behavior: "smooth", block: "start" });
+  // 翻页先回到列表开头，与资源窗口同一口径：不拉回去就停在列表底部，看不到新一页的头几条
+  scrollToContentTop(bodyRef.value);
   void search();
 }
 

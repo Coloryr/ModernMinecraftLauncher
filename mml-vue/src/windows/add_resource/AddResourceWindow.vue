@@ -29,6 +29,7 @@ import { familyInstanceFromLabel, projectParamToItem, targetProject, targetUuid,
 import { useInstanceChange } from "../../composables/useInstanceChange";
 import { useRefreshKey } from "../../composables/useRefreshKey";
 import { usePageKeys } from "../../composables/usePageKeys";
+import { scrollToContentTop } from "../../lib/scrollTop";
 import type {
   FileListItemDto,
   InstanceInfoDto,
@@ -356,9 +357,9 @@ function turnPage(delta: number) {
   const next = page.value + delta;
   if (next < 0 || next > maxPage.value) return;
   page.value = next;
-  // 翻页先回到内容顶部：整页滚动的窗口里，用户此刻停在列表底部，不拉回去就看不到
-  // 新一页的头几条。scrollIntoView 会自己找最近的滚动容器（这里是窗口框架的 .frame-body）
-  bodyRef.value?.scrollIntoView({ behavior: "smooth", block: "start" });
+  // 翻页先回到列表开头：整页滚动的窗口里，用户此刻停在列表底部，不拉回去就看不到
+  // 新一页的头几条。已经在顶部时不滚，见 scrollToContentTop
+  scrollToContentTop(bodyRef.value);
   void search();
 }
 
