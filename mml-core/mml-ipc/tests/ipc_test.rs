@@ -71,20 +71,12 @@ fn read_frame(stream: &mut std::net::TcpStream) -> Vec<u8> {
         6 | 7 => read_bytes_into(stream, &mut frame, 5),
         // 鼠标滚轮(8): i32
         8 => read_bytes_into(stream, &mut frame, 4),
+        // 连接验证(12): 密钥(String)
+        12 => read_string_into(stream, &mut frame),
         // 其它类型没有消息体
         _ => {}
     }
     frame
-}
-
-/// 给游戏连接补上「连接验证」(12)，密钥取本进程 IPC 服务生成的密钥
-fn send_auth(stream: &mut std::net::TcpStream) {
-    let key = get_auth_key().expect("auth key should be generated");
-    let mut content = Vec::new();
-    content.extend_from_slice(&12i32.to_be_bytes());
-    content.extend_from_slice(&(key.len() as i32).to_be_bytes());
-    content.extend_from_slice(key.as_bytes());
-    write_frame(stream, &content);
 }
 
 /// 读取固定长度的消息体并追加到输出
@@ -139,7 +131,6 @@ fn test_channel_set_title() {
     let uuid = Uuid::new_v4();
 
     let mut stream = connect(port);
-    send_auth(&mut stream);
 
     // 发送 GAME_CHANNEL(9): uuid
     let mut content = Vec::new();
@@ -257,7 +248,6 @@ fn test_game_state_report() {
     let uuid = Uuid::new_v4();
 
     let mut stream = connect(port);
-    send_auth(&mut stream);
 
     // MOUSE_STATE(1): uuid + 状态(bool)
     let mut content = Vec::new();
@@ -317,7 +307,6 @@ fn test_send_input() {
     let uuid = Uuid::new_v4();
 
     let mut stream = connect(port);
-    send_auth(&mut stream);
 
     // 发送 GAME_CHANNEL(9): uuid
     let mut content = Vec::new();
@@ -368,51 +357,17 @@ fn test_send_input() {
     assert_eq!(body.get_i32(), -2);
 }
 
-/// 断言连接已被服务端关闭
-///
-/// - `stream`: 待检查的连接
-fn assert_closed(stream: &mut std::net::TcpStream) {
-    let mut one = [0u8; 1];
-    match stream.read(&mut one) {
-        Ok(0) => {}
-        Ok(n) => panic!("unexpected data before close: {n} bytes"),
-        Err(err) if err.kind() == std::io::ErrorKind::ConnectionReset => {}
-        Err(err) => panic!("connection was not closed: {err}"),
-    }
-}
-
-/// 没有发送「连接验证」就发游戏消息，连接应被直接断开
+/// 连接建立后启动器先发「连接验证」(12)，内容是本进程生成的密钥
 #[test]
-fn test_auth_required() {
+fn test_server_auth() {
     ensure_log();
     let port = ipc_port();
     let mut stream = connect(port);
 
-    let uuid = Uuid::new_v4();
-    let uuid_str = uuid.to_string();
-    let mut content = Vec::new();
-    content.extend_from_slice(&9i32.to_be_bytes());
-    content.extend_from_slice(&(uuid_str.len() as i32).to_be_bytes());
-    content.extend_from_slice(uuid_str.as_bytes());
-    write_frame(&mut stream, &content);
-
-    assert_closed(&mut stream);
-}
-
-/// 密钥错误时连接应被直接断开
-#[test]
-fn test_auth_wrong_key() {
-    ensure_log();
-    let port = ipc_port();
-    let mut stream = connect(port);
-
-    let mut content = Vec::new();
-    content.extend_from_slice(&12i32.to_be_bytes());
-    content.extend_from_slice(&5i32.to_be_bytes());
-    content.extend_from_slice(b"wrong");
-    write_frame(&mut stream, &content);
-
-    assert_closed(&mut stream);
+    let payload = read_frame(&mut stream);
+    let mut body = payload.as_slice();
+    assert_eq!(body.get_i32(), 12);
+    assert_eq!(read_string(&mut body), get_auth_key().unwrap());
 }
 
 /// 向未注册通道的游戏发送输入应返回 false，不依赖网络返回

@@ -628,6 +628,14 @@ pub struct ModPackUpdateDto {
     pub new_file: String,
     /// 新文件发布时间，ISO 8601 字符串
     pub date: String,
+    /// 实例名，确认窗里说明这次更新的是哪个实例
+    pub instance_name: String,
+    /// 本次会新增的文件数；只有在线服务器包算得出来，平台整合包为 0
+    pub added_files: u32,
+    /// 本次会删除的文件数；同上
+    pub removed_files: u32,
+    /// 本次内容有变化的文件数，含配置压缩包；同上
+    pub changed_files: u32,
 }
 
 /// 自动标记的进度，即事件 `resource-mods-auto-mark-progress` 的负载

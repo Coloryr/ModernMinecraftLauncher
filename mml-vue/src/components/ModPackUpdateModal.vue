@@ -1,8 +1,7 @@
 <script setup lang="ts">
-// 整合包更新的确认窗：把平台上查到的新版本摆出来，用户点了「立即更新」才开更新
+// 整合包 / 服务器包更新的确认窗：把更新信息摆出来，用户点了确认才开更新
 //
 // 入口在**实例设置**面板（InstanceMetaPanel），不在资源管理窗口 —— 升级动的是整个实例。
-//
 // 更新本身在后端跑（挂在共享的整合包任务表上），进度与取消在标题栏 / 整合包任务里，
 // 这里只负责"确认"这一步。
 import { computed } from "vue";
@@ -23,8 +22,13 @@ const emit = defineEmits<{
   (e: "update", fileId: string): void;
 }>();
 
-/** 这次更新的是在线服务器包：文案换成"同步"，也没有发布时间 */
+/** 这次更新的是在线服务器包：版本按"本地包版本 → 发布地址上的包版本"显示 */
 const serverPack = computed(() => props.result.source === "serverpack");
+
+/** 服务器包的清单差异有没有内容：三个计数全 0 时不显示那一行 */
+const changed = computed(
+  () => props.result.addedFiles + props.result.removedFiles + props.result.changedFiles > 0,
+);
 </script>
 
 <template>
@@ -33,13 +37,34 @@ const serverPack = computed(() => props.result.source === "serverpack");
     :closable="false"
     @close="emit('close')"
   >
-    <p class="pack-version">
-      {{ t("resource.modpackNewVersion", { version: props.result.newVersion || props.result.newFile }) }}
-    </p>
-    <p v-if="props.result.date" class="pack-date">{{ t("resource.modpackNewDate", { date: props.result.date }) }}</p>
-    <p class="pack-tip">
-      {{ t(serverPack ? "resource.serverPackUpdateTip" : "resource.modpackUpdateTip") }}
-    </p>
+    <p class="pack-line">{{ t("update.instance", { name: props.result.instanceName }) }}</p>
+    <template v-if="serverPack">
+      <p class="pack-version">
+        {{
+          t("update.serverPackVersion", {
+            from: props.result.fileId || "-",
+            to: props.result.newVersion || "-",
+          })
+        }}
+      </p>
+      <p v-if="changed" class="pack-changes">
+        {{
+          t("update.changes", {
+            added: props.result.addedFiles,
+            removed: props.result.removedFiles,
+            changed: props.result.changedFiles,
+          })
+        }}
+      </p>
+    </template>
+    <template v-else>
+      <p class="pack-version">
+        {{ t("resource.modpackNewVersion", { version: props.result.newVersion || props.result.newFile }) }}
+      </p>
+      <p v-if="props.result.date" class="pack-date">
+        {{ t("resource.modpackNewDate", { date: props.result.date }) }}
+      </p>
+    </template>
     <div class="modal-actions">
       <BaseButton @click="emit('close')">{{ t("resource.cancel") }}</BaseButton>
       <!-- 与模组更新弹窗、依赖图弹窗的确认按钮同一档（accent），别在同一个窗口里两套 -->
@@ -51,24 +76,32 @@ const serverPack = computed(() => props.result.source === "serverpack");
 </template>
 
 <style scoped>
-/* 版本号是主角，比下面的说明大一号 */
-.pack-version {
-  margin: 0 0 4px;
-  font-size: 13.5px;
+/* 三行信息：实例 / 版本 / 差异（平台包第二行是发布时间），从主到次 */
+.pack-line,
+.pack-version,
+.pack-date,
+.pack-changes {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.pack-line {
+  font-size: 12.5px;
   color: var(--text);
 }
 
-.pack-date {
-  margin: 0;
-  font-size: 12px;
+.pack-version {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.pack-date,
+.pack-changes {
+  font-size: 11.5px;
   color: var(--text-dim);
 }
 
-/* 更新范围的说明：与确认按钮之间留一段 */
-.pack-tip {
-  margin: 12px 0 0;
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: var(--text-dim);
+.pack-changes {
+  margin-top: 4px;
 }
 </style>

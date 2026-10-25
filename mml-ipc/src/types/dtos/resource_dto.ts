@@ -269,6 +269,10 @@ export type ModPackUpdateDto = {
   newVersion: string,
   newFile: string,
   date: string,
+  instanceName: string,
+  addedFiles: number,
+  removedFiles: number,
+  changedFiles: number,
 };
 
 export type ModAutoMarkProgressDto = {

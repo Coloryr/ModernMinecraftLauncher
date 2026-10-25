@@ -9,12 +9,14 @@
 //! （新版要求 1.21 之类），按实例现在的版本过滤会让这类升级永远查不出来。
 //! 因此取项目下发布时间最晚的那份文件，新版要求的游戏版本与加载器由内核升级时写回实例。
 
+use std::collections::HashMap;
+
 use mml_base::serialize_tools;
 use mml_game::GameInstance;
 use mml_game::gui_hook::AddModPackGui;
 use mml_game::launcher::ModPackType;
 use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
-use mml_game::serverpack::serverpack_obj::ServerPackObj;
+use mml_game::serverpack::serverpack_obj::{ServerItemObj, ServerPackObj};
 use mml_net::curseforge_api::{self, CurseFogreArg};
 use mml_net::modrinth_api;
 use tauri::AppHandle;
@@ -71,6 +73,11 @@ pub async fn resource_modpack_check(uuid: String) -> Result<ModPackUpdateDto, St
         new_version: latest.version,
         new_file: latest.file,
         date: latest.date,
+        instance_name: snapshot.name.clone(),
+        // 平台整合包的差异要下完新版才能算，这里给 0，界面也就不会显示这一行
+        added_files: 0,
+        removed_files: 0,
+        changed_files: 0,
     })
 }
 
@@ -177,6 +184,11 @@ async fn check_server_pack(game: &InstanceSettingObj) -> Result<ModPackUpdateDto
         // 本地没有清单，说明上次没同步成：按有新版处理，升一次就好了
         None => true,
     };
+    // 清单差异就是这次升级要做的事，确认窗里直接摆出来
+    let plan = match &local {
+        Some(local) => pack_diff(local, &remote),
+        None => PackDiff::default(),
+    };
 
     Ok(ModPackUpdateDto {
         has_update,
@@ -187,7 +199,79 @@ async fn check_server_pack(game: &InstanceSettingObj) -> Result<ModPackUpdateDto
         new_version: remote.pack_version,
         new_file: mml_names::names::SERVER_FILE.to_string(),
         date: String::new(),
+        instance_name: game.name.clone(),
+        added_files: plan.added,
+        removed_files: plan.removed,
+        changed_files: plan.changed,
     })
+}
+
+/// 两份清单的差异统计
+#[derive(Debug, Default)]
+struct PackDiff {
+    /// 新清单里多出来的文件与压缩包
+    added: u32,
+    /// 旧清单里有、新清单里没有的
+    removed: u32,
+    /// 路径没变但内容换了：按 SHA1 判断
+    changed: u32,
+}
+
+/// 统计两份清单的差异，路径都按游戏目录下的相对路径比
+///
+/// - `old`: 本地清单
+/// - `new`: 发布地址上的清单
+///
+/// # 返回值
+///
+/// 见 [`PackDiff`]
+fn pack_diff(old: &ServerPackObj, new: &ServerPackObj) -> PackDiff {
+    let mut diff = PackDiff::default();
+
+    let hash_of = |items: &[ServerItemObj]| -> HashMap<String, String> {
+        items
+            .iter()
+            .map(|item| (item.file.clone(), item.sha1.clone().unwrap_or_default()))
+            .collect()
+    };
+    let old_files = hash_of(&old.online_list);
+    let new_files = hash_of(&new.online_list);
+    for (file, sha1) in &new_files {
+        match old_files.get(file) {
+            None => diff.added += 1,
+            Some(old_sha1) if old_sha1 != sha1 => diff.changed += 1,
+            _ => {}
+        }
+    }
+    diff.removed += old_files
+        .keys()
+        .filter(|file| !new_files.contains_key(*file))
+        .count() as u32;
+
+    // 配置目录整包下发：包换了就算一次内容变化
+    let old_archives: HashMap<&str, &str> = old
+        .archive_list
+        .iter()
+        .map(|item| (item.file.as_str(), item.sha1.as_deref().unwrap_or_default()))
+        .collect();
+    let new_archives: HashMap<&str, &str> = new
+        .archive_list
+        .iter()
+        .map(|item| (item.file.as_str(), item.sha1.as_deref().unwrap_or_default()))
+        .collect();
+    for (file, sha1) in &new_archives {
+        match old_archives.get(file) {
+            None => diff.added += 1,
+            Some(old_sha1) if old_sha1 != sha1 => diff.changed += 1,
+            _ => {}
+        }
+    }
+    diff.removed += old_archives
+        .keys()
+        .filter(|file| !new_archives.contains_key(*file))
+        .count() as u32;
+
+    diff
 }
 
 /// 两份服务器包清单内容是否一致
