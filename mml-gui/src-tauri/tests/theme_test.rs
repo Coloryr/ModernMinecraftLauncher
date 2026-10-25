@@ -1,17 +1,19 @@
-//! 主题包判定与校验的用例
+//! 主题包判定与校验的集成测试
 //!
-//! 包样本都用 zip 写出来，覆盖三种类型、清单有无、目录兜底、各类坏包与限额；
-//! 临时目录统一走 test_support，落在 target/temp 下。
+//! 包样本都用 zip 写出来，覆盖三种类型、清单有无、目录兜底、各类坏包与限额。
+//! 判定与整包句柄是窗口模块的内部实现，经 `windows::test_api` 再导出取用；
+//! 临时目录落在仓库 target/temp 下，内核单例在本进程内只 boot 一次。
 
 use std::{
     io::Write,
     path::{Path, PathBuf},
+    sync::Once,
 };
 
-use super::*;
-use crate::err_keys;
-use crate::windows::web_assets::{
-    MAX_ARCHIVE_BYTES, MAX_ENTRIES, MAX_ENTRY_BYTES, MAX_TOTAL_BYTES, WebArchive, replace_atomic,
+use mml_gui_lib::err_keys;
+use mml_gui_lib::windows::test_api::{
+    MAX_ARCHIVE_BYTES, MAX_ENTRIES, MAX_ENTRY_BYTES, MAX_TOTAL_BYTES, ThemeKind, WebArchive,
+    detect_theme, meta_of_archive, replace_atomic,
 };
 
 /// zip 中央目录签名
@@ -47,10 +49,46 @@ fn folder(name: &str) -> Spec<'_> {
     }
 }
 
+/// 启动内核单例，进程内只执行一次
+///
+/// `mml_log` 的 `STREAM` 是 `OnceLock`，第二次 `start()` 会 panic，所以整份用例共用这一次。
+/// 集成测试与库里的单测编在不同进程，各自的 boot 互不影响。
+fn ensure_boot() {
+    static BOOT: Once = Once::new();
+    BOOT.call_once(|| {
+        let dir = mml_testutil::temp_path(format!("mml-gui-theme-boot-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        mml_base::init(&dir);
+        mml_names::init(&dir).unwrap();
+        mml_log::start(&dir).unwrap();
+    });
+}
+
+/// 一个干净的测试临时目录，建在 target/temp 下，按 tag 加随机名分开
+///
+/// - `tag`: 用例特征名，用来在临时目录里认出是谁的
+fn temp_dir(tag: &str) -> PathBuf {
+    let dir = mml_testutil::temp_path(format!("mml-gui-{tag}-{}", uuid::Uuid::new_v4()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+/// 用完清掉临时目录，用例失败时留着现场方便查
+///
+/// - `dirs`: 要删的目录列表，删不掉就忽略
+fn cleanup(dirs: &[&Path]) {
+    for dir in dirs {
+        let _ = std::fs::remove_dir_all(dir);
+    }
+}
+
 /// 建一个用例专用临时目录并启动内核单例
 fn case(tag: &str) -> PathBuf {
-    crate::test_support::ensure_boot();
-    crate::test_support::temp_dir(tag)
+    ensure_boot();
+    temp_dir(tag)
 }
 
 /// 按条目表写一个 zip
@@ -81,16 +119,38 @@ fn write_package(dir: &Path, file_name: &str, entries: &[Spec]) -> PathBuf {
     path
 }
 
-/// 写一个带 AES 加密条目的 zip
+/// 写一个标着"已加密"的 zip
+///
+/// 依赖里已经去掉 zip 的 AES 支持，这里改置通用标志的第 0 位：校验只看这个标志，
+/// 不需要真的加密数据。
 fn write_encrypted(dir: &Path, file_name: &str) -> PathBuf {
     let path = dir.join(file_name);
-    let handle = std::fs::File::create(&path).unwrap();
-    let mut writer = zip::ZipWriter::new(handle);
-    let options = zip::write::SimpleFileOptions::default()
-        .with_aes_encryption(zip::AesMode::Aes256, "secret");
-    writer.start_file("index.html", options).unwrap();
-    writer.write_all(b"<html></html>").unwrap();
-    writer.finish().unwrap();
+    {
+        let handle = std::fs::File::create(&path).unwrap();
+        let mut writer = zip::ZipWriter::new(handle);
+        writer
+            .start_file("index.html", zip::write::SimpleFileOptions::default())
+            .unwrap();
+        writer.write_all(b"<html></html>").unwrap();
+        writer.finish().unwrap();
+    }
+
+    // 本地文件头与中央目录各存一份标志位，条目的 encrypted() 读的是后者
+    let mut bytes = std::fs::read(&path).unwrap();
+    for (signature, offset) in [
+        (b"PK\x03\x04".as_slice(), 6usize),
+        (b"PK\x01\x02".as_slice(), 8usize),
+    ] {
+        let mut from = 0;
+        while let Some(pos) = bytes[from..]
+            .windows(signature.len())
+            .position(|window| window == signature)
+        {
+            bytes[from + pos + offset] |= 1;
+            from += pos + signature.len();
+        }
+    }
+    std::fs::write(&path, &bytes).unwrap();
     path
 }
 
@@ -154,7 +214,7 @@ fn home_accepts_entry_variants() {
         assert_eq!(info.kind, ThemeKind::Home);
         assert!(!info.declared);
     }
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -175,7 +235,7 @@ fn page_accepts_entry_variants() {
         assert_eq!(info.kind, ThemeKind::Page);
         assert!(!info.declared);
     }
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -203,7 +263,7 @@ fn css_accepts_entry_variants() {
     let info = detect_theme(&scripted, Some(ThemeKind::Css)).unwrap();
     assert_eq!(info.kind, ThemeKind::Css);
     assert!(info.declared);
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -227,7 +287,7 @@ fn unmarked_theme_package_rejected_as_css() {
         detect_theme(&component, Some(ThemeKind::Css)).unwrap_err(),
         err_keys::THEME_TYPE_UNKNOWN
     );
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -245,7 +305,7 @@ fn accepts_wrapped_directory() {
     );
     let info = detect_theme(&path, Some(ThemeKind::Home)).unwrap();
     assert_eq!(info.kind, ThemeKind::Home);
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -262,7 +322,7 @@ fn manifest_declares_type_and_metadata() {
     assert_eq!(info.name, "Coloryr 主页");
     assert_eq!(info.version, "1.0.0");
     assert!(info.declared);
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -281,7 +341,7 @@ fn manifest_in_wrapped_directory() {
     let info = detect_theme(&path, Some(ThemeKind::Css)).unwrap();
     assert_eq!(info.kind, ThemeKind::Css);
     assert!(info.declared);
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -301,7 +361,7 @@ fn legacy_package_uses_import_entry() {
         detect_theme(&path, None).unwrap_err(),
         err_keys::THEME_TYPE_UNKNOWN
     );
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -310,7 +370,7 @@ fn case_insensitive_entry_accepted() {
     let path = write_package(&dir, "case.zip", &[file("INDEX.HTML", b"x")]);
     let info = detect_theme(&path, Some(ThemeKind::Home)).unwrap();
     assert_eq!(info.kind, ThemeKind::Home);
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 // ================= 清单与入口错误 =================
@@ -339,7 +399,7 @@ fn manifest_type_mismatch_rejected() {
         detect_theme(&path, Some(ThemeKind::Page)).unwrap_err(),
         err_keys::THEME_TYPE_MISMATCH
     );
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -355,7 +415,7 @@ fn manifest_entry_missing() {
         detect_theme(&path, Some(ThemeKind::Home)).unwrap_err(),
         err_keys::THEME_MISSING_ENTRY
     );
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -380,7 +440,7 @@ fn manifest_invalid_rejected() {
             "manifest {index}"
         );
     }
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -400,7 +460,7 @@ fn manifest_too_large_rejected() {
         detect_theme(&path, Some(ThemeKind::Home)).unwrap_err(),
         err_keys::THEME_MANIFEST_INVALID
     );
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -419,7 +479,7 @@ fn css_only_package_rejected_by_home_and_page() {
         detect_theme(&path, None).unwrap().kind,
         ThemeKind::Css
     );
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -434,7 +494,7 @@ fn missing_entry_rejected() {
         detect_theme(&path, Some(ThemeKind::Css)).unwrap_err(),
         err_keys::THEME_MISSING_ENTRY
     );
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -445,7 +505,7 @@ fn directory_entry_is_not_an_entry() {
         detect_theme(&path, Some(ThemeKind::Home)).unwrap_err(),
         err_keys::THEME_MISSING_ENTRY
     );
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 // ================= 坏包 =================
@@ -481,7 +541,7 @@ fn non_zip_rejected() {
         detect_theme(&truncated, Some(ThemeKind::Home)).unwrap_err(),
         err_keys::THEME_ZIP_INVALID
     );
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -492,7 +552,7 @@ fn encrypted_entry_rejected() {
         detect_theme(&path, Some(ThemeKind::Home)).unwrap_err(),
         err_keys::THEME_ZIP_ENCRYPTED
     );
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -515,7 +575,7 @@ fn bad_entry_path_rejected() {
             "entry {name}"
         );
     }
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -527,7 +587,7 @@ fn invalid_utf8_entry_name_rejected() {
         detect_theme(&path, Some(ThemeKind::Home)).unwrap_err(),
         err_keys::THEME_ZIP_INVALID
     );
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -552,7 +612,7 @@ fn duplicate_entry_names_rejected() {
         detect_theme(&norm_dup, Some(ThemeKind::Home)).unwrap_err(),
         err_keys::THEME_ZIP_DUPLICATE
     );
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -575,7 +635,7 @@ fn unsupported_entry_type_rejected() {
             "mode {mode:o}"
         );
     }
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 // ================= 限额 =================
@@ -590,7 +650,7 @@ fn entry_count_limit() {
         detect_theme(&path, Some(ThemeKind::Home)).unwrap_err(),
         err_keys::PAGE_ARCHIVE_LIMIT
     );
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -602,7 +662,7 @@ fn entry_size_limit() {
         detect_theme(&path, Some(ThemeKind::Home)).unwrap_err(),
         err_keys::PAGE_ARCHIVE_LIMIT
     );
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -629,7 +689,7 @@ fn total_size_limit() {
         detect_theme(&path, Some(ThemeKind::Home)).unwrap_err(),
         err_keys::PAGE_ARCHIVE_LIMIT
     );
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -644,7 +704,7 @@ fn archive_size_limit() {
         detect_theme(&path, Some(ThemeKind::Home)).unwrap_err(),
         err_keys::PAGE_ARCHIVE_LIMIT
     );
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -656,7 +716,7 @@ fn compression_ratio_limit() {
         detect_theme(&path, Some(ThemeKind::Home)).unwrap_err(),
         err_keys::THEME_ZIP_RATIO
     );
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 // ================= 原子替换与状态读回 =================
@@ -679,7 +739,7 @@ fn replace_atomic_keeps_old_on_failure() {
     let archive = WebArchive::open(&target).unwrap();
     assert_eq!(archive.read("index.html").unwrap(), b"new".to_vec());
     assert!(!target.with_file_name("package.zip.tmp").exists());
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -689,7 +749,7 @@ fn opens_archive_without_extension() {
     let path = write_package(&dir, "home", &[file("index.html", b"x")]);
     let archive = WebArchive::open(&path).unwrap();
     assert_eq!(archive.read("index.html").unwrap(), b"x".to_vec());
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -706,7 +766,7 @@ fn replace_atomic_while_handle_is_open() {
     assert_eq!(held.read("index.html").unwrap(), b"old".to_vec());
     let reopened = WebArchive::open(&target).unwrap();
     assert_eq!(reopened.read("index.html").unwrap(), b"new".to_vec());
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }
 
 #[test]
@@ -731,5 +791,5 @@ fn meta_of_archive_prefers_manifest() {
     assert_eq!(meta.kind, ThemeKind::Page);
     assert!(meta.name.is_empty());
     assert!(!meta.declared);
-    crate::test_support::cleanup(&[&dir]);
+    cleanup(&[&dir]);
 }

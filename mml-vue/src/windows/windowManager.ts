@@ -617,7 +617,10 @@ export function projectParamToItem(p: WindowProjectParam): ProjectItemDto {
  * 实例 uuid；其余窗口为 null
  */
 function instanceArgOf(kind: WindowKind, params?: WindowOpenParams): string | null {
-  return FAMILY_LABEL_PREFIX[kind] || kind === "export" || kind === "server_pack"
+  return FAMILY_LABEL_PREFIX[kind] ||
+    kind === "export" ||
+    kind === "server_pack" ||
+    kind === "server_instance"
     ? (params?.uuid ?? null)
     : null;
 }

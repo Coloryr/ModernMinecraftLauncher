@@ -7,6 +7,7 @@ import { commands, type InstanceInfoDto, type LobbyViewDto } from "../../lib/bin
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
 import { isTauri, multiWindow, prepareLobby, releaseLobby } from "../windowManager";
+import { useInstanceChange } from "../../composables/useInstanceChange";
 
 defineEmits<{ (e: "close"): void }>();
 
@@ -118,6 +119,15 @@ async function copy(value: string) {
   try { await navigator.clipboard.writeText(value); showToast(t("account.copied")); }
   catch { showToast(t("account.copyFail")); }
 }
+
+/** 实例在别处被增删改：重拉下拉，删掉的那个自动取消选中 */
+async function syncInstanceList() {
+  const list = await commands.main.getInstances().catch(() => [] as InstanceInfoDto[]);
+  instances.value = list;
+  if (!list.some((item) => item.uuid === instance.value)) instance.value = "";
+}
+
+useInstanceChange(syncInstanceList);
 
 onMounted(activate);
 onActivated(activate);

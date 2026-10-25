@@ -52,6 +52,7 @@ export type InstMenuAction =
   | "viewLog"
   | "changeIcon"
   | "export"
+  | "serverInstance"
   | "copy"
   | "rename"
   | "moveGroup"

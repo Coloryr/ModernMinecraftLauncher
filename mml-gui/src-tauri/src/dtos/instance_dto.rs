@@ -43,6 +43,9 @@ pub struct InstanceInfoDto {
     pub source: Option<String>,
     /// 组内排列次序，来自分组表 `group_save.json` 的 `order`，升序
     pub order: i32,
+    /// 是否有操作占着这个实例：运行中、下载、扫描、导出、生成都算，期间不能删 / 改名
+    #[serde(default)]
+    pub busy: bool,
 }
 
 /// 分组条目

@@ -36,17 +36,42 @@ fn test_find_java_inner() {
     }
 }
 
+/// 读回剪贴板里的文本：直接用 Win32，测试不再依赖 clipboard-rs
+///
+/// # 返回值
+///
+/// 剪贴板里的文本；没有文本时 panic，测试里就是失败
+fn read_clipboard_text() -> String {
+    use windows::Win32::Foundation::HGLOBAL;
+    use windows::Win32::System::DataExchange::{CloseClipboard, GetClipboardData, OpenClipboard};
+    use windows::Win32::System::Memory::{GlobalLock, GlobalUnlock};
+
+    /// 文本格式，即 `CF_UNICODETEXT`
+    const CF_UNICODETEXT: u32 = 13;
+
+    unsafe {
+        OpenClipboard(None).expect("打开剪贴板");
+        let handle = GetClipboardData(CF_UNICODETEXT).expect("剪贴板里没有文本");
+        let memory = HGLOBAL(handle.0);
+        let ptr = GlobalLock(memory).cast::<u16>();
+        // 内容是以 0 结尾的 UTF-16
+        let mut len = 0usize;
+        while *ptr.add(len) != 0 {
+            len += 1;
+        }
+        let text = String::from_utf16_lossy(std::slice::from_raw_parts(ptr, len));
+        _ = GlobalUnlock(memory);
+        _ = CloseClipboard();
+        text
+    }
+}
+
 /// 剪贴板写入后可读回
 #[test]
 fn test_clipboard_copy_text() {
-    use clipboard_rs::Clipboard;
-
     let text = format!("mml 测试文本 {}", std::process::id());
     mml_sys::clipboard_helper::copy_text(&text);
-
-    let context = clipboard_rs::ClipboardContext::new().unwrap();
-    let got = context.get_text().unwrap();
-    assert_eq!(got, text);
+    assert_eq!(read_clipboard_text(), text);
 }
 
 /// 创建 .lnk 快捷方式

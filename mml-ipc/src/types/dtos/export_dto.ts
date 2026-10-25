@@ -7,6 +7,7 @@ export type ExportEntryDto = {
   url: string,
   modId: string | null,
   fileId: string | null,
+  sha1: string,
 };
 
 export type ExportInfoDto = {

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::LazyLock;
 
 use uuid::{Uuid};
-use super::uuids::{LOBBY_WINDOW_UUID, MAIN_WINDOW_UUID, ACCOUNT_WINDOW_UUID, SETTINGS_WINDOW_UUID, STATS_WINDOW_UUID, HELP_WINDOW_UUID, RESOURCE_WINDOW_UUID, ADD_WINDOW_UUID, DOWNLOAD_WINDOW_UUID, ADD_MODPACK_WINDOW_UUID, ADD_RESOURCE_WINDOW_UUID, COLLECT_WINDOW_UUID, BLOCK_WINDOW_UUID, JAVA_DOWNLOAD_WINDOW_UUID, LOG_WINDOW_UUID, EXPORT_WINDOW_UUID, CONFIG_WINDOW_UUID, SERVER_PACK_WINDOW_UUID, uuid_for_kind};
+use super::uuids::{LOBBY_WINDOW_UUID, MAIN_WINDOW_UUID, ACCOUNT_WINDOW_UUID, SETTINGS_WINDOW_UUID, STATS_WINDOW_UUID, HELP_WINDOW_UUID, RESOURCE_WINDOW_UUID, ADD_WINDOW_UUID, DOWNLOAD_WINDOW_UUID, ADD_MODPACK_WINDOW_UUID, ADD_RESOURCE_WINDOW_UUID, COLLECT_WINDOW_UUID, BLOCK_WINDOW_UUID, JAVA_DOWNLOAD_WINDOW_UUID, LOG_WINDOW_UUID, EXPORT_WINDOW_UUID, CONFIG_WINDOW_UUID, SERVER_PACK_WINDOW_UUID, SERVER_INSTANCE_WINDOW_UUID, uuid_for_kind};
 use super::family::{family_of_label, family_min_size};
 
 
@@ -98,6 +98,12 @@ pub(crate) const SERVER_PACK_MIN_WIDTH: f64 = 640.0;
 
 /// 服务器包导出窗口最小高度
 pub(crate) const SERVER_PACK_MIN_HEIGHT: f64 = 420.0;
+
+/// 服务器实例生成窗口最小宽度：模组页是一张六列表格，窄了要横向滚
+pub(crate) const SERVER_INSTANCE_MIN_WIDTH: f64 = 860.0;
+
+/// 服务器实例生成窗口最小高度
+pub(crate) const SERVER_INSTANCE_MIN_HEIGHT: f64 = 500.0;
 
 /// 方块列表窗口最小宽度，分类栏加网格；工具条上还有搜索框、图标尺寸档与两个按钮
 pub(crate) const BLOCK_MIN_WIDTH: f64 = 770.0;
@@ -258,6 +264,14 @@ pub(crate) static WINDOWS_INFO: LazyLock<HashMap<Uuid, WindowEntry>> = LazyLock:
                 label: "mml-server_pack",
                 min_width: SERVER_PACK_MIN_WIDTH,
                 min_height: SERVER_PACK_MIN_HEIGHT,
+            },
+        ),
+        (
+            SERVER_INSTANCE_WINDOW_UUID,
+            WindowEntry {
+                label: "mml-server_instance",
+                min_width: SERVER_INSTANCE_MIN_WIDTH,
+                min_height: SERVER_INSTANCE_MIN_HEIGHT,
             },
         ),
     ])

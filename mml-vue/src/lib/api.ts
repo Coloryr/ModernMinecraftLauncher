@@ -77,6 +77,9 @@ import type {
   SaveEditDto,
   SaveItemDto,
   ScreenshotItemDto,
+  ServerInstanceOptionsDto,
+  ServerInstanceProgressDto,
+  ServerInstanceResultDto,
   ServerItemDto,
   ShaderItemDto,
   SchematicDetailDto,
@@ -91,7 +94,7 @@ import type {
   GuiThemeDto,
   ViewMode,
 } from "./bindings";
-import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, CustomUiChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiThemeChange, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress, StartArg } from "./listens";
+import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, CustomUiChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiThemeChange, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress, ServerInstanceFocus, ServerInstanceProgress, StartArg } from "./listens";
 
 export interface CreateInstanceOpts {
   loader?: string;
@@ -1264,6 +1267,23 @@ export const api = {
   },
 
   /**
+   * 生成服务器实例，把清单与托管文件写进指定文件夹
+   *
+   * - `uuid`: 源实例 uuid
+   * - `options`: 生成选项，见 `ServerInstanceOptionsDto`
+   *
+   * # 返回值
+   *
+   * 生成结果，见 `ServerInstanceResultDto`；进度经 onServerInstanceProgress 上报
+   */
+  async generateServerInstance(
+    uuid: string,
+    options: ServerInstanceOptionsDto,
+  ): Promise<ServerInstanceResultDto> {
+    return commands.serverInstance.generate(uuid, options);
+  },
+
+  /**
    * 获取下载状态快照
    *
    * # 返回值
@@ -1582,6 +1602,36 @@ export function onExportProgress(
  */
 export function onExportFocus(cb: (uuid: string) => void): Promise<UnlistenFn> {
   return listen<LogFocusDto>(ExportFocus, (e) => cb(e.payload.uuid));
+}
+
+/**
+ * 服务器实例生成进度事件
+ *
+ * - `cb`: 进度回调，每处理一个文件一条
+ *
+ * # 返回值
+ *
+ * 取消监听的函数
+ */
+export function onServerInstanceProgress(
+  cb: (e: ServerInstanceProgressDto) => void,
+): Promise<UnlistenFn> {
+  return listen<ServerInstanceProgressDto>(ServerInstanceProgress, (e) => cb(e.payload));
+}
+
+/**
+ * 服务器实例窗口切换目标实例事件
+ *
+ * - `cb`: 收到新目标实例 uuid 时回调
+ *
+ * # 返回值
+ *
+ * 取消监听的函数
+ *
+ * 窗口已存在时再次打开，壳层推送新目标；新窗口的目标从 URL 参数取
+ */
+export function onServerInstanceFocus(cb: (uuid: string) => void): Promise<UnlistenFn> {
+  return listen<LogFocusDto>(ServerInstanceFocus, (e) => cb(e.payload.uuid));
 }
 
 /**

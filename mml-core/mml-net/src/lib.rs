@@ -52,6 +52,7 @@ pub mod adoptium_api;
 pub mod authlib_api;
 pub mod chunkbase_api;
 pub mod curseforge_api;
+mod html_scan;
 pub mod fabric_api;
 pub mod foojay_api;
 pub mod input_file;

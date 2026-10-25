@@ -8,6 +8,7 @@
 
 mod args;
 mod catalog;
+pub(crate) mod deleting;
 // 带命令的子模块必须 `pub(crate)`：生成的 `tauri_commands!` 从 crate 根引用它们
 pub(crate) mod instance;
 pub(crate) mod launch;

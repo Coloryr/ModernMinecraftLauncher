@@ -111,6 +111,22 @@
   （每个 `export type X = {...}` 归一化后按名字比），而不是看 diff 行数。
 - 磁盘配置的 JSON 键统一用**大驼峰**（如 `MainWindow` / `SelectedInstance`），
   跨 IPC 传输一律经 `src-tauri/src/dtos/` 转成 camelCase DTO。
+- **实例列表跨窗口同步走 `instance-change`**：实例的增删只发生在主窗口，其余窗口的下拉是打开时
+  拉的一份快照，"别的窗口删了、这里还留着"就会点出一个不存在的实例。凡是显示实例列表的窗口
+  （导出、生成服务器实例、设置、收藏、大厅、建筑渲染、下载资源……）都挂一行
+  `useInstanceChange(...)`（`src/composables/useInstanceChange.ts`）：事件来了重拉列表，
+  当前选中的实例没了就清空 / 回落到第一个，别只重拉列表、留着失效的选中项。
+  挂在实例名下的四类窗口由后端 `close_instance_windows` 直接关掉，不用再自己判断。
+- **删除的界面处理放在删除开始时**：挪回收站要几十秒，别等它跑完再更新列表 / 关窗口。
+  `main_delete_instance` 先用 `windows/main/deleting.rs` 的守卫标记、广播、关窗，再删文件；
+  列表命令据这个标记过滤（`main_get_instances`），删失败时撤销标记并再广播一次把实例放回来。
+  标记守卫**只能在释放锁之后构造**：它的 `Drop` 会去拿同一把锁，边持锁边丢就是自死锁。
+- **实例被占用时禁止删除 / 改名**：判据集中在 `windows/main/instance/group.rs` 的 `busy_of`
+  （运行中 / 下载 / 资源窗口操作 / 添加资源下载 / `windows/instance_task.rs` 的长任务），
+  `ensure_idle` 与实例列表 DTO 的 `busy` 都用它，别在别处另写一套判断。
+  导出、生成实例信息、生成服务器实例这类会整份读实例目录的命令，开头挂
+  `instance_task::begin(&uuid)?`（守卫活到任务结束），正在删除的实例也会被它拒绝。
+  `busy_of` 不锁实例本身：`main_get_instances` 是在持有实例读锁时调它的。
 
 ## 5. 目录分工
 

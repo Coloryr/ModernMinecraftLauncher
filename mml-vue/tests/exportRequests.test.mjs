@@ -88,14 +88,19 @@ test("实例信息在加载对话框模块前固定目标，不跟随后续切�
 
 function packFixture(save) {
   const calls = [], errors = [];
+  // 单实例导出：不是服务器包窗口，实例多选那几个引用短路不取
   const state = Object.fromEntries(Object.entries({ currentUuid: "a", preparing: false, loadingInfo: false, progress: null,
     pack: "modrinth", includeLauncher: false, packName: "A", author: "author", version: "1", summary: "summary",
-    packLabel: "Modrinth", fileExt: "mrpack", customLoaderLost: false, info: { name: "A", canBundleLauncher: true },
-    pickedMods: new Map([["mods/a.jar", {}]]), pickedFiles: new Map(), urls: new Map([["mods/a.jar", "https://example.invalid/a"]]),
+    packLabel: "Modrinth", fileExt: "mrpack", zipLevel: "normal", customLoaderLost: false,
+    info: { name: "A", canBundleLauncher: true },
+    pickedMods: new Map([["mods/a.jar", {}]]), pickedFiles: new Map(), unpickedFiles: new Set(),
+    urls: new Map([["mods/a.jar", "https://example.invalid/a"]]), modIds: new Map(),
+    serverPack: false, serverPicked: [], guiConfig: null,
   }).map(([key, value]) => [key, ref(value)]));
+  const serverOptions = { config: true, guiConfig: true, page: false, css: false, home: false };
   const busy = computed(() => state.preparing.value || state.progress.value?.state === "running");
-  const startExport = functions("windows/export/ExportWindow.vue", ["startExport", "picksOf"], {
-    ...state, busy, inTauri: true, dialogModule: Promise.resolve({ save }),
+  const startExport = functions("windows/export/ExportWindow.vue", ["startExport", "picksOf", "filePicks"], {
+    ...state, serverOptions, busy, inTauri: true, dialogModule: Promise.resolve({ save }), loadCustomAssets: async () => {},
     api: { runExport: async (...args) => calls.push(args) }, showToast: (e) => errors.push(e), t: (key) => key, tErr: String,
   });
   return { ...state, calls, errors, startExport };
@@ -116,7 +121,8 @@ test("实例包固定保存前的请求，并阻止双击打开第二个保存�
   assert.equal(options[0].defaultPath, "A.mrpack");
   assert.equal(state.calls[0][0], "a");
   assert.equal(state.calls[0][1].pack, "modrinth");
-  assert.deepEqual(state.calls[0][1].mods, [{ path: "mods/a.jar", url: "https://example.invalid/a" }]);
+  assert.deepEqual(state.calls[0][1].mods, [{ path: "mods/a.jar", url: "https://example.invalid/a", modId: null, fileId: null, exclude: false }]);
+  assert.deepEqual(state.calls[0][1].files, []);
   assert.equal(state.preparing.value, false);
 });
 

@@ -28,6 +28,7 @@ pub mod log;
 pub mod lobby;
 pub mod main;
 pub mod resource;
+pub(crate) mod server_instance;
 pub mod settings;
 pub mod stats;
 
@@ -39,6 +40,8 @@ pub mod stats;
 mod effects;
 mod export_file;
 mod geometry;
+// 实例上的长任务：导出 / 生成实例信息 / 生成服务器实例，删实例前要查
+pub(crate) mod instance_task;
 mod lifecycle;
 mod modpack_task;
 mod registry;
@@ -46,6 +49,19 @@ mod registry;
 mod web_assets;
 // 三种换皮包共用的类型判定与坏包校验，见 theme/mod.rs
 mod theme;
+
+/// 集成测试用的内部实现入口，只给 `tests/` 下的用例取用
+///
+/// 主题包判定与整包句柄都是窗口模块的内部实现，用例却编在另一个 crate 里
+/// （见 tests/theme_test.rs），只能经这里再导出。**不属于对外接口**，业务代码不要用。
+#[doc(hidden)]
+pub mod test_api {
+    pub use super::theme::{ThemeInfo, ThemeKind, detect_theme, meta_of_archive};
+    pub use super::web_assets::{
+        MAX_ARCHIVE_BYTES, MAX_ENTRIES, MAX_ENTRY_BYTES, MAX_TOTAL_BYTES, WebArchive,
+        replace_atomic,
+    };
+}
 
 // 打开着的 NBT 文件：句柄与解析结果留在会话里，配置窗口关了才放手。
 // `pub(crate)`：配置窗口的读 / 写命令与窗口销毁时的兜底清理都要用它
@@ -203,7 +219,7 @@ pub fn window_get_window_sizes() -> Vec<WindowSizeDto> {
 /// `query` 由前端 `windowManager` 组装 —— 目标窗口的实例与"要打开哪个项目"
 /// 的 `uuid` / `psource` / `ppid` … 都只能靠 URL 送达，而参数名在前端
 /// `PROJ_PARAMS` 里只有一份，读那边也用它，所以不在 Rust 侧另立一套。
-/// 传空 / 不传时退回下面按 kind 拼的老路子，只有窗口族、export 与 server_pack 带 uuid。
+/// 传空 / 不传时退回下面按 kind 拼的老路子，只有窗口族与导出 / 服务器包 / 服务器实例带 uuid。
 ///
 /// # 返回值
 ///
@@ -228,7 +244,7 @@ pub async fn window_open_window(
             }
             format!("index.html?{query}")
         }
-        // 只有窗口族与 export 能带 instance，上面校验过了；这里把实例写进 URL，
+        // 只有窗口族与导出 / 服务器包 / 服务器实例能带 instance，上面校验过了；这里把实例写进 URL，
         // 因为新窗口的实例身份只能靠 URL 送到前端
         None => match &instance {
             Some(instance) => format!("index.html?window={kind}&uuid={instance}"),
@@ -266,29 +282,30 @@ pub async fn window_open_window(
         return Err(error);
     }
     // 新创建的窗口靠 URL query 拿目标；已存在的窗口 URL 不变，靠事件切换
-    if let Some(instance) = &instance
-        && kind == "export"
-    {
-        export::emit_export_focus(
-            &app,
-            LogFocusDto {
-                uuid: instance.clone(),
-            },
-        );
+    if let Some(instance) = &instance {
+        let event = LogFocusDto {
+            uuid: instance.clone(),
+        };
+        match kind.as_str() {
+            "export" => export::emit_export_focus(&app, event),
+            "server_instance" => server_instance::emit_server_instance_focus(&app, event),
+            _ => {}
+        }
     }
     Ok(())
 }
 
 /// 打开 / 关闭窗口时的实例参数校验：kind 与 instance 要匹配
 ///
-/// - `kind`: 窗口类型，只有窗口族与 export 接受 instance
-/// - `instance`: 目标实例 UUID；窗口族、导出与服务器包之外传了即报错
+/// - `kind`: 窗口类型，只有窗口族与导出 / 服务器包 / 服务器实例接受 instance
+/// - `instance`: 目标实例 UUID；窗口族、导出、服务器包与服务器实例之外传了即报错
 ///
 /// # 返回值
 ///
 /// 校验不通过返回 `err_keys` 里的键：kind 不匹配为 `err.windowQuery`，非法 uuid 为 `err.uuid`
 fn kind_parse_check(kind: &str, instance: &Option<String>) -> Result<(), String> {
-    let accepts_instance = kind == "export" || kind == "server_pack" || family_of_kind(kind).is_some();
+    let accepts_instance = matches!(kind, "export" | "server_pack" | "server_instance")
+        || family_of_kind(kind).is_some();
     if !accepts_instance && instance.is_some() {
         return Err(err_keys::WINDOW_QUERY.to_string());
     }

@@ -24,6 +24,7 @@ use crate::{
     serverpack::serverpack_obj::{ServerArchiveItemObj, ServerItemObj, ServerPackObj},
 };
 
+pub mod generate;
 mod paths;
 pub mod plan;
 pub mod serverpack_obj;
@@ -31,11 +32,18 @@ pub mod serverpack_obj;
 impl InstanceSettingObj {
     /// 将服务器实例信息标记为旧版
     ///
+    /// 第一次同步时本地还没有清单，没有可搬的旧版，直接当成功处理：
+    /// 否则新玩家第一次启动必然卡在这里。
+    ///
     /// # 返回值
     ///
     /// 成功返回 `Ok(())`；移动失败返回对应错误
     pub fn move_serverpack_to_old(&self) -> CoreResult<()> {
-        path_helper::move_file(self.get_server_pack_file(), self.get_server_pack_old_file())
+        let file = self.get_server_pack_file();
+        if !file.exists() {
+            return Ok(());
+        }
+        path_helper::move_file(file, self.get_server_pack_old_file())
     }
 
     /// 读取旧版服务器实例信息

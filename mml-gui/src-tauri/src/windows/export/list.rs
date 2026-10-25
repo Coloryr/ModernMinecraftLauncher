@@ -132,6 +132,7 @@ pub(super) fn list_entries(
             url: info.map(|x| x.url.clone()).unwrap_or_default(),
             mod_id: info.map(|x| x.modid.clone()),
             file_id: info.map(|x| x.fileid.clone()),
+            sha1: info.map(|x| x.sha1.clone()).unwrap_or_default(),
         });
     }
 
@@ -149,6 +150,8 @@ pub(super) fn list_entries(
 #[gui_macros::ipc_group("export")]
 #[gui_macros::command]
 pub async fn export_get_info(uuid: String) -> Result<ExportInfoDto, String> {
+    // 这一趟要扫整个 mods 目录、给在线模组算哈希，跑完之前不许删实例
+    let _task = crate::windows::instance_task::begin(&uuid)?;
     tokio::task::spawn_blocking(move || {
         let game = instance_snapshot(&uuid)?;
         let online = online_of(&game);

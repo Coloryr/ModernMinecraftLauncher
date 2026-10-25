@@ -7,3 +7,12 @@ edition = "2024"
 wgpu.workspace = true
 pollster.workspace = true
 tiny-skia.workspace = true
+
+# Apple 上 metal 是唯一能给出适配器的后端，wgpu 的后端按 target 编译，
+# 这条不会给 Windows 产物增加 metal 代码；全 workspace 共用一份 wgpu，feature 会合并
+[target.'cfg(target_vendor = "apple")'.dependencies]
+wgpu = { workspace = true, features = ["metal"] }
+
+# Linux 上 VK 是首选后端，GL 只作兜底
+[target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
+wgpu = { workspace = true, features = ["vulkan"] }

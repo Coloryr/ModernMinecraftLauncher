@@ -22,6 +22,8 @@ pub struct ExportEntryDto {
     pub mod_id: Option<String>,
     /// 文件 ID，只有在线来源的模组才有
     pub file_id: Option<String>,
+    /// 实例记录的 SHA1；没有在线来源时是空串，服务器实例窗口的表格用它显示哈希值
+    pub sha1: String,
 }
 
 /// 实例导出信息，即 `export_get_info` 的返回值

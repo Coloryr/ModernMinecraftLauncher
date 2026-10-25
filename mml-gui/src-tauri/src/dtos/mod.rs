@@ -27,6 +27,7 @@ pub mod log_dto;
 pub mod main_dto;
 pub mod motd_dto;
 pub mod resource_dto;
+pub mod server_instance_dto;
 pub mod settings_dto;
 pub mod skin_dto;
 pub mod stats_dto;
@@ -73,6 +74,10 @@ pub use main_dto::{
     LaunchPrecheckDto, NewsItem, CustomJsonItemDto, StartArgDto, StateEvent, SystemMemoryDto,
 };
 pub use motd_dto::{MotdDto, MotdSegmentDto};
+pub use server_instance_dto::{
+    ServerInstanceConfigDto, ServerInstanceOptionsDto, ServerInstancePickDto,
+    ServerInstanceProgressDto, ServerInstanceResultDto,
+};
 pub use resource_dto::{
     DataPackItemDto, DepProblemDto, DepProblemKindDto, ModAutoMarkDto, ModAutoMarkProgressDto,
     ModDepEdgeDto, ModDepNodeDto, ModDepTreeDto, ModDuplicateDto, ModDuplicateFileDto, ModGroupDto,

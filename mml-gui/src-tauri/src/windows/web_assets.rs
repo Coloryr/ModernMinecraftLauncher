@@ -13,13 +13,13 @@ use tauri::UriSchemeResponder;
 use tauri::http::{Response, StatusCode};
 
 /// 单次导入允许的最大条目数，含目录条目
-pub(crate) const MAX_ENTRIES: usize = 4096;
+pub const MAX_ENTRIES: usize = 4096;
 /// 单个条目解压后的最大字节数
-pub(crate) const MAX_ENTRY_BYTES: u64 = 128 * 1024 * 1024;
+pub const MAX_ENTRY_BYTES: u64 = 128 * 1024 * 1024;
 /// 全部条目解压后的最大字节数
-pub(crate) const MAX_TOTAL_BYTES: u64 = 512 * 1024 * 1024;
+pub const MAX_TOTAL_BYTES: u64 = 512 * 1024 * 1024;
 /// 单个压缩包文件的最大字节数
-pub(crate) const MAX_ARCHIVE_BYTES: u64 = 256 * 1024 * 1024;
+pub const MAX_ARCHIVE_BYTES: u64 = 256 * 1024 * 1024;
 /// 单条目的最大压缩比，超过按 zip 炸弹拒绝
 pub(crate) const MAX_COMPRESSION_RATIO: u64 = 200;
 
@@ -39,7 +39,7 @@ pub(crate) const BRIDGE_TAG: &str = "<script src=\"/__mml_bridge.js\"></script>"
 ///
 /// `BaseArchive` 内部是 `Mutex<Box<dyn ArchiveHandle>>` 且 `Send + Sync`，
 /// 所以能常驻一份给协议 handler 反复按条目读；条目表只在打开时读一次。
-pub(crate) struct WebArchive {
+pub struct WebArchive {
     /// 条目索引：规范化后的名字 → 包内原始条目名，名字里的分隔符统一成正斜杠
     ///
     /// 单独建索引是因为 zip 里的名字可能用反斜杠，PowerShell 的 `Compress-Archive`
@@ -65,7 +65,7 @@ impl WebArchive {
     /// # 返回值
     ///
     /// 打开好的句柄；打不开时返回底层错误信息，超限时返回 `err.pageArchiveLimit`
-    pub(crate) fn open(path: &Path) -> Result<Self, String> {
+    pub fn open(path: &Path) -> Result<Self, String> {
         let archive =
             BaseArchive::open_readonly_as(path, ArchiveType::Zip).map_err(|err| err.to_string())?;
         let entries = archive.entries();
@@ -142,7 +142,7 @@ impl WebArchive {
     /// # 返回值
     ///
     /// 条目内容；条目不存在或解压失败返回 `None`
-    pub(crate) fn read(&self, name: &str) -> Option<Vec<u8>> {
+    pub fn read(&self, name: &str) -> Option<Vec<u8>> {
         let entry = self.entry_name(name)?;
         self.archive.read(entry).ok()
     }
@@ -435,7 +435,7 @@ pub(crate) fn inject_bridge(data: Vec<u8>, tag: &str) -> Vec<u8> {
 /// # 返回值
 ///
 /// 替换成功返回 `()`；复制或改名失败时返回 IO 错误信息
-pub(crate) fn replace_atomic(src: &Path, dst: &Path) -> Result<(), String> {
+pub fn replace_atomic(src: &Path, dst: &Path) -> Result<(), String> {
     if let Some(parent) = dst.parent() {
         std::fs::create_dir_all(parent).map_err(|err| err.to_string())?;
     }

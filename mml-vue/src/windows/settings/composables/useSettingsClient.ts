@@ -18,6 +18,7 @@ import {
 import { applyWindowAlpha, applyWindowMaterial } from "../../../lib/appearance";
 import { typeLabelKey } from "../../../lib/accountStore";
 import { useSaveState } from "./useSaveState";
+import { useInstanceChange } from "../../../composables/useInstanceChange";
 
 /** 登录方式锁定的候选（复用账户添加类型的文案） */
 const LOGIN_TYPES = ["offline", "microsoft", "littleskin", "selflittleskin", "authlib", "nide8"];
@@ -223,6 +224,9 @@ export function useSettingsClient() {
   async function refreshLockInstances() {
     lockInstances.value = await commands.main.getInstances().catch(() => []);
   }
+
+  // 实例在别的窗口里被增删改：锁定的下拉跟着变，删掉的那条不再出现
+  useInstanceChange(refreshLockInstances);
 
   /** 已保存的锁定 uuid 在实例列表里找不到（实例被删 / 改名）：下拉框额外补一条选中项 */
   const lockMissing = computed(

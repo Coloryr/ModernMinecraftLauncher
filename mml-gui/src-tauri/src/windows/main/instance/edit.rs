@@ -72,6 +72,8 @@ pub fn main_create_instance(
         source,
         // 新建的实例排到组末：给一个足够大的值，下次整组重编号时会被压回正常区间
         order: i32::MAX,
+        // 还没登记进内核，没有任务能占着它
+        busy: false,
     };
     let store = model(&window)?;
     let mut store = store.lock().unwrap();

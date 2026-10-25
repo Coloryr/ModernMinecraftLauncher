@@ -158,6 +158,25 @@ pub const EXPORT_RUNNING: &str = "err.exportRunning";
 /// 不支持的整合包类型
 pub const EXPORT_PACK_TYPE: &str = "err.exportPackType";
 
+// ---------- 服务器实例生成 ----------
+
+/// 生成格式不认识，只支持 mml 与 hmcl
+pub const SERVER_INSTANCE_FORMAT: &str = "err.serverInstanceFormat";
+/// 发布地址为空或不是 http(s) 地址
+pub const SERVER_INSTANCE_URL: &str = "err.serverInstanceUrl";
+/// 输出文件夹为空、创建失败或落在实例目录里
+pub const SERVER_INSTANCE_FOLDER: &str = "err.serverInstanceFolder";
+/// HMCL 表达不了这个加载器
+pub const SERVER_INSTANCE_LOADER: &str = "err.serverInstanceLoader";
+/// 实例里没有可同步的模组或配置
+pub const SERVER_INSTANCE_EMPTY: &str = "err.serverInstanceEmpty";
+/// 已有生成任务在跑
+pub const SERVER_INSTANCE_BUSY: &str = "err.serverInstanceBusy";
+/// 配置打包方式不认识，只支持 archive 与 files
+pub const SERVER_INSTANCE_MODE: &str = "err.serverInstanceMode";
+/// 配置目录或资源包文件不存在
+pub const SERVER_INSTANCE_DIR: &str = "err.serverInstanceDir";
+
 // ---------- 主题包 ----------
 
 /// 主题包声明的类型与导入入口不匹配

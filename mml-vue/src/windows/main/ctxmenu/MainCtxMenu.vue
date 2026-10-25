@@ -137,6 +137,9 @@ watchEffect(async () => {
       <button class="ctx-item" @click="emit('inst-action', 'export')">
         {{ t("actions.export") }}
       </button>
+      <button class="ctx-item" @click="emit('inst-action', 'serverInstance')">
+        {{ t("actions.serverInstance") }}
+      </button>
       <button class="ctx-item" @click="emit('inst-action', 'copy')">
         {{ t("actions.copyInstance") }}
       </button>

@@ -7,7 +7,7 @@ use mml_base::archives::BaseArchiveGui;
 
 use crate::{err_keys, log_text::LogText};
 
-pub(super) fn files_under(root: &Path) -> Result<Vec<PathBuf>, String> {
+pub(crate) fn files_under(root: &Path) -> Result<Vec<PathBuf>, String> {
     reject_link(root)?;
     let mut files = Vec::new();
     for entry in fs::read_dir(root).map_err(|e| e.to_string())? {
@@ -58,7 +58,7 @@ pub(super) fn check_destination(file: &Path, source: &Path) -> Result<(), String
 /// 单次读写的块大小；`io::copy` 的 8KB 在写压缩包时系统调用开销明显
 const COPY_BUF: usize = 256 * 1024;
 
-pub(super) fn write_zip(
+pub(crate) fn write_zip(
     file: &Path, files: &[(String, PathBuf)], data: &[(String, Vec<u8>)],
     gui: &BaseArchiveGui, cancel: &AtomicBool,
 ) -> Result<(), String> {

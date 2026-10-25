@@ -364,12 +364,12 @@ fn save_then_move_to_old_round_trip() {
     assert_eq!(read.online_list[0].file, "mods/a.jar");
 }
 
-/// 没有旧清单时 `move_serverpack_to_old` 会失败，源文件不存在
+/// 没有旧清单时 `move_serverpack_to_old` 是空操作
 ///
-/// 原实现直接 `path_helper::move_file`，没有"文件不存在就跳过"的分支；这里把现状钉住，
-/// 是否要容错由用户决定，未擅自改。
+/// 第一次同步时本地还没有 `server.json`，这里报错会让新玩家第一次启动必定失败；
+/// 已改成"文件不存在就跳过"。
 #[test]
-fn move_to_old_without_file_is_error() {
+fn move_to_old_without_file_is_ok() {
     let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     ensure_init();
 
@@ -381,6 +381,8 @@ fn move_to_old_without_file_is_error() {
     };
     std::fs::create_dir_all(instance.get_server_pack_file().parent().unwrap()).unwrap();
 
-    let res = instance.move_serverpack_to_old();
-    assert!(res.is_err(), "源文件不存在时应报错（现状）");
+    instance
+        .move_serverpack_to_old()
+        .expect("源文件不存在时应当作没有旧版");
+    assert!(!instance.get_server_pack_old_file().exists());
 }

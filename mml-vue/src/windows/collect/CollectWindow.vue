@@ -14,6 +14,7 @@ import SearchBox from "../../components/ui/SearchBox.vue";
 import HighlightText from "../../components/ui/HighlightText.vue";
 import DragGhost from "../../components/ui/DragGhost.vue";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
+import { useInstanceChange } from "../../composables/useInstanceChange";
 import { useCollectDrag } from "../../composables/useCollectDrag";
 import { api, onCollectChange } from "../../lib/api";
 import { loadGuiConfig, saveGuiConfig, type CollectConfig } from "../../lib/guiConfig";
@@ -261,6 +262,11 @@ function refresh() {
 
 // 单窗口模式：窗口被 KeepAlive 缓存，切回不会重新挂载 → 自己补一次
 useWindowRefresh(refresh);
+
+// 实例在别的窗口里被增删改：「安装到」下拉跟着变，删掉的那个不再列出来
+useInstanceChange(() => {
+  void loadInstances();
+});
 
 // ---------------- 窗口级键盘 ----------------
 

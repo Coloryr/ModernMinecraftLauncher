@@ -62,6 +62,10 @@ pub(crate) const LOBBY_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000
 /// 服务器包导出窗口固定 uuid
 pub(crate) const SERVER_PACK_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000013");
 
+/// 服务器实例生成窗口固定 uuid
+pub(crate) const SERVER_INSTANCE_WINDOW_UUID: Uuid =
+    uuid!("00000000-0000-0000-0000-000000000014");
+
 /// 前端窗口 kind → uuid，标签去 `mml-` 前缀匹配
 ///
 /// - `kind`: 窗口类型，即标签去掉 `mml-` 前缀后的那一段

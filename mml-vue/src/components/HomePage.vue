@@ -99,11 +99,11 @@ const emit = defineEmits<{
       <h2 class="empty-block-title">{{ t("empty.title") }}</h2>
       <p class="empty-block-desc">{{ t("empty.desc") }}</p>
       <div class="empty-block-actions">
-        <button class="empty-block-btn primary" @click="emit('add-instance')">
-          <GlyphIcon name="plus" :size="14" :weight="2.2" /> {{ t("empty.addInstance") }}
-        </button>
         <button class="empty-block-btn" @click="emit('add-account')">
           {{ t("empty.addAccount") }}
+        </button>
+        <button class="empty-block-btn primary" @click="emit('add-instance')">
+          <GlyphIcon name="plus" :size="14" :weight="2.2" /> {{ t("empty.addInstance") }}
         </button>
       </div>
     </div>

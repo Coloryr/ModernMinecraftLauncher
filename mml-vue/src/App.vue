@@ -69,6 +69,9 @@ const windowMap: Record<WindowKind, Component> = {
   config: defineAsyncComponent(() => import("./windows/config/ConfigWindow.vue")),
   // 服务器包导出与实例导出共用一套界面：同一个组件按 kind 锁成服务器包模式
   server_pack: defineAsyncComponent(() => import("./windows/export/ExportWindow.vue")),
+  server_instance: defineAsyncComponent(
+    () => import("./windows/server_instance/ServerInstanceWindow.vue"),
+  ),
 };
 
 const currentWindow = computed(() => windowMap[currentKind.value]);

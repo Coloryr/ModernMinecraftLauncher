@@ -154,6 +154,11 @@ pub async fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -
     } else {
         vec![uuid.clone()]
     };
+    // 导出期间这些实例都算被占用：整个过程都在读它们的模组与配置，删到一半会读到空目录
+    let tasks = uuids
+        .iter()
+        .map(|item| crate::windows::instance_task::begin(item))
+        .collect::<Result<Vec<_>, _>>()?;
     let games = uuids
         .iter()
         .map(|item| instance_snapshot(item))
@@ -235,6 +240,8 @@ pub async fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -
     // 同步命令跑在主线程上，没有 tokio reactor：必须借 tauri 的运行时
     tauri::async_runtime::spawn(async move {
         let _permit = permit;
+        // 守卫跟着后台任务活：导出结束时才把实例从"占用中"放出来
+        let _tasks = tasks;
         let res = if pack == ExportPackType::MML {
             let flag = cancel.clone();
             tokio::task::spawn_blocking(move || {

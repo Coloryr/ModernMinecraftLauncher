@@ -773,6 +773,10 @@ function onInstMenuAction(id: InstMenuAction) {
     case "export":
       openExportWindow();
       break;
+    case "serverInstance":
+      // 独立窗口：带目标实例，已开着时由壳层推送 server-instance-focus 换实例
+      if (target) openWindow("server_instance", { uuid: target.uuid });
+      break;
     case "copy":
       if (target) openCopy(target);
       break;
@@ -1048,6 +1052,15 @@ function onAction(id: ActionId) {
       showRename.value = true;
       break;
     case "delete":
+      // 运行中 / 有任务占着（下载、扫描、导出、生成）就不让删：后端也会拦，这里先把原因说清楚
+      if (selected.value.running) {
+        showToast(t("err.instanceRunning"));
+        break;
+      }
+      if (selected.value.busy) {
+        showToast(t("err.instanceBusy"));
+        break;
+      }
       showDelete.value = true;
       break;
     case "manageResource":

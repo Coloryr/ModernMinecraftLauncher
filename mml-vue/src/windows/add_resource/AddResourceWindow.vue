@@ -26,6 +26,7 @@ import { useCollectStars } from "../../lib/useCollectStars";
 import { showToast } from "../../lib/toast";
 import { useResourceStatus } from "../../lib/resourceTasks";
 import { familyInstanceFromLabel, projectParamToItem, targetProject, targetUuid, type WindowProjectParam } from "../windowManager";
+import { useInstanceChange } from "../../composables/useInstanceChange";
 import type {
   FileListItemDto,
   InstanceInfoDto,
@@ -620,6 +621,12 @@ onMounted(async () => {
   await refreshInstance();
   await loadSources();
   consumeTargetProject();
+});
+
+// 实例在别的窗口里被增删改：待选列表作废（下次点下载时重拉），标题栏的名字跟着刷新
+useInstanceChange(() => {
+  pickableInstances.value = [];
+  return refreshInstance();
 });
 
 /**

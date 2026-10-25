@@ -15,9 +15,6 @@
 
 mod archive;
 
-#[cfg(test)]
-mod tests;
-
 use std::path::Path;
 
 use serde::Deserialize;
@@ -40,7 +37,7 @@ const MAX_MANIFEST_BYTES: u64 = 64 * 1024;
 
 /// 主题包类型，决定要哪些入口文件
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ThemeKind {
+pub enum ThemeKind {
     /// 自定义主页面：只替换主窗口主页内容区
     Home,
     /// 自定义 CSS：多份，按条目启用
@@ -76,15 +73,15 @@ impl ThemeKind {
 /// declared 为 false 表示包里没有可用的清单，类型是按导入入口推断的，
 /// 设置页据此提示「未声明类型」。
 #[derive(Debug)]
-pub(crate) struct ThemeInfo {
+pub struct ThemeInfo {
     /// 实际类型
-    pub(crate) kind: ThemeKind,
+    pub kind: ThemeKind,
     /// 主题名，来自清单；没有清单时为空串
-    pub(crate) name: String,
+    pub name: String,
     /// 主题版本，来自清单；没有清单时为空串
-    pub(crate) version: String,
+    pub version: String,
     /// 是否由清单明确声明了类型
-    pub(crate) declared: bool,
+    pub declared: bool,
 }
 
 impl ThemeInfo {
@@ -136,7 +133,7 @@ struct Manifest {
 /// # 返回值
 ///
 /// 类型判定结果；zip 非法、路径越界、重名、入口缺失或与入口不匹配时返回对应错误键
-pub(crate) fn detect_theme(path: &Path, expected: Option<ThemeKind>) -> Result<ThemeInfo, String> {
+pub fn detect_theme(path: &Path, expected: Option<ThemeKind>) -> Result<ThemeInfo, String> {
     let mut archive = archive::Package::open(path)?;
 
     if let Some(manifest) = read_manifest(&mut archive)? {
@@ -204,7 +201,7 @@ pub(crate) fn detect_theme(path: &Path, expected: Option<ThemeKind>) -> Result<T
 ///
 /// - `archive`: 常驻包句柄
 /// - `fallback`: 没有可用清单时按导入入口推断的类型
-pub(crate) fn meta_of_archive(archive: &WebArchive, fallback: ThemeKind) -> ThemeInfo {
+pub fn meta_of_archive(archive: &WebArchive, fallback: ThemeKind) -> ThemeInfo {
     if let Some(manifest) = manifest_of_archive(archive)
         && let Some(kind) = ThemeKind::from_manifest(&manifest.kind)
         && manifest.api.is_none_or(|api| api == 1)

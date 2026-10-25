@@ -71,6 +71,8 @@ base64 = "~0.23.1"
 winreg = "~0.56.0"
 windows = { version = "~0.62.2", features = [
     "Win32_Foundation",
+    "Win32_System_DataExchange",
+    "Win32_System_Memory",
     "Win32_System_IO",
     "Win32_System_Pipes",
     "Win32_System_Threading",
@@ -82,16 +84,15 @@ windows = { version = "~0.62.2", features = [
     "Win32_System_Com",
     "Win32_UI_Shell_Common",
 ] }
-zip = { version = "~9.0.5", features = ["chrono"] }
+zip = { version = "~9.0.5", default-features = false, features = ["deflate-flate2", "chrono"] }
 tar = "~0.4.46"
-flate2 = "~1.1.10"
-sevenz-rust2 = "~0.20.2"
+flate2 = { version = "~1.1.10", default-features = false, features = ["rust_backend"] }
+sevenz-rust2 = { version = "~0.20.2", default-features = false, features = ["compress", "util"] }
 xz2 = { version = "~0.1.7", features = ["static"] }
 lz4_flex = "~0.14.0"
 rayon = "~1.12.0"
 sys-locale = "~0.3.2"
 regex = "~1.13.1"
-scraper = "~0.29.0"
 itertools = "~0.15.0"
 semka = "~2.0.7"
 soft-canonicalize = "~0.5.6"
@@ -111,13 +112,16 @@ clipboard-rs = "~0.3.5"
 dbus = "~0.9.12"
 bytes = "~1.12.1"
 tiny-skia = "~0.12.0"
-wgpu = "~30.0.1"
+wgpu = { version = "~30.0.1", default-features = false, features = [
+    "dx12",
+    "gles",
+    "wgsl",
+    "std",
+    "parking_lot",
+] }
 pollster = "~1.0.1"
 bytemuck = { version = "~1.25.2", features = ["derive"] }
-rquickjs = { version = "~0.14.0", default-features = false, features = [
-    "std",
-    "futures",
-] }
+
 tauri-plugin-dialog = "~2.7.3"
 window-vibrancy = "~0.8.1"
 font-kit = "~0.14.3"
@@ -130,8 +134,6 @@ image = { version = "~0.25.10", default-features = false, features = [
 ] }
 rfd = "~0.17.2"
 
-# dev 下也把压缩相关依赖优化掉：默认全不优化，导出 / 解包能慢一个数量级
-# 只点名这几个 crate，其余依赖照旧不优化，首次构建的额外耗时很小
 [profile.dev.package.miniz_oxide]
 opt-level = 3
 
@@ -144,7 +146,6 @@ opt-level = 3
 [profile.dev.package.crc32fast]
 opt-level = 3
 
-# 导出要给几百个模组算 SHA1 / SHA512：哈希在不优化时慢一两个数量级，dev 下也要开优化
 [profile.dev.package.sha1]
 opt-level = 3
 
@@ -154,8 +155,6 @@ opt-level = 3
 [profile.dev.package.digest]
 opt-level = 3
 
-# 正式发布：fat LTO + 单代码生成单元，体积最小、运行最快，但出包慢（单线程合并优化）
-# 命令：cargo build --release / npm run build:release
 [profile.release]
 codegen-units = 1
 lto = true
@@ -163,10 +162,8 @@ opt-level = 3
 panic = "abort"
 strip = true
 
-# 预发布：thin LTO + 并行代码生成，出包快很多，性能与此前基本一致（体积略大）
-# 命令：cargo build --profile prerelease / npm run build:pre
-# 注意：自定义 profile 有自己的产物子目录（target/prerelease），首次构建要重编全部依赖
 [profile.prerelease]
 inherits = "release"
 codegen-units = 16
 lto = "thin"
+

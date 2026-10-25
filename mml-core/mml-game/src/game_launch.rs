@@ -482,8 +482,10 @@ impl InstanceSettingObj {
         gui: LaunchGui,
         cancel: CancellationToken,
     ) -> CoreResult<()> {
+        // 只有"在线网络整合包"才按服务器包同步：界面上只有这一类会填服务器实例网址，
+        // 别的整合包带一个残留地址不该把启动卡在网络上
         if self.is_modpack
-            && self.modpack_type != ModPackType::ServerPack
+            && self.modpack_type == ModPackType::ServerPack
             && let Some(mut url) = self.server_url.clone()
         {
             if let Some(gui) = &gui {

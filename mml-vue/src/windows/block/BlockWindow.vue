@@ -13,6 +13,7 @@ import SkinAddModal from "./parts/SkinAddModal.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
+import { useInstanceChange } from "../../composables/useInstanceChange";
 import { t } from "../../lib/i18n";
 import { api, blockRenderCancel, onCloseBlocked } from "../../lib/api";
 import { loadGuiConfig } from "../../lib/guiConfig";
@@ -80,6 +81,9 @@ async function syncInstance() {
 
 // 单窗口模式：窗口被 KeepAlive 缓存，切回不会重新挂载 → 自己补一次
 useWindowRefresh(syncInstance);
+
+// 实例在别的窗口里被增删改：当前实例跟着重算，删掉的直接清空
+useInstanceChange(syncInstance);
 
 onUnmounted(() => unlisten?.());
 

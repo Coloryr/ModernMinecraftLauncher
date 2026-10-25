@@ -25,5 +25,7 @@ async function saveInfo() {
 </script>
 
 <template>
-  <BaseButton size="sm" :disabled="disabled || busy" @click="saveInfo">{{ t("winExport.generateInfo") }}</BaseButton>
+  <BaseButton size="sm" :disabled="disabled || busy" @click="saveInfo">
+    {{ busy ? t("winExport.generatingInfo") : t("winExport.generateInfo") }}
+  </BaseButton>
 </template>

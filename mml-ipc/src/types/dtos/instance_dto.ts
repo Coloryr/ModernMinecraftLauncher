@@ -20,6 +20,7 @@ export type InstanceInfoDto = {
   logEncoding: string | null,
   source: string | null,
   order: number,
+  busy: boolean,
 };
 
 export type GroupDto = {

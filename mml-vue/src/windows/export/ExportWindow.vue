@@ -25,6 +25,7 @@ import { api, onCloseBlocked, onExportFocus, onExportProgress } from "../../lib/
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { currentKind, isTauri, multiWindow, targetUuid, windowParams } from "../windowManager";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
+import { useInstanceChange } from "../../composables/useInstanceChange";
 import {
   commands,
   type CustomHomeInfoDto,
@@ -761,17 +762,23 @@ function applyTarget() {
   }
 }
 
-/** 重新拉实例列表并定位目标实例（首次挂载、切回本窗口都用） */
+/** 重新拉实例列表并定位目标实例（首次挂载、切回本窗口、实例被增删改都用） */
 async function syncInstances() {
   try {
     instances.value = await api.getInstances();
-    // 服务器包已经选过实例时不再按打开参数覆盖，避免切回窗口时把手动取消的实例又勾回来
-    if (!serverPack.value || !serverPicked.value.length) applyTarget();
-    // 服务器包多选：没有目标参数时默认带上第一个，表单才不会只剩一句提示
-    if (serverPack.value) syncServerPicked();
   } catch (e) {
     console.error("[ExportWindow] 初始化失败", e);
+    return;
   }
+  // 当前实例可能在别的窗口里被删掉了：先清空，下面再落到第一个
+  const lost = !!currentUuid.value && !instances.value.some((i) => i.uuid === currentUuid.value);
+  if (lost) currentUuid.value = "";
+  // 服务器包已经选过实例时不再按打开参数覆盖，避免切回窗口时把手动取消的实例又勾回来
+  if (!serverPack.value || !serverPicked.value.length) applyTarget();
+  // 服务器包多选：没有目标参数时默认带上第一个，表单才不会只剩一句提示
+  if (serverPack.value) syncServerPicked();
+  // 单个实例导出：被删的那个让位给第一个；一个都不剩就停在空态
+  else if (lost && !currentUuid.value && instances.value.length) focusInstance(instances.value[0].uuid);
 }
 
 // 单窗口模式：窗口被 KeepAlive 缓存，切回不会重新挂载，自己补一次列表与定位
@@ -782,6 +789,9 @@ useWindowRefresh(() => {
   if (serverPack.value) void loadCustomAssets();
   return syncInstances();
 });
+
+// 实例在别的窗口里被增删改（删掉的那个）→ 下拉与多选跟着变
+useInstanceChange(syncInstances);
 
 // 已经停在本窗口时又被打开：openWindow 只更新参数、不换组件，跟着参数换实例
 watch(() => windowParams.value.uuid, applyTarget);
