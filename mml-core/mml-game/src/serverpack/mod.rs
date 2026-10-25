@@ -3,6 +3,7 @@
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use mml_base::{
@@ -74,9 +75,6 @@ impl InstanceSettingObj {
 
     /// 执行升级操作
     ///
-    /// 对比旧版服务器包信息，删除已移除的文件，下载并解压新增的文件，
-    /// 最后保存新版本信息并清理旧文件。
-    ///
     /// - `new_pack`: 新版服务器包信息
     /// - `cancel`: 取消令牌
     ///
@@ -87,6 +85,27 @@ impl InstanceSettingObj {
         &self,
         new_pack: ServerPackObj,
         cancel: CancellationToken,
+    ) -> CoreResult<()> {
+        self.upgrade_serverpack_with(new_pack, cancel, None).await
+    }
+
+    /// 执行升级操作，并把下载进度报给调用方
+    ///
+    /// 与 [`upgrade_serverpack`](Self::upgrade_serverpack) 同一条链路，多一个进度回调：
+    /// 导入在线实例时要用它把"下了几个文件"推给界面，否则进度条会一直停在 0。
+    ///
+    /// - `new_pack`: 新版服务器包信息
+    /// - `cancel`: 取消令牌
+    /// - `progress`: 进度回调，参数是已完成数与总数，单位个；`None` 表示不关心
+    ///
+    /// # 返回值
+    ///
+    /// 成功返回 `Ok(())`；下载 / 解压失败或被取消返回对应错误
+    pub async fn upgrade_serverpack_with(
+        &self,
+        new_pack: ServerPackObj,
+        cancel: CancellationToken,
+        progress: Option<ServerPackProgress<'_>>,
     ) -> CoreResult<()> {
         let old = self.get_old_serverpack()?;
 
@@ -158,9 +177,7 @@ impl InstanceSettingObj {
             archives.push((planned.item, temp));
         }
 
-        if !downloads.is_empty() && !mml_downloader::start_download_task(downloads).await {
-            return Err(ErrorType::DownloadFileFail);
-        }
+        download_all(downloads, &cancel, progress).await?;
 
         for (item, temp) in archives.iter() {
             if cancel.is_cancelled() {
@@ -191,6 +208,66 @@ impl InstanceSettingObj {
 
         Ok(())
     }
+}
+
+/// 服务器包同步的进度回调：已完成数与总数，单位个
+pub type ServerPackProgress<'a> = &'a (dyn Fn(usize, usize) + Sync);
+
+/// 下载服务器包里的文件
+///
+/// 整批交给下载器：下载窗口里的**那一个任务**就是这次同步，进度也从同一处取
+/// （[`mml_downloader::get_tasks`]），不把一次同步拆成一串小任务。
+///
+/// - `downloads`: 要下的文件
+/// - `cancel`: 取消令牌
+/// - `progress`: 进度回调；`Some` 时每 200ms 把任务表里的完成数报一次
+///
+/// # 返回值
+///
+/// 全部下完返回 `Ok(())`；被取消返回 `TaskCancel`，有文件失败返回 `DownloadFileFail`
+async fn download_all(
+    downloads: Vec<FileItemObj>,
+    cancel: &CancellationToken,
+    progress: Option<ServerPackProgress<'_>>,
+) -> CoreResult<()> {
+    if downloads.is_empty() {
+        return Ok(());
+    }
+    let total = downloads.len();
+
+    let Some(report) = progress else {
+        if !mml_downloader::start_download_task(downloads).await {
+            return Err(ErrorType::DownloadFileFail);
+        }
+        return Ok(());
+    };
+
+    report(0, total);
+    let Some(handle) = mml_downloader::start_download_task_handle(downloads, cancel.clone()) else {
+        return Err(ErrorType::DownloadFileFail);
+    };
+    let done = handle.wait();
+    tokio::pin!(done);
+
+    let outcome = loop {
+        tokio::select! {
+            outcome = &mut done => break outcome,
+            _ = tokio::time::sleep(Duration::from_millis(200)) => {
+                let status = handle.status();
+                report(status.completed, status.total);
+            }
+        }
+    };
+
+    if !outcome.is_done() {
+        return Err(if outcome.is_cancelled() {
+            ErrorType::TaskCancel
+        } else {
+            ErrorType::DownloadFileFail
+        });
+    }
+    report(total, total);
+    Ok(())
 }
 
 /// 删除文件；若文件已被禁用，即追加了 `.disable`/`.disabled` 后缀，则一并删除

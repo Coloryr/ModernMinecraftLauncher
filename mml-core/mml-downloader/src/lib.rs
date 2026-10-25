@@ -357,21 +357,7 @@ pub struct TaskSnapshot {
 /// 返回队列中每个任务的进度快照，无进行中任务时为空列表
 pub fn get_tasks() -> Vec<TaskSnapshot> {
     let read = TASKS.read().unwrap();
-    read.iter()
-        .map(|t| {
-            let bytes = t.bytes();
-            TaskSnapshot {
-                id: t.id,
-                total: t.total_size,
-                completed: t.completed_count.load(Ordering::SeqCst),
-                failed: t.failed_count.load(Ordering::SeqCst),
-                all_bytes: bytes.all_bytes,
-                now_bytes: bytes.now_bytes,
-                elapsed_ms: t.elapsed_ms(),
-                paused: t.is_paused(),
-            }
-        })
-        .collect()
+    read.iter().map(|t| t.snapshot()).collect()
 }
 
 /// 是否有下载任务的文件正落在某个目录下
@@ -549,27 +535,29 @@ pub async fn start_download_task_cancellable(
     items: Vec<FileItemObj>,
     cancel: CancellationToken,
 ) -> TaskOutcome {
-    start_download_task_reporting(items, cancel, |_| {}).await
+    match start_download_task_handle(items, cancel) {
+        Some(handle) => handle.wait().await,
+        None => TaskOutcome::Cancelled,
+    }
 }
 
-/// 创建新下载任务并开始下载，同时把任务编号交出去
+/// 创建新下载任务并返回句柄
 ///
-/// 调用方拿这个编号去 [`get_tasks`] 里盯完成数，用于在别处同步下载进度。
+/// 句柄拿到时任务已经在队列里，可以立刻查进度；之后查状态、等结果、取消都走它，
+/// 不用再去 [`get_tasks`] 里按编号找。
 ///
 /// - `items`: 需要下载的文件列表
-/// - `cancel`: 外部取消令牌
-/// - `on_start`: 任务入队、开始下载之前回调一次，参数是任务编号
+/// - `cancel`: 外部取消令牌，与 [`DownloadHandle::cancel`] 是同一批任务的两个叫停入口
 ///
 /// # 返回值
 ///
-/// 见 [`TaskOutcome`]；取消后任务会被移出队列
-pub async fn start_download_task_reporting(
+/// 见 [`DownloadHandle`]；下载器已停止（进程正在退出）时返回 `None`
+pub fn start_download_task_handle(
     items: Vec<FileItemObj>,
     cancel: CancellationToken,
-    on_start: impl FnOnce(u64),
-) -> TaskOutcome {
+) -> Option<DownloadHandle> {
     if STOP.load(Ordering::SeqCst) {
-        return TaskOutcome::Cancelled;
+        return None;
     }
     let task = DownloadTask::new(items);
     // 全局暂停期间新增的任务同样保持暂停
@@ -577,29 +565,87 @@ pub async fn start_download_task_reporting(
         task.pause();
     }
     let task = Arc::new(task);
-    let task_handel = task.clone();
     let id = task.id;
 
-    TASKS.write().unwrap().push(task);
+    TASKS.write().unwrap().push(task.clone());
 
     add_task(id);
-    // 入队之后再交编号：调用方拿去 [`get_tasks`] 查进度时任务一定已经在列表里
-    on_start(id);
 
     // 唤醒所有工作线程
     for item in THREADS.read().unwrap().iter() {
         item.run();
     }
 
-    tokio::select! {
-        res = task_handel.wait_done() => res,
-        _ = cancel.cancelled() => {
-            // 与 cancel_task 相同：移出队列并唤醒完成等待
-            TASKS.write().unwrap().retain(|t| t.id != id);
-            task_handel.cancel();
-            task_done(&task_handel);
-            TaskOutcome::Cancelled
+    Some(DownloadHandle { id, task, cancel })
+}
+
+/// 下载任务句柄
+///
+/// 一批文件一个句柄：进度看 [`status`](Self::status)，结果用 [`wait`](Self::wait)，
+/// 中途叫停用 [`cancel`](Self::cancel)。
+pub struct DownloadHandle {
+    /// 任务编号，与 [`get_tasks`] 里的编号一致
+    id: u64,
+    /// 任务本体：进度与完成信号都在它身上
+    task: Arc<DownloadTask>,
+    /// 外部取消令牌：调用方那一侧的叫停入口
+    cancel: CancellationToken,
+}
+
+impl DownloadHandle {
+    /// 任务编号
+    ///
+    /// # 返回值
+    ///
+    /// 与 [`get_tasks`] / [`cancel_task`] 同一套编号
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+
+    /// 任务当前状态
+    ///
+    /// # 返回值
+    ///
+    /// 见 [`TaskSnapshot`]；任务结束后仍可读到最后一组计数
+    pub fn status(&self) -> TaskSnapshot {
+        self.task.snapshot()
+    }
+
+    /// 任务是否已经结束
+    ///
+    /// # 返回值
+    ///
+    /// 任务已从任务表里摘掉（下完 / 失败 / 取消）时返回 `true`
+    pub fn is_finished(&self) -> bool {
+        let tasks = TASKS.read().unwrap();
+        !tasks.iter().any(|task| task.id == self.id)
+    }
+
+    /// 等任务结束并取结果
+    ///
+    /// 外部取消令牌置位时与 [`cancel_task`] 同一套收尾：移出队列、唤醒等待方。
+    ///
+    /// # 返回值
+    ///
+    /// 见 [`TaskOutcome`]
+    pub async fn wait(&self) -> TaskOutcome {
+        tokio::select! {
+            res = self.task.wait_done() => res,
+            _ = self.cancel.cancelled() => {
+                // 与 cancel_task 相同：移出队列并唤醒完成等待
+                TASKS.write().unwrap().retain(|task| task.id != self.id);
+                self.task.cancel();
+                task_done(&self.task);
+                TaskOutcome::Cancelled
+            }
         }
+    }
+
+    /// 取消任务
+    ///
+    /// 与 [`cancel_task`] 同一套收尾：移出队列并唤醒 [`wait`](Self::wait)。
+    pub fn cancel(&self) {
+        let _ = cancel_task(self.id);
     }
 }
 

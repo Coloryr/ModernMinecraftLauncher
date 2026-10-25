@@ -1002,15 +1002,36 @@ async function multiLaunch() {
   if (launched) showToast(t("multi.launched", { count: launched }));
 }
 
-// 点击空白处关闭菜单；Esc 依次关闭菜单 / 退出多选
+// 点击空白处关闭菜单；Esc 依次关闭菜单 / 退出多选；Ctrl+A 全选当前列表
 function onDocClick() {
   if (ctxMenu.value) closeCtxMenu();
 }
 
+/** 这一下是不是"全选"：Ctrl+A / Cmd+A；带 Shift / Alt 的组合不算 */
+function isSelectAllKey(e: KeyboardEvent): boolean {
+  if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return false;
+  return e.key.toLowerCase() === "a";
+}
+
 function onDocKeyDown(e: KeyboardEvent) {
-  if (e.key !== "Escape") return;
-  if (ctxMenu.value) closeCtxMenu();
-  else if (multiSelect.value) exitMultiSelect();
+  if (e.key === "Escape") {
+    if (ctxMenu.value) closeCtxMenu();
+    else if (multiSelect.value) exitMultiSelect();
+    return;
+  }
+  if (!isSelectAllKey(e)) return;
+  // 主页新闻与列表模式里没有"一排实例"可选，Ctrl+A 仍归页面自己的文字选择
+  if (newsActive.value || mode.value === "list") return;
+  // 光标在输入框 / 可编辑区里，或者有弹窗挡着：全选归它们自己
+  const target = e.target as HTMLElement | null;
+  if (target?.closest("input, textarea, [contenteditable], .monaco-editor")) return;
+  if (document.querySelector(".modal-mask")) return;
+  const ids = filteredInstances.value.map((inst) => inst.uuid);
+  if (!ids.length) return;
+  e.preventDefault();
+  closeCtxMenu();
+  enterMultiSelect(ids);
+  showToast(t("multi.selectAllDone", { count: ids.length }));
 }
 
 /** 刷新实例列表并选中给定实例；添加 / 整合包安装完成后调用 */

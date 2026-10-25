@@ -23,3 +23,13 @@ pub struct BuildInfoDto {
     /// 构建通道，决定主页面是否提示"测试版 / 预发布版"
     pub channel: BuildChannel,
 }
+
+/// 启动器可执行文件
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExeInfoDto {
+    /// 可执行文件绝对路径
+    pub path: String,
+    /// 文件内容的 SHA1，小写十六进制，40 位
+    pub sha1: String,
+}

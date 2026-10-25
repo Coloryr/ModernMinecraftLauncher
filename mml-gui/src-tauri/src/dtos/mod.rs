@@ -36,11 +36,11 @@ pub mod version_dto;
 pub mod window_dto;
 
 pub use account_dto::{AccountStoreDto, AccountStoreViewDto};
-pub use build_info_dto::{BuildChannel, BuildInfoDto};
+pub use build_info_dto::{BuildChannel, BuildInfoDto, ExeInfoDto};
 pub use analysis_dto::{CrashAnalysisDto, CrashFindingDto};
 pub use add_dto::{
     DetectedPackDto, DirEntry, FolderInstanceDto, LoaderProgressDto, NameConflictDto,
-    PackProgressDto,
+    PackProgressDto, ServerPackProbeDto,
 };
 pub use add_modpack_dto::{ModPackStatusDto, ModPackTaskDto};
 pub use add_resource_dto::{

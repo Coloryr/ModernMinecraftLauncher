@@ -1,12 +1,18 @@
 <script setup lang="ts">
-// 帮助窗口：FAQ 手风琴 + 开源许可 + 问题反馈提示，文案取当前语言的 locale 包
+// 帮助窗口：启动器信息 + FAQ 手风琴 + 开源许可 + 第三方服务 + 问题反馈提示，
+// 文案取当前语言的 locale 包
 //
+// 启动器信息里的 exe SHA1 是打开窗口时现读可执行文件算出来的，见 src-tauri/src/build_info.rs。
 // 开源许可只给**上游地址**：许可全文不随安装包分发，点按钮由系统浏览器打开
 // （见 ./thirdParty.ts 的说明）。
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
-import { t, locale } from "../../lib/i18n";
+import { t, tErr, locale } from "../../lib/i18n";
 import { api } from "../../lib/api";
+import { commands } from "../../lib/bindings";
+import { appVersion, buildBadgeKey, buildChannel, isTestBuild, loadBuildInfo } from "../../lib/buildInfo";
+// 与 src-tauri/icons 那套是同一个源（design/icon/f-blend.svg）；换图标时两处一起换
+import appIcon from "../../assets/app-icon.svg";
 import { faqs as zhFaqs } from "../../lib/i18n/locales/zh-CN";
 import { faqs as enFaqs } from "../../lib/i18n/locales/en-US";
 import {
@@ -27,6 +33,35 @@ import {
 // 第二遍时 currentKind 已经回到 main，于是"返回"变成退出应用
 /** 请求关闭本窗口 */
 defineEmits<{ (e: "close"): void }>();
+
+// ---------------- 启动器信息 ----------------
+
+/** 当前 exe 的 SHA1，小写十六进制；还没算完时为空串 */
+const exeSha1 = ref("");
+/** exe 的绝对路径，挂在 SHA1 上的悬浮提示 */
+const exePath = ref("");
+/** 读 exe 失败时的原因 */
+const exeError = ref("");
+/** exe 信息读取中：哈希要读完整份 exe，先显示「读取中」 */
+const exeLoading = ref(true);
+
+/** 读启动器 exe 的路径与 SHA1；失败只把原因写在这一栏，不影响帮助内容 */
+async function loadExeInfo() {
+  try {
+    const info = await commands.buildInfo.exeInfo();
+    exeSha1.value = info.sha1;
+    exePath.value = info.path;
+  } catch (e) {
+    exeError.value = tErr(e);
+  } finally {
+    exeLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  void loadBuildInfo();
+  void loadExeInfo();
+});
 
 const faqs = computed(() => (locale.value === "en_us" ? enFaqs : zhFaqs));
 
@@ -94,6 +129,36 @@ function openUrl(url: string) {
 
 <template>
   <WindowFrame :title="t('features.help')" body-gutter @close="$emit('close')">
+    <!-- 启动器信息：图标、名称、版本、作者与这份 exe 的 SHA1，放在 FAQ 之前 -->
+    <section class="about">
+      <img class="about-icon" :src="appIcon" alt="" />
+      <div class="about-body">
+        <div class="about-title">
+          {{ t("app.name") }}
+          <span v-if="isTestBuild" class="about-badge" :class="`is-${buildChannel}`">
+            {{ t(buildBadgeKey) }}
+          </span>
+        </div>
+        <p class="about-sub">{{ t("app.sub") }}</p>
+        <div class="about-row">
+          <span class="about-label">{{ t("winHelp.version") }}</span>
+          <span class="about-value">{{ appVersion || "—" }}</span>
+        </div>
+        <div class="about-row">
+          <span class="about-label">{{ t("winHelp.author") }}</span>
+          <span class="about-value">{{ t("winHelp.authorName") }}</span>
+        </div>
+        <div class="about-row">
+          <span class="about-label">{{ t("winHelp.exeSha1") }}</span>
+          <code class="about-sha1" :class="{ 'is-error': !!exeError }" :title="exePath">
+            <template v-if="exeSha1">{{ exeSha1 }}</template>
+            <template v-else-if="exeLoading">{{ t("winHelp.sha1Reading") }}</template>
+            <template v-else>{{ exeError || "—" }}</template>
+          </code>
+        </div>
+      </div>
+    </section>
+
     <div class="help-list">
       <div v-for="(item, i) in faqs" :key="i" class="faq-item">
         <button class="faq-q" @click="toggle(i)">
@@ -182,6 +247,94 @@ function openUrl(url: string) {
 </template>
 
 <style scoped>
+/* ---------- 启动器信息 ---------- */
+
+.about {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 16px 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.about-icon {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 12px;
+}
+
+.about-body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.about-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* 构建通道徽章：与顶栏那一枚同口径，测试版用强调色、预发布版用黄色 */
+.about-badge {
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.about-badge.is-debug {
+  color: var(--accent);
+}
+
+.about-badge.is-prerelease {
+  color: var(--yellow);
+}
+
+.about-sub {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.about-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.about-label {
+  flex-shrink: 0;
+  min-width: 84px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.about-value {
+  color: var(--text);
+}
+
+/* SHA1 有 40 位：窄窗口下任意位置折行，别把内容区撑出横向滚动 */
+.about-sha1 {
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.about-sha1.is-error {
+  color: var(--red);
+}
+
 .help-list {
   display: flex;
   flex-direction: column;

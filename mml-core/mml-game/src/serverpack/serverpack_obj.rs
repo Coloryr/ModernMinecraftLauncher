@@ -15,6 +15,9 @@ pub struct ServerPackObj {
     /// 实例名
     #[serde(rename = "Name")]
     pub name: String,
+    /// 图标文件名，相对发布目录，如 `icon.png`；没有图标时为空
+    #[serde(rename = "Icon")]
+    pub icon: Option<String>,
     /// 游戏版本
     #[serde(rename = "Version")]
     pub version: String,

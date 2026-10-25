@@ -52,6 +52,31 @@ pub struct DetectedPackDto {
     pub name: String,
 }
 
+
+/// 在线实例清单摘要，`add_probe_server_pack` 的返回结构
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerPackProbeDto {
+    /// 实际读取的清单地址，已补上 `server.json`
+    pub url: String,
+    /// 清单里的实例名
+    pub name: String,
+    /// 游戏版本
+    pub version: String,
+    /// 加载器 ID，如 `neoforge`
+    pub loader: String,
+    /// 加载器版本，没有时为空
+    pub loader_version: Option<String>,
+    /// 包版本
+    pub pack_version: String,
+    /// 说明文本
+    pub text: String,
+    /// 清单里的模组条目数
+    pub file_count: u64,
+    /// 清单里的配置压缩包数
+    pub archive_count: u64,
+}
+
 /// 整合包安装进度，state 取值：downloadPack / readInfo / getInfo / downloadFile / extract / done
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]

@@ -58,6 +58,8 @@ pub fn build_server_pack(
     archive_list: Vec<ServerArchiveItemObj>,
 ) -> ServerPackObj {
     ServerPackObj {
+        // 图标由调用方按实际文件补，见 server_instance 的 generate_mml
+        icon: None,
         name: name.to_string(),
         version: game.version.clone(),
         loader: game.loader,

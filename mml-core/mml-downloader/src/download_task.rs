@@ -18,6 +18,7 @@ use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
 
 use crate::download_item::DownloadItem;
+use crate::TaskSnapshot;
 
 /// 下载任务的字节统计
 ///
@@ -190,6 +191,25 @@ impl DownloadTask {
     pub(crate) fn has_file_under(&self, dir: &std::path::Path) -> bool {
         let all = self.all.lock().unwrap();
         all.iter().any(|item| item.base.file.starts_with(dir))
+    }
+
+    /// 任务当前状态快照
+    ///
+    /// # 返回值
+    ///
+    /// 见 [`TaskSnapshot`]；与 `get_tasks` 里的口径完全一致
+    pub(crate) fn snapshot(&self) -> TaskSnapshot {
+        let bytes = self.bytes();
+        TaskSnapshot {
+            id: self.id,
+            total: self.total_size,
+            completed: self.completed_count.load(Ordering::SeqCst),
+            failed: self.failed_count.load(Ordering::SeqCst),
+            all_bytes: bytes.all_bytes,
+            now_bytes: bytes.now_bytes,
+            elapsed_ms: self.elapsed_ms(),
+            paused: self.is_paused(),
+        }
     }
 
     /// 异步等待任务结束

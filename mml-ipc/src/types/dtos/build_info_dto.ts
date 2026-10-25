@@ -7,3 +7,8 @@ export type BuildInfoDto = {
   channel: BuildChannel,
 };
 
+export type ExeInfoDto = {
+  path: string,
+  sha1: string,
+};
+

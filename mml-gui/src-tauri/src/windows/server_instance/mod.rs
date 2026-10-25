@@ -344,6 +344,12 @@ fn generate_mml(
     let mut now = 0;
     let mut items = Vec::new();
     let mut written = BTreeSet::new();
+
+    // 图标也带一份：玩家导入时按清单里的 Icon 去 <发布地址>/icon.png 下载
+    let icon = copy_icon(game, out)?;
+    if let Some(name) = &icon {
+        written.insert(name.clone());
+    }
     let mut archived = 0;
     let mut archives = Vec::new();
 
@@ -419,7 +425,7 @@ fn generate_mml(
     }
 
     let count = items.len() + archived;
-    let pack = generate::build_server_pack(
+    let mut pack = generate::build_server_pack(
         game,
         &options.name,
         &options.version,
@@ -427,6 +433,7 @@ fn generate_mml(
         items,
         archives,
     );
+    pack.icon = icon;
     let bytes = serde_json::to_vec_pretty(&pack).map_err(|e| e.to_string())?;
     // 客户端拿本地 server.json 的 SHA1 与 server.json.sha1 逐字比对，这里不能带换行
     let sha1 = gen_hash(HashType::Sha1, &bytes);
@@ -629,6 +636,27 @@ fn file_name(rel: &Path) -> String {
     rel.file_name()
         .map(|name| name.to_string_lossy().to_string())
         .unwrap_or_default()
+}
+
+/// 把实例图标复制进输出文件夹
+///
+/// 玩家导入时按清单里的 `Icon` 去 `<发布地址>/<文件名>` 下载，所以这里只放一份文件；
+/// 实例没有图标文件时返回 `None`。
+///
+/// - `game`: 源实例
+/// - `out`: 输出文件夹
+///
+/// # 返回值
+///
+/// 写进清单的文件名；没有图标时是 `None`
+fn copy_icon(game: &InstanceSettingObj, out: &Path) -> Result<Option<String>, String> {
+    let source = game.get_icon_file_or_default();
+    if !source.is_file() {
+        return Ok(None);
+    }
+    let name = names::ICON_FILE.to_string();
+    fs::copy(&source, out.join(&name)).map_err(|e| e.to_string())?;
+    Ok(Some(name))
 }
 
 /// 写一个文件到输出文件夹
@@ -1147,5 +1175,40 @@ mod tests {
         assert_eq!(err, err_keys::SERVER_INSTANCE_LOADER);
 
         crate::test_support::cleanup(&[&base, &out]);
+    }
+
+    /// 实例自带图标时复制进输出文件夹，没有图标时返回 None
+    #[test]
+    fn copy_icon_follows_instance_icon() {
+        crate::test_support::ensure_boot();
+        // 实例路径要 mml-game 的运行目录：本 crate 的 boot 只起 mml_base / 日志
+        static GAME: std::sync::Once = std::sync::Once::new();
+        GAME.call_once(|| {
+            mml_game::init(mml_base::get_base_dir()).unwrap();
+        });
+        let dir = crate::test_support::temp_dir("icon-src");
+        let out = crate::test_support::temp_dir("icon-out");
+
+        let mut game = InstanceSettingObj {
+            // 绝对路径：脱离测试运行目录，直接指向临时目录本身
+            dir: dir.to_string_lossy().to_string(),
+            icon: Some(names::ICON_FILE.to_string()),
+            ..Default::default()
+        };
+        assert_eq!(copy_icon(&game, &out).unwrap(), None, "没有图标文件时不带");
+
+        let bytes = b"fake png bytes";
+        std::fs::write(dir.join(names::ICON_FILE), bytes).unwrap();
+        assert_eq!(
+            copy_icon(&game, &out).unwrap(),
+            Some(names::ICON_FILE.to_string())
+        );
+        assert_eq!(std::fs::read(out.join(names::ICON_FILE)).unwrap(), bytes);
+
+        // 图标名被清掉时按默认 icon.png 找
+        game.icon = None;
+        assert!(copy_icon(&game, &out).unwrap().is_some());
+
+        crate::test_support::cleanup(&[&dir, &out]);
     }
 }

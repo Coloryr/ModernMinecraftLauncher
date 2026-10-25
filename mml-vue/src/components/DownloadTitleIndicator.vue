@@ -5,7 +5,7 @@
 // 改成标题栏指示器后不占内容区，位置也和整合包那个 ModpackTitleIndicator 并排。
 //
 // 挂载范围：主窗口顶栏（MainTopbar）+ 会发起 / 观看下载的那几个功能窗口的标题栏
-// （WindowFrame 的 showTaskIndicators：下载整合包 / 资源管理 / 实例日志）。
+// （WindowFrame 的 showTaskIndicators：下载整合包 / 添加实例 / 资源管理 / 实例日志）。
 // 没有任务时整块不存在，所以挂多了也不占位。
 // 点击走 openWindow("download")：单窗口模式它会被特判成弹窗，多窗口模式开真实窗口。
 //

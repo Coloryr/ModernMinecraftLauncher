@@ -236,19 +236,22 @@ pub(super) async fn run_update(
         let objs: Vec<FileItemObj> = pending.iter().map(|entry| entry.obj.clone()).collect();
         mml_log::info(LogText::ModUpdateDownloadStarted { count: batch }.text());
         // 下载阶段跟着下载任务的**真实完成数**走：这样资源窗口那条进度与「下载」窗口
-        // 里那个任务是同一个数。下载器没有"每个任务完成多少"的推送，只能查快照
-        let (id_tx, id_rx) = tokio::sync::watch::channel(0u64);
-        let sync = {
-            let window = window.clone();
-            let token = token.clone();
-            tauri::async_runtime::spawn(poll_download(window, token, id_rx))
+        // 里那个任务是同一个数。句柄自己带状态，不必再去任务表里按编号找
+        let outcome = match mml_downloader::start_download_task_handle(objs, token.clone()) {
+            Some(handle) => {
+                let handle = Arc::new(handle);
+                let sync = {
+                    let window = window.clone();
+                    let token = token.clone();
+                    tauri::async_runtime::spawn(poll_download(window, token, handle.clone()))
+                };
+                let outcome = handle.wait().await;
+                sync.abort();
+                outcome
+            }
+            // 下载器已停止（程序正在退出）：与取消同一个口径
+            None => mml_downloader::TaskOutcome::Cancelled,
         };
-        let outcome =
-            mml_downloader::start_download_task_reporting(objs, token.clone(), move |id| {
-                let _ = id_tx.send(id);
-            })
-            .await;
-        sync.abort();
         mml_log::info(
             LogText::ModUpdateDownloadFinished {
                 outcome: format!("{outcome:?}"),
@@ -296,11 +299,11 @@ pub(super) async fn run_update(
 ///
 /// - `window`: 进度事件只发给它
 /// - `token`: 窗口的取消令牌，取消即停
-/// - `id_rx`: 任务编号，下载任务入队后由启动方填进来；0 表示还没拿到
+/// - `handle`: 这一批下载的句柄，状态直接从它取
 pub(super) async fn poll_download(
     window: WebviewWindow,
     token: CancellationToken,
-    mut id_rx: tokio::sync::watch::Receiver<u64>,
+    handle: Arc<mml_downloader::DownloadHandle>,
 ) {
     loop {
         tokio::select! {
@@ -308,21 +311,17 @@ pub(super) async fn poll_download(
             _ = tokio::time::sleep(std::time::Duration::from_millis(DOWNLOAD_SYNC_MS)) => {}
         }
 
-        let id = *id_rx.borrow_and_update();
-        if id == 0 {
-            continue;
-        }
-        // 任务从列表里消失就说明结束了：完成数已经报过，剩下的交给收尾阶段
-        let Some(task) = mml_downloader::get_tasks().into_iter().find(|task| task.id == id)
-        else {
+        // 任务结束就不再报：完成数已经发过，剩下的交给收尾阶段
+        if handle.is_finished() {
             return;
-        };
+        }
+        let status = handle.status();
         emit_resource_mods_update_progress(
             &window,
             ModUpdateProgressDto {
                 stage: STAGE_DOWNLOAD.to_string(),
-                done: task.completed,
-                total: task.total,
+                done: status.completed,
+                total: status.total,
             },
         );
     }

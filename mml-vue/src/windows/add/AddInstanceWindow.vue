@@ -39,8 +39,9 @@ import { t, tErr } from "../../lib/i18n";
 import { dropFromUrl, isTauri, multiWindow, openWindow, windowParams } from "../windowManager";
 import type { WindowDropParam } from "../windowManager";
 import { commands } from "../../lib/bindings";
-import type { FolderInstanceDto, GroupDto, PackProgressDto } from "../../lib/bindings";
+import type { FolderInstanceDto, GroupDto, PackProgressDto, ServerPackProbeDto } from "../../lib/bindings";
 import { ADD_MODES, isModpackPackType, type AddMode } from "./types";
+import { isArchiveUrl, serverPackUrl } from "../../lib/onlineInstance";
 
 const emit = defineEmits<{
   /** 请求关闭本窗口 */
@@ -487,6 +488,68 @@ function folderPathOf(rel: string): string {
 
 const addUrl = ref("");
 
+/** 地址探测结果：填完地址自动读一次 server.json，把名字 / 版本 / 加载器显示出来 */
+const onlineProbe = ref<ServerPackProbeDto | null>(null);
+/** 正在读清单 */
+const onlineProbing = ref(false);
+/** 读清单失败的原因 */
+const onlineProbeError = ref("");
+/** 防抖计时器：边打字边发请求既慢又吵 */
+let onlineProbeTimer: ReturnType<typeof setTimeout> | undefined;
+/** 探测代次：地址改过之后，旧请求的结果丢掉 */
+let onlineProbeSeq = 0;
+
+/** 作废当前摘要（换模式 / 清空地址 / 换成压缩包地址） */
+function clearOnlineProbe() {
+  onlineProbeSeq += 1;
+  onlineProbing.value = false;
+  onlineProbe.value = null;
+  onlineProbeError.value = "";
+}
+
+/** 访问一次清单；空地址与压缩包地址不发请求 */
+async function probeOnline() {
+  const url = addUrl.value.trim();
+  if (addMode.value !== "online" || !url || isArchiveUrl(url)) {
+    clearOnlineProbe();
+    return;
+  }
+  const seq = ++onlineProbeSeq;
+  onlineProbing.value = true;
+  onlineProbe.value = null;
+  onlineProbeError.value = "";
+  try {
+    const info = await api.addProbeServerPack(url);
+    if (seq !== onlineProbeSeq) return;
+    onlineProbe.value = info;
+    // 实例名没手填过就用清单里的名字，与压缩包识别同一套自动填写口径
+    if (!nameEdited && info.name) newName.value = info.name;
+  } catch (e) {
+    if (seq !== onlineProbeSeq) return;
+    onlineProbeError.value = tErr(e);
+  } finally {
+    if (seq === onlineProbeSeq) onlineProbing.value = false;
+  }
+}
+
+// 停手 0.6 秒再发：否则每敲一个字母就是一次网络请求
+watch(addUrl, () => {
+  clearTimeout(onlineProbeTimer);
+  onlineProbeTimer = setTimeout(() => void probeOnline(), 600);
+});
+
+// 切到在线实例就探一次；切走就作废，别把摘要留在别的模式里
+watch(addMode, (mode) => {
+  clearTimeout(onlineProbeTimer);
+  if (mode !== "online") {
+    clearOnlineProbe();
+    return;
+  }
+  void probeOnline();
+});
+
+onUnmounted(() => clearTimeout(onlineProbeTimer));
+
 // ================= mock 文件列表（仅浏览器预览用） =================
 
 // 浏览器预览下没有真实路径，用占位前缀拼一个像 Windows 的路径给视图渲染
@@ -637,7 +700,11 @@ async function create() {
         uuid = await api.addImportFolder(addFolderPath.value.trim(), name, groupId);
       }
     } else {
-      uuid = await api.addImportUrl(addUrl.value.trim(), name, groupId);
+      // 在线实例：压缩包走压缩包导入，其余按服务器包清单（server.json）登记
+      const target = addUrl.value.trim();
+      uuid = isArchiveUrl(target)
+        ? await api.addImportUrl(target, name, groupId)
+        : await api.addImportServerPack(serverPackUrl(target), name, groupId);
     }
     if (isLeaving()) return;
     // 通知主窗口选中新实例，后端已发 instance-change 刷新列表，然后询问是否继续添加
@@ -864,7 +931,8 @@ onUnmounted(() => {
           @pick="pickFolder" @rescan="scanFolder" @toggle-instance="toggleFoundInstance"
           @set-all-instances="setAllFoundInstances" @toggle-file="onFolderToggleFile" @toggle-dir="onFolderToggleDir"
           @toggle-expand="onFolderToggleExpand" @lazy-load="onFolderLazyLoad" @set-all="setAllFolder" />
-        <OnlineMode v-else :url="addUrl" :invalid="addErrorField === 'url'" @update:url="addUrl = $event" />
+        <OnlineMode v-else :url="addUrl" :invalid="addErrorField === 'url'" :probe="onlineProbe"
+      :probing="onlineProbing" :probe-error="onlineProbeError" @update:url="addUrl = $event" />
       </div>
 
       <p v-if="addError" class="error-text" role="alert">{{ addError }}</p>

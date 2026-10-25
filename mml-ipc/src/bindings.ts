@@ -4,7 +4,7 @@
 // 传输层不在这里绑定：createCommands 接收调用方传入的 invoke。
 
 import type { Invoke } from "./invoke";
-import type { AccountStoreDto, AccountStoreViewDto, AutoSaveTargetDto, BgInfoDto, BlockGroupsDto, BlockItemDto, BlockStatusDto, BuildInfoDto, BytesSliceDto, ChunkFindDto, CollectDataDto, ColorMcInfoDto, ColorMcReportDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, CrashAnalysisDto, CustomCssItemDto, CustomHomeInfoDto, CustomJsonItemDto, CustomUiInfoDto, DataPackItemDto, DepProblemDto, DetectedPackDto, DirEntry, DownloadStatusDto, DropPathDto, ExportConfigDto, ExportEntryDto, ExportInfoDto, FileItemDto, FileListDto, FolderInstanceDto, GroupDto, GuiConfigDto, IconSourceDto, InstanceArgsDto, InstanceInfoDto, InstanceLangDto, InstancePatch, JavaDownloadItemDto, JavaDownloadOptionsDto, JavaInfoDto, JavaTypes, LaunchPrecheckDto, LaunchSettingDto, LoadState, LobbyViewDto, LocalFileEntryDto, LogLine, LogSettingDto, MappingLobbyDto, McaChunkDto, ModAutoMarkDto, ModDepTreeDto, ModExportDto, ModGroupDto, ModItemDto, ModPackStatusDto, ModPackUpdateDto, ModRenameDto, ModUpdateApplyDto, ModUpdateCheckDto, ModUpdateProjectDto, MotdDto, NbtEditDto, NetworkSettingDto, NewsItem, PackItemDto, ProjectDetailDto, ProjectDto, ProjectItemDto, ResourceDependencyDto, ResourceDropDto, ResourceSaveDto, ResourceStatusDto, ResourceViewDto, RunArgSettingDto, SaveBackupDto, SaveEditDto, SaveItemDto, SchematicDetailDto, SchematicItemDto, ScreenshotItemDto, ServerInstanceOptionsDto, ServerInstanceResultDto, ServerItemDto, SettingsDefaultsDto, ShaderItemDto, StartArgDto, StatsDataDto, StatsPlaytimeDto, SystemMemoryDto, TexturesDto, VersionInfoDto, WindowSettingDto, WindowSizeDto } from "./types";
+import type { AccountStoreDto, AccountStoreViewDto, AutoSaveTargetDto, BgInfoDto, BlockGroupsDto, BlockItemDto, BlockStatusDto, BuildInfoDto, BytesSliceDto, ChunkFindDto, CollectDataDto, ColorMcInfoDto, ColorMcReportDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, CrashAnalysisDto, CustomCssItemDto, CustomHomeInfoDto, CustomJsonItemDto, CustomUiInfoDto, DataPackItemDto, DepProblemDto, DetectedPackDto, DirEntry, DownloadStatusDto, DropPathDto, ExeInfoDto, ExportConfigDto, ExportEntryDto, ExportInfoDto, FileItemDto, FileListDto, FolderInstanceDto, GroupDto, GuiConfigDto, IconSourceDto, InstanceArgsDto, InstanceInfoDto, InstanceLangDto, InstancePatch, JavaDownloadItemDto, JavaDownloadOptionsDto, JavaInfoDto, JavaTypes, LaunchPrecheckDto, LaunchSettingDto, LoadState, LobbyViewDto, LocalFileEntryDto, LogLine, LogSettingDto, MappingLobbyDto, McaChunkDto, ModAutoMarkDto, ModDepTreeDto, ModExportDto, ModGroupDto, ModItemDto, ModPackStatusDto, ModPackUpdateDto, ModRenameDto, ModUpdateApplyDto, ModUpdateCheckDto, ModUpdateProjectDto, MotdDto, NbtEditDto, NetworkSettingDto, NewsItem, PackItemDto, ProjectDetailDto, ProjectDto, ProjectItemDto, ResourceDependencyDto, ResourceDropDto, ResourceSaveDto, ResourceStatusDto, ResourceViewDto, RunArgSettingDto, SaveBackupDto, SaveEditDto, SaveItemDto, SchematicDetailDto, SchematicItemDto, ScreenshotItemDto, ServerInstanceOptionsDto, ServerInstanceResultDto, ServerItemDto, ServerPackProbeDto, SettingsDefaultsDto, ShaderItemDto, StartArgDto, StatsDataDto, StatsPlaytimeDto, SystemMemoryDto, TexturesDto, VersionInfoDto, WindowSettingDto, WindowSizeDto } from "./types";
 
 export * from "./types";
 
@@ -12,6 +12,7 @@ export * from "./types";
 export function createCommands(invoke: Invoke) {
   return {
     buildInfo: {
+      exeInfo: () => invoke<ExeInfoDto>("app_build_exe_info"),
       info: () => invoke<BuildInfoDto>("app_build_info"),
     },
     windows: {
@@ -67,9 +68,11 @@ export function createCommands(invoke: Invoke) {
       getVersionTypes: () => invoke<string[]>("add_get_version_types"),
       importArchive: (path: string, packType: string, name: string | null, group: string | null, unselect: string[] | null) => invoke<string>("add_import_archive", { path, packType, name, group, unselect }),
       importFolder: (path: string, name: string | null, group: string | null) => invoke<string>("add_import_folder", { path, name, group }),
+      importServerPack: (url: string, name: string | null, group: string | null) => invoke<string>("add_import_server_pack", { url, name, group }),
       importUrl: (url: string, name: string | null, group: string | null) => invoke<string>("add_import_url", { url, name, group }),
       listArchive: (path: string) => invoke<string[]>("add_list_archive", { path }),
       listDir: (path: string) => invoke<DirEntry[]>("add_list_dir", { path }),
+      probeServerPack: (url: string) => invoke<ServerPackProbeDto>("add_probe_server_pack", { url }),
       scanFolder: (path: string) => invoke<FolderInstanceDto[]>("add_scan_folder", { path }),
       setCloseGuard: (enabled: boolean) => invoke<void>("add_set_close_guard", { enabled }),
     },

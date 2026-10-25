@@ -26,6 +26,18 @@ export type DetectedPackDto = {
   name: string,
 };
 
+export type ServerPackProbeDto = {
+  url: string,
+  name: string,
+  version: string,
+  loader: string,
+  loaderVersion: string | null,
+  packVersion: string,
+  text: string,
+  fileCount: number,
+  archiveCount: number,
+};
+
 export type PackProgressDto = {
   state: string,
   now: number,

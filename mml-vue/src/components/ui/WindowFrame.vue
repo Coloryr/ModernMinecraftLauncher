@@ -39,15 +39,15 @@ const props = defineProps<{
 }>();
 
 /**
- * 下载 / 整合包两个进度指示器挂在下载整合包窗口、资源管理窗口与**实例日志窗口**
+ * 下载 / 整合包两个进度指示器挂在下载整合包、添加实例、资源管理与**实例日志**四个窗口
  *
- * 前两个窗口自己就会发起下载（装整合包 / 更新模组）；日志窗口是**启动游戏**的地方
- * （标题栏那颗测试启动键），启动前的缺失文件补齐走的是同一个下载器，在那里要能直接看到进度。
+ * 它们自己就会发起下载：装整合包、导入在线实例（服务器包内容）、更新模组；日志窗口是
+ * **启动游戏**的地方（标题栏那颗测试启动键），启动前的缺失文件补齐走的是同一个下载器。
  * 其它窗口没必要挂。下载整合包窗口关掉之后它们回主页面，见 MainTopbar 的 modpackWindowOpen。
  */
 const showTaskIndicators = computed(() => {
   const kind = currentKind.value;
-  return kind === "add_modpack" || kind === "resource" || kind === "log";
+  return kind === "add" || kind === "add_modpack" || kind === "resource" || kind === "log";
 });
 
 const emit = defineEmits<{

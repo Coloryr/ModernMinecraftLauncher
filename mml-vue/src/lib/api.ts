@@ -77,6 +77,7 @@ import type {
   SaveEditDto,
   SaveItemDto,
   ScreenshotItemDto,
+  ServerPackProbeDto,
   ServerInstanceOptionsDto,
   ServerInstanceProgressDto,
   ServerInstanceResultDto,
@@ -351,6 +352,38 @@ export const api = {
    */
   async addImportUrl(url: string, name: string, group: string | null): Promise<string> {
     return commands.add.importUrl(url, name, group);
+  },
+
+  /**
+   * 从在线服务器包（server.json）添加实例
+   *
+   * 只取清单，包内容在启动时按清单同步；实例里存发布目录。
+   *
+   * - `url`: 服务器实例地址，发布目录或 server.json 都认
+   * - `name`: 实例名
+   * - `group`: 分组 uuid，null = 默认分组
+   *
+   * # 返回值
+   *
+   * 新实例的 uuid
+   */
+  async addImportServerPack(url: string, name: string, group: string | null): Promise<string> {
+    return commands.add.importServerPack(url, name, group);
+  },
+
+  /**
+   * 探测在线实例地址，取回清单摘要
+   *
+   * 添加窗口填完地址后自动调用，用来校验地址并把实例名 / 版本 / 加载器显示出来。
+   *
+   * - `url`: 服务器实例地址，发布目录或 server.json 都认
+   *
+   * # 返回值
+   *
+   * 清单摘要，见 `ServerPackProbeDto`
+   */
+  async addProbeServerPack(url: string): Promise<ServerPackProbeDto> {
+    return commands.add.probeServerPack(url);
   },
 
   /**
