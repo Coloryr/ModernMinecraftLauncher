@@ -30,7 +30,7 @@
 //!
 //! 输入类消息由启动器按游戏通道定向发送，消息体不含 uuid。
 //! 键盘与鼠标按键使用 GLFW 编码，鼠标移动是相对位移，单位像素，正数向右或向下；
-//! 滚轮正数向上。游戏未抓取鼠标时，鼠标移动不会改变视角。
+//! 滚轮正数向上。游戏抓取鼠标时鼠标移动用于转动视角，未抓取时用于移动系统光标。
 //!
 //! ## 启动器 -> 启动器，防止多开
 //!
@@ -197,13 +197,14 @@ pub fn get_run_arg() -> Vec<String> {
     RUN_ARG.read().unwrap().clone()
 }
 
-/// 获取游戏上报的鼠标状态
+/// 获取游戏上报的鼠标抓取状态
 ///
 /// - `uuid`: 游戏实例 ID
 ///
 /// # 返回值
 ///
-/// 返回该实例最近一次上报的状态，未上报过返回 `None`
+/// 返回该实例最近一次上报的状态。`true` 表示游戏已抓取鼠标，鼠标移动用于转动视角；
+/// `false` 表示处于光标模式，鼠标移动用于移动系统光标；未上报过返回 `None`
 pub fn get_mouse_state(uuid: Uuid) -> Option<bool> {
     MOUSE_STATES.read().unwrap().get(&uuid).copied()
 }
@@ -255,8 +256,8 @@ pub fn set_title(uuid: Uuid, title: &str) -> bool {
 ///
 /// # 返回值
 ///
-/// 发送成功返回 `true`，游戏实例未注册通道时返回 `false`；
-/// 游戏未抓取鼠标时该消息不会改变视角
+/// 发送成功返回 `true`，游戏实例未注册通道时返回 `false`。
+/// 游戏抓取鼠标时该消息用于转动视角，未抓取时用于移动游戏窗口内的系统光标
 pub fn send_mouse_move(uuid: Uuid, dx: f64, dy: f64) -> bool {
     let mut content = BytesMut::new();
     content.put_i32(TYPE_MOUSE_MOVE);
