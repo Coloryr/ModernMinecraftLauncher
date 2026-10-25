@@ -9,7 +9,6 @@ use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 
 use crate::dtos::ModGroupDto;
 
-
 //
 // 分组**不是 mod.rs 的数据**：它属于实例的 GUI 设置，即 `gui_setting.json` 的 `Mod.Groups`，
 // 分组 uuid → 分组对象，见 crate::gui_setting。
@@ -18,7 +17,6 @@ use crate::dtos::ModGroupDto;
 // - 分组顺序 = 用户自己拖出来的，存在 `gui_setting.json` 的 `Mod.GroupOrder`；
 //   没存过则用默认顺序：识别失败 → 已启用 → 已禁用 → 自建分组按名字
 // - 成员用 SHA1 而不是 uuid：启用/禁用会改文件名，uuid 跟着变，SHA1 不变
-
 
 /// 三个**状态分组**的固定 uuid
 ///

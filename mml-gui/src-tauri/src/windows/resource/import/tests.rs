@@ -5,9 +5,6 @@ use super::files::*;
 
 use std::path::{Path, PathBuf};
 
-
-
-
 use crate::test_support::{cleanup, ensure_boot, temp_dir};
 
 /// 在 `dir` 下造一个内容为 `name` 的文件

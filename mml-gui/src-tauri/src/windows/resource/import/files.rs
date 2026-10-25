@@ -10,10 +10,9 @@ use mml_sys::path_helper;
 use crate::dtos::ResourceDropDto;
 use crate::err_keys;
 
+use super::common::{MODE_CHECK, MODE_RENAME, MODE_SKIP, file_name, unique_name};
+use super::saves::import_saves;
 use crate::windows::resource::{KIND_DATAPACKS, KIND_SAVES, datapack_dir, dir_of, parse_instance};
-use super::common::{MODE_CHECK, MODE_SKIP, MODE_RENAME, unique_name, file_name};
-use super::saves::{import_saves};
-
 
 /// 导入实现，同步执行，在阻塞线程里跑
 ///
@@ -71,7 +70,11 @@ pub(super) fn import(
 /// 本次结果：`imported` / `skipped` / `conflicts` 三个名单
 ///
 /// 只认文件：传进来的目录一律跳过，前端不会为目录显示导入遮罩，这里是兜底。
-pub(super) fn copy_into(dir: &Path, files: &[PathBuf], mode: &str) -> Result<ResourceDropDto, String> {
+pub(super) fn copy_into(
+    dir: &Path,
+    files: &[PathBuf],
+    mode: &str,
+) -> Result<ResourceDropDto, String> {
     let mut result = ResourceDropDto::default();
     if mode != MODE_CHECK {
         path_helper::create_dir_all(dir).map_err(|err| err.to_string())?;

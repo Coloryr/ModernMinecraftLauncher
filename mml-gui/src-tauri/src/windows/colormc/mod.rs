@@ -41,5 +41,4 @@ pub(crate) mod window;
 #[cfg(test)]
 mod tests;
 
-
-pub(crate) use self::window::{progress};
+pub(crate) use self::window::progress;

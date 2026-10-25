@@ -145,7 +145,10 @@ pub fn set_gui_handel(app: &AppHandle) {
 ///
 /// 形如 `00000000-0000-0000-0000-000000000000` 的 uuid 串
 fn cat_uuid(cat: &str) -> String {
-    match mml_tex_draw::order::CAT_ORDER.iter().position(|c| *c == cat) {
+    match mml_tex_draw::order::CAT_ORDER
+        .iter()
+        .position(|c| *c == cat)
+    {
         Some(index) => format!("00000000-0000-0000-0000-{index:012}"),
         None => uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_OID, cat.as_bytes()).to_string(),
     }

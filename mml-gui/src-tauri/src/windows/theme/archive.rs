@@ -4,11 +4,7 @@
 //! 名字合法性，并算出「整包是否套了一层顶层目录」。读取内容只给清单用，
 //! 其余条目只在真正被请求时由常驻句柄按条目解压。
 
-use std::{
-    collections::HashMap,
-    io::Read,
-    path::Path,
-};
+use std::{collections::HashMap, io::Read, path::Path};
 
 use zip::ZipArchive;
 
@@ -166,7 +162,11 @@ impl Package {
     /// 找到的文件条目；不存在或是目录条目时返回 `None`
     pub(super) fn locate(&self, rel: &str) -> Option<Located> {
         let full = self.full_name(rel);
-        if let Some(entry) = self.entries.iter().find(|entry| !entry.is_dir && entry.name == full) {
+        if let Some(entry) = self
+            .entries
+            .iter()
+            .find(|entry| !entry.is_dir && entry.name == full)
+        {
             return Some(located(entry, false));
         }
         self.entries

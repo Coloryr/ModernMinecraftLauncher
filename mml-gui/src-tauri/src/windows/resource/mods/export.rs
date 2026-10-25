@@ -1,16 +1,33 @@
 //! 从资源窗口的扫描缓存导出模组清单。
 
-use std::{collections::{HashMap, HashSet}, io::Write, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    io::Write,
+    path::Path,
+};
 
 use serde_json::{Map, Value};
 
-use crate::{dtos::mod_export_dto::ModExportDto, err_keys, windows::instance_snapshot};
-use super::item::{ModCtx, mod_item};
 use super::super::model::window_model;
+use super::item::{ModCtx, mod_item};
+use crate::{dtos::mod_export_dto::ModExportDto, err_keys, windows::instance_snapshot};
 
 const FIELDS: &[&str] = &[
-    "name", "modId", "version", "file", "author", "description", "url",
-    "source", "projectId", "fileId", "sha1", "disable", "side", "loaders", "note",
+    "name",
+    "modId",
+    "version",
+    "file",
+    "author",
+    "description",
+    "url",
+    "source",
+    "projectId",
+    "fileId",
+    "sha1",
+    "disable",
+    "side",
+    "loaders",
+    "note",
 ];
 
 /// 导出已扫描的模组，字段顺序与用户选择一致。
@@ -29,19 +46,29 @@ pub async fn resource_export_mods(uuid: String, config: ModExportDto) -> Result<
     let settings = crate::gui_setting::load(&game).mods;
     let path = game.get_game_path();
     let ids: HashSet<_> = config.ids.iter().map(String::as_str).collect();
-    let rows = model.with_cache(|cache| {
-        let online: HashMap<_, _> = cache.online.values()
-            .map(|info| (info.sha1.clone(), info.clone())).collect();
-        let ctx = ModCtx {
-            notes: &settings.mod_name, sources: &settings.mod_source,
-            online: &online, game_path: &path, loader: cache.loader,
-        };
-        cache.list.iter()
-            .filter(|item| ids.is_empty() || ids.contains(item.uuid.to_string().as_str()))
-            .filter_map(|item| mod_item(item, &ctx, false))
-            .map(serde_json::to_value)
-            .collect::<Result<Vec<_>, _>>()
-    }).ok_or_else(|| err_keys::MOD_EXPORT_SCAN.to_string())?
+    let rows = model
+        .with_cache(|cache| {
+            let online: HashMap<_, _> = cache
+                .online
+                .values()
+                .map(|info| (info.sha1.clone(), info.clone()))
+                .collect();
+            let ctx = ModCtx {
+                notes: &settings.mod_name,
+                sources: &settings.mod_source,
+                online: &online,
+                game_path: &path,
+                loader: cache.loader,
+            };
+            cache
+                .list
+                .iter()
+                .filter(|item| ids.is_empty() || ids.contains(item.uuid.to_string().as_str()))
+                .filter_map(|item| mod_item(item, &ctx, false))
+                .map(serde_json::to_value)
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .ok_or_else(|| err_keys::MOD_EXPORT_SCAN.to_string())?
         .map_err(|e| e.to_string())?;
     if !ids.is_empty() && rows.len() != ids.len() {
         return Err(err_keys::MOD_EXPORT_SCAN.to_string());
@@ -49,14 +76,22 @@ pub async fn resource_export_mods(uuid: String, config: ModExportDto) -> Result<
     let text = render(&rows, &config.fields, &config.format)?;
     let count = rows.len();
     tokio::task::spawn_blocking(move || {
-        if op.is_cancelled() { return Err(err_keys::CANCELLED.to_string()); }
+        if op.is_cancelled() {
+            return Err(err_keys::CANCELLED.to_string());
+        }
         crate::windows::export_file::write(Path::new(&config.file), |output| {
-            output.write_all(text.as_bytes()).map_err(|e| e.to_string())?;
-            if op.is_cancelled() { return Err(err_keys::CANCELLED.to_string()); }
+            output
+                .write_all(text.as_bytes())
+                .map_err(|e| e.to_string())?;
+            if op.is_cancelled() {
+                return Err(err_keys::CANCELLED.to_string());
+            }
             Ok(())
         })?;
         Ok(count)
-    }).await.map_err(|e| e.to_string())?
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 fn text_of(value: &Value) -> String {
@@ -70,33 +105,66 @@ fn text_of(value: &Value) -> String {
 
 fn csv_cell(value: &str) -> String {
     // 表格软件会执行以这些符号起始的公式，文本字段必须保持为文本。
-    let value = if value.trim_start().starts_with(['=', '+', '-', '@', '\t', '\r']) {
+    let value = if value
+        .trim_start()
+        .starts_with(['=', '+', '-', '@', '\t', '\r'])
+    {
         format!("'{value}")
-    } else { value.to_string() };
+    } else {
+        value.to_string()
+    };
     format!("\"{}\"", value.replace('"', "\"\""))
 }
 
 fn render(rows: &[Value], fields: &[String], format: &str) -> Result<String, String> {
     let unique: HashSet<_> = fields.iter().collect();
-    if fields.is_empty() || unique.len() != fields.len()
-        || fields.iter().any(|key| !FIELDS.contains(&key.as_str())) {
+    if fields.is_empty()
+        || unique.len() != fields.len()
+        || fields.iter().any(|key| !FIELDS.contains(&key.as_str()))
+    {
         return Err(err_keys::EXPORT_FIELDS.to_string());
     }
     match format {
         "json" => {
-            let rows: Vec<Map<String, Value>> = rows.iter().map(|row| fields.iter()
-                .map(|key| (key.clone(), row[key].clone())).collect()).collect();
+            let rows: Vec<Map<String, Value>> = rows
+                .iter()
+                .map(|row| {
+                    fields
+                        .iter()
+                        .map(|key| (key.clone(), row[key].clone()))
+                        .collect()
+                })
+                .collect();
             serde_json::to_string_pretty(&rows).map_err(|e| e.to_string())
         }
         "csv" => {
-            let mut lines = vec![fields.iter().map(|s| csv_cell(s)).collect::<Vec<_>>().join(",")];
-            lines.extend(rows.iter().map(|row| fields.iter()
-                .map(|key| csv_cell(&text_of(&row[key]))).collect::<Vec<_>>().join(",")));
+            let mut lines = vec![
+                fields
+                    .iter()
+                    .map(|s| csv_cell(s))
+                    .collect::<Vec<_>>()
+                    .join(","),
+            ];
+            lines.extend(rows.iter().map(|row| {
+                fields
+                    .iter()
+                    .map(|key| csv_cell(&text_of(&row[key])))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            }));
             Ok(lines.join("\r\n") + "\r\n")
         }
-        "txt" => Ok(rows.iter().map(|row| fields.iter()
-            .map(|key| format!("{key}: {}", text_of(&row[key])))
-            .collect::<Vec<_>>().join("\n")).collect::<Vec<_>>().join("\n\n")),
+        "txt" => Ok(rows
+            .iter()
+            .map(|row| {
+                fields
+                    .iter()
+                    .map(|key| format!("{key}: {}", text_of(&row[key])))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n")),
         _ => Err(err_keys::EXPORT_PACK_TYPE.to_string()),
     }
 }
@@ -108,7 +176,8 @@ mod tests {
 
     #[test]
     fn selected_fields_and_csv_escaping() {
-        let rows = vec![json!({"name": "中文,\"a\"\nline", "version": "=1+1", "file": "private.jar"})];
+        let rows =
+            vec![json!({"name": "中文,\"a\"\nline", "version": "=1+1", "file": "private.jar"})];
         let fields = vec!["name".into(), "version".into()];
         let csv = render(&rows, &fields, "csv").unwrap();
         assert!(csv.contains("\"中文,\"\"a\"\"\nline\""));
@@ -121,18 +190,31 @@ mod tests {
 
     #[test]
     fn json_keeps_value_types_and_only_requested_fields() {
-        let rows = [json!({"name":"中文", "disable":false, "loaders":["fabric","quilt"], "note":null, "icon":"private"})];
+        let rows = [
+            json!({"name":"中文", "disable":false, "loaders":["fabric","quilt"], "note":null, "icon":"private"}),
+        ];
         let fields = ["name", "disable", "loaders", "note"].map(String::from);
         let result: Value = serde_json::from_str(&render(&rows, &fields, "json").unwrap()).unwrap();
-        assert_eq!(result, json!([{"name":"中文", "disable":false, "loaders":["fabric","quilt"], "note":null}]));
+        assert_eq!(
+            result,
+            json!([{"name":"中文", "disable":false, "loaders":["fabric","quilt"], "note":null}])
+        );
     }
 
     #[test]
     fn text_and_csv_follow_field_order_and_preserve_multiline_text() {
-        let rows = [json!({"name":"中文,\"引号\"\r\n下一行", "disable":false, "loaders":["fabric","quilt"], "note":null})];
+        let rows = [
+            json!({"name":"中文,\"引号\"\r\n下一行", "disable":false, "loaders":["fabric","quilt"], "note":null}),
+        ];
         let fields = ["disable", "loaders", "note", "name"].map(String::from);
-        assert_eq!(render(&rows, &fields, "txt").unwrap(), "disable: false\nloaders: fabric, quilt\nnote: \nname: 中文,\"引号\"\r\n下一行");
-        assert_eq!(render(&rows, &fields, "csv").unwrap(), "\"disable\",\"loaders\",\"note\",\"name\"\r\n\"false\",\"fabric, quilt\",\"\",\"中文,\"\"引号\"\"\r\n下一行\"\r\n");
+        assert_eq!(
+            render(&rows, &fields, "txt").unwrap(),
+            "disable: false\nloaders: fabric, quilt\nnote: \nname: 中文,\"引号\"\r\n下一行"
+        );
+        assert_eq!(
+            render(&rows, &fields, "csv").unwrap(),
+            "\"disable\",\"loaders\",\"note\",\"name\"\r\n\"false\",\"fabric, quilt\",\"\",\"中文,\"\"引号\"\"\r\n下一行\"\r\n"
+        );
     }
 
     #[test]
@@ -145,12 +227,22 @@ mod tests {
 
     #[test]
     fn invalid_field_selection_or_format_is_rejected() {
-        for fields in [vec![], vec!["name".into(), "name".into()], vec!["token".into()]] {
+        for fields in [
+            vec![],
+            vec!["name".into(), "name".into()],
+            vec!["token".into()],
+        ] {
             for format in ["txt", "csv", "json"] {
-                assert_eq!(render(&[], &fields, format).unwrap_err(), err_keys::EXPORT_FIELDS);
+                assert_eq!(
+                    render(&[], &fields, format).unwrap_err(),
+                    err_keys::EXPORT_FIELDS
+                );
             }
         }
-        assert_eq!(render(&[], &["name".into()], "exe").unwrap_err(), err_keys::EXPORT_PACK_TYPE);
+        assert_eq!(
+            render(&[], &["name".into()], "exe").unwrap_err(),
+            err_keys::EXPORT_PACK_TYPE
+        );
     }
 
     #[test]
@@ -158,8 +250,12 @@ mod tests {
         for text in ["=1+1", "+1", "-1", "@SUM(A1)", " \t=1", "\r\n+1"] {
             let rows = [json!({"name":text})];
             let fields = ["name".to_string()];
-            assert_eq!(render(&rows, &fields, "csv").unwrap(), format!("\"name\"\r\n\"'{text}\"\r\n"));
-            let json: Value = serde_json::from_str(&render(&rows, &fields, "json").unwrap()).unwrap();
+            assert_eq!(
+                render(&rows, &fields, "csv").unwrap(),
+                format!("\"name\"\r\n\"'{text}\"\r\n")
+            );
+            let json: Value =
+                serde_json::from_str(&render(&rows, &fields, "json").unwrap()).unwrap();
             assert_eq!(json[0]["name"], text);
         }
     }

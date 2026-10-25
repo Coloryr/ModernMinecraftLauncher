@@ -17,9 +17,9 @@ mod chunk;
 mod session;
 
 pub(crate) use self::chunk::chunk_bytes;
-pub(crate) use self::session::{close, close_all_of};
 use self::chunk::write_chunk_back;
 use self::session::{NbtSession, SESSIONS, key_of, stamp_of};
+pub(crate) use self::session::{close, close_all_of};
 
 /// 打开会话的产物
 pub(crate) struct OpenedNbt<T> {
@@ -162,9 +162,9 @@ mod tests {
     use std::sync::Mutex;
 
     use mml_base::hash_helper::{self, HashType};
+    use mml_nbt::NbtType;
     use mml_nbt::nbt_file::{CompressType, NbtFile};
     use mml_nbt::nbt_types::{compound, int};
-    use mml_nbt::NbtType;
     use uuid::Uuid;
 
     use super::{close, close_all_of, open_with, update_with};
@@ -188,7 +188,8 @@ mod tests {
 
     /// 在临时目录里造一个 gzip 的 NBT 文件
     fn write_sample(tag: &str) -> std::path::PathBuf {
-        let dir = mml_testutil::temp_dir().join(format!("mml-nbt-session-{tag}-{}", Uuid::new_v4()));
+        let dir =
+            mml_testutil::temp_dir().join(format!("mml-nbt-session-{tag}-{}", Uuid::new_v4()));
         fs::create_dir_all(&dir).unwrap();
         let path = dir.join("level.dat");
 
@@ -216,13 +217,23 @@ mod tests {
         let path = write_sample("keep");
         let owner = owner();
 
-        assert_eq!(open_with(&owner, &path, None, |nbt| game_type_of(nbt)).unwrap().value, 1);
+        assert_eq!(
+            open_with(&owner, &path, None, |nbt| game_type_of(nbt))
+                .unwrap()
+                .value,
+            1
+        );
 
         // 绕过会话直接改盘上的字节：长度与修改时间都会变
         fs::write(&path, b"not nbt at all").unwrap();
 
         // 会话还在：再打开给的还是原来那份，说明没重新读
-        assert_eq!(open_with(&owner, &path, None, |nbt| game_type_of(nbt)).unwrap().value, 1);
+        assert_eq!(
+            open_with(&owner, &path, None, |nbt| game_type_of(nbt))
+                .unwrap()
+                .value,
+            1
+        );
 
         // 关掉之后才是重新读 —— 这时盘上那份已经不是合法 NBT 了
         close(&path, None);
@@ -248,7 +259,12 @@ mod tests {
         assert!(open_with(&owner_a, &first, None, |nbt| game_type_of(nbt)).is_err());
         // 第二份还在：拿到的仍是会话里那份，说明没被一起清掉
         fs::write(&second, b"not nbt at all").unwrap();
-        assert_eq!(open_with(&owner_b, &second, None, |nbt| game_type_of(nbt)).unwrap().value, 1);
+        assert_eq!(
+            open_with(&owner_b, &second, None, |nbt| game_type_of(nbt))
+                .unwrap()
+                .value,
+            1
+        );
 
         for path in [&first, &second] {
             let _ = fs::remove_dir_all(path.parent().unwrap());
@@ -330,8 +346,13 @@ mod tests {
             update_with(&path, None, &sha1, |_| Ok(())).unwrap_err(),
             err_keys::FILE_CHANGED
         );
-        assert_eq!(open_with(&owner, &path, None, |nbt| game_type_of(nbt)).unwrap().value, 1);
+        assert_eq!(
+            open_with(&owner, &path, None, |nbt| game_type_of(nbt))
+                .unwrap()
+                .value,
+            1
+        );
 
         let _ = fs::remove_dir_all(path.parent().unwrap());
     }
-}
+}

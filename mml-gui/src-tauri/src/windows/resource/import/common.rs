@@ -4,10 +4,6 @@
 
 use std::path::{Path, PathBuf};
 
-
-
-
-
 /// 只预检冲突，不落盘
 pub(super) const MODE_CHECK: &str = "check";
 

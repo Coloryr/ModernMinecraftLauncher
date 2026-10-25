@@ -32,6 +32,7 @@ import CustomUiPage from "./components/CustomUiPage.vue";
 import AccountLockModal from "./components/AccountLockModal.vue";
 import AutoSaveModal from "./components/AutoSaveModal.vue";
 import LaunchCheckModal from "./components/LaunchCheckModal.vue";
+import ServerPackUpdateModal from "./components/ServerPackUpdateModal.vue";
 
 applyTheme();
 applyLocale();
@@ -245,4 +246,6 @@ const closeAskButton = computed(() =>
   <AutoSaveModal />
   <!-- 启动前检查：加载器没启用 / 模组多而内存低时问一次 -->
   <LaunchCheckModal />
+  <!-- 服务器包有新版本时问一句：更新后启动 / 直接启动 / 取消 -->
+  <ServerPackUpdateModal />
 </template>

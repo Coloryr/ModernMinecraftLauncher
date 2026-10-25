@@ -13,8 +13,8 @@ use mml_names::Lang;
 use crate::gui_config::{
     CapeConfig, CapeDisplay, ClientConfig, CollectWindowConfig, CustomCssItemObj,
     ExperimentalConfig, GuiConfig, HeadConfig, HeadType, LaunchCheckConfig, LoginLockObj,
-    MainWindowConfig,
-    SidebarSide, SkinConfig, SkinDisplay, StartupPage, Theme, ViewMode, WindowMode,
+    MainWindowConfig, SidebarSide, SkinConfig, SkinDisplay, StartupPage, Theme, ViewMode,
+    WindowMode,
 };
 
 /// 皮肤显示设置，前端 wire 为 camelCase，字段即 `skin`

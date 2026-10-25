@@ -2,7 +2,6 @@
 //!
 //! 打开的文件留在会话里，保存直接套在会话那份树上、由同一个句柄写回。
 
-
 use mml_nbt::NbtType;
 use uuid::Uuid;
 
@@ -13,7 +12,6 @@ use crate::windows::{instance_snapshot, nbt_session};
 
 use super::nbt_edit::{MAX_ARRAY_EDIT, apply_nbt_edits};
 use super::source::{check_size, resolve_source};
-
 
 /// 把一个 NBT 标签转成树上的节点
 ///

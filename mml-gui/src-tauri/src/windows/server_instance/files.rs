@@ -10,7 +10,7 @@ use std::{
     sync::atomic::AtomicBool,
 };
 
-use mml_base::hash_helper::{gen_hash_from_file, HashType};
+use mml_base::hash_helper::{HashType, gen_hash_from_file};
 
 use crate::{
     dtos::server_instance_dto::ServerInstancePickDto,
@@ -58,7 +58,11 @@ pub(super) fn mods(base: &Path, picks: &[ServerInstancePickDto]) -> Result<Vec<M
             }
             let entry = ModPick {
                 path: rel.clone(),
-                url: if single { pick.url.trim().to_string() } else { String::new() },
+                url: if single {
+                    pick.url.trim().to_string()
+                } else {
+                    String::new()
+                },
             };
             selected.insert(rel, entry);
         }
@@ -146,7 +150,8 @@ fn expand(base: &Path, path: &Path) -> Result<Vec<PathBuf>, String> {
 ///
 /// 是否排除
 fn is_excluded(decisions: &HashSet<PathBuf>, path: &Path) -> bool {
-    path.ancestors().any(|ancestor| decisions.contains(ancestor))
+    path.ancestors()
+        .any(|ancestor| decisions.contains(ancestor))
 }
 
 /// 校验并转成相对游戏目录的路径

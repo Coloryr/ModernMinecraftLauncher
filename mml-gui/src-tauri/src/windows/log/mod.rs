@@ -10,8 +10,10 @@
 //! 事件转发 `forward_run_log` / `emit_game_log` / `emit_log_line` 都放在这里。
 //! 主窗口只负责按钮开窗这个"入口"与启动 / 退出时推一行状态，转换逻辑不跟着它走。
 
-pub(crate) mod read;
 mod emit;
+pub(crate) mod read;
 pub(crate) mod setting;
 
-pub(crate) use self::emit::{LOG_FLUSH_INTERVAL_MS, flush_pending_logs, emit_log_line, forward_run_log};
+pub(crate) use self::emit::{
+    LOG_FLUSH_INTERVAL_MS, emit_log_line, flush_pending_logs, forward_run_log,
+};

@@ -15,10 +15,8 @@ use crate::dtos::{ColorMcInfoDto, ColorMcProgressDto, ColorMcReportDto};
 use crate::err_keys;
 use crate::listens;
 
-
 use super::detect::{asked, detect, info, mark};
 use super::migrate::migrate;
-
 
 /// 迁移是否正在进行，防重入：迁移期间再点一次不该并发跑第二遍
 pub(crate) static MIGRATING: AtomicBool = AtomicBool::new(false);
@@ -65,7 +63,7 @@ pub(crate) fn progress(app: Option<&AppHandle>, stage: &str, done: u32, total: u
 ///
 /// 探测到的 ColorMC 工作目录信息，含路径 / 来源 / 实例数 / 顶层条目；
 /// 已经问过、没探测到、或探测结果就是运行目录时返回 `None`
-#[gui_macros::ipc_group("colormc")]
+#[gui_macros::ipc_group("colormc")]
 #[gui_macros::command]
 pub fn window_check_colormc() -> Option<ColorMcInfoDto> {
     if asked() {
@@ -89,7 +87,7 @@ pub fn window_check_colormc() -> Option<ColorMcInfoDto> {
 /// # 返回值
 ///
 /// 标记写成功返回 `Ok(())`；写标记失败返回 `Err`，内容为错误原文
-#[gui_macros::ipc_group("colormc")]
+#[gui_macros::ipc_group("colormc")]
 #[gui_macros::command]
 pub fn window_skip_colormc() -> Result<(), String> {
     mark("skip")?;
@@ -109,7 +107,7 @@ pub fn window_skip_colormc() -> Result<(), String> {
 ///
 /// 迁移与兼容性检测的报告，含搬入条目数 / 失败项 / 实例结论表；
 /// 模式非法、已有迁移在跑或迁移失败时返回 `Err`，内容为 i18n 键
-#[gui_macros::ipc_group("colormc")]
+#[gui_macros::ipc_group("colormc")]
 #[gui_macros::command]
 pub async fn window_migrate_colormc(
     app: AppHandle,

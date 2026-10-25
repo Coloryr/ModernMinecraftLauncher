@@ -2,18 +2,19 @@
 //!
 //! 关窗请求在这里统一处理：拦下要阻止的关闭，其余走到销毁流程。
 
-use std::{sync::{Mutex}};
+use std::sync::Mutex;
 
 use tauri::{Manager, WebviewWindow};
 
 use uuid::Uuid;
 
-use crate::windows::geometry::{save_window_state};
-use crate::windows::registry::{ADD_MODPACK_WINDOW_UUID, MAIN_WINDOW_UUID, family_of_label, uuid_of_label};
-use crate::windows::{add_modpack, resource};
+use super::create::{close_guarded, emit_close_blocked, notify_modpack_window};
 use super::models::{OPEN_WINDOWS, model_for_kind, remove_window_model};
-use super::create::{close_guarded, notify_modpack_window, emit_close_blocked};
-
+use crate::windows::geometry::save_window_state;
+use crate::windows::registry::{
+    ADD_MODPACK_WINDOW_UUID, MAIN_WINDOW_UUID, family_of_label, uuid_of_label,
+};
+use crate::windows::{add_modpack, resource};
 
 /// 窗口事件处理，注册于 `Builder::on_window_event`
 ///
@@ -40,7 +41,9 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
             // 关闭已放行：终止该窗口还在跑的操作 —— 整合包搜索、模组扫描 / 更新检查 / 下载更新
             add_modpack::cancel_search(&label);
             resource::cancel_window(&label);
-            if label == "mml-lobby" { crate::windows::lobby::cancel(); }
+            if label == "mml-lobby" {
+                crate::windows::lobby::cancel();
+            }
             // 下载整合包窗口关掉：那两个进度指示器要回到主页面，广播一次让 `window_open` 变 false
             if uuid == ADD_MODPACK_WINDOW_UUID {
                 notify_modpack_window(window.app_handle());

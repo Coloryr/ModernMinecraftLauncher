@@ -11,7 +11,6 @@ use std::time::SystemTime;
 use mml_nbt::nbt_file::NbtFile;
 use uuid::Uuid;
 
-
 /// 一个打开着的 NBT 文件
 pub(super) struct NbtSession {
     /// 打开它的实例 uuid，即配置窗口的实例；关那个窗口时按它只清这一份
@@ -75,4 +74,4 @@ pub(crate) fn close(path: &Path, chunk: Option<u32>) {
 /// - `owner`: 实例 uuid，见 [`open_with`]
 pub(crate) fn close_all_of(owner: &Uuid) {
     SESSIONS.lock().unwrap().retain(|_, s| s.owner != *owner);
-}
+}

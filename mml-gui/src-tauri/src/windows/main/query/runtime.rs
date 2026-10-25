@@ -3,16 +3,13 @@
 //! Java、系统内存、可装版本与新闻都来自内核与本机探测；
 //! 只读，失败时给出空列表而不是报错，界面照常显示。
 
-
-
 use crate::dtos::main_dto::{CustomJsonItemDto, NewsItem, StartArgDto};
 use crate::dtos::{JavaInfoDto, MotdDto, SystemMemoryDto, VersionInfoDto};
 use crate::image_manager;
 
-use crate::windows::main::args::{core_instance};
+use super::instance::java_list;
+use crate::windows::main::args::core_instance;
 use crate::windows::main::catalog::{VERSIONS_CACHE, fetch_versions, parse_motd_addr};
-use super::instance::{java_list};
-
 
 /// 获取 Java 列表，来自 mml_jvms，配置加载 / 扫描异步进行
 ///

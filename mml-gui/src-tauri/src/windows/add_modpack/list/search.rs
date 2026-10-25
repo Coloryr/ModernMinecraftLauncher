@@ -3,7 +3,6 @@
 //! 搜索结果按当前实例的游戏版本过滤，在线列表只回一页；
 //! 已安装的项目在结果里带上本地状态。
 
-
 use mml_game::launcher::{FileType, ModPackType};
 use mml_game::modrinth;
 use mml_net::curseforge_api::{self, CurseFogreArg, CurseForgeSortType};
@@ -15,9 +14,8 @@ use crate::dtos::add_resource_dto::{ProjectDto, ProjectItemDto};
 
 use crate::err_keys;
 
-use crate::windows::add_modpack::{CURSEFOGRE_INFO, MODRINTH_INFO, register_search};
 use super::installed::{installed_modpack_pids, running_pids};
-
+use crate::windows::add_modpack::{CURSEFOGRE_INFO, MODRINTH_INFO, register_search};
 
 /// 获取项目列表
 ///

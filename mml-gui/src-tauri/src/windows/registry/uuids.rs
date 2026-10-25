@@ -3,11 +3,9 @@
 //! 一个 kind 一个固定 uuid，按标签查回 kind；
 //! 「一实例一窗」的窗口实际 uuid 由窗口族在基准 uuid 上派生。
 
-
+use super::family::{family_of_label, family_window_id};
+use super::spec::WINDOWS_INFO;
 use uuid::{Uuid, uuid};
-use super::family::{family_window_id, family_of_label};
-use super::spec::{WINDOWS_INFO};
-
 
 /// 主窗口固定 uuid；其余窗口从 2 号起按顺序分配
 pub(crate) const MAIN_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000001");
@@ -63,8 +61,7 @@ pub(crate) const LOBBY_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000
 pub(crate) const SERVER_PACK_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000013");
 
 /// 服务器实例生成窗口固定 uuid
-pub(crate) const SERVER_INSTANCE_WINDOW_UUID: Uuid =
-    uuid!("00000000-0000-0000-0000-000000000014");
+pub(crate) const SERVER_INSTANCE_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000014");
 
 /// 前端窗口 kind → uuid，标签去 `mml-` 前缀匹配
 ///

@@ -19,7 +19,7 @@ use mml_net::{mojang_api, urls};
 use mml_sys::{Os, path_helper};
 
 use crate::{
-    game_launch::{AutoJoinType, GameLaunchArg},
+    game_launch::{AutoJoinType, GameLaunchArg, MixinArg},
     game_log::GameLog,
     launcher::instance_setting_obj::InstanceSettingObj,
     launcher_path::{self, assets_path, libraries_path, version_path},
@@ -423,7 +423,7 @@ impl InstanceSettingObj {
     ///
     /// - `auth`: 登陆使用的账户
     /// - `java`: 使用的JAVA主版本号
-    /// - `mixin`: 外部注入使用的端口号
+    /// - `mixin`: ColorASM IPC 连接参数，`None` 表示不注入
     ///
     /// # 返回值
     ///
@@ -432,7 +432,7 @@ impl InstanceSettingObj {
         &self,
         auth: &LoginObj,
         java: u8,
-        mixin: Option<u16>,
+        mixin: Option<&MixinArg>,
     ) -> CoreResult<Vec<String>> {
         let config = &mml_config::read_config().jvm_arg;
 
@@ -472,12 +472,16 @@ impl InstanceSettingObj {
 
         if self.isolate_home() {
             // Windows 上 JVM 的 user.home 不跟环境变量走，单独补一条属性
-            args.push(format!("-Duser.home={}", self.isolated_home().to_string_lossy()));
+            args.push(format!(
+                "-Duser.home={}",
+                self.isolated_home().to_string_lossy()
+            ));
         }
 
-        if colorasm && let Some(port) = mixin {
-            args.push(format!("-Dcolormc.mixin.port={}", port));
-            args.push(format!("-Dcolormc.mixin.uuid={}", self.uuid));
+        if colorasm && let Some(mixin) = mixin {
+            args.push(format!("-Dcoloryrasm.mixin.port={}", mixin.port));
+            args.push(format!("-Dcoloryrasm.mixin.uuid={}", self.uuid));
+            args.push(format!("-Dcoloryrasm.mixin.key={}", mixin.key));
             args.push(format!(
                 "-javaagent:{}",
                 launcher_path::get_colorasm().file.to_string_lossy()
@@ -966,7 +970,7 @@ impl InstanceSettingObj {
         // 创建启动器自定义JVM参数
         let java_version = obj.java_versions.iter().next().copied().unwrap_or(8);
         let jvm_args = self
-            .make_jvm_arg(&arg.auth, java_version as u8, arg.mixin)
+            .make_jvm_arg(&arg.auth, java_version as u8, arg.mixin.as_ref())
             .await?;
 
         obj.jvm_args.extend(jvm_args);
@@ -1261,7 +1265,7 @@ impl InstanceSettingObj {
         // 创建启动器自定义JVM参数
         let java_version = obj.java_versions.iter().next().copied().unwrap_or(8);
         let jvm_args = self
-            .make_jvm_arg(&arg.auth, java_version as u8, arg.mixin)
+            .make_jvm_arg(&arg.auth, java_version as u8, arg.mixin.as_ref())
             .await?;
 
         obj.jvm_args.extend(jvm_args);
@@ -1422,7 +1426,7 @@ mod tests {
 
     /// 起内核各系统，并把全局 JVM 配置清成全 `None`
     ///
-    /// `boot()` 不含本 crate 的 `init`，而 `-Dcolormc.*` 那段要读实例路径（`BASE_DIR`），
+    /// boot() 不含本 crate 的 init，而 -Dcoloryrasm.* 那段要读实例路径（BASE_DIR），
     /// 所以这里补上；路径都是 `OnceLock::get_or_init`，重复初始化是幂等的。
     ///
     /// # 返回值
@@ -1461,19 +1465,55 @@ mod tests {
     #[tokio::test]
     async fn isolate_home_paths() {
         let _guard = setup();
-        let obj = instance(RunArgObj { isolate_home: Some(true), ..Default::default() });
+        let obj = instance(RunArgObj {
+            isolate_home: Some(true),
+            ..Default::default()
+        });
         let home = obj.get_base_path().to_string_lossy().into_owned();
         let env = obj.make_env_arg();
         assert_eq!(env.get("HOME"), Some(&home));
         assert_eq!(env.get("USERPROFILE"), Some(&home));
         assert!(env["XDG_CONFIG_HOME"].ends_with(".config"));
-        let args = obj.make_jvm_arg(&LoginObj::default(), 21, None).await.unwrap();
+        let args = obj
+            .make_jvm_arg(&LoginObj::default(), 21, None)
+            .await
+            .unwrap();
         assert!(args.iter().any(|a| a == &format!("-Duser.home={home}")));
 
-        let off = instance(RunArgObj { isolate_home: Some(false), ..Default::default() });
+        let off = instance(RunArgObj {
+            isolate_home: Some(false),
+            ..Default::default()
+        });
         assert!(!off.make_env_arg().contains_key("HOME"));
-        let args = off.make_jvm_arg(&LoginObj::default(), 21, None).await.unwrap();
+        let args = off
+            .make_jvm_arg(&LoginObj::default(), 21, None)
+            .await
+            .unwrap();
         assert!(!args.iter().any(|a| a.starts_with("-Duser.home=")));
+    }
+
+    /// ColorASM 注入：端口、实例 ID 与验证密钥都要写进 JVM 参数
+    #[tokio::test]
+    async fn jvm_arg_colorasm() {
+        let _guard = setup();
+        let obj = instance(RunArgObj {
+            colorasm: Some(true),
+            ..Default::default()
+        });
+        let mixin = MixinArg {
+            port: 12345,
+            key: "test-key".to_string(),
+        };
+
+        let args = obj
+            .make_jvm_arg(&LoginObj::default(), 21, Some(&mixin))
+            .await
+            .unwrap();
+
+        assert!(args.contains(&"-Dcoloryrasm.mixin.port=12345".to_string()));
+        assert!(args.contains(&format!("-Dcoloryrasm.mixin.uuid={}", obj.uuid)));
+        assert!(args.contains(&"-Dcoloryrasm.mixin.key=test-key".to_string()));
+        assert!(args.iter().any(|a| a.starts_with("-javaagent:")));
     }
 
     /// 内存：最小填 `-Xms`、最大填 `-Xmx`，且 `-Xms` 排在前面
@@ -1683,6 +1723,7 @@ mod tests {
             admin: false,
             mixin: None,
             lang: None,
+            skip_server_pack: false,
         };
         let args = instance.make_run_arg(&launch_arg, &mut obj, false);
         assert!(

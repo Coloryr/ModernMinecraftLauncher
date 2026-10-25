@@ -83,8 +83,12 @@ fn size_of(kind: &LocalFileKind) -> u64 {
         return total;
     }
     total
-        .saturating_sub(path_helper::get_folder_size(kind.dir.join(names::IMAGE_DIR)))
-        .saturating_sub(path_helper::get_folder_size(kind.dir.join(names::WEBVIEW_DIR)))
+        .saturating_sub(path_helper::get_folder_size(
+            kind.dir.join(names::IMAGE_DIR),
+        ))
+        .saturating_sub(path_helper::get_folder_size(
+            kind.dir.join(names::WEBVIEW_DIR),
+        ))
 }
 
 /// 采集全部文件夹的占用

@@ -136,11 +136,13 @@ pub fn run() {
             let handle = app.handle().clone();
             std::thread::Builder::new()
                 .name("Mml Log Flush".to_string())
-                .spawn(move || loop {
-                    std::thread::sleep(std::time::Duration::from_millis(
-                        windows::log::LOG_FLUSH_INTERVAL_MS,
-                    ));
-                    windows::log::flush_pending_logs(&handle);
+                .spawn(move || {
+                    loop {
+                        std::thread::sleep(std::time::Duration::from_millis(
+                            windows::log::LOG_FLUSH_INTERVAL_MS,
+                        ));
+                        windows::log::flush_pending_logs(&handle);
+                    }
                 })
                 .ok();
 

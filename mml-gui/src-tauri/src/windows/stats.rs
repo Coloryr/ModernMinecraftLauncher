@@ -10,7 +10,9 @@ use chrono::{Days, Local, NaiveDate, NaiveTime};
 use mml_game::game_count;
 use uuid::Uuid;
 
-use crate::dtos::stats_dto::{StatsDataDto, StatsDayInstanceDto, StatsInstanceDto, StatsPlayDayDto, StatsPlaytimeDto};
+use crate::dtos::stats_dto::{
+    StatsDataDto, StatsDayInstanceDto, StatsInstanceDto, StatsPlayDayDto, StatsPlaytimeDto,
+};
 use crate::err_keys;
 
 /// 单实例的统计汇总，聚合期间的中间值
@@ -303,7 +305,10 @@ pub fn stats_get_playtime(
                 let done = dones_per_instance.get(&uuid).copied().unwrap_or(0);
                 StatsDayInstanceDto {
                     uuid: uuid.to_string(),
-                    name: names.get(&uuid).cloned().unwrap_or_else(|| uuid.to_string()),
+                    name: names
+                        .get(&uuid)
+                        .cloned()
+                        .unwrap_or_else(|| uuid.to_string()),
                     seconds,
                     count,
                     failed: count.saturating_sub(done),

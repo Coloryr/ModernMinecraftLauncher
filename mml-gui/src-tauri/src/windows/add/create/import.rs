@@ -3,7 +3,6 @@
 //! 目录、压缩包、下载地址三条路都汇到同一份任务上；
 //! 建实例是最后一步，前面任何一步失败都不落盘。
 
-
 use tauri::{AppHandle, WebviewWindow};
 
 use mml_game::add_game::{self, PackType};
@@ -13,11 +12,10 @@ use crate::windows::add_resource::SourceInfo;
 use crate::windows::modpack_task::{LOCAL_PACK_PID, RegisteredTask, finish_task, register_task};
 use uuid::Uuid;
 
+use super::prepare::{PreparedTask, is_modpack, pack_file_stem, prepare};
 use crate::dtos::ServerPackProbeDto;
 use crate::windows::add::loader::{parse_loader, parse_pack_type};
 use crate::windows::add::model::{instance_gui, pack_gui};
-use super::prepare::{PreparedTask, prepare, is_modpack, pack_file_stem};
-
 
 /// 导入文件夹为实例
 ///
@@ -122,7 +120,15 @@ pub async fn add_import_archive(
         let RegisteredTask {
             task,
             gui: progress,
-        } = register_task(&app, key, "local", display, String::new(), "install", token.clone())?;
+        } = register_task(
+            &app,
+            key,
+            "local",
+            display,
+            String::new(),
+            "install",
+            token.clone(),
+        )?;
         (progress, Some(task))
     } else {
         (pack_gui(&window), None)

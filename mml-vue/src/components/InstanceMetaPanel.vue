@@ -58,10 +58,16 @@ function normType(vt: string): string {
 
 // ================= 整合包更新 =================
 
-/** 这个实例是不是从平台安装的整合包：本地导入的包没有项目号，问不了平台 */
-const onlineModpack = computed(
-  () => props.instance.modpackType === "curseforge" || props.instance.modpackType === "modrinth",
+/** 能不能查更新：平台安装的整合包按平台查，在线服务器包按发布地址查 */
+const updatableModpack = computed(
+  () =>
+    props.instance.modpackType === "curseforge" ||
+    props.instance.modpackType === "modrinth" ||
+    (props.instance.modpackType === "serverpack" && !!props.instance.serverUrl),
 );
+
+/** 这次检查针对的是在线服务器包 */
+const serverPack = computed(() => props.instance.modpackType === "serverpack");
 
 /** 查更新 / 登记升级任务期间置真 */
 const packBusy = ref(false);
@@ -69,27 +75,44 @@ const packBusy = ref(false);
 const packResult = ref<ModPackUpdateDto | null>(null);
 
 /**
- * 查整合包更新
+ * 查整合包 / 服务器包更新
  *
  * 查到就开确认弹窗（见 ModPackUpdateModal），没查到给一条轻提示，不留空窗。
  * 入口在这一层而不是资源窗口：升级动的是整个实例。
+ *
+ * - `auto`: 选中实例后自动查的那一次；不弹"已是最新"，失败也不提示，免得每次切实例都打扰
  */
-async function checkModpack() {
-  if (packBusy.value || !onlineModpack.value) return;
+async function checkModpack(auto = false) {
+  if (packBusy.value || !updatableModpack.value) return;
   packBusy.value = true;
   try {
     const result = await modpackCheck(props.instance.uuid);
     if (!result.hasUpdate) {
-      showToast(t("detail.modpackUpToDate"));
+      if (!auto) showToast(t(serverPack.value ? "detail.serverPackUpToDate" : "detail.modpackUpToDate"));
       return;
     }
     packResult.value = result;
   } catch (e) {
-    showToast(tErr(e));
+    if (!auto) showToast(tErr(e));
   } finally {
     packBusy.value = false;
   }
 }
+
+/** 已经自动查过的实例：实例列表刷新会换掉对象，只认 uuid，免得反复查 */
+const autoChecked = new Set<string>();
+
+// 选中实例后自动按下「检查更新」：有新版就弹确认窗，没有就静默。
+// 同时盯 `updatableModpack`：服务器包的地址是随实例数据异步回来的，来晚一步也要补查一次
+watch(
+  [() => props.instance.uuid, updatableModpack] as const,
+  ([uuid, ok]) => {
+    if (!uuid || !ok || autoChecked.has(uuid)) return;
+    autoChecked.add(uuid);
+    void checkModpack(true);
+  },
+  { immediate: true },
+);
 
 /**
  * 确认更新：把任务登记到后端，进度在标题栏 / 整合包任务里看
@@ -498,10 +521,14 @@ function onPlatformChange(value: string) {
         @change="onPlatformChange(($event.target as HTMLSelectElement).value)">
         <option v-for="p in platforms" :key="p.value" :value="p.value">{{ p.label }}</option>
       </select>
-      <!-- 在线网络整合包：网址输入框（隐藏 ID 输入框） -->
+      <!-- 在线网络整合包：网址输入框（隐藏 ID 输入框），右侧是同步按钮 -->
       <div v-if="instance.modpackType === 'serverpack'" class="modpack-url">
         <input class="field-input" :value="instance.serverUrl ?? ''" :placeholder="t('add.url')" spellcheck="false"
           @input="change({ serverUrl: ($event.target as HTMLInputElement).value || null })" />
+        <button class="ui-btn-icon" :disabled="packBusy || !instance.serverUrl" v-tip="t('detail.serverPackCheck')"
+          :aria-label="t('detail.serverPackCheck')" @click="checkModpack()">
+          <GlyphIcon name="update" :size="14" :weight="2" />
+        </button>
       </div>
       <!-- ID 平台：项目 / 文件 ID 与"检查整合包更新"同一行。
            更新按钮只给从平台安装的整合包（本地导入的包没有项目号，问不了平台），
@@ -512,7 +539,7 @@ function onPlatformChange(value: string) {
         <input class="field-input" :value="instance.fid ?? ''" :placeholder="t('meta.fid')" spellcheck="false"
           @input="change({ fid: ($event.target as HTMLInputElement).value || null })" />
         <button class="ui-btn-icon" :disabled="packBusy" v-tip="t('detail.modpackCheck')"
-          :aria-label="t('detail.modpackCheck')" @click="checkModpack">
+          :aria-label="t('detail.modpackCheck')" @click="checkModpack()">
           <GlyphIcon name="update" :size="14" :weight="2" />
         </button>
       </div>
@@ -600,11 +627,12 @@ function onPlatformChange(value: string) {
   min-width: 0;
 }
 
-/* 在线网络整合包网址输入框 */
+/* 在线网络整合包网址输入框 + 右侧同步按钮 */
 
 .modpack-url {
   grid-column: 3 / 5;
   display: flex;
+  gap: 10px;
   min-width: 0;
 }
 

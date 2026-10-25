@@ -47,8 +47,12 @@ pub fn collect<I: IntoIterator<Item = String>>(args: I) {
 fn parse(args: &[String]) -> Option<StartArgDto> {
     let first = args.first()?;
 
-    if first == "--run-dir" { return parse(args.get(2..)?); }
-    if first == mml_names::names::COMMAND_RESTART { return parse(&args[1..]); }
+    if first == "--run-dir" {
+        return parse(args.get(2..)?);
+    }
+    if first == mml_names::names::COMMAND_RESTART {
+        return parse(&args[1..]);
+    }
 
     if first == CMD_GAME {
         args.get(1).map(|uuid| StartArgDto::game(uuid))
@@ -78,7 +82,9 @@ pub fn run_dir(args: impl IntoIterator<Item = String>) -> Option<std::path::Path
         if arg == "--run-dir" {
             return args.next().map(std::path::PathBuf::from);
         }
-        if arg == CMD_INSTALL || arg == CMD_IMPORT || arg == CMD_GAME { args.next(); }
+        if arg == CMD_INSTALL || arg == CMD_IMPORT || arg == CMD_GAME {
+            args.next();
+        }
     }
     None
 }
@@ -96,9 +102,18 @@ mod tests {
         assert_eq!(dropped.action, "install");
         assert_eq!(dropped.value, flagged.value);
         assert_eq!(dropped.value, path);
-        let restarted = super::parse(&["--restart".into(), "--run-dir".into(), dir.to_string_lossy().into_owned(), path.clone()]).unwrap();
+        let restarted = super::parse(&[
+            "--restart".into(),
+            "--run-dir".into(),
+            dir.to_string_lossy().into_owned(),
+            path.clone(),
+        ])
+        .unwrap();
         assert_eq!(restarted.value, path);
-        assert_eq!(super::run_dir(["--run-dir".into(), dir.to_string_lossy().into_owned()]), Some(dir.clone()));
+        assert_eq!(
+            super::run_dir(["--run-dir".into(), dir.to_string_lossy().into_owned()]),
+            Some(dir.clone())
+        );
         crate::test_support::cleanup(&[&dir]);
     }
 }

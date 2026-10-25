@@ -85,7 +85,12 @@ pub(crate) fn reload() {
                 }
             }
             Err(err) => {
-                mml_log::warn(LogText::ArchiveOpenFailed { error: err.to_string() }.text());
+                mml_log::warn(
+                    LogText::ArchiveOpenFailed {
+                        error: err.to_string(),
+                    }
+                    .text(),
+                );
                 None
             }
         }

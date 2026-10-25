@@ -8,7 +8,7 @@
 //! 判定放在 Rust 侧而不是前端读 `import.meta.env`：预发布与正式发布的前端产物
 //! **是同一份**，只有后端的编译 profile 不同。
 
-use mml_base::hash_helper::{gen_hash_from_file, HashType};
+use mml_base::hash_helper::{HashType, gen_hash_from_file};
 
 use crate::dtos::build_info_dto::{BuildChannel, BuildInfoDto, ExeInfoDto};
 

@@ -8,12 +8,10 @@ use std::path::Path;
 use tauri::{AppHandle, WebviewWindow};
 use uuid::Uuid;
 
-
 use crate::err_keys;
 use crate::windows;
 
 use crate::windows::main::{deleting, emit_instance_change, model};
-
 
 /// 新建分组
 ///

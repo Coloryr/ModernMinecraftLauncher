@@ -3,14 +3,19 @@
 //! 每个窗口一份模型，按实例归属；窗口销毁时释放，
 //! 建窗前第一次用到时建立。
 
-use std::{any::Any, collections::HashMap, sync::{Arc, LazyLock, Mutex, RwLock}};
+use std::{
+    any::Any,
+    collections::HashMap,
+    sync::{Arc, LazyLock, Mutex, RwLock},
+};
 
 use tauri::{Manager, WebviewWindow};
 
 use uuid::Uuid;
 
-use crate::windows::registry::{ADD_MODPACK_WINDOW_UUID, ADD_WINDOW_UUID, MAIN_WINDOW_UUID, WINDOWS_INFO, uuid_for_kind};
-
+use crate::windows::registry::{
+    ADD_MODPACK_WINDOW_UUID, ADD_WINDOW_UUID, MAIN_WINDOW_UUID, WINDOWS_INFO, uuid_for_kind,
+};
 
 /// 已打开窗口的句柄表：uuid → 句柄
 pub(crate) static OPEN_WINDOWS: LazyLock<RwLock<HashMap<Uuid, WebviewWindow<tauri::Wry>>>> =
@@ -198,7 +203,10 @@ pub(crate) fn app_has_window(label: &str) -> bool {
 /// - `uuid`: 窗口 uuid
 pub(crate) fn remove_window_model(uuid: &Uuid) {
     let model = WINDOW_MODELS.write().unwrap().remove(uuid);
-    if let Some(model) = model.and_then(|m| m.downcast::<crate::windows::lobby::model::LobbyModel>().ok()) {
+    if let Some(model) = model.and_then(|m| {
+        m.downcast::<crate::windows::lobby::model::LobbyModel>()
+            .ok()
+    }) {
         model.close();
     }
 }

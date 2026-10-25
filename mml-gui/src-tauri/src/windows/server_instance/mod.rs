@@ -17,7 +17,7 @@ use std::{
     sync::atomic::AtomicBool,
 };
 
-use mml_base::hash_helper::{gen_hash, HashType};
+use mml_base::hash_helper::{HashType, gen_hash};
 use mml_game::{
     launcher::{file_online_info_obj::OnlineInfoObj, instance_setting_obj::InstanceSettingObj},
     other_launcher::hmcl_obj::HMCLServerFileObj,
@@ -240,7 +240,9 @@ fn generate(
     match format {
         Format::Mml => {
             let online = online_sources(game);
-            generate_mml(game, &online, &base, &out, &url, options, &contents, progress)
+            generate_mml(
+                game, &online, &base, &out, &url, options, &contents, progress,
+            )
         }
         Format::Hmcl => generate_hmcl(game, &base, &out, &url, options, &contents, progress),
     }
@@ -362,7 +364,9 @@ fn generate_mml(
         let recorded = online.get(&file_name(&entry.path));
         let download = pick(&entry.url, recorded.map(|info| info.url.as_str()));
         let pid = recorded.map(|info| info.modid.as_str()).unwrap_or_default();
-        let fid = recorded.map(|info| info.fileid.as_str()).unwrap_or_default();
+        let fid = recorded
+            .map(|info| info.fileid.as_str())
+            .unwrap_or_default();
 
         // 地址优先，其次是"项目号 + 文件号"能解析出来的；都没有就只能自己托管
         let online_download = !download.is_empty() || (!pid.is_empty() && !fid.is_empty());
@@ -533,7 +537,9 @@ fn pick(typed: &str, recorded: Option<&str>) -> String {
     if !typed.is_empty() {
         return typed.to_string();
     }
-    recorded.map(|value| value.trim().to_string()).unwrap_or_default()
+    recorded
+        .map(|value| value.trim().to_string())
+        .unwrap_or_default()
 }
 
 /// 在线下载的条目：不复制文件，客户端按地址或项目号自己下载
@@ -576,12 +582,7 @@ fn source_item(
 /// # 返回值
 ///
 /// 见 [`ServerItemObj`]；复制或算哈希失败返回错误文案
-fn hosted_item(
-    base: &Path,
-    out: &Path,
-    rel: &Path,
-    url: &str,
-) -> Result<ServerItemObj, String> {
+fn hosted_item(base: &Path, out: &Path, rel: &Path, url: &str) -> Result<ServerItemObj, String> {
     files::copy_into(base, out, rel)?;
     let wire = files::wire_path(rel);
     Ok(ServerItemObj {
@@ -773,7 +774,13 @@ mod tests {
             normalize_url("http://127.0.0.1:8080").unwrap(),
             "http://127.0.0.1:8080"
         );
-        for bad in ["", "  ", "example.invalid", "ftp://example.invalid", "https://"] {
+        for bad in [
+            "",
+            "  ",
+            "example.invalid",
+            "ftp://example.invalid",
+            "https://",
+        ] {
             assert!(normalize_url(bad).is_err(), "{bad}");
         }
     }
@@ -821,7 +828,10 @@ mod tests {
             exclude: true,
             url: String::new(),
         });
-        assert_eq!(paths(files::mods(&base, &exclude).unwrap()), vec![PathBuf::from("mods/a.jar")]);
+        assert_eq!(
+            paths(files::mods(&base, &exclude).unwrap()),
+            vec![PathBuf::from("mods/a.jar")]
+        );
 
         assert!(files::mods(&base, &[]).unwrap().is_empty());
 
@@ -841,7 +851,8 @@ mod tests {
         fs::write(base.join("mods/local.jar"), b"local").unwrap();
         fs::write(base.join("config/a.toml"), b"a = 1").unwrap();
 
-        let online = HashMap::from([("online.jar".to_string(), online("online.jar", "123", "456"))]);
+        let online =
+            HashMap::from([("online.jar".to_string(), online("online.jar", "123", "456"))]);
         let options = options("mml", &["mods"], &[("config", "archive")], &[]);
         let contents = contents(&base, &options);
         let result = generate_mml(
@@ -989,14 +1000,22 @@ mod tests {
         assert_eq!(pack.online_list.len(), 2);
 
         // a：手填地址盖掉实例记录，编号仍是记录里的，文件不复制
-        let a = pack.online_list.iter().find(|item| item.file == "mods/a.jar").unwrap();
+        let a = pack
+            .online_list
+            .iter()
+            .find(|item| item.file == "mods/a.jar")
+            .unwrap();
         assert_eq!(a.url.as_deref(), Some("https://typed.example/a.jar"));
         assert_eq!(a.pid.as_deref(), Some("1"));
         assert_eq!(a.fid.as_deref(), Some("2"));
         assert!(!out.join("mods/a.jar").exists());
 
         // b：没有地址也没有编号，复制进文件夹并给托管地址
-        let b = pack.online_list.iter().find(|item| item.file == "mods/b.jar").unwrap();
+        let b = pack
+            .online_list
+            .iter()
+            .find(|item| item.file == "mods/b.jar")
+            .unwrap();
         assert_eq!(
             b.url.as_deref(),
             Some("https://example.invalid/pack/mods/b.jar")
@@ -1085,9 +1104,15 @@ mod tests {
             pack.online_list[0].url.as_deref(),
             Some("https://example.invalid/pack/resourcepacks/%E4%B8%AD%E6%96%87%201.zip")
         );
-        assert_eq!(pack.online_list[0].sha1.as_deref(), Some(sha1(b"pack").as_str()));
+        assert_eq!(
+            pack.online_list[0].sha1.as_deref(),
+            Some(sha1(b"pack").as_str())
+        );
         assert!(pack.archive_list.is_empty());
-        assert_eq!(fs::read(out.join("resourcepacks/中文 1.zip")).unwrap(), b"pack");
+        assert_eq!(
+            fs::read(out.join("resourcepacks/中文 1.zip")).unwrap(),
+            b"pack"
+        );
         assert_eq!(result.files, ["resourcepacks"]);
         assert_eq!(result.count, 1);
 
@@ -1136,11 +1161,7 @@ mod tests {
         let paths: Vec<&str> = pack.files.iter().map(|f| f.path.as_str()).collect();
         assert_eq!(
             paths,
-            [
-                "config/x.toml",
-                "mods/a.jar",
-                "resourcepacks/p.zip"
-            ]
+            ["config/x.toml", "mods/a.jar", "resourcepacks/p.zip"]
         );
         assert_eq!(pack.files[1].hash, sha1(b"mod"));
 

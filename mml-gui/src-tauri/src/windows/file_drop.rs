@@ -84,7 +84,6 @@ pub(crate) const INJECT_SCRIPT: &str = r#"
 /// - `label`: 窗口标签，事件只发给这个窗口
 /// - `webview2`: WebView2 的 `ICoreWebView2`，由 `on_webview_ready` 里取
 pub fn install(app: &AppHandle, label: String, webview2: &ICoreWebView2) {
-
     let mut token = 0;
     let handle = app.clone();
     let target = label;
@@ -105,7 +104,12 @@ pub fn install(app: &AppHandle, label: String, webview2: &ICoreWebView2) {
                 let paths = file_paths(&args);
                 if paths.is_empty() {
                     // 过桥了却取不到路径：用户侧会看到"没拿到拖入文件的路径"的提示
-                    mml_log::error(LogText::FilePathBridgeNoPath { label: target.clone() }.text());
+                    mml_log::error(
+                        LogText::FilePathBridgeNoPath {
+                            label: target.clone(),
+                        }
+                        .text(),
+                    );
                     return Ok(());
                 }
                 emit_file_drop(&handle, &target, FileDropDto { paths });

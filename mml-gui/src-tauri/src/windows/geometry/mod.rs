@@ -11,14 +11,14 @@
 //!   而下限**只在装饰激活后设**：建窗时窗口是带装饰口径，那时算出的下限比恢复值高一个标题栏，
 //!   tao 重设尺寸时 Windows 会顺着它把窗口顶上去，实测每开一次高 31px。
 
-mod state;
-mod size;
 mod placement;
+mod size;
+mod state;
 
-pub use self::state::{init};
+pub use self::state::init;
 
-pub(crate) use self::state::{remember_decorated_inset, window_state_for, save_window_state};
+pub(crate) use self::state::{remember_decorated_inset, save_window_state, window_state_for};
 
-pub(crate) use self::size::{reconcile_min_size, clamp_runtime_min_size};
+pub(crate) use self::size::{clamp_runtime_min_size, reconcile_min_size};
 
-pub(crate) use self::placement::{SizeF, RectF, Placement, child_placement, center_placement};
+pub(crate) use self::placement::{Placement, RectF, SizeF, center_placement, child_placement};

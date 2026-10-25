@@ -19,8 +19,7 @@ use crate::err_keys;
 use crate::windows::resource::{block_on_instance, data_url};
 
 // ==================== 模组 ====================
-use super::list::{mod_dependencies};
-
+use super::list::mod_dependencies;
 
 /// `mod_item` 需要的几份外部数据，打包传，省得一路加参数
 pub(super) struct ModCtx<'a> {
@@ -277,7 +276,10 @@ pub(crate) async fn find_mod(instance: GameInstance, mod_uuid: &str) -> Result<M
 /// # 返回值
 ///
 /// 新的 uuid / 文件名 / 相对路径；取游戏根目录失败时返回错误串
-pub(super) async fn mod_rename_dto(instance: GameInstance, path: PathBuf) -> Result<ModRenameDto, String> {
+pub(super) async fn mod_rename_dto(
+    instance: GameInstance,
+    path: PathBuf,
+) -> Result<ModRenameDto, String> {
     let game_path = block_on_instance(instance, |game| game.get_game_path()).await?;
 
     Ok(ModRenameDto {

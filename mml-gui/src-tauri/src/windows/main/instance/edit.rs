@@ -15,9 +15,8 @@ use crate::dtos::{InstanceArgsDto, InstanceInfoDto, InstancePatch};
 use crate::err_keys;
 use crate::windows;
 
-use crate::windows::main::{emit_instance_change, model};
 use super::group::{ensure_idle, uuid_short};
-
+use crate::windows::main::{emit_instance_change, model};
 
 /// 创建实例
 ///
@@ -142,7 +141,11 @@ pub fn main_rename_instance(
 /// 复制成功返回 `true`；名字为空返回 `false`；名字不合法 / 重名、实例不存在或复制失败返回 `Err`
 #[gui_macros::ipc_group("main")]
 #[gui_macros::command]
-pub async fn main_copy_instance(app: AppHandle, uuid: String, name: String) -> Result<bool, String> {
+pub async fn main_copy_instance(
+    app: AppHandle,
+    uuid: String,
+    name: String,
+) -> Result<bool, String> {
     let n = name.trim().to_string();
     if n.is_empty() {
         return Ok(false);

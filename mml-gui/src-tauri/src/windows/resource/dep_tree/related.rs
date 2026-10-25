@@ -2,20 +2,19 @@
 //!
 //! 都读窗口 model 里的扫描结果，不重新扫盘。
 
-use std::collections::{HashSet};
+use std::collections::HashSet;
 
-use mml_game::game_mods::{ModObj};
+use mml_game::game_mods::ModObj;
 use mml_game::loader::LoaderType;
 
-use crate::dtos::{ModDepTreeDto};
+use crate::dtos::ModDepTreeDto;
 use crate::err_keys;
 
+use super::build::build_tree;
+use super::draft::modid_of;
 use crate::windows::resource::model::window_model;
-use crate::windows::resource::mods::{mod_dependencies};
+use crate::windows::resource::mods::mod_dependencies;
 use crate::windows::resource::{block_on_instance, parse_instance};
-use super::draft::{modid_of};
-use super::build::{build_tree};
-
 
 /// 要和这几个模组一起改的那些条目
 ///

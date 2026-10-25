@@ -144,7 +144,12 @@ pub fn start(app: &AppHandle) {
         Ok(Some(port)) => write_port(port),
         Ok(None) => {}
         Err(err) => {
-            mml_log::error(LogText::IpcStartFailed { error: i18::get_error(err) }.text());
+            mml_log::error(
+                LogText::IpcStartFailed {
+                    error: i18::get_error(err),
+                }
+                .text(),
+            );
         }
     }
 
@@ -178,7 +183,8 @@ mod tests {
     ///
     /// 已建好的空目录
     fn port_dir(tag: &str) -> PathBuf {
-        let dir = mml_testutil::temp_dir().join(format!("mml_ipc_port_{tag}_{}", std::process::id()));
+        let dir =
+            mml_testutil::temp_dir().join(format!("mml_ipc_port_{tag}_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir

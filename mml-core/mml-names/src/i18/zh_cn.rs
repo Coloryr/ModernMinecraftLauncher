@@ -73,6 +73,7 @@ impl I18Lang for ZhCn {
                 format!("IPC：服务已启动，监听 127.0.0.1:{port}")
             }
             InfoType::IpcClientConnected { addr } => format!("IPC：客户端已连接 {addr}"),
+            InfoType::IpcAuthFailed { addr } => format!("IPC：连接验证失败，已断开 {addr}"),
             InfoType::IpcUnknownMessageType { msg_type } => {
                 format!("IPC：未知的消息类型 {msg_type}")
             }

@@ -10,13 +10,13 @@
 //! 检查要重扫一遍 mods 目录（在线信息按 SHA1 关联），代价与打开模组分类相同；
 //! 之后逐个问平台，进度经 `resource-mods-update-progress` 事件上报。
 
-mod emit;
 pub(crate) mod check;
-pub(crate) mod run;
-pub(crate) mod record;
+mod emit;
 mod newfile;
 mod prepare;
 mod query;
+pub(crate) mod record;
+pub(crate) mod run;
 
 #[cfg(test)]
 mod tests;

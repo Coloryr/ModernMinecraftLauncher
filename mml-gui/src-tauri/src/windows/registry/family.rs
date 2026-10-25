@@ -3,11 +3,11 @@
 //! 族里窗口的 uuid 是基准 uuid 与实例 uuid 的 UUIDv5，标签是前缀 + 实例 uuid；
 //! 按标签反查、按实例派生、最小尺寸都从这里走，族表不另存尺寸。
 
-
-use uuid::{Uuid};
-use super::uuids::{RESOURCE_WINDOW_UUID, ADD_RESOURCE_WINDOW_UUID, LOG_WINDOW_UUID, CONFIG_WINDOW_UUID};
 use super::spec::{MinSize, min_size_of};
-
+use super::uuids::{
+    ADD_RESOURCE_WINDOW_UUID, CONFIG_WINDOW_UUID, LOG_WINDOW_UUID, RESOURCE_WINDOW_UUID,
+};
+use uuid::Uuid;
 
 /// 「一个实例一个窗口」的窗口族
 ///

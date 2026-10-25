@@ -1,8 +1,8 @@
 //! 启动器与游戏、以及启动器实例之间的 IPC 通信
 //!
 //! 启动器在本机绑定 `127.0.0.1` 的临时端口作为 TCP 服务端：
-//! - 游戏通过注入的 Agent 连接回启动器，端口与实例 ID 分别来自
-//!   `-Dcolormc.mixin.port` 与 `-Dcolormc.mixin.uuid`；
+//! - 游戏通过注入的 Agent 连接回启动器，端口、实例 ID 与验证密钥分别来自
+//!   `-Dcoloryrasm.mixin.port`、`-Dcoloryrasm.mixin.uuid` 与 `-Dcoloryrasm.mixin.key`；
 //! - 重复启动的启动器实例通过该端口通知已运行实例，防止多开：
 //!   无启动参数时请求显示窗口，有启动参数时传递参数。
 //!
@@ -27,10 +27,16 @@
 //! | 游戏通道 | 9 | 游戏 -> 启动器 | uuid(String) |
 //! | 设置标题 | 10 | 启动器 -> 游戏 | 标题(String) |
 //! | 窗口大小 | 11 | 游戏 -> 启动器 | uuid(String) + 宽(i32) + 高(i32) |
+//! | 连接验证 | 12 | 游戏 -> 启动器 | 密钥(String) |
+//!
+//! 游戏连接建立后必须先把「连接验证」(12) 发给启动器，密钥由 IPC 服务启动时随机生成，
+//! 经 get_auth_key 取出后作为启动参数传给游戏；验证失败会直接断开连接。
+//! 启动器实例之间的「启动显示 / 启动参数」不需要密钥。
 //!
 //! 输入类消息由启动器按游戏通道定向发送，消息体不含 uuid。
 //! 键盘与鼠标按键使用 GLFW 编码，鼠标移动是相对位移，单位像素，正数向右或向下；
-//! 滚轮正数向上。游戏抓取鼠标时鼠标移动用于转动视角，未抓取时用于移动系统光标。
+//! 滚轮正数向上。游戏抓取鼠标时鼠标移动用于转动视角，未抓取时用于移动系统光标；
+//! 可用 [`get_mouse_state`] 查询当前模式，据此切换手柄的按键映射。
 //!
 //! ## 启动器 -> 启动器，防止多开
 //!
@@ -90,6 +96,7 @@ const TYPE_MOUSE_SCROLL: i32 = 8;
 const TYPE_GAME_CHANNEL: i32 = 9;
 const TYPE_SET_TITLE: i32 = 10;
 const TYPE_GAME_WINDOW_SIZE: i32 = 11;
+const TYPE_GAME_AUTH: i32 = 12;
 
 /// 单个消息体的最大长度，单位字节；本地 IPC 正常数据远小于该值，用于防御异常长度
 const MAX_FRAME_SIZE: usize = 1 << 20;
@@ -114,6 +121,8 @@ static WINDOW_SIZES: LazyLock<RwLock<HashMap<Uuid, WindowSize>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 /// IPC 服务端口，只初始化一次
 static IPC_PORT: OnceLock<u16> = OnceLock::new();
+/// 游戏连接的验证密钥，服务启动时随机生成一次
+static AUTH_KEY: OnceLock<String> = OnceLock::new();
 /// 保护服务启动过程：并发调用 [`init()`] 时只启动一个服务，其余复用同一端口
 static INIT_LOCK: Mutex<()> = Mutex::new(());
 
@@ -409,9 +418,28 @@ pub fn init(port: Option<u16>) -> CoreResult<Option<u16>> {
         .map_err(|err| SocketError(ErrorData::from_error(err)))?;
 
     let _ = IPC_PORT.set(port);
+    let _ = AUTH_KEY.set(Uuid::new_v4().to_string());
     mml_log::info_type(InfoType::IpcServerStart { port });
 
     Ok(Some(port))
+}
+
+/// 获取本进程 IPC 服务的端口
+///
+/// # 返回值
+///
+/// 服务已启动时返回监听端口，未启动返回 None
+pub fn get_port() -> Option<u16> {
+    IPC_PORT.get().copied()
+}
+
+/// 获取游戏连接的验证密钥
+///
+/// # 返回值
+///
+/// 服务已启动时返回密钥，未启动返回 None；调用方应把它作为启动参数传给游戏
+pub fn get_auth_key() -> Option<&'static str> {
+    AUTH_KEY.get().map(String::as_str)
 }
 
 /// 在独立线程上运行 IPC 服务，阻塞直到线程结束
@@ -462,15 +490,26 @@ async fn accept_loop(listener: TcpListener) -> CoreResult<()> {
         mml_log::info_type(InfoType::IpcClientConnected {
             addr: addr.to_string(),
         });
-        tokio::spawn(handle_client(stream));
+        tokio::spawn(handle_client(stream, addr.to_string()));
     }
+}
+
+/// 检查游戏连接发来的验证密钥
+///
+/// - `key`: 游戏发来的密钥
+///
+/// # 返回值
+///
+/// 与服务启动时生成的密钥一致返回 true；未生成密钥或不一致返回 false
+fn check_auth_key(key: &str) -> bool {
+    AUTH_KEY.get().is_some_and(|expected| expected == key)
 }
 
 /// 处理单个客户端连接，含读取循环与写入任务
 ///
 /// 每个连接分配一条出站通道，写入任务负责将通道中的消息发送到 TCP；
 /// 该通道同时注册进 [`CLIENTS`] 用于广播，并注册为游戏通道用于定向发送。
-async fn handle_client(stream: TcpStream) -> CoreResult<()> {
+async fn handle_client(stream: TcpStream, addr: String) -> CoreResult<()> {
     let (mut reader, mut writer) = tokio::io::split(stream);
     let (write_tx, mut write_rx) = mpsc::unbounded_channel::<BytesMut>();
 
@@ -489,6 +528,7 @@ async fn handle_client(stream: TcpStream) -> CoreResult<()> {
 
     // 读取循环：消息无总长度前缀，按类型自定界解析，与 ColorMC 一致
     let mut buf = BytesMut::with_capacity(1024);
+    let mut authenticated = false;
     loop {
         let msg_len = match message_len(&buf) {
             Ok(length) => length,
@@ -499,6 +539,27 @@ async fn handle_client(stream: TcpStream) -> CoreResult<()> {
         };
         if let Some(msg_len) = msg_len {
             let mut msg = buf.split_to(msg_len);
+            let frame_type = i32::from_be_bytes(msg[..4].try_into().unwrap());
+            if !authenticated {
+                if frame_type == TYPE_GAME_AUTH {
+                    msg.advance(4);
+                    let key = msg.read_string();
+                    if !check_auth_key(&key) {
+                        mml_log::warn_type(InfoType::IpcAuthFailed { addr: addr.clone() });
+                        break;
+                    }
+                    authenticated = true;
+                    continue;
+                }
+                // 启动器实例之间的通知没有密钥，仍然允许
+                if frame_type != TYPE_LAUNCH_SHOW && frame_type != TYPE_LAUNCH_ARG {
+                    mml_log::warn_type(InfoType::IpcAuthFailed { addr: addr.clone() });
+                    break;
+                }
+            } else if frame_type == TYPE_GAME_AUTH {
+                // 重复验证直接忽略
+                continue;
+            }
             if let Err(err) = process_message(&mut msg, &write_tx).await {
                 mml_log::error_type(err);
                 break;
@@ -588,6 +649,11 @@ fn message_len(buf: &[u8]) -> CoreResult<Option<usize>> {
             }
         }
         TYPE_GAME_CHANNEL => {
+            if !string_field(buf, &mut offset)? {
+                return Ok(None);
+            }
+        }
+        TYPE_GAME_AUTH => {
             if !string_field(buf, &mut offset)? {
                 return Ok(None);
             }
@@ -808,6 +874,13 @@ mod tests {
         let mut bad = buf.clone();
         bad.truncate(bad.len() - 3);
         assert_eq!(message_len(&bad).unwrap(), None);
+    }
+
+    /// 连接验证消息：类型 + 密钥字符串
+    #[test]
+    fn test_message_len_auth() {
+        let buf = msg_with_string(TYPE_GAME_AUTH, "some-key");
+        assert_eq!(message_len(&buf).unwrap(), Some(buf.len()));
     }
 
     /// 游戏通道消息：类型 + uuid 字符串

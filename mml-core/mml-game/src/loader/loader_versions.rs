@@ -628,7 +628,10 @@ async fn fabric_meta() -> CoreResult<Arc<LoaderMeta>> {
     }
     let games = obj.game.iter().map(|item| item.version.clone()).collect();
 
-    let meta = Arc::new(LoaderMeta { loaders: list, games });
+    let meta = Arc::new(LoaderMeta {
+        loaders: list,
+        games,
+    });
     *FABRIC_META.write().unwrap() = Some(meta.clone());
     Ok(meta)
 }
@@ -672,7 +675,10 @@ async fn quilt_meta() -> CoreResult<Arc<LoaderMeta>> {
     list.reverse();
     let games = obj.game.iter().map(|item| item.version.clone()).collect();
 
-    let meta = Arc::new(LoaderMeta { loaders: list, games });
+    let meta = Arc::new(LoaderMeta {
+        loaders: list,
+        games,
+    });
     *QUILT_META.write().unwrap() = Some(meta.clone());
     Ok(meta)
 }

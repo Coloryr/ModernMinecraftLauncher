@@ -187,8 +187,16 @@ pub async fn lobby_launch_game(app: AppHandle, uuid: String) -> Result<(), Strin
         .ok_or(err_keys::LOBBY_CLOSED)?
         .key
         .clone();
-    crate::windows::main::launch::launch_game(app, uuid, None, None, Some(false), Some((key, auto)))
-        .await
+    crate::windows::main::launch::launch_game(
+        app,
+        uuid,
+        None,
+        None,
+        Some(false),
+        None,
+        Some((key, auto)),
+    )
+    .await
 }
 
 /// 释放大厅会话，单窗口页面离开时调用。

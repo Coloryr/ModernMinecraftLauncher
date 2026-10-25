@@ -262,6 +262,7 @@ fn make_launch_arg() -> GameLaunchArg {
         admin: false,
         mixin: None,
         lang: None,
+        skip_server_pack: false,
     }
 }
 

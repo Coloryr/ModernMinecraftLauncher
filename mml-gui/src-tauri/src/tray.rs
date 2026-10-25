@@ -8,13 +8,13 @@
 //! 托盘跟着运行态走：实例真正启动时 sync 把它建出来，最后一个实例退出时收掉；
 //! 若收掉的那一刻主界面也已经关掉，进程没有留下的理由，quit_idle 收工。
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use mml_names::Lang;
+use tauri::AppHandle;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::AppHandle;
 
 use crate::gui_config;
 use crate::log_text::LogText;

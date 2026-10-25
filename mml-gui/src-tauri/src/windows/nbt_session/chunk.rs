@@ -74,4 +74,4 @@ pub(super) fn write_chunk_back(file: &mut File, index: u32, payload: &[u8]) -> R
     file.flush().map_err(|err| err.to_string())?;
 
     Ok(())
-}
+}

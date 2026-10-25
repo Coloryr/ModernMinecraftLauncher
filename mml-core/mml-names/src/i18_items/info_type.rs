@@ -90,6 +90,11 @@ pub enum InfoType {
         /// 对端地址，形如 `127.0.0.1:12345`
         addr: String,
     },
+    /// 游戏连接的验证密钥不正确，带对端地址
+    IpcAuthFailed {
+        /// 对端地址
+        addr: String,
+    },
     /// 收到未知类型的 IPC 消息，带消息类型号
     IpcUnknownMessageType {
         /// 消息类型号

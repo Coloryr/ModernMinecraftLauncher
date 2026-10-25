@@ -13,10 +13,9 @@ use uuid::Uuid;
 
 use crate::err_keys;
 
+use super::cache::{KIND, ModCache};
 use crate::windows::lifecycle::{window_model_by_uuid, window_model_or_insert};
 use crate::windows::registry::{family_of_kind, family_of_label, family_window_id};
-use super::cache::{KIND, ModCache};
-
 
 /// 资源窗口的窗口模型
 pub(crate) struct ResourceWindowModel {

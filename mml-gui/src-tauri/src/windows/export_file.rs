@@ -1,6 +1,10 @@
 //! 导出先写同目录临时文件，成功后才替换用户选定的文件。
 
-use std::{fs::{self, File}, future::Future, path::{Path, PathBuf}};
+use std::{
+    fs::{self, File},
+    future::Future,
+    path::{Path, PathBuf},
+};
 
 /// 导出任务结束或取消时回收未提交的临时文件。
 struct StagedFile {
@@ -10,7 +14,9 @@ struct StagedFile {
 
 impl StagedFile {
     fn new(destination: &Path) -> Result<Self, String> {
-        if destination.file_name().is_none() { return Err(crate::err_keys::FILE_NAME.into()); }
+        if destination.file_name().is_none() {
+            return Err(crate::err_keys::FILE_NAME.into());
+        }
         let path = destination.with_extension(format!("{}.part", uuid::Uuid::new_v4()));
         File::create_new(&path).map_err(|e| e.to_string())?;
         Ok(Self { path })
@@ -18,7 +24,9 @@ impl StagedFile {
 }
 
 impl Drop for StagedFile {
-    fn drop(&mut self) { let _ = fs::remove_file(&self.path); }
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
 }
 
 /// 完整写入导出文件，写入或提交失败时保留原文件。
@@ -26,9 +34,15 @@ impl Drop for StagedFile {
 /// - `write`: 写入内容并检查取消状态的回调。
 /// # 返回值
 /// 文件已替换或写入失败的原因。
-pub(super) fn write(path: &Path, write: impl FnOnce(&mut File) -> Result<(), String>) -> Result<(), String> {
+pub(super) fn write(
+    path: &Path,
+    write: impl FnOnce(&mut File) -> Result<(), String>,
+) -> Result<(), String> {
     let temp = StagedFile::new(path)?;
-    let mut file = File::options().write(true).open(&temp.path).map_err(|e| e.to_string())?;
+    let mut file = File::options()
+        .write(true)
+        .open(&temp.path)
+        .map_err(|e| e.to_string())?;
     write(&mut file)?;
     file.sync_all().map_err(|e| e.to_string())?;
     drop(file);
@@ -41,11 +55,16 @@ pub(super) fn write(path: &Path, write: impl FnOnce(&mut File) -> Result<(), Str
 /// # 返回值
 /// 文件已替换或导出失败的原因。
 pub(super) async fn write_async<F: Future<Output = Result<(), String>>>(
-    path: &Path, write: impl FnOnce(PathBuf) -> F,
+    path: &Path,
+    write: impl FnOnce(PathBuf) -> F,
 ) -> Result<(), String> {
     let temp = StagedFile::new(path)?;
     write(temp.path.clone()).await?;
-    File::options().write(true).open(&temp.path).and_then(|file| file.sync_all()).map_err(|e| e.to_string())?;
+    File::options()
+        .write(true)
+        .open(&temp.path)
+        .and_then(|file| file.sync_all())
+        .map_err(|e| e.to_string())?;
     fs::rename(&temp.path, path).map_err(|e| e.to_string())
 }
 
@@ -59,13 +78,21 @@ mod tests {
         let dir = crate::test_support::temp_dir("archive-export-commit");
         let path = dir.join("instance.mrpack");
         fs::write(&path, "previous").unwrap();
-        assert!(write_async(&path, |temp| async move {
-            fs::write(temp, "partial").unwrap();
-            Err("source disappeared".into())
-        }).await.is_err());
+        assert!(
+            write_async(&path, |temp| async move {
+                fs::write(temp, "partial").unwrap();
+                Err("source disappeared".into())
+            })
+            .await
+            .is_err()
+        );
         assert_eq!(fs::read_to_string(&path).unwrap(), "previous");
         assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
-        write_async(&path, |temp| async move { fs::write(temp, "complete").map_err(|e| e.to_string()) }).await.unwrap();
+        write_async(&path, |temp| async move {
+            fs::write(temp, "complete").map_err(|e| e.to_string())
+        })
+        .await
+        .unwrap();
         assert_eq!(fs::read_to_string(&path).unwrap(), "complete");
         assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
         crate::test_support::cleanup(&[&dir]);
@@ -83,7 +110,8 @@ mod tests {
                 fs::write(temp, "partial").unwrap();
                 ready.send(()).unwrap();
                 std::future::pending::<Result<(), String>>().await
-            }).await
+            })
+            .await
         });
         started.await.unwrap();
         task.abort();
@@ -98,7 +126,11 @@ mod tests {
         let dir = crate::test_support::temp_dir("text-export-replace");
         let path = dir.join("中文.json");
         fs::write(&path, "previous").unwrap();
-        write(&path, |file| file.write_all("[\"中文\"]".as_bytes()).map_err(|e| e.to_string())).unwrap();
+        write(&path, |file| {
+            file.write_all("[\"中文\"]".as_bytes())
+                .map_err(|e| e.to_string())
+        })
+        .unwrap();
         assert_eq!(fs::read(&path).unwrap(), "[\"中文\"]".as_bytes());
         assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
         crate::test_support::cleanup(&[&dir]);
@@ -110,10 +142,14 @@ mod tests {
         let path = dir.join("mods.csv");
         fs::write(&path, "previous").unwrap();
         for reason in ["write failed", crate::err_keys::CANCELLED] {
-            assert_eq!(write(&path, |file| {
-                file.write_all(b"partial").unwrap();
-                Err(reason.into())
-            }).unwrap_err(), reason);
+            assert_eq!(
+                write(&path, |file| {
+                    file.write_all(b"partial").unwrap();
+                    Err(reason.into())
+                })
+                .unwrap_err(),
+                reason
+            );
             assert_eq!(fs::read_to_string(&path).unwrap(), "previous");
             assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
         }
@@ -135,7 +171,12 @@ mod tests {
         let path = dir.join("mods.json");
         fs::create_dir(&path).unwrap();
         fs::write(path.join("keep"), "previous").unwrap();
-        assert!(write(&path, |file| file.write_all(b"new").map_err(|e| e.to_string())).is_err());
+        assert!(
+            write(&path, |file| file
+                .write_all(b"new")
+                .map_err(|e| e.to_string()))
+            .is_err()
+        );
         assert_eq!(fs::read_to_string(path.join("keep")).unwrap(), "previous");
         assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
         crate::test_support::cleanup(&[&dir]);

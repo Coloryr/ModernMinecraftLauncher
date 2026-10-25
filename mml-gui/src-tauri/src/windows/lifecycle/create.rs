@@ -4,7 +4,7 @@
 //! 都要先做一次合法性收敛。
 
 use crate::log_text::LogText;
-use std::{path::PathBuf, sync::{Mutex}};
+use std::{path::PathBuf, sync::Mutex};
 
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
@@ -12,10 +12,16 @@ use crate::listens;
 use mml_names::names;
 use uuid::Uuid;
 
-use crate::windows::geometry::{Placement, RectF, SizeF, center_placement, child_placement, remember_decorated_inset, save_window_state, window_state_for};
-use crate::windows::registry::{ADD_MODPACK_WINDOW_UUID, BLOCK_WINDOW_UUID, EXPORT_WINDOW_UUID, MAIN_WINDOW_UUID, SERVER_PACK_WINDOW_UUID, min_size_of_label};
-use crate::windows::{block};
 use super::models::{OPEN_WINDOWS, WINDOW_MODELS, ensure_window_model};
+use crate::windows::block;
+use crate::windows::geometry::{
+    Placement, RectF, SizeF, center_placement, child_placement, remember_decorated_inset,
+    save_window_state, window_state_for,
+};
+use crate::windows::registry::{
+    ADD_MODPACK_WINDOW_UUID, BLOCK_WINDOW_UUID, EXPORT_WINDOW_UUID, MAIN_WINDOW_UUID,
+    SERVER_PACK_WINDOW_UUID, min_size_of_label,
+};
 
 /// 窗口内允许导航的地址：启动器自身页面与本地自定义协议
 ///
@@ -37,7 +43,6 @@ fn is_app_url(url: &tauri::Url) -> bool {
         || host == "tauri.localhost"
         || host.ends_with(".localhost")
 }
-
 
 /// 窗口是否拒绝本次关闭
 ///

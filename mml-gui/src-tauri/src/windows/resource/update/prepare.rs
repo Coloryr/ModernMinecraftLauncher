@@ -2,22 +2,21 @@
 //!
 //! 先算好同目录同名与旧文件处置，再落盘并收尾。
 
+use std::path::Path;
 
-use std::path::{Path};
-
-use mml_base::file_item::{LaterRun};
+use mml_base::file_item::LaterRun;
 use mml_game::GameInstance;
 use mml_game::game_mods::{ModObj, add_disable_suffix};
+use mml_game::launcher::ModPackType;
 use mml_game::launcher::mod_update_obj::ModUpdateRecordObj;
-use mml_game::launcher::{ModPackType};
 use mml_game::{curseforge, modrinth};
 use mml_names::names;
 
-use crate::dtos::{ModUpdateApplyDto};
+use crate::dtos::ModUpdateApplyDto;
 use crate::err_keys;
 
-use crate::windows::resource::mods::{find_mod};
-use super::newfile::{PendingUpdate, NewFileData, fetch_one};
+use super::newfile::{NewFileData, PendingUpdate, fetch_one};
+use crate::windows::resource::mods::find_mod;
 
 /// 准备一条更新：把平台数据拼成下载项，并攒好收尾要用的信息
 ///
@@ -49,7 +48,7 @@ pub(super) async fn prepare_one(
     // 都判成"文件找不到"，批量只当加速用
     let data = match data {
         Some(data) => data,
-        None => fetch_one(source, item).await?
+        None => fetch_one(source, item).await?,
     };
 
     let (mut obj, info) = match data {

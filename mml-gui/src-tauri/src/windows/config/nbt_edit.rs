@@ -2,14 +2,11 @@
 //!
 //! 按前端给的「改值 / 新增 / 删除」操作，在树上定位后用 JSON 形状的文本赋值。
 
-
 use mml_nbt::nbt_types;
 use mml_nbt::{NBT_END_ORDER, NbtType};
 
 use crate::dtos::{NbtEditDto, NbtKindDto, NbtOpDto};
 use crate::err_keys;
-
-
 
 /// 数组（字节 / 整数 / 长整数）最多展开多少个元素给前端编辑
 ///
@@ -114,7 +111,10 @@ pub(super) fn set_array_item<T: std::str::FromStr>(
 /// # 返回值
 ///
 /// 目标标签的可变引用；走到非复合 / 非列表上、索引越界或下标不是整数时返回 `err.nbtPath`
-pub(super) fn nbt_at_mut<'a>(root: &'a mut NbtType, path: &[String]) -> Result<&'a mut NbtType, String> {
+pub(super) fn nbt_at_mut<'a>(
+    root: &'a mut NbtType,
+    path: &[String],
+) -> Result<&'a mut NbtType, String> {
     let mut cur = root;
     for segment in path {
         cur = match cur {
@@ -203,7 +203,11 @@ pub(super) fn parse_array<T: std::str::FromStr>(text: &str) -> Result<Vec<T>, St
 /// # 返回值
 ///
 /// 改成功返回 `Ok(())`；父容器不是复合、旧键不存在、新键已被占用或路径为空返回 `err.nbtPath`
-pub(super) fn rename_nbt_node(root: &mut NbtType, path: &[String], new_name: &str) -> Result<(), String> {
+pub(super) fn rename_nbt_node(
+    root: &mut NbtType,
+    path: &[String],
+    new_name: &str,
+) -> Result<(), String> {
     let (last, parent_path) = path
         .split_last()
         .ok_or_else(|| String::from(err_keys::NBT_PATH))?;

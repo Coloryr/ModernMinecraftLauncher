@@ -21,7 +21,9 @@ fn main() {
         && std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc")
     {
         println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
-        println!("cargo:rustc-link-arg=/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'");
+        println!(
+            "cargo:rustc-link-arg=/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'"
+        );
         // 应用已由 Tauri 嵌入完整清单，此参数必须在 EMBED 后，避免资源重复。
         println!("cargo:rustc-link-arg-bins=/MANIFEST:NO");
     }
@@ -39,10 +41,7 @@ fn main() {
         src_dir: manifest.join("src"),
         // mml-names 的 Lang 是外部 crate 的 unit 枚举：线上是变体名，
         // 变体固定 zh_cn / en_us，前端一直这么写死，见 lib/guiConfig.ts 的 Locale
-        external_types: BTreeMap::from([(
-            "Lang".to_string(),
-            "\"zh_cn\" | \"en_us\"".to_string(),
-        )]),
+        external_types: BTreeMap::from([("Lang".to_string(), "\"zh_cn\" | \"en_us\"".to_string())]),
         ..Default::default()
     })
     .expect("生成 IPC 绑定失败");

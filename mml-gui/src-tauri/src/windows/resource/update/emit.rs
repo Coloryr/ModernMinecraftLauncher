@@ -2,14 +2,10 @@
 //!
 //! 阶段名与前端进度条口径一一对应，事件经 `listens` 转成前端常量。
 
-
-
 use tauri::{Emitter, WebviewWindow};
 
 use crate::dtos::{ModUpdateDoneDto, ModUpdateProgressDto};
 use crate::listens;
-
-
 
 /// 进度阶段：检查有没有更新
 pub(super) const STAGE_CHECK: &str = "check";

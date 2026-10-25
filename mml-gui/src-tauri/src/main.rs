@@ -18,8 +18,8 @@ fn main() {
         oauth_key: "aa0dd576-d717-4950-b257-a478d2c20968".to_string(),
     };
 
-    let path = mml_gui_lib::start_arg::run_dir(std::env::args().skip(1))
-        .unwrap_or_else(get_run_path);
+    let path =
+        mml_gui_lib::start_arg::run_dir(std::env::args().skip(1)).unwrap_or_else(get_run_path);
 
     println!("Run path: {}", path.display());
 
@@ -34,7 +34,10 @@ fn main() {
         .and_then(|data| serde_json::from_slice::<gui_config::GuiConfig>(&data).ok())
         .is_some_and(|config| config.experimental.launcher_admin);
     if elevated && !mml_sys::process_helper::is_run_as_admin() {
-        let mut args = vec!["--run-dir".to_string(), obj.path.to_string_lossy().into_owned()];
+        let mut args = vec![
+            "--run-dir".to_string(),
+            obj.path.to_string_lossy().into_owned(),
+        ];
         args.extend(std::env::args().skip(1));
         if let Err(error) = mml_sys::process_helper::launch_admin(&args) {
             err_box::fatal_error_text(&format!("Administrator startup failed: {error}"));

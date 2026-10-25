@@ -98,7 +98,10 @@ pub fn hmcl_addons(game: &InstanceSettingObj) -> Option<Vec<AddonsObj>> {
         LoaderType::NeoForge => names::NEOFORGE_KEY,
         LoaderType::Fabric => names::FABRIC_KEY,
         LoaderType::Quilt => names::QUILT_KEY,
-        LoaderType::OptiFine | LoaderType::LiteLoader | LoaderType::Cleanroom | LoaderType::Custom => {
+        LoaderType::OptiFine
+        | LoaderType::LiteLoader
+        | LoaderType::Cleanroom
+        | LoaderType::Custom => {
             return None;
         }
     };
@@ -237,8 +240,14 @@ mod tests {
         let mut item = game();
         let addons = hmcl_addons(&item).unwrap();
         assert_eq!(addons.len(), 2);
-        assert_eq!((addons[0].id.as_str(), addons[0].version.as_str()), ("game", "1.21.1"));
-        assert_eq!((addons[1].id.as_str(), addons[1].version.as_str()), ("forge", "52.0.1"));
+        assert_eq!(
+            (addons[0].id.as_str(), addons[0].version.as_str()),
+            ("game", "1.21.1")
+        );
+        assert_eq!(
+            (addons[1].id.as_str(), addons[1].version.as_str()),
+            ("forge", "52.0.1")
+        );
 
         for (loader, key) in [
             (LoaderType::NeoForge, "neoforge"),

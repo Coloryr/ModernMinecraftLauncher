@@ -52,7 +52,6 @@ pub struct DetectedPackDto {
     pub name: String,
 }
 
-
 /// 在线实例清单摘要，`add_probe_server_pack` 的返回结构
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]

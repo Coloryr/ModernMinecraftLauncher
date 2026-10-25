@@ -4,19 +4,18 @@
 
 use std::collections::HashMap;
 
-use std::path::{PathBuf};
+use std::path::PathBuf;
 
-use mml_base::file_item::{FileItemObj};
+use mml_base::file_item::FileItemObj;
+use mml_game::launcher::ModPackType;
 use mml_game::launcher::file_online_info_obj::OnlineInfoObj;
 use mml_game::launcher::mod_update_obj::ModUpdateRecordObj;
-use mml_game::launcher::{ModPackType};
 use mml_net::curseforge_api::{self, file_obj::CurseForgeFileDataObj};
 use mml_net::modrinth_api::{self, version_obj::ModrinthVersionObj};
 
-use crate::dtos::{ModUpdateApplyDto};
+use crate::dtos::ModUpdateApplyDto;
 use crate::err_keys;
 use crate::log_text::LogText;
-
 
 /// 一批更新里的一条：待下载的新文件 + 下完之后收尾要用的信息
 ///
@@ -93,7 +92,10 @@ pub(super) fn split_new_file_ids(items: &[ModUpdateApplyDto]) -> NewFileIds {
     curseforge.dedup();
     modrinth.sort();
     modrinth.dedup();
-    NewFileIds { curseforge, modrinth }
+    NewFileIds {
+        curseforge,
+        modrinth,
+    }
 }
 
 /// 一次问回这一批的新文件
@@ -157,7 +159,10 @@ pub(super) async fn fetch_new_files(items: &[ModUpdateApplyDto]) -> NewFileMap {
 /// # 返回值
 ///
 /// 见 [`NewFileData`]；文件号非法或平台没有这个文件时返回错误串
-pub(super) async fn fetch_one(source: ModPackType, item: &ModUpdateApplyDto) -> Result<NewFileData, String> {
+pub(super) async fn fetch_one(
+    source: ModPackType,
+    item: &ModUpdateApplyDto,
+) -> Result<NewFileData, String> {
     match source {
         ModPackType::CurseForge => {
             let fid: u64 = item

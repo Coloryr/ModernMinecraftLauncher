@@ -13,9 +13,7 @@ pub fn fatal_error(e: ErrorType) -> ! {
 
     rfd::MessageDialog::new()
         .set_level(rfd::MessageLevel::Error)
-        .set_title(
-            crate::log_text::LogText::FatalInitFailed.text_in(&mml_names::get_lang_type()),
-        )
+        .set_title(crate::log_text::LogText::FatalInitFailed.text_in(&mml_names::get_lang_type()))
         .set_description(msg.as_str())
         .show();
 
@@ -32,9 +30,7 @@ pub fn fatal_error_text(text: &str) -> ! {
 
     rfd::MessageDialog::new()
         .set_level(rfd::MessageLevel::Error)
-        .set_title(
-            crate::log_text::LogText::FatalRunFailed.text_in(&mml_names::get_lang_type()),
-        )
+        .set_title(crate::log_text::LogText::FatalRunFailed.text_in(&mml_names::get_lang_type()))
         .set_description(text)
         .show();
 

@@ -3,6 +3,6 @@
 //! 从 `add_resource/mod.rs` 拆出来的几个大函数。列表页顺手把项目与文件数据写进
 //! `CURSEFOGRE_*` / `MODRINTH_*` 缓存，详情与下载都从缓存里取。
 
-mod query;
 pub(crate) mod detail;
+mod query;
 pub(crate) mod search;

@@ -6,5 +6,5 @@
 //! 所有写入都经 [`edit_mod_setting`]：它用**写锁**把"读文件 → 改 → 写回整份"串起来，
 //! 避免几个命令并发时互相覆盖。
 
-mod state;
 pub(crate) mod cmds;
+mod state;

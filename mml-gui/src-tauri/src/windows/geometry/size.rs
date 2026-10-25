@@ -3,13 +3,11 @@
 //! 装饰边框会随标题栏样式变化，历史几何与注册表里的最小尺寸
 //! 都要按当前装饰差重新核对，否则会出现「改了最小尺寸而窗口纹丝不动」。
 
-
 use tauri::WebviewWindow;
 use uuid::Uuid;
 
-use crate::windows::registry::{MinSize};
-use super::state::{DECORATED_INSET};
-
+use super::state::DECORATED_INSET;
+use crate::windows::registry::MinSize;
 
 /// 窗口客户区的宽高，单位物理像素，由注册表里的最小尺寸换算而来
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

@@ -9,8 +9,8 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter};
 
 use crate::dtos::BgInfoDto;
-use crate::listens;
 use crate::err_keys;
+use crate::listens;
 use crate::log_text::LogText;
 
 /// 一张图片的字节与它的实际 mime
@@ -179,10 +179,20 @@ pub(super) async fn store_bg(
     .await
     .map_err(|err| err.to_string())
     .inspect_err(|err| {
-        mml_log::error(LogText::BgResizeJoinFailed { error: err.to_string() }.text())
+        mml_log::error(
+            LogText::BgResizeJoinFailed {
+                error: err.to_string(),
+            }
+            .text(),
+        )
     })?
     .inspect_err(|err| {
-        mml_log::error(LogText::BgResizeFailed { error: err.to_string() }.text())
+        mml_log::error(
+            LogText::BgResizeFailed {
+                error: err.to_string(),
+            }
+            .text(),
+        )
     })?;
 
     // 处理结果落盘到配置目录，文件名不带扩展名、读取时按魔数识别格式，各窗口启动时从这里取图
@@ -197,7 +207,14 @@ pub(super) async fn store_bg(
     .await
     .map_err(|err| format!("set_bg write join failed: {err}"))
     .inspect_err(|err| mml_log::error(err.to_string()))?
-    .inspect_err(|err| mml_log::error(LogText::BgWriteFailed { error: err.to_string() }.text()))?;
+    .inspect_err(|err| {
+        mml_log::error(
+            LogText::BgWriteFailed {
+                error: err.to_string(),
+            }
+            .text(),
+        )
+    })?;
 
     // 来源与分辨率记入配置；set 会异步落盘 gui_config.json
     let mut config = crate::gui_config::get();
@@ -243,10 +260,21 @@ pub async fn settings_set_bg(
     percent: u32,
 ) -> Result<String, String> {
     let percent = percent.clamp(10, 100);
-    mml_log::info(LogText::BgSet { percent, source: source.clone() }.text());
+    mml_log::info(
+        LogText::BgSet {
+            percent,
+            source: source.clone(),
+        }
+        .text(),
+    );
 
     let image = load_bg_bytes(&source).await.inspect_err(|err| {
-        mml_log::error(LogText::BgLoadFailed { error: err.to_string() }.text());
+        mml_log::error(
+            LogText::BgLoadFailed {
+                error: err.to_string(),
+            }
+            .text(),
+        );
     })?;
     if source.starts_with("http://") || source.starts_with("https://") {
         cache_bg_original(&source, &image);
@@ -274,7 +302,13 @@ pub async fn settings_resize_bg(app: AppHandle, percent: u32) -> Result<String, 
     if source.is_empty() {
         return Err(err_keys::BG_NONE.to_string());
     }
-    mml_log::info(LogText::BgResize { percent, source: source.clone() }.text());
+    mml_log::info(
+        LogText::BgResize {
+            percent,
+            source: source.clone(),
+        }
+        .text(),
+    );
 
     let is_url = source.starts_with("http://") || source.starts_with("https://");
     let cached = if is_url {
@@ -291,7 +325,12 @@ pub async fn settings_resize_bg(app: AppHandle, percent: u32) -> Result<String, 
         Some(hit) => hit,
         None => {
             let image = load_bg_bytes(&source).await.inspect_err(|err| {
-                mml_log::error(LogText::BgResizeLoadFailed { error: err.to_string() }.text());
+                mml_log::error(
+                    LogText::BgResizeLoadFailed {
+                        error: err.to_string(),
+                    }
+                    .text(),
+                );
             })?;
             if is_url {
                 cache_bg_original(&source, &image);
@@ -343,7 +382,14 @@ pub fn settings_get_bg() -> Result<Option<BgInfoDto>, String> {
         return Ok(None);
     };
     let bytes = std::fs::read(dir.join("bg_image"))
-        .inspect_err(|err| mml_log::error(LogText::BgReadFailed { error: err.to_string() }.text()))
+        .inspect_err(|err| {
+            mml_log::error(
+                LogText::BgReadFailed {
+                    error: err.to_string(),
+                }
+                .text(),
+            )
+        })
         .map_err(|err| err.to_string())?;
     let mime = sniff_bg_mime(&bytes);
     Ok(Some(BgInfoDto {

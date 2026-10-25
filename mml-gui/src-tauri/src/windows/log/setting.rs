@@ -5,17 +5,16 @@
 
 use std::path::PathBuf;
 
-use mml_game::game_log::{InstanceRuntimeLog};
+use mml_game::game_log::InstanceRuntimeLog;
 use uuid::Uuid;
 
-use crate::dtos::main_dto::LogLine;
 use crate::dtos::LogSettingDto;
+use crate::dtos::main_dto::LogLine;
 use crate::err_keys;
 use crate::gui_setting;
 
-use crate::windows::instance_handle;
 use super::read::{join_log_lines, log_line_from_item};
-
+use crate::windows::instance_handle;
 
 /// 获取实例的实时运行日志快照
 ///

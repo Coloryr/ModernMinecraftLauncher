@@ -65,7 +65,10 @@ pub(super) fn args_from_core(inst: &InstanceSettingObj) -> InstanceArgsDto {
         }
     }
     // 没写就是跟随启动器设置，界面上展示实际生效值
-    let global_isolate = mml_config::read_config().jvm_arg.isolate_home.unwrap_or(true);
+    let global_isolate = mml_config::read_config()
+        .jvm_arg
+        .isolate_home
+        .unwrap_or(true);
     a.isolate_home = inst
         .jvm_arg
         .as_ref()

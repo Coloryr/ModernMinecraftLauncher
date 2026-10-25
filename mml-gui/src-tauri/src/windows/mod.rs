@@ -24,8 +24,8 @@ pub mod custom_ui;
 pub mod download;
 pub mod export;
 pub mod java_download;
-pub mod log;
 pub mod lobby;
+pub mod log;
 pub mod main;
 pub mod resource;
 pub(crate) mod server_instance;
@@ -278,9 +278,13 @@ pub async fn window_open_window(
     let Some(uuid) = uuid_for_kind(&kind) else {
         return Err(format!("unknown window kind: {kind}"));
     };
-    if kind == "lobby" { lobby::lobby_prepare(app.clone()).await?; }
+    if kind == "lobby" {
+        lobby::lobby_prepare(app.clone()).await?;
+    }
     if let Err(error) = open_window_from_uuid(&app, &uuid, &url_path, Some(&window)) {
-        if kind == "lobby" { lobby::lobby_close(); }
+        if kind == "lobby" {
+            lobby::lobby_close();
+        }
         return Err(error);
     }
     // 新创建的窗口靠 URL query 拿目标；已存在的窗口 URL 不变，靠事件切换
@@ -311,9 +315,7 @@ fn kind_parse_check(kind: &str, instance: &Option<String>) -> Result<(), String>
     if !accepts_instance && instance.is_some() {
         return Err(err_keys::WINDOW_QUERY.to_string());
     }
-    if accepts_instance
-        && let Some(instance) = instance
-    {
+    if accepts_instance && let Some(instance) = instance {
         Uuid::parse_str(instance).map_err(|_| err_keys::UUID.to_string())?;
     }
     Ok(())
@@ -500,7 +502,9 @@ pub fn window_probe_drop(path: String) -> DropPathDto {
         .rsplit_once('.')
         .map(|(_, ext)| ext)
     {
-        Some("zip") if export::server_pack::is_server_pack(std::path::Path::new(&path)) => other("serverPack"),
+        Some("zip") if export::server_pack::is_server_pack(std::path::Path::new(&path)) => {
+            other("serverPack")
+        }
         Some("zip" | "mrpack" | "modpack") => other("archive"),
         Some("url" | "webloc" | "website") => shortcut_of(&path),
         // 卡片拖到桌面后不一定是 `.url`：有的站点给的是 `.json` / `.txt`。
@@ -776,12 +780,12 @@ mod tests {
     #[test]
     fn startup_quiet_only_for_first_main_show() {
         crate::windows::quiet_main_window_startup();
-        assert!(
-            !take_startup_quiet("mml-log-x"),
-            "别的窗口不该走不抢前台"
-        );
+        assert!(!take_startup_quiet("mml-log-x"), "别的窗口不该走不抢前台");
         assert!(take_startup_quiet(main_window_label()), "主窗口第一次要走");
-        assert!(!take_startup_quiet(main_window_label()), "第二次起照常拿焦点");
+        assert!(
+            !take_startup_quiet(main_window_label()),
+            "第二次起照常拿焦点"
+        );
     }
 
     /// 工作区与显示器完全重合时判定为「平台没给任务栏信息」
@@ -1000,7 +1004,9 @@ pub fn window_is_maximized(window: WebviewWindow) -> bool {
 /// 设置成功返回 `Ok(())`，失败返回错误文案
 #[gui_macros::command]
 pub fn window_set_fullscreen(window: WebviewWindow, fullscreen: bool) -> Result<(), String> {
-    window.set_fullscreen(fullscreen).map_err(|err| err.to_string())
+    window
+        .set_fullscreen(fullscreen)
+        .map_err(|err| err.to_string())
 }
 
 /// 当前是否全屏，标题栏换图标用
@@ -1164,7 +1170,9 @@ fn x11_work_area(scale: f64, physical_width: u32) -> Option<tauri::PhysicalRect<
 #[gui_macros::command]
 pub fn window_fill_screen(window: WebviewWindow) -> Result<(), String> {
     if window.is_fullscreen().unwrap_or(false) {
-        window.set_fullscreen(false).map_err(|err| err.to_string())?;
+        window
+            .set_fullscreen(false)
+            .map_err(|err| err.to_string())?;
     }
     let monitor = window
         .current_monitor()
@@ -1280,7 +1288,12 @@ pub fn window_restart_app(app: AppHandle) {
                 }
             }
             Err(err) => {
-                mml_log::error(LogText::RestartLauncherError { error: err.to_string() }.text());
+                mml_log::error(
+                    LogText::RestartLauncherError {
+                        error: err.to_string(),
+                    }
+                    .text(),
+                );
             }
         }
 

@@ -3,10 +3,14 @@
 //! 运行目录与内部数据目录各存一份，只存在一侧时互相补齐；解锁时两份一起删。
 //! Windows 给它打隐藏属性，其它平台靠点开头的文件名并把权限收到 600。
 
-use std::{fs, io::ErrorKind, path::{Path, PathBuf}};
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use crate::err_keys;
+use serde::{Deserialize, Serialize};
+use std::{
+    fs,
+    io::ErrorKind,
+    path::{Path, PathBuf},
+};
+use uuid::Uuid;
 
 /// 锁文件名：点开头，Unix 下天然隐藏
 pub(crate) const FILE_NAME: &str = ".client_lock.json";
@@ -67,12 +71,18 @@ fn encode(salt: &str, hash: &str) -> String {
 /// 轮数、盐、哈希；算法不认识或字段不齐时返回 `None`
 fn parts(text: &str) -> Option<(u32, &str, &str)> {
     let mut pieces = text.strip_prefix('$')?.split('$');
-    if pieces.next()? != ALGORITHM { return None; }
+    if pieces.next()? != ALGORITHM {
+        return None;
+    }
     let rounds: u32 = pieces.next()?.parse().ok()?;
     let salt = pieces.next()?;
     let hash = pieces.next()?;
-    if pieces.next().is_some() || salt.is_empty() || hash.is_empty()
-        || rounds == 0 || rounds > 10_000_000 {
+    if pieces.next().is_some()
+        || salt.is_empty()
+        || hash.is_empty()
+        || rounds == 0
+        || rounds > 10_000_000
+    {
         return None;
     }
     Some((rounds, salt, hash))
@@ -90,7 +100,9 @@ fn lock_path(dir: &Path) -> PathBuf {
 /// - `dir`: 某个落点
 fn read(dir: &Path) -> Option<String> {
     let data = fs::read(lock_path(dir)).ok()?;
-    if data.len() > 4096 { return None; }
+    if data.len() > 4096 {
+        return None;
+    }
     from_bytes(&data)
 }
 
@@ -99,11 +111,15 @@ fn read(dir: &Path) -> Option<String> {
 /// - `data`: 锁文件内容
 fn from_bytes(data: &[u8]) -> Option<String> {
     if let Ok(lock) = serde_json::from_slice::<StoredLock>(data) {
-        if parts(&lock.password).is_none() { return None; }
+        if parts(&lock.password).is_none() {
+            return None;
+        }
         return Some(lock.password);
     }
     let lock: LegacyLock = serde_json::from_slice(data).ok()?;
-    if lock.salt.is_empty() || lock.hash.is_empty() { return None; }
+    if lock.salt.is_empty() || lock.hash.is_empty() {
+        return None;
+    }
     Some(encode(&lock.salt, &lock.hash))
 }
 
@@ -120,9 +136,13 @@ fn data_dir() -> PathBuf {
 /// 锁文件的两个落点：运行目录 + 内部数据目录，同一个路径只留一份
 fn targets() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
-    if let Some(dir) = run_dir() { dirs.push(dir); }
+    if let Some(dir) = run_dir() {
+        dirs.push(dir);
+    }
     let data = data_dir();
-    if !dirs.contains(&data) { dirs.push(data); }
+    if !dirs.contains(&data) {
+        dirs.push(data);
+    }
     dirs
 }
 
@@ -130,11 +150,17 @@ fn targets() -> Vec<PathBuf> {
 ///
 /// - `dirs`: 两个落点，运行目录在前
 fn sync(dirs: &[PathBuf]) {
-    let Some(source) = dirs.iter().find(|dir| lock_path(dir).is_file()) else { return; };
-    let Ok(data) = fs::read(lock_path(source)) else { return; };
+    let Some(source) = dirs.iter().find(|dir| lock_path(dir).is_file()) else {
+        return;
+    };
+    let Ok(data) = fs::read(lock_path(source)) else {
+        return;
+    };
     for dir in dirs {
         // 内容一样就不重写，免得每次取配置都刷一遍修改时间
-        if fs::read(lock_path(dir)).is_ok_and(|current| current == data) { continue; }
+        if fs::read(lock_path(dir)).is_ok_and(|current| current == data) {
+            continue;
+        }
         let _ = install(dir, &data);
     }
 }
@@ -169,7 +195,9 @@ pub(crate) fn locked() -> bool {
 /// 任一侧的锁文件能验证通过、或根本没有锁时返回 `true`
 fn verify_in(dirs: &[PathBuf], password: &str) -> bool {
     sync(dirs);
-    if !exists(dirs) { return true; }
+    if !exists(dirs) {
+        return true;
+    }
     dirs.iter().filter_map(|dir| read(dir)).any(|lock| {
         parts(&lock).is_some_and(|(rounds, salt, hash)| {
             hash_password(password, salt, rounds).as_str() == hash
@@ -202,7 +230,11 @@ fn write_all(dirs: &[PathBuf], data: &[u8]) -> Result<(), String> {
         }
     }
     // 有一侧写成功就算锁上了，另一侧下次同步会补
-    if written == 0 { Err(last.unwrap_or_default()) } else { Ok(()) }
+    if written == 0 {
+        Err(last.unwrap_or_default())
+    } else {
+        Ok(())
+    }
 }
 
 /// 写入新密码
@@ -210,10 +242,14 @@ fn write_all(dirs: &[PathBuf], data: &[u8]) -> Result<(), String> {
 /// - `dirs`: 两个落点
 /// - `password`: 新密码，不能为空
 fn set_in(dirs: &[PathBuf], password: &str) -> Result<(), String> {
-    if password.is_empty() { return Err(err_keys::CLIENT_LOCK_EMPTY.into()); }
+    if password.is_empty() {
+        return Err(err_keys::CLIENT_LOCK_EMPTY.into());
+    }
     let salt = Uuid::new_v4().simple().to_string();
     let hash = hash_password(password, &salt, ROUNDS);
-    let lock = StoredLock { password: encode(&salt, &hash) };
+    let lock = StoredLock {
+        password: encode(&salt, &hash),
+    };
     let data = serde_json::to_vec_pretty(&lock).map_err(|e| e.to_string())?;
     write_all(dirs, &data)
 }
@@ -246,7 +282,9 @@ fn remove(dir: &Path) -> Result<(), String> {
 fn clear_in(dirs: &[PathBuf]) -> Result<(), String> {
     let mut first = None;
     for dir in dirs {
-        if let Err(error) = remove(dir) { first.get_or_insert(error); }
+        if let Err(error) = remove(dir) {
+            first.get_or_insert(error);
+        }
     }
     first.map_or(Ok(()), Err)
 }
@@ -325,15 +363,17 @@ pub(crate) fn hide(path: &Path) {
 #[cfg(windows)]
 fn set_hidden(path: &Path) {
     use std::os::windows::ffi::OsStrExt;
-    use windows::core::PCWSTR;
     use windows::Win32::Storage::FileSystem::{
-        GetFileAttributesW, SetFileAttributesW, FILE_ATTRIBUTE_HIDDEN, FILE_FLAGS_AND_ATTRIBUTES,
+        FILE_ATTRIBUTE_HIDDEN, FILE_FLAGS_AND_ATTRIBUTES, GetFileAttributesW, SetFileAttributesW,
     };
+    use windows::core::PCWSTR;
     let wide: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
     // 属性读写按 Win32 的既有口径：失败就只当没隐藏，不影响锁本身
     unsafe {
         let attrs = GetFileAttributesW(PCWSTR(wide.as_ptr()));
-        if attrs == u32::MAX { return; }
+        if attrs == u32::MAX {
+            return;
+        }
         let _ = SetFileAttributesW(
             PCWSTR(wide.as_ptr()),
             FILE_FLAGS_AND_ATTRIBUTES(attrs | FILE_ATTRIBUTE_HIDDEN.0),
@@ -369,8 +409,15 @@ mod tests {
     fn verifies_with_rounds_from_the_string() {
         let dir = test_support::temp_dir("client-lock-rounds");
         let dirs = vec![dir.clone()];
-        let password = format!("$pbkdf2-sha256$1000$aabb${}", hash_password("pw", "aabb", 1000));
-        fs::write(lock_path(&dir), serde_json::to_vec(&StoredLock { password }).unwrap()).unwrap();
+        let password = format!(
+            "$pbkdf2-sha256$1000$aabb${}",
+            hash_password("pw", "aabb", 1000)
+        );
+        fs::write(
+            lock_path(&dir),
+            serde_json::to_vec(&StoredLock { password }).unwrap(),
+        )
+        .unwrap();
         assert!(verify_in(&dirs, "pw"));
         assert!(!verify_in(&dirs, "bad"));
         assert!(parse_ok(&fs::read(lock_path(&dir)).unwrap()));
@@ -381,7 +428,10 @@ mod tests {
     fn reads_legacy_two_field_lock() {
         let dir = test_support::temp_dir("client-lock-legacy");
         let dirs = vec![dir.clone()];
-        let legacy = format!(r#"{{"Salt":"aa","Hash":"{}"}}"#, hash_password("pw", "aa", ROUNDS));
+        let legacy = format!(
+            r#"{{"Salt":"aa","Hash":"{}"}}"#,
+            hash_password("pw", "aa", ROUNDS)
+        );
         fs::write(lock_path(&dir), legacy).unwrap();
         assert!(verify_in(&dirs, "pw"));
         assert!(!verify_in(&dirs, "bad"));
@@ -398,7 +448,10 @@ mod tests {
         // 两份不一致时以运行目录为准
         fs::write(lock_path(&data), b"stale").unwrap();
         assert!(locked_in(&dirs));
-        assert_eq!(fs::read(lock_path(&data)).unwrap(), fs::read(lock_path(&run)).unwrap());
+        assert_eq!(
+            fs::read(lock_path(&data)).unwrap(),
+            fs::read(lock_path(&run)).unwrap()
+        );
         // 删掉内部数据目录那份：下次访问用运行目录补回来
         fs::remove_file(lock_path(&data)).unwrap();
         assert!(locked_in(&dirs));
@@ -420,7 +473,11 @@ mod tests {
         let dir = test_support::temp_dir("client-lock-hidden");
         set_in(&[dir.clone()], "pw").unwrap();
         let attrs = fs::metadata(lock_path(&dir)).unwrap().file_attributes();
-        assert_ne!(attrs & 0x2, 0, "lock file should carry FILE_ATTRIBUTE_HIDDEN");
+        assert_ne!(
+            attrs & 0x2,
+            0,
+            "lock file should carry FILE_ATTRIBUTE_HIDDEN"
+        );
         test_support::cleanup(&[&dir]);
     }
 

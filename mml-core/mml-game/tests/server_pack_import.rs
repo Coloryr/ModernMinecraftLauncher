@@ -62,7 +62,10 @@ fn json_server_slot() -> (u16, Arc<Mutex<String>>) {
                     std::thread::sleep(Duration::from_millis(1200));
                     (TINY_JAR.to_vec(), "application/java-archive")
                 } else {
-                    (shared.lock().unwrap().clone().into_bytes(), "application/json")
+                    (
+                        shared.lock().unwrap().clone().into_bytes(),
+                        "application/json",
+                    )
                 };
                 let head = format!(
                     "HTTP/1.1 200 OK\r\nContent-Type: {kind}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -209,7 +212,9 @@ fn progress_follows_download_task() {
 
     let steps = sink.0.lock().unwrap().clone();
     assert!(
-        steps.iter().any(|(done, all)| *done == 1 && *all == Some(2)),
+        steps
+            .iter()
+            .any(|(done, all)| *done == 1 && *all == Some(2)),
         "下到一半应报 1/2：{steps:?}"
     );
     assert_eq!(steps.last(), Some(&(2, Some(2))), "最后应报 2/2：{steps:?}");

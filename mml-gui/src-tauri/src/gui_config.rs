@@ -369,7 +369,10 @@ pub struct LaunchCheckConfig {
 impl Default for LaunchCheckConfig {
     /// 两项检查默认都开
     fn default() -> Self {
-        Self { check_loader: true, check_memory: true }
+        Self {
+            check_loader: true,
+            check_memory: true,
+        }
     }
 }
 

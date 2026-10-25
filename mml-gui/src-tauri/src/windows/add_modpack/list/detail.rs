@@ -3,7 +3,6 @@
 //! 详情按项目编号拉，文件列表给出可选版本与下载地址；
 //! 文件编号到本地路径的映射由 `installed` 提供。
 
-
 use mml_game::launcher::{FileType, ModPackType};
 use mml_net::curseforge_api::{self, CurseFogreArg};
 use mml_net::modrinth_api::{self};
@@ -12,10 +11,9 @@ use crate::dtos::add_resource_dto::{FileListDto, FileListItemDto, ProjectDetailD
 
 use crate::err_keys;
 
-use crate::windows::add_modpack::{CURSEFOGRE_FILE, CURSEFOGRE_INFO, MODRINTH_FILE, MODRINTH_INFO};
-use super::search::{PackFileId};
 use super::installed::{installed_modpack_files, running_files};
-
+use super::search::PackFileId;
+use crate::windows::add_modpack::{CURSEFOGRE_FILE, CURSEFOGRE_INFO, MODRINTH_FILE, MODRINTH_INFO};
 
 /// 获取项目详情，双击列表项时调用
 ///

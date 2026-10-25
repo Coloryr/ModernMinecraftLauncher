@@ -489,8 +489,12 @@ mod tests {
         std::fs::create_dir_all(&dir).expect("建临时目录");
         let zip = dir.join("page.zip");
         let mut archive = BaseArchive::create_empty(ArchiveType::Zip, &zip).expect("建包");
-        archive.add_data("index.html", b"<html></html>").expect("写入口页");
-        archive.add_data("assets/app.js", b"console.log(1)").expect("写资源");
+        archive
+            .add_data("index.html", b"<html></html>")
+            .expect("写入口页");
+        archive
+            .add_data("assets/app.js", b"console.log(1)")
+            .expect("写资源");
         drop(archive);
         let opened = WebArchive::open(&zip).expect("打开包");
         (dir, opened)
@@ -503,13 +507,22 @@ mod tests {
         std::fs::create_dir_all(&dir).expect("建临时目录");
         let zip = dir.join("wrapped.zip");
         let mut archive = BaseArchive::create_empty(ArchiveType::Zip, &zip).expect("建包");
-        archive.add_data("demo/index.html", b"<html></html>").expect("写入口页");
-        archive.add_data("demo/assets/app.js", b"console.log(1)").expect("写资源");
-        archive.add_data("demo/custom.js", b"console.log(2)").expect("写入口脚本");
+        archive
+            .add_data("demo/index.html", b"<html></html>")
+            .expect("写入口页");
+        archive
+            .add_data("demo/assets/app.js", b"console.log(1)")
+            .expect("写资源");
+        archive
+            .add_data("demo/custom.js", b"console.log(2)")
+            .expect("写入口脚本");
         drop(archive);
         let archive = WebArchive::open(&zip).expect("打开包");
 
-        assert_eq!(resolve_entry(&archive, "/", "index.html"), Some("demo/index.html"));
+        assert_eq!(
+            resolve_entry(&archive, "/", "index.html"),
+            Some("demo/index.html")
+        );
         assert_eq!(
             resolve_entry(&archive, "/assets/app.js", "index.html"),
             Some("demo/assets/app.js")
@@ -525,13 +538,22 @@ mod tests {
     #[test]
     fn resolves_only_entries_inside_archive() {
         let (dir, archive) = test_archive();
-        assert_eq!(resolve_entry(&archive, "/", "index.html"), Some("index.html"));
+        assert_eq!(
+            resolve_entry(&archive, "/", "index.html"),
+            Some("index.html")
+        );
         assert_eq!(
             resolve_entry(&archive, "/assets/app.js", "index.html"),
             Some("assets/app.js")
         );
-        assert_eq!(resolve_entry(&archive, "/%2e%2e/secret.txt", "index.html"), None);
-        assert_eq!(resolve_entry(&archive, "/../secret.txt", "index.html"), None);
+        assert_eq!(
+            resolve_entry(&archive, "/%2e%2e/secret.txt", "index.html"),
+            None
+        );
+        assert_eq!(
+            resolve_entry(&archive, "/../secret.txt", "index.html"),
+            None
+        );
         assert_eq!(resolve_entry(&archive, "/missing.js", "index.html"), None);
         let _ = std::fs::remove_dir_all(&dir);
     }

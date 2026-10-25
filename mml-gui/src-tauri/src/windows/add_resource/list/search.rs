@@ -13,9 +13,8 @@ use crate::collect_utils;
 use crate::dtos::add_resource_dto::{ProjectDto, ProjectItemDto};
 use crate::err_keys;
 
+use super::query::{ListQuery, check_download_now, parse_query};
 use crate::windows::add_resource::{CURSEFOGRE_INFO, MODRINTH_INFO};
-use super::query::{ListQuery, parse_query, check_download_now};
-
 
 /// 获取项目列表，支持搜索与分类翻页
 ///

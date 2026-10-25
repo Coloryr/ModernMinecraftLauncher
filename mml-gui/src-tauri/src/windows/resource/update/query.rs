@@ -2,17 +2,15 @@
 //!
 //! 按游戏版本与加载器过滤，两个平台各有一套口径。
 
-
-
-use mml_game::launcher::{ModPackType};
+use mml_game::launcher::ModPackType;
 use mml_game::loader::LoaderType;
 use mml_game::{curseforge, modrinth};
 use mml_net::curseforge_api::{self, CurseFogreArg, file_obj::CurseForgeFileDataObj};
 use mml_net::modrinth_api::{self, version_obj::ModrinthVersionObj};
 
-use crate::dtos::{ModUpdateDto};
+use crate::dtos::ModUpdateDto;
 
-use super::check::{Target};
+use super::check::Target;
 
 /// 查一个模组，判断装上的是不是最新
 ///

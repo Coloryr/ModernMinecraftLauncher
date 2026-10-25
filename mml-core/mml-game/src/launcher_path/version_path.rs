@@ -98,10 +98,9 @@ static LITE_LOADER: LazyLock<RwLock<HashMap<String, Arc<LiteloaderVersionObj>>>>
 pub(crate) fn init<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
     let dir = BASE_DIR.get_or_init(|| dir.as_ref().join(names::VERSION_DIR));
 
-    OPTIFINE_FILE.set(dir.join(names::OPTIFINE_FILE)).unwrap();
-    LITELOADER_FILE
-        .set(dir.join(names::LITELOADER_FILE))
-        .unwrap();
+    // 用 get_or_init 而不是 set().unwrap()：重复 init 不该 panic（测试里多次起步很常见）
+    OPTIFINE_FILE.get_or_init(|| dir.join(names::OPTIFINE_FILE));
+    LITELOADER_FILE.get_or_init(|| dir.join(names::LITELOADER_FILE));
 
     let dir = dir.as_path();
     if !dir.is_dir() {

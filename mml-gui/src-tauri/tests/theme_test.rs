@@ -315,7 +315,10 @@ fn manifest_declares_type_and_metadata() {
     let path = write_package(
         &dir,
         "declared.zip",
-        &[file("theme.json", manifest.as_bytes()), file("index.html", b"x")],
+        &[
+            file("theme.json", manifest.as_bytes()),
+            file("index.html", b"x"),
+        ],
     );
     let info = detect_theme(&path, Some(ThemeKind::Home)).unwrap();
     assert_eq!(info.kind, ThemeKind::Home);
@@ -382,7 +385,10 @@ fn manifest_type_mismatch_rejected() {
     let path = write_package(
         &dir,
         "page.zip",
-        &[file("theme.json", page.as_bytes()), file("index.html", b"x")],
+        &[
+            file("theme.json", page.as_bytes()),
+            file("index.html", b"x"),
+        ],
     );
     assert_eq!(
         detect_theme(&path, Some(ThemeKind::Home)).unwrap_err(),
@@ -409,7 +415,10 @@ fn manifest_entry_missing() {
     let path = write_package(
         &dir,
         "no-entry.zip",
-        &[file("theme.json", manifest.as_bytes()), file("custom.css", b"x")],
+        &[
+            file("theme.json", manifest.as_bytes()),
+            file("custom.css", b"x"),
+        ],
     );
     assert_eq!(
         detect_theme(&path, Some(ThemeKind::Home)).unwrap_err(),
@@ -432,7 +441,10 @@ fn manifest_invalid_rejected() {
         let path = write_package(
             &dir,
             &format!("bad-{index}.zip"),
-            &[file("theme.json", manifest.as_bytes()), file("index.html", b"x")],
+            &[
+                file("theme.json", manifest.as_bytes()),
+                file("index.html", b"x"),
+            ],
         );
         assert_eq!(
             detect_theme(&path, Some(ThemeKind::Home)).unwrap_err(),
@@ -454,7 +466,10 @@ fn manifest_too_large_rejected() {
     let path = write_package(
         &dir,
         "big.zip",
-        &[file("theme.json", manifest.as_bytes()), file("index.html", b"x")],
+        &[
+            file("theme.json", manifest.as_bytes()),
+            file("index.html", b"x"),
+        ],
     );
     assert_eq!(
         detect_theme(&path, Some(ThemeKind::Home)).unwrap_err(),
@@ -475,10 +490,7 @@ fn css_only_package_rejected_by_home_and_page() {
         detect_theme(&path, Some(ThemeKind::Page)).unwrap_err(),
         err_keys::THEME_TYPE_MISMATCH
     );
-    assert_eq!(
-        detect_theme(&path, None).unwrap().kind,
-        ThemeKind::Css
-    );
+    assert_eq!(detect_theme(&path, None).unwrap().kind, ThemeKind::Css);
     cleanup(&[&dir]);
 }
 
@@ -643,7 +655,9 @@ fn unsupported_entry_type_rejected() {
 #[test]
 fn entry_count_limit() {
     let dir = case("theme-count");
-    let names: Vec<String> = (0..=MAX_ENTRIES).map(|index| format!("f{index}.txt")).collect();
+    let names: Vec<String> = (0..=MAX_ENTRIES)
+        .map(|index| format!("f{index}.txt"))
+        .collect();
     let entries: Vec<Spec> = names.iter().map(|name| file(name, b"")).collect();
     let path = write_package(&dir, "many.zip", &entries);
     assert_eq!(
@@ -776,7 +790,10 @@ fn meta_of_archive_prefers_manifest() {
     let path = write_package(
         &dir,
         "declared.zip",
-        &[file("theme.json", manifest.as_bytes()), file("index.html", b"x")],
+        &[
+            file("theme.json", manifest.as_bytes()),
+            file("index.html", b"x"),
+        ],
     );
     let archive = WebArchive::open(&path).unwrap();
     let meta = meta_of_archive(&archive, ThemeKind::Home);

@@ -3,7 +3,11 @@
 //! 导出前先看这一份：整合包元信息、要打包的文件与在线文件映射；
 //! 目录浏览只读，给前端的文件选择用。
 
-use std::{collections::HashMap, path::{Path, PathBuf}, sync::{atomic::{AtomicBool}}};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::atomic::AtomicBool,
+};
 
 use crate::err_keys;
 
@@ -13,10 +17,13 @@ use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 use mml_game::loader::LoaderType;
 use tauri::{AppHandle, Emitter};
 
-use crate::{dtos::export_dto::{ExportEntryDto, ExportInfoDto, ExportProgressDto}, dtos::log_dto::LogFocusDto, listens};
+use crate::{
+    dtos::export_dto::{ExportEntryDto, ExportInfoDto, ExportProgressDto},
+    dtos::log_dto::LogFocusDto,
+    listens,
+};
 
 use crate::windows::{config::resolve_under, instance_snapshot};
-
 
 /// 导出任务进行中，同时只允许一个导出任务
 pub(crate) static EXPORT_RUNNING: AtomicBool = AtomicBool::new(false);
@@ -77,11 +84,15 @@ pub(crate) fn online_of(game: &InstanceSettingObj) -> HashMap<String, OnlineInfo
 ///
 /// 字节数；读不到的条目略过，链接不跟进，免得绕圈或算进别的目录
 fn dir_size(path: &Path) -> u64 {
-    let Ok(items) = std::fs::read_dir(path) else { return 0 };
+    let Ok(items) = std::fs::read_dir(path) else {
+        return 0;
+    };
     let mut total = 0;
     for item in items.flatten() {
         let Ok(kind) = item.file_type() else { continue };
-        if kind.is_symlink() { continue; }
+        if kind.is_symlink() {
+            continue;
+        }
         if kind.is_dir() {
             total += dir_size(&item.path());
         } else if kind.is_file() {
@@ -218,7 +229,10 @@ pub async fn export_list_dir(uuid: String, dir: String) -> Result<Vec<ExportEntr
 /// 该目录的直接子项；路径非法返回 `err.fileName`，目录不存在返回 `err.fileNotFound`
 #[gui_macros::ipc_group("export")]
 #[gui_macros::command]
-pub async fn export_list_instance_dir(uuid: String, dir: String) -> Result<Vec<ExportEntryDto>, String> {
+pub async fn export_list_instance_dir(
+    uuid: String,
+    dir: String,
+) -> Result<Vec<ExportEntryDto>, String> {
     tokio::task::spawn_blocking(move || {
         let game = instance_snapshot(&uuid)?;
         let base = game.get_base_path();
@@ -278,4 +292,3 @@ mod tests {
         crate::test_support::cleanup(&[&dir]);
     }
 }
-

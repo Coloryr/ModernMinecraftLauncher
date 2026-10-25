@@ -30,7 +30,10 @@ pub(crate) mod state;
 #[cfg(test)]
 mod tests;
 
-pub use self::files::{config_delete_file, config_get_bytes_slice, config_get_file, config_get_files, config_get_image, config_open_file_dir, config_save_file};
+pub use self::files::{
+    config_delete_file, config_get_bytes_slice, config_get_file, config_get_files,
+    config_get_image, config_open_file_dir, config_save_file,
+};
 pub use self::mca::{config_find_chunk, config_get_mca};
 pub use self::nbt::{config_close_nbt, config_open_nbt, config_set_nbt};
 pub use self::state::{config_set_tree_width, config_tree_width};

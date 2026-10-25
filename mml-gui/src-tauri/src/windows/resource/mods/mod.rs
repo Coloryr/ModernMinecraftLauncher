@@ -7,10 +7,10 @@
 //! `mod_note` / `mod_note_key` 是 `pub(super)`：模组备注的读写命令在 `mod.rs`
 //! 的分组段里，测试也在那边。
 
-pub(crate) mod list;
+pub(crate) mod actions;
 pub(crate) mod export;
 mod item;
-pub(crate) mod actions;
+pub(crate) mod list;
 
 pub(super) use self::list::{ModDependencyRef, mod_dependencies};
 

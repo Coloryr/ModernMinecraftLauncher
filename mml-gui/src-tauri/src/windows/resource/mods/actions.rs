@@ -2,21 +2,21 @@
 //!
 //! 每个命令都先按实例加锁，再改磁盘并回写窗口 model。
 
-
 use mml_game::game_mods::{DependantProblem, DependantProblemKind, ModDuplicate, mods_dep_test};
 use mml_game::launcher::file_online_info_obj::OnlineInfoObj;
 use mml_names::names;
 
-use crate::dtos::{DepProblemDto, DepProblemKindDto, ModDuplicateDto, ModDuplicateFileDto, ModRenameDto};
+use crate::dtos::{
+    DepProblemDto, DepProblemKindDto, ModDuplicateDto, ModDuplicateFileDto, ModRenameDto,
+};
 
 use crate::err_keys;
 
-use crate::windows::resource::model::{window_model};
+use crate::windows::resource::model::window_model;
 use crate::windows::resource::{block_on_instance, parse_instance};
 
 // ==================== 模组 ====================
-use super::item::{mod_note_key, sha1_of, find_mod, mod_rename_dto};
-
+use super::item::{find_mod, mod_note_key, mod_rename_dto, sha1_of};
 
 /// 启用模组，去掉 .disable / .disabled 后缀
 ///

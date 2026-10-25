@@ -131,7 +131,10 @@ impl StartArgDto {
     ///
     /// 见 [`Self`]；`action` 取 `game`，`value` 为实例 uuid
     pub fn game(uuid: &str) -> Self {
-        Self { action: "game".to_string(), value: uuid.to_string() }
+        Self {
+            action: "game".to_string(),
+            value: uuid.to_string(),
+        }
     }
 
     /// 用文件 / 文件夹打开添加实例
@@ -142,9 +145,11 @@ impl StartArgDto {
     ///
     /// 见 [`Self`]；`action` 取 `install`，`value` 为该路径
     pub fn install(path: &str) -> Self {
-        Self { action: "install".to_string(), value: path.to_string() }
+        Self {
+            action: "install".to_string(),
+            value: path.to_string(),
+        }
     }
-
 }
 
 /// 游戏日志事件

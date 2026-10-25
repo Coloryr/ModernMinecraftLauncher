@@ -10,14 +10,13 @@ use uuid::Uuid;
 use mml_game::launcher::LogEncoding;
 use mml_game::loader::LoaderType;
 
-use crate::dtos::main_dto::{LoadState};
+use crate::dtos::main_dto::LoadState;
 use crate::dtos::{
     GroupDto, InstanceArgsDto, InstanceInfoDto, InstanceLangDto, JavaInfoDto, LaunchPrecheckDto,
 };
 
 use crate::windows::main::args::{apply_args_to_core, args_from_core, core_instance};
 use crate::windows::main::model;
-
 
 /// 获取实例列表，对接 mml-game::get_instances 并合并运行状态
 ///

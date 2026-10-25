@@ -12,8 +12,7 @@ use crate::dtos::main_dto::LogLine;
 use crate::listens;
 use mml_game::{InstanceLog, InstanceLogType};
 
-use super::read::{now_time, log_line_from_item};
-
+use super::read::{log_line_from_item, now_time};
 
 /// 游戏日志事件
 ///
@@ -42,7 +41,8 @@ pub(super) struct PendingLog {
 }
 
 /// 待发日志：内核逐行推来，先攒在这里，由 flusher 按周期成批发出去
-pub(super) static PENDING_LOG: LazyLock<Mutex<Vec<PendingLog>>> = LazyLock::new(|| Mutex::new(Vec::new()));
+pub(super) static PENDING_LOG: LazyLock<Mutex<Vec<PendingLog>>> =
+    LazyLock::new(|| Mutex::new(Vec::new()));
 
 /// 一行日志放进攒批缓冲，超上限丢最旧的
 ///

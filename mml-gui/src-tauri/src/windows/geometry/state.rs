@@ -3,7 +3,11 @@
 //! 一份 window_save.json 记全部窗口的位置与大小，
 //! 关窗时存、开窗时按合法性收敛后取用。
 
-use std::{collections::HashMap, path::{Path, PathBuf}, sync::{LazyLock, OnceLock, RwLock}};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::{LazyLock, OnceLock, RwLock},
+};
 
 use mml_base::serialize_tools;
 use mml_config::config_save;
@@ -12,9 +16,8 @@ use serde::{Deserialize, Serialize};
 use tauri::WebviewWindow;
 use uuid::Uuid;
 
-use crate::windows::registry::{min_size_of_label};
-use super::size::{PhysicalDelta, min_inner_physical, decoration_growth};
-
+use super::size::{PhysicalDelta, decoration_growth, min_inner_physical};
+use crate::windows::registry::min_size_of_label;
 
 /// 窗口几何状态，落盘为 window_save.json
 ///
@@ -166,10 +169,7 @@ pub(crate) fn save_window_state(
     // 920×600 的客户区只有 904×600，不收的话这个偏小的值会被一直写回、不收敛。
     // **按标签取而不是按 uuid**：窗口族的 uuid 是派生出来的，静态表里没有它，
     // 按 uuid 查会静默退化成"没有下限"
-    let min = min_inner_physical(
-        min_size_of_label(window.label()).unwrap_or_default(),
-        scale,
-    );
+    let min = min_inner_physical(min_size_of_label(window.label()).unwrap_or_default(), scale);
 
     if !maximized {
         // 无装饰时标题栏被并进客户区，直接存 inner 每轮净增约 30px，即 639 → 669 → …；

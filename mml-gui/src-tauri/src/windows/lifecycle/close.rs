@@ -2,16 +2,14 @@
 //!
 //! 一族实例窗口随实例一起关；关窗前先把模型里的任务取消。
 
-
 use tauri::{AppHandle, Error::WindowNotFound, Manager, WebviewWindow};
 
 use uuid::Uuid;
 
-use crate::windows::geometry::{save_window_state};
+use super::create::create_window;
+use super::models::OPEN_WINDOWS;
+use crate::windows::geometry::save_window_state;
 use crate::windows::registry::{MAIN_WINDOW_UUID, WINDOWS_INFO};
-use super::models::{OPEN_WINDOWS};
-use super::create::{create_window};
-
 
 /// 关掉挂在某个实例名下的所有窗口
 ///

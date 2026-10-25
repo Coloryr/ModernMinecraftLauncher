@@ -52,6 +52,15 @@ pub enum AutoJoinType {
     Server(Arc<ServerObj>),
 }
 
+/// ColorASM 注入所需的 IPC 连接参数
+#[derive(Clone, Debug)]
+pub struct MixinArg {
+    /// IPC 服务端口
+    pub port: u16,
+    /// 连接验证密钥，启动时由 IPC 服务生成
+    pub key: String,
+}
+
 /// 游戏启动所使用的参数
 pub struct GameLaunchArg {
     /// 登录账户，含玩家名与令牌
@@ -60,10 +69,12 @@ pub struct GameLaunchArg {
     pub auto: AutoJoinType,
     /// 是否以管理员方式启动
     pub admin: bool,
-    /// Mixin 调试端口，不调试时为 `None`
-    pub mixin: Option<u16>,
+    /// ColorASM IPC 连接参数，未启用时为 `None`
+    pub mixin: Option<MixinArg>,
     /// 启动时设置语言
     pub lang: Option<String>,
+    /// 启动时是否跳过服务器包同步；用户在升级弹窗里选了「直接启动」时为真
+    pub skip_server_pack: bool,
 }
 
 /// 游戏实例处理完成后的参数
@@ -405,7 +416,12 @@ impl InstanceSettingObj {
         self.jvm_arg
             .as_ref()
             .and_then(|item| item.isolate_home)
-            .unwrap_or_else(|| mml_config::read_config().jvm_arg.isolate_home.unwrap_or(true))
+            .unwrap_or_else(|| {
+                mml_config::read_config()
+                    .jvm_arg
+                    .isolate_home
+                    .unwrap_or(true)
+            })
     }
 
     /// 隔离时使用的用户目录：实例目录本身
@@ -437,9 +453,18 @@ impl InstanceSettingObj {
             for dir in [&config, &data, &cache] {
                 let _ = std::fs::create_dir_all(dir);
             }
-            env.insert("XDG_CONFIG_HOME".to_string(), config.to_string_lossy().into_owned());
-            env.insert("XDG_DATA_HOME".to_string(), data.to_string_lossy().into_owned());
-            env.insert("XDG_CACHE_HOME".to_string(), cache.to_string_lossy().into_owned());
+            env.insert(
+                "XDG_CONFIG_HOME".to_string(),
+                config.to_string_lossy().into_owned(),
+            );
+            env.insert(
+                "XDG_DATA_HOME".to_string(),
+                data.to_string_lossy().into_owned(),
+            );
+            env.insert(
+                "XDG_CACHE_HOME".to_string(),
+                cache.to_string_lossy().into_owned(),
+            );
             #[cfg(windows)]
             if let Some((drive, rest)) = home_str.split_once(':') {
                 env.insert("HOMEDRIVE".to_string(), format!("{drive}:"));
@@ -846,8 +871,10 @@ impl InstanceSettingObj {
             return Err(ErrorType::TaskCancel);
         }
 
-        // 服务器包更新
-        self.server_pack_update(gui.clone(), cancel.clone()).await?;
+        // 服务器包更新：用户在升级弹窗里选了「直接启动」时这次不比对清单
+        if !arg.skip_server_pack {
+            self.server_pack_update(gui.clone(), cancel.clone()).await?;
+        }
 
         if cancel.is_cancelled() {
             return Err(ErrorType::TaskCancel);

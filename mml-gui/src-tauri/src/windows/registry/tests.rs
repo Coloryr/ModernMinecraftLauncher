@@ -1,11 +1,10 @@
 //! 窗口注册表单元测试
 
-use super::uuids::*;
 use super::family::*;
 use super::spec::*;
+use super::uuids::*;
 
-
-use uuid::{Uuid};
+use uuid::Uuid;
 
 /// 每个 kind 一条基准 uuid，用于断言"派生 uuid 不撞基准"
 const BASE_OF_KIND: [(&str, Uuid); 4] = [
@@ -122,7 +121,10 @@ fn static_labels_still_resolve() {
         let label = format!("mml-{kind}");
         assert!(family_of_label(&label).is_none());
         assert_eq!(uuid_of_label(&label), Some(base));
-        assert_eq!(min_size_of_label(&label), Some(family_min_size(family(kind))));
+        assert_eq!(
+            min_size_of_label(&label),
+            Some(family_min_size(family(kind)))
+        );
         // 后缀不是 uuid 的同类标签同样不认
         let bad = format!("mml-{kind}-not-a-uuid");
         assert!(family_of_label(&bad).is_none());

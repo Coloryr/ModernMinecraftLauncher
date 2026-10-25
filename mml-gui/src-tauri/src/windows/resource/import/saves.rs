@@ -2,14 +2,13 @@
 //!
 //! 存档按「一个目录一个存档」搬，落点由存档名决定。
 
-use std::path::{PathBuf};
+use std::path::PathBuf;
 
 use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 
 use crate::dtos::ResourceDropDto;
 
-use super::common::{MODE_CHECK, MODE_SKIP, MODE_RENAME, unique_name, save_dir_name};
-
+use super::common::{MODE_CHECK, MODE_RENAME, MODE_SKIP, save_dir_name, unique_name};
 
 /// 存档导入：压缩包解压成一个存档目录，口径与内核 `import_save` 一致
 ///

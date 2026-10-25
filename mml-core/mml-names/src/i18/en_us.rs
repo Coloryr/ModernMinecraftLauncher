@@ -72,6 +72,9 @@ impl I18Lang for EnUs {
                 format!("IPC: server started, listening on 127.0.0.1:{port}")
             }
             InfoType::IpcClientConnected { addr } => format!("IPC: client connected {addr}"),
+            InfoType::IpcAuthFailed { addr } => {
+                format!("IPC: connection authentication failed, closing {addr}")
+            }
             InfoType::IpcUnknownMessageType { msg_type } => {
                 format!("IPC: unknown message type {msg_type}")
             }

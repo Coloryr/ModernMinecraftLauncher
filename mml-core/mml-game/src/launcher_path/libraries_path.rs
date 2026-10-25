@@ -713,9 +713,7 @@ mod tests {
             .collect();
 
         assert!(
-            !paths
-                .iter()
-                .any(|item| item.contains("universal")),
+            !paths.iter().any(|item| item.contains("universal")),
             "universal 包不该进类路径：{paths:?}"
         );
         assert!(

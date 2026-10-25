@@ -1635,6 +1635,62 @@ pub async fn install_server_pack_from_url(
     Ok(uuid)
 }
 
+/// 按发布地址重新同步一个在线服务器包实例
+///
+/// 启动时的服务器包检查与「实例设置」里的升级按钮走同一条链路：拉清单 → 与本地清单比对 →
+/// 删旧文件、下新文件、重解压配置目录 → 回写在线信息与实例的版本 / 加载器。
+///
+/// - `game`: 目标实例的设置快照
+/// - `gui`: 安装进度回调，`None` 表示不显示进度
+/// - `cancel`: 取消令牌
+///
+/// # 返回值
+///
+/// 同步成功返回 `Ok(())`；实例没有发布地址、清单读取失败、下载或解压失败返回对应错误
+pub async fn upgrade_server_pack(
+    game: &InstanceSettingObj,
+    gui: AddModPackGui,
+    cancel: CancellationToken,
+) -> CoreResult<()> {
+    let url = game
+        .server_url
+        .clone()
+        .filter(|item| !item.trim().is_empty())
+        .ok_or(ErrorType::DataNotFound(DataNotFoundData::Info))?;
+
+    let (manifest_url, pack) = fetch_server_pack(&url).await?;
+    // 图标名先取出来：清单本体要整个交给同步流程
+    let icon = pack.icon.clone();
+
+    let total = pack.online_list.len() + pack.archive_list.len();
+    if let Some(gui) = &gui {
+        gui.set_state(AddModPackState::DownloadFile);
+        gui.set_now(0, Some(total));
+    }
+
+    let progress_gui = gui.clone();
+    let report = move |done: usize, all: usize| {
+        if let Some(gui) = &progress_gui {
+            gui.set_now(done, Some(all));
+        }
+    };
+    // 旧清单先挪成 `.old`：升级时按新旧两份清单算该删什么，与启动时那条链路一致
+    game.move_serverpack_to_old()?;
+    game.upgrade_serverpack_with(pack, cancel, Some(&report))
+        .await?;
+
+    // 图标会随清单换，按新清单再取一次；下不下来都不影响实例可用
+    let base = server_pack_base_url(&manifest_url);
+    download_server_pack_icon(&game.uuid, game, &base, icon.as_deref()).await;
+
+    if let Some(gui) = &gui {
+        gui.set_state(AddModPackState::Done);
+        gui.set_now(total, Some(total));
+    }
+
+    Ok(())
+}
+
 /// 下载服务器包里的图标并写进实例目录
 ///
 /// 清单里的 `Icon` 是发布目录下的文件名：取 `<发布地址>/<文件名>` 存成实例的

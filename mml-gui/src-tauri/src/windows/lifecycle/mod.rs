@@ -7,18 +7,24 @@
 //! **`window_*` 命令留在 `mod.rs`**：`bindings.ts` 的组键取"来源 .rs 模块最后一段"，
 //! 命令搬文件会让组键从 `windows` 变成别的名字，前端会断，见 AGENTS.md §4。
 
-mod models;
-mod create;
 mod close;
+mod create;
 mod events;
+mod models;
 
-pub(crate) use self::models::{window_model, window_model_by_uuid, window_model_or_insert, model_for_kind, ensure_model_for_kind, drop_model_for_kind};
+pub(crate) use self::models::{
+    drop_model_for_kind, ensure_model_for_kind, model_for_kind, window_model, window_model_by_uuid,
+    window_model_or_insert,
+};
 
 #[cfg(test)]
-pub(crate) use self::models::{remove_window_model};
+pub(crate) use self::models::remove_window_model;
 
-pub use self::close::{show_main_window};
+pub use self::close::show_main_window;
 
-pub(crate) use self::close::{close_instance_windows, close_window, close_window_from_uuid, open_window, open_window_from_uuid};
+pub(crate) use self::close::{
+    close_instance_windows, close_window, close_window_from_uuid, open_window,
+    open_window_from_uuid,
+};
 
-pub use self::events::{on_window_event};
+pub use self::events::on_window_event;

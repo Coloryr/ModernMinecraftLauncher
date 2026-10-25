@@ -13,7 +13,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use mml_base::hash_helper::{gen_hash_from_file, HashType};
+use mml_base::hash_helper::{HashType, gen_hash_from_file};
 use mml_config::config_obj::GCType;
 use mml_game::{
     launcher::{
@@ -52,7 +52,10 @@ pub async fn export_generate_info(uuid: String, file: String) -> Result<(), Stri
     tokio::task::spawn_blocking(move || {
         let env = ReportEnv {
             ui_lang: mml_names::get_lang(crate::gui_config::locale()).to_string(),
-            global_isolate: mml_config::read_config().jvm_arg.isolate_home.unwrap_or(true),
+            global_isolate: mml_config::read_config()
+                .jvm_arg
+                .isolate_home
+                .unwrap_or(true),
         };
         let online = online_of(&game);
         let report = report(&game, &game.get_game_path(), &env, &online)?;
@@ -289,14 +292,15 @@ fn report(
                 .as_ref()
                 .and_then(|adv| adv.main_class.clone())
                 .filter(|text| !text.trim().is_empty()),
-            class_path: lines(game.advance_jvm.as_ref().and_then(|adv| adv.class_path.as_deref())),
+            class_path: lines(
+                game.advance_jvm
+                    .as_ref()
+                    .and_then(|adv| adv.class_path.as_deref()),
+            ),
             isolate_home: jvm
                 .and_then(|jvm| jvm.isolate_home)
                 .unwrap_or(env.global_isolate),
-            java_name: game
-                .jvm_name
-                .clone()
-                .filter(|name| !name.trim().is_empty()),
+            java_name: game.jvm_name.clone().filter(|name| !name.trim().is_empty()),
             window_width: game.window.as_ref().and_then(|window| window.width),
             window_height: game.window.as_ref().and_then(|window| window.height),
             fullscreen: game
@@ -355,7 +359,9 @@ fn mod_entries(
     let mut files = Vec::new();
     for entry in entries.flatten() {
         let path = entry.path();
-        let Ok(kind) = entry.file_type() else { continue };
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
         if kind.is_symlink() {
             continue;
         }
@@ -481,7 +487,9 @@ fn collect(base: &Path, dir: &Path, out: &mut Vec<PathBuf>) {
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        let Ok(kind) = entry.file_type() else { continue };
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
         if kind.is_symlink() {
             continue;
         }
@@ -528,7 +536,9 @@ fn dir_len(dir: &Path) -> u64 {
     };
     let mut total = 0;
     for entry in entries.flatten() {
-        let Ok(kind) = entry.file_type() else { continue };
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
         if kind.is_symlink() {
             continue;
         }
@@ -686,7 +696,13 @@ mod tests {
     fn report_lists_mods_with_state_and_source() {
         let dir = crate::test_support::temp_dir("instance-report-mods");
         fs::create_dir_all(dir.join("mods/sub")).unwrap();
-        for name in ["z.jar", "中文.JAR", "a.jar.disable", "b.DISABLED", "readme.txt"] {
+        for name in [
+            "z.jar",
+            "中文.JAR",
+            "a.jar.disable",
+            "b.DISABLED",
+            "readme.txt",
+        ] {
             fs::write(dir.join("mods").join(name), "sample").unwrap();
         }
         fs::write(dir.join("mods/sub/nested.jar"), "nested").unwrap();
@@ -851,14 +867,25 @@ mod tests {
             ..Default::default()
         });
 
-        let text = serde_json::to_string(&report(&game, &dir, &env(), &no_online()).unwrap()).unwrap();
+        let text =
+            serde_json::to_string(&report(&game, &dir, &env(), &no_online()).unwrap()).unwrap();
         assert!(!text.contains("private"), "{text}");
         assert!(!text.contains("10.0.0.1"), "{text}");
 
         let value: Value = serde_json::from_str(&text).unwrap();
         for key in [
-            "Format", "Launcher", "System", "Locale", "Modpack", "Launch", "Mods",
-            "ResourcePacks", "ShaderPacks", "Saves", "Schematics", "Screenshots",
+            "Format",
+            "Launcher",
+            "System",
+            "Locale",
+            "Modpack",
+            "Launch",
+            "Mods",
+            "ResourcePacks",
+            "ShaderPacks",
+            "Saves",
+            "Schematics",
+            "Screenshots",
         ] {
             assert!(value.get(key).is_some(), "缺少 {key}");
         }

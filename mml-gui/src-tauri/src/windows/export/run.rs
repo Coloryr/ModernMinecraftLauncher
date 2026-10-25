@@ -3,18 +3,25 @@
 //! 在线导出按项目编号拉文件，普通导出直接打包本地目录；
 //! 全程报进度，跑着的时候不重复入队。
 
-use std::{path::PathBuf, sync::{Arc, Mutex, atomic::{AtomicBool, AtomicUsize, Ordering}}, time::{Duration, Instant}};
+use std::{
+    path::PathBuf,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    },
+    time::{Duration, Instant},
+};
 
 use crate::{err_keys, log_text::LogText};
 
-use mml_base::{archives::{ArchiveType, IBaseArchiveGui}};
+use mml_base::archives::{ArchiveType, IBaseArchiveGui};
 use mml_game::game_export::{ExportArg, ExportPackType};
-use tauri::{AppHandle};
+use tauri::AppHandle;
 
-use crate::{dtos::export_dto::{ExportConfigDto, ExportProgressDto}};
+use crate::dtos::export_dto::{ExportConfigDto, ExportProgressDto};
 
-use crate::windows::instance_snapshot;
 use super::list::{EXPORT_RUNNING, emit_export_progress, online_of};
+use crate::windows::instance_snapshot;
 
 /// 当前导出任务的取消令牌；置位后写文件的循环会在下一条收手
 static EXPORT_CANCEL: Mutex<Option<Arc<AtomicBool>>> = Mutex::new(None);
@@ -141,9 +148,12 @@ pub(super) struct ExportProgressGui {
 ///
 /// 任务已开始返回 `Ok(())`；已有导出在跑、uuid 非法、格式或文件名为空返回错误文案
 #[gui_macros::ipc_group("export")]
-
 #[gui_macros::command]
-pub async fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -> Result<(), String> {
+pub async fn export_run(
+    app: AppHandle,
+    uuid: String,
+    config: ExportConfigDto,
+) -> Result<(), String> {
     let began = Instant::now();
     let permit = ExportPermit::acquire(&EXPORT_RUNNING)?;
 
@@ -205,7 +215,11 @@ pub async fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -
 
     let online = online_of(&game);
     // 直接压缩的勾选相对实例目录（含 .minecraft 那一段），其余格式相对游戏目录
-    let pick_base = if pack == ExportPackType::MML { game.get_base_path() } else { base.clone() };
+    let pick_base = if pack == ExportPackType::MML {
+        game.get_base_path()
+    } else {
+        base.clone()
+    };
     // 收集勾选要遍历目录、给在线模组算哈希，大实例上要读几百 MB：放到阻塞线程，并逐条报进度
     let picks: Vec<_> = config.mods.iter().chain(&config.files).cloned().collect();
     let total_picks = picks.len();
@@ -247,47 +261,72 @@ pub async fn export_run(app: AppHandle, uuid: String, config: ExportConfigDto) -
             tokio::task::spawn_blocking(move || {
                 if server_pack {
                     super::server_pack::export_pack(
-                        &games, &arg.file, config.include_launcher, &server_options, &arg.gui, &flag,
+                        &games,
+                        &arg.file,
+                        config.include_launcher,
+                        &server_options,
+                        &arg.gui,
+                        &flag,
                     )
                 } else if arg.select.is_empty() {
                     // 一个文件都没勾：保持老行为，整份实例压缩
                     super::archive::native_instance(&game, &arg.file, &arg.gui, &flag)
                 } else {
-                    super::archive::native_instance_selected(&game, &arg.select, &arg.file, &arg.gui, &flag)
+                    super::archive::native_instance_selected(
+                        &game,
+                        &arg.select,
+                        &arg.file,
+                        &arg.gui,
+                        &flag,
+                    )
                 }
             })
-                .await.map_err(|e| e.to_string()).and_then(|result| result)
+            .await
+            .map_err(|e| e.to_string())
+            .and_then(|result| result)
         } else {
-            crate::windows::export_file::write_async(std::path::Path::new(&save_file), |file| async move {
-                let mut arg = arg;
-                arg.file = file;
-                game.export(arg).await.map_err(|e| e.to_string())
-            }).await
+            crate::windows::export_file::write_async(
+                std::path::Path::new(&save_file),
+                |file| async move {
+                    let mut arg = arg;
+                    arg.file = file;
+                    game.export(arg).await.map_err(|e| e.to_string())
+                },
+            )
+            .await
         };
         // 任务收尾：摘掉取消令牌，别让下一轮导出看见上一轮的取消位
         {
             let mut slot = EXPORT_CANCEL.lock().unwrap();
-            if slot.as_ref().is_some_and(|flag| Arc::ptr_eq(flag, &cancel)) { *slot = None; }
+            if slot.as_ref().is_some_and(|flag| Arc::ptr_eq(flag, &cancel)) {
+                *slot = None;
+            }
         }
         // 耗时统计：直接压缩的四段明细在 write_zip 里已经打过，这里只补其它格式的
         let end = Instant::now();
         if pack != ExportPackType::MML {
             let (open, write, finish) = clock.spans(end);
-            mml_log::info(LogText::ExportPackDetail {
-                open,
-                write,
-                finish,
-                commit: None,
-                entries: clock.total(),
-            }.text());
+            mml_log::info(
+                LogText::ExportPackDetail {
+                    open,
+                    write,
+                    finish,
+                    commit: None,
+                    entries: clock.total(),
+                }
+                .text(),
+            );
         }
-        mml_log::info(LogText::ExportTime {
-            level,
-            prepare: prepared.as_secs_f64(),
-            pack: (end - clock.started()).as_secs_f64(),
-            total: began.elapsed().as_secs_f64(),
-            file: save_file.clone(),
-        }.text());
+        mml_log::info(
+            LogText::ExportTime {
+                level,
+                prepare: prepared.as_secs_f64(),
+                pack: (end - clock.started()).as_secs_f64(),
+                total: began.elapsed().as_secs_f64(),
+                file: save_file.clone(),
+            }
+            .text(),
+        );
 
         let event = match res {
             Ok(()) => ExportProgressDto {
@@ -329,7 +368,9 @@ pub async fn export_cancel() -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(|| {
         // 一个文件内部的复制打断不了，等它写完再看一次
         for _ in 0..100 {
-            if !running() { break; }
+            if !running() {
+                break;
+            }
             std::thread::sleep(std::time::Duration::from_millis(50));
         }
     })
@@ -381,7 +422,9 @@ impl IBaseArchiveGui for ExportProgressGui {
     fn update(&self, filename: Option<String>, current: usize) {
         self.clock.mark_update();
         // 条目上千时逐条发事件会把主线程压在序列化与重渲染上，压到 25 条/秒
-        if !self.emit_due() { return; }
+        if !self.emit_due() {
+            return;
+        }
         emit_export_progress(
             &self.app,
             ExportProgressDto {
@@ -430,7 +473,9 @@ impl ExportProgressGui {
     /// - `now`: 已处理的勾选条数
     /// - `total`: 勾选总条数
     fn prepare(&self, now: usize, total: usize) {
-        if !self.emit_due() { return; }
+        if !self.emit_due() {
+            return;
+        }
         emit_export_progress(
             &self.app,
             ExportProgressDto {

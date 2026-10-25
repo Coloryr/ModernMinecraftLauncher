@@ -268,7 +268,9 @@ fn curseforge_loader(id: u32) -> Option<&'static str> {
 /// 去重后的列表；顺序与入参一致
 fn dedup(list: Vec<String>) -> Vec<String> {
     let mut seen = std::collections::HashSet::new();
-    list.into_iter().filter(|item| seen.insert(item.clone())).collect()
+    list.into_iter()
+        .filter(|item| seen.insert(item.clone()))
+        .collect()
 }
 
 /// 取项目图标地址，供收藏时没存到图标的老条目回源用

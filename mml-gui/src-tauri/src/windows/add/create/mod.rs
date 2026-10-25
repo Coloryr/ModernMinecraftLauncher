@@ -4,6 +4,5 @@
 //! `modpack_task` 注册表里。命令带分组标记，值填原始组名 add，把组键钉回 `add`，
 //! 见 AGENTS.md §4。
 
-pub(crate) mod prepare;
 pub(crate) mod import;
-
+pub(crate) mod prepare;

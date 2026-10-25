@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
 
 use mml_auth::{AuthType, auths, lock_user, locked_by_other, unlock_user};
-use mml_game::game_launch::{AutoJoinType, GameLaunchArg};
+use mml_game::game_launch::{AutoJoinType, GameLaunchArg, MixinArg};
 use mml_game::gui_hook::{ILaunchGui, LaunchState, ProcessRunType};
 use mml_game::launcher::instance_setting_obj::{InstanceSettingObj, ServerObj};
 use mml_game::{InstanceExit, game_count, get_running_instances, is_running, stop_game};
@@ -74,6 +74,8 @@ fn global_auto_join() -> Option<ServerObj> {
 /// - `world`: 启动后直接进入的存档目录名，空串或 `None` 为不自动进入
 /// - `force`: 账户被占用时是否跳过占用检查，`Some(true)` 为用户在弹窗里选了继续
 /// - `auto_save`: 实例配的自动进入存档这次用不用，`Some(false)` 为用户在弹窗里选了不进入
+/// - `server_pack`: 在线服务器包这次怎么处理：`Some("skip")` 不比对清单直接启动，
+///   其余（含 `None`）照旧按发布地址同步；要不要问用户由前端在启动前决定
 ///
 /// # 返回值
 ///
@@ -87,20 +89,29 @@ pub async fn main_launch_game(
     world: Option<String>,
     force: Option<bool>,
     auto_save: Option<bool>,
+    server_pack: Option<String>,
 ) -> Result<(), String> {
-    launch_game(app, uuid, world, force, auto_save, None).await
+    launch_game(app, uuid, world, force, auto_save, server_pack, None).await
 }
 
 /// 大厅的临时进服参数只作用于本次启动，不改实例配置。
 pub(crate) async fn launch_game(
-    app: AppHandle, uuid: String, world: Option<String>, force: Option<bool>, auto_save: Option<bool>,
+    app: AppHandle,
+    uuid: String,
+    world: Option<String>,
+    force: Option<bool>,
+    auto_save: Option<bool>,
+    server_pack: Option<String>,
     lobby: Option<(mml_auth::UserKeyObj, AutoJoinType)>,
 ) -> Result<(), String> {
     let id = Uuid::parse_str(&uuid).map_err(|_| err_keys::GAME_NOT_FOUND.to_string())?;
     let reservation = launch_gate::begin_launch(id)?;
     let core = core_instance(&uuid).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())?;
 
-    let auth = lobby.as_ref().map(|(key, _)| key.clone()).or_else(auths::get_current)
+    let auth = lobby
+        .as_ref()
+        .map(|(key, _)| key.clone())
+        .or_else(auths::get_current)
         .and_then(|key| auths::get(&key.uuid, key.auth_type))
         .ok_or_else(|| err_keys::ACCOUNT_MISSING.to_string())?;
 
@@ -137,11 +148,11 @@ pub(crate) async fn launch_game(
     });
     // 存档按目录名找回来：目录被删/改名时当作找不到，别让启动卡在一个不存在的存档上
     let save = match wanted {
-        Some(dir) => inst
-            .get_saves()
-            .await
-            .into_iter()
-            .find(|item| item.path.file_name().is_some_and(|name| name == dir.as_str())),
+        Some(dir) => inst.get_saves().await.into_iter().find(|item| {
+            item.path
+                .file_name()
+                .is_some_and(|name| name == dir.as_str())
+        }),
         None => None,
     };
     let auto = if explicit.is_some() {
@@ -181,12 +192,22 @@ pub(crate) async fn launch_game(
         app: app.clone(),
         uuid: core.uuid,
     });
+    // IPC 服务没起来时不注入 ColorASM，免得游戏连到一个不存在的端口
+    let mixin = match (mml_ipc::get_port(), mml_ipc::get_auth_key()) {
+        (Some(port), Some(key)) => Some(MixinArg {
+            port,
+            key: key.to_string(),
+        }),
+        _ => None,
+    };
     let mut arg = GameLaunchArg {
         auth,
         auto,
         admin: gui_config::get().experimental.instance_admin,
-        mixin: None,
+        mixin,
         lang: None,
+        // 用户在这次升级弹窗里选了「直接启动」：启动时不再比对服务器包清单
+        skip_server_pack: server_pack.as_deref() == Some("skip"),
     };
 
     // 命令返回后这次启动还要跑完：实例快照与 app 都搬进后台线程，
@@ -206,7 +227,10 @@ pub(crate) async fn launch_game(
         .name(format!("Mml Game Launch {launch_uuid}"))
         .spawn(move || {
             let _reservation = reservation;
-            let runtime = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
+            let runtime = match tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            {
                 Ok(runtime) => runtime,
                 Err(err) => {
                     mml_log::error(
@@ -331,12 +355,11 @@ pub async fn main_auto_save_target(uuid: String) -> Result<Option<AutoSaveTarget
     if !inst.is_game_version_120() {
         return Ok(None);
     }
-    let Some(save) = inst
-        .get_saves()
-        .await
-        .into_iter()
-        .find(|save| save.path.file_name().is_some_and(|name| name == dir.as_str()))
-    else {
+    let Some(save) = inst.get_saves().await.into_iter().find(|save| {
+        save.path
+            .file_name()
+            .is_some_and(|name| name == dir.as_str())
+    }) else {
         return Ok(None);
     };
 

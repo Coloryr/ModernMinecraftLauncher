@@ -20,9 +20,8 @@ use crate::windows::resource::model::{ModCache, window_model};
 use crate::windows::resource::{block_on_instance, parse_instance};
 
 // ==================== 模组 ====================
+use super::actions::mod_duplicate_dto;
 use super::item::{ModCtx, mod_item};
-use super::actions::{mod_duplicate_dto};
-
 
 /// 模组扫描进度回调：把 `x/x` 直接 emit 给发起扫描的那个窗口
 ///

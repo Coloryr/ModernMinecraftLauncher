@@ -5,12 +5,9 @@
 
 use std::collections::HashSet;
 
-
-
 use crate::windows::modpack_task::DOWNLOAD_NOW;
 
-use super::search::{PackFileId};
-
+use super::search::PackFileId;
 
 /// 已安装过的整合包 pid 集合，整页列表共用一次构建
 ///

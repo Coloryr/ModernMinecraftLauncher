@@ -9,7 +9,6 @@ use mml_names::names;
 use crate::dtos::{FileItemDto, FileItemType};
 use crate::err_keys;
 
-
 use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 
 /// 单个配置文件的可读上限，单位字节
@@ -91,7 +90,11 @@ pub(crate) fn resolve_under(base: &Path, rel: &str) -> Result<PathBuf, String> {
 /// # 返回值
 ///
 /// 解析出的绝对路径；来源或路径非法（绝对路径、`..` 穿越）时返回 `err.fileName`
-pub(super) fn resolve_source(game: &InstanceSettingObj, source: &str, file: &str) -> Result<PathBuf, String> {
+pub(super) fn resolve_source(
+    game: &InstanceSettingObj,
+    source: &str,
+    file: &str,
+) -> Result<PathBuf, String> {
     resolve_source_in(&game.get_game_path(), &game.get_saves_path(), source, file)
 }
 

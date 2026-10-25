@@ -8,9 +8,6 @@ use mml_game::game_mods::ModObj;
 use mml_game::launcher::file_online_info_obj::OnlineInfoObj;
 use mml_game::loader::LoaderType;
 
-
-
-
 /// 资源窗口在注册表里的 kind，也是窗口族表里的族名
 pub(super) const KIND: &str = "resource";
 

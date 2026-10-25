@@ -4,21 +4,23 @@
 
 use std::sync::Arc;
 
-
-use mml_base::file_item::{FileItemObj};
+use mml_base::file_item::FileItemObj;
 use mml_game::GameInstance;
-use tauri::{WebviewWindow};
+use tauri::WebviewWindow;
 use tokio::sync::Semaphore;
-use tokio_util::sync::CancellationToken;
 use tokio::task::JoinSet;
+use tokio_util::sync::CancellationToken;
 
 use crate::dtos::{ModUpdateApplyDto, ModUpdateDoneDto, ModUpdateProgressDto};
 use crate::log_text::LogText;
 
+use super::emit::{
+    STAGE_DOWNLOAD, STAGE_FETCH, STAGE_FINISH, emit_resource_mods_update_done,
+    emit_resource_mods_update_progress,
+};
+use super::newfile::fetch_new_files;
+use super::prepare::{finish_one, prepare_one};
 use crate::windows::resource::{block_on_instance, parse_instance};
-use super::emit::{STAGE_FETCH, STAGE_DOWNLOAD, STAGE_FINISH, emit_resource_mods_update_progress, emit_resource_mods_update_done};
-use super::newfile::{fetch_new_files};
-use super::prepare::{prepare_one, finish_one};
 
 /// 同时在查的模组数上限
 ///
@@ -94,9 +96,8 @@ pub async fn resource_mods_update_apply(
         // 前端是在 `await` 这个完成事件，丢了就永远停在"下载中"
         // 用 `tokio::spawn` 而不是 `tauri::async_runtime::spawn`：后者的 JoinError 是
         // `tauri::Error`，拿不到 panic 内容；tokio 的 `JoinError` 能抠出来，日志里才有线索
-        let handle = tokio::spawn(async move {
-            run_update(instance, items, batch_window, token).await
-        });
+        let handle =
+            tokio::spawn(async move { run_update(instance, items, batch_window, token).await });
         let UpdateCounts { ok, failed } = match handle.await {
             Ok(counts) => counts,
             Err(err) => {
@@ -115,7 +116,10 @@ pub async fn resource_mods_update_apply(
                 };
                 mml_log::error(LogText::ModUpdateAborted { reason }.text());
                 // 任务死在半路，只能按"这一批都没换成"收尾，先让界面能落地
-                UpdateCounts { ok: 0, failed: total }
+                UpdateCounts {
+                    ok: 0,
+                    failed: total,
+                }
             }
         };
         emit_resource_mods_update_done(&window, ModUpdateDoneDto { ok, failed });
@@ -231,7 +235,13 @@ pub(super) async fn run_update(
     // ② 合成一个下载任务跑完：并发由下载器按配置的线程数决定。
     //    窗口关了就把令牌一取消，下载器会收手，这一批不再往下走
     let batch = pending.len();
-    mml_log::info(LogText::ModUpdateDownloadable { count: batch, total }.text());
+    mml_log::info(
+        LogText::ModUpdateDownloadable {
+            count: batch,
+            total,
+        }
+        .text(),
+    );
     if batch > 0 && !token.is_cancelled() {
         let objs: Vec<FileItemObj> = pending.iter().map(|entry| entry.obj.clone()).collect();
         mml_log::info(LogText::ModUpdateDownloadStarted { count: batch }.text());

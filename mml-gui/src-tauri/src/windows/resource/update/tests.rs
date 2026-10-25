@@ -9,14 +9,13 @@ use std::collections::HashMap;
 
 use std::path::{Path, PathBuf};
 
-use mml_game::game_mods::{ModObj};
+use mml_game::game_mods::ModObj;
+use mml_game::launcher::ModPackType;
 use mml_game::launcher::file_online_info_obj::OnlineInfoObj;
-use mml_game::launcher::{ModPackType};
-use mml_net::curseforge_api::{file_obj::CurseForgeFileDataObj};
-use mml_net::modrinth_api::{version_obj::ModrinthVersionObj};
+use mml_net::curseforge_api::file_obj::CurseForgeFileDataObj;
+use mml_net::modrinth_api::version_obj::ModrinthVersionObj;
 
-use crate::dtos::{ModUpdateApplyDto};
-
+use crate::dtos::ModUpdateApplyDto;
 
 use mml_base::file_item::FileHash;
 use mml_game::game_mods::ModItemObj;

@@ -9,7 +9,7 @@ use std::{
 use mml_base::{
     archives::{ArchiveType, BaseArchive},
     file_item::{FileItemObj, LaterRun},
-    hash_helper::{gen_hash_from_file, HashType},
+    hash_helper::{HashType, gen_hash_from_file},
     serialize_tools,
 };
 use mml_config::config_save;
@@ -23,8 +23,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     launcher::{
-        file_online_info_obj::OnlineInfoObj,
-        instance_setting_obj::InstanceSettingObj,
+        ModPackType, file_online_info_obj::OnlineInfoObj, instance_setting_obj::InstanceSettingObj,
     },
     serverpack::serverpack_obj::{ServerArchiveItemObj, ServerItemObj, ServerPackObj},
 };
@@ -212,8 +211,51 @@ impl InstanceSettingObj {
 
         // 清单里带项目号的文件回写在线信息，导入后才能当平台来源用
         self.sync_online_info(&new_pack, &game_path);
+        // 升版常常连加载器一起往上走，实例得跟着改，否则用旧加载器配新模组
+        self.apply_pack_setting(&new_pack);
 
         Ok(())
+    }
+
+    /// 把清单里的游戏版本与加载器写回实例设置
+    ///
+    /// 写回走注册表：调用方手里的 `self` 是快照，`get_instance` 拿到的才是锁里那份。
+    ///
+    /// - `pack`: 本次同步的清单
+    fn apply_pack_setting(&self, pack: &ServerPackObj) {
+        let Some(instance) = crate::get_instance(&self.uuid) else {
+            return;
+        };
+        let mut game = instance.write().unwrap();
+        if game.modpack_type != ModPackType::ServerPack {
+            return;
+        }
+
+        let mut changed = false;
+        let version = pack.version.trim();
+        if !version.is_empty() && game.version != version {
+            game.version = version.to_string();
+            changed = true;
+        }
+        if game.loader != pack.loader {
+            game.loader = pack.loader;
+            changed = true;
+        }
+        let loader_version = pack
+            .loader_version
+            .as_deref()
+            .map(str::trim)
+            .filter(|item| !item.is_empty());
+        if let Some(loader_version) = loader_version
+            && game.loader_version.as_deref() != Some(loader_version)
+        {
+            game.loader_version = Some(loader_version.to_string());
+            changed = true;
+        }
+
+        if changed {
+            game.save();
+        }
     }
 
     /// 用清单里的项目号 / 文件号刷新实例的在线信息
@@ -237,7 +279,8 @@ impl InstanceSettingObj {
         info.retain(|_, item| !owned.contains(&item.file) && local_file(game_path, item).is_file());
 
         for item in &new_pack.online_list {
-            let (Some(pid), Some(fid)) = (trimmed(item.pid.as_deref()), trimmed(item.fid.as_deref()))
+            let (Some(pid), Some(fid)) =
+                (trimmed(item.pid.as_deref()), trimmed(item.fid.as_deref()))
             else {
                 continue;
             };

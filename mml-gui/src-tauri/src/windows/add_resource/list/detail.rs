@@ -3,17 +3,16 @@
 //! 详情按项目编号拉一次，文件列表带版本号做缓存键；
 //! 返回的 DTO 是前端直接渲染的那一份。
 
-use mml_game::launcher::{ModPackType};
-use mml_game::{curseforge};
+use mml_game::curseforge;
+use mml_game::launcher::ModPackType;
 use mml_net::curseforge_api::{self, CurseFogreArg};
 use mml_net::modrinth_api::{self};
 
 use crate::dtos::add_resource_dto::{FileListDto, FileListItemDto, ProjectDetailDto};
 use crate::err_keys;
 
+use super::query::{ListQuery, check_version_download_now, parse_query};
 use crate::windows::add_resource::{CURSEFOGRE_FILE, CURSEFOGRE_INFO, MODRINTH_FILE};
-use super::query::{ListQuery, parse_query, check_version_download_now};
-
 
 /// 获取项目详情：简介 + 正文 + 作者 + 标签 + 截图
 ///

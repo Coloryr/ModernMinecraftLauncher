@@ -11,12 +11,12 @@
 //! 模型按**派生窗口 uuid** 登记，与句柄表、几何同一套键：资源窗口是"一个实例一个窗口"
 //! （见 registry 的窗口族），命令侧手里只有实例 uuid，用 [`window_uuid`] 换算。
 
-mod window;
 mod cache;
+mod window;
 
 #[cfg(test)]
 mod tests;
 
 pub(crate) use self::window::{begin_if_open, cancel_window, instance_busy, window_model};
 
-pub(crate) use self::cache::{ModCache};
+pub(crate) use self::cache::ModCache;

@@ -191,7 +191,9 @@ pub fn account_remove_account(app: AppHandle, uuid: String) -> Result<bool, Stri
     let Some(login) = find_by_uuid(&uuid) else {
         return Ok(false);
     };
-    if !login.delete() { return Err(err_keys::LOBBY_ACCOUNT_LOCKED.into()); }
+    if !login.delete() {
+        return Err(err_keys::LOBBY_ACCOUNT_LOCKED.into());
+    }
     if auths::get_current().map(|k| k.uuid) == Some(uuid) {
         auths::set_current(auths::get_all().first().map(|a| a.get_key()));
     }
@@ -252,14 +254,18 @@ pub fn account_refresh_skin(app: AppHandle, uuid: String) -> Result<(), String> 
 pub fn account_set_current_account(app: AppHandle, uuid: String) -> Result<bool, String> {
     // 空串 = 取消选择；登录方式锁定把当前账户滤掉时前端调这个
     if uuid.is_empty() {
-        if !auths::set_current(None) { return Err(err_keys::LOBBY_ACCOUNT_LOCKED.into()); }
+        if !auths::set_current(None) {
+            return Err(err_keys::LOBBY_ACCOUNT_LOCKED.into());
+        }
         emit_account_change(&app);
         return Ok(true);
     }
     let Some(login) = find_by_uuid(&uuid) else {
         return Ok(false);
     };
-    if !auths::set_current(Some(login.get_key())) { return Err(err_keys::LOBBY_ACCOUNT_LOCKED.into()); }
+    if !auths::set_current(Some(login.get_key())) {
+        return Err(err_keys::LOBBY_ACCOUNT_LOCKED.into());
+    }
     emit_account_change(&app);
     Ok(true)
 }

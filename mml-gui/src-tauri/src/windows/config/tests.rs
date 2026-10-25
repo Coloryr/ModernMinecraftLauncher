@@ -459,10 +459,7 @@ fn binary_extensions_are_marked() {
         assert!(
             matches!(
                 get_file_type(name),
-                FileItemType::Nbt
-                    | FileItemType::Mca
-                    | FileItemType::Image
-                    | FileItemType::Archive
+                FileItemType::Nbt | FileItemType::Mca | FileItemType::Image | FileItemType::Archive
             ),
             "{name} 应认成二进制"
         );

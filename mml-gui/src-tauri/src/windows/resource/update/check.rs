@@ -5,11 +5,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-
-use mml_game::game_mods::{ModObj};
+use mml_game::game_mods::ModObj;
 use mml_game::launcher::file_online_info_obj::OnlineInfoObj;
 use mml_game::launcher::{ModPackType, get_source_type};
-use tauri::{WebviewWindow};
+use tauri::WebviewWindow;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
@@ -17,11 +16,11 @@ use crate::dtos::{ModUpdateCheckDto, ModUpdateProgressDto};
 use crate::err_keys;
 use crate::log_text::LogText;
 
-use crate::windows::resource::mods::{mod_note_key, sha1_of};
-use crate::windows::resource::{parse_instance};
 use super::emit::{STAGE_CHECK, emit_resource_mods_update_progress};
-use super::run::{MAX_CONCURRENT};
-use super::query::{check_one};
+use super::query::check_one;
+use super::run::MAX_CONCURRENT;
+use crate::windows::resource::mods::{mod_note_key, sha1_of};
+use crate::windows::resource::parse_instance;
 
 /// 一个待检查的模组，即"有在线信息的顶层条目"
 pub(super) struct Target {
@@ -53,7 +52,10 @@ pub(super) struct Target {
 /// # 返回值
 ///
 /// 待检查的模组，按扫描顺序；项目号或文件号缺一项的都跳过
-pub(super) fn collect_targets(list: &[ModObj], online: &HashMap<String, OnlineInfoObj>) -> Vec<Target> {
+pub(super) fn collect_targets(
+    list: &[ModObj],
+    online: &HashMap<String, OnlineInfoObj>,
+) -> Vec<Target> {
     // 在线信息表按项目号 / 路径索引，这里要按 SHA1 反查，先建一份索引
     let online_of: HashMap<&str, &OnlineInfoObj> = online
         .values()

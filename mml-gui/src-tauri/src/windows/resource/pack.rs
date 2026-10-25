@@ -9,9 +9,12 @@
 //! （新版要求 1.21 之类），按实例现在的版本过滤会让这类升级永远查不出来。
 //! 因此取项目下发布时间最晚的那份文件，新版要求的游戏版本与加载器由内核升级时写回实例。
 
+use mml_base::serialize_tools;
 use mml_game::GameInstance;
 use mml_game::gui_hook::AddModPackGui;
 use mml_game::launcher::ModPackType;
+use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
+use mml_game::serverpack::serverpack_obj::ServerPackObj;
 use mml_net::curseforge_api::{self, CurseFogreArg};
 use mml_net::modrinth_api;
 use tauri::AppHandle;
@@ -40,6 +43,11 @@ use super::update::{LatestFile, newest_curseforge, newest_modrinth};
 #[gui_macros::command]
 pub async fn resource_modpack_check(uuid: String) -> Result<ModPackUpdateDto, String> {
     let instance = parse_instance(&uuid)?;
+    // 快照先拿出来：在线服务器包不查平台，只看发布地址上的清单
+    let snapshot = instance.read().unwrap().clone();
+    if snapshot.modpack_type == ModPackType::ServerPack {
+        return check_server_pack(&snapshot).await;
+    }
     let id = modpack_of(&instance)?;
 
     let latest = match id.platform {
@@ -89,6 +97,10 @@ pub async fn resource_modpack_update(
     // 读的过程中删实例会被拦住，见 resource::instance_busy
     let _op = super::model::begin_if_open(&uuid);
     let instance = parse_instance(&uuid)?;
+    let snapshot = instance.read().unwrap().clone();
+    if snapshot.modpack_type == ModPackType::ServerPack {
+        return update_server_pack(app, uuid, snapshot);
+    }
     let id = modpack_of(&instance)?;
     let (name, instance_uuid) = {
         let game = instance.read().unwrap();
@@ -128,6 +140,127 @@ pub async fn resource_modpack_update(
                 pack_gui,
                 update_token,
             ))
+        })
+        .await
+        .unwrap_or_else(|err| Err(err.to_string()));
+
+        finish_task(&app_task, &task, &token, res.map(|_| instance_uuid));
+    });
+
+    Ok(())
+}
+
+/// 查在线服务器包有没有新版
+///
+/// 清单里的内容换了就算有新版：本地 `server.json` 与发布地址上的那份按字段比一遍，
+/// 不比 `PackVersion` 单字段 —— 发布方忘了改版本号时也得能察觉。
+///
+/// - `game`: 实例设置快照
+///
+/// # 返回值
+///
+/// 见 [`ModPackUpdateDto`]；实例没填发布地址时返回 `err.notOnlineModpack`
+async fn check_server_pack(game: &InstanceSettingObj) -> Result<ModPackUpdateDto, String> {
+    let url = game
+        .server_url
+        .clone()
+        .filter(|item| !item.trim().is_empty())
+        .ok_or_else(|| err_keys::NOT_ONLINE_MODPACK.to_string())?;
+
+    let (_, remote) = mml_game::add_game::fetch_server_pack(&url)
+        .await
+        .map_err(|err| err.to_string())?;
+    let local = serialize_tools::json_from_file::<ServerPackObj>(game.get_server_pack_file()).ok();
+
+    let has_update = match &local {
+        Some(local) => !same_pack(local, &remote),
+        // 本地没有清单，说明上次没同步成：按有新版处理，升一次就好了
+        None => true,
+    };
+
+    Ok(ModPackUpdateDto {
+        has_update,
+        source: "serverpack".to_string(),
+        project_id: String::new(),
+        file_id: local.map(|pack| pack.pack_version).unwrap_or_default(),
+        new_file_id: String::new(),
+        new_version: remote.pack_version,
+        new_file: mml_names::names::SERVER_FILE.to_string(),
+        date: String::new(),
+    })
+}
+
+/// 两份服务器包清单内容是否一致
+///
+/// 按序列化后的 JSON 比：同一类型的字段顺序固定，等价于逐字段比较，
+/// 又不用给清单类型挂 `PartialEq`。
+///
+/// - `left`: 本地清单
+/// - `right`: 发布地址上的清单
+///
+/// # 返回值
+///
+/// 内容一致返回 `true`；序列化失败按不一致处理
+fn same_pack(left: &ServerPackObj, right: &ServerPackObj) -> bool {
+    match (
+        serialize_tools::json_to_string(left),
+        serialize_tools::json_to_string(right),
+    ) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => false,
+    }
+}
+
+/// 把在线服务器包的升级挂到共享任务表上
+///
+/// 与平台整合包那条路径同一套：命令登记完就返回，进度与取消走整合包任务，
+/// 终态让主窗口刷新并选中这个实例。
+///
+/// - `app`: 应用句柄
+/// - `uuid`: 实例 uuid
+/// - `game`: 实例设置快照
+///
+/// # 返回值
+///
+/// 任务登记成功即返回 `Ok(())`；同地址的任务已在跑时返回错误串
+fn update_server_pack(
+    app: AppHandle,
+    uuid: String,
+    game: InstanceSettingObj,
+) -> Result<(), String> {
+    let url = game.server_url.clone().unwrap_or_default();
+    let key = SourceInfo {
+        pid: url.clone(),
+        fid: String::new(),
+    };
+    let token = CancellationToken::new();
+    let RegisteredTask {
+        task,
+        gui: pack_gui,
+    } = register_task(
+        &app,
+        key,
+        "serverpack",
+        game.name.clone(),
+        String::new(),
+        "upgrade",
+        token.clone(),
+    )?;
+    // 升级的是已有实例，目标从开始就记上：任务列表里点它要能回到那个实例
+    *task.instance_uuid.lock().unwrap() = Some(uuid.clone());
+
+    let app_task = app.clone();
+    let update_token = token.clone();
+    let instance_uuid = game.uuid;
+    tauri::async_runtime::spawn(async move {
+        // 同步 future 非 Send，放阻塞线程上 block_on，与平台整合包那条路径同一做法
+        let res = tauri::async_runtime::spawn_blocking(move || {
+            tauri::async_runtime::block_on(mml_game::add_game::upgrade_server_pack(
+                &game,
+                pack_gui,
+                update_token,
+            ))
+            .map_err(|err| err.to_string())
         })
         .await
         .unwrap_or_else(|err| Err(err.to_string()));

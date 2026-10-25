@@ -6,7 +6,10 @@ mod tests;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    sync::{atomic::{AtomicBool, Ordering}, Arc},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use mml_base::{
@@ -14,7 +17,10 @@ use mml_base::{
     file_item::FileHash,
     serialize_tools,
 };
-use mml_names::{i18_items::error_type::{CoreResult, ErrorType}, names};
+use mml_names::{
+    i18_items::error_type::{CoreResult, ErrorType},
+    names,
+};
 
 use mml_net::{
     curseforge_api::{self, list_obj::AuthorsObj},
@@ -126,7 +132,10 @@ impl InstanceSettingObj {
 ///
 /// 已置位时返回任务取消错误，调用方据此停下
 fn check_cancel(cancel: &Option<Arc<AtomicBool>>) -> CoreResult<()> {
-    if cancel.as_ref().is_some_and(|flag| flag.load(Ordering::Relaxed)) {
+    if cancel
+        .as_ref()
+        .is_some_and(|flag| flag.load(Ordering::Relaxed))
+    {
         return Err(ErrorType::TaskCancel);
     }
     Ok(())
@@ -331,7 +340,10 @@ async fn curseforge(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()>
             format!("{}/{}", names::OVERRIDE_DIR, rel_str)
         };
 
-        pending.push(ArchiveAddFile { src: item.clone(), dest: PathBuf::from(name) });
+        pending.push(ArchiveAddFile {
+            src: item.clone(),
+            dest: PathBuf::from(name),
+        });
     }
 
     // 一次写完：逐条 add_file 每写一条都要重写一遍中央目录
@@ -465,7 +477,10 @@ async fn modrinth(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
             format!("{}/{}", names::OVERRIDE_DIR, rel_str)
         };
 
-        pending.push(ArchiveAddFile { src: item.clone(), dest: PathBuf::from(name) });
+        pending.push(ArchiveAddFile {
+            src: item.clone(),
+            dest: PathBuf::from(name),
+        });
     }
 
     // 一次写完：逐条 add_file 每写一条都要重写一遍中央目录
@@ -506,7 +521,10 @@ fn add_game_files(
             continue;
         };
         let name = format!("{}/{}", prefix, rel.to_string_lossy().replace('\\', "/"));
-        pending.push(ArchiveAddFile { src: item.clone(), dest: PathBuf::from(name) });
+        pending.push(ArchiveAddFile {
+            src: item.clone(),
+            dest: PathBuf::from(name),
+        });
     }
 
     // 一次写完：逐条 add_file 每写一条都要重写一遍中央目录

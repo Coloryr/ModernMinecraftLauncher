@@ -2,13 +2,9 @@
 //!
 //! 记录落在实例的更新表里，给「已更新过什么」一个可回看的清单。
 
-
-
-
 use crate::dtos::{ModUpdateProjectDto, ModUpdateRecordDto};
 
-use crate::windows::resource::{parse_instance};
-
+use crate::windows::resource::parse_instance;
 
 /// 读模组更新记录
 ///
@@ -53,9 +49,7 @@ pub async fn resource_mods_update_log(uuid: String) -> Result<Vec<ModUpdateProje
         })
         .collect();
     // 项目之间按最新一条的时间倒序；没有记录的项目排最后
-    groups.sort_by_key(|group| {
-        std::cmp::Reverse(group.update.first().map_or(0, |item| item.time))
-    });
+    groups.sort_by_key(|group| std::cmp::Reverse(group.update.first().map_or(0, |item| item.time)));
 
     Ok(groups)
 }

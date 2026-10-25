@@ -65,7 +65,10 @@ pub(crate) fn begin(uuid: &str) -> Result<TaskGuard, String> {
 ///
 /// 有任务占着返回 `true`
 pub(crate) fn is_busy(instance: &Uuid) -> bool {
-    TASKS.lock().map(|map| map.contains_key(instance)).unwrap_or(false)
+    TASKS
+        .lock()
+        .map(|map| map.contains_key(instance))
+        .unwrap_or(false)
 }
 
 #[cfg(test)]

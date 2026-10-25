@@ -5,15 +5,14 @@
 
 use std::sync::{Arc, Mutex};
 
-use tauri::{WebviewWindow};
+use tauri::WebviewWindow;
 use tokio_util::sync::CancellationToken;
 
-use mml_game::add_game::{PackType};
+use mml_game::add_game::PackType;
 
 use crate::dtos::{DetectedPackDto, DirEntry, FolderInstanceDto};
 
 use crate::windows::add::model::{AddWindowModel, model};
-
 
 /// 一次安装任务的前置上下文：窗口模型句柄与这次任务的取消令牌
 pub(crate) struct PreparedTask {

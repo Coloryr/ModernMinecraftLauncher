@@ -4,12 +4,9 @@ use super::window::*;
 
 use std::path::PathBuf;
 
-
 use mml_base::get_base_dir;
 
-
-
-use super::detect::{asked};
+use super::detect::asked;
 use super::migrate::migrate;
 
 // 迁移引擎的用例

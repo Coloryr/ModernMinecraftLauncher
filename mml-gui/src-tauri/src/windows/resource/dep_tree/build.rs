@@ -10,9 +10,11 @@ use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 use crate::dtos::{DepProblemKindDto, ModDepEdgeDto, ModDepNodeDto, ModDepTreeDto};
 use crate::err_keys;
 
+use super::draft::{
+    Drafts, NodeDraft, Provider, add_nested, add_provider, chosen_of, file_name_of, icon_of,
+    key_of, modid_of, name_of, version_of, virtual_version,
+};
 use crate::windows::resource::mods::{ModDependencyRef, mod_dependencies};
-use super::draft::{Provider, NodeDraft, Drafts, modid_of, file_name_of, name_of, version_of, icon_of, key_of, virtual_version, add_provider, add_nested, chosen_of};
-
 
 /// 按 modid 取节点下标，没有就按它的提供者建一个
 pub(super) fn node_of(
@@ -191,7 +193,10 @@ pub(super) fn walk(
 /// 依赖检测的结论：modid 小写 → 问题种类
 ///
 /// 与「依赖检测」同一个口径（内核 `mods_dep_test`），节点靠它决定打勾还是打感叹号。
-pub(super) fn problem_map(game: &InstanceSettingObj, list: &[ModObj]) -> HashMap<String, DepProblemKindDto> {
+pub(super) fn problem_map(
+    game: &InstanceSettingObj,
+    list: &[ModObj],
+) -> HashMap<String, DepProblemKindDto> {
     let mut map = HashMap::new();
     let Ok(test) = mods_dep_test(game, list) else {
         return map;

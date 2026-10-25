@@ -100,12 +100,13 @@ pub async fn resource_schematic_detail(
 
     // 解一个结构可能不小：丢到阻塞线程，别占住 async runtime。
     // 解析失败按"读不出来"处理，与列表条目一样标 `fail`，不把内核错误串弹给用户
-    let parsed = tauri::async_runtime::spawn_blocking(move || -> Result<Option<SchematicObj>, String> {
-        let mut stream = path_helper::open_read(&path).map_err(|err| err.to_string())?;
-        Ok(read_schematic_file(&mut stream, SchematicType::from_ext(&ext)).ok())
-    })
-    .await
-    .map_err(|err| err.to_string())??;
+    let parsed =
+        tauri::async_runtime::spawn_blocking(move || -> Result<Option<SchematicObj>, String> {
+            let mut stream = path_helper::open_read(&path).map_err(|err| err.to_string())?;
+            Ok(read_schematic_file(&mut stream, SchematicType::from_ext(&ext)).ok())
+        })
+        .await
+        .map_err(|err| err.to_string())??;
 
     let obj = parsed.unwrap_or_else(|| SchematicObj {
         fail: true,

@@ -645,14 +645,30 @@ impl LogText {
             LogText::LogLaunchTime { secs } => format!("启动用时：{secs:.2}s"),
             LogText::LogCmdPreTime { secs } => format!("启动前执行用时：{secs:.2}s"),
             LogText::LogCmdPostTime { secs } => format!("启动后执行用时：{secs:.2}s"),
-            LogText::ExportTime { level, prepare, pack, total, file } => format!(
+            LogText::ExportTime {
+                level,
+                prepare,
+                pack,
+                total,
+                file,
+            } => format!(
                 "[export] 导出耗时：准备 {}、打包 {}、合计 {}，压缩档位 {level}，文件 {file}",
-                time_text(*prepare), time_text(*pack), time_text(*total)
+                time_text(*prepare),
+                time_text(*pack),
+                time_text(*total)
             ),
-            LogText::ExportPackDetail { open, write, finish, commit, entries } => {
+            LogText::ExportPackDetail {
+                open,
+                write,
+                finish,
+                commit,
+                entries,
+            } => {
                 let mut text = format!(
                     "[export] 打包明细：建包 {}、写入 {}、收尾 {}",
-                    time_text(*open), time_text(*write), time_text(*finish)
+                    time_text(*open),
+                    time_text(*write),
+                    time_text(*finish)
                 );
                 if let Some(commit) = commit {
                     text.push_str(&format!("、改名 {}", time_text(*commit)));
@@ -694,9 +710,11 @@ impl LogText {
             LogText::MusicReadFailed { source, error } => {
                 format!("读取自定义音乐失败 {source}：{error}")
             }
-            LogText::ColormcMigrateStart { source, target, mode } => format!(
-                "[colormc] 迁移开始：{source} -> {target}（{mode}）"
-            ),
+            LogText::ColormcMigrateStart {
+                source,
+                target,
+                mode,
+            } => format!("[colormc] 迁移开始：{source} -> {target}（{mode}）"),
             LogText::ColormcMoveFailed { name, error } => {
                 format!("[colormc] 移动 {name} 失败：{error}")
             }
@@ -707,9 +725,14 @@ impl LogText {
             LogText::ColormcCopyFailed { name, error } => {
                 format!("[colormc] 复制 {name} 失败：{error}")
             }
-            LogText::ColormcMigrateDone { ok, failed, instances, total } => format!(
-                "[colormc] 迁移完成：ok={ok} failed={failed} instances={instances}/{total}"
-            ),
+            LogText::ColormcMigrateDone {
+                ok,
+                failed,
+                instances,
+                total,
+            } => {
+                format!("[colormc] 迁移完成：ok={ok} failed={failed} instances={instances}/{total}")
+            }
             LogText::ColormcCopySkip { path, error } => {
                 format!("[colormc] 跳过复制失败的文件 {path}：{error}")
             }
@@ -780,7 +803,9 @@ impl LogText {
                 "[tray] the last instance exited and the main window is closed, quitting the launcher",
             ),
             LogText::IpcStartFailed { error } => {
-                format!("[ipc] failed to start the IPC server, single-instance and summon are disabled: {error}")
+                format!(
+                    "[ipc] failed to start the IPC server, single-instance and summon are disabled: {error}"
+                )
             }
             LogText::IpcPortSaveFailed { path, error } => {
                 format!("[ipc] failed to write the port file {path}: {error}")
@@ -789,9 +814,9 @@ impl LogText {
                 "[drop] failed to set up the file path bridge, \
                  dropped files will not carry paths: {error}"
             ),
-            LogText::FilePathBridgeNoPath { label } => format!(
-                "[drop] the path bridge returned no path (window {label})"
-            ),
+            LogText::FilePathBridgeNoPath { label } => {
+                format!("[drop] the path bridge returned no path (window {label})")
+            }
             LogText::WebviewDataDirFailed { dir, error } => format!(
                 "[window] failed to create the webview data directory, \
                  falling back to the default: {dir} ({error})"
@@ -890,14 +915,30 @@ impl LogText {
             LogText::LogLaunchTime { secs } => format!("launch took {secs:.2}s"),
             LogText::LogCmdPreTime { secs } => format!("pre-launch command took {secs:.2}s"),
             LogText::LogCmdPostTime { secs } => format!("post-launch command took {secs:.2}s"),
-            LogText::ExportTime { level, prepare, pack, total, file } => format!(
+            LogText::ExportTime {
+                level,
+                prepare,
+                pack,
+                total,
+                file,
+            } => format!(
                 "[export] export took {} in total: preparing {}, packing {} (compression {level}, file {file})",
-                time_text(*total), time_text(*prepare), time_text(*pack)
+                time_text(*total),
+                time_text(*prepare),
+                time_text(*pack)
             ),
-            LogText::ExportPackDetail { open, write, finish, commit, entries } => {
+            LogText::ExportPackDetail {
+                open,
+                write,
+                finish,
+                commit,
+                entries,
+            } => {
                 let mut text = format!(
                     "[export] packing detail: opening {}, writing {}, finishing {}",
-                    time_text(*open), time_text(*write), time_text(*finish)
+                    time_text(*open),
+                    time_text(*write),
+                    time_text(*finish)
                 );
                 if let Some(commit) = commit {
                     text.push_str(&format!(", renaming {}", time_text(*commit)));
@@ -908,9 +949,9 @@ impl LogText {
             LogText::LogJavaPath { path } => format!("Java path: {path}"),
             LogText::LaunchStarting => String::from("launching the game…"),
             LogText::LaunchProcessStarted => String::from("the game process has started"),
-            LogText::LaunchNoJava { java } => format!(
-                "no Java {java} found, set the Java path in the instance settings"
-            ),
+            LogText::LaunchNoJava { java } => {
+                format!("no Java {java} found, set the Java path in the instance settings")
+            }
             LogText::ArchiveIndexMissing { name } => {
                 format!("[custom_home] the archive has no {name}")
             }
@@ -941,9 +982,11 @@ impl LogText {
             LogText::MusicReadFailed { source, error } => {
                 format!("failed to read the custom music {source}: {error}")
             }
-            LogText::ColormcMigrateStart { source, target, mode } => format!(
-                "[colormc] migrate start: {source} -> {target} ({mode})"
-            ),
+            LogText::ColormcMigrateStart {
+                source,
+                target,
+                mode,
+            } => format!("[colormc] migrate start: {source} -> {target} ({mode})"),
             LogText::ColormcMoveFailed { name, error } => {
                 format!("[colormc] failed to move {name}: {error}")
             }
@@ -956,7 +999,12 @@ impl LogText {
             LogText::ColormcCopyFailed { name, error } => {
                 format!("[colormc] failed to copy {name}: {error}")
             }
-            LogText::ColormcMigrateDone { ok, failed, instances, total } => format!(
+            LogText::ColormcMigrateDone {
+                ok,
+                failed,
+                instances,
+                total,
+            } => format!(
                 "[colormc] migrate done: ok={ok} failed={failed} instances={instances}/{total}"
             ),
             LogText::ColormcCopySkip { path, error } => {
@@ -980,9 +1028,9 @@ impl LogText {
             }
             LogText::BgResizeJoinFailed { error } => format!("[bg] resize wait failed: {error}"),
             LogText::BgResizeFailed { error } => format!("[bg] resize failed: {error}"),
-            LogText::BgConfigDirMissing => String::from(
-                "[bg] failed to set the background: the config directory is not ready",
-            ),
+            LogText::BgConfigDirMissing => {
+                String::from("[bg] failed to set the background: the config directory is not ready")
+            }
             LogText::BgWriteFailed { error } => {
                 format!("[bg] failed to write the background image: {error}")
             }
@@ -1060,12 +1108,19 @@ mod tests {
             LogText::FatalInitFailed.text_in(&Lang::zh_cn),
             LogText::FatalInitFailed.text_in(&Lang::en_us)
         );
-        assert!(LogText::FatalInitFailed.text_in(&Lang::en_us).contains("M²L"));
+        assert!(
+            LogText::FatalInitFailed
+                .text_in(&Lang::en_us)
+                .contains("M²L")
+        );
 
         // 日志窗口那几条：时间要落进文案
         let login = LogText::LogLoginTime { secs: 1.25 };
         assert_eq!(login.text_in(&Lang::zh_cn), String::from("登录用时：1.25s"));
-        assert_eq!(login.text_in(&Lang::en_us), String::from("login took 1.25s"));
+        assert_eq!(
+            login.text_in(&Lang::en_us),
+            String::from("login took 1.25s")
+        );
 
         let java = LogText::LaunchNoJava { java: 17 };
         assert!(java.text_in(&Lang::zh_cn).contains("Java 17"));
@@ -1153,4 +1208,3 @@ fn time_text(secs: f64) -> String {
         format!("{:.2} s", secs)
     }
 }
-

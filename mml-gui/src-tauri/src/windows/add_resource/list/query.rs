@@ -10,8 +10,7 @@ use uuid::Uuid;
 
 use crate::err_keys;
 
-use crate::windows::add_resource::{DOWNLOAD_NOW};
-
+use crate::windows::add_resource::DOWNLOAD_NOW;
 
 /// 列表与详情命令共用的入参解析结果
 pub(super) struct ListQuery {

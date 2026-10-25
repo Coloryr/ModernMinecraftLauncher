@@ -4,13 +4,13 @@
 //! 仅当跨 Tauri IPC 传输到前端时才转成 DTO，或 DTO 本身即 wire 形态，
 //! 如事件负载 / 命令入参。纯传输、无业务方法的窗口类型也集中在此。
 
-pub mod build_info_dto;
 pub mod account_dto;
-pub mod analysis_dto;
 pub mod add_dto;
 pub mod add_modpack_dto;
 pub mod add_resource_dto;
+pub mod analysis_dto;
 pub mod args_dto;
+pub mod build_info_dto;
 pub mod collect_dto;
 pub mod colormc_dto;
 pub mod config_dto;
@@ -18,13 +18,13 @@ pub mod custom_home_dto;
 pub mod custom_ui_dto;
 pub mod download_dto;
 pub mod export_dto;
-pub mod mod_export_dto;
 pub mod gui_config_dto;
 pub mod instance_dto;
 pub mod java_download_dto;
 pub mod java_dto;
 pub mod log_dto;
 pub mod main_dto;
+pub mod mod_export_dto;
 pub mod motd_dto;
 pub mod resource_dto;
 pub mod server_instance_dto;
@@ -36,8 +36,6 @@ pub mod version_dto;
 pub mod window_dto;
 
 pub use account_dto::{AccountStoreDto, AccountStoreViewDto};
-pub use build_info_dto::{BuildChannel, BuildInfoDto, ExeInfoDto};
-pub use analysis_dto::{CrashAnalysisDto, CrashFindingDto};
 pub use add_dto::{
     DetectedPackDto, DirEntry, FolderInstanceDto, LoaderProgressDto, NameConflictDto,
     PackProgressDto, ServerPackProbeDto,
@@ -47,12 +45,14 @@ pub use add_resource_dto::{
     DecPicDto, FileListDto, FileListItemDto, McmodDto, PicDto, ProjectDetailDto, ProjectDto,
     ProjectItemDto, ResourceSaveDto, ResourceStatusDto, ResourceTaskDto, SourceTypeDto, TagDto,
 };
+pub use analysis_dto::{CrashAnalysisDto, CrashFindingDto};
 pub use args_dto::{EnvVarLineDto, InstanceArgsDto};
+pub use build_info_dto::{BuildChannel, BuildInfoDto, ExeInfoDto};
 pub use collect_dto::{CollectDataDto, CollectItemDto};
 pub use colormc_dto::{ColorMcCompatDto, ColorMcInfoDto, ColorMcProgressDto, ColorMcReportDto};
 pub use config_dto::{
-    BytesSliceDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, FileItemDto, FileItemType,
-    ChunkFindDto, McaChunkDto, NbtEditDto, NbtKindDto, NbtNodeDto, NbtOpDto,
+    BytesSliceDto, ChunkFindDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, FileItemDto,
+    FileItemType, McaChunkDto, NbtEditDto, NbtKindDto, NbtNodeDto, NbtOpDto,
 };
 pub use custom_home_dto::CustomHomeInfoDto;
 pub use custom_ui_dto::{CustomUiCssDto, CustomUiInfoDto};
@@ -69,24 +69,23 @@ pub use java_download_dto::{JavaDownloadItemDto, JavaDownloadOptionsDto, JavaTyp
 pub use java_dto::{JavaImportProgressDto, JavaInfoDto};
 pub use log_dto::{LogFocusDto, LogSettingDto};
 pub use main_dto::{
-    AutoSaveTargetDto, BlockGroupDto, BlockGroupsDto, BlockItemDto, BlockStatusDto, ErrorEvent,
-    ExitEvent, IconSourceDto, InstanceChangeEvent, InstanceLangDto, InstancePatch, LogEvent,
-    LaunchPrecheckDto, NewsItem, CustomJsonItemDto, StartArgDto, StateEvent, SystemMemoryDto,
+    AutoSaveTargetDto, BlockGroupDto, BlockGroupsDto, BlockItemDto, BlockStatusDto,
+    CustomJsonItemDto, ErrorEvent, ExitEvent, IconSourceDto, InstanceChangeEvent, InstanceLangDto,
+    InstancePatch, LaunchPrecheckDto, LogEvent, NewsItem, StartArgDto, StateEvent, SystemMemoryDto,
 };
 pub use motd_dto::{MotdDto, MotdSegmentDto};
-pub use server_instance_dto::{
-    ServerInstanceConfigDto, ServerInstanceOptionsDto, ServerInstancePickDto,
-    ServerInstanceProgressDto, ServerInstanceResultDto,
-};
 pub use resource_dto::{
     DataPackItemDto, DepProblemDto, DepProblemKindDto, ModAutoMarkDto, ModAutoMarkProgressDto,
     ModDepEdgeDto, ModDepNodeDto, ModDepTreeDto, ModDuplicateDto, ModDuplicateFileDto, ModGroupDto,
     ModItemDto, ModPackUpdateDto, ModRenameDto, ModScanProgressDto, ModUpdateApplyDto,
     ModUpdateCheckDto, ModUpdateDoneDto, ModUpdateDto, ModUpdateProgressDto, ModUpdateProjectDto,
-    ModUpdateRecordDto,
-    PackItemDto,
-    ResourceDropDto, ResourceViewDto, SaveBackupDto, SaveEditDto, SaveItemDto, SchematicBlockDto,
-    SchematicDetailDto, SchematicItemDto, ScreenshotItemDto, ServerItemDto, ShaderItemDto,
+    ModUpdateRecordDto, PackItemDto, ResourceDropDto, ResourceViewDto, SaveBackupDto, SaveEditDto,
+    SaveItemDto, SchematicBlockDto, SchematicDetailDto, SchematicItemDto, ScreenshotItemDto,
+    ServerItemDto, ShaderItemDto,
+};
+pub use server_instance_dto::{
+    ServerInstanceConfigDto, ServerInstanceOptionsDto, ServerInstancePickDto,
+    ServerInstanceProgressDto, ServerInstanceResultDto,
 };
 pub use settings_dto::{
     BgInfoDto, DnsSettingDto, GameCheckSettingDto, LaunchSettingDto, LocalFileEntryDto,
@@ -98,4 +97,6 @@ pub use version_dto::VersionInfoDto;
 pub use window_dto::{DropPathDto, FileDropDto, WindowSizeDto};
 
 mod lobby_dto;
-pub use lobby_dto::{LobbyProfileDto, LobbyStateDto, LobbyViewDto, MappingRoomDto, MappingLobbyDto};
+pub use lobby_dto::{
+    LobbyProfileDto, LobbyStateDto, LobbyViewDto, MappingLobbyDto, MappingRoomDto,
+};

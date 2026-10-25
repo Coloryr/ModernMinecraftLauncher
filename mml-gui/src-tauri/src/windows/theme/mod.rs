@@ -232,8 +232,8 @@ fn read_manifest(archive: &mut archive::Package) -> Result<Option<Manifest>, Str
     let Some(bytes) = archive.read(found.index, MAX_MANIFEST_BYTES)? else {
         return Err(error(err_keys::THEME_MANIFEST_INVALID));
     };
-    let manifest: Manifest = serde_json::from_slice(&bytes)
-        .map_err(|_| error(err_keys::THEME_MANIFEST_INVALID))?;
+    let manifest: Manifest =
+        serde_json::from_slice(&bytes).map_err(|_| error(err_keys::THEME_MANIFEST_INVALID))?;
     if manifest.api.is_some_and(|api| api != 1) {
         return Err(error(err_keys::THEME_MANIFEST_INVALID));
     }
@@ -265,7 +265,11 @@ fn has_entry(archive: &archive::Package, name: &str) -> bool {
 /// - `archive`: 已通过容器与路径校验的包
 /// - `kind`: 清单声明的类型
 fn ensure_entry(archive: &archive::Package, kind: ThemeKind) -> Result<(), String> {
-    if kind.entry_names().iter().any(|name| has_entry(archive, name)) {
+    if kind
+        .entry_names()
+        .iter()
+        .any(|name| has_entry(archive, name))
+    {
         Ok(())
     } else {
         Err(error(err_keys::THEME_MISSING_ENTRY))

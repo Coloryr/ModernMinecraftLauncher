@@ -20,8 +20,7 @@ use crate::windows::resource::parse_instance;
 // - 分组顺序 = 用户自己拖出来的，存在 `gui_setting.json` 的 `Mod.GroupOrder`；
 //   没存过则用默认顺序：识别失败 → 已启用 → 已禁用 → 自建分组按名字
 // - 成员用 SHA1 而不是 uuid：启用/禁用会改文件名，uuid 跟着变，SHA1 不变
-use super::state::{default_group_order, group_order_of, mod_groups_of, edit_mod_setting};
-
+use super::state::{default_group_order, edit_mod_setting, group_order_of, mod_groups_of};
 
 /// 取某个实例的模组分组
 ///

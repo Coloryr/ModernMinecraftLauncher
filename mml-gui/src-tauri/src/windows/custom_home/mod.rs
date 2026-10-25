@@ -38,7 +38,9 @@ mod archive;
 mod protocol;
 
 // 按原路径再导出：`lib.rs` 注册协议处理器、配置变更后重载，都用这两个
-pub(crate) use self::archive::{CSS_FILE, INDEX_FILE, SCRIPT_FILE, import_archive, open_handle, reload};
+pub(crate) use self::archive::{
+    CSS_FILE, INDEX_FILE, SCRIPT_FILE, import_archive, open_handle, reload,
+};
 pub(crate) use self::protocol::url_custom_home;
 
 // ================= 路径 =================

@@ -18,7 +18,6 @@ use super::source::{
     check_binary, check_size, get_file_type, push_file, resolve_source, resolve_under,
 };
 
-
 /// 二进制视图一次最多读多少字节
 ///
 /// 一页给 64 KiB 足够铺满屏幕；再大只是让 IPC 白搬数据。

@@ -320,6 +320,7 @@ pub async fn launch(version: &str, loader: LoaderType, loader_version: &str) -> 
         admin: false,
         mixin: None,
         lang: None,
+        skip_server_pack: false,
     };
     let check_started = Instant::now();
     let check = match instance

@@ -1,15 +1,14 @@
 //! 资源窗口模型相关单元测试
 
-use super::window::*;
 use super::cache::*;
+use super::window::*;
 
 use std::collections::HashMap;
-use std::sync::{Arc};
+use std::sync::Arc;
 
 use mml_game::game_mods::ModObj;
 use mml_game::loader::LoaderType;
 use uuid::Uuid;
-
 
 use crate::windows::lifecycle::{window_model_by_uuid, window_model_or_insert};
 

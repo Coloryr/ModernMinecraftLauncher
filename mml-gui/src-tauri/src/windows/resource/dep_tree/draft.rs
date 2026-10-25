@@ -8,10 +8,9 @@ use std::collections::{HashMap, HashSet};
 use mml_game::game_mods::{ModObj, ProvidedVersion, provided_version};
 use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 
-use crate::dtos::{ModDepEdgeDto};
+use crate::dtos::ModDepEdgeDto;
 
-use crate::windows::resource::{data_url};
-
+use crate::windows::resource::data_url;
 
 /// 提供某个 modid 的一个条目
 pub(super) struct Provider<'a> {

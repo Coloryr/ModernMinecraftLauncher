@@ -5,6 +5,7 @@
 //
 // 更新本身在后端跑（挂在共享的整合包任务表上），进度与取消在标题栏 / 整合包任务里，
 // 这里只负责"确认"这一步。
+import { computed } from "vue";
 import { t } from "../lib/i18n";
 import BaseButton from "./ui/BaseButton.vue";
 import BaseModal from "./ui/BaseModal.vue";
@@ -21,20 +22,29 @@ const emit = defineEmits<{
   /** 确认更新，载荷是要升到的那份文件编号 */
   (e: "update", fileId: string): void;
 }>();
+
+/** 这次更新的是在线服务器包：文案换成"同步"，也没有发布时间 */
+const serverPack = computed(() => props.result.source === "serverpack");
 </script>
 
 <template>
-  <BaseModal :title="t('resource.modpackUpdateTitle')" :closable="false" @close="emit('close')">
+  <BaseModal
+    :title="t(serverPack ? 'resource.serverPackUpdateTitle' : 'resource.modpackUpdateTitle')"
+    :closable="false"
+    @close="emit('close')"
+  >
     <p class="pack-version">
       {{ t("resource.modpackNewVersion", { version: props.result.newVersion || props.result.newFile }) }}
     </p>
-    <p class="pack-date">{{ t("resource.modpackNewDate", { date: props.result.date }) }}</p>
-    <p class="pack-tip">{{ t("resource.modpackUpdateTip") }}</p>
+    <p v-if="props.result.date" class="pack-date">{{ t("resource.modpackNewDate", { date: props.result.date }) }}</p>
+    <p class="pack-tip">
+      {{ t(serverPack ? "resource.serverPackUpdateTip" : "resource.modpackUpdateTip") }}
+    </p>
     <div class="modal-actions">
       <BaseButton @click="emit('close')">{{ t("resource.cancel") }}</BaseButton>
       <!-- 与模组更新弹窗、依赖图弹窗的确认按钮同一档（accent），别在同一个窗口里两套 -->
       <BaseButton variant="accent" @click="emit('update', props.result.newFileId)">
-        {{ t("resource.modpackUpdate") }}
+        {{ t(serverPack ? "resource.serverPackUpdate" : "resource.modpackUpdate") }}
       </BaseButton>
     </div>
   </BaseModal>
