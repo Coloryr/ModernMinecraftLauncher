@@ -5,6 +5,7 @@
 import { computed, nextTick, onActivated, onMounted, onUnmounted, ref, watch } from "vue";
 import {
   api,
+  createShortcut,
   getBlockStatus,
   getLoadState,
   onClientConfigChange,
@@ -777,6 +778,13 @@ function onInstMenuAction(id: InstMenuAction) {
       // 独立窗口：带目标实例，已开着时由壳层推送 server-instance-focus 换实例
       if (target) openWindow("server_instance", { uuid: target.uuid });
       break;
+    case "cloudSave":
+      // 还没做：给一条「制作中」提示，别让菜单点了没反应
+      showToast(t("actions.comingSoon", { name: t("actions.cloudSync") }));
+      break;
+    case "shortcut":
+      if (target) void createShortcutOf(target);
+      break;
     case "copy":
       if (target) openCopy(target);
       break;
@@ -1107,6 +1115,22 @@ function onAction(id: ActionId) {
       break;
     default:
       showToast(t("actions.wip", { name: t(ACTION_LABELS[id]) }));
+  }
+}
+
+/**
+ * 在桌面给实例建一个快捷方式
+ *
+ * 快捷方式指向启动器本体并带 `--game <uuid>`，双击等于「启动这个实例」。
+ *
+ * - `instance`: 目标实例
+ */
+async function createShortcutOf(instance: InstanceInfoDto) {
+  try {
+    await createShortcut(instance.uuid);
+    showToast(t("actions.shortcutOk", { name: instance.name }));
+  } catch (e) {
+    showToast(tErr(e));
   }
 }
 

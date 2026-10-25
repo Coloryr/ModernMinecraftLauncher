@@ -19,6 +19,7 @@ export * from "./dtos/custom_home_dto";
 export * from "./dtos/custom_ui_dto";
 export * from "./dtos/download_dto";
 export * from "./dtos/export_dto";
+export * from "./dtos/gamepad_dto";
 export * from "./dtos/gui_config_dto";
 export * from "./dtos/instance_dto";
 export * from "./dtos/java_download_dto";

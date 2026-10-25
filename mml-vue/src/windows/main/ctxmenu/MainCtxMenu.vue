@@ -140,6 +140,13 @@ watchEffect(async () => {
       <button class="ctx-item" @click="emit('inst-action', 'serverInstance')">
         {{ t("actions.serverInstance") }}
       </button>
+      <!-- 云存档同步：功能还没做，点了只提示「制作中」 -->
+      <button class="ctx-item" @click="emit('inst-action', 'cloudSave')">
+        {{ t("actions.cloudSync") }}
+      </button>
+      <button class="ctx-item" @click="emit('inst-action', 'shortcut')">
+        {{ t("actions.shortcut") }}
+      </button>
       <button class="ctx-item" @click="emit('inst-action', 'copy')">
         {{ t("actions.copyInstance") }}
       </button>

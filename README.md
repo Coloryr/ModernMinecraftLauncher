@@ -50,11 +50,12 @@
 - **Windows**：Rust 的 MSVC 工具链、Visual Studio 生成工具（勾选「使用 C++ 的桌面开发」）、
   WebView2 运行时（Windows 11 和较新的 Windows 10 已自带）。
 - **Linux**：Tauri 2 需要的 WebKitGTK 4.1、GTK 3、libappindicator、librsvg、patchelf、libxdo，
-  以及 `mml-sys`「在文件管理器中显示」用的 D-Bus 开发包；Debian / Ubuntu 上：
+  以及 `mml-sys`「在文件管理器中显示」用的 D-Bus 开发包、手柄读取用的 libudev 开发包；
+  Debian / Ubuntu 上：
 
   ```bash
   sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
-      librsvg2-dev patchelf libxdo-dev libdbus-1-dev rpm
+      librsvg2-dev patchelf libxdo-dev libdbus-1-dev libudev-dev rpm
   ```
 
   打 AppImage 还要 FUSE 2 运行库（Ubuntu 24.04 起包名是 `libfuse2t64`）；
@@ -244,13 +245,10 @@ ModernColoryrMinecraftLauncher/
 ## 未来计划
 - 实验性功能：模组映射
 - 跨版本迁移助手
-- 大屏手柄模式
-- 手柄设置
 - 模组二分模式
 
 ## 待完成列表
 - MCMOD搜索
-- 手柄模式
 - 存档云同步(ColorMC)
 - 映射大厅 / 联机
 - 启动器自更新

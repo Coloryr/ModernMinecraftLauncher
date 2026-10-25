@@ -10,9 +10,10 @@ use super::family::{family_min_size, family_of_label};
 use super::uuids::{
     ACCOUNT_WINDOW_UUID, ADD_MODPACK_WINDOW_UUID, ADD_RESOURCE_WINDOW_UUID, ADD_WINDOW_UUID,
     BLOCK_WINDOW_UUID, COLLECT_WINDOW_UUID, CONFIG_WINDOW_UUID, DOWNLOAD_WINDOW_UUID,
-    EXPORT_WINDOW_UUID, HELP_WINDOW_UUID, JAVA_DOWNLOAD_WINDOW_UUID, LOBBY_WINDOW_UUID,
-    LOG_WINDOW_UUID, MAIN_WINDOW_UUID, RESOURCE_WINDOW_UUID, SERVER_INSTANCE_WINDOW_UUID,
-    SERVER_PACK_WINDOW_UUID, SETTINGS_WINDOW_UUID, STATS_WINDOW_UUID, uuid_for_kind,
+    EXPORT_WINDOW_UUID, GAMEPAD_WINDOW_UUID, HELP_WINDOW_UUID, JAVA_DOWNLOAD_WINDOW_UUID,
+    LOBBY_WINDOW_UUID, LOG_WINDOW_UUID, MAIN_WINDOW_UUID, RESOURCE_WINDOW_UUID,
+    SERVER_INSTANCE_WINDOW_UUID, SERVER_PACK_WINDOW_UUID, SETTINGS_WINDOW_UUID, STATS_WINDOW_UUID,
+    uuid_for_kind,
 };
 use uuid::Uuid;
 
@@ -121,6 +122,12 @@ pub(crate) const CONFIG_MIN_WIDTH: f64 = 820.0;
 
 /// 配置文件窗口最小高度
 pub(crate) const CONFIG_MIN_HEIGHT: f64 = 560.0;
+
+/// 手柄配置窗口最小宽度，左侧配置列表加右侧映射表单
+pub(crate) const GAMEPAD_MIN_WIDTH: f64 = 860.0;
+
+/// 手柄配置窗口最小高度
+pub(crate) const GAMEPAD_MIN_HEIGHT: f64 = 600.0;
 
 /// 游戏统计窗口最小宽度
 pub(crate) const STATS_MIN_WIDTH: f64 = 780.0;
@@ -268,6 +275,14 @@ pub(crate) static WINDOWS_INFO: LazyLock<HashMap<Uuid, WindowEntry>> = LazyLock:
                 label: "mml-config",
                 min_width: CONFIG_MIN_WIDTH,
                 min_height: CONFIG_MIN_HEIGHT,
+            },
+        ),
+        (
+            GAMEPAD_WINDOW_UUID,
+            WindowEntry {
+                label: "mml-gamepad",
+                min_width: GAMEPAD_MIN_WIDTH,
+                min_height: GAMEPAD_MIN_HEIGHT,
             },
         ),
         (

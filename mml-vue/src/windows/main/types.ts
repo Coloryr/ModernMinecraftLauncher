@@ -53,6 +53,8 @@ export type InstMenuAction =
   | "changeIcon"
   | "export"
   | "serverInstance"
+  | "cloudSave"
+  | "shortcut"
   | "copy"
   | "rename"
   | "moveGroup"

@@ -3068,6 +3068,19 @@ export function openInstanceDir(uuid: string): Promise<void> {
 }
 
 /**
+ * 在桌面为实例创建快捷方式
+ *
+ * - `uuid`: 实例 uuid
+ *
+ * # 返回值
+ *
+ * 快捷方式的完整路径；平台不支持或写入失败时抛错
+ */
+export function createShortcut(uuid: string): Promise<string> {
+  return commands.main.createShortcut(uuid);
+}
+
+/**
  * 列出某个来源下可编辑的配置文件
  *
  * - `uuid`: 实例 uuid

@@ -18,6 +18,7 @@ pub mod custom_home_dto;
 pub mod custom_ui_dto;
 pub mod download_dto;
 pub mod export_dto;
+pub mod gamepad_dto;
 pub mod gui_config_dto;
 pub mod instance_dto;
 pub mod java_download_dto;
@@ -60,6 +61,11 @@ pub use download_dto::{
     DownloadItemEvent, DownloadStatusDto, DownloadTaskDto, DownloadTaskEvent, DownloadThreadDto,
 };
 pub use export_dto::{ExportConfigDto, ExportEntryDto, ExportInfoDto, ExportProgressDto};
+pub use gamepad_dto::{
+    GamepadAxisDto, GamepadAxisRuleDto, GamepadAxisValueDto, GamepadButtonDto,
+    GamepadButtonRuleDto, GamepadButtonValueDto, GamepadConfigDto, GamepadDto, GamepadMouseDto,
+    GamepadProfileDto, GamepadStateDto, GamepadStickDto,
+};
 pub use gui_config_dto::{
     ClientConfigDto, CustomCssItemDto, ExperimentalConfigDto, GuiConfigDto, GuiThemeDto,
     LoginLockItemDto, MainWindowConfigDto,

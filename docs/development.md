@@ -5,7 +5,7 @@
 
 ## 技术栈
 
-- **内核**：Rust workspace（`mml-core/` 本体 + 18 个子 crate，edition 2024）
+- **内核**：Rust workspace（`mml-core/` 本体 + 19 个子 crate，edition 2024）
 - **界面**：Tauri 2 桌面壳（`mml-gui/`）+ Vue 3 / Vite 前端（`mml-vue/`）
 - **IPC**：Rust 源码是命令与 DTO 的唯一来源，`ipc-gen` 生成独立的 npm 契约包 `mml-ipc`，
   启动器前端与自定义主页面共用
@@ -134,9 +134,10 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 
 - Linux runner 固定 `ubuntu-22.04` 作为 glibc 基线，并预装 Tauri 需要的
   `libwebkit2gtk-4.1-dev` / `libayatana-appindicator3-dev` / `librsvg2-dev` /
-  `patchelf` / `libxdo-dev` / `libfuse2` / `rpm` / `libdbus-1-dev` /
+  `patchelf` / `libxdo-dev` / `libfuse2` / `rpm` / `libdbus-1-dev` / `libudev-dev` /
   `libarchive-tools` / `zstd`。`libdbus-1-dev` 是 `mml-sys` 在 Linux 上
-  「在文件管理器中显示」用的 D-Bus 绑定，缺了会编译失败；`libarchive-tools` 用来给 Arch 包生成 `.MTREE`。
+  「在文件管理器中显示」用的 D-Bus 绑定，缺了会编译失败；`libudev-dev` 是手柄读取在 Linux 上的后端依赖；
+  `libarchive-tools` 用来给 Arch 包生成 `.MTREE`。
 - 产物名与本地一致：`mml-windows-x64-0.0.1.msi`、`mml-linux-x64-0.0.1.deb`、
   `mml-linux-x64-0.0.1.flatpak`、`mml-arch-x64-0.0.1.pkg.tar.zst`、
   `mml-macos-arm64-0.0.1.dmg` 等，架构取自 `runner.arch`。

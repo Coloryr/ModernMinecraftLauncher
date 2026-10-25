@@ -98,6 +98,17 @@ pub(super) fn begin_launch(uuid: Uuid) -> Result<LaunchGuard<'static>, String> {
     GATE.launch(uuid)
 }
 
+/// 实例是否处于启动准备中
+///
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// 已登记启动、还没完成启动前返回 true；服务器包同步也在这段时间里
+pub(crate) fn is_launching(uuid: Uuid) -> bool {
+    GATE.state.lock().unwrap().launching.contains(&uuid)
+}
+
 /// 预约服务器包导入。
 /// # 返回值
 /// 导入预约，或有启动、运行、导入任务的错误。

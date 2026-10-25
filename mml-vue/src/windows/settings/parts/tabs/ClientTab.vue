@@ -336,6 +336,14 @@ watch(lockServerError, async (msg) => {
     </BaseButton>
   </SettingsGroup>
 
+  <!-- 手柄：按键映射、轴区间与摇杆参数都在独立窗口里改 -->
+  <SettingsGroup id="gamepad" title-key="winSettings.secGamepad" :flash="flashGroup === 'gamepad'">
+    <p class="field-desc">{{ t("winSettings.gamepadDesc") }}</p>
+    <BaseButton size="sm" variant="accent" @click="openWindow('gamepad')">
+      {{ t("winSettings.gamepadOpen") }}
+    </BaseButton>
+  </SettingsGroup>
+
   <!-- 设置 / 修改解锁密码 -->
   <BaseModal v-if="lockOpen" :title="t('winSettings.clientLockSet')" @close="lockOpen = false">
     <p v-if="!client.loginLockOn || !client.lockInstance" class="field-desc">

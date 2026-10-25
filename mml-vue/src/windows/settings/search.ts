@@ -39,6 +39,7 @@ export const GROUP_TITLES: Record<string, string> = {
   customHome: "winSettings.secCustomHome",
   music: "winSettings.secMusic",
   serverPack: "winSettings.secServerPack",
+  gamepad: "winSettings.secGamepad",
   clientLock: "winSettings.secClientLock",
   gameTitle: "winSettings.secGameTitle",
   "window-look": "winSettings.secWindowLook",
@@ -216,6 +217,7 @@ const SETTINGS_INDEX: IndexEntry[] = [
   { tab: "client", group: "gameTitle", labelKey: "winSettings.gameTitle", extra: ["title", "标题文字"] },
   { tab: "client", group: "gameTitle", labelKey: "winSettings.titleDelay", extra: ["title", "间隔"] },
   { tab: "client", group: "serverPack", labelKey: "winSettings.serverPackExport", extra: ["server pack", "serverpack", "服务器包", "导出", "分发"] },
+  { tab: "client", group: "gamepad", labelKey: "winSettings.gamepadOpen", extra: ["gamepad", "joystick", "controller", "手柄", "摇杆", "按键映射"] },
 
   // ---- 本地文件 ----
   { tab: "files", group: "localFiles", labelKey: "winSettings.localFile.cache", extra: ["cache", "cleanup", "disk", "缓存", "清理", "占用"] },
