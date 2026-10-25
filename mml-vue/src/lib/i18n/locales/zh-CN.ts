@@ -216,6 +216,7 @@ export default {
   "detail.modpackCheck": "检查整合包更新",
   "detail.modpackUpToDate": "整合包已是最新版本",
   "detail.serverPackCheck": "同步服务器包",
+  "detail.modpackChecking": "正在检查更新…",
   "launch.serverPackTitle": "服务器包有新版本",
   "launch.serverPackVersion": "发布地址上的版本：{version}",
   "launch.serverPackLocal": "本地版本：{version}",

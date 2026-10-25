@@ -214,6 +214,7 @@ export default {
   "detail.selectHint": "Select an instance from the left",
   "detail.modpackCheck": "Check modpack update",
   "detail.serverPackCheck": "Sync server pack",
+  "detail.modpackChecking": "Checking for updates…",
   "launch.serverPackTitle": "Server pack has a new version",
   "launch.serverPackVersion": "Version at the publish URL: {version}",
   "launch.serverPackLocal": "Local version: {version}",

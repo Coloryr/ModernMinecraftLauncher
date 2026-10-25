@@ -2,10 +2,11 @@
 //
 // 「自动打开日志窗口」必须在前端按当前窗口模式处理：单窗口模式是应用内切页，
 // 多窗口模式才是开新窗口；后端直接建窗会把单窗口模式撑出第二个窗口。
-import { api } from "./api";
+import { api, modpackCheck } from "./api";
 import { askAccountLock } from "./accountLock";
 import { askAutoSave } from "./autoSavePrompt";
 import { askLaunchCheck } from "./launchCheck";
+import { askServerPackUpdate } from "./serverPackPrompt";
 import { saveGuiConfig } from "./guiConfig";
 import { openWindow } from "../windows/windowManager";
 
@@ -40,6 +41,10 @@ export async function launchGame(uuid: string, world?: string): Promise<boolean>
     }
   }
 
+  // 在线服务器包：启动时后端本来会直接按发布地址同步，这里先问一句，别悄悄升级
+  const serverPack = await askServerPack(uuid);
+  if (serverPack === null) return false;
+
   let autoShow = false;
   try {
     autoShow = (await api.getLogSetting(uuid)).autoShow;
@@ -68,7 +73,7 @@ export async function launchGame(uuid: string, world?: string): Promise<boolean>
   }
 
   try {
-    await api.launchGame(uuid, enterWorld, undefined, autoSave);
+    await api.launchGame(uuid, enterWorld, undefined, autoSave, serverPack);
   } catch (e) {
     if (String(e) !== "err.accountInUse") throw e;
 
@@ -78,11 +83,36 @@ export async function launchGame(uuid: string, world?: string): Promise<boolean>
       await saveGuiConfig({ client: { accountCheck: false } }).catch(() => {});
     }
     // 这一次先放行；检查关掉后后续启动不会再被拦
-    await api.launchGame(uuid, enterWorld, true, autoSave);
+    await api.launchGame(uuid, enterWorld, true, autoSave, serverPack);
   }
 
   if (autoShow) {
     openWindow("log", { uuid });
   }
   return true;
+}
+
+/**
+ * 启动前查服务器包有没有新版本，有就问用户
+ *
+ * 只对填了发布地址的在线服务器包实例查；其它实例直接返回 `undefined`，不发请求。
+ *
+ * - `uuid`: 实例 uuid
+ *
+ * # 返回值
+ *
+ * `"update"` 先同步再启动 / `"skip"` 直接启动 / `null` 用户取消启动 / `undefined` 不用问
+ */
+async function askServerPack(uuid: string): Promise<"update" | "skip" | null | undefined> {
+  const list = await api.getInstances().catch(() => []);
+  const instance = list.find((item) => item.uuid === uuid);
+  if (instance?.modpackType !== "serverpack" || !instance.serverUrl) return undefined;
+
+  // 查不到（地址不通 / 清单坏了）就当没更新：启动本身不该被一次查询挡住
+  const result = await modpackCheck(uuid).catch(() => null);
+  if (!result?.hasUpdate) return undefined;
+
+  const answer = await askServerPackUpdate(result);
+  if (!answer.ok) return null;
+  return answer.update ? "update" : "skip";
 }

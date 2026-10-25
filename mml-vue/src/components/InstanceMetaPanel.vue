@@ -107,7 +107,8 @@ const autoChecked = new Set<string>();
 watch(
   [() => props.instance.uuid, updatableModpack] as const,
   ([uuid, ok]) => {
-    if (!uuid || !ok || autoChecked.has(uuid)) return;
+    // 锁定的实例整块整合包设置是隐藏的，自动查到了也没地方弹出确认窗
+    if (!uuid || props.locked || !ok || autoChecked.has(uuid)) return;
     autoChecked.add(uuid);
     void checkModpack(true);
   },
@@ -517,17 +518,21 @@ function onPlatformChange(value: string) {
     <template v-if="!locked">
       <!-- 整合包类型：最底部，不占整行；ID 平台填项目 / 文件 ID，在线平台填网址 -->
       <span class="meta-label">{{ t("meta.modpack") }}</span>
+      <!-- 查更新期间整块锁住：类型、网址都不能改，按钮转圈表示正在检测 -->
       <select class="field-select" :value="instance.modpackType === 'none' ? '' : instance.modpackType ?? ''"
-        @change="onPlatformChange(($event.target as HTMLSelectElement).value)">
+        :disabled="packBusy" @change="onPlatformChange(($event.target as HTMLSelectElement).value)">
         <option v-for="p in platforms" :key="p.value" :value="p.value">{{ p.label }}</option>
       </select>
       <!-- 在线网络整合包：网址输入框（隐藏 ID 输入框），右侧是同步按钮 -->
       <div v-if="instance.modpackType === 'serverpack'" class="modpack-url">
         <input class="field-input" :value="instance.serverUrl ?? ''" :placeholder="t('add.url')" spellcheck="false"
-          @input="change({ serverUrl: ($event.target as HTMLInputElement).value || null })" />
-        <button class="ui-btn-icon" :disabled="packBusy || !instance.serverUrl" v-tip="t('detail.serverPackCheck')"
-          :aria-label="t('detail.serverPackCheck')" @click="checkModpack()">
-          <GlyphIcon name="update" :size="14" :weight="2" />
+          :disabled="packBusy" @input="change({ serverUrl: ($event.target as HTMLInputElement).value || null })" />
+        <button class="ui-btn-icon" :disabled="packBusy || !instance.serverUrl"
+          :v-tip="packBusy ? t('detail.modpackChecking') : t('detail.serverPackCheck')"
+          :aria-label="packBusy ? t('detail.modpackChecking') : t('detail.serverPackCheck')"
+          @click="checkModpack()">
+          <span v-if="packBusy" class="pack-spin" />
+          <GlyphIcon v-else name="update" :size="14" :weight="2" />
         </button>
       </div>
       <!-- ID 平台：项目 / 文件 ID 与"检查整合包更新"同一行。
@@ -535,12 +540,15 @@ function onPlatformChange(value: string) {
            只有图标、文案走悬停提示，与这一栏的其它小按钮一致 -->
       <div v-else-if="instance.modpackType && instance.modpackType !== 'none'" class="modpack-ids">
         <input class="field-input" :value="instance.pid ?? ''" :placeholder="t('meta.pid')" spellcheck="false"
-          @input="change({ pid: ($event.target as HTMLInputElement).value || null })" />
+          :disabled="packBusy" @input="change({ pid: ($event.target as HTMLInputElement).value || null })" />
         <input class="field-input" :value="instance.fid ?? ''" :placeholder="t('meta.fid')" spellcheck="false"
-          @input="change({ fid: ($event.target as HTMLInputElement).value || null })" />
-        <button class="ui-btn-icon" :disabled="packBusy" v-tip="t('detail.modpackCheck')"
-          :aria-label="t('detail.modpackCheck')" @click="checkModpack()">
-          <GlyphIcon name="update" :size="14" :weight="2" />
+          :disabled="packBusy" @input="change({ fid: ($event.target as HTMLInputElement).value || null })" />
+        <button class="ui-btn-icon" :disabled="packBusy"
+          :v-tip="packBusy ? t('detail.modpackChecking') : t('detail.modpackCheck')"
+          :aria-label="packBusy ? t('detail.modpackChecking') : t('detail.modpackCheck')"
+          @click="checkModpack()">
+          <span v-if="packBusy" class="pack-spin" />
+          <GlyphIcon v-else name="update" :size="14" :weight="2" />
         </button>
       </div>
       <!-- 整合包更新的确认窗：查到新版本才开 -->
@@ -639,5 +647,22 @@ function onPlatformChange(value: string) {
 .modpack-url .field-input {
   flex: 1;
   min-width: 0;
+}
+
+/* 检测中的转圈：与按钮里那个更新图标同尺寸，转动表示查询在跑。
+   关掉界面动画时会被全局规则停住，这时靠提示文案与禁用态表达 */
+.pack-spin {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  animation: pack-spin 0.8s linear infinite;
+}
+
+@keyframes pack-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

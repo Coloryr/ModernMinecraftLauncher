@@ -20,6 +20,7 @@ export { default as CompInstanceLogPanel } from "../components/InstanceLogPanel.
 export { default as CompInstanceMetaPanel } from "../components/InstanceMetaPanel.vue";
 export { default as CompInstanceSelect } from "../components/InstanceSelect.vue";
 export { default as CompLaunchArgsPanel } from "../components/LaunchArgsPanel.vue";
+export { default as CompLaunchCheckModal } from "../components/LaunchCheckModal.vue";
 export { default as CompLoaderQueryProgress } from "../components/LoaderQueryProgress.vue";
 export { default as CompMemoryHint } from "../components/MemoryHint.vue";
 export { default as CompModPackUpdateModal } from "../components/ModPackUpdateModal.vue";
@@ -35,6 +36,7 @@ export { default as CompProxyPanel } from "../components/ProxyPanel.vue";
 export { default as CompResourceDownloadBar } from "../components/ResourceDownloadBar.vue";
 export { default as CompResourcePopup } from "../components/ResourcePopup.vue";
 export { default as CompResourceTitleIndicator } from "../components/ResourceTitleIndicator.vue";
+export { default as CompServerPackUpdateModal } from "../components/ServerPackUpdateModal.vue";
 export { default as CompUiAppToast } from "../components/ui/AppToast.vue";
 export { default as CompUiAsyncImage } from "../components/ui/AsyncImage.vue";
 export { default as CompUiAuthorTag } from "../components/ui/AuthorTag.vue";

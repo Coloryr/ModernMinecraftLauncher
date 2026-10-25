@@ -48,6 +48,7 @@ export { default as JavaDownloadWindow } from "../windows/java_download/JavaDown
 export { default as LobbyWindow } from "../windows/lobby/LobbyWindow.vue";
 export { default as WinLobbyMappingLobby } from "../windows/lobby/MappingLobby.vue";
 export { default as LogWindow } from "../windows/log/LogWindow.vue";
+export { default as WinMainBlockIconPickModal } from "../windows/main/BlockIconPickModal.vue";
 export { default as WinMainColorMcMigrateModal } from "../windows/main/ColorMcMigrateModal.vue";
 export { default as WinMainIconCropStage } from "../windows/main/IconCropStage.vue";
 export { default as WinMainIconPickModal } from "../windows/main/IconPickModal.vue";
@@ -84,6 +85,7 @@ export { default as WinResourcePartsModModReplaceModal } from "../windows/resour
 export { default as WinResourcePartsModModTable } from "../windows/resource/parts/mod/ModTable.vue";
 export { default as WinResourcePartsModModUpdateLogModal } from "../windows/resource/parts/mod/ModUpdateLogModal.vue";
 export { default as WinResourcePartsModModUpdateModal } from "../windows/resource/parts/mod/ModUpdateModal.vue";
+export { default as ServerInstanceWindow } from "../windows/server_instance/ServerInstanceWindow.vue";
 export { default as SettingsWindow } from "../windows/settings/SettingsWindow.vue";
 export { default as WinSettingsPartsSaveStateText } from "../windows/settings/parts/SaveStateText.vue";
 export { default as WinSettingsPartsSettingsGroup } from "../windows/settings/parts/SettingsGroup.vue";
