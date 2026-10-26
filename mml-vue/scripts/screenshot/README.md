@@ -18,7 +18,11 @@ npm run shots -- --only=main  # 只跑 id 含 main 的场景
   可用 `--edge=<路径>` 指定）；
 - 端口 1420 空闲。脚本发现 Vite 没跑会自己起 `npm run dev`，跑完一起收掉。
 
-产物在仓库根目录 `target/temp/screens/`（`target/` 已在 `.gitignore`）：
+产物在仓库根目录 `target/temp/screens/`（`target/` 已在 `.gitignore`）。
+
+每次运行结束会删掉临时的 `target/temp/shot-edge-<pid>/`；如果进程异常退出，下次启动会清掉
+已退出进程留下的目录。Vite 与 Edge 都按进程树关闭，不会留下占着 1420 端口的子进程。
+`screens/` 是产物，保留：
 
 - `<场景 id>.png`：每个场景一张，视口尺寸由场景的 `size` 决定；
 - `report.json`：每个场景的失败原因、页面错误、未 mock 的命令。

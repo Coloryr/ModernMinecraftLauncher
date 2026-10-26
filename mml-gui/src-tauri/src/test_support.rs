@@ -20,7 +20,8 @@ use std::{
 pub fn ensure_boot() {
     static BOOT: Once = Once::new();
     BOOT.call_once(|| {
-        let dir = mml_testutil::temp_path(format!("mml-gui-test-boot-{}", std::process::id()));
+        // 固定目录，每轮启动先清空；不用 PID 命名，避免每次 cargo test 都留下一个目录
+        let dir = mml_testutil::temp_path("mml-gui-test-boot");
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
 
