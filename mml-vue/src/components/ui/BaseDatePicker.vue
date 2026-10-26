@@ -18,8 +18,10 @@ const props = withDefaults(
     max?: string;
     /** 无障碍名称，也是悬停提示 */
     ariaLabel?: string;
+    /** 未选日期时输入框里的提示；不给就用通用的「选择日期」 */
+    placeholder?: string;
   }>(),
-  { min: "", max: "", ariaLabel: "" },
+  { min: "", max: "", ariaLabel: "", placeholder: "" },
 );
 
 const emit = defineEmits<{
@@ -66,8 +68,8 @@ const today = computed(() => {
   return formatDate(p.year, p.month, p.day);
 });
 
-/** 输入框里显示的文本 */
-const label = computed(() => (props.modelValue ? props.modelValue : t("date.empty")));
+/** 输入框里显示的文本：选了就是日期，没选用调用方给的提示，最后才回落通用提示 */
+const label = computed(() => props.modelValue || props.placeholder || t("date.empty"));
 
 /**
  * 某一格能不能选

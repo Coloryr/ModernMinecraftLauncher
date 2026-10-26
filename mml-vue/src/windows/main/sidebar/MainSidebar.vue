@@ -186,11 +186,10 @@ function isGroupOpen(id: string) {
       <div v-if="groups.length === 0" class="empty-tip">{{ t("list.empty") }}</div>
       <div v-else-if="filteredGroups.length === 0" class="empty-tip">{{ t("search.empty") }}</div>
 
-      <!-- 添加分组（虚线行，与组内添加实例一致） -->
-      <button class="add-inst-row add-group-row" :disabled="dragActive?.kind === 'instance'" @click="emit('add-group')">
-        <span class="add-inst-icon">
-          <GlyphIcon name="plus" :size="18" />
-        </span>
+      <!-- 添加分组：与其它窗口同一套整行添加外观 -->
+      <button class="add-row-btn add-group-row" :disabled="dragActive?.kind === 'instance'"
+        @click="emit('add-group')">
+        <GlyphIcon name="plus" :size="14" />
         <span>{{ t("group.addGroup") }}</span>
       </button>
     </div>
@@ -442,27 +441,9 @@ function isGroupOpen(id: string) {
   color: var(--text-dim);
 }
 
-/* 添加分组行（列表底部）：绿色系，与「添加实例」的主题色区分 */
+/* 添加分组行（列表底部）：外观走全局 .add-row-btn，这里只管与上方实例列表的间距 */
 .add-group-row {
   margin-top: 6px;
-  border-color: color-mix(in srgb, var(--green) 42%, transparent);
-  color: var(--green);
-}
-
-.add-group-row:not(:disabled) .add-inst-icon {
-  background: color-mix(in srgb, var(--green) 14%, transparent);
-  color: var(--green);
-}
-
-.add-group-row:hover:not(:disabled) {
-  border-color: var(--green);
-  color: var(--green);
-  background: color-mix(in srgb, var(--green) 12%, transparent);
-}
-
-.add-group-row:hover:not(:disabled) .add-inst-icon {
-  background: color-mix(in srgb, var(--green) 18%, transparent);
-  color: var(--green);
 }
 
 .add-inst-icon {

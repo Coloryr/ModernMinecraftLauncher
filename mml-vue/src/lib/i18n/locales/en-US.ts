@@ -787,6 +787,8 @@ export default {
   "resource.updateLogDateTo": "To date",
   "resource.updateLogOnly": "Only: {name}",
   "resource.updateLogNoMatch": "No entries match the filter",
+  "resource.updateLogClear": "Clear filters",
+  "resource.updateLogSha1": "SHA1",
   "resource.onlineDoubleClick": "Double-click to edit the source / project id / file id",
   "resource.onlineSaved": "Saved",
   "resource.rename": "Rename",

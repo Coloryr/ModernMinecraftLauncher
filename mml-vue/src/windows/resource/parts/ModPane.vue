@@ -1826,7 +1826,6 @@ onBeforeUnmount(() => {
   <ModExportModal v-if="exportOpen" :uuid="instanceUuid" :selected-ids="selectedItems.map(item => item.uuid)" @close="exportOpen = false" />
   <ContentHead :data="data" :busy="depBusy || updateBusy">
     <template #actions>
-      <BaseButton size="sm" :disabled="busy || loading" @click="exportOpen = true">{{ t("modExport.title") }}</BaseButton>
       <!--
         有选中项时顶栏换成批量操作条，用户选的口径是"顶栏出现批量按钮"。
         整条替换而不是并列：选中之后的重点是"对这些项做什么"，
@@ -1868,10 +1867,6 @@ onBeforeUnmount(() => {
           { value: 'list', label: t('resource.viewList') },
           { value: 'table', label: t('resource.viewTable') },
         ]" @update:model-value="setModView($event as ModView)" />
-        <button class="mini-btn icon-btn icon-only" :disabled="busy" v-tip="t('resource.groupAdd')"
-          :aria-label="t('resource.groupAdd')" @click="openGroupForm()">
-          <GlyphIcon name="folder-plus" :size="14" />
-        </button>
         <!-- 依赖检测要重扫一遍模组，跑的时候按钮置灰并把图标转起来 -->
         <button class="mini-btn icon-btn icon-only" :disabled="depBusy || loading" v-tip="t('resource.depTest')"
           :aria-label="t('resource.depTest')" @click="runDepTest">
@@ -1901,6 +1896,13 @@ onBeforeUnmount(() => {
           <GlyphIcon name="history" :size="14" />
         </button>
       </template>
+
+      <!-- 导出模组列表：名称走悬浮提示与 aria-label，不占工具条宽度。
+           放在图标组末尾、两种模式都在 —— 导出弹窗可以只导选中的模组 -->
+      <button class="mini-btn icon-btn icon-only" :disabled="busy || loading" v-tip="t('modExport.title')"
+        :aria-label="t('modExport.title')" @click="exportOpen = true">
+        <GlyphIcon name="export" :size="14" />
+      </button>
     </template>
   </ContentHead>
 
@@ -1961,6 +1963,12 @@ onBeforeUnmount(() => {
         </template>
       </div>
     </div>
+
+    <!-- 表格视图的「新建分组」：白底卡片下方，同样落在分组末尾 -->
+    <button class="add-row-btn" :disabled="busy" @click="openGroupForm()">
+      <GlyphIcon name="plus" :size="14" />
+      {{ t("resource.groupAdd") }}
+    </button>
   </div>
 
   <!-- 列表视图：按块渲染，自建分组与三个状态分组各一块 -->
@@ -2024,6 +2032,12 @@ onBeforeUnmount(() => {
           <span class="mod-group-count">{{ sectionGhostCount }}</span>
         </div>
     </template>
+
+    <!-- 新建分组：放在分组最下面，不占工具条 -->
+    <button class="add-row-btn" :disabled="busy" @click="openGroupForm()">
+      <GlyphIcon name="plus" :size="14" />
+      {{ t("resource.groupAdd") }}
+    </button>
   </div>
 
   <!-- 新建 / 重命名分组 -->

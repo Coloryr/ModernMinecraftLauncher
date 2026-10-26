@@ -788,6 +788,8 @@ export default {
   "resource.updateLogDateTo": "结束日期",
   "resource.updateLogOnly": "只看：{name}",
   "resource.updateLogNoMatch": "没有符合筛选条件的记录",
+  "resource.updateLogClear": "清除筛选",
+  "resource.updateLogSha1": "SHA1",
   "resource.onlineDoubleClick": "双击可以改下载源 / 项目编号 / 文件编号",
   "resource.onlineSaved": "已保存",
   "resource.rename": "重命名",

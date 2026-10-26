@@ -1036,17 +1036,17 @@ function selectGroup(group: string) {
 
       </div>
 
-      <!-- 最后一行：新建分组 + 去挑资源收藏，三个同款整行按钮。
+      <!-- 最后一行：新建分组 + 去挑资源收藏，三个同款整行按钮（外观走全局 .add-row-btn）。
            放在分组列表**外面**：一个收藏都没有时也要能从这里去挑 -->
       <div class="collect-acts-row">
-        <button v-if="!isEmpty" class="add-group-row" @click="showAddGroup = true">
-          <GlyphIcon name="plus" :size="14" :weight="2.2" />
+        <button v-if="!isEmpty" class="add-row-btn add-group-row" @click="showAddGroup = true">
+          <GlyphIcon name="plus" :size="14" />
           {{ t("collect.addGroup") }}
         </button>
-        <button class="add-group-row" @click="openWindow('add_modpack')">
+        <button class="add-row-btn add-group-row" @click="openWindow('add_modpack')">
           {{ t("collect.addModpack") }}
         </button>
-        <button class="add-group-row" @click.stop="openAddResource">
+        <button class="add-row-btn add-group-row" @click.stop="openAddResource">
           {{ t("collect.addResource") }}
         </button>
       </div>

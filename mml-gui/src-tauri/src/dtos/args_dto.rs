@@ -74,14 +74,14 @@ pub struct InstanceArgsDto {
 }
 
 impl Default for InstanceArgsDto {
-    /// 默认启动参数，不是全零：内存 2048 / 窗口 854×480 这些是可用初值
+    /// 默认启动参数，不是全零：内存 4096 / 窗口 854×480 这些是可用初值
     ///
     /// # 返回值
     ///
     /// 返回新建实例可直接使用的启动参数
     fn default() -> Self {
         Self {
-            memory: 2048,
+            memory: 4096,
             min_memory: 1024,
             fullscreen: false,
             width: 854,

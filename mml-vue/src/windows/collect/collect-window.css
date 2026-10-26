@@ -236,33 +236,12 @@
   gap: 8px;
 }
 
-/* 整行添加键：整体走强调色，比灰虚线显眼也好搭。
-   高度由 padding 撑出（与侧栏的「添加实例」行同角色），不按控件档定高 */
+/* 三个整行添加键均分宽度：外观走全局 .add-row-btn，这里只管 flex 布局；
+   min-width 0 让窄窗时能一起缩，谁都不单独溢出 */
 .add-group-row {
-  /* 三个均分整行宽度；min-width 0 让窄窗时能一起缩，谁都不单独溢出 */
   flex: 1 1 0;
+  width: auto;
   min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  white-space: nowrap;
-  padding: 10px;
-  border: 1px dashed var(--accent-border);
-  border-radius: 10px;
-  background: transparent;
-  color: var(--accent);
-  font-size: 13px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: border-color 0.12s, color 0.12s, background 0.12s;
-}
-
-.add-group-row:hover {
-  /* 悬停把虚线收成实线，再铺一层淡强调色 */
-  border-style: solid;
-  border-color: var(--accent);
-  background: var(--accent-soft);
 }
 
 .collect-filters {
