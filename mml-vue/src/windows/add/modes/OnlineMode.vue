@@ -60,7 +60,7 @@ function fillManifest() {
     <div class="probe-row">
       <span>{{ t("meta.loader") }}</span>
       <b>{{ t(`add.loader.${probe.loader}`) }}<template v-if="probe.loaderVersion">
-          {{ probe.loaderVersion }}</template></b>
+          {{ " " + probe.loaderVersion }}</template></b>
     </div>
     <div class="probe-row">
       <span>{{ t("add.probePackVersion") }}</span><b>{{ probe.packVersion || "—" }}</b>

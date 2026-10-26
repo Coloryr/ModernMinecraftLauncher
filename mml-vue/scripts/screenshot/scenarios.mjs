@@ -6,7 +6,7 @@
 // - commands: 覆盖 data.mjs 的公共命令
 // - actions: 字符串按 JS 执行；{ wait } 等待；{ eval } 执行后等一会
 import {
-  collectWithData, commonCommands, downloadStatus, groups, instances, javaDownloadList,
+  addVersions, collectWithData, commonCommands, downloadStatus, groups, instances, javaDownloadList,
   javaList, resourceView, saves, schematics, servers, shaders,
 } from "./data.mjs";
 
@@ -51,6 +51,20 @@ const clickText = (text, scope = "body") =>
 const selectValue = (selector, value) =>
   "(() => { const el = document.querySelector(" + JSON.stringify(selector) + "); if (!el) return false;" +
   " el.value = " + JSON.stringify(value) + "; el.dispatchEvent(new Event('change', { bubbles: true })); return true; })()";
+
+/** 给第 index 个匹配的下拉设值 */
+const selectAt = (selector, index, value) =>
+  "(() => { const el = [...document.querySelectorAll(" + JSON.stringify(selector) + ")][" + index + "]; if (!el) return false;" +
+  " el.value = " + JSON.stringify(value) + "; el.dispatchEvent(new Event('change', { bubbles: true })); return true; })()";
+
+/** 给输入框填值并触发 input / change */
+const setInput = (selector, value) =>
+  "(() => { const el = document.querySelector(" + JSON.stringify(selector) + "); if (!el) return false;" +
+  " el.value = " + JSON.stringify(value) + "; el.dispatchEvent(new Event('input', { bubbles: true }));" +
+  " el.dispatchEvent(new Event('change', { bubbles: true })); return true; })()";
+
+/** 向页面派发一条后端事件 */
+const emit = (name, payload) => "window.__SHOT__.emit(" + JSON.stringify(name) + ", " + JSON.stringify(payload) + ")";
 
 export const scenarios = [
   /* ---------------- 主窗口 ---------------- */
@@ -304,6 +318,68 @@ export const scenarios = [
     }],
   },
   {
+    id: "account-tooltip",
+    kind: "account",
+    label: "mml-account",
+    size: [1000, 700],
+    commands: base(),
+    actions: [{
+      eval: "(() => { const b = document.querySelector('.acc-card .acc-actions button'); if (!b) return false; const r = b.getBoundingClientRect(); const o = { bubbles: true, clientX: r.left + 12, clientY: r.top + 12 }; b.dispatchEvent(new MouseEvent('mouseenter', o)); document.dispatchEvent(new MouseEvent('mousemove', o)); return true; })()",
+      after: 700,
+    }],
+  },
+  {
+    id: "account-context",
+    kind: "account",
+    label: "mml-account",
+    size: [1000, 700],
+    commands: base(),
+    actions: [{
+      eval: "(() => { const c = [...document.querySelectorAll('.acc-card')].find((x) => x.textContent.includes('Alex')); if (!c) return false; c.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 330, clientY: 470, button: 2 })); return true; })()",
+      after: 500,
+    }],
+  },
+  {
+    id: "account-oauth-xbox",
+    kind: "account",
+    label: "mml-account",
+    size: [1000, 700],
+    commands: base(),
+    actions: [{ eval: emit("account-oauth-state", { state: "xbox" }), after: 500 }],
+  },
+  {
+    id: "account-oauth-xsts",
+    kind: "account",
+    label: "mml-account",
+    size: [1000, 700],
+    commands: base(),
+    actions: [{ eval: emit("account-oauth-state", { state: "xsts" }), after: 500 }],
+  },
+  {
+    id: "account-oauth-token",
+    kind: "account",
+    label: "mml-account",
+    size: [1000, 700],
+    commands: base(),
+    actions: [{ eval: emit("account-oauth-state", { state: "token" }), after: 500 }],
+  },
+  {
+    id: "account-oauth-profile",
+    kind: "account",
+    label: "mml-account",
+    size: [1000, 700],
+    commands: base(),
+    actions: [{ eval: emit("account-oauth-state", { state: "profile" }), after: 500 }],
+  },
+  {
+    id: "account-oauth-fail",
+    kind: "account",
+    label: "mml-account",
+    size: [1000, 700],
+    commands: base(),
+    actions: [{ eval: emit("account-oauth-state", { state: "fail", message: "Xbox 账户受到家长控制限制" }), after: 500 }],
+  },
+  {
     id: "account-skin",
     kind: "account",
     label: "mml-account",
@@ -320,6 +396,300 @@ export const scenarios = [
   { id: "add-archive", kind: "add", label: "mml-add", size: [1100, 760], commands: base(), actions: [{ eval: clickText("导入压缩包"), after: 450 }] },
   { id: "add-folder", kind: "add", label: "mml-add", size: [1100, 760], commands: base(), actions: [{ eval: clickText("添加文件夹"), after: 450 }] },
   { id: "add-online", kind: "add", label: "mml-add", size: [1100, 760], commands: base(), actions: [{ eval: clickText("在线实例"), after: 450 }] },
+  {
+    id: "add-new-loading",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    commands: base({ main_get_versions: { __delay: 2200, value: addVersions } }),
+  },
+  {
+    id: "add-new-loaded",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    commands: base({ main_get_versions: { __delay: 1600, value: addVersions } }),
+    actions: [{ wait: 2000 }],
+  },
+  {
+    id: "add-new-type-drop",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    commands: base(),
+    actions: [{ eval: click(".type-trigger"), after: 400 }],
+  },
+  {
+    id: "add-new-group-drop",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    commands: base(),
+    actions: [{ eval: "document.querySelector('.group-combo input')?.focus()", after: 400 }],
+  },
+  {
+    id: "add-new-version-loading",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    commands: base({ add_get_support_loaders: { __delay: 2200, value: ["normal", "forge", "neoforge", "fabric"] } }),
+    actions: [
+      { eval: selectAt(".add-card-content select", 0, "1.21.4"), after: 250 },
+      { eval: emit("add-loader-progress", { step: 2, total: 8 }), after: 350 },
+    ],
+  },
+  {
+    id: "add-new-version-loaded",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    commands: base({ add_get_support_loaders: { __delay: 900, value: ["normal", "forge", "neoforge", "fabric"] } }),
+    actions: [
+      { eval: selectAt(".add-card-content select", 0, "1.21.4"), after: 1200 },
+      { eval: emit("add-loader-progress", { step: 8, total: 8 }), after: 300 },
+    ],
+  },
+  {
+    id: "add-new-loader-version-loading",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    commands: base({
+      add_get_support_loaders: ["normal", "forge", "neoforge", "fabric"],
+      add_get_loader_versions: { __delay: 2200, value: ["0.16.10", "0.16.9"] },
+    }),
+    actions: [
+      { eval: selectAt(".add-card-content select", 0, "1.21.4"), after: 500 },
+      { eval: selectAt(".add-card-content select", 1, "fabric"), after: 350 },
+    ],
+  },
+  {
+    id: "add-new-loader-version-loaded",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    commands: base({
+      add_get_support_loaders: ["normal", "forge", "neoforge", "fabric"],
+      add_get_loader_versions: { __delay: 700, value: ["0.16.10", "0.16.9"] },
+    }),
+    actions: [
+      { eval: selectAt(".add-card-content select", 0, "1.21.4"), after: 500 },
+      { eval: selectAt(".add-card-content select", 1, "fabric"), after: 1000 },
+    ],
+  },
+  {
+    id: "add-new-empty-error",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    commands: base(),
+    actions: [{ eval: clickText("创建"), after: 500 }],
+  },
+  {
+    id: "add-new-version-error",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    commands: base(),
+    actions: [
+      { eval: setInput("#add-name", "测试实例"), after: 250 },
+      { eval: clickText("创建"), after: 500 },
+    ],
+  },
+  {
+    id: "add-archive-loading",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    openPath: "E:\\packs\\BetterMC.zip",
+    commands: base({ add_list_archive: { __delay: 2200, value: ["manifest.json", "mods/", "mods/sodium.jar"] } }),
+    actions: [
+      { eval: clickText("导入压缩包"), after: 250 },
+      { eval: click(".add-card-content .pick-btn"), after: 300 },
+    ],
+  },
+  {
+    id: "add-archive-loaded",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    openPath: "E:\\packs\\BetterMC.zip",
+    commands: base({ add_list_archive: { __delay: 700, value: ["manifest.json", "mods/", "mods/sodium.jar", "config/", "config/sodium-options.json"] } }),
+    actions: [
+      { eval: clickText("导入压缩包"), after: 250 },
+      { eval: click(".add-card-content .pick-btn"), after: 1200 },
+    ],
+  },
+  {
+    id: "add-archive-empty-error",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    commands: base(),
+    actions: [
+      { eval: clickText("导入压缩包"), after: 250 },
+      { eval: clickText("导入"), after: 500 },
+    ],
+  },
+  {
+    id: "add-archive-read-error",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    openPath: "E:\\packs\\broken.zip",
+    commands: base({ add_list_archive: { __error: "压缩包已损坏" } }),
+    actions: [
+      { eval: clickText("导入压缩包"), after: 250 },
+      { eval: click(".add-card-content .pick-btn"), after: 700 },
+    ],
+  },
+  {
+    id: "add-folder-confirm",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    openPath: "E:\\M2L\\instances",
+    commands: base(),
+    actions: [
+      { eval: clickText("添加文件夹"), after: 250 },
+      { eval: click(".add-card-content .pick-btn"), after: 600 },
+    ],
+  },
+  {
+    id: "add-folder-loading",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    openPath: "E:\\M2L\\instances",
+    commands: base({ add_scan_folder: { __delay: 2200, value: [{ path: "E:\\M2L\\instances\\Better MC", name: "Better MC" }] } }),
+    actions: [
+      { eval: clickText("添加文件夹"), after: 250 },
+      { eval: click(".add-card-content .pick-btn"), after: 450 },
+      { eval: clickText("允许", ".modal"), after: 350 },
+    ],
+  },
+  {
+    id: "add-folder-loaded",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    openPath: "E:\\M2L\\instances",
+    commands: base({ add_scan_folder: { __delay: 700, value: [{ path: "E:\\M2L\\instances\\Better MC", name: "Better MC" }, { path: "E:\\M2L\\instances\\RLCraft", name: "RLCraft" }] } }),
+    actions: [
+      { eval: clickText("添加文件夹"), after: 250 },
+      { eval: click(".add-card-content .pick-btn"), after: 450 },
+      { eval: clickText("允许", ".modal"), after: 1200 },
+    ],
+  },
+  {
+    id: "add-folder-tree-loaded",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    openPath: "E:\\M2L\\one-instance",
+    commands: base({ add_scan_folder: { value: [] } }),
+    actions: [
+      { eval: clickText("添加文件夹"), after: 250 },
+      { eval: click(".add-card-content .pick-btn"), after: 450 },
+      { eval: clickText("允许", ".modal"), after: 1200 },
+    ],
+  },
+  {
+    id: "add-folder-scan-error",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    openPath: "E:\\M2L\\denied",
+    commands: base({ add_scan_folder: { __error: "没有权限读取该目录" } }),
+    actions: [
+      { eval: clickText("添加文件夹"), after: 250 },
+      { eval: click(".add-card-content .pick-btn"), after: 450 },
+      { eval: clickText("允许", ".modal"), after: 700 },
+    ],
+  },
+  {
+    id: "add-folder-empty-error",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    commands: base(),
+    actions: [
+      { eval: clickText("添加文件夹"), after: 250 },
+      { eval: clickText("添加"), after: 500 },
+    ],
+  },
+  {
+    id: "add-online-probing",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    commands: base({ add_probe_server_pack: { __delay: 2200, value: { url: "https://example.com/pack/server.json", name: "Better MC Server", version: "1.20.1", loader: "forge", loaderVersion: "47.2.0", packVersion: "1.0.0", text: "服务端整合包", fileCount: 132, archiveCount: 4 } } }),
+    actions: [
+      { eval: clickText("在线实例"), after: 250 },
+      { eval: setInput(".add-card-content input", "https://example.com/pack/server.json"), after: 900 },
+    ],
+  },
+  {
+    id: "add-online-loaded",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    commands: base({ add_probe_server_pack: { __delay: 700, value: { url: "https://example.com/pack/server.json", name: "Better MC Server", version: "1.20.1", loader: "forge", loaderVersion: "47.2.0", packVersion: "1.0.0", text: "服务端整合包，包含 128 个模组", fileCount: 132, archiveCount: 4 } } }),
+    actions: [
+      { eval: clickText("在线实例"), after: 250 },
+      { eval: setInput(".add-card-content input", "https://example.com/pack/server.json"), after: 1800 },
+    ],
+  },
+  {
+    id: "add-online-error",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    commands: base({ add_probe_server_pack: { __error: "add.probeFail" } }),
+    actions: [
+      { eval: clickText("在线实例"), after: 250 },
+      { eval: setInput(".add-card-content input", "https://example.com/pack/broken.json"), after: 900 },
+    ],
+  },
+  {
+    id: "add-online-empty-error",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    commands: base(),
+    actions: [
+      { eval: clickText("在线实例"), after: 250 },
+      { eval: clickText("下载"), after: 500 },
+    ],
+  },
+  {
+    id: "add-continue-modal",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    commands: base({ add_create_new: "new-instance-uuid" }),
+    actions: [
+      { eval: setInput("#add-name", "继续添加测试"), after: 250 },
+      { eval: selectAt(".add-card-content select", 0, "1.21.4"), after: 500 },
+      { eval: clickText("创建"), after: 800 },
+    ],
+  },
+  {
+    id: "add-name-conflict-modal",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    commands: base(),
+    actions: [{ eval: emit("add-name-conflict", { id: 1, kind: "instance", name: "1.21.4" }), after: 600 }],
+  },
+  {
+    id: "add-pack-progress-modal",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    commands: base(),
+    actions: [{ eval: emit("add-pack-progress", { state: "extract", now: 42, total: 100, subText: "mods/sodium-0.5.11.jar", subNow: 50, subTotal: 100 }), after: 600 }],
+  },
   { id: "add-modpack", kind: "add_modpack", label: "mml-add_modpack", size: [1150, 800], commands: base() },
   { id: "add-resource", kind: "add_resource", label: "mml-add_resource-inst-1", size: [1200, 800], query: "uuid=inst-1", commands: base() },
 

@@ -1207,6 +1207,7 @@ export default {
   "add.urlHint": "在线实例填 server.json 的地址，只填目录会自动补上；整合包压缩包地址也能导入",
   "add.urlEmpty": "请输入下载地址",
   "add.probeReading": "正在读取服务器清单…",
+  "add.probeFail": "读取服务器清单失败",
   "add.probePackVersion": "包版本",
   "add.probeContents": "内容",
   "add.probeCounts": "{files} 个模组 · {archives} 个配置包",

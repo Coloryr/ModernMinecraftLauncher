@@ -106,6 +106,15 @@ export const instances = [
   }),
 ];
 
+export const addVersions = [
+  { id: "1.21.4", versionType: "release" },
+  { id: "1.21.1", versionType: "release" },
+  { id: "1.20.1", versionType: "release" },
+  { id: "1.20.4", versionType: "release" },
+  { id: "1.19.2", versionType: "release" },
+  { id: "24w14a", versionType: "snapshot" },
+];
+
 export const accounts = {
   accounts: [
     {
@@ -116,7 +125,7 @@ export const accounts = {
       avatarColor: "#4f8cff",
       skin: "",
       tokenStatus: "ok",
-      avatar: null,
+      avatar: svgImage("#4f8cff", "S"),
       server: null,
       ext1: null,
       ext2: null,
@@ -539,6 +548,7 @@ export function moreCommands(extra = {}) {
     add_get_pack_types: ["curseforge", "modrinth", "mmc", "hmcl"],
     add_get_support_loaders: ["normal", "forge", "neoforge", "fabric", "quilt", "optifine", "liteloader", "cleanroom"],
     add_set_close_guard: null,
+    add_create_new: "new-instance-uuid",
     window_ensure_model: null,
     window_drop_model: null,
     add_modpack_last_source: "curseforge",
@@ -624,13 +634,38 @@ export function commonCommands(extra = {}) {
     main_music_base_url: "",
     main_image_base_url: "",
     main_take_start_arg: null,
-    main_get_versions: [
-      { id: "1.21.4", versionType: "release" },
-      { id: "1.21.1", versionType: "release" },
-      { id: "1.20.1", versionType: "release" },
-      { id: "1.20.4", versionType: "release" },
-      { id: "1.19.2", versionType: "release" },
+    main_get_versions: addVersions,
+    main_refresh_versions: addVersions,
+    add_get_loader_versions: ["0.16.10", "0.16.9", "0.15.11"],
+    add_list_archive: [
+      "manifest.json",
+      "mods/",
+      "mods/sodium.jar",
+      "mods/iris.jar",
+      "config/",
+      "config/sodium-options.json",
     ],
+    add_detect_archive: { packType: "curseforge", name: "Better MC" },
+    add_scan_folder: [
+      { path: "E:\\M2L\\instances\\Better MC", name: "Better MC" },
+      { path: "E:\\M2L\\instances\\RLCraft", name: "RLCraft" },
+    ],
+    add_list_dir: [
+      { name: "mods", isDir: true },
+      { name: "config", isDir: true },
+      { name: "options.txt", isDir: false },
+    ],
+    add_probe_server_pack: {
+      url: "https://example.com/pack/server.json",
+      name: "Better MC Server",
+      version: "1.20.1",
+      loader: "forge",
+      loaderVersion: "47.2.0",
+      packVersion: "1.0.0",
+      text: "服务端整合包，包含 128 个模组",
+      fileCount: 132,
+      archiveCount: 4,
+    },
     main_get_custom_json: [],
     settings_get_bg: { source: "", dataUrl: "", opacity: 100, blur: 0, nativeSize: 0 },
     log_get_setting: {

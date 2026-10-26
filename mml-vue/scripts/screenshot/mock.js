@@ -14,6 +14,7 @@
   let nextId = 1;
 
   const clone = (value) => (value === undefined ? null : JSON.parse(JSON.stringify(value)));
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   /** 插件命令的兜底值：窗口 / 事件 / 对话框 / 路径这些页面启动就要用 */
   function pluginDefault(cmd, args) {
@@ -61,7 +62,16 @@
   const internals = {
     invoke: async (cmd, args) => {
       calls.push({ cmd, args });
-      if (Object.prototype.hasOwnProperty.call(data, cmd)) return clone(data[cmd]);
+      if (Object.prototype.hasOwnProperty.call(data, cmd)) {
+        const entry = data[cmd];
+        // 场景可用 { __delay, value } / { __error } 模拟慢查询与失败
+        if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+          if (entry.__delay) await sleep(entry.__delay);
+          if (entry.__error) throw new Error(entry.__error);
+          if ("value" in entry) return clone(entry.value);
+        }
+        return clone(entry);
+      }
       const fallback = pluginDefault(cmd, args);
       if (fallback !== undefined) return fallback;
       unknown.push(cmd);

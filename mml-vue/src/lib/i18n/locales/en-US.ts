@@ -1206,6 +1206,7 @@ export default {
   "add.urlHint": "For an online instance use the server.json address — a folder address gets server.json appended. Modpack archive URLs still work",
   "add.urlEmpty": "Please enter a download URL",
   "add.probeReading": "Reading the server manifest…",
+  "add.probeFail": "Failed to read the server manifest",
   "add.probePackVersion": "Pack version",
   "add.probeContents": "Contents",
   "add.probeCounts": "{files} mods · {archives} config packs",

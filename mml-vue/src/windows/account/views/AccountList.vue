@@ -36,6 +36,8 @@ const emit = defineEmits<{
   (e: "edit", acc: AccountStoreDto): void;
   /** 删除该账户 */
   (e: "delete", acc: AccountStoreDto): void;
+  /** 右键账户：打开操作菜单 */
+  (e: "menu", payload: { event: MouseEvent; acc: AccountStoreDto }): void;
 }>();
 
 /** 是否当前使用的账户 */
@@ -79,7 +81,8 @@ function hidePreview() {
     </button>
 
     <div v-for="acc in accounts" :key="acc.uuid" class="acc-row" :class="{ current: isCurrent(acc) }"
-      @dblclick="!accountLocked && emit('switch', acc)">
+      @dblclick="!accountLocked && emit('switch', acc)"
+      @contextmenu.prevent="emit('menu', { event: $event, acc })">
       <!-- 加载中：图上叠转圈，onload 后消失 -->
       <div v-if="!imageFailed(acc, 'avatar')" class="row-avatar-box">
         <img :src="acc.avatar || accountAvatarUrl(acc)" class="row-avatar"

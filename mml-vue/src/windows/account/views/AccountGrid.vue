@@ -56,6 +56,8 @@ const emit = defineEmits<{
   (e: "edit", acc: AccountStoreDto): void;
   /** 删除该账户 */
   (e: "delete", acc: AccountStoreDto): void;
+  /** 右键账户：打开操作菜单 */
+  (e: "menu", payload: { event: MouseEvent; acc: AccountStoreDto }): void;
 }>();
 
 /** 是否当前使用的账户 */
@@ -122,7 +124,8 @@ function hidePreview() {
     </button>
 
     <div v-for="acc in accounts" :key="acc.uuid" class="acc-card" :class="{ current: isCurrent(acc) }"
-      @dblclick="!accountLocked && emit('switch', acc)">
+      @dblclick="!accountLocked && emit('switch', acc)"
+      @contextmenu.prevent="emit('menu', { event: $event, acc })">
       <div class="acc-images"
         :class="{ empty: imageFailed(acc, 'avatar') && imageFailed(acc, 'skin') && imageFailed(acc, 'cape') }">
         <span v-if="isCurrent(acc)" class="current-badge">{{ t("account.current") }}</span>

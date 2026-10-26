@@ -17,6 +17,7 @@ import { showToast } from "../../lib/toast";
 import AccountGrid from "./views/AccountGrid.vue";
 import AccountList from "./views/AccountList.vue";
 import AccountDetail from "./views/AccountDetail.vue";
+import RowMenu, { type RowMenuItem } from "../resource/parts/RowMenu.vue";
 import {
   ACCOUNT_TYPES,
   accounts,
@@ -35,7 +36,7 @@ import { AccountOAuth, AccountOAuthState } from "../../lib/listens";
 import { commands } from "../../lib/bindings";
 import type { AccountOAuthDto, AccountOAuthStateDto } from "../../lib/bindings";
 import { loadGuiConfig, type LoginLockItem } from "../../lib/guiConfig";
-import { bumpImageVersion, resetImageState } from "../../lib/accountImages";
+import { bumpImageVersion, hasNoSkin, resetImageState } from "../../lib/accountImages";
 // 皮肤预览弹窗按需加载：它静态引入 skinview3d，含 three.js 整块 ~560 kB。
 // 账户窗口打开时绝大多数操作是看列表 / 切账户，不该为此先付掉这个体积。
 const SkinModal = defineAsyncComponent(() => import("./SkinModal.vue"));
@@ -443,6 +444,61 @@ async function refreshSkin(acc: AccountStoreDto) {
   }
 }
 
+/** 右键账户菜单的位置与目标 */
+const accountMenu = ref<{ x: number; y: number; acc: AccountStoreDto } | null>(null);
+
+/** 右键菜单项：按账户能力置灰，删除单独隔开 */
+const accountMenuItems = computed<RowMenuItem[]>(() => {
+  const acc = accountMenu.value?.acc;
+  if (!acc) return [];
+  const items: RowMenuItem[] = [];
+  if (!hasNoSkin(acc)) {
+    items.push({ id: "viewSkin", label: t("account.viewSkin") });
+    items.push({ id: "refreshSkin", label: t("account.refreshSkin") });
+  }
+  if (acc.canRefresh) items.push({ id: "refresh", label: t("account.refresh") });
+  if (acc.canRelogin) items.push({ id: "relogin", label: t("account.relogin") });
+  if (acc.canEdit) items.push({ id: "edit", label: t("account.editOffline") });
+  items.push({ id: "delete", label: t("account.delete"), danger: true, separated: true });
+  return items;
+});
+
+/** 打开右键菜单 */
+function openAccountMenu(payload: { event: MouseEvent; acc: AccountStoreDto }) {
+  accountMenu.value = {
+    x: payload.event.clientX,
+    y: payload.event.clientY,
+    acc: payload.acc,
+  };
+}
+
+/** 执行右键菜单动作 */
+function onAccountMenuPick(id: string) {
+  const acc = accountMenu.value?.acc;
+  accountMenu.value = null;
+  if (!acc) return;
+  switch (id) {
+    case "viewSkin":
+      viewSkin(acc);
+      break;
+    case "refreshSkin":
+      void refreshSkin(acc);
+      break;
+    case "refresh":
+      refreshToken(acc);
+      break;
+    case "relogin":
+      relogin(acc);
+      break;
+    case "edit":
+      openEdit(acc);
+      break;
+    case "delete":
+      deleteTarget.value = acc;
+      break;
+  }
+}
+
 /** 查看皮肤：预览被点击的那一条账户，不要求它同时是"当前使用"的账户 */
 const skinTarget = ref<AccountStoreDto | null>(null);
 
@@ -590,14 +646,15 @@ function tokenLabel(acc: AccountStoreDto): string {
     <!-- 视图：平铺 / 列表 / 详情（见 views/ 目录）；详情模式下视图区自己管理滚动 -->
     <div class="view-area" :class="{ fill: view === 'detail' }">
       <AccountGrid v-if="view === 'grid'" :accounts="filtered" :filtering="filtering"
-        :current-uuid="currentAccount?.uuid ?? ''" @add="openAdd"
+        :current-uuid="currentAccount?.uuid ?? ''" @add="openAdd" @menu="openAccountMenu"
         @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin" @refresh-skin="refreshSkin"
         @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" />
       <AccountList v-else-if="view === 'list'" :accounts="filtered" :filtering="filtering"
-        :current-uuid="currentAccount?.uuid ?? ''"
+        :current-uuid="currentAccount?.uuid ?? ''" @menu="openAccountMenu"
         :token-label="tokenLabel" @add="openAdd" @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin"
         @refresh-skin="refreshSkin" @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" />
       <AccountDetail v-else :accounts="filtered" :filtering="filtering" :current-uuid="currentAccount?.uuid ?? ''"
+        @menu="openAccountMenu"
         :token-label="tokenLabel"
         @add="openAdd" @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin" @refresh-skin="refreshSkin"
         @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" />
@@ -738,6 +795,10 @@ function tokenLabel(acc: AccountStoreDto): string {
     <!-- 皮肤 / 披风预览弹窗（2D / 3D 预览 + 纹理列表 + 正版装备）。
          目标账户由点开它的那一条决定，不是"当前使用"的账户 -->
     <SkinModal v-if="showSkin" :account="skinTarget" @close="showSkin = false" />
+
+    <!-- 右键账户：查看皮肤 / 刷新 / 重新登录 / 编辑 / 删除 -->
+    <RowMenu v-if="accountMenu" :x="accountMenu.x" :y="accountMenu.y" :items="accountMenuItems"
+      @pick="onAccountMenuPick" @close="accountMenu = null" />
 
     <!-- 拖入登录卡片 / 快捷方式时的遮罩（标题按拖入类型变） -->
     <DropOverlay v-if="fileDragOver" :title="t(dragKind === 'text' ? 'account.dropTitle' : 'account.dropFileTitle')" />

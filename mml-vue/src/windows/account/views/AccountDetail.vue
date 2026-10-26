@@ -40,6 +40,8 @@ const emit = defineEmits<{
   (e: "edit", acc: AccountStoreDto): void;
   /** 删除该账户 */
   (e: "delete", acc: AccountStoreDto): void;
+  /** 右键账户：打开操作菜单 */
+  (e: "menu", payload: { event: MouseEvent; acc: AccountStoreDto }): void;
 }>();
 
 /** 是否当前使用的账户 */
@@ -78,7 +80,8 @@ function isCurrent(acc: AccountStoreDto): boolean {
             <td class="cell-name add-text" colspan="7">{{ t("account.add") }}</td>
           </tr>
           <tr v-for="acc in accounts" :key="acc.uuid" :class="{ current: isCurrent(acc) }"
-            @dblclick="!accountLocked && emit('switch', acc)">
+            @dblclick="!accountLocked && emit('switch', acc)"
+            @contextmenu.prevent="emit('menu', { event: $event, acc })">
             <td class="col-actions">
               <!-- 不可见的皮肤探测图：表格不展示皮肤，但「查看皮肤 / 刷新皮肤」要知道有没有皮肤。
                  没有它就永远不会产生 skin 的失败标记，那俩按钮在没皮肤的账户上照样显示。
