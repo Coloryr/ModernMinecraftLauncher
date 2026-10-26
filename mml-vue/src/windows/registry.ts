@@ -20,7 +20,6 @@ export type WindowKind =
   | "log"
   | "export"
   | "config"
-  | "gamepad"
   | "server_pack"
   | "server_instance";
 
@@ -51,7 +50,6 @@ export const WINDOW_REGISTRY: WindowInfo[] = [
   { kind: "log", titleKey: "winTitle.log" },
   { kind: "export", titleKey: "winTitle.export" },
   { kind: "config", titleKey: "winTitle.config" },
-  { kind: "gamepad", titleKey: "winTitle.gamepad" },
   { kind: "server_pack", titleKey: "winTitle.serverPack" },
   { kind: "server_instance", titleKey: "winTitle.serverInstance" },
 ];

@@ -31,7 +31,8 @@
   不要同时起。浏览器直连只能看到无 IPC 数据的空状态。
 - **出包两个 profile**（各自独立 target 目录，来回切不会互相刷缓存）：
   - 正式发布：`build/build-release.ps1`（bash 版 `build/build-release.sh`；
-    = `cd mml-gui && npm run tauri build`）。
+    = `cd mml-gui && npm run tauri build`）。Windows 默认三种架构（x64 / x86 / arm64），
+    只要一种用 `-Arch x64`；arm64 只打 NSIS。
     `[profile.release]` 是 fat LTO + `codegen-units = 1`：体积最小、运行最快，但末尾的
     跨 crate 优化是单线程的，**构建时会看到只有一个核在跑**，含安装包。
   - 预发布：`build/build-prerelease.ps1`（bash 版 `build/build-prerelease.sh`；
@@ -43,6 +44,8 @@
     漏了即使 profile 是 release-like 也会被当成 dev 构建，exe 去连 localhost:1420，
     没起 vite 就是"进程在跑、窗口不出来"。
     `[profile.prerelease]` 是 thin LTO + `codegen-units = 16`：快很多，体积略大，只出 exe。
+    Linux / macOS 的 x64 / arm64 由 CI 原生 runner 出（Linux x64 + arm64，macOS x64 + arm64）。
+    Windows 默认三种架构，产物按架构命名：`target/prerelease/mml-gui-<arch>.exe`（`-Arch` 同样可过滤）。
   - 预发布也要**安装包**时：`tauri` CLI 不认 `--profile`（`--` 透传给 cargo 会让它去
     `target/release` 找错文件），只能覆盖 release 的设置：
     `CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 npm run tauri build -- --features prerelease`。

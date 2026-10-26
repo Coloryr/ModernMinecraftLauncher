@@ -66,16 +66,17 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
 | `build/init.ps1` | 首次安装 `mml-vue` / `mml-gui` 的 npm 依赖（bash 版 `build/init.sh`） |
 | `cd mml-gui && npm run tauri dev` | 桌面开发模式（会先还原 vendor 插件并起 vite，端口 1420 必须空闲） |
 | `build/dev-frontend.ps1` | 只起 Vite，配合 debug 版 Rust 后端单独运行；`tauri dev` 已自带 Vite，不要重复起 |
-| `build/build-release.ps1` | 正式发布构建（fat LTO，含安装包，按版本收集到 `build_out/`） |
-| `build/build-prerelease.ps1` | 预发布构建（thin LTO，只出 exe，更快） |
+| `build/build-release.ps1` | 正式发布构建（fat LTO，含安装包，按版本收集到 `build_out/`；Windows 默认 x64 / x86 / arm64；Linux / macOS 的 x64 / arm64 由 CI 原生 runner 出） |
+| `build/build-prerelease.ps1` | 预发布构建（thin LTO，只出 exe，更快；Windows 三种架构，`target/prerelease/mml-gui-<arch>.exe`） |
 | `bash build/package-flatpak.sh` | 用已构建的二进制打 `.flatpak`，需要 `flatpak`，不重新编译 |
 | `bash build/package-arch.sh` | 用已构建的二进制打 `.pkg.tar.zst`，不依赖 `makepkg`，任一 Linux 可跑 |
 | `cd mml-gui && npm run gen` | 改过 Rust 侧命令 / DTO 后重新生成 `mml-ipc` 契约 |
 | `cd mml-gui && npx tauri icon ../design/icon/f-blend-mirror.svg` | 改过程序图标后重新生成 `src-tauri/icons/`；会顺带产出 `android/` 与 `ios/`，桌面端用不到可删 |
 | `cd custom/custom-main-demo && npm run build` | 构建自定义主页面示例并打包成 `custom-main-demo.zip`（四个示例的用法见 [custom/README.md](../custom/README.md)） |
 
-`build/` 下带 PowerShell 版（`.ps1`，Windows）与 bash 版（`.sh`，Linux / macOS / Git Bash）的脚本
-做的是同一件事；`build/*.mjs` 是版本同步与产物打包用的跨平台辅助脚本。
+`build/` 下带 PowerShell 版（`.ps1`，Windows）与 bash 版（`.sh`，Linux / macOS / Git Bash）：
+PowerShell 版在 Windows 默认出三架构，bash 版构建当前架构；`build/*.mjs` 是版本同步与产物打包用的
+跨平台辅助脚本。
 
 Flatpak 与 Arch 包不在 `build-release` 里自动跑，由 `build/package-flatpak.sh`、
 `build/package-arch.sh` 单独完成，输入都是 `target/release/mml-gui`：
@@ -93,9 +94,22 @@ Flatpak 默认声明 `org.freedesktop.Platform//25.08`，安装时由 Flathub �
 按版本重命名到 `build_out/`。完整发版流程见根 README 的[版本与发布](../README.md#版本与发布)。
 
 构建 profile 与产物：正式发布是 `[profile.release]`（fat LTO + `codegen-units = 1`），
-预发布是 `[profile.prerelease]`（thin LTO + `codegen-units = 16`）；两者分别在 `target/release/`
-与 `target/prerelease/` 下，来回切不会互相刷缓存。预发布也要安装包时，只能覆盖 release 的设置
-（`tauri` CLI 不认 `--profile`）：
+预发布是 `[profile.prerelease]`（thin LTO + `codegen-units = 16`）；两者分别在
+`target/<三元组>/release/` 与 `target/<三元组>/prerelease/` 下，来回切不会互相刷缓存。
+
+Windows 的正式 / 预发布脚本默认构建 **x64 / x86 / arm64**：
+
+- 只要一种：`-Arch x64`（也可 `-Arch x64,x86`）；
+- arm64 只打 NSIS，x64 / x86 出 MSI + NSIS；
+- 交叉编译要求 `rustup target add i686-pc-windows-msvc` / `aarch64-pc-windows-msvc`，
+  以及 Visual Studio 对应架构的 MSVC 工具链（ARM64 要装「MSVC v143 - VS 2022 C++ ARM64/ARM64EC 生成工具」）。
+  CI 的 arm64 跑在 `windows-11-arm` 原生 runner 上，不需要交叉工具链。
+- Linux / macOS 本地只构建当前架构；需要多架构时用 `MML_TARGETS` 指定三元组（空格分隔）：
+  `MML_TARGETS=x86_64-apple-darwin bash build/build-release.sh` 可在 Apple Silicon 上交叉出 macOS x64
+  （需先 `rustup target add x86_64-apple-darwin`）；Linux arm64 建议直接在 arm64 机器上构建。
+  macOS 通用包可用 `MML_TARGETS=universal-apple-darwin`，仅正式发布支持。
+
+预发布也要安装包时，只能覆盖 release 的设置（`tauri` CLI 不认 `--profile`）：
 
 ```powershell
 $env:CARGO_PROFILE_RELEASE_LTO = 'thin'
@@ -124,10 +138,11 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 
 1. `actions/checkout@v4` + `actions/setup-node@v4`（Node 22，按两个 lockfile 缓存）+
    `dtolnay/rust-toolchain@stable` + `Swatinem/rust-cache@v2`；
-2. Windows 跑 `build/init.ps1` / `build/build-release.ps1`，
-   Linux 与 macOS 跑 `bash build/init.sh` / `bash build/build-release.sh`；
-3. Linux 额外跑 `build/package-flatpak.sh` 与 `build/package-arch.sh`，
-   把 `.flatpak` 与 `.pkg.tar.zst` 也放进 `build_out/`；
+2. Windows 拆成 x64 / x86 / arm64 三行 matrix，各跑 `build/init.ps1` / `build/build-release.ps1 -Arch <arch>`
+   （arm64 用 `windows-11-arm` 原生 runner）；Linux 跑 x64（`ubuntu-22.04`）与 arm64（`ubuntu-24.04-arm`），
+   macOS 跑 x64（`macos-15-intel`）与 arm64（`macos-15`），都执行 `bash build/init.sh` / `bash build/build-release.sh`；
+3. Linux x64 额外跑 `build/package-flatpak.sh` 与 `build/package-arch.sh`，
+   把 `.flatpak` 与 `.pkg.tar.zst` 也放进 `build_out/`；arm64 只出 deb / rpm / AppImage；
 4. 脚本把安装包按版本改名到 `build_out/`，`actions/upload-artifact@v4` 收走；
    发版 job 用 `actions/download-artifact@v4`（`merge-multiple: true`）合并，
    再交给 `softprops/action-gh-release@v2`。

@@ -33,9 +33,31 @@ npm --prefix "$root/mml-vue" run build
 
 cd "$root/mml-gui/src-tauri"
 echo '正在构建 prerelease（thin LTO）...'
-# 必须带 custom-protocol：不带的话 tauri 把这次构建当成 dev，
-# 前端会连接 localhost:1420；未启动开发服务时无法加载页面。
-cargo build --profile prerelease --features custom-protocol,prerelease
 
-echo
-echo "产物: $root/target/prerelease/mml-gui.exe"
+# 默认当前机器架构；MML_TARGETS 可指定多个三元组，例如：
+#   MML_TARGETS="aarch64-apple-darwin x86_64-apple-darwin" bash build/build-prerelease.sh
+if [ -n "${MML_TARGETS:-}" ]; then
+  for target in $MML_TARGETS; do
+    echo "  -> $target"
+    # 必须带 custom-protocol：不带的话 tauri 把这次构建当成 dev，
+    # 前端会连接 localhost:1420；未启动开发服务时无法加载页面。
+    cargo build --profile prerelease --target "$target" --features custom-protocol,prerelease
+  done
+  mkdir -p "$root/target/prerelease"
+  for target in $MML_TARGETS; do
+    src="$root/target/$target/prerelease/mml-gui"
+    [ -f "$src" ] || src="$root/target/$target/prerelease/mml-gui.exe"
+    [ -f "$src" ] || { echo "找不到产物: $src" >&2; exit 1; }
+    ext=""
+    case "$src" in *.exe) ext=".exe" ;; esac
+    cp -f "$src" "$root/target/prerelease/mml-gui-$target$ext"
+  done
+  echo
+  echo "产物: $root/target/prerelease/mml-gui-<三元组>"
+else
+  # 必须带 custom-protocol：不带的话 tauri 把这次构建当成 dev，
+  # 前端会连接 localhost:1420；未启动开发服务时无法加载页面。
+  cargo build --profile prerelease --features custom-protocol,prerelease
+  echo
+  echo "产物: $root/target/prerelease/mml-gui.exe"
+fi

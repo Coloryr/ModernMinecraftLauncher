@@ -37,7 +37,21 @@ jobs:
 
   build-windows:
     needs: check-version
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # x64 / x86 在 x64 runner 上构建；x86 由 MSVC 交叉编译
+          - runner: windows-latest
+            arch: x64
+          - runner: windows-latest
+            arch: x86
+          # arm64 用原生 ARM runner，省掉在 x64 上装 ARM64 交叉工具链。
+          # 仓库没有 ARM runner 时，可改成 windows-latest 并在镜像里装
+          # 「MSVC v143 - VS 2022 C++ ARM64/ARM64EC 生成工具」后交叉编译。
+          - runner: windows-11-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,20 +69,34 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: .
+          key: ${{ matrix.arch }}
       - name: 安装依赖
         run: pwsh -NoProfile -File build/init.ps1
-      - name: 构建并打包
-        run: pwsh -NoProfile -File build/build-release.ps1
+      - name: 构建并打包（${{ matrix.arch }}）
+        run: pwsh -NoProfile -File build/build-release.ps1 -Arch ${{ matrix.arch }}
       - name: 上传 Windows 产物
         uses: actions/upload-artifact@v4
         with:
-          name: mml-windows-${{ runner.arch }}
+          name: mml-windows-${{ matrix.arch }}
           path: build_out/*
           if-no-files-found: error
 
   build-linux:
     needs: check-version
-    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # x64 留在 22.04：AppImage 的 glibc 下限更低，兼容旧发行版
+          - runner: ubuntu-22.04
+            arch: x64
+            fuse: libfuse2
+          # arm64 用 24.04 原生 runner；Tauri 的 Linux 依赖全走 arm64 包。
+          # 这两个 arm runner 是 GitHub 公共预览，私有仓库不可用时改自托管或交叉编译
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            fuse: libfuse2t64
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -93,28 +121,38 @@ jobs:
             build-essential curl wget file \
             libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
             librsvg2-dev patchelf libxdo-dev libssl-dev \
-            libgtk-3-dev libfuse2 rpm libdbus-1-dev libudev-dev \
+            libgtk-3-dev ${{ matrix.fuse }} rpm libdbus-1-dev libudev-dev \
             libarchive-tools zstd
       - name: 安装依赖
         run: bash build/init.sh
       - name: 构建并打包
         run: bash build/build-release.sh
-      - name: 打 Flatpak 包
+      - name: 打 Flatpak 包（仅 x64）
+        if: matrix.arch == 'x64'
         run: |
           sudo apt-get install -y flatpak
           bash build/package-flatpak.sh
-      - name: 打 Arch 包
+      - name: 打 Arch 包（仅 x64）
+        if: matrix.arch == 'x64'
         run: bash build/package-arch.sh
       - name: 上传 Linux 产物
         uses: actions/upload-artifact@v4
         with:
-          name: mml-linux-${{ runner.arch }}
+          name: mml-linux-${{ matrix.arch }}
           path: build_out/*
           if-no-files-found: error
 
   build-macos:
     needs: check-version
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15-intel
+            arch: x64
+          - runner: macos-15
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -139,7 +177,7 @@ jobs:
       - name: 上传 macOS 产物
         uses: actions/upload-artifact@v4
         with:
-          name: mml-macos-${{ runner.arch }}
+          name: mml-macos-${{ matrix.arch }}
           path: build_out/*
           if-no-files-found: error
 
@@ -165,9 +203,9 @@ jobs:
           body: |
             M²L ${{ github.ref_name }} 构建产物
 
-            - Windows：MSI / NSIS
-            - Linux：deb / rpm / AppImage
-            - macOS：dmg / app.tar.gz
+            - Windows：x64 / x86 / arm64（MSI / NSIS；arm64 为 NSIS）
+            - Linux：x64 / arm64（deb / rpm / AppImage；x64 另有 Flatpak / Arch）
+            - macOS：x64 / arm64（dmg / app.tar.gz）
           files: artifacts/*
           fail_on_unmatched_files: true
           draft: false

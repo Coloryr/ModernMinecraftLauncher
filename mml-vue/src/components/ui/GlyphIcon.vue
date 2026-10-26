@@ -29,6 +29,8 @@ export type GlyphName =
   | "arrow-up"
   | "arrow-down"
   | "play"
+  // 设置窗口左侧导航：手柄（按键映射）
+  | "gamepad"
   // 自定义音乐的标题栏入口：暂停与停止
   | "pause"
   | "stop"
@@ -129,6 +131,12 @@ withDefaults(
       <path d="m6 13 6 6 6-6" />
     </g>
     <path v-else-if="name === 'play'" d="M7.5 5.2v13.6L19 12 7.5 5.2z" />
+    <!-- 手柄：左右握把 + 十字键 + 两个按键；与其它图标同一套 24 视窗描边 -->
+    <g v-else-if="name === 'gamepad'">
+      <path d="M7 8h10a4 4 0 0 1 3.9 3.1l1 4.6a2.6 2.6 0 0 1-4.6 2.2L16 16H8l-1.3 1.9A2.6 2.6 0 0 1 2.1 15.7l1-4.6A4 4 0 0 1 7 8z" />
+      <path d="M7.5 11v3M6 12.5h3" />
+      <path d="M16 11.5h.01M17.5 13.5h.01" />
+    </g>
     <!-- 暂停 / 停止：自定义音乐那两枚 -->
     <path v-else-if="name === 'pause'" d="M9.5 5v14M14.5 5v14" />
     <rect v-else-if="name === 'stop'" x="6.5" y="6.5" width="11" height="11" rx="1.6" />

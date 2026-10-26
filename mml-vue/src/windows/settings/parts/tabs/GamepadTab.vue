@@ -1,27 +1,23 @@
 <script setup lang="ts">
-// 手柄配置窗口：左侧配置列表，右侧编辑按钮 / 轴映射与摇杆参数
+// 手柄设置页：左侧配置列表，右侧编辑按钮 / 轴映射与摇杆参数
 //
 // 配置存在运行目录的 gamepad 目录下，一份映射一个 json；保存后后端立即重新加载，
 // 运行中的游戏下一次读映射就走新值。列表里的「生效中」是后端按 Selected 选出来的那份。
 import { computed, onMounted, reactive, ref } from "vue";
-import WindowFrame from "../../components/ui/WindowFrame.vue";
-import BaseButton from "../../components/ui/BaseButton.vue";
-import BaseModal from "../../components/ui/BaseModal.vue";
-import ActionSelect from "./parts/ActionSelect.vue";
-import { useWindowRefresh } from "../../composables/useWindowRefresh";
-import { t, tErr } from "../../lib/i18n";
-import { showToast } from "../../lib/toast";
+import BaseButton from "../../../../components/ui/BaseButton.vue";
+import BaseModal from "../../../../components/ui/BaseModal.vue";
+import ActionSelect from "../ActionSelect.vue";
+import { useWindowRefresh } from "../../../../composables/useWindowRefresh";
+import { t, tErr } from "../../../../lib/i18n";
+import { showToast } from "../../../../lib/toast";
 import {
   commands,
   type GamepadAxisDto,
   type GamepadButtonDto,
   type GamepadConfigDto,
   type GamepadProfileDto,
-} from "../../lib/bindings";
-import { isTauri } from "../windowManager";
-
-/** 请求关闭本窗口 */
-defineEmits<{ (e: "close"): void }>();
+} from "../../../../lib/bindings";
+import { isTauri } from "../../../windowManager";
 
 const inTauri = isTauri();
 
@@ -349,13 +345,7 @@ function addAxis() {
 </script>
 
 <template>
-  <WindowFrame :title="t('winTitle.gamepad')" body-fill body-flush @close="$emit('close')">
-    <template #head-right>
-      <span v-if="dirty" class="gp-dirty">{{ t("winGamepad.unsaved") }}</span>
-      <BaseButton size="sm" variant="accent" :disabled="!config || saving" @click="save">
-        {{ t("winGamepad.save") }}
-      </BaseButton>
-    </template>
+  <div id="set-gamepad" class="gp-tab">
 
     <div class="gp-body">
       <!-- 左侧：配置文件列表 + 新建 / 生效 / 删除 -->
@@ -396,7 +386,13 @@ function addAxis() {
         <p v-else-if="!config" class="empty-tip">{{ t("winGamepad.broken") }}</p>
 
         <template v-else>
-          <h2 class="gp-title">{{ editing }}</h2>
+          <div class="gp-head">
+            <h2 class="gp-title">{{ editing }}</h2>
+            <span v-if="dirty" class="gp-dirty">{{ t("winGamepad.unsaved") }}</span>
+            <BaseButton size="sm" variant="accent" :disabled="!config || saving" @click="save">
+              {{ t("winGamepad.save") }}
+            </BaseButton>
+          </div>
 
           <section class="gp-sec">
             <h3 class="gp-sec-title">{{ t("winGamepad.buttons") }}</h3>
@@ -549,24 +545,21 @@ function addAxis() {
         <BaseButton variant="danger" @click="discardAndSelect">{{ t("winGamepad.discard") }}</BaseButton>
       </div>
     </BaseModal>
-  </WindowFrame>
+  </div>
 </template>
 
 <style scoped>
-/* 两栏：左侧配置列表贴边，右侧表单自己滚 */
 .gp-body {
-  flex: 1;
-  min-height: 0;
   display: flex;
+  align-items: flex-start;
+  gap: 18px;
 }
 
 .gp-side {
-  width: 240px;
+  width: 200px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--border);
-  background: var(--bg-side);
 }
 
 .gp-side-head {
@@ -574,7 +567,7 @@ function addAxis() {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 14px 14px 10px;
+  padding: 0 0 8px;
 }
 
 .gp-side-title {
@@ -584,10 +577,9 @@ function addAxis() {
 }
 
 .gp-list {
-  flex: 1;
-  min-height: 0;
+  max-height: 260px;
   overflow-y: auto;
-  padding: 0 8px 8px;
+  padding: 0 2px 4px 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -643,20 +635,24 @@ function addAxis() {
 .gp-side-foot {
   display: flex;
   gap: 8px;
-  padding: 10px 14px 14px;
-  border-top: 1px solid var(--border);
+  padding-top: 10px;
 }
 
 .gp-main {
   flex: 1;
   min-width: 0;
-  overflow-y: auto;
-  padding: 18px 22px 26px;
-  scrollbar-gutter: stable;
+}
+
+.gp-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
 .gp-title {
-  margin: 0 0 14px;
+  flex: 1;
+  margin: 0;
   font-size: 15px;
 }
 

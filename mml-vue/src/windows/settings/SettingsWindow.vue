@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 启动器设置窗口：左侧标签导航 + 右侧内容区
-// 标签：界面（含窗口设置）/ Java / 网络与下载 / 游戏启动 / 皮肤与头像 / 客户端设置 / 本地文件
+// 标签：界面（含窗口设置）/ Java / 网络与下载 / 游戏启动 / 手柄 / 皮肤与头像 / 客户端设置 / 本地文件
 //
 // 这里只做编排：状态与保存逻辑全在 composables/（每个标签一份），
 // 排版在 parts/tabs/，每个标签一个组件；窗口级样式在 settings.css，非 scoped、子组件共用。
@@ -15,6 +15,7 @@ import UiTab from "./parts/tabs/UiTab.vue";
 import JavaTab from "./parts/tabs/JavaTab.vue";
 import NetworkTab from "./parts/tabs/NetworkTab.vue";
 import LaunchTab from "./parts/tabs/LaunchTab.vue";
+import GamepadTab from "./parts/tabs/GamepadTab.vue";
 import SkinTab from "./parts/tabs/SkinTab.vue";
 import ClientTab from "./parts/tabs/ClientTab.vue";
 import LocalFilesTab from "./parts/tabs/LocalFilesTab.vue";
@@ -310,6 +311,7 @@ function onKeyDown(e: KeyboardEvent) {
           <NetworkTab v-else-if="tab === 'network'" :settings="network" :flash-group="flashGroup" />
           <LaunchTab v-else-if="tab === 'launch'" :settings="launch" :look="client" :locked="locked"
             :flash-group="flashGroup" />
+          <GamepadTab v-else-if="tab === 'gamepad'" />
           <SkinTab v-else-if="tab === 'skin'" :settings="skin" :flash-group="flashGroup" />
           <ClientTab v-else-if="tab === 'client' && (clientUnlocked || !clientLocked)" :settings="client"
             v-model:win="launchWin" :flash-group="flashGroup" />

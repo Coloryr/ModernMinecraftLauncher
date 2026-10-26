@@ -1,6 +1,6 @@
 // 设置窗口 · 设置项搜索索引
 //
-// 为什么是静态索引而不是扫 DOM：只有当前标签是渲染出来的（v-if），跨 6 个标签搜不到别页的项；
+// 为什么是静态索引而不是扫 DOM：只有当前标签是渲染出来的（v-if），跨标签搜不到别页的项；
 // 而索引里的 `group` 就是 SettingsGroup 的 id，也是 DOM 锚点 `#set-<id>`，命中后跳过去即可。
 //
 // 维护约定：**这里列的是"能搜到的设置项"**，标签页里加/改设置项时同步这里；
@@ -39,7 +39,7 @@ export const GROUP_TITLES: Record<string, string> = {
   customHome: "winSettings.secCustomHome",
   music: "winSettings.secMusic",
   serverPack: "winSettings.secServerPack",
-  gamepad: "winSettings.secGamepad",
+  gamepad: "winSettings.tab.gamepad",
   clientLock: "winSettings.secClientLock",
   gameTitle: "winSettings.secGameTitle",
   "window-look": "winSettings.secWindowLook",
@@ -217,7 +217,7 @@ const SETTINGS_INDEX: IndexEntry[] = [
   { tab: "client", group: "gameTitle", labelKey: "winSettings.gameTitle", extra: ["title", "标题文字"] },
   { tab: "client", group: "gameTitle", labelKey: "winSettings.titleDelay", extra: ["title", "间隔"] },
   { tab: "client", group: "serverPack", labelKey: "winSettings.serverPackExport", extra: ["server pack", "serverpack", "服务器包", "导出", "分发"] },
-  { tab: "client", group: "gamepad", labelKey: "winSettings.gamepadOpen", extra: ["gamepad", "joystick", "controller", "手柄", "摇杆", "按键映射"] },
+  { tab: "gamepad", group: "gamepad", labelKey: "winSettings.tab.gamepad", extra: ["gamepad", "joystick", "controller", "手柄", "摇杆", "按键映射"] },
 
   // ---- 本地文件 ----
   { tab: "files", group: "localFiles", labelKey: "winSettings.localFile.cache", extra: ["cache", "cleanup", "disk", "缓存", "清理", "占用"] },

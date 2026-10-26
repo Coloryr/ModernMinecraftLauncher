@@ -7,6 +7,7 @@ export type SettingsTab =
   | "java"
   | "network"
   | "launch"
+  | "gamepad"
   | "skin"
   | "client"
   | "files"
@@ -17,6 +18,7 @@ export type SettingsTabIcon =
   | "coffee"
   | "download"
   | "play"
+  | "gamepad"
   | "user"
   | "gear"
   | "folder"
@@ -33,6 +35,7 @@ export const SETTINGS_TABS: SettingsTabItem[] = [
   { id: "java", icon: "coffee" },
   { id: "network", icon: "download" },
   { id: "launch", icon: "play" },
+  { id: "gamepad", icon: "gamepad" },
   { id: "skin", icon: "user" },
   { id: "client", icon: "gear" },
   { id: "files", icon: "folder" },

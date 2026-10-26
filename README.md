@@ -99,21 +99,27 @@ build/dev-frontend.sh     # Linux / macOS / Git Bash
 
 | 目标 | 命令 | 产物 |
 | --- | --- | --- |
-| 正式发布 | `build/build-release.ps1`（或 `.sh`） | `build_out/` 下带版本号的安装包；Tauri 原始产物在 `target/release/bundle/` |
-| 预发布 | `build/build-prerelease.ps1`（或 `.sh`） | `target/prerelease/mml-gui.exe` |
+| 正式发布 | `build/build-release.ps1`（或 `.sh`） | `build_out/` 下带版本号的安装包；Windows 默认 x64 / x86 / arm64，Linux / macOS 由 CI 出 x64 / arm64 |
+| 预发布 | `build/build-prerelease.ps1`（或 `.sh`） | `target/prerelease/mml-gui-<arch>.exe` |
 | Linux 附加包 | `bash build/package-flatpak.sh` / `bash build/package-arch.sh` | `build_out/` 下的 `.flatpak` 与 `.pkg.tar.zst` |
 
 - 正式发布用 fat LTO + `codegen-units = 1`，体积最小、运行最快；末尾的跨 crate 优化只能单线程跑，
   构建期间只会看到一个核在工作。
 - 预发布用 thin LTO + `codegen-units = 16`，快很多，体积略大；主界面会显示「预发布版」。
-- 两个 profile 各有独立 target 子目录（`target/release` / `target/prerelease`），来回切不会互相刷缓存。
+- Windows 默认构建 x64 / x86 / arm64；只要一种用 `-Arch x64`（或 `-Arch x64,x86`）。arm64 只打 NSIS，
+  x64 / x86 出 MSI + NSIS。x86 / arm64 交叉编译需要对应架构的 MSVC 工具链，CI 的 arm64 跑在原生 ARM runner 上。
+- Linux 出 x64 / arm64（CI 分别跑 `ubuntu-22.04` 与 `ubuntu-24.04-arm`）；macOS 出 x64 / arm64
+  （`macos-15-intel` 与 `macos-15`）。Linux 32 位 i686 没有可用的 WebKitGTK 运行时，不在支持范围。
+- Windows 三种架构各有独立 target 子目录（`target/<三元组>/release`、`target/<三元组>/prerelease`）；
+  宿主直接构建（不带 `--target`）仍在 `target/release`、`target/prerelease`，来回切不会互相刷缓存。
 
-两个出包脚本都有 PowerShell 版与 bash 版，做的是同一件事。预发布也要安装包、或想调整 profile，
+两个出包脚本都有 PowerShell 版与 bash 版：PowerShell 版在 Windows 上默认出三架构，
+bash 版构建当前架构（可用 `MML_TARGETS` 指定三元组）。预发布也要安装包、或想调整 profile，
 见[开发与构建](docs/development.md)。
 
 Linux 还有两个附加包，都拿已构建的 `target/release/mml-gui` 直接封装、不重新编译：
 `package-flatpak.sh` 需要 `flatpak`；`package-arch.sh` 直接按 Arch 包格式组装
-tar.zst，不依赖 `makepkg`，Ubuntu 上也能打。CI 会分别执行这两个脚本。
+tar.zst，不依赖 `makepkg`，Ubuntu 上也能打。CI 只在 Linux x64 执行这两个脚本，arm64 不做这两个附加包。
 
 ### 版本与发布
 
@@ -128,18 +134,23 @@ tar.zst，不依赖 `makepkg`，Ubuntu 上也能打。CI 会分别执行这两�
 
 | 平台 | 产物示例 |
 | --- | --- |
-| Windows | `mml-windows-x64-0.0.1.msi`、`mml-windows-x64-0.0.1-setup.exe` |
-| Linux | `mml-linux-x64-0.0.1.deb`、`mml-linux-x64-0.0.1.rpm`、`mml-linux-x64-0.0.1.AppImage` |
+| Windows x64 | `mml-windows-x64-0.0.1.msi`、`mml-windows-x64-0.0.1-setup.exe` |
+| Windows x86 | `mml-windows-x86-0.0.1.msi`、`mml-windows-x86-0.0.1-setup.exe` |
+| Windows arm64 | `mml-windows-arm64-0.0.1-setup.exe` |
+| Linux x64 | `mml-linux-x64-0.0.1.deb`、`mml-linux-x64-0.0.1.rpm`、`mml-linux-x64-0.0.1.AppImage` |
+| Linux arm64 | `mml-linux-arm64-0.0.1.deb`、`mml-linux-arm64-0.0.1.rpm`、`mml-linux-arm64-0.0.1.AppImage` |
 | Linux（Flatpak） | `mml-linux-x64-0.0.1.flatpak` |
 | Arch Linux | `mml-arch-x64-0.0.1.pkg.tar.zst` |
-| macOS | `mml-macos-arm64-0.0.1.dmg` |
+| macOS x64 | `mml-macos-x64-0.0.1.dmg`、`mml-macos-x64-0.0.1.app.tar.gz` |
+| macOS arm64 | `mml-macos-arm64-0.0.1.dmg`、`mml-macos-arm64-0.0.1.app.tar.gz` |
 
-本地只会构建当前系统，三平台齐全靠 GitHub Actions：
+Windows 本地默认把三种架构都构建出来；Linux / macOS 本地构建当前架构（macOS 可用
+`MML_TARGETS=x86_64-apple-darwin` 交叉出 x64），各架构齐全靠 GitHub Actions：
 [`.github/workflows/release.yml`](.github/workflows/release.yml)。
 
 | 触发 | 行为 |
 | --- | --- |
-| 推送 `v*` 标签（如 `v0.0.1`） | 先校验 `build/version` 与标签一致，再并行构建 Windows / Linux / macOS，最后汇总成一个 GitHub Release |
+| 推送 `v*` 标签（如 `v0.0.1`） | 先校验 `build/version` 与标签一致，再按 Windows 3 种、Linux 2 种、macOS 2 种架构并行构建，最后汇总成一个 GitHub Release |
 | 推送 `releases/**` 分支 | 只构建并把产物传成 Actions artifact，不发 Release，用于验证 |
 | Actions 页面手动 `workflow_dispatch` | 同上，验证用 |
 

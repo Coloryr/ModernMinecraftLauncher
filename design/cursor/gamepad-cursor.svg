@@ -1,0 +1,21 @@
+<!--
+  M²L 手柄光标 · 灰色圆环
+
+  手柄驱动光标时用的指针：一圈半透明的灰色圆环，环内透明，除这一圈描边外没有别的装饰。
+  描边做径向渐变：内沿亮、外沿暗，颜色顺着环的厚度走，不是上下或斜向的一道。
+
+  按 32 画，环中线直径 24、环宽 4.5；外沿 28.5，四周留 1.75 边距。
+  实际用 24 到 32 等比缩放，环宽跟着缩。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <title>手柄光标</title>
+  <defs>
+    <radialGradient id="ring" gradientUnits="userSpaceOnUse" cx="16" cy="16" r="14.25">
+      <stop offset="0" stop-color="#c8c8c8" />
+      <stop offset="0.6842" stop-color="#c8c8c8" />
+      <stop offset="0.8421" stop-color="#8a8a8a" />
+      <stop offset="1" stop-color="#4e4e4e" />
+    </radialGradient>
+  </defs>
+  <circle cx="16" cy="16" r="12" fill="none" stroke="url(#ring)" stroke-opacity="0.55" stroke-width="4.5" />
+</svg>

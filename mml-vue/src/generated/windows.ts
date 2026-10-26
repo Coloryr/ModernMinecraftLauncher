@@ -44,8 +44,6 @@ export { default as DownloadWindow } from "../windows/download/DownloadWindow.vu
 export { default as ExportWindow } from "../windows/export/ExportWindow.vue";
 export { default as WinExportPartsFilePicker } from "../windows/export/parts/FilePicker.vue";
 export { default as WinExportPartsInfoExportButton } from "../windows/export/parts/InfoExportButton.vue";
-export { default as GamepadWindow } from "../windows/gamepad/GamepadWindow.vue";
-export { default as WinGamepadPartsActionSelect } from "../windows/gamepad/parts/ActionSelect.vue";
 export { default as HelpWindow } from "../windows/help/HelpWindow.vue";
 export { default as JavaDownloadWindow } from "../windows/java_download/JavaDownloadWindow.vue";
 export { default as LobbyWindow } from "../windows/lobby/LobbyWindow.vue";
@@ -90,12 +88,14 @@ export { default as WinResourcePartsModModUpdateLogModal } from "../windows/reso
 export { default as WinResourcePartsModModUpdateModal } from "../windows/resource/parts/mod/ModUpdateModal.vue";
 export { default as ServerInstanceWindow } from "../windows/server_instance/ServerInstanceWindow.vue";
 export { default as SettingsWindow } from "../windows/settings/SettingsWindow.vue";
+export { default as WinSettingsPartsActionSelect } from "../windows/settings/parts/ActionSelect.vue";
 export { default as WinSettingsPartsSaveStateText } from "../windows/settings/parts/SaveStateText.vue";
 export { default as WinSettingsPartsSettingsGroup } from "../windows/settings/parts/SettingsGroup.vue";
 export { default as WinSettingsPartsSettingsRail } from "../windows/settings/parts/SettingsRail.vue";
 export { default as WinSettingsPartsSettingsSearch } from "../windows/settings/parts/SettingsSearch.vue";
 export { default as WinSettingsPartsTabsClientTab } from "../windows/settings/parts/tabs/ClientTab.vue";
 export { default as WinSettingsPartsTabsExperimentalTab } from "../windows/settings/parts/tabs/ExperimentalTab.vue";
+export { default as WinSettingsPartsTabsGamepadTab } from "../windows/settings/parts/tabs/GamepadTab.vue";
 export { default as WinSettingsPartsTabsJavaTab } from "../windows/settings/parts/tabs/JavaTab.vue";
 export { default as WinSettingsPartsTabsLaunchTab } from "../windows/settings/parts/tabs/LaunchTab.vue";
 export { default as WinSettingsPartsTabsLocalFilesTab } from "../windows/settings/parts/tabs/LocalFilesTab.vue";
