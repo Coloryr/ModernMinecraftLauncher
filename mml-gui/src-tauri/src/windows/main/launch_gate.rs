@@ -14,6 +14,8 @@ static GATE: LazyLock<Gate> = LazyLock::new(Gate::default);
 struct State {
     /// 从读取快照到启动结束的实例。
     launching: HashSet<Uuid>,
+    /// 正在同步存档，阻止启动与第二次同步。
+    syncing: HashSet<Uuid>,
     /// 正在导入或等待重启。
     importing: bool,
 }
@@ -31,6 +33,20 @@ pub(super) struct LaunchGuard<'a> {
     gate: &'a Gate,
     /// 本次启动的实例。
     uuid: Uuid,
+}
+
+/// 同步期间持有的实例文件预约。
+pub(crate) struct SyncGuard<'a> {
+    /// 本次同步所属的状态锁。
+    gate: &'a Gate,
+    /// 本次同步的实例。
+    uuid: Uuid,
+}
+
+impl Drop for SyncGuard<'_> {
+    fn drop(&mut self) {
+        self.gate.state.lock().unwrap().syncing.remove(&self.uuid);
+    }
 }
 
 impl Drop for LaunchGuard<'_> {
@@ -63,10 +79,25 @@ impl Drop for ImportGuard<'_> {
 }
 
 impl Gate {
+    fn sync(&self, uuid: Uuid) -> Result<SyncGuard<'_>, String> {
+        let mut state = self.state.lock().unwrap();
+        if state.importing || state.launching.contains(&uuid) || state.syncing.contains(&uuid) {
+            return Err(err_keys::INSTANCE_BUSY.into());
+        }
+        if mml_game::is_running(&uuid) {
+            return Err(err_keys::INSTANCE_RUNNING.into());
+        }
+        state.syncing.insert(uuid);
+        Ok(SyncGuard { gate: self, uuid })
+    }
+
     fn launch(&self, uuid: Uuid) -> Result<LaunchGuard<'_>, String> {
         let mut state = self.state.lock().unwrap();
         if state.importing {
             return Err(err_keys::SERVER_PACK_BUSY.into());
+        }
+        if state.syncing.contains(&uuid) {
+            return Err(err_keys::INSTANCE_BUSY.into());
         }
         if mml_game::is_running(&uuid) || !state.launching.insert(uuid) {
             return Err(err_keys::INSTANCE_RUNNING.into());
@@ -78,6 +109,7 @@ impl Gate {
         let mut state = self.state.lock().unwrap();
         if state.importing
             || !state.launching.is_empty()
+            || !state.syncing.is_empty()
             || !mml_game::get_running_instances().is_empty()
         {
             return Err(err_keys::SERVER_PACK_BUSY.into());
@@ -105,9 +137,39 @@ pub(crate) fn import_guard() -> Result<ImportGuard<'static>, String> {
     GATE.import()
 }
 
+/// 同步存档时阻止启动和同实例的重叠同步。
+///
+/// - `uuid`: 本地实例 UUID
+///
+/// # 返回值
+///
+/// 任务结束自动释放的预约；运行、启动或导入中返回占用错误。
+pub(crate) fn begin_sync(uuid: Uuid) -> Result<SyncGuard<'static>, String> {
+    GATE.sync(uuid)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sync_blocks_launch_import_and_second_sync_until_released() {
+        let gate = Gate::default();
+        let uuid = Uuid::new_v4();
+        let sync = gate.sync(uuid).unwrap();
+        assert!(gate.launch(uuid).is_err());
+        assert!(gate.sync(uuid).is_err());
+        assert!(gate.import().is_err());
+        assert!(gate.launch(Uuid::new_v4()).is_ok());
+        drop(sync);
+        let launch = gate.launch(uuid).unwrap();
+        assert!(gate.sync(uuid).is_err());
+        drop(launch);
+        let import = gate.import().unwrap();
+        assert!(gate.sync(uuid).is_err());
+        drop(import);
+        assert!(gate.sync(uuid).is_ok());
+    }
 
     #[test]
     fn import_and_launch_reservations_are_exclusive() {

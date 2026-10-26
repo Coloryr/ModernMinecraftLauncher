@@ -47,6 +47,8 @@ reqwest.workspace = true
 
 mml-core = { path = "../../mml-core" }
 mml-game = { path = "../../mml-core/mml-game" }
+mml-cloud = { path = "../../mml-core/mml-cloud" }
+mml-gamepad = { path = "../../mml-core/mml-gamepad" }
 mml-config = { path = "../../mml-core/mml-config" }
 mml-jvms = { path = "../../mml-core/mml-jvms" }
 # 单开与唤回：端口记录、通知已运行实例、接收显示 / 参数请求

@@ -1,0 +1,14 @@
+[package]
+name = "mml-gamepad"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+mml-ipc = { path = "../mml-ipc" }
+gilrs = "~0.11.2"
+serde.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+mml-testutil = { path = "../mml-testutil" }
+mml-log = { path = "../mml-log" }

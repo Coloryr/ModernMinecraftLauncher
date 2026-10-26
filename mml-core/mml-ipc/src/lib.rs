@@ -219,6 +219,21 @@ pub fn get_mouse_state(uuid: Uuid) -> Option<bool> {
     MOUSE_STATES.read().unwrap().get(&uuid).copied()
 }
 
+/// 检查游戏输入通道是否仍连接，历史鼠标状态不代表连接存活。
+///
+/// - `uuid`: 游戏实例 ID
+///
+/// # 返回值
+///
+/// 通道存在且接收端未关闭时返回 true。
+pub fn is_game_connected(uuid: Uuid) -> bool {
+    GAME_CHANNELS
+        .read()
+        .unwrap()
+        .get(&uuid)
+        .is_some_and(|channel| !channel.is_closed())
+}
+
 /// 获取游戏上报的窗口大小
 ///
 /// - `uuid`: 游戏实例 ID

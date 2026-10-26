@@ -3,6 +3,11 @@
 /// 预定义的一般信息种类，经 [`i18`](crate::i18) 转换为对应语言的字符串。
 #[derive(Clone, Debug)]
 pub enum InfoType {
+    /// 独立云同步服务器已开始监听。
+    CloudServerStart {
+        /// 实际监听地址。
+        address: String,
+    },
     /// 启动器核心启动，文案里带版本号
     CoreStart,
     /// 启动器核心停止

@@ -1,0 +1,18 @@
+[package]
+name = "mml-cloud"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sha1.workspace = true
+zip.workspace = true
+flate2.workspace = true
+uuid.workspace = true
+reqwest.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+mml-testutil = { path = "../mml-testutil" }
+tokio = { workspace = true, features = ["rt-multi-thread", "net"] }

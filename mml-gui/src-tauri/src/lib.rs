@@ -33,6 +33,7 @@ pub mod err_keys;
 pub mod gui_config;
 pub mod gui_setting;
 pub mod image_manager;
+pub mod integrations;
 pub mod log_text;
 pub mod music;
 pub mod single_instance;
@@ -170,6 +171,10 @@ pub fn run() {
             if let Err(err) = collect_utils::load() {
                 mml_log::error_type(err);
             }
+            if let Err(err) = integrations::load() {
+                mml_log::error_type(err);
+            }
+            integrations::start_gamepad();
 
             // 自定义主页面：把压缩包打开成常驻句柄，不落盘解压，请求时按条目现读
             windows::custom_home::reload();
@@ -199,6 +204,9 @@ pub fn run() {
         .expect("error while building tauri application");
 
     app.run(|_app, event| {
+        if matches!(event, tauri::RunEvent::Exit) {
+            integrations::stop_gamepad();
+        }
         // 还有实例在跑时，关掉所有窗口只是退回后台：托盘可见，后台还要继续给游戏计时。
         // 没有实例在跑就照常退出 —— 那时既没有托盘，也没有要留在后台干的事。
         // code 为 Some 的是 app.exit() 发起的真退出，不拦。

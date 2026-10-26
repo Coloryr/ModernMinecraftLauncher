@@ -68,6 +68,9 @@ impl I18Lang for EnUs {
             InfoType::IpcNotifyExistingFailed { port } => {
                 format!("IPC: notify failed on port {port}, starting a new server")
             }
+            InfoType::CloudServerStart { address } => {
+                format!("Save cloud sync server listening on {address}")
+            }
             InfoType::IpcServerStart { port } => {
                 format!("IPC: server started, listening on 127.0.0.1:{port}")
             }
@@ -348,6 +351,9 @@ impl I18Lang for EnUs {
             }
             ErrorType::IpcRuntimeCreateError(data) => {
                 format!("IPC: failed to create the async runtime: {}", data.error)
+            }
+            ErrorType::CloudServerFailed(data) => {
+                format!("Save cloud sync server failed: {}", data.error)
             }
             ErrorType::IpcBindError(data) => {
                 format!("IPC: failed to bind the port: {}", data.error)

@@ -13,6 +13,7 @@ use crate::dtos::{
 
 // 带命令的子模块必须 `pub(crate)`：生成的 `tauri_commands!` 从 crate 根引用它们
 pub(crate) mod bg;
+pub(crate) mod gamepad;
 pub(crate) mod java;
 pub(crate) mod local_files;
 

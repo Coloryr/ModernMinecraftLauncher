@@ -24,6 +24,7 @@ import BaseButton from "../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../components/ui/BaseModal.vue";
 import BaseSwitch from "../../../components/ui/BaseSwitch.vue";
 import ContentHead from "./ContentHead.vue";
+import CloudSavePane from "./CloudSavePane.vue";
 import FormattedText from "../../../components/ui/FormattedText.vue";
 import ListSkeleton from "./ListSkeleton.vue";
 import ResourceRow from "./ResourceRow.vue";
@@ -315,8 +316,7 @@ const editTouched = ref(false);
  * 实例跑着的时候**不开**：游戏退出时会用它内存里的值覆盖 level.dat，改了也白改，
  * 所以先查一次运行状态并给提示。
  *
- * 运行标记取自 `main_get_instances`：`main_get_running` 读的是**调用方窗口**的模型，
- * 资源窗口调它只会拿到空表。
+ * 运行标记取自 `main_get_instances`，使用内核的全局运行状态。
  *
  * - `item`: 要编辑的那条存档
  */
@@ -484,14 +484,16 @@ function saveTip(item: SaveItemDto): string {
     <!-- 有选中项时顶栏换成批量操作条，与模组列表同一口径。
          这一条与右键的批量菜单**动作一致**，都只有「删除」：批量备份用户不要 -->
     <template #actions>
+      <CloudSavePane :uuid="instanceUuid" :saves="saves" :disabled="busy"
+        @busy="busy = $event" @changed="reloadCurrent" />
       <template v-if="count">
         <span class="row-selected-count">{{ t("resource.selectedCount", { n: count }) }}</span>
-        <button class="mini-btn danger" :disabled="busy" @click="batchRemove">
+        <BaseButton size="sm" variant="danger" :disabled="busy" @click="batchRemove">
           {{ t("resource.delete") }}
-        </button>
-        <button class="mini-btn" :disabled="busy" @click="clear">
+        </BaseButton>
+        <BaseButton size="sm" :disabled="busy" @click="clear">
           {{ t("resource.clearSelection") }}
-        </button>
+        </BaseButton>
       </template>
     </template>
   </ContentHead>
@@ -693,7 +695,7 @@ function saveTip(item: SaveItemDto): string {
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 9px 11px;
+  padding: 8px 12px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--bg-hover);

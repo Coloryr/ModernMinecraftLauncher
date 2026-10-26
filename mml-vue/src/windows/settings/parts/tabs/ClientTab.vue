@@ -10,6 +10,7 @@ import BaseModal from "../../../../components/ui/BaseModal.vue";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
 import NumberStepper from "../../../../components/ui/NumberStepper.vue";
 import SettingsGroup from "../SettingsGroup.vue";
+import GamepadPanel from "../GamepadPanel.vue";
 import SaveStateText from "../SaveStateText.vue";
 import { selectedInstance } from "../../../../lib/settings";
 import { openWindow } from "../../../../windows/windowManager";
@@ -117,6 +118,7 @@ watch(lockServerError, async (msg) => {
 </script>
 
 <template>
+  <GamepadPanel :flash="flashGroup === 'gamepad'" />
   <SettingsGroup id="servers" title-key="winSettings.secServers" :flash="flashGroup === 'servers'">
     <!-- 服务器地址：自动进服与 MOTD 显示共用 -->
     <label class="field-label">{{ t("winSettings.serverAddress") }}</label>
