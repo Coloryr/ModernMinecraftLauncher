@@ -31,6 +31,8 @@ members = [
     "mml-core/mml-sys",
     "mml-core/mml-testutil",
     "mml-core/mml-analysis",
+    "mml-core/mml-cloud",
+    "mml-cloud-server",
     "mml-gui/src-tauri",
     "mml-theme-studio/src-tauri",
     "ipc-gen",

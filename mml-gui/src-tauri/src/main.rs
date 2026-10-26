@@ -80,6 +80,7 @@ fn main() {
     gui_config::init(&obj.path);
     collect_utils::init(&obj.path);
     block_groups::init(&obj.path);
+    mml_gui_lib::integrations::init(&obj.path);
 
     // 手柄配置放在运行目录，内核初始化后日志才可用
     let run_path = obj.path.clone();

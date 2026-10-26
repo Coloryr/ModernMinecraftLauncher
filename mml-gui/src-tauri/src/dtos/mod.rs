@@ -21,6 +21,7 @@ pub mod export_dto;
 pub mod gamepad_dto;
 pub mod gui_config_dto;
 pub mod instance_dto;
+pub mod integration_dto;
 pub mod java_download_dto;
 pub mod java_dto;
 pub mod log_dto;

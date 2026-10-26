@@ -395,6 +395,8 @@ pub enum ErrorType {
     IpcRuntimeCreateError(ErrorData),
     /// IPC：绑定端口失败
     IpcBindError(ErrorData),
+    /// 独立云同步服务器无法启动或继续服务。
+    CloudServerFailed(ErrorData),
     /// IPC：接受连接失败
     IpcAcceptError(ErrorData),
     /// IPC：发送数据失败

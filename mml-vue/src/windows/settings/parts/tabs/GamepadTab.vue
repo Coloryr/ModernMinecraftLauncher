@@ -4,12 +4,14 @@
 // 配置存在运行目录的 gamepad 目录下，一份映射一个 json；保存后后端立即重新加载，
 // 运行中的游戏下一次读映射就走新值。列表里的「生效中」是后端按 Selected 选出来的那份。
 import { computed, onMounted, reactive, ref } from "vue";
-import BaseButton from "../../../../components/ui/BaseButton.vue";
-import BaseModal from "../../../../components/ui/BaseModal.vue";
-import ActionSelect from "../ActionSelect.vue";
-import { useWindowRefresh } from "../../../../composables/useWindowRefresh";
-import { t, tErr } from "../../../../lib/i18n";
-import { showToast } from "../../../../lib/toast";
+import WindowFrame from "../../components/ui/WindowFrame.vue";
+import BaseButton from "../../components/ui/BaseButton.vue";
+import BaseModal from "../../components/ui/BaseModal.vue";
+import ActionSelect from "./parts/ActionSelect.vue";
+import GamepadTestPanel from "./parts/GamepadTestPanel.vue";
+import { useWindowRefresh } from "../../composables/useWindowRefresh";
+import { t, tErr } from "../../lib/i18n";
+import { showToast } from "../../lib/toast";
 import {
   commands,
   type GamepadAxisDto,
@@ -394,6 +396,7 @@ function addAxis() {
             </BaseButton>
           </div>
 
+          <GamepadTestPanel />
           <section class="gp-sec">
             <h3 class="gp-sec-title">{{ t("winGamepad.buttons") }}</h3>
             <p class="field-desc">{{ t("winGamepad.buttonHint") }}</p>

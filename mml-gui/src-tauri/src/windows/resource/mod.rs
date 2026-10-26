@@ -12,6 +12,7 @@
 // 带命令的子模块必须 `pub(crate)`：生成的 `tauri_commands!` 从 crate 根引用它们
 // windows::resource::screenshots::...，私有模块在这里会 E0603
 pub(crate) mod auto_mark;
+pub(crate) mod cloud;
 pub(crate) mod datapacks;
 pub(crate) mod dep_tree;
 pub(crate) mod folder;

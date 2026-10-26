@@ -33,6 +33,7 @@ pub mod err_keys;
 pub mod gui_config;
 pub mod gui_setting;
 pub mod image_manager;
+pub mod integrations;
 pub mod log_text;
 pub mod music;
 pub mod single_instance;
@@ -193,6 +194,9 @@ pub fn run() {
             }
 
             if let Err(err) = collect_utils::load() {
+                mml_log::error_type(err);
+            }
+            if let Err(err) = integrations::load() {
                 mml_log::error_type(err);
             }
 

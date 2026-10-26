@@ -69,6 +69,7 @@ impl I18Lang for ZhCn {
             InfoType::IpcNotifyExistingFailed { port } => {
                 format!("IPC：通知运行中的实例失败，端口 {port}，改为启动新的服务")
             }
+            InfoType::CloudServerStart { address } => format!("存档云同步服务器已监听 {address}"),
             InfoType::IpcServerStart { port } => {
                 format!("IPC：服务已启动，监听 127.0.0.1:{port}")
             }
@@ -333,6 +334,9 @@ impl I18Lang for ZhCn {
                 format!("IPC：创建异步运行时报错：{}", data.error)
             }
             ErrorType::IpcBindError(data) => format!("IPC：绑定端口失败：{}", data.error),
+            ErrorType::CloudServerFailed(data) => {
+                format!("存档云同步服务器运行失败：{}", data.error)
+            }
             ErrorType::IpcAcceptError(data) => format!("IPC：接受连接失败：{}", data.error),
             ErrorType::IpcWriteError(data) => format!("IPC：发送数据失败：{}", data.error),
             ErrorType::IpcInvalidFrame => "IPC：数据帧长度无效".to_string(),

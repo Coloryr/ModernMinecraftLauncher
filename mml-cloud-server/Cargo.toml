@@ -1,0 +1,20 @@
+[package]
+name = "mml-cloud-server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+mml-cloud = { path = "../mml-core/mml-cloud" }
+mml-names = { path = "../mml-core/mml-names" }
+axum = "~0.8.9"
+tokio = { workspace = true, features = ["rt-multi-thread", "net", "signal"] }
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+url.workspace = true
+base64.workspace = true
+
+[dev-dependencies]
+mml-testutil = { path = "../mml-core/mml-testutil" }
+reqwest.workspace = true

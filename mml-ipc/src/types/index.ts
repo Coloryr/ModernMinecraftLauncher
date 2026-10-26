@@ -22,6 +22,7 @@ export * from "./dtos/export_dto";
 export * from "./dtos/gamepad_dto";
 export * from "./dtos/gui_config_dto";
 export * from "./dtos/instance_dto";
+export * from "./dtos/integration_dto";
 export * from "./dtos/java_download_dto";
 export * from "./dtos/java_dto";
 export * from "./dtos/lobby_dto";

@@ -36,9 +36,11 @@ struct Relay {
     /// 当前手柄编号
     pad: Option<u64>,
     /// 上次看到的鼠标抓取状态
-    grabbed: bool,
+    grabbed: Option<bool>,
     /// 已按下的动作
     held: HashSet<Action>,
+    /// 切目标、设备或模式时仍按住的按钮，松开后才允许触发
+    blocked: [bool; BUTTON_COUNT],
     /// 累计的水平位移，单位像素
     acc_x: f64,
     /// 累计的垂直位移，单位像素
@@ -79,8 +81,9 @@ impl Relay {
         Self {
             target: None,
             pad: None,
-            grabbed: false,
+            grabbed: None,
             held: HashSet::new(),
+            blocked: [false; BUTTON_COUNT],
             acc_x: 0.0,
             acc_y: 0.0,
         }
@@ -91,6 +94,20 @@ impl Relay {
     /// - `delta`: 距上一帧的时间，单位秒
     fn tick(&mut self, delta: f64) {
         let target = target_instance();
+        let pad = target.and_then(|_| first_pad_id());
+        let values = pad.and_then(pad_values);
+        self.forward(target, pad, values.as_ref(), &map::current(), delta);
+    }
+
+    /// 使用同一条转发链路处理设备快照，便于脱离物理驱动验证输入
+    fn forward(
+        &mut self,
+        target: Option<Uuid>,
+        pad: Option<u64>,
+        values: Option<&PadValues>,
+        map: &CompiledMap,
+        delta: f64,
+    ) {
         if target != self.target {
             self.release_all();
             self.target = target;
@@ -105,7 +122,7 @@ impl Relay {
             return;
         };
 
-        let Some(pad) = first_pad_id() else {
+        let Some(pad) = pad else {
             self.release_all();
             self.pad = None;
             return;
@@ -114,21 +131,30 @@ impl Relay {
             self.release_all();
             self.pad = Some(pad);
         }
-        let Some(values) = pad_values(pad) else {
+        let Some(values) = values else {
             self.release_all();
             self.pad = None;
             return;
         };
 
-        let map = map::current();
         let grabbed = mml_ipc::get_mouse_state(uuid).unwrap_or(false);
-        if grabbed != self.grabbed {
-            self.grabbed = grabbed;
-            self.acc_x = 0.0;
-            self.acc_y = 0.0;
+        if self.grabbed != Some(grabbed) {
+            self.release_all();
+            self.grabbed = Some(grabbed);
+            self.blocked = values.buttons.map(|value| value >= BUTTON_DOWN);
         }
 
-        let desired = desired_actions(&map, &values, grabbed);
+        let mut filtered = PadValues {
+            buttons: values.buttons,
+            axes: values.axes,
+        };
+        for (index, blocked) in self.blocked.iter_mut().enumerate() {
+            *blocked &= values.buttons[index] >= BUTTON_DOWN;
+            if *blocked {
+                filtered.buttons[index] = 0.0;
+            }
+        }
+        let desired = desired_actions(map, &filtered, grabbed);
         for action in &self.held {
             if !desired.contains(action) {
                 send_action(uuid, *action, false);
@@ -154,6 +180,7 @@ impl Relay {
         if y.abs() < map.mouse.deadzone {
             y = 0.0;
         }
+        let delta = delta.clamp(0.0, MAX_DELTA);
         self.acc_x += f64::from(x) * f64::from(rule.speed) * delta;
         // gilrs 的 Y 轴向上为正，鼠标位移向下为正，这里取反
         self.acc_y -= f64::from(y) * f64::from(rule.speed) * delta;
@@ -174,6 +201,8 @@ impl Relay {
             }
         }
         self.held.clear();
+        self.grabbed = None;
+        self.blocked.fill(false);
         self.acc_x = 0.0;
         self.acc_y = 0.0;
     }
@@ -260,6 +289,10 @@ fn send_action(uuid: Uuid, action: Action, down: bool) {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "relay_tests.rs"]
+mod bridge_tests;
 
 #[cfg(test)]
 mod tests {
