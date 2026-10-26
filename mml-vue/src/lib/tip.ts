@@ -1,14 +1,15 @@
 // v-tip 全局指令：统一悬停提示，替代原生 title。
 // WebView2 对原生 title 不可靠——tooltip 计时器靠元素内的 mousemove 启动，
 // 鼠标从外部直接移入并停住时第一次经常不触发；且系统 tooltip 样式与暗色 UI 不搭。
-// 用法：v-tip="t('xxx')"，提示按锚点摆（锚点下方居中，超出视口回收）；
-// v-tip.mouse="..." 则跟着光标走（工具型内容预览，如资源窗口的存档信息）；
+//
+// **一律跟着光标摆**（右下偏一档，贴边回收）：卡片、长行这类宽元素按锚点居中挂下来
+// 会离光标很远，看着像"没跟着手走"。早先按锚点摆、只有 `v-tip.mouse` 跟随，两种混用
+// 观感不一致，现在统一跟随；`.mouse` 仍可写，只是不再有区别。
+//
 // 值为空串 / undefined / null 时不显示。
 
 type TipState = {
   value: string;
-  /** 是否跟随光标摆位；锚点当前的 clientRect 不看 */
-  followMouse: boolean;
   enter: (e: MouseEvent) => void;
   leave: () => void;
   down: () => void;
@@ -21,7 +22,7 @@ let timer = 0;
 let anchor: Element | null = null;
 const states = new WeakMap<Element, TipState>();
 
-/** 光标落点（视口坐标）：mouseenter 与 mousemove 各刷一次，跟随式摆位用 */
+/** 光标落点（视口坐标）：mouseenter 与 mousemove 各刷一次 */
 const pointer = { x: 0, y: 0 };
 
 function ensureEl(): HTMLDivElement {
@@ -47,7 +48,7 @@ function hide() {
   if (tipEl) tipEl.classList.remove("show");
 }
 
-/** 先渲染出字再摆位；display 不能是 none，否则 offset 量不出来 */
+// 先渲染出字再摆位；display 不能是 none，否则 offset 量不出来
 function show() {
   timer = 0;
   if (!anchor) return;
@@ -64,33 +65,23 @@ function show() {
   position();
 }
 
-/** 按锚点或光标落点摆位，超界就收回来 */
+/** 按光标落点摆位，贴边就收回来 */
 function position() {
   if (!anchor || !tipEl) return;
   const el = tipEl;
   const tw = el.offsetWidth;
   const th = el.offsetHeight;
-  let x: number;
-  let y: number;
-  if (states.get(anchor)?.followMouse) {
-    // 跟着光标：往右下偏一档；右缘贴边就往里收，底上放不下就翻到上方
-    x = pointer.x + 12;
-    y = pointer.y + 16;
-    if (x + tw > window.innerWidth - 4) x = Math.max(4, pointer.x - tw - 12);
-    if (y + th > window.innerHeight - 4) y = Math.max(4, pointer.y - th - 12);
-  } else {
-    // 锚点下方水平居中，超出视口就收回；下方放不下且上方有空间则放上方
-    const rect = anchor.getBoundingClientRect();
-    x = Math.max(4, Math.min(rect.left + rect.width / 2 - tw / 2, window.innerWidth - tw - 4));
-    y = rect.bottom + 6;
-    if (y + th > window.innerHeight - 4 && rect.top - th - 6 >= 4) y = rect.top - th - 6;
-  }
+  // 往右下偏一档；右缘 / 底部放不下就往里收
+  let x = pointer.x + 12;
+  let y = pointer.y + 16;
+  if (x + tw > window.innerWidth - 4) x = Math.max(4, pointer.x - tw - 12);
+  if (y + th > window.innerHeight - 4) y = Math.max(4, pointer.y - th - 12);
   el.style.left = `${x}px`;
   el.style.top = `${y}px`;
 }
 
 /**
- * 提示待显示 / 显示期间挂着的鼠标监听：跟随式顺手重新摆位。
+ * 提示待显示 / 显示期间挂着的鼠标监听：重新摆位。
  * 提示本身 pointer-events: none（styles/tip.css），监听不会被它截走
  */
 function onPointerMove(e: MouseEvent) {
@@ -98,15 +89,15 @@ function onPointerMove(e: MouseEvent) {
   pointer.y = e.clientY;
   if (!anchor) return;
   // 锚点已从文档树上摘走（切页时 KeepAlive 收走、列表重渲染换行）：mouseleave 不会再来，
-  // 只能靠这里收；否则提示会留在原地，跟随式的还会一路跟着光标跑
+  // 只能靠这里收；否则提示会留在原地，一路跟着光标跑
   if (!anchor.isConnected) {
     hide();
     return;
   }
-  if (states.get(anchor)?.followMouse) position();
+  position();
 }
 
-/** 只刷文本与位置，不改动事件绑定；updated 钩子与 mousemove 共用 */
+/** 只刷文本，不改动事件绑定；updated 钩子与 mousemove 共用 */
 function refresh(el: HTMLElement) {
   const text = states.get(el)?.value;
   // 显示中内容被清空（如行状态不再有提示）：直接收掉，别留上一份
@@ -119,10 +110,9 @@ function refresh(el: HTMLElement) {
   position();
 }
 
-function bind(el: HTMLElement, value: string, followMouse: boolean) {
+function bind(el: HTMLElement, value: string) {
   const state: TipState = {
     value,
-    followMouse,
     enter: (e) => {
       const cur = states.get(el);
       if (!cur?.value) return;
@@ -160,19 +150,16 @@ function unbind(el: HTMLElement) {
 
 type TipBinding = {
   value: unknown;
-  /** `.mouse` 修饰符：跟着光标摆位，而不是按锚点 */
-  modifiers?: { mouse?: boolean };
 };
 
 export const vTip = {
   mounted(el: HTMLElement, binding: TipBinding) {
-    bind(el, String(binding.value ?? ""), binding.modifiers?.mouse === true);
+    bind(el, String(binding.value ?? ""));
   },
   updated(el: HTMLElement, binding: TipBinding) {
     const state = states.get(el);
     if (!state) return;
     state.value = String(binding.value ?? "");
-    state.followMouse = binding.modifiers?.mouse === true;
     // 显示中内容变了（如状态文本刷新）：即时重刷文本与位置
     if (anchor === el) refresh(el);
   },

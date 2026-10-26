@@ -1,31 +1,32 @@
 # 手柄输入与测试
 
-通过 gilrs 采样设备，将标准手柄输入转换为 M²L 游戏 IPC 消息。
+通过 gilrs 读取设备，使用现有映射配置生成 M²L 游戏 IPC 消息。
 不向操作系统注入键盘或鼠标事件。
 
-启动器入口为“设置 → 客户端设置 → 手柄”。先选设备与目标实例、保存，
-再启用游戏控制。目标游戏需由启动器启动并连接输入通道。
-设备测试面板不依赖启用控制，可查看两个摇杆与按钮状态。
-设备列表支持热插拔；同型号设备可能报告相同 GUID，当前配置按 GUID 选择。
+入口为“设置 → 客户端设置 → 打开手柄配置”。保留上游的多配置、
+按钮和轴绑定、修饰组合键及摇杆参数；配置保存在运行目录的 `gamepad/` 下，
+保存后由同一套内核采样和转发线程生效。
 
-- 游戏抓取鼠标时：左摇杆 WASD，右摇杆视角，A 跳跃，B 潜行，X 背包，Y 副手。
-- RT 攻击，LT 使用，L3 冲刺，R3 F5，Select 丢弃，Start ESC。
-- 菜单中：左摇杆光标，A 左键，X 右键，B / Start ESC。
-- 肩键、十字上下：边沿触发滚轮，按住不会连发。
-- 禁用、换目标、断开设备、退出线程时释放原通道按键。
-- 模式切换时，按住的按钮须先松开再使用，避免跳跃键误点菜单。
+配置窗口增加实时测试面板：选择设备后查看两个摇杆与按下的按钮。
+测试面板只读取已有采样快照，不另开驱动，也不发送游戏输入；
+已经生效的映射仍会向游戏转发输入。测试设备选择不改变实际转发设备。
+转发仍按上游规则选择第一只设备，并优先选取已抓取鼠标的游戏实例。
+
+切换目标、设备或鼠标抓取模式时，先释放旧按键。切换时仍按住的按钮
+须先松开再触发，避免在菜单或另一个实例中误点。方向轴可立即恢复移动。
+手柄断开时释放已发出的按键，游戏连接断开后重置转发状态。
 
 自动测试：
 
 ```sh
-cargo test -p mml-gamepad --test mapping --test input_bridge
+cargo test -p mml-gamepad --lib
 ```
 
-`mapping` 覆盖死区、重复抑制、切模式释放、共享 ESC、速度与帧停顿限制。
-`input_bridge` 建立两个真实本机 TCP 游戏连接，检查映射后消息的编码、
-接收实例隔离、抓取状态切换和释放消息，不需要物理手柄。
-还会在按住方向与扳机时断开连接，验证断线发送失败、映射重置与同一实例重连；
-重连后恢复方向输入，扳机松开再按才发送攻击，全程检查另一实例没有收到输入。
+映射与采样单测覆盖配置解析、规则范围、组合键、方向轴、滚轮和状态快照。
+`tcp_relay_releases_on_mode_device_target_changes_and_reconnect` 使用真实本机 TCP
+通道和可控设备快照，验证按键、位移、滚轮编码，重复抑制，切模式、设备断开、
+游戏断线重连、目标切换时的按键释放与实例隔离。测试使用实际转发逻辑，
+不依赖物理手柄，不模拟系统输入。
 
 设备探测：
 
@@ -33,20 +34,21 @@ cargo test -p mml-gamepad --test mapping --test input_bridge
 cargo run -p mml-gamepad --example probe
 ```
 
-物理设备验收仍需连接手柄后检查热插拔、摇杆方向与死区、各按钮、
-游戏和菜单切换、禁用控制后的按键释放。自动测试不能替代驱动和实际手感验证。
+物理验收仍需连接手柄后检查热插拔、摇杆方向与死区、各按钮、游戏和菜单切换。
+自动测试不能替代驱动和实际手感验证。上游的 `gamepad_manual` 用例默认忽略，
+需连接手柄后按源码内命令单独运行。
 
 ## English
 
-Open Settings → Client settings → Gamepad. Choose a device and a target instance, save the
-settings, then enable control. The game must connect to the launcher's input channel.
-The live device panel works while control is disabled. Device selection uses the GUID;
-identical models may share a GUID.
+Open Settings → Client settings → Open gamepad settings. Existing profiles, button and axis
+bindings, modifier combinations and stick settings remain in the upstream `gamepad/` configuration.
+The live test panel reads the existing device snapshots. It does not open another driver or send
+input; active game mappings continue running. Selecting a test device does not change the device
+used for forwarding. Forwarding retains the upstream first-device and mouse-capture target rules.
 
-The tests cover pure mappings and real localhost TCP delivery to the selected game connection.
-The bridge test also disconnects while movement and attack are held, resets the mapper and
-reconnects the same instance. It verifies failed delivery while disconnected, restored movement,
-release before attack can trigger again, and continued isolation from the other instance.
-They do not inject system input or require a physical controller. Hardware acceptance still
-requires checking hotplug, stick directions, deadzones, buttons, menu transitions and key release
-with an actual controller.
+Target, device and capture-mode changes release held actions. Buttons held during a transition
+must be released before they trigger again; directional axes can resume immediately.
+Tests exercise the actual relay over localhost TCP, including repeat suppression, mode changes,
+device loss, game reconnection, target changes and isolation between game instances.
+Hardware acceptance still requires an actual controller for hotplug, directions, deadzones,
+buttons and menu transitions. The upstream hardware-only manual test remains ignored by default.

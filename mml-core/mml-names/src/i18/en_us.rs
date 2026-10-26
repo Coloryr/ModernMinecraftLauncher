@@ -82,6 +82,28 @@ impl I18Lang for EnUs {
                 String::from("IPC: the running instance asked to show the main window")
             }
             InfoType::IpcGameChannelBound { guid } => format!("IPC: game channel bound to {guid}"),
+            InfoType::GamepadConnected { name } => format!("[gamepad] gamepad connected: {name}"),
+            InfoType::GamepadDisconnected { name } => {
+                format!("[gamepad] gamepad disconnected: {name}")
+            }
+            InfoType::GamepadInitFailed { error } => {
+                format!("[gamepad] gamepad reader initialization failed: {error}")
+            }
+            InfoType::GamepadMapUnavailable { path } => {
+                format!("[gamepad] no usable gamepad map in {path}")
+            }
+            InfoType::GamepadMapLoadFailed { path, error } => {
+                format!("[gamepad] gamepad map unavailable: {path}: {error}")
+            }
+            InfoType::GamepadMapDefaultWritten { path } => {
+                format!("[gamepad] wrote the default gamepad map: {path}")
+            }
+            InfoType::GamepadMapLoaded { path } => {
+                format!("[gamepad] gamepad map loaded: {path}")
+            }
+            InfoType::GamepadForwardStart { uuid } => {
+                format!("[gamepad] forwarding gamepad input to instance {uuid}")
+            }
         }
     }
 

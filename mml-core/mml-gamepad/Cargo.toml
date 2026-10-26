@@ -5,10 +5,12 @@ edition = "2024"
 
 [dependencies]
 mml-ipc = { path = "../mml-ipc" }
-gilrs = "~0.11.2"
+mml-log = { path = "../mml-log" }
+mml-names = { path = "../mml-names" }
+gilrs.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
 mml-testutil = { path = "../mml-testutil" }
-mml-log = { path = "../mml-log" }

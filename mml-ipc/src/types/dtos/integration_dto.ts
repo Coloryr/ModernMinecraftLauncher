@@ -20,25 +20,3 @@ export type CloudStatusDto = {
   worlds: CloudWorldDto[],
 };
 
-export type GamepadSettingsDto = {
-  enabled: boolean,
-  target: string | null,
-  device: string,
-  deadzone: number,
-  lookSpeed: number,
-  cursorSpeed: number,
-};
-
-export type GamepadDeviceDto = {
-  id: string,
-  name: string,
-};
-
-export type GamepadStatusDto = {
-  devices: GamepadDeviceDto[],
-  axes: number[],
-  buttons: string[],
-  active: boolean,
-  error: string | null,
-};
-

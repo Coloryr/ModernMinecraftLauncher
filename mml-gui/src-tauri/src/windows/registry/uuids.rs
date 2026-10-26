@@ -63,6 +63,9 @@ pub(crate) const SERVER_PACK_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-
 /// 服务器实例生成窗口固定 uuid
 pub(crate) const SERVER_INSTANCE_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000014");
 
+/// 手柄配置窗口固定 uuid
+pub(crate) const GAMEPAD_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000015");
+
 /// 前端窗口 kind → uuid，标签去 `mml-` 前缀匹配
 ///
 /// - `kind`: 窗口类型，即标签去掉 `mml-` 前缀后的那一段

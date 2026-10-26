@@ -3,7 +3,8 @@
 // empty=true 时顶部展示空实例引导块，含添加账户 / 添加游戏实例两个按钮；此时一个实例都没有
 import { t } from "../lib/i18n";
 import { buildChannel, buildNoticeKey, isTestBuild } from "../lib/buildInfo";
-import { lobbyOpening, openWindow } from "../windows/windowManager";
+import { showToast } from "../lib/toast";
+import { openWindow } from "../windows/windowManager";
 import type { InstanceInfoDto, NewsItem } from "../lib/bindings";
 import NewsPanel from "./NewsPanel.vue";
 import InstanceIcon from "./InstanceIcon.vue";
@@ -58,6 +59,11 @@ const emit = defineEmits<{
   /** 打开新闻里的链接 */
   (e: "open", url: string): void;
 }>();
+
+/** 联机大厅暂未开放：功能入口还在，点了只提示「制作中」 */
+function onLobby() {
+  showToast(t("actions.comingSoon", { name: t("home.lobby") }));
+}
 
 </script>
 
@@ -121,8 +127,8 @@ const emit = defineEmits<{
     </div>
 
     <div class="entry-cards">
-      <!-- 联机大厅 -->
-      <button class="entry-card lobby" :disabled="lobbyOpening" @click="openWindow('lobby')">
+      <!-- 联机大厅：功能暂未开放，点了只提示「制作中」 -->
+      <button class="entry-card lobby" @click="onLobby">
         <span class="entry-icon">
           <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8"
             stroke-linecap="round" stroke-linejoin="round">
@@ -132,7 +138,7 @@ const emit = defineEmits<{
           </svg>
         </span>
         <span class="entry-text">
-          <span class="entry-title">{{ t(lobbyOpening ? "lobby.verifying" : "home.lobby") }}</span>
+          <span class="entry-title">{{ t("home.lobby") }}</span>
           <span class="entry-desc">{{ t("home.lobbyDesc") }}</span>
         </span>
         <GlyphIcon class="entry-arrow" name="chevron-right" :size="18" />

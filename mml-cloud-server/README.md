@@ -77,7 +77,7 @@ JSON 使用无 BOM 的 UTF-8；相对 `DataDir` 以配置文件所在目录为�
 ```sh
 cargo test -p mml-cloud --test archive
 cargo test -p mml-cloud-server --lib --test protocol
-cargo test -p mml-gamepad --test mapping --test input_bridge
+cargo test -p mml-gamepad --lib
 ```
 
 `protocol` 通过真实 HTTP 覆盖同一修订号的并发更新、跨存档的账户配额竞争，

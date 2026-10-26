@@ -49,6 +49,10 @@ pub(crate) fn begin(uuid: &str) -> Result<TaskGuard, String> {
     if crate::windows::main::deleting::is_deleting(&id) {
         return Err(err_keys::INSTANCE_BUSY.to_string());
     }
+    // 启动准备中（含服务器包同步）不能再开长任务：两侧都会读写实例目录
+    if crate::windows::main::launch_gate::is_launching(id) {
+        return Err(err_keys::INSTANCE_BUSY.to_string());
+    }
     {
         let mut map = TASKS.lock().unwrap();
         *map.entry(id).or_insert(0) += 1;

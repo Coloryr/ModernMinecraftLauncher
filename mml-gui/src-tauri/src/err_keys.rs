@@ -150,6 +150,8 @@ pub const MOD_EXPORT_SCAN: &str = "err.modExportScan";
 pub const EXPORT_DESTINATION: &str = "err.exportDestination";
 pub const SERVER_PACK_INVALID: &str = "err.serverPackInvalid";
 pub const SERVER_PACK_PLATFORM: &str = "err.serverPackPlatform";
+/// 创建快捷方式只在 Windows 上支持
+pub const SHORTCUT_PLATFORM: &str = "err.shortcutPlatform";
 pub const SERVER_PACK_BUSY: &str = "err.serverPackBusy";
 /// 实例内的链接不能打包。
 pub const EXPORT_LINK: &str = "err.exportLink";
@@ -206,6 +208,19 @@ pub const THEME_ZIP_RATIO: &str = "err.themeZipRatio";
 pub const PAGE_ARCHIVE_LIMIT: &str = "err.pageArchiveLimit";
 /// 自定义界面条目 id 不合法
 pub const CUSTOM_UI_ID: &str = "err.customUiId";
+
+// ---------- 手柄映射 ----------
+
+/// 手柄配置名不合法
+pub const GAMEPAD_PROFILE_INVALID: &str = "err.gamepadProfileInvalid";
+/// 同名手柄配置已存在
+pub const GAMEPAD_PROFILE_EXISTS: &str = "err.gamepadProfileExists";
+/// 找不到手柄配置
+pub const GAMEPAD_PROFILE_MISSING: &str = "err.gamepadProfileMissing";
+/// 至少要保留一份手柄配置
+pub const GAMEPAD_PROFILE_LAST: &str = "err.gamepadProfileLast";
+/// 手柄映射内容不合法
+pub const GAMEPAD_CONFIG_INVALID: &str = "err.gamepadConfigInvalid";
 
 // ---------- ColorMC 迁移 ----------
 

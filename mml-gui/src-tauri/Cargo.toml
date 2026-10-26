@@ -48,7 +48,6 @@ reqwest.workspace = true
 mml-core = { path = "../../mml-core" }
 mml-game = { path = "../../mml-core/mml-game" }
 mml-cloud = { path = "../../mml-core/mml-cloud" }
-mml-gamepad = { path = "../../mml-core/mml-gamepad" }
 mml-config = { path = "../../mml-core/mml-config" }
 mml-jvms = { path = "../../mml-core/mml-jvms" }
 # 单开与唤回：端口记录、通知已运行实例、接收显示 / 参数请求
@@ -66,6 +65,8 @@ mml-skin-draw = { path = "../../mml-core/mml-skin-draw" }
 mml-tex-draw = { path = "../../mml-core/mml-tex-draw" }
 mml-analysis = { path = "../../mml-core/mml-analysis" }
 window-vibrancy.workspace = true
+# 手柄：读取、映射与转发都在内核 crate 里
+mml-gamepad = { path = "../../mml-core/mml-gamepad" }
 
 [dev-dependencies]
 # 测试临时目录统一放 target/temp（AGENTS.md §6）：不要用系统 %TEMP%，也不要自己拼仓库根
@@ -81,8 +82,14 @@ x11-dl = "2"
 # 用 WebView2 的"附加对象"通道把 DOM 拖入的文件真实路径捞回来
 webview2-com = "~0.39.1"
 # 与 tauri / webview2-com 同一个 windows 版本（0.62），PCWSTR / PWSTR 才通用；
-# Win32_UI_WindowsAndMessaging 是"启动时不抢前台"要用的 ShowWindow
-windows = { workspace = true, features = ["Win32_UI_WindowsAndMessaging"] }
+# Win32_UI_WindowsAndMessaging 是"启动时不抢前台"要用的 ShowWindow，
+# Win32_UI_Shell / Win32_System_Com 是桌面快捷方式要用的 IShellLink 与已知文件夹
+windows = { workspace = true, features = [
+  "Win32_Foundation",
+  "Win32_System_Com",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
+] }
 
 [features]
 # 前端资源走内嵌 dist 而不是 devUrl。**直接 cargo build 必须显式打开**：

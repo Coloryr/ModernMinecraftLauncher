@@ -1,11 +1,12 @@
 <script setup lang="ts">
 // 新闻面板：公告卡片列表（分类标签 + 封面 + 标题）与分页，数据由父组件拉取
 import { t } from "../lib/i18n";
+import { usePageKeys } from "../composables/usePageKeys";
 import AsyncImage from "./ui/AsyncImage.vue";
 import GlyphIcon from "./ui/GlyphIcon.vue";
 import type { NewsItem } from "../lib/bindings";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     /** 当前这一页的新闻 */
     items: NewsItem[];
@@ -18,6 +19,16 @@ withDefaults(
   }>(),
   { loading: false, page: 1, hasMore: true },
 );
+
+// 鼠标侧键翻新闻：后退 = 上一页，前进 = 下一页；与按钮同样的可用条件
+usePageKeys({
+  prev: () => {
+    if (props.page > 1 && !props.loading) emit("prev");
+  },
+  next: () => {
+    if (props.hasMore && !props.loading) emit("next");
+  },
+});
 
 const emit = defineEmits<{
   /** 重新拉取当前页 */

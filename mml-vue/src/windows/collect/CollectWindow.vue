@@ -3,7 +3,7 @@
 //
 // 布局与交互对应旧启动器的 CollectControl：顶部分组下拉，第 0 项「默认分组」即不过滤
 // + 添加 / 删除分组 / 清空，下面一行类型过滤，主体是多选卡片网格，右键出菜单。
-// 「安装选中」本轮未实现。
+// 安装走 InstallModal：多选时对支持加载器 / 游戏版本取交集，只列同时满足的实例。
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
@@ -13,6 +13,7 @@ import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import SearchBox from "../../components/ui/SearchBox.vue";
 import HighlightText from "../../components/ui/HighlightText.vue";
 import DragGhost from "../../components/ui/DragGhost.vue";
+import InstallModal from "./parts/InstallModal.vue";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import { useInstanceChange } from "../../composables/useInstanceChange";
 import { useCollectDrag } from "../../composables/useCollectDrag";
@@ -250,7 +251,6 @@ onMounted(async () => {
 onUnmounted(() => {
   unlistenCollect?.();
   document.removeEventListener("keydown", onDocKeyDown);
-  document.removeEventListener("scroll", closeInstPick, true);
 });
 
 /** 重拉收藏列表与实例列表；首次挂载与切回本窗口都走这里 */
@@ -272,9 +272,25 @@ useInstanceChange(() => {
 
 /** Esc：先收右键菜单，再逐层关掉打开的弹窗（与其它窗口的逐级关闭一致） */
 function onDocKeyDown(e: KeyboardEvent) {
+  // Ctrl+A：全选当前看得见的项，与主窗口实例列表同一口径
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
+    const target = e.target as HTMLElement | null;
+    // 正在输入框里敲字时不抢：那是"全选文本"
+    if (target && /^(INPUT|TEXTAREA)$/.test(target.tagName)) return;
+    if (!shownItems.value.length) return;
+    e.preventDefault();
+    multiSelect.value = true;
+    selectAllVisible();
+    return;
+  }
+
   if (e.key !== "Escape") return;
-  if (instPick.value) {
-    closeInstPick();
+  if (groupMenu.value) {
+    groupMenu.value = null;
+    return;
+  }
+  if (installTargets.value.length) {
+    installTargets.value = [];
     return;
   }
   if (menu.value) {
@@ -303,8 +319,6 @@ function onDocKeyDown(e: KeyboardEvent) {
 }
 
 document.addEventListener("keydown", onDocKeyDown);
-// 捕获阶段听：滚的是 WindowFrame 的正文容器，scroll 不冒泡到 .collect-body
-document.addEventListener("scroll", closeInstPick, true);
 
 // ---------------- 类型过滤 ----------------
 
@@ -509,14 +523,14 @@ function openUrl(item: CollectItemDto) {
 /**
  * 点卡片：多选模式下切换勾选；默认模式下按"下载"处理
  *
- * 下载分两条路，见 [`startDownload`]：整合包不需要实例，其余资源要先选实例。
+ * 下载分两条路，见 [`startDownload`]：整合包不需要实例，其余资源走安装弹窗选实例。
  */
-function toggleCard(item: CollectItemDto, at?: { x: number; y: number }) {
+function toggleCard(item: CollectItemDto) {
   if (multiSelect.value) {
     toggleCheck(item.uuid, !checked.value.has(item.uuid));
     return;
   }
-  startDownload(item, at);
+  startDownload(item);
 }
 
 // ---------------- 拖拽改分组 ----------------
@@ -537,14 +551,12 @@ const { draggingUuids, dropGroup, ghost: collectGhost, onCardPointerDown, consum
 
 /** 卡片点击：刚拖完的那一下不算点击，否则一松手就顺手打开了下载窗口 */
 function onCardClick(item: CollectItemDto, ev?: MouseEvent) {
-  closeInstPick();
   // 右键菜单原本靠 .collect-body 那一下收；这里挡住了冒泡，得自己收
   closeMenu();
-  // 别让这次点击冒到 .collect-body：那里负责"点外面收起下拉"，会把刚打开的下拉立刻关掉
+  // 别让这次点击冒到 .collect-body：那里负责"点外面收起菜单"
   ev?.stopPropagation();
   if (consumeSuppressClick()) return;
-  const rect = (ev?.currentTarget as HTMLElement | null)?.getBoundingClientRect();
-  toggleCard(item, rect ? { x: rect.left, y: rect.bottom + 4 } : undefined);
+  toggleCard(item);
 }
 
 /** 补组进行中：避免 reload → 补组 → reload 转圈 */
@@ -583,11 +595,6 @@ async function backfillGroups() {
   }
   await reload();
 }
-/** 收起选实例下拉（点别处、按 Esc、再点一张卡片都会走这里） */
-function closeInstPick() {
-  instPick.value = null;
-}
-
 /** 跟手浮起副本的内容：手里抓着的第一项（按下那张排最前） */
 const collectDragItem = computed(() => {
   const uuid = collectGhost.value?.item.uuids[0];
@@ -656,20 +663,32 @@ function openDownloadWindow(item: CollectItemDto, uuid?: string) {
  * 点卡片后的分流
  *
  * - **整合包**：目标窗口自己就是"下载并新建实例"，不需要先有实例，直接跳详情；
- * - **其余资源**：模组 / 资源包 / 光影包要装进某个已有实例。先按收藏时记下的
- *   加载器 / 游戏版本筛出兼容的实例 ——
- *   1. 「安装到」里那个正合适，直接走；
- *   2. 不合适就从卡片下弹出下拉，只列兼容的那几个；
- *   3. 一个都不兼容就只提示，不打开下载窗口。
+ * - **其余资源**：模组 / 资源包 / 光影包要装进某个已有实例，交给 InstallModal 选实例。
  *
  * 在下载资源窗口里选不了实例：那边只有一行只读的实例名、没有选择器，
  * 所以 uuid 必须从这里带过去，见 openDownloadWindow。
+ *
+ * - `item`: 要装的收藏项
  */
-function startDownload(item: CollectItemDto, at?: { x: number; y: number }) {
+function startDownload(item: CollectItemDto) {
   if (item.fileType === "modpack") {
     openDownloadWindow(item);
     return;
   }
+  openInstall([item]);
+}
+
+/** 安装弹窗里待装的项；空数组 = 弹窗没开 */
+const installTargets = ref<CollectItemDto[]>([]);
+
+/**
+ * 打开安装弹窗
+ *
+ * 整合包不走这里（它要新建实例，见 startDownload）；混在多选里的一并剔掉并说一声。
+ *
+ * - `list`: 要装的收藏项
+ */
+function openInstall(list: CollectItemDto[]) {
   if (instancesLoading.value) {
     showToast(t("resource.loading"));
     return;
@@ -679,97 +698,60 @@ function startDownload(item: CollectItemDto, at?: { x: number; y: number }) {
     return;
   }
 
-  // 先按收藏时记下的加载器 / 游戏版本筛：对得上的才列进下拉
-  const fitsList = instances.value.filter((inst) => fits(item, inst));
-  if (!fitsList.length) {
-    showToast(t("collect.noFitInstance", { need: requirement(item) }));
-    return;
-  }
-
-  openInstPick(item, fitsList, at);
-}
-
-/**
- * 资源与实例是否兼容
- *
- * 收藏时记下的加载器与游戏版本都对得上才装。老收藏没记支持信息（空列表），
- * 这时不筛 —— 与其猜，不如让用户进版本列表自己看。
- *
- * - `item`: 收藏项
- * - `inst`: 候选实例
- */
-function fits(item: CollectItemDto, inst: InstanceInfoDto): boolean {
-  return (
-    (!item.loaders.length || item.loaders.includes(inst.loader)) &&
-    (!item.gameVersions.length || item.gameVersions.includes(inst.version))
+  // 整合包要新建实例、数据包要先选存档：这两类不走批量安装
+  const installable = list.filter(
+    (item) => item.fileType !== "modpack" && item.fileType !== "datapacks",
   );
-}
-
-/**
- * 支持信息的简短描述，用于"没有兼容实例"的提示与下拉标题
- *
- * 游戏版本可能几十个，只列前三个，多的用省略号带过 —— 它只是让人认出
- * 差在哪儿，不是给人逐个核对的口径表。
- *
- * - `item`: 收藏项
- *
- * # 返回值
- *
- * 形如 `fabric · 1.20.1 / 1.20.4 / 1.21.1 …`；没有支持信息时为空串
- */
-function requirement(item: CollectItemDto): string {
-  const parts: string[] = [];
-  if (item.loaders.length) {
-    parts.push(item.loaders.join(" / "));
+  if (list.some((item) => item.fileType === "modpack")) {
+    showToast(t("collect.installModpack"));
   }
-  if (item.gameVersions.length) {
-    const head = item.gameVersions.slice(0, 3).join(" / ");
-    parts.push(item.gameVersions.length > 3 ? `${head} …` : head);
+  if (list.some((item) => item.fileType === "datapacks")) {
+    showToast(t("collect.installDatapack"));
   }
-  return parts.join(" · ");
-}
-
-/** 点卡片时弹出的选实例下拉；null = 没开 */
-const instPick = ref<{ x: number; y: number; item: CollectItemDto; list: InstanceInfoDto[] } | null>(
-  null,
-);
-/** 下拉尺寸估值：钳边用，宽度与高度 */
-const INST_PICK_W = 260;
-const INST_PICK_H = 96;
-
-/**
- * 在卡片位置弹出可选实例的下拉
- *
- * 位置沿用右键菜单那套钳边规则：贴着窗口右 / 下边缘时不能露到可视区外面。
- *
- * - `item`: 要装的那一项
- * - `list`: 已筛过的兼容实例
- * - `at`: 触发位置，缺省取窗口中间偏上
- */
-function openInstPick(item: CollectItemDto, list: InstanceInfoDto[], at?: { x: number; y: number }) {
-  const x = at?.x ?? window.innerWidth / 2 - 110;
-  const y = at?.y ?? 120;
-  instPick.value = {
-    x: Math.max(8, Math.min(x, window.innerWidth - INST_PICK_W - 8)),
-    y: Math.max(8, Math.min(y, window.innerHeight - INST_PICK_H - 8)),
-    item,
-    list,
-  };
+  if (!installable.length) return;
+  installTargets.value = installable;
 }
 
 /**
- * 下拉里选了实例：安装模式就装进去，浏览模式就打开该实例的「下载资源」窗口
+ * 执行安装：按目标实例的游戏版本与加载器挑每个项目最新的兼容文件，逐个交给下载器
  *
- * - `ev`: 下拉的 change 事件，取当前选中值
+ * 进度在下载窗口看；没有兼容文件的项目跳过，最后给一条汇总提示。
+ *
+ * - `uuid`: 目标实例 uuid
  */
-function pickInstanceFromMenu(ev: Event) {
-  const uuid = (ev.target as HTMLSelectElement).value;
-  const pick = instPick.value;
-  if (!pick) return;
-  const inst = pick.list.find((item) => item.uuid === uuid);
-  instPick.value = null;
-  if (!inst) return;
-  openDownloadWindow(pick.item, inst.uuid);
+async function doInstall(uuid: string) {
+  const instance = instances.value.find((item) => item.uuid === uuid);
+  const targets = installTargets.value;
+  if (!instance || !targets.length) return;
+  installTargets.value = [];
+
+  let done = 0;
+  let skipped = 0;
+  for (const item of targets) {
+    try {
+      const page = await api.getResourceFiles(
+        uuid,
+        item.source,
+        item.pid,
+        item.fileType,
+        0,
+        instance.version,
+        instance.loader,
+      );
+      const file = page.list[0];
+      if (!file?.source.fid) {
+        skipped += 1;
+        continue;
+      }
+      await api.downloadResource(uuid, item.source, item.pid, file.source.fid, item.fileType, null);
+      done += 1;
+    } catch {
+      skipped += 1;
+    }
+  }
+
+  if (done) showToast(t("collect.installDone", { count: done }));
+  if (skipped) showToast(t("collect.installSkipped", { count: skipped }));
 }
 
 /**
@@ -812,6 +794,12 @@ function selectAllVisible() {
   showToast(t("multi.selectAllDone", { count: checked.value.size }));
 }
 
+/** 多选条上的「安装」：把勾选的项一起丢进安装弹窗 */
+function installChecked() {
+  const list = items.value.filter((item) => checked.value.has(item.uuid));
+  if (list.length) openInstall(list);
+}
+
 /** 当前操作的目标：多选模式取勾选集，否则取右键点中的那一项 */
 function takeTargets(): string[] {
   if (multiSelect.value) {
@@ -843,6 +831,49 @@ function openMenu(e: MouseEvent, item: CollectItemDto) {
 
 function closeMenu() {
   menu.value = null;
+  groupMenu.value = null;
+}
+
+// ---------------- 分组右键菜单 ----------------
+
+/** 右键分组标题弹出的菜单；null = 没开 */
+const groupMenu = ref<{ x: number; y: number; group: string } | null>(null);
+/** 分组菜单尺寸估值（一项 + 内边距） */
+const GROUP_MENU_W = 150;
+const GROUP_MENU_H = 48;
+
+/**
+ * 右键分组标题：弹出该组的菜单
+ *
+ * - `e`: 右键事件，定位用
+ * - `group`: 分组键
+ */
+function openGroupMenu(e: MouseEvent, group: string) {
+  menu.value = null;
+  groupMenu.value = {
+    x: Math.max(8, Math.min(e.clientX, window.innerWidth - GROUP_MENU_W - 8)),
+    y: Math.max(8, Math.min(e.clientY, window.innerHeight - GROUP_MENU_H - 8)),
+    group,
+  };
+}
+
+/**
+ * 全选某个分组里**当前看得见**的项
+ *
+ * 与多选条上的「全选」同一口径：搜索 / 类型过滤生效时只选筛出来的那些。
+ *
+ * - `group`: 分组键
+ */
+function selectGroup(group: string) {
+  const section = groupSections.value.find((item) => item.key === group);
+  groupMenu.value = null;
+  if (!section?.items.length) return;
+
+  multiSelect.value = true;
+  const next = new Set(checked.value);
+  for (const item of section.items) next.add(item.uuid);
+  checked.value = next;
+  showToast(t("multi.selectAllDone", { count: section.items.length }));
 }
 </script>
 
@@ -874,7 +905,7 @@ function closeMenu() {
       </div>
     </template>
 
-    <div class="collect-body" @click="closeMenu(); closeInstPick()">
+    <div class="collect-body" @click="closeMenu()">
       <!-- 多选条：只有多选模式下才出现 -->
       <div v-if="multiSelect" class="multi-bar">
         <span class="multi-count">{{ t("collect.multiSelected", { count: checked.size }) }}</span>
@@ -883,6 +914,10 @@ function closeMenu() {
           v-tip="checked.size === 0 ? t('collect.multiNoneTip') : groupNames.length === 0 ? t('collect.addToGroupNone') : ''"
           @click="askAddToGroup">
           {{ t("collect.multiMoveGroup") }}
+        </button>
+        <button class="multi-btn" :disabled="checked.size === 0"
+          v-tip="checked.size === 0 ? t('collect.multiNoneTip') : ''" @click="installChecked">
+          {{ t("collect.installDo") }}
         </button>
         <button class="multi-btn danger" :disabled="checked.size === 0"
           v-tip="checked.size === 0 ? t('collect.multiNoneTip') : ''" @click="askRemove">
@@ -907,7 +942,7 @@ function closeMenu() {
       <div v-else class="collect-groups">
         <section v-for="g in groupSections" :key="g.key" class="group-block"
           :class="{ 'drop-target': dropGroup === g.key }" :data-group="g.key">
-          <div class="group-head">
+          <div class="group-head" @contextmenu.prevent="openGroupMenu($event, g.key)">
             <button class="group-title" @click="toggleGroupOpen(g.key)">
               <GlyphIcon class="group-chevron" :class="{ collapsed: !isGroupOpen(g.key) }" name="chevron-down"
                 :size="13" :weight="2.4" />
@@ -1001,35 +1036,31 @@ function closeMenu() {
 
       </div>
 
-      <!-- 最后一行：新建分组 + 去挑资源收藏，三个同款整行按钮。
+      <!-- 最后一行：新建分组 + 去挑资源收藏，三个同款整行按钮（外观走全局 .add-row-btn）。
            放在分组列表**外面**：一个收藏都没有时也要能从这里去挑 -->
       <div class="collect-acts-row">
-        <button v-if="!isEmpty" class="add-group-row" @click="showAddGroup = true">
-          <GlyphIcon name="plus" :size="14" :weight="2.2" />
+        <button v-if="!isEmpty" class="add-row-btn add-group-row" @click="showAddGroup = true">
+          <GlyphIcon name="plus" :size="14" />
           {{ t("collect.addGroup") }}
         </button>
-        <button class="add-group-row" @click="openWindow('add_modpack')">
+        <button class="add-row-btn add-group-row" @click="openWindow('add_modpack')">
           {{ t("collect.addModpack") }}
         </button>
-        <button class="add-group-row" @click.stop="openAddResource">
+        <button class="add-row-btn add-group-row" @click.stop="openAddResource">
           {{ t("collect.addResource") }}
         </button>
       </div>
 
-      <!-- 选实例下拉：点卡片时弹在卡片下方，只列兼容的实例。
-           外壳复用右键菜单（.ctx-menu），两者不会同时打开 -->
-      <div v-if="instPick" class="ctx-menu inst-menu"
-        :style="{ left: instPick.x + 'px', top: instPick.y + 'px' }" @click.stop>
-        <div class="inst-menu-title">
-          {{ t("collect.installTo") }}
-          <span v-if="requirement(instPick.item)" class="inst-menu-need">{{ requirement(instPick.item) }}</span>
-        </div>
-        <select class="field-select inst-menu-select" @change="pickInstanceFromMenu">
-          <option value="" selected disabled>{{ t("collect.chooseInstance") }}</option>
-          <option v-for="inst in instPick.list" :key="inst.uuid" :value="inst.uuid">
-            {{ inst.name }} · {{ inst.version }}
-          </option>
-        </select>
+      <!-- 安装弹窗：多选时按支持加载器 / 游戏版本的交集筛实例 -->
+      <InstallModal v-if="installTargets.length" :items="installTargets" :instances="instances"
+        @close="installTargets = []" @install="doInstall" />
+
+      <!-- 分组右键菜单：全选该组 -->
+      <div v-if="groupMenu" class="ctx-menu" :style="{ left: groupMenu.x + 'px', top: groupMenu.y + 'px' }"
+        @click.stop>
+        <button class="ctx-item" @click="selectGroup(groupMenu.group)">
+          {{ t("collect.selectGroup") }}
+        </button>
       </div>
 
       <!-- 右键菜单 -->

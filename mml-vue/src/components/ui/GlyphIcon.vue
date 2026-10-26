@@ -49,6 +49,8 @@ export type GlyphName =
   | "puzzle"
   | "image"
   | "download"
+  // 导出：与「下载」互为镜像，表示把东西从这里送出去
+  | "export"
   | "update"
   | "refresh"
   | "folder"
@@ -207,6 +209,12 @@ withDefaults(
     <g v-else-if="name === 'download'">
       <path d="M12 3v12" />
       <path d="m7 10 5 5 5-5" />
+      <path d="M4 20h16" />
+    </g>
+    <!-- 导出：托盘 + 向上的箭头，与「下载」上下对称 -->
+    <g v-else-if="name === 'export'">
+      <path d="M12 15V3" />
+      <path d="m7 8 5-5 5 5" />
       <path d="M4 20h16" />
     </g>
     <!-- 升级：向上的箭头（版本往上走），与"下载"那条向下的箭头区分开 -->

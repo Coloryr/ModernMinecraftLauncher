@@ -39,9 +39,9 @@ export const GROUP_TITLES: Record<string, string> = {
   customHome: "winSettings.secCustomHome",
   music: "winSettings.secMusic",
   serverPack: "winSettings.secServerPack",
+  gamepad: "winSettings.secGamepad",
   clientLock: "winSettings.secClientLock",
   gameTitle: "winSettings.secGameTitle",
-  gamepad: "gamepad.title",
   "window-look": "winSettings.secWindowLook",
   localFiles: "winSettings.secLocalFiles",
   experimental: "winSettings.secExperimental",
@@ -187,7 +187,6 @@ const SETTINGS_INDEX: IndexEntry[] = [
   { tab: "java", group: "javaAdd", labelKey: "winSettings.javaRemoveAll", extra: ["remove", "删除"] },
 
   // ---- 客户端设置 ----
-  { tab: "client", group: "gamepad", labelKey: "gamepad.title", extra: ["controller", "gamepad", "手柄", "死区", "摇杆"] },
   { tab: "client", group: "servers", labelKey: "winSettings.serverAddress", extra: ["server", "服务器地址"] },
   { tab: "client", group: "servers", labelKey: "winSettings.autoJoin", extra: ["auto join", "自动进服"] },
   { tab: "client", group: "servers", labelKey: "winSettings.motdCard", extra: ["motd", "服务器信息"] },
@@ -218,6 +217,7 @@ const SETTINGS_INDEX: IndexEntry[] = [
   { tab: "client", group: "gameTitle", labelKey: "winSettings.gameTitle", extra: ["title", "标题文字"] },
   { tab: "client", group: "gameTitle", labelKey: "winSettings.titleDelay", extra: ["title", "间隔"] },
   { tab: "client", group: "serverPack", labelKey: "winSettings.serverPackExport", extra: ["server pack", "serverpack", "服务器包", "导出", "分发"] },
+  { tab: "client", group: "gamepad", labelKey: "winSettings.gamepadOpen", extra: ["gamepad", "joystick", "controller", "手柄", "摇杆", "按键映射"] },
 
   // ---- 本地文件 ----
   { tab: "files", group: "localFiles", labelKey: "winSettings.localFile.cache", extra: ["cache", "cleanup", "disk", "缓存", "清理", "占用"] },

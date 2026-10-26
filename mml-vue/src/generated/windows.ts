@@ -32,6 +32,7 @@ export { default as WinBlockPartsCategoryRail } from "../windows/block/parts/Cat
 export { default as WinBlockPartsInstancePickModal } from "../windows/block/parts/InstancePickModal.vue";
 export { default as WinBlockPartsSkinAddModal } from "../windows/block/parts/SkinAddModal.vue";
 export { default as CollectWindow } from "../windows/collect/CollectWindow.vue";
+export { default as WinCollectPartsInstallModal } from "../windows/collect/parts/InstallModal.vue";
 export { default as ConfigWindow } from "../windows/config/ConfigWindow.vue";
 export { default as WinConfigPartsHexView } from "../windows/config/parts/HexView.vue";
 export { default as WinConfigPartsImageView } from "../windows/config/parts/ImageView.vue";
@@ -43,6 +44,8 @@ export { default as DownloadWindow } from "../windows/download/DownloadWindow.vu
 export { default as ExportWindow } from "../windows/export/ExportWindow.vue";
 export { default as WinExportPartsFilePicker } from "../windows/export/parts/FilePicker.vue";
 export { default as WinExportPartsInfoExportButton } from "../windows/export/parts/InfoExportButton.vue";
+export { default as GamepadWindow } from "../windows/gamepad/GamepadWindow.vue";
+export { default as WinGamepadPartsActionSelect } from "../windows/gamepad/parts/ActionSelect.vue";
 export { default as HelpWindow } from "../windows/help/HelpWindow.vue";
 export { default as JavaDownloadWindow } from "../windows/java_download/JavaDownloadWindow.vue";
 export { default as LobbyWindow } from "../windows/lobby/LobbyWindow.vue";

@@ -94,6 +94,37 @@ const flowEdges = computed<Edge[]>(() =>
   })),
 );
 
+/** 画布外层：处理"从连线上起手平移"时要找里面的 vue-flow 视口 */
+const flowEl = ref<HTMLElement | null>(null);
+
+/**
+ * 从连线上按下也能平移画布
+ *
+ * vue-flow 给每条线的组都挂了 `nopan`，它的 d3 平移筛选因此拒绝从连线起手。
+ * 这里把这次按下按"落在画布上"再派发一次 mousedown，交给 d3 的平移接管：
+ * 拖动时 d3 会把随后的 click 一并吞掉，所以轻点连线仍然会触发 edge-click 弹说明。
+ *
+ * - `event`: 画布内按下的 mousedown
+ */
+function onFlowMouseDown(event: MouseEvent) {
+  if (event.button !== 0) return;
+  const target = event.target as Element | null;
+  if (!target?.closest(".vue-flow__edge")) return;
+  const viewport = flowEl.value?.querySelector<HTMLElement>(".vue-flow__viewport");
+  if (!viewport) return;
+  viewport.dispatchEvent(
+    new MouseEvent("mousedown", {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      button: 0,
+      buttons: 1,
+    }),
+  );
+}
+
 /** 点了线之后浮在鼠标旁边的那句话；空串 = 不显示 */
 const popupText = ref("");
 /** 浮层位置，单位 px，视口坐标（浮层是 fixed 的） */
@@ -276,8 +307,9 @@ watch(graph, () => {
 
     <p v-else-if="!graph?.edges.length" class="empty-tip">{{ t("resource.depTreeNone") }}</p>
 
-    <div v-else class="dep-flow">
-      <!-- 拖节点、滚轮缩放、拖画布平移全是 vue-flow 的默认行为 -->
+    <div v-else ref="flowEl" class="dep-flow" @mousedown.capture="onFlowMouseDown">
+      <!-- 拖节点、滚轮缩放、拖画布平移全是 vue-flow 的默认行为；
+           连线本身带 nopan，从线上起手的情况由 onFlowMouseDown 补一次 -->
       <VueFlow :nodes="flowNodes" :edges="flowEdges" :min-zoom="0.2" :max-zoom="2.5"
         :nodes-connectable="false" :fit-view-on-init="true" @edge-click="onEdgeClick"
         @node-click="hidePopup" @node-double-click="onNodeDoubleClick" @node-drag-start="hidePopup"

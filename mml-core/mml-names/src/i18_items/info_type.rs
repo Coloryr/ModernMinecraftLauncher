@@ -107,4 +107,47 @@ pub enum InfoType {
         /// 实例 ID
         guid: String,
     },
+
+    /// 手柄已连上，带系统给出的手柄名
+    GamepadConnected {
+        /// 系统给出的手柄名称
+        name: String,
+    },
+    /// 手柄已断开，带系统给出的手柄名
+    GamepadDisconnected {
+        /// 系统给出的手柄名称
+        name: String,
+    },
+    /// 手柄读取后端初始化失败
+    GamepadInitFailed {
+        /// 失败原因
+        error: String,
+    },
+    /// 手柄映射目录里没有可用配置
+    GamepadMapUnavailable {
+        /// 配置目录路径
+        path: String,
+    },
+    /// 手柄映射配置不可用，带路径与原因
+    GamepadMapLoadFailed {
+        /// 配置文件路径
+        path: String,
+        /// 失败原因
+        error: String,
+    },
+    /// 手柄映射已写出默认配置
+    GamepadMapDefaultWritten {
+        /// 配置文件路径
+        path: String,
+    },
+    /// 手柄映射已加载，带生效的配置文件路径
+    GamepadMapLoaded {
+        /// 配置文件路径
+        path: String,
+    },
+    /// 开始向某个游戏实例转发手柄输入
+    GamepadForwardStart {
+        /// 游戏实例 ID
+        uuid: String,
+    },
 }

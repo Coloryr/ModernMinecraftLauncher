@@ -234,6 +234,18 @@ pub fn is_game_connected(uuid: Uuid) -> bool {
         .is_some_and(|channel| !channel.is_closed())
 }
 
+/// 列出已注册游戏通道的实例
+///
+/// # 返回值
+///
+/// 已连接游戏实例的 ID，按 ID 排序；没有游戏连接时为空列表
+pub fn get_game_uuids() -> Vec<Uuid> {
+    cleanup();
+    let mut uuids: Vec<Uuid> = GAME_CHANNELS.read().unwrap().keys().copied().collect();
+    uuids.sort();
+    uuids
+}
+
 /// 获取游戏上报的窗口大小
 ///
 /// - `uuid`: 游戏实例 ID
@@ -1039,6 +1051,19 @@ mod tests {
 
         assert_eq!(get_run_arg(), expect);
         assert_eq!(&*got.lock().unwrap(), &vec![expect.clone()]);
+    }
+
+    /// 注册游戏通道后应能从列表里查到
+    #[tokio::test]
+    async fn test_get_game_uuids() {
+        ensure_log();
+        let uuid = Uuid::new_v4();
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let mut buf = msg_with_string(TYPE_GAME_CHANNEL, &uuid.to_string());
+
+        process_message(&mut buf, &tx).await.unwrap();
+
+        assert!(get_game_uuids().contains(&uuid));
     }
 
     /// 向未注册通道的游戏发送标题应返回 false

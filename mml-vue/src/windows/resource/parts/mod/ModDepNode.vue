@@ -66,7 +66,7 @@ const tip = computed(() => {
     'dep-node-missing': props.data.node.missing,
     'dep-node-disabled': props.data.node.disabled,
     'dep-node-virtual': props.data.node.virtual,
-  }" :style="{ width: NODE_W + 'px', height: NODE_H + 'px' }" v-tip.mouse="tip">
+  }" :style="{ width: NODE_W + 'px', height: NODE_H + 'px' }" v-tip="tip">
     <Handle type="target" :position="Position.Left" class="dep-handle" />
 
     <img v-if="props.data.node.icon" class="dep-node-icon" :src="props.data.node.icon" alt="" />

@@ -236,33 +236,12 @@
   gap: 8px;
 }
 
-/* 整行添加键：整体走强调色，比灰虚线显眼也好搭。
-   高度由 padding 撑出（与侧栏的「添加实例」行同角色），不按控件档定高 */
+/* 三个整行添加键均分宽度：外观走全局 .add-row-btn，这里只管 flex 布局；
+   min-width 0 让窄窗时能一起缩，谁都不单独溢出 */
 .add-group-row {
-  /* 三个均分整行宽度；min-width 0 让窄窗时能一起缩，谁都不单独溢出 */
   flex: 1 1 0;
+  width: auto;
   min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  white-space: nowrap;
-  padding: 10px;
-  border: 1px dashed var(--accent-border);
-  border-radius: 10px;
-  background: transparent;
-  color: var(--accent);
-  font-size: 13px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: border-color 0.12s, color 0.12s, background 0.12s;
-}
-
-.add-group-row:hover {
-  /* 悬停把虚线收成实线，再铺一层淡强调色 */
-  border-style: solid;
-  border-color: var(--accent);
-  background: var(--accent-soft);
 }
 
 .collect-filters {
@@ -542,38 +521,6 @@
 
 .ctx-item.danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--red) 12%, transparent);
-}
-
-/* ----- 选实例下拉：外壳就是右键菜单，只加宽高与标题 ----- */
-
-.inst-menu {
-  min-width: 260px;
-  /* 里面就一行标题 + 一个下拉，不需要滚动 */
-  overflow: visible;
-}
-
-.inst-menu-title {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 4px 10px 6px;
-  font-size: 11.5px;
-  color: var(--text-dim);
-}
-
-/* 资源需要什么：列在标题右端，解释这一串实例为什么这么短 */
-.inst-menu-need {
-  margin-left: auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text-dim);
-  opacity: 0.75;
-}
-
-/* 弹层里的下拉：宽度撑满，外观走 .field-select（箭头 / 底色 / 弹层动画都在那边） */
-.inst-menu-select {
-  width: 100%;
 }
 
 /* 没有具名分组时"添加到分组"无处可加：置灰 + 悬停提示（见模板的 v-tip） */

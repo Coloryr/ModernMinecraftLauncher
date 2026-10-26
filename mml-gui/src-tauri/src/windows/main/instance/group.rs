@@ -221,7 +221,7 @@ pub async fn main_delete_instance(
 pub(crate) enum Busy {
     /// 游戏进程还在跑
     Running,
-    /// 有任务在跑：下载、扫描、导出、生成
+    /// 有任务在跑：下载、扫描、导出、生成、启动准备
     Task,
 }
 
@@ -239,6 +239,10 @@ pub(crate) fn busy_of(instance: &Uuid, base: &Path) -> Option<Busy> {
     // 游戏进程还在跑
     if mml_game::is_running(instance) {
         return Some(Busy::Running);
+    }
+    // 启动准备中：服务器包同步、文件检查都会读写实例目录，不能删、改名或复制
+    if crate::windows::main::launch_gate::is_launching(*instance) {
+        return Some(Busy::Task);
     }
     // 还有文件在往这个实例的目录里下（模组更新、资源下载等）
     if mml_downloader::is_busy_under(base) {
@@ -326,6 +330,16 @@ mod tests {
     fn task_makes_instance_busy() {
         let id = Uuid::new_v4();
         let guard = crate::windows::instance_task::begin(&id.to_string()).expect("占位");
+        assert_eq!(busy_of(&id, Path::new(NO_DIR)), Some(Busy::Task));
+        drop(guard);
+        assert!(busy_of(&id, Path::new(NO_DIR)).is_none());
+    }
+
+    /// 启动预约期间算忙，删除 / 改名会被拦住；预约释放后恢复
+    #[test]
+    fn launching_makes_instance_busy() {
+        let id = Uuid::new_v4();
+        let guard = crate::windows::main::launch_gate::begin_launch(id).expect("预约启动");
         assert_eq!(busy_of(&id, Path::new(NO_DIR)), Some(Busy::Task));
         drop(guard);
         assert!(busy_of(&id, Path::new(NO_DIR)).is_none());

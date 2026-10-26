@@ -189,8 +189,8 @@ onUnmounted(() => {
         <span class="cat-num">{{ dragged?.count }}</span>
       </div>
 
-    <!-- 新建分组：与分类项同一套排版，图标打头 -->
-    <button type="button" class="cat-item cat-new" @click="emit('new-group')">
+    <!-- 新建分组：与其它窗口同一套整行添加外观 -->
+    <button type="button" class="add-row-btn cat-new" @click="emit('new-group')">
       <GlyphIcon name="plus" :size="14" />
       <span class="cat-name">{{ t("blocks.groupAdd") }}</span>
     </button>
@@ -257,12 +257,9 @@ onUnmounted(() => {
   opacity: 0.45;
 }
 
-/* 新建分组：图标 + 文字，左对齐；它不是分类，用虚线边框区分 */
+/* 新建分组：外观走全局 .add-row-btn（虚线强调色整行键），这里只留与分类项的间距 */
 .cat-new {
-  justify-content: flex-start;
   margin-top: 2px;
-  border: 1px dashed var(--border);
-  color: var(--text-dim);
 }
 
 /* 拖拽落点占位：虚线框 + 被拖分类的名字与数量 */

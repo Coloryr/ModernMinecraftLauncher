@@ -122,6 +122,19 @@ const onlyName = computed(() => {
   return group ? group.name || group.projectId : onlyProjectId.value;
 });
 
+/** 有没有任何筛选在生效：搜索、日期范围、只看某个项目，用来决定显不显示「清除筛选」 */
+const hasFilter = computed(
+  () => !!keyword.value || !!from.value || !!to.value || !!onlyProjectId.value,
+);
+
+/** 清掉全部筛选，回到完整列表 */
+function clearFilters() {
+  keyword.value = "";
+  from.value = "";
+  to.value = "";
+  onlyProjectId.value = "";
+}
+
 /** 收起的组，键是项目编号；默认全展开 —— 记录本来就不多，摊开省一次点击 */
 const collapsed = ref<Set<string>>(new Set());
 
@@ -221,9 +234,11 @@ function dash(value: string): string {
         <div v-if="!onlyProjectId" class="log-search">
           <SearchBox v-model="keyword" :placeholder="t('resource.updateLogSearch')" width="100%" />
         </div>
-        <BaseDatePicker v-model="from" class="log-date" :aria-label="t('resource.updateLogDateFrom')" />
+        <BaseDatePicker v-model="from" class="log-date" :placeholder="t('resource.updateLogDateFrom')"
+          :max="to" :aria-label="t('resource.updateLogDateFrom')" />
         <span class="log-sep">–</span>
-        <BaseDatePicker v-model="to" class="log-date" :aria-label="t('resource.updateLogDateTo')" />
+        <BaseDatePicker v-model="to" class="log-date" :placeholder="t('resource.updateLogDateTo')"
+          :min="from" :aria-label="t('resource.updateLogDateTo')" />
       </div>
 
       <!-- 只看一个模组时给一条可关掉的提示，否则用户不知道列表为什么只剩一组 -->
@@ -234,7 +249,12 @@ function dash(value: string): string {
         </button>
       </p>
 
-      <p class="log-count">{{ t("resource.updateLogCount", { n: totalCount }) }}</p>
+      <div class="log-summary">
+        <p class="log-count">{{ t("resource.updateLogCount", { n: totalCount }) }}</p>
+        <button v-if="hasFilter" class="log-clear" @click="clearFilters">
+          {{ t("resource.updateLogClear") }}
+        </button>
+      </div>
       <p v-if="!visibleGroups.length" class="empty-tip">{{ t("resource.updateLogNoMatch") }}</p>
 
       <div v-else class="log-list">
@@ -267,7 +287,10 @@ function dash(value: string): string {
               <div class="log-meta">
                 {{ t("resource.updateLogFileId", { from: dash(item.oldFileId), to: dash(item.fileId) }) }}
               </div>
-              <div class="log-sha1">{{ item.sha1 }}</div>
+              <div class="log-sha1">
+                <span class="log-sha1-label">{{ t("resource.updateLogSha1") }}</span>
+                <span class="log-sha1-value">{{ item.sha1 }}</span>
+              </div>
             </div>
           </div>
         </section>
@@ -275,7 +298,7 @@ function dash(value: string): string {
     </template>
 
     <div class="modal-actions">
-      <BaseButton @click="emit('close')">{{ t("resource.cancel") }}</BaseButton>
+      <BaseButton @click="emit('close')">{{ t("resource.close") }}</BaseButton>
     </div>
   </BaseModal>
 </template>
@@ -338,17 +361,45 @@ function dash(value: string): string {
   background: var(--bg-hover);
 }
 
+/* 统计行：「共 N 条」在左，有筛选时右边补一个「清除筛选」 */
+.log-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .log-count {
-  margin: 0 0 8px;
+  margin: 0;
   color: var(--text-dim);
   font-size: 11.5px;
 }
 
-/* 加载中 / 出错 / 空 / 筛完没结果：这几档没有可滚的列表，让提示吃掉剩余高度，
+.log-clear {
+  padding: 2px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 11.5px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.log-clear:hover {
+  background: var(--bg-hover);
+}
+
+/* 加载中 / 出错 / 空 / 筛完没结果：这几档没有可滚的列表，让提示吃掉剩余高度并居中，
    动作按钮才会贴底，而不是浮在面板中间 */
 .modal-body > .empty-tip,
 .modal-body > .error-text {
   flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* 弹窗高度被 fixed-height 锁死，这里吃掉剩余高度自己滚 ——
@@ -371,8 +422,10 @@ function dash(value: string): string {
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 2px 0;
+  /* 左右各让 6px：悬停底色有边距；下方卡片按同样的起点缩进，与组名对齐 */
+  padding: 4px 6px;
   border: none;
+  border-radius: 8px;
   background: transparent;
   color: var(--text);
   font-size: 12.5px;
@@ -380,6 +433,11 @@ function dash(value: string): string {
   font-family: inherit;
   cursor: pointer;
   text-align: left;
+  transition: background 0.12s;
+}
+
+.log-group-head:hover {
+  background: var(--bg-hover);
 }
 
 .log-group-caret {
@@ -395,6 +453,8 @@ function dash(value: string): string {
 }
 
 .log-group-count {
+  flex-shrink: 0;
+  margin-left: auto;
   color: var(--text-dim);
   font-size: 11.5px;
   font-weight: 400;
@@ -404,16 +464,17 @@ function dash(value: string): string {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 8px 0 2px 20px;
+  /* 26 = 组头的 6px 内边距 + 12px 箭头 + 8px 间距：卡片与组名左对齐 */
+  padding: 8px 0 2px 26px;
 }
 
 .log-row {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 8px 10px;
+  gap: 4px;
+  padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--bg-card);
 }
 
@@ -475,9 +536,20 @@ function dash(value: string): string {
   word-break: break-all;
 }
 
+/* SHA1：标签与值分开，值仍是等宽；长哈希允许折行 */
 .log-sha1 {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   color: var(--text-dim);
   font-size: 11.5px;
+}
+
+.log-sha1-label {
+  flex-shrink: 0;
+}
+
+.log-sha1-value {
   font-family: monospace;
   word-break: break-all;
 }

@@ -3064,8 +3064,10 @@ dependencies = [
  "gilrs",
  "mml-ipc",
  "mml-log",
+ "mml-names",
  "mml-testutil",
  "serde",
+ "serde_json",
  "uuid",
 ]
 

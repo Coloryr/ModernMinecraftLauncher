@@ -47,6 +47,27 @@ mod test_support;
 
 include!(concat!(env!("OUT_DIR"), "/invokes_gen.rs"));
 
+/// 给进程钉一个固定的任务栏身份
+///
+/// 不设的话 Windows 会按"从哪个快捷方式启动"来猜任务栏图标：桌面快捷方式带的是实例图标
+/// （见 `windows::main::instance::shortcut`），从它启动时任务栏就跟着显示实例图标。
+/// 钉成与 `tauri.conf.json` 相同的 identifier，任务栏始终认这个启动器。
+#[cfg(windows)]
+fn set_app_user_model_id() {
+    // 这里必须写绝对路径：本 crate 自己也有一个叫 `windows` 的模块
+    use ::windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID;
+    use ::windows::core::HSTRING;
+
+    // 失败也只是任务栏图标退回到旧行为，不影响启动，忽略即可
+    let _ = unsafe { SetCurrentProcessExplicitAppUserModelID(&HSTRING::from(APP_USER_MODEL_ID)) };
+}
+
+#[cfg(not(windows))]
+fn set_app_user_model_id() {}
+
+/// 任务栏身份，与 `tauri.conf.json` 的 `identifier` 一致
+const APP_USER_MODEL_ID: &str = "com.coloryr.mml";
+
 /// 启动 Tauri 应用
 ///
 /// 挂接图片协议、窗口事件、Java 列表变更与下载器回调，
@@ -55,6 +76,10 @@ include!(concat!(env!("OUT_DIR"), "/invokes_gen.rs"));
 pub fn run() {
     // 命令行 / 协议带来的启动请求先记下来，前端初始化完成后取走执行
     start_arg::collect(std::env::args());
+
+    // 进程身份要在建窗口之前钉好，见 [`set_app_user_model_id`]
+    set_app_user_model_id();
+
 
     let app = tauri::Builder::default()
         // webview 就绪后的统一装配，都在 on_webview_ready 里拿 ICoreWebView2 做一次：
@@ -174,7 +199,6 @@ pub fn run() {
             if let Err(err) = integrations::load() {
                 mml_log::error_type(err);
             }
-            integrations::start_gamepad();
 
             // 自定义主页面：把压缩包打开成常驻句柄，不落盘解压，请求时按条目现读
             windows::custom_home::reload();
@@ -204,9 +228,6 @@ pub fn run() {
         .expect("error while building tauri application");
 
     app.run(|_app, event| {
-        if matches!(event, tauri::RunEvent::Exit) {
-            integrations::stop_gamepad();
-        }
         // 还有实例在跑时，关掉所有窗口只是退回后台：托盘可见，后台还要继续给游戏计时。
         // 没有实例在跑就照常退出 —— 那时既没有托盘，也没有要留在后台干的事。
         // code 为 Some 的是 app.exit() 发起的真退出，不拦。

@@ -23,6 +23,7 @@ pub mod custom_home;
 pub mod custom_ui;
 pub mod download;
 pub mod export;
+pub(crate) mod gamepad;
 pub mod java_download;
 pub mod lobby;
 pub mod log;

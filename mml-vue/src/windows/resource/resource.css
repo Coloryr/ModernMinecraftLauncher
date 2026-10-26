@@ -638,6 +638,16 @@
   white-space: nowrap;
 }
 
+/* 分组末尾的「新建分组」：外观走全局 .add-row-btn，这里只管两处布局：
+   列表视图里它是 flex 子项、不参与压缩；表格视图的按钮在白底卡片外面，留 12px */
+.resource-layout .item-list.mod-groups > .add-row-btn {
+  flex: none;
+}
+
+.resource-layout .item-list.mod-groups-table > .add-row-btn {
+  margin-top: 12px;
+}
+
 
 .resource-layout .mod-group-body {
   display: flex;

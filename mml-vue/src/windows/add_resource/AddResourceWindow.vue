@@ -27,6 +27,9 @@ import { showToast } from "../../lib/toast";
 import { useResourceStatus } from "../../lib/resourceTasks";
 import { familyInstanceFromLabel, projectParamToItem, targetProject, targetUuid, type WindowProjectParam } from "../windowManager";
 import { useInstanceChange } from "../../composables/useInstanceChange";
+import { useRefreshKey } from "../../composables/useRefreshKey";
+import { usePageKeys } from "../../composables/usePageKeys";
+import { scrollToContentTop } from "../../lib/scrollTop";
 import type {
   FileListItemDto,
   InstanceInfoDto,
@@ -332,6 +335,19 @@ async function search() {
   }
 }
 
+// F5 重跑当前搜索；详情页打开时 F5 交给详情页自己的版本列表
+useRefreshKey(() => {
+  if (detailOpen.value) return;
+  submitSearch();
+});
+
+// 鼠标侧键：后退 = 上一页，前进 = 下一页（详情页打开时由详情页自己接）
+usePageKeys({
+  prev: () => turnPage(-1),
+  next: () => turnPage(1),
+  enabled: () => !detailOpen.value,
+});
+
 function submitSearch() {
   page.value = 0;
   void search();
@@ -341,9 +357,9 @@ function turnPage(delta: number) {
   const next = page.value + delta;
   if (next < 0 || next > maxPage.value) return;
   page.value = next;
-  // 翻页先回到内容顶部：整页滚动的窗口里，用户此刻停在列表底部，不拉回去就看不到
-  // 新一页的头几条。scrollIntoView 会自己找最近的滚动容器（这里是窗口框架的 .frame-body）
-  bodyRef.value?.scrollIntoView({ behavior: "smooth", block: "start" });
+  // 翻页先回到列表开头：整页滚动的窗口里，用户此刻停在列表底部，不拉回去就看不到
+  // 新一页的头几条。已经在顶部时不滚，见 scrollToContentTop
+  scrollToContentTop(bodyRef.value);
   void search();
 }
 

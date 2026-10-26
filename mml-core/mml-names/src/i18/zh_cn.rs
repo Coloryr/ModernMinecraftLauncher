@@ -79,6 +79,24 @@ impl I18Lang for ZhCn {
             }
             InfoType::IpcLauncherShowWindow => String::from("IPC：已运行实例请求显示主窗口"),
             InfoType::IpcGameChannelBound { guid } => format!("IPC：游戏通道已绑定 {guid}"),
+            InfoType::GamepadConnected { name } => format!("[gamepad] 已连接手柄：{name}"),
+            InfoType::GamepadDisconnected { name } => format!("[gamepad] 已断开手柄：{name}"),
+            InfoType::GamepadInitFailed { error } => {
+                format!("[gamepad] 手柄读取初始化失败：{error}")
+            }
+            InfoType::GamepadMapUnavailable { path } => {
+                format!("[gamepad] 配置目录里没有可用的映射：{path}")
+            }
+            InfoType::GamepadMapLoadFailed { path, error } => {
+                format!("[gamepad] 映射配置不可用：{path}，{error}")
+            }
+            InfoType::GamepadMapDefaultWritten { path } => {
+                format!("[gamepad] 已写出默认映射：{path}")
+            }
+            InfoType::GamepadMapLoaded { path } => format!("[gamepad] 已加载映射：{path}"),
+            InfoType::GamepadForwardStart { uuid } => {
+                format!("[gamepad] 开始向实例 {uuid} 转发输入")
+            }
         }
     }
 

@@ -5,3 +5,4 @@
 
 pub(crate) mod edit;
 pub(crate) mod group;
+pub(crate) mod shortcut;

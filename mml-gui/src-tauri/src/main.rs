@@ -82,9 +82,14 @@ fn main() {
     block_groups::init(&obj.path);
     mml_gui_lib::integrations::init(&obj.path);
 
+    // 手柄配置放在运行目录，内核初始化后日志才可用
+    let run_path = obj.path.clone();
     if let Err(e) = mml_core::init(obj) {
         err_box::fatal_error(e);
     }
+
+    // 手柄：内核 crate 负责读映射、监听手柄并把输入转发给运行中的游戏实例
+    mml_gamepad::init(&run_path);
 
     // 内核日志语言跟随界面语言：没有 lang.txt 时内核按系统语言走，可能与 GUI 配置不一致
     gui_config::sync_core_lang(gui_config::get().locale);

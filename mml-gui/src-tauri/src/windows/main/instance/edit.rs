@@ -190,6 +190,10 @@ pub fn main_update_instance(
         .ok()
         .and_then(|id| mml_game::get_instance(&id).map(|inst| (id, inst)));
     if let Some((id, instance)) = core {
+        // 启动准备中（含服务器包同步）不能改实例：改名会挪目录，改版本会和本次启动打架
+        if crate::windows::main::launch_gate::is_launching(id) {
+            return Err(err_keys::INSTANCE_BUSY.to_string());
+        }
         // 名字改动走 rename：实例目录跟随改名，重名报错
         if let Some(v) = &patch.name {
             let n = v.trim();

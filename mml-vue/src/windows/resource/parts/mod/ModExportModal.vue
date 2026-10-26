@@ -37,19 +37,86 @@ async function saveList() {
 <template>
   <BaseModal :title="t('modExport.title')" :width="520" :closable="!busy" @close="emit('close')">
     <fieldset class="export-options" :disabled="busy">
-      <label>{{ t('modExport.format') }}
-        <select v-model="format" class="field-select"><option value="txt">TXT</option><option value="csv">CSV</option><option value="json">JSON</option></select>
+      <!-- 格式：标签与下拉同一行，下拉定宽 —— 三个短选项撑满整行没有必要 -->
+      <div class="export-format">
+        <label class="field-label" for="mod-export-format">{{ t('modExport.format') }}</label>
+        <select id="mod-export-format" v-model="format" class="field-select">
+          <option value="txt">TXT</option>
+          <option value="csv">CSV</option>
+          <option value="json">JSON</option>
+        </select>
+      </div>
+
+      <label v-if="selectedIds.length || onlySelected" class="export-check export-only-selected">
+        <input v-model="onlySelected" type="checkbox" />{{ t('modExport.selected') }}
       </label>
-      <label v-if="selectedIds.length || onlySelected"><input v-model="onlySelected" type="checkbox" />{{ t('modExport.selected') }}</label>
-      <p>{{ t('modExport.fields') }}</p>
-      <div class="export-fields"><label v-for="field in options" :key="field"><input v-model="fields" type="checkbox" :value="field" />{{ t(`modExport.${field}`) }}</label></div>
-      <BaseButton variant="primary" :disabled="!fields.length || busy || (onlySelected && !selectedIds.length)" @click="saveList">{{ t('winExport.exportBtn') }}</BaseButton>
+
+      <p class="field-label">{{ t('modExport.fields') }}</p>
+      <div class="export-fields">
+        <label v-for="field in options" :key="field" class="export-check">
+          <input v-model="fields" type="checkbox" :value="field" />{{ t(`modExport.${field}`) }}
+        </label>
+      </div>
     </fieldset>
+
+    <div class="modal-actions">
+      <BaseButton variant="primary" :disabled="!fields.length || busy || (onlySelected && !selectedIds.length)" @click="saveList">{{ t('winExport.exportBtn') }}</BaseButton>
+    </div>
   </BaseModal>
 </template>
 
 <style scoped>
-.export-options { border: 0; padding: 0; display: grid; gap: 14px; min-width: 0; }
-.export-options label { display: flex; align-items: center; gap: 8px; }
-.export-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+/* 弹窗在 body 下，样式走 scoped（与 ModUpdateModal / ModDepsModal 同一处理） */
+.export-options {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+/* 格式：标签与下拉同一行；标签 flex: none 才不会被下拉挤成竖排 */
+.export-format {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.export-format .field-label {
+  margin: 0;
+  flex: none;
+}
+
+.export-format .field-select {
+  width: 180px;
+}
+
+.export-only-selected {
+  margin-top: 12px;
+}
+
+/* 导出字段：三列，15 项正好五行 */
+.export-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.export-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.export-check input {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
 </style>
