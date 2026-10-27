@@ -85,13 +85,30 @@ fn test_auths_lifecycle() {
     );
 
     // ---- 1) 预写 auth.json 后 init，验证从磁盘加载 ----
+    // 旧版刷新正版令牌时把无连字符 UUID 另存成新记录，留下同一账户的两条数据
+    let mut stale = fake_login(
+        "Steve",
+        "0000000000000000000000000000aaaa",
+        AuthType::OAuth,
+        "token-a-stale",
+    );
+    stale.last_login = FixedOffset::east_opt(8 * 3600)
+        .unwrap()
+        .with_ymd_and_hms(2025, 12, 1, 12, 0, 0)
+        .unwrap();
     let accounts = vec![
+        stale,
         fake_login("Steve", FAKE_UUID_A, AuthType::OAuth, "token-a"),
         fake_login("Alex", FAKE_UUID_B, AuthType::LittleSkin, "token-b"),
     ];
     serialize_tools::json_to_file(&accounts, inner.join("auth.json")).unwrap();
 
     auths::init();
+    assert_eq!(
+        auths::get_all().len(),
+        2,
+        "UUID 写法不同的同一账户应在加载时合并"
+    );
 
     let key_a = UserKeyObj {
         uuid: FAKE_UUID_A.to_string(),
@@ -185,6 +202,23 @@ fn test_auths_lifecycle() {
     auths::clear_auths();
     assert!(auths::get_all().is_empty());
     assert!(auths::get(FAKE_UUID_A, AuthType::OAuth).is_none());
+
+    // ---- 7.5) 同 UUID 不同认证类型按 UserKeyObj 视为两条账户，不按 UUID 合并 ----
+    let same_uuid = vec![
+        fake_login("Steve", FAKE_UUID_A, AuthType::OAuth, "token-oauth"),
+        fake_login("Steve", FAKE_UUID_A, AuthType::Offline, "token-offline"),
+    ];
+    let same_uuid_file = dir.join("same_uuid_auths.json");
+    serialize_tools::json_to_file(&same_uuid, &same_uuid_file).unwrap();
+    assert!(
+        !auths::import(&same_uuid_file).unwrap(),
+        "空存储导入不应判为合并"
+    );
+    assert_eq!(
+        auths::get_all().len(),
+        2,
+        "同 UUID 的不同认证类型应各保留一条"
+    );
 
     // ---- 8) 清理临时目录 ----
     let _ = std::fs::remove_dir_all(dir);

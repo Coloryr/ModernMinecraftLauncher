@@ -12,7 +12,6 @@ use mml_names::i18_items::error_type::{CoreResult, ErrorType};
 use mml_net::mojang_api::{self, MinecraftProfileObj};
 use tauri::{AppHandle, Emitter};
 use tokio_util::sync::CancellationToken;
-use uuid::Uuid;
 
 use crate::dtos::account_dto::{AccountOAuthDto, AccountOAuthStateDto, AccountStoreDto};
 use crate::listens;
@@ -129,9 +128,7 @@ pub(super) async fn microsoft_login(app: &AppHandle) -> Result<AccountStoreDto, 
     *OAUTH_NOW.write().unwrap() = None;
 
     // Profile 返回的 UUID 无连字符，转为 Minecraft 常规带连字符格式
-    let uuid = Uuid::parse_str(&profile.id)
-        .map(|u| u.to_string())
-        .unwrap_or(profile.id);
+    let uuid = mml_auth::normalize_uuid(&profile.id);
 
     let mut login = LoginObj::new(profile.name, uuid, mc_token.access_token, String::new());
     login.auth_type = AuthType::OAuth;

@@ -41,6 +41,23 @@ pub mod auths;
 pub mod legacy;
 pub mod oauth;
 
+/// 统一 UUID 文本格式
+///
+/// 微软 Profile 返回的 UUID 不带连字符，登录与刷新必须落成同一种写法，
+/// 否则同一账户会因存储键不同被存成两条记录。
+///
+/// - `uuid`: UUID 文本，带不带连字符均可
+///
+/// # 返回值
+///
+/// 合法 UUID 统一为带连字符的小写形式；无法解析时返回去掉首尾空白的原文本
+pub fn normalize_uuid(uuid: &str) -> String {
+    let uuid = uuid.trim();
+    Uuid::parse_str(uuid)
+        .map(|u| u.to_string())
+        .unwrap_or_else(|_| uuid.to_string())
+}
+
 /// 账户认证类型
 ///
 /// 定义了启动器支持的六种账户认证方式。
@@ -279,7 +296,7 @@ impl LoginObj {
     /// 见 [`UserKeyObj`]
     pub fn get_key(&self) -> UserKeyObj {
         UserKeyObj {
-            uuid: self.uuid.clone(),
+            uuid: normalize_uuid(&self.uuid),
             auth_type: self.auth_type.clone(),
         }
     }
@@ -561,6 +578,23 @@ mod tests {
         map.insert(a.get_key(), a.clone());
         assert_eq!(map.len(), 2);
         assert_eq!(map[&a.get_key()].access_token, "new-token");
+    }
+
+    /// 微软 Profile 的无连字符 UUID 与登录时的带连字符 UUID 应落到同一个账户键
+    #[test]
+    fn test_uuid_format_shares_key() {
+        let mut hyphenated = LoginObj::new(
+            "Steve".to_string(),
+            "00000000-0000-0000-0000-00000000aaaa".to_string(),
+            FAKE_TOKEN.to_string(),
+            FAKE_CLIENT.to_string(),
+        );
+        hyphenated.auth_type = AuthType::OAuth;
+        let mut plain = hyphenated.clone();
+        plain.uuid = "0000000000000000000000000000aaaa".to_string();
+
+        assert_eq!(normalize_uuid(&plain.uuid), hyphenated.uuid);
+        assert_eq!(plain.get_key(), hyphenated.get_key());
     }
 
     /// 离线账户 refresh 无需网络，应直接返回成功

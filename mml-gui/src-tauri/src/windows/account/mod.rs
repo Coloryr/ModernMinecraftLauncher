@@ -191,10 +191,12 @@ pub fn account_remove_account(app: AppHandle, uuid: String) -> Result<bool, Stri
     let Some(login) = find_by_uuid(&uuid) else {
         return Ok(false);
     };
+    // 当前账户按 UserKeyObj 判断：同一 UUID 的不同认证类型是两条账户
+    let key = login.get_key();
     if !login.delete() {
         return Err(err_keys::LOBBY_ACCOUNT_LOCKED.into());
     }
-    if auths::get_current().map(|k| k.uuid) == Some(uuid) {
+    if auths::get_current().as_ref() == Some(&key) {
         auths::set_current(auths::get_all().first().map(|a| a.get_key()));
     }
     emit_account_change(&app);

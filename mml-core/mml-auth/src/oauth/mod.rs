@@ -354,7 +354,7 @@ impl LoginObj {
         let profile = mojang_api::get_minecraft_profile(&mc_token.access_token).await?;
 
         self.user_name = profile.name;
-        self.uuid = profile.id;
+        self.uuid = crate::normalize_uuid(&profile.id);
         self.text1 = Some(oauth.refresh_token);
         self.access_token = mc_token.access_token;
         self.set_expire_in(mc_token.expires_in);

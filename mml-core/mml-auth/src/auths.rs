@@ -21,7 +21,7 @@ use std::{
     sync::{LazyLock, RwLock},
 };
 
-use crate::{AuthType, LoginObj, UserKeyObj};
+use crate::{AuthType, LoginObj, UserKeyObj, normalize_uuid};
 use mml_base::{inner_path, serialize_tools};
 use mml_config::config_save;
 use mml_names::{i18_items::error_type::CoreResult, names, uuids};
@@ -71,10 +71,15 @@ pub fn current_is_locked() -> bool { SELECTION_LOCK.read().unwrap().is_some() }
 ///
 /// - `path`: 账户数据文件的路径
 fn load<P: AsRef<Path>>(path: P) {
-    if let Err(err) = import(path) {
-        mml_log::error_type(err);
+    match import(path) {
+        // 旧数据可能把同一账户的无连字符 UUID 另存成一条，合并后立刻写回磁盘
+        Ok(true) => save(),
+        Ok(false) => {}
+        Err(err) => {
+            mml_log::error_type(err);
 
-        save();
+            save();
+        }
     }
 }
 
@@ -91,7 +96,10 @@ fn load_select<P: AsRef<Path>>(path: P) {
         return;
     }
 
-    *CURRENT_USER.write().unwrap() = json.unwrap();
+    *CURRENT_USER.write().unwrap() = json.unwrap().map(|mut key| {
+        key.uuid = normalize_uuid(&key.uuid);
+        key
+    });
 }
 
 /// 将内存中所有账户持久化到磁盘
@@ -136,7 +144,7 @@ pub fn get(uuid: &str, auth_type: AuthType) -> Option<LoginObj> {
     let auths = AUTHS.read().unwrap();
     auths
         .get(&UserKeyObj {
-            uuid: uuid.to_string(),
+            uuid: normalize_uuid(uuid),
             auth_type,
         })
         .cloned()
@@ -145,23 +153,52 @@ pub fn get(uuid: &str, auth_type: AuthType) -> Option<LoginObj> {
 /// 从 JSON 文件批量导入账户列表
 ///
 /// 文件内容应为 `Vec<LoginObj>` 格式的 JSON 数组。
-/// 导入的账户按 `UserKeyObj` 为唯一键合并到已有存储中。
+/// 导入的账户按 `UserKeyObj` 为唯一键合并到已有存储中；
+/// 同一个键下有多条记录时保留最近登录的一条，UUID 只作为键的一部分参与判重。
 ///
 /// - `file`: JSON 文件路径
 ///
 /// # 返回值
 ///
-/// 成功时返回 `Ok(())`，失败时返回反序列化错误
-pub fn import<P: AsRef<Path>>(file: P) -> CoreResult<()> {
+/// 成功时返回是否遇到同键账户；失败时返回反序列化错误
+pub fn import<P: AsRef<Path>>(file: P) -> CoreResult<bool> {
     let json = serialize_tools::json_from_file::<Vec<LoginObj>>(file)?;
 
     let mut auths = AUTHS.write().unwrap();
+    let mut merged = false;
 
-    for item in json.into_iter() {
-        auths.insert(item.get_key(), item);
+    for mut item in json.into_iter() {
+        let raw_uuid = item.uuid.clone();
+        item.uuid = normalize_uuid(&raw_uuid);
+        let key = item.get_key();
+        let replace = match auths.get(&key) {
+            None => true,
+            Some(old) => {
+                merged = true;
+                newer_than(&item, old)
+            }
+        };
+        if replace {
+            auths.insert(key, item);
+        }
     }
 
-    Ok(())
+    Ok(merged)
+}
+
+/// 同键的两条账户记录保留哪一条
+///
+/// - `new`: 待导入的记录
+/// - `old`: 存储中已有的记录
+///
+/// # 返回值
+///
+/// 待导入记录登录时间更新时返回 `true`；时间相同时未过期的一方优先
+fn newer_than(new: &LoginObj, old: &LoginObj) -> bool {
+    if new.last_login != old.last_login {
+        return new.last_login > old.last_login;
+    }
+    old.is_expired() && !new.is_expired()
 }
 
 /// 清除所有已保存的账户，内存与磁盘一并清空
@@ -205,6 +242,10 @@ pub fn get_current() -> Option<UserKeyObj> {
 /// # 返回值
 /// 联机会话锁定时拒绝切换并返回 false。
 pub fn set_current(user: Option<UserKeyObj>) -> bool {
+    let user = user.map(|mut key| {
+        key.uuid = normalize_uuid(&key.uuid);
+        key
+    });
     let lock = SELECTION_LOCK.read().unwrap();
     if lock.as_ref().is_some_and(|(_, key)| user.as_ref() != Some(key)) { return false; }
     *CURRENT_USER.write().unwrap() = user;
@@ -229,11 +270,12 @@ pub fn check_online_user() -> bool {
 impl LoginObj {
     /// 将当前账户保存到全局存储并持久化到磁盘，相同键覆盖更新
     pub fn save(&self) {
-        let key = self.get_key();
+        let mut item = self.clone();
+        item.uuid = normalize_uuid(&item.uuid);
         // 同 clear_auths：先释放写锁再落盘，防重入死锁
         {
             let mut auths = AUTHS.write().unwrap();
-            auths.insert(key, self.clone());
+            auths.insert(item.get_key(), item);
         }
 
         save();
