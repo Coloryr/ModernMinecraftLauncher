@@ -30,6 +30,7 @@ import { useSettingsLaunch } from "./composables/useSettingsLaunch";
 import { useSettingsJava } from "./composables/useSettingsJava";
 import { useSettingsClient } from "./composables/useSettingsClient";
 import { useSettingsLocalFiles } from "./composables/useSettingsLocalFiles";
+import { useSettingsGamepad } from "./composables/useSettingsGamepad";
 import { isSettingsTab, SETTINGS_TABS, type SettingsTab } from "./types";
 import { groupsOfTab, RESETTABLE_GROUPS, type SettingsHit } from "./search";
 import "./settings.css";
@@ -62,6 +63,8 @@ const java = useSettingsJava();
 const client = useSettingsClient();
 // 本地文件的统计只在打开那一页时做，见 LocalFilesTab 的 onMounted
 const files = useSettingsLocalFiles();
+// 手柄编辑状态放在这一层：切标签时 GamepadTab 会被卸载，未保存内容不能跟着丢
+const gamepad = useSettingsGamepad();
 
 // ================= 锁定客户端设置 =================
 
@@ -311,7 +314,7 @@ function onKeyDown(e: KeyboardEvent) {
           <NetworkTab v-else-if="tab === 'network'" :settings="network" :flash-group="flashGroup" />
           <LaunchTab v-else-if="tab === 'launch'" :settings="launch" :look="client" :locked="locked"
             :flash-group="flashGroup" />
-          <GamepadTab v-else-if="tab === 'gamepad'" />
+          <GamepadTab v-else-if="tab === 'gamepad'" :settings="gamepad" :flash-group="flashGroup" />
           <SkinTab v-else-if="tab === 'skin'" :settings="skin" :flash-group="flashGroup" />
           <ClientTab v-else-if="tab === 'client' && (clientUnlocked || !clientLocked)" :settings="client"
             v-model:win="launchWin" :flash-group="flashGroup" />

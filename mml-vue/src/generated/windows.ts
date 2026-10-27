@@ -59,6 +59,7 @@ export { default as WinMainSidebarMainSidebar } from "../windows/main/sidebar/Ma
 export { default as WinMainTopbarMainTopbar } from "../windows/main/topbar/MainTopbar.vue";
 export { default as ResourceWindow } from "../windows/resource/ResourceWindow.vue";
 export { default as WinResourcePartsCategoryRail } from "../windows/resource/parts/CategoryRail.vue";
+export { default as WinResourcePartsCloudSavePane } from "../windows/resource/parts/CloudSavePane.vue";
 export { default as WinResourcePartsConfirmModal } from "../windows/resource/parts/ConfirmModal.vue";
 export { default as WinResourcePartsContentHead } from "../windows/resource/parts/ContentHead.vue";
 export { default as WinResourcePartsDatapackPane } from "../windows/resource/parts/DatapackPane.vue";
@@ -89,6 +90,7 @@ export { default as WinResourcePartsModModUpdateModal } from "../windows/resourc
 export { default as ServerInstanceWindow } from "../windows/server_instance/ServerInstanceWindow.vue";
 export { default as SettingsWindow } from "../windows/settings/SettingsWindow.vue";
 export { default as WinSettingsPartsActionSelect } from "../windows/settings/parts/ActionSelect.vue";
+export { default as WinSettingsPartsGamepadTestPanel } from "../windows/settings/parts/GamepadTestPanel.vue";
 export { default as WinSettingsPartsSaveStateText } from "../windows/settings/parts/SaveStateText.vue";
 export { default as WinSettingsPartsSettingsGroup } from "../windows/settings/parts/SettingsGroup.vue";
 export { default as WinSettingsPartsSettingsRail } from "../windows/settings/parts/SettingsRail.vue";
