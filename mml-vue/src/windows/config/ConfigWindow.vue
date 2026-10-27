@@ -618,10 +618,11 @@ useWindowRefresh(() => {
             {{ t("config.readonly") }}
           </template>
         </span>
-        <BaseButton v-if="canSave" size="sm" :variant="unsaved ? 'accent' : 'ghost'"
-          :disabled="loading || busy || !unsaved" @click="save">
+        <BaseButton v-if="canSave" size="sm" :variant="unsaved ? 'accent' : 'ghost'" class="icon-btn-head"
+          :disabled="loading || busy || !unsaved" @click="save"
+          v-tip="t(saving || nbtSaving ? 'config.saving' : 'config.save')"
+          :aria-label="t(saving || nbtSaving ? 'config.saving' : 'config.save')">
           <GlyphIcon name="save" :size="16" :weight="1.8" />
-          {{ t(saving || nbtSaving ? "config.saving" : "config.save") }}
         </BaseButton>
       </div>
     </template>

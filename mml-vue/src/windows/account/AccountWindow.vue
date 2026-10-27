@@ -637,26 +637,31 @@ function tokenLabel(acc: AccountStoreDto): string {
       <!-- 搜索框与设置窗口那是同一份（components/ui/SearchBox），
            宽度按这里的需要给：这一排还有筛选下拉与视图切换，168px 是余下的空间 -->
       <SearchBox v-model="searchText" :placeholder="t('account.search')" width="168px" />
-      <SegmentedTabs class="head-tabs" :model-value="view" :options="VIEW_OPTIONS"
+      <SegmentedTabs class="head-tabs" :model-value="view" :options="VIEW_OPTIONS" icon-only
         @update:model-value="view = $event as ViewMode" />
-      <!-- 添加账户已移到账户列表里（作为列表的第一项，三种视图都是），
-           标题栏只留筛选 / 搜索 / 视图切换这些"看"的控件 -->
+      <BaseButton size="sm" variant="primary" class="icon-btn-head" v-tip="t('account.addTitle')"
+        :aria-label="t('account.addTitle')" @click="openAdd">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </BaseButton>
     </template>
 
     <!-- 视图：平铺 / 列表 / 详情（见 views/ 目录）；详情模式下视图区自己管理滚动 -->
     <div class="view-area" :class="{ fill: view === 'detail' }">
       <AccountGrid v-if="view === 'grid'" :accounts="filtered" :filtering="filtering"
-        :current-uuid="currentAccount?.uuid ?? ''" @add="openAdd" @menu="openAccountMenu"
+        :current-uuid="currentAccount?.uuid ?? ''" @menu="openAccountMenu"
         @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin" @refresh-skin="refreshSkin"
         @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" />
       <AccountList v-else-if="view === 'list'" :accounts="filtered" :filtering="filtering"
         :current-uuid="currentAccount?.uuid ?? ''" @menu="openAccountMenu"
-        :token-label="tokenLabel" @add="openAdd" @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin"
+        :token-label="tokenLabel" @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin"
         @refresh-skin="refreshSkin" @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" />
       <AccountDetail v-else :accounts="filtered" :filtering="filtering" :current-uuid="currentAccount?.uuid ?? ''"
         @menu="openAccountMenu"
         :token-label="tokenLabel"
-        @add="openAdd" @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin" @refresh-skin="refreshSkin"
+        @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin" @refresh-skin="refreshSkin"
         @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" />
     </div>
 

@@ -67,7 +67,11 @@
         // 场景可用 { __delay, value } / { __error } 模拟慢查询与失败
         if (entry && typeof entry === "object" && !Array.isArray(entry)) {
           if (entry.__delay) await sleep(entry.__delay);
-          if (entry.__error) throw new Error(entry.__error);
+          // 字符串错误不包 Error：tErr 才能按 i18n key 翻译
+          if (entry.__error) throw entry.__error;
+          // 目录型假数据：按 dir 参数取子项，避免文件树递归回根目录
+          if (entry.__dirs) return entry.__dirs[args?.dir ?? ""] ?? [];
+          if (entry.__byIndex) return entry.__byIndex[String(args?.index ?? "null")] ?? entry.__byIndex.default ?? [];
           if ("value" in entry) return clone(entry.value);
         }
         return clone(entry);

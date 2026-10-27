@@ -261,11 +261,10 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
     <!-- 标题栏：当前实例（原先挤在左侧分类栏顶部）+ 下载资源入口 -->
     <template #head-right>
       <InstanceChip :instance="instance" />
-      <!-- BaseButton 本身就是 inline-flex + gap，图标与文字自然成一行，不用额外类 -->
       <!-- 资源下载窗口也是一个实例一个，没有实例就无处可放，按钮跟着灰掉 -->
-      <BaseButton size="sm" variant="accent" :disabled="!instanceUuid" @click="openDownload">
-        <GlyphIcon name="download" :size="14" />
-        {{ t("resource.download") }}
+      <BaseButton size="sm" variant="accent" class="icon-btn-head" :disabled="!instanceUuid"
+        v-tip="t('resource.download')" :aria-label="t('resource.download')" @click="openDownload">
+        <GlyphIcon name="download" :size="15" />
       </BaseButton>
     </template>
 

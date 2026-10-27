@@ -10,6 +10,7 @@ import {
 } from "../../../lib/accountImages";
 import AccountActions from "../../../components/AccountActions.vue";
 import AccountTypeBadge from "../../../components/AccountTypeBadge.vue";
+import AccountEmpty from "../AccountEmpty.vue";
 import type { AccountStoreDto } from "../../../lib/bindings";
 
 const props = defineProps<{
@@ -24,8 +25,6 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  /** 打开「添加账户」表单 */
-  (e: "add"): void;
   /** 双击账户：切换为当前使用 */
   (e: "switch", acc: AccountStoreDto): void;
   /** 刷新该账户的令牌 */
@@ -52,7 +51,7 @@ function isCurrent(acc: AccountStoreDto): boolean {
 
 <template>
   <div class="acc-detail">
-    <div class="table-wrap">
+    <div v-if="accounts.length > 0" class="table-wrap">
       <table class="detail-table wide">
         <thead>
           <tr>
@@ -67,18 +66,6 @@ function isCurrent(acc: AccountStoreDto): boolean {
           </tr>
         </thead>
         <tbody>
-          <!-- 添加账户：作为表格的第一行 -->
-          <tr v-if="!filtering" class="add-tr" @click="emit('add')">
-            <td class="col-actions">
-              <button class="add-btn" v-tip="t('account.addTitle')" :aria-label="t('account.addTitle')">
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"
-                  stroke-linecap="round">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-              </button>
-            </td>
-            <td class="cell-name add-text" colspan="7">{{ t("account.add") }}</td>
-          </tr>
           <tr v-for="acc in accounts" :key="acc.uuid" :class="{ current: isCurrent(acc) }"
             @dblclick="!accountLocked && emit('switch', acc)"
             @contextmenu.prevent="emit('menu', { event: $event, acc })">
@@ -111,7 +98,9 @@ function isCurrent(acc: AccountStoreDto): boolean {
         </tbody>
       </table>
     </div>
-    <div v-if="accounts.length === 0 && filtering" class="empty-tip">{{ t("account.searchEmpty") }}</div>
+    <AccountEmpty v-else class="detail-empty"
+      :title="filtering ? t('account.searchEmpty') : t('account.emptyTitle')"
+      :hint="filtering ? undefined : t('account.emptyHint')" />
   </div>
 </template>
 
@@ -166,39 +155,6 @@ function isCurrent(acc: AccountStoreDto): boolean {
 
 .detail-table tbody tr.current td {
   background: var(--accent-soft);
-}
-
-/* 添加账户行：虚线下边框，整行可点，观感与列表/网格视图的添加项一致 */
-.add-tr {
-  cursor: pointer;
-  color: var(--text-dim);
-}
-
-.add-tr:hover {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.add-tr td {
-  border-bottom-style: dashed !important;
-}
-
-.add-tr .add-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--ctl-h);
-  height: var(--ctl-h);
-  padding: 0;
-  border: 1px dashed currentColor;
-  border-radius: 8px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-
-.add-text {
-  font-weight: 600;
 }
 
 .col-actions {

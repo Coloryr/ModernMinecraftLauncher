@@ -6,12 +6,13 @@ import { t } from "../../../lib/i18n";
 import { accountAvatarUrl, hasNoSkin, imageFailed, imageLoading, markImageFailed, markImageLoaded } from "../../../lib/accountImages";
 import AccountActions from "../../../components/AccountActions.vue";
 import AccountTypeBadge from "../../../components/AccountTypeBadge.vue";
+import AccountEmpty from "../AccountEmpty.vue";
 import type { AccountStoreDto } from "../../../lib/bindings";
 
 const props = defineProps<{
   /** 要展示的账户，调用方已按锁定 / 筛选 / 搜索过滤好 */
   accounts: AccountStoreDto[];
-  /** 列表是不是被筛过：为真时不列「添加」入口，空结果给文案 */
+  /** 列表是不是被筛过：空结果给对应文案 */
   filtering: boolean;
   /** 当前使用的账户 uuid，空串表示没有 */
   currentUuid: string;
@@ -20,8 +21,6 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  /** 打开「添加账户」表单 */
-  (e: "add"): void;
   /** 双击账户：切换为当前使用 */
   (e: "switch", acc: AccountStoreDto): void;
   /** 刷新该账户的令牌 */
@@ -68,18 +67,6 @@ function hidePreview() {
 
 <template>
   <div class="acc-list">
-    <!-- 添加账户：作为列表的第一行，与账户行同一套布局 -->
-    <button v-if="!filtering" class="acc-row add-row" v-tip="t('account.addTitle')"
-      :aria-label="t('account.addTitle')" @click="emit('add')">
-      <span class="add-icon">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-      </span>
-      <span class="row-name add-text">{{ t("account.add") }}</span>
-    </button>
-
     <div v-for="acc in accounts" :key="acc.uuid" class="acc-row" :class="{ current: isCurrent(acc) }"
       @dblclick="!accountLocked && emit('switch', acc)"
       @contextmenu.prevent="emit('menu', { event: $event, acc })">
@@ -109,7 +96,9 @@ function hidePreview() {
         @refresh-skin="emit('refreshSkin', acc)" @relogin="emit('relogin', acc)" @edit="emit('edit', acc)"
         @delete="emit('delete', acc)" />
     </div>
-    <div v-if="accounts.length === 0 && filtering" class="empty-tip">{{ t("account.searchEmpty") }}</div>
+    <AccountEmpty v-if="accounts.length === 0"
+      :title="filtering ? t('account.searchEmpty') : t('account.emptyTitle')"
+      :hint="filtering ? undefined : t('account.emptyHint')" />
 
     <!-- 悬停头像时的头像大图 -->
     <Teleport to="body">
@@ -141,44 +130,6 @@ function hidePreview() {
 .acc-row.current {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
-}
-
-/* 添加账户行：虚线边框，与账户行同布局（图标占头像槽的位置）。
-   底色取 --bg-side（比账户行的 --bg-card 暗一档）：全透明显得不能点，
-   --accent-soft 又太抢眼（那是选中态的浓度）。
-   悬停时虚线转实线：虚线是"这里还空着"的语义，鼠标上来就该是实心的选中感 */
-.add-row {
-  border-style: dashed;
-  border-color: var(--accent-border);
-  background: var(--bg-side);
-  color: var(--accent);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 13px;
-  text-align: left;
-  transition: border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
-}
-
-.add-row:hover {
-  border-style: solid;
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-
-.add-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  border: 1px dashed currentColor;
-}
-
-.add-text {
-  font-weight: 600;
 }
 
 /* 头像槽容器：相对定位，加载中时上面叠转圈 */

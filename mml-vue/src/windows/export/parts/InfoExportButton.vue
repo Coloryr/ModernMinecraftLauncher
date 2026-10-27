@@ -25,7 +25,13 @@ async function saveInfo() {
 </script>
 
 <template>
-  <BaseButton size="sm" :disabled="disabled || busy" @click="saveInfo">
-    {{ busy ? t("winExport.generatingInfo") : t("winExport.generateInfo") }}
+  <BaseButton size="sm" class="icon-btn-head" :disabled="disabled || busy"
+    v-tip="busy ? t('winExport.generatingInfo') : t('winExport.generateInfo')"
+    :aria-label="busy ? t('winExport.generatingInfo') : t('winExport.generateInfo')" @click="saveInfo">
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+      <path d="M14 3v5h5M9 13h6M9 17h6" />
+    </svg>
   </BaseButton>
 </template>

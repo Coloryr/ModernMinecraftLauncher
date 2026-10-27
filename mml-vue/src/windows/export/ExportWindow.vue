@@ -15,6 +15,7 @@ import WindowFrame from "../../components/ui/WindowFrame.vue";
 import IconTabs from "../../components/ui/IconTabs.vue";
 import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
+import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import FilePicker from "./parts/FilePicker.vue";
 import { isPickedPath } from "./picked";
@@ -839,8 +840,10 @@ onBeforeUnmount(() => {
       </select>
       <InfoExportButton v-if="!serverPack" :uuid="currentUuid" :name="info?.name ?? ''"
         :disabled="busy || loadingInfo || !info" />
-      <BaseButton size="sm" variant="primary" :disabled="busy || loadingInfo || !info" @click="startExport()">
-        {{ running ? t("winExport.exporting") : t("winExport.exportBtn") }}
+      <BaseButton size="sm" variant="primary" class="icon-btn-head" :disabled="busy || loadingInfo || !info"
+        v-tip="running ? t('winExport.exporting') : t('winExport.exportBtn')"
+        :aria-label="running ? t('winExport.exporting') : t('winExport.exportBtn')" @click="startExport()">
+        <GlyphIcon name="export" :size="15" :weight="1.8" />
       </BaseButton>
     </template>
 

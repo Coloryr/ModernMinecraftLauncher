@@ -217,7 +217,7 @@ const SETTINGS_INDEX: IndexEntry[] = [
   { tab: "client", group: "gameTitle", labelKey: "winSettings.gameTitle", extra: ["title", "标题文字"] },
   { tab: "client", group: "gameTitle", labelKey: "winSettings.titleDelay", extra: ["title", "间隔"] },
   { tab: "client", group: "serverPack", labelKey: "winSettings.serverPackExport", extra: ["server pack", "serverpack", "服务器包", "导出", "分发"] },
-  { tab: "gamepad", group: "gamepad", labelKey: "winSettings.tab.gamepad", extra: ["gamepad", "joystick", "controller", "手柄", "摇杆", "按键映射"] },
+  { tab: "gamepad", group: "gamepad", labelKey: "winSettings.tabDesc.gamepad", extra: ["gamepad", "joystick", "controller", "手柄", "摇杆", "按键映射"] },
 
   // ---- 本地文件 ----
   { tab: "files", group: "localFiles", labelKey: "winSettings.localFile.cache", extra: ["cache", "cleanup", "disk", "缓存", "清理", "占用"] },

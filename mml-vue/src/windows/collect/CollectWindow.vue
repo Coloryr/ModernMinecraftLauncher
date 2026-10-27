@@ -898,9 +898,10 @@ function selectGroup(group: string) {
         <span class="count">{{ t("collect.count", { n: shownCount }) }}</span>
         <!-- 多选模式的入口：默认不进行多选，点这里才进（进去后由多选条负责退出）。
              当前过滤下一项都没有时没有可勾的东西，按钮不出现 -->
-        <button v-if="!multiSelect && shownCount > 0" class="multi-toggle" @click="toggleMultiSelect">
-          {{ t("collect.multiSelect") }}
-        </button>
+        <BaseButton v-if="!multiSelect && shownCount > 0" size="sm" variant="ghost" class="icon-btn-head"
+          v-tip="t('collect.multiSelect')" :aria-label="t('collect.multiSelect')" @click="toggleMultiSelect">
+          <GlyphIcon name="check-square" :size="15" :weight="1.8" />
+        </BaseButton>
 
       </div>
     </template>

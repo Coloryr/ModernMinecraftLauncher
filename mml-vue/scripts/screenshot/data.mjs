@@ -125,7 +125,7 @@ export const accounts = {
       avatarColor: "#4f8cff",
       skin: "",
       tokenStatus: "ok",
-      avatar: svgImage("#4f8cff", "S"),
+      avatar: null,
       server: null,
       ext1: null,
       ext2: null,
@@ -344,7 +344,7 @@ const mod = (uuid, file, modId, name, version, extra = {}) => ({
 });
 
 export const mods = [
-  mod("mod-1", "appliedenergistics2-15.2.1.jar", "ae2", "Applied Energistics 2", "15.2.1"),
+  mod("mod-1", "appliedenergistics2-15.2.1.jar", "ae2", "Applied Energistics 2", "15.2.1", { hasDependencies: true }),
   mod("mod-2", "geckolib-4.7.jar", "geckolib", "GeckoLib 4", "4.7.0", { loaders: ["neoforge"] }),
   mod("mod-3", "jei-1.21.4.jar", "jei", "Just Enough Items", "19.21.0.247"),
   mod("mod-4", "jade-15.10.0.jar", "jade", "Jade", "15.10.0"),
@@ -356,8 +356,17 @@ export const mods = [
 
 export const resourceView = { order: [], category: "mods", modView: "list", modColWidths: {} };
 export const modGroups = [];
-export const blockGroups = { order: [], groups: [], members: {}, favorites: [] };
-export const blockItems = [];
+export const blockGroups = { order: ["custom-1"], groups: [{ uuid: "custom-1", name: "我的方块" }], members: { "custom-1": ["stone", "glass"] }, favorites: [] };
+export const blockItems = [
+  { id: "stone", name: "石头", cat: "建筑方块", catId: "building", catUuid: "cat-building", image: svgImage("#9ca3af", "石") },
+  { id: "oak-planks", name: "橡木木板", cat: "建筑方块", catId: "building", catUuid: "cat-building", image: svgImage("#c89b6a", "木") },
+  { id: "glass", name: "玻璃", cat: "建筑方块", catId: "building", catUuid: "cat-building", image: svgImage("#a5d8f3", "玻") },
+  { id: "grass", name: "草方块", cat: "建筑方块", catId: "building", catUuid: "cat-building", image: svgImage("#6fbf73", "草") },
+  { id: "lantern", name: "灯笼", cat: "装饰方块", catId: "decor", catUuid: "cat-decor", image: svgImage("#f6c453", "灯") },
+  { id: "bookshelf", name: "书架", cat: "装饰方块", catId: "decor", catUuid: "cat-decor", image: svgImage("#a97a4e", "书") },
+  { id: "chest", name: "箱子", cat: "功能方块", catId: "functional", catUuid: "cat-functional", image: svgImage("#b7793f", "箱") },
+  { id: "furnace", name: "熔炉", cat: "功能方块", catId: "functional", catUuid: "cat-functional", image: svgImage("#8f8f8f", "炉") },
+];
 export const collectData = { items: [], groups: {} };
 
 export const lobbyView = {
@@ -395,6 +404,15 @@ export const gamepadConfig = {
   mouse: { cursorStick: "left", turnStick: "right", cursorSpeed: 50, turnSpeed: 50, deadzone: 0.2 },
 };
 
+const modEntry = (path, size, modId, fileId, url = "") => ({
+  path,
+  dir: false,
+  size,
+  url,
+  modId,
+  fileId,
+  sha1: "",
+});
 const entry = (path, size, dir = false) => ({
   path,
   dir,
@@ -409,9 +427,48 @@ export const exportInfo = {
   name: "1.21.4 NeoForge",
   customLoader: false,
   mods: [
-    entry("mods/appliedenergistics2-15.2.1.jar", 4_200_000),
-    entry("mods/jei-1.21.4.jar", 2_400_000),
-    entry("mods/jade-15.10.0.jar", 1_100_000),
+    modEntry("mods/appliedenergistics2-15.2.1.jar", 4_200_000, "238222", "5821001", "https://example.com/mods/ae2.jar"),
+    modEntry("mods/jei-1.21.4.jar", 2_400_000, "238222", "5821002", "https://example.com/mods/jei.jar"),
+    modEntry("mods/jade-15.10.0.jar", 1_100_000, "324717", "5821003", "https://example.com/mods/jade.jar"),
+  ],
+};
+
+export const exportRoot = [
+  { ...entry("mods", 0, true), dir: true },
+  { ...entry("config", 0, true), dir: true },
+  { ...entry("saves", 0, true), dir: true },
+  entry("options.txt", 2048),
+  entry("servers.dat", 512),
+];
+
+export const exportInstanceRoot = [
+  { ...entry(".minecraft", 0, true), dir: true },
+  { ...entry("instance.json", 1024), dir: false },
+  { ...entry("screenshots", 0, true), dir: true },
+];
+
+export const statsData = {
+  launchCount: 42,
+  launchDoneCount: 35,
+  launchErrorCount: 7,
+  totalSeconds: 248400,
+  instances: [
+    { uuid: "inst-1", name: "1.21.4 NeoForge", count: 20, failed: 3, seconds: 108000, last: 1761390000000, running: false, deleted: false },
+    { uuid: "inst-2", name: "1.20.1 Forge", count: 12, failed: 2, seconds: 75600, last: 1761290000000, running: false, deleted: false },
+    { uuid: "inst-3", name: "Fabric 1.21.1", count: 7, failed: 1, seconds: 46800, last: 1761190000000, running: false, deleted: false },
+    { uuid: "other", name: "其他", count: 3, failed: 1, seconds: 18000, last: 1761000000000, running: false, deleted: false },
+    { uuid: "gone", name: "已删整合包", count: 2, failed: 0, seconds: 7200, last: 1760900000000, running: false, deleted: true },
+  ],
+};
+
+export const statsSingleDay = {
+  days: [{ date: "2026-10-27", seconds: 28800, count: 5, failed: 1 }],
+  totalSeconds: 28800,
+  activeDays: 1,
+  byInstance: [
+    { uuid: "inst-1", name: "1.21.4 NeoForge", seconds: 18000, count: 3, failed: 0 },
+    { uuid: "inst-2", name: "1.20.1 Forge", seconds: 7200, count: 1, failed: 1 },
+    { uuid: "other", name: "其他", seconds: 3600, count: 1, failed: 0 },
   ],
 };
 
@@ -443,8 +500,60 @@ export const logRuntime = [
 export const configFiles = [
   { name: "options.txt", fileType: "text" },
   { name: "servers.dat", fileType: "nbt" },
-  { name: "config", fileType: "text" },
-  { name: "logs", fileType: "text" },
+  { name: "level.dat", fileType: "nbt" },
+  { name: "region/r.0.0.mca", fileType: "mca" },
+  { name: "screenshots/2026-10-25.png", fileType: "image" },
+  { name: "config/neoforge.toml", fileType: "toml" },
+  { name: "logs/latest.log", fileType: "text" },
+  { name: "data/cache.bin", fileType: "archive" },
+];
+
+const nbt = (name, kind, value, children = [], items = []) => ({
+  name, kind, value,
+  length: kind === "List" ? items.length : kind === "Compound" ? children.length : 0,
+  children, items,
+});
+export const configNbt = {
+  sha1: "nbt-sha1",
+  node: nbt("", "Compound", "", [
+    nbt("servers", "List", "", [], [
+      nbt("", "Compound", "", [
+        nbt("name", "String", "Hypixel"),
+        nbt("ip", "String", "mc.hypixel.net"),
+        nbt("acceptTextures", "Byte", "1"),
+      ]),
+      nbt("", "Compound", "", [
+        nbt("name", "String", "2b2t"),
+        nbt("ip", "String", "2b2t.org"),
+        nbt("acceptTextures", "Byte", "0"),
+      ]),
+    ]),
+    nbt("DataVersion", "Int", "4189"),
+  ]),
+};
+
+export const configChunkNbt = {
+  sha1: "chunk-sha1",
+  node: nbt("", "Compound", "", [
+    nbt("Level", "Compound", "", [
+      nbt("xPos", "Int", "0"),
+      nbt("zPos", "Int", "0"),
+      nbt("Status", "String", "minecraft:full"),
+      nbt("LastUpdate", "Long", "1761390000"),
+      nbt("InhabitedTime", "Long", "128000"),
+      nbt("biomes", "Compound", "", [
+        nbt("palette", "List", "", [], [nbt("", "String", "minecraft:plains")]),
+      ]),
+      nbt("block_entities", "List", "", [], []),
+    ]),
+  ]),
+};
+
+export const configMca = [
+  { index: 0, x: 0, z: 0, pos: 4096, sectors: 2, time: 1761390000 },
+  { index: 1, x: 1, z: 0, pos: 12288, sectors: 3, time: 1761390120 },
+  { index: 2, x: 0, z: 1, pos: 20480, sectors: 1, time: 1761390240 },
+  { index: 34, x: 2, z: 1, pos: 28672, sectors: 2, time: 1761390360 },
 ];
 export const saves = [
   { dir: "世界一", levelName: "新的世界", lastPlayed: 1761390000, gameType: 0, hardCore: false, difficulty: 2, broken: false, seed: "123456789", icon: "", backups: 2, autoEnter: false },
@@ -479,7 +588,81 @@ export const collectItems = [
   { uuid: "col-2", name: "Iris Shaders", source: "modrinth", fileType: "shaderpack", pid: "iris", icon: null, url: "https://modrinth.com/mod/iris", favTime: 1761290000000, loaders: ["fabric"], gameVersions: ["1.21.1"] },
   { uuid: "col-3", name: "Create", source: "curseforge", fileType: "mod", pid: "create", icon: null, url: "https://www.curseforge.com/minecraft/mc-mods/create", favTime: 1761190000000, loaders: ["forge"], gameVersions: ["1.20.1"] },
 ];
-export const collectWithData = { items: collectItems, groups: { "模组": ["col-1", "col-3"], "光影包": ["col-2"] } };
+export const collectWithData = { items: collectItems, groups: { "我的分组": ["col-1"], "模组": ["col-1", "col-3"], "光影包": ["col-2"] } };
+
+export const modpackItems = [
+  {
+    name: "Better MC [FORGE] 1.20.1",
+    summary: "面向 Forge 的轻量冒险整合包，包含优化、任务与大量结构。",
+    image: svgImage("#4f8cff", "B"),
+    authors: [{ name: "Luna", logo: null }],
+    tag: [{ name: "冒险", logo: null, svg: null }, { name: "优化", logo: null, svg: null }],
+    screenshots: [{ name: "主菜单", logo: svgImage("#4f8cff", "1"), description: "主菜单预览" }],
+    downloadCount: 1234567,
+    date: "2026-10-20T10:00:00Z",
+    download: false,
+    canStar: true,
+    isStar: false,
+    downloadNow: false,
+    url: "https://example.com/modpack/better-mc",
+    mcmod: null,
+    source: { fileType: "modpack", source: "curseforge", pid: "better-mc", fid: "" },
+  },
+  {
+    name: "Adrenaline",
+    summary: "专注性能的 Modrinth 整合包，适合低配机器。",
+    image: svgImage("#f59e0b", "A"),
+    authors: [{ name: "Mika", logo: null }],
+    tag: [{ name: "性能", logo: null, svg: null }],
+    screenshots: [],
+    downloadCount: 98765,
+    date: "2026-10-18T08:00:00Z",
+    download: false,
+    canStar: true,
+    isStar: true,
+    downloadNow: false,
+    url: "https://example.com/modpack/adrenaline",
+    mcmod: null,
+    source: { fileType: "modpack", source: "modrinth", pid: "adrenaline", fid: "" },
+  },
+];
+
+export const modpackDetail = {
+  summary: "面向 Forge 的轻量冒险整合包，包含优化、任务与大量结构。",
+  body: "## Better MC\n\n这是一个用于截图测试的整合包手册。\n\n- 内置任务章节\n- 包含 200+ 模组\n- 适配 1.20.1\n\n### 安装说明\n\n1. 选择版本\n2. 点击安装\n3. 等待整合包任务完成\n",
+  authors: [{ name: "Luna", logo: null }],
+  tag: [{ name: "冒险", logo: null, svg: null }, { name: "优化", logo: null, svg: null }],
+  screenshots: [
+    { name: "主菜单", logo: svgImage("#4f8cff", "1"), description: "主菜单预览" },
+    { name: "任务书", logo: svgImage("#7bc4ff", "2"), description: "任务书预览" },
+  ],
+};
+
+export const modpackFiles = {
+  list: [
+    { name: "Better MC 1.20.1 v25.0.0", download: 456789, size: 734003200, time: "2026-10-20T10:00:00Z", isDownload: false, downloadNow: false, source: { fileType: "modpack", source: "curseforge", pid: "better-mc", fid: "f-25" } },
+    { name: "Better MC 1.20.1 v24.5.0", download: 123456, size: 728000000, time: "2026-10-12T10:00:00Z", isDownload: false, downloadNow: false, source: { fileType: "modpack", source: "curseforge", pid: "better-mc", fid: "f-24" } },
+    { name: "Better MC 1.20.1 v24.0.0", download: 98765, size: 720000000, time: "2026-10-01T10:00:00Z", isDownload: false, downloadNow: false, source: { fileType: "modpack", source: "curseforge", pid: "better-mc", fid: "f-24-0" } },
+  ],
+  count: 3,
+  name: "Better MC [FORGE] 1.20.1",
+  maxPage: 1,
+};
+
+export const modpackStatusFailed = {
+  windowOpen: true,
+  tasks: [
+    { uuid: "task-2", source: "curseforge", pid: "better-mc", fid: "f-24", name: "Better MC", icon: svgImage("#ef4444", "B"), kind: "install", state: "downloadFile", now: 18, total: 100, subText: "连接超时", subNow: 0, subTotal: 0, done: false, failed: true, cancelled: false, error: "网络超时", instanceUuid: null },
+  ],
+};
+
+export const modpackStatus = {
+  windowOpen: true,
+  tasks: [
+    { uuid: "task-1", source: "curseforge", pid: "better-mc", fid: "f-25", name: "Better MC", icon: svgImage("#4f8cff", "B"), kind: "install", state: "downloadFile", now: 42, total: 100, subText: "mods/sodium-0.5.11.jar", subNow: 50, subTotal: 100, done: false, failed: false, cancelled: false, error: null, instanceUuid: null },
+  ],
+};
+
 export const downloadStatus = {
   tasks: [
     { id: 1, total: 3, completed: 2, failed: 0, allBytes: 73400320, nowBytes: 52428800, elapsedMs: 42000, paused: false },
@@ -542,6 +725,32 @@ export function moreCommands(extra = {}) {
     ],
     resource_mod_groups_collapsed: [],
     resource_list_mods: mods,
+    resource_mods_update_check: {
+      checked: 8,
+      failed: 0,
+      updates: [
+        { uuid: "mod-1", file: "appliedenergistics2-15.2.1.jar", disable: false, name: "Applied Energistics 2", version: "15.2.1", source: "curseforge", projectId: "238222", fileId: "5821001", newFileId: "5822001", newVersion: "15.3.0", newFile: "appliedenergistics2-15.3.0.jar", date: "2026-10-22" },
+        { uuid: "mod-7", file: "create-6.0.4.jar", disable: false, name: "Create", version: "6.0.4", source: "modrinth", projectId: "create", fileId: "f-1", newFileId: "f-2", newVersion: "6.1.0", newFile: "create-6.1.0.jar", date: "2026-10-21" },
+      ],
+    },
+    resource_mods_dep_test: [
+      { modid: "ae2", kind: "missing", required: "geckolib", installed: "", requiredBy: ["Applied Energistics 2"] },
+      { modid: "jei", kind: "mismatch", required: "19.20", installed: "19.21.0.247", requiredBy: ["Jade"] },
+      { modid: "sodium", kind: "disabled", required: "0.6.0", installed: "0.6.5", requiredBy: ["Iris Shaders"] },
+    ],
+    resource_mods_dep_tree: {
+      nodes: [
+        { key: "ae2", label: "Applied Energistics 2", modId: "ae2", version: "15.2.1", icon: "", root: true, nested: false, virtual: false, installed: true, missing: false, disabled: false, mandatory: true, required: [], problem: null },
+        { key: "geckolib", label: "GeckoLib 4", modId: "geckolib", version: "4.7.0", icon: "", root: false, nested: false, virtual: false, installed: true, missing: false, disabled: false, mandatory: true, required: ["ae2"], problem: null },
+        { key: "jei", label: "Just Enough Items", modId: "jei", version: "19.21.0.247", icon: "", root: false, nested: false, virtual: false, installed: true, missing: false, disabled: false, mandatory: true, required: ["ae2"], problem: null },
+        { key: "missing", label: "Missing Dependency", modId: "missing", version: "1.0.0", icon: "", root: false, nested: false, virtual: true, installed: false, missing: true, disabled: false, mandatory: true, required: ["geckolib"], problem: "missing" },
+      ],
+      edges: [
+        { id: "e1", from: "ae2", to: "geckolib", optional: false, required: "4.7" },
+        { id: "e2", from: "ae2", to: "jei", optional: false, required: "19.20" },
+        { id: "e3", from: "geckolib", to: "missing", optional: false, required: "1.0.0" },
+      ],
+    },
     resource_view_set: null,
     resource_mod_groups_collapsed_set: null,
     add_get_version_types: ["release", "snapshot", "old_beta", "old_alpha"],
@@ -554,7 +763,7 @@ export function moreCommands(extra = {}) {
     add_modpack_last_source: "curseforge",
     add_modpack_set_last_source: null,
     add_resource_set_last_source: null,
-    add_resource_categories: {},
+    add_resource_categories: { adventure: "冒险", tech: "科技" },
     add_resource_game_versions: ["1.21.4", "1.21.1", "1.20.1", "1.19.2"],
     add_resource_sort_type: ["relevance", "downloads", "follows", "newest", "updated"],
     resource_mod_group_order: [],
@@ -570,7 +779,7 @@ export function moreCommands(extra = {}) {
       ],
     },
     add_resource_last_source: "curseforge",
-    add_resource_source_type: ["mod", "resourcepack", "shaderpack", "save", "datapack"],
+    add_resource_source_type: ["curseforge", "modrinth"],
     collect_get_data: collectData,
     collect_project_icon: null,
     collect_image_url: null,
@@ -578,28 +787,51 @@ export function moreCommands(extra = {}) {
     java_download_get_options: javaOptions,
     java_download_get_list: [],
     block_get_groups: blockGroups,
+    block_set_groups: null,
     block_list: blockItems,
     log_get_files: [],
     log_get_runtime: logRuntime,
     log_set_setting: null,
     export_get_info: exportInfo,
-    export_list_dir: [],
-    export_list_instance_dir: [],
+    export_list_dir: { __dirs: {
+      "": exportRoot,
+      mods: [entry("mods/sodium-0.6.5.jar", 2_400_000), entry("mods/iris-1.8.8.jar", 1_800_000)],
+      config: [entry("config/neoforge.toml", 1200)],
+      saves: [entry("saves/世界一/level.dat", 2048)],
+      resourcepacks: [entry("resourcepacks/FreshAnimations.zip", 4_800_000), entry("resourcepacks/Faithful 32x.zip", 12_000_000)],
+    } },
+    export_list_instance_dir: { __dirs: {
+      "": exportInstanceRoot,
+      ".minecraft": [entry(".minecraft/options.txt", 2048), entry(".minecraft/servers.dat", 512)],
+    } },
     lobby_prepare: lobbyView,
     lobby_status: lobbyView,
     config_tree_width: 240,
     config_get_files: configFiles,
+    config_open_nbt: { __byIndex: { null: configNbt, default: configNbt, "0": configChunkNbt } },
+    config_get_nbt: configNbt,
+    config_get_mca: configMca,
+    config_get_image: svgImage("#4f8cff", "图"),
+    config_get_bytes_slice: { offset: 0, length: 256, total: 4096, data: "AAECAwQFBgcICQ==" },
+    config_delete_file: null,
+    config_close_nbt: null,
     config_get_file: {
       text: "# 由截图脚本提供的示例配置\nmaxFps: 120\nrenderDistance: 12\nguiScale: 2\nlanguage: zh_cn\n",
       sha1: "0123456789abcdef",
     },
     resource_list_saves: saves,
     gamepad_get_actions: gamepadActions,
+    gamepad_list: [],
     gamepad_get_profiles: gamepadProfiles,
     gamepad_get_config: gamepadConfig,
     app_build_exe_info: { path: "C:\\Program Files\\M²L\\mml-gui.exe", sha1: "a1b2c3d4e5f6" },
     stats_get_playtime: statsPlaytime,
-    add_modpack_list: { items: [], count: 0 },
+    add_modpack_list: { items: modpackItems, count: modpackItems.length },
+    add_modpack_detail: modpackDetail,
+    add_modpack_file: modpackFiles,
+    add_modpack_status: { windowOpen: false, tasks: [] },
+    add_modpack_cancel: null,
+    add_modpack_clear_done: null,
     add_resource_list: { items: [], count: 0 },
     resource_list_resourcepacks: packs,
     resource_list_servers: servers,
@@ -679,7 +911,8 @@ export function commonCommands(extra = {}) {
       autoShow: false,
     },
     download_get_status: { tasks: [], threads: [], speed: 0, paused: false },
-    stats_get_data: { launchCount: 0, launchDoneCount: 0, launchErrorCount: 0, totalSeconds: 0, instances: [] },
+    stats_get_data: statsData,
+    stats_get_playtime_single: statsSingleDay,
     block_status: { rendered: false, version: "", running: false, now: 0, total: 0, text: null, error: null },
     window_save_gui_config: null,
     window_check_colormc: null,

@@ -3,8 +3,8 @@
 import { computed } from "vue";
 import { t } from "../../../lib/i18n";
 import BaseButton from "../../../components/ui/BaseButton.vue";
-import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import SegmentedTabs from "../../../components/ui/SegmentedTabs.vue";
+import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import { BLOCK_SIZE_ORDER, isBlockSize, type BlockSize } from "../types";
 
 defineProps<{

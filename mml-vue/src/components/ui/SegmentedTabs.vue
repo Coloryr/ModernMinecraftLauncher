@@ -15,6 +15,8 @@ const props = defineProps<{
   modelValue: string;
   /** 禁用整组；加载期间锁住筛选控件用 */
   disabled?: boolean;
+  /** 只显示图标，文字只作为提示与读屏名 */
+  iconOnly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -35,11 +37,12 @@ const ICONS: Record<string, string> = {
 
 <template>
   <div class="seg-tabs">
-    <button v-for="opt in options" :key="opt.value" class="seg-btn" :class="{ active: current === opt.value }"
-      :disabled="props.disabled" v-tip="opt.label" @click="emit('update:modelValue', opt.value)">
+    <button v-for="opt in options" :key="opt.value" class="seg-btn"
+      :class="{ active: current === opt.value, 'icon-only': props.iconOnly }" :disabled="props.disabled"
+      :aria-label="opt.label" v-tip="opt.label" @click="emit('update:modelValue', opt.value)">
       <svg v-if="opt.icon && ICONS[opt.icon]" class="seg-icon" viewBox="0 0 24 24" width="14" height="14" fill="none"
         stroke="currentColor" stroke-width="2" stroke-linecap="round" v-html="ICONS[opt.icon]" />
-      <span>{{ opt.label }}</span>
+      <span v-if="!props.iconOnly">{{ opt.label }}</span>
     </button>
   </div>
 </template>
@@ -85,6 +88,13 @@ const ICONS: Record<string, string> = {
 
 .seg-icon {
   flex-shrink: 0;
+}
+
+.seg-btn.icon-only {
+  justify-content: center;
+  width: calc(var(--ctl-h) - 6px);
+  padding: 0;
+  gap: 0;
 }
 
 .seg-btn:disabled {

@@ -17,12 +17,13 @@ import {
 import { capeDisplay, skinDisplay } from "../../../lib/settings";
 import AccountActions from "../../../components/AccountActions.vue";
 import AccountTypeBadge from "../../../components/AccountTypeBadge.vue";
+import AccountEmpty from "../AccountEmpty.vue";
 import type { AccountStoreDto } from "../../../lib/bindings";
 
 const props = defineProps<{
   /** 要展示的账户，调用方已按锁定 / 筛选 / 搜索过滤好 */
   accounts: AccountStoreDto[];
-  /** 列表是不是被筛过：为真时不列「添加」入口，空结果给文案 */
+  /** 列表是不是被筛过：空结果给对应文案 */
   filtering: boolean;
   /** 当前使用的账户 uuid，空串表示没有 */
   currentUuid: string;
@@ -40,8 +41,6 @@ const isSkin3D = computed(
 const isCape2D = computed(() => capeDisplay.value === "Cape2D");
 
 const emit = defineEmits<{
-  /** 打开「添加账户」表单 */
-  (e: "add"): void;
   /** 双击账户：切换为当前使用 */
   (e: "switch", acc: AccountStoreDto): void;
   /** 刷新该账户的令牌 */
@@ -111,18 +110,6 @@ function hidePreview() {
 
 <template>
   <div class="acc-grid">
-    <!-- 添加账户：作为网格的第一项，与账户卡片同一套尺寸和观感 -->
-    <button v-if="!filtering" class="acc-card add-card" v-tip="t('account.addTitle')"
-      :aria-label="t('account.addTitle')" @click="emit('add')">
-      <span class="add-icon">
-        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-      </span>
-      <span class="add-text">{{ t("account.add") }}</span>
-    </button>
-
     <div v-for="acc in accounts" :key="acc.uuid" class="acc-card" :class="{ current: isCurrent(acc) }"
       @dblclick="!accountLocked && emit('switch', acc)"
       @contextmenu.prevent="emit('menu', { event: $event, acc })">
@@ -185,7 +172,9 @@ function hidePreview() {
           @delete="emit('delete', acc)" />
       </div>
     </div>
-    <div v-if="accounts.length === 0 && filtering" class="empty-tip">{{ t("account.searchEmpty") }}</div>
+    <AccountEmpty v-if="accounts.length === 0"
+      :title="filtering ? t('account.searchEmpty') : t('account.emptyTitle')"
+      :hint="filtering ? undefined : t('account.emptyHint')" />
 
     <!-- 悬停图片时的大图预览（跟随鼠标，不拦截事件），尺寸按图片类型区分 -->
     <Teleport to="body">
@@ -380,44 +369,6 @@ function hidePreview() {
 .acc-card.current {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
-}
-
-/* 添加账户卡片：虚线边框、内容居中，与账户卡片同尺寸同观感，一眼看去是"再来一个"。
-   底色取 --bg-side（比账户卡片的 --bg-card 暗一档）：全透明会"陷进去"显得不能点，
-   而 --accent-soft 又太抢眼（那是给选中态用的浓度），中性暗一档正好。
-   悬停时虚线转实线：虚线是"这里还空着"的语义，鼠标上来就说明已经选中它了，
-   留着虚线会显得没响应 */
-.add-card {
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  /* 与账户卡片同高：没有账户时它单独占一行，不给最小高度就塌成图标那一条。
-     214 = 内边距 18×2 + 图片区 18×2 + 皮肤槽 96 + 间距 14 + 操作按钮 32 */
-  min-height: 214px;
-  border-style: dashed;
-  border-color: var(--accent-border);
-  background: var(--bg-side);
-  color: var(--accent);
-  cursor: pointer;
-  font-family: inherit;
-  transition: border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
-}
-
-.add-card:hover {
-  border-style: solid;
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-
-.add-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  border: 1px dashed currentColor;
 }
 
 /* 悬停图片时的大图：Teleport 到 body，跟随鼠标，按图片类型取不同尺寸 */

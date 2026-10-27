@@ -17,7 +17,6 @@ import { scenarios } from "./scenarios.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const VUE_DIR = resolve(HERE, "../..");
 const ROOT = resolve(VUE_DIR, "..");
-const OUT_DIR = join(ROOT, "target", "temp", "screens");
 const MOCK = readFileSync(join(HERE, "mock.js"), "utf8");
 
 const args = process.argv.slice(2);
@@ -27,6 +26,8 @@ const value = (name, fallback) => {
   return hit ? hit.slice(name.length + 3) : fallback;
 };
 const only = value("only", "");
+const ids = value("ids", "").split(",").map((s) => s.trim()).filter(Boolean);
+const OUT_DIR = resolve(ROOT, value("out", "target/temp/screens"));
 const PORT = Number(value("port", "1420"));
 const EDGE = value("edge", "C:\\\\Program Files (x86)\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe");
 
@@ -35,7 +36,7 @@ if (flag("list")) {
   process.exit(0);
 }
 
-const chosen = only ? scenarios.filter((s) => s.id.includes(only)) : scenarios;
+const chosen = ids.length ? scenarios.filter((s) => ids.includes(s.id)) : only ? scenarios.filter((s) => s.id.includes(only)) : scenarios;
 if (!chosen.length) {
   console.error("没有匹配的场景:", only);
   process.exit(1);
