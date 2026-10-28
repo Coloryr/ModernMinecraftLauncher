@@ -42,7 +42,7 @@ for arg in "$@"; do
 done
 
 if [ -f "$OUT_DIR/Cargo.toml" ] && [ "$FORCE" -eq 0 ]; then
-    echo "已存在，跳过：$OUT_DIR（要重新拉取加 --force）"
+    echo "已存在，跳过：${OUT_DIR}（要重新拉取加 --force）"
     exit 0
 fi
 
@@ -113,12 +113,12 @@ for p in "${PATCHES[@]}"; do
         fi
         # 补丁后文件里必须留下标记，否则说明补丁没真正落地
         if ! grep -q 'M²L 本地修改' "$out_file"; then
-            echo "patch $name 未落到 $r（找不到 M²L 本地修改 标记）" >&2
+            echo "patch ${name} 未落到 ${r}（找不到 M²L 本地修改 标记）" >&2
             exit 1
         fi
     done
 
-    echo "已应用：$name（改动 ${#touched[@]} 个文件）"
+    echo "已应用：${name}（改动 ${#touched[@]} 个文件）"
 done
 
 echo "完成：$OUT_DIR"

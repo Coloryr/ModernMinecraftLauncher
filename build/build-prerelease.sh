@@ -58,6 +58,10 @@ else
   # 必须带 custom-protocol：不带的话 tauri 把这次构建当成 dev，
   # 前端会连接 localhost:1420；未启动开发服务时无法加载页面。
   cargo build --profile prerelease --features custom-protocol,prerelease
+  # 产物名按平台：Windows 带 .exe，macOS / Linux 没有
+  bin="$root/target/prerelease/mml-gui"
+  [ -f "$bin" ] || bin="$bin.exe"
+  [ -f "$bin" ] || { echo "找不到产物: $root/target/prerelease/mml-gui" >&2; exit 1; }
   echo
-  echo "产物: $root/target/prerelease/mml-gui.exe"
+  echo "产物: $bin"
 fi

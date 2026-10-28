@@ -15,7 +15,7 @@ version="$(tr -d '[:space:]' < "$root/build/version")"
 
 binary="$root/target/release/mml-gui"
 if [ ! -f "$binary" ]; then
-    echo "找不到 $binary，请先跑 build/build-release.sh。" >&2
+    echo "找不到 ${binary}，请先跑 build/build-release.sh。" >&2
     exit 1
 fi
 
