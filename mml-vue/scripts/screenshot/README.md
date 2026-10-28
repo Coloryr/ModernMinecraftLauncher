@@ -56,6 +56,21 @@ npm run shots -- --scene=control-buttons     # 单张
 
 加控件时改 `controls/ControlsGallery.vue`，再在 `scenarios.mjs` 的「控件」段补一条带 `path` 的场景。
 
+## 交互断言
+
+截图只能证明「画出来了」，点下去之后命令有没有真的发出去，用 `assert` 动作断：
+
+```js
+actions: [
+  { eval: click(".launch-main-btn"), after: 1400 },
+  { assert: "window.__SHOT__.callsOf('main_launch_game').length > 0", label: "启动命令已发出" },
+],
+```
+
+- `assert` 里是任意 JS 表达式，返回假值就让这个场景判失败，`label` 进报告。
+- 页面里的 `window.__SHOT__.callsOf(命令名)` 能取到本次场景调用过的命令，也可以断言参数。
+- 这类场景的 `commands` 要把链路经过的命令都 mock 上，否则会落进 `unknown`。
+
 ## 它怎么工作
 
 ```

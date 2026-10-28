@@ -95,6 +95,21 @@ Flatpak 默认声明 `org.freedesktop.Platform//25.08`，安装时由 Flathub �
 `mml-gui/src-tauri/Cargo.toml`、`tauri.conf.json` 与 `mml-gui/package.json`，再把 Tauri 产物
 按版本重命名到 `build_out/`。完整发版流程见根 README 的[版本与发布](../README.md#版本与发布)。
 
+**版本号在界面上的写法按通道区分**（见 `src-tauri/src/build_info.rs`）：
+
+| 通道 | 写法 |
+| --- | --- |
+| 正式发布 | `1.0.0`，不带日期 |
+| 预发布版（`prerelease` feature） | `1.0.0.20261028` |
+| 测试版（`cargo run` / `tauri dev`） | `1.0.0.20261028` |
+
+日期由 `src-tauri/build.rs` 在编译期取当天写进 `MML_BUILD_DATE`，所以查版本时看到的是
+**这份二进制哪天编出来的**，不是运行日期。`build/version` 里只写三段，日期不进安装包元数据。
+
+内核的配置版本 `mml_names::VERSION` 也是同一套写法：测试版 `1.0.0.20261028`、
+正式版 `1.0.0`。日期由 `mml-names/build.rs` 注入 ——
+配置结构没变、只是换了一天出的包，它也会跟着变，这是"配置是哪天的构建写的"这条线索。
+
 构建 profile 与产物：正式发布是 `[profile.release]`（fat LTO + `codegen-units = 1`），
 预发布是 `[profile.prerelease]`（thin LTO + `codegen-units = 16`）；两者分别在
 `target/<三元组>/release/` 与 `target/<三元组>/prerelease/` 下，来回切不会互相刷缓存。

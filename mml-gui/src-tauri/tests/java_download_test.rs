@@ -45,17 +45,25 @@ fn setup() {
 async fn foojay_download_and_register() {
     setup();
 
+    // 按当前系统取包：写死 windows 时在 Linux / macOS 上会去下一个几十 MB 的 Windows JRE，
+    // 解包也认不出来，等于白跑
+    let system = if cfg!(target_os = "windows") {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "mac"
+    } else {
+        "linux"
+    };
+    let arch = if cfg!(target_arch = "aarch64") { "aarch64" } else { "x64" };
+
     // jre 包比 jdk 小很多，下载快；只挑 zip，其他格式可能是不支持的安装器
-    let list = java_download_get_list(
-        JavaTypes::Foojay,
-        "jre".to_string(),
-        21,
-        "windows".to_string(),
-        "x64".to_string(),
-    )
-    .await
-    .expect("foojay 拉取列表失败");
-    assert!(!list.is_empty(), "foojay 21/jre/windows/x64 应有候选包");
+    let list = java_download_get_list(JavaTypes::Foojay, "jre".to_string(), 21, system.to_string(), arch.to_string())
+        .await
+        .expect("foojay 拉取列表失败");
+    assert!(
+        !list.is_empty(),
+        "foojay 21/jre/{system}/{arch} 应有候选包"
+    );
 
     let Some(picked) = list.iter().find(|item| item.filename.ends_with(".zip")) else {
         panic!("候选包里应存在 zip 压缩包");

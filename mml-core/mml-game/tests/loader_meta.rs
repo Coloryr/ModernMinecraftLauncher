@@ -11,7 +11,14 @@ use mml_game::loader::LoaderType;
 #[test]
 fn loader_type_id_round_trip() {
     let ids = LoaderType::ids();
-    assert_eq!(ids.len(), 8);
+    // 清单写死，新增加载器时要一起改：数量断言看不出漏了哪个
+    assert_eq!(
+        ids,
+        vec![
+            "normal", "forge", "fabric", "quilt", "neoforge", "cleanroom", "optifine", "liteloader",
+            "custom"
+        ]
+    );
 
     for id in ids {
         let loader = LoaderType::from_string(id).expect("ids() 里的 ID 必须能解析");

@@ -236,6 +236,7 @@ async function shoot(cdp, browser, scenario, index) {
   const { targetId } = await browser.send("Target.createTarget", { url: "about:blank" });
   const { sessionId } = await browser.send("Target.attachToTarget", { targetId, flatten: true });
   const consoleErrors = [];
+  const asserts = [];
   cdp.on("Runtime.exceptionThrown", (params, sid) => {
     if (sid === sessionId) consoleErrors.push(params.exceptionDetails?.text || "exception");
   });
@@ -264,6 +265,12 @@ async function shoot(cdp, browser, scenario, index) {
       if (typeof action === "string") await evalIn(cdp, sessionId, action);
       else if (action.wait) await sleep(action.wait);
       else if (action.eval) await evalIn(cdp, sessionId, action.eval);
+      else if (action.assert) {
+        // 交互型断言：点完之后确认命令真的发出去了（截图只证明画出来了）
+        const ok = await evalIn(cdp, sessionId, "Boolean(" + action.assert + ")");
+        if (!ok) throw new Error("断言失败: " + (action.label || action.assert));
+        asserts.push(action.label || action.assert);
+      }
       await sleep(action.after ?? 220);
     }
 
@@ -273,12 +280,17 @@ async function shoot(cdp, browser, scenario, index) {
 
     const runtimeErrors = await evalIn(cdp, sessionId, "JSON.stringify(window.__SHOT__ ? window.__SHOT__.errors : [])");
     const unknown = await evalIn(cdp, sessionId, "JSON.stringify(window.__SHOT__ ? [...new Set(window.__SHOT__.unknown)] : [])");
+    // 本场景实际调用过的命令：用来统计哪些命令从来没被任何场景碰到
+    const calls = await evalIn(cdp, sessionId, "JSON.stringify(window.__SHOT__ ? [...new Set(window.__SHOT__.calls.map((c) => c.cmd))] : [])");
     return {
       id: scenario.id,
+      kind: scenario.kind,
       file,
       consoleErrors: [...new Set(consoleErrors)].slice(0, 20),
       runtimeErrors: JSON.parse(runtimeErrors || "[]").slice(0, 20),
       unknown: JSON.parse(unknown || "[]"),
+      calls: JSON.parse(calls || "[]"),
+      asserts,
     };
   } catch (error) {
     let diag = "";

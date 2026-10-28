@@ -61,6 +61,14 @@ cargo test -p mml-nbt
 cargo test -p mml-game --lib
 ```
 
+> 提权用例要当心：Linux 的 `pkexec` 用例在没有图形会话 / polkit 代理时会**卡住等密码**，
+> CI 或远程 shell 里用 `cargo test -p mml-sys --test process_utils -- --skip admin` 跳过，
+> 然后在有桌面的机器上单独跑一次。macOS 的 `osascript` 同理。
+>
+> `mml-base` 的归档测试会在 crate 目录下用相对路径 `test_run/`，跑完会删掉
+> `mml-core/mml-base/test_run/test.zip`（这个文件在版本库里）。跑完记得
+> `git checkout -- mml-core/mml-base/test_run/test.zip`，或先把它挪出仓库。
+
 - `mml-gui` 的集成测试（`mml-gui/src-tauri/tests/`）按改动面挑相关的跑。
 - 渲染相关（`mml-tex-draw`）依赖下载客户端 jar，按需跑，不要整仓全量。
 
@@ -147,9 +155,56 @@ cargo test -p mml-game --lib
 | --- | --- | --- |
 | 例：导入 zip 整合包 | 通过 | `target/screens/add-archive.png` |
 
-## 7. 已知问题（Linux 冒烟发现，已修）
+## 7. Linux 冒烟结论（2026-10-28）
 
-- `mml-core/mml-sys/tests/process_utils.rs` 的 Linux / macOS 模块缺 `use mml_sys::process_helper;`，
-  且残留 `use mml_base::process_utils;`（`mml-sys` 没有这个 dev-dependency）。
-  Linux 下 `cargo check --all-targets` 直接编译失败 —— 这两个平台的提权测试从未被编译过。
-  已补上 import、删掉无效引用；Windows / macOS 上仍要确认这两个用例真的能跑起来。
+跑过的范围与结果：
+
+| 项 | 结果 |
+| --- | --- |
+| `npm run lint` / `npx vue-tsc --noEmit` | 0 error / 无输出 |
+| `npm test`（mml-vue） | 71 passed |
+| 界面场景 202 张（`--skip=lobby`） | 0 运行时错误 / 0 未 mock 命令 / 0 控制台错误 |
+| `cargo check --workspace --all-targets` | 通过（仅 dead_code 警告） |
+| `cargo test`：mml-base / mml-ipc / mml-jvms / mml-log / mml-names / mml-nbt / mml-config / mml-analysis | 全绿 |
+| `cargo test -p mml-sys --lib` | 33 passed |
+| `cargo test -p mml-sys --test process_utils -- --skip admin` | 3 passed，5 filtered |
+
+修掉的问题：
+
+1. `mml-sys/tests/process_utils.rs` 的 Linux / macOS 模块缺 `use mml_sys::process_helper;`，
+   还残留 `use mml_base::process_utils;`（`mml-sys` 没有这个 dev-dependency）。
+   这两个平台的提权测试从来没被编译过，Linux 下 `cargo check --all-targets` 直接失败。
+2. `mml-config` 的测试仍按旧默认值断言 `download_thread == 5`，实际默认已是 10；
+   同步了 `tests/config.rs` 与 `tests/config_obj.rs`。若默认值本该是 5，要改的是 `config_obj.rs`。
+3. `path_helper` 的 `write_text_async` / `write_bytes_async` / `write_stream_async` 写完没 `flush`：
+   tokio 的 `File` 自带缓冲，紧跟其后的同步读会读到空文件。已补 `flush`。
+4. `AddModpackWindow` / `AddResourceWindow` 在 `onMounted` 的 `await` 之后调 `onUnmounted`，
+   订阅永远不会注销（Vue 只打一条告警）。改成 `useUnlisteners()`。
+
+后端（mml-game / mml-downloader / mml-net / mml-auth / mml-skin / mml-skin-draw）跑下来的结论：
+
+| 项 | 结果 |
+| --- | --- |
+| 离线用例 | 除下面几条外全绿 |
+| `server_pack_import` | 8 条用例共用一个实例名，并行会互相覆盖，且偶发失败；已改为独立实例名 + 串行锁，连跑 3 次稳定 |
+| `shaderpacks` / `modrinth_api_test` | 5 条用例没启动 `mml_log`，`mml_net::init()` 一写日志就 panic；已补 `mml_log::start` |
+| `url_helper` | 2 条期望值停在旧实现（`forge_url_fix` 现在对普通版本返回空串；NeoForge maven 已迁到 `maven.neoforged.net`） |
+| `abort_test` | 断言中文「已中断」，实际错误是 `Aborted { url }`；改为断言变体名 |
+| `real_pack_download`（真实 Modrinth 包） | 把线上包 NeoForge 补丁号写死成 `26.2.0.75`，上游已改成 `26.2.0.88`；改为只钉 `26.2.x` |
+| `mml-gui/tests/java_download_test` | 真下载 JDK → 解包 → 注册；原来把系统写死成 `windows`，在 Linux / macOS 上会去下 Windows 包并卡住，已改为按当前系统取包 |
+| `real_launch::real_download_prepares_game_files` | 真下载 1.20.1 客户端 jar + 53 个运行库，通过 |
+| `mml-gui/tests/collect_test`（新增） | 收藏 / 分组持久化：收藏去重、建组、移动、清空、落盘、读回，通过 |
+
+真实网络用例的两个环境前提（**Windows / macOS 上同样适用**）：
+
+- `real_launch`、`real_pack_download`、`modpack_upgrade` 默认走 `127.0.0.1:7890` 代理（作者本机环境）。
+  直连能上外网的机器要加 `MML_TEST_PROXY=off`，否则报 `tunnel error: Connection refused`；
+  三个文件现在都认这个写法。
+- `real_launch_downloads_and_starts` 需要带 `jdk.compiler` 的 JDK（探针走源文件模式），
+  没有就自动跳过；可用启动器自己的「下载 Java」拉一个，再把 `JAVA_HOME` 指过去。
+
+Windows / macOS 上要重点复核的：
+
+- 上面第 1 条的两个提权用例能否真正跑通（Windows 命名管道 / UAC、macOS `osascript`）。
+- 第 3 条在 Windows 上的表现（tokio 缓冲 + NTFS 语义）。
+- 界面场景里字体、图标、滚动条、弹层定位与 Linux 的差异。

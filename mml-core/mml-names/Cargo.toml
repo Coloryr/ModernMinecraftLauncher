@@ -7,5 +7,9 @@ edition = "2024"
 uuid.workspace = true
 serde.workspace = true
 
+[build-dependencies]
+# 配置版本号里的构建日期，见 build.rs
+chrono.workspace = true
+
 [dev-dependencies]
 mml-testutil = { path = "../mml-testutil" }

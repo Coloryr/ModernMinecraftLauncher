@@ -5,11 +5,29 @@
 
 mod common;
 
+use std::sync::Once;
+
 use mml_game::game_shaderpacks;
+
+/// 网络样本用例的启动链：`common::init_net` 里的 `mml_net::init` 会打日志，
+/// 日志单例没起来时 `info()` 直接 panic
+fn ensure_init() {
+    static INIT: Once = Once::new();
+    INIT.call_once(|| {
+        let dir = mml_testutil::temp_dir().join(format!("mml-shaderpack-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        mml_base::init(&dir);
+        mml_names::init(mml_base::get_base_dir()).unwrap();
+        mml_log::start(mml_base::get_base_dir()).unwrap();
+    });
+}
 
 /// 从 Modrinth 下载多个常见光影包并解析名称与说明
 #[test]
 fn read_shaderpacks() {
+    ensure_init();
     let mut downloaded = 0;
     let mut parsed = 0;
 

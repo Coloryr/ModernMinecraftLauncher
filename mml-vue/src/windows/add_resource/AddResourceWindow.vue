@@ -6,7 +6,7 @@
 // 下载走全局下载器：命令立即返回，进度在下载窗口里看。
 //
 // 项目详情与下载整合包窗口共用 components/ProjectDetailPage.vue。
-import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onActivated, onDeactivated, onMounted, ref, watch } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import InstanceChip from "../../components/ui/InstanceChip.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
@@ -29,6 +29,7 @@ import { familyInstanceFromLabel, projectParamToItem, targetProject, targetUuid,
 import { useInstanceChange } from "../../composables/useInstanceChange";
 import { useRefreshKey } from "../../composables/useRefreshKey";
 import { usePageKeys } from "../../composables/usePageKeys";
+import { useUnlisteners } from "../../composables/useUnlisteners";
 import { scrollToContentTop } from "../../lib/scrollTop";
 import type {
   FileListItemDto,
@@ -47,6 +48,9 @@ defineEmits<{
 
 /** 下载任务状态（本窗口是"负责显示"的窗口） */
 const { status: resourceStatus, init: initResourceStatus } = useResourceStatus(true);
+
+/** 事件订阅卸载时统一注销：onMounted 里的 await 之后登记 onUnmounted 是无效写法 */
+const { track } = useUnlisteners();
 
 /** 后端列表每页 20 个项目 */
 const PAGE_SIZE = 20;
@@ -659,8 +663,7 @@ watch(type, () => {
 });
 
 onMounted(async () => {
-  const unlisten = await initResourceStatus();
-  onUnmounted(unlisten);
+  track(initResourceStatus());
 
   await refreshInstance();
   await loadSources();

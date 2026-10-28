@@ -43,7 +43,7 @@ fn config_lifecycle() {
 
     // 默认配置
     assert_eq!(read_config().version, *VERSION);
-    assert_eq!(read_config().http.download_thread, 5);
+    assert_eq!(read_config().http.download_thread, 10);
     assert_eq!(read_config().http.source, SourceLocal::Offical);
 
     // ---------- 同步保存 ----------
@@ -76,12 +76,12 @@ fn config_lifecycle() {
         assert_eq!(cfg.http.download_thread, 64, "load 应读入新字段值");
         assert_eq!(cfg.version, *VERSION, "版本号应迁移为当前版本");
     }
-    // 版本变更触发 save_now，但 save_now 写的是更新前的内存 CONFIG，download_thread 仍是 5，
+    // 版本变更触发 save_now，但 save_now 写的是更新前的内存 CONFIG，download_thread 仍是 10，
     // 而 config_obj 在此之后才写入 CONFIG，因此磁盘与内存不一致，疑似时序 bug。
     let back: ConfigObj = serde_json::from_str(&fs::read_to_string(&config_file).unwrap()).unwrap();
     assert_eq!(back.version, *VERSION, "config.json 的版本号应已更新");
     assert_eq!(
-        back.http.download_thread, 5,
+        back.http.download_thread, 10,
         "当前实现下 config.json 写回的是 load 前的内存配置"
     );
 

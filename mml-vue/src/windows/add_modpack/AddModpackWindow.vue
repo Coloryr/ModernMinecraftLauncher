@@ -2,12 +2,13 @@
 // 下载整合包窗口：CurseForge / Modrinth 在线搜索 + 选版本安装
 // 安装是多任务的：命令立即返回，进度由 add-modpack-status 事件驱动，
 // 顶部进度条显示任务数与详情，见 ModpackInstallBar。
-import { onMounted, onUnmounted, ref } from "vue";
+import { onMounted, ref } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import { api } from "../../lib/api";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
 import { useModpackStatus } from "../../lib/modpackTasks";
+import { useUnlisteners } from "../../composables/useUnlisteners";
 import type { GroupDto } from "../../lib/bindings";
 import ModpackMode from "./ModpackMode.vue";
 
@@ -28,6 +29,9 @@ const groups = ref<GroupDto[]>([]);
 /** 安装任务状态：本窗口负责显示，终态 toast 由这里弹 */
 const { status: modpackStatus, init: initModpackStatus } = useModpackStatus(true);
 
+/** 事件订阅卸载时统一注销：onMounted 里的 await 之后登记 onUnmounted 是无效写法 */
+const { track } = useUnlisteners();
+
 /** 安装在线整合包：实例名取自整合包元数据，命令立即返回（任务后台安装） */
 async function install(p: {
   source: string;
@@ -45,8 +49,7 @@ async function install(p: {
 }
 
 onMounted(async () => {
-  const unlisten = await initModpackStatus();
-  onUnmounted(unlisten);
+  track(initModpackStatus());
 
   try {
     // 默认分组（空白名字）不进下拉：输入框留空即默认分组

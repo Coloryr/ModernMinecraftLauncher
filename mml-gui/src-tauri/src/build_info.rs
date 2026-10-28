@@ -12,6 +12,45 @@ use mml_base::hash_helper::{HashType, gen_hash_from_file};
 
 use crate::dtos::build_info_dto::{BuildChannel, BuildInfoDto, ExeInfoDto};
 
+/// 构建日期，yyyymmdd，由 `build.rs` 在编译期注入
+const BUILD_DATE: &str = env!("MML_BUILD_DATE");
+
+/// 把版本号补齐成三段
+///
+/// 清单里少写一段时（`1.0`）按 semver 补 0，否则拼出来是 `1.0.20261028` ——
+/// 少一段的版本号会被当成"日期占了大版本位"，与正式版 `1.0.0` 也对不上。
+///
+/// - `raw`: 清单里的版本号
+///
+/// # 返回值
+///
+/// 至少三段的版本号，如 `1.0` → `1.0.0`
+fn base_version(raw: &str) -> String {
+    let mut parts: Vec<&str> = raw.split('.').collect();
+    while parts.len() < 3 {
+        parts.push("0");
+    }
+    parts.join(".")
+}
+
+/// 版本号
+///
+/// 正式版只写清单里的三段（如 `1.0.0`）；测试版与预发布版追加构建日期
+/// （如 `1.0.0.20261028`），一眼能看出手里这份是哪个日期的包。
+///
+/// - `channel`: 构建通道
+///
+/// # 返回值
+///
+/// 展示与日志里用的版本号
+fn version_of(channel: BuildChannel) -> String {
+    let base = base_version(env!("CARGO_PKG_VERSION"));
+    match channel {
+        BuildChannel::Release => base,
+        BuildChannel::Debug | BuildChannel::Prerelease => format!("{base}.{BUILD_DATE}"),
+    }
+}
+
 /// 取构建信息
 ///
 /// # 返回值
@@ -27,7 +66,7 @@ pub fn app_build_info() -> BuildInfoDto {
         BuildChannel::Release
     };
     BuildInfoDto {
-        version: env!("CARGO_PKG_VERSION").to_string(),
+        version: version_of(channel),
         channel,
     }
 }
@@ -52,4 +91,34 @@ pub async fn app_build_exe_info() -> Result<ExeInfoDto, String> {
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 少写一段的版本号要补齐：`1.0` 不能拼成 `1.0.20261028`
+    #[test]
+    fn base_version_is_three_parts() {
+        assert_eq!(base_version("1"), "1.0.0");
+        assert_eq!(base_version("1.0"), "1.0.0");
+        assert_eq!(base_version("1.0.0"), "1.0.0");
+        assert_eq!(base_version("2.3.4"), "2.3.4");
+    }
+
+    /// 正式版不带日期，测试版与预发布版带 yyyymmdd
+    #[test]
+    fn version_follows_channel() {
+        let base = base_version(env!("CARGO_PKG_VERSION"));
+        assert_eq!(version_of(BuildChannel::Release), base);
+
+        for channel in [BuildChannel::Debug, BuildChannel::Prerelease] {
+            let version = version_of(channel);
+            let date = version
+                .strip_prefix(&format!("{base}."))
+                .unwrap_or_else(|| panic!("版本号应以 {base}. 开头：{version}"));
+            assert_eq!(date.len(), 8, "日期应为 yyyymmdd：{date}");
+            assert!(date.chars().all(|c| c.is_ascii_digit()), "日期只能是数字：{date}");
+        }
+    }
 }

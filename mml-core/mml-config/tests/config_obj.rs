@@ -16,7 +16,7 @@ fn config_roundtrip() {
     assert_eq!(back.version, *VERSION);
     assert!(back.java_list.is_empty());
     assert_eq!(back.http.source, SourceLocal::Offical);
-    assert_eq!(back.http.download_thread, 5);
+    assert_eq!(back.http.download_thread, 10);
     assert_eq!(back.http.proxy_port, 7890);
     assert_eq!(back.http.check_file, true);
     assert_eq!(back.http.auto_download, true);
@@ -32,7 +32,7 @@ fn config_roundtrip() {
 fn partial_json_fills_defaults() {
     let obj: ConfigObj = serde_json::from_str(r#"{"Version":"0.0.0"}"#).unwrap();
     assert_eq!(obj.version, "0.0.0");
-    assert_eq!(obj.http.download_thread, 5);
+    assert_eq!(obj.http.download_thread, 10);
     assert_eq!(obj.http.source, SourceLocal::Offical);
     assert_eq!(obj.dns.enable, false);
     assert_eq!(obj.check.lib, true);
@@ -98,7 +98,7 @@ fn jvm_config_field_names() {
 #[test]
 fn sub_obj_defaults() {
     let http = HttpObj::default();
-    assert_eq!(http.download_thread, 5);
+    assert_eq!(http.download_thread, 10);
     assert_eq!(http.proxy_ip, "127.0.0.1");
     assert_eq!(http.work_proxy, ProxyState::Auto);
     assert_eq!(http.work_proxy_type, ProxyType::Http);

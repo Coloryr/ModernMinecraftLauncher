@@ -14,10 +14,25 @@ if (!raw) {
     process.exit(1);
 }
 
-const version = raw.replace(/^v/, "");
-if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) {
-    console.error(`版本号格式不对：${raw}`);
+const version = normalize(raw.replace(/^v/, ""));
+if (!version) {
+    console.error(`版本号格式不对：${raw}（要 1、1.0 或 1.0.0，可带 -rc.1 这类后缀）`);
     process.exit(1);
+}
+
+/**
+ * 把版本号补齐成三段
+ *
+ * `1.0` 直接写进清单会拼出 `1.0.20261028`，日期占了大版本位，与正式版 `1.0.0` 也对不上。
+ *
+ * @param {string} text 去掉 `v` 前缀的版本号
+ * @returns {string} 三段版本号，后缀原样保留；格式不对返回空串
+ */
+function normalize(text) {
+    const matched = /^(\d+(?:\.\d+){0,2})((?:[-+][0-9A-Za-z.-]+)?)$/.exec(text);
+    if (!matched) return "";
+    const [major, minor = "0", patch = "0"] = matched[1].split(".");
+    return `${major}.${minor}.${patch}${matched[2]}`;
 }
 
 const targets = [

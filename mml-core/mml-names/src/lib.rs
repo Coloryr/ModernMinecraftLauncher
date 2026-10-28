@@ -36,12 +36,30 @@ use crate::{
     names::{LANG_EN_US, LANG_ZH_CN},
 };
 
-/// 启动器主版本号
+/// 配置结构主版本号，结构变了才加一
 pub const VERSION_NUM: i32 = 1;
-/// 启动器日期，格式 yyyymmdd
-pub const DATE: &str = "20261013";
-/// 启动器版本号，由主版本号与日期拼成
-pub const VERSION: LazyLock<String> = LazyLock::new(|| format!("1.{}.{DATE}", VERSION_NUM));
+/// 小版本号
+pub const VERSION_SEC_NUM: i32 = 0;
+/// 修订号
+pub const VERSION_PATCH_NUM: i32 = 0;
+/// 构建日期，格式 yyyymmdd，由 `build.rs` 在编译期注入；只有测试版用得上
+#[cfg(debug_assertions)]
+const BUILD_DATE: &str = env!("MML_NAMES_BUILD_DATE");
+/// 配置版本号
+///
+/// 测试版追加构建日期，如 `1.0.0.20261028`；正式版只有三段，如 `1.0.0`。
+/// 日期跟着构建走，不用手改：换一天出的包，配置版本号自然就变了。
+#[cfg(debug_assertions)]
+pub const VERSION: LazyLock<String> = LazyLock::new(|| {
+    format!("{VERSION_NUM}.{VERSION_SEC_NUM}.{VERSION_PATCH_NUM}.{BUILD_DATE}")
+});
+
+/// 配置版本号
+///
+/// 测试版追加构建日期，如 `1.0.0.20261028`；正式版只有三段，如 `1.0.0`
+#[cfg(not(debug_assertions))]
+pub const VERSION: LazyLock<String> =
+    LazyLock::new(|| format!("{VERSION_NUM}.{VERSION_SEC_NUM}.{VERSION_PATCH_NUM}"));
 
 /// 启动器界面语言
 #[allow(non_camel_case_types)]
@@ -361,10 +379,23 @@ mod tests {
         assert_eq!(get_line_ending(), expected);
     }
 
-    /// 版本号拼接格式
+    /// 配置版本号 = 主版本号 + 编译日期
     #[test]
     fn version_format() {
-        assert_eq!(*VERSION, format!("1.{}.{}", VERSION_NUM, DATE));
-        assert!(!DATE.is_empty());
+        let base = format!("{VERSION_NUM}.{VERSION_SEC_NUM}.{VERSION_PATCH_NUM}");
+        println!("配置版本号：{}", *VERSION);
+
+        #[cfg(debug_assertions)]
+        {
+            assert_eq!(*VERSION, format!("{base}.{BUILD_DATE}"));
+            assert_eq!(BUILD_DATE.len(), 8, "日期应为 yyyymmdd：{BUILD_DATE}");
+            assert!(
+                BUILD_DATE.chars().all(|c| c.is_ascii_digit()),
+                "日期只能是数字：{BUILD_DATE}"
+            );
+        }
+
+        #[cfg(not(debug_assertions))]
+        assert_eq!(*VERSION, base);
     }
 }

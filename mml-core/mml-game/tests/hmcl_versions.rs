@@ -18,7 +18,7 @@
 //! 运行：`cargo test -p mml-game --test hmcl_versions -- --nocapture`
 
 use std::path::{Path, PathBuf};
-use std::sync::Once;
+use std::sync::{Once, OnceLock};
 
 use mml_game::other_launcher::official_obj::OfficialObj;
 
@@ -37,8 +37,14 @@ fn samples_dir() -> PathBuf {
 /// 之后把一份**版本清单缓存**放进运行目录：`have_version()` 依赖它才能认出 `26.2`。
 /// 清单来源见 [`find_version_list`]；找不到就不放，此时无 patches 的版本号只能为空，
 /// 相关断言会给出"清单不可用"的明确失败原因。
-fn ensure_init() {
+///
+/// # 返回值
+///
+/// 版本清单是否就位；没有时无 patches 的用例只能跳过
+fn ensure_init() -> bool {
     static INIT: Once = Once::new();
+    static READY: OnceLock<bool> = OnceLock::new();
+
     INIT.call_once(|| {
         let dir = run_dir();
         let _ = std::fs::remove_dir_all(&dir);
@@ -49,19 +55,30 @@ fn ensure_init() {
         mml_config::init(mml_base::get_base_dir()).unwrap();
         mml_game::init(mml_base::get_base_dir()).unwrap();
 
-        if let Some(src) = find_version_list() {
+        let ready = if let Some(src) = find_version_list() {
             let dst_dir = mml_base::get_base_dir().join("minecraft/versions");
             // 目标目录可能还没建，版本路径的目录是首次用到才创建，先补上
             let _ = std::fs::create_dir_all(&dst_dir);
             let dst = dst_dir.join(mml_names::names::VERSION_FILE);
             match std::fs::copy(&src, &dst) {
-                Ok(_) => println!("版本清单缓存：{}", src.display()),
-                Err(e) => println!("复制版本清单失败（{e}），版本号可能判成空"),
+                Ok(_) => {
+                    println!("版本清单缓存：{}", src.display());
+                    true
+                }
+                Err(e) => {
+                    println!("复制版本清单失败（{e}），版本号可能判成空");
+                    false
+                }
             }
         } else {
             println!("没有可用的版本清单缓存，have_version 会判 false");
-        }
+            false
+        };
+
+        let _ = READY.set(ready);
     });
+
+    *READY.get().unwrap_or(&false)
 }
 
 /// 找一份可用的版本清单缓存，即 Mojang 版本列表
@@ -162,7 +179,7 @@ fn dump_one(file: &Path) -> Option<Dump> {
 /// 遍历样本目录，逐个校验版本号与加载器的识别结果
 #[test]
 fn read_hmcl_versions() {
-    ensure_init();
+    let list_ready = ensure_init();
 
     let root = samples_dir();
     if !root.is_dir() {
@@ -184,6 +201,11 @@ fn read_hmcl_versions() {
 
     for d in &dumps {
         if d.no_patches {
+            // 没有版本清单时 have_version 必然为假，版本号只能是空，跳过而不是误报
+            if !list_ready {
+                eprintln!("[跳过] 没有版本清单缓存，{} 的版本号无法校验", d.name);
+                continue;
+            }
             // 无 patches：版本号来自 json，inheritsFrom 优先，且必须能被 have_version 认出来
             let want = if d.inherits_from.is_empty() {
                 &d.id

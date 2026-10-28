@@ -39,7 +39,11 @@ fn ensure_init() {
 
         // 可选测试代理：设置 MML_TEST_PROXY=ip:port 时走显式代理
         // reqwest 的 Auto 模式在本环境不读取 HTTP_PROXY 等环境变量，须写进配置
-        if let Ok(proxy) = std::env::var("MML_TEST_PROXY") {
+        // `MML_TEST_PROXY=off` 表示直连，与 real_launch.rs 同一口径
+        let proxy = std::env::var("MML_TEST_PROXY")
+            .ok()
+            .filter(|p| !p.eq_ignore_ascii_case("off"));
+        if let Some(proxy) = proxy {
             let (ip, port) = proxy
                 .split_once(':')
                 .expect("MML_TEST_PROXY 格式应为 ip:port");
@@ -288,12 +292,18 @@ async fn install_real_modrinth_neoforge_pack() {
     .await
     .expect("真实 NeoForge 整合包安装失败");
 
-    // 包元数据：minecraft 26.2 + neoforge 26.2.0.75
+    // 包元数据：minecraft 26.2 + neoforge 26.2.x
+    // 加载器补丁号由包作者随时改（26.2.0.75 → 26.2.0.88 实测变过），
+    // 这里只钉住大版本，免得上游一改补丁号这条用例就红
     let game = mml_game::get_instance(&uuid).expect("安装后应能取到实例");
     let read = game.read().unwrap();
     assert_eq!(read.version, "26.2");
     assert!(matches!(read.loader, LoaderType::NeoForge));
-    assert_eq!(read.loader_version.as_deref(), Some("26.2.0.75"));
+    let loader = read.loader_version.as_deref().unwrap_or_default();
+    assert!(
+        loader.starts_with("26.2."),
+        "加载器版本应与 26.2 配套，实际 {loader}"
+    );
     assert!(read.is_modpack);
 
     // 包内清单的 17 个 mod 都下载到了 mods 目录

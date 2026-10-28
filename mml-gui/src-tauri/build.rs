@@ -32,6 +32,13 @@ fn main() {
     println!("cargo:rerun-if-changed=src");
     println!("cargo:rerun-if-changed=build.rs");
 
+    // 测试版 / 预发布版的版本号要带构建日期（如 1.0.0.20261028），正式版不带。
+    // 日期在这里定死：运行时再取就成了"运行日期"，隔天跑旧包会显示错日子。
+    println!(
+        "cargo:rustc-env=MML_BUILD_DATE={}",
+        chrono::Local::now().format("%Y%m%d")
+    );
+
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
     // 前端契约落在独立的 mml-ipc npm 包，mml-vue 与 custom 下的示例都从那里取
     let ts_dir = manifest.join("../../mml-ipc/src");

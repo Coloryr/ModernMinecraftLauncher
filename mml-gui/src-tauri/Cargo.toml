@@ -17,6 +17,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 tauri-build = { version = "~2.7.4", features = [] }
 gui-ipc-gen = { path = "../../ipc-gen" }
+# 构建日期写进版本号（测试版 / 预发布版带日期），见 build.rs
+chrono.workspace = true
 
 [dependencies]
 # tray-icon：主窗口关掉后进程留在后台（继续给运行中的游戏计时），托盘负责唤回界面

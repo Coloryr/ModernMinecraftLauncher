@@ -51,9 +51,9 @@ fn forge_url_fix_special_versions() {
     assert_eq!(url_helper::forge_url_fix("1.9"), "-1.9.0");
     assert_eq!(url_helper::forge_url_fix("1.9.4"), "-1.9.4");
     assert_eq!(url_helper::forge_url_fix("1.10"), "-1.10.0");
-    // 其余版本原样返回
-    assert_eq!(url_helper::forge_url_fix("1.20.4"), "1.20.4");
-    assert_eq!(url_helper::forge_url_fix("1.21"), "1.21");
+    // 其余版本返回空串：调用方不追加后缀，避免拼出 `28641.12.2` 这种畸形版本号
+    assert_eq!(url_helper::forge_url_fix("1.20.4"), "");
+    assert_eq!(url_helper::forge_url_fix("1.21"), "");
 }
 
 /// 切换两种下载源，验证各构建函数随源正确分支。
@@ -179,9 +179,9 @@ fn url_builders_follow_selected_source() {
         url_helper::replace_forge_libraries("https://maven.minecraftforge.net/y.jar"),
         "https://bmclapi2.bangbang93.com/maven/y.jar"
     );
-    // NeoForge 库地址替换的是 forge maven 前缀，旧版 NeoForge 库托管于该域名
+    // NeoForge 库地址替换的是它自己的 maven 前缀
     assert_eq!(
-        url_helper::replace_neoforge_libraries("https://maven.minecraftforge.net/z.jar"),
+        url_helper::replace_neoforge_libraries("https://maven.neoforged.net/z.jar"),
         "https://bmclapi2.bangbang93.com/maven/z.jar"
     );
     assert_eq!(

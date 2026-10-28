@@ -39,7 +39,7 @@ npm run shots -- --clean
 
 ## 场景表
 
-共 205 个场景，按窗口分组。
+共 216 个场景，按窗口分组。
 「窗口」列是页面的 `kind`，窗口族场景会自动带上实例参数，不需要在命令里另写；
 控件场景的 `control` 是截图工具里的预览页，不是启动器窗口。
 
@@ -65,6 +65,8 @@ npm run shots -- --clean
 | `main-multi-delete` | 主窗口 · 批量删除 | `main` | 1280×800 |
 | `main-search-empty` | 主窗口 · 搜索 · 空状态 | `main` | 1280×800 |
 | `main-add-group-modal` | 主窗口 · 添加分组弹窗 | `main` | 1280×800 |
+| `main-launch` | 主窗口 · 点击启动（断言命令） | `main` | 1280×800 |
+| `main-create-group` | 主窗口 · 新建分组（断言命令） | `main` | 1280×800 |
 
 ### 设置
 
@@ -86,6 +88,7 @@ npm run shots -- --clean
 | `settings-client-lock` | 设置 · 客户端设置 · 登录方式锁定 | `settings` | 1100×780 |
 | `settings-local-clear` | 设置 · 本地文件 · 清理确认 | `settings` | 1100×760 |
 | `settings-gamepad-new` | 设置 · 手柄 · 新建配置 | `settings` | 1100×860 |
+| `settings-save` | 设置 · 改动保存（断言命令） | `settings` | 1100×760 |
 
 ### 资源管理
 
@@ -141,6 +144,7 @@ npm run shots -- --clean
 | `account-oauth-profile` | 账户 · 设备码登录 · 拉取档案 | `account` | 1000×700 |
 | `account-oauth-fail` | 账户 · 设备码登录 · 失败 | `account` | 1000×700 |
 | `account-skin` | 账户 · 皮肤 | `account` | 1000×720 |
+| `account-add-ok` | 账户 · 添加成功（断言命令） | `account` | 1000×700 |
 
 ### 添加实例
 
@@ -177,6 +181,7 @@ npm run shots -- --clean
 | `add-continue-modal` | 添加实例 · 继续安装弹窗 | `add` | 1100×760 |
 | `add-name-conflict-modal` | 添加实例 · 重名弹窗 | `add` | 1100×760 |
 | `add-pack-progress-modal` | 添加实例 · 整合包进度弹窗 | `add` | 1100×760 |
+| `add-resource-loaded` | 添加资源 · 搜索结果 | `add_resource` | 1180×800 |
 
 ### 下载整合包
 
@@ -220,6 +225,8 @@ npm run shots -- --clean
 | `download-empty` | 下载 · 空状态 | `download` | 1000×700 |
 | `download-paused` | 下载 · 已暂停 | `download` | 1000×700 |
 | `download-stop-modal` | 下载 · 停止确认弹窗 | `download` | 1000×700 |
+| `download-pause` | 下载 · 暂停全部（断言命令） | `download` | 1000×700 |
+| `download-failed` | 下载 · 有失败任务 | `download` | 1000×700 |
 
 ### Java 下载
 
@@ -227,6 +234,8 @@ npm run shots -- --clean
 | --- | --- | --- | --- |
 | `java-download` | Java 下载 · 列表 | `java_download` | 1000×720 |
 | `java-loading` | Java 下载 · 加载中 | `java_download` | 1000×720 |
+| `java-download-start` | Java 下载 · 点击下载（断言命令） | `java_download` | 1000×700 |
+| `java-download-empty` | Java 下载 · 无匹配 | `java_download` | 1000×700 |
 
 ### 方块与物品
 
@@ -255,6 +264,7 @@ npm run shots -- --clean
 | `log-stop-modal` | 游戏日志 · 停止弹窗 | `log` | 1100×720 |
 | `log-crash-modal` | 游戏日志 · 崩溃分析 | `log` | 1100×720 |
 | `log-upload-modal` | 游戏日志 · 上传弹窗 | `log` | 1100×720 |
+| `log-empty` | 日志 · 无输出 | `log` | 1100×780 |
 
 ### 导出实例
 
@@ -327,6 +337,7 @@ npm run shots -- --clean
 | `stats` | 统计 | `stats` | 1150×800 |
 | `stats-other` | 统计 · 其他 | `stats` | 1150×800 |
 | `stats-single-day` | 统计 · 单日 | `stats` | 1150×800 |
+| `stats-empty` | 统计 · 无数据 | `stats` | 1150×800 |
 
 ### 控件
 

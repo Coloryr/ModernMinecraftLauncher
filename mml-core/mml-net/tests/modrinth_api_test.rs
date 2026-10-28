@@ -15,6 +15,8 @@ fn init() {
         let dir = mml_testutil::temp_dir().join(format!("mml-net-api-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).expect("创建临时配置目录失败");
         let _ = mml_config::init(&dir);
+        // HTTP 客户端初始化会写日志，日志流没起来会 panic
+        let _ = mml_log::start(&dir);
         mml_net::init();
     });
 }

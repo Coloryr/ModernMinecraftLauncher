@@ -536,7 +536,11 @@ fn ensure_init() {
 
         // 可选测试代理 `MML_TEST_PROXY=ip:port`：reqwest 的 Auto 模式不读 HTTP_PROXY
         // 等环境变量，必须写进配置，与 `real_pack_download.rs` 同一写法
-        if let Ok(proxy) = std::env::var("MML_TEST_PROXY") {
+        // `MML_TEST_PROXY=off` 表示直连，与 real_launch.rs 同一口径
+        let proxy = std::env::var("MML_TEST_PROXY")
+            .ok()
+            .filter(|p| !p.eq_ignore_ascii_case("off"));
+        if let Some(proxy) = proxy {
             let (ip, port) = proxy
                 .split_once(':')
                 .expect("MML_TEST_PROXY 格式应为 ip:port");

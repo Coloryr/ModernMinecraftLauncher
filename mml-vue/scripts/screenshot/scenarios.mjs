@@ -7,7 +7,7 @@
 // - actions: 字符串按 JS 执行；{ wait } 等待；{ eval } 执行后等一会
 import {
   addVersions, blockItems, collectWithData, commonCommands, downloadStatus, groups, instances, javaDownloadList, lobbyView,
-  statsSingleDay, customHomeStatus, customUiStatus, modpackDetail, modpackFiles, modpackStatus, modpackStatusFailed,
+  statsSingleDay, customHomeStatus, customUiStatus, modpackDetail, modpackFiles, modpackItems, modpackStatus, modpackStatusFailed,
   javaList, resourceView, saves, schematics, servers, shaders,
 } from "./data.mjs";
 
@@ -1633,5 +1633,169 @@ export const scenarios = [
     kind: "control",
     path: "/scripts/screenshot/controls/index.html?section=icons",
     size: [1100, 580],
+  },
+
+  /* ---------------- 交互断言：点完之后确认命令真的发出去了 ---------------- */
+  // 截图只能证明"画出来了"，这一组点下去再用 __SHOT__.callsOf 断言命令已发出
+  {
+    id: "main-launch",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base(
+      { main_check_launch: null, main_auto_save_target: null, main_launch_game: null },
+      { viewMode: "list", startupPage: "List" },
+    ),
+    actions: [
+      { eval: click(".launch-main-btn"), after: 1400 },
+      { assert: "window.__SHOT__.callsOf('main_launch_game').length > 0", label: "启动命令已发出" },
+    ],
+  },
+  {
+    id: "main-delete-confirm",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({ main_delete_instance: null }, { viewMode: "group", startupPage: "List" }),
+    actions: [
+      { eval: "(() => { const g = [...document.querySelectorAll('.group-title-row')].find((x) => x.textContent.includes('生存')); if (!g) return false; g.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 150, clientY: 250, button: 2 })); return true; })()", after: 350 },
+      { eval: clickText("全选", ".ctx-menu"), after: 400 },
+      { eval: clickText("删除实例", ".multi-bar"), after: 450 },
+      { eval: click(".modal-actions .v-danger"), after: 1000 },
+      { assert: "window.__SHOT__.callsOf('main_delete_instance').length > 0", label: "删除实例命令已发出" },
+    ],
+  },
+  {
+    id: "main-create-group",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({ main_add_group: "grp-smoke" }, { viewMode: "group", startupPage: "List" }),
+    actions: [
+      { eval: click(".sidebar-slot .add-group-row"), after: 400 },
+      { eval: setInput(".modal .field-input", "冒烟分组"), after: 250 },
+      { eval: clickText("添加分组", ".modal"), after: 800 },
+      { assert: "window.__SHOT__.callsOf('main_add_group').length > 0", label: "新增分组命令已发出" },
+    ],
+  },
+  {
+    id: "account-add-ok",
+    kind: "account",
+    label: "mml-account",
+    size: [1000, 700],
+    commands: base({
+      account_add_account: {
+        userName: "冒烟账户",
+        uuid: "acc-smoke",
+        authType: "offline",
+        loginTime: "2026-10-28 12:00:00",
+        avatarColor: "#8b5cf6",
+        skin: "",
+        tokenStatus: "ok",
+        avatar: null,
+        server: null,
+        ext1: null,
+        ext2: null,
+        canRefresh: false,
+        canRelogin: true,
+        canEdit: true,
+      },
+    }),
+    actions: [
+      { eval: click(".icon-btn-head"), after: 300 },
+      { eval: setInput(".modal .field-input", "冒烟账户"), after: 250 },
+      { eval: click(".modal-actions .v-primary"), after: 900 },
+      { assert: "window.__SHOT__.callsOf('account_add_account').length > 0", label: "新增账户命令已发出" },
+    ],
+  },
+  {
+    id: "settings-save",
+    kind: "settings",
+    label: "mml-settings",
+    size: [1100, 760],
+    commands: base(),
+    actions: [
+      { eval: clickTab("界面"), after: 500 },
+      { eval: click(".switch"), after: 1200 },
+      { assert: "window.__SHOT__.callsOf('window_save_gui_config').length > 0", label: "设置保存命令已发出" },
+    ],
+  },
+  {
+    id: "java-download-start",
+    kind: "java_download",
+    label: "mml-java_download",
+    size: [1000, 700],
+    commands: base({ java_download_get_list: javaDownloadList, java_download_start: null }),
+    actions: [
+      { eval: click(".item-card .ui-btn"), after: 800 },
+      { assert: "window.__SHOT__.callsOf('java_download_start').length > 0", label: "Java 下载命令已发出" },
+    ],
+  },
+  {
+    id: "download-pause",
+    kind: "download",
+    label: "mml-download",
+    size: [1000, 700],
+    commands: base({ download_get_status: downloadStatus, download_pause_all: null }),
+    actions: [
+      { eval: click(".ov-actions .mini-btn"), after: 800 },
+      { assert: "window.__SHOT__.callsOf('download_pause_all').length > 0", label: "暂停全部命令已发出" },
+    ],
+  },
+
+  /* ---------------- 补状态 ---------------- */
+  {
+    id: "java-download-empty",
+    kind: "java_download",
+    label: "mml-java_download",
+    size: [1000, 700],
+    commands: base(),
+  },
+  {
+    id: "download-failed",
+    kind: "download",
+    label: "mml-download",
+    size: [1000, 700],
+    commands: base({
+      download_get_status: {
+        tasks: [
+          { id: 1, total: 3, completed: 1, failed: 2, allBytes: 73400320, nowBytes: 20971520, elapsedMs: 12000, paused: false },
+          { id: 2, total: 5, completed: 2, failed: 0, allBytes: 52428800, nowBytes: 20971520, elapsedMs: 8000, paused: false },
+        ],
+        threads: [
+          { thread: 1, name: "sodium-0.6.5.jar", state: "下载中", progress: 40, nowBytes: 1048576, allBytes: 2097152, speed: 0 },
+        ],
+        speed: 0,
+        paused: false,
+      },
+    }),
+  },
+  {
+    id: "add-resource-loaded",
+    kind: "add_resource",
+    label: "mml-add_resource",
+    size: [1180, 800],
+    commands: base({ add_resource_list: { items: modpackItems.slice(0, 6), count: 6 } }),
+    actions: [
+      { eval: setInput(".search-input, .search-box .sb-input", "优化"), after: 200 },
+      { eval: click(".search-btn"), after: 700 },
+    ],
+  },
+  {
+    id: "stats-empty",
+    kind: "stats",
+    label: "mml-stats",
+    size: [1150, 800],
+    commands: base({
+      stats_get_data: { launchCount: 0, launchDoneCount: 0, launchErrorCount: 0, totalSeconds: 0, instances: [] },
+      stats_get_playtime: { days: [], totalSeconds: 0, activeDays: 0, byInstance: [] },
+    }),
+  },
+  {
+    id: "log-empty",
+    kind: "log",
+    label: "mml-log",
+    size: [1100, 780],
+    commands: base({ log_get_runtime: [] }),
   },
 ];

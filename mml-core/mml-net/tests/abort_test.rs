@@ -115,7 +115,7 @@ fn abort_interrupts_inflight_request() {
         lag < Duration::from_millis(500),
         "中断不够快：abort 后 {lag:?} 才返回"
     );
-    assert!(detail.contains("已中断"), "错误内容不是中断提示：{detail}");
+    assert!(detail.contains("Aborted"), "错误内容不是中断错误：{detail}");
 }
 
 /// 中断之后发出的新请求不受上一轮中断影响

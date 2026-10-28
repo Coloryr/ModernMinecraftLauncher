@@ -8,6 +8,7 @@
 
 use std::io::{Read, Write};
 use std::net::TcpListener;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, Once};
 use std::time::Duration;
 
@@ -16,6 +17,14 @@ use mml_game::launcher::ModPackType;
 use mml_game::loader::LoaderType;
 use mml_game::serverpack::serverpack_obj::{ServerItemObj, ServerPackObj};
 use tokio_util::sync::CancellationToken;
+
+/// 这些用例共用同一个运行目录和同一个实例名，并行跑会互相覆盖安装目录
+static SERIAL: Mutex<()> = Mutex::new(());
+
+/// 取串行锁：装实例的用例都先拿它
+fn serial() -> std::sync::MutexGuard<'static, ()> {
+    SERIAL.lock().unwrap_or_else(|err| err.into_inner())
+}
 
 /// 初始化链：运行目录、路径、日志、配置、网络客户端与实例表
 fn ensure_init() -> std::path::PathBuf {
@@ -114,12 +123,17 @@ fn manifest() -> String {
 
 /// 把 manifest() 解析回来，方便按用例改字段
 fn decode_manifest() -> ServerPackObj {
-    serde_json::from_str(&manifest()).unwrap()
+    // 每个用例装进各自的实例目录：同名会触发"重名自动加尾号"，断言就对不上了
+    static SEQ: AtomicU32 = AtomicU32::new(0);
+    let mut pack: ServerPackObj = serde_json::from_str(&manifest()).unwrap();
+    pack.name = format!("{}-{}", pack.name, SEQ.fetch_add(1, Ordering::Relaxed));
+    pack
 }
 
 /// 只填目录也能导入：地址补齐成 server.json，实例里存目录
 #[test]
 fn import_from_directory_url() {
+    let _guard = serial();
     let run = ensure_init();
     let port = json_server(manifest());
     let base = format!("http://127.0.0.1:{port}/pack");
@@ -149,6 +163,7 @@ fn import_from_directory_url() {
 /// 直接贴 server.json 也认，名字可以由调用方覆盖
 #[test]
 fn import_from_manifest_url_with_name() {
+    let _guard = serial();
     ensure_init();
     let port = json_server(manifest());
 
@@ -195,6 +210,7 @@ fn probe_reads_manifest_summary() {
 /// 进度从下载器的任务表同步：下到一半就能看到 1/2，不是等全部下完才跳一下
 #[test]
 fn progress_follows_download_task() {
+    let _guard = serial();
     ensure_init();
     let (port, slot) = json_server_slot();
     *slot.lock().unwrap() = manifest_with_slow_file(port);
@@ -236,6 +252,7 @@ fn manifest_with_slow_file(port: u16) -> String {
 /// 导入时就同步：清单里的文件在导入结束时已经落进实例目录
 #[test]
 fn import_downloads_files() {
+    let _guard = serial();
     ensure_init();
     let (port, slot) = json_server_slot();
     *slot.lock().unwrap() = manifest_with_file(port);
@@ -281,6 +298,7 @@ fn manifest_with_file(port: u16) -> String {
 /// 清单里写了图标就顺带下下来：写进实例目录并记到 Icon
 #[test]
 fn import_downloads_icon() {
+    let _guard = serial();
     ensure_init();
     let port = json_server(manifest_with_icon());
 
@@ -336,6 +354,7 @@ fn empty_url_is_rejected() {
 /// 清单里带项目号的文件会写进实例的在线信息表，没有编号的不记
 #[test]
 fn import_records_online_info() {
+    let _guard = serial();
     ensure_init();
     let (port, slot) = json_server_slot();
     *slot.lock().unwrap() = manifest_with_indexed_file(port);

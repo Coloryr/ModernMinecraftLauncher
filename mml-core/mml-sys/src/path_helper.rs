@@ -791,6 +791,12 @@ pub async fn write_text_async<P: AsRef<Path>>(file: P, text: String) -> CoreResu
         .write_all(text.as_bytes())
         .await
         .map_err(|err| fs_error(file.as_ref(), err))?;
+    // tokio 的 File 自己带缓冲，不 flush 时数据还停在用户态，
+    // 紧接着用同步 API 读同一个文件会读不到刚写的内容
+    stream
+        .flush()
+        .await
+        .map_err(|err| fs_error(file.as_ref(), err))?;
 
     Ok(())
 }
@@ -918,6 +924,11 @@ pub async fn write_bytes_async<P: AsRef<Path>>(file: P, data: &[u8]) -> CoreResu
     stream
         .write_all(data)
         .await
+        .map_err(|err| fs_error(file.as_ref(), err))?;
+    // 同 write_text_async：不 flush 的话数据还留在 tokio 的缓冲里
+    stream
+        .flush()
+        .await
         .map_err(|err| fs_error(file.as_ref(), err))
 }
 
@@ -949,6 +960,10 @@ pub async fn write_stream_async<P: AsRef<Path>, R: AsyncRead + Unpin>(
 ) -> CoreResult<()> {
     let mut stream = open_write_async(&path).await?;
     tokio::io::copy(&mut reader, &mut stream)
+        .await
+        .map_err(|err| fs_error(path.as_ref(), err))?;
+    stream
+        .flush()
         .await
         .map_err(|err| fs_error(path.as_ref(), err))?;
     Ok(())
