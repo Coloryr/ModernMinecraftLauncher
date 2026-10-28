@@ -40,7 +40,7 @@ import { dropFromUrl, isTauri, multiWindow, openWindow, windowParams } from "../
 import type { WindowDropParam } from "../windowManager";
 import { commands } from "../../lib/bindings";
 import type { FolderInstanceDto, GroupDto, PackProgressDto, ServerPackProbeDto } from "../../lib/bindings";
-import { ADD_MODES, isModpackPackType, type AddMode } from "./types";
+import { ADD_MODES, type AddMode } from "./types";
 import { isArchiveUrl, serverPackUrl } from "../../lib/onlineInstance";
 
 const emit = defineEmits<{
@@ -49,6 +49,29 @@ const emit = defineEmits<{
 }>();
 
 // ================= 模式与通用字段 =================
+
+/** 页签 ID：「下载整合包」是入口，不是一种添加模式 */
+type AddTabId = AddMode | "modpack";
+
+/** 页签清单：四种模式 + 末尾的整合包下载入口 */
+const ADD_TABS: Array<{ id: AddTabId; labelKey: string; icon: string }> = [
+  ...ADD_MODES,
+  // 点它只开「下载整合包」窗口，所以永远不进入选中态
+  { id: "modpack", labelKey: "add.downloadModpack", icon: "download" },
+];
+
+/**
+ * 切换页签
+ *
+ * - `id`: 目标页签；`modpack` 不是模式，只跳窗口，不写回 `addMode`
+ */
+function onTabChange(id: AddTabId) {
+  if (id === "modpack") {
+    openWindow("add_modpack");
+    return;
+  }
+  addMode.value = id;
+}
 
 const addMode = ref<AddMode>("new");
 const newName = ref("");
@@ -75,11 +98,6 @@ const BUTTON_KEYS: Record<AddMode, string> = {
 };
 const createLabel = computed(() => {
   if (creating.value) return t("add.creating");
-  // 压缩包模式选了整合包类型：这一步实际是"安装整合包"，走的是下载整合包那套安装任务
-  // 见后端 add_import_archive，按钮上直说，别让用户以为只是解开压缩包
-  if (addMode.value === "archive" && isModpackPackType(addPackType.value)) {
-    return t("add.installPack");
-  }
   return t(BUTTON_KEYS[addMode.value]);
 });
 
@@ -192,7 +210,8 @@ async function applyArchivePath(path: string) {
     } catch {
       if (isLeaving()) return;
       resetArchive();
-      addError.value = t("add.archiveReadFail");
+      // 归到压缩包这一格：红框与红字都要贴在路径框上
+      failField("archive", t("add.archiveReadFail"));
       return;
     }
     // 识别整合包类型，自动填入类型和实例名（用户改过名字则不动）
@@ -463,7 +482,8 @@ async function loadFolderTree(rootPath: string) {
   } catch {
     if (isLeaving()) return;
     resetFolder();
-    addError.value = t("add.folderReadFail");
+    // 同压缩包：读目录失败归到文件夹这一格
+    failField("folder", t("add.folderReadFail"));
   }
 }
 
@@ -892,7 +912,7 @@ onUnmounted(() => {
   <WindowFrame :title="t('add.title')" body-gutter @close="$emit('close')">
     <!-- 内容区：撑满窗口，底部按钮靠 margin-top:auto 钉在右下角 -->
     <div class="add-body">
-      <IconTabs v-model="addMode" :tabs="ADD_MODES" :disabled="busy" />
+      <IconTabs :model-value="addMode" :tabs="ADD_TABS" :disabled="busy" @update:model-value="onTabChange" />
 
       <!-- 实例名称 + 分组 -->
       <div class="add-card">
@@ -906,6 +926,7 @@ onUnmounted(() => {
               :placeholder="folderScanned ? t('add.folderNameHint') : t('add.namePlaceholder')"
               :disabled="folderScanned" spellcheck="false" autocomplete="off" @input="onNameInput"
               @keydown.enter="create" />
+            <p v-if="addErrorField === 'name'" class="error-text" role="alert">{{ addError }}</p>
             <!-- 扫到实例时逐个导入，名字各自取目录名，这里填了也没用 -->
             <p v-if="folderScanned" class="field-hint">{{ t("add.folderNameHint") }}</p>
           </div>
@@ -923,33 +944,35 @@ onUnmounted(() => {
           :loader="loader" :loaders="loaders" :loader-loading="loaderLoading" :query-step="queryStep"
           :query-total="queryTotal" :loader-version="loaderVersion" :loader-versions="loaderVersions"
           :loader-ver-loading="loaderVerLoading" :no-loader-version="NO_VERSION_LOADERS.includes(loader)"
-          :loader-path="loaderPath" :invalid-version="addErrorField === 'version'" @refresh-versions="refreshVersions"
+          :loader-path="loaderPath" :invalid-version="addErrorField === 'version'"
+          :error="addErrorField === 'version' ? addError : ''"
+          @refresh-versions="refreshVersions"
           @refresh-loaders="refreshSupportLoaders" @refresh-loader-versions="refreshLoaderVersions"
           @update:ver-types="verTypes = $event" @update:new-version="newVersion = $event"
           @update:loader="loader = $event" @update:loader-version="loaderVersion = $event"
           @update:loader-path="loaderPath = $event" />
         <ArchiveMode v-else-if="addMode === 'archive'" :path="addArchivePath" :tree="archiveTree"
           :checked="archiveChecked" :expanded="archiveExpanded" :pack-types="packTypes" :pack-type="addPackType"
-          :scanning="archiveScanning" :invalid="addErrorField === 'archive'" @update:path="addArchivePath = $event"
+          :scanning="archiveScanning" :invalid="addErrorField === 'archive'"
+          :error="addErrorField === 'archive' ? addError : ''" @update:path="addArchivePath = $event"
           @pick="pickArchive" @toggle-file="onArchiveToggleFile" @toggle-dir="onArchiveToggleDir"
           @toggle-expand="onArchiveToggleExpand" @set-all="setAllArchive" @update:pack-type="addPackType = $event" />
         <FolderMode v-else-if="addMode === 'folder'" :path="addFolderPath" :tree="folderTree" :checked="folderChecked"
           :expanded="folderExpanded" :found="folderFound" :picked="folderPicked" :scanning="folderScanning"
-          :scan-error="folderScanError" :invalid="addErrorField === 'folder'" @update:path="addFolderPath = $event"
+          :scan-error="folderScanError" :invalid="addErrorField === 'folder'"
+          :error="addErrorField === 'folder' ? addError : ''" @update:path="addFolderPath = $event"
           @pick="pickFolder" @rescan="scanFolder" @toggle-instance="toggleFoundInstance"
           @set-all-instances="setAllFoundInstances" @toggle-file="onFolderToggleFile" @toggle-dir="onFolderToggleDir"
           @toggle-expand="onFolderToggleExpand" @lazy-load="onFolderLazyLoad" @set-all="setAllFolder" />
-        <OnlineMode v-else :url="addUrl" :invalid="addErrorField === 'url'" :probe="onlineProbe"
+        <OnlineMode v-else :url="addUrl" :invalid="addErrorField === 'url'"
+          :error="addErrorField === 'url' ? addError : ''" :probe="onlineProbe"
       :probing="onlineProbing" :probe-error="onlineProbeError" @update:url="addUrl = $event" />
       </div>
 
-      <p v-if="addError" class="error-text" role="alert">{{ addError }}</p>
+      <!-- 不属于某个输入框的错误（创建失败、读包失败这类）落在这里 -->
+      <p v-if="addError && !addErrorField" class="error-text" role="alert">{{ addError }}</p>
 
       <div class="modal-actions">
-        <!-- 整合包入口：浏览 / 安装与安装进度都在「下载整合包」窗口 -->
-        <BaseButton class="modpack-entry" @click="openWindow('add_modpack')">
-          {{ t("add.downloadModpack") }}
-        </BaseButton>
         <BaseButton variant="primary" :disabled="busy" @click="create">
           {{ createLabel }}
         </BaseButton>
@@ -997,20 +1020,6 @@ onUnmounted(() => {
 
 .add-body>.modal-actions {
   margin-top: auto;
-}
-
-/* 整合包入口靠左，与右侧的创建按钮分开；绿色软底，和侧边栏「添加分组」同色系。
-   加 .ui-btn 提高优先级，稳定压过 BaseButton 的 .v-plain 底色 */
-.ui-btn.modpack-entry {
-  margin-right: auto;
-  border: 1px solid color-mix(in srgb, var(--green) 42%, transparent);
-  background: color-mix(in srgb, var(--green) 12%, transparent);
-  color: var(--green);
-}
-
-.ui-btn.modpack-entry:hover {
-  background: color-mix(in srgb, var(--green) 20%, transparent);
-  color: var(--green);
 }
 
 /* 内容卡片 */

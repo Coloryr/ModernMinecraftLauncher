@@ -275,7 +275,7 @@ mod linux_admin_tests {
     use std::collections::HashMap;
     use std::io::Read;
 
-    use mml_base::process_utils;
+    use mml_sys::process_helper;
 
     /// 非 root 用户请求提权时会调用 pkexec；无 TTY 的 CI 环境中 pkexec 会失败，
     /// 但 launch() 本身不应 panic，且返回的 is_admin 应为 true
@@ -350,7 +350,7 @@ mod macos_admin_tests {
     use std::collections::HashMap;
     use std::io::Read;
 
-    use mml_base::process_utils;
+    use mml_sys::process_helper;
 
     /// 非 root 用户请求提权时会调用 osascript；无 GUI 的 CI 环境中 osascript 会失败，
     /// 但 launch() 本身不应 panic，且返回的 is_admin 应为 true

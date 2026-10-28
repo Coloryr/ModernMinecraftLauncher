@@ -21,7 +21,7 @@ http://localhost:1420/?window=settings
 `<kind>` 取 `src/windows/registry.ts` 里的 `WindowKind`。此时没有 IPC 数据，界面按空状态渲染。
 
 需要带假数据的整页截图时用 `npm run shots`：脚本会起 Vite 与 Edge headless，按
-`scripts/screenshot/scenarios.mjs` 逐页截图到 `target/temp/screens/`。加页面 / 加状态、
+`scripts/screenshot/scenarios.mjs` 逐页截图到 `target/screens/`。加页面 / 加状态、
 假数据与已知限制见 [scripts/screenshot/README.md](scripts/screenshot/README.md)。
 
 ## 目录结构

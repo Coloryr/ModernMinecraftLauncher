@@ -5,13 +5,17 @@
 // 每个场景新建一个 target，注入 mock.js（替换 Tauri 运行时）+ 假数据，再截图。
 //
 // 用法：
-//   node scripts/screenshot/run.mjs                # 全部场景
-//   node scripts/screenshot/run.mjs --only=main    # 只跑 id 含 main 的
-//   node scripts/screenshot/run.mjs --list         # 只列场景
+//   node scripts/screenshot/run.mjs                       # 全部场景
+//   node scripts/screenshot/run.mjs --scene=main-grid     # 只跑指定场景（精确名字，逗号分隔）
+//   node scripts/screenshot/run.mjs main-grid settings-ui # 同上，位置参数写法
+//   node scripts/screenshot/run.mjs --only=settings       # 只跑 id 含 settings 的
+//   node scripts/screenshot/run.mjs --list[=md]           # 列场景名 / 生成 Markdown 表
+//   node scripts/screenshot/run.mjs --clean               # 先清空旧截图再跑
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { describe, markdownTable } from "./catalog.mjs";
 import { scenarios } from "./scenarios.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -26,17 +30,57 @@ const value = (name, fallback) => {
   return hit ? hit.slice(name.length + 3) : fallback;
 };
 const only = value("only", "");
-const ids = value("ids", "").split(",").map((s) => s.trim()).filter(Boolean);
-const OUT_DIR = resolve(ROOT, value("out", "target/temp/screens"));
+// 排除：--skip=lobby 按 id 子串排除，逗号分隔多组
+const skip = value("skip", "").split(",").map((s) => s.trim()).filter(Boolean);
+// 精确名字：--scene=id / --ids=id / 直接写位置参数，三种写法等价
+const named = [
+  ...value("scene", "").split(","),
+  ...value("ids", "").split(","),
+  ...args.filter((a) => !a.startsWith("--")),
+].map((s) => s.trim()).filter(Boolean);
+const clean = flag("clean");
+const listMode = value("list", flag("list") ? "ids" : "");
+const OUT_DIR = resolve(ROOT, value("out", "target/screens"));
 const PORT = Number(value("port", "1420"));
 const EDGE = value("edge", "C:\\\\Program Files (x86)\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe");
 
-if (flag("list")) {
+if (listMode === "ids") {
   for (const s of scenarios) console.log(s.id);
   process.exit(0);
 }
+if (listMode === "md") {
+  console.log(markdownTable(scenarios, describe));
+  process.exit(0);
+}
+if (flag("help")) {
+  console.log([
+    "用法: node scripts/screenshot/run.mjs [场景名…] [选项]",
+    "",
+    "场景名   精确匹配 id，可写多个或用逗号分隔；不写则跑全部",
+    "         node scripts/screenshot/run.mjs main-grid settings-ui",
+    "         node scripts/screenshot/run.mjs --scene=main-grid,settings-ui",
+    "--only=  按 id 子串筛选，例如 --only=settings",
+    "--skip=  按 id 子串排除，例如 --skip=lobby（逗号分隔多组）",
+    "--list   只列场景 id；--list=md 输出 Markdown 表",
+    "--clean  先清空输出目录里的旧截图与 report.json",
+    "--out=   输出目录，默认 target/screens",
+    "--edge=  浏览器路径，默认 Windows Edge",
+    "--port=  Vite 端口，默认 1420",
+  ].join("\n"));
+  process.exit(0);
+}
 
-const chosen = ids.length ? scenarios.filter((s) => ids.includes(s.id)) : only ? scenarios.filter((s) => s.id.includes(only)) : scenarios;
+const missing = named.filter((id) => !scenarios.some((s) => s.id === id));
+if (missing.length) {
+  console.error("找不到场景:", missing.join(", "));
+  process.exit(1);
+}
+
+const chosen = (named.length
+  ? scenarios.filter((s) => named.includes(s.id))
+  : only
+    ? scenarios.filter((s) => s.id.includes(only))
+    : scenarios).filter((s) => !skip.some((k) => s.id.includes(k)));
 if (!chosen.length) {
   console.error("没有匹配的场景:", only);
   process.exit(1);
@@ -50,11 +94,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** 杀掉子进程及其派生进程：Vite / Edge 都是 shell 拉起来的，只杀 shell 会留下监听端口 */
 function killTree(child) {
-  if (!child || child.exitCode !== null) return;
+  if (!child) return;
   if (process.platform === "win32") {
-    spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
-  } else {
-    child.kill();
+    if (child.exitCode === null) spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+    return;
+  }
+  // 两个子进程都以独立进程组启动，向整组发信号才能收掉 npm 下面的 vite
+  try {
+    process.kill(-child.pid, "SIGTERM");
+  } catch {
+    try {
+      child.kill();
+    } catch {}
   }
 }
 
@@ -73,6 +124,7 @@ async function ensureVite() {
     cwd: VUE_DIR,
     shell: true,
     stdio: "ignore",
+    detached: process.platform !== "win32",
   });
   for (let i = 0; i < 120; i += 1) {
     await sleep(500);
@@ -201,7 +253,10 @@ async function shoot(cdp, browser, scenario, index) {
     await cdp.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false }, sessionId);
     await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: scenarioSource(scenario) }, sessionId);
     const query = scenario.query ? "&" + scenario.query.replace(/^\?/, "") : "";
-    const url = "http://127.0.0.1:" + PORT + "/?window=" + scenario.kind + query;
+    // 普通场景按 ?window=<kind> 载入窗口；控件预览这类独立页面直接给 path
+    const url = scenario.path
+      ? "http://127.0.0.1:" + PORT + scenario.path
+      : "http://127.0.0.1:" + PORT + "/?window=" + scenario.kind + query;
     await cdp.send("Page.navigate", { url }, sessionId);
     await waitReady(cdp, sessionId, scenario);
 
@@ -261,7 +316,7 @@ async function launchEdge(port, profile) {
       "--window-size=1400,900",
       "about:blank",
     ],
-    { stdio: "ignore" },
+    { stdio: "ignore", detached: process.platform !== "win32" },
   );
   for (let i = 0; i < 60; i += 1) {
     await sleep(250);
@@ -278,17 +333,29 @@ async function launchEdge(port, profile) {
 }
 
 
-/** 生成一个可直接打开的索引页：所有截图按场景 id 排列，失败与未 mock 一并标出 */
+/** 生成一个可直接打开的索引页：目录里的每张截图都列出，失败与未 mock 一并标出 */
 function writeIndex(report) {
-  const cards = report
-    .map((item) => {
-      const name = item.file ? item.file.split(/[\\/]/).pop() : "";
+  // 以目录里的 PNG 为准：只跑部分场景时，旧截图也要留在索引里
+  const byId = new Map(report.map((item) => [item.id, item]));
+  const ids = readdirSync(OUT_DIR)
+    .filter((name) => name.endsWith(".png"))
+    .map((name) => name.slice(0, -4))
+    .sort();
+  // 失败场景没有 PNG，也要进索引，否则看不出哪张没跑出来
+  for (const item of report) {
+    const failed = item.error || (item.unknown && item.unknown.length) || (item.runtimeErrors && item.runtimeErrors.length);
+    if (failed && !ids.includes(item.id)) ids.push(item.id);
+  }
+  const cards = ids
+    .map((id) => {
+      const item = byId.get(id) ?? { id };
       const notes = [];
       if (item.error) notes.push("失败：" + item.error);
       for (const u of item.unknown || []) notes.push("未 mock：" + u);
       for (const e of item.runtimeErrors || []) notes.push("页面错误：" + e);
-      const img = name ? '<a href="' + name + '"><img loading="lazy" src="' + name + '" alt="' + item.id + '"></a>' : "";
-      return '<figure><figcaption>' + item.id + "</figcaption>" + img + (notes.length ? "<p>" + notes.join("<br>") + "</p>" : "") + "</figure>";
+      const name = id + ".png";
+      const img = existsSync(join(OUT_DIR, name)) ? '<a href="' + name + '"><img loading="lazy" src="' + name + '" alt="' + id + '"></a>' : "";
+      return '<figure><figcaption>' + id + "</figcaption>" + img + (notes.length ? "<p>" + notes.join("<br>") + "</p>" : "") + "</figure>";
     })
     .join("\n");
   const html = [
@@ -304,7 +371,7 @@ function writeIndex(report) {
     "img{width:100%;height:auto;border-radius:6px;display:block}",
     "p{font-size:11px;color:#6a7480;margin:6px 0 0}",
     "</style>",
-    "<h1>M²L 页面截图 · " + report.length + " 个场景</h1>",
+    "<h1>M²L 页面截图 · " + ids.length + " 个场景</h1>",
     '<div class="grid">' + cards + "</div>",
   ].join("\n");
   writeFileSync(join(OUT_DIR, "index.html"), html);
@@ -375,14 +442,41 @@ async function removeProfile(profile) {
   console.warn("临时目录未能删除：", profile);
 }
 
+/** 合并多次运行的报告：按场景表顺序排列，同 id 以本次结果为准 */
+function mergeReports(previous, current) {
+  const order = new Map(scenarios.map((s, i) => [s.id, i]));
+  const byId = new Map();
+  for (const item of previous) if (item && item.id) byId.set(item.id, item);
+  for (const item of current) if (item && item.id) byId.set(item.id, item);
+  return [...byId.values()]
+    .filter((item) => order.has(item.id))
+    .sort((a, b) => order.get(a.id) - order.get(b.id));
+}
+
 async function main() {
   cleanupStaleProfiles();
-  if (existsSync(OUT_DIR)) {
+  mkdirSync(OUT_DIR, { recursive: true });
+  // 只跑部分场景时保留已有截图，方便逐张补齐；要整批重来用 --clean
+  if (clean) {
     for (const name of readdirSync(OUT_DIR)) {
-      if (name.endsWith(".png") || name === "report.json") rmSync(join(OUT_DIR, name), { force: true });
+      if (name.endsWith(".png") || name === "report.json" || name === "index.html") {
+        rmSync(join(OUT_DIR, name), { force: true });
+      }
     }
   }
-  mkdirSync(OUT_DIR, { recursive: true });
+  let previous = [];
+  try {
+    const file = join(OUT_DIR, "report.json");
+    if (!clean && existsSync(file)) {
+      const parsed = JSON.parse(readFileSync(file, "utf8"));
+      if (Array.isArray(parsed)) {
+        // 图片被手动删掉的旧记录不再进索引，避免索引里出现破图
+        previous = parsed.filter((item) => item && item.id && (!item.file || existsSync(item.file)));
+      }
+    }
+  } catch {
+    previous = [];
+  }
   const vite = await ensureVite();
   const port = 9300 + (process.pid % 400);
   const profile = join(ROOT, "target", "temp", "shot-edge-" + process.pid);
@@ -405,8 +499,9 @@ async function main() {
       }
     }
   } finally {
-    writeFileSync(join(OUT_DIR, "report.json"), JSON.stringify(report, null, 2));
-    writeIndex(report);
+    const merged = mergeReports(previous, report);
+    writeFileSync(join(OUT_DIR, "report.json"), JSON.stringify(merged, null, 2));
+    writeIndex(merged);
     if (edge) {
       killTree(edge.child);
       await waitExit(edge.child, 3000);
@@ -415,7 +510,8 @@ async function main() {
     if (vite) killTree(vite);
   }
   const failed = report.filter((r) => r.error || (r.unknown && r.unknown.length) || (r.consoleErrors && r.consoleErrors.length));
-  console.log("\n[done] 图片目录:", OUT_DIR);
+  const total = readdirSync(OUT_DIR).filter((name) => name.endsWith(".png")).length;
+  console.log("\n[done] 本次 " + report.length + " 张，目录共 " + total + " 张:", OUT_DIR);
   if (failed.length) {
     console.log("[有问题的场景]");
     for (const item of failed) {

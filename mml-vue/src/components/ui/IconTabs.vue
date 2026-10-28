@@ -2,7 +2,7 @@
 // 通用图标选项卡：图标 + 渐变激活态，按数量等分填满整行
 //
 // 原「添加实例」窗口的 ModeTabs，导出窗口要用同一套观感，所以挪到这里共用。
-// 图标名固定四个：cube / box / folder / globe，其它值回落成地球。
+// 图标名固定五个：cube / box / folder / globe / download，其它值回落成地球。
 import { t } from "../../lib/i18n";
 
 defineProps<{
@@ -40,6 +40,12 @@ const emit = defineEmits<{
       <svg v-else-if="tab.icon === 'folder'" viewBox="0 0 24 24" width="17" height="17" fill="none"
         stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+      </svg>
+      <svg v-else-if="tab.icon === 'download'" viewBox="0 0 24 24" width="17" height="17" fill="none"
+        stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3v11" />
+        <path d="m7 10 5 5 5-5" />
+        <path d="M5 20h14" />
       </svg>
       <svg v-else viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"
         stroke-linecap="round" stroke-linejoin="round">

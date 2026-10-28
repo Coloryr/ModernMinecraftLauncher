@@ -44,6 +44,8 @@ const props = defineProps<{
   loaderPath: string;
   /** 校验失败：游戏版本必填（高亮 + 自动聚焦） */
   invalidVersion?: boolean;
+  /** 校验失败的文案，贴在版本下拉下面 */
+  error?: string;
 }>();
 
 const emit = defineEmits<{
@@ -192,6 +194,8 @@ function onLoaderPathPick(e: Event) {
           <GlyphIcon name="refresh" :size="14" :weight="2" />
         </button>
       </div>
+      <!-- 校验失败的原因贴在版本下拉下面 -->
+      <p v-if="error" class="error-text" role="alert">{{ error }}</p>
       <div v-if="versions.length === 0" class="empty-tip">
         {{ versionsLoaded ? t("add.noVersion") : t("add.loading") }}
       </div>

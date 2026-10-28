@@ -10,6 +10,8 @@ const props = defineProps<{
   url: string;
   /** 校验失败：下载地址必填（高亮 + 自动聚焦） */
   invalid?: boolean;
+  /** 校验失败的文案，贴在地址框下面 */
+  error?: string;
   /** 清单摘要；null 表示还没探到 */
   probe?: ServerPackProbeDto | null;
   /** 正在读清单 */
@@ -47,6 +49,10 @@ function fillManifest() {
   <input ref="urlInput" :value="url" class="field-input" :class="{ 'is-invalid': invalid }"
     :placeholder="t('add.urlPlaceholder')" spellcheck="false" autocomplete="off"
     @input="emit('update:url', ($event.target as HTMLInputElement).value)" @blur="fillManifest" />
+
+  <!-- 校验失败的原因贴在框下面，别让它落到底部按钮上方去找 -->
+  <p v-if="error" class="error-text" role="alert">{{ error }}</p>
+
   <p class="field-hint">{{ t("add.urlHint") }}</p>
 
   <!-- 填完地址自动读一次清单：先让人看清会装成什么，再决定要不要下载 -->

@@ -141,10 +141,15 @@ const filtered = computed(() => {
 /** 列表是不是被筛过：搜索词或类型筛选生效。空结果文案与「添加」入口都看它 */
 const filtering = computed(() => searchText.value.trim() !== "" || typeFilter.value !== "all");
 
+/** 账户库是否为空：空库时标题栏只留标题，添加入口交给空状态里的按钮 */
+const hasAccounts = computed(() => accounts.value.length > 0);
+
 // 添加账户弹窗（按类型显示不同输入框）
 const showAdd = ref(false);
 const addType = ref("offline");
 const addFields = ref<Record<string, string>>({});
+/** 提交时没填的必填字段 key：就地标红，用户补填一格就撤一格 */
+const addInvalid = ref<string[]>([]);
 
 // 登录方式锁定：客户端设置里配置的条目列表，总开关打开时只允许列表中的登录方式
 const loginLock = ref<LoginLockItem[]>([]);
@@ -181,6 +186,7 @@ function onSelectLockServer(server: string) {
 /** 类型切换后重置表单：有锁定条目时默认选中第一个登录模型 */
 function resetAddFields() {
   addFields.value = {};
+  addInvalid.value = [];
   const first = lockServerEntries.value[0];
   if (first) {
     onSelectLockServer(first.server);
@@ -188,6 +194,11 @@ function resetAddFields() {
     selectedLockServer.value = "";
   }
 }
+/** 开始补填某一格就撤掉它的标红 */
+function clearInvalid(key: string) {
+  addInvalid.value = addInvalid.value.filter((k) => k !== key);
+}
+
 const showOauth = ref(false);
 const showOauthRun = ref(false);
 const oauthCode = ref("");
@@ -359,11 +370,13 @@ const adding = ref(false);
 /** 提交添加：校验必填字段后按类型走设备码流程或直接添加 */
 async function confirmAdd() {
   if (adding.value) return;
-  const fields = ADD_FIELDS[addType.value] ?? [];
-  if (fields.some((f) => !f.optional && !addFields.value[f.key]?.trim())) {
-    showToast(t("account.fieldsRequired"));
+  const missing = addFormFields.value.filter((f) => !f.optional && !addFields.value[f.key]?.trim());
+  if (missing.length) {
+    // 就地标红：toast 一闪而过，用户回头还得自己猜是哪一格没填
+    addInvalid.value = missing.map((f) => f.key);
     return;
   }
+  addInvalid.value = [];
 
   adding.value = true;
   try {
@@ -514,11 +527,12 @@ function relogin(acc: AccountStoreDto) {
     return;
   }
   reloginTarget.value = acc;
-  reloginFields.value = { server: acc.server ?? "", name: acc.userName, pass: "" };
+  reloginFields.value = { name: acc.userName, pass: "" };
 }
 
 const reloginTarget = ref<AccountStoreDto | null>(null);
-const reloginFields = ref({ server: "", name: "", pass: "" });
+/** 重新登录只重输用户名 / 密码：登录地址由账户本身固定，不在这里改 */
+const reloginFields = ref({ name: "", pass: "" });
 
 /** 防止重复提交 */
 const relogining = ref(false);
@@ -533,8 +547,8 @@ async function confirmRelogin() {
 
   relogining.value = true;
   try {
-    // 同 uuid + 类型会覆盖旧账户数据，等效重新认证
-    const server = reloginFields.value.server.trim();
+    // 同 uuid + 类型会覆盖旧账户数据，等效重新认证；地址沿用账户自己的
+    const server = (acc.server ?? "").trim();
     await addAccount(acc.authType, reloginFields.value.name.trim(), server || undefined, reloginFields.value.pass);
     reloginTarget.value = null;
     showToast(t("account.reloginOk"));
@@ -628,24 +642,28 @@ function tokenLabel(acc: AccountStoreDto): string {
          标题本身不删 —— 「账户管理」是这一页的身份，删掉窗口标题就只剩一排控件，
          用户分不清自己在哪一页 -->
     <template #head-right>
-      <!-- 同时挂 .field-select：尺寸以外的观感（不透明底 / 主题描边 / 共享箭头 /
-           以及 Chromium 135+ 的 base-select 页内弹层）全部由它统一提供，
-           这里只覆盖标题栏要的尺寸。之前单独写一套，弹层还是系统原生那个 -->
-      <select v-model="typeFilter" class="field-select head-select">
-        <option v-for="o in TYPE_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
-      </select>
-      <!-- 搜索框与设置窗口那是同一份（components/ui/SearchBox），
-           宽度按这里的需要给：这一排还有筛选下拉与视图切换，168px 是余下的空间 -->
-      <SearchBox v-model="searchText" :placeholder="t('account.search')" width="168px" />
-      <SegmentedTabs class="head-tabs" :model-value="view" :options="VIEW_OPTIONS" icon-only
-        @update:model-value="view = $event as ViewMode" />
-      <BaseButton size="sm" variant="primary" class="icon-btn-head" v-tip="t('account.addTitle')"
-        :aria-label="t('account.addTitle')" @click="openAdd">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-      </BaseButton>
+      <!-- 一个账户都没有时这一排全部收起：筛选、搜索、视图切换都无从谈起，
+           加号也搬进空状态里，标题栏只留「账户管理」这个身份 -->
+      <template v-if="hasAccounts">
+        <!-- 同时挂 .field-select：尺寸以外的观感（不透明底 / 主题描边 / 共享箭头 /
+             以及 Chromium 135+ 的 base-select 页内弹层）全部由它统一提供，
+             这里只覆盖标题栏要的尺寸。之前单独写一套，弹层还是系统原生那个 -->
+        <select v-model="typeFilter" class="field-select head-select">
+          <option v-for="o in TYPE_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+        </select>
+        <!-- 搜索框与设置窗口那是同一份（components/ui/SearchBox），
+             宽度按这里的需要给：这一排还有筛选下拉与视图切换，168px 是余下的空间 -->
+        <SearchBox v-model="searchText" :placeholder="t('account.search')" width="168px" />
+        <SegmentedTabs class="head-tabs" :model-value="view" :options="VIEW_OPTIONS" icon-only
+          @update:model-value="view = $event as ViewMode" />
+        <BaseButton size="sm" variant="primary" class="icon-btn-head" v-tip="t('account.addTitle')"
+          :aria-label="t('account.addTitle')" @click="openAdd">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </BaseButton>
+      </template>
     </template>
 
     <!-- 视图：平铺 / 列表 / 详情（见 views/ 目录）；详情模式下视图区自己管理滚动 -->
@@ -653,16 +671,17 @@ function tokenLabel(acc: AccountStoreDto): string {
       <AccountGrid v-if="view === 'grid'" :accounts="filtered" :filtering="filtering"
         :current-uuid="currentAccount?.uuid ?? ''" @menu="openAccountMenu"
         @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin" @refresh-skin="refreshSkin"
-        @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" />
+        @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" @add="openAdd" />
       <AccountList v-else-if="view === 'list'" :accounts="filtered" :filtering="filtering"
         :current-uuid="currentAccount?.uuid ?? ''" @menu="openAccountMenu"
         :token-label="tokenLabel" @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin"
-        @refresh-skin="refreshSkin" @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" />
+        @refresh-skin="refreshSkin" @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event"
+        @add="openAdd" />
       <AccountDetail v-else :accounts="filtered" :filtering="filtering" :current-uuid="currentAccount?.uuid ?? ''"
         @menu="openAccountMenu"
         :token-label="tokenLabel"
         @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin" @refresh-skin="refreshSkin"
-        @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" />
+        @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" @add="openAdd" />
     </div>
 
     <!-- 添加账户弹窗（按类型显示不同输入框）：不遮标题栏 -->
@@ -687,9 +706,12 @@ function tokenLabel(acc: AccountStoreDto): string {
 
       <template v-for="f in addFormFields" :key="f.key">
         <label class="field-label">{{ t(f.labelKey) }}</label>
-        <input v-model="addFields[f.key]" class="field-input" :type="f.password ? 'password' : 'text'"
-          spellcheck="false" @keyup.enter="confirmAdd" />
+        <input v-model="addFields[f.key]" class="field-input" :class="{ 'is-invalid': addInvalid.includes(f.key) }"
+          :type="f.password ? 'password' : 'text'" spellcheck="false"
+          @input="clearInvalid(f.key)" @keyup.enter="confirmAdd" />
       </template>
+
+      <p v-if="addInvalid.length" class="error-text">{{ t("account.fieldsRequired") }}</p>
 
       <p v-if="addType === 'microsoft'" class="hint">{{ t("account.loginHint") }}</p>
 
@@ -753,16 +775,16 @@ function tokenLabel(acc: AccountStoreDto): string {
       </div>
     </BaseModal>
 
-    <!-- 重新登录（非微软账户）：重输密码重新认证，服务器地址预填 -->
+    <!-- 重新登录（非微软账户）：重输密码重新认证。
+         登录地址不许改 —— 换地址就是换服，账户属于哪个服由账户自己带着 -->
     <BaseModal v-if="reloginTarget" :title="t('account.reloginTitle')" :closable="false" below-titlebar
       @close="reloginTarget = null">
-      <template v-if="reloginTarget.authType === 'nide8'">
-        <label class="field-label">{{ t("account.serverId") }}</label>
-        <input v-model="reloginFields.server" class="field-input" spellcheck="false" />
-      </template>
-      <template v-else>
-        <label class="field-label">{{ t("account.server") }}</label>
-        <input v-model="reloginFields.server" class="field-input" spellcheck="false" />
+      <template v-if="reloginTarget.server">
+        <label class="field-label">
+          {{ reloginTarget.authType === "nide8" ? t("account.serverId") : t("account.server") }}
+        </label>
+        <input class="field-input" :value="reloginTarget.server" disabled spellcheck="false" />
+        <div class="field-hint">{{ t("account.reloginServerLocked") }}</div>
       </template>
 
       <label class="field-label">{{ t("account.username") }}</label>

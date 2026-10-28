@@ -24,6 +24,8 @@ const props = defineProps<{
   scanning: boolean;
   /** 校验失败：压缩包必填（高亮 + 自动聚焦） */
   invalid?: boolean;
+  /** 校验失败的文案，贴在路径框下面 */
+  error?: string;
 }>();
 
 const emit = defineEmits<{
@@ -64,6 +66,9 @@ watch(
       @input="emit('update:path', ($event.target as HTMLInputElement).value)" />
     <BaseButton class="pick-btn" size="sm" variant="accent" @click="emit('pick')">{{ t("add.browse") }}</BaseButton>
   </div>
+
+  <!-- 校验失败的原因贴在框下面，别让它落到底部按钮上方去找 -->
+  <p v-if="error" class="error-text" role="alert">{{ error }}</p>
 
   <!-- 读取条目 / 识别类型中：不确定滚动进度条，与加载器查询、目录扫描同一套观感 -->
   <LoaderQueryProgress v-if="scanning" kind="versions" :visible="true" :step="0" :total="0"

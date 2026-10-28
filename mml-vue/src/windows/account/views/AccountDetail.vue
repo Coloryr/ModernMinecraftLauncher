@@ -41,6 +41,8 @@ const emit = defineEmits<{
   (e: "delete", acc: AccountStoreDto): void;
   /** 右键账户：打开操作菜单 */
   (e: "menu", payload: { event: MouseEvent; acc: AccountStoreDto }): void;
+  /** 空状态里点「添加账户」 */
+  (e: "add"): void;
 }>();
 
 /** 是否当前使用的账户 */
@@ -100,7 +102,8 @@ function isCurrent(acc: AccountStoreDto): boolean {
     </div>
     <AccountEmpty v-else class="detail-empty"
       :title="filtering ? t('account.searchEmpty') : t('account.emptyTitle')"
-      :hint="filtering ? undefined : t('account.emptyHint')" />
+      :hint="filtering ? undefined : t('account.emptyHint')" :show-add="!filtering"
+      @add="emit('add')" />
   </div>
 </template>
 

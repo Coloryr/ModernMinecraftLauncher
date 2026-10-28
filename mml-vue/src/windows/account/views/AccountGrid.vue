@@ -57,6 +57,8 @@ const emit = defineEmits<{
   (e: "delete", acc: AccountStoreDto): void;
   /** 右键账户：打开操作菜单 */
   (e: "menu", payload: { event: MouseEvent; acc: AccountStoreDto }): void;
+  /** 空状态里点「添加账户」 */
+  (e: "add"): void;
 }>();
 
 /** 是否当前使用的账户 */
@@ -106,6 +108,12 @@ function movePreview(e: MouseEvent) {
 function hidePreview() {
   preview.value = null;
 }
+
+/** 点皮肤 / 披风图：先收起跟随鼠标的大图，再打开该账户的皮肤弹窗 */
+function openSkin(acc: AccountStoreDto) {
+  hidePreview();
+  emit("viewSkin", acc);
+}
 </script>
 
 <template>
@@ -134,10 +142,13 @@ function hidePreview() {
           <span>{{ t("account.noAvatar") }}</span>
         </div>
         <div v-if="!imageFailed(acc, 'skin')" class="img-box img-skin-box">
-          <img :src="accountSkinUrl(acc)" class="img-skin"
+          <!-- 点开皮肤弹窗：与操作按钮里的「查看皮肤」同一个入口。
+               双击的父级语义是"切换账户"，这里 .stop 掉，免得点两下顺手换了账户 -->
+          <img :src="accountSkinUrl(acc)" class="img-skin" role="button" tabindex="0"
             :class="{ 'mode-3d': isSkin3D, pending: imageLoading(acc, 'skin') }" :alt="t('account.skin')"
             data-no-fallback @load="markImageLoaded(acc, 'skin')" @error="markImageFailed(acc, 'skin')"
-            @mouseenter="showPreview($event, acc, 'skin')" @mousemove="movePreview" @mouseleave="hidePreview" />
+            @mouseenter="showPreview($event, acc, 'skin')" @mousemove="movePreview" @mouseleave="hidePreview"
+            @click.stop="openSkin(acc)" @dblclick.stop="openSkin(acc)" @keydown.enter.prevent="openSkin(acc)" />
           <div v-if="imageLoading(acc, 'skin')" class="img-spin" />
         </div>
         <div v-else class="img-ph img-skin-ph">
@@ -149,10 +160,11 @@ function hidePreview() {
           <span>{{ t("account.noSkin") }}</span>
         </div>
         <div v-if="!imageFailed(acc, 'cape')" class="img-box img-cape-box">
-          <img :src="accountCapeUrl(acc, capeDisplay)" class="img-cape" :class="{ pending: imageLoading(acc, 'cape') }"
-            :alt="t('account.cape')" data-no-fallback @load="markImageLoaded(acc, 'cape')"
-            @error="markImageFailed(acc, 'cape')" @mouseenter="showPreview($event, acc, 'cape')"
-            @mousemove="movePreview" @mouseleave="hidePreview" />
+          <img :src="accountCapeUrl(acc, capeDisplay)" class="img-cape" role="button" tabindex="0"
+            :class="{ pending: imageLoading(acc, 'cape') }" :alt="t('account.cape')" data-no-fallback
+            @load="markImageLoaded(acc, 'cape')" @error="markImageFailed(acc, 'cape')"
+            @mouseenter="showPreview($event, acc, 'cape')" @mousemove="movePreview" @mouseleave="hidePreview"
+            @click.stop="openSkin(acc)" @dblclick.stop="openSkin(acc)" @keydown.enter.prevent="openSkin(acc)" />
           <div v-if="imageLoading(acc, 'cape')" class="img-spin" />
         </div>
         <div v-else class="img-ph img-cape-ph">
@@ -174,7 +186,8 @@ function hidePreview() {
     </div>
     <AccountEmpty v-if="accounts.length === 0"
       :title="filtering ? t('account.searchEmpty') : t('account.emptyTitle')"
-      :hint="filtering ? undefined : t('account.emptyHint')" />
+      :hint="filtering ? undefined : t('account.emptyHint')" :show-add="!filtering"
+      @add="emit('add')" />
 
     <!-- 悬停图片时的大图预览（跟随鼠标，不拦截事件），尺寸按图片类型区分 -->
     <Teleport to="body">
@@ -311,6 +324,21 @@ function hidePreview() {
   object-fit: contain;
   border-radius: 5px;
   image-rendering: pixelated;
+}
+
+/* 皮肤 / 披风图点开皮肤弹窗（与操作按钮里的「查看皮肤」同一入口）：
+   跟随鼠标的大图只说明"能看大图"，要点得动还得给个描边信号 */
+.img-skin,
+.img-cape {
+  cursor: pointer;
+}
+
+.img-skin:hover,
+.img-skin:focus-visible,
+.img-cape:hover,
+.img-cape:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
 }
 
 /* 图片拉取失败 / 无皮肤时的占位：图标 + 横排文字，三个槽位样式统一 */

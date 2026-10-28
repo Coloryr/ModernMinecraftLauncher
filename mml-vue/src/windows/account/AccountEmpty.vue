@@ -1,10 +1,23 @@
 <script setup lang="ts">
 // 账户空状态：占满视图内容区，避免只剩顶部一行提示
-defineProps<{
-  /** 主文案 */
-  title: string;
-  /** 补充说明；筛选无结果时不传 */
-  hint?: string;
+import BaseButton from "../../components/ui/BaseButton.vue";
+import { t } from "../../lib/i18n";
+
+withDefaults(
+  defineProps<{
+    /** 主文案 */
+    title: string;
+    /** 补充说明；筛选无结果时不传 */
+    hint?: string;
+    /** 是否给「添加账户」按钮：筛选无结果时不给，加一个也找不到原本要的那条 */
+    showAdd?: boolean;
+  }>(),
+  { showAdd: false },
+);
+
+const emit = defineEmits<{
+  /** 点「添加账户」：由所属窗口打开添加弹窗 */
+  (e: "add"): void;
 }>();
 </script>
 
@@ -19,6 +32,13 @@ defineProps<{
     </div>
     <p class="empty-title">{{ title }}</p>
     <p v-if="hint" class="empty-hint">{{ hint }}</p>
+    <BaseButton v-if="showAdd" variant="primary" class="empty-add" @click="emit('add')">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round">
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+      {{ t("account.addTitle") }}
+    </BaseButton>
   </div>
 </template>
 
@@ -62,5 +82,10 @@ defineProps<{
   max-width: 320px;
   font-size: 12.5px;
   line-height: 1.6;
+}
+
+/* 空状态里唯一的动作：与上方两行文案拉开一点，别贴在一起 */
+.empty-add {
+  margin-top: 8px;
 }
 </style>

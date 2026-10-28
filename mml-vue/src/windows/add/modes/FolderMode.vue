@@ -31,6 +31,8 @@ const props = defineProps<{
   scanError: string;
   /** 校验失败：文件夹必填（高亮 + 自动聚焦） */
   invalid?: boolean;
+  /** 校验失败的文案，贴在路径框下面 */
+  error?: string;
 }>();
 
 const emit = defineEmits<{
@@ -81,6 +83,9 @@ watch(
       {{ t("add.folderScan") }}
     </BaseButton>
   </div>
+
+  <!-- 校验失败的原因贴在框下面，别让它落到底部按钮上方去找 -->
+  <p v-if="error" class="error-text" role="alert">{{ error }}</p>
 
   <!-- 扫描失败：把原因显示出来，以前静默回落，看起来像功能没生效 -->
   <p v-if="scanError" class="field-hint scan-err">

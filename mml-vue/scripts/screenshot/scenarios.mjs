@@ -417,9 +417,9 @@ export const scenarios = [
   { id: "account-empty", kind: "account", label: "mml-account", size: [1000, 700], commands: base({ account_get_accounts: { accounts: [], currentUuid: null, locked: false } }) },
   { id: "account-list", kind: "account", label: "mml-account", size: [1000, 700], commands: base(), actions: [{ eval: click(".head-tabs .seg-btn:nth-child(2)"), after: 450 }] },
   { id: "account-detail", kind: "account", label: "mml-account", size: [1000, 700], commands: base(), actions: [{ eval: click(".head-tabs .seg-btn:nth-child(3)"), after: 450 }] },
-  { id: "account-empty-list", kind: "account", label: "mml-account", size: [1000, 700], commands: base({ account_get_accounts: { accounts: [], currentUuid: null, locked: false } }), actions: [{ eval: click(".head-tabs .seg-btn:nth-child(2)"), after: 450 }] },
-  { id: "account-empty-detail", kind: "account", label: "mml-account", size: [1000, 700], commands: base({ account_get_accounts: { accounts: [], currentUuid: null, locked: false } }), actions: [{ eval: click(".head-tabs .seg-btn:nth-child(3)"), after: 450 }] },
-  { id: "account-add", kind: "account", label: "mml-account", size: [1000, 700], commands: base(), actions: [{ eval: click(".head-add"), after: 450 }] },
+  { id: "account-list-no-match", kind: "account", label: "mml-account", size: [1000, 700], commands: base(), actions: [{ eval: click(".head-tabs .seg-btn:nth-child(2)"), after: 300 }, { eval: setInput(".search-box .sb-input", "zzz"), after: 450 }] },
+  { id: "account-detail-no-match", kind: "account", label: "mml-account", size: [1000, 700], commands: base(), actions: [{ eval: click(".head-tabs .seg-btn:nth-child(3)"), after: 300 }, { eval: setInput(".search-box .sb-input", "zzz"), after: 450 }] },
+  { id: "account-add", kind: "account", label: "mml-account", size: [1000, 700], commands: base(), actions: [{ eval: click(".icon-btn-head"), after: 450 }] },
   {
     id: "account-add-microsoft",
     kind: "account",
@@ -427,7 +427,7 @@ export const scenarios = [
     size: [1000, 700],
     commands: base(),
     actions: [
-      { eval: click(".head-add"), after: 300 },
+      { eval: click(".icon-btn-head"), after: 300 },
       { eval: selectValue(".modal select", "microsoft"), after: 350 },
     ],
   },
@@ -438,7 +438,7 @@ export const scenarios = [
     size: [1000, 700],
     commands: base(),
     actions: [
-      { eval: click(".head-add"), after: 300 },
+      { eval: click(".icon-btn-head"), after: 300 },
       { eval: selectValue(".modal select", "littleskin"), after: 350 },
     ],
   },
@@ -449,8 +449,31 @@ export const scenarios = [
     size: [1000, 700],
     commands: base(),
     actions: [
-      { eval: click(".head-add"), after: 300 },
+      { eval: click(".icon-btn-head"), after: 300 },
       { eval: selectValue(".modal select", "authlib"), after: 350 },
+    ],
+  },
+  {
+    id: "account-add-invalid",
+    kind: "account",
+    label: "mml-account",
+    size: [1000, 700],
+    commands: base(),
+    actions: [
+      { eval: click(".icon-btn-head"), after: 300 },
+      { eval: clickText("添加", ".modal"), after: 400 },
+    ],
+  },
+  {
+    id: "account-add-invalid-authlib",
+    kind: "account",
+    label: "mml-account",
+    size: [1000, 700],
+    commands: base(),
+    actions: [
+      { eval: click(".icon-btn-head"), after: 300 },
+      { eval: selectValue(".modal select", "authlib"), after: 350 },
+      { eval: clickText("添加", ".modal"), after: 400 },
     ],
   },
   {
@@ -708,7 +731,8 @@ export const scenarios = [
     commands: base(),
     actions: [
       { eval: clickText("导入压缩包"), after: 250 },
-      { eval: clickText("导入"), after: 500 },
+      { eval: setInput("#add-name", "整合包测试"), after: 250 },
+      { eval: click(".add-body .modal-actions .v-primary"), after: 500 },
     ],
   },
   {
@@ -795,6 +819,7 @@ export const scenarios = [
     commands: base(),
     actions: [
       { eval: clickText("添加文件夹"), after: 250 },
+      { eval: setInput("#add-name", "文件夹测试"), after: 250 },
       { eval: clickText("添加"), after: 500 },
     ],
   },
@@ -839,6 +864,7 @@ export const scenarios = [
     commands: base(),
     actions: [
       { eval: clickText("在线实例"), after: 250 },
+      { eval: setInput("#add-name", "在线实例测试"), after: 250 },
       { eval: clickText("下载"), after: 500 },
     ],
   },
@@ -1511,5 +1537,101 @@ export const scenarios = [
     label: "mml-stats",
     size: [1150, 800],
     commands: base({ stats_get_playtime: statsSingleDay }),
+  },
+
+  /* ---------------- 控件 ---------------- */
+  // 控件预览是 scripts/screenshot/controls 下的独立页面，不走 ?window=<kind>
+  {
+    id: "control-buttons",
+    kind: "control",
+    path: "/scripts/screenshot/controls/index.html?section=buttons",
+    size: [1000, 620],
+  },
+  {
+    id: "control-inputs",
+    kind: "control",
+    path: "/scripts/screenshot/controls/index.html?section=inputs",
+    size: [1000, 360],
+    actions: [{ eval: "document.querySelector('#input-focus').focus()", after: 300 }],
+  },
+  {
+    id: "control-selects",
+    kind: "control",
+    path: "/scripts/screenshot/controls/index.html?section=selects",
+    size: [1000, 380],
+  },
+  {
+    id: "control-select-open",
+    kind: "control",
+    path: "/scripts/screenshot/controls/index.html?section=select-open",
+    size: [1000, 600],
+    actions: [{ eval: "document.querySelector('#select-open').showPicker()", after: 500 }],
+  },
+  {
+    id: "control-switches",
+    kind: "control",
+    path: "/scripts/screenshot/controls/index.html?section=switches",
+    size: [1000, 300],
+  },
+  {
+    id: "control-segmented",
+    kind: "control",
+    path: "/scripts/screenshot/controls/index.html?section=segmented",
+    size: [1000, 380],
+  },
+  {
+    id: "control-steppers",
+    kind: "control",
+    path: "/scripts/screenshot/controls/index.html?section=steppers",
+    size: [1000, 300],
+  },
+  {
+    id: "control-search",
+    kind: "control",
+    path: "/scripts/screenshot/controls/index.html?section=search",
+    size: [1000, 300],
+  },
+  {
+    id: "control-form",
+    kind: "control",
+    path: "/scripts/screenshot/controls/index.html?section=form",
+    size: [1000, 520],
+  },
+  {
+    id: "control-date",
+    kind: "control",
+    path: "/scripts/screenshot/controls/index.html?section=date",
+    size: [1000, 340],
+  },
+  {
+    id: "control-date-open",
+    kind: "control",
+    path: "/scripts/screenshot/controls/index.html?section=date-open",
+    size: [1000, 620],
+    actions: [{ eval: "document.querySelector('.date-open .dp-trigger').click()", after: 500 }],
+  },
+  {
+    id: "control-modal",
+    kind: "control",
+    path: "/scripts/screenshot/controls/index.html?section=modal",
+    size: [1000, 700],
+  },
+  {
+    id: "control-collapse",
+    kind: "control",
+    path: "/scripts/screenshot/controls/index.html?section=collapse",
+    size: [1000, 380],
+  },
+  {
+    id: "control-tabs",
+    kind: "control",
+    path: "/scripts/screenshot/controls/index.html?section=tabs",
+    size: [1000, 400],
+  },
+  {
+    id: "control-icons",
+    kind: "control",
+    path: "/scripts/screenshot/controls/index.html?section=icons",
+    size: [1100, 580],
   },
 ];
