@@ -904,7 +904,10 @@ export const scenarios = [
     label: "mml-add_modpack",
     size: [1150, 800],
     commands: base({ add_modpack_detail: modpackDetail, add_modpack_file: modpackFiles }),
-    actions: [{ eval: click(".pack-main"), after: 1000 }],
+    actions: [
+      { eval: click(".pack-main"), after: 1000 },
+      { assert: "(() => { const e = document.querySelector('.sel-file-version'); if (!e) return false; const c = getComputedStyle(e); return c.paddingRight === '28px' && c.fontSize === '12.5px' && Math.abs(e.getBoundingClientRect().height - 32) < 1; })()", label: "版本筛选下拉与标准下拉一致" },
+    ],
   },
   {
     id: "addmodpack-manual",
@@ -1846,6 +1849,7 @@ export const scenarios = [
     actions: [
       { eval: click(".res-list .pack-main"), after: 900 },
       { assert: "!!document.querySelector('.detail-head')", label: "详情页已打开" },
+      { assert: "(() => { const e = document.querySelector('.sel-file-version'); if (!e) return false; const c = getComputedStyle(e); return c.paddingRight === '28px' && c.fontSize === '12.5px' && Math.abs(e.getBoundingClientRect().height - 32) < 1; })()", label: "版本筛选下拉与标准下拉一致" },
     ],
   },
   {

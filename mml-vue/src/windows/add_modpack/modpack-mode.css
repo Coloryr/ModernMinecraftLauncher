@@ -25,13 +25,6 @@
      会让这几个下拉比同排搜索框高一头 */
 }
 
-/* field-select 的自定义箭头留位：sel-group 是组合框输入框，不在此列 */
-select.sel-version,
-select.sel-sort,
-select.sel-category {
-  padding-right: 26px;
-}
-
 /* 分组是组合框：外层 div 包输入框 + 下拉，尺寸同样交给 .field-input */
 .sel-group {
   padding: 0;

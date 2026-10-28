@@ -39,11 +39,6 @@
      原来写 padding: 10px 是配当年的 42px 档，会让这几个筛选下拉比同排搜索框高一头 */
 }
 
-/* field-select 的自定义箭头留位 */
-select.sel-filter {
-  padding-right: 26px;
-}
-
 /* 第一行的版本下拉独占该行剩余宽度；第二行那三个固定 150px，把宽度让给同行的搜索框 */
 .sel-version {
   flex: 1 1 110px;

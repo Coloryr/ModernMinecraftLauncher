@@ -362,13 +362,9 @@
 .sel-file-version {
   min-width: 132px;
   max-width: 150px;
-  font-size: 12px;
-  /* 选中的版本名可能很长：不让它在这条下拉里折成两行 */
+  /* 字号、内边距、箭头留位全部走 .field-select，与全 app 的下拉同一套；
+     这里只限宽度，并压住长版本名不让它折行 */
   white-space: nowrap;
-}
-
-select.sel-file-version {
-  padding-right: 26px;
 }
 
 .file-page {
