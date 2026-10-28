@@ -576,9 +576,17 @@ mod windows_pipe_tests {
     fn test_launch_with_elevation_windows_e2e() {
         use std::collections::HashMap;
 
+        // 提权 helper 按 CRT 规则给每个参数单独加引号，而 cmd.exe 的 /c 有自己一套
+        // 去引号规则：`"/c" "echo" ...` 会被它当成程序名，输出全落到 stderr。
+        // 生产上提权的是 java / 启动器本体，这里用 PowerShell 直接验证管道本身
         let result = process_helper::launch_with_elevation_windows(
-            "cmd",
-            vec!["/c".into(), "echo".into(), "hello_from_pipe".into()],
+            "powershell.exe",
+            vec![
+                "-NoProfile".into(),
+                "-NonInteractive".into(),
+                "-Command".into(),
+                "[Console]::Out.WriteLine('hello_from_pipe')".into(),
+            ],
             HashMap::new(),
             ".",
         );

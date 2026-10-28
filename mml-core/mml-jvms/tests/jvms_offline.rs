@@ -13,7 +13,7 @@
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{
-    Once, OnceLock,
+    Mutex, MutexGuard, Once, OnceLock,
     atomic::{AtomicU64, Ordering},
 };
 use std::time::{Duration, Instant};
@@ -29,6 +29,15 @@ static INIT: Once = Once::new();
 
 /// 临时目录自增计数，用于用例间隔离
 static COUNTER: AtomicU64 = AtomicU64::new(0);
+
+/// 全局 Java 列表与配置是进程级单例：几个用例并行改同一份列表会互相清掉，
+/// 触碰列表的用例统一串行，其余用例不受影响
+static SERIAL: Mutex<()> = Mutex::new(());
+
+/// 取串行锁；前面的用例 panic 过也继续
+fn serial() -> MutexGuard<'static, ()> {
+    SERIAL.lock().unwrap_or_else(|err| err.into_inner())
+}
 
 /// 初始化全局依赖链，进程内只执行一次，返回运行根目录
 fn setup() -> PathBuf {
@@ -175,6 +184,7 @@ fn find_all_java_from_path_finds_every_home() {
 /// add_item / remove：添加有效 Java、持久化到配置、再移除
 #[test]
 fn add_and_remove_item_roundtrip() {
+    let _serial = serial();
     let _dir = setup();
 
     let fake_dir = make_temp_dir("fake-java");
@@ -236,6 +246,7 @@ fn add_and_remove_item_roundtrip() {
 /// 检测完成后会触发变更事件
 #[tokio::test]
 async fn load_config_with_invalid_java_creates_placeholder() {
+    let _serial = serial();
     let _dir = setup();
 
     let fake_dir = make_temp_dir("invalid");
@@ -288,6 +299,7 @@ async fn load_config_with_invalid_java_creates_placeholder() {
 /// add_info_items：同版本同发行版的两套 JDK 各自入库，不互相覆盖
 #[test]
 fn add_info_items_keeps_same_version_java_apart() {
+    let _serial = serial();
     let _dir = setup();
 
     let make = |path: PathBuf| mml_jvms::JavaInfoObj {

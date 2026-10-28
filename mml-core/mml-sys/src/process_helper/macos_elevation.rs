@@ -4,17 +4,20 @@
 //! 命令结束前 osascript 一个字都不吐，日志窗口在游戏运行期间只能是空的。
 //! 改成把 stdout / stderr 重定向到 FIFO，启动器读另一端，就与 Windows 的命名管道一致了。
 
+use std::{collections::HashMap, path::Path, process::Command};
+
+// FIFO 只在 unix 上存在；这里按 unix 收窄，Windows 的测试构建只编到命令拼装
+#[cfg(unix)]
 use std::{
-    collections::HashMap,
     ffi::CString,
     fs::{File, OpenOptions},
     io::{self, Read},
-    path::{Path, PathBuf},
-    process::Command,
+    path::PathBuf,
     sync::mpsc::{self, Receiver},
 };
 
 /// 提权进程的日志管道
+#[cfg(unix)]
 pub(super) struct LogPipe {
     /// FIFO 路径；提权脚本收尾时自己删掉
     pub(super) path: PathBuf,
@@ -27,6 +30,7 @@ pub(super) struct LogPipe {
 /// 打开 FIFO 读端会阻塞到有写端连上来，而提权脚本要等用户点完密码框才执行，
 /// 所以把 `open` 放到后台线程，`read` 先等它把句柄送过来。之后就是普通的管道读：
 /// 提权进程退出、写端关闭时自然读到 EOF。
+#[cfg(unix)]
 pub(super) struct PipeReader {
     /// 后台线程打开好的读句柄
     opened: Receiver<File>,
@@ -34,6 +38,7 @@ pub(super) struct PipeReader {
     file: Option<File>,
 }
 
+#[cfg(unix)]
 impl PipeReader {
     /// 等后台线程把读句柄送过来
     fn handle(&mut self) -> io::Result<&mut File> {
@@ -47,6 +52,7 @@ impl PipeReader {
     }
 }
 
+#[cfg(unix)]
 impl Read for PipeReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.handle()?.read(buf)
@@ -63,6 +69,7 @@ fn shell_literal(value: &str) -> String {
 /// # 返回值
 ///
 /// 建不出 FIFO（文件系统不支持等）时返回 `None`，调用方退回旧的捕获方式
+#[cfg(unix)]
 pub(super) fn create_log_pipe() -> Option<LogPipe> {
     let path = std::env::temp_dir().join(format!("mml-launch-{}.fifo", uuid::Uuid::new_v4()));
     let raw = CString::new(path.to_string_lossy().as_bytes()).ok()?;
