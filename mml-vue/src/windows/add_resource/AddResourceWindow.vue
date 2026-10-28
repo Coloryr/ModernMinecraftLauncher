@@ -853,7 +853,7 @@ onActivated(async () => {
             </div>
           </div>
         </template>
-        <div v-else-if="error" class="empty-tip">{{ error }}</div>
+        <div v-else-if="error" class="empty-tip load-error" role="alert">{{ error }}</div>
         <div v-else-if="items.length === 0" class="empty-tip">{{ t("addResource.empty") }}</div>
         <template v-else>
           <div v-for="item in items" :key="item.source.pid" class="pack-item">

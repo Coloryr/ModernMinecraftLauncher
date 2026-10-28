@@ -196,7 +196,10 @@ function onLoaderPathPick(e: Event) {
       </div>
       <!-- 校验失败的原因贴在版本下拉下面 -->
       <p v-if="error" class="error-text" role="alert">{{ error }}</p>
-      <div v-if="versions.length === 0" class="empty-tip">
+      <!-- 拉取进度与加载器那两处同一套：就地一行，不再用一行"加载中"占位 -->
+      <LoaderQueryProgress v-if="verLoading" kind="versions" :visible="true" :step="0" :total="0"
+        :label="t('add.loading')" />
+      <div v-else-if="versions.length === 0" class="empty-tip">
         {{ versionsLoaded ? t("add.noVersion") : t("add.loading") }}
       </div>
     </div>
@@ -274,30 +277,30 @@ function onLoaderPathPick(e: Event) {
   white-space: nowrap;
 }
 
+/* 弹层与原生下拉的 ::picker(select) 保持同一套尺寸与配色，
+   差异只在"这里能多选、勾选不收起" */
 .type-drop {
   position: absolute;
   z-index: 20;
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  background: var(--bg-elev, var(--bg, #fff));
+  background: var(--bg-solid, var(--bg-card));
   border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.15));
-  padding: 4px;
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+  padding: 5px;
   max-height: 220px;
   overflow-y: auto;
-  scrollbar-gutter: stable;
-  /* 见 styles/scrollbar.css */
 }
 
 .type-opt {
   display: block;
   width: 100%;
-  margin: 2px 0;
-  padding: 7px 8px;
+  margin: 0;
+  padding: 8px 12px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text);
   cursor: pointer;
@@ -307,7 +310,7 @@ function onLoaderPathPick(e: Event) {
 }
 
 .type-opt:hover {
-  background: var(--hover, rgba(0, 0, 0, 0.06));
+  background: var(--bg-hover);
 }
 
 /* 已选中：背景高亮 */

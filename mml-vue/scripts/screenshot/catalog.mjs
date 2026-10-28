@@ -231,6 +231,7 @@ const OVERRIDE = {
   "account-add-invalid-authlib": "账户 · 添加 · 未填服务器与账密",
   "account-add-ok": "账户 · 添加成功（断言命令）",
   "settings-custom-css": "设置 · 界面 · 自定义样式包",
+  "addmodpack-install-done": "下载整合包 · 安装完成",
   "main-launch": "主窗口 · 点击启动（断言命令）",
   "main-create-group": "主窗口 · 新建分组（断言命令）",
   "settings-save": "设置 · 改动保存（断言命令）",

@@ -37,7 +37,7 @@ export function useAddVersions(isLeaving: () => boolean) {
   const packTypes = ref<string[]>([]);
   /** 已选版本类型（多选，空 = 不过滤） */
   const verTypes = ref<string[]>(["release"]);
-  /** 版本列表刷新中（刷新按钮转圈并禁用） */
+  /** 版本列表加载中：首次加载、核心未就绪的轮询、手动刷新都算 */
   const verLoading = ref(false);
 
   /** 按版本类型过滤；不重排，重排会打乱后端给的分组顺序 */
@@ -60,30 +60,38 @@ export function useAddVersions(isLeaving: () => boolean) {
 
   /** 首次加载版本列表，失败留空，由 startPolling 继续重试 */
   async function loadVersions() {
+    verLoading.value = true;
     try {
       const list = await api.getVersions();
       if (isLeaving()) return;
       versions.value = list;
     } catch {
       versions.value = [];
+    } finally {
+      verLoading.value = false;
     }
   }
 
   /** 核心尚未就绪时轮询重试；关窗（或已拿到列表）立即停止 */
   async function startPolling() {
-    for (let i = 0; i < POLL_TIMES; i++) {
-      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-      if (isLeaving() || versions.value.length) return;
-      try {
-        const list = await api.getVersions();
-        if (isLeaving()) return;
-        if (list.length) {
-          versions.value = list;
-          return;
+    verLoading.value = true;
+    try {
+      for (let i = 0; i < POLL_TIMES; i++) {
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        if (isLeaving() || versions.value.length) return;
+        try {
+          const list = await api.getVersions();
+          if (isLeaving()) return;
+          if (list.length) {
+            versions.value = list;
+            return;
+          }
+        } catch {
+          // 忽略，继续重试
         }
-      } catch {
-        // 忽略，继续重试
       }
+    } finally {
+      verLoading.value = false;
     }
   }
 

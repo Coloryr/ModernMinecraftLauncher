@@ -39,7 +39,7 @@ npm run shots -- --clean
 
 ## 场景表
 
-共 218 个场景，按窗口分组。
+共 219 个场景，按窗口分组。
 「窗口」列是页面的 `kind`，窗口族场景会自动带上实例参数，不需要在命令里另写；
 控件场景的 `control` 是截图工具里的预览页，不是启动器窗口。
 
@@ -197,6 +197,7 @@ npm run shots -- --clean
 | `addmodpack-error` | 下载整合包 · 错误 | `add_modpack` | 1150×800 |
 | `addmodpack-install` | 下载整合包 · 安装 | `add_modpack` | 1150×800 |
 | `addmodpack-install-popup` | 下载整合包 · 安装进度弹窗 | `add_modpack` | 1150×800 |
+| `addmodpack-install-done` | 下载整合包 · 安装完成 | `add_modpack` | 1150×800 |
 | `addmodpack-files` | 下载整合包 · 文件 | `add_modpack` | 1150×900 |
 | `addmodpack-install-error` | 下载整合包 · 安装失败 | `add_modpack` | 1150×800 |
 

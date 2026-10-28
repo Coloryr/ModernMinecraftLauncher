@@ -342,12 +342,13 @@ function scrollToVersions() {
                 <span v-if="projectInstalled(current)" class="pack-badge">{{ t("modpack.installed") }}</span>
                 <span v-else-if="projectRunning(current)" class="pack-badge busy">{{ t("modpack.downloading")
                 }}</span>
-                <template v-if="authorList.length">
-                  <AuthorTag :authors="authorList" :max="4" />
-                  <span> · </span>
+                <AuthorTag v-if="authorList.length" :authors="authorList" :max="4" />
+                <span class="sub-sep">·</span>
+                <span class="sub-text">{{ t("modpack.downloads", { n: formatCount(current.downloadCount) }) }}</span>
+                <template v-if="current.date">
+                  <span class="sub-sep">·</span>
+                  <span class="sub-text">{{ formatDate(current.date) }}</span>
                 </template>
-                <span>{{ t("modpack.downloads", { n: formatCount(current.downloadCount) }) }}</span>
-                <span v-if="current.date"> · {{ formatDate(current.date) }}</span>
               </div>
             </div>
             <div class="detail-actions">
@@ -375,10 +376,11 @@ function scrollToVersions() {
               </button>
             </div>
             <div v-if="detail?.tag.length || current.tag.length" class="pack-tags detail-tags">
-              <span v-for="tag in detail?.tag.length ? detail.tag : current.tag" :key="tag.name" class="pack-tag">
+              <span v-for="tag in detail?.tag.length ? detail.tag : current.tag" :key="tag.name" class="pack-tag"
+                v-tip="tag.name">
                 <span v-if="tag.svg" class="tag-svg" v-html="svgIcon(tag.svg)"></span>
                 <img v-else-if="tag.logo" class="pack-tag-icon" :src="tag.logo" loading="lazy" alt="" />
-                {{ tag.name }}
+                <span class="pack-tag-name">{{ tag.name }}</span>
               </span>
             </div>
           </div>
@@ -386,7 +388,7 @@ function scrollToVersions() {
           <div class="detail-scroll">
             <!-- 详情正文的加载 / 失败只在这里提示一次；版本列表是并行的另一份加载，自己管自己 -->
             <div v-if="detailLoading" class="empty-tip">{{ t("modpack.loadingDetail") }}</div>
-            <div v-else-if="detailError" class="empty-tip">{{ detailError }}</div>
+            <div v-else-if="detailError" class="error-text detail-error" role="alert">{{ detailError }}</div>
             <!-- 简介 / 截图 / 版本列表合并为一块大卡片，分区间距隔开，避免多框割裂 -->
             <div class="detail-card">
               <template v-if="detail">
@@ -440,7 +442,7 @@ function scrollToVersions() {
                     </div>
                   </template>
                   <!-- 失败与"没有版本"必须分开：前者可重试，后者是空结果 -->
-                  <div v-else-if="filesError" class="empty-tip">
+                  <div v-else-if="filesError" class="error-text detail-error" role="alert">
                     {{ t("modpack.versionFail") }}
                     <button class="retry-btn" @click="reloadFiles">{{ t("modpack.retry") }}</button>
                   </div>

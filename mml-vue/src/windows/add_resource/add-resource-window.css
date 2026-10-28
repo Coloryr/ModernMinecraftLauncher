@@ -568,3 +568,8 @@ select.sel-filter {
   font-size: 11px;
   color: var(--text-dim);
 }
+
+/* 加载失败：与"没有内容"的空状态区分开，用错误色 */
+.load-error {
+  color: var(--red);
+}

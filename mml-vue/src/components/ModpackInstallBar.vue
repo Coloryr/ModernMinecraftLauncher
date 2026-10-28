@@ -21,9 +21,16 @@ const props = withDefaults(
     /** 撑满父容器剩余高度、任务多了内部自己滚（弹窗锁死高度时用）。
      *  页面里那两处不传：卡片跟着内容自适应即可 */
     fillHeight?: boolean;
+    /** 底部是否给「关闭」按钮；弹窗形态用，页面里没有可关的东西 */
+    showClose?: boolean;
   }>(),
-  { collapsible: true, fillHeight: false },
+  { collapsible: true, fillHeight: false, showClose: false },
 );
+
+const emit = defineEmits<{
+  /** 点底部的「关闭」；由弹窗收起自己 */
+  (e: "close"): void;
+}>();
 
 /** 是否展开任务详情：不可折叠时恒为展开 */
 const open = ref(!props.collapsible);
@@ -138,12 +145,22 @@ async function clearDone() {
       </div>
       <!-- 清掉已结束的任务：放在列表底部 —— 放标题行右侧时紧挨着标题，
            和弹窗自己的 ✕ 挤在一起，分不清哪个是哪个 -->
-      <div v-if="finished.length" class="mp-footer">
+      <div v-if="!fillHeight && finished.length" class="mp-footer">
         <button class="mp-clear-btn" @click="clearDone">
           {{ t("modpack.bar.clearDone") }}
         </button>
       </div>
     </CollapsePanel>
+
+    <!-- 弹窗形态：操作条常驻在弹窗底部，清除已完成与关闭都靠右，不再爬标题栏那一行 -->
+    <div v-if="fillHeight && (finished.length || showClose)" class="mp-actions">
+      <button v-if="finished.length" class="mp-clear-btn" @click="clearDone">
+        {{ t("modpack.bar.clearDone") }}
+      </button>
+      <button v-if="showClose" class="mp-close-btn" @click="emit('close')">
+        {{ t("actions.close") }}
+      </button>
+    </div>
   </div>
 </template>
 
@@ -241,6 +258,38 @@ async function clearDone() {
 
 .mp-clear-btn:hover {
   color: var(--text);
+  border-color: var(--accent);
+}
+
+/* 弹窗底部操作条：与任务列表用一条分隔线隔开，按钮全部靠右 */
+.mp-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* 关闭：与主操作按钮同档，但不是"危险/强调"，用次要外观 */
+.mp-close-btn {
+  height: var(--ctl-h);
+  padding: 0 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--ctl-radius);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--ctl-font);
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.mp-close-btn:hover {
+  background: var(--bg-hover);
   border-color: var(--accent);
 }
 
@@ -386,13 +435,30 @@ async function clearDone() {
   padding-top: 6px;
 }
 
+/* 弹窗里一条任务就是一"项目"：第一行图标 + 名字 + 操作，下面阶段 / 进度条 / 文件名
+   统一缩进到名字下面，读起来是同一块，而不是几行左对齐的长条 */
 .mp-bar.fill-h .mp-task {
-  padding: 8px 2px;
+  padding: 10px 0 12px;
+  gap: 6px;
   border-bottom: 1px solid var(--border);
 }
 
 .mp-bar.fill-h .mp-task:last-child {
   border-bottom: none;
+}
+
+.mp-bar.fill-h .mp-task-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+}
+
+/* 28px 图标 + 8px 间距：详情与名字左边缘对齐 */
+.mp-bar.fill-h .mp-task-state,
+.mp-bar.fill-h .mp-task-sub,
+.mp-bar.fill-h .mp-task-error,
+.mp-bar.fill-h .mp-task>.progress-track {
+  margin-left: 36px;
 }
 .mp-task-icon {
   width: 24px;

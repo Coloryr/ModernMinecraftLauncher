@@ -1064,6 +1064,7 @@ export default {
   "actions.nameExists": "已有同名实例，换一个名字",
   "actions.deleteTitle": "删除实例",
   "actions.deleteConfirm": "确定删除实例「{name}」？此操作不可恢复。",
+  "actions.close": "关闭",
   "actions.confirm": "确定",
   "actions.cancel": "取消",
 

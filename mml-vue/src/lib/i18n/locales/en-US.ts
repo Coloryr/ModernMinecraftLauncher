@@ -1063,6 +1063,7 @@ export default {
   "actions.nameExists": "An instance with this name already exists",
   "actions.deleteTitle": "Delete Instance",
   "actions.deleteConfirm": "Delete instance “{name}”? This cannot be undone.",
+  "actions.close": "Close",
   "actions.confirm": "Confirm",
   "actions.cancel": "Cancel",
 

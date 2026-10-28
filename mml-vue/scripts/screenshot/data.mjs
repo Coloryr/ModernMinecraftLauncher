@@ -663,6 +663,13 @@ export const modpackStatus = {
   ],
 };
 
+export const modpackStatusDone = {
+  windowOpen: true,
+  tasks: [
+    { uuid: "task-3", source: "curseforge", pid: "better-mc", fid: "f-25", name: "Better MC", icon: svgImage("#34d399", "B"), kind: "install", state: "done", now: 100, total: 100, subText: "", subNow: 0, subTotal: 0, done: true, failed: false, cancelled: false, error: null, instanceUuid: "inst-new" },
+  ],
+};
+
 export const downloadStatus = {
   tasks: [
     { id: 1, total: 3, completed: 2, failed: 0, allBytes: 73400320, nowBytes: 52428800, elapsedMs: 42000, paused: false },

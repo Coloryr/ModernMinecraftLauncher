@@ -7,7 +7,7 @@
 // - actions: 字符串按 JS 执行；{ wait } 等待；{ eval } 执行后等一会
 import {
   addVersions, blockItems, collectWithData, commonCommands, downloadStatus, groups, instances, javaDownloadList, lobbyView,
-  statsSingleDay, customHomeStatus, customUiStatus, modpackDetail, modpackFiles, modpackItems, modpackStatus, modpackStatusFailed,
+  statsSingleDay, customHomeStatus, customUiStatus, modpackDetail, modpackFiles, modpackItems, modpackStatus, modpackStatusDone, modpackStatusFailed,
   javaList, resourceView, saves, schematics, servers, shaders,
 } from "./data.mjs";
 
@@ -955,6 +955,19 @@ export const scenarios = [
     actions: [
       { eval: emit("add-modpack-status", modpackStatus), after: 500 },
       { eval: click(".mp-indicator"), after: 500 },
+    ],
+  },
+  {
+    id: "addmodpack-install-done",
+    kind: "add_modpack",
+    label: "mml-add_modpack",
+    size: [1150, 800],
+    commands: base({ add_modpack_status: modpackStatusDone }),
+    actions: [
+      { eval: emit("add-modpack-status", modpackStatusDone), after: 500 },
+      { eval: click(".mp-indicator"), after: 500 },
+      { assert: "!!document.querySelector('.mp-tag.done')", label: "完成标签已出现" },
+      { assert: "!!document.querySelector('.mp-clear-btn')", label: "清除已完成入口已出现" },
     ],
   },
   {
