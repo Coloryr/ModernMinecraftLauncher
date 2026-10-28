@@ -36,9 +36,12 @@ pub enum OutputStream {
     Stdout(std::process::ChildStdout),
     /// 普通子进程的 stderr
     Stderr(std::process::ChildStderr),
-    /// 提权进程通过命名管道重定向的输出，仅 Windows
-    #[cfg(target_os = "windows")]
+    /// 提权进程通过命名管道重定向的输出：Windows 用命名管道，macOS 用 FIFO
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
     File(std::fs::File),
+    /// macOS 的 FIFO 读端：写端还没连上时要先等它
+    #[cfg(target_os = "macos")]
+    Pipe(macos_elevation::PipeReader),
 }
 
 impl Read for OutputStream {
@@ -46,8 +49,10 @@ impl Read for OutputStream {
         match self {
             OutputStream::Stdout(s) => s.read(buf),
             OutputStream::Stderr(s) => s.read(buf),
-            #[cfg(target_os = "windows")]
+            #[cfg(any(target_os = "windows", target_os = "macos"))]
             OutputStream::File(f) => f.read(buf),
+            #[cfg(target_os = "macos")]
+            OutputStream::Pipe(p) => p.read(buf),
         }
     }
 }
@@ -182,18 +187,30 @@ fn launch_with_elevation<P: AsRef<Path>>(
 
     #[cfg(target_os = "macos")]
     {
-        let mut cmd = macos_elevation::command(path.as_ref(), &args, env, working_dir.as_ref());
+        // 有 FIFO 就把输出重定向进去，日志才是实时的；
+        // 建不出来就退回"输出合并进脚本返回值"，至少退出后还能看到
+        let pipe = macos_elevation::create_log_pipe();
+        let mut cmd = macos_elevation::command(
+            path.as_ref(),
+            &args,
+            env,
+            working_dir.as_ref(),
+            pipe.as_ref().map(|item| item.path.as_path()),
+        );
 
         cmd.stdout(Stdio::piped()).stderr(Stdio::null());
         let mut child = cmd.spawn().map_err(process_err)?;
-        let stdout = child.stdout.take().map(OutputStream::Stdout);
+        let stdout = match pipe {
+            Some(item) => Some(OutputStream::Pipe(item.reader)),
+            None => child.stdout.take().map(OutputStream::Stdout),
+        };
         Ok(LaunchResult {
             child,
             is_admin: true,
             pid: None,
             control: None,
             stdout,
-            stderr: None, // stderr 已由 2>&1 合并到 stdout
+            stderr: None, // stderr 已经并进 stdout
         })
     }
 
@@ -249,8 +266,9 @@ pub fn launch_admin(args: &[String]) -> CoreResult<()> {
 
     #[cfg(target_os = "macos")]
     {
+        // 重启自身不需要日志管道：输出留给调用方的控制台
         let status = macos_elevation::command(&current_exe, args, HashMap::new(),
-            &std::env::current_dir().map_err(process_err)?)
+            &std::env::current_dir().map_err(process_err)?, None)
             .status().map_err(process_err)?;
         if !status.success() { return Err(process_err(format!("osascript: {status}"))); }
         Ok(())

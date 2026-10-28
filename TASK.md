@@ -163,11 +163,12 @@ cargo test -p mml-game --lib
 | --- | --- |
 | `npm run lint` / `npx vue-tsc --noEmit` | 0 error / 无输出 |
 | `npm test`（mml-vue） | 71 passed |
-| 界面场景 202 张（`--skip=lobby`） | 0 运行时错误 / 0 未 mock 命令 / 0 控制台错误 |
+| 界面场景 215 张（`--skip=lobby`，共 218 个场景） | 0 运行时错误 / 0 未 mock 命令 / 0 控制台错误；7 个交互断言场景 |
 | `cargo check --workspace --all-targets` | 通过（仅 dead_code 警告） |
-| `cargo test`：mml-base / mml-ipc / mml-jvms / mml-log / mml-names / mml-nbt / mml-config / mml-analysis | 全绿 |
-| `cargo test -p mml-sys --lib` | 33 passed |
-| `cargo test -p mml-sys --test process_utils -- --skip admin` | 3 passed，5 filtered |
+| `cargo test` 15 个 crate（game / downloader / net / auth / skin / skin-draw / config / names / base / ipc / jvms / log / nbt / analysis / sys） | 121 个测试套件、870 passed、0 failed、40 ignored |
+| `cargo test -p mml-tex-draw` | 方块 / 物品全量渲染通过（781 个，真下载客户端 jar） |
+| 真实链路 | 客户端文件真下载、真起 JVM 进程、Modrinth 真包安装、Java 下载解包注册全通过 |
+| `mml-gui` | theme 31、java_download（真下载 JRE）、collect（新增）通过 |
 
 修掉的问题：
 
@@ -194,6 +195,7 @@ cargo test -p mml-game --lib
 | `mml-gui/tests/java_download_test` | 真下载 JDK → 解包 → 注册；原来把系统写死成 `windows`，在 Linux / macOS 上会去下 Windows 包并卡住，已改为按当前系统取包 |
 | `real_launch::real_download_prepares_game_files` | 真下载 1.20.1 客户端 jar + 53 个运行库，通过 |
 | `mml-gui/tests/collect_test`（新增） | 收藏 / 分组持久化：收藏去重、建组、移动、清空、落盘、读回，通过 |
+| `mml-tex-draw/tests/render_all` | 物品数量区间与 `apple → foodAndDrink` 都是 1.20.1 的旧数据；分组表按 26.3 生成、渲染用的是 Mojang 最新版，改为只卡下限 + 用跨版本稳定的 stick / torch 验分组 |
 
 真实网络用例的两个环境前提（**Windows / macOS 上同样适用**）：
 
@@ -202,6 +204,20 @@ cargo test -p mml-game --lib
   三个文件现在都认这个写法。
 - `real_launch_downloads_and_starts` 需要带 `jdk.compiler` 的 JDK（探针走源文件模式），
   没有就自动跳过；可用启动器自己的「下载 Java」拉一个，再把 `JAVA_HOME` 指过去。
+
+macOS 提权启动日志（本轮修改，**必须在真机复核**）：
+
+- 原来走 `osascript` 的 `do shell script … 2>&1`：输出被攒成脚本返回值，游戏运行期间日志窗口是空的，
+  退出后才一次性刷进来，长输出还可能被截断。
+- 现在改成 FIFO：提权脚本把 stdout / stderr 重定向到 `mml-launch-*.fifo`，启动器后台线程打开读端，
+  `read` 与普通管道一致（写端关闭即 EOF），脚本收尾 `rm -f` 掉 FIFO。
+  建不出 FIFO 时自动退回旧写法，不影响启动。
+- Linux 上有单测覆盖脚本拼接、FIFO 读写与清理；macOS 上要实测：日志是否实时滚动、
+  取消授权后是否卡住、游戏退出后日志窗口是否正常结束。
+- 顺带修了两个 macOS 编译错误（`memory_helper` 里的 `process_utils` 应为 `process_helper`、
+  `open_helper` 的 `open -R` 参数类型）。`cargo check -p mml-sys --target aarch64-apple-darwin` 通过；
+  整仓 macOS 交叉编译在 Linux 上验不了（`objc2-exception-helper` 需要 macOS SDK 的 `-arch`），
+  只能在 macOS runner 上跑。
 
 Windows / macOS 上要重点复核的：
 

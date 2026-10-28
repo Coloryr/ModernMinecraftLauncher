@@ -119,7 +119,7 @@ fn get_memory_free_inner() -> u64 {
 fn get_memory_size_inner() -> u64 {
     use crate::process_helper;
 
-    let res = process_utils::run_command_arg("sysctl", &["hw.memsize"]);
+    let res = process_helper::run_command_arg("sysctl", &["hw.memsize"]);
     if res.is_err() {
         return u64::MAX;
     }
@@ -147,7 +147,7 @@ fn get_memory_size_inner() -> u64 {
 fn get_memory_free_inner() -> u64 {
     use crate::process_helper;
 
-    let res = process_utils::run_command("vm_stat");
+    let res = process_helper::run_command("vm_stat");
     if res.is_err() {
         return u64::MAX;
     }

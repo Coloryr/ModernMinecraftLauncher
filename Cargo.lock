@@ -3240,6 +3240,7 @@ dependencies = [
  "base64 0.23.1",
  "clipboard-rs",
  "dbus",
+ "libc",
  "mml-names",
  "mml-testutil",
  "tokio",

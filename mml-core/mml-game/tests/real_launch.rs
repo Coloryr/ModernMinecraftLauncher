@@ -323,7 +323,7 @@ async fn real_download_prepares_game_files() {
 #[tokio::test]
 async fn real_launch_downloads_and_starts() {
     ensure_init();
-    let Some((_java, javac)) = find_jdk() else {
+    let Some((java, javac)) = find_jdk() else {
         eprintln!("跳过真实启动用例：本机没有可用的 JDK");
         return;
     };
@@ -333,7 +333,9 @@ async fn real_launch_downloads_and_starts() {
 
     // 探针：打印 JVM 的类路径与收到的游戏参数，两样都是"下载 + 拼装"的结果
     let (main, classes) = build_probe(&base, &javac);
-    let instance = make_instance(uuid, "real-launch", Some((&main, &classes)));
+    let mut instance = make_instance(uuid, "real-launch", Some((&main, &classes)));
+    // 测试进程的 Java 列表是空的，get_java 只能靠实例自己指路；直接用 JAVA_HOME 找到的那个
+    instance.jvm_local = Some(java.to_string_lossy().to_string());
 
     // 运行日志：只收进程的原始输出行
     let logs = Arc::new(Mutex::new(Vec::<String>::new()));

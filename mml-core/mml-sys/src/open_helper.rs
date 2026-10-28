@@ -68,7 +68,8 @@ fn open_file_with_explorer_inner<P: AsRef<Path>>(path: P) {
 #[cfg(target_os = "macos")]
 fn open_file_with_explorer_inner<P: AsRef<Path>>(path: P) {
     Command::new("open")
-        .args(&["-R", path.as_ref().as_os_str()])
+        .arg("-R")
+        .arg(path.as_ref())
         .spawn()
         .unwrap();
 }

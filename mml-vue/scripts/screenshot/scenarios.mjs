@@ -1709,6 +1709,25 @@ export const scenarios = [
     ],
   },
   {
+    id: "settings-custom-css",
+    kind: "settings",
+    label: "mml-settings",
+    size: [1100, 800],
+    commands: base({
+      window_get_gui_config: {
+        client: {
+          ...commonCommands().window_get_gui_config.client,
+          customCssOn: true,
+          customCss: [
+            { id: "css-1", name: "深色青柠.zip", enabled: true },
+            { id: "css-2", name: "圆角卡片.zip", enabled: false },
+          ],
+        },
+      },
+    }),
+    actions: [{ eval: clickTab("界面"), after: 600 }],
+  },
+  {
     id: "settings-save",
     kind: "settings",
     label: "mml-settings",

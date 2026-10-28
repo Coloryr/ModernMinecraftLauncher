@@ -39,7 +39,7 @@ npm run shots -- --clean
 
 ## 场景表
 
-共 216 个场景，按窗口分组。
+共 218 个场景，按窗口分组。
 「窗口」列是页面的 `kind`，窗口族场景会自动带上实例参数，不需要在命令里另写；
 控件场景的 `control` 是截图工具里的预览页，不是启动器窗口。
 
@@ -66,6 +66,7 @@ npm run shots -- --clean
 | `main-search-empty` | 主窗口 · 搜索 · 空状态 | `main` | 1280×800 |
 | `main-add-group-modal` | 主窗口 · 添加分组弹窗 | `main` | 1280×800 |
 | `main-launch` | 主窗口 · 点击启动（断言命令） | `main` | 1280×800 |
+| `main-delete-confirm` | 主窗口 · 删除 · 确认 | `main` | 1280×800 |
 | `main-create-group` | 主窗口 · 新建分组（断言命令） | `main` | 1280×800 |
 
 ### 设置
@@ -88,6 +89,7 @@ npm run shots -- --clean
 | `settings-client-lock` | 设置 · 客户端设置 · 登录方式锁定 | `settings` | 1100×780 |
 | `settings-local-clear` | 设置 · 本地文件 · 清理确认 | `settings` | 1100×760 |
 | `settings-gamepad-new` | 设置 · 手柄 · 新建配置 | `settings` | 1100×860 |
+| `settings-custom-css` | 设置 · 界面 · 自定义样式包 | `settings` | 1100×800 |
 | `settings-save` | 设置 · 改动保存（断言命令） | `settings` | 1100×760 |
 
 ### 资源管理

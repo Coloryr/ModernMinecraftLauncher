@@ -14,6 +14,10 @@ url.workspace = true
 # Windows 侧剪贴板直接调 Win32（见 clipboard_helper）；其它平台仍用 clipboard-rs
 clipboard-rs.workspace = true
 
+[target.'cfg(unix)'.dependencies]
+# macOS 提权启动用 mkfifo 建日志管道，见 process_helper/macos_elevation.rs
+libc.workspace = true
+
 [target.'cfg(target_os = "linux")'.dependencies]
 dbus.workspace = true
 
