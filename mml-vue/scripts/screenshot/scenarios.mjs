@@ -955,6 +955,8 @@ export const scenarios = [
     actions: [
       { eval: emit("add-modpack-status", modpackStatus), after: 500 },
       { eval: click(".mp-indicator"), after: 500 },
+      { assert: "!!document.querySelector('.mp-actions .mp-close-btn')", label: "关闭按钮在右下角" },
+      { assert: "!document.querySelector('.modal-x')", label: "右上角关闭按钮已移除" },
     ],
   },
   {
@@ -967,7 +969,8 @@ export const scenarios = [
       { eval: emit("add-modpack-status", modpackStatusDone), after: 500 },
       { eval: click(".mp-indicator"), after: 500 },
       { assert: "!!document.querySelector('.mp-tag.done')", label: "完成标签已出现" },
-      { assert: "!!document.querySelector('.mp-clear-btn')", label: "清除已完成入口已出现" },
+      { assert: "!!document.querySelector('.mp-actions .mp-clear-btn')", label: "清除已完成在右下角" },
+      { assert: "!!document.querySelector('.mp-actions .mp-close-btn')", label: "关闭按钮在右下角" },
     ],
   },
   {
