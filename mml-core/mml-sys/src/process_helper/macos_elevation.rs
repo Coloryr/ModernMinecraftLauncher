@@ -31,7 +31,7 @@ pub(super) struct LogPipe {
 /// 所以把 `open` 放到后台线程，`read` 先等它把句柄送过来。之后就是普通的管道读：
 /// 提权进程退出、写端关闭时自然读到 EOF。
 #[cfg(unix)]
-pub(super) struct PipeReader {
+pub struct PipeReader {
     /// 后台线程打开好的读句柄
     opened: Receiver<File>,
     /// 已经拿到的句柄

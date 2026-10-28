@@ -19,6 +19,7 @@
 //! 自定义界面的 CSS 与整页包走 `mml-ui://`，整页包同一套现读口径，见 [`windows::custom_ui`]。
 
 use mml_names::i18;
+#[cfg(windows)]
 use tauri::Manager;
 
 use crate::windows::{block, download, main};
@@ -66,6 +67,7 @@ fn set_app_user_model_id() {
 fn set_app_user_model_id() {}
 
 /// 任务栏身份，与 `tauri.conf.json` 的 `identifier` 一致
+#[cfg(windows)]
 const APP_USER_MODEL_ID: &str = "com.coloryr.mml";
 
 /// 启动 Tauri 应用

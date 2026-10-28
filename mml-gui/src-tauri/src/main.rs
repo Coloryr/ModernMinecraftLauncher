@@ -218,5 +218,5 @@ fn get_run_path() -> PathBuf {
 #[cfg(not(debug_assertions))]
 #[cfg(target_os = "macos")]
 fn get_run_path() -> PathBuf {
-    get_config_path().unwrap_or({ Path::new("/Users/shared/mml/").to_path_buf() })
+    get_config_path().unwrap_or(Path::new("/Users/shared/mml/").to_path_buf())
 }

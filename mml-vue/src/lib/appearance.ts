@@ -240,7 +240,7 @@ const MATERIAL_PLATFORM = /Windows|Macintosh/.test(navigator.userAgent);
  * 材质躲在窗口背后，表面不透明就只在卡片之间的缝里透出来，看着像没生效，
  * 所以材质开着时各表面转半透明，见 themes.css。
  *
- * - `effect`: 窗口材质，`auto` / `mica` / `acrylic` / `blur` / `none`
+ * - `effect`: 窗口材质，`none` / `mica` / `acrylic`
  */
 export function applyWindowMaterial(effect: string) {
   document.documentElement.classList.toggle("has-material", MATERIAL_PLATFORM && effect !== "none");

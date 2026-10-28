@@ -13,14 +13,14 @@
 //! 所有函数均提供同步版与 Tokio 异步版。
 //! 回收站操作自动根据编译目标选择 Windows/Linux/macOS 实现。
 
-#[cfg(any(not(windows), test))]
+#[cfg(any(target_os = "linux", test))]
 use std::env;
 #[cfg(any(not(windows), test))]
 use std::process::Command;
 #[cfg(not(windows))]
 use std::process::Stdio;
 use std::time::SystemTime;
-#[cfg(any(not(windows), test))]
+#[cfg(any(target_os = "linux", test))]
 use std::time::UNIX_EPOCH;
 
 use std::fs::{self};

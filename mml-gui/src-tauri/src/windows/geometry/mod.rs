@@ -19,6 +19,7 @@ pub use self::state::init;
 
 pub(crate) use self::state::{remember_decorated_inset, save_window_state, window_state_for};
 
+#[cfg(windows)]
 pub(crate) use self::size::{clamp_runtime_min_size, reconcile_min_size};
 
 pub(crate) use self::placement::{Placement, RectF, SizeF, center_placement, child_placement};

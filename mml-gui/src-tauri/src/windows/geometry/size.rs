@@ -60,6 +60,7 @@ pub(crate) fn min_inner_physical(min: MinSize, scale: f64) -> PhysicalSize {
 /// - `win`: 目标窗口，量它当前的外框与客户区差值
 /// - `min_w`: 最小客户区宽度，逻辑像素
 /// - `min_h`: 最小客户区高度，逻辑像素
+#[cfg(windows)]
 pub(crate) fn reconcile_min_size(win: &WebviewWindow, min_w: f64, min_h: f64) {
     let (Ok(inner), Ok(outer)) = (win.inner_size(), win.outer_size()) else {
         return;
@@ -85,6 +86,7 @@ pub(crate) fn reconcile_min_size(win: &WebviewWindow, min_w: f64, min_h: f64) {
 ///
 /// - `win`: 目标窗口
 /// - `min`: 注册表里的最小客户区尺寸，逻辑像素
+#[cfg(windows)]
 pub(crate) fn clamp_runtime_min_size(win: &WebviewWindow, min: MinSize) {
     let Ok(inner) = win.inner_size() else {
         return;

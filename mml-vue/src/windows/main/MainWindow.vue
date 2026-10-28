@@ -1282,7 +1282,7 @@ const clientConfig = ref<ClientConfig>({
   customPageOn: false,
   musicOn: false,
   musicSource: "",
-  windowEffect: "auto",
+  windowEffect: "none",
   windowOpacity: 85,
 });
 

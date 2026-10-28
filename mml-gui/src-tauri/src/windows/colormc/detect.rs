@@ -249,6 +249,7 @@ pub(super) fn info(path: PathBuf, from: &'static str) -> ColorMcInfoDto {
 pub(super) const COLORMC_DIR: &str = "ColorMC";
 
 /// ColorMC 在 exe 旁边的默认工作目录名，Windows 上是 `<exe 目录>\colormc\`
+#[cfg(target_os = "windows")]
 pub(super) const COLORMC_INNER_DIR: &str = "colormc";
 
 /// ColorMC 记"运行路径"的文件名，内容就是路径字符串，放在 `%LOCALAPPDATA%\ColorMC\` 下

@@ -259,11 +259,12 @@ function toggleCustomPage(on: boolean) {
   <SettingsGroup v-if="!locked" id="window-look" title-key="winSettings.secWindowLook" :flash="flashGroup === 'window-look'">
     <label class="field-label">{{ t("winSettings.windowEffect") }}</label>
     <select v-model="client.windowEffect" class="field-select" @change="applyWindowEffect">
-      <option value="auto">{{ t("winSettings.windowEffectAuto") }}</option>
+      <option value="none">{{ t("winSettings.windowEffectNone") }}</option>
       <option value="mica">{{ t("winSettings.windowEffectMica") }}</option>
       <option value="acrylic">{{ t("winSettings.windowEffectAcrylic") }}</option>
-      <option value="none">{{ t("winSettings.windowEffectNone") }}</option>
     </select>
+    <!-- 窗口透明在建窗时定，切换材质要重开窗口才看得到 -->
+    <p class="field-desc">{{ t("winSettings.windowEffectRestart") }}</p>
 
     <label class="field-label">{{ t("winSettings.windowOpacity") }}</label>
     <NumberStepper v-model="client.windowOpacity" :min="0" :max="100" :step="5"

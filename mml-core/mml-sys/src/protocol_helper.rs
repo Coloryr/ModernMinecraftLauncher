@@ -71,10 +71,10 @@ fn delete_protocol_handler_inner(id: &str) {
 ///
 /// - `id`: 协议名，此处未使用
 #[cfg(not(target_os = "windows"))]
-fn register_protocol_handler_inner(id: &str) {}
+fn register_protocol_handler_inner(_id: &str) {}
 
 /// 非 Windows 平台没有注册表，取消注册为空实现
 ///
 /// - `id`: 协议名，此处未使用
 #[cfg(not(target_os = "windows"))]
-fn delete_protocol_handler_inner(id: &str) {}
+fn delete_protocol_handler_inner(_id: &str) {}

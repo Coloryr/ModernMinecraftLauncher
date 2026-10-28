@@ -1482,7 +1482,7 @@ export default {
   "winSettings.secGameTitle": "Window Title",
   "winSettings.secWindowLook": "Window look",
 "winSettings.windowEffect": "Window blur",
-"winSettings.windowEffectAuto": "Auto (Mica → Acrylic → Blur)",
+"winSettings.windowEffectRestart": "Reopen the window for the material change to take effect",
 "winSettings.windowEffectMica": "Mica (Windows 11)",
 "winSettings.windowEffectAcrylic": "Acrylic (Windows 10 1809+)",
 "winSettings.windowEffectNone": "Off",

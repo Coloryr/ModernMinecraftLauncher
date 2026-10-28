@@ -129,6 +129,9 @@ fn ico_of_png(png: &[u8]) -> Vec<u8> {
 /// # 返回值
 ///
 /// 可以直接当文件名的名字；全是非法字符时退回 `M²L`
+///
+/// 只有 Windows 写快捷方式时用到，其余平台靠测试覆盖，允许未使用
+#[cfg_attr(not(windows), allow(dead_code))]
 fn shortcut_name(name: &str) -> String {
     let cleaned: String = name
         .trim()

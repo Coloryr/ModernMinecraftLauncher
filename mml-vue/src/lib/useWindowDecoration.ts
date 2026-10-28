@@ -14,7 +14,7 @@
 import { nextTick, onMounted, onUnmounted, ref, type Ref } from "vue";
 import { commands } from "./bindings";
 import { isTauri } from "../windows/windowManager";
-import { registerSnapTarget, waitForSnapTarget } from "./decoration";
+import { pluginDecorated, registerSnapTarget, waitForSnapTarget } from "./decoration";
 
 /**
  * 给当前窗口接上插件装饰
@@ -42,12 +42,15 @@ export function useWindowDecoration(rootEl: Ref<HTMLElement | null>) {
 
     try {
       const mode = await commands.windows.activateDecoration();
+      // 只有插件真正接管了才不画圆点；其余平台这里返回 native，圆点仍由前端画
+      pluginDecorated.value = mode === "custom";
       if (mode === "custom") {
         decorated.value = true;
       } else {
         console.warn("[decoration] 退回原生 frame:", mode);
       }
     } catch (e) {
+      pluginDecorated.value = false;
       console.warn("[decoration] 激活失败:", e);
     }
   });

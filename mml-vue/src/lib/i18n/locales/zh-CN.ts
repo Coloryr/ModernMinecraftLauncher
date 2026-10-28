@@ -1483,7 +1483,7 @@ export default {
   "winSettings.secGameTitle": "游戏标题",
   "winSettings.secWindowLook": "窗口外观",
 "winSettings.windowEffect": "窗口毛玻璃",
-"winSettings.windowEffectAuto": "自动（云母 → 亚克力 → 模糊）",
+"winSettings.windowEffectRestart": "切换材质后需要重开窗口才会生效",
 "winSettings.windowEffectMica": "云母（Windows 11）",
 "winSettings.windowEffectAcrylic": "亚克力（Windows 10 1809+）",
 "winSettings.windowEffectNone": "关闭",

@@ -94,11 +94,14 @@ use self::lifecycle::{
     open_window_from_uuid,
 };
 
+// 装饰摘掉后的几何校正只有 Windows 那条路会走
+#[cfg(windows)]
 use self::geometry::{clamp_runtime_min_size, reconcile_min_size};
 use self::registry::{
-    FamilyWindowId, MAIN_WINDOW_UUID, WINDOWS_INFO, family_of_kind, family_window_id,
-    min_size_of_label, uuid_for_kind,
+    FamilyWindowId, MAIN_WINDOW_UUID, WINDOWS_INFO, family_of_kind, family_window_id, uuid_for_kind,
 };
+#[cfg(windows)]
+use self::registry::min_size_of_label;
 
 use crate::listens;
 use uuid::Uuid;
@@ -441,6 +444,7 @@ pub async fn window_reopen_window(
 /// - `app`: 应用句柄，发事件用它
 /// - `label`: 目标窗口标签
 /// - `payload`: 拖入文件的真实绝对路径
+#[cfg(windows)]
 #[gui_macros::emit]
 fn emit_file_drop(app: &AppHandle, label: &str, payload: crate::dtos::FileDropDto) {
     let _ = app.emit_to(label, listens::FILE_DROP, payload);
@@ -905,7 +909,7 @@ fn show_without_activate(window: &WebviewWindow) -> Result<(), String> {
     window.show().map_err(|err| err.to_string())
 }
 
-/// 激活插件装饰并显示窗口；所有窗口都走插件装饰，见 [`create_window`]
+/// 激活插件装饰并显示窗口；Windows 上所有窗口都走插件装饰，见 [`create_window`]
 ///
 /// 窗口建出来时是 `decorations: true` + 隐藏的，见 `create_window`；
 /// 这里在原生 frame 上激活自绘装饰、再显示。激活成功即由**插件的控件**接管标题栏右侧，
@@ -913,13 +917,31 @@ fn show_without_activate(window: &WebviewWindow) -> Result<(), String> {
 ///
 /// 失败时退回原生 frame 并照样显示窗口：宁可露出系统标题栏，也不能让主窗口打不开。
 ///
+/// 其余平台建窗时就是无边框 + 直接显示，这里只补一次 show 并回 `"native"`，
+/// 让前端按无边框窗口自己画圆点。
+///
 /// - `window`: 调用方窗口，由 tauri 注入
 ///
 /// # 返回值
 ///
-/// 成功返回 `"custom"`，表示自绘装饰已接管；失败返回带原因的 `Err`
+/// 成功返回 `"custom"`，表示自绘装饰已接管；其余平台返回 `"native"`；失败返回带原因的 `Err`
 #[gui_macros::command]
 pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'static str, String> {
+    #[cfg(not(windows))]
+    {
+        show_window(&window)?;
+        return Ok("native");
+    }
+
+    #[cfg(windows)]
+    {
+        activate_decoration_plugin(window).await
+    }
+}
+
+/// 在原生 frame 上激活插件装饰，仅 Windows，说明见 [`window_activate_decoration`]
+#[cfg(windows)]
+async fn activate_decoration_plugin(window: WebviewWindow) -> Result<&'static str, String> {
     use tauri_plugin_decoration::WebviewWindowExt;
 
     if let Err(error) = window.activate_decoration().await {

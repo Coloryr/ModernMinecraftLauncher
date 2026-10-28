@@ -29,11 +29,11 @@ import { ref } from "vue";
 const DECORATION_GLOBAL = "__TAURI_PLUGIN_DECORATION__";
 
 /**
- * 本窗口是否已把窗口按钮交给插件装饰
+ * 本窗口的装饰是否已由插件接管
  *
- * 注册成功后置 true。给"插件会自己画按钮"的场景用 —— 目前只有 macOS：
- * 那边插件用的是**原生红黄绿**（不是 HTML 按钮），我们不该再画自己的圆点。
- * Windows 下插件不再画按钮（热区由本模块提供），这里置位只是状态记录。
+ * 只在激活命令返回 `custom` 之后置 true，见 useWindowDecoration —— 注册热区本身
+ * 不代表插件接过了标题栏：macOS / Linux 上不接插件装饰（那边窗口无边框直接显示），
+ * 圆点必须由前端自己画。
  */
 export const pluginDecorated = ref(false);
 
@@ -91,7 +91,6 @@ export function registerSnapTarget(root: HTMLElement | null): () => void {
     return () => { };
   }
 
-  pluginDecorated.value = true;
   runtime.setExternalControlProvider(measure.bind(null, root));
 
   // 悬停态：原生命中区盖在 webview 上、吃掉了鼠标消息，我们自己的按钮

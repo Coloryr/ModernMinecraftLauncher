@@ -435,7 +435,7 @@ export function defaultConfig(): GuiConfig {
       autoSaveNotice: true,
       autoJoinServer: readString(KEYS.autoJoinServer),
       // 这两项不做 localStorage 首帧缓存：真值一律来自 gui_config.json
-      windowEffect: "auto",
+      windowEffect: "none",
       windowOpacity: 85,
       motdServer: readString(KEYS.motdServer),
       lockInstance: readString(KEYS.lockInstance),

@@ -306,7 +306,7 @@ pub struct ClientConfig {
     pub music_on: bool,
     /// 自定义音乐来源：本地音频文件路径或 http(s) 直链；空串表示没配
     pub music_source: String,
-    /// 窗口材质：`auto`（云母→亚克力→模糊逐个降级）/ `mica` / `acrylic` / `blur` / `none`
+    /// 窗口材质：`none` / `mica` / `acrylic`；不是 `none` 时窗口才开透明
     pub window_effect: String,
     /// 窗口底色不透明度，单位百分比；界面底色按它混透明，材质才透得出来
     pub window_opacity: u8,
@@ -333,7 +333,7 @@ impl Default for ClientConfig {
             custom_page_on: false,
             music_on: false,
             music_source: String::new(),
-            window_effect: String::from("auto"),
+            window_effect: String::from("none"),
             window_opacity: 85,
         }
     }
@@ -495,7 +495,7 @@ static FRESH_CONFIG: AtomicBool = AtomicBool::new(false);
 pub fn init<P: AsRef<Path>>(path: P) {
     let file = FILE.get_or_init(|| path.as_ref().join(names::GUI_CONFIG_FILE));
 
-    let config = if file.exists()
+    let mut config = if file.exists()
         && file.is_file()
         && let Ok(data) = serialize_tools::json_from_file::<GuiConfig>(file)
     {
@@ -504,7 +504,21 @@ pub fn init<P: AsRef<Path>>(path: P) {
         FRESH_CONFIG.store(true, Ordering::Release);
         GuiConfig::default()
     };
+    normalize_window_effect(&mut config);
     let _ = CONFIG.set(Arc::new(RwLock::new(config)));
+}
+
+/// 把老配置里的材质值归一到现在这几个选项
+///
+/// `auto` 已删除，`blur` 也不再单列：不认的值一律当作不铺材质，
+/// 否则设置页那个下拉会落到一个已经不存在的选项上
+fn normalize_window_effect(config: &mut GuiConfig) {
+    config.client.window_effect = match config.client.window_effect.as_str() {
+        "mica" => "mica",
+        "acrylic" | "blur" => "acrylic",
+        _ => "none",
+    }
+    .to_string();
 }
 
 /// 启动时是否没有配置文件，前端据此让默认主题跟随系统
@@ -593,4 +607,26 @@ pub fn save() {
     };
     let data = CONFIG.get().unwrap().read().unwrap();
     config_save::save(uuids::GUI_CONFIG_FILE_UUID, &*data, file);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 删掉的材质选项要收口，别让设置页那个下拉落到不存在的值上
+    #[test]
+    fn window_effect_normalizes_removed_options() {
+        let mut config = GuiConfig::default();
+        for (raw, want) in [
+            ("auto", "none"),
+            ("blur", "acrylic"),
+            ("mica", "mica"),
+            ("acrylic", "acrylic"),
+            ("", "none"),
+        ] {
+            config.client.window_effect = raw.to_string();
+            normalize_window_effect(&mut config);
+            assert_eq!(config.client.window_effect, want, "raw={raw}");
+        }
+    }
 }
