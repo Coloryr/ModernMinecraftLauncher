@@ -1,6 +1,7 @@
 // 应用入口：禁用默认右键菜单，加载 GUI 配置后挂载根组件
 import { createApp, watch } from "vue";
 import * as Vue from "vue";
+import { commands } from "./lib/bindings";
 import "./styles/index.css";
 import App from "./App.vue";
 import { loadGuiConfig } from "./lib/guiConfig";
@@ -60,6 +61,19 @@ document.addEventListener("contextmenu", (e) => {
 // 调试要用。
 //
 // 注意只拦"浏览器专有"的键：Ctrl+C / Ctrl+V / Ctrl+A / Ctrl+Z 这些编辑键一概不动。
+// 调试构建：F12 / ⌘⌥I 打开 Web Inspector。发布构建没有把 DevTools 编进去，
+// 那条命令会直接返回错误，所以只在 DEV 下装这个监听
+if (import.meta.env.DEV) {
+  window.addEventListener("keydown", (e) => {
+    const inspect =
+      e.key === "F12" ||
+      (e.metaKey && e.altKey && (e.key === "i" || e.key === "I"));
+    if (!inspect) return;
+    e.preventDefault();
+    commands.windows.openDevtools().catch(() => { });
+  });
+}
+
 if (import.meta.env.PROD) {
   window.addEventListener("keydown", (e) => {
     const ctrl = e.ctrlKey || e.metaKey;

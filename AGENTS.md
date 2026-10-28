@@ -475,7 +475,7 @@ pub(super) struct MotdAddr {
 pub(super) fn parse_motd_addr(address: &str) -> MotdAddr { /* ... */ }
 ```
 
-### 14.3 三条硬约束（写错会出事）
+### 14.3 四条硬约束（写错会出事）
 
 - **别在注释里写出 `#[gui_macros::command]` / `#[gui_macros::emit]` 的字面量**（`//`、`///`、
   `/* */` 都不行）：生成器是裸文本 `find(marker)`，会把注释后面第一个函数误判成命令（§4）。
@@ -483,6 +483,9 @@ pub(super) fn parse_motd_addr(address: &str) -> MotdAddr { /* ... */ }
   开头的行，插一行 `//` 会让 `rename_all` 解析不到，`bindings.ts` 字段名静默退回 snake_case。
 - **临时痕迹要能一次搜净**：临时验证代码标 `TEMP` 注释（§2）、临时诊断日志带 `[TEMP]` 前缀
   （§13），用完立即删；长期保留的运行日志不带 `[TEMP]`。
+- **注释里不写彩蛋**：愚人节那类隐藏功能只按**行为**描述（如"标题栏按另一套样式展示"），
+  不出现"彩蛋 / 愚人节 / 4 月 1 日"这类字样 —— 写明白等于提前泄露，
+  也会让 `grep 彩蛋` 这种排查把普通逻辑一起拖进来。
 
 ### 14.4 前端（TS / Vue）
 

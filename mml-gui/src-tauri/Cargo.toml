@@ -74,6 +74,17 @@ mml-gamepad = { path = "../../mml-core/mml-gamepad" }
 # 测试临时目录统一放 target/temp（AGENTS.md §6）：不要用系统 %TEMP%，也不要自己拼仓库根
 mml-testutil = { path = "../../mml-core/mml-testutil" }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# 藏掉 macOS 原生窗口按钮要用（标题栏换边时改由前端画），
+# 版本与 tauri-plugin-decoration 保持一致，避免编出两份 objc2
+objc2 = { version = "=0.6.4", features = ["exception"] }
+objc2-app-kit = { version = "=0.3.2", default-features = false, features = [
+  "std",
+  "NSButton",
+  "NSView",
+  "NSWindow",
+] }
+
 [target.'cfg(target_os = "linux")'.dependencies]
 # Wayland 会话里 GDK 的 workarea 是整块屏幕；读 XWayland 根窗口的 _NET_WORKAREA
 # 才能拿到左侧 Dock / 顶栏扣掉后的工作区

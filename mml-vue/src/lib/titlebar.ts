@@ -1,7 +1,7 @@
 // 自绘标题栏：平台判定 + 拖动 / 最大化助手
 //
 // 两套样式：`windows` 右端三个方按钮，`macos` 左端红黄绿圆点。
-// 4 月 1 日对调两套样式，愚人节彩蛋。
+// 标题栏样式在启动时定一次，按平台与日期决定用哪套。
 //
 // 窗口动作都走应用自己的 Rust 命令，见 src-tauri 的 windows/mod.rs 末尾，不走 JS 的
 // `getCurrentWindow()`，省得往 capabilities/default.json 加窗口权限。
@@ -61,13 +61,13 @@ export function detectOs(): OsKind {
 }
 
 /**
- * 是否 4 月 1 日
+ * 今天是否要换用另一套标题栏样式
  *
  * - `now`: 判定的时刻，缺省为当前时间
  *
  * # 返回值
  *
- * 是 4 月 1 日时为 true
+ * 需要换用时为 true
  */
 export function isAprilFools(now = new Date()): boolean {
   return now.getMonth() === 3 && now.getDate() === 1;

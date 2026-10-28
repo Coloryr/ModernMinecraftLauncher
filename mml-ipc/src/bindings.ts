@@ -29,6 +29,7 @@ export function createCommands(invoke: Invoke) {
       isFullscreen: () => invoke<boolean>("window_is_fullscreen"),
       isMaximized: () => invoke<boolean>("window_is_maximized"),
       minimize: () => invoke<void>("window_minimize"),
+      openDevtools: () => invoke<void>("window_open_devtools"),
       openWindow: (kind: string, instance: string | null, query: string | null) => invoke<void>("window_open_window", { kind, instance, query }),
       probeDrop: (path: string) => invoke<DropPathDto>("window_probe_drop", { path }),
       reopenWindow: (kind: string, instance: string | null, query: string | null) => invoke<void>("window_reopen_window", { kind, instance, query }),

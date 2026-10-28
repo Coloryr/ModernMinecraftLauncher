@@ -31,8 +31,21 @@ body {
   background: color-mix(in srgb, var(--bg) var(--window-alpha, 85%), transparent);
   color: var(--text);
   overflow: hidden;
+  /* 界面文本不可拖选：和原生窗口一致。WKWebView 认前缀写法，两套都写 */
+  -webkit-user-select: none;
   user-select: none;
   transition: background 0.2s, color 0.2s;
+}
+
+/* 需要选中 / 复制的控件显式放行：body 上的 none 会继承下去，
+   Safari 里会把输入框的选择也一起禁掉 */
+input,
+textarea,
+[contenteditable="true"],
+[contenteditable=""],
+.selectable-text {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 /* 没开材质、也没设背景图时窗口不能透：底下既没有模糊也没有底色，透出去就是未处理的桌面 */

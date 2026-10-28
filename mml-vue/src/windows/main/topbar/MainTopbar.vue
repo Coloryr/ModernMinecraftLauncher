@@ -8,7 +8,8 @@ import WindowControls from "../../../components/ui/WindowControls.vue";
 import ModpackTitleIndicator from "../../../components/ModpackTitleIndicator.vue";
 import DownloadTitleIndicator from "../../../components/DownloadTitleIndicator.vue";
 import ResourceTitleIndicator from "../../../components/ResourceTitleIndicator.vue";
-import { onTitleBarPointerDown, titleBarStyle } from "../../../lib/titlebar";
+import { detectOs, onTitleBarPointerDown, titleBarStyle } from "../../../lib/titlebar";
+import { useWindowFullscreen } from "../../../lib/useWindowFullscreen";
 import { useModpackStatus } from "../../../lib/modpackTasks";
 import { pluginDecorated } from "../../../lib/decoration";
 import { buildBadgeKey, buildChannel, isTestBuild, loadBuildInfo } from "../../../lib/buildInfo";
@@ -29,6 +30,11 @@ defineProps<{
 // 下载 / 整合包两个进度指示器默认挂在下载整合包窗口，那个窗口关着时才回到这里。
 // 单窗口模式下它只是应用内的一页，`windowOpen` 恒为 false，由那一页自己挂
 const { status: modpackStatus, init: initModpackStatus } = useModpackStatus(false);
+/** 全屏时顶栏要让出 macOS 的刘海 / 菜单栏区域 */
+const fullscreen = useWindowFullscreen();
+const pluginControls = computed(() => isMac && titleBarStyle === "macos");
+/** 安全区这类"按系统"的样式用平台判定，不跟标题栏样式走：换用另一套时外观会反转 */
+const isMac = detectOs() === "macos";
 let unsubModpack: (() => void) | null = null;
 
 onMounted(async () => {
@@ -55,12 +61,14 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <header class="topbar" :class="titleBarStyle" @pointerdown="onTitleBarPointerDown">
-    <!-- macos 样式：红黄绿在左端。
-         主窗口接插件装饰时，插件在 macOS 上用的是**原生红黄绿**（不是 HTML 按钮），
-         所以这里不渲染自己的圆点，免得与原生控件重叠 -->
-    <WindowControls v-if="titleBarStyle === 'macos' && !pluginDecorated" :style="titleBarStyle" />
-
+  <header class="topbar"
+    :class="[titleBarStyle, {
+      'is-macos': isMac,
+      'is-plugin-decorated': pluginDecorated,
+      'is-plugin-controls': pluginControls,
+      'is-fullscreen': fullscreen,
+    }]"
+    @pointerdown="onTitleBarPointerDown">
     <div class="brand">
       <div class="brand-text">
         <div class="brand-name">
@@ -119,10 +127,10 @@ const emit = defineEmits<{
         @update:account="emit('update:account', $event)" />
     </div>
 
-    <!-- windows 样式：最小化 / 最大化 / 关闭在右端。
-         窗口按钮一律由 M²L 自己画，插件那套 DOM 全局隐藏，见 styles/decoration.css；
-         Windows 的贴靠热区由 lib/decoration.ts 把这三个按钮的矩形报给插件去摆原生命中区 -->
-    <WindowControls v-if="titleBarStyle === 'windows'" :style="titleBarStyle" />
+    <!-- 窗口按钮：插件摆原生按钮时不画（macOS 正常形态）；原生被藏掉时
+         这里按对调后的样式自己画一套，位置跟着样式走。
+         Windows 的贴靠热区由 lib/decoration.ts 把这三个按钮的矩形报给插件 -->
+    <WindowControls v-if="!pluginControls" :style="titleBarStyle" />
   </header>
 </template>
 
@@ -132,6 +140,9 @@ const emit = defineEmits<{
    顶栏是 .main-window 的第一个 flex 子节点，改高度会让顶栏以下的所有内容（含侧栏）整体下移 */
 .topbar {
   height: var(--titlebar-h);
+  /* 高度锁死：内容比它高时 flex 仍会按内容撑开，实测量出来会多出两三个像素 */
+  min-height: var(--titlebar-h);
+  max-height: var(--titlebar-h);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -139,6 +150,70 @@ const emit = defineEmits<{
   padding: 0 18px;
   background: var(--bg-side);
   border-bottom: 1px solid var(--border);
+}
+
+/* 插件接管后原生红黄绿摆在内容上方：按插件发布的清空量让出左侧，
+   此时自己的 WindowControls 已被 v-if 掉，不会重复占位。
+   全屏时插件把清空量发成 0，用 max 退回常规内边距，免得内容贴到窗口边缘；
+   进出全屏是窗口尺寸形变，间距跟着一起过渡，不然退出全屏会先贴边再跳开 */
+/* 全屏切换会同时改左内边距、上内边距与高度：三条放同一个过渡里，否则内容会先右移再上移，
+   看着像两段动画。时长与窗口进出全屏的尺寸动画同档 */
+.topbar.is-macos {
+  transition: padding-left 0.3s, padding-top 0.3s, height 0.3s;
+}
+
+/* 按系统而不是按标题栏样式：Windows 的插件接管不发布 left-clearance，带上会白多一段内边距 */
+.topbar.is-macos.is-plugin-controls {
+  padding-left: max(18px, var(--tauri-plugin-decoration-left-clearance, 76px));
+}
+
+/* macOS 全屏时窗口铺满整屏，顶栏顶在屏幕最上沿，刘海与菜单栏会挡住内容：
+   整体下压一层安全区，顶部露出的仍是顶栏底色，下面的布局跟着一起下去 */
+.topbar.is-macos.is-fullscreen {
+  /* 顶上 24px 是刘海 / 菜单栏的安全区，剩下 28px 是内容；总高与非全屏一致。
+     顶栏内的方形键跟着缩到 26px，否则 32px 的按钮撑出这条 28px 的内容区 */
+  --titlebar-actual-h: var(--titlebar-h);
+  --ctl-h: 26px;
+  box-sizing: border-box;
+  height: var(--titlebar-actual-h);
+  padding-top: 24px;
+}
+
+/* 28px 的内容区：Logo、副标题、账户按钮都要收一档 */
+.topbar.is-macos.is-fullscreen .brand-logo {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.topbar.is-macos.is-fullscreen .brand-sub {
+  display: none;
+}
+
+.topbar.is-macos.is-fullscreen .brand-name {
+  font-size: 13px;
+}
+
+/* 账户按钮按内容定高（头像 + 内边距），这里把它压到 26px 上下。
+   必须穿透到子组件，见 AccountSelector 的 .account-btn */
+.topbar.is-macos.is-fullscreen :deep(.account-btn) {
+  padding: 2px 6px;
+}
+
+.topbar.is-macos.is-fullscreen :deep(.account-btn .avatar) {
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+}
+
+.topbar.is-macos.is-fullscreen :deep(.account-btn .account-name) {
+  font-size: 11.5px;
+}
+
+/* 全屏时只留账户名一行，类型标签挤不下 */
+.topbar.is-macos.is-fullscreen :deep(.account-btn .account-type) {
+  display: none;
 }
 
 /* windows 样式的窗口按钮是小方块、不贴边，右侧留一点呼吸空间；

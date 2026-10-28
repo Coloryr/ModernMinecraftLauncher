@@ -117,7 +117,14 @@ export async function addAccount(
   password?: string,
 ): Promise<AccountStoreDto> {
   const acc = await commands.account.addAccount(name, type, server ?? null, password ?? null);
-  accounts.value.push(acc);
+  // account-change 广播可能比这条命令的返回值先到，那条路已经重拉过一次列表：
+  // 直接 push 会多出一条，所以按 uuid 去重
+  const index = accounts.value.findIndex((item) => item.uuid === acc.uuid);
+  if (index >= 0) {
+    accounts.value.splice(index, 1, acc);
+  } else {
+    accounts.value.push(acc);
+  }
   if (!currentAccount.value) currentAccount.value = acc;
   return acc;
 }

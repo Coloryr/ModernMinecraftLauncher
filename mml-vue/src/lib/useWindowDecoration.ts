@@ -14,6 +14,7 @@
 import { nextTick, onMounted, onUnmounted, ref, type Ref } from "vue";
 import { commands } from "./bindings";
 import { isTauri } from "../windows/windowManager";
+import { detectOs } from "./titlebar";
 import { pluginDecorated, registerSnapTarget, waitForSnapTarget } from "./decoration";
 
 /**
@@ -38,7 +39,11 @@ export function useWindowDecoration(rootEl: Ref<HTMLElement | null>) {
 
     // 等一帧让标题栏（含窗口按钮）渲染出来，否则量不到矩形
     await nextTick();
-    await waitForSnapTarget(root);
+    // 只有 Windows 需要等最大化按钮：贴靠热区按它量。macOS / Linux 的红黄绿由插件摆的是
+    // **原生**按钮，这里量不到，白等 15 秒超时会让窗口迟迟不显示
+    if (detectOs() === "windows") {
+      await waitForSnapTarget(root);
+    }
 
     try {
       const mode = await commands.windows.activateDecoration();

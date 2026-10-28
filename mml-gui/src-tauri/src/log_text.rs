@@ -97,6 +97,18 @@ pub enum LogText {
         /// 失败原因，库给的原文
         error: String,
     },
+    /// 装饰激活失败，窗口退回无边框、按钮由界面自绘
+    DecorationActivateFailed {
+        /// 窗口标签，用来看是哪个窗口出的问题
+        label: String,
+        /// 失败原因，插件给的原文
+        error: String,
+    },
+    /// macOS 原生红黄绿没摆到位，按钮留在默认位置
+    TrafficLightsFailed {
+        /// 失败原因，插件给的原文
+        error: String,
+    },
     /// 取 WebView2 设置失败，快捷键没能关掉
     WebviewSettingsFailed,
     /// 关 DevTools 失败
@@ -565,6 +577,12 @@ impl LogText {
             LogText::WindowEffectFailed { label, mode, error } => format!(
                 "[window] 铺系统材质失败，窗口退回不透明底色：mode={mode} 窗口={label} ({error})"
             ),
+            LogText::DecorationActivateFailed { label, error } => format!(
+                "[window] 装饰激活失败，窗口退回无边框、按钮由界面自绘：窗口={label} ({error})"
+            ),
+            LogText::TrafficLightsFailed { error } => {
+                format!("[window] 摆放原生窗口按钮失败，按钮留在默认位置: {error}")
+            }
             LogText::WebviewSettingsFailed => {
                 String::from("[webview] 取 WebView2 设置失败，快捷键未能关闭")
             }
@@ -823,6 +841,12 @@ impl LogText {
             ),
             LogText::WindowEffectFailed { label, mode, error } => format!(
                 "[window] failed to apply the system backdrop, the window falls back to an opaque background: mode={mode} window={label} ({error})"
+            ),
+            LogText::DecorationActivateFailed { label, error } => format!(
+                "[window] decoration activation failed, the window falls back to a borderless frame with app-drawn buttons: window={label} ({error})"
+            ),
+            LogText::TrafficLightsFailed { error } => format!(
+                "[window] failed to position the native window buttons, they stay at the default place: {error}"
             ),
             LogText::WebviewSettingsFailed => String::from(
                 "[webview] failed to get WebView2 settings, browser shortcuts stay enabled",

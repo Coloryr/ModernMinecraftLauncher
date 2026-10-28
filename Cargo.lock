@@ -3114,6 +3114,8 @@ dependencies = [
  "mml-sys",
  "mml-testutil",
  "mml-tex-draw",
+ "objc2",
+ "objc2-app-kit",
  "pbkdf2",
  "reqwest",
  "rfd 0.17.2",

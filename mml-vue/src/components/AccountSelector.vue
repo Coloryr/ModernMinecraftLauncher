@@ -131,14 +131,32 @@ function pick(account: AccountStoreDto) {
 .account-btn {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 12px 6px 8px;
+  gap: 8px;
+  /* 高度跟着标题栏走：52px 的顶栏里上下各留 6px */
+  padding: 5px 12px 5px 10px;
+  /* 高度固定：有账户时是"名字 + 类型"两行，没有时只有一行，
+     不钉死的话选中账户后按钮会自己长高一截 */
+  height: 40px;
+  /* 最小宽度：账户名长短不一时按钮别跟着忽宽忽窄，右侧那一排也就不会跳 */
+  min-width: 180px;
   border-radius: 12px;
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text);
   cursor: pointer;
   transition: all 0.15s;
+}
+
+/* 按钮里的头像比菜单项小一档：34px 的版本在 52px 的标题栏里会顶到上下边 */
+.account-btn .avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+}
+
+/* 按钮有最小宽度之后，箭头贴到右缘，别悬在文字后面 */
+.account-btn .chevron {
+  margin-left: auto;
 }
 
 .account-btn:hover {
@@ -157,11 +175,6 @@ function pick(account: AccountStoreDto) {
   font-weight: 700;
   font-size: 15px;
   flex-shrink: 0;
-}
-
-/* 阴影只给字母 / 占位头像：3D 头像 PNG 带透明区，img 上投影会成方形托板 */
-.avatar:not(.avatar-img) {
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
 }
 
 .avatar.small {
@@ -187,7 +200,8 @@ function pick(account: AccountStoreDto) {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  line-height: 1.25;
+  /* 1.25 时两行（名字 + 类型）= 32.6px，超出按钮 40px 的内容区 */
+  line-height: 1.1;
   text-align: left;
 }
 
@@ -198,23 +212,19 @@ function pick(account: AccountStoreDto) {
 
 .account-type {
   font-size: 11px;
-  padding: 1px 7px;
-  border-radius: 20px;
 }
 
+/* 类型只靠文字颜色区分，不铺底色 */
 .type-ms {
   color: #8fd0ff;
-  background: rgba(63, 140, 255, 0.16);
 }
 
 .type-offline {
   color: var(--text-dim);
-  background: rgba(154, 163, 175, 0.14);
 }
 
 .type-external {
   color: #22d3ee;
-  background: rgba(6, 182, 212, 0.16);
 }
 
 /* 亮色主题：浅色文字在白底上看不清，换深色系 */
@@ -283,7 +293,8 @@ function pick(account: AccountStoreDto) {
   right: 0;
   top: calc(100% + 8px);
   width: 240px;
-  max-height: calc(100vh - var(--titlebar-h) - 16px);
+  /* 顶栏全屏时会更高，按实际占位算，否则菜单底部会被屏幕切掉 */
+  max-height: calc(100vh - var(--titlebar-actual-h, var(--titlebar-h)) - 16px);
   overflow-y: auto;
   scrollbar-gutter: stable;
   /* 见 styles/scrollbar.css */

@@ -94,14 +94,11 @@ use self::lifecycle::{
     open_window_from_uuid,
 };
 
-// 装饰摘掉后的几何校正只有 Windows 那条路会走
-#[cfg(windows)]
 use self::geometry::{clamp_runtime_min_size, reconcile_min_size};
 use self::registry::{
-    FamilyWindowId, MAIN_WINDOW_UUID, WINDOWS_INFO, family_of_kind, family_window_id, uuid_for_kind,
+    FamilyWindowId, MAIN_WINDOW_UUID, WINDOWS_INFO, family_of_kind, family_window_id,
+    min_size_of_label, uuid_for_kind,
 };
-#[cfg(windows)]
-use self::registry::min_size_of_label;
 
 use crate::listens;
 use uuid::Uuid;
@@ -909,54 +906,70 @@ fn show_without_activate(window: &WebviewWindow) -> Result<(), String> {
     window.show().map_err(|err| err.to_string())
 }
 
-/// 激活插件装饰并显示窗口；Windows 上所有窗口都走插件装饰，见 [`create_window`]
+/// 激活插件装饰并显示窗口；所有窗口都走插件装饰，见 [`create_window`]
 ///
 /// 窗口建出来时是 `decorations: true` + 隐藏的，见 `create_window`；
-/// 这里在原生 frame 上激活自绘装饰、再显示。激活成功即由**插件的控件**接管标题栏右侧，
-/// Windows 11 的贴靠布局 flyout 挂在它的最大化按钮上 —— 这正是本命令存在的理由。
+/// 这里在原生 frame 上激活装饰、再显示：
+///
+/// - Windows：自绘装饰接管标题栏右侧，Win11 贴靠布局挂在最大化按钮上
+/// - macOS：插件摆的是**原生红黄绿**，位置要在激活之后、显示之前用
+///   `set_traffic_lights_inset` 定好，见插件 docs/platforms.md
 ///
 /// 失败时退回原生 frame 并照样显示窗口：宁可露出系统标题栏，也不能让主窗口打不开。
-///
-/// 其余平台建窗时就是无边框 + 直接显示，这里只补一次 show 并回 `"native"`，
-/// 让前端按无边框窗口自己画圆点。
 ///
 /// - `window`: 调用方窗口，由 tauri 注入
 ///
 /// # 返回值
 ///
-/// 成功返回 `"custom"`，表示自绘装饰已接管；其余平台返回 `"native"`；失败返回带原因的 `Err`
+/// 成功返回 `"custom"`，表示装饰已由插件接管；失败返回带原因的 `Err`
 #[gui_macros::command]
 pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'static str, String> {
-    #[cfg(not(windows))]
-    {
-        show_window(&window)?;
-        return Ok("native");
-    }
-
-    #[cfg(windows)]
-    {
-        activate_decoration_plugin(window).await
-    }
-}
-
-/// 在原生 frame 上激活插件装饰，仅 Windows，说明见 [`window_activate_decoration`]
-#[cfg(windows)]
-async fn activate_decoration_plugin(window: WebviewWindow) -> Result<&'static str, String> {
     use tauri_plugin_decoration::WebviewWindowExt;
 
     if let Err(error) = window.activate_decoration().await {
-        // 回退：先确保原生 frame 还在，再显示，最后把原因带回前端
+        // 回退：先确保原生 frame 还在，再收起它
         let _ = window.restore_decoration().await;
-        // 退回原生 frame：此刻量到的差值含标题栏，正好是带装饰窗口该有的下限
+        // 原生标题栏不能留：它与自绘顶栏会叠成两条（截图上就是这种）。
+        // 装饰没接管就去掉原生 frame，红黄绿改由前端画，见 useWindowDecoration
+        let _ = window.set_decorations(false);
+        // 换成无边框后量到的差值只剩边框带，正好是窗口该有的下限
         if let Some(min) = min_size_of_label(window.label()) {
             reconcile_min_size(&window, min.width, min.height);
         }
+        mml_log::error(
+            crate::log_text::LogText::DecorationActivateFailed {
+                label: window.label().to_string(),
+                error: error.to_string(),
+            }
+            .text(),
+        );
         let _ = show_window(&window);
         self::effects::apply(&window, &crate::gui_config::get().client.window_effect);
         return Err(format!("decoration activate failed: {error}"));
     }
 
-    // 装饰已摘掉，此刻量到的「外框 − 客户区」才是那圈 Windows 边框带；
+    // macOS 的红黄绿是 AppKit 原生按钮，位置必须在激活之后、显示之前定好，
+    // 见插件 docs/platforms.md。第一个参数是关闭钮距左缘的点数，第二个加在按钮高度上
+    // 形成容器高度（AppKit 在容器里垂直居中）：按钮 14 + 38 = 52，与 --titlebar-h 对齐
+    #[cfg(target_os = "macos")]
+    {
+        if is_april_fools() {
+            // 标题栏按另一套样式展示时窗口按钮也换边：原生红黄绿要藏掉，
+            // 否则会和前端画的那套并存
+            if let Err(error) = hide_native_traffic_lights(&window) {
+                mml_log::info(crate::log_text::LogText::TrafficLightsFailed { error }.text());
+            }
+        } else if let Err(error) = window.set_traffic_lights_inset(16.0, 38.0).await {
+            mml_log::info(
+                crate::log_text::LogText::TrafficLightsFailed {
+                    error: error.to_string(),
+                }
+                .text(),
+            );
+        }
+    }
+
+    // 装饰已摘掉，此刻量到的「外框 − 客户区」才是那圈边框带；
     // 建窗时量到的是边框带 + 标题栏，拿它当客户区下限会把窗口顶高，所以建窗时**不设**下限，
     // 到这里才设；激活失败退回原生 frame 的那条分支另设一次
     if let Some(min) = min_size_of_label(window.label()) {
@@ -971,6 +984,84 @@ async fn activate_decoration_plugin(window: WebviewWindow) -> Result<&'static st
     // 隐藏状态下铺的会被随后 activate_decoration 改窗口样式一起丢掉
     self::effects::apply(&window, &crate::gui_config::get().client.window_effect);
     Ok("custom")
+}
+
+/// 按本地日期判断今天是否要换用另一套标题栏样式
+///
+/// # 返回值
+///
+/// 需要换用时返回 `true`
+fn is_april_fools() -> bool {
+    use chrono::{Datelike, Local};
+
+    let now = Local::now();
+    now.month() == 4 && now.day() == 1
+}
+
+/// 藏掉 macOS 的原生红黄绿，改由前端按对调后的样式自己画
+///
+/// - `window`: 目标窗口
+///
+/// # 返回值
+///
+/// 取不到原生窗口或主线程调度失败时返回错误文案
+#[cfg(target_os = "macos")]
+fn hide_native_traffic_lights(window: &WebviewWindow) -> Result<(), String> {
+    use objc2_app_kit::{NSWindow, NSWindowButton};
+    use tauri::Manager;
+
+    let handle = window.app_handle().clone();
+    let window = window.clone();
+    let (tx, rx) = std::sync::mpsc::channel();
+    handle
+        .run_on_main_thread(move || {
+            let result = (|| -> Result<(), String> {
+                let pointer = window.ns_window().map_err(|err| err.to_string())?;
+                if pointer.is_null() {
+                    return Ok(());
+                }
+                // SAFETY: 主线程上执行；句柄取自本窗口且期间存活，只改按钮可见性
+                unsafe {
+                    let ns_window = &*(pointer as *const NSWindow);
+                    for kind in [
+                        NSWindowButton::CloseButton,
+                        NSWindowButton::MiniaturizeButton,
+                        NSWindowButton::ZoomButton,
+                    ] {
+                        if let Some(button) = ns_window.standardWindowButton(kind) {
+                            button.setHidden(true);
+                        }
+                    }
+                }
+                Ok(())
+            })();
+            let _ = tx.send(result);
+        })
+        .map_err(|err| err.to_string())?;
+    rx.recv().map_err(|err| err.to_string())?
+}
+
+/// 打开开发者工具
+///
+/// 只对调试构建可用：发布构建没有把 DevTools 编进去，这里返回错误
+///
+/// - `window`: 调用方窗口，由 tauri 注入
+///
+/// # 返回值
+///
+/// 打开成功返回 `Ok(())`；发布构建返回错误文案
+#[gui_macros::command]
+pub fn window_open_devtools(window: WebviewWindow) -> Result<(), String> {
+    #[cfg(debug_assertions)]
+    {
+        window.open_devtools();
+        Ok(())
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        let _ = window;
+        Err("DevTools are only available in debug builds".to_string())
+    }
 }
 
 /// 最小化窗口

@@ -5,6 +5,7 @@
 // 只是显示在这一页。这里只负责排版与分组（SettingsGroup）。
 import { onMounted } from "vue";
 import { t } from "../../../../lib/i18n";
+import { detectOs } from "../../../../lib/titlebar";
 import { fontStack } from "../../../../lib/fonts";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
@@ -69,6 +70,9 @@ const {
   bgBlur,
   setBgBlur,
 } = props.settings;
+
+/** 窗口材质（云母 / 亚克力）只有 Windows 提供；macOS / Linux 没有对应实现，整块藏掉 */
+const supportsMaterial = detectOs() === "windows";
 
 // 窗口外观与自定义界面都属于 gui_config.client，由 useSettingsClient 持有
 const {
@@ -257,14 +261,16 @@ function toggleCustomPage(on: boolean) {
 
   <!-- 窗口外观：材质由系统在窗口背后合成（Rust 侧 windows/effects.rs），落 gui_config.client.windowEffect -->
   <SettingsGroup v-if="!locked" id="window-look" title-key="winSettings.secWindowLook" :flash="flashGroup === 'window-look'">
-    <label class="field-label">{{ t("winSettings.windowEffect") }}</label>
-    <select v-model="client.windowEffect" class="field-select" @change="applyWindowEffect">
-      <option value="none">{{ t("winSettings.windowEffectNone") }}</option>
-      <option value="mica">{{ t("winSettings.windowEffectMica") }}</option>
-      <option value="acrylic">{{ t("winSettings.windowEffectAcrylic") }}</option>
-    </select>
-    <!-- 窗口透明在建窗时定，切换材质要重开窗口才看得到 -->
-    <p class="field-desc">{{ t("winSettings.windowEffectRestart") }}</p>
+    <template v-if="supportsMaterial">
+      <label class="field-label">{{ t("winSettings.windowEffect") }}</label>
+      <select v-model="client.windowEffect" class="field-select" @change="applyWindowEffect">
+        <option value="none">{{ t("winSettings.windowEffectNone") }}</option>
+        <option value="mica">{{ t("winSettings.windowEffectMica") }}</option>
+        <option value="acrylic">{{ t("winSettings.windowEffectAcrylic") }}</option>
+      </select>
+      <!-- 窗口透明在建窗时定，切换材质要重开窗口才看得到 -->
+      <p class="field-desc">{{ t("winSettings.windowEffectRestart") }}</p>
+    </template>
 
     <label class="field-label">{{ t("winSettings.windowOpacity") }}</label>
     <NumberStepper v-model="client.windowOpacity" :min="0" :max="100" :step="5"

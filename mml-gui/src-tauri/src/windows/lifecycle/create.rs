@@ -156,12 +156,9 @@ pub(crate) fn create_window(
         .map(|m| (m.width, m.height))
         .unwrap_or((600.0, 400.0));
 
-    // Windows 走插件装饰：必须以 decorations(true) 建出来，插件才能在原生 frame 上激活
-    // 自绘装饰，激活前先藏起来。收益是 Win11 贴靠布局，矩形由前端量好交给插件，见 decoration.ts。
-    //
-    // macOS / Linux 不接插件：那边激活会超时（实测 macOS 5 秒），而显示窗口等它；
-    // 更糟的是隐藏窗口里 WebKit 会冻结前端定时器，前端"等标题栏 → 激活 → 显示"根本跑不完，
-    // 结果进程在跑、窗口永不出现。改用无边框 + 直接显示，圆点由前端自己画
+    // 所有窗口都走插件装饰：必须以 decorations(true) 建出来，插件才能在原生 frame 上激活，
+    // 激活前先藏起来。收益是 Win11 贴靠布局（矩形由前端量好交给插件，见 decoration.ts），
+    // 以及 macOS 上由插件摆位的原生红黄绿，见插件 docs/platforms.md
 
     // 建窗时**不设**最小尺寸：此刻窗口是带装饰口径，最小客户区加上边框带算出的下限是外框 639，
     // 比拉到最小的窗口（外框 608）还高；而 tao 的 set_min_inner_size 会把当前尺寸立刻重设一遍，
@@ -171,16 +168,20 @@ pub(crate) fn create_window(
     // webview 铺不透明暗色底，避免加载首帧透出桌面，与暗色主题 --bg 一致
     let builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App(url_path.into()))
         .title(names::MML)
+        // 原生 frame 起步 + 隐藏：装饰激活成功后再显示，失败则退回原生 frame 显示
+        .decorations(true)
         // 关掉框架 wry 自己那份拖放实现：它会顶掉 WebView2 的拖放目标且只认文件，网页上
         // 拖下来的卡片连 dragenter 都收不到。关掉后 DOM 拖放全功能，路径由 file_drop 补上
-        .disable_drag_drop_handler();
+        .disable_drag_drop_handler()
+        .visible(false);
 
-    // 原生 frame 起步 + 隐藏：装饰激活成功后再显示，失败则退回原生 frame 显示。
-    // 这个口径只对 Windows 成立，其余平台的取舍见上面那段
-    #[cfg(windows)]
-    let builder = builder.decorations(true).visible(false);
-    #[cfg(not(windows))]
-    let builder = builder.decorations(false).visible(true);
+    // macOS：标题栏用 Overlay 并藏掉标题文字，内容才铺得到窗口顶部、红黄绿能浮在自绘顶栏上。
+    // 插件摆的就是这几个原生按钮（见 docs/platforms.md），不开 Overlay 就变成两条栏：
+    // 原生标题栏一条 + 自绘顶栏一条
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .title_bar_style(tauri::TitleBarStyle::Overlay)
+        .hidden_title(true);
 
     // 下载资源 / 整合包两个窗口只承载启动器页面：正文里的外链由前端拦下转给系统浏览器，
     // 这里再兜一层，任何外部导航都不允许把窗口带走
@@ -221,10 +222,13 @@ pub(crate) fn create_window(
     // 填客户区，alpha 会被丢掉 —— 设成 #14161a00 实际是刷一层不透明深色，把 DWM 合成在
     // 窗口背后的材质整片盖住（实测窗内留白恒为 #14161a，与壁纸无关）。
     // 界面自己的底色是半透明的（见 base.css 的 body），材质没生效时也看得清
-    // 窗口透明只为材质服务：不铺材质就保持不透明，默认的 `none` 也就不透明。
-    // 透明窗口在 macOS 上还要私有 API，没铺材质时白白承担"整窗透明、看着像没画出来"的风险
-    let builder =
-        builder.transparent(crate::gui_config::get().client.window_effect != "none");
+    // 窗口透明只为材质服务，而材质只有 Windows 提供（云母 / 亚克力）：
+    // 其余平台一律不透明，否则 macOS 上会没材质也开透明，界面看着像没画出来
+    #[cfg(windows)]
+    let transparent = crate::gui_config::get().client.window_effect != "none";
+    #[cfg(not(windows))]
+    let transparent = false;
+    let builder = builder.transparent(transparent);
     let win = match geom {
         Some(g) => {
             // 恢复端 builder.position / inner_size 用逻辑像素，保存端是物理像素：按目标

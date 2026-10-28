@@ -9,7 +9,8 @@ import ModpackTitleIndicator from "../ModpackTitleIndicator.vue";
 import DownloadTitleIndicator from "../DownloadTitleIndicator.vue";
 import ResourceTitleIndicator from "../ResourceTitleIndicator.vue";
 import MusicTitleIndicator from "../MusicTitleIndicator.vue";
-import { onTitleBarPointerDown, titleBarStyle, useWindowTitle } from "../../lib/titlebar";
+import { detectOs, onTitleBarPointerDown, titleBarStyle, useWindowTitle } from "../../lib/titlebar";
+import { useWindowFullscreen } from "../../lib/useWindowFullscreen";
 import { useWindowDecoration } from "../../lib/useWindowDecoration";
 
 const props = defineProps<{
@@ -72,6 +73,11 @@ useWindowTitle(() => props.title);
 // 每个功能窗口都要做，放这里统一处理，见 lib/useWindowDecoration.ts
 const rootEl = ref<HTMLElement | null>(null);
 const { decorated } = useWindowDecoration(rootEl);
+/** 全屏时顶栏要让出 macOS 的刘海 / 菜单栏区域 */
+const fullscreen = useWindowFullscreen();
+const pluginControls = computed(() => isMac && titleBarStyle === "macos");
+/** 安全区这类"按系统"的样式用平台判定，不跟标题栏样式走：换用另一套时外观会反转 */
+const isMac = detectOs() === "macos";
 
 // 内容区元素：整页滚动的窗口（如统计窗口）把它交给行虚拟化当滚动容器，
 // 表格只渲染视口附近那几行，页面整体滚动的行为不变
@@ -81,10 +87,14 @@ defineExpose({ bodyEl });
 
 <template>
   <div class="window-frame" ref="rootEl">
-    <header class="frame-head" :class="titleBarStyle" @pointerdown="onTitleBarPointerDown">
-      <!-- macos 样式：红黄绿在左端。插件接管时由它画原生圆点，这里不重复渲染 -->
-      <WindowControls v-if="titleBarStyle === 'macos' && !decorated" :style="titleBarStyle" />
-
+    <header class="frame-head"
+      :class="[titleBarStyle, {
+        'is-macos': isMac,
+        'is-plugin-decorated': decorated,
+        'is-plugin-controls': pluginControls,
+        'is-fullscreen': fullscreen,
+      }]"
+      @pointerdown="onTitleBarPointerDown">
       <!-- 窗口内子页面的返回键，如整合包详情：与下面的单窗口返回按钮共用一套外观。
            按钮只画箭头，文案改由悬停提示给出，见 .back-btn 的说明 -->
       <button v-if="props.back" class="back-btn" v-tip="props.back" :aria-label="props.back" @click="emit('back')">
@@ -116,10 +126,8 @@ defineExpose({ bodyEl });
       <!-- 自定义音乐：只有持有播放器的那个窗口会画出来（多窗口模式 = 主窗口） -->
       <MusicTitleIndicator />
 
-      <!-- windows 样式：最小化 / 最大化 / 关闭在右端。
-           插件不再画自己的按钮（vendor patch），热区按这三颗的位置摆，
-           所以这里照常渲染，悬停反馈由插件转发的事件驱动 -->
-      <WindowControls v-if="titleBarStyle === 'windows'" :style="titleBarStyle" />
+      <!-- 插件摆原生按钮时不画；原生被藏掉时，这里按对调后的样式自己画一套 -->
+      <WindowControls v-if="!pluginControls" :style="titleBarStyle" />
     </header>
     <div ref="bodyEl" class="frame-body" :class="{ fill: props.bodyFill, gutter: props.bodyGutter, flush: props.bodyFlush }">
       <slot />
@@ -137,6 +145,9 @@ defineExpose({ bodyEl });
 
 .frame-head {
   height: var(--titlebar-h);
+  /* 高度锁死，同 MainTopbar 的 .topbar */
+  min-height: var(--titlebar-h);
+  max-height: var(--titlebar-h);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -145,6 +156,31 @@ defineExpose({ bodyEl });
   padding: 0 18px;
   background: var(--bg-side);
   border-bottom: 1px solid var(--border);
+}
+
+/* 插件接管后原生红黄绿在内容上方（window 用 Overlay 标题栏）：按插件发布的清空量
+   让出左侧，此时自己的 WindowControls 已被 v-if 掉，不会重复占位。
+   全屏时清空量为 0，max 退回常规内边距；过渡与窗口进出全屏的尺寸动画同步 */
+/* 全屏切换会同时改左内边距、上内边距与高度：三条放同一个过渡里，否则内容会先右移再上移，
+   看着像两段动画。时长与窗口进出全屏的尺寸动画同档 */
+.frame-head.is-macos {
+  transition: padding-left 0.3s, padding-top 0.3s, height 0.3s;
+}
+
+/* 按系统而不是按标题栏样式：Windows 的插件接管不发布 left-clearance，带上会白多一段内边距 */
+.frame-head.is-macos.is-plugin-controls {
+  padding-left: max(18px, var(--tauri-plugin-decoration-left-clearance, 76px));
+}
+
+/* macOS 全屏时窗口铺满整屏，标题栏顶在屏幕最上沿，刘海与菜单栏会挡住内容：
+   整体下压一层安全区，下面的布局跟着一起下去 */
+.frame-head.is-macos.is-fullscreen {
+  /* 整体高度与非全屏一致，安全区从里面扣；方形键同步缩到 26px，见 MainTopbar 同名规则 */
+  --titlebar-actual-h: var(--titlebar-h);
+  --ctl-h: 26px;
+  box-sizing: border-box;
+  height: var(--titlebar-actual-h);
+  padding-top: 24px;
 }
 
 /* windows 样式的窗口按钮是小方块、不贴边，右侧留一点呼吸空间；
