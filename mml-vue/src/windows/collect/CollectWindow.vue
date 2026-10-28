@@ -1,11 +1,12 @@
 <script setup lang="ts">
 // 资源收藏窗口
 //
-// 布局与交互对应旧启动器的 CollectControl：顶部分组下拉，第 0 项「默认分组」即不过滤
-// + 添加 / 删除分组 / 清空，下面一行类型过滤，主体是多选卡片网格，右键出菜单。
+// 左栏是分类（与方块窗口同一个 CategoryRail）：全部 + 按资源类型自动分的默认分组 +
+// 用户自建分组，选中哪一组就只显示哪一组；类型过滤与多选在标题栏。
 // 安装走 InstallModal：多选时对支持加载器 / 游戏版本取交集，只列同时满足的实例。
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
+import CategoryRail from "../../components/CategoryRail.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import AsyncImage from "../../components/ui/AsyncImage.vue";
@@ -31,7 +32,7 @@ defineEmits<{
   (e: "close"): void;
 }>();
 
-/** 「默认分组」的键：不在任何具名分组里的那批收藏，见 groupSections */
+/** 未归组那一批收藏的键：拖拽与删除时用来判断"是否在具名分组里"，见 useCollectDrag */
 const DEFAULT_GROUP = "";
 
 const items = ref<CollectItemDto[]>([]);
@@ -43,8 +44,8 @@ const multiSelect = ref(false);
 /** 本次操作的目标 uuid。点菜单 / 多选条时**快照**下来 ——
  *  等确认弹窗弹出来时，右键菜单早就关了，不能再从 menu 里现取 */
 const actionUuids = ref<string[]>([]);
-/** 折叠起来的分组，键是分组的 key；默认展开 */
-const collapsedGroups = ref<Record<string, boolean>>({});
+/** 左栏选中的分组；空串表示「全部」 */
+const activeGroup = ref("");
 
 /** 收藏数据变更订阅的退订函数（挂载后赋值，卸载时统一摘掉） */
 let unlistenCollect: (() => void) | null = null;
@@ -107,32 +108,47 @@ const shownItems = computed(() => {
 /** 「共 N 项」：当前过滤下所有分组合起来 */
 const shownCount = computed(() => shownItems.value.length);
 
+/** 某一组在当前过滤下看得见的项 */
+function itemsOfGroup(name: string): CollectItemDto[] {
+  return shownItems.value.filter((i) => groupOfUuid.value.get(i.uuid) === name);
+}
+
 /**
- * 折叠分组列表：只有具名分组，按名字排序
+ * 左栏的分组条目
  *
- * 不再有「默认分组」那一栏：新收藏在星标那一刻就按资源类型归组（见 lib/collectGroups），
- * 组名就是「整合包 / 模组 / 资源包 / 光影包」。每组只带当前类型过滤下属于自己的项。
+ * 前四项是**默认分组**（整合包 / 模组 / 资源包 / 光影包）：按资源类型自动归组，
+ * 没有收藏时也要留在栏里（0 项），否则用户会以为那一类收藏丢了。
+ * 数据里其余的默认分组（存档 / 数据包）接在后面，最后是用户自建分组（按名字排序）。
  */
-const groupSections = computed(() =>
-  groupNames.value
-    // 默认分组空了就不显示（删掉最后一条收藏之后它还留在数据里）；
-    // 用户自建的分组即使空着也留着，那是给拖放准备的落点
-    .filter((name) => !isDefaultGroupName(name) || (groups.value[name]?.length ?? 0) > 0)
-    .map((name) => ({
-      key: name,
-      label: name,
-      items: shownItems.value.filter((i) => groupOfUuid.value.get(i.uuid) === name),
-    })),
+const railItems = computed<Array<{ id: string; label: string; count: number; custom: boolean }>>(() => {
+  const fixed = FILTER_TYPES.map((f) => typeGroupName(f.types[0])).filter((n): n is string => !!n);
+  const restDefaults = groupNames.value
+    .filter((name) => isDefaultGroupName(name) && !fixed.includes(name))
+    .sort((a, b) => a.localeCompare(b));
+  const custom = groupNames.value
+    .filter((name) => !isDefaultGroupName(name))
+    .sort((a, b) => a.localeCompare(b));
+
+  return [...fixed, ...restDefaults, ...custom].map((name) => ({
+    id: name,
+    label: name,
+    count: itemsOfGroup(name).length,
+    custom: !isDefaultGroupName(name),
+  }));
+});
+
+/** 当前选中分组里的项；「全部」就是整份过滤结果 */
+const activeItems = computed(() =>
+  activeGroup.value === "" ? shownItems.value : itemsOfGroup(activeGroup.value),
 );
 
-/** 分组的实例列表是否展开；存的是"折叠"状态，所以默认展开 */
-function isGroupOpen(key: string): boolean {
-  return !collapsedGroups.value[key];
-}
-
-function toggleGroupOpen(key: string) {
-  collapsedGroups.value = { ...collapsedGroups.value, [key]: isGroupOpen(key) };
-}
+// 选中的分组被删掉（或在别的窗口里被改名）时回落到「全部」，
+// 否则正文会一直空着、左栏里也没有任何一项是选中的
+watch(railItems, (list) => {
+  if (activeGroup.value && !list.some((item) => item.id === activeGroup.value)) {
+    activeGroup.value = "";
+  }
+});
 
 // ---------------- 加载 ----------------
 
@@ -383,9 +399,8 @@ async function confirmClear() {
   if (!target) {
     return;
   }
-  // 只清这一组里当前看得见的那些（与按钮的可用条件一致）
-  const section = groupSections.value.find((s) => s.key === target);
-  const uuids = (section?.items ?? []).map((i) => i.uuid);
+  // 只清这一组里当前看得见的那些（与菜单项的可用条件一致）
+  const uuids = itemsOfGroup(target).map((i) => i.uuid);
   if (uuids.length === 0) {
     return;
   }
@@ -399,16 +414,15 @@ async function confirmClear() {
   }
 }
 
-/** 某个分组标题上的「清空」：只清空该组的归属，收藏本身保留 */
+/** 某个分组上的「清空」：只清空该组的归属，收藏本身保留 */
 function askClear(groupKey: string) {
+  groupMenu.value = null;
   clearGroup.value = groupKey;
   clearOpen.value = true;
 }
 
 /** 清空确认里那句"N 项"的 N：当前清空目标那一组里看得见的项数 */
-const clearCount = computed(
-  () => groupSections.value.find((s) => s.key === clearGroup.value)?.items.length ?? 0,
-);
+const clearCount = computed(() => itemsOfGroup(clearGroup.value).length);
 
 /** 「移动到分组」：先记下目标再开弹窗；没有具名分组时按钮已置灰，这里兜底 */
 function askAddToGroup() {
@@ -600,39 +614,6 @@ const collectDragItem = computed(() => {
   const uuid = collectGhost.value?.item.uuids[0];
   return uuid ? (items.value.find((i) => i.uuid === uuid) ?? null) : null;
 });
-
-/**
- * 拖拽幽灵卡片的内容：与实例拖拽的 `.drop-ghost-row` 同一观感，图标 + 名字
- *
- * 分组没有组内次序，所以幽灵只落在**落点分组的末尾**，实例那边才要算"插到第几行"。
- * 已经在目标组里的项不会被移动，一件都不动时不给幽灵 —— 否则看着像"松手会变"，
- * 实际是空操作，见 useCollectDrag 的 commitDrag。
- */
-const dragGhostCard = computed(() => {
-  const group = dropGroup.value;
-  if (group === null) return null;
-  const moved = [...draggingUuids.value].filter(
-    (uuid) => (groupOfUuid.value.get(uuid) ?? DEFAULT_GROUP) !== group,
-  );
-  if (!moved.length) return null;
-  const item = items.value.find((i) => i.uuid === moved[0]);
-  if (!item) return null;
-  return {
-    group,
-    name: item.name,
-    icon: iconOf(item),
-    // 多选整批拖动时说清是几项；单项就照常显示源与类型
-    meta:
-      moved.length > 1
-        ? t("collect.count", { n: moved.length })
-        : `${item.source} · ${item.fileType}`,
-  };
-});
-
-/** 幽灵卡片是否画在这一组；空分组也要渲染网格时同样用它判断 */
-function isGhostGroup(key: string): boolean {
-  return dragGhostCard.value?.group === key;
-}
 
 // ---------------- 下载 ----------------
 
@@ -838,22 +819,21 @@ function closeMenu() {
 
 /** 右键分组标题弹出的菜单；null = 没开 */
 const groupMenu = ref<{ x: number; y: number; group: string } | null>(null);
-/** 分组菜单尺寸估值（一项 + 内边距） */
+/** 分组右键菜单尺寸估值（三项 + 内边距） */
 const GROUP_MENU_W = 150;
-const GROUP_MENU_H = 48;
+const GROUP_MENU_H = 116;
 
 /**
- * 右键分组标题：弹出该组的菜单
+ * 右键左栏的分组：弹出该组的菜单
  *
- * - `e`: 右键事件，定位用
- * - `group`: 分组键
+ * - `payload`: 事件（定位用）与分组键
  */
-function openGroupMenu(e: MouseEvent, group: string) {
+function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }) {
   menu.value = null;
   groupMenu.value = {
-    x: Math.max(8, Math.min(e.clientX, window.innerWidth - GROUP_MENU_W - 8)),
-    y: Math.max(8, Math.min(e.clientY, window.innerHeight - GROUP_MENU_H - 8)),
-    group,
+    x: Math.max(8, Math.min(payload.event.clientX, window.innerWidth - GROUP_MENU_W - 8)),
+    y: Math.max(8, Math.min(payload.event.clientY, window.innerHeight - GROUP_MENU_H - 8)),
+    group: payload.id,
   };
 }
 
@@ -865,22 +845,22 @@ function openGroupMenu(e: MouseEvent, group: string) {
  * - `group`: 分组键
  */
 function selectGroup(group: string) {
-  const section = groupSections.value.find((item) => item.key === group);
+  const list = itemsOfGroup(group);
   groupMenu.value = null;
-  if (!section?.items.length) return;
+  if (!list.length) return;
 
   multiSelect.value = true;
   const next = new Set(checked.value);
-  for (const item of section.items) next.add(item.uuid);
+  for (const item of list) next.add(item.uuid);
   checked.value = next;
-  showToast(t("multi.selectAllDone", { count: section.items.length }));
+  showToast(t("multi.selectAllDone", { count: list.length }));
 }
 </script>
 
 <template>
-  <WindowFrame :title="t('winTitle.collect')" body-gutter @close="$emit('close')">
+  <WindowFrame :title="t('winTitle.collect')" body-fill @close="$emit('close')">
     <!-- 工具栏整体进标题栏，与账户 / 方块 / 设置三个窗口同一套做法：
-         类型开关 + 总计数 + 多选入口，正文直接从折叠分组开始 -->
+         类型开关 + 总计数 + 多选入口，正文左边是分组栏 -->
     <template #head-right>
       <div class="collect-toolbar">
         <div class="collect-filters">
@@ -928,47 +908,27 @@ function selectGroup(group: string) {
         <button class="multi-exit" @click="toggleMultiSelect">{{ t("multi.exit") }}</button>
       </div>
 
-      <!-- 搜索：按收藏项名字过滤，分组计数与「共 N 项」都跟着变 -->
-      <SearchBox v-if="!isEmpty" v-model="keyword" :placeholder="t('collect.search')"
-        :clear-label="t('collect.searchClear')" width="100%" />
+      <!-- 左栏：全部 + 默认分组 + 自建分组，与方块窗口同一个分类栏 -->
+      <div class="collect-main">
+        <CategoryRail flush :all-label="t('collect.all')" :all-count="shownCount" :items="railItems"
+          :active="activeGroup" :drop-key="dropGroup" :new-label="t('collect.addGroup')"
+          @pick="activeGroup = $event" @group-menu="openGroupMenu" @new-group="showAddGroup = true" />
 
-      <!-- 一个收藏都没有：只给一条引导，不铺一排空分组 -->
-      <p v-if="isEmpty" class="empty-tip collect-empty">{{ t("collect.empty") }}</p>
-      <!-- 搜索没有命中：不再铺一排 0 项的分组 -->
-      <p v-else-if="keyword.trim() && !shownItems.length" class="empty-tip collect-empty">
-        {{ t("collect.searchEmpty") }}
-      </p>
+        <div class="collect-content">
+          <!-- 搜索：按收藏项名字过滤，分组计数与「共 N 项」都跟着变 -->
+          <SearchBox v-if="!isEmpty" v-model="keyword" :placeholder="t('collect.search')"
+            :clear-label="t('collect.searchClear')" width="100%" />
 
-      <!-- 折叠分组列表：按名字排序，每个分组自带计数与操作 -->
-      <div v-else class="collect-groups">
-        <section v-for="g in groupSections" :key="g.key" class="group-block"
-          :class="{ 'drop-target': dropGroup === g.key }" :data-group="g.key">
-          <div class="group-head" @contextmenu.prevent="openGroupMenu($event, g.key)">
-            <button class="group-title" @click="toggleGroupOpen(g.key)">
-              <GlyphIcon class="group-chevron" :class="{ collapsed: !isGroupOpen(g.key) }" name="chevron-down"
-                :size="13" :weight="2.4" />
-              <span class="group-name">{{ g.label }}</span>
-              <span class="group-count">{{ t("collect.count", { n: g.items.length }) }}</span>
-            </button>
-            <!-- 分组操作：悬停该行才浮出来，免得一排按钮一直在眼前 -->
-            <span class="group-acts">
-              <button class="group-act" :disabled="!g.items.length" @click.stop="askClear(g.key)">
-                {{ t("collect.clear") }}
-              </button>
-              <button v-if="!isDefaultGroupName(g.key)" class="group-act danger"
-                @click.stop="deleteGroupTarget = g.key">
-                {{ t("collect.deleteGroup") }}
-              </button>
-            </span>
-          </div>
-
-          <div v-show="isGroupOpen(g.key)" class="group-items">
-            <!-- 空分组：只有"没有收藏、也没有拖过来的幽灵卡片"时才只给提示 -->
-            <p v-if="!g.items.length && !isGhostGroup(g.key)" class="empty-tip">
-              {{ t("collect.emptyGroup") }}
+          <div class="collect-scroll">
+            <!-- 一个收藏都没有：只给一条引导 -->
+            <p v-if="isEmpty" class="empty-tip collect-empty">{{ t("collect.empty") }}</p>
+            <!-- 当前分组是空的：搜索没命中与"这一组确实没收藏"分开说 -->
+            <p v-else-if="!activeItems.length" class="empty-tip collect-empty">
+              {{ keyword.trim() ? t("collect.searchEmpty") : t("collect.emptyGroup") }}
             </p>
-            <div v-if="g.items.length || isGhostGroup(g.key)" class="collect-grid">
-              <div v-for="item in g.items" :key="item.uuid" class="collect-card"
+
+            <div v-else class="collect-grid">
+              <div v-for="item in activeItems" :key="item.uuid" class="collect-card"
                 :class="{ active: checked.has(item.uuid), dragging: draggingUuids.has(item.uuid) }"
                 @pointerdown="onCardPointerDown($event, item)" @click="onCardClick(item, $event)"
                 @contextmenu.prevent="openMenu($event, item)">
@@ -1009,58 +969,47 @@ function selectGroup(group: string) {
                   </button>
                 </span>
               </div>
+            </div>
 
-              <!-- 拖拽幽灵卡片：与实例拖拽的 .drop-ghost-row 同一观感，虚框 + 淡强调底 +
-                   淡化，摆在落点分组的末尾。分组没有组内次序，所以不跟着鼠标插行 -->
-              <div v-if="isGhostGroup(g.key)" class="collect-card ghost">
-                <div class="card-icon">
-                  <AsyncImage v-if="dragGhostCard?.icon" :src="dragGhostCard.icon" />
-                  <GlyphIcon v-else class="card-icon-none" name="image" :size="22" :weight="1.6" />
-                </div>
-                <div class="card-text">
-                  <div class="card-name">{{ dragGhostCard?.name }}</div>
-                  <div class="card-meta">{{ dragGhostCard?.meta }}</div>
-                </div>
-              </div>
-
-              <!-- 跟手浮起副本：手里抓着的那一项，跟着指针走 -->
-              <DragGhost v-if="collectGhost && collectDragItem" :x="collectGhost.x" :y="collectGhost.y">
-                <div class="card-icon">
-                  <AsyncImage v-if="iconOf(collectDragItem)" :src="iconOf(collectDragItem)" />
-                  <GlyphIcon v-else class="card-icon-none" name="image" :size="22" :weight="1.6" />
-                </div>
-                <span class="card-name">{{ collectDragItem.name }}</span>
-              </DragGhost>
+            <!-- 去挑资源收藏：跟在卡片后面，一个收藏都没有时也要能从这里去挑 -->
+            <div class="collect-acts-row">
+              <button class="add-row-btn add-group-row" @click="openWindow('add_modpack')">
+                {{ t("collect.addModpack") }}
+              </button>
+              <button class="add-row-btn add-group-row" @click.stop="openAddResource">
+                {{ t("collect.addResource") }}
+              </button>
             </div>
           </div>
-        </section>
 
-      </div>
-
-      <!-- 最后一行：新建分组 + 去挑资源收藏，三个同款整行按钮（外观走全局 .add-row-btn）。
-           放在分组列表**外面**：一个收藏都没有时也要能从这里去挑 -->
-      <div class="collect-acts-row">
-        <button v-if="!isEmpty" class="add-row-btn add-group-row" @click="showAddGroup = true">
-          <GlyphIcon name="plus" :size="14" />
-          {{ t("collect.addGroup") }}
-        </button>
-        <button class="add-row-btn add-group-row" @click="openWindow('add_modpack')">
-          {{ t("collect.addModpack") }}
-        </button>
-        <button class="add-row-btn add-group-row" @click.stop="openAddResource">
-          {{ t("collect.addResource") }}
-        </button>
+          <!-- 跟手浮起副本：手里抓着的那一项，跟着指针走 -->
+          <DragGhost v-if="collectGhost && collectDragItem" :x="collectGhost.x" :y="collectGhost.y">
+            <div class="card-icon">
+              <AsyncImage v-if="iconOf(collectDragItem)" :src="iconOf(collectDragItem)" />
+              <GlyphIcon v-else class="card-icon-none" name="image" :size="22" :weight="1.6" />
+            </div>
+            <span class="card-name">{{ collectDragItem.name }}</span>
+          </DragGhost>
+        </div>
       </div>
 
       <!-- 安装弹窗：多选时按支持加载器 / 游戏版本的交集筛实例 -->
       <InstallModal v-if="installTargets.length" :items="installTargets" :instances="instances"
         @close="installTargets = []" @install="doInstall" />
 
-      <!-- 分组右键菜单：全选该组 -->
+      <!-- 分组右键菜单：全选 / 清空 / 删除（删除只对自建分组给） -->
       <div v-if="groupMenu" class="ctx-menu" :style="{ left: groupMenu.x + 'px', top: groupMenu.y + 'px' }"
         @click.stop>
         <button class="ctx-item" @click="selectGroup(groupMenu.group)">
           {{ t("collect.selectGroup") }}
+        </button>
+        <button class="ctx-item" :disabled="!itemsOfGroup(groupMenu.group).length"
+          @click="askClear(groupMenu.group)">
+          {{ t("collect.clear") }}
+        </button>
+        <button v-if="!isDefaultGroupName(groupMenu.group)" class="ctx-item danger"
+          @click="deleteGroupTarget = groupMenu.group; groupMenu = null">
+          {{ t("collect.deleteGroup") }}
         </button>
       </div>
 

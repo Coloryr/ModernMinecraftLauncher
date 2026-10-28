@@ -2122,6 +2122,7 @@ export default {
   "collect.addToGroupTitle": "移动到分组",
   "collect.empty": "没有收藏的资源，给游戏实例添加资源时点击星星图标即可收藏",
   "collect.emptyGroup": "这个分组里没有收藏",
+  "collect.all": "全部",
   "collect.count": "共 {n} 项",
   "collect.search": "搜索收藏…",
   "collect.searchClear": "清除搜索",

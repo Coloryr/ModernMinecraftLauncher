@@ -39,7 +39,7 @@ npm run shots -- --clean
 
 ## 场景表
 
-共 228 个场景，按窗口分组。
+共 232 个场景，按窗口分组。
 「窗口」列是页面的 `kind`，窗口族场景会自动带上实例参数，不需要在命令里另写；
 控件场景的 `control` 是截图工具里的预览页，不是启动器窗口。
 
@@ -221,8 +221,12 @@ npm run shots -- --clean
 | 图片 | 画面 | 窗口 | 视口 |
 | --- | --- | --- | --- |
 | `collect-loaded` | 收藏 · 已加载 | `collect` | 1100×760 |
+| `collect-group-pick` | 收藏 · 选中分组 | `collect` | 1100×760 |
+| `collect-group-empty` | 收藏 · 空分组 | `collect` | 1100×760 |
 | `collect-card-menu` | 收藏 · 卡片菜单 | `collect` | 1100×760 |
 | `collect-remove-modal` | 收藏 · 移除弹窗 | `collect` | 1100×760 |
+| `collect-group-menu` | 收藏 · 分组菜单 | `collect` | 1100×760 |
+| `collect-drag-group` | 收藏 · 拖到分组 | `collect` | 1100×760 |
 | `collect-clear-modal` | 收藏 · 清空弹窗 | `collect` | 1100×760 |
 | `collect-delete-group-modal` | 收藏 · 删除分组弹窗 | `collect` | 1100×760 |
 | `collect-add-group-modal` | 收藏 · 添加分组弹窗 | `collect` | 1100×760 |

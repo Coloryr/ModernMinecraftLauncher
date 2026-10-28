@@ -2121,6 +2121,7 @@ export default {
   "collect.addToGroupTitle": "Move to group",
   "collect.empty": "No favourites yet. Click the star icon when adding resources to an instance.",
   "collect.emptyGroup": "No favourites in this group.",
+  "collect.all": "All",
   "collect.count": "{n} items",
   "collect.search": "Search favorites…",
   "collect.searchClear": "Clear search",

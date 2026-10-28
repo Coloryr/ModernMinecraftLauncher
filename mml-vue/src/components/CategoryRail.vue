@@ -1,42 +1,55 @@
 <script setup lang="ts">
-// 方块列表 · 左侧分类栏：全部 + 自建分组 + 各游戏分类，条目数跟在右边
+// 左侧分类栏：全部 + 一组分类 / 分组，条目数跟在右边，栏底可给一行「新建分组」
 //
-// 拖动排序沿用资源窗口那套（见 resource/parts/CategoryRail.vue）：按下记候选 →
-// 移动超阈值才开始拖 → 按指针纵坐标算插到第几个 → 松手把新顺序抛给上层落盘。
-// 拖动期间列表里那一项原地淡出，另有一份跟着指针的浮起副本。
+// 方块列表与资源收藏共用这一份外观与交互，各窗口只管把条目算好传进来。
 //
-// 「全部」不参与排序与右键；自建分组可以右键改名 / 删除，栏底有「新建分组」。
+// 拖动排序（`sortable`）：按下记候选 → 移动超阈值才开始拖 → 按指针纵坐标算插到第几个 →
+// 松手把新顺序抛给上层落盘。拖动期间列表里那一项原地淡出，另有一份跟着指针的浮起副本。
+//
+// 投放高亮（`dropKey`）：别的窗口把条目拖到分组上时，给对应那一项描一道虚线框。
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import { t } from "../../../lib/i18n";
-import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
+import GlyphIcon from "./ui/GlyphIcon.vue";
 
 /** 左栏的一项 */
 export interface CatItem {
-  /** 分类 uuid（自带分类是固定 uuid，自建分组是自己的 uuid；「全部」不在这里，空串由外壳表示） */
+  /** 分类 uuid 或分组名（「全部」不在这里，空串由外壳表示） */
   id: string;
   /** 显示名 */
   label: string;
   /** 条目数 */
   count: number;
-  /** 自建分组：可以改名 / 删除，右键给菜单 */
+  /** 用户自建：可以改名 / 删除，右键给菜单 */
   custom?: boolean;
 }
 
-const props = defineProps<{
-  /** 「全部」的条目数 */
-  allCount: number;
-  /** 其余分类（含自建分组），顺序就是显示顺序 */
-  items: CatItem[];
-  /** 当前选中的分类 ID；空串表示「全部」 */
-  active: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    /** 「全部」那一项的文案 */
+    allLabel: string;
+    /** 「全部」的条目数 */
+    allCount: number;
+    /** 其余分类，顺序就是显示顺序 */
+    items: CatItem[];
+    /** 当前选中的 ID；空串表示「全部」 */
+    active: string;
+    /** 允许拖动排序 */
+    sortable?: boolean;
+    /** 别的窗口拖过来的落点：命中的那一项高亮成投放目标；`null` 表示没有 */
+    dropKey?: string | null;
+    /** 栏底「新建分组」的文案；空串则不显示这一行 */
+    newLabel?: string;
+    /** 去掉上下留白：由父级自己安排（父级内容区不滚动时用） */
+    flush?: boolean;
+  }>(),
+  { sortable: false, dropKey: null, newLabel: "", flush: false },
+);
 
 const emit = defineEmits<{
   /** 选中一个分类，空串表示「全部」 */
   (e: "pick", id: string): void;
   /** 拖完顺序：给的是新的完整顺序 */
   (e: "reorder", order: string[]): void;
-  /** 右键自建分组，交给上层弹菜单 */
+  /** 右键某一项，交给上层弹菜单 */
   (e: "group-menu", payload: { event: MouseEvent; id: string; label: string }): void;
   /** 点了「新建分组」 */
   (e: "new-group"): void;
@@ -67,7 +80,7 @@ let suppressClick = false;
 const dragged = computed(() => props.items.find((c) => c.id === dragging.value) ?? null);
 
 function onPointerDown(e: PointerEvent, id: string) {
-  if (e.button !== 0 || id === "") return;
+  if (!props.sortable || e.button !== 0 || id === "") return;
   suppressClick = false;
   pointerId = e.pointerId;
   startX = e.clientX;
@@ -143,9 +156,8 @@ function showLine(index: number): boolean {
   return dragging.value !== null && insertAt.value === index;
 }
 
-/** 右键：只有自建分组有菜单，其余交给默认行为 */
+/** 右键：交给上层决定给不给菜单（「全部」与自带分类由上层忽略） */
 function onContextMenu(e: MouseEvent, item: CatItem) {
-  if (!item.custom) return;
   e.preventDefault();
   emit("group-menu", { event: e, id: item.id, label: item.label });
 }
@@ -163,11 +175,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <aside ref="navEl" class="cat-rail" role="tablist" aria-orientation="vertical">
+  <aside ref="navEl" class="cat-rail" :class="{ flush }" role="tablist" aria-orientation="vertical">
     <!-- 全部：不参与排序，也不给右键 -->
     <button type="button" role="tab" class="cat-item" :class="{ on: active === '' }" :aria-selected="active === ''"
       @click="onClick('')">
-      <span class="cat-name">{{ t("blocks.catAll") }}</span>
+      <span class="cat-name">{{ allLabel }}</span>
       <span class="cat-num">{{ allCount }}</span>
     </button>
 
@@ -177,22 +189,23 @@ onUnmounted(() => {
         <span class="cat-name">{{ dragged?.label }}</span>
         <span class="cat-num">{{ dragged?.count }}</span>
       </div>
-      <button type="button" role="tab" class="cat-item" :class="{ on: active === c.id, dragging: dragging === c.id }"
-        :data-cat="c.id" :aria-selected="active === c.id" @pointerdown="onPointerDown($event, c.id)"
+      <button type="button" role="tab" class="cat-item"
+        :class="{ on: active === c.id, dragging: dragging === c.id, 'drop-target': dropKey === c.id }" :data-cat="c.id"
+        :data-group="c.id" :aria-selected="active === c.id" @pointerdown="onPointerDown($event, c.id)"
         @click="onClick(c.id)" @contextmenu="onContextMenu($event, c)">
         <span class="cat-name">{{ c.label }}</span>
         <span class="cat-num">{{ c.count }}</span>
       </button>
     </template>
     <div v-if="showLine(items.length)" class="cat-insert">
-        <span class="cat-name">{{ dragged?.label }}</span>
-        <span class="cat-num">{{ dragged?.count }}</span>
-      </div>
+      <span class="cat-name">{{ dragged?.label }}</span>
+      <span class="cat-num">{{ dragged?.count }}</span>
+    </div>
 
     <!-- 新建分组：与其它窗口同一套整行添加外观 -->
-    <button type="button" class="add-row-btn cat-new" @click="emit('new-group')">
+    <button v-if="newLabel" type="button" class="add-row-btn cat-new" @click="emit('new-group')">
       <GlyphIcon name="plus" :size="14" />
-      <span class="cat-name">{{ t("blocks.groupAdd") }}</span>
+      <span class="cat-name">{{ newLabel }}</span>
     </button>
 
     <!-- 拖动时的浮起副本：跟着指针走，位置见 ghost；列表里那一项留在原位淡出 -->
@@ -218,6 +231,13 @@ onUnmounted(() => {
   /* 上下留白跟着窗口内容区的原内边距（22px）走，且放进滚动内容里：
      空档只在滚到两端时出现，分类栏的滚动条轨道保持整条 */
   padding: 22px 2px 22px 0;
+}
+
+/* 父级自己安排了上下留白（内容区不整页滚动的窗口）：这里只留右侧那 2px，
+   免得与父级的间距叠成两份 */
+.cat-rail.flush {
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .cat-item {
@@ -255,6 +275,14 @@ onUnmounted(() => {
 /* 正被拖的分类：留在原位淡下去（顺序由插入线表达） */
 .cat-item.dragging {
   opacity: 0.45;
+}
+
+/* 投放目标：别的窗口把条目拖到这一组上时描一道虚线。
+   outline 不占布局，指针经过时不会把下面的项顶动 */
+.cat-item.drop-target {
+  outline: 1px dashed var(--accent);
+  outline-offset: -1px;
+  background: var(--accent-soft);
 }
 
 /* 新建分组：外观走全局 .add-row-btn（虚线强调色整行键），这里只留与分类项的间距 */

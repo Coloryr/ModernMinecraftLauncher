@@ -1002,14 +1002,49 @@ export const scenarios = [
   { id: "add-resource", kind: "add_resource", label: "mml-add_resource-inst-1", size: [1200, 800], query: "uuid=inst-1", commands: base() },
 
   /* ---------------- 收藏 ---------------- */
-  { id: "collect-loaded", kind: "collect", label: "mml-collect", size: [1100, 760], commands: base({ collect_get_data: collectWithData }) },
+  {
+    id: "collect-loaded",
+    kind: "collect",
+    label: "mml-collect",
+    size: [1100, 760],
+    commands: base({ collect_get_data: collectWithData }),
+    actions: [
+      { assert: "(() => { const names = [...document.querySelectorAll('.cat-rail .cat-item .cat-name')].map((x) => x.textContent.trim()); return ['全部', '整合包', '模组', '资源包', '光影包'].every((n) => names.includes(n)); })()", label: "左栏列出全部与四个默认分组" },
+      { assert: "(() => { const c = document.querySelector('.collect-card'); if (!c) return false; const r = c.getBoundingClientRect(); return Math.abs(r.width - 340) < 1 && Math.abs(r.height - 78) < 2; })()", label: "卡片尺寸保持 340×78" },
+    ],
+  },
+  {
+    id: "collect-group-pick",
+    kind: "collect",
+    label: "mml-collect",
+    size: [1100, 760],
+    commands: base({ collect_get_data: collectWithData }),
+    actions: [
+      { eval: '(() => { const el = [...document.querySelectorAll(\'.cat-rail .cat-item\')].find((x) => x.textContent.includes("模组")); if (!el) return false; el.click(); return true; })()', after: 400 },
+      { assert: "document.querySelectorAll('.collect-card').length === 2 && !!document.querySelector('.cat-item.on')", label: "只显示选中分组的卡片" },
+    ],
+  },
+  {
+    id: "collect-group-empty",
+    kind: "collect",
+    label: "mml-collect",
+    size: [1100, 760],
+    commands: base({ collect_get_data: collectWithData }),
+    actions: [
+      { eval: '(() => { const el = [...document.querySelectorAll(\'.cat-rail .cat-item\')].find((x) => x.textContent.includes("我的分组")); if (!el) return false; el.click(); return true; })()', after: 400 },
+      { assert: "!document.querySelector('.collect-card') && !!document.querySelector('.collect-empty')", label: "空分组给出提示" },
+    ],
+  },
   {
     id: "collect-card-menu",
     kind: "collect",
     label: "mml-collect",
     size: [1100, 760],
     commands: base({ collect_get_data: collectWithData }),
-    actions: [{ eval: "(() => { const c = document.querySelector('.collect-card'); if (!c) return false; c.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 300, clientY: 300, button: 2 })); return true; })()", after: 450 }],
+    actions: [
+      { eval: "(() => { const c = document.querySelector('.collect-card'); if (!c) return false; c.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 300, clientY: 300, button: 2 })); return true; })()", after: 450 },
+      { assert: "document.querySelectorAll('.ctx-menu .ctx-item').length >= 3", label: "卡片右键菜单已打开" },
+    ],
   },
   {
     id: "collect-remove-modal",
@@ -1020,6 +1055,29 @@ export const scenarios = [
     actions: [
       { eval: "(() => { const c = document.querySelector('.collect-card'); if (!c) return false; c.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 300, clientY: 300, button: 2 })); return true; })()", after: 350 },
       { eval: clickText("删除收藏", ".ctx-menu"), after: 450 },
+      { assert: "!!document.querySelector('.modal .modal-actions')", label: "删除确认弹窗已打开" },
+    ],
+  },
+  {
+    id: "collect-group-menu",
+    kind: "collect",
+    label: "mml-collect",
+    size: [1100, 760],
+    commands: base({ collect_get_data: collectWithData }),
+    actions: [
+      { eval: '(() => { const el = [...document.querySelectorAll(\'.cat-rail .cat-item\')].find((x) => x.textContent.includes("我的分组")); if (!el) return false; el.dispatchEvent(new MouseEvent(\'contextmenu\', { bubbles: true, cancelable: true, clientX: 110, clientY: 260, button: 2 })); return true; })()', after: 450 },
+      { assert: "document.querySelectorAll('.ctx-menu .ctx-item').length === 3", label: "分组菜单有全选 / 清空 / 删除" },
+    ],
+  },
+  {
+    id: "collect-drag-group",
+    kind: "collect",
+    label: "mml-collect",
+    size: [1100, 760],
+    commands: base({ collect_get_data: collectWithData }),
+    actions: [
+      { eval: "(() => { const card = document.querySelector('.collect-card'); const rail = [...document.querySelectorAll('.cat-rail .cat-item')].find((x) => x.textContent.includes('我的分组')); if (!card || !rail) return false; const c = card.getBoundingClientRect(), r = rail.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2; const send = (el, type, cx, cy) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, button: 0, pointerId: 1, isPrimary: true, clientX: cx, clientY: cy })); send(card, 'pointerdown', c.left + 60, c.top + 20); send(window, 'pointermove', c.left + 80, c.top + 40); send(window, 'pointermove', x, y); send(window, 'pointerup', x, y); return true; })()", after: 800 },
+      { assert: "window.__SHOT__.callsOf('collect_set_group_items').length > 0", label: "拖到左栏分组后发出了归组命令" },
     ],
   },
   {
@@ -1028,7 +1086,11 @@ export const scenarios = [
     label: "mml-collect",
     size: [1100, 760],
     commands: base({ collect_get_data: collectWithData }),
-    actions: [{ eval: clickText("清空", ".collect-body"), after: 500 }],
+    actions: [
+      { eval: '(() => { const el = [...document.querySelectorAll(\'.cat-rail .cat-item\')].find((x) => x.textContent.includes("模组")); if (!el) return false; el.dispatchEvent(new MouseEvent(\'contextmenu\', { bubbles: true, cancelable: true, clientX: 110, clientY: 260, button: 2 })); return true; })()', after: 350 },
+      { eval: clickText("清空", ".ctx-menu"), after: 450 },
+      { assert: "!!document.querySelector('.modal .modal-actions')", label: "清空确认弹窗已打开" },
+    ],
   },
   {
     id: "collect-delete-group-modal",
@@ -1036,7 +1098,11 @@ export const scenarios = [
     label: "mml-collect",
     size: [1100, 760],
     commands: base({ collect_get_data: collectWithData }),
-    actions: [{ eval: "(() => { const b = document.querySelector('.group-act.danger'); if (b) { b.click(); return true; } return false; })()", after: 500 }],
+    actions: [
+      { eval: '(() => { const el = [...document.querySelectorAll(\'.cat-rail .cat-item\')].find((x) => x.textContent.includes("我的分组")); if (!el) return false; el.dispatchEvent(new MouseEvent(\'contextmenu\', { bubbles: true, cancelable: true, clientX: 110, clientY: 260, button: 2 })); return true; })()', after: 350 },
+      { eval: clickText("删除分组", ".ctx-menu"), after: 450 },
+      { assert: "!!document.querySelector('.modal .modal-actions')", label: "删除分组确认弹窗已打开" },
+    ],
   },
   {
     id: "collect-add-group-modal",
@@ -1044,7 +1110,10 @@ export const scenarios = [
     label: "mml-collect",
     size: [1100, 760],
     commands: base({ collect_get_data: collectWithData }),
-    actions: [{ eval: clickText("添加分组", ".collect-body"), after: 450 }],
+    actions: [
+      { eval: clickText("添加分组", ".cat-rail"), after: 450 },
+      { assert: "!!document.querySelector('.modal input.field-input')", label: "添加分组弹窗已打开" },
+    ],
   },
   {
     id: "collect-install-modal",
@@ -1053,12 +1122,20 @@ export const scenarios = [
     size: [1100, 760],
     commands: base({ collect_get_data: collectWithData }),
     actions: [
-      { eval: clickText("多选"), after: 300 },
+      { eval: click(".icon-btn-head"), after: 300 },
       { eval: click(".card-check"), after: 300 },
-      { eval: clickText("安装", ".multi-bar"), after: 500 },
+      { eval: clickText("安装", ".multi-bar"), after: 600 },
+      { assert: "!!document.querySelector('.modal select, .modal .instance-row')", label: "选实例弹窗已打开" },
     ],
   },
-  { id: "collect-empty", kind: "collect", label: "mml-collect", size: [1100, 760], commands: base({ collect_get_data: { items: [], groups: {} } }) },
+  {
+    id: "collect-empty",
+    kind: "collect",
+    label: "mml-collect",
+    size: [1100, 760],
+    commands: base({ collect_get_data: { items: [], groups: {} } }),
+    actions: [{ assert: "(() => { const names = [...document.querySelectorAll('.cat-rail .cat-item .cat-name')].map((x) => x.textContent.trim()); return ['全部', '整合包', '模组', '资源包', '光影包'].every((n) => names.includes(n)); })()", label: "一个收藏都没有时默认分组仍在" }],
+  },
 
   /* ---------------- 下载 / Java ---------------- */
   { id: "download-loaded", kind: "download", label: "mml-download", size: [1000, 700], commands: base({ download_get_status: downloadStatus }) },

@@ -121,7 +121,7 @@ export function useCollectDrag(deps: DragDeps) {
     dragGhost.stopGhost();
   }
 
-  /** 指针下方是哪个分组；用 DOM 反向查找，`data-group` 存分组 key，与实例拖拽同一做法 */
+  /** 指针下方是哪个分组；用 DOM 反向查找，`data-group` 存分组 key（左栏那一项），与实例拖拽同一做法 */
   function updateDropGroup(e: PointerEvent) {
     const el = elementBeneathShield(e.clientX, e.clientY);
 
@@ -133,9 +133,9 @@ export function useCollectDrag(deps: DragDeps) {
       else if (e.clientY > rect.bottom - SCROLL_EDGE) body.scrollTop += SCROLL_STEP;
     }
 
-    const block = (el?.closest?.(".group-block") ?? null) as HTMLElement | null;
-    // 挂上了 .group-block 就一定取得到 key（含默认分组的空串）；
-    // 没挂在任何分组上记 null —— 与"落在默认分组（空串）"必须区分开
+    const block = (el?.closest?.("[data-group]") ?? null) as HTMLElement | null;
+    // 挂上了 data-group 就一定取得到 key；
+    // 没挂在任何分组上记 null —— 「全部」那一项没有 data-group
     dropGroup.value = block ? (block.dataset.group ?? "") : null;
   }
 

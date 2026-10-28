@@ -2,7 +2,8 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  min-height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 /* ----- 标题栏里的工具栏：类型开关 + 总计数 + 多选入口 ----- */
@@ -71,172 +72,44 @@
   margin-left: auto;
 }
 
-/* ----- 折叠分组列表 ----- */
+/* ----- 左栏 + 卡片区（与方块窗口同一套两栏布局） ----- */
 
-.collect-groups {
-  display: flex;
-  flex-direction: column;
-  /* 与卡片之间的间距保持一致，即 .collect-grid 的 gap：
-     项目↔项目、项目↔分组头、分组↔分组 三处都是 12px */
-  gap: 12px;
+.collect-main {
+  flex: 1;
   min-height: 0;
-}
-
-/* 分组：**只给标题行加底色**，内容区不铺底；卡片自己就是框，铺底会变"框套框" */
-.group-block {
-  min-width: 0;
-  /* 拖拽落点的高亮框要贴着整块（标题行 + 卡片区）画，所以这里留出圆角与内缩基准 */
-  border-radius: 12px;
-}
-
-/* 拖拽投放目标：整块描一圈虚线强调色 —— 松手就把拖着的收藏归到这一组。
-   虚线而不是实线，跟"已勾选""悬停"那两种实线状态区分开；
-   outline 不占布局，拖拽经过时不会把下面的分组顶动 */
-.group-block.drop-target {
-  outline: 1px dashed var(--accent);
-  outline-offset: 4px;
-}
-
-.group-head {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  /* 与方块窗口分类栏（.cat-item）同一套规格：8/11 内边距 + --ctl-radius；
-     这两处是列表里的"行"，跟着控件档走，不再自己留一档 9px */
-  padding: 8px 11px;
-  border-radius: var(--ctl-radius);
-  /* 底色要能"站起来"：用 --bg-raised（全仓"抬起来的面"都取它 —— 默认按钮、计数器、
-     文件树按钮）。--bg-hover 在亮色下只比页面底深一点点（#e9ecf1 vs #eef1f5），看不出来 */
-  background: var(--bg-raised);
-  /* 悬停显出的强调色描边：平时透明。用 outline 而不是 border —— 不占布局，
-     不会让标题条在悬停时"胀"1px；-1px 是向内收，与 .cat-item / .inst-row 同一处理 */
-  outline: 1px solid transparent;
-  outline-offset: -1px;
-  transition: outline-color 0.12s;
+  gap: 16px;
 }
 
-/* 悬停**不改底色**：这层本来就比页面亮一档，压成 --bg-hover 反而像塌下去，
-   改成一圈强调色描边 + 两处小变化：箭头点亮、计数药丸描边；右边还会浮出操作按钮 */
-.group-head:hover {
-  outline-color: var(--accent-border);
-}
-
-.group-head:hover .group-chevron {
-  color: var(--accent);
-}
-
-.group-head:hover .group-count {
-  border-color: var(--accent-border);
-}
-
-.group-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.collect-content {
+  /* 卡片区自己滚：左栏与上面的搜索框不跟着走 */
   flex: 1;
   min-width: 0;
-  padding: 4px 0;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.group-chevron {
-  color: var(--text-dim);
-  transition: transform 0.15s, color 0.12s;
-}
-
-/* 收起时箭头转成"向右"（与侧栏分组头部同一套观感） */
-.group-chevron.collapsed {
-  transform: rotate(-90deg);
-}
-
-.group-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.group-count {
-  flex: none;
-  /* 跟在分组名后面（左半边），不加底色/边框，就是一行淡字 */
-  color: var(--text-dim);
-  font-size: 12px;
-  font-weight: 400;
-  white-space: nowrap;
-}
-
-/* 分组操作：悬停这一行才浮出来，免得一排按钮一直杵在眼前。
-   隐藏时必须一并关掉 pointer-events —— 否则"看不见但点得到"，
-   在标题行右侧随手一点会误触「清空」（那是会删收藏的操作） */
-.group-acts {
+  min-height: 0;
   display: flex;
-  align-items: center;
-  gap: 4px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.12s;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.group-head:hover .group-acts,
-.group-acts:focus-within {
-  opacity: 1;
-  pointer-events: auto;
+.collect-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  /* 见 styles/scrollbar.css */
+  /* 底边留 2px：卡片悬停上浮时下缘不被滚动区裁掉 */
+  padding-bottom: 2px;
 }
 
-/* 分组标题行里的小动作键（清空 / 删除）：悬停才显形，尺寸跟着行高走，
-   不占 --ctl-h 那一档 —— 撑到 32px 会把整条标题行顶高 */
-.group-act {
-  padding: 4px 8px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-dim);
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-}
-
-.group-act:not(:disabled):hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-.group-act.danger:not(:disabled):hover {
-  background: color-mix(in srgb, var(--red) 12%, transparent);
-  color: var(--red);
-}
-
-.group-act:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.group-items {
-  /* 分组头与第一行项目的间距，与项目之间保持一致 */
-  padding: 12px 0 0;
-}
-
-/* 组内为空时的那句话：跟标题行一样左对齐（全局 .empty-tip 是居中的，
-   顶着一条左对齐的标题条居中看着是散的） */
-.group-items .empty-tip {
-  padding: 8px 10px 4px;
-  text-align: left;
-}
-
-/* 分组列表末尾那一行：新建分组 + 两个"去挑资源"入口，三个等宽的整行按钮 */
+/* 底部那一行：两个"去挑资源"入口，等宽的整行按钮 */
 .collect-acts-row {
   display: flex;
   gap: 8px;
+  /* 与上面那排卡片 / 空态提示拉开距离（卡片区的 gap 管不到这里） */
+  margin-top: 12px;
 }
 
-/* 三个整行添加键均分宽度：外观走全局 .add-row-btn，这里只管 flex 布局；
+/* 整行添加键均分宽度：外观走全局 .add-row-btn，这里只管 flex 布局；
    min-width 0 让窄窗时能一起缩，谁都不单独溢出 */
 .add-group-row {
   flex: 1 1 0;
@@ -320,9 +193,10 @@
 }
 
 .collect-grid {
-  /* 自适应列数：与账户窗口的 .acc-grid 同规格（340px 起、自动填充） */
+  /* 卡片宽度固定 340px，不随所在分组 / 窗口宽度拉伸：左栏占了 168px，
+     用 1fr 的话两列会被撑到 430 左右，看着比原来大一圈 */
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fill, 340px);
   gap: 12px;
   align-content: start;
 }
@@ -354,18 +228,9 @@
 }
 
 /* 正被拖着的卡片：留在原位但淡下去；卡片网格去掉一张会整片重排，反而看不清拖的是哪个，
-   落点由目标分组那圈虚线 + 幽灵卡片表达 */
+   落点由左栏那一组的虚线框 + 跟手的幽灵卡片表达 */
 .collect-card.dragging {
   opacity: 0.4;
-}
-
-/* 拖拽幽灵卡片：与实例拖拽的 .drop-ghost-row 同一套观感 —— 虚框 + 淡强调底 + 整体淡化，
-   摆在落点分组的末尾表示"松手就归到这一组"。纯展示，不参与命中判定 */
-.collect-card.ghost {
-  border: 1.5px dashed var(--accent-border);
-  background: var(--accent-soft);
-  opacity: 0.75;
-  pointer-events: none;
 }
 
 .card-icon {

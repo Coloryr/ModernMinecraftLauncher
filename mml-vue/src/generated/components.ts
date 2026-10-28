@@ -7,6 +7,7 @@ export { default as CompAccountLockModal } from "../components/AccountLockModal.
 export { default as CompAccountSelector } from "../components/AccountSelector.vue";
 export { default as CompAccountTypeBadge } from "../components/AccountTypeBadge.vue";
 export { default as CompAutoSaveModal } from "../components/AutoSaveModal.vue";
+export { default as CompCategoryRail } from "../components/CategoryRail.vue";
 export { default as CompCrashAnalysisCard } from "../components/CrashAnalysisCard.vue";
 export { default as CompCustomExecPanel } from "../components/CustomExecPanel.vue";
 export { default as CompCustomHomePage } from "../components/CustomHomePage.vue";

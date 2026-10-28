@@ -7,7 +7,7 @@
 import { computed, ref, watch } from "vue";
 import { t } from "../../lib/i18n";
 import { SKIN_CAT } from "./types";
-import CategoryRail from "./parts/CategoryRail.vue";
+import CategoryRail from "../../components/CategoryRail.vue";
 import BlockGrid from "./parts/BlockGrid.vue";
 import BlockDetailModal from "./parts/BlockDetailModal.vue";
 import InstancePickModal from "./parts/InstancePickModal.vue";
@@ -104,6 +104,8 @@ const groupForm = ref<{ uuid: string; name: string } | null>(null);
 const groupRemove = ref<{ uuid: string; label: string } | null>(null);
 
 function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }) {
+  // 自带分类不能改名 / 删除，右键不给菜单
+  if (!isCustomGroup(payload.id)) return;
   // 贴边时往回收，菜单别被窗口裁掉
   groupMenu.value = {
     x: Math.min(payload.event.clientX, window.innerWidth - 160),
@@ -354,8 +356,9 @@ async function onDetailRemove() {
 
     <!-- 已渲染：分类栏 + 网格 -->
     <div v-if="rendered" class="block-main">
-      <CategoryRail :all-count="blocks.length" :items="catItems" :active="cat" @pick="cat = $event"
-        @reorder="setOrder" @group-menu="openGroupMenu" @new-group="openNewGroup()" />
+      <CategoryRail :all-label="t('blocks.catAll')" :all-count="blocks.length" :items="catItems" :active="cat"
+        :sortable="true" :new-label="t('blocks.groupAdd')" @pick="cat = $event" @reorder="setOrder"
+        @group-menu="openGroupMenu" @new-group="openNewGroup()" />
       <BlockGrid :items="filtered" :keyword="keyword" :size="size" :active-id="detail?.id ?? null"
         :skin-cat="SKIN_CAT" :filtered="isFiltered" :is-favorite="isFavorite" :toggle-favorite="toggleFavorite"
         :select-mode="multiSelect" :is-selected="(id) => selectedIds.has(id)"
