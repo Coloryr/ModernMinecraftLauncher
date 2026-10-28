@@ -8,6 +8,7 @@
 import {
   addVersions, blockItems, collectWithData, commonCommands, downloadStatus, groups, instances, javaDownloadList, lobbyView,
   statsSingleDay, customHomeStatus, customUiStatus, modpackDetail, modpackFiles, modpackItems, modpackStatus, modpackStatusDone, modpackStatusFailed,
+  resourceDeps, resourceFiles, resourceItems, resourceStatusRunning,
   javaList, resourceView, saves, schematics, servers, shaders,
 } from "./data.mjs";
 
@@ -1814,6 +1815,135 @@ export const scenarios = [
     actions: [
       { eval: setInput(".search-input, .search-box .sb-input", "优化"), after: 200 },
       { eval: click(".search-btn"), after: 700 },
+    ],
+  },
+  {
+    id: "add-resource-loading",
+    kind: "add_resource",
+    label: "mml-add_resource",
+    size: [1180, 800],
+    commands: base({ add_resource_list: { __delay: 4000, value: { items: resourceItems, count: resourceItems.length } } }),
+    actions: [{ assert: "!!document.querySelector('.sk-row')", label: "骨架屏已显示" }],
+  },
+  {
+    id: "add-resource-error",
+    kind: "add_resource",
+    label: "mml-add_resource",
+    size: [1180, 800],
+    commands: base({ add_resource_list: { __error: "modpack.sourceFail" } }),
+    actions: [{ assert: "!!document.querySelector('.load-error')", label: "错误以红字显示" }],
+  },
+  {
+    id: "add-resource-detail",
+    kind: "add_resource",
+    label: "mml-add_resource",
+    size: [1180, 800],
+    commands: base({
+      add_resource_list: { items: resourceItems, count: resourceItems.length },
+      add_resource_detail: modpackDetail,
+      add_resource_file: resourceFiles,
+    }),
+    actions: [
+      { eval: click(".res-list .pack-main"), after: 900 },
+      { assert: "!!document.querySelector('.detail-head')", label: "详情页已打开" },
+    ],
+  },
+  {
+    id: "add-resource-downloading",
+    kind: "add_resource",
+    label: "mml-add_resource",
+    size: [1180, 800],
+    commands: base({
+      add_resource_list: { items: resourceItems, count: resourceItems.length },
+      add_resource_status: resourceStatusRunning,
+    }),
+    actions: [{ assert: "!!document.querySelector('.pack-badge.busy')", label: "卡片显示下载中" }],
+  },
+  {
+    id: "add-resource-save",
+    kind: "add_resource",
+    label: "mml-add_resource",
+    size: [1180, 800],
+    commands: base({
+      add_resource_list: { items: resourceItems, count: resourceItems.length },
+      add_resource_saves: saves,
+    }),
+    actions: [
+      { eval: clickText("存档", ".res-filters"), after: 700 },
+      { assert: "!!document.querySelector('.res-source-lock')", label: "存档类型已选中" },
+    ],
+  },
+  {
+    id: "add-resource-save-pick",
+    kind: "add_resource",
+    label: "mml-add_resource",
+    size: [1180, 800],
+    query: "uuid=inst-1",
+    commands: base({
+      add_resource_list: { items: resourceItems, count: resourceItems.length },
+      add_resource_detail: modpackDetail,
+      add_resource_file: resourceFiles,
+      add_resource_saves: saves,
+    }),
+    actions: [
+      { eval: clickText("数据包", ".res-filters"), after: 500 },
+      { eval: click(".res-list .pack-main"), after: 800 },
+      { eval: click(".detail-download"), after: 800 },
+      { assert: "!!document.querySelector('.save-list .save-row')", label: "存档选择弹窗已打开" },
+    ],
+  },
+  {
+    id: "add-resource-instance-pick",
+    kind: "add_resource",
+    label: "mml-add_resource",
+    size: [1180, 800],
+    commands: base({
+      add_resource_list: { items: resourceItems, count: resourceItems.length },
+      add_resource_detail: modpackDetail,
+      add_resource_file: resourceFiles,
+    }),
+    actions: [
+      { eval: click(".res-list .pack-main"), after: 800 },
+      { eval: click(".detail-download"), after: 800 },
+      { assert: "!!document.querySelector('.modal-actions')", label: "实例选择弹窗已打开" },
+    ],
+  },
+  {
+    id: "add-resource-deps",
+    kind: "add_resource",
+    label: "mml-add_resource",
+    size: [1180, 800],
+    query: "uuid=inst-1",
+    commands: base({
+      add_resource_list: { items: resourceItems, count: resourceItems.length },
+      add_resource_detail: modpackDetail,
+      add_resource_file: resourceFiles,
+      add_resource_dependencies: resourceDeps,
+    }),
+    actions: [
+      { eval: click(".res-list .pack-main"), after: 800 },
+      { eval: click(".detail-download"), after: 900 },
+      { assert: "!!document.querySelector('.dep-row')", label: "前置弹窗已打开" },
+      { assert: "(() => { const s = document.querySelector('.dep-select'); const l = document.querySelector('.dep-files-label'); if (!s || !l) return false; const a = s.getBoundingClientRect(); const b = l.getBoundingClientRect(); return Math.abs((a.top + a.bottom) / 2 - (b.top + b.bottom) / 2) < 1 && Math.abs(a.height - 32) < 1; })()", label: "版本下拉与标签垂直居中且高度 32" },
+    ],
+  },
+  {
+    id: "add-resource-deps-skip",
+    kind: "add_resource",
+    label: "mml-add_resource",
+    size: [1180, 800],
+    query: "uuid=inst-1",
+    commands: base({
+      add_resource_list: { items: resourceItems, count: resourceItems.length },
+      add_resource_detail: modpackDetail,
+      add_resource_file: resourceFiles,
+      add_resource_dependencies: resourceDeps,
+    }),
+    actions: [
+      { eval: click(".res-list .pack-main"), after: 800 },
+      { eval: click(".detail-download"), after: 900 },
+      { eval: clickText("不下载前置", ".modal"), after: 800 },
+      { assert: "document.querySelectorAll('.modal').length >= 2", label: "跳过确认框叠在前置弹窗上" },
     ],
   },
   {

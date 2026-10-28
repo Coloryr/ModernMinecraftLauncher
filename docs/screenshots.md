@@ -39,7 +39,7 @@ npm run shots -- --clean
 
 ## 场景表
 
-共 219 个场景，按窗口分组。
+共 228 个场景，按窗口分组。
 「窗口」列是页面的 `kind`，窗口族场景会自动带上实例参数，不需要在命令里另写；
 控件场景的 `control` 是截图工具里的预览页，不是启动器窗口。
 
@@ -184,6 +184,15 @@ npm run shots -- --clean
 | `add-name-conflict-modal` | 添加实例 · 重名弹窗 | `add` | 1100×760 |
 | `add-pack-progress-modal` | 添加实例 · 整合包进度弹窗 | `add` | 1100×760 |
 | `add-resource-loaded` | 添加资源 · 搜索结果 | `add_resource` | 1180×800 |
+| `add-resource-loading` | 添加资源 · 加载中 | `add_resource` | 1180×800 |
+| `add-resource-error` | 添加资源 · 加载失败 | `add_resource` | 1180×800 |
+| `add-resource-detail` | 添加资源 · 项目详情 | `add_resource` | 1180×800 |
+| `add-resource-downloading` | 添加资源 · 下载中 | `add_resource` | 1180×800 |
+| `add-resource-save` | 添加资源 · 存档类型 | `add_resource` | 1180×800 |
+| `add-resource-save-pick` | 添加资源 · 选择存档 | `add_resource` | 1180×800 |
+| `add-resource-instance-pick` | 添加资源 · 选择实例 | `add_resource` | 1180×800 |
+| `add-resource-deps` | 添加资源 · 前置选择 | `add_resource` | 1180×800 |
+| `add-resource-deps-skip` | 添加资源 · 跳过前置确认 | `add_resource` | 1180×800 |
 
 ### 下载整合包
 
@@ -205,7 +214,7 @@ npm run shots -- --clean
 
 | 图片 | 画面 | 窗口 | 视口 |
 | --- | --- | --- | --- |
-| `add-resource` | 添加资源 | `add_resource` | 1200×800 |
+| `add-resource` | 添加资源 · 默认页 | `add_resource` | 1200×800 |
 
 ### 收藏
 

@@ -627,6 +627,101 @@ export const modpackItems = [
   },
 ];
 
+export const resourceItems = [
+  {
+    name: "Sodium",
+    summary: "现代渲染优化模组，显著提升帧数并修掉大量原版卡顿。",
+    image: svgImage("#22c55e", "S"),
+    authors: [{ name: "jellysquid3", logo: null }],
+    tag: [{ name: "优化", logo: null, svg: null }, { name: "Fabric", logo: null, svg: null }],
+    screenshots: [],
+    downloadCount: 45678901,
+    date: "2026-10-21T09:00:00Z",
+    download: false,
+    canStar: true,
+    isStar: false,
+    downloadNow: false,
+    url: "https://modrinth.com/mod/sodium",
+    mcmod: null,
+    source: { fileType: "mod", source: "modrinth", pid: "sodium", fid: "" },
+  },
+  {
+    name: "Iris Shaders",
+    summary: "兼容 OptiFine 光影包的现代光影加载器。",
+    image: svgImage("#a78bfa", "I"),
+    authors: [{ name: "coderbot", logo: null }],
+    tag: [{ name: "光影", logo: null, svg: null }],
+    screenshots: [],
+    downloadCount: 12345678,
+    date: "2026-10-19T12:00:00Z",
+    download: false,
+    canStar: true,
+    isStar: false,
+    downloadNow: false,
+    url: "https://modrinth.com/mod/iris",
+    mcmod: null,
+    source: { fileType: "mod", source: "modrinth", pid: "iris", fid: "" },
+  },
+  {
+    name: "Just Enough Items",
+    summary: "查看物品配方与用途，模组包必备。",
+    image: svgImage("#f59e0b", "J"),
+    authors: [{ name: "mezz", logo: null }],
+    tag: [{ name: "实用", logo: null, svg: null }],
+    screenshots: [],
+    downloadCount: 9876543,
+    date: "2026-10-15T08:00:00Z",
+    download: true,
+    canStar: true,
+    isStar: true,
+    downloadNow: false,
+    url: "https://modrinth.com/mod/jei",
+    mcmod: null,
+    source: { fileType: "mod", source: "curseforge", pid: "jei", fid: "" },
+  },
+];
+
+export const resourceFiles = {
+  list: [
+    { name: "Sodium 0.6.5", download: 1234567, size: 2097152, time: "2026-10-20T10:00:00Z", isDownload: false, downloadNow: false, source: { fileType: "mod", source: "modrinth", pid: "sodium", fid: "s-065" } },
+    { name: "Sodium 0.6.3", download: 987654, size: 2097152, time: "2026-10-01T10:00:00Z", isDownload: false, downloadNow: false, source: { fileType: "mod", source: "modrinth", pid: "sodium", fid: "s-063" } },
+  ],
+  count: 2,
+  name: "Sodium",
+  maxPage: 1,
+};
+
+/** 下载模组前的前置列表：一条必选 + 一条可选 */
+export const resourceDeps = [
+  {
+    pid: "fabric-api",
+    fid: "fa-1",
+    name: "Fabric API",
+    icon: svgImage("#f472b6", "F"),
+    optional: false,
+    files: [
+      { fid: "fa-1", name: "Fabric API 0.115.0", time: "2026-10-20T10:00:00Z" },
+      { fid: "fa-0", name: "Fabric API 0.114.1", time: "2026-10-10T10:00:00Z" },
+    ],
+  },
+  {
+    pid: "indium",
+    fid: "in-1",
+    name: "Indium",
+    icon: null,
+    optional: true,
+    files: [{ fid: "in-1", name: "Indium 1.0.36", time: "2026-10-18T10:00:00Z" }],
+  },
+];
+
+/** 下载中的资源任务：卡片上出「下载中」角标 */
+export const resourceStatusRunning = {
+  windowOpen: true,
+  tasks: [
+    { uuid: "res-task-1", source: "modrinth", pid: "sodium", fid: "s-065", name: "Sodium", icon: null, kind: "download", state: "downloadFile", now: 32, total: 100, subText: "sodium-0.6.5.jar", subNow: 40, subTotal: 100, done: false, failed: false, cancelled: false, error: null, instanceUuid: "inst-1" },
+  ],
+};
+
 export const modpackDetail = {
   summary: "面向 Forge 的轻量冒险整合包，包含优化、任务与大量结构。",
   body: "## Better MC\n\n这是一个用于截图测试的整合包手册。\n\n- 内置任务章节\n- 包含 200+ 模组\n- 适配 1.20.1\n\n### 安装说明\n\n1. 选择版本\n2. 点击安装\n3. 等待整合包任务完成\n",
