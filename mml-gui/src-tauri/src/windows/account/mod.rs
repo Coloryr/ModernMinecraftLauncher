@@ -32,13 +32,14 @@ pub(super) fn emit_account_change(app: &AppHandle) {
 
 /// 按 UUID 在账户列表中查找账户
 ///
-/// auths 以 UUID + 类型为键，此处 UUID 即可唯一定位当前场景。
+/// 账户存储的键是 UUID 与认证类型，同一 UUID 可能对应多条不同类型的账户，
+/// 这里只按 UUID 匹配并取第一条。
 ///
 /// - `uuid`: 账户 UUID，不带连字符
 ///
 /// # 返回值
 ///
-/// 没有该 UUID 的账户时返回 `None`
+/// 没有该 UUID 的账户时返回 `None`；有多条时取列表里的第一条
 pub(super) fn find_by_uuid(uuid: &str) -> Option<LoginObj> {
     auths::get_all().into_iter().find(|a| a.uuid == uuid)
 }
@@ -121,7 +122,7 @@ pub async fn account_add_account(
     let user = name.trim().to_string();
     let password = password.unwrap_or_default();
 
-    let mut login = match auth_type {
+    let login = match auth_type {
         AuthType::LittleSkin | AuthType::SelfLittleSkin => {
             // 自建皮肤站必须填服务器地址；LittleSkin 的 server 为 None 时使用官方站
             if auth_type == AuthType::SelfLittleSkin && server.is_none() {
@@ -158,10 +159,6 @@ pub async fn account_add_account(
     }
     .map_err(|e| e.to_string())?;
 
-    // 皮肤站类的 auth_type 与服务器地址 text1 由认证层设置，此处不覆盖
-    if auth_type == AuthType::Offline {
-        login.auth_type = AuthType::Offline;
-    }
     if auths::get_current().is_none() {
         auths::set_current(Some(login.get_key()));
     }
@@ -322,5 +319,3 @@ pub fn account_edit_offline(
     emit_account_change(&app);
     Ok(())
 }
-
-// ---- 皮肤 / 披风纹理：原皮肤窗口的查询与正版装备操作 ----

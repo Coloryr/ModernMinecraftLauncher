@@ -4,7 +4,7 @@
 //! 进度与重名确认复用添加实例窗口的回调 `super::add`，因为压缩包 / 网址
 //! 导入走的是同一套安装流程。
 //!
-//! 安装是多任务的：任务登记在全局表 [`DOWNLOAD_NOW`]，键为 pid+fid，同键
+//! 安装是多任务的：任务登记在 `modpack_task` 的全局任务表，键为 pid+fid，同键
 //! 不允许重复安装；与窗口生命周期解耦——窗口关闭任务照跑，进度改由主窗口
 //! 显示；任务进度通过 `add-modpack-status` 事件广播，携带窗口开关状态。
 
@@ -44,6 +44,7 @@ pub fn add_modpack_set_last_source(source: String) {
     config.resource_window.add_modpack_source = source;
     crate::gui_config::set(config);
 }
+
 /// CurseForge 项目列表缓存，pid → 项目数据，列表页请求时填充
 pub(super) static CURSEFOGRE_INFO: LazyLock<AsyncRwLock<HashMap<String, CurseForgeListDataObj>>> =
     LazyLock::new(|| AsyncRwLock::new(HashMap::new()));

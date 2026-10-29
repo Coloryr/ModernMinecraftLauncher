@@ -51,6 +51,7 @@ pub fn add_resource_set_last_source(source: String) {
     config.resource_window.add_resource_source = source;
     crate::gui_config::set(config);
 }
+
 /// CurseForge 项目列表缓存，pid 映射到项目数据，列表页请求时填充
 pub(super) static CURSEFOGRE_INFO: LazyLock<AsyncRwLock<HashMap<String, CurseForgeListDataObj>>> =
     LazyLock::new(|| AsyncRwLock::new(HashMap::new()));

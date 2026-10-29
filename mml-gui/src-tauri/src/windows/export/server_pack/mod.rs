@@ -13,29 +13,58 @@ use tauri::AppHandle;
 pub(crate) use format::is_server_pack;
 pub(crate) use import::{ImportedPack, import_pack};
 
+/// 包内清单文件名，也是「这是不是一个服务器包」的判据
 const MANIFEST: &str = "mml-server.json";
+/// 包内内核配置，可选
 const CONFIG: &str = "mml/config.json";
+/// 包内界面配置，可选
 const GUI_CONFIG: &str = "mml/gui_config.json";
+/// 包内实例目录前缀，后面接实例目录名
 const INSTANCES: &str = "mml/minecraft/instances/";
+/// 可选携带的启动器文件名，仅 Windows 允许带
 const LAUNCHER: &str = "MML.exe";
+/// 导入互斥：同时只跑一次导入，免得两份包互相覆盖
 static IMPORTING: Mutex<()> = Mutex::new(());
 
+/// 包内清单 `mml-server.json`
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase", deny_unknown_fields)]
 struct Manifest {
+    /// 格式标识，必须等于 `mml-server-pack`
     format: String,
+    /// 清单版本，目前只认 `1`
     version: u32,
+    /// 包内实例，至少一个
     instances: Vec<Instance>,
+    /// 是否携带启动器 `MML.exe`
     launcher: bool,
 }
 
+/// 清单里的一条实例
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase", deny_unknown_fields)]
 struct Instance {
+    /// 实例标识，与包内 game.json 里的一致
     uuid: uuid::Uuid,
+    /// 包内目录名，相对 [`INSTANCES`]
     directory: String,
 }
 
+/// 打一个服务器包：多个实例、可选启动器、可选配置与自定义界面文件
+///
+/// 实例锁定只留一个：包里不止一个实例、或锁的不是包里的那个时清空锁，
+/// 否则玩家进不去包里其它实例。界面配置里的开关按实际带走的文件回填。
+///
+/// - `games`: 要打进去的实例
+/// - `file`: 输出 zip
+/// - `include_launcher`: 是否带上当前启动器可执行文件
+/// - `options`: 生成选项，控制配置与自定义界面文件是否随包
+/// - `gui`: 进度回调
+/// - `cancel`: 取消令牌
+///
+/// # 返回值
+///
+/// 写盘成功返回 `Ok(())`；实例为空、目录名非法、跨平台带启动器或写盘失败返回错误
 pub(super) fn export_pack(
     games: &[mml_game::launcher::instance_setting_obj::InstanceSettingObj],
     file: &Path,
@@ -161,11 +190,14 @@ pub(super) fn export_pack(
     archive::write_zip(file, &files, &data, gui, cancel)
 }
 
-/// 导入服务器包并重新载入启动器。
-/// - `app`: 应用句柄。
-/// - `file`: 用户拖入的服务器包路径。
+/// 导入服务器包并重新载入启动器
+///
+/// - `app`: 应用句柄，重启经它发起
+/// - `file`: 用户拖入的服务器包路径
+///
 /// # 返回值
-/// 校验或覆盖失败时返回错误。
+///
+/// 导入完成会重启进程，不会正常返回；校验、占用或覆盖失败返回错误文案
 #[gui_macros::ipc_group("export")]
 #[gui_macros::command]
 pub async fn export_import_server_pack(app: AppHandle, file: String) -> Result<(), String> {

@@ -13,6 +13,13 @@ use mml_base::archives::BaseArchiveGui;
 
 use crate::{err_keys, log_text::LogText};
 
+/// 递归收集目录下的全部文件，遇到链接直接报错
+///
+/// - `root`: 待遍历的目录
+///
+/// # 返回值
+///
+/// 目录下全部文件的绝对路径，已按路径排序
 pub(crate) fn files_under(root: &Path) -> Result<Vec<PathBuf>, String> {
     reject_link(root)?;
     let mut files = Vec::new();
@@ -29,6 +36,13 @@ pub(crate) fn files_under(root: &Path) -> Result<Vec<PathBuf>, String> {
     Ok(files)
 }
 
+/// 读元数据并拒绝符号链接与 Windows 重解析点
+///
+/// - `path`: 待检查的路径
+///
+/// # 返回值
+///
+/// 该路径的元数据；路径本身是链接时返回 `err.exportLink`
 pub(super) fn reject_link(path: &Path) -> Result<fs::Metadata, String> {
     let meta = fs::symlink_metadata(path).map_err(|e| e.to_string())?;
     if meta.file_type().is_symlink() {
@@ -67,6 +81,14 @@ pub(super) fn selected_path(root: &Path, relative: &str) -> Result<PathBuf, Stri
     Ok(path)
 }
 
+/// 拒绝把导出文件写进源目录，否则下一次导出会把它自己也打进去
+///
+/// - `file`: 用户选择的输出路径
+/// - `source`: 被导出的目录
+///
+/// # 返回值
+///
+/// 目标在源目录之外返回 `Ok(())`；落在源目录里返回 `err.exportDestination`
 pub(super) fn check_destination(file: &Path, source: &Path) -> Result<(), String> {
     let parent = file
         .parent()
@@ -83,6 +105,19 @@ pub(super) fn check_destination(file: &Path, source: &Path) -> Result<(), String
 /// 单次读写的块大小；`io::copy` 的 8KB 在写压缩包时系统调用开销明显
 const COPY_BUF: usize = 256 * 1024;
 
+/// 写一个 zip：文件按路径流式复制，内存数据直接写入
+///
+/// 先写同目录的临时文件，成功后才改名替换目标，失败或取消时删掉半成品。
+///
+/// - `file`: 输出 zip 路径
+/// - `files`: 打包条目，依次为包内路径与源文件路径
+/// - `data`: 直接写进包内存数据的条目，依次为包内路径与内容
+/// - `gui`: 进度回调，`None` 表示不报进度
+/// - `cancel`: 取消令牌，每写完一个文件检查一次
+///
+/// # 返回值
+///
+/// 写盘成功返回 `Ok(())`；取消、读文件或压缩失败返回错误文案
 pub(crate) fn write_zip(
     file: &Path,
     files: &[(String, PathBuf)],
@@ -159,6 +194,16 @@ pub(crate) fn write_zip(
     result
 }
 
+/// 整份归档一个实例，包内路径相对实例目录
+///
+/// - `game`: 实例配置，包里的 game.json 用当前快照
+/// - `file`: 输出 zip
+/// - `gui`: 进度回调
+/// - `cancel`: 取消令牌
+///
+/// # 返回值
+///
+/// 写盘成功返回 `Ok(())`；路径越界、读文件或压缩失败返回错误文案
 pub(super) fn native_instance(
     game: &mml_game::launcher::instance_setting_obj::InstanceSettingObj,
     file: &Path,
@@ -224,7 +269,17 @@ fn native_archive_selected(
     )
 }
 
-/// 归档实例目录，并用当前配置快照替换磁盘上尚未更新的配置。
+/// 归档实例目录，并用当前配置快照替换磁盘上尚未更新的配置
+///
+/// - `game`: 实例配置，包里的 game.json 用当前快照
+/// - `root`: 实例根目录
+/// - `file`: 输出 zip
+/// - `gui`: 进度回调
+/// - `cancel`: 取消令牌
+///
+/// # 返回值
+///
+/// 写盘成功返回 `Ok(())`；路径越界、读文件或压缩失败返回错误文案
 fn native_archive(
     game: &mml_game::launcher::instance_setting_obj::InstanceSettingObj,
     root: &Path,

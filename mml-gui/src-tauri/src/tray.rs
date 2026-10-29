@@ -156,6 +156,12 @@ fn hide(app: &AppHandle) {
 }
 
 /// 实际建托盘，失败把原因交回调用方记日志
+///
+/// - `app`: 应用句柄
+///
+/// # 返回值
+///
+/// 建好返回 `Ok(())`；建菜单或图标失败返回原因
 fn create(app: &AppHandle) -> Result<(), String> {
     let lang = gui_config::locale();
     let menu = build_menu(app).map_err(|err| err.to_string())?;

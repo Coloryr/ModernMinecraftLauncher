@@ -6,6 +6,9 @@
 //! - `mml://run/<uuid>`：启动实例
 //! - `mml://install/<路径>`：同上，用路径打开「添加实例」
 //!
+//! 提权与重启还会在参数前面塞 `--run-dir <目录>` 与 `--restart`：前者由 [`run_dir`]
+//! 在解析启动请求之前取走，后者只是「跳过单开检查」的标记。
+//!
 //! 快捷启动钩子（ColorMC 的 `--register`）与 `modrinth:` 协议还没实现：前者我们没有那套钩子，
 //! 后者要资源窗口支持按项目 id 打开。
 //!
@@ -44,6 +47,15 @@ pub fn collect<I: IntoIterator<Item = String>>(args: I) {
     }
 }
 
+/// 解析一条启动请求
+///
+/// 先剥掉提权与重启用的前置参数，再认命令行、`mml:` 协议与裸文件路径三种形式。
+///
+/// - `args`: 不含可执行文件的参数，前面可以带 `--run-dir <目录>` 或 `--restart`
+///
+/// # 返回值
+///
+/// 解析出的启动请求；认不出时返回 `None`
 fn parse(args: &[String]) -> Option<StartArgDto> {
     let first = args.first()?;
 
@@ -72,10 +84,13 @@ fn parse(args: &[String]) -> Option<StartArgDto> {
     }
 }
 
-/// 读取提权和重启时传递的数据目录。
-/// - `args`: 不含可执行文件的参数列表。
+/// 读取提权和重启时传递的数据目录
+///
+/// - `args`: 不含可执行文件的参数列表
+///
 /// # 返回值
-/// 首个显式数据目录，没有指定时返回空。
+///
+/// 首个显式数据目录；没有指定时返回 `None`
 pub fn run_dir(args: impl IntoIterator<Item = String>) -> Option<std::path::PathBuf> {
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {

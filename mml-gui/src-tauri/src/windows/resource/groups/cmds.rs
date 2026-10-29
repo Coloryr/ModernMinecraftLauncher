@@ -12,14 +12,6 @@ use crate::err_keys;
 use crate::windows::resource::mods::mod_note_key;
 use crate::windows::resource::parse_instance;
 
-//
-// 分组**不是 mod.rs 的数据**：它属于实例的 GUI 设置，即 `gui_setting.json` 的 `Mod.Groups`，
-// 分组 uuid → 分组对象，见 crate::gui_setting。
-// 本模块只做"读-改-写 + 转 DTO"：
-// - 每个命令都是 load → 改 → save：那份文件还存着日志设置、方块图标等，不能整份覆盖
-// - 分组顺序 = 用户自己拖出来的，存在 `gui_setting.json` 的 `Mod.GroupOrder`；
-//   没存过则用默认顺序：识别失败 → 已启用 → 已禁用 → 自建分组按名字
-// - 成员用 SHA1 而不是 uuid：启用/禁用会改文件名，uuid 跟着变，SHA1 不变
 use super::state::{default_group_order, edit_mod_setting, group_order_of, mod_groups_of};
 
 /// 取某个实例的模组分组
@@ -208,7 +200,7 @@ pub fn resource_mod_group_rename(
 ///
 /// - `uuid`: 实例 uuid
 /// - `order`: **分组 uuid** 数组，与 [`group_order_of`] 同一套口径，状态分组用
-///   [`STATE_GROUP_ON`] 那几个固定 uuid。接进来先规范化一次再落盘：前端可能因为
+///   `super::state::STATE_GROUP_ON` 那几个固定 uuid。接进来先规范化一次再落盘：前端可能因为
 ///   版本差异多传 / 少传了键，存脏数据的话下次读出来还得再纠一遍
 #[gui_macros::ipc_group("resource")]
 #[gui_macros::command]
@@ -219,7 +211,6 @@ pub fn resource_mod_group_order_set(uuid: String, order: Vec<String>) {
 
     edit_mod_setting(&instance, |mods| {
         // 借当前的分组表跑一遍规范化再落盘，免得把过时的键存进去
-        let order = order.clone();
         let probe = crate::gui_setting::GameModSettingObj {
             groups: mods.groups.clone(),
             mod_name: Default::default(),
@@ -245,11 +236,12 @@ pub fn resource_mod_group_collapsed_set(uuid: String, collapsed: Vec<String>) {
 
     edit_mod_setting(&instance, |mods| {
         let known: HashSet<String> = group_order_of(mods).into_iter().collect();
-        let mut kept: Vec<String> = collapsed
+        // 前端传来的顺序不保证相邻重复，按出现顺序去重而不是 `dedup` 只清相邻项
+        let mut seen: HashSet<String> = HashSet::new();
+        let kept: Vec<String> = collapsed
             .into_iter()
-            .filter(|key| known.contains(key))
+            .filter(|key| known.contains(key) && seen.insert(key.clone()))
             .collect();
-        kept.dedup();
         // 存 Some：哪怕是空数组也代表"用户明确展开了全部"，
         // 不能写回 None，那会让下次读出来又是"已启用默认收起"
         mods.group_collapsed = Some(kept);

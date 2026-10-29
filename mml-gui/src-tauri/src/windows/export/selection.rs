@@ -1,9 +1,6 @@
 //! 按目标格式将所选文件分配到下载清单或本地覆盖文件。
 
-use super::{
-    archive,
-    list::{collect_files, export_meta},
-};
+use super::{archive, list::export_meta};
 use crate::dtos::export_dto::ExportPickDto;
 use mml_base::file_item::FileHash;
 use mml_game::{
@@ -81,7 +78,7 @@ pub(super) fn collect_reporting<'a>(
             continue;
         }
         if path.is_dir() {
-            let files = collect_files(&path)?;
+            let files = archive::files_under(&path)?;
             result.local.extend(
                 files
                     .into_iter()

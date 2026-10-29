@@ -169,11 +169,11 @@ pub struct PackItemDto {
     pub file: String,
     /// 简介
     pub description: String,
-    /// 版本号
+    /// pack.mcmeta 里 `pack_format` 声明的版本号；缺失为 0
     pub pack_format: i64,
-    /// 最小版本
+    /// 支持的起始版本号，取自 `min_format` / `supported_formats`；缺失为 0
     pub min_format: i64,
-    /// 最大版本号
+    /// 支持的结束版本号，口径同上；缺失为 0
     pub max_format: i64,
     /// 是否读取失败
     pub fail: bool,
@@ -193,7 +193,7 @@ pub struct SaveItemDto {
     pub level_name: String,
     /// 上次游玩时间，Unix 毫秒，未知为 0
     pub last_played: i64,
-    /// 游戏类型：0 生存 / 1 创造 / 2 冒险
+    /// 游戏类型：0 生存 / 1 创造 / 2 冒险 / 3 旁观
     pub game_type: i32,
     /// 极限模式
     pub hard_core: bool,

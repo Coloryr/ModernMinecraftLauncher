@@ -150,8 +150,8 @@ pub(crate) async fn list_projects(
             // 查不到就让前端退回名字首字母的占位
             let avatars = modrinth::author_avatars(&list.hits).await;
 
-            // 与上面 CurseForge 分支同理：构建 DTO 期间不持锁，new_modrinth 会
-            // await 查标签图标；攒完一次性写入缓存。
+            // 构建 DTO 期间不持锁：new_modrinth 会 await 查标签图标，持全局写锁
+            // 跨 await 会把其它窗口读同一份缓存的请求一起堵住；攒完一次性写入。
             let mut cached = Vec::new();
 
             for item in list.hits {

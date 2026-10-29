@@ -116,7 +116,6 @@ pub(crate) fn on_download_item(file: &std::sync::Arc<DownloadItem>, app: &AppHan
     };
 
     if changed {
-        let dto = build_status(app);
-        let _ = app.emit(listens::ADD_RESOURCE_STATUS, dto);
+        emit_add_resource_status(app, build_status(app));
     }
 }

@@ -3,18 +3,19 @@
 //! 从 `add/mod.rs` 拆出来的，光 `add_get_support_loaders` 就有 62 行。命令带
 //! 分组标记，值填原始组名 add，把组键钉回 `add`，见 AGENTS.md §4。
 
-use crate::log_text::LogText;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use mml_game::add_game::PackType;
 use mml_game::gui_hook::{IProgressGui, ProgressGui};
 use mml_game::loader::LoaderType;
 use tauri::{AppHandle, Emitter};
+use tokio::sync::{Mutex, OnceCell};
 
 use crate::dtos::LoaderProgressDto;
 use crate::err_keys;
 use crate::listens;
+use crate::log_text::LogText;
 
 /// 前端加载器 ID 转成 LoaderType，ID 列表见 [`add_get_loaders`]
 ///
@@ -109,7 +110,7 @@ impl IProgressGui for SupportLoadersProgressGui {
 ///
 /// **中断自动重试**：用户改代理时 `mml_net` 会中断全部在途请求，这一次查询随之失败。
 /// 此时**自动用新客户端重跑一次**——因为旧请求绑定的是发出时那份客户端，
-/// 只有重新发起才会走新代理。最多重试 [`RETRY_ON_ABORT`] 次，避免代理不通时死循环。
+/// 只有重新发起才会走新代理。最多重试两次，避免代理不通时死循环。
 ///
 /// - `app`: 应用句柄，进度事件发给它
 /// - `mc`: 游戏版本号，缓存与单飞都按它分组
@@ -120,9 +121,6 @@ impl IProgressGui for SupportLoadersProgressGui {
 #[gui_macros::ipc_group("add")]
 #[gui_macros::command]
 pub async fn add_get_support_loaders(app: AppHandle, mc: String) -> Result<Vec<String>, String> {
-    use std::sync::LazyLock;
-    use tokio::sync::{Mutex, OnceCell};
-
     /// 因"中断"即改代理而失败时允许的重试次数
     const RETRY_ON_ABORT: usize = 2;
 

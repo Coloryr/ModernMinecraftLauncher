@@ -114,9 +114,6 @@ pub async fn add_resource_list(
                 return Err(String::from(err_keys::SORT_TYPE_NOT_FOUND));
             };
 
-            // 有一项分类需要输入文本才能搜索
-            // if matches!(sort, ModrinthSortType::Downloads)
-
             let arg = ModrinthSearchArg {
                 page: Some(page),
                 category,

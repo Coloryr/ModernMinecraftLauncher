@@ -27,9 +27,10 @@ pub(crate) struct WindowFamily {
     pub(super) base: Uuid,
 }
 
-/// 全部窗口族
+/// 窗口族表；新加一族只在这里补一条
 ///
-/// 新加一族只需在这里补一条：按标签反查、按实例派生、最小尺寸三处分支都在下面共用
+/// 按标签反查、按实例派生与最小尺寸三处都直接读它，分别见 `family_of_label`、
+/// `family_window_id` 与 `family_min_size`；别处不要另立族名或前缀。
 pub(super) static WINDOW_FAMILIES: &[WindowFamily] = &[
     WindowFamily {
         kind: "log",
@@ -73,7 +74,9 @@ pub(crate) fn family_of_kind(kind: &str) -> Option<&'static WindowFamily> {
     WINDOW_FAMILIES.iter().find(|item| item.kind == kind)
 }
 
-/// 窗口族里一个窗口的身份
+/// 窗口族里一个窗口的身份：派生出的 uuid 与标签
+///
+/// 开窗 / 关窗 / 事件处理都靠这一对定位族内窗口，见 [`family_window_id`]。
 pub(crate) struct FamilyWindowId {
     /// 派生出的窗口 uuid；句柄表、几何、模型表都以它登记
     pub(crate) uuid: Uuid,

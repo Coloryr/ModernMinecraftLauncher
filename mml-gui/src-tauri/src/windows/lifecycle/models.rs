@@ -31,8 +31,8 @@ pub(crate) static WINDOW_MODELS: LazyLock<RwLock<HashMap<Uuid, Arc<dyn Any + Sen
 
 /// 确保指定窗口的模型已创建，尚无则初始化
 ///
-/// 当前仅主窗口有模型 `MainWindowModel`，其余窗口无状态；
-/// 新增窗口模型时在此按 uuid 分派。
+/// 目前有模型的三类窗口：主窗口的 `MainWindowModel`，添加实例与下载整合包共用的
+/// `AddWindowModel`；其余窗口无状态。新增窗口模型时在此按 uuid 分派。
 ///
 /// - `uuid`: 窗口 uuid
 pub(crate) fn ensure_window_model(uuid: &Uuid) {
@@ -199,6 +199,9 @@ pub(crate) fn app_has_window(label: &str) -> bool {
 }
 
 /// 移除窗口模型，窗口销毁或逻辑页关闭时调用
+///
+/// 大厅模型要从表里取出来显式 `close`：丢弃 `Arc` 只是不引用它，取消令牌与后台任务
+/// 都还活着。
 ///
 /// - `uuid`: 窗口 uuid
 pub(crate) fn remove_window_model(uuid: &Uuid) {

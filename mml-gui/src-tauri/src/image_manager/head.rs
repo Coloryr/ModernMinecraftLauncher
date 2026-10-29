@@ -18,7 +18,8 @@ use super::{HEAD_IMAGE, PairImageKey};
 ///
 /// 保持账户型：账户列表高频渲染，不能每个头像先查一次纹理列表
 ///
-/// - `uri`: 协议路径片段，首段 `head` 已剥；第 2 段为 `preview` 时走设置页样例预览
+/// - `uri`: 协议路径片段，第 1 段是路由名 `head`，第 2 段为 `preview` 时走设置页样例
+///   预览，否则是账户类型、第 3 段是账户 uuid
 /// - `res`: 响应回写句柄
 pub(super) async fn load_head_image(uri: &[&str], res: UriSchemeResponder) {
     if uri.len() != 3 {
@@ -46,7 +47,7 @@ pub(super) async fn load_head_image(uri: &[&str], res: UriSchemeResponder) {
 
 /// 头像渲染，sha1 入口；账户型请求解析出当前皮肤后也转调这里
 ///
-/// 缓存键带上头像渲染配置：切换头像模式或旋转角度后立即出新图而不是旧缓存；
+/// 缓存键带上头像渲染配置：切换头像模式或旋转角度后不会命中旧缓存；
 /// 同一皮肤的头像跨账户共享
 ///
 /// - `skin_sha1`: 皮肤贴图内容 SHA1

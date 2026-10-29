@@ -1,5 +1,5 @@
 //! 资源添加窗口 DTO：CurseForge / Modrinth 的项目列表、详情、文件列表与下载任务
-
+//!
 //! 从单个 565 行的文件按用途拆成几个模块；类型经 `pub use` 再导出，
 //! 所以 `crate::dtos::add_resource_dto::XxxDto` 这些既有路径都没变。
 

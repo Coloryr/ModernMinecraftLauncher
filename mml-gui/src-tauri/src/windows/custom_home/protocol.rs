@@ -22,7 +22,7 @@ use super::archive::{INDEX_FILE, open_handle};
 /// `/` 或空路径落到 `index.html`，含「整包套一层目录」的兜底；`/__mml_bridge.js`
 /// 是内置资源，直接返回桥接脚本，不在包里；query string 与 fragment 由
 /// `uri().path()` 天然滤掉，`?v=...` 只是破缓存；全程不落盘，内容是
-/// `BaseArchive::read` 从 zip 条目现读出来的。
+/// 整包句柄的 `read` 从 zip 条目现读出来的。
 ///
 /// - `req`: 协议请求
 /// - `res`: 协议响应器

@@ -1,8 +1,8 @@
 //! 账户皮肤与披风：贴图列表 / 应用 / 上传 / 去官网
 //!
 //! 从 `account/mod.rs` 拆出来的。贴图来自账户档案的 Mojang skin / cape 两项，
-//! 应用走 `auths` 的"当前选中"标记，与游戏内显示一致。命令带分组标记，
-//! 值填原始组名 `account`，免得组键随文件名变掉，见 AGENTS.md §4。
+//! 装备走 Mojang services 的换肤 / 显示披风接口，需要该账户自己的 OAuth 令牌。
+//! 命令带分组标记，值填原始组名 `account`，免得组键随文件名变掉，见 AGENTS.md §4。
 
 use std::path::Path;
 
@@ -90,16 +90,16 @@ pub async fn account_get_textures(
     Ok(TexturesDto { skins, capes })
 }
 
-/// 把 OAuth 档案的纹理列表转成 DTO，逐个下载定内容 SHA1 并登记源 URL
+/// 把 OAuth 档案的纹理列表转成 DTO，并行下载后按内容算 SHA1 并登记源 URL
 ///
 /// 各项并行下载：都是等网络的 IO，串行会随皮肤 / 披风数量线性变慢；
-/// 某个纹理下载失败时跳过该项而不整体失败，结果保持档案里的顺序
+/// 某个纹理下载失败时跳过该项而不整体失败
 ///
 /// - `items`: 档案里的纹理条目，皮肤或披风
 ///
 /// # 返回值
 ///
-/// 下载成功条目的 DTO，顺序与 `items` 一致
+/// 只含下载成功条目的 DTO，相对顺序与 `items` 一致
 pub(super) async fn textures_from(items: &[SkinObj]) -> Vec<TextureItemDto> {
     let handles: Vec<_> = items
         .iter()

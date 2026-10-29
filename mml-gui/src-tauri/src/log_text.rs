@@ -11,6 +11,9 @@ use mml_names::Lang;
 use crate::gui_config;
 
 /// 界面日志条目
+///
+/// 中文与英文两个 match 各有一个分支；加变体时两边一起补，
+/// 参数一律作为字段传进来，不在调用处拼字符串。
 pub enum LogText {
     /// 图标网址登记表落盘失败
     IconUrlsSaveFailed {
@@ -92,7 +95,7 @@ pub enum LogText {
     WindowEffectFailed {
         /// 窗口标签，用来看是哪个窗口出的问题
         label: String,
-        /// 请求的材质，`auto` / `mica` / `acrylic` / `blur`
+        /// 请求的材质，`mica` / `acrylic` / `blur`
         mode: String,
         /// 失败原因，库给的原文
         error: String,

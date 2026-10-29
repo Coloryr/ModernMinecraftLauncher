@@ -55,7 +55,7 @@ pub(super) fn mod_item(item: &ModObj, ctx: &ModCtx, nested: bool) -> Option<ModI
     let info = item.info.first();
     let mod_id = info.map(|i| i.mod_id.clone()).unwrap_or_default();
     let name = info.map(|i| i.name.clone()).unwrap_or_default();
-    // 拿不到文件名才跳过，`file` 为空只可能是"不在 mods 目录下的东西"
+    // 文件名、modid、显示名三样都拿不到才跳过：只可能是"不在 mods 目录下的东西"
     if file.is_empty() && mod_id.is_empty() && name.is_empty() {
         return None;
     }
@@ -205,7 +205,8 @@ pub(crate) fn mod_note(notes: &HashMap<String, Option<String>>, file: &str) -> S
     notes
         .get(mod_note_key(file))
         .or_else(|| notes.get(file))
-        .and_then(|value| value.clone())
+        .cloned()
+        .flatten()
         .unwrap_or_default()
 }
 

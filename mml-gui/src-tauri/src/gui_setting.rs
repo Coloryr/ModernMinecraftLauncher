@@ -210,15 +210,12 @@ pub fn save(instance: &InstanceSettingObj, obj: &GameGuiSettingObj) {
     config_save::save(instance.uuid, obj, instance.get_gui_setting_file());
 }
 
-/// 读-改-写：把方块 ID 设为 `block`，并按二选一规则清掉 `Icon`
+/// 读-改-写：把方块 ID 设为 `block` 并落盘
 ///
-/// 图标与方块 ID 二选一：
-/// - 设方块 ID → 写 `Block`、清 `InstanceSettingObj.icon`，不再用 icon.png；
-/// - 上传图片 → 写 `icon.png`、清 `Block`，见 [`clear_block`]。
+/// 图标与方块 ID 二选一，这里只写 `Block`；`InstanceSettingObj.icon` 由调用方清空，
+/// 见 `windows::block::icon::block_set_icon`。两步必须一起做，只写一个会让图标读取走错分支。
 ///
-/// 两步必须一起做：只写一个会让图标读取走错分支。
-///
-/// - `instance`: 实例配置，用它定位文件并回写 icon
+/// - `instance`: 实例配置，用它定位文件
 /// - `block`: 方块 ID
 pub fn set_block(instance: &InstanceSettingObj, block: String) {
     let mut obj = load(instance);

@@ -2,7 +2,7 @@
 
 use serde::Serialize;
 
-/// 目录项，由 list_dir 返回
+/// 目录项，由 `add_list_dir` 返回
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DirEntry {

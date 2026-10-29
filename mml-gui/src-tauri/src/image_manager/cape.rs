@@ -81,7 +81,7 @@ impl CapeRender {
     /// # 返回值
     ///
     /// 除 3D 外就是 sha1；披风 3D 的角度参与渲染，键里带上角度，
-    /// 改角度自然换键，不必清缓存
+    /// 改角度自然换键
     fn cache_key(&self, sha1: &str) -> String {
         match self {
             CapeRender::Cape3D => {
@@ -176,8 +176,9 @@ pub(super) async fn load_elytra_3d_image(uri: &[&str], res: UriSchemeResponder) 
 
 /// 披风 / 鞘翅渲染图的通用取图流程
 ///
-/// - `uri`: 协议路径片段，首段路由名已剥。`<sha1>` 按内容直接取，
-///   `<账户类型>/<uuid>` 解析该账户**当前选中**的披风后转 sha1 型渲染，账户列表预览用
+/// - `uri`: 协议路径片段，第 1 段是路由名。`<路由>/<sha1>` 按内容直接取，
+///   `<路由>/<账户类型>/<uuid>` 解析该账户**当前选中**的披风后转 sha1 型渲染，
+///   账户列表预览用
 /// - `kind`: 渲染档位
 /// - `res`: 响应回写句柄
 pub(super) async fn load_cape_render(uri: &[&str], kind: CapeRender, res: UriSchemeResponder) {

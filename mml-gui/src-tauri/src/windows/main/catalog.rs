@@ -1,6 +1,6 @@
 //! 主窗口的"目录类"数据：版本清单缓存与 MOTD 地址解析
 //!
-//! 从 `main.rs` 拆出来的纯逻辑，不碰窗口、不碰模型，连同它自己的单测。
+//! 从 `main/mod.rs` 拆出来的纯逻辑，不碰窗口、不碰模型，连同它自己的单测。
 
 use std::sync::{LazyLock, RwLock};
 
@@ -10,7 +10,7 @@ use crate::dtos::VersionInfoDto;
 pub(super) static VERSIONS_CACHE: LazyLock<RwLock<Vec<VersionInfoDto>>> =
     LazyLock::new(|| RwLock::new(Vec::new()));
 
-/// 从 mml-core 拉取版本清单，配置源可选官方或 BMCLAPI
+/// 从 mml_net 拉取官方版本清单
 ///
 /// 按类型分组排序，正式版 > 快照 > 旧版 Beta > 旧版 Alpha，组内保持清单顺序，
 /// 因为清单本身按新旧排列。

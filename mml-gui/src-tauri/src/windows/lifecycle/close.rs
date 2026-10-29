@@ -1,6 +1,7 @@
 //! 关窗与开窗
 //!
-//! 一族实例窗口随实例一起关；关窗前先把模型里的任务取消。
+//! 实例被删时按窗口族逐个关窗；关窗统一走 [`close_window`]，几何保存与关闭保护
+//! 都在那条链路上，模型里任务的取消见 `events.rs`。
 
 use tauri::{AppHandle, Error::WindowNotFound, Manager, WebviewWindow};
 

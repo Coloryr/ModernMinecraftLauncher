@@ -41,6 +41,13 @@ pub struct LogSettingDto {
 }
 
 impl From<&GameGuiSettingObj> for LogSettingDto {
+    /// 从实例的游戏设置取日志窗口设置
+    ///
+    /// - `obj`: 实例的 `gui_setting.json`
+    ///
+    /// # 返回值
+    ///
+    /// 前端 wire 形态的日志设置，`auto_show` 取设置顶层的 `log_auto_show`
     fn from(obj: &GameGuiSettingObj) -> Self {
         let log = &obj.log;
         Self {
@@ -56,8 +63,15 @@ impl From<&GameGuiSettingObj> for LogSettingDto {
     }
 }
 
-// 只映射 `Log` 段里的字段；`auto_show` 在 `GameGuiSettingObj::log_auto_show`，只由日志设置以外的命令写
 impl From<LogSettingDto> for GameLogSettingObj {
+    /// 只映射 `Log` 段里的字段；`auto_show` 在 `GameGuiSettingObj::log_auto_show`，
+    /// 由日志设置以外的命令写，这里不带
+    ///
+    /// - `obj`: 前端提交的日志设置
+    ///
+    /// # 返回值
+    ///
+    /// 待写入实例 `gui_setting.json` 的 `Log` 段
     fn from(obj: LogSettingDto) -> Self {
         Self {
             word_wrap: obj.word_wrap,

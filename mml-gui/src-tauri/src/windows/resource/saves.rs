@@ -184,8 +184,8 @@ pub async fn resource_delete_save(uuid: String, dir: String) -> Result<(), Strin
 pub async fn resource_backup_save(uuid: String, dir: String) -> Result<String, String> {
     let instance = parse_instance(&uuid)?;
 
-    // 压缩耗时较长，这里**全程不持锁**：先克隆一份设置快照，取存档列表与压缩都在这份
-    // 快照上做；原来的实现整个 zip 期间都持着读锁，`get_saves().await` 还跨了 await
+    // 压缩耗时较长，**不在持锁状态下跑**：只短暂加读锁克隆一份设置快照，取存档列表与
+    // 压缩都在这份快照上做；原来的实现整个 zip 期间都持着读锁，`get_saves().await` 还跨了 await
     let name = tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
         let game = instance.read().unwrap().clone();
         let saves = tokio::runtime::Handle::current().block_on(async { game.get_saves().await });

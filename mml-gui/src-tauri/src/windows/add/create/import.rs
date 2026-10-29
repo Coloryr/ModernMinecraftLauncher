@@ -58,7 +58,7 @@ pub async fn add_import_folder(
     .await
     .map_err(|e| e.to_string())?
     .map_err(|e| e.to_string())?;
-    let uuid = { res.read().unwrap().uuid.to_string() };
+    let uuid = res.read().unwrap().uuid.to_string();
     crate::windows::main::emit_instance_change(&app, "add");
     Ok(uuid)
 }
@@ -66,7 +66,7 @@ pub async fn add_import_folder(
 /// 导入整合包压缩包为实例
 ///
 /// CurseForge / Modrinth 两种是**真整合包**：登记成「下载整合包」那套安装任务，
-/// 任务表与进度事件见 [`crate::windows::add::modpack_task`]；于是标题栏的整合包指示器、
+/// 任务表与进度事件见 [`crate::windows::modpack_task`]；于是标题栏的整合包指示器、
 /// 进度弹窗、取消、装完刷新并选中新实例全部复用同一条路径，
 /// 与在线安装的差别只剩"包从哪来"，所以它没有项目 ID，用占位 pid。
 /// 其余类型即 MMC / HMCL / 直接解压等行为不变：进度发到本窗口的进度弹窗。
@@ -279,7 +279,7 @@ pub async fn add_create_new(
     .await
     .map_err(|e| e.to_string())?
     .map_err(|e| e.to_string())?;
-    let uuid = { res.read().unwrap().uuid.to_string() };
+    let uuid = res.read().unwrap().uuid.to_string();
     crate::windows::main::emit_instance_change(&app, "add");
     Ok(uuid)
 }

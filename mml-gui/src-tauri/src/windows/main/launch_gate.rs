@@ -1,4 +1,8 @@
-//! 实例启动与服务器包覆盖互斥，导入成功后由重启的新进程接管。
+//! 实例启动、服务器包导入、云存档同步三者的进程级互斥
+//!
+//! 粒度不同：启动与同步按实例，导入是全局的 —— 导入要整份覆盖实例文件，
+//! 任何在跑的启动都可能读到写了一半的目录。导入成功后由重启的新进程接管，
+//! 那一次会一直占着导入位，旧进程不再允许启动。
 
 use crate::err_keys;
 use std::{
@@ -7,9 +11,10 @@ use std::{
 };
 use uuid::Uuid;
 
+/// 进程级互斥状态，所有窗口的命令共用这一份
 static GATE: LazyLock<Gate> = LazyLock::new(Gate::default);
 
-/// 启动准备和文件导入共享的互斥状态。
+/// 启动、导入与同步共用的互斥状态。
 #[derive(Default)]
 struct State {
     /// 从读取快照到启动结束的实例。
@@ -20,7 +25,7 @@ struct State {
     importing: bool,
 }
 
-/// 保护进程内所有实例的启动与导入操作。
+/// 保护进程内所有实例的启动、导入与同步操作。
 #[derive(Default)]
 struct Gate {
     /// 启动与导入共用的短时状态锁。
@@ -79,6 +84,7 @@ impl Drop for ImportGuard<'_> {
 }
 
 impl Gate {
+    /// 预约实例文件同步：导入、运行、同实例启动或同步中时拒绝
     fn sync(&self, uuid: Uuid) -> Result<SyncGuard<'_>, String> {
         let mut state = self.state.lock().unwrap();
         if state.importing || state.launching.contains(&uuid) || state.syncing.contains(&uuid) {
@@ -91,6 +97,7 @@ impl Gate {
         Ok(SyncGuard { gate: self, uuid })
     }
 
+    /// 预约实例启动：导入、同实例同步、已在运行或已在启动中时拒绝
     fn launch(&self, uuid: Uuid) -> Result<LaunchGuard<'_>, String> {
         let mut state = self.state.lock().unwrap();
         if state.importing {
@@ -105,6 +112,7 @@ impl Gate {
         Ok(LaunchGuard { gate: self, uuid })
     }
 
+    /// 预约全局导入：已有导入、启动、同步或运行中的实例时拒绝
     fn import(&self) -> Result<ImportGuard<'_>, String> {
         let mut state = self.state.lock().unwrap();
         if state.importing
@@ -122,10 +130,13 @@ impl Gate {
     }
 }
 
-/// 预约实例启动。
-/// - `uuid`: 待启动实例。
+/// 预约实例启动
+///
+/// - `uuid`: 待启动的实例
+///
 /// # 返回值
-/// 启动预约，或正在导入、实例已运行的错误。
+///
+/// 启动预约；正在导入、同实例同步或实例已在运行时返回错误
 pub(super) fn begin_launch(uuid: Uuid) -> Result<LaunchGuard<'static>, String> {
     GATE.launch(uuid)
 }
@@ -141,9 +152,11 @@ pub(crate) fn is_launching(uuid: Uuid) -> bool {
     GATE.state.lock().unwrap().launching.contains(&uuid)
 }
 
-/// 预约服务器包导入。
+/// 预约服务器包导入
+///
 /// # 返回值
-/// 导入预约，或有启动、运行、导入任务的错误。
+///
+/// 导入预约；已有导入、启动、同步或运行中的实例时返回错误
 pub(crate) fn import_guard() -> Result<ImportGuard<'static>, String> {
     GATE.import()
 }

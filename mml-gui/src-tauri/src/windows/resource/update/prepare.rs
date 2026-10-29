@@ -20,7 +20,8 @@ use crate::windows::resource::mods::find_mod;
 
 /// 准备一条更新：把平台数据拼成下载项，并攒好收尾要用的信息
 ///
-/// **不碰网络**：平台数据由 [`fetch_new_files`] 批量取好，这里只做本地拼装。
+/// 正常情况下平台数据由 [`super::newfile::fetch_new_files`] 批量取好，这里只做本地
+/// 拼装；批量那一趟没拿到时退回 [`fetch_one`] 单独问一次。
 ///
 /// - `instance`: 实例句柄
 /// - `dir`: mods 目录，调用方取一次共用
@@ -29,7 +30,7 @@ use crate::windows::resource::mods::find_mod;
 ///
 /// # 返回值
 ///
-/// 旧文件找不到、平台数据缺失、文件号非法返回错误串
+/// 见 [`PendingUpdate`]；旧文件找不到、平台数据缺失、文件号非法返回错误串
 pub(super) async fn prepare_one(
     instance: GameInstance,
     dir: &Path,

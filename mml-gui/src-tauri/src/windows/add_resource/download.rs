@@ -28,7 +28,7 @@ use super::{DOWNLOAD_NOW, SourceDownloadInfo, SourceInfo};
 ///
 /// 下载走全局下载器，进度在下载窗口可见，命令立即返回；
 /// 进度按目标文件路径匹配后经 add-resource-status 事件推给前端，
-/// 完成后条目保留一段时间再从任务表移除，窗口顶部进度条停在「完成」
+/// 终态条目留在任务表里不自动移除，由「清除已完成」手动清，窗口顶部进度条停在「完成」
 ///
 /// - `app`: 窗口句柄，用于广播下载状态事件
 /// - `game`: 实例 uuid
@@ -53,21 +53,15 @@ pub async fn add_resource_download(
     file_type: String,
     world: Option<String>,
 ) -> Result<(), String> {
-    let uuid = Uuid::parse_str(&game);
-    if uuid.is_err() {
+    let Ok(uuid) = Uuid::parse_str(&game) else {
         return Err(String::from(err_keys::UUID));
-    }
-    let uuid = uuid.unwrap();
-    let instance = mml_game::get_instance(&uuid);
-    if instance.is_none() {
+    };
+    let Some(instance) = mml_game::get_instance(&uuid) else {
         return Err(String::from(err_keys::GAME_NOT_FOUND));
-    }
-    let instance = instance.unwrap();
-    let file_type = FileType::from_string(&file_type);
-    if file_type.is_none() {
+    };
+    let Some(file_type) = FileType::from_string(&file_type) else {
         return Err(String::from(err_keys::FILE_TYPE_NOT_FOUND));
-    }
-    let file_type = file_type.unwrap();
+    };
     if !matches!(
         file_type,
         FileType::Mod
@@ -295,16 +289,12 @@ pub async fn add_resource_download(
 #[gui_macros::ipc_group("add_resource")]
 #[gui_macros::command]
 pub async fn add_resource_saves(game: String) -> Result<Vec<ResourceSaveDto>, String> {
-    let uuid = Uuid::parse_str(&game);
-    if uuid.is_err() {
+    let Ok(uuid) = Uuid::parse_str(&game) else {
         return Err(String::from(err_keys::UUID));
-    }
-    let uuid = uuid.unwrap();
-    let game = mml_game::get_instance(&uuid);
-    if game.is_none() {
+    };
+    let Some(game) = mml_game::get_instance(&uuid) else {
         return Err(String::from(err_keys::GAME_NOT_FOUND));
-    }
-    let game = game.unwrap();
+    };
 
     // get_saves 是异步的，而 std 锁卫不能跨 await，future 须 Send：先克隆实例设置快照、立刻放锁，
     // 再在阻塞线程里 block_on —— 持锁等异步很容易和写锁互相卡死，clippy 的 await_holding_lock 报的就是这里

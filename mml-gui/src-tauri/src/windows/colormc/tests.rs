@@ -1,40 +1,29 @@
 //! 迁移引擎的用例
+//!
+//! 数据两种：
+//! - **真实样本** `tests/colormc/`，从真 ColorMC 工作目录裁出来的一份，见那边的 README ——
+//!   验"真实的 ColorMC 目录能被识别、里面的实例 M²L 读得出来、结论表覆盖齐全"；
+//! - **临时小目录**：边界情况现场造，覆盖同名文件、拒绝套娃路径、只有 auth.json 的目录。
+//!
+//! 全部在 `target/temp` 下操作，见 AGENTS.md §6，而且**只读**真实样本 —— 移动用例先把样本
+//! 复制一份再搬，反复跑也不会把样本搬没。
 
-use super::window::*;
-
-use std::path::PathBuf;
-
-use mml_base::get_base_dir;
-
-use super::detect::asked;
-use super::migrate::migrate;
-
-// 迁移引擎的用例
-//
-// 数据两种：
-// - **真实样本** `tests/colormc/`，从真 ColorMC 工作目录裁出来的一份，见那边的 README ——
-//   验"真实的 ColorMC 目录能被识别、里面的实例 M²L 读得出来、结论表覆盖齐全"；
-// - **临时小目录**：边界情况现场造，覆盖同名文件、拒绝套娃路径、只有 auth.json 的目录。
-//
-// 全部在 `target/temp` 下操作，见 AGENTS.md §6，而且**只读**真实样本 —— 移动用例先把样本
-// 复制一份再搬，反复跑也不会把样本搬没。
-
-// 单测要同时用到各子模块的实现细节，原先是同一个文件里的 `use super::*`
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 use uuid::Uuid;
 
 use mml_auth::{AuthType, LoginObj};
-use mml_base::serialize_tools;
+use mml_base::{get_base_dir, serialize_tools};
 use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 use mml_names::names;
 
 use super::account;
-use super::check::*;
-use super::detect::*;
-use super::migrate::*;
+use super::check::{Checked, check};
+use super::detect::{asked, instance_root, list_instance_dirs, looks_like_colormc, top_entries};
+use super::migrate::{copy_entry, migrate};
+use super::window::window_skip_colormc;
 use crate::test_support::{cleanup, ensure_boot, temp_dir};
 
 /// 真实样本目录 `mml-gui/src-tauri/tests/colormc`

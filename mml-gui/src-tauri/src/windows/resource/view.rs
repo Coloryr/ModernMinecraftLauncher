@@ -35,7 +35,7 @@ pub fn resource_view_get(uuid: String) -> Result<ResourceViewDto, String> {
     })
 }
 
-/// 保存某实例的资源窗口视图偏好：整份覆盖，未传的项保持原值
+/// 保存某实例的资源窗口视图偏好：这四项整份覆盖，文件里其余设置原样保留
 ///
 /// - `uuid`: 实例 uuid
 /// - `order`: 左侧分类顺序，元素是分类键

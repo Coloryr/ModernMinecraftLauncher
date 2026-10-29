@@ -1,7 +1,7 @@
 //! 分组与实例的增删移
 //!
-//! 分组本身只是一组名字，实例归属靠实例表里的分组字段；
-//! 移动实例与删实例都要先把还在跑的任务停掉。
+//! 实例归属与组内次序都在内核分组表的 `group_save.json`，本模块只转发；
+//! 删除与改名都要先确认实例空闲，删除开始就广播变更并关掉挂在它名下的窗口。
 
 use std::path::Path;
 
@@ -51,7 +51,7 @@ pub fn main_remove_group(app: AppHandle, uuid: String) -> Result<bool, String> {
     let Some(uuid) = windows::parse_group_id(Some(uuid)) else {
         return Ok(false);
     };
-    // 核心分组表：组内实例移入默认分组，并逐个发变更通知
+    // 核心分组表：组内实例移入默认分组，随后统一广播一次变更刷新列表
     if !mml_game::remove_group(&uuid) {
         return Ok(false);
     }
@@ -178,7 +178,7 @@ pub async fn main_delete_instance(
         crate::windows::lifecycle::close_instance_windows(&app, &id);
     }
 
-    let deleted = tauri::async_runtime::spawn_blocking(move || -> Result<bool, String> {
+    let deleted = match tauri::async_runtime::spawn_blocking(move || -> Result<bool, String> {
         let Some(id) = id else {
             return Ok(false);
         };
@@ -190,7 +190,11 @@ pub async fn main_delete_instance(
         Ok(true)
     })
     .await
-    .map_err(|e| e.to_string())?;
+    {
+        Ok(result) => result,
+        // 后台线程 panic：同样当作删失败处理，否则标记撤了、列表却停在"已删除"
+        Err(err) => Err(err.to_string()),
+    };
 
     let deleted = match deleted {
         Ok(deleted) => deleted,

@@ -160,15 +160,12 @@ pub async fn settings_scan_java_dir(path: String) -> Result<Vec<JavaInfoDto>, St
 #[gui_macros::ipc_group("settings")]
 #[gui_macros::command]
 pub async fn settings_detect_java(path: String) -> Result<Option<String>, String> {
-    let data = tauri::async_runtime::spawn(async move { java_helper::test_java(Path::new(&path)) })
-        .await
-        .map_err(|err| err.to_string())?;
+    let data =
+        tauri::async_runtime::spawn_blocking(move || java_helper::test_java(Path::new(&path)))
+            .await
+            .map_err(|err| err.to_string())?;
 
-    if let Some(data) = data {
-        Ok(Some(data.name))
-    } else {
-        Ok(None)
-    }
+    Ok(data.map(|info| info.name))
 }
 
 /// mml-jvms 内存列表 → 前端 DTO
@@ -186,7 +183,7 @@ pub(super) fn java_list() -> Vec<JavaInfoDto> {
 ///
 /// # 返回值
 ///
-/// 占位条目的主版本号在 DTO 里归零
+/// 前端 DTO；主版本号为负时归零
 fn info_dto(info: &Arc<JavaInfoObj>) -> JavaInfoDto {
     JavaInfoDto {
         name: info.name.clone(),

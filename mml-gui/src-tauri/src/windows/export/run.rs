@@ -39,6 +39,13 @@ pub(crate) fn running() -> bool {
 struct ExportPermit<'a>(&'a AtomicBool);
 
 impl<'a> ExportPermit<'a> {
+    /// 抢占导出名额
+    ///
+    /// - `flag`: 导出占用标志，守卫 Drop 时复位
+    ///
+    /// # 返回值
+    ///
+    /// 抢到名额返回守卫；已有导出在跑返回 `err.exportRunning`
     fn acquire(flag: &'a AtomicBool) -> Result<Self, String> {
         flag.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
             .map(|_| Self(flag))
@@ -50,6 +57,16 @@ impl Drop for ExportPermit<'_> {
     fn drop(&mut self) {
         self.0.store(false, Ordering::SeqCst);
     }
+}
+
+/// 一次导出里三个环节的耗时，单位秒
+struct ExportSpans {
+    /// 建包与清单，从任务开始到第一条进度
+    open: f64,
+    /// 写条目，从第一条进度到最后一条
+    write: f64,
+    /// 收尾，从最后一条进度到结束
+    finish: f64,
 }
 
 /// 进度时间戳：导出结束后据此拆出建包、写入、收尾三段
@@ -106,15 +123,15 @@ impl ExportClock {
     ///
     /// # 返回值
     ///
-    /// 依次为建包、写入、收尾的秒数
-    fn spans(&self, end: Instant) -> (f64, f64, f64) {
+    /// 见 [`ExportSpans`]
+    fn spans(&self, end: Instant) -> ExportSpans {
         let first = self.first.lock().unwrap().unwrap_or(end);
         let last = self.last.lock().unwrap().unwrap_or(first);
-        (
-            (first - self.started).as_secs_f64(),
-            (last - first).as_secs_f64(),
-            (end - last).as_secs_f64(),
-        )
+        ExportSpans {
+            open: (first - self.started).as_secs_f64(),
+            write: (last - first).as_secs_f64(),
+            finish: (end - last).as_secs_f64(),
+        }
     }
 }
 
@@ -305,12 +322,12 @@ pub async fn export_run(
         // 耗时统计：直接压缩的四段明细在 write_zip 里已经打过，这里只补其它格式的
         let end = Instant::now();
         if pack != ExportPackType::MML {
-            let (open, write, finish) = clock.spans(end);
+            let spans = clock.spans(end);
             mml_log::info(
                 LogText::ExportPackDetail {
-                    open,
-                    write,
-                    finish,
+                    open: spans.open,
+                    write: spans.write,
+                    finish: spans.finish,
                     commit: None,
                     entries: clock.total(),
                 }

@@ -31,9 +31,7 @@ pub(super) struct UniqueName {
 ///
 /// # 返回值
 ///
-/// 见 [`UniqueName`]；999 个候选都撞时退回原名
-///
-/// 试到 999 还撞就退回原名，宁可覆盖，也不要在这里无限找下去。
+/// 见 [`UniqueName`]；999 个候选都撞时退回原名，宁可覆盖，也不在这里无限找下去
 pub(super) fn unique_name(dir: &Path, name: &str) -> UniqueName {
     let path = Path::new(name);
     let stem = path

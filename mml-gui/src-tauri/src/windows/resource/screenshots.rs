@@ -1,8 +1,7 @@
 //! 资源管理窗口的截图分类：列表 / 删除 / 清空
 //!
-//! 从 `resource/mod.rs` 拆出来的**试点**：命令搬进子模块后，靠一条分组标记属性把组键钉回
-//! `resource`，标记值填原始组名 resource，前端 `commands.resource.*` 一个调用点都不用改；
-//! 生成器侧见 ipc-gen/src/scan.rs 的 `group_of`。
+//! 命令在子模块里，组键靠一条分组标记钉回 `resource`（标记值填原始组名），前端
+//! `commands.resource.*` 不变；生成器侧见 ipc-gen/src/scan.rs 的 `group_of`。
 
 use mml_sys::path_helper;
 

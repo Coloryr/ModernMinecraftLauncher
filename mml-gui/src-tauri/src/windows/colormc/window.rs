@@ -75,11 +75,13 @@ pub fn window_check_colormc() -> Option<ColorMcInfoDto> {
     if found.dir == get_base_dir() {
         return None;
     }
-    mml_log::info(format!(
-        "colormc detected: {} (from={})",
-        found.dir.display(),
-        found.from
-    ));
+    mml_log::info(
+        LogText::ColormcDetected {
+            dir: found.dir.display().to_string(),
+            from: found.from.to_string(),
+        }
+        .text(),
+    );
     Some(info(found.dir, found.from))
 }
 
@@ -92,7 +94,7 @@ pub fn window_check_colormc() -> Option<ColorMcInfoDto> {
 #[gui_macros::command]
 pub fn window_skip_colormc() -> Result<(), String> {
     mark("skip")?;
-    mml_log::info(String::from("colormc migrate skipped by user"));
+    mml_log::info(LogText::ColormcMigrateSkipped.text());
     Ok(())
 }
 
@@ -163,7 +165,7 @@ pub async fn window_migrate_colormc(
             // 只在**迁移成功后**记"问过了"；写不上只记日志：数据已经搬完，
             // 不该因为一个标记文件把整次迁移报成失败，顶多下次启动再问一遍
             if let Err(err) = mark(if moved { "move" } else { "copy" }) {
-                mml_log::error(format!("colormc marker write failed: {err}"));
+                mml_log::error(LogText::ColormcMarkerWriteFailed { error: err }.text());
             }
             Ok(report)
         }

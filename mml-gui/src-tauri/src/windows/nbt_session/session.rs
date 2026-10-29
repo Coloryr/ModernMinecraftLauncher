@@ -19,11 +19,11 @@ pub(super) struct NbtSession {
     pub(super) file: File,
     /// 打开时读进来的内容；保存就在这上面套改动
     pub(super) nbt: NbtFile,
-    /// 最近一次读 / 写后文件字节的 SHA1
+    /// 最近一次读 / 写后那份内容的 SHA1，整份文件或区块负载
     pub(super) sha1: String,
     /// 最近一次读 / 写后的状态戳
     pub(super) stamp: Stamp,
-    /// 能不能写回；只读文件也能看，改到时候再报只读
+    /// 能不能写回；只读文件也能看，改的时候再报只读
     pub(super) writable: bool,
 }
 
@@ -36,14 +36,21 @@ pub(super) struct Stamp {
     len: u64,
 }
 
-/// 打开着的文件，键是文件的绝对路径
+/// 打开着的文件，键见 [`key_of`]
 pub(super) static SESSIONS: LazyLock<Mutex<HashMap<String, NbtSession>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-/// 会话的键：普通 NBT 是文件绝对路径，区域文件里的区块是 `路径#表项下标`
+/// 拼出会话的键
 ///
-/// - `path`: 文件绝对路径（调用方已经过 `resolve_under` 挡过穿越）
+/// 普通 NBT 用文件绝对路径，区域文件里的区块再带上 `#表项下标`，同一份 `.mca` 的
+/// 不同区块因此各占一条会话。
+///
+/// - `path`: 文件绝对路径，调用方已经过 `resolve_under` 挡过穿越
 /// - `chunk`: 区块表项下标；普通 NBT 文件传 `None`
+///
+/// # 返回值
+///
+/// 键字符串，见 [`SESSIONS`]
 pub(super) fn key_of(path: &Path, chunk: Option<u32>) -> String {
     let base = path.to_string_lossy().into_owned();
     match chunk {
@@ -53,6 +60,12 @@ pub(super) fn key_of(path: &Path, chunk: Option<u32>) -> String {
 }
 
 /// 取文件当前的状态戳
+///
+/// - `file`: 已打开的文件句柄
+///
+/// # 返回值
+///
+/// 见 [`Stamp`]；取元数据失败时返回错误文案
 pub(super) fn stamp_of(file: &File) -> Result<Stamp, String> {
     let meta = file.metadata().map_err(|err| err.to_string())?;
     Ok(Stamp {
@@ -71,7 +84,7 @@ pub(crate) fn close(path: &Path, chunk: Option<u32>) {
 
 /// 关掉某个实例的全部会话：它的配置窗口没了，它打开过的文件都该放手
 ///
-/// - `owner`: 实例 uuid，见 [`open_with`]
+/// - `owner`: 实例 uuid，见 [`super::open_with`]
 pub(crate) fn close_all_of(owner: &Uuid) {
     SESSIONS.lock().unwrap().retain(|_, s| s.owner != *owner);
 }

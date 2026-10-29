@@ -1,3 +1,5 @@
+//! 账户皮肤 / 披风纹理列表：账户窗口取当前账户可选的全部纹理
+
 use serde::{Deserialize, Serialize};
 
 /// 账户的皮肤 / 披风纹理列表，由 `account_get_textures` 返回

@@ -21,7 +21,10 @@ use crate::err_keys;
 static TASKS: LazyLock<Mutex<HashMap<Uuid, usize>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// 任务占位，丢弃时把计数减回去
-pub(crate) struct TaskGuard(Uuid);
+pub(crate) struct TaskGuard(
+    /// 占用的实例 uuid，丢弃时按它把计数减一
+    Uuid,
+);
 
 impl Drop for TaskGuard {
     fn drop(&mut self) {

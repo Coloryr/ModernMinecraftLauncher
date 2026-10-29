@@ -6,7 +6,7 @@
 /// 子窗口贴角时与锚点窗口边缘留的间距，单位逻辑像素
 pub(super) const CHILD_GAP: f64 = 32.0;
 
-/// 逻辑像素的尺寸
+/// 逻辑像素的宽高；摆放计算全用逻辑单位
 pub(crate) struct SizeF {
     /// 宽
     pub(crate) width: f64,
@@ -14,7 +14,7 @@ pub(crate) struct SizeF {
     pub(crate) height: f64,
 }
 
-/// 逻辑像素的矩形
+/// 逻辑像素的矩形，工作区与锚点窗口外框都用它
 pub(crate) struct RectF {
     /// 左边缘
     pub(crate) x: f64,
@@ -26,7 +26,7 @@ pub(crate) struct RectF {
     pub(crate) height: f64,
 }
 
-/// 窗口落点，逻辑像素
+/// 算出的窗口落点，逻辑像素
 pub(crate) struct Placement {
     /// 左边缘
     pub(crate) x: f64,

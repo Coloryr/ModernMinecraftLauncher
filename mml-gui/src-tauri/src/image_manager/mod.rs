@@ -78,7 +78,7 @@ pub(super) static CAPE_IMAGE: LazyLock<RwLock<HashMap<String, Vec<u8>>>> =
 /// 披风背面渲染图内存缓存，键是内容 sha1
 pub(super) static CAPE_BACK_IMAGE: LazyLock<RwLock<HashMap<String, Vec<u8>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
-/// 披风 3D 渲染图内存缓存，键是内容 sha1；角度变更时由配置变更整体清空
+/// 披风 3D 渲染图内存缓存，键是内容 sha1 加角度；改角度自然换键
 pub(super) static CAPE_3D_IMAGE: LazyLock<RwLock<HashMap<String, Vec<u8>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 /// 鞘翅 2D 收拢渲染图内存缓存，键是内容 sha1
@@ -96,7 +96,7 @@ pub(super) static TEXTURE_URLS: LazyLock<RwLock<HashMap<String, String>>> =
 /// 远程图标内存缓存，键是请求名，也就是网址的 sha256
 pub(super) static ICON_IMAGE: LazyLock<RwLock<HashMap<String, IconCache>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
-/// 图标磁盘缓存目录，即 `<运行目录>/image`
+/// 图标磁盘缓存目录，即 `<运行目录>/cache/image`
 pub(super) static ICON_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 /// 图标内存缓存存活时长，超时后删除并回源重新下载
@@ -117,11 +117,11 @@ pub(super) struct IconCache {
 pub(super) static URL_IMAGE: LazyLock<RwLock<HashMap<String, String>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
-/// 图标磁盘缓存目录
+/// 取图标磁盘缓存目录，顺带完成首次初始化
 ///
 /// # 返回值
 ///
-/// `<运行目录>/cache/image`，首次调用时按下载缓存目录算出来
+/// `<运行目录>/cache/image`，按下载缓存目录算出来
 pub fn icon_cache_dir() -> PathBuf {
     ICON_DIR
         .get_or_init(|| mml_downloader::get_cache_path().join(names::IMAGE_DIR))
@@ -183,40 +183,23 @@ pub fn push_texture_url(sha1: &str, url: &str) {
 /// - `res`: 响应回写句柄
 pub async fn url_image(req: Request<Vec<u8>>, res: UriSchemeResponder) {
     let uri = split_path(req.uri().path());
-    let image_type = uri.first().copied().unwrap_or_default();
-
-    if image_type == "instance" {
-        load_instance_image(&uri, res);
-    } else if image_type == "head" {
-        load_head_image(&uri, res).await;
-    } else if image_type == "skin" {
-        load_skin_image(&uri, res).await;
-    } else if image_type == "skinraw" {
-        load_skinraw_image(&uri, res).await;
-    } else if image_type == "caperaw" {
-        load_caperaw_image(&uri, res).await;
-    } else if image_type == "cape" {
-        load_cape_image(&uri, res).await;
-    } else if image_type == "capeback" {
-        load_cape_back_image(&uri, res).await;
-    } else if image_type == "cape3d" {
-        load_cape_3d_image(&uri, res).await;
-    } else if image_type == "elytrafolded" {
-        load_elytra_folded_image(&uri, res).await;
-    } else if image_type == "elytraflying" {
-        load_elytra_flying_image(&uri, res).await;
-    } else if image_type == "elytra3d" {
-        load_elytra_3d_image(&uri, res).await;
-    } else if image_type == "icon" {
-        load_icon_image(&uri, res).await;
-    } else if image_type == "block" {
-        load_block_image(&uri, res);
-    } else if image_type == "item" {
-        load_item_image(&uri, res);
-    } else if image_type == "screenshot" {
-        load_screenshot_image(&uri, res);
-    } else {
-        send_bad(res);
+    match uri.first().copied().unwrap_or_default() {
+        "instance" => load_instance_image(&uri, res),
+        "head" => load_head_image(&uri, res).await,
+        "skin" => load_skin_image(&uri, res).await,
+        "skinraw" => load_skinraw_image(&uri, res).await,
+        "caperaw" => load_caperaw_image(&uri, res).await,
+        "cape" => load_cape_image(&uri, res).await,
+        "capeback" => load_cape_back_image(&uri, res).await,
+        "cape3d" => load_cape_3d_image(&uri, res).await,
+        "elytrafolded" => load_elytra_folded_image(&uri, res).await,
+        "elytraflying" => load_elytra_flying_image(&uri, res).await,
+        "elytra3d" => load_elytra_3d_image(&uri, res).await,
+        "icon" => load_icon_image(&uri, res).await,
+        "block" => load_block_image(&uri, res),
+        "item" => load_item_image(&uri, res),
+        "screenshot" => load_screenshot_image(&uri, res),
+        _ => send_bad(res),
     }
 }
 

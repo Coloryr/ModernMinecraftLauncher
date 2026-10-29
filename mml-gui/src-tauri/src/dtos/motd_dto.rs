@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use mml_game::game_motd::{ChatSegment, MotdState, ServerMotdObj, chat_to_segments};
 
-/// 展平后的一段 MOTD 文字，color 为 #RRGGBB，前端直接上 style
+/// 展平后的一段 MOTD 文字，已带好颜色与样式，前端直接上 style
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MotdSegmentDto {
@@ -108,7 +108,7 @@ impl From<ServerMotdObj> for MotdDto {
             segments: m
                 .description
                 .as_ref()
-                .map_or(Vec::new(), chat_to_segments)
+                .map_or_else(Vec::new, chat_to_segments)
                 .iter()
                 .map(MotdSegmentDto::from)
                 .collect(),

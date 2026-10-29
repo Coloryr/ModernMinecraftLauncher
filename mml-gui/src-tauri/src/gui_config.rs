@@ -209,11 +209,8 @@ impl Default for MainWindowConfig {
             sidebar_side: Default::default(),
             // 首次启动或没有配置时默认收起侧栏
             sidebar_collapsed: true,
-            // 默认列表模式，用户改过后用用户的值
             view_mode: ViewMode::default(),
-            // 默认先显示启动器主页
             startup_page: StartupPage::default(),
-            // 默认未选中
             selected_instance: String::new(),
         }
     }
@@ -262,7 +259,7 @@ pub struct LoginLockObj {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "PascalCase")]
 pub struct CustomCssItemObj {
-    /// 条目 id，CSS 文件在 `custom_ui/css` 下叫 `<id>.css`
+    /// 条目 id，样式包在 `custom_ui/css` 下叫 `<id>.zip`
     pub id: String,
     /// 显示名，导入时的文件名
     pub name: String,
@@ -270,7 +267,7 @@ pub struct CustomCssItemObj {
     pub enabled: bool,
 }
 
-/// 客户端设置：主窗口 MOTD 卡片与登录方式限制
+/// 客户端设置：MOTD 卡片、登录方式锁定、自定义界面、自定义音乐与窗口外观
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "PascalCase")]
 pub struct ClientConfig {
@@ -341,8 +338,8 @@ impl Default for ClientConfig {
 
 /// 实验性功能开关
 ///
-/// **行为都还没接线**：这里只把用户的选择存下来，设置页客户端设置里的「实验性功能」组负责展示，
-/// 真正生效要等各自的实现（提权 / 自定义协议 / 沙盒）落地。
+/// `launcher_admin` 与 `instance_admin` 已接线；`uri_launch` 与 `sandbox_launch` 目前只保存
+/// 用户的选择，生效要等各自的实现落地。
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "PascalCase")]
 pub struct ExperimentalConfig {
@@ -495,8 +492,7 @@ static FRESH_CONFIG: AtomicBool = AtomicBool::new(false);
 pub fn init<P: AsRef<Path>>(path: P) {
     let file = FILE.get_or_init(|| path.as_ref().join(names::GUI_CONFIG_FILE));
 
-    let mut config = if file.exists()
-        && file.is_file()
+    let mut config = if file.is_file()
         && let Ok(data) = serialize_tools::json_from_file::<GuiConfig>(file)
     {
         data
@@ -511,7 +507,9 @@ pub fn init<P: AsRef<Path>>(path: P) {
 /// 把老配置里的材质值归一到现在这几个选项
 ///
 /// `auto` 已删除，`blur` 也不再单列：不认的值一律当作不铺材质，
-/// 否则设置页那个下拉会落到一个已经不存在的选项上
+/// 否则设置页那个下拉会落到一个已经不存在的选项上。
+///
+/// - `config`: 要归一的配置
 fn normalize_window_effect(config: &mut GuiConfig) {
     config.client.window_effect = match config.client.window_effect.as_str() {
         "mica" => "mica",

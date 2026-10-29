@@ -1,4 +1,7 @@
-//! 资源收藏
+//! 资源收藏数据，文件 collect.json
+//!
+//! 与 [`crate::block_groups`] 同一套路：内存一份、改动后异步落盘。
+//! 这些是**用户数据**，按仓库约定不进前端 localStorage，见 AGENTS.md §7.1。
 
 use std::{
     collections::{HashMap, HashSet},

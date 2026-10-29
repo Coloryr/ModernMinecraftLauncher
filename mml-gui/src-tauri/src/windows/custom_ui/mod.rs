@@ -119,35 +119,27 @@ pub(crate) fn current_info() -> CustomUiInfoDto {
         .custom_css
         .iter()
         .map(|item| {
-            let path = css_package(&item.id);
             let archive = store::css_handle(&item.id);
-            let version = version_of(&path);
+            let version = version_of(&css_package(&item.id));
+            // 样式表与入口脚本同目录，只有文件名不同
+            let url_of = |name: &str| {
+                format!(
+                    "{}/{}/{}/{}?v={}",
+                    ui_base_url(),
+                    CSS_DIR,
+                    item.id,
+                    name,
+                    version
+                )
+            };
             let url = archive
                 .as_ref()
-                .map(|_| {
-                    format!(
-                        "{}/{}/{}/{}?v={}",
-                        ui_base_url(),
-                        CSS_DIR,
-                        item.id,
-                        CSS_FILE,
-                        version
-                    )
-                })
+                .map(|_| url_of(CSS_FILE))
                 .unwrap_or_default();
             let script_url = archive
                 .as_ref()
                 .filter(|archive| archive.has_entry(SCRIPT_FILE))
-                .map(|_| {
-                    format!(
-                        "{}/{}/{}/{}?v={}",
-                        ui_base_url(),
-                        CSS_DIR,
-                        item.id,
-                        SCRIPT_FILE,
-                        version
-                    )
-                })
+                .map(|_| url_of(SCRIPT_FILE))
                 .unwrap_or_default();
             CustomUiCssDto {
                 id: item.id.clone(),
@@ -207,7 +199,7 @@ pub(crate) fn current_info() -> CustomUiInfoDto {
 ///
 /// # 返回值
 ///
-/// 与 `current_info` 相同的状态，目前不会失败
+/// 见 [`current_info`]；目前不会失败
 #[gui_macros::command]
 pub fn custom_ui_status() -> Result<CustomUiInfoDto, String> {
     Ok(current_info())

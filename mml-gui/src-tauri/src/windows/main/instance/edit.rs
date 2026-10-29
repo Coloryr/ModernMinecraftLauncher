@@ -1,7 +1,7 @@
 //! 实例的创建与编辑
 //!
-//! 新建以最新的正式版为底，改名只动显示名；
-//! 更新实例读写的是实例配置，改前先确认没有任务在跑。
+//! 核心实例的改名 / 复制 / 更新都走 mml-game，改名会连实例目录一起挪；
+//! 找不到核心实例时按遗留数据只改本地存储。改前都先确认实例空闲。
 
 use tauri::{AppHandle, WebviewWindow};
 use uuid::Uuid;
@@ -18,11 +18,11 @@ use crate::windows;
 use super::group::{ensure_idle, uuid_short};
 use crate::windows::main::{emit_instance_change, model};
 
-/// 创建实例
+/// 创建遗留实例记录：只写进窗口模型，核心实例由 mml-game 管理
 ///
 /// - `app`: 应用句柄，用于发变更事件
 /// - `window`: 调用方窗口，用于取本窗口模型存实例
-/// - `name`: 实例名，同时作为实例目录名
+/// - `name`: 实例名，同时作为实例目录名；这里只记录，不建目录
 /// - `version`: 游戏版本号
 /// - `loader`: 加载器 ID，缺省为 `normal`
 /// - `loader_version`: 加载器版本，缺省为无

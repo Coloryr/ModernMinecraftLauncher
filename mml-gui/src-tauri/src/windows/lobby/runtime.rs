@@ -18,6 +18,7 @@ use std::{
 use tokio::sync::{Mutex, OwnedMutexGuard};
 use tokio_util::sync::CancellationToken;
 
+/// 陶瓦进程租约锁：同一时间只允许一个会话安装、启动并退出工作进程
 static WORKER: LazyLock<Arc<Mutex<()>>> = LazyLock::new(|| Arc::new(Mutex::new(())));
 
 /// 陶瓦控制接口的查询参数，允许公共节点同名重复。
@@ -35,6 +36,14 @@ pub(super) struct WorkerLease {
 }
 
 impl WorkerLease {
+    /// 等上一份租约释放，窗口关闭时不再等
+    ///
+    /// - `gate`: 全局租约锁
+    /// - `cancel`: 窗口取消令牌
+    ///
+    /// # 返回值
+    ///
+    /// 租约；等待期间窗口关闭返回 `err.lobbyClosed`
     async fn acquire(
         gate: Arc<Mutex<()>>,
         cancel: &CancellationToken,
@@ -61,37 +70,54 @@ pub(super) struct Session {
     worker: Option<Arc<WorkerLease>>,
 }
 
+/// 陶瓦写出的端口文件
 #[derive(Deserialize)]
 struct PortFile {
+    /// 监听端口；启动还没完成时是 0
     port: u16,
 }
 
+/// `/meta` 的响应
 #[derive(Deserialize)]
 struct Meta {
+    /// 陶瓦版本
     version: String,
 }
 
+/// `/state` 里的一个联机档案
 #[derive(Deserialize)]
 struct Profile {
+    /// 档案所属机器的标识
     machine_id: String,
+    /// 玩家名
     name: String,
+    /// 档案类型，如 `LOCAL`
     kind: String,
+    /// 提供该档案的陶瓦实现
     vendor: String,
 }
 
+/// `/state` 的响应
 #[derive(Deserialize)]
 struct State {
+    /// 房间状态，如 `waiting` / `guest-ok`
     state: String,
+    /// 状态序号，越大越新
     index: u64,
+    /// 房间号，还没进房间时为空
     room: Option<String>,
+    /// 加入方要连的地址 `host:port`
     url: Option<String>,
+    /// 房间难度
     difficulty: Option<String>,
-    #[serde(rename = "type")]
+    /// 异常码，协议里的 `type`
     exception: Option<u32>,
+    /// 联机档案列表
     #[serde(default)]
     profiles: Vec<Profile>,
 }
 
+/// 会话结束时删掉陶瓦写的端口文件
 struct PortGuard(PathBuf);
 impl Drop for PortGuard {
     fn drop(&mut self) {
@@ -101,6 +127,13 @@ impl Drop for PortGuard {
 }
 
 impl Session {
+    /// 安装并启动陶瓦，或复用用户已经打开的那个实例
+    ///
+    /// - `model`: 大厅模型，下载进度写进它的视图
+    ///
+    /// # 返回值
+    ///
+    /// 会话与陶瓦版本；安装、启动、取版本失败返回错误
     pub async fn start(model: &Arc<LobbyModel>) -> Result<(Arc<Self>, String), String> {
         let worker = WorkerLease::acquire(WORKER.clone(), &model.cancel).await?;
         let executable = super::install::executable(model, worker.clone()).await?;
@@ -219,6 +252,11 @@ impl Session {
         Ok((session, meta.version))
     }
 
+    /// 拉一次陶瓦状态
+    ///
+    /// # 返回值
+    ///
+    /// 见 [`LobbyStateDto`]；请求或解析失败返回错误文案
     pub async fn state(&self) -> Result<LobbyStateDto, String> {
         let state: State = self
             .client
@@ -251,6 +289,14 @@ impl Session {
         })
     }
 
+    /// 发一条状态切换请求
+    ///
+    /// - `path`: 控制接口路径，如 `/state/scanning`
+    /// - `query`: 查询参数，同名参数允许重复
+    ///
+    /// # 返回值
+    ///
+    /// 陶瓦接受返回 `Ok(())`；请求失败或被拒绝返回错误文案
     pub async fn action(&self, path: &str, query: &[QueryParameter]) -> Result<(), String> {
         let mut url =
             reqwest::Url::parse(&format!("{}{path}", self.base)).map_err(|e| e.to_string())?;
@@ -283,6 +329,7 @@ impl Session {
 }
 
 impl Drop for Session {
+    /// 按归属清理：自带的工作进程退出，外部实例只退出房间
     fn drop(&mut self) {
         if !self.owned && !self.room_owned.load(Ordering::Acquire) {
             return;
@@ -298,7 +345,11 @@ impl Drop for Session {
     }
 }
 
-/// 退出请求完成后再等待自有进程释放 HTTP 端口。
+/// 退出请求完成后再等自有进程释放 HTTP 端口
+///
+/// - `client`: 不经过代理的 HTTP 客户端
+/// - `base`: 陶瓦回环地址
+/// - `owned`: 进程是不是本次会话启动的；外部实例只退房间
 async fn cleanup(client: &reqwest::Client, base: &str, owned: bool) {
     let path = if owned {
         "/panic?peaceful=true"
@@ -316,6 +367,13 @@ async fn cleanup(client: &reqwest::Client, base: &str, owned: bool) {
     }
 }
 
+/// 读陶瓦的 lock 文件，取用户已经打开的实例端口
+///
+/// lock 文件里是大端两字节端口。
+///
+/// # 返回值
+///
+/// 端口；没有 lock 文件、内容不是两字节或端口为 0 时返回 `None`
 fn existing_port() -> Option<u16> {
     #[cfg(target_os = "macos")]
     let directory = dirs::home_dir()?.join("terracotta");
@@ -326,6 +384,11 @@ fn existing_port() -> Option<u16> {
     (port != 0).then_some(port)
 }
 
+/// 拉公共节点：内置两个，再从节点列表服务补充
+///
+/// # 返回值
+///
+/// 去重后的节点地址，形如 `tcp://host:port`；拉取失败只留内置的两个
 pub(super) async fn nodes() -> Vec<String> {
     let mut result = vec![
         "tcp://public.easytier.top:11010".into(),
@@ -353,6 +416,15 @@ pub(super) async fn nodes() -> Vec<String> {
     result
 }
 
+/// 把加入方要连的地址转成本地实例的服务器项
+///
+/// 只接受回环地址，避免大厅把客户端引到别的机器。
+///
+/// - `address`: 陶瓦给的 `host:port`，没写端口按 25565
+///
+/// # 返回值
+///
+/// 服务器项；地址不是 `127.0.0.1` 或端口非法时返回 `err.lobbyState`
 pub(super) fn join_server(
     address: &str,
 ) -> Result<mml_game::launcher::instance_setting_obj::ServerObj, String> {

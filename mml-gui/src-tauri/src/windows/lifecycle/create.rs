@@ -165,7 +165,6 @@ pub(crate) fn create_window(
     // Windows 借这次变更按下限把窗口顶上去，于是每开一次就比用户拉到的位置高一截。
     // 下限改在装饰激活后设，见 window_activate_decoration
 
-    // webview 铺不透明暗色底，避免加载首帧透出桌面，与暗色主题 --bg 一致
     let builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App(url_path.into()))
         .title(names::MML)
         // 原生 frame 起步 + 隐藏：装饰激活成功后再显示，失败则退回原生 frame 显示

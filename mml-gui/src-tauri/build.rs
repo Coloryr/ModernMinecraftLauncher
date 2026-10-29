@@ -5,7 +5,8 @@
 //!
 //! 注意：vendor 插件的还原**不能**放这里 —— cargo 在解析依赖图时就要读
 //! target/vendor/tauri-plugin-decoration/Cargo.toml，那发生在任何 build script
-//! 之前。改由各构建入口在 cargo 之前跑 vendor/prepare.ps1，见 build-*.bat。
+//! 之前。改由各构建入口在 cargo 之前跑 `mml-gui/vendor/prepare.ps1`，
+//! 见 build/build-release.* 与 build/build-prerelease.*。
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -74,8 +75,8 @@ fn main() {
 
 /// 删掉 types/ 下不在本次生成结果里的 .ts
 ///
-/// - types_dir: types/ 目录，可能还不存在
-/// - files: 本次生成的文件，rel_path 相对 mml-ipc/src
+/// - `types_dir`: types/ 目录，可能还不存在
+/// - `files`: 本次生成的文件，rel_path 相对 mml-ipc/src
 fn prune_types(types_dir: &Path, files: &[gui_ipc_gen::GeneratedFile]) {
     let expected: BTreeSet<String> = files
         .iter()

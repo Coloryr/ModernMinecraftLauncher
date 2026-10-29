@@ -26,7 +26,7 @@
 //!
 //! # 与框架的关系
 //!
-//! 建窗时用 `disable_drag_drop_handler()` 关掉 wry 那一份，见 `windows/lifecycle.rs`；
+//! 建窗时用 `disable_drag_drop_handler()` 关掉 wry 那一份，见 `windows/lifecycle/create.rs`；
 //! 于是 `tauri://drag-drop` **不再触发**，前端只走本模块这条路径事件 + DOM 事件。
 //! 两套不能并存，否则遮罩会闪两次。
 
@@ -56,7 +56,7 @@ const MESSAGE: &str = "__MML_WINDOWS_FILE_DROP__";
 /// 只在**有文件**时转发，文本 / 链接由前端自己处理，不必过桥；
 /// 用捕获阶段挂 `document`，先于页面自己的处理器拿到事件。
 ///
-/// 由建窗时的 `initialization_script` 注册，见 `windows/lifecycle.rs`：它在导航开始前
+/// 由建窗时的 `initialization_script` 注册，见 `windows/lifecycle/create.rs`：它在导航开始前
 /// 就挂好了，每个新建文档都会执行。**不能**改回在 webview ready 回调里调
 /// `AddScriptToExecuteOnDocumentCreated` —— 那个 API 只对之后新建的文档生效，
 /// 初始文档已经建好，脚本永远不执行（文件拖入会一直拿不到路径）。

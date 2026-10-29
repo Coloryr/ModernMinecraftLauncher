@@ -34,7 +34,7 @@ pub(crate) struct AddWindowModel {
 }
 
 impl Default for AddWindowModel {
-    /// `Default` 实现：创建空模型，等价于 `new`
+    /// 等价于 [`Self::new`]
     fn default() -> Self {
         Self::new()
     }

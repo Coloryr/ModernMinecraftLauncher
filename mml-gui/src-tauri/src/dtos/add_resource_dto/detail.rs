@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use mml_game::modrinth;
 use mml_names::i18_items::error_type::CoreResult;
 use mml_net::curseforge_api::list_obj::CurseForgeListDataObj;
+use mml_net::modrinth_api;
 use mml_net::modrinth_api::project_obj::ModrinthProjectObj;
-use mml_net::modrinth_api::{self};
 
 use crate::image_manager;
 

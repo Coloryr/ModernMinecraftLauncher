@@ -223,8 +223,8 @@ pub struct ErrorEvent {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InstanceChangeEvent {
-    /// 变更类型：add / edit / remove / group / icon
-    /// （`icon` 专指图标换了或清了，只有图标订阅它）
+    /// 变更类型：add / edit / remove / group / icon；`icon` 专指图标换了或清了，
+    /// 只有图标订阅它
     pub r#type: String,
 }
 
@@ -315,7 +315,7 @@ pub struct BlockGroupDto {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockItemDto {
-    /// 方块ID，如 minecraft:stone
+    /// 方块 ID，如 minecraft:stone
     pub id: String,
     /// 显示名，按请求语言翻译，miss 时回退 id 尾段
     pub name: String,

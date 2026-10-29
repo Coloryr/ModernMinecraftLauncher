@@ -182,12 +182,20 @@ impl Format {
     }
 }
 
+/// 一个要同步的配置目录
+struct ConfigDir {
+    /// 目录名，相对游戏目录，只允许顶层目录
+    dir: String,
+    /// 同步方式
+    mode: ConfigMode,
+}
+
 /// 本次要写进包里的内容
 struct Contents {
     /// 勾选的模组，带手填的下载信息
     mods: Vec<files::ModPick>,
     /// 配置目录与各自的同步方式
-    configs: Vec<(String, ConfigMode)>,
+    configs: Vec<ConfigDir>,
     /// 资源包文件，路径相对游戏目录
     packs: Vec<PathBuf>,
 }
@@ -219,7 +227,10 @@ fn generate(
         if dir.is_empty() || dir.contains(['/', '\\']) {
             return Err(err_keys::SERVER_INSTANCE_DIR.to_string());
         }
-        configs.push((dir.to_string(), ConfigMode::parse(&item.mode)?));
+        configs.push(ConfigDir {
+            dir: dir.to_string(),
+            mode: ConfigMode::parse(&item.mode)?,
+        });
     }
     let packs = options
         .resource_packs
@@ -329,8 +340,12 @@ fn generate_mml(
 ) -> Result<ServerInstanceResultDto, String> {
     // 先把目录内容列出来：进度总数与后面的打包都要用
     let mut config_files = Vec::new();
-    for (dir, mode) in &contents.configs {
-        config_files.push((dir.clone(), *mode, files::dir_files(base, dir)?));
+    for config in &contents.configs {
+        config_files.push((
+            config.dir.clone(),
+            config.mode,
+            files::dir_files(base, &config.dir)?,
+        ));
     }
 
     let total = contents.mods.len()
@@ -486,8 +501,8 @@ fn generate_hmcl(
 
     // 模组 + 各配置目录里的文件 + 资源包，按路径去重
     let mut all: BTreeSet<PathBuf> = contents.mods.iter().map(|item| item.path.clone()).collect();
-    for (dir, _) in &contents.configs {
-        all.extend(files::dir_files(base, dir)?);
+    for config in &contents.configs {
+        all.extend(files::dir_files(base, &config.dir)?);
     }
     all.extend(contents.packs.iter().cloned());
 
@@ -727,7 +742,10 @@ mod tests {
             configs: options
                 .configs
                 .iter()
-                .map(|item| (item.dir.clone(), ConfigMode::parse(&item.mode).unwrap()))
+                .map(|item| ConfigDir {
+                    dir: item.dir.clone(),
+                    mode: ConfigMode::parse(&item.mode).unwrap(),
+                })
                 .collect(),
             packs: options
                 .resource_packs

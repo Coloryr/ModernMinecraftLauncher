@@ -84,13 +84,13 @@ pub(super) fn sniff_mime(data: &[u8]) -> Option<&'static str> {
     }
 }
 
-/// 归一化图标：优先转 PNG，解不动再原样透传
+/// 归一化图标：已是 PNG 直接透传，能解码的转 PNG，解不动的按嗅探出的格式原样返回
 ///
 /// - `data`: 原始图片字节
 ///
 /// # 返回值
 ///
-/// 认不出格式返回 `None`
+/// 嗅探不出格式、也解码不出 PNG 时返回 `None`
 pub(super) fn normalize_icon(data: &[u8]) -> Option<IconBytes> {
     // 磁盘缓存里存的就是 PNG，见 write_icon_file 的调用点：先按文件头认一下直接透传，
     // 省掉一次"解码 + 重新编码"，收藏夹每次刷新图标都会走这条路径

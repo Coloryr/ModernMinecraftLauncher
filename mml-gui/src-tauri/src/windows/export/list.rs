@@ -3,11 +3,7 @@
 //! 导出前先看这一份：整合包元信息、要打包的文件与在线文件映射；
 //! 目录浏览只读，给前端的文件选择用。
 
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-    sync::atomic::AtomicBool,
-};
+use std::{collections::HashMap, path::Path, sync::atomic::AtomicBool};
 
 use crate::err_keys;
 
@@ -44,17 +40,6 @@ pub fn emit_export_focus(app: &AppHandle, event: LogFocusDto) {
 #[gui_macros::emit]
 pub(super) fn emit_export_progress(app: &AppHandle, event: ExportProgressDto) {
     let _ = app.emit(listens::EXPORT_PROGRESS, event);
-}
-
-/// 收集目录下全部文件
-///
-/// - `path`: 待收集的目录
-///
-/// # 返回值
-///
-/// 目录下的全部文件；读取失败或遇到链接时终止导出。
-pub(super) fn collect_files(path: &Path) -> Result<Vec<PathBuf>, String> {
-    super::archive::files_under(path)
 }
 
 /// 读 mod_info.json 里带在线来源的那些，键是文件名

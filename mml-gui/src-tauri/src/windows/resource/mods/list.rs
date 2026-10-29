@@ -61,8 +61,8 @@ pub fn emit_resource_mods_duplicate(window: &WebviewWindow, dto: Vec<ModDuplicat
 /// 扫描结果会存进**窗口模型**（见 [`crate::windows::resource::model`]）：更新检查、依赖检测都按这份数据算，
 /// 所以一个窗口里真正扫 mods 目录的只有这里。
 ///
-/// - `window`: 发起这次扫描的那个资源窗口，由 Tauri 注入。扫描进度 `x/x` 只发给它，
-///   不用全局广播：主窗口等也会收到，白跑一遍状态更新
+/// - `window`: 发起这次扫描的那个资源窗口，由 Tauri 注入；扫描进度 `x/x` 只发给它，
+///   全局广播会让主窗口等也白跑一遍状态更新
 /// - `uuid`: 实例 uuid
 ///
 /// # 返回值

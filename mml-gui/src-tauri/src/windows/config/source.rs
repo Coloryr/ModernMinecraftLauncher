@@ -21,6 +21,12 @@ pub(super) const MAX_FILE_SIZE: u64 = 4 * 1024 * 1024;
 ///
 /// 认不出来的一律按纯文本：这里面对的是人写的配置文件，扩展名没见过也该能打开看看，
 /// 别因为认不出来就把它藏了。大小写不敏感，`.JSON` 也算 JSON。
+///
+/// - `path`: 文件路径，只取扩展名
+///
+/// # 返回值
+///
+/// 见 [`FileItemType`]
 pub(super) fn get_file_type<P: AsRef<Path>>(path: P) -> FileItemType {
     let Some(ext) = path.as_ref().extension() else {
         return FileItemType::Text;

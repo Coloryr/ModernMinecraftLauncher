@@ -1,6 +1,6 @@
 //! 主窗口的实例启动参数：核心配置 ↔ 前端 DTO 的双向转换
 //!
-//! 从 `main.rs` 拆出来的，那边只剩命令与窗口模型。这里的字段是一对一搬运，
+//! 从 `main/mod.rs` 拆出来的，那边只剩命令与窗口模型。这里的字段是一对一搬运，
 //! 但要对着 `InstanceSettingObj` 看语义，单独放一处免得埋在命令堆里。
 
 use crate::dtos::{EnvVarLineDto, InstanceArgsDto};
@@ -126,7 +126,7 @@ pub(super) fn apply_args_to_core(inst: &mut InstanceSettingObj, a: &InstanceArgs
         "none" => GCType::None,
         _ => GCType::Auto,
     });
-    // 自定义 GC 参数没有独立字段：并入附加 JVM 参数一起下发
+    // 自定义 GC 参数没有独立字段：并入附加 JVM 参数一起下发，读回时 gc 会变回 auto
     let mut jvm_lines: Vec<String> = a.jvm_args.clone();
     if a.gc == "custom" && !a.gc_custom.trim().is_empty() {
         jvm_lines.extend(a.gc_custom.lines().map(String::from));

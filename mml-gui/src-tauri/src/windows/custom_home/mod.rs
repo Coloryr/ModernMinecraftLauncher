@@ -1,8 +1,8 @@
 //! 自定义主页面：服主导入的整页 HTML 或窗口组件替换启动器主页内容区
 //!
 //! **压缩包是唯一产物，全程不落盘解压**：服主导入的 zip 存成 `base_dir/home`，不带扩展名，
-//! 启动时打开成一个常驻句柄 [`HomeArchive`]，`mml-home` 协议的每个请求
-//! **直接从包内按条目读取**，即 [`BaseArchive::read`]，内部 seek 到条目偏移解压到内存，
+//! 启动时打开成一个常驻句柄，`mml-home` 协议的每个请求
+//! **直接从包内按条目读取**，即整包句柄的 `read`，内部 seek 到条目偏移解压到内存，
 //! 不会把文件铺到磁盘上。页面经自定义协议 `mml-home` 供主窗口的 iframe 加载，
 //! 地址形如 `http://mml-home.localhost/...`，见 [`home_base_url`]。
 //!
@@ -84,8 +84,6 @@ pub fn home_base_url() -> &'static str {
     }
 }
 
-// ================= 常驻句柄 =================
-
 // ================= 状态 =================
 
 /// 内容版本号：取**压缩包**的 mtime，单位毫秒时间戳
@@ -161,7 +159,7 @@ fn current_info() -> CustomHomeInfoDto {
 ///
 /// # 返回值
 ///
-/// 与 `current_info` 相同的状态，目前不会失败
+/// 见 [`current_info`]；目前不会失败
 #[gui_macros::command]
 pub fn custom_home_status() -> Result<CustomHomeInfoDto, String> {
     Ok(current_info())

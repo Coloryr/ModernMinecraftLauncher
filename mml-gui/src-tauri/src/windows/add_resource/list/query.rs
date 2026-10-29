@@ -90,12 +90,11 @@ pub(super) fn check_download_now(game: Option<&Uuid>, pid: &str) -> bool {
         return false;
     };
     let read = DOWNLOAD_NOW.read().unwrap();
-    let list = read.get(game);
-    if list.is_none() {
+    let Some(list) = read.get(game) else {
         return false;
-    }
-    // 终态条目会一直留在表里（等用户点「清除已完成」），所以必须把 done / failed 排掉
-    for (key, info) in list.unwrap().iter() {
+    };
+    // 终态条目会一直留在表里，等用户点「清除已完成」，所以必须把 done / failed 排掉
+    for (key, info) in list.iter() {
         if key.pid == pid && !info.done && !info.failed {
             return true;
         }
@@ -118,11 +117,10 @@ pub(super) fn check_version_download_now(game: Option<&Uuid>, pid: &str, fid: &s
         return false;
     };
     let read = DOWNLOAD_NOW.read().unwrap();
-    let list = read.get(game);
-    if list.is_none() {
+    let Some(list) = read.get(game) else {
         return false;
-    }
-    for (key, info) in list.unwrap().iter() {
+    };
+    for (key, info) in list.iter() {
         if key.fid == fid && key.pid == pid && !info.done && !info.failed {
             return true;
         }

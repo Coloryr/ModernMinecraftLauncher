@@ -37,6 +37,6 @@ pub struct DropPathDto {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileDropDto {
-    /// 拖入文件的绝对路径
+    /// 拖入文件的绝对路径列表
     pub paths: Vec<String>,
 }

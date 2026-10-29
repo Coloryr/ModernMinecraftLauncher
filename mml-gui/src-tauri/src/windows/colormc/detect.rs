@@ -71,10 +71,10 @@ pub(super) fn looks_like_colormc(dir: &Path) -> bool {
 ///
 /// 照 `Program.cs` 的 `Main()`：`%LOCALAPPDATA%\ColorMC\run` 记的路径 → 平台默认
 /// Windows 是 `<exe 目录>\colormc\`、Linux 是 `~/.ColorMC/`、macOS 是 `/Users/shared/ColorMC/`
-/// → `%APPDATA%\ColorMC\`，ColorMC 在默认位置不可写时会退到这里。
+/// → 最后兜底 ColorMC 的数据目录本身，它在默认位置不可写时会退到这里当工作目录。
 ///
-/// Windows 多两条线索：`colormc://` 协议注册的可执行文件旁边，以及 ColorMC 的数据目录本身
-/// —— 便携版通常不写 `run` 文件，装到别的盘时这两条是唯一能自动找到它的地方。
+/// Windows 多一条线索：`colormc://` 协议注册的可执行文件旁边 —— 便携版通常不写 `run` 文件，
+/// 装到别的盘时这是唯一能自动找到它的地方。
 ///
 /// 与 ColorMC 的差别：**不创建任何目录、也不试写**，ColorMC 会建目录再写 `test` 文件
 /// 来探可写性。这里只是探测，不动用户的东西；代价是"默认位置不存在但数据目录里有"

@@ -73,7 +73,7 @@ pub async fn main_refresh_versions() -> Result<Vec<VersionInfoDto>, String> {
     main_get_versions().await
 }
 
-/// 获取 Minecraft 官方新闻，走 Mojang 新闻接口按页拉取，核心加载完成后可调用
+/// 获取 Minecraft 官方新闻，走 Mojang 新闻接口按页拉取
 ///
 /// - `page`: 页码，从 1 起；缺省为 1
 ///

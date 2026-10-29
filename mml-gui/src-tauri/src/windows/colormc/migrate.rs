@@ -181,7 +181,7 @@ pub(super) fn migrate(
 ///
 /// # 返回值
 ///
-/// 源目录读不到时返回 `Err`，内容为错误原文
+/// 源目录读不到或建不了目标目录时返回 `Err`，内容为错误原文
 #[allow(clippy::too_many_arguments)]
 fn migrate_minecraft(
     app: Option<&AppHandle>,
@@ -399,17 +399,41 @@ fn entry_failed(moved: bool, name: &str, error: String) -> LogText {
     }
 }
 
-/// `minecraft/` 下的子条目数，移动模式的进度总量用它替换掉 `minecraft` 那一个占位
+/// `minecraft/` 下要逐个搬的条目数，移动模式的进度总量用它替换掉 `minecraft` 那一个占位
+///
+/// `instances` 是按里面的实例目录与零碎文件逐个搬的，要展开计数，否则实例一多
+/// `done` 就会超过 `total`。
 ///
 /// - `src`: 源工作目录
 ///
 /// # 返回值
 ///
-/// 子条目数；目录读不到返回 0
+/// 条目数；目录读不到返回 0
 fn minecraft_children(src: &Path) -> u32 {
-    fs::read_dir(src.join(names::MINECRAFT_DIR))
-        .map(|reader| reader.flatten().count() as u32)
-        .unwrap_or(0)
+    let Ok(reader) = fs::read_dir(src.join(names::MINECRAFT_DIR)) else {
+        return 0;
+    };
+    let mut total = 0;
+    for entry in reader.flatten() {
+        if entry.file_name() == names::INSTANCE_DIR && entry.path().is_dir() {
+            total += fs::read_dir(entry.path())
+                .map(|inner| {
+                    inner
+                        .flatten()
+                        .filter(|item| {
+                            // 分组表是 M²L 自己的，不搬，也不计入进度
+                            item.path().is_dir()
+                                || (item.file_name() != names::GROUP_FILE
+                                    && item.file_name() != names::LEGACY_GROUP_FILE)
+                        })
+                        .count() as u32
+                })
+                .unwrap_or(1);
+        } else {
+            total += 1;
+        }
+    }
+    total
 }
 
 /// 目录是否为空；读不到按"不空"处理，宁可留着也不误删

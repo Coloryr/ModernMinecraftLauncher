@@ -4,7 +4,7 @@
 //! `mml_log` 的 `STREAM` / `SEM` 都是 `OnceLock`，第二次 `start()` 会 panic；而没
 //! `start()` 过就调 `info()` / `error()` 一样会 panic，内部是 `SEM.get().unwrap()`。
 //! 所以同一 crate 里的用例**只在这里 boot 一次**，与 mml-game 的 `test_support` 同一口径，
-//! 见 AGENTS.md §6。
+//! 见 AGENTS.md §6.1。
 //!
 //! 临时目录一律走 [`mml_testutil`]，落在仓库的 `target/temp` 下，不要用系统 `%TEMP%`。
 
@@ -35,7 +35,7 @@ pub fn ensure_boot() {
 
 /// 一个干净的测试临时目录，建在 `target/temp` 下，按 `tag` 加随机名分开
 ///
-/// **每个用例各用各的子目录**：落盘是异步的，共用目录会互相踩，见 AGENTS.md §6。
+/// **每个用例各用各的子目录**：落盘是异步的，共用目录会互相踩，见 AGENTS.md §6.1。
 ///
 /// - `tag`: 用例特征名，用来在临时目录里认出是谁的
 ///

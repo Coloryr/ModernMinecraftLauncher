@@ -2,7 +2,9 @@
 //!
 //! | 模块 | 说明 |
 //! | --- | --- |
+//! | [`block_groups`] | 方块窗口的用户数据，文件 block_groups.json |
 //! | [`build_info`] | 版本号与构建通道，主页面据此提示测试版 / 预发布版 |
+//! | `client_lock` | 客户端设置锁，密码只存加盐哈希 |
 //! | [`collect_utils`] | 收藏数据读写 |
 //! | [`dtos`] | 跨 IPC DTO，Rust 结构转 camelCase |
 //! | [`err_box`] | 致命错误弹窗 |
@@ -10,8 +12,12 @@
 //! | [`gui_config`] | GUI 配置读写 |
 //! | [`gui_setting`] | 实例 GUI 设置读写，文件 gui_setting.json，归属 GUI 而非内核 |
 //! | [`image_manager`] | 图片资源加载，走 `mml-image://` 协议 |
+//! | [`integrations`] | 云连接与跨电脑实例绑定配置，文件 integrations.json |
 //! | [`log_text`] | 界面侧日志文案，中英两套，不进内核 i18n |
+//! | [`music`] | 自定义音乐，走 `mml-music` 协议 |
+//! | [`single_instance`] | 单开与唤回，运行目录下的端口文件 `temp` |
 //! | [`start_arg`] | 启动参数（命令行 / `mml:` 协议）解析，等前端初始化后取走执行 |
+//! | [`tray`] | 有实例运行时才出现的系统托盘 |
 //! | [`windows`] | 各窗口的规格 / IPC 命令 / 事件，窗口创建 / 聚焦 / 关闭统一处理 |
 //!
 //! 自定义主页面走 `mml-home://` 协议，其压缩包在运行根目录常驻，
@@ -42,7 +48,7 @@ pub mod start_arg;
 pub mod tray;
 pub mod windows;
 
-/// 单元测试的共用启动，内核单例每进程只 boot 一次，见 AGENTS.md §6
+/// 单元测试的共用启动，内核单例每进程只 boot 一次，见 AGENTS.md §6.1
 #[cfg(test)]
 mod test_support;
 
@@ -72,7 +78,7 @@ const APP_USER_MODEL_ID: &str = "com.coloryr.mml";
 
 /// 启动 Tauri 应用
 ///
-/// 挂接图片协议、窗口事件、Java 列表变更与下载器回调，
+/// 挂接图片 / 主页 / 界面 / 音乐四个自定义协议、窗口事件、Java 列表变更与下载器回调，
 /// 注册全部 IPC 命令后进入事件循环。
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -81,7 +87,6 @@ pub fn run() {
 
     // 进程身份要在建窗口之前钉好，见 [`set_app_user_model_id`]
     set_app_user_model_id();
-
 
     let app = tauri::Builder::default()
         // webview 就绪后的统一装配，都在 on_webview_ready 里拿 ICoreWebView2 做一次：
@@ -188,9 +193,8 @@ pub fn run() {
             // 方块渲染：内核 `load()` 里的启动自动补渲染经此回调上报界面
             block::set_gui_handel(app.handle());
 
-            // 收藏数据与核心无关，但必须等 `mml_core::init` 里的日志系统起来后再读，
+            // 这几份用户数据与核心无关，但必须等 `mml_core::init` 里的日志系统起来后再读，
             // 否则解析失败会没有输出、看起来像没加载
-            // 方块窗口的用户数据，同样是启动时读一次
             if let Err(err) = block_groups::load() {
                 mml_log::error_type(err);
             }

@@ -18,8 +18,8 @@ use crate::windows::resource::{block_on_instance, parse_instance};
 
 /// 要和这几个模组一起改的那些条目
 ///
-/// - `disable = true`：还有哪些**启用**的模组依赖它们 —— 少了前置轻则功能缺失、重则起不来
-/// - `disable = false`：它们要求的强制前置里，现在被禁用着的那些
+/// `disable = true` 时找还有哪些**启用**的模组依赖它们 —— 少了前置轻则功能缺失、
+/// 重则起不来；`disable = false` 时找它们要求的强制前置里现在被禁用着的那些。
 ///
 /// - `list`: 窗口模型里那份扫描结果
 /// - `loader`: 实例的加载器

@@ -3,7 +3,6 @@
 //! 文件号按平台接口的上限切批，取回的是「替换旧文件」这一步要用的数据。
 
 use std::collections::HashMap;
-
 use std::path::PathBuf;
 
 use mml_base::file_item::FileItemObj;

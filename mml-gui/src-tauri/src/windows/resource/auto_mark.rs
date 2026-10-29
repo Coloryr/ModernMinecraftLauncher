@@ -28,9 +28,6 @@ const HASH_BATCH: usize = 50;
 
 /// 一个待标记的模组
 struct Target {
-    /// 模组 uuid，只用于日志
-    #[allow(dead_code)]
-    uuid: String,
     /// 现在的 SHA1：用来删掉旧条目（在线信息按 SHA1 认人）
     sha1: String,
     /// jar 的绝对路径：现读 SHA512 用
@@ -83,7 +80,6 @@ pub async fn resource_mods_auto_mark(
                 .filter(|item| !item.fail)
                 .filter(|item| overwrite || !known.contains(&sha1_of(&item.hash)))
                 .map(|item| Target {
-                    uuid: item.uuid.to_string(),
                     sha1: sha1_of(&item.hash),
                     path: item.file.clone(),
                 })

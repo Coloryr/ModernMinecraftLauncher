@@ -1,15 +1,14 @@
 //! 窗口模块
 //!
-//! 每个窗口一个 rs 文件，包含：
-//! - 窗口规格与模型：标签 / 标题 / 尺寸常量
-//! - 窗口专属的数据模型与方法，如账户 / 新闻 / 游戏事件
-//! - 窗口按钮调用的方法，即 IPC 命令，如 list_dir
+//! 每个窗口一个模块，放该窗口的规格、数据模型与 IPC 命令：
+//! - 窗口注册表（uuid / 标签 / 最小尺寸 / 窗口族）在 `registry`，是唯一来源
+//! - 建窗、关窗与窗口事件在 `lifecycle`，几何口径与 `window_save.json` 在 `geometry`
+//! - 本文件只放 `window_*` 命令与几个跨窗口共用的解析函数：命令的分组键取来源模块，
+//!   搬进子模块会让前端 `bindings.ts` 的组名跟着变
 //!
-//! 所有窗口的创建、聚焦、关闭统一在本模块处理：
-//! - 主窗口在 `setup` 阶段通过 [`show_main_window`] 创建，并恢复上次几何
-//! - 功能窗口通过 [`create_window`] 创建或聚焦；`window_open_window` / `window_close_window`
-//!   命令供前端调用，用于多窗口模式；参数为窗口 kind，与前端 `registry.ts` 对应
-//! - 窗口几何状态 `window_save.json` 与 GUI 配置 `gui_config.json` 也在此维护
+//! 主窗口在 `setup` 阶段通过 [`show_main_window`] 创建并恢复上次几何；功能窗口走
+//! `window_open_window` / `window_close_window` 两个命令，参数是窗口 kind，与前端
+//! `windowManager` 的 kind 对应。GUI 配置的读写命令也留在本文件。
 
 pub mod account;
 pub mod add;
@@ -240,11 +239,7 @@ pub async fn window_open_window(
     // 没给就退回老路子 —— 只有窗口族与 export 把 uuid 拼进去
     let url_path = match query.as_deref().filter(|q| !q.is_empty()) {
         Some(query) => {
-            // 前端那份 query 是 URLSearchParams 编出来的，不会出现裸 # / 控制字符；
-            // 这里只做一次兜底，别把畸形串拼进 WebviewUrl
-            if query.contains('#') || query.chars().any(char::is_control) {
-                return Err(String::from(err_keys::WINDOW_QUERY));
-            }
+            ensure_query_ok(query)?;
             format!("index.html?{query}")
         }
         // 只有窗口族与导出 / 服务器包 / 服务器实例能带 instance，上面校验过了；这里把实例写进 URL，
@@ -267,11 +262,7 @@ pub async fn window_open_window(
 
     // 窗口族是"一个实例一个"：身份由实例 uuid 派生，没有实例就无从开窗
     if let Some(family) = family_of_kind(&kind) {
-        let Some(instance) = instance.as_deref() else {
-            return Err(err_keys::WINDOW_INSTANCE_MISSING.to_string());
-        };
-        let instance = Uuid::parse_str(instance).map_err(|_| err_keys::UUID.to_string())?;
-        let id = family_window_id(family, &instance);
+        let id = family_window_id(family, &required_instance(instance.as_deref())?);
         // 目标实例已经写进窗口身份，已开的窗口不必、也不能再换实例
         return open_window(&app, &id.uuid, &id.label, &url_path, Some(&window));
     }
@@ -322,6 +313,35 @@ fn kind_parse_check(kind: &str, instance: &Option<String>) -> Result<(), String>
     Ok(())
 }
 
+/// 取命令参数里的实例 uuid，窗口族与导出类窗口都靠它定位窗口
+///
+/// - `instance`: 前端传来的实例 uuid 字符串
+///
+/// # 返回值
+///
+/// 缺失返回 `err.windowInstanceMissing`，非法返回 `err.uuid`
+fn required_instance(instance: Option<&str>) -> Result<Uuid, String> {
+    let instance = instance.ok_or_else(|| err_keys::WINDOW_INSTANCE_MISSING.to_string())?;
+    Uuid::parse_str(instance).map_err(|_| err_keys::UUID.to_string())
+}
+
+/// 校验前端拼好的 URL query：不能带裸 `#` 与控制字符
+///
+/// 前端那份 query 由 `URLSearchParams` 编出来，本来就不会有这些字符；
+/// 这里只做一次兜底，免得畸形串被拼进 webview 地址。
+///
+/// - `query`: 不带 `?` 的 query，空串也接受
+///
+/// # 返回值
+///
+/// 合法返回 `Ok(())`，否则返回 `err.windowQuery`
+fn ensure_query_ok(query: &str) -> Result<(), String> {
+    if query.contains('#') || query.chars().any(char::is_control) {
+        return Err(String::from(err_keys::WINDOW_QUERY));
+    }
+    Ok(())
+}
+
 /// 关闭一个窗口，多窗口模式下由窗口关闭按钮调用
 ///
 /// - `app`: 应用句柄，取窗口与关闭都用它
@@ -346,11 +366,7 @@ pub fn window_close_window(
         return close_window_from_uuid(&app, &uuid);
     }
     if let Some(family) = family_of_kind(&kind) {
-        let Some(instance) = instance.as_deref() else {
-            return Err(err_keys::WINDOW_INSTANCE_MISSING.to_string());
-        };
-        let instance = Uuid::parse_str(instance).map_err(|_| err_keys::UUID.to_string())?;
-        let id = family_window_id(family, &instance);
+        let id = family_window_id(family, &required_instance(instance.as_deref())?);
         return close_window(&app, &id.uuid, &id.label);
     }
     let Some(uuid) = uuid_for_kind(&kind) else {
@@ -388,11 +404,7 @@ pub async fn window_reopen_window(
         return window_open_window(app, window, kind, instance, query).await;
     }
     let query = query.unwrap_or_default();
-    // 前端那份 query 是 URLSearchParams 编出来的，不会出现裸 # / 控制字符；
-    // 这里只做一次兜底，别把畸形串拼进 URL，同 window_open_window
-    if query.contains('#') || query.chars().any(char::is_control) {
-        return Err(String::from(err_keys::WINDOW_QUERY));
-    }
+    ensure_query_ok(&query)?;
     let url_path = if query.is_empty() {
         String::from("index.html")
     } else {
@@ -401,13 +413,7 @@ pub async fn window_reopen_window(
 
     // 窗口族按实例定位到族里那一个；静态窗口按 kind 查表
     let id = match family_of_kind(&kind) {
-        Some(family) => {
-            let Some(instance) = instance.as_deref() else {
-                return Err(err_keys::WINDOW_INSTANCE_MISSING.to_string());
-            };
-            let instance = Uuid::parse_str(instance).map_err(|_| err_keys::UUID.to_string())?;
-            family_window_id(family, &instance)
-        }
+        Some(family) => family_window_id(family, &required_instance(instance.as_deref())?),
         None => {
             let Some(uuid) = uuid_for_kind(&kind) else {
                 return Err(format!("unknown window kind: {kind}"));
@@ -484,7 +490,8 @@ pub fn window_url_of_text(text: String) -> String {
 ///
 /// # 返回值
 ///
-/// `kind` 取 `folder` / `archive` / `shortcut` / `other`；`shortcut` 时 `url` 为解析出的地址
+/// `kind` 取 `folder` / `archive` / `serverPack` / `shortcut` / `other`；
+/// `shortcut` 时 `url` 为解析出的地址，其余情况为空串
 #[gui_macros::command]
 pub fn window_probe_drop(path: String) -> DropPathDto {
     let other = |kind: &str| DropPathDto {
@@ -546,7 +553,7 @@ fn shortcut_of(path: &str) -> DropPathDto {
     }
 }
 
-/// 整份读成文本，限小文件；读不出来返回 None
+/// 整份读成文本；只给拖入探测用，调用方已按后缀与大小筛过
 fn read_whole_text(path: &str) -> Option<String> {
     let bytes = std::fs::read(path).ok()?;
     Some(String::from_utf8_lossy(&bytes).to_string())
@@ -834,13 +841,13 @@ pub fn window_start_dragging(window: WebviewWindow) -> Result<(), String> {
 
 // ---------------- 启动时的显示 ----------------
 
-/// 启动后主窗口第一次显示时不要抢前台
-///
-/// 应用由系统、脚本或开发期的 watcher 拉起来时，把前台从用户正在用的窗口抢走会打断操作，
-/// 所以**进程启动后的第一次**主窗口显示只显示、不激活；之后（托盘点开、重开窗口）照常拿焦点。
+/// 下一次显示主窗口是否只显示、不抢前台；被 `take_startup_quiet` 消费一次即复位
 static QUIET_STARTUP: AtomicBool = AtomicBool::new(false);
 
-/// 标记"下一次显示主窗口不要抢前台"，setup 阶段建主窗口之前调一次
+/// 标记下一次显示主窗口不要抢前台，setup 阶段建主窗口之前调一次
+///
+/// 应用由系统、脚本或开发期的 watcher 拉起来时，把前台从用户正在用的窗口抢走会打断操作，
+/// 所以**进程启动后的第一次**主窗口显示只显示、不激活，之后照常拿焦点。
 pub(crate) fn quiet_main_window_startup() {
     QUIET_STARTUP.store(true, Ordering::SeqCst);
 }
@@ -906,9 +913,9 @@ fn show_without_activate(window: &WebviewWindow) -> Result<(), String> {
     window.show().map_err(|err| err.to_string())
 }
 
-/// 激活插件装饰并显示窗口；所有窗口都走插件装饰，见 [`create_window`]
+/// 激活插件装饰并显示窗口；所有窗口都走插件装饰，建窗逻辑见 `lifecycle/create.rs`
 ///
-/// 窗口建出来时是 `decorations: true` + 隐藏的，见 `create_window`；
+/// 窗口建出来时是 `decorations: true` + 隐藏的；
 /// 这里在原生 frame 上激活装饰、再显示：
 ///
 /// - Windows：自绘装饰接管标题栏右侧，Win11 贴靠布局挂在最大化按钮上
@@ -929,7 +936,7 @@ pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'stati
     if let Err(error) = window.activate_decoration().await {
         // 回退：先确保原生 frame 还在，再收起它
         let _ = window.restore_decoration().await;
-        // 原生标题栏不能留：它与自绘顶栏会叠成两条（截图上就是这种）。
+        // 原生标题栏不能留：它与自绘顶栏会叠成两条。
         // 装饰没接管就去掉原生 frame，红黄绿改由前端画，见 useWindowDecoration
         let _ = window.set_decorations(false);
         // 换成无边框后量到的差值只剩边框带，正好是窗口该有的下限
@@ -980,8 +987,7 @@ pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'stati
     }
 
     show_window(&window)?;
-    // 材质要在窗口显示之后铺：demo 也是拿到可见窗口才调（examples/tauri 的 main.rs），
-    // 隐藏状态下铺的会被随后 activate_decoration 改窗口样式一起丢掉
+    // 材质要在窗口显示之后铺：隐藏状态下铺的会被随后 activate_decoration 改窗口样式一起丢掉
     self::effects::apply(&window, &crate::gui_config::get().client.window_effect);
     Ok("custom")
 }

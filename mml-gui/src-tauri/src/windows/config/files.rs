@@ -57,8 +57,6 @@ pub(super) fn read_slice(path: &Path, offset: u64, length: u32) -> Result<BytesS
     })
 }
 
-/// 获取实例可编辑的配置文件列表
-///
 /// 列出某个来源下可编辑的配置文件
 ///
 /// 来源为空串时收 options.txt 与 `config` / `kubejs` / `local` 下的全部文件；
@@ -118,7 +116,7 @@ pub fn config_get_files(game: String, source: String) -> Result<Vec<FileItemDto>
 /// # 返回值
 ///
 /// 见 [`ConfigTextDto`]；路径非法返回 `err.fileName`，二进制文件返回 `err.fileBinary`，
-/// 体积超过 [`MAX_FILE_SIZE`] 返回 `err.fileTooLarge`，读取失败返回内核错误串
+/// 体积超过 [`super::source::MAX_FILE_SIZE`] 返回 `err.fileTooLarge`，读取失败返回内核错误串
 #[gui_macros::ipc_group("config")]
 #[gui_macros::command]
 pub fn config_get_file(
@@ -193,7 +191,13 @@ pub fn config_save_file(
 
 /// 文本全文的 SHA1，十六进制小写
 ///
-/// 按**解码后文本**的 UTF-8 字节算：读与写都过同一套解码，前后自然同一口径
+/// 按**解码后文本**的 UTF-8 字节算：读与写都过同一套解码，前后自然同一口径。
+///
+/// - `text`: 已经解码好的全文
+///
+/// # 返回值
+///
+/// 十六进制小写的 SHA1
 pub(super) fn text_sha1(text: &str) -> String {
     hash_helper::gen_hash(HashType::Sha1, text.as_bytes())
 }
@@ -272,6 +276,10 @@ pub fn config_get_bytes_slice(
 /// 图片文件扩展名 → MIME
 ///
 /// 与 [`get_file_type`] 的 `Image` 分支同口径；认不出的按二进制流给，让浏览器自己判。
+///
+/// # 返回值
+///
+/// 图片的 MIME；扩展名不认识时是 `application/octet-stream`
 pub(super) fn image_mime(path: &Path) -> &'static str {
     match path
         .extension()
@@ -290,7 +298,7 @@ pub(super) fn image_mime(path: &Path) -> &'static str {
 /// 读取一个图片文件，转成可以直接塞进 `<img src>` 的 data URL
 ///
 /// 配置目录里的图片都是图标 / 缩略图量级，一次 IPC 读完即可；体积上限沿用
-/// [`MAX_FILE_SIZE`]，再大就不是"看一眼"的用途了。
+/// [`super::source::MAX_FILE_SIZE`]，再大就不是"看一眼"的用途了。
 ///
 /// - `game`: 实例 uuid
 /// - `source`: 来源，空串为实例本身，否则是存档目录名

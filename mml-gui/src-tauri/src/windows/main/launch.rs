@@ -94,7 +94,21 @@ pub async fn main_launch_game(
     launch_game(app, uuid, world, force, auto_save, server_pack, None).await
 }
 
-/// 大厅的临时进服参数只作用于本次启动，不改实例配置。
+/// 启动实例的完整实现，主窗口命令与大厅共用
+///
+/// 大厅传来的账户与进服参数只作用于本次启动，不改实例配置。
+///
+/// - `app`: 应用句柄，用于发启动状态 / 日志 / 退出事件
+/// - `uuid`: 实例 uuid
+/// - `world`: 启动后直接进入的存档目录名，`None` 或空串表示不指定
+/// - `force`: 账户被占用时是否跳过占用检查
+/// - `auto_save`: 实例配的自动进入存档这次用不用，`Some(false)` 为不进入
+/// - `server_pack`: 服务器包处理方式，`Some("skip")` 表示不比对清单直接启动
+/// - `lobby`: 大厅的临时账户与进服方式，`None` 表示走当前账户与常规规则
+///
+/// # 返回值
+///
+/// 已交给后台线程时返回 `Ok(())`；其余错误与 `main_launch_game` 相同
 pub(crate) async fn launch_game(
     app: AppHandle,
     uuid: String,
@@ -305,11 +319,11 @@ pub(crate) async fn launch_game(
 ///
 /// 只在进程起来之前有效：取消令牌在启动线程收工时就摘掉，进游戏后要停请用 main_stop_game。
 ///
-/// - uuid: 实例 uuid
+/// - `uuid`: 实例 uuid
 ///
 /// # 返回值
 ///
-/// 已发出取消返回 true；进程已经起来或不在启动中返回 false，uuid 非法返回 Err
+/// 已发出取消返回 `true`；进程已经起来或不在启动中返回 `false`，uuid 非法返回 `Err`
 #[gui_macros::ipc_group("main")]
 #[gui_macros::command]
 pub fn main_cancel_launch(uuid: String) -> Result<bool, String> {

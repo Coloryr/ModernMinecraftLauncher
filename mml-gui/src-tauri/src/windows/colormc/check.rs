@@ -91,7 +91,7 @@ pub(super) struct CompatEntry {
 
 /// 兼容性对照表：ColorMC 工作目录的**顶层条目** → 每条的级别与说明
 ///
-/// 结论来自逐项对照 ColorMC 源码 `E:\code\ColorMC` 与本仓库代码：
+/// 结论来自逐项对照 ColorMC 源码与本仓库代码：
 /// - `minecraft/` **同构**：实例、资源、版本库、依赖库都在同样的位置，能直接用；
 /// - `collect.json` 结构一致：M²L 的 `CollectObj` 少了 ColorMC 的 4 个开关，未知字段被忽略；
 /// - `config.json` 能读，靠的是 `#[serde(default)]`，但 ColorMC 独有的 `SafeLog4j` 会丢、

@@ -2,7 +2,9 @@
 
 use mml_sys::{open_helper, path_helper};
 
-use super::{KIND_DATAPACKS, datapack_dir, instance_dir, parse_instance, resource_file};
+use super::{
+    KIND_DATAPACKS, check_parent, datapack_dir, instance_dir, parse_instance, resource_file,
+};
 use crate::err_keys;
 
 // ==================== 打开文件夹 ====================
@@ -39,7 +41,13 @@ pub fn resource_open_folder(
     // 给了名字是"定位这个文件"，没给是"打开这个目录"，两者打开方式不同，见末尾
     let named = matches!(name.as_deref(), Some(name) if !name.trim().is_empty());
     let target = if named {
-        resource_file(&instance, &kind, name.as_deref().unwrap_or_default())?
+        let name = name.as_deref().unwrap_or_default();
+        if kind == KIND_DATAPACKS {
+            // 数据包不在 dir_of 的类别表里，落点由上面算好的存档目录 + 纯文件名拼
+            dir.join(check_parent(name)?)
+        } else {
+            resource_file(&instance, &kind, name)?
+        }
     } else {
         if !dir.exists() {
             path_helper::create_dir_all(&dir).map_err(|err| err.to_string())?;

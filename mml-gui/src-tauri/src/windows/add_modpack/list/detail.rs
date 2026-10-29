@@ -5,7 +5,7 @@
 
 use mml_game::launcher::{FileType, ModPackType};
 use mml_net::curseforge_api::{self, CurseFogreArg};
-use mml_net::modrinth_api::{self};
+use mml_net::modrinth_api;
 
 use crate::dtos::add_resource_dto::{FileListDto, FileListItemDto, ProjectDetailDto};
 
@@ -164,16 +164,9 @@ pub async fn add_modpack_file(
                 }
             };
 
-            let list = modrinth_api::get_file_versions(
-                &pid,
-                match version.as_ref() {
-                    Some(data) => Some(data),
-                    None => None,
-                },
-                None,
-            )
-            .await
-            .map_err(|err| err.to_string())?;
+            let list = modrinth_api::get_file_versions(&pid, version.as_deref(), None)
+                .await
+                .map_err(|err| err.to_string())?;
 
             let mut list1 = Vec::new();
 

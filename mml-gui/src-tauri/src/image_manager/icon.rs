@@ -16,7 +16,7 @@ use mml_sys::path_helper;
 use tauri::UriSchemeResponder;
 
 use super::respond::{IconBytes, normalize_icon, send_bad, send_icon};
-use super::{ICON_DIR, ICON_IMAGE, ICON_TIMEOUT, IconCache, URL_IMAGE};
+use super::{ICON_DIR, ICON_IMAGE, ICON_TIMEOUT, IconCache, URL_IMAGE, icon_cache_dir};
 
 /// 远程图标，URI 形如 `icon/<请求名>`：内存 → 磁盘 + ETag 校验 → 网络
 ///
@@ -24,7 +24,7 @@ use super::{ICON_DIR, ICON_IMAGE, ICON_TIMEOUT, IconCache, URL_IMAGE};
 /// 服务器 304 图没变就不拉图片体，直接用硬盘缓存；200 才重新拉图更新本地；
 /// 网络失败时用本地副本兜底
 ///
-/// - `uri`: 协议路径片段，首段 `icon` 已剥，第 2 段是网址的 sha256
+/// - `uri`: 协议路径片段，第 1 段是路由名 `icon`，第 2 段是网址的 sha256
 /// - `res`: 响应回写句柄
 pub(super) async fn load_icon_image(uri: &[&str], res: UriSchemeResponder) {
     if uri.len() != 2 {
@@ -34,24 +34,7 @@ pub(super) async fn load_icon_image(uri: &[&str], res: UriSchemeResponder) {
 
     let name = uri[1];
 
-    let url = URL_IMAGE.read().unwrap().get(name).cloned();
-    let Some(url) = url else {
-        // 映射里没有 ≠ 图片没有：`sha → 远程网址` 只在内存里，重启后就空了，
-        // 但图片字节是按 sha256 落在磁盘缓存上的，所以先按 name 查盘再说
-        let file = icon_file_by_name(name);
-        match read_icon_bytes(&file) {
-            Some(icon) => {
-                // 顺手写回内存缓存：这条路径是重启后收藏夹里的老地址，本来每次刷新
-                // 都要读盘 + 归一化一遍，不缓存等于每次全量解一次
-                set_icon_image(name, icon.data.clone(), icon.mime);
-                send_icon(res, &icon);
-            }
-            None => send_bad(res),
-        }
-        return;
-    };
-
-    // 内存缓存
+    // 内存缓存先查：没有网址登记的旧地址也走这条，否则每次刷新都要读盘解码一遍
     if let Some(icon) = get_icon_image(name) {
         send_icon(
             res,
@@ -62,6 +45,22 @@ pub(super) async fn load_icon_image(uri: &[&str], res: UriSchemeResponder) {
         );
         return;
     }
+
+    let url = URL_IMAGE.read().unwrap().get(name).cloned();
+    let Some(url) = url else {
+        // 映射里没有 ≠ 图片没有：`sha → 远程网址` 只在内存里，重启后就空了，
+        // 但图片字节是按 sha256 落在磁盘缓存上的，所以先按 name 查盘再说
+        let file = icon_file_by_name(name);
+        match read_icon_bytes(&file) {
+            Some(icon) => {
+                // 写回内存缓存，后续请求在 TTL 内不必再读盘归一化
+                set_icon_image(name, icon.data.clone(), icon.mime);
+                send_icon(res, &icon);
+            }
+            None => send_bad(res),
+        }
+        return;
+    };
 
     let file = icon_file(&url);
     let etag_file = icon_etag_file(&url);
@@ -235,7 +234,8 @@ pub(super) fn icon_file(url: &str) -> PathBuf {
 ///
 /// `<name>.png` 的完整路径
 pub(super) fn icon_file_by_name(name: &str) -> PathBuf {
-    ICON_DIR.get().unwrap().join(format!("{name}.png"))
+    // 走 icon_cache_dir 而不是直接取 ICON_DIR：协议回调不能 panic，目录没初始化时补上
+    icon_cache_dir().join(format!("{name}.png"))
 }
 
 /// 图标的 ETag 旁车文件
@@ -246,10 +246,7 @@ pub(super) fn icon_file_by_name(name: &str) -> PathBuf {
 ///
 /// `<网址 sha256>.etag` 的完整路径
 pub(super) fn icon_etag_file(url: &str) -> PathBuf {
-    ICON_DIR
-        .get()
-        .unwrap()
-        .join(format!("{}.etag", icon_name(url)))
+    icon_cache_dir().join(format!("{}.etag", icon_name(url)))
 }
 
 /// 读取记录的 ETag

@@ -23,6 +23,8 @@ fn run_dir() -> PathBuf {
 }
 
 /// 起齐全局单例：运行目录、路径、日志、配置与异步保存线程
+///
+/// - `dir`: 本次用例的运行目录
 fn setup(dir: &PathBuf) {
     mml_base::init(dir);
     mml_names::init(mml_base::get_base_dir()).unwrap();
@@ -35,6 +37,11 @@ fn setup(dir: &PathBuf) {
 /// 造一条收藏
 ///
 /// - `pid`: 项目 ID，同一路径下靠它判重
+/// - `name`: 收藏显示名
+///
+/// # 返回值
+///
+/// 一条填好必填字段的收藏，其余字段取默认值
 fn item(pid: &str, name: &str) -> CollectItemObj {
     CollectItemObj {
         source: ModPackType::Modrinth,
@@ -115,7 +122,10 @@ fn collect_lifecycle() {
     collect_utils::load().unwrap();
     let reloaded = collect_utils::get();
     assert_eq!(reloaded.items.len(), 2);
-    assert!(reloaded.groups["优化"].contains(&iris), "分组关系应读得回来");
+    assert!(
+        reloaded.groups["优化"].contains(&iris),
+        "分组关系应读得回来"
+    );
 
     // ---------- 删分组：条目保留 ----------
     collect_utils::remove_group("优化");

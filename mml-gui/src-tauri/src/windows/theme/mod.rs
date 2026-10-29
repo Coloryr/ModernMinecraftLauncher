@@ -201,6 +201,10 @@ pub fn detect_theme(path: &Path, expected: Option<ThemeKind>) -> Result<ThemeInf
 ///
 /// - `archive`: 常驻包句柄
 /// - `fallback`: 没有可用清单时按导入入口推断的类型
+///
+/// # 返回值
+///
+/// 见 [`ThemeInfo`]；清单不可用时 `declared` 为 `false`，类型取 `fallback`
 pub fn meta_of_archive(archive: &WebArchive, fallback: ThemeKind) -> ThemeInfo {
     if let Some(manifest) = manifest_of_archive(archive)
         && let Some(kind) = ThemeKind::from_manifest(&manifest.kind)
@@ -240,7 +244,7 @@ fn read_manifest(archive: &mut archive::Package) -> Result<Option<Manifest>, Str
     Ok(Some(manifest))
 }
 
-/// 包里有没有这个入口，大小写不一致时按小写匹配并记一条日志
+/// 包里有没有这个入口；只能大小写不敏感地匹配上时记一条日志
 ///
 /// - `archive`: 已通过容器与路径校验的包
 /// - `name`: 约定的小写入口文件名

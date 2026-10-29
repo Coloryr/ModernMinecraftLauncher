@@ -4,8 +4,8 @@
 //! `resource-list-mods-progress` 事件上报；启用 / 禁用只改文件名，加减 `.disabled` 后缀，
 //! 删除进回收站。
 //!
-//! `mod_note` / `mod_note_key` 是 `pub(super)`：模组备注的读写命令在 `mod.rs`
-//! 的分组段里，测试也在那边。
+//! 备注的定位键 `mod_note_key` 与读取 `mod_note` 在 `item` 里：写备注的命令在
+//! `groups/cmds.rs`，`mod.rs` 只把 `mod_note` 再导出给测试。
 
 pub(crate) mod actions;
 pub(crate) mod export;

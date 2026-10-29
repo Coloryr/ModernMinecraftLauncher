@@ -1,6 +1,6 @@
 //! NBT 编辑动作
 //!
-//! 按前端给的「改值 / 新增 / 删除」操作，在树上定位后用 JSON 形状的文本赋值。
+//! 按前端给的「改值 / 新增 / 改名 / 删除」操作，在树上定位后用文本描述的新值赋值。
 
 use mml_nbt::nbt_types;
 use mml_nbt::{NBT_END_ORDER, NbtType};
@@ -122,13 +122,9 @@ pub(super) fn nbt_at_mut<'a>(
                 .data
                 .get_mut(segment)
                 .ok_or_else(|| String::from(err_keys::NBT_PATH))?,
-            NbtType::List(list) => {
-                let index = segment
-                    .parse::<usize>()
-                    .map_err(|_| String::from(err_keys::NBT_PATH))?;
-                list.get_item_mut(index)
-                    .ok_or_else(|| String::from(err_keys::NBT_PATH))?
-            }
+            NbtType::List(list) => list
+                .get_item_mut(parse_index(segment)?)
+                .ok_or_else(|| String::from(err_keys::NBT_PATH))?,
             _ => return Err(String::from(err_keys::NBT_PATH)),
         };
     }

@@ -1,7 +1,7 @@
-//! 主窗口：新闻 / 游戏事件模型 + 实例数据存储 + IPC 命令，即窗口按钮调用的方法
+//! 主窗口：遗留实例与启动参数的窗口模型、窗口间事件、IPC 命令
 //!
-//! 数据从 Rust 侧获取：实例 / Java / 版本存储在 `MainWindowModel`，
-//! 持久化到应用数据目录的 `main_data.json`；前端通过 IPC 调用本模块命令。
+//! `MainWindowModel` 只是内存里的兜底存储，核心实例 / 分组 / 运行态一律以 mml-game 为准；
+//! 前端通过 IPC 调用本模块命令。
 //!
 //! **分组不在这里**：组名归属与两种顺序都由内核分组表
 //! `mml_game::game_group` 的 `group_save.json` 持有，本模块只转发。
@@ -25,7 +25,7 @@ use crate::dtos::{ErrorEvent, InstanceArgsDto, InstanceChangeEvent, InstanceInfo
 use crate::err_keys;
 use crate::{listens, windows};
 
-// block.rs 也用它，故按原路径再导出，供 use super::main::core_instance 取到
+// block 窗口也用它，故按原路径再导出，供 `use super::main::core_instance` 取到
 pub(crate) use self::args::core_instance;
 
 /// 核心加载完成事件：ok 为加载成功，error 为失败信息，前端据此显示错误页
@@ -59,7 +59,7 @@ pub struct MainWindowModel {
     pub instances: Vec<InstanceInfoDto>,
     /// 遗留实例的启动参数，键为实例 uuid
     pub args: HashMap<String, InstanceArgsDto>,
-    /// 运行中的实例 uuid
+    /// 运行中的实例 uuid，遗留字段；运行态以 `mml_game` 为准，这里不再写入
     pub running: HashSet<String>,
 }
 
@@ -89,7 +89,7 @@ impl Default for MainWindowModel {
 
 /// 取主窗口模型，模型跟随主窗口生命周期，开窗创建、关窗销毁，见 `windows`
 ///
-/// 模型缺失属异常情形，即主窗口未创建，返回 Err / 空列表由调用方降级，不 panic。
+/// 模型缺失说明主窗口还没建，此时返回 `err.modelMissing` 由调用方降级，不 panic。
 ///
 /// **调用方不一定是主窗口**：日志窗口也要读运行列表、启动 / 停止实例（标题栏的
 /// 「测试启动 / 停止」）。所以先按调用窗口取，拿不到再退到 kind 为 `main` 的那一份 ——

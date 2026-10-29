@@ -10,6 +10,15 @@ use std::{
 };
 use zip::ZipArchive;
 
+/// 判断一个路径段能不能安全落盘
+///
+/// 挡掉空段、`.` / `..`、结尾的点或空格、路径分隔符与 Windows 保留设备名。
+///
+/// - `value`: 待校验的路径段
+///
+/// # 返回值
+///
+/// 可以安全使用返回 `true`
 pub(super) fn safe_component(value: &str) -> bool {
     !value.is_empty()
         && value != "."
@@ -50,6 +59,13 @@ pub(super) fn safe_component(value: &str) -> bool {
         )
 }
 
+/// 判断文件是不是服务器包：能打开 zip 且包内有清单
+///
+/// - `path`: 待检查的文件
+///
+/// # 返回值
+///
+/// 包内有 `mml-server.json` 返回 `true`；打不开或无清单返回 `false`
 pub(crate) fn is_server_pack(path: &Path) -> bool {
     File::open(path)
         .ok()
@@ -57,6 +73,14 @@ pub(crate) fn is_server_pack(path: &Path) -> bool {
         .is_some_and(|mut zip| zip.by_name(MANIFEST).is_ok())
 }
 
+/// 从包里读一个 JSON 条目，条目大小限制 4MB
+///
+/// - `zip`: 已打开的包
+/// - `name`: 包内条目名
+///
+/// # 返回值
+///
+/// 反序列化结果；条目不存在、超过大小限制或解析失败返回 `err.serverPackInvalid`
 pub(super) fn read_json<T: serde::de::DeserializeOwned, R: Read + Seek>(
     zip: &mut ZipArchive<R>,
     name: &str,
@@ -70,6 +94,15 @@ pub(super) fn read_json<T: serde::de::DeserializeOwned, R: Read + Seek>(
     serde_json::from_reader(file).map_err(|_| err_keys::SERVER_PACK_INVALID.into())
 }
 
+/// 在任何覆盖之前校验清单、实例配置与完整条目表
+///
+/// 逐条检查路径段合法、无重复、无符号链接、条目归属在白名单内，并限制总大小。
+///
+/// - `zip`: 已打开的包
+///
+/// # 返回值
+///
+/// 校验通过的清单；任一条不合规返回 `err.serverPackInvalid`
 pub(super) fn validate<R: Read + Seek>(zip: &mut ZipArchive<R>) -> Result<Manifest, String> {
     let bad = || err_keys::SERVER_PACK_INVALID.to_string();
     let manifest: Manifest = read_json(zip, MANIFEST)?;

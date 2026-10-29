@@ -31,7 +31,7 @@ pub fn gamepad_list() -> Vec<GamepadDto> {
 
 /// 读取一个手柄的当前状态
 ///
-/// - 手柄编号：gamepad_list 返回的编号
+/// - `id`: 手柄编号，即 gamepad_list 返回的编号
 ///
 /// # 返回值
 ///
@@ -79,7 +79,7 @@ pub fn gamepad_get_profiles() -> Vec<GamepadProfileDto> {
 
 /// 读取一份映射
 ///
-/// - 配置名：文件名去掉 .json
+/// - `name`: 配置名，即文件名去掉 `.json`
 ///
 /// # 返回值
 ///
@@ -93,8 +93,8 @@ pub fn gamepad_get_config(name: String) -> Result<GamepadConfigDto, String> {
 
 /// 保存一份映射
 ///
-/// - 配置名：文件名去掉 .json
-/// - 配置内容：界面编辑后的整份映射
+/// - `name`: 配置名，即文件名去掉 `.json`
+/// - `config`: 界面编辑后的整份映射
 ///
 /// # 返回值
 ///
@@ -107,7 +107,7 @@ pub fn gamepad_save_config(name: String, config: GamepadConfigDto) -> Result<(),
 
 /// 新建一份映射，内容复制当前生效的那份
 ///
-/// - 配置名：新配置的显示名，同时作为文件名
+/// - `name`: 新配置的显示名，同时作为文件名
 ///
 /// # 返回值
 ///
@@ -119,7 +119,7 @@ pub fn gamepad_create_profile(name: String) -> Result<(), String> {
 
 /// 删除一份映射，至少保留一份
 ///
-/// - 配置名：要删除的配置
+/// - `name`: 要删除的配置
 ///
 /// # 返回值
 ///
@@ -131,7 +131,7 @@ pub fn gamepad_delete_profile(name: String) -> Result<(), String> {
 
 /// 把一份映射设为当前生效
 ///
-/// - 配置名：要生效的配置
+/// - `name`: 要生效的配置
 ///
 /// # 返回值
 ///

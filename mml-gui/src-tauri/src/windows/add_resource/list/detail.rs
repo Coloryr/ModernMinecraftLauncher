@@ -6,7 +6,7 @@
 use mml_game::curseforge;
 use mml_game::launcher::ModPackType;
 use mml_net::curseforge_api::{self, CurseFogreArg};
-use mml_net::modrinth_api::{self};
+use mml_net::modrinth_api;
 
 use crate::dtos::add_resource_dto::{FileListDto, FileListItemDto, ProjectDetailDto};
 use crate::err_keys;
@@ -144,19 +144,9 @@ pub async fn add_resource_file(
                 .await
                 .map_err(|err| err.to_string())?;
 
-            let list = modrinth_api::get_file_versions(
-                &pid,
-                match version.as_ref() {
-                    Some(data) => Some(data),
-                    None => None,
-                },
-                match loader.as_ref() {
-                    Some(data) => Some(data),
-                    None => None,
-                },
-            )
-            .await
-            .map_err(|err| err.to_string())?;
+            let list = modrinth_api::get_file_versions(&pid, version.as_deref(), loader.as_deref())
+                .await
+                .map_err(|err| err.to_string())?;
 
             let mut list1 = Vec::new();
 

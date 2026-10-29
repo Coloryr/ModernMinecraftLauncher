@@ -9,43 +9,65 @@ use std::{
     sync::Arc,
 };
 
+/// 固定使用的陶瓦版本，与下面的摘要一一对应
 const VERSION: &str = "0.4.2";
 
-fn asset() -> Result<(&'static str, &'static str), String> {
+/// 一个平台的发布包
+struct Asset {
+    /// 发布包平台名，如 `windows-x86_64`
+    platform: &'static str,
+    /// 发布包的 SHA-256
+    digest: &'static str,
+}
+
+/// 当前平台对应的发布包与摘要
+///
+/// # 返回值
+///
+/// 见 [`Asset`]；平台没有预置包时返回 `err.lobbyPlatform`
+fn asset() -> Result<Asset, String> {
     match (std::env::consts::OS, std::env::consts::ARCH) {
-        ("windows", "x86_64") => Ok((
-            "windows-x86_64",
-            "07ebe139e3ca5f74576e58b1a96efe59abdfbe148d3f1a49bfdca8b6f70745f0",
-        )),
-        ("windows", "aarch64") => Ok((
-            "windows-arm64",
-            "acfab0a87a02dedc6dab7c05303186c8907f56f815548b693fb3324358da7d14",
-        )),
-        ("linux", "x86_64") => Ok((
-            "linux-x86_64",
-            "675c4fd6c74d49ed8165151ba2be5b6582e0af20fb6d912074543c2484b1e10a",
-        )),
-        ("linux", "aarch64") => Ok((
-            "linux-arm64",
-            "845285ff264ac5fbc16db1a1605ad190e7fa64196516068cc309de5a1d2bf66d",
-        )),
-        ("macos", "x86_64") => Ok((
-            "macos-x86_64",
-            "16306157d89423ce79fa901cdb75a6386ec1a9b1bd43a5d47c2c47cf01a16b86",
-        )),
-        ("macos", "aarch64") => Ok((
-            "macos-arm64",
-            "13de7f9ce8733971b23493fabbe7e16d480f1e0d16a6265b4861f5a01bbecb60",
-        )),
+        ("windows", "x86_64") => Ok(Asset {
+            platform: "windows-x86_64",
+            digest: "07ebe139e3ca5f74576e58b1a96efe59abdfbe148d3f1a49bfdca8b6f70745f0",
+        }),
+        ("windows", "aarch64") => Ok(Asset {
+            platform: "windows-arm64",
+            digest: "acfab0a87a02dedc6dab7c05303186c8907f56f815548b693fb3324358da7d14",
+        }),
+        ("linux", "x86_64") => Ok(Asset {
+            platform: "linux-x86_64",
+            digest: "675c4fd6c74d49ed8165151ba2be5b6582e0af20fb6d912074543c2484b1e10a",
+        }),
+        ("linux", "aarch64") => Ok(Asset {
+            platform: "linux-arm64",
+            digest: "845285ff264ac5fbc16db1a1605ad190e7fa64196516068cc309de5a1d2bf66d",
+        }),
+        ("macos", "x86_64") => Ok(Asset {
+            platform: "macos-x86_64",
+            digest: "16306157d89423ce79fa901cdb75a6386ec1a9b1bd43a5d47c2c47cf01a16b86",
+        }),
+        ("macos", "aarch64") => Ok(Asset {
+            platform: "macos-arm64",
+            digest: "13de7f9ce8733971b23493fabbe7e16d480f1e0d16a6265b4861f5a01bbecb60",
+        }),
         _ => Err(err_keys::LOBBY_PLATFORM.into()),
     }
 }
 
+/// 确保陶瓦可执行文件就位且摘要匹配，没有就下载并解包
+///
+/// - `model`: 大厅模型，下载进度写进它的视图
+/// - `worker`: 进程租约，解包线程活到它结束才释放
+///
+/// # 返回值
+///
+/// 可执行文件路径；平台不支持、下载、校验或解包失败返回错误
 pub(super) async fn executable(
     model: &Arc<LobbyModel>,
     worker: Arc<WorkerLease>,
 ) -> Result<PathBuf, String> {
-    let (platform, digest) = asset()?;
+    let Asset { platform, digest } = asset()?;
     let folder = crate::gui_config::dir()
         .ok_or(err_keys::LOBBY_CLOSED)?
         .join("terracotta")
@@ -120,6 +142,17 @@ pub(super) async fn executable(
     result
 }
 
+/// 解包发布包，拒绝链接、越界条目与超限文件
+///
+/// - `bytes`: 已校验摘要的 tar.gz 内容
+/// - `folder`: 安装目录
+/// - `name`: 可执行文件名
+/// - `digest`: 已校验的摘要，最后写进 `verified.sha256`
+/// - `token`: 取消令牌，逐条检查
+///
+/// # 返回值
+///
+/// 解包并标记完成返回 `Ok(())`；取消、条目非法或缺少可执行文件返回错误
 fn unpack(
     bytes: &[u8],
     folder: &Path,
@@ -170,6 +203,7 @@ mod tests {
     use flate2::{Compression, write::GzEncoder};
     use tokio_util::sync::CancellationToken;
 
+    /// 造一个只含单文件的 tar.gz，`link` 决定那一条是不是符号链接
     fn fixture(link: bool) -> Vec<u8> {
         let mut tar = tar::Builder::new(GzEncoder::new(Vec::new(), Compression::default()));
         let mut header = tar::Header::new_gnu();

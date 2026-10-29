@@ -15,7 +15,10 @@ use uuid::Uuid;
 static DELETING: LazyLock<Mutex<HashSet<Uuid>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
 
 /// 「删除中」的标记，丢弃即撤销
-pub(crate) struct Deleting(Uuid);
+pub(crate) struct Deleting(
+    /// 被标记的实例 uuid
+    Uuid,
+);
 
 impl Drop for Deleting {
     fn drop(&mut self) {

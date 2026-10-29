@@ -13,6 +13,13 @@ struct StagedFile {
 }
 
 impl StagedFile {
+    /// 在目标文件同目录建一个占位临时文件
+    ///
+    /// - `destination`: 用户选择的输出路径
+    ///
+    /// # 返回值
+    ///
+    /// 已创建的暂存文件；目标没有文件名或建不出来时返回错误文案
     fn new(destination: &Path) -> Result<Self, String> {
         if destination.file_name().is_none() {
             return Err(crate::err_keys::FILE_NAME.into());
@@ -29,11 +36,14 @@ impl Drop for StagedFile {
     }
 }
 
-/// 完整写入导出文件，写入或提交失败时保留原文件。
-/// - `path`: 用户选择的输出路径。
-/// - `write`: 写入内容并检查取消状态的回调。
+/// 完整写入导出文件，写入或提交失败时保留原文件
+///
+/// - `path`: 用户选择的输出路径
+/// - `write`: 写入内容并检查取消状态的回调
+///
 /// # 返回值
-/// 文件已替换或写入失败的原因。
+///
+/// 文件已替换返回 `Ok(())`；写入或改名失败返回错误文案
 pub(super) fn write(
     path: &Path,
     write: impl FnOnce(&mut File) -> Result<(), String>,
@@ -49,11 +59,14 @@ pub(super) fn write(
     fs::rename(&temp.path, path).map_err(|e| e.to_string())
 }
 
-/// 为异步导出提供暂存路径，成功后提交完整文件。
-/// - `path`: 用户选择的输出路径。
-/// - `write`: 将归档写入暂存路径的异步回调。
+/// 为异步导出提供暂存路径，成功后提交完整文件
+///
+/// - `path`: 用户选择的输出路径
+/// - `write`: 将归档写入暂存路径的异步回调
+///
 /// # 返回值
-/// 文件已替换或导出失败的原因。
+///
+/// 文件已替换返回 `Ok(())`；导出被取消或失败时返回错误文案
 pub(super) async fn write_async<F: Future<Output = Result<(), String>>>(
     path: &Path,
     write: impl FnOnce(PathBuf) -> F,

@@ -62,14 +62,24 @@ fn encode(salt: &str, hash: &str) -> String {
     format!("${ALGORITHM}${ROUNDS}${salt}${hash}")
 }
 
+/// 自描述串拆出的字段
+struct LockParts<'a> {
+    /// 迭代轮数
+    rounds: u32,
+    /// 十六进制盐
+    salt: &'a str,
+    /// 十六进制哈希
+    hash: &'a str,
+}
+
 /// 拆自描述串
 ///
 /// - `text`: 形如 `$pbkdf2-sha256$120000$<盐>$<哈希>`
 ///
 /// # 返回值
 ///
-/// 轮数、盐、哈希；算法不认识或字段不齐时返回 `None`
-fn parts(text: &str) -> Option<(u32, &str, &str)> {
+/// 拆出的轮数、盐与哈希；算法不认识或字段不齐时返回 `None`
+fn parts(text: &str) -> Option<LockParts<'_>> {
     let mut pieces = text.strip_prefix('$')?.split('$');
     if pieces.next()? != ALGORITHM {
         return None;
@@ -85,7 +95,7 @@ fn parts(text: &str) -> Option<(u32, &str, &str)> {
     {
         return None;
     }
-    Some((rounds, salt, hash))
+    Some(LockParts { rounds, salt, hash })
 }
 
 /// 锁文件路径
@@ -199,8 +209,8 @@ fn verify_in(dirs: &[PathBuf], password: &str) -> bool {
         return true;
     }
     dirs.iter().filter_map(|dir| read(dir)).any(|lock| {
-        parts(&lock).is_some_and(|(rounds, salt, hash)| {
-            hash_password(password, salt, rounds).as_str() == hash
+        parts(&lock).is_some_and(|parsed| {
+            hash_password(password, parsed.salt, parsed.rounds).as_str() == parsed.hash
         })
     })
 }

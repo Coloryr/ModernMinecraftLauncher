@@ -125,6 +125,7 @@ pub async fn settings_get_local_files() -> Vec<LocalFileEntryDto> {
 
 /// 清理一项缓存目录，只删目录里的东西、目录本身留着
 ///
+/// - `app`: 应用句柄，清理「界面数据」时用来取任意一个 webview
 /// - `id`: 文件夹 id，取自 [`settings_get_local_files`] 的返回值
 ///
 /// # 返回值

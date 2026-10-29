@@ -12,6 +12,7 @@ use super::super::model::window_model;
 use super::item::{ModCtx, mod_item};
 use crate::{dtos::mod_export_dto::ModExportDto, err_keys, windows::instance_snapshot};
 
+/// 允许导出的字段名，与窗口 model 里那份 DTO 的键一致
 const FIELDS: &[&str] = &[
     "name",
     "modId",
@@ -94,6 +95,7 @@ pub async fn resource_export_mods(uuid: String, config: ModExportDto) -> Result<
     .map_err(|e| e.to_string())?
 }
 
+/// 把字段值转成展示文本：数组按逗号拼接，null 为空串
 fn text_of(value: &Value) -> String {
     match value {
         Value::String(text) => text.clone(),
@@ -103,6 +105,7 @@ fn text_of(value: &Value) -> String {
     }
 }
 
+/// 按 CSV 规则加引号转义；以公式符号开头的加单引号，防表格软件当成公式执行
 fn csv_cell(value: &str) -> String {
     // 表格软件会执行以这些符号起始的公式，文本字段必须保持为文本。
     let value = if value
@@ -116,6 +119,15 @@ fn csv_cell(value: &str) -> String {
     format!("\"{}\"", value.replace('"', "\"\""))
 }
 
+/// 按选定字段与格式渲染整份导出内容
+///
+/// - `rows`: 已转成 JSON 的模组条目，每项是字段名 → 值
+/// - `fields`: 用户选定的字段名，顺序即输出顺序
+/// - `format`: 导出格式，取值 `json` / `csv` / `txt`
+///
+/// # 返回值
+///
+/// 渲染好的文本；字段为空、重复、不认识，或格式不认识时返回错误串
 fn render(rows: &[Value], fields: &[String], format: &str) -> Result<String, String> {
     let unique: HashSet<_> = fields.iter().collect();
     if fields.is_empty()

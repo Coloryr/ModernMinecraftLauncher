@@ -39,30 +39,38 @@ struct AppliedFile {
     existed: bool,
 }
 
+/// 解析安装位置，并逐段拒绝符号链接与 Windows 重解析点
+///
+/// 目标可以还不存在，只有已存在的路径段才做链接检查。
+///
+/// - `root`: 运行目录
+/// - `relative`: 包内条目对应的相对路径
+///
+/// # 返回值
+///
+/// 安装位置的绝对路径；路径上有链接时返回 `err.exportLink`
 fn destination(root: &Path, relative: &Path) -> Result<PathBuf, String> {
     let mut path = root.to_path_buf();
     for component in relative.components() {
         path.push(component);
-        if let Ok(meta) = fs::symlink_metadata(&path) {
-            if meta.file_type().is_symlink() {
-                return Err(err_keys::EXPORT_LINK.into());
-            }
-            #[cfg(windows)]
-            {
-                use std::os::windows::fs::MetadataExt;
-                if meta.file_attributes() & 0x400 != 0 {
-                    return Err(err_keys::EXPORT_LINK.into());
-                }
-            }
+        if fs::symlink_metadata(&path).is_ok() {
+            archive::reject_link(&path)?;
         }
     }
     Ok(path)
 }
 
-/// 解包并逐文件替换
+/// 解包并逐文件替换，失败时回滚已替换的文件
+///
+/// 先把整包解到运行目录下的暂存目录，确认全部可写之后才逐个替换，
+/// 中途失败时按相反顺序把备份放回去。
 ///
 /// - `file`: 服务器包
 /// - `root`: 运行目录
+///
+/// # 返回值
+///
+/// 已替换的目标文件与导入后的配置；校验、解包或写盘失败返回错误文案
 pub(crate) fn import_pack(
     file: &Path,
     root: &Path,
@@ -211,7 +219,14 @@ pub(crate) fn import_pack(
     result
 }
 
-// 同 UUID 已经安装时覆盖原目录，避免重启扫描出两个相同实例。
+/// 同 UUID 已经安装时覆盖原目录，避免重启扫描出两个相同实例
+///
+/// - `root`: 运行目录
+/// - `manifest`: 包内清单
+///
+/// # 返回值
+///
+/// 包内目录名 → 实际安装的目录名；同 UUID 对应多个目录或目录名非法时返回错误
 fn instance_directories(
     root: &Path,
     manifest: &Manifest,

@@ -24,9 +24,10 @@ use super::{PairImageKey, SKIN_IMAGE, SKINRAW_IMAGE, TEXTURE_URLS};
 
 /// 皮肤类 URI 的账户型请求，解析出账户并取回皮肤 / 披风纹理
 ///
-/// URI 形如 `skin*/cape*/<账户类型>/<uuid>`。账户不存在返回 None；皮肤 / 披风某一项
-/// 可能没有，离线账户两个都没有。下载结果由 player_skin 层按内容 SHA1 缓存到本地
-/// 皮肤目录，同时把源 URL 登记进 [`TEXTURE_URLS`]，sha1 型请求在文件被清后能回源。
+/// URI 形如 `skin*/<账户类型>/<uuid>`，`head` 与 `cape*` 同理。账户不存在返回 None；
+/// 皮肤 / 披风某一项可能没有，离线账户两个都没有。下载结果由 player_skin 层按内容
+/// SHA1 缓存到本地皮肤目录，同时把源 URL 登记进 [`TEXTURE_URLS`]，sha1 型请求在
+/// 文件被清后能回源。
 ///
 /// - `uri`: 协议路径片段，第 2 段是账户类型，第 3 段是账户 uuid
 ///
@@ -87,7 +88,7 @@ pub(super) async fn load_texture_bytes(sha1: &str) -> Option<Vec<u8>> {
 
 /// 皮肤全身渲染图，URI 形如 `skin/...`
 ///
-/// 片段形态，首段 `skin` 已剥：
+/// 片段形态，第 1 段是路由名 `skin`：
 /// - `skin/<sha1>`、`skin/<sha1>/<skin_type>`：sha1 型，40 位十六进制，
 ///   直接按内容取皮肤——皮肤窗口等已知具体贴图的场景用
 /// - `skin/<账户类型>/<uuid>[/<skin_type>]`：账户型，解析该账户**当前选中**的皮肤
@@ -98,7 +99,7 @@ pub(super) async fn load_texture_bytes(sha1: &str) -> Option<Vec<u8>> {
 /// Skin3D / Skin3DD / Skin3DRotate，前端不选风格。皮肤型号段取值 `auto` 自动检测且可省略、
 /// `old` 1.7 旧版、`new` 1.8 新版、`slim` 纤细——这是皮肤版型信息，不是渲染风格
 ///
-/// - `uri`: 协议路径片段，首段 `skin` 已剥
+/// - `uri`: 协议路径片段，第 1 段是路由名 `skin`
 /// - `res`: 响应回写句柄
 pub(super) async fn load_skin_image(uri: &[&str], res: UriSchemeResponder) {
     // sha1 型：2-3 段且第 2 段是 40 位十六进制
@@ -142,7 +143,7 @@ pub(super) async fn load_skin_image(uri: &[&str], res: UriSchemeResponder) {
 /// 皮肤全身渲染，sha1 入口；账户型请求解析出当前皮肤后也转调这里
 ///
 /// `server_slim` 为账户型解析得到的会话服务器纤细标记，是权威值，用于自动型号纠偏；
-/// sha1 型请求传 `None`，自动型号仅按贴图检测
+/// sha1 型请求传 `None`，自动型号仅按贴图检测。它会改变 auto 的判定结果，所以也进缓存键。
 ///
 /// - `sha1`: 皮肤贴图内容 SHA1
 /// - `skin_type`: 皮肤型号段，取值 `auto` / `old` / `new` / `slim`
@@ -155,10 +156,13 @@ pub(super) async fn send_skin_display(
     res: UriSchemeResponder,
 ) {
     let skin = gui_config::get().skin;
-    // 旋转档的角度参与渲染，一并进缓存键，改角度就是新键
+    // 旋转档的角度与服务器纤细标记都参与渲染，一并进缓存键，改了就换新键
     let key = PairImageKey {
         sha1: sha1.to_string(),
-        config: format!("{:?}/{}/{}/{skin_type}", skin.display, skin.pitch, skin.yaw),
+        config: format!(
+            "{:?}/{}/{}/{skin_type}/{server_slim:?}",
+            skin.display, skin.pitch, skin.yaw
+        ),
     };
 
     {
@@ -177,19 +181,16 @@ pub(super) async fn send_skin_display(
         send_bad(res);
         return;
     };
-    let st = match parse_skin_type(skin_type).flatten() {
-        Some(st) => Some(st),
-        None => {
-            // 自动检测：带服务器纤细标记时用于纠偏——服务器说是纤细就直接按纤细；
-            // 说不是而贴图检测出纤细，多半是手臂宽度含糊导致误判，按普通新版处理
-            let detected = skin_type_checker::get_skin_type(&bitmap);
-            Some(match server_slim {
-                Some(true) => SkinType::NewSlim,
-                Some(false) if detected == SkinType::NewSlim => SkinType::New,
-                _ => detected,
-            })
-        }
-    };
+    let st = parse_skin_type(skin_type).flatten().or_else(|| {
+        // 自动检测：带服务器纤细标记时用于纠偏，服务器说是纤细就直接按纤细；
+        // 说不是而贴图检测出纤细，多半是手臂宽度含糊导致误判，按普通新版处理
+        let detected = skin_type_checker::get_skin_type(&bitmap);
+        Some(match server_slim {
+            Some(true) => SkinType::NewSlim,
+            Some(false) if detected == SkinType::NewSlim => SkinType::New,
+            _ => detected,
+        })
+    });
     let Some(image) = render_skin_display(&bitmap, st, &skin) else {
         send_bad(res);
         return;
@@ -252,7 +253,7 @@ pub(super) fn parse_skin_type(s: &str) -> Option<Option<SkinType>> {
 
 /// 原始皮肤贴图 PNG，URI 形如 `skinraw/<sha1>`，供前端 skinview3d 做 3D 渲染
 ///
-/// - `uri`: 协议路径片段，首段 `skinraw` 已剥
+/// - `uri`: 协议路径片段，第 1 段是路由名 `skinraw`，第 2 段是内容 sha1
 /// - `res`: 响应回写句柄
 pub(super) async fn load_skinraw_image(uri: &[&str], res: UriSchemeResponder) {
     if uri.len() != 2 {

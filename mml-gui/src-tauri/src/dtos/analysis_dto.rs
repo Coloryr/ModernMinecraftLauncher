@@ -52,6 +52,13 @@ pub struct CrashFindingDto {
 }
 
 impl From<CrashAnalysis> for CrashAnalysisDto {
+    /// 内核分析结果 -> 前端 wire 形态，枚举转稳定 id，异常链展平成一行的文本
+    ///
+    /// - `value`: `mml-analysis` 的分析结果
+    ///
+    /// # 返回值
+    ///
+    /// 前端直接渲染的分析结果
     fn from(value: CrashAnalysis) -> Self {
         Self {
             kind: value.kind.as_str().to_string(),
@@ -73,6 +80,13 @@ impl From<CrashAnalysis> for CrashAnalysisDto {
 }
 
 impl From<Finding> for CrashFindingDto {
+    /// 一条内核结论 -> 前端 wire 形态
+    ///
+    /// - `value`: `mml-analysis` 的一条结论
+    ///
+    /// # 返回值
+    ///
+    /// 前端渲染用的结论，字段一一对应
     fn from(value: Finding) -> Self {
         Self {
             id: value.id.as_str().to_string(),

@@ -69,7 +69,7 @@ impl ThreadInfo {
         }
     }
 
-    /// 用最新进度刷新速度采样：换文件时重置，判据是字节回退或文件名变化
+    /// 用最新进度刷新速度采样：字节回退按断点续传重置，换文件由 `DownloadGuiHook::track` 处理
     ///
     /// - `now`: 本次回调的时刻，与上次采样时刻的差就是速度分母
     fn sample(&mut self, now: Instant) {
@@ -132,7 +132,7 @@ impl DownloadGuiHook {
         }
     }
 
-    /// 文件名：优先用 FileItemObj.name，为空则取路径末段
+    /// 取展示用的文件名：优先用 `FileItemObj.name`，为空则取路径末段
     fn item_name(file: &Arc<DownloadItem>) -> String {
         if !file.base.name.is_empty() {
             return file.base.name.clone();
@@ -144,7 +144,7 @@ impl DownloadGuiHook {
             .unwrap_or_default()
     }
 
-    /// 下载项状态 → 前端状态 ID
+    /// 下载项状态转前端状态 ID
     fn state_id(state: DownloadItemState) -> String {
         match state {
             DownloadItemState::Wait => "wait",

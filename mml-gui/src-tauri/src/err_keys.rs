@@ -142,20 +142,23 @@ pub const SAVE_SEED: &str = "err.saveSeed";
 
 // ---------- 导出 ----------
 
-/// 已有导出任务在跑
-/// 模组清单尚未扫描或已变化。
+/// 模组清单尚未扫描或已变化
 pub const MOD_EXPORT_SCAN: &str = "err.modExportScan";
-/// 导出字段无效。
-/// 导出路径不能位于实例内。
+/// 导出路径不能位于实例内
 pub const EXPORT_DESTINATION: &str = "err.exportDestination";
+/// 服务器包格式无效或含不允许的文件
 pub const SERVER_PACK_INVALID: &str = "err.serverPackInvalid";
+/// 当前系统不支持把启动器程序加入服务器包
 pub const SERVER_PACK_PLATFORM: &str = "err.serverPackPlatform";
 /// 创建快捷方式只在 Windows 上支持
 pub const SHORTCUT_PLATFORM: &str = "err.shortcutPlatform";
+/// 游戏启动或任务未结束，暂时不能导入服务器包
 pub const SERVER_PACK_BUSY: &str = "err.serverPackBusy";
-/// 实例内的链接不能打包。
+/// 实例内的链接不能打包
 pub const EXPORT_LINK: &str = "err.exportLink";
+/// 导出字段无效或重复
 pub const EXPORT_FIELDS: &str = "err.exportFields";
+/// 已有导出任务在进行中
 pub const EXPORT_RUNNING: &str = "err.exportRunning";
 /// 不支持的整合包类型
 pub const EXPORT_PACK_TYPE: &str = "err.exportPackType";
@@ -268,13 +271,23 @@ pub const BG_CONFIG_DIR: &str = "err.bgConfigDir";
 /// 当前没有设置背景图
 pub const BG_NONE: &str = "err.bgNone";
 
+// ---------- 联机大厅 ----------
+
+/// 联机大厅需要已登录的微软正版账户
 pub const LOBBY_ACCOUNT: &str = "err.lobbyAccount";
+/// 联机大厅运行期间锁定当前账户
 pub const LOBBY_ACCOUNT_LOCKED: &str = "err.lobbyAccountLocked";
+/// 联机大厅会话已结束
 pub const LOBBY_CLOSED: &str = "err.lobbyClosed";
+/// 当前系统或处理器不支持陶瓦联机
 pub const LOBBY_PLATFORM: &str = "err.lobbyPlatform";
+/// 陶瓦下载或校验失败
 pub const LOBBY_DOWNLOAD: &str = "err.lobbyDownload";
+/// 陶瓦尚未就绪或启动失败
 pub const LOBBY_START: &str = "err.lobbyStart";
+/// 房间状态不支持该操作，或房间参数无效
 pub const LOBBY_STATE: &str = "err.lobbyState";
+/// 映射大厅服务尚未接入
 pub const LOBBY_MAPPING: &str = "err.lobbyMapping";
 
 #[cfg(test)]

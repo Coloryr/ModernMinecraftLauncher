@@ -546,7 +546,7 @@ fn slice_is_clamped_to_file() {
     let _ = fs::remove_dir_all(&dir);
 }
 
-/// NBT 转树：复合按键名排序、数组只报个数、列表记下标、标量带值
+/// NBT 转树：复合按键名排序、短数组展开成元素、列表记下标、标量带值
 #[test]
 fn nbt_tree_is_converted() {
     use mml_nbt::nbt_types::{NbtByte, NbtByteArray, NbtCompound, NbtInt, NbtList, NbtString};

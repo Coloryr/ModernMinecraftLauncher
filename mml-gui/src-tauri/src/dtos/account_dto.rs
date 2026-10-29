@@ -37,7 +37,7 @@ pub struct AccountStoreDto {
     pub skin: String,
     /// Token 状态：valid / expired
     pub token_status: String,
-    /// 皮肤头像，mml-skin-draw 渲染的 data URI PNG；无皮肤为 None
+    /// 预留字段，当前恒为 `None`；头像由前端按账户 uuid 取 `mml-image` 的 `head` 地址
     pub avatar: Option<String>,
     /// 服务器地址，重登时预填：littleskin/authlib 为服务器 URL，nide8 为服务器 ID；
     /// offline 没有，微软的 text1 存的是 refresh_token，绝不能下发给前端
@@ -77,9 +77,8 @@ pub struct AccountOAuthStateDto {
 impl AccountStoreDto {
     /// 从 LoginObj 构造前端 DTO，LoginObj 即账户完整凭据
     ///
-    /// 有皮肤时 `avatar` 应为 `mml-skin-draw` 渲染的头像 data URI，渲染管线见
-    /// `windows/account.rs`；当前 LoginObj 尚未携带皮肤贴图，故为 None，
-    /// 前端回退到原来的占位图显示。
+    /// 头像不在这里拼：`avatar` 恒为 `None`，前端按 uuid 取 `mml-image` 的账户头像；
+    /// 其余显示字段，占位渐变色、令牌状态、能否刷新 / 重登 / 编辑，都按凭据算出来。
     ///
     /// - `login`: 账户完整凭据
     ///

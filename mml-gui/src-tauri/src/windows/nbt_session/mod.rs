@@ -25,7 +25,7 @@ pub(crate) use self::session::{close, close_all_of};
 pub(crate) struct OpenedNbt<T> {
     /// 回调把 NBT 转成的结果
     pub(crate) value: T,
-    /// 这一份文件字节的 SHA1
+    /// 打开时那份内容的 SHA1，整份文件或区块负载
     pub(crate) sha1: String,
 }
 
@@ -100,8 +100,8 @@ pub(crate) fn open_with<T>(
 ///
 /// # 返回值
 ///
-/// 写回后文件字节的 SHA1；会话不在、基准对不上、文件被别处改过返回 `err.fileChanged`，
-/// 只读文件返回 `err.fileReadOnly`，套改动或写盘失败返回各自的错误文案
+/// 写回后内容的 SHA1，整份文件或区块负载；会话不在、基准对不上、文件被别处改过返回
+/// `err.fileChanged`，只读文件返回 `err.fileReadOnly`，套改动或写盘失败返回各自的错误文案
 pub(crate) fn update_with(
     path: &Path,
     chunk: Option<u32>,

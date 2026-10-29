@@ -39,7 +39,7 @@ pub(super) fn emit_account_oauth_state(app: &AppHandle, dto: AccountOAuthStateDt
     let _ = app.emit(listens::ACCOUNT_OAUTH_STATE, dto);
 }
 
-/// 发送微软登录阶段事件，按 state 与 message 组装 DTO 的包装
+/// 组装并发送微软登录阶段事件
 ///
 /// - `app`: 应用句柄
 /// - `state`: 阶段名，取 `waiting` / `xbox` / `xsts` / `token` / `profile` / `ok` / `fail`
@@ -71,8 +71,7 @@ pub(super) fn oauth_fail(app: &AppHandle, err: impl Display) -> String {
 
 /// 微软账户登录：设备码授权 → Xbox → XSTS → Minecraft Token → Profile → 保存账户
 ///
-/// 各阶段通过 [`emit_oauth_state`] 通知前端展示进度，
-/// 用户可经 `account_cancel_oauth` 中断等待。
+/// 各阶段经 [`emit_oauth_state`] 通知前端展示进度，用户可经 `account_cancel_oauth` 中断等待。
 ///
 /// - `app`: 应用句柄，发事件并在保存账户后广播变更
 ///

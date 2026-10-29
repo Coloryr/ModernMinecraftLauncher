@@ -1,7 +1,7 @@
 //! 窗口几何的持久化
 //!
-//! 一份 window_save.json 记全部窗口的位置与大小，
-//! 关窗时存、开窗时按合法性收敛后取用。
+//! 一份 window_save.json 记全部窗口的位置与大小：开窗时读回，
+//! 移动 / 缩放与关窗前写回。
 
 use std::{
     collections::HashMap,
@@ -30,7 +30,7 @@ use crate::windows::registry::min_size_of_label;
 /// 缩放系数一次换算，见 [`min_inner_physical`]；只有下发给 Windows 的外框最小尺寸
 /// 才需要再加上那圈边框带，见 [`reconcile_min_size`]。
 ///
-/// ⚠ `inner_size()` 的含义**随装饰状态变化**：有原生 frame 时是客户区，
+/// 注意 `inner_size()` 的含义**随装饰状态变化**：有原生 frame 时是客户区，
 /// 插件 `set_decorations(false)` 之后同一块窗口会把标题栏并进客户区，外框不变。
 /// 而保存动作在两种状态下都会发生，直接存它会让窗口高度每次开关都涨一截。
 /// 所以存盘前统一折算回**带装饰口径**，见 [`decoration_growth`]。
@@ -41,9 +41,9 @@ pub(crate) struct WindowState {
     pub x: i32,
     /// 外框 Y，单位物理像素，与 `outer_position()` 同源
     pub y: i32,
-    /// 客户区宽，单位物理像素，与 `inner_size()` 同源
+    /// 带装饰口径的客户区宽，单位物理像素；无装饰时由 [`save_window_state`] 折算回该口径
     pub width: u32,
-    /// 客户区高，单位物理像素，与 `inner_size()` 同源
+    /// 带装饰口径的客户区高，单位物理像素；无装饰时由 [`save_window_state`] 折算回该口径
     pub height: u32,
     /// 上次退出时是否处于最大化，全屏也算
     ///
@@ -96,7 +96,7 @@ pub fn init<P: AsRef<Path>>(path: P) {
     }
 }
 
-/// 保存窗口状态
+/// 把内存里的整份几何写回 `window_save.json`，落盘交给 `config_save` 排队
 pub(crate) fn save() {
     let Some(file) = STATE_FILE.get() else {
         return;

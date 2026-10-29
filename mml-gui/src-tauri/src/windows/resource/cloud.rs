@@ -9,6 +9,15 @@ use crate::{
 use mml_cloud::client::{Client, Settings};
 use uuid::Uuid;
 
+/// 组装当前实例的云连接参数
+///
+/// 远端绑定优先取 `cloud_instances` 里记的那份，没有就按本地实例 uuid 当远端 uuid。
+///
+/// - `uuid`: 本地实例 uuid，只用来校验与查绑定
+///
+/// # 返回值
+///
+/// 见 [`CloudConfigDto`]；uuid 非法返回 `err.uuid`，实例不存在返回 `err.gameNotFound`
 fn connection(uuid: &str) -> Result<CloudConfigDto, String> {
     let id = Uuid::parse_str(uuid).map_err(|_| err_keys::UUID.to_string())?;
     parse_instance(uuid)?;
@@ -21,6 +30,13 @@ fn connection(uuid: &str) -> Result<CloudConfigDto, String> {
     })
 }
 
+/// 归一连接参数：校验云端 uuid，去掉服务器地址的尾部斜杠
+///
+/// - `config`: 界面传进来的连接参数
+///
+/// # 返回值
+///
+/// 归一后的参数；云端 uuid 不是合法 uuid 时返回 `err.cloudSettings`
 fn normalize(mut config: CloudConfigDto) -> Result<CloudConfigDto, String> {
     config.remote_uuid = Uuid::parse_str(config.remote_uuid.trim())
         .map_err(|_| "err.cloudSettings".to_string())?
@@ -29,6 +45,13 @@ fn normalize(mut config: CloudConfigDto) -> Result<CloudConfigDto, String> {
     Ok(config)
 }
 
+/// 按连接参数建云客户端
+///
+/// - `config`: 已归一的连接参数
+///
+/// # 返回值
+///
+/// 见 [`Client`]；服务器地址或密钥不被接受时返回错误键
 fn client(config: &CloudConfigDto) -> Result<Client, String> {
     Client::new(Settings {
         server: config.server.clone(),

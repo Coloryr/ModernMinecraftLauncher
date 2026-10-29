@@ -205,16 +205,9 @@ pub(super) async fn store_bg(
         std::fs::write(dir.join("bg_image"), write_data).map_err(|err| err.to_string())
     })
     .await
-    .map_err(|err| format!("set_bg write join failed: {err}"))
-    .inspect_err(|err| mml_log::error(err.to_string()))?
-    .inspect_err(|err| {
-        mml_log::error(
-            LogText::BgWriteFailed {
-                error: err.to_string(),
-            }
-            .text(),
-        )
-    })?;
+    .map_err(|err| err.to_string())
+    .and_then(|res| res)
+    .inspect_err(|err| mml_log::error(LogText::BgWriteFailed { error: err.clone() }.text()))?;
 
     // 来源与分辨率记入配置；set 会异步落盘 gui_config.json
     let mut config = crate::gui_config::get();
@@ -293,7 +286,7 @@ pub async fn settings_set_bg(
 ///
 /// # 返回值
 ///
-/// 处理后的 dataURL 供前端立即显示；没设置过背景图时返回 `no background image`
+/// 处理后的 dataURL 供前端立即显示；没设置过背景图时返回 `err.bgNone`
 #[gui_macros::ipc_group("settings")]
 #[gui_macros::command]
 pub async fn settings_resize_bg(app: AppHandle, percent: u32) -> Result<String, String> {

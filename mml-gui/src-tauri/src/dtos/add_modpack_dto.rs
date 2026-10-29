@@ -5,7 +5,7 @@ use serde::Serialize;
 /// 单个整合包安装任务的状态
 ///
 /// state 为安装阶段 ID，与前端 i18n 键一一对应，取值 downloadPack / readInfo /
-/// getInfo / downloadFile / extract / done，见 add.rs 的 `pack_state_id`；
+/// getInfo / downloadFile / extract / done，见 `windows/modpack_task.rs` 的 `pack_state_id`；
 /// done / failed / cancelled 为终态标记，三者互斥。
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]

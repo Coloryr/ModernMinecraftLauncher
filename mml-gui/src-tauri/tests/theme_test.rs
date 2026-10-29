@@ -31,7 +31,10 @@ struct Spec<'a> {
     mode: Option<u32>,
 }
 
-/// 普通文件条目
+/// 造一个普通文件条目
+///
+/// - `name`: 条目名
+/// - `data`: 条目内容
 fn file<'a>(name: &'a str, data: &'a [u8]) -> Spec<'a> {
     Spec {
         name,
@@ -40,7 +43,9 @@ fn file<'a>(name: &'a str, data: &'a [u8]) -> Spec<'a> {
     }
 }
 
-/// 目录条目
+/// 造一个目录条目
+///
+/// - `name`: 目录名，结尾带 `/`
 fn folder(name: &str) -> Spec<'_> {
     Spec {
         name,
@@ -92,6 +97,14 @@ fn case(tag: &str) -> PathBuf {
 }
 
 /// 按条目表写一个 zip
+///
+/// - `dir`: 输出目录
+/// - `file_name`: zip 文件名
+/// - `entries`: 要写进去的条目，目录条目靠结尾的 `/` 区分
+///
+/// # 返回值
+///
+/// 写好的 zip 路径
 fn write_package(dir: &Path, file_name: &str, entries: &[Spec]) -> PathBuf {
     let path = dir.join(file_name);
     let handle = std::fs::File::create(&path).unwrap();
@@ -123,6 +136,13 @@ fn write_package(dir: &Path, file_name: &str, entries: &[Spec]) -> PathBuf {
 ///
 /// 依赖里已经去掉 zip 的 AES 支持，这里改置通用标志的第 0 位：校验只看这个标志，
 /// 不需要真的加密数据。
+///
+/// - `dir`: 输出目录
+/// - `file_name`: zip 文件名
+///
+/// # 返回值
+///
+/// 写好的 zip 路径
 fn write_encrypted(dir: &Path, file_name: &str) -> PathBuf {
     let path = dir.join(file_name);
     {
@@ -155,6 +175,9 @@ fn write_encrypted(dir: &Path, file_name: &str) -> PathBuf {
 }
 
 /// 把文件里所有 needle 字节换成 0xFF，用来造非 UTF-8 条目名
+///
+/// - `path`: 要改写的 zip
+/// - `needle`: 原条目名
 fn corrupt_name(path: &Path, needle: &str) {
     let mut bytes = std::fs::read(path).unwrap();
     let marker = needle.as_bytes();
@@ -173,6 +196,10 @@ fn corrupt_name(path: &Path, needle: &str) {
 }
 
 /// 改写第 index 个条目的解压后大小，中央目录与本地头一起改
+///
+/// - `path`: 要改写的 zip
+/// - `index`: 条目下标，从 0 起
+/// - `size`: 新的解压后大小，单位字节
 fn patch_size(path: &Path, index: usize, size: u32) {
     let mut bytes = std::fs::read(path).unwrap();
     let mut seen = 0;

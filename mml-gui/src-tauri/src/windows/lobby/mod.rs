@@ -13,10 +13,14 @@ use model::LobbyModel;
 use std::{sync::Arc, time::Duration};
 use tauri::AppHandle;
 
-/// 验证并锁定当前正版账户，成功后才允许显示大厅。
-/// - `app`: 广播账户锁状态的应用句柄。
+/// 验证并锁定当前正版账户，成功后才允许显示大厅
+///
+/// - `app`: 应用句柄，账户锁状态变更经它广播
+///
 /// # 返回值
-/// 已验证的大厅视图，失败时释放本次账户锁。
+///
+/// 已验证的大厅视图；未登录、不是正版账户、取消、超时或刷新失败时
+/// 释放本次账户锁并返回错误
 #[gui_macros::command]
 pub async fn lobby_prepare(app: AppHandle) -> Result<LobbyViewDto, String> {
     let id = crate::windows::registry::uuid_for_kind("lobby").unwrap();
@@ -63,9 +67,11 @@ pub async fn lobby_prepare(app: AppHandle) -> Result<LobbyViewDto, String> {
     Ok(view.clone())
 }
 
-/// 获取大厅快照及陶瓦房间状态。
+/// 获取大厅快照，顺带把当前会话的最新状态合进去
+///
 /// # 返回值
-/// 当前房间、成员、节点及下载进度。
+///
+/// 当前账户、房间、成员、节点与下载进度；窗口已关闭或请求本机陶瓦失败返回错误
 #[gui_macros::command]
 pub async fn lobby_status() -> Result<LobbyViewDto, String> {
     let model = model::get()?;
@@ -84,9 +90,11 @@ pub async fn lobby_status() -> Result<LobbyViewDto, String> {
     Ok(view)
 }
 
-/// 下载并启动陶瓦，读取版本和公共节点。
+/// 下载并启动陶瓦，取版本与公共节点
+///
 /// # 返回值
-/// 陶瓦就绪后的大厅视图。
+///
+/// 陶瓦就绪后的大厅视图；下载、解包或启动失败返回错误
 #[gui_macros::command]
 pub async fn lobby_start() -> Result<LobbyViewDto, String> {
     let model = model::get()?;
@@ -123,6 +131,13 @@ pub async fn lobby_start() -> Result<LobbyViewDto, String> {
     lobby_status().await
 }
 
+/// 取当前陶瓦会话
+///
+/// - `model`: 大厅模型
+///
+/// # 返回值
+///
+/// 会话句柄；窗口已关闭或还没启动陶瓦返回 `err.lobbyStart`
 fn session(model: &Arc<LobbyModel>) -> Result<Arc<runtime::Session>, String> {
     model.check()?;
     model
@@ -133,12 +148,15 @@ fn session(model: &Arc<LobbyModel>) -> Result<Arc<runtime::Session>, String> {
         .ok_or_else(|| err_keys::LOBBY_START.into())
 }
 
-/// 创建或加入陶瓦房间。
-/// - `action`: host 创建，join 加入，leave 退出。
-/// - `room`: 加入房间的邀请码。
-/// - `nodes`: 从当前节点列表选择的附加节点。
+/// 创建或加入陶瓦房间
+///
+/// - `action`: `host` 创建、`join` 加入、`leave` 退出
+/// - `room`: 加入房间的邀请码
+/// - `nodes`: 从当前节点列表选择的附加节点
+///
 /// # 返回值
-/// 控制请求成功或状态错误。
+///
+/// 控制请求成功返回 `Ok(())`；参数或当前房间状态不允许返回 `err.lobbyState`
 #[gui_macros::command]
 pub async fn lobby_room_action(
     action: String,
@@ -155,11 +173,14 @@ pub async fn lobby_room_action(
     }
 }
 
-/// 使用大厅锁定的账户启动所选实例，加入方自动连接本机转发端口。
-/// - `app`: 游戏启动事件的应用句柄。
-/// - `uuid`: 用户选择的实例。
+/// 用大厅锁定的账户启动所选实例，加入方自动连接本机转发端口
+///
+/// - `app`: 应用句柄，游戏启动事件经它广播
+/// - `uuid`: 用户选择的实例
+///
 /// # 返回值
-/// 游戏启动已提交或参数、房间状态错误。
+///
+/// 启动已提交返回 `Ok(())`；房间地址或状态不允许、窗口已关闭返回错误
 #[gui_macros::command]
 pub async fn lobby_launch_game(app: AppHandle, uuid: String) -> Result<(), String> {
     let model = model::get()?;
@@ -199,15 +220,17 @@ pub async fn lobby_launch_game(app: AppHandle, uuid: String) -> Result<(), Strin
     .await
 }
 
-/// 释放大厅会话，单窗口页面离开时调用。
+/// 释放大厅会话，单窗口页面离开时调用
 #[gui_macros::command]
 pub fn lobby_close() {
     let _ = crate::windows::lifecycle::drop_model_for_kind("lobby");
 }
 
-/// 映射大厅预留查询接口，后端服务尚未接入。
+/// 映射大厅预留查询接口，后端服务尚未接入
+///
 /// # 返回值
-/// 不可用状态与空房间列表。
+///
+/// 不可用状态与空房间列表
 #[gui_macros::command]
 pub fn lobby_mapping_list() -> Result<MappingLobbyDto, String> {
     model::get()?.check()?;
@@ -217,11 +240,14 @@ pub fn lobby_mapping_list() -> Result<MappingLobbyDto, String> {
     })
 }
 
-/// 映射大厅预留操作接口。
-/// - `action`: 创建或加入操作。
-/// - `room`: 房间标识。
+/// 映射大厅预留操作接口
+///
+/// - `action`: 创建或加入操作
+/// - `room`: 房间标识
+///
 /// # 返回值
-/// 后端尚未接入的提示。
+///
+/// 恒为 `err.lobbyMapping`，后端尚未接入
 #[gui_macros::command]
 pub fn lobby_mapping_action(action: String, room: String) -> Result<(), String> {
     model::get()?.check()?;
@@ -229,7 +255,7 @@ pub fn lobby_mapping_action(action: String, room: String) -> Result<(), String> 
     Err(err_keys::LOBBY_MAPPING.into())
 }
 
-/// 关闭真实窗口前先取消任务并释放账户。
+/// 关闭真实窗口前先取消任务并释放账户
 pub(crate) fn cancel() {
     if let Ok(model) = model::get() {
         model.close();

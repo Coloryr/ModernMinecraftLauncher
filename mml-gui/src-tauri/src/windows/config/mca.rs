@@ -29,7 +29,7 @@ use super::source::{get_file_type, resolve_source, resolve_under};
 /// # 返回值
 ///
 /// 有数据的区块，按表项下标升序；空表项不返回。路径非法返回 `err.fileName`，
-/// 扩展名不是 `.mca` 返回 `err.notMcaFile`，文件头读不满返回内核错误串
+/// 扩展名不是 `.mca` 返回 `err.notMcaFile`，文件短于 8 KiB 返回 `err.mcaFileEmpty`
 #[gui_macros::ipc_group("config")]
 #[gui_macros::command]
 pub fn config_get_mca(
@@ -177,7 +177,7 @@ pub(super) struct ChunkHit {
 ///
 /// # 返回值
 ///
-/// 见 [`ChunkHit`]；没命中返回 `None`
+/// 见 [`ChunkHit`]；没命中返回 `None`，文件短于 8 KiB 返回 `err.mcaFileEmpty`
 pub(super) fn find_in_file(
     path: &Path,
     kind: &str,

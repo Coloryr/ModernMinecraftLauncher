@@ -10,7 +10,7 @@ use mml_gui_lib::{block_groups, collect_utils, err_box, gui_config, image_manage
 use mml_names::names;
 use mml_sys::path_helper;
 
-/// 程序入口：定运行路径、初始化各单例，最后进入 Tauri 事件循环
+/// 程序入口：确定运行路径，处理提权与单开，初始化各单例后进入 Tauri 事件循环
 fn main() {
     let mut obj = CoreInitObj {
         path: Default::default(),
@@ -131,7 +131,7 @@ fn get_save_path() -> PathBuf {
         .or(dirs::home_dir())
         .unwrap();
 
-    dir.join(names::MML_DIR).to_path_buf()
+    dir.join(names::MML_DIR)
 }
 
 /// 调试构建：取 exe 同目录下的 M²L 目录
@@ -157,8 +157,6 @@ fn get_run_path() -> PathBuf {
 /// 返回记录的运行路径；文件缺失或路径无效返回 `None`
 #[cfg(not(debug_assertions))]
 fn get_config_path() -> Option<PathBuf> {
-    use std::path::Path;
-
     let dir = dirs::data_local_dir()?;
     let file = dir.join(names::MML_DIR).join("run");
 
@@ -206,7 +204,7 @@ fn get_run_path() -> PathBuf {
     get_config_path().unwrap_or({
         let dir = dirs::home_dir().unwrap();
 
-        dir.join(names::MML_INNER_DIR).to_path_buf()
+        dir.join(names::MML_INNER_DIR)
     })
 }
 

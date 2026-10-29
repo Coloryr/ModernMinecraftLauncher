@@ -1,6 +1,12 @@
 //! 分组口径：名称、顺序与状态
 //!
-//! 分组存在实例的设置里，这里只解释「这条分组是什么、排第几」。
+//! 分组**不是窗口 model 的数据**：它属于实例的 GUI 设置，即 `gui_setting.json` 的
+//! `Mod.Groups`，分组 uuid → 分组对象，见 crate::gui_setting。
+//!
+//! - 写入一律 load → 改 → save：那份文件还存着日志设置、方块图标等，不能整份覆盖
+//! - 顺序由用户拖出来，存在 `Mod.GroupOrder`；没存过则用默认顺序：
+//!   识别失败 → 已启用 → 已禁用 → 自建分组按名字
+//! - 成员用 SHA1 而不是 uuid：启用 / 禁用会改文件名，uuid 跟着变，SHA1 不变
 
 use std::collections::HashSet;
 
@@ -9,18 +15,9 @@ use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 
 use crate::dtos::ModGroupDto;
 
-//
-// 分组**不是 mod.rs 的数据**：它属于实例的 GUI 设置，即 `gui_setting.json` 的 `Mod.Groups`，
-// 分组 uuid → 分组对象，见 crate::gui_setting。
-// 本模块只做"读-改-写 + 转 DTO"：
-// - 每个命令都是 load → 改 → save：那份文件还存着日志设置、方块图标等，不能整份覆盖
-// - 分组顺序 = 用户自己拖出来的，存在 `gui_setting.json` 的 `Mod.GroupOrder`；
-//   没存过则用默认顺序：识别失败 → 已启用 → 已禁用 → 自建分组按名字
-// - 成员用 SHA1 而不是 uuid：启用/禁用会改文件名，uuid 跟着变，SHA1 不变
-
-/// 三个**状态分组**的固定 uuid
+/// 「识别失败」状态分组的固定 uuid，也是三个状态分组这一套键的说明
 ///
-/// 它们不是用户数据，所以不进 `gui_setting.json` 的 `Mod.Groups`；但要参与"顺序"与
+/// 三个状态分组都不是用户数据，所以不进 `gui_setting.json` 的 `Mod.Groups`；但要参与"顺序"与
 /// "收起状态"，也就是用户能拖、能折叠，所以需要**稳定的键**。用固定 uuid 而不是
 /// 原先的 `$on` / `$off` / `$fail` 字符串：
 /// - 与自建分组同一套键形状，都是 uuid，前端不必维护"两套键"的映射；
@@ -36,8 +33,10 @@ use crate::dtos::ModGroupDto;
 /// 改要一起改。
 pub(super) const STATE_GROUP_FAIL: &str = "00000000-0000-0000-0000-000000000000";
 
+/// 「已启用」状态分组的固定 uuid，值与上面同一套口径
 pub(super) const STATE_GROUP_ON: &str = "00000000-0000-0000-0000-000000000001";
 
+/// 「已禁用」状态分组的固定 uuid，值与上面同一套口径
 pub(super) const STATE_GROUP_OFF: &str = "00000000-0000-0000-0000-000000000002";
 
 /// 默认顺序：识别失败 → 已启用 → 已禁用，自建分组排在后面
@@ -107,17 +106,17 @@ pub(super) fn group_order_of(mods: &crate::gui_setting::GameModSettingObj) -> Ve
 
 /// 模组的自定义分组，**按用户拖出来的顺序**下发
 ///
+/// 顺序取自 [`group_order_of`]：它同时管自建分组与状态分组的排列，所以这里按它遍历、
+/// 跳过状态分组即可 —— 状态分组不是用户数据，前端自己按固定 uuid 拼。
+///
 /// - `instance`: 实例设置本体
 ///
 /// # 返回值
 ///
 /// 自建分组列表，每项带 uuid、名字与成员 SHA1，成员已排序，展示才稳定
-///
-/// 顺序取自 [`group_order_of`]：它同时管自建分组与状态分组的排列，所以这里按它遍历、
-/// 跳过状态分组即可 —— 状态分组不是用户数据，前端自己按固定 uuid 拼。
 pub(super) fn mod_groups_of(instance: &InstanceSettingObj) -> Vec<ModGroupDto> {
     let setting = crate::gui_setting::load(instance);
-    let mut list: Vec<ModGroupDto> = group_order_of(&setting.mods)
+    group_order_of(&setting.mods)
         .into_iter()
         .filter(|key| !is_state_group(key))
         .filter_map(|uuid| {
@@ -131,9 +130,7 @@ pub(super) fn mod_groups_of(instance: &InstanceSettingObj) -> Vec<ModGroupDto> {
                 mods,
             })
         })
-        .collect();
-    list.shrink_to_fit();
-    list
+        .collect()
 }
 
 /// 读出实例设置 → 交给 `edit` 改 → 存回去

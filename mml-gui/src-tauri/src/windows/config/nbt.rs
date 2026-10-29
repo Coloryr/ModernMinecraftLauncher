@@ -110,12 +110,6 @@ pub(super) fn nbt_node(name: String, nbt: &NbtType) -> NbtNodeDto {
     }
 }
 
-/// 读取一个 NBT 文件，转成可展示、可编辑的树
-///
-/// - `game`: 实例 uuid
-/// - `source`: 来源，空串为实例本身，否则是存档目录名
-/// - `file`: 来源内的相对路径
-///
 /// 打开一个 NBT 文件，转成可展示、可编辑的树
 ///
 /// **打开就是真的打开**：文件句柄与解析出的内容都留在会话里（见 [`nbt_session`]），
@@ -129,9 +123,9 @@ pub(super) fn nbt_node(name: String, nbt: &NbtType) -> NbtNodeDto {
 ///
 /// # 返回值
 ///
-/// 见 [`ConfigNbtDto`]：树 + **文件字节**的 SHA1（保存时按它核对）；
-/// 路径非法返回 `err.fileName`，体积超过 [`MAX_FILE_SIZE`] 返回 `err.fileTooLarge`，
-/// 不是 NBT 或解不开时返回内核错误串
+/// 见 [`ConfigNbtDto`]：树 + 打开时那份内容的 SHA1，保存时按它核对；
+/// 路径非法返回 `err.fileName`，整份文件超过 [`super::source::MAX_FILE_SIZE`] 返回
+/// `err.fileTooLarge`，不是 NBT 或解不开时返回内核错误串
 #[gui_macros::ipc_group("config")]
 #[gui_macros::command]
 pub fn config_open_nbt(
@@ -187,7 +181,7 @@ pub fn config_close_nbt(
 
 /// 按前端记下的一批改动改写 NBT 文件
 ///
-/// 改动按顺序套用，见 [`NbtEditDto`]：改值 / 新增 / 删除三种。写回在**打开时那个句柄**上做
+/// 改动按顺序套用，见 [`NbtEditDto`]：改值 / 新增 / 改名 / 删除四种。写回在**打开时那个句柄**上做
 /// （见 [`nbt_session::update_with`]），不重新打开也不重新读盘；压缩方式沿用原文件。
 /// 改之前核对前端那份基准 SHA1 与文件有没有被别处动过。
 ///
@@ -195,14 +189,15 @@ pub fn config_close_nbt(
 /// - `source`: 来源，空串为实例本身，否则是存档目录名
 /// - `file`: 来源内的相对路径，与 [`config_open_nbt`] 同一口径
 /// - `index`: 文件是区域文件时的区块下标，整份文件为 `None`
-/// - `base_sha1`: 打开时那一份文件字节的 SHA1
+/// - `base_sha1`: 打开时那份内容的 SHA1，即打开返回值里的 `sha1`
 /// - `edits`: 要套的改动，按发生顺序
 ///
 /// # 返回值
 ///
-/// 写回后文件字节的 SHA1；路径非法返回 `err.fileName`，没打开过、基准对不上或文件被别处
-/// 改过返回 `err.fileChanged`，只读文件返回 `err.fileReadOnly`，路径对不上返回 `err.nbtPath`，
-/// 值解析不了或数组超上限返回 `err.nbtValue`
+/// 写回后内容的 SHA1，整份文件或区块负载；路径非法返回 `err.fileName`，整份文件超过
+/// [`super::source::MAX_FILE_SIZE`] 返回 `err.fileTooLarge`，没打开过、基准对不上或文件被
+/// 别处改过返回 `err.fileChanged`，只读文件返回 `err.fileReadOnly`，路径对不上返回
+/// `err.nbtPath`，值解析不了或数组超上限返回 `err.nbtValue`
 #[gui_macros::ipc_group("config")]
 #[gui_macros::command]
 pub fn config_set_nbt(

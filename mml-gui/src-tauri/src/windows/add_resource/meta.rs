@@ -40,11 +40,9 @@ pub async fn add_resource_categories(
     file_type: String,
 ) -> Result<HashMap<String, String>, String> {
     let source = ModPackType::from_string(&source);
-    let file_type = FileType::from_string(&file_type);
-    if file_type.is_none() {
+    let Some(file_type) = FileType::from_string(&file_type) else {
         return Err(String::from(err_keys::FILE_TYPE_NOT_FOUND));
-    }
-    let file_type = file_type.unwrap();
+    };
 
     match source {
         // CurseForge 的数据包走固定 categoryId，不支持再按分类过滤

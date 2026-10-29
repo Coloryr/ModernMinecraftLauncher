@@ -17,6 +17,15 @@ use super::draft::{
 use crate::windows::resource::mods::{ModDependencyRef, mod_dependencies};
 
 /// 按 modid 取节点下标，没有就按它的提供者建一个
+///
+/// - `id`: modid，小写
+/// - `providers`: modid 小写 → 提供它的条目
+/// - `game`: 实例设置，用来判断虚拟前置与版本
+/// - `drafts`: 建图中间状态
+///
+/// # 返回值
+///
+/// 节点在 `drafts.nodes` 里的下标；新建的追加在末尾
 pub(super) fn node_of(
     id: &str,
     providers: &HashMap<String, Vec<Provider>>,
@@ -137,6 +146,12 @@ pub(super) fn set_root(item: &ModObj, drafts: &mut Drafts) -> usize {
 }
 
 /// 深度优先铺开：同一对节点只连一条边，撞上路径上的节点就是环，不再往下走
+///
+/// - `key`: 当前节点键
+/// - `deps`: 当前节点声明的前置
+/// - `providers`: modid 小写 → 提供它的条目
+/// - `game`: 实例设置，取加载器并判断虚拟前置
+/// - `drafts`: 建图中间状态
 pub(super) fn walk(
     key: &str,
     deps: &[ModDependencyRef],
@@ -193,6 +208,13 @@ pub(super) fn walk(
 /// 依赖检测的结论：modid 小写 → 问题种类
 ///
 /// 与「依赖检测」同一个口径（内核 `mods_dep_test`），节点靠它决定打勾还是打感叹号。
+///
+/// - `game`: 实例设置
+/// - `list`: 模组扫描结果
+///
+/// # 返回值
+///
+/// modid 小写 → 问题种类；依赖检测整体失败时是空表
 pub(super) fn problem_map(
     game: &InstanceSettingObj,
     list: &[ModObj],

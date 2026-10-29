@@ -3,7 +3,7 @@
 //! 配置文件 `gui_config.json` 落盘用 Rust 命名，见 `../gui_config.rs`，
 //! 仅当跨 Tauri IPC 传输到前端时转成此结构：
 //! - 字段 camelCase = 前端 `mml-vue/src/lib/guiConfig.ts` 的类型名
-//! - 枚举值 = Rust 变体名："Dark" / "Light" / "Multi" / "Single" / "Left" / "Right"
+//! - 枚举值 = Rust 变体名，如 `System` / `Dark` / `Multi` / `Left`
 //! - locale 为字符串，core `Lang` 未实现 serde
 
 use serde::{Deserialize, Serialize};
@@ -23,9 +23,9 @@ use crate::gui_config::{
 pub struct SkinConfigDto {
     /// Skin2DA / Skin2DB / Skin3D / Skin3DD / Skin3DRotate
     pub display: SkinDisplay,
-    /// 3D 旋转 X
+    /// 绕 X 轴旋转角度，单位度；只有 Skin3DRotate 用
     pub pitch: f32,
-    /// 3D 旋转 Y
+    /// 绕 Y 轴旋转角度，单位度；只有 Skin3DRotate 用
     pub yaw: f32,
 }
 
@@ -35,9 +35,9 @@ pub struct SkinConfigDto {
 pub struct CapeConfigDto {
     /// Cape2D / Cape3D / Elytra
     pub display: CapeDisplay,
-    /// 披风 3D 旋转 X
+    /// 披风 3D 绕 X 轴旋转角度，单位度；只有 Cape3D 用
     pub pitch: f32,
-    /// 披风 3D 旋转 Y
+    /// 披风 3D 绕 Y 轴旋转角度，单位度；只有 Cape3D 用
     pub yaw: f32,
 }
 
@@ -45,11 +45,11 @@ pub struct CapeConfigDto {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct HeadConfigDto {
-    /// Head2DA / Head3DA / Head3DB / Head2DB
+    /// Head2DA / Head3DA / Head3DB / Head3DC / Head2DB
     pub head_type: HeadType,
-    /// 3D 旋转 X
+    /// 绕 X 轴旋转角度，单位度；只有 Head3DB 用
     pub x: f32,
-    /// 3D 旋转 Y
+    /// 绕 Y 轴旋转角度，单位度；只有 Head3DB 用
     pub y: f32,
 }
 
@@ -312,7 +312,7 @@ pub struct LaunchCheckConfigDto {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct GuiConfigDto {
-    /// 主题：Dark / Light
+    /// 主题：System / Light / Dark
     pub theme: Theme,
     /// 强调色：预设 id（blue / green / …）或 custom
     pub accent: String,

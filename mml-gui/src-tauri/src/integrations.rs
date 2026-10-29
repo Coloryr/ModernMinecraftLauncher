@@ -1,4 +1,6 @@
-//! 云连接和跨电脑实例绑定由 Rust 持久化。
+//! 云连接和跨电脑实例绑定由 Rust 持久化，文件 integrations.json。
+//!
+//! 与 [`crate::collect_utils`] 同一套路：内存一份、改动后异步落盘。
 
 use mml_base::serialize_tools;
 use mml_config::config_save;
@@ -21,7 +23,9 @@ pub struct Config {
     pub cloud_instances: HashMap<Uuid, Uuid>,
 }
 
+/// 配置文件路径，init 时设置
 static FILE: OnceLock<PathBuf> = OnceLock::new();
+/// 内存配置
 static CONFIG: LazyLock<RwLock<Config>> = LazyLock::new(|| RwLock::new(Config::default()));
 
 /// 记录配置位置。

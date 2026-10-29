@@ -169,8 +169,7 @@ pub async fn add_modpack_install(
 #[gui_macros::command]
 pub async fn add_modpack_cancel(app: AppHandle, pid: String, fid: String) -> Result<(), String> {
     let key = SourceInfo { pid, fid };
-    let task = DOWNLOAD_NOW.read().unwrap().get(&key).cloned();
-    let Some(task) = task else {
+    let Some(task) = DOWNLOAD_NOW.read().unwrap().get(&key).cloned() else {
         return Err(String::from(err_keys::TASK_NOT_FOUND));
     };
     task.cancelled.store(true, Ordering::Release);

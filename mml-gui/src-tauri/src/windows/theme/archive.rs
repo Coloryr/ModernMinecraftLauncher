@@ -8,6 +8,7 @@ use std::{collections::HashMap, io::Read, path::Path};
 
 use zip::ZipArchive;
 
+use super::error;
 use crate::err_keys;
 use crate::windows::web_assets::{
     MAX_ARCHIVE_BYTES, MAX_COMPRESSION_RATIO, MAX_ENTRIES, MAX_ENTRY_BYTES, MAX_TOTAL_BYTES,
@@ -279,11 +280,4 @@ fn detect_root(entries: &[Entry]) -> Option<String> {
         }
     }
     top.map(String::from)
-}
-
-/// 错误键转成命令返回的字符串
-///
-/// - `key`: crate::err_keys 里的常量
-fn error(key: &str) -> String {
-    String::from(key)
 }

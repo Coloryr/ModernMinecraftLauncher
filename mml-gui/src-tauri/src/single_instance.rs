@@ -175,7 +175,7 @@ mod tests {
     use super::*;
     use mml_names::names;
 
-    /// 每个用例各用一个临时目录，见 AGENTS.md §6
+    /// 每个用例各用一个临时目录，见 AGENTS.md §6.1
     ///
     /// - `tag`: 用例特征名，出问题时方便在 target/temp 下认出来
     ///
@@ -183,8 +183,7 @@ mod tests {
     ///
     /// 已建好的空目录
     fn port_dir(tag: &str) -> PathBuf {
-        let dir =
-            mml_testutil::temp_dir().join(format!("mml_ipc_port_{tag}_{}", std::process::id()));
+        let dir = mml_testutil::temp_path(format!("mml_ipc_port_{tag}_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir

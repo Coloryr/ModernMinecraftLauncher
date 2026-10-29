@@ -113,6 +113,7 @@ pub struct GamepadStateDto {
     /// 全部轴的当前值
     pub axes: Vec<GamepadAxisValueDto>,
 }
+
 /// 摇杆
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

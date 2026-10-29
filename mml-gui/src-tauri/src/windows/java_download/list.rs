@@ -1,8 +1,7 @@
 //! Java 运行时下载列表：按源查可用包，源有 Adoptium / Zulu / OpenJ9 / Foojay
 //!
-//! 从 `java_download/mod.rs` 拆出来的，`java_download_get_list` 一个函数就有 205 行。
-//! 列表查询是"每个源一套参数与解析"，四个分支各自独立；命令带分组标记，
-//! 值填原始组名 `java_download`，把组键钉回 `javaDownload`，见 AGENTS.md §4。
+//! 从 `java_download/mod.rs` 拆出来：四个源各一套查询参数与解析，分支互相独立。
+//! 命令带分组标记，值填原始组名 `java_download`，把组键钉回 `javaDownload`，见 AGENTS.md §4。
 
 use mml_base::file_item::{FileHash, FileItemObj, LaterRun};
 use mml_net::adoptium_api;

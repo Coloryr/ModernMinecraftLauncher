@@ -62,10 +62,11 @@ pub fn main_get_instances() -> Vec<InstanceInfoDto> {
                 source: None,
                 // 组内次序 = 分组表里的 `order`，键为实例 uuid；不在任何分组里时排到最后
                 order: mml_game::get_instance_order(&inst.uuid).unwrap_or(i32::MAX),
-                // 这里正拿着实例读锁，只能查不锁实例的那些占用
+                // 这里正拿着实例读锁，只能查不锁实例的那些占用；
+                // 目录必须是绝对路径：下载任务按绝对路径比对
                 busy: crate::windows::main::instance::group::busy_of(
                     &inst.uuid,
-                    Path::new(&inst.dir),
+                    &inst.get_base_path(),
                 )
                 .is_some(),
             }

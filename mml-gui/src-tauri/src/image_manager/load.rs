@@ -20,36 +20,31 @@ use super::respond::{read_as_png, send_bad, send_png};
 /// 设了方块 ID 就按 ID 现渲染，方块贴图未渲染完时拿不到图，返回占位失败；
 /// 否则读 `icon.png`，上传的自定义图片与老实例都走这条。
 ///
-/// - `uri`: 协议路径片段，首段 `instance` 已剥，第 2 段是实例 uuid
+/// - `uri`: 协议路径片段，第 1 段是路由名 `instance`，第 2 段是实例 uuid
 /// - `res`: 响应回写句柄
 pub(super) fn load_instance_image(uri: &[&str], res: UriSchemeResponder) {
     if uri.len() != 2 {
         send_bad(res);
         return;
     }
-    let uuid = Uuid::from_str(uri[1]);
-    if uuid.is_err() {
+    let Ok(uuid) = Uuid::from_str(uri[1]) else {
         send_bad(res);
         return;
-    }
-    let uuid = uuid.unwrap();
+    };
     let image = INSTANCE_IMAGE.read().unwrap().get(&uuid).cloned();
     if let Some(data) = image {
-        send_png(res, data.clone());
+        send_png(res, data);
         return;
     }
 
-    let instance = mml_game::get_instance(&uuid);
-    if instance.is_none() {
+    let Some(instance) = mml_game::get_instance(&uuid) else {
         send_bad(res);
         return;
-    }
+    };
 
-    let instance = instance.unwrap();
-
-    // 分支一：设了方块 ID → 用方块渲染结果
+    // 分支一：设了方块 ID → 用方块渲染结果；锁内只读配置，不整份 clone 实例
     let block_id = {
-        let inst = instance.read().unwrap().clone();
+        let inst = instance.read().unwrap();
         crate::gui_setting::block_icon_id(&inst)
     };
     if let Some(id) = block_id {
@@ -69,17 +64,16 @@ pub(super) fn load_instance_image(uri: &[&str], res: UriSchemeResponder) {
 
     // 分支二：没有方块 ID → 读图标文件，Icon 已清空的实例按默认 icon.png 找
     let icon = instance.read().unwrap().get_icon_file_or_default();
-    if !icon.exists() || !icon.is_file() {
+    if !icon.is_file() {
         send_bad(res);
         return;
     }
-    let image = read_as_png(icon);
-    if image.is_none() {
+    let Some(image) = read_as_png(icon) else {
         send_bad(res);
         return;
-    }
+    };
 
-    cache_and_send(uuid, image.unwrap(), res);
+    cache_and_send(uuid, image, res);
 }
 
 /// 把实例图标写进内存缓存并回给请求方
@@ -97,7 +91,7 @@ pub(super) fn cache_and_send(uuid: Uuid, image: Vec<u8>, res: UriSchemeResponder
 /// PNG 直接读盘透传，不进内存缓存，重渲染后立即生效；
 /// webview 自身的缓存由 URL 上的 `?v=<版本>` 破掉
 ///
-/// - `uri`: 协议路径片段，首段 `block` 已剥
+/// - `uri`: 协议路径片段，第 1 段是路由名 `block`，第 2 段是方块 ID
 /// - `res`: 响应回写句柄
 pub(super) fn load_block_image(uri: &[&str], res: UriSchemeResponder) {
     if uri.len() != 2 {
@@ -119,7 +113,7 @@ pub(super) fn load_block_image(uri: &[&str], res: UriSchemeResponder) {
 /// PNG 直接读盘透传，不进内存缓存，重渲染后立即生效；
 /// webview 自身的缓存由 URL 上的 `?v=<版本>` 破掉
 ///
-/// - `uri`: 协议路径片段，首段 `item` 已剥
+/// - `uri`: 协议路径片段，第 1 段是路由名 `item`，第 2 段是物品 ID
 /// - `res`: 响应回写句柄
 pub(super) fn load_item_image(uri: &[&str], res: UriSchemeResponder) {
     if uri.len() != 2 {
@@ -140,7 +134,8 @@ pub(super) fn load_item_image(uri: &[&str], res: UriSchemeResponder) {
 ///
 /// PNG 读盘透传，不进内存缓存，游戏运行中新增截图下次请求即可见
 ///
-/// - `uri`: 协议路径片段，首段 `screenshot` 已剥
+/// - `uri`: 协议路径片段，第 1 段是路由名 `screenshot`，第 2 段是实例 uuid，
+///   第 3 段是文件名
 /// - `res`: 响应回写句柄
 pub(super) fn load_screenshot_image(uri: &[&str], res: UriSchemeResponder) {
     if uri.len() != 3 {

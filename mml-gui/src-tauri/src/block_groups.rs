@@ -1,7 +1,7 @@
 //! 方块窗口的用户数据：左栏顺序 / 自建分组 / 收藏，配置文件 `block_groups.json`
 //!
 //! 与 [`crate::collect_utils`] 同一套路：内存一份、改动后异步落盘。
-//! 这些是**用户数据**，按仓库约定不进前端 localStorage（见 AGENTS.md「前端本地存储」一节）。
+//! 这些是**用户数据**，按仓库约定不进前端 localStorage，见 AGENTS.md §7.1。
 
 use std::{
     collections::HashMap,
