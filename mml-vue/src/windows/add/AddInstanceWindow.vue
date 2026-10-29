@@ -269,6 +269,8 @@ const folderFound = ref<FolderInstanceDto[]>([]);
 /** 已勾选要导入的实例路径 */
 const folderPicked = ref<Set<string>>(new Set());
 const folderScanning = ref(false);
+/** 目录扫描代次：两次扫描重叠时只让最后一次收尾 */
+let folderScanSeq = 0;
 /** 扫描失败的原因：扫描命令报错时显示出来，别静默当成"没扫到" */
 const folderScanError = ref("");
 /** 待确认"是否允许读取"的目录（非空 = 确认框打开着） */
@@ -332,23 +334,25 @@ function confirmScan() {
 async function scanFolder() {
   const path = addFolderPath.value.trim();
   if (!path) return;
+  const seq = ++folderScanSeq;
   folderScanning.value = true;
   folderScanError.value = "";
   try {
     const found = await api.addScanFolder(path);
-    // 扫描期间路径又被改了：这次结果作废，别把它贴到新路径上
-    if (addFolderPath.value.trim() !== path) return;
+    // 扫描期间路径又被改了、或已有更新的一次扫描：这次结果作废
+    if (seq !== folderScanSeq || addFolderPath.value.trim() !== path) return;
     folderFound.value = found;
     folderPicked.value = new Set(found.map((item) => item.path));
     if (!found.length) await loadFolderTree(path);
   } catch (e) {
-    if (addFolderPath.value.trim() !== path) return;
+    if (seq !== folderScanSeq || addFolderPath.value.trim() !== path) return;
     folderFound.value = [];
     folderPicked.value = new Set();
     // 扫描失败要说出来，别静默当成"没扫到"
     folderScanError.value = tErr(e);
   } finally {
-    folderScanning.value = false;
+    // 旧的一次扫描不能把新一次扫描的"扫描中"提前清掉
+    if (seq === folderScanSeq) folderScanning.value = false;
   }
 }
 

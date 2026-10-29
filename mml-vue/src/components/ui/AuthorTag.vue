@@ -26,7 +26,7 @@ const more = computed(() => Math.max(0, props.authors.length - props.max));
 </script>
 
 <template>
-  <span v-for="a in shown" :key="a.name" class="author-tag" v-tip="a.name">
+  <span v-for="(a, i) in shown" :key="`${a.name}-${i}`" class="author-tag" v-tip="a.name">
     <AsyncImage v-if="a.logo" class="author-avatar" :src="a.logo" alt="" />
     <span v-else class="author-avatar author-avatar-fallback">{{ a.name.slice(0, 1).toUpperCase() }}</span>
     <span class="author-name">{{ a.name }}</span>

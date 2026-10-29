@@ -61,7 +61,6 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: |
-            mml-gui/package-lock.json
             mml-vue/package-lock.json
       - name: 设置 Rust
         uses: dtolnay/rust-toolchain@stable
@@ -70,6 +69,8 @@ jobs:
         with:
           workspaces: .
           key: ${{ matrix.arch }}
+      - name: 安装 Tauri CLI
+        run: cargo install tauri-cli --version "^2" --locked
       - name: 安装依赖
         run: pwsh -NoProfile -File build/init.ps1
       - name: 构建并打包（${{ matrix.arch }}）
@@ -106,7 +107,6 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: |
-            mml-gui/package-lock.json
             mml-vue/package-lock.json
       - name: 设置 Rust
         uses: dtolnay/rust-toolchain@stable
@@ -123,6 +123,8 @@ jobs:
             librsvg2-dev patchelf libxdo-dev libssl-dev \
             libgtk-3-dev ${{ matrix.fuse }} rpm libdbus-1-dev libudev-dev \
             libarchive-tools zstd
+      - name: 安装 Tauri CLI
+        run: cargo install tauri-cli --version "^2" --locked
       - name: 安装依赖
         run: bash build/init.sh
       - name: 构建并打包
@@ -162,7 +164,6 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: |
-            mml-gui/package-lock.json
             mml-vue/package-lock.json
       - name: 设置 Rust
         uses: dtolnay/rust-toolchain@stable
@@ -170,6 +171,8 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: .
+      - name: 安装 Tauri CLI
+        run: cargo install tauri-cli --version "^2" --locked
       - name: 安装依赖
         run: bash build/init.sh
       - name: 构建并打包

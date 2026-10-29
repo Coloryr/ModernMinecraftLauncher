@@ -15,6 +15,7 @@ import type { NbtKindDto } from "../../../lib/bindings";
 import { t } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
+import HighlightText from "../../../components/ui/HighlightText.vue";
 import {
   ADDABLE_KINDS,
   MAX_ARRAY_EDIT,
@@ -40,6 +41,8 @@ const props = defineProps<{
   path: string[];
   /** 搜索命中的路径集合，由树一次算好；null = 没有搜索，不过滤 */
   hits?: Set<string> | null;
+  /** 搜索词，用来给命中的键名加底色 */
+  query: string;
   /** 改本节点键名的回调；只有复合的成员给，列表 / 数组元素按序号认，根标签没有键名 */
   renameSelf?: (name: string) => void;
   /** 删掉本节点；根节点没有父容器，不给这个回调，行尾也就不显示 ✕ */
@@ -282,7 +285,7 @@ const kindClass = computed(() => {
           @click.stop @dblclick.stop @keydown.enter.prevent="commitRename" @keydown.esc="cancelRename"
           @blur="commitRename" />
         <span v-else class="nbt-name" :class="{ renamable: !!renameSelf }" v-tip="nameTip"
-          @dblclick.stop="startRename">{{ node.name }}</span>
+          @dblclick.stop="startRename"><HighlightText :text="node.name" :query="query" /></span>
         <span class="nbt-kind" :class="kindClass">{{ node.kind }}</span>
       </div>
       <!-- 值列：与键列之间由一条竖线分开，谁属于谁一眼看得出来 -->
@@ -329,7 +332,8 @@ const kindClass = computed(() => {
       </div>
 
       <NbtNode v-for="(child, index) in below" :key="`${child.name}-${index}`" :node="child" :depth="depth + 1"
-        :path="[...path, child.name]" :hits="hits" :remove-self="() => edit?.remove(node, path, index)"
+        :path="[...path, child.name]" :hits="hits" :query="query"
+        :remove-self="() => edit?.remove(node, path, index)"
         :rename-self="isCompound ? (name: string) => renameChild(index, name) : undefined" />
     </div>
   </div>

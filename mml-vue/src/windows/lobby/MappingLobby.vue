@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from "vue";
 import { commands, type MappingLobbyDto } from "../../lib/bindings";
 import { t, tErr } from "../../lib/i18n";
 import BaseButton from "../../components/ui/BaseButton.vue";
+import HighlightText from "../../components/ui/HighlightText.vue";
 
 /** 大厅快照；未加载时为 null */
 const view = ref<MappingLobbyDto | null>(null);
@@ -50,7 +51,7 @@ onMounted(refresh);
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="!rooms.length" class="empty">{{ t('lobby.noRooms') }}</p>
     <article v-for="room in rooms" :key="room.id">
-      <strong>{{ room.name }}</strong>
+      <strong><HighlightText :text="room.name" :query="keyword" /></strong>
       <span>{{ t('lobby.players', { count: room.players }) }}</span>
       <BaseButton :disabled="!view?.available" @click="action('join', room.id)">{{ t('lobby.joinRoom') }}</BaseButton>
     </article>

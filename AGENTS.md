@@ -25,13 +25,16 @@
   `... --test <name>`，必要时加 `单个用例名` 过滤）。不要动辄
   `cargo check --workspace --all-targets` / `cargo test --workspace` / 整仓全量测试；
   同一结论不要重复跑第二遍（改了代码再验一次除外）。
-- 桌面壳：`cd mml-gui && npm run tauri dev`（会先起 mml-vue 的 vite，**端口 1420 必须空闲**）。
+- 整仓检查：根目录 `.\check.ps1 --all`（bash 版 `bash check.sh --all`）会先还原 vendor 插件；
+  裸 `cargo check --all` 前必须已还原过 `target/vendor/tauri-plugin-decoration`，Cargo 没有可用的
+  构建前钩子，别指望它自己准备。
+- 桌面壳：`cd mml-gui && .\tauri.ps1 dev`（Linux / macOS 用 `bash tauri.sh dev`；会先还原 vendor 插件再起 mml-vue 的 vite，**端口 1420 必须空闲**）。
 - 只跑前端：`build/dev-frontend.ps1`（bash 版 `build/dev-frontend.sh`；vite，1420）。
   只在 Rust 后端以 debug 模式单独运行（`cargo run`）时配合使用；`tauri dev` 已自带 vite，
   不要同时起。浏览器直连只能看到无 IPC 数据的空状态。
 - **出包两个 profile**（各自独立 target 目录，来回切不会互相刷缓存）：
   - 正式发布：`build/build-release.ps1`（bash 版 `build/build-release.sh`；
-    = `cd mml-gui && npm run tauri build`）。Windows 默认三种架构（x64 / x86 / arm64），
+    = `cd mml-gui && cargo tauri build`）。Windows 默认三种架构（x64 / x86 / arm64），
     只要一种用 `-Arch x64`；arm64 只打 NSIS。
     `[profile.release]` 是 fat LTO + `codegen-units = 1`：体积最小、运行最快，但末尾的
     跨 crate 优化是单线程的，**构建时会看到只有一个核在跑**，含安装包。
@@ -48,9 +51,9 @@
     Windows 默认三种架构，产物按架构命名：`target/prerelease/mml-gui-<arch>.exe`（`-Arch` 同样可过滤）。
   - 预发布也要**安装包**时：`tauri` CLI 不认 `--profile`（`--` 透传给 cargo 会让它去
     `target/release` 找错文件），只能覆盖 release 的设置：
-    `CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 npm run tauri build -- --features prerelease`。
+    `CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 cargo tauri build --features prerelease`。
     PowerShell 里环境变量写成 `$env:CARGO_PROFILE_RELEASE_LTO = 'thin'` 单独两行再跑
-    `npm run tauri build -- --features prerelease`；`--features prerelease` 不能省，
+    `cargo tauri build --features prerelease`；`--features prerelease` 不能省，
     否则这样出的包与正式版一模一样，主页面不会提示「预发布版」。
     代价是它与正式发布共用 target 目录，来回切会重编末尾那几个单元。
 - Rust workspace 在**仓库根目录**（根 `Cargo.toml` 收编 `mml-core/` 全部子 crate 与
@@ -80,7 +83,7 @@
   `mml-vue/src/lib/bindings.ts` / `listens.ts` 只是兼容层：前者把 Tauri 的 invoke 绑到
   `createCommands`，后者再导出事件名，既有导入路径不变；`custom-main-demo` 直接引用 `mml-ipc`。
   新增命令加 `#[gui_macros::command]`，新增事件加 `#[gui_macros::emit]`；单独重新生成可跑
-  `cd mml-gui && npm run gen`（或任意 `cargo check`）。
+  `cd mml-gui && cargo check --manifest-path src-tauri/Cargo.toml`（或仓库根 `cargo check -p mml-gui`）。
 - 扫描与生成逻辑在 `ipc-gen/`（包名 `gui-ipc-gen`，有单测），过程宏在 `ipc-gen/macros/`
   （包名 `gui-macros`）：`src-tauri/build.rs` 只是调用方（算路径、传 `GenConfig`、写文件、
   打 cargo 指令）；改生成规则改那个包，跑 `cd ipc-gen && cargo test` 验证。
@@ -265,7 +268,7 @@ windows/<窗口>/mod.rs 里：
   "默认"是省事的起点，不是禁令——**功能确实需要后端时，就把后端一起改完，不要只留骨架**。
 - **判据是"前端拿不到的能力"**：重启进程、直接读写磁盘文件、访问注册表、拉起外部程序、
   拿本机信息之类，不写后端就根本跑不通。这种情况把 `#[gui_macros::command]` 连同**函数体**
-  一起实现，改完跑 `cd mml-gui && npm run gen`（或任意 `cargo check`）重新生成
+  一起实现，改完跑 `cd mml-gui && cargo check --manifest-path src-tauri/Cargo.toml` 重新生成
   `bindings.ts`。
   **不要留 `todo!()` / 空实现**：那会让用户点下去的那一刻 panic、或者毫无反应，
   比不改还糟（`window_restart_app` 就是这种"必须实现"的例子）。
@@ -273,7 +276,7 @@ windows/<窗口>/mod.rs 里：
   `#[gui_macros::command]` 声明与 DTO 定义（含注册进 `generate_handler!`），函数体留空，
   跑生成让前端接线类型对得上。
 - **用户添加 DTO 后要同步前端**：用户在 Rust 侧添加 / 修改 DTO 模型时，读取对应源码，
-  跑 `cd mml-gui && npm run gen` 重新生成 `bindings.ts`，并在前端接上新结构。
+  跑 `cd mml-gui && cargo check --manifest-path src-tauri/Cargo.toml` 重新生成 `bindings.ts`，并在前端接上新结构。
 - 不论哪种情况，**命令与 DTO 的唯一来源仍是 Rust 源码**（见 §4），前端不另写一套类型。
 
 ### 12.1 前端只留这份界面要用的数据，其余放后端的窗口 model

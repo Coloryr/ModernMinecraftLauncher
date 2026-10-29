@@ -20,7 +20,7 @@
 缺命令或字段时改 Rust 源码，再跑：
 
 ```bash
-cd mml-gui && npm run gen
+cd mml-gui && cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
 ## 用法

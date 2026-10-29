@@ -338,7 +338,8 @@ watch(key, () => void activate(), { immediate: true });
       <!-- 键值之间的竖线：拖动改键列宽度 -->
       <div class="nbt-split" :class="{ on: resizing }" @pointerdown="startResize" />
       <div v-if="loading" class="empty-tip">{{ t("config.loading") }}</div>
-      <NbtNode v-else-if="session.tree && !searchEmpty" :node="session.tree" :depth="0" :path="[]" :hits="hits" />
+      <NbtNode v-else-if="session.tree && !searchEmpty" :node="session.tree" :depth="0" :path="[]" :hits="hits"
+        :query="query" />
       <p v-else class="empty-tip">{{ session.tree ? t("config.nbtSearchEmpty") : t("config.nbtEmpty") }}</p>
     </div>
   </div>

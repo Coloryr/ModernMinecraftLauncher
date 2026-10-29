@@ -1,4 +1,4 @@
-# 预发布构建：thin LTO + 16 个代码生成单元，能并行，出包快很多。
+﻿# 预发布构建：thin LTO + 16 个代码生成单元，能并行，出包快很多。
 # 带 prerelease feature：主页面会提示「预发布版」，见 mml-gui/src-tauri/src/build_info.rs。
 # 只产出可执行文件，不打安装包；Windows 默认三种架构，集中在 <仓库>\target\prerelease\：
 #   mml-gui-x64.exe / mml-gui-x86.exe / mml-gui-arm64.exe

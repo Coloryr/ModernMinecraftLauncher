@@ -29,7 +29,7 @@ fn main() {
         println!("cargo:rustc-link-arg-bins=/MANIFEST:NO");
     }
 
-    // src 下任何文件变动都触发重新扫描；单独重生成可跑 npm run gen
+    // src 下任何文件变动都触发重新扫描；单独重生成可跑 cargo check -p mml-gui
     println!("cargo:rerun-if-changed=src");
     println!("cargo:rerun-if-changed=build.rs");
 

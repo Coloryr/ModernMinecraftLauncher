@@ -11,7 +11,7 @@ import { t, tErr, locale } from "../../lib/i18n";
 import { api } from "../../lib/api";
 import { commands } from "../../lib/bindings";
 import { appVersion, buildBadgeKey, buildChannel, isTestBuild, loadBuildInfo } from "../../lib/buildInfo";
-// 与 src-tauri/icons 那套是同一个源（design/icon/f-blend-mirror.svg）；换图标时两处一起换
+// 与 src-tauri/icons 那套是同一个源（design/icon/f-blend.svg）；换图标时两处一起换
 import appIcon from "../../assets/app-icon.svg";
 import { faqs as zhFaqs } from "../../lib/i18n/locales/zh-CN";
 import { faqs as enFaqs } from "../../lib/i18n/locales/en-US";

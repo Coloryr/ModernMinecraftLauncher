@@ -14,8 +14,9 @@ const props = defineProps<{
 
 const consoleEl = ref<HTMLElement | null>(null);
 
+// 同时看长度和最后一行：日志有上限，到顶后长度不再变，只追加新行时必须靠后者触发
 watch(
-  () => props.logs.length,
+  () => [props.logs.length, props.logs[props.logs.length - 1]] as const,
   () => {
     nextTick(() => {
       if (consoleEl.value) {

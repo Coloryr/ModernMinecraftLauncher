@@ -46,21 +46,6 @@ const targets = [
         pattern: /"version"\s*:\s*"[^"]+"/,
         value: `"version": "${version}"`,
     },
-    {
-        file: "mml-gui/package.json",
-        pattern: /"version"\s*:\s*"[^"]+"/,
-        value: `"version": "${version}"`,
-    },
-    {
-        file: "mml-gui/package-lock.json",
-        pattern: /"name": "mml-gui",(\r?\n)  "version": "[^"]+"/,
-        value: `"name": "mml-gui",$1  "version": "${version}"`,
-    },
-    {
-        file: "mml-gui/package-lock.json",
-        pattern: /"": \{(\r?\n)      "name": "mml-gui",(\r?\n)      "version": "[^"]+"/,
-        value: `"": {$1      "name": "mml-gui",$2      "version": "${version}"`,
-    },
 ];
 
 for (const target of targets) {

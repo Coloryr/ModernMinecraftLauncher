@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="design/icon/f-blend-mirror.svg" width="128" alt="M²L 程序图标">
+  <img src="design/icon/f-blend.svg" width="128" alt="M²L 程序图标">
 </p>
 
 # ModernMinecraftLauncher (M²L)
@@ -46,7 +46,8 @@
 
 ### 环境要求
 
-- **通用**：Rust stable（edition 2024，需 1.85+）、Node.js 20.19+ 或 22.12+（Vite 8 要求，建议 LTS）。
+- **通用**：Rust stable（edition 2024，需 1.85+）、Node.js 20.19+ 或 22.12+（Vite 8 要求，建议 LTS）、
+  `cargo install tauri-cli --version "^2" --locked`（提供 `cargo tauri`）。
 - **Windows**：Rust 的 MSVC 工具链、Visual Studio 生成工具（勾选「使用 C++ 的桌面开发」）、
   WebView2 运行时（Windows 11 和较新的 Windows 10 已自带）。
 - **Linux**：Tauri 2 需要的 WebKitGTK 4.1、GTK 3、libappindicator、librsvg、patchelf、libxdo，
@@ -70,20 +71,22 @@ build/init.ps1      # Windows
 bash build/init.sh  # Linux / macOS / Git Bash
 ```
 
-脚本只装 `mml-vue` 与 `mml-gui` 的 npm 依赖，不构建、不启动程序。
+脚本只装 `mml-vue` 的 npm 依赖，并检查 `cargo tauri` 是否可用；不构建、不启动程序。
 
 ### 开发运行
 
 ```bash
 cd mml-gui
-npm run tauri dev
+.\tauri.ps1 dev        # Linux / macOS 用 bash tauri.sh dev
 ```
 
-`npm run tauri` 会先还原本地 vendor 插件（`tauri-plugin-decoration` 的 patch），再启动
-`mml-vue` 的 Vite 服务器并打开桌面窗口。**端口 1420 必须空闲**；改前端会热更新，改 Rust 会重新编译。
+这个入口会先还原 vendor 插件（`tauri-plugin-decoration` 的 patch），再启动 `mml-vue` 的
+Vite 服务器并打开桌面窗口，避免 `cargo tauri` 直接跑时丢库。**端口 1420 必须空闲**；
+改前端会热更新，改 Rust 会重新编译。Tauri CLI 由
+`cargo install tauri-cli --version "^2" --locked` 安装；`mml-gui` 自身不再有 npm 依赖。
 
 `build/dev-frontend` 只启动 Vite，不启动桌面壳。它只在 **Rust 后端以 debug 模式单独运行** 时
-配合使用：先跑这个脚本起前端，另开终端在 `mml-gui` 里 `npm run vendor` 还原插件，再到
+配合使用：先跑这个脚本起前端，另开终端在 `mml-gui` 里跑 `vendor/prepare.ps1` 还原插件，再到
 `mml-gui/src-tauri` 用 `cargo run` 启动 debug 后端（debug 构建会连 `devUrl`）。
 
 ```bash
@@ -91,7 +94,7 @@ build/dev-frontend.ps1    # Windows
 build/dev-frontend.sh     # Linux / macOS / Git Bash
 ```
 
-`npm run tauri dev` 已经自带 Vite，不要再同时运行这个脚本，否则端口 1420 会冲突。
+`cargo tauri dev` 已经自带 Vite，不要再同时运行这个脚本，否则端口 1420 会冲突。
 直接在浏览器打开 `http://localhost:1420/?window=<kind>` 只能看到没有 IPC 数据的空状态，
 不能替代桌面调试。
 
@@ -128,8 +131,7 @@ tar.zst，不依赖 `makepkg`，Ubuntu 上也能打。CI 只在 Linux x64 执行
 
 1. 改 `build/version`。
 2. 跑 `build/build-release.ps1`（Windows）或 `bash build/build-release.sh`（Linux / macOS）。
-   脚本会先把版本同步到 `mml-gui/src-tauri/Cargo.toml`、`tauri.conf.json` 与 `mml-gui/package.json`，
-   再开始构建。
+   脚本会先把版本同步到 `mml-gui/src-tauri/Cargo.toml` 与 `tauri.conf.json`，再开始构建。
 3. 安装包会按版本重命名后集中到 `build_out/`，该目录不入库：
 
 | 平台 | 产物示例 |
@@ -162,12 +164,13 @@ CI 每个平台都走同一套脚本（`build/init.*` 装依赖、`build/build-r
 
 | 命令 | 说明 |
 | --- | --- |
-| `cd mml-gui && npm run gen` | 改过 Rust 侧命令 / DTO 后重新生成 `mml-ipc` 契约 |
+| `cd mml-gui && powershell -NoProfile -ExecutionPolicy Bypass -File vendor/prepare.ps1; cargo check --manifest-path src-tauri/Cargo.toml` | 改过 Rust 侧命令 / DTO 后重新生成 `mml-ipc` 契约 |
+| `.\check.ps1 --all` | 根目录整仓检查，先还原 vendor 插件再 `cargo check`（bash 版 `bash check.sh --all`） |
 | `cd mml-vue && npm run build` | 只构建前端到 `mml-vue/dist/` |
 | `cd mml-vue && npm run lint` | 前端 lint |
 | `cd mml-vue && npm test` | 前端单测 |
 | `cargo test -p <crate>` | 只跑改动相关的 Rust 测试，不要整仓全量测试 |
-| `cd mml-gui && npx tauri icon ../design/icon/f-blend-mirror.svg` | 改过程序图标后重新生成各平台图标 |
+| `cd mml-gui && .\tauri.ps1 icon ../design/icon/f-blend.svg` | 改过程序图标后重新生成各平台图标 |
 
 IPC 生成规则与构建配置细节见[开发与构建](docs/development.md)。
 

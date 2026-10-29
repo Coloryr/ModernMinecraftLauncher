@@ -9,6 +9,7 @@ import BaseModal from "../../components/ui/BaseModal.vue";
 import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import { useFileDrop } from "../../composables/useFileDrop";
+import { useUnlisteners } from "../../composables/useUnlisteners";
 import type { FileDropPayload } from "../../composables/useFileDrop";
 import { dropFromUrl, multiWindow, windowParams } from "../windowManager";
 import type { WindowDropParam } from "../windowManager";
@@ -56,6 +57,8 @@ const showSkin = ref(false);
 type ViewMode = "grid" | "list" | "detail";
 const view = ref<ViewMode>("grid");
 
+const { track } = useUnlisteners();
+
 // 进入窗口时加载账户数据与登录方式锁定，并订阅微软登录事件
 onMounted(() => {
   loadAccounts();
@@ -67,38 +70,44 @@ onMounted(() => {
     }
   });
   // 设置窗口保存客户端设置时实时同步锁定，增删登录模型后无需重开账户窗口
-  onClientConfigChange((c: ClientConfigDto) => {
-    loginLock.value = c.loginLockOn ? c.loginLock : [];
-  }).catch(() => { /* 忽略 */ });
+  track(
+    onClientConfigChange((c: ClientConfigDto) => {
+      loginLock.value = c.loginLockOn ? c.loginLock : [];
+    }),
+  );
 
   // 后端拿到设备码：弹出授权码窗口
-  listen<AccountOAuthDto>(AccountOAuth, (data) => {
-    showAdd.value = false;
-    oauthCode.value = data.payload.code;
-    oauthUrl.value = data.payload.url;
-    showOauth.value = true;
-  });
+  track(
+    listen<AccountOAuthDto>(AccountOAuth, (data) => {
+      showAdd.value = false;
+      oauthCode.value = data.payload.code;
+      oauthUrl.value = data.payload.url;
+      showOauth.value = true;
+    }),
+  );
 
   // 登录阶段进度：waiting / xbox / xsts / token / profile / ok / fail
-  listen<AccountOAuthStateDto>(AccountOAuthState, (data) => {
-    const s = data.payload;
-    if (s.state === "ok") {
-      showOauth.value = false;
-      showOauthRun.value = false;
-      showToast(t("account.oauthOk"));
-      loadAccounts();
-    } else if (s.state === "fail") {
-      showOauth.value = false;
-      showOauthRun.value = false;
-      showToast(s.message || t("account.oauthFail"));
-    } else {
-      oauthState.value = t(`account.oauthState.${s.state}`);
-      // 授权码弹窗还开着（用户尚未点「打开浏览器」）时不抢焦点，只静默更新文案
-      if (!showOauth.value) {
-        showOauthRun.value = true;
+  track(
+    listen<AccountOAuthStateDto>(AccountOAuthState, (data) => {
+      const s = data.payload;
+      if (s.state === "ok") {
+        showOauth.value = false;
+        showOauthRun.value = false;
+        showToast(t("account.oauthOk"));
+        loadAccounts();
+      } else if (s.state === "fail") {
+        showOauth.value = false;
+        showOauthRun.value = false;
+        showToast(s.message || t("account.oauthFail"));
+      } else {
+        oauthState.value = t(`account.oauthState.${s.state}`);
+        // 授权码弹窗还开着（用户尚未点「打开浏览器」）时不抢焦点，只静默更新文案
+        if (!showOauth.value) {
+          showOauthRun.value = true;
+        }
       }
-    }
-  });
+    }),
+  );
 });
 
 // 单窗口模式：窗口被 KeepAlive 缓存，切回不会重新挂载 → 自己补一次（账户可能在别处被加/删）
@@ -690,16 +699,16 @@ function tokenLabel(acc: AccountStoreDto): string {
     <!-- 视图：平铺 / 列表 / 详情（见 views/ 目录）；详情模式下视图区自己管理滚动 -->
     <div class="view-area" :class="{ fill: view === 'detail' }">
       <AccountGrid v-if="view === 'grid'" :accounts="filtered" :filtering="filtering"
-        :current-uuid="currentAccount?.uuid ?? ''" @menu="openAccountMenu"
+        :current-uuid="currentAccount?.uuid ?? ''" :query="searchText" @menu="openAccountMenu"
         @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin" @refresh-skin="refreshSkin"
         @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" @add="openAdd" />
       <AccountList v-else-if="view === 'list'" :accounts="filtered" :filtering="filtering"
-        :current-uuid="currentAccount?.uuid ?? ''" @menu="openAccountMenu"
+        :current-uuid="currentAccount?.uuid ?? ''" :query="searchText" @menu="openAccountMenu"
         :token-label="tokenLabel" @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin"
         @refresh-skin="refreshSkin" @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event"
         @add="openAdd" />
       <AccountDetail v-else :accounts="filtered" :filtering="filtering" :current-uuid="currentAccount?.uuid ?? ''"
-        @menu="openAccountMenu"
+        :query="searchText" @menu="openAccountMenu"
         :token-label="tokenLabel"
         @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin" @refresh-skin="refreshSkin"
         @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" @add="openAdd" />

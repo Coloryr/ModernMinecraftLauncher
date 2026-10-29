@@ -42,7 +42,7 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
 ```
 
 - 新增命令加 `#[gui_macros::command]`（过程宏在 `ipc-gen/macros/`，展开成 Tauri 的命令宏），
-  新增事件加 `#[gui_macros::emit]`；改完跑 `cd mml-gui && npm run gen`（或任意 `cargo check`）。
+  新增事件加 `#[gui_macros::emit]`；改完在 `mml-gui` 里跑 `cargo check --manifest-path src-tauri/Cargo.toml`。
 - `mml-ipc/src/` 下的 `types/`、`bindings.ts`、`listens.ts` 是生成产物，**不要手改**：DTO 按
   来源 .rs 拆在 `types/` 下（`types/index.ts` 是 barrel），`bindings.ts` 是 `createCommands(invoke)`
   命令包装，`listens.ts` 是事件名、payload 类型映射与 `createEvents(on)` 订阅函数。
@@ -56,24 +56,26 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
 
 环境要求（Windows 的 MSVC / WebView2 等）、依赖安装与出包产物见根 README 的[构建与运行](../README.md#构建与运行)。
 
-依赖：Rust（含 cargo）、Node.js。启动器本体先跑 `build/init.ps1` 或 `bash build/init.sh`，
-它会装好 `mml-vue` / `mml-gui` 的 npm 依赖；`custom/` 下前三个示例各自 `npm install`。
+依赖：Rust（含 cargo 与 `cargo install tauri-cli --version "^2" --locked`）、Node.js。
+启动器本体先跑 `build/init.ps1` 或 `bash build/init.sh`，它会装好 `mml-vue` 的 npm 依赖并检查
+`cargo tauri`；`custom/` 下前三个示例各自 `npm install`。
 示例的 `mml-ipc` / `mml-vue` 由 `scripts/deps.mjs` 在安装前链接到本仓库，仓库不在时
 自动浅克隆一份，不需要单独发布。`custom-ui-html-demo` 没有 npm 依赖，不用 install。
 
 | 命令 | 说明 |
 | --- | --- |
-| `build/init.ps1` | 首次安装 `mml-vue` / `mml-gui` 的 npm 依赖（bash 版 `build/init.sh`） |
-| `cd mml-gui && npm run tauri dev` | 桌面开发模式（会先还原 vendor 插件并起 vite，端口 1420 必须空闲） |
+| `build/init.ps1` | 首次安装 `mml-vue` 的 npm 依赖并检查 `cargo tauri`（bash 版 `build/init.sh`） |
+| `cd mml-gui && .\tauri.ps1 dev` | 桌面开发模式（自动还原 vendor 插件；Linux / macOS 用 `bash tauri.sh dev`；端口 1420 必须空闲） |
 | `build/dev-frontend.ps1` | 只起 Vite，配合 debug 版 Rust 后端单独运行；`tauri dev` 已自带 Vite，不要重复起 |
 | `build/build-release.ps1` | 正式发布构建（fat LTO，含安装包，按版本收集到 `build_out/`；Windows 默认 x64 / x86 / arm64；Linux / macOS 的 x64 / arm64 由 CI 原生 runner 出） |
 | `build/build-prerelease.ps1` | 预发布构建（thin LTO，只出 exe，更快；Windows 三种架构，`target/prerelease/mml-gui-<arch>.exe`） |
 | `bash build/package-flatpak.sh` | 用已构建的二进制打 `.flatpak`，需要 `flatpak`，不重新编译 |
 | `bash build/package-arch.sh` | 用已构建的二进制打 `.pkg.tar.zst`，不依赖 `makepkg`，任一 Linux 可跑 |
-| `cd mml-gui && npm run gen` | 改过 Rust 侧命令 / DTO 后重新生成 `mml-ipc` 契约 |
+| `.\check.ps1 --all` | 根目录整仓检查，先还原 vendor 插件再 `cargo check`（bash 版 `bash check.sh --all`） |
+| `cd mml-gui && cargo check --manifest-path src-tauri/Cargo.toml` | 改过 Rust 侧命令 / DTO 后重新生成 `mml-ipc` 契约 |
 | `cd mml-vue && npm run shots` | 无后端渲染前端页面截图，`--scene=<名字>` 只跑一张；场景表见[前端页面截图目录](screenshots.md) |
 | `cd mml-vue && npm run shots:docs` | 按 `scenarios.mjs` 重新生成 `docs/screenshots.md` |
-| `cd mml-gui && npx tauri icon ../design/icon/f-blend-mirror.svg` | 改过程序图标后重新生成 `src-tauri/icons/`；会顺带产出 `android/` 与 `ios/`，桌面端用不到可删 |
+| `cd mml-gui && .\tauri.ps1 icon ../design/icon/f-blend.svg` | 改过程序图标后重新生成 `src-tauri/icons/`；会顺带产出 `android/` 与 `ios/`，桌面端用不到可删 |
 | `cd custom/custom-main-demo && npm run build` | 构建自定义主页面示例并打包成 `custom-main-demo.zip`（四个示例的用法见 [custom/README.md](../custom/README.md)） |
 
 `build/` 下带 PowerShell 版（`.ps1`，Windows）与 bash 版（`.sh`，Linux / macOS / Git Bash）：
@@ -132,7 +134,7 @@ Windows 的正式 / 预发布脚本默认构建 **x64 / x86 / arm64**：
 $env:CARGO_PROFILE_RELEASE_LTO = 'thin'
 $env:CARGO_PROFILE_RELEASE_CODEGEN_UNITS = '16'
 cd mml-gui
-npm run tauri build -- --features prerelease
+cargo tauri build --features prerelease
 ```
 
 `--features prerelease` 不能漏，否则主界面不会提示「预发布版」，出的包与正式版一样。

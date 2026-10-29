@@ -54,11 +54,13 @@ function onInput(e: Event) {
   draft.value = (e.target as HTMLInputElement).value;
 }
 
-/** 失焦 / 回车：草稿是数字就提交，不是就丢弃 */
+/** 失焦 / 回车：草稿是非空数字就提交，否则保持原值（清空不能变成 0） */
 function onCommit() {
   editing.value = false;
-  const n = Number(draft.value);
-  if (!Number.isNaN(n)) commit(n);
+  const text = draft.value.trim();
+  if (!text) return;
+  const n = Number(text);
+  if (Number.isFinite(n)) commit(n);
 }
 </script>
 

@@ -71,14 +71,19 @@ const pos = ref({ x: 0, y: 0 });
 /** 与窗口边缘至少留这么宽，单位 px */
 const MARGIN = 8;
 
+let positionSeq = 0;
+
 watchEffect(async () => {
   // 菜单高度随视图（分组 / 实例 / 多选）变化，读一下 menu 就能在切换时重新定位
   const menu = props.menu;
+  const seq = ++positionSeq;
   if (!menu) return;
 
   pos.value = { x: menu.x, y: menu.y };
   // 等菜单渲染出来才有尺寸可量；内容由 v-if 分支决定，量不到就保持点击处
   await nextTick();
+  // 快速换菜单时旧的一次定位可能晚到：作废，别拿旧坐标盖新菜单
+  if (seq !== positionSeq) return;
   const rect = el.value?.getBoundingClientRect();
   if (!rect) return;
 

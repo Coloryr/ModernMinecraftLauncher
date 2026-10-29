@@ -10,6 +10,7 @@ import {
 } from "../../../lib/accountImages";
 import AccountActions from "../../../components/AccountActions.vue";
 import AccountTypeBadge from "../../../components/AccountTypeBadge.vue";
+import HighlightText from "../../../components/ui/HighlightText.vue";
 import AccountEmpty from "../AccountEmpty.vue";
 import type { AccountStoreDto } from "../../../lib/bindings";
 
@@ -22,6 +23,8 @@ const props = defineProps<{
   currentUuid: string;
   /** 把账户的令牌状态翻成文案 */
   tokenLabel: (acc: AccountStoreDto) => string;
+  /** 搜索词，用来给命中的名字 / uuid 加底色 */
+  query: string;
 }>();
 
 const emit = defineEmits<{
@@ -83,10 +86,10 @@ function isCurrent(acc: AccountStoreDto): boolean {
                 @delete="emit('delete', acc)" />
             </td>
             <td class="cell-name" v-tip="acc.userName">
-              {{ acc.userName }}
+              <HighlightText :text="acc.userName" :query="query" />
               <span v-if="isCurrent(acc)" class="current-tag">{{ t("account.current") }}</span>
             </td>
-            <td class="mono">{{ acc.uuid }}</td>
+            <td class="mono"><HighlightText :text="acc.uuid" :query="query" /></td>
             <td>
               <AccountTypeBadge :auth-type="acc.authType" />
             </td>

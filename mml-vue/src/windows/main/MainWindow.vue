@@ -1391,6 +1391,20 @@ function onClientConfig(c: ClientConfig) {
 // ================= 事件订阅 =================
 
 const unlistens: Array<() => void> = [];
+/** 组件是否已卸载：异步订阅回来时据此当场退订，别塞进已经清空的列表 */
+let gone = false;
+
+/** 登记一个异步订阅；订阅返回前组件已卸载时立即退订 */
+function trackAsync(subscribing: Promise<() => void>) {
+  subscribing
+    .then((unlisten) => {
+      if (gone) unlisten();
+      else unlistens.push(unlisten);
+    })
+    .catch(() => {
+      /* 订阅失败（窗口已销毁）无需处理 */
+    });
+}
 
 // 整合包安装任务：进度本身已交给标题栏上的 ModpackTitleIndicator 指示器，
 // 这里只借它做一件事 —— 安装成功后刷新实例列表并选中刚装好的那个，即 adoptAddedInstance。
@@ -1855,7 +1869,7 @@ onActivated(() => void refreshBlocksRendered());
 onMounted(async () => {
   subscribeEvents();
   void refreshBlocksRendered();
-  initModpackStatus().then((unlisten) => unlistens.push(unlisten));
+  trackAsync(initModpackStatus());
   document.addEventListener("click", onDocClick);
   document.addEventListener("keydown", onDocKeyDown);
   unlistenAdded = onStorageChange(KEYS.addedInstance, (v) => void onAddedInstanceStorage(v));
@@ -1866,10 +1880,11 @@ onMounted(async () => {
   } catch {
     /* 浏览器环境忽略 */
   }
-  onClientConfigChange(onClientConfig).then((unlisten) => unlistens.push(unlisten));
+  trackAsync(onClientConfigChange(onClientConfig));
 });
 
 onUnmounted(() => {
+  gone = true;
   unlistens.forEach((fn) => fn());
   document.removeEventListener("click", onDocClick);
   document.removeEventListener("keydown", onDocKeyDown);
@@ -1877,14 +1892,16 @@ onUnmounted(() => {
 });
 
 // 后端核心加载完成事件：决定关闭启动页（进入主界面）还是显示错误页
-listen<LoadState>(LoadDone, async (data) => {
-  const state = data.payload;
-  if (state.ok) {
-    doInit();
-  } else {
-    closeSplash(state.error || t("init.failed"));
-  }
-});
+trackAsync(
+  listen<LoadState>(LoadDone, async (data) => {
+    const state = data.payload;
+    if (state.ok) {
+      doInit();
+    } else {
+      closeSplash(state.error || t("init.failed"));
+    }
+  }),
+);
 
 // 兜底：启动很快时 load-done 可能在页面监听注册前就已发出而被错过，
 // 挂载后主动查一次核心状态（已加载则直接进主界面）

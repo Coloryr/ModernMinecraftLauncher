@@ -1,14 +1,14 @@
 <!--
   M²L 程序图标 · 方案 F「拼接」镜像版
 
-  与 f-blend.svg 是同一份几何，沿中轴线 x=256 左右镜像：
+  与 f-blend-gear.svg 的立方体部分是同一份几何，沿中轴线 x=256 左右镜像：
   左半变成科技方块，右半变成原始草方块。
 
   中线单独画一条，居中于 x=256，左右各 7px：它不属于任何一半，所以两条边
   一样宽，不受右半裁剪。冷白渐变像一道光缝，在草皮与暗面板上都够亮。
 
   做法是给整个图形套一层 matrix(-1 0 0 1 512 0)，一个顶点都不重算，
-  所以接缝、外轮廓、发光裁剪的位置与 f-blend 严格左右对称。
+  所以接缝、外轮廓、发光裁剪的位置与 f-blend-gear 的立方体严格左右对称。
   defs 里的渐变、颗粒 pattern、right-clip 都是 userSpaceOnUse，
   会跟着这层变换一起镜像，右半的科技线照样只落在轮廓内。
 -->
@@ -187,9 +187,9 @@
       <feGaussianBlur stdDeviation="6" />
     </filter>
     <linearGradient id="seam-grad" gradientUnits="userSpaceOnUse" x1="0" y1="46" x2="0" y2="466">
-      <stop offset="0" stop-color="#f6fcff" />
-      <stop offset="0.5" stop-color="#cfeaff" />
-      <stop offset="1" stop-color="#8fd2f2" />
+      <stop offset="0" stop-color="#e9f3ff" />
+      <stop offset="0.5" stop-color="#b4deff" />
+      <stop offset="1" stop-color="#1392ce" />
     </linearGradient>
     <clipPath id="right-clip">
       <path d="M256,46 L438,151 L438,361 L256,466 Z" />

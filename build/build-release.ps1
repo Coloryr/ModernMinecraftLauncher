@@ -1,4 +1,4 @@
-# 正式发布构建：fat LTO + 单代码生成单元，体积最小、运行最快，但出包慢 ——
+﻿# 正式发布构建：fat LTO + 单代码生成单元，体积最小、运行最快，但出包慢 ——
 # 末尾的跨 crate 优化是单线程的，会看到只有一个核在跑；产出安装包（tauri 打包链）。
 # 预发布 / 日常打包用 build\build-prerelease.ps1。
 #
@@ -39,7 +39,7 @@ if (-not $targets) {
 
 # ---- 构建期临时目录 ----
 # 主修复在 .cargo\config.toml 的 [env]（把 TMP/TEMP 指到仓库的 target\，覆盖一切走 cargo
-# 的构建：npm run tauri build / tauri dev / cargo build / cargo test）。
+# 的构建：cargo tauri build / cargo tauri dev / cargo build / cargo test）。
 # 这里再设一次是为了**非 cargo 的子进程**：tauri 打包链（NSIS / WiX）不经过 cargo，
 # 拿不到 [env] 注入的值。
 # 起因：系统 %TEMP% 会让 MSVC 的 lib.exe / link.exe 报
@@ -72,7 +72,7 @@ Push-Location (Join-Path $root 'mml-gui')
 try {
     foreach ($t in $targets) {
         Write-Host "正在构建 release $($t['arch'])（$($t['triple'])）..."
-        npm run tauri -- build --target $t['triple'] --bundles $t['bundles']
+        cargo tauri build --target $t['triple'] --bundles $t['bundles']
         if ($LASTEXITCODE -ne 0) {
             throw "构建失败：$($t['arch'])（退出码 $LASTEXITCODE）。x86 / arm64 交叉编译需要对应架构的 MSVC 工具链。"
         }

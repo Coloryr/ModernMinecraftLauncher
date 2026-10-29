@@ -18,7 +18,7 @@
 #
 # 注意：产物放在 target/vendor 下（已被 git 忽略）。cargo 在**解析依赖图时**
 # 就要求 path 依赖的 Cargo.toml 存在，所以这个脚本必须在 cargo 之前跑 ——
-# 各构建入口（build-*.sh / npm 脚本）都已接好。
+# 构建脚本（build/build-release.sh、build/build-prerelease.sh）都已接好。
 
 set -euo pipefail
 

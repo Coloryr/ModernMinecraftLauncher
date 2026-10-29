@@ -6,6 +6,7 @@ import { t } from "../../../lib/i18n";
 import { accountAvatarUrl, hasNoSkin, imageFailed, imageLoading, markImageFailed, markImageLoaded } from "../../../lib/accountImages";
 import AccountActions from "../../../components/AccountActions.vue";
 import AccountTypeBadge from "../../../components/AccountTypeBadge.vue";
+import HighlightText from "../../../components/ui/HighlightText.vue";
 import AccountEmpty from "../AccountEmpty.vue";
 import type { AccountStoreDto } from "../../../lib/bindings";
 
@@ -18,6 +19,8 @@ const props = defineProps<{
   currentUuid: string;
   /** 把账户的令牌状态翻成文案 */
   tokenLabel: (acc: AccountStoreDto) => string;
+  /** 搜索词，用来给命中的名字 / uuid 加底色 */
+  query: string;
 }>();
 
 const emit = defineEmits<{
@@ -85,10 +88,10 @@ function hidePreview() {
         {{ acc.userName.charAt(0).toUpperCase() }}
       </span>
       <div class="row-meta">
-        <span class="row-name" v-tip="acc.userName">{{ acc.userName }}</span>
+        <span class="row-name" v-tip="acc.userName"><HighlightText :text="acc.userName" :query="query" /></span>
         <span class="row-sub">
           <AccountTypeBadge :auth-type="acc.authType" />
-          <span class="row-uuid">{{ acc.uuid }}</span>
+          <span class="row-uuid"><HighlightText :text="acc.uuid" :query="query" /></span>
         </span>
       </div>
       <span v-if="isCurrent(acc)" class="current-tag">{{ t("account.current") }}</span>

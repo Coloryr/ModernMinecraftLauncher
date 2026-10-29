@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 初始化开发环境：安装启动器两个前端工程的 npm 依赖。
+# 初始化开发环境：装 mml-vue 的 npm 依赖，并确认 cargo tauri 可用。
 # 只装依赖，不构建、不启动程序；克隆仓库后跑一次即可。
 #
 # 用法：bash build/init.sh
@@ -14,10 +14,15 @@ if ! command -v npm >/dev/null 2>&1; then
     echo '未找到 npm，请先安装 Node.js 20.19+ 或 22.12+。' >&2
     exit 1
 fi
+if ! cargo tauri --version >/dev/null 2>&1; then
+    echo '未找到 cargo tauri，请先执行 cargo install tauri-cli --version "^2" --locked。' >&2
+    exit 1
+fi
 
-for project in mml-vue mml-gui; do
-    echo "正在安装 $project 的依赖..."
-    (cd "$root/$project" && npm install)
-done
+echo '正在安装 mml-vue 的依赖...'
+(cd "$root/mml-vue" && npm install)
+
+# 还原 vendor 插件；否则第一次 cargo check 会因 path 依赖缺 Cargo.toml 直接失败
+bash "$root/mml-gui/vendor/prepare.sh"
 
 echo '依赖安装完成。'

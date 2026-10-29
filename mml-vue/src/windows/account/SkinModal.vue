@@ -167,9 +167,12 @@ watch(selectedSkin, (s) => {
 // 账户变化：重拉列表。不先清空，装备披风等操作触发的 account-change 刷新时
 // 旧列表继续显示，避免预览区整个塌掉重载；换账户才在失败时清空
 let texturesUuid = "";
+/** 纹理请求代次：快速换账户时丢弃旧账户晚到的响应 */
+let textureSeq = 0;
 watch(
   target,
   async (acc) => {
+    const seq = ++textureSeq;
     if (!acc) {
       textures.value = null;
       texturesUuid = "";
@@ -179,12 +182,14 @@ watch(
     uploadFile.value = "";
     listLoading.value = true;
     try {
-      textures.value = await commands.account.getTextures(acc.authType, acc.uuid);
+      const data = await commands.account.getTextures(acc.authType, acc.uuid);
+      if (seq !== textureSeq) return;
+      textures.value = data;
       texturesUuid = acc.uuid;
     } catch {
-      if (accountChanged) textures.value = null;
+      if (seq === textureSeq && accountChanged) textures.value = null;
     } finally {
-      listLoading.value = false;
+      if (seq === textureSeq) listLoading.value = false;
     }
   },
   { immediate: true },
@@ -261,7 +266,9 @@ async function doUpload(variant: "classic" | "slim") {
   try {
     await commands.account.uploadSkin(acc.authType, acc.uuid, variant, uploadFile.value);
     uploadFile.value = "";
-    textures.value = await commands.account.getTextures(acc.authType, acc.uuid);
+    const data = await commands.account.getTextures(acc.authType, acc.uuid);
+    // 上传期间换了账户：别把旧账户的纹理写进新账户的弹窗
+    if (target.value?.uuid === acc.uuid) textures.value = data;
     showToast(t("account.uploadOk"));
   } catch (e) {
     showToast(tErr(e));
@@ -282,7 +289,8 @@ async function equip(kind: "skin" | "cape", item: TextureItemDto) {
       await commands.account.setActiveCape(acc.authType, acc.uuid, item.sha1);
     }
     // 后端已广播 account-change，这里重拉列表刷新 active 标记与预览
-    textures.value = await commands.account.getTextures(acc.authType, acc.uuid);
+    const data = await commands.account.getTextures(acc.authType, acc.uuid);
+    if (target.value?.uuid === acc.uuid) textures.value = data;
     showToast(t("account.equipOk"));
   } catch (e) {
     showToast(tErr(e));

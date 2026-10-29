@@ -37,10 +37,10 @@ echo '正在构建 release（fat LTO，含安装包）...'
 if [ -n "${MML_TARGETS:-}" ]; then
   for target in $MML_TARGETS; do
     echo "  -> $target"
-    npm run tauri -- build --target "$target"
+    cargo tauri build --target "$target"
   done
 else
-  npm run tauri build
+  cargo tauri build
 fi
 
 # 把 Tauri 的安装包按 build/version 重命名后集中到 build_out/

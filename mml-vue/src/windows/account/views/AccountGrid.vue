@@ -17,6 +17,7 @@ import {
 import { capeDisplay, skinDisplay } from "../../../lib/settings";
 import AccountActions from "../../../components/AccountActions.vue";
 import AccountTypeBadge from "../../../components/AccountTypeBadge.vue";
+import HighlightText from "../../../components/ui/HighlightText.vue";
 import AccountEmpty from "../AccountEmpty.vue";
 import type { AccountStoreDto } from "../../../lib/bindings";
 
@@ -27,6 +28,8 @@ const props = defineProps<{
   filtering: boolean;
   /** 当前使用的账户 uuid，空串表示没有 */
   currentUuid: string;
+  /** 搜索词，用来给命中的名字加底色 */
+  query: string;
 }>();
 
 // 皮肤显示模式是否为 3D：仰视 / 俯视 / 旋转都用等距全身图，槽位与悬浮样式一致
@@ -176,7 +179,7 @@ function openSkin(acc: AccountStoreDto) {
         </div>
       </div>
       <div class="acc-head">
-        <span class="acc-name">{{ acc.userName }}</span>
+        <span class="acc-name"><HighlightText :text="acc.userName" :query="query" /></span>
         <AccountTypeBadge :auth-type="acc.authType" />
         <AccountActions :locked="accountLocked && acc.uuid === currentUuid" :can-refresh="acc.canRefresh" :can-relogin="acc.canRelogin" :can-edit="acc.canEdit"
           :has-skin="!hasNoSkin(acc)" @refresh="emit('refresh', acc)" @view-skin="emit('viewSkin', acc)"

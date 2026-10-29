@@ -45,7 +45,7 @@ http://localhost:1420/?window=settings
 前端缺命令或字段时，先在 Rust 侧补 `#[gui_macros::command]` 或改 DTO，再重新生成：
 
 ```bash
-cd ../mml-gui && npm run gen
+cd ../mml-gui && cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
 - `src/lib/api.ts` 是**手写**的便捷包装层，其中的类型一律 `import` 自 `./bindings`；

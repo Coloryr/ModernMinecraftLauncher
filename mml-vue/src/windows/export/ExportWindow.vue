@@ -17,6 +17,7 @@ import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
+import HighlightText from "../../components/ui/HighlightText.vue";
 import FilePicker from "./parts/FilePicker.vue";
 import { isPickedPath } from "./picked";
 import InfoExportButton from "./parts/InfoExportButton.vue";
@@ -1019,7 +1020,7 @@ onBeforeUnmount(() => {
                   :title="cfIdInvalid(mod.path) ? t('winExport.idNotNumeric') : undefined"
                   @change="toggleMod(mod)" />
                 <span class="mod-name-cell">
-                  <span class="mod-name" :title="mod.path">{{ mod.path.split("/").pop() }}</span>
+                  <span class="mod-name" :title="mod.path"><HighlightText :text="mod.path.split('/').pop() ?? ''" :query="modKeyword" /></span>
                   <!-- 编号不成立的在 CF 里点不动：就地标出来，别让人以为是漏掉了 -->
                   <span v-if="cfIdInvalid(mod.path)" class="mod-tag" v-tip="t('winExport.idNotNumeric')">
                     {{ t("winExport.notCfMod") }}
