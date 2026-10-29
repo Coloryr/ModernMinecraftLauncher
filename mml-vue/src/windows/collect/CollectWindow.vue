@@ -330,10 +330,20 @@ function toggleMultiSelect() {
   }
 }
 
-/** 多选条上的「全选」：勾上当前搜索下看得见的所有项 */
+/**
+ * 多选条上的「全选」
+ *
+ * 看当前分组：在「全部」时选所有分组里当前搜索命中的项，选了具体分组就只选那一组
+ * 当前搜索命中的项。结果是**并集**，不会清掉已经勾过的项 —— 允许边选边切分组。
+ */
 function selectAllVisible() {
-  checked.value = new Set(shownItems.value.map((i) => i.uuid));
-  showToast(t("multi.selectAllDone", { count: checked.value.size }));
+  const list = activeGroup.value === "" ? shownItems.value : itemsOfGroup(activeGroup.value);
+  const next = new Set(checked.value);
+  for (const item of list) {
+    next.add(item.uuid);
+  }
+  checked.value = next;
+  showToast(t("multi.selectAllDone", { count: next.size }));
 }
 
 /** 多选条上的「安装」：把勾选的项一起丢进安装弹窗 */

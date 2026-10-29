@@ -93,9 +93,9 @@ pub(super) fn check_download_now(game: Option<&Uuid>, pid: &str) -> bool {
     let Some(list) = read.get(game) else {
         return false;
     };
-    // 终态条目会一直留在表里，等用户点「清除已完成」，所以必须把 done / failed 排掉
+    // 终态条目会一直留在表里，等用户点「清除已完成」，所以 done / failed / cancelled 都要排掉
     for (key, info) in list.iter() {
-        if key.pid == pid && !info.done && !info.failed {
+        if key.pid == pid && !info.done && !info.failed && !info.cancelled {
             return true;
         }
     }
@@ -121,7 +121,7 @@ pub(super) fn check_version_download_now(game: Option<&Uuid>, pid: &str, fid: &s
         return false;
     };
     for (key, info) in list.iter() {
-        if key.fid == fid && key.pid == pid && !info.done && !info.failed {
+        if key.fid == fid && key.pid == pid && !info.done && !info.failed && !info.cancelled {
             return true;
         }
     }

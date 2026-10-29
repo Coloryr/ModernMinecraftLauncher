@@ -2,7 +2,7 @@
 //!
 //! 账户在 Rust 侧以 `mml_auth::LoginObj` 存完整凭据并持久化到 `accounts.json`，
 //! 通过 [`AccountStoreDto::from_login`] 转成前端消费的 DTO：
-//! 登录信息 userName / authType / loginTime，加上前端显示用的 avatarColor / skin / tokenStatus / avatar。
+//! 登录信息 userName / authType / loginTime，加上前端显示用的 avatarColor / skin / tokenStatus。
 
 use mml_auth::{AuthType, LoginObj};
 use serde::{Deserialize, Serialize};
@@ -37,8 +37,6 @@ pub struct AccountStoreDto {
     pub skin: String,
     /// Token 状态：valid / expired
     pub token_status: String,
-    /// 预留字段，当前恒为 `None`；头像由前端按账户 uuid 取 `mml-image` 的 `head` 地址
-    pub avatar: Option<String>,
     /// 服务器地址，重登时预填：littleskin/authlib 为服务器 URL，nide8 为服务器 ID；
     /// offline 没有，微软的 text1 存的是 refresh_token，绝不能下发给前端
     pub server: Option<String>,
@@ -77,7 +75,7 @@ pub struct AccountOAuthStateDto {
 impl AccountStoreDto {
     /// 从 LoginObj 构造前端 DTO，LoginObj 即账户完整凭据
     ///
-    /// 头像不在这里拼：`avatar` 恒为 `None`，前端按 uuid 取 `mml-image` 的账户头像；
+    /// 头像不在这里拼：前端按 uuid 取 `mml-image` 的账户头像；
     /// 其余显示字段，占位渐变色、令牌状态、能否刷新 / 重登 / 编辑，都按凭据算出来。
     ///
     /// - `login`: 账户完整凭据
@@ -100,7 +98,6 @@ impl AccountStoreDto {
             } else {
                 "valid".to_string()
             },
-            avatar: None,
             server: match login.auth_type {
                 AuthType::OAuth | AuthType::Offline => None,
                 _ => login.text1.clone(),

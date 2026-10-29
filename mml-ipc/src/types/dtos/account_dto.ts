@@ -14,7 +14,6 @@ export type AccountStoreDto = {
   avatarColor: string,
   skin: string,
   tokenStatus: string,
-  avatar: string | null,
   server: string | null,
   ext1: string | null,
   ext2: string | null,

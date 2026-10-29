@@ -127,6 +127,27 @@ pub(crate) fn update_with(
         return Err(err);
     }
 
+    let result = write_session(session, chunk);
+    if result.is_err() {
+        // 写盘失败时内存树已经套过改动，但 sha1 / stamp 还是旧的：
+        // 留着这份会话会让前端拿同一 base_sha1 重试时二次套用非幂等改动。
+        sessions.remove(&key);
+    }
+    result
+}
+
+/// 把会话里已套好改动的树写回磁盘
+///
+/// 成功时同步更新会话的 SHA1 与状态戳；失败时调用方必须扔掉整份会话，
+/// 因为此时内存树已经改过而磁盘上的基准没有跟上。
+///
+/// - `session`: 已套好改动的会话
+/// - `chunk`: 区域文件的区块下标，整份文件为 `None`
+///
+/// # 返回值
+///
+/// 写回后内容的 SHA1，整份文件或区块负载；序列化或写盘失败返回错误文案
+fn write_session(session: &mut NbtSession, chunk: Option<u32>) -> Result<String, String> {
     let mut out = Vec::new();
     session.nbt.write(&mut out).map_err(|err| err.to_string())?;
     let sha1 = hash_helper::gen_hash(HashType::Sha1, &out);
@@ -151,7 +172,6 @@ pub(crate) fn update_with(
 
     session.sha1 = sha1.clone();
     session.stamp = stamp_of(&session.file)?;
-
     Ok(sha1)
 }
 

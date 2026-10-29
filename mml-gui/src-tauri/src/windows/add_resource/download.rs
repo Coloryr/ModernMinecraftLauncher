@@ -246,7 +246,7 @@ pub async fn add_resource_download(
                 } else if outcome.is_cancelled() {
                     info.cancelled = true;
                 } else {
-                    info.now = 100.0;
+                    // 失败时保留失败那一刻的进度：拉满会看成"下完了"，而失败标签已经说明了终态
                     info.failed = true;
                 }
             }

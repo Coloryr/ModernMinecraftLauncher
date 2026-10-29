@@ -260,47 +260,68 @@ pub(crate) async fn launch_game(
             };
 
             let uuid = core.uuid.to_string();
-            runtime.block_on(async move {
-                match setting.start_game(&mut arg, Some(gui), cancel).await {
-                    Ok(()) => {
-                        emit_log_line(&app, &uuid, &LogText::LaunchProcessStarted.text(), false)
-                    }
-                    Err(err) => {
-                        // 进程已经起来、只是启动后命令失败时不算启动失败，否则会多记一次
-                        let started = is_running(&launch_uuid);
-                        if !started {
-                            unlock_user(&launch_uuid);
+            // 启动 future 把 app 移走了，panic 收尾这条路径还得用它发错误事件
+            let panic_app = app.clone();
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                runtime.block_on(async move {
+                    match setting.start_game(&mut arg, Some(gui), cancel).await {
+                        Ok(()) => {
+                            emit_log_line(&app, &uuid, &LogText::LaunchProcessStarted.text(), false)
                         }
-                        // 用户取消不算启动失败：不记统计、不弹错误，只推一条状态让各窗口收回启动态
-                        if matches!(err, ErrorType::TaskCancel) {
+                        Err(err) => {
+                            // 进程已经起来、只是启动后命令失败时不算启动失败，否则会多记一次
+                            let started = is_running(&launch_uuid);
                             if !started {
-                                emit_launch_state(
-                                    &app,
-                                    StateEvent {
-                                        uuid: uuid.clone(),
-                                        state: "cancelled".into(),
-                                        progress: None,
-                                    },
-                                );
+                                unlock_user(&launch_uuid);
                             }
-                            return;
+                            // 用户取消不算启动失败：不记统计、不弹错误，只推一条状态让各窗口收回启动态
+                            if matches!(err, ErrorType::TaskCancel) {
+                                if !started {
+                                    emit_launch_state(
+                                        &app,
+                                        StateEvent {
+                                            uuid: uuid.clone(),
+                                            state: "cancelled".into(),
+                                            progress: None,
+                                        },
+                                    );
+                                }
+                                return;
+                            }
+                            if !started {
+                                game_count::launch_error(&launch_uuid);
+                            }
+                            mml_log::error_type(err.clone());
+                            let text = i18::get_error(err.clone());
+                            emit_log_line(&app, &uuid, &text, false);
+                            emit_launch_error(
+                                &app,
+                                ErrorEvent {
+                                    uuid: Some(uuid),
+                                    message: text,
+                                },
+                            );
                         }
-                        if !started {
-                            game_count::launch_error(&launch_uuid);
-                        }
-                        mml_log::error_type(err.clone());
-                        let text = i18::get_error(err.clone());
-                        emit_log_line(&app, &uuid, &text, false);
-                        emit_launch_error(
-                            &app,
-                            ErrorEvent {
-                                uuid: Some(uuid),
-                                message: text,
-                            },
-                        );
                     }
+                });
+            }));
+
+            if let Err(payload) = result {
+                let reason = panic_reason(payload);
+                let text = LogText::LaunchPanicked { reason }.text();
+                mml_log::error(text.clone());
+                // 进程没起来才放开账户；已经起来的交给退出事件解锁
+                if !is_running(&launch_uuid) {
+                    unlock_user(&launch_uuid);
+                    emit_launch_error(
+                        &panic_app,
+                        ErrorEvent {
+                            uuid: Some(launch_uuid.to_string()),
+                            message: text,
+                        },
+                    );
                 }
-            });
+            }
 
             // 线程收工：成败都已定，把"启动中"与取消令牌摘掉（失败后要允许重试）
             LAUNCH_CANCEL.lock().unwrap().remove(&launch_uuid);
@@ -443,6 +464,23 @@ pub(crate) fn forward_game_exit(app: &AppHandle, event: &InstanceExit) {
         .is_none()
     {
         crate::tray::quit_idle(app);
+    }
+}
+
+/// 从 panic 载荷里取可读文本，取不到时返回空串
+///
+/// - `payload`: `catch_unwind` 给的原载荷
+///
+/// # 返回值
+///
+/// panic 时传的 `String` 或 `&'static str`；其它类型转不出来
+fn panic_reason(payload: Box<dyn std::any::Any + Send>) -> String {
+    match payload.downcast::<String>() {
+        Ok(text) => *text,
+        Err(payload) => match payload.downcast::<&'static str>() {
+            Ok(text) => (*text).to_string(),
+            Err(_) => String::new(),
+        },
     }
 }
 

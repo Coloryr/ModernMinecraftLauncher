@@ -288,6 +288,11 @@ pub enum LogText {
     LaunchStarting,
     /// 主窗口：游戏进程已经起来
     LaunchProcessStarted,
+    /// 主窗口：启动线程 panic，已按失败收尾
+    LaunchPanicked {
+        /// panic 内容；取不到时为空串
+        reason: String,
+    },
     /// 主窗口：找不到可用的 Java
     LaunchNoJava {
         /// 主版本号
@@ -710,6 +715,9 @@ impl LogText {
             LogText::LogJavaPath { path } => format!("Java 路径：{path}"),
             LogText::LaunchStarting => String::from("游戏启动中…"),
             LogText::LaunchProcessStarted => String::from("游戏进程已启动"),
+            LogText::LaunchPanicked { reason } => {
+                format!("游戏启动线程异常退出：{reason}")
+            }
             LogText::LaunchNoJava { java } => {
                 format!("没有找到 Java {java}，请在实例设置里指定 Java 路径")
             }
@@ -992,6 +1000,9 @@ impl LogText {
             LogText::LogJavaPath { path } => format!("Java path: {path}"),
             LogText::LaunchStarting => String::from("launching the game…"),
             LogText::LaunchProcessStarted => String::from("the game process has started"),
+            LogText::LaunchPanicked { reason } => {
+                format!("the launch thread panicked: {reason}")
+            }
             LogText::LaunchNoJava { java } => {
                 format!("no Java {java} found, set the Java path in the instance settings")
             }

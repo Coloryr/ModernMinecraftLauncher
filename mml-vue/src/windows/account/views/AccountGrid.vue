@@ -78,7 +78,7 @@ const preview = ref<{
 /** 按图片类型取预览大图地址 */
 const previewUrl = (kind: string, acc: AccountStoreDto): string =>
   kind === "avatar"
-    ? acc.avatar || accountAvatarUrl(acc)
+    ? accountAvatarUrl(acc)
     : kind === "skin"
       ? accountSkinUrl(acc)
       : accountCapeUrl(acc, capeDisplay.value);
@@ -126,7 +126,7 @@ function openSkin(acc: AccountStoreDto) {
         <span v-if="isCurrent(acc)" class="current-badge">{{ t("account.current") }}</span>
         <!-- 加载中：图上叠转圈，onload 后消失（img 先渲染，加载完才能触发事件） -->
         <div v-if="!imageFailed(acc, 'avatar')" class="img-box img-avatar-box">
-          <img :src="acc.avatar || accountAvatarUrl(acc)" class="img-avatar"
+          <img :src="accountAvatarUrl(acc)" class="img-avatar"
             :class="{ pending: imageLoading(acc, 'avatar') }" :alt="t('account.avatar')" data-no-fallback
             @load="markImageLoaded(acc, 'avatar')" @error="markImageFailed(acc, 'avatar')"
             @mouseenter="showPreview($event, acc, 'avatar')" @mousemove="movePreview" @mouseleave="hidePreview" />

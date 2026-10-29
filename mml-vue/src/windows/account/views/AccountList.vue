@@ -52,7 +52,7 @@ const preview = ref<{ x: number; y: number; url: string } | null>(null);
 /** 悬停时定位并展示头像大图；该图已加载失败就不展示 */
 function showPreview(e: MouseEvent, acc: AccountStoreDto) {
   if (imageFailed(acc, "avatar")) return;
-  preview.value = { x: e.clientX, y: e.clientY, url: acc.avatar || accountAvatarUrl(acc) };
+  preview.value = { x: e.clientX, y: e.clientY, url: accountAvatarUrl(acc) };
 }
 
 function movePreview(e: MouseEvent) {
@@ -74,7 +74,7 @@ function hidePreview() {
       @contextmenu.prevent="emit('menu', { event: $event, acc })">
       <!-- 加载中：图上叠转圈，onload 后消失 -->
       <div v-if="!imageFailed(acc, 'avatar')" class="row-avatar-box">
-        <img :src="acc.avatar || accountAvatarUrl(acc)" class="row-avatar"
+        <img :src="accountAvatarUrl(acc)" class="row-avatar"
           :class="{ pending: imageLoading(acc, 'avatar') }" alt="" data-no-fallback
           @load="markImageLoaded(acc, 'avatar')" @error="markImageFailed(acc, 'avatar')"
           @mouseenter="showPreview($event, acc)" @mousemove="movePreview" @mouseleave="hidePreview" />

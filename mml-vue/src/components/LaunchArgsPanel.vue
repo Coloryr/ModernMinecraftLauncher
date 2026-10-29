@@ -33,7 +33,6 @@ const emit = defineEmits<{
 }>();
 
 const advancedOpen = ref(false);
-const fileInput = ref<HTMLInputElement | null>(null);
 
 // 预设下拉与手输是同一件事的两种口径：**下拉**的手输态由「用户刚选过自定义」或「当前值不在预设里」
 // 决定。选了自定义但值恰好等于某档预设时（如从 1920×1080 起手微调），必须靠前者才停得住
@@ -130,12 +129,25 @@ function update(patch: Partial<InstanceArgsDto>) {
   emit("update:args", { ...props.args, ...patch });
 }
 
-function onBrowseFile(e: Event) {
-  const input = e.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (file) {
-    // 浏览器 input 拿不到完整路径，只能存文件名；要可用的绝对路径得走目录选择对话框
-    update({ javaPath: file.name });
+/**
+ * 选自定义 Java 的可执行文件
+ *
+ * 必须走 Tauri 对话框：浏览器 `<input type="file">` 拿不到完整路径，
+ * 后端拼启动命令时只拿到一个文件名，等于不可用。
+ */
+async function pickJava() {
+  try {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const picked = await open({
+      title: t("args.customJava"),
+      multiple: false,
+      directory: false,
+    });
+    if (typeof picked === "string" && picked) {
+      update({ javaPath: picked });
+    }
+  } catch {
+    // 浏览器预览没有对话框：保留手动输入路径
   }
 }
 
@@ -259,8 +271,7 @@ const gcOptions = computed(() => [
         <span class="args-label">{{ t("args.javaPath") }}</span>
         <input class="field-input grow" :value="args.javaPath" placeholder="C:\Program Files\Java\jdk-21\bin\java.exe"
           spellcheck="false" @input="update({ javaPath: ($event.target as HTMLInputElement).value })" />
-        <BaseButton size="sm" @click="fileInput?.click()">{{ t("args.browse") }}</BaseButton>
-        <input ref="fileInput" type="file" class="hidden-file" @change="onBrowseFile" />
+        <BaseButton size="sm" @click="pickJava">{{ t("args.browse") }}</BaseButton>
       </div>
     </div>
 
@@ -401,10 +412,6 @@ const gcOptions = computed(() => [
 .grow {
   flex: 1;
   min-width: 120px;
-}
-
-.hidden-file {
-  display: none;
 }
 
 .advanced-toggle {
