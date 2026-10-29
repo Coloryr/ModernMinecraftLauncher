@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 收藏项安装：选目标实例的覆盖弹窗
 //
-// 卡片上原来的小下拉换成了这个：多选可以一次装好几个，所以先对**支持加载器 / 支持游戏版本**
+// 卡片上原来的小下拉换成了这个：先对**支持加载器 / 支持游戏版本**
 // 取交集 —— 交集之外的实例装进去也是坏的。没记支持信息的项（老收藏）当"不限"，不参与收窄。
 import { computed, ref, watch } from "vue";
 import BaseButton from "../../../components/ui/BaseButton.vue";
@@ -89,7 +89,7 @@ function summary(list: string[]): string {
 
 <template>
   <BaseModal :title="t('collect.installTitle')" :closable="false" @close="emit('close')">
-    <p class="inst-count">{{ t("collect.multiSelected", { count: items.length }) }}</p>
+    <p class="inst-count">{{ t("collect.installCount", { count: items.length }) }}</p>
     <ul class="inst-items">
       <li v-for="item in items" :key="item.uuid" class="inst-item">
         <span class="inst-name" v-tip="item.name">{{ item.name }}</span>

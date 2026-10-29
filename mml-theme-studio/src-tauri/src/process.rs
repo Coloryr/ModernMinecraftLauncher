@@ -429,9 +429,6 @@ fn hide_console_std(command: &mut std::process::Command) {
     command.creation_flags(0x0800_0000);
 }
 
-#[cfg(not(windows))]
-fn hide_console_std(_command: &mut std::process::Command) {}
-
 #[cfg(test)]
 mod tests {
     use super::*;

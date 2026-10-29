@@ -19,8 +19,11 @@ export function typeGroupName(fileType: string): string | null {
   return name === key ? null : name;
 }
 
-/** 有默认分组的资源类型，顺序即收藏窗口类型过滤的顺序 */
-const DEFAULT_GROUP_TYPES = ["modpack", "mod", "resourcepack", "shaderpack", "save", "dataPacks"];
+/** 左栏固定列出的四个默认分组，顺序即分类栏顺序 */
+export const FIXED_GROUP_TYPES = ["modpack", "mod", "resourcepack", "shaderpack"];
+
+/** 有默认分组的资源类型 */
+const DEFAULT_GROUP_TYPES = [...FIXED_GROUP_TYPES, "save", "dataPacks"];
 
 /**
  * 这个分组名是不是按类型自动分的默认分组

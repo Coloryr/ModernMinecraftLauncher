@@ -29,9 +29,7 @@ use std::path::{Path, PathBuf};
 
 use tokio::fs as tfs;
 
-use mml_names::i18_items::error_type::{
-    CoreResult, ErrorData, ErrorType, FileSystemErrorData, MoveToTrashErrorData,
-};
+use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType, FileSystemErrorData};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 
 mod safe_path;
@@ -172,6 +170,8 @@ pub fn move_to_trash<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
 
     #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
     {
+        use mml_names::i18_items::error_type::MoveToTrashErrorData;
+
         Err(ErrorType::MoveToTrashError(MoveToTrashErrorData {
             path: dir.as_ref().to_path_buf(),
             code: 0,
@@ -241,6 +241,8 @@ fn move_to_trash_linux(dir: &Path) -> CoreResult<()> {
 /// 通过 Finder 将文件或目录移入 macOS 回收站
 #[cfg(any(target_os = "macos", test))]
 fn move_to_trash_macos(dir: &Path) -> CoreResult<()> {
+    use mml_names::i18_items::error_type::MoveToTrashErrorData;
+
     let escaped_dir = dir
         .to_str()
         .ok_or_else(|| {
@@ -279,6 +281,7 @@ fn move_to_trash_macos(dir: &Path) -> CoreResult<()> {
 #[cfg(target_os = "windows")]
 fn move_to_trash_windows<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
     use std::os::windows::ffi::OsStrExt;
+    use mml_names::i18_items::error_type::MoveToTrashErrorData;
     use windows::Win32::Foundation::HWND;
     use windows::Win32::UI::Shell::FO_DELETE;
     use windows::Win32::UI::Shell::FOF_ALLOWUNDO;

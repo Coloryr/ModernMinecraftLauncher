@@ -268,6 +268,7 @@ const OVERRIDE = {
   "collect-group-empty": "收藏 · 空分组",
   "collect-group-menu": "收藏 · 分组菜单",
   "collect-drag-group": "收藏 · 拖到分组",
+  "collect-multi-select": "收藏 · 多选模式",
   "collect-install-modal": "收藏 · 安装确认弹窗",
   "download-stop-modal": "下载 · 停止确认弹窗",
   "log-crash-modal": "游戏日志 · 崩溃分析",

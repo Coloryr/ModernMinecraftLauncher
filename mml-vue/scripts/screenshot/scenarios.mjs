@@ -6,7 +6,7 @@
 // - commands: 覆盖 data.mjs 的公共命令
 // - actions: 字符串按 JS 执行；{ wait } 等待；{ eval } 执行后等一会
 import {
-  addVersions, blockItems, collectWithData, commonCommands, downloadStatus, groups, instances, javaDownloadList, lobbyView,
+  addVersions, blockItems, collectItems, collectWithData, commonCommands, downloadStatus, groups, instances, javaDownloadList, lobbyView,
   statsSingleDay, customHomeStatus, customUiStatus, modpackDetail, modpackFiles, modpackItems, modpackStatus, modpackStatusDone, modpackStatusFailed,
   resourceDeps, resourceFiles, resourceItems, resourceStatusRunning,
   javaList, resourceView, saves, schematics, servers, shaders,
@@ -1043,7 +1043,20 @@ export const scenarios = [
     commands: base({ collect_get_data: collectWithData }),
     actions: [
       { eval: "(() => { const c = document.querySelector('.collect-card'); if (!c) return false; c.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 300, clientY: 300, button: 2 })); return true; })()", after: 450 },
-      { assert: "document.querySelectorAll('.ctx-menu .ctx-item').length >= 3", label: "卡片右键菜单已打开" },
+      { assert: "document.querySelectorAll('.ctx-menu .ctx-item').length === 5", label: "卡片菜单为多选 / 安装 / 打开 / 移动 / 删除" },
+    ],
+  },
+  {
+    id: "collect-card-menu-group",
+    kind: "collect",
+    label: "mml-collect",
+    size: [1100, 760],
+    commands: base({
+      collect_get_data: { items: collectItems, groups: { "我的分组": ["col-1"], "模组": ["col-3"], "光影包": ["col-2"] } },
+    }),
+    actions: [
+      { eval: "(() => { const c = document.querySelector('.collect-card'); if (!c) return false; c.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 300, clientY: 300, button: 2 })); return true; })()", after: 450 },
+      { assert: "document.querySelectorAll('.ctx-menu .ctx-item').length === 6 && [...document.querySelectorAll('.ctx-menu .ctx-item')].some((b) => b.textContent.trim() === '移出分组')", label: "自建分组里的条目菜单多出移出分组" },
     ],
   },
   {
@@ -1066,7 +1079,7 @@ export const scenarios = [
     commands: base({ collect_get_data: collectWithData }),
     actions: [
       { eval: '(() => { const el = [...document.querySelectorAll(\'.cat-rail .cat-item\')].find((x) => x.textContent.includes("我的分组")); if (!el) return false; el.dispatchEvent(new MouseEvent(\'contextmenu\', { bubbles: true, cancelable: true, clientX: 110, clientY: 260, button: 2 })); return true; })()', after: 450 },
-      { assert: "document.querySelectorAll('.ctx-menu .ctx-item').length === 3", label: "分组菜单有全选 / 清空 / 删除" },
+      { assert: "document.querySelectorAll('.ctx-menu .ctx-item').length === 2", label: "分组菜单有清空 / 删除" },
     ],
   },
   {
@@ -1116,16 +1129,27 @@ export const scenarios = [
     ],
   },
   {
+    id: "collect-multi-select",
+    kind: "collect",
+    label: "mml-collect",
+    size: [1100, 760],
+    commands: base({ collect_get_data: collectWithData }),
+    actions: [
+      { eval: "(() => { const c = document.querySelector('.collect-card'); if (!c) return false; c.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 300, clientY: 300, button: 2 })); return true; })()", after: 400 },
+      { eval: clickText("多选", ".ctx-menu"), after: 400 },
+      { assert: "!!document.querySelector('.multi-bar') && document.querySelectorAll('.card-check').length > 0", label: "从右键菜单进入多选模式" },
+    ],
+  },
+  {
     id: "collect-install-modal",
     kind: "collect",
     label: "mml-collect",
     size: [1100, 760],
     commands: base({ collect_get_data: collectWithData }),
     actions: [
-      { eval: click(".icon-btn-head"), after: 300 },
-      { eval: click(".card-check"), after: 300 },
-      { eval: clickText("安装", ".multi-bar"), after: 600 },
-      { assert: "!!document.querySelector('.modal select, .modal .instance-row')", label: "选实例弹窗已打开" },
+      { eval: "(() => { const c = document.querySelector('.collect-card'); if (!c) return false; c.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 300, clientY: 300, button: 2 })); return true; })()", after: 350 },
+      { eval: clickText("安装", ".ctx-menu"), after: 600 },
+      { assert: "!!document.querySelector('.modal select, .modal .instance-row')", label: "右键菜单的安装按钮打开选实例弹窗" },
     ],
   },
   {

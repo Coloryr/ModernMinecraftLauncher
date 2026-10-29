@@ -2,8 +2,8 @@
 // 资源收藏窗口
 //
 // 左栏是分类（与方块窗口同一个 CategoryRail）：全部 + 按资源类型自动分的默认分组 +
-// 用户自建分组，选中哪一组就只显示哪一组；类型过滤与多选在标题栏。
-// 安装走 InstallModal：多选时对支持加载器 / 游戏版本取交集，只列同时满足的实例。
+// 用户自建分组，选中哪一组就只显示哪一组。
+// 安装走 InstallModal：按目标实例的加载器 / 游戏版本挑兼容文件。
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import CategoryRail from "../../components/CategoryRail.vue";
@@ -19,9 +19,8 @@ import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import { useInstanceChange } from "../../composables/useInstanceChange";
 import { useCollectDrag } from "../../composables/useCollectDrag";
 import { api, onCollectChange } from "../../lib/api";
-import { loadGuiConfig, saveGuiConfig, type CollectConfig } from "../../lib/guiConfig";
 import { t, tErr } from "../../lib/i18n";
-import { isDefaultGroupName, typeGroupName } from "../../lib/collectGroups";
+import { FIXED_GROUP_TYPES, isDefaultGroupName, typeGroupName } from "../../lib/collectGroups";
 import { formatMinute } from "../../lib/format";
 import { showToast } from "../../lib/toast";
 import type { CollectItemDto, InstanceInfoDto } from "../../lib/bindings";
@@ -39,7 +38,7 @@ const items = ref<CollectItemDto[]>([]);
 const groups = ref<Record<string, string[]>>({});
 /** 勾选的收藏项 uuid */
 const checked = ref<Set<string>>(new Set());
-/** 多选模式：默认关。只有开着的时候卡片上才出现勾选框、点卡片才会勾选 */
+/** 多选模式：默认关。由卡片右键菜单的「多选」进入，退出见多选条 */
 const multiSelect = ref(false);
 /** 本次操作的目标 uuid。点菜单 / 多选条时**快照**下来 ——
  *  等确认弹窗弹出来时，右键菜单早就关了，不能再从 menu 里现取 */
@@ -49,22 +48,6 @@ const activeGroup = ref("");
 
 /** 收藏数据变更订阅的退订函数（挂载后赋值，卸载时统一摘掉） */
 let unlistenCollect: (() => void) | null = null;
-
-/** 类型过滤，持久化在 gui_config 的 collect 里 */
-const filters = ref<CollectConfig>({
-  modpack: true,
-  showMod: true,
-  resourcePack: true,
-  shaderpack: true,
-});
-
-/** 勾选框 → 资源类型线串，取值同 `FileType::to_string()`；存档 / 数据包等不在收藏范围内 */
-const FILTER_TYPES: Array<{ key: keyof CollectConfig; types: string[]; label: () => string }> = [
-  { key: "modpack", types: ["modpack"], label: () => t("collect.filterModpack") },
-  { key: "showMod", types: ["mod"], label: () => t("resource.mods") },
-  { key: "resourcePack", types: ["resourcepack"], label: () => t("resource.resourcepacks") },
-  { key: "shaderpack", types: ["shaderpack"], label: () => t("resource.shaders") },
-];
 
 const groupNames = computed(() => Object.keys(groups.value).sort());
 
@@ -87,28 +70,19 @@ const isEmpty = computed(() => items.value.length === 0);
 const keyword = ref("");
 
 /**
- * 当前类型过滤 + 搜索词下要显示的收藏
+ * 当前搜索词下要显示的收藏
  *
- * 勾选框只覆盖模组 / 资源包 / 光影包 / 整合包四类；存档与数据包没有勾选框，
- * 它们（以及将来别的类型）不受类型过滤约束，照常显示 —— 否则收藏了却看不见。
+ * 类型已经由左栏的默认分组负责，这里只按名字过滤。
  */
 const shownItems = computed(() => {
-  const limited = new Set(FILTER_TYPES.flatMap((f) => f.types));
-  const on = new Set(
-    FILTER_TYPES.filter((f) => filters.value[f.key]).flatMap((f) => f.types),
-  );
   const kw = keyword.value.trim().toLowerCase();
-  return items.value.filter(
-    (item) =>
-      (!limited.has(item.fileType) || on.has(item.fileType)) &&
-      (!kw || item.name.toLowerCase().includes(kw)),
-  );
+  return items.value.filter((item) => !kw || item.name.toLowerCase().includes(kw));
 });
 
-/** 「共 N 项」：当前过滤下所有分组合起来 */
+/** 「共 N 项」：当前搜索词下所有分组合起来 */
 const shownCount = computed(() => shownItems.value.length);
 
-/** 某一组在当前过滤下看得见的项 */
+/** 某一组在当前搜索下看得见的项 */
 function itemsOfGroup(name: string): CollectItemDto[] {
   return shownItems.value.filter((i) => groupOfUuid.value.get(i.uuid) === name);
 }
@@ -121,7 +95,7 @@ function itemsOfGroup(name: string): CollectItemDto[] {
  * 数据里其余的默认分组（存档 / 数据包）接在后面，最后是用户自建分组（按名字排序）。
  */
 const railItems = computed<Array<{ id: string; label: string; count: number; custom: boolean }>>(() => {
-  const fixed = FILTER_TYPES.map((f) => typeGroupName(f.types[0])).filter((n): n is string => !!n);
+  const fixed = FIXED_GROUP_TYPES.map((type) => typeGroupName(type)).filter((n): n is string => !!n);
   const restDefaults = groupNames.value
     .filter((name) => isDefaultGroupName(name) && !fixed.includes(name))
     .sort((a, b) => a.localeCompare(b));
@@ -137,7 +111,7 @@ const railItems = computed<Array<{ id: string; label: string; count: number; cus
   }));
 });
 
-/** 当前选中分组里的项；「全部」就是整份过滤结果 */
+/** 当前选中分组里的项；「全部」就是整份搜索结果 */
 const activeItems = computed(() =>
   activeGroup.value === "" ? shownItems.value : itemsOfGroup(activeGroup.value),
 );
@@ -249,10 +223,6 @@ function iconOf(item: CollectItemDto): string {
 }
 
 onMounted(async () => {
-  const cfg = await loadGuiConfig();
-  if (cfg) {
-    filters.value = cfg.collect;
-  }
   void loadInstances();
 
   // 赋值与注册分开：onUnmounted 只能在 setup 的同步阶段注册，
@@ -288,18 +258,6 @@ useInstanceChange(() => {
 
 /** Esc：先收右键菜单，再逐层关掉打开的弹窗（与其它窗口的逐级关闭一致） */
 function onDocKeyDown(e: KeyboardEvent) {
-  // Ctrl+A：全选当前看得见的项，与主窗口实例列表同一口径
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
-    const target = e.target as HTMLElement | null;
-    // 正在输入框里敲字时不抢：那是"全选文本"
-    if (target && /^(INPUT|TEXTAREA)$/.test(target.tagName)) return;
-    if (!shownItems.value.length) return;
-    e.preventDefault();
-    multiSelect.value = true;
-    selectAllVisible();
-    return;
-  }
-
   if (e.key !== "Escape") return;
   if (groupMenu.value) {
     groupMenu.value = null;
@@ -336,13 +294,6 @@ function onDocKeyDown(e: KeyboardEvent) {
 
 document.addEventListener("keydown", onDocKeyDown);
 
-// ---------------- 类型过滤 ----------------
-
-async function toggleFilter(key: keyof CollectConfig, value: boolean) {
-  filters.value = { ...filters.value, [key]: value };
-  await saveGuiConfig({ collect: { [key]: value } });
-}
-
 // ---------------- 勾选 ----------------
 
 function toggleCheck(uuid: string, value: boolean) {
@@ -353,6 +304,43 @@ function toggleCheck(uuid: string, value: boolean) {
     next.delete(uuid);
   }
   checked.value = next;
+}
+
+/** 进入多选模式并勾上刚右键的那一项；之后的增删都在多选条里 */
+function enterMultiSelect(item: CollectItemDto) {
+  closeMenu();
+  multiSelect.value = true;
+  toggleCheck(item.uuid, true);
+}
+
+/** 开关多选模式；退出时清空勾选（卡片上的勾选框也跟着消失） */
+function toggleMultiSelect() {
+  multiSelect.value = !multiSelect.value;
+  if (!multiSelect.value) {
+    checked.value = new Set();
+  }
+}
+
+/** 多选条上的「全选」：勾上当前搜索下看得见的所有项 */
+function selectAllVisible() {
+  checked.value = new Set(shownItems.value.map((i) => i.uuid));
+  showToast(t("multi.selectAllDone", { count: checked.value.size }));
+}
+
+/** 多选条上的「安装」：把勾选的项一起丢进安装弹窗 */
+function installChecked() {
+  const list = items.value.filter((item) => checked.value.has(item.uuid));
+  if (list.length) {
+    openInstall(list);
+  }
+}
+
+/** 当前操作的目标：多选模式取勾选集，否则取右键点中的那一项 */
+function takeTargets(): string[] {
+  if (multiSelect.value) {
+    return [...checked.value];
+  }
+  return menu.value ? [menu.value.item.uuid] : [];
 }
 
 // ---------------- 分组 ----------------
@@ -424,7 +412,7 @@ function askClear(groupKey: string) {
 /** 清空确认里那句"N 项"的 N：当前清空目标那一组里看得见的项数 */
 const clearCount = computed(() => itemsOfGroup(clearGroup.value).length);
 
-/** 「移动到分组」：先记下目标再开弹窗；没有具名分组时按钮已置灰，这里兜底 */
+/** 「移动到分组」：先记下目标再开弹窗；没有具名分组时菜单项已置灰，这里兜底 */
 function askAddToGroup() {
   actionUuids.value = takeTargets();
   closeMenu();
@@ -455,7 +443,7 @@ async function confirmAddToGroup() {
  * 这一项是否落在「按类型自动分的默认分组」里
  *
  * 那种分组不是用户建的（整合包 / 模组 / 资源包 / 光影包），从里面"移出分组"没有意义 ——
- * 下次打开窗口补组时又会被归回去。所以在这些分组里，菜单该给的是"删除收藏"。
+ * 下次打开窗口补组时又会被归回去。所以只有自建分组里的条目才给「移出分组」。
  *
  * - `item`: 收藏项
  */
@@ -465,7 +453,54 @@ function inTypeGroup(item: CollectItemDto): boolean {
   return !!auto && group === auto;
 }
 
-/** 「删除」：先记下目标再开确认弹窗 */
+/**
+ * 这一项是否在用户自建分组里
+ *
+ * - `item`: 收藏项
+ */
+function inCustomGroup(item: CollectItemDto): boolean {
+  const group = groupOfUuid.value.get(item.uuid);
+  return !!group && !inTypeGroup(item);
+}
+
+/** 菜单要不要给「移出分组」：目标里至少有一个在自建分组里 */
+function canLeaveGroup(): boolean {
+  return takeTargets().some((uuid) => {
+    const item = items.value.find((i) => i.uuid === uuid);
+    return !!item && inCustomGroup(item);
+  });
+}
+
+/** 「移出分组」：只断开分组归属，收藏本身保留 */
+async function leaveGroup() {
+  const uuids = takeTargets().filter((uuid) => {
+    const item = items.value.find((i) => i.uuid === uuid);
+    return !!item && inCustomGroup(item);
+  });
+  closeMenu();
+  if (uuids.length === 0) {
+    return;
+  }
+  const byGroup = new Map<string, string[]>();
+  for (const uuid of uuids) {
+    const name = groupOfUuid.value.get(uuid);
+    if (!name) continue;
+    const list = byGroup.get(name) ?? [];
+    list.push(uuid);
+    byGroup.set(name, list);
+  }
+  try {
+    for (const [name, list] of byGroup) {
+      await api.collectRemoveItems(list, name);
+    }
+    checked.value = new Set();
+    showToast(t("collect.leftGroup"));
+  } catch (e) {
+    showToast(tErr(e));
+  }
+}
+
+/** 「删除收藏」：先记下目标再开确认弹窗 */
 function askRemove() {
   actionUuids.value = takeTargets();
   closeMenu();
@@ -475,12 +510,7 @@ function askRemove() {
   removeOpen.value = true;
 }
 
-/**
- * 删除目标项
- *
- * 逐项分流：未归组的、以及只在类型默认分组里的**从收藏里删除**；
- * 用户自建分组里的只从该分组移出，收藏保留。勾选可以跨分组，所以不能整批一刀切。
- */
+/** 删除目标项：收藏本身从库里删掉，不管原来在哪个分组 */
 async function confirmRemove() {
   const uuids = actionUuids.value;
   removeOpen.value = false;
@@ -488,42 +518,13 @@ async function confirmRemove() {
   if (uuids.length === 0) {
     return;
   }
-
-  const byGroup = new Map<string, string[]>();
-  const removing: string[] = [];
-  for (const uuid of uuids) {
-    const name = groupOfUuid.value.get(uuid);
-    const item = items.value.find((i) => i.uuid === uuid);
-    if (name === undefined || (item && inTypeGroup(item))) {
-      removing.push(uuid);
-      continue;
-    }
-    const list = byGroup.get(name) ?? [];
-    list.push(uuid);
-    byGroup.set(name, list);
-  }
   try {
-    for (const [name, list] of byGroup) {
-      await api.collectRemoveItems(list, name);
-    }
-    if (removing.length > 0) {
-      await api.collectRemoveItems(removing, null);
-    }
+    await api.collectRemoveItems(uuids, null);
     checked.value = new Set();
   } catch (e) {
     showToast(tErr(e));
   }
 }
-
-/** 这次操作其实只是把收藏移出分组（没有真删）：确认弹窗换成对应的说法 */
-const removeOnlyLeavesGroup = computed(
-  () =>
-    actionUuids.value.length > 0 &&
-    actionUuids.value.every((uuid) => {
-      const item = items.value.find((i) => i.uuid === uuid);
-      return item !== undefined && !inTypeGroup(item) && groupOfUuid.value.has(uuid);
-    }),
-);
 
 /** 打开项目页面（网址） */
 function openUrl(item: CollectItemDto) {
@@ -532,13 +533,7 @@ function openUrl(item: CollectItemDto) {
   }
 }
 
-/** 本次操作的目标项（多选条上的操作会用到） */
-
-/**
- * 点卡片：多选模式下切换勾选；默认模式下按"下载"处理
- *
- * 下载分两条路，见 [`startDownload`]：整合包不需要实例，其余资源走安装弹窗选实例。
- */
+/** 点卡片 = 按"下载"处理，见 [`startDownload`]；多选模式下改为切换勾选 */
 function toggleCard(item: CollectItemDto) {
   if (multiSelect.value) {
     toggleCheck(item.uuid, !checked.value.has(item.uuid));
@@ -663,9 +658,18 @@ function startDownload(item: CollectItemDto) {
 const installTargets = ref<CollectItemDto[]>([]);
 
 /**
+ * 能走安装弹窗的类型：整合包要新建实例，存档 / 数据包要先有目标，都不从这里装
+ *
+ * - `item`: 收藏项
+ */
+function canInstall(item: CollectItemDto): boolean {
+  return item.fileType !== "modpack" && item.fileType !== "datapacks" && item.fileType !== "save";
+}
+
+/**
  * 打开安装弹窗
  *
- * 整合包不走这里（它要新建实例，见 startDownload）；混在多选里的一并剔掉并说一声。
+ * 整合包不走这里（它要新建实例，见 startDownload）；数据包 / 存档要先选目标，剔掉并说一声。
  *
  * - `list`: 要装的收藏项
  */
@@ -678,16 +682,15 @@ function openInstall(list: CollectItemDto[]) {
     showToast(t("collect.pickInstanceNone"));
     return;
   }
-
-  // 整合包要新建实例、数据包要先选存档：这两类不走批量安装
-  const installable = list.filter(
-    (item) => item.fileType !== "modpack" && item.fileType !== "datapacks",
-  );
+  const installable = list.filter(canInstall);
   if (list.some((item) => item.fileType === "modpack")) {
     showToast(t("collect.installModpack"));
   }
   if (list.some((item) => item.fileType === "datapacks")) {
     showToast(t("collect.installDatapack"));
+  }
+  if (list.some((item) => item.fileType === "save")) {
+    showToast(t("collect.installSave"));
   }
   if (!installable.length) return;
   installTargets.value = installable;
@@ -761,41 +764,13 @@ async function loadInstances() {
   }
 }
 
-/** 开关多选模式；退出时清空勾选（卡片上的勾选框也跟着消失） */
-function toggleMultiSelect() {
-  multiSelect.value = !multiSelect.value;
-  if (!multiSelect.value) {
-    checked.value = new Set();
-  }
-}
-
-/** 多选条上的「全选」：勾上当前类型过滤下看得见的所有项 */
-function selectAllVisible() {
-  checked.value = new Set(shownItems.value.map((i) => i.uuid));
-  showToast(t("multi.selectAllDone", { count: checked.value.size }));
-}
-
-/** 多选条上的「安装」：把勾选的项一起丢进安装弹窗 */
-function installChecked() {
-  const list = items.value.filter((item) => checked.value.has(item.uuid));
-  if (list.length) openInstall(list);
-}
-
-/** 当前操作的目标：多选模式取勾选集，否则取右键点中的那一项 */
-function takeTargets(): string[] {
-  if (multiSelect.value) {
-    return [...checked.value];
-  }
-  return menu.value ? [menu.value.item.uuid] : [];
-}
-
 // ---------------- 右键菜单 ----------------
 
 const menu = ref<{ x: number; y: number; item: CollectItemDto } | null>(null);
 
-/** 菜单尺寸估值（钳边用；三项 + 内边距） */
+/** 菜单尺寸估值（钳边用；最多六项 + 两条分隔 + 内边距） */
 const MENU_W = 170;
-const MENU_H = 130;
+const MENU_H = 240;
 
 function openMenu(e: MouseEvent, item: CollectItemDto) {
   // 钳进窗口：贴着右/下边缘右键时，菜单会整个露在可视区之外
@@ -815,13 +790,24 @@ function closeMenu() {
   groupMenu.value = null;
 }
 
+/** 卡片菜单的「安装」：多选模式下装勾选的，否则只装点中的这一项 */
+function menuInstall() {
+  const item = menu.value?.item;
+  closeMenu();
+  if (multiSelect.value) {
+    installChecked();
+  } else if (item && canInstall(item)) {
+    openInstall([item]);
+  }
+}
+
 // ---------------- 分组右键菜单 ----------------
 
 /** 右键分组标题弹出的菜单；null = 没开 */
 const groupMenu = ref<{ x: number; y: number; group: string } | null>(null);
-/** 分组右键菜单尺寸估值（三项 + 内边距） */
+/** 分组右键菜单尺寸估值（两项 + 内边距） */
 const GROUP_MENU_W = 150;
-const GROUP_MENU_H = 116;
+const GROUP_MENU_H = 92;
 
 /**
  * 右键左栏的分组：弹出该组的菜单
@@ -836,65 +822,27 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
     group: payload.id,
   };
 }
-
-/**
- * 全选某个分组里**当前看得见**的项
- *
- * 与多选条上的「全选」同一口径：搜索 / 类型过滤生效时只选筛出来的那些。
- *
- * - `group`: 分组键
- */
-function selectGroup(group: string) {
-  const list = itemsOfGroup(group);
-  groupMenu.value = null;
-  if (!list.length) return;
-
-  multiSelect.value = true;
-  const next = new Set(checked.value);
-  for (const item of list) next.add(item.uuid);
-  checked.value = next;
-  showToast(t("multi.selectAllDone", { count: list.length }));
-}
 </script>
 
 <template>
   <WindowFrame :title="t('winTitle.collect')" body-fill @close="$emit('close')">
     <!-- 工具栏整体进标题栏，与账户 / 方块 / 设置三个窗口同一套做法：
-         类型开关 + 总计数 + 多选入口，正文左边是分组栏 -->
+         只放总计数，正文左边是分组栏 -->
     <template #head-right>
       <div class="collect-toolbar">
-        <div class="collect-filters">
-          <label v-for="f in FILTER_TYPES" :key="f.key" class="filter-item">
-            <span class="filter-box">
-              <input type="checkbox" class="filter-check" :checked="filters[f.key]"
-                @change="toggleFilter(f.key, ($event.target as HTMLInputElement).checked)" />
-              <span class="check-mark">
-                <GlyphIcon name="check" :size="11" :weight="3" />
-              </span>
-            </span>
-            {{ f.label() }}
-          </label>
-        </div>
         <span class="count">{{ t("collect.count", { n: shownCount }) }}</span>
-        <!-- 多选模式的入口：默认不进行多选，点这里才进（进去后由多选条负责退出）。
-             当前过滤下一项都没有时没有可勾的东西，按钮不出现 -->
-        <BaseButton v-if="!multiSelect && shownCount > 0" size="sm" variant="ghost" class="icon-btn-head"
-          v-tip="t('collect.multiSelect')" :aria-label="t('collect.multiSelect')" @click="toggleMultiSelect">
-          <GlyphIcon name="check-square" :size="15" :weight="1.8" />
-        </BaseButton>
-
       </div>
     </template>
 
     <div class="collect-body" @click="closeMenu()">
-      <!-- 多选条：只有多选模式下才出现 -->
+      <!-- 多选条：由卡片右键菜单的「多选」进入 -->
       <div v-if="multiSelect" class="multi-bar">
-        <span class="multi-count">{{ t("collect.multiSelected", { count: checked.size }) }}</span>
+        <span class="multi-count">{{ t("collect.installCount", { count: checked.size }) }}</span>
         <button class="multi-btn" @click="selectAllVisible">{{ t("multi.selectAll") }}</button>
         <button class="multi-btn" :disabled="checked.size === 0 || groupNames.length === 0"
           v-tip="checked.size === 0 ? t('collect.multiNoneTip') : groupNames.length === 0 ? t('collect.addToGroupNone') : ''"
           @click="askAddToGroup">
-          {{ t("collect.multiMoveGroup") }}
+          {{ t("collect.addToGroup") }}
         </button>
         <button class="multi-btn" :disabled="checked.size === 0"
           v-tip="checked.size === 0 ? t('collect.multiNoneTip') : ''" @click="installChecked">
@@ -902,7 +850,7 @@ function selectGroup(group: string) {
         </button>
         <button class="multi-btn danger" :disabled="checked.size === 0"
           v-tip="checked.size === 0 ? t('collect.multiNoneTip') : ''" @click="askRemove">
-          {{ t("collect.multiDelete") }}
+          {{ t("collect.deleteFav") }}
         </button>
         <span class="multi-sep"></span>
         <button class="multi-exit" @click="toggleMultiSelect">{{ t("multi.exit") }}</button>
@@ -993,16 +941,13 @@ function selectGroup(group: string) {
         </div>
       </div>
 
-      <!-- 安装弹窗：多选时按支持加载器 / 游戏版本的交集筛实例 -->
+      <!-- 安装弹窗：按目标实例的加载器 / 游戏版本挑兼容文件 -->
       <InstallModal v-if="installTargets.length" :items="installTargets" :instances="instances"
         @close="installTargets = []" @install="doInstall" />
 
-      <!-- 分组右键菜单：全选 / 清空 / 删除（删除只对自建分组给） -->
+      <!-- 分组右键菜单：清空 / 删除（删除只对自建分组给） -->
       <div v-if="groupMenu" class="ctx-menu" :style="{ left: groupMenu.x + 'px', top: groupMenu.y + 'px' }"
         @click.stop>
-        <button class="ctx-item" @click="selectGroup(groupMenu.group)">
-          {{ t("collect.selectGroup") }}
-        </button>
         <button class="ctx-item" :disabled="!itemsOfGroup(groupMenu.group).length"
           @click="askClear(groupMenu.group)">
           {{ t("collect.clear") }}
@@ -1015,15 +960,26 @@ function selectGroup(group: string) {
 
       <!-- 右键菜单 -->
       <div v-if="menu" class="ctx-menu" :style="{ left: menu.x + 'px', top: menu.y + 'px' }" @click.stop>
+        <button v-if="!multiSelect" class="ctx-item" @click="enterMultiSelect(menu.item)">
+          {{ t("collect.multiSelect") }}
+        </button>
+        <button v-if="multiSelect || canInstall(menu.item)" class="ctx-item" @click="menuInstall">
+          {{ t("collect.installDo") }}
+        </button>
         <button class="ctx-item" @click="openUrl(menu.item); closeMenu()">
           {{ t("collect.openUrl") }}
         </button>
-        <button class="ctx-item danger" @click="askRemove">
-          {{ groupOfUuid.has(menu.item.uuid) && !inTypeGroup(menu.item) ? t("collect.removeFromGroup") : t("collect.deleteFav") }}
+        <span class="ctx-sep"></span>
+        <button v-if="canLeaveGroup()" class="ctx-item" @click="leaveGroup">
+          {{ t("collect.removeFromGroup") }}
         </button>
         <button class="ctx-item" :disabled="groupNames.length === 0"
           v-tip="groupNames.length === 0 ? t('collect.addToGroupNone') : ''" @click="askAddToGroup">
           {{ t("collect.addToGroup") }}
+        </button>
+        <span class="ctx-sep"></span>
+        <button class="ctx-item danger" @click="askRemove">
+          {{ t("collect.deleteFav") }}
         </button>
       </div>
     </div>
@@ -1051,17 +1007,9 @@ function selectGroup(group: string) {
       </div>
     </BaseModal>
 
-    <!-- 删除收藏确认：多选条与卡片菜单共用，只问一句"删几项" -->
-    <BaseModal v-if="removeOpen"
-      :title="removeOnlyLeavesGroup ? t('collect.removeFromGroup') : t('collect.multiDelete')"
-      :closable="false" @close="removeOpen = false">
-      <p class="delete-tip">
-        {{
-          removeOnlyLeavesGroup
-            ? t("collect.removeFromGroupConfirm", { count: actionUuids.length })
-            : t("collect.removeConfirm", { count: actionUuids.length })
-        }}
-      </p>
+    <!-- 删除收藏确认：卡片菜单打开，只问一句"删几项" -->
+    <BaseModal v-if="removeOpen" :title="t('collect.deleteFav')" :closable="false" @close="removeOpen = false">
+      <p class="delete-tip">{{ t("collect.removeConfirm", { count: actionUuids.length }) }}</p>
       <div class="modal-actions">
         <BaseButton @click="removeOpen = false">{{ t("add.no") }}</BaseButton>
         <BaseButton variant="primary" @click="confirmRemove">{{ t("add.yes") }}</BaseButton>

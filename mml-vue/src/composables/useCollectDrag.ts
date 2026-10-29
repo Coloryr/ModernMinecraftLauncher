@@ -76,8 +76,7 @@ export function useCollectDrag(deps: DragDeps) {
     pointerId = e.pointerId;
     startX = e.clientX;
     startY = e.clientY;
-    // 多选模式下拖一张**已勾选**的卡片：整批一起走（与「移动到分组」弹窗同一语义）；
-    // 其余情况只拖按下的这一张。
+    // 多选模式下拖一张**已勾选**的卡片：整批一起走；其余情况只拖按下的这一张。
     // 按下那一张排最前：拖拽幽灵卡片显示的是"第一项"，该是用户手里抓着的那张
     const picked = deps.checked.value;
     const uuids =
@@ -90,7 +89,7 @@ export function useCollectDrag(deps: DragDeps) {
   function onPointerMove(e: PointerEvent) {
     if (pointerId === null || e.pointerId !== pointerId) return;
     if (!dragActive.value) {
-      // 还没到阈值：按下可能只是想点卡片 / 点勾选框，别急着当拖拽
+      // 还没到阈值：按下可能只是想点卡片，别急着当拖拽
       if (Math.hypot(e.clientX - startX, e.clientY - startY) <= DRAG_THRESHOLD) return;
       dragActive.value = dragCandidate.value;
       if (!dragActive.value) return;

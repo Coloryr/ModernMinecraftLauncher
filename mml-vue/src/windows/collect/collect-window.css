@@ -6,52 +6,7 @@
   min-height: 0;
 }
 
-/* ----- 标题栏里的工具栏：类型开关 + 总计数 + 多选入口 ----- */
-
-.collect-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  /* 标题栏里要能收缩：窗口最窄时先挤开关，不去裁其它控件 */
-  flex-shrink: 1;
-  min-width: 0;
-}
-
-.collect-toolbar .collect-filters {
-  /* 标题栏高度有限，不能换行（换行会撑破标题栏）；间距与标题栏标准统一 8px */
-  flex-wrap: nowrap;
-  gap: 8px;
-}
-
-/* 标题栏控件高度全 app 统一 32px（controls.css 的 --ctl-h），这里不再单独覆盖 */
-
-.count {
-  font-size: 12px;
-  color: var(--text-dim);
-  white-space: nowrap;
-}
-
-/* 多选模式入口（工具栏右端）：默认不进行多选，点这里才进 */
-.multi-toggle {
-  height: var(--ctl-h);
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--ctl-radius);
-  background: var(--bg-card);
-  color: var(--text);
-  font-size: 12.5px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
-}
-
-.multi-toggle:hover {
-  background: var(--bg-hover);
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-/* ----- 多选条：与主窗口多选工具栏（.multi-bar）同一套规格 ----- */
+/* ----- 多选条：按钮外观走 styles/parts/multi-bar.css，这里只管排布 ----- */
 
 .multi-bar {
   display: flex;
@@ -64,12 +19,28 @@
   box-shadow: var(--shadow-md);
 }
 
-/* 禁用的按钮（没勾选 / 没有分组可去）：别让它看起来还能点 */
+/* 右侧「退出多选」推到最右 */
 .multi-sep {
   width: 1px;
   height: 18px;
   background: var(--border);
   margin-left: auto;
+}
+
+/* ----- 标题栏里的工具栏：总计数 ----- */
+
+.collect-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.count {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
 }
 
 /* ----- 左栏 + 卡片区（与方块窗口同一套两栏布局） ----- */
@@ -117,36 +88,20 @@
   min-width: 0;
 }
 
-.collect-filters {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.filter-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--text);
-  cursor: pointer;
-}
-
-/* 勾选框：原生样式在暗色主题下偏灰、各平台大小也不一致，统一自己画一个
-   （类型开关与卡片上的勾选共用）。
-   勾**不再由 CSS 画**（两根边框转 45° 的写法视觉重心天然偏，怎么调都像没居中），
-   改用全仓通用的 GlyphIcon 的 check，并且用 flex 居中 —— 不依赖任何手算坐标 */
-.filter-box,
+/* 卡片上的勾选框：原生样式在暗色主题下偏灰、各平台大小也不一致，统一自己画一个。
+   勾由 GlyphIcon 的 check 画，并用 flex 居中，不依赖手算坐标。
+   绝对定位压在图标左上角：放进流里会挤掉项目 ID 那一行，卡片尺寸也就跟着变了 */
 .card-box {
-  position: relative;
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  z-index: 2;
   display: inline-flex;
   width: 15px;
   height: 15px;
   flex: 0 0 auto;
 }
 
-.filter-check,
 .card-check {
   position: absolute;
   inset: 0;
@@ -161,20 +116,16 @@
   transition: background 0.12s, border-color 0.12s;
 }
 
-.filter-check:hover,
 .card-check:hover {
   border-color: var(--accent);
 }
 
-.filter-check:checked,
 .card-check:checked {
   background: var(--accent);
   border-color: var(--accent);
 }
 
-/* 勾：居中由 flex 负责 —— 注意必须是真正的元素（span）来当 flex 容器：
-   <svg> 不是 flex 容器，display: inline-flex 加在它身上不生效，
-   里面的路径会按自己的坐标画，结果就贴到左上角去了 */
+/* 勾：必须是真正的元素当 flex 容器，svg 自身的 display 不参与这里 */
 .check-mark {
   position: absolute;
   inset: 0;
@@ -187,7 +138,6 @@
   transition: opacity 0.12s;
 }
 
-.filter-check:checked+.check-mark,
 .card-check:checked+.check-mark {
   opacity: 1;
 }
@@ -215,8 +165,7 @@
   transition: border-color 0.15s, background 0.15s, transform 0.15s;
 }
 
-/* 悬停：与方块列表的格子一致（强调色描边 + 抬起 2px），不铺底色 ——
-   底色留给"已勾选"那个状态 */
+/* 悬停：与方块列表的格子一致（强调色描边 + 抬起 2px） */
 .collect-card:hover {
   border-color: var(--accent);
   transform: translateY(-2px);
@@ -392,5 +341,12 @@
 .ctx-item:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* 菜单分隔：把「多选 / 安装 / 打开」与分组、删除分开 */
+.ctx-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
 }
 

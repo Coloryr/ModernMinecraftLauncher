@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use mml_names::i18_items::error_type::{CoreResult, ErrorType};
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 use mml_names::i18_items::error_type::FileSystemErrorData;
 
 /// 创建快捷方式
@@ -16,17 +16,6 @@ use mml_names::i18_items::error_type::FileSystemErrorData;
 /// # 返回值
 ///
 /// 返回快捷方式路径，创建失败时返回相应错误
-/// 把快捷方式路径与出错原因包成文件系统错误
-///
-/// 只有 Windows 写 .lnk 时用到
-#[cfg(target_os = "windows")]
-fn fs_err(path: PathBuf, err: impl std::fmt::Display) -> ErrorType {
-    ErrorType::FileSystemError(FileSystemErrorData {
-        path,
-        error: err.to_string(),
-    })
-}
-
 pub fn create_shortcut<P: AsRef<Path>>(
     uuid: &str,
     icon: Option<P>,
@@ -34,6 +23,17 @@ pub fn create_shortcut<P: AsRef<Path>>(
     file: P,
 ) -> CoreResult<PathBuf> {
     create_shortcut_inner(uuid, icon, work, file)
+}
+
+/// 把快捷方式路径与出错原因包成文件系统错误
+///
+/// Windows 写 .lnk、Linux 写 .desktop 都用到
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+fn fs_err(path: PathBuf, err: impl std::fmt::Display) -> ErrorType {
+    ErrorType::FileSystemError(FileSystemErrorData {
+        path,
+        error: err.to_string(),
+    })
 }
 
 /// Windows 实现：通过 Shell COM 的 IShellLink 写出 .lnk 文件

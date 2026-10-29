@@ -991,6 +991,7 @@ pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'stati
 /// # 返回值
 ///
 /// 需要换用时返回 `true`
+#[cfg(target_os = "macos")]
 fn is_april_fools() -> bool {
     use chrono::{Datelike, Local};
 
