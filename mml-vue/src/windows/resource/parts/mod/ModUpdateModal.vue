@@ -9,6 +9,7 @@ import VirtualList from "../VirtualList.vue";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../../components/ui/BaseModal.vue";
 import type { ModUpdateCheckDto, ModUpdateDto } from "../../../../lib/bindings";
+import { isoDate } from "../../types";
 
 const props = defineProps<{
   /** 检查结果，updates 非空时才开这个弹窗 */
@@ -68,20 +69,6 @@ function apply() {
   if (picked.length) emit("download", picked);
 }
 
-/**
- * 发布时间只取日期那一段
- *
- * - `iso`: ISO 8601 字符串，形如 `2024-03-01T12:00:00Z`
- *
- * # 返回值
- *
- * `2024-03-01`；不是这个形态时原样返回
- *
- * 不引入日期解析：接口给的一定是 ISO，切前 10 位就是日期，还省掉时区换算。
- */
-function dateOf(iso: string): string {
-  return /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : iso;
-}
 </script>
 
 <template>
@@ -112,7 +99,7 @@ function dateOf(iso: string): string {
             </span>
             <span class="upd-note">
               <span class="upd-file">{{ u.file }} → {{ u.newFile }}</span>
-              <span v-if="u.date">{{ t("resource.updateDate", { date: dateOf(u.date) }) }}</span>
+              <span v-if="u.date">{{ t("resource.updateDate", { date: isoDate(u.date) }) }}</span>
             </span>
           </span>
         </label>

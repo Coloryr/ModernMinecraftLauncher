@@ -32,11 +32,11 @@ interface DragCandidate {
   uuids: string[];
 }
 
-/** 开始拖拽的位移阈值（与实例拖拽一致） */
+/** 开始拖拽的位移阈值，单位 px；与实例拖拽一致 */
 const DRAG_THRESHOLD = 5;
-/** 靠近内容区上下边缘多少像素时自动滚动 */
+/** 靠近内容区上下边缘多少时自动滚动，单位 px */
 const SCROLL_EDGE = 60;
-/** 自动滚动每次挪多少像素 */
+/** 自动滚动每次挪多少，单位 px */
 const SCROLL_STEP = 10;
 
 /**
@@ -76,8 +76,8 @@ export function useCollectDrag(deps: DragDeps) {
     pointerId = e.pointerId;
     startX = e.clientX;
     startY = e.clientY;
-    // 多选模式下拖一张**已勾选**的卡片：整批一起走；其余情况只拖按下的这一张。
-    // 按下那一张排最前：拖拽幽灵卡片显示的是"第一项"，该是用户手里抓着的那张
+    // 多选模式下拖一张已勾选的卡片就是整批一起走，其余情况只拖按下的这一张；
+    // 按下的那张排最前，拖拽副本显示的是用户手里抓着的那张
     const picked = deps.checked.value;
     const uuids =
       deps.multiSelect.value && picked.has(item.uuid)
@@ -86,6 +86,7 @@ export function useCollectDrag(deps: DragDeps) {
     dragCandidate.value = { uuids };
   }
 
+  /** 移动超过阈值才算拖拽；之后跟随指针并更新落点分组 */
   function onPointerMove(e: PointerEvent) {
     if (pointerId === null || e.pointerId !== pointerId) return;
     if (!dragActive.value) {
@@ -102,8 +103,10 @@ export function useCollectDrag(deps: DragDeps) {
     updateDropGroup(e);
   }
 
+  /** 松手：落在分组上就提交，否则当作取消 */
   function onPointerUp(e: PointerEvent) {
-    if (pointerId === null || e.pointerId !== pointerId) return;
+    // 只认左键松开：拖到一半按右键再松开，不该把这次拖拽提交掉
+    if (pointerId === null || e.pointerId !== pointerId || e.button !== 0) return;
     const active = dragActive.value;
     const target = dropGroup.value;
     resetDrag();
@@ -112,6 +115,7 @@ export function useCollectDrag(deps: DragDeps) {
     }
   }
 
+  /** 清掉一次拖拽的状态 */
   function resetDrag() {
     pointerId = null;
     dragCandidate.value = null;
@@ -138,7 +142,12 @@ export function useCollectDrag(deps: DragDeps) {
     dropGroup.value = block ? (block.dataset.group ?? "") : null;
   }
 
-  /** 提交：把这次拖拽的项移到落点分组 */
+  /**
+   * 提交：把这次拖拽的项移到落点分组
+   *
+   * - `active`: 本次拖拽的批次
+   * - `target`: 落点分组的 key；等于 `defaultGroup` 时表示移出所有具名分组
+   */
   async function commitDrag(active: DragCandidate, target: string) {
     // 已经在目标组里的不用动：拖回原组就是一次空操作，别白写一次盘、白广播一次事件
     const uuids = active.uuids.filter(
@@ -192,7 +201,6 @@ export function useCollectDrag(deps: DragDeps) {
     window.removeEventListener("pointercancel", resetDrag);
   });
 
-  // 拖拽一旦开始，紧随的 click 就不该再当成"点卡片"
   return {
     dragActive,
     ghost: dragGhost.ghost,

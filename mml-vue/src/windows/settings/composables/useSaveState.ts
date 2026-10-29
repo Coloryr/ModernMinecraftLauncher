@@ -50,6 +50,12 @@ export function useSaveState() {
 
   /**
    * 包一次保存动作：先把状态置 saving，成功转 saved，抛错转 error 并原样抛出
+   *
+   * - `run`: 实际保存动作
+   *
+   * # 返回值
+   *
+   * 原样返回 `run` 的结果
    */
   async function track<T>(run: () => Promise<T>): Promise<T> {
     state.value = "saving";

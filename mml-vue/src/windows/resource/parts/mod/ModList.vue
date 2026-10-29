@@ -20,12 +20,12 @@ import ResourceRow from "../ResourceRow.vue";
 import { LIST_ROW_GAP, LIST_ROW_H, useVirtualRows } from "../../../../composables/useVirtualRows";
 import {
   modRowKey,
+  modSelectKey,
   modSub,
   sortedMods,
   type ModViewEmits,
   type ModViewProps,
 } from "../../types";
-import { modSelectKey } from "../../types";
 
 const props = withDefaults(
   defineProps<
@@ -67,11 +67,6 @@ function isOpen(key: string): boolean {
   return expanded.value.has(key);
 }
 
-/** 展开状态用的键：顶层认 sha1，内置条目没有 sha1 时退回名字 */
-function keyOf(item: ModViewProps["items"][number]): string {
-  return modRowKey(item);
-}
-
 /** 拍平后的一行 */
 interface FlatRow {
   /** 这一行的模组条目 */
@@ -92,7 +87,7 @@ interface FlatRow {
 function flatten(items: ModViewProps["items"], depth: number, out: FlatRow[]) {
   for (const item of sortedMods(items)) {
     out.push({ item, depth });
-    if (item.jarInJar.length && isOpen(keyOf(item))) {
+    if (item.jarInJar.length && isOpen(modRowKey(item))) {
       flatten(item.jarInJar, depth + 1, out);
     }
   }
@@ -126,7 +121,7 @@ const visible = computed(() => rows.value.slice(start.value, end.value));
 <template>
   <div ref="root" class="mod-rows"
     :style="{ paddingTop: padTop + 'px', paddingBottom: padBottom + 'px' }">
-    <ResourceRow v-for="row in visible" :key="keyOf(row.item)" :icon="row.item.icon"
+    <ResourceRow v-for="row in visible" :key="modRowKey(row.item)" :icon="row.item.icon"
       :name="row.item.name || row.item.file" :depth="row.depth" :class="{
         'row-selected': selectedKeys.has(modSelectKey(row.item)),
         'row-anchor': modSelectKey(row.item) === anchorKey,
@@ -147,10 +142,10 @@ const visible = computed(() => rows.value.slice(start.value, end.value));
       <!-- 展开箭头：只有带内置模组的行才有（内置行自己没有下级）；默认收起 -->
       <template #lead>
         <button v-if="row.item.jarInJar.length" class="mod-tree-caret"
-          :class="{ collapsed: !isOpen(keyOf(row.item)) }" v-tip="isOpen(keyOf(row.item))
+          :class="{ collapsed: !isOpen(modRowKey(row.item)) }" v-tip="isOpen(modRowKey(row.item))
             ? t('resource.modBuiltinCollapse')
             : t('resource.modBuiltinExpand')
-            " @click.stop="toggleExpand(keyOf(row.item))" @pointerdown.stop>
+            " @click.stop="toggleExpand(modRowKey(row.item))" @pointerdown.stop>
           <GlyphIcon name="chevron-down" :size="13" :weight="2.4" />
         </button>
         <!-- 占位：没有下级的行也留出箭头的宽度，图标与名字才能对齐成一列 -->

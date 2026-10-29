@@ -3,8 +3,7 @@
 // 所有动作通过事件抛给父组件处理
 //
 // 目标分组的选择**不在这里**：那是个弹窗，见 MainWindow 的"选择目标分组"。
-// 早先把它做成菜单的第二级视图 `moveGroupView` 时，因为 `menu.kind` 仍是 'group'，
-// 渲染时永远轮不到它，表现就是"点了转移分组没反应"——所以改成了弹窗。
+// 菜单视图只由 `menu.kind` 决定，别再加第二级视图 —— 父级 kind 不变时永远渲染不到。
 //
 // 定位：`position: fixed` 钉在点击处，但**渲染后要量一次并收进窗口**——
 // 否则靠近窗口下/右边缘点开时，菜单会超出可视区被裁掉 —— 实例菜单 10 项，比分组菜单高一截。
@@ -182,7 +181,7 @@ watchEffect(async () => {
   position: fixed;
   z-index: 120;
   min-width: 180px;
-  /* 屏幕很矮时（收进窗口后仍放不下）才内部滚动；正常窗口下列表项全部可见 */
+  /* 屏幕很矮、收进窗口后仍放不下时才内部滚动；正常窗口下列表项全部可见 */
   max-height: calc(100vh - 16px);
   overflow-y: auto;
   padding: 6px;
@@ -231,30 +230,13 @@ watchEffect(async () => {
 }
 
 .ctx-item.danger:hover {
-  background: rgba(255, 95, 86, 0.12);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
 }
 
 .ctx-item:disabled {
   opacity: 0.4;
   cursor: not-allowed;
   background: transparent;
-}
-
-.ctx-back {
-  color: var(--text-dim);
-}
-
-.ctx-label {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ctx-count {
-  font-size: 11.5px;
-  color: var(--text-dim);
-  margin-left: auto;
 }
 
 .ctx-sep {

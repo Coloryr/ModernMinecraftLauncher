@@ -20,7 +20,7 @@ const props = withDefaults(
     /** 标题：服务器名或地址，由调用方给，不从 MOTD 里取 */
     name: string;
     /**
-     * 紧凑版：图标 46px、去阴影、内边距略松
+     * 紧凑版：图标 46px、内边距略松、MOTD 字号大一档
      *
      * 给"嵌在面板里"的场合用（实例详情）；悬浮卡与列表上方那张用默认大小。
      */
@@ -75,10 +75,8 @@ const iconUrl = computed(() => (iconFailed.value ? "" : faviconOf(props.motd)));
       </svg>
     </button>
 
-    <!-- 图标：**只认服务器查询带回来的 favicon**，`servers.dat` 里存的那个跳过。
-         没有 / 加载失败就什么都不画 —— 与资源列表的行同一口径。
-         `data-no-fallback` 是必须的：全局兜底 lib/imageFallback.ts 会把加载失败的图
-         换成灰底占位图，那正是这里要避免的"占位符" -->
+    <!-- 图标只认服务器查询带回来的 favicon；没有 / 加载失败就什么都不画。
+         data-no-fallback 不能省：全局兜底 lib/imageFallback.ts 会换成灰底占位图 -->
     <img v-if="iconUrl" class="motd-icon" :src="iconUrl" alt="" data-no-fallback @error="iconFailed = true" />
 
     <div class="motd-info">
@@ -122,7 +120,7 @@ const iconUrl = computed(() => (iconFailed.value ? "" : faviconOf(props.motd)));
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid var(--border);
   background: var(--bg-card);
   /* 用户口径：MOTD 卡片**不要阴影**，原来悬浮卡那份 --shadow-lg 也去掉了，
@@ -166,7 +164,7 @@ const iconUrl = computed(() => (iconFailed.value ? "" : faviconOf(props.motd)));
 }
 
 .motd-name {
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.3;
   font-weight: 700;
   color: var(--text);
@@ -193,7 +191,7 @@ const iconUrl = computed(() => (iconFailed.value ? "" : faviconOf(props.motd)));
 
 /* 紧凑版里 MOTD 是主角：大一号、用正文色 */
 .motd-card.compact .motd-text {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text);
 }
@@ -202,7 +200,7 @@ const iconUrl = computed(() => (iconFailed.value ? "" : faviconOf(props.motd)));
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 11.5px;
   line-height: 1.3;
   color: var(--text-dim);
   white-space: nowrap;
@@ -223,7 +221,7 @@ const iconUrl = computed(() => (iconFailed.value ? "" : faviconOf(props.motd)));
   right: 6px;
   width: var(--ctl-h);
   height: var(--ctl-h);
-  border-radius: 7px;
+  border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--bg-side);
   color: var(--text-dim);

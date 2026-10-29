@@ -53,25 +53,11 @@ export const RESOURCE_CATEGORIES: ResourceCategory[] = [
 ];
 
 /**
- * 取某个分类的图标
- *
- * - `id`: 分类 id
- *
- * # 返回值
- *
- * 分类没登记时返回 `null`，调用方不画图标
- */
-export function categoryIcon(id: CategoryId): GlyphName | null {
-  return RESOURCE_CATEGORIES.find((c) => c.id === id)?.icon ?? null;
-}
-
-/**
  * 分类 → 后端的 kind 串
  *
- * 后端认的是**目录名**，光影包那类是 `shaderpacks`，而左侧导航的 id 是 `shaders`，
- * 各面板调 `openFolder` 时也都是这么手写的。
+ * 后端认的是**目录名**，光影包那类是 `shaderpacks`，而左侧导航的 id 是 `shaders`。
  * 拖拽导入要按当前面板定落点，得有一份"分类 → 目录"的映射，收在这里；
- * 面板里那几处手写串以后可以一并换过来。
+ * 各面板调 `openFolder` 时仍各自写同一串，值必须与这张表一致。
  */
 export const CATEGORY_KIND: Record<CategoryId, string> = {
   mods: "mods",
@@ -120,9 +106,7 @@ export interface ServerFormDraft {
 /**
  * 模组的展示方式，两种视图见 parts/mod/
  *
- * 原先还有第三种「树形」：按 jar-in-jar 展开层级。它已**并入列表** ——
- * 层级现在就在列表列里展开：有下级的行前面是展开箭头，下一层缩进显示，
- * 所以"看得见层级"与"看得见图标/副标题"不再需要二选一。
+ * 列表视图里同时展开 jar-in-jar 的层级，所以层级与图标 / 副标题不必二选一。
  */
 export type ModView = "list" | "table";
 
@@ -181,7 +165,7 @@ export interface ModViewEmits {
   /**
    * 折叠 / 展开所在分组（表格视图的第一列有折叠箭头）
    *
-   * 列表视图的折叠在分组头上、树形视图已并入列表，所以只有表格会发这个事件。
+   * 列表视图的折叠在分组头上，所以只有表格会发这个事件。
    */
   (e: "toggle-group"): void;
   /**
@@ -258,6 +242,21 @@ export function modRowKey(item: ModItemDto): string {
  */
 export function modSelectKey(item: ModItemDto): string {
   return item.sha1 || item.uuid;
+}
+
+/**
+ * 平台返回的 ISO 时间只取日期那一段
+ *
+ * 接口给的形如 `2024-03-01T12:00:00Z`，前 10 位就是日期，不做日期解析与时区换算。
+ *
+ * - `iso`: ISO 8601 字符串
+ *
+ * # 返回值
+ *
+ * `2024-03-01`；不是这个形态时原样返回
+ */
+export function isoDate(iso: string): string {
+  return /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : iso;
 }
 
 /**

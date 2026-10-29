@@ -31,6 +31,7 @@ const maximized = ref(false);
 /** 是否全屏：全屏下第二个按钮同样显示「还原」，点击退出全屏 */
 const fullscreen = ref(false);
 
+/** 重查最大化 / 全屏状态 */
 async function refresh() {
   const [max, full] = await Promise.all([isWindowMaximized(), isWindowFullscreen()]);
   maximized.value = max;
@@ -121,6 +122,7 @@ function onButtonContextMenu(e: MouseEvent, id: string) {
   }
 }
 
+/** 收起最大化按钮的右键菜单 */
 function closeMenu() {
   menuOpen.value = false;
 }
@@ -139,6 +141,7 @@ async function onMenuFillScreen() {
   await refresh();
 }
 
+/** Esc 收起菜单 */
 function onMenuKeydown(e: KeyboardEvent) {
   if (e.key === "Escape") {
     closeMenu();

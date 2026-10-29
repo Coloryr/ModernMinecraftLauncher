@@ -389,40 +389,6 @@
   word-break: break-all;
 }
 
-.badges {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-}
-
-.badge {
-  font-size: 11.5px;
-  padding: 3px 10px;
-  border-radius: 20px;
-  background: var(--bg-hover);
-  color: var(--text-dim);
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.badge.loader {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.badge.type {
-  background: color-mix(in srgb, var(--green) 14%, transparent);
-  color: var(--green);
-}
-
-.badge.dim {
-  background: transparent;
-  border: 1px solid var(--border);
-}
-
 .detail-meta {
   display: flex;
   align-items: center;
@@ -433,18 +399,6 @@
 
 .sep {
   opacity: 0.5;
-}
-
-/* 加载器文字标签 */
-.loader-text {
-  font-size: 10px;
-  padding: 1px 7px;
-  border-radius: 8px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  white-space: nowrap;
-  flex-shrink: 0;
-  line-height: 1.6;
 }
 
 /* ----- 启动参数 ----- */
@@ -500,12 +454,6 @@
   color: var(--text-dim);
   min-width: 60px;
   white-space: nowrap;
-}
-
-.server-label.small {
-  min-width: 0;
-  margin-left: 8px;
-  margin-right: 14px;
 }
 
 .server-row .chk {
@@ -835,14 +783,13 @@
   box-shadow: var(--shadow-md);
 }
 
-/* 禁用的按钮：如"没有别的分组可去"时的修改分组，别让它看起来还能点 */
+/* 工具栏里的竖分隔线：隔开操作与「退出多选」 */
 .multi-sep {
   width: 1px;
   height: 18px;
   background: var(--border);
 }
 
-/* 实例勾选 */
 /* 多选详情提示 */
 .multi-detail {
   flex: 1;

@@ -31,6 +31,7 @@ const emit = defineEmits<{
   (e: "toggle-multi"): void;
 }>();
 
+/** 分段控件的档位选项，文案取自 blocks.size.* */
 const sizeOptions = computed(() =>
   BLOCK_SIZE_ORDER.map((s) => ({ value: s as string, label: t(`blocks.size.${s}`) })),
 );
@@ -109,8 +110,7 @@ function onSize(v: string) {
 .block-top .block-search {
   flex: 1;
   min-width: 0;
-  padding: 3px 30px 3px 12px;
-  font-size: 13px;
+  padding: 5px 30px 5px 12px;
 }
 
 /* 外观走共享的 .input-clear（styles/controls.css），这里只负责摆位：压在输入框右端 */

@@ -56,14 +56,15 @@ const { track } = useUnlisteners();
 const PAGE_SIZE = 20;
 
 /** 资源类型，取值是后端 FileType 线串，显示标签走 i18n */
-const TYPES = [
+const TYPES = computed(() => [
   { value: "mod", label: t("addResource.mods") },
   { value: "resourcepack", label: t("addResource.resourcepacks") },
   { value: "shaderpack", label: t("addResource.shaders") },
   { value: "save", label: t("addResource.saves") },
   { value: "dataPacks", label: t("addResource.datapacks") },
-];
+]);
 
+/** 下载源的 i18n 文案键 */
 const SOURCE_LABELS: Record<string, string> = {
   curseforge: "modpack.curseforge",
   modrinth: "modpack.modrinth",
@@ -136,11 +137,10 @@ const filter = ref("");
 /** 目标实例版本支持的加载器 ID；null = 还没查到（或没选实例），按全量显示 */
 const supportedLoaders = ref<string[] | null>(null);
 /** 筛选下拉的选项：按实例版本收窄，给 1.12.2 列 Fabric / NeoForge 只是噪音 */
-const loaderChoices = computed(() =>
-  supportedLoaders.value
-    ? LOADERS.filter((item) => (supportedLoaders.value as string[]).includes(item))
-    : LOADERS,
-);
+const loaderChoices = computed(() => {
+  const supported = supportedLoaders.value;
+  return supported ? LOADERS.filter((item) => supported.includes(item)) : LOADERS;
+});
 
 // 换实例（版本跟着变）就重查一次：内核按版本缓存，同一版本只查一趟
 watch(
@@ -160,7 +160,6 @@ watch(
   },
   { immediate: true },
 );
-
 
 // 离开本窗口时清掉搜索词：来源 / 类型 / 版本等**筛选**留着，那是浏览上下文，
 // 搜索词只是"找某样东西"的一次性输入。
@@ -211,7 +210,7 @@ const sourceOptions = computed(() =>
 
 const isSaveType = computed(() => type.value === "save");
 
-/** 拉取下载源列表并选中第一个 */
+/** 拉取下载源列表；没存过已选源时才默认第一个 */
 async function loadSources() {
   try {
     sources.value = (await api.getModpackSources()).map((value) => ({
@@ -226,7 +225,10 @@ async function loadSources() {
     error.value = t("modpack.sourceFail");
     return;
   }
-  source.value = sourceOptions.value[0]?.value ?? sources.value[0].value;
+  // 已选源（上次保存的那个）还在列表里就留着，别被默认值盖掉
+  if (!sources.value.some((item) => item.value === source.value)) {
+    source.value = sourceOptions.value[0]?.value ?? sources.value[0].value;
+  }
 }
 
 /**
@@ -387,6 +389,7 @@ function loadDetail(pid: string) {
   return api.getResourceDetail(source.value, pid);
 }
 
+/** 详情页取版本列表；资源接口按实例取数 */
 function loadFiles(pid: string, pageNo: number, fileVersion: string | null) {
   return api.getResourceFiles(
     instanceUuid.value,
@@ -631,6 +634,13 @@ async function confirmSave() {
   await doDownload(pid, file, pickedSave.value);
 }
 
+/**
+ * 发起资源下载
+ *
+ * - `pid`: 项目 ID
+ * - `file`: 选中的文件
+ * - `world`: 目标存档目录名，数据包才用；其余类型传 null
+ */
 async function doDownload(pid: string, file: FileListItemDto, world: string | null = null) {
   try {
     await api.downloadResource(
@@ -648,11 +658,9 @@ async function doDownload(pid: string, file: FileListItemDto, world: string | nu
   }
 }
 
-/** 收藏 / 取消收藏 */
-
 /** 类型 / 下载源变化：换源重载；存档类型强制 CurseForge */
 watch([source, type], () => {
-  if (source.value) loadSource();
+  if (source.value) void loadSource();
 });
 
 watch(type, () => {
@@ -680,25 +688,27 @@ useInstanceChange(() => {
  * 读本窗口该锁定的实例，更新 uuid 与标题栏 chip 用的名字 / 版本
  *
  * 多窗口模式按窗口标签，那是窗口身份的一部分；单窗口 / 浏览器按本次跳转参数，收藏窗口
- * 点非整合包卡片时那边会先让用户选好实例再跳过来。都没有时退回主窗口选中的那个 ——
- * 单窗口模式下从别的页面返回本页时跳转参数已被清掉，读它就是改造前的行为。
+ * 点非整合包卡片时那边会先让用户选好实例再跳过来。都没有就是浏览模式，不锁定实例，
+ * 等点下载时再让用户选。
  */
 async function refreshInstance() {
   const locked = familyInstanceFromLabel("add_resource") ?? targetUuid() ?? "";
   // 只认"传进来的"实例：没传就是浏览模式，实例等点下载时再选
   instanceUuid.value = locked;
 
-
-  if (instanceUuid.value) {
-    try {
-      const list = await api.getInstances();
-      const found = list.find((i) => i.uuid === instanceUuid.value);
-      instanceName.value = found?.name ?? "";
-      instanceVersion.value = found?.version ?? "";
-    } catch {
-      instanceName.value = "";
-      instanceVersion.value = "";
-    }
+  if (!instanceUuid.value) {
+    instanceName.value = "";
+    instanceVersion.value = "";
+    return;
+  }
+  try {
+    const list = await api.getInstances();
+    const found = list.find((i) => i.uuid === instanceUuid.value);
+    instanceName.value = found?.name ?? "";
+    instanceVersion.value = found?.version ?? "";
+  } catch {
+    instanceName.value = "";
+    instanceVersion.value = "";
   }
 }
 

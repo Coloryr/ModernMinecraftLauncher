@@ -1,10 +1,10 @@
 <script setup lang="ts">
-// 带加载占位的图片：加载中显示流光动画，失败显示占位（图标 + 可选文案）。
+// 带加载占位的图片：加载中显示流光动画，失败显示灰底图标占位。
 // 父级把尺寸类挂在组件上即可。
 //
 // 失败兜底与全局那套 lib/imageFallback.ts 是一回事，区别在这里能画得更讲究：
-// 全局兜底只是把 <img> 换成一张灰底占位图，够用且覆盖所有直接写 <img> 的地方，
-// 而走本组件的地方还能显示一行说明文字、并且不留破图痕迹。
+// 全局兜底只是把 <img> 换成一张灰底占位图，够用且覆盖所有直接写 <img> 的地方；
+// 走本组件的地方加载中有流光、失败还能抛出 error 让调用方重试，也不留破图痕迹。
 import { ref, watch } from "vue";
 
 const props = defineProps<{
@@ -21,8 +21,16 @@ const emit = defineEmits<{
   (e: "error"): void;
 }>();
 
+/** 图片是否已经加载出来，用来收掉流光占位 */
 const loaded = ref(false);
+/** 是否加载失败，失败后换成灰底图标占位 */
 const failed = ref(false);
+
+/** 图片加载失败：切到占位并通知调用方 */
+function onError() {
+  failed.value = true;
+  emit("error");
+}
 
 // 换图（如版本筛选刷新截图）时回到占位状态
 watch(
@@ -37,7 +45,7 @@ watch(
 <template>
   <span class="async-img">
     <img v-if="!failed" :src="src" :alt="alt ?? ''" v-tip="title" loading="lazy" :class="{ show: loaded }"
-      @load="loaded = true" @error="failed = true; emit('error')" />
+      @load="loaded = true" @error="onError" />
     <span v-if="!loaded && !failed" class="async-shimmer"></span>
     <!-- 加载失败：换成"灰底 + 图片图标"的占位，别留破图图标 -->
     <span v-else-if="failed" class="async-fail" aria-hidden="true">

@@ -14,7 +14,7 @@ const props = defineProps<{
 }>();
 
 defineEmits<{
-  /** 用户关闭本次分析卡片。 */
+  /** 用户关闭本次分析卡片 */
   (e: "close"): void;
 }>();
 

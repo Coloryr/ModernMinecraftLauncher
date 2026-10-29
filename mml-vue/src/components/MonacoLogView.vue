@@ -15,7 +15,7 @@ import type { LogLine } from "../lib/bindings";
 const props = defineProps<{
   /** 日志行，按时间顺序；调用方已按等级 / 线程 / 分组筛过 */
   logs: LogLine[];
-  /** 撑满父容器；独立窗口与浮动面板用，默认固定高度内嵌 */
+  /** 撑满父容器；日志窗口用，默认固定高度内嵌 */
   fill?: boolean;
   /** 无日志时的遮罩提示；不给就不盖东西，没有日志时直接是空的编辑器 */
   emptyHint?: string;
@@ -129,7 +129,6 @@ function scrollBottom() {
   monacoEditor.revealLine(monacoEditor.getModel()?.getLineCount() ?? 1);
   monacoEditor.setScrollTop(monacoEditor.getScrollHeight());
 }
-
 
 /** 打开页内查找框；日志窗口的「搜索」按钮用它（浏览器快捷键被壳层关掉了，只能按钮触发） */
 function openFind() {
@@ -270,7 +269,6 @@ onMounted(() => {
     lastScrollTop = top;
   });
   rebuild();
-
 });
 
 // Monaco 的主题是全局的：单窗口模式下配置窗口可能也还挂着，切回日志时把自己的那套刷回来
@@ -373,7 +371,6 @@ watch(wordWrap, (on) => {
   position: absolute;
   inset: 0;
 }
-
 
 .log-empty {
   position: absolute;

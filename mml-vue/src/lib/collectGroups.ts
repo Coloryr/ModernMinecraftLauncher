@@ -35,7 +35,7 @@ const DEFAULT_GROUP_TYPES = [...FIXED_GROUP_TYPES, "save", "dataPacks"];
  *
  * # 返回值
  *
- * 是四个默认分组之一时为 true
+ * 是默认分组时为 true
  */
 export function isDefaultGroupName(name: string): boolean {
   return DEFAULT_GROUP_TYPES.some((fileType) => typeGroupName(fileType) === name);

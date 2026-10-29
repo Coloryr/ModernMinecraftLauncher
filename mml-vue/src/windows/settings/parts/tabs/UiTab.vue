@@ -27,7 +27,6 @@ const props = defineProps<{
   flashGroup?: string;
 }>();
 
-
 const {
   inTauri,
   locale,
@@ -349,7 +348,7 @@ function toggleCustomPage(on: boolean) {
 </template>
 
 <style scoped>
-/* 已安装的样式：一行一条，开关 / 文件名 / 删除；顺序即注入顺序 */
+/* 已安装的样式：一行一条，开关 / 文件名 / 上移下移 / 删除；列表顺序即注入顺序 */
 .custom-css-list {
   margin: 8px 0 0;
   padding: 0;

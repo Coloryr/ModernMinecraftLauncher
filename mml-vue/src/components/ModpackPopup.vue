@@ -1,8 +1,7 @@
 <script setup lang="ts">
 // 整合包安装进度弹窗：右下角 chip 点开后浮在当前页面之上
 //
-// 内容直接复用 ModpackInstallBar，与"下载整合包"窗口里那条、以及多窗口模式下主窗口那条
-// 完全是同一份渲染，这里只负责套一层弹窗壳。
+// 内容直接复用 ModpackInstallBar，这里只负责套一层弹窗壳。
 import BaseModal from "./ui/BaseModal.vue";
 import ModpackInstallBar from "./ModpackInstallBar.vue";
 import { t } from "../lib/i18n";

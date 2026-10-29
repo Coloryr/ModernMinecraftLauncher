@@ -33,6 +33,7 @@ const STATS_ROW_H = 48;
 /** 整页滚动交给行虚拟化：几百个实例时只渲染视口附近那几行 */
 const listScroll = createListScroll();
 
+/** 全局汇总快照；null 表示还没读到 */
 const data = ref<StatsDataDto | null>(null);
 
 const { start: rowStart, end: rowEnd, padTop, padBottom } = useVirtualRows({
@@ -106,7 +107,7 @@ const dayRows = computed(() => (isSingleDay.value ? (playtime.value?.byInstance 
 /** 横轴网格列，天数变化时重算 */
 const chartColumns = computed(() => "repeat(" + Math.max(1, dayCount.value) + ", minmax(0, 1fr))");
 
-/** 柱间距，单位像素；天数一多，固定 2px 的间隙会把柱宽挤成 0 */
+/** 柱间距；天数一多，固定的间隙会把柱宽挤成 0，按天数收窄 */
 const chartGap = computed(() => {
   const n = dayCount.value;
   if (n > 240) return "0";
@@ -114,7 +115,7 @@ const chartGap = computed(() => {
   return "2px";
 });
 
-/** 当前范围的累计：选中实例时是该实例的，全部实例时是全局合计 */
+/** 累计口径：选中实例时是该实例的总时长与启动次数，全部实例时是全局合计（不随日期范围变） */
 const playSub = computed(() => {
   const inst = selectedInstance.value;
   const seconds = inst ? inst.seconds : (data.value?.totalSeconds ?? 0);
@@ -189,6 +190,7 @@ async function refreshAll() {
   listScroll.bump();
 }
 
+/** 打开 5 秒轮询：汇总表与图表一起刷新 */
 function startTimer() {
   if (timer === null) {
     timer = window.setInterval(() => {
@@ -197,6 +199,7 @@ function startTimer() {
   }
 }
 
+/** 停掉轮询；窗口隐藏或切走时调用，别在后台空转 IPC */
 function stopTimer() {
   if (timer !== null) {
     window.clearInterval(timer);
@@ -444,7 +447,7 @@ function instanceLabel(inst: StatsInstanceDto): string {
             <span class="play-num">{{ hoursShort((playtime?.totalSeconds ?? 0) / Math.max(1, dayCount)) }}</span>
             <span class="play-cap">{{ t("winStats.dailyAverage") }}</span>
           </div>
-          <!-- 当前范围的累计口径，贴在统计行右端：全部实例时是全局累计 -->
+          <!-- 累计口径贴在统计行右端：选中实例时是该实例的累计，全部实例时是全局合计 -->
           <p v-if="data" class="play-total" :title="playSub">{{ playSub }}</p>
         </div>
       </div>
@@ -580,8 +583,7 @@ function instanceLabel(inst: StatsInstanceDto): string {
 }
 
 /* 有失败时把这一个数字标红，扫一眼就知道统计里有失败 */
-.summary-num.danger,
-.stats-table td.danger {
+.summary-num.danger {
   color: var(--red);
 }
 
@@ -593,6 +595,8 @@ function instanceLabel(inst: StatsInstanceDto): string {
 /* ---------- 游玩时间图 ---------- */
 
 .play-panel {
+  /* 图表区高度：纵轴、柱状区与空状态三处共用，改一处三处一起变 */
+  --chart-h: 150px;
   position: relative;
   margin-bottom: 16px;
   padding: 16px;
@@ -601,8 +605,6 @@ function instanceLabel(inst: StatsInstanceDto): string {
   border-radius: 12px;
 }
 
-/* 工具条：左边一列（标题 / 区间 / 三个统计），右边实例下拉单独一列。
-   两列按自己的内容定宽，互不挤压 —— 实例名再长也只在自己那一列里省略 */
 /* 工具条固定两行：第一行标题 / 实例 / 时间区间，第二行三个区间统计 */
 .play-bar {
   display: flex;
@@ -710,7 +712,7 @@ function instanceLabel(inst: StatsInstanceDto): string {
 .inst-option {
   display: block;
   width: 100%;
-  padding: 7px 10px;
+  padding: 6px 10px;
   border: none;
   border-radius: var(--ctl-radius);
   background: transparent;
@@ -776,7 +778,7 @@ function instanceLabel(inst: StatsInstanceDto): string {
 /* 纵轴：与柱状区同高，三档刻度分别贴着上 / 中 / 下 */
 .chart-y {
   width: 40px;
-  height: 150px;
+  height: var(--chart-h);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -795,7 +797,7 @@ function instanceLabel(inst: StatsInstanceDto): string {
 
 .chart-body {
   position: relative;
-  height: 150px;
+  height: var(--chart-h);
 }
 
 /* 背景网格：只在柱状区画，不挡鼠标（提示挂在柱子上） */
@@ -974,7 +976,7 @@ function instanceLabel(inst: StatsInstanceDto): string {
 }
 
 .chart-empty {
-  height: 150px;
+  height: var(--chart-h);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1012,7 +1014,7 @@ function instanceLabel(inst: StatsInstanceDto): string {
   border-bottom: 1px solid var(--border);
 }
 
-/* 行高必须固定：隐藏的行按它估着撑高，见 composables/virtualWindow.ts。
+/* 行高必须固定：隐藏的行按它估着撑高，见 composables/useVirtualRows.ts。
    分隔线用 box-shadow 画，不占高度；用 border 会随虚拟化窗口边界忽有忽无 */
 .stats-row {
   height: 48px;

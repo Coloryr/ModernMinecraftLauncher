@@ -109,6 +109,11 @@ const updateStage = ref<"check" | "download" | null>(null);
 /** 更新进度；检查阶段的总数要等后端扫完 mods 目录才知道，在那之前一直是 0 */
 const updateProgress = ref({ stage: "", done: 0, total: 0 });
 
+/** 把进度清回"没在跑"的形态，开始与收尾都走它 */
+function resetUpdateProgress() {
+  updateProgress.value = { stage: "", done: 0, total: 0 };
+}
+
 /**
  * 当前进度的阶段文案
  *
@@ -260,7 +265,7 @@ async function runUpdateCheck() {
   if (!uuid || updateBusy.value) return;
   updateBusy.value = true;
   updateStage.value = "check";
-  updateProgress.value = { stage: "", done: 0, total: 0 };
+  resetUpdateProgress();
   // 先订阅再调命令，否则可能漏掉最开始那几条进度
   const unlisten = await onModsUpdateProgress((e) => {
     updateProgress.value = e;
@@ -287,7 +292,7 @@ async function runUpdateCheck() {
     unlisten();
     updateBusy.value = false;
     updateStage.value = null;
-    updateProgress.value = { stage: "", done: 0, total: 0 };
+    resetUpdateProgress();
   }
 }
 
@@ -355,7 +360,7 @@ async function applyUpdates(picked: ModUpdateDto[]) {
     unlistenDone();
     updateBusy.value = false;
     updateStage.value = null;
-    updateProgress.value = { stage: "", done: 0, total: 0 };
+    resetUpdateProgress();
   }
 }
 
@@ -500,6 +505,8 @@ async function runAutoMark() {
 
 /** 本实例整合包升级任务的退订函数 */
 let unlistenPack: (() => void) | null = null;
+/** 窗口是否已经销毁：订阅是异步挂上的，挂好之前窗口可能已经关了 */
+let gone = false;
 /** 已经收过尾的升级任务 id，避免同一条任务重复刷新 */
 const packSeen = new Set<string>();
 
@@ -662,7 +669,6 @@ watch(
   { immediate: true },
 );
 
-
 const groups = useModGroups(props.data);
 
 /** 依赖关系：依赖图与"要和哪几个一起改"都在后端算，见 useModDeps */
@@ -797,8 +803,10 @@ const {
       ),
 });
 
-/** 选中的那些条目；批量操作要 uuid 去调命令，选中键只是身份 */
+/** 导出模组列表的弹窗是否打开 */
 const exportOpen = ref(false);
+
+/** 选中的那些条目；批量操作要 uuid 去调命令，选中键只是身份 */
 const selectedItems = computed<ModItemDto[]>(() => mods.value.filter(isSelected));
 
 /** 批量改启用状态：`wantDisable = true` 禁用、`false` 启用 */
@@ -975,7 +983,8 @@ function openGroupMenu(payload: {
 
 /** 右键菜单：整组启用 / 禁用；只挑状态不同的，和顶栏批量一个口径 */
 async function groupSetState(id: string, wantDisable: boolean) {
-  const picked = groupItems(id).filter((item) => item.disable !== wantDisable);
+  // 识别失败的模组改不了启用状态：与顶栏批量、菜单那两处同一口径
+  const picked = groupItems(id).filter((item) => !item.fail && item.disable !== wantDisable);
   if (picked.length) await setState(picked, wantDisable);
 }
 
@@ -1604,6 +1613,7 @@ function toggleCollapse(id: string) {
  */
 const sectionEls = new Map<string, HTMLElement>();
 
+/** 记下某个分组块的元素，量位置算插入点用 */
 function bindSection(id: string, el: Element | null) {
   if (el) sectionEls.set(id, el as HTMLElement);
   else sectionEls.delete(id);
@@ -1662,8 +1672,8 @@ async function moveSection(from: string, insertAt: number) {
 
   // 只把"看得见的块"排了序，隐藏的块（空的识别失败等）不在里面 ——
   // 它们在顺序表里的位置由后端保留原样，这里按原顺序补回去
-  const visible = new Set(ids);
-  const hidden = groups.order.value.filter((id) => !visible.has(id));
+  const shown = new Set(ids);
+  const hidden = groups.order.value.filter((id) => !shown.has(id));
   await groups.setOrder([...next.filter((id) => id !== UPDATE_GROUP_ID), ...hidden]);
 }
 
@@ -1809,16 +1819,33 @@ function toggle(item: ModItemDto) {
   void setState([item], !item.disable);
 }
 
+/**
+ * 删除单个模组，进回收站；确认文案用模组名
+ *
+ * - `item`: 要删除的模组
+ */
 function remove(item: ModItemDto) {
   askDelete(item.name || item.file, () => deleteMod(instanceUuid.value, item.uuid));
 }
 
-onMounted(() => void groups.load());
-onMounted(async () => {
-  unlistenPack = await watchModpackTask();
+/** 挂上整合包任务订阅；挂好之前窗口就关了时当场退订，别留一个悬空监听 */
+async function mountPackWatch() {
+  const unlisten = await watchModpackTask();
+  if (gone) {
+    unlisten();
+    return;
+  }
+  unlistenPack = unlisten;
+}
+
+onMounted(() => {
+  void groups.load();
+  void mountPackWatch();
 });
 onBeforeUnmount(() => {
+  gone = true;
   unlistenPack?.();
+  unlistenPack = null;
 });
 </script>
 
@@ -1943,9 +1970,9 @@ onBeforeUnmount(() => {
       <div ref="tableScrollEl" class="mod-table-scroll">
         <template v-for="(sec, idx) in sections" :key="sec.id">
           <div v-if="showSectionLine(idx)" class="mod-group-insert">
-          <span class="mod-group-name">{{ sectionGhostLabel }}</span>
-          <span class="mod-group-count">{{ sectionGhostCount }}</span>
-        </div>
+            <span class="mod-group-name">{{ sectionGhostLabel }}</span>
+            <span class="mod-group-count">{{ sectionGhostCount }}</span>
+          </div>
 
           <section :ref="(el) => bindSection(sec.id, el as Element | null)" class="mod-group mod-group-table"
             :class="{ 'mod-group-dragging': draggingSection === sec.id }">
@@ -1977,9 +2004,9 @@ onBeforeUnmount(() => {
     <template v-for="(sec, idx) in sections" :key="sec.id">
       <!-- 拖分组头时的插入线：松手后这一块会落到这里 -->
       <div v-if="showSectionLine(idx)" class="mod-group-insert">
-          <span class="mod-group-name">{{ sectionGhostLabel }}</span>
-          <span class="mod-group-count">{{ sectionGhostCount }}</span>
-        </div>
+        <span class="mod-group-name">{{ sectionGhostLabel }}</span>
+        <span class="mod-group-count">{{ sectionGhostCount }}</span>
+      </div>
 
       <section :ref="(el) => bindSection(sec.id, el as Element | null)" class="mod-group" :class="{
         'mod-group-dragging': draggingSection === sec.id,
@@ -2028,9 +2055,9 @@ onBeforeUnmount(() => {
 
       <!-- 尾部插入线：拖到最末一块之后 -->
       <div v-if="idx === sections.length - 1 && showSectionLine(sections.length)" class="mod-group-insert">
-          <span class="mod-group-name">{{ sectionGhostLabel }}</span>
-          <span class="mod-group-count">{{ sectionGhostCount }}</span>
-        </div>
+        <span class="mod-group-name">{{ sectionGhostLabel }}</span>
+        <span class="mod-group-count">{{ sectionGhostCount }}</span>
+      </div>
     </template>
 
     <!-- 新建分组：放在分组最下面，不占工具条 -->

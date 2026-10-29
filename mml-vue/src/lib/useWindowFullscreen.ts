@@ -17,18 +17,28 @@ import { isWindowFullscreen } from "./titlebar";
 export function useWindowFullscreen() {
   const fullscreen = ref(false);
   let unlisten: (() => void) | null = null;
+  let disposed = false;
 
   const refresh = async () => {
-    fullscreen.value = await isWindowFullscreen();
+    const now = await isWindowFullscreen();
+    if (!disposed) fullscreen.value = now;
   };
 
   onMounted(async () => {
     if (!isTauri()) return;
     await refresh();
-    unlisten = await getCurrentWindow().onResized(() => void refresh());
+    if (disposed) return;
+    const stop = await getCurrentWindow().onResized(() => void refresh());
+    // 等订阅期间组件可能已经卸载，这时监听要立刻退掉，否则会留到窗口销毁
+    if (disposed) {
+      stop();
+      return;
+    }
+    unlisten = stop;
   });
 
   onUnmounted(() => {
+    disposed = true;
     unlisten?.();
     unlisten = null;
   });

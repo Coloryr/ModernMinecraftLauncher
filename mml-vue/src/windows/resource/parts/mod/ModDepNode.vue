@@ -93,7 +93,7 @@ const tip = computed(() => {
   padding: 6px 9px;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 10px;
   background: var(--bg-card);
 }
 
@@ -134,7 +134,7 @@ const tip = computed(() => {
 .dep-node-icon {
   width: 24px;
   height: 24px;
-  border-radius: 6px;
+  border-radius: 8px;
   flex-shrink: 0;
   object-fit: contain;
 }
@@ -176,12 +176,12 @@ const tip = computed(() => {
 }
 
 .dep-node-mark.ok {
-  background: rgba(22, 163, 74, 0.18);
+  background: color-mix(in srgb, var(--green) 18%, transparent);
   color: var(--green);
 }
 
 .dep-node-mark.warn {
-  background: rgba(220, 38, 38, 0.16);
+  background: color-mix(in srgb, var(--red) 16%, transparent);
   color: var(--red);
 }
 

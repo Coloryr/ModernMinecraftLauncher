@@ -1,4 +1,8 @@
 <script setup lang="ts">
+// 导出模组列表：选格式与字段，落成 txt / csv / json 文件
+//
+// 内容由后端按当前实例的扫描结果生成，这里只收集选项；没有选中项时不出现
+// 「只导选中项」那一行。
 import { ref } from "vue";
 import BaseModal from "../../../../components/ui/BaseModal.vue";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
@@ -6,14 +10,29 @@ import { commands, type ModExportDto } from "../../../../lib/bindings";
 import { t, tErr } from "../../../../lib/i18n";
 import { showToast } from "../../../../lib/toast";
 
-const props = defineProps<{ uuid: string; selectedIds: string[] }>();
-const emit = defineEmits<{ close: [] }>();
+const props = defineProps<{
+  /** 本窗口锁定的实例 uuid */
+  uuid: string;
+  /** 当前选中的模组 uuid；空数组表示没有选中项 */
+  selectedIds: string[];
+}>();
+
+const emit = defineEmits<{
+  /** 关掉弹窗；导出成功后也走它 */
+  (e: "close"): void;
+}>();
+
+/** 导出格式 */
 const format = ref<ModExportDto["format"]>("txt");
+/** 勾中的字段，取值见下面的 options */
 const fields = ref(["name", "modId", "version", "file"]);
+/** 只导出选中的那些；没有选中项时恒为 false */
 const onlySelected = ref(props.selectedIds.length > 0);
 const busy = ref(false);
+/** 可导出字段，顺序即弹窗里的排列，取值与后端 DTO 的字段名一致 */
 const options = ["name", "modId", "version", "file", "author", "description", "url", "source", "projectId", "fileId", "sha1", "disable", "side", "loaders", "note"];
 
+/** 选落点并导出：选完对话框就直接写文件，成功后关窗 */
 async function saveList() {
   if (busy.value || !fields.value.length || (onlySelected.value && !props.selectedIds.length)) return;
   const uuid = props.uuid;

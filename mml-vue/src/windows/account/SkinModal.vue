@@ -82,6 +82,7 @@ const ANIM_FACTORY: Record<Exclude<AnimType, "none">, () => skinview3d.PlayerAni
 /** 请求关闭弹窗 */
 const emit = defineEmits<{ close: [] }>();
 
+/** mml-image 协议前缀，空表示还没取到 */
 const base = ref("");
 /** 皮肤获取失败（离线账户 / 下载失败） */
 const noSkin = ref(false);
@@ -407,9 +408,11 @@ watch(skin2dUrl, () => {
 });
 
 // ---- 2D 平移 / 缩放 ----
+/** 2D 视图的缩放倍数与平移量，单位逻辑像素 */
 const viewScale = ref(1);
 const viewX = ref(0);
 const viewY = ref(0);
+/** 缩放范围 */
 const MIN_SCALE = 0.2;
 const MAX_SCALE = 8;
 /** 平移拖拽中（光标形态切换用） */
@@ -424,7 +427,6 @@ function resetView() {
 
 /** 滚轮缩放：以光标为缩放中心 */
 function onWheel(e: WheelEvent) {
-  e.preventDefault();
   const stageEl = stage.value;
   if (!stageEl) return;
   const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
@@ -438,8 +440,10 @@ function onWheel(e: WheelEvent) {
   viewScale.value = next;
 }
 
+/** 上一次指针位置，单位 px；null 表示没在拖 */
 let lastPointer: { x: number; y: number } | null = null;
 
+/** 2D 下按下开始平移 */
 function onPointerDown(e: PointerEvent) {
   if (mode.value !== "2d") return;
   panning.value = true;
@@ -447,6 +451,7 @@ function onPointerDown(e: PointerEvent) {
   (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 }
 
+/** 拖动平移 2D 视图 */
 function onPointerMove(e: PointerEvent) {
   if (!panning.value || !lastPointer) return;
   viewX.value += e.clientX - lastPointer.x;
@@ -454,6 +459,7 @@ function onPointerMove(e: PointerEvent) {
   lastPointer = { x: e.clientX, y: e.clientY };
 }
 
+/** 结束平移 */
 function onPointerUp() {
   panning.value = false;
   lastPointer = null;
@@ -463,7 +469,8 @@ function onPointerUp() {
 watch([mode, skin2dUrl], resetView);
 
 onMounted(async () => {
-  base.value = await getImageBaseUrl();
+  // 浏览器预览取不到协议前缀，按空串处理并继续走占位图
+  base.value = await getImageBaseUrl().catch(() => "");
   setupViewer();
 });
 

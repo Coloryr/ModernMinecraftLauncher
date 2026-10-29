@@ -21,7 +21,7 @@ const label = computed(() => t(typeLabelKey(props.authType)));
   display: inline-block;
   font-size: 10.5px;
   padding: 2px 8px;
-  border-radius: 20px;
+  border-radius: 999px;
   white-space: nowrap;
   background: var(--bg-hover);
   color: var(--text-dim);

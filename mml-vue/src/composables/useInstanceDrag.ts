@@ -8,29 +8,37 @@ import type { InstanceInfoDto } from "../lib/bindings";
 import { elementBeneathShield, useDragGhost } from "./useDragGhost";
 
 export interface GroupView {
-  /** 分组 uuid（身份） */
+  /** 分组 uuid，作为身份 */
   id: string;
   /** 分组显示名 */
   name: string;
   /** 是否默认分组 */
   isDefault: boolean;
+  /** 组内实例，按显示顺序 */
   items: InstanceInfoDto[];
 }
 
 interface DragDeps {
+  /** 多选模式是否开着；开着时不拖 */
   multiSelect: Ref<boolean>;
+  /** 分组视图，落点与插入占位都按它算 */
   groups: Ref<GroupView[]>;
+  /** 分组折叠表；跨组投放后展开目标分组 */
   collapsedGroups: Ref<Record<string, boolean>>;
+  /** 重拉实例列表 */
   loadInstances: () => Promise<void> | void;
+  /** 重拉分组列表 */
   loadGroups: () => Promise<void> | void;
 }
 
 interface DragCandidate {
+  /** 拖的是实例还是分组 */
   kind: "instance" | "group";
+  /** 被拖的实例；kind 为 instance 时有值 */
   instance?: InstanceInfoDto;
-  /** 分组 uuid（拖动与落点判断都用它） */
+  /** 分组 uuid，拖动与落点判断都用它 */
   groupId?: string;
-  /** 分组显示名（只用于拖拽占位上的文案） */
+  /** 分组显示名，只用于拖拽占位上的文案 */
   groupName?: string;
 }
 
@@ -74,6 +82,12 @@ export function useInstanceDrag(deps: DragDeps) {
   /** 拖拽结束后抑制紧随的 click（避免误触选择 / 折叠） */
   let suppressClick = false;
 
+  /**
+   * 记下拖拽候选；多选模式下与非左键都不拖
+   *
+   * - `e`: 指针按下事件
+   * - `cand`: 被按住的实例或分组
+   */
   function onDragPointerDown(e: PointerEvent, cand: DragCandidate) {
     if (e.button !== 0 || deps.multiSelect.value) return;
     suppressClick = false;
@@ -100,11 +114,13 @@ export function useInstanceDrag(deps: DragDeps) {
   }
 
   function onDragPointerUp(e: PointerEvent) {
-    if (dragPointerId === null || e.pointerId !== dragPointerId) return;
+    // 只认左键松开：拖到一半按右键再松开，不该把这次拖拽提交掉
+    if (dragPointerId === null || e.pointerId !== dragPointerId || e.button !== 0) return;
     if (dragActive.value) commitDrag(dragActive.value);
     resetDrag();
   }
 
+  /** 清掉本次拖拽的全部状态与 body 上的拖拽标记 */
   function resetDrag() {
     dragPointerId = null;
     dragCandidate.value = null;
@@ -115,6 +131,7 @@ export function useInstanceDrag(deps: DragDeps) {
     document.body.classList.remove("drag-active");
   }
 
+  /** 按指针位置算插入占位 */
   function updateDragInsert(e: PointerEvent) {
     const active = dragActive.value;
     if (!active) return;
@@ -123,6 +140,7 @@ export function useInstanceDrag(deps: DragDeps) {
     const listEl = el?.closest?.(".group-list") as HTMLElement | null;
     if (listEl) {
       const rect = listEl.getBoundingClientRect();
+      // 边缘热区，单位 px
       const threshold = 40;
       if (e.clientY < rect.top + threshold) listEl.scrollTop -= 10;
       else if (e.clientY > rect.bottom - threshold) listEl.scrollTop += 10;
@@ -163,6 +181,7 @@ export function useInstanceDrag(deps: DragDeps) {
     }
   }
 
+  /** 松手提交：实例走 moveInstance，分组走 moveGroup，成功后重拉对应列表 */
   async function commitDrag(active: DragCandidate) {
     if (active.kind === "instance" && active.instance) {
       const ins = dragInsert.value;
@@ -233,10 +252,15 @@ export function useInstanceDrag(deps: DragDeps) {
   onMounted(() => {
     window.addEventListener("pointermove", onDragPointerMove);
     window.addEventListener("pointerup", onDragPointerUp);
+    // 指针被系统收走（触摸被打断等）时当作取消，别把占位留成"一直在拖"
+    window.addEventListener("pointercancel", resetDrag);
   });
   onUnmounted(() => {
     window.removeEventListener("pointermove", onDragPointerMove);
     window.removeEventListener("pointerup", onDragPointerUp);
+    window.removeEventListener("pointercancel", resetDrag);
+    // 拖到一半窗口被关掉：body 上的 .drag-active 只有这里能摘
+    resetDrag();
   });
 
   return {

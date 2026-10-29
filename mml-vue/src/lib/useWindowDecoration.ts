@@ -1,19 +1,12 @@
-// 窗口装饰生命周期：激活插件装饰 + 注册贴靠热区
+// 窗口装饰生命周期：先注册贴靠热区，再激活插件装饰
 //
-// 每个窗口（主窗口与全部功能窗口）都要做这两件事：
-//   1. 把贴靠热区（自己的最大化按钮矩形）交给插件 —— 插件用它摆原生命中区；
-//   2. 调 window_activate_decoration 激活自绘装饰并显示窗口。
-//
-// 为什么必须"先注册再激活"：插件在激活流程里就要量那个矩形，量不到会以
-// kind="disabled" 完成这次激活，原生 frame 不摘、系统标题栏与自绘按钮并存，
-// 之后再补报也改不回已完成的那次。而窗口是按 `visible(false)` 建出来的，
-// 激活同时负责显示 —— 所以顺序错了窗口表现会很怪。
-//
-// 窗口建出来时是隐藏的，前端挂载后才显示。主窗口多一层启动画面：它的标题栏要等
-// 核心 load 完成才渲染 —— 这一点由 waitForSnapTarget 兜住，它会一直等到按钮出现。
+// 顺序不能反：插件在激活流程里就要量热区矩形，量不到会以 `disabled` 完成这次激活，
+// 之后再补报也改不回，表现为原生 frame 没摘、系统标题栏与自绘按钮并存。
+// 窗口按 `visible(false)` 建出来，激活同时负责显示，所以前端挂载后才显示。
+// 主窗口多一层启动画面：标题栏要等核心 load 完成才渲染，由 `waitForSnapTarget` 兜住。
 import { nextTick, onMounted, onUnmounted, ref, type Ref } from "vue";
 import { commands } from "./bindings";
-import { isTauri } from "../windows/windowManager";
+import { isTauri } from "./util";
 import { detectOs } from "./titlebar";
 import { pluginDecorated, registerSnapTarget, waitForSnapTarget } from "./decoration";
 
@@ -24,12 +17,12 @@ import { pluginDecorated, registerSnapTarget, waitForSnapTarget } from "./decora
  *
  * # 返回值
  *
- * - `decorated`: 装饰是否已由插件接管；macOS 下为 true 时前端不该再画圆点
+ * - `decorated`: 装饰是否已由插件接管
  */
 export function useWindowDecoration(rootEl: Ref<HTMLElement | null>) {
-  /** 装饰是否已由插件接管：macOS 下插件用原生红黄绿，前端不该再画圆点 */
   const decorated = ref(false);
   let unregister: (() => void) | null = null;
+  let disposed = false;
 
   onMounted(async () => {
     if (!isTauri()) return;
@@ -39,19 +32,22 @@ export function useWindowDecoration(rootEl: Ref<HTMLElement | null>) {
 
     // 等一帧让标题栏（含窗口按钮）渲染出来，否则量不到矩形
     await nextTick();
-    // 只有 Windows 需要等最大化按钮：贴靠热区按它量。macOS / Linux 的红黄绿由插件摆的是
-    // **原生**按钮，这里量不到，白等 15 秒超时会让窗口迟迟不显示
+    // 窗口关得快时不必再等按钮：激活已经没意义，白等 15 秒
+    if (disposed) return;
+    // 只有 Windows 需要等最大化按钮：贴靠热区按它量。macOS / Linux 上插件摆的是
+    // 原生按钮，这里量不到，白等 15 秒还会让窗口迟迟不显示
     if (detectOs() === "windows") {
       await waitForSnapTarget(root);
     }
+    if (disposed) return;
 
     try {
       const mode = await commands.windows.activateDecoration();
-      // 只有插件真正接管了才不画圆点；其余平台这里返回 native，圆点仍由前端画
-      pluginDecorated.value = mode === "custom";
-      if (mode === "custom") {
-        decorated.value = true;
-      } else {
+      // 只有插件真正接管了才置 true；返回 native 说明激活没成，标题栏的类也不会挂上
+      const custom = mode === "custom";
+      pluginDecorated.value = custom;
+      decorated.value = custom;
+      if (!custom) {
         console.warn("[decoration] 退回原生 frame:", mode);
       }
     } catch (e) {
@@ -61,6 +57,7 @@ export function useWindowDecoration(rootEl: Ref<HTMLElement | null>) {
   });
 
   onUnmounted(() => {
+    disposed = true;
     unregister?.();
     unregister = null;
   });

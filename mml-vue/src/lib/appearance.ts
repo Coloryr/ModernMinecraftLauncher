@@ -5,7 +5,7 @@
 //   浏览器环境回退本地存储，仅 dataURL 直显，无缩放处理
 import { computed, ref, watch } from "vue";
 import { listen } from "@tauri-apps/api/event";
-import { isTauri } from "../windows/windowManager";
+import { isTauri } from "./util";
 import { commands } from "./bindings";
 import type { ClientConfigDto } from "./bindings";
 import { saveGuiConfig } from "./guiConfig";
@@ -54,14 +54,22 @@ export const bgNativeSize = ref(100);
 /** 后端正在加载 / 处理背景图（加载提示与按钮禁用用） */
 export const bgLoading = ref(false);
 
-/** 用后端返回的信息更新本地状态，restoreBg 与 bg-change 共用 */
-function applyBgInfo(info: {
+/** 后端返回的背景图状态 */
+interface BgInfo {
+  /** 来源：文件路径或网址，空串表示无 */
   source: string;
+  /** 处理后的 dataURL，空串表示无 */
   dataUrl: string;
+  /** 图层不透明度，单位 % */
   opacity: number;
+  /** 模糊半径，单位 px */
   blur: number;
+  /** 原始分辨率，单位 % */
   nativeSize: number;
-}) {
+}
+
+/** 用后端返回的信息更新本地状态，restoreBg 与 bg-change 共用 */
+function applyBgInfo(info: BgInfo) {
   bgSource.value = info.source;
   bgImage.value = info.dataUrl;
   bgOpacity.value = info.opacity;
@@ -132,6 +140,8 @@ export async function setBgImageFromOriginal(source: string) {
     const dataUrl = await commands.settings.setBg(source, bgNativeSize.value);
     bgSource.value = source;
     bgImage.value = dataUrl;
+    // 与 applyBgInfo 一样缓存一份：下次启动首帧就有背景，不用等后端
+    writeString(KEYS.bgImage, dataUrl);
   } catch (err) {
     // 带上后端的具体错误，方便定位加载失败的原因
     showToast(`${t("winSettings.bgLoadFailed")}${t("common.detailSep")}${String(err)}`);
@@ -153,7 +163,9 @@ export async function resizeBg(percent: number) {
   if (!isTauri() || !bgSource.value) return;
   bgLoading.value = true;
   try {
-    bgImage.value = await commands.settings.resizeBg(bgNativeSize.value);
+    const dataUrl = await commands.settings.resizeBg(bgNativeSize.value);
+    bgImage.value = dataUrl;
+    writeString(KEYS.bgImage, dataUrl);
   } catch (err) {
     showToast(`${t("winSettings.bgResizeFailed")}${t("common.detailSep")}${String(err)}`);
   } finally {
@@ -183,8 +195,11 @@ export function setBgBlur(v: number) {
   void saveGuiConfig({ bgBlur: v });
 }
 
-/** 背景图层的内联样式，App.vue 的 .app-bg 绑定用：始终铺满窗口并居中，
- *  标题栏与各表面一样半透明透出此层，见 themes.css 的 has-bg */
+/**
+ * 背景图层的内联样式，App.vue 的 .app-bg 绑定用
+ *
+ * 始终铺满窗口并居中；标题栏与各表面一样半透明透出这层，见 themes.css 的 has-bg。
+ */
 export const bgLayerStyle = computed(() => {
   if (!bgImage.value) return undefined;
   return {
@@ -240,7 +255,7 @@ const MATERIAL_PLATFORM = /Windows|Macintosh/.test(navigator.userAgent);
  * 材质躲在窗口背后，表面不透明就只在卡片之间的缝里透出来，看着像没生效，
  * 所以材质开着时各表面转半透明，见 themes.css。
  *
- * - `effect`: 窗口材质，`none` / `mica` / `acrylic`
+ * - `effect`: 窗口材质，`none` / `auto` / `mica` / `acrylic` / `blur`
  */
 export function applyWindowMaterial(effect: string) {
   document.documentElement.classList.toggle("has-material", MATERIAL_PLATFORM && effect !== "none");

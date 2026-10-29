@@ -30,7 +30,7 @@ interface TaskSnapshot {
 /**
  * 挂上角标判定，须在 setup 里调用
  *
- * - `status`: 本窗口的任务快照；传 null 表示还没有快地过
+ * - `status`: 本窗口的任务快照；传 null 表示还没有拉到任务快照
  *
  * # 返回值
  *

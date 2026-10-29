@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// 启动器主页：上次启动实例 / 联机大厅 / 方块列表 入口 + Minecraft 新闻
-// empty=true 时顶部展示空实例引导块，含添加账户 / 添加游戏实例两个按钮；此时一个实例都没有
+// 启动器主页：上次启动实例 / 联机大厅 / 方块列表入口 + Minecraft 新闻
+// empty 为 true 时在内容区顶部展示空实例引导块，含添加账户 / 添加游戏实例两个按钮
 import { t } from "../lib/i18n";
 import { buildChannel, buildNoticeKey, isTestBuild } from "../lib/buildInfo";
 import { showToast } from "../lib/toast";
@@ -27,12 +27,8 @@ withDefaults(
     /**
      * 页头返回按钮的文案键
      *
-     * 返回的**去处随视图模式而变**，由调用方决定，见 MainWindow：
-     * - 列表模式：返回的是"实例列表"那一屏，主页与它同为整屏，属于同级切换；
-     * - 分组 / 平铺模式：实例列表是**常驻的侧栏**，主页只是右侧内容区的一屏，
-     *   返回的是被它盖住的"实例设置"详情。
-     *
-     * 所以文案不能写死 —— 写死会出现"点了'返回实例列表'却回到实例设置"。
+     * 返回的去处随视图模式而变，文案由调用方决定，见 MainWindow：列表模式回到实例列表，
+     * 分组 / 平铺模式回到被盖住的实例设置详情。写死文案会出现"点了返回实例列表却回到实例设置"。
      */
     backLabelKey?: string;
   }>(),
@@ -44,7 +40,7 @@ const emit = defineEmits<{
   (e: "select", inst: InstanceInfoDto): void;
   /** 快捷启动上次启动的实例 */
   (e: "quick-launch"): void;
-  /** 点击页头返回按钮：返回实例列表（关闭启动器主页） */
+  /** 点击页头返回按钮：返回目标由调用方决定，见 backLabelKey */
   (e: "back"): void;
   /** 空实例引导块里的"添加实例" */
   (e: "add-instance"): void;
@@ -78,8 +74,7 @@ function onLobby() {
       </svg>
       <span>{{ t(buildNoticeKey) }}</span>
     </div>
-    <!-- 页头：主页标题 + 返回，主页自己的页面级控件，不占卡片槽位。
-         按钮文案随视图模式变，返回的去处见 backLabelKey 的说明 -->
+    <!-- 页头：主页标题 + 返回，主页自己的页面级控件，不占卡片槽位 -->
     <div v-if="!empty" class="page-head">
       <h2 class="page-title">{{ t("home.entry") }}</h2>
       <button class="page-back" @click="emit('back')">
@@ -88,7 +83,7 @@ function onLobby() {
       </button>
     </div>
 
-    <!-- 无实例：空实例引导块（融合空状态设计） -->
+    <!-- 无实例：空实例引导块 -->
     <div v-if="empty" class="empty-block">
       <div class="empty-block-icon">
         <!-- 图标跟随所在色块的文字色，.empty-block-icon 已把 color 定为 #fff -->
@@ -127,7 +122,7 @@ function onLobby() {
     </div>
 
     <div class="entry-cards">
-      <!-- 联机大厅：功能暂未开放，点了只提示「制作中」 -->
+      <!-- 联机大厅：入口保留，点了只提示「制作中」 -->
       <button class="entry-card lobby" @click="onLobby">
         <span class="entry-icon">
           <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8"
@@ -210,7 +205,7 @@ function onLobby() {
 }
 
 .page-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text);
 }
@@ -222,7 +217,7 @@ function onLobby() {
   height: var(--ctl-h);
   padding: 0 13px 0 10px;
   border: 1px solid var(--accent-border);
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--bg-card);
   color: var(--accent);
   font-size: 12.5px;
@@ -251,7 +246,7 @@ function onLobby() {
   gap: 6px;
   padding: 26px 20px 22px;
   border: 1px dashed var(--accent-border);
-  border-radius: 16px;
+  border-radius: 12px;
   background: var(--bg-card);
 }
 
@@ -287,7 +282,7 @@ function onLobby() {
 }
 
 .empty-block-title {
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 700;
 }
 
@@ -316,7 +311,7 @@ function onLobby() {
   border-radius: 10px;
   background: var(--bg-card);
   color: var(--accent);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
@@ -344,7 +339,7 @@ function onLobby() {
   align-items: center;
   gap: 14px;
   padding: 14px 16px;
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid var(--accent-border);
   background: var(--accent-soft);
 }
@@ -363,7 +358,7 @@ function onLobby() {
 .last-play {
   height: var(--ctl-h);
   padding: 0 18px;
-  border-radius: 9px;
+  border-radius: 8px;
   border: none;
   background: var(--accent);
   color: #fff;
@@ -382,7 +377,7 @@ function onLobby() {
 .last-open {
   width: var(--ctl-h);
   height: var(--ctl-h);
-  border-radius: 9px;
+  border-radius: 8px;
   border: 1px solid var(--accent-border);
   background: var(--bg-raised);
   color: var(--accent);
@@ -408,7 +403,7 @@ function onLobby() {
   align-items: center;
   gap: 14px;
   padding: 16px 18px;
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text);
@@ -467,7 +462,7 @@ function onLobby() {
 }
 
 .entry-desc {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-dim);
 }
 

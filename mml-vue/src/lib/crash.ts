@@ -23,10 +23,10 @@ export function crashTimeOf(path: string): number | null {
 /**
  * 最近一份崩溃报告
  *
- * 只认 `maxAgeMs` 内写出的，避免把上一次崩溃的旧报告当成这次退出。
+ * 只认报告时间在 `maxAgeMs` 内的，避免把上一次崩溃的旧报告当成这次退出。
  *
  * - `files`: 实例日志文件列表
- * - `maxAgeMs`: 允许的最大文件年龄，单位毫秒
+ * - `maxAgeMs`: 允许的最大报告年龄，单位毫秒，缺省 2 分钟
  *
  * # 返回值
  *

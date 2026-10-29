@@ -121,7 +121,6 @@ function pick(account: AccountStoreDto) {
   position: relative;
 }
 
-/* 点击菜单外区域收起 */
 .menu-backdrop {
   position: fixed;
   inset: 0;
@@ -132,7 +131,6 @@ function pick(account: AccountStoreDto) {
   display: flex;
   align-items: center;
   gap: 8px;
-  /* 高度跟着标题栏走：52px 的顶栏里上下各留 6px */
   padding: 5px 12px 5px 10px;
   /* 高度固定：有账户时是"名字 + 类型"两行，没有时只有一行，
      不钉死的话选中账户后按钮会自己长高一截 */
@@ -200,18 +198,17 @@ function pick(account: AccountStoreDto) {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  /* 1.25 时两行（名字 + 类型）= 32.6px，超出按钮 40px 的内容区 */
   line-height: 1.1;
   text-align: left;
 }
 
 .account-name {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
 }
 
 .account-type {
-  font-size: 11px;
+  font-size: 11.5px;
 }
 
 /* 类型只靠文字颜色区分，不铺底色 */
@@ -236,8 +233,7 @@ function pick(account: AccountStoreDto) {
   color: #0e7490;
 }
 
-/* 真实头像图（加载失败回退字母头像）。
- * 阴影用 drop-shadow：跟随头像轮廓投影，不会像 box-shadow 那样透出方形底板 */
+/* 真实头像图；加载失败回退字母头像 */
 .avatar-img {
   object-fit: cover;
   image-rendering: pixelated;
@@ -309,14 +305,14 @@ function pick(account: AccountStoreDto) {
 }
 
 .menu-title {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-dim);
   padding: 6px 8px;
 }
 
 /* 菜单空状态（还没有任何账户） */
 .empty-tip {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-dim);
   text-align: center;
   padding: 10px 8px;
@@ -329,7 +325,7 @@ function pick(account: AccountStoreDto) {
   width: 100%;
   padding: 8px;
   border: none;
-  border-radius: 9px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text);
   cursor: pointer;
@@ -361,12 +357,12 @@ function pick(account: AccountStoreDto) {
 }
 
 .menu-type {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text-dim);
 }
 
 .menu-footer {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-dim);
   text-align: center;
   padding: 8px;

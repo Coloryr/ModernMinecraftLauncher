@@ -205,6 +205,7 @@ export function useBlockGroups() {
 
   // ---------- 收藏 ----------
 
+  /** 某个方块是否已收藏 */
   function isFavorite(id: string): boolean {
     return favorites.value.includes(id);
   }

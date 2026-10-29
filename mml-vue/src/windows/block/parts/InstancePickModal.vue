@@ -32,6 +32,7 @@ const loading = ref(true);
 /** 下拉当前选中的实例 uuid；空串表示还没选 */
 const selected = ref("");
 
+/** 下拉里选中的实例；没选时为 null */
 const picked = computed(() => instances.value.find((inst) => inst.uuid === selected.value) ?? null);
 
 onMounted(async () => {
@@ -62,6 +63,7 @@ function labelOf(inst: InstanceInfoDto): string {
   return parts.join(" · ");
 }
 
+/** 确认选择：没选中实例时什么都不做 */
 function confirm() {
   if (picked.value) emit("pick", picked.value);
 }

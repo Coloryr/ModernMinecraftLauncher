@@ -92,7 +92,7 @@ function textOf(value: number): string {
     : t("winStats.times", { n: value });
 }
 
-/** 中心显示的总数 */
+/** 环中心显示的总数，口径同各段提示 */
 const totalText = computed(() => textOf(total.value));
 
 </script>

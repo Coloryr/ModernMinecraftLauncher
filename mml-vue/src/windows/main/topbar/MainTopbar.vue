@@ -32,9 +32,10 @@ defineProps<{
 const { status: modpackStatus, init: initModpackStatus } = useModpackStatus(false);
 /** 全屏时顶栏要让出 macOS 的刘海 / 菜单栏区域 */
 const fullscreen = useWindowFullscreen();
-const pluginControls = computed(() => isMac && titleBarStyle === "macos");
-/** 安全区这类"按系统"的样式用平台判定，不跟标题栏样式走：换用另一套时外观会反转 */
+/** 平台判定：安全区这类"按系统"的样式用它，不跟标题栏样式走，否则换样式时外观会反转 */
 const isMac = detectOs() === "macos";
+/** 原生红黄绿由插件负责摆放：此时不再自绘窗口按钮，左侧按插件给的清空量让位 */
+const pluginControls = computed(() => isMac && titleBarStyle === "macos");
 let unsubModpack: (() => void) | null = null;
 
 onMounted(async () => {
@@ -136,7 +137,7 @@ const emit = defineEmits<{
 
 <style scoped>
 /* 高度即标题栏高度：与子窗口框架 WindowFrame 的 .frame-head 共用 --titlebar-h，
-   两边必须一致，否则单窗口模式切换页面时标题栏会跳高 —— 曾经这里写死 64px、那边 60px。
+   两边必须一致，否则单窗口模式切换页面时标题栏会跳高。
    顶栏是 .main-window 的第一个 flex 子节点，改高度会让顶栏以下的所有内容（含侧栏）整体下移 */
 .topbar {
   height: var(--titlebar-h);
@@ -179,14 +180,7 @@ const emit = defineEmits<{
   padding-top: 24px;
 }
 
-/* 28px 的内容区：Logo、副标题、账户按钮都要收一档 */
-.topbar.is-macos.is-fullscreen .brand-logo {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  font-size: 11px;
-}
-
+/* 28px 的内容区：副标题与账户按钮都要收一档 */
 .topbar.is-macos.is-fullscreen .brand-sub {
   display: none;
 }
@@ -229,20 +223,6 @@ const emit = defineEmits<{
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.brand-logo {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #4f8cff, #7c5cff);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 16px;
-  color: #fff;
-  box-shadow: 0 3px 10px rgba(79, 140, 255, 0.35);
 }
 
 .brand-text {

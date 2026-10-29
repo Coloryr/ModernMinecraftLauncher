@@ -37,7 +37,7 @@ export interface VirtualWindow {
  * 可见区间就是"视口 ± overscan"与这个序列的交集。上下留白**精确**补回隐藏行的高度：
  * 行间距只出现在渲染出来的行之间，一行都没渲染时末尾那行的间距也不存在。
  *
- * 截图那种一排多个的网格也能用它：把"行"当成"第几排"，`count` 给排数即可。
+ * 截图墙那种一排多个的网格也能用它：把"行"当成"第几排"，`count` 给排数即可。
  *
  * - `scrollTop`: 滚动容器的滚动位置，单位 px
  * - `viewHeight`: 滚动容器的高度，单位 px
@@ -75,8 +75,8 @@ export function visibleWindow(options: {
 
   let padTop = start * slot;
   let padBottom = (count - end) * slot;
-  // 一行都没渲染时，整列里就没有行间距了：末尾那行的间距要从留白里扣掉
-  // （优先扣下面那侧；组在视口上方时下面本来就是 0，就扣上面那侧）
+  // 一行都没渲染时，整列里就没有行间距了：末尾那行的间距要从留白里扣掉。
+  // 优先扣下面那侧；组在视口上方时下面本来就是 0，改扣上面那侧
   if (end <= start) {
     if (padBottom >= gap) {
       padBottom -= gap;

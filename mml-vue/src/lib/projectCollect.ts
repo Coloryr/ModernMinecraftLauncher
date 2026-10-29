@@ -1,3 +1,4 @@
+// 收藏星标切换：状态以后端为准，失败只提示
 import { api } from "./api";
 import { tErr } from "./i18n";
 import { typeGroupName } from "./collectGroups";

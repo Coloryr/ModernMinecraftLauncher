@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 图片放大预览：全屏浮层，滚轮缩放 1~8 倍、放大后拖动平移、点空白处关闭。
+// 图片放大预览：全屏浮层，滚轮缩放 1~8 倍、放大后拖动平移、点击关闭。
 //
 // 从「下载整合包」的项目详情搬过来的 —— 那边原本写死在页面里，
 // 资源窗口的截图预览也要同一套观感，所以抽成组件，两边共用一份。
@@ -30,6 +30,7 @@ const offset = ref({ x: 0, y: 0 });
 let dragged = false;
 let from = { x: 0, y: 0, ox: 0, oy: 0 };
 
+/** 回到适配大小并清零平移 */
 function reset() {
   scale.value = 1;
   offset.value = { x: 0, y: 0 };
@@ -45,8 +46,11 @@ function onDown(e: PointerEvent) {
   from = { x: e.clientX, y: e.clientY, ox: offset.value.x, oy: offset.value.y };
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onUp);
+  // 指针被系统收走时 pointerup 不会来，这里也要收尾
+  window.addEventListener("pointercancel", onUp);
 }
 
+/** 跟随指针平移；位移超过 3px 就算真拖动过 */
 function onMove(e: PointerEvent) {
   const dx = e.clientX - from.x;
   const dy = e.clientY - from.y;
@@ -55,15 +59,17 @@ function onMove(e: PointerEvent) {
   offset.value = { x: from.ox + dx, y: from.oy + dy };
 }
 
+/** 结束拖动，摘掉窗口监听 */
 function onUp() {
   window.removeEventListener("pointermove", onMove);
   window.removeEventListener("pointerup", onUp);
+  window.removeEventListener("pointercancel", onUp);
 }
 
-// 拖动过程中被关掉（点空白 / Esc）时也要摘掉 window 监听，否则会一直挂着
+// 拖动过程中浮层被关掉时也要摘掉 window 监听，否则会一直挂着
 onUnmounted(onUp);
 
-/** 点空白处关闭；刚拖过的那一下不算点击 */
+/** 点击关闭；底部操作条自己拦了点击，刚拖过的那一下也不算 */
 function onClick() {
   if (dragged) {
     dragged = false;

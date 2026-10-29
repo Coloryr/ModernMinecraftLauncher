@@ -211,6 +211,7 @@ export function useSettingsClient() {
     void applyClient();
   }
 
+  /** 删掉第 `i` 条锁定条目并保存 */
   function removeLock(i: number) {
     client.value.loginLock.splice(i, 1);
     void applyClient();
@@ -467,7 +468,12 @@ export function useSettingsClient() {
       default:
         return false;
     }
-    await applyClient();
+    if (id === "launchCheck") {
+      // 启动前检查开关不在 client 里，走自己那份提交
+      await applyLaunchCheck();
+    } else {
+      await applyClient();
+    }
     // 透明度是纯 CSS 变量，恢复默认后要把窗口里的实际效果一起改回来
     if (id === "window-look") {
       applyWindowAlpha(client.value.windowOpacity);

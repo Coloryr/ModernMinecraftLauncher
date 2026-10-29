@@ -39,7 +39,7 @@ import {
   startupPage,
   viewMode,
 } from "../../lib/settings";
-import type { AccountStoreDto, CustomHomeInfoDto, GroupDto, InstanceInfoDto, JavaInfoDto, NewsItem, StartArgDto, VersionInfoDto } from "../../lib/bindings";
+import type { AccountStoreDto, ColorMcInfoDto, CustomHomeInfoDto, GroupDto, InstanceInfoDto, JavaInfoDto, LoadState, NewsItem, StartArgDto, VersionInfoDto, ViewMode } from "../../lib/bindings";
 import InstanceIcon from "../../components/InstanceIcon.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import DropOverlay from "../../components/ui/DropOverlay.vue";
@@ -68,7 +68,6 @@ import type { FileDropPayload } from "../../composables/useFileDrop";
 import { useMotd } from "./composables/useMotd";
 import { useInstanceArgs } from "./composables/useInstanceArgs";
 import { useInstanceStats } from "./composables/useInstanceStats";
-import type { ColorMcInfoDto, ViewMode } from "../../lib/bindings";
 import type { CtxMenuState, FeatureId, GroupView, InstMenuAction } from "./types";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
@@ -76,6 +75,16 @@ import WindowControls from "../../components/ui/WindowControls.vue";
 import CollapsePanel from "../../components/ui/CollapsePanel.vue";
 import { titleBarStyle, onTitleBarPointerDown, useWindowTitle } from "../../lib/titlebar";
 import { useWindowDecoration } from "../../lib/useWindowDecoration";
+import { closeSplash, splashError, splashVisible } from "../../lib/splash";
+import {
+  accounts as storeAccounts,
+  currentAccount as storeCurrentAccount,
+  loadAccounts,
+  setCurrentAccount,
+  clearCurrentAccount,
+} from "../../lib/accountStore";
+import { listen } from "@tauri-apps/api/event";
+import { LoadDone } from "../../lib/listens.ts";
 
 // 注意：不能用顶层 await —— 会让 <script setup> 变成 async setup，
 // App.vue 没有 <Suspense> 包裹，Vue 将不渲染该组件（窗口白屏）
@@ -84,10 +93,6 @@ import { useWindowDecoration } from "../../lib/useWindowDecoration";
 // 必须用 useWindowTitle 而不是在这里直接设一次：单窗口模式下本页被 KeepAlive 缓存，
 // 从子窗口切回来不重新挂载，只设一次的话任务栏上会一直挂着子窗口的标题
 useWindowTitle(() => t("winTitle.main"));
-
-// ================= 基础状态 =================
-
-import { closeSplash, splashError, splashVisible } from "../../lib/splash";
 
 // ================= 数据 =================
 
@@ -231,10 +236,17 @@ function toggleGroup(id: string) {
 
 // ================= 侧栏：收起 / 展开 =================
 
-/** 是否启用侧栏过渡：默认关闭，只在用户主动收起 / 展开的这 300ms 内打开。
-    常开的话，启动时按配置恢复侧栏宽度也会被播成一次滑动动画 */
+/**
+ * 是否启用侧栏过渡
+ *
+ * 默认关闭，只在用户主动收起 / 展开之后的这段时间里打开；常开的话，启动时按配置恢复
+ * 侧栏宽度也会被播成一次滑动动画。
+ */
 const sidebarAnim = ref(false);
 let sidebarAnimTimer: number | undefined;
+
+/** 收起 / 展开后保持过渡开关的时间，单位 ms；须长于 .sidebar-slot 的宽度过渡 */
+const SIDEBAR_ANIM_MS = 300;
 
 /** 用户主动收起 / 展开侧栏（唯一会播放动画的入口） */
 function collapseSidebar(collapsed: boolean) {
@@ -243,7 +255,7 @@ function collapseSidebar(collapsed: boolean) {
   window.clearTimeout(sidebarAnimTimer);
   sidebarAnimTimer = window.setTimeout(() => {
     sidebarAnim.value = false;
-  }, 300);
+  }, SIDEBAR_ANIM_MS);
 }
 
 // ================= 启动器主页 =================
@@ -355,16 +367,6 @@ function prevNewsPage() {
 // ================= 账户 =================
 
 // 账户与当前账户来自共享存储（与账户窗口联动）
-import {
-  accounts as storeAccounts,
-  currentAccount as storeCurrentAccount,
-  loadAccounts,
-  setCurrentAccount,
-  clearCurrentAccount,
-} from "../../lib/accountStore";
-import { listen } from "@tauri-apps/api/event";
-import { LoadDone } from "../../lib/listens.ts";
-import type { LoadState } from "../../lib/bindings";
 const accounts = storeAccounts;
 const currentAccount = storeCurrentAccount;
 
@@ -382,12 +384,10 @@ function onAccountChange(account: AccountStoreDto) {
 
 const statusText = ref(t("launch.ready"));
 
-
-
 // ================= 启动进度（顶部进度条） =================
 // 进度百分比由后端按 LaunchState 阶段随状态事件下发；无进度语义的状态走滚动条
 const launchStage = ref("");
-/** 内核给的阶段百分比：按 LaunchState 等权近似，下载阶段恒为 36 */
+/** 内核随启动状态下发的阶段百分比，单位 %；没有进度语义的阶段为 null */
 const statePct = ref<number | null>(null);
 
 /** 下载队列的真实进度 */
@@ -487,14 +487,15 @@ async function onMetaUpdate(patch: Partial<InstanceInfoDto>) {
   }
 }
 
-/** 实例设置面板刷新版本列表（清空后端缓存重新拉取） */
+/** 可选版本列表，供实例设置面板的版本下拉使用 */
+const versions = ref<VersionInfoDto[]>([]);
+
+/** 实例设置面板拉到新的版本列表后同步本窗口这份 */
 function onVersionsRefreshed(list: VersionInfoDto[]) {
   versions.value = list;
 }
 
-// ================= 分组拖拽移动 =================
-
-// ================= 自定义拖拽：useInstanceDrag，见下方多选初始化之后 =================
+// ================= 拖拽排序：useInstanceDrag，见下方多选初始化之后 =================
 
 /** 点击分组标题，拖拽结束后抑制误触折叠 */
 function onGroupTitleClick(id: string) {
@@ -582,6 +583,31 @@ function onGroupSelectAll(groupId?: string) {
   showToast(t("multi.selectAllDone", { count: g.items.length }));
 }
 
+/**
+ * 逐个启动给定实例，返回成功数
+ *
+ * 单个失败只把它自己的按钮放开，不影响其余实例。
+ *
+ * - `ids`: 要启动的实例 uuid
+ *
+ * # 返回值
+ *
+ * 真正进入启动流程的实例数
+ */
+async function launchMany(ids: string[]): Promise<number> {
+  let launched = 0;
+  for (const uuid of ids) {
+    markLaunching(uuid);
+    try {
+      if (await launchGame(uuid)) launched += 1;
+      else clearLaunching(uuid);
+    } catch {
+      clearLaunching(uuid);
+    }
+  }
+  return launched;
+}
+
 /** 分组菜单“启动全部”：启动该分组全部实例 */
 async function launchGroupAll(groupId?: string) {
   if (offlineLaunchBlocked.value) {
@@ -591,17 +617,7 @@ async function launchGroupAll(groupId?: string) {
   const g = groups.value.find((x) => x.id === groupId);
   closeCtxMenu();
   if (!g || g.items.length === 0) return;
-  let launched = 0;
-  for (const inst of g.items) {
-    markLaunching(inst.uuid);
-    try {
-      if (await launchGame(inst.uuid)) launched += 1;
-      else clearLaunching(inst.uuid);
-    } catch {
-      // 单个失败：把它的按钮放开，别的照旧
-      clearLaunching(inst.uuid);
-    }
-  }
+  const launched = await launchMany(g.items.map((i) => i.uuid));
   if (launched) showToast(t("multi.launched", { count: launched }));
 }
 
@@ -870,12 +886,28 @@ const copyInst = ref<InstanceInfoDto | null>(null);
 /** 新实例名，默认「原名 副本」 */
 const copyName = ref("");
 
-/** 新名字与已有实例重名：忽略大小写与首尾空白 */
-const copyConflict = computed(() => {
-  const name = copyName.value.trim().toLowerCase();
-  if (!name) return false;
-  return instances.value.some((i) => i.name.trim().toLowerCase() === name);
-});
+/**
+ * 实例名是否已被占用
+ *
+ * 忽略大小写与首尾空白；改名时用 `exceptUuid` 排除实例自己。
+ *
+ * - `name`: 待检查的名字
+ * - `exceptUuid`: 不参与比较的实例 uuid，可缺省
+ *
+ * # 返回值
+ *
+ * 已有实例重名时为 `true`
+ */
+function nameTaken(name: string, exceptUuid?: string): boolean {
+  const n = name.trim().toLowerCase();
+  if (!n) return false;
+  return instances.value.some(
+    (i) => i.uuid !== exceptUuid && i.name.trim().toLowerCase() === n,
+  );
+}
+
+/** 新名字与已有实例重名 */
+const copyConflict = computed(() => nameTaken(copyName.value));
 /** 正在复制：弹窗不关，按钮全部禁用 */
 const copyBusy = ref(false);
 
@@ -997,17 +1029,7 @@ async function multiLaunch() {
   }
   const ids = [...selectedIds.value];
   closeCtxMenu();
-  let launched = 0;
-  for (const uuid of ids) {
-    markLaunching(uuid);
-    try {
-      if (await launchGame(uuid)) launched += 1;
-      else clearLaunching(uuid);
-    } catch {
-      // 单个失败：把它的按钮放开，别的照旧
-      clearLaunching(uuid);
-    }
-  }
+  const launched = await launchMany(ids);
   exitMultiSelect();
   if (launched) showToast(t("multi.launched", { count: launched }));
 }
@@ -1060,16 +1082,13 @@ async function onAddedInstanceStorage(newValue: string | null) {
 /** 上面那条通知的退订函数（挂载时订阅，卸载时摘掉） */
 let unlistenAdded: (() => void) | null = null;
 
-// 轻提示统一使用全局 showToast
 const showRename = ref(false);
 const renameName = ref("");
 
-/** 新名字与已有实例重名：自己不算，忽略大小写与首尾空白 */
+/** 新名字与已有实例重名；实例自己不算 */
 const renameConflict = computed(() => {
-  const name = renameName.value.trim().toLowerCase();
   const self = selected.value;
-  if (!name || !self) return false;
-  return instances.value.some((i) => i.uuid !== self.uuid && i.name.trim().toLowerCase() === name);
+  return !!self && nameTaken(renameName.value, self.uuid);
 });
 const renameBusy = ref(false);
 const showDelete = ref(false);
@@ -1189,55 +1208,60 @@ const features: Array<{ id: FeatureId; icon: string }> = [
   { id: "help", icon: "book" },
 ];
 
-// ================= 添加分组 弹窗 =================
-
-const versions = ref<VersionInfoDto[]>([]);
-
 // ================= 拖拽文件：逻辑见 composables/useFileDrop =================
 
 /**
- * 拖入的文件 / 文件夹 / 登录卡片：认出类型后交给对应窗口
+ * 认出拖入 / 命令行给入的一个路径是什么，再交给对应窗口
  *
- * - **网页卡片**（DOM 给的文本地址）与 `.url` / `.webloc` 快捷方式文件 → 「账户管理」预填地址；
- * - 整合包与文件夹 → 「添加实例」，那边有完整的导入链路，主窗口只负责"认类型 + 开窗"。
+ * 快捷方式 → 「账户管理」预填地址；服务器包 → 直接导入；整合包与文件夹 → 「添加实例」。
  *
- * 多个文件只取第一个。
+ * - `path`: 本机绝对路径
  */
-async function onFilesDropped(payload: FileDropPayload) {
-  // ① 网页卡片：地址已经在手上（DOM 那条路），直接开账户窗口
-  if (payload.url) {
-    openWindow("account", { drop: { path: "", kind: "shortcut", url: payload.url } });
-    return;
-  }
-  // ② 文件：路径由路径桥补上，照旧认类型再开窗
-  const first = payload.paths[0];
-  if (!first) {
-    // 路径桥没把真实路径送回来（文件拖入拿不到路径）：说一声，别静默什么都不做
-    showToast(t("drop.noPath"));
-    return;
-  }
-  if (payload.paths.length > 1) showToast(t("drop.onlyFirst"));
+async function openFromPath(path: string) {
   let probe: { kind: string; url: string };
   try {
-    probe = await commands.windows.probeDrop(first);
+    probe = await commands.windows.probeDrop(path);
   } catch (e) {
     showToast(tErr(e));
     return;
   }
   if (probe.kind === "shortcut" && probe.url) {
-    openWindow("account", { drop: { path: first, kind: "shortcut", url: probe.url } });
+    openWindow("account", { drop: { path, kind: "shortcut", url: probe.url } });
     return;
   }
   if (probe.kind === "serverPack") {
     showToast(t("serverPack.importing"));
-    try { await commands.export.importServerPack(first); } catch (e) { showToast(tErr(e)); }
+    try { await commands.export.importServerPack(path); } catch (e) { showToast(tErr(e)); }
     return;
   }
   if (probe.kind !== "folder" && probe.kind !== "archive") {
     showToast(t("drop.notModpack"));
     return;
   }
-  openWindow("add", { drop: { path: first, kind: probe.kind } });
+  openWindow("add", { drop: { path, kind: probe.kind } });
+}
+
+/**
+ * 拖入的文件 / 文件夹 / 登录卡片
+ *
+ * - **网页卡片**：地址已经在 DOM 给的数据里，直接开「账户管理」预填；
+ * - **文件**：路径由路径桥补上后交给 `openFromPath` 认类型。
+ *
+ * 多个文件只取第一个。
+ */
+async function onFilesDropped(payload: FileDropPayload) {
+  if (payload.url) {
+    openWindow("account", { drop: { path: "", kind: "shortcut", url: payload.url } });
+    return;
+  }
+  const first = payload.paths[0];
+  if (!first) {
+    // 路径桥没把真实路径送回来：说一声，别静默什么都不做
+    showToast(t("drop.noPath"));
+    return;
+  }
+  if (payload.paths.length > 1) showToast(t("drop.onlyFirst"));
+  await openFromPath(first);
 }
 
 const { fileDragOver, dragKind } = useFileDrop(onFilesDropped);
@@ -1255,6 +1279,7 @@ const DROP_TITLE_KEYS: Record<string, string> = {
 };
 const dropTitleKey = computed(() => DROP_TITLE_KEYS[dragKind.value] ?? DROP_TITLE_KEYS.files);
 
+// ---- 添加分组弹窗 ----
 const showAddGroup = ref(false);
 const groupName = ref("");
 const groupError = ref("");
@@ -1543,8 +1568,11 @@ async function loadInstances() {
   }
 }
 
-/** 启动时按 gui_config 恢复上次选中的实例。
- *  故意不走 select()：那会把 newsActive 置 false，而启动页设成「启动器主页」时应停在主页。 */
+/**
+ * 启动时按 gui_config 恢复上次选中的实例
+ *
+ * 故意不走 select()：那会把 newsActive 置 false，而启动页设成「启动器主页」时应停在主页。
+ */
 function restoreSelection() {
   const uuid = selectedInstance.value;
   if (!uuid) return;
@@ -1562,8 +1590,7 @@ async function loadGroups() {
 async function loadJava() {
   try {
     javas.value = await api.getJavaList();
-    // 不给空的 javaName 补第一个 Java：空就是「自动」，由 core 按版本要求的
-    // Java 主版本去挑（比"列表里第一个"更对；这条以前会把刚扫到的 Java 顶上去）
+    // 空 javaName 表示「自动」：由 core 按版本要求的 Java 主版本去挑，不用列表里第一个
   } catch {
     javas.value = [];
   }
@@ -1728,26 +1755,8 @@ async function handleStartArg() {
   if (!arg) return;
 
   if (arg.action === "install") {
-    // 与拖入文件同一个落点：先认类型，再交给「添加实例」
-    try {
-      const probe = await commands.windows.probeDrop(arg.value);
-      if (probe.kind === "shortcut" && probe.url) {
-        openWindow("account", { drop: { path: arg.value, kind: "shortcut", url: probe.url } });
-        return;
-      }
-      if (probe.kind === "serverPack") {
-        showToast(t("serverPack.importing"));
-        await commands.export.importServerPack(arg.value);
-        return;
-      }
-      if (probe.kind !== "folder" && probe.kind !== "archive") {
-        showToast(t("drop.notModpack"));
-        return;
-      }
-      openWindow("add", { drop: { path: arg.value, kind: probe.kind } });
-    } catch (e) {
-      showToast(tErr(e));
-    }
+    // 与拖入文件同一个落点
+    await openFromPath(arg.value);
     return;
   }
 
@@ -1926,12 +1935,8 @@ onMounted(async () => {
         </BaseButton>
       </section>
 
-      <!-- 整合包安装进度不再内嵌在这里：它改成了标题栏上的指示器 + 弹窗，
-           即 ModpackTitleIndicator / ModpackPopup，否则这条卡片会一直占着内容区的高度、把列表顶下去。
-           状态订阅在各处自己拿，标题栏指示器自包含；弹窗由 App.vue 渲染 -->
-
-      <!-- 资源下载进度同样改成了标题栏指示器 + 弹窗，即 ResourceTitleIndicator / ResourcePopup，
-           主页面顶栏那份挂在 MainTopbar 上，这里不再内嵌卡片 -->
+      <!-- 整合包安装与资源下载的进度都在标题栏指示器里（ModpackTitleIndicator /
+           ResourceTitleIndicator），对应弹窗由 App.vue 渲染：内容区不再留卡片占位 -->
 
       <!-- 主体 -->
       <main class="main" :class="{ 'side-right': sidebarSide === 'Right', 'sidebar-anim': sidebarAnim }">
@@ -2248,11 +2253,8 @@ onMounted(async () => {
                             </label>
                           </div>
 
-                          <!-- MOTD 展示：只在**填了服务器地址**时出现。
-                           没填时整块不显示 —— 原来会渲染一张只有兜底文案的卡片
-                           "M²L 服务器 / 欢迎来到 M²L 服务器大厅"，看着像查询成功了，其实没查。
-                           卡片本身在 components/MotdCard.vue：图标 / 彩色分段 / 人数-版本-延迟，
-                           与底部悬浮卡、资源窗口服务器列表上方那张是同一份 -->
+                          <!-- MOTD 展示：只在**填了服务器地址**时出现，否则会像"查过但没结果"；
+                               卡片外观在 components/MotdCard.vue，与底部悬浮卡、资源窗口那张同一份 -->
                           <MotdCard v-if="argsOf(selected.uuid).serverIp.trim()" compact :motd="instMotd"
                             :loading="instMotdLoading" :name="instMotd?.ip || argsOf(selected.uuid).serverIp" />
                         </div>
@@ -2311,10 +2313,6 @@ onMounted(async () => {
         @move-group="onMoveGroupClick" @delete-group="onDeleteGroup" @inst-action="onInstMenuAction"
         @multi-move="openMoveGroupPicker(null)" @multi-delete="onMultiDelete" @multi-launch="multiLaunch" />
     </template>
-
-    <!-- ===== 启动界面：已移除（启动按钮显示加载态，不弹窗） ===== -->
-
-    <!-- ===== 添加实例：独立窗口（openAdd 打开） ===== -->
 
     <!-- ===== 关闭游戏确认 ===== -->
     <BaseModal v-if="stopAsk && selected" :title="t('launch.stop')" :closable="false"

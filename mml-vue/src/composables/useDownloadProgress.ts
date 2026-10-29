@@ -2,10 +2,11 @@
 //
 // 下载窗口、标题栏上的下载指示器、启动按钮三处要的是同一个数，口径见 lib/progress.ts。
 // 启动阶段的百分比由内核按"阶段等权"给（下载阶段恒为 36），所以下载期间必须换成这里的真实值。
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { api, onDownloadItem, onDownloadTask } from "../lib/api";
 import { downloadOverallPercent } from "../lib/progress";
 import type { DownloadStatusDto } from "../lib/bindings";
+import { useUnlisteners } from "./useUnlisteners";
 
 /**
  * 跟踪下载队列的实时总进度
@@ -28,18 +29,13 @@ export function useDownloadProgress() {
     }
   }
 
-  let unsubs: Array<() => void> = [];
+  const { track } = useUnlisteners();
 
   onMounted(async () => {
     await refresh();
     // 任务 / 文件状态变化都会广播，跟着刷新即可
-    unsubs.push(await onDownloadTask(() => void refresh()));
-    unsubs.push(await onDownloadItem(() => void refresh()));
-  });
-
-  onUnmounted(() => {
-    unsubs.forEach((fn) => fn());
-    unsubs = [];
+    track(onDownloadTask(() => void refresh()));
+    track(onDownloadItem(() => void refresh()));
   });
 
   return {

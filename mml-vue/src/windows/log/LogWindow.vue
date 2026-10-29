@@ -157,6 +157,7 @@ const category = ref("");
 /** 日志行是否属于当前运行日志来源（只有它跟着 game-log 事件增长） */
 const liveSource = computed(() => file.value === "");
 
+/** 取绝对路径里的文件名，给来源下拉显示 */
 function fileName(path: string): string {
   return path.replace(/\\/g, "/").split("/").pop() ?? path;
 }
@@ -171,7 +172,9 @@ const shownLogs = computed(() =>
   ),
 );
 
+/** 当前来源里出现过的线程名，去重后作筛选下拉的选项 */
 const threads = computed(() => uniq(sourceLogs.value.map((l) => l.thread)));
+/** 当前来源里出现过的分组名，去重后作筛选下拉的选项 */
 const categories = computed(() => uniq(sourceLogs.value.map((l) => l.category)));
 
 /** 刷新日志文件列表；失败按空处理 */
@@ -314,6 +317,7 @@ async function applyOpenParams() {
 
 // ---------------- 运行状态：测试启动 / 停止 ----------------
 
+/** 该实例当前是否在运行，以后端 getRunning 的结果为准 */
 const running = ref(false);
 
 /**
@@ -848,19 +852,8 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
 }
 
-.modal-text {
-  margin: 0 0 14px;
-  font-size: 13px;
-  color: var(--text);
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-/* 上传中：上传键里的图标转圈，颜色跟随按钮文字，动画与其它按钮里的转圈同一档 */
+/* 弹窗正文与按钮行用 styles/modal.css 的 .modal-text / .modal-actions，
+   这里只留上传中图标转圈 —— 颜色跟随按钮文字，动画与其它按钮里的转圈同一档 */
 .upload-spin {
   flex-shrink: 0;
   animation: upload-spin 0.8s linear infinite;

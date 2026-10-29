@@ -218,6 +218,15 @@ export function useSettingsJava() {
 
   // Java 列表是"系统里扫出来的东西"，没有"恢复默认"可言
 
+  /**
+   * Java 页没有可恢复的默认值：列表是系统扫描出来的
+   *
+   * - `_id`: 分组 id，这里不用
+   *
+   * # 返回值
+   *
+   * 恒为 `false`，表示没有处理这个分组
+   */
   async function resetGroup(_id: string): Promise<boolean> {
     return false;
   }

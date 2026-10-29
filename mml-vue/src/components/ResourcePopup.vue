@@ -1,8 +1,7 @@
 <script setup lang="ts">
 // 资源下载进度弹窗：标题栏指示器点开后浮在当前页面之上
 //
-// 内容直接复用 ResourceDownloadBar，与内容区那张卡片完全是同一份渲染，这里只套一层弹窗壳。
-// 关掉弹窗只是收起，下载照跑。
+// 内容直接复用 ResourceDownloadBar，这里只套一层弹窗壳。关掉弹窗只是收起，下载照跑。
 import BaseModal from "./ui/BaseModal.vue";
 import ResourceDownloadBar from "./ResourceDownloadBar.vue";
 import { t } from "../lib/i18n";

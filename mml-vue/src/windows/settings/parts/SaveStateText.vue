@@ -21,13 +21,21 @@ const text = computed(() => {
       return t("winSettings.stateSaving");
     case "error":
       return t("winSettings.stateFailed");
+    case "saved":
+      // 成功后与 idle 一样安静
+      return "";
     default:
-      // saved 与 idle 一样安静（成功不需要播报）
       return props.pending ? t("winSettings.statePending") : "";
   }
 });
 
-const kind = computed(() => (props.state === "idle" && props.pending ? "pending" : props.state));
+/** 样式类：与 settings.css 的 .save-state.ok / .err / .pending 对应 */
+const kind = computed(() => {
+  if (props.state === "idle" && props.pending) return "pending";
+  if (props.state === "saved") return "ok";
+  if (props.state === "error") return "err";
+  return props.state;
+});
 </script>
 
 <template>

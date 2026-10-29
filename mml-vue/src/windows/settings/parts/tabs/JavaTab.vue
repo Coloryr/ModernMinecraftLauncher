@@ -16,7 +16,6 @@ const props = defineProps<{
   flashGroup?: string;
 }>();
 
-
 const {
   inTauri,
   javaList,

@@ -26,12 +26,20 @@ const { status, init } = useResourceStatus(true);
  * 的 `await` 之后就注册不上了，订阅会一直挂着 —— 所以退订函数存这里、由同步钩子调用。
  */
 let unlistenStatus: (() => void) | null = null;
+let disposed = false;
 
 onMounted(async () => {
-  unlistenStatus = await init();
+  const off = await init();
+  // 订阅期间组件已卸载：立刻退订，别把监听留到窗口关闭之后
+  if (disposed) {
+    off();
+    return;
+  }
+  unlistenStatus = off;
 });
 
 onUnmounted(() => {
+  disposed = true;
   unlistenStatus?.();
   unlistenStatus = null;
 });
@@ -59,7 +67,7 @@ const tipText = computed(() => {
   return t("addResource.bar.done");
 });
 
-/** 图标状态：下载中转、失败警示、全部完成常态 */
+/** 图标状态：下载中、失败警示、全部完成常态 */
 const iconState = computed(() => {
   if (running.value.length) return "busy";
   return hasFailed.value ? "failed" : "done";

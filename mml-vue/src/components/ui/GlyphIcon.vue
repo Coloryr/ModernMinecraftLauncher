@@ -8,7 +8,7 @@
 // - 字号一改图标就变形，而 SVG 的尺寸由 size 定死，线宽由 weight 调。
 //
 // 统一 24 视窗 + stroke=currentColor（跟随所在处的字体色）+ 圆头圆角，
-// 与仓库里其它内联图标同一套画法，那边有 86 处 stroke="currentColor"。
+// 与仓库里其它内联图标同一套画法。
 export type GlyphName =
   | "plus"
   | "minus"
@@ -57,7 +57,7 @@ export type GlyphName =
   | "refresh"
   | "folder"
   | "folder-plus"
-  // 以下为资源分类，见 windows/resource/types.ts 的 RESOURCE_CATEGORIES
+  // 以下为资源分类，见 mml-vue/src/windows/resource/types.ts 的 RESOURCE_CATEGORIES
   | "archive"
   | "package"
   | "palette"
@@ -76,7 +76,7 @@ withDefaults(
     name: GlyphName;
     /** 边长，单位 px */
     size?: number;
-    /** 线宽 */
+    /** 线宽，无单位，对应 SVG 的 stroke-width */
     weight?: number;
   }>(),
   {

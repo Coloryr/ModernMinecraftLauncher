@@ -1,7 +1,7 @@
 // 自定义界面（前端应用层）
 //
 // 三种换皮互相独立，开关与 CSS 条目都在 gui_config.client：
-// - 自定义主页面：主窗口内容区的整页替换，见 windows/main 的 CustomHomePage；
+// - 自定义主页面：主窗口内容区的整页替换，见 components/CustomHomePage.vue；
 // - 自定义 CSS：按条目挂样式表；包里有 custom.js 时再加载脚本，挂载后调用它的入口函数；
 // - 完全自定义界面：主窗口整体换成自定义页面，地址交给 App.vue 的 iframe。
 //
@@ -305,7 +305,7 @@ interface HostMml {
 }
 
 /** 给直接渲染的整页 / 主页组件装 window.mml；已有时不覆盖 */
-export function ensureHostMml() {
+export function ensureHostMml(): void {
   const target = window as unknown as { mml?: HostMml };
   if (target.mml) return;
   target.mml = {
@@ -359,7 +359,7 @@ function ensurePageStyle(url: string) {
   pageStyle = link;
 }
 
-/** 关包 / 切包：移除脚本与样式、清回调、撤掉 host 的 window.mml */
+/** 关包 / 切包：移除脚本与样式、清窗口页面回调 */
 function teardownWindowPages() {
   pageScript?.remove();
   pageScript = null;
@@ -431,7 +431,7 @@ function syncScripts(items: Array<{ id: string; url: string; scriptUrl: string }
   }
 }
 
-/** 按当前状态应用样式与入口脚本；整页模式不注入，由 App.vue 渲染整页 iframe */
+/** 按当前状态应用样式与入口脚本；整页 iframe 的地址由 App.vue 单独处理 */
 export function applyCustomUi() {
   if (devCssUrl) {
     syncLinks([{ id: "dev", url: devCssUrl }]);

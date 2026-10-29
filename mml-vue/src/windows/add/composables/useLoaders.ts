@@ -56,6 +56,8 @@ export function useLoaders(gameVersion: Ref<string>, isLeaving: () => boolean) {
   const versionCache = new Map<string, string[]>();
   /** 正在查询支持列表的游戏版本（防同一版本并发重复查询） */
   let querying = "";
+  /** 加载器版本请求代次：旧一发的返回与「获取中」标记都不能盖掉新的 */
+  let verQuery = 0;
 
   /** 当前加载器不被支持时回退到原版 */
   function ensureLoaderSupported() {
@@ -140,14 +142,19 @@ export function useLoaders(gameVersion: Ref<string>, isLeaving: () => boolean) {
    * 是否拿到了有效列表；刷新按钮据此决定要不要提示
    */
   async function fetchLoaderVersions(): Promise<boolean> {
-    if (NO_VERSION_LOADERS.includes(loader.value) || !gameVersion.value) {
+    const mine = ++verQuery;
+    const reqLoader = loader.value;
+    const reqMc = gameVersion.value;
+    if (NO_VERSION_LOADERS.includes(reqLoader) || !reqMc) {
+      loaderVerLoading.value = false;
       loaderVersions.value = [];
       loaderVersion.value = "";
       return false;
     }
-    const key = `${loader.value}:${gameVersion.value}`;
+    const key = `${reqLoader}:${reqMc}`;
     const cached = versionCache.get(key);
     if (cached) {
+      loaderVerLoading.value = false;
       loaderVersions.value = cached;
       loaderVersion.value = cached[0] ?? "";
       return true;
@@ -157,11 +164,9 @@ export function useLoaders(gameVersion: Ref<string>, isLeaving: () => boolean) {
     loaderVersions.value = [];
     loaderVersion.value = "";
     try {
-      // 记录请求参数，返回后对比：期间选择已变化则丢弃过期结果
-      const reqLoader = loader.value;
-      const reqMc = gameVersion.value;
       const list = await api.addLoaderVersions(reqLoader, reqMc);
-      if (isLeaving()) return false;
+      // 期间选择已变化则丢弃过期结果，别把旧列表或旧失败提示贴到新选择上
+      if (isLeaving() || mine !== verQuery) return false;
       versionCache.set(key, list);
       if (loader.value === reqLoader && gameVersion.value === reqMc) {
         loaderVersions.value = list;
@@ -170,14 +175,15 @@ export function useLoaders(gameVersion: Ref<string>, isLeaving: () => boolean) {
       }
       return false;
     } catch {
-      if (isLeaving()) return false;
+      if (isLeaving() || mine !== verQuery) return false;
       // 拉取失败（如数据源不可达）时清空并提示，可用刷新按钮重试
       loaderVersions.value = [];
       loaderVersion.value = "";
       showToast(t("add.loaderVerFail"));
       return false;
     } finally {
-      loaderVerLoading.value = false;
+      // 只有最新一发负责收掉「获取中」，旧的一发不能提前关掉新请求的标记
+      if (mine === verQuery) loaderVerLoading.value = false;
     }
   }
 
@@ -191,10 +197,10 @@ export function useLoaders(gameVersion: Ref<string>, isLeaving: () => boolean) {
 
   /** 选版本 / 换加载器时自动重查；用 watch 而非模板事件，避免漏掉程序性赋值 */
   watch(gameVersion, () => {
-    fetchSupportLoaders();
+    void fetchSupportLoaders();
   });
   watch([loader, gameVersion], () => {
-    fetchLoaderVersions();
+    void fetchLoaderVersions();
   });
 
   // 查询数据期间开启窗口关闭保护，后端在 CloseRequested 阶段拒绝关闭

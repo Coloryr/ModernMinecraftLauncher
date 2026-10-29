@@ -165,9 +165,9 @@ onUnmounted(() => {
       </button>
     </template>
     <div v-if="showLine(items.length) && dragged" class="cat-insert">
-        <GlyphIcon :name="dragged.icon" :size="15" />
-        <span class="cat-name">{{ t(dragged.labelKey) }}</span>
-      </div>
+      <GlyphIcon :name="dragged.icon" :size="15" />
+      <span class="cat-name">{{ t(dragged.labelKey) }}</span>
+    </div>
 
     <!-- 拖动时的浮起副本：跟着指针走，位置见 ghost；列表里那一项留在原位淡出 -->
     <Teleport to="body">
@@ -193,7 +193,7 @@ onUnmounted(() => {
   width: calc(var(--rail-w) - 2px);
   padding: 10px 12px;
   border: 1px solid var(--accent-border);
-  border-radius: 9px;
+  border-radius: 10px;
   background: var(--bg-modal);
   color: var(--accent);
   font-size: 13px;

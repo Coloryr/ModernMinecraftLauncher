@@ -98,14 +98,19 @@ import type {
 import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, CustomUiChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiThemeChange, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress, ServerInstanceFocus, ServerInstanceProgress, StartArg } from "./listens";
 
 export interface CreateInstanceOpts {
+  /** 加载器 ID，缺省为 `normal` */
   loader?: string;
+  /** 加载器版本，缺省为无 */
   loaderVersion?: string | null;
   /** 目标分组 uuid；后端原样存下不做解析，null / 缺省表示不归组 */
   group?: string | null;
+  /** 整合包类型 ID，缺省为非整合包 */
   modpackType?: string;
+  /** 下载源标识，缺省为无 */
   source?: string;
 }
 
+/** 前端 IPC 便捷包装，按窗口 / 业务域分组 */
 export const api = {
   /**
    * 获取实例列表
@@ -154,7 +159,7 @@ export const api = {
    * MOTD 查询结果；连不上或无数据时 `state` 为对应失败态
    */
   async getMotd(address: string): Promise<MotdDto> {
-    return getMotd(address);
+    return commands.main.getMotd(address);
   },
 
   /**
@@ -1509,7 +1514,7 @@ export const api = {
     return commands.collect.star(source, fileType, pid, name, icon, url, star, group);
   },
 
-  // ---------------- 从 ColorMC 迁移：首次启动，见 windows/colormc.rs ----------------
+  // ---------------- 从 ColorMC 迁移：首次启动，见 windows/colormc/ ----------------
 
   /**
    * 探测本机的 ColorMC 工作目录
@@ -1835,8 +1840,10 @@ export function onCloseBlocked(cb: (label: string) => void): Promise<UnlistenFn>
 /**
  * 在区域文件的某个区块里按 id 找实体或方块实体
  *
- * - `x` / `z`: 区块**绝对坐标**，与列表上显示的一致
+ * - `uuid`: 实例 uuid
+ * - `source`: 来源，空串为实例本身，否则是存档目录名
  * - `kind`: `Entities` 或 `block_entities`
+ * - `x` / `z`: 区块绝对坐标，与列表上显示的一致
  * - `name`: id 片段，空串表示只定位区块
  */
 export function findConfigChunk(
@@ -1852,7 +1859,13 @@ export function findConfigChunk(
 
 // ---------- 配置文件的右键操作 ----------
 
-/** 在文件管理器里打开这个配置文件所在的目录 */
+/**
+ * 在文件管理器里打开这个配置文件所在的目录
+ *
+ * - `game`: 实例 uuid
+ * - `source`: 来源，空串为实例本身，否则是存档目录名
+ * - `file`: 来源内的相对路径
+ */
 export function openConfigFileDir(game: string, source: string, file: string): Promise<void> {
   return commands.config.openFileDir(game, source, file);
 }
@@ -1862,12 +1875,22 @@ export function getConfigTreeWidth(): Promise<number> {
   return commands.config.treeWidth();
 }
 
-/** 记住配置文件窗口左栏的宽度，后端会夹到合法区间 */
+/**
+ * 记住配置文件窗口左栏的宽度，后端会夹到合法区间
+ *
+ * - `width`: 宽度，单位像素
+ */
 export function setConfigTreeWidth(width: number): Promise<void> {
   return commands.config.setTreeWidth(width);
 }
 
-/** 删除一个配置文件（进回收站） */
+/**
+ * 删除一个配置文件，进回收站
+ *
+ * - `game`: 实例 uuid
+ * - `source`: 来源，空串为实例本身，否则是存档目录名
+ * - `file`: 来源内的相对路径
+ */
 export function deleteConfigFile(game: string, source: string, file: string): Promise<void> {
   return commands.config.deleteFile(game, source, file);
 }
@@ -1880,7 +1903,11 @@ export function getAddModpackSource(): Promise<string> {
   return commands.addModpack.lastSource();
 }
 
-/** 记住下载整合包窗口这次选的下载源 */
+/**
+ * 记住下载整合包窗口这次选的下载源
+ *
+ * - `source`: 下载源 ID
+ */
 export function setAddModpackSource(source: string): Promise<void> {
   return commands.addModpack.setLastSource(source);
 }
@@ -1890,7 +1917,11 @@ export function getAddResourceSource(): Promise<string> {
   return commands.addResource.lastSource();
 }
 
-/** 记住添加资源窗口这次选的下载源 */
+/**
+ * 记住添加资源窗口这次选的下载源
+ *
+ * - `source`: 下载源 ID
+ */
 export function setAddResourceSource(source: string): Promise<void> {
   return commands.addResource.setLastSource(source);
 }
@@ -2394,7 +2425,7 @@ export function enableMod(uuid: string, modUuid: string): Promise<ModRenameDto> 
  *
  * # 返回值
  *
- * 同 [`enableMod`]
+ * 同 `enableMod`
  */
 export function disableMod(uuid: string, modUuid: string): Promise<ModRenameDto> {
   return commands.resource.modDisable(uuid, modUuid);
@@ -2556,7 +2587,7 @@ export function setResourceView(
  *
  * - `uuid`: 实例 uuid
  * - `order`: 分组 uuid 序列；状态分组用 `STATE_GROUP_ID_*` 那几个固定 uuid，
- *   与后端 `resource.rs::STATE_GROUP_*` 同源，自建分组就是它自己的 uuid
+ *   与后端 `windows/resource/groups/state.rs` 的 `STATE_GROUP_*` 同源，自建分组就是它自己的 uuid
  */
 export function setModGroupOrder(uuid: string, order: string[]): Promise<void> {
   return commands.resource.modGroupOrderSet(uuid, order);
@@ -2663,7 +2694,7 @@ export function autoSaveTarget(uuid: string): Promise<AutoSaveTargetDto | null> 
 }
 
 /**
- * 禁用材质包，上面那条的反向操作，口径见 [`enableResourcepack`]
+ * 禁用材质包，上面那条的反向操作，口径见 `enableResourcepack`
  *
  * - `uuid`: 实例 uuid
  * - `file`: 材质包文件名
@@ -2773,7 +2804,7 @@ export function listScreenshots(uuid: string): Promise<ScreenshotItemDto[]> {
  *
  * # 返回值
  *
- * 源文件不存在或复制失败时返回错误
+ * 源文件不存在或复制失败时抛错
  */
 export function exportServers(uuid: string, path: string): Promise<void> {
   return commands.resource.serversExport(uuid, path);
@@ -2787,7 +2818,7 @@ export function exportServers(uuid: string, path: string): Promise<void> {
  *
  * # 返回值
  *
- * 文件不存在、复制失败或解析不通过时返回错误；后端会先备份，解析不通过自动还原
+ * 文件不存在、复制失败或解析不通过时抛错；后端会先备份，解析不通过自动还原
  */
 export function importServers(uuid: string, path: string): Promise<void> {
   return commands.resource.serversImport(uuid, path);

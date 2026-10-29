@@ -74,6 +74,7 @@ type DragKind = "move" | "resize";
 let dragging: DragKind | null = null;
 let from = { mx: 0, my: 0, x: 0, y: 0, size: 0 };
 
+/** 按下选区或右下角把手：记下起点，指针在窗口外也要跟手 */
 function onDown(e: PointerEvent, kind: DragKind) {
   e.preventDefault();
   dragging = kind;
@@ -88,6 +89,7 @@ function onDown(e: PointerEvent, kind: DragKind) {
   window.addEventListener("pointerup", onUp);
 }
 
+/** 拖动中：位移换算成展示坐标，并夹在容器范围内 */
 function onMove(e: PointerEvent) {
   if (!dragging) return;
   const dx = e.clientX - from.mx;
@@ -107,6 +109,7 @@ function onMove(e: PointerEvent) {
   sel.value = { x: from.x, y: from.y, size };
 }
 
+/** 松手：结束这次拖拽，摘掉窗口级监听 */
 function onUp() {
   dragging = null;
   window.removeEventListener("pointermove", onMove);

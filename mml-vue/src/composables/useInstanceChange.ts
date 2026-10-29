@@ -8,9 +8,9 @@
 // ```ts
 // useInstanceChange(syncInstances);
 // ```
-import { onBeforeUnmount, onMounted } from "vue";
-import type { UnlistenFn } from "@tauri-apps/api/event";
+import { onMounted } from "vue";
 import { onInstanceChange } from "../lib/api";
+import { useUnlisteners } from "./useUnlisteners";
 
 /**
  * 订阅实例变更事件
@@ -21,15 +21,10 @@ import { onInstanceChange } from "../lib/api";
  * - `refresh`: 实例被添加 / 删除 / 改名 / 换分组 / 换图标时调用，参数是变更类型
  */
 export function useInstanceChange(refresh: (type: string) => void | Promise<void>) {
-  let unlisten: UnlistenFn | null = null;
+  const { track } = useUnlisteners();
 
-  // 订阅要 await，卸载时可能还没订上：成立与否都按"订上才退订"处理
-  onMounted(async () => {
-    unlisten = await onInstanceChange((type) => void refresh(type));
-  });
-
-  onBeforeUnmount(() => {
-    unlisten?.();
-    unlisten = null;
+  // 订阅是异步的，卸载早于订阅完成时就地退订，别把监听留到窗口关掉之后
+  onMounted(() => {
+    track(onInstanceChange((type) => void refresh(type)));
   });
 }

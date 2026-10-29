@@ -146,7 +146,9 @@ export function measureRowHeight(root: HTMLElement | null, fallback: number): nu
  *
  * # 返回值
  *
- * `start` / `end` 是要渲染的下标区间，`padTop` / `padBottom` 是上下留白
+ * - `start` / `end`: 要渲染的下标区间，`end` 不含
+ * - `padTop` / `padBottom`: 上下藏起来的行占的高度，单位 px
+ * - `remeasure`: 本组行数变了就报一次布局变化，让后面各组重算位置
  */
 export function useVirtualRows(options: {
   root: Ref<HTMLElement | null>;
@@ -165,8 +167,8 @@ export function useVirtualRows(options: {
     const count = options.count();
     const rootEl = options.root.value;
     const containerEl = scroll?.container.value ?? null;
-    // 整列都要渲染（就地编辑备注）、没有滚动状态（组件被单独用）或还没量到元素：
-    // 先全渲染，别把行藏没了
+    // 整列都要渲染、没有滚动状态或还没量到元素时先全渲染，别把行藏没了；
+    // 整列用于表格里就地编辑备注，被窗口裁掉的那行会连草稿一起销毁
     if (options.whole?.() || !scroll || !rootEl || !containerEl || count <= 0) {
       return { start: 0, end: Math.max(count, 0), padTop: 0, padBottom: 0 };
     }
@@ -196,7 +198,7 @@ export function useVirtualRows(options: {
     padTop: computed(() => win.value.padTop),
     /** 下面藏起来的行占的高度 */
     padBottom: computed(() => win.value.padBottom),
-    /** 本组自己的行数变了（展开内置模组等）：报一次布局变化，后面那些组要重量位置 */
+    /** 本组行数变了时调它，让后面那些组重新量位置 */
     remeasure: () => scroll?.bump(),
   };
 }

@@ -205,33 +205,44 @@ function setConfigMode(dir: string, mode: ConfigMode) {
   configs.value = configs.value.map((item) => (item.dir === dir ? { ...item, mode } : item));
 }
 
+/** 加载序号：快速切实例时只认最后一次请求的结果 */
+let loadSeq = 0;
+
 /** 重新读一个实例的模组、资源包与顶层目录，勾选与配置列表重置成默认值 */
 async function loadInstance(uuid: string) {
+  const seq = ++loadSeq;
   try {
     const info = await api.getExportInfo(uuid);
+    if (seq !== loadSeq) return;
     mods.value = info.mods.filter((item) => !item.dir);
     pickedMods.value = new Set(mods.value.map((item) => item.path));
     modUrls.value = new Map(mods.value.map((item) => [item.path, item.url ?? ""]));
   } catch (e) {
+    if (seq !== loadSeq) return;
     mods.value = [];
     pickedMods.value = new Set();
     modUrls.value = new Map();
     showToast(tErr(e));
   }
 
+  let packsNext: ExportEntryDto[] = [];
   try {
-    packs.value = (await api.listExportDir(uuid, "resourcepacks")).filter((item) => !item.dir);
+    packsNext = (await api.listExportDir(uuid, "resourcepacks")).filter((item) => !item.dir);
   } catch {
     // 没有 resourcepacks 目录就是空表
-    packs.value = [];
   }
+  if (seq !== loadSeq) return;
+  packs.value = packsNext;
   pickedPacks.value = new Set(packs.value.map((item) => item.path));
 
+  let dirsNext: ExportEntryDto[] = [];
   try {
-    topDirs.value = await api.listExportDir(uuid, "");
+    dirsNext = await api.listExportDir(uuid, "");
   } catch {
-    topDirs.value = [];
+    // 读不到就当没有可同步的目录
   }
+  if (seq !== loadSeq) return;
+  topDirs.value = dirsNext;
 
   // 默认把所有能同步的文件夹都加上，用户再按需改方式或删掉
   configs.value = topDirs.value
@@ -273,6 +284,8 @@ function applyTarget() {
 
 /** 清掉目标实例与它带出来的勾选：实例没了，界面上不能留着上一份快照 */
 function clearInstance() {
+  // 在途的加载结果作废，否则它回来又会把已删实例的数据铺上
+  loadSeq += 1;
   currentUuid.value = "";
   name.value = "";
   mods.value = [];
@@ -681,7 +694,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 12px;
+  padding: 8px 12px;
   border: none;
   border-radius: 10px;
   background: transparent;
@@ -762,7 +775,7 @@ onBeforeUnmount(() => {
 }
 
 .si-title {
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 800;
 }
 
@@ -892,8 +905,6 @@ onBeforeUnmount(() => {
   color: var(--accent);
   background: var(--accent-soft);
 }
-
-
 
 .si-size {
   flex-shrink: 0;
@@ -1067,7 +1078,7 @@ select.si-cell-control {
   height: 100%;
   border-radius: 999px;
   background: var(--accent-grad, var(--accent));
-  transition: width 0.15s ease;
+  transition: width 0.3s;
 }
 
 .run-info {
@@ -1103,6 +1114,7 @@ select.si-cell-control {
   word-break: break-all;
 }
 
+/* 实例下拉比标题栏标准的 170–280 宽一档：实例名长，要留够显示宽度 */
 .head-select {
   min-width: 200px;
   max-width: 300px;

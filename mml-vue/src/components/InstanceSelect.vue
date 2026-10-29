@@ -230,7 +230,7 @@ function addNew() {
 }
 
 .sel-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -239,7 +239,7 @@ function addNew() {
 }
 
 .sel-placeholder {
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--text-dim);
 }
 
@@ -252,7 +252,7 @@ function addNew() {
 }
 
 .loader-text {
-  font-size: 10px;
+  font-size: 10.5px;
   padding: 0 6px;
   border-radius: 8px;
   background: var(--accent-soft);
@@ -307,7 +307,7 @@ function addNew() {
   gap: 10px;
   padding: 8px 10px;
   border: none;
-  border-radius: 9px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text);
   cursor: pointer;
@@ -345,7 +345,7 @@ function addNew() {
 }
 
 .option-sub {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text-dim);
   display: inline-flex;
   align-items: center;
@@ -353,7 +353,7 @@ function addNew() {
 }
 
 .option-sub .loader-text {
-  font-size: 9.5px;
+  font-size: 10.5px;
 }
 
 /* 运行中的绿点：贴右缘并**脱离文档流**，不给选项行带来任何尺寸影响 */

@@ -21,8 +21,18 @@ export type AccentId =
   | "purple"
   | "indigo";
 
-/** 强调色预设列表：color 用于设置界面色块预览，check 为选中对勾颜色 */
-export const ACCENTS: { id: AccentId; color: string; check: string }[] = [
+/** 一个强调色预设 */
+export interface AccentPreset {
+  /** 预设 id，同时是 `data-accent` 的值 */
+  id: AccentId;
+  /** 色块预览用的 `#rrggbb` */
+  color: string;
+  /** 选中对勾颜色：浅色强调色配深色对勾 */
+  check: string;
+}
+
+/** 强调色预设列表，设置界面的色块与 `data-accent` 都取自这里 */
+export const ACCENTS: AccentPreset[] = [
   { id: "blue", color: "#4f8cff", check: "#fff" },
   { id: "sky", color: "#38bdf8", check: "#fff" },
   { id: "cyan", color: "#22d3ee", check: "#fff" },
@@ -75,7 +85,10 @@ function hexToRgb(hex: string): [number, number, number] {
 
 /** [r, g, b] → #rrggbb */
 function rgbToHex(r: number, g: number, b: number): string {
-  return "#" + [r, g, b].map((v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, "0")).join("");
+  const hex = [r, g, b]
+    .map((v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, "0"))
+    .join("");
+  return `#${hex}`;
 }
 
 /** 按比例靠拢：ratio > 0 向白，ratio < 0 向黑 */
@@ -146,7 +159,7 @@ export function setTheme(v: Theme) {
   theme.value = v;
   writeString(KEYS.theme, v);
   applyTheme();
-  saveGuiConfig({ theme: v });
+  void saveGuiConfig({ theme: v });
 }
 
 /**

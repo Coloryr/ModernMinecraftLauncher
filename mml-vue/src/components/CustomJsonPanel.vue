@@ -14,17 +14,21 @@ const props = defineProps<{
 }>();
 
 const list = ref<CustomJsonItemDto[]>([]);
+/** 拉取代次：切实例时丢弃旧一发的返回 */
+let loadSeq = 0;
 
 /** 拉一次列表；失败按空表处理，不打断详情页 */
 async function load() {
+  const mine = ++loadSeq;
   if (!props.uuid) {
     list.value = [];
     return;
   }
   try {
-    list.value = await api.getCustomJson(props.uuid);
+    const items = await api.getCustomJson(props.uuid);
+    if (mine === loadSeq) list.value = items;
   } catch {
-    list.value = [];
+    if (mine === loadSeq) list.value = [];
   }
 }
 

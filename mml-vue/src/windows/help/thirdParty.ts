@@ -33,6 +33,14 @@ export interface ThirdPartyGroup {
   items: ThirdPartyItem[];
 }
 
+/** 第三方服务的一条附加链接 */
+export interface ThirdPartyLink {
+  /** 链接文案的 i18n 键 */
+  label: string;
+  /** 链接地址 */
+  url: string;
+}
+
 /** 本项目会去调用的第三方服务；与组件不同，它没有许可与版本，只有用途与地址 */
 export interface ThirdPartyService {
   /** 服务名，专有名词，不翻译 */
@@ -41,8 +49,8 @@ export interface ThirdPartyService {
   purpose: string;
   /** 服务地址，通常是官网或控制台；空串表示不显示按钮 */
   url: string;
-  /** 附加链接，如 API 文档 */
-  links: Array<{ label: string; url: string }>;
+  /** 附加链接，如 API 文档；没有时为空数组 */
+  links: ThirdPartyLink[];
 }
 
 /** 本项目作者自己的作品，不算第三方；列出来是为了让清单完整 */

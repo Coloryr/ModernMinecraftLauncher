@@ -1,12 +1,13 @@
 // 主窗口共享类型，MainWindow 与其子组件共用
 import type { InstanceInfoDto } from "../../lib/bindings";
 
-/** 实例列表显示模式；默认 list，来源见 lib/guiConfig.ts */
+/** 实例列表显示模式：group / grid / list，默认 list，真源在 lib/guiConfig.ts */
 export type { ViewMode } from "../../lib/guiConfig";
 
 /** 顶栏功能入口的 id：settings / stats / help / collect */
 export type FeatureId = "settings" | "stats" | "help" | "collect";
 
+/** 侧栏里的一个分组：分组信息加上组内实例 */
 export interface GroupView {
   /** 分组 uuid，身份字段；改名不影响它 */
   id: string;
@@ -18,11 +19,11 @@ export interface GroupView {
   items: InstanceInfoDto[];
 }
 
-/** 右键菜单状态 */
+/** 右键菜单状态：位置加上这次右键落在什么目标上 */
 export interface CtxMenuState {
-  /** 菜单左上角位置，单位 px，相对视口 */
+  /** 菜单左边缘，单位 px，相对视口 */
   x: number;
-  /** 菜单左上角位置，单位 px，相对视口 */
+  /** 菜单上边缘，单位 px，相对视口 */
   y: number;
   /** 右键落在哪一类目标上 */
   kind: "group" | "multi" | "instance";

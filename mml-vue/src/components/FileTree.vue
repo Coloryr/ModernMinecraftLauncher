@@ -89,10 +89,6 @@ function onChevronClick(node: FileNode) {
 </template>
 
 <style scoped>
-.ftree-node {
-  /* 递归子树的缩进由 .ftree-children 控制 */
-}
-
 .ftree-row {
   display: flex;
   align-items: center;

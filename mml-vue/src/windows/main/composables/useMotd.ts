@@ -38,11 +38,13 @@ export function useMotd(opts: {
   // 竞态保护：旧请求晚到不覆盖新结果
   let motdSeq = 0;
 
+  /** 重查悬浮卡；地址为空时什么都不做，卡片由 MainWindow 按开关隐藏 */
   async function refreshMotd() {
     const addr = clientConfig.value.motdServer.trim();
-    if (!addr || motdLoading.value) return;
-    motdLoading.value = true;
+    if (!addr) return;
+    // 不因"已有请求在飞"提前返回：地址刚改时那次旧请求会让新地址一直等不到结果
     const seq = ++motdSeq;
+    motdLoading.value = true;
     try {
       const dto = await api.getMotd(addr);
       if (seq === motdSeq) motdInfo.value = dto;
@@ -59,17 +61,19 @@ export function useMotd(opts: {
   const instMotdLoading = ref(false);
   let instMotdSeq = 0;
 
+  /** 重查实例详情卡；没填地址时清空结果，并把在途请求作废 */
   async function refreshInstMotd() {
     const inst = selected.value;
     const ip = inst ? argsOf(inst.uuid).serverIp.trim() : "";
+    // 先占新序号：地址被清空或换成别的服务器时，旧请求晚到的结果不再写回
+    const seq = ++instMotdSeq;
     if (!ip) {
       instMotd.value = null;
+      instMotdLoading.value = false;
       return;
     }
-    if (instMotdLoading.value) return;
     const port = inst ? argsOf(inst.uuid).serverPort || 25565 : 25565;
     instMotdLoading.value = true;
-    const seq = ++instMotdSeq;
     try {
       const dto = await api.getMotd(`${ip}:${port}`);
       if (seq === instMotdSeq) instMotd.value = dto;
@@ -93,6 +97,7 @@ export function useMotd(opts: {
 
   // ---- 悬浮卡的显隐与自动刷新定时器（由客户端设置驱动）----
 
+  /** 悬浮卡是否该显示；由 MainWindow 按客户端设置的开关与地址同步过来 */
   const motdCardVisible = ref(true);
   let motdTimer: number | null = null;
 

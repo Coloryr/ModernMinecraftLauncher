@@ -43,7 +43,13 @@ const listLoading = ref(false);
 /** 本机架构：探不出来为 null，回落到选第一项 */
 type PlatformArch = "x86_64" | "x86" | "aarch64" | "arm" | null;
 
-/** 探测本机 CPU 架构 */
+/**
+ * 探测本机 CPU 架构
+ *
+ * # 返回值
+ *
+ * 架构名；两项探测都认不出时为 null
+ */
 async function detectArch(): Promise<PlatformArch> {
   // Chromium 的 userAgentData 能给出真实架构：Windows ARM 的 UA 仍伪装成 x64，
   // 所以不能只靠 UA；WebView2 支持，浏览器预览也大多支持
@@ -115,7 +121,7 @@ onMounted(loadSources);
 // 单窗口模式：窗口被 KeepAlive 缓存，切回不会重新挂载 → 自己补一次
 useWindowRefresh(loadSources);
 
-/** 拉当前源的四个下拉候选，并默认选本机对应的系统与架构 */
+/** 拉当前源的四个下拉候选，默认选本机对应的系统与架构，再按默认筛选拉一次列表 */
 async function loadOptions() {
   if (!source.value) return;
   optionsLoading.value = true;
@@ -134,10 +140,11 @@ async function loadOptions() {
       "";
   } catch (e) {
     showToast(tErr(e));
+    // 候选没拉到就别按旧条件拉列表，否则列表与下拉显示的源对不上
+    return;
   } finally {
     optionsLoading.value = false;
   }
-  // 选项就绪后按默认筛选拉一遍列表
   await loadList();
 }
 
@@ -168,6 +175,8 @@ function formatSize(bytes: number): string {
 /** 按当前筛选条件拉取匹配的包列表 */
 async function loadList() {
   if (!source.value || !javaType.value || major.value === null || !system.value || !arch.value) {
+    // 筛选不全时清空，别留着上一个源的列表
+    items.value = [];
     return;
   }
   listLoading.value = true;
@@ -271,7 +280,7 @@ async function loadList() {
   justify-content: center;
   gap: 12px;
   color: var(--text-dim);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .loading-spin {
@@ -303,7 +312,6 @@ async function loadList() {
 }
 
 .field-label {
-  margin-bottom: 6px;
   white-space: nowrap;
 }
 
@@ -322,7 +330,7 @@ async function loadList() {
 
 .item-card {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--bg-card);
   padding: 12px 14px;
   display: flex;
@@ -346,7 +354,7 @@ async function loadList() {
 
 .item-sub {
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: 11.5px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

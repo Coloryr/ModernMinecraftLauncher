@@ -57,7 +57,7 @@ function showPreview(e: MouseEvent, acc: AccountStoreDto) {
 
 function movePreview(e: MouseEvent) {
   if (!preview.value) return;
-  // 右/下缘内翻，避免大图出窗：大图最大 256px 高 + 边距
+  // 右/下缘内翻，避免大图出窗：大图 160px + 边距
   preview.value.x = Math.min(e.clientX + 14, window.innerWidth - 200);
   preview.value.y = Math.min(e.clientY + 14, window.innerHeight - 200);
 }

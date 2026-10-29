@@ -78,6 +78,7 @@ const canDisable = computed(() => selectedItems.value.some((item) => item.enable
  * - `enable`: 目标状态，`true` 启用、`false` 禁用
  */
 async function batchToggle(enable: boolean) {
+  // 目标是启用就挑禁用中的，目标是禁用就挑启用中的
   const picked = selectedItems.value.filter((item) => (item.enable === false) === enable);
   if (!picked.length) return;
   await act(async () => {

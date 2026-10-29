@@ -16,6 +16,7 @@ export interface AddModeTab {
   icon: AddModeIcon;
 }
 
+/** 四种添加模式及其页签文案键，顺序即界面顺序 */
 export const ADD_MODES: AddModeTab[] = [
   { id: "new", labelKey: "add.modeNew", icon: "cube" },
   { id: "archive", labelKey: "add.modeArchive", icon: "box" },

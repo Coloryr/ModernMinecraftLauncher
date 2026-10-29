@@ -379,7 +379,7 @@ async function applyDefaults(data: ExportInfoDto, uuid: string, request: number)
  */
 function seedModPicks(): Map<string, ExportEntryDto> {
   const picked = new Map<string, ExportEntryDto>();
-  if (!modsInManifest.value) return picked;
+  if (!showModsTab.value) return picked;
   for (const mod of info.value?.mods ?? []) {
     const ids = modIds.value.get(mod.path) ?? { modId: mod.modId ?? "", fileId: mod.fileId ?? "" };
     // 只勾编号成立的模组；其余随 mods 目录打进包
@@ -438,9 +438,6 @@ watch(pack, () => {
   if (currentUuid.value) void reseedFilePicks(currentUuid.value);
 });
 
-/** 这个格式有没有下载清单：只有两种清单格式会把模组列进去，其余整包打进去 */
-const modsInManifest = computed(() => showModsTab.value);
-
 /**
  * 模组勾选联动文件树：勾了模组就走清单下载，同名文件不能再打进 overrides
  *
@@ -448,7 +445,7 @@ const modsInManifest = computed(() => showModsTab.value);
  * - `excluded`: 这次是排除文件（勾上模组）还是放回文件（取消勾选）
  */
 function setModExcluded(path: string, excluded: boolean) {
-  if (!modsInManifest.value) return;
+  if (!showModsTab.value) return;
   if (excluded) {
     // 记下来的只是"这次改的"：本来就手动画掉的不算，取消勾选时不该被还原
     if (isPickedPath(path, pickedFiles.value, unpickedFiles.value)) autoExcluded.value.add(path);
@@ -462,7 +459,7 @@ function setModExcluded(path: string, excluded: boolean) {
 /** 换实例 / 换格式后重新铺一遍联动：已勾的在线模组对应的文件要重新排除 */
 function syncModExclusions() {
   autoExcluded.value = new Set();
-  if (!modsInManifest.value) return;
+  if (!showModsTab.value) return;
   for (const path of pickedMods.value.keys()) {
     if (!isOnlineMod(path)) continue;
     autoExcluded.value.add(path);
@@ -754,6 +751,8 @@ watch(running, (value) => {
 let unlistenProgress: UnlistenFn | null = null;
 let unlistenFocus: UnlistenFn | null = null;
 let unlistenCloseBlocked: UnlistenFn | null = null;
+/** 窗口是否已经销毁：订阅是异步挂上的，挂好之前窗口可能已经关了 */
+let gone = false;
 
 /** 定位到 openWindow 带入的目标实例；没有或不存在就保持下拉默认值 */
 function applyTarget() {
@@ -801,12 +800,12 @@ onMounted(async () => {
   await syncInstances();
   void loadCustomAssets();
 
-  unlistenProgress = await onExportProgress((p) => {
+  const progressOff = await onExportProgress((p) => {
     progress.value = p;
   });
 
   // 窗口已存在时再次打开：壳层推送新的目标实例
-  unlistenFocus = await onExportFocus((uuid) => {
+  const focusOff = await onExportFocus((uuid) => {
     if (instances.value.some((i) => i.uuid === uuid)) {
       focusInstance(uuid);
     }
@@ -814,18 +813,33 @@ onMounted(async () => {
 
   // 多窗口：原生关窗（Alt+F4 / 任务栏）由 Rust 拦下并发 close-blocked。
   // 单窗口模式下页面是在主窗口里切换，关页面走标题栏 ✕，看到的是同一条 askClose
-  if (multiWindow.value) {
-    unlistenCloseBlocked = await onCloseBlocked((label) => {
-      if (label && label !== myLabel) return;
-      confirmClose.value = true;
-    });
+  const closeOff = multiWindow.value
+    ? await onCloseBlocked((label) => {
+        if (label && label !== myLabel) return;
+        confirmClose.value = true;
+      })
+    : null;
+
+  // 订阅回来之前窗口可能已经关了：当场退订，别留悬空监听
+  if (gone) {
+    progressOff();
+    focusOff();
+    closeOff?.();
+    return;
   }
+  unlistenProgress = progressOff;
+  unlistenFocus = focusOff;
+  unlistenCloseBlocked = closeOff;
 });
 
 onBeforeUnmount(() => {
+  gone = true;
   unlistenProgress?.();
+  unlistenProgress = null;
   unlistenFocus?.();
+  unlistenFocus = null;
   unlistenCloseBlocked?.();
+  unlistenCloseBlocked = null;
 });
 </script>
 

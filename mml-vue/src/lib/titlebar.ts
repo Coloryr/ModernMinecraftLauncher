@@ -10,9 +10,11 @@
 
 import { onActivated, onMounted, watch } from "vue";
 import { commands } from "./bindings";
-import { isTauri } from "../windows/windowManager";
+import { isTauri } from "./util";
 
+/** 运行平台，由 UA 判定 */
 export type OsKind = "windows" | "linux" | "macos";
+/** 自绘标题栏样式：windows 右端三个方按钮，macos 左端红黄绿圆点 */
 export type TitleBarStyle = "windows" | "macos";
 
 /**
@@ -82,7 +84,7 @@ export const titleBarStyle: TitleBarStyle = (() => {
 /** 标题栏上按下时不应触发拖动 / 最大化的元素 */
 const INTERACTIVE = "button, a, input, select, textarea, label, [data-no-drag]";
 
-/** 判定双击的最大间隔 */
+/** 判定双击的最大间隔，单位毫秒 */
 const DOUBLE_CLICK_MS = 400;
 
 function isInteractive(target: EventTarget | null): boolean {
@@ -92,7 +94,9 @@ function isInteractive(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest(INTERACTIVE) !== null;
 }
 
+/** 上一次标题栏按下的时刻，单位毫秒；0 表示没有待判定的按下 */
 let lastDownAt = 0;
+/** 上一次按下的事件目标，用来区分两次是否点在同一个元素上 */
 let lastDownTarget: EventTarget | null = null;
 
 /**

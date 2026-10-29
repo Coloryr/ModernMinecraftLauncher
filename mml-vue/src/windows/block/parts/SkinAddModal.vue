@@ -18,12 +18,14 @@ const emit = defineEmits<{
   (e: "close"): void;
 }>();
 
+/** 输入的用户名或 UUID，提交时去掉前后空白 */
 const input = ref("");
 
 useModalKeys((e) => {
   if (e.key === "Escape" && !props.busy) emit("close");
 });
 
+/** 提交输入；空输入或提交中时不发 */
 function submit() {
   const value = input.value.trim();
   if (!value || props.busy) return;

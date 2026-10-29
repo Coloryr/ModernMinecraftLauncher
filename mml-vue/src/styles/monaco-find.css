@@ -23,7 +23,7 @@
   --vscode-errorForeground: var(--red);
   --vscode-disabledForeground: var(--text-dim);
   --vscode-cornerRadius-large: 10px;
-  --vscode-cornerRadius-small: 6px;
+  --vscode-cornerRadius-small: 8px;
   --vscode-shadow-lg: var(--shadow-md);
   font-family: var(--app-font, "Microsoft YaHei", "PingFang SC", "Segoe UI", system-ui, sans-serif);
 }
@@ -36,7 +36,7 @@
    Monaco 把底色与描边写成了元素内联样式，只能 !important 盖 */
 .monaco-editor .find-widget .monaco-inputbox {
   background-color: var(--bg-solid, var(--bg-card)) !important;
-  border-radius: 6px;
+  border-radius: 8px;
   border-color: var(--border) !important;
 }
 

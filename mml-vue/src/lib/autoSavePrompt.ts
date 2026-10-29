@@ -34,6 +34,11 @@ let pending: ((answer: AutoSaveAnswer) => void) | null = null;
  * 用户是否进入、是否继续提醒、是否清掉该实例的配置
  */
 export function askAutoSave(target: AutoSaveTargetDto): Promise<AutoSaveAnswer> {
+  // 上一问还没回答就来了新的一问：先按“不进入、继续提醒”放掉旧的，
+  // 否则它的 Promise 永远不 settle。正常启动是串行的，这里只是兜底。
+  pending?.({ enter: false, notice: true, disable: false });
+  pending = null;
+
   return new Promise((resolve) => {
     pending = resolve;
     autoSavePick.value = target;

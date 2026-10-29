@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 启动器设置窗口：左侧标签导航 + 右侧内容区
-// 标签：界面（含窗口设置）/ Java / 网络与下载 / 游戏启动 / 手柄 / 皮肤与头像 / 客户端设置 / 本地文件
+// 标签：界面 / Java / 网络与下载 / 游戏启动 / 手柄 / 皮肤与头像 / 客户端设置 / 本地文件 / 实验性功能
 //
 // 这里只做编排：状态与保存逻辑全在 composables/（每个标签一份），
 // 排版在 parts/tabs/，每个标签一个组件；窗口级样式在 settings.css，非 scoped、子组件共用。
@@ -42,6 +42,13 @@ const emit = defineEmits<{
 
 // ================= 标签（记住上次所在页） =================
 
+/**
+ * 读回上次停留的标签页
+ *
+ * # 返回值
+ *
+ * 本地存过且仍合法时用它，否则回落到「界面」
+ */
 function storedTab(): SettingsTab {
   const raw = readString(KEYS.settingsTab);
   return isSettingsTab(raw) ? raw : "ui";
@@ -162,6 +169,7 @@ const { win: launchWin } = launch;
 const flashGroup = ref("");
 let flashTimer: number | null = null;
 
+/** 让某个分组短暂高亮，等用户看清落点 */
 function flash(id: string) {
   flashGroup.value = id;
   if (flashTimer !== null) clearTimeout(flashTimer);

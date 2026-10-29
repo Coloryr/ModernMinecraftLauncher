@@ -49,6 +49,7 @@ useModalKeys((e) => {
   if (e.key === "Escape") emit("close");
 });
 
+/** 复制方块 id，成败都给一句提示 */
 async function copyId() {
   showToast((await copyText(props.block.id)) ? t("blocks.copied") : t("blocks.copyFail"));
 }
@@ -136,7 +137,7 @@ async function copyId() {
 
 .detail-group-empty {
   margin: 0;
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-dim);
 }
 
@@ -172,21 +173,21 @@ async function copyId() {
   min-width: 0;
   padding: 4px 8px;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: 8px;
   background: var(--bg-side);
   font-family: ui-monospace, Consolas, "Courier New", monospace;
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text);
   word-break: break-all;
 }
 
 .cat-chip {
   align-self: flex-start;
-  padding: 2px 9px;
+  padding: 2px 8px;
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
 }
 </style>

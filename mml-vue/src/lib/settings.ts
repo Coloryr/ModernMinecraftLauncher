@@ -31,9 +31,12 @@ import {
   writeString,
 } from "./storage";
 import { bumpImageVersion } from "./accountImages";
-import { isTauri } from "../windows/windowManager";
+import { isTauri } from "./util";
 import { SkinConfigChange } from "./listens";
 export type { SidebarSide, ViewMode, SkinDisplay, CapeDisplay, HeadType, StartupPage } from "./guiConfig";
+
+// restore* 系列只在启动时把配置同步到内存与本地存储，不回写 gui_config.json；
+// set* 系列才是用户改动，会写配置并广播。
 
 export const sidebarSide = ref<SidebarSide>(
   readString(KEYS.sidebarSide) === "Right" ? "Right" : "Left",
@@ -60,7 +63,7 @@ export function setStartupPage(v: StartupPage) {
 }
 
 /**
- * 启动恢复：只同步内存与本地存储，不回写 gui_config.json
+ * 启动恢复：同步启动页
  *
  * - `v`: 启动页
  */
@@ -105,18 +108,14 @@ export function setViewMode(v: ViewMode) {
 /** 当前选中实例 uuid（空串 = 未选中） */
 export const selectedInstance = ref(readString(KEYS.selectedInstance));
 
-function mirrorSelected(uuid: string) {
-  writeString(KEYS.selectedInstance, uuid);
-}
-
 /**
- * 启动引导：从 gui_config 恢复选中实例，只同步内存 + 本地存储，不回写配置文件
+ * 启动引导：从 gui_config 恢复选中实例
  *
  * - `uuid`: 选中实例 uuid，空串 = 未选中
  */
 export function restoreSelectedInstance(uuid: string) {
   selectedInstance.value = uuid;
-  mirrorSelected(uuid);
+  writeString(KEYS.selectedInstance, uuid);
 }
 
 /**
@@ -129,7 +128,7 @@ export function restoreSelectedInstance(uuid: string) {
 export function setSelectedInstance(uuid: string) {
   if (selectedInstance.value === uuid) return;
   selectedInstance.value = uuid;
-  mirrorSelected(uuid);
+  writeString(KEYS.selectedInstance, uuid);
   saveGuiConfig({ mainWindow: { selectedInstance: uuid } });
 }
 
@@ -159,7 +158,7 @@ export function setSkinConfig(display: SkinDisplay, pitch = skinPitch.value, yaw
 }
 
 /**
- * 启动恢复：只同步内存与镜像，不回写 gui_config.json
+ * 启动恢复：同步皮肤显示模式与角度
  *
  * - `display`: 显示模式
  * - `pitch`: 3D 旋转 X 角度
@@ -200,7 +199,7 @@ export function setCapeConfig(display: CapeDisplay, pitch = capePitch.value, yaw
 }
 
 /**
- * 启动恢复：只同步内存与镜像，不回写 gui_config.json
+ * 启动恢复：同步披风显示模式与角度
  *
  * - `display`: 显示模式
  * - `pitch`: 3D 旋转 X 角度
@@ -219,12 +218,8 @@ export function restoreCapeConfig(display: CapeDisplay, pitch: number, yaw: numb
 
 export const headType = ref<HeadType>(normalizeHeadType(readString(KEYS.headType)));
 // 3D 旋转模式默认角度：x 15 / y 65（没存过或存了非法值时用默认）
-export const headX = ref(readAngle(KEYS.headX, 15));
-export const headY = ref(readAngle(KEYS.headY, 65));
-
-function readAngle(key: (typeof KEYS)["headX"] | (typeof KEYS)["headY"], dflt: number): number {
-  return readNumber(key, dflt);
-}
+export const headX = ref(readNumber(KEYS.headX, 15));
+export const headY = ref(readNumber(KEYS.headY, 65));
 
 /**
  * 设置头像渲染模式，3D 旋转模式附带 X / Y 角度
@@ -245,7 +240,7 @@ export function setHeadConfig(type: HeadType, x = headX.value, y = headY.value) 
 }
 
 /**
- * 启动恢复：只同步内存与镜像，不回写 gui_config.json
+ * 启动恢复：同步头像渲染模式与角度
  *
  * - `type`: 头像渲染模式
  * - `x`: 3D 旋转 X 角度

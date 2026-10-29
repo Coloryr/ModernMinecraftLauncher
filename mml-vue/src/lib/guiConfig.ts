@@ -118,7 +118,12 @@ export function normalizeStartupPage(value: string | null | undefined): StartupP
  * 合法类型，非法 / 缺省时回落 `Head2DB`
  */
 export function normalizeHeadType(value: string | null | undefined): HeadType {
-  return value === "Head3DA" || value === "Head3DB" || value === "Head3DC" || value === "Head2DA" ? value : "Head2DB";
+  return value === "Head3DA" ||
+    value === "Head3DB" ||
+    value === "Head3DC" ||
+    value === "Head2DA"
+    ? value
+    : "Head2DB";
 }
 
 /** 主窗口配置，对应 Rust MainWindowConfig，wire 为 mainWindow */
@@ -170,7 +175,6 @@ export interface LoginLockItem {
   server: string;
 }
 
-/** 客户端设置，对应 Rust ClientConfig，wire 为 client */
 /** 实验性功能开关，对应 Rust ExperimentalConfig，wire 为 experimental */
 export interface ExperimentalConfig {
   /** 启动器自身以管理员身份运行 */
@@ -193,6 +197,7 @@ export interface CustomCssItem {
   enabled: boolean;
 }
 
+/** 客户端设置，对应 Rust ClientConfig，wire 为 client */
 export interface ClientConfig {
   /** 主窗口实例设置里显示 MOTD 卡片 */
   motdCard: boolean;
@@ -277,13 +282,19 @@ export interface GuiConfig {
   bgNativeSize: number;
 }
 
+/** 窗口几何，对应 window_save.json 的一条记录 */
 export interface WindowState {
+  /** 窗口 uuid：普通窗口是注册表里的固定值，窗口族按实例派生 */
   uuid: string;
   /** 窗口标签：main / mml-settings … */
   label: string;
+  /** 客户区左上角 X，单位逻辑像素 */
   x: number;
+  /** 客户区左上角 Y，单位逻辑像素 */
   y: number;
+  /** 客户区宽度，单位逻辑像素 */
   width: number;
+  /** 客户区高度，单位逻辑像素 */
   height: number;
 }
 

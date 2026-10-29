@@ -86,7 +86,7 @@ export function useSettingsSkin() {
     { value: "Elytra", label: t("winSettings.elytra") },
   ]);
 
-  /** 只有 3D B 档需要手调偏移，与原来模板里的 v-if 一致 */
+  /** 只有 3D B 档需要手调偏移 */
   const offsetAdjustable = computed(() => headType.value === "Head3DB");
 
   /** 只有皮肤 3D 旋转档需要手调角度 */

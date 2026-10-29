@@ -19,7 +19,7 @@ import { onUnmounted } from "vue";
  *
  * # 返回值
  *
- * - `track`: 登记一个订阅的 Promise；回调里拿到的 unlisten 会在卸载时调用
+ * - `track`: 登记一个订阅；组件卸载时调用它的 unlisten，订阅还没完成则等完成后立即退订
  */
 export function useUnlisteners() {
   const unlisteners: Array<() => void> = [];

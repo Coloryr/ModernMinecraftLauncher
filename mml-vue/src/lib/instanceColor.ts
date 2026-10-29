@@ -20,7 +20,7 @@ const PALETTE: readonly (readonly [string, string])[] = [
  *
  * # 返回值
  *
- * 0..PALETTE.length 之间的稳定下标
+ * 0 到 `PALETTE.length - 1` 之间的稳定下标
  */
 function indexOf(uuid: string): number {
   let h = 0;

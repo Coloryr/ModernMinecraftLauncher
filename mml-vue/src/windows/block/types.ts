@@ -21,7 +21,7 @@ export interface BlockSizeMetrics {
 }
 
 export const BLOCK_SIZES: Record<BlockSize, BlockSizeMetrics> = {
-  sm: { minCol: 78, img: 40, cell: 84, gap: 8, pad: 8, font: 11 },
+  sm: { minCol: 78, img: 40, cell: 84, gap: 8, pad: 8, font: 10.5 },
   md: { minCol: 96, img: 56, cell: 100, gap: 10, pad: 10, font: 11.5 },
   lg: { minCol: 136, img: 88, cell: 136, gap: 12, pad: 12, font: 12.5 },
 };

@@ -105,7 +105,13 @@ const busy = computed(() => saving.value || nbtSaving.value || deleting.value);
 
 const pendingDiscard = ref<((discard: boolean) => void) | null>(null);
 
-/** 确认是否放弃文本改动；保存、删除或等待确认时拒绝切换 */
+/**
+ * 确认是否放弃文本改动；保存、删除或已有确认在等时拒绝切换
+ *
+ * # 返回值
+ *
+ * 可以继续切换为 `true`；被拒绝为 `false`
+ */
 async function allowTextLoss(): Promise<boolean> {
   if (busy.value || pendingDiscard.value) return false;
   if (!isText.value || !dirty.value) return true;
@@ -263,6 +269,8 @@ async function open(file: FileItemDto) {
   const from = source.value;
   const current = () => generation === requestGeneration && uuid === instanceUuid.value && from === source.value;
   selected.value = file;
+  // 上一个文件留下的定位目标不作数了，否则新文件会按旧区块下标翻开
+  mcaTarget.value = null;
   text.value = "";
   origin.value = "";
   originSha1.value = "";
@@ -583,9 +591,9 @@ onBeforeUnmount(() => {
   stopResize?.();
   resizeObserver?.disconnect();
   window.removeEventListener("keydown", onSaveHotkey);
+  // 卸载时关闭 NBT 会话；单窗口模式的 KeepAlive 切页不会触发卸载
+  closeSessions();
 });
-// 组件卸载时关闭 NBT 会话；单窗口模式的 KeepAlive 切页不会触发卸载。
-onBeforeUnmount(closeSessions);
 // 单窗口模式切回本窗口时重读；有没保存的改动就不动，免得把编辑内容冲掉
 useWindowRefresh(() => {
   if (!dirty.value && !nbtDirty.value) void load();

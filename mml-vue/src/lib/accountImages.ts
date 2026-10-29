@@ -21,7 +21,7 @@ void getImageBaseUrl()
 export const imageVersion = ref(0);
 
 /** 皮肤或头像显示设置变化后调用，所有账户图片立即按新模式重取 */
-export function bumpImageVersion() {
+export function bumpImageVersion(): void {
   imageVersion.value += 1;
 }
 
@@ -130,7 +130,9 @@ export function capeSampleUrl(mode: CapeDisplay): string {
  * 渲染图 URL；协议前缀未就绪时为空串
  */
 export function accountCapeBackUrl(acc: AccountStoreDto): string {
-  return imageBase.value ? `${imageBase.value}/capeback/${acc.authType}/${acc.uuid}` : "";
+  if (!imageBase.value) return "";
+  // 刷新皮肤后正反面要一起换，版本号不能只带给正面，否则背面还是旧缓存
+  return `${imageBase.value}/capeback/${acc.authType}/${acc.uuid}?v=${imageVersion.value}`;
 }
 
 /** 图片加载失败标记，键为 `uuid:kind`，标记后回退占位图 */
@@ -169,7 +171,7 @@ export function markImageFailed(acc: AccountStoreDto, kind: string): void {
 /**
  * 某账户是否确认"没有皮肤"，用于隐藏依赖皮肤的按钮
  *
- * 与 [`imageFailed`] 的区别在于**协议前缀未就绪时不算没有皮肤**：
+ * 与 `imageFailed` 的区别在于**协议前缀未就绪时不算没有皮肤**：
  * `imageFailed` 把 base 为空串也当作失败，那是给渲染逻辑用的；而 base 是进窗口后
  * 异步取的，页面刚打开那一瞬间它还是空的，直接拿 imageFailed 当判据会让
  * 「查看皮肤 / 刷新皮肤」在加载完成前先闪一下或干脆不出现。
@@ -221,12 +223,14 @@ export function markImageLoaded(acc: AccountStoreDto, kind: string): void {
   loadedImages.value = next;
 }
 
+/** 拼一个 SVG data URL */
 function svg(w: number, h: number, body: string): string {
   const data =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${body}</svg>`;
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(data);
 }
 
+/** 由种子与盐生成固定的十六进制颜色 */
 function seedColor(seed: number, salt: number): string {
   const h = ((seed * 2654435761 + salt * 40503) >>> 0).toString(16).padStart(6, "0");
   return h.slice(0, 6);

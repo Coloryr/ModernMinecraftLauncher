@@ -1,6 +1,9 @@
 // 窗口注册表：定义启动器的所有窗口
 // 多窗口模式下每个窗口是独立的 Tauri WebviewWindow / 浏览器标签页，
 // 单窗口模式下这些窗口在应用内切换展示。
+//
+// 只登记 kind 与标题键：窗口宽高的唯一来源是后端 WINDOWS_INFO，由
+// window_get_window_sizes 下发；前端不另存一份，免得两边改一处对不上。
 
 export type WindowKind =
   | "lobby"
@@ -30,8 +33,7 @@ export interface WindowInfo {
   titleKey: string;
 }
 
-// 窗口宽高不在前端维护：唯一来源是后端 WINDOWS_INFO，由 window_get_window_sizes
-// 命令下发。真实窗口与 JS 回退路径都用后端的默认尺寸 + 历史几何
+/** 全部窗口的 kind 与标题键，顺序即注册顺序 */
 export const WINDOW_REGISTRY: WindowInfo[] = [
   { kind: "lobby", titleKey: "winTitle.lobby" },
   { kind: "main", titleKey: "winTitle.main" },

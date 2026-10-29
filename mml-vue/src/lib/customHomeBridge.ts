@@ -118,14 +118,14 @@ export function attachCustomHomeBridge(iframe: HTMLIFrameElement): () => void {
     ids.add(id);
     if (pendingListens.has(event)) return;
 
-    const pending = listen(event, (e) => {
+    const pending: Promise<UnlistenFn> = listen(event, (e) => {
       // 原始 payload 直接转发，不走 api.ts 那些带类型转换的包装
       for (const sub of byEvent.get(event) ?? []) {
         pushEvent(sub, event, e.payload);
       }
     }).then((un) => {
-      // 建立期间订阅已被取消：立刻解绑，别留下没人用的监听
-      if (byEvent.has(event)) unlistens.set(event, un);
+      // 建立期间订阅被取消、或同一事件已经重新 listen 了一次：解绑这份多余的
+      if (pendingListens.get(event) === pending && byEvent.has(event)) unlistens.set(event, un);
       else un();
       return un;
     });

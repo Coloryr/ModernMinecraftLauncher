@@ -30,8 +30,8 @@ const rows = ref<McaChunkDto[]>([]);
 const loading = ref(false);
 /** 正在编辑的区块下标；null 表示停在区块列表 */
 const editing = ref<number | null>(props.chunk ?? null);
-/** 交给编辑器的定位路径 */
-const reveal = ref<string[] | null>(props.reveal ?? null);
+/** 交给编辑器的定位路径；与 prop 同名会混淆，这里换个名字 */
+const revealPath = ref<string[] | null>(props.reveal ?? null);
 /** 编辑器有没有未保存的改动，决定返回条上要不要给保存键 */
 const dirty = ref(false);
 /** 区块编辑器实例，保存键按它调 save() */
@@ -96,7 +96,7 @@ watch(
   () => [props.uuid, props.source, props.file],
   () => {
     editing.value = props.chunk ?? null;
-    reveal.value = props.reveal ?? null;
+    revealPath.value = props.reveal ?? null;
     void load();
   },
   { immediate: true },
@@ -107,7 +107,7 @@ watch(
   () => [props.chunk, props.reveal],
   () => {
     editing.value = props.chunk ?? null;
-    reveal.value = props.reveal ?? null;
+    revealPath.value = props.reveal ?? null;
   },
 );
 </script>
@@ -118,7 +118,7 @@ watch(
     <div v-if="editing === null" class="mca-list">
       <div class="mca-head">{{ fileName }}</div>
       <button v-for="row in rows" :key="row.index" class="mca-row"
-        @click="reveal = null; editing = row.index">
+        @click="revealPath = null; editing = row.index">
         <span class="mca-key">
           <span class="mca-arrow" aria-hidden="true">›</span>
           ({{ chunkX(row) }}, {{ chunkZ(row) }})
@@ -140,7 +140,7 @@ watch(
         <button v-if="dirty" class="mca-save" @click="saveChunk">{{ t("config.save") }}</button>
       </div>
       <NbtTree ref="treeRef" :uuid="uuid" :source="source" :file="file" :chunk="editing"
-        :reveal="reveal ?? undefined" @dirty="dirty = $event" />
+        :reveal="revealPath ?? undefined" @dirty="dirty = $event" />
     </template>
   </div>
 </template>

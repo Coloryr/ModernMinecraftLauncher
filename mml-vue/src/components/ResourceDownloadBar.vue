@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 资源下载进度条：每个下载项目（pid）一条进度，终态带标签。
-// 完成后后端保留一段时间再自动移除，这里只做展示。
-// 添加资源窗口常显；主窗口仅在添加资源窗口关闭时显示（由调用方 v-if 控制）。
+// 终态条目不自动移除，由「清除已完成」手动清理。
+// 当前由右下角的进度弹窗（ResourcePopup）使用；内容区改用标题栏指示器。
 //
 // 口径见 lib/progress.ts：同一个项目下选了多个文件时按「项目数」推进，
 // 只有一个文件时用该文件自己的字节进度（单独下一个模组就是这一种）。
@@ -145,7 +145,7 @@ function progressText(group: ResourceGroupProgress): string {
 }
 
 /* 弹窗形态：卡片撑满弹窗剩余高度，任务多了由任务列表自己滚，不再把弹窗顶高。
-   高度由弹窗那侧传 fillHeight 打开，窗口里那处保持自适应 */
+   高度由弹窗那侧传 fillHeight 打开 */
 .res-bar.fill-h {
   flex: 1;
   min-height: 0;
@@ -176,7 +176,7 @@ function progressText(group: ResourceGroupProgress): string {
 
 .res-task-name {
   flex: 1;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text);
   word-break: break-all;
   overflow: hidden;
@@ -185,13 +185,13 @@ function progressText(group: ResourceGroupProgress): string {
 }
 
 .res-task-percent {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text-dim);
   flex-shrink: 0;
 }
 
 .res-tag {
-  font-size: 11px;
+  font-size: 11.5px;
   padding: 1px 8px;
   border-radius: 999px;
   flex-shrink: 0;
@@ -258,7 +258,7 @@ function progressText(group: ResourceGroupProgress): string {
 }
 
 /* ---------- 弹窗形态：任务排成项目列表，不再套"一个大框" ---------- */
-/* 只作用于 fill-h（弹窗那侧传的）；窗口里内嵌那张卡片仍保留底色与描边 */
+/* 只作用于 fill-h（弹窗那侧传的）；默认形态仍保留底色与描边 */
 .res-bar.fill-h {
   background: none;
   border: none;
@@ -279,6 +279,7 @@ function progressText(group: ResourceGroupProgress): string {
 .res-bar.fill-h .res-task:last-child {
   border-bottom: none;
 }
+
 .res-task-icon {
   width: 24px;
   height: 24px;
@@ -294,7 +295,7 @@ function progressText(group: ResourceGroupProgress): string {
   justify-content: center;
   background: var(--bg-hover);
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
 }
 </style>

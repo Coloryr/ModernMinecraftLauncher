@@ -47,9 +47,14 @@ self.MonacoEnvironment = {
   /**
    * 按语言给 worker
    *
+   * - `_id`: Monaco 的 worker 分组 id，本仓库不用
    * - `label`: Monaco 传进来的语言 id
    *
-   * json 的语言服务有独立 worker，按需**异步**加载：日志视图用不到它，
+   * # 返回值
+   *
+   * worker 实例；json 语言返回异步加载的 Promise
+   *
+   * json 的语言服务有独立 worker，按需异步加载：日志视图用不到它，
    * 静态 import 会把这份 worker 塞进日志那个包，白白多几百 KB。
    */
   getWorker(_id, label) {

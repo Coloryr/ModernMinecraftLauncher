@@ -24,8 +24,11 @@ export type SettingsTabIcon =
   | "folder"
   | "flask";
 
+/** 左侧导航的一项 */
 export interface SettingsTabItem {
+  /** 标签 id，同时是搜索索引与文案键的后半段 */
   id: SettingsTab;
+  /** 导航图标名，取自 GlyphIcon */
   icon: SettingsTabIcon;
 }
 

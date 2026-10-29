@@ -27,9 +27,13 @@ import { openWindow } from "../../windowManager";
 import type { BlockItemDto, BlockStatusDto } from "../../../lib/bindings";
 import { isBlockSize, type BlockSize } from "../types";
 
+/** 上次的浏览上下文，存本地存储 */
 interface ViewPref {
+  /** 上次停留的分类键；空串是「全部」 */
   cat: string;
+  /** 上次的搜索词；离开本页会清空，这里只兜住进程异常退出的情况 */
   keyword: string;
+  /** 上次的图标尺寸档 */
   size: BlockSize;
 }
 
@@ -58,6 +62,7 @@ export interface BlockListHooks {
   isFavorite?: (id: string) => boolean;
 }
 
+/** 读上次的浏览上下文；读不到或字段缺失时由调用方按默认值处理 */
 function readPref(): Partial<ViewPref> {
   return readJson<ViewPref>(KEYS.blockView);
 }
@@ -78,10 +83,14 @@ export function useBlockList(hooks?: BlockListHooks) {
 
   // ---------- 渲染状态与列表 ----------
 
+  /** 渲染状态快照；null 表示还没查到 */
   const status = ref<BlockStatusDto | null>(null);
+  /** 方块列表，名字已按当前语言取好 */
   const blocks = ref<BlockItemDto[]>([]);
 
+  /** 是否已有可用的渲染结果 */
   const rendered = computed(() => !!status.value?.rendered);
+  /** 是否有渲染任务在跑 */
   const running = computed(() => !!status.value?.running);
   /** 渲染前置阶段，即拉清单 / 下载核心 jar：进度还没开始步进，显示下载文案而非 0 / 0 */
   const preparing = computed(() => running.value && (status.value?.now ?? 0) === 0);
@@ -268,6 +277,7 @@ export function useBlockList(hooks?: BlockListHooks) {
   /** 是否处于筛选态（决定计数文案与空状态） */
   const isFiltered = computed(() => !!keyword.value.trim() || !!cat.value);
 
+  /** 按分类与搜索词筛过的列表，收藏的排在前面 */
   const filtered = computed(() => {
     const kw = keyword.value.trim().toLowerCase();
     const list = blocks.value.filter((b) => {
@@ -303,16 +313,24 @@ export function useBlockList(hooks?: BlockListHooks) {
   //
   // 只存 id：列表刷新（换语言 / 重渲染）后对象会换新的，用 id 现查才不会指向旧对象。
 
+  /** 详情里正在看的方块 id；null 表示详情没开 */
   const detailId = ref<string | null>(null);
 
+  /** 详情要展示的方块；列表刷新后按 id 现查，查不到就是 null */
   const detail = computed(() =>
     detailId.value ? (blocks.value.find((b) => b.id === detailId.value) ?? null) : null,
   );
 
+  /**
+   * 打开详情
+   *
+   * - `b`: 要看的方块
+   */
   function openDetail(b: BlockItemDto) {
     detailId.value = b.id;
   }
 
+  /** 关闭详情 */
   function closeDetail() {
     detailId.value = null;
   }

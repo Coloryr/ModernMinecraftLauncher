@@ -18,7 +18,7 @@ const props = defineProps<{
   instance: InstanceInfoDto;
   /** 可选版本清单，供版本类型 / 版本下拉使用 */
   versions: VersionInfoDto[];
-  /** 实例锁定生效：只留游戏内语言 / 日志编码，版本与加载器整块隐藏 */
+  /** 实例锁定生效：隐藏版本 / 加载器与整合包设置，只留游戏内语言、日志编码与自动打开日志窗口 */
   locked?: boolean;
 }>();
 
@@ -45,7 +45,7 @@ const isModpack = computed(
   () => !!props.instance.modpackType && props.instance.modpackType !== "none",
 );
 
-// 版本类型显示名；独立 ID 走 i18n 的 add.type.*
+// 版本类型显示名；文案键为 add.type.*
 function typeName(vt: string): string {
   return t(`add.type.${vt}`);
 }
@@ -160,13 +160,15 @@ const filteredVersions = computed(() =>
  * 换游戏版本：加载器类型回到原版
  *
  * 新版本下原来那个加载器多半不存在（加载器版本列表也按版本拉），一起清掉并锁回未拉取状态。
+ * 一次提交所有改动，避免分两次 IPC 写同一条实例记录。
  *
  * - `value`: 选中的版本 id
+ * - `extra`: 顺带提交的其它字段，如版本类型
  */
-function onVersionChange(value: string) {
+function onVersionChange(value: string, extra: Partial<InstanceInfoDto> = {}) {
   lvLocked.value = true;
   loaderVersions.value = [];
-  change({ version: value, loader: "normal", loaderVersion: null });
+  change({ version: value, loader: "normal", loaderVersion: null, ...extra });
 }
 
 function onVersionTypeChange(value: string) {
@@ -174,8 +176,7 @@ function onVersionTypeChange(value: string) {
   // 当前版本不在该类型中时，切到该类型第一个版本；换版本同样把加载器带回原版
   const target = props.versions.find((v) => normType(v.versionType) === value);
   if (target && target.id !== props.instance.version) {
-    onVersionChange(target.id);
-    change({ versionType: value });
+    onVersionChange(target.id, { versionType: value });
   } else {
     change({ versionType: value });
   }
@@ -223,14 +224,25 @@ const progressStep = ref(0);
 const progressTotal = ref(0);
 
 let unlistenProgress: (() => void) | null = null;
+let disposed = false;
 onMounted(async () => {
-  unlistenProgress = await onAddLoaderProgress((e) => {
+  const off = await onAddLoaderProgress((e) => {
     if (!loadersLoading.value) return;
     progressStep.value = e.step;
     progressTotal.value = e.total;
   });
+  // 订阅期间组件已卸载：立刻退订，别把监听留到窗口关闭之后
+  if (disposed) {
+    off();
+    return;
+  }
+  unlistenProgress = off;
 });
-onUnmounted(() => unlistenProgress?.());
+onUnmounted(() => {
+  disposed = true;
+  unlistenProgress?.();
+  unlistenProgress = null;
+});
 
 async function onRefreshLoaders() {
   if (!props.instance.version) return;
@@ -309,10 +321,14 @@ const langs = ref([...DEFAULT_LANGS]);
 // 免得用户选到还没被真实列表替换掉的默认项
 const langsLoading = ref(false);
 
+let langsSeq = 0;
+
 async function refreshLangs() {
+  const mine = ++langsSeq;
   langsLoading.value = true;
   try {
     const list = await api.getInstanceLangs(props.instance.uuid);
+    if (mine !== langsSeq) return;
     if (list.length) {
       // 显示名由后端从该语言文件里读 language.name，如 简体中文；
       // 资源没下全时后端回落成代码，这里再兜一层，反正别显示空串
@@ -322,9 +338,9 @@ async function refreshLangs() {
       }));
     }
   } catch {
-    langs.value = [...DEFAULT_LANGS];
+    if (mine === langsSeq) langs.value = [...DEFAULT_LANGS];
   } finally {
-    langsLoading.value = false;
+    if (mine === langsSeq) langsLoading.value = false;
   }
 }
 
@@ -390,12 +406,13 @@ watch(
 
 // ================= 整合包类型（面板最底部） =================
 
-const platforms = [
+// 放进 computed：切换语言时下拉文案要跟着变，setup 里取一次会停在旧语言
+const platforms = computed(() => [
   { value: "", label: t("meta.platformNone") },
   { value: "curseforge", label: t("add.pack.curseforge") },
   { value: "modrinth", label: t("add.pack.modrinth") },
   { value: "serverpack", label: t("meta.platformOnline") },
-];
+]);
 
 function onPlatformChange(value: string) {
   // null 必须显式下发，JSON.stringify 会丢掉 undefined，后端才能区分“清空”
@@ -414,8 +431,8 @@ function onPlatformChange(value: string) {
 
 <template>
   <div class="meta-panel">
-    <!-- 加载器查询进度不浮在窗口正上方：就地显示在各自字段下面，见下面的
-         .meta-progress，与添加实例窗口同一套 LoaderQueryProgress -->
+    <!-- 加载器查询进度就地显示在各自字段下面，见 .meta-progress；
+         与添加实例窗口同一套 LoaderQueryProgress -->
 
     <!-- 版本与加载器：实例锁定时整块隐藏，避免玩家改掉整合包作者选定的版本；
          整合包实例同样整块隐藏 —— 版本 / 加载器 / 加载器版本都由整合包 manifest
@@ -480,8 +497,8 @@ function onPlatformChange(value: string) {
         </button>
       </div>
 
-      <!-- 查询进度就地显示在字段下面，原来浮在窗口正上方。
-           面板是 4 列网格，所以每行要显式跨满整行，否则会被塞进"加载器版本"那两格里 -->
+      <!-- 查询进度就地显示在字段下面。面板是 4 列网格，所以每行要显式跨满整行，
+           否则会被塞进"加载器版本"那两格里 -->
       <div v-if="loadersLoading" class="meta-progress">
         <LoaderQueryProgress kind="query" :visible="true" :step="progressStep" :total="progressTotal" />
       </div>
@@ -506,7 +523,7 @@ function onPlatformChange(value: string) {
       <option value="gbk">{{ t("meta.gbk") }}</option>
     </select>
 
-    <!-- 自动打开日志窗口：实例级行为，原先在日志窗口工具条里 -->
+    <!-- 自动打开日志窗口：实例级行为 -->
     <span class="meta-label">{{ t("meta.logWindow") }}</span>
     <label class="meta-switch">
       <BaseSwitch :model-value="logAutoShow" :disabled="!logAutoShowLoaded || logAutoShowBusy"
@@ -528,7 +545,7 @@ function onPlatformChange(value: string) {
         <input class="field-input" :value="instance.serverUrl ?? ''" :placeholder="t('add.url')" spellcheck="false"
           :disabled="packBusy" @input="change({ serverUrl: ($event.target as HTMLInputElement).value || null })" />
         <button class="ui-btn-icon" :disabled="packBusy || !instance.serverUrl"
-          :v-tip="packBusy ? t('detail.modpackChecking') : t('detail.serverPackCheck')"
+          v-tip="packBusy ? t('detail.modpackChecking') : t('detail.serverPackCheck')"
           :aria-label="packBusy ? t('detail.modpackChecking') : t('detail.serverPackCheck')"
           @click="checkModpack()">
           <span v-if="packBusy" class="pack-spin" />
@@ -544,7 +561,7 @@ function onPlatformChange(value: string) {
         <input class="field-input" :value="instance.fid ?? ''" :placeholder="t('meta.fid')" spellcheck="false"
           :disabled="packBusy" @input="change({ fid: ($event.target as HTMLInputElement).value || null })" />
         <button class="ui-btn-icon" :disabled="packBusy"
-          :v-tip="packBusy ? t('detail.modpackChecking') : t('detail.modpackCheck')"
+          v-tip="packBusy ? t('detail.modpackChecking') : t('detail.modpackCheck')"
           :aria-label="packBusy ? t('detail.modpackChecking') : t('detail.modpackCheck')"
           @click="checkModpack()">
           <span v-if="packBusy" class="pack-spin" />
@@ -625,8 +642,8 @@ function onPlatformChange(value: string) {
   display: none;
 }
 
-/* 项目 / 文件 ID 与「检查整合包更新」图标按钮**同一行**（跨右侧两列）：
-   两个输入框等宽，按钮按自身宽度收在右端 —— 三列而不是两列，否则按钮会被挤到下一行 */
+/* 项目 / 文件 ID 与「检查整合包更新」图标按钮同一行，跨右侧两列：
+   两个输入框等宽，按钮按自身宽度收在右端。用三列而不是两列，否则按钮会被挤到下一行 */
 .modpack-ids {
   grid-column: 3 / 5;
   display: grid;
@@ -636,7 +653,6 @@ function onPlatformChange(value: string) {
 }
 
 /* 在线网络整合包网址输入框 + 右侧同步按钮 */
-
 .modpack-url {
   grid-column: 3 / 5;
   display: flex;

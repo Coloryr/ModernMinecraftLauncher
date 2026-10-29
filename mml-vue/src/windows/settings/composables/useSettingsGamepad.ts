@@ -265,8 +265,8 @@ export function useSettingsGamepad() {
   /**
    * 把输入框可能留下的空串归一成数字
    *
-   * `<input type="number">` 清空时 `v-model.number` 给的是空串，先由 [`validate`]
-   * 拒绝，归一放在校验之后，只处理校验通过的数值。
+   * `<input type="number">` 清空时 `v-model.number` 给的是空串，先由 `validate` 拒绝；
+   * 归一放在校验之后，只处理校验通过的数值。
    */
   function normalize(data: GamepadConfigDto) {
     data.mouse.cursorSpeed = Number(data.mouse.cursorSpeed);

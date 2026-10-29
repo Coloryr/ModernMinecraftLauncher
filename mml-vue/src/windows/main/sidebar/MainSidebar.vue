@@ -7,8 +7,7 @@ import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import HighlightText from "../../../components/ui/HighlightText.vue";
 import InstanceIcon from "../../../components/InstanceIcon.vue";
 import { t } from "../../../lib/i18n";
-import type { InstanceInfoDto } from "../../../lib/bindings";
-import type { ViewMode } from "../../../lib/bindings";
+import type { InstanceInfoDto, ViewMode } from "../../../lib/bindings";
 import type { DragCandidate, GroupView } from "../types";
 
 const props = defineProps<{
@@ -68,6 +67,7 @@ const emit = defineEmits<{
   (e: "collapse"): void;
 }>();
 
+/** 搜索框输入：把最新文本抛给父组件的 `v-model` */
 function onSearchInput(e: Event) {
   emit("update:searchText", (e.target as HTMLInputElement).value);
 }

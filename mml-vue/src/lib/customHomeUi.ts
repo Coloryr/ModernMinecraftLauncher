@@ -2,7 +2,7 @@
 //
 // 与整页包的窗口回调分开：这里只替换主窗口的「主页内容区」，不是整个窗口。
 // 包根 custom.js 在挂载前加载，脚本调用 window.__mmlHomePages.push(fn) 登记；
-// App.vue 侧不参与，由 windows/main 的 CustomHomePage 按回调渲染。
+// App.vue 侧不参与，由 components/CustomHomePage.vue 按回调渲染。
 //
 // 没有 custom.js 时仍走原来的 iframe（index.html + mml-home 协议）。
 
@@ -73,6 +73,7 @@ function loadHomeScript(url: string): Promise<void> {
   });
 }
 
+/** 挂上或更新主页样式链接 */
 function ensureHomeStyle(url: string) {
   if (!url) return;
   const link = homeStyle ?? document.createElement("link");
@@ -83,6 +84,7 @@ function ensureHomeStyle(url: string) {
   homeStyle = link;
 }
 
+/** 移除主页脚本与样式，清掉已注册的回调 */
 function teardownHome() {
   homeScript?.remove();
   homeScript = null;
@@ -94,7 +96,7 @@ function teardownHome() {
 }
 
 /** 按状态同步主页 custom.js / custom.css；挂载前 await，窗口首帧就是替换后的 */
-export async function syncCustomHome() {
+export async function syncCustomHome(): Promise<void> {
   const info = await commands.customHome.status().catch(() => null);
   if (!info?.enabled || !info.installed || !info.scriptUrl) {
     teardownHome();
@@ -113,17 +115,14 @@ export async function syncCustomHome() {
   if (homePages.length > 0) homePageVersion.value += 1;
 }
 
-/** 启动时加载一次并监听变更；重复调用无副作用 */
-export async function initCustomHome() {
+/** 启动时加载一次并监听变更；重复调用直接返回 */
+export async function initCustomHome(): Promise<void> {
   // 只有主窗口有主页内容区，别在设置 / 下载窗口白加载一份组件
   if (started || currentKind.value !== "main") return;
   started = true;
   installHomeRegistry();
   await syncCustomHome();
-  void onCustomHomeChange(() => {
-    void syncCustomHome();
-  });
-  void onClientConfigChange(() => {
-    void syncCustomHome();
-  });
+  // 非 Tauri 环境下 listen 会拒绝，忽略；配置与文件变更都重拉一次状态
+  void onCustomHomeChange(() => void syncCustomHome()).catch(() => {});
+  void onClientConfigChange(() => void syncCustomHome()).catch(() => {});
 }

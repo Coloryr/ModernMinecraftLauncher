@@ -73,7 +73,6 @@ const preview = ref<{
   url: string;
   backUrl: string;
   kind: string;
-  acc: AccountStoreDto;
 } | null>(null);
 
 /** 按图片类型取预览大图地址 */
@@ -94,10 +93,10 @@ function showPreview(e: MouseEvent, acc: AccountStoreDto, kind: string) {
     url: previewUrl(kind, acc),
     // 披风 2D 档悬浮多带一张背面图（鞘翅各档没有背面，空串不渲染）
     backUrl: kind === "cape" && isCape2D.value ? accountCapeBackUrl(acc) : "",
-    acc,
   };
 }
 
+/** 大图跟随鼠标，靠近右 / 下缘时向内翻 */
 function movePreview(e: MouseEvent) {
   if (!preview.value) return;
   // 右/下缘内翻，避免大图出窗：3D 等距图 320px 见方 + 边距
@@ -105,6 +104,7 @@ function movePreview(e: MouseEvent) {
   preview.value.y = Math.min(e.clientY + 14, window.innerHeight - 368);
 }
 
+/** 收起悬浮大图 */
 function hidePreview() {
   preview.value = null;
 }
@@ -206,14 +206,6 @@ function openSkin(acc: AccountStoreDto) {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 16px;
-}
-
-/* 空状态：横跨全部列并在内容区居中。
-   48px 的上下留白是有意的：它要在一片卡片格里撑出一块呼吸区，
-   与全局 .empty-tip 的 10px 不是一个场景，不回全局值 */
-.empty-tip {
-  grid-column: 1 / -1;
-  padding: 48px 0;
 }
 
 .acc-card {

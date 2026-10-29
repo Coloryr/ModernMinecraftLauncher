@@ -71,9 +71,12 @@ function listDir(dir: string) {
 async function load(dir: string) {
   if (children.value.has(dir) || loading.value.has(dir)) return;
 
+  // 这一发回来时可能已经换了实例 / 根目录，那张表整份换掉了：别写进新的那张
+  const table = children.value;
   loading.value.add(dir);
   try {
-    children.value.set(dir, await listDir(dir));
+    const list = await listDir(dir);
+    if (table === children.value) table.set(dir, list);
   } catch (e) {
     showToast(tErr(e));
   } finally {
@@ -163,7 +166,7 @@ watch(
   overflow: auto;
   padding: 4px;
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 10px;
   background: var(--bg-solid, var(--bg-card));
   /* 只留滚动条那一侧的槽：条目左右内边距本来就一样，两侧都留反而把内容推向右 */
   scrollbar-gutter: stable;
@@ -175,7 +178,7 @@ watch(
   gap: 8px;
   min-height: 27px;
   padding: 0 8px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 12.5px;
   /* 点一下就是一整行的操作，别让它顺手选中文字 */
   user-select: none;

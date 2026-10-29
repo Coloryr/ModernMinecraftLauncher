@@ -24,7 +24,7 @@ const count = computed(() => tasks.value.length);
 /**
  * 任务是否还在下，与下载窗口的 taskState 同一口径
  *
- * 暂停不算、已下完不算、有失败也不算 —— 那几种都不该让图标一直转。
+ * 暂停不算、已下完不算、有失败也不算 —— 那几种都不该算进行中。
  */
 function isDownloading(task: DownloadTaskDto): boolean {
   if (task.paused) return false;
@@ -32,12 +32,12 @@ function isDownloading(task: DownloadTaskDto): boolean {
   return task.failed === 0;
 }
 
-/** 还没下完；暂停也算，进度条照显示，只是图标不转 */
+/** 还没下完；暂停也算，进度条照显示，只是不算进行中 */
 function isIncomplete(task: DownloadTaskDto): boolean {
   return task.total === 0 || task.completed + task.failed < task.total;
 }
 
-/** 是否仍在下（决定图标转不转） */
+/** 是否仍在下（决定图标显示为进行中） */
 const busy = computed(() => tasks.value.some(isDownloading));
 
 /** 进度条显示与否：只要还有没下完的（含暂停）就显示，别让暂停时进度凭空消失 */
@@ -52,12 +52,11 @@ const tipText = computed(() =>
     : t("winDownload.taskCount", { n: count.value }),
 );
 
-/** 图标状态：下载中转、失败警示、结束常态 */
+/** 图标状态：下载中、失败警示、结束常态 */
 const iconState = computed(() => {
   if (busy.value) return "busy";
   return hasFailed.value ? "failed" : "done";
 });
-
 </script>
 
 <template>

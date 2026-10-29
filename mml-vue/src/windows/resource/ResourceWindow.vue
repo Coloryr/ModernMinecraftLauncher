@@ -298,9 +298,9 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
 
       <!-- 删除 / 清空确认；全窗口共用一份，内容来自 ops -->
       <ConfirmModal v-if="confirmBox" :ops="ops" @close="confirmBox = null" />
-  <!-- 重命名：六个分类共用同一份弹窗，见 useResourceOps 的 askRename -->
-  <RenameModal v-if="renameAsk" :name="renameAsk.name" @rename="ops.doRename"
-    @close="renameAsk = null" />
+      <!-- 重命名：六个分类共用同一份弹窗，见 useResourceOps 的 askRename -->
+      <RenameModal v-if="renameAsk" :name="renameAsk.name" @rename="ops.doRename"
+        @close="renameAsk = null" />
 
       <!-- 拖拽导入：同名冲突问一次（覆盖 / 跳过 / 重命名），选完才落盘 -->
       <DropConflictModal v-if="dropPending" :conflicts="dropPending.conflicts" :busy="dropBusy"

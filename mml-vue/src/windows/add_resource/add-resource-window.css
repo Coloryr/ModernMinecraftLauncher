@@ -102,12 +102,6 @@
   cursor: not-allowed;
 }
 
-/* 标题栏里没有目标实例时的提示：chip 的位置由一句红字顶上 */
-.head-warn {
-  font-size: 12px;
-  color: var(--red);
-}
-
 .res-list {
   flex: 1;
   min-height: 120px;
@@ -477,7 +471,7 @@
   cursor: not-allowed;
 }
 
-/* 右侧两行；左缘即图标左缘（勾选框 13 + 间距 8 = 21） */
+/* 右侧两行：左缘与前置图标对齐 */
 .dep-body {
   flex: 1;
   min-width: 0;

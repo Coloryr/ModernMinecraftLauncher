@@ -22,10 +22,8 @@ const DRAG_THRESHOLD = 8;
  * 只处理骨架（阈值判定、抑制拖后点击），"落在第几项之前"由调用方的 `hitTest` 算。
  *
  * - `deps.hitTest`: 拖动中每次指针移动调用，返回要提交的落点，`null` 表示不提交
- * - `deps.onDrop`: 松手时调用，落点非 `null` 才调。**第二个参数是被拖项的 key** ——
- *   提交前 `dragKey` 已经被 `reset()` 清掉了，调用方**不能**在回调里读 `dragKey`，
- *   读了必然是 `null`，于是"拖了却什么都没发生"。这正是分组头拖不动的根因：
- *   `useReorderDrag` 的回调读的就是 `dragKey`。
+ * - `deps.onDrop`: 松手时调用，落点非 `null` 才调；第二个参数是被拖项的 key，
+ *   提交前 `dragKey` 已被 `reset()` 清空，回调里不能再读它
  * - `hitTest` 里也可以做副作用，例如内容区边缘自动滚动
  *
  * # 返回值
@@ -53,13 +51,11 @@ export function useDragGesture<T>(deps: {
   let startX = 0;
   let startY = 0;
   /**
-   * 这一轮指针操作**是否真的拖动过**，即超过阈值
+   * 这一轮是否真的拖过，即超过阈值
    *
-   * 与 `dragKey !== null` 分开记：`dragKey` 会在 `reset()` 里清掉，而"要不要抑制
-   * 紧随的 click"必须保留到 click 派发那一刻，也就是 `onPointerUp` 之后浏览器再发的那一次。
-   * 原来的写法靠 `moving && target !== null` 决定抑制，**重排拖拽的 hitTest 永远有落点**，
-   * 返回的是"插到第几项之前"这个数字，于是"按下—松手"这种没动过的点击也被当成
-   * 拖动、把 click 吞掉 —— 表现就是分组头点不动，用户报的"点击后默认拖动、无法收起"。
+   * 不能靠 `dragKey` 判断：它会在 `reset()` 里清掉，而"抑制紧随的 click"要保留到
+   * click 派发那一刻。也不能只看落点：重排的 hitTest 永远有落点，那样按下-松手
+   * 没动过的点击也会被吞掉，分组头就点不动了。
    */
   let dragged = false;
   /** 拖拽结束后抑制紧随的 click，否则松手会顺手触发这一项的点击 */
@@ -176,10 +172,7 @@ export function useReorderDrag(deps: {
       }
       return index;
     },
-    // 被拖项的 key 由骨架交过来。**以前这里读 `gesture.dragKey`**，
-    // 而那时它已被 reset 清成 null —— 于是 `from` 永远是空、
-    // `deps.onDrop` 根本没被调用过：拖分组头看着有插入线，松手却什么都没发生，
-    // 顺序自然也永远没写进 `GroupOrder`，用户报过"模组分组无法移动顺序"。
+    // 被拖项的 key 由骨架交过来：此刻 dragKey 已被清空，不能自己读
     onDrop: (index, key) => deps.onDrop(key, index),
   });
 

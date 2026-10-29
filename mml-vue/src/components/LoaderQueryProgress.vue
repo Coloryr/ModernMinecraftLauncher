@@ -6,9 +6,7 @@
 // 两种形态：有总数时走确定进度条，如查询支持的加载器按加载器步进；
 // 无总数的场景走**不确定滚动条**，小色块来回滚：拉取加载器版本、扫描目录。
 //
-// 摆放：**就地**，铺满所在字段那一列的宽度（由调用方那边排布）。
-// 早先是 Teleport 到 body、固定在窗口正上方的一条浮层，但它对应的字段就在下面几行，
-// 浮在窗口顶上离得太远，几处都改成内联了。
+// 摆放：就地，铺满所在字段那一列的宽度（由调用方那边排布）。
 import { computed } from "vue";
 import { t } from "../lib/i18n";
 
@@ -96,7 +94,7 @@ const percent = computed(() => (props.total ? (props.step / props.total) * 100 :
   height: 100%;
   border-radius: 3px;
   background: var(--accent);
-  transition: width 0.2s;
+  transition: width 0.3s;
 }
 
 /* 不确定进度：小色块来回滚动 */
@@ -126,7 +124,7 @@ const percent = computed(() => (props.total ? (props.step / props.total) * 100 :
 
 .load-progress-enter-active,
 .load-progress-leave-active {
-  transition: opacity 0.2s, transform 0.2s;
+  transition: opacity 0.18s, transform 0.18s;
 }
 
 .load-progress-enter-from,

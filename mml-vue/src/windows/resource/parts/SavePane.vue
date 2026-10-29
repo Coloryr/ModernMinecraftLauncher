@@ -152,7 +152,7 @@ function itemMenuItems(item: SaveItemDto): RowMenuItem[] {
   // 损坏的存档置灰：它没有 `Data` 复合标签，后端 set_mode 必然返回 DataNotFound
   const items: RowMenuItem[] = [
     // 「进入存档」与「自动进入」都依赖 1.20+ 的 quick play，低版本没有等价参数，不给入口
-    ...(props.data.instance.value?.quickPlay
+    ...(quickPlay.value
       ? [
           { id: "enter-world", label: t("resource.enterWorld") },
           {
@@ -550,7 +550,7 @@ function saveTip(item: SaveItemDto): string {
     </template>
   </VirtualList>
 
-  <!-- 行右键菜单：单行与批量共用，菜单项见 itemMenuItems / batchMenuItems -->
+  <!-- 行右键菜单：单行与批量共用，菜单项都在本文件的 itemMenuItems / openMenu 里算 -->
   <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title" @pick="onMenuPick"
     @close="rowMenu = null" />
 

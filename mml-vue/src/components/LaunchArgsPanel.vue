@@ -134,7 +134,7 @@ function onBrowseFile(e: Event) {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
   if (file) {
-    // 浏览器 input 只能拿到 fakepath；待改用 @tauri-apps/plugin-dialog，settings / add 窗口已在用
+    // 浏览器 input 拿不到完整路径，只能存文件名；要可用的绝对路径得走目录选择对话框
     update({ javaPath: file.name });
   }
 }
@@ -179,13 +179,14 @@ function addEnv() {
   update({ envVars: [...props.args.envVars, { key: "", value: "" }] });
 }
 
-const gcOptions = [
+// 放进 computed：切换语言时下拉文案要跟着变，setup 里取一次会停在旧语言
+const gcOptions = computed(() => [
   { value: "auto", label: t("args.gcAuto") },
   { value: "g1gc", label: t("args.gcG1") },
   { value: "zgc", label: t("args.gcZ") },
   { value: "none", label: t("args.gcNone") },
   { value: "custom", label: t("args.gcCustom") },
-];
+]);
 </script>
 
 <template>
@@ -454,7 +455,7 @@ const gcOptions = [
 .line-del {
   width: var(--ctl-h);
   height: var(--ctl-h);
-  /* 图标是 SVG：用 flex 精确居中（原来靠字形在行盒里居中） */
+  /* 图标是 SVG，用 flex 精确居中 */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -477,7 +478,7 @@ const gcOptions = [
   align-self: flex-start;
   display: inline-flex;
   align-items: center;
-  /* 图标是 SVG（原来是字形，靠一个空格隔开），间距改由 gap 给 */
+  /* 图标是 SVG，与文字用 gap 隔开 */
   gap: 6px;
   height: var(--ctl-h);
   padding: 0 22px;

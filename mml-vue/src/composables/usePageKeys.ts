@@ -35,7 +35,6 @@ export function usePageKeys(options: PageKeyOptions) {
     if (e.button !== BUTTON_BACK && e.button !== BUTTON_FORWARD) return;
     // 先拦掉历史回退 / 前进，否则界面会跟着 WebView 跳走
     e.preventDefault();
-    e.stopPropagation();
     if (!active.value) return;
     if (options.enabled && !options.enabled()) return;
     if (e.button === BUTTON_BACK) options.prev?.();

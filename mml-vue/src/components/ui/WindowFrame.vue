@@ -75,9 +75,10 @@ const rootEl = ref<HTMLElement | null>(null);
 const { decorated } = useWindowDecoration(rootEl);
 /** 全屏时顶栏要让出 macOS 的刘海 / 菜单栏区域 */
 const fullscreen = useWindowFullscreen();
-const pluginControls = computed(() => isMac && titleBarStyle === "macos");
 /** 安全区这类"按系统"的样式用平台判定，不跟标题栏样式走：换用另一套时外观会反转 */
 const isMac = detectOs() === "macos";
+/** 插件接管原生按钮时不再自绘，避免两套按钮同时出现 */
+const pluginControls = computed(() => isMac && titleBarStyle === "macos");
 
 // 内容区元素：整页滚动的窗口（如统计窗口）把它交给行虚拟化当滚动容器，
 // 表格只渲染视口附近那几行，页面整体滚动的行为不变

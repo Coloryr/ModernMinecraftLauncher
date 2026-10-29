@@ -36,7 +36,9 @@ const list = useBlockList({
 });
 const { rendered, keyword, size, running, startRender, addSkin } = list;
 
+/** 主窗口当前选中的实例；设图标时高亮它 */
 const currentInstance = ref<InstanceInfoDto | null>(null);
+/** close-blocked 事件的取消订阅 */
 let unlisten: (() => void) | null = null;
 
 /** 多选模式：标题栏工具条按钮切换，勾选与设置分组在 BlockPanel 里 */
@@ -47,9 +49,16 @@ const confirmClose = ref(false);
 
 // ---------- 添加玩家头颅：入口在标题栏工具条上，所以弹窗跟着放这一层 ----------
 
+/** 添加玩家头颅弹窗是否开着 */
 const skinOpen = ref(false);
+/** 提交中：禁用按钮防连点 */
 const skinBusy = ref(false);
 
+/**
+ * 提交要添加的用户名或 UUID
+ *
+ * - `input`: 弹窗里输入的内容，交给 useBlockList 的 addSkin 校验与落盘
+ */
 async function onSkinSubmit(input: string) {
   if (skinBusy.value) return;
   skinBusy.value = true;
@@ -73,7 +82,8 @@ async function syncInstance() {
   try {
     const [cfg, instances] = await Promise.all([loadGuiConfig(), api.getInstances()]);
     const uuid = cfg?.mainWindow.selectedInstance;
-    if (uuid) currentInstance.value = instances.find((i) => i.uuid === uuid) ?? null;
+    // 主窗口没有选中实例、或选中的已被删掉时一并清空，别留着上一份快照
+    currentInstance.value = uuid ? (instances.find((i) => i.uuid === uuid) ?? null) : null;
   } catch {
     currentInstance.value = null;
   }

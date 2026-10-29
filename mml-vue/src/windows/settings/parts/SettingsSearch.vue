@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 设置窗口 · 设置项搜索
 //
-// 索引在 ../search.ts（静态表，覆盖 6 个标签）。这里只负责输入与结果列表：
+// 索引在 ../search.ts（静态表，覆盖全部标签页）。这里只负责输入与结果列表：
 // ↑/↓ 选择、Enter 跳转、点击跳转；Esc 有内容时先清空（不关窗口）。
 // 输入框与清空键的观感走共享组件 SearchBox，结果列表由它的 `drop` 插槽挂出来。
 import { computed, onDeactivated, ref, watch } from "vue";
@@ -45,6 +45,7 @@ onDeactivated(() => {
   active.value = 0;
 });
 
+/** 选中第 `i` 条结果：清空输入并交给父组件跳转 */
 function choose(i: number) {
   const hit = hits.value[i];
   if (!hit) return;
@@ -54,6 +55,7 @@ function choose(i: number) {
   emit("select", hit);
 }
 
+/** 键盘：↑/↓ 移动、Enter 跳转、Esc 有内容时只清搜索 */
 function onKey(e: KeyboardEvent) {
   if (e.key === "Escape") {
     if (!query.value) return; // 没内容：交给窗口的 Esc（关窗）

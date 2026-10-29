@@ -83,7 +83,7 @@ export function useModpackStatus(
         // 通知其它窗口：原生的 storage 事件只跨文档触发，这里显式广播一次
         emitChange(KEYS.addedInstance, task.instanceUuid);
       }
-      // 初次同步只记录：窗口打开前就结束的任务不再提示，也不把选中实例改过去
+      // 初次同步不弹提示：窗口打开前就结束的任务不再提示，但仍会写本地存储让主窗口接管新实例
       if (silent) {
         continue;
       }

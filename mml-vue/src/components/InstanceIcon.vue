@@ -22,13 +22,7 @@ const palette = computed(() => instanceGradient(props.uuid));
 
 const char = computed(() => props.name.trim().charAt(0).toUpperCase() || "M");
 
-/**
- * 容器样式
- *
- * 真图加载成功后**不再画占位底色**：方块图标是透明底 PNG，实测 94%~97% 的像素
- * alpha=0，留着渐变会从透明处透出来，看着就是"占位图没隐藏、方块图叠在绿色底上"。
- * 加载中 / 失败时仍是渐变底 + 字母。
- */
+/** 容器样式：真图加载成功后不再画占位底色，原因见 loaded */
 const iconStyle = computed(() => ({
   width: props.size + "px",
   height: props.size + "px",
@@ -78,7 +72,12 @@ function onLoad() {
 // onUnmounted 必须在 setup 同步期注册，await 后再调会失去组件实例，
 // 所以注销函数先存下来，由同步注册的钩子代为调用
 let unlistenChange: (() => void) | null = null;
-onUnmounted(() => unlistenChange?.());
+let disposed = false;
+onUnmounted(() => {
+  disposed = true;
+  unlistenChange?.();
+  unlistenChange = null;
+});
 
 (async () => {
   try {
@@ -86,16 +85,23 @@ onUnmounted(() => unlistenChange?.());
   } catch {
     base.value = "";
   }
+  if (disposed) return;
 
   // 只认 icon 类型：图标换 / 清了才重拉图。
   // 别改回 edit —— 改实例设置、重命名、换分组都会发 edit，那样每动一次就白重载一次图标
-  unlistenChange = await onInstanceChange((type) => {
+  const off = await onInstanceChange((type) => {
     if (type !== "icon") return;
     ver.value = Date.now();
     failed.value = false;
     // 换图期间先回到字母，新图到了再藏（否则旧图会一直挂着）
     loaded.value = false;
   });
+  // 订阅期间组件已卸载：立刻退订，别把监听留到窗口关闭之后
+  if (disposed) {
+    off();
+    return;
+  }
+  unlistenChange = off;
 })();
 
 watch(

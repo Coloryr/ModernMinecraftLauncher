@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 添加实例 · 模式一：从头新建，含版本类型 / 版本 / 加载器 / 加载器版本 / 自定义加载器路径
-// 选项数据全部来自 mml-core 的独立 ID，显示名走 i18n；含版本类型 / 加载器 / 加载器版本
+// 选项数据全部来自 mml-core 的独立 ID，显示名走 i18n
 // 版本类型为多选：下拉展开后是复选项；选中多个类型时，右侧版本列表按类型分组
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 import { t } from "../../../lib/i18n";
@@ -122,6 +122,7 @@ const groupedVersions = computed(() => {
     .filter((g) => g.items.length > 0);
 });
 
+/** 切换一个版本类型的选中态 */
 function toggleType(vt: string) {
   const sel = props.verTypes.includes(vt)
     ? props.verTypes.filter((x) => x !== vt)
@@ -143,15 +144,17 @@ function onVersionChange(e: Event) {
   emit("update:loaderVersion", "");
 }
 
+/** 切换加载器；加载器版本列表由父组件按新选择拉取 */
 function onLoaderChange(e: Event) {
-  // 加载器版本列表由父组件 watch loader/newVersion 变化后拉取
   emit("update:loader", (e.target as HTMLSelectElement).value);
 }
 
+/** 切换加载器版本 */
 function onLoaderVersionChange(e: Event) {
   emit("update:loaderVersion", (e.target as HTMLSelectElement).value);
 }
 
+/** 选中自定义加载器的 jar 文件 */
 function onLoaderPathPick(e: Event) {
   const input = e.target as HTMLInputElement;
   if (input.files?.[0]) emit("update:loaderPath", input.files[0].name);

@@ -6,7 +6,7 @@ withDefaults(
   defineProps<{
     /** 外观变体；primary 主操作、accent 强调、plain 次要、danger 危险、ghost 图标类 */
     variant?: "primary" | "accent" | "plain" | "danger" | "ghost";
-    /** 尺寸档；定高一律 --ctl-h（32px），sm / md 只差左右内边距，lg 为主操作按钮（大一号） */
+    /** 尺寸档；sm / md 定高 --ctl-h（32px），只差左右内边距；lg 不给高度，靠内边距撑开且字号大一档 */
     size?: "sm" | "md" | "lg";
     /** 是否禁用 */
     disabled?: boolean;

@@ -4,8 +4,11 @@
 export interface FileNode {
   /** 完整路径：规范 key 一律不含尾部斜杠，是否目录看 isDir */
   key: string;
+  /** 节点显示名，即路径最后一段 */
   name: string;
+  /** 是否为目录 */
   isDir: boolean;
+  /** 子节点；文件为空数组 */
   children: FileNode[];
   /** 目录子节点尚未加载：懒加载时首次展开会通过事件加载 */
   lazy?: boolean;

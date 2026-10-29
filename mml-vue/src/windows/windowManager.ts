@@ -1,7 +1,7 @@
 // 窗口管理器：负责窗口打开 / 关闭、单窗口 / 多窗口模式切换
 //
 // 多窗口模式：
-// - Tauri 环境：统一调用 Rust 窗口管理器，即 src-tauri 的 windows/mod.rs 里的
+// - Tauri 环境：统一调用 Rust 窗口管理器，即 src-tauri 的 windows/lifecycle 里的
 //   open_window / close_window 命令创建 / 关闭真实窗口，逻辑全在 Rust 侧；
 //   命令失败时回退到官方 JS API new WebviewWindow()，再失败回退应用内切换。
 // - 浏览器环境：用新标签页模拟独立窗口
@@ -25,8 +25,8 @@ const UUID_PARAM = "uuid";
 /**
  * 「一个实例一个窗口」的窗口族 → 标签前缀，完整形式 `<前缀><实例uuid>`
  *
- * 这类窗口的身份由后端按实例 uuid 派生，见 src-tauri 的 windows/registry.rs 窗口族
- * `WINDOW_FAMILIES`。前端只按这些前缀认它们，不再另立一套命名。
+ * 这类窗口的身份由后端按实例 uuid 派生，见 src-tauri 的 windows/registry/family.rs
+ * 窗口族 `WINDOW_FAMILIES`。前端只按这些前缀认它们，不再另立一套命名。
  */
 const FAMILY_LABEL_PREFIX: Partial<Record<WindowKind, string>> = {
   log: "mml-log-",
@@ -126,7 +126,7 @@ export interface WindowOpenParams {
  * 单窗口既没有新窗口、也没有新 URL，Tauri 下连 pushState 都不做，壳层的 focus 事件更是
  * 无从触发，所以目标实例只能这样送达：openWindow 写进来，窗口组件 watch / onActivated 读走。
  */
-export const windowParams = ref<{
+export interface WindowParamsState {
   /** 目标实例 uuid */
   uuid: string | null;
   /** 要直接打开的项目 */
@@ -141,15 +141,23 @@ export const windowParams = ref<{
   logBottom: boolean;
   /** 要直接打开的资源类别 id */
   category: string | null;
-}>({
-  uuid: null,
-  project: null,
-  drop: null,
-  saveDir: null,
-  logFile: null,
-  logBottom: false,
-  category: null,
-});
+}
+
+/** 一份空参数，字段与 {@link WindowOpenParams} 一一对应；重置点共用它，别各抄一份 */
+function emptyWindowParams(): WindowParamsState {
+  return {
+    uuid: null,
+    project: null,
+    drop: null,
+    saveDir: null,
+    logFile: null,
+    logBottom: false,
+    category: null,
+  };
+}
+
+/** 单窗口模式下本次打开带入的参数，见 {@link WindowParamsState} */
+export const windowParams = ref<WindowParamsState>(emptyWindowParams());
 
 /**
  * 单窗口模式：下载管理以"悬浮弹窗"出现，而不是把当前页面换掉
@@ -357,15 +365,7 @@ export function setMultiWindow(v: boolean): Promise<void> {
   multiWindow.value = v;
   // 换了模式，之前的返回栈与带入参数都不再成立
   backStack.value = [];
-  windowParams.value = {
-    uuid: null,
-    project: null,
-    drop: null,
-    saveDir: null,
-    logFile: null,
-    logBottom: false,
-    category: null,
-  };
+  windowParams.value = emptyWindowParams();
   writeString(KEYS.windowMode, v ? "Multi" : "Single");
   // 返回保存的 Promise：要紧接着重启进程的调用方必须等这次写入真的落盘。
   // 重启会立刻刷盘并退出，写请求还在路上就丢了，见 useSettingsUi 的窗口模式切换
@@ -394,8 +394,7 @@ function resolveKind(): WindowKind {
     }
   }
   // 浏览器：从 URL 查询参数识别
-  const k = new URLSearchParams(window.location.search).get(WIN_PARAM);
-  return isWindowKind(k) ? k : "main";
+  return kindFromUrl();
 }
 
 /** 项目参数在 URL 上的键；多窗口模式下新窗口只能从 URL 拿到"要打开哪个项目" */
@@ -625,17 +624,24 @@ function instanceArgOf(kind: WindowKind, params?: WindowOpenParams): string | nu
     : null;
 }
 
-/** 大厅验证期间防止重复打开。 */
+/** 大厅验证期间防止重复打开 */
 export const lobbyOpening = ref(false);
+/** 上一次大厅会话释放的 Promise，下一次打开前先等它收尾 */
 let lobbyClosing: Promise<void> = Promise.resolve();
 
-/** 等待上一页释放账户后，再验证本次大厅会话。 */
+/**
+ * 等上一页释放账户后，再验证本次大厅会话
+ *
+ * # 返回值
+ *
+ * 大厅会话就绪的 Promise；验证失败时 reject，由调用方弹提示
+ */
 export async function prepareLobby() {
   await lobbyClosing;
   return commands.lobby.prepare();
 }
 
-/** 单窗口模式先释放旧会话，再允许下一次打开。 */
+/** 单窗口模式先释放旧会话，再允许下一次打开 */
 export function releaseLobby() {
   lobbyClosing = commands.lobby.close().catch(error => console.error("[lobby] 释放会话失败", error));
 }
@@ -657,11 +663,11 @@ export async function openWindow(kind: WindowKind, params?: WindowOpenParams) {
   // 单窗口模式（浏览器 / Tauri 一致）：应用内页面切换。
   // 窗口族是"一个实例一个"：实例是它的窗口身份（后端按它派生 uuid 与标签），
   // 没有实例就开不出正确的窗口，两种模式都直接作罢
-  const family = FAMILY_LABEL_PREFIX[kind] ? kind : null;
+  const isFamily = !!FAMILY_LABEL_PREFIX[kind];
   // 「下载资源」例外：没有实例时开那个静态窗口（标签 `mml-add_resource`），
   // 实例在窗口标题栏里选，见 AddResourceWindow 的 refreshInstance
-  if (family && !params?.uuid && kind !== "add_resource") {
-    console.warn(`[windowManager] 打开 ${family} 窗口缺少实例 uuid，已忽略`);
+  if (isFamily && !params?.uuid && kind !== "add_resource") {
+    console.warn(`[windowManager] 打开 ${kind} 窗口缺少实例 uuid，已忽略`);
     return;
   }
 
@@ -723,7 +729,7 @@ export async function openWindow(kind: WindowKind, params?: WindowOpenParams) {
         });
       return;
     }
-    // 统一走 Rust 窗口管理器：创建 / 聚焦在 src-tauri 的 windows/mod.rs 处理。
+    // 统一走 Rust 窗口管理器：创建 / 聚焦在 src-tauri 的 windows/lifecycle 处理。
     // open_window 是 async 命令，不在 Windows 主线程创建窗口，避免冻结。
     // 命令失败（例如窗口创建被拒）时回退到官方 JS API。
     commands.windows
@@ -868,7 +874,7 @@ export function closeWindow() {
   }
 
   if (isTauri()) {
-    // 多窗口：走 Rust 窗口管理器关闭当前真实窗口，kind → 标签的映射在 windows/mod.rs。
+    // 多窗口：走 Rust 窗口管理器关闭当前真实窗口，kind → 标签的映射在 windows/registry。
     // 日志窗口族的标签带实例 uuid，所以要把实例一起报上去。
     // 命令失败时回退到官方 JS API 关闭当前窗口。
     commands.windows.closeWindow(kind, closeInstanceArg(kind)).catch((e) => {
@@ -886,15 +892,7 @@ function goTo(kind: WindowKind) {
   currentKind.value = kind;
   // 返回后不再带着上一次的目标实例 / 目标项目 / 拖入路径 / 存档参数，
   // 避免窗口"记得"不该记的东西
-  windowParams.value = {
-    uuid: null,
-    project: null,
-    drop: null,
-    saveDir: null,
-    logFile: null,
-    logBottom: false,
-    category: null,
-  };
+  windowParams.value = emptyWindowParams();
   if (!isTauri()) window.history.pushState({}, "", urlFor(kind));
 }
 

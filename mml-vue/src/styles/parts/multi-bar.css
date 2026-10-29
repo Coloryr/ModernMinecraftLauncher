@@ -7,7 +7,7 @@
 .multi-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   height: var(--ctl-h);
   padding: 0 12px;
   border-radius: var(--ctl-radius);

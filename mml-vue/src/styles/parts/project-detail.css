@@ -73,7 +73,7 @@
   align-self: center;
   width: 76px;
   height: 76px;
-  border-radius: 14px;
+  border-radius: 12px;
   object-fit: cover;
   flex-shrink: 0;
   background: var(--bg-side);
@@ -232,7 +232,7 @@
   width: var(--ctl-h);
   height: var(--ctl-h);
   border: none;
-  border-radius: 9px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
@@ -265,7 +265,7 @@
   width: var(--ctl-h);
   height: var(--ctl-h);
   border: none;
-  border-radius: 9px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
@@ -376,7 +376,7 @@
 }
 
 .file-page-num {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-dim);
   min-width: 48px;
   text-align: center;
@@ -388,7 +388,7 @@
   height: var(--ctl-h);
   padding: 0 14px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--ctl-radius);
   background: var(--bg-raised);
   color: var(--text-dim);
   font-size: 13px;
@@ -408,7 +408,7 @@
   height: var(--ctl-h);
   padding: 0 22px;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--ctl-radius);
   background: var(--accent-grad);
   color: #fff;
   font-size: 13px;

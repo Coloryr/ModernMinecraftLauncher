@@ -37,6 +37,7 @@ onMounted(() => {
   }
 });
 
+/** 确认清理：先关弹窗，再清那一项并等它重新统计 */
 async function onConfirmClear() {
   const id = pending.value;
   pending.value = "";

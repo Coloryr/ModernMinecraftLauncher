@@ -5,6 +5,7 @@
 // 冲突出现时把焦点落到"要改小"的最小内存上；NumberStepper 的输入框在组件内部，取 $el 里的 input。
 import { computed, nextTick, ref, watch } from "vue";
 import { t } from "../../../../lib/i18n";
+import { memoryLabel } from "../../../../lib/format";
 import { COMMON_MEMORY, COMMON_MIN_MEMORY, COMMON_RESOLUTIONS } from "../../../../lib/resolutions";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
 import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
@@ -15,7 +16,6 @@ import SettingsGroup from "../SettingsGroup.vue";
 import SaveStateText from "../SaveStateText.vue";
 import type { useSettingsLaunch } from "../../composables/useSettingsLaunch";
 import type { useSettingsClient } from "../../composables/useSettingsClient";
-import { memoryLabel } from "../../../../lib/format";
 
 const props = defineProps<{
   /** 游戏启动标签的状态与保存方法，来自 useSettingsLaunch */
@@ -27,7 +27,6 @@ const props = defineProps<{
   /** 需要高亮脉冲的分组 id（搜索命中） */
   flashGroup?: string;
 }>();
-
 
 const {
   run,
@@ -232,7 +231,8 @@ watch(memoryConflict, async (bad) => {
             :placeholder="t('winSettings.envKey')" @change="commitEnvLines" />
           <input v-model="envLines[i].value" class="field-input grow" spellcheck="false" autocomplete="off"
             :placeholder="t('winSettings.envValue')" />
-          <button class="line-del" aria-label="remove" v-tip="t('args.removeLine')" @click="removeEnvLine(i)">
+          <button class="line-del" :aria-label="t('args.removeLine')" v-tip="t('args.removeLine')"
+            @click="removeEnvLine(i)">
             <GlyphIcon name="close" :size="13" />
           </button>
         </div>

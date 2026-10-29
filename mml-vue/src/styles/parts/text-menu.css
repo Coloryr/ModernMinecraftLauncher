@@ -9,9 +9,9 @@
   min-width: 132px;
   padding: 4px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--bg-modal-raised);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.28);
+  box-shadow: var(--shadow-md);
 }
 
 .text-menu-item {
@@ -19,7 +19,7 @@
   width: 100%;
   padding: 6px 10px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text);
   font-size: 12.5px;

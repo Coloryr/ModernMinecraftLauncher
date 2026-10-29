@@ -103,6 +103,13 @@ const groupForm = ref<{ uuid: string; name: string } | null>(null);
 /** 待确认删除的分组 */
 const groupRemove = ref<{ uuid: string; label: string } | null>(null);
 
+/**
+ * 打开自建分组的右键菜单
+ *
+ * - `payload.event`: 右键事件，用来取弹出坐标
+ * - `payload.id`: 分类键；不是自建分组时不弹菜单
+ * - `payload.label`: 菜单里用的分组名
+ */
 function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }) {
   // 自带分类不能改名 / 删除，右键不给菜单
   if (!isCustomGroup(payload.id)) return;
@@ -115,7 +122,11 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
   };
 }
 
-/** 分组菜单分发 */
+/**
+ * 分组菜单分发：改名或删除
+ *
+ * - `kind`: 菜单项标识，取 rename / remove
+ */
 function onGroupPick(kind: string) {
   const menu = groupMenu.value;
   groupMenu.value = null;
@@ -134,7 +145,7 @@ function openNewGroup(targets: string[] = []) {
   groupForm.value = { uuid: "", name: "" };
 }
 
-/** 保存新建 / 改名：名字为空不动 */
+/** 保存新建 / 改名；名为空时不动，新建时把待分配的方块一起放进去 */
 function saveGroupForm() {
   const form = groupForm.value;
   if (!form) return;
@@ -191,6 +202,12 @@ const groupPickValue = computed(() => {
   return groupOf(ids[0]) ?? "";
 });
 
+/**
+ * 打开方块右键菜单
+ *
+ * - `payload.event`: 右键事件，用来取弹出坐标
+ * - `payload.item`: 右键的那个方块
+ */
 function openBlockMenu(payload: { event: MouseEvent; item: BlockItemDto }) {
   blockMenu.value = {
     x: Math.min(payload.event.clientX, window.innerWidth - 200),
@@ -295,6 +312,11 @@ const descText = computed(() =>
 const iconTarget = ref<BlockItemDto | null>(null);
 const iconBusy = ref(false);
 
+/**
+ * 打开选实例弹窗
+ *
+ * - `block`: 要设为图标的那个方块
+ */
 function openIconPick(block: BlockItemDto) {
   iconTarget.value = block;
 }
@@ -304,6 +326,11 @@ function openDetailIconPick() {
   if (detail.value) openIconPick(detail.value);
 }
 
+/**
+ * 确认把方块设为该实例的图标；成功后关掉弹窗与详情
+ *
+ * - `inst`: 选中的实例
+ */
 async function onIconPick(inst: InstanceInfoDto) {
   const b = iconTarget.value;
   if (!b || iconBusy.value) return;
@@ -468,14 +495,14 @@ async function onDetailRemove() {
   top: calc(var(--titlebar-h) + 10px);
   left: 50%;
   transform: translateX(-50%);
-  z-index: 90;
+  z-index: 40;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
   background: var(--bg-card);
   border: 1px solid var(--accent-border);
-  border-radius: 14px;
+  border-radius: 12px;
   box-shadow: var(--shadow-md);
 }
 
@@ -498,15 +525,16 @@ async function onDetailRemove() {
 
 /* ---------- 分组右键菜单 ---------- */
 
+/* 右键菜单挂在窗口最上层：遮罩与菜单同为 250 档，菜单在 DOM 里靠后，自然压在遮罩上 */
 .menu-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 400;
+  z-index: 250;
 }
 
 .group-menu {
   position: fixed;
-  z-index: 401;
+  z-index: 250;
   min-width: 140px;
   /* 分组多时在菜单内滚动，不把菜单撑出窗口 */
   max-height: 70vh;
@@ -531,7 +559,7 @@ async function onDetailRemove() {
 /* 还没有分组时，下拉框下面补一句怎么建 */
 .group-pick-empty {
   margin: 6px 0 0;
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-dim);
 }
 
@@ -540,27 +568,12 @@ async function onDetailRemove() {
   margin-right: auto;
 }
 
-/* 菜单里的分隔线 */
-.group-menu-sep {
-  display: block;
-  height: 1px;
-  margin: 4px 6px;
-  background: var(--border);
-}
-
-/* 分组项前面的勾位：没勾也占宽，名字才对得齐 */
-.group-menu-check {
-  display: inline-block;
-  width: 14px;
-  color: var(--accent);
-}
-
 .group-menu-item {
   display: block;
   width: 100%;
-  padding: 7px 10px;
+  padding: 6px 10px;
   border: none;
-  border-radius: 7px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text);
   font-size: 13px;
@@ -574,7 +587,7 @@ async function onDetailRemove() {
 }
 
 .group-menu-item.danger:hover {
-  color: var(--danger, #e5484d);
+  color: var(--red);
 }
 
 .group-tip {
@@ -610,16 +623,16 @@ async function onDetailRemove() {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 30px 20px 26px;
+  padding: 32px 20px 24px;
   border: 1px dashed var(--accent-border);
-  border-radius: 16px;
+  border-radius: 12px;
   background: var(--bg-card);
 }
 
 .block-prompt-icon {
   width: 84px;
   height: 84px;
-  border-radius: 24px;
+  border-radius: 12px;
   background: var(--accent-soft);
   color: var(--accent);
   display: flex;
@@ -629,7 +642,7 @@ async function onDetailRemove() {
 }
 
 .block-prompt-title {
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 700;
 }
 
@@ -676,7 +689,7 @@ async function onDetailRemove() {
   height: 100%;
   border-radius: 999px;
   background: var(--accent);
-  transition: width 0.2s ease;
+  transition: width 0.3s;
 }
 
 .block-progress-percent {

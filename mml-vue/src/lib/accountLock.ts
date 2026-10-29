@@ -26,6 +26,10 @@ let pending: ((answer: AccountLockAnswer) => void) | null = null;
  * 用户选择继续 / 取消，以及是否继续检测
  */
 export function askAccountLock(): Promise<AccountLockAnswer> {
+  // 上一问还没回答就来了新的一问：按“取消、继续检测”放掉旧的，避免它的 Promise 永远不落地
+  pending?.({ ok: false, keep: true });
+  pending = null;
+
   return new Promise((resolve) => {
     pending = resolve;
     accountLockOpen.value = true;
@@ -38,7 +42,7 @@ export function askAccountLock(): Promise<AccountLockAnswer> {
  * - `ok`: 是否继续启动
  * - `keep`: 是否继续检测账户占用
  */
-export function answerAccountLock(ok: boolean, keep: boolean) {
+export function answerAccountLock(ok: boolean, keep: boolean): void {
   accountLockOpen.value = false;
   const resolve = pending;
   pending = null;

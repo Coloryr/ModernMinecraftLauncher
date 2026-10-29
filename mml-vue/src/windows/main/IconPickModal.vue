@@ -33,7 +33,16 @@ const emit = defineEmits<{ (e: "close"): void }>();
 
 /** 可选输出边长，单位 px：图标最大显示 84px，256 已足够；大档给需要高清图标的场合 */
 const SIZES = [64, 128, 256, 512];
-/** 记住上次选的边长；纯前端偏好，与主题 / 侧栏一样走本地存储 */
+
+/**
+ * 读回上次选的边长
+ *
+ * 纯前端偏好，与主题 / 侧栏一样走本地存储。
+ *
+ * # 返回值
+ *
+ * 本地存过且仍在 `SIZES` 里时用它，否则回落到 256
+ */
 function readSize(): number {
   const n = readNumber(KEYS.iconPickSize, 256);
   return SIZES.includes(n) ? n : 256;
@@ -41,6 +50,7 @@ function readSize(): number {
 
 const size = ref(readSize());
 
+/** 换输出边长并记住 */
 function setSize(v: number) {
   size.value = v;
   writeNumber(KEYS.iconPickSize, v);
@@ -60,8 +70,7 @@ const applying = ref(false);
  *
  * Tauri 的 `<img>` 读不了本地路径，所以经后端转成 data URL；后端给的是**降采样后的预览**
  * 加原图尺寸，见 `IconSourceDto` —— 预览只用于选范围，裁剪仍按原图坐标做，清晰度不受影响。
- * 不要在这里拿 data URL 再 `new Image()` 量尺寸：那等于在页面里把原图整个解一遍，
- * 大图会把 WebView 卡住（改之前就是这样）。
+ * 不要在这里拿 data URL 再 `new Image()` 量尺寸：那等于在页面里把原图整个解一遍，大图会卡住 WebView。
  */
 async function loadSource() {
   reading.value = true;

@@ -19,7 +19,6 @@ const props = defineProps<{
   flashGroup?: string;
 }>();
 
-
 const {
   network,
   dnsLines,
@@ -140,7 +139,8 @@ const {
             <input class="field-input grow" :value="line" spellcheck="false" autocomplete="off"
               @input="setDnsLine(i, ($event.target as HTMLInputElement).value)" @change="commitDns(); applyNetwork();"
               @keydown.enter="($event.target as HTMLInputElement).blur()" />
-            <button class="line-del" aria-label="remove" v-tip="t('args.removeLine')" @click="removeDnsLine(i)">
+            <button class="line-del" :aria-label="t('args.removeLine')" v-tip="t('args.removeLine')"
+              @click="removeDnsLine(i)">
               <GlyphIcon name="close" :size="13" />
             </button>
           </div>

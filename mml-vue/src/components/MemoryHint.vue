@@ -28,7 +28,7 @@ const { text, usedPercent } = useSystemMemory();
 }
 
 .mem-text {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
 }

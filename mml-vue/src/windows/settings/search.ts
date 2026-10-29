@@ -47,8 +47,11 @@ export const GROUP_TITLES: Record<string, string> = {
   experimental: "winSettings.secExperimental",
 };
 
+/** 索引里的一条设置项 */
 interface IndexEntry {
+  /** 所在标签页 */
   tab: SettingsTab;
+  /** 所在分组 id，与 SettingsGroup 的 id / DOM 锚点 `#set-<id>` 一致 */
   group: string;
   /** 设置项标题的 i18n 键 */
   labelKey: string;

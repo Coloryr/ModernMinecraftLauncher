@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 账户操作：查看皮肤 / 刷新皮肤 / 刷新 Token / 重新登录 / 编辑 / 删除（单色 SVG 图标按钮）
+// 账户操作：查看皮肤 / 刷新皮肤 / 刷新 Token / 重新登录 / 编辑 / 删除
 // 按钮显隐由后端给的能力标志决定 —— 哪些账户类型有什么操作是业务规则，不由前端硬编码
 import { t } from "../lib/i18n";
 
@@ -10,10 +10,9 @@ defineProps<{
   canRelogin?: boolean;
   /** 是否可编辑，对应 AccountStoreDto.canEdit */
   canEdit?: boolean;
-  /** 当前账户被联机会话锁定时禁用删除。 */
+  /** 当前账户被联机会话锁定时禁用删除 */
   locked?: boolean;
-  /** 该账户是否有皮肤：false 时隐藏「查看皮肤 / 刷新皮肤」两个按钮；
-   *  没皮肤时两个按钮点了也没内容，留着只是噪音 */
+  /** 该账户是否有皮肤：false 时隐藏「查看皮肤 / 刷新皮肤」两个按钮 */
   hasSkin?: boolean;
 }>();
 
@@ -41,8 +40,7 @@ defineEmits<{
         <path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z" />
       </svg>
     </button>
-    <!-- 查看皮肤：眼睛图标，"看一眼"的通用语义，与"刷新"的循环箭头不会混。
-         没有皮肤时整个按钮不出现 -->
+    <!-- 眼睛图标表示"看一眼"，与刷新用的循环箭头区分 -->
     <button v-if="hasSkin" class="icon-btn" v-tip="t('account.viewSkin')" @click="$emit('viewSkin')">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"
         stroke-linecap="round" stroke-linejoin="round">
@@ -92,7 +90,7 @@ defineEmits<{
 .icon-btn {
   width: var(--ctl-h);
   height: var(--ctl-h);
-  border-radius: 8px;
+  border-radius: var(--ctl-radius);
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text-dim);
@@ -113,6 +111,6 @@ defineEmits<{
 .icon-btn.danger:hover {
   border-color: var(--red);
   color: var(--red);
-  background: rgba(255, 95, 86, 0.1);
+  background: color-mix(in srgb, var(--red) 10%, transparent);
 }
 </style>

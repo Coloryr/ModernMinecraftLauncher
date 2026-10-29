@@ -52,7 +52,11 @@ const compatGroups = computed(() => {
     .filter((group) => group.items.length > 0);
 });
 
-/** 开始迁移 */
+/**
+ * 开始迁移：订阅进度事件，跑完把结果放进 `report`
+ *
+ * - `mode`: `copy` 保留源数据 / `move` 搬走后删除源数据
+ */
 async function run(mode: "copy" | "move") {
   if (running.value) return;
   running.value = true;

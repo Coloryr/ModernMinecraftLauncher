@@ -31,8 +31,11 @@ interface ConfirmBox {
  * - `busy`: 是否有操作在跑，列表上的按钮据此置灰
  * - `confirmBox`: 待确认的弹窗内容，`null` 表示不显示
  * - `confirmBusy`: 确认动作是否在跑
+ * - `renameAsk`: 待重命名的目标，`null` 表示没在问
  * - `askConfirm`: 弹确认框，可指定做完是否重拉
  * - `askDelete`: 删除类确认，文案统一
+ * - `askRename`: 问一个新名字
+ * - `doRename`: 执行重命名并重拉列表
  * - `runConfirm`: 执行确认框里的动作
  * - `act`: 串行化 + 失败提示 + 成功后重拉列表
  * - `actLocal`: 同上但不重拉，给调用方自己就地更新的操作用
@@ -69,7 +72,12 @@ export function useResourceOps(data: ReturnType<typeof useResourceData>) {
     confirmBox.value = { title, text, run, reload: opts?.reload ?? true };
   }
 
-  /** 删除类确认：文案统一（"确定删除 X 吗"），确认后由 runConfirm 负责重拉 */
+  /**
+   * 删除类确认，文案统一
+   *
+   * - `name`: 要删的东西的显示名，进确认文案
+   * - `run`: 确认后执行的动作
+   */
   function askDelete(name: string, run: () => Promise<void>) {
     askConfirm(t("resource.delete"), t("resource.deleteConfirm", { name }), run);
   }
@@ -117,7 +125,11 @@ export function useResourceOps(data: ReturnType<typeof useResourceData>) {
     await act(() => renameResource(instanceUuid.value, ask.kind, ask.parent, ask.name, name));
   }
 
-  /** 轻操作（备份 / 切换光影…）：串行化 + 失败提示 + 成功后重拉 */
+  /**
+   * 轻操作（备份 / 切换光影…）：串行化 + 失败提示 + 成功后重拉
+   *
+   * - `run`: 要执行的动作
+   */
   async function act(run: () => Promise<void>) {
     if (busy.value) return;
     busy.value = true;
@@ -139,6 +151,8 @@ export function useResourceOps(data: ReturnType<typeof useResourceData>) {
    *
    * 重拉一次模组要把每个 jar 的元数据重新解析一遍（几百个包要好几秒），
    * 这两种操作都不需要它。
+   *
+   * - `run`: 要执行的动作
    */
   async function actLocal(run: () => Promise<void>) {
     if (busy.value) return;

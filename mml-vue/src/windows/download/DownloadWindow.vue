@@ -57,7 +57,9 @@ const shellProps = computed(() =>
     },
 );
 
+/** 最近一次状态快照；轮询与事件都写它 */
 const status = ref<DownloadStatusDto>({ tasks: [], threads: [], speed: 0, paused: false });
+/** 首次快照还没到：先显示「读取中」而不是「没有任务」 */
 const loading = ref(true);
 
 /** 停止下载确认弹窗 */
@@ -203,11 +205,13 @@ const allPaused = computed(() => status.value.paused);
 /** 是否有任务可操作（决定全局按钮是否可用） */
 const hasTasks = computed(() => tasks.value.length > 0);
 
+/** 暂停全部下载线程，随后立刻刷一次状态 */
 async function pauseAll() {
   await api.pauseAllDownloads();
   await refresh();
 }
 
+/** 继续全部下载线程，随后立刻刷一次状态 */
 async function resumeAll() {
   await api.resumeAllDownloads();
   await refresh();
@@ -237,7 +241,7 @@ async function confirmStopAll() {
  * 单窗口模式下它只是浮在当前页上的一层壳，收起 ≠ 停止下载：任务照跑，
  * 顶栏的入口 DownloadTitleIndicator 还在。真正会连带停掉下载的是"关下载窗口"和
  * "退出启动器"，那两种情况由 Rust 侧的关闭保护拦下，再由根组件弹确认框，
- * 见 src-tauri 的 close_guarded 与 App.vue
+ * 见 src-tauri 的 windows/lifecycle/create.rs 的 close_guarded 与 App.vue
  */
 function requestClose() {
   emit("close");
@@ -250,6 +254,7 @@ function startTimer() {
   }
 }
 
+/** 停掉轮询；窗口切走或卸载时调用，别在后台空转 IPC */
 function stopTimer() {
   if (timer !== null) {
     window.clearInterval(timer);
@@ -302,15 +307,15 @@ onUnmounted(() => {
           </span>
           <!-- 全局控制：暂停 / 继续 / 停止（作用于所有下载任务） -->
           <span class="ov-actions">
-            <button v-if="!allPaused" class="mini-btn" :disabled="!hasTasks" @click="pauseAll">
+            <BaseButton v-if="!allPaused" size="sm" :disabled="!hasTasks" @click="pauseAll">
               {{ t("winDownload.pause") }}
-            </button>
-            <button v-else class="mini-btn primary" :disabled="!hasTasks" @click="resumeAll">
+            </BaseButton>
+            <BaseButton v-else size="sm" variant="accent" :disabled="!hasTasks" @click="resumeAll">
               {{ t("winDownload.resume") }}
-            </button>
-            <button class="mini-btn danger" :disabled="!hasTasks" @click="requestStop">
+            </BaseButton>
+            <BaseButton size="sm" variant="danger" :disabled="!hasTasks" @click="requestStop">
               {{ t("winDownload.stop") }}
-            </button>
+            </BaseButton>
           </span>
         </div>
         <div class="ov-progress">
@@ -450,7 +455,7 @@ onUnmounted(() => {
 .overview {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
   padding: 10px 12px;
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -490,7 +495,7 @@ onUnmounted(() => {
 .ov-speed-value {
   font-size: 13px;
   font-weight: 700;
-  color: var(--green, #4caf7d);
+  color: var(--green);
   font-variant-numeric: tabular-nums;
 }
 
@@ -523,7 +528,7 @@ onUnmounted(() => {
 .section {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
 }
 
 .section-head {
@@ -572,7 +577,7 @@ onUnmounted(() => {
   grid-template-columns: 26px 86px minmax(0, 1fr) 54px 122px 100px;
   gap: 8px;
   align-items: center;
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .task-id {
@@ -591,41 +596,6 @@ onUnmounted(() => {
 
 .task-meta.right {
   text-align: right;
-}
-
-.mini-btn {
-  height: var(--ctl-h);
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--ctl-radius);
-  background: var(--bg-raised);
-  color: var(--text);
-  font-size: 11.5px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.mini-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-.mini-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.mini-btn.primary {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.mini-btn.danger:hover {
-  border-color: var(--red);
-  color: var(--red);
 }
 
 .task-foot {
@@ -649,7 +619,7 @@ onUnmounted(() => {
   flex: 1;
   display: block;
   height: 6px;
-  border-radius: 3px;
+  border-radius: 999px;
   background: var(--bg-hover);
   overflow: hidden;
 }
@@ -657,7 +627,7 @@ onUnmounted(() => {
 .progress-fill {
   display: block;
   height: 100%;
-  border-radius: 3px;
+  border-radius: 999px;
   background: var(--accent-grad);
   transition: width 0.3s;
 }
@@ -667,7 +637,7 @@ onUnmounted(() => {
 }
 
 .progress-fill.paused {
-  background: var(--yellow, #f5b944);
+  background: var(--yellow);
 }
 
 /* ---------- 线程 ---------- */
@@ -681,8 +651,8 @@ onUnmounted(() => {
   padding: 6px 10px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 9px;
-  font-size: 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
 }
 
 .thread-id {
@@ -701,7 +671,7 @@ onUnmounted(() => {
 .thread-progress {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
 }
 
 .thread-percent {
@@ -726,7 +696,7 @@ onUnmounted(() => {
   text-align: right;
   font-size: 11.5px;
   font-weight: 600;
-  color: var(--green, #4caf7d);
+  color: var(--green);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -740,7 +710,7 @@ onUnmounted(() => {
 .state-tag {
   padding: 1px 8px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 10.5px;
   white-space: nowrap;
   text-align: center;
   overflow: hidden;
@@ -756,7 +726,7 @@ onUnmounted(() => {
 }
 
 .ts-paused {
-  color: var(--yellow, #f5b944);
+  color: var(--yellow);
   background: rgba(245, 185, 68, 0.16);
 }
 
@@ -792,7 +762,7 @@ onUnmounted(() => {
 }
 
 .state-pause {
-  color: var(--yellow, #f5b944);
+  color: var(--yellow);
   background: rgba(245, 185, 68, 0.16);
 }
 

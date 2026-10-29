@@ -26,9 +26,18 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  /** 游戏窗口设置有改动；整份抛给 SettingsWindow 再走防抖保存 */
   (e: "update:win", value: WindowSettingDto): void;
 }>();
 
+/**
+ * 改游戏窗口设置里的一个字段
+ *
+ * 组件的 `win` 是只读的，改动经 `update:win` 交给父级那份可写状态。
+ *
+ * - `key`: 字段名
+ * - `value`: 新值
+ */
 function updateWindow<K extends keyof WindowSettingDto>(key: K, value: WindowSettingDto[K]) {
   if (props.win) emit("update:win", { ...props.win, [key]: value });
 }
@@ -167,7 +176,8 @@ watch(lockServerError, async (msg) => {
     <!-- 已锁定的条目列表（总开关打开时才可编辑） -->
     <template v-if="client.loginLockOn">
       <div v-if="client.loginLock.length" class="switch-list">
-        <div v-for="(e, i) in client.loginLock" :key="e.ty" class="switch-row lock-item">
+        <!-- 同一种登录方式可以按不同服务器重复添加，键要带上服务器，不能只用 ty -->
+        <div v-for="(e, i) in client.loginLock" :key="`${e.ty}|${e.server}`" class="switch-row lock-item">
           <span class="lock-item-text">
             {{ loginTypeLabel(e.ty) }}<template v-if="e.name"> — {{ e.name }}</template><template v-if="e.server"> — {{
               e.server }}</template>

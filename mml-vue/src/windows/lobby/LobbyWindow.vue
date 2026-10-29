@@ -8,9 +8,12 @@ import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
 import { isTauri, multiWindow, prepareLobby, releaseLobby } from "../windowManager";
 import { useInstanceChange } from "../../composables/useInstanceChange";
+import { copyText } from "../../lib/clipboard";
 
+/** 请求关闭本窗口 */
 defineEmits<{ (e: "close"): void }>();
 
+/** 当前页签：陶瓦联机 / 映射大厅 */
 const tab = ref<"terracotta" | "mapping">("terracotta");
 const view = ref<LobbyViewDto | null>(null);
 const instances = ref<InstanceInfoDto[]>([]);
@@ -24,12 +27,23 @@ let active = false;
 let generation = 0;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
+/** 后端大厅状态机当前状态；拿不到快照时按 stopped 处理 */
 const state = computed(() => view.value?.state.state || "stopped");
+/** 处于可建房 / 可加入的等待态 */
 const waiting = computed(() => state.value === "waiting");
+/** 实例已选、联机组件就绪且状态允许时才放行「启动游戏」 */
 const canLaunch = computed(() => !!instance.value && view.value?.ready &&
   ["waiting", "host-scanning", "host-starting", "host-ok", "guest-ok"].includes(state.value));
+/** 状态机文案，键为 lobby.state.* */
 const stateText = computed(() => t(`lobby.state.${state.value}`));
 
+/**
+ * 应用一帧大厅快照
+ *
+ * - `next`: 后端返回的最新快照
+ *
+ * 轮询请求可能乱序回来，旧会话或旧状态的一帧直接丢掉，免得界面倒退。
+ */
 function applyView(next: LobbyViewDto) {
   const previous = view.value;
   if (previous && next.sessionGeneration < previous.sessionGeneration) return;
@@ -42,6 +56,11 @@ function applyView(next: LobbyViewDto) {
   view.value = next;
 }
 
+/**
+ * 轮询一次大厅状态，结束后再排下一轮
+ *
+ * - `ticket`: 本次激活的世代号，与 generation 不符说明页面已切走或换过会话，直接停
+ */
 async function poll(ticket: number) {
   if (!active || ticket !== generation) return;
   try {
@@ -54,6 +73,7 @@ async function poll(ticket: number) {
   }
 }
 
+/** 页面激活：准备大厅会话、拉实例列表，然后开始轮询 */
 async function activate() {
   if (active) return;
   active = true;
@@ -78,6 +98,7 @@ async function activate() {
   }
 }
 
+/** 页面离开：停轮询、作废在途请求，单窗口模式下释放大厅会话 */
 function deactivate() {
   if (!active) return;
   active = false;
@@ -87,6 +108,11 @@ function deactivate() {
   if (!multiWindow.value && isTauri()) releaseLobby();
 }
 
+/**
+ * 执行一个大厅操作，随后刷新一次快照
+ *
+ * - `operation`: 要执行的后端命令
+ */
 async function run(operation: () => Promise<unknown>) {
   if (busy.value) return;
   const ticket = generation;
@@ -103,21 +129,33 @@ async function run(operation: () => Promise<unknown>) {
   }
 }
 
+/**
+ * 房间操作：建房 / 加入 / 离开
+ *
+ * - `action`: 后端认识的房间动作名
+ */
 function roomAction(action: string) {
   return run(() => commands.lobby.roomAction(action, room.value.trim(), selectedNodes.value));
 }
 
+/** 下载 / 刷新联机组件 */
 function start() {
   return run(() => commands.lobby.start());
 }
 
+/** 用选中实例启动游戏并进入联机 */
 function launchGame() {
   return run(() => commands.lobby.launchGame(instance.value));
 }
 
+/**
+ * 复制房间码 / 地址到剪贴板
+ *
+ * - `value`: 要复制的文本
+ */
 async function copy(value: string) {
-  try { await navigator.clipboard.writeText(value); showToast(t("account.copied")); }
-  catch { showToast(t("account.copyFail")); }
+  if (await copyText(value)) showToast(t("account.copied"));
+  else showToast(t("account.copyFail"));
 }
 
 /** 实例在别处被增删改：重拉下拉，删掉的那个自动取消选中 */

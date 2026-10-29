@@ -47,14 +47,13 @@ const viewMonth = ref(todayParts().month);
 const rootEl = ref<HTMLElement | null>(null);
 const popEl = ref<HTMLElement | null>(null);
 
-/** 六个星期的表头，周一起始 */
+/** 星期的表头，周一起始；格子窄，标签截到两个字符以内 */
 const WEEKDAYS = computed(() => {
-  const miss = [t("date.mon"), t("date.tue"), t("date.wed"), t("date.thu"), t("date.fri"), t("date.sat"), t("date.sun")];
-  // 英文太宽，弹层里用单字母；中文本来就一个字
-  return miss.map((w) => (w.length > 1 ? w.slice(0, 2) : w));
+  const days = [t("date.mon"), t("date.tue"), t("date.wed"), t("date.thu"), t("date.fri"), t("date.sat"), t("date.sun")];
+  return days.map((w) => (w.length > 1 ? w.slice(0, 2) : w));
 });
 
-/** 标题：中文按「2026 年 10 月」，英文按「October 2026」 */
+/** 标题：中文按「2026 年 10 月」，英文按「10/2026」 */
 const title = computed(() =>
   t("date.monthTitle", { y: viewYear.value, m: viewMonth.value }),
 );
@@ -94,7 +93,7 @@ function syncView() {
   viewMonth.value = base.month;
 }
 
-/** 弹层与窗口边缘至少留这么多 */
+/** 弹层与窗口边缘至少留这么多，单位 px */
 const EDGE = 8;
 
 /**
@@ -151,7 +150,11 @@ function pick(date: string) {
   open.value = false;
 }
 
-/** 翻月 */
+/**
+ * 翻月
+ *
+ * - `delta`: 负数为上个月，正数为下个月
+ */
 function shift(delta: number) {
   const next = shiftMonth(viewYear.value, viewMonth.value, delta);
   viewYear.value = next.year;

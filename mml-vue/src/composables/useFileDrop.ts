@@ -19,6 +19,7 @@ import { commands } from "../lib/bindings";
 import type { FileDropDto } from "../lib/bindings";
 import { FileDrop } from "../lib/listens";
 import { isTauri } from "../lib/util";
+import { useUnlisteners } from "./useUnlisteners";
 
 /** 一次拖入的数据 */
 export interface FileDropPayload {
@@ -98,7 +99,7 @@ function dragKindOf(
 }
 
 /**
- * 悬停阶段"是不是目录"（best effort）
+ * 悬停阶段判断"是不是目录"，尽力而为
  *
  * 拿不到就返回 `null` = 认不出来，调用方退回按 MIME 猜。`webkitGetAsEntry()` 不可用
  * 或返回 null 都算拿不到。多个文件里只要有一个是目录就按目录算。
@@ -121,7 +122,7 @@ function hoverIsDirectory(items: DataTransferItem[]): boolean | null {
 /**
  * 给本窗口挂上拖放监听
  *
- * - `onDrop`: 松手时回调，文件路径与文本地址都在里面
+ * - `onDrop`: 松手时回调，文件路径与文本地址都在这份数据里
  * - `options.accept`: 自定义"这次拖入接不接"
  *
  * # 返回值
@@ -135,7 +136,7 @@ export function useFileDrop(
 ) {
   const fileDragOver = ref(false);
   const dragKind = ref<DragKind>("");
-  const unlisteners: Array<() => void> = [];
+  const { track } = useUnlisteners();
   /** 本次拖入的世代号：异步判定回来时若已经换了新的一次，结果作废 */
   let dragSeq = 0;
   /** 等路径桥那一步的暂存：DOM 的 drop 有文件时先不发，等 `file-drop` 送来真实路径 */
@@ -150,16 +151,6 @@ export function useFileDrop(
       console.error("[useFileDrop] 判定拖入是否可接受失败", err);
       return false;
     }
-  }
-
-  /**
-   * 交付一次拖入
-   *
-   * 松手时**不再问一遍 accept**：能不能接在悬停阶段已经定过 —— 不接的内容 `dragover`
-   * 就不放行、根本不会有 drop。再判一次只会多一轮探测，还会在判定不通过时静默丢弃。
-   */
-  async function deliver(payload: FileDropPayload) {
-    await onDrop(payload);
   }
 
   /** 文本 → 地址；规则与 Rust 侧的 `window_url_of_text` 共用一份 */
@@ -230,7 +221,7 @@ export function useFileDrop(
     dragSeq++;
     fileDragOver.value = false;
     dragKind.value = "";
-
+    // 松手时不再问一遍 accept：不接的内容 dragover 就没放行，根本不会有 drop
     const data = event.dataTransfer;
     const types = data ? [...data.types] : [];
     const hasFiles = !!data && data.files.length > 0;
@@ -240,7 +231,7 @@ export function useFileDrop(
       const url = text ? await urlOfText(text) : "";
       if (!hasFiles) {
         // 纯文本 / 链接（网页卡片就是这种）
-        await deliver({ paths: [], url, types, isDirectory: null });
+        await onDrop({ paths: [], url, types, isDirectory: null });
         return;
       }
       // 有文件：路径只有原生拿得到，等 `file-drop`
@@ -248,7 +239,7 @@ export function useFileDrop(
       entry.timer = window.setTimeout(() => {
         if (pending !== entry) return;
         pending = null;
-        void deliver({ paths: [], url: entry.url, types: entry.types, isDirectory: null });
+        void onDrop({ paths: [], url: entry.url, types: entry.types, isDirectory: null });
       }, 500);
       pending = entry;
     })();
@@ -261,7 +252,7 @@ export function useFileDrop(
       window.clearTimeout(entry.timer);
       pending = null;
     }
-    void deliver({
+    void onDrop({
       paths,
       url: entry?.url ?? "",
       types: entry?.types ?? [],
@@ -269,7 +260,7 @@ export function useFileDrop(
     });
   }
 
-  onMounted(async () => {
+  onMounted(() => {
     // 挡在 dragenter 之前：不挡的话内部元素的原生拖拽会把"拖入文件"的遮罩带出来
     window.addEventListener("dragstart", onDomDragStart);
     window.addEventListener("dragenter", onDomEnter);
@@ -279,15 +270,14 @@ export function useFileDrop(
 
     // 路径桥只在 Tauri 下有：浏览器预览里文件拖入拿不到路径（文本那条照旧可用）
     if (!isTauri()) return;
-    try {
-      unlisteners.push(
-        await listen<FileDropDto>(FileDrop, (event) => {
-          onNativePaths(event.payload.paths ?? []);
-        }),
-      );
-    } catch (err) {
+    // 订阅交给 track：卸载早于订阅完成时就地退订，别把监听留到窗口关掉之后
+    const subscribing = listen<FileDropDto>(FileDrop, (event) => {
+      onNativePaths(event.payload.paths ?? []);
+    });
+    subscribing.catch((err) => {
       console.error("[useFileDrop] 注册路径桥事件失败（文件拖入将拿不到路径）", err);
-    }
+    });
+    track(subscribing);
   });
 
   onUnmounted(() => {
@@ -296,8 +286,6 @@ export function useFileDrop(
     window.removeEventListener("dragover", onDomOver);
     window.removeEventListener("dragleave", onDomLeave);
     window.removeEventListener("drop", onDomDrop);
-    unlisteners.forEach((fn) => fn());
-    unlisteners.length = 0;
     dragKind.value = "";
     if (pending) {
       window.clearTimeout(pending.timer);

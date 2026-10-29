@@ -9,8 +9,13 @@ import { commands } from "./bindings";
 import { tErr } from "./i18n";
 import { showToast } from "./toast";
 
+/** 全部账户，顺序由后端定 */
 export const accounts = ref<AccountStoreDto[]>([]);
+
+/** 账户操作是否被联机大厅锁定 */
 export const accountLocked = ref(false);
+
+/** 当前账户；null 表示未选择 */
 export const currentAccount = ref<AccountStoreDto | null>(null);
 
 /** 账户类型显示名 */
@@ -50,12 +55,26 @@ export async function loadAccounts(): Promise<void> {
     /* 浏览器环境：保持为空 */
   }
 }
-/** 设置当前账户；后端拒绝时保持原选择。 */
+/**
+ * 设置当前账户，后端拒绝时保持原选择
+ *
+ * - `acc`: 目标账户
+ *
+ * # 返回值
+ *
+ * 后端确实切换了返回 true
+ */
 export async function setCurrentAccount(acc: AccountStoreDto): Promise<boolean> {
   return updateSelection(acc.uuid);
 }
 
-/** 清除当前选择，联机大厅锁定期间由后端拒绝。 */
+/**
+ * 清除当前选择，联机大厅锁定期间由后端拒绝
+ *
+ * # 返回值
+ *
+ * 后端确实清掉了返回 true
+ */
 export async function clearCurrentAccount(): Promise<boolean> {
   return updateSelection("");
 }
@@ -71,7 +90,15 @@ async function updateSelection(uuid: string): Promise<boolean> {
   }
 }
 
-/** 删除成功后重拉账户，保持选择与后端一致。 */
+/**
+ * 删除成功后重拉账户，保持选择与后端一致
+ *
+ * - `uuid`: 账户 uuid
+ *
+ * # 返回值
+ *
+ * 删除成功返回 true
+ */
 export async function removeAccount(uuid: string): Promise<boolean> {
   try {
     const removed = await commands.account.removeAccount(uuid);
@@ -90,7 +117,7 @@ export async function removeAccount(uuid: string): Promise<boolean> {
  *
  * - `uuid`: 目标账户 uuid
  */
-export async function refreshAccountToken(uuid: string) {
+export async function refreshAccountToken(uuid: string): Promise<void> {
   try {
     await commands.account.refreshAccountToken(uuid);
   } catch {
@@ -129,11 +156,15 @@ export async function addAccount(
   return acc;
 }
 
-/** 微软登录：触发后端设备码流程；弹窗交互与结果经 account-oauth / account-oauth-state 事件通知。
- *  失败时抛出后端错误，如网络不通，由调用方提示 */
+/**
+ * 微软登录：触发后端设备码流程
+ *
+ * 弹窗交互与结果经 account-oauth / account-oauth-state 事件通知；失败时抛出后端错误，
+ * 如网络不通，由调用方提示
+ */
 export async function loginMicrosoft(): Promise<void> {
   await commands.account.addAccount("", "microsoft", null, null);
 }
 
-// 跨窗口同步：某个窗口改了账户后，其它窗口重新加载
-listen(AccountChange, () => loadAccounts());
+// 跨窗口同步：某个窗口改了账户后，其它窗口重新加载；浏览器预览下 listen 会拒绝，忽略
+listen(AccountChange, () => loadAccounts()).catch(() => {});

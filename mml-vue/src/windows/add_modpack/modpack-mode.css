@@ -180,16 +180,14 @@
   opacity: 1;
 }
 
-.pack-star.on {
-  opacity: 1;
-}
-
 .pack-star svg {
   fill: none;
   stroke: currentColor;
 }
 
+/* 已收藏：常显且星色常亮 */
 .pack-star.on {
+  opacity: 1;
   color: var(--star);
 }
 

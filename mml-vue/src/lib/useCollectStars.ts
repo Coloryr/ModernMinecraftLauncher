@@ -18,9 +18,11 @@ import type { ProjectItemDto } from "./bindings";
  */
 export function useCollectStars(items: () => ProjectItemDto[]) {
   let unlisten: (() => void) | null = null;
+  // 组件可能在监听建立完成前就卸载，之后到的退订函数要立刻执行，否则监听泄漏
+  let disposed = false;
 
   /** 按最新收藏夹重算每条目的 isStar */
-  async function sync() {
+  async function sync(): Promise<void> {
     try {
       const data = await api.collectGetData();
       const starred = new Set(data.items.map((i) => `${i.source}:${i.pid}`));
@@ -33,10 +35,15 @@ export function useCollectStars(items: () => ProjectItemDto[]) {
   }
 
   onMounted(async () => {
-    unlisten = await onCollectChange(() => void sync());
+    // 非 Tauri 环境下 listen 会拒绝；星标保持原样即可
+    const un = await onCollectChange(() => void sync()).catch(() => null);
+    if (!un) return;
+    if (disposed) un();
+    else unlisten = un;
   });
 
   onUnmounted(() => {
+    disposed = true;
     unlisten?.();
     unlisten = null;
   });

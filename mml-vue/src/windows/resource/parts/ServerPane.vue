@@ -483,7 +483,7 @@ function onMenuPick(id: string) {
             }}
           </span>
         </template>
-  
+
         <!--
           副标题：**这一行自己回答"能不能连上"** + 地址。
           MOTD 搬去上方那张卡了，这里不再铺彩色分段 —— 一行只有一句话，扫一眼就分得清。

@@ -20,16 +20,6 @@ const props = withDefaults(
   { loading: false, page: 1, hasMore: true },
 );
 
-// 鼠标侧键翻新闻：后退 = 上一页，前进 = 下一页；与按钮同样的可用条件
-usePageKeys({
-  prev: () => {
-    if (props.page > 1 && !props.loading) emit("prev");
-  },
-  next: () => {
-    if (props.hasMore && !props.loading) emit("next");
-  },
-});
-
 const emit = defineEmits<{
   /** 重新拉取当前页 */
   (e: "refresh"): void;
@@ -40,6 +30,16 @@ const emit = defineEmits<{
   /** 打开这条新闻的链接 */
   (e: "open", url: string): void;
 }>();
+
+// 鼠标侧键翻新闻：后退 = 上一页，前进 = 下一页；与按钮同样的可用条件
+usePageKeys({
+  prev: () => {
+    if (props.page > 1 && !props.loading) emit("prev");
+  },
+  next: () => {
+    if (props.hasMore && !props.loading) emit("next");
+  },
+});
 
 /** 分类标签配色：按 tag 字符串哈希取色相，同一分类颜色稳定且各不相同 */
 function tagColor(tag: string) {
@@ -127,7 +127,7 @@ function tagColor(tag: string) {
 }
 
 .panel-head h2 {
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 700;
 }
 
@@ -222,7 +222,7 @@ function tagColor(tag: string) {
 .sk-tag {
   width: 56px;
   height: 15px;
-  border-radius: 20px;
+  border-radius: 999px;
 }
 
 .sk-date {
@@ -253,20 +253,19 @@ function tagColor(tag: string) {
   padding: 10px 14px 0;
 }
 
+/* 底色与文字色由 tagColor 按分类现算，见脚本 */
 .news-tag {
-  font-size: 10px;
+  font-size: 10.5px;
   padding: 1px 8px;
-  border-radius: 20px;
-  background: rgba(79, 140, 255, 0.16);
-  color: #8fb0ff;
+  border-radius: 999px;
 }
 
 .news-date {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text-dim);
   /* 副标题最长 60+ 字，会折行把这一行撑高；标签是垂直居中的，
      于是下方标题与左侧分类的间距每张卡片都不一样。锁成单行 + 省略号，
-     完整内容靠 title 悬停看 */
+     完整内容靠 v-tip 悬停看 */
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -274,7 +273,7 @@ function tagColor(tag: string) {
 }
 
 .news-title {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   line-height: 1.5;
   padding: 14px 14px 14px;

@@ -115,15 +115,18 @@ export function useSettingsUi() {
     }
   }
 
+  /** 语言：只认 zh_cn / en_us，其余回落到默认 */
   function onLangChange(v: string) {
     setLocale(v === "en_us" ? "en_us" : DEFAULT_LOCALE);
   }
 
+  /** 侧栏停靠到左边还是右边 */
   function onSideChange(v: string) {
     side.value = v === "Right" ? "Right" : DEFAULT_SIDE;
     setSidebarSide(side.value);
   }
 
+  /** 启动页：启动器主页或项目列表 */
   function onStartupChange(v: string) {
     startup.value = v === "List" ? "List" : DEFAULT_STARTUP_PAGE;
     setStartupPage(startup.value);
@@ -135,6 +138,7 @@ export function useSettingsUi() {
     setViewMode(view.value);
   }
 
+  /** 主题：跟随系统 / 浅色 / 深色 */
   function onThemeChange(v: string) {
     const next = v as Theme;
     themeValue.value = next;

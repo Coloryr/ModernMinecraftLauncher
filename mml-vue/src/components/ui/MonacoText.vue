@@ -130,6 +130,7 @@ async function openMenu(x: number, y: number) {
   await nextTick();
   const box = menuEl.value?.getBoundingClientRect();
   if (!box) return;
+  // 菜单与窗口边缘的最小距离，单位 px
   const pad = 8;
   menu.value = {
     x: Math.max(pad, Math.min(x, window.innerWidth - box.width - pad)),
@@ -269,7 +270,7 @@ watch(wordWrap, (on) => {
   min-width: 0;
   min-height: 0;
   border: 1px solid var(--border);
-  /* 不能裁：同上，查找框的悬停提示要能伸出编辑器之外 */
+  /* 不设 overflow: hidden：查找框的悬停提示要能伸出编辑器之外 */
 }
 </style>
 

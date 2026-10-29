@@ -63,10 +63,17 @@ onMounted(() => {
   void loadExeInfo();
 });
 
+/** 当前语言的 FAQ 列表，文案在 lib/i18n/locales 里 */
 const faqs = computed(() => (locale.value === "en_us" ? enFaqs : zhFaqs));
 
+/** 展开的 FAQ 下标；null 表示全部收起，默认展开第一条 */
 const openIndex = ref<number | null>(0);
 
+/**
+ * 展开 / 收起一条 FAQ
+ *
+ * - `i`: FAQ 下标；再点一次同一条即收起
+ */
 function toggle(i: number) {
   openIndex.value = openIndex.value === i ? null : i;
 }
@@ -253,7 +260,7 @@ function openUrl(url: string) {
   display: flex;
   gap: 14px;
   margin-bottom: 14px;
-  padding: 16px 18px;
+  padding: 16px 20px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -354,11 +361,11 @@ function openUrl(url: string) {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 15px 18px;
+  padding: 14px 20px;
   border: none;
   background: transparent;
   color: var(--text);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
@@ -376,7 +383,7 @@ function openUrl(url: string) {
 }
 
 .faq-a {
-  padding: 4px 18px 16px;
+  padding: 4px 20px 16px;
   font-size: 13px;
   color: var(--text-dim);
   line-height: 1.7;
@@ -384,7 +391,7 @@ function openUrl(url: string) {
 
 .footer-note {
   margin-top: 22px;
-  padding: 16px 18px;
+  padding: 16px 20px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -405,7 +412,7 @@ function openUrl(url: string) {
 }
 
 .lic-body {
-  padding: 4px 18px 16px;
+  padding: 4px 20px 16px;
   font-size: 13px;
   color: var(--text-dim);
   line-height: 1.7;
@@ -437,14 +444,14 @@ function openUrl(url: string) {
   flex-wrap: wrap;
   gap: 4px 14px;
   margin-bottom: 8px;
-  font-size: 12px;
+  font-size: 11.5px;
 }
 
 .lic-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 7px 0;
+  padding: 6px 0;
 }
 
 .lic-row + .lic-row {
@@ -467,7 +474,7 @@ function openUrl(url: string) {
 }
 
 .lic-meta {
-  font-size: 12px;
+  font-size: 11.5px;
 }
 
 /* 补充说明整条另起一行 */

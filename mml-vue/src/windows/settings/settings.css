@@ -1,6 +1,6 @@
 /* 设置窗口的窗口级样式（**非 scoped**）
  *
- * 设置窗口拆成了「薄窗口 + 6 个 tab 组件 + 若干 parts」，scoped 样式跨不过组件边界，
+ * 设置窗口拆成了「薄窗口 + 每个 tab 一个组件 + 若干 parts」，scoped 样式跨不过组件边界，
  * 所以公共样式集中放这里，由 SettingsWindow.vue 注入一次。
  *
  * 反外溢：所有规则都挂在 `.settings-layout` 之下（这个类只属于本窗口），
@@ -248,16 +248,6 @@
 }
 
 @keyframes set-group-flash {
-  from {
-    background: var(--accent-soft);
-  }
-
-  to {
-    background: transparent;
-  }
-}
-
-@keyframes set-group-hit {
   from {
     background: var(--accent-soft);
   }

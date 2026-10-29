@@ -44,6 +44,10 @@ let pending: ((answer: LaunchCheckAnswer) => void) | null = null;
  * 用户选择继续 / 取消，以及是否关掉这项检查
  */
 export function askLaunchCheck(kind: LaunchCheckKind, info: LaunchPrecheckDto): Promise<LaunchCheckAnswer> {
+  // 与账户占用同一口径：上一问未回答时按“取消、保留检查”放掉，别让旧 Promise 悬着
+  pending?.({ ok: false, disable: false });
+  pending = null;
+
   return new Promise((resolve) => {
     pending = resolve;
     launchCheckKind.value = kind;
@@ -58,7 +62,7 @@ export function askLaunchCheck(kind: LaunchCheckKind, info: LaunchPrecheckDto): 
  * - `ok`: 是否继续启动
  * - `disable`: 是否关掉这项检查
  */
-export function answerLaunchCheck(ok: boolean, disable: boolean) {
+export function answerLaunchCheck(ok: boolean, disable: boolean): void {
   launchCheckOpen.value = false;
   launchCheckInfo.value = null;
   const resolve = pending;

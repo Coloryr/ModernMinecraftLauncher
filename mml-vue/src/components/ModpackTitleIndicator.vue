@@ -33,12 +33,20 @@ const { status, init } = useModpackStatus(false);
  * 的 `await` 之后就注册不上了，订阅会一直挂着 —— 所以退订函数存这里、由同步钩子调用。
  */
 let unlistenStatus: (() => void) | null = null;
+let disposed = false;
 
 onMounted(async () => {
-  unlistenStatus = await init();
+  const off = await init();
+  // 订阅期间组件已卸载：立刻退订，别把监听留到窗口关闭之后
+  if (disposed) {
+    off();
+    return;
+  }
+  unlistenStatus = off;
 });
 
 onUnmounted(() => {
+  disposed = true;
   unlistenStatus?.();
   unlistenStatus = null;
 });
@@ -68,23 +76,21 @@ const tipText = computed(() => {
   return t("modpack.bar.finished", { count: tasks.value.length });
 });
 
-/** 图标状态：安装中转、失败警示、全部完成常态 */
+/** 图标状态：安装中、失败警示、全部完成常态 */
 const iconState = computed(() => {
   if (running.value.length) return "busy";
   return hasFailed.value ? "failed" : "done";
 });
 
 /** 点一下：展开进度弹窗（关掉弹窗只收起，安装照跑） */
-const clickable = computed(() => props.popup);
-
 function onClick() {
-  if (clickable.value) openModpackPopup();
+  if (props.popup) openModpackPopup();
 }
 </script>
 
 <template>
   <!-- 没有任务时整块不存在 -->
-  <button v-if="tasks.length" class="mp-indicator" :class="iconState" :disabled="!clickable" v-tip="tipText"
+  <button v-if="tasks.length" class="mp-indicator" :class="iconState" :disabled="!popup" v-tip="tipText"
     :aria-label="tipText" @click="onClick">
     <span class="mp-ind-icon">
       <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9"

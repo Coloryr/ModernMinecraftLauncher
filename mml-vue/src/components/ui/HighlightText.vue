@@ -28,7 +28,6 @@ const parts = computed<Part[]>(() => {
     out.push({ text: m[0], hit: true });
     last = at + m[0].length;
   }
-  if (!out.length) return [{ text: props.text, hit: false }];
   if (last < props.text.length) out.push({ text: props.text.slice(last), hit: false });
   return out;
 });

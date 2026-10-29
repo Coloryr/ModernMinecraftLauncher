@@ -2,12 +2,21 @@
 // 通用图标选项卡：图标 + 渐变激活态，按数量等分填满整行
 //
 // 原「添加实例」窗口的 ModeTabs，导出窗口要用同一套观感，所以挪到这里共用。
-// 图标名固定五个：cube / box / folder / globe / download，其它值回落成地球。
+// 图标按名字画 cube / box / folder / download 四种，其余（含 globe）回落成地球。
 import { t } from "../../lib/i18n";
 
 defineProps<{
   /** 页签清单，顺序即显示顺序 */
-  tabs: Array<{ id: T; labelKey: string; icon: string; suffix?: string }>;
+  tabs: Array<{
+    /** 页签 id，也就是 `v-model` 的值 */
+    id: T;
+    /** 文案的 i18n key */
+    labelKey: string;
+    /** 图标名，见文件头的四种加地球兜底 */
+    icon: string;
+    /** 跟在标签后的数量一类小尾巴；不传则不画 */
+    suffix?: string;
+  }>;
   /** 当前页签 */
   modelValue: T;
   /** 禁止切换，比如表单正在提交 */

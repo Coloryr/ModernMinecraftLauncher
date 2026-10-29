@@ -362,7 +362,7 @@ function onMenuPick(id: string) {
 .mini-btn {
   height: var(--ctl-h);
   padding: 0 12px;
-  border-radius: 7px;
+  border-radius: 8px;
   border: 1px solid rgb(255 255 255 / 25%);
   background: rgb(0 0 0 / 55%);
   color: rgb(255 255 255 / 90%);

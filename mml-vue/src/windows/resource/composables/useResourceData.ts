@@ -382,7 +382,9 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     }
     // 拉过的分类留在窗口里，切回来不再重读（见 loadedCats）
     void loadIfNeeded();
-  }); watch(saveTab, (tab) => {
+  });
+
+  watch(saveTab, (tab) => {
     if (tab === "datapacks") void enterDatapackTab();
   });
   watch(dpSave, () => void loadDatapacks());

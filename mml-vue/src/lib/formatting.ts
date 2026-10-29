@@ -12,12 +12,17 @@
 
 /** 一段带样式的文字 */
 export interface FormattedSegment {
+  /** 文字内容，不含格式码 */
   text: string;
-  /** #RRGGBB；空串 = 跟随当前文字颜色 */
+  /** 颜色 #RRGGBB；空串表示跟随当前文字颜色 */
   color: string;
+  /** 是否加粗 */
   bold: boolean;
+  /** 是否斜体 */
   italic: boolean;
+  /** 是否下划线 */
   underlined: boolean;
+  /** 是否删除线 */
   strikethrough: boolean;
 }
 
@@ -83,6 +88,16 @@ export function parseFormatting(text: string): FormattedSegment[] {
     strikethrough = false;
   }
 
+  /** 字体样式码；只影响之后的文字 */
+  const styleCodes: Record<string, () => void> = {
+    l: () => (bold = true),
+    o: () => (italic = true),
+    n: () => (underlined = true),
+    m: () => (strikethrough = true),
+    // 混淆字符按普通文字展示（见函数说明）
+    k: () => {},
+  };
+
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     if (ch !== "§") {
@@ -114,16 +129,8 @@ export function parseFormatting(text: string): FormattedSegment[] {
       continue;
     }
 
-    // 字体样式码：同样要先收尾，样式只影响**之后**的文字
-    const styles: Record<string, () => void> = {
-      l: () => (bold = true),
-      o: () => (italic = true),
-      n: () => (underlined = true),
-      m: () => (strikethrough = true),
-      // 混淆字符按普通文字展示（见函数说明）
-      k: () => { },
-    };
-    const apply = styles[lower];
+    // 字体样式码：同样要先收尾，样式只影响之后的文字
+    const apply = styleCodes[lower];
     if (apply) {
       flush();
       apply();
@@ -164,14 +171,14 @@ export function segmentStyle(seg: FormattedSegment): Record<string, string> {
 /**
  * 去掉格式码、只留纯文本
  *
- * 给**不适合上色**的地方用：`title` 悬浮提示、确认弹窗里的名字、搜索匹配等，
- * 那些地方 `§a` 只会显示成一串乱码。
+ * 给不适合上色的地方用：`title` 悬浮提示、确认弹窗里的名字、搜索匹配等，
+ * 那些地方 `§a` 只会显示成一串乱码。认不出的码按 `parseFormatting` 的口径原样保留。
  *
  * - `text`: 带格式码的原始文本
  *
  * # 返回值
  *
- * 去掉全部格式码后的纯文本
+ * 去掉认得出的格式码后的纯文本
  */
 export function stripFormatting(text: string): string {
   return parseFormatting(text)

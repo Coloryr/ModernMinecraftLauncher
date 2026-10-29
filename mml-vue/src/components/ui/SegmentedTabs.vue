@@ -1,10 +1,11 @@
 <script setup lang="ts">
 // 统一分段切换控件，配合 `v-model` 使用，值为 string；选项可带图标
-import { computed } from "vue";
-
 interface SegOption {
+  /** 选中值，也就是 `v-model` 的值 */
   value: string;
+  /** 显示文案，调用方已 `t()` 好的成品 */
   label: string;
+  /** 内置图标名，取值为下面 ICONS 的键；不传则只显示文案 */
   icon?: string;
 }
 
@@ -24,8 +25,6 @@ const emit = defineEmits<{
   (e: "update:modelValue", value: string): void;
 }>();
 
-const current = computed(() => props.modelValue);
-
 // 内置图标（线条风格）
 const ICONS: Record<string, string> = {
   folder:
@@ -38,7 +37,7 @@ const ICONS: Record<string, string> = {
 <template>
   <div class="seg-tabs">
     <button v-for="opt in options" :key="opt.value" class="seg-btn"
-      :class="{ active: current === opt.value, 'icon-only': props.iconOnly }" :disabled="props.disabled"
+      :class="{ active: modelValue === opt.value, 'icon-only': props.iconOnly }" :disabled="props.disabled"
       :aria-label="opt.label" v-tip="opt.label" @click="emit('update:modelValue', opt.value)">
       <svg v-if="opt.icon && ICONS[opt.icon]" class="seg-icon" viewBox="0 0 24 24" width="14" height="14" fill="none"
         stroke="currentColor" stroke-width="2" stroke-linecap="round" v-html="ICONS[opt.icon]" />

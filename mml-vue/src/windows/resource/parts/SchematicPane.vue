@@ -7,8 +7,8 @@
 //   方块数 · 方块种类 + 描述。
 //
 // 之所以两个都要：`Name` 与文件名经常不一致，作者改了名没改文件或者反过来，
-// 而用户要找的是磁盘上那个文件 —— 只显示 `Name` 时根本对不上文件夹里看到的东西
-// 与光影包列表同一口径，见 ShaderPane 的 sub。
+// 而用户要找的是磁盘上那个文件 —— 只显示 `Name` 时根本对不上文件夹里看到的东西。
+// 副标题的口径与光影包列表一致，见 ShaderPane 的 sub。
 //
 // `author` / `description` **只有 litematic 会填**，它的 `Metadata` 里有这两个字段，
 // `.schem` / `.nbt` 那两个 reader 不设，所以那两种格式这两段是空的、整段不渲染。
@@ -340,7 +340,7 @@ function metaLabel(item: SchematicItemDto): string {
   align-items: center;
   gap: 10px;
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 12px;
 }
 

@@ -90,6 +90,11 @@ const scrollTop = ref(0);
 let ro: ResizeObserver | null = null;
 let raf = 0;
 
+/**
+ * 量一次滚动容器与网格的尺寸
+ *
+ * - `el`: 滚动容器，网格还没挂上时按它的宽度兜底
+ */
 function measure(el: HTMLElement) {
   // 容器通栏（滚动条贴窗口右边），网格在容器里右侧缩进；列数按**网格**宽度算，
   // 否则列会按"更宽"的容器宽度去分，格子被压窄、最后一列还会顶到留白区里
@@ -200,6 +205,15 @@ watch(
   },
 );
 
+/**
+ * 把索引夹到列表范围内
+ *
+ * - `i`: 目标索引，可能越界
+ *
+ * # 返回值
+ *
+ * 夹好的索引；列表为空时为 0
+ */
 function clampIndex(i: number) {
   const n = props.items.length;
   return n ? Math.min(n - 1, Math.max(0, i)) : 0;
@@ -222,6 +236,12 @@ async function focusAt(i: number) {
   scroller.value?.querySelector<HTMLElement>(`[data-idx="${idx}"]`)?.focus();
 }
 
+/**
+ * 格子上的方向键 / Home / End 导航
+ *
+ * - `e`: 键盘事件
+ * - `i`: 当前格子在列表里的下标
+ */
 function onCellKey(e: KeyboardEvent, i: number) {
   const c = cols.value;
   switch (e.key) {
@@ -384,7 +404,7 @@ function onCellKey(e: KeyboardEvent, i: number) {
   height: var(--cell-h);
   padding: var(--cell-pad);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--bg-card);
   color: var(--text);
   font-family: inherit;

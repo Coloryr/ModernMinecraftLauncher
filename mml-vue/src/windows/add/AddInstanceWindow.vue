@@ -183,6 +183,7 @@ const {
   unselectedKeys: archiveUnselected,
 } = useFileTree();
 
+/** 浏览器回退：选本地文件后按占位路径生成 mock 内容树 */
 function onArchivePick(e: Event) {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -284,14 +285,13 @@ const {
   toggleExpand: onFolderToggleExpand,
 } = useFileTree();
 
+/** 浏览器回退：借 webkitRelativePath 拼出占位目录，内容树交给路径 watch 生成 */
 function onFolderPick(e: Event) {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
   if (!file) return;
   const folder = file.webkitRelativePath.split("/")[0];
   addFolderPath.value = `${MOCK_PATH}\\.minecraft\\versions\\${folder}`;
-  // 浏览器回退：用 mock 内容树（默认不勾选、不展开）
-  resetFolder(buildTree(MOCK_FOLDER_FILES));
 }
 
 /**
@@ -360,6 +360,7 @@ function toggleFoundInstance(path: string, on: boolean) {
   folderPicked.value = next;
 }
 
+/** 全选 / 全不选扫到的实例 */
 function setAllFoundInstances(on: boolean) {
   folderPicked.value = on ? new Set(folderFound.value.map((item) => item.path)) : new Set();
 }
@@ -495,6 +496,8 @@ async function onFolderLazyLoad(node: FileNode) {
     node.children = await listDirNodes(dirPath, node.key);
   } catch {
     node.children = [];
+    // 读失败恢复 lazy：下次展开再试一次，否则这个目录会一直是空的
+    node.lazy = true;
   }
 }
 
@@ -627,8 +630,11 @@ watch(addArchivePath, () => clearFieldError("archive"));
  * 手输 / 粘贴路径用路径框右边的「扫描目录」按钮触发。扫描要读磁盘，不该在用户
  * 还在敲路径的时候就自己跑起来。
  */
-watch(addFolderPath, () => {
+watch(addFolderPath, (path) => {
   clearFieldError("folder");
+  // 新路径还没扫：旧路径的内容树与实例列表都不能留着
+  resetFolder();
+  if (!isTauri() && path) resetFolder(buildTree(MOCK_FOLDER_FILES));
   folderFound.value = [];
   folderPicked.value = new Set();
   folderScanError.value = "";
@@ -823,8 +829,7 @@ function onKeyDown(e: KeyboardEvent) {
 
 const { track } = useUnlisteners();
 
-/** 键盘监听：单窗口模式下窗口被 KeepAlive 缓存，切走时 onUnmounted 不会跑 ——
- *  必须自己在停用 / 启用之间装卸，否则在别的窗口按 Esc 会被当成"关闭本窗口" */
+/** 挂上 Esc 监听；KeepAlive 缓存下切走不触发 onUnmounted，必须随启用 / 停用装卸 */
 function bindKeys() {
   document.addEventListener("keydown", onKeyDown);
 }
@@ -1002,8 +1007,7 @@ onUnmounted(() => {
     <!-- 整合包安装进度 -->
     <PackProgressModal v-if="packProgress" :progress="packProgress" :title="t(packTitleKey)" />
 
-    <!-- 加载器查询进度不再浮在窗口正上方：两条查询都改成就地显示在各自字段下面了，
-         见 NewMode 里的 LoaderQueryProgress -->
+    <!-- 加载器查询进度就地显示在各自字段下方，见 NewMode 里的 LoaderQueryProgress -->
 
     <!-- 拖入整合包 / 文件夹时的遮罩（本窗口只接文件，见 accept） -->
     <DropOverlay v-if="fileDragOver" :title="t('add.dropTitle')" />

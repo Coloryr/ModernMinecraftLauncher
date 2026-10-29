@@ -3,8 +3,8 @@
 // 与 VS Code 的 `editor.wordWrap` 一个口径：一份设置管所有编辑器，Alt+Z 在哪个视图按都在改它，
 // 不是每个窗口、更不是每个实例各存一份（那正是"两边显示不一致"的来源）。
 //
-// 落在 [`KEYS.editorWordWrap`] 里：多窗口模式下日志与配置是两个窗口，
-// 改一处由 [`onStorageChange`] 同步过去，界面上的开关因此跟着动。
+// 落在 `KEYS.editorWordWrap` 里：多窗口模式下日志与配置是两个窗口，
+// 改一处由 `onStorageChange` 同步过去，界面上的开关因此跟着动。
 import { ref, watch } from "vue";
 import { KEYS, emitChange, onStorageChange, readFlag, writeFlag } from "./storage";
 

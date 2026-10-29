@@ -101,7 +101,7 @@ defineProps<{
 
 .launch-pct {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: 11.5px;
   opacity: 0.85;
   font-variant-numeric: tabular-nums;
 }

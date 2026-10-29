@@ -25,10 +25,12 @@ const emit = defineEmits<{
 const editing = ref(false);
 const draft = ref(String(props.modelValue));
 
+/** 把值夹进 min~max，越界取边界 */
 function clamp(v: number) {
   return Math.min(props.max, Math.max(props.min, v));
 }
 
+/** 夹好再回写 v-model */
 function commit(v: number) {
   emit("update:modelValue", clamp(v));
 }
@@ -41,15 +43,18 @@ function inc() {
   commit(props.modelValue + props.step);
 }
 
+/** 进入编辑态，草稿从当前值起 */
 function onFocus() {
   editing.value = true;
   draft.value = String(props.modelValue);
 }
 
+/** 打字只更新草稿，等失焦或回车再提交 */
 function onInput(e: Event) {
   draft.value = (e.target as HTMLInputElement).value;
 }
 
+/** 失焦 / 回车：草稿是数字就提交，不是就丢弃 */
 function onCommit() {
   editing.value = false;
   const n = Number(draft.value);

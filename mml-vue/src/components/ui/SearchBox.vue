@@ -40,7 +40,7 @@ const emit = defineEmits<{
 
 const hasText = computed(() => props.modelValue.length > 0);
 
-/** 清空键：回写空串。mousedown 已 prevent，点它不会先触发 blur（设置窗口的下拉靠 blur 收起） */
+/** 清空键：回写空串 */
 function clear() {
   emit("update:modelValue", "");
 }
@@ -52,7 +52,8 @@ function clear() {
     <input :value="modelValue" class="field-input sb-input" :placeholder="placeholder" spellcheck="false"
       autocomplete="off" @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
       @focus="emit('focus')" @blur="emit('blur')" @keydown="emit('keydown', $event)" />
-    <!-- 清空键与输入框内的其它清空键同一枚：20px 方形热区，见 styles/controls.css -->
+    <!-- 清空键与输入框内的其它清空键同一枚：20px 方形热区，见 styles/controls.css；
+         mousedown 已 prevent，点它不会先触发 blur（设置窗口的下拉靠 blur 收起） -->
     <button v-if="hasText" class="input-clear sb-clear" :aria-label="clearLabel || placeholder" @mousedown.prevent
       @click="clear">
       <GlyphIcon name="close" :size="12" :weight="2.4" />

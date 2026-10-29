@@ -9,6 +9,7 @@ import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../../components/ui/BaseModal.vue";
 import type { FileListDto, FileListItemDto, ModItemDto } from "../../../../lib/bindings";
 import { formatSize } from "../../../../lib/format";
+import { isoDate } from "../../types";
 
 const props = defineProps<{
   /** 要换版本的那个模组 */
@@ -70,19 +71,6 @@ function pick(item: FileListItemDto) {
   emit("pick", item);
 }
 
-/**
- * 发布时间只取日期那一段
- *
- * - `iso`: ISO 8601 字符串，形如 `2024-03-01T12:00:00Z`
- *
- * # 返回值
- *
- * `2024-03-01`；不是这个形态时原样返回
- */
-function dateOf(iso: string): string {
-  return /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : iso;
-}
-
 </script>
 
 <template>
@@ -105,7 +93,7 @@ function dateOf(iso: string): string {
             <span v-if="isCurrent(item)" class="rep-tag">{{ t("resource.replaceCurrent") }}</span>
           </span>
           <span class="rep-meta">
-            <span v-if="item.time">{{ t("resource.updateDate", { date: dateOf(item.time) }) }}</span>
+            <span v-if="item.time">{{ t("resource.updateDate", { date: isoDate(item.time) }) }}</span>
             <span v-if="item.size > 0">{{ formatSize(item.size) }}</span>
           </span>
         </span>

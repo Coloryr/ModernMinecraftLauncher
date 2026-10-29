@@ -21,7 +21,7 @@ withDefaults(
     /**
      * 缩进层级（0 = 顶层）
      *
-     * 每一级缩进 22px，与原来树形视图的缩进步长一致，见 `resource.css` 的 `--row-indent`。
+     * 每一级缩进 22px，由 resource.css 的 `--row-depth` 换算。
      */
     depth?: number;
   }>(),

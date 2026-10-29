@@ -8,6 +8,7 @@
 import { t } from "../../lib/i18n";
 import type { ModItemDto } from "../../lib/bindings";
 import { sortedMods } from "./types";
+
 /** 一列的规格 */
 export interface ModCol {
   /** 取值键，见 ModTable 的 `colValue` */
@@ -18,7 +19,7 @@ export interface ModCol {
   width: number;
   /** 拖宽下限，缺省用 `MIN_COL_WIDTH` */
   min?: number;
-  /** 表头可点，在「正序 → 倒序 → 不排序」之间切（启用**右边**的列才给） */
+  /** 表头可点，在「正序 → 倒序 → 不排序」之间切；勾选框列不给 */
   sortable?: boolean;
   /** 可拖右边缘改宽度（启用列固定，不给） */
   resizable?: boolean;

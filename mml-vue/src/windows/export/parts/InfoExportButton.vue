@@ -1,13 +1,26 @@
 <script setup lang="ts">
+// 「生成实例信息」：挑一个落点，把实例信息写成一份 JSON
+//
+// 内容由后端按实例整份读出来，这里只管问落点与提示结果。
 import { ref } from "vue";
 import BaseButton from "../../../components/ui/BaseButton.vue";
 import { commands } from "../../../lib/bindings";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
 
-const props = defineProps<{ uuid: string; name: string; disabled: boolean }>();
+const props = defineProps<{
+  /** 要导出的实例 uuid */
+  uuid: string;
+  /** 实例名，用作默认文件名 */
+  name: string;
+  /** 外层禁用条件，如导出任务正在跑 */
+  disabled: boolean;
+}>();
+
+/** 正在生成 */
 const busy = ref(false);
 
+/** 选落点并生成实例信息 JSON */
 async function saveInfo() {
   if (busy.value || props.disabled || !props.uuid) return;
   const uuid = props.uuid;
@@ -19,8 +32,11 @@ async function saveInfo() {
     if (!file) return;
     await commands.export.generateInfo(uuid, file);
     showToast(t("winExport.done", { file }));
-  } catch (error) { showToast(tErr(error)); }
-  finally { busy.value = false; }
+  } catch (error) {
+    showToast(tErr(error));
+  } finally {
+    busy.value = false;
+  }
 }
 </script>
 

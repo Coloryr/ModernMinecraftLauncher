@@ -48,6 +48,8 @@ const activeGroup = ref("");
 
 /** 收藏数据变更订阅的退订函数（挂载后赋值，卸载时统一摘掉） */
 let unlistenCollect: (() => void) | null = null;
+/** 窗口是否已经销毁：订阅是异步挂上的，挂好之前窗口可能已经关了 */
+let gone = false;
 
 const groupNames = computed(() => Object.keys(groups.value).sort());
 
@@ -61,7 +63,6 @@ const groupOfUuid = computed(() => {
   }
   return map;
 });
-
 
 /** 一个收藏都没有；这时只给一条引导文案，不铺一排空分组 */
 const isEmpty = computed(() => items.value.length === 0);
@@ -227,15 +228,23 @@ onMounted(async () => {
 
   // 赋值与注册分开：onUnmounted 只能在 setup 的同步阶段注册，
   // 写在 await 之后就注册不上了（监听会一直挂着，卸载时摘不掉）
-  unlistenCollect = await onCollectChange(() => {
+  const unlisten = await onCollectChange(() => {
     reload().catch(() => { });
   });
+  // 订阅回来之前窗口可能已经关了：当场退订，别留一个悬空监听
+  if (gone) {
+    unlisten();
+    return;
+  }
+  unlistenCollect = unlisten;
 
   reload().catch((e) => showToast(tErr(e)));
 });
 
 onUnmounted(() => {
+  gone = true;
   unlistenCollect?.();
+  unlistenCollect = null;
   document.removeEventListener("keydown", onDocKeyDown);
 });
 
@@ -613,17 +622,15 @@ const collectDragItem = computed(() => {
 // ---------------- 下载 ----------------
 
 /**
- * 下载这一项：打开「下载整合包」或「下载资源」窗口，并把项目带过去
+ * 打开「下载整合包」或「下载资源」窗口，并把项目带过去
  *
- * 两个窗口都是"按实例取数"的，`add_resource_list(game, …)` 必须有实例 uuid，
- * 所以这里只把项目参数送过去，由目标窗口在实例就绪后自己打开版本列表。
+ * 两个窗口都是"按实例取数"的，所以这里只送项目参数，由目标窗口在实例就绪后
+ * 自己打开版本列表。
  *
- * `uuid` 也要送：非整合包那条路已经让用户选好实例了，
- * 目标窗口会优先用它，见 AddResourceWindow 的 onMounted。
+ * - `item`: 要下载的收藏项
  */
-function openDownloadWindow(item: CollectItemDto, uuid?: string) {
+function openDownloadWindow(item: CollectItemDto) {
   openWindow(item.fileType === "modpack" ? "add_modpack" : "add_resource", {
-    uuid,
     project: {
       source: item.source,
       pid: item.pid,

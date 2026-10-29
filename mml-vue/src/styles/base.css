@@ -34,7 +34,7 @@ body {
   /* 界面文本不可拖选：和原生窗口一致。WKWebView 认前缀写法，两套都写 */
   -webkit-user-select: none;
   user-select: none;
-  transition: background 0.2s, color 0.2s;
+  transition: background 0.15s, color 0.15s;
 }
 
 /* 需要选中 / 复制的控件显式放行：body 上的 none 会继承下去，

@@ -17,6 +17,7 @@ import { dismissToast, toasts } from "../../lib/toast";
 
 <style scoped>
 .toast-wrap {
+  /* 整层不吃指针，否则会挡住底下的界面；每条提示自己恢复点击，点它即关闭 */
   position: fixed;
   bottom: 34px;
   left: 50%;

@@ -67,7 +67,7 @@ export function useInstanceArgs(opts: { selected: Ref<InstanceInfoDto | null> })
   const argsMap = ref<Record<string, InstanceArgsDto>>({});
   const argsLoaded = ref<Record<string, boolean>>({});
 
-  /** 取实例参数（未加载则先落一份骨架默认值） */
+  /** 取实例参数，未加载时先落一份骨架默认值 */
   function argsOf(uuid: string): InstanceArgsDto {
     if (!argsMap.value[uuid]) {
       argsMap.value[uuid] = { ...ARGS_DEFAULTS };
@@ -93,24 +93,33 @@ export function useInstanceArgs(opts: { selected: Ref<InstanceInfoDto | null> })
     { immediate: true },
   );
 
-  let argsSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  // 每个实例各一个定时器：共用一个的话，快速切换实例并各改一处时，前一个实例的写回会被取消
+  const argsSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   /**
-   * 更新参数并防抖写回后端。
+   * 更新参数并防抖写回后端
    *
    * 注意**故意不做卸载清理**：窗口/页面关掉时若还有待写回的一次编辑，
    * 让定时器照常跑完才是对的 —— 清掉它就等于把用户刚改的设置丢了。
+   *
+   * - `v`: 该实例的整份启动参数
    */
   function updateArgs(v: InstanceArgsDto) {
     const uuid = selected.value?.uuid;
     if (!uuid) return;
     argsMap.value[uuid] = v;
-    if (argsSaveTimer) clearTimeout(argsSaveTimer);
-    argsSaveTimer = setTimeout(() => {
-      api.updateInstanceArgs(uuid, argsMap.value[uuid]).catch((e) => showToast(tErr(e)));
-    }, SAVE_DEBOUNCE);
+    const pending = argsSaveTimers.get(uuid);
+    if (pending) clearTimeout(pending);
+    argsSaveTimers.set(
+      uuid,
+      setTimeout(() => {
+        argsSaveTimers.delete(uuid);
+        api.updateInstanceArgs(uuid, argsMap.value[uuid]).catch((e) => showToast(tErr(e)));
+      }, SAVE_DEBOUNCE),
+    );
   }
 
+  /** 只改部分字段，经 updateArgs 防抖写回 */
   function patchArgs(patch: Partial<InstanceArgsDto>) {
     if (selected.value) updateArgs({ ...argsOf(selected.value.uuid), ...patch });
   }

@@ -2,6 +2,7 @@
 //
 // 覆盖 16:9（480p~4K）、4:3、16:10、21:9 各档，含 854×480 这种老机器 / 小窗口常用的规格。
 // **按像素多少从小到大排**，点了直接填宽 / 高。
+/** 常用分辨率预设，宽高单位像素 */
 export const COMMON_RESOLUTIONS: ReadonlyArray<{ w: number; h: number }> = [
   { w: 854, h: 480 },
   { w: 1024, h: 768 },
@@ -15,17 +16,21 @@ export const COMMON_RESOLUTIONS: ReadonlyArray<{ w: number; h: number }> = [
   { w: 3840, h: 2160 },
 ];
 
-// 常用最大内存预设，单位 MiB，从小到大多档，点了直接填「最大内存」
-//
-// 只覆盖到 16 GB 这档为止：再往上（32/64 GB）意义不大 —— Minecraft 单实例吃不下那么多，
-// 且堆开太大反而拖慢 GC；需要更大的仍可在步进器里手输。
+/**
+ * 常用最大内存预设，单位 MiB，从小到大多档，点了直接填「最大内存」
+ *
+ * 只覆盖到 16 GB 这档为止：再往上意义不大 —— Minecraft 单实例吃不下那么多，
+ * 且堆开太大反而拖慢 GC；需要更大的仍可在步进器里手输。
+ */
 export const COMMON_MEMORY: ReadonlyArray<number> = [
   1024, 2048, 3072, 4096, 6144, 8192, 12288, 16384,
 ];
 
-// 常用「最小内存」预设，单位 MiB：比最大内存那排多出 256 / 512 两档
-//
-// 单独一份是因为默认最小内存就是 512（见 Rust 侧 RunArgSettingObj 的 default）——
-// 不带这两档时，最小内存那栏一打开永远显示「自定义」；而 256 / 512 当最大内存没有意义，
-// 所以不并进上面那排
+/**
+ * 常用「最小内存」预设，单位 MiB：比最大内存那排多出 256 / 512 两档
+ *
+ * 单独一份是因为默认最小内存就是 512，见 Rust 侧 RunArgSettingObj 的 default ——
+ * 不带这两档时，最小内存那栏一打开永远显示「自定义」；而 256 / 512 当最大内存没有意义，
+ * 所以不并进上面那排。
+ */
 export const COMMON_MIN_MEMORY: ReadonlyArray<number> = [256, 512, ...COMMON_MEMORY];

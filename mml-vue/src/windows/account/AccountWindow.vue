@@ -47,7 +47,7 @@ const SkinModal = defineAsyncComponent(() => import("./SkinModal.vue"));
 /** 请求关闭本窗口 */
 defineEmits<{ (e: "close"): void }>();
 
-/** 皮肤预览弹窗（原独立皮肤窗口已并入） */
+/** 皮肤预览弹窗是否打开 */
 const showSkin = ref(false);
 
 // 系统窗口标题由 WindowFrame 统一同步，即 watch title → window_set_title；
@@ -56,7 +56,7 @@ const showSkin = ref(false);
 type ViewMode = "grid" | "list" | "detail";
 const view = ref<ViewMode>("grid");
 
-// 进入窗口时从 Rust 加载账户数据，并注册微软登录事件
+// 进入窗口时加载账户数据与登录方式锁定，并订阅微软登录事件
 onMounted(() => {
   loadAccounts();
   // 读客户端设置的登录方式锁定
@@ -124,6 +124,7 @@ onDeactivated(() => {
   searchText.value = "";
 });
 
+/** 按登录方式锁定、类型筛选与搜索词过滤后的账户列表 */
 const filtered = computed(() => {
   const q = searchText.value.trim().toLowerCase();
   const lock = lockedTypes.value;
@@ -144,15 +145,18 @@ const filtering = computed(() => searchText.value.trim() !== "" || typeFilter.va
 /** 账户库是否为空：空库时标题栏只留标题，添加入口交给空状态里的按钮 */
 const hasAccounts = computed(() => accounts.value.length > 0);
 
-// 添加账户弹窗（按类型显示不同输入框）
+/** 添加账户弹窗是否打开 */
 const showAdd = ref(false);
+/** 添加弹窗当前选中的账户类型 */
 const addType = ref("offline");
+/** 表单值，键为字段 key */
 const addFields = ref<Record<string, string>>({});
 /** 提交时没填的必填字段 key：就地标红，用户补填一格就撤一格 */
 const addInvalid = ref<string[]>([]);
 
 // 登录方式锁定：客户端设置里配置的条目列表，总开关打开时只允许列表中的登录方式
 const loginLock = ref<LoginLockItem[]>([]);
+/** 添加弹窗可选的登录类型：锁定生效时只留锁定类型 */
 const addTypeOptions = computed(() =>
   loginLock.value.length
     ? ACCOUNT_TYPES.filter((x) => loginLock.value.some((e) => e.ty === x.value))
@@ -170,7 +174,7 @@ const lockServerEntries = computed(() =>
     ? loginLock.value.filter((e) => e.ty === addType.value && e.server)
     : [],
 );
-/** 当前选中的登录模型：值为条目的服务器地址，类型内唯一 */
+/** 当前选中的登录模型，值即条目的服务器地址，类型内唯一 */
 const selectedLockServer = ref("");
 
 /** 选中登录模型：把条目服务器写进对应字段，外置登录 / 自定义皮肤站写 server，统一通行证写 serverId */
@@ -199,12 +203,18 @@ function clearInvalid(key: string) {
   addInvalid.value = addInvalid.value.filter((k) => k !== key);
 }
 
+/** 微软授权码弹窗：显示设备码与验证地址 */
 const showOauth = ref(false);
+/** 授权进行中弹窗：等后端轮询结果 */
 const showOauthRun = ref(false);
+/** 后端下发的设备码 */
 const oauthCode = ref("");
+/** 设备码对应的验证地址 */
 const oauthUrl = ref("");
+/** 当前登录阶段的文案 */
 const oauthState = ref("");
 
+/** 添加账户表单里的一个输入字段 */
 interface AddField {
   key: string;
   labelKey: string;
@@ -213,6 +223,7 @@ interface AddField {
   optional?: boolean;
 }
 
+/** 各添加类型的输入字段；微软账户没有字段，走设备码流程 */
 const ADD_FIELDS: Record<string, AddField[]> = {
   offline: [{ key: "name", labelKey: "account.name" }],
   microsoft: [],
@@ -269,6 +280,7 @@ function openRegister() {
   commands.main.openUrl(registerUrl.value).catch(() => {});
 }
 
+/** 打开添加账户弹窗；锁定登录方式时默认选第一个锁定类型 */
 function openAdd() {
   showAdd.value = true;
   // 锁定登录方式时默认第一个锁定条目的类型，并选中第一个登录模型
@@ -276,6 +288,7 @@ function openAdd() {
   resetAddFields();
 }
 
+/** 切换添加类型并重置表单 */
 function onAddTypeChange(value: string) {
   addType.value = value;
   resetAddFields();
@@ -409,8 +422,15 @@ async function openBrowser() {
   oauthState.value = t("account.oauthState.waiting");
 }
 
-/** 复制到剪贴板：优先异步 Clipboard API，失败回退 execCommand */
-/** 复制文本：异步 Clipboard API 失败时回退 execCommand */
+/**
+ * 复制文本到剪贴板：优先异步 Clipboard API，失败回退 execCommand
+ *
+ * - `text`: 要复制的文本
+ *
+ * # 返回值
+ *
+ * 是否复制成功
+ */
 async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
@@ -439,9 +459,9 @@ async function switchAccount(acc: AccountStoreDto) {
   if (await setCurrentAccount(acc)) showToast(t("account.switched", { name: acc.userName }));
 }
 
-// 操作
+/** 刷新账户令牌；真实状态由后端的 account-change 广播刷回 */
 function refreshToken(acc: AccountStoreDto) {
-  refreshAccountToken(acc.uuid);
+  void refreshAccountToken(acc.uuid);
   showToast(t("account.refreshed"));
 }
 
@@ -512,9 +532,10 @@ function onAccountMenuPick(id: string) {
   }
 }
 
-/** 查看皮肤：预览被点击的那一条账户，不要求它同时是"当前使用"的账户 */
+/** 皮肤弹窗预览的账户；不要求它是"当前使用"的账户 */
 const skinTarget = ref<AccountStoreDto | null>(null);
 
+/** 打开皮肤弹窗，预览被点开的这一条账户 */
 function viewSkin(acc: AccountStoreDto) {
   skinTarget.value = acc;
   showSkin.value = true;
@@ -530,6 +551,7 @@ function relogin(acc: AccountStoreDto) {
   reloginFields.value = { name: acc.userName, pass: "" };
 }
 
+/** 待重新登录的账户；非空即弹窗打开 */
 const reloginTarget = ref<AccountStoreDto | null>(null);
 /** 重新登录只重输用户名 / 密码：登录地址由账户本身固定，不在这里改 */
 const reloginFields = ref({ name: "", pass: "" });
@@ -537,6 +559,7 @@ const reloginFields = ref({ name: "", pass: "" });
 /** 防止重复提交 */
 const relogining = ref(false);
 
+/** 提交重新登录：同 uuid + 类型会覆盖旧账户数据，等效重新认证 */
 async function confirmRelogin() {
   const acc = reloginTarget.value;
   if (!acc || relogining.value) return;
@@ -568,6 +591,7 @@ async function cancelLogin() {
 
 const deleteTarget = ref<AccountStoreDto | null>(null);
 
+/** 删除确认：成功后收起弹窗并提示 */
 async function confirmDelete() {
   if (!deleteTarget.value) return;
   if (!await removeAccount(deleteTarget.value.uuid)) return;
@@ -576,8 +600,10 @@ async function confirmDelete() {
 }
 
 // 编辑离线账户：改名 / 改 UUID（UUID 右边可一键随机）
+/** 待编辑的离线账户；非空即编辑弹窗打开 */
 const editTarget = ref<AccountStoreDto | null>(null);
 const editFields = ref({ name: "", uuid: "" });
+/** 保存中，防重复提交 */
 const editing = ref(false);
 
 function openEdit(acc: AccountStoreDto) {
@@ -596,6 +622,7 @@ function randomUuid() {
   editFields.value.uuid = `${hex(8)}${hex(4)}4${hex(3)}${hex(4)}${hex(12)}`;
 }
 
+/** 提交改名 / 改 UUID，成功后重拉列表 */
 async function confirmEdit() {
   const acc = editTarget.value;
   if (!acc || editing.value) return;
@@ -636,23 +663,17 @@ function tokenLabel(acc: AccountStoreDto): string {
 
 <template>
   <WindowFrame :title="t('account.manage')" :body-fill="view === 'detail'" body-gutter @close="$emit('close')">
-    <!-- 工具栏整体搬进标题栏右侧：类型筛选 + 搜索 + 视图切换 + 添加账户。
-         「查看皮肤」不在这里 —— 它是针对某个账户的动作，放在各账户条目的操作按钮里。
-         标题栏高度是固定的 --titlebar-h，这一排必须比它矮，否则会把整条顶栏撑高。
-         标题本身不删 —— 「账户管理」是这一页的身份，删掉窗口标题就只剩一排控件，
-         用户分不清自己在哪一页 -->
+    <!-- 工具栏：类型筛选 + 搜索 + 视图切换 + 添加账户。高度必须压在 --titlebar-h 内，
+         否则会撑高整条顶栏；「查看皮肤」是针对单个账户的动作，留在各条目的按钮里 -->
     <template #head-right>
-      <!-- 一个账户都没有时这一排全部收起：筛选、搜索、视图切换都无从谈起，
-           加号也搬进空状态里，标题栏只留「账户管理」这个身份 -->
+      <!-- 空库时整排收起：筛选与视图切换都无从谈起，加号交给空状态 -->
       <template v-if="hasAccounts">
-        <!-- 同时挂 .field-select：尺寸以外的观感（不透明底 / 主题描边 / 共享箭头 /
-             以及 Chromium 135+ 的 base-select 页内弹层）全部由它统一提供，
-             这里只覆盖标题栏要的尺寸。之前单独写一套，弹层还是系统原生那个 -->
+        <!-- 观感（不透明底 / 主题描边 / 共享箭头 / 页内弹层）全部来自 .field-select，
+             这里只覆盖标题栏要的尺寸 -->
         <select v-model="typeFilter" class="field-select head-select">
           <option v-for="o in TYPE_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
         </select>
-        <!-- 搜索框与设置窗口那是同一份（components/ui/SearchBox），
-             宽度按这里的需要给：这一排还有筛选下拉与视图切换，168px 是余下的空间 -->
+        <!-- 共享组件 SearchBox；168px 是这一排减掉筛选下拉与视图切换后剩下的宽度 -->
         <SearchBox v-model="searchText" :placeholder="t('account.search')" width="168px" />
         <SegmentedTabs class="head-tabs" :model-value="view" :options="VIEW_OPTIONS" icon-only
           @update:model-value="view = $event as ViewMode" />
@@ -854,8 +875,6 @@ function tokenLabel(acc: AccountStoreDto): string {
   margin-right: auto;
 }
 
-/* ===== 标题栏右侧控件（head-right 插槽）=====
-   全 app 控件统一 32px（controls.css 的 --ctl-h），这一排不再各自定高 */
 /* 这一排的通用标准（宽度 170–280、省略号、按钮不缩、chip 可压）在 styles/titlebar.css；
    这里只留账户窗口自己的例外：类型筛选比标准下拉窄一档，标题栏还要塞搜索框与分段控件 */
 .head-select {
@@ -869,7 +888,7 @@ function tokenLabel(acc: AccountStoreDto): string {
   min-width: 140px;
 }
 
-/* 平铺 */
+/* 微软登录码：等宽字体 + 宽字距，方便照着抄 */
 .oauth-code {
   font-size: 18px;
   font-weight: 800;
@@ -927,7 +946,4 @@ function tokenLabel(acc: AccountStoreDto): string {
   margin: 10px 0 0;
 }
 
-.mono {
-  font-family: "Cascadia Code", Consolas, monospace;
-}
 </style>

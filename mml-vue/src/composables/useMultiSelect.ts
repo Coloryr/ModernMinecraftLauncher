@@ -3,8 +3,11 @@ import { nextTick, ref, type Ref } from "vue";
 import type { InstanceInfoDto } from "../lib/bindings";
 
 interface MultiDeps {
+  /** 当前单选中的实例；进入多选时清空 */
   selected: Ref<InstanceInfoDto | null>;
+  /** 新闻页是否打开；进入多选时关掉 */
   newsActive: Ref<boolean>;
+  /** 分组折叠表；进入多选时全部展开 */
   collapsedGroups: Ref<Record<string, boolean>>;
   /** 退出多选时回调（例如关闭右键菜单） */
   onExit?: () => void;
@@ -35,22 +38,33 @@ export function useMultiSelect(deps: MultiDeps) {
     row?.scrollIntoView({ block: "center", behavior: "smooth" });
   }
 
+  /**
+   * 进入多选：勾选给定的一批实例，并清空单选与新闻页
+   *
+   * - `ids`: 要勾选的实例 uuid
+   */
   function enterMultiSelect(ids: string[]) {
     multiSelect.value = true;
     deps.selected.value = null;
     deps.newsActive.value = false;
     selectedIds.value = new Set(ids);
-    // 多选模式：强制所有分组展开，并把第一个选中项滚动到正中
+    // 勾选的行可能藏在折叠的分组里，全部展开才看得见
     deps.collapsedGroups.value = {};
     nextTick(scrollFirstSelectedIntoView);
   }
 
+  /** 退出多选：清空勾选并通知调用方（例如收起右键菜单） */
   function exitMultiSelect() {
     multiSelect.value = false;
     selectedIds.value = new Set();
     deps.onExit?.();
   }
 
+  /**
+   * 切换单个实例的勾选
+   *
+   * - `inst`: 被点击的实例
+   */
   function toggleSelect(inst: InstanceInfoDto) {
     const s = new Set(selectedIds.value);
     const adding = !s.has(inst.uuid);

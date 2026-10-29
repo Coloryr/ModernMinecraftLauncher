@@ -43,17 +43,18 @@ const emit = defineEmits<{
 /** 后端列表每页 20 个项目 */
 const PAGE_SIZE = 20;
 
+/** 下载源的 i18n 文案键 */
 const SOURCE_LABELS: Record<string, string> = {
   curseforge: "modpack.curseforge",
   modrinth: "modpack.modrinth",
 };
 
-/** 下载源，取值是后端线串，显示的标签走 i18n */
+/** 可选下载源；value 是后端线串，label 走 i18n */
 const sources = ref<Array<{ value: string; label: string }>>([]);
-/** 下载源；上次选的那个由后端落 gui_config.json，见 AddModpackSource */
+/** 当前下载源；上次选的那个由后端落 gui_config.json */
+const source = ref("");
 /** 上次选的源还没读回来之前不要写回，否则会用空串把它覆盖掉 */
 let sourceReady = false;
-const source = ref("");
 watch(source, (value) => {
   if (sourceReady) {
     void setAddModpackSource(value).catch(() => {});
@@ -134,7 +135,7 @@ const bodyRef = ref<HTMLElement | null>(null);
 
 const maxPage = computed(() => Math.max(0, Math.ceil(total.value / PAGE_SIZE) - 1));
 
-/** 拉取下载源列表并选中第一个；后续筛选数据由 watch(source) 加载 */
+/** 拉取下载源列表；没存过已选源时才默认第一个，后续筛选数据由 watch(source) 加载 */
 async function loadSources() {
   try {
     sources.value = (await api.getModpackSources()).map((value) => ({
@@ -149,7 +150,10 @@ async function loadSources() {
     error.value = t("modpack.sourceFail");
     return;
   }
-  source.value = sources.value[0].value;
+  // 已选源（上次保存的那个）还在列表里就留着，别被默认值盖掉
+  if (!sources.value.some((item) => item.value === source.value)) {
+    source.value = sources.value[0].value;
+  }
 }
 
 /**
@@ -209,7 +213,6 @@ async function loadSource() {
 /** 搜索代次：新的一发开始后，旧一发的返回（含被后端取消的）全部丢弃 */
 let searchSeq = 0;
 
-/** 搜索期间置 `searching`（弹窗锁住窗口），成败都清掉 */
 // F5 重跑当前搜索；详情页打开时让位给详情页自己的版本列表
 useRefreshKey(() => {
   if (detailItem.value) return;
@@ -223,6 +226,7 @@ usePageKeys({
   enabled: () => !detailItem.value,
 });
 
+/** 按当前筛选与页码搜索；排序表未就绪时不发请求 */
 async function search() {
   // 排序列表还没拉回来时别发请求：换下载源时它是**异步**拉回来的
   // loadSource 里 await 若干请求，这中间发出去必然带不上合法排序
@@ -312,6 +316,7 @@ function loadDetail(pid: string) {
   return api.getModpackDetail(source.value, pid);
 }
 
+/** 详情页取版本列表 */
 function loadFiles(pid: string, pageNo: number, fileVersion: string | null) {
   return api.getModpackFiles(source.value, pid, pageNo, fileVersion);
 }
@@ -323,6 +328,7 @@ function onDownload(file: FileListItemDto) {
   }
 }
 
+/** 把选中的版本交给上层安装，并收起详情 */
 function install(item: ProjectItemDto, file: FileListItemDto) {
   emit("install", {
     source: item.source.source,
@@ -332,8 +338,6 @@ function install(item: ProjectItemDto, file: FileListItemDto) {
   });
   closeDetail();
 }
-
-/** 收藏 / 取消收藏（列表星标与详情页星标共用） */
 
 onMounted(async () => {
   await loadSources();

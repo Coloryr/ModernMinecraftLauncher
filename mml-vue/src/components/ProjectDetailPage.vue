@@ -215,8 +215,6 @@ function downloadLatest() {
   }
 }
 
-/** 收藏 / 取消收藏；`item` 与列表项是同一个对象，改它即改列表上的星标 */
-
 /** Modrinth 正文（markdown）渲染成 HTML；CurseForge 没有 body，显示简介 */
 const bodyHtml = computed(() => {
   const body = detail.value?.body;

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 整合包安装进度条（多任务）：总进度条 + 任务数，每个任务的详情
 // 阶段 / 主子进度 / 取消按钮，默认可以点击标题行折叠；终态任务带状态标签，可一键清除。
-// 下载整合包窗口常显；右下角的进度弹窗与多窗口模式的主窗口也用它（由调用方 v-if 控制）。
+// 当前由右下角的进度弹窗（ModpackPopup）使用；内容区与主窗口改用标题栏指示器。
 import { computed, ref } from "vue";
 import CollapsePanel from "./ui/CollapsePanel.vue";
 import { api } from "../lib/api";
@@ -15,13 +15,13 @@ const props = withDefaults(
   defineProps<{
     /** 整合包安装任务状态 */
     status: ModPackStatusDto;
-    /** 任务详情是否可以折叠。默认可以（页面里为了省地方）；
-     *  弹窗形态传 false —— 那里本来就是点开来看详情的，再折一层等于白点一次 */
+    /** 任务详情是否可以折叠。默认可以；
+     *  进度弹窗传 false —— 那里本来就是点开来看详情的，再折一层等于白点一次 */
     collapsible?: boolean;
-    /** 撑满父容器剩余高度、任务多了内部自己滚（弹窗锁死高度时用）。
-     *  页面里那两处不传：卡片跟着内容自适应即可 */
+    /** 撑满父容器剩余高度、任务多了内部自己滚（弹窗锁死高度时用）；
+     *  不传时卡片跟着内容自适应 */
     fillHeight?: boolean;
-    /** 底部是否给「关闭」按钮；弹窗形态用，页面里没有可关的东西 */
+    /** 底部是否给「关闭」按钮；弹窗形态用 */
     showClose?: boolean;
   }>(),
   { collapsible: true, fillHeight: false, showClose: false },
@@ -116,7 +116,7 @@ async function clearDone() {
             <span v-else class="mp-task-icon mp-task-icon-fallback">{{ task.name.slice(0, 1).toUpperCase() }}</span>
             <span class="mp-task-name">{{ task.name }}</span>
             <span v-if="task.done" class="mp-tag done">{{ t("add.packState.done") }}</span>
-            <span v-else-if="task.failed" class="mp-tag failed" v-tip="task.error || ''">{{ t("modpack.bar.failed")
+            <span v-else-if="task.failed" class="mp-tag failed" v-tip="task.error ? tErr(task.error) : ''">{{ t("modpack.bar.failed")
             }}</span>
             <span v-else-if="task.cancelled" class="mp-tag cancelled">{{ t("modpack.bar.cancelled") }}</span>
             <button v-else class="mp-cancel" @click="cancel(task)">{{ t("modpack.bar.cancel") }}</button>
@@ -184,7 +184,7 @@ async function clearDone() {
 
 /* 弹窗形态：外层 BaseModal 锁了高度，内容区是 flex 列。
    本卡片撑满剩余高度，任务多了由任务区自己滚，不再把弹窗顶高。
-   高度由弹窗那侧传 fillHeight 打开，页面里那两处保持自适应 */
+   高度由弹窗那侧传 fillHeight 打开 */
 .mp-bar.fill-h {
   flex: 1;
   min-height: 0;
@@ -299,7 +299,7 @@ async function clearDone() {
   align-items: center;
   flex-shrink: 0;
   color: var(--text-dim);
-  transition: transform 0.22s ease;
+  transition: transform 0.18s;
 }
 
 .mp-bar-chevron.up {
@@ -336,7 +336,7 @@ async function clearDone() {
 }
 
 .mp-task-state {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-dim);
 }
 
@@ -345,13 +345,13 @@ async function clearDone() {
 }
 
 .mp-task-sub {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-dim);
   word-break: break-all;
 }
 
 .mp-task-error {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--red);
   word-break: break-all;
 }
@@ -412,17 +412,12 @@ async function clearDone() {
   transition: width 0.3s;
 }
 
-.progress-fill.dim {
-  background: var(--text-dim);
-  opacity: 0.5;
-}
-
 .progress-track.sub {
   height: 6px;
 }
 
 /* ---------- 弹窗形态：任务排成项目列表，不再套"一个大框" ---------- */
-/* 只作用于 fill-h（弹窗那侧传的）；窗口里内嵌那张卡片仍保留底色与描边 */
+/* 只作用于 fill-h（弹窗那侧传的）；默认形态仍保留底色与描边 */
 .mp-bar.fill-h {
   background: none;
   border: none;

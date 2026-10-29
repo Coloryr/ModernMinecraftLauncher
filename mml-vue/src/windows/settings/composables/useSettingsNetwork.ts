@@ -1,10 +1,9 @@
 // 设置窗口 · 网络与下载标签
 //
-// 保存模型（本文件是本次重构的重点）：
-// - **非代理项**即改即存：下载源 / 线程 / 校验开关 / DNS，与原来一致；
-// - **代理项改成"草稿 + 显式保存"**：原来代理字段直接改 `network` 对象，而任一处
-//   `applyNetwork()` 都会把整个 DTO 提交，于是"只改本地、没点保存"的代理地址会被别的开关
-//   顺带写盘。现在草稿独立，只有点「保存」才合并进 `network` 并落盘。
+// 保存模型：
+// - **非代理项**即改即存：下载源 / 线程 / 校验开关 / DNS；
+// - **代理项是"草稿 + 显式保存"**：草稿独立，只有点「保存」才合并进 `network` 并落盘。
+//   直接改 `network` 的话，任一处 `applyNetwork()` 都会整份提交，把没点保存的代理地址顺带写盘。
 import { computed, reactive, ref } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
@@ -15,13 +14,21 @@ import { loadDefaults } from "./useSettingsDefaults";
 
 /** 代理草稿：只在这些字段里改，点保存才落到 network */
 export interface ProxyDraft {
+  /** 工作代理模式：Auto / None / User */
   workProxy: string;
+  /** 登录代理模式：Auto / None / User */
   loginProxy: string;
+  /** 工作代理类型：Http / Sock4 / Sock5 */
   workProxyType: string;
+  /** 登录代理类型：Http / Sock4 / Sock5 */
   loginProxyType: string;
+  /** 代理地址，可为主机名或 IP */
   proxyIp: string;
+  /** 代理端口；0 表示未填 */
   proxyPort: number;
+  /** 代理用户名，可缺省 */
   proxyUser: string;
+  /** 代理密码，可缺省 */
   proxyPassword: string;
 }
 

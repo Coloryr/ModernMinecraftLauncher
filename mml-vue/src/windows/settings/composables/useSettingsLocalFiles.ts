@@ -35,6 +35,7 @@ export function useSettingsLocalFiles() {
     tasks.value.some((task) => task.total === 0 || task.completed + task.failed < task.total),
   );
 
+  /** 重新统计各文件夹的占用 */
   async function load() {
     loading.value = true;
     try {

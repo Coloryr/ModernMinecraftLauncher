@@ -50,12 +50,10 @@ const props = withDefaults(
       groupOpen?: boolean;
       /** 是不是自建分组；只有自建分组能改名 / 删 */
       custom?: boolean;
-      /** 分组键：自建分组是组名，状态分组是带前缀的内置键 */
+      /** 分组 uuid：自建分组与状态分组同一套键空间 */
       groupKey?: string;
       /** 正在被拖动排序的分组键，整块淡出 */
       draggingGroup?: string | null;
-      /** 递归层级；1 是模组行，>1 是内置模组行 */
-      depth?: number;
       /** 不画表头；只有第一块画，其余块关掉，否则一屏里重复十几列 */
       hideHeader?: boolean;
       /** 列宽，列 key → 像素宽；状态在外层 `useResourceView`，所有分组共用一份 */
@@ -72,7 +70,6 @@ const props = withDefaults(
     custom: false,
     groupKey: "",
     draggingGroup: null,
-    depth: 0,
     hideHeader: false,
     query: "",
   },
@@ -181,8 +178,6 @@ function sortMark(key: string): string {
   if (!cur || cur.key !== key) return "";
   return cur.dir === "asc" ? "↑" : "↓";
 }
-
-
 
 // ---------- 行的拍平（父行 + 已展开的内置模组行） ----------
 
@@ -296,16 +291,16 @@ function isEditingOnline(row: TableRow, field: "source" | "projectId" | "fileId"
  */
 async function startOnline(item: ModItemDto, field: "source" | "projectId" | "fileId", event: MouseEvent) {
   if (props.busy || item.fail) return;
+  // currentTarget 只在事件派发期间有值，等完 nextTick 已经清成 null，必须先取出来
+  const el = event.currentTarget as HTMLElement | null;
   editingOnline.value = { key: modRowKey(item), field, item };
   await nextTick();
-  const el = event.currentTarget as HTMLElement | null;
-  if (field !== "source") {
-    el?.focus();
-    const range = document.createRange();
-    range.selectNodeContents(el!);
-    window.getSelection()?.removeAllRanges();
-    window.getSelection()?.addRange(range);
-  }
+  if (!el || field === "source") return;
+  el.focus();
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  window.getSelection()?.removeAllRanges();
+  window.getSelection()?.addRange(range);
 }
 
 /** 收起编辑态，不发保存 */

@@ -38,7 +38,11 @@ let wasOn = false;
 /** 播放器：真的要播时才建，没配音乐的窗口一个 DOM 都不多 */
 let audio: HTMLAudioElement | null = null;
 
-/** 播放地址：本地文件走协议（带时间戳，换文件不吃浏览器缓存），直链原样用 */
+/**
+ * 把配置里的来源转成 `<audio>` 能用的地址
+ *
+ * 本地文件走协议并带时间戳，换文件不吃浏览器缓存；直链原样用。
+ */
 function srcOf(raw: string): string {
   if (/^https?:\/\//i.test(raw)) return raw;
   return `${baseUrl}?v=${Date.now()}`;
@@ -140,7 +144,13 @@ export function applyMusicConfig(cfg: MusicConfig): void {
   wasOn = true;
 }
 
-/** 启动时读一遍配置并订阅变更 */
+/**
+ * 启动时读一遍配置并订阅变更
+ *
+ * # 返回值
+ *
+ * 取消监听的函数
+ */
 export async function initMusic(): Promise<() => void> {
   try {
     const cfg = await loadGuiConfig();
@@ -151,7 +161,16 @@ export async function initMusic(): Promise<() => void> {
   return onClientConfigChange((cfg) => applyMusicConfig(cfg));
 }
 
-/** 给标题栏那枚按钮用的一组状态 */
+/**
+ * 给标题栏那枚按钮用的一组状态
+ *
+ * # 返回值
+ *
+ * - `available`: 本窗口要不要显示入口
+ * - `playing`: 是否正在播放
+ * - `active`: 是否在播放或暂停
+ * - `play` / `pause` / `stop` / `toggle`: 播放控制
+ */
 export function useMusic() {
   return {
     /** 本窗口要不要显示这枚按钮：持有播放器且配了来源 */

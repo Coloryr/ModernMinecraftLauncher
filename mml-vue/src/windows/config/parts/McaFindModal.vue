@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // 「查找实体 / 方块」弹窗，口径照 ColorMC 的查找对话框
 //
-// 三样输入：找哪一类、哪个区域文件、区块坐标（绝对坐标，与区块列表显示的一致），
-// 外加一个可空的 id 片段。只负责收集与校验，真正的查找由调用方发命令。
+// 三栏输入：找哪一类、区块坐标（绝对坐标，与区块列表显示的一致）、可空的 id 片段。
+// 区域文件由后端按坐标自己算。只负责收集与校验，真正的查找由调用方发命令。
 import { ref } from "vue";
 import { t } from "../../../lib/i18n";
 import BaseModal from "../../../components/ui/BaseModal.vue";

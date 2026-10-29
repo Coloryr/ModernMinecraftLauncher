@@ -6,7 +6,7 @@
 /** 向上展开的标记类 */
 const UP_CLASS = "select-up";
 
-/** 单个选项的估算高度，单位 px：与 controls.css 里 option 的 8px + 8px 内边距、13px 字号一致 */
+/** 单个选项的单行估算高度，单位 px，含 option 的上下内边距 */
 const ITEM_HEIGHT = 34;
 
 /**
@@ -38,7 +38,7 @@ function markDirection(event: Event) {
 }
 
 /** 给全应用的下拉挂上方向判断；只挂一次，交给事件捕获处理所有窗口与弹窗 */
-export function initSelectDirection() {
+export function initSelectDirection(): void {
   document.addEventListener("pointerdown", markDirection, true);
   document.addEventListener(
     "keydown",

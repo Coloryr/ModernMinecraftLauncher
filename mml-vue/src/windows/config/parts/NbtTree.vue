@@ -311,6 +311,7 @@ function startResize(event: PointerEvent) {
     resizing.value = false;
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
+    window.removeEventListener("pointercancel", onUp);
     if (keyWidth.value) {
       writeNumber(KEYS.nbtKeyWidth, keyWidth.value);
     }
@@ -318,6 +319,8 @@ function startResize(event: PointerEvent) {
 
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onUp);
+  // 指针被系统收走时也要收尾，否则 resizing 会一直亮着、监听也摘不掉
+  window.addEventListener("pointercancel", onUp);
 }
 
 // 换来源或换文件就换会话；`immediate` 让首次打开就有内容

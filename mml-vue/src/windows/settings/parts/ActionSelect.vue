@@ -14,6 +14,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  /** 选中的动作名变化 */
   (e: "update:modelValue", value: string): void;
 }>();
 

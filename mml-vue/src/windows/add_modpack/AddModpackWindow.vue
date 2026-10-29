@@ -61,8 +61,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <!-- hide-modpack-indicator 不再传：安装进度改成标题栏上的指示器 + 弹窗
-       （ModpackTitleIndicator / ModpackPopup），与资源下载那一套一致，内容区不再内嵌进度卡片 -->
+  <!-- 安装进度走标题栏指示器 + 弹窗（ModpackTitleIndicator / ModpackPopup），与资源下载同一套，
+       所以不传 hide-modpack-indicator，内容区也不内嵌进度卡片 -->
   <WindowFrame :title="t('winTitle.addModpack')" :back="detailOpen ? t('modpack.back') : ''" body-gutter
     @back="modeRef?.closeDetail()" @close="$emit('close')">
     <div class="modpack-body">
@@ -73,12 +73,11 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* 这一列不额外回缩：卡片边缘与筛选卡、项目卡一样落在窗口内容区边距上；
+   项目列表那 8px 是给悬停阴影留的，已在 ModpackMode 里用负外边距抵掉 */
 .modpack-body {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-
-/* 安装进度条也是这一列里的卡片：边缘与筛选卡、项目卡一样落在窗口内容区边距（26px）上，
-   不再单独回缩 8px —— 那 8px 是项目列表给悬停阴影留的，已在 ModpackMode 里用负外边距抵掉 */
 </style>

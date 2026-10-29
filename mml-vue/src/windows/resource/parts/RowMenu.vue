@@ -121,7 +121,7 @@ function pick(id: string) {
   width: 100%;
   padding: 6px 10px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text);
   font-size: 12.5px;

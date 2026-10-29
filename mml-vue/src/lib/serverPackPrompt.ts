@@ -25,13 +25,17 @@ let pending: ((answer: ServerPackAnswer) => void) | null = null;
 /**
  * 打开服务器包更新弹窗并等待用户选择
  *
- * - \`result\`: 检查结果，含本地与发布地址上的包版本
+ * - `result`: 检查结果，含本地与发布地址上的包版本
  *
  * # 返回值
  *
  * 用户选了继续还是取消，以及要不要先更新
  */
 export function askServerPackUpdate(result: ModPackUpdateDto): Promise<ServerPackAnswer> {
+  // 上一问未回答时按“取消、不更新”放掉，避免旧 Promise 永远不 settle
+  pending?.({ ok: false, update: false });
+  pending = null;
+
   return new Promise((resolve) => {
     pending = resolve;
     serverPackResult.value = result;
@@ -42,10 +46,10 @@ export function askServerPackUpdate(result: ModPackUpdateDto): Promise<ServerPac
 /**
  * 关闭弹窗并回答等待方
  *
- * - \`ok\`: 是否继续启动
- * - \`update\`: 是否先同步再启动
+ * - `ok`: 是否继续启动
+ * - `update`: 是否先同步再启动
  */
-export function answerServerPackUpdate(ok: boolean, update: boolean) {
+export function answerServerPackUpdate(ok: boolean, update: boolean): void {
   serverPackOpen.value = false;
   serverPackResult.value = null;
   const resolve = pending;
