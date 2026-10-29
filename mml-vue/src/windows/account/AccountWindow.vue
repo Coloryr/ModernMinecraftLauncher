@@ -585,15 +585,15 @@ function openEdit(acc: AccountStoreDto) {
   editFields.value = { name: acc.userName, uuid: acc.uuid };
 }
 
-/** 随机 UUID v4，crypto.randomUUID 不可用时手动拼 */
+/** 随机 UUID v4，与账户存储一致用不带连字符的写法；crypto.randomUUID 不可用时手动拼 */
 function randomUuid() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    editFields.value.uuid = crypto.randomUUID();
+    editFields.value.uuid = crypto.randomUUID().replace(/-/g, "");
     return;
   }
   const hex = (n: number) =>
     Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join("");
-  editFields.value.uuid = `${hex(8)}-${hex(4)}-4${hex(3)}-${hex(4)}-${hex(12)}`;
+  editFields.value.uuid = `${hex(8)}${hex(4)}4${hex(3)}${hex(4)}${hex(12)}`;
 }
 
 async function confirmEdit() {

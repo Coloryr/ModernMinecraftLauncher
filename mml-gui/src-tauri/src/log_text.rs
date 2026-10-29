@@ -408,6 +408,16 @@ pub enum LogText {
         /// 失败原因
         error: String,
     },
+    /// ColorMC 迁移时合并账户
+    ColormcAccountsImported {
+        /// 新导入的账户数
+        count: usize,
+    },
+    /// ColorMC 迁移时合并账户失败
+    ColormcAccountsFailed {
+        /// 失败原因
+        error: String,
+    },
     /// 探测到旧版 ColorMC 数据
     ColormcDetected {
         /// 数据目录
@@ -763,6 +773,12 @@ impl LogText {
             LogText::ColormcGroupMergeFailed { error } => {
                 format!("[colormc] 合并分组失败：{error}")
             }
+            LogText::ColormcAccountsImported { count } => {
+                format!("[colormc] 合并账户 {count} 个")
+            }
+            LogText::ColormcAccountsFailed { error } => {
+                format!("[colormc] 合并账户失败：{error}")
+            }
             LogText::ColormcDetected { dir, from } => {
                 format!("[colormc] 探测到旧版数据：{dir}（from={from}）")
             }
@@ -1042,6 +1058,12 @@ impl LogText {
             }
             LogText::ColormcGroupMergeFailed { error } => {
                 format!("[colormc] failed to merge groups: {error}")
+            }
+            LogText::ColormcAccountsImported { count } => {
+                format!("[colormc] imported {count} account(s)")
+            }
+            LogText::ColormcAccountsFailed { error } => {
+                format!("[colormc] failed to import accounts: {error}")
             }
             LogText::ColormcDetected { dir, from } => {
                 format!("[colormc] found legacy data: {dir} (from={from})")

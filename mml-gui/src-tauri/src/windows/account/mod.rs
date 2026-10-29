@@ -34,7 +34,7 @@ pub(super) fn emit_account_change(app: &AppHandle) {
 ///
 /// auths 以 UUID + 类型为键，此处 UUID 即可唯一定位当前场景。
 ///
-/// - `uuid`: 账户 UUID，带连字符
+/// - `uuid`: 账户 UUID，不带连字符
 ///
 /// # 返回值
 ///

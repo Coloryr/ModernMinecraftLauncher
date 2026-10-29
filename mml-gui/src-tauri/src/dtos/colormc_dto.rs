@@ -8,8 +8,8 @@ use serde::Serialize;
 pub struct ColorMcInfoDto {
     /// 探测到的工作目录
     pub path: String,
-    /// 命中来源：`run` = `%LOCALAPPDATA%\ColorMC\run` 记的路径 / `default` = 平台默认位置 /
-    /// `fallback` = `%APPDATA%\ColorMC`
+    /// 命中来源：`run` = `%LOCALAPPDATA%\ColorMC\run` 记的路径 / `app` = `colormc://`
+    /// 协议注册的安装位置 / `default` = 平台默认位置 / `fallback` = ColorMC 的数据目录
     pub from: String,
     /// 该目录里的实例数，即 `minecraft/instances` 下的子目录数
     pub instances: u32,
@@ -68,6 +68,6 @@ pub struct ColorMcReportDto {
     pub instances_legacy_gui: Vec<String>,
     /// 逐条兼容性结论，按搬过来的顶层条目组织
     pub compat: Vec<ColorMcCompatDto>,
-    /// 账户提醒：ColorMC 的 `auth.json` 不在工作目录里，所以**账户不会被迁移**
-    pub auth_outside: bool,
+    /// 从 ColorMC 的 `auth.json` 新合并进来的账户数；没有账户文件或全都已存在时为 0
+    pub accounts: u32,
 }

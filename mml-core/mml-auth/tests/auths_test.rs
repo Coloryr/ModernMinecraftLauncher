@@ -20,9 +20,9 @@ use mml_auth::{AuthType, LoginObj, UserKeyObj, auths};
 use mml_base::{inner_path, serialize_tools};
 
 /// 假凭据，与真实账户无关
-const FAKE_UUID_A: &str = "00000000-0000-0000-0000-00000000aaaa";
-const FAKE_UUID_B: &str = "00000000-0000-0000-0000-00000000bbbb";
-const FAKE_UUID_C: &str = "00000000-0000-0000-0000-00000000cccc";
+const FAKE_UUID_A: &str = "0000000000000000000000000000aaaa";
+const FAKE_UUID_B: &str = "0000000000000000000000000000bbbb";
+const FAKE_UUID_C: &str = "0000000000000000000000000000cccc";
 
 /// 测试根目录，只初始化一次，保证 env 重定向只发生一次
 static TEST_DIR: OnceLock<PathBuf> = OnceLock::new();
@@ -98,7 +98,13 @@ fn test_auths_lifecycle() {
         .unwrap();
     let accounts = vec![
         stale,
-        fake_login("Steve", FAKE_UUID_A, AuthType::OAuth, "token-a"),
+        // 同一账户的另一种写法：带连字符，加载时应并到同一个键
+        fake_login(
+            "Steve",
+            "00000000-0000-0000-0000-00000000aaaa",
+            AuthType::OAuth,
+            "token-a",
+        ),
         fake_login("Alex", FAKE_UUID_B, AuthType::LittleSkin, "token-b"),
     ];
     serialize_tools::json_to_file(&accounts, inner.join("auth.json")).unwrap();

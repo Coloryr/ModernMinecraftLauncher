@@ -31,6 +31,7 @@
 //! 首次启动的"问过了"状态存在运行目录下的 `colormc_migrate.json`，见 [`mark`]：
 //! 它表达的是"这个运行目录已经问过了"，删掉它就能重新触发询问。
 
+mod account;
 mod check;
 mod detect;
 mod import;

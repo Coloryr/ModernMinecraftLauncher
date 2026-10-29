@@ -41,7 +41,7 @@ const percent = computed(() => {
   return Math.min(100, Math.max(0, Math.round((p.done / p.total) * 100)));
 });
 
-/** 命中来源；后端只给 run / default / fallback */
+/** 命中来源；后端只给 run / app / default / fallback */
 const fromText = computed(() => t(`colormc.from.${props.info.from}`));
 
 /** 兼容性结论按级别分档（每档一行条目名） */
@@ -118,6 +118,9 @@ async function restart() {
     <!-- ---------- 3. 结果 ---------- -->
     <template v-else-if="report">
       <p class="modal-text">{{ t("colormc.entriesDone", { n: report.entries }) }}</p>
+      <div v-if="report.accounts" class="line ok">
+        {{ t("colormc.accountsDone", { n: report.accounts }) }}
+      </div>
 
       <div v-if="report.instancesOk.length" class="line ok">
         {{ t("colormc.instOk", { n: report.instancesOk.length }) }}{{ t("common.detailSep") }}{{

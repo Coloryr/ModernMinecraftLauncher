@@ -30,6 +30,6 @@ export type ColorMcReportDto = {
   instancesBad: string[],
   instancesLegacyGui: string[],
   compat: ColorMcCompatDto[],
-  authOutside: boolean,
+  accounts: number,
 };
 

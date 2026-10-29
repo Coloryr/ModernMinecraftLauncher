@@ -9,13 +9,18 @@
 // 值为空串 / undefined / null 时不显示。
 
 type TipState = {
+  /** 当前提示文案；空串表示不显示 */
   value: string;
+  /** 指针进入：记落点、挂监听并起延时 */
   enter: (e: MouseEvent) => void;
+  /** 指针离开：立即收起 */
   leave: () => void;
+  /** 按下鼠标：收起，避免挡点击目标 */
   down: () => void;
 };
 
-const SHOW_DELAY = 400; // ms；系统默认约 1s，自绘取更跟手的节奏
+/** 悬停多久后显示，单位 ms；系统默认约 1s，自绘取更跟手的节奏 */
+const SHOW_DELAY = 400;
 
 let tipEl: HTMLDivElement | null = null;
 let timer = 0;

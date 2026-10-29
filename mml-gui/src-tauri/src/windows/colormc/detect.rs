@@ -73,9 +73,12 @@ pub(super) fn looks_like_colormc(dir: &Path) -> bool {
 /// Windows 是 `<exe 目录>\colormc\`、Linux 是 `~/.ColorMC/`、macOS 是 `/Users/shared/ColorMC/`
 /// → `%APPDATA%\ColorMC\`，ColorMC 在默认位置不可写时会退到这里。
 ///
+/// Windows 多两条线索：`colormc://` 协议注册的可执行文件旁边，以及 ColorMC 的数据目录本身
+/// —— 便携版通常不写 `run` 文件，装到别的盘时这两条是唯一能自动找到它的地方。
+///
 /// 与 ColorMC 的差别：**不创建任何目录、也不试写**，ColorMC 会建目录再写 `test` 文件
-/// 来探可写性。这里只是探测，不动用户的东西；代价是"默认位置不存在但 %APPDATA% 有数据"
-/// 这种退化情况靠**三个候选挨个查**来覆盖，而不是靠试写。
+/// 来探可写性。这里只是探测，不动用户的东西；代价是"默认位置不存在但数据目录里有"
+/// 这种退化情况靠**候选挨个查**来覆盖，而不是靠试写。
 ///
 /// # 返回值
 ///
@@ -99,7 +102,20 @@ pub(super) fn candidates() -> Vec<Candidate> {
         }
     }
 
-    // 2. 平台默认位置
+    // 2. Windows：`colormc://` 协议注册的可执行文件旁边
+    //    便携版不写 run 文件，装在别的盘时只能靠这条线索
+    #[cfg(target_os = "windows")]
+    if let Some(exe) = mml_sys::protocol_helper::registered_exe("colormc")
+        && !is_self(&exe)
+        && let Some(dir) = exe.parent()
+    {
+        list.push(Candidate {
+            dir: dir.join(COLORMC_INNER_DIR),
+            from: "app",
+        });
+    }
+
+    // 3. 平台默认位置
     #[cfg(target_os = "windows")]
     let default = std::env::current_exe()
         .ok()
@@ -115,8 +131,19 @@ pub(super) fn candidates() -> Vec<Candidate> {
         });
     }
 
-    // 3. 兜底位置
-    if let Some(data) = dirs::data_dir() {
+    // 4. 兜底位置：ColorMC 的数据目录本身
+    //    它默认在 `%LOCALAPPDATA%\ColorMC`，装到只读位置时会退到这里当工作目录；
+    //    Linux / macOS 上 `data_local_dir` 与 `data_dir` 是同一个目录，只留一份
+    let local = dirs::data_local_dir();
+    if let Some(dir) = &local {
+        list.push(Candidate {
+            dir: dir.join(COLORMC_DIR),
+            from: "fallback",
+        });
+    }
+    if let Some(data) = dirs::data_dir()
+        && local.as_ref() != Some(&data)
+    {
         list.push(Candidate {
             dir: data.join(COLORMC_DIR),
             from: "fallback",
@@ -126,12 +153,35 @@ pub(super) fn candidates() -> Vec<Candidate> {
     list
 }
 
+/// 这个可执行文件是不是 MML 自己
+///
+/// MML 接管 `colormc://` 后注册表里写的就是本进程，不排掉会把 MML 的安装目录当成
+/// ColorMC 的位置。
+///
+/// - `exe`: 注册表里的处理程序
+///
+/// # 返回值
+///
+/// 规范化后与当前 exe 相同即为 `true`；取不到当前 exe 时按不同处理
+#[cfg(target_os = "windows")]
+fn is_self(exe: &Path) -> bool {
+    let Ok(current) = std::env::current_exe() else {
+        return false;
+    };
+    match (exe.canonicalize(), current.canonicalize()) {
+        (Ok(exe), Ok(current)) => exe == current,
+        _ => exe
+            .to_string_lossy()
+            .eq_ignore_ascii_case(&current.to_string_lossy()),
+    }
+}
+
 /// 一个 ColorMC 工作目录候选
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Candidate {
     /// 候选目录
     pub(super) dir: PathBuf,
-    /// 来源标记，取 `run` / `default` / `fallback`，可信度从高到低
+    /// 来源标记，取 `run` / `app` / `default` / `fallback`，可信度从高到低
     pub(super) from: &'static str,
 }
 
@@ -146,16 +196,33 @@ pub(super) fn detect() -> Option<Candidate> {
         .find(|c| c.dir.is_dir() && looks_like_colormc(&c.dir))
 }
 
-/// ColorMC 的账户文件位置，**在工作目录之外**，所以永远不会被迁移
+/// ColorMC 的账户文件位置，**在工作目录之外**，迁移时单独合并进 M²L 的账户文件
+///
+/// .NET 在 Unix 上把 `LocalApplicationData` 放在 `~/.local/share`，macOS 也是这条，
+/// 与 `dirs::data_local_dir` 的 `~/Library/Application Support` 不同，所以两个都查。
 ///
 /// # 返回值
 ///
 /// 账户文件路径；文件不存在返回 `None`
 pub fn auth_file() -> Option<PathBuf> {
-    let file = dirs::data_local_dir()?
-        .join(COLORMC_DIR)
-        .join(names::AUTH_FILE);
-    file.is_file().then_some(file)
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Some(dir) = dirs::data_local_dir() {
+        candidates.push(dir.join(COLORMC_DIR).join(names::AUTH_FILE));
+    }
+    if let Some(dir) = dirs::data_dir() {
+        candidates.push(dir.join(COLORMC_DIR).join(names::AUTH_FILE));
+    }
+    #[cfg(unix)]
+    if let Some(dir) = dirs::home_dir() {
+        candidates.push(
+            dir.join(".local")
+                .join("share")
+                .join(COLORMC_DIR)
+                .join(names::AUTH_FILE),
+        );
+    }
+
+    candidates.into_iter().find(|file| file.is_file())
 }
 
 /// 实例根目录，即工作目录下的 `minecraft/instances`，两边布局一致
@@ -228,7 +295,7 @@ pub(super) fn top_entries(root: &Path) -> Vec<String> {
 /// 组装探测结果
 ///
 /// - `path`: 探测到的 ColorMC 工作目录
-/// - `from`: 候选来源标记，取 `run` / `default` / `fallback`
+/// - `from`: 候选来源标记，取 `run` / `app` / `default` / `fallback`
 ///
 /// # 返回值
 ///

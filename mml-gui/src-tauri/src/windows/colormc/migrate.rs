@@ -21,7 +21,7 @@ use crate::err_keys;
 use crate::log_text::LogText;
 
 use super::check::check;
-use super::detect::{auth_file, instance_root, looks_like_colormc, top_entries};
+use super::detect::{instance_root, looks_like_colormc, top_entries};
 use super::import::{self, InstancePlan};
 use super::progress;
 
@@ -162,7 +162,7 @@ pub(super) fn migrate(
         instances_bad: checked.instances_bad,
         instances_legacy_gui: checked.instances_legacy_gui,
         compat: checked.compat,
-        auth_outside: auth_file().is_some(),
+        accounts: 0,
     })
 }
 

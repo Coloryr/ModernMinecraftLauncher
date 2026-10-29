@@ -128,7 +128,7 @@ fn run_dir() -> Option<PathBuf> {
     crate::gui_config::dir()
 }
 
-/// 系统内部数据目录：Windows `%LOCALAPPDATA%\mml`，Linux `~/.local/share/mml`，macOS `~/.mml`
+/// 系统内部数据目录：Windows `%LOCALAPPDATA%\mml`，Linux / macOS `~/.local/share/mml`
 fn data_dir() -> PathBuf {
     mml_base::inner_path::get_inner_path()
 }

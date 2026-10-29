@@ -19,17 +19,19 @@ use super::migrate::migrate;
 // 全部在 `target/temp` 下操作，见 AGENTS.md §6，而且**只读**真实样本 —— 移动用例先把样本
 // 复制一份再搬，反复跑也不会把样本搬没。
 
-// 单测要同时用到三个子模块的实现细节，原先是同一个文件里的 `use super::*`
+// 单测要同时用到各子模块的实现细节，原先是同一个文件里的 `use super::*`
 use std::fs;
 use std::path::Path;
 
 use serde_json::{Value, json};
 use uuid::Uuid;
 
+use mml_auth::{AuthType, LoginObj};
 use mml_base::serialize_tools;
 use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 use mml_names::names;
 
+use super::account;
 use super::check::*;
 use super::detect::*;
 use super::migrate::*;
@@ -581,4 +583,157 @@ fn group_names_merge_into_group_save() {
     }
 
     cleanup(&[&src, &dst]);
+}
+
+/// 账户转换：UUID 去连字符、null 令牌、认证类型映射
+#[test]
+fn converts_colormc_accounts() {
+    let src = temp_dir("acc-src");
+    let src_file = src.join("auth.json");
+    fs::write(
+        &src_file,
+        serde_json::to_string(&json!([
+            {
+                "UserName": "Color_yr",
+                "UUID": "cced95f30a844377b8c18e60cf1b3fea",
+                "AccessToken": "old",
+                "ClientToken": null,
+                "AuthType": 1,
+                "Text1": "old-refresh",
+                "Text2": null,
+                "LastLogin": "2026-10-27T22:29:53.9708468+08:00"
+            },
+            {
+                "UserName": "123",
+                "UUID": "202cb962ac59075b964b07152d234b70",
+                "AccessToken": null,
+                "ClientToken": "1aab65d7-ac11-41f3-b7de-c0e5e46bf8ae",
+                "AuthType": 0,
+                "Text1": null,
+                "Text2": null,
+                "LastLogin": "0001-01-01T00:00:00"
+            },
+            {
+                "UserName": "nide8",
+                "UUID": "8c1f6f9f6f6f4f6f8f6f6f6f6f6f6f6f",
+                "AccessToken": "token",
+                "ClientToken": "client",
+                "AuthType": 2,
+                "Text1": "b74ac4f292e811e88feb525400b59b6a",
+                "Text2": "color_yr",
+                "LastLogin": "2026-01-02T03:04:05+08:00"
+            }
+        ]))
+        .unwrap(),
+    )
+    .unwrap();
+
+    let list = account::read(&src_file).unwrap();
+    assert_eq!(list.len(), 3);
+
+    let microsoft = list
+        .iter()
+        .find(|auth| auth.auth_type == AuthType::OAuth)
+        .unwrap();
+    assert_eq!(microsoft.access_token, "old");
+    assert_eq!(microsoft.text1.as_deref(), Some("old-refresh"));
+
+    let offline = list
+        .iter()
+        .find(|auth| auth.auth_type == AuthType::Offline)
+        .unwrap();
+    assert_eq!(
+        offline.uuid, "202cb962ac59075b964b07152d234b70",
+        "UUID 该统一成不带连字符的写法"
+    );
+    assert!(offline.access_token.is_empty(), "null 令牌该落成空串");
+    assert_eq!(offline.last_login.timestamp(), 0, "0001 年归到 Unix 纪元");
+
+    let nide8 = list
+        .iter()
+        .find(|auth| auth.auth_type == AuthType::Nide8)
+        .unwrap();
+    assert_eq!(
+        nide8.text1.as_deref(),
+        Some("b74ac4f292e811e88feb525400b59b6a")
+    );
+    assert_eq!(nide8.text2.as_deref(), Some("color_yr"));
+
+    cleanup(&[&src]);
+}
+
+/// 同键账户保留 M²L 已有的，ColorMC 独有的才进新增列表
+#[test]
+fn merge_keeps_existing_accounts() {
+    let src = temp_dir("acc-merge-src");
+    let src_file = src.join("auth.json");
+    fs::write(
+        &src_file,
+        serde_json::to_string(&json!([
+            {
+                "UserName": "Color_yr",
+                "UUID": "cced95f30a844377b8c18e60cf1b3fea",
+                "AccessToken": "old",
+                "ClientToken": null,
+                "AuthType": 1,
+                "Text1": "old-refresh",
+                "Text2": null,
+                "LastLogin": "2026-10-27T22:29:53.9708468+08:00"
+            },
+            {
+                "UserName": "123",
+                "UUID": "202cb962ac59075b964b07152d234b70",
+                "AccessToken": null,
+                "ClientToken": "1aab65d7-ac11-41f3-b7de-c0e5e46bf8ae",
+                "AuthType": 0,
+                "Text1": null,
+                "Text2": null,
+                "LastLogin": "2026-07-18T17:17:20.0594432+08:00"
+            }
+        ]))
+        .unwrap(),
+    )
+    .unwrap();
+
+    // M²L 里已有同一微软账户，令牌是用户后来刷新过的
+    let keep = LoginObj {
+        user_name: String::from("microsoft-old"),
+        uuid: String::from("cced95f30a844377b8c18e60cf1b3fea"),
+        access_token: String::from("mml-token"),
+        client_token: String::new(),
+        auth_type: AuthType::OAuth,
+        text1: Some(String::from("mml-refresh")),
+        text2: None,
+        last_login: chrono::Local::now().fixed_offset(),
+        expire_at: None,
+    };
+
+    let added = account::merge(&[keep.clone()], account::read(&src_file).unwrap());
+    assert_eq!(added.len(), 1, "同键账户不该被旧令牌覆盖");
+    assert_eq!(added[0].auth_type, AuthType::Offline);
+    assert_eq!(keep.access_token, "mml-token");
+
+    cleanup(&[&src]);
+}
+
+/// 源文件解析失败返回错误
+#[test]
+fn bad_account_source_is_error() {
+    let src = temp_dir("acc-bad-src");
+    let src_file = src.join("auth.json");
+    fs::write(&src_file, "not json").unwrap();
+
+    assert!(account::read(&src_file).is_err());
+
+    cleanup(&[&src]);
+}
+
+/// 没有 ColorMC 账户文件时返回空表
+#[test]
+fn missing_account_source_is_empty() {
+    let src = temp_dir("acc-none-src");
+
+    assert!(account::read(&src.join("auth.json")).unwrap().is_empty());
+
+    cleanup(&[&src]);
 }

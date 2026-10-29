@@ -247,8 +247,8 @@ pub async fn upload_minecraft_skin(
 pub async fn get_user_profile(uuid: &str, url: Option<&str>) -> CoreResult<UserProfileObj> {
     let url = match url {
         Some(data) => data.to_string(),
-        // 官方会话服务器只认不带连字符的 UUID，带连字符会返回 400，
-        // 而账户数据里存的是常规带连字符格式，这里统一去掉
+        // 官方会话服务器只认不带连字符的 UUID，带连字符会返回 400；
+        // 账户现在存的就是不带连字符的写法，这里仍然去一次，防调用方传错
         None => format!(
             "{}/{}",
             urls::MINECRAFT_SESSION_SERVER,

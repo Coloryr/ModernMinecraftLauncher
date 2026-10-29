@@ -43,18 +43,19 @@ pub mod oauth;
 
 /// 统一 UUID 文本格式
 ///
-/// 微软 Profile 返回的 UUID 不带连字符，登录与刷新必须落成同一种写法，
+/// 账户存储与 ColorMC 保持一致，用**不带连字符**的 32 位小写十六进制；
+/// 微软 Profile、ColorMC 的 `auth.json` 都是这个写法，登录与刷新也落成同一种，
 /// 否则同一账户会因存储键不同被存成两条记录。
 ///
 /// - `uuid`: UUID 文本，带不带连字符均可
 ///
 /// # 返回值
 ///
-/// 合法 UUID 统一为带连字符的小写形式；无法解析时返回去掉首尾空白的原文本
+/// 合法 UUID 统一为不带连字符的小写形式；无法解析时返回去掉首尾空白的原文本
 pub fn normalize_uuid(uuid: &str) -> String {
     let uuid = uuid.trim();
     Uuid::parse_str(uuid)
-        .map(|u| u.to_string())
+        .map(|u| u.simple().to_string())
         .unwrap_or_else(|_| uuid.to_string())
 }
 
@@ -159,7 +160,7 @@ pub struct LoginObj {
     /// 用户名
     #[serde(rename = "UserName")]
     pub user_name: String,
-    /// 账户 UUID，Minecraft 格式，含连字符
+    /// 账户 UUID，32 位小写十六进制，不带连字符
     #[serde(rename = "UUID")]
     pub uuid: String,
     /// 登录访问令牌，即 access token，用于验证身份
@@ -410,7 +411,7 @@ mod tests {
     use std::collections::HashMap;
 
     /// 测试用的假凭据，与真实账户无关
-    const FAKE_UUID: &str = "00000000-0000-0000-0000-00000000aaaa";
+    const FAKE_UUID: &str = "0000000000000000000000000000aaaa";
     const FAKE_TOKEN: &str = "fake-access-token";
     const FAKE_CLIENT: &str = "fake-client-token";
 
@@ -580,7 +581,7 @@ mod tests {
         assert_eq!(map[&a.get_key()].access_token, "new-token");
     }
 
-    /// 微软 Profile 的无连字符 UUID 与登录时的带连字符 UUID 应落到同一个账户键
+    /// 带连字符与不带连字符的 UUID 都应统一成不带连字符的账户键
     #[test]
     fn test_uuid_format_shares_key() {
         let mut hyphenated = LoginObj::new(
@@ -593,8 +594,9 @@ mod tests {
         let mut plain = hyphenated.clone();
         plain.uuid = "0000000000000000000000000000aaaa".to_string();
 
-        assert_eq!(normalize_uuid(&plain.uuid), hyphenated.uuid);
+        assert_eq!(normalize_uuid(&hyphenated.uuid), plain.uuid);
         assert_eq!(plain.get_key(), hyphenated.get_key());
+        assert_eq!(hyphenated.get_key().uuid, plain.uuid);
     }
 
     /// 离线账户 refresh 无需网络，应直接返回成功

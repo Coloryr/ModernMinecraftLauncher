@@ -127,7 +127,7 @@ pub(super) async fn microsoft_login(app: &AppHandle) -> Result<AccountStoreDto, 
 
     *OAUTH_NOW.write().unwrap() = None;
 
-    // Profile 返回的 UUID 无连字符，转为 Minecraft 常规带连字符格式
+    // Profile 返回的 UUID 无连字符，与账户存储保持同一种写法
     let uuid = mml_auth::normalize_uuid(&profile.id);
 
     let mut login = LoginObj::new(profile.name, uuid, mc_token.access_token, String::new());

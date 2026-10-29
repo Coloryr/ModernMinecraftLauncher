@@ -21,7 +21,12 @@ import {
   sidebarSide,
   viewMode,
 } from "./lib/settings";
-import { applyWindowAlpha, applyWindowMaterial, restoreBg } from "./lib/appearance";
+import {
+  applyAnimations,
+  applyWindowAlpha,
+  applyWindowMaterial,
+  restoreBg,
+} from "./lib/appearance";
 import { setMultiWindow } from "./windows/windowManager";
 import { restoreFontFamily } from "./lib/fonts";
 import { installImageFallback } from "./lib/imageFallback";
@@ -52,17 +57,8 @@ document.addEventListener("contextmenu", (e) => {
   e.preventDefault();
 });
 
-// 发布构建：拦掉 WebView2 自带的浏览器功能键，即 F5 / Ctrl+R 重载页面、
-// F12 / Ctrl+Shift+C 开发者工具、Ctrl+P 打印。
-//
-// 这是**兜底**：正经做法是 WebView2 的设置项，见 src-tauri/src/windows/webview_keys.rs 的
-// AreBrowserAcceleratorKeysEnabled / AreDevToolsEnabled。万一那两项没生效，即老版本
-// WebView2 没有 Settings3，页面这一层还能挡住。开发构建 vite dev / tauri dev 不拦，
-// 调试要用。
-//
-// 注意只拦"浏览器专有"的键：Ctrl+C / Ctrl+V / Ctrl+A / Ctrl+Z 这些编辑键一概不动。
 // 调试构建：F12 / ⌘⌥I 打开 Web Inspector。发布构建没有把 DevTools 编进去，
-// 那条命令会直接返回错误，所以只在 DEV 下装这个监听
+// 那条命令会直接返回错误，所以监听只在 DEV 下装
 if (import.meta.env.DEV) {
   window.addEventListener("keydown", (e) => {
     const inspect =
@@ -70,10 +66,14 @@ if (import.meta.env.DEV) {
       (e.metaKey && e.altKey && (e.key === "i" || e.key === "I"));
     if (!inspect) return;
     e.preventDefault();
-    commands.windows.openDevtools().catch(() => { });
+    commands.windows.openDevtools().catch(() => {});
   });
 }
 
+// 发布构建：兜底拦掉 WebView2 的浏览器功能键（F5 / Ctrl+R、F12 / Ctrl+Shift+C、
+// Ctrl+P、Ctrl+F 页内查找）。正经做法是 WebView2 设置项，见
+// src-tauri/src/windows/webview_keys.rs；老版本没有 Settings3 时，页面这层还能挡。
+// 只拦浏览器专有键，Ctrl+C / Ctrl+V / Ctrl+A / Ctrl+Z 这些编辑键一概不动。
 if (import.meta.env.PROD) {
   window.addEventListener("keydown", (e) => {
     const ctrl = e.ctrlKey || e.metaKey;
@@ -125,14 +125,16 @@ async function bootstrap() {
 
   applyTheme();
   applyLocale();
+  applyAnimations();
   // Monaco 的界面文案（查找框等）跟着界面语言走：包内没有语言包，表由我们自己挂。
   // watch 是为了在设置里改语言时立刻跟上，不用重开窗口
   applyMonacoNls(locale.value);
   watch(locale, (now) => applyMonacoNls(now));
-  loadAccounts(); // 账户列表由 Rust 提供（浏览器环境静默跳过）
+  // 账户列表由 Rust 提供（浏览器环境静默跳过），不挡首屏
+  void loadAccounts();
   createApp(App).directive("tip", vTip).mount("#app");
   // 入口函数要查挂载后的控件，必须等 mount 完成再放行
   startCustomCss();
 }
 
-bootstrap();
+void bootstrap();

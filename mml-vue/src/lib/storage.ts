@@ -18,6 +18,9 @@
 // 所以 localStorage 本身也跟着运行目录走了 —— 这一层不再需要额外落盘一份镜像。
 import { isTauri } from "./util";
 
+/** 自派发的变更事件名，与原生 `storage` 分开，避免和真事件混淆 */
+const CHANGE_EVENT = "mml:storage";
+
 /**
  * 全部存储键（**唯一登记处**）
  *
@@ -62,7 +65,6 @@ export const KEYS = {
   settingsTab: "mml.settingsTab",
   /** 图标裁剪上次选的边长 */
   iconPickSize: "mml.iconPickSize",
-
 
   // ---- 账户显示 ----
   /** 皮肤显示模式 Skin2DA / Skin2DB / Skin3D / Skin3DD / Skin3DRotate */
@@ -349,9 +351,6 @@ export function onStorageChange(
     window.removeEventListener("storage", listener);
   };
 }
-
-/** 自派发的变更事件名，与原生 `storage` 分开，避免和真事件混淆 */
-const CHANGE_EVENT = "mml:storage";
 
 /**
  * 广播一次值变更，让**其它窗口**知道

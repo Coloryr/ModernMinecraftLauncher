@@ -15,7 +15,8 @@ use crate::dtos::{ColorMcInfoDto, ColorMcProgressDto, ColorMcReportDto};
 use crate::err_keys;
 use crate::listens;
 
-use super::detect::{asked, detect, info, mark};
+use super::account;
+use super::detect::{asked, auth_file, detect, info, mark};
 use super::migrate::migrate;
 
 /// 迁移是否正在进行，防重入：迁移期间再点一次不该并发跑第二遍
@@ -128,7 +129,30 @@ pub async fn window_migrate_colormc(
     let dst = get_base_dir();
     let result = tauri::async_runtime::spawn_blocking(move || {
         let src = PathBuf::from(source.trim());
-        migrate(Some(&handle), &src, &dst, moved)
+        let mut report = migrate(Some(&handle), &src, &dst, moved)?;
+
+        // 账户文件不在工作目录里，单独合并；这一步失败不推翻已经搬完的文件，
+        // 只记日志，报告里的账户数是 0
+        if let Some(source_auth) = auth_file() {
+            match account::read(&source_auth) {
+                Ok(converted) => {
+                    // 走账户模块的内存存储：已存在的键不覆盖，save 把整份列表排队落盘
+                    let added = account::merge(&mml_auth::auths::get_all(), converted);
+                    for auth in &added {
+                        auth.save();
+                    }
+                    report.accounts = added.len() as u32;
+                    if !added.is_empty() {
+                        mml_log::info(
+                            LogText::ColormcAccountsImported { count: added.len() }.text(),
+                        );
+                    }
+                }
+                Err(err) => mml_log::error(LogText::ColormcAccountsFailed { error: err }.text()),
+            }
+        }
+
+        Ok(report)
     })
     .await;
 

@@ -210,7 +210,9 @@ fn get_run_path() -> PathBuf {
     })
 }
 
-/// 发布构建 macOS：取 `run` 文件记录的路径，取不到用共享目录
+/// 发布构建 macOS：取 `run` 文件记录的路径，取不到用家目录下的 `.mml`
+///
+/// 与 Linux 同一口径：数据落在当前账户的家目录，不写 `/Users/shared`。
 ///
 /// # 返回值
 ///
@@ -218,5 +220,10 @@ fn get_run_path() -> PathBuf {
 #[cfg(not(debug_assertions))]
 #[cfg(target_os = "macos")]
 fn get_run_path() -> PathBuf {
-    get_config_path().unwrap_or(Path::new("/Users/shared/mml/").to_path_buf())
+    use mml_names::names;
+
+    get_config_path().unwrap_or({
+        let dir = dirs::home_dir().unwrap();
+        dir.join(names::MML_INNER_DIR)
+    })
 }

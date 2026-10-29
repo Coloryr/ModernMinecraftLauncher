@@ -358,6 +358,7 @@ function prevNewsPage() {
 import {
   accounts as storeAccounts,
   currentAccount as storeCurrentAccount,
+  loadAccounts,
   setCurrentAccount,
   clearCurrentAccount,
 } from "../../lib/accountStore";
@@ -1486,12 +1487,14 @@ function onColorMcClosed() {
 /**
  * 迁移完成
  *
- * 实例是"文件夹搬进来"的，运行中的核心**不会**重新扫实例目录，见 windows/colormc.rs，
- * 所以权威结果是重启后再看；这里先把列表拉一次，万一被文件监听捡到了也能立刻显示。
+ * 账户已经写进账户模块，重拉列表就能看到；实例是"文件夹搬进来"的，运行中的核心
+ * **不会**重新扫实例目录，见 windows/colormc.rs，重拉只是万一被文件监听捡到了能立刻显示。
  */
 function onColorMcDone() {
   void loadInstances();
   void loadGroups();
+  // 账户也在这轮迁移里合并，顶栏的账户列表要跟着刷新
+  void loadAccounts();
 }
 
 /**

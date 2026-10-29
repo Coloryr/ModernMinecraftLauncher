@@ -96,10 +96,18 @@ fn load_select<P: AsRef<Path>>(path: P) {
         return;
     }
 
-    *CURRENT_USER.write().unwrap() = json.unwrap().map(|mut key| {
-        key.uuid = normalize_uuid(&key.uuid);
-        key
-    });
+    let Some(mut key) = json.unwrap() else {
+        *CURRENT_USER.write().unwrap() = None;
+        return;
+    };
+    let raw_uuid = key.uuid.clone();
+    key.uuid = normalize_uuid(&raw_uuid);
+    let changed = key.uuid != raw_uuid;
+    *CURRENT_USER.write().unwrap() = Some(key);
+    // 旧文件里的带连字符写法顺手改成统一写法
+    if changed {
+        save_select();
+    }
 }
 
 /// 将内存中所有账户持久化到磁盘
@@ -160,21 +168,23 @@ pub fn get(uuid: &str, auth_type: AuthType) -> Option<LoginObj> {
 ///
 /// # 返回值
 ///
-/// 成功时返回是否遇到同键账户；失败时返回反序列化错误
+/// 需要回写时返回 `true`：遇到了同键账户，或有 UUID 被统一成不带连字符的写法；
+/// 失败时返回反序列化错误
 pub fn import<P: AsRef<Path>>(file: P) -> CoreResult<bool> {
     let json = serialize_tools::json_from_file::<Vec<LoginObj>>(file)?;
 
     let mut auths = AUTHS.write().unwrap();
-    let mut merged = false;
+    let mut changed = false;
 
     for mut item in json.into_iter() {
         let raw_uuid = item.uuid.clone();
         item.uuid = normalize_uuid(&raw_uuid);
+        changed |= item.uuid != raw_uuid;
         let key = item.get_key();
         let replace = match auths.get(&key) {
             None => true,
             Some(old) => {
-                merged = true;
+                changed = true;
                 newer_than(&item, old)
             }
         };
@@ -183,7 +193,7 @@ pub fn import<P: AsRef<Path>>(file: P) -> CoreResult<bool> {
         }
     }
 
-    Ok(merged)
+    Ok(changed)
 }
 
 /// 同键的两条账户记录保留哪一条

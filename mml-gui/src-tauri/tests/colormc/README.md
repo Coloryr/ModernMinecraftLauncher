@@ -51,7 +51,8 @@
 
 - 用例**只读**这份样本：移动模式的用例会先把样本复制到 `target/temp` 再搬，不会动这里。
 - 样本里**没有** `auth.json` —— ColorMC 的账户文件不在工作目录里（在
-  `%LOCALAPPDATA%\ColorMC\auth.json`），这正是迁移时要提醒用户"账户不会跟着迁移"的原因。
+  `%LOCALAPPDATA%\ColorMC\auth.json`），迁移时由账户迁移单独合并，不随工作目录搬运；
+  这里不放真实令牌。
 
 ## 用法
 
