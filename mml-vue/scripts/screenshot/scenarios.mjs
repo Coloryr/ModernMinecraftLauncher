@@ -1878,7 +1878,7 @@ export const scenarios = [
     size: [1000, 700],
     commands: base({ download_get_status: downloadStatus, download_pause_all: null }),
     actions: [
-      { eval: click(".ov-actions .mini-btn"), after: 800 },
+      { eval: click(".ov-actions button"), after: 800 },
       { assert: "window.__SHOT__.callsOf('download_pause_all').length > 0", label: "暂停全部命令已发出" },
     ],
   },

@@ -87,7 +87,7 @@ watch(
   <!-- 校验失败的原因贴在框下面，别让它落到底部按钮上方去找 -->
   <p v-if="error" class="error-text" role="alert">{{ error }}</p>
 
-  <!-- 扫描失败：把原因显示出来，以前静默回落，看起来像功能没生效 -->
+  <!-- 扫描失败：把原因显示出来，别静默当成没扫到 -->
   <p v-if="scanError" class="field-hint scan-err">
     {{ t("add.folderScanFail", { msg: scanError }) }}
   </p>

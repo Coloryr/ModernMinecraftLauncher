@@ -345,7 +345,7 @@ async function scanFolder() {
     if (addFolderPath.value.trim() !== path) return;
     folderFound.value = [];
     folderPicked.value = new Set();
-    // 扫描失败要说出来：以前是静默当"没扫到"，界面看起来像功能没生效
+    // 扫描失败要说出来，别静默当成"没扫到"
     folderScanError.value = tErr(e);
   } finally {
     folderScanning.value = false;
@@ -624,7 +624,7 @@ watch(newName, () => clearFieldError("name"));
 watch(newVersion, () => clearFieldError("version"));
 watch(addArchivePath, () => clearFieldError("archive"));
 /**
- * 路径一变就把上一次的扫描结果清掉
+ * 路径一变就清掉上一次的扫描结果与内容树
  *
  * **不自动扫描**：选目录走"确认框 → 允许了再扫"，即 pickFolder → scanAsk → confirmScan；
  * 手输 / 粘贴路径用路径框右边的「扫描目录」按钮触发。扫描要读磁盘，不该在用户

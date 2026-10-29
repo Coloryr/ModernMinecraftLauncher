@@ -151,7 +151,6 @@ function isCurrent(acc: AccountStoreDto): boolean {
   background: var(--bg-side);
 }
 
-.detail-table tbody tr:last-child th,
 .detail-table tbody tr:last-child td {
   border-bottom: none;
 }

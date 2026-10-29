@@ -19,9 +19,11 @@ const props = withDefaults(
 /** 实际显示的标题：调用方没给就退回"安装整合包" */
 const shownTitle = computed(() => props.title || t("add.installing"));
 
+/** 整体进度百分比，0–100 */
 const percent = computed(() =>
   props.progress.total ? (props.progress.now / props.progress.total) * 100 : 0,
 );
+/** 当前子任务进度百分比，0–100 */
 const subPercent = computed(() =>
   props.progress.subTotal ? (props.progress.subNow / props.progress.subTotal) * 100 : 0,
 );
