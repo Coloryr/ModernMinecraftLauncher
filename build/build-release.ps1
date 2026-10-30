@@ -50,7 +50,7 @@ $env:MML_BUILD_TMP = $buildTmp
 $env:TMP = $buildTmp
 $env:TEMP = $buildTmp
 
-# 发布版本以 build/version 为准，先同步到应用清单
+# 版本来自 Git 标签，先同步到应用清单
 node (Join-Path $root 'build\set-version.mjs')
 if ($LASTEXITCODE -ne 0) { throw '版本同步失败，已中止构建。' }
 
@@ -82,7 +82,7 @@ finally {
     Pop-Location
 }
 
-# 把 Tauri 的安装包按 build/version 重命名后集中到 build_out/
+# 把 Tauri 的安装包按版本标签重命名后集中到 build_out/
 Write-Host '正在收集安装包到 build_out ...'
 node (Join-Path $root 'build\package-release.mjs')
 if ($LASTEXITCODE -ne 0) { throw "安装包收集失败（退出码 $LASTEXITCODE）" }

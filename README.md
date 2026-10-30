@@ -136,13 +136,13 @@ CI 的 `windows-11-arm` 与 `ubuntu-24.04-arm` 是 GitHub 公共预览 runner，
 
 ### 版本与发布
 
-发布版本从 **v0.0.1** 开始。版本号的唯一来源是 [`build/version`](build/version)：文件里写
-数字版本 `0.0.1`，Git 标签写 `v0.0.1`。带后缀的版本走预发布，如 `build/version` 写
-`1.0.0-pre`、标签写 `v1.0.0-pre`。
+发布版本从 **v0.0.1** 开始。版本号的唯一来源是 **Git 标签**：标签写 `v0.0.1`，
+构建时自动同步到 `mml-gui/src-tauri/Cargo.toml` 与 `tauri.conf.json`。带 `-pre` 这类后缀的
+标签走预发布，如 `v1.0.0-pre`；`testbuild` 这类不是版本号的标签，版本取最近的可达标签。
 
-1. 改 `build/version`。
+1. 打标签：`git tag v0.0.1`。HEAD 不在标签上时按最近的标签构建，脚本会给出提示。
 2. 跑 `build/build-release.ps1`（Windows）或 `bash build/build-release.sh`（Linux / macOS）。
-   脚本会先把版本同步到 `mml-gui/src-tauri/Cargo.toml` 与 `tauri.conf.json`，再开始构建。
+   脚本先把版本同步到应用清单，再开始构建。
 3. 安装包会按版本重命名后集中到 `build_out/`，该目录不入库：
 
 | 平台 | 产物示例 |
@@ -164,13 +164,13 @@ Windows 本地默认把三种架构都构建出来；Linux / macOS 本地构建�
 
 | 触发 | 行为 |
 | --- | --- |
-| 推送正式版标签（如 `v0.0.1`） | 先校验 `build/version` 与标签一致，再按 Windows 3 种、Linux 3 种、macOS 2 种架构并行构建安装包，最后汇总成一个 GitHub Release |
+| 推送正式版标签（如 `v0.0.1`） | 版本直接取自标签，再按 Windows 3 种、Linux 3 种、macOS 2 种架构并行构建安装包，最后汇总成一个 GitHub Release |
 | 推送预发布标签（如 `v1.0.0-pre`） | 走预发布构建，只出可执行文件，汇总成一个标记为 Pre-release 的 GitHub Release |
-| 推送测试构建标签（如 `testbuild`、`testbuild-1`） | 跑完整的构建流程，通道仍按 `build/version` 决定、不校验标签与版本一致；**产物全部丢弃**：不上传 artifact、不打包附加包、不发 Release |
+| 推送测试构建标签（如 `testbuild`、`testbuild-1`） | 跑完整的构建流程，版本取最近的可达标签、通道按其后缀决定；**产物全部丢弃**：不上传 artifact、不打包附加包、不发 Release |
 | 推送 `releases/**` 分支 | 只构建并把产物传成 Actions artifact，不发 Release，用于验证 |
 | Actions 页面手动 `workflow_dispatch` | 同上，验证用 |
 
-走 CI 发版只要三步：改 `build/version`、提交、打标签推送。正式版与预发布都这样，标签分别是
+走 CI 发版只要两步：提交、打标签推送。正式版与预发布都这样，标签分别是
 `v0.0.1` 与 `v1.0.0-pre`。CI 每个平台都走同一套脚本（`build/init.*` 装依赖，正式版用
 `build/build-release.*`、预发布用 `build/build-prerelease.*`），正式版产物名与本地一致。
 预发布只出可执行文件，如 `mml-windows-x64-1.0.0-pre.exe`、`mml-linux-arm64-1.0.0-pre`、

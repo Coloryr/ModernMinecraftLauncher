@@ -11,7 +11,7 @@ set -euo pipefail
 umask 022
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-version="$(tr -d '[:space:]' < "$root/build/version")"
+version="$(node "$root/build/version.mjs")"
 
 binary="$root/target/release/ModernMinecraftLauncher"
 # tauri build 会按 productName 重命名；没改名时退回 crate 名

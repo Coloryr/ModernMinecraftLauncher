@@ -5,7 +5,9 @@ on:
     branches:
       - 'releases/**'
     tags:
+      # 带 v 与不带 v 都认：版本号取自标签，开头的 v 会被剥掉
       - '[0-9]*'
+      - 'v[0-9]*'
       - 'testbuild*'
 
 permissions:
@@ -28,45 +30,47 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # 版本取自标签：浅克隆不带标签与历史，git describe 无从下手
+          fetch-depth: 0
       - name: 解析版本与发布通道
         id: resolve
         shell: bash
         run: |
-          version="$(tr -d '\r\n' < build/version)"
-          version="${version#v}"
-          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "build/version 格式不对：${version}（要三段版本号，预发布带 -pre 这类后缀）"
-            exit 1
-          fi
-          if [[ "$version" == *-* ]]; then
-            channel=prerelease
-          else
-            channel=release
-          fi
-          # 测试构建标签：跑完整构建流程，但产物一律丢弃，也不校验标签与版本一致
+          # 测试构建标签：跑完整构建流程，但产物一律丢弃，版本取最近的版本标签
           test=false
           if [[ "$GITHUB_REF" == refs/tags/testbuild* ]]; then
             test=true
           fi
 
+          # 发版标签本身就是版本号；分支推送上没有标签，留给脚本回落到最近的标签
+          if [ "$test" = false ] && [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            export MML_VERSION="$GITHUB_REF_NAME"
+          fi
+          version="$(node build/version.mjs)"
+
+          if [[ "$version" == *-* ]]; then
+            channel=prerelease
+          else
+            channel=release
+          fi
+
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "channel=${channel}" >> "$GITHUB_OUTPUT"
           echo "test=${test}" >> "$GITHUB_OUTPUT"
-          echo "build/version=${version}，发布通道=${channel}，测试构建=${test}"
+          echo "版本=${version}，发布通道=${channel}，测试构建=${test}"
 
           if [ "$test" = true ]; then
             echo "测试构建：产物全部丢弃，不上传 artifact、不发 Release。"
           elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            tag="${GITHUB_REF_NAME#v}"
-            if [ "$version" != "$tag" ]; then
-              echo "build/version 是 ${version}，标签是 ${GITHUB_REF_NAME}，两者不一致。"
-              exit 1
-            fi
-            echo "版本 ${version} 与标签 ${GITHUB_REF_NAME} 一致。"
+            echo "发版标签 ${GITHUB_REF_NAME}，版本 ${version}。"
           fi
 
   build-windows:
     needs: check-version
+    env:
+      # 版本由 check-version 从标签解析，构建机是浅克隆，自己取不到标签
+      MML_VERSION: ${{ needs.check-version.outputs.version }}
     strategy:
       fail-fast: false
       matrix:
@@ -138,6 +142,8 @@ jobs:
 
   build-linux:
     needs: check-version
+    env:
+      MML_VERSION: ${{ needs.check-version.outputs.version }}
     strategy:
       fail-fast: false
       matrix:
@@ -235,6 +241,7 @@ jobs:
     runs-on: ubuntu-22.04
     container: debian:bookworm
     env:
+      MML_VERSION: ${{ needs.check-version.outputs.version }}
       DEBIAN_FRONTEND: noninteractive
       MML_TARGETS: i686-unknown-linux-gnu
       MML_BUNDLES: deb,rpm
@@ -320,6 +327,8 @@ jobs:
     if: needs.check-version.outputs.channel == 'release' && needs.check-version.outputs.test != 'true'
     needs: [check-version, build-linux]
     runs-on: ubuntu-22.04
+    env:
+      MML_VERSION: ${{ needs.check-version.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -349,6 +358,8 @@ jobs:
 
   build-macos:
     needs: check-version
+    env:
+      MML_VERSION: ${{ needs.check-version.outputs.version }}
     strategy:
       fail-fast: false
       matrix:

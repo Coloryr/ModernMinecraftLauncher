@@ -7,6 +7,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveVersion } from "./version.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -35,12 +36,11 @@ if (!systems.includes(os) || !arches.includes(arch)) {
     process.exit(1);
 }
 
-const versionFile = path.join(root, "build", "version");
-const version = fs.existsSync(versionFile)
-    ? fs.readFileSync(versionFile, "utf8").trim().replace(/^v/, "")
-    : "";
-if (!version) {
-    console.error("build/version 为空或不存在。");
+let version;
+try {
+    version = resolveVersion();
+} catch (error) {
+    console.error(error.message);
     process.exit(1);
 }
 

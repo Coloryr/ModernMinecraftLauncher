@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 收集 Tauri 的安装包，按 build/version 命名后复制到 build_out/。
+// 收集 Tauri 的安装包，按版本标签命名后复制到 build_out/。
 //
 // 支持多架构：Tauri 用 --target 构建时产物在 target/<三元组>/release/bundle/，
 // 宿主直接构建的产物在 target/release/bundle/。两处都扫，按目录里的三元组
@@ -7,20 +7,17 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveVersion } from "./version.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const versionFile = path.join(root, "build", "version");
-const rawVersion = fs.existsSync(versionFile)
-    ? fs.readFileSync(versionFile, "utf8").trim()
-    : "";
 
-if (!rawVersion) {
-    console.error("build/version 为空或不存在。");
+let version;
+try {
+    version = resolveVersion();
+} catch (error) {
+    console.error(error.message);
     process.exit(1);
 }
-
-// 版本文件写 0.0.1；即便误写成 v0.0.1 也按数字版本命名产物
-const version = rawVersion.replace(/^v/, "");
 
 // 应用清单必须与发布版本一致，否则安装包元数据和产物名会对不上
 const cargoVersion = (fs.readFileSync(
@@ -32,7 +29,7 @@ const tauriVersion = JSON.parse(
 ).version;
 if (cargoVersion !== version || tauriVersion !== version) {
     console.error(
-        "版本不一致：build/version=" + version + "，Cargo.toml=" + cargoVersion + "，tauri.conf.json=" + tauriVersion,
+        "版本不一致：标签版本=" + version + "，Cargo.toml=" + cargoVersion + "，tauri.conf.json=" + tauriVersion,
     );
     process.exit(1);
 }

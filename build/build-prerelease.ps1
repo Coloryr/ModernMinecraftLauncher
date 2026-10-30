@@ -42,7 +42,7 @@ $env:MML_BUILD_TMP = $buildTmp
 $env:TMP = $buildTmp
 $env:TEMP = $buildTmp
 
-# 版本以 build/version 为准，先同步到应用清单
+# 版本来自 Git 标签，先同步到应用清单
 node (Join-Path $root 'build\set-version.mjs')
 if ($LASTEXITCODE -ne 0) { throw '版本同步失败，已中止构建。' }
 

@@ -9,7 +9,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-version="$(tr -d '[:space:]' < "$root/build/version")"
+version="$(node "$root/build/version.mjs")"
 runtime="${MML_FLATPAK_RUNTIME:-25.08}"
 
 if ! command -v flatpak >/dev/null 2>&1; then

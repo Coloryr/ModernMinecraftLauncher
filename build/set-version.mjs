@@ -1,38 +1,19 @@
 #!/usr/bin/env node
-// 把 build/version 同步到应用清单，避免发版时漏改版本。
+// 把 Git 标签里的版本同步到应用清单，避免清单版本与标签对不上。
 // 版本由 build-release / build-prerelease 在构建前自动调用。
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveVersion } from "./version.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const versionFile = path.join(root, "build", "version");
-const raw = fs.existsSync(versionFile) ? fs.readFileSync(versionFile, "utf8").trim() : "";
 
-if (!raw) {
-    console.error("build/version 为空或不存在。");
+let version;
+try {
+    version = resolveVersion();
+} catch (error) {
+    console.error(error.message);
     process.exit(1);
-}
-
-const version = normalize(raw.replace(/^v/, ""));
-if (!version) {
-    console.error(`版本号格式不对：${raw}（要 1、1.0 或 1.0.0，可带 -rc.1 这类后缀）`);
-    process.exit(1);
-}
-
-/**
- * 把版本号补齐成三段
- *
- * `1.0` 直接写进清单会拼出 `1.0.20261028`，日期占了大版本位，与正式版 `1.0.0` 也对不上。
- *
- * @param {string} text 去掉 `v` 前缀的版本号
- * @returns {string} 三段版本号，后缀原样保留；格式不对返回空串
- */
-function normalize(text) {
-    const matched = /^(\d+(?:\.\d+){0,2})((?:[-+][0-9A-Za-z.-]+)?)$/.exec(text);
-    if (!matched) return "";
-    const [major, minor = "0", patch = "0"] = matched[1].split(".");
-    return `${major}.${minor}.${patch}${matched[2]}`;
 }
 
 const targets = [
