@@ -124,27 +124,28 @@ mod windows_link {
         pid: 5,
     };
 
-    /// 开始菜单里的快捷方式名，与安装包（NSIS）建的那份同名：
-    /// 装过的用户这里已经有文件，直接跳过，免得开始菜单里出现两条
+    /// 开始菜单里的快捷方式名，与安装包（NSIS）建的那份同名
     const SHORTCUT_NAME: &str = "ModernMinecraftLauncher.lnk";
 
-    /// 确保开始菜单里有带 AUMID 的快捷方式
+    /// 确保开始菜单里有带 AUMID、且指向当前 exe 的快捷方式
     ///
     /// # 返回值
     ///
-    /// 已存在或写成功返回 `Ok(())`；写失败返回原因
+    /// 写成功返回 `Ok(())`；写失败返回原因
     pub(super) fn ensure() -> Result<(), String> {
         let path = programs_dir()?.join(SHORTCUT_NAME);
-        if path.is_file() {
-            return Ok(());
-        }
+        // 安装包或旧版本可能留下一份没有 AUMID、或仍指向旧 exe 的快捷方式；
+        // 同名也重写，通知中心才会把这条应用归到 ModernMinecraftLauncher 名下
+        let existed = path.is_file();
         write_link(&path)?;
-        mml_log::info(
-            LogText::NotificationShortcut {
-                path: path.to_string_lossy().to_string(),
-            }
-            .text(),
-        );
+        if !existed {
+            mml_log::info(
+                LogText::NotificationShortcut {
+                    path: path.to_string_lossy().to_string(),
+                }
+                .text(),
+            );
+        }
         Ok(())
     }
 
