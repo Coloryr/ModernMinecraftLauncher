@@ -1600,7 +1600,7 @@ const oldData = ref<{ colormc: ColorMcInfoDto | null; minecraft: MinecraftInfoDt
 /** 弹窗"已结束"信号：答完或直接关掉时解开 */
 let oldDataSettled: (() => void) | null = null;
 
-/** 首次使用设置弹窗是否打开；旧数据那段询问结束后出现 */
+/** 主页面设置弹窗是否打开；旧数据那段询问结束后出现 */
 const firstRunSetup = ref(false);
 
 /**
@@ -1628,7 +1628,7 @@ function onOldDataClosed() {
   oldData.value = null;
   oldDataSettled?.();
   oldDataSettled = null;
-  // 旧数据这段询问结束（搬没搬都算）就进入首次使用设置
+  // 旧数据这段询问结束（搬没搬都算）就进入主页面设置
   firstRunSetup.value = true;
 }
 
@@ -2063,6 +2063,18 @@ onMounted(async () => {
     <!-- ===== 主界面 ===== -->
     <template v-else>
 
+      <!-- 多选模式工具栏：与其它窗口同一套外观。排在内容区最上方，
+           出现时把下面的内容一起挤下去，不压住第一行 -->
+      <div v-if="multiSelect" class="multi-bar" @contextmenu.prevent @click.stop>
+        <span class="multi-count">{{ t("multi.selected", { count: selectedIds.size }) }}</span>
+        <button class="multi-btn" :disabled="!canChangeGroup" v-tip="canChangeGroup ? '' : t('group.pickNone')"
+          @click="openMoveFromBar">{{ t("multi.moveGroup") }}</button>
+        <button class="multi-btn danger" @click="onMultiDelete">{{ t("multi.delete") }}</button>
+        <button class="multi-btn" :disabled="offlineLaunchBlocked" @click="multiLaunch">{{ t("multi.launch") }}</button>
+        <span class="multi-sep"></span>
+        <button class="multi-exit" @click="exitMultiSelect">{{ t("multi.exit") }}</button>
+      </div>
+
       <!-- 离线启动限制：未登录过微软正版账户时，离线账户不能启动 -->
       <section v-if="offlineLaunchBlocked" class="premium-lock" role="alert">
         <GlyphIcon class="premium-lock-icon" name="alert" :size="16" :weight="2" />
@@ -2081,17 +2093,6 @@ onMounted(async () => {
       <!-- 主体 -->
       <main class="main"
         :class="{ 'side-right': sidebarSide === 'Right', 'sidebar-anim': sidebarAnim, 'pane-max': paneMaximized }">
-        <!-- 多选模式浮动工具栏 -->
-        <div v-if="multiSelect" class="multi-bar" @contextmenu.prevent @click.stop>
-          <span class="multi-count">{{ t("multi.selected", { count: selectedIds.size }) }}</span>
-          <button class="multi-btn" :disabled="!canChangeGroup" v-tip="canChangeGroup ? '' : t('group.pickNone')"
-            @click="openMoveFromBar">{{ t("multi.moveGroup") }}</button>
-          <button class="multi-btn danger" @click="onMultiDelete">{{ t("multi.delete") }}</button>
-          <button class="multi-btn" :disabled="offlineLaunchBlocked" @click="multiLaunch">{{ t("multi.launch") }}</button>
-          <span class="multi-sep"></span>
-          <button class="multi-exit" @click="exitMultiSelect">{{ t("multi.exit") }}</button>
-        </div>
-
         <!-- 锁定的实例已不存在，例如整合包作者的实例被删 / 改名：整块换成错误页，顶部栏保留 -->
         <template v-if="lockMissing">
           <section class="lock-error">
@@ -2564,7 +2565,7 @@ onMounted(async () => {
     <OldDataModal v-if="oldData" :colormc="oldData.colormc" :minecraft="oldData.minecraft"
       @close="onOldDataClosed" @done="onOldDataDone" />
 
-    <!-- ===== 首次使用设置：旧数据询问结束后问一次（见 onOldDataClosed）===== -->
+    <!-- ===== 主页面设置：旧数据询问结束后问一次（见 onOldDataClosed）===== -->
     <FirstRunSetup v-if="firstRunSetup" @close="firstRunSetup = false" />
 
     <!-- ===== 选择目标分组：转移分组与移动选中实例共用 ===== -->

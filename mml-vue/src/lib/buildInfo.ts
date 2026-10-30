@@ -12,6 +12,13 @@ export const appVersion = ref("");
 
 /** 是否需要提示：测试版与预发布版都要，正式版不提示 */
 export const isTestBuild = computed(() => buildChannel.value !== "release");
+/**
+ * 是否源码启动，也就是 debug 构建（界面上的「测试版」）
+ *
+ * 还没上线的东西只用这一档：联机大厅、存档云同步、设置里的手柄栏。
+ * 预发布版是给用户试的，不该露出这些半成品，所以判据比 isTestBuild 更严。
+ */
+export const isSourceBuild = computed(() => buildChannel.value === "debug");
 
 /** 提示文案的键：测试版与预发布版说法不同 */
 export const buildNoticeKey = computed(() =>

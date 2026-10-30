@@ -1,8 +1,9 @@
 <script setup lang="ts">
-// 首次使用设置：旧数据（ColorMC / .minecraft）询问结束后问一次主页面样式、背景图与透明模式
+// 主页面设置：旧数据（ColorMC / .minecraft）询问结束后问一次主页面样式、背景图与透明模式
 //
 // 三项都是**选中即生效**（后面主窗口就在弹窗底下，能立刻看到效果），所以只有一个「完成」
-// 按钮负责关窗；之后要改走设置窗口。弹窗在旧数据询问结束后出现，见 MainWindow。
+// 按钮负责关窗；之后要改走设置窗口。透明模式是窗口材质，只有 Windows 有这一节。
+// 弹窗在旧数据询问结束后出现，见 MainWindow。
 import { computed, onMounted, ref } from "vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
@@ -10,8 +11,9 @@ import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import { t } from "../../lib/i18n";
 import { setViewMode, viewMode, type ViewMode } from "../../lib/settings";
-import { applyWindowAlpha, bgImage, bgLoading, setBgImage, setBgImageFromOriginal } from "../../lib/appearance";
+import { applyWindowMaterial, bgImage, bgLoading, setBgImage, setBgImageFromOriginal } from "../../lib/appearance";
 import { loadGuiConfig, saveGuiConfig } from "../../lib/guiConfig";
+import { detectOs } from "../../lib/titlebar";
 import { isTauri } from "../../lib/util";
 
 const emit = defineEmits<{ (e: "close"): void }>();
@@ -23,23 +25,23 @@ const MODES: { value: ViewMode; icon: "folder" | "grid" | "list"; label: string;
   { value: "list", icon: "list", label: "mode.list", desc: "firstRun.modeListDesc" },
 ];
 
-/** 透明模式的档位：窗口不透明度，单位 % */
-const ALPHAS = [100, 85, 65] as const;
+/** 窗口材质（云母 / 亚克力）只有 Windows 提供，其他平台不显示这一节 */
+const supportsMaterial = detectOs() === "windows";
 
-/** 当前档位，只用于高亮；真值在 gui_config 的 client.windowOpacity */
-const alpha = ref<number>(85);
+/** 当前材质，只用于高亮；真值在 gui_config 的 client.windowEffect */
+const material = ref("none");
 
-/** 透明模式的选项文案，语言切换后跟着重算 */
-const alphaOptions = computed(() => [
-  { value: "100", label: t("firstRun.alphaNone") },
-  { value: "85", label: t("firstRun.alphaHalf") },
-  { value: "65", label: t("firstRun.alphaGlass") },
+/** 材质选项文案，语言切换后跟着重算 */
+const materialOptions = computed(() => [
+  { value: "none", label: t("firstRun.materialNone") },
+  { value: "mica", label: t("firstRun.materialMica") },
+  { value: "acrylic", label: t("firstRun.materialAcrylic") },
 ]);
 
 /** 先不画：配置回来之前不知道有没有被服主锁住，锁着的话首启设置也不该出现 */
 const visible = ref(false);
 
-// 打开时先确认没被锁，再按当前配置高亮透明档位（调过的话落在最近的一档）
+// 打开时先确认没被锁，再按当前配置高亮材质
 onMounted(async () => {
   const cfg = await loadGuiConfig();
   if (cfg?.client.lockClient) {
@@ -48,11 +50,10 @@ onMounted(async () => {
   }
   visible.value = true;
   if (!cfg) return;
-  const current = cfg.client.windowOpacity;
-  alpha.value = ALPHAS.reduce(
-    (best, v) => (Math.abs(v - current) < Math.abs(best - current) ? v : best),
-    ALPHAS[0],
-  );
+  // 旧配置可能还是 auto / blur，这三档之外按关闭显示
+  material.value = ["none", "mica", "acrylic"].includes(cfg.client.windowEffect)
+    ? cfg.client.windowEffect
+    : "none";
 });
 
 /**
@@ -65,15 +66,14 @@ function pickMode(v: ViewMode) {
 }
 
 /**
- * 换透明档位：写 CSS 变量再落盘，弹窗底下的主窗口当场就透
+ * 换窗口材质：写 CSS 类再落盘，弹窗底下的主窗口当场就换
  *
- * - `v`: 选项值，字符串形态的百分比
+ * - `v`: `none` / `mica` / `acrylic`
  */
-function pickAlpha(v: string) {
-  const value = Number(v);
-  alpha.value = value;
-  applyWindowAlpha(value);
-  void saveGuiConfig({ client: { windowOpacity: value } });
+function pickMaterial(v: string) {
+  material.value = v;
+  applyWindowMaterial(v);
+  void saveGuiConfig({ client: { windowEffect: v } });
 }
 
 /** 缩略图的背景样式；没图时不给，交给 .bg-preview.empty 的斜纹占位 */
@@ -100,10 +100,10 @@ function clearImage() {
 </script>
 
 <template>
-  <BaseModal v-if="visible" :title="t('firstRun.title')" :width="560" @close="emit('close')">
+  <!-- 右上角不画 ✕：关闭入口只留底部「完成」 -->
+  <BaseModal v-if="visible" :title="t('firstRun.title')" :width="560" :closable="false"
+    @close="emit('close')">
     <div class="first-run">
-      <p class="run-intro">{{ t("firstRun.intro") }}</p>
-
       <!-- 主页面样式：三张卡并排，选中即生效 -->
       <section class="run-sec">
         <h4 class="run-title">{{ t("firstRun.modeTitle") }}</h4>
@@ -136,12 +136,12 @@ function clearImage() {
         </div>
       </section>
 
-      <!-- 透明模式：三档，越往右越透 -->
-      <section class="run-sec">
-        <h4 class="run-title">{{ t("firstRun.alphaTitle") }}</h4>
-        <SegmentedTabs :model-value="String(alpha)" :options="alphaOptions"
-          @update:model-value="pickAlpha" />
-        <p class="run-hint">{{ t("firstRun.alphaHint") }}</p>
+      <!-- 透明模式：云母 / 亚克力由系统在窗口背后合成，只有 Windows 有 -->
+      <section v-if="supportsMaterial" class="run-sec">
+        <h4 class="run-title">{{ t("firstRun.materialTitle") }}</h4>
+        <SegmentedTabs :model-value="material" :options="materialOptions"
+          @update:model-value="pickMaterial" />
+        <p class="run-hint">{{ t("firstRun.materialHint") }}</p>
       </section>
 
       <div class="modal-actions">
@@ -152,17 +152,16 @@ function clearImage() {
 </template>
 
 <style scoped>
-.run-intro {
-  margin: 0 0 14px;
-  font-size: 12.5px;
-  line-height: 1.7;
-  color: var(--text-dim);
-}
-
 /* 三段之间用细分隔线断开，弹窗里不至于挤成一团 */
 .run-sec {
   padding: 14px 0;
   border-top: 1px solid var(--border);
+}
+
+/* 没有引言了：第一段顶到弹窗标题下面，不要再画一条分隔线 */
+.run-sec:first-child {
+  padding-top: 0;
+  border-top: none;
 }
 
 .run-title {

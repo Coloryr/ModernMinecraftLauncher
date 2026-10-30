@@ -24,11 +24,31 @@ const { entries, loading, downloading, clearing, total, load, clear, open } = pr
 /** 等待确认清理的项 id；空串表示没有弹窗 */
 const pending = ref("");
 
+/** 展开了明细的行 id；目前只有「游戏实例」这一行带 children */
+const expanded = ref<Set<string>>(new Set());
+
 /** 确认框里要显示的名字，取当前语言的文案 */
 const pendingName = computed(() => {
   const entry = entries.value.find((e) => e.id === pending.value);
   return entry ? t(`winSettings.localFile.${entry.id}`) : "";
 });
+
+/** 某一行的实例明细是否展开 */
+function isExpanded(id: string) {
+  return expanded.value.has(id);
+}
+
+/**
+ * 展开 / 收起某一行的实例明细
+ *
+ * - `id`: 行的 id，取自 `entries`
+ */
+function toggle(id: string) {
+  const next = new Set(expanded.value);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  expanded.value = next;
+}
 
 // 统计一次就够：切走再回来沿用上次结果，要最新的点「重新统计」
 onMounted(() => {
@@ -80,23 +100,43 @@ async function onConfirmClear() {
     <!-- 重新统计：旧数据压暗不可点，避免拿着过期结果去清理。
          清理流程里不压暗 —— 那一行自己有转圈，压暗只会把它一起糊掉 -->
     <div v-else class="local-files-list" :class="{ 'is-loading-dim': loading && !clearing }">
-      <div v-for="e in entries" :key="e.id" class="local-file-row">
-        <div class="local-file-main">
-          <span class="local-file-name">{{ t(`winSettings.localFile.${e.id}`) }}</span>
-          <span class="local-file-path" :title="e.path">{{ e.path }}</span>
+      <div v-for="e in entries" :key="e.id" class="local-file-block">
+        <div class="local-file-row">
+          <div class="local-file-main">
+            <span class="local-file-title">
+              <!-- 只有带明细的行（目前是「游戏实例」）才有展开箭头 -->
+              <button v-if="e.children.length" class="local-file-expand" :class="{ flip: isExpanded(e.id) }"
+                :aria-expanded="isExpanded(e.id)"
+                v-tip="isExpanded(e.id) ? t('winSettings.localFileInstancesCollapse') : t('winSettings.localFileInstancesExpand')"
+                :aria-label="isExpanded(e.id) ? t('winSettings.localFileInstancesCollapse') : t('winSettings.localFileInstancesExpand')"
+                @click="toggle(e.id)">
+                <GlyphIcon name="chevron-down" :size="14" :weight="2.4" />
+              </button>
+              <span class="local-file-name">{{ t(`winSettings.localFile.${e.id}`) }}</span>
+            </span>
+            <span class="local-file-path" :title="e.path">{{ e.path }}</span>
+          </div>
+          <!-- 清理中：数字让位给转圈，删完且重新统计完才换回新数字 -->
+          <span class="local-file-size">
+            <span v-if="clearing === e.id" class="loading-spin sm" />
+            <template v-else>{{ formatSize(e.size) }}</template>
+          </span>
+          <div class="local-file-actions">
+            <BaseButton size="sm" @click="open(e.id)">{{ t("winSettings.localFileOpen") }}</BaseButton>
+            <BaseButton v-if="e.deletable" size="sm" variant="danger"
+              :disabled="!!clearing || loading || downloading || e.size === 0"
+              :title="downloading ? t('winSettings.localFileClearBlocked') : undefined" @click="pending = e.id">
+              {{ t("winSettings.localFileClear") }}
+            </BaseButton>
+          </div>
         </div>
-        <!-- 清理中：数字让位给转圈，删完且重新统计完才换回新数字 -->
-        <span class="local-file-size">
-          <span v-if="clearing === e.id" class="loading-spin sm" />
-          <template v-else>{{ formatSize(e.size) }}</template>
-        </span>
-        <div class="local-file-actions">
-          <BaseButton size="sm" @click="open(e.id)">{{ t("winSettings.localFileOpen") }}</BaseButton>
-          <BaseButton v-if="e.deletable" size="sm" variant="danger"
-            :disabled="!!clearing || loading || downloading || e.size === 0"
-            :title="downloading ? t('winSettings.localFileClearBlocked') : undefined" @click="pending = e.id">
-            {{ t("winSettings.localFileClear") }}
-          </BaseButton>
+
+        <!-- 每个实例一行：名字贴左、大小靠右 -->
+        <div v-if="e.children.length && isExpanded(e.id)" class="local-file-children">
+          <div v-for="child in e.children" :key="child.uuid" class="local-file-child">
+            <span class="local-file-child-name" :title="child.path">{{ child.name }}</span>
+            <span class="local-file-size">{{ formatSize(child.size) }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -114,3 +154,78 @@ async function onConfirmClear() {
     </div>
   </BaseModal>
 </template>
+
+<style scoped>
+/* 展开后的实例明细与展开键：只属于这一屏，跟组件走 */
+.local-file-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.local-file-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* 24px 的可点方块：18px 太小，悬停时也没有可辨认的边界 */
+.local-file-expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: transform 0.15s ease, color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.local-file-expand:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.local-file-expand.flip {
+  transform: rotate(180deg);
+}
+
+/* 明细是一块有边界的缩进面板，别和上面的合计行糊成一片 */
+.local-file-children {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 6px 12px 0 42px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.local-file-child {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12.5px;
+}
+
+.local-file-child:hover {
+  background: var(--bg-hover);
+}
+
+.local-file-child-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>

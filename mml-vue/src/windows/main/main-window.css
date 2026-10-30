@@ -753,28 +753,10 @@
 
 /* ================= 多选模式 ================= */
 
-/* 顶部浮动工具栏 */
+/* 多选条：外观走 styles/parts/multi-bar.css，这里只管它到顶栏的距离。
+   顶棚与内容区都从这一条之后开始，多选条出现就整体下移，不压住列表第一行 */
 .multi-bar {
-  position: fixed;
-  top: 72px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 90;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--bg-card);
-  border: 1px solid var(--accent-border);
-  border-radius: 14px;
-  box-shadow: var(--shadow-md);
-}
-
-/* 工具栏里的竖分隔线：隔开操作与「退出多选」 */
-.multi-sep {
-  width: 1px;
-  height: 18px;
-  background: var(--border);
+  margin: 10px 0;
 }
 
 /* 多选详情提示 */

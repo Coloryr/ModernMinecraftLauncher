@@ -463,6 +463,18 @@ async function onDetailRemove() {
       </BaseButton>
     </div>
 
+    <!-- 多选工具条：与主窗口、收藏窗口同一套外观。排在内容区最上方，
+         出现时把下面的分类栏与网格一起挤下去，不压住第一行 -->
+    <div v-if="multiSelect" class="multi-bar">
+      <span class="multi-count">{{ t("multi.selected", { count: selectedIds.size }) }}</span>
+      <button class="multi-btn" @click="selectAllVisible">{{ t("multi.selectAll") }}</button>
+      <button class="multi-btn" :disabled="!selectedIds.size" @click="openMultiGroup">
+        {{ t("blocks.menuSetGroup") }}
+      </button>
+      <span class="multi-sep" />
+      <button class="multi-exit" @click="exitMultiSelect">{{ t("multi.exit") }}</button>
+    </div>
+
     <!-- 内容区工具条：搜索与玩家皮肤入口都放这里，不占标题栏。
          它和网格一起放在分类栏右边，分类栏的「全部」才与搜索框同一条顶线 -->
     <div v-if="rendered" class="block-main">
@@ -485,17 +497,6 @@ async function onDetailRemove() {
           @open="openDetail" @remove-skin="removeSkin" @clear-filters="clearFilters"
           @item-menu="openBlockMenu" @toggle-select="(p) => toggleSelect(p.item, p.event)" />
       </div>
-    </div>
-
-    <!-- 多选工具条：与主窗口多选条同一套外观，浮在标题栏下方 -->
-    <div v-if="multiSelect" class="multi-bar">
-      <span class="multi-count">{{ t("multi.selected", { count: selectedIds.size }) }}</span>
-      <button class="multi-btn" @click="selectAllVisible">{{ t("multi.selectAll") }}</button>
-      <button class="multi-btn" :disabled="!selectedIds.size" @click="openMultiGroup">
-        {{ t("blocks.menuSetGroup") }}
-      </button>
-      <span class="multi-sep" />
-      <button class="multi-exit" @click="exitMultiSelect">{{ t("multi.exit") }}</button>
     </div>
 
     <!-- 尺寸滑杆：右下角，小 → 大连续调图标大小 -->
@@ -608,21 +609,11 @@ async function onDetailRemove() {
 <style scoped src="../../styles/parts/multi-bar.css"></style>
 
 <style scoped>
-/* 多选工具条：外观与主窗口同一套，浮在标题栏下方居中 */
+/* 多选条：外观走 styles/parts/multi-bar.css，这里只管位置。
+   内容区上内边距是 22px，往上探 12px 就落在标题栏下沿 10px 处；
+   面板右侧通栏了 26px，补回来它才在窗口里真正居中 */
 .multi-bar {
-  position: fixed;
-  top: calc(var(--titlebar-h) + 10px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--bg-card);
-  border: 1px solid var(--accent-border);
-  border-radius: 12px;
-  box-shadow: var(--shadow-md);
+  margin: -12px 26px 0 0;
 }
 
 .block-panel {

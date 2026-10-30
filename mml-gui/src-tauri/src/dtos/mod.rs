@@ -100,7 +100,8 @@ pub use server_instance_dto::{
 };
 pub use settings_dto::{
     BgInfoDto, DnsSettingDto, GameCheckSettingDto, LaunchSettingDto, LocalFileEntryDto,
-    NetworkSettingDto, RunArgSettingDto, SettingsDefaultsDto, WindowSettingDto,
+    LocalFileInstanceDto, NetworkSettingDto, RunArgSettingDto, SettingsDefaultsDto,
+    WindowSettingDto,
 };
 pub use stats_dto::{StatsDataDto, StatsInstanceDto, StatsPlayDayDto, StatsPlaytimeDto};
 pub use theme_dto::ThemeKindDto;

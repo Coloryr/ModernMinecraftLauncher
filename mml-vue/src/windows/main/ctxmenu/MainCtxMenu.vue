@@ -9,6 +9,7 @@
 // 否则靠近窗口下/右边缘点开时，菜单会超出可视区被裁掉 —— 实例菜单十来项，比分组菜单高一截。
 import { computed, nextTick, ref, watchEffect } from "vue";
 import { t } from "../../../lib/i18n";
+import { isSourceBuild } from "../../../lib/buildInfo";
 import type { CtxMenuState, GroupView, InstMenuAction } from "../types";
 
 const props = defineProps<{
@@ -164,8 +165,8 @@ watchEffect(async () => {
       <button class="ctx-item" @click="emit('inst-action', 'copy')">
         {{ t("actions.copyInstance") }}
       </button>
-      <!-- 云存档同步：功能还没做，点了只提示「制作中」 -->
-      <button class="ctx-item" @click="emit('inst-action', 'cloudSave')">
+      <!-- 云存档同步：功能还没做，只在源码启动（测试版）时露出来，点了提示「制作中」 -->
+      <button v-if="isSourceBuild" class="ctx-item" @click="emit('inst-action', 'cloudSave')">
         {{ t("actions.cloudSync") }}
       </button>
       <div class="ctx-sep"></div>

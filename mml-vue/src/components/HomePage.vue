@@ -3,7 +3,7 @@
 // empty 为 true 时在内容区顶部展示空实例引导块，含添加账户 / 添加游戏实例两个按钮
 import { computed } from "vue";
 import { t } from "../lib/i18n";
-import { buildChannel, buildNoticeKey, isTestBuild } from "../lib/buildInfo";
+import { buildChannel, buildNoticeKey, isSourceBuild, isTestBuild } from "../lib/buildInfo";
 import { showToast } from "../lib/toast";
 import { openWindow } from "../windows/windowManager";
 import type { InstanceInfoDto, NewsItem } from "../lib/bindings";
@@ -138,7 +138,8 @@ function onLobby() {
 
     <div class="entry-cards">
       <!-- 联机大厅：入口保留，点了只提示「制作中」 -->
-      <button class="entry-card lobby" @click="onLobby">
+      <!-- 联机大厅：还没上线，只在源码启动（测试版）时露出来 -->
+      <button v-if="isSourceBuild" class="entry-card lobby" @click="onLobby">
         <span class="entry-icon">
           <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8"
             stroke-linecap="round" stroke-linejoin="round">

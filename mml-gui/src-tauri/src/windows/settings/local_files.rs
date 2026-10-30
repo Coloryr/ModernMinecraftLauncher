@@ -11,7 +11,7 @@ use mml_names::names;
 use mml_sys::{open_helper, path_helper};
 use tauri::{AppHandle, Manager};
 
-use crate::dtos::LocalFileEntryDto;
+use crate::dtos::{LocalFileEntryDto, LocalFileInstanceDto};
 use crate::err_keys;
 use crate::log_text::LogText;
 
@@ -99,13 +99,57 @@ fn size_of(kind: &LocalFileKind) -> u64 {
 fn collect() -> Vec<LocalFileEntryDto> {
     kinds()
         .into_iter()
-        .map(|kind| LocalFileEntryDto {
-            size: size_of(&kind),
-            path: kind.dir.to_string_lossy().to_string(),
-            id: kind.id.to_string(),
-            deletable: kind.deletable,
+        .map(|kind| {
+            let children = if kind.id == "instances" {
+                instance_sizes()
+            } else {
+                Vec::new()
+            };
+            // 实例行按明细求和，避免为了一个总数再整棵实例目录扫第二遍
+            let size = if kind.id == "instances" {
+                children.iter().map(|item| item.size).sum()
+            } else {
+                size_of(&kind)
+            };
+            LocalFileEntryDto {
+                size,
+                path: kind.dir.to_string_lossy().to_string(),
+                id: kind.id.to_string(),
+                deletable: kind.deletable,
+                children,
+            }
         })
         .collect()
+}
+
+/// 各游戏实例的占用，按大小降序
+///
+/// # 返回值
+///
+/// 每个实例的 uuid / 名字 / 根目录与字节数；没有实例时为空列表
+fn instance_sizes() -> Vec<LocalFileInstanceDto> {
+    let mut list: Vec<LocalFileInstanceDto> = mml_game::get_instances()
+        .into_iter()
+        .map(|instance| {
+            // 扫目录可能很慢：先把字段取出来放锁，别攥着实例读锁做磁盘遍历
+            let (uuid, name, path) = {
+                let instance = instance.read().unwrap();
+                (
+                    instance.uuid.to_string(),
+                    instance.name.clone(),
+                    instance.get_base_path(),
+                )
+            };
+            LocalFileInstanceDto {
+                uuid,
+                name,
+                size: path_helper::get_folder_size(&path),
+                path: path.to_string_lossy().to_string(),
+            }
+        })
+        .collect();
+    list.sort_by(|a, b| b.size.cmp(&a.size).then_with(|| a.name.cmp(&b.name)));
+    list
 }
 
 /// 读取各文件夹占用，界面打开本标签时调用一次

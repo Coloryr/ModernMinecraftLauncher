@@ -1,9 +1,33 @@
-/* 实例多选工具条（顶部浮动条）：主窗口与资源收藏窗口共用的同一套外观。
+/* 实例多选工具条：主窗口、资源收藏与方块窗口共用的同一套外观。
  *
- * 用法：两边各自的 <style scoped src="..."> 引这一份 —— 同一个文件被两个组件
- * 分别编译，选择器各自带上**自己组件**的 data-v 属性，所以作用域互不干扰，
- * 而规则只维护一处：改这里会同时影响两个窗口，这是有意的。
+ * 用法：各窗口的 <style scoped src="..."> 引这一份 —— 同一个文件被各自编译，
+ * 选择器带的是**自己组件**的 data-v 属性，作用域互不干扰，规则只维护一处。
+ *
+ * 它是内容区最上方的一张浮起卡片：居中、按内容宽度，出现时把下面的内容往下挤，
+ * 不压住第一行。与标题栏的距离由各窗口的 margin-top 调，见各自的 .multi-bar。
  */
+
+.multi-bar {
+  /* 竖直方向不被压缩：内容区再窄，条子也按自己的高度占一行 */
+  flex: none;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--accent-border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-md);
+}
+
+/* 竖分隔线：隔开操作与「退出多选」 */
+.multi-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+}
+
 .multi-btn {
   display: inline-flex;
   align-items: center;

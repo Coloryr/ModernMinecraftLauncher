@@ -6,25 +6,11 @@
   min-height: 0;
 }
 
-/* ----- 多选条：按钮外观走 styles/parts/multi-bar.css，这里只管排布 ----- */
+/* ----- 多选条：外观走 styles/parts/multi-bar.css，这里只管与标题栏的距离 ----- */
 
+/* 内容区上内边距是 22px，条子往上探 12px 就落在标题栏下沿 10px 处 */
 .multi-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--bg-card);
-  border: 1px solid var(--accent-border);
-  border-radius: 14px;
-  box-shadow: var(--shadow-md);
-}
-
-/* 右侧「退出多选」推到最右 */
-.multi-sep {
-  width: 1px;
-  height: 18px;
-  background: var(--border);
-  margin-left: auto;
+  margin-top: -12px;
 }
 
 /* ----- 空状态：占满窗口的白框，两个入口放在里面（与账户窗口的空状态同一套） ----- */

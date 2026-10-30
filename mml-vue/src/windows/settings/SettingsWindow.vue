@@ -20,7 +20,7 @@ import SkinTab from "./parts/tabs/SkinTab.vue";
 import ClientTab from "./parts/tabs/ClientTab.vue";
 import LocalFilesTab from "./parts/tabs/LocalFilesTab.vue";
 import ExperimentalTab from "./parts/tabs/ExperimentalTab.vue";
-import { buildChannel, loadBuildInfo } from "../../lib/buildInfo";
+import { isSourceBuild, loadBuildInfo } from "../../lib/buildInfo";
 import { t } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
 import { KEYS, readString, writeString } from "../../lib/storage";
@@ -110,8 +110,8 @@ function isLockedGroup(id: string): boolean {
   return locked.value && LOCKED_GROUPS.includes(id);
 }
 
-/** 手柄页只给测试版：正式发布与预发布都不显示 */
-const showGamepad = computed(() => buildChannel.value === "debug");
+/** 手柄页只给测试版（源码启动）：正式发布与预发布都不显示 */
+const showGamepad = isSourceBuild;
 
 /** 左侧导航：未锁定，或本次已解锁时才显示「客户端设置」；测试版才有「手柄」 */
 const visibleTabs = computed(() =>

@@ -10,6 +10,7 @@ import { computed, ref } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { stripFormatting } from "../../../lib/formatting";
 import { showToast } from "../../../lib/toast";
+import { isSourceBuild } from "../../../lib/buildInfo";
 import { openWindow } from "../../windowManager";
 import { launchGame } from "../../../lib/launch";
 import {
@@ -484,7 +485,8 @@ function saveTip(item: SaveItemDto): string {
     <!-- 有选中项时顶栏换成批量操作条，与模组列表同一口径。
          这一条与右键的批量菜单**动作一致**，都只有「删除」：批量备份用户不要 -->
     <template #actions>
-      <CloudSavePane :uuid="instanceUuid" :saves="saves" :disabled="busy"
+      <!-- 存档云同步：还没上线，只在源码启动（测试版）时露出来 -->
+      <CloudSavePane v-if="isSourceBuild" :uuid="instanceUuid" :saves="saves" :disabled="busy"
         @busy="busy = $event" @changed="reloadCurrent" />
       <template v-if="count">
         <span class="row-selected-count">{{ t("resource.selectedCount", { n: count }) }}</span>

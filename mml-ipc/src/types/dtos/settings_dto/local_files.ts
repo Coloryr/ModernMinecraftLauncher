@@ -5,5 +5,13 @@ export type LocalFileEntryDto = {
   path: string,
   size: number,
   deletable: boolean,
+  children: LocalFileInstanceDto[],
+};
+
+export type LocalFileInstanceDto = {
+  uuid: string,
+  name: string,
+  path: string,
+  size: number,
 };
 
