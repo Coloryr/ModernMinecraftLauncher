@@ -2,7 +2,6 @@
 // 皮肤预览弹窗：2D 平面图 / 3D 模型（skinview3d）预览当前选中账户，
 // 并列出该账户所有皮肤 / 披风；正版账户可"设为装备"，第三方规范只有单皮肤单披风
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import BaseModal from "../../components/ui/BaseModal.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseSwitch from "../../components/ui/BaseSwitch.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
@@ -78,9 +77,6 @@ const ANIM_FACTORY: Record<Exclude<AnimType, "none">, () => skinview3d.PlayerAni
   hit: () => new skinview3d.HitAnimation(),
   swim: () => new skinview3d.SwimAnimation(),
 };
-
-/** 请求关闭弹窗 */
-const emit = defineEmits<{ close: [] }>();
 
 /** mml-image 协议前缀，空表示还没取到 */
 const base = ref("");
@@ -486,7 +482,7 @@ onBeforeUnmount(destroyViewer);
 </script>
 
 <template>
-  <BaseModal :title="t('account.viewSkin')" :width="780" fixed-height="520px" below-titlebar @close="emit('close')">
+  <div class="skin-page">
     <div class="skin-layout">
       <!-- 预览区：2D / 3D 切换在展示区上方 -->
       <div class="preview">
@@ -606,19 +602,31 @@ onBeforeUnmount(destroyViewer);
         </div>
       </div>
     </div>
-  </BaseModal>
+  </div>
 </template>
 
 <style scoped>
+/* 皮肤子页面：占满窗口内容区，预览与右侧列表各自管理滚动 */
+.skin-page {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
 .skin-layout {
   display: flex;
   gap: 18px;
-  flex-wrap: wrap;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }
 
 .preview {
   flex: 1;
-  min-width: 320px;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* SegmentedTabs（2D / 3D）下方留缝 */
@@ -627,7 +635,8 @@ onBeforeUnmount(destroyViewer);
 }
 
 .preview-stage {
-  height: 380px;
+  flex: 1;
+  min-height: 280px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -715,11 +724,10 @@ onBeforeUnmount(destroyViewer);
   color: var(--text-dim);
 }
 
-/* 滚动只发生在右侧列表面板内部：弹窗体高度已被 fixed-height 锁死，
-   不会再有第二条滚动条；预览区不会跟着滚走 */
+/* 右侧面板自己滚：预览区不会跟着滚走 */
 .skin-side {
-  width: 260px;
-  max-height: 430px;
+  width: 280px;
+  flex: none;
   overflow-y: auto;
   scrollbar-gutter: stable;
   /* 行与滚动条之间留 8px：滚动容器向外借 8px、再用内边距收回 ——

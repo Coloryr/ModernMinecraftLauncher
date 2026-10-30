@@ -15,6 +15,7 @@ import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import AsyncImage from "../../components/ui/AsyncImage.vue";
 import AuthorTag from "../../components/ui/AuthorTag.vue";
 import ProjectDetailPage from "../../components/ProjectDetailPage.vue";
+import ResourceDownloadBar from "../../components/ResourceDownloadBar.vue";
 import { api, getAddResourceSource, setAddResourceSource } from "../../lib/api";
 import { useDownloadBadges } from "../../lib/downloadBadges";
 import { formatCount, t, tErr } from "../../lib/i18n";
@@ -906,6 +907,9 @@ onActivated(async () => {
         </template>
       </div>
 
+      <!-- 下载任务：点下载后就在列表下方逐个项目显示进度，与整合包窗口的下载项目列表同一套渲染 -->
+      <ResourceDownloadBar v-if="resourceStatus && resourceStatus.tasks.length" :status="resourceStatus" />
+
       <!-- 分页 -->
       <div v-if="maxPage > 0" class="res-page">
         <button class="page-btn" :disabled="page === 0 || searching" @click="turnPage(-1)">
@@ -927,7 +931,14 @@ onActivated(async () => {
           <div v-else-if="saves.length === 0" class="empty-tip">{{ t("resource.empty") }}</div>
           <label v-for="save in saves" :key="save.dir" class="save-row" :class="{ on: pickedSave === save.dir }">
             <input v-model="pickedSave" type="radio" name="save-pick" :value="save.dir" />
-            <span class="save-name">{{ save.name }}</span>
+            <svg class="save-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+              stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            </svg>
+            <span class="save-text">
+              <span class="save-name">{{ save.name }}</span>
+              <span class="save-dir">{{ save.dir }}</span>
+            </span>
           </label>
         </div>
         <div class="modal-actions">
@@ -965,7 +976,8 @@ onActivated(async () => {
             {{ t("addResource.depsLoading") }}
           </div>
           <template v-else>
-            <div v-for="dep in deps" :key="dep.pid" class="dep-row" :class="{ off: !dep.fid }">
+            <div v-for="dep in deps" :key="dep.pid" class="dep-row"
+              :class="{ off: !dep.fid, picked: depsPick.has(dep.pid) }">
               <!-- 必选取消不了：勾上且禁用，要跳过前置只能走下面那个「不下载前置」。
                    勾选框挂在整行上（不放进第一行），这样它按整行高度上下居中 -->
               <input :id="`dep-${dep.pid}`" class="dep-check" type="checkbox" :checked="depsPick.has(dep.pid)"
@@ -974,7 +986,7 @@ onActivated(async () => {
               <div class="dep-body">
                 <label class="dep-main" :for="`dep-${dep.pid}`">
                   <AsyncImage v-if="dep.icon" class="dep-icon" :src="dep.icon" alt="" />
-                  <span class="dep-name">{{ dep.name || dep.pid }}</span>
+                  <span v-else class="dep-icon dep-icon-fallback">{{ (dep.name || dep.pid).slice(0, 1).toUpperCase() }}</span>
                   <span class="dep-tag">
                     {{ dep.optional ? t("addResource.depsOptional") : t("addResource.depsRequired") }}
                   </span>

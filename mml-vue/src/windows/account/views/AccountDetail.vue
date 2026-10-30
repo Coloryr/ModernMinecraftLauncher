@@ -85,7 +85,7 @@ function isCurrent(acc: AccountStoreDto): boolean {
                 @refresh-skin="emit('refreshSkin', acc)" @relogin="emit('relogin', acc)" @edit="emit('edit', acc)"
                 @delete="emit('delete', acc)" />
             </td>
-            <td class="cell-name" v-tip="acc.userName">
+            <td class="cell-name">
               <HighlightText :text="acc.userName" :query="query" />
               <span v-if="isCurrent(acc)" class="current-tag">{{ t("account.current") }}</span>
             </td>

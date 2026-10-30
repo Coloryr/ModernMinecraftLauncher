@@ -378,10 +378,16 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
+  padding: 9px 12px;
   border: 1px solid var(--border);
   border-radius: 10px;
+  background: var(--bg-card);
   cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.save-row:hover {
+  border-color: var(--accent-border);
 }
 
 /* 选中态跟全仓一致：强调色描边 + --accent-soft 底，见 styles/parts/instance-check.css */
@@ -390,9 +396,41 @@
   background: var(--accent-soft);
 }
 
+.save-row input[type="radio"] {
+  margin: 0;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+
+.save-icon {
+  flex-shrink: 0;
+  color: var(--text-dim);
+}
+
+/* 名字与存档目录两行：目录只是核对用，长串省略 */
+.save-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .save-name {
   font-size: 13px;
   color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.save-dir {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: "Cascadia Code", Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 前置勾选弹窗：标题与按钮栏都用全局那套，这里只留它自己那段副提示 */
@@ -450,9 +488,21 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 10px;
+  padding: 9px 12px;
   border: 1px solid var(--border);
   border-radius: 10px;
+  background: var(--bg-card);
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.dep-row:hover {
+  border-color: var(--accent-border);
+}
+
+/* 已勾选：强调色描边，与存档选择、实例勾选同一套 */
+.dep-row.picked {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 /* 勾选框：与仓库里其它勾选同一套写法 —— 原生控件 + accent-color 跟主题走
@@ -528,6 +578,17 @@
   border-radius: 8px;
   object-fit: cover;
   flex-shrink: 0;
+}
+
+/* 没有图标的前置用首字母占位，与项目列表的 .pack-icon-fallback 同一套 */
+.dep-icon-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-hover);
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .dep-name {

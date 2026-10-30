@@ -33,22 +33,32 @@ const total = computed(() => collectFileKeys(props.tree).length);
 </script>
 
 <template>
-  <div class="files-head">
-    <span class="files-label">{{ t("add.files") }}</span>
-    <span class="files-note">{{ t("add.filesSelected", { n: checked.size, total }) }}</span>
-    <span class="files-actions">
-      <button type="button" class="files-btn" @click="emit('set-all', true)">{{ t("add.filesAll") }}</button>
-      <button type="button" class="files-btn" @click="emit('set-all', false)">{{ t("add.filesNone") }}</button>
-    </span>
-  </div>
-  <div class="file-list">
-    <FileTree :nodes="tree" :checked="checked" :expanded="expanded" @toggle-file="emit('toggle-file', $event)"
-      @toggle-dir="(n: FileNode, on: boolean) => emit('toggle-dir', n, on)"
-      @toggle-expand="emit('toggle-expand', $event)" @lazy-load="emit('lazy-load', $event)" />
+  <div class="files-panel">
+    <div class="files-head">
+      <span class="files-label">{{ t("add.files") }}</span>
+      <span class="files-note">{{ t("add.filesSelected", { n: checked.size, total }) }}</span>
+      <span class="files-actions">
+        <button type="button" class="files-btn" @click="emit('set-all', true)">{{ t("add.filesAll") }}</button>
+        <button type="button" class="files-btn" @click="emit('set-all', false)">{{ t("add.filesNone") }}</button>
+      </span>
+    </div>
+    <div class="file-list">
+      <FileTree :nodes="tree" :checked="checked" :expanded="expanded" @toggle-file="emit('toggle-file', $event)"
+        @toggle-dir="(n: FileNode, on: boolean) => emit('toggle-dir', n, on)"
+        @toggle-expand="emit('toggle-expand', $event)" @lazy-load="emit('lazy-load', $event)" />
+    </div>
   </div>
 </template>
 
 <style scoped>
+/* 列表撑满卡片剩余高度：窗口多大，文件树就多高 */
+.files-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 .files-head {
   display: flex;
   align-items: center;
@@ -105,7 +115,8 @@ const total = computed(() => collectFileKeys(props.tree).length);
 }
 
 .file-list {
-  max-height: 220px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
   /* 见 styles/scrollbar.css */

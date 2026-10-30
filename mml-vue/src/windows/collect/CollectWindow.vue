@@ -265,8 +265,17 @@ useInstanceChange(() => {
 
 // ---------------- 窗口级键盘 ----------------
 
-/** Esc：先收右键菜单，再逐层关掉打开的弹窗（与其它窗口的逐级关闭一致） */
+/** Esc：先收右键菜单，再逐层关掉打开的弹窗；Ctrl+A 全选当前分组的收藏 */
 function onDocKeyDown(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
+    const el = e.target as HTMLElement | null;
+    if (el?.closest("input, textarea, select, [contenteditable='true']")) return;
+    if (isEmpty.value) return;
+    e.preventDefault();
+    multiSelect.value = true;
+    selectAllVisible();
+    return;
+  }
   if (e.key !== "Escape") return;
   if (groupMenu.value) {
     groupMenu.value = null;
@@ -320,11 +329,13 @@ function enterMultiSelect(item: CollectItemDto) {
   closeMenu();
   multiSelect.value = true;
   toggleCheck(item.uuid, true);
+  anchorUuid = item.uuid;
 }
 
 /** 开关多选模式；退出时清空勾选（卡片上的勾选框也跟着消失） */
 function toggleMultiSelect() {
   multiSelect.value = !multiSelect.value;
+  anchorUuid = null;
   if (!multiSelect.value) {
     checked.value = new Set();
   }
@@ -552,13 +563,35 @@ function openUrl(item: CollectItemDto) {
   }
 }
 
-/** 点卡片 = 按"下载"处理，见 [`startDownload`]；多选模式下改为切换勾选 */
-function toggleCard(item: CollectItemDto) {
-  if (multiSelect.value) {
-    toggleCheck(item.uuid, !checked.value.has(item.uuid));
+/** Shift 连选的锚点：上一次点中的卡片 uuid */
+let anchorUuid: string | null = null;
+
+/**
+ * 点卡片：多选模式下按修饰键勾选，否则按"下载"处理
+ *
+ * - `item`: 被点的收藏项
+ * - `ev`: 点击事件，用来读 Ctrl / Shift
+ */
+function toggleCard(item: CollectItemDto, ev?: MouseEvent) {
+  if (!multiSelect.value) {
+    startDownload(item);
     return;
   }
-  startDownload(item);
+  const list = activeGroup.value === "" ? shownItems.value : itemsOfGroup(activeGroup.value);
+  const index = list.findIndex((each) => each.uuid === item.uuid);
+  const anchor = anchorUuid ? list.findIndex((each) => each.uuid === anchorUuid) : -1;
+  const next = new Set(checked.value);
+  if (ev?.shiftKey && anchor >= 0 && index >= 0) {
+    const from = Math.min(anchor, index);
+    const to = Math.max(anchor, index);
+    for (let i = from; i <= to; i += 1) next.add(list[i].uuid);
+  } else if (next.has(item.uuid)) {
+    next.delete(item.uuid);
+  } else {
+    next.add(item.uuid);
+  }
+  checked.value = next;
+  anchorUuid = item.uuid;
 }
 
 // ---------------- 拖拽改分组 ----------------
@@ -584,7 +617,7 @@ function onCardClick(item: CollectItemDto, ev?: MouseEvent) {
   // 别让这次点击冒到 .collect-body：那里负责"点外面收起菜单"
   ev?.stopPropagation();
   if (consumeSuppressClick()) return;
-  toggleCard(item);
+  toggleCard(item, ev);
 }
 
 /** 补组进行中：避免 reload → 补组 → reload 转圈 */
@@ -843,15 +876,27 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
 
 <template>
   <WindowFrame :title="t('winTitle.collect')" body-fill @close="$emit('close')">
-    <!-- 工具栏整体进标题栏，与账户 / 方块 / 设置三个窗口同一套做法：
-         只放总计数，正文左边是分组栏 -->
-    <template #head-right>
-      <div class="collect-toolbar">
-        <span class="count">{{ t("collect.count", { n: shownCount }) }}</span>
+    <!-- 一个收藏都没有：左栏与搜索全部收起，两个入口放进占满窗口的占位框 -->
+    <div v-if="isEmpty" class="collect-empty-box">
+      <div class="empty-mark">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="m12 2.6 2.9 5.9 6.5.95-4.7 4.58 1.1 6.47L12 17.44 6.2 20.5l1.1-6.47-4.7-4.58 6.5-.95z" />
+        </svg>
       </div>
-    </template>
+      <p class="empty-title">{{ t("collect.emptyTitle") }}</p>
+      <p class="empty-hint">{{ t("collect.empty") }}</p>
+      <div class="collect-empty-actions">
+        <BaseButton variant="primary" @click="openWindow('add_modpack')">
+          {{ t("collect.addModpack") }}
+        </BaseButton>
+        <BaseButton variant="accent" @click="openAddResource">
+          {{ t("collect.addResource") }}
+        </BaseButton>
+      </div>
+    </div>
 
-    <div class="collect-body" @click="closeMenu()">
+    <div v-else class="collect-body" @click="closeMenu()">
       <!-- 多选条：由卡片右键菜单的「多选」进入 -->
       <div v-if="multiSelect" class="multi-bar">
         <span class="multi-count">{{ t("collect.installCount", { count: checked.size }) }}</span>
@@ -880,15 +925,13 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
           @pick="activeGroup = $event" @group-menu="openGroupMenu" @new-group="showAddGroup = true" />
 
         <div class="collect-content">
-          <!-- 搜索：按收藏项名字过滤，分组计数与「共 N 项」都跟着变 -->
-          <SearchBox v-if="!isEmpty" v-model="keyword" :placeholder="t('collect.search')"
+          <!-- 搜索：按收藏项名字过滤，分组计数跟着变 -->
+          <SearchBox v-model="keyword" :placeholder="t('collect.search')"
             :clear-label="t('collect.searchClear')" width="100%" />
 
           <div class="collect-scroll">
-            <!-- 一个收藏都没有：只给一条引导 -->
-            <p v-if="isEmpty" class="empty-tip collect-empty">{{ t("collect.empty") }}</p>
             <!-- 当前分组是空的：搜索没命中与"这一组确实没收藏"分开说 -->
-            <p v-else-if="!activeItems.length" class="empty-tip collect-empty">
+            <p v-if="!activeItems.length" class="empty-tip collect-empty">
               {{ keyword.trim() ? t("collect.searchEmpty") : t("collect.emptyGroup") }}
             </p>
 
@@ -936,15 +979,17 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
               </div>
             </div>
 
-            <!-- 去挑资源收藏：跟在卡片后面，一个收藏都没有时也要能从这里去挑 -->
-            <div class="collect-acts-row">
-              <button class="add-row-btn add-group-row" @click="openWindow('add_modpack')">
-                {{ t("collect.addModpack") }}
-              </button>
-              <button class="add-row-btn add-group-row" @click.stop="openAddResource">
-                {{ t("collect.addResource") }}
-              </button>
             </div>
+          </div>
+
+          <!-- 去挑资源收藏：放在滚动区外面，右边缘与上面的搜索框对齐 -->
+          <div class="collect-acts-row">
+            <button class="add-row-btn add-group-row" @click="openWindow('add_modpack')">
+              {{ t("collect.addModpack") }}
+            </button>
+            <button class="add-row-btn add-group-row" @click.stop="openAddResource">
+              {{ t("collect.addResource") }}
+            </button>
           </div>
 
           <!-- 跟手浮起副本：手里抓着的那一项，跟着指针走 -->

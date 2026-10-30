@@ -69,6 +69,8 @@ pub struct CollectDataDto {
     pub items: Vec<CollectItemDto>,
     /// 分组：分组名 → 收藏项 uuid 列表
     pub groups: HashMap<String, Vec<String>>,
+    /// 分组显示顺序，已补齐未记录顺序的分组（按名字追加在末尾）
+    pub group_order: Vec<String>,
 }
 
 impl From<CollectObj> for CollectDataDto {

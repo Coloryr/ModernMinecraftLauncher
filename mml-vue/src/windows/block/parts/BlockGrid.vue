@@ -47,12 +47,12 @@ const emit = defineEmits<{
   /** 右键某个方块：交给外壳弹收藏 / 分组菜单 */
   (e: "item-menu", payload: { event: MouseEvent; item: BlockItemDto }): void;
   /** 多选模式下点了一个方块：切换它的勾选状态 */
-  (e: "toggle-select", b: BlockItemDto): void;
+  (e: "toggle-select", payload: { item: BlockItemDto; event: MouseEvent }): void;
 }>();
 
 /** 点击格子：多选模式下只切换勾选，否则打开详情 */
-function onCellClick(b: BlockItemDto) {
-  if (props.selectMode) emit("toggle-select", b);
+function onCellClick(b: BlockItemDto, event: MouseEvent) {
+  if (props.selectMode) emit("toggle-select", { item: b, event });
   else emit("open", b);
 }
 
@@ -69,9 +69,9 @@ const OVERSCAN = 2;
  *
  * 由滚动内容自己提供，即加在占位高度上，而不是把滚动区从底部缩进来：
  * 这样滚动条能一直延伸到底边，而"最后一行下面有空档"只在滚到最下面时出现。
- * 数值等于窗口内容区原本的下内边距 22px，观感与之前一致。
+ * 比原来的 22px 多留一截，给右下角的尺寸滑杆让位，最后一行不会被它压住。
  */
-const BOTTOM_SPACE = 22;
+const BOTTOM_SPACE = 64;
 
 // ---------- 度量 ----------
 
@@ -280,10 +280,10 @@ function onCellKey(e: KeyboardEvent, i: number) {
         <button v-for="(b, k) in visible" :key="b.id" type="button" class="block-cell"
           :class="{ on: b.id === activeId, 'multi-checked': selectMode && isSelected?.(b.id) }"
           :data-idx="startIndex + k" :tabindex="startIndex + k === tabbableIndex ? 0 : -1"
-          @click="onCellClick(b)" @focus="focusIndex = startIndex + k"
+          @click="onCellClick(b, $event)" @focus="focusIndex = startIndex + k"
           @keydown="onCellKey($event, startIndex + k)" @contextmenu.prevent="onCellMenu($event, b)">
-          <!-- 多选模式：每格右上角一枚勾选圈，选定后填充强调色 -->
-          <span v-if="selectMode" class="row-check" :class="{ on: isSelected?.(b.id) }">
+          <!-- 多选模式：每格左上角一枚方形勾选圈，与资源收藏卡片的勾选框同一套 -->
+          <span v-if="selectMode" class="cell-check" :class="{ on: isSelected?.(b.id) }">
             <GlyphIcon v-if="isSelected?.(b.id)" name="check" :size="11" :weight="3" />
           </span>
           <!-- 收藏：未收藏只在悬停 / 键盘聚焦时露出星框，收藏后常显实心星；多选时让位给勾选圈 -->
@@ -314,9 +314,32 @@ function onCellKey(e: KeyboardEvent, i: number) {
   </div>
 </template>
 
-<style scoped src="../../../styles/parts/instance-check.css"></style>
-
 <style scoped>
+/* 多选勾选框：外观照资源收藏卡片的 .card-check，方形 15px，选中填充强调色 */
+.cell-check {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-card);
+  color: transparent;
+  pointer-events: none;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.cell-check.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 .grid-scroll {
   flex: 1;
   min-width: 0;

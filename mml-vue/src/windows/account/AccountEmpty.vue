@@ -44,13 +44,13 @@ const emit = defineEmits<{
 
 <style scoped>
 .acc-empty {
-  grid-column: 1 / -1;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 320px;
   padding: 32px 24px;
   border: 1px dashed var(--accent-border);
   border-radius: 12px;

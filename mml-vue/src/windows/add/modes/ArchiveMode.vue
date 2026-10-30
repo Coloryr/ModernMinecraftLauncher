@@ -75,15 +75,16 @@ watch(
     :label="t('add.archiveReading')" />
 
   <template v-if="tree.length">
-    <FileTreePanel :tree="tree" :checked="checked" :expanded="expanded" @toggle-file="emit('toggle-file', $event)"
-      @toggle-dir="(n: FileNode, on: boolean) => emit('toggle-dir', n, on)"
-      @toggle-expand="emit('toggle-expand', $event)" @set-all="emit('set-all', $event)" />
-
+    <!-- 压缩包类型决定按普通包还是整合包安装，放到文件列表上面 -->
     <label class="field-label">{{ t("add.packType") }}</label>
-    <select :value="packType" class="field-select"
+    <select :value="packType" class="field-select pack-type"
       @change="emit('update:packType', ($event.target as HTMLSelectElement).value)">
       <option v-for="p in packTypes" :key="p" :value="p">{{ t(`add.pack.${p}`) }}</option>
     </select>
+
+    <FileTreePanel :tree="tree" :checked="checked" :expanded="expanded" @toggle-file="emit('toggle-file', $event)"
+      @toggle-dir="(n: FileNode, on: boolean) => emit('toggle-dir', n, on)"
+      @toggle-expand="emit('toggle-expand', $event)" @set-all="emit('set-all', $event)" />
   </template>
   <!-- 还没选包时的空状态：说明这一步之后会发生什么 -->
   <p v-else class="field-hint">{{ t("add.archiveHint") }}</p>
@@ -95,10 +96,12 @@ watch(
   margin-top: 0;
 }
 
-/* 这个「整合包类型」下拉在卡片最底部，下方常常没空间：默认的"优先向下、
-   放不下才翻转"在这里没兜住（底下就是窗口边），弹层会被切掉。
-   改成按可用空间挑方向（most-block-size），空间在下面就往下、在上面就往上。
-   只作用于本页这一个下拉，controls.css 里那条全局的偏好不动 */
+/* 压缩包类型下拉与下方文件列表留一点间距 */
+.pack-type {
+  margin-bottom: 8px;
+}
+
+/* 这个「整合包类型」下拉在卡片顶部，弹层按可用空间挑方向 */
 select.field-select::picker(select) {
   position-try-order: most-block-size;
 }

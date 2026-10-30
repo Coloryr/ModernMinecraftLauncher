@@ -63,6 +63,9 @@ pub struct CollectObj {
     /// 收藏分组列表
     #[serde(rename = "Groups")]
     pub groups: HashMap<String, HashSet<String>>,
+    /// 分组显示顺序；只存分组名，缺失的由 DTO 追加到末尾
+    #[serde(rename = "Order")]
+    pub order: Vec<String>,
 }
 
 /// 收藏文件路径，init 时设置
@@ -108,6 +111,17 @@ pub fn load() -> CoreResult<()> {
     for group in obj.groups.values_mut() {
         group.retain(|key1| obj.items.contains_key(key1));
     }
+
+    // 顺序表跟上分组表：删掉的分组不再占位，新分组（含旧文件里的）追加到末尾
+    obj.order.retain(|name| obj.groups.contains_key(name));
+    let mut missing: Vec<String> = obj
+        .groups
+        .keys()
+        .filter(|name| !obj.order.contains(name))
+        .cloned()
+        .collect();
+    missing.sort();
+    obj.order.extend(missing);
 
     *COLLECT.write().unwrap() = obj;
 
@@ -247,6 +261,7 @@ pub fn add_group(name: &str) {
         }
 
         collect.groups.insert(name.to_string(), Default::default());
+        collect.order.push(name.to_string());
     }
 
     save();
@@ -259,6 +274,22 @@ pub fn remove_group(name: &str) {
     {
         let mut collect = COLLECT.write().unwrap();
         collect.groups.remove(name);
+        collect.order.retain(|each| each != name);
+    }
+
+    save();
+}
+
+/// 保存分组显示顺序
+///
+/// - `order`: 新的完整顺序，只留仍然存在的分组
+pub fn set_group_order(order: Vec<String>) {
+    {
+        let mut collect = COLLECT.write().unwrap();
+        collect.order = order
+            .into_iter()
+            .filter(|name| collect.groups.contains_key(name))
+            .collect();
     }
 
     save();

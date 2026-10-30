@@ -29,6 +29,7 @@ import {
   removeAccount,
   refreshAccountToken,
   setCurrentAccount,
+  typeLabelKey,
 } from "../../lib/accountStore";
 import { onClientConfigChange } from "../../lib/api";
 import type { AccountStoreDto, ClientConfigDto } from "../../lib/bindings";
@@ -38,9 +39,9 @@ import { commands } from "../../lib/bindings";
 import type { AccountOAuthDto, AccountOAuthStateDto } from "../../lib/bindings";
 import { loadGuiConfig, type LoginLockItem } from "../../lib/guiConfig";
 import { bumpImageVersion, hasNoSkin, resetImageState } from "../../lib/accountImages";
-// 皮肤预览弹窗按需加载：它静态引入 skinview3d，含 three.js 整块 ~560 kB。
+// 皮肤预览子页面按需加载：它静态引入 skinview3d，含 three.js 整块 ~560 kB。
 // 账户窗口打开时绝大多数操作是看列表 / 切账户，不该为此先付掉这个体积。
-const SkinModal = defineAsyncComponent(() => import("./SkinModal.vue"));
+const SkinPage = defineAsyncComponent(() => import("./SkinPage.vue"));
 
 // 必须显式声明 close：不声明的话 Vue 会把父级的 @close 当 attrs 透传到根组件（WindowFrame），
 // 与模板里的 @close="$emit('close')" 合并成两个处理器 —— 一次"返回"会调两遍 closeWindow()，
@@ -48,8 +49,11 @@ const SkinModal = defineAsyncComponent(() => import("./SkinModal.vue"));
 /** 请求关闭本窗口 */
 defineEmits<{ (e: "close"): void }>();
 
-/** 皮肤预览弹窗是否打开 */
+/** 皮肤预览子页面是否打开 */
 const showSkin = ref(false);
+
+/** 登录失败弹窗：微软账户给「重新登录」，其余类型带回添加表单重填 */
+const loginError = ref<{ message: string; microsoft: boolean } | null>(null);
 
 // 系统窗口标题由 WindowFrame 统一同步，即 watch title → window_set_title；
 // 这里不再手动调 JS API setTitle，那需要 capabilities 未放行的 set-title 权限
@@ -98,7 +102,10 @@ onMounted(() => {
       } else if (s.state === "fail") {
         showOauth.value = false;
         showOauthRun.value = false;
-        showToast(s.message || t("account.oauthFail"));
+        loginError.value = {
+          message: tErr(s.message || "account.oauthFail"),
+          microsoft: true,
+        };
       } else {
         oauthState.value = t(`account.oauthState.${s.state}`);
         // 授权码弹窗还开着（用户尚未点「打开浏览器」）时不抢焦点，只静默更新文案
@@ -417,10 +424,26 @@ async function confirmAdd() {
       showToast(t("account.added"));
     }
   } catch (e) {
-    showToast(String(e));
+    const microsoft = addType.value === "microsoft";
+    showAdd.value = false;
+    loginError.value = { message: tErr(e), microsoft };
   } finally {
     adding.value = false;
   }
+}
+
+/** 微软登录失败后重试：错误弹窗收起，重新走设备码流程 */
+function retryMicrosoftLogin() {
+  loginError.value = null;
+  loginMicrosoft().catch((e) => {
+    loginError.value = { message: tErr(e), microsoft: true };
+  });
+}
+
+/** 非微软账户登录失败：带回已填内容重新打开添加弹窗 */
+function reopenAddForm() {
+  loginError.value = null;
+  showAdd.value = true;
 }
 
 // 微软授权弹窗：打开浏览器并切换到进度窗口
@@ -494,11 +517,18 @@ const accountMenuItems = computed<RowMenuItem[]>(() => {
   const acc = accountMenu.value?.acc;
   if (!acc) return [];
   const items: RowMenuItem[] = [];
-  if (!hasNoSkin(acc)) {
-    items.push({ id: "viewSkin", label: t("account.viewSkin") });
-    items.push({ id: "refreshSkin", label: t("account.refreshSkin") });
-  }
-  if (acc.canRefresh) items.push({ id: "refresh", label: t("account.refresh") });
+  // 查看皮肤需要有皮肤；刷新皮肤只有在线账户能重拉
+  items.push({ id: "viewSkin", label: t("account.viewSkin"), disabled: hasNoSkin(acc) });
+  items.push({
+    id: "refreshSkin",
+    label: t("account.refreshSkin"),
+    disabled: acc.authType === "offline",
+  });
+  items.push({
+    id: "refresh",
+    label: t("account.refreshAuth"),
+    disabled: !acc.canRefresh,
+  });
   if (acc.canRelogin) items.push({ id: "relogin", label: t("account.relogin") });
   if (acc.canEdit) items.push({ id: "edit", label: t("account.editOffline") });
   items.push({ id: "delete", label: t("account.delete"), danger: true, separated: true });
@@ -553,7 +583,9 @@ function viewSkin(acc: AccountStoreDto) {
 /** 重新登录：微软账户直接走设备码流程；其余类型弹窗重输密码重新认证 */
 function relogin(acc: AccountStoreDto) {
   if (acc.authType === "microsoft") {
-    loginMicrosoft().catch((e) => showToast(String(e)));
+    loginMicrosoft().catch((e) => {
+      loginError.value = { message: tErr(e), microsoft: true };
+    });
     return;
   }
   reloginTarget.value = acc;
@@ -585,7 +617,18 @@ async function confirmRelogin() {
     reloginTarget.value = null;
     showToast(t("account.reloginOk"));
   } catch (e) {
-    showToast(String(e));
+    // 非微软账户重新登录失败：把这一条的类型 / 用户名 / 密码 / 服务器带回添加弹窗
+    addType.value = acc.authType;
+    addFields.value = { name: reloginFields.value.name, pass: reloginFields.value.pass };
+    if (acc.server) {
+      if (acc.authType === "nide8") addFields.value.serverId = acc.server;
+      else addFields.value.server = acc.server;
+    }
+    selectedLockServer.value =
+      lockServerEntries.value.find((item) => item.server === acc.server)?.server ?? "";
+    addInvalid.value = [];
+    reloginTarget.value = null;
+    loginError.value = { message: tErr(e), microsoft: false };
   } finally {
     relogining.value = false;
   }
@@ -671,12 +714,15 @@ function tokenLabel(acc: AccountStoreDto): string {
 </script>
 
 <template>
-  <WindowFrame :title="t('account.manage')" :body-fill="view === 'detail'" body-gutter @close="$emit('close')">
+  <WindowFrame :title="showSkin ? t('account.viewSkin') : t('account.manage')"
+    :body-fill="view === 'detail' || showSkin || filtered.length === 0" body-gutter
+    :back="showSkin ? t('winCommon.back') : undefined" @back="showSkin = false" @close="$emit('close')">
     <!-- 工具栏：类型筛选 + 搜索 + 视图切换 + 添加账户。高度必须压在 --titlebar-h 内，
          否则会撑高整条顶栏；「查看皮肤」是针对单个账户的动作，留在各条目的按钮里 -->
     <template #head-right>
-      <!-- 空库时整排收起：筛选与视图切换都无从谈起，加号交给空状态 -->
-      <template v-if="hasAccounts">
+      <!-- 空库时整排收起：筛选与视图切换都无从谈起，加号交给空状态；
+           皮肤子页面占满窗口时同样收起 -->
+      <template v-if="hasAccounts && !showSkin">
         <!-- 观感（不透明底 / 主题描边 / 共享箭头 / 页内弹层）全部来自 .field-select，
              这里只覆盖标题栏要的尺寸 -->
         <select v-model="typeFilter" class="field-select head-select">
@@ -696,12 +742,14 @@ function tokenLabel(acc: AccountStoreDto): string {
       </template>
     </template>
 
-    <!-- 视图：平铺 / 列表 / 详情（见 views/ 目录）；详情模式下视图区自己管理滚动 -->
-    <div class="view-area" :class="{ fill: view === 'detail' }">
-      <AccountGrid v-if="view === 'grid'" :accounts="filtered" :filtering="filtering"
+    <!-- 视图：平铺 / 列表 / 详情 / 皮肤子页面（见 views/ 目录）；详情与皮肤子页面由自己管理滚动 -->
+    <div class="view-area" :class="{ fill: view === 'detail' || showSkin || filtered.length === 0 }">
+      <SkinPage v-if="showSkin" :account="skinTarget" />
+      <AccountGrid v-else-if="view === 'grid'" :accounts="filtered" :filtering="filtering"
         :current-uuid="currentAccount?.uuid ?? ''" :query="searchText" @menu="openAccountMenu"
-        @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin" @refresh-skin="refreshSkin"
-        @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" @add="openAdd" />
+        :token-label="tokenLabel" @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin"
+        @refresh-skin="refreshSkin" @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event"
+        @add="openAdd" />
       <AccountList v-else-if="view === 'list'" :accounts="filtered" :filtering="filtering"
         :current-uuid="currentAccount?.uuid ?? ''" :query="searchText" @menu="openAccountMenu"
         :token-label="tokenLabel" @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin"
@@ -795,10 +843,13 @@ function tokenLabel(acc: AccountStoreDto): string {
       </div>
     </BaseModal>
 
-    <!-- 删除确认 -->
+    <!-- 删除确认：账户名与类型一行，UUID 单独一行，方便核对删的是哪一个 -->
     <BaseModal v-if="deleteTarget" :title="t('account.delete')" :closable="false" below-titlebar
       @close="deleteTarget = null">
-      <p class="delete-tip">{{ t("account.deleteConfirm", { name: deleteTarget.userName }) }}</p>
+      <div class="delete-tip">
+        <span class="delete-name">{{ deleteTarget.userName }} - {{ t(typeLabelKey(deleteTarget.authType)) }}</span>
+        <span class="delete-uuid">{{ deleteTarget.uuid }}</span>
+      </div>
       <div class="modal-actions">
         <BaseButton @click="deleteTarget = null">{{ t("add.cancel") }}</BaseButton>
         <BaseButton variant="danger" @click="confirmDelete">{{ t("actions.confirm") }}</BaseButton>
@@ -849,9 +900,18 @@ function tokenLabel(acc: AccountStoreDto): string {
       </div>
     </BaseModal>
 
-    <!-- 皮肤 / 披风预览弹窗（2D / 3D 预览 + 纹理列表 + 正版装备）。
-         目标账户由点开它的那一条决定，不是"当前使用"的账户 -->
-    <SkinModal v-if="showSkin" :account="skinTarget" @close="showSkin = false" />
+    <!-- 登录失败：微软给「重新登录」，其余类型带回已填内容重开添加表单 -->
+    <BaseModal v-if="loginError" :title="t('account.loginFailTitle')" :closable="false" below-titlebar
+      @close="loginError = null">
+      <p class="error-text">{{ loginError.message }}</p>
+      <div class="modal-actions">
+        <BaseButton @click="loginError = null">{{ t("add.cancel") }}</BaseButton>
+        <BaseButton v-if="loginError.microsoft" variant="primary" @click="retryMicrosoftLogin">
+          {{ t("account.relogin") }}
+        </BaseButton>
+        <BaseButton v-else variant="primary" @click="reopenAddForm">{{ t("account.refill") }}</BaseButton>
+      </div>
+    </BaseModal>
 
     <!-- 右键账户：查看皮肤 / 刷新 / 重新登录 / 编辑 / 删除 -->
     <RowMenu v-if="accountMenu" :x="accountMenu.x" :y="accountMenu.y" :items="accountMenuItems"
@@ -863,13 +923,34 @@ function tokenLabel(acc: AccountStoreDto): string {
 </template>
 
 <style scoped>
-/* 详情模式下视图区占满剩余高度，滚动交给表格容器 */
+/* 详情 / 皮肤子页面 / 空状态时视图区占满剩余高度，滚动交给内部容器 */
 .view-area.fill {
   flex: 1;
   min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+/* 删除确认：名字与类型一行，UUID 换行，长串都允许折行 */
+.delete-tip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 16px;
+}
+
+.delete-name {
+  font-size: 14px;
+  font-weight: 700;
+  word-break: break-all;
+}
+
+.delete-uuid {
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  word-break: break-all;
 }
 
 /* UUID 输入 + 随机按钮 */

@@ -4,9 +4,11 @@
 // 顶部进度条显示任务数与详情，见 ModpackInstallBar。
 import { onMounted, ref } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
+import BaseButton from "../../components/ui/BaseButton.vue";
 import { api } from "../../lib/api";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
+import { openWindow } from "../windowManager";
 import { useModpackStatus } from "../../lib/modpackTasks";
 import { useUnlisteners } from "../../composables/useUnlisteners";
 import type { GroupDto } from "../../lib/bindings";
@@ -65,6 +67,18 @@ onMounted(async () => {
        所以不传 hide-modpack-indicator，内容区也不内嵌进度卡片 -->
   <WindowFrame :title="t('winTitle.addModpack')" :back="detailOpen ? t('modpack.back') : ''" body-gutter
     @back="modeRef?.closeDetail()" @close="$emit('close')">
+    <!-- 标题栏常驻下载窗口入口：装整合包时想看整体下载队列，不必等指示器冒出来 -->
+    <template #head-right>
+      <BaseButton variant="ghost" class="icon-btn-head" v-tip="t('features.download')"
+        :aria-label="t('features.download')" @click="openWindow('download')">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3v12" />
+          <path d="m7 12 5 5 5-5" />
+          <path d="M4 21h16" />
+        </svg>
+      </BaseButton>
+    </template>
     <div class="modpack-body">
       <ModpackMode ref="modeRef" :group="group" :groups="groups" :status="modpackStatus" @update:group="group = $event"
         @install="install" @detail="detailOpen = $event" />

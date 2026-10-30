@@ -30,9 +30,11 @@ const props = defineProps<{
   currentUuid: string;
   /** 搜索词，用来给命中的名字加底色 */
   query: string;
+  /** 把账户的令牌状态翻成文案，右上角有效性提示用 */
+  tokenLabel: (acc: AccountStoreDto) => string;
 }>();
 
-// 皮肤显示模式是否为 3D：仰视 / 俯视 / 旋转都用等距全身图，槽位与悬浮样式一致
+// 皮肤显示模式是否为 3D：仰视 / 俯视 / 旋转都用等距全身图，槽位尺寸一致
 const isSkin3D = computed(
   () =>
     skinDisplay.value === "Skin3D" ||
@@ -67,6 +69,12 @@ const emit = defineEmits<{
 /** 是否当前使用的账户 */
 function isCurrent(acc: AccountStoreDto): boolean {
   return acc.uuid === props.currentUuid;
+}
+
+/** 点皮肤 / 披风图：先收起跟随鼠标的大图，再打开该账户的皮肤子页面 */
+function openSkin(acc: AccountStoreDto) {
+  hidePreview();
+  emit("viewSkin", acc);
 }
 
 // 悬停图片浮动显示对应大图：头像取头部渲染，皮肤取全身图，披风取正面 + 背面两张并排
@@ -111,22 +119,18 @@ function movePreview(e: MouseEvent) {
 function hidePreview() {
   preview.value = null;
 }
-
-/** 点皮肤 / 披风图：先收起跟随鼠标的大图，再打开该账户的皮肤弹窗 */
-function openSkin(acc: AccountStoreDto) {
-  hidePreview();
-  emit("viewSkin", acc);
-}
 </script>
 
 <template>
-  <div class="acc-grid">
+  <div class="acc-grid" :class="{ empty: accounts.length === 0 }">
     <div v-for="acc in accounts" :key="acc.uuid" class="acc-card" :class="{ current: isCurrent(acc) }"
       @dblclick="!accountLocked && emit('switch', acc)"
       @contextmenu.prevent="emit('menu', { event: $event, acc })">
       <div class="acc-images"
         :class="{ empty: imageFailed(acc, 'avatar') && imageFailed(acc, 'skin') && imageFailed(acc, 'cape') }">
         <span v-if="isCurrent(acc)" class="current-badge">{{ t("account.current") }}</span>
+        <!-- 平铺卡片看不到详情表格里的 Token 列，右上角直接标出这一条是否有效 -->
+        <span class="validity-badge" :class="acc.tokenStatus">{{ tokenLabel(acc) }}</span>
         <!-- 加载中：图上叠转圈，onload 后消失（img 先渲染，加载完才能触发事件） -->
         <div v-if="!imageFailed(acc, 'avatar')" class="img-box img-avatar-box">
           <img :src="accountAvatarUrl(acc)" class="img-avatar"
@@ -211,6 +215,14 @@ function openSkin(acc: AccountStoreDto) {
   gap: 16px;
 }
 
+/* 空状态：去掉网格，让占位框吃满视图区剩余高度 */
+.acc-grid.empty {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 .acc-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -247,6 +259,27 @@ function openSkin(acc: AccountStoreDto) {
   background: var(--accent);
   color: #fff;
   white-space: nowrap;
+}
+
+/* 右上角有效性：有效 / 已过期，与列表的 token 标记同一套配色 */
+.validity-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 10.5px;
+  padding: 2px 9px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.validity-badge.valid {
+  background: color-mix(in srgb, var(--green) 16%, transparent);
+  color: var(--green);
+}
+
+.validity-badge.expired {
+  background: color-mix(in srgb, var(--red) 16%, transparent);
+  color: var(--red);
 }
 
 /* 图片槽容器：相对定位，加载中时上面叠转圈 */
@@ -397,7 +430,7 @@ function openSkin(acc: AccountStoreDto) {
 /* 悬停图片时的大图：Teleport 到 body，跟随鼠标，按图片类型取不同尺寸 */
 .skin-float {
   position: fixed;
-  z-index: 999;
+  z-index: 300;
   pointer-events: none;
   padding: 8px;
   background: var(--bg-card);

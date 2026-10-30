@@ -7,7 +7,7 @@
 
 export { default as WinAccountAccountEmpty } from "../windows/account/AccountEmpty.vue";
 export { default as AccountWindow } from "../windows/account/AccountWindow.vue";
-export { default as WinAccountSkinModal } from "../windows/account/SkinModal.vue";
+export { default as WinAccountSkinPage } from "../windows/account/SkinPage.vue";
 export { default as WinAccountViewsAccountDetail } from "../windows/account/views/AccountDetail.vue";
 export { default as WinAccountViewsAccountGrid } from "../windows/account/views/AccountGrid.vue";
 export { default as WinAccountViewsAccountList } from "../windows/account/views/AccountList.vue";
@@ -28,7 +28,6 @@ export { default as WinBlockBlockPanel } from "../windows/block/BlockPanel.vue";
 export { default as BlockWindow } from "../windows/block/BlockWindow.vue";
 export { default as WinBlockPartsBlockDetailModal } from "../windows/block/parts/BlockDetailModal.vue";
 export { default as WinBlockPartsBlockGrid } from "../windows/block/parts/BlockGrid.vue";
-export { default as WinBlockPartsBlockToolbar } from "../windows/block/parts/BlockToolbar.vue";
 export { default as WinBlockPartsInstancePickModal } from "../windows/block/parts/InstancePickModal.vue";
 export { default as WinBlockPartsSkinAddModal } from "../windows/block/parts/SkinAddModal.vue";
 export { default as CollectWindow } from "../windows/collect/CollectWindow.vue";

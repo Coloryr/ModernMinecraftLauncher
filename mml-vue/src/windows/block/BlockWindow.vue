@@ -3,13 +3,10 @@
 // 当前实例从 gui_config 的选中实例恢复（与主窗口共享同一份配置）
 // 渲染进行中后端拒绝关闭，即 close-blocked 事件；这里弹二次确认，中断渲染再关
 //
-// 工具条放在标题栏的 head-right 槽里，含搜索 / 图标尺寸档 / 添加玩家头颅 / 重新渲染：
-// 所以状态在这一层创建，面板与工具条共用同一份；BlockPanel 只接收它做排版。
+// 搜索、尺寸滑杆、添加玩家头颅都在内容区，标题栏只留标题与窗口按钮。
 import { onMounted, onUnmounted, ref } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BlockPanel from "./BlockPanel.vue";
-import BlockToolbar from "./parts/BlockToolbar.vue";
-import SkinAddModal from "./parts/SkinAddModal.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
@@ -34,41 +31,16 @@ const list = useBlockList({
   isCustomGroup: groups.isCustomGroup,
   isFavorite: groups.isFavorite,
 });
-const { rendered, keyword, size, running, startRender, addSkin } = list;
-
 /** 主窗口当前选中的实例；设图标时高亮它 */
 const currentInstance = ref<InstanceInfoDto | null>(null);
 /** close-blocked 事件的取消订阅 */
 let unlisten: (() => void) | null = null;
 
-/** 多选模式：标题栏工具条按钮切换，勾选与设置分组在 BlockPanel 里 */
+/** 多选模式：方块右键菜单的「多选」进入，勾选与设置分组在 BlockPanel 里 */
 const multiSelect = ref(false);
 
 /** 关闭被渲染拦下时的二次确认框 */
 const confirmClose = ref(false);
-
-// ---------- 添加玩家头颅：入口在标题栏工具条上，所以弹窗跟着放这一层 ----------
-
-/** 添加玩家头颅弹窗是否开着 */
-const skinOpen = ref(false);
-/** 提交中：禁用按钮防连点 */
-const skinBusy = ref(false);
-
-/**
- * 提交要添加的用户名或 UUID
- *
- * - `input`: 弹窗里输入的内容，交给 useBlockList 的 addSkin 校验与落盘
- */
-async function onSkinSubmit(input: string) {
-  if (skinBusy.value) return;
-  skinBusy.value = true;
-  try {
-    // 成功才关弹窗：失败时提示已弹，输入内容留着让用户改
-    if (await addSkin(input)) skinOpen.value = false;
-  } finally {
-    skinBusy.value = false;
-  }
-}
 
 onMounted(async () => {
   await syncInstance();
@@ -111,19 +83,8 @@ async function confirmCloseRender() {
 
 <template>
   <WindowFrame body-fill :title="t('home.blocks')" @close="emit('close')">
-    <!-- 工具条放进标题栏：不占内容区高度，也不随内容滚动；未渲染时整条不出现 -->
-    <template #head-right>
-      <BlockToolbar v-if="rendered" :keyword="keyword" :size="size" :running="running"
-        :multi-select="multiSelect" @update:keyword="keyword = $event" @update:size="size = $event"
-        @add-skin="skinOpen = true" @re-render="startRender(true)"
-        @toggle-multi="multiSelect = !multiSelect" />
-    </template>
-
     <BlockPanel :settings="list" :groups="groups" :current-instance="currentInstance"
       :multi-select="multiSelect" @update:multi-select="multiSelect = $event" />
-
-    <!-- 添加玩家头颅（用户名或 UUID） -->
-    <SkinAddModal v-if="skinOpen" :busy="skinBusy" @submit="onSkinSubmit" @close="skinOpen = false" />
 
     <!-- 渲染中关窗：确认后中断渲染再关 -->
     <BaseModal v-if="confirmClose" :title="t('blocks.closeRenderTitle')" :closable="false"

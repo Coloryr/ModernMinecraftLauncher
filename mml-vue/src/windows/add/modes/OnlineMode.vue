@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 添加实例 · 模式四：在线实例（下载地址）
-import { nextTick, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { t } from "../../../lib/i18n";
 import { isArchiveUrl, serverPackUrl } from "../../../lib/onlineInstance";
 import type { ServerPackProbeDto } from "../../../lib/bindings";
@@ -27,6 +27,9 @@ const emit = defineEmits<{
 
 const urlInput = ref<HTMLInputElement | null>(null);
 
+/** 填的是整合包压缩包地址：在线实例不收，提示去「导入压缩包」 */
+const archiveUrl = computed(() => isArchiveUrl(props.url));
+
 // 必填校验失败：聚焦地址框，高亮见模板的 is-invalid
 watch(
   () => props.invalid,
@@ -37,9 +40,10 @@ watch(
   },
 );
 
-/** 失焦时补齐清单文件名：在线实例认 server.json；压缩包地址原样留着 */
+/** 失焦时补齐清单文件名：在线实例认 server.json；压缩包地址原样留着交给上面的校验拦 */
 function fillManifest() {
-  const next = isArchiveUrl(props.url) ? props.url.trim() : serverPackUrl(props.url);
+  if (archiveUrl.value) return;
+  const next = serverPackUrl(props.url);
   if (next && next !== props.url) emit("update:url", next);
 }
 </script>
@@ -53,7 +57,9 @@ function fillManifest() {
   <!-- 校验失败的原因贴在框下面，别让它落到底部按钮上方去找 -->
   <p v-if="error" class="error-text" role="alert">{{ error }}</p>
 
-  <p class="field-hint">{{ t("add.urlHint") }}</p>
+  <p v-else-if="archiveUrl" class="error-text" role="alert">{{ t("add.urlArchiveNotAllowed") }}</p>
+
+  <p v-else class="field-hint">{{ t("add.urlHint") }}</p>
 
   <!-- 填完地址自动读一次清单：先让人看清会装成什么，再决定要不要下载 -->
   <p v-if="probing" class="probe-tip">{{ t("add.probeReading") }}</p>

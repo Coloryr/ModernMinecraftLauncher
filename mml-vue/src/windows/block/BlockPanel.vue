@@ -4,13 +4,17 @@
 //
 // 状态在 BlockWindow：工具条在标题栏，两边要共用同一份状态，这里只做排版与局部交互；
 // 数据、事件订阅与操作在 composables/useBlockList，局部 UI 在 parts/。
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { t } from "../../lib/i18n";
+import { showToast } from "../../lib/toast";
 import { SKIN_CAT } from "./types";
+import { BLOCK_SIZE_ORDER, type BlockSize } from "./types";
 import CategoryRail from "../../components/CategoryRail.vue";
 import BlockGrid from "./parts/BlockGrid.vue";
 import BlockDetailModal from "./parts/BlockDetailModal.vue";
 import InstancePickModal from "./parts/InstancePickModal.vue";
+import SkinAddModal from "./parts/SkinAddModal.vue";
+import SearchBox from "../../components/ui/SearchBox.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import type { BlockItemDto, InstanceInfoDto } from "../../lib/bindings";
@@ -57,6 +61,7 @@ const {
   closeDetail,
   removeSkin,
   setIcon,
+  addSkin,
 } = props.settings;
 
 const {
@@ -243,20 +248,50 @@ function onGroupPickChange(uuid: string) {
 /** 多选模式里勾选的方块 id */
 const selectedIds = ref<Set<string>>(new Set());
 
+/** Shift 连选的锚点：上一次点中的下标 */
+let anchorIndex: number | null = null;
+
 // 退出多选时清空勾选，免得下次进来还留着上一次的选择
 watch(
   () => props.multiSelect,
   (on) => {
-    if (!on) selectedIds.value = new Set();
+    if (!on) {
+      selectedIds.value = new Set();
+      anchorIndex = null;
+    }
   },
 );
 
-/** 多选模式下点方块：切换勾选 */
-function toggleSelect(b: BlockItemDto) {
+/**
+ * 多选模式下点方块：普通点击切换，Ctrl 点单独切换，Shift 点从锚点连选
+ *
+ * - `b`: 被点的方块
+ * - `event`: 点击事件，用来读 Ctrl / Shift
+ */
+function toggleSelect(b: BlockItemDto, event?: MouseEvent) {
+  const list = filtered.value;
+  const index = list.findIndex((item) => item.id === b.id);
   const next = new Set(selectedIds.value);
-  if (next.has(b.id)) next.delete(b.id);
-  else next.add(b.id);
+  if (event?.shiftKey && anchorIndex !== null && anchorIndex >= 0 && index >= 0) {
+    const from = Math.min(anchorIndex, index);
+    const to = Math.max(anchorIndex, index);
+    for (let i = from; i <= to; i += 1) next.add(list[i].id);
+  } else if (next.has(b.id)) {
+    next.delete(b.id);
+  } else {
+    next.add(b.id);
+  }
   selectedIds.value = next;
+  anchorIndex = index;
+}
+
+/** 全选当前筛选结果；与收藏窗口一样取并集，不清掉别的分类里已勾的 */
+function selectAllVisible() {
+  const next = new Set(selectedIds.value);
+  for (const item of filtered.value) next.add(item.id);
+  selectedIds.value = next;
+  // 只有一块内容时也提示一句，否则看不出 Ctrl+A 生效了
+  showToast(t("multi.selectAllDone", { count: next.size }));
 }
 
 /** 多选条上的「设置分组」：把勾选的方块一起交给分组弹窗 */
@@ -267,6 +302,63 @@ function openMultiGroup() {
 /** 退出多选 */
 function exitMultiSelect() {
   emit("update:multi-select", false);
+}
+
+/** 方块右键菜单的「多选」：进入多选并把这一项勾上 */
+function enterMultiSelectFromMenu() {
+  const menu = blockMenu.value;
+  if (!menu) return;
+  blockMenu.value = null;
+  emit("update:multi-select", true);
+  toggleSelect(menu.item);
+}
+
+/** Ctrl+A / Cmd+A：全选当前列表（输入框里不拦，照常全选文字） */
+function onDocKey(e: KeyboardEvent) {
+  if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "a") return;
+  const el = e.target as HTMLElement | null;
+  if (el?.closest("input, textarea, select, [contenteditable='true']")) return;
+  if (!rendered.value || filtered.value.length === 0) return;
+  e.preventDefault();
+  emit("update:multi-select", true);
+  selectAllVisible();
+}
+
+onMounted(() => document.addEventListener("keydown", onDocKey));
+onUnmounted(() => document.removeEventListener("keydown", onDocKey));
+
+// ---------- 内容区工具栏：搜索 / 玩家头颅 / 尺寸滑杆 ----------
+
+/** 当前是不是玩家头颅分类：添加按钮只在这里出现 */
+const inSkinCat = computed(() => cats.value.find((c) => c.uuid === cat.value)?.id === SKIN_CAT);
+
+/** 添加玩家头颅弹窗是否开着 */
+const skinOpen = ref(false);
+/** 提交中：禁用按钮防连点 */
+const skinBusy = ref(false);
+
+/**
+ * 提交要添加的用户名或 UUID
+ *
+ * - `input`: 弹窗里输入的内容，交给 useBlockList 的 addSkin 校验与落盘
+ */
+async function onSkinSubmit(input: string) {
+  if (skinBusy.value) return;
+  skinBusy.value = true;
+  try {
+    if (await addSkin(input)) skinOpen.value = false;
+  } finally {
+    skinBusy.value = false;
+  }
+}
+
+/** 尺寸滑杆的档位下标，小 → 中 → 大 */
+const sizeIndex = computed(() => Math.max(0, BLOCK_SIZE_ORDER.indexOf(size.value)));
+
+/** 滑杆拖动：下标换算回尺寸档 */
+function onSizeSlider(event: Event) {
+  const next = BLOCK_SIZE_ORDER[Number((event.target as HTMLInputElement).value)];
+  if (next) size.value = next as BlockSize;
 }
 
 /** 右键菜单里删除分组：只断开这个方块的归属，分组本身保留 */
@@ -371,9 +463,19 @@ async function onDetailRemove() {
       </BaseButton>
     </div>
 
+    <!-- 内容区工具条：搜索与玩家头颅入口都放这里，不占标题栏 -->
+    <div v-if="rendered" class="block-filters">
+      <SearchBox v-model="keyword" :placeholder="t('blocks.search')" :clear-label="t('blocks.searchClear')"
+        width="240px" />
+      <BaseButton v-if="inSkinCat" size="sm" variant="accent" @click="skinOpen = true">
+        {{ t("blocks.addSkin") }}
+      </BaseButton>
+    </div>
+
     <!-- 多选工具条：与主窗口多选条同一套外观，浮在标题栏下方 -->
     <div v-if="multiSelect" class="multi-bar">
       <span class="multi-count">{{ t("multi.selected", { count: selectedIds.size }) }}</span>
+      <button class="multi-btn" @click="selectAllVisible">{{ t("multi.selectAll") }}</button>
       <button class="multi-btn" :disabled="!selectedIds.size" @click="openMultiGroup">
         {{ t("blocks.menuSetGroup") }}
       </button>
@@ -390,7 +492,15 @@ async function onDetailRemove() {
         :skin-cat="SKIN_CAT" :filtered="isFiltered" :is-favorite="isFavorite" :toggle-favorite="toggleFavorite"
         :select-mode="multiSelect" :is-selected="(id) => selectedIds.has(id)"
         @open="openDetail" @remove-skin="removeSkin" @clear-filters="clearFilters"
-        @item-menu="openBlockMenu" @toggle-select="toggleSelect" />
+        @item-menu="openBlockMenu" @toggle-select="(p) => toggleSelect(p.item, p.event)" />
+    </div>
+
+    <!-- 尺寸滑杆：右下角，小 → 大连续调图标大小 -->
+    <div v-if="rendered" class="size-dock">
+      <span class="size-edge">{{ t("blocks.size.sm") }}</span>
+      <input class="size-range" type="range" min="0" max="2" step="1" :value="sizeIndex"
+        :aria-label="t('blocks.size.title')" :title="t('blocks.size.title')" @input="onSizeSlider" />
+      <span class="size-edge">{{ t("blocks.size.lg") }}</span>
     </div>
 
     <!-- 未渲染：提示卡；渲染中显示进度说明，不再给按钮 -->
@@ -416,6 +526,9 @@ async function onDetailRemove() {
     <InstancePickModal v-if="iconTarget" :current-uuid="currentInstance?.uuid ?? null" :busy="iconBusy"
       @pick="onIconPick" @close="iconTarget = null" />
 
+    <!-- 添加玩家头颅（用户名或 UUID）：入口在玩家头颅分类里 -->
+    <SkinAddModal v-if="skinOpen" :busy="skinBusy" @submit="onSkinSubmit" @close="skinOpen = false" />
+
     <!-- 方块详情：打开选实例弹窗时先让位，避免两层遮罩叠着 -->
     <BlockDetailModal v-if="detail && !iconTarget" :block="detail" :category="catLabel(detail.catUuid)" :keyword="keyword"
       :removable="detail.catId === SKIN_CAT" :busy="iconBusy" :favorite="isFavorite(detail.id)"
@@ -434,8 +547,11 @@ async function onDetailRemove() {
     <div v-if="blockMenu" class="menu-backdrop" @pointerdown="blockMenu = null" @contextmenu.prevent />
     <div v-if="blockMenu" class="group-menu"
       :style="{ left: blockMenu.x + 'px', top: blockMenu.y + 'px' }" @pointerdown.stop @contextmenu.prevent>
-      <button class="group-menu-item" @click="menuSetIcon">{{ t("blocks.menuSetIcon") }}</button>
-      <button class="group-menu-item" @click="menuSetGroup">{{ t("blocks.menuSetGroup") }}</button>
+      <button v-if="!multiSelect" class="group-menu-item" @click="enterMultiSelectFromMenu">
+        {{ t("blocks.multiSelect") }}
+      </button>
+      <button v-if="!multiSelect" class="group-menu-item" @click="menuSetIcon">{{ t("blocks.menuSetIcon") }}</button>
+      <button v-if="!multiSelect" class="group-menu-item" @click="menuSetGroup">{{ t("blocks.menuSetGroup") }}</button>
       <button v-if="inCustomGroupView && groupOf(blockMenu.item.id)" class="group-menu-item danger"
         @click="menuRemoveGroup">
         {{ t("blocks.groupDeassign") }}
@@ -507,6 +623,7 @@ async function onDetailRemove() {
 }
 
 .block-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -521,6 +638,50 @@ async function onDetailRemove() {
   margin-bottom: -22px;
   margin-top: -22px;
   padding-right: 0;
+}
+
+/* ---------- 内容区工具条 ---------- */
+
+.block-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 22px;
+  margin-right: 26px;
+}
+
+/* 上面已经有进度行时不再补一份顶部留白 */
+.block-progress + .block-filters {
+  margin-top: 0;
+}
+
+/* ---------- 尺寸滑杆（右下角） ---------- */
+
+.size-dock {
+  position: absolute;
+  right: 34px;
+  bottom: 30px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-md);
+}
+
+.size-edge {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.size-range {
+  width: 120px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 /* ---------- 分组右键菜单 ---------- */

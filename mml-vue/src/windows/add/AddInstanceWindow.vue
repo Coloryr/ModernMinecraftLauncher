@@ -688,6 +688,10 @@ async function create() {
   if (addMode.value === "online" && !addUrl.value.trim()) {
     return failField("url", t("add.urlEmpty"));
   }
+  // 在线实例只收服务器包清单；压缩包地址去「导入压缩包」里填
+  if (addMode.value === "online" && isArchiveUrl(addUrl.value)) {
+    return failField("url", t("add.urlArchiveNotAllowed"));
+  }
 
   const group = addGroup.value;
   addError.value = "";
@@ -732,14 +736,10 @@ async function create() {
         uuid = await api.addImportFolder(addFolderPath.value.trim(), name, groupId);
       }
     } else {
-      // 在线实例：压缩包走压缩包导入，其余按服务器包清单（server.json）登记
+      // 在线实例：按服务器包清单（server.json）登记，压缩包地址已在上面拦掉
       const target = addUrl.value.trim();
-      const archive = isArchiveUrl(target);
-      // 标题跟着实际走的那条路：在线实例是"下载"，压缩包地址仍是"安装整合包"
-      packTitleKey.value = archive ? "add.installing" : "add.downloadingOnline";
-      uuid = archive
-        ? await api.addImportUrl(target, name, groupId)
-        : await api.addImportServerPack(serverPackUrl(target), name, groupId);
+      packTitleKey.value = "add.downloadingOnline";
+      uuid = await api.addImportServerPack(serverPackUrl(target), name, groupId);
     }
     if (isLeaving()) return;
     // 通知主窗口选中新实例，后端已发 instance-change 刷新列表，然后询问是否继续添加
@@ -918,7 +918,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <WindowFrame :title="t('add.title')" body-gutter @close="$emit('close')">
+  <WindowFrame :title="t('add.title')" :body-fill="addMode === 'archive' || addMode === 'folder'" body-gutter
+    @close="$emit('close')">
     <!-- 内容区：撑满窗口，底部按钮靠 margin-top:auto 钉在右下角 -->
     <div class="add-body">
       <IconTabs :model-value="addMode" :tabs="ADD_TABS" :disabled="busy" @update:model-value="onTabChange" />
@@ -947,7 +948,7 @@ onUnmounted(() => {
       </div>
 
       <!-- 模式内容（各模式组件见 modes/ 目录） -->
-      <div class="add-card add-card-content">
+      <div class="add-card add-card-content" :class="{ fill: addMode === 'archive' || addMode === 'folder' }">
         <NewMode v-if="addMode === 'new'" :versions="filteredVersions" :versions-loaded="versions.length > 0"
           :ver-loading="verLoading" :ver-types="verTypes" :version-types="versionTypes" :new-version="newVersion"
           :loader="loader" :loaders="loaders" :loader-loading="loaderLoading" :query-step="queryStep"
@@ -1023,6 +1024,7 @@ onUnmounted(() => {
 .add-body {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-height: 100%;
 }
 
@@ -1042,6 +1044,14 @@ onUnmounted(() => {
 /* 模式内容卡片：四个模式保持同一高度，切换时不跳动 */
 .add-card-content {
   min-height: 180px;
+}
+
+/* 压缩包 / 文件夹模式：内容卡片吃满窗口剩余高度，文件列表在里面自己滚 */
+.add-card-content.fill {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 确认弹窗正文如"是否允许读取目录 xxx"：路径可能很长，允许换行 */

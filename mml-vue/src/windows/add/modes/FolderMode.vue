@@ -179,7 +179,8 @@ watch(
   flex-direction: column;
   gap: 2px;
   margin-top: 6px;
-  max-height: 200px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
   /* 见 styles/scrollbar.css */

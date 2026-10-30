@@ -71,7 +71,7 @@ function hidePreview() {
 </script>
 
 <template>
-  <div class="acc-list">
+  <div class="acc-list" :class="{ empty: accounts.length === 0 }">
     <div v-for="acc in accounts" :key="acc.uuid" class="acc-row" :class="{ current: isCurrent(acc) }"
       @dblclick="!accountLocked && emit('switch', acc)"
       @contextmenu.prevent="emit('menu', { event: $event, acc })">
@@ -88,7 +88,7 @@ function hidePreview() {
         {{ acc.userName.charAt(0).toUpperCase() }}
       </span>
       <div class="row-meta">
-        <span class="row-name" v-tip="acc.userName"><HighlightText :text="acc.userName" :query="query" /></span>
+        <span class="row-name"><HighlightText :text="acc.userName" :query="query" /></span>
         <span class="row-sub">
           <AccountTypeBadge :auth-type="acc.authType" />
           <span class="row-uuid"><HighlightText :text="acc.uuid" :query="query" /></span>
@@ -120,6 +120,12 @@ function hidePreview() {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* 空状态：占位框吃满视图区剩余高度 */
+.acc-list.empty {
+  flex: 1;
+  min-height: 0;
 }
 
 .acc-row {
@@ -256,7 +262,7 @@ function hidePreview() {
 /* 悬停头像时的头像大图：Teleport 到 body，跟随鼠标 */
 .skin-float {
   position: fixed;
-  z-index: 999;
+  z-index: 300;
   pointer-events: none;
   padding: 8px;
   background: var(--bg-card);
