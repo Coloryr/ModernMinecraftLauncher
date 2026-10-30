@@ -307,6 +307,8 @@ pub struct ClientConfig {
     pub window_effect: String,
     /// 窗口底色不透明度，单位百分比；界面底色按它混透明，材质才透得出来
     pub window_opacity: u8,
+    /// 自定义程序图标：运行目录下的文件名，空串表示用内置图标
+    pub program_icon: String,
 }
 
 impl Default for ClientConfig {
@@ -332,6 +334,7 @@ impl Default for ClientConfig {
             music_source: String::new(),
             window_effect: String::from("none"),
             window_opacity: 85,
+            program_icon: String::new(),
         }
     }
 }

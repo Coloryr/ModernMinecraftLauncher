@@ -328,6 +328,7 @@ export function createCommands(invoke: Invoke) {
       addJava: (name: string | null, path: string) => invoke<JavaInfoDto>("settings_add_java", { name, path }),
       clearBg: () => invoke<void>("settings_clear_bg"),
       clearLocalFile: (id: string) => invoke<void>("settings_clear_local_file", { id }),
+      clearProgramIcon: () => invoke<void>("settings_clear_program_icon"),
       detectJava: (path: string) => invoke<string | null>("settings_detect_java", { path }),
       getBg: () => invoke<BgInfoDto | null>("settings_get_bg"),
       getCachePath: () => invoke<string>("settings_get_cache_path"),
@@ -335,6 +336,7 @@ export function createCommands(invoke: Invoke) {
       getLaunch: () => invoke<LaunchSettingDto>("settings_get_launch"),
       getLocalFiles: () => invoke<LocalFileEntryDto[]>("settings_get_local_files"),
       getNetwork: () => invoke<NetworkSettingDto>("settings_get_network"),
+      getProgramIcon: () => invoke<string | null>("settings_get_program_icon"),
       getSystemFonts: () => invoke<string[]>("settings_get_system_fonts"),
       importJava: (name: string | null, archivePath: string) => invoke<JavaInfoDto | null>("settings_import_java", { name, archivePath }),
       openLocalFile: (id: string) => invoke<void>("settings_open_local_file", { id }),
@@ -346,6 +348,7 @@ export function createCommands(invoke: Invoke) {
       scanJava: () => invoke<JavaInfoDto[]>("settings_scan_java"),
       scanJavaDir: (path: string) => invoke<JavaInfoDto[]>("settings_scan_java_dir", { path }),
       setBg: (source: string, percent: number) => invoke<string>("settings_set_bg", { source, percent }),
+      setProgramIcon: (source: string) => invoke<string>("settings_set_program_icon", { source }),
     },
     stats: {
       data: () => invoke<StatsDataDto>("stats_get_data"),

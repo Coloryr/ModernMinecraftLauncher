@@ -8,6 +8,7 @@ import { t } from "../../../../lib/i18n";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../../components/ui/BaseModal.vue";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
+import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
 import NumberStepper from "../../../../components/ui/NumberStepper.vue";
 import SettingsGroup from "../SettingsGroup.vue";
 import SaveStateText from "../SaveStateText.vue";
@@ -47,6 +48,9 @@ const {
   applyClient,
   serverAddr,
   pickMusicFile,
+  programIcon,
+  pickProgramIcon,
+  clearProgramIcon,
   loginTypeLabel,
   addLockType,
   addLockName,
@@ -289,6 +293,21 @@ watch(lockServerError, async (msg) => {
       <div class="java-progress-track">
         <div class="java-progress-fill rolling" />
       </div>
+    </div>
+  </SettingsGroup>
+
+  <!-- 程序图标：换掉任务栏 / 托盘 / Alt+Tab 的图标；图片复制进运行目录，服务器包会一起带上 -->
+  <SettingsGroup id="programIcon" title-key="winSettings.secProgramIcon" :flash="flashGroup === 'programIcon'">
+    <p class="field-desc">{{ t("winSettings.programIconDesc") }}</p>
+    <div class="program-icon-row">
+      <div class="program-icon-preview">
+        <img v-if="programIcon" :src="programIcon" alt="" />
+        <GlyphIcon v-else name="image" :size="22" :weight="1.6" />
+      </div>
+      <BaseButton size="sm" @click="pickProgramIcon">{{ t("winSettings.programIconPick") }}</BaseButton>
+      <BaseButton v-if="programIcon" size="sm" variant="danger" @click="clearProgramIcon">
+        {{ t("winSettings.programIconClear") }}
+      </BaseButton>
     </div>
   </SettingsGroup>
 

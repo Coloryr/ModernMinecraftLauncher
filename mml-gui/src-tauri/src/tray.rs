@@ -186,9 +186,15 @@ fn create(app: &AppHandle) -> Result<(), String> {
                 crate::windows::summon_main_window(tray.app_handle());
             }
         });
-    // 图标直接用窗口图标：打包时由 tauri.conf.json 的 bundle.icon 内嵌进来
-    if let Some(icon) = app.default_window_icon() {
-        builder = builder.icon(icon.clone());
+    // 图标跟窗口一致：客户端设置里换过就用那一张，否则用打包时内嵌的
+    // tauri.conf.json bundle.icon
+    match crate::windows::settings::icon::custom_icon() {
+        Some(icon) => builder = builder.icon(icon),
+        None => {
+            if let Some(icon) = app.default_window_icon() {
+                builder = builder.icon(icon.clone());
+            }
+        }
     }
     builder
         .build(app)

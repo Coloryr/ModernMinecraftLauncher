@@ -80,6 +80,7 @@ const TOKEN = {
   help: "帮助",
   hex: "十六进制",
   hmcl: "HMCL",
+  icon: "程序图标",
   home: "主页",
   image: "图片",
   install: "安装",

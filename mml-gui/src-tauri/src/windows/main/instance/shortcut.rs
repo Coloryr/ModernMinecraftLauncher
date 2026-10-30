@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use uuid::Uuid;
 
 use crate::err_keys;
+use crate::windows::settings::icon::{ico_of_png, square_png};
 
 /// 在桌面为实例创建快捷方式
 ///
@@ -23,7 +24,9 @@ pub fn main_create_shortcut(uuid: String) -> Result<String, String> {
     let instance =
         mml_game::get_instance(&id).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())?;
     let snapshot = instance.read().unwrap().clone();
-    let icon = ico_of(&snapshot.get_icon_file_or_default());
+    // 实例自己没设图标时用自定义程序图标：快捷方式指向的是启动器本体，两者的图标该一致
+    let icon = ico_of(&snapshot.get_icon_file_or_default())
+        .or_else(crate::windows::settings::icon::custom_ico);
 
     create_shortcut(&snapshot.name, &uuid, icon.as_deref())
         .map(|path| path.to_string_lossy().to_string())
@@ -69,57 +72,6 @@ fn ico_of(source: &std::path::Path) -> Option<PathBuf> {
     let png = square_png(&bytes, 256)?;
     std::fs::write(&target, ico_of_png(&png)).ok()?;
     Some(target)
-}
-
-/// 把任意图片缩放到 `size` 见方的透明画布上，按 PNG 输出
-///
-/// - `bytes`: 原始图片字节，格式自动识别
-/// - `size`: 边长，快捷方式图标取 256
-///
-/// # 返回值
-///
-/// PNG 字节；解不出来返回 `None`
-fn square_png(bytes: &[u8], size: u32) -> Option<Vec<u8>> {
-    let image = image::load_from_memory(bytes).ok()?;
-    let scaled = image.resize(size, size, image::imageops::FilterType::Lanczos3);
-    let mut canvas = image::RgbaImage::new(size, size);
-    let (width, height) = (scaled.width(), scaled.height());
-    image::imageops::overlay(
-        &mut canvas,
-        &scaled.to_rgba8(),
-        ((size - width) / 2) as i64,
-        ((size - height) / 2) as i64,
-    );
-
-    let mut out = Vec::new();
-    canvas
-        .write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Png)
-        .ok()?;
-    Some(out)
-}
-
-/// 把一张 PNG 包成只有一条目的 ICO
-///
-/// 条目里直接放 PNG 数据（Vista 起 shell 认），省掉 BMP 那套掩码。
-///
-/// - `png`: PNG 字节，边长 256 时宽度 / 高度字段写 0
-///
-/// # 返回值
-///
-/// ICO 文件字节
-fn ico_of_png(png: &[u8]) -> Vec<u8> {
-    const HEADER: u32 = 6 + 16;
-    let mut out = Vec::with_capacity(png.len() + HEADER as usize);
-    out.extend_from_slice(&0u16.to_le_bytes()); // 保留
-    out.extend_from_slice(&1u16.to_le_bytes()); // 1 = 图标
-    out.extend_from_slice(&1u16.to_le_bytes()); // 条目数
-    out.extend_from_slice(&[0, 0, 0, 0]); // 宽 256 / 高 256 / 调色板 / 保留
-    out.extend_from_slice(&1u16.to_le_bytes()); // 颜色平面
-    out.extend_from_slice(&32u16.to_le_bytes()); // 位深
-    out.extend_from_slice(&(png.len() as u32).to_le_bytes());
-    out.extend_from_slice(&HEADER.to_le_bytes()); // 数据偏移
-    out.extend_from_slice(png);
-    out
 }
 
 /// 快捷方式文件名：Windows 不允许的字符换成下划线，去掉首尾空白与结尾的点

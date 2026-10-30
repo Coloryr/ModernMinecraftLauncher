@@ -136,9 +136,17 @@ function isGroupOpen(id: string) {
 
           <!-- 拖拽实例时自动展开，便于投放；展开 / 收起走高度动画（grid-template-rows 0fr↔1fr） -->
           <div class="group-items-wrap" :class="{ collapsed: !isGroupOpen(g.id) }">
-            <div class="group-items">
-              <!-- 添加实例（与实例行同尺寸；多选时隐藏，拖拽实例时禁用并变色） -->
-              <button v-show="!multiSelect" class="add-inst-row" :disabled="dragActive?.kind === 'instance'"
+            <div class="group-items" :class="{ 'as-tiles': maximized }">
+              <!-- 添加实例（与实例行同尺寸；多选时隐藏，拖拽实例时禁用并变色）。
+                   占满时换成平铺那张「添加」卡，与实例卡同一套外观 -->
+              <button v-if="maximized" v-show="!multiSelect" class="tile add-tile"
+                :disabled="dragActive?.kind === 'instance'" @click="emit('add-instance')">
+                <span class="add-plus">
+                  <GlyphIcon name="plus" :size="24" :weight="1.8" />
+                </span>
+                <span class="tile-name">{{ t("group.add") }}</span>
+              </button>
+              <button v-else v-show="!multiSelect" class="add-inst-row" :disabled="dragActive?.kind === 'instance'"
                 @click="emit('add-instance')">
                 <span class="add-inst-icon">
                   <GlyphIcon name="plus" :size="18" />
@@ -154,18 +162,31 @@ function isGroupOpen(id: string) {
                       :size="38" />
                     <span class="inst-name">{{ dragActive?.instance?.name ?? "" }}</span>
                   </div>
-                  <div class="inst-row" :data-uuid="inst.uuid" :class="{
+                  <!-- 占满时和平铺模式用的是同一张卡：外观、加载器角标、运行点位置都一致 -->
+                  <div v-if="maximized" class="tile" :data-uuid="inst.uuid" :class="{
                     active: selected?.uuid === inst.uuid,
                     'multi-checked': multiSelect && selectedIds.has(inst.uuid),
-                    running: inst.running,
-                    'inst-card': maximized,
                   }" @pointerdown="onDragPointerDown($event, { kind: 'instance', instance: inst })"
                     @click="onInstClick(inst, $event)" @contextmenu.prevent="onInstContext($event, inst)">
                     <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(inst.uuid) }">
                       <GlyphIcon name="check" :size="12" :weight="2.6" />
                     </span>
-                    <!-- 占满后每项是一张渲染图卡片，图标放到 88px -->
-                    <InstanceIcon :name="inst.name" :uuid="inst.uuid" :size="maximized ? 88 : 38" />
+                    <InstanceIcon :name="inst.name" :uuid="inst.uuid" :size="44" />
+                    <span v-if="inst.loader !== 'normal'" class="loader-corner loader-text"
+                      :class="`loader-${inst.loader}`">{{ t(`add.loader.${inst.loader}`) }}</span>
+                    <span class="tile-name"><HighlightText :text="inst.name" :query="searchText" /></span>
+                    <span v-if="inst.running" class="run-dot" v-tip="t('launch.running')"></span>
+                  </div>
+                  <div v-else class="inst-row" :data-uuid="inst.uuid" :class="{
+                    active: selected?.uuid === inst.uuid,
+                    'multi-checked': multiSelect && selectedIds.has(inst.uuid),
+                    running: inst.running,
+                  }" @pointerdown="onDragPointerDown($event, { kind: 'instance', instance: inst })"
+                    @click="onInstClick(inst, $event)" @contextmenu.prevent="onInstContext($event, inst)">
+                    <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(inst.uuid) }">
+                      <GlyphIcon name="check" :size="12" :weight="2.6" />
+                    </span>
+                    <InstanceIcon :name="inst.name" :uuid="inst.uuid" :size="38" />
                     <span v-if="inst.loader !== 'normal'" class="loader-text" :class="`loader-${inst.loader}`">{{
                       t(`add.loader.${inst.loader}`) }}</span>
                     <span class="inst-name"><HighlightText :text="inst.name" :query="searchText" /></span>
@@ -436,67 +457,13 @@ function isGroupOpen(id: string) {
 
 /* 占满后横向空间大：组内实例按渲染图卡片多列排开。
    overflow 不能改：分组收起靠的是外层 0fr 行高 + 这里的裁切 */
-.sidebar.is-max .group-items {
+/* 占满后横向空间大：组内实例直接用平铺那张卡，网格也照平铺模式铺
+   （从左往右填、整行铺开，格子等宽；卡内的图标 / 名字自己居中） */
+.group-items.as-tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 8px;
-}
-
-/* 卡片：渲染图在上，名字 / 加载器在下。底色与描边必须有 ——
-   行模式靠底色区分，卡片模式下没有底色时图片像是浮在空处，运行中的绿点也看不出落在哪张卡上 */
-.inst-row.inst-card {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 10px;
-  min-height: 0;
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-}
-
-.inst-row.inst-card:hover {
-  border-color: var(--accent-border);
-}
-
-.inst-row.inst-card .inst-name {
-  order: 1;
-  flex: none;
-  width: 100%;
-  white-space: normal;
-  word-break: break-all;
-  font-size: 12.5px;
-}
-
-.inst-row.inst-card .loader-text {
-  order: 2;
-}
-
-/* 卡片里运行点钉在右上角，别挤在名字后面 */
-.inst-row.inst-card.running .run-dot {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  transform: none;
-}
-
-.inst-row.inst-card.running .inst-name {
-  padding-right: 0;
-}
-
-/* 多选勾选圈钉在卡片左上角，不参与纵向排布 */
-.inst-row.inst-card .row-check {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 1;
-}
-
-/* 占满态下「添加实例」也做成一张同样高的卡片，不然网格里塌成一窄条 */
-.sidebar.is-max .add-inst-row {
-  flex-direction: column;
-  justify-content: center;
-  gap: 8px;
-  min-height: 132px;
+  align-content: start;
 }
 
 /* 平铺占满后格子跟着放大一档，不然一排全是 96px 的小方块 */
@@ -711,6 +678,11 @@ function isGroupOpen(id: string) {
   position: absolute;
   top: 8px;
   left: 8px;
+}
+
+/* 多选勾选圈也钉在左上角：加载器角标往右让一格，两个不叠在一起 */
+.tile .row-check ~ .loader-corner {
+  left: 30px;
 }
 
 .tile-name {

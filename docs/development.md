@@ -155,23 +155,29 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 
 每个平台的步骤都是同一套：
 
-1. `actions/checkout@v4` + `actions/setup-node@v4`（Node 22，按两个 lockfile 缓存）+
+1. `actions/checkout@v4` + `actions/setup-node@v4`（Node 22，按 lockfile 缓存）+
    `dtolnay/rust-toolchain@stable` + `Swatinem/rust-cache@v2`；
-2. Windows 拆成 x64 / x86 / arm64 三行 matrix，各跑 `build/init.ps1` / `build/build-release.ps1 -Arch <arch>`
+2. 用 `taiki-e/install-action` 装 `cargo-binstall`，再由它下载 Tauri CLI 的**预编译**
+   `cargo-tauri`（GitHub Release 资产），不跑 `cargo install`。上游 binstall 元数据只给
+   x64 的 zip 包写了格式覆盖，macOS / Windows 的 ARM64 产物其实也是 zip，工作流按平台显式传
+   `--pkg-fmt`，避免回退到源码编译；
+3. Windows 拆成 x64 / x86 / arm64 三行 matrix，各跑 `build/init.ps1` / `build/build-release.ps1 -Arch <arch>`
    （arm64 用 `windows-11-arm` 原生 runner）；Linux 跑 x64（`ubuntu-22.04`）与 arm64（`ubuntu-24.04-arm`），
    macOS 跑 x64（`macos-15-intel`）与 arm64（`macos-15`），都执行 `bash build/init.sh` / `bash build/build-release.sh`；
-3. Linux x64 额外跑 `build/package-flatpak.sh` 与 `build/package-arch.sh`，
-   把 `.flatpak` 与 `.pkg.tar.zst` 也放进 `build_out/`；arm64 只出 deb / rpm / AppImage；
-4. 脚本把安装包按版本改名到 `build_out/`，`actions/upload-artifact@v4` 收走；
-   发版 job 用 `actions/download-artifact@v4`（`merge-multiple: true`）合并，
-   再交给 `softprops/action-gh-release@v2`。
+4. Linux x64 构建完先上传 deb / rpm / AppImage，再单独上传原始二进制；`package-linux-extra` job
+   下载这份二进制后跑 `build/package-flatpak.sh` 与 `build/package-arch.sh`，把 `.flatpak` 与
+   `.pkg.tar.zst` 也放进 `build_out/`。附加包失败不影响主产物，但发版 job 会等它，缺包时不发 Release；
+   arm64 只出 deb / rpm / AppImage；
+5. 脚本把安装包按版本改名到 `build_out/`，`actions/upload-artifact@v4` 收走；
+   发版 job 用 `actions/download-artifact@v4` 按 `mml-*` 取产物并保留每个 artifact 的子目录，
+   先检查文件名有无重复，再交给 `softprops/action-gh-release@v2`。
 
 - Linux runner 固定 `ubuntu-22.04` 作为 glibc 基线，并预装 Tauri 需要的
   `libwebkit2gtk-4.1-dev` / `libayatana-appindicator3-dev` / `librsvg2-dev` /
-  `patchelf` / `libxdo-dev` / `libfuse2` / `rpm` / `libdbus-1-dev` / `libudev-dev` /
-  `libarchive-tools` / `zstd`。`libdbus-1-dev` 是 `mml-sys` 在 Linux 上
+  `patchelf` / `libxdo-dev` / `rpm` / `libdbus-1-dev` / `libudev-dev`；
+  FUSE 运行时 x64 用 `libfuse2`、arm64 用 `libfuse2t64`。`libdbus-1-dev` 是 `mml-sys` 在 Linux 上
   「在文件管理器中显示」用的 D-Bus 绑定，缺了会编译失败；`libudev-dev` 是手柄读取在 Linux 上的后端依赖；
-  `libarchive-tools` 用来给 Arch 包生成 `.MTREE`。
+  `libarchive-tools` 与 `zstd` 给 Arch 包生成 `.MTREE`。
 - 产物名与本地一致：`mml-windows-x64-0.0.1.msi`、`mml-linux-x64-0.0.1.deb`、
   `mml-linux-x64-0.0.1.flatpak`、`mml-arch-x64-0.0.1.pkg.tar.zst`、
   `mml-macos-arm64-0.0.1.dmg` 等，架构取自 `runner.arch`。
@@ -184,4 +190,13 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
   避免发出错版本的包。
 - macOS runner 的 `bash` 是 3.2，`build/*.sh` 与 `mml-gui/vendor/prepare.sh` 都不能用
   `mapfile` / `readarray` 这类 bash 4 语法。
+- FUSE 运行时包在 24.04 改名为 `libfuse2t64`：工作流装依赖前先用 `apt-cache show` 断言包名存在，
+  将来再改名时直接失败并列出候选包，不会只留一句 `Unable to locate package`。
+- macOS 构建会读 `APPLE_CERTIFICATE` / `APPLE_CERTIFICATE_PASSWORD` / `APPLE_SIGNING_IDENTITY` /
+  `APPLE_ID` / `APPLE_PASSWORD` / `APPLE_TEAM_ID` 完成签名与公证；`APPLE_CERTIFICATE` 是 base64 后的
+  `.p12`，`APPLE_PASSWORD` 是 App 专用密码。secrets 没配置时这些变量是空串，
+  而 Tauri 只看变量是否存在，所以工作流先把空值 `unset` 再调构建；此时产物未签名，首次打开需右键 → 打开。
+- 发版前检查产物重名：不同平台产物同名时会在 GitHub Release 上互相覆盖，发现重名直接失败。
+- `windows-11-arm` 与 `ubuntu-24.04-arm` 是 GitHub 公共预览 runner，私有仓库可能不可用；
+  届时改自托管，或回退到 x64 runner 交叉编译。
 - 发版 job 需要 `contents: write`（工作流默认只给 `contents: read`），只在 tag 触发时执行。

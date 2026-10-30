@@ -857,6 +857,35 @@
   color: var(--text-dim);
 }
 
+/* ---------- 客户端设置：程序图标 ---------- */
+
+/* 预览与两个按钮排一行：图标是正方形，和按钮同一档高度对齐 */
+.settings-layout .program-icon-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.settings-layout .program-icon-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  overflow: hidden;
+  color: var(--text-dim);
+}
+
+.settings-layout .program-icon-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 /* ---------- 扫描 / 导入中的加载弹窗 ---------- */
 
 .settings-layout .loading-modal {

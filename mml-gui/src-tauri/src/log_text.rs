@@ -523,6 +523,11 @@ pub enum LogText {
         /// 写进压缩包的条目数
         entries: usize,
     },
+    /// 换了自定义程序图标
+    ProgramIconSet {
+        /// 落盘的文件路径
+        path: String,
+    },
     /// 系统通知发不出去
     NotificationFailed {
         /// 失败原因
@@ -825,6 +830,9 @@ impl LogText {
             }
             LogText::RestartLauncherError { error } => {
                 format!("[window] 重启启动器失败：{error}")
+            }
+            LogText::ProgramIconSet { path } => {
+                format!("[window] 已换用自定义程序图标：{path}")
             }
             LogText::NotificationFailed { error } => {
                 format!("[notify] 系统通知发送失败：{error}")
@@ -1130,6 +1138,9 @@ impl LogText {
             }
             LogText::RestartLauncherError { error } => {
                 format!("[window] failed to restart the launcher: {error}")
+            }
+            LogText::ProgramIconSet { path } => {
+                format!("[window] switched to the custom program icon: {path}")
             }
             LogText::NotificationFailed { error } => {
                 format!("[notify] failed to show a system notification: {error}")

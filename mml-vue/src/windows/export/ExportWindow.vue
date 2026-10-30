@@ -37,6 +37,7 @@ import {
   type ExportProgressDto,
   type GuiConfigDto,
   type InstanceInfoDto,
+  type JavaInfoDto,
 } from "../../lib/bindings";
 
 /** 请求关闭本窗口 */
@@ -67,7 +68,28 @@ const serverPack = computed(() => currentKind.value === "server_pack");
 const pack = ref<PackId>(serverPack.value ? "server" : "mml");
 const includeLauncher = ref(false);
 
+/** 已检测到的 Java 运行时，服务器包的「内置 Java」从这里挑 */
+const javas = ref<JavaInfoDto[]>([]);
+/** 是否把 Java 运行时打进包 */
+const bundleJava = ref(false);
+/** 打进包的那个运行时名称 */
+const javaPick = ref("");
+
 /** 服务器包的三组选择：配置 → 自定义内容 → 实例 */
+/** 拉一次已检测到的 Java，服务器包用来挑要打进去的那一个 */
+async function loadJavas() {
+  if (!serverPack.value) return;
+  try {
+    javas.value = await api.getJavaList();
+  } catch {
+    javas.value = [];
+  }
+  if (!javaPick.value && javas.value.length) {
+    // 默认选第一个可用的：用户勾上「打包内置 Java」就能直接导出
+    javaPick.value = javas.value[0].name;
+  }
+}
+
 const serverOptions = reactive({
   config: true,
   guiConfig: true,
@@ -686,6 +708,7 @@ async function startExport(confirmed = false) {
     server: {
       config: serverOptions.config,
       guiConfig: serverOptions.guiConfig,
+      java: bundleJava.value && javaPick.value ? javaPick.value : null,
       page: serverOptions.page,
       css: serverOptions.css,
       home: serverOptions.home,
@@ -790,7 +813,10 @@ useWindowRefresh(() => {
   // 上一轮的结果弹窗别留到下一次打开；还在跑就让它继续显示进度
   if (!running.value) progress.value = null;
   // 设置窗口可能刚改过自定义内容与锁定，切回来重读一次
-  if (serverPack.value) void loadCustomAssets();
+  if (serverPack.value) {
+    void loadCustomAssets();
+    void loadJavas();
+  }
   return syncInstances();
 });
 
@@ -803,6 +829,7 @@ watch(() => windowParams.value.uuid, applyTarget);
 onMounted(async () => {
   await syncInstances();
   void loadCustomAssets();
+  void loadJavas();
 
   const progressOff = await onExportProgress((p) => {
     progress.value = p;
@@ -939,6 +966,24 @@ onBeforeUnmount(() => {
               <input v-model="includeLauncher" type="checkbox" :disabled="busy" />
               {{ t("winExport.includeLauncher") }}
             </label>
+          </section>
+
+          <!-- 内置 Java：把本机认得的运行时整个打进包，玩家没装 Java 也能直接启动 -->
+          <section class="pack-card">
+            <header class="pack-card-head">
+              <span class="pack-card-title">{{ t("winExport.serverJava") }}</span>
+              <span class="pack-card-hint">{{ t("winExport.serverJavaHint") }}</span>
+            </header>
+            <label class="check-row" :class="{ 'is-disabled': !javas.length }">
+              <input v-model="bundleJava" type="checkbox" :disabled="busy || !javas.length" />
+              {{ t("winExport.serverJavaBundle") }}
+            </label>
+            <select v-if="bundleJava" v-model="javaPick" class="field-select java-pick" :disabled="busy">
+              <option v-for="j in javas" :key="j.name" :value="j.name">
+                {{ j.name }} · Java {{ j.major }}
+              </option>
+            </select>
+            <p v-if="!javas.length" class="field-hint">{{ t("winExport.serverJavaNone") }}</p>
           </section>
 
           <div class="row">
@@ -1164,6 +1209,12 @@ onBeforeUnmount(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 20px;
+}
+
+/* 内置 Java 的下拉：跟在勾选框下面，别贴着 */
+.java-pick {
+  margin-top: 8px;
+  max-width: 320px;
 }
 
 .check-row.is-disabled {

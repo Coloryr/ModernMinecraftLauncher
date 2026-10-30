@@ -221,7 +221,7 @@ export const scenarios = [
     actions: [
       { eval: click('[aria-label="占满窗口"]'), after: 700 },
       { assert: "document.querySelector('.main.pane-max') !== null", label: "分组已向右占满" },
-      { assert: "document.querySelectorAll('.inst-card').length > 0", label: "实例按渲染图卡片展示" },
+      { assert: "document.querySelectorAll('.group-items.as-tiles .tile').length > 0", label: "实例按平铺卡展示" },
     ],
   },
   {
@@ -256,6 +256,25 @@ export const scenarios = [
   { id: "settings-network", kind: "settings", label: "mml-settings", size: [1100, 780], commands: base(), actions: [{ eval: clickTab("网络与下载"), after: 500 }] },
   { id: "settings-launch", kind: "settings", label: "mml-settings", size: [1100, 780], commands: base(), actions: [{ eval: clickTab("游戏启动"), after: 500 }] },
   { id: "settings-client", kind: "settings", label: "mml-settings", size: [1100, 780], commands: base(), actions: [{ eval: clickTab("客户端设置"), after: 500 }] },
+  // 自定义程序图标：滚到那一组，预览位放一张 8×8 的占位图
+  {
+    id: "settings-client-icon",
+    kind: "settings",
+    label: "mml-settings",
+    size: [1100, 780],
+    commands: base({
+      settings_get_program_icon:
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAJUlEQVR4nGP8z8Dwn4EIwESMolGFlCscVUiyQoYRrIBAYRg5CgEAPi0EAcHZ5fEAAAAASUVORK5CYII=",
+    }),
+    actions: [
+      { eval: clickTab("客户端设置"), after: 500 },
+      {
+        eval: "(() => { const el = [...document.querySelectorAll('.group-title')].find((x) => x.textContent.includes('程序图标')); if (!el) return false; el.scrollIntoView({ block: 'start' }); return true; })()",
+        after: 500,
+      },
+      { assert: "document.querySelector('.program-icon-preview img') !== null", label: "预览位显示已设置的图标" },
+    ],
+  },
   { id: "settings-gamepad", kind: "settings", label: "mml-settings", size: [1100, 860], commands: base(), actions: [{ eval: clickTab("手柄"), after: 600 }] },
   { id: "settings-skin", kind: "settings", label: "mml-settings", size: [1100, 800], commands: base(), actions: [{ eval: clickTab("皮肤与头像"), after: 600 }] },
   { id: "settings-local", kind: "settings", label: "mml-settings", size: [1100, 760], commands: base(), actions: [{ eval: clickTab("本地文件"), after: 500 }] },
@@ -1723,6 +1742,22 @@ export const scenarios = [
       custom_home_status: { ...customHomeStatus, installed: true, enabled: true },
     }),
     actions: [{ eval: click(".instance-row:nth-child(2) input"), after: 600 }],
+  },
+  // 内置 Java：勾上之后出现运行时下拉，导出时才真正把运行时打进包
+  {
+    id: "server-pack-java",
+    kind: "server_pack",
+    label: "mml-server_pack",
+    size: [1100, 800],
+    query: "uuid=inst-1",
+    commands: base(),
+    actions: [
+      {
+        eval: "(() => { const card = [...document.querySelectorAll('.pack-card')].find((c) => c.textContent.includes('内置 Java')); const box = card && card.querySelector('input[type=checkbox]'); if (!box) return false; box.click(); return true; })()",
+        after: 500,
+      },
+      { assert: "document.querySelector('.java-pick') !== null", label: "勾选后出现运行时下拉" },
+    ],
   },
   {
     id: "server-pack-progress",

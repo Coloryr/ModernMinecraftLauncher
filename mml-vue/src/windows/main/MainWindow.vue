@@ -1376,6 +1376,7 @@ const clientConfig = ref<ClientConfig>({
   musicSource: "",
   windowEffect: "none",
   windowOpacity: 85,
+  programIcon: "",
 });
 
 // ---- 实例锁定：只允许使用锁定的那个实例，入口在设置窗口「客户端设置 → 实例锁定」 ----

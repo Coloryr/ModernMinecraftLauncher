@@ -237,6 +237,8 @@ export interface ClientConfig {
   musicOn: boolean;
   /** 自定义音乐来源：本地音频文件路径或 http(s) 直链，空串表示没配 */
   musicSource: string;
+  /** 自定义程序图标文件名，落在运行目录；空串表示用内置图标 */
+  programIcon: string;
 }
 
 /** 启动前检查开关 */
@@ -459,6 +461,8 @@ export function defaultConfig(): GuiConfig {
       // 自定义音乐：不给 localStorage 兜底，缺省就是没配
       musicOn: false,
       musicSource: "",
+      // 程序图标同理：没设就是内置图标
+      programIcon: "",
     },
     experimental: {
       launcherAdmin: false,

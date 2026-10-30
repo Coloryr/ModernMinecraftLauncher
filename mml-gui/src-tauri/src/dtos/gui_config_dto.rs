@@ -217,6 +217,8 @@ pub struct ClientConfigDto {
     pub window_effect: String,
     /// 窗口底色不透明度，单位百分比
     pub window_opacity: u8,
+    /// 自定义程序图标文件名，空串表示用内置图标
+    pub program_icon: String,
 }
 
 impl From<ClientConfig> for ClientConfigDto {
@@ -248,6 +250,7 @@ impl From<ClientConfig> for ClientConfigDto {
             music_source: c.music_source,
             window_effect: c.window_effect,
             window_opacity: c.window_opacity,
+            program_icon: c.program_icon,
         }
     }
 }
@@ -280,6 +283,7 @@ impl From<ClientConfigDto> for ClientConfig {
             music_source: c.music_source,
             window_effect: c.window_effect,
             window_opacity: c.window_opacity,
+            program_icon: c.program_icon,
         }
     }
 }
@@ -417,6 +421,7 @@ impl From<GuiConfig> for GuiConfigDto {
                 music_source: c.client.music_source,
                 window_effect: c.client.window_effect,
                 window_opacity: c.client.window_opacity,
+                program_icon: c.client.program_icon,
             },
             experimental: ExperimentalConfigDto {
                 launcher_admin: c.experimental.launcher_admin,
@@ -499,6 +504,7 @@ impl From<GuiConfigDto> for GuiConfig {
                 music_source: d.client.music_source,
                 window_effect: d.client.window_effect,
                 window_opacity: d.client.window_opacity,
+                program_icon: d.client.program_icon,
             },
             experimental: ExperimentalConfig {
                 launcher_admin: d.experimental.launcher_admin,

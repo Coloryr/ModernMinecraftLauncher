@@ -18,6 +18,9 @@ concurrency:
 env:
   CI: true
 
+# windows-11-arm 与 ubuntu-24.04-arm 是 GitHub 公共预览 runner：私有仓库可能不可用，
+# 届时改自托管，或回退到 x64 runner 交叉编译；Windows ARM64 要装对应的 MSVC 工具链。
+
 jobs:
   check-version:
     runs-on: ubuntu-latest
@@ -69,8 +72,21 @@ jobs:
         with:
           workspaces: .
           key: ${{ matrix.arch }}
-      - name: 安装 Tauri CLI
-        run: cargo install tauri-cli --version "^2" --locked
+      - name: 安装 cargo-binstall
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-binstall
+      - name: 安装 Tauri CLI（预编译）
+        shell: bash
+        run: |
+          # tauri-cli 的 binstall 元数据只给 x64 的 zip 包写了格式覆盖，macOS / Windows
+          # 的 ARM64 产物其实也是 zip。按平台显式指定格式，避免回退到源码编译。
+          case "$RUNNER_OS" in
+            Linux) pkg_fmt=tgz ;;
+            *) pkg_fmt=zip ;;
+          esac
+          cargo binstall --no-confirm --pkg-fmt "$pkg_fmt" tauri-cli@^2
+          cargo tauri --version
       - name: 安装依赖
         run: pwsh -NoProfile -File build/init.ps1
       - name: 构建并打包（${{ matrix.arch }}）
@@ -117,31 +133,84 @@ jobs:
       - name: 安装 Linux 依赖
         run: |
           sudo apt-get update
+          # 24.04 起 libfuse2 改名为 libfuse2t64：先确认包名存在，
+          # 将来再改名时能直接看出是哪一步，而不是只报一句 Unable to locate package
+          if ! apt-cache show "${{ matrix.fuse }}" >/dev/null 2>&1; then
+            echo "找不到 ${{ matrix.fuse }}，当前可用的 libfuse 包："
+            apt-cache search '^libfuse'
+            exit 1
+          fi
           sudo apt-get install -y \
             build-essential curl wget file \
             libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
             librsvg2-dev patchelf libxdo-dev libssl-dev \
             libgtk-3-dev ${{ matrix.fuse }} rpm libdbus-1-dev libudev-dev \
             libarchive-tools zstd
-      - name: 安装 Tauri CLI
-        run: cargo install tauri-cli --version "^2" --locked
+      - name: 安装 cargo-binstall
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-binstall
+      - name: 安装 Tauri CLI（预编译）
+        shell: bash
+        run: |
+          # tauri-cli 的 binstall 元数据只给 x64 的 zip 包写了格式覆盖，macOS / Windows
+          # 的 ARM64 产物其实也是 zip。按平台显式指定格式，避免回退到源码编译。
+          case "$RUNNER_OS" in
+            Linux) pkg_fmt=tgz ;;
+            *) pkg_fmt=zip ;;
+          esac
+          cargo binstall --no-confirm --pkg-fmt "$pkg_fmt" tauri-cli@^2
+          cargo tauri --version
       - name: 安装依赖
         run: bash build/init.sh
       - name: 构建并打包
         run: bash build/build-release.sh
-      - name: 打 Flatpak 包（仅 x64）
-        if: matrix.arch == 'x64'
-        run: |
-          sudo apt-get install -y flatpak
-          bash build/package-flatpak.sh
-      - name: 打 Arch 包（仅 x64）
-        if: matrix.arch == 'x64'
-        run: bash build/package-arch.sh
       - name: 上传 Linux 产物
         uses: actions/upload-artifact@v4
         with:
           name: mml-linux-${{ matrix.arch }}
           path: build_out/*
+          if-no-files-found: error
+      # 附加包在独立 job 里打，需要这份原始二进制；名字不以 mml- 开头，
+      # 发版 job 按 mml-* 下载产物时不会把它带进 Release
+      - name: 上传 Linux x64 二进制
+        if: matrix.arch == 'x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64-bin
+          path: target/release/mml-gui
+          if-no-files-found: error
+
+  # Flatpak / Arch 与 deb / rpm / AppImage 分开：附加包失败不影响主产物已上传的部分。
+  # 但发版 job 仍会等它，避免发出缺包的 Release。
+  package-linux-extra:
+    needs: [build-linux]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: 安装打包依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak libarchive-tools zstd
+      - name: 下载 Linux x64 二进制
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-x64-bin
+          path: target/release
+      - name: 恢复可执行权限
+        run: chmod +x target/release/mml-gui
+      - name: 打 Flatpak 包
+        run: bash build/package-flatpak.sh
+      - name: 打 Arch 包
+        run: bash build/package-arch.sh
+      - name: 上传附加包
+        uses: actions/upload-artifact@v4
+        with:
+          name: mml-linux-x64-extra
+          path: |
+            build_out/*.flatpak
+            build_out/*.pkg.tar.zst
           if-no-files-found: error
 
   build-macos:
@@ -171,12 +240,66 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: .
-      - name: 安装 Tauri CLI
-        run: cargo install tauri-cli --version "^2" --locked
+      - name: 安装 cargo-binstall
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-binstall
+      - name: 安装 Tauri CLI（预编译）
+        shell: bash
+        run: |
+          # tauri-cli 的 binstall 元数据只给 x64 的 zip 包写了格式覆盖，macOS / Windows
+          # 的 ARM64 产物其实也是 zip。按平台显式指定格式，避免回退到源码编译。
+          case "$RUNNER_OS" in
+            Linux) pkg_fmt=tgz ;;
+            *) pkg_fmt=zip ;;
+          esac
+          cargo binstall --no-confirm --pkg-fmt "$pkg_fmt" tauri-cli@^2
+          cargo tauri --version
+      - name: 检查签名配置
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          signed=0
+          notarized=0
+          if [ -n "$APPLE_CERTIFICATE" ] && [ -n "$APPLE_CERTIFICATE_PASSWORD" ]; then
+            signed=1
+          fi
+          if [ -n "$APPLE_ID" ] && [ -n "$APPLE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            notarized=1
+          fi
+          if [ "$signed" = 1 ] && [ "$notarized" = 1 ]; then
+            echo 'macOS 签名与公证已配置。'
+          elif [ "$signed" = 1 ]; then
+            echo '只配置了签名证书，没有公证凭据：Gatekeeper 仍会拦首次打开。'
+          else
+            echo '未配置 macOS 签名：产物未签名，用户首次打开需右键 → 打开。'
+          fi
       - name: 安装依赖
         run: bash build/init.sh
       - name: 构建并打包
-        run: bash build/build-release.sh
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # secrets 没配置时这些变量是空串，而 Tauri 只看变量是否存在：
+          # 空证书会让签名失败，空 Apple ID 会让公证失败，所以先把空值清掉
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY \
+                      APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!name:-}" ]; then
+              unset "$name"
+            fi
+          done
+          bash build/build-release.sh
       - name: 上传 macOS 产物
         uses: actions/upload-artifact@v4
         with:
@@ -186,7 +309,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [check-version, build-windows, build-linux, build-macos]
+    needs: [check-version, build-windows, build-linux, package-linux-extra, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -194,10 +317,24 @@ jobs:
       - name: 下载全部产物
         uses: actions/download-artifact@v4
         with:
+          # 只取发布产物，linux-x64-bin 之类的中间件不带进 Release
+          pattern: mml-*
+          # 保留每个 artifact 的子目录：同名文件不会在解压阶段互相覆盖
+          merge-multiple: false
           path: artifacts
-          merge-multiple: true
+      - name: 检查产物重名
+        shell: bash
+        run: |
+          # 不同平台产物同名时，发布阶段会互相覆盖，先在这里拦住
+          dupes="$(find artifacts -type f -printf '%f\n' | sort | uniq -d)"
+          if [ -n "$dupes" ]; then
+            echo '发现重名产物：'
+            printf '%s\n' "$dupes"
+            exit 1
+          fi
+          echo '产物无重名。'
       - name: 列出产物
-        run: find artifacts -maxdepth 2 -type f -print
+        run: find artifacts -type f -print
       - name: 创建 GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -209,7 +346,7 @@ jobs:
             - Windows：x64 / x86 / arm64（MSI / NSIS；arm64 为 NSIS）
             - Linux：x64 / arm64（deb / rpm / AppImage；x64 另有 Flatpak / Arch）
             - macOS：x64 / arm64（dmg / app.tar.gz）
-          files: artifacts/*
+          files: artifacts/**/*
           fail_on_unmatched_files: true
           draft: false
           prerelease: false

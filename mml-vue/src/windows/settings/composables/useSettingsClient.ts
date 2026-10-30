@@ -40,6 +40,7 @@ const SERVER_LOCK_TYPES = ["authlib", "selflittleskin", "nide8"];
  * - `customUi` / `customPageState` / `refreshCustomUi` / `importCustomPage` / `removeCustomPage`: 完全自定义界面的整页包
  * - `addCustomCss` / `setCustomCssEnabled` / `moveCustomCss` / `removeCustomCss` / `openCustomUiDir`: 自定义 CSS 的安装、启停、排序与删除
  * - `pickMusicFile`: 选一个本地音频文件填进"自定义音乐"
+ * - `programIcon` / `pickProgramIcon` / `clearProgramIcon`: 自定义程序图标（落成运行目录下的图标文件）
  * - `experimental` / `applyExperimental`: 实验性功能四开关（界面先行，行为未接线）
  * - `applyWindowOpacity`: 透明度写进 CSS 变量并落盘，界面页的窗口外观用
  * - `load` / `applyClient` / `saveState` / `resetGroup`: 加载、落盘与分组级恢复默认
@@ -59,6 +60,7 @@ export function useSettingsClient() {
     if (cfg?.client) client.value = { ...cfg.client };
     if (cfg?.experimental) experimental.value = { ...cfg.experimental };
     if (cfg?.launchCheck) launchCheck.value = { ...cfg.launchCheck };
+    await loadProgramIcon();
   }
 
   // ---------- 即改即存 ----------
@@ -282,6 +284,47 @@ export function useSettingsClient() {
     }
   }
 
+  // ---------- 自定义程序图标 ----------
+
+  /** 已设置图标的 data URL，空串表示还在用内置图标 */
+  const programIcon = ref("");
+
+  /** 读一次已设置的图标，打开设置页时显示预览 */
+  async function loadProgramIcon() {
+    programIcon.value = (await commands.settings.getProgramIcon().catch(() => null)) ?? "";
+  }
+
+  /** 选一张图当程序图标：后端转 PNG、落进运行目录，再把文件名写进配置 */
+  async function pickProgramIcon() {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const picked = await open({
+      title: t("winSettings.programIconPick"),
+      multiple: false,
+      filters: [{ name: t("winSettings.programIconFilter"), extensions: ["png", "jpg", "jpeg", "webp", "bmp", "ico"] }],
+    });
+    if (typeof picked !== "string") return;
+    try {
+      const name = await commands.settings.setProgramIcon(picked);
+      client.value.programIcon = name;
+      await applyClient();
+      await loadProgramIcon();
+    } catch (e) {
+      showToast(tErr(e));
+    }
+  }
+
+  /** 恢复内置图标：删掉运行目录里的图标文件并清空配置 */
+  async function clearProgramIcon() {
+    try {
+      await commands.settings.clearProgramIcon();
+      client.value.programIcon = "";
+      await applyClient();
+      programIcon.value = "";
+    } catch (e) {
+      showToast(tErr(e));
+    }
+  }
+
   /** 选一个音频文件填进"自定义音乐"；只把路径写进配置，播放由标题栏那枚按钮管 */
   async function pickMusicFile() {
     const { open } = await import("@tauri-apps/plugin-dialog");
@@ -496,6 +539,9 @@ export function useSettingsClient() {
     applyLaunchCheck,
     serverAddr,
     pickMusicFile,
+    programIcon,
+    pickProgramIcon,
+    clearProgramIcon,
     LOGIN_TYPES,
     loginTypeLabel,
     addLockType,

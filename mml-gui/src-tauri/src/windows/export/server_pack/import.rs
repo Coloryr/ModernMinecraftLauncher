@@ -3,8 +3,9 @@
 use super::{CONFIG, GUI_CONFIG, INSTANCES, LAUNCHER, MANIFEST, Manifest, archive, format};
 use crate::{err_keys, gui_config::GuiConfig};
 use mml_config::config_obj::ConfigObj;
+use mml_names::names;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
     fs::{self, File},
     io::{self, Read},
     path::{Path, PathBuf},
@@ -17,6 +18,8 @@ pub(crate) struct ImportedPack {
     pub config: Option<ConfigObj>,
     /// 导入后的界面配置；服务器包没带这一份时为 `None`。
     pub gui: Option<GuiConfig>,
+    /// 包里自带的 Java 运行时名称，落在运行目录的 java/ 下；导入后要登记进 Java 列表
+    pub java: Vec<String>,
 }
 
 /// 已解包并等待替换的文件。
@@ -94,6 +97,7 @@ pub(crate) fn import_pack(
     fs::create_dir(&stage).map_err(|e| e.to_string())?;
     let result = (|| {
         let mut files = Vec::new();
+        let mut java = BTreeSet::new();
         for index in 0..zip.len() {
             let mut entry = zip.by_index(index).map_err(|e| e.to_string())?;
             let name = entry.name().map_err(|e| e.to_string())?;
@@ -120,6 +124,12 @@ pub(crate) fn import_pack(
                     None,
                 )
             };
+            // 包内自带 Java：记下运行时名称，导入完成后登记进 Java 列表
+            if let Ok(rest) = relative.strip_prefix(names::JAVA_DIR)
+                && let Some(name) = rest.components().next()
+            {
+                java.insert(name.as_os_str().to_string_lossy().to_string());
+            }
             let is_lock = relative == Path::new(crate::client_lock::FILE_NAME);
             let target = destination(&root, &relative)?;
             let staged = stage.join("files").join(&relative);
@@ -205,7 +215,11 @@ pub(crate) fn import_pack(
         }
         Ok(mml_config::config_save::ReplacedFiles {
             files: applied.into_iter().map(|file| file.target).collect(),
-            value: ImportedPack { config, gui },
+            value: ImportedPack {
+                config,
+                gui,
+                java: java.into_iter().collect(),
+            },
         })
     })();
     // 恢复失败时保留备份，避免丢掉旧文件。

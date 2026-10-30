@@ -39,7 +39,7 @@ npm run shots -- --clean
 
 ## 场景表
 
-共 243 个场景，按窗口分组。
+共 245 个场景，按窗口分组。
 「窗口」列是页面的 `kind`，窗口族场景会自动带上实例参数，不需要在命令里另写；
 控件场景的 `control` 是截图工具里的预览页，不是启动器窗口。
 
@@ -81,6 +81,7 @@ npm run shots -- --clean
 | `settings-network` | 设置 · 网络与下载 | `settings` | 1100×780 |
 | `settings-launch` | 设置 · 游戏启动 | `settings` | 1100×780 |
 | `settings-client` | 设置 · 客户端设置 | `settings` | 1100×780 |
+| `settings-client-icon` | 设置 · 客户端 · 程序图标 | `settings` | 1100×780 |
 | `settings-gamepad` | 设置 · 手柄 | `settings` | 1100×860 |
 | `settings-skin` | 设置 · 皮肤与头像 | `settings` | 1100×800 |
 | `settings-local` | 设置 · 本地文件 | `settings` | 1100×760 |
@@ -347,6 +348,7 @@ npm run shots -- --clean
 | --- | --- | --- | --- |
 | `server-pack` | 服务器包 | `server_pack` | 1100×760 |
 | `server-pack-filled` | 服务器包 · 已填充 | `server_pack` | 1100×800 |
+| `server-pack-java` | 服务器包 · Java | `server_pack` | 1100×800 |
 | `server-pack-progress` | 服务器包 · 进度 | `server_pack` | 1100×800 |
 | `server-pack-done` | 服务器包 · 完成 | `server_pack` | 1100×800 |
 | `server-pack-error` | 服务器包 · 错误 | `server_pack` | 1100×800 |

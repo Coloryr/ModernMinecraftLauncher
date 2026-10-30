@@ -23,6 +23,10 @@ const GUI_CONFIG: &str = "mml/gui_config.json";
 const INSTANCES: &str = "mml/minecraft/instances/";
 /// 可选携带的启动器文件名，仅 Windows 允许带
 const LAUNCHER: &str = "MML.exe";
+/// 可选携带的 Java 运行时目录前缀，后面接运行时名称
+///
+/// 导入端按 mml/ 前缀落到运行目录，正好是启动器认的 java/ 位置
+const JAVA: &str = "mml/java";
 /// 导入互斥：同时只跑一次导入，免得两份包互相覆盖
 static IMPORTING: Mutex<()> = Mutex::new(());
 
@@ -115,6 +119,31 @@ pub(super) fn export_pack(
             std::env::current_exe().map_err(|e| e.to_string())?,
         ));
     }
+    // 内置 Java：把整个运行时目录照原样打进 java/<名称>/，导入端解到运行目录后登记进 Java 列表，
+    // 玩家没有装过对应版本的 Java 也能直接启动
+    if let Some(name) = options.java.as_deref().filter(|name| !name.is_empty()) {
+        let info =
+            mml_jvms::get_java_info(name).ok_or_else(|| err_keys::SERVER_PACK_INVALID.to_string())?;
+        // 运行时名称要当目录名进 zip：按包内条目的同一套规则清洗，清洗完不合法就不带
+        let name = java_dir_name(name);
+        if !format::safe_component(&name) {
+            return Err(err_keys::SERVER_PACK_INVALID.into());
+        }
+        // 可执行文件是 <根>/bin/java(或 javaw.exe)，退两级才是运行时根目录
+        let exe = info.path.as_path();
+        let root = exe
+            .parent()
+            .and_then(|bin| bin.parent())
+            .ok_or_else(|| err_keys::SERVER_PACK_INVALID.to_string())?;
+        for path in archive::files_under(root)? {
+            let rel = path
+                .strip_prefix(root)
+                .map_err(|e| e.to_string())?
+                .to_string_lossy()
+                .replace('\\', "/");
+            files.push((format!("{JAVA}/{name}/{rel}"), path));
+        }
+    }
 
     let page = crate::windows::custom_ui::page_file();
     let page_on = options.page && page.is_file();
@@ -174,6 +203,12 @@ pub(super) fn export_pack(
     {
         data.push((format!("mml/{}", crate::client_lock::FILE_NAME), lock));
     }
+    // 自定义程序图标：文件名在界面配置里，文件本身要一起带上，导入端才显示得出同一张图
+    if options.gui_config
+        && let Some(icon) = crate::windows::settings::icon::icon_path()
+    {
+        files.push((format!("mml/{}", crate::windows::settings::icon::ICON_FILE), icon));
+    }
 
     let manifest = Manifest {
         format: "mml-server-pack".into(),
@@ -200,6 +235,27 @@ pub(super) fn export_pack(
     archive::write_zip(file, &files, &data, gui, cancel)
 }
 
+/// 运行时名称当目录名用前先清洗：替换掉包内条目不允许的字符，去掉结尾的点与空格
+///
+/// - `name`: Java 显示名
+///
+/// # 返回值
+///
+/// 可直接当 zip 目录名用的字符串；全部字符都不合法时为空串
+fn java_dir_name(name: &str) -> String {
+    let cleaned: String = name
+        .chars()
+        .map(|c| {
+            if c.is_control() || "\\/:*?\"<>|".contains(c) {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect();
+    cleaned.trim_end_matches(['.', ' ']).to_string()
+}
+
 /// 导入服务器包并重新载入启动器
 ///
 /// - `app`: 应用句柄，重启经它发起
@@ -220,12 +276,20 @@ pub async fn export_import_server_pack(app: AppHandle, file: String) -> Result<(
         let imported = mml_config::config_save::replace_before_restart(|| {
             import_pack(Path::new(&file), &root)
         })?;
-        let ImportedPack { config, gui } = imported;
+        let ImportedPack { config, gui, java } = imported;
         if let Some(config) = config {
             *mml_config::write_config() = config;
         }
         if let Some(gui) = gui {
             gui_config::set(gui);
+        }
+        // 包里自带的 Java 已经在运行目录的 java/ 下：登记进列表，导入完成重启后就能直接用。
+        // 必须在配置替换之后做，否则写进的是被覆盖掉的那份配置
+        for name in java {
+            let dir = root.join(names::JAVA_DIR).join(&name);
+            if let Some(exe) = mml_jvms::find_java_from_path(&dir) {
+                mml_jvms::add_item(Some(name), exe.to_string_lossy().to_string());
+            }
         }
         launch_guard.commit();
         crate::windows::window_restart_app(app);
@@ -233,4 +297,18 @@ pub async fn export_import_server_pack(app: AppHandle, file: String) -> Result<(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::java_dir_name;
+
+    /// 运行时名称要当包内目录名：非法字符换成下划线，结尾的点与空格去掉
+    #[test]
+    fn java_dir_name_cleans_path_chars() {
+        assert_eq!(java_dir_name("OpenJDK-17.0.1-x86_64"), "OpenJDK-17.0.1-x86_64");
+        assert_eq!(java_dir_name("Java 17 (x64)"), "Java 17 (x64)");
+        assert_eq!(java_dir_name("jdk21. "), "jdk21");
+        assert!(super::format::safe_component(&java_dir_name("a/b:c*?")));
+    }
 }

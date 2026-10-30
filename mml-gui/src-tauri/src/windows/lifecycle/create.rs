@@ -263,9 +263,17 @@ pub(crate) fn create_window(
     let win = win.map_err(|e| e.to_string())?;
 
     // 任务栏与 Alt+Tab 的图标固定用程序自己的：桌面快捷方式带的是实例图标（见
-    // windows::main::instance::shortcut），从它启动时 Windows 会把那个图标带进任务栏
-    if let Some(icon) = app.default_window_icon() {
-        let _ = win.set_icon(icon.clone());
+    // windows::main::instance::shortcut），从它启动时 Windows 会把那个图标带进任务栏。
+    // 客户端设置里换过图标就用那一张，没有才回落到内置
+    match crate::windows::settings::icon::custom_icon() {
+        Some(icon) => {
+            let _ = win.set_icon(icon);
+        }
+        None => {
+            if let Some(icon) = app.default_window_icon() {
+                let _ = win.set_icon(icon.clone());
+            }
+        }
     }
 
     // 材质不在这里铺：此刻窗口还是隐藏的，随后 activate_decoration 还会改窗口样式。

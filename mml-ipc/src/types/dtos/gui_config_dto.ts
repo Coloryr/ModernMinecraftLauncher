@@ -67,6 +67,7 @@ export type ClientConfigDto = {
   musicSource: string,
   windowEffect: string,
   windowOpacity: number,
+  programIcon: string,
 };
 
 export type ExperimentalConfigDto = {

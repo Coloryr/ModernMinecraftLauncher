@@ -65,6 +65,11 @@ pub struct ServerPackOptionsDto {
     pub config: bool,
     /// 是否导出界面配置 gui_config.json
     pub gui_config: bool,
+    /// 要打进包的 Java 运行时名称，取已检测到的 Java 列表；None 表示不带
+    ///
+    /// 带上的运行时解到包内 mml/java/<名称>/，导入端落进运行目录的 java/ 并登记进 Java 列表
+    #[serde(default)]
+    pub java: Option<String>,
     /// 是否导出整页主题 custom_ui/page.zip
     pub page: bool,
     /// 是否导出全部自定义样式 custom_ui/css/*.zip
@@ -81,6 +86,7 @@ impl Default for ServerPackOptionsDto {
         Self {
             config: true,
             gui_config: true,
+            java: None,
             page: false,
             css: false,
             home: false,

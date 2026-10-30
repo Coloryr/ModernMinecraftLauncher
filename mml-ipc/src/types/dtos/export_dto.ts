@@ -28,6 +28,7 @@ export type ExportPickDto = {
 export type ServerPackOptionsDto = {
   config: boolean,
   guiConfig: boolean,
+  java?: string | null,
   page: boolean,
   css: boolean,
   home: boolean,

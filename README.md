@@ -122,7 +122,12 @@ bash 版构建当前架构（可用 `MML_TARGETS` 指定三元组）。预发布
 
 Linux 还有两个附加包，都拿已构建的 `target/release/mml-gui` 直接封装、不重新编译：
 `package-flatpak.sh` 需要 `flatpak`；`package-arch.sh` 直接按 Arch 包格式组装
-tar.zst，不依赖 `makepkg`，Ubuntu 上也能打。CI 只在 Linux x64 执行这两个脚本，arm64 不做这两个附加包。
+tar.zst，不依赖 `makepkg`，Ubuntu 上也能打。CI 只在 Linux x64 执行这两个脚本，arm64 不做这两个附加包；
+附加包在独立 job 里打，失败不影响 deb / rpm / AppImage，但发版 job 会等它，缺包时不发 Release。
+
+macOS 产物在配置了 `APPLE_*` secrets 时自动签名并公证，没配置时是未签名包，首次打开需右键 → 打开。
+CI 的 `windows-11-arm` 与 `ubuntu-24.04-arm` 是 GitHub 公共预览 runner，私有仓库可能不可用，
+届时改自托管或回退到 x64 runner 交叉编译。
 
 ### 版本与发布
 

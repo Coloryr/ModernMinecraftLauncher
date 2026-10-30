@@ -1006,6 +1006,8 @@ export function commonCommands(extra = {}) {
     },
     main_get_custom_json: [],
     settings_get_bg: { source: "", dataUrl: "", opacity: 100, blur: 0, nativeSize: 0 },
+    // 没设自定义程序图标：预览位是占位字形
+    settings_get_program_icon: null,
     log_get_setting: {
       wordWrap: false,
       auto: true,
