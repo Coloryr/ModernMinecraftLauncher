@@ -18,14 +18,14 @@ export const accountLocked = ref(false);
 /** 当前账户；null 表示未选择 */
 export const currentAccount = ref<AccountStoreDto | null>(null);
 
-/** 账户类型显示名 */
+/** 账户类型显示名；微软放第一个，离线放最后一个 */
 export const ACCOUNT_TYPES: Array<{ value: string; labelKey: string }> = [
-  { value: "offline", labelKey: "account.typeOffline" },
   { value: "microsoft", labelKey: "account.typeMicrosoft" },
   { value: "littleskin", labelKey: "account.typeLittleSkin" },
   { value: "selflittleskin", labelKey: "account.typeSelflittleskin" },
   { value: "authlib", labelKey: "account.typeAuthlib" },
   { value: "nide8", labelKey: "account.typeNide8" },
+  { value: "offline", labelKey: "account.typeOffline" },
 ];
 
 /**

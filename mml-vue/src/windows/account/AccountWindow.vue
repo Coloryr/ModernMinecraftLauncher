@@ -164,7 +164,7 @@ const hasAccounts = computed(() => accounts.value.length > 0);
 /** 添加账户弹窗是否打开 */
 const showAdd = ref(false);
 /** 添加弹窗当前选中的账户类型 */
-const addType = ref("offline");
+const addType = ref("microsoft");
 /** 表单值，键为字段 key */
 const addFields = ref<Record<string, string>>({});
 /** 提交时没填的必填字段 key：就地标红，用户补填一格就撤一格 */
@@ -296,11 +296,10 @@ function openRegister() {
   commands.main.openUrl(registerUrl.value).catch(() => {});
 }
 
-/** 打开添加账户弹窗；锁定登录方式时默认选第一个锁定类型 */
+/** 打开添加账户弹窗；优先微软登录，锁定生效时用锁定列表里的第一个可用类型 */
 function openAdd() {
   showAdd.value = true;
-  // 锁定登录方式时默认第一个锁定条目的类型，并选中第一个登录模型
-  addType.value = loginLock.value[0]?.ty ?? "offline";
+  addType.value = addTypeOptions.value[0]?.value ?? "microsoft";
   resetAddFields();
 }
 

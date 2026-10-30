@@ -67,7 +67,7 @@ use mml_names::{
     names,
 };
 
-use mml_net::input_file::InputFile;
+use mml_net::{get_work_client, input_file::InputFile};
 use mml_sys::{Os, path_helper};
 use uuid::Uuid;
 
@@ -1001,6 +1001,27 @@ pub fn stop_game(uuid: &Uuid) {
     }
 }
 
+/// 按图标字节判断扩展名；GIF 原样保留，其余常见格式也给出真实扩展
+///
+/// - `data`: 图标原始字节
+///
+/// # 返回值
+///
+/// `gif` / `png` / `jpg` / `webp`；认不出时按 png 兼容旧行为
+fn icon_extension(data: &[u8]) -> &'static str {
+    if data.starts_with(b"GIF8") {
+        "gif"
+    } else if data.starts_with(&[0x89, b'P', b'N', b'G']) {
+        "png"
+    } else if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        "jpg"
+    } else if data.len() > 12 && &data[0..4] == b"RIFF" && &data[8..12] == b"WEBP" {
+        "webp"
+    } else {
+        "png"
+    }
+}
+
 impl InstanceSettingObj {
     /// 创建实例，落在默认分组
     ///
@@ -1278,6 +1299,25 @@ impl InstanceSettingObj {
     ///
     /// 成功返回 `Ok(())`；写盘失败返回对应错误
     pub async fn save_icon(game: &GameInstance, icon: InputFile) -> CoreResult<()> {
+        // 在线整合包图标先读字节判格式：GIF 必须保留 .gif，不能固定写成 icon.png 再转静态图
+        if let InputFile::Url(url) = &icon {
+            let data = get_work_client().get_bytes(url).await?;
+            let ext = icon_extension(&data);
+            let file = game
+                .read()
+                .unwrap()
+                .get_base_path()
+                .join(format!("icon.{ext}"));
+            path_helper::write_bytes_async(&file, &data).await?;
+            let name = file
+                .file_name()
+                .map(|item| item.to_string_lossy().into_owned());
+            let mut game = game.write().unwrap();
+            game.icon = name;
+            game.save();
+            return Ok(());
+        }
+
         let (file, name) = {
             let game = game.read().unwrap();
             // 上传图片 = 图标二选一里的"图片"那一支：写默认的 icon.png

@@ -94,10 +94,12 @@ pub(super) fn sniff_mime(data: &[u8]) -> Option<&'static str> {
 pub(super) fn normalize_icon(data: &[u8]) -> Option<IconBytes> {
     // 磁盘缓存里存的就是 PNG，见 write_icon_file 的调用点：先按文件头认一下直接透传，
     // 省掉一次"解码 + 重新编码"，收藏夹每次刷新图标都会走这条路径
-    if sniff_mime(data) == Some("image/png") {
+    if let Some(mime) = sniff_mime(data)
+        && (mime == "image/png" || mime == "image/gif")
+    {
         return Some(IconBytes {
             data: data.to_vec(),
-            mime: "image/png",
+            mime,
         });
     }
 

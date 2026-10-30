@@ -12,7 +12,9 @@ use uuid::Uuid;
 use mml_sys::path_helper;
 
 use super::INSTANCE_IMAGE;
-use super::respond::{read_as_png, send_bad, send_png};
+use super::respond::{
+    IconBytes, decode_as_png, read_as_png, send_bad, send_icon, send_png, sniff_mime,
+};
 
 /// 实例图标，URI 形如 `instance/<uuid>`：内存缓存命中直接回，未命中按图标来源取图
 ///
@@ -64,11 +66,24 @@ pub(super) fn load_instance_image(uri: &[&str], res: UriSchemeResponder) {
 
     // 分支二：没有方块 ID → 读图标文件，Icon 已清空的实例按默认 icon.png 找
     let icon = instance.read().unwrap().get_icon_file_or_default();
-    if !icon.is_file() {
+    let Ok(data) = path_helper::read_byte(&icon) else {
         send_bad(res);
         return;
+    };
+
+    // GIF 原样回给 webview，解码成 PNG 会把动画截成第一帧
+    if sniff_mime(&data) == Some("image/gif") {
+        send_icon(
+            res,
+            &IconBytes {
+                data,
+                mime: "image/gif",
+            },
+        );
+        return;
     }
-    let Some(image) = read_as_png(icon) else {
+
+    let Some(image) = decode_as_png(&data) else {
         send_bad(res);
         return;
     };

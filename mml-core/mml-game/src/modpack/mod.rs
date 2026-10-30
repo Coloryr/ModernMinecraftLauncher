@@ -161,6 +161,7 @@ impl IBaseArchiveGui for PackExtractGui {
     fn update(&self, filename: Option<String>, current: usize) {
         let total = self.total.load(Ordering::Relaxed);
         if let Some(pack) = &self.pack {
+            // 完整路径交给前端按宽度截成一行；这里只保留原值，别提前丢了上级目录
             pack.set_sub_text(filename.clone());
             pack.set_sub_now(current, Some(total));
         }

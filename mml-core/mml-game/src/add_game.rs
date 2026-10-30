@@ -1,12 +1,21 @@
 //! 添加游戏实例操作
 //! 导入文件夹，导入压缩包
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    thread,
+    time::Duration,
+};
 
 use mml_base::{
     archives::{ArchiveEntryInfo, BaseArchive, BaseArchiveGui},
     file_item::{FileHash, FileItemObj, LaterRun},
     serialize_tools::{self, MiniJsonObj},
 };
+use mml_downloader::TaskOutcome;
 use mml_names::{
     i18,
     i18_items::{
@@ -345,6 +354,74 @@ pub async fn add_game_folder<P: AsRef<Path>>(
 /// # 返回值
 ///
 /// 新实例 uuid；路径不存在、元数据缺失或中途取消返回对应错误
+/// 下载进度的分母：按千分比写入任务的子进度，避开 u32 字节数上限
+const DOWNLOAD_PROGRESS_TOTAL: usize = 1000;
+
+/// 下载一批文件，并把字节进度写进整合包安装任务的子进度
+///
+/// - `items`: 待下载文件
+/// - `pack_gui`: 安装任务进度回调；`None` 时只等结果
+/// - `cancel`: 取消令牌
+///
+/// # 返回值
+///
+/// 下载结果
+pub(crate) async fn download_with_progress(
+    items: Vec<FileItemObj>,
+    pack_gui: AddModPackGui,
+    cancel: CancellationToken,
+) -> TaskOutcome {
+    let Some(handle) = mml_downloader::start_download_task_handle(items, cancel) else {
+        return TaskOutcome::Cancelled;
+    };
+    let handle = Arc::new(handle);
+    if let Some(gui) = &pack_gui {
+        gui.set_sub_text(None);
+        gui.set_sub_now(0, Some(DOWNLOAD_PROGRESS_TOTAL));
+    }
+
+    // 下载句柄的 wait 只等结果；每 200ms 从快照读一次字节进度，交给任务子进度条
+    let stop = Arc::new(AtomicBool::new(false));
+    let reporter = {
+        let handle = handle.clone();
+        let gui = pack_gui.clone();
+        let stop = stop.clone();
+        thread::spawn(move || {
+            while !stop.load(Ordering::Acquire) {
+                report_download(&gui, &handle.status());
+                if handle.is_finished() {
+                    break;
+                }
+                thread::sleep(Duration::from_millis(200));
+            }
+        })
+    };
+
+    let outcome = handle.wait().await;
+    stop.store(true, Ordering::Release);
+    let _ = reporter.join();
+    report_download(&pack_gui, &handle.status());
+    outcome
+}
+
+/// 把下载任务快照折算成千分比子进度
+///
+/// - `gui`: 安装任务进度回调
+/// - `status`: 下载任务快照
+fn report_download(gui: &AddModPackGui, status: &mml_downloader::TaskSnapshot) {
+    let Some(gui) = gui else {
+        return;
+    };
+    let done = if status.all_bytes > 0 {
+        status.now_bytes.min(status.all_bytes) * DOWNLOAD_PROGRESS_TOTAL as u64 / status.all_bytes
+    } else if status.total > 0 {
+        status.completed as u64 * DOWNLOAD_PROGRESS_TOTAL as u64 / status.total as u64
+    } else {
+        0
+    };
+    gui.set_sub_now(done as usize, Some(DOWNLOAD_PROGRESS_TOTAL));
+}
+
 async fn modpack<P: AsRef<Path>>(
     file: P,
     source: ModPackType,
@@ -1785,9 +1862,8 @@ pub async fn install_modrinth(
     let item = modrinth::make_download_obj(data, mml_downloader::get_download_path());
     let file = item.file.clone();
 
-    let res = mml_downloader::start_download_task(vec![item]).await;
-
-    if !res {
+    let outcome = download_with_progress(vec![item], pack_gui.clone(), cancel.clone()).await;
+    if !outcome.is_done() {
         return Err(ErrorType::DownloadFileFail);
     }
 
@@ -1842,9 +1918,8 @@ pub async fn install_curseforge(
     let item = curseforge::make_file_item_obj(data, mml_downloader::get_download_path());
     let file = item.file.clone();
 
-    let res = mml_downloader::start_download_task(vec![item]).await;
-
-    if !res {
+    let outcome = download_with_progress(vec![item], pack_gui.clone(), cancel.clone()).await;
+    if !outcome.is_done() {
         return Err(ErrorType::DownloadFileFail);
     }
 

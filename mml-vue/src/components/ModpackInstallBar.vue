@@ -63,6 +63,45 @@ function taskProgress(task: ModPackTaskDto): number {
   return task.total ? (task.now / task.total) * 100 : 0;
 }
 
+/**
+ * 把解压条目的完整路径压成一行，保留末尾文件名
+ *
+ * - `path`: 压缩包内路径
+ * - `max`: 最多显示多少字符，超出时优先保留上级目录与扩展名
+ *
+ * # 返回值
+ *
+ * 形如 `.../父目录/文件名`；文件名本身过长时缩短中段
+ */
+function shortPath(path: string, max = 64): string {
+  const normalized = path.replace(/\\/g, "/");
+  if (normalized.length <= max) return normalized;
+
+  const parts = normalized.split("/").filter(Boolean);
+  const file = parts.pop() ?? normalized;
+  const parent = parts.pop();
+  const dot = file.lastIndexOf(".");
+  const ext = dot > 0 && dot < file.length - 1 ? file.slice(dot) : "";
+  const base = ext ? file.slice(0, dot) : file;
+
+  /** 把文件名缩成 head...tail */
+  const shortenBase = (budget: number) => {
+    if (base.length <= budget) return base;
+    const head = Math.max(1, Math.ceil(budget / 2));
+    return `${base.slice(0, head)}...${base.slice(-(budget - head))}`;
+  };
+
+  const prefix = parent ? `${parent}/` : "";
+  const budget = max - 4 - prefix.length - ext.length - 3;
+  if (budget >= 8) {
+    return `.../${prefix}${shortenBase(budget)}${ext}`;
+  }
+
+  // 上级目录太长：只保留文件名，仍然缩短中段并保留扩展名
+  const onlyFileBudget = Math.max(8, max - 4 - ext.length - 3);
+  return `.../${shortenBase(onlyFileBudget)}${ext}`;
+}
+
 /** 标题行文案：还有在装的按"正在安装 N 个"说，全结束了改说"已结束"（别再报 0 个正在安装） */
 const headText = computed(() =>
   running.value.length
@@ -100,9 +139,9 @@ async function clearDone() {
         </svg>
       </span>
     </div>
-    <!-- 总进度条：只在真有任务在跑时画。全结束时它是条满格蓝杠，什么信息都没表达，
-         还占着标题下面一整行，配合"清除已完成"的 ✕ 整块看着像还在下载 -->
-    <div v-if="running.length" class="progress-track">
+    <!-- 总进度条：只有多个任务时才画；单个任务下面那条就是它自己的进度，
+         再画一条总进度只会重复。全结束时也不画，满格蓝杠没有信息量 -->
+    <div v-if="running.length > 1" class="progress-track">
       <div class="progress-fill" :style="{ width: percent + '%' }" />
     </div>
 
@@ -130,13 +169,13 @@ async function clearDone() {
           </div>
           <!-- 任务进度：失败 / 取消的任务不再画条。原来兜底给 100%，失败的任务下面就
                挂着一条满格的灰条，看着像"下载完了"，与旁边的"失败"标签自相矛盾。
-               已完成才走 100%。解压阶段有子进度时让位，避免一条阶段条压在解压条上面不动 -->
-          <div v-if="!task.failed && !task.cancelled && !(task.state === 'extract' && task.subTotal > 0)"
+               已完成才走 100%。进行中有子进度时让位，避免一条阶段条压在子进度条上面不动 -->
+          <div v-if="!task.failed && !task.cancelled && !(isRunning(task) && task.subTotal > 0)"
             class="progress-track sub">
             <div class="progress-fill" :style="{ width: taskProgress(task) + '%' }" />
           </div>
           <template v-if="isRunning(task) && (task.subText || task.subTotal)">
-            <div class="mp-task-sub">{{ task.subText || "" }}</div>
+            <div class="mp-task-sub" v-tip="task.subText || ''">{{ shortPath(task.subText || "") }}</div>
             <div class="progress-track sub">
               <div class="progress-fill"
                 :style="{ width: task.subTotal ? (task.subNow / task.subTotal) * 100 + '%' : '0%' }" />
@@ -348,7 +387,9 @@ async function clearDone() {
 .mp-task-sub {
   font-size: 12.5px;
   color: var(--text-dim);
-  word-break: break-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mp-task-error {
