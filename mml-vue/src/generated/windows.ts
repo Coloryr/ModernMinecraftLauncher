@@ -50,6 +50,7 @@ export { default as WinLobbyMappingLobby } from "../windows/lobby/MappingLobby.v
 export { default as LogWindow } from "../windows/log/LogWindow.vue";
 export { default as WinMainBlockIconPickModal } from "../windows/main/BlockIconPickModal.vue";
 export { default as WinMainColorMcMigrateSection } from "../windows/main/ColorMcMigrateSection.vue";
+export { default as WinMainFirstRunSetup } from "../windows/main/FirstRunSetup.vue";
 export { default as WinMainIconCropStage } from "../windows/main/IconCropStage.vue";
 export { default as WinMainIconPickModal } from "../windows/main/IconPickModal.vue";
 export { default as MainWindow } from "../windows/main/MainWindow.vue";

@@ -16,6 +16,7 @@ use mml_names::{
     i18,
     i18_items::{
         error_type::{CoreResult, ErrorType},
+        info_type::InfoType,
         thread_type::ThreadType,
     },
     names,
@@ -206,8 +207,14 @@ fn read() {
     } else {
         match read_with_retry(&file) {
             Ok(data) => {
+                // 读到的是哪一份文件要留痕：统计被空文件盖掉时，这行能直接看出读到的内容
+                mml_log::info_type(InfoType::GameCountLoad {
+                    size: std::fs::metadata(&file).map(|meta| meta.len()).unwrap_or(0),
+                    launch: data.launch_count,
+                    runs: data.game_runs.values().map(|list| list.len()).sum(),
+                });
+                // 指纹已经在 read_with_retry 里按"读之前那一版"记好了
                 *COUNT.write().unwrap() = data;
-                *FILE_STAMP.lock().unwrap() = file_stamp(&file);
             }
             Err(err) => {
                 loaded = false;
@@ -250,8 +257,18 @@ fn read_with_retry(file: &Path) -> CoreResult<CountObj> {
         if attempt > 0 {
             thread::sleep(StdDuration::from_millis(400));
         }
+        // 先记指纹再解析，两次一致才算这一份：用户可能正好在启动器读文件的同时把
+        // count.dat 换掉 —— 读到旧内容、却把新文件的指纹记成"自己读的那一版"，
+        // 随后那次启动保存就会拿空统计把刚换进来的文件盖掉
+        let before = file_stamp(file);
         match parse_file(file) {
-            Ok(data) => return Ok(data),
+            Ok(data) => {
+                if before.is_some() && before == file_stamp(file) {
+                    *FILE_STAMP.lock().unwrap() = before;
+                    return Ok(data);
+                }
+                last = Some(ErrorType::NbtReadError);
+            }
             Err(err) => last = Some(err),
         }
     }
@@ -270,9 +287,34 @@ fn file_stamp(file: &Path) -> Option<(SystemTime, u64)> {
     Some((meta.modified().ok()?, meta.len()))
 }
 
-/// 把读不出来的统计文件备份成 `count.dat.bak`
+/// 磁盘上那份统计是否比内存里这份多
 ///
-/// 只备份、不删除：原文件留在原地，下次启动还会再试；备份留着方便排查。
+/// 启动次数与运行段只增不减，所以"磁盘上的更多"只可能意味着内存里这份是空的或旧的
+/// （比如启动器读文件的时候，文件正好被用户换掉了）。这时候写回去就是拿空统计盖掉
+/// 用户的数据，宁可这一次不保存。
+///
+/// - `file`: 统计文件
+/// - `count`: 内存里的统计
+///
+/// # 返回值
+///
+/// 磁盘上那份更多时返回它的累计启动次数与内存里这份的次数，否则 `None`
+fn disk_more_than(file: &Path, count: &CountObj) -> Option<(i64, i64)> {
+    // 读不出来就当没有证据：坏文件本来就该被这份好数据覆盖
+    let disk = parse_file(file).ok()?;
+    let disk_runs: usize = disk.game_runs.values().map(|list| list.len()).sum();
+    let mem_runs: usize = count.game_runs.values().map(|list| list.len()).sum();
+    if disk.launch_count > count.launch_count || disk_runs > mem_runs {
+        Some((disk.launch_count, count.launch_count))
+    } else {
+        None
+    }
+}
+
+/// 把统计文件备份成 `count.dat.bak`
+///
+/// 两处用到：读不出来时留一份坏文件方便排查；每次覆盖前留一份上一版，
+/// 万一还是被空统计盖掉，用户能手动换回来。
 ///
 /// - `file`: 统计文件
 fn backup_file(file: &Path) {
@@ -541,6 +583,7 @@ fn save() {
         && let Some(now) = file_stamp(file)
         && now != old
     {
+        mml_log::info_type(InfoType::GameCountKeepOuter);
         IS_SAVE.store(false, Ordering::SeqCst);
         return;
     }
@@ -551,6 +594,12 @@ fn save() {
         };
 
         let count = COUNT.read().unwrap();
+
+        // 最后一道闸：统计只增不减，磁盘上那份更多就说明内存里这份是空的 / 旧的
+        if let Some((disk, mem)) = disk_more_than(&file, &count) {
+            mml_log::info_type(InfoType::GameCountKeepBigger { disk, mem });
+            return Ok(());
+        }
 
         let mut nbt = NbtCompound::new();
         nbt.data.insert(
@@ -630,11 +679,20 @@ fn save() {
 
         drop(count);
 
+        // 覆盖前把上一版留成 count.dat.bak：真被空统计盖掉时还能捞回来
+        if file.is_file() {
+            backup_file(&file);
+        }
+
         let nbt_file = NbtFile::new(nbt.to_nbt(), CompressType::GZip);
         let stream = &mut path_helper::open_write(&file)?;
         nbt_file.write(stream)?;
         // 记下自己这次写出去的指纹，下次保存才分得清"外部改过"与"自己写的"
-        *FILE_STAMP.lock().unwrap() = file_stamp(&file);
+        let stamp = file_stamp(&file);
+        *FILE_STAMP.lock().unwrap() = stamp;
+        mml_log::info_type(InfoType::GameCountSave {
+            size: stamp.map(|(_, len)| len).unwrap_or(0),
+        });
 
         Ok(())
     })();
@@ -916,6 +974,31 @@ mod tests {
             "2026-09-20 00:35:16"
         );
         assert!(stop > start);
+    }
+
+    /// 磁盘上那份统计比内存里多时不能落盘
+    ///
+    /// 统计只增不减：内存里这份要是比磁盘上的少，说明读到的是空的 / 旧的那一份
+    /// （文件在启动器读它的时候被换掉了），写回去就把用户的统计盖没了。
+    #[test]
+    fn disk_with_more_data_blocks_save() {
+        let dir = mml_testutil::temp_path(format!("count-guard-{}", Uuid::new_v4()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join(names::COUNT_DATA_FILE);
+        std::fs::write(&file, include_bytes!("../tests/count/count.dat")).unwrap();
+
+        // 内存里是空的：磁盘上那份（1533 次启动）更多，必须拦住
+        let empty = CountObj::default();
+        let (disk, mem) = disk_more_than(&file, &empty).expect("磁盘上那份更多时应当拦住");
+        assert_eq!(mem, 0);
+        assert!(disk > 0);
+
+        // 内存里就是这份文件读出来的：不拦
+        let same = parse_file(&file).unwrap();
+        assert!(disk_more_than(&file, &same).is_none());
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// 读不出来的统计文件不能被空统计覆盖

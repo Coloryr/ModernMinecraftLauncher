@@ -235,6 +235,16 @@ pub async fn add_resource_download(
     tauri::async_runtime::spawn(async move {
         let outcome = mml_downloader::start_download_task_outcome(vec![obj]).await;
 
+        // 结束通知用条目里的显示名；先读，标完终态后前端「清除已完成」可能已经把它清掉。
+        // 成功与失败各发一条，取消是用户自己按的，不打扰
+        let name = {
+            let map = DOWNLOAD_NOW.read().unwrap();
+            map.get(&uuid)
+                .and_then(|entry| entry.get(&key))
+                .map(|info| info.name.clone())
+                .unwrap_or_default()
+        };
+
         // 终态：完成 / 失败 / 取消三态互斥（与整合包那套一致）；取消时进度停在原地，
         // 不拉满 —— 用户看得见它是被中途停掉的
         {
@@ -270,6 +280,16 @@ pub async fn add_resource_download(
             let mut list = game.read_online_info();
             list.insert(pid2, online_info);
             game.save_online_info(&list);
+
+            crate::notify::notify_if_unfocused(
+                &app2,
+                crate::log_text::NotifyText::ResourceDone { name },
+            );
+        } else if !outcome.is_cancelled() {
+            crate::notify::notify_if_unfocused(
+                &app2,
+                crate::log_text::NotifyText::ResourceFailed { name },
+            );
         }
 
         // 终态条目**不自动移除**：用户要能回头看这次下了哪些、哪些失败了，

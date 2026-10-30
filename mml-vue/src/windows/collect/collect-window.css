@@ -99,8 +99,13 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-gutter: stable;
   /* 见 styles/scrollbar.css */
+  scrollbar-gutter: stable;
+  /* 右边缘顶到窗口边：抵消 .frame-body 的 26px 右内边距，滚动条才贴着窗口右边，
+     不然它会停在离窗口边 26px 的地方 */
+  margin-right: -26px;
+  /* 与上面的 scrollbar-gutter 成对：扣掉常驻的那 9px，卡片右缘仍与搜索框对齐 */
+  padding-right: calc(26px - 9px);
   /* 底边留 2px：卡片悬停上浮时下缘不被滚动区裁掉 */
   padding-bottom: 2px;
 }
@@ -176,10 +181,10 @@
 }
 
 .collect-grid {
-  /* 卡片宽度固定 340px，不随所在分组 / 窗口宽度拉伸：左栏占了 168px，
-     用 1fr 的话两列会被撑到 430 左右，看着比原来大一圈 */
+  /* 卡片随窗口宽度拉伸：340px 是最小宽度，窗口变宽时同排的卡片一起变宽，
+     不会在右边留一大块空白。min() 保证窄窗时也不会撑出横向滚动 */
   display: grid;
-  grid-template-columns: repeat(auto-fill, 340px);
+  grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
   gap: 12px;
   align-content: start;
 }

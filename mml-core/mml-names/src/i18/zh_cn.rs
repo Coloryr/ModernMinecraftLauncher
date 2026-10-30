@@ -38,6 +38,16 @@ impl I18Lang for ZhCn {
             InfoType::ImportLegacyGroups { groups, instances } => format!(
                 "已把旧版分组文件 instgroups.json 并入分组表：新建 {groups} 个分组，归入 {instances} 个实例"
             ),
+            InfoType::GameCountLoad { size, launch, runs } => format!(
+                "统计文件已读取：{size} 字节，{launch} 次启动，{runs} 段运行记录"
+            ),
+            InfoType::GameCountSave { size } => format!("统计文件已保存：{size} 字节"),
+            InfoType::GameCountKeepOuter => {
+                String::from("统计文件在运行期间被外部替换过，本次不覆盖")
+            }
+            InfoType::GameCountKeepBigger { disk, mem } => format!(
+                "磁盘上的统计比内存里的多（{disk} 次启动 > {mem} 次），本次不覆盖"
+            ),
             InfoType::DownloadTaskDone {
                 total,
                 completed,

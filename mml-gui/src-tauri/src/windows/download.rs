@@ -295,10 +295,13 @@ impl mml_downloader::IDownloadGui for DownloadGuiHook {
 
         if queue_done {
             let count = TASKS_SINCE_IDLE.swap(0, Ordering::SeqCst);
-            crate::notify::notify_if_unfocused(
-                &self.app,
-                crate::log_text::NotifyText::DownloadDone { count },
-            );
+            // 资源下载与整合包安装会自己发终态通知，这里不再补一条泛化的下载完成
+            if !super::has_self_notifying_task() {
+                crate::notify::notify_if_unfocused(
+                    &self.app,
+                    crate::log_text::NotifyText::DownloadDone { count },
+                );
+            }
         }
     }
 }

@@ -93,6 +93,17 @@ pub(crate) fn instance_busy(instance: &Uuid) -> bool {
     })
 }
 
+/// 是否有未结束的资源下载
+///
+/// 系统通知用：资源下载结束时会自己发通知，下载队列清空时不再重复提示。
+pub(crate) fn has_active() -> bool {
+    DOWNLOAD_NOW.read().unwrap().values().any(|entry| {
+        entry
+            .values()
+            .any(|info| !(info.done || info.failed || info.cancelled))
+    })
+}
+
 /// 下载源定位信息，pid + fid 唯一确定一个资源 / 文件
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct SourceInfo {

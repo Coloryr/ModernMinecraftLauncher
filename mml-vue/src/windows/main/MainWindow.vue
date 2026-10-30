@@ -63,6 +63,7 @@ import LaunchProgress from "../../components/LaunchProgress.vue";
 import IconPickModal from "./IconPickModal.vue";
 import BlockIconPickModal from "./BlockIconPickModal.vue";
 import OldDataModal from "./OldDataModal.vue";
+import FirstRunSetup from "./FirstRunSetup.vue";
 import { useInstanceDrag } from "../../composables/useInstanceDrag";
 import { useMultiSelect } from "../../composables/useMultiSelect";
 import { useFileDrop } from "../../composables/useFileDrop";
@@ -1595,6 +1596,12 @@ const oldData = ref<{ colormc: ColorMcInfoDto | null; minecraft: MinecraftInfoDt
 /** 弹窗"已结束"信号：答完或直接关掉时解开 */
 let oldDataSettled: (() => void) | null = null;
 
+/** 这次运行里有没有真的搬过旧数据：决定关掉旧数据弹窗后要不要问首次使用设置 */
+let oldDataImported = false;
+
+/** 首次使用设置弹窗是否打开；只在导入完成之后出现 */
+const firstRunSetup = ref(false);
+
 /**
  * 问后端有没有可迁移的旧数据（ColorMC / .minecraft），**在加载期间问，主页面之前**
  *
@@ -1620,6 +1627,8 @@ function onOldDataClosed() {
   oldData.value = null;
   oldDataSettled?.();
   oldDataSettled = null;
+  // 这次真的搬过数据才问首次使用设置：没搬就没什么"首启"可言
+  if (oldDataImported) firstRunSetup.value = true;
 }
 
 /**
@@ -1630,6 +1639,7 @@ function onOldDataClosed() {
  * 立刻显示；.minecraft 那节走实例 API 建实例，重拉就能看到。
  */
 function onOldDataDone() {
+  oldDataImported = true;
   void loadInstances();
   void loadGroups();
   // ColorMC 迁移会合并账户，顶栏的账户列表要跟着刷新
@@ -2553,6 +2563,9 @@ onMounted(async () => {
     <!-- ===== 首次启动：把旧启动器的数据搬过来（见 doInit 的探测）===== -->
     <OldDataModal v-if="oldData" :colormc="oldData.colormc" :minecraft="oldData.minecraft"
       @close="onOldDataClosed" @done="onOldDataDone" />
+
+    <!-- ===== 首次使用设置：旧数据搬完之后问一次（见 onOldDataClosed）===== -->
+    <FirstRunSetup v-if="firstRunSetup" @close="firstRunSetup = false" />
 
     <!-- ===== 选择目标分组：转移分组与移动选中实例共用 ===== -->
     <BaseModal v-if="showMoveGroupPick" :title="t('group.pickTitle')" :closable="false"

@@ -31,6 +31,10 @@ const ICONS: Record<string, string> = {
     '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>',
   grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
   list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  // 柱状图：三根高低不同的柱子
+  bars: '<path d="M6 20V11M12 20V4M18 20v-6"/>',
+  // 饼图：圆 + 一撇切出来的扇形
+  pie: '<circle cx="12" cy="12" r="9"/><path d="M12 3v9h9"/>',
 };
 </script>
 

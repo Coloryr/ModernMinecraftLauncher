@@ -1347,6 +1347,21 @@ pub enum NotifyText {
         /// 整合包显示名
         name: String,
     },
+    /// 实例添加完成
+    InstanceAdded {
+        /// 实例显示名
+        name: String,
+    },
+    /// 资源下载完成
+    ResourceDone {
+        /// 资源显示名
+        name: String,
+    },
+    /// 资源下载失败
+    ResourceFailed {
+        /// 资源显示名
+        name: String,
+    },
 }
 
 impl NotifyText {
@@ -1370,12 +1385,22 @@ impl NotifyText {
                 format!("{count} 个下载任务已结束，打开下载窗口查看结果"),
             ),
             NotifyText::ModpackDone { name } => {
-                (String::from("安装完成"), format!("{name} 已安装完成"))
+                (String::from("整合包安装完成"), format!("{name} 已安装完成"))
             }
             // 失败原因是一串前端文案键，界面侧才翻得出来，通知里只报是哪一包
             NotifyText::ModpackFailed { name } => (
-                String::from("安装失败"),
+                String::from("整合包安装失败"),
                 format!("{name} 安装失败，打开下载窗口查看原因"),
+            ),
+            NotifyText::InstanceAdded { name } => {
+                (String::from("添加完成"), format!("{name} 已添加完成"))
+            }
+            NotifyText::ResourceDone { name } => {
+                (String::from("资源下载完成"), format!("{name} 已下载完成"))
+            }
+            NotifyText::ResourceFailed { name } => (
+                String::from("资源下载失败"),
+                format!("{name} 下载失败，打开添加资源窗口查看原因"),
             ),
         }
     }
@@ -1388,12 +1413,24 @@ impl NotifyText {
                 format!("{count} download tasks finished, open the download window for details"),
             ),
             NotifyText::ModpackDone { name } => (
-                String::from("Installation finished"),
+                String::from("Modpack installed"),
                 format!("{name} has been installed"),
             ),
             NotifyText::ModpackFailed { name } => (
-                String::from("Installation failed"),
+                String::from("Modpack installation failed"),
                 format!("failed to install {name}, open the download window for details"),
+            ),
+            NotifyText::InstanceAdded { name } => (
+                String::from("Instance added"),
+                format!("{name} has been added"),
+            ),
+            NotifyText::ResourceDone { name } => (
+                String::from("Resource downloaded"),
+                format!("{name} has been downloaded"),
+            ),
+            NotifyText::ResourceFailed { name } => (
+                String::from("Resource download failed"),
+                format!("failed to download {name}, open the add resource window for details"),
             ),
         }
     }

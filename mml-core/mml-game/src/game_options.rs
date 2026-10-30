@@ -122,7 +122,7 @@ impl InstanceSettingObj {
         Ok(())
     }
 
-    /// 读取游戏配置文件 options.txt，`=` 分隔；文件不存在时返回空表
+    /// 读取游戏配置文件 options.txt，`:` 分隔；文件不存在时返回空表
     ///
     /// # 返回值
     ///
@@ -130,13 +130,13 @@ impl InstanceSettingObj {
     pub fn get_minecraft_options(&self) -> CoreResult<InstanceCfg> {
         let file = self.get_option_file();
         if file.exists() {
-            read_options_from_file(file, Some('='))
+            read_options_from_file(file, None)
         } else {
             Ok(Default::default())
         }
     }
 
-    /// 保存游戏配置文件 options.txt，`=` 分隔
+    /// 保存游戏配置文件 options.txt，`:` 分隔
     ///
     /// - `list`: 配置选项
     ///
@@ -150,7 +150,7 @@ impl InstanceSettingObj {
         for (key, value) in list.iter() {
             stream
                 .write_fmt(format_args!(
-                    "{}={}{}",
+                    "{}:{}{}",
                     key,
                     value,
                     mml_names::get_line_ending()
@@ -159,5 +159,51 @@ impl InstanceSettingObj {
         }
 
         Ok(())
+    }
+
+    /// 改 options.txt 里的一个键，其余行原样保留
+    ///
+    /// 单个键的修改不要走整表重写：整表会把值里带 `#` 的行截断，也会打乱原有顺序。
+    ///
+    /// - `key`: 键名，如 `lang`
+    /// - `value`: 新值；`None` 表示删掉这一行
+    ///
+    /// # 返回值
+    ///
+    /// 写入失败返回对应错误
+    pub fn set_minecraft_option(&self, key: &str, value: Option<&str>) -> CoreResult<()> {
+        let file = self.get_option_file();
+        if !file.exists() && value.is_none() {
+            return Ok(());
+        }
+        let text = if file.exists() {
+            path_helper::read_text(&file)?
+        } else {
+            String::new()
+        };
+        let eol = mml_names::get_line_ending();
+        let prefix = format!("{key}:");
+        let mut out = String::with_capacity(text.len() + value.map_or(0, |v| v.len()) + eol.len());
+        let mut found = false;
+        for line in text.lines() {
+            if line.starts_with(&prefix) {
+                // 重复键只认第一条，后面的重复行直接丢掉
+                if !found && let Some(value) = value {
+                    out.push_str(&prefix);
+                    out.push_str(value);
+                    out.push_str(&eol);
+                }
+                found = true;
+            } else {
+                out.push_str(line);
+                out.push_str(&eol);
+            }
+        }
+        if !found && let Some(value) = value {
+            out.push_str(&prefix);
+            out.push_str(value);
+            out.push_str(&eol);
+        }
+        path_helper::write_text(file, &out)
     }
 }

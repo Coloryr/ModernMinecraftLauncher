@@ -35,6 +35,16 @@ impl I18Lang for EnUs {
             InfoType::ImportLegacyGroups { groups, instances } => format!(
                 "imported legacy group file instgroups.json: {groups} new groups, {instances} instances"
             ),
+            InfoType::GameCountLoad { size, launch, runs } => format!(
+                "count file loaded: {size} bytes, {launch} launches, {runs} runs"
+            ),
+            InfoType::GameCountSave { size } => format!("count file saved: {size} bytes"),
+            InfoType::GameCountKeepOuter => {
+                String::from("count file was replaced externally, not overwriting this run")
+            }
+            InfoType::GameCountKeepBigger { disk, mem } => format!(
+                "count file on disk has more data than memory ({disk} launches > {mem}), not overwriting"
+            ),
             InfoType::DownloadTaskDone {
                 total,
                 completed,

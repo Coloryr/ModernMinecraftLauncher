@@ -2,10 +2,13 @@
 //!
 //! 实例创建走 `mml_game::add_game`，含新建 / 文件夹导入 / 压缩包 / 在线网址，创建成功后
 //! 发 instance-change 事件通知主窗口刷新列表。命令按职责拆在 `create` / `loader` / `model`
-//! 三个子模块里，本文件只留取消、关闭保护与重名确认答复；模型只保存跟随窗口生命周期的
+//! 三个子模块里，本文件只留取消、关闭保护、重名确认答复与实例完成通知；模型只保存跟随窗口生命周期的
 //! 运行态：取消令牌、关闭保护与重名确认应答通道。
 
-use tauri::WebviewWindow;
+use tauri::{AppHandle, WebviewWindow};
+use uuid::Uuid;
+
+use crate::log_text::NotifyText;
 // 带命令的子模块必须 `pub(crate)`：生成的 `tauri_commands!` 从 crate 根引用它们
 pub(crate) mod create;
 pub(crate) mod loader;
@@ -60,4 +63,18 @@ pub fn add_set_close_guard(window: WebviewWindow, enabled: bool) {
     if let Ok(store) = model(&window) {
         store.lock().unwrap().set_close_guard(enabled);
     }
+}
+
+/// 新实例建好后，若启动器不在前台就发一条系统通知
+///
+/// - `app`: 应用句柄
+/// - `uuid`: 新实例 uuid，用来取实例显示名
+pub(crate) fn notify_instance_added(app: &AppHandle, uuid: &str) {
+    let name = Uuid::parse_str(uuid)
+        .ok()
+        .and_then(|uuid| mml_game::get_instance(&uuid))
+        .and_then(|game| game.read().ok().map(|game| game.name.clone()))
+        .unwrap_or_else(|| uuid.to_string());
+
+    crate::notify::notify_if_unfocused(app, NotifyText::InstanceAdded { name });
 }

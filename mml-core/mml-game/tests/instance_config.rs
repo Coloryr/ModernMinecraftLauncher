@@ -252,6 +252,38 @@ fn game_options_missing_file_returns_empty() {
     assert!(data.is_empty());
 }
 
+/// options.txt 用冒号分隔，且改单个键不能动别的行
+#[test]
+fn minecraft_options_use_colon_separator() {
+    init_all();
+
+    let dir = format!("options-{}", Uuid::new_v4().simple());
+    let instance = make_instance(&dir);
+    std::fs::create_dir_all(instance.get_game_path()).unwrap();
+    let file = instance.get_option_file();
+    let raw = "version:3465\n# keep\nlang:en_us\nresourcePacks:[\"file/A#B.zip\"]\n";
+    std::fs::write(&file, raw).unwrap();
+
+    let mut options = instance.get_minecraft_options().unwrap();
+    assert_eq!(options.get("lang").map(String::as_str), Some("en_us"));
+    options.insert(String::from("lang"), String::from("zh_cn"));
+    instance.save_minecraft_options(&options).unwrap();
+    let text = std::fs::read_to_string(&file).unwrap();
+    assert!(text.contains("lang:zh_cn"), "{text}");
+    assert!(!text.contains("lang=zh_cn"), "{text}");
+
+    // 只改 lang 这一行，其余内容（含带 # 的值）原样保留
+    std::fs::write(&file, raw).unwrap();
+    instance
+        .set_minecraft_option("lang", Some("zh_cn"))
+        .unwrap();
+    let text = std::fs::read_to_string(&file).unwrap();
+    assert!(text.lines().any(|line| line == "lang:zh_cn"), "{text}");
+    assert!(text.contains("# keep"), "{text}");
+    assert!(text.contains("resourcePacks:[\"file/A#B.zip\"]"), "{text}");
+    assert!(text.contains("version:3465"), "{text}");
+}
+
 /// 模组更新记录：追加两条，读回来两条且保持追加顺序
 ///
 /// 关键是**追加不能冲掉前一条**：这条链路是"读旧表 + 追加 + 写回"，

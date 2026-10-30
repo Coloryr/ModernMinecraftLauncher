@@ -12,6 +12,7 @@ import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import HighlightText from "../../../components/ui/HighlightText.vue";
 import VirtualList from "../../../components/ui/VirtualList.vue";
 import InstanceIcon from "../../../components/InstanceIcon.vue";
+import { animations } from "../../../lib/appearance";
 import { t } from "../../../lib/i18n";
 import type { InstanceInfoDto, ViewMode } from "../../../lib/bindings";
 import type { DragCandidate, GroupView } from "../types";
@@ -82,14 +83,119 @@ function onSearchInput(e: Event) {
   emit("update:searchText", (e.target as HTMLInputElement).value);
 }
 
-/** 分组的实例列表是否展开：拖拽实例 / 搜索 / 多选时强制展开，便于投放与查看结果 */
+// ---------------- 分组收起 / 展开动画 ----------------
+
+/** 正在做动画的分组：uuid → 内容高度比例，1 完整展开、0 完全收起 */
+const groupScales = ref<Record<string, number>>({});
+/** 有动画在跑的分组 uuid：rows 只认"在不在"，不跟每帧比例走，避免每帧重建行表 */
+const animatingGroups = ref<Set<string>>(new Set());
+/** 每个分组动画的起止值与开始时间 */
+const groupAnimJobs = new Map<string, { from: number; to: number; start: number }>();
+let groupAnimFrame = 0;
+
+/**
+ * 某个分组的实例列表是否展开
+ *
+ * 收起动画期间虽然状态已经变成收起，也要继续渲染组内行，等高度动画走完再卸掉。
+ * 拖拽实例 / 搜索 / 多选时强制展开，便于投放与查看结果。
+ */
 function isGroupOpen(id: string) {
   return (
+    animatingGroups.value.has(id) ||
     !props.isCollapsed(id) ||
     props.searching ||
     props.multiSelect ||
     props.dragActive?.kind === "instance"
   );
+}
+
+/**
+ * 开始一个分组的收起 / 展开动画
+ *
+ * - `id`: 分组 uuid
+ * - `collapsed`: 目标状态，true 收起、false 展开
+ */
+function animateGroup(id: string, collapsed: boolean) {
+  const to = collapsed ? 0 : 1;
+  // 关了界面动画就瞬时完成：收起靠状态把行卸掉，展开直接按完整高度铺开
+  if (!animations.value) {
+    stopGroupAnim(id);
+    return;
+  }
+  const from = groupScales.value[id] ?? (collapsed ? 1 : 0);
+  if (from === to) {
+    stopGroupAnim(id);
+    return;
+  }
+  const actives = new Set(animatingGroups.value);
+  actives.add(id);
+  animatingGroups.value = actives;
+  groupScales.value = { ...groupScales.value, [id]: from };
+  groupAnimJobs.set(id, { from, to, start: performance.now() });
+  if (!groupAnimFrame) groupAnimFrame = requestAnimationFrame(stepGroupAnim);
+}
+
+/**
+ * 动画帧：把每个任务的比例推进一帧，走完的从动画现场里摘掉
+ *
+ * - `now`: rAF 给的时间戳，单位 ms
+ */
+function stepGroupAnim(now: number) {
+  groupAnimFrame = 0;
+  const scales = { ...groupScales.value };
+  const done: string[] = [];
+  for (const [id, job] of groupAnimJobs) {
+    const t = Math.min(1, (now - job.start) / GROUP_ANIM_MS);
+    // easeOutCubic：收起时先快后慢，与旧版 grid 过渡的观感接近
+    const eased = 1 - Math.pow(1 - t, 3);
+    scales[id] = job.from + (job.to - job.from) * eased;
+    if (t >= 1) done.push(id);
+  }
+  for (const id of done) groupAnimJobs.delete(id);
+  if (done.length) {
+    const actives = new Set(animatingGroups.value);
+    for (const id of done) {
+      actives.delete(id);
+      delete scales[id];
+    }
+    animatingGroups.value = actives;
+  }
+  groupScales.value = scales;
+  if (groupAnimJobs.size) groupAnimFrame = requestAnimationFrame(stepGroupAnim);
+}
+
+/**
+ * 结束某个分组的动画，直接落到"没有动画"的状态
+ *
+ * - `id`: 分组 uuid
+ */
+function stopGroupAnim(id: string) {
+  groupAnimJobs.delete(id);
+  if (animatingGroups.value.has(id)) {
+    const actives = new Set(animatingGroups.value);
+    actives.delete(id);
+    animatingGroups.value = actives;
+  }
+  if (id in groupScales.value) {
+    const scales = { ...groupScales.value };
+    delete scales[id];
+    groupScales.value = scales;
+  }
+  if (!groupAnimJobs.size && groupAnimFrame) {
+    cancelAnimationFrame(groupAnimFrame);
+    groupAnimFrame = 0;
+  }
+}
+
+/** 清掉所有分组动画现场：强制展开、关闭界面动画或窗口卸载时用 */
+function clearGroupAnims() {
+  groupAnimJobs.clear();
+  animatingGroups.value = new Set();
+  groupScales.value = {};
+  if (groupAnimFrame) {
+    cancelAnimationFrame(groupAnimFrame);
+    groupAnimFrame = 0;
+  }
 }
 
 // ---------------- 虚拟列表的行表 ----------------
@@ -108,6 +214,10 @@ const ROW_H_TILE = TILE_H + TILE_GAP;
 const TILE_MIN = 96;
 /** 占满时的最小宽度，单位 px；与原来的 minmax(120px, 1fr) 同源 */
 const TILE_MIN_MAX = 120;
+/** 分组收起 / 展开的高度动画时长，单位 ms；沿用旧版 grid 过渡的 0.22s */
+const GROUP_ANIM_MS = 220;
+/** 侧栏列表的顶部内边距，单位 px；与 .sidebar-list 的 padding-top 同源 */
+const LIST_PAD_TOP = 2;
 
 /** 平铺模式的一格：添加卡或实例卡 */
 type TileCell = { kind: "add" } | { kind: "inst"; inst: InstanceInfoDto };
@@ -154,19 +264,81 @@ function measureWidth() {
   contentWidth.value = Math.max(0, el.clientWidth - pad);
 }
 
-const widthObserver = new ResizeObserver(() => measureWidth());
+/** 侧栏列表当前滚动位置，单位 px；只给粘滞头算位置，不做成响应式 */
+let listScrollTop = 0;
+/** 当前粘在列表顶部的分组下标，-1 表示不显示 */
+const stickyIndex = ref(-1);
+/** 当前绑定的滚动容器，换容器时要摘掉旧的 scroll 监听 */
+let listEl: HTMLElement | null = null;
+
+/**
+ * 按当前滚动位置与行高重算粘滞分组
+ *
+ * 只有下标真的变化时才改 ref：滚动事件很密，每帧都换一个新值会让整列跟着重渲染。
+ */
+function updateStickyIndex() {
+  let next = -1;
+  if (props.mode === "group") {
+    const list = rows.value;
+    const heights = rowHeights.value;
+    if (list.length) {
+      const top = listScrollTop;
+      let y = LIST_PAD_TOP;
+      let active: { gi: number; headerTop: number } | null = null;
+      for (let i = 0; i < list.length; i += 1) {
+        const row = list[i];
+        if (row.kind === "group" && y <= top + 0.5) {
+          active = { gi: row.gi, headerTop: y };
+        }
+        y += heights[i] ?? 0;
+      }
+      if (active && top > active.headerTop + 0.5) next = active.gi;
+    }
+  }
+  if (stickyIndex.value !== next) stickyIndex.value = next;
+}
+
+/** 列表滚动：只同步位置，滚动本身由 VirtualList 处理 */
+function onListScroll() {
+  listScrollTop = listEl?.scrollTop ?? 0;
+  updateStickyIndex();
+}
+
+/**
+ * 粘滞头在滚动容器外，滚轮落在这里时手动把滚动交给列表
+ *
+ * - `e`: 滚轮事件
+ */
+function onStickyWheel(e: WheelEvent) {
+  if (!listEl) return;
+  listEl.scrollTop += e.deltaY;
+}
+
+const widthObserver = new ResizeObserver(() => {
+  measureWidth();
+  updateStickyIndex();
+});
 
 onMounted(() => measureWidth());
-onUnmounted(() => widthObserver.disconnect());
+onUnmounted(() => {
+  widthObserver.disconnect();
+  listEl?.removeEventListener("scroll", onListScroll);
+  clearGroupAnims();
+});
 
-// 挂载后滚动容器才出现（两种模式共用同一个实例），盯住它量宽度
+// 挂载后滚动容器才出现（两种模式共用同一个实例），盯住它量宽度、挂滚动监听
 watch(
   () => listRef.value?.el ?? null,
   (el) => {
     widthObserver.disconnect();
+    if (listEl) listEl.removeEventListener("scroll", onListScroll);
+    listEl = el;
     if (!el) return;
     widthObserver.observe(el);
+    el.addEventListener("scroll", onListScroll, { passive: true });
+    listScrollTop = el.scrollTop;
     measureWidth();
+    updateStickyIndex();
   },
   { flush: "post" },
 );
@@ -238,14 +410,111 @@ const rows = computed<Row[]>(() => {
   return out;
 });
 
-/** 每行高度，单位 px；顺序与 rows 一致，变高虚拟列表按它算窗口 */
+/**
+ * 一行在完整展开时的高度，单位 px
+ *
+ * - `row`: 行表里的一行
+ *
+ * # 返回值
+ *
+ * 与 CSS 里该行种的固定高度一致
+ */
+function baseRowHeight(row: Row): number {
+  if (row.kind === "tiles") return ROW_H_TILE;
+  if (row.kind === "group" || row.kind === "ghost-group") return ROW_H_GROUP;
+  return ROW_H_INST;
+}
+
+/**
+ * 一行当前的高度比例：动画期间只缩组内内容，分组标题行保持原高
+ *
+ * - `row`: 行表里的一行
+ *
+ * # 返回值
+ *
+ * 1 表示按完整高度；0–1 表示正在收起 / 展开
+ */
+function rowScale(row: Row): number {
+  if (row.kind === "group" || row.kind === "ghost-group") return 1;
+  const id = props.filteredGroups[row.gi]?.id;
+  return id ? (groupScales.value[id] ?? 1) : 1;
+}
+
+/**
+ * 动画期间给行加的内联高度
+ *
+ * 虚拟列表按 `rowHeights` 算窗口，DOM 行必须同步缩到同一高度，
+ * 否则滚动条长度与实际内容对不上。
+ *
+ * - `row`: 行表里的一行
+ *
+ * # 返回值
+ *
+ * 内联样式；不在动画中时返回 undefined，交给 CSS 的固定高度
+ */
+function rowStyle(row: Row): Record<string, string> | undefined {
+  const scale = rowScale(row);
+  if (scale >= 1) return undefined;
+  return {
+    height: baseRowHeight(row) * scale + "px",
+    overflow: "hidden",
+    opacity: String(scale),
+  };
+}
+
+/** 每行当前高度，单位 px；顺序与 rows 一致，变高虚拟列表按它算窗口 */
 const rowHeights = computed(() =>
-  rows.value.map((row) => {
-    if (row.kind === "tiles") return ROW_H_TILE;
-    if (row.kind === "group" || row.kind === "ghost-group") return ROW_H_GROUP;
-    return ROW_H_INST;
-  }),
+  rows.value.map((row) => baseRowHeight(row) * rowScale(row)),
 );
+
+/** 各分组当前是否收起，按 uuid 索引；分组增删不会误触发别的组 */
+const collapseState = computed<Record<string, boolean>>(() => {
+  const map: Record<string, boolean> = {};
+  for (const group of props.groups) {
+    map[group.id] = props.isCollapsed(group.id);
+  }
+  return map;
+});
+
+/** 搜索 / 多选 / 拖实例时强制展开，此时统一不播收起展开动画 */
+const forcedGroupOpen = computed(
+  () => props.searching || props.multiSelect || props.dragActive?.kind === "instance",
+);
+
+watch(collapseState, (now, before) => {
+  if (!before || forcedGroupOpen.value) return;
+  for (const [id, collapsed] of Object.entries(now)) {
+    if (before[id] === undefined || before[id] === collapsed) continue;
+    animateGroup(id, collapsed);
+  }
+  // 分组被删掉时，把还没走完的动画现场一起清掉
+  for (const id of [...groupAnimJobs.keys()]) {
+    if (!(id in now)) stopGroupAnim(id);
+  }
+});
+
+watch(forcedGroupOpen, (forced) => {
+  if (forced) clearGroupAnims();
+});
+
+watch(animations, (on) => {
+  if (!on) clearGroupAnims();
+});
+
+watch(
+  () => props.mode,
+  () => clearGroupAnims(),
+);
+
+/** 粘滞分组头对应的分组；下标不变时对象引用也不变 */
+const stickyGroup = computed<GroupView | null>(() => {
+  const index = stickyIndex.value;
+  return index >= 0 ? (props.filteredGroups[index] ?? null) : null;
+});
+
+watch([rows, rowHeights, () => props.mode, () => props.filteredGroups], () => {
+  updateStickyIndex();
+});
 
 /**
  * 平铺卡按下：只有分组模式（占满）支持拖拽，平铺模式的卡片不拖
@@ -308,9 +577,11 @@ defineExpose({ scrollToInstance });
       </button>
     </div>
 
-    <!-- 分组 / 平铺共用一张虚拟列表：行表由脚本按模式铺好，这里只按行种画 -->
-    <VirtualList ref="listRef" class="sidebar-list" :class="mode === 'group' ? 'group-list' : 'tile-list'"
-      :count="rows.length" :heights="rowHeights" :row-gap="0">
+    <!-- 虚拟列表外包一层：粘滞分组头绝对定位在列表顶部，不跟着列表滚走 -->
+    <div class="sidebar-list-wrap">
+      <!-- 分组 / 平铺共用一张虚拟列表：行表由脚本按模式铺好，这里只按行种画 -->
+      <VirtualList ref="listRef" class="sidebar-list" :class="mode === 'group' ? 'group-list' : 'tile-list'"
+        :count="rows.length" :heights="rowHeights" :row-gap="0">
       <template #default="{ start, end }">
         <template v-for="row in rows.slice(start, end)" :key="row.key">
           <!-- 分组标题：收起 / 展开只影响行表里有没有组内那几行 -->
@@ -336,7 +607,8 @@ defineExpose({ scrollToInstance });
           </div>
 
           <!-- 添加实例：与实例行同尺寸，多选时整行不进行表 -->
-          <div v-else-if="row.kind === 'add'" class="vrow vrow-add" :data-group="row.groupId">
+          <div v-else-if="row.kind === 'add'" class="vrow vrow-add" :data-group="row.groupId"
+            :style="rowStyle(row)">
             <button class="add-inst-row" :disabled="dragActive?.kind === 'instance'" @click="emit('add-instance')">
               <span class="add-inst-icon">
                 <GlyphIcon name="plus" :size="18" />
@@ -346,7 +618,8 @@ defineExpose({ scrollToInstance });
           </div>
 
           <!-- 实例拖拽插入占位（淡化的实例，位于鼠标对应位置） -->
-          <div v-else-if="row.kind === 'ghost-inst'" class="vrow vrow-ghost-inst" :data-group="row.groupId">
+          <div v-else-if="row.kind === 'ghost-inst'" class="vrow vrow-ghost-inst" :data-group="row.groupId"
+            :style="rowStyle(row)">
             <div class="drop-ghost-row">
               <InstanceIcon :name="dragActive?.instance?.name ?? ''" :uuid="dragActive?.instance?.uuid ?? '0'"
                 :size="38" />
@@ -355,7 +628,7 @@ defineExpose({ scrollToInstance });
           </div>
 
           <!-- 平铺卡片行：占满时与平铺模式同一套卡，外观、角标、运行点位置都一致 -->
-          <div v-else-if="row.kind === 'tiles'" class="vrow vrow-tiles">
+          <div v-else-if="row.kind === 'tiles'" class="vrow vrow-tiles" :style="rowStyle(row)">
             <div class="tile-grid" :style="tileGridStyle">
               <template v-for="(cell, ci) in row.cells" :key="ci">
                 <div v-if="cell.kind === 'add'" class="tile add-tile" @click="emit('add-instance')">
@@ -383,7 +656,7 @@ defineExpose({ scrollToInstance });
           </div>
 
           <!-- 实例行 -->
-          <div v-else class="vrow vrow-inst" :data-group="row.group.id">
+          <div v-else class="vrow vrow-inst" :data-group="row.group.id" :style="rowStyle(row)">
             <div class="inst-row" :data-uuid="row.inst.uuid" :data-idx="row.idx" :data-group="row.group.id" :class="{
               active: selected?.uuid === row.inst.uuid,
               'multi-checked': multiSelect && selectedIds.has(row.inst.uuid),
@@ -414,7 +687,23 @@ defineExpose({ scrollToInstance });
         </template>
         <div v-else-if="filteredInstances.length === 0" class="empty-tip tile-empty">{{ t("search.empty") }}</div>
       </template>
-    </VirtualList>
+      </VirtualList>
+
+      <!-- 粘滞分组头：行被虚拟化卸载后仍要能看见当前分组，交互与普通标题一致 -->
+      <div v-if="stickyGroup" class="group-sticky" :data-group="stickyGroup.id"
+        :data-gi="stickyIndex" @contextmenu.prevent="onGroupContext($event, stickyGroup.id)"
+        @wheel.prevent="onStickyWheel"
+        @pointerdown="onDragPointerDown($event, { kind: 'group', groupId: stickyGroup.id, groupName: stickyGroup.name })">
+        <button class="group-title" v-tip="t('group.collapse')" @click="onGroupTitleClick(stickyGroup.id)">
+          <svg class="group-chevron" :class="{ collapsed: isCollapsed(stickyGroup.id) }" viewBox="0 0 24 24"
+            width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+          <span><HighlightText :text="stickyGroup.name" :query="searchText" /></span>
+          <span class="group-count">{{ stickyGroup.items.length }}</span>
+        </button>
+      </div>
+    </div>
 
     <!-- 跟手浮起副本：被抓住的实例 / 分组，跟着指针走 -->
     <DragGhost v-if="ghost" :x="ghost.x" :y="ghost.y">
@@ -541,6 +830,15 @@ defineExpose({ scrollToInstance });
 
 /* ----- 虚拟列表（分组 / 平铺共用） ----- */
 
+/* 虚拟列表外包一层：粘滞分组头相对它定位，列表自己滚 */
+.sidebar-list-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 /* 滚动与"只渲染视口附近那几行"由 VirtualList 负责，这里只管左右内边距 */
 .sidebar-list {
   flex: 1;
@@ -548,6 +846,24 @@ defineExpose({ scrollToInstance });
   padding: 2px var(--side-pad-x) 14px;
   /* 与 scrollbar-gutter 成对：减掉常驻的那 9px，行才是左右各 10px，见 styles/scrollbar.css */
   padding-right: calc(var(--side-pad-x) - 9px);
+}
+
+/* 粘滞分组头：盖住已经滚出视口的分组标题；右侧让开常驻滚动条，内容与列表对齐 */
+.group-sticky {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 9px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  padding-left: var(--side-pad-x);
+  padding-right: calc(var(--side-pad-x) - 9px);
+  background: var(--bg-side);
+  /* 侧栏在透明 / 毛玻璃主题下是半透明的，粘滞头要挡住底下滚过的行 */
+  backdrop-filter: blur(8px);
+  box-shadow: 0 1px 0 var(--border);
+  z-index: 2;
 }
 
 .tile-list {
@@ -881,7 +1197,7 @@ defineExpose({ scrollToInstance });
 }
 
 /* 多选勾选 */
-/* outline 画在元素外沿，会被分组内容容器的 overflow: hidden（收起动画需要）裁掉，故统一向内收 1px */
+/* outline 画在元素外沿，收起动画期间行容器是 overflow: hidden，会被裁掉，故统一向内收 1px */
 .inst-row.active,
 .inst-row.multi-checked {
   outline-offset: -1px;

@@ -50,7 +50,16 @@ pub fn main_get_instances() -> Vec<InstanceInfoDto> {
                 pid: inst.pid.clone(),
                 fid: inst.fid.clone(),
                 server_url: inst.server_url.clone(),
-                lang: None,
+                lang: inst
+                    .get_minecraft_options()
+                    .ok()
+                    .and_then(|options| {
+                        options
+                            .get("lang")
+                            .filter(|lang| !lang.trim().is_empty())
+                            .cloned()
+                    })
+                    .or_else(|| Some(mml_names::get_lang(crate::gui_config::locale()).to_string())),
                 log_encoding: Some(
                     if matches!(inst.encoding, LogEncoding::GBK) {
                         "gbk"

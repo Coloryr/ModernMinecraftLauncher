@@ -119,6 +119,14 @@ pub(crate) fn main_window_label() -> &'static str {
         .unwrap_or("mml-main")
 }
 
+/// 是否有会自己发系统通知的长任务在跑
+///
+/// 资源下载与整合包安装在结束时各发一条通知，下载队列清空时就不必再补一条泛化的
+/// 下载完成。资源任务要等下载器移除任务之后才写终态，所以此刻仍能读到它未结束。
+pub(crate) fn has_self_notifying_task() -> bool {
+    add_resource::has_active() || modpack_task::has_active()
+}
+
 /// 唤出主窗口：还在就显示并聚焦，已经关掉就按上次几何重建一个
 ///
 /// 托盘点击与新实例请求「显示主窗口」都走这里。建窗是阻塞操作，不能在主线程

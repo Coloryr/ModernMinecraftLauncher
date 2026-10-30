@@ -65,6 +65,35 @@ fn global_auto_join() -> Option<ServerObj> {
     })
 }
 
+/// 读取实例的 options.txt 语言；没有就按启动器语言补一条
+///
+/// 新实例第一次启动时还没有 options.txt，游戏会按英文起；这里补上启动器语言，
+/// 之后玩家在游戏里改的语言也会留在 options.txt，再次启动以它为准。
+///
+/// - `inst`: 实例配置
+///
+/// # 返回值
+///
+/// 当前应使用的语言代码；options.txt 读不出来时返回 `None`
+fn ensure_game_lang(inst: &InstanceSettingObj) -> Option<String> {
+    let options = match inst.get_minecraft_options() {
+        Ok(options) => options,
+        Err(err) => {
+            mml_log::error_type(err);
+            return None;
+        }
+    };
+    if let Some(lang) = options.get("lang").filter(|lang| !lang.trim().is_empty()) {
+        return Some(lang.clone());
+    }
+
+    let lang = mml_names::get_lang(crate::gui_config::locale()).to_string();
+    if let Err(err) = inst.set_minecraft_option("lang", Some(&lang)) {
+        mml_log::error_type(err);
+    }
+    Some(lang)
+}
+
 /// 启动游戏
 ///
 /// 账户取后端记的"当前账户"，实例取核心实例表。启动本身在后台任务里跑，命令立刻返回。
@@ -219,7 +248,7 @@ pub(crate) async fn launch_game(
         auto,
         admin: gui_config::get().experimental.instance_admin,
         mixin,
-        lang: None,
+        lang: ensure_game_lang(&inst),
         // 用户在这次升级弹窗里选了「直接启动」：启动时不再比对服务器包清单
         skip_server_pack: server_pack.as_deref() == Some("skip"),
     };

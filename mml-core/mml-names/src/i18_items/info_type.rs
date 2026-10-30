@@ -30,6 +30,32 @@ pub enum InfoType {
         instances: usize,
     },
 
+    /// 统计文件已读取：文件大小、累计启动次数与运行段条数
+    ///
+    /// 排查"统计被空文件盖掉"时，这一行能直接看出读到的到底是哪一份文件。
+    GameCountLoad {
+        /// 读到的文件大小，单位字节
+        size: u64,
+        /// 累计启动次数
+        launch: i64,
+        /// 运行段条数，含所有实例
+        runs: usize,
+    },
+    /// 统计文件已保存：写出后的大小，单位字节
+    GameCountSave {
+        /// 写入后的大小，单位字节
+        size: u64,
+    },
+    /// 统计文件在运行期间被外部替换过，本次不覆盖
+    GameCountKeepOuter,
+    /// 磁盘上的统计比内存里的还多，本次不覆盖
+    GameCountKeepBigger {
+        /// 磁盘上那份的累计启动次数
+        disk: i64,
+        /// 内存里这份的累计启动次数
+        mem: i64,
+    },
+
     /// 下载任务结束：总数 / 成功数 / 失败数
     DownloadTaskDone {
         /// 文件总数

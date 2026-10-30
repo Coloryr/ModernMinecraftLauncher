@@ -60,6 +60,7 @@ pub async fn add_import_folder(
     .map_err(|e| e.to_string())?;
     let uuid = res.read().unwrap().uuid.to_string();
     crate::windows::main::emit_instance_change(&app, "add");
+    crate::windows::add::notify_instance_added(&app, &uuid);
     Ok(uuid)
 }
 
@@ -160,13 +161,14 @@ pub async fn add_import_archive(
         Err(err) => Err(err.to_string()),
     };
 
-    // 终态：整合包任务自己记录并广播，成功时连同 instance-change 一起发，
-    // 其它类型跟以前一样只补一条 instance-change
+    // 终态：整合包任务自己记录并广播，成功时连同 instance-change 一起发；
+    // 其它类型补一条 instance-change 与系统通知
     match &task {
         Some(task) => finish_task(&app, task, &token, res.clone()),
         None => {
-            if res.is_ok() {
+            if let Ok(uuid) = &res {
                 crate::windows::main::emit_instance_change(&app, "add");
+                crate::windows::add::notify_instance_added(&app, &uuid.to_string());
             }
         }
     }
@@ -225,8 +227,10 @@ pub async fn add_import_url(
     .await
     .map_err(|e| e.to_string())?
     .map_err(|e| e.to_string())?;
+    let uuid = uuid.to_string();
     crate::windows::main::emit_instance_change(&app, "add");
-    Ok(uuid.to_string())
+    crate::windows::add::notify_instance_added(&app, &uuid);
+    Ok(uuid)
 }
 
 /// 从头新建实例：按版本与加载器创建
@@ -281,6 +285,7 @@ pub async fn add_create_new(
     .map_err(|e| e.to_string())?;
     let uuid = res.read().unwrap().uuid.to_string();
     crate::windows::main::emit_instance_change(&app, "add");
+    crate::windows::add::notify_instance_added(&app, &uuid);
     Ok(uuid)
 }
 
@@ -327,8 +332,10 @@ pub async fn add_import_server_pack(
     .await
     .map_err(|e| e.to_string())?
     .map_err(|e| e.to_string())?;
+    let uuid = uuid.to_string();
     crate::windows::main::emit_instance_change(&app, "add");
-    Ok(uuid.to_string())
+    crate::windows::add::notify_instance_added(&app, &uuid);
+    Ok(uuid)
 }
 
 /// 探测在线实例地址，返回清单摘要给添加窗口预览

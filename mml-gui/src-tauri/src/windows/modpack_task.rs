@@ -123,6 +123,17 @@ pub(super) fn build_status(app: &AppHandle) -> ModPackStatusDto {
     }
 }
 
+/// 是否有未结束的整合包安装任务
+///
+/// 系统通知用：整合包安装结束时会自己发通知，下载队列清空时不再重复提示。
+pub(crate) fn has_active() -> bool {
+    DOWNLOAD_NOW.read().unwrap().values().any(|task| {
+        !(task.done.load(Ordering::Acquire)
+            || task.failed.load(Ordering::Acquire)
+            || task.cancelled.load(Ordering::Acquire))
+    })
+}
+
 /// 整合包安装任务总览事件，任务增删 / 进度变化 / 终态时广播
 ///
 /// - `app`: 应用句柄，广播用它

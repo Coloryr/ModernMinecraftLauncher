@@ -172,7 +172,7 @@ pub async fn main_copy_instance(
 /// - `app`: 应用句柄，用于发变更事件
 /// - `window`: 调用方窗口，用于取本窗口模型改遗留数据
 /// - `uuid`: 实例 uuid；命中核心实例时走 mml-game，否则只改本地存储
-/// - `patch`: 要改的字段，缺失即不改；`lang` 无核心字段，仅前端显示
+/// - `patch`: 要改的字段，缺失即不改；`lang` 写进实例的 options.txt
 ///
 /// # 返回值
 ///
@@ -245,8 +245,16 @@ pub fn main_update_instance(
                     _ => LogEncoding::UTF8,
                 };
             }
-            // lang 无核心字段，仅前端显示
             obj.save();
+
+            // 游戏内语言落在 options.txt：游戏读的就是它，下次打开设置也按它回显。
+            // 只改 lang 这一行，别整表重写把别的选项（资源包名里可能带 #）弄坏
+            if let Some(v) = &patch.lang {
+                let value = v.trim();
+                let value = (!value.is_empty()).then_some(value);
+                obj.set_minecraft_option("lang", value)
+                    .map_err(|e| e.to_string())?;
+            }
         }
     }
     let store = model(&window)?;
