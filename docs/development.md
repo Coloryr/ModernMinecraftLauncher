@@ -67,7 +67,7 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
 | `build/init.ps1` | 首次安装 `mml-vue` 的 npm 依赖并检查 `cargo tauri`（bash 版 `build/init.sh`） |
 | `cd mml-gui && .\tauri.ps1 dev` | 桌面开发模式（自动还原 vendor 插件；Linux / macOS 用 `bash tauri.sh dev`；端口 1420 必须空闲） |
 | `build/dev-frontend.ps1` | 只起 Vite，配合 debug 版 Rust 后端单独运行；`tauri dev` 已自带 Vite，不要重复起 |
-| `build/build-release.ps1` | 正式发布构建（fat LTO，含安装包，按版本收集到 `build_out/`；Windows 默认 x64 / x86 / arm64；Linux / macOS 的 x64 / arm64 由 CI 原生 runner 出） |
+| `build/build-release.ps1` | 正式发布构建（fat LTO，含安装包，按版本收集到 `build_out/`；Windows 默认 x64 / arm64；Linux / macOS 的 x64 / arm64 由 CI 原生 runner 出） |
 | `build/build-prerelease.ps1` | 预发布构建（thin LTO，只出 exe，更快；Windows 三种架构，`target/prerelease/mml-gui-<arch>.exe`） |
 | `bash build/package-flatpak.sh` | 用已构建的二进制打 `.flatpak`，需要 `flatpak`，不重新编译 |
 | `bash build/package-arch.sh` | 用已构建的二进制打 `.pkg.tar.zst`，不依赖 `makepkg`，任一 Linux 可跑 |
@@ -116,11 +116,11 @@ Flatpak 默认声明 `org.freedesktop.Platform//25.08`，安装时由 Flathub �
 预发布是 `[profile.prerelease]`（thin LTO + `codegen-units = 16`）；两者分别在
 `target/<三元组>/release/` 与 `target/<三元组>/prerelease/` 下，来回切不会互相刷缓存。
 
-Windows 的正式 / 预发布脚本默认构建 **x64 / x86 / arm64**：
+Windows 的正式 / 预发布脚本默认构建 **x64 / arm64**：
 
-- 只要一种：`-Arch x64`（也可 `-Arch x64,x86`）；
-- arm64 只打 NSIS，x64 / x86 出 MSI + NSIS；
-- 交叉编译要求 `rustup target add i686-pc-windows-msvc` / `aarch64-pc-windows-msvc`，
+- 只要一种：`-Arch x64`；
+- arm64 只打 NSIS，x64 出 MSI + NSIS；
+- 交叉编译要求 `rustup target add aarch64-pc-windows-msvc`，
   以及 Visual Studio 对应架构的 MSVC 工具链（ARM64 要装「MSVC v143 - VS 2022 C++ ARM64/ARM64EC 生成工具」）。
   CI 的 arm64 跑在 `windows-11-arm` 原生 runner 上，不需要交叉工具链。
 - Linux / macOS 本地只构建当前架构；需要多架构时用 `MML_TARGETS` 指定三元组（空格分隔）：
@@ -165,7 +165,7 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
    `cargo-tauri`（GitHub Release 资产），不跑 `cargo install`。上游 binstall 元数据只给
    x64 的 zip 包写了格式覆盖，macOS / Windows 的 ARM64 产物其实也是 zip，工作流按平台显式传
    `--pkg-fmt`，避免回退到源码编译；
-3. Windows 拆成 x64 / x86 / arm64 三行 matrix，各跑 `build/init.ps1` 再按通道跑
+3. Windows 拆成 x64 / arm64 两行 matrix，各跑 `build/init.ps1` 再按通道跑
    `build/build-release.ps1 -Arch <arch>` 或 `build/build-prerelease.ps1 -Arch <arch>`
    （arm64 用 `windows-11-arm` 原生 runner）；Linux 跑 x64（`ubuntu-22.04`）与 arm64（`ubuntu-24.04-arm`），
    macOS 的 x64 跑 `macos-26-intel`（原生 Intel）、arm64 跑 `macos-latest`，都执行

@@ -2,11 +2,10 @@
 # 末尾的跨 crate 优化是单线程的，会看到只有一个核在跑；产出安装包（tauri 打包链）。
 # 预发布 / 日常打包用 build\build-prerelease.ps1。
 #
-# Windows 默认构建三种架构：x64 / x86 / arm64，安装包集中在 build_out/：
+# Windows 默认构建两种架构：x64 / arm64，安装包集中在 build_out/：
 #   mml-windows-x64-<版本>.msi / -setup.exe
-#   mml-windows-x86-<版本>.msi / -setup.exe
 #   mml-windows-arm64-<版本>-setup.exe（arm64 只打 NSIS）
-# 只需要一种时用 -Arch：-Arch x64 / -Arch x64,x86 / -Arch arm64。
+# 只需要一种时用 -Arch：-Arch x64 / -Arch arm64。
 #
 # 交叉编译前提：rustup target 里有对应三元组（脚本会自动 rustup target add），
 # 且 Visual Studio 装了该架构的 MSVC 工具链。arm64 交叉编译要装
@@ -16,8 +15,8 @@
 # 对应的 bash 版：build/build-release.sh
 
 param(
-    # 要构建的架构，逗号分隔：x64,x86,arm64
-    [string]$Arch = 'x64,x86,arm64'
+    # 要构建的架构，逗号分隔：x64,arm64
+    [string]$Arch = 'x64,arm64'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -27,14 +26,13 @@ $root = Split-Path -Parent $PSScriptRoot
 
 $all = @(
     @{ arch = 'x64';   triple = 'x86_64-pc-windows-msvc';  bundles = 'msi,nsis' },
-    @{ arch = 'x86';   triple = 'i686-pc-windows-msvc';    bundles = 'msi,nsis' },
     # arm64 的 WiX 支持视 WiX 版本而定：只打 NSIS 安装包，避免整条构建因 MSI 失败
     @{ arch = 'arm64'; triple = 'aarch64-pc-windows-msvc'; bundles = 'nsis' }
 )
 $want = $Arch.Split(',') | ForEach-Object { $_.Trim().ToLower() } | Where-Object { $_ }
 $targets = $all | Where-Object { $want -contains $_.arch }
 if (-not $targets) {
-    throw "没有匹配的架构：$Arch（可选 x64 / x86 / arm64）"
+    throw "没有匹配的架构：$Arch（可选 x64 / arm64）"
 }
 
 # ---- 构建期临时目录 ----
@@ -74,7 +72,7 @@ try {
         Write-Host "正在构建 release $($t['arch'])（$($t['triple'])）..."
         cargo tauri build --target $t['triple'] --bundles $t['bundles']
         if ($LASTEXITCODE -ne 0) {
-            throw "构建失败：$($t['arch'])（退出码 $LASTEXITCODE）。x86 / arm64 交叉编译需要对应架构的 MSVC 工具链。"
+            throw "构建失败：$($t['arch'])（退出码 $LASTEXITCODE）。arm64 交叉编译需要对应架构的 MSVC 工具链。"
         }
     }
 }

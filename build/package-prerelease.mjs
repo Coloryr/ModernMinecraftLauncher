@@ -30,9 +30,9 @@ const arch = arg("--arch");
 /** 交叉构建时的三元组；不填就用按架构命名的产物 */
 const triple = arg("--triple");
 const systems = ["windows", "linux", "macos"];
-const arches = ["x64", "x86", "arm64"];
+const arches = ["x64", "arm64"];
 if (!systems.includes(os) || !arches.includes(arch)) {
-    console.error("用法：node build/package-prerelease.mjs --os windows|linux|macos --arch x64|x86|arm64 [--triple 三元组]");
+    console.error("用法：node build/package-prerelease.mjs --os windows|linux|macos --arch x64|arm64 [--triple 三元组]");
     process.exit(1);
 }
 

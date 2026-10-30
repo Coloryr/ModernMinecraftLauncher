@@ -1,7 +1,7 @@
 # 预发布构建：thin LTO + 16 个代码生成单元，能并行，出包快很多。
 # 带 prerelease feature：主页面会提示「预发布版」，见 mml-gui/src-tauri/src/build_info.rs。
-# 只产出可执行文件，不打安装包；Windows 默认三种架构，集中在 <仓库>\target\prerelease\：
-#   mml-gui-x64.exe / mml-gui-x86.exe / mml-gui-arm64.exe
+# 只产出可执行文件，不打安装包；Windows 默认两种架构，集中在 <仓库>\target\prerelease\：
+#   mml-gui-x64.exe / mml-gui-arm64.exe
 # 只需要一种时用 -Arch：-Arch x64 / -Arch arm64。
 # 用的是根 Cargo.toml 里的 [profile.prerelease]，各架构各有 target 子目录，
 # 两个模式来回切不会互相刷缓存。正式发布用 build\build-release.ps1。
@@ -12,8 +12,8 @@
 # 对应的 bash 版：build/build-prerelease.sh
 
 param(
-    # 要构建的架构，逗号分隔：x64,x86,arm64
-    [string]$Arch = 'x64,x86,arm64'
+    # 要构建的架构，逗号分隔：x64,arm64
+    [string]$Arch = 'x64,arm64'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,13 +23,12 @@ $root = Split-Path -Parent $PSScriptRoot
 
 $all = @(
     @{ arch = 'x64';   triple = 'x86_64-pc-windows-msvc' },
-    @{ arch = 'x86';   triple = 'i686-pc-windows-msvc' },
     @{ arch = 'arm64'; triple = 'aarch64-pc-windows-msvc' }
 )
 $want = $Arch.Split(',') | ForEach-Object { $_.Trim().ToLower() } | Where-Object { $_ }
 $targets = $all | Where-Object { $want -contains $_.arch }
 if (-not $targets) {
-    throw "没有匹配的架构：$Arch（可选 x64 / x86 / arm64）"
+    throw "没有匹配的架构：$Arch（可选 x64 / arm64）"
 }
 
 # ---- 构建期临时目录 ----
@@ -76,7 +75,7 @@ try {
         # 前端会连接 localhost:1420；未启动开发服务时无法加载页面。
         cargo build --profile prerelease --target $t['triple'] --features custom-protocol,prerelease
         if ($LASTEXITCODE -ne 0) {
-            throw "构建失败：$($t['arch'])（退出码 $LASTEXITCODE）。x86 / arm64 交叉编译需要对应架构的 MSVC 工具链。"
+            throw "构建失败：$($t['arch'])（退出码 $LASTEXITCODE）。arm64 交叉编译需要对应架构的 MSVC 工具链。"
         }
     }
 }
