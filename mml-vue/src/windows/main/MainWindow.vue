@@ -22,11 +22,12 @@ import {
 import { commands } from "../../lib/bindings";
 import { loadGuiConfig, type ClientConfig } from "../../lib/guiConfig";
 import { t, tErr } from "../../lib/i18n";
+import { ISSUES_URL } from "../../lib/links";
 import { showToast } from "../../lib/toast";
 import { stateText } from "../../lib/launchState";
 import { useDownloadProgress } from "../../composables/useDownloadProgress";
 import { useRefreshKey } from "../../composables/useRefreshKey";
-import { KEYS, onStorageChange } from "../../lib/storage";
+import { KEYS, onStorageChange, readJson, writeJson } from "../../lib/storage";
 import { openWindow } from "../windowManager";
 import { latestCrash } from "../../lib/crash";
 import { launchGame } from "../../lib/launch";
@@ -225,8 +226,31 @@ const groups = computed<GroupView[]>(() => {
   });
 });
 
-// 分组收缩状态（键是分组 uuid）
+/**
+ * 分组收起状态，键是分组 uuid
+ *
+ * 存 localStorage（浏览上下文一档，见 lib/storage.ts 的 KEYS.groupCollapsed）：
+ * 重开窗口时按上次的样子铺开。分组删掉后留下的旧 uuid 只是永远匹配不上，不影响显示。
+ */
 const collapsedGroups = ref<Record<string, boolean>>({});
+// 只认 true：缺的 / 脏的值一律当"展开"
+for (const [id, collapsed] of Object.entries(
+  readJson<Record<string, boolean>>(KEYS.groupCollapsed),
+)) {
+  if (collapsed === true) collapsedGroups.value[id] = true;
+}
+
+/** 收起 / 展开后落盘；只写 true 的那些，展开的分组不占地方 */
+watch(
+  collapsedGroups,
+  (v) => {
+    writeJson(
+      KEYS.groupCollapsed,
+      Object.fromEntries(Object.entries(v).filter(([, collapsed]) => collapsed)),
+    );
+  },
+  { deep: true },
+);
 
 function isCollapsed(id: string): boolean {
   return collapsedGroups.value[id] ?? false;
@@ -338,13 +362,14 @@ watch(
   },
 );
 
-/** 主页卡片的启动：选中当前实例并收起主页，再走正常启动流程 */
+/**
+ * 主页卡片的启动：**留在主页**直接启动
+ *
+ * 以前这里先调 select()，那会把主页收掉、跳到实例详情；主页只是"顺手点一下启动"，
+ * 不该把人从新闻页拽走。按钮的启动中 / 运行中状态由 HomePage 按实例状态自己按住。
+ */
 function quickLaunch() {
-  const inst = selected.value;
-  if (inst) {
-    select(inst);
-    launch();
-  }
+  if (selected.value) void launch();
 }
 
 const news = ref<NewsItem[]>([]);
@@ -535,6 +560,9 @@ function onGroupTitleClick(id: string) {
 // ================= 多选模式：逻辑见 composables/useMultiSelect =================
 // 入口：右键分组 → 全选 → 进入多选；多选模式下右键实例出现操作菜单。
 
+/** 侧栏组件引用：多选后把勾选的第一个实例滚进视野要按它的行表下标滚 */
+const sidebarRef = ref<InstanceType<typeof MainSidebar> | null>(null);
+
 const {
   multiSelect,
   selectedIds,
@@ -544,7 +572,7 @@ const {
 } = useMultiSelect({
   selected,
   newsActive,
-  collapsedGroups,
+  scrollToInstance: (uuid) => sidebarRef.value?.scrollToInstance(uuid),
   onExit: closeCtxMenu,
 });
 
@@ -1635,7 +1663,7 @@ async function doInit() {
 
 /** 初始化失败反馈：打开 GitHub Issues */
 function openFeedback() {
-  api.openUrl("https://github.com/Coloryr/ModernColoryrMinecraftLauncher/issues");
+  api.openUrl(ISSUES_URL);
 }
 
 // ================= 数据加载 =================
@@ -2087,8 +2115,9 @@ onMounted(async () => {
             <section v-else-if="newsActive" key="home" class="news-page">
               <HomePage :items="news" :loading="newsLoading" @refresh="fetchNews(newsPage)" :page="newsPage"
                 :has-more="newsHasMore" @prev="prevNewsPage" @next="nextNewsPage" @open="openNews"
-                :current-instance="selected" @select="(inst: InstanceInfoDto) => select(inst)"
-                @quick-launch="quickLaunch" back-label-key="home.backToList" @back="newsActive = false" />
+                :current-instance="selected" :launching="isLaunching"
+                @select="(inst: InstanceInfoDto) => select(inst)" @quick-launch="quickLaunch"
+                back-label-key="home.backToList" @back="newsActive = false" />
             </section>
 
             <section v-else key="list" class="list-mode" :class="{ 'has-motd': motdCardVisible }">
@@ -2175,7 +2204,7 @@ onMounted(async () => {
         <template v-else>
           <!-- 侧栏槽位：宽度在展开 300px / 收起 24px 之间过渡，动画期间内容被裁掉而不被压扁 -->
           <div class="sidebar-slot" :class="{ collapsed: sidebarCollapsed }">
-            <MainSidebar :mode="effectiveMode" :search-text="searchText" :groups="groups"
+            <MainSidebar ref="sidebarRef" :mode="effectiveMode" :search-text="searchText" :groups="groups"
               :filtered-groups="filteredGroups" :filtered-instances="filteredInstances" :searching="searching"
               :selected="selected" :multi-select="multiSelect" :selected-ids="selectedIds" :drag-active="dragActive"
               :maximized="paneMaximized" @toggle-maximize="togglePaneMaximize"
@@ -2205,7 +2234,7 @@ onMounted(async () => {
 
               <HomePage v-else-if="newsActive" key="home" :items="news" :loading="newsLoading"
                 @refresh="fetchNews(newsPage)" :page="newsPage" :has-more="newsHasMore" @prev="prevNewsPage"
-                @next="nextNewsPage" @open="openNews" :current-instance="selected"
+                @next="nextNewsPage" @open="openNews" :current-instance="selected" :launching="isLaunching"
                 @select="(inst: InstanceInfoDto) => select(inst)" @quick-launch="quickLaunch"
                 back-label-key="home.backToDetail" @back="newsActive = false" />
 

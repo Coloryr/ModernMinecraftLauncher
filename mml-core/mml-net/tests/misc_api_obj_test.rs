@@ -7,7 +7,9 @@
 use mml_net::adoptium_api::{AdoptiumJavaVersionObj, AdoptiumObj};
 use mml_net::authlib_api::{ArtifactsObj, AuthlibInjectorMetaObj, AuthlibInjectorObj};
 use mml_net::nide8_api::Nide8Obj;
-use mml_net::openfrp_api::{OpenFrpChannelInfoObj, OpenFrpChannelObj, OpenFrpDownloadObj};
+use mml_net::openfrp_api::{
+    OpenFrpChannelObj, OpenFrpDownloadObj, OpenFrpUserInfoObj, OpenFrpUserProxyListObj,
+};
 use mml_net::optifine_api::OptifineListObj;
 use mml_net::sakurafrp_api::SakuraFrpDownloadObj;
 
@@ -17,38 +19,114 @@ const NIDE8_JSON: &str = r#"{
     "jarHash": "5f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c"
 }"#;
 
-/// OpenFrp 通道列表接口 `?action=getallproxies` 的响应
+/// OpenFrp 隧道列表接口 `?action=getallproxies` 的响应
 const OPENFRP_CHANNEL_JSON: &str = r#"{
-    "state": "success",
+    "status": 200,
+    "success": true,
+    "message": "上午好！Test",
     "data": [
         {
-            "name": "香港",
+            "node": "香港-1「CN2」",
             "proxies": [
-                { "name": "mc-server", "id": 10086, "type": "tcp", "remote": "hk-1.openfrp.net:12345" }
+                {
+                    "name": "mc-server",
+                    "id": 10086,
+                    "type": "tcp",
+                    "remote": "hk-1.openfrp.net:12345",
+                    "local": "127.0.0.1:25565"
+                }
             ]
         }
     ]
 }"#;
 
-/// OpenFrp 通道配置接口 `?action=getproxy` 的响应
-const OPENFRP_CONFIG_JSON: &str = r#"{
-    "proxies": {
-        "1.2.3.4": "节点说明",
-        "hk-1.openfrp.net": "香港节点"
-    }
+/// OpenFrp 用户信息接口 `getUserInfo` 的响应
+const OPENFRP_USER_INFO_JSON: &str = r#"{
+    "data": {
+        "outLimit": 1536,
+        "used": 0,
+        "token": "e900d8f2498202114ec2e9b0597dfb66",
+        "realname": false,
+        "regTime": "2022-04-06 11:39:01",
+        "inLimit": 1536,
+        "friendlyGroup": "普通用户",
+        "proxies": 4,
+        "id": 4,
+        "email": "test@test.com",
+        "username": "test",
+        "group": "normal",
+        "traffic": 2171
+    },
+    "flag": true,
+    "msg": "ok"
+}"#;
+
+/// OpenFrp 用户隧道列表接口 `getUserProxies` 的响应
+const OPENFRP_USER_PROXIES_JSON: &str = r#"{
+    "data": {
+        "total": 2,
+        "list": [
+            {
+                "connectAddress": "homoaddr.com",
+                "custom": "homo=true",
+                "domain": "[\"homoaddr.com\"]",
+                "forceHttps": false,
+                "friendlyNode": "日本-1",
+                "id": 32933,
+                "lastLogin": 1687449600000,
+                "lastUpdate": 1687449600100,
+                "localIp": "19.19.81.0",
+                "localPort": 5173,
+                "nid": 6,
+                "online": false,
+                "proxyName": "homo_web",
+                "proxyProtocolVersion": false,
+                "proxyType": "https",
+                "status": true,
+                "uid": 19198,
+                "useCompression": true,
+                "useEncryption": true
+            },
+            {
+                "autoTls": "false",
+                "connectAddress": "cn-cq-plc-1.of-7af93c01.shop:51607",
+                "forceHttps": false,
+                "friendlyNode": "重庆联通-2",
+                "id": 120623,
+                "lastUpdate": 1687449600900,
+                "localIp": "11.45.1.4",
+                "localPort": 11451,
+                "nid": 41,
+                "online": false,
+                "proxyName": "foo",
+                "proxyProtocolVersion": false,
+                "proxyType": "tcp",
+                "remotePort": 1892,
+                "status": true,
+                "uid": 19198,
+                "useCompression": false,
+                "useEncryption": false,
+                "lastLogin": null
+            }
+        ]
+    },
+    "flag": true,
+    "msg": "ok"
 }"#;
 
 /// OpenFrp 下载列表接口的响应
 const OPENFRP_DOWNLOAD_JSON: &str = r#"{
-    "state": "success",
-    "key": "software",
     "data": {
-        "latest": "0.51.3",
-        "latest_full": "0.51.3",
+        "latest": "/OF_0.61.1_4df06100_250122/",
+        "latest_full": "OF_0.61.1_4df06100_250122",
+        "latest_ver": "0.61.1",
         "source": [
-            { "value": "https://ghproxy.net/https://github.com/openfrp/frpc/releases/download/" }
+            { "label": "CDN/Starshield", "value": "https://staticassets.naids.com/client" }
         ]
-    }
+    },
+    "flag": true,
+    "msg": "OK",
+    "detail": null
 }"#;
 
 /// SakuraFrp 客户端下载接口 `system/clients` 的响应
@@ -156,37 +234,66 @@ fn deserialize_nide8_obj() {
     assert_eq!(obj.jar_hash, "5f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c");
 }
 
-/// OpenFrp 通道列表反序列化
+/// OpenFrp 隧道列表反序列化：新接口按 node 分组
 #[test]
 fn deserialize_openfrp_channel() {
     let obj: OpenFrpChannelObj = serde_json::from_str(OPENFRP_CHANNEL_JSON).unwrap();
+    assert_eq!(obj.status, 200);
+    assert!(obj.success);
     assert_eq!(obj.data.len(), 1);
-    assert_eq!(obj.data[0].name, "香港");
+    assert_eq!(obj.data[0].name, "香港-1「CN2」");
     assert_eq!(obj.data[0].proxies.len(), 1);
     let proxy = &obj.data[0].proxies[0];
     assert_eq!(proxy.id, 10086);
     assert_eq!(proxy.p_type, "tcp");
     assert_eq!(proxy.remote, "hk-1.openfrp.net:12345");
+    assert_eq!(proxy.local, "127.0.0.1:25565");
 }
 
-/// OpenFrp 通道配置反序列化
+/// OpenFrp 用户信息反序列化：camelCase 字段与 token
 #[test]
-fn deserialize_openfrp_config() {
-    let obj: OpenFrpChannelInfoObj = serde_json::from_str(OPENFRP_CONFIG_JSON).unwrap();
-    assert_eq!(obj.proxies.len(), 2);
-    assert_eq!(
-        obj.proxies.get("hk-1.openfrp.net").map(String::as_str),
-        Some("香港节点")
-    );
+fn deserialize_openfrp_user_info() {
+    let obj: OpenFrpUserInfoObj = serde_json::from_str(OPENFRP_USER_INFO_JSON).unwrap();
+    assert!(obj.flag);
+    assert_eq!(obj.data.out_limit, 1536);
+    assert_eq!(obj.data.in_limit, 1536);
+    assert_eq!(obj.data.friendly_group, "普通用户");
+    assert_eq!(obj.data.token, "e900d8f2498202114ec2e9b0597dfb66");
 }
 
-/// OpenFrp 下载列表反序列化
+/// OpenFrp 用户隧道列表反序列化：可选字段缺失时取默认值
+#[test]
+fn deserialize_openfrp_user_proxies() {
+    let obj: OpenFrpUserProxyListObj = serde_json::from_str(OPENFRP_USER_PROXIES_JSON).unwrap();
+    assert!(obj.flag);
+    assert_eq!(obj.data.total, 2);
+
+    let first = &obj.data.list[0];
+    assert_eq!(first.proxy_name, "homo_web");
+    assert_eq!(first.proxy_type, "https");
+    assert_eq!(first.last_login, Some(1687449600000));
+    assert!(first.remote_port.is_none());
+    assert_eq!(first.domain, "[\"homoaddr.com\"]");
+
+    let second = &obj.data.list[1];
+    assert_eq!(second.remote_port, Some(1892));
+    assert!(second.last_login.is_none());
+    assert_eq!(second.auto_tls, "false");
+    assert_eq!(second.proxy_name, "foo");
+}
+
+/// OpenFrp 下载列表反序列化：latest 现在是带斜杠的目录名
 #[test]
 fn deserialize_openfrp_download() {
     let obj: OpenFrpDownloadObj = serde_json::from_str(OPENFRP_DOWNLOAD_JSON).unwrap();
-    assert_eq!(obj.data.latest, "0.51.3");
+    assert!(obj.flag);
+    assert_eq!(obj.data.latest, "/OF_0.61.1_4df06100_250122/");
+    assert_eq!(obj.data.latest_full, "OF_0.61.1_4df06100_250122");
     assert_eq!(obj.data.source.len(), 1);
-    assert!(obj.data.source[0].value.starts_with("https://"));
+    assert_eq!(
+        obj.data.source[0].value,
+        "https://staticassets.naids.com/client"
+    );
 }
 
 /// SakuraFrp 客户端下载信息反序列化

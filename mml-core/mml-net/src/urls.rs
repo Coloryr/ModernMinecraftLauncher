@@ -159,10 +159,10 @@ pub const CHUNKBASE: &str = "https://www.chunkbase.com/apps/seed-map#";
 // OpenFrp API
 // ============================================================================
 
-/// OpenFrp 开发者 API
-pub const OPENFRP: &str = "https://of-dev-api.bfsea.com/api";
+/// OpenFrp API 根地址
+pub const OPENFRP: &str = "https://api.openfrp.net";
 /// OpenFrp 软件下载配置地址
-pub const OPENFRP_DOWNLOAD: &str = "https://console.openfrp.net/web/commonQuery/get?key=software";
+pub const OPENFRP_DOWNLOAD: &str = "https://api.openfrp.net/commonQuery/get?key=software";
 
 // ============================================================================
 // SakuraFrp API

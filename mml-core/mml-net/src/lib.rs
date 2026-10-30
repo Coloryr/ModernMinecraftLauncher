@@ -25,7 +25,7 @@
 //! | [`adoptium_api`] | Adoptium Java 下载 |
 //! | [`nide8_api`] | 统一通行证 API |
 //! | [`liteloader_api`] | LiteLoader API |
-//! | [`openfrp_api`] / [`sakurafrp_api`] | 联机平台 OpenFrp / SakuraFrp 的节点列表 |
+//! | [`openfrp_api`] / [`sakurafrp_api`] | 联机平台 OpenFrp / SakuraFrp 的隧道与客户端信息 |
 //! | [`chunkbase_api`] | Chunkbase 相关接口 |
 //! | [`urls`] | URL 常量定义 |
 //! | [`url_helper`] | URL 构建辅助函数 |
@@ -37,7 +37,7 @@ use mml_config::config_obj::{HttpObj, ProxyState, ProxyType};
 use mml_names::i18;
 use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType, HttpErrorData};
 use mml_names::i18_items::info_type::InfoType;
-use reqwest::header::{ETAG, HeaderMap, HeaderValue, IF_NONE_MATCH, USER_AGENT};
+use reqwest::header::{AUTHORIZATION, ETAG, HeaderMap, HeaderValue, IF_NONE_MATCH, USER_AGENT};
 use reqwest::{Proxy, Request, Response, StatusCode};
 use serde::de::DeserializeOwned;
 use serde::ser::SerializeTuple;
@@ -698,6 +698,30 @@ impl Client {
         json: &B,
     ) -> CoreResult<T> {
         let req = self.inner.post(url).json(json);
+        let resp = abortable(async move { req.send().await.map_err(map_err) }).await?;
+        abortable(handle_response(resp)).await
+    }
+
+    /// 发送带 Authorization 头的 POST 请求，返回反序列化的 JSON
+    ///
+    /// OpenFrp 等平台的新接口用登录后拿到的 Authorization 鉴权，请求体为空对象。
+    ///
+    /// - `url`: 请求地址
+    /// - `authorization`: 鉴权头的值，原样放进 `Authorization`
+    ///
+    /// # 返回值
+    ///
+    /// 响应体反序列化成 `T`
+    pub async fn post_json_auth<T: DeserializeOwned + Send + 'static>(
+        &self,
+        url: &str,
+        authorization: &str,
+    ) -> CoreResult<T> {
+        let req = self
+            .inner
+            .post(url)
+            .header(AUTHORIZATION, authorization)
+            .json(&serde_json::json!({}));
         let resp = abortable(async move { req.send().await.map_err(map_err) }).await?;
         abortable(handle_response(resp)).await
     }

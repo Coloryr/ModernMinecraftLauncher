@@ -108,7 +108,8 @@ build/dev-frontend.sh     # Linux / macOS / Git Bash
 
 - 正式发布用 fat LTO + `codegen-units = 1`，体积最小、运行最快；末尾的跨 crate 优化只能单线程跑，
   构建期间只会看到一个核在工作。
-- 预发布用 thin LTO + `codegen-units = 16`，快很多，体积略大；主界面会显示「预发布版」。
+- 预发布用 thin LTO + `codegen-units = 16`，快很多，体积略大；主界面会显示「预发布版」，
+  并保留 DevTools（F12 打开控制台，独立窗口），正式发布不含。
 - Windows 默认构建 x64 / x86 / arm64；只要一种用 `-Arch x64`（或 `-Arch x64,x86`）。arm64 只打 NSIS，
   x64 / x86 出 MSI + NSIS。x86 / arm64 交叉编译需要对应架构的 MSVC 工具链，CI 的 arm64 跑在原生 ARM runner 上。
 - Linux 出 x64 / arm64（CI 分别跑 `ubuntu-22.04` 与 `ubuntu-24.04-arm`）；macOS 出 x64 / arm64
@@ -167,8 +168,8 @@ Windows 本地默认把三种架构都构建出来；Linux / macOS 本地构建�
 `v0.0.1` 与 `v1.0.0-pre`。CI 每个平台都走同一套脚本（`build/init.*` 装依赖，正式版用
 `build/build-release.*`、预发布用 `build/build-prerelease.*`），正式版产物名与本地一致。
 预发布只出可执行文件，如 `mml-windows-x64-1.0.0-pre.exe`、`mml-linux-arm64-1.0.0-pre`、
-`mml-macos-x64-1.0.0-pre`；Linux / macOS 下载后要 `chmod +x`。
-细节见[开发与构建](docs/development.md#自动化构建github-actions)。
+`mml-macos-x64-1.0.0-pre`；Linux / macOS 下载后要 `chmod +x`。发布说明由 CI 生成，
+附每个产物的 SHA1 与 SHA256。细节见[开发与构建](docs/development.md#自动化构建github-actions)。
 
 ### 其它常用命令
 

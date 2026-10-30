@@ -176,7 +176,8 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
    把可执行文件按 平台 / 架构 / 版本 改名到 `build_out/`，`actions/upload-artifact@v4` 收走；
    发版 job（正式版与预发布各一个）用 `actions/download-artifact@v4` 取产物并保留每个
    artifact 的子目录：正式版按 `mml-*`，预发布按 `mml-prerelease-*`；先检查文件名有无重复，
-   再交给 `softprops/action-gh-release@v2`。
+   再由 `build/release-body.mjs` 用产物现算 SHA1 / SHA256 生成发布说明，最后交给
+   `softprops/action-gh-release@v2`。
 
 - Linux runner 固定 `ubuntu-22.04` 作为 glibc 基线，并预装 Tauri 需要的
   `libwebkit2gtk-4.1-dev` / `libayatana-appindicator3-dev` / `librsvg2-dev` /
@@ -204,6 +205,7 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
   `.p12`，`APPLE_PASSWORD` 是 App 专用密码。secrets 没配置时这些变量是空串，
   而 Tauri 只看变量是否存在，所以工作流先把空值 `unset` 再调构建；此时产物未签名，首次打开需右键 → 打开。
 - 发版前检查产物重名：不同平台产物同名时会在 GitHub Release 上互相覆盖，发现重名直接失败。
+- 发布说明里的校验和是当场对下载下来的产物算的：SHA1 与 SHA256 各一列，随 Release 正文发布。
 - `windows-11-arm` 与 `ubuntu-24.04-arm` 是 GitHub 公共预览 runner，私有仓库可能不可用；
   届时改自托管，或回退到 x64 runner 交叉编译。
 - 发版 job 需要 `contents: write`（工作流默认只给 `contents: read`），只在 tag 触发时执行。

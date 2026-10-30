@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // 启动器主页：上次启动实例 / 联机大厅 / 方块列表入口 + Minecraft 新闻
 // empty 为 true 时在内容区顶部展示空实例引导块，含添加账户 / 添加游戏实例两个按钮
+import { computed } from "vue";
 import { t } from "../lib/i18n";
 import { buildChannel, buildNoticeKey, isTestBuild } from "../lib/buildInfo";
 import { showToast } from "../lib/toast";
@@ -10,12 +11,14 @@ import NewsPanel from "./NewsPanel.vue";
 import InstanceIcon from "./InstanceIcon.vue";
 import GlyphIcon from "./ui/GlyphIcon.vue";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     /** 当前这一页的新闻 */
     items: NewsItem[];
     /** 上次启动的实例；`null` 表示没有，那张卡片不显示 */
     currentInstance: InstanceInfoDto | null;
+    /** 这个实例正在启动流程里（进程还没起来）；按钮据此禁用并显示「正在启动」 */
+    launching?: boolean;
     /** 是否一个实例都没有：为 true 时顶部换成空实例引导块 */
     empty?: boolean;
     /** 新闻是否加载中 */
@@ -32,8 +35,20 @@ withDefaults(
      */
     backLabelKey?: string;
   }>(),
-  { loading: false, page: 1, hasMore: true, backLabelKey: "home.backToList" },
+  { loading: false, page: 1, hasMore: true, backLabelKey: "home.backToList", launching: false },
 );
+
+/** 快捷启动按钮能不能点：启动中 / 运行中都按住，别在主页重复点出两次启动 */
+const playDisabled = computed(
+  () => !props.currentInstance || props.launching || props.currentInstance.running,
+);
+
+/** 快捷启动按钮的文案：跟着实例状态走 */
+const playLabel = computed(() => {
+  if (props.launching) return t("launch.launching");
+  if (props.currentInstance?.running) return t("launch.running");
+  return t("home.lastPlay");
+});
 
 const emit = defineEmits<{
   /** 选中该实例 */
@@ -113,8 +128,8 @@ function onLobby() {
     <div v-if="currentInstance" class="last-card">
       <InstanceIcon :name="currentInstance.name" :uuid="currentInstance.uuid" :size="52" />
       <span class="last-name">{{ currentInstance.name }}</span>
-      <button class="last-play" @click="emit('quick-launch')">
-        <GlyphIcon name="play" :size="12" /> {{ t("home.lastPlay") }}
+      <button class="last-play" :disabled="playDisabled" @click="emit('quick-launch')">
+        <GlyphIcon name="play" :size="12" /> {{ playLabel }}
       </button>
       <button class="last-open" @click="emit('select', currentInstance)">
         <GlyphIcon name="chevron-right" :size="18" />
@@ -370,8 +385,14 @@ function onLobby() {
   white-space: nowrap;
 }
 
-.last-play:hover {
+.last-play:hover:not(:disabled) {
   filter: brightness(1.12);
+}
+
+/* 启动中 / 运行中：按住不放，跟着实例状态变灰 */
+.last-play:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .last-open {

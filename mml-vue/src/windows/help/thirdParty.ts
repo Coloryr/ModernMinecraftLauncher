@@ -270,7 +270,7 @@ export const THIRD_PARTY_SERVICES: ThirdPartyService[] = [
   {
     name: "OpenFrp",
     purpose: "winHelp.serviceFrp",
-    url: "https://console.openfrp.net/home/",
+    url: "https://console.openfrp.net/dashboard",
     links: [{ label: "winHelp.serviceApiDoc", url: "https://github.com/ZGIT-Network/OPENFRP-APIDOC" }],
   },
 ];

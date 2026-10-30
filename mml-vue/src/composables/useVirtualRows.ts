@@ -6,12 +6,19 @@
 //
 // 两种用法：
 // - 资源窗口的模组页：一份滚动状态 provide 给同页各分组，每组各算各的窗口，见 `provideListScroll`
-// - 通用列表：容器与行都在组件自己手里，见 windows/resource/parts/VirtualList.vue，用 `createListScroll`
+// - 通用列表：容器与行都在组件自己手里，见 components/ui/VirtualList.vue，用 `createListScroll`
 import { computed, inject, onBeforeUnmount, provide, ref, shallowRef, type Ref } from "vue";
 
-import { visibleWindow, type VirtualWindow } from "./virtualWindow";
+import { visibleWindow, visibleWindowOfHeights, type VirtualWindow } from "./virtualWindow";
 
-export { LIST_ROW_GAP, LIST_ROW_H, RESOURCE_ROW_GAP, TABLE_ROW_H, visibleWindow } from "./virtualWindow";
+export {
+  LIST_ROW_GAP,
+  LIST_ROW_H,
+  RESOURCE_ROW_GAP,
+  TABLE_ROW_H,
+  visibleWindow,
+  visibleWindowOfHeights,
+} from "./virtualWindow";
 export type { VirtualWindow } from "./virtualWindow";
 
 /** 列表滚动状态：谁滚动谁持有，行虚拟化靠它重算窗口 */
@@ -139,6 +146,8 @@ export function measureRowHeight(root: HTMLElement | null, fallback: number): nu
  * - `root`: 行容器的根元素
  * - `count`: 行数
  * - `rowH`: 行高，单位 px，与 CSS 里钉死的一致；给函数则每次重算时取一次（量出来的行高）
+ * - `heights`: 每行高度，单位 px，顺序与行一致；给了就按变高算，`rowH` 不再参与。
+ *   长度与 `count` 对不上时退回定高，别因为数据还没准备好把行藏没了
  * - `gap`: 行间距，单位 px；默认 0，同样可以给函数
  * - `whole`: 返回 true 时**整列都渲染**（不做窗口）—— 表格里正在就地编辑备注时用：
  *   被窗口裁掉的那一行会连元素一起销毁，正在写的草稿就丢了
@@ -154,6 +163,7 @@ export function useVirtualRows(options: {
   root: Ref<HTMLElement | null>;
   count: () => number;
   rowH: number | (() => number);
+  heights?: () => readonly number[] | null;
   gap?: number | (() => number);
   whole?: () => boolean;
   scroll?: ListScrollState;
@@ -177,8 +187,18 @@ export function useVirtualRows(options: {
       rootEl.getBoundingClientRect().top -
       containerEl.getBoundingClientRect().top +
       containerEl.scrollTop;
-    const rowH = typeof options.rowH === "function" ? options.rowH() : options.rowH;
     const gap = typeof options.gap === "function" ? options.gap() : (options.gap ?? 0);
+    const heights = options.heights?.();
+    if (heights && heights.length === count) {
+      return visibleWindowOfHeights({
+        scrollTop: scroll.top.value,
+        viewHeight: scroll.height.value,
+        rootTop,
+        heights,
+        gap,
+      });
+    }
+    const rowH = typeof options.rowH === "function" ? options.rowH() : options.rowH;
     return visibleWindow({
       scrollTop: scroll.top.value,
       viewHeight: scroll.height.value,

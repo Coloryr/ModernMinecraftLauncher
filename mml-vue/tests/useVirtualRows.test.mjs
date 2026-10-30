@@ -7,6 +7,7 @@ import {
   LIST_ROW_GAP,
   LIST_ROW_H,
   visibleWindow,
+  visibleWindowOfHeights,
 } from "../src/composables/virtualWindow.ts";
 
 const SLOT = LIST_ROW_H + LIST_ROW_GAP;
@@ -92,4 +93,82 @@ test("边界：空列表、组在视口上方 / 下方都不越界", () => {
   assert.equal(below.start, 0);
   assert.equal(below.end, 0);
   assert.equal(below.padTop + below.padBottom, 20 * LIST_ROW_H + 19 * LIST_ROW_GAP);
+});
+
+// ---------------- 变高行（分组列表：标题 / 实例行 / 平铺卡片各一档） ----------------
+
+const H = [48, 60, 60, 60, 120];
+/** 全部渲染时的高度：各行之和 + 行间距 */
+const FULL = H.reduce((sum, h) => sum + h, 0) + (H.length - 1) * 8;
+
+test("变高行：可见区间包住视口，留白把隐藏行的高度精确补回来", () => {
+  const win = visibleWindowOfHeights({
+    scrollTop: 0,
+    viewHeight: 100,
+    rootTop: 0,
+    heights: H,
+    gap: 8,
+    overscan: 0,
+  });
+  // 顶边 0 / 56 / 124 / 192 / 260：视口 0~100 只盖得住前两行
+  assert.equal(win.start, 0);
+  assert.equal(win.end, 2);
+  assert.equal(win.padTop, 0);
+  assert.equal(win.padBottom, FULL - (H[0] + 8 + H[1]));
+});
+
+test("变高行：滚到中间时上下留白都按前缀和算", () => {
+  const win = visibleWindowOfHeights({
+    scrollTop: 124,
+    viewHeight: 100,
+    rootTop: 0,
+    heights: H,
+    gap: 8,
+    overscan: 0,
+  });
+  assert.equal(win.start, 2);
+  assert.equal(win.end, 4);
+  assert.equal(win.padTop, 124);
+  // 下面藏着的是一行卡片加上它前面那道行距（每行的留白都含自己前面那道间距）
+  assert.equal(win.padBottom, H[4] + 8);
+  // 留白 + 渲染出来的行 + 行间距 == 全部渲染时的高度
+  const rendered = H[2] + 8 + H[3];
+  assert.equal(win.padTop + rendered + win.padBottom, FULL);
+});
+
+test("变高行：整列在视口上方 / 下方时一行都不渲染，高度仍然对得上", () => {
+  const above = visibleWindowOfHeights({
+    scrollTop: 100000,
+    viewHeight: 500,
+    rootTop: 0,
+    heights: H,
+    gap: 8,
+    overscan: 0,
+  });
+  assert.equal(above.start, H.length);
+  assert.equal(above.end, H.length);
+  assert.equal(above.padTop, FULL);
+
+  const below = visibleWindowOfHeights({
+    scrollTop: 0,
+    viewHeight: 500,
+    rootTop: 100000,
+    heights: H,
+    gap: 8,
+    overscan: 0,
+  });
+  assert.equal(below.start, 0);
+  assert.equal(below.end, 0);
+  assert.equal(below.padBottom, FULL);
+});
+
+test("变高行：空列表返回空窗口", () => {
+  const win = visibleWindowOfHeights({
+    scrollTop: 0,
+    viewHeight: 500,
+    rootTop: 0,
+    heights: [],
+    gap: 8,
+  });
+  assert.deepEqual(win, { start: 0, end: 0, padTop: 0, padBottom: 0 });
 });

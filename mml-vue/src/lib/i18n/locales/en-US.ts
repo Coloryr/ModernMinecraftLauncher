@@ -1882,7 +1882,7 @@ export default {
 
   // Help window
   "winHelp.stillStuck": "Still stuck?",
-  "winHelp.report": "Please provide the game logs (logs directory) and launcher version, then report at GitHub Issues.",
+  "winHelp.report": "Please provide the game logs (logs directory) and launcher version, then use the top-right icons to report at GitHub Issues.",
   "winHelp.repo": "Repository",
   "winHelp.feedback": "Report an issue",
   "winHelp.qqGroup": "QQ group {n}",

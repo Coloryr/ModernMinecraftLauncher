@@ -1051,24 +1051,28 @@ fn hide_native_traffic_lights(window: &WebviewWindow) -> Result<(), String> {
 
 /// 打开开发者工具
 ///
-/// 只对调试构建可用：发布构建没有把 DevTools 编进去，这里返回错误
+/// 测试版与预发布版可用；正式发布没有把 DevTools 编进去（见 Cargo.toml 的
+/// `prerelease = ["tauri/devtools"]`），这里返回错误。
+///
+/// 三个平台都是**独立窗口**：Windows 是 WebView2 的 DevTools 窗口，macOS 是
+/// Web Inspector 窗口，Linux 是 WebKitGTK 的 inspector（默认不贴靠）。
 ///
 /// - `window`: 调用方窗口，由 tauri 注入
 ///
 /// # 返回值
 ///
-/// 打开成功返回 `Ok(())`；发布构建返回错误文案
+/// 打开成功返回 `Ok(())`；正式发布返回错误文案
 #[gui_macros::command]
 pub fn window_open_devtools(window: WebviewWindow) -> Result<(), String> {
-    #[cfg(debug_assertions)]
+    #[cfg(any(debug_assertions, feature = "prerelease"))]
     {
         window.open_devtools();
         Ok(())
     }
-    #[cfg(not(debug_assertions))]
+    #[cfg(not(any(debug_assertions, feature = "prerelease")))]
     {
         let _ = window;
-        Err("DevTools are only available in debug builds".to_string())
+        Err("DevTools are only available in debug and prerelease builds".to_string())
     }
 }
 

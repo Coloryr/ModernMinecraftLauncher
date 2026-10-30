@@ -1883,7 +1883,7 @@ export default {
 
   // 帮助窗口
   "winHelp.stillStuck": "仍无法解决问题？",
-  "winHelp.report": "请提供游戏日志（logs 目录）与启动器版本号，前往 GitHub Issues 反馈。",
+  "winHelp.report": "请提供游戏日志（logs 目录）与启动器版本号，再点右上角的图标前往 GitHub Issues 反馈。",
   "winHelp.repo": "仓库地址",
   "winHelp.feedback": "问题反馈",
   "winHelp.qqGroup": "QQ 交流群 {n}",

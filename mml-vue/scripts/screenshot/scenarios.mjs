@@ -221,7 +221,7 @@ export const scenarios = [
     actions: [
       { eval: click('[aria-label="占满窗口"]'), after: 700 },
       { assert: "document.querySelector('.main.pane-max') !== null", label: "分组已向右占满" },
-      { assert: "document.querySelectorAll('.group-items.as-tiles .tile').length > 0", label: "实例按平铺卡展示" },
+      { assert: "document.querySelectorAll('.vrow-tiles .tile').length > 0", label: "实例按平铺卡展示" },
     ],
   },
   {

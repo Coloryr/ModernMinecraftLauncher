@@ -11,7 +11,7 @@ import ListSkeleton from "./ListSkeleton.vue";
 import ResourceRow from "./ResourceRow.vue";
 import FormattedText from "../../../components/ui/FormattedText.vue";
 import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
-import VirtualList from "./VirtualList.vue";
+import VirtualList from "../../../components/ui/VirtualList.vue";
 import { RESOURCE_ROW_GAP } from "../../../composables/useVirtualRows";
 import { useRowSelect } from "../composables/useRowSelect";
 import type { useResourceData } from "../composables/useResourceData";

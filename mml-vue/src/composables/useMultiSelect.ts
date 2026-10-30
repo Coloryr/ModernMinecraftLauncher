@@ -7,8 +7,13 @@ interface MultiDeps {
   selected: Ref<InstanceInfoDto | null>;
   /** 新闻页是否打开；进入多选时关掉 */
   newsActive: Ref<boolean>;
-  /** 分组折叠表；进入多选时全部展开 */
-  collapsedGroups: Ref<Record<string, boolean>>;
+  /**
+   * 把某个实例滚进视野
+   *
+   * 实例行走虚拟滚动，被藏起来的行没有 DOM，所以由调用方转给侧栏按行表下标滚，
+   * 不在这里自己 querySelector。
+   */
+  scrollToInstance?: (uuid: string) => void;
   /** 退出多选时回调（例如关闭右键菜单） */
   onExit?: () => void;
 }
@@ -34,8 +39,7 @@ export function useMultiSelect(deps: MultiDeps) {
   function scrollFirstSelectedIntoView() {
     const first = [...selectedIds.value][0];
     if (!first) return;
-    const row = document.querySelector<HTMLElement>(`.inst-row[data-uuid="${first}"]`);
-    row?.scrollIntoView({ block: "center", behavior: "smooth" });
+    deps.scrollToInstance?.(first);
   }
 
   /**
@@ -48,8 +52,7 @@ export function useMultiSelect(deps: MultiDeps) {
     deps.selected.value = null;
     deps.newsActive.value = false;
     selectedIds.value = new Set(ids);
-    // 勾选的行可能藏在折叠的分组里，全部展开才看得见
-    deps.collapsedGroups.value = {};
+    // 勾选的行可能藏在收起的分组里：侧栏在多选时强制展开，不改用户存下的收起状态
     nextTick(scrollFirstSelectedIntoView);
   }
 

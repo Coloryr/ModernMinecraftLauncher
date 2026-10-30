@@ -1,15 +1,16 @@
 <script setup lang="ts">
-// 帮助窗口：启动器信息 + FAQ 手风琴 + 开源许可 + 第三方服务 + 问题反馈提示，
-// 文案取当前语言的 locale 包
+// 帮助窗口：启动器信息（右上角挂仓库 / 问题反馈两枚图标按钮）+ FAQ 手风琴 +
+// 开源许可 + 第三方服务，文案取当前语言的 locale 包
 //
 // 启动器信息里的 exe SHA1 是打开窗口时现读可执行文件算出来的，见 src-tauri/src/build_info.rs。
 // 开源许可只给**上游地址**：许可全文不随安装包分发，点按钮由系统浏览器打开
 // （见 ./thirdParty.ts 的说明）。
 import { computed, onMounted, ref } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
-import BaseButton from "../../components/ui/BaseButton.vue";
+import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import { t, tErr, locale } from "../../lib/i18n";
 import { api } from "../../lib/api";
+import { ISSUES_URL, QQ_GROUP, REPO_URL } from "../../lib/links";
 import { commands } from "../../lib/bindings";
 import { copyText } from "../../lib/clipboard";
 import { showToast } from "../../lib/toast";
@@ -136,12 +137,6 @@ function openUrl(url: string) {
   api.openUrl(url).catch(() => {});
 }
 
-/** 项目仓库与问题反馈地址 */
-const REPO_URL = "https://github.com/Coloryr/ModernMinecraftLauncher";
-const ISSUES_URL = `${REPO_URL}/issues`;
-/** QQ 交流群号 */
-const QQ_GROUP = "571239090";
-
 /** 复制 QQ 群号 */
 async function copyQq() {
   showToast((await copyText(QQ_GROUP)) ? t("winHelp.qqCopied") : t("account.copyFail"));
@@ -178,6 +173,18 @@ async function copyQq() {
           </code>
         </div>
       </div>
+
+      <!-- 仓库与问题反馈：跟介绍信息同一张卡，贴右上角，正文行数不用再挪 -->
+      <div class="about-actions">
+        <button class="ui-btn-icon" v-tip="t('winHelp.repo')" :aria-label="t('winHelp.repo')"
+          @click="openUrl(REPO_URL)">
+          <GlyphIcon name="github" :size="16" />
+        </button>
+        <button class="ui-btn-icon" v-tip="t('winHelp.feedback')" :aria-label="t('winHelp.feedback')"
+          @click="openUrl(ISSUES_URL)">
+          <GlyphIcon name="bug" :size="16" />
+        </button>
+      </div>
     </section>
 
     <div class="help-list">
@@ -196,17 +203,13 @@ async function copyQq() {
     <div class="footer-note">
       <p>{{ t("winHelp.stillStuck") }}</p>
       <p>{{ t("winHelp.report") }}</p>
-      <div class="footer-actions">
-        <BaseButton size="sm" @click="openUrl(REPO_URL)">{{ t("winHelp.repo") }}</BaseButton>
-        <BaseButton size="sm" @click="openUrl(ISSUES_URL)">{{ t("winHelp.feedback") }}</BaseButton>
-        <span class="footer-qq">
-          {{ t("winHelp.qqGroup", { n: QQ_GROUP }) }}
-          <button class="qq-copy" v-tip="t('winHelp.qqCopy')" :aria-label="t('winHelp.qqCopy')"
-            @click="copyQq">
-            {{ t("winHelp.qqCopy") }}
-          </button>
-        </span>
-      </div>
+      <span class="footer-qq">
+        {{ t("winHelp.qqGroup", { n: QQ_GROUP }) }}
+        <button class="qq-copy" v-tip="t('winHelp.qqCopy')" :aria-label="t('winHelp.qqCopy')"
+          @click="copyQq">
+          {{ t("winHelp.qqCopy") }}
+        </button>
+      </span>
     </div>
 
     <!-- 开源许可：只给上游链接，许可全文不随安装包分发，见 ./thirdParty.ts -->
@@ -304,6 +307,14 @@ async function copyQq() {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+/* 仓库 / 反馈两枚图标按钮：贴卡片右上角，不另占正文的一行 */
+.about-actions {
+  display: flex;
+  gap: 4px;
+  align-self: flex-start;
+  margin-right: -8px;
 }
 
 .about-title {
@@ -425,18 +436,11 @@ async function copyQq() {
   line-height: 1.8;
 }
 
-.footer-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
-}
-
 .footer-qq {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  margin-top: 10px;
   font-size: 12.5px;
   color: var(--text-dim);
 }

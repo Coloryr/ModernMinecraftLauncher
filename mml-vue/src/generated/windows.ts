@@ -79,7 +79,6 @@ export { default as WinResourcePartsScreenshotPane } from "../windows/resource/p
 export { default as WinResourcePartsServerFormModal } from "../windows/resource/parts/ServerFormModal.vue";
 export { default as WinResourcePartsServerPane } from "../windows/resource/parts/ServerPane.vue";
 export { default as WinResourcePartsShaderPane } from "../windows/resource/parts/ShaderPane.vue";
-export { default as WinResourcePartsVirtualList } from "../windows/resource/parts/VirtualList.vue";
 export { default as WinResourcePartsModModDepNode } from "../windows/resource/parts/mod/ModDepNode.vue";
 export { default as WinResourcePartsModModDepsModal } from "../windows/resource/parts/mod/ModDepsModal.vue";
 export { default as WinResourcePartsModModExportModal } from "../windows/resource/parts/mod/ModExportModal.vue";

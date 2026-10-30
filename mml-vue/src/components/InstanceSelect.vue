@@ -2,8 +2,12 @@
 // 实例下拉选择，用于列表模式选中实例
 // 整块控件**不带图标**：按钮与展开的列表都只有文字（名字 / 版本 / 加载器），详见下方模板
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
+import VirtualList from "./ui/VirtualList.vue";
 import { t } from "../lib/i18n";
 import type { InstanceInfoDto } from "../lib/bindings";
+
+/** 每个实例项的高度，单位 px；与 CSS 的 .option height 同源 */
+const OPTION_H = 48;
 
 const props = defineProps<{
   /** 可选的实例列表 */
@@ -22,7 +26,11 @@ const emit = defineEmits<{
 const open = ref(false);
 const rootEl = ref<HTMLDivElement | null>(null);
 const btnEl = ref<HTMLButtonElement | null>(null);
-const listEl = ref<HTMLDivElement | null>(null);
+/** 实例列表：虚拟滚动的容器，定位与滚动都通过它 */
+const listRef = ref<{
+  el: HTMLElement | null;
+  scrollToIndex: (index: number, align?: "nearest" | "center") => void;
+} | null>(null);
 
 /**
  * 浮层定位：**fixed**，不是 absolute
@@ -49,7 +57,7 @@ function placeMenu() {
   const below = window.innerHeight - rect.bottom - GAP - EDGE;
   const above = rect.top - GAP - EDGE;
   // 不限高时浮层要多高：没被截就是当前高度，被截过就把列表藏起来的那截加回去
-  const list = listEl.value;
+  const list = listRef.value?.el ?? null;
   const menu = list?.parentElement as HTMLElement | null;
   const hidden = list ? Math.max(0, list.scrollHeight - list.clientHeight) : 0;
   const natural = menu ? menu.offsetHeight + hidden : 0;
@@ -70,17 +78,11 @@ function placeMenu() {
  * 打开时把当前实例带进视野
  *
  * 浮层每次打开都是重新挂载的，scrollTop 必然回到 0：不滚一下，实例一多就得每次从最上面往下
- * 翻着找，切到别的实例再打开也一样。
+ * 翻着找，切到别的实例再打开也一样。列表是虚拟滚动的，选中项不一定有 DOM，所以按下标滚。
  */
 function revealActive() {
-  const list = listEl.value;
-  const active = list?.querySelector<HTMLElement>(".option.active");
-  if (!list || !active) return;
-  // 用布局值而不是 getBoundingClientRect：此刻浮层还在播 enter 动画，rect 带着缩放
-  const top = active.offsetTop - list.offsetTop;
-  const bottom = top + active.offsetHeight;
-  if (top < list.scrollTop) list.scrollTop = top;
-  else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
+  const index = props.instances.findIndex((i) => i.uuid === props.modelValue);
+  if (index >= 0) listRef.value?.scrollToIndex(index, "nearest");
 }
 
 async function toggle() {
@@ -162,21 +164,23 @@ function addNew() {
         <!-- 实例列表：整块浮层里**唯一**可滚动的地方，
              所以右侧滚动条只在这一段，不会延伸到下面的"添加实例"上去。
              每行只有文字：图标（实例头像 / 加号）在这个下拉里一律不画 -->
-        <div class="menu-list" ref="listEl">
-          <button v-for="inst in instances" :key="inst.uuid" class="option"
-            :class="{ active: inst.uuid === modelValue, running: inst.running }" @click="pick(inst)">
-            <span class="option-text">
-              <span class="option-name">{{ inst.name }}</span>
-              <span class="option-sub">
-                {{ inst.version }}
-                <template v-if="inst.loader !== 'normal'">
-                  <span class="loader-text">{{ t(`add.loader.${inst.loader}`) }}</span>
-                </template>
+        <VirtualList ref="listRef" class="menu-list" :count="instances.length" :row-h="OPTION_H" :row-gap="0">
+          <template #default="{ start, end }">
+            <button v-for="inst in instances.slice(start, end)" :key="inst.uuid" class="option"
+              :class="{ active: inst.uuid === modelValue, running: inst.running }" @click="pick(inst)">
+              <span class="option-text">
+                <span class="option-name">{{ inst.name }}</span>
+                <span class="option-sub">
+                  {{ inst.version }}
+                  <template v-if="inst.loader !== 'normal'">
+                    <span class="loader-text">{{ t(`add.loader.${inst.loader}`) }}</span>
+                  </template>
+                </span>
               </span>
-            </span>
-            <span v-if="inst.running" class="run-dot" v-tip="t('launch.running')"></span>
-          </button>
-        </div>
+              <span v-if="inst.running" class="run-dot" v-tip="t('launch.running')"></span>
+            </button>
+          </template>
+        </VirtualList>
 
         <!-- 浮层底部固定：新建实例入口在滚动区之外，实例再多也一直看得见 -->
         <div class="menu-foot">
@@ -302,6 +306,8 @@ function addNew() {
 .option {
   position: relative;
   width: 100%;
+  /* 高度钉死：虚拟列表按它算窗口（脚本里的 OPTION_H），名字 / 版本一两行都占同样高 */
+  height: 48px;
   display: flex;
   align-items: center;
   gap: 10px;

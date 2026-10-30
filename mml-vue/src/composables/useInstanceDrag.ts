@@ -146,34 +146,47 @@ export function useInstanceDrag(deps: DragDeps) {
       else if (e.clientY > rect.bottom - threshold) listEl.scrollTop += 10;
     }
     if (active.kind === "instance") {
-      const block = (el?.closest?.(".group-block") ?? null) as HTMLElement | null;
-      if (!block) {
+      // 行是虚拟滚动的，只渲染视口附近那几行：落点按"压在哪一行、行上半还是下半"加该行的
+      // data-idx 算，不能数渲染出来的行数（被藏起来的行没有 DOM）
+      const groupEl = (el?.closest?.("[data-group]") ?? null) as HTMLElement | null;
+      if (!groupEl) {
         dragInsert.value = null;
         return;
       }
-      // data-group 存的是分组 uuid（身份；组名可改）
-      const groupId = block.dataset.group ?? "";
-      // 插入位置按组内实例计算（排除正在拖拽的实例本身）
-      const rows = [...block.querySelectorAll(".inst-row")].filter(
-        (r) => (r as HTMLElement).dataset.uuid !== active.instance?.uuid,
-      ) as HTMLElement[];
-      let index = rows.length;
-      for (let i = 0; i < rows.length; i++) {
-        const r = rows[i].getBoundingClientRect();
-        if (e.clientY < r.top + r.height / 2) {
-          index = i;
+      // data-group 存的是分组 uuid（身份；组名可改）；默认分组也有 uuid，只有拿不到分组表时才是空串
+      const groupId = groupEl.dataset.group ?? "";
+      const rows = listEl
+        ? ([...listEl.querySelectorAll(".inst-row")] as HTMLElement[]).filter(
+            (r) => r.dataset.group === groupId,
+          )
+        : [];
+      let index = 0;
+      for (const row of rows) {
+        const rect = row.getBoundingClientRect();
+        const at = Number(row.dataset.idx ?? 0);
+        if (e.clientY < rect.top + rect.height / 2) {
+          index = at;
           break;
         }
+        index = at + 1;
       }
+      // data-idx 是组内完整下标（含正在拖的那个），接口要的是"拿掉它之后"的下标
+      const dragged =
+        deps.groups.value
+          .find((g) => g.id === groupId)
+          ?.items.findIndex((i) => i.uuid === active.instance?.uuid) ?? -1;
+      if (dragged >= 0 && dragged < index) index -= 1;
       dragInsert.value = { groupId, index };
     } else {
-      const list = el?.closest?.(".group-list") ?? null;
-      const blocks = list ? [...list.querySelectorAll(".group-block")] : [];
-      let index = blocks.length;
-      for (let i = 0; i < blocks.length; i++) {
-        const r = (blocks[i] as HTMLElement).getBoundingClientRect();
-        if (e.clientY < r.top + r.height / 2) {
-          index = i;
+      // 分组标题行带 data-gi，同样按它算插到第几个分组之前
+      const headers = listEl ? ([...listEl.querySelectorAll("[data-gi]")] as HTMLElement[]) : [];
+      let index = headers.length
+        ? Number(headers[headers.length - 1].dataset.gi ?? 0) + 1
+        : 0;
+      for (const header of headers) {
+        const rect = header.getBoundingClientRect();
+        if (e.clientY < rect.top + rect.height / 2) {
+          index = Number(header.dataset.gi ?? 0);
           break;
         }
       }

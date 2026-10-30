@@ -52,5 +52,6 @@ export { default as CompUiImagePreview } from "../components/ui/ImagePreview.vue
 export { default as CompUiInstanceChip } from "../components/ui/InstanceChip.vue";
 export { default as CompUiMonacoText } from "../components/ui/MonacoText.vue";
 export { default as CompUiSplashScreen } from "../components/ui/SplashScreen.vue";
+export { default as CompUiVirtualList } from "../components/ui/VirtualList.vue";
 export { default as CompUiWindowControls } from "../components/ui/WindowControls.vue";
 export { default as CompUiWindowFrame } from "../components/ui/WindowFrame.vue";

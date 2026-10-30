@@ -147,7 +147,15 @@ fn archive_json_name(archive: &BaseArchive, entry: &str) -> String {
         .ok()
         .and_then(|data| MiniJsonObj::from_stream(data.as_slice()).ok())
         .and_then(|json| json.as_object())
-        .map(|map| map.get_string("name"))
+        .map(|map| {
+            let name = map.get_string("name");
+            let version = map.get_opt_string("version").or(map.get_opt_string("versionId"));
+
+            match version {
+                Some(data) => format!("{name}-{data}"),
+                None => name,
+            }
+        })
         .unwrap_or_default()
 }
 

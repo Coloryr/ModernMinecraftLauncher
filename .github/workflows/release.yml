@@ -364,6 +364,8 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: 下载全部产物
         uses: actions/download-artifact@v4
         with:
@@ -382,17 +384,14 @@ jobs:
           echo '产物无重名。'
       - name: 列出产物
         run: find artifacts -type f -print
+      - name: 生成发布说明
+        run: node build/release-body.mjs --kind release --version ${{ github.ref_name }} --artifacts artifacts --out "$RUNNER_TEMP/release-body.md"
       - name: 创建 GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: M²L ${{ github.ref_name }}
-          body: |
-            M²L ${{ github.ref_name }} 构建产物
-
-            - Windows：x64 / x86 / arm64（MSI / NSIS；arm64 为 NSIS）
-            - Linux：x64 / arm64（deb / rpm / AppImage；x64 另有 Flatpak / Arch）
-            - macOS：x64 / arm64（dmg / app.tar.gz）
+          body_path: ${{ runner.temp }}/release-body.md
           files: artifacts/**/*
           fail_on_unmatched_files: true
           draft: false
@@ -405,6 +404,8 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: 下载预发布产物
         uses: actions/download-artifact@v4
         with:
@@ -423,18 +424,14 @@ jobs:
           echo '产物无重名。'
       - name: 列出产物
         run: find artifacts -type f -print
+      - name: 生成发布说明
+        run: node build/release-body.mjs --kind prerelease --version ${{ github.ref_name }} --artifacts artifacts --out "$RUNNER_TEMP/release-body.md"
       - name: 创建 GitHub 预发布
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: M²L ${{ github.ref_name }} 预发布
-          body: |
-            M²L ${{ github.ref_name }} 预发布构建
-
-            - 预发布只提供可执行文件，不打安装包；主界面会提示「预发布版」。
-            - Windows：x64 / x86 / arm64（.exe）
-            - Linux：x64 / arm64（下载后 `chmod +x`）
-            - macOS：x64 / arm64（下载后 `chmod +x`）
+          body_path: ${{ runner.temp }}/release-body.md
           files: artifacts/**/*
           fail_on_unmatched_files: true
           draft: false

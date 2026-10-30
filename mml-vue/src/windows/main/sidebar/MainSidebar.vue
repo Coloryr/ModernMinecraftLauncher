@@ -2,9 +2,15 @@
 // 主窗口侧栏：搜索 / 分组列表（拖拽排序）/ 平铺
 // 状态与交互全部通过 props / emits 与 MainWindow 联通；
 // 分组 / 平铺 / 列表的切换入口不在这里，在设置窗口「界面 → 主窗口」
+//
+// 两种模式的实例列表都走虚拟滚动（components/ui/VirtualList）：实例上百时只渲染视口附近
+// 那几行。行高按行种钉死（分组标题 / 添加 / 实例 / 平铺卡片各一档，见 ROW_H_*），窗口与
+// 滚动条长度都按常量算，不用渲染出来再量。
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import DragGhost from "../../../components/ui/DragGhost.vue";
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import HighlightText from "../../../components/ui/HighlightText.vue";
+import VirtualList from "../../../components/ui/VirtualList.vue";
 import InstanceIcon from "../../../components/InstanceIcon.vue";
 import { t } from "../../../lib/i18n";
 import type { InstanceInfoDto, ViewMode } from "../../../lib/bindings";
@@ -76,12 +82,200 @@ function onSearchInput(e: Event) {
   emit("update:searchText", (e.target as HTMLInputElement).value);
 }
 
-/** 分组的实例列表是否展开：拖拽实例 / 搜索时强制展开，便于投放与查看结果 */
+/** 分组的实例列表是否展开：拖拽实例 / 搜索 / 多选时强制展开，便于投放与查看结果 */
 function isGroupOpen(id: string) {
   return (
-    !props.isCollapsed(id) || props.searching || props.dragActive?.kind === "instance"
+    !props.isCollapsed(id) ||
+    props.searching ||
+    props.multiSelect ||
+    props.dragActive?.kind === "instance"
   );
 }
+
+// ---------------- 虚拟列表的行表 ----------------
+
+/** 分组标题行高度，单位 px；与 CSS 的 .vrow-group 同源 */
+const ROW_H_GROUP = 48;
+/** 实例行 / 添加行 / 实例插入占位的高度，单位 px；与 CSS 的 .vrow-inst 等同源 */
+const ROW_H_INST = 60;
+/** 平铺卡片高度，单位 px；与 CSS 的 .tile height 同源 */
+const TILE_H = 112;
+/** 平铺的行间距，单位 px；与 .vrow-tiles 里多出来的那截同源 */
+const TILE_GAP = 8;
+/** 一行平铺卡片的高度，单位 px */
+const ROW_H_TILE = TILE_H + TILE_GAP;
+/** 平铺卡片的最小宽度，单位 px；未占满时与 CSS 原来的 minmax(96px, 1fr) 同源 */
+const TILE_MIN = 96;
+/** 占满时的最小宽度，单位 px；与原来的 minmax(120px, 1fr) 同源 */
+const TILE_MIN_MAX = 120;
+
+/** 平铺模式的一格：添加卡或实例卡 */
+type TileCell = { kind: "add" } | { kind: "inst"; inst: InstanceInfoDto };
+
+/** 虚拟列表的一行 */
+type Row =
+  | { kind: "group"; key: string; gi: number; group: GroupView }
+  | { kind: "ghost-group"; key: string; gi: number }
+  | { kind: "add"; key: string; gi: number; groupId: string }
+  | { kind: "inst"; key: string; gi: number; group: GroupView; idx: number; inst: InstanceInfoDto }
+  | { kind: "ghost-inst"; key: string; gi: number; groupId: string }
+  | { kind: "tiles"; key: string; gi: number; cells: TileCell[] };
+
+/** 滚动容器（VirtualList 的根），量宽度与按行滚动都通过它 */
+const listRef = ref<{
+  el: HTMLElement | null;
+  scrollToIndex: (index: number, align?: "nearest" | "center") => void;
+} | null>(null);
+
+/** 滚动容器去掉左右内边距后的宽度，单位 px；平铺的列数按它算 */
+const contentWidth = ref(0);
+
+/** 平铺卡片的最小宽度，单位 px：占满时放宽一档，一排不至于全是小方块 */
+const tileMin = computed(() => (props.maximized ? TILE_MIN_MAX : TILE_MIN));
+
+/** 平铺每行的列数：与 CSS 的 auto-fill 同一口径（宽度减去最小宽度，按间距取整） */
+const columns = computed(() => {
+  const w = contentWidth.value;
+  return Math.max(1, Math.floor((w + TILE_GAP) / (tileMin.value + TILE_GAP)));
+});
+
+/** 平铺一行的网格样式：列数按容器宽度现算，与脚本里切行的口径一致 */
+const tileGridStyle = computed(() => ({
+  gridTemplateColumns: "repeat(" + columns.value + ", minmax(0, 1fr))",
+  gap: TILE_GAP + "px",
+}));
+
+/** 量一次滚动容器的内容宽度 */
+function measureWidth() {
+  const el = listRef.value?.el ?? null;
+  if (!el) return;
+  const cs = getComputedStyle(el);
+  const pad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+  contentWidth.value = Math.max(0, el.clientWidth - pad);
+}
+
+const widthObserver = new ResizeObserver(() => measureWidth());
+
+onMounted(() => measureWidth());
+onUnmounted(() => widthObserver.disconnect());
+
+// 挂载后滚动容器才出现（两种模式共用同一个实例），盯住它量宽度
+watch(
+  () => listRef.value?.el ?? null,
+  (el) => {
+    widthObserver.disconnect();
+    if (!el) return;
+    widthObserver.observe(el);
+    measureWidth();
+  },
+  { flush: "post" },
+);
+
+/**
+ * 把一串格子按列数切成若干行
+ *
+ * - `cells`: 这一组（或整个平铺列表）的格子
+ * - `key`: 行的 key 前缀，分组 uuid 或 grid
+ * - `gi`: 分组下标；平铺模式给 -1
+ *
+ * # 返回值
+ *
+ * 见 [`Row`] 里的 tiles 行
+ */
+function chunkTiles(cells: TileCell[], key: string, gi: number): Row[] {
+  const out: Row[] = [];
+  const cols = Math.max(1, columns.value);
+  for (let i = 0; i < cells.length; i += cols) {
+    out.push({ kind: "tiles", key: "t-" + key + "-" + i, gi, cells: cells.slice(i, i + cols) });
+  }
+  return out;
+}
+
+/** 平铺模式的行表：添加卡 + 全部实例，按列数切行 */
+function gridRows(list: InstanceInfoDto[]): Row[] {
+  const cells: TileCell[] = [];
+  if (!props.multiSelect) cells.push({ kind: "add" });
+  for (const inst of list) cells.push({ kind: "inst", inst });
+  return chunkTiles(cells, "grid", -1);
+}
+
+/**
+ * 分组模式的行表：分组标题 + 添加行 + 实例行
+ *
+ * 收起的组只留标题行 —— 组内一行都不渲染，滚起来才省事。
+ * 占满时组内改用平铺卡片，与平铺模式同一套格子。
+ */
+const rows = computed<Row[]>(() => {
+  if (props.mode === "grid") return gridRows(props.filteredInstances);
+  const out: Row[] = [];
+  props.filteredGroups.forEach((g, gi) => {
+    if (props.isGroupInsert(gi)) out.push({ kind: "ghost-group", key: "gg-" + gi, gi });
+    out.push({ kind: "group", key: "g-" + g.id, gi, group: g });
+    if (!isGroupOpen(g.id)) return;
+    if (props.maximized) {
+      const cells: TileCell[] = [];
+      if (!props.multiSelect) cells.push({ kind: "add" });
+      for (const inst of g.items) cells.push({ kind: "inst", inst });
+      out.push(...chunkTiles(cells, g.id, gi));
+      return;
+    }
+    if (!props.multiSelect) out.push({ kind: "add", key: "a-" + g.id, gi, groupId: g.id });
+    g.items.forEach((inst, idx) => {
+      // 正在拖的实例行不渲染，位置由插入占位显示
+      if (inst.uuid === props.draggingUuid) return;
+      if (props.isInstInsert(g.id, idx)) {
+        out.push({ kind: "ghost-inst", key: "pi-" + g.id + "-" + idx, gi, groupId: g.id });
+      }
+      out.push({ kind: "inst", key: "i-" + inst.uuid, gi, group: g, idx, inst });
+    });
+    if (props.isInstInsertEnd(g.id)) {
+      out.push({ kind: "ghost-inst", key: "pe-" + g.id, gi, groupId: g.id });
+    }
+  });
+  if (props.isGroupInsert(props.filteredGroups.length)) {
+    out.push({ kind: "ghost-group", key: "gg-end", gi: props.filteredGroups.length });
+  }
+  return out;
+});
+
+/** 每行高度，单位 px；顺序与 rows 一致，变高虚拟列表按它算窗口 */
+const rowHeights = computed(() =>
+  rows.value.map((row) => {
+    if (row.kind === "tiles") return ROW_H_TILE;
+    if (row.kind === "group" || row.kind === "ghost-group") return ROW_H_GROUP;
+    return ROW_H_INST;
+  }),
+);
+
+/**
+ * 平铺卡按下：只有分组模式（占满）支持拖拽，平铺模式的卡片不拖
+ *
+ * - `e`: 指针按下事件
+ * - `inst`: 被按住的实例
+ */
+function onTilePointerDown(e: PointerEvent, inst: InstanceInfoDto) {
+  if (props.mode !== "group") return;
+  props.onDragPointerDown(e, { kind: "instance", instance: inst });
+}
+
+/**
+ * 把某个实例滚进视野
+ *
+ * 虚拟列表里被藏起来的行没有 DOM，scrollIntoView 找不到，所以按行表下标滚。
+ *
+ * - `uuid`: 实例 uuid；行表里没有（分组收起 / 搜索过滤掉）时什么都不做
+ */
+function scrollToInstance(uuid: string) {
+  // 占满时实例在平铺卡片行里，行号要按"这一行里有它"来找
+  const index = rows.value.findIndex((row) =>
+    row.kind === "inst"
+      ? row.inst.uuid === uuid
+      : row.kind === "tiles" && row.cells.some((c) => c.kind === "inst" && c.inst.uuid === uuid),
+  );
+  if (index >= 0) listRef.value?.scrollToIndex(index, "center");
+}
+
+defineExpose({ scrollToInstance });
 </script>
 
 <template>
@@ -114,144 +308,124 @@ function isGroupOpen(id: string) {
       </button>
     </div>
 
-    <!-- 分组：可收缩，组内顶部有添加 -->
-    <div v-if="mode === 'group'" class="group-list">
-      <template v-for="(g, gi) in filteredGroups" :key="g.id">
-        <!-- 分组拖拽插入占位 -->
-        <div v-if="isGroupInsert(gi)" class="drop-ghost-group">
-          <span class="drop-ghost-group-name">{{ dragActive?.groupName }}</span>
-        </div>
-        <div class="group-block" :data-group="g.id">
-          <div class="group-title-row" @contextmenu.prevent="onGroupContext($event, g.id)"
-            @pointerdown="onDragPointerDown($event, { kind: 'group', groupId: g.id, groupName: g.name })">
-            <button class="group-title" v-tip="t('group.collapse')" @click="onGroupTitleClick(g.id)">
-              <svg class="group-chevron" :class="{ collapsed: isCollapsed(g.id) }" viewBox="0 0 24 24" width="13"
-                height="13" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="m6 9 6 6 6-6" />
-              </svg>
-              <span><HighlightText :text="g.name" :query="searchText" /></span>
-              <span class="group-count">{{ g.items.length }}</span>
+    <!-- 分组 / 平铺共用一张虚拟列表：行表由脚本按模式铺好，这里只按行种画 -->
+    <VirtualList ref="listRef" class="sidebar-list" :class="mode === 'group' ? 'group-list' : 'tile-list'"
+      :count="rows.length" :heights="rowHeights" :row-gap="0">
+      <template #default="{ start, end }">
+        <template v-for="row in rows.slice(start, end)" :key="row.key">
+          <!-- 分组标题：收起 / 展开只影响行表里有没有组内那几行 -->
+          <div v-if="row.kind === 'group'" class="vrow vrow-group" :data-group="row.group.id" :data-gi="row.gi">
+            <div class="group-title-row" @contextmenu.prevent="onGroupContext($event, row.group.id)"
+              @pointerdown="onDragPointerDown($event, { kind: 'group', groupId: row.group.id, groupName: row.group.name })">
+              <button class="group-title" v-tip="t('group.collapse')" @click="onGroupTitleClick(row.group.id)">
+                <svg class="group-chevron" :class="{ collapsed: isCollapsed(row.group.id) }" viewBox="0 0 24 24"
+                  width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+                <span><HighlightText :text="row.group.name" :query="searchText" /></span>
+                <span class="group-count">{{ row.group.items.length }}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 分组拖拽插入占位 -->
+          <div v-else-if="row.kind === 'ghost-group'" class="vrow vrow-group">
+            <div class="drop-ghost-group">
+              <span class="drop-ghost-group-name">{{ dragActive?.groupName }}</span>
+            </div>
+          </div>
+
+          <!-- 添加实例：与实例行同尺寸，多选时整行不进行表 -->
+          <div v-else-if="row.kind === 'add'" class="vrow vrow-add" :data-group="row.groupId">
+            <button class="add-inst-row" :disabled="dragActive?.kind === 'instance'" @click="emit('add-instance')">
+              <span class="add-inst-icon">
+                <GlyphIcon name="plus" :size="18" />
+              </span>
+              <span class="add-inst-text">{{ t("list.add") }}</span>
             </button>
           </div>
 
-          <!-- 拖拽实例时自动展开，便于投放；展开 / 收起走高度动画（grid-template-rows 0fr↔1fr） -->
-          <div class="group-items-wrap" :class="{ collapsed: !isGroupOpen(g.id) }">
-            <div class="group-items" :class="{ 'as-tiles': maximized }">
-              <!-- 添加实例（与实例行同尺寸；多选时隐藏，拖拽实例时禁用并变色）。
-                   占满时换成平铺那张「添加」卡，与实例卡同一套外观 -->
-              <button v-if="maximized" v-show="!multiSelect" class="tile add-tile"
-                :disabled="dragActive?.kind === 'instance'" @click="emit('add-instance')">
-                <span class="add-plus">
-                  <GlyphIcon name="plus" :size="24" :weight="1.8" />
-                </span>
-                <span class="tile-name">{{ t("group.add") }}</span>
-              </button>
-              <button v-else v-show="!multiSelect" class="add-inst-row" :disabled="dragActive?.kind === 'instance'"
-                @click="emit('add-instance')">
-                <span class="add-inst-icon">
-                  <GlyphIcon name="plus" :size="18" />
-                </span>
-                <span class="add-inst-text">{{ t("list.add") }}</span>
-              </button>
-              <template v-for="(inst, idx) in g.items" :key="inst.uuid">
-                <!-- 正在拖拽的实例行不渲染（位置由插入占位显示），避免出现空位 / 双占位 -->
-                <template v-if="inst.uuid !== draggingUuid">
-                  <!-- 实例拖拽插入占位（淡化的实例，位于鼠标对应位置） -->
-                  <div v-if="isInstInsert(g.id, idx)" class="drop-ghost-row">
-                    <InstanceIcon :name="dragActive?.instance?.name ?? ''" :uuid="dragActive?.instance?.uuid ?? '0'"
-                      :size="38" />
-                    <span class="inst-name">{{ dragActive?.instance?.name ?? "" }}</span>
-                  </div>
-                  <!-- 占满时和平铺模式用的是同一张卡：外观、加载器角标、运行点位置都一致 -->
-                  <div v-if="maximized" class="tile" :data-uuid="inst.uuid" :class="{
-                    active: selected?.uuid === inst.uuid,
-                    'multi-checked': multiSelect && selectedIds.has(inst.uuid),
-                  }" @pointerdown="onDragPointerDown($event, { kind: 'instance', instance: inst })"
-                    @click="onInstClick(inst, $event)" @contextmenu.prevent="onInstContext($event, inst)">
-                    <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(inst.uuid) }">
-                      <GlyphIcon name="check" :size="12" :weight="2.6" />
-                    </span>
-                    <InstanceIcon :name="inst.name" :uuid="inst.uuid" :size="44" />
-                    <span v-if="inst.loader !== 'normal'" class="loader-corner loader-text"
-                      :class="`loader-${inst.loader}`">{{ t(`add.loader.${inst.loader}`) }}</span>
-                    <span class="tile-name"><HighlightText :text="inst.name" :query="searchText" /></span>
-                    <span v-if="inst.running" class="run-dot" v-tip="t('launch.running')"></span>
-                  </div>
-                  <div v-else class="inst-row" :data-uuid="inst.uuid" :class="{
-                    active: selected?.uuid === inst.uuid,
-                    'multi-checked': multiSelect && selectedIds.has(inst.uuid),
-                    running: inst.running,
-                  }" @pointerdown="onDragPointerDown($event, { kind: 'instance', instance: inst })"
-                    @click="onInstClick(inst, $event)" @contextmenu.prevent="onInstContext($event, inst)">
-                    <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(inst.uuid) }">
-                      <GlyphIcon name="check" :size="12" :weight="2.6" />
-                    </span>
-                    <InstanceIcon :name="inst.name" :uuid="inst.uuid" :size="38" />
-                    <span v-if="inst.loader !== 'normal'" class="loader-text" :class="`loader-${inst.loader}`">{{
-                      t(`add.loader.${inst.loader}`) }}</span>
-                    <span class="inst-name"><HighlightText :text="inst.name" :query="searchText" /></span>
-                    <span v-if="inst.running" class="run-dot" v-tip="t('launch.running')"></span>
-                  </div>
-                </template>
-              </template>
-              <!-- 分组末尾插入占位 -->
-              <div v-if="isInstInsertEnd(g.id)" class="drop-ghost-row">
-                <InstanceIcon :name="dragActive?.instance?.name ?? ''" :uuid="dragActive?.instance?.uuid ?? '0'"
-                  :size="38" />
-                <span class="inst-name">{{ dragActive?.instance?.name ?? "" }}</span>
-              </div>
+          <!-- 实例拖拽插入占位（淡化的实例，位于鼠标对应位置） -->
+          <div v-else-if="row.kind === 'ghost-inst'" class="vrow vrow-ghost-inst" :data-group="row.groupId">
+            <div class="drop-ghost-row">
+              <InstanceIcon :name="dragActive?.instance?.name ?? ''" :uuid="dragActive?.instance?.uuid ?? '0'"
+                :size="38" />
+              <span class="inst-name">{{ dragActive?.instance?.name ?? "" }}</span>
             </div>
           </div>
-        </div>
+
+          <!-- 平铺卡片行：占满时与平铺模式同一套卡，外观、角标、运行点位置都一致 -->
+          <div v-else-if="row.kind === 'tiles'" class="vrow vrow-tiles">
+            <div class="tile-grid" :style="tileGridStyle">
+              <template v-for="(cell, ci) in row.cells" :key="ci">
+                <div v-if="cell.kind === 'add'" class="tile add-tile" @click="emit('add-instance')">
+                  <span class="add-plus">
+                    <GlyphIcon name="plus" :size="24" :weight="1.8" />
+                  </span>
+                  <span class="tile-name">{{ t("group.add") }}</span>
+                </div>
+                <div v-else class="tile" :data-uuid="cell.inst.uuid" :class="{
+                  active: selected?.uuid === cell.inst.uuid,
+                  'multi-checked': multiSelect && selectedIds.has(cell.inst.uuid),
+                }" @pointerdown="onTilePointerDown($event, cell.inst)" @click="onInstClick(cell.inst, $event)"
+                  @contextmenu.prevent="onInstContext($event, cell.inst)">
+                  <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(cell.inst.uuid) }">
+                    <GlyphIcon name="check" :size="12" :weight="2.6" />
+                  </span>
+                  <InstanceIcon :name="cell.inst.name" :uuid="cell.inst.uuid" :size="44" />
+                  <span v-if="cell.inst.loader !== 'normal'" class="loader-corner loader-text"
+                    :class="`loader-${cell.inst.loader}`">{{ t(`add.loader.${cell.inst.loader}`) }}</span>
+                  <span class="tile-name"><HighlightText :text="cell.inst.name" :query="searchText" /></span>
+                  <span v-if="cell.inst.running" class="run-dot" v-tip="t('launch.running')"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- 实例行 -->
+          <div v-else class="vrow vrow-inst" :data-group="row.group.id">
+            <div class="inst-row" :data-uuid="row.inst.uuid" :data-idx="row.idx" :data-group="row.group.id" :class="{
+              active: selected?.uuid === row.inst.uuid,
+              'multi-checked': multiSelect && selectedIds.has(row.inst.uuid),
+              running: row.inst.running,
+            }" @pointerdown="onDragPointerDown($event, { kind: 'instance', instance: row.inst })"
+              @click="onInstClick(row.inst, $event)" @contextmenu.prevent="onInstContext($event, row.inst)">
+              <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(row.inst.uuid) }">
+                <GlyphIcon name="check" :size="12" :weight="2.6" />
+              </span>
+              <InstanceIcon :name="row.inst.name" :uuid="row.inst.uuid" :size="38" />
+              <span v-if="row.inst.loader !== 'normal'" class="loader-text"
+                :class="`loader-${row.inst.loader}`">{{ t(`add.loader.${row.inst.loader}`) }}</span>
+              <span class="inst-name"><HighlightText :text="row.inst.name" :query="searchText" /></span>
+              <span v-if="row.inst.running" class="run-dot" v-tip="t('launch.running')"></span>
+            </div>
+          </div>
+        </template>
+
+        <!-- 空态与「添加分组」跟在最后一行后面，不参与窗口计算 -->
+        <template v-if="mode === 'group'">
+          <div v-if="groups.length === 0" class="empty-tip">{{ t("list.empty") }}</div>
+          <div v-else-if="filteredGroups.length === 0" class="empty-tip">{{ t("search.empty") }}</div>
+          <button class="add-row-btn add-group-row" :disabled="dragActive?.kind === 'instance'"
+            @click="emit('add-group')">
+            <GlyphIcon name="plus" :size="14" />
+            <span>{{ t("group.addGroup") }}</span>
+          </button>
+        </template>
+        <div v-else-if="filteredInstances.length === 0" class="empty-tip tile-empty">{{ t("search.empty") }}</div>
       </template>
-      <!-- 分组列表末尾插入占位 -->
-      <div v-if="isGroupInsert(filteredGroups.length)" class="drop-ghost-group">
-        <span class="drop-ghost-group-name">{{ dragActive?.groupName }}</span>
-      </div>
-      <!-- 跟手浮起副本：被抓住的实例 / 分组，跟着指针走 -->
-      <DragGhost v-if="ghost" :x="ghost.x" :y="ghost.y">
-        <InstanceIcon v-if="ghost.item.kind === 'instance'" :name="ghost.item.instance?.name ?? ''"
-          :uuid="ghost.item.instance?.uuid ?? '0'" :size="32" />
-        <GlyphIcon v-else name="folder" :size="16" />
-        <span>
-          {{ ghost.item.kind === "instance" ? (ghost.item.instance?.name ?? "") : (ghost.item.groupName ?? "") }}
-        </span>
-      </DragGhost>
+    </VirtualList>
 
-      <div v-if="groups.length === 0" class="empty-tip">{{ t("list.empty") }}</div>
-      <div v-else-if="filteredGroups.length === 0" class="empty-tip">{{ t("search.empty") }}</div>
+    <!-- 跟手浮起副本：被抓住的实例 / 分组，跟着指针走 -->
+    <DragGhost v-if="ghost" :x="ghost.x" :y="ghost.y">
+      <InstanceIcon v-if="ghost.item.kind === 'instance'" :name="ghost.item.instance?.name ?? ''"
+        :uuid="ghost.item.instance?.uuid ?? '0'" :size="32" />
+      <GlyphIcon v-else name="folder" :size="16" />
+      <span>
+        {{ ghost.item.kind === "instance" ? (ghost.item.instance?.name ?? "") : (ghost.item.groupName ?? "") }}
+      </span>
+    </DragGhost>
 
-      <!-- 添加分组：与其它窗口同一套整行添加外观 -->
-      <button class="add-row-btn add-group-row" :disabled="dragActive?.kind === 'instance'"
-        @click="emit('add-group')">
-        <GlyphIcon name="plus" :size="14" />
-        <span>{{ t("group.addGroup") }}</span>
-      </button>
-    </div>
-
-    <!-- 平铺：首格为添加 -->
-    <div v-else class="tile-list">
-      <div v-show="!multiSelect" class="tile add-tile" @click="emit('add-instance')">
-        <span class="add-plus">
-          <GlyphIcon name="plus" :size="24" :weight="1.8" />
-        </span>
-        <span class="tile-name">{{ t("group.add") }}</span>
-      </div>
-      <div v-for="inst in filteredInstances" :key="inst.uuid" class="tile" :class="{
-        active: selected?.uuid === inst.uuid,
-        'multi-checked': multiSelect && selectedIds.has(inst.uuid),
-      }" @click="onInstClick(inst, $event)" @contextmenu.prevent="onInstContext($event, inst)">
-        <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(inst.uuid) }">
-          <GlyphIcon name="check" :size="12" :weight="2.6" />
-        </span>
-        <InstanceIcon :name="inst.name" :uuid="inst.uuid" :size="44" />
-        <span v-if="inst.loader !== 'normal'" class="loader-corner loader-text" :class="`loader-${inst.loader}`">{{
-          t(`add.loader.${inst.loader}`) }}</span>
-        <span class="tile-name"><HighlightText :text="inst.name" :query="searchText" /></span>
-        <span v-if="inst.running" class="run-dot" v-tip="t('launch.running')"></span>
-      </div>
-      <div v-if="filteredInstances.length === 0" class="empty-tip tile-empty">{{ t("search.empty") }}</div>
-    </div>
   </aside>
 </template>
 
@@ -264,9 +438,6 @@ function isGroupOpen(id: string) {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  /* 侧栏一行的高度：实例行、拖拽占位、底部的「添加实例 / 添加分组」都取这一档，
-     全列节奏才一致（原来 48 / 50 / 50 三处各写一个数） */
-  --row-h: 48px;
   /* 侧栏左右内边距：搜索行、分组列表、平铺网格共用一处 ——
      三处各写一个数时搜索框 / 收起按钮与下面的实例对不齐。
      取值以顶部那一行为准（收起按钮到右边的距离） */
@@ -368,25 +539,61 @@ function isGroupOpen(id: string) {
   cursor: default;
 }
 
-/* ----- 分组模式列表 ----- */
+/* ----- 虚拟列表（分组 / 平铺共用） ----- */
 
-.group-list {
+/* 滚动与"只渲染视口附近那几行"由 VirtualList 负责，这里只管左右内边距 */
+.sidebar-list {
   flex: 1;
-  overflow-y: auto;
   scrollbar-gutter: stable;
   padding: 2px var(--side-pad-x) 14px;
   /* 与 scrollbar-gutter 成对：减掉常驻的那 9px，行才是左右各 10px，见 styles/scrollbar.css */
   padding-right: calc(var(--side-pad-x) - 9px);
+}
+
+.tile-list {
+  padding-top: 6px;
+}
+
+/* 每种虚拟行的高度都钉死：窗口与滚动条长度按这些常量算，改这里要同时改脚本的 ROW_H_* */
+.vrow {
+  flex-shrink: 0;
+}
+
+/* 分组标题行：标题上下各留一点空，分组之间才分得开 */
+.vrow-group {
+  height: 48px;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+}
+
+/* 实例行 / 添加行 / 实例插入占位：56 的行身 + 4 的行距 */
+.vrow-inst,
+.vrow-add,
+.vrow-ghost-inst {
+  height: 60px;
+}
+
+.vrow-inst .inst-row,
+.vrow-add .add-inst-row,
+.vrow-ghost-inst .drop-ghost-row {
+  height: 56px;
+}
+
+/* 平铺卡片行：112 的卡 + 8 的行距 */
+.vrow-tiles {
+  height: 120px;
+}
+
+.tile-grid {
+  display: grid;
+  align-content: start;
 }
 
 .group-title-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 2px;
+  width: 100%;
 }
 
 .group-title {
@@ -434,43 +641,6 @@ function isGroupOpen(id: string) {
   margin-left: auto;
 }
 
-/* 分组内容的收起动画：grid-template-rows 0fr↔1fr 可以在不知道内容高度的前提下过渡高度 */
-.group-items-wrap {
-  display: grid;
-  grid-template-rows: 1fr;
-  transition: grid-template-rows 0.22s ease;
-}
-
-.group-items-wrap.collapsed {
-  grid-template-rows: 0fr;
-}
-
-.group-items {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 0;
-  /* 收起时裁掉内容（配合 0fr 行高），同时给出过渡的最小高度基准 */
-  overflow: hidden;
-  min-height: 0;
-}
-
-/* 占满后横向空间大：组内实例按渲染图卡片多列排开。
-   overflow 不能改：分组收起靠的是外层 0fr 行高 + 这里的裁切 */
-/* 占满后横向空间大：组内实例直接用平铺那张卡，网格也照平铺模式铺
-   （从左往右填、整行铺开，格子等宽；卡内的图标 / 名字自己居中） */
-.group-items.as-tiles {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 8px;
-  align-content: start;
-}
-
-/* 平铺占满后格子跟着放大一档，不然一排全是 96px 的小方块 */
-.sidebar.is-max .tile-list {
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-}
-
 /* 添加实例行（与实例行同尺寸，位于实例上方）。
    边框也占布局位置：内边距减掉那 1px，内容左右 / 上下才和**不带边框**的实例行对齐 */
 .add-inst-row {
@@ -487,7 +657,6 @@ function isGroupOpen(id: string) {
   font-family: inherit;
   cursor: pointer;
   transition: all 0.12s;
-  min-height: var(--row-h);
 }
 
 /* 默认态就用主题色，和绿色系的「添加分组」区分开 */
@@ -546,7 +715,6 @@ function isGroupOpen(id: string) {
   border-radius: 10px;
   cursor: grab;
   transition: background 0.12s;
-  min-height: var(--row-h);
 }
 
 .inst-row:active {
@@ -562,7 +730,6 @@ function isGroupOpen(id: string) {
   /* 同 .add-inst-row：内边距减掉边框那 1.5px，占位与它替换的实例行逐像素对齐
      （否则拖动时整列会上下跳一下） */
   padding: 7.5px 10.5px;
-  min-height: var(--row-h);
   border-radius: 10px;
   border: 1.5px dashed var(--accent-border);
   background: var(--accent-soft);
@@ -573,7 +740,6 @@ function isGroupOpen(id: string) {
 }
 
 .drop-ghost-group {
-  margin: 2px 0;
   /* 同上：减掉边框宽度，分组名与实例行的内容左缘对齐 */
   padding: 7.5px 10.5px;
   border: 1.5px dashed var(--accent-border);
@@ -604,27 +770,16 @@ function isGroupOpen(id: string) {
   flex: 1;
 }
 
-/* ----- 平铺模式网格 ----- */
+/* ----- 平铺卡片 ----- */
 
-.tile-list {
-  flex: 1;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-  padding: 6px var(--side-pad-x) 14px;
-  /* 同上：不然平铺网格整块偏左 */
-  padding-right: calc(var(--side-pad-x) - 9px);
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: 10px;
-  align-content: start;
-}
-
+/* 高度钉死：一行平铺卡片的高度按它算（脚本的 TILE_H），名字一两行都占同样高 */
 .tile {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
+  height: 112px;
   padding: 16px 8px 12px;
   background: var(--bg-card);
   border: 1px solid var(--border);

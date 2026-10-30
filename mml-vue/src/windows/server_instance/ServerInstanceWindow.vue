@@ -13,7 +13,7 @@ import BaseButton from "../../components/ui/BaseButton.vue";
 import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 // 通用行虚拟列表（资源窗口那几个分类也在用）：几百个模组时只渲染视口附近的行
-import VirtualList from "../resource/parts/VirtualList.vue";
+import VirtualList from "../../components/ui/VirtualList.vue";
 import { api, onServerInstanceFocus, onServerInstanceProgress } from "../../lib/api";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";

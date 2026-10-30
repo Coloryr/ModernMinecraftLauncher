@@ -5,7 +5,7 @@
 // 查询失败的个数在底部如实说明 —— 没查出来的不等于"已是最新"。
 import { computed, ref } from "vue";
 import { t } from "../../../../lib/i18n";
-import VirtualList from "../VirtualList.vue";
+import VirtualList from "../../../../components/ui/VirtualList.vue";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../../components/ui/BaseModal.vue";
 import type { ModUpdateCheckDto, ModUpdateDto } from "../../../../lib/bindings";
