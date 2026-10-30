@@ -18,6 +18,7 @@ use uuid::Uuid;
 
 use crate::dtos::add_modpack_dto::{ModPackStatusDto, ModPackTaskDto};
 use crate::err_keys;
+use crate::log_text::NotifyText;
 use crate::listens;
 use crate::windows::add_resource::SourceInfo;
 
@@ -236,7 +237,9 @@ pub(crate) fn finish_task(
     cancel: &CancellationToken,
     res: Result<Uuid, String>,
 ) {
-    match res {
+    // 安装结果在界面里未必看得见：窗口可能关着，或者用户已经切去干别的。
+    // 取消是用户自己按的，不用再弹提示
+    let notice = match res {
         Ok(uuid) => {
             *task.instance_uuid.lock().unwrap() = Some(uuid.to_string());
             // 装完了就是装完了：取消标记要清掉。用户恰在成功前点了取消的话，
@@ -244,17 +247,28 @@ pub(crate) fn finish_task(
             task.cancelled.store(false, Ordering::Release);
             task.done.store(true, Ordering::Release);
             crate::windows::main::emit_instance_change(app, "add");
+            Some(NotifyText::ModpackDone {
+                name: task.name.clone(),
+            })
         }
         Err(err) => {
             if cancel.is_cancelled() {
                 task.cancelled.store(true, Ordering::Release);
+                None
             } else {
                 *task.error.lock().unwrap() = Some(err);
                 task.failed.store(true, Ordering::Release);
+                Some(NotifyText::ModpackFailed {
+                    name: task.name.clone(),
+                })
             }
         }
-    }
+    };
     emit_add_modpack_status(app, build_status(app));
+
+    if let Some(notice) = notice {
+        crate::notify::notify_if_unfocused(app, notice);
+    }
 }
 
 /// 安装阶段 ID，与前端 i18n 键对应

@@ -523,6 +523,16 @@ pub enum LogText {
         /// 写进压缩包的条目数
         entries: usize,
     },
+    /// 系统通知发不出去
+    NotificationFailed {
+        /// 失败原因
+        error: String,
+    },
+    /// 系统通知权限申请失败
+    NotificationPermissionFailed {
+        /// 失败原因
+        error: String,
+    },
 }
 
 impl LogText {
@@ -815,6 +825,12 @@ impl LogText {
             }
             LogText::RestartLauncherError { error } => {
                 format!("[window] 重启启动器失败：{error}")
+            }
+            LogText::NotificationFailed { error } => {
+                format!("[notify] 系统通知发送失败：{error}")
+            }
+            LogText::NotificationPermissionFailed { error } => {
+                format!("[notify] 申请系统通知权限失败：{error}")
             }
         }
     }
@@ -1115,6 +1131,12 @@ impl LogText {
             LogText::RestartLauncherError { error } => {
                 format!("[window] failed to restart the launcher: {error}")
             }
+            LogText::NotificationFailed { error } => {
+                format!("[notify] failed to show a system notification: {error}")
+            }
+            LogText::NotificationPermissionFailed { error } => {
+                format!("[notify] failed to request the notification permission: {error}")
+            }
         }
     }
 }
@@ -1251,6 +1273,77 @@ mod tests {
             LogText::MainWindowModelMissing.text_in(&Lang::zh_cn),
             LogText::MainWindowModelMissing.text_in(&Lang::en_us)
         );
+    }
+}
+
+/// 系统通知的文案：标题与正文分开给，都跟界面语言走
+///
+/// 只在启动器不在前台时用，见 [`crate::notify`]。
+pub enum NotifyText {
+    /// 下载队列已清空
+    DownloadDone {
+        /// 这一轮从空队列开始算起的任务数
+        count: usize,
+    },
+    /// 整合包安装完成
+    ModpackDone {
+        /// 整合包显示名
+        name: String,
+    },
+    /// 整合包安装失败
+    ModpackFailed {
+        /// 整合包显示名
+        name: String,
+    },
+}
+
+impl NotifyText {
+    /// 按当前界面语言渲染
+    ///
+    /// # 返回值
+    ///
+    /// `(标题, 正文)`，都是当前界面语言的成品字符串
+    pub fn parts(&self) -> (String, String) {
+        match gui_config::locale() {
+            Lang::zh_cn => self.zh(),
+            Lang::en_us => self.en(),
+        }
+    }
+
+    /// 中文标题与正文
+    fn zh(&self) -> (String, String) {
+        match self {
+            NotifyText::DownloadDone { count } => (
+                String::from("下载完成"),
+                format!("{count} 个下载任务已结束，打开下载窗口查看结果"),
+            ),
+            NotifyText::ModpackDone { name } => {
+                (String::from("安装完成"), format!("{name} 已安装完成"))
+            }
+            // 失败原因是一串前端文案键，界面侧才翻得出来，通知里只报是哪一包
+            NotifyText::ModpackFailed { name } => (
+                String::from("安装失败"),
+                format!("{name} 安装失败，打开下载窗口查看原因"),
+            ),
+        }
+    }
+
+    /// 英文标题与正文
+    fn en(&self) -> (String, String) {
+        match self {
+            NotifyText::DownloadDone { count } => (
+                String::from("Download finished"),
+                format!("{count} download tasks finished, open the download window for details"),
+            ),
+            NotifyText::ModpackDone { name } => (
+                String::from("Installation finished"),
+                format!("{name} has been installed"),
+            ),
+            NotifyText::ModpackFailed { name } => (
+                String::from("Installation failed"),
+                format!("failed to install {name}, open the download window for details"),
+            ),
+        }
     }
 }
 

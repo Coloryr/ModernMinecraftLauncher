@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 方块列表 · 添加玩家头颅：输入正版用户名或 UUID（同名覆盖）
+// 方块列表 · 添加玩家皮肤：输入正版用户名或 UUID（同名覆盖）
 import { ref } from "vue";
 import { t } from "../../../lib/i18n";
 import { useModalKeys } from "../../../composables/useModalKeys";

@@ -21,7 +21,14 @@ import { useCollectDrag } from "../../composables/useCollectDrag";
 import { api, onCollectChange } from "../../lib/api";
 import { commands } from "../../lib/bindings";
 import { t, tErr } from "../../lib/i18n";
-import { FIXED_GROUP_TYPES, isDefaultGroupName, typeGroupName } from "../../lib/collectGroups";
+import {
+  FIXED_GROUP_TYPES,
+  defaultGroupKey,
+  groupLabel,
+  isDefaultGroupKey,
+  legacyDefaultGroupNames,
+  typeOfDefaultGroupKey,
+} from "../../lib/collectGroups";
 import { formatMinute } from "../../lib/format";
 import { showToast } from "../../lib/toast";
 import type { CollectItemDto, InstanceInfoDto } from "../../lib/bindings";
@@ -52,7 +59,22 @@ let unlistenCollect: (() => void) | null = null;
 /** 窗口是否已经销毁：订阅是异步挂上的，挂好之前窗口可能已经关了 */
 let gone = false;
 
-const groupNames = computed(() => Object.keys(groups.value).sort());
+/** 分组 key，按左栏顺序排：先默认分组，再自建分组按名字 */
+const groupNames = computed(() => {
+  const defaults = Object.keys(groups.value)
+    .filter(isDefaultGroupKey)
+    .sort((a, b) => railOrderIndex(a) - railOrderIndex(b));
+  const custom = Object.keys(groups.value)
+    .filter((key) => !isDefaultGroupKey(key))
+    .sort((a, b) => a.localeCompare(b));
+  return [...defaults, ...custom];
+});
+
+/** 默认分组在左栏里的先后：固定四项按表中顺序，其余排在它们后面 */
+function railOrderIndex(key: string): number {
+  const fixed = FIXED_GROUP_TYPES.indexOf(typeOfDefaultGroupKey(key) ?? "");
+  return fixed >= 0 ? fixed : FIXED_GROUP_TYPES.length;
+}
 /** 分组显示顺序，来自后端；缺失的分组按默认顺序补在末尾 */
 const groupOrder = ref<string[]>([]);
 
@@ -100,25 +122,25 @@ function itemsOfGroup(name: string): CollectItemDto[] {
  * 实际顺序以用户拖出来的 `groupOrder` 为准，没记录过的按上面的默认顺序补在后面。
  */
 const railItems = computed<Array<{ id: string; label: string; count: number; custom: boolean }>>(() => {
-  const fixed = FIXED_GROUP_TYPES.map((type) => typeGroupName(type)).filter((n): n is string => !!n);
+  const fixed = FIXED_GROUP_TYPES.map((type) => defaultGroupKey(type)).filter(
+    (key): key is string => !!key,
+  );
   const restDefaults = groupNames.value
-    .filter((name) => isDefaultGroupName(name) && !fixed.includes(name))
-    .sort((a, b) => a.localeCompare(b));
-  const custom = groupNames.value
-    .filter((name) => !isDefaultGroupName(name))
-    .sort((a, b) => a.localeCompare(b));
+    .filter((key) => isDefaultGroupKey(key) && !fixed.includes(key))
+    .sort((a, b) => groupLabel(a).localeCompare(groupLabel(b)));
+  const custom = groupNames.value.filter((key) => !isDefaultGroupKey(key));
 
   const fallback = [...fixed, ...restDefaults, ...custom];
   const ordered = [
-    ...groupOrder.value.filter((name) => fallback.includes(name)),
-    ...fallback.filter((name) => !groupOrder.value.includes(name)),
+    ...groupOrder.value.filter((key) => fallback.includes(key)),
+    ...fallback.filter((key) => !groupOrder.value.includes(key)),
   ];
 
-  return ordered.map((name) => ({
-    id: name,
-    label: name,
-    count: itemsOfGroup(name).length,
-    custom: !isDefaultGroupName(name),
+  return ordered.map((key) => ({
+    id: key,
+    label: groupLabel(key),
+    count: itemsOfGroup(key).length,
+    custom: !isDefaultGroupKey(key),
   }));
 });
 
@@ -147,11 +169,50 @@ watch(railItems, (list) => {
 
 // ---------------- 加载 ----------------
 
+/** 并组只在打开窗口时做一次，避免 reload 互相触发 */
+let migratedLegacy = false;
+
+/**
+ * 把旧口径建的默认分组并到固定 key 上
+ *
+ * 早先默认分组的 key 就是当时的界面语言文案，落过盘的数据里留着「模组」或 "Mods"。
+ * 不并的话，升级后它们会以自建分组的样子跟新的默认分组各占一栏。用户自建的分组不动。
+ *
+ * # 返回值
+ *
+ * 真的改过数据返回 true，调用方据此重读一遍
+ */
+async function migrateLegacyGroups(): Promise<boolean> {
+  if (migratedLegacy) return false;
+  migratedLegacy = true;
+
+  const legacy = legacyDefaultGroupNames();
+  const steps = Object.keys(groups.value)
+    .filter((key) => legacy.has(key))
+    .map((key) => ({ from: key, to: legacy.get(key) as string, uuids: groups.value[key] ?? [] }));
+  if (steps.length === 0) return false;
+
+  try {
+    for (const step of steps) {
+      if (!groups.value[step.to]) await api.collectAddGroup(step.to);
+      if (step.uuids.length) await api.collectSetGroupItems(step.to, step.uuids);
+      await api.collectRemoveGroup(step.from);
+    }
+  } catch (e) {
+    showToast(tErr(e));
+  }
+  return true;
+}
+
 async function reload() {
   const data = await api.collectGetData();
   items.value = data.items;
   groups.value = data.groups;
   groupOrder.value = data.groupOrder;
+  if (await migrateLegacyGroups()) {
+    await reload();
+    return;
+  }
   void backfillGroups();
   // 丢掉已不存在的勾选
   const alive = new Set(data.items.map((i) => i.uuid));
@@ -446,7 +507,7 @@ async function confirmClear() {
   try {
     // 用户自建分组：只把它们移出该分组，收藏本身保留；
     // 默认分组：移出会被补组再归回来，所以这里就是删掉这些收藏
-    await api.collectRemoveItems(uuids, isDefaultGroupName(target) ? null : target);
+    await api.collectRemoveItems(uuids, isDefaultGroupKey(target) ? null : target);
     checked.value = new Set();
   } catch (e) {
     showToast(tErr(e));
@@ -500,7 +561,7 @@ async function confirmAddToGroup() {
  */
 function inTypeGroup(item: CollectItemDto): boolean {
   const group = groupOfUuid.value.get(item.uuid);
-  const auto = typeGroupName(item.fileType);
+  const auto = defaultGroupKey(item.fileType);
   return !!auto && group === auto;
 }
 
@@ -656,19 +717,19 @@ async function backfillGroups() {
   const byGroup = new Map<string, string[]>();
   for (const item of items.value) {
     if (grouped.has(item.uuid)) continue;
-    const name = typeGroupName(item.fileType);
-    if (!name) continue;
-    const list = byGroup.get(name) ?? [];
+    const key = defaultGroupKey(item.fileType);
+    if (!key) continue;
+    const list = byGroup.get(key) ?? [];
     list.push(item.uuid);
-    byGroup.set(name, list);
+    byGroup.set(key, list);
   }
   if (byGroup.size === 0) return;
 
   backfilling = true;
   try {
-    for (const [name, uuids] of byGroup) {
-      if (!groups.value[name]) await api.collectAddGroup(name);
-      await api.collectSetGroupItems(name, uuids);
+    for (const [key, uuids] of byGroup) {
+      if (!groups.value[key]) await api.collectAddGroup(key);
+      await api.collectSetGroupItems(key, uuids);
     }
   } catch (e) {
     showToast(tErr(e));
@@ -1034,7 +1095,7 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
           @click="askClear(groupMenu.group)">
           {{ t("collect.clear") }}
         </button>
-        <button v-if="!isDefaultGroupName(groupMenu.group)" class="ctx-item danger"
+        <button v-if="!isDefaultGroupKey(groupMenu.group)" class="ctx-item danger"
           @click="deleteGroupTarget = groupMenu.group; groupMenu = null">
           {{ t("collect.deleteGroup") }}
         </button>
@@ -1082,7 +1143,7 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
     <!-- 删除分组确认 -->
     <BaseModal v-if="deleteGroupTarget" :title="t('collect.deleteGroup')" :closable="false"
       @close="deleteGroupTarget = ''">
-      <p class="delete-tip">{{ t("collect.deleteGroupConfirm", { name: deleteGroupTarget }) }}</p>
+      <p class="delete-tip">{{ t("collect.deleteGroupConfirm", { name: groupLabel(deleteGroupTarget) }) }}</p>
       <div class="modal-actions">
         <BaseButton @click="deleteGroupTarget = ''">{{ t("add.no") }}</BaseButton>
         <BaseButton variant="primary" @click="confirmDeleteGroup">{{ t("add.yes") }}</BaseButton>
@@ -1102,9 +1163,9 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
     <BaseModal v-if="clearOpen" :title="t('collect.clear')" :closable="false" @close="clearOpen = false">
       <p class="delete-tip">
         {{
-          isDefaultGroupName(clearGroup)
+          isDefaultGroupKey(clearGroup)
             ? t("collect.removeConfirm", { count: clearCount })
-            : t("collect.clearGroupConfirm", { name: clearGroup })
+            : t("collect.clearGroupConfirm", { name: groupLabel(clearGroup) })
         }}
       </p>
       <div class="modal-actions">
@@ -1117,7 +1178,7 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
     <BaseModal v-if="addToGroupTarget !== ''" :title="t('collect.addToGroupTitle')" @close="addToGroupTarget = ''"
       :closable="false">
       <select v-model="addToGroupTarget" class="field-select">
-        <option v-for="g in groupNames" :key="g" :value="g">{{ g }}</option>
+        <option v-for="g in groupNames" :key="g" :value="g">{{ groupLabel(g) }}</option>
       </select>
       <div class="modal-actions">
         <BaseButton @click="addToGroupTarget = ''">{{ t("add.cancel") }}</BaseButton>

@@ -753,15 +753,18 @@
   opacity: 0;
 }
 
-/* 次级操作（设置 / 日志 / 资源管理）：一行，各自按文案取宽；
-   min-width 让「日志」这种短文案不至于比旁边窄一截（中文下三个因此等宽） */
+/* 次级操作（实例设置 / 资源管理 / 日志 / 导出）：四个方形图标键排一行，
+   尺寸与标题栏那档一致，文案全在 v-tip 与 aria-label 里 */
 .launch-sub-actions {
   display: flex;
   gap: 10px;
 }
 
 .launch-sub-actions :deep(.ui-btn) {
-  min-width: 120px;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
+  padding: 0;
+  border-radius: var(--ctl-radius);
 }
 
 /* ================= 多选模式 ================= */

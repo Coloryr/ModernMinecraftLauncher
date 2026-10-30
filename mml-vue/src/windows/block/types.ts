@@ -43,9 +43,9 @@ export function isBlockSize(v: unknown): v is BlockSize {
 }
 
 /**
- * 玩家头颅的分类原始 id
+ * 玩家皮肤分组的原始 id
  *
  * 值沿用 crate 里的 `playerSkin`，`block/skin.rs` 已把它写进 `block.json` 的渲染结果，
- * 改名会让旧数据对不上，**只改显示文案**为「玩家头颅」。
+ * 改名会让旧数据对不上，**只改显示文案**为「玩家皮肤」。
  */
 export const SKIN_CAT = "playerSkin";

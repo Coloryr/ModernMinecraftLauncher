@@ -3,7 +3,7 @@
 // 当前实例从 gui_config 的选中实例恢复（与主窗口共享同一份配置）
 // 渲染进行中后端拒绝关闭，即 close-blocked 事件；这里弹二次确认，中断渲染再关
 //
-// 搜索、尺寸滑杆、添加玩家头颅都在内容区，标题栏只留标题与窗口按钮。
+// 搜索、尺寸滑杆、添加玩家皮肤都在内容区，标题栏只留标题与窗口按钮。
 import { onMounted, onUnmounted, ref } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BlockPanel from "./BlockPanel.vue";

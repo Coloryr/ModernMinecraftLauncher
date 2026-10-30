@@ -10,7 +10,10 @@
 
 use std::{
     collections::HashMap,
-    sync::{Arc, LazyLock, Mutex, RwLock},
+    sync::{
+        Arc, LazyLock, Mutex, RwLock,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::Instant,
 };
 
@@ -29,6 +32,14 @@ use crate::{
 
 /// 速度采样最小间隔，单位秒；间隔更短的回调不重算速度，避免抖动
 const SPEED_WINDOW: f64 = 0.25;
+
+/// 队列里还有几个任务
+///
+/// 自己数而不是问 mml_downloader::get_tasks()：这个回调是下载器**持有任务表写锁**时
+/// 发出来的，那里再去读同一把锁会直接卡死。
+static QUEUE_LEN: Mutex<usize> = Mutex::new(0);
+/// 这一轮从空队列开始算起加进队列的任务数，队列清空时随系统通知一起报出去
+static TASKS_SINCE_IDLE: AtomicUsize = AtomicUsize::new(0);
 /// 速度过期时间，单位秒；超过此时长没有进度回调，视为线程停滞，速度按 0 计
 const SPEED_EXPIRE: f64 = 1.5;
 
@@ -239,8 +250,14 @@ impl mml_downloader::IDownloadGui for DownloadGuiHook {
 
     /// 任务列表变化回调：任务增删 / 进度更新转发为事件
     ///
+    /// 队列由有到空的那一刻，若启动器不在前台就补一条系统通知：
+    /// 用户切去干别的时，下载结束这件事只靠界面是看不见的。
+    ///
     /// - `state`: 本次变化，含新增任务、移除任务与任务进度更新三种
     fn update_task(&self, state: DownloadTaskState) {
+        let added = matches!(state, DownloadTaskState::AddTask(_));
+        let removed = matches!(state, DownloadTaskState::RemoveTask(_));
+
         let event = match state {
             DownloadTaskState::AddTask(id) => DownloadTaskEvent {
                 r#type: "add".into(),
@@ -259,6 +276,30 @@ impl mml_downloader::IDownloadGui for DownloadGuiHook {
             },
         };
         emit_download_task(&self.app, event);
+
+        // 队列由有到空的那一刻就是这一轮下载结束；这个判断只动自己那份计数，
+        // 不去碰下载器的任务表
+        let queue_done = {
+            let mut left = QUEUE_LEN.lock().unwrap();
+            if added {
+                *left += 1;
+                TASKS_SINCE_IDLE.fetch_add(1, Ordering::SeqCst);
+                false
+            } else if removed {
+                *left = left.saturating_sub(1);
+                *left == 0
+            } else {
+                false
+            }
+        };
+
+        if queue_done {
+            let count = TASKS_SINCE_IDLE.swap(0, Ordering::SeqCst);
+            crate::notify::notify_if_unfocused(
+                &self.app,
+                crate::log_text::NotifyText::DownloadDone { count },
+            );
+        }
     }
 }
 

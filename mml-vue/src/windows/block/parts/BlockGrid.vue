@@ -23,7 +23,7 @@ const props = defineProps<{
   size: BlockSize;
   /** 详情里正在看的方块（网格里高亮） */
   activeId: string | null;
-  /** 玩家头颅分类的原始 id：这类格子带悬停删除角标 */
+  /** 玩家皮肤分类的原始 id：这类格子带悬停删除角标 */
   skinCat: string;
   /** 是否处于筛选态，决定空状态要不要给「清除筛选」 */
   filtered: boolean;
@@ -40,7 +40,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   /** 点开某个方块的详情 */
   (e: "open", b: BlockItemDto): void;
-  /** 删除某个玩家头颅，仅 `skinCat` 那一类会发 */
+  /** 删除某个玩家皮肤，仅 `skinCat` 那一类会发 */
   (e: "remove-skin", b: BlockItemDto): void;
   /** 空状态里请求清掉搜索词与分类 */
   (e: "clear-filters"): void;
@@ -292,7 +292,7 @@ function onCellKey(e: KeyboardEvent, i: number) {
             @click.stop="toggleFavorite?.(b.id)">
             <GlyphIcon name="star" :size="13" :weight="2" />
           </span>
-          <!-- 玩家头颅：悬停角标删除；多选时同样让位 -->
+          <!-- 玩家皮肤：悬停角标删除；多选时同样让位 -->
           <span v-if="!selectMode && b.catId === skinCat" class="block-del" v-tip="t('blocks.skinRemove')"
             @click.stop="emit('remove-skin', b)">
             <GlyphIcon name="close" :size="11" :weight="2.6" />
@@ -452,7 +452,7 @@ function onCellKey(e: KeyboardEvent, i: number) {
   background: var(--accent-soft);
 }
 
-/* 玩家头颅的删除角标（悬停或键盘聚焦时显示）。
+/* 玩家皮肤的删除角标（悬停或键盘聚焦时显示）。
    与小图标键同档（20px 方块 + 5px 圆角），但不挂 .input-clear：它不压在输入框里，
    而是常显在格子上的一枚角标，底色与悬停色都是自己的 */
 .block-del {
@@ -487,7 +487,7 @@ function onCellKey(e: KeyboardEvent, i: number) {
   border-radius: 8px;
   /* 不要 image-rendering: pixelated：这里的图标是内核渲染好的 256×256 PNG，
      即 mml-tex-draw 的 BLOCK_SIZE，显示时被缩到 40~88px，最近邻采样会把斜边采成
-     锯齿、细纹理采丢。pixelated 只适合像素画贴图（如玩家头颅），缩放渲染图要用平滑插值 */
+     锯齿、细纹理采丢。pixelated 只适合像素画贴图（如玩家皮肤），缩放渲染图要用平滑插值 */
 }
 
 .block-name {

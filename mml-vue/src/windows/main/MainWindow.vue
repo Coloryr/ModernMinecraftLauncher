@@ -2058,8 +2058,7 @@ onMounted(async () => {
               <InstanceSelect v-if="!lockActive" :instances="instances" :model-value="selected?.uuid ?? null"
                 @update:model-value="onPickInstance" @add="openAdd" />
 
-              <!-- 启动按钮一行、次级操作一行小按钮，两块宽度不同、整块居中不撑满：
-                   启动按钮按自己的文案取宽，下面那行按三个按钮的文案取宽，
+              <!-- 启动按钮一行、次级操作一行方形图标键，两块宽度不同、整块居中不撑满，
                    见 main-window.css .launch-actions -->
               <div class="launch-actions">
                 <BaseButton variant="primary" size="lg" class="launch-main-btn"

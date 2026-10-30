@@ -327,12 +327,12 @@ function onDocKey(e: KeyboardEvent) {
 onMounted(() => document.addEventListener("keydown", onDocKey));
 onUnmounted(() => document.removeEventListener("keydown", onDocKey));
 
-// ---------- 内容区工具栏：搜索 / 玩家头颅 / 尺寸滑杆 ----------
+// ---------- 内容区工具栏：搜索 / 玩家皮肤 / 尺寸滑杆 ----------
 
-/** 当前是不是玩家头颅分类：添加按钮只在这里出现 */
+/** 当前是不是玩家皮肤分类：添加按钮只在这里出现 */
 const inSkinCat = computed(() => cats.value.find((c) => c.uuid === cat.value)?.id === SKIN_CAT);
 
-/** 添加玩家头颅弹窗是否开着 */
+/** 添加玩家皮肤弹窗是否开着 */
 const skinOpen = ref(false);
 /** 提交中：禁用按钮防连点 */
 const skinBusy = ref(false);
@@ -437,7 +437,7 @@ async function onIconPick(inst: InstanceInfoDto) {
   }
 }
 
-/** 详情弹窗里删除玩家头颅；详情会随 removeSkin 一起关掉 */
+/** 详情弹窗里删除玩家皮肤；详情会随 removeSkin 一起关掉 */
 async function onDetailRemove() {
   const b = detail.value;
   if (b) await removeSkin(b);
@@ -463,7 +463,7 @@ async function onDetailRemove() {
       </BaseButton>
     </div>
 
-    <!-- 内容区工具条：搜索与玩家头颅入口都放这里，不占标题栏 -->
+    <!-- 内容区工具条：搜索与玩家皮肤入口都放这里，不占标题栏 -->
     <div v-if="rendered" class="block-filters">
       <SearchBox v-model="keyword" :placeholder="t('blocks.search')" :clear-label="t('blocks.searchClear')"
         width="240px" />
@@ -526,7 +526,7 @@ async function onDetailRemove() {
     <InstancePickModal v-if="iconTarget" :current-uuid="currentInstance?.uuid ?? null" :busy="iconBusy"
       @pick="onIconPick" @close="iconTarget = null" />
 
-    <!-- 添加玩家头颅（用户名或 UUID）：入口在玩家头颅分类里 -->
+    <!-- 添加玩家皮肤（用户名或 UUID）：入口在玩家皮肤分类里 -->
     <SkinAddModal v-if="skinOpen" :busy="skinBusy" @submit="onSkinSubmit" @close="skinOpen = false" />
 
     <!-- 方块详情：打开选实例弹窗时先让位，避免两层遮罩叠着 -->

@@ -1,7 +1,7 @@
 // 收藏星标切换：状态以后端为准，失败只提示
 import { api } from "./api";
 import { tErr } from "./i18n";
-import { typeGroupName } from "./collectGroups";
+import { defaultGroupKey } from "./collectGroups";
 import { showToast } from "./toast";
 import type { ProjectItemDto } from "./bindings";
 
@@ -23,7 +23,7 @@ export async function toggleStar(item: ProjectItemDto): Promise<void> {
       item.image,
       item.url,
       star,
-      star ? typeGroupName(item.source.fileType) : null,
+      star ? defaultGroupKey(item.source.fileType) : null,
     );
     item.isStar = star;
   } catch (e) {

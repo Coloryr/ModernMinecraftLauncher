@@ -4,7 +4,7 @@
 // 1. 渲染状态查询 / 事件订阅（含下载任务补开下载窗口）/ 列表加载；
 // 2. 三态派生与进度：未渲染 / 渲染中 / 已渲染；
 // 3. 分类聚合、搜索过滤、详情选中与前后切换；
-// 4. 渲染与玩家头颅操作（带提示）；
+// 4. 渲染与玩家皮肤操作（带提示）；
 // 5. 视图偏好记忆：分类 / 图标尺寸档存本地存储，**搜索词离开本页即清空**。
 import { computed, onDeactivated, onMounted, ref, watch } from "vue";
 import { locale, t, tErr } from "../../../lib/i18n";
@@ -76,7 +76,7 @@ function readPref(): Partial<ViewPref> {
  * - `startRender` / `cancelRender` / `loadBlocks`: 渲染操作与列表重拉
  * - `keyword` / `cat` / `size` / `cats` / `catCounts` / `catLabel` / `isFiltered` / `filtered` / `clearFilters`: 搜索、分类与尺寸档
  * - `detail` / `openDetail` / `closeDetail`: 详情选中，只存 id，列表刷新后按 id 现查
- * - `addSkin` / `removeSkin` / `setIcon`: 玩家头颅与设为实例图标，均返回是否成功
+ * - `addSkin` / `removeSkin` / `setIcon`: 玩家皮肤与设为实例图标，均返回是否成功
  */
 export function useBlockList(hooks?: BlockListHooks) {
   const { track } = useUnlisteners();
@@ -258,14 +258,14 @@ export function useBlockList(hooks?: BlockListHooks) {
     return map;
   });
 
-  // 当前分类消失时回到「全部」：重渲染换版本，或删掉最后一个玩家头颅。
+  // 当前分类消失时回到「全部」：重渲染换版本，或删掉最后一个玩家皮肤。
   // 自建分组的键不在这份游戏分类里，删组时由上层自己清（见 BlockPanel）
   watch(cats, (list) => {
     if (!cat.value || hooks?.isCustomGroup?.(cat.value)) return;
     if (!list.some((each) => each.uuid === cat.value)) cat.value = "";
   });
 
-  /** 分类显示名：先查 i18n（玩家头颅这类启动器自己的分类），miss 时用后端翻译好的名字 */
+  /** 分类显示名：先查 i18n（玩家皮肤这类启动器自己的分类），miss 时用后端翻译好的名字 */
   function catLabel(uuid: string): string {
     const found = cats.value.find((each) => each.uuid === uuid);
     if (!found) return uuid;
@@ -335,7 +335,7 @@ export function useBlockList(hooks?: BlockListHooks) {
     detailId.value = null;
   }
 
-  // ---------- 玩家头颅 ----------
+  // ---------- 玩家皮肤 ----------
 
   /** 按用户名或 UUID 添加（同名覆盖），成功后刷新列表；返回是否成功 */
   async function addSkin(input: string): Promise<boolean> {
@@ -350,7 +350,7 @@ export function useBlockList(hooks?: BlockListHooks) {
     }
   }
 
-  /** 删除玩家头颅；id 上的 `custom:` 前缀要去掉 */
+  /** 删除玩家皮肤；id 上的 `custom:` 前缀要去掉 */
   async function removeSkin(b: BlockItemDto) {
     try {
       await blockSkinRemove(b.id.slice("custom:".length));

@@ -15,6 +15,7 @@
 //! | [`integrations`] | 云连接与跨电脑实例绑定配置，文件 integrations.json |
 //! | [`log_text`] | 界面侧日志文案，中英两套，不进内核 i18n |
 //! | [`music`] | 自定义音乐，走 `mml-music` 协议 |
+//! | [`notify`] | 系统通知，启动器不在前台时把结果推给用户 |
 //! | [`single_instance`] | 单开与唤回，运行目录下的端口文件 `temp` |
 //! | [`start_arg`] | 启动参数（命令行 / `mml:` 协议）解析，等前端初始化后取走执行 |
 //! | [`tray`] | 有实例运行时才出现的系统托盘 |
@@ -43,6 +44,7 @@ pub mod image_manager;
 pub mod integrations;
 pub mod log_text;
 pub mod music;
+pub mod notify;
 pub mod single_instance;
 pub mod start_arg;
 pub mod tray;
@@ -140,9 +142,14 @@ pub fn run() {
             },
         )
         .plugin(tauri_plugin_dialog::init())
+        // 系统通知：启动器不在前台时把下载 / 安装结果推给系统，见 notify.rs
+        .plugin(tauri_plugin_notification::init())
         .on_window_event(windows::on_window_event)
         .setup(|app| {
             // 托盘不在这里建：只有实例在运行时才出现，见 tray::sync
+
+            // macOS 首次要问用户要通知权限；Windows 与 Linux 上直接就是已授权
+            notify::request_permission(app.handle());
 
             // 单开与唤回：起 IPC 服务并记下端口，之后启动的实例会把请求交给本进程
             single_instance::start(app.handle());

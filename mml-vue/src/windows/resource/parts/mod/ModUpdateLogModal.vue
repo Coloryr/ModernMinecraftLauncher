@@ -214,6 +214,19 @@ async function removeEntry(projectId: string, index: number) {
 function dash(value: string): string {
   return value || "--";
 }
+
+/**
+ * SHA1 只露前 12 位，完整值挂在悬停提示里
+ *
+ * - `value`: 记录里的 SHA1
+ *
+ * # 返回值
+ *
+ * 截断后的文本；短于 12 位时原样返回
+ */
+function shortSha1(value: string): string {
+  return value.length > 12 ? `${value.slice(0, 12)}…` : value;
+}
 </script>
 
 <template>
@@ -269,9 +282,13 @@ function dash(value: string): string {
             <span class="log-group-count">{{ t("resource.updateLogGroupCount", { n: group.update.length }) }}</span>
           </button>
 
+          <!-- 每条记录两行：上行是「版本跃迁 + 文件名 + 时间」，下行是文件号与 SHA1 两枚小标签。
+               左侧一条时间轴把同一模组的更新按时间串起来，比一叠卡片更容易看出前后顺序 -->
           <div v-if="!isCollapsed(group.projectId)" class="log-rows">
             <div v-for="(item, index) in group.update" :key="index" class="log-row">
+              <span class="log-dot"></span>
               <div class="log-head">
+                <span class="log-ver">{{ t("resource.updateLogVersion", { from: dash(item.oldVersion), to: dash(item.version) }) }}</span>
                 <span class="log-file">{{ item.file }}</span>
                 <span class="log-right">
                   <span class="log-time">{{ formatTime(item.time) }}</span>
@@ -282,14 +299,12 @@ function dash(value: string): string {
                 </span>
               </div>
               <div class="log-meta">
-                {{ t("resource.updateLogVersion", { from: dash(item.oldVersion), to: dash(item.version) }) }}
-              </div>
-              <div class="log-meta">
-                {{ t("resource.updateLogFileId", { from: dash(item.oldFileId), to: dash(item.fileId) }) }}
-              </div>
-              <div class="log-sha1">
-                <span class="log-sha1-label">{{ t("resource.updateLogSha1") }}</span>
-                <span class="log-sha1-value">{{ item.sha1 }}</span>
+                <span class="log-chip">
+                  {{ t("resource.updateLogFileId", { from: dash(item.oldFileId), to: dash(item.fileId) }) }}
+                </span>
+                <span class="log-chip mono" v-tip="item.sha1">
+                  {{ t("resource.updateLogSha1") }} {{ shortSha1(item.sha1) }}
+                </span>
               </div>
             </div>
           </div>
@@ -460,33 +475,73 @@ function dash(value: string): string {
   font-weight: 400;
 }
 
+/* 时间轴：一条竖线把同一模组的更新串起来，每条记录左缘一枚圆点。
+   26px 的左边距与组名对齐（组头 6px 内边距 + 12px 箭头 + 8px 间距） */
 .log-rows {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  /* 26 = 组头的 6px 内边距 + 12px 箭头 + 8px 间距：卡片与组名左对齐 */
+  position: relative;
   padding: 8px 0 2px 26px;
 }
 
+.log-rows::before {
+  content: "";
+  position: absolute;
+  /* 与下面圆点的圆心对齐：26px 左内边距 - 16px 偏移 + 4px 半径 */
+  left: 13px;
+  top: 14px;
+  bottom: 14px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--border);
+}
+
 .log-row {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
+  gap: 6px;
+  padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--bg-card);
+}
+
+/* 圆点压在时间轴上，用强调色描一圈底色把它与竖线分开 */
+.log-dot {
+  position: absolute;
+  left: -16px;
+  top: 14px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--bg-card);
 }
 
 .log-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 3px 10px;
+  gap: 3px 8px;
+}
+
+/* 版本跃迁是本条记录的主信息：底色淡强调、等宽数字，扫一眼就能看出换了哪一版 */
+.log-ver {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .log-file {
+  flex: 1;
+  min-width: 0;
   color: var(--text);
   font-size: 12.5px;
   font-weight: 600;
@@ -498,6 +553,7 @@ function dash(value: string): string {
   display: flex;
   align-items: center;
   gap: 6px;
+  margin-left: auto;
   flex-shrink: 0;
 }
 
@@ -530,27 +586,24 @@ function dash(value: string): string {
   cursor: default;
 }
 
+/* 文件号与 SHA1：两枚小标签，长哈希截断，完整值在悬停提示里 */
 .log-meta {
-  color: var(--text-dim);
-  font-size: 11.5px;
-  word-break: break-all;
-}
-
-/* SHA1：标签与值分开，值仍是等宽；长哈希允许折行 */
-.log-sha1 {
   display: flex;
-  align-items: baseline;
+  flex-wrap: wrap;
   gap: 6px;
   color: var(--text-dim);
   font-size: 11.5px;
 }
 
-.log-sha1-label {
-  flex-shrink: 0;
+.log-chip {
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-side);
+  word-break: break-all;
 }
 
-.log-sha1-value {
+.log-chip.mono {
   font-family: monospace;
-  word-break: break-all;
 }
 </style>

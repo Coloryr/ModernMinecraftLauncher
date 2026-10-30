@@ -20,7 +20,7 @@ const props = defineProps<{
   category: string;
   /** 搜索词：详情里同样高亮，方便看清为什么命中 */
   keyword: string;
-  /** 玩家头颅（可删除） */
+  /** 玩家皮肤（可删除） */
   removable: boolean;
   /** 这个方块已收藏 */
   favorite: boolean;
@@ -35,7 +35,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   /** 请求关闭弹窗 */
   (e: "close"): void;
-  /** 请求删除该玩家头颅，仅在 `removable` 为真时可用 */
+  /** 请求删除该玩家皮肤，仅在 `removable` 为真时可用 */
   (e: "remove"): void;
   /** 请求把它设为某个实例的图标，父级接着打开选实例弹窗 */
   (e: "set-icon"): void;

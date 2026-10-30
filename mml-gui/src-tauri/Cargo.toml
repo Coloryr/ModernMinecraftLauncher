@@ -25,6 +25,8 @@ chrono.workspace = true
 tauri = { version = "~2.12.5", features = ["tray-icon"] }
 base64.workspace = true
 tauri-plugin-dialog.workspace = true
+# 系统通知：启动器不在前台时，下载完成这类结果用系统提示告诉用户，见 notify.rs
+tauri-plugin-notification = "~2.8.0"
 tauri-plugin-decoration = { path = "../../target/vendor/tauri-plugin-decoration" }
 async-trait.workspace = true
 gui-macros = { path = "../../ipc-gen/macros" }
