@@ -161,6 +161,7 @@ Windows 本地默认把三种架构都构建出来；Linux / macOS 本地构建�
 | --- | --- |
 | 推送正式版标签（如 `v0.0.1`） | 先校验 `build/version` 与标签一致，再按 Windows 3 种、Linux 2 种、macOS 2 种架构并行构建安装包，最后汇总成一个 GitHub Release |
 | 推送预发布标签（如 `v1.0.0-pre`） | 走预发布构建，只出可执行文件，汇总成一个标记为 Pre-release 的 GitHub Release |
+| 推送测试构建标签（如 `testbuild`、`testbuild-1`） | 跑完整的构建流程，通道仍按 `build/version` 决定、不校验标签与版本一致；**产物全部丢弃**：不上传 artifact、不打包附加包、不发 Release |
 | 推送 `releases/**` 分支 | 只构建并把产物传成 Actions artifact，不发 Release，用于验证 |
 | Actions 页面手动 `workflow_dispatch` | 同上，验证用 |
 

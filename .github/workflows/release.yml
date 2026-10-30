@@ -8,6 +8,8 @@ on:
       # 正式版 v1.0.0、预发布 v1.0.0-pre；也接受不带 v 的标签
       - 'v*'
       - '[0-9]*'
+      # 测试构建：跑完整的构建流程，产物一律丢弃（不上传、不发 Release）
+      - 'testbuild*'
   workflow_dispatch:
 
 permissions:
@@ -27,6 +29,7 @@ jobs:
     outputs:
       channel: ${{ steps.resolve.outputs.channel }}
       version: ${{ steps.resolve.outputs.version }}
+      test: ${{ steps.resolve.outputs.test }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,11 +48,20 @@ jobs:
           else
             channel=release
           fi
+          # 测试构建标签：跑完整构建流程，但产物一律丢弃，也不校验标签与版本一致
+          test=false
+          if [[ "$GITHUB_REF" == refs/tags/testbuild* ]]; then
+            test=true
+          fi
+
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "channel=${channel}" >> "$GITHUB_OUTPUT"
-          echo "build/version=${version}，发布通道=${channel}"
+          echo "test=${test}" >> "$GITHUB_OUTPUT"
+          echo "build/version=${version}，发布通道=${channel}，测试构建=${test}"
 
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+          if [ "$test" = true ]; then
+            echo "测试构建：产物全部丢弃，不上传 artifact、不发 Release。"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
             tag="${GITHUB_REF_NAME#v}"
             if [ "$version" != "$tag" ]; then
               echo "build/version 是 ${version}，标签是 ${GITHUB_REF_NAME}，两者不一致。"
@@ -109,7 +121,7 @@ jobs:
         if: needs.check-version.outputs.channel == 'release'
         run: pwsh -NoProfile -File build/build-release.ps1 -Arch ${{ matrix.arch }}
       - name: 上传 Windows 产物
-        if: needs.check-version.outputs.channel == 'release'
+        if: needs.check-version.outputs.channel == 'release' && needs.check-version.outputs.test != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: mml-windows-${{ matrix.arch }}
@@ -122,7 +134,7 @@ jobs:
         if: needs.check-version.outputs.channel == 'prerelease'
         run: node build/package-prerelease.mjs --os windows --arch ${{ matrix.arch }}
       - name: 上传预发布产物
-        if: needs.check-version.outputs.channel == 'prerelease'
+        if: needs.check-version.outputs.channel == 'prerelease' && needs.check-version.outputs.test != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: mml-prerelease-windows-${{ matrix.arch }}
@@ -193,14 +205,14 @@ jobs:
         if: needs.check-version.outputs.channel == 'release'
         run: bash build/build-release.sh
       - name: 上传 Linux 产物
-        if: needs.check-version.outputs.channel == 'release'
+        if: needs.check-version.outputs.channel == 'release' && needs.check-version.outputs.test != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: mml-linux-${{ matrix.arch }}
           path: build_out/*
           if-no-files-found: error
       - name: 上传 Linux x64 二进制
-        if: needs.check-version.outputs.channel == 'release' && matrix.arch == 'x64'
+        if: needs.check-version.outputs.channel == 'release' && matrix.arch == 'x64' && needs.check-version.outputs.test != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: linux-x64-bin
@@ -213,7 +225,7 @@ jobs:
         if: needs.check-version.outputs.channel == 'prerelease'
         run: node build/package-prerelease.mjs --os linux --arch ${{ matrix.arch }}
       - name: 上传预发布产物
-        if: needs.check-version.outputs.channel == 'prerelease'
+        if: needs.check-version.outputs.channel == 'prerelease' && needs.check-version.outputs.test != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: mml-prerelease-linux-${{ matrix.arch }}
@@ -221,7 +233,8 @@ jobs:
           if-no-files-found: error
 
   package-linux-extra:
-    if: needs.check-version.outputs.channel == 'release'
+    # 依赖 build-linux 上传的 linux-x64-bin；测试构建不传产物，这一组也没有可用的二进制
+    if: needs.check-version.outputs.channel == 'release' && needs.check-version.outputs.test != 'true'
     needs: [check-version, build-linux]
     runs-on: ubuntu-22.04
     steps:
@@ -337,7 +350,7 @@ jobs:
           done
           bash build/build-release.sh
       - name: 上传 macOS 产物
-        if: needs.check-version.outputs.channel == 'release'
+        if: needs.check-version.outputs.channel == 'release' && needs.check-version.outputs.test != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: mml-macos-${{ matrix.arch }}
@@ -350,7 +363,7 @@ jobs:
         if: needs.check-version.outputs.channel == 'prerelease'
         run: node build/package-prerelease.mjs --os macos --arch ${{ matrix.arch }}
       - name: 上传预发布产物
-        if: needs.check-version.outputs.channel == 'prerelease'
+        if: needs.check-version.outputs.channel == 'prerelease' && needs.check-version.outputs.test != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: mml-prerelease-macos-${{ matrix.arch }}
@@ -358,7 +371,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: startsWith(github.ref, 'refs/tags/') && needs.check-version.outputs.channel == 'release'
+    if: startsWith(github.ref, 'refs/tags/') && needs.check-version.outputs.channel == 'release' && needs.check-version.outputs.test != 'true'
     needs: [check-version, build-windows, build-linux, package-linux-extra, build-macos]
     runs-on: ubuntu-latest
     permissions:
@@ -398,7 +411,7 @@ jobs:
           prerelease: false
 
   prerelease:
-    if: startsWith(github.ref, 'refs/tags/') && needs.check-version.outputs.channel == 'prerelease'
+    if: startsWith(github.ref, 'refs/tags/') && needs.check-version.outputs.channel == 'prerelease' && needs.check-version.outputs.test != 'true'
     needs: [check-version, build-windows, build-linux, build-macos]
     runs-on: ubuntu-latest
     permissions:

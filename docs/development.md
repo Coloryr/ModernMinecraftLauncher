@@ -152,6 +152,7 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 | --- | --- |
 | 推送正式版标签（如 `v0.0.1`） | `check-version` 校验 `build/version` 与标签一致，随后并行构建三平台安装包，最后汇总成一个 GitHub Release |
 | 推送预发布标签（如 `v1.0.0-pre`） | `build/version` 带 `-pre` 这类后缀时走预发布通道：各平台跑 `build-prerelease`，只出可执行文件，最后汇总成一个标记为 Pre-release 的 GitHub Release |
+| 推送测试构建标签（如 `testbuild`） | 完整跑一遍构建，通道按 `build/version` 决定且不校验标签与版本一致；产物全部丢弃——`upload-artifact` 步骤、Flatpak / Arch 附加包与 Release 都不执行，只看构建是否通过 |
 | 推送 `releases/**` 分支 | 只构建、把产物传成 Actions artifact，不发 Release，用来验证构建 |
 | Actions 页面手动 `workflow_dispatch` | 同上，验证用 |
 
