@@ -30,6 +30,8 @@ import { familyInstanceFromLabel, projectParamToItem, targetProject, targetUuid,
 import { useInstanceChange } from "../../composables/useInstanceChange";
 import { useRefreshKey } from "../../composables/useRefreshKey";
 import { usePageKeys } from "../../composables/usePageKeys";
+import { useModalKeys } from "../../composables/useModalKeys";
+import { usePageActive } from "../../lib/pageActive";
 import { useUnlisteners } from "../../composables/useUnlisteners";
 import { scrollToContentTop } from "../../lib/scrollTop";
 import type {
@@ -196,6 +198,30 @@ const depsPick = ref(new Map<string, string>());
 const depsLoading = ref(false);
 /** 「不下载前置」的二次确认 */
 const depSkipAsk = ref(false);
+
+/** 本页是否在前台：单窗口模式下页面被缓存，别在别的页面上抢 Esc */
+const pageActive = usePageActive();
+
+// 弹窗打开时 Esc 先收弹窗，别让底下的项目详情被关掉
+useModalKeys((e) => {
+  if (e.key !== "Escape" || !pageActive.value) return;
+  if (!depSkipAsk.value && !depFile.value && !savePickFile.value && !pendingFile.value) return;
+  // 文档上的监听先于 window 上的详情监听，拦住它，本次 Esc 只关弹窗
+  e.stopPropagation();
+  if (depSkipAsk.value) {
+    depSkipAsk.value = false;
+    return;
+  }
+  if (depFile.value) {
+    closeDeps();
+    return;
+  }
+  if (savePickFile.value) {
+    savePickFile.value = null;
+    return;
+  }
+  if (pendingFile.value) pendingFile.value = null;
+});
 
 /** 内容区根节点，翻页时用它把窗口滚回顶部 */
 const bodyRef = ref<HTMLElement | null>(null);
@@ -1033,7 +1059,8 @@ onActivated(async () => {
       <!-- 项目详情：与下载整合包窗口共用同一份实现 -->
       <ProjectDetailPage :item="detailItem" :versions="versions" :initial-version="version"
         :action-label="t('addResource.download')" :status="resourceStatus" :load-detail="loadDetail"
-        :load-files="loadFiles" @close="closeDetail" @download="download" />
+        :load-files="loadFiles" :shortcuts-disabled="!!depFile || depSkipAsk || !!savePickFile || !!pendingFile"
+        @close="closeDetail" @download="download" />
     </div>
   </WindowFrame>
 </template>

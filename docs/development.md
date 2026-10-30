@@ -126,6 +126,7 @@ Windows 的正式 / 预发布脚本默认构建 **x64 / x86 / arm64**：
 - Linux / macOS 本地只构建当前架构；需要多架构时用 `MML_TARGETS` 指定三元组（空格分隔）：
   `MML_TARGETS=x86_64-apple-darwin bash build/build-release.sh` 可在 Apple Silicon 上交叉出 macOS x64
   （需先 `rustup target add x86_64-apple-darwin`）；Linux arm64 建议直接在 arm64 机器上构建。
+  打包类型用 `MML_BUNDLES` 限定（如 `MML_BUNDLES=deb,rpm`），不写就交给 tauri 决定该平台的全套。
   macOS 通用包可用 `MML_TARGETS=universal-apple-darwin`，仅正式发布支持。
 
 预发布也要安装包时，只能覆盖 release 的设置（`tauri` CLI 不认 `--profile`）：
@@ -144,7 +145,7 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 
 ## 自动化构建（GitHub Actions）
 
-[`.github/workflows/release.yml`](../.github/workflows/release.yml) 把 `init`、`build-release` 与
+[`.github/workflows/build.yml`](../.github/workflows/build.yml) 把 `init`、`build-release` 与
 `build-prerelease` 三个本地脚本串成三平台流水线，按标签后缀决定走正式发布还是预发布，
 不另写一份构建逻辑：
 
@@ -167,7 +168,8 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 3. Windows 拆成 x64 / x86 / arm64 三行 matrix，各跑 `build/init.ps1` 再按通道跑
    `build/build-release.ps1 -Arch <arch>` 或 `build/build-prerelease.ps1 -Arch <arch>`
    （arm64 用 `windows-11-arm` 原生 runner）；Linux 跑 x64（`ubuntu-22.04`）与 arm64（`ubuntu-24.04-arm`），
-   macOS 跑 x64（`macos-15-intel`）与 arm64（`macos-15`），都执行 `bash build/init.sh` 再按通道跑
+   x86 单独一个 job（Debian bookworm 容器里交叉编译，见下），macOS 的 x64 跑 `macos-26-intel`
+   （原生 Intel）、arm64 跑 `macos-latest`，都执行 `bash build/init.sh` 再按通道跑
    `build/build-release.sh` 或 `build/build-prerelease.sh`；
 4. 正式版的 Linux x64 构建完先上传 deb / rpm / AppImage，再单独上传原始二进制；`package-linux-extra` job
    下载这份二进制后跑 `build/package-flatpak.sh` 与 `build/package-arch.sh`，把 `.flatpak` 与
@@ -186,10 +188,23 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
   FUSE 运行时 x64 用 `libfuse2`、arm64 用 `libfuse2t64`。`libdbus-1-dev` 是 `mml-sys` 在 Linux 上
   「在文件管理器中显示」用的 D-Bus 绑定，缺了会编译失败；`libudev-dev` 是手柄读取在 Linux 上的后端依赖；
   `libarchive-tools` 与 `zstd` 给 Arch 包生成 `.MTREE`。
+- Linux x86（32 位 i686）单独一个 job：Ubuntu 的 i386 仓库里没有 `libayatana-appindicator3-dev`
+  与 `libxdo-dev`，装不齐就链接不过，所以整个 job 跑在 `debian:bookworm` 容器里 —— Debian 的
+  i386 是完整架构，这两包都有；再用 `gcc-i686-linux-gnu` 交叉编译（`MML_TARGETS=i686-unknown-linux-gnu`，
+  `PKG_CONFIG_LIBDIR` 指向 `/usr/lib/i386-linux-gnu/pkgconfig`）。打包类型限定为 deb / rpm
+  （`MML_BUNDLES=deb,rpm`）：AppImage 的打包工具链没有 32 位版本。代价是 x86 的 glibc 基线
+  跟着容器走，是 bookworm 的 2.36，比 x64 / arm64 的 2.35 高一档 —— Tauri 2 要 webkit2gtk 4.1，
+  更老的发行版装不上，这个基线也降不下去。
+- macOS 的 x64 跑 `macos-26-intel`：这代 Intel 镜像是最后一代 —— Apple 已说明 macOS 26 是
+  最后一个支持 Intel 的系统，不会再有 `macos-27-intel`。等它退役时 Intel 这条线也就结束了，
+  那时要么只出 arm64，要么回退到在 `macos-latest` 上交叉编译（`MML_TARGETS=x86_64-apple-darwin`
+  加 `rustup target add` 即可，签名与公证不看宿主架构）。
 - 产物名与本地一致：`mml-windows-x64-0.0.1.msi`、`mml-linux-x64-0.0.1.deb`、
-  `mml-linux-x64-0.0.1.flatpak`、`mml-arch-x64-0.0.1.pkg.tar.zst`、
-  `mml-macos-arm64-0.0.1.dmg` 等，架构取自 `runner.arch`。
+  `mml-linux-x86-0.0.1.deb`、`mml-linux-x64-0.0.1.flatpak`、`mml-arch-x64-0.0.1.pkg.tar.zst`、
+  `mml-macos-arm64-0.0.1.dmg` 等，架构取自 `runner.arch`；只有 Linux x86 是交叉构建，
+  架构取自目标三元组。
 - 预发布只出可执行文件：`mml-windows-x64-1.0.0-pre.exe`、`mml-linux-arm64-1.0.0-pre`、
+  `mml-linux-x86-1.0.0-pre`、
   `mml-macos-x64-1.0.0-pre` 等；Linux / macOS 下载后要 `chmod +x`。预发布不打安装包，
   安装包的版本字段放不下 `-pre` 这类后缀。
 - Flatpak 不需要在 runner 上装 `org.freedesktop.Platform`：封装只做 OSTree 提交与 bundle，
@@ -204,7 +219,11 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 - macOS 构建会读 `APPLE_CERTIFICATE` / `APPLE_CERTIFICATE_PASSWORD` / `APPLE_SIGNING_IDENTITY` /
   `APPLE_ID` / `APPLE_PASSWORD` / `APPLE_TEAM_ID` 完成签名与公证；`APPLE_CERTIFICATE` 是 base64 后的
   `.p12`，`APPLE_PASSWORD` 是 App 专用密码。secrets 没配置时这些变量是空串，
-  而 Tauri 只看变量是否存在，所以工作流先把空值 `unset` 再调构建；此时产物未签名，首次打开需右键 → 打开。
+  而 Tauri 只看变量是否存在，所以工作流先把空值 `unset`。**没有证书时一定要补一道 ad-hoc 签名**：
+  把 `APPLE_SIGNING_IDENTITY` 设成单个 `-`，Tauri 就会用 `codesign --sign -` 签一遍。
+  Apple Silicon 上未签名的二进制根本起不来，Intel 上也会被 Gatekeeper 判成「已损坏」。
+  预发布只有裸可执行文件、不过 Tauri 打包，工作流在收集完之后自己签一道。
+  ad-hoc 不等于公证，首次打开仍需在「隐私与安全性」里放行。
 - 发版前检查产物重名：不同平台产物同名时会在 GitHub Release 上互相覆盖，发现重名直接失败。
 - 发布说明里的校验和是当场对下载下来的产物算的：SHA1 与 SHA256 各一列，随 Release 正文发布。
 - `windows-11-arm` 与 `ubuntu-24.04-arm` 是 GitHub 公共预览 runner，私有仓库可能不可用；

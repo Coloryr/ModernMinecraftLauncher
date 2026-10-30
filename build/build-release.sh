@@ -33,11 +33,18 @@ cd "$root/mml-gui"
 # 需要多架构时用 MML_TARGETS 指定三元组，空格分隔，例如：
 #   MML_TARGETS="aarch64-apple-darwin x86_64-apple-darwin" bash build/build-release.sh
 # Windows 的多架构（x64 / x86 / arm64）用 build-release.ps1。
+#
+# 打包类型默认交给 tauri 自己决定（Linux 上是 deb / rpm / AppImage）。交叉编译、
+# 或该架构没有某个打包工具时用 MML_BUNDLES 限定，例如 MML_BUNDLES=deb,rpm。
 echo '正在构建 release（fat LTO，含安装包）...'
 if [ -n "${MML_TARGETS:-}" ]; then
   for target in $MML_TARGETS; do
     echo "  -> $target"
-    cargo tauri build --target "$target"
+    if [ -n "${MML_BUNDLES:-}" ]; then
+      cargo tauri build --target "$target" --bundles "$MML_BUNDLES"
+    else
+      cargo tauri build --target "$target"
+    fi
   done
 else
   cargo tauri build

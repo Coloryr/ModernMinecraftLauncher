@@ -101,17 +101,23 @@ function pickMatch(list: string[], candidates: string[]): string | null {
   return null;
 }
 
+/** 刷新代次：F5 连续触发时，旧的一发不能再改源、也不能再启动选项请求 */
+let sourcesSeq = 0;
+
 /** 拉下载源并加载其选项：首次挂载与切回本窗口都走这里，保留用户已选的源 */
 async function loadSources() {
+  const mine = ++sourcesSeq;
   if (!inTauri) return;
   try {
     const list = await commands.javaDownload.getTypes();
+    if (mine !== sourcesSeq) return;
     sources.value = list;
     if (!source.value || !list.includes(source.value)) {
       source.value = list[0] ?? null;
     }
     if (source.value) await loadOptions();
   } catch (e) {
+    if (mine !== sourcesSeq) return;
     showToast(tErr(e));
   }
 }
@@ -121,30 +127,39 @@ onMounted(loadSources);
 // 单窗口模式：窗口被 KeepAlive 缓存，切回不会重新挂载 → 自己补一次
 useWindowRefresh(loadSources);
 
+/** 候选请求代次：F5 / 连续切源只让最新一发写回下拉并继续拉列表 */
+let optionsSeq = 0;
+
 /** 拉当前源的四个下拉候选，默认选本机对应的系统与架构，再按默认筛选拉一次列表 */
 async function loadOptions() {
-  if (!source.value) return;
+  const mine = ++optionsSeq;
+  if (!source.value) {
+    optionsLoading.value = false;
+    return;
+  }
   optionsLoading.value = true;
   try {
-    options.value = await commands.javaDownload.getOptions(source.value);
+    const data = await commands.javaDownload.getOptions(source.value);
+    if (mine !== optionsSeq) return;
+    options.value = data;
     // 类型 / 主版本选第一项；系统 / 架构自动选本机对应的项
-    javaType.value = options.value.types[0] ?? "";
-    major.value = options.value.majors[0] ?? null;
+    javaType.value = data.types[0] ?? "";
+    major.value = data.majors[0] ?? null;
     const osCands = OS_CANDIDATES[detectOs()] ?? [];
-    system.value =
-      pickMatch(options.value.systems, osCands) ?? options.value.systems[0] ?? "";
+    system.value = pickMatch(data.systems, osCands) ?? data.systems[0] ?? "";
     const archDetected = await detectArch();
+    if (mine !== optionsSeq) return;
     arch.value =
-      pickMatch(options.value.archs, archDetected ? ARCH_CANDIDATES[archDetected] : []) ??
-      options.value.archs[0] ??
-      "";
+      pickMatch(data.archs, archDetected ? ARCH_CANDIDATES[archDetected] : []) ?? data.archs[0] ?? "";
   } catch (e) {
+    if (mine !== optionsSeq) return;
     showToast(tErr(e));
     // 候选没拉到就别按旧条件拉列表，否则列表与下拉显示的源对不上
     return;
   } finally {
-    optionsLoading.value = false;
+    if (mine === optionsSeq) optionsLoading.value = false;
   }
+  if (mine !== optionsSeq) return;
   await loadList();
 }
 
@@ -172,26 +187,34 @@ function formatSize(bytes: number): string {
   return `${bytes} B`;
 }
 
+/** 列表请求代次：F5 / 连续改筛选时，只让最新一发写回结果 */
+let listSeq = 0;
+
 /** 按当前筛选条件拉取匹配的包列表 */
 async function loadList() {
+  const mine = ++listSeq;
   if (!source.value || !javaType.value || major.value === null || !system.value || !arch.value) {
-    // 筛选不全时清空，别留着上一个源的列表
+    // 筛选不全时清空，别留着上一个源的列表；在途的旧请求也一并作废
     items.value = [];
+    listLoading.value = false;
     return;
   }
   listLoading.value = true;
   try {
-    items.value = await commands.javaDownload.getList(
+    const list = await commands.javaDownload.getList(
       source.value,
       javaType.value,
       major.value,
       system.value,
       arch.value,
     );
+    if (mine !== listSeq) return;
+    items.value = list;
   } catch (e) {
+    if (mine !== listSeq) return;
     showToast(tErr(e));
   } finally {
-    listLoading.value = false;
+    if (mine === listSeq) listLoading.value = false;
   }
 }
 </script>

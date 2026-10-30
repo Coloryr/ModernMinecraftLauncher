@@ -786,7 +786,7 @@ const installTargets = ref<CollectItemDto[]>([]);
  * - `item`: 收藏项
  */
 function canInstall(item: CollectItemDto): boolean {
-  return item.fileType !== "modpack" && item.fileType !== "datapacks" && item.fileType !== "save";
+  return item.fileType !== "modpack" && item.fileType !== "dataPacks" && item.fileType !== "save";
 }
 
 /**
@@ -809,7 +809,7 @@ function openInstall(list: CollectItemDto[]) {
   if (list.some((item) => item.fileType === "modpack")) {
     showToast(t("collect.installModpack"));
   }
-  if (list.some((item) => item.fileType === "datapacks")) {
+  if (list.some((item) => item.fileType === "dataPacks")) {
     showToast(t("collect.installDatapack"));
   }
   if (list.some((item) => item.fileType === "save")) {

@@ -2179,6 +2179,7 @@ export default {
   "collect.installLoaders": "Supported loaders: {value}",
   "collect.installVersions": "Supported game versions: {value}",
   "collect.installAny": "Any",
+  "collect.installNone": "No overlap",
   "collect.installNoFit": "No instance satisfies the loaders and game versions shared by the selection",
   "collect.installDo": "Install",
   "collect.installDone": "Added {count} download tasks",

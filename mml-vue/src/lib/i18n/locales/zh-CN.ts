@@ -2180,6 +2180,7 @@ export default {
   "collect.installLoaders": "支持加载器：{value}",
   "collect.installVersions": "支持游戏版本：{value}",
   "collect.installAny": "不限",
+  "collect.installNone": "无交集",
   "collect.installNoFit": "没有实例同时满足选中项的支持加载器与游戏版本",
   "collect.installDo": "安装",
   "collect.installDone": "已加入 {count} 个下载任务",

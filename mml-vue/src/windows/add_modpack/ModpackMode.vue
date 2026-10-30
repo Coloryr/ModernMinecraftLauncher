@@ -358,12 +358,12 @@ async function consumeTargetProject() {
   }
   closeDetail();
   filter.value = "";
-  // 换源会让排序表作废：**同步**清掉，不能等 watch 里那次异步重载，
-  // 否则中间那几发搜索会带着上一个源的排序名发出去（后端不认 → 报未知排序）
-  sorts.value = [];
-  sort.value = "";
-  if (p.source) {
+  // 只有真的换源才让排序表作废：同源跳转保留当前排序，否则 watch(source) 不触发，
+  // sorts 被清空后搜索会直接返回，直到手动换源才恢复
+  if (p.source && p.source !== source.value) {
     source.value = p.source;
+  } else if (!sorts.value.includes(sort.value)) {
+    sort.value = sorts.value[0] ?? "";
   }
 
   await nextTick();

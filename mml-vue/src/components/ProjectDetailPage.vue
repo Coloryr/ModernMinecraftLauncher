@@ -46,6 +46,8 @@ const props = defineProps<{
   loadDetail: (pid: string) => Promise<ProjectDetailDto>;
   /** 取版本列表，`version` 为 null 表示不限 */
   loadFiles: (pid: string, page: number, version: string | null) => Promise<FileListDto>;
+  /** 上层弹窗打开时禁用 Esc 与翻页快捷键，避免把底下的详情关掉 */
+  shortcutsDisabled?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -189,11 +191,12 @@ function onFileVersionChange() {
   }
 }
 
-// 鼠标侧键翻版本列表：后退 = 上一页，前进 = 下一页
+// 鼠标侧键翻版本列表：后退 = 上一页，前进 = 下一页。详情收起或上层弹窗打开时让位
 usePageKeys({
   prev: () => turnFilePage(-1),
   next: () => turnFilePage(1),
-  enabled: () => !filesLoading.value && fileMaxPage.value > 1,
+  enabled: () =>
+    !!props.item && active.value && !props.shortcutsDisabled && !filesLoading.value && fileMaxPage.value > 1,
 });
 
 /** 版本列表翻页：Modrinth 本地切片，CurseForge 向后端取页 */
@@ -238,13 +241,14 @@ function closePreview() {
   preview.value = "";
 }
 
-/** Esc：先关截图预览，再关详情页 */
+/** Esc：先关截图预览，再关详情页；上层弹窗打开时整层让位 */
 function onKey(e: KeyboardEvent) {
   if (e.key !== "Escape") return;
   if (preview.value) {
     closePreview();
     return;
   }
+  if (props.shortcutsDisabled) return;
   emit("close");
 }
 

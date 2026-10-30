@@ -5,15 +5,11 @@ on:
     branches:
       - 'releases/**'
     tags:
-      # 正式版 v1.0.0、预发布 v1.0.0-pre；也接受不带 v 的标签
-      - 'v*'
       - '[0-9]*'
-      # 测试构建：跑完整的构建流程，产物一律丢弃（不上传、不发 Release）
       - 'testbuild*'
-  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: mml-${{ github.ref }}
@@ -23,7 +19,6 @@ env:
   CI: true
 
 jobs:
-  # 版本号只认 build/version：带 -pre 之类后缀走预发布，否则走正式发布
   check-version:
     runs-on: ubuntu-latest
     outputs:
@@ -95,6 +90,8 @@ jobs:
             mml-vue/package-lock.json
       - name: 设置 Rust
         uses: dtolnay/rust-toolchain@stable
+      - name: 还原 vendor 插件
+        run: pwsh -NoProfile -File mml-gui/vendor/prepare.ps1
       - name: 缓存 Rust
         uses: Swatinem/rust-cache@v2
         with:
@@ -107,8 +104,6 @@ jobs:
       - name: 安装 Tauri CLI（预编译）
         shell: bash
         run: |
-          # tauri-cli 的 binstall 元数据只给 x64 的 zip 包写了格式覆盖，macOS / Windows
-          # 的 ARM64 产物其实也是 zip。按平台显式指定格式，避免回退到源码编译。
           case "$RUNNER_OS" in
             Linux) pkg_fmt=tgz ;;
             *) pkg_fmt=zip ;;
@@ -166,6 +161,8 @@ jobs:
             mml-vue/package-lock.json
       - name: 设置 Rust
         uses: dtolnay/rust-toolchain@stable
+      - name: 还原 vendor 插件
+        run: bash mml-gui/vendor/prepare.sh
       - name: 缓存 Rust
         uses: Swatinem/rust-cache@v2
         with:
@@ -191,8 +188,6 @@ jobs:
       - name: 安装 Tauri CLI（预编译）
         shell: bash
         run: |
-          # tauri-cli 的 binstall 元数据只给 x64 的 zip 包写了格式覆盖，macOS / Windows
-          # 的 ARM64 产物其实也是 zip。按平台显式指定格式，避免回退到源码编译。
           case "$RUNNER_OS" in
             Linux) pkg_fmt=tgz ;;
             *) pkg_fmt=zip ;;
@@ -232,8 +227,93 @@ jobs:
           path: build_out/*
           if-no-files-found: error
 
+  build-linux-x86:
+    needs: check-version
+    runs-on: ubuntu-22.04
+    container: debian:bookworm
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      MML_TARGETS: i686-unknown-linux-gnu
+      MML_BUNDLES: deb,rpm
+      PKG_CONFIG_ALLOW_CROSS: "1"
+      PKG_CONFIG_LIBDIR: /usr/lib/i386-linux-gnu/pkgconfig:/usr/share/pkgconfig
+      PKG_CONFIG_PATH: /usr/lib/i386-linux-gnu/pkgconfig
+      CC_i686_unknown_linux_gnu: i686-linux-gnu-gcc
+      CXX_i686_unknown_linux_gnu: i686-linux-gnu-g++
+      AR_i686_unknown_linux_gnu: i686-linux-gnu-ar
+      CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_LINKER: i686-linux-gnu-gcc
+    steps:
+      - name: 安装容器基础工具
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates curl xz-utils
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            mml-vue/package-lock.json
+      - name: 设置 Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: i686-unknown-linux-gnu
+      - name: 还原 vendor 插件
+        run: bash mml-gui/vendor/prepare.sh
+      - name: 缓存 Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .
+          key: linux-x86
+      - name: 安装 i386 构建依赖
+        run: |
+          dpkg --add-architecture i386
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential pkg-config file dpkg-dev patchelf cpio \
+            gcc-i686-linux-gnu g++-i686-linux-gnu \
+            libwebkit2gtk-4.1-dev:i386 libgtk-3-dev:i386 \
+            libayatana-appindicator3-dev:i386 libxdo-dev:i386 \
+            librsvg2-dev:i386 libssl-dev:i386 libdbus-1-dev:i386 libudev-dev:i386 \
+            rpm
+      - name: 安装 cargo-binstall
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-binstall
+      - name: 安装 Tauri CLI（预编译）
+        shell: bash
+        run: |
+          cargo binstall --no-confirm --pkg-fmt tgz tauri-cli@^2
+          cargo tauri --version
+      - name: 安装依赖
+        run: bash build/init.sh
+      - name: 构建并打包（x86）
+        if: needs.check-version.outputs.channel == 'release'
+        run: bash build/build-release.sh
+      - name: 上传 Linux x86 产物
+        if: needs.check-version.outputs.channel == 'release' && needs.check-version.outputs.test != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mml-linux-x86
+          path: build_out/*
+          if-no-files-found: error
+      - name: 构建预发布（x86）
+        if: needs.check-version.outputs.channel == 'prerelease'
+        run: bash build/build-prerelease.sh
+      - name: 收集预发布产物
+        if: needs.check-version.outputs.channel == 'prerelease'
+        run: node build/package-prerelease.mjs --os linux --arch x86 --triple i686-unknown-linux-gnu
+      - name: 上传预发布产物
+        if: needs.check-version.outputs.channel == 'prerelease' && needs.check-version.outputs.test != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mml-prerelease-linux-x86
+          path: build_out/*
+          if-no-files-found: error
+
   package-linux-extra:
-    # 依赖 build-linux 上传的 linux-x64-bin；测试构建不传产物，这一组也没有可用的二进制
     if: needs.check-version.outputs.channel == 'release' && needs.check-version.outputs.test != 'true'
     needs: [check-version, build-linux]
     runs-on: ubuntu-22.04
@@ -270,9 +350,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-15-intel
+          - runner: macos-26-intel
             arch: x64
-          - runner: macos-15
+          - runner: macos-latest
             arch: arm64
     runs-on: ${{ matrix.runner }}
     steps:
@@ -287,6 +367,8 @@ jobs:
             mml-vue/package-lock.json
       - name: 设置 Rust
         uses: dtolnay/rust-toolchain@stable
+      - name: 还原 vendor 插件
+        run: bash mml-gui/vendor/prepare.sh
       - name: 缓存 Rust
         uses: Swatinem/rust-cache@v2
         with:
@@ -327,7 +409,7 @@ jobs:
           elif [ "$signed" = 1 ]; then
             echo '只配置了签名证书，没有公证凭据：Gatekeeper 仍会拦首次打开。'
           else
-            echo '未配置 macOS 签名：产物未签名，用户首次打开需右键 → 打开。'
+            echo '未配置 macOS 签名证书：产物会做 ad-hoc 签名，用户首次打开仍需手动放行。'
           fi
       - name: 安装依赖
         run: bash build/init.sh
@@ -342,8 +424,16 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY \
-                      APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+          # 没有证书也必须签名：Apple Silicon 上未签名的二进制根本起不来，Intel 上
+          # 也会被 Gatekeeper 判成"已损坏"。用 ad-hoc 兜底，伪身份就是 "-"
+          if [ -z "${APPLE_CERTIFICATE:-}" ] || [ -z "${APPLE_CERTIFICATE_PASSWORD:-}" ]; then
+            unset APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD
+            if [ -z "${APPLE_SIGNING_IDENTITY:-}" ]; then
+              export APPLE_SIGNING_IDENTITY="-"
+            fi
+          fi
+          # 公证凭据缺任何一项都不公证：Tauri 只看变量在不在，空串会被当成已配置
+          for name in APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
             if [ -z "${!name:-}" ]; then
               unset "$name"
             fi
@@ -362,6 +452,15 @@ jobs:
       - name: 收集预发布产物
         if: needs.check-version.outputs.channel == 'prerelease'
         run: node build/package-prerelease.mjs --os macos --arch ${{ matrix.arch }}
+      - name: 预发布产物 ad-hoc 签名
+        if: needs.check-version.outputs.channel == 'prerelease'
+        run: |
+          # 预发布只有裸可执行文件，不经过 Tauri 打包，得自己签一道 ——
+          # 否则 arm64 上连启动都过不去
+          for f in build_out/*; do
+            codesign --force --sign - "$f"
+            codesign --verify --verbose=1 "$f"
+          done
       - name: 上传预发布产物
         if: needs.check-version.outputs.channel == 'prerelease' && needs.check-version.outputs.test != 'true'
         uses: actions/upload-artifact@v4
@@ -372,7 +471,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/') && needs.check-version.outputs.channel == 'release' && needs.check-version.outputs.test != 'true'
-    needs: [check-version, build-windows, build-linux, package-linux-extra, build-macos]
+    needs: [check-version, build-windows, build-linux, build-linux-x86, package-linux-extra, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -412,7 +511,7 @@ jobs:
 
   prerelease:
     if: startsWith(github.ref, 'refs/tags/') && needs.check-version.outputs.channel == 'prerelease' && needs.check-version.outputs.test != 'true'
-    needs: [check-version, build-windows, build-linux, build-macos]
+    needs: [check-version, build-windows, build-linux, build-linux-x86, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write

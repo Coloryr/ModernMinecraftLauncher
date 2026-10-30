@@ -26,19 +26,25 @@ const emit = defineEmits<{
 /**
  * 若干份支持列表的交集
  *
- * 空列表表示"这项不限"，不参与收窄；全都不限时交集为空，界面按"不限"显示。
+ * 空列表本身不参与收窄；但"全都为空"和"交集为空"返回值相同，
+ * 调用方必须再看 `hasLoaderLimit` / `hasVersionLimit` 区分。
  *
  * - `lists`: 每项的支持列表
  *
  * # 返回值
  *
- * 交集；没有任何一项记了支持信息时返回空数组
+ * 交集；没有限制或互不相容时都是空数组
  */
 function intersect(lists: string[][]): string[] {
   const filled = lists.filter((list) => list.length > 0);
   if (!filled.length) return [];
   return filled.reduce((acc, cur) => acc.filter((value) => cur.includes(value)));
 }
+
+/** 选中项里有人记了加载器信息：此时交集为空表示互不相容，而不是"不限" */
+const hasLoaderLimit = computed(() => props.items.some((item) => item.loaders.length > 0));
+/** 同上，游戏版本 */
+const hasVersionLimit = computed(() => props.items.some((item) => item.gameVersions.length > 0));
 
 /** 选中项共同支持的加载器 */
 const loaders = computed(() => intersect(props.items.map((item) => item.loaders)));
@@ -49,8 +55,8 @@ const versions = computed(() => intersect(props.items.map((item) => item.gameVer
 const candidates = computed(() =>
   props.instances.filter(
     (inst) =>
-      (!loaders.value.length || loaders.value.includes(inst.loader)) &&
-      (!versions.value.length || versions.value.includes(inst.version)),
+      (!hasLoaderLimit.value || loaders.value.includes(inst.loader)) &&
+      (!hasVersionLimit.value || versions.value.includes(inst.version)),
   ),
 );
 
@@ -79,9 +85,14 @@ function requirement(item: CollectItemDto): string {
   return parts.length ? parts.join(" · ") : t("collect.installAny");
 }
 
-/** 交集的显示文本：最多列三个版本，多的省略 */
-function summary(list: string[]): string {
-  if (!list.length) return t("collect.installAny");
+/**
+ * 交集的显示文本：最多列三个版本，多的省略
+ *
+ * - `list`: 交集
+ * - `limited`: 选中项里是否有人记了这项支持信息；有限制但交集为空时显示"无交集"
+ */
+function summary(list: string[], limited: boolean): string {
+  if (!list.length) return limited ? t("collect.installNone") : t("collect.installAny");
   const head = list.slice(0, 3).join(" / ");
   return list.length > 3 ? `${head} …` : head;
 }
@@ -96,8 +107,8 @@ function summary(list: string[]): string {
         <span class="inst-need">{{ requirement(item) }}</span>
       </li>
     </ul>
-    <p class="inst-line">{{ t("collect.installLoaders", { value: summary(loaders) }) }}</p>
-    <p class="inst-line">{{ t("collect.installVersions", { value: summary(versions) }) }}</p>
+    <p class="inst-line">{{ t("collect.installLoaders", { value: summary(loaders, hasLoaderLimit) }) }}</p>
+    <p class="inst-line">{{ t("collect.installVersions", { value: summary(versions, hasVersionLimit) }) }}</p>
     <template v-if="candidates.length">
       <label class="field-label inst-label">{{ t("collect.installTo") }}</label>
       <select v-model="pick" class="field-select">
