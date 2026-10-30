@@ -5,10 +5,12 @@
 //! `AddWindowModel` 与 `instance_gui` 按原路径再导出，窗口生命周期、下载整合包窗口在用。
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use async_trait::async_trait;
+use mml_base::archives::{BaseArchiveGui, IBaseArchiveGui};
 use mml_game::GameInstance;
 use mml_game::gui_hook::{
     AddInstanceGui, AddModPackGui, AddModPackState, IAddInstanceGui, IAddModPackGui,
@@ -243,16 +245,35 @@ pub(super) struct PackProgressGui {
     window: WebviewWindow,
     /// 当前进度快照，各回调分别更新字段后整体发出
     dto: Mutex<PackProgressDto>,
+    /// 上一次子进度事件的时间；子进度最多 100ms 发一次
+    last_sub: Mutex<Instant>,
 }
 
 impl PackProgressGui {
-    /// 更新进度快照并发事件
+    /// 更新进度快照并立即发事件
     ///
     /// - `f`: 就地改快照字段的闭包
     fn update(&self, f: impl FnOnce(&mut PackProgressDto)) {
         let mut dto = self.dto.lock().unwrap();
         f(&mut dto);
         emit_add_pack_progress(&self.window, dto.clone());
+    }
+
+    /// 更新子进度快照；100ms 内只发一次，阶段切换时由 [`Self::update`] 补发最新值
+    ///
+    /// - `f`: 就地改快照字段的闭包
+    fn update_sub(&self, f: impl FnOnce(&mut PackProgressDto)) {
+        {
+            let mut dto = self.dto.lock().unwrap();
+            f(&mut dto);
+        }
+        let mut last = self.last_sub.lock().unwrap();
+        if last.elapsed().as_millis() < 100 {
+            return;
+        }
+        *last = Instant::now();
+        drop(last);
+        emit_add_pack_progress(&self.window, self.dto.lock().unwrap().clone());
     }
 }
 
@@ -279,7 +300,7 @@ impl IAddModPackGui for PackProgressGui {
     ///
     /// - `text`: 说明文字；`None` 表示清空
     fn set_sub_text(&self, text: Option<String>) {
-        self.update(|dto| dto.sub_text = text);
+        self.update_sub(|dto| dto.sub_text = text);
     }
 
     /// 设置子任务进度
@@ -287,11 +308,64 @@ impl IAddModPackGui for PackProgressGui {
     /// - `value`: 已完成数量
     /// - `all`: 总数量；`None` 表示未知，按 0 发给前端
     fn set_sub_now(&self, value: usize, all: Option<usize>) {
-        self.update(|dto| {
+        self.update_sub(|dto| {
             dto.sub_now = value as u32;
             dto.sub_total = all.unwrap_or(0) as u32;
         });
     }
+}
+
+/// 压缩包解压进度桥：把 `IBaseArchiveGui` 的文件名 / 条目数写进安装进度
+///
+/// 添加实例窗口的压缩包导入走这条；整合包任务已有自己的解压进度桥，不重复挂。
+pub(super) struct PackArchiveGui {
+    /// 目标安装进度回调
+    pack: AddModPackGui,
+    /// 本批总条目数，`start` 写入
+    total: AtomicUsize,
+}
+
+impl IBaseArchiveGui for PackArchiveGui {
+    fn start(&self, total: usize) {
+        self.total.store(total, Ordering::Relaxed);
+        if let Some(gui) = &self.pack {
+            gui.set_sub_text(None);
+            gui.set_sub_now(0, Some(total));
+        }
+    }
+
+    fn update(&self, filename: Option<String>, current: usize) {
+        if let Some(gui) = &self.pack {
+            gui.set_sub_text(filename);
+            gui.set_sub_now(current, Some(self.total.load(Ordering::Relaxed)));
+        }
+    }
+
+    fn done(&self) {
+        if let Some(gui) = &self.pack {
+            let total = self.total.load(Ordering::Relaxed);
+            gui.set_sub_now(total, Some(total));
+        }
+    }
+
+    fn file_rename(&self, _name: &str) -> bool {
+        // 添加实例窗口没有逐条确认入口：沿用无 GUI 时的自动改名
+        true
+    }
+}
+
+/// 构建添加实例窗口的压缩包解压进度桥
+///
+/// - `pack`: 当前安装进度回调
+///
+/// # 返回值
+///
+/// 交给 `install_archive_from_file` 的 `archive_gui`
+pub(super) fn pack_archive_gui(pack: AddModPackGui) -> BaseArchiveGui {
+    Some(Arc::new(PackArchiveGui {
+        pack,
+        total: AtomicUsize::new(0),
+    }) as Arc<dyn IBaseArchiveGui>)
 }
 
 /// 构建安装进度回调，跟随调用方窗口
@@ -304,6 +378,7 @@ impl IAddModPackGui for PackProgressGui {
 pub(super) fn pack_gui(window: &WebviewWindow) -> AddModPackGui {
     Some(Arc::new(PackProgressGui {
         window: window.clone(),
+        last_sub: Mutex::new(Instant::now()),
         dto: Mutex::new(PackProgressDto {
             state: "downloadPack".into(),
             now: 0,

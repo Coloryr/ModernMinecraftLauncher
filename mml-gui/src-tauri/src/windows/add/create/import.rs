@@ -15,7 +15,7 @@ use uuid::Uuid;
 use super::prepare::{PreparedTask, is_modpack, pack_file_stem, prepare};
 use crate::dtos::ServerPackProbeDto;
 use crate::windows::add::loader::{parse_loader, parse_pack_type};
-use crate::windows::add::model::{instance_gui, pack_gui};
+use crate::windows::add::model::{instance_gui, pack_archive_gui, pack_gui};
 
 /// 导入文件夹为实例
 ///
@@ -135,6 +135,13 @@ pub async fn add_import_archive(
         (pack_gui(&window), None)
     };
 
+    // 非整合包压缩包：把解压逐文件进度桥到本窗口的安装进度；整合包任务已有同一套桥
+    let archive_gui = if task.is_none() {
+        pack_archive_gui(progress.clone())
+    } else {
+        None
+    };
+
     // 安装 future 非 Send：放阻塞线程上 block_on，与 add_create_new 等同一条路子
     let install_token = token.clone();
     let file = path.clone();
@@ -147,7 +154,7 @@ pub async fn add_import_archive(
                 unselect,
                 gui,
                 progress,
-                None,
+                archive_gui,
                 pack,
                 install_token,
             )

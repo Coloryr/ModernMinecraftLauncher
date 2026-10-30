@@ -392,7 +392,7 @@ pub(crate) async fn download_with_progress(
                 if handle.is_finished() {
                     break;
                 }
-                thread::sleep(Duration::from_millis(200));
+                thread::sleep(Duration::from_millis(100));
             }
         })
     };

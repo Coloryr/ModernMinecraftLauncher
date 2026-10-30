@@ -80,3 +80,42 @@ export function formatDate(date: string): string {
 export function memoryLabel(mib: number): string {
   return mib % 1024 === 0 ? `${mib / 1024} GB` : `${mib} MB`;
 }
+
+/**
+ * 把压缩包内的完整路径压成一行，保留末尾文件名
+ *
+ * - `path`: 压缩包内路径
+ * - `max`: 最多显示多少字符，超出时优先保留上级目录与扩展名
+ *
+ * # 返回值
+ *
+ * 形如 `.../父目录/文件名`；文件名本身过长时缩短中段
+ */
+export function shortPath(path: string, max = 64): string {
+  const normalized = path.replace(/\\/g, "/");
+  if (normalized.length <= max) return normalized;
+
+  const parts = normalized.split("/").filter(Boolean);
+  const file = parts.pop() ?? normalized;
+  const parent = parts.pop();
+  const dot = file.lastIndexOf(".");
+  const ext = dot > 0 && dot < file.length - 1 ? file.slice(dot) : "";
+  const base = ext ? file.slice(0, dot) : file;
+
+  /** 把文件名缩成 head...tail */
+  const shortenBase = (budget: number) => {
+    if (base.length <= budget) return base;
+    const head = Math.max(1, Math.ceil(budget / 2));
+    return `${base.slice(0, head)}...${base.slice(-(budget - head))}`;
+  };
+
+  const prefix = parent ? `${parent}/` : "";
+  const budget = max - 4 - prefix.length - ext.length - 3;
+  if (budget >= 8) {
+    return `.../${prefix}${shortenBase(budget)}${ext}`;
+  }
+
+  // 上级目录太长：只保留文件名，仍然缩短中段并保留扩展名
+  const onlyFileBudget = Math.max(8, max - 4 - ext.length - 3);
+  return `.../${shortenBase(onlyFileBudget)}${ext}`;
+}

@@ -10,6 +10,8 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock, Mutex, RwLock};
+use std::thread;
+use std::time::Duration;
 
 use mml_game::gui_hook::{AddModPackGui, AddModPackState, IAddModPackGui};
 use tauri::{AppHandle, Emitter, Manager};
@@ -222,9 +224,12 @@ pub(crate) fn register_task(
     }
     emit_add_modpack_status(app, build_status(app));
 
+    let dirty = Arc::new(AtomicBool::new(false));
+    spawn_progress_emitter(task.clone(), app.clone(), dirty.clone());
     let pack_gui: AddModPackGui = Some(Arc::new(TaskPackGui {
         task: task.clone(),
         app: app.clone(),
+        dirty,
     }));
     Ok(RegisteredTask {
         task,
@@ -306,19 +311,51 @@ pub(super) struct TaskPackGui {
     task: Arc<ModPackTask>,
     /// 应用句柄，广播总览事件用
     app: AppHandle,
+    /// 子进度有更新、还没广播：后台每秒 10 次合并发出
+    dirty: Arc<AtomicBool>,
 }
 
 impl TaskPackGui {
-    /// 更新任务进度并广播总览事件
+    /// 就地改写进度快照
     ///
-    /// - `f`: 就地改写进度快照的闭包
+    /// - `f`: 改写闭包
     fn update(&self, f: impl FnOnce(&mut ModPackProgress)) {
-        {
-            let mut progress = self.task.progress.lock().unwrap();
-            f(&mut progress);
-        }
+        let mut progress = self.task.progress.lock().unwrap();
+        f(&mut progress);
+    }
+
+    /// 立即广播；阶段切换必须马上让界面看到
+    fn emit_now(&self) {
+        self.dirty.store(false, Ordering::Release);
         emit_add_modpack_status(&self.app, build_status(&self.app));
     }
+
+    /// 标记子进度有更新，由后台线程按 100ms 合并广播
+    fn mark_dirty(&self) {
+        self.dirty.store(true, Ordering::Release);
+    }
+}
+
+/// 子进度合并广播：每 100ms 最多发一次，避免逐文件刷事件
+///
+/// - `task`: 目标任务，终态后线程退出
+/// - `app`: 广播句柄
+/// - `dirty`: 子进度是否有未发更新
+fn spawn_progress_emitter(task: Arc<ModPackTask>, app: AppHandle, dirty: Arc<AtomicBool>) {
+    thread::spawn(move || {
+        loop {
+            thread::sleep(Duration::from_millis(100));
+            if dirty.swap(false, Ordering::AcqRel) {
+                emit_add_modpack_status(&app, build_status(&app));
+            }
+            if task.done.load(Ordering::Acquire)
+                || task.failed.load(Ordering::Acquire)
+                || task.cancelled.load(Ordering::Acquire)
+            {
+                break;
+            }
+        }
+    });
 }
 
 impl IAddModPackGui for TaskPackGui {
@@ -327,6 +364,7 @@ impl IAddModPackGui for TaskPackGui {
     /// - `state`: 内核安装状态
     fn set_state(&self, state: AddModPackState) {
         self.update(|progress| progress.state = pack_state_id(state).into());
+        self.emit_now();
     }
 
     /// 设置主进度
@@ -338,6 +376,7 @@ impl IAddModPackGui for TaskPackGui {
             progress.now = value as u32;
             progress.total = all.unwrap_or(0) as u32;
         });
+        self.emit_now();
     }
 
     /// 设置子任务说明文字
@@ -345,6 +384,7 @@ impl IAddModPackGui for TaskPackGui {
     /// - `text`: 说明文字，`None` 表示当前没有子任务
     fn set_sub_text(&self, text: Option<String>) {
         self.update(|progress| progress.sub_text = text);
+        self.mark_dirty();
     }
 
     /// 设置子任务进度
@@ -356,5 +396,6 @@ impl IAddModPackGui for TaskPackGui {
             progress.sub_now = value as u32;
             progress.sub_total = all.unwrap_or(0) as u32;
         });
+        self.mark_dirty();
     }
 }

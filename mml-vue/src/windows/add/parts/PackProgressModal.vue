@@ -3,6 +3,7 @@
 // 两级进度：整体是已处理条目 / 总条目，加上当前子任务，如某个文件的解压或下载
 import { computed } from "vue";
 import { t } from "../../../lib/i18n";
+import { shortPath } from "../../../lib/format";
 import BaseModal from "../../../components/ui/BaseModal.vue";
 import type { PackProgressDto } from "../../../lib/bindings";
 
@@ -41,7 +42,7 @@ const subPercent = computed(() =>
       <div v-if="progress.total" class="install-num">{{ progress.now }} / {{ progress.total }}</div>
 
       <template v-if="progress.subText || progress.subTotal">
-        <div class="install-sub">{{ progress.subText || "" }}</div>
+        <div class="install-sub" v-tip="progress.subText || ''">{{ shortPath(progress.subText || "") }}</div>
         <div class="progress-track sub">
           <div class="progress-fill" :style="{ width: subPercent + '%' }" />
         </div>
@@ -91,6 +92,8 @@ const subPercent = computed(() =>
   font-size: 12px;
   color: var(--text-dim);
   margin-top: 4px;
-  word-break: break-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

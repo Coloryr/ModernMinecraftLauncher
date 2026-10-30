@@ -5,8 +5,9 @@
 //! `settings`，免得组键随文件名变掉，见 AGENTS.md §4。
 
 use std::path::Path;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use mml_base::archives::IBaseArchiveGui;
 use mml_jvms::{JavaInfoObj, java_helper};
@@ -80,6 +81,12 @@ pub(super) struct JavaArchiveGui {
     app: AppHandle,
     /// `start` 下发的总数，`update` 时回读
     total: AtomicUsize,
+    /// 当前文件名；更新事件被节流时仍保留最新值
+    last_name: Mutex<Option<String>>,
+    /// 当前已完成条目数；`done` 用它补发最终进度
+    last_current: AtomicUsize,
+    /// 上一次进度事件的时间；最多 100ms 发一次
+    last_emit: Mutex<Instant>,
 }
 
 /// 从压缩包解包导入 Java，支持 zip / 7z / tar.gz 等
@@ -207,6 +214,9 @@ impl JavaArchiveGui {
         Arc::new(Self {
             app: app.clone(),
             total: AtomicUsize::new(0),
+            last_name: Mutex::new(None),
+            last_current: AtomicUsize::new(0),
+            last_emit: Mutex::new(Instant::now()),
         })
     }
 }
@@ -217,6 +227,9 @@ impl IBaseArchiveGui for JavaArchiveGui {
     /// - `total`: 压缩包内待解包的条目总数
     fn start(&self, total: usize) {
         self.total.store(total, Ordering::Relaxed);
+        self.last_current.store(0, Ordering::Relaxed);
+        *self.last_name.lock().unwrap() = None;
+        *self.last_emit.lock().unwrap() = Instant::now();
         emit_settings_java_progress(
             &self.app,
             JavaImportProgressDto {
@@ -233,19 +246,39 @@ impl IBaseArchiveGui for JavaArchiveGui {
     /// - `filename`: 当前正在解包的条目名；没有名字时为 `None`
     /// - `current`: 已完成的条目数
     fn update(&self, filename: Option<String>, current: usize) {
+        *self.last_name.lock().unwrap() = filename;
+        self.last_current.store(current, Ordering::Relaxed);
+
+        let mut last = self.last_emit.lock().unwrap();
+        if last.elapsed().as_millis() < 100 {
+            return;
+        }
+        *last = Instant::now();
+        drop(last);
+
         emit_settings_java_progress(
             &self.app,
             JavaImportProgressDto {
                 state: "extract".to_string(),
                 now: current as u32,
                 total: self.total.load(Ordering::Relaxed) as u32,
-                sub_text: filename,
+                sub_text: self.last_name.lock().unwrap().clone(),
             },
         );
     }
 
-    /// 解包结束：命令返回即导入完成，这里不额外发事件
-    fn done(&self) {}
+    /// 解包结束：补发最终进度，避免最后一个被节流后停在 99%
+    fn done(&self) {
+        emit_settings_java_progress(
+            &self.app,
+            JavaImportProgressDto {
+                state: "extract".to_string(),
+                now: self.last_current.load(Ordering::Relaxed) as u32,
+                total: self.total.load(Ordering::Relaxed) as u32,
+                sub_text: self.last_name.lock().unwrap().clone(),
+            },
+        );
+    }
 
     /// 导入场景无需询问，非法字符文件名直接同意替换
     ///

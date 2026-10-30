@@ -1,1 +1,1 @@
-- mml-gui里面的thread::spawn，全部改成tokio::spawn，然后完全异步
+- mml-gui里面的thread::spawn，除了循环任务或者可能的地方，全部改成tokio::spawn，然后完全异步
