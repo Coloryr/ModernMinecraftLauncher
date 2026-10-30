@@ -158,6 +158,16 @@ pub(super) fn export_pack(
     if home_on {
         files.push(("mml/home".into(), home));
     }
+    // 背景图是渲染好的缓存文件；界面配置里的 bg_source 可能指向导出者本机路径，
+    // 只带这份图就能在导入端显示
+    if options.bg
+        && let Some(dir) = gui_config::dir()
+    {
+        let bg = dir.join("bg_image");
+        if bg.is_file() {
+            files.push(("mml/bg_image".into(), bg));
+        }
+    }
     // 客户端设置锁也在界面配置里：不带上，玩家导入后就变成未锁定
     if options.gui_config
         && let Some(lock) = crate::client_lock::read_bytes()

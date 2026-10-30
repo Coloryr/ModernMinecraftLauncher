@@ -288,6 +288,27 @@ onUnmounted(() => {
 
 <template>
   <component :is="shell" v-bind="shellProps" @close="requestClose">
+    <!-- 暂停 / 继续 / 停止：独立窗口时收进标题栏，改用图标按钮 -->
+    <template v-if="multiWindow" #head-right>
+      <BaseButton size="sm" :variant="allPaused ? 'accent' : 'ghost'" class="icon-btn-head" :disabled="!hasTasks"
+        v-tip="allPaused ? t('winDownload.resume') : t('winDownload.pause')"
+        :aria-label="allPaused ? t('winDownload.resume') : t('winDownload.pause')"
+        @click="allPaused ? resumeAll() : pauseAll()">
+        <svg v-if="allPaused" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" stroke="none">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+        <svg v-else viewBox="0 0 24 24" width="15" height="15" fill="currentColor" stroke="none">
+          <path d="M7 5h4v14H7zM13 5h4v14h-4z" />
+        </svg>
+      </BaseButton>
+      <BaseButton size="sm" variant="ghost" class="icon-btn-head" :disabled="!hasTasks"
+        v-tip="t('winDownload.stop')" :aria-label="t('winDownload.stop')" @click="requestStop">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="none">
+          <rect x="5" y="5" width="14" height="14" rx="2" />
+        </svg>
+      </BaseButton>
+    </template>
+
     <div class="download-body" :class="{ fill: !multiWindow }">
       <!-- 总览：任务总量 / 文件数 / 大小 / 总体速度 + 总体进度条 -->
       <div class="overview">
@@ -305,8 +326,8 @@ onUnmounted(() => {
               {{ formatSpeed(status.speed) }}
             </span>
           </span>
-          <!-- 全局控制：暂停 / 继续 / 停止（作用于所有下载任务） -->
-          <span class="ov-actions">
+          <!-- 全局控制：独立窗口时在标题栏上；单窗口的弹窗没有标题栏槽，留在这里 -->
+          <span v-if="!multiWindow" class="ov-actions">
             <BaseButton v-if="!allPaused" size="sm" :disabled="!hasTasks" @click="pauseAll">
               {{ t("winDownload.pause") }}
             </BaseButton>

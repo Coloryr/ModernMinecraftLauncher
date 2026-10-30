@@ -249,6 +249,9 @@ function formatLabel(item: PackItemDto): string {
           <span v-if="item.fail" class="badge badge-red">{{ t("resource.modFail") }}</span>
           <span v-if="item.enable" class="badge">{{ t("resource.packOn") }}</span>
         </template>
+        <template #name>
+          <FormattedText :text="item.file" />
+        </template>
         <!--
           描述要过格式码，整合包作者常用 `§a` 这类上色；包格式那句不要 ——
           所以两段分开渲染、中间自己接分隔符，不能先拼成一个字符串再整体格式化

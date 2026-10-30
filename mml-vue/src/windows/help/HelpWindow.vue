@@ -7,9 +7,12 @@
 // （见 ./thirdParty.ts 的说明）。
 import { computed, onMounted, ref } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
+import BaseButton from "../../components/ui/BaseButton.vue";
 import { t, tErr, locale } from "../../lib/i18n";
 import { api } from "../../lib/api";
 import { commands } from "../../lib/bindings";
+import { copyText } from "../../lib/clipboard";
+import { showToast } from "../../lib/toast";
 import { appVersion, buildBadgeKey, buildChannel, isTestBuild, loadBuildInfo } from "../../lib/buildInfo";
 // 与 src-tauri/icons 那套是同一个源（design/icon/f-blend.svg）；换图标时两处一起换
 import appIcon from "../../assets/app-icon.svg";
@@ -132,6 +135,17 @@ const licenseSections = computed<LicenseSection[]>(() => [
 function openUrl(url: string) {
   api.openUrl(url).catch(() => {});
 }
+
+/** 项目仓库与问题反馈地址 */
+const REPO_URL = "https://github.com/Coloryr/ModernMinecraftLauncher";
+const ISSUES_URL = `${REPO_URL}/issues`;
+/** QQ 交流群号 */
+const QQ_GROUP = "571239090";
+
+/** 复制 QQ 群号 */
+async function copyQq() {
+  showToast((await copyText(QQ_GROUP)) ? t("winHelp.qqCopied") : t("account.copyFail"));
+}
 </script>
 
 <template>
@@ -182,6 +196,17 @@ function openUrl(url: string) {
     <div class="footer-note">
       <p>{{ t("winHelp.stillStuck") }}</p>
       <p>{{ t("winHelp.report") }}</p>
+      <div class="footer-actions">
+        <BaseButton size="sm" @click="openUrl(REPO_URL)">{{ t("winHelp.repo") }}</BaseButton>
+        <BaseButton size="sm" @click="openUrl(ISSUES_URL)">{{ t("winHelp.feedback") }}</BaseButton>
+        <span class="footer-qq">
+          {{ t("winHelp.qqGroup", { n: QQ_GROUP }) }}
+          <button class="qq-copy" v-tip="t('winHelp.qqCopy')" :aria-label="t('winHelp.qqCopy')"
+            @click="copyQq">
+            {{ t("winHelp.qqCopy") }}
+          </button>
+        </span>
+      </div>
     </div>
 
     <!-- 开源许可：只给上游链接，许可全文不随安装包分发，见 ./thirdParty.ts -->
@@ -398,6 +423,40 @@ function openUrl(url: string) {
   font-size: 12.5px;
   color: var(--text-dim);
   line-height: 1.8;
+}
+
+.footer-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.footer-qq {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.qq-copy {
+  height: var(--ctl-h);
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--ctl-radius);
+  background: var(--bg-raised);
+  color: var(--accent);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.qq-copy:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 /* ---------- 开源许可 ---------- */

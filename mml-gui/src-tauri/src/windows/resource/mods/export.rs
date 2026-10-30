@@ -95,6 +95,28 @@ pub async fn resource_export_mods(uuid: String, config: ModExportDto) -> Result<
     .map_err(|e| e.to_string())?
 }
 
+/// 把一段文本写到用户选定的文件，供依赖检测结果导出到文件
+///
+/// - `file`: 用户选择的输出路径
+/// - `content`: 要写入的文本
+///
+/// # 返回值
+///
+/// 写入成功返回 `Ok(())`；路径无效或写入失败返回错误文案
+#[gui_macros::ipc_group("resource")]
+#[gui_macros::command]
+pub async fn resource_export_text(file: String, content: String) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || {
+        crate::windows::export_file::write(Path::new(&file), |output| {
+            output
+                .write_all(content.as_bytes())
+                .map_err(|e| e.to_string())
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// 把字段值转成展示文本：数组按逗号拼接，null 为空串
 fn text_of(value: &Value) -> String {
     match value {

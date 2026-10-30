@@ -536,11 +536,37 @@ const {
   loadGroups,
 });
 
-/** 实例点击：多选模式切换勾选，普通模式单选（拖拽结束后忽略误触点击） */
-function onInstClick(inst: InstanceInfoDto) {
+/** Shift 连选的锚点：上一次点中的实例 uuid */
+let instAnchor: string | null = null;
+
+/** 当前视图下实例的显示顺序，Shift 连选按它取区间 */
+function visibleInstanceOrder(): InstanceInfoDto[] {
+  return effectiveMode.value === "group"
+    ? filteredGroups.value.flatMap((group) => group.items)
+    : filteredInstances.value;
+}
+
+/** 实例点击：多选模式切换勾选（支持 Shift 连选），普通模式单选（拖拽结束后忽略误触点击） */
+function onInstClick(inst: InstanceInfoDto, event?: MouseEvent) {
   if (consumeSuppressClick()) return;
-  if (multiSelect.value) toggleSelect(inst);
-  else select(inst);
+  if (!multiSelect.value) {
+    select(inst);
+    instAnchor = inst.uuid;
+    return;
+  }
+  const list = visibleInstanceOrder();
+  const index = list.findIndex((item) => item.uuid === inst.uuid);
+  const anchor = instAnchor ? list.findIndex((item) => item.uuid === instAnchor) : -1;
+  if (event?.shiftKey && anchor >= 0 && index >= 0) {
+    const from = Math.min(anchor, index);
+    const to = Math.max(anchor, index);
+    const next = new Set(selectedIds.value);
+    for (let i = from; i <= to; i += 1) next.add(list[i].uuid);
+    selectedIds.value = next;
+  } else {
+    toggleSelect(inst);
+  }
+  instAnchor = inst.uuid;
 }
 
 // ----- 自定义右键菜单 -----
@@ -785,6 +811,9 @@ function onInstMenuAction(id: InstMenuAction) {
     case "viewMods":
       // 资源管理窗口是"一个实例一个"的窗口族；带上类别，进去直接停在模组页
       if (target) openWindow("resource", { uuid: target.uuid, category: "mods" });
+      break;
+    case "manageResource":
+      if (target) openWindow("resource", { uuid: target.uuid });
       break;
     case "changeIcon":
       if (target) void pickIconFile(target);
@@ -2051,17 +2080,25 @@ onMounted(async () => {
                 </BaseButton>
                 <div class="launch-sub-actions">
                   <!-- 实例设置：含启动参数（与分组模式下的设置面板一致） -->
-                  <BaseButton size="sm" :disabled="!selected" @click="toggleSettings">
-                    <GlyphIcon name="gear" :size="13" :weight="1.8" /> {{ t("detail.settings") }}
-                  </BaseButton>
-                  <!-- 实例日志：主页面不展示日志内容，直接开独立日志窗口 -->
-                  <BaseButton size="sm" :disabled="!selected" @click="openLogWindow">
-                    <GlyphIcon name="log" :size="13" :weight="1.8" /> {{ t("detail.logs") }}
+                  <BaseButton size="sm" class="icon-btn-head" v-tip="t('detail.settings')"
+                    :aria-label="t('detail.settings')" :disabled="!selected" @click="toggleSettings">
+                    <GlyphIcon name="gear" :size="15" :weight="1.8" />
                   </BaseButton>
                   <!-- 资源管理：分组 / 平铺模式的右侧详情面板里有这个入口，而列表模式没有详情面板，
-                     这里不补一个就进不去资源管理窗口；添加资源在资源窗口里有自己的入口 -->
-                  <BaseButton size="sm" :disabled="!selected" @click="onAction('manageResource')">
-                    <GlyphIcon name="package" :size="13" :weight="1.8" /> {{ t("actions.manageResource") }}
+                       这里不补一个就进不去资源管理窗口 -->
+                  <BaseButton size="sm" class="icon-btn-head" v-tip="t('actions.manageResource')"
+                    :aria-label="t('actions.manageResource')" :disabled="!selected" @click="onAction('manageResource')">
+                    <GlyphIcon name="package" :size="15" :weight="1.8" />
+                  </BaseButton>
+                  <!-- 实例日志：主页面不展示日志内容，直接开独立日志窗口 -->
+                  <BaseButton size="sm" class="icon-btn-head" v-tip="t('detail.logs')"
+                    :aria-label="t('detail.logs')" :disabled="!selected" @click="openLogWindow">
+                    <GlyphIcon name="log" :size="15" :weight="1.8" />
+                  </BaseButton>
+                  <!-- 导出实例：与右侧详情面板里的导出按钮同一个动作 -->
+                  <BaseButton size="sm" class="icon-btn-head" v-tip="t('actions.export')"
+                    :aria-label="t('actions.export')" :disabled="!selected" @click="openExportWindow">
+                    <GlyphIcon name="export" :size="15" :weight="1.8" />
                   </BaseButton>
                 </div>
               </div>

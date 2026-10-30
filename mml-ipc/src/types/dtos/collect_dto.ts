@@ -16,5 +16,6 @@ export type CollectItemDto = {
 export type CollectDataDto = {
   items: CollectItemDto[],
   groups: Record<string, string[]>,
+  groupOrder: string[],
 };
 

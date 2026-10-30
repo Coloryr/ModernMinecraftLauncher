@@ -19,6 +19,7 @@ import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import { useInstanceChange } from "../../composables/useInstanceChange";
 import { useCollectDrag } from "../../composables/useCollectDrag";
 import { api, onCollectChange } from "../../lib/api";
+import { commands } from "../../lib/bindings";
 import { t, tErr } from "../../lib/i18n";
 import { FIXED_GROUP_TYPES, isDefaultGroupName, typeGroupName } from "../../lib/collectGroups";
 import { formatMinute } from "../../lib/format";
@@ -52,6 +53,8 @@ let unlistenCollect: (() => void) | null = null;
 let gone = false;
 
 const groupNames = computed(() => Object.keys(groups.value).sort());
+/** 分组显示顺序，来自后端；缺失的分组按默认顺序补在末尾 */
+const groupOrder = ref<string[]>([]);
 
 /** uuid → 它所在的具名分组名（未归组的没有条目） */
 const groupOfUuid = computed(() => {
@@ -94,6 +97,7 @@ function itemsOfGroup(name: string): CollectItemDto[] {
  * 前四项是**默认分组**（整合包 / 模组 / 资源包 / 光影包）：按资源类型自动归组，
  * 没有收藏时也要留在栏里（0 项），否则用户会以为那一类收藏丢了。
  * 数据里其余的默认分组（存档 / 数据包）接在后面，最后是用户自建分组（按名字排序）。
+ * 实际顺序以用户拖出来的 `groupOrder` 为准，没记录过的按上面的默认顺序补在后面。
  */
 const railItems = computed<Array<{ id: string; label: string; count: number; custom: boolean }>>(() => {
   const fixed = FIXED_GROUP_TYPES.map((type) => typeGroupName(type)).filter((n): n is string => !!n);
@@ -104,13 +108,29 @@ const railItems = computed<Array<{ id: string; label: string; count: number; cus
     .filter((name) => !isDefaultGroupName(name))
     .sort((a, b) => a.localeCompare(b));
 
-  return [...fixed, ...restDefaults, ...custom].map((name) => ({
+  const fallback = [...fixed, ...restDefaults, ...custom];
+  const ordered = [
+    ...groupOrder.value.filter((name) => fallback.includes(name)),
+    ...fallback.filter((name) => !groupOrder.value.includes(name)),
+  ];
+
+  return ordered.map((name) => ({
     id: name,
     label: name,
     count: itemsOfGroup(name).length,
     custom: !isDefaultGroupName(name),
   }));
 });
+
+/** 拖完分组顺序：先就地更新左栏，再交给后端落盘 */
+async function onGroupReorder(order: string[]) {
+  groupOrder.value = order;
+  try {
+    await commands.collect.setGroupOrder(order);
+  } catch (e) {
+    showToast(tErr(e));
+  }
+}
 
 /** 当前选中分组里的项；「全部」就是整份搜索结果 */
 const activeItems = computed(() =>
@@ -131,6 +151,7 @@ async function reload() {
   const data = await api.collectGetData();
   items.value = data.items;
   groups.value = data.groups;
+  groupOrder.value = data.groupOrder;
   void backfillGroups();
   // 丢掉已不存在的勾选
   const alive = new Set(data.items.map((i) => i.uuid));
@@ -921,8 +942,9 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
       <!-- 左栏：全部 + 默认分组 + 自建分组，与方块窗口同一个分类栏 -->
       <div class="collect-main">
         <CategoryRail flush :all-label="t('collect.all')" :all-count="shownCount" :items="railItems"
-          :active="activeGroup" :drop-key="dropGroup" :new-label="t('collect.addGroup')"
-          @pick="activeGroup = $event" @group-menu="openGroupMenu" @new-group="showAddGroup = true" />
+          :active="activeGroup" :drop-key="dropGroup" :new-label="t('collect.addGroup')" sortable
+          @pick="activeGroup = $event" @reorder="onGroupReorder" @group-menu="openGroupMenu"
+          @new-group="showAddGroup = true" />
 
         <div class="collect-content">
           <!-- 搜索：按收藏项名字过滤，分组计数跟着变 -->
@@ -977,8 +999,6 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
                   </button>
                 </span>
               </div>
-            </div>
-
             </div>
           </div>
 

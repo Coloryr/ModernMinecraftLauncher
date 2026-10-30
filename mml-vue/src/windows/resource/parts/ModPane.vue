@@ -47,6 +47,7 @@ import {
   setModOnline,
 } from "../../../lib/api";
 import { copyText } from "../../../lib/clipboard";
+import { commands } from "../../../lib/bindings";
 import { useModDeps } from "../composables/useModDeps";
 import { provideListScroll } from "../../../composables/useVirtualRows";
 import { useReorderDrag } from "../composables/useReorderDrag";
@@ -618,6 +619,22 @@ function depReportText(): string {
 async function exportDepReport() {
   const ok = await copyText(depReportText());
   showToast(ok ? t("resource.copied") : t("resource.copyFail"));
+}
+
+/** 把依赖检测结果导出成文本文件 */
+async function exportDepFile() {
+  try {
+    const { save } = await import("@tauri-apps/plugin-dialog");
+    const file = await save({
+      defaultPath: "dependencies.txt",
+      filters: [{ name: "TXT", extensions: ["txt"] }],
+    });
+    if (!file) return;
+    await commands.resource.exportText(file, depReportText());
+    showToast(t("resource.exportedFile", { file }));
+  } catch (e) {
+    showToast(tErr(e));
+  }
 }
 
 /**
@@ -2220,6 +2237,10 @@ onBeforeUnmount(() => {
       <BaseButton @click="exportDepReport">
         <GlyphIcon name="document" :size="14" />
         {{ t("resource.exportClipboard") }}
+      </BaseButton>
+      <BaseButton @click="exportDepFile">
+        <GlyphIcon name="document" :size="14" />
+        {{ t("resource.exportFile") }}
       </BaseButton>
       <BaseButton variant="accent" @click="depOpen = false">{{ t("actions.confirm") }}</BaseButton>
     </div>

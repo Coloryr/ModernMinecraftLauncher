@@ -40,7 +40,7 @@ const props = defineProps<{
   /** 实例行或分组标题按下，交给父组件起拖拽 */
   onDragPointerDown: (e: PointerEvent, cand: DragCandidate) => void;
   /** 点击实例行 */
-  onInstClick: (inst: InstanceInfoDto) => void;
+  onInstClick: (inst: InstanceInfoDto, event?: MouseEvent) => void;
   /** 右键实例行 */
   onInstContext: (e: MouseEvent, inst: InstanceInfoDto) => void;
   /** 右键分组标题 */
@@ -147,7 +147,7 @@ function isGroupOpen(id: string) {
                     'multi-checked': multiSelect && selectedIds.has(inst.uuid),
                     running: inst.running,
                   }" @pointerdown="onDragPointerDown($event, { kind: 'instance', instance: inst })"
-                    @click="onInstClick(inst)" @contextmenu.prevent="onInstContext($event, inst)">
+                    @click="onInstClick(inst, $event)" @contextmenu.prevent="onInstContext($event, inst)">
                     <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(inst.uuid) }">
                       <GlyphIcon name="check" :size="12" :weight="2.6" />
                     </span>
@@ -205,7 +205,7 @@ function isGroupOpen(id: string) {
       <div v-for="inst in filteredInstances" :key="inst.uuid" class="tile" :class="{
         active: selected?.uuid === inst.uuid,
         'multi-checked': multiSelect && selectedIds.has(inst.uuid),
-      }" @click="onInstClick(inst)" @contextmenu.prevent="onInstContext($event, inst)">
+      }" @click="onInstClick(inst, $event)" @contextmenu.prevent="onInstContext($event, inst)">
         <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(inst.uuid) }">
           <GlyphIcon name="check" :size="12" :weight="2.6" />
         </span>

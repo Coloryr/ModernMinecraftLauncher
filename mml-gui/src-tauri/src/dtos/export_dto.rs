@@ -71,6 +71,8 @@ pub struct ServerPackOptionsDto {
     pub css: bool,
     /// 是否导出自定义主页面 home
     pub home: bool,
+    /// 是否导出启动器背景图 `bg_image`
+    pub bg: bool,
 }
 
 impl Default for ServerPackOptionsDto {
@@ -82,6 +84,7 @@ impl Default for ServerPackOptionsDto {
             page: false,
             css: false,
             home: false,
+            bg: false,
         }
     }
 }

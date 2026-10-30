@@ -31,6 +31,7 @@ export type ServerPackOptionsDto = {
   page: boolean,
   css: boolean,
   home: boolean,
+  bg: boolean,
 };
 
 export type ExportConfigDto = {

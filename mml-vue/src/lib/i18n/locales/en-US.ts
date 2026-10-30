@@ -118,6 +118,7 @@ export default {
   "winExport.serverConfig": "Configuration",
   "winExport.serverConfigCore": "Launcher config",
   "winExport.serverConfigGui": "Interface config",
+  "winExport.serverBg": "Background image",
   "winExport.serverCustom": "Custom content",
   "winExport.serverCustomPage": "Custom theme",
   "winExport.serverCustomCss": "Custom styles",
@@ -778,6 +779,8 @@ export default {
   "resource.depRequired": "requires {range}",
   "resource.depBy": "required by {list}",
   "resource.exportClipboard": "Export to clipboard",
+  "resource.exportFile": "Export to file",
+  "resource.exportedFile": "Exported to {file}",
   "resource.copied": "Copied to clipboard",
   "resource.copyFail": "Copy failed",
   // Dependency graph and "disable dependents too"
@@ -1864,6 +1867,11 @@ export default {
   // Help window
   "winHelp.stillStuck": "Still stuck?",
   "winHelp.report": "Please provide the game logs (logs directory) and launcher version, then report at GitHub Issues.",
+  "winHelp.repo": "Repository",
+  "winHelp.feedback": "Report an issue",
+  "winHelp.qqGroup": "QQ group {n}",
+  "winHelp.qqCopy": "Copy group number",
+  "winHelp.qqCopied": "Group number copied",
   "winHelp.version": "Launcher version",
   "winHelp.author": "Author",
   "winHelp.authorName": "Coloryr",

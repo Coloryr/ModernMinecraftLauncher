@@ -119,34 +119,40 @@ watchEffect(async () => {
       </button>
     </template>
 
-    <!-- 实例菜单：启动 / 看模组 / 文件夹 / 日志 / 图标 / 导出 / 复制 / 改名 / 改分组，
-         删除单独隔开。
-         （「修改实例配置」已去掉：右侧面板本来就有设置区） -->
+    <!-- 实例菜单：按功能归类 —— 启动 / 管理 / 组织 / 分享 / 删除 -->
     <template v-else-if="menu.kind === 'instance'">
       <button class="ctx-item" @click="emit('inst-action', 'launch')">
         {{ t("launch.play") }}
       </button>
+      <div class="ctx-sep"></div>
       <button class="ctx-item" @click="emit('inst-action', 'viewMods')">
         {{ t("actions.viewMods") }}
       </button>
-      <button class="ctx-item" @click="emit('inst-action', 'openFolder')">
-        {{ t("actions.openFolder") }}
+      <button class="ctx-item" @click="emit('inst-action', 'manageResource')">
+        {{ t("actions.manageResource") }}
       </button>
       <button class="ctx-item" @click="emit('inst-action', 'viewLog')">
         {{ t("actions.viewLog") }}
       </button>
+      <button class="ctx-item" @click="emit('inst-action', 'openFolder')">
+        {{ t("actions.openFolder") }}
+      </button>
+      <div class="ctx-sep"></div>
       <button class="ctx-item" @click="emit('inst-action', 'changeIcon')">
         {{ t("actions.changeIcon") }}
       </button>
+      <button class="ctx-item" @click="emit('inst-action', 'rename')">
+        {{ t("actions.rename") }}
+      </button>
+      <button class="ctx-item" :disabled="!canChangeGroup" @click="emit('inst-action', 'moveGroup')">
+        {{ t("multi.moveGroup") }}
+      </button>
+      <div class="ctx-sep"></div>
       <button class="ctx-item" @click="emit('inst-action', 'export')">
         {{ t("actions.export") }}
       </button>
       <button class="ctx-item" @click="emit('inst-action', 'serverInstance')">
         {{ t("actions.serverInstance") }}
-      </button>
-      <!-- 云存档同步：功能还没做，点了只提示「制作中」 -->
-      <button class="ctx-item" @click="emit('inst-action', 'cloudSave')">
-        {{ t("actions.cloudSync") }}
       </button>
       <button class="ctx-item" @click="emit('inst-action', 'shortcut')">
         {{ t("actions.shortcut") }}
@@ -154,11 +160,9 @@ watchEffect(async () => {
       <button class="ctx-item" @click="emit('inst-action', 'copy')">
         {{ t("actions.copyInstance") }}
       </button>
-      <button class="ctx-item" @click="emit('inst-action', 'rename')">
-        {{ t("actions.rename") }}
-      </button>
-      <button class="ctx-item" :disabled="!canChangeGroup" @click="emit('inst-action', 'moveGroup')">
-        {{ t("multi.moveGroup") }}
+      <!-- 云存档同步：功能还没做，点了只提示「制作中」 -->
+      <button class="ctx-item" @click="emit('inst-action', 'cloudSave')">
+        {{ t("actions.cloudSync") }}
       </button>
       <div class="ctx-sep"></div>
       <button class="ctx-item danger" @click="emit('inst-action', 'delete')">

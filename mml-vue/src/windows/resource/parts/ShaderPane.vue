@@ -9,6 +9,7 @@ import { deleteShaderpack, setShader } from "../../../lib/api";
 import ContentHead from "./ContentHead.vue";
 import ListSkeleton from "./ListSkeleton.vue";
 import ResourceRow from "./ResourceRow.vue";
+import FormattedText from "../../../components/ui/FormattedText.vue";
 import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
 import VirtualList from "./VirtualList.vue";
 import { RESOURCE_ROW_GAP } from "../../../composables/useVirtualRows";
@@ -192,7 +193,13 @@ function sub(item: ShaderItemDto): string {
         <template #badges>
           <span v-if="item.selected" class="badge">{{ t("resource.shaderOn") }}</span>
         </template>
-        <template #sub>{{ sub(item) }}</template>
+        <!-- 光影包注释与文件名都可能带 `§` 格式码，统一过显示期解析 -->
+        <template #name>
+          <FormattedText :text="item.name || item.file" />
+        </template>
+        <template #sub>
+          <FormattedText :text="sub(item)" />
+        </template>
       </ResourceRow>
       <div v-if="!shaders.length" class="empty-tip">{{ t("resource.empty") }}</div>
     </template>

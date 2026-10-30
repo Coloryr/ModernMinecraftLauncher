@@ -74,6 +74,7 @@ const serverOptions = reactive({
   page: false,
   css: false,
   home: false,
+  bg: false,
 });
 /** 已安装的整页主题 / 自定义样式 */
 const customUi = ref<CustomUiInfoDto | null>(null);
@@ -107,6 +108,7 @@ watch(
       serverOptions.page = false;
       serverOptions.css = false;
       serverOptions.home = false;
+      serverOptions.bg = false;
     }
   },
 );
@@ -687,6 +689,7 @@ async function startExport(confirmed = false) {
       page: serverOptions.page,
       css: serverOptions.css,
       home: serverOptions.home,
+      bg: serverOptions.bg,
     },
   };
   const warnCustomLoader = customLoaderLost.value;
@@ -880,6 +883,10 @@ onBeforeUnmount(() => {
               <input v-model="serverOptions.guiConfig" type="checkbox" :disabled="busy" />
               {{ t("winExport.serverConfigGui") }}
             </label>
+            <label class="check-row" :class="{ 'is-disabled': !serverOptions.guiConfig }">
+              <input v-model="serverOptions.bg" type="checkbox" :disabled="busy || !serverOptions.guiConfig" />
+              {{ t("winExport.serverBg") }}
+            </label>
           </section>
 
           <!-- 自定义内容：依赖界面配置，没导入的置灰 -->
@@ -890,21 +897,23 @@ onBeforeUnmount(() => {
                 {{ serverOptions.guiConfig ? t("winExport.serverCustomHint") : t("winExport.serverCustomNeedsGui") }}
               </span>
             </header>
-            <label class="check-row" :class="{ 'is-disabled': !serverOptions.guiConfig || !customUi?.pageInstalled }">
-              <input v-model="serverOptions.page" type="checkbox"
-                :disabled="busy || !serverOptions.guiConfig || !customUi?.pageInstalled" />
-              {{ t("winExport.serverCustomPage") }}
-            </label>
-            <label class="check-row" :class="{ 'is-disabled': !serverOptions.guiConfig || !customUi?.css.length }">
-              <input v-model="serverOptions.css" type="checkbox"
-                :disabled="busy || !serverOptions.guiConfig || !customUi?.css.length" />
-              {{ t("winExport.serverCustomCss") }}
-            </label>
-            <label class="check-row" :class="{ 'is-disabled': !serverOptions.guiConfig || !customHome?.installed }">
-              <input v-model="serverOptions.home" type="checkbox"
-                :disabled="busy || !serverOptions.guiConfig || !customHome?.installed" />
-              {{ t("winExport.serverCustomHome") }}
-            </label>
+            <div class="check-row-group">
+              <label class="check-row" :class="{ 'is-disabled': !serverOptions.guiConfig || !customUi?.pageInstalled }">
+                <input v-model="serverOptions.page" type="checkbox"
+                  :disabled="busy || !serverOptions.guiConfig || !customUi?.pageInstalled" />
+                {{ t("winExport.serverCustomPage") }}
+              </label>
+              <label class="check-row" :class="{ 'is-disabled': !serverOptions.guiConfig || !customUi?.css.length }">
+                <input v-model="serverOptions.css" type="checkbox"
+                  :disabled="busy || !serverOptions.guiConfig || !customUi?.css.length" />
+                {{ t("winExport.serverCustomCss") }}
+              </label>
+              <label class="check-row" :class="{ 'is-disabled': !serverOptions.guiConfig || !customHome?.installed }">
+                <input v-model="serverOptions.home" type="checkbox"
+                  :disabled="busy || !serverOptions.guiConfig || !customHome?.installed" />
+                {{ t("winExport.serverCustomHome") }}
+              </label>
+            </div>
           </section>
 
           <!-- 实例：可多选，每个实例在包里各占一份 -->
@@ -940,16 +949,12 @@ onBeforeUnmount(() => {
         </template>
 
         <template v-else>
-        <!-- 格式用分段页签：一览可选格式，切换不用展开下拉 -->
+        <!-- 导出格式与压缩等级同一行：两者一起决定输出文件 -->
         <div class="row">
           <label class="field-label">{{ t("winExport.format") }}</label>
           <SegmentedTabs :options="packOptions" :model-value="pack" :disabled="busy"
             @update:model-value="onPackChange" />
-        </div>
-
-        <!-- 压缩等级：对整份导出生效，直接压缩与其它格式都走它 -->
-        <div class="row">
-          <label class="field-label" v-tip="t('winExport.zipLevelTip')">{{ t("winExport.zipLevel") }}</label>
+          <label class="field-label zip-label" v-tip="t('winExport.zipLevelTip')">{{ t("winExport.zipLevel") }}</label>
           <SegmentedTabs :options="zipOptions" :model-value="zipLevel" :disabled="busy"
             @update:model-value="onZipLevelChange" />
         </div>
@@ -1140,6 +1145,11 @@ onBeforeUnmount(() => {
   margin: 0;
 }
 
+/* 压缩等级紧跟在格式后面，同一个行里隔开一档 */
+.row .zip-label {
+  margin-left: 12px;
+}
+
 /* 服务器包里的勾选项 */
 .check-row {
   display: flex;
@@ -1147,6 +1157,13 @@ onBeforeUnmount(() => {
   gap: 8px;
   font-size: 12.5px;
   cursor: pointer;
+}
+
+/* 自定义内容三项横排，窄窗口时自动换行 */
+.check-row-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
 }
 
 .check-row.is-disabled {

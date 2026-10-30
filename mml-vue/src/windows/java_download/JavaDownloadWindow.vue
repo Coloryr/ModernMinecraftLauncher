@@ -245,6 +245,9 @@ async function loadList() {
       </div>
 
       <!-- 匹配的包列表：grid 文本卡片 -->
+      <div v-if="!items.length && !listLoading" class="list-empty">
+        {{ t("winJavaDownload.listEmpty") }}
+      </div>
       <div class="item-grid">
         <div v-for="item in items" :key="item.uuid" class="item-card">
           <div class="item-head">
@@ -257,9 +260,6 @@ async function loadList() {
           <div class="item-sub">{{ item.filename }}</div>
           <div v-if="item.size > 0" class="item-sub">{{ formatSize(item.size) }}</div>
         </div>
-      </div>
-      <div v-if="!items.length && !listLoading" class="list-empty">
-        {{ t("winJavaDownload.listEmpty") }}
       </div>
     </div>
   </WindowFrame>
@@ -360,9 +360,10 @@ async function loadList() {
   white-space: nowrap;
 }
 
+/* 没有匹配的 Java：紧贴筛选行下方，用告警色 */
 .list-empty {
-  margin-top: 20px;
-  color: var(--text-dim);
-  text-align: center;
+  margin-top: 4px;
+  color: var(--red);
+  font-size: 12.5px;
 }
 </style>

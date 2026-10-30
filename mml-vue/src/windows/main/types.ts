@@ -49,6 +49,7 @@ export interface DragCandidate {
 export type InstMenuAction =
   | "launch"
   | "viewMods"
+  | "manageResource"
   | "openFolder"
   | "viewLog"
   | "changeIcon"

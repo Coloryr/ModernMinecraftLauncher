@@ -127,6 +127,7 @@ export function createCommands(invoke: Invoke) {
       removeGroup: (name: string) => invoke<void>("collect_remove_group", { name }),
       removeItems: (uuids: string[], group: string | null) => invoke<void>("collect_remove_items", { uuids, group }),
       setGroupItems: (group: string, uuids: string[]) => invoke<void>("collect_set_group_items", { group, uuids }),
+      setGroupOrder: (order: string[]) => invoke<void>("collect_set_group_order", { order }),
       star: (source: string, fileType: string, pid: string, name: string, icon: string | null, url: string, star: boolean, group: string | null) => invoke<void>("collect_star", { source, fileType, pid, name, icon, url, star, group }),
     },
     colormc: {
@@ -270,6 +271,7 @@ export function createCommands(invoke: Invoke) {
       deleteScreenshot: (uuid: string, name: string) => invoke<void>("resource_delete_screenshot", { uuid, name }),
       deleteShaderpack: (uuid: string, file: string) => invoke<void>("resource_delete_shaderpack", { uuid, file }),
       exportMods: (uuid: string, config: ModExportDto) => invoke<number>("resource_export_mods", { uuid, config }),
+      exportText: (file: string, content: string) => invoke<void>("resource_export_text", { file, content }),
       importFiles: (uuid: string, kind: string, paths: string[], mode: string, parent: string | null) => invoke<ResourceDropDto>("resource_import_files", { uuid, kind, paths, mode, parent }),
       listDatapacks: (uuid: string, dir: string) => invoke<DataPackItemDto[]>("resource_list_datapacks", { uuid, dir }),
       listMods: (uuid: string) => invoke<ModItemDto[]>("resource_list_mods", { uuid }),

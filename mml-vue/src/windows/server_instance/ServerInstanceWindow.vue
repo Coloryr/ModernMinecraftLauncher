@@ -1062,6 +1062,7 @@ select.si-cell-control {
 .si-actions {
   display: flex;
   gap: 8px;
+  justify-content: flex-end;
   margin-top: 4px;
 }
 

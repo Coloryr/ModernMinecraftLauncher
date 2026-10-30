@@ -90,6 +90,22 @@ impl From<CollectObj> for CollectDataDto {
         // `items` 是 HashMap，迭代顺序不稳定；按名字排序保证前端展示稳定
         items.sort_by(|a, b| a.name.cmp(&b.name));
 
+        // 顺序表：先按用户拖出来的，再把没记录过的分组按名字补到末尾
+        let mut group_order: Vec<String> = obj
+            .order
+            .iter()
+            .filter(|name| obj.groups.contains_key(*name))
+            .cloned()
+            .collect();
+        let mut missing: Vec<String> = obj
+            .groups
+            .keys()
+            .filter(|name| !group_order.contains(name))
+            .cloned()
+            .collect();
+        missing.sort();
+        group_order.extend(missing);
+
         let groups = obj
             .groups
             .into_iter()
@@ -100,6 +116,10 @@ impl From<CollectObj> for CollectDataDto {
             })
             .collect();
 
-        Self { items, groups }
+        Self {
+            items,
+            groups,
+            group_order,
+        }
     }
 }

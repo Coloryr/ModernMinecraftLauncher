@@ -70,6 +70,16 @@ pub fn collect_remove_group(app: AppHandle, name: String) {
     emit_collect_change(&app);
 }
 
+/// 保存分组显示顺序
+///
+/// - `app`: 应用句柄，广播变更事件用
+/// - `order`: 新的完整顺序，只保留仍然存在的分组
+#[gui_macros::command]
+pub fn collect_set_group_order(app: AppHandle, order: Vec<String>) {
+    collect_utils::set_group_order(order);
+    emit_collect_change(&app);
+}
+
 /// 清空收藏
 ///
 /// - `app`: 应用句柄，广播变更事件用

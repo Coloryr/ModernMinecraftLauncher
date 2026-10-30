@@ -118,6 +118,7 @@ export default {
   "winExport.serverConfig": "配置",
   "winExport.serverConfigCore": "启动器配置",
   "winExport.serverConfigGui": "界面配置",
+  "winExport.serverBg": "背景图",
   "winExport.serverCustom": "自定义内容",
   "winExport.serverCustomPage": "自定义主题",
   "winExport.serverCustomCss": "自定义样式",
@@ -779,6 +780,8 @@ export default {
   "resource.depRequired": "要求 {range}",
   "resource.depBy": "被 {list} 需要",
   "resource.exportClipboard": "导出到剪贴板",
+  "resource.exportFile": "导出到文件",
+  "resource.exportedFile": "已导出到 {file}",
   "resource.copied": "已复制到剪贴板",
   "resource.copyFail": "复制失败",
   // 依赖图与"禁用前置时顺带禁用依赖方"
@@ -1865,6 +1868,11 @@ export default {
   // 帮助窗口
   "winHelp.stillStuck": "仍无法解决问题？",
   "winHelp.report": "请提供游戏日志（logs 目录）与启动器版本号，前往 GitHub Issues 反馈。",
+  "winHelp.repo": "仓库地址",
+  "winHelp.feedback": "问题反馈",
+  "winHelp.qqGroup": "QQ 交流群 {n}",
+  "winHelp.qqCopy": "复制群号",
+  "winHelp.qqCopied": "群号已复制",
   "winHelp.version": "启动器版本",
   "winHelp.author": "作者",
   "winHelp.authorName": "Coloryr",
