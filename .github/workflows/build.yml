@@ -29,7 +29,7 @@ jobs:
       test: ${{ steps.resolve.outputs.test }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # 版本取自标签：浅克隆不带标签与历史，git describe 无从下手
           fetch-depth: 0
@@ -82,9 +82,9 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: 设置 Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -119,7 +119,7 @@ jobs:
         run: pwsh -NoProfile -File build/build-release.ps1 -Arch ${{ matrix.arch }}
       - name: 上传 Windows 产物
         if: needs.check-version.outputs.channel == 'release' && needs.check-version.outputs.test != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mml-windows-${{ matrix.arch }}
           path: build_out/*
@@ -132,7 +132,7 @@ jobs:
         run: node build/package-prerelease.mjs --os windows --arch ${{ matrix.arch }}
       - name: 上传预发布产物
         if: needs.check-version.outputs.channel == 'prerelease' && needs.check-version.outputs.test != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mml-prerelease-windows-${{ matrix.arch }}
           path: build_out/*
@@ -155,9 +155,9 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: 设置 Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -205,14 +205,14 @@ jobs:
         run: bash build/build-release.sh
       - name: 上传 Linux 产物
         if: needs.check-version.outputs.channel == 'release' && needs.check-version.outputs.test != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mml-linux-${{ matrix.arch }}
           path: build_out/*
           if-no-files-found: error
       - name: 上传 Linux x64 二进制
         if: needs.check-version.outputs.channel == 'release' && matrix.arch == 'x64' && needs.check-version.outputs.test != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: linux-x64-bin
           # tauri build 会按 productName 重命名产物；两种名字都收，版本行为有差异时也不空手
@@ -228,7 +228,7 @@ jobs:
         run: node build/package-prerelease.mjs --os linux --arch ${{ matrix.arch }}
       - name: 上传预发布产物
         if: needs.check-version.outputs.channel == 'prerelease' && needs.check-version.outputs.test != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mml-prerelease-linux-${{ matrix.arch }}
           path: build_out/*
@@ -242,13 +242,13 @@ jobs:
       MML_VERSION: ${{ needs.check-version.outputs.version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: 安装打包依赖
         run: |
           sudo apt-get update
           sudo apt-get install -y flatpak libarchive-tools zstd
       - name: 下载 Linux x64 二进制
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: linux-x64-bin
           path: target/release
@@ -259,7 +259,7 @@ jobs:
       - name: 打 Arch 包
         run: bash build/package-arch.sh
       - name: 上传附加包
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mml-linux-x64-extra
           path: |
@@ -282,9 +282,9 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: 设置 Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -366,7 +366,7 @@ jobs:
           bash build/build-release.sh
       - name: 上传 macOS 产物
         if: needs.check-version.outputs.channel == 'release' && needs.check-version.outputs.test != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mml-macos-${{ matrix.arch }}
           path: build_out/*
@@ -388,7 +388,7 @@ jobs:
           done
       - name: 上传预发布产物
         if: needs.check-version.outputs.channel == 'prerelease' && needs.check-version.outputs.test != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mml-prerelease-macos-${{ matrix.arch }}
           path: build_out/*
@@ -402,9 +402,9 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: 下载全部产物
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: mml-*
           merge-multiple: false
@@ -424,7 +424,7 @@ jobs:
       - name: 生成发布说明
         run: node build/release-body.mjs --kind release --version ${{ github.ref_name }} --artifacts artifacts --out "$RUNNER_TEMP/release-body.md"
       - name: 创建 GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           name: M²L ${{ github.ref_name }}
@@ -442,9 +442,9 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: 下载预发布产物
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: mml-prerelease-*
           merge-multiple: false
@@ -464,7 +464,7 @@ jobs:
       - name: 生成发布说明
         run: node build/release-body.mjs --kind prerelease --version ${{ github.ref_name }} --artifacts artifacts --out "$RUNNER_TEMP/release-body.md"
       - name: 创建 GitHub 预发布
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           name: M²L ${{ github.ref_name }} 预发布

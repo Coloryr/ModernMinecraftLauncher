@@ -159,7 +159,7 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 
 每个平台都走同一套骨架，正式版与预发布只在构建脚本和打包方式上分叉：
 
-1. `actions/checkout@v4` + `actions/setup-node@v4`（Node 24，按 lockfile 缓存）+
+1. `actions/checkout@v5` + `actions/setup-node@v5`（Node 24，按 lockfile 缓存）+
    `dtolnay/rust-toolchain@stable` + `Swatinem/rust-cache@v2`；
 2. 用 `taiki-e/install-action` 装 `cargo-binstall`，再由它下载 Tauri CLI 的**预编译**
    `cargo-tauri`（GitHub Release 资产），不跑 `cargo install`。上游 binstall 元数据只给
@@ -175,11 +175,11 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
    `.pkg.tar.zst` 也放进 `build_out/`。附加包失败不影响主产物，但发版 job 会等它，缺包时不发 Release；
    arm64 只出 deb / rpm / AppImage；
 5. 正式版由脚本把安装包按版本改名到 `build_out/`，预发布由 `build/package-prerelease.mjs`
-   把可执行文件按 平台 / 架构 / 版本 改名到 `build_out/`，`actions/upload-artifact@v4` 收走；
-   发版 job（正式版与预发布各一个）用 `actions/download-artifact@v4` 取产物并保留每个
+   把可执行文件按 平台 / 架构 / 版本 改名到 `build_out/`，`actions/upload-artifact@v6` 收走；
+   发版 job（正式版与预发布各一个）用 `actions/download-artifact@v7` 取产物并保留每个
    artifact 的子目录：正式版按 `mml-*`，预发布按 `mml-prerelease-*`；先检查文件名有无重复，
    再由 `build/release-body.mjs` 用产物现算 SHA1 / SHA256 生成发布说明，最后交给
-   `softprops/action-gh-release@v2`。
+   `softprops/action-gh-release@v3`。
 
 - Linux runner 固定 `ubuntu-22.04` 作为 glibc 基线，并预装 Tauri 需要的
   `libwebkit2gtk-4.1-dev` / `libayatana-appindicator3-dev` / `librsvg2-dev` /
