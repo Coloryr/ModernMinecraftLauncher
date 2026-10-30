@@ -27,6 +27,7 @@ pub mod java_download;
 pub mod lobby;
 pub mod log;
 pub mod main;
+pub mod minecraft;
 pub mod resource;
 pub(crate) mod server_instance;
 pub mod settings;

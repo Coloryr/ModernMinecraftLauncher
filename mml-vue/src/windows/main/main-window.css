@@ -846,7 +846,7 @@
 /* 外观在 components/ui/DropOverlay.vue（四个落点共用同一个组件），这里不再定义 */
 
 /* ================= 加载期间的标题栏 =================
-   只显示关闭按钮：最小化 / 最大化两颗用 visibility 占位而不是 display: none ——
+   品牌 + 关闭按钮：最小化 / 最大化两颗用 visibility 占位而不是 display: none ——
    自绘装饰激活时要量最大化按钮的矩形（lib/decoration.ts 的 findMaximizeBtn），
    量不到插件会以 kind="disabled" 收场（原生 frame 不摘，系统标题栏与自绘按钮并存）。
    位置与主界面顶栏同一套：高 --titlebar-h、右侧留出窗口按钮的余地 */
@@ -862,6 +862,21 @@
 
 .boot-head.windows {
   padding-right: 10px;
+}
+
+/* macOS：插件把原生红黄绿摆在左端，品牌要让出插件发布的清空量；
+   与 MainTopbar 的 .topbar.is-macos.is-plugin-controls 同口径 */
+.boot-head.is-macos.is-plugin-controls {
+  padding-left: max(18px, var(--tauri-plugin-decoration-left-clearance, 76px));
+}
+
+/* macOS 全屏：顶栏顶到刘海下沿，整体下压安全区、总高不变，与 MainTopbar 同口径 */
+.boot-head.is-macos.is-fullscreen {
+  --titlebar-actual-h: var(--titlebar-h);
+  --ctl-h: 26px;
+  box-sizing: border-box;
+  height: var(--titlebar-actual-h);
+  padding-top: 24px;
 }
 
 .boot-head .spacer {

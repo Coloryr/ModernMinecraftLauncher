@@ -23,6 +23,9 @@ import type {
   DepProblemDto,
   DetectedPackDto,
   LogLine,
+  MinecraftImportDto,
+  MinecraftInfoDto,
+  MinecraftProgressDto,
   DownloadItemEvent,
   DownloadStatusDto,
   DownloadTaskEvent,
@@ -95,7 +98,7 @@ import type {
   GuiThemeDto,
   ViewMode,
 } from "./bindings";
-import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, CustomUiChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiThemeChange, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress, ServerInstanceFocus, ServerInstanceProgress, StartArg } from "./listens";
+import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, CustomUiChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiThemeChange, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, MinecraftProgress, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress, ServerInstanceFocus, ServerInstanceProgress, StartArg } from "./listens";
 
 export interface CreateInstanceOpts {
   /** 加载器 ID，缺省为 `normal` */
@@ -1545,6 +1548,43 @@ export const api = {
   async skipColorMc(): Promise<void> {
     return commands.colormc.skipColormc();
   },
+
+  // ---------------- 从官方启动器 .minecraft 导入：首次启动，见 windows/minecraft/ ----------------
+
+  /**
+   * 探测本机的 .minecraft
+   *
+   * # 返回值
+   *
+   * 探测到的目录、版本列表与会搬的顶层条目；已经问过或没探测到返回 null
+   */
+  async checkMinecraft(): Promise<MinecraftInfoDto | null> {
+    return commands.minecraft.checkMinecraft();
+  },
+
+  /**
+   * 把 .minecraft 的某个版本导入成实例
+   *
+   * - `path`: .minecraft 目录，把 `checkMinecraft` 给的那份传回来
+   * - `version`: 版本 id，即 versions 下的目录名
+   * - `name`: 实例名，缺省用版本 id
+   *
+   * # 返回值
+   *
+   * 导入结果，含新实例名、版本与文件数
+   */
+  async importMinecraft(
+    path: string,
+    version: string,
+    name: string | null = null,
+  ): Promise<MinecraftImportDto> {
+    return commands.minecraft.importMinecraft(path, version, name);
+  },
+
+  /** 选择「不导入」：记下标记，以后不再询问 */
+  async skipMinecraft(): Promise<void> {
+    return commands.minecraft.skipMinecraft();
+  },
 };
 
 // ---------------- 事件订阅：Rust emit → 前端 listen ----------------
@@ -1578,6 +1618,21 @@ export function onColormcProgress(
   cb: (e: ColorMcProgressDto) => void,
 ): Promise<UnlistenFn> {
   return listen<ColorMcProgressDto>(ColormcProgress, (e) => cb(e.payload));
+}
+
+/**
+ * .minecraft 导入进度事件
+ *
+ * - `cb`: 进度回调，`stage` 目前只有 copy
+ *
+ * # 返回值
+ *
+ * 取消监听的函数
+ */
+export function onMinecraftProgress(
+  cb: (e: MinecraftProgressDto) => void,
+): Promise<UnlistenFn> {
+  return listen<MinecraftProgressDto>(MinecraftProgress, (e) => cb(e.payload));
 }
 
 /**

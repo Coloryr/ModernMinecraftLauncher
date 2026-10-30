@@ -26,6 +26,7 @@ pub mod java_download_dto;
 pub mod java_dto;
 pub mod log_dto;
 pub mod main_dto;
+pub mod minecraft_dto;
 pub mod mod_export_dto;
 pub mod motd_dto;
 pub mod resource_dto;
@@ -79,6 +80,9 @@ pub use main_dto::{
     AutoSaveTargetDto, BlockGroupDto, BlockGroupsDto, BlockItemDto, BlockStatusDto,
     CustomJsonItemDto, ErrorEvent, ExitEvent, IconSourceDto, InstanceChangeEvent, InstanceLangDto,
     InstancePatch, LaunchPrecheckDto, LogEvent, NewsItem, StartArgDto, StateEvent, SystemMemoryDto,
+};
+pub use minecraft_dto::{
+    MinecraftImportDto, MinecraftInfoDto, MinecraftProgressDto, MinecraftVersionDto,
 };
 pub use motd_dto::{MotdDto, MotdSegmentDto};
 pub use resource_dto::{

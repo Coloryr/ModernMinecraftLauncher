@@ -15,8 +15,20 @@
 //! | [`GameCheckObj`] | 游戏文件校验设置 |
 //! | [`JvmConfigObj`] | Java 运行时配置 |
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+
+/// 把 JSON 里的 `null` 当成默认值
+///
+/// ColorMC 的 `config.json` 把代理用户名 / 密码写成 `null`，而 M²L 这两个字段是
+/// `String`：迁移过来的配置必须还能读，否则核心初始化失败、启动器起不来。
+fn null_as_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de> + Default,
+{
+    Ok(Option::<T>::deserialize(deserializer)?.unwrap_or_default())
+}
 
 /// Java 虚拟机配置
 ///
@@ -113,11 +125,11 @@ pub struct HttpObj {
     /// 代理服务器端口，对应 JSON 键 `ProxyPort`，默认 7890
     #[serde(rename = "ProxyPort")]
     pub proxy_port: u16,
-    /// 代理认证用户名，对应 JSON 键 `ProxyUser`，默认空字符串
-    #[serde(rename = "ProxyUser")]
+    /// 代理认证用户名，对应 JSON 键 `ProxyUser`，默认空字符串；ColorMC 写的是 `null`
+    #[serde(rename = "ProxyUser", deserialize_with = "null_as_default")]
     pub proxy_user: String,
-    /// 代理认证密码，对应 JSON 键 `ProxyPassword`，默认空字符串
-    #[serde(rename = "ProxyPassword")]
+    /// 代理认证密码，对应 JSON 键 `ProxyPassword`，默认空字符串；ColorMC 写的是 `null`
+    #[serde(rename = "ProxyPassword", deserialize_with = "null_as_default")]
     pub proxy_password: String,
 
     /// 一般请求的代理策略，对应 JSON 键 `ProxyWork`，默认 `Auto`
@@ -469,5 +481,86 @@ impl Default for ConfigObj {
             window: WindowSettingObj::new(),
             check: GameCheckObj::default(),
         }
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::ConfigObj;
+
+    /// ColorMC 的 config.json 原样（代理用户名 / 密码写的是 null）
+    ///
+    /// 迁移后 M²L 要能读它，否则核心初始化直接失败、启动器起不来。
+    #[test]
+    fn color_mc_config_with_null_proxy_loads() {
+        let json = r#"{
+  "Version": "40.20260928",
+  "JavaList": [
+    {
+      "Name": "java_1.8.0_301",
+      "Local": "C:\\Program Files\\Java\\jre1.8.0_301\\bin\\javaw.exe"
+    }
+  ],
+  "Http": {
+    "Source": 0,
+    "DownloadThread": 20,
+    "ProxyIP": "127.0.0.1",
+    "ProxyPort": 7890,
+    "ProxyUser": null,
+    "ProxyPassword": null,
+    "LoginProxy": true,
+    "DownloadProxy": true,
+    "GameProxy": false,
+    "CheckFile": true,
+    "AutoDownload": true
+  },
+  "Dns": {
+    "Enable": false,
+    "Https": [
+      "https://223.5.5.5/dns-query"
+    ],
+    "HttpProxy": false
+  },
+  "DefaultJvmArg": {
+    "RemoveJvmArg": null,
+    "RemoveGameArg": null,
+    "JvmArgs": null,
+    "GameArgs": null,
+    "JvmEnv": null,
+    "GC": 0,
+    "MaxMemory": 4096,
+    "MinMemory": 512,
+    "ColorASM": false,
+    "LaunchPre": false,
+    "PreRunSame": false,
+    "LaunchPreData": null,
+    "LaunchPost": false,
+    "LaunchPostData": null
+  },
+  "Window": {
+    "FullScreen": false,
+    "Height": 1080,
+    "Width": 1920,
+    "GameTitle": null,
+    "RandomTitle": false,
+    "CycTitle": false,
+    "TitleDelay": 0,
+    "EditTitle": false
+  },
+  "GameCheck": {
+    "CheckCore": true,
+    "CheckLib": true,
+    "CheckAssets": true,
+    "CheckMod": true,
+    "CheckCoreSha1": true,
+    "CheckLibSha1": true,
+    "CheckAssetsSha1": true,
+    "CheckModSha1": true
+  },
+  "SafeLog4j": false
+}"#;
+        let obj: ConfigObj = serde_json::from_str(json).expect("ColorMC 的配置要能读");
+        assert_eq!(obj.http.proxy_port, 7890);
+        assert!(obj.http.proxy_user.is_empty());
+        assert_eq!(obj.java_list.len(), 1);
     }
 }

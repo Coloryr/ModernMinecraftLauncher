@@ -155,7 +155,7 @@ pub fn run() {
             single_instance::start(app.handle());
 
             if let Err(e) = windows::show_main_window(app.handle()) {
-                err_box::fatal_error_text(&e);
+                err_box::fatal_error_text(&mml_base::get_base_dir(), &e);
             }
 
             // Java 列表变更：mml_jvms 添加 / 删除 / 配置加载完成 → 通知前端刷新

@@ -40,7 +40,7 @@ fn main() {
         ];
         args.extend(std::env::args().skip(1));
         if let Err(error) = mml_sys::process_helper::launch_admin(&args) {
-            err_box::fatal_error_text(&format!("Administrator startup failed: {error}"));
+            err_box::fatal_error_text(&obj.path, &format!("Administrator startup failed: {error}"));
         }
         return;
     }
@@ -85,7 +85,7 @@ fn main() {
     // 手柄配置放在运行目录，内核初始化后日志才可用
     let run_path = obj.path.clone();
     if let Err(e) = mml_core::init(obj) {
-        err_box::fatal_error(e);
+        err_box::fatal_error(&run_path, e);
     }
 
     // 手柄：内核 crate 负责读映射、监听手柄并把输入转发给运行中的游戏实例

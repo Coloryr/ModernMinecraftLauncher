@@ -739,4 +739,21 @@ mod tests {
         );
         assert!(stop > start);
     }
+
+    /// TEMP 诊断：读运行目录里实际的 count.dat，看能不能解析、有多少数据
+    #[test]
+    fn temp_dump_run_dir_count() {
+        let path = r"E:\code\ModernColoryrMinecraftLauncher\target\debug\mml\count.dat";
+        let bytes = std::fs::read(path).unwrap();
+        println!("bytes: {}", bytes.len());
+        let file = NbtFile::read(&mut Cursor::new(bytes.as_slice())).unwrap();
+        let nbt = file.nbt.as_compound().unwrap();
+        let mut keys: Vec<_> = nbt.data.keys().cloned().collect();
+        keys.sort();
+        println!("keys: {:?}", keys);
+        println!("LaunchCount: {:?}", nbt.get_long("LaunchCount"));
+        println!("AllTime: {:?}", nbt.get_long("AllTime"));
+        println!("GameRuns: {:?}", nbt.get_list("GameRuns").map(|l| l.len()));
+        println!("LaunchLogs: {:?}", nbt.get_list("LaunchLogs").map(|l| l.len()));
+    }
 }

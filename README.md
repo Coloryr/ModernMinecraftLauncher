@@ -26,7 +26,7 @@
 | Java | 扫描本机 Java；从 Adoptium / Zulu / OpenJ9 / Foojay 下载 JRE / JDK |
 | 下载 | 多线程、断点续传、哈希校验，带独立的下载管理窗口 |
 | 渲染 | 从客户端 jar 离线渲染方块 / 物品图标；皮肤、披风、头像的 2D / 3D 绘制 |
-| 迁移 | 从 ColorMC 迁移数据；HMCL / MMC / 官方启动器通过实例导入 |
+| 迁移 | 从 ColorMC 迁移数据；导入 `.minecraft`（官方 / HMCL / PCL）；MMC 通过实例导入 |
 | 联机 | 陶瓦联机：正版账户验证、创建 / 加入房间、邀请码与直连地址；映射大厅预留 |
 | 统计 | 每日游玩时间图、实例明细、启动次数与失败统计 |
 | 分发 | 实例导出（直接压缩 / CurseForge / Modrinth / MMC / HMCL）、生成实例信息、服务器包、服务器实例（MML / HMCL） |

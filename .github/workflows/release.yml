@@ -18,9 +18,6 @@ concurrency:
 env:
   CI: true
 
-# windows-11-arm 与 ubuntu-24.04-arm 是 GitHub 公共预览 runner：私有仓库可能不可用，
-# 届时改自托管，或回退到 x64 runner 交叉编译；Windows ARM64 要装对应的 MSVC 工具链。
-
 jobs:
   check-version:
     runs-on: ubuntu-latest
@@ -44,14 +41,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # x64 / x86 在 x64 runner 上构建；x86 由 MSVC 交叉编译
           - runner: windows-latest
             arch: x64
           - runner: windows-latest
             arch: x86
-          # arm64 用原生 ARM runner，省掉在 x64 上装 ARM64 交叉工具链。
-          # 仓库没有 ARM runner 时，可改成 windows-latest 并在镜像里装
-          # 「MSVC v143 - VS 2022 C++ ARM64/ARM64EC 生成工具」后交叉编译。
           - runner: windows-11-arm
             arch: arm64
     runs-on: ${{ matrix.runner }}
@@ -104,12 +97,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # x64 留在 22.04：AppImage 的 glibc 下限更低，兼容旧发行版
           - runner: ubuntu-22.04
             arch: x64
             fuse: libfuse2
-          # arm64 用 24.04 原生 runner；Tauri 的 Linux 依赖全走 arm64 包。
-          # 这两个 arm runner 是 GitHub 公共预览，私有仓库不可用时改自托管或交叉编译
           - runner: ubuntu-24.04-arm
             arch: arm64
             fuse: libfuse2t64
@@ -133,8 +123,6 @@ jobs:
       - name: 安装 Linux 依赖
         run: |
           sudo apt-get update
-          # 24.04 起 libfuse2 改名为 libfuse2t64：先确认包名存在，
-          # 将来再改名时能直接看出是哪一步，而不是只报一句 Unable to locate package
           if ! apt-cache show "${{ matrix.fuse }}" >/dev/null 2>&1; then
             echo "找不到 ${{ matrix.fuse }}，当前可用的 libfuse 包："
             apt-cache search '^libfuse'
@@ -171,8 +159,6 @@ jobs:
           name: mml-linux-${{ matrix.arch }}
           path: build_out/*
           if-no-files-found: error
-      # 附加包在独立 job 里打，需要这份原始二进制；名字不以 mml- 开头，
-      # 发版 job 按 mml-* 下载产物时不会把它带进 Release
       - name: 上传 Linux x64 二进制
         if: matrix.arch == 'x64'
         uses: actions/upload-artifact@v4
@@ -181,8 +167,6 @@ jobs:
           path: target/release/mml-gui
           if-no-files-found: error
 
-  # Flatpak / Arch 与 deb / rpm / AppImage 分开：附加包失败不影响主产物已上传的部分。
-  # 但发版 job 仍会等它，避免发出缺包的 Release。
   package-linux-extra:
     needs: [build-linux]
     runs-on: ubuntu-22.04
@@ -247,8 +231,6 @@ jobs:
       - name: 安装 Tauri CLI（预编译）
         shell: bash
         run: |
-          # tauri-cli 的 binstall 元数据只给 x64 的 zip 包写了格式覆盖，macOS / Windows
-          # 的 ARM64 产物其实也是 zip。按平台显式指定格式，避免回退到源码编译。
           case "$RUNNER_OS" in
             Linux) pkg_fmt=tgz ;;
             *) pkg_fmt=zip ;;
@@ -291,8 +273,6 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          # secrets 没配置时这些变量是空串，而 Tauri 只看变量是否存在：
-          # 空证书会让签名失败，空 Apple ID 会让公证失败，所以先把空值清掉
           for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY \
                       APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
             if [ -z "${!name:-}" ]; then
@@ -317,15 +297,12 @@ jobs:
       - name: 下载全部产物
         uses: actions/download-artifact@v4
         with:
-          # 只取发布产物，linux-x64-bin 之类的中间件不带进 Release
           pattern: mml-*
-          # 保留每个 artifact 的子目录：同名文件不会在解压阶段互相覆盖
           merge-multiple: false
           path: artifacts
       - name: 检查产物重名
         shell: bash
         run: |
-          # 不同平台产物同名时，发布阶段会互相覆盖，先在这里拦住
           dupes="$(find artifacts -type f -printf '%f\n' | sort | uniq -d)"
           if [ -n "$dupes" ]; then
             echo '发现重名产物：'

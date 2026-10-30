@@ -2253,6 +2253,9 @@ export default {
   "err.colormcBusy": "已经有一次迁移在进行中",
   // ColorMC 迁移任务失败：原始错误进日志，前端只显示这条
   "err.colormcTask": "ColorMC 迁移任务失败（详情见日志）",
+  "err.minecraftMissing": "这个目录不是 .minecraft",
+  "err.minecraftVersionMissing": "选中的版本文件不存在",
+  "err.minecraftCoreTimeout": "等待核心加载超时，请重启启动器后再试",
   "err.bgUnsupported": "不支持的图片格式",
   "err.bgConfigDir": "配置目录还没初始化",
   "err.bgNone": "当前没有设置背景图",
@@ -2286,6 +2289,7 @@ export default {
   "colormc.level.partial": "有偏差",
   "colormc.level.extra": "用不到",
   "colormc.restart": "重启启动器",
+  "colormc.restarting": "迁移完成，正在重启启动器…",
   "colormc.finish": "完成",
   "colormc.compat.minecraft": "实例、资源、版本库、依赖库位置一致，可直接使用",
   "colormc.compat.collect": "收藏格式一致，直接可用（ColorMC 独有的几个开关会被忽略）",
@@ -2301,6 +2305,24 @@ export default {
   "colormc.compat.gui": "ColorMC 的界面状态，M²L 不读",
   "colormc.compat.lock": "ColorMC 的运行锁文件，M²L 不读",
   "colormc.compat.extra": "M²L 不认识，原样留在运行目录里（不碍事）",
+
+  // 发现旧数据：ColorMC 与官方启动器 .minecraft 共用一个弹窗
+  "oldData.title": "发现旧数据",
+  "oldData.hint": "检测到这些旧启动器的数据，可以搬到 M²L。",
+  "oldData.close": "关闭",
+  "colormc.skipped": "已跳过，以后不再询问",
+  "minecraft.section": ".minecraft",
+  "minecraft.versions": "{n} 个版本",
+  "minecraft.version": "版本",
+  "minecraft.name": "实例名",
+  "minecraft.hint": "只搬 mods、saves、config、options.txt 这些游戏数据；HMCL / PCL 的版本隔离目录也会一起搬，versions、libraries、assets 由启动器自己补。",
+  "minecraft.unknown": "M²L 未收录这个版本，会按自定义版本导入。",
+  "minecraft.import": "导入",
+  "minecraft.skip": "不导入",
+  "minecraft.importing": "导入中…",
+  "minecraft.done": "已导入 {n} 个文件",
+  "minecraft.failed": "{n} 个文件没搬成功",
+  "minecraft.skipped": "已跳过，以后不再询问",
 
   // 服务器实例生成：把本地实例导出成在线实例的服务端清单
   "serverInstance.format": "格式",

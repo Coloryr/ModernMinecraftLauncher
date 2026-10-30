@@ -617,10 +617,17 @@ pub async fn check_update(mc: &str) -> CoreResult<Arc<GameArgObj>> {
         .next();
 
     match item {
-        // 在线也没有这个版本号
-        None => Err(ErrorType::DataNotFound(DataNotFoundData::Version(
-            mc.to_string(),
-        ))),
+        // 在线没有这个版本号：本地有版本 json 就按自定义版本用（如从 .minecraft 导入的
+        // LabyMod 这类），启动参数直接读本地那份，不去在线找
+        None => {
+            let local = BASE_DIR.get().unwrap().join(format!("{mc}.json"));
+            if local.is_file() {
+                return get_version(mc);
+            }
+            Err(ErrorType::DataNotFound(DataNotFoundData::Version(
+                mc.to_string(),
+            )))
+        }
         Some(item) => {
             let local = BASE_DIR.get().unwrap().join(format!("{}.json", mc));
             // 本地没有版本 json，如首次安装整合包，直接在线下载

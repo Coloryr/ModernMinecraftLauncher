@@ -39,7 +39,7 @@ import {
   startupPage,
   viewMode,
 } from "../../lib/settings";
-import type { AccountStoreDto, ColorMcInfoDto, CustomHomeInfoDto, GroupDto, InstanceInfoDto, JavaInfoDto, LoadState, NewsItem, StartArgDto, VersionInfoDto, ViewMode } from "../../lib/bindings";
+import type { AccountStoreDto, ColorMcInfoDto, CustomHomeInfoDto, GroupDto, InstanceInfoDto, JavaInfoDto, LoadState, MinecraftInfoDto, NewsItem, StartArgDto, VersionInfoDto, ViewMode } from "../../lib/bindings";
 import InstanceIcon from "../../components/InstanceIcon.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import DropOverlay from "../../components/ui/DropOverlay.vue";
@@ -55,12 +55,13 @@ import ProxyPanel from "../../components/ProxyPanel.vue";
 import { useModpackStatus } from "../../lib/modpackTasks";
 import SplashScreen from "../../components/ui/SplashScreen.vue";
 import MainTopbar from "./topbar/MainTopbar.vue";
+import MainBrand from "./topbar/MainBrand.vue";
 import MainSidebar from "./sidebar/MainSidebar.vue";
 import MainCtxMenu from "./ctxmenu/MainCtxMenu.vue";
 import LaunchProgress from "../../components/LaunchProgress.vue";
 import IconPickModal from "./IconPickModal.vue";
 import BlockIconPickModal from "./BlockIconPickModal.vue";
-import ColorMcMigrateModal from "./ColorMcMigrateModal.vue";
+import OldDataModal from "./OldDataModal.vue";
 import { useInstanceDrag } from "../../composables/useInstanceDrag";
 import { useMultiSelect } from "../../composables/useMultiSelect";
 import { useFileDrop } from "../../composables/useFileDrop";
@@ -73,8 +74,9 @@ import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import WindowControls from "../../components/ui/WindowControls.vue";
 import CollapsePanel from "../../components/ui/CollapsePanel.vue";
-import { titleBarStyle, onTitleBarPointerDown, useWindowTitle } from "../../lib/titlebar";
+import { detectOs, titleBarStyle, onTitleBarPointerDown, useWindowTitle } from "../../lib/titlebar";
 import { useWindowDecoration } from "../../lib/useWindowDecoration";
+import { useWindowFullscreen } from "../../lib/useWindowFullscreen";
 import { closeSplash, splashError, splashVisible } from "../../lib/splash";
 import {
   accounts as storeAccounts,
@@ -1558,48 +1560,51 @@ async function subscribeEvents() {
 // 只初始化一次：load-done 事件与下面的状态查询兜底可能先后到达
 let inited = false;
 
-/** 首次启动的 ColorMC 迁移弹窗数据（非空 = 弹窗显示中） */
-const colorMcInfo = ref<ColorMcInfoDto | null>(null);
-/** 弹窗"已结束"信号：答完（复制 / 移动 / 不迁移）或直接关掉时解开 */
-let colorMcSettled: (() => void) | null = null;
+/** 首次启动的「发现旧数据」弹窗数据（非空 = 弹窗显示中） */
+const oldData = ref<{ colormc: ColorMcInfoDto | null; minecraft: MinecraftInfoDto | null } | null>(
+  null,
+);
+/** 弹窗"已结束"信号：答完或直接关掉时解开 */
+let oldDataSettled: (() => void) | null = null;
 
 /**
- * 问后端有没有可迁移的 ColorMC 数据，**在加载期间问，主页面之前**
+ * 问后端有没有可迁移的旧数据（ColorMC / .minecraft），**在加载期间问，主页面之前**
  *
  * 探测只读几个目录项、不依赖内核，所以挂载时就能发起（见 onMounted），与核心加载并行；
  * 一旦要弹窗，就**等用户答完**才放行主界面 —— 加载页继续盖着，见 doInit。
- * 后端已问过（标记文件存在）或本机没有 ColorMC 时返回 null，直接放行。
+ * 两边都已问过（标记文件存在）或本机都没有时返回 null，直接放行。
  */
-async function checkColorMc() {
+async function checkOldData() {
   try {
-    const info = await api.checkColorMc();
-    if (!info) return;
-    colorMcInfo.value = info;
+    const [colormc, minecraft] = await Promise.all([api.checkColorMc(), api.checkMinecraft()]);
+    if (!colormc && !minecraft) return;
+    oldData.value = { colormc, minecraft };
     await new Promise<void>((resolve) => {
-      colorMcSettled = resolve;
+      oldDataSettled = resolve;
     });
   } catch {
-    colorMcInfo.value = null;
+    oldData.value = null;
   }
 }
 
-/** 弹窗关闭：三种选择任一或右上角直接关掉，都放行主界面 */
-function onColorMcClosed() {
-  colorMcInfo.value = null;
-  colorMcSettled?.();
-  colorMcSettled = null;
+/** 弹窗关闭：答完或右上角直接关掉，都放行主界面 */
+function onOldDataClosed() {
+  oldData.value = null;
+  oldDataSettled?.();
+  oldDataSettled = null;
 }
 
 /**
- * 迁移完成
+ * 有一节搬完了数据
  *
- * 账户已经写进账户模块，重拉列表就能看到；实例是"文件夹搬进来"的，运行中的核心
- * **不会**重新扫实例目录，见 windows/colormc.rs，重拉只是万一被文件监听捡到了能立刻显示。
+ * 账户已经写进账户模块，重拉列表就能看到。ColorMC 那节是"文件夹搬进来"的，运行中的
+ * 核心**不会**重新扫实例目录，见 windows/colormc.rs，重拉只是万一被文件监听捡到了能
+ * 立刻显示；.minecraft 那节走实例 API 建实例，重拉就能看到。
  */
-function onColorMcDone() {
+function onOldDataDone() {
   void loadInstances();
   void loadGroups();
-  // 账户也在这轮迁移里合并，顶栏的账户列表要跟着刷新
+  // ColorMC 迁移会合并账户，顶栏的账户列表要跟着刷新
   void loadAccounts();
 }
 
@@ -1607,7 +1612,7 @@ function onColorMcDone() {
  * 迁移探测任务：**建组件时就发起**（此刻还在加载页上），与核心加载并行；
  * `doInit` 里 await 它，答完（或关掉弹窗）才关启动页 —— 于是"搬运在主页面之前"。
  */
-const colorMcReady = checkColorMc();
+const oldDataReady = checkOldData();
 
 async function doInit() {
   if (inited) return;
@@ -1615,8 +1620,8 @@ async function doInit() {
   try {
     await Promise.all([loadInstances(), loadGroups(), loadJava(), loadCustomHome()]);
     restoreSelection();
-    // ColorMC 迁移在主页面**之前**：加载期间就弹了，这里等它答完再关启动页
-    await colorMcReady;
+    // 旧数据迁移在主页面**之前**：加载期间就弹了，这里等它答完再关启动页
+    await oldDataReady;
     closeSplash();
     // 启动参数（命令行 / 协议）留到实例表就绪之后再执行
     void handleStartArg();
@@ -1925,6 +1930,12 @@ async function createGroup() {
 /** 主窗口根元素：贴靠热区在里面惰性查找自己的最大化按钮 */
 const rootEl = ref<HTMLElement | null>(null);
 
+// 加载期间标题栏的平台口径：macOS 的插件按钮占住左端、全屏还要让出刘海，
+// 与 MainTopbar 同一套，见 main-window.css 的 .boot-head
+const isMac = detectOs() === "macos";
+const bootFullscreen = useWindowFullscreen();
+const bootPluginControls = computed(() => isMac && titleBarStyle === "macos");
+
 // 窗口装饰：激活插件装饰 + 交出贴靠热区，与其它窗口共用同一套逻辑。
 // 主窗口的特别之处只在"启动画面"——标题栏要等核心 load 完成才渲染，
 // waitForSnapTarget 会一直等到那时，所以这里无需额外处理
@@ -1986,12 +1997,19 @@ onMounted(async () => {
 
 <template>
   <div class="main-window" ref="rootEl">
-    <!-- 加载期间：**只画一个关闭按钮**的标题栏，不放整条顶栏。
+    <!-- 加载期间：只画品牌与关闭按钮的标题栏，不放整条顶栏。
+         品牌不能省 —— 发现旧数据的弹窗会盖住启动画面中央的程序名，顶栏空着就像没标题。
          两颗不画的按钮用 visibility 占位，见 .boot-head 的样式 —— 自绘装饰激活要量
          "最大化按钮"的矩形，即 lib/decoration.ts 的 findMaximizeBtn，量不到插件会退回
          原生 frame、系统标题栏就又冒出来。 -->
-    <header v-if="splashVisible || splashError" class="boot-head" :class="titleBarStyle"
+    <header v-if="splashVisible || splashError" class="boot-head"
+      :class="[titleBarStyle, {
+        'is-macos': isMac,
+        'is-plugin-controls': bootPluginControls,
+        'is-fullscreen': bootFullscreen,
+      }]"
       @pointerdown="onTitleBarPointerDown">
+      <MainBrand />
       <span class="spacer" />
       <WindowControls :style="titleBarStyle" />
     </header>
@@ -2503,8 +2521,9 @@ onMounted(async () => {
     <BlockIconPickModal v-if="blockIconInst" :uuid="blockIconInst.uuid" :name="blockIconInst.name"
       @close="blockIconInst = null" />
 
-    <!-- ===== 首次启动：把 ColorMC 的数据搬过来（见 doInit 的探测）===== -->
-    <ColorMcMigrateModal v-if="colorMcInfo" :info="colorMcInfo" @close="onColorMcClosed" @done="onColorMcDone" />
+    <!-- ===== 首次启动：把旧启动器的数据搬过来（见 doInit 的探测）===== -->
+    <OldDataModal v-if="oldData" :colormc="oldData.colormc" :minecraft="oldData.minecraft"
+      @close="onOldDataClosed" @done="onOldDataDone" />
 
     <!-- ===== 选择目标分组：转移分组与移动选中实例共用 ===== -->
     <BaseModal v-if="showMoveGroupPick" :title="t('group.pickTitle')" :closable="false"

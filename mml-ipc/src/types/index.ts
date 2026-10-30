@@ -28,6 +28,7 @@ export * from "./dtos/java_dto";
 export * from "./dtos/lobby_dto";
 export * from "./dtos/log_dto";
 export * from "./dtos/main_dto";
+export * from "./dtos/minecraft_dto";
 export * from "./dtos/mod_export_dto";
 export * from "./dtos/motd_dto";
 export * from "./dtos/resource_dto";

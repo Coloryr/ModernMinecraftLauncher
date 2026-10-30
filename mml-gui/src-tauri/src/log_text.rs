@@ -440,6 +440,25 @@ pub enum LogText {
         /// 失败原因
         error: String,
     },
+    /// 探测到官方启动器的 .minecraft
+    MinecraftDetected {
+        /// 数据目录
+        dir: String,
+    },
+    /// 从 .minecraft 导入完成
+    MinecraftImported {
+        /// 实例名
+        name: String,
+        /// 搬进来的文件数
+        files: u32,
+    },
+    /// 用户跳过了 .minecraft 导入
+    MinecraftImportSkipped,
+    /// .minecraft 导入标记落盘失败
+    MinecraftMarkerWriteFailed {
+        /// 失败原因
+        error: String,
+    },
     /// 背景图缩放的等待失败
     BgResizeJoinFailed {
         /// 失败原因
@@ -812,6 +831,16 @@ impl LogText {
             LogText::ColormcMarkerWriteFailed { error } => {
                 format!("[colormc] 迁移标记落盘失败：{error}")
             }
+            LogText::MinecraftDetected { dir } => {
+                format!("[minecraft] 探测到 .minecraft：{dir}")
+            }
+            LogText::MinecraftImported { name, files } => {
+                format!("[minecraft] 导入实例 {name} 完成：{files} 个文件")
+            }
+            LogText::MinecraftImportSkipped => String::from("[minecraft] 用户跳过导入"),
+            LogText::MinecraftMarkerWriteFailed { error } => {
+                format!("[minecraft] 导入标记落盘失败：{error}")
+            }
             LogText::BgResizeJoinFailed { error } => format!("[bg] 缩放等待失败：{error}"),
             LogText::BgResizeFailed { error } => format!("[bg] 缩放失败：{error}"),
             LogText::BgConfigDirMissing => String::from("[bg] 设置背景失败：配置目录未初始化"),
@@ -1109,6 +1138,18 @@ impl LogText {
             LogText::ColormcMigrateSkipped => String::from("[colormc] migrate skipped by the user"),
             LogText::ColormcMarkerWriteFailed { error } => {
                 format!("[colormc] failed to write the migrate marker: {error}")
+            }
+            LogText::MinecraftDetected { dir } => {
+                format!("[minecraft] found .minecraft: {dir}")
+            }
+            LogText::MinecraftImported { name, files } => {
+                format!("[minecraft] imported the instance {name}: {files} file(s)")
+            }
+            LogText::MinecraftImportSkipped => {
+                String::from("[minecraft] import skipped by the user")
+            }
+            LogText::MinecraftMarkerWriteFailed { error } => {
+                format!("[minecraft] failed to write the import marker: {error}")
             }
             LogText::BgResizeJoinFailed { error } => format!("[bg] resize wait failed: {error}"),
             LogText::BgResizeFailed { error } => format!("[bg] resize failed: {error}"),

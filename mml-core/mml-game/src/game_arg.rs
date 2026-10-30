@@ -568,15 +568,16 @@ impl InstanceSettingObj {
             args.push("-Dauthlibinjector.side=client".to_string());
         }
 
+        // 启动器自身信息的系统属性，前缀统一 mml
         args.push(format!(
-            "-Dcolormc.dir={}",
+            "-Dmml.dir={}",
             mml_base::get_base_dir().to_string_lossy()
         ));
-        args.push(format!("-Dcolormc.game.uuid={}", self.uuid.to_string()));
-        args.push(format!("-Dcolormc.game.name={}", self.name));
-        args.push(format!("-Dcolormc.game.version={}", self.version));
+        args.push(format!("-Dmml.game.uuid={}", self.uuid.to_string()));
+        args.push(format!("-Dmml.game.name={}", self.name));
+        args.push(format!("-Dmml.game.version={}", self.version));
         args.push(format!(
-            "-Dcolormc.game.dir={}",
+            "-Dmml.game.dir={}",
             self.get_game_path().to_string_lossy()
         ));
 

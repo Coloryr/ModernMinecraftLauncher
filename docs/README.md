@@ -700,8 +700,13 @@ MML 服务器包填到 `server.json`（只填发布目录，离开输入框时�
   同一个账户以本启动器已有的令牌为准，令牌失效时启动前会自动刷新，刷新失败再要求重新登录。
 - 实例重名时导入的实例自动改名保留两份（如 `Foo` 和 `Foo1`）；uuid 冲突只给导入的实例换新；
   ColorMC 的分组名会合并进分组表，同名组复用。
-- 删掉运行目录里的迁移标记文件可以重新触发询问。
-- HMCL / MMC / 官方启动器没有专门迁移，请用「添加实例 → 文件夹 / 压缩包导入」把实例搬进来。
+- 支持从 `.minecraft` 导入：启动时探测 `.minecraft`（Windows 为 `%APPDATA%\.minecraft`，另含微软商店版），
+  在同一个「发现旧数据」弹窗里列出可导入的版本；选版本、改实例名后导入成实例。官方启动器、HMCL、PCL
+  生成的目录都认：开了版本隔离的（HMCL / PCL 常见）搬 `versions/<id>/` 里那份游戏数据，没开的搬根目录。
+  只搬游戏数据（mods、saves、config、options.txt 等），`versions` / `libraries` / `assets` 由启动器自己补；
+  M²L 未收录的版本（如 LabyMod）按自定义版本导入。
+- 删掉运行目录里的迁移标记文件（`colormc_migrate.json` / `minecraft_migrate.json`）可以重新触发询问。
+- HMCL / MMC 没有专门迁移，请用「添加实例 → 文件夹 / 压缩包导入」把实例搬进来。
 
 ## 16. 服务器包
 

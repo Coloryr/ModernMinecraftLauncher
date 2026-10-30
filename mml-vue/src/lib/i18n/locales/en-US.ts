@@ -2253,6 +2253,9 @@ export default {
   "err.colormcBusy": "A migration is already running",
   // ColorMC migration task failed: the raw error goes to the log
   "err.colormcTask": "ColorMC migration task failed (see the log for details)",
+  "err.minecraftMissing": "That folder is not .minecraft",
+  "err.minecraftVersionMissing": "The selected version file is missing",
+  "err.minecraftCoreTimeout": "Timed out waiting for the core to load; restart the launcher and try again",
   "err.bgUnsupported": "Unsupported image format",
   "err.bgConfigDir": "The config directory is not ready yet",
   "err.bgNone": "No background image is set",
@@ -2286,6 +2289,7 @@ export default {
   "colormc.level.partial": "Differences",
   "colormc.level.extra": "Unused",
   "colormc.restart": "Restart launcher",
+  "colormc.restarting": "Migration done, restarting the launcher…",
   "colormc.finish": "Done",
   "colormc.compat.minecraft":
     "Instances, assets, versions and libraries share the same layout — usable as is",
@@ -2302,6 +2306,24 @@ export default {
   "colormc.compat.gui": "ColorMC's UI state; M²L does not read it",
   "colormc.compat.lock": "ColorMC's run lock file; M²L does not read it",
   "colormc.compat.extra": "Unknown to M²L — left in the run directory as is (harmless)",
+
+  // Old data found: ColorMC and the official launcher's .minecraft share one dialog
+  "oldData.title": "Old data found",
+  "oldData.hint": "These old launchers' data can be brought into M²L.",
+  "oldData.close": "Close",
+  "colormc.skipped": "Skipped, will not ask again",
+  "minecraft.section": ".minecraft",
+  "minecraft.versions": "{n} version(s)",
+  "minecraft.version": "Version",
+  "minecraft.name": "Instance name",
+  "minecraft.hint": "Only game data such as mods, saves, config and options.txt is copied; HMCL / PCL per-version (isolated) folders are included too, while versions, libraries and assets are supplied by the launcher.",
+  "minecraft.unknown": "M²L does not list this version; it will be imported as a custom version.",
+  "minecraft.import": "Import",
+  "minecraft.skip": "Do not import",
+  "minecraft.importing": "Importing…",
+  "minecraft.done": "Imported {n} file(s)",
+  "minecraft.failed": "{n} file(s) could not be copied",
+  "minecraft.skipped": "Skipped, will not ask again",
 
   // Server instance generation: export a local instance as an online instance's server manifest
   "serverInstance.format": "Format",

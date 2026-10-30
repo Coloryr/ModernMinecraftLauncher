@@ -12,7 +12,7 @@ import { detectOs, onTitleBarPointerDown, titleBarStyle } from "../../../lib/tit
 import { useWindowFullscreen } from "../../../lib/useWindowFullscreen";
 import { useModpackStatus } from "../../../lib/modpackTasks";
 import { pluginDecorated } from "../../../lib/decoration";
-import { buildBadgeKey, buildChannel, isTestBuild, loadBuildInfo } from "../../../lib/buildInfo";
+import MainBrand from "./MainBrand.vue";
 import type { AccountStoreDto } from "../../../lib/bindings";
 import type { FeatureId } from "../types";
 
@@ -39,7 +39,6 @@ const pluginControls = computed(() => isMac && titleBarStyle === "macos");
 let unsubModpack: (() => void) | null = null;
 
 onMounted(async () => {
-  void loadBuildInfo();
   unsubModpack = await initModpackStatus();
 });
 
@@ -70,16 +69,8 @@ const emit = defineEmits<{
       'is-fullscreen': fullscreen,
     }]"
     @pointerdown="onTitleBarPointerDown">
-    <div class="brand">
-      <div class="brand-text">
-        <div class="brand-name">
-          {{ t("app.name") }}
-          <!-- 测试版 / 预发布版徽章：顶栏一直可见，切到实例列表时也知道自己在用什么版本 -->
-          <span v-if="isTestBuild" class="build-badge" :class="buildChannel">{{ t(buildBadgeKey) }}</span>
-        </div>
-        <div class="brand-sub">{{ t("app.sub") }}</div>
-      </div>
-    </div>
+    <!-- 品牌块与加载期间的标题栏共用，见 MainBrand.vue -->
+    <MainBrand />
 
     <div class="topbar-right">
       <!-- 进度指示器：排在主页按钮左边（整排的最前面）。
@@ -180,17 +171,8 @@ const emit = defineEmits<{
   padding-top: 24px;
 }
 
-/* 28px 的内容区：副标题与账户按钮都要收一档 */
-.topbar.is-macos.is-fullscreen .brand-sub {
-  display: none;
-}
-
-.topbar.is-macos.is-fullscreen .brand-name {
-  font-size: 13px;
-}
-
-/* 账户按钮按内容定高（头像 + 内边距），这里把它压到 26px 上下。
-   必须穿透到子组件，见 AccountSelector 的 .account-btn */
+/* 28px 的内容区：账户按钮按内容定高（头像 + 内边距），这里压到 26px 上下；
+   必须穿透到子组件，见 AccountSelector 的 .account-btn。品牌块自己收一档，见 MainBrand */
 .topbar.is-macos.is-fullscreen :deep(.account-btn) {
   padding: 2px 6px;
 }
@@ -217,48 +199,6 @@ const emit = defineEmits<{
    视觉与占位都由 M²L 自己的 WindowControls 提供，再让一次宽度会多出一段空白 */
 .topbar.windows {
   padding-right: 10px;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.brand-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.2;
-}
-
-/* 构建通道徽章：预发布版用黄色、测试版用强调色，与状态色的用法一致 */
-.build-badge {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 6px;
-  border-radius: 999px;
-  font-size: 10.5px;
-  font-weight: 600;
-  vertical-align: 2px;
-  border: 1px solid currentColor;
-}
-
-.build-badge.prerelease {
-  color: var(--yellow);
-}
-
-.build-badge.debug {
-  color: var(--accent);
-}
-
-.brand-name {
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.brand-sub {
-  font-size: 11px;
-  color: var(--text-dim);
 }
 
 /* 右侧集群自己顶到最右：窗口按钮在 macos 下插在头部、windows 下插在尾部，
