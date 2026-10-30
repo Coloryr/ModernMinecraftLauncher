@@ -37,9 +37,9 @@ use crate::{
 };
 
 /// 配置结构主版本号，结构变了才加一
-pub const VERSION_NUM: i32 = 1;
+pub const VERSION_NUM: i32 = 0;
 /// 小版本号
-pub const VERSION_SEC_NUM: i32 = 0;
+pub const VERSION_SEC_NUM: i32 = 1;
 /// 修订号
 pub const VERSION_PATCH_NUM: i32 = 0;
 /// 构建日期，格式 yyyymmdd，由 `build.rs` 在编译期注入；只有测试版用得上
