@@ -21,6 +21,9 @@ const ARGS_DEFAULTS: InstanceArgsDto = {
   fullscreen: false,
   width: 1280,
   height: 720,
+  // 骨架值也按"跟随全局"来：真值没拉回来之前，界面上显示的就是这一档
+  memoryInherit: true,
+  windowInherit: true,
   javaName: "",
   javaPath: "",
   gc: "auto",

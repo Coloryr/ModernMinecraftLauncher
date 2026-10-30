@@ -20,6 +20,7 @@ import SkinTab from "./parts/tabs/SkinTab.vue";
 import ClientTab from "./parts/tabs/ClientTab.vue";
 import LocalFilesTab from "./parts/tabs/LocalFilesTab.vue";
 import ExperimentalTab from "./parts/tabs/ExperimentalTab.vue";
+import { buildChannel, loadBuildInfo } from "../../lib/buildInfo";
 import { t } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
 import { KEYS, readString, writeString } from "../../lib/storage";
@@ -109,10 +110,15 @@ function isLockedGroup(id: string): boolean {
   return locked.value && LOCKED_GROUPS.includes(id);
 }
 
-/** 左侧导航：未锁定，或本次已解锁时才显示「客户端设置」 */
+/** 手柄页只给测试版：正式发布与预发布都不显示 */
+const showGamepad = computed(() => buildChannel.value === "debug");
+
+/** 左侧导航：未锁定，或本次已解锁时才显示「客户端设置」；测试版才有「手柄」 */
 const visibleTabs = computed(() =>
   SETTINGS_TABS.filter(
-    (item) => item.id !== "client" || !clientLocked.value || clientUnlocked.value,
+    (item) =>
+      (item.id !== "client" || !clientLocked.value || clientUnlocked.value) &&
+      (item.id !== "gamepad" || showGamepad.value),
   ),
 );
 
@@ -249,8 +255,13 @@ onMounted(async () => {
     client.load(),
     client.refreshLockInstances(),
     client.refreshCustomHome(),
+    loadBuildInfo(),
   ]);
   loadingConfig = false;
+  // 上次停在手柄页、这次不是测试版：回到界面页
+  if (!showGamepad.value && tab.value === "gamepad") {
+    tab.value = "ui";
+  }
   if (clientLocked.value && tab.value === "client") {
     tab.value = "ui";
   }
@@ -322,7 +333,7 @@ function onKeyDown(e: KeyboardEvent) {
           <NetworkTab v-else-if="tab === 'network'" :settings="network" :flash-group="flashGroup" />
           <LaunchTab v-else-if="tab === 'launch'" :settings="launch" :look="client" :locked="locked"
             :flash-group="flashGroup" />
-          <GamepadTab v-else-if="tab === 'gamepad'" :settings="gamepad" :flash-group="flashGroup" />
+          <GamepadTab v-else-if="tab === 'gamepad' && showGamepad" :settings="gamepad" :flash-group="flashGroup" />
           <SkinTab v-else-if="tab === 'skin'" :settings="skin" :flash-group="flashGroup" />
           <ClientTab v-else-if="tab === 'client' && (clientUnlocked || !clientLocked)" :settings="client"
             v-model:win="launchWin" :flash-group="flashGroup" />

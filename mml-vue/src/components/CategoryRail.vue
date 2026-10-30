@@ -20,6 +20,10 @@ export interface CatItem {
   count: number;
   /** 用户自建：可以改名 / 删除，右键给菜单 */
   custom?: boolean;
+  /** 为 true 时不当拖放目标：不渲染 `data-group`，指针落上去等于没落在分组上 */
+  dropDisabled?: boolean;
+  /** 能不能拖动排序；为 false 时按不动（位置由上层定死） */
+  reorderable?: boolean;
 }
 
 const props = withDefaults(
@@ -79,13 +83,13 @@ let suppressClick = false;
 /** 正在拖的那个分类；没在拖时是 `null` */
 const dragged = computed(() => props.items.find((c) => c.id === dragging.value) ?? null);
 
-function onPointerDown(e: PointerEvent, id: string) {
-  if (!props.sortable || e.button !== 0 || id === "") return;
+function onPointerDown(e: PointerEvent, item: CatItem) {
+  if (!props.sortable || e.button !== 0 || item.reorderable === false) return;
   suppressClick = false;
   pointerId = e.pointerId;
   startX = e.clientX;
   startY = e.clientY;
-  candidate = id;
+  candidate = item.id;
   dragging.value = null;
   insertAt.value = null;
   ghost.value = { x: e.clientX, y: e.clientY };
@@ -113,6 +117,11 @@ function updateInsert(e: PointerEvent) {
       index = i;
       break;
     }
+  }
+  // 不可拖的项只占位：落到它们前面，等于落到第一个可拖项前面
+  const firstMovable = props.items.findIndex((item) => item.reorderable !== false);
+  if (firstMovable >= 0 && index < firstMovable) {
+    index = firstMovable;
   }
   insertAt.value = index;
 }
@@ -191,7 +200,8 @@ onUnmounted(() => {
       </div>
       <button type="button" role="tab" class="cat-item"
         :class="{ on: active === c.id, dragging: dragging === c.id, 'drop-target': dropKey === c.id }" :data-cat="c.id"
-        :data-group="c.id" :aria-selected="active === c.id" @pointerdown="onPointerDown($event, c.id)"
+        :data-group="c.dropDisabled ? undefined : c.id" :aria-selected="active === c.id"
+        @pointerdown="onPointerDown($event, c)"
         @click="onClick(c.id)" @contextmenu="onContextMenu($event, c)">
         <span class="cat-name">{{ c.label }}</span>
         <span class="cat-num">{{ c.count }}</span>

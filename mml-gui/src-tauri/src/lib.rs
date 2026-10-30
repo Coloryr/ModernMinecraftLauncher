@@ -225,6 +225,9 @@ pub fn run() {
                     Ok(()) => {
                         // 统计要在实例表加载完之后读：read() 会拿当前实例刷新名字快照
                         mml_game::game_count::init(mml_base::get_base_dir());
+                        // Windows 便携版：系统通知要求有带 AUMID 的开始菜单快捷方式。
+                        // 放这里而不是 setup：写盘与日志都要等内核（日志系统）起来，见 notify.rs
+                        std::thread::spawn(notify::register_start_menu_shortcut);
                         main::emit_load_done(&handle, None);
                     }
                     Err(err) => {

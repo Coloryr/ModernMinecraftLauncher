@@ -1,8 +1,8 @@
 <script setup lang="ts">
-// 首次使用设置：旧数据（ColorMC / .minecraft）刚搬完时问一次主页面样式、背景图与透明模式
+// 首次使用设置：旧数据（ColorMC / .minecraft）询问结束后问一次主页面样式、背景图与透明模式
 //
 // 三项都是**选中即生效**（后面主窗口就在弹窗底下，能立刻看到效果），所以只有一个「完成」
-// 按钮负责关窗；之后要改走设置窗口。弹窗只在导入真的搬过数据之后才出现，见 MainWindow。
+// 按钮负责关窗；之后要改走设置窗口。弹窗在旧数据询问结束后出现，见 MainWindow。
 import { computed, onMounted, ref } from "vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";

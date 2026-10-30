@@ -237,6 +237,7 @@ export default {
 
   // Multi-select
   "multi.selectAll": "Select all",
+  "multi.enter": "Multi-select",
   "multi.selectAllDone": "{count} instances selected",
   "multi.moveGroup": "Change group",
   "multi.delete": "Delete instances",
@@ -279,6 +280,7 @@ export default {
   // Instance detail
   "detail.selectHint": "Select an instance from the left",
   "detail.modpackCheck": "Check modpack update",
+  "detail.modpackNeedIds": "Fill in the project ID and file ID first",
   "detail.serverPackCheck": "Sync server pack",
   "detail.modpackChecking": "Checking for updates…",
   "launch.serverPackTitle": "Server pack has a new version",
@@ -1099,6 +1101,7 @@ export default {
   "args.minMemory": "Min",
   "args.maxMemory": "Max",
   "args.custom": "Custom",
+  "args.useGlobal": "Use global setting",
   "args.windowSize": "Window size",
   "args.fullscreen": "Fullscreen",
   "args.width": "Width",
@@ -1889,9 +1892,9 @@ export default {
   "winHelp.qqCopy": "Copy group number",
   "winHelp.qqCopied": "Group number copied",
 
-  // First-run setup: asked once after old data has been imported
+  // First-run setup: asked once after the old-data prompt is done
   "firstRun.title": "First-run setup",
-  "firstRun.intro": "Your old data has been imported. Pick a few settings to start with — you can change them anytime in Settings.",
+  "firstRun.intro": "Pick a few settings to start with — you can change them anytime in Settings.",
   "firstRun.modeTitle": "Main page layout",
   "firstRun.modeGroupDesc": "Grouped list, groups can collapse",
   "firstRun.modeGridDesc": "Icon grid, several per row",

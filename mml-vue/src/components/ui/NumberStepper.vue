@@ -13,8 +13,10 @@ const props = withDefaults(
     max?: number;
     /** 加减按钮的步长 */
     step?: number;
+    /** 禁用：输入框与加减按钮都不可用。跟随全局设置这类"值只作展示"的场合用 */
+    disabled?: boolean;
   }>(),
-  { min: 0, max: 99999, step: 1 },
+  { min: 0, max: 99999, step: 1, disabled: false },
 );
 
 const emit = defineEmits<{
@@ -65,14 +67,14 @@ function onCommit() {
 </script>
 
 <template>
-  <div class="stepper">
-    <button class="step-btn" @click="dec">
+  <div class="stepper" :class="{ 'is-disabled': disabled }">
+    <button class="step-btn" :disabled="disabled" @click="dec">
       <GlyphIcon name="minus" :size="14" />
     </button>
-    <input class="step-input" type="number" :min="min" :max="max" :step="step" :value="editing ? draft : modelValue"
-      @focus="onFocus" @input="onInput" @change="onCommit" @keyup.enter="($event.target as HTMLInputElement).blur()"
-      @blur="onCommit" />
-    <button class="step-btn" @click="inc">
+    <input class="step-input" type="number" :min="min" :max="max" :step="step" :disabled="disabled"
+      :value="editing ? draft : modelValue" @focus="onFocus" @input="onInput" @change="onCommit"
+      @keyup.enter="($event.target as HTMLInputElement).blur()" @blur="onCommit" />
+    <button class="step-btn" :disabled="disabled" @click="inc">
       <GlyphIcon name="plus" :size="14" />
     </button>
   </div>
@@ -116,7 +118,7 @@ function onCommit() {
   border-left: 1px solid var(--border);
 }
 
-.step-btn:hover {
+.step-btn:hover:not(:disabled) {
   background: var(--accent-soft);
   color: var(--accent);
 }
@@ -147,5 +149,16 @@ function onCommit() {
 /* 输入框无边框，聚焦反馈落在整体外框上 */
 .stepper:focus-within {
   border-color: var(--accent);
+}
+
+/* 禁用态：整块压暗，鼠标变成禁止符。值仍然看得见 —— 跟随全局时那正是会用的数字 */
+.stepper.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.stepper.is-disabled .step-btn,
+.stepper.is-disabled .step-input {
+  cursor: not-allowed;
 }
 </style>

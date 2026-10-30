@@ -6,7 +6,7 @@
 // 菜单视图只由 `menu.kind` 决定，别再加第二级视图 —— 父级 kind 不变时永远渲染不到。
 //
 // 定位：`position: fixed` 钉在点击处，但**渲染后要量一次并收进窗口**——
-// 否则靠近窗口下/右边缘点开时，菜单会超出可视区被裁掉 —— 实例菜单 10 项，比分组菜单高一截。
+// 否则靠近窗口下/右边缘点开时，菜单会超出可视区被裁掉 —— 实例菜单十来项，比分组菜单高一截。
 import { computed, nextTick, ref, watchEffect } from "vue";
 import { t } from "../../../lib/i18n";
 import type { CtxMenuState, GroupView, InstMenuAction } from "../types";
@@ -119,10 +119,14 @@ watchEffect(async () => {
       </button>
     </template>
 
-    <!-- 实例菜单：按功能归类 —— 启动 / 管理 / 组织 / 分享 / 删除 -->
+    <!-- 实例菜单：按功能归类 —— 启动 / 多选 / 管理 / 组织 / 分享 / 删除 -->
     <template v-else-if="menu.kind === 'instance'">
       <button class="ctx-item" @click="emit('inst-action', 'launch')">
         {{ t("launch.play") }}
+      </button>
+      <!-- 多选：以这一项为起点进入多选，之后勾别的实例、用顶部工具栏批量操作 -->
+      <button class="ctx-item" @click="emit('inst-action', 'multiSelect')">
+        {{ t("multi.enter") }}
       </button>
       <div class="ctx-sep"></div>
       <button class="ctx-item" @click="emit('inst-action', 'viewMods')">

@@ -102,7 +102,11 @@ webview2-com = "~0.39.1"
 windows = { workspace = true, features = [
   "Win32_Foundation",
   "Win32_System_Com",
+  # 系统通知要写带 AUMID 属性的快捷方式：IPropertyStore 与 VT_LPWSTR 的 PROPVARIANT
+  "Win32_System_Com_StructuredStorage",
+  "Win32_System_Variant",
   "Win32_UI_Shell",
+  "Win32_UI_Shell_PropertiesSystem",
   "Win32_UI_WindowsAndMessaging",
 ] }
 

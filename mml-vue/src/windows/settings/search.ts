@@ -5,6 +5,7 @@
 //
 // 维护约定：**这里列的是"能搜到的设置项"**，标签页里加/改设置项时同步这里；
 // 键名写错不会报错，只是搜不到，所以加完记得在搜索框里打一遍试试。
+import { buildChannel } from "../../lib/buildInfo";
 import { t } from "../../lib/i18n";
 import { SETTINGS_TABS, type SettingsTab } from "./types";
 
@@ -204,7 +205,7 @@ const SETTINGS_INDEX: IndexEntry[] = [
     extra: ["lock client", "unlock", "password", "锁定客户端设置", "解锁", "密码"],
   },
   {
-    tab: "client",
+    tab: "launch",
     group: "autoSave",
     labelKey: "winSettings.autoSaveNotice",
     extra: ["auto save", "save", "自动进入存档", "存档", "提醒"],
@@ -318,6 +319,8 @@ export function searchSettings(query: string, limit = 40): SettingsHit[] {
 
   const hits: SettingsHit[] = [];
   for (const e of SETTINGS_INDEX) {
+    // 手柄页只有测试版才有，正式 / 预发布连搜索也不该命中
+    if (e.tab === "gamepad" && buildChannel.value !== "debug") continue;
     const groupTitleKey = GROUP_TITLES[e.group];
     const groupLabel = groupTitleKey ? t(groupTitleKey) : e.group;
     const label = t(e.labelKey);

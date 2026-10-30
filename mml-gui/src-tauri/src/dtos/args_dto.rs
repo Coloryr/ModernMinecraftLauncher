@@ -25,6 +25,15 @@ pub struct InstanceArgsDto {
     pub width: i64,
     /// 窗口高度
     pub height: i64,
+    /// 内存是否跟随全局设置
+    ///
+    /// 实例没单独设最大 / 最小内存时为 true：这时 [`Self::memory`] 与 [`Self::min_memory`]
+    /// 填的是**全局的生效值**，界面上那两个框只作展示、不可编辑。
+    pub memory_inherit: bool,
+    /// 窗口大小是否跟随全局设置
+    ///
+    /// 实例没单独设全屏 / 宽 / 高时为 true，[`Self::fullscreen`] 等同理是全局生效值。
+    pub window_inherit: bool,
     /// 使用的 Java 名；"custom" 表示自定义路径
     pub java_name: String,
     /// 自定义 Java 路径
@@ -86,6 +95,9 @@ impl Default for InstanceArgsDto {
             fullscreen: false,
             width: 854,
             height: 480,
+            // 新实例默认跟随全局：内存与窗口都不单独设，启动时用 mml_config 里那份
+            memory_inherit: true,
+            window_inherit: true,
             java_name: String::new(),
             java_path: String::new(),
             gc: "auto".into(),

@@ -66,6 +66,21 @@ const updatableModpack = computed(
     (props.instance.modpackType === "serverpack" && !!props.instance.serverUrl),
 );
 
+/**
+ * 「检查整合包更新」按钮能不能点
+ *
+ * 平台整合包还要**项目 ID 与文件 ID 都在**才问得动平台，缺一个都拼不出请求；
+ * 在线服务器包只看地址（判据在 updatableModpack 里）。
+ * 自动检查仍按 updatableModpack 走：手填 ID 的过程中不该突然弹确认窗。
+ */
+const canCheckModpack = computed(() => {
+  const type = props.instance.modpackType;
+  if (type === "curseforge" || type === "modrinth") {
+    return !!props.instance.pid && !!props.instance.fid;
+  }
+  return updatableModpack.value;
+});
+
 /** 这次检查针对的是在线服务器包 */
 const serverPack = computed(() => props.instance.modpackType === "serverpack");
 
@@ -83,7 +98,7 @@ const packResult = ref<ModPackUpdateDto | null>(null);
  * - `auto`: 选中实例后自动查的那一次；不弹"已是最新"，失败也不提示，免得每次切实例都打扰
  */
 async function checkModpack(auto = false) {
-  if (packBusy.value || !updatableModpack.value) return;
+  if (packBusy.value || !canCheckModpack.value) return;
   packBusy.value = true;
   try {
     const result = await modpackCheck(props.instance.uuid);
@@ -560,9 +575,10 @@ function onPlatformChange(value: string) {
           :disabled="packBusy" @input="change({ pid: ($event.target as HTMLInputElement).value || null })" />
         <input class="field-input" :value="instance.fid ?? ''" :placeholder="t('meta.fid')" spellcheck="false"
           :disabled="packBusy" @input="change({ fid: ($event.target as HTMLInputElement).value || null })" />
-        <button class="ui-btn-icon" :disabled="packBusy"
-          v-tip="packBusy ? t('detail.modpackChecking') : t('detail.modpackCheck')"
-          :aria-label="packBusy ? t('detail.modpackChecking') : t('detail.modpackCheck')"
+        <!-- 项目 / 文件 ID 缺一个就问不动平台，按钮直接禁用并说明缺什么 -->
+        <button class="ui-btn-icon" :disabled="packBusy || !canCheckModpack"
+          v-tip="packBusy ? t('detail.modpackChecking') : !canCheckModpack ? t('detail.modpackNeedIds') : t('detail.modpackCheck')"
+          :aria-label="packBusy ? t('detail.modpackChecking') : !canCheckModpack ? t('detail.modpackNeedIds') : t('detail.modpackCheck')"
           @click="checkModpack()">
           <span v-if="packBusy" class="pack-spin" />
           <GlyphIcon v-else name="update" :size="14" :weight="2" />

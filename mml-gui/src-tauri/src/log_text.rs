@@ -557,6 +557,26 @@ pub enum LogText {
         /// 失败原因
         error: String,
     },
+    /// 系统通知已发出
+    NotificationSent {
+        /// 通知标题，已跟界面语言
+        title: String,
+    },
+    /// 有窗口在前台，所以没发系统通知
+    NotificationSkipped {
+        /// 处于前台的窗口标签
+        window: String,
+    },
+    /// 已为系统通知注册开始菜单快捷方式
+    NotificationShortcut {
+        /// 快捷方式路径
+        path: String,
+    },
+    /// 为系统通知注册开始菜单快捷方式失败
+    NotificationShortcutFailed {
+        /// 失败原因
+        error: String,
+    },
 }
 
 impl LogText {
@@ -868,6 +888,16 @@ impl LogText {
             }
             LogText::NotificationPermissionFailed { error } => {
                 format!("[notify] 申请系统通知权限失败：{error}")
+            }
+            LogText::NotificationSent { title } => format!("[notify] 已发出系统通知：{title}"),
+            LogText::NotificationSkipped { window } => {
+                format!("[notify] 启动器有窗口在前台（{window}），不发系统通知")
+            }
+            LogText::NotificationShortcut { path } => {
+                format!("[notify] 已为系统通知注册开始菜单快捷方式：{path}")
+            }
+            LogText::NotificationShortcutFailed { error } => {
+                format!("[notify] 为系统通知注册开始菜单快捷方式失败：{error}")
             }
         }
     }
@@ -1189,6 +1219,18 @@ impl LogText {
             LogText::NotificationPermissionFailed { error } => {
                 format!("[notify] failed to request the notification permission: {error}")
             }
+            LogText::NotificationSent { title } => {
+                format!("[notify] system notification sent: {title}")
+            }
+            LogText::NotificationSkipped { window } => format!(
+                "[notify] launcher window \"{window}\" is focused, system notification skipped"
+            ),
+            LogText::NotificationShortcut { path } => format!(
+                "[notify] registered the start menu shortcut for system notifications: {path}"
+            ),
+            LogText::NotificationShortcutFailed { error } => format!(
+                "[notify] failed to register the start menu shortcut for system notifications: {error}"
+            ),
         }
     }
 }

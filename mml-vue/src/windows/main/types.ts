@@ -48,6 +48,7 @@ export interface DragCandidate {
 /** 实例右键菜单的动作 id */
 export type InstMenuAction =
   | "launch"
+  | "multiSelect"
   | "viewMods"
   | "manageResource"
   | "openFolder"

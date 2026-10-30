@@ -479,38 +479,6 @@
   white-space: nowrap;
 }
 
-.args-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  /* 与全 app 控件同高（原来靠 11px 纵向内边距撑到 40px，比所有控件都高一截） */
-  height: var(--ctl-h);
-  padding: 0 14px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.args-toggle:hover {
-  border-color: var(--accent);
-}
-
-.args-chevron {
-  color: var(--text-dim);
-  transition: transform 0.15s;
-}
-
-.args-chevron.flip {
-  transform: rotate(180deg);
-}
-
 .list-args {
   width: 100%;
   max-width: 640px;
@@ -764,8 +732,7 @@
   opacity: 0;
 }
 
-/* 次级操作（实例设置 / 资源管理 / 日志 / 导出）：四个方形图标键排一行，
-   尺寸与标题栏那档一致，文案全在 v-tip 与 aria-label 里 */
+/* 次级操作：实例设置 / 资源管理带文字，日志 / 导出是方形图标键（文案在 v-tip 与 aria-label 里） */
 .launch-sub-actions {
   display: flex;
   gap: 10px;
@@ -776,6 +743,12 @@
   height: var(--ctl-h);
   padding: 0;
   border-radius: var(--ctl-radius);
+}
+
+/* 带文字的两个：宽按文案走，左右内边距回到 .s-sm 那一档（方形键的 0 内边距会把字贴边） */
+.launch-sub-actions :deep(.ui-btn.has-text) {
+  width: auto;
+  padding: 0 14px;
 }
 
 /* ================= 多选模式 ================= */

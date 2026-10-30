@@ -414,6 +414,48 @@ select.field-select {
   cursor: not-allowed;
 }
 
+/* ---------- 折叠段标题 ----------
+ * 实例设置的自定义段 / 扩展参数与启动器设置的 Java 分组共用这一副外观，
+ * 避免同一个"可展开标题"在几个窗口里各长一个样 */
+.collapse-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: var(--ctl-h);
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.collapse-head:hover {
+  border-color: var(--accent);
+}
+
+.collapse-head:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* 箭头统一推到最右；展开时由调用方加 .flip */
+.collapse-head .collapse-chevron {
+  margin-left: auto;
+  color: var(--text-dim);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.collapse-head .collapse-chevron.flip {
+  transform: rotate(180deg);
+}
+
 /* 图标按钮：方形、无边框，悬停才出底 */
 .ui-btn-icon {
   display: inline-flex;

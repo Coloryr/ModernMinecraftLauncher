@@ -17,16 +17,12 @@ use uuid::Uuid;
 ///
 /// # 返回值
 ///
-/// 前端启动参数 DTO；核心侧缺省的内存 / 全屏等沿用 `InstanceArgsDto` 默认值
+/// 前端启动参数 DTO。核心侧没设的内存 / 窗口填的是**全局生效值**，同时把
+/// `memory_inherit` / `window_inherit` 置真，界面据此把对应输入框禁掉
 pub(super) fn args_from_core(inst: &InstanceSettingObj) -> InstanceArgsDto {
     let mut a = InstanceArgsDto::default();
+    let global = mml_config::read_config();
     if let Some(jvm) = &inst.jvm_arg {
-        if let Some(v) = jvm.max_memory {
-            a.memory = v as i64;
-        }
-        if let Some(v) = jvm.min_memory {
-            a.min_memory = v as i64;
-        }
         a.gc = match jvm.gc_mode {
             Some(GCType::G1GC) => "g1gc",
             Some(GCType::ZGC) => "zgc",
@@ -64,17 +60,41 @@ pub(super) fn args_from_core(inst: &InstanceSettingObj) -> InstanceArgsDto {
             a.post_cmd = s.clone();
         }
     }
-    // 没写就是跟随启动器设置，界面上展示实际生效值
-    let global_isolate = mml_config::read_config()
+    // 内存没单独设就是跟随全局：把全局的生效值填进来，界面上那两个框显示的是真正会用的
+    // 数字，只是处于禁用状态。最大 / 最小要一起看：只要设了其中一个就算实例自己定
+    a.memory_inherit = inst
         .jvm_arg
-        .isolate_home
-        .unwrap_or(true);
+        .as_ref()
+        .is_none_or(|jvm| jvm.max_memory.is_none() && jvm.min_memory.is_none());
+    if a.memory_inherit {
+        a.memory = global.jvm_arg.max_memory.unwrap_or(0) as i64;
+        a.min_memory = global.jvm_arg.min_memory.unwrap_or(0) as i64;
+    } else {
+        if let Some(v) = inst.jvm_arg.as_ref().and_then(|jvm| jvm.max_memory) {
+            a.memory = v as i64;
+        }
+        if let Some(v) = inst.jvm_arg.as_ref().and_then(|jvm| jvm.min_memory) {
+            a.min_memory = v as i64;
+        }
+    }
+
+    // 没写就是跟随启动器设置，界面上展示实际生效值
+    let global_isolate = global.jvm_arg.isolate_home.unwrap_or(true);
     a.isolate_home = inst
         .jvm_arg
         .as_ref()
         .and_then(|jvm| jvm.isolate_home)
         .unwrap_or(global_isolate);
-    if let Some(w) = &inst.window {
+    // 窗口同理：全屏 / 宽 / 高全都没设才算跟随全局
+    a.window_inherit = inst
+        .window
+        .as_ref()
+        .is_none_or(|w| w.full_screen.is_none() && w.width.is_none() && w.height.is_none());
+    if a.window_inherit {
+        a.fullscreen = global.window.full_screen.unwrap_or(false);
+        a.width = global.window.width.unwrap_or(0) as i64;
+        a.height = global.window.height.unwrap_or(0) as i64;
+    } else if let Some(w) = &inst.window {
         if let Some(v) = w.full_screen {
             a.fullscreen = v;
         }
@@ -114,12 +134,21 @@ pub(super) fn args_from_core(inst: &InstanceSettingObj) -> InstanceArgsDto {
 
 /// 前端启动参数 DTO -> 写入核心实例配置，不保存，由调用方 save
 ///
+/// `memory_inherit` / `window_inherit` 为真时把实例这一层的值**清成 `None`**，
+/// 启动时才会回落到 `mml_config` 里的全局设置。
+///
 /// - `inst`: 待写入的核心实例配置，缺失的子对象就地创建
 /// - `a`: 前端提交的启动参数
 pub(super) fn apply_args_to_core(inst: &mut InstanceSettingObj, a: &InstanceArgsDto) {
     let jvm = inst.jvm_arg.get_or_insert_with(RunArgObj::default);
-    jvm.max_memory = Some(a.memory.max(0) as u32);
-    jvm.min_memory = Some(a.min_memory.max(0) as u32);
+    if a.memory_inherit {
+        // 跟随全局：把实例这一层的值清掉，启动时才会回落到 mml_config 里的那份
+        jvm.max_memory = None;
+        jvm.min_memory = None;
+    } else {
+        jvm.max_memory = Some(a.memory.max(0) as u32);
+        jvm.min_memory = Some(a.min_memory.max(0) as u32);
+    }
     jvm.gc_mode = Some(match a.gc.as_str() {
         "g1gc" => GCType::G1GC,
         "zgc" => GCType::ZGC,
@@ -146,10 +175,15 @@ pub(super) fn apply_args_to_core(inst: &mut InstanceSettingObj, a: &InstanceArgs
     jvm.launch_post_run = Some(a.post_enabled);
     jvm.post_run_arg = Some(a.post_cmd.clone());
 
-    let win = inst.window.get_or_insert_with(WindowSettingObj::default);
-    win.full_screen = Some(a.fullscreen);
-    win.width = Some(a.width.clamp(0, u16::MAX as i64) as u16);
-    win.height = Some(a.height.clamp(0, u16::MAX as i64) as u16);
+    if a.window_inherit {
+        // 同上：整块窗口设置清掉，启动时回落到全局那份
+        inst.window = None;
+    } else {
+        let win = inst.window.get_or_insert_with(WindowSettingObj::default);
+        win.full_screen = Some(a.fullscreen);
+        win.width = Some(a.width.clamp(0, u16::MAX as i64) as u16);
+        win.height = Some(a.height.clamp(0, u16::MAX as i64) as u16);
+    }
 
     inst.jvm_name = (!a.java_name.is_empty()).then(|| a.java_name.clone());
     inst.jvm_local = (!a.java_path.is_empty()).then(|| a.java_path.clone());

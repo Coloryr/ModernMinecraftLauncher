@@ -40,7 +40,7 @@ const {
   saveState,
 } = props.settings;
 
-const { launchCheck, applyLaunchCheck } = props.look;
+const { client, applyClient, launchCheck, applyLaunchCheck } = props.look;
 
 /** 应用一个内存预设：填最大内存；最小内存高于它时一并顶上去 */
 function applyMemory(mib: number) {
@@ -277,6 +277,18 @@ watch(memoryConflict, async (bad) => {
         <label class="field-label">{{ t("winSettings.postCmd") }}</label>
         <input v-model="run!.postRunArg" class="field-input" spellcheck="false" autocomplete="off" />
       </template>
+    </SettingsGroup>
+
+    <!-- 自动进入存档：实例配了启动后自动进入某个存档时，先弹窗确认；关掉后直接进入 -->
+    <SettingsGroup v-if="!locked" id="autoSave" title-key="winSettings.secAutoSave"
+      :flash="flashGroup === 'autoSave'">
+      <div class="switch-row">
+        <div class="switch-text">
+          <span class="switch-label">{{ t("winSettings.autoSaveNotice") }}</span>
+          <span class="switch-state">{{ t("winSettings.autoSaveNoticeDesc") }}</span>
+        </div>
+        <BaseSwitch v-model="client.autoSaveNotice" @update:model-value="applyClient" />
+      </div>
     </SettingsGroup>
 
     <!-- 启动前检查：加载器与内存，开关存 gui_config -->

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // 实例启动参数面板：
-//   启动参数：窗口大小（分辨率预设 / 全屏 / 自定义）与内存（最小 / 最大）走预设下拉，
-//            数值框一直可改，改出下拉里没有的值会自动落到「自定义」；
+//   启动参数：窗口大小（跟随全局 / 分辨率预设 / 全屏 / 自定义）与内存（最小 / 最大）走预设下拉，
+//            数值框可改，改出下拉里没有的值会自动落到「自定义」；
+//            选「使用全局设定」时数值框禁用，显示的是全局那份生效值（后端清掉实例这层的值）；
 //            下拉各占一行、数值续一行；内存行带本机总量与可用量；
 //            Java 选「自定义」时显示路径 + 选择文件
 //   扩展参数：GC / 自定义主类 / 附加 JVM 参数 / 附加游戏参数 / 附加 classpath（多行列表）
@@ -9,6 +10,7 @@
 import { computed, ref, watch } from "vue";
 import { t } from "../lib/i18n";
 import { COMMON_MEMORY, COMMON_MIN_MEMORY, COMMON_RESOLUTIONS } from "../lib/resolutions";
+import { commands } from "../lib/bindings";
 import type { InstanceArgsDto, JavaInfoDto } from "../lib/bindings";
 import BaseButton from "./ui/BaseButton.vue";
 import BaseSwitch from "./ui/BaseSwitch.vue";
@@ -40,8 +42,9 @@ const resManual = ref(false);
 const memManual = ref(false);
 const minMemManual = ref(false);
 
-/** 窗口大小下拉的当前项：全屏 / 预设的 `宽x高` / `custom`，三者互斥 */
+/** 窗口大小下拉的当前项：跟随全局 / 全屏 / 预设的 `宽x高` / `custom`，四者互斥 */
 const resPick = computed(() => {
+  if (props.args.windowInherit) return "global";
   if (props.args.fullscreen) return "fullscreen";
   const hit = COMMON_RESOLUTIONS.find((r) => r.w === props.args.width && r.h === props.args.height);
   return !resManual.value && hit ? `${hit.w}x${hit.h}` : "custom";
@@ -50,15 +53,19 @@ const resPick = computed(() => {
 /** 是否展开宽 / 高手输：非全屏一直可改（照着预设微调就不必先点一次「自定义」），全屏时尺寸无效 */
 const resInputs = computed(() => !props.args.fullscreen);
 
-/** 最大内存下拉的当前项：预设的 MB 字符串，手输或没匹配上预设都是 `custom` */
-const memPick = computed(() =>
-  !memManual.value && COMMON_MEMORY.includes(props.args.memory) ? String(props.args.memory) : "custom",
-);
+/** 最大内存下拉的当前项：跟随全局 / 预设的 MB 字符串 / 手输 */
+const memPick = computed(() => {
+  if (props.args.memoryInherit) return "global";
+  return !memManual.value && COMMON_MEMORY.includes(props.args.memory) ? String(props.args.memory) : "custom";
+});
 
 /** 最小内存下拉的当前项：口径与最大内存相同，预设表多出 256 / 512 两档 */
-const minMemPick = computed(() =>
-  !minMemManual.value && COMMON_MIN_MEMORY.includes(props.args.minMemory) ? String(props.args.minMemory) : "custom",
-);
+const minMemPick = computed(() => {
+  if (props.args.memoryInherit) return "global";
+  return !minMemManual.value && COMMON_MIN_MEMORY.includes(props.args.minMemory)
+    ? String(props.args.minMemory)
+    : "custom";
+});
 
 /** 当前选的 Java 不在候选列表里（被删了 / 还没扫到）：下拉要补一条同名的，否则显示成空白 */
 const missingJava = computed(
@@ -82,43 +89,91 @@ watch(() => props.args.minMemory, () => {
 
 /** 应用一个内存预设：填最大内存；最小内存高于它时一并顶上去 */
 function applyMemory(mib: number) {
-  update({ memory: mib, minMemory: Math.min(props.args.minMemory, mib) });
+  update({ memory: mib, minMemory: Math.min(props.args.minMemory, mib), memoryInherit: false });
+}
+
+/**
+ * 切到「使用全局设定」：把全局的生效值填进来
+ *
+ * 后端保存时会把实例这一层的值清掉，启动时回落到全局那份；这里顺手把全局值填上，
+ * 那几个禁用框里显示的就是真正会用的数字，不会停在实例原来的值上。
+ */
+async function useGlobalMemory() {
+  // 取全局值要过一次 IPC，这期间可能已经切了实例：切走就别把值写到别人身上
+  const snapshot = props.args;
+  const launch = await commands.settings.getLaunch().catch(() => null);
+  if (props.args !== snapshot) return;
+  update({
+    memoryInherit: true,
+    memory: launch?.run.maxMemory ?? props.args.memory,
+    minMemory: launch?.run.minMemory ?? props.args.minMemory,
+  });
+}
+
+/** 同上，窗口大小：全屏 / 宽 / 高一起回落到全局 */
+async function useGlobalWindow() {
+  const snapshot = props.args;
+  const launch = await commands.settings.getLaunch().catch(() => null);
+  if (props.args !== snapshot) return;
+  update({
+    windowInherit: true,
+    fullscreen: launch?.window.fullScreen ?? props.args.fullscreen,
+    width: launch?.window.width ?? props.args.width,
+    height: launch?.window.height ?? props.args.height,
+  });
 }
 
 /** 分辨率下拉：全屏 / 预设 / 自定义 三选一；后两者都要退出全屏，否则选项与状态对不上 */
 function onResPick(e: Event) {
   const v = (e.target as HTMLSelectElement).value;
+  if (v === "global") {
+    resManual.value = false;
+    void useGlobalWindow();
+    return;
+  }
   if (v === "fullscreen") {
     resManual.value = false;
-    update({ fullscreen: true });
+    update({ fullscreen: true, windowInherit: false });
     return;
   }
   if (v === "custom") {
     resManual.value = true;
-    update({ fullscreen: false });
+    update({ fullscreen: false, windowInherit: false });
     return;
   }
   const [w, h] = v.split("x").map(Number);
   resManual.value = false;
-  update({ width: w, height: h, fullscreen: false });
+  update({ width: w, height: h, fullscreen: false, windowInherit: false });
 }
 
 /** 最小内存下拉：选预设就填最小内存；预设高于当前上限时压到上限，与上限侧的夹取对称 */
 function onMinMemPick(e: Event) {
   const v = (e.target as HTMLSelectElement).value;
+  if (v === "global") {
+    minMemManual.value = false;
+    void useGlobalMemory();
+    return;
+  }
   if (v === "custom") {
     minMemManual.value = true;
+    update({ memoryInherit: false });
     return;
   }
   minMemManual.value = false;
-  update({ minMemory: Math.min(Number(v), props.args.memory) });
+  update({ minMemory: Math.min(Number(v), props.args.memory), memoryInherit: false });
 }
 
 /** 内存下拉：与上面同一口径，选预设就是应用一个最大内存预设 */
 function onMemPick(e: Event) {
   const v = (e.target as HTMLSelectElement).value;
+  if (v === "global") {
+    memManual.value = false;
+    void useGlobalMemory();
+    return;
+  }
   if (v === "custom") {
     memManual.value = true;
+    update({ memoryInherit: false });
     return;
   }
   memManual.value = false;
@@ -205,11 +260,13 @@ const gcOptions = computed(() => [
   <div class="args-panel">
     <!-- 启动参数 -->
     <div class="args-block">
-      <!-- 窗口大小：第一行是预设下拉（含全屏），第二行是宽 / 高；改成下拉里没有的值会自动
-           落到「自定义」。全屏时尺寸无效，第二行整行收起 -->
+      <!-- 窗口大小：第一行是下拉（跟随全局 / 预设 / 全屏 / 自定义），第二行是宽 / 高；
+           改成下拉里没有的值会自动落到「自定义」。全屏或跟随全局时尺寸不可改，
+           但跟随全局时仍然显示（禁用）——那正是会用的数字 -->
       <div class="args-row">
         <span class="args-label">{{ t("args.windowSize") }}</span>
         <select class="field-select pick-select res-pick" :value="resPick" @change="onResPick">
+          <option value="global">{{ t("args.useGlobal") }}</option>
           <option v-for="r in COMMON_RESOLUTIONS" :key="`${r.w}x${r.h}`" :value="`${r.w}x${r.h}`">
             {{ r.w }}×{{ r.h }}
           </option>
@@ -220,10 +277,10 @@ const gcOptions = computed(() => [
       <div v-if="resInputs" class="args-row sub-row">
         <span class="sub-tag">{{ t("args.width") }}</span>
         <NumberStepper :model-value="args.width" :min="0" :max="9999" :step="10"
-          @update:model-value="(v: number) => update({ width: v })" />
+          :disabled="args.windowInherit" @update:model-value="(v: number) => update({ width: v })" />
         <span class="sub-tag">{{ t("args.height") }}</span>
         <NumberStepper :model-value="args.height" :min="0" :max="9999" :step="10"
-          @update:model-value="(v: number) => update({ height: v })" />
+          :disabled="args.windowInherit" @update:model-value="(v: number) => update({ height: v })" />
       </div>
 
       <!-- 内存：最小一行、最大续一行，各自预设下拉 + 数值框，口径与窗口大小相同 -->
@@ -231,21 +288,23 @@ const gcOptions = computed(() => [
         <span class="args-label">{{ t("args.memory") }}</span>
         <span class="sub-tag">{{ t("args.minMemory") }}</span>
         <select class="field-select pick-select" :value="minMemPick" @change="onMinMemPick">
+          <option value="global">{{ t("args.useGlobal") }}</option>
           <option v-for="m in COMMON_MIN_MEMORY" :key="m" :value="String(m)">{{ memoryLabel(m) }}</option>
           <option value="custom">{{ t("args.custom") }}</option>
         </select>
         <NumberStepper :model-value="args.minMemory" :min="256" :max="args.memory" :step="256"
-          @update:model-value="(v: number) => update({ minMemory: v })" />
+          :disabled="args.memoryInherit" @update:model-value="(v: number) => update({ minMemory: v })" />
         <span class="mem-unit">MB</span>
       </div>
       <div class="args-row sub-row">
         <span class="sub-tag">{{ t("args.maxMemory") }}</span>
         <select class="field-select pick-select" :value="memPick" @change="onMemPick">
+          <option value="global">{{ t("args.useGlobal") }}</option>
           <option v-for="m in COMMON_MEMORY" :key="m" :value="String(m)">{{ memoryLabel(m) }}</option>
           <option value="custom">{{ t("args.custom") }}</option>
         </select>
         <NumberStepper :model-value="args.memory" :min="args.minMemory" :max="16384" :step="256"
-          @update:model-value="(v: number) => update({ memory: v })" />
+          :disabled="args.memoryInherit" @update:model-value="(v: number) => update({ memory: v })" />
         <span class="mem-unit">MB</span>
       </div>
       <!-- 本机内存参考值：给设最大内存一个依据（已用 / 共 · 剩余 + 左占用右剩余的条，拿不到会写明原因） -->

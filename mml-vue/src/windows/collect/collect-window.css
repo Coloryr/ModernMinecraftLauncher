@@ -106,7 +106,11 @@
   margin-right: -26px;
   /* 与上面的 scrollbar-gutter 成对：扣掉常驻的那 9px，卡片右缘仍与搜索框对齐 */
   padding-right: calc(26px - 9px);
-  /* 底边留 2px：卡片悬停上浮时下缘不被滚动区裁掉 */
+  /* 上下各留 2px：卡片悬停上浮 2px，而滚动容器会把自己的溢出裁掉，
+     不留这一截第一排卡片的顶边就被切掉。上边那 2px 用负外边距借回来，
+     卡片起始位置不变，与搜索框的间距仍是 12px */
+  margin-top: -2px;
+  padding-top: 2px;
   padding-bottom: 2px;
 }
 

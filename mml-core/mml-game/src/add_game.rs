@@ -1330,6 +1330,27 @@ async fn launcher_pack<P: AsRef<Path>>(
     Ok(uuid)
 }
 
+/// 本地压缩包没有项目 / 文件 ID 时，把整合包类型清成「无」
+///
+/// 类型下拉只对能回查在线项目的包有意义；本地包留着 CurseForge / Modrinth 会让
+/// 「检查更新」指向不存在的项目。`is_modpack` 保持原样，启动与模组检查照旧。
+///
+/// - `uuid`: 刚安装好的实例 uuid
+fn clear_modpack_type_without_ids(uuid: &Uuid) {
+    let Some(instance) = crate::get_instance(uuid) else {
+        return;
+    };
+    let mut game = instance.write().unwrap();
+    if game.pid.is_some() && game.fid.is_some() {
+        return;
+    }
+    if game.modpack_type == ModPackType::None {
+        return;
+    }
+    game.modpack_type = ModPackType::None;
+    game.save();
+}
+
 /// 从文件路径安装压缩包
 ///
 /// - `file`: 压缩包
@@ -1356,7 +1377,7 @@ pub async fn install_archive_from_file<P: AsRef<Path>>(
     pack_type: PackType,
     cancel: CancellationToken,
 ) -> CoreResult<Uuid> {
-    match pack_type {
+    let uuid = match pack_type {
         PackType::CurseForge => {
             modpack(
                 file,
@@ -1452,7 +1473,11 @@ pub async fn install_archive_from_file<P: AsRef<Path>>(
             )
             .await
         }
-    }
+    }?;
+
+    // 本地包没有项目 / 文件 ID 时，类型留「无」：否则界面上会显示成可更新平台
+    clear_modpack_type_without_ids(&uuid);
+    Ok(uuid)
 }
 
 /// 从在线网址安装整合包

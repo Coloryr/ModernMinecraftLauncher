@@ -876,6 +876,10 @@ function onInstMenuAction(id: InstMenuAction) {
     case "launch":
       launch();
       break;
+    case "multiSelect":
+      // 以这一项为起点进多选：之后勾别的实例，批量操作走顶部工具栏
+      if (target) enterMultiSelect([target.uuid]);
+      break;
     case "viewMods":
       // 资源管理窗口是"一个实例一个"的窗口族；带上类别，进去直接停在模组页
       if (target) openWindow("resource", { uuid: target.uuid, category: "mods" });
@@ -1596,10 +1600,7 @@ const oldData = ref<{ colormc: ColorMcInfoDto | null; minecraft: MinecraftInfoDt
 /** 弹窗"已结束"信号：答完或直接关掉时解开 */
 let oldDataSettled: (() => void) | null = null;
 
-/** 这次运行里有没有真的搬过旧数据：决定关掉旧数据弹窗后要不要问首次使用设置 */
-let oldDataImported = false;
-
-/** 首次使用设置弹窗是否打开；只在导入完成之后出现 */
+/** 首次使用设置弹窗是否打开；旧数据那段询问结束后出现 */
 const firstRunSetup = ref(false);
 
 /**
@@ -1627,8 +1628,8 @@ function onOldDataClosed() {
   oldData.value = null;
   oldDataSettled?.();
   oldDataSettled = null;
-  // 这次真的搬过数据才问首次使用设置：没搬就没什么"首启"可言
-  if (oldDataImported) firstRunSetup.value = true;
+  // 旧数据这段询问结束（搬没搬都算）就进入首次使用设置
+  firstRunSetup.value = true;
 }
 
 /**
@@ -1639,7 +1640,6 @@ function onOldDataClosed() {
  * 立刻显示；.minecraft 那节走实例 API 建实例，重拉就能看到。
  */
 function onOldDataDone() {
-  oldDataImported = true;
   void loadInstances();
   void loadGroups();
   // ColorMC 迁移会合并账户，顶栏的账户列表要跟着刷新
@@ -2174,16 +2174,16 @@ onMounted(async () => {
                   </template>
                 </BaseButton>
                 <div class="launch-sub-actions">
-                  <!-- 实例设置：含启动参数（与分组模式下的设置面板一致） -->
-                  <BaseButton size="sm" class="icon-btn-head" v-tip="t('detail.settings')"
-                    :aria-label="t('detail.settings')" :disabled="!selected" @click="toggleSettings">
-                    <GlyphIcon name="gear" :size="15" :weight="1.8" />
+                  <!-- 实例设置：含启动参数（与分组模式下的设置面板一致）。带文字：这两项是常用入口 -->
+                  <BaseButton size="sm" class="has-text" :aria-label="t('detail.settings')" :disabled="!selected"
+                    @click="toggleSettings">
+                    <GlyphIcon name="gear" :size="15" :weight="1.8" /> {{ t("detail.settings") }}
                   </BaseButton>
                   <!-- 资源管理：分组 / 平铺模式的右侧详情面板里有这个入口，而列表模式没有详情面板，
                        这里不补一个就进不去资源管理窗口 -->
-                  <BaseButton size="sm" class="icon-btn-head" v-tip="t('actions.manageResource')"
-                    :aria-label="t('actions.manageResource')" :disabled="!selected" @click="onAction('manageResource')">
-                    <GlyphIcon name="package" :size="15" :weight="1.8" />
+                  <BaseButton size="sm" class="has-text" :aria-label="t('actions.manageResource')"
+                    :disabled="!selected" @click="onAction('manageResource')">
+                    <GlyphIcon name="package" :size="15" :weight="1.8" /> {{ t("actions.manageResource") }}
                   </BaseButton>
                   <!-- 实例日志：主页面不展示日志内容，直接开独立日志窗口 -->
                   <BaseButton size="sm" class="icon-btn-head" v-tip="t('detail.logs')"
@@ -2347,11 +2347,11 @@ onMounted(async () => {
 
                     <!-- 自定义执行 -->
                     <div class="args-section">
-                      <button class="args-toggle" :class="{ merged: execOpen }" @click="execOpen = !execOpen">
+                      <button class="collapse-head args-toggle" :class="{ merged: execOpen }" @click="execOpen = !execOpen">
                         <span>
                           <GlyphIcon name="gear" :size="14" :weight="1.8" /> {{ t("exec.title") }}
                         </span>
-                        <svg class="args-chevron" :class="{ flip: execOpen }" viewBox="0 0 24 24" width="13" height="13"
+                        <svg class="collapse-chevron" :class="{ flip: execOpen }" viewBox="0 0 24 24" width="13" height="13"
                           fill="none" stroke="currentColor" stroke-width="2">
                           <path d="m6 9 6 6 6-6" />
                         </svg>
@@ -2363,11 +2363,11 @@ onMounted(async () => {
 
                     <!-- 自定义启动配置（json/ 目录）：与 ColorMC 游戏编辑窗口 tab1 同一张表 -->
                     <div class="args-section">
-                      <button class="args-toggle" :class="{ merged: jsonOpen }" @click="jsonOpen = !jsonOpen">
+                      <button class="collapse-head args-toggle" :class="{ merged: jsonOpen }" @click="jsonOpen = !jsonOpen">
                         <span>
                           <GlyphIcon name="gear" :size="14" :weight="1.8" /> {{ t("customJson.title") }}
                         </span>
-                        <svg class="args-chevron" :class="{ flip: jsonOpen }" viewBox="0 0 24 24" width="13"
+                        <svg class="collapse-chevron" :class="{ flip: jsonOpen }" viewBox="0 0 24 24" width="13"
                           height="13" fill="none" stroke="currentColor" stroke-width="2">
                           <path d="m6 9 6 6 6-6" />
                         </svg>
@@ -2379,11 +2379,11 @@ onMounted(async () => {
 
                     <!-- 自定义服务器（自动加入 + MOTD 展示） -->
                     <div class="args-section">
-                      <button class="args-toggle" :class="{ merged: serverOpen }" @click="serverOpen = !serverOpen">
+                      <button class="collapse-head args-toggle" :class="{ merged: serverOpen }" @click="serverOpen = !serverOpen">
                         <span>
                           <GlyphIcon name="gear" :size="14" :weight="1.8" /> {{ t("server.title") }}
                         </span>
-                        <svg class="args-chevron" :class="{ flip: serverOpen }" viewBox="0 0 24 24" width="13"
+                        <svg class="collapse-chevron" :class="{ flip: serverOpen }" viewBox="0 0 24 24" width="13"
                           height="13" fill="none" stroke="currentColor" stroke-width="2">
                           <path d="m6 9 6 6 6-6" />
                         </svg>
@@ -2413,11 +2413,11 @@ onMounted(async () => {
 
                     <!-- 游戏内代理 -->
                     <div class="args-section">
-                      <button class="args-toggle" :class="{ merged: proxyOpen }" @click="proxyOpen = !proxyOpen">
+                      <button class="collapse-head args-toggle" :class="{ merged: proxyOpen }" @click="proxyOpen = !proxyOpen">
                         <span>
                           <GlyphIcon name="gear" :size="14" :weight="1.8" /> {{ t("proxy.title") }}
                         </span>
-                        <svg class="args-chevron" :class="{ flip: proxyOpen }" viewBox="0 0 24 24" width="13"
+                        <svg class="collapse-chevron" :class="{ flip: proxyOpen }" viewBox="0 0 24 24" width="13"
                           height="13" fill="none" stroke="currentColor" stroke-width="2">
                           <path d="m6 9 6 6 6-6" />
                         </svg>
@@ -2564,7 +2564,7 @@ onMounted(async () => {
     <OldDataModal v-if="oldData" :colormc="oldData.colormc" :minecraft="oldData.minecraft"
       @close="onOldDataClosed" @done="onOldDataDone" />
 
-    <!-- ===== 首次使用设置：旧数据搬完之后问一次（见 onOldDataClosed）===== -->
+    <!-- ===== 首次使用设置：旧数据询问结束后问一次（见 onOldDataClosed）===== -->
     <FirstRunSetup v-if="firstRunSetup" @close="firstRunSetup = false" />
 
     <!-- ===== 选择目标分组：转移分组与移动选中实例共用 ===== -->

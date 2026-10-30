@@ -3,6 +3,10 @@
 //
 // 左栏是分类（与方块窗口同一个 CategoryRail）：全部 + 按资源类型自动分的默认分组 +
 // 用户自建分组，选中哪一组就只显示哪一组。
+//
+// **默认分组的成员按资源类型现算，不落盘**：一类收藏永远待在自己那一类里，把它们拖进
+// 自建分组只是多一个归属，那一项不会从默认分组里消失。所以默认分组既不能拖入、也不能
+// 移出，左栏里它只负责"按类型看这一类收藏"。
 // 安装走 InstallModal：按目标实例的加载器 / 游戏版本挑兼容文件。
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
@@ -22,12 +26,12 @@ import { api, onCollectChange } from "../../lib/api";
 import { commands } from "../../lib/bindings";
 import { t, tErr } from "../../lib/i18n";
 import {
+  DEFAULT_GROUP_TYPES,
   FIXED_GROUP_TYPES,
   defaultGroupKey,
   groupLabel,
   isDefaultGroupKey,
   legacyDefaultGroupNames,
-  typeOfDefaultGroupKey,
 } from "../../lib/collectGroups";
 import { formatMinute } from "../../lib/format";
 import { showToast } from "../../lib/toast";
@@ -38,9 +42,6 @@ defineEmits<{
   /** 请求关闭本窗口，由标题栏关闭按钮与 Esc 触发 */
   (e: "close"): void;
 }>();
-
-/** 未归组那一批收藏的键：拖拽与删除时用来判断"是否在具名分组里"，见 useCollectDrag */
-const DEFAULT_GROUP = "";
 
 const items = ref<CollectItemDto[]>([]);
 const groups = ref<Record<string, string[]>>({});
@@ -59,29 +60,37 @@ let unlistenCollect: (() => void) | null = null;
 /** 窗口是否已经销毁：订阅是异步挂上的，挂好之前窗口可能已经关了 */
 let gone = false;
 
-/** 分组 key，按左栏顺序排：先默认分组，再自建分组按名字 */
-const groupNames = computed(() => {
-  const defaults = Object.keys(groups.value)
-    .filter(isDefaultGroupKey)
-    .sort((a, b) => railOrderIndex(a) - railOrderIndex(b));
-  const custom = Object.keys(groups.value)
+/** 用户自建分组的名字，按名字排；默认分组不在这里，它的成员按资源类型现算 */
+const customGroups = computed(() =>
+  Object.keys(groups.value)
     .filter((key) => !isDefaultGroupKey(key))
-    .sort((a, b) => a.localeCompare(b));
-  return [...defaults, ...custom];
-});
+    .sort((a, b) => a.localeCompare(b)),
+);
 
-/** 默认分组在左栏里的先后：固定四项按表中顺序，其余排在它们后面 */
-function railOrderIndex(key: string): number {
-  const fixed = FIXED_GROUP_TYPES.indexOf(typeOfDefaultGroupKey(key) ?? "");
-  return fixed >= 0 ? fixed : FIXED_GROUP_TYPES.length;
-}
-/** 分组显示顺序，来自后端；缺失的分组按默认顺序补在末尾 */
+/** 固定列出的四个默认分组，顺序即分类栏顺序 */
+const fixedGroupKeys = FIXED_GROUP_TYPES.map((type) => defaultGroupKey(type)).filter(
+  (key): key is string => !!key,
+);
+
+/** 存档 / 数据包：有收藏时才列出来，别在栏里留两条永远是 0 的 */
+const extraGroupKeys = computed(() =>
+  DEFAULT_GROUP_TYPES.filter((type) => !FIXED_GROUP_TYPES.includes(type))
+    .map((type) => defaultGroupKey(type))
+    // 看全量收藏而不是搜索结果：搜不到东西时那一组不该整个从栏里消失
+    .filter(
+      (key): key is string => !!key && items.value.some((item) => defaultGroupKey(item.fileType) === key),
+    ),
+);
+
+/** 分组显示顺序，来自后端；只对自建分组有意义，默认分组按类型表固定 */
 const groupOrder = ref<string[]>([]);
 
-/** uuid → 它所在的具名分组名（未归组的没有条目） */
-const groupOfUuid = computed(() => {
+/** uuid → 它所在的自建分组名；没归过组的、只在默认分组里的都没有条目 */
+const customGroupOfUuid = computed(() => {
   const map = new Map<string, string>();
   for (const [name, list] of Object.entries(groups.value)) {
+    // 默认分组那几条是旧版本收藏时顺手写下的镜像，成员按类型现算，不参与归属判断
+    if (isDefaultGroupKey(name)) continue;
     for (const uuid of list) {
       map.set(uuid, name);
     }
@@ -108,47 +117,77 @@ const shownItems = computed(() => {
 /** 「共 N 项」：当前搜索词下所有分组合起来 */
 const shownCount = computed(() => shownItems.value.length);
 
-/** 某一组在当前搜索下看得见的项 */
-function itemsOfGroup(name: string): CollectItemDto[] {
-  return shownItems.value.filter((i) => groupOfUuid.value.get(i.uuid) === name);
+/**
+ * 某一组在当前搜索下看得见的项
+ *
+ * 默认分组按资源类型现算 —— 收藏项不管被拖进哪个自建分组，都还在它那一类里；
+ * 自建分组看落盘的归属。
+ *
+ * - `key`: 分组 key
+ */
+function itemsOfGroup(key: string): CollectItemDto[] {
+  if (isDefaultGroupKey(key)) {
+    return shownItems.value.filter((item) => defaultGroupKey(item.fileType) === key);
+  }
+  return shownItems.value.filter((item) => customGroupOfUuid.value.get(item.uuid) === key);
+}
+
+/** 左栏的一项：默认分组不能拖入、也不参与排序 */
+interface RailItem {
+  /** 分组 key */
+  id: string;
+  /** 显示名 */
+  label: string;
+  /** 当前搜索词下的条目数 */
+  count: number;
+  /** 用户自建：可右键给菜单 */
+  custom: boolean;
+  /** 能不能当拖放目标；默认分组没有归属可改，故为 false */
+  dropDisabled: boolean;
+  /** 能不能拖动排序；默认分组位置固定，故为 false */
+  reorderable: boolean;
 }
 
 /**
  * 左栏的分组条目
  *
- * 前四项是**默认分组**（整合包 / 模组 / 资源包 / 光影包）：按资源类型自动归组，
- * 没有收藏时也要留在栏里（0 项），否则用户会以为那一类收藏丢了。
- * 数据里其余的默认分组（存档 / 数据包）接在后面，最后是用户自建分组（按名字排序）。
- * 实际顺序以用户拖出来的 `groupOrder` 为准，没记录过的按上面的默认顺序补在后面。
+ * 默认分组（整合包 / 模组 / 资源包 / 光影包）按资源类型现算，没有收藏时也留在栏里
+ * （0 项），否则用户会以为那一类收藏丢了；存档 / 数据包有收藏时才接在后面。
+ * 再往后是用户自建分组，顺序以拖出来的 `groupOrder` 为准，没记录过的按名字补在后面。
  */
-const railItems = computed<Array<{ id: string; label: string; count: number; custom: boolean }>>(() => {
-  const fixed = FIXED_GROUP_TYPES.map((type) => defaultGroupKey(type)).filter(
-    (key): key is string => !!key,
-  );
-  const restDefaults = groupNames.value
-    .filter((key) => isDefaultGroupKey(key) && !fixed.includes(key))
-    .sort((a, b) => groupLabel(a).localeCompare(groupLabel(b)));
-  const custom = groupNames.value.filter((key) => !isDefaultGroupKey(key));
-
-  const fallback = [...fixed, ...restDefaults, ...custom];
-  const ordered = [
-    ...groupOrder.value.filter((key) => fallback.includes(key)),
-    ...fallback.filter((key) => !groupOrder.value.includes(key)),
-  ];
-
-  return ordered.map((key) => ({
+const railItems = computed<RailItem[]>(() => {
+  const defaults = [...fixedGroupKeys, ...extraGroupKeys.value].map((key) => ({
     id: key,
     label: groupLabel(key),
     count: itemsOfGroup(key).length,
-    custom: !isDefaultGroupKey(key),
+    custom: false,
+    dropDisabled: true,
+    reorderable: false,
   }));
+
+  // 顺序只对自建分组有意义：拖到默认分组前面等于拖到第一个自建分组前面
+  const ordered = [
+    ...groupOrder.value.filter((key) => customGroups.value.includes(key)),
+    ...customGroups.value.filter((key) => !groupOrder.value.includes(key)),
+  ];
+  const customs = ordered.map((key) => ({
+    id: key,
+    label: key,
+    count: itemsOfGroup(key).length,
+    custom: true,
+    dropDisabled: false,
+    reorderable: true,
+  }));
+
+  return [...defaults, ...customs];
 });
 
 /** 拖完分组顺序：先就地更新左栏，再交给后端落盘 */
 async function onGroupReorder(order: string[]) {
-  groupOrder.value = order;
+  const custom = order.filter((key) => !isDefaultGroupKey(key));
+  groupOrder.value = custom;
   try {
-    await commands.collect.setGroupOrder(order);
+    await commands.collect.setGroupOrder(custom);
   } catch (e) {
     showToast(tErr(e));
   }
@@ -169,34 +208,34 @@ watch(railItems, (list) => {
 
 // ---------------- 加载 ----------------
 
-/** 并组只在打开窗口时做一次，避免 reload 互相触发 */
-let migratedLegacy = false;
+/** 清理只在打开窗口时做一次，避免 reload 互相触发 */
+let droppedStale = false;
 
 /**
- * 把旧口径建的默认分组并到固定 key 上
+ * 删掉落盘里那些"默认分组"条目
  *
- * 早先默认分组的 key 就是当时的界面语言文案，落过盘的数据里留着「模组」或 "Mods"。
- * 不并的话，升级后它们会以自建分组的样子跟新的默认分组各占一栏。用户自建的分组不动。
+ * 默认分组的成员现在按资源类型现算，不该再作为分组落盘：旧版本按固定 key 存过一份，
+ * 更早的版本直接用当时的界面语言文案（「模组」/ "Mods"）当 key。留着它们会以自建分组的
+ * 样子跟默认分组各占一栏 —— 组里记的成员跟"按类型算"的结果一致，直接删组即可，
+ * 收藏条目一条不动。用户自建的分组不受影响。
  *
  * # 返回值
  *
- * 真的改过数据返回 true，调用方据此重读一遍
+ * 真的删过返回 true，调用方据此重读一遍
  */
-async function migrateLegacyGroups(): Promise<boolean> {
-  if (migratedLegacy) return false;
-  migratedLegacy = true;
+async function dropStaleGroups(): Promise<boolean> {
+  if (droppedStale) return false;
+  droppedStale = true;
 
   const legacy = legacyDefaultGroupNames();
-  const steps = Object.keys(groups.value)
-    .filter((key) => legacy.has(key))
-    .map((key) => ({ from: key, to: legacy.get(key) as string, uuids: groups.value[key] ?? [] }));
-  if (steps.length === 0) return false;
+  const keys = Object.keys(groups.value).filter(
+    (key) => isDefaultGroupKey(key) || legacy.has(key),
+  );
+  if (keys.length === 0) return false;
 
   try {
-    for (const step of steps) {
-      if (!groups.value[step.to]) await api.collectAddGroup(step.to);
-      if (step.uuids.length) await api.collectSetGroupItems(step.to, step.uuids);
-      await api.collectRemoveGroup(step.from);
+    for (const key of keys) {
+      await api.collectRemoveGroup(key);
     }
   } catch (e) {
     showToast(tErr(e));
@@ -209,11 +248,10 @@ async function reload() {
   items.value = data.items;
   groups.value = data.groups;
   groupOrder.value = data.groupOrder;
-  if (await migrateLegacyGroups()) {
+  if (await dropStaleGroups()) {
     await reload();
     return;
   }
-  void backfillGroups();
   // 丢掉已不存在的勾选
   const alive = new Set(data.items.map((i) => i.uuid));
   checked.value = new Set([...checked.value].filter((u) => alive.has(u)));
@@ -524,12 +562,12 @@ function askClear(groupKey: string) {
 /** 清空确认里那句"N 项"的 N：当前清空目标那一组里看得见的项数 */
 const clearCount = computed(() => itemsOfGroup(clearGroup.value).length);
 
-/** 「移动到分组」：先记下目标再开弹窗；没有具名分组时菜单项已置灰，这里兜底 */
+/** 「移动到分组」：先记下目标再开弹窗；没有自建分组时菜单项已置灰，这里兜底 */
 function askAddToGroup() {
   actionUuids.value = takeTargets();
   closeMenu();
-  if (groupNames.value.length === 0 || actionUuids.value.length === 0) return;
-  addToGroupTarget.value = groupNames.value[0];
+  if (customGroups.value.length === 0 || actionUuids.value.length === 0) return;
+  addToGroupTarget.value = customGroups.value[0];
 }
 
 async function confirmAddToGroup() {
@@ -552,27 +590,15 @@ async function confirmAddToGroup() {
 // ---------------- 条目操作 ----------------
 
 /**
- * 这一项是否落在「按类型自动分的默认分组」里
- *
- * 那种分组不是用户建的（整合包 / 模组 / 资源包 / 光影包），从里面"移出分组"没有意义 ——
- * 下次打开窗口补组时又会被归回去。所以只有自建分组里的条目才给「移出分组」。
- *
- * - `item`: 收藏项
- */
-function inTypeGroup(item: CollectItemDto): boolean {
-  const group = groupOfUuid.value.get(item.uuid);
-  const auto = defaultGroupKey(item.fileType);
-  return !!auto && group === auto;
-}
-
-/**
  * 这一项是否在用户自建分组里
+ *
+ * 默认分组是"按类型看这一类收藏"，改不掉，也就没有「移出分组」可给；
+ * 所以只有归过自建分组的条目才给那一项菜单。
  *
  * - `item`: 收藏项
  */
 function inCustomGroup(item: CollectItemDto): boolean {
-  const group = groupOfUuid.value.get(item.uuid);
-  return !!group && !inTypeGroup(item);
+  return customGroupOfUuid.value.has(item.uuid);
 }
 
 /** 菜单要不要给「移出分组」：目标里至少有一个在自建分组里 */
@@ -595,7 +621,7 @@ async function leaveGroup() {
   }
   const byGroup = new Map<string, string[]>();
   for (const uuid of uuids) {
-    const name = groupOfUuid.value.get(uuid);
+    const name = customGroupOfUuid.value.get(uuid);
     if (!name) continue;
     const list = byGroup.get(name) ?? [];
     list.push(uuid);
@@ -679,17 +705,18 @@ function toggleCard(item: CollectItemDto, ev?: MouseEvent) {
 // ---------------- 拖拽改分组 ----------------
 
 /**
- * 拖卡片到分组上 = 移到那个分组，逻辑见 composables/useCollectDrag
+ * 拖卡片到**自建分组**上 = 移到那个分组，逻辑见 composables/useCollectDrag
  *
  * 与拖动游戏实例同一套做法：指针拖拽、落点用 `data-group` 反查、多选模式下拖已勾选的
  * 卡片整批一起走。收藏的分组没有组内次序，数据层是集合，所以只做归属、不做排序。
+ * 默认分组的成员按资源类型算、没有归属可改，左栏里它们不带 `data-group`，
+ * 指针落上去就等于没落在任何分组上，松手即取消。
  */
 const { draggingUuids, dropGroup, ghost: collectGhost, onCardPointerDown, consumeSuppressClick } = useCollectDrag({
   checked,
   multiSelect,
   // 传取值函数而不是 computed 本身：这里只在松手那一刻读一次，不需要是 Ref
-  groupOf: () => groupOfUuid.value,
-  defaultGroup: DEFAULT_GROUP,
+  groupOf: () => customGroupOfUuid.value,
 });
 
 /** 卡片点击：刚拖完的那一下不算点击，否则一松手就顺手打开了下载窗口 */
@@ -702,42 +729,6 @@ function onCardClick(item: CollectItemDto, ev?: MouseEvent) {
   toggleCard(item, ev);
 }
 
-/** 补组进行中：避免 reload → 补组 → reload 转圈 */
-let backfilling = false;
-
-/**
- * 把没有归组的收藏按类型补进默认分组
- *
- * 没有这一栏的收藏在界面上根本不会出现（分组列表只列具名分组），所以这次补组属于
- * "不能省"：老收藏、以及用户删掉分组后留下的条目，都在这里归位。
- */
-async function backfillGroups() {
-  if (backfilling) return;
-  const grouped = new Set(Object.values(groups.value).flat());
-  const byGroup = new Map<string, string[]>();
-  for (const item of items.value) {
-    if (grouped.has(item.uuid)) continue;
-    const key = defaultGroupKey(item.fileType);
-    if (!key) continue;
-    const list = byGroup.get(key) ?? [];
-    list.push(item.uuid);
-    byGroup.set(key, list);
-  }
-  if (byGroup.size === 0) return;
-
-  backfilling = true;
-  try {
-    for (const [key, uuids] of byGroup) {
-      if (!groups.value[key]) await api.collectAddGroup(key);
-      await api.collectSetGroupItems(key, uuids);
-    }
-  } catch (e) {
-    showToast(tErr(e));
-  } finally {
-    backfilling = false;
-  }
-  await reload();
-}
 /** 跟手浮起副本的内容：手里抓着的第一项（按下那张排最前） */
 const collectDragItem = computed(() => {
   const uuid = collectGhost.value?.item.uuids[0];
@@ -983,8 +974,8 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
       <div v-if="multiSelect" class="multi-bar">
         <span class="multi-count">{{ t("collect.installCount", { count: checked.size }) }}</span>
         <button class="multi-btn" @click="selectAllVisible">{{ t("multi.selectAll") }}</button>
-        <button class="multi-btn" :disabled="checked.size === 0 || groupNames.length === 0"
-          v-tip="checked.size === 0 ? t('collect.multiNoneTip') : groupNames.length === 0 ? t('collect.addToGroupNone') : ''"
+        <button class="multi-btn" :disabled="checked.size === 0 || customGroups.length === 0"
+          v-tip="checked.size === 0 ? t('collect.multiNoneTip') : customGroups.length === 0 ? t('collect.addToGroupNone') : ''"
           @click="askAddToGroup">
           {{ t("collect.addToGroup") }}
         </button>
@@ -1116,8 +1107,8 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
         <button v-if="canLeaveGroup()" class="ctx-item" @click="leaveGroup">
           {{ t("collect.removeFromGroup") }}
         </button>
-        <button class="ctx-item" :disabled="groupNames.length === 0"
-          v-tip="groupNames.length === 0 ? t('collect.addToGroupNone') : ''" @click="askAddToGroup">
+        <button class="ctx-item" :disabled="customGroups.length === 0"
+          v-tip="customGroups.length === 0 ? t('collect.addToGroupNone') : ''" @click="askAddToGroup">
           {{ t("collect.addToGroup") }}
         </button>
         <span class="ctx-sep"></span>
@@ -1178,7 +1169,7 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
     <BaseModal v-if="addToGroupTarget !== ''" :title="t('collect.addToGroupTitle')" @close="addToGroupTarget = ''"
       :closable="false">
       <select v-model="addToGroupTarget" class="field-select">
-        <option v-for="g in groupNames" :key="g" :value="g">{{ groupLabel(g) }}</option>
+        <option v-for="g in customGroups" :key="g" :value="g">{{ groupLabel(g) }}</option>
       </select>
       <div class="modal-actions">
         <BaseButton @click="addToGroupTarget = ''">{{ t("add.cancel") }}</BaseButton>

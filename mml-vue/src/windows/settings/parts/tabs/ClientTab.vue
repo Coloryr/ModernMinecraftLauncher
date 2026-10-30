@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 设置窗口 · 客户端设置标签：服务器 / MOTD / 登录方式锁定 / 实例锁定 / 自动进入存档 / 自定义主页面 / 游戏标题
+// 设置窗口 · 客户端设置标签：服务器 / MOTD / 登录方式锁定 / 实例锁定 / 自定义主页面 / 游戏标题
 //
 // 游戏标题那组的数据属于 `window`，由 useSettingsLaunch 持有，所以这里额外接一个 `win`。
 // 窗口外观（材质 / 透明度）属 gui_config.client，但显示在界面页，见 UiTab。
@@ -229,17 +229,6 @@ watch(lockServerError, async (msg) => {
           {{ t("winSettings.instanceLockMissing") }}
         </option>
       </select>
-    </div>
-  </SettingsGroup>
-
-  <!-- 自动进入存档：实例配了启动后自动进入某个存档时，先弹窗确认；关掉后直接进入 -->
-  <SettingsGroup id="autoSave" title-key="winSettings.secAutoSave" :flash="flashGroup === 'autoSave'">
-    <div class="switch-row">
-      <div class="switch-text">
-        <span class="switch-label">{{ t("winSettings.autoSaveNotice") }}</span>
-        <span class="switch-state">{{ t("winSettings.autoSaveNoticeDesc") }}</span>
-      </div>
-      <BaseSwitch v-model="client.autoSaveNotice" @update:model-value="applyClient" />
     </div>
   </SettingsGroup>
 

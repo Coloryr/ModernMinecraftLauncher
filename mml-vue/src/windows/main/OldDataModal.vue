@@ -38,7 +38,8 @@ function onBusy(value: boolean) {
 </script>
 
 <template>
-  <BaseModal :title="t('oldData.title')" :width="560" :closable="!busy" @close="emit('close')">
+  <!-- 右上角不画 ✕：关闭入口只留底部那个 -->
+  <BaseModal :title="t('oldData.title')" :width="560" :closable="false" @close="emit('close')">
     <div class="old-modal">
       <p class="old-hint">{{ t("oldData.hint") }}</p>
 

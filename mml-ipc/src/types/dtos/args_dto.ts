@@ -11,6 +11,8 @@ export type InstanceArgsDto = {
   fullscreen: boolean,
   width: number,
   height: number,
+  memoryInherit: boolean,
+  windowInherit: boolean,
   javaName: string,
   javaPath: string,
   gc: string,

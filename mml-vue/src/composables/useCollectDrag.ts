@@ -1,4 +1,4 @@
-// 收藏卡片的自定义拖拽：把收藏项拖到某个分组上 = 移到那个分组
+// 收藏卡片的自定义拖拽：把收藏项拖到某个**自建**分组上 = 移到那个分组
 //
 // 与实例拖拽 `useInstanceDrag` 同一套路数：**不用** HTML5 draggable ——
 // WebView2 里会出现"禁止"光标且投放不可靠 —— 改用指针事件模拟：
@@ -20,10 +20,8 @@ interface DragDeps {
   checked: Ref<Set<string>>;
   /** 多选模式是否开着 */
   multiSelect: Ref<boolean>;
-  /** uuid → 它所在的具名分组名（未归组没有条目） */
+  /** uuid → 它所在的自建分组名（没归过组没有条目） */
   groupOf: () => Map<string, string>;
-  /** 「默认分组」的键；拖到这里 = 移出所有具名分组 */
-  defaultGroup: string;
 }
 
 /** 一次拖拽要移动的收藏项 */
@@ -138,7 +136,7 @@ export function useCollectDrag(deps: DragDeps) {
 
     const block = (el?.closest?.("[data-group]") ?? null) as HTMLElement | null;
     // 挂上了 data-group 就一定取得到 key；
-    // 没挂在任何分组上记 null —— 「全部」那一项没有 data-group
+    // 没挂在任何分组上记 null —— 「全部」与按类型算的默认分组都没有 data-group
     dropGroup.value = block ? (block.dataset.group ?? "") : null;
   }
 
@@ -146,33 +144,17 @@ export function useCollectDrag(deps: DragDeps) {
    * 提交：把这次拖拽的项移到落点分组
    *
    * - `active`: 本次拖拽的批次
-   * - `target`: 落点分组的 key；等于 `defaultGroup` 时表示移出所有具名分组
+   * - `target`: 落点分组的 key，只会是自建分组
    */
   async function commitDrag(active: DragCandidate, target: string) {
     // 已经在目标组里的不用动：拖回原组就是一次空操作，别白写一次盘、白广播一次事件
-    const uuids = active.uuids.filter(
-      (uuid) => (deps.groupOf().get(uuid) ?? deps.defaultGroup) !== target,
-    );
+    const uuids = active.uuids.filter((uuid) => deps.groupOf().get(uuid) !== target);
     if (!uuids.length) return;
 
     try {
-      if (target === deps.defaultGroup) {
-        // 默认分组不是具名分组：把这些项从各自所在的组里摘出来，摘完自然回到默认分组
-        const byGroup = new Map<string, string[]>();
-        for (const uuid of uuids) {
-          const name = deps.groupOf().get(uuid);
-          if (!name) continue;
-          const list = byGroup.get(name) ?? [];
-          list.push(uuid);
-          byGroup.set(name, list);
-        }
-        for (const [name, list] of byGroup) {
-          await api.collectRemoveItems(list, name);
-        }
-      } else {
-        // 移动语义：后端会先把它们从其它分组里摘掉，见 collect_utils::set_group_items
-        await api.collectSetGroupItems(target, uuids);
-      }
+      // 移动语义：后端会先把它们从其它自建分组里摘掉，见 collect_utils::set_group_items。
+      // 默认分组的成员按资源类型现算，不在这张表里，所以那一项不会从默认分组里消失
+      await api.collectSetGroupItems(target, uuids);
       // 移走的项已经不在原来的组里了，勾选跟着清掉（与「移动到分组」弹窗一致）
       deps.checked.value = new Set();
     } catch (e) {

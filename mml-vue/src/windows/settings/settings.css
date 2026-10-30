@@ -654,37 +654,12 @@
 
 /* ---------- Java 页 ---------- */
 
-/* 分组是一块面板：头行是面板条，展开后卡片挂在面板里，收起时只剩这条。
-   面板之间的间距交给 .setting-group 的"块 ↔ 块 16px"节奏，这里不再另加外边距 */
+/* 分组头走全局 .collapse-head（与实例设置的折叠头同一副外观）；
+   展开后的 Java 卡片自己成网格，不再套一层面板。组间距交给 .setting-group 的
+   "块 ↔ 块 16px"节奏，这里不再另加外边距 */
 .settings-layout .java-type {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-card);
-  overflow: hidden;
-}
-
-.settings-layout .java-type-head {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 12px;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 0.12s ease;
-}
-
-.settings-layout .java-type-head:hover {
-  background: var(--bg-hover);
-}
-
-/* 描边画在内侧：头行贴着面板边框，外扩的焦点圈会被 overflow 裁掉 */
-.settings-layout .java-type-head:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
+  flex-direction: column;
 }
 
 .settings-layout .java-type-name {
@@ -702,31 +677,14 @@
   padding: 1px 8px;
 }
 
-/* 分隔线只挂在展开态：收起时卡片区高度为 0，线不能悬在头行下面 */
-.settings-layout .java-type.is-open .java-type-head {
-  border-bottom: 1px solid var(--border);
-}
-
-.settings-layout .chev {
-  /* 箭头推到最右，头行读起来是"一段的标题"而不是树节点 */
-  margin-left: auto;
-  font-size: 11px;
-  color: var(--text-dim);
-  transition: transform 0.22s ease;
-}
-
-.settings-layout .chev.up {
-  transform: rotate(180deg);
-}
-
 .settings-layout .java-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 8px;
-  padding: 10px 12px 12px;
+  padding: 8px 0 0;
 }
 
-/* 卡片比面板底色更沉：面板与卡片同一层的话，整块会糊成一片 */
+/* 卡片与头行同色，靠描边和展开后的 8px 间距区分 */
 .settings-layout .java-card {
   display: flex;
   flex-direction: column;
@@ -734,7 +692,7 @@
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--bg);
+  background: var(--bg-card);
   min-width: 0;
 }
 
@@ -878,6 +836,15 @@
   background: var(--bg-card);
   overflow: hidden;
   color: var(--text-dim);
+}
+
+/* 自定义主页面与程序图标两行的操作按钮统一按控件高度：
+   不同变体（默认 / danger）与周围行高都不该把按钮撑出两种高度 */
+.settings-layout .custom-home-row .ui-btn,
+.settings-layout .program-icon-row .ui-btn {
+  height: var(--ctl-h);
+  min-height: var(--ctl-h);
+  line-height: 1;
 }
 
 .settings-layout .program-icon-preview img {

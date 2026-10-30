@@ -134,7 +134,7 @@ pub fn collect_set_group_items(app: AppHandle, group: String, uuids: Vec<String>
 /// - `icon`: 图标网址，可缺省
 /// - `url`: 项目网页地址
 /// - `star`: 为真加入收藏，重复收藏忽略；为假按下载源加项目 ID 移除
-/// - `group`: 新收藏归到哪个分组，一般是按资源类型分的默认分组；取消收藏时忽略
+/// - `group`: 新收藏归到哪个具名分组；默认分组的成员按资源类型现算，一般传 `None`。取消收藏时忽略
 ///
 /// 参数是 IPC 契约，`bindings.ts` 由 Rust 源码生成，见 AGENTS.md §4，不能合并成结构体。
 ///

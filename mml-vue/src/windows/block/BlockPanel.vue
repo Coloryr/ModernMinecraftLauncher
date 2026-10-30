@@ -463,13 +463,28 @@ async function onDetailRemove() {
       </BaseButton>
     </div>
 
-    <!-- 内容区工具条：搜索与玩家皮肤入口都放这里，不占标题栏 -->
-    <div v-if="rendered" class="block-filters">
-      <SearchBox v-model="keyword" :placeholder="t('blocks.search')" :clear-label="t('blocks.searchClear')"
-        width="240px" />
-      <BaseButton v-if="inSkinCat" size="sm" variant="accent" @click="skinOpen = true">
-        {{ t("blocks.addSkin") }}
-      </BaseButton>
+    <!-- 内容区工具条：搜索与玩家皮肤入口都放这里，不占标题栏。
+         它和网格一起放在分类栏右边，分类栏的「全部」才与搜索框同一条顶线 -->
+    <div v-if="rendered" class="block-main">
+      <CategoryRail :all-label="t('blocks.catAll')" :all-count="blocks.length" :items="catItems" :active="cat"
+        :sortable="true" :new-label="t('blocks.groupAdd')" flush @pick="cat = $event" @reorder="setOrder"
+        @group-menu="openGroupMenu" @new-group="openNewGroup()" />
+
+      <div class="block-content">
+        <div class="block-filters">
+          <SearchBox v-model="keyword" :placeholder="t('blocks.search')" :clear-label="t('blocks.searchClear')"
+            width="240px" />
+          <BaseButton v-if="inSkinCat" size="sm" variant="accent" @click="skinOpen = true">
+            {{ t("blocks.addSkin") }}
+          </BaseButton>
+        </div>
+
+        <BlockGrid :items="filtered" :keyword="keyword" :size="size" :active-id="detail?.id ?? null"
+          :skin-cat="SKIN_CAT" :filtered="isFiltered" :is-favorite="isFavorite" :toggle-favorite="toggleFavorite"
+          :select-mode="multiSelect" :is-selected="(id) => selectedIds.has(id)"
+          @open="openDetail" @remove-skin="removeSkin" @clear-filters="clearFilters"
+          @item-menu="openBlockMenu" @toggle-select="(p) => toggleSelect(p.item, p.event)" />
+      </div>
     </div>
 
     <!-- 多选工具条：与主窗口多选条同一套外观，浮在标题栏下方 -->
@@ -481,18 +496,6 @@ async function onDetailRemove() {
       </button>
       <span class="multi-sep" />
       <button class="multi-exit" @click="exitMultiSelect">{{ t("multi.exit") }}</button>
-    </div>
-
-    <!-- 已渲染：分类栏 + 网格 -->
-    <div v-if="rendered" class="block-main">
-      <CategoryRail :all-label="t('blocks.catAll')" :all-count="blocks.length" :items="catItems" :active="cat"
-        :sortable="true" :new-label="t('blocks.groupAdd')" @pick="cat = $event" @reorder="setOrder"
-        @group-menu="openGroupMenu" @new-group="openNewGroup()" />
-      <BlockGrid :items="filtered" :keyword="keyword" :size="size" :active-id="detail?.id ?? null"
-        :skin-cat="SKIN_CAT" :filtered="isFiltered" :is-favorite="isFavorite" :toggle-favorite="toggleFavorite"
-        :select-mode="multiSelect" :is-selected="(id) => selectedIds.has(id)"
-        @open="openDetail" @remove-skin="removeSkin" @clear-filters="clearFilters"
-        @item-menu="openBlockMenu" @toggle-select="(p) => toggleSelect(p.item, p.event)" />
     </div>
 
     <!-- 尺寸滑杆：右下角，小 → 大连续调图标大小 -->
@@ -629,30 +632,32 @@ async function onDetailRemove() {
   gap: 12px;
   flex: 1;
   min-height: 0;
-  /* 上 / 右 / 下 三边抵消 WindowFrame .frame-body 的 22/26 内边距：
-     网格与它的滚动条顶到窗口右边缘、上下也一直延伸到窗口边（滚动条是整条）。
-     左内边距保持原样；上下的呼吸改由各自滚动内容自己的留白给 ——
-     网格见 BlockGrid 的 padding-top 与 BOTTOM_SPACE，分类栏见 .cat-rail 的 padding。
-     那样空档只在滚到两端时出现，而不是把滚动区缩掉 */
+  /* 右侧与下侧抵消 WindowFrame .frame-body 的 26 / 22 内边距：网格与它的滚动条顶到
+     窗口右边、一直延伸到窗口底，滚动条是整条。上边不抵消 —— 分类栏与搜索框要落在
+     内容区的同一条顶线上，与资源收藏窗口一致；分类栏因此传 flush，不再自带上下留白 */
   margin-right: -26px;
   margin-bottom: -22px;
-  margin-top: -22px;
   padding-right: 0;
 }
 
-/* ---------- 内容区工具条 ---------- */
+/* ---------- 右列：搜索条 + 网格 ---------- */
+
+/* 分类栏右边那一列：搜索条在上、网格撑满剩余高度 */
+.block-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 
 .block-filters {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 22px;
+  /* 面板右侧是通栏的，这里补回窗口内边距 */
   margin-right: 26px;
-}
-
-/* 上面已经有进度行时不再补一份顶部留白 */
-.block-progress + .block-filters {
-  margin-top: 0;
 }
 
 /* ---------- 尺寸滑杆（右下角） ---------- */
@@ -757,8 +762,7 @@ async function onDetailRemove() {
   color: var(--text-dim);
 }
 
-/* 只有网格 / 分类栏区域是"通栏"的，其余卡片保持和网格一致的留白：
-   进度行在第一行时要补回 22px（它在面板顶部）；提示卡只在自己是第一行、或作为最底元素时补。
+/* 只有网格 / 分类栏区域是"通栏"的，其余卡片保持和网格一致的留白。
    右边距取 26 而不是网格那 16：网格的缩进 16 之外还有约 9px 的滚动条槽，
    卡片没有那条槽，按 16 补会让卡片右边比左边多空出去 16px，看着左右不一样宽 */
 .block-progress,
@@ -766,11 +770,7 @@ async function onDetailRemove() {
   margin-right: 26px;
 }
 
-.block-progress,
-.block-panel>.block-prompt:first-child {
-  margin-top: 22px;
-}
-
+/* 面板底部是通栏的，提示卡补回窗口下内边距 */
 .block-prompt {
   margin-bottom: 22px;
 }
@@ -867,7 +867,7 @@ async function onDetailRemove() {
   white-space: nowrap;
 }
 
-/* ---------- 主体：分类栏 + 网格 ---------- */
+/* ---------- 主体：分类栏 + 右列 ---------- */
 .block-main {
   flex: 1;
   min-height: 0;

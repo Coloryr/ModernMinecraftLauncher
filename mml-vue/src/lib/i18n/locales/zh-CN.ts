@@ -237,6 +237,7 @@ export default {
 
   // 多选模式
   "multi.selectAll": "全选",
+  "multi.enter": "多选",
   "multi.selectAllDone": "已选 {count} 个实例",
   "multi.moveGroup": "修改分组",
   "multi.delete": "删除实例",
@@ -280,6 +281,7 @@ export default {
   "detail.selectHint": "从左侧选择一个游戏实例",
   "detail.settings": "实例设置",
   "detail.modpackCheck": "检查整合包更新",
+  "detail.modpackNeedIds": "先填项目 ID 与文件 ID",
   "detail.modpackUpToDate": "整合包已是最新版本",
   "detail.serverPackCheck": "同步服务器包",
   "detail.modpackChecking": "正在检查更新…",
@@ -1100,6 +1102,7 @@ export default {
   "args.minMemory": "最小",
   "args.maxMemory": "最大",
   "args.custom": "自定义",
+  "args.useGlobal": "使用全局设定",
   "args.windowSize": "窗口大小",
   "args.fullscreen": "全屏",
   "args.width": "宽",
@@ -1890,9 +1893,9 @@ export default {
   "winHelp.qqCopy": "复制群号",
   "winHelp.qqCopied": "群号已复制",
 
-  // 首次使用设置：旧数据搬完之后问一次
+  // 首次使用设置：旧数据询问结束后问一次
   "firstRun.title": "首次使用设置",
-  "firstRun.intro": "旧数据已经搬过来了。先挑几个顺手的设置，之后随时能在设置窗口里改。",
+  "firstRun.intro": "先挑几个顺手的设置，之后随时能在设置窗口里改。",
   "firstRun.modeTitle": "主页面样式",
   "firstRun.modeGroupDesc": "按分组铺开，组可以收起",
   "firstRun.modeGridDesc": "图标网格，一排多个",
