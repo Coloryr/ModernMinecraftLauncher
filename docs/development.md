@@ -159,7 +159,7 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 
 每个平台都走同一套骨架，正式版与预发布只在构建脚本和打包方式上分叉：
 
-1. `actions/checkout@v4` + `actions/setup-node@v4`（Node 22，按 lockfile 缓存）+
+1. `actions/checkout@v4` + `actions/setup-node@v4`（Node 24，按 lockfile 缓存）+
    `dtolnay/rust-toolchain@stable` + `Swatinem/rust-cache@v2`；
 2. 用 `taiki-e/install-action` 装 `cargo-binstall`，再由它下载 Tauri CLI 的**预编译**
    `cargo-tauri`（GitHub Release 资产），不跑 `cargo install`。上游 binstall 元数据只给
@@ -168,9 +168,8 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 3. Windows 拆成 x64 / x86 / arm64 三行 matrix，各跑 `build/init.ps1` 再按通道跑
    `build/build-release.ps1 -Arch <arch>` 或 `build/build-prerelease.ps1 -Arch <arch>`
    （arm64 用 `windows-11-arm` 原生 runner）；Linux 跑 x64（`ubuntu-22.04`）与 arm64（`ubuntu-24.04-arm`），
-   x86 单独一个 job（Debian bookworm 容器里交叉编译，见下），macOS 的 x64 跑 `macos-26-intel`
-   （原生 Intel）、arm64 跑 `macos-latest`，都执行 `bash build/init.sh` 再按通道跑
-   `build/build-release.sh` 或 `build/build-prerelease.sh`；
+   macOS 的 x64 跑 `macos-26-intel`（原生 Intel）、arm64 跑 `macos-latest`，都执行
+   `bash build/init.sh` 再按通道跑 `build/build-release.sh` 或 `build/build-prerelease.sh`；
 4. 正式版的 Linux x64 构建完先上传 deb / rpm / AppImage，再单独上传原始二进制；`package-linux-extra` job
    下载这份二进制后跑 `build/package-flatpak.sh` 与 `build/package-arch.sh`，把 `.flatpak` 与
    `.pkg.tar.zst` 也放进 `build_out/`。附加包失败不影响主产物，但发版 job 会等它，缺包时不发 Release；
@@ -188,23 +187,14 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
   FUSE 运行时 x64 用 `libfuse2`、arm64 用 `libfuse2t64`。`libdbus-1-dev` 是 `mml-sys` 在 Linux 上
   「在文件管理器中显示」用的 D-Bus 绑定，缺了会编译失败；`libudev-dev` 是手柄读取在 Linux 上的后端依赖；
   `libarchive-tools` 与 `zstd` 给 Arch 包生成 `.MTREE`。
-- Linux x86（32 位 i686）单独一个 job：Ubuntu 的 i386 仓库里没有 `libayatana-appindicator3-dev`
-  与 `libxdo-dev`，装不齐就链接不过，所以整个 job 跑在 `debian:bookworm` 容器里 —— Debian 的
-  i386 是完整架构，这两包都有；再用 `gcc-i686-linux-gnu` 交叉编译（`MML_TARGETS=i686-unknown-linux-gnu`，
-  `PKG_CONFIG_LIBDIR` 指向 `/usr/lib/i386-linux-gnu/pkgconfig`）。打包类型限定为 deb / rpm
-  （`MML_BUNDLES=deb,rpm`）：AppImage 的打包工具链没有 32 位版本。代价是 x86 的 glibc 基线
-  跟着容器走，是 bookworm 的 2.36，比 x64 / arm64 的 2.35 高一档 —— Tauri 2 要 webkit2gtk 4.1，
-  更老的发行版装不上，这个基线也降不下去。
 - macOS 的 x64 跑 `macos-26-intel`：这代 Intel 镜像是最后一代 —— Apple 已说明 macOS 26 是
   最后一个支持 Intel 的系统，不会再有 `macos-27-intel`。等它退役时 Intel 这条线也就结束了，
   那时要么只出 arm64，要么回退到在 `macos-latest` 上交叉编译（`MML_TARGETS=x86_64-apple-darwin`
   加 `rustup target add` 即可，签名与公证不看宿主架构）。
 - 产物名与本地一致：`mml-windows-x64-0.0.1.msi`、`mml-linux-x64-0.0.1.deb`、
-  `mml-linux-x86-0.0.1.deb`、`mml-linux-x64-0.0.1.flatpak`、`mml-arch-x64-0.0.1.pkg.tar.zst`、
-  `mml-macos-arm64-0.0.1.dmg` 等，架构取自 `runner.arch`；只有 Linux x86 是交叉构建，
-  架构取自目标三元组。
+  `mml-linux-x64-0.0.1.flatpak`、`mml-arch-x64-0.0.1.pkg.tar.zst`、
+  `mml-macos-arm64-0.0.1.dmg` 等，架构取自 `runner.arch`。
 - 预发布只出可执行文件：`mml-windows-x64-1.0.0-pre.exe`、`mml-linux-arm64-1.0.0-pre`、
-  `mml-linux-x86-1.0.0-pre`、
   `mml-macos-x64-1.0.0-pre` 等；Linux / macOS 下载后要 `chmod +x`。预发布不打安装包，
   安装包的版本字段放不下 `-pre` 这类后缀。
 - Flatpak 不需要在 runner 上装 `org.freedesktop.Platform`：封装只做 OSTree 提交与 bundle，

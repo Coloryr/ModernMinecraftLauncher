@@ -88,7 +88,7 @@ jobs:
       - name: 设置 Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           cache-dependency-path: |
             mml-vue/package-lock.json
@@ -161,7 +161,7 @@ jobs:
       - name: 设置 Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           cache-dependency-path: |
             mml-vue/package-lock.json
@@ -236,93 +236,6 @@ jobs:
           path: build_out/*
           if-no-files-found: error
 
-  build-linux-x86:
-    needs: check-version
-    runs-on: ubuntu-22.04
-    container: debian:bookworm
-    env:
-      MML_VERSION: ${{ needs.check-version.outputs.version }}
-      DEBIAN_FRONTEND: noninteractive
-      MML_TARGETS: i686-unknown-linux-gnu
-      MML_BUNDLES: deb,rpm
-      PKG_CONFIG_ALLOW_CROSS: "1"
-      PKG_CONFIG_LIBDIR: /usr/lib/i386-linux-gnu/pkgconfig:/usr/share/pkgconfig
-      PKG_CONFIG_PATH: /usr/lib/i386-linux-gnu/pkgconfig
-      CC_i686_unknown_linux_gnu: i686-linux-gnu-gcc
-      CXX_i686_unknown_linux_gnu: i686-linux-gnu-g++
-      AR_i686_unknown_linux_gnu: i686-linux-gnu-ar
-      CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_LINKER: i686-linux-gnu-gcc
-    steps:
-      - name: 安装容器基础工具
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends git ca-certificates curl xz-utils
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: 设置 Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: |
-            mml-vue/package-lock.json
-      - name: 设置 Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: i686-unknown-linux-gnu
-      - name: 还原 vendor 插件
-        run: bash mml-gui/vendor/prepare.sh
-      - name: 缓存 Rust
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: .
-          key: linux-x86
-      - name: 安装 i386 构建依赖
-        run: |
-          dpkg --add-architecture i386
-          apt-get update
-          apt-get install -y --no-install-recommends \
-            build-essential pkg-config file dpkg-dev patchelf cpio \
-            gcc-i686-linux-gnu g++-i686-linux-gnu \
-            libwebkit2gtk-4.1-dev:i386 libgtk-3-dev:i386 \
-            libayatana-appindicator3-dev:i386 libxdo-dev:i386 \
-            librsvg2-dev:i386 libssl-dev:i386 libdbus-1-dev:i386 libudev-dev:i386 \
-            rpm
-      - name: 安装 cargo-binstall
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-binstall
-      - name: 安装 Tauri CLI（预编译）
-        shell: bash
-        run: |
-          cargo binstall --no-confirm --pkg-fmt tgz tauri-cli@^2
-          cargo tauri --version
-      - name: 安装依赖
-        run: bash build/init.sh
-      - name: 构建并打包（x86）
-        if: needs.check-version.outputs.channel == 'release'
-        run: bash build/build-release.sh
-      - name: 上传 Linux x86 产物
-        if: needs.check-version.outputs.channel == 'release' && needs.check-version.outputs.test != 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: mml-linux-x86
-          path: build_out/*
-          if-no-files-found: error
-      - name: 构建预发布（x86）
-        if: needs.check-version.outputs.channel == 'prerelease'
-        run: bash build/build-prerelease.sh
-      - name: 收集预发布产物
-        if: needs.check-version.outputs.channel == 'prerelease'
-        run: node build/package-prerelease.mjs --os linux --arch x86 --triple i686-unknown-linux-gnu
-      - name: 上传预发布产物
-        if: needs.check-version.outputs.channel == 'prerelease' && needs.check-version.outputs.test != 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: mml-prerelease-linux-x86
-          path: build_out/*
-          if-no-files-found: error
-
   package-linux-extra:
     if: needs.check-version.outputs.channel == 'release' && needs.check-version.outputs.test != 'true'
     needs: [check-version, build-linux]
@@ -375,7 +288,7 @@ jobs:
       - name: 设置 Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           cache-dependency-path: |
             mml-vue/package-lock.json
@@ -485,7 +398,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/') && needs.check-version.outputs.channel == 'release' && needs.check-version.outputs.test != 'true'
-    needs: [check-version, build-windows, build-linux, build-linux-x86, package-linux-extra, build-macos]
+    needs: [check-version, build-windows, build-linux, package-linux-extra, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -525,7 +438,7 @@ jobs:
 
   prerelease:
     if: startsWith(github.ref, 'refs/tags/') && needs.check-version.outputs.channel == 'prerelease' && needs.check-version.outputs.test != 'true'
-    needs: [check-version, build-windows, build-linux, build-linux-x86, build-macos]
+    needs: [check-version, build-windows, build-linux, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write

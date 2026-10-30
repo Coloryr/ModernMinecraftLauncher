@@ -102,7 +102,7 @@ build/dev-frontend.sh     # Linux / macOS / Git Bash
 
 | 目标 | 命令 | 产物 |
 | --- | --- | --- |
-| 正式发布 | `build/build-release.ps1`（或 `.sh`） | `build_out/` 下带版本号的安装包；Windows 默认 x64 / x86 / arm64，Linux 由 CI 出 x64 / arm64 / x86（x86 只出 deb / rpm），macOS 由 CI 出 x64 / arm64 |
+| 正式发布 | `build/build-release.ps1`（或 `.sh`） | `build_out/` 下带版本号的安装包；Windows 默认 x64 / x86 / arm64，Linux / macOS 由 CI 出 x64 / arm64 |
 | 预发布 | `build/build-prerelease.ps1`（或 `.sh`） | `target/prerelease/mml-gui-<arch>.exe` |
 | Linux 附加包 | `bash build/package-flatpak.sh` / `bash build/package-arch.sh` | `build_out/` 下的 `.flatpak` 与 `.pkg.tar.zst` |
 
@@ -112,10 +112,7 @@ build/dev-frontend.sh     # Linux / macOS / Git Bash
   并保留 DevTools（F12 打开控制台，独立窗口），正式发布不含。
 - Windows 默认构建 x64 / x86 / arm64；只要一种用 `-Arch x64`（或 `-Arch x64,x86`）。arm64 只打 NSIS，
   x64 / x86 出 MSI + NSIS。x86 / arm64 交叉编译需要对应架构的 MSVC 工具链，CI 的 arm64 跑在原生 ARM runner 上。
-- Linux 出 x64 / arm64 / x86（x86 即 32 位 i686，只出 deb / rpm）；macOS 出 x64 / arm64
-  （x64 跑 `macos-26-intel`，arm64 跑 `macos-latest`）。Ubuntu 的 i386 仓库里没有托盘依赖
-  `libayatana-appindicator3-dev` 与 Tauri 要的 `libxdo-dev`，所以 x86 在 Debian bookworm 容器里
-  交叉编译（Debian 的 i386 是完整架构）；AppImage 的打包工具链没有 32 位版本，因此不产出 AppImage。
+- Linux 出 x64 / arm64；macOS 出 x64 / arm64（x64 跑 `macos-26-intel`，arm64 跑 `macos-latest`）。
 - Windows 三种架构各有独立 target 子目录（`target/<三元组>/release`、`target/<三元组>/prerelease`）；
   宿主直接构建（不带 `--target`）仍在 `target/release`、`target/prerelease`，来回切不会互相刷缓存。
 
@@ -125,7 +122,7 @@ bash 版构建当前架构（可用 `MML_TARGETS` 指定三元组）。预发布
 
 Linux 还有两个附加包，都拿已构建的 `target/release/ModernMinecraftLauncher` 直接封装、不重新编译：
 `package-flatpak.sh` 需要 `flatpak`；`package-arch.sh` 直接按 Arch 包格式组装
-tar.zst，不依赖 `makepkg`，Ubuntu 上也能打。CI 只在 Linux x64 执行这两个脚本，arm64 / x86 不做这两个附加包；
+tar.zst，不依赖 `makepkg`，Ubuntu 上也能打。CI 只在 Linux x64 执行这两个脚本，arm64 不做这两个附加包；
 附加包在独立 job 里打，失败不影响 deb / rpm / AppImage，但发版 job 会等它，缺包时不发 Release。
 
 macOS 产物在配置了 `APPLE_*` secrets 时自动签名并公证；没配置时走 ad-hoc 签名 —— Apple Silicon 上
@@ -152,7 +149,6 @@ CI 的 `windows-11-arm` 与 `ubuntu-24.04-arm` 是 GitHub 公共预览 runner，
 | Windows arm64 | `mml-windows-arm64-0.0.1-setup.exe` |
 | Linux x64 | `mml-linux-x64-0.0.1.deb`、`mml-linux-x64-0.0.1.rpm`、`mml-linux-x64-0.0.1.AppImage` |
 | Linux arm64 | `mml-linux-arm64-0.0.1.deb`、`mml-linux-arm64-0.0.1.rpm`、`mml-linux-arm64-0.0.1.AppImage` |
-| Linux x86 | `mml-linux-x86-0.0.1.deb`、`mml-linux-x86-0.0.1.rpm` |
 | Linux（Flatpak） | `mml-linux-x64-0.0.1.flatpak` |
 | Arch Linux | `mml-arch-x64-0.0.1.pkg.tar.zst` |
 | macOS x64 | `mml-macos-x64-0.0.1.dmg`、`mml-macos-x64-0.0.1.app.tar.gz` |
@@ -164,7 +160,7 @@ Windows 本地默认把三种架构都构建出来；Linux / macOS 本地构建�
 
 | 触发 | 行为 |
 | --- | --- |
-| 推送正式版标签（如 `v0.0.1`） | 版本直接取自标签，再按 Windows 3 种、Linux 3 种、macOS 2 种架构并行构建安装包，最后汇总成一个 GitHub Release |
+| 推送正式版标签（如 `v0.0.1`） | 版本直接取自标签，再按 Windows 3 种、Linux 2 种、macOS 2 种架构并行构建安装包，最后汇总成一个 GitHub Release |
 | 推送预发布标签（如 `v1.0.0-pre`） | 走预发布构建，只出可执行文件，汇总成一个标记为 Pre-release 的 GitHub Release |
 | 推送测试构建标签（如 `testbuild`、`testbuild-1`） | 跑完整的构建流程，版本取最近的可达标签、通道按其后缀决定；**产物全部丢弃**：不上传 artifact、不打包附加包、不发 Release |
 | 推送 `releases/**` 分支 | 只构建并把产物传成 Actions artifact，不发 Release，用于验证 |

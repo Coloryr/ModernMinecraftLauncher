@@ -80,12 +80,12 @@ if (!files.length) {
 const lines = [`M²L ${version} ${kind === "prerelease" ? "预发布构建" : "构建产物"}`, ""];
 if (kind === "release") {
     lines.push("- Windows：x64 / x86 / arm64（MSI / NSIS；arm64 为 NSIS）");
-    lines.push("- Linux：x64 / arm64（deb / rpm / AppImage；x64 另有 Flatpak / Arch），x86 只出 deb / rpm");
+    lines.push("- Linux：x64 / arm64（deb / rpm / AppImage；x64 另有 Flatpak / Arch）");
     lines.push("- macOS：x64 / arm64（dmg / app.tar.gz）");
 } else {
     lines.push("- 预发布只提供可执行文件，不打安装包；主界面会提示「预发布版」。");
     lines.push("- Windows：x64 / x86 / arm64（.exe）");
-    lines.push("- Linux：x64 / arm64 / x86（下载后 `chmod +x`）");
+    lines.push("- Linux：x64 / arm64（下载后 `chmod +x`）");
     lines.push("- macOS：x64 / arm64（下载后 `chmod +x`）");
 }
 lines.push("");
