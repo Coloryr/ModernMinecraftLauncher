@@ -16,6 +16,10 @@ pub struct StatsInstanceDto {
     pub failed: u64,
     /// 累计游玩秒数，含正在运行的本次时长
     pub seconds: u64,
+    /// 最早一次记录时间，epoch 毫秒；无记录为 None
+    ///
+    /// 统计窗口用它限制日期选择的下界：不能早于这个实例的第一条记录。
+    pub first: Option<i64>,
     /// 最近一次启动时间，epoch 毫秒；无记录为 None
     pub last: Option<i64>,
     /// 是否正在运行
@@ -80,6 +84,6 @@ pub struct StatsPlaytimeDto {
     pub total_seconds: u64,
     /// 有游玩记录的天数
     pub active_days: u32,
-    /// 单日范围时各实例当天的时长，按时长降序；多天范围时为空
+    /// 范围内各实例的时长，按时长降序；没有记录时为空
     pub by_instance: Vec<StatsDayInstanceDto>,
 }

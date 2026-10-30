@@ -115,4 +115,5 @@ custom-protocol = ["tauri/custom-protocol"]
 
 # 预发布版标记：预发布构建（build/build-prerelease.*）打开它，主页会提示"预发布版"。
 # 正式发布不带，前端据 app_build_info 的 channel 决定提示与否。
-prerelease = []
+# 同时打开 tauri 的 devtools：预发布版要能用 F12 打开控制台，正式版不把它编进去。
+prerelease = ["tauri/devtools"]

@@ -8,13 +8,16 @@ use std::{
         atomic::{AtomicBool, Ordering},
     },
     thread,
-    time::Duration as StdDuration,
+    time::{Duration as StdDuration, SystemTime},
 };
 
 use chrono::{DateTime, Local, LocalResult, TimeDelta, TimeZone, Utc};
 use mml_names::{
     i18,
-    i18_items::{error_type::CoreResult, thread_type::ThreadType},
+    i18_items::{
+        error_type::{CoreResult, ErrorType},
+        thread_type::ThreadType,
+    },
     names,
 };
 use mml_nbt::{
@@ -39,6 +42,18 @@ static IS_SAVE: AtomicBool = AtomicBool::new(false);
 
 /// 统计数据
 static COUNT: LazyLock<GameCountObj> = LazyLock::new(|| Arc::new(RwLock::new(CountObj::default())));
+
+/// 上次读 / 写统计文件时的指纹：修改时间 + 长度
+///
+/// 用户可能在启动器运行期间手动替换 `count.dat`；落盘前对一下指纹，
+/// 变了就不写，免得把人家的文件盖掉。
+static FILE_STAMP: LazyLock<Mutex<Option<(SystemTime, u64)>>> = LazyLock::new(|| Mutex::new(None));
+
+/// 启动时统计文件是否读成功
+///
+/// 读不出来时（文件坏了、或者正被别的程序替换）这次运行**不落盘**，
+/// 否则退出时的保存会把用户原来的文件盖掉。
+static READ_OK: AtomicBool = AtomicBool::new(true);
 
 /// 正在运行的游戏及其上次统计时间
 static TIME_LIST: LazyLock<Mutex<HashMap<Uuid, DateTime<Local>>>> =
@@ -110,7 +125,8 @@ pub struct LaunchLogData {
 ///
 /// - `dir`: 运行路径，统计文件落在它下面
 pub fn init<P: AsRef<Path>>(dir: P) {
-    let _ = COUNT_FILE.get_or_init(|| dir.as_ref().join(names::COUNT_DATA_FILE));
+    let dir = dir.as_ref().to_path_buf();
+    let _ = COUNT_FILE.get_or_init(|| dir.join(names::COUNT_DATA_FILE));
 
     if IS_RUN.swap(true, Ordering::Relaxed) {
         return;
@@ -122,6 +138,8 @@ pub fn init<P: AsRef<Path>>(dir: P) {
         .unwrap();
 
     read();
+    // 迁移过来的统计（ColorMC 的 count.dat）在读完自己的统计之后再合并
+    merge_pending(&dir);
 }
 
 /// 停止统计线程
@@ -179,102 +197,24 @@ fn read() {
         return;
     };
 
+    // 解析失败时不落盘：文件可能正被别的程序替换（读到的是一半），
+    // 这时写回去就把用户原来的数据毁了，见下面的 backup_file
+    let mut loaded = true;
     if !file.exists() {
-        {
-            let mut count = COUNT.write().unwrap();
-            *count = CountObj::default();
-        }
+        let mut count = COUNT.write().unwrap();
+        *count = CountObj::default();
     } else {
-        let result = (|| -> CoreResult<()> {
-            let mut stream = path_helper::open_read(&file)?;
-            let nbt_file = NbtFile::read(&mut stream)?;
-            let Some(nbt) = nbt_file.nbt.as_compound() else {
-                return Ok(());
-            };
-
-            let mut count = CountObj::default();
-            count.launch_count = nbt.get_long("LaunchCount").unwrap_or(0);
-            count.launch_done_count = nbt.get_long("LaunchDoneCount").unwrap_or(0);
-            count.launch_error_count = nbt.get_long("LaunchErrorCount").unwrap_or(0);
-            count.all_time = duration_from_ticks(nbt.get_long("AllTime").unwrap_or(0));
-
-            if let Some(list) = nbt.get_list("GameRuns") {
-                for item in list.iter() {
-                    let Some(com) = item.as_compound() else {
-                        continue;
-                    };
-                    let Some(key) = com.get_string("Key") else {
-                        continue;
-                    };
-                    let Ok(uuid) = Uuid::parse_str(&key) else {
-                        continue;
-                    };
-
-                    let mut times = Vec::new();
-                    if let Some(list1) = com.get_list("List") {
-                        for item1 in list1.iter() {
-                            let Some(com1) = item1.as_compound() else {
-                                continue;
-                            };
-                            let start = com1.get_long("StartTime").unwrap_or(0);
-                            let stop = com1.get_long("StopTime").unwrap_or(0);
-                            times.push(GameTimeData {
-                                now: false,
-                                start_time: ticks_to_date(start),
-                                stop_time: ticks_to_date(stop),
-                            });
-                        }
-                    }
-                    count.game_runs.insert(uuid, times);
-                }
+        match read_with_retry(&file) {
+            Ok(data) => {
+                *COUNT.write().unwrap() = data;
+                *FILE_STAMP.lock().unwrap() = file_stamp(&file);
             }
-
-            if let Some(list) = nbt.get_list("LaunchLogs") {
-                for item in list.iter() {
-                    let Some(com) = item.as_compound() else {
-                        continue;
-                    };
-                    let Some(key) = com.get_string("Key") else {
-                        continue;
-                    };
-                    let Ok(uuid) = Uuid::parse_str(&key) else {
-                        continue;
-                    };
-
-                    let mut logs = Vec::new();
-                    if let Some(list1) = com.get_list("List") {
-                        for item1 in list1.iter() {
-                            let Some(com1) = item1.as_compound() else {
-                                continue;
-                            };
-                            let time = com1.get_long("Time").unwrap_or(0);
-                            let error = com1.get_byte("Error").unwrap_or(0) == 1;
-                            logs.push(LaunchLogData {
-                                time: ticks_to_date(time),
-                                error,
-                            });
-                        }
-                    }
-                    count.launch_logs.insert(uuid, logs);
-                }
+            Err(err) => {
+                loaded = false;
+                READ_OK.store(false, Ordering::Relaxed);
+                mml_log::error_type(err);
+                backup_file(&file);
             }
-
-            if let Some(game_names) = nbt.get_compound("GameNames") {
-                for (key, value) in &game_names.data {
-                    if let Some(str) = value.as_string()
-                        && let Ok(uuid) = Uuid::parse_str(key)
-                    {
-                        count.game_names.insert(uuid, str.data.clone());
-                    }
-                }
-            }
-
-            *COUNT.write().unwrap() = count;
-            Ok(())
-        })();
-
-        if let Err(err) = result {
-            mml_log::error_type(err);
         }
     }
 
@@ -288,7 +228,227 @@ fn read() {
         }
     }
 
+    if loaded {
+        save();
+    }
+}
+
+/// 读统计文件，失败时短暂重试
+///
+/// 用户手动替换 `count.dat` 时，文件可能还没复制完：这时解压会报
+/// "incomplete deflate stream"。等一会儿再读一次，别把这种情况当成坏文件。
+///
+/// - `file`: 统计文件
+///
+/// # 返回值
+///
+/// 解析出的统计；重试后仍读不出来返回最后一次的错误
+fn read_with_retry(file: &Path) -> CoreResult<CountObj> {
+    let mut last = None;
+    // 5 次、每次间隔 400ms：杀毒软件扫描新文件时，复制到一半的状态可能持续一两秒
+    for attempt in 0..5 {
+        if attempt > 0 {
+            thread::sleep(StdDuration::from_millis(400));
+        }
+        match parse_file(file) {
+            Ok(data) => return Ok(data),
+            Err(err) => last = Some(err),
+        }
+    }
+    Err(last.unwrap_or(ErrorType::NbtReadError))
+}
+
+/// 统计文件的指纹：修改时间 + 长度
+///
+/// - `file`: 统计文件
+///
+/// # 返回值
+///
+/// 文件存在且拿得到修改时间时返回指纹，否则 `None`
+fn file_stamp(file: &Path) -> Option<(SystemTime, u64)> {
+    let meta = std::fs::metadata(file).ok()?;
+    Some((meta.modified().ok()?, meta.len()))
+}
+
+/// 把读不出来的统计文件备份成 `count.dat.bak`
+///
+/// 只备份、不删除：原文件留在原地，下次启动还会再试；备份留着方便排查。
+///
+/// - `file`: 统计文件
+fn backup_file(file: &Path) {
+    let bak = file.with_file_name(format!("{}.bak", names::COUNT_DATA_FILE));
+    let _ = std::fs::copy(file, bak);
+}
+
+/// 解析一份统计文件
+///
+/// 结构与 ColorMC 的 `count.dat` 是同一套 NBT，见 [`CountObj`]。
+///
+/// - `file`: 统计文件
+///
+/// # 返回值
+///
+/// 解析出的统计；文件读不出来或不是 NBT 时返回错误
+fn parse_file(file: &Path) -> CoreResult<CountObj> {
+    let mut stream = path_helper::open_read(file)?;
+    let nbt_file = NbtFile::read(&mut stream)?;
+    let Some(nbt) = nbt_file.nbt.as_compound() else {
+        return Ok(CountObj::default());
+    };
+
+    let mut count = CountObj::default();
+    count.launch_count = nbt.get_long("LaunchCount").unwrap_or(0);
+    count.launch_done_count = nbt.get_long("LaunchDoneCount").unwrap_or(0);
+    count.launch_error_count = nbt.get_long("LaunchErrorCount").unwrap_or(0);
+    count.all_time = duration_from_ticks(nbt.get_long("AllTime").unwrap_or(0));
+
+    if let Some(list) = nbt.get_list("GameRuns") {
+        for item in list.iter() {
+            let Some(com) = item.as_compound() else {
+                continue;
+            };
+            let Some(key) = com.get_string("Key") else {
+                continue;
+            };
+            let Ok(uuid) = Uuid::parse_str(&key) else {
+                continue;
+            };
+
+            let mut times = Vec::new();
+            if let Some(list1) = com.get_list("List") {
+                for item1 in list1.iter() {
+                    let Some(com1) = item1.as_compound() else {
+                        continue;
+                    };
+                    let start = com1.get_long("StartTime").unwrap_or(0);
+                    let stop = com1.get_long("StopTime").unwrap_or(0);
+                    times.push(GameTimeData {
+                        now: false,
+                        start_time: ticks_to_date(start),
+                        stop_time: ticks_to_date(stop),
+                    });
+                }
+            }
+            count.game_runs.insert(uuid, times);
+        }
+    }
+
+    if let Some(list) = nbt.get_list("LaunchLogs") {
+        for item in list.iter() {
+            let Some(com) = item.as_compound() else {
+                continue;
+            };
+            let Some(key) = com.get_string("Key") else {
+                continue;
+            };
+            let Ok(uuid) = Uuid::parse_str(&key) else {
+                continue;
+            };
+
+            let mut logs = Vec::new();
+            if let Some(list1) = com.get_list("List") {
+                for item1 in list1.iter() {
+                    let Some(com1) = item1.as_compound() else {
+                        continue;
+                    };
+                    let time = com1.get_long("Time").unwrap_or(0);
+                    let error = com1.get_byte("Error").unwrap_or(0) == 1;
+                    logs.push(LaunchLogData {
+                        time: ticks_to_date(time),
+                        error,
+                    });
+                }
+            }
+            count.launch_logs.insert(uuid, logs);
+        }
+    }
+
+    if let Some(game_names) = nbt.get_compound("GameNames") {
+        for (key, value) in &game_names.data {
+            if let Some(str) = value.as_string()
+                && let Ok(uuid) = Uuid::parse_str(key)
+            {
+                count.game_names.insert(uuid, str.data.clone());
+            }
+        }
+    }
+
+    Ok(count)
+}
+
+/// 把另一份统计文件合并进当前统计
+///
+/// 从 ColorMC 迁移用：两边是同一套 NBT 结构，计数与总时长相加，运行段与启动记录
+/// 按 uuid 合并并去重，实例名以已有的为准。合并后立即落盘。
+///
+/// - `file`: 要合并的统计文件
+///
+/// # 返回值
+///
+/// 合并成功返回 `Ok(())`；文件读不出来返回错误
+pub fn merge_file(file: &Path) -> CoreResult<()> {
+    let other = parse_file(file)?;
+    {
+        let mut count = COUNT.write().unwrap();
+        count.launch_count += other.launch_count;
+        count.launch_done_count += other.launch_done_count;
+        count.launch_error_count += other.launch_error_count;
+        count.all_time += other.all_time;
+
+        for (uuid, runs) in other.game_runs {
+            let list = count.game_runs.entry(uuid).or_default();
+            for run in runs {
+                // 同一段时间重复导入时不重复计，删掉迁移标记再搬一次也不会翻倍
+                let dup = list
+                    .iter()
+                    .any(|old| old.start_time == run.start_time && old.stop_time == run.stop_time);
+                if !dup {
+                    list.push(run);
+                }
+            }
+        }
+
+        for (uuid, logs) in other.launch_logs {
+            let list = count.launch_logs.entry(uuid).or_default();
+            for log in logs {
+                let dup = list
+                    .iter()
+                    .any(|old| old.time == log.time && old.error == log.error);
+                if !dup {
+                    list.push(log);
+                }
+            }
+        }
+
+        for (uuid, name) in other.game_names {
+            count.game_names.entry(uuid).or_insert(name);
+        }
+    }
+
     save();
+    Ok(())
+}
+
+/// 合并迁移时留下的统计旁路文件
+///
+/// ColorMC 的 `count.dat` 不会直接覆盖 M²L 的统计，迁移时先落到
+/// [`names::COUNT_IMPORT_FILE`]，下次启动读完自己的统计后再合并。
+///
+/// - `dir`: 运行目录
+fn merge_pending(dir: &Path) {
+    let file = dir.join(names::COUNT_IMPORT_FILE);
+    if !file.is_file() {
+        return;
+    }
+    match merge_file(&file) {
+        // 自己那份统计没读出来时不会落盘，旁路文件也得留着，下次启动再合
+        Ok(()) if READ_OK.load(Ordering::Relaxed) => {
+            let _ = std::fs::remove_file(&file);
+        }
+        Ok(()) => {}
+        // 合并不了就把旁路文件留着，下次启动再试，别把数据删了
+        Err(err) => mml_log::error_type(err),
+    }
 }
 
 /// 统计线程主体：每 100 毫秒累加一次运行中实例的时长
@@ -366,6 +526,22 @@ pub fn save_async() {
 /// 保存统计数据到 COUNT_DATA_FILE，重入时直接返回
 fn save() {
     if IS_SAVE.swap(true, Ordering::SeqCst) {
+        return;
+    }
+
+    // 启动时没读到统计：这次运行整场不落盘，别把用户原来的文件盖掉
+    if !READ_OK.load(Ordering::Relaxed) {
+        IS_SAVE.store(false, Ordering::SeqCst);
+        return;
+    }
+
+    // 文件在运行期间被外部换过（用户手动替换）：以外部为准，这次不写
+    if let Some(old) = *FILE_STAMP.lock().unwrap()
+        && let Some(file) = COUNT_FILE.get()
+        && let Some(now) = file_stamp(file)
+        && now != old
+    {
+        IS_SAVE.store(false, Ordering::SeqCst);
         return;
     }
 
@@ -457,6 +633,8 @@ fn save() {
         let nbt_file = NbtFile::new(nbt.to_nbt(), CompressType::GZip);
         let stream = &mut path_helper::open_write(&file)?;
         nbt_file.write(stream)?;
+        // 记下自己这次写出去的指纹，下次保存才分得清"外部改过"与"自己写的"
+        *FILE_STAMP.lock().unwrap() = file_stamp(&file);
 
         Ok(())
     })();
@@ -740,20 +918,31 @@ mod tests {
         assert!(stop > start);
     }
 
-    /// TEMP 诊断：读运行目录里实际的 count.dat，看能不能解析、有多少数据
+    /// 读不出来的统计文件不能被空统计覆盖
+    ///
+    /// 用户手动替换 `count.dat` 时，读到的可能是一半的文件；以前这里会退回空统计，
+    /// 退出时再把空统计写回去，把用户原来的数据毁掉。
     #[test]
-    fn temp_dump_run_dir_count() {
-        let path = r"E:\code\ModernColoryrMinecraftLauncher\target\debug\mml\count.dat";
-        let bytes = std::fs::read(path).unwrap();
-        println!("bytes: {}", bytes.len());
-        let file = NbtFile::read(&mut Cursor::new(bytes.as_slice())).unwrap();
-        let nbt = file.nbt.as_compound().unwrap();
-        let mut keys: Vec<_> = nbt.data.keys().cloned().collect();
-        keys.sort();
-        println!("keys: {:?}", keys);
-        println!("LaunchCount: {:?}", nbt.get_long("LaunchCount"));
-        println!("AllTime: {:?}", nbt.get_long("AllTime"));
-        println!("GameRuns: {:?}", nbt.get_list("GameRuns").map(|l| l.len()));
-        println!("LaunchLogs: {:?}", nbt.get_list("LaunchLogs").map(|l| l.len()));
+    fn unreadable_count_is_not_overwritten() {
+        // 读失败要写日志，日志系统是单例，得先起来
+        crate::test_support::boot();
+        let dir = mml_testutil::temp_path(format!("count-broken-{}", Uuid::new_v4()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join(names::COUNT_DATA_FILE);
+        // 半截 gzip：模拟复制到一半的文件
+        std::fs::write(&file, [0x1F, 0x8B, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00]).unwrap();
+
+        init(&dir);
+        stop();
+
+        assert_eq!(
+            std::fs::read(&file).unwrap().len(),
+            8,
+            "读不出来的文件不该被覆盖"
+        );
+        assert!(dir.join(format!("{}.bak", names::COUNT_DATA_FILE)).exists());
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

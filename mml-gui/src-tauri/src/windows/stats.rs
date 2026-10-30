@@ -24,6 +24,8 @@ struct InstanceAgg {
     failed: u64,
     /// 累计运行时长，单位秒
     seconds: u64,
+    /// 最早一次记录的时间戳，单位毫秒；没有记录时为 `None`
+    first: Option<i64>,
     /// 最近一次启动的时间戳，单位毫秒；没有记录时为 `None`
     last: Option<i64>,
     /// 当前是否正在运行
@@ -46,6 +48,7 @@ pub fn stats_get_data() -> Result<StatsDataDto, String> {
     let mut agg: HashMap<Uuid, InstanceAgg> = HashMap::new();
     for (uuid, runs) in &count.game_runs {
         let mut secs = 0u64;
+        let mut first: Option<i64> = None;
         let mut last: Option<i64> = None;
         let mut running = false;
         for run in runs {
@@ -53,6 +56,9 @@ pub fn stats_get_data() -> Result<StatsDataDto, String> {
             secs += (end - run.start_time).num_seconds().max(0) as u64;
 
             let start_ms = run.start_time.timestamp_millis();
+            if first.is_none_or(|v| start_ms < v) {
+                first = Some(start_ms);
+            }
             if last.is_none_or(|v| start_ms > v) {
                 last = Some(start_ms);
             }
@@ -66,6 +72,7 @@ pub fn stats_get_data() -> Result<StatsDataDto, String> {
                 count: runs.len() as u64,
                 failed: 0,
                 seconds: secs,
+                first,
                 last,
                 running,
             },
@@ -80,6 +87,13 @@ pub fn stats_get_data() -> Result<StatsDataDto, String> {
         if total > entry.count {
             entry.failed = total - entry.count;
             entry.count = total;
+        }
+        // 失败启动只有日志没有运行段，下界也要算上它们
+        for log in logs {
+            let time_ms = log.time.timestamp_millis();
+            if entry.first.is_none_or(|v| time_ms < v) {
+                entry.first = Some(time_ms);
+            }
         }
     }
 
@@ -97,6 +111,7 @@ pub fn stats_get_data() -> Result<StatsDataDto, String> {
             count: a.count,
             failed: a.failed,
             seconds: a.seconds,
+            first: a.first,
             last: a.last,
             running: a.running,
             deleted: false,
@@ -115,6 +130,7 @@ pub fn stats_get_data() -> Result<StatsDataDto, String> {
                 count: a.count,
                 failed: a.failed,
                 seconds: a.seconds,
+                first: a.first,
                 last: a.last,
                 running: a.running,
                 deleted: true,
@@ -133,6 +149,7 @@ pub fn stats_get_data() -> Result<StatsDataDto, String> {
             count: 0,
             failed: 0,
             seconds: 0,
+            first: None,
             last: None,
             running: false,
             deleted: true,
@@ -222,8 +239,7 @@ pub fn stats_get_playtime(
 
     let count = game_count::get_count();
     let count = count.read().unwrap();
-    // 单日范围额外按实例拆分：饼图要看这一天各实例的占比
-    let single_day = day_count == 1;
+    // 按实例拆分：饼图要看这段时间里各实例的占比，单日与多日都算
     let mut per_instance: HashMap<Uuid, u64> = HashMap::new();
     // 当天各实例的启动次数与成功次数；launch_error 不会 push game_run，两者相减即失败数
     let mut starts_per_instance: HashMap<Uuid, u32> = HashMap::new();
@@ -239,9 +255,7 @@ pub fn stats_get_playtime(
         for run in runs {
             if let Some(i) = index.get(&run.start_time.naive_local().date()) {
                 done_per_day[*i] += 1;
-                if single_day {
-                    *dones_per_instance.entry(*inst_uuid).or_default() += 1;
-                }
+                *dones_per_instance.entry(*inst_uuid).or_default() += 1;
             }
             let end = if run.now {
                 now
@@ -262,9 +276,7 @@ pub fn stats_get_playtime(
                 let secs = (chunk_end - cursor).num_seconds().max(0) as u64;
                 if let Some(i) = index.get(&date) {
                     buckets[*i].seconds += secs;
-                    if single_day {
-                        *per_instance.entry(*inst_uuid).or_default() += secs;
-                    }
+                    *per_instance.entry(*inst_uuid).or_default() += secs;
                 }
                 cursor = chunk_end;
             }
@@ -279,9 +291,7 @@ pub fn stats_get_playtime(
         for log in logs {
             if let Some(i) = index.get(&log.time.naive_local().date()) {
                 buckets[*i].count += 1;
-                if single_day {
-                    *starts_per_instance.entry(*inst_uuid).or_default() += 1;
-                }
+                *starts_per_instance.entry(*inst_uuid).or_default() += 1;
             }
         }
     }
@@ -289,9 +299,9 @@ pub fn stats_get_playtime(
         day.failed = day.count.saturating_sub(done_per_day[i]);
     }
 
-    // 单日时补实例名：现有实例取当前名字，已删除的取历史快照
+    // 补实例名：现有实例取当前名字，已删除的取历史快照
     let mut by_instance: Vec<StatsDayInstanceDto> = Vec::new();
-    if single_day && !per_instance.is_empty() {
+    if !per_instance.is_empty() {
         let mut names: HashMap<Uuid, String> = count.game_names.clone();
         for game in mml_game::get_instances() {
             let g = game.read().unwrap();

@@ -14,7 +14,7 @@ import { api } from "../../lib/api";
 import { t } from "../../lib/i18n";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import { createListScroll, useVirtualRows } from "../../composables/useVirtualRows";
-import type { StatsDataDto, StatsInstanceDto, StatsPlayDayDto, StatsPlaytimeDto } from "../../lib/bindings";
+import type { StatsDataDto, StatsInstanceDto, StatsPlaytimeDto } from "../../lib/bindings";
 
 // 必须显式声明 close：不声明的话 Vue 会把父级的 @close 当 attrs 透传到根组件（WindowFrame），
 // 与模板里的 @close="$emit('close')" 合并成两个处理器 —— 一次返回会调两遍 closeWindow()，
@@ -36,15 +36,80 @@ const listScroll = createListScroll();
 /** 全局汇总快照；null 表示还没读到 */
 const data = ref<StatsDataDto | null>(null);
 
+/** 表格可排序的列 */
+type SortKey = "name" | "count" | "failed" | "seconds" | "last";
+
+/** 当前排序列；默认按最近启动，与后端的初始顺序一致 */
+const sortKey = ref<SortKey>("last");
+/** 排序方向：true 降序 */
+const sortDesc = ref(true);
+
+/**
+ * 按当前排序列排好的实例
+ *
+ * 同值时按名字兜底，刷新时顺序才不会来回跳。
+ */
+const sortedInstances = computed(() => {
+  const list = [...(data.value?.instances ?? [])];
+  const dir = sortDesc.value ? -1 : 1;
+  list.sort((a, b) => {
+    let cmp: number;
+    switch (sortKey.value) {
+      case "name":
+        cmp = a.name.localeCompare(b.name);
+        break;
+      case "count":
+        cmp = a.count - b.count;
+        break;
+      case "failed":
+        cmp = a.failed - b.failed;
+        break;
+      case "seconds":
+        cmp = a.seconds - b.seconds;
+        break;
+      default:
+        // 没有启动记录的排在最后
+        cmp = (a.last ?? -1) - (b.last ?? -1);
+        break;
+    }
+    if (cmp === 0) cmp = a.name.localeCompare(b.name);
+    return cmp * dir;
+  });
+  return list;
+});
+
+/**
+ * 切换排序列
+ *
+ * - `key`: 点的那一列；再点同一列翻转方向
+ */
+function toggleSort(key: SortKey) {
+  if (sortKey.value === key) {
+    sortDesc.value = !sortDesc.value;
+    return;
+  }
+  sortKey.value = key;
+  // 名字默认升序，次数 / 时长 / 时间默认降序（先看大的）
+  sortDesc.value = key !== "name";
+}
+
+/** 表头的 aria-sort 取值 */
+function ariaSort(key: SortKey): "ascending" | "descending" | "none" {
+  if (sortKey.value !== key) return "none";
+  return sortDesc.value ? "descending" : "ascending";
+}
+
 const { start: rowStart, end: rowEnd, padTop, padBottom } = useVirtualRows({
   root: rowsEl,
-  count: () => data.value?.instances.length ?? 0,
+  count: () => sortedInstances.value.length,
   rowH: STATS_ROW_H,
   scroll: listScroll,
 });
 
 /** 当前要渲染的那几行 */
-const visibleInstances = computed(() => (data.value?.instances ?? []).slice(rowStart.value, rowEnd.value));
+const visibleInstances = computed(() =>
+  sortedInstances.value.slice(rowStart.value, rowEnd.value),
+);
 
 // ---------------- 游玩时间图：实例 + 时间段 ----------------
 
@@ -59,7 +124,7 @@ const customRange = ref(false);
 /** 自定义范围的起止日期，YYYY-MM-DD */
 const fromDate = ref("");
 const toDate = ref("");
-/** 今天的本地日期：结束日不能超过它；跨天后由刷新补上 */
+/** 今天的本地日期：没有统计记录时的兜底上界；跨天后由刷新补上 */
 const todayDate = ref(localDate(new Date()));
 
 /** 时间段选项文案，语言切换后跟着重算 */
@@ -82,6 +147,33 @@ const selectedInstance = computed(() =>
     : null,
 );
 
+/** 图表范围里的实例：选中一个就是它，否则全部 */
+const scopeInstances = computed(() =>
+  selectedUuid.value
+    ? (data.value?.instances ?? []).filter((inst) => inst.uuid === selectedUuid.value)
+    : (data.value?.instances ?? []),
+);
+
+/** 统计范围的第一天：最早一条记录，没有记录时为空串 */
+const minDate = computed(() => {
+  let min: number | null = null;
+  for (const inst of scopeInstances.value) {
+    if (inst.first == null) continue;
+    if (min === null || inst.first < min) min = inst.first;
+  }
+  return min === null ? "" : localDate(new Date(min));
+});
+
+/** 统计范围的最后一天：最近一次启动，没有记录时为空串 */
+const maxDate = computed(() => {
+  let max: number | null = null;
+  for (const inst of scopeInstances.value) {
+    if (inst.last == null) continue;
+    if (max === null || inst.last > max) max = inst.last;
+  }
+  return max === null ? "" : localDate(new Date(max));
+});
+
 /** 实例下拉是否展开 */
 const instOpen = ref(false);
 
@@ -95,21 +187,85 @@ let playtimeSeq = 0;
 /** 图表的实例下拉：全部实例 + 现有与有历史记录的实例 */
 const instanceOptions = computed(() => data.value?.instances ?? []);
 
-/** 图表天数：用作横轴格数 */
+/** 图表覆盖的天数：日均与单日判断按它算 */
 const dayCount = computed(() => playtime.value?.days.length ?? 0);
+
+/** 逐日画柱子的上限；超过就把相邻几天合并成一根 */
+const MERGE_OVER_DAYS = 90;
+
+/** 合并后的柱子数量档位，从密到疏 */
+const MERGE_BUCKETS = [90, 60, 30] as const;
+
+/** 这次画多少根柱子：不超过 90 天一天一根，再长就从 90 / 60 / 30 里挑一档 */
+const barCount = computed(() => {
+  const days = dayCount.value;
+  if (days <= MERGE_OVER_DAYS) return days;
+  if (days <= 180) return MERGE_BUCKETS[0];
+  if (days <= 360) return MERGE_BUCKETS[1];
+  return MERGE_BUCKETS[2];
+});
+
+/** 图上的一根柱子：一天，或合并后的若干天 */
+interface ChartBar {
+  /** 起始日期，YYYY-MM-DD */
+  from: string;
+  /** 结束日期，含当天，YYYY-MM-DD */
+  to: string;
+  /** 这段的游玩秒数 */
+  seconds: number;
+  /** 这段的启动次数 */
+  count: number;
+  /** 这段的启动失败次数 */
+  failed: number;
+}
+
+/** 按 barCount 把逐日数据切成等分的柱子，每根柱子覆盖的天数最多差一天 */
+const chartBars = computed<ChartBar[]>(() => {
+  const days = playtime.value?.days ?? [];
+  const total = days.length;
+  const buckets = barCount.value;
+  if (total === 0 || buckets === 0) return [];
+  const bars: ChartBar[] = [];
+  for (let i = 0; i < buckets; i++) {
+    const start = Math.floor((i * total) / buckets);
+    const end = Math.max(start + 1, Math.floor(((i + 1) * total) / buckets));
+    const slice = days.slice(start, Math.min(end, total));
+    if (slice.length === 0) continue;
+    bars.push({
+      from: slice[0].date,
+      to: slice[slice.length - 1].date,
+      seconds: slice.reduce((sum, day) => sum + day.seconds, 0),
+      count: slice.reduce((sum, day) => sum + day.count, 0),
+      failed: slice.reduce((sum, day) => sum + day.failed, 0),
+    });
+  }
+  return bars;
+});
 
 /** 只选了一天：此时用环形图看这一天各实例的占比 */
 const isSingleDay = computed(() => playtime.value?.days.length === 1);
 
-/** 单日各实例的统计，按时长降序；多日时为空 */
-const dayRows = computed(() => (isSingleDay.value ? (playtime.value?.byInstance ?? []) : []));
+/** 范围内各实例的统计，按时长降序 */
+const dayRows = computed(() => playtime.value?.byInstance ?? []);
 
-/** 横轴网格列，天数变化时重算 */
-const chartColumns = computed(() => "repeat(" + Math.max(1, dayCount.value) + ", minmax(0, 1fr))");
+/** 图表形态：`bars` 柱状图 / `pie` 饼图；只选一天时固定用饼图 */
+const chartMode = ref("bars");
 
-/** 柱间距；天数一多，固定的间隙会把柱宽挤成 0，按天数收窄 */
+/** 当前是否画饼图：单日固定饼图，多日按用户选的 */
+const showPie = computed(() => isSingleDay.value || chartMode.value === "pie");
+
+/** 形态切换的选项文案，语言切换后跟着重算 */
+const chartModeOptions = computed(() => [
+  { value: "bars", label: t("winStats.modeBars") },
+  { value: "pie", label: t("winStats.modePie") },
+]);
+
+/** 横轴网格列，柱子数量变化时重算 */
+const chartColumns = computed(() => "repeat(" + Math.max(1, barCount.value) + ", minmax(0, 1fr))");
+
+/** 柱间距；柱子一多，固定的间隙会把柱宽挤成 0，按数量收窄 */
 const chartGap = computed(() => {
-  const n = dayCount.value;
+  const n = barCount.value;
   if (n > 240) return "0";
   if (n > 120) return "1px";
   return "2px";
@@ -125,7 +281,7 @@ const playSub = computed(() => {
 
 /** 纵轴顶格小时数，至少 1 小时，向上取整到整小时 */
 const axisMaxHours = computed(() => {
-  const max = playtime.value?.days.reduce((acc, day) => Math.max(acc, day.seconds), 0) ?? 0;
+  const max = chartBars.value.reduce((acc, bar) => Math.max(acc, bar.seconds), 0);
   return Math.max(1, Math.ceil(max / 3600));
 });
 
@@ -162,11 +318,13 @@ async function loadPlaytime() {
     // 两端填反了也不报错，按用户想要的那段画
     if (from > to) [from, to] = [to, from];
   } else {
-    const end = new Date();
-    const start = new Date();
+    // 预设区间贴着"统计最后一天"往前数，不越过第一条记录
+    const end = maxDate.value ? parseLocalDate(maxDate.value) : new Date();
+    const start = new Date(end);
     start.setDate(start.getDate() - (Number(range.value) - 1));
     from = localDate(start);
     to = localDate(end);
+    if (minDate.value && from < minDate.value) from = minDate.value;
   }
 
   const seq = ++playtimeSeq;
@@ -243,6 +401,9 @@ watch([selectedUuid, range, customRange, fromDate, toDate], () => {
   void loadPlaytime();
 });
 
+// 换实例或数据刷新后，自定义日期不能落在统计范围外
+watch([selectedUuid, minDate, maxDate], clampCustomRange);
+
 // ---------------- 展示格式 ----------------
 
 /** 本地日期文本，YYYY-MM-DD；日期输入框与后端都用这个口径 */
@@ -252,13 +413,32 @@ function localDate(d: Date): string {
 }
 
 /**
- * 双击柱子：把范围收窄到那一天，图表切成该天的实例占比饼图
+ * 把 YYYY-MM-DD 解析成本地时间的零点
  *
- * - `date`: 柱子对应的日期，YYYY-MM-DD
+ * 不能用 new Date("YYYY-MM-DD")：那是按 UTC 解析，东八区会退到前一天。
+ *
+ * - `text`: 日期文本，YYYY-MM-DD
+ *
+ * # 返回值
+ *
+ * 当天零点的本地时间
  */
-function pickDay(date: string) {
-  fromDate.value = date;
-  toDate.value = date;
+function parseLocalDate(text: string): Date {
+  const [y, m, d] = text.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/**
+ * 双击柱子：把范围收窄到这根柱子覆盖的那段
+ *
+ * 合并柱可能跨好几天，收窄后按新范围重画；只剩一天时图表自动切成饼图。
+ *
+ * - `from`: 起始日期，YYYY-MM-DD
+ * - `to`: 结束日期，含当天
+ */
+function pickRange(from: string, to: string) {
+  fromDate.value = from;
+  toDate.value = to;
   customRange.value = true;
 }
 
@@ -282,11 +462,33 @@ function setCustomRange(on: boolean) {
   customRange.value = on;
   // 第一次打开时用当前预设区间起手，用户不至于面对两个空日期框
   if (on && (!fromDate.value || !toDate.value)) {
-    const end = new Date();
-    const start = new Date();
+    const end = maxDate.value ? parseLocalDate(maxDate.value) : new Date();
+    const start = new Date(end);
     start.setDate(start.getDate() - (Number(range.value) - 1));
-    fromDate.value = localDate(start);
+    let from = localDate(start);
+    if (minDate.value && from < minDate.value) from = minDate.value;
+    fromDate.value = from;
     toDate.value = localDate(end);
+  }
+  if (on) clampCustomRange();
+}
+
+/**
+ * 把自定义日期收进当前实例的统计范围
+ *
+ * 下界是最早一条记录（实例创建 / 统计开始），上界是最近一次启动；
+ * 换实例或数据刷新后调用，避免停在范围外的日期上。
+ */
+function clampCustomRange() {
+  if (!customRange.value) return;
+  if (fromDate.value && minDate.value && fromDate.value < minDate.value) {
+    fromDate.value = minDate.value;
+  }
+  if (toDate.value && maxDate.value && toDate.value > maxDate.value) {
+    toDate.value = maxDate.value;
+  }
+  if (fromDate.value && toDate.value && fromDate.value > toDate.value) {
+    fromDate.value = toDate.value;
   }
 }
 
@@ -342,23 +544,24 @@ function xLabel(date: string): string {
 
 /** 横轴标签抽稀：天数多时隔几天标一个，首尾都标 */
 function showXLabel(index: number): boolean {
-  const n = dayCount.value;
+  const n = barCount.value;
   if (n <= 10) return true;
   const step = Math.ceil(n / 6);
   return index % step === 0 || index === n - 1;
 }
 
-/** 柱子的悬停提示：日期、当天时长与启动次数；有失败时补上失败次数 */
-function barTip(day: StatsPlayDayDto): string {
-  const args = { date: xLabel(day.date), h: hoursNum(day.seconds), count: day.count };
-  return day.failed > 0
-    ? t("winStats.barTipFail", { ...args, failed: day.failed })
+/** 柱子的悬停提示：日期（合并柱是区间）、这段时长与启动次数；有失败时补上失败次数 */
+function barTip(bar: ChartBar): string {
+  const date = bar.from === bar.to ? xLabel(bar.from) : xLabel(bar.from) + "–" + xLabel(bar.to);
+  const args = { date, h: hoursNum(bar.seconds), count: bar.count };
+  return bar.failed > 0
+    ? t("winStats.barTipFail", { ...args, failed: bar.failed })
     : t("winStats.barTip", args);
 }
 
 /** 失败段占整根柱子的高度：按失败次数占比，太低时留 4px 保证看得见 */
-function failHeight(day: StatsPlayDayDto): string {
-  const pct = (day.failed / Math.max(1, day.count)) * 100;
+function failHeight(bar: ChartBar): string {
+  const pct = (bar.failed / Math.max(1, bar.count)) * 100;
   return "min(100%, max(4px, " + pct.toFixed(1) + "%))";
 }
 
@@ -425,13 +628,15 @@ function instanceLabel(inst: StatsInstanceDto): string {
             </label>
             <SegmentedTabs v-if="!customRange" v-model="range" :options="rangeOptions" />
             <template v-else>
-              <BaseDatePicker v-model="fromDate" class="range-date" :max="toDate || todayDate"
-                :aria-label="t('winStats.dateFrom')" />
+              <BaseDatePicker v-model="fromDate" class="range-date" :min="minDate"
+                :max="toDate || maxDate || todayDate" :aria-label="t('winStats.dateFrom')" />
               <span class="range-sep">–</span>
-              <BaseDatePicker v-model="toDate" class="range-date" :min="fromDate" :max="todayDate"
-                :aria-label="t('winStats.dateTo')" />
+              <BaseDatePicker v-model="toDate" class="range-date" :min="fromDate || minDate"
+                :max="maxDate || todayDate" :aria-label="t('winStats.dateTo')" />
             </template>
           </div>
+          <!-- 形态切换：单日固定饼图，不给切 -->
+          <SegmentedTabs v-if="!isSingleDay" v-model="chartMode" :options="chartModeOptions" />
         </div>
 
         <div class="play-stats">
@@ -454,7 +659,7 @@ function instanceLabel(inst: StatsInstanceDto): string {
 
       <!-- 图表区：只选一天时换成饼图看实例占比，多天时是柱状图。
            零记录与还没读到时各给一句说明，不留空框 -->
-      <div v-if="isSingleDay && dayRows.length > 0" class="day-share">
+      <div v-if="showPie && dayRows.length > 0" class="day-share">
         <div class="ring-row">
           <DaySharePie :items="dayRows.map((r) => ({ uuid: r.uuid, name: r.name, value: r.seconds }))"
             :title="t('winStats.colHours')" kind="hours" />
@@ -496,18 +701,18 @@ function instanceLabel(inst: StatsInstanceDto): string {
               <span></span>
             </div>
             <div class="chart-bars" :style="{ gridTemplateColumns: chartColumns, gap: chartGap }">
-              <div v-for="day in playtime.days" :key="day.date" class="chart-slot">
-                <div class="chart-bar" :class="{ empty: day.seconds === 0 }"
-                  :style="{ height: day.seconds > 0 ? barHeight(day.seconds) : undefined }" v-tip="barTip(day)"
-                  @dblclick="pickDay(day.date)">
-                  <span v-if="day.failed > 0" class="chart-bar-fail" :style="{ height: failHeight(day) }"></span>
+              <div v-for="bar in chartBars" :key="bar.from" class="chart-slot">
+                <div class="chart-bar" :class="{ empty: bar.seconds === 0 }"
+                  :style="{ height: bar.seconds > 0 ? barHeight(bar.seconds) : undefined }" v-tip="barTip(bar)"
+                  @dblclick="pickRange(bar.from, bar.to)">
+                  <span v-if="bar.failed > 0" class="chart-bar-fail" :style="{ height: failHeight(bar) }"></span>
                 </div>
               </div>
             </div>
           </div>
           <div class="chart-x" :style="{ gridTemplateColumns: chartColumns, gap: chartGap }">
-            <span v-for="(day, index) in playtime.days" :key="day.date">
-              <i v-if="showXLabel(index)">{{ xLabel(day.date) }}</i>
+            <span v-for="(bar, index) in chartBars" :key="bar.from">
+              <i v-if="showXLabel(index)">{{ xLabel(bar.from) }}</i>
             </span>
           </div>
         </div>
@@ -516,7 +721,7 @@ function instanceLabel(inst: StatsInstanceDto): string {
       <div v-else class="chart-empty">{{ t("winStats.chartEmpty") }}</div>
 
       <!-- 双击是隐藏操作，给一句话提示；单日已经是饼图，不用再说 -->
-      <p v-if="!isSingleDay && playtime && playtime.totalSeconds > 0" class="chart-hint">
+      <p v-if="!showPie && playtime && playtime.totalSeconds > 0" class="chart-hint">
         {{ t("winStats.dblHint") }}
       </p>
     </section>
@@ -525,11 +730,36 @@ function instanceLabel(inst: StatsInstanceDto): string {
          滚动容器是 WindowFrame 的内容区（整页滚动不变），上下留白撑住总高度 -->
     <div class="stats-table" role="table">
       <div class="stats-head" role="row">
-        <span class="cell-inst" role="columnheader">{{ t("winStats.colInstance") }}</span>
-        <span role="columnheader">{{ t("winStats.colCount") }}</span>
-        <span role="columnheader">{{ t("winStats.colFailed") }}</span>
-        <span role="columnheader">{{ t("winStats.colHours") }}</span>
-        <span role="columnheader">{{ t("winStats.colLast") }}</span>
+        <span role="columnheader" :aria-sort="ariaSort('name')">
+          <button type="button" class="sort-btn" @click="toggleSort('name')">
+            {{ t("winStats.colInstance") }}
+            <span v-if="sortKey === 'name'" class="sort-arrow">{{ sortDesc ? "▼" : "▲" }}</span>
+          </button>
+        </span>
+        <span role="columnheader" :aria-sort="ariaSort('count')">
+          <button type="button" class="sort-btn" @click="toggleSort('count')">
+            {{ t("winStats.colCount") }}
+            <span v-if="sortKey === 'count'" class="sort-arrow">{{ sortDesc ? "▼" : "▲" }}</span>
+          </button>
+        </span>
+        <span role="columnheader" :aria-sort="ariaSort('failed')">
+          <button type="button" class="sort-btn" @click="toggleSort('failed')">
+            {{ t("winStats.colFailed") }}
+            <span v-if="sortKey === 'failed'" class="sort-arrow">{{ sortDesc ? "▼" : "▲" }}</span>
+          </button>
+        </span>
+        <span role="columnheader" :aria-sort="ariaSort('seconds')">
+          <button type="button" class="sort-btn" @click="toggleSort('seconds')">
+            {{ t("winStats.colHours") }}
+            <span v-if="sortKey === 'seconds'" class="sort-arrow">{{ sortDesc ? "▼" : "▲" }}</span>
+          </button>
+        </span>
+        <span role="columnheader" :aria-sort="ariaSort('last')">
+          <button type="button" class="sort-btn" @click="toggleSort('last')">
+            {{ t("winStats.colLast") }}
+            <span v-if="sortKey === 'last'" class="sort-arrow">{{ sortDesc ? "▼" : "▲" }}</span>
+          </button>
+        </span>
       </div>
       <div v-if="!data || data.instances.length === 0" class="empty-cell">{{ t("winStats.noData") }}</div>
       <div v-else ref="rowsEl" class="stats-rows"
@@ -1012,6 +1242,34 @@ function instanceLabel(inst: StatsInstanceDto): string {
   font-weight: 600;
   background: var(--bg-side);
   border-bottom: 1px solid var(--border);
+}
+
+/* 表头可点击排序：按钮只借表格的排版，外观仍是一行文字 */
+.sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.12s;
+}
+
+.sort-btn:hover {
+  color: var(--text);
+}
+
+/* 当前排序列的箭头：只标方向，不改变列宽（固定宽度，翻转时不抖） */
+.sort-arrow {
+  display: inline-block;
+  width: 10px;
+  font-size: 9px;
+  color: var(--accent);
 }
 
 /* 行高必须固定：隐藏的行按它估着撑高，见 composables/useVirtualRows.ts。

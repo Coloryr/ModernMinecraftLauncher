@@ -5,7 +5,9 @@ on:
     branches:
       - 'releases/**'
     tags:
+      # 正式版 v1.0.0、预发布 v1.0.0-pre；也接受不带 v 的标签
       - 'v*'
+      - '[0-9]*'
   workflow_dispatch:
 
 permissions:
@@ -19,21 +21,42 @@ env:
   CI: true
 
 jobs:
+  # 版本号只认 build/version：带 -pre 之类后缀走预发布，否则走正式发布
   check-version:
     runs-on: ubuntu-latest
+    outputs:
+      channel: ${{ steps.resolve.outputs.channel }}
+      version: ${{ steps.resolve.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: 校验 build/version 与标签
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: 解析版本与发布通道
+        id: resolve
         shell: bash
         run: |
           version="$(tr -d '\r\n' < build/version)"
-          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
-            echo "build/version 是 ${version}，标签是 ${GITHUB_REF_NAME}，两者不一致。"
+          version="${version#v}"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "build/version 格式不对：${version}（要三段版本号，预发布带 -pre 这类后缀）"
             exit 1
           fi
-          echo "版本 ${version} 与标签一致。"
+          if [[ "$version" == *-* ]]; then
+            channel=prerelease
+          else
+            channel=release
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "channel=${channel}" >> "$GITHUB_OUTPUT"
+          echo "build/version=${version}，发布通道=${channel}"
+
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            tag="${GITHUB_REF_NAME#v}"
+            if [ "$version" != "$tag" ]; then
+              echo "build/version 是 ${version}，标签是 ${GITHUB_REF_NAME}，两者不一致。"
+              exit 1
+            fi
+            echo "版本 ${version} 与标签 ${GITHUB_REF_NAME} 一致。"
+          fi
 
   build-windows:
     needs: check-version
@@ -83,11 +106,26 @@ jobs:
       - name: 安装依赖
         run: pwsh -NoProfile -File build/init.ps1
       - name: 构建并打包（${{ matrix.arch }}）
+        if: needs.check-version.outputs.channel == 'release'
         run: pwsh -NoProfile -File build/build-release.ps1 -Arch ${{ matrix.arch }}
       - name: 上传 Windows 产物
+        if: needs.check-version.outputs.channel == 'release'
         uses: actions/upload-artifact@v4
         with:
           name: mml-windows-${{ matrix.arch }}
+          path: build_out/*
+          if-no-files-found: error
+      - name: 构建预发布（${{ matrix.arch }}）
+        if: needs.check-version.outputs.channel == 'prerelease'
+        run: pwsh -NoProfile -File build/build-prerelease.ps1 -Arch ${{ matrix.arch }}
+      - name: 收集预发布产物
+        if: needs.check-version.outputs.channel == 'prerelease'
+        run: node build/package-prerelease.mjs --os windows --arch ${{ matrix.arch }}
+      - name: 上传预发布产物
+        if: needs.check-version.outputs.channel == 'prerelease'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mml-prerelease-windows-${{ matrix.arch }}
           path: build_out/*
           if-no-files-found: error
 
@@ -152,23 +190,39 @@ jobs:
       - name: 安装依赖
         run: bash build/init.sh
       - name: 构建并打包
+        if: needs.check-version.outputs.channel == 'release'
         run: bash build/build-release.sh
       - name: 上传 Linux 产物
+        if: needs.check-version.outputs.channel == 'release'
         uses: actions/upload-artifact@v4
         with:
           name: mml-linux-${{ matrix.arch }}
           path: build_out/*
           if-no-files-found: error
       - name: 上传 Linux x64 二进制
-        if: matrix.arch == 'x64'
+        if: needs.check-version.outputs.channel == 'release' && matrix.arch == 'x64'
         uses: actions/upload-artifact@v4
         with:
           name: linux-x64-bin
           path: target/release/mml-gui
           if-no-files-found: error
+      - name: 构建预发布
+        if: needs.check-version.outputs.channel == 'prerelease'
+        run: bash build/build-prerelease.sh
+      - name: 收集预发布产物
+        if: needs.check-version.outputs.channel == 'prerelease'
+        run: node build/package-prerelease.mjs --os linux --arch ${{ matrix.arch }}
+      - name: 上传预发布产物
+        if: needs.check-version.outputs.channel == 'prerelease'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mml-prerelease-linux-${{ matrix.arch }}
+          path: build_out/*
+          if-no-files-found: error
 
   package-linux-extra:
-    needs: [build-linux]
+    if: needs.check-version.outputs.channel == 'release'
+    needs: [check-version, build-linux]
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
@@ -238,6 +292,7 @@ jobs:
           cargo binstall --no-confirm --pkg-fmt "$pkg_fmt" tauri-cli@^2
           cargo tauri --version
       - name: 检查签名配置
+        if: needs.check-version.outputs.channel == 'release'
         shell: bash
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -264,6 +319,7 @@ jobs:
       - name: 安装依赖
         run: bash build/init.sh
       - name: 构建并打包
+        if: needs.check-version.outputs.channel == 'release'
         shell: bash
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -281,14 +337,28 @@ jobs:
           done
           bash build/build-release.sh
       - name: 上传 macOS 产物
+        if: needs.check-version.outputs.channel == 'release'
         uses: actions/upload-artifact@v4
         with:
           name: mml-macos-${{ matrix.arch }}
           path: build_out/*
           if-no-files-found: error
+      - name: 构建预发布
+        if: needs.check-version.outputs.channel == 'prerelease'
+        run: bash build/build-prerelease.sh
+      - name: 收集预发布产物
+        if: needs.check-version.outputs.channel == 'prerelease'
+        run: node build/package-prerelease.mjs --os macos --arch ${{ matrix.arch }}
+      - name: 上传预发布产物
+        if: needs.check-version.outputs.channel == 'prerelease'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mml-prerelease-macos-${{ matrix.arch }}
+          path: build_out/*
+          if-no-files-found: error
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/') && needs.check-version.outputs.channel == 'release'
     needs: [check-version, build-windows, build-linux, package-linux-extra, build-macos]
     runs-on: ubuntu-latest
     permissions:
@@ -327,3 +397,45 @@ jobs:
           fail_on_unmatched_files: true
           draft: false
           prerelease: false
+
+  prerelease:
+    if: startsWith(github.ref, 'refs/tags/') && needs.check-version.outputs.channel == 'prerelease'
+    needs: [check-version, build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: 下载预发布产物
+        uses: actions/download-artifact@v4
+        with:
+          pattern: mml-prerelease-*
+          merge-multiple: false
+          path: artifacts
+      - name: 检查产物重名
+        shell: bash
+        run: |
+          dupes="$(find artifacts -type f -printf '%f\n' | sort | uniq -d)"
+          if [ -n "$dupes" ]; then
+            echo '发现重名产物：'
+            printf '%s\n' "$dupes"
+            exit 1
+          fi
+          echo '产物无重名。'
+      - name: 列出产物
+        run: find artifacts -type f -print
+      - name: 创建 GitHub 预发布
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: M²L ${{ github.ref_name }} 预发布
+          body: |
+            M²L ${{ github.ref_name }} 预发布构建
+
+            - 预发布只提供可执行文件，不打安装包；主界面会提示「预发布版」。
+            - Windows：x64 / x86 / arm64（.exe）
+            - Linux：x64 / arm64（下载后 `chmod +x`）
+            - macOS：x64 / arm64（下载后 `chmod +x`）
+          files: artifacts/**/*
+          fail_on_unmatched_files: true
+          draft: false
+          prerelease: true

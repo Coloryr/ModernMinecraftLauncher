@@ -104,6 +104,7 @@ pub const INTEGRATIONS_FILE: &str = "integrations.json";
 pub const BLOCK_GROUPS_FILE: &str = "block_groups.json";
 pub const COLORMC_MIGRATE_FILE: &str = "colormc_migrate.json";
 pub const MINECRAFT_MIGRATE_FILE: &str = "minecraft_migrate.json";
+pub const COUNT_IMPORT_FILE: &str = "count.import.dat";
 
 pub const MINECRAFT_KEY: &str = "minecraft";
 pub const LANG_KEY1: &str = "minecraft/lang/";
@@ -361,6 +362,7 @@ mod tests {
             BLOCK_GROUPS_FILE,
             COLORMC_MIGRATE_FILE,
             MINECRAFT_MIGRATE_FILE,
+            COUNT_IMPORT_FILE,
             IPC_PORT_FILE,
         ] {
             assert!(!name.is_empty(), "文件常量不应为空: {name:?}");

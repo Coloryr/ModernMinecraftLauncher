@@ -97,5 +97,3 @@ Write-Host '产物:'
 foreach ($t in $targets) {
     Write-Host "  $(Join-Path $outDir "mml-gui-$($t['arch']).exe")"
 }
-
-if (-not [Console]::IsInputRedirected -and -not $env:CI) { Read-Host '按回车关闭' }

@@ -132,7 +132,8 @@ CI 的 `windows-11-arm` 与 `ubuntu-24.04-arm` 是 GitHub 公共预览 runner，
 ### 版本与发布
 
 发布版本从 **v0.0.1** 开始。版本号的唯一来源是 [`build/version`](build/version)：文件里写
-数字版本 `0.0.1`，Git 标签写 `v0.0.1`。
+数字版本 `0.0.1`，Git 标签写 `v0.0.1`。带后缀的版本走预发布，如 `build/version` 写
+`1.0.0-pre`、标签写 `v1.0.0-pre`。
 
 1. 改 `build/version`。
 2. 跑 `build/build-release.ps1`（Windows）或 `bash build/build-release.sh`（Linux / macOS）。
@@ -157,13 +158,17 @@ Windows 本地默认把三种架构都构建出来；Linux / macOS 本地构建�
 
 | 触发 | 行为 |
 | --- | --- |
-| 推送 `v*` 标签（如 `v0.0.1`） | 先校验 `build/version` 与标签一致，再按 Windows 3 种、Linux 2 种、macOS 2 种架构并行构建，最后汇总成一个 GitHub Release |
+| 推送正式版标签（如 `v0.0.1`） | 先校验 `build/version` 与标签一致，再按 Windows 3 种、Linux 2 种、macOS 2 种架构并行构建安装包，最后汇总成一个 GitHub Release |
+| 推送预发布标签（如 `v1.0.0-pre`） | 走预发布构建，只出可执行文件，汇总成一个标记为 Pre-release 的 GitHub Release |
 | 推送 `releases/**` 分支 | 只构建并把产物传成 Actions artifact，不发 Release，用于验证 |
 | Actions 页面手动 `workflow_dispatch` | 同上，验证用 |
 
-走 CI 发版只要三步：改 `build/version`、提交、`git tag v0.0.1 && git push origin v0.0.1`。
-CI 每个平台都走同一套脚本（`build/init.*` 装依赖、`build/build-release.*` 出包），
-产物名与本地一致。细节见[开发与构建](docs/development.md#自动化构建github-actions)。
+走 CI 发版只要三步：改 `build/version`、提交、打标签推送。正式版与预发布都这样，标签分别是
+`v0.0.1` 与 `v1.0.0-pre`。CI 每个平台都走同一套脚本（`build/init.*` 装依赖，正式版用
+`build/build-release.*`、预发布用 `build/build-prerelease.*`），正式版产物名与本地一致。
+预发布只出可执行文件，如 `mml-windows-x64-1.0.0-pre.exe`、`mml-linux-arm64-1.0.0-pre`、
+`mml-macos-x64-1.0.0-pre`；Linux / macOS 下载后要 `chmod +x`。
+细节见[开发与构建](docs/development.md#自动化构建github-actions)。
 
 ### 其它常用命令
 

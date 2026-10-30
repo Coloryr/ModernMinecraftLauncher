@@ -1833,7 +1833,9 @@ export default {
   "winStats.times": "{n} 次",
   "winStats.pieTip": "{name} · {value} · {pct}%",
   "winStats.pieAria": "这一天各实例的游玩时长占比",
-  "winStats.dblHint": "双击柱子可以看这一天的实例占比",
+  "winStats.dblHint": "双击柱子可以放大到这一段；只剩一天时看该天的实例占比",
+  "winStats.modeBars": "柱状图",
+  "winStats.modePie": "饼图",
   "winStats.deleted": "已删除",
   "winStats.deletedInstances": "已删除实例",
   "winStats.deletedName": "{name}（已删除）",
@@ -2295,7 +2297,7 @@ export default {
   "colormc.compat.collect": "收藏格式一致，直接可用（ColorMC 独有的几个开关会被忽略）",
   "colormc.compat.config":
     "能读，但 ColorMC 独有的 SafeLog4j 会丢；代理设置两边语义不同（ColorMC 是登录 / 下载 / 游戏三个开关，M²L 是策略 + 类型两组枚举），会回落成默认值",
-  "colormc.compat.count": "游戏统计，格式不保证一致；读不了就从零开始统计",
+  "colormc.compat.count": "游戏统计，按实例 uuid 合并进 M²L 的统计，不会覆盖已有记录",
   "colormc.compat.logs": "会盖掉 M²L 自己那份日志文件",
   "colormc.compat.java":
     "ColorMC 的 Java 运行时目录会合并进来；M²L 不会自动认这些运行时，需要在设置里重新扫描或添加",

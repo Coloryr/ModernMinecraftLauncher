@@ -705,6 +705,10 @@ MML 服务器包填到 `server.json`（只填发布目录，离开输入框时�
   生成的目录都认：开了版本隔离的（HMCL / PCL 常见）搬 `versions/<id>/` 里那份游戏数据，没开的搬根目录。
   只搬游戏数据（mods、saves、config、options.txt 等），`versions` / `libraries` / `assets` 由启动器自己补；
   M²L 未收录的版本（如 LabyMod）按自定义版本导入。
+- ColorMC 的游戏统计（`count.dat`）不直接覆盖本启动器的统计：迁移时先落到 `count.import.dat`，
+  下次启动按实例 uuid 合并进现有记录，已有统计不会丢。
+- 手动把 `count.dat` 换成旧启动器那份也能直接读。读不出来时（比如文件还在复制、被杀毒软件占着）
+  会重试几次；仍不行就**不覆盖**原文件，并留一份 `count.dat.bak`，下次启动还会再读。
 - 删掉运行目录里的迁移标记文件（`colormc_migrate.json` / `minecraft_migrate.json`）可以重新触发询问。
 - HMCL / MMC 没有专门迁移，请用「添加实例 → 文件夹 / 压缩包导入」把实例搬进来。
 

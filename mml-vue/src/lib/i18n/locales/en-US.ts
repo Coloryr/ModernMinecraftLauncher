@@ -1832,7 +1832,9 @@ export default {
   "winStats.times": "{n} launches",
   "winStats.pieTip": "{name} · {value} · {pct}%",
   "winStats.pieAria": "Share of playtime per instance on this day",
-  "winStats.dblHint": "Double-click a bar to see that day’s per-instance share",
+  "winStats.dblHint": "Double-click a bar to zoom into that span; a single day shows the per-instance share",
+  "winStats.modeBars": "Bars",
+  "winStats.modePie": "Pie",
   "winStats.deleted": "Deleted",
   "winStats.deletedInstances": "Deleted instances",
   "winStats.deletedName": "{name} (deleted)",
@@ -2296,7 +2298,7 @@ export default {
   "colormc.compat.collect": "Same favorites format — usable as is (ColorMC-only switches are ignored)",
   "colormc.compat.config":
     "Readable, but ColorMC's SafeLog4j is dropped; the two proxy models differ (ColorMC uses login / download / game switches, M²L uses strategy + type enums) and fall back to defaults",
-  "colormc.compat.count": "Play statistics; format not guaranteed — unreadable data restarts from zero",
+  "colormc.compat.count": "Play statistics; merged into M²L's stats by instance uuid without replacing existing records",
   "colormc.compat.logs": "Replaces M²L's own log file",
   "colormc.compat.java":
     "ColorMC's Java runtimes are merged in; M²L will not pick them up automatically — rescan or add them in Settings",

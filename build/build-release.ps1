@@ -86,7 +86,3 @@ finally {
 Write-Host '正在收集安装包到 build_out ...'
 node (Join-Path $root 'build\package-release.mjs')
 if ($LASTEXITCODE -ne 0) { throw "安装包收集失败（退出码 $LASTEXITCODE）" }
-
-# 右键「使用 PowerShell 运行」时窗口会在结束时关掉，停一下看输出；
-# 非交互（管道 / 自动化）不问，免得卡住
-if (-not [Console]::IsInputRedirected -and -not $env:CI) { Read-Host '按回车关闭' }

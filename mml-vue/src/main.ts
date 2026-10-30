@@ -30,6 +30,7 @@ import {
 import { setMultiWindow } from "./windows/windowManager";
 import { restoreFontFamily } from "./lib/fonts";
 import { installImageFallback } from "./lib/imageFallback";
+import { buildChannel, loadBuildInfo } from "./lib/buildInfo";
 import { vTip } from "./lib/tip";
 import { initSelectDirection } from "./lib/selectDirection";
 
@@ -57,18 +58,25 @@ document.addEventListener("contextmenu", (e) => {
   e.preventDefault();
 });
 
-// 调试构建：F12 / ⌘⌥I 打开 Web Inspector。发布构建没有把 DevTools 编进去，
-// 那条命令会直接返回错误，所以监听只在 DEV 下装
-if (import.meta.env.DEV) {
-  window.addEventListener("keydown", (e) => {
-    const inspect =
-      e.key === "F12" ||
-      (e.metaKey && e.altKey && (e.key === "i" || e.key === "I"));
-    if (!inspect) return;
-    e.preventDefault();
-    commands.windows.openDevtools().catch(() => {});
-  });
+// 构建通道：预发布版要按 channel 判断能不能开 DevTools，尽早拉一次
+void loadBuildInfo();
+
+/** 当前这份构建能不能开 DevTools：测试版与预发布版可以，正式发布没有编进去 */
+function devtoolsAllowed(): boolean {
+  return import.meta.env.DEV || buildChannel.value !== "release";
 }
+
+// 测试版与预发布版：F12 / ⌘⌥I 打开 Web Inspector。
+// 三个平台都是独立窗口（Windows 的 DevTools 窗口 / macOS 的 Web Inspector /
+// Linux 的 WebKitGTK inspector）。正式发布那条命令会直接返回错误，所以先挡一层
+window.addEventListener("keydown", (e) => {
+  const inspect =
+    e.key === "F12" ||
+    (e.metaKey && e.altKey && (e.key === "i" || e.key === "I"));
+  if (!inspect || !devtoolsAllowed()) return;
+  e.preventDefault();
+  commands.windows.openDevtools().catch(() => {});
+});
 
 // 发布构建：兜底拦掉 WebView2 的浏览器功能键（F5 / Ctrl+R、F12 / Ctrl+Shift+C、
 // Ctrl+P、Ctrl+F 页内查找）。正经做法是 WebView2 设置项，见
@@ -79,7 +87,8 @@ if (import.meta.env.PROD) {
     const ctrl = e.ctrlKey || e.metaKey;
     const blocked =
       e.key === "F5" ||
-      e.key === "F12" ||
+      // 预发布版要留 F12 开控制台，正式发布照旧拦掉
+      (e.key === "F12" && !devtoolsAllowed()) ||
       (ctrl && ["r", "R", "p", "P"].includes(e.key)) ||
       // 页内查找也归启动器自己：日志窗口的 Ctrl+F 走 Monaco 的查找框
       (ctrl && !e.shiftKey && (e.key === "f" || e.key === "F")) ||

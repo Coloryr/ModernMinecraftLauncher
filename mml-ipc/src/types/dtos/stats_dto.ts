@@ -6,6 +6,7 @@ export type StatsInstanceDto = {
   count: number,
   failed: number,
   seconds: number,
+  first: number | null,
   last: number | null,
   running: boolean,
   deleted: boolean,

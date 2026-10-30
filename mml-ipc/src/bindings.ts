@@ -4,7 +4,7 @@
 // 传输层不在这里绑定：createCommands 接收调用方传入的 invoke。
 
 import type { Invoke } from "./invoke";
-import type { AccountStoreDto, AccountStoreViewDto, AutoSaveTargetDto, BgInfoDto, BlockGroupsDto, BlockItemDto, BlockStatusDto, BuildInfoDto, BytesSliceDto, ChunkFindDto, CloudConfigDto, CloudStatusDto, CollectDataDto, ColorMcInfoDto, ColorMcReportDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, CrashAnalysisDto, CustomCssItemDto, CustomHomeInfoDto, CustomJsonItemDto, CustomUiInfoDto, DataPackItemDto, DepProblemDto, DetectedPackDto, DirEntry, DownloadStatusDto, DropPathDto, ExeInfoDto, ExportConfigDto, ExportEntryDto, ExportInfoDto, FileItemDto, FileListDto, FolderInstanceDto, GamepadConfigDto, GamepadDto, GamepadProfileDto, GamepadStateDto, GroupDto, GuiConfigDto, IconSourceDto, InstanceArgsDto, InstanceInfoDto, InstanceLangDto, InstancePatch, JavaDownloadItemDto, JavaDownloadOptionsDto, JavaInfoDto, JavaTypes, LaunchPrecheckDto, LaunchSettingDto, LoadState, LobbyViewDto, LocalFileEntryDto, LogLine, LogSettingDto, MappingLobbyDto, McaChunkDto, MinecraftImportDto, MinecraftInfoDto, ModAutoMarkDto, ModDepTreeDto, ModExportDto, ModGroupDto, ModItemDto, ModPackStatusDto, ModPackUpdateDto, ModRenameDto, ModUpdateApplyDto, ModUpdateCheckDto, ModUpdateProjectDto, MotdDto, NbtEditDto, NetworkSettingDto, NewsItem, PackItemDto, ProjectDetailDto, ProjectDto, ProjectItemDto, ResourceDependencyDto, ResourceDropDto, ResourceSaveDto, ResourceStatusDto, ResourceViewDto, RunArgSettingDto, SaveBackupDto, SaveEditDto, SaveItemDto, SchematicDetailDto, SchematicItemDto, ScreenshotItemDto, ServerInstanceOptionsDto, ServerInstanceResultDto, ServerItemDto, ServerPackProbeDto, SettingsDefaultsDto, ShaderItemDto, StartArgDto, StatsDataDto, StatsPlaytimeDto, SystemMemoryDto, TexturesDto, VersionInfoDto, WindowSettingDto, WindowSizeDto } from "./types";
+import type { AccountStoreDto, AccountStoreViewDto, AutoSaveTargetDto, BgInfoDto, BlockGroupsDto, BlockItemDto, BlockStatusDto, BuildInfoDto, BytesSliceDto, ChunkFindDto, CloudConfigDto, CloudStatusDto, CollectDataDto, ColorMcInfoDto, ColorMcReportDto, ConfigHunkDto, ConfigNbtDto, ConfigTextDto, CrashAnalysisDto, CustomCssItemDto, CustomHomeInfoDto, CustomJsonItemDto, CustomUiInfoDto, DataPackItemDto, DepProblemDto, DetectedPackDto, DirEntry, DownloadStatusDto, DropPathDto, ExeInfoDto, ExportConfigDto, ExportEntryDto, ExportInfoDto, FileItemDto, FileListDto, FolderInstanceDto, GamepadConfigDto, GamepadDto, GamepadProfileDto, GamepadStateDto, GroupDto, IconSourceDto, InstanceArgsDto, InstanceInfoDto, InstanceLangDto, InstancePatch, JavaDownloadItemDto, JavaDownloadOptionsDto, JavaInfoDto, JavaTypes, LaunchPrecheckDto, LaunchSettingDto, LoadState, LobbyViewDto, LocalFileEntryDto, LogLine, LogSettingDto, MappingLobbyDto, McaChunkDto, MinecraftImportDto, MinecraftInfoDto, ModAutoMarkDto, ModDepTreeDto, ModExportDto, ModGroupDto, ModItemDto, ModPackStatusDto, ModPackUpdateDto, ModRenameDto, ModUpdateApplyDto, ModUpdateCheckDto, ModUpdateProjectDto, MotdDto, NbtEditDto, NetworkSettingDto, NewsItem, PackItemDto, ProjectDetailDto, ProjectDto, ProjectItemDto, ResourceDependencyDto, ResourceDropDto, ResourceSaveDto, ResourceStatusDto, ResourceViewDto, RunArgSettingDto, SaveBackupDto, SaveEditDto, SaveItemDto, SchematicDetailDto, SchematicItemDto, ScreenshotItemDto, ServerInstanceOptionsDto, ServerInstanceResultDto, ServerItemDto, ServerPackProbeDto, SettingsDefaultsDto, ShaderItemDto, StartArgDto, StatsDataDto, StatsPlaytimeDto, SystemMemoryDto, TexturesDto, VersionInfoDto, WindowSettingDto, WindowSizeDto } from "./types";
 
 export * from "./types";
 
@@ -17,14 +17,8 @@ export function createCommands(invoke: Invoke) {
     },
     windows: {
       activateDecoration: () => invoke<string>("window_activate_decoration"),
-      clientLockClear: () => invoke<void>("window_client_lock_clear"),
-      clientLockSet: (password: string) => invoke<void>("window_client_lock_set", { password }),
-      clientLockVerify: (password: string) => invoke<boolean>("window_client_lock_verify", { password }),
       closeWindow: (kind: string, instance: string | null) => invoke<void>("window_close_window", { kind, instance }),
-      dropModel: (kind: string) => invoke<void>("window_drop_model", { kind }),
-      ensureModel: (kind: string) => invoke<void>("window_ensure_model", { kind }),
       fillScreen: () => invoke<void>("window_fill_screen"),
-      getGuiConfig: () => invoke<GuiConfigDto>("window_get_gui_config"),
       getWindowSizes: () => invoke<WindowSizeDto[]>("window_get_window_sizes"),
       isFullscreen: () => invoke<boolean>("window_is_fullscreen"),
       isMaximized: () => invoke<boolean>("window_is_maximized"),
@@ -33,10 +27,7 @@ export function createCommands(invoke: Invoke) {
       openWindow: (kind: string, instance: string | null, query: string | null) => invoke<void>("window_open_window", { kind, instance, query }),
       probeDrop: (path: string) => invoke<DropPathDto>("window_probe_drop", { path }),
       reopenWindow: (kind: string, instance: string | null, query: string | null) => invoke<void>("window_reopen_window", { kind, instance, query }),
-      restartApp: () => invoke<void>("window_restart_app"),
-      saveGuiConfig: (config: GuiConfigDto) => invoke<void>("window_save_gui_config", { config }),
       setFullscreen: (fullscreen: boolean) => invoke<void>("window_set_fullscreen", { fullscreen }),
-      setTitle: (title: string) => invoke<void>("window_set_title", { title }),
       startDragging: () => invoke<void>("window_start_dragging"),
       toggleMaximize: () => invoke<boolean>("window_toggle_maximize"),
       urlOfText: (text: string) => invoke<string>("window_url_of_text", { text }),

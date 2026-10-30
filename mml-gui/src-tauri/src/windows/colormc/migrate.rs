@@ -3,9 +3,11 @@
 //! 从 `colormc/mod.rs` 拆出来的。**原样文件夹搬运**，不做字段级转换；单个文件失败不中断
 //! 整次迁移，记进报告的 `failed` 里。
 //!
-//! 唯一的例外是 `minecraft/instances`：实例不能原样覆盖，见 [`super::import`]。
-//! 重名时导入的那个改名、两份都留；uuid 冲突只给导入的那个换新；
-//! ColorMC 的组名并进 `group_save.json`。
+//! 两处例外：
+//! - `minecraft/instances`：实例不能原样覆盖，见 [`super::import`]。重名时导入的那个改名、
+//!   两份都留；uuid 冲突只给导入的那个换新；ColorMC 的组名并进 `group_save.json`；
+//! - `count.dat`：统计不能原样覆盖。先落到 `count.import.dat`，下次启动由内核按 uuid
+//!   合并进 M²L 自己的统计，见 `mml_game::game_count::merge_pending`。
 
 use std::fs;
 use std::io;
@@ -95,6 +97,31 @@ pub(super) fn migrate(
     for name in &src_entries {
         let from = src.join(name);
         let to = dst.join(name);
+
+        // 统计不能原样覆盖：M²L 自己可能已有记录，ColorMC 的也值得留。
+        // 先落到旁路文件，下次启动由内核合并，见 game_count::merge_pending
+        if name == names::COUNT_DATA_FILE {
+            let sidecar = dst.join(names::COUNT_IMPORT_FILE);
+            let result = path_helper::copy_file(&from, &sidecar)
+                .map_err(|err| err.to_string())
+                .and_then(|_| {
+                    if moved {
+                        fs::remove_file(&from).map_err(|err| err.to_string())
+                    } else {
+                        Ok(())
+                    }
+                });
+            done += 1;
+            match result {
+                Ok(()) => ok_entries += 1,
+                Err(err) => {
+                    mml_log::error(entry_failed(moved, name, err).text());
+                    failed.push(name.clone());
+                }
+            }
+            continue;
+        }
+
         let result = if name == names::MINECRAFT_DIR {
             migrate_minecraft(
                 app,
