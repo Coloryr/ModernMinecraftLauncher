@@ -280,8 +280,8 @@ fn move_to_trash_macos(dir: &Path) -> CoreResult<()> {
 /// 通过 Windows Shell 将文件或目录移入回收站
 #[cfg(target_os = "windows")]
 fn move_to_trash_windows<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
-    use std::os::windows::ffi::OsStrExt;
     use mml_names::i18_items::error_type::MoveToTrashErrorData;
+    use std::os::windows::ffi::OsStrExt;
     use windows::Win32::Foundation::HWND;
     use windows::Win32::UI::Shell::FO_DELETE;
     use windows::Win32::UI::Shell::FOF_ALLOWUNDO;

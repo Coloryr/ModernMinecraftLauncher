@@ -61,14 +61,12 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <header class="topbar"
-    :class="[titleBarStyle, {
-      'is-macos': isMac,
-      'is-plugin-decorated': pluginDecorated,
-      'is-plugin-controls': pluginControls,
-      'is-fullscreen': fullscreen,
-    }]"
-    @pointerdown="onTitleBarPointerDown">
+  <header class="topbar" :class="[titleBarStyle, {
+    'is-macos': isMac,
+    'is-plugin-decorated': pluginDecorated,
+    'is-plugin-controls': pluginControls,
+    'is-fullscreen': fullscreen,
+  }]" @pointerdown="onTitleBarPointerDown">
     <!-- 品牌块与加载期间的标题栏共用，见 MainBrand.vue -->
     <MainBrand />
 

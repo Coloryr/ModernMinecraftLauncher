@@ -2,9 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use mml_names::i18_items::error_type::{CoreResult, ErrorType};
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use mml_names::i18_items::error_type::FileSystemErrorData;
+use mml_names::i18_items::error_type::{CoreResult, ErrorType};
 
 /// 创建快捷方式
 ///

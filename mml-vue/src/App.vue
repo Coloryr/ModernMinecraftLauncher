@@ -73,7 +73,7 @@ const windowMap: Record<WindowKind, Component> = {
 const currentWindow = computed(() => windowMap[currentKind.value]);
 
 // 整页包里的组件可以直接复用内置窗口：ReplaceWindow 会从 window.__mmlWindows 取 main
-;(window as unknown as { __mmlWindows?: Record<string, Component> }).__mmlWindows = windowMap;
+; (window as unknown as { __mmlWindows?: Record<string, Component> }).__mmlWindows = windowMap;
 
 /**
  * 整页 iframe 只在主窗口生效
@@ -197,39 +197,40 @@ const closeAskButton = computed(() =>
   <CustomUiPage v-else-if="customPage" :url="customUiPageUrl" />
 
   <template v-else>
-  <!-- 背景图层：设置里选的本地图片，所有窗口共用 -->
-  <div v-if="bgImage" class="app-bg" :style="bgLayerStyle" />
-  <!-- 单窗口模式的页面切换动画：多窗口模式下每个窗口是独立 webview、组件不会变，
+    <!-- 背景图层：设置里选的本地图片，所有窗口共用 -->
+    <div v-if="bgImage" class="app-bg" :style="bgLayerStyle" />
+    <!-- 单窗口模式的页面切换动画：多窗口模式下每个窗口是独立 webview、组件不会变，
        这里平时不动。动画只作用在内容区（base.css 的 .win-page-*），标题栏与窗口按钮
        不参与；根元素自身不产生过渡、Vue 推断不出时长，所以显式给 160ms。 -->
-  <Transition name="win-page" mode="out-in" :duration="160">
-    <KeepAlive>
-      <component :is="currentWindow" :key="currentKind" @close="closeWindow" />
-    </KeepAlive>
-  </Transition>
-  <!-- 单窗口模式：下载管理浮在当前页面之上，属工具窗口，见 windowManager 的
+    <Transition name="win-page" mode="out-in" :duration="160">
+      <KeepAlive>
+        <component :is="currentWindow" :key="currentKind" @close="closeWindow" />
+      </KeepAlive>
+    </Transition>
+    <!-- 单窗口模式：下载管理浮在当前页面之上，属工具窗口，见 windowManager 的
        openWindow 特例；关掉只是收起，任务照跑 -->
-  <DownloadWindow v-if="!multiWindow && downloadPopupOpen && currentKind !== 'download'" @close="closeDownloadPopup" />
-  <!-- 整合包安装进度弹窗：由标题栏上那个指示器点开。单窗口模式下是主窗口顶栏，
+    <DownloadWindow v-if="!multiWindow && downloadPopupOpen && currentKind !== 'download'"
+      @close="closeDownloadPopup" />
+    <!-- 整合包安装进度弹窗：由标题栏上那个指示器点开。单窗口模式下是主窗口顶栏，
        多窗口模式下各窗口自己的标题栏里也有指示器，点开同一个弹窗。
        关掉它只是收起，安装照常跑 -->
-  <ModpackPopup v-if="modpackPopupOpen && modpackStatus?.tasks.length" :status="modpackStatus"
-    @close="closeModpackPopup" />
-  <!-- 资源下载进度弹窗：入口是标题栏上的 ResourceTitleIndicator，关掉只收起、下载照跑 -->
-  <ResourcePopup v-if="resourcePopupOpen && resourceStatus?.tasks.length" :status="resourceStatus"
-    @close="closeResourcePopup" />
-  <!-- 全局轻提示（所有窗口统一） -->
-  <AppToast />
+    <ModpackPopup v-if="modpackPopupOpen && modpackStatus?.tasks.length" :status="modpackStatus"
+      @close="closeModpackPopup" />
+    <!-- 资源下载进度弹窗：入口是标题栏上的 ResourceTitleIndicator，关掉只收起、下载照跑 -->
+    <ResourcePopup v-if="resourcePopupOpen && resourceStatus?.tasks.length" :status="resourceStatus"
+      @close="closeResourcePopup" />
+    <!-- 全局轻提示（所有窗口统一） -->
+    <AppToast />
 
-  <!-- 关闭被拦截：还有下载任务时先问一句再停下载、关窗 / 退出。
+    <!-- 关闭被拦截：还有下载任务时先问一句再停下载、关窗 / 退出。
        Rust 侧的关闭保护见 src-tauri 的 close_guarded -->
-  <BaseModal v-if="closeAsk" :title="closeAskTitle" :closable="false" @close="closeAsk = false">
-    <p class="modal-text">{{ closeAskText }}</p>
-    <div class="modal-actions">
-      <BaseButton @click="closeAsk = false">{{ t("actions.cancel") }}</BaseButton>
-      <BaseButton variant="danger" @click="stopDownloadsAndClose">{{ closeAskButton }}</BaseButton>
-    </div>
-  </BaseModal>
+    <BaseModal v-if="closeAsk" :title="closeAskTitle" :closable="false" @close="closeAsk = false">
+      <p class="modal-text">{{ closeAskText }}</p>
+      <div class="modal-actions">
+        <BaseButton @click="closeAsk = false">{{ t("actions.cancel") }}</BaseButton>
+        <BaseButton variant="danger" @click="stopDownloadsAndClose">{{ closeAskButton }}</BaseButton>
+      </div>
+    </BaseModal>
   </template>
 
   <!-- 账户占用确认：任何窗口里点启动都可能弹，所以挂在根上 -->

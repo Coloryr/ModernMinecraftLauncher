@@ -187,7 +187,9 @@ fn normalize(bytes: &[u8]) -> Result<Vec<u8>, String> {
 #[gui_macros::command]
 pub async fn settings_set_program_icon(app: AppHandle, source: String) -> Result<String, String> {
     let dir = gui_config::dir().ok_or_else(|| String::from("config dir missing"))?;
-    let bytes = tokio::fs::read(&source).await.map_err(|err| err.to_string())?;
+    let bytes = tokio::fs::read(&source)
+        .await
+        .map_err(|err| err.to_string())?;
     let png = tokio::task::spawn_blocking(move || normalize(&bytes))
         .await
         .map_err(|err| err.to_string())??;

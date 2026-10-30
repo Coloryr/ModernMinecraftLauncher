@@ -323,13 +323,13 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
       const found = list.find((i) => i.uuid === uuid) ?? null;
       instance.value = found
         ? {
-            name: found.name,
-            version: found.version,
-            quickPlay: found.quickPlay,
-            loader: found.loader,
-            loaderVersion: found.loaderVersion,
-            modpackType: found.modpackType ?? "",
-          }
+          name: found.name,
+          version: found.version,
+          quickPlay: found.quickPlay,
+          loader: found.loader,
+          loaderVersion: found.loaderVersion,
+          modpackType: found.modpackType ?? "",
+        }
         : null;
       instanceUuid.value = found?.uuid ?? "";
       imgBase.value = await getImageBaseUrl();

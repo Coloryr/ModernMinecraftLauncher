@@ -41,7 +41,7 @@ body {
   padding: 16px 18px 18px;
 }
 
-.card + .card {
+.card+.card {
   margin-top: 14px;
 }
 
@@ -71,7 +71,7 @@ body {
   gap: 10px;
 }
 
-.g-block + .g-block {
+.g-block+.g-block {
   margin-top: 14px;
 }
 
@@ -101,7 +101,7 @@ body {
   min-width: 0;
 }
 
-.g-item > .g-caption {
+.g-item>.g-caption {
   margin-bottom: 0;
 }
 

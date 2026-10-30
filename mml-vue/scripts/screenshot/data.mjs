@@ -899,17 +899,21 @@ export function moreCommands(extra = {}) {
     log_get_runtime: logRuntime,
     log_set_setting: null,
     export_get_info: exportInfo,
-    export_list_dir: { __dirs: {
-      "": exportRoot,
-      mods: [entry("mods/sodium-0.6.5.jar", 2_400_000), entry("mods/iris-1.8.8.jar", 1_800_000)],
-      config: [entry("config/neoforge.toml", 1200)],
-      saves: [entry("saves/世界一/level.dat", 2048)],
-      resourcepacks: [entry("resourcepacks/FreshAnimations.zip", 4_800_000), entry("resourcepacks/Faithful 32x.zip", 12_000_000)],
-    } },
-    export_list_instance_dir: { __dirs: {
-      "": exportInstanceRoot,
-      ".minecraft": [entry(".minecraft/options.txt", 2048), entry(".minecraft/servers.dat", 512)],
-    } },
+    export_list_dir: {
+      __dirs: {
+        "": exportRoot,
+        mods: [entry("mods/sodium-0.6.5.jar", 2_400_000), entry("mods/iris-1.8.8.jar", 1_800_000)],
+        config: [entry("config/neoforge.toml", 1200)],
+        saves: [entry("saves/世界一/level.dat", 2048)],
+        resourcepacks: [entry("resourcepacks/FreshAnimations.zip", 4_800_000), entry("resourcepacks/Faithful 32x.zip", 12_000_000)],
+      }
+    },
+    export_list_instance_dir: {
+      __dirs: {
+        "": exportInstanceRoot,
+        ".minecraft": [entry(".minecraft/options.txt", 2048), entry(".minecraft/servers.dat", 512)],
+      }
+    },
     lobby_prepare: lobbyView,
     lobby_status: lobbyView,
     config_tree_width: 240,

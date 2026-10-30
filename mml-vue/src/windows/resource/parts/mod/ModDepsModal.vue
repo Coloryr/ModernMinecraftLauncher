@@ -172,15 +172,15 @@ function edgeTextOf(edge: ModDepEdgeDto): string {
 
   const text = to?.virtual
     ? t("resource.depGraphWorksOn", {
-        from,
-        target: to.label || to.modId || to.key,
-        version: versionPart(to),
-      })
+      from,
+      target: to.label || to.modId || to.key,
+      version: versionPart(to),
+    })
     : t(edge.optional ? "resource.depGraphIsOptionalDep" : "resource.depGraphIsDep", {
-        from,
-        target: labelOf.value.get(edge.to) ?? edge.to,
-        version: to ? versionPart(to) : "",
-      });
+      from,
+      target: labelOf.value.get(edge.to) ?? edge.to,
+      version: to ? versionPart(to) : "",
+    });
 
   return edge.backward ? text + " " + t("resource.depGraphCycle") : text;
 }
@@ -310,10 +310,9 @@ watch(graph, () => {
     <div v-else ref="flowEl" class="dep-flow" @mousedown.capture="onFlowMouseDown">
       <!-- 拖节点、滚轮缩放、拖画布平移全是 vue-flow 的默认行为；
            连线本身带 nopan，从线上起手的情况由 onFlowMouseDown 补一次 -->
-      <VueFlow :nodes="flowNodes" :edges="flowEdges" :min-zoom="0.2" :max-zoom="2.5"
-        :nodes-connectable="false" :fit-view-on-init="true" @edge-click="onEdgeClick"
-        @node-click="hidePopup" @node-double-click="onNodeDoubleClick" @node-drag-start="hidePopup"
-        @pane-click="hidePopup">
+      <VueFlow :nodes="flowNodes" :edges="flowEdges" :min-zoom="0.2" :max-zoom="2.5" :nodes-connectable="false"
+        :fit-view-on-init="true" @edge-click="onEdgeClick" @node-click="hidePopup"
+        @node-double-click="onNodeDoubleClick" @node-drag-start="hidePopup" @pane-click="hidePopup">
         <Background :gap="18" :size="1.1" :pattern-color="'var(--border)'" />
         <template #node-mod="nodeProps">
           <ModDepNode :data="nodeProps.data" :selected="nodeProps.selected" />
@@ -323,7 +322,8 @@ watch(graph, () => {
 
     <!-- 点了线之后浮在鼠标旁边的那句话：fixed 定位，量过宽高再摆（见 showPopup） -->
     <p v-if="popupText" ref="popupEl" class="dep-edge-popup"
-      :style="{ left: popupPos.x + 'px', top: popupPos.y + 'px' }">{{ popupText }}</p>
+      :style="{ left: popupPos.x + 'px', top: popupPos.y + 'px' }">{{
+        popupText }}</p>
 
     <div class="modal-actions">
       <BaseButton @click="resetView">{{ t("resource.depGraphReset") }}</BaseButton>

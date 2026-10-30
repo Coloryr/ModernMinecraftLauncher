@@ -293,7 +293,7 @@ const registerUrl = computed(() => {
 /** 打开注册页：交给系统浏览器，失败静默 */
 function openRegister() {
   if (!registerUrl.value) return;
-  commands.main.openUrl(registerUrl.value).catch(() => {});
+  commands.main.openUrl(registerUrl.value).catch(() => { });
 }
 
 /** 打开添加账户弹窗；优先微软登录，锁定生效时用锁定列表里的第一个可用类型 */
@@ -745,25 +745,21 @@ function tokenLabel(acc: AccountStoreDto): string {
     <div class="view-area" :class="{ fill: view === 'detail' || showSkin || filtered.length === 0 }">
       <SkinPage v-if="showSkin" :account="skinTarget" />
       <AccountGrid v-else-if="view === 'grid'" :accounts="filtered" :filtering="filtering"
-        :current-uuid="currentAccount?.uuid ?? ''" :query="searchText" @menu="openAccountMenu"
-        :token-label="tokenLabel" @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin"
-        @refresh-skin="refreshSkin" @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event"
-        @add="openAdd" />
-      <AccountList v-else-if="view === 'list'" :accounts="filtered" :filtering="filtering"
-        :current-uuid="currentAccount?.uuid ?? ''" :query="searchText" @menu="openAccountMenu"
-        :token-label="tokenLabel" @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin"
-        @refresh-skin="refreshSkin" @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event"
-        @add="openAdd" />
-      <AccountDetail v-else :accounts="filtered" :filtering="filtering" :current-uuid="currentAccount?.uuid ?? ''"
-        :query="searchText" @menu="openAccountMenu"
-        :token-label="tokenLabel"
+        :current-uuid="currentAccount?.uuid ?? ''" :query="searchText" @menu="openAccountMenu" :token-label="tokenLabel"
         @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin" @refresh-skin="refreshSkin"
         @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" @add="openAdd" />
+      <AccountList v-else-if="view === 'list'" :accounts="filtered" :filtering="filtering"
+        :current-uuid="currentAccount?.uuid ?? ''" :query="searchText" @menu="openAccountMenu" :token-label="tokenLabel"
+        @switch="switchAccount" @refresh="refreshToken" @view-skin="viewSkin" @refresh-skin="refreshSkin"
+        @relogin="relogin" @edit="openEdit" @delete="deleteTarget = $event" @add="openAdd" />
+      <AccountDetail v-else :accounts="filtered" :filtering="filtering" :current-uuid="currentAccount?.uuid ?? ''"
+        :query="searchText" @menu="openAccountMenu" :token-label="tokenLabel" @switch="switchAccount"
+        @refresh="refreshToken" @view-skin="viewSkin" @refresh-skin="refreshSkin" @relogin="relogin" @edit="openEdit"
+        @delete="deleteTarget = $event" @add="openAdd" />
     </div>
 
     <!-- 添加账户弹窗（按类型显示不同输入框）：不遮标题栏 -->
-    <BaseModal v-if="showAdd" :title="t('account.addTitle')" :closable="false" below-titlebar
-      @close="showAdd = false">
+    <BaseModal v-if="showAdd" :title="t('account.addTitle')" :closable="false" below-titlebar @close="showAdd = false">
       <label class="field-label">{{ t("account.type") }}</label>
       <select v-model="addType" class="field-select"
         @change="onAddTypeChange(($event.target as HTMLSelectElement).value)">
@@ -784,8 +780,8 @@ function tokenLabel(acc: AccountStoreDto): string {
       <template v-for="f in addFormFields" :key="f.key">
         <label class="field-label">{{ t(f.labelKey) }}</label>
         <input v-model="addFields[f.key]" class="field-input" :class="{ 'is-invalid': addInvalid.includes(f.key) }"
-          :type="f.password ? 'password' : 'text'" spellcheck="false"
-          @input="clearInvalid(f.key)" @keyup.enter="confirmAdd" />
+          :type="f.password ? 'password' : 'text'" spellcheck="false" @input="clearInvalid(f.key)"
+          @keyup.enter="confirmAdd" />
       </template>
 
       <p v-if="addInvalid.length" class="error-text">{{ t("account.fieldsRequired") }}</p>
@@ -803,8 +799,7 @@ function tokenLabel(acc: AccountStoreDto): string {
     </BaseModal>
 
     <!-- 微软登录：请求码 + 地址 + 打开浏览器 / 取消 -->
-    <BaseModal v-if="showOauth" :title="t('account.oauthTitle')" :closable="false" below-titlebar
-      @close="cancelLogin">
+    <BaseModal v-if="showOauth" :title="t('account.oauthTitle')" :closable="false" below-titlebar @close="cancelLogin">
       <label class="field-label">{{ t("account.oauthCode") }}</label>
       <div class="oauth-code copyable" v-tip="t('account.copy')" @click="copyOauthValue(oauthCode)">
         {{ oauthCode }}
@@ -1034,5 +1029,4 @@ function tokenLabel(acc: AccountStoreDto): string {
   color: var(--text-dim);
   margin: 10px 0 0;
 }
-
 </style>

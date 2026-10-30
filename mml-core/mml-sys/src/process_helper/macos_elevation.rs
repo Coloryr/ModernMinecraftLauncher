@@ -43,9 +43,10 @@ impl PipeReader {
     /// 等后台线程把读句柄送过来
     fn handle(&mut self) -> io::Result<&mut File> {
         if self.file.is_none() {
-            let file = self.opened.recv().map_err(|_| {
-                io::Error::new(io::ErrorKind::BrokenPipe, "日志管道没有建立起来")
-            })?;
+            let file = self
+                .opened
+                .recv()
+                .map_err(|_| io::Error::new(io::ErrorKind::BrokenPipe, "日志管道没有建立起来"))?;
             self.file = Some(file);
         }
         Ok(self.file.as_mut().expect("刚刚填过"))

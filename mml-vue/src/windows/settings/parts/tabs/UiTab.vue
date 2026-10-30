@@ -194,8 +194,7 @@ function toggleCustomPage(on: boolean) {
     <!-- 已安装的样式：一行一条，开关 / 文件名 / 上移下移 / 删除；列表顺序即注入顺序 -->
     <ul v-if="client.customCss.length" class="custom-css-list">
       <li v-for="(item, index) in client.customCss" :key="item.id" class="custom-css-item">
-        <BaseSwitch :model-value="item.enabled"
-          @update:model-value="(v) => setCustomCssEnabled(item.id, v)" />
+        <BaseSwitch :model-value="item.enabled" @update:model-value="(v) => setCustomCssEnabled(item.id, v)" />
         <span class="custom-css-name" :title="item.name">{{ item.name }}</span>
         <!-- 上移 / 下移：排在第一个 / 最后一个时对应的按钮禁用 -->
         <button class="ui-btn-icon" :disabled="index === 0" v-tip="t('winSettings.customCssMoveUp')"
@@ -222,7 +221,8 @@ function toggleCustomPage(on: boolean) {
     </div>
   </SettingsGroup>
 
-  <SettingsGroup v-if="!locked" id="customPage" title-key="winSettings.secCustomPage" :flash="flashGroup === 'customPage'">
+  <SettingsGroup v-if="!locked" id="customPage" title-key="winSettings.secCustomPage"
+    :flash="flashGroup === 'customPage'">
     <p class="field-desc">{{ t("winSettings.customPageDesc") }}</p>
     <div class="switch-row">
       <div class="switch-text">
@@ -259,7 +259,8 @@ function toggleCustomPage(on: boolean) {
   </SettingsGroup>
 
   <!-- 窗口外观：材质由系统在窗口背后合成（Rust 侧 windows/effects.rs），落 gui_config.client.windowEffect -->
-  <SettingsGroup v-if="!locked" id="window-look" title-key="winSettings.secWindowLook" :flash="flashGroup === 'window-look'">
+  <SettingsGroup v-if="!locked" id="window-look" title-key="winSettings.secWindowLook"
+    :flash="flashGroup === 'window-look'">
     <template v-if="supportsMaterial">
       <label class="field-label">{{ t("winSettings.windowEffect") }}</label>
       <select v-model="client.windowEffect" class="field-select" @change="applyWindowEffect">
@@ -388,5 +389,4 @@ function toggleCustomPage(on: boolean) {
   font-size: 11.5px;
   color: var(--text-dim);
 }
-
 </style>

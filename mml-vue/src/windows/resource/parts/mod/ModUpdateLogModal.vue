@@ -247,11 +247,11 @@ function shortSha1(value: string): string {
         <div v-if="!onlyProjectId" class="log-search">
           <SearchBox v-model="keyword" :placeholder="t('resource.updateLogSearch')" width="100%" />
         </div>
-        <BaseDatePicker v-model="from" class="log-date" :placeholder="t('resource.updateLogDateFrom')"
-          :max="to" :aria-label="t('resource.updateLogDateFrom')" />
+        <BaseDatePicker v-model="from" class="log-date" :placeholder="t('resource.updateLogDateFrom')" :max="to"
+          :aria-label="t('resource.updateLogDateFrom')" />
         <span class="log-sep">–</span>
-        <BaseDatePicker v-model="to" class="log-date" :placeholder="t('resource.updateLogDateTo')"
-          :min="from" :aria-label="t('resource.updateLogDateTo')" />
+        <BaseDatePicker v-model="to" class="log-date" :placeholder="t('resource.updateLogDateTo')" :min="from"
+          :aria-label="t('resource.updateLogDateTo')" />
       </div>
 
       <!-- 只看一个模组时给一条可关掉的提示，否则用户不知道列表为什么只剩一组 -->
@@ -288,7 +288,9 @@ function shortSha1(value: string): string {
             <div v-for="(item, index) in group.update" :key="index" class="log-row">
               <span class="log-dot"></span>
               <div class="log-head">
-                <span class="log-ver">{{ t("resource.updateLogVersion", { from: dash(item.oldVersion), to: dash(item.version) }) }}</span>
+                <span class="log-ver">{{ t("resource.updateLogVersion", {
+                  from: dash(item.oldVersion), to:
+                    dash(item.version) }) }}</span>
                 <span class="log-file">{{ item.file }}</span>
                 <span class="log-right">
                   <span class="log-time">{{ formatTime(item.time) }}</span>
@@ -409,8 +411,8 @@ function shortSha1(value: string): string {
 
 /* 加载中 / 出错 / 空 / 筛完没结果：这几档没有可滚的列表，让提示吃掉剩余高度并居中，
    动作按钮才会贴底，而不是浮在面板中间 */
-.modal-body > .empty-tip,
-.modal-body > .error-text {
+.modal-body>.empty-tip,
+.modal-body>.error-text {
   flex: 1;
   display: flex;
   align-items: center;

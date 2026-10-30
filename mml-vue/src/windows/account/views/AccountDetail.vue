@@ -80,8 +80,9 @@ function isCurrent(acc: AccountStoreDto): boolean {
                  1px + opacity 0：不占位、不可见，只为了让 @error / @load 能触发 -->
               <img class="skin-probe" :src="accountSkinUrl(acc)" alt="" aria-hidden="true" data-no-fallback
                 @error="markImageFailed(acc, 'skin')" @load="markImageLoaded(acc, 'skin')" />
-              <AccountActions :locked="accountLocked && acc.uuid === currentUuid" :can-refresh="acc.canRefresh" :can-relogin="acc.canRelogin" :can-edit="acc.canEdit"
-                :has-skin="!hasNoSkin(acc)" @refresh="emit('refresh', acc)" @view-skin="emit('viewSkin', acc)"
+              <AccountActions :locked="accountLocked && acc.uuid === currentUuid" :can-refresh="acc.canRefresh"
+                :can-relogin="acc.canRelogin" :can-edit="acc.canEdit" :has-skin="!hasNoSkin(acc)"
+                @refresh="emit('refresh', acc)" @view-skin="emit('viewSkin', acc)"
                 @refresh-skin="emit('refreshSkin', acc)" @relogin="emit('relogin', acc)" @edit="emit('edit', acc)"
                 @delete="emit('delete', acc)" />
             </td>
@@ -89,7 +90,9 @@ function isCurrent(acc: AccountStoreDto): boolean {
               <HighlightText :text="acc.userName" :query="query" />
               <span v-if="isCurrent(acc)" class="current-tag">{{ t("account.current") }}</span>
             </td>
-            <td class="mono"><HighlightText :text="acc.uuid" :query="query" /></td>
+            <td class="mono">
+              <HighlightText :text="acc.uuid" :query="query" />
+            </td>
             <td>
               <AccountTypeBadge :auth-type="acc.authType" />
             </td>
@@ -103,10 +106,8 @@ function isCurrent(acc: AccountStoreDto): boolean {
         </tbody>
       </table>
     </div>
-    <AccountEmpty v-else class="detail-empty"
-      :title="filtering ? t('account.searchEmpty') : t('account.emptyTitle')"
-      :hint="filtering ? undefined : t('account.emptyHint')" :show-add="!filtering"
-      @add="emit('add')" />
+    <AccountEmpty v-else class="detail-empty" :title="filtering ? t('account.searchEmpty') : t('account.emptyTitle')"
+      :hint="filtering ? undefined : t('account.emptyHint')" :show-add="!filtering" @add="emit('add')" />
   </div>
 </template>
 

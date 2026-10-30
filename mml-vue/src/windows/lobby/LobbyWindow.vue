@@ -186,8 +186,8 @@ onBeforeUnmount(deactivate);
         <nav class="tabs" :aria-label="t('winTitle.lobby')">
           <button :class="{ selected: tab === 'terracotta' }" :aria-pressed="tab === 'terracotta'"
             @click="tab = 'terracotta'">{{ t('lobby.terracotta') }}</button>
-          <button :class="{ selected: tab === 'mapping' }" :aria-pressed="tab === 'mapping'"
-            @click="tab = 'mapping'">{{ t('lobby.mapping') }}</button>
+          <button :class="{ selected: tab === 'mapping' }" :aria-pressed="tab === 'mapping'" @click="tab = 'mapping'">{{
+            t('lobby.mapping') }}</button>
         </nav>
         <MappingLobby v-if="tab === 'mapping'" />
         <template v-else>
@@ -218,15 +218,16 @@ onBeforeUnmount(deactivate);
             </label>
             <p v-if="!instances.length" class="muted">{{ t('lobby.noInstances') }}</p>
             <div class="actions">
-              <BaseButton variant="primary" :disabled="busy || !canLaunch"
-                @click="launchGame">{{ t('lobby.launchGame') }}</BaseButton>
+              <BaseButton variant="primary" :disabled="busy || !canLaunch" @click="launchGame">{{ t('lobby.launchGame')
+                }}</BaseButton>
             </div>
           </section>
           <div class="room-grid">
             <section class="panel">
               <h2>{{ t('lobby.host') }}</h2>
               <p class="muted">{{ t('lobby.hostHint') }}</p>
-              <BaseButton :disabled="busy || !waiting" @click="roomAction('host')">{{ t('lobby.createRoom') }}</BaseButton>
+              <BaseButton :disabled="busy || !waiting" @click="roomAction('host')">{{ t('lobby.createRoom') }}
+              </BaseButton>
             </section>
             <section class="panel">
               <h2>{{ t('lobby.join') }}</h2>
@@ -235,7 +236,8 @@ onBeforeUnmount(deactivate);
                 <input id="lobby-room" v-model="room" maxlength="256" :disabled="busy || !waiting"
                   placeholder="U/XXXX-XXXX-XXXX-XXXX" @keydown.enter="waiting && room.trim() && roomAction('join')" />
               </label>
-              <BaseButton :disabled="busy || !waiting || !room.trim()" @click="roomAction('join')">{{ t('lobby.joinRoom') }}</BaseButton>
+              <BaseButton :disabled="busy || !waiting || !room.trim()" @click="roomAction('join')">{{
+                t('lobby.joinRoom') }}</BaseButton>
             </section>
           </div>
           <section v-if="view.ready && !waiting" class="panel">
@@ -268,7 +270,8 @@ onBeforeUnmount(deactivate);
               <span>{{ node }}</span>
             </label>
           </details>
-          <button class="credit" @click="commands.main.openUrl('https://github.com/burningtnt/Terracotta').catch(cause => showToast(tErr(cause)))">
+          <button class="credit"
+            @click="commands.main.openUrl('https://github.com/burningtnt/Terracotta').catch(cause => showToast(tErr(cause)))">
             Terracotta / 陶瓦联机 © burningtnt · AGPL-3.0 + IPC exception
           </button>
         </template>
@@ -279,34 +282,203 @@ onBeforeUnmount(deactivate);
 </template>
 
 <style scoped>
-.lobby-page { display: flex; flex-direction: column; gap: 14px; max-width: 1040px; margin: 0 auto; }
-.account-banner, .section-head, .copy-row, .actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.account-banner { padding: 12px 16px; background: var(--accent-soft); border: 1px solid var(--accent-border); border-radius: 10px; }
-.account-banner span, .muted { color: var(--text-dim); font-size: var(--ctl-font); line-height: 1.6; }
-.tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
-.tabs button { padding: 8px 16px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--text-dim); cursor: pointer; }
-.tabs button.selected { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent); }
-.panel { padding: 16px; border: 1px solid var(--border); background: var(--bg-card); border-radius: 12px; display: flex; flex-direction: column; align-items: stretch; gap: 12px; min-width: 0; }
-.panel h2 { font-size: 15px; margin: 0; }
-.panel p { margin: 0; }
-.section-head { justify-content: space-between; }
-.section-head > div { display: grid; gap: 6px; }
-.room-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.field { display: flex; flex-direction: column; gap: 8px; font-size: var(--ctl-font); }
-.field input, .field select { width: 100%; min-width: 0; min-height: var(--ctl-h); padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-raised); color: var(--text); font: inherit; }
-.state { color: var(--accent); font-weight: 600; font-size: 13px; }
-.error { color: var(--red); overflow-wrap: anywhere; }
-.download { display: flex; align-items: center; gap: 12px; font-size: var(--ctl-font); }
-.download progress { flex: 1; min-width: 0; accent-color: var(--accent); }
-.copy-row { justify-content: space-between; }
-.copy-row code { overflow-wrap: anywhere; user-select: text; }
-.members { padding: 0; margin: 0; list-style: none; display: grid; gap: 8px; }
-.members li { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
-details.panel { display: block; }
-summary { cursor: pointer; font-size: 13px; }
-details.panel p { margin: 10px 0; }
-.node { display: flex; gap: 8px; margin-top: 8px; font-size: var(--ctl-font); overflow-wrap: anywhere; }
-.credit { border: 0; padding: 4px; background: transparent; color: var(--accent); font-size: var(--ctl-font); cursor: pointer; align-self: center; }
-.close-hint { text-align: center; margin: 0; }
-@media (max-width: 620px) { .room-grid { grid-template-columns: 1fr; } }
+.lobby-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+.account-banner,
+.section-head,
+.copy-row,
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.account-banner {
+  padding: 12px 16px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: 10px;
+}
+
+.account-banner span,
+.muted {
+  color: var(--text-dim);
+  font-size: var(--ctl-font);
+  line-height: 1.6;
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+
+.tabs button {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.tabs button.selected {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.panel {
+  padding: 16px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  min-width: 0;
+}
+
+.panel h2 {
+  font-size: 15px;
+  margin: 0;
+}
+
+.panel p {
+  margin: 0;
+}
+
+.section-head {
+  justify-content: space-between;
+}
+
+.section-head>div {
+  display: grid;
+  gap: 6px;
+}
+
+.room-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: var(--ctl-font);
+}
+
+.field input,
+.field select {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--ctl-h);
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+}
+
+.state {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.error {
+  color: var(--red);
+  overflow-wrap: anywhere;
+}
+
+.download {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--ctl-font);
+}
+
+.download progress {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+
+.copy-row {
+  justify-content: space-between;
+}
+
+.copy-row code {
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.members {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.members li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+details.panel {
+  display: block;
+}
+
+summary {
+  cursor: pointer;
+  font-size: 13px;
+}
+
+details.panel p {
+  margin: 10px 0;
+}
+
+.node {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: var(--ctl-font);
+  overflow-wrap: anywhere;
+}
+
+.credit {
+  border: 0;
+  padding: 4px;
+  background: transparent;
+  color: var(--accent);
+  font-size: var(--ctl-font);
+  cursor: pointer;
+  align-self: center;
+}
+
+.close-hint {
+  text-align: center;
+  margin: 0;
+}
+
+@media (max-width: 620px) {
+  .room-grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

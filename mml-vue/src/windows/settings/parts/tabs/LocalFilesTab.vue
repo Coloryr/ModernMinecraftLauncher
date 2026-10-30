@@ -136,8 +136,8 @@ async function onConfirmClear() {
         </div>
 
         <!-- 每个实例一条：名字贴左、大小靠右；实例多时只渲染视口附近的行 -->
-        <VirtualList v-if="e.children.length && isExpanded(e.id)" class="local-file-children"
-          :count="e.children.length" :row-h="INSTANCE_ROW_H" :row-gap="0">
+        <VirtualList v-if="e.children.length && isExpanded(e.id)" class="local-file-children" :count="e.children.length"
+          :row-h="INSTANCE_ROW_H" :row-gap="0">
           <template #default="{ start, end }">
             <div v-for="child in e.children.slice(start, end)" :key="child.uuid" class="local-file-child">
               <span class="local-file-child-name" :title="child.path">{{ child.name }}</span>

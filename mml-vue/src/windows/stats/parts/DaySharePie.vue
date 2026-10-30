@@ -102,8 +102,8 @@ const totalText = computed(() => textOf(total.value));
     <svg class="ring" viewBox="0 0 100 100" role="img" :aria-label="title">
       <circle :cx="50" :cy="50" :r="R" fill="none" stroke="var(--border)" :stroke-width="W" />
       <circle v-for="seg in segments" :key="seg.uuid" :cx="50" :cy="50" :r="R" fill="none"
-        :stroke="instanceColor(seg.uuid)" :stroke-width="W" :stroke-dasharray="seg.dash"
-        :stroke-dashoffset="seg.offset" transform="rotate(-90 50 50)" v-tip="seg.tip" />
+        :stroke="instanceColor(seg.uuid)" :stroke-width="W" :stroke-dasharray="seg.dash" :stroke-dashoffset="seg.offset"
+        transform="rotate(-90 50 50)" v-tip="seg.tip" />
       <!-- 中心数值：环中间空着，正好放这一项的总数 -->
       <text x="50" y="50" class="ring-total" text-anchor="middle" dominant-baseline="central">{{ totalText }}</text>
     </svg>

@@ -158,7 +158,9 @@ fn archive_json_name(archive: &BaseArchive, entry: &str) -> String {
         .and_then(|json| json.as_object())
         .map(|map| {
             let name = map.get_string("name");
-            let version = map.get_opt_string("version").or(map.get_opt_string("versionId"));
+            let version = map
+                .get_opt_string("version")
+                .or(map.get_opt_string("versionId"));
 
             match version {
                 Some(data) => format!("{name}-{data}"),

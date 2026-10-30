@@ -201,8 +201,7 @@ onUnmounted(() => {
       <button type="button" role="tab" class="cat-item"
         :class="{ on: active === c.id, dragging: dragging === c.id, 'drop-target': dropKey === c.id }" :data-cat="c.id"
         :data-group="c.dropDisabled ? undefined : c.id" :aria-selected="active === c.id"
-        @pointerdown="onPointerDown($event, c)"
-        @click="onClick(c.id)" @contextmenu="onContextMenu($event, c)">
+        @pointerdown="onPointerDown($event, c)" @click="onClick(c.id)" @contextmenu="onContextMenu($event, c)">
         <span class="cat-name">{{ c.label }}</span>
         <span class="cat-num">{{ c.count }}</span>
       </button>

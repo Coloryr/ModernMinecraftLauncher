@@ -955,8 +955,7 @@ onUnmounted(() => {
           :query-total="queryTotal" :loader-version="loaderVersion" :loader-versions="loaderVersions"
           :loader-ver-loading="loaderVerLoading" :no-loader-version="NO_VERSION_LOADERS.includes(loader)"
           :loader-path="loaderPath" :invalid-version="addErrorField === 'version'"
-          :error="addErrorField === 'version' ? addError : ''"
-          @refresh-versions="refreshVersions"
+          :error="addErrorField === 'version' ? addError : ''" @refresh-versions="refreshVersions"
           @refresh-loaders="refreshSupportLoaders" @refresh-loader-versions="refreshLoaderVersions"
           @update:ver-types="verTypes = $event" @update:new-version="newVersion = $event"
           @update:loader="loader = $event" @update:loader-version="loaderVersion = $event"
@@ -970,13 +969,13 @@ onUnmounted(() => {
         <FolderMode v-else-if="addMode === 'folder'" :path="addFolderPath" :tree="folderTree" :checked="folderChecked"
           :expanded="folderExpanded" :found="folderFound" :picked="folderPicked" :scanning="folderScanning"
           :scan-error="folderScanError" :invalid="addErrorField === 'folder'"
-          :error="addErrorField === 'folder' ? addError : ''" @update:path="addFolderPath = $event"
-          @pick="pickFolder" @rescan="scanFolder" @toggle-instance="toggleFoundInstance"
-          @set-all-instances="setAllFoundInstances" @toggle-file="onFolderToggleFile" @toggle-dir="onFolderToggleDir"
-          @toggle-expand="onFolderToggleExpand" @lazy-load="onFolderLazyLoad" @set-all="setAllFolder" />
+          :error="addErrorField === 'folder' ? addError : ''" @update:path="addFolderPath = $event" @pick="pickFolder"
+          @rescan="scanFolder" @toggle-instance="toggleFoundInstance" @set-all-instances="setAllFoundInstances"
+          @toggle-file="onFolderToggleFile" @toggle-dir="onFolderToggleDir" @toggle-expand="onFolderToggleExpand"
+          @lazy-load="onFolderLazyLoad" @set-all="setAllFolder" />
         <OnlineMode v-else :url="addUrl" :invalid="addErrorField === 'url'"
-          :error="addErrorField === 'url' ? addError : ''" :probe="onlineProbe"
-      :probing="onlineProbing" :probe-error="onlineProbeError" @update:url="addUrl = $event" />
+          :error="addErrorField === 'url' ? addError : ''" :probe="onlineProbe" :probing="onlineProbing"
+          :probe-error="onlineProbeError" @update:url="addUrl = $event" />
       </div>
 
       <!-- 不属于某个输入框的错误（创建失败、读包失败这类）落在这里 -->

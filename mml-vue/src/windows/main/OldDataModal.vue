@@ -43,10 +43,8 @@ function onBusy(value: boolean) {
     <div class="old-modal">
       <p class="old-hint">{{ t("oldData.hint") }}</p>
 
-      <ColorMcMigrateSection v-if="props.colormc" :info="props.colormc" @done="emit('done')"
-        @busy="onBusy" />
-      <MinecraftImportSection v-if="props.minecraft" :info="props.minecraft" @done="emit('done')"
-        @busy="onBusy" />
+      <ColorMcMigrateSection v-if="props.colormc" :info="props.colormc" @done="emit('done')" @busy="onBusy" />
+      <MinecraftImportSection v-if="props.minecraft" :info="props.minecraft" @done="emit('done')" @busy="onBusy" />
 
       <div class="modal-actions">
         <BaseButton variant="accent" :disabled="busy" @click="emit('close')">{{

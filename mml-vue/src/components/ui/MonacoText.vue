@@ -251,8 +251,8 @@ watch(wordWrap, (on) => {
   <div ref="hostEl" class="monaco-text"></div>
 
   <!-- 右键菜单：固定定位、贴点击处弹出，越界由 openMenu 夹回窗口里 -->
-  <div v-if="menu" ref="menuEl" class="text-menu" :style="{ left: menu.x + 'px', top: menu.y + 'px' }"
-    @pointerdown.stop @contextmenu.prevent>
+  <div v-if="menu" ref="menuEl" class="text-menu" :style="{ left: menu.x + 'px', top: menu.y + 'px' }" @pointerdown.stop
+    @contextmenu.prevent>
     <template v-for="item in menuItems" :key="item.command">
       <span v-if="item.separated" class="text-menu-sep" />
       <button class="text-menu-item" :disabled="item.disabled" @click="pick(item.command)">

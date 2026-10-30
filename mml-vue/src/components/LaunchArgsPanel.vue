@@ -276,11 +276,11 @@ const gcOptions = computed(() => [
       </div>
       <div v-if="resInputs" class="args-row sub-row">
         <span class="sub-tag">{{ t("args.width") }}</span>
-        <NumberStepper :model-value="args.width" :min="0" :max="9999" :step="10"
-          :disabled="args.windowInherit" @update:model-value="(v: number) => update({ width: v })" />
+        <NumberStepper :model-value="args.width" :min="0" :max="9999" :step="10" :disabled="args.windowInherit"
+          @update:model-value="(v: number) => update({ width: v })" />
         <span class="sub-tag">{{ t("args.height") }}</span>
-        <NumberStepper :model-value="args.height" :min="0" :max="9999" :step="10"
-          :disabled="args.windowInherit" @update:model-value="(v: number) => update({ height: v })" />
+        <NumberStepper :model-value="args.height" :min="0" :max="9999" :step="10" :disabled="args.windowInherit"
+          @update:model-value="(v: number) => update({ height: v })" />
       </div>
 
       <!-- 内存：最小一行、最大续一行，各自预设下拉 + 数值框，口径与窗口大小相同 -->
@@ -409,8 +409,7 @@ const gcOptions = computed(() => [
           <!-- 隔离用户目录：HOME / APPDATA / XDG 等指到实例目录 -->
           <div class="args-row">
             <span class="args-label" v-tip="t('args.isolateHomeDesc')">{{ t("args.isolateHome") }}</span>
-            <BaseSwitch :model-value="args.isolateHome"
-              @update:model-value="update({ isolateHome: $event })" />
+            <BaseSwitch :model-value="args.isolateHome" @update:model-value="update({ isolateHome: $event })" />
           </div>
 
           <!-- 附加环境变量（键值对） -->

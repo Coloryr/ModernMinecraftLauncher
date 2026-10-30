@@ -47,7 +47,8 @@ function pick(account: AccountStoreDto) {
 
 <template>
   <div class="account-wrap">
-    <button class="account-btn" :disabled="accountLocked" v-tip="accountLocked ? t('err.lobbyAccountLocked') : ''" @click="toggle">
+    <button class="account-btn" :disabled="accountLocked" v-tip="accountLocked ? t('err.lobbyAccountLocked') : ''"
+      @click="toggle">
       <template v-if="account">
         <!-- 加载中：头像上叠转圈，onload 后消失 -->
         <span v-if="!imageFailed(account, 'avatar')" class="avatar-box">
@@ -94,8 +95,8 @@ function pick(account: AccountStoreDto) {
       <div v-if="open" class="account-menu" data-no-drag>
         <div class="menu-title">{{ t("account.switch") }}</div>
         <div v-if="accounts.length === 0" class="empty-tip">{{ t("account.noAccount") }}</div>
-        <button v-for="acc in accounts" :key="acc.uuid" class="menu-item"
-          :disabled="accountLocked" :class="{ active: acc.uuid === account?.uuid }" @click="pick(acc)">
+        <button v-for="acc in accounts" :key="acc.uuid" class="menu-item" :disabled="accountLocked"
+          :class="{ active: acc.uuid === account?.uuid }" @click="pick(acc)">
           <span v-if="!imageFailed(acc, 'avatar')" class="avatar-box">
             <img class="avatar small avatar-img" :class="{ pending: imageLoading(acc, 'avatar') }"
               :src="accountAvatarUrl(acc)" alt="" data-no-fallback @load="markImageLoaded(acc, 'avatar')"

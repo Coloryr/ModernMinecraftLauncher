@@ -123,8 +123,8 @@ pub(super) fn export_pack(
     // 玩家没有装过对应版本的 Java 也能直接启动。可以同时带多个（不同版本各一套）
     let mut bundled = std::collections::HashSet::new();
     for name in options.java.iter().filter(|name| !name.is_empty()) {
-        let info =
-            mml_jvms::get_java_info(name).ok_or_else(|| err_keys::SERVER_PACK_INVALID.to_string())?;
+        let info = mml_jvms::get_java_info(name)
+            .ok_or_else(|| err_keys::SERVER_PACK_INVALID.to_string())?;
         // 运行时名称要当目录名进 zip：按包内条目的同一套规则清洗，清洗完不合法就不带
         let name = java_dir_name(name);
         if !format::safe_component(&name) || !bundled.insert(name.clone()) {
@@ -208,7 +208,10 @@ pub(super) fn export_pack(
     if options.gui_config
         && let Some(icon) = crate::windows::settings::icon::icon_path()
     {
-        files.push((format!("mml/{}", crate::windows::settings::icon::ICON_FILE), icon));
+        files.push((
+            format!("mml/{}", crate::windows::settings::icon::ICON_FILE),
+            icon,
+        ));
     }
 
     let manifest = Manifest {
@@ -307,7 +310,10 @@ mod tests {
     /// 运行时名称要当包内目录名：非法字符换成下划线，结尾的点与空格去掉
     #[test]
     fn java_dir_name_cleans_path_chars() {
-        assert_eq!(java_dir_name("OpenJDK-17.0.1-x86_64"), "OpenJDK-17.0.1-x86_64");
+        assert_eq!(
+            java_dir_name("OpenJDK-17.0.1-x86_64"),
+            "OpenJDK-17.0.1-x86_64"
+        );
         assert_eq!(java_dir_name("Java 17 (x64)"), "Java 17 (x64)");
         assert_eq!(java_dir_name("jdk21. "), "jdk21");
         assert!(super::format::safe_component(&java_dir_name("a/b:c*?")));

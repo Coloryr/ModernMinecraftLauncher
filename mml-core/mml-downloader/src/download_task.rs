@@ -17,8 +17,8 @@ use mml_names::i18_items::info_type::InfoType;
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
 
-use crate::download_item::DownloadItem;
 use crate::TaskSnapshot;
+use crate::download_item::DownloadItem;
 
 /// 下载任务的字节统计
 ///

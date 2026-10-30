@@ -133,10 +133,18 @@ const icons = [
       <div class="g-block">
         <div class="g-caption">图标按钮</div>
         <div class="g-row">
-          <button class="ui-btn-icon" aria-label="添加"><GlyphIcon name="plus" :size="15" /></button>
-          <button class="ui-btn-icon" aria-label="刷新"><GlyphIcon name="refresh" :size="15" /></button>
-          <button class="ui-btn-icon" aria-label="删除"><GlyphIcon name="trash" :size="15" /></button>
-          <button class="ui-btn-icon" aria-label="关闭" disabled><GlyphIcon name="close" :size="15" /></button>
+          <button class="ui-btn-icon" aria-label="添加">
+            <GlyphIcon name="plus" :size="15" />
+          </button>
+          <button class="ui-btn-icon" aria-label="刷新">
+            <GlyphIcon name="refresh" :size="15" />
+          </button>
+          <button class="ui-btn-icon" aria-label="删除">
+            <GlyphIcon name="trash" :size="15" />
+          </button>
+          <button class="ui-btn-icon" aria-label="关闭" disabled>
+            <GlyphIcon name="close" :size="15" />
+          </button>
         </div>
       </div>
 
@@ -238,9 +246,15 @@ const icons = [
       <p class="g-note">关闭、打开、禁用三种状态。</p>
 
       <div class="g-row">
-        <label class="g-switch"><BaseSwitch v-model="switchOff" /><span>关闭</span></label>
-        <label class="g-switch"><BaseSwitch v-model="switchOn" /><span>打开</span></label>
-        <label class="g-switch"><BaseSwitch v-model="switchDisabled" disabled /><span>禁用</span></label>
+        <label class="g-switch">
+          <BaseSwitch v-model="switchOff" /><span>关闭</span>
+        </label>
+        <label class="g-switch">
+          <BaseSwitch v-model="switchOn" /><span>打开</span>
+        </label>
+        <label class="g-switch">
+          <BaseSwitch v-model="switchDisabled" disabled /><span>禁用</span>
+        </label>
       </div>
     </section>
 
@@ -359,13 +373,8 @@ const icons = [
       <div class="g-panel">弹窗覆盖在窗口内容之上，点遮罩空白处不会关闭。</div>
     </section>
 
-    <BaseModal
-      v-if="show('modal') && modalOpen"
-      title="重命名实例"
-      :width="420"
-      :below-titlebar="false"
-      @close="modalOpen = false"
-    >
+    <BaseModal v-if="show('modal') && modalOpen" title="重命名实例" :width="420" :below-titlebar="false"
+      @close="modalOpen = false">
       <label class="field-label">新的实例名称</label>
       <input class="field-input" value="Fabric 生存" />
       <div class="field-hint">改名不会移动游戏目录。</div>

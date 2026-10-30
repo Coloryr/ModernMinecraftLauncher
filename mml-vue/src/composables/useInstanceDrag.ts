@@ -157,8 +157,8 @@ export function useInstanceDrag(deps: DragDeps) {
       const groupId = groupEl.dataset.group ?? "";
       const rows = listEl
         ? ([...listEl.querySelectorAll(".inst-row")] as HTMLElement[]).filter(
-            (r) => r.dataset.group === groupId,
-          )
+          (r) => r.dataset.group === groupId,
+        )
         : [];
       let index = 0;
       for (const row of rows) {

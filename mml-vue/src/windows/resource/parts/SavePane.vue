@@ -155,12 +155,12 @@ function itemMenuItems(item: SaveItemDto): RowMenuItem[] {
     // 「进入存档」与「自动进入」都依赖 1.20+ 的 quick play，低版本没有等价参数，不给入口
     ...(quickPlay.value
       ? [
-          { id: "enter-world", label: t("resource.enterWorld") },
-          {
-            id: "auto-enter",
-            label: item.autoEnter ? t("resource.autoEnterOff") : t("resource.autoEnterOn"),
-          },
-        ]
+        { id: "enter-world", label: t("resource.enterWorld") },
+        {
+          id: "auto-enter",
+          label: item.autoEnter ? t("resource.autoEnterOff") : t("resource.autoEnterOn"),
+        },
+      ]
       : []),
     { id: "edit", label: t("resource.saveEdit"), disabled: item.broken },
     // 「修改配置文件」开配置窗口，直接落到这个存档的文件树：
@@ -486,8 +486,8 @@ function saveTip(item: SaveItemDto): string {
          这一条与右键的批量菜单**动作一致**，都只有「删除」：批量备份用户不要 -->
     <template #actions>
       <!-- 存档云同步：还没上线，只在源码启动（测试版）时露出来 -->
-      <CloudSavePane v-if="isSourceBuild" :uuid="instanceUuid" :saves="saves" :disabled="busy"
-        @busy="busy = $event" @changed="reloadCurrent" />
+      <CloudSavePane v-if="isSourceBuild" :uuid="instanceUuid" :saves="saves" :disabled="busy" @busy="busy = $event"
+        @changed="reloadCurrent" />
       <template v-if="count">
         <span class="row-selected-count">{{ t("resource.selectedCount", { n: count }) }}</span>
         <BaseButton size="sm" variant="danger" :disabled="busy" @click="batchRemove">
@@ -518,8 +518,8 @@ function saveTip(item: SaveItemDto): string {
       </div>
     </template>
     <template #default="{ start, end }">
-      <ResourceRow v-for="item in saves.slice(start, end)" :key="item.dir" :icon="item.icon" :name="item.levelName || item.dir"
-        v-tip="saveTip(item)" :class="{
+      <ResourceRow v-for="item in saves.slice(start, end)" :key="item.dir" :icon="item.icon"
+        :name="item.levelName || item.dir" v-tip="saveTip(item)" :class="{
           'row-selected': isSelected(item),
           'row-anchor': anchorKey === item.dir,
           'row-selecting': selected.size > 0,

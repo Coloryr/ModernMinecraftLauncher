@@ -1000,8 +1000,8 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
 
         <div class="collect-content">
           <!-- 搜索：按收藏项名字过滤，分组计数跟着变 -->
-          <SearchBox v-model="keyword" :placeholder="t('collect.search')"
-            :clear-label="t('collect.searchClear')" width="100%" />
+          <SearchBox v-model="keyword" :placeholder="t('collect.search')" :clear-label="t('collect.searchClear')"
+            width="100%" />
 
           <div class="collect-scroll">
             <!-- 当前分组是空的：搜索没命中与"这一组确实没收藏"分开说 -->
@@ -1080,10 +1080,8 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
         @close="installTargets = []" @install="doInstall" />
 
       <!-- 分组右键菜单：清空 / 删除（删除只对自建分组给） -->
-      <div v-if="groupMenu" class="ctx-menu" :style="{ left: groupMenu.x + 'px', top: groupMenu.y + 'px' }"
-        @click.stop>
-        <button class="ctx-item" :disabled="!itemsOfGroup(groupMenu.group).length"
-          @click="askClear(groupMenu.group)">
+      <div v-if="groupMenu" class="ctx-menu" :style="{ left: groupMenu.x + 'px', top: groupMenu.y + 'px' }" @click.stop>
+        <button class="ctx-item" :disabled="!itemsOfGroup(groupMenu.group).length" @click="askClear(groupMenu.group)">
           {{ t("collect.clear") }}
         </button>
         <button v-if="!isDefaultGroupKey(groupMenu.group)" class="ctx-item danger"

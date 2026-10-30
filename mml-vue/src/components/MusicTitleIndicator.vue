@@ -17,8 +17,7 @@ const { available, playing, active, toggle, stop } = useMusic();
       <GlyphIcon :name="playing ? 'pause' : 'play'" :size="14" />
     </button>
     <!-- 停止只在有进度时给：没在播时点它没有意义 -->
-    <button v-if="active" class="music-btn" v-tip="t('music.stop')" :aria-label="t('music.stop')"
-      @click="stop">
+    <button v-if="active" class="music-btn" v-tip="t('music.stop')" :aria-label="t('music.stop')" @click="stop">
       <GlyphIcon name="stop" :size="14" />
     </button>
   </div>

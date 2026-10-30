@@ -98,6 +98,7 @@ pub(crate) fn register_start_menu_shortcut() {
 mod windows_link {
     use std::path::{Path, PathBuf};
 
+    use windows::Win32::Foundation::PROPERTYKEY;
     use windows::Win32::System::Com::StructuredStorage::{
         PROPVARIANT, PROPVARIANT_0, PROPVARIANT_0_0, PROPVARIANT_0_0_0,
     };
@@ -106,7 +107,6 @@ mod windows_link {
         CoTaskMemAlloc, CoTaskMemFree, IPersistFile,
     };
     use windows::Win32::System::Variant::VT_LPWSTR;
-    use windows::Win32::Foundation::PROPERTYKEY;
     use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
     use windows::Win32::UI::Shell::{
         FOLDERID_Programs, IShellLinkW, KF_FLAG_DEFAULT, SHGetKnownFolderPath, ShellLink,
@@ -205,7 +205,9 @@ mod windows_link {
                         wReserved1: 0,
                         wReserved2: 0,
                         wReserved3: 0,
-                        Anonymous: PROPVARIANT_0_0_0 { pwszVal: PWSTR(aumid) },
+                        Anonymous: PROPVARIANT_0_0_0 {
+                            pwszVal: PWSTR(aumid),
+                        },
                     }),
                 },
             };

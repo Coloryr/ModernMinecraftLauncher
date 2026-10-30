@@ -2040,13 +2040,11 @@ onMounted(async () => {
          两颗不画的按钮用 visibility 占位，见 .boot-head 的样式 —— 自绘装饰激活要量
          "最大化按钮"的矩形，即 lib/decoration.ts 的 findMaximizeBtn，量不到插件会退回
          原生 frame、系统标题栏就又冒出来。 -->
-    <header v-if="splashVisible || splashError" class="boot-head"
-      :class="[titleBarStyle, {
-        'is-macos': isMac,
-        'is-plugin-controls': bootPluginControls,
-        'is-fullscreen': bootFullscreen,
-      }]"
-      @pointerdown="onTitleBarPointerDown">
+    <header v-if="splashVisible || splashError" class="boot-head" :class="[titleBarStyle, {
+      'is-macos': isMac,
+      'is-plugin-controls': bootPluginControls,
+      'is-fullscreen': bootFullscreen,
+    }]" @pointerdown="onTitleBarPointerDown">
       <MainBrand />
       <span class="spacer" />
       <WindowControls :style="titleBarStyle" />
@@ -2126,9 +2124,8 @@ onMounted(async () => {
             <section v-else-if="newsActive" key="home" class="news-page">
               <HomePage :items="news" :loading="newsLoading" @refresh="fetchNews(newsPage)" :page="newsPage"
                 :has-more="newsHasMore" @prev="prevNewsPage" @next="nextNewsPage" @open="openNews"
-                :current-instance="selected" :launching="isLaunching"
-                @select="(inst: InstanceInfoDto) => select(inst)" @quick-launch="quickLaunch"
-                back-label-key="home.backToList" @back="newsActive = false" />
+                :current-instance="selected" :launching="isLaunching" @select="(inst: InstanceInfoDto) => select(inst)"
+                @quick-launch="quickLaunch" back-label-key="home.backToList" @back="newsActive = false" />
             </section>
 
             <section v-else key="list" class="list-mode" :class="{ 'has-motd': motdCardVisible }">
@@ -2158,9 +2155,8 @@ onMounted(async () => {
               <!-- 启动按钮一行、次级操作一行方形图标键，两块宽度不同、整块居中不撑满，
                    见 main-window.css .launch-actions -->
               <div class="launch-actions">
-                <BaseButton variant="primary" size="lg" class="launch-main-btn"
-                  :class="{ running: selected?.running }" :disabled="!selected || (!selected.running && offlineLaunchBlocked)"
-                  @click="onLaunchAction">
+                <BaseButton variant="primary" size="lg" class="launch-main-btn" :class="{ running: selected?.running }"
+                  :disabled="!selected || (!selected.running && offlineLaunchBlocked)" @click="onLaunchAction">
                   <!-- 启动中：按钮里是阶段 + 进度；运行中：运行中。悬停两者都换成取消 / 关闭动作 -->
                   <span v-if="selected?.running" class="launch-busy">
                     <LaunchProgress v-if="isLaunching" :text="launchStageText" :percent="launchPct" />
@@ -2182,13 +2178,13 @@ onMounted(async () => {
                   </BaseButton>
                   <!-- 资源管理：分组 / 平铺模式的右侧详情面板里有这个入口，而列表模式没有详情面板，
                        这里不补一个就进不去资源管理窗口 -->
-                  <BaseButton size="sm" class="has-text" :aria-label="t('actions.manageResource')"
-                    :disabled="!selected" @click="onAction('manageResource')">
+                  <BaseButton size="sm" class="has-text" :aria-label="t('actions.manageResource')" :disabled="!selected"
+                    @click="onAction('manageResource')">
                     <GlyphIcon name="package" :size="15" :weight="1.8" /> {{ t("actions.manageResource") }}
                   </BaseButton>
                   <!-- 实例日志：主页面不展示日志内容，直接开独立日志窗口 -->
-                  <BaseButton size="sm" class="icon-btn-head" v-tip="t('detail.logs')"
-                    :aria-label="t('detail.logs')" :disabled="!selected" @click="openLogWindow">
+                  <BaseButton size="sm" class="icon-btn-head" v-tip="t('detail.logs')" :aria-label="t('detail.logs')"
+                    :disabled="!selected" @click="openLogWindow">
                     <GlyphIcon name="log" :size="15" :weight="1.8" />
                   </BaseButton>
                   <!-- 导出实例：与右侧详情面板里的导出按钮同一个动作 -->
@@ -2218,9 +2214,8 @@ onMounted(async () => {
             <MainSidebar ref="sidebarRef" :mode="effectiveMode" :search-text="searchText" :groups="groups"
               :filtered-groups="filteredGroups" :filtered-instances="filteredInstances" :searching="searching"
               :selected="selected" :multi-select="multiSelect" :selected-ids="selectedIds" :drag-active="dragActive"
-              :maximized="paneMaximized" @toggle-maximize="togglePaneMaximize"
-              :dragging-uuid="draggingUuid" :ghost="instanceGhost" :is-collapsed="isCollapsed"
-              :on-drag-pointer-down="onDragPointerDown"
+              :maximized="paneMaximized" @toggle-maximize="togglePaneMaximize" :dragging-uuid="draggingUuid"
+              :ghost="instanceGhost" :is-collapsed="isCollapsed" :on-drag-pointer-down="onDragPointerDown"
               :on-inst-click="onInstClick" :on-inst-context="onInstContext" :on-group-context="onGroupContext"
               :on-group-title-click="onGroupTitleClick" :is-inst-insert="isInstInsert"
               :is-inst-insert-end="isInstInsertEnd" :is-group-insert="isGroupInsert"
@@ -2272,9 +2267,8 @@ onMounted(async () => {
                       </div>
                       <!-- 右侧：启动游戏用大按钮，添加 / 管理资源用小按钮 -->
                       <div class="detail-side">
-                        <BaseButton variant="primary" size="lg" class="play-btn"
-                          :class="{ running: selected.running }" :disabled="!selected.running && offlineLaunchBlocked"
-                          @click="onLaunchAction">
+                        <BaseButton variant="primary" size="lg" class="play-btn" :class="{ running: selected.running }"
+                          :disabled="!selected.running && offlineLaunchBlocked" @click="onLaunchAction">
                           <span v-if="selected.running" class="launch-busy">
                             <LaunchProgress v-if="isLaunching" :text="launchStageText" :percent="launchPct" />
                             <span v-else class="launch-running">{{ t("launch.running") }}</span>
@@ -2348,12 +2342,13 @@ onMounted(async () => {
 
                     <!-- 自定义执行 -->
                     <div class="args-section">
-                      <button class="collapse-head args-toggle" :class="{ merged: execOpen }" @click="execOpen = !execOpen">
+                      <button class="collapse-head args-toggle" :class="{ merged: execOpen }"
+                        @click="execOpen = !execOpen">
                         <span>
                           <GlyphIcon name="gear" :size="14" :weight="1.8" /> {{ t("exec.title") }}
                         </span>
-                        <svg class="collapse-chevron" :class="{ flip: execOpen }" viewBox="0 0 24 24" width="13" height="13"
-                          fill="none" stroke="currentColor" stroke-width="2">
+                        <svg class="collapse-chevron" :class="{ flip: execOpen }" viewBox="0 0 24 24" width="13"
+                          height="13" fill="none" stroke="currentColor" stroke-width="2">
                           <path d="m6 9 6 6 6-6" />
                         </svg>
                       </button>
@@ -2364,7 +2359,8 @@ onMounted(async () => {
 
                     <!-- 自定义启动配置（json/ 目录）：与 ColorMC 游戏编辑窗口 tab1 同一张表 -->
                     <div class="args-section">
-                      <button class="collapse-head args-toggle" :class="{ merged: jsonOpen }" @click="jsonOpen = !jsonOpen">
+                      <button class="collapse-head args-toggle" :class="{ merged: jsonOpen }"
+                        @click="jsonOpen = !jsonOpen">
                         <span>
                           <GlyphIcon name="gear" :size="14" :weight="1.8" /> {{ t("customJson.title") }}
                         </span>
@@ -2380,7 +2376,8 @@ onMounted(async () => {
 
                     <!-- 自定义服务器（自动加入 + MOTD 展示） -->
                     <div class="args-section">
-                      <button class="collapse-head args-toggle" :class="{ merged: serverOpen }" @click="serverOpen = !serverOpen">
+                      <button class="collapse-head args-toggle" :class="{ merged: serverOpen }"
+                        @click="serverOpen = !serverOpen">
                         <span>
                           <GlyphIcon name="gear" :size="14" :weight="1.8" /> {{ t("server.title") }}
                         </span>
@@ -2414,7 +2411,8 @@ onMounted(async () => {
 
                     <!-- 游戏内代理 -->
                     <div class="args-section">
-                      <button class="collapse-head args-toggle" :class="{ merged: proxyOpen }" @click="proxyOpen = !proxyOpen">
+                      <button class="collapse-head args-toggle" :class="{ merged: proxyOpen }"
+                        @click="proxyOpen = !proxyOpen">
                         <span>
                           <GlyphIcon name="gear" :size="14" :weight="1.8" /> {{ t("proxy.title") }}
                         </span>
@@ -2479,8 +2477,8 @@ onMounted(async () => {
     <BaseModal v-if="showRename && selected" :title="t('actions.renameTitle')" :closable="false"
       @close="showRename = false">
       <label class="field-label">{{ t("add.name") }}</label>
-      <input v-model="renameName" class="field-input" :class="{ 'is-invalid': renameConflict }"
-        @keyup.enter="doRename" spellcheck="false" />
+      <input v-model="renameName" class="field-input" :class="{ 'is-invalid': renameConflict }" @keyup.enter="doRename"
+        spellcheck="false" />
       <p v-if="renameConflict" class="error-text" role="alert">{{ t("actions.nameExists") }}</p>
 
       <div class="modal-actions">
@@ -2494,8 +2492,8 @@ onMounted(async () => {
     <!-- ===== 复制实例：整份实例目录复制到新名字下 ===== -->
     <BaseModal v-if="copyInst" :title="t('actions.copyInstance')" :closable="false" @close="closeCopy">
       <label class="field-label">{{ t("copy.nameLabel") }}</label>
-      <input v-model="copyName" class="field-input" :class="{ 'is-invalid': copyConflict }"
-        :disabled="copyBusy" @keyup.enter="doCopy" spellcheck="false" />
+      <input v-model="copyName" class="field-input" :class="{ 'is-invalid': copyConflict }" :disabled="copyBusy"
+        @keyup.enter="doCopy" spellcheck="false" />
       <p v-if="copyConflict" class="error-text" role="alert">{{ t("actions.nameExists") }}</p>
       <p v-else class="field-hint">{{ t("copy.hint") }}</p>
 
@@ -2562,8 +2560,8 @@ onMounted(async () => {
       @close="blockIconInst = null" />
 
     <!-- ===== 首次启动：把旧启动器的数据搬过来（见 doInit 的探测）===== -->
-    <OldDataModal v-if="oldData" :colormc="oldData.colormc" :minecraft="oldData.minecraft"
-      @close="onOldDataClosed" @done="onOldDataDone" />
+    <OldDataModal v-if="oldData" :colormc="oldData.colormc" :minecraft="oldData.minecraft" @close="onOldDataClosed"
+      @done="onOldDataDone" />
 
     <!-- ===== 主页面设置：旧数据询问结束后问一次（见 onOldDataClosed）===== -->
     <FirstRunSetup v-if="firstRunSetup" @close="firstRunSetup = false" />

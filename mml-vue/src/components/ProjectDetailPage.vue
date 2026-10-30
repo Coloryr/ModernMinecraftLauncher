@@ -312,7 +312,7 @@ function onDetailClick(e: MouseEvent) {
   } else if (!/^https?:/i.test(href)) {
     return;
   }
-  api.openUrl(url).catch(() => {});
+  api.openUrl(url).catch(() => { });
 }
 
 /** 版本列表锚点：头部「版本列表」按钮滚动到这里 */
@@ -336,8 +336,7 @@ function scrollToVersions() {
       <!-- 显示与否跟父组件的 item 走：收起时立刻进退场动画。
            退场那一下的内容仍取 current —— 它留着最后一次打开的项目，
            所以动画期间画面不会变空；只按 current 判断的话详情页永远关不掉 -->
-      <div v-if="active && props.item && current" class="detail-page" @click="onDetailClick"
-        @auxclick="onDetailClick">
+      <div v-if="active && props.item && current" class="detail-page" @click="onDetailClick" @auxclick="onDetailClick">
         <!-- 头部固定、内容滚动；没有外层卡片，直接用窗口底色 -->
         <div class="detail-panel">
           <div class="detail-head">
@@ -390,8 +389,7 @@ function scrollToVersions() {
                 <img v-else-if="tag.logo" class="pack-tag-icon" :src="tag.logo" loading="lazy" alt="" />
                 <span class="pack-tag-name">{{ tag.name }}</span>
               </span>
-              <span v-if="tagRow.more" class="pack-tag pack-tag-more"
-                v-tip="hiddenTagTip(tagRow.hidden)">…</span>
+              <span v-if="tagRow.more" class="pack-tag pack-tag-more" v-tip="hiddenTagTip(tagRow.hidden)">…</span>
             </div>
           </div>
 

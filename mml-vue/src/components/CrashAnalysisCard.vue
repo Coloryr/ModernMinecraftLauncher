@@ -89,14 +89,14 @@ const exceptionChain = computed(() => {
       </div>
 
       <div class="analysis-actions">
-        <BaseButton
-          v-if="primary?.evidence.length || exceptionChain"
-          variant="ghost" size="sm" :aria-expanded="showEvidence"
-          @click="showEvidence = !showEvidence"
-        >
-          {{ showEvidence ? t("analysis.hideEvidence") : t("analysis.showEvidence", { count: primary?.evidence.length ?? 0 }) }}
+        <BaseButton v-if="primary?.evidence.length || exceptionChain" variant="ghost" size="sm"
+          :aria-expanded="showEvidence" @click="showEvidence = !showEvidence">
+          {{ showEvidence ? t("analysis.hideEvidence") : t("analysis.showEvidence", {
+            count: primary?.evidence.length ??
+          0 }) }}
         </BaseButton>
-        <BaseButton v-if="others.length" variant="ghost" size="sm" :aria-expanded="showOthers" @click="showOthers = !showOthers">
+        <BaseButton v-if="others.length" variant="ghost" size="sm" :aria-expanded="showOthers"
+          @click="showOthers = !showOthers">
           {{ showOthers ? t("analysis.hideOthers") : t("analysis.showOthers") }}
         </BaseButton>
       </div>
@@ -127,7 +127,8 @@ const exceptionChain = computed(() => {
         </div>
       </CollapsePanel>
     </div>
-    <BaseButton class="analysis-close" variant="ghost" size="sm" :aria-label="t('analysis.close')" v-tip="t('analysis.close')" @click="$emit('close')">
+    <BaseButton class="analysis-close" variant="ghost" size="sm" :aria-label="t('analysis.close')"
+      v-tip="t('analysis.close')" @click="$emit('close')">
       <GlyphIcon name="close" :size="15" />
     </BaseButton>
   </section>

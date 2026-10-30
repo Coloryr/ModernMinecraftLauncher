@@ -66,14 +66,9 @@ onMounted(init);
         </div>
 
         <div class="gp-list">
-          <button
-            v-for="item in profiles"
-            :key="item.name"
-            class="gp-item"
-            :class="{ 'is-active': item.name === editing, 'is-broken': !!item.error }"
-            :title="item.error ?? ''"
-            @click="requestSelect(item.name)"
-          >
+          <button v-for="item in profiles" :key="item.name" class="gp-item"
+            :class="{ 'is-active': item.name === editing, 'is-broken': !!item.error }" :title="item.error ?? ''"
+            @click="requestSelect(item.name)">
             <span class="gp-item-name">{{ item.name }}</span>
             <span v-if="item.active" class="gp-badge">{{ t("winGamepad.active") }}</span>
           </button>
@@ -118,12 +113,7 @@ onMounted(init);
               <span class="gp-key">{{ BUTTON_LABEL[rule.button] }}</span>
               <select v-model="rule.modifier" class="field-select">
                 <option :value="null">{{ t("winGamepad.modifierNone") }}</option>
-                <option
-                  v-for="button in ALL_BUTTONS"
-                  :key="button"
-                  :value="button"
-                  :disabled="button === rule.button"
-                >
+                <option v-for="button in ALL_BUTTONS" :key="button" :value="button" :disabled="button === rule.button">
                   {{ BUTTON_LABEL[button] }}
                 </option>
               </select>
@@ -140,21 +130,15 @@ onMounted(init);
               </select>
               <select v-model="newButton.modifier" class="field-select">
                 <option :value="null">{{ t("winGamepad.modifierNone") }}</option>
-                <option
-                  v-for="button in ALL_BUTTONS"
-                  :key="button"
-                  :value="button"
-                  :disabled="button === newButton.button"
-                >
+                <option v-for="button in ALL_BUTTONS" :key="button" :value="button"
+                  :disabled="button === newButton.button">
                   {{ BUTTON_LABEL[button] }}
                 </option>
               </select>
               <ActionSelect v-model="newButton.action" :actions="actions" />
-              <BaseButton
-                size="sm"
+              <BaseButton size="sm"
                 :disabled="isTaken(newButton.button, newButton.modifier) || newButton.modifier === newButton.button"
-                @click="addButton"
-              >
+                @click="addButton">
                 {{ t("winGamepad.addButton") }}
               </BaseButton>
             </div>
@@ -219,7 +203,8 @@ onMounted(init);
               </div>
               <div class="gp-field">
                 <label class="field-label">{{ t("winGamepad.deadzone") }}</label>
-                <input v-model.number="config.mouse.deadzone" class="field-input" type="number" step="0.05" min="0" max="1" />
+                <input v-model.number="config.mouse.deadzone" class="field-input" type="number" step="0.05" min="0"
+                  max="1" />
               </div>
             </div>
           </section>

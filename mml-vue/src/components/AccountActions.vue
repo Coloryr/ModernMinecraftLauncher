@@ -70,7 +70,8 @@ defineEmits<{
         <path d="M10 17l5-5-5-5M15 12H3" />
       </svg>
     </button>
-    <button class="icon-btn danger" :disabled="locked" v-tip="t(locked ? 'err.lobbyAccountLocked' : 'account.delete')" @click="$emit('delete')">
+    <button class="icon-btn danger" :disabled="locked" v-tip="t(locked ? 'err.lobbyAccountLocked' : 'account.delete')"
+      @click="$emit('delete')">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"
         stroke-linecap="round" stroke-linejoin="round">
         <path

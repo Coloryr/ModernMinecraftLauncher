@@ -281,11 +281,11 @@ const kindClass = computed(() => {
         <span class="nbt-caret" :class="{ open: showChildren }">
           <GlyphIcon v-if="isBranch" name="chevron-down" :size="12" :weight="2.4" />
         </span>
-        <input v-if="renaming" ref="nameInputEl" v-model="draftName" class="nbt-input" spellcheck="false"
-          @click.stop @dblclick.stop @keydown.enter.prevent="commitRename" @keydown.esc="cancelRename"
-          @blur="commitRename" />
-        <span v-else class="nbt-name" :class="{ renamable: !!renameSelf }" v-tip="nameTip"
-          @dblclick.stop="startRename"><HighlightText :text="node.name" :query="query" /></span>
+        <input v-if="renaming" ref="nameInputEl" v-model="draftName" class="nbt-input" spellcheck="false" @click.stop
+          @dblclick.stop @keydown.enter.prevent="commitRename" @keydown.esc="cancelRename" @blur="commitRename" />
+        <span v-else class="nbt-name" :class="{ renamable: !!renameSelf }" v-tip="nameTip" @dblclick.stop="startRename">
+          <HighlightText :text="node.name" :query="query" />
+        </span>
         <span class="nbt-kind" :class="kindClass">{{ node.kind }}</span>
       </div>
       <!-- 值列：与键列之间由一条竖线分开，谁属于谁一眼看得出来 -->
@@ -298,8 +298,8 @@ const kindClass = computed(() => {
           @click="startEdit">{{ shown }}</span>
         <!-- 行尾操作：悬停才出现，不占常驻宽度；点它们不能顺带展开 / 收起这一行 -->
         <span class="nbt-acts">
-          <button v-if="canAdd" class="nbt-act" v-tip="t('config.nbtAddChild')"
-            :aria-label="t('config.nbtAddChild')" @click.stop="startAdd">
+          <button v-if="canAdd" class="nbt-act" v-tip="t('config.nbtAddChild')" :aria-label="t('config.nbtAddChild')"
+            @click.stop="startAdd">
             <GlyphIcon name="plus" :size="12" :weight="2.2" />
           </button>
           <button v-if="removeSelf" class="nbt-act" v-tip="t('config.nbtRemove')" :aria-label="t('config.nbtRemove')"
@@ -332,8 +332,7 @@ const kindClass = computed(() => {
       </div>
 
       <NbtNode v-for="(child, index) in below" :key="`${child.name}-${index}`" :node="child" :depth="depth + 1"
-        :path="[...path, child.name]" :hits="hits" :query="query"
-        :remove-self="() => edit?.remove(node, path, index)"
+        :path="[...path, child.name]" :hits="hits" :query="query" :remove-self="() => edit?.remove(node, path, index)"
         :rename-self="isCompound ? (name: string) => renameChild(index, name) : undefined" />
     </div>
   </div>

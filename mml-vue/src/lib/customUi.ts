@@ -503,10 +503,10 @@ export async function initCustomUi() {
   await refreshStatus();
 
   // 导入 / 删除文件不改配置，只有这一条事件；非 Tauri 环境下 listen 会拒绝，忽略
-  onCustomUiChange(() => void refreshStatus()).catch(() => {});
+  onCustomUiChange(() => void refreshStatus()).catch(() => { });
   // 开关与条目走 gui_config，多窗口下靠这条广播；与 CSS 无关的设置变更也重拉一遍，
   // 状态现算很便宜，省得再比一遍字段
-  onClientConfigChange(() => void refreshStatus()).catch(() => {});
+  onClientConfigChange(() => void refreshStatus()).catch(() => { });
 }
 
 /**

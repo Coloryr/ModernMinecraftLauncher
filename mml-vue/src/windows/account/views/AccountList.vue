@@ -73,13 +73,11 @@ function hidePreview() {
 <template>
   <div class="acc-list" :class="{ empty: accounts.length === 0 }">
     <div v-for="acc in accounts" :key="acc.uuid" class="acc-row" :class="{ current: isCurrent(acc) }"
-      @dblclick="!accountLocked && emit('switch', acc)"
-      @contextmenu.prevent="emit('menu', { event: $event, acc })">
+      @dblclick="!accountLocked && emit('switch', acc)" @contextmenu.prevent="emit('menu', { event: $event, acc })">
       <!-- 加载中：图上叠转圈，onload 后消失 -->
       <div v-if="!imageFailed(acc, 'avatar')" class="row-avatar-box">
-        <img :src="accountAvatarUrl(acc)" class="row-avatar"
-          :class="{ pending: imageLoading(acc, 'avatar') }" alt="" data-no-fallback
-          @load="markImageLoaded(acc, 'avatar')" @error="markImageFailed(acc, 'avatar')"
+        <img :src="accountAvatarUrl(acc)" class="row-avatar" :class="{ pending: imageLoading(acc, 'avatar') }" alt=""
+          data-no-fallback @load="markImageLoaded(acc, 'avatar')" @error="markImageFailed(acc, 'avatar')"
           @mouseenter="showPreview($event, acc)" @mousemove="movePreview" @mouseleave="hidePreview" />
         <div v-if="imageLoading(acc, 'avatar')" class="img-spin" />
       </div>
@@ -88,23 +86,25 @@ function hidePreview() {
         {{ acc.userName.charAt(0).toUpperCase() }}
       </span>
       <div class="row-meta">
-        <span class="row-name"><HighlightText :text="acc.userName" :query="query" /></span>
+        <span class="row-name">
+          <HighlightText :text="acc.userName" :query="query" />
+        </span>
         <span class="row-sub">
           <AccountTypeBadge :auth-type="acc.authType" />
-          <span class="row-uuid"><HighlightText :text="acc.uuid" :query="query" /></span>
+          <span class="row-uuid">
+            <HighlightText :text="acc.uuid" :query="query" />
+          </span>
         </span>
       </div>
       <span v-if="isCurrent(acc)" class="current-tag">{{ t("account.current") }}</span>
       <span class="token-tag" :class="acc.tokenStatus">{{ tokenLabel(acc) }}</span>
-      <AccountActions :locked="accountLocked && acc.uuid === currentUuid" :can-refresh="acc.canRefresh" :can-relogin="acc.canRelogin" :can-edit="acc.canEdit"
-        :has-skin="!hasNoSkin(acc)" @refresh="emit('refresh', acc)" @view-skin="emit('viewSkin', acc)"
-        @refresh-skin="emit('refreshSkin', acc)" @relogin="emit('relogin', acc)" @edit="emit('edit', acc)"
-        @delete="emit('delete', acc)" />
+      <AccountActions :locked="accountLocked && acc.uuid === currentUuid" :can-refresh="acc.canRefresh"
+        :can-relogin="acc.canRelogin" :can-edit="acc.canEdit" :has-skin="!hasNoSkin(acc)"
+        @refresh="emit('refresh', acc)" @view-skin="emit('viewSkin', acc)" @refresh-skin="emit('refreshSkin', acc)"
+        @relogin="emit('relogin', acc)" @edit="emit('edit', acc)" @delete="emit('delete', acc)" />
     </div>
-    <AccountEmpty v-if="accounts.length === 0"
-      :title="filtering ? t('account.searchEmpty') : t('account.emptyTitle')"
-      :hint="filtering ? undefined : t('account.emptyHint')" :show-add="!filtering"
-      @add="emit('add')" />
+    <AccountEmpty v-if="accounts.length === 0" :title="filtering ? t('account.searchEmpty') : t('account.emptyTitle')"
+      :hint="filtering ? undefined : t('account.emptyHint')" :show-add="!filtering" @add="emit('add')" />
 
     <!-- 悬停头像时的头像大图 -->
     <Teleport to="body">

@@ -238,14 +238,16 @@ fn launch_with_elevation<P: AsRef<Path>>(
     }
 }
 
-#[cfg(windows)]
-mod windows_elevation;
 #[cfg(any(target_os = "linux", test))]
 mod linux_elevation;
 #[cfg(any(target_os = "macos", test))]
 mod macos_elevation;
 #[cfg(windows)]
-pub use windows_elevation::{create_named_pipe, connect_named_pipe_with_timeout, launch_with_elevation_windows};
+mod windows_elevation;
+#[cfg(windows)]
+pub use windows_elevation::{
+    connect_named_pipe_with_timeout, create_named_pipe, launch_with_elevation_windows,
+};
 
 /// 以管理员权限重新启动启动器自身
 ///
@@ -267,19 +269,33 @@ pub fn launch_admin(args: &[String]) -> CoreResult<()> {
     #[cfg(target_os = "macos")]
     {
         // 重启自身不需要日志管道：输出留给调用方的控制台
-        let status = macos_elevation::command(&current_exe, args, HashMap::new(),
-            &std::env::current_dir().map_err(process_err)?, None)
-            .status().map_err(process_err)?;
-        if !status.success() { return Err(process_err(format!("osascript: {status}"))); }
+        let status = macos_elevation::command(
+            &current_exe,
+            args,
+            HashMap::new(),
+            &std::env::current_dir().map_err(process_err)?,
+            None,
+        )
+        .status()
+        .map_err(process_err)?;
+        if !status.success() {
+            return Err(process_err(format!("osascript: {status}")));
+        }
         Ok(())
     }
 
     #[cfg(target_os = "linux")]
     {
-        let mut cmd = linux_elevation::command(&current_exe, args, HashMap::new(),
-            &std::env::current_dir().map_err(process_err)?);
+        let mut cmd = linux_elevation::command(
+            &current_exe,
+            args,
+            HashMap::new(),
+            &std::env::current_dir().map_err(process_err)?,
+        );
         let status = cmd.status().map_err(process_err)?;
-        if !status.success() { return Err(process_err(format!("pkexec: {status}"))); }
+        if !status.success() {
+            return Err(process_err(format!("pkexec: {status}")));
+        }
         Ok(())
     }
 

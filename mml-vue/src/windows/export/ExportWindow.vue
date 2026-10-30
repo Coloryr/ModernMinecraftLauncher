@@ -850,9 +850,9 @@ onMounted(async () => {
   // 单窗口模式下页面是在主窗口里切换，关页面走标题栏 ✕，看到的是同一条 askClose
   const closeOff = multiWindow.value
     ? await onCloseBlocked((label) => {
-        if (label && label !== myLabel) return;
-        confirmClose.value = true;
-      })
+      if (label && label !== myLabel) return;
+      confirmClose.value = true;
+    })
     : null;
 
   // 订阅回来之前窗口可能已经关了：当场退订，别留悬空监听
@@ -971,8 +971,8 @@ onBeforeUnmount(() => {
               <label v-for="i in instances" :key="i.uuid" class="instance-row"
                 :class="{ 'is-on': serverPicked.includes(i.uuid) }"
                 :title="isOnlyPicked(i.uuid) ? t('winExport.serverInstanceKeepOne') : undefined">
-                <input type="checkbox" :checked="serverPicked.includes(i.uuid)"
-                  :disabled="busy || isOnlyPicked(i.uuid)" @change="toggleServerInstance(i.uuid)" />
+                <input type="checkbox" :checked="serverPicked.includes(i.uuid)" :disabled="busy || isOnlyPicked(i.uuid)"
+                  @change="toggleServerInstance(i.uuid)" />
                 <span class="instance-name" :title="i.name">{{ i.name }}</span>
                 <span v-if="i.running" class="instance-tag">{{ t("launch.running") }}</span>
                 <span class="instance-meta">{{ i.version }} · {{ loaderLabel(i.loader) }}</span>
@@ -985,7 +985,8 @@ onBeforeUnmount(() => {
             <header class="pack-card-head">
               <span class="pack-card-title">{{ t("winExport.serverJava") }}</span>
               <span class="pack-card-hint">
-                {{ javas.length ? t("winExport.serverJavaPicked", { count: javaPicked.length }) : t("winExport.serverJavaNone") }}
+                {{ javas.length ? t("winExport.serverJavaPicked", { count: javaPicked.length }) :
+                  t("winExport.serverJavaNone") }}
               </span>
             </header>
             <div v-if="javas.length" class="instance-list">
@@ -1007,108 +1008,109 @@ onBeforeUnmount(() => {
         </template>
 
         <template v-else>
-        <!-- 导出格式与压缩等级同一行：两者一起决定输出文件 -->
-        <div class="row">
-          <label class="field-label">{{ t("winExport.format") }}</label>
-          <SegmentedTabs :options="packOptions" :model-value="pack" :disabled="busy"
-            @update:model-value="onPackChange" />
-          <label class="field-label zip-label" v-tip="t('winExport.zipLevelTip')">{{ t("winExport.zipLevel") }}</label>
-          <SegmentedTabs :options="zipOptions" :model-value="zipLevel" :disabled="busy"
-            @update:model-value="onZipLevelChange" />
-        </div>
+          <!-- 导出格式与压缩等级同一行：两者一起决定输出文件 -->
+          <div class="row">
+            <label class="field-label">{{ t("winExport.format") }}</label>
+            <SegmentedTabs :options="packOptions" :model-value="pack" :disabled="busy"
+              @update:model-value="onPackChange" />
+            <label class="field-label zip-label" v-tip="t('winExport.zipLevelTip')">{{ t("winExport.zipLevel")
+              }}</label>
+            <SegmentedTabs :options="zipOptions" :model-value="zipLevel" :disabled="busy"
+              @update:model-value="onZipLevelChange" />
+          </div>
 
-        <!-- 这层限制在选择格式时就说清楚，别让用户以为包里带了自定义加载器 -->
-        <p v-if="customLoaderLost" class="warn-hint">{{ t("winExport.customLoaderWarn") }}</p>
+          <!-- 这层限制在选择格式时就说清楚，别让用户以为包里带了自定义加载器 -->
+          <p v-if="customLoaderLost" class="warn-hint">{{ t("winExport.customLoaderWarn") }}</p>
 
-        <!-- 选项卡：与「添加实例」窗口同一套图标页签 -->
-        <p v-if="pack === 'mml'" class="sec-hint">{{ t("winExport.nativeHint") }}</p>
-        <IconTabs v-else v-model="tab" :tabs="tabOptions" />
+          <!-- 选项卡：与「添加实例」窗口同一套图标页签 -->
+          <p v-if="pack === 'mml'" class="sec-hint">{{ t("winExport.nativeHint") }}</p>
+          <IconTabs v-else v-model="tab" :tabs="tabOptions" />
 
-        <div class="tab-body">
-          <!-- 整合包信息：写进清单的元数据，配着上面的格式一起看 -->
-          <template v-if="shownTab === 'meta'">
-            <p class="sec-hint">
-              {{
-                showModsTab
-                  ? t("winExport.summaryLine", {
+          <div class="tab-body">
+            <!-- 整合包信息：写进清单的元数据，配着上面的格式一起看 -->
+            <template v-if="shownTab === 'meta'">
+              <p class="sec-hint">
+                {{
+                  showModsTab
+                    ? t("winExport.summaryLine", {
                       mods: pickedMods.size,
                       files: pickedFiles.size,
                       urls: urlRows.filter((x) => (urls.get(x.path) ?? "").length > 0).length,
                     })
-                  : t("winExport.summaryFiles", { files: pickedFiles.size })
-              }}
-            </p>
-            <div class="grid-2">
-              <div>
-                <label class="field-label">{{ t("winExport.metaName") }}</label>
-                <input v-model="packName" class="field-input" spellcheck="false" />
+                    : t("winExport.summaryFiles", { files: pickedFiles.size })
+                }}
+              </p>
+              <div class="grid-2">
+                <div>
+                  <label class="field-label">{{ t("winExport.metaName") }}</label>
+                  <input v-model="packName" class="field-input" spellcheck="false" />
+                </div>
+                <div>
+                  <label class="field-label">{{ t("winExport.metaAuthor") }}</label>
+                  <input v-model="author" class="field-input" spellcheck="false" />
+                </div>
+                <div>
+                  <label class="field-label">{{ t("winExport.metaVersion") }}</label>
+                  <input v-model="version" class="field-input" spellcheck="false" />
+                </div>
+                <div>
+                  <label class="field-label">{{ t("winExport.metaSummary") }}</label>
+                  <input v-model="summary" class="field-input" spellcheck="false" />
+                </div>
               </div>
-              <div>
-                <label class="field-label">{{ t("winExport.metaAuthor") }}</label>
-                <input v-model="author" class="field-input" spellcheck="false" />
-              </div>
-              <div>
-                <label class="field-label">{{ t("winExport.metaVersion") }}</label>
-                <input v-model="version" class="field-input" spellcheck="false" />
-              </div>
-              <div>
-                <label class="field-label">{{ t("winExport.metaSummary") }}</label>
-                <input v-model="summary" class="field-input" spellcheck="false" />
-              </div>
-            </div>
-          </template>
+            </template>
 
-          <!-- 模组 -->
-          <template v-else-if="shownTab === 'mods'">
-            <div class="sec-bar">
-              <input v-model="modKeyword" class="field-input search" spellcheck="false"
-                :placeholder="t('winExport.searchMods')" />
-              <BaseButton size="sm" @click="pickAllMods(true)">{{ t("winExport.selectAll") }}</BaseButton>
-              <BaseButton size="sm" @click="pickAllMods(false)">{{ t("winExport.selectNone") }}</BaseButton>
-            </div>
-            <!-- 表格列跟着格式走：只有 Modrinth 的清单带下载地址，多一列它就够宽 -->
-            <div class="mod-table" :class="{ 'with-url': withUrls }">
-              <div class="mod-head">
-                <span />
-                <span>{{ t("winExport.modFile") }}</span>
-                <span>{{ t("winExport.projectId") }}</span>
-                <span>{{ t("winExport.fileId") }}</span>
-                <span v-if="withUrls">{{ t("winExport.downloadUrl") }}</span>
+            <!-- 模组 -->
+            <template v-else-if="shownTab === 'mods'">
+              <div class="sec-bar">
+                <input v-model="modKeyword" class="field-input search" spellcheck="false"
+                  :placeholder="t('winExport.searchMods')" />
+                <BaseButton size="sm" @click="pickAllMods(true)">{{ t("winExport.selectAll") }}</BaseButton>
+                <BaseButton size="sm" @click="pickAllMods(false)">{{ t("winExport.selectNone") }}</BaseButton>
               </div>
-              <p v-if="!mods.length" class="empty-tip">{{ t("winExport.noOnlineMods") }}</p>
-              <div v-for="mod in mods" :key="mod.path" class="mod-line"
-                :class="{ 'is-local': !isOnlineMod(mod.path) }">
-                <input type="checkbox" :checked="pickedMods.has(mod.path)"
-                  :disabled="!isOnlineMod(mod.path)"
-                  :title="cfIdInvalid(mod.path) ? t('winExport.idNotNumeric') : undefined"
-                  @change="toggleMod(mod)" />
-                <span class="mod-name-cell">
-                  <span class="mod-name" :title="mod.path"><HighlightText :text="mod.path.split('/').pop() ?? ''" :query="modKeyword" /></span>
-                  <!-- 编号不成立的在 CF 里点不动：就地标出来，别让人以为是漏掉了 -->
-                  <span v-if="cfIdInvalid(mod.path)" class="mod-tag" v-tip="t('winExport.idNotNumeric')">
-                    {{ t("winExport.notCfMod") }}
+              <!-- 表格列跟着格式走：只有 Modrinth 的清单带下载地址，多一列它就够宽 -->
+              <div class="mod-table" :class="{ 'with-url': withUrls }">
+                <div class="mod-head">
+                  <span />
+                  <span>{{ t("winExport.modFile") }}</span>
+                  <span>{{ t("winExport.projectId") }}</span>
+                  <span>{{ t("winExport.fileId") }}</span>
+                  <span v-if="withUrls">{{ t("winExport.downloadUrl") }}</span>
+                </div>
+                <p v-if="!mods.length" class="empty-tip">{{ t("winExport.noOnlineMods") }}</p>
+                <div v-for="mod in mods" :key="mod.path" class="mod-line"
+                  :class="{ 'is-local': !isOnlineMod(mod.path) }">
+                  <input type="checkbox" :checked="pickedMods.has(mod.path)" :disabled="!isOnlineMod(mod.path)"
+                    :title="cfIdInvalid(mod.path) ? t('winExport.idNotNumeric') : undefined" @change="toggleMod(mod)" />
+                  <span class="mod-name-cell">
+                    <span class="mod-name" :title="mod.path">
+                      <HighlightText :text="mod.path.split('/').pop() ?? ''" :query="modKeyword" />
+                    </span>
+                    <!-- 编号不成立的在 CF 里点不动：就地标出来，别让人以为是漏掉了 -->
+                    <span v-if="cfIdInvalid(mod.path)" class="mod-tag" v-tip="t('winExport.idNotNumeric')">
+                      {{ t("winExport.notCfMod") }}
+                    </span>
                   </span>
-                </span>
-                <input class="field-input" spellcheck="false" :value="modIdOf(mod.path, 'modId')"
-                  @input="setModId(mod.path, 'modId', ($event.target as HTMLInputElement).value)" />
-                <input class="field-input" spellcheck="false" :value="modIdOf(mod.path, 'fileId')"
-                  @input="setModId(mod.path, 'fileId', ($event.target as HTMLInputElement).value)" />
-                <input v-if="withUrls" class="field-input" spellcheck="false"
-                  :value="urls.get(mod.path) ?? ''" :placeholder="t('winExport.urlPlaceholder')"
-                  @input="setUrl(mod.path, ($event.target as HTMLInputElement).value)" />
+                  <input class="field-input" spellcheck="false" :value="modIdOf(mod.path, 'modId')"
+                    @input="setModId(mod.path, 'modId', ($event.target as HTMLInputElement).value)" />
+                  <input class="field-input" spellcheck="false" :value="modIdOf(mod.path, 'fileId')"
+                    @input="setModId(mod.path, 'fileId', ($event.target as HTMLInputElement).value)" />
+                  <input v-if="withUrls" class="field-input" spellcheck="false" :value="urls.get(mod.path) ?? ''"
+                    :placeholder="t('winExport.urlPlaceholder')"
+                    @input="setUrl(mod.path, ($event.target as HTMLInputElement).value)" />
+                </div>
               </div>
-            </div>
-          </template>
+            </template>
 
-          <!-- 文件：只有一棵树，勾选即打包，取消勾选就排除 -->
-          <template v-else>
-            <div class="files-pane">
-              <p class="sec-hint">{{ fileHint }}</p>
-              <FilePicker :uuid="currentUuid" :picked="pickedFilePaths" :unpicked="unpickedFiles"
-                :base="fileBase" :expand="fileExpand" :locked="isLockedFile" @toggle="toggleFile" />
-            </div>
-          </template>
-        </div>
+            <!-- 文件：只有一棵树，勾选即打包，取消勾选就排除 -->
+            <template v-else>
+              <div class="files-pane">
+                <p class="sec-hint">{{ fileHint }}</p>
+                <FilePicker :uuid="currentUuid" :picked="pickedFilePaths" :unpicked="unpickedFiles" :base="fileBase"
+                  :expand="fileExpand" :locked="isLockedFile" @toggle="toggleFile" />
+              </div>
+            </template>
+          </div>
         </template>
       </template>
       <div v-else-if="loadingInfo" class="hint-full">{{ t("winExport.loading") }}</div>
@@ -1135,7 +1137,9 @@ onBeforeUnmount(() => {
         <div class="progress-fill" :style="{ width: percent + '%' }" />
       </div>
       <p v-if="progress.state === 'running'" class="prog-count">
-        {{ progress.total > 0 ? t("winExport.progressCount", { now: progress.now, total: progress.total }) : percent + "%" }}
+        {{ progress.total > 0 ? t("winExport.progressCount", { now: progress.now, total: progress.total }) : percent +
+        "%"
+        }}
       </p>
       <p v-else-if="progress.state === 'done'" class="prog-note">
         {{ t("winExport.progressSaved", { file: progress.file }) }}

@@ -76,13 +76,13 @@ static RE_ACTUAL: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)currently, ([A-Za-z0-9_.-]+) is ([0-9][^\s]*)").unwrap());
 
 /// File mods\x.jar is a Fabric mod and cannot be loaded
-static RE_WRONG_LOADER: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)(fabric|forge|neoforge|quilt) mod and cannot be loaded").unwrap());
+static RE_WRONG_LOADER: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)(fabric|forge|neoforge|quilt) mod and cannot be loaded").unwrap()
+});
 
 /// 报错里被点名的 jar 文件名，如 mods\indium-1.0.35+mc1.21.jar
-static RE_JAR_FILE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)([A-Za-z0-9_.+]+-[0-9][A-Za-z0-9_.+-]*)\.jar").unwrap()
-});
+static RE_JAR_FILE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)([A-Za-z0-9_.+]+-[0-9][A-Za-z0-9_.+-]*)\.jar").unwrap());
 
 /// JVM 致命错误暂不分析；规则保留，后续接上时改为 true
 const ANALYZE_JVM_FATAL: bool = false;
@@ -368,7 +368,10 @@ fn check_watchdog(report: &CrashReport, scan: &Scan, out: &mut Vec<Finding>) {
         id: FindingId::WatchdogTimeout,
         severity: Severity::Error,
         confidence: Confidence::High,
-        evidence: scan.evidence(&["watchdog", "single server tick took", "watching server"], 6),
+        evidence: scan.evidence(
+            &["watchdog", "single server tick took", "watching server"],
+            6,
+        ),
         mods: Vec::new(),
         details: Vec::new(),
     });
@@ -421,7 +424,10 @@ fn check_missing_dependency(scan: &Scan, out: &mut Vec<Finding>) {
         push_detail(&mut details, format!("requires={}", &captures[2]));
         if let Some(version) = captures.get(3) {
             version_issue = true;
-            push_detail(&mut details, format!("required_version={}", version.as_str()));
+            push_detail(
+                &mut details,
+                format!("required_version={}", version.as_str()),
+            );
         }
     }
     for captures in RE_ACTUAL.captures_iter(scan.raw) {
@@ -1240,7 +1246,11 @@ fn push_detail(details: &mut Vec<String>, line: String) {
 /// 权重从高到低：异常消息里直接出现的模组 id、结论点名的模组（按顺序递减）、
 /// 栈帧包名与正文里出现的模组 id。栈帧命中每个模组最多算三次，
 /// 免得一个到处出现的库把真正被点名的模组挤下去。
-fn collect_suspected(report: &CrashReport, findings: &[Finding], detail_lower: &str) -> Vec<String> {
+fn collect_suspected(
+    report: &CrashReport,
+    findings: &[Finding],
+    detail_lower: &str,
+) -> Vec<String> {
     let mut score: HashMap<String, u32> = HashMap::new();
 
     // 依赖类结论可能一次列几十个模组，全给同样的权重会让排头变成字母序的偶然结果
@@ -1286,9 +1296,7 @@ fn collect_suspected(report: &CrashReport, findings: &[Finding], detail_lower: &
         .environment
         .mods
         .iter()
-        .filter(|entry| {
-            entry.id.len() >= 4 && (entry.id.contains('_') || entry.id.contains('-'))
-        })
+        .filter(|entry| entry.id.len() >= 4 && (entry.id.contains('_') || entry.id.contains('-')))
         .map(|entry| {
             (
                 entry.id.as_str(),

@@ -57,9 +57,11 @@ useModalKeys((e) => {
           spellcheck="false" autocomplete="off" />
         <input v-model="newJavaPath" class="field-input grow" :placeholder="t('winSettings.javaPath')"
           spellcheck="false" autocomplete="off" />
-        <BaseButton size="sm" :disabled="scanning || scanningDir" @click="browseJava">{{ t("args.browse") }}</BaseButton>
+        <BaseButton size="sm" :disabled="scanning || scanningDir" @click="browseJava">{{ t("args.browse") }}
+        </BaseButton>
         <BaseButton size="sm" variant="accent"
-          :disabled="addingJava || scanning || scanningDir || !newJavaName.trim() || !newJavaPath.trim()" @click="addJava">
+          :disabled="addingJava || scanning || scanningDir || !newJavaName.trim() || !newJavaPath.trim()"
+          @click="addJava">
           {{ t("winSettings.javaAdd") }}
         </BaseButton>
       </div>
@@ -110,8 +112,7 @@ useModalKeys((e) => {
             <div v-for="j in g.items" :key="j.name" class="java-card">
               <div class="java-card-top">
                 <span class="java-name" v-tip="j.name">{{ j.name }}</span>
-                <BaseButton size="sm" variant="danger" :disabled="scanning || scanningDir"
-                  @click="removeJava(j.name)">
+                <BaseButton size="sm" variant="danger" :disabled="scanning || scanningDir" @click="removeJava(j.name)">
                   {{ t("winSettings.javaRemove") }}
                 </BaseButton>
               </div>
@@ -124,8 +125,8 @@ useModalKeys((e) => {
     </SettingsGroup>
 
     <!-- 删除全部确认 -->
-    <BaseModal v-if="confirmRemoveAll" :title="t('winSettings.javaRemoveAll')" below-titlebar
-      :closable="false" @close="confirmRemoveAll = false">
+    <BaseModal v-if="confirmRemoveAll" :title="t('winSettings.javaRemoveAll')" below-titlebar :closable="false"
+      @close="confirmRemoveAll = false">
       <p class="field-desc">{{ t("winSettings.javaRemoveAllConfirm") }}</p>
       <div class="set-save-row">
         <BaseButton size="sm" @click="confirmRemoveAll = false">{{ t("actions.cancel") }}</BaseButton>

@@ -96,14 +96,12 @@ defineExpose({ bodyEl });
 
 <template>
   <div class="window-frame" ref="rootEl">
-    <header class="frame-head"
-      :class="[titleBarStyle, {
-        'is-macos': isMac,
-        'is-plugin-decorated': decorated,
-        'is-plugin-controls': pluginControls,
-        'is-fullscreen': fullscreen,
-      }]"
-      @pointerdown="onTitleBarPointerDown">
+    <header class="frame-head" :class="[titleBarStyle, {
+      'is-macos': isMac,
+      'is-plugin-decorated': decorated,
+      'is-plugin-controls': pluginControls,
+      'is-fullscreen': fullscreen,
+    }]" @pointerdown="onTitleBarPointerDown">
       <!-- 窗口内子页面的返回键，如整合包详情：与下面的单窗口返回按钮共用一套外观。
            按钮只画箭头，文案改由悬停提示给出，见 .back-btn 的说明 -->
       <button v-if="props.back" class="back-btn" v-tip="props.back" :aria-label="props.back" @click="emit('back')">
@@ -138,7 +136,8 @@ defineExpose({ bodyEl });
       <!-- 插件摆原生按钮时不画；原生被藏掉时，这里按对调后的样式自己画一套 -->
       <WindowControls v-if="!pluginControls" :style="titleBarStyle" />
     </header>
-    <div ref="bodyEl" class="frame-body" :class="{ fill: props.bodyFill, gutter: props.bodyGutter, flush: props.bodyFlush }">
+    <div ref="bodyEl" class="frame-body"
+      :class="{ fill: props.bodyFill, gutter: props.bodyGutter, flush: props.bodyFlush }">
       <slot />
     </div>
   </div>

@@ -95,7 +95,7 @@ export function parseFormatting(text: string): FormattedSegment[] {
     n: () => (underlined = true),
     m: () => (strikethrough = true),
     // 混淆字符按普通文字展示（见函数说明）
-    k: () => {},
+    k: () => { },
   };
 
   for (let i = 0; i < text.length; i++) {

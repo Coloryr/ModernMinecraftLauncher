@@ -117,8 +117,7 @@ watch(
     <!-- 区块列表：一行一个区块，键列是坐标、值列是扇区与写入时间 -->
     <div v-if="editing === null" class="mca-list">
       <div class="mca-head">{{ fileName }}</div>
-      <button v-for="row in rows" :key="row.index" class="mca-row"
-        @click="revealPath = null; editing = row.index">
+      <button v-for="row in rows" :key="row.index" class="mca-row" @click="revealPath = null; editing = row.index">
         <span class="mca-key">
           <span class="mca-arrow" aria-hidden="true">›</span>
           ({{ chunkX(row) }}, {{ chunkZ(row) }})

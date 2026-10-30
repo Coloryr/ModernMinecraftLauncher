@@ -113,9 +113,10 @@ impl ZipReader {
                 let relative_path = path.strip_prefix(root_path).unwrap();
                 let tempfile = archives::normalize_path(relative_path);
 
-                zip.start_file(&tempfile, archives::zip_entry_options(&tempfile, 0o755)).map_err(|err| {
-                    archive_err(path.to_string_lossy().to_string(), tempfile.clone(), err)
-                })?;
+                zip.start_file(&tempfile, archives::zip_entry_options(&tempfile, 0o755))
+                    .map_err(|err| {
+                        archive_err(path.to_string_lossy().to_string(), tempfile.clone(), err)
+                    })?;
 
                 std::io::copy(&mut buffer, &mut zip).map_err(|err| {
                     archive_err(path.to_string_lossy().to_string(), tempfile.clone(), err)
@@ -124,9 +125,10 @@ impl ZipReader {
                 let relative_path = path.strip_prefix(root_path).unwrap();
                 let tempfile = archives::normalize_path(relative_path);
 
-                zip.add_directory(&tempfile, archives::zip_entry_options(&tempfile, 0o755)).map_err(|err| {
-                    archive_err(path.to_string_lossy().to_string(), tempfile.clone(), err)
-                })?;
+                zip.add_directory(&tempfile, archives::zip_entry_options(&tempfile, 0o755))
+                    .map_err(|err| {
+                        archive_err(path.to_string_lossy().to_string(), tempfile.clone(), err)
+                    })?;
             }
         }
 
@@ -347,8 +349,11 @@ impl ArchiveHandle for ZipReader {
             let internal_path = file.dest.to_string_lossy();
             let mut reader = path_helper::open_read(&file.src)?;
 
-            zip.start_file(internal_path.as_ref(), archives::zip_entry_options(&internal_path, 0o644))
-                .map_err(write_error)?;
+            zip.start_file(
+                internal_path.as_ref(),
+                archives::zip_entry_options(&internal_path, 0o644),
+            )
+            .map_err(write_error)?;
 
             std::io::copy(&mut reader, &mut zip).map_err(write_error)?;
         }
@@ -407,7 +412,8 @@ impl ArchiveHandle for ZipReader {
             .map_err(|err| fs_err(self.path.clone(), err))?;
         let mut zip = ZipWriter::new_append(file).map_err(|err| open_error(&self.path, err))?;
 
-        zip.start_file(name, archives::zip_entry_options(name, 0o644)).map_err(write_error)?;
+        zip.start_file(name, archives::zip_entry_options(name, 0o644))
+            .map_err(write_error)?;
 
         zip.write_all(data).map_err(write_error)?;
 

@@ -32,11 +32,8 @@ const changed = computed(
 </script>
 
 <template>
-  <BaseModal
-    :title="t(serverPack ? 'resource.serverPackUpdateTitle' : 'resource.modpackUpdateTitle')"
-    :closable="false"
-    @close="emit('close')"
-  >
+  <BaseModal :title="t(serverPack ? 'resource.serverPackUpdateTitle' : 'resource.modpackUpdateTitle')" :closable="false"
+    @close="emit('close')">
     <p class="pack-line">{{ t("update.instance", { name: props.result.instanceName }) }}</p>
     <template v-if="serverPack">
       <p class="pack-version">

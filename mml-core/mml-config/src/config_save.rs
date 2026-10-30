@@ -190,7 +190,9 @@ pub fn replace_before_restart<T, E>(
     flush_queue();
     let result = action()?;
     let mut queue = QUEUE.lock().unwrap();
-    queue.replaced.extend(result.files.iter().map(|path| file_identity(path)));
+    queue
+        .replaced
+        .extend(result.files.iter().map(|path| file_identity(path)));
     let SaveQueue { pending, replaced } = &mut *queue;
     pending.retain(|task| !replaced.contains(&file_identity(&task.file)));
     Ok(result.value)
@@ -257,13 +259,20 @@ mod replacement_tests {
             save(Uuid::new_v4(), &"stale", &path);
             save(Uuid::new_v4(), &"account update", &other);
             std::fs::write(&path, "\"imported\"").unwrap();
-            Ok::<_, ()>(ReplacedFiles { files: vec![path.canonicalize().unwrap()], value: () })
-        }).unwrap();
+            Ok::<_, ()>(ReplacedFiles {
+                files: vec![path.canonicalize().unwrap()],
+                value: (),
+            })
+        })
+        .unwrap();
         save(Uuid::new_v4(), &"late stale snapshot", &path);
         save_now();
         let actual = std::fs::read_to_string(&path).unwrap();
         assert_eq!(actual, "\"imported\"");
-        assert_eq!(std::fs::read_to_string(&other).unwrap(), "\"account update\"");
+        assert_eq!(
+            std::fs::read_to_string(&other).unwrap(),
+            "\"account update\""
+        );
 
         let result = replace_before_restart::<(), _>(|| {
             save(Uuid::new_v4(), &"preserved after rollback", &other);
@@ -271,7 +280,10 @@ mod replacement_tests {
         });
         assert!(result.is_err());
         save_now();
-        assert_eq!(std::fs::read_to_string(&other).unwrap(), "\"preserved after rollback\"");
+        assert_eq!(
+            std::fs::read_to_string(&other).unwrap(),
+            "\"preserved after rollback\""
+        );
         std::fs::remove_dir_all(dir).unwrap();
     }
 }

@@ -29,14 +29,14 @@ export async function launchGame(uuid: string, world?: string): Promise<boolean>
       const answer = await askLaunchCheck("loader", check);
       if (!answer.ok) return false;
       if (answer.disable) {
-        await saveGuiConfig({ launchCheck: { checkLoader: false } }).catch(() => {});
+        await saveGuiConfig({ launchCheck: { checkLoader: false } }).catch(() => { });
       }
     }
     if (check.checkMemory && !check.loaderNormal && check.memoryLow) {
       const answer = await askLaunchCheck("memory", check);
       if (!answer.ok) return false;
       if (answer.disable) {
-        await saveGuiConfig({ launchCheck: { checkMemory: false } }).catch(() => {});
+        await saveGuiConfig({ launchCheck: { checkMemory: false } }).catch(() => { });
       }
     }
   }
@@ -61,10 +61,10 @@ export async function launchGame(uuid: string, world?: string): Promise<boolean>
     if (target) {
       const answer = await askAutoSave(target);
       if (!answer.notice) {
-        await saveGuiConfig({ client: { autoSaveNotice: false } }).catch(() => {});
+        await saveGuiConfig({ client: { autoSaveNotice: false } }).catch(() => { });
       }
       if (answer.disable) {
-        await api.updateInstance(uuid, { autoSave: null }).catch(() => {});
+        await api.updateInstance(uuid, { autoSave: null }).catch(() => { });
       }
       // 选"进入"就按这个目录显式进（配置可能刚被清掉）；选"不进入"则让后端忽略配置
       if (answer.enter) enterWorld = target.dir;
@@ -80,7 +80,7 @@ export async function launchGame(uuid: string, world?: string): Promise<boolean>
     const answer = await askAccountLock();
     if (!answer.ok) return false;
     if (!answer.keep) {
-      await saveGuiConfig({ client: { accountCheck: false } }).catch(() => {});
+      await saveGuiConfig({ client: { accountCheck: false } }).catch(() => { });
     }
     // 这一次先放行；检查关掉后后续启动不会再被拦
     await api.launchGame(uuid, enterWorld, true, autoSave, serverPack);

@@ -7,11 +7,11 @@
 
 use std::{collections::HashSet, path::Path, sync::OnceLock};
 
+use crate::html_scan::{attr, find_tag, text};
 use itertools::Itertools;
 use mml_base::serialize_tools;
 use mml_config::config_obj::SourceLocal;
 use mml_names::i18_items::error_type::{CoreResult, DataNotFoundData, ErrorType};
-use crate::html_scan::{attr, find_tag, text};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -86,7 +86,10 @@ fn download_rows(html: &str) -> Vec<DownloadRow> {
     let mut rows = Vec::new();
     let mut from = 0;
     while let Some((start, end)) = find_tag(html, from, "tr") {
-        let row_end = html[end..].find("</tr>").map(|pos| end + pos).unwrap_or(html.len());
+        let row_end = html[end..]
+            .find("</tr>")
+            .map(|pos| end + pos)
+            .unwrap_or(html.len());
         let is_row = attr(&html[start..end], "class")
             .is_some_and(|class| class.split_whitespace().any(|item| item == "downloadLine"));
         if is_row {
@@ -105,9 +108,15 @@ fn parse_row(body: &str) -> DownloadRow {
     let mut row = DownloadRow::default();
     let mut from = 0;
     while let Some((start, end)) = find_tag(body, from, "td") {
-        let cell_end = body[end..].find("</td>").map(|pos| end + pos).unwrap_or(body.len());
+        let cell_end = body[end..]
+            .find("</td>")
+            .map(|pos| end + pos)
+            .unwrap_or(body.len());
         let cell = &body[end + 1..cell_end];
-        match attr(&body[start..end], "class").unwrap_or_default().as_str() {
+        match attr(&body[start..end], "class")
+            .unwrap_or_default()
+            .as_str()
+        {
             "colDownload" => row.download = link(cell),
             "colMirror" => row.mirror = link(cell),
             "colForge" => row.forge = text(cell),
@@ -294,7 +303,12 @@ mod tests {
         assert_eq!(row.file, "OptiFine HD U K2 pre5");
         assert_eq!(row.forge, "Forge N/A");
         assert_eq!(row.date, "20.10.2026");
-        assert!(row.mirror.as_ref().unwrap().ends_with("preview_OptiFine_26.2_HD_U_K2_pre5.jar"));
+        assert!(
+            row.mirror
+                .as_ref()
+                .unwrap()
+                .ends_with("preview_OptiFine_26.2_HD_U_K2_pre5.jar")
+        );
     }
 
     #[test]
@@ -308,6 +322,9 @@ mod tests {
     #[test]
     fn finds_download_link() {
         let html = "<span id='Download'><a href='downloadx?f=x.jar&x=abc'>dl</a></span>";
-        assert_eq!(download_link(html).as_deref(), Some("downloadx?f=x.jar&x=abc"));
+        assert_eq!(
+            download_link(html).as_deref(),
+            Some("downloadx?f=x.jar&x=abc")
+        );
     }
 }

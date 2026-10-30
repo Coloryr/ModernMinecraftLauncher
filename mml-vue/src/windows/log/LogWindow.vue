@@ -732,22 +732,16 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- 崩溃分析：主因、可疑模组与证据，结论由后端规则给出 -->
-      <CrashAnalysisCard
-        v-if="analysis && analysis.findings.length"
-        :analysis="analysis"
-        @close="analysis = null"
-      />
+      <CrashAnalysisCard v-if="analysis && analysis.findings.length" :analysis="analysis" @close="analysis = null" />
 
       <!-- 日志正文 -->
       <MonacoLogView ref="viewRef" :logs="shownLogs" :auto-scroll="setting.auto"
-        :empty-hint="loadingSource ? t('logWindow.loading') : undefined" fill
-        @scroll-away="setting.auto = false" />
+        :empty-hint="loadingSource ? t('logWindow.loading') : undefined" fill @scroll-away="setting.auto = false" />
     </div>
 
     <!-- 上传确认：日志会发到第三方站点，先问一句。上传期间弹窗不关，
          关闭键与按钮都禁用，上传键原位换成转圈 + 上传中 -->
-    <BaseModal v-if="uploadAsk" :title="t('logWindow.upload')" :close-disabled="uploading"
-      @close="uploadAsk = false">
+    <BaseModal v-if="uploadAsk" :title="t('logWindow.upload')" :close-disabled="uploading" @close="uploadAsk = false">
       <p class="modal-text">{{ t("logWindow.uploadConfirm") }}</p>
       <div class="modal-actions">
         <BaseButton :disabled="uploading" @click="uploadAsk = false">{{ t("actions.cancel") }}</BaseButton>
@@ -759,8 +753,7 @@ onBeforeUnmount(() => {
     </BaseModal>
 
     <!-- 异常退出：多半就是来找日志的，直接问一句要不要传；上传期间同上传确认框 -->
-    <BaseModal v-if="crashAsk" :title="t('logWindow.crashTitle')" :close-disabled="uploading"
-      @close="crashAsk = false">
+    <BaseModal v-if="crashAsk" :title="t('logWindow.crashTitle')" :close-disabled="uploading" @close="crashAsk = false">
       <p class="modal-text">{{ t("logWindow.crashUpload", { code: crashCode }) }}</p>
       <div class="modal-actions">
         <BaseButton :disabled="uploading" @click="crashAsk = false">{{ t("actions.cancel") }}</BaseButton>

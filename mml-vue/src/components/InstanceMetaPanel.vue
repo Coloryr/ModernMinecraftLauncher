@@ -469,8 +469,7 @@ function onPlatformChange(value: string) {
           </optgroup>
         </select>
         <button class="ui-btn-icon" :disabled="verLoading || loadersLoading || lvLoading"
-          v-tip="t('add.versionRefresh')"
-          :aria-label="t('add.versionRefresh')" @click="onRefreshVersions">
+          v-tip="t('add.versionRefresh')" :aria-label="t('add.versionRefresh')" @click="onRefreshVersions">
           <GlyphIcon name="refresh" :size="14" :weight="2" />
         </button>
       </div>
@@ -506,8 +505,7 @@ function onPlatformChange(value: string) {
         </select>
         <button class="ui-btn-icon"
           :disabled="lvLoading || !instance.version || instance.loader === 'normal' || loadersLoading"
-          v-tip="t('add.loaderVerRefresh')"
-          :aria-label="t('add.loaderVerRefresh')" @click="onRefreshLoaderVersions">
+          v-tip="t('add.loaderVerRefresh')" :aria-label="t('add.loaderVerRefresh')" @click="onRefreshLoaderVersions">
           <GlyphIcon name="refresh" :size="14" :weight="2" />
         </button>
       </div>
@@ -561,8 +559,7 @@ function onPlatformChange(value: string) {
           :disabled="packBusy" @input="change({ serverUrl: ($event.target as HTMLInputElement).value || null })" />
         <button class="ui-btn-icon" :disabled="packBusy || !instance.serverUrl"
           v-tip="packBusy ? t('detail.modpackChecking') : t('detail.serverPackCheck')"
-          :aria-label="packBusy ? t('detail.modpackChecking') : t('detail.serverPackCheck')"
-          @click="checkModpack()">
+          :aria-label="packBusy ? t('detail.modpackChecking') : t('detail.serverPackCheck')" @click="checkModpack()">
           <span v-if="packBusy" class="pack-spin" />
           <GlyphIcon v-else name="update" :size="14" :weight="2" />
         </button>

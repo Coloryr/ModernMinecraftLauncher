@@ -38,11 +38,8 @@ const groups = computed(() => [
 </script>
 
 <template>
-  <select
-    class="field-select"
-    :value="modelValue"
-    @change="emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
-  >
+  <select class="field-select" :value="modelValue"
+    @change="emit('update:modelValue', ($event.target as HTMLSelectElement).value)">
     <optgroup v-for="group in groups" :key="group.label" :label="group.label">
       <option v-for="item in group.items" :key="item" :value="item">{{ item }}</option>
     </optgroup>

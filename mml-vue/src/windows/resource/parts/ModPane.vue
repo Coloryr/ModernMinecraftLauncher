@@ -334,7 +334,7 @@ async function applyUpdates(picked: ModUpdateDto[]) {
   updateProgress.value = { stage: "fetch", done: 0, total: items.length };
   updateOpen.value = false;
 
-  let settle: (done: ModUpdateDoneDto) => void = () => {};
+  let settle: (done: ModUpdateDoneDto) => void = () => { };
   const finished = new Promise<ModUpdateDoneDto>((resolve) => {
     settle = resolve;
   });
@@ -519,7 +519,7 @@ const packSeen = new Set<string>();
  */
 async function watchModpackTask(): Promise<() => void> {
   const uuid = instanceUuid.value;
-  if (!uuid) return () => {};
+  if (!uuid) return () => { };
   return onAddModpackStatus((e) => {
     for (const task of e.tasks) {
       if (task.kind !== "upgrade" || task.instanceUuid !== uuid) continue;
@@ -1867,7 +1867,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <ModExportModal v-if="exportOpen" :uuid="instanceUuid" :selected-ids="selectedItems.map(item => item.uuid)" @close="exportOpen = false" />
+  <ModExportModal v-if="exportOpen" :uuid="instanceUuid" :selected-ids="selectedItems.map(item => item.uuid)"
+    @close="exportOpen = false" />
   <ContentHead :data="data" :busy="depBusy || updateBusy">
     <template #actions>
       <!--
@@ -1917,8 +1918,8 @@ onBeforeUnmount(() => {
           <GlyphIcon :name="depBusy ? 'refresh' : 'puzzle'" :size="14" :class="{ 'dep-spin': depBusy }" />
         </button>
         <!-- 更新检查要重扫一遍模组、再逐个问平台；按钮只放图标，进度在工具条下方 -->
-        <button class="mini-btn icon-btn icon-only" :disabled="updateBusy || loading"
-          v-tip="t('resource.updateCheck')" :aria-label="t('resource.updateCheck')" @click="runUpdateCheck">
+        <button class="mini-btn icon-btn icon-only" :disabled="updateBusy || loading" v-tip="t('resource.updateCheck')"
+          :aria-label="t('resource.updateCheck')" @click="runUpdateCheck">
           <GlyphIcon :name="updateStage === 'check' ? 'refresh' : 'update'" :size="14"
             :class="{ 'dep-spin': updateStage === 'check' }" />
         </button>
@@ -1931,8 +1932,7 @@ onBeforeUnmount(() => {
         <!-- 自动标记：按 SHA512 去 Modrinth 认模组，回填项目号 / 文件号 / 下载源 -->
         <button class="mini-btn icon-btn icon-only" :disabled="markBusy || busy || loading"
           v-tip="t('resource.autoMark')" :aria-label="t('resource.autoMark')" @click="markAsk = true">
-          <GlyphIcon :name="markBusy ? 'refresh' : 'check-square'" :size="14"
-            :class="{ 'dep-spin': markBusy }" />
+          <GlyphIcon :name="markBusy ? 'refresh' : 'check-square'" :size="14" :class="{ 'dep-spin': markBusy }" />
         </button>
         <!-- 更新记录：这个实例换过的模组，新的在前；记录由后端在换文件成功时追加 -->
         <button class="mini-btn icon-btn icon-only" v-tip="t('resource.updateLog')"
@@ -1954,8 +1954,7 @@ onBeforeUnmount(() => {
     更新进度：**整行显示在工具条下方**，不再挤在按钮右边；检查与下载共用这一条。
     检查阶段后端要先扫一遍 mods 目录才知道总数，那之前走不确定滚动条，拿到总数后转成确定进度条
   -->
-  <LoaderQueryProgress :visible="updateBusy" kind="query" :step="updateProgress.done"
-    :total="updateProgress.total"
+  <LoaderQueryProgress :visible="updateBusy" kind="query" :step="updateProgress.done" :total="updateProgress.total"
     :label="updateLabel" />
   <LoaderQueryProgress :visible="markBusy" kind="query" :step="markProgress.done" :total="markProgress.total"
     :label="t('resource.autoMarkRunning')" />
@@ -1993,16 +1992,15 @@ onBeforeUnmount(() => {
 
           <section :ref="(el) => bindSection(sec.id, el as Element | null)" class="mod-group mod-group-table"
             :class="{ 'mod-group-dragging': draggingSection === sec.id }">
-            <ModTable :items="sec.items" :busy="busy" :selected-keys="selected" :update-keys="updateKeys"
-              :query="query" :group-label="sec.label"
-              :group-key="sec.id" :group-open="isOpen(sec.id)" :custom="sec.custom" :dragging-group="draggingSection"
-              :hide-header="idx > 0" :col-widths="colWidths" :sort="sort" @col-resize="setColWidth"
-              @sort-change="setSort" @group-menu="openGroupMenu" @toggle="toggle" @remove="remove"
-              @toggle-group="onSectionToggle(sec.id)" @drag-group="onSectionPointerDown($event, sec.id)"
-              @note-save="saveNoteInline" @open-folder="openFolder('mods', $event.file)" @select="toggleSelect"
+            <ModTable :items="sec.items" :busy="busy" :selected-keys="selected" :update-keys="updateKeys" :query="query"
+              :group-label="sec.label" :group-key="sec.id" :group-open="isOpen(sec.id)" :custom="sec.custom"
+              :dragging-group="draggingSection" :hide-header="idx > 0" :col-widths="colWidths" :sort="sort"
+              @col-resize="setColWidth" @sort-change="setSort" @group-menu="openGroupMenu" @toggle="toggle"
+              @remove="remove" @toggle-group="onSectionToggle(sec.id)"
+              @drag-group="onSectionPointerDown($event, sec.id)" @note-save="saveNoteInline"
+              @open-folder="openFolder('mods', $event.file)" @select="toggleSelect"
               @select-group="groupToggleSelect(sec.id)" @item-menu="openItemMenu" @row-click="onRowClick"
-              @online-save="saveModOnline"
-              :anchor-key="anchorKey" />
+              @online-save="saveModOnline" :anchor-key="anchorKey" />
           </section>
         </template>
       </div>
@@ -2062,8 +2060,7 @@ onBeforeUnmount(() => {
               <span class="mod-part-name">{{ part.label }}</span>
               <span class="mod-part-count">{{ part.items.length }}</span>
             </div>
-            <ModList :items="part.items" :busy="busy" :selected-keys="selected" :update-keys="updateKeys"
-              :query="query"
+            <ModList :items="part.items" :busy="busy" :selected-keys="selected" :update-keys="updateKeys" :query="query"
               @toggle="toggle" @remove="remove" @note="openNote" @open-folder="openFolder('mods', $event.file)"
               @select="toggleSelect" @item-menu="openItemMenu" @row-click="onRowClick" :anchor-key="anchorKey" />
           </div>
@@ -2173,10 +2170,10 @@ onBeforeUnmount(() => {
     :title="t(stateAsk.wantDisable ? 'resource.disableDepsTitle' : 'resource.enableDepsTitle')"
     @close="stateAsk = null">
     <p class="dep-note">
-      {{ t(stateAsk.wantDisable ? "resource.disableDepsHint" : "resource.enableDepsHint", {
+      {{t(stateAsk.wantDisable ? "resource.disableDepsHint" : "resource.enableDepsHint", {
         name: stateAsk.picked.map((item) => item.name || item.file).join(", "),
         list: stateAsk.related.map((item) => item.name || item.file).join(", "),
-      }) }}
+      })}}
     </p>
     <div class="modal-actions">
       <BaseButton @click="answerStateAsk(false)">
@@ -2204,8 +2201,7 @@ onBeforeUnmount(() => {
   <BaseModal v-if="depOpen" :title="t('resource.depTitle')" :closable="false" @close="depOpen = false">
     <div class="dep-list">
       <div v-for="g in depGroups" :key="g.kind" class="dep-group">
-        <button class="dep-group-head" :class="{ collapsed: !isDepOpen(g.kind) }"
-          @click="toggleDepGroup(g.kind)">
+        <button class="dep-group-head" :class="{ collapsed: !isDepOpen(g.kind) }" @click="toggleDepGroup(g.kind)">
           <GlyphIcon class="dep-group-caret" name="chevron-down" :size="13" :weight="2.4" />
           <span class="dep-group-label">{{ t(DEP_KIND_LABEL[g.kind]) }}</span>
           <span class="dep-group-count">{{ g.items.length }}</span>
@@ -2291,8 +2287,8 @@ onBeforeUnmount(() => {
     @download="applyUpdates" />
 
   <!-- 替换版本：右键某一行点开，列表按当前实例的游戏版本与加载器筛，见 loadReplaceFiles -->
-  <ModReplaceModal v-if="replaceTarget" :target="replaceTarget" :load="loadReplaceFiles"
-    @close="replaceTarget = null" @pick="replaceVersion" />
+  <ModReplaceModal v-if="replaceTarget" :target="replaceTarget" :load="loadReplaceFiles" @close="replaceTarget = null"
+    @pick="replaceVersion" />
 
   <!-- 更新记录：入口是工具条上那颗时钟图标，列表由后端读实例目录的 mod_update.json -->
   <ModUpdateLogModal v-if="updateLogOpen" :load="loadUpdateLog" :remove="removeUpdateLog"

@@ -76,7 +76,8 @@ function apply() {
     <!-- 全选 + 已选计数：条目可能几十个，逐个点太慢 -->
     <div class="upd-toolbar">
       <label class="upd-all">
-        <input type="checkbox" class="upd-check" :checked="allChecked" :indeterminate="someChecked" @change="toggleAll" />
+        <input type="checkbox" class="upd-check" :checked="allChecked" :indeterminate="someChecked"
+          @change="toggleAll" />
         <span>{{ t("resource.selectAll") }}</span>
       </label>
       <span class="upd-count">{{ t("resource.selectedCount", { n: checked.size }) }}</span>
@@ -85,7 +86,8 @@ function apply() {
     <!-- 更新条数可能上百：接虚拟列表，只渲染视口附近那几行；行高不齐（名字会换行），量第一行当估值 -->
     <VirtualList class="upd-list" :count="updates.length" :row-gap="8" measure-row>
       <template #default="{ start, end }">
-        <label v-for="u in updates.slice(start, end)" :key="u.uuid" class="upd-row" :class="{ 'upd-row-on': isChecked(u) }">
+        <label v-for="u in updates.slice(start, end)" :key="u.uuid" class="upd-row"
+          :class="{ 'upd-row-on': isChecked(u) }">
           <input type="checkbox" class="upd-check" :checked="isChecked(u)" @change="toggle(u)" />
           <span class="upd-body">
             <span class="upd-head">

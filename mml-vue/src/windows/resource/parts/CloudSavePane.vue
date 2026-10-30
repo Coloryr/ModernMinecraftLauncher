@@ -139,11 +139,14 @@ watch(() => props.uuid, () => {
       <aside v-if="config" class="cloud-connection">
         <h4>{{ t("cloud.connection") }}</h4>
         <label class="field-label" for="cloud-server">{{ t("cloud.server") }}</label>
-        <input id="cloud-server" v-model="config.server" class="field-input" :disabled="busy" type="url" spellcheck="false" />
+        <input id="cloud-server" v-model="config.server" class="field-input" :disabled="busy" type="url"
+          spellcheck="false" />
         <label class="field-label" for="cloud-server-key">{{ t("cloud.serverKey") }}</label>
-        <input id="cloud-server-key" v-model="config.serverKey" class="field-input" :disabled="busy" type="password" autocomplete="off" />
+        <input id="cloud-server-key" v-model="config.serverKey" class="field-input" :disabled="busy" type="password"
+          autocomplete="off" />
         <label class="field-label" for="cloud-client-key">{{ t("cloud.clientKey") }}</label>
-        <input id="cloud-client-key" v-model="config.clientKey" class="field-input" :disabled="busy" type="password" autocomplete="off" />
+        <input id="cloud-client-key" v-model="config.clientKey" class="field-input" :disabled="busy" type="password"
+          autocomplete="off" />
         <label class="field-label" for="cloud-uuid">{{ t("cloud.remoteUuid") }}</label>
         <input id="cloud-uuid" v-model="config.remoteUuid" class="field-input" :disabled="busy" spellcheck="false" />
         <p class="field-hint">{{ t("cloud.bindingHint") }}</p>
@@ -156,7 +159,9 @@ watch(() => props.uuid, () => {
         <div v-if="status" class="cloud-status">
           <div>
             <strong>{{ t(status.enabled ? "cloud.enabled" : "cloud.paused") }}</strong>
-            <p class="field-hint">{{ t("cloud.storage", { used: formatSize(status.used), quota: formatSize(status.quota) }) }}</p>
+            <p class="field-hint">{{ t("cloud.storage", {
+              used: formatSize(status.used), quota: formatSize(status.quota)
+              }) }}</p>
           </div>
           <BaseButton size="sm" :disabled="busy || !!dirty" @click="toggle">
             {{ t(status.enabled ? "cloud.pause" : "cloud.enable") }}
@@ -164,7 +169,8 @@ watch(() => props.uuid, () => {
         </div>
         <div class="cloud-toolbar">
           <h4>{{ t("cloud.worlds") }}</h4>
-          <BaseButton size="sm" :disabled="busy || !config?.server || !!dirty" @click="refresh">{{ t("cloud.refresh") }}</BaseButton>
+          <BaseButton size="sm" :disabled="busy || !config?.server || !!dirty" @click="refresh">{{ t("cloud.refresh") }}
+          </BaseButton>
         </div>
         <p v-if="dirty && status" class="field-hint">{{ t("cloud.unsaved") }}</p>
         <p v-if="!status" class="empty-tip">{{ t("cloud.connectHint") }}</p>
@@ -175,12 +181,16 @@ watch(() => props.uuid, () => {
             <strong>{{ stripFormatting(row.local?.levelName || row.name) }}</strong>
             <span class="cloud-dir">{{ row.name }}</span>
             <p class="field-hint">{{ t(row.local ? "cloud.localPresent" : "cloud.localAbsent") }} ·
-              {{ row.remote ? t("cloud.remoteTime", { time: formatTime(Date.parse(row.remote.time)) }) : t("cloud.remoteAbsent") }}
+              {{ row.remote ? t("cloud.remoteTime", { time: formatTime(Date.parse(row.remote.time)) }) :
+                t("cloud.remoteAbsent") }}
             </p>
             <div class="cloud-actions">
-              <BaseButton size="sm" :disabled="busy || !!dirty || !row.local" @click="request(row.name, 'upload')">{{ t("cloud.upload") }}</BaseButton>
-              <BaseButton size="sm" :disabled="busy || !!dirty || !row.remote" @click="request(row.name, 'download')">{{ t("cloud.download") }}</BaseButton>
-              <BaseButton size="sm" :disabled="busy || !!dirty || !row.remote" @click="request(row.name, 'delete')">{{ t("cloud.delete") }}</BaseButton>
+              <BaseButton size="sm" :disabled="busy || !!dirty || !row.local" @click="request(row.name, 'upload')">{{
+                t("cloud.upload") }}</BaseButton>
+              <BaseButton size="sm" :disabled="busy || !!dirty || !row.remote" @click="request(row.name, 'download')">{{
+                t("cloud.download") }}</BaseButton>
+              <BaseButton size="sm" :disabled="busy || !!dirty || !row.remote" @click="request(row.name, 'delete')">{{
+                t("cloud.delete") }}</BaseButton>
             </div>
           </article>
         </div>
@@ -201,20 +211,97 @@ watch(() => props.uuid, () => {
 </template>
 
 <style scoped>
-.cloud-layout { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: 24px; }
-.cloud-connection { display: flex; flex-direction: column; gap: 8px; padding-right: 20px; border-right: 1px solid var(--border); }
-.cloud-layout h4 { margin: 0 0 8px; font-size: 13px; }
-.cloud-worlds { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
-.cloud-status, .cloud-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.cloud-status { background: var(--accent-soft); padding: 12px; border-radius: 10px; }
-.cloud-list { display: flex; flex-direction: column; gap: 10px; max-height: 360px; overflow-y: auto; }
-.cloud-world { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; overflow-wrap: anywhere; }
-.cloud-dir { font-size: 11.5px; color: var(--text-dim); }
-.cloud-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.cloud-confirm { justify-content: flex-end; margin-top: 20px; }
-.cloud-error { color: var(--red); font-size: var(--ctl-font); margin-top: 12px; }
+.cloud-layout {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  gap: 24px;
+}
+
+.cloud-connection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 20px;
+  border-right: 1px solid var(--border);
+}
+
+.cloud-layout h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.cloud-worlds {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cloud-status,
+.cloud-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cloud-status {
+  background: var(--accent-soft);
+  padding: 12px;
+  border-radius: 10px;
+}
+
+.cloud-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.cloud-world {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+
+.cloud-dir {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.cloud-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cloud-confirm {
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.cloud-error {
+  color: var(--red);
+  font-size: var(--ctl-font);
+  margin-top: 12px;
+}
+
 @media (max-width: 620px) {
-  .cloud-layout { grid-template-columns: 1fr; gap: 16px; }
-  .cloud-connection { padding-right: 0; padding-bottom: 16px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .cloud-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .cloud-connection {
+    padding-right: 0;
+    padding-bottom: 16px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
 }
 </style>

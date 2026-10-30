@@ -59,7 +59,7 @@
 }
 
 /* 关闭键对齐到查找行的中线：Monaco 默认 16×16 的盒子在圆角面板里看着偏低 */
-.monaco-editor .find-widget > .button.codicon-widget-close {
+.monaco-editor .find-widget>.button.codicon-widget-close {
   top: 3px;
   right: 5px;
   box-sizing: border-box;

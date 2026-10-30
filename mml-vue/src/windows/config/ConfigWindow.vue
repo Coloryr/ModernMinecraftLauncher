@@ -641,8 +641,8 @@ useWindowRefresh(() => {
         <div class="cfg-list-head">
           <SearchBox v-model="query" :placeholder="t('config.search')" :clear-label="t('config.searchClear')"
             width="100%" />
-          <BaseButton v-if="source" size="sm" variant="ghost" block
-            :disabled="loading || busy || !mcaFiles.length" @click="findOpen = true">
+          <BaseButton v-if="source" size="sm" variant="ghost" block :disabled="loading || busy || !mcaFiles.length"
+            @click="findOpen = true">
             <GlyphIcon name="search" :size="16" :weight="1.8" />
             {{ t("config.mcaFindTitle") }}
           </BaseButton>
@@ -652,11 +652,13 @@ useWindowRefresh(() => {
           <template v-for="row in rows" :key="row.key">
             <!-- 目录：按侧栏的分组标题写，缩进由层级给 -->
             <button v-if="row.isDir" class="cfg-dir" :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
-              :aria-expanded="row.expanded"
-              @click="toggleExpand(row.key)" @contextmenu.prevent="openRowMenu($event, row.key)">
+              :aria-expanded="row.expanded" @click="toggleExpand(row.key)"
+              @contextmenu.prevent="openRowMenu($event, row.key)">
               <GlyphIcon class="cfg-chevron" :class="{ 'is-expanded': row.expanded }" name="chevron-down" :size="14"
                 :weight="2.4" />
-              <span class="cfg-dir-name" :title="row.key"><HighlightText :text="row.name" :query="query" /></span>
+              <span class="cfg-dir-name" :title="row.key">
+                <HighlightText :text="row.name" :query="query" />
+              </span>
             </button>
             <!-- 文件：按侧栏的实例行写 -->
             <button v-else class="cfg-row" :class="{ 'is-active': selected?.name === row.key }"
@@ -664,7 +666,9 @@ useWindowRefresh(() => {
               :style="{ paddingLeft: `${8 + row.depth * 14}px` }" :title="row.key" @click="openFile(row.key)"
               @contextmenu.prevent="openRowMenu($event, row.key)">
               <span class="cfg-chevron-spacer"></span>
-              <span class="cfg-file-name"><HighlightText :text="row.name" :query="query" /></span>
+              <span class="cfg-file-name">
+                <HighlightText :text="row.name" :query="query" />
+              </span>
             </button>
           </template>
           <p v-if="!rows.length" class="empty-tip">{{ emptyTip }}</p>
@@ -678,12 +682,13 @@ useWindowRefresh(() => {
 
       <section class="cfg-view" :aria-busy="loading || deleting">
         <!-- 占位编辑器与文件编辑器使用独立实例，隔离只读状态 -->
-        <MonacoText v-if="!selected || (isText && (loading || deleting))" key="empty" :model-value="deleting ? text : ''" readonly />
+        <MonacoText v-if="!selected || (isText && (loading || deleting))" key="empty"
+          :model-value="deleting ? text : ''" readonly />
         <MonacoText v-else-if="isText" key="file" v-model="text" :language="langOf(selected)" />
         <NbtTree v-else-if="isNbt" ref="nbtRef" :uuid="instanceUuid" :source="source" :file="selected.name"
           @dirty="nbtDirty = $event" />
-        <McaTable v-else-if="selected.fileType === 'mca'" :uuid="instanceUuid" :source="source"
-          :file="selected.name" :chunk="mcaTarget?.chunk" :reveal="mcaTarget?.path" />
+        <McaTable v-else-if="selected.fileType === 'mca'" :uuid="instanceUuid" :source="source" :file="selected.name"
+          :chunk="mcaTarget?.chunk" :reveal="mcaTarget?.path" />
         <ImageView v-else-if="selected.fileType === 'image'" :uuid="instanceUuid" :source="source"
           :file="selected.name" />
         <HexView v-else :uuid="instanceUuid" :source="source" :file="selected.name" />
@@ -695,14 +700,15 @@ useWindowRefresh(() => {
       <p>{{ t("config.discardChanges") }}</p>
       <div class="modal-actions">
         <BaseButton @click="answerDiscard(false)">{{ t("config.keepEditing") }}</BaseButton>
-        <BaseButton variant="danger" :disabled="busy" @click="answerDiscard(true)">{{ t("config.discard") }}</BaseButton>
+        <BaseButton variant="danger" :disabled="busy" @click="answerDiscard(true)">{{ t("config.discard") }}
+        </BaseButton>
       </div>
     </BaseModal>
     <McaFindModal v-if="findOpen" @find="onFindChunk" @close="findOpen = false" />
 
     <!-- 文件行右键菜单：打开所在目录 / 删除 -->
-    <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenuItems"
-      @pick="onRowMenuPick" @close="rowMenu = null" />
+    <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenuItems" @pick="onRowMenuPick"
+      @close="rowMenu = null" />
   </WindowFrame>
 </template>
 
@@ -856,10 +862,11 @@ useWindowRefresh(() => {
 }
 
 /* 视图占满容器，滚动交给各视图内部 */
-.cfg-view > * {
+.cfg-view>* {
   flex: 1;
   min-height: 0;
 }
+
 /* 透明热区覆盖侧栏边框，不占用两栏的可见空间 */
 .cfg-split {
   flex: 0 0 6px;

@@ -123,6 +123,6 @@ export async function initCustomHome(): Promise<void> {
   installHomeRegistry();
   await syncCustomHome();
   // 非 Tauri 环境下 listen 会拒绝，忽略；配置与文件变更都重拉一次状态
-  void onCustomHomeChange(() => void syncCustomHome()).catch(() => {});
-  void onClientConfigChange(() => void syncCustomHome()).catch(() => {});
+  void onCustomHomeChange(() => void syncCustomHome()).catch(() => { });
+  void onClientConfigChange(() => void syncCustomHome()).catch(() => { });
 }

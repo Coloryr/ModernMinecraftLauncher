@@ -567,8 +567,7 @@ defineExpose({ scrollToInstance });
       <!-- 向右占满：把详情区让出来，实例按多列排开；多选时锁死在这一档 -->
       <button class="icon-btn" :class="{ on: maximized }" :disabled="multiSelect"
         v-tip="multiSelect ? t('sidebar.maximizeLocked') : (maximized ? t('sidebar.restore') : t('sidebar.maximize'))"
-        :aria-label="maximized ? t('sidebar.restore') : t('sidebar.maximize')"
-        @click="emit('toggle-maximize')">
+        :aria-label="maximized ? t('sidebar.restore') : t('sidebar.maximize')" @click="emit('toggle-maximize')">
         <GlyphIcon :name="maximized ? 'restore' : 'maximize'" :size="16" />
       </button>
 
@@ -582,124 +581,130 @@ defineExpose({ scrollToInstance });
       <!-- 分组 / 平铺共用一张虚拟列表：行表由脚本按模式铺好，这里只按行种画 -->
       <VirtualList ref="listRef" class="sidebar-list" :class="mode === 'group' ? 'group-list' : 'tile-list'"
         :count="rows.length" :heights="rowHeights" :row-gap="0">
-      <template #default="{ start, end }">
-        <template v-for="row in rows.slice(start, end)" :key="row.key">
-          <!-- 分组标题：收起 / 展开只影响行表里有没有组内那几行 -->
-          <div v-if="row.kind === 'group'" class="vrow vrow-group" :data-group="row.group.id" :data-gi="row.gi">
-            <div class="group-title-row" @contextmenu.prevent="onGroupContext($event, row.group.id)"
-              @pointerdown="onDragPointerDown($event, { kind: 'group', groupId: row.group.id, groupName: row.group.name })">
-              <button class="group-title" v-tip="t('group.collapse')" @click="onGroupTitleClick(row.group.id)">
-                <svg class="group-chevron" :class="{ collapsed: isCollapsed(row.group.id) }" viewBox="0 0 24 24"
-                  width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-                <span><HighlightText :text="row.group.name" :query="searchText" /></span>
-                <span class="group-count">{{ row.group.items.length }}</span>
+        <template #default="{ start, end }">
+          <template v-for="row in rows.slice(start, end)" :key="row.key">
+            <!-- 分组标题：收起 / 展开只影响行表里有没有组内那几行 -->
+            <div v-if="row.kind === 'group'" class="vrow vrow-group" :data-group="row.group.id" :data-gi="row.gi">
+              <div class="group-title-row" @contextmenu.prevent="onGroupContext($event, row.group.id)"
+                @pointerdown="onDragPointerDown($event, { kind: 'group', groupId: row.group.id, groupName: row.group.name })">
+                <button class="group-title" v-tip="t('group.collapse')" @click="onGroupTitleClick(row.group.id)">
+                  <svg class="group-chevron" :class="{ collapsed: isCollapsed(row.group.id) }" viewBox="0 0 24 24"
+                    width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                  <span>
+                    <HighlightText :text="row.group.name" :query="searchText" />
+                  </span>
+                  <span class="group-count">{{ row.group.items.length }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 分组拖拽插入占位 -->
+            <div v-else-if="row.kind === 'ghost-group'" class="vrow vrow-group">
+              <div class="drop-ghost-group">
+                <span class="drop-ghost-group-name">{{ dragActive?.groupName }}</span>
+              </div>
+            </div>
+
+            <!-- 添加实例：与实例行同尺寸，多选时整行不进行表 -->
+            <div v-else-if="row.kind === 'add'" class="vrow vrow-add" :data-group="row.groupId" :style="rowStyle(row)">
+              <button class="add-inst-row" :disabled="dragActive?.kind === 'instance'" @click="emit('add-instance')">
+                <span class="add-inst-icon">
+                  <GlyphIcon name="plus" :size="18" />
+                </span>
+                <span class="add-inst-text">{{ t("list.add") }}</span>
               </button>
             </div>
-          </div>
 
-          <!-- 分组拖拽插入占位 -->
-          <div v-else-if="row.kind === 'ghost-group'" class="vrow vrow-group">
-            <div class="drop-ghost-group">
-              <span class="drop-ghost-group-name">{{ dragActive?.groupName }}</span>
+            <!-- 实例拖拽插入占位（淡化的实例，位于鼠标对应位置） -->
+            <div v-else-if="row.kind === 'ghost-inst'" class="vrow vrow-ghost-inst" :data-group="row.groupId"
+              :style="rowStyle(row)">
+              <div class="drop-ghost-row">
+                <InstanceIcon :name="dragActive?.instance?.name ?? ''" :uuid="dragActive?.instance?.uuid ?? '0'"
+                  :size="38" />
+                <span class="inst-name">{{ dragActive?.instance?.name ?? "" }}</span>
+              </div>
             </div>
-          </div>
 
-          <!-- 添加实例：与实例行同尺寸，多选时整行不进行表 -->
-          <div v-else-if="row.kind === 'add'" class="vrow vrow-add" :data-group="row.groupId"
-            :style="rowStyle(row)">
-            <button class="add-inst-row" :disabled="dragActive?.kind === 'instance'" @click="emit('add-instance')">
-              <span class="add-inst-icon">
-                <GlyphIcon name="plus" :size="18" />
-              </span>
-              <span class="add-inst-text">{{ t("list.add") }}</span>
+            <!-- 平铺卡片行：占满时与平铺模式同一套卡，外观、角标、运行点位置都一致 -->
+            <div v-else-if="row.kind === 'tiles'" class="vrow vrow-tiles" :style="rowStyle(row)">
+              <div class="tile-grid" :style="tileGridStyle">
+                <template v-for="(cell, ci) in row.cells" :key="ci">
+                  <div v-if="cell.kind === 'add'" class="tile add-tile" @click="emit('add-instance')">
+                    <span class="add-plus">
+                      <GlyphIcon name="plus" :size="24" :weight="1.8" />
+                    </span>
+                    <span class="tile-name">{{ t("group.add") }}</span>
+                  </div>
+                  <div v-else class="tile" :data-uuid="cell.inst.uuid" :class="{
+                    active: selected?.uuid === cell.inst.uuid,
+                    'multi-checked': multiSelect && selectedIds.has(cell.inst.uuid),
+                  }" @pointerdown="onTilePointerDown($event, cell.inst)" @click="onInstClick(cell.inst, $event)"
+                    @contextmenu.prevent="onInstContext($event, cell.inst)">
+                    <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(cell.inst.uuid) }">
+                      <GlyphIcon name="check" :size="12" :weight="2.6" />
+                    </span>
+                    <InstanceIcon :name="cell.inst.name" :uuid="cell.inst.uuid" :size="44" />
+                    <span v-if="cell.inst.loader !== 'normal'" class="loader-corner loader-text"
+                      :class="`loader-${cell.inst.loader}`">{{ t(`add.loader.${cell.inst.loader}`) }}</span>
+                    <span class="tile-name">
+                      <HighlightText :text="cell.inst.name" :query="searchText" />
+                    </span>
+                    <span v-if="cell.inst.running" class="run-dot" v-tip="t('launch.running')"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- 实例行 -->
+            <div v-else class="vrow vrow-inst" :data-group="row.group.id" :style="rowStyle(row)">
+              <div class="inst-row" :data-uuid="row.inst.uuid" :data-idx="row.idx" :data-group="row.group.id" :class="{
+                active: selected?.uuid === row.inst.uuid,
+                'multi-checked': multiSelect && selectedIds.has(row.inst.uuid),
+                running: row.inst.running,
+              }" @pointerdown="onDragPointerDown($event, { kind: 'instance', instance: row.inst })"
+                @click="onInstClick(row.inst, $event)" @contextmenu.prevent="onInstContext($event, row.inst)">
+                <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(row.inst.uuid) }">
+                  <GlyphIcon name="check" :size="12" :weight="2.6" />
+                </span>
+                <InstanceIcon :name="row.inst.name" :uuid="row.inst.uuid" :size="38" />
+                <span v-if="row.inst.loader !== 'normal'" class="loader-text" :class="`loader-${row.inst.loader}`">{{
+                  t(`add.loader.${row.inst.loader}`) }}</span>
+                <span class="inst-name">
+                  <HighlightText :text="row.inst.name" :query="searchText" />
+                </span>
+                <span v-if="row.inst.running" class="run-dot" v-tip="t('launch.running')"></span>
+              </div>
+            </div>
+          </template>
+
+          <!-- 空态与「添加分组」跟在最后一行后面，不参与窗口计算 -->
+          <template v-if="mode === 'group'">
+            <div v-if="groups.length === 0" class="empty-tip">{{ t("list.empty") }}</div>
+            <div v-else-if="filteredGroups.length === 0" class="empty-tip">{{ t("search.empty") }}</div>
+            <button class="add-row-btn add-group-row" :disabled="dragActive?.kind === 'instance'"
+              @click="emit('add-group')">
+              <GlyphIcon name="plus" :size="14" />
+              <span>{{ t("group.addGroup") }}</span>
             </button>
-          </div>
-
-          <!-- 实例拖拽插入占位（淡化的实例，位于鼠标对应位置） -->
-          <div v-else-if="row.kind === 'ghost-inst'" class="vrow vrow-ghost-inst" :data-group="row.groupId"
-            :style="rowStyle(row)">
-            <div class="drop-ghost-row">
-              <InstanceIcon :name="dragActive?.instance?.name ?? ''" :uuid="dragActive?.instance?.uuid ?? '0'"
-                :size="38" />
-              <span class="inst-name">{{ dragActive?.instance?.name ?? "" }}</span>
-            </div>
-          </div>
-
-          <!-- 平铺卡片行：占满时与平铺模式同一套卡，外观、角标、运行点位置都一致 -->
-          <div v-else-if="row.kind === 'tiles'" class="vrow vrow-tiles" :style="rowStyle(row)">
-            <div class="tile-grid" :style="tileGridStyle">
-              <template v-for="(cell, ci) in row.cells" :key="ci">
-                <div v-if="cell.kind === 'add'" class="tile add-tile" @click="emit('add-instance')">
-                  <span class="add-plus">
-                    <GlyphIcon name="plus" :size="24" :weight="1.8" />
-                  </span>
-                  <span class="tile-name">{{ t("group.add") }}</span>
-                </div>
-                <div v-else class="tile" :data-uuid="cell.inst.uuid" :class="{
-                  active: selected?.uuid === cell.inst.uuid,
-                  'multi-checked': multiSelect && selectedIds.has(cell.inst.uuid),
-                }" @pointerdown="onTilePointerDown($event, cell.inst)" @click="onInstClick(cell.inst, $event)"
-                  @contextmenu.prevent="onInstContext($event, cell.inst)">
-                  <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(cell.inst.uuid) }">
-                    <GlyphIcon name="check" :size="12" :weight="2.6" />
-                  </span>
-                  <InstanceIcon :name="cell.inst.name" :uuid="cell.inst.uuid" :size="44" />
-                  <span v-if="cell.inst.loader !== 'normal'" class="loader-corner loader-text"
-                    :class="`loader-${cell.inst.loader}`">{{ t(`add.loader.${cell.inst.loader}`) }}</span>
-                  <span class="tile-name"><HighlightText :text="cell.inst.name" :query="searchText" /></span>
-                  <span v-if="cell.inst.running" class="run-dot" v-tip="t('launch.running')"></span>
-                </div>
-              </template>
-            </div>
-          </div>
-
-          <!-- 实例行 -->
-          <div v-else class="vrow vrow-inst" :data-group="row.group.id" :style="rowStyle(row)">
-            <div class="inst-row" :data-uuid="row.inst.uuid" :data-idx="row.idx" :data-group="row.group.id" :class="{
-              active: selected?.uuid === row.inst.uuid,
-              'multi-checked': multiSelect && selectedIds.has(row.inst.uuid),
-              running: row.inst.running,
-            }" @pointerdown="onDragPointerDown($event, { kind: 'instance', instance: row.inst })"
-              @click="onInstClick(row.inst, $event)" @contextmenu.prevent="onInstContext($event, row.inst)">
-              <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(row.inst.uuid) }">
-                <GlyphIcon name="check" :size="12" :weight="2.6" />
-              </span>
-              <InstanceIcon :name="row.inst.name" :uuid="row.inst.uuid" :size="38" />
-              <span v-if="row.inst.loader !== 'normal'" class="loader-text"
-                :class="`loader-${row.inst.loader}`">{{ t(`add.loader.${row.inst.loader}`) }}</span>
-              <span class="inst-name"><HighlightText :text="row.inst.name" :query="searchText" /></span>
-              <span v-if="row.inst.running" class="run-dot" v-tip="t('launch.running')"></span>
-            </div>
-          </div>
+          </template>
+          <div v-else-if="filteredInstances.length === 0" class="empty-tip tile-empty">{{ t("search.empty") }}</div>
         </template>
-
-        <!-- 空态与「添加分组」跟在最后一行后面，不参与窗口计算 -->
-        <template v-if="mode === 'group'">
-          <div v-if="groups.length === 0" class="empty-tip">{{ t("list.empty") }}</div>
-          <div v-else-if="filteredGroups.length === 0" class="empty-tip">{{ t("search.empty") }}</div>
-          <button class="add-row-btn add-group-row" :disabled="dragActive?.kind === 'instance'"
-            @click="emit('add-group')">
-            <GlyphIcon name="plus" :size="14" />
-            <span>{{ t("group.addGroup") }}</span>
-          </button>
-        </template>
-        <div v-else-if="filteredInstances.length === 0" class="empty-tip tile-empty">{{ t("search.empty") }}</div>
-      </template>
       </VirtualList>
 
       <!-- 粘滞分组头：行被虚拟化卸载后仍要能看见当前分组，交互与普通标题一致 -->
-      <div v-if="stickyGroup" class="group-sticky" :data-group="stickyGroup.id"
-        :data-gi="stickyIndex" @contextmenu.prevent="onGroupContext($event, stickyGroup.id)"
-        @wheel.prevent="onStickyWheel"
+      <div v-if="stickyGroup" class="group-sticky" :data-group="stickyGroup.id" :data-gi="stickyIndex"
+        @contextmenu.prevent="onGroupContext($event, stickyGroup.id)" @wheel.prevent="onStickyWheel"
         @pointerdown="onDragPointerDown($event, { kind: 'group', groupId: stickyGroup.id, groupName: stickyGroup.name })">
         <button class="group-title" v-tip="t('group.collapse')" @click="onGroupTitleClick(stickyGroup.id)">
-          <svg class="group-chevron" :class="{ collapsed: isCollapsed(stickyGroup.id) }" viewBox="0 0 24 24"
-            width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+          <svg class="group-chevron" :class="{ collapsed: isCollapsed(stickyGroup.id) }" viewBox="0 0 24 24" width="13"
+            height="13" fill="none" stroke="currentColor" stroke-width="2">
             <path d="m6 9 6 6 6-6" />
           </svg>
-          <span><HighlightText :text="stickyGroup.name" :query="searchText" /></span>
+          <span>
+            <HighlightText :text="stickyGroup.name" :query="searchText" />
+          </span>
           <span class="group-count">{{ stickyGroup.items.length }}</span>
         </button>
       </div>
@@ -1152,7 +1157,7 @@ defineExpose({ scrollToInstance });
 }
 
 /* 多选勾选圈也钉在左上角：加载器角标往右让一格，两个不叠在一起 */
-.tile .row-check ~ .loader-corner {
+.tile .row-check~.loader-corner {
   left: 30px;
 }
 

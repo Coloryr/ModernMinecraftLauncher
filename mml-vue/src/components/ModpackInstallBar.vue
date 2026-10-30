@@ -116,8 +116,9 @@ async function clearDone() {
             <span v-else class="mp-task-icon mp-task-icon-fallback">{{ task.name.slice(0, 1).toUpperCase() }}</span>
             <span class="mp-task-name">{{ task.name }}</span>
             <span v-if="task.done" class="mp-tag done">{{ t("add.packState.done") }}</span>
-            <span v-else-if="task.failed" class="mp-tag failed" v-tip="task.error ? tErr(task.error) : ''">{{ t("modpack.bar.failed")
-            }}</span>
+            <span v-else-if="task.failed" class="mp-tag failed" v-tip="task.error ? tErr(task.error) : ''">{{
+              t("modpack.bar.failed")
+              }}</span>
             <span v-else-if="task.cancelled" class="mp-tag cancelled">{{ t("modpack.bar.cancelled") }}</span>
             <button v-else class="mp-cancel" @click="cancel(task)">{{ t("modpack.bar.cancel") }}</button>
           </div>
@@ -458,6 +459,7 @@ async function clearDone() {
 .mp-bar.fill-h .mp-task>.progress-track {
   margin-left: 36px;
 }
+
 .mp-task-icon {
   width: 24px;
   height: 24px;

@@ -688,8 +688,8 @@
   min-width: 0;
 }
 
-.launch-busy > .launch-in,
-.launch-busy > .launch-running {
+.launch-busy>.launch-in,
+.launch-busy>.launch-running {
   transition: opacity 0.12s;
 }
 
@@ -725,10 +725,10 @@
   opacity: 1;
 }
 
-.launch-main-btn:hover .launch-busy > .launch-in,
-.launch-main-btn:hover .launch-busy > .launch-running,
-.play-btn:hover .launch-busy > .launch-in,
-.play-btn:hover .launch-busy > .launch-running {
+.launch-main-btn:hover .launch-busy>.launch-in,
+.launch-main-btn:hover .launch-busy>.launch-running,
+.play-btn:hover .launch-busy>.launch-in,
+.play-btn:hover .launch-busy>.launch-running {
   opacity: 0;
 }
 

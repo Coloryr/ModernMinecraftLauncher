@@ -102,7 +102,7 @@ let sourceReady = false;
 const source = ref("");
 watch(source, (value) => {
   if (sourceReady) {
-    void setAddResourceSource(value).catch(() => {});
+    void setAddResourceSource(value).catch(() => { });
   }
 });
 
@@ -1014,7 +1014,8 @@ onActivated(async () => {
               <div class="dep-body">
                 <label class="dep-main" :for="`dep-${dep.pid}`">
                   <AsyncImage v-if="dep.icon" class="dep-icon" :src="dep.icon" alt="" />
-                  <span v-else class="dep-icon dep-icon-fallback">{{ (dep.name || dep.pid).slice(0, 1).toUpperCase() }}</span>
+                  <span v-else class="dep-icon dep-icon-fallback">{{ (dep.name || dep.pid).slice(0, 1).toUpperCase()
+                    }}</span>
                   <span class="dep-tag">
                     {{ dep.optional ? t("addResource.depsOptional") : t("addResource.depsRequired") }}
                   </span>

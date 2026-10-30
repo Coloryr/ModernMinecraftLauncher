@@ -130,8 +130,8 @@ function pick(item: FileListItemDto) {
 
 /* 加载中 / 出错 / 空：这几档没有可滚的列表，让提示吃掉剩余高度，
    动作按钮才会贴底，而不是浮在面板中间 */
-.modal-body > .empty-tip,
-.modal-body > .error-text {
+.modal-body>.empty-tip,
+.modal-body>.error-text {
   flex: 1;
 }
 

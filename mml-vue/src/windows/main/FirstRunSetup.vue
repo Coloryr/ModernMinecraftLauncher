@@ -101,8 +101,7 @@ function clearImage() {
 
 <template>
   <!-- 右上角不画 ✕：关闭入口只留底部「完成」 -->
-  <BaseModal v-if="visible" :title="t('firstRun.title')" :width="560" :closable="false"
-    @close="emit('close')">
+  <BaseModal v-if="visible" :title="t('firstRun.title')" :width="560" :closable="false" @close="emit('close')">
     <div class="first-run">
       <!-- 主页面样式：三张卡并排，选中即生效 -->
       <section class="run-sec">
@@ -139,8 +138,7 @@ function clearImage() {
       <!-- 透明模式：云母 / 亚克力由系统在窗口背后合成，只有 Windows 有 -->
       <section v-if="supportsMaterial" class="run-sec">
         <h4 class="run-title">{{ t("firstRun.materialTitle") }}</h4>
-        <SegmentedTabs :model-value="material" :options="materialOptions"
-          @update:model-value="pickMaterial" />
+        <SegmentedTabs :model-value="material" :options="materialOptions" @update:model-value="pickMaterial" />
         <p class="run-hint">{{ t("firstRun.materialHint") }}</p>
       </section>
 

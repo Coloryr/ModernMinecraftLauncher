@@ -79,7 +79,8 @@ async function saveList() {
     </fieldset>
 
     <div class="modal-actions">
-      <BaseButton variant="primary" :disabled="!fields.length || busy || (onlySelected && !selectedIds.length)" @click="saveList">{{ t('winExport.exportBtn') }}</BaseButton>
+      <BaseButton variant="primary" :disabled="!fields.length || busy || (onlySelected && !selectedIds.length)"
+        @click="saveList">{{ t('winExport.exportBtn') }}</BaseButton>
     </div>
   </BaseModal>
 </template>

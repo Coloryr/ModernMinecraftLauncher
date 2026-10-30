@@ -17,12 +17,8 @@ const changed = computed(() => {
 </script>
 
 <template>
-  <BaseModal
-    v-if="serverPackOpen && serverPackResult"
-    :title="t('launch.serverPackTitle')"
-    :closable="false"
-    @close="answerServerPackUpdate(false, false)"
-  >
+  <BaseModal v-if="serverPackOpen && serverPackResult" :title="t('launch.serverPackTitle')" :closable="false"
+    @close="answerServerPackUpdate(false, false)">
     <p class="pack-line">{{ t("update.instance", { name: serverPackResult.instanceName }) }}</p>
     <p class="pack-version">
       {{

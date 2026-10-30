@@ -421,7 +421,7 @@ watch(wordWrap, (on) => {
    一半"这是个编辑器"的观感。这里按 Monaco 自己的节奏补一个 1s 周期的闪烁。
    只覆盖 `cursor` 元素本身的 opacity，不影响它负责定位的 inline top / left；
    选择器限定在日志这块 —— 配置窗口那个编辑器是可写的，光标本来就闪，不用这条 */
-.monaco-log .monaco-editor .cursors-layer > .cursor {
+.monaco-log .monaco-editor .cursors-layer>.cursor {
   animation: mml-log-caret-blink 1s step-end infinite;
 }
 

@@ -29,9 +29,8 @@ function answer(ok: boolean) {
 </script>
 
 <template>
-  <BaseModal v-if="launchCheckOpen"
-    :title="t(isLoader ? 'launchCheck.titleLoader' : 'launchCheck.titleMemory')" :closable="false"
-    @close="answer(false)">
+  <BaseModal v-if="launchCheckOpen" :title="t(isLoader ? 'launchCheck.titleLoader' : 'launchCheck.titleMemory')"
+    :closable="false" @close="answer(false)">
     <p class="modal-text">
       {{
         t(isLoader ? "launchCheck.descLoader" : "launchCheck.descMemory", {

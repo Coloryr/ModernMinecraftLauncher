@@ -140,17 +140,14 @@ watch(
 <template>
   <div class="tree">
     <p v-if="!rows.length" class="empty-tip">{{ t("winExport.noFiles") }}</p>
-    <div v-for="row in rows" :key="row.entry.path" class="tree-row"
-      :style="{ paddingLeft: `${8 + row.depth * 16}px` }">
+    <div v-for="row in rows" :key="row.entry.path" class="tree-row" :style="{ paddingLeft: `${8 + row.depth * 16}px` }">
       <span class="tree-caret" :class="{ open: opened.has(row.entry.path) }" @click="toggleDir(row.entry.path)">
         <GlyphIcon v-if="row.entry.dir" name="chevron-down" :size="12" :weight="2.4" />
       </span>
       <input type="checkbox" class="tree-box" :checked="isLocked(row.entry.path) || checked(row.entry.path)"
-        :disabled="isLocked(row.entry.path)"
-        :title="isLocked(row.entry.path) ? t('winExport.mandatory') : undefined"
+        :disabled="isLocked(row.entry.path)" :title="isLocked(row.entry.path) ? t('winExport.mandatory') : undefined"
         @change="toggleRow(row.entry)" />
-      <span class="tree-name" :class="{ dir: row.entry.dir, locked: isLocked(row.entry.path) }"
-        :title="row.entry.path"
+      <span class="tree-name" :class="{ dir: row.entry.dir, locked: isLocked(row.entry.path) }" :title="row.entry.path"
         @click="row.entry.dir ? toggleDir(row.entry.path) : toggleRow(row.entry)">{{
           row.entry.path.split("/").pop()
         }}</span>

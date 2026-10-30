@@ -366,6 +366,7 @@ watch(key, () => void activate(), { immediate: true });
   overflow: auto;
   padding: 0 10px 8px;
 }
+
 /* 热区要相对树定位 */
 .nbt-tree {
   position: relative;

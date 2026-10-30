@@ -36,8 +36,7 @@ function answer(enter: boolean) {
 </script>
 
 <template>
-  <BaseModal v-if="autoSaveOpen && autoSavePick" :title="t('autoSave.title')" :closable="false"
-    @close="answer(false)">
+  <BaseModal v-if="autoSaveOpen && autoSavePick" :title="t('autoSave.title')" :closable="false" @close="answer(false)">
     <p class="modal-text">{{ t("autoSave.desc", { name: saveName }) }}</p>
     <label class="auto-save-option">
       <BaseSwitch v-model="dontNotice" />

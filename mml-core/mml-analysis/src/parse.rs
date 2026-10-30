@@ -293,7 +293,10 @@ fn parse_mod_issues(lines: &[&str]) -> Vec<ModEntry> {
             if id.is_empty() {
                 continue;
             }
-            if let Some(index) = mods.iter().position(|item| item.id.eq_ignore_ascii_case(id)) {
+            if let Some(index) = mods
+                .iter()
+                .position(|item| item.id.eq_ignore_ascii_case(id))
+            {
                 current = Some(index);
             } else {
                 mods.push(ModEntry {

@@ -57,7 +57,7 @@ const source = ref("");
 let sourceReady = false;
 watch(source, (value) => {
   if (sourceReady) {
-    void setAddModpackSource(value).catch(() => {});
+    void setAddModpackSource(value).catch(() => { });
   }
 });
 

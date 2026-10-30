@@ -75,7 +75,7 @@ window.addEventListener("keydown", (e) => {
     (e.metaKey && e.altKey && (e.key === "i" || e.key === "I"));
   if (!inspect || !devtoolsAllowed()) return;
   e.preventDefault();
-  commands.windows.openDevtools().catch(() => {});
+  commands.windows.openDevtools().catch(() => { });
 });
 
 // 发布构建：兜底拦掉 WebView2 的浏览器功能键（F5 / Ctrl+R、F12 / Ctrl+Shift+C、

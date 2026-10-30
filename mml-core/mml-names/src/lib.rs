@@ -50,9 +50,8 @@ const BUILD_DATE: &str = env!("MML_NAMES_BUILD_DATE");
 /// 测试版追加构建日期，如 `1.0.0.20261028`；正式版只有三段，如 `1.0.0`。
 /// 日期跟着构建走，不用手改：换一天出的包，配置版本号自然就变了。
 #[cfg(debug_assertions)]
-pub const VERSION: LazyLock<String> = LazyLock::new(|| {
-    format!("{VERSION_NUM}.{VERSION_SEC_NUM}.{VERSION_PATCH_NUM}.{BUILD_DATE}")
-});
+pub const VERSION: LazyLock<String> =
+    LazyLock::new(|| format!("{VERSION_NUM}.{VERSION_SEC_NUM}.{VERSION_PATCH_NUM}.{BUILD_DATE}"));
 
 /// 配置版本号
 ///

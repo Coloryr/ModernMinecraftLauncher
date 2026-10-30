@@ -40,9 +40,9 @@ use mml_sys::path_helper;
 
 /// 已经是压缩格式的后缀：再压一遍又慢又不省空间，写包时直接存
 const STORED_EXT: &[&str] = &[
-    "jar", "zip", "mrpack", "7z", "rar", "gz", "tgz", "xz", "bz2", "zst", "lz4",
-    "png", "jpg", "jpeg", "webp", "gif", "ogg", "oga", "mp3", "m4a", "flac",
-    "mp4", "webm", "mkv", "ttf", "otf", "woff", "woff2", "mca", "mcr", "dat", "nbt",
+    "jar", "zip", "mrpack", "7z", "rar", "gz", "tgz", "xz", "bz2", "zst", "lz4", "png", "jpg",
+    "jpeg", "webp", "gif", "ogg", "oga", "mp3", "m4a", "flac", "mp4", "webm", "mkv", "ttf", "otf",
+    "woff", "woff2", "mca", "mcr", "dat", "nbt",
 ];
 
 /// 写 zip 的压缩档位
@@ -102,7 +102,11 @@ pub fn zip_entry_options(name: &str, permissions: u32) -> SimpleFileOptions {
     let stored = Path::new(name)
         .extension()
         .and_then(|ext| ext.to_str())
-        .is_some_and(|ext| STORED_EXT.iter().any(|known| known.eq_ignore_ascii_case(ext)));
+        .is_some_and(|ext| {
+            STORED_EXT
+                .iter()
+                .any(|known| known.eq_ignore_ascii_case(ext))
+        });
     if stored {
         return options.compression_method(CompressionMethod::Stored);
     }

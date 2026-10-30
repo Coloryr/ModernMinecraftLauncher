@@ -143,11 +143,7 @@ fn try_dbus_filemanager1(path: &str) -> Result<(), Box<dyn std::error::Error>> {
 
     // 参数：要选中的 URI 列表 + 启动目录，启动目录传空字符串
     let items: Vec<&str> = vec![&uri];
-    let (): () = proxy.method_call(
-        "org.freedesktop.FileManager1",
-        "ShowItems",
-        (items, ""),
-    )?;
+    let (): () = proxy.method_call("org.freedesktop.FileManager1", "ShowItems", (items, ""))?;
     Ok(())
 }
 

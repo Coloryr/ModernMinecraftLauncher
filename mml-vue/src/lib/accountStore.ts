@@ -167,4 +167,4 @@ export async function loginMicrosoft(): Promise<void> {
 }
 
 // 跨窗口同步：某个窗口改了账户后，其它窗口重新加载；浏览器预览下 listen 会拒绝，忽略
-listen(AccountChange, () => loadAccounts()).catch(() => {});
+listen(AccountChange, () => loadAccounts()).catch(() => { });

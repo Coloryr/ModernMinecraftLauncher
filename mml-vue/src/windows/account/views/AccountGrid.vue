@@ -124,8 +124,7 @@ function hidePreview() {
 <template>
   <div class="acc-grid" :class="{ empty: accounts.length === 0 }">
     <div v-for="acc in accounts" :key="acc.uuid" class="acc-card" :class="{ current: isCurrent(acc) }"
-      @dblclick="!accountLocked && emit('switch', acc)"
-      @contextmenu.prevent="emit('menu', { event: $event, acc })">
+      @dblclick="!accountLocked && emit('switch', acc)" @contextmenu.prevent="emit('menu', { event: $event, acc })">
       <div class="acc-images"
         :class="{ empty: imageFailed(acc, 'avatar') && imageFailed(acc, 'skin') && imageFailed(acc, 'cape') }">
         <span v-if="isCurrent(acc)" class="current-badge">{{ t("account.current") }}</span>
@@ -133,10 +132,10 @@ function hidePreview() {
         <span class="validity-badge" :class="acc.tokenStatus">{{ tokenLabel(acc) }}</span>
         <!-- 加载中：图上叠转圈，onload 后消失（img 先渲染，加载完才能触发事件） -->
         <div v-if="!imageFailed(acc, 'avatar')" class="img-box img-avatar-box">
-          <img :src="accountAvatarUrl(acc)" class="img-avatar"
-            :class="{ pending: imageLoading(acc, 'avatar') }" :alt="t('account.avatar')" data-no-fallback
-            @load="markImageLoaded(acc, 'avatar')" @error="markImageFailed(acc, 'avatar')"
-            @mouseenter="showPreview($event, acc, 'avatar')" @mousemove="movePreview" @mouseleave="hidePreview" />
+          <img :src="accountAvatarUrl(acc)" class="img-avatar" :class="{ pending: imageLoading(acc, 'avatar') }"
+            :alt="t('account.avatar')" data-no-fallback @load="markImageLoaded(acc, 'avatar')"
+            @error="markImageFailed(acc, 'avatar')" @mouseenter="showPreview($event, acc, 'avatar')"
+            @mousemove="movePreview" @mouseleave="hidePreview" />
           <div v-if="imageLoading(acc, 'avatar')" class="img-spin" />
         </div>
         <!-- 头像由皮肤渲染而来：皮肤都没有时不再显示"无头像"，只留皮肤/披风占位 -->
@@ -183,18 +182,18 @@ function hidePreview() {
         </div>
       </div>
       <div class="acc-head">
-        <span class="acc-name"><HighlightText :text="acc.userName" :query="query" /></span>
+        <span class="acc-name">
+          <HighlightText :text="acc.userName" :query="query" />
+        </span>
         <AccountTypeBadge :auth-type="acc.authType" />
-        <AccountActions :locked="accountLocked && acc.uuid === currentUuid" :can-refresh="acc.canRefresh" :can-relogin="acc.canRelogin" :can-edit="acc.canEdit"
-          :has-skin="!hasNoSkin(acc)" @refresh="emit('refresh', acc)" @view-skin="emit('viewSkin', acc)"
-          @refresh-skin="emit('refreshSkin', acc)" @relogin="emit('relogin', acc)" @edit="emit('edit', acc)"
-          @delete="emit('delete', acc)" />
+        <AccountActions :locked="accountLocked && acc.uuid === currentUuid" :can-refresh="acc.canRefresh"
+          :can-relogin="acc.canRelogin" :can-edit="acc.canEdit" :has-skin="!hasNoSkin(acc)"
+          @refresh="emit('refresh', acc)" @view-skin="emit('viewSkin', acc)" @refresh-skin="emit('refreshSkin', acc)"
+          @relogin="emit('relogin', acc)" @edit="emit('edit', acc)" @delete="emit('delete', acc)" />
       </div>
     </div>
-    <AccountEmpty v-if="accounts.length === 0"
-      :title="filtering ? t('account.searchEmpty') : t('account.emptyTitle')"
-      :hint="filtering ? undefined : t('account.emptyHint')" :show-add="!filtering"
-      @add="emit('add')" />
+    <AccountEmpty v-if="accounts.length === 0" :title="filtering ? t('account.searchEmpty') : t('account.emptyTitle')"
+      :hint="filtering ? undefined : t('account.emptyHint')" :show-add="!filtering" @add="emit('add')" />
 
     <!-- 悬停图片时的大图预览（跟随鼠标，不拦截事件），尺寸按图片类型区分 -->
     <Teleport to="body">

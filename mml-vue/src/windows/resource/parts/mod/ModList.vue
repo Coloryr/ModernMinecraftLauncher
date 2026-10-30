@@ -119,8 +119,7 @@ const visible = computed(() => rows.value.slice(start.value, end.value));
 </script>
 
 <template>
-  <div ref="root" class="mod-rows"
-    :style="{ paddingTop: padTop + 'px', paddingBottom: padBottom + 'px' }">
+  <div ref="root" class="mod-rows" :style="{ paddingTop: padTop + 'px', paddingBottom: padBottom + 'px' }">
     <ResourceRow v-for="row in visible" :key="modRowKey(row.item)" :icon="row.item.icon"
       :name="row.item.name || row.item.file" :depth="row.depth" :class="{
         'row-selected': selectedKeys.has(modSelectKey(row.item)),
@@ -135,8 +134,8 @@ const visible = computed(() => rows.value.slice(start.value, end.value));
       -->
       <template #select>
         <input v-if="row.depth === depth" type="checkbox" class="row-select"
-          :checked="selectedKeys.has(modSelectKey(row.item))" @pointerdown.stop
-          @change.stop="emit('select', row.item)" @click.stop />
+          :checked="selectedKeys.has(modSelectKey(row.item))" @pointerdown.stop @change.stop="emit('select', row.item)"
+          @click.stop />
         <span v-else class="row-select-gap" />
       </template>
       <!-- 展开箭头：只有带内置模组的行才有（内置行自己没有下级）；默认收起 -->
@@ -155,7 +154,8 @@ const visible = computed(() => rows.value.slice(start.value, end.value));
       <template #badges>
         <!-- 支持的加载器：一个包可能不止一个，比如同时带 fabric.mod.json 与 mods.toml；
               后端已汇总去重，这里逐个显示 -->
-        <span v-for="name in row.item.loaders" :key="name" class="badge badge-dim">{{ t(`resource.loader.${name}`) }}</span>
+        <span v-for="name in row.item.loaders" :key="name" class="badge badge-dim">{{ t(`resource.loader.${name}`)
+          }}</span>
         <!-- 内置的**库**：没有模组元数据的内置 jar，如 asm / mixinextras。
               它不是模组，标出来免得和真正的内置模组混在一起 -->
         <span v-if="row.item.library" class="badge badge-dim">{{ t("resource.modLibrary") }}</span>
@@ -187,7 +187,9 @@ const visible = computed(() => rows.value.slice(start.value, end.value));
 
       <!-- 副标题含版本 / 作者 / 文件名：搜索也匹配文件名，命中就在这儿着色 -->
       <template #sub>
-        <span><HighlightText :text="modSub(row.item)" :query="props.query" /></span>
+        <span>
+          <HighlightText :text="modSub(row.item)" :query="props.query" />
+        </span>
       </template>
     </ResourceRow>
   </div>

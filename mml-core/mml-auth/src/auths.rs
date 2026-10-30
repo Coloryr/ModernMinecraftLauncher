@@ -33,7 +33,8 @@ static AUTHS: LazyLock<RwLock<HashMap<UserKeyObj, LoginObj>>> =
 /// 当前使用的账户键，随 `auth_select.json` 持久化，`init` 时载回
 static CURRENT_USER: LazyLock<RwLock<Option<UserKeyObj>>> = LazyLock::new(|| RwLock::new(None));
 
-static SELECTION_LOCK: LazyLock<RwLock<Option<(uuid::Uuid, UserKeyObj)>>> = LazyLock::new(|| RwLock::new(None));
+static SELECTION_LOCK: LazyLock<RwLock<Option<(uuid::Uuid, UserKeyObj)>>> =
+    LazyLock::new(|| RwLock::new(None));
 
 /// 联机会话持有的账户选择锁，释放后允许切换。
 pub struct CurrentUserGuard {
@@ -44,7 +45,9 @@ pub struct CurrentUserGuard {
 impl Drop for CurrentUserGuard {
     fn drop(&mut self) {
         let mut lock = SELECTION_LOCK.write().unwrap();
-        if lock.as_ref().is_some_and(|(id, _)| *id == self.id) { *lock = None; }
+        if lock.as_ref().is_some_and(|(id, _)| *id == self.id) {
+            *lock = None;
+        }
     }
 }
 
@@ -53,7 +56,9 @@ impl Drop for CurrentUserGuard {
 /// 已被其它会话锁定或未选择账户时返回空。
 pub fn lock_current() -> Option<CurrentUserGuard> {
     let mut lock = SELECTION_LOCK.write().unwrap();
-    if lock.is_some() { return None; }
+    if lock.is_some() {
+        return None;
+    }
     let key = get_current()?;
     let id = uuid::Uuid::new_v4();
     *lock = Some((id, key.clone()));
@@ -63,7 +68,9 @@ pub fn lock_current() -> Option<CurrentUserGuard> {
 /// 查询当前账户的联机锁。
 /// # 返回值
 /// 存在联机会话时返回 true。
-pub fn current_is_locked() -> bool { SELECTION_LOCK.read().unwrap().is_some() }
+pub fn current_is_locked() -> bool {
+    SELECTION_LOCK.read().unwrap().is_some()
+}
 
 /// 从磁盘加载账户列表到内存
 ///
@@ -216,7 +223,9 @@ fn newer_than(new: &LoginObj, old: &LoginObj) -> bool {
 /// 谨慎使用，此操作不可逆。
 pub fn clear_auths() {
     let lock = SELECTION_LOCK.read().unwrap();
-    if lock.is_some() { return; }
+    if lock.is_some() {
+        return;
+    }
     // 先释放写锁再落盘：save() 内部要拿读锁，同线程写锁未释放时重入会死锁
     {
         let mut auths = AUTHS.write().unwrap();
@@ -257,7 +266,12 @@ pub fn set_current(user: Option<UserKeyObj>) -> bool {
         key
     });
     let lock = SELECTION_LOCK.read().unwrap();
-    if lock.as_ref().is_some_and(|(_, key)| user.as_ref() != Some(key)) { return false; }
+    if lock
+        .as_ref()
+        .is_some_and(|(_, key)| user.as_ref() != Some(key))
+    {
+        return false;
+    }
     *CURRENT_USER.write().unwrap() = user;
 
     save_select();
@@ -297,7 +311,9 @@ impl LoginObj {
     pub fn delete(&self) -> bool {
         let key = self.get_key();
         let lock = SELECTION_LOCK.read().unwrap();
-        if lock.as_ref().is_some_and(|(_, selected)| *selected == key) { return false; }
+        if lock.as_ref().is_some_and(|(_, selected)| *selected == key) {
+            return false;
+        }
 
         // 同 clear_auths：先释放写锁再落盘，防重入死锁
         {
@@ -316,7 +332,11 @@ mod selection_tests {
 
     #[test]
     fn lobby_lease_blocks_switch_delete_and_clear_until_dropped() {
-        let account = LoginObj { uuid: "lobby-player".into(), auth_type: AuthType::OAuth, ..Default::default() };
+        let account = LoginObj {
+            uuid: "lobby-player".into(),
+            auth_type: AuthType::OAuth,
+            ..Default::default()
+        };
         let key = account.get_key();
         *CURRENT_USER.write().unwrap() = Some(key.clone());
         AUTHS.write().unwrap().insert(key.clone(), account.clone());
@@ -324,7 +344,10 @@ mod selection_tests {
         assert!(current_is_locked());
         assert!(lock_current().is_none());
         assert!(!set_current(None));
-        assert!(!set_current(Some(UserKeyObj { uuid: "another-player".into(), auth_type: AuthType::OAuth })));
+        assert!(!set_current(Some(UserKeyObj {
+            uuid: "another-player".into(),
+            auth_type: AuthType::OAuth
+        })));
         assert!(!account.delete());
         clear_auths();
         assert_eq!(get_current(), Some(key.clone()));

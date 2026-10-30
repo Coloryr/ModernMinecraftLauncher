@@ -409,8 +409,7 @@ onBeforeUnmount(() => {
   <WindowFrame :title="t('winTitle.serverInstance')" body-fill body-flush @close="emit('close')">
     <!-- 实例放标题栏：换实例不用回到总体设定 -->
     <template #head-right>
-      <select v-model="currentUuid" class="field-select head-select" :disabled="busy"
-        @change="onInstanceChange">
+      <select v-model="currentUuid" class="field-select head-select" :disabled="busy" @change="onInstanceChange">
         <option value="" disabled>{{ t("winExport.instance") }}</option>
         <option v-for="i in instances" :key="i.uuid" :value="i.uuid">{{ i.name }}</option>
       </select>
@@ -419,9 +418,8 @@ onBeforeUnmount(() => {
     <div class="si-layout">
       <!-- 左侧分页 -->
       <nav class="si-rail">
-        <button v-for="item in sections" :key="item.id" class="si-rail-item"
-          :class="{ active: section === item.id }" :disabled="busy && item.id === 'start'"
-          @click="section = item.id">
+        <button v-for="item in sections" :key="item.id" class="si-rail-item" :class="{ active: section === item.id }"
+          :disabled="busy && item.id === 'start'" @click="section = item.id">
           <span class="si-rail-icon">
             <GlyphIcon :name="item.icon" :size="16" :weight="1.8" />
           </span>
@@ -458,8 +456,7 @@ onBeforeUnmount(() => {
               </div>
               <div>
                 <label class="field-label" for="si-version">{{ t("serverInstance.version") }}</label>
-                <input id="si-version" v-model="version" class="field-input" :disabled="busy"
-                  spellcheck="false" />
+                <input id="si-version" v-model="version" class="field-input" :disabled="busy" spellcheck="false" />
               </div>
             </div>
 
@@ -557,8 +554,8 @@ onBeforeUnmount(() => {
             <!-- 与模组页同一个表头行：左边计数，右边控件；下面的表也是同一副外观 -->
             <div class="si-section-head">
               <span class="si-counter">{{ t("serverInstance.configCount", { n: configs.length }) }}</span>
-              <select v-model="newDir" class="field-select si-add-dir"
-                :title="t('serverInstance.configSelect')" :disabled="busy || !dirChoices.length">
+              <select v-model="newDir" class="field-select si-add-dir" :title="t('serverInstance.configSelect')"
+                :disabled="busy || !dirChoices.length">
                 <option value="" disabled>
                   {{ dirChoices.length ? t("serverInstance.configPick") : t("serverInstance.configNoMore") }}
                 </option>
@@ -629,8 +626,7 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="si-actions">
-              <BaseButton variant="primary" size="lg" :disabled="busy || !ready || !pickedCount"
-                @click="generate">
+              <BaseButton variant="primary" size="lg" :disabled="busy || !ready || !pickedCount" @click="generate">
                 {{ busy ? t("serverInstance.running") : t("serverInstance.generate") }}
               </BaseButton>
             </div>
@@ -766,7 +762,7 @@ onBeforeUnmount(() => {
 
 /* 页头不在滚动容器里，没有槽位，直接留 26px，与下方内容的右缘对齐 */
 .si-head,
-.si-content > .empty-tip {
+.si-content>.empty-tip {
   padding-right: 26px;
 }
 
@@ -833,7 +829,7 @@ onBeforeUnmount(() => {
 }
 
 /* 计数靠左、按钮靠右：第一个元素吃掉剩余宽度 */
-.si-section-head > :first-child {
+.si-section-head> :first-child {
   flex: 1;
 }
 

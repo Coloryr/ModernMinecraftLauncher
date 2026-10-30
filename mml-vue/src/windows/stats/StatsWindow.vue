@@ -609,7 +609,8 @@ function instanceLabel(inst: StatsInstanceDto): string {
           <div class="inst-picker">
             <button type="button" class="field-select inst-select" :aria-label="t('winStats.colInstance')"
               :title="selectedInstance ? instanceLabel(selectedInstance) : undefined" @click="instOpen = !instOpen">
-              <span class="inst-select-text">{{ selectedInstance ? instanceLabel(selectedInstance) : t("winStats.allInstances") }}</span>
+              <span class="inst-select-text">{{ selectedInstance ? instanceLabel(selectedInstance) :
+                t("winStats.allInstances") }}</span>
             </button>
             <div v-if="instOpen" class="inst-menu">
               <button type="button" class="inst-option" :class="{ active: !selectedUuid }" @click="pickInstance('')">
@@ -630,11 +631,11 @@ function instanceLabel(inst: StatsInstanceDto): string {
           </div>
           <!-- 自定义时间段：日期框跟在开关后面，缩窄后与第一行同排；窄窗才整组换行 -->
           <div v-if="customRange" class="range-row">
-            <BaseDatePicker v-model="fromDate" class="range-date" :min="minDate"
-              :max="toDate || maxDate || todayDate" :aria-label="t('winStats.dateFrom')" />
+            <BaseDatePicker v-model="fromDate" class="range-date" :min="minDate" :max="toDate || maxDate || todayDate"
+              :aria-label="t('winStats.dateFrom')" />
             <span class="range-sep">–</span>
-            <BaseDatePicker v-model="toDate" class="range-date" :min="fromDate || minDate"
-              :max="maxDate || todayDate" :aria-label="t('winStats.dateTo')" />
+            <BaseDatePicker v-model="toDate" class="range-date" :min="fromDate || minDate" :max="maxDate || todayDate"
+              :aria-label="t('winStats.dateTo')" />
           </div>
           <!-- 形态切换：单日固定饼图，不给切。只画图标，文案进提示与读屏名 -->
           <SegmentedTabs v-if="!isSingleDay" v-model="chartMode" class="chart-mode" :options="chartModeOptions"
@@ -1182,8 +1183,8 @@ function instanceLabel(inst: StatsInstanceDto): string {
   font-variant-numeric: tabular-nums;
 }
 
-.legend-head > span:not(:first-child),
-.legend-item > span:not(:first-child) {
+.legend-head>span:not(:first-child),
+.legend-item>span:not(:first-child) {
   text-align: right;
 }
 

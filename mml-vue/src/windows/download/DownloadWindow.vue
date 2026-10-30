@@ -301,8 +301,8 @@ onUnmounted(() => {
           <path d="M7 5h4v14H7zM13 5h4v14h-4z" />
         </svg>
       </BaseButton>
-      <BaseButton size="sm" variant="ghost" class="icon-btn-head" :disabled="!hasTasks"
-        v-tip="t('winDownload.stop')" :aria-label="t('winDownload.stop')" @click="requestStop">
+      <BaseButton size="sm" variant="ghost" class="icon-btn-head" :disabled="!hasTasks" v-tip="t('winDownload.stop')"
+        :aria-label="t('winDownload.stop')" @click="requestStop">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="none">
           <rect x="5" y="5" width="14" height="14" rx="2" />
         </svg>

@@ -134,7 +134,7 @@ const licenseSections = computed<LicenseSection[]>(() => [
 
 /** 用系统浏览器打开上游地址；打不开就静默，许可清单不该为一次跳转弹提示 */
 function openUrl(url: string) {
-  api.openUrl(url).catch(() => {});
+  api.openUrl(url).catch(() => { });
 }
 
 /** 复制 QQ 群号 */
@@ -168,9 +168,9 @@ async function copyQq() {
           <span class="about-label">{{ t("winHelp.exeSha1") }}</span>
           <code class="about-sha1" :class="{ 'is-error': !!exeError }" :title="exePath">
             <template v-if="exeSha1">{{ exeSha1 }}</template>
-            <template v-else-if="exeLoading">{{ t("winHelp.sha1Reading") }}</template>
-            <template v-else>{{ exeError || "—" }}</template>
-          </code>
+<template v-else-if="exeLoading">{{ t("winHelp.sha1Reading") }}</template>
+<template v-else>{{ exeError || "—" }}</template>
+</code>
         </div>
       </div>
 
@@ -205,8 +205,7 @@ async function copyQq() {
       <p>{{ t("winHelp.report") }}</p>
       <span class="footer-qq">
         {{ t("winHelp.qqGroup", { n: QQ_GROUP }) }}
-        <button class="qq-copy" v-tip="t('winHelp.qqCopy')" :aria-label="t('winHelp.qqCopy')"
-          @click="copyQq">
+        <button class="qq-copy" v-tip="t('winHelp.qqCopy')" :aria-label="t('winHelp.qqCopy')" @click="copyQq">
           {{ t("winHelp.qqCopy") }}
         </button>
       </span>
@@ -485,7 +484,7 @@ async function copyQq() {
   margin: 0 0 10px;
 }
 
-.lic-sec + .lic-sec {
+.lic-sec+.lic-sec {
   margin-top: 16px;
 }
 
@@ -517,7 +516,7 @@ async function copyQq() {
   padding: 6px 0;
 }
 
-.lic-row + .lic-row {
+.lic-row+.lic-row {
   border-top: 1px solid var(--border);
 }
 

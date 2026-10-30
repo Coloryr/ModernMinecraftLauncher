@@ -105,7 +105,7 @@ function killTree(child) {
   } catch {
     try {
       child.kill();
-    } catch {}
+    } catch { }
   }
 }
 
@@ -116,7 +116,7 @@ async function ensureVite() {
     try {
       const res = await fetch(url);
       if (res.ok) return null;
-    } catch {}
+    } catch { }
     await sleep(300);
   }
   console.log("[shots] 启动 Vite …");
@@ -131,7 +131,7 @@ async function ensureVite() {
     try {
       const res = await fetch(url);
       if (res.ok) return child;
-    } catch {}
+    } catch { }
   }
   killTree(child);
   throw new Error("Vite 启动超时");
@@ -213,7 +213,7 @@ async function waitReady(cdp, sessionId, scenario) {
         await sleep(120);
         return;
       }
-    } catch {}
+    } catch { }
     await sleep(120);
   }
   throw new Error("页面没有就绪: " + scenario.id);
@@ -300,10 +300,10 @@ async function shoot(cdp, browser, scenario, index) {
         sessionId,
         "JSON.stringify({ errors: window.__SHOT__?.errors ?? [], unknown: window.__SHOT__?.unknown ?? [], text: (document.body?.innerText ?? '').slice(0, 400) })",
       );
-    } catch {}
+    } catch { }
     throw new Error(String(error) + " | " + diag);
   } finally {
-    await cdp.send("Target.closeTarget", { targetId }).catch(() => {});
+    await cdp.send("Target.closeTarget", { targetId }).catch(() => { });
   }
 }
 
@@ -338,7 +338,7 @@ async function launchEdge(port, profile) {
         const info = await res.json();
         return { child, wsUrl: info.webSocketDebuggerUrl };
       }
-    } catch {}
+    } catch { }
   }
   killTree(child);
   throw new Error("Edge 调试端口没起来");

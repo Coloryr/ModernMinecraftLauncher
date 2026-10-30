@@ -174,8 +174,8 @@ function onLoaderPathPick(e: Event) {
         </button>
         <div v-if="typeOpen" class="type-drop" role="listbox" aria-multiselectable="true">
           <button v-for="vt in versionTypes" :key="vt" type="button" class="type-opt" role="option"
-            :aria-selected="verTypes.includes(vt)" :disabled="versionBusy"
-            :class="{ selected: verTypes.includes(vt) }" @click="toggleType(vt)">
+            :aria-selected="verTypes.includes(vt)" :disabled="versionBusy" :class="{ selected: verTypes.includes(vt) }"
+            @click="toggleType(vt)">
             {{ t(`add.type.${vt}`) }}
           </button>
         </div>
@@ -186,8 +186,8 @@ function onLoaderPathPick(e: Event) {
       <div class="path-row">
         <!-- 选中多个版本类型时按类型分组展示 -->
         <!-- 版本改了加载器就回到原版，见 onVersionChange；三种刷新期间都不给改 -->
-        <select ref="versionSelect" :value="newVersion" class="field-select"
-          :class="{ 'is-invalid': invalidVersion }" :disabled="versionBusy" @change="onVersionChange">
+        <select ref="versionSelect" :value="newVersion" class="field-select" :class="{ 'is-invalid': invalidVersion }"
+          :disabled="versionBusy" @change="onVersionChange">
           <optgroup v-for="grp in groupedVersions" :key="grp.type" :label="t(`add.type.${grp.type}`)">
             <option v-for="v in grp.items" :key="v.id" :value="v.id">{{ v.id }}</option>
           </optgroup>
@@ -217,8 +217,8 @@ function onLoaderPathPick(e: Event) {
           @change="onLoaderChange">
           <option v-for="l in loaders" :key="l" :value="l">{{ t(`add.loader.${l}`) }}</option>
         </select>
-        <button class="ui-btn-icon" :disabled="!newVersion || loaderLoading || loaderVerLoading" v-tip="t('add.loaderRefresh')"
-          :aria-label="t('add.loaderRefresh')" @click="emit('refreshLoaders')">
+        <button class="ui-btn-icon" :disabled="!newVersion || loaderLoading || loaderVerLoading"
+          v-tip="t('add.loaderRefresh')" :aria-label="t('add.loaderRefresh')" @click="emit('refreshLoaders')">
           <GlyphIcon name="refresh" :size="14" :weight="2" />
         </button>
       </div>
@@ -232,12 +232,12 @@ function onLoaderPathPick(e: Event) {
       <div class="path-row">
         <!-- 始终显示：拉取中 / 原版、自定义等无版本列表的加载器置灰 -->
         <select :value="loaderVersion" class="field-select"
-          :disabled="loaderVerLoading || !loaderVersions.length || loaderLoading"
-          @change="onLoaderVersionChange">
+          :disabled="loaderVerLoading || !loaderVersions.length || loaderLoading" @change="onLoaderVersionChange">
           <option v-for="lv in loaderVersions" :key="lv" :value="lv">{{ lv }}</option>
         </select>
-        <button class="ui-btn-icon" :disabled="!newVersion || noLoaderVersion || loaderVerLoading || loaderLoading" v-tip="t('add.loaderVerRefresh')"
-          :aria-label="t('add.loaderVerRefresh')" @click="emit('refreshLoaderVersions')">
+        <button class="ui-btn-icon" :disabled="!newVersion || noLoaderVersion || loaderVerLoading || loaderLoading"
+          v-tip="t('add.loaderVerRefresh')" :aria-label="t('add.loaderVerRefresh')"
+          @click="emit('refreshLoaderVersions')">
           <GlyphIcon name="refresh" :size="14" :weight="2" />
         </button>
       </div>

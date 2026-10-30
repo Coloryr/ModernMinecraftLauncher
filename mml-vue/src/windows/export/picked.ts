@@ -18,7 +18,7 @@ export function isPickedPath(
   unpicked: ReadonlySet<string>,
 ): boolean {
   let current = path;
-  for (;;) {
+  for (; ;) {
     if (unpicked.has(current)) return false;
     if (picked.has(current)) return true;
     const cut = current.lastIndexOf("/");

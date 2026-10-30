@@ -254,7 +254,8 @@ watch(memoryConflict, async (bad) => {
       <textarea v-model="run!.gameArgs" class="field-input args-input" spellcheck="false" />
     </SettingsGroup>
 
-    <SettingsGroup v-if="!locked" id="launchCmd" title-key="winSettings.secLaunchCmd" :flash="flashGroup === 'launchCmd'">
+    <SettingsGroup v-if="!locked" id="launchCmd" title-key="winSettings.secLaunchCmd"
+      :flash="flashGroup === 'launchCmd'">
       <div class="switch-list">
         <div class="switch-row">
           <span>{{ t("winSettings.preLaunch") }}</span>
@@ -280,8 +281,7 @@ watch(memoryConflict, async (bad) => {
     </SettingsGroup>
 
     <!-- 自动进入存档：实例配了启动后自动进入某个存档时，先弹窗确认；关掉后直接进入 -->
-    <SettingsGroup v-if="!locked" id="autoSave" title-key="winSettings.secAutoSave"
-      :flash="flashGroup === 'autoSave'">
+    <SettingsGroup v-if="!locked" id="autoSave" title-key="winSettings.secAutoSave" :flash="flashGroup === 'autoSave'">
       <div class="switch-row">
         <div class="switch-text">
           <span class="switch-label">{{ t("winSettings.autoSaveNotice") }}</span>

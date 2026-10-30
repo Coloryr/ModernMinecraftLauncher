@@ -493,9 +493,9 @@ async function onDetailRemove() {
 
         <BlockGrid :items="filtered" :keyword="keyword" :size="size" :active-id="detail?.id ?? null"
           :skin-cat="SKIN_CAT" :filtered="isFiltered" :is-favorite="isFavorite" :toggle-favorite="toggleFavorite"
-          :select-mode="multiSelect" :is-selected="(id) => selectedIds.has(id)"
-          @open="openDetail" @remove-skin="removeSkin" @clear-filters="clearFilters"
-          @item-menu="openBlockMenu" @toggle-select="(p) => toggleSelect(p.item, p.event)" />
+          :select-mode="multiSelect" :is-selected="(id) => selectedIds.has(id)" @open="openDetail"
+          @remove-skin="removeSkin" @clear-filters="clearFilters" @item-menu="openBlockMenu"
+          @toggle-select="(p) => toggleSelect(p.item, p.event)" />
       </div>
     </div>
 
@@ -534,23 +534,23 @@ async function onDetailRemove() {
     <SkinAddModal v-if="skinOpen" :busy="skinBusy" @submit="onSkinSubmit" @close="skinOpen = false" />
 
     <!-- 方块详情：打开选实例弹窗时先让位，避免两层遮罩叠着 -->
-    <BlockDetailModal v-if="detail && !iconTarget" :block="detail" :category="catLabel(detail.catUuid)" :keyword="keyword"
-      :removable="detail.catId === SKIN_CAT" :busy="iconBusy" :favorite="isFavorite(detail.id)"
+    <BlockDetailModal v-if="detail && !iconTarget" :block="detail" :category="catLabel(detail.catUuid)"
+      :keyword="keyword" :removable="detail.catId === SKIN_CAT" :busy="iconBusy" :favorite="isFavorite(detail.id)"
       :groups="groupList" :group="groupOf(detail.id)" @close="closeDetail" @remove="onDetailRemove"
       @set-icon="openDetailIconPick" @toggle-favorite="onDetailFavorite" @set-group="onDetailSetGroup" />
 
     <!-- 分组右键菜单：改名 / 删除；点空白处关掉 -->
     <div v-if="groupMenu" class="menu-backdrop" @pointerdown="groupMenu = null" @contextmenu.prevent />
-    <div v-if="groupMenu" class="group-menu"
-      :style="{ left: groupMenu.x + 'px', top: groupMenu.y + 'px' }" @pointerdown.stop @contextmenu.prevent>
+    <div v-if="groupMenu" class="group-menu" :style="{ left: groupMenu.x + 'px', top: groupMenu.y + 'px' }"
+      @pointerdown.stop @contextmenu.prevent>
       <button class="group-menu-item" @click="onGroupPick('rename')">{{ t("blocks.groupRename") }}</button>
       <button class="group-menu-item danger" @click="onGroupPick('remove')">{{ t("blocks.groupRemove") }}</button>
     </div>
 
     <!-- 方块右键菜单：设置实例 / 设置分组；自建分组视图里多一个「移出分组」 -->
     <div v-if="blockMenu" class="menu-backdrop" @pointerdown="blockMenu = null" @contextmenu.prevent />
-    <div v-if="blockMenu" class="group-menu"
-      :style="{ left: blockMenu.x + 'px', top: blockMenu.y + 'px' }" @pointerdown.stop @contextmenu.prevent>
+    <div v-if="blockMenu" class="group-menu" :style="{ left: blockMenu.x + 'px', top: blockMenu.y + 'px' }"
+      @pointerdown.stop @contextmenu.prevent>
       <button v-if="!multiSelect" class="group-menu-item" @click="enterMultiSelectFromMenu">
         {{ t("blocks.multiSelect") }}
       </button>

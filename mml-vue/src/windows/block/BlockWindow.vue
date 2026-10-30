@@ -83,8 +83,8 @@ async function confirmCloseRender() {
 
 <template>
   <WindowFrame body-fill :title="t('home.blocks')" @close="emit('close')">
-    <BlockPanel :settings="list" :groups="groups" :current-instance="currentInstance"
-      :multi-select="multiSelect" @update:multi-select="multiSelect = $event" />
+    <BlockPanel :settings="list" :groups="groups" :current-instance="currentInstance" :multi-select="multiSelect"
+      @update:multi-select="multiSelect = $event" />
 
     <!-- 渲染中关窗：确认后中断渲染再关 -->
     <BaseModal v-if="confirmClose" :title="t('blocks.closeRenderTitle')" :closable="false"

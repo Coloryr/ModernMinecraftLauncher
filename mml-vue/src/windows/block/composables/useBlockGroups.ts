@@ -55,7 +55,7 @@ export function useBlockGroups() {
       groups: groups.value.map((g) => ({ uuid: g.uuid, name: g.name })),
       members: members.value,
       favorites: favorites.value,
-    }).catch(() => {});
+    }).catch(() => { });
   }
 
   // 打开窗口时读一次；读不到就按空的来，之后的改动照样能写回去
