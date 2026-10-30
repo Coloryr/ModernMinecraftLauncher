@@ -119,14 +119,15 @@ pub(super) fn export_pack(
             std::env::current_exe().map_err(|e| e.to_string())?,
         ));
     }
-    // 内置 Java：把整个运行时目录照原样打进 java/<名称>/，导入端解到运行目录后登记进 Java 列表，
-    // 玩家没有装过对应版本的 Java 也能直接启动
-    if let Some(name) = options.java.as_deref().filter(|name| !name.is_empty()) {
+    // 内置 Java：选中的运行时各自照原样打进 java/<名称>/，导入端解到运行目录后登记进 Java 列表，
+    // 玩家没有装过对应版本的 Java 也能直接启动。可以同时带多个（不同版本各一套）
+    let mut bundled = std::collections::HashSet::new();
+    for name in options.java.iter().filter(|name| !name.is_empty()) {
         let info =
             mml_jvms::get_java_info(name).ok_or_else(|| err_keys::SERVER_PACK_INVALID.to_string())?;
         // 运行时名称要当目录名进 zip：按包内条目的同一套规则清洗，清洗完不合法就不带
         let name = java_dir_name(name);
-        if !format::safe_component(&name) {
+        if !format::safe_component(&name) || !bundled.insert(name.clone()) {
             return Err(err_keys::SERVER_PACK_INVALID.into());
         }
         // 可执行文件是 <根>/bin/java(或 javaw.exe)，退两级才是运行时根目录

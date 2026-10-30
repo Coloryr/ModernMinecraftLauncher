@@ -1743,7 +1743,7 @@ export const scenarios = [
     }),
     actions: [{ eval: click(".instance-row:nth-child(2) input"), after: 600 }],
   },
-  // 内置 Java：勾上之后出现运行时下拉，导出时才真正把运行时打进包
+  // 内置 Java：与实例同一套多选，勾一个运行时（导出时才真正打进包）
   {
     id: "server-pack-java",
     kind: "server_pack",
@@ -1753,10 +1753,10 @@ export const scenarios = [
     commands: base(),
     actions: [
       {
-        eval: "(() => { const card = [...document.querySelectorAll('.pack-card')].find((c) => c.textContent.includes('内置 Java')); const box = card && card.querySelector('input[type=checkbox]'); if (!box) return false; box.click(); return true; })()",
+        eval: "(() => { const card = [...document.querySelectorAll('.pack-card')].find((c) => c.textContent.includes('内置 Java')); const box = card && card.querySelector('.instance-row input'); if (!box) return false; box.click(); return true; })()",
         after: 500,
       },
-      { assert: "document.querySelector('.java-pick') !== null", label: "勾选后出现运行时下拉" },
+      { assert: "[...document.querySelectorAll('.pack-card')].find((c) => c.textContent.includes('内置 Java')).querySelectorAll('.instance-row.is-on').length === 1", label: "选中的运行时高亮" },
     ],
   },
   {

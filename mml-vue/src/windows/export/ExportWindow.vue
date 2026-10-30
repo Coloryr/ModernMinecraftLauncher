@@ -68,15 +68,13 @@ const serverPack = computed(() => currentKind.value === "server_pack");
 const pack = ref<PackId>(serverPack.value ? "server" : "mml");
 const includeLauncher = ref(false);
 
-/** 已检测到的 Java 运行时，服务器包的「内置 Java」从这里挑 */
+/** 已检测到的 Java 运行时，服务器包的「内置 Java」从这里多选 */
 const javas = ref<JavaInfoDto[]>([]);
-/** 是否把 Java 运行时打进包 */
-const bundleJava = ref(false);
-/** 打进包的那个运行时名称 */
-const javaPick = ref("");
+/** 要打进包的运行时名称，可多个；与实例多选同一套交互 */
+const javaPicked = ref<string[]>([]);
 
 /** 服务器包的三组选择：配置 → 自定义内容 → 实例 */
-/** 拉一次已检测到的 Java，服务器包用来挑要打进去的那一个 */
+/** 拉一次已检测到的 Java，服务器包用来挑要打进去的那几个 */
 async function loadJavas() {
   if (!serverPack.value) return;
   try {
@@ -84,10 +82,16 @@ async function loadJavas() {
   } catch {
     javas.value = [];
   }
-  if (!javaPick.value && javas.value.length) {
-    // 默认选第一个可用的：用户勾上「打包内置 Java」就能直接导出
-    javaPick.value = javas.value[0].name;
-  }
+  // 拉回来的列表里没有已选项了就清掉，避免导出时报「运行时不存在」
+  const alive = new Set(javas.value.map((j) => j.name));
+  javaPicked.value = javaPicked.value.filter((name) => alive.has(name));
+}
+
+/** 勾选 / 取消一个要打进包的运行时 */
+function toggleJava(name: string) {
+  javaPicked.value = javaPicked.value.includes(name)
+    ? javaPicked.value.filter((item) => item !== name)
+    : [...javaPicked.value, name];
 }
 
 const serverOptions = reactive({
@@ -708,7 +712,7 @@ async function startExport(confirmed = false) {
     server: {
       config: serverOptions.config,
       guiConfig: serverOptions.guiConfig,
-      java: bundleJava.value && javaPick.value ? javaPick.value : null,
+      java: [...javaPicked.value],
       page: serverOptions.page,
       css: serverOptions.css,
       home: serverOptions.home,
@@ -894,8 +898,20 @@ onBeforeUnmount(() => {
 
     <div class="export-window">
       <template v-if="info">
-        <!-- 服务器包：配置 → 自定义内容 → 实例 -->
+        <!-- 服务器包：启动器 → 配置 → 自定义内容 → 实例 → 内置 Java -->
         <template v-if="serverPack">
+          <!-- 启动器本体：只有 Windows 能带，放在最上面 -->
+          <section v-if="info.canBundleLauncher" class="pack-card">
+            <header class="pack-card-head">
+              <span class="pack-card-title">{{ t("winExport.serverLauncher") }}</span>
+              <span class="pack-card-hint">{{ t("winExport.serverLauncherHint") }}</span>
+            </header>
+            <label class="check-row">
+              <input v-model="includeLauncher" type="checkbox" :disabled="busy" />
+              {{ t("winExport.includeLauncher") }}
+            </label>
+          </section>
+
           <!-- 配置：跟包一起带走的启动器设置，不带就保留玩家原来的 -->
           <section class="pack-card">
             <header class="pack-card-head">
@@ -962,28 +978,25 @@ onBeforeUnmount(() => {
                 <span class="instance-meta">{{ i.version }} · {{ loaderLabel(i.loader) }}</span>
               </label>
             </div>
-            <label v-if="info.canBundleLauncher" class="check-row">
-              <input v-model="includeLauncher" type="checkbox" :disabled="busy" />
-              {{ t("winExport.includeLauncher") }}
-            </label>
           </section>
 
-          <!-- 内置 Java：把本机认得的运行时整个打进包，玩家没装 Java 也能直接启动 -->
+          <!-- 内置 Java：可多选，交互与实例列表一致；玩家没装对应版本也能直接启动 -->
           <section class="pack-card">
             <header class="pack-card-head">
               <span class="pack-card-title">{{ t("winExport.serverJava") }}</span>
-              <span class="pack-card-hint">{{ t("winExport.serverJavaHint") }}</span>
+              <span class="pack-card-hint">
+                {{ javas.length ? t("winExport.serverJavaPicked", { count: javaPicked.length }) : t("winExport.serverJavaNone") }}
+              </span>
             </header>
-            <label class="check-row" :class="{ 'is-disabled': !javas.length }">
-              <input v-model="bundleJava" type="checkbox" :disabled="busy || !javas.length" />
-              {{ t("winExport.serverJavaBundle") }}
-            </label>
-            <select v-if="bundleJava" v-model="javaPick" class="field-select java-pick" :disabled="busy">
-              <option v-for="j in javas" :key="j.name" :value="j.name">
-                {{ j.name }} · Java {{ j.major }}
-              </option>
-            </select>
-            <p v-if="!javas.length" class="field-hint">{{ t("winExport.serverJavaNone") }}</p>
+            <div v-if="javas.length" class="instance-list">
+              <label v-for="j in javas" :key="j.name" class="instance-row"
+                :class="{ 'is-on': javaPicked.includes(j.name) }">
+                <input type="checkbox" :checked="javaPicked.includes(j.name)" :disabled="busy"
+                  @change="toggleJava(j.name)" />
+                <span class="instance-name" :title="j.name">{{ j.name }}</span>
+                <span class="instance-meta">Java {{ j.major }} · {{ j.arch }}</span>
+              </label>
+            </div>
           </section>
 
           <div class="row">
@@ -1211,11 +1224,6 @@ onBeforeUnmount(() => {
   gap: 8px 20px;
 }
 
-/* 内置 Java 的下拉：跟在勾选框下面，别贴着 */
-.java-pick {
-  margin-top: 8px;
-  max-width: 320px;
-}
 
 .check-row.is-disabled {
   color: var(--text-dim);
