@@ -930,7 +930,7 @@ export function moreCommands(extra = {}) {
     gamepad_list: [],
     gamepad_get_profiles: gamepadProfiles,
     gamepad_get_config: gamepadConfig,
-    app_build_exe_info: { path: "C:\\Program Files\\M²L\\mml-gui.exe", sha1: "a1b2c3d4e5f6" },
+    app_build_exe_info: { path: "C:\\Program Files\\M²L\\ModernMinecraftLauncher.exe", sha1: "a1b2c3d4e5f6" },
     stats_get_playtime: statsPlaytime,
     add_modpack_list: { items: modpackItems, count: modpackItems.length },
     add_modpack_detail: modpackDetail,

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 用已构建的 target/release/mml-gui 打 Flatpak 单文件包，不重新编译。
+# 用已构建的 target/release/ModernMinecraftLauncher 打 Flatpak 单文件包，不重新编译。
 # 只做 OSTree 提交与 bundle，所以不需要装 Flatpak SDK / runtime；运行时要装
 # org.freedesktop.Platform（由用户或 CI 自行安装）。
 #
@@ -17,7 +17,9 @@ if ! command -v flatpak >/dev/null 2>&1; then
     exit 1
 fi
 
-binary="$root/target/release/mml-gui"
+binary="$root/target/release/ModernMinecraftLauncher"
+# tauri build 会按 productName 重命名；没改名时退回 crate 名
+[ -f "$binary" ] || binary="$root/target/release/mml-gui"
 if [ ! -f "$binary" ]; then
     echo "找不到 ${binary}，请先跑 build/build-release.sh。" >&2
     exit 1
@@ -40,7 +42,7 @@ mkdir -p "$build/files/bin" \
     "$build/export/share/icons/hicolor/256x256/apps" \
     "$build/var"
 
-install -m755 "$binary" "$build/files/bin/mml-gui"
+install -m755 "$binary" "$build/files/bin/ModernMinecraftLauncher"
 install -m644 "$root/build/linux/com.coloryr.mml.desktop" \
     "$build/files/share/applications/com.coloryr.mml.desktop"
 install -m644 "$root/build/linux/com.coloryr.mml.metainfo.xml" \
@@ -58,7 +60,7 @@ cat > "$build/metadata" <<EOF
 [Application]
 name=com.coloryr.mml
 runtime=org.freedesktop.Platform/$host_arch/$runtime
-command=mml-gui
+command=ModernMinecraftLauncher
 EOF
 
 repo="$work/repo"

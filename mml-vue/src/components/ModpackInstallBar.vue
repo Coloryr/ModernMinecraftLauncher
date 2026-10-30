@@ -130,8 +130,9 @@ async function clearDone() {
           </div>
           <!-- 任务进度：失败 / 取消的任务不再画条。原来兜底给 100%，失败的任务下面就
                挂着一条满格的灰条，看着像"下载完了"，与旁边的"失败"标签自相矛盾。
-               已完成才走 100% -->
-          <div v-if="!task.failed && !task.cancelled" class="progress-track sub">
+               已完成才走 100%。解压阶段有子进度时让位，避免一条阶段条压在解压条上面不动 -->
+          <div v-if="!task.failed && !task.cancelled && !(task.state === 'extract' && task.subTotal > 0)"
+            class="progress-track sub">
             <div class="progress-fill" :style="{ width: taskProgress(task) + '%' }" />
           </div>
           <template v-if="isRunning(task) && (task.subText || task.subTotal)">

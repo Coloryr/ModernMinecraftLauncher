@@ -19,6 +19,7 @@ import { svgIcon } from "../lib/modrinthIcon";
 import { usePageActive } from "../lib/pageActive";
 import { usePageKeys } from "../composables/usePageKeys";
 import { toggleStar } from "../lib/projectCollect";
+import { cardTags, hiddenTagTip } from "../lib/projectTags";
 import type {
   FileListItemDto,
   FileListDto,
@@ -99,6 +100,12 @@ const authorList = computed(() => {
   const fromItem = pick(current.value?.authors ?? []);
   return fromItem.length ? fromItem : pick(detail.value?.authors ?? []);
 });
+
+/** 详情头部这一行标签；过多时折叠进末尾的省略号，悬停看剩余 */
+const tagRow = computed(() =>
+  // 详情头部右侧还有操作按钮，比卡片少留两个的位置，保证末尾省略号不被裁掉
+  cardTags(detail.value?.tag.length ? detail.value.tag : current.value?.tag ?? [], 4),
+);
 
 const pageFiles = computed(() =>
   isModrinth.value
@@ -377,13 +384,14 @@ function scrollToVersions() {
                 </svg>
               </button>
             </div>
-            <div v-if="detail?.tag.length || current.tag.length" class="pack-tags detail-tags">
-              <span v-for="tag in detail?.tag.length ? detail.tag : current.tag" :key="tag.name" class="pack-tag"
-                v-tip="tag.name">
+            <div v-if="tagRow.shown.length" class="pack-tags detail-tags">
+              <span v-for="tag in tagRow.shown" :key="tag.name" class="pack-tag" v-tip="tag.name">
                 <span v-if="tag.svg" class="tag-svg" v-html="svgIcon(tag.svg)"></span>
                 <img v-else-if="tag.logo" class="pack-tag-icon" :src="tag.logo" loading="lazy" alt="" />
                 <span class="pack-tag-name">{{ tag.name }}</span>
               </span>
+              <span v-if="tagRow.more" class="pack-tag pack-tag-more"
+                v-tip="hiddenTagTip(tagRow.hidden)">…</span>
             </div>
           </div>
 

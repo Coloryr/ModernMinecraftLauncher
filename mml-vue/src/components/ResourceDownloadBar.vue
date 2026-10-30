@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 资源下载进度条：每个下载项目（pid）一条进度，终态带标签。
-// 终态条目不自动移除，由「清除已完成」手动清理。
-// 当前由右下角的进度弹窗（ResourcePopup）使用；内容区改用标题栏指示器。
+// 终态条目不自动移除，由「清除已完成」手动清理；内容区底部那条只显示进行中的，
+// 终态已经有进度弹窗 / 系统提示，不再重复占一列。
 //
 // 口径见 lib/progress.ts：同一个项目下选了多个文件时按「项目数」推进，
 // 只有一个文件时用该文件自己的字节进度（单独下一个模组就是这一种）。
@@ -19,12 +19,19 @@ const props = withDefaults(
     status: ResourceStatusDto;
     /** 弹窗形态：撑满弹窗剩余高度，任务多了由任务区自己滚（弹窗那侧锁死高度时用） */
     fillHeight?: boolean;
+    /** 只显示进行中的项目；内容区底部用，终态交给进度弹窗 */
+    hideFinished?: boolean;
   }>(),
-  { fillHeight: false },
+  { fillHeight: false, hideFinished: false },
 );
 
 /** 按下载项目分组的进度 */
 const groups = computed(() => resourceGroups(props.status.tasks));
+
+/** 列表实际显示的项目；隐藏终态时只留还在下的 */
+const visibleGroups = computed(() =>
+  props.hideFinished ? groups.value.filter((group) => !group.done && !group.failed && !group.cancelled) : groups.value,
+);
 
 /** 还在下的项目；标题与总进度条都按它算，全结束了就别再报"正在下载" */
 const running = computed(() =>
@@ -73,7 +80,7 @@ function progressText(group: ResourceGroupProgress): string {
 </script>
 
 <template>
-  <div class="res-bar" :class="{ 'fill-h': props.fillHeight }">
+  <div v-if="!hideFinished || visibleGroups.length" class="res-bar" :class="{ 'fill-h': props.fillHeight }">
     <div class="res-bar-head">
       <span class="res-bar-title">{{ headText }}</span>
     </div>
@@ -84,8 +91,8 @@ function progressText(group: ResourceGroupProgress): string {
 
     <!-- 每个下载项目的进度。**只有一个项目时也列**：名字是用户唯一能确认"下的是哪个"的东西；
          那种情况下总进度条就是它的进度，不再画一条重复的子条 -->
-    <div v-if="groups.length" class="res-task-list">
-      <div v-for="group in groups" :key="group.pid" class="res-task">
+    <div v-if="visibleGroups.length" class="res-task-list">
+      <div v-for="group in visibleGroups" :key="group.pid" class="res-task">
         <div class="res-task-head">
           <!-- 项目图标：一眼认出下的是哪个资源；没有就用首字母占位 -->
           <AsyncImage v-if="group.icon" class="res-task-icon" :src="group.icon" alt="" />
@@ -97,7 +104,7 @@ function progressText(group: ResourceGroupProgress): string {
           </span>
           <span v-else class="res-task-percent">{{ progressText(group) }}</span>
         </div>
-        <div v-if="groups.length > 1" class="progress-track sub">
+        <div v-if="visibleGroups.length > 1" class="progress-track sub">
           <div class="progress-fill" :style="{ width: group.percent + '%' }" />
         </div>
       </div>
@@ -105,7 +112,7 @@ function progressText(group: ResourceGroupProgress): string {
 
     <!-- 清掉已结束的条目：放列表底部，与整合包那条进度卡同一位置口径。
          终态条目不再自动移除，不点它就一直在，方便回头看下过什么 -->
-    <div v-if="finished.length" class="res-footer">
+    <div v-if="!hideFinished && finished.length" class="res-footer">
       <button class="res-clear-btn" @click="clearDone">
         {{ t("addResource.bar.clearDone") }}
       </button>

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 用已构建的 target/release/mml-gui 打 Arch 包（.pkg.tar.zst），不重新编译。
+# 用已构建的 target/release/ModernMinecraftLauncher 打 Arch 包（.pkg.tar.zst），不重新编译。
 # 不依赖 makepkg / Arch：Arch 包就是 tar.zst 里放 .PKGINFO（可选 .MTREE），
 # 在 Ubuntu 上也能直接打；有 bsdtar 时顺带生成 .MTREE。
 #
@@ -13,7 +13,9 @@ umask 022
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 version="$(tr -d '[:space:]' < "$root/build/version")"
 
-binary="$root/target/release/mml-gui"
+binary="$root/target/release/ModernMinecraftLauncher"
+# tauri build 会按 productName 重命名；没改名时退回 crate 名
+[ -f "$binary" ] || binary="$root/target/release/mml-gui"
 if [ ! -f "$binary" ]; then
     echo "找不到 ${binary}，请先跑 build/build-release.sh。" >&2
     exit 1
@@ -34,7 +36,7 @@ install -d -m755 "$pkgroot/usr/bin" \
     "$pkgroot/usr/share/metainfo" \
     "$pkgroot/usr/share/licenses/mml-gui"
 
-install -m755 "$binary" "$pkgroot/usr/bin/mml-gui"
+install -m755 "$binary" "$pkgroot/usr/bin/ModernMinecraftLauncher"
 install -m644 "$root/build/linux/com.coloryr.mml.desktop" \
     "$pkgroot/usr/share/applications/com.coloryr.mml.desktop"
 install -m644 "$root/mml-gui/src-tauri/icons/128x128@2x.png" \

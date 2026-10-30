@@ -11,7 +11,7 @@ import { api, getAddModpackSource, setAddModpackSource } from "../../lib/api";
 import { useDownloadBadges } from "../../lib/downloadBadges";
 import { formatCount, t, tErr } from "../../lib/i18n";
 import { svgIcon } from "../../lib/modrinthIcon";
-import { cardTags } from "../../lib/projectTags";
+import { cardTags, hiddenTagTip } from "../../lib/projectTags";
 import HighlightText from "../../components/ui/HighlightText.vue";
 import { toggleStar } from "../../lib/projectCollect";
 import { useCollectStars } from "../../lib/useCollectStars";
@@ -476,7 +476,8 @@ watch(source, loadSource);
                   {{ tag.name }}
                 </span>
                 <!-- 超过上限的标签用省略号顶上，别把最后一个切掉一半 -->
-                <span v-if="cardTags(item.tag).more" class="pack-tag">…</span>
+                <span v-if="cardTags(item.tag).more" class="pack-tag pack-tag-more"
+                  v-tip="hiddenTagTip(cardTags(item.tag).hidden)">…</span>
               </div>
               <div class="pack-meta">
                 {{ t("modpack.downloads", { n: formatCount(item.downloadCount) }) }}

@@ -20,7 +20,7 @@ import { api, getAddResourceSource, setAddResourceSource } from "../../lib/api";
 import { useDownloadBadges } from "../../lib/downloadBadges";
 import { formatCount, t, tErr } from "../../lib/i18n";
 import { svgIcon } from "../../lib/modrinthIcon";
-import { cardTags } from "../../lib/projectTags";
+import { cardTags, hiddenTagTip } from "../../lib/projectTags";
 import HighlightText from "../../components/ui/HighlightText.vue";
 import { toggleStar } from "../../lib/projectCollect";
 import { useCollectStars } from "../../lib/useCollectStars";
@@ -921,7 +921,8 @@ onActivated(async () => {
                     {{ tag.name }}
                   </span>
                   <!-- 超过上限的标签用省略号顶上，别把最后一个切掉一半 -->
-                  <span v-if="cardTags(item.tag).more" class="pack-tag">…</span>
+                  <span v-if="cardTags(item.tag).more" class="pack-tag pack-tag-more"
+                    v-tip="hiddenTagTip(cardTags(item.tag).hidden)">…</span>
                 </div>
                 <div class="pack-meta">
                   {{ t("modpack.downloads", { n: formatCount(item.downloadCount) }) }}
@@ -933,8 +934,9 @@ onActivated(async () => {
         </template>
       </div>
 
-      <!-- 下载任务：点下载后就在列表下方逐个项目显示进度，与整合包窗口的下载项目列表同一套渲染 -->
-      <ResourceDownloadBar v-if="resourceStatus && resourceStatus.tasks.length" :status="resourceStatus" />
+      <!-- 下载任务：只在列表下方显示还在下的项目；终态由进度弹窗 / 系统提示承担 -->
+      <ResourceDownloadBar v-if="resourceStatus && resourceStatus.tasks.length" :status="resourceStatus"
+        hide-finished />
 
       <!-- 分页 -->
       <div v-if="maxPage > 0" class="res-page">

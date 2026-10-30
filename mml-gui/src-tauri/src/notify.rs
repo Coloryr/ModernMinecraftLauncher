@@ -126,7 +126,7 @@ mod windows_link {
 
     /// 开始菜单里的快捷方式名，与安装包（NSIS）建的那份同名：
     /// 装过的用户这里已经有文件，直接跳过，免得开始菜单里出现两条
-    const SHORTCUT_NAME: &str = "mml-gui.lnk";
+    const SHORTCUT_NAME: &str = "ModernMinecraftLauncher.lnk";
 
     /// 确保开始菜单里有带 AUMID 的快捷方式
     ///

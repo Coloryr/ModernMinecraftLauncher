@@ -83,7 +83,7 @@ PowerShell 版在 Windows 默认出三架构，bash 版构建当前架构；`bui
 跨平台辅助脚本。
 
 Flatpak 与 Arch 包不在 `build-release` 里自动跑，由 `build/package-flatpak.sh`、
-`build/package-arch.sh` 单独完成，输入都是 `target/release/mml-gui`：
+`build/package-arch.sh` 单独完成，输入都是 `target/release/ModernMinecraftLauncher`：
 Flatpak 走 `flatpak build-export` + `build-bundle`，不依赖 SDK / runtime；
 Arch 包按 `.PKGINFO` + `tar.zst` 直接组装，不依赖 `makepkg`，有 `bsdtar` 时顺带生成 `.MTREE`。
 桌面文件与 AppStream 元数据在 `build/linux/`。

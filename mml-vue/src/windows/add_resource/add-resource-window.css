@@ -298,6 +298,11 @@
   border-radius: 3px;
 }
 
+.pack-tag-more {
+  cursor: help;
+  flex-shrink: 0;
+}
+
 /* Modrinth 分类图标：icon 字段是内联 svg 源码，stroke=currentColor 继承这里设置的文字色 */
 .tag-svg {
   display: inline-flex;

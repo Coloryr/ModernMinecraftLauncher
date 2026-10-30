@@ -7,11 +7,14 @@
 //! | `curseforge_worker` | CurseForge 整合包安装 |
 //! | `modrinth_worker` | Modrinth 整合包安装 |
 
-use std::sync::Mutex;
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicUsize, Ordering},
+};
 
 use async_trait::async_trait;
 use mml_base::{
-    archives::{BaseArchive, BaseArchiveGui},
+    archives::{BaseArchive, BaseArchiveGui, IBaseArchiveGui},
     file_item::FileItemObj,
 };
 use mml_names::i18_items::error_type::{CoreResult, DataNotFoundData, ErrorType};
@@ -133,6 +136,63 @@ pub struct BaseModPackWorker {
     pub icon: Option<String>,
 }
 
+/// 整合包解压的进度桥：同一份解压进度同时写给压缩包弹窗与安装任务
+struct PackExtractGui {
+    /// 添加实例窗口自己的压缩包解压进度；没有该窗口时为 `None`
+    archive: BaseArchiveGui,
+    /// 安装任务的主进度回调；写进子进度，任务列表据此画解压条
+    pack: AddModPackGui,
+    /// 本批总文件数；`start` 写入，`update` 时用来带上总数
+    total: AtomicUsize,
+}
+
+impl IBaseArchiveGui for PackExtractGui {
+    fn start(&self, total: usize) {
+        self.total.store(total, Ordering::Relaxed);
+        if let Some(pack) = &self.pack {
+            pack.set_sub_text(None);
+            pack.set_sub_now(0, Some(total));
+        }
+        if let Some(archive) = &self.archive {
+            archive.start(total);
+        }
+    }
+
+    fn update(&self, filename: Option<String>, current: usize) {
+        let total = self.total.load(Ordering::Relaxed);
+        if let Some(pack) = &self.pack {
+            pack.set_sub_text(filename.clone());
+            pack.set_sub_now(current, Some(total));
+        }
+        if let Some(archive) = &self.archive {
+            archive.update(filename, current);
+        }
+    }
+
+    fn done(&self) {
+        let total = self.total.load(Ordering::Relaxed);
+        if let Some(pack) = &self.pack {
+            pack.set_sub_text(None);
+            pack.set_sub_now(total, Some(total));
+        }
+        if let Some(archive) = &self.archive {
+            archive.done();
+        }
+    }
+
+    fn cancelled(&self) -> bool {
+        self.archive.as_ref().is_some_and(|gui| gui.cancelled())
+    }
+
+    fn file_rename(&self, name: &str) -> bool {
+        // 任务进度弹窗没有确认入口：沿用无 GUI 时的自动改名
+        match &self.archive {
+            Some(gui) => gui.file_rename(name),
+            None => true,
+        }
+    }
+}
+
 impl BaseModPackWorker {
     /// 创建安装器
     ///
@@ -200,6 +260,16 @@ impl BaseModPackWorker {
             return Err(ErrorType::TaskCancel);
         }
 
+        let extract_gui = if self.pack_gui.is_some() || self.archive_gui.is_some() {
+            Some(Arc::new(PackExtractGui {
+                archive: self.archive_gui.clone(),
+                pack: self.pack_gui.clone(),
+                total: AtomicUsize::new(0),
+            }) as Arc<dyn IBaseArchiveGui>)
+        } else {
+            None
+        };
+
         self.archive.extract_where(
             |entry| {
                 // 跳过不需要解压的条目
@@ -216,7 +286,7 @@ impl BaseModPackWorker {
                 };
                 Some(output)
             },
-            self.archive_gui.as_deref(),
+            extract_gui.as_deref(),
         )
     }
 }

@@ -207,7 +207,13 @@
 
 .detail-tags .pack-tag {
   min-width: 0;
-  flex-shrink: 1;
+  flex-shrink: 0;
+}
+
+/* 折叠后的省略号：悬停列出剩余标签 */
+.detail-tags .pack-tag-more {
+  flex-shrink: 0;
+  cursor: help;
 }
 
 /* 头部右侧的操作按钮组 */

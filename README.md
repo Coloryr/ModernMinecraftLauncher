@@ -123,7 +123,7 @@ build/dev-frontend.sh     # Linux / macOS / Git Bash
 bash 版构建当前架构（可用 `MML_TARGETS` 指定三元组）。预发布也要安装包、或想调整 profile，
 见[开发与构建](docs/development.md)。
 
-Linux 还有两个附加包，都拿已构建的 `target/release/mml-gui` 直接封装、不重新编译：
+Linux 还有两个附加包，都拿已构建的 `target/release/ModernMinecraftLauncher` 直接封装、不重新编译：
 `package-flatpak.sh` 需要 `flatpak`；`package-arch.sh` 直接按 Arch 包格式组装
 tar.zst，不依赖 `makepkg`，Ubuntu 上也能打。CI 只在 Linux x64 执行这两个脚本，arm64 / x86 不做这两个附加包；
 附加包在独立 job 里打，失败不影响 deb / rpm / AppImage，但发版 job 会等它，缺包时不发 Release。
