@@ -628,18 +628,17 @@ function instanceLabel(inst: StatsInstanceDto): string {
             </label>
             <SegmentedTabs v-if="!customRange" v-model="range" :options="rangeOptions" />
           </div>
+          <!-- 自定义时间段：日期框跟在开关后面，缩窄后与第一行同排；窄窗才整组换行 -->
+          <div v-if="customRange" class="range-row">
+            <BaseDatePicker v-model="fromDate" class="range-date" :min="minDate"
+              :max="toDate || maxDate || todayDate" :aria-label="t('winStats.dateFrom')" />
+            <span class="range-sep">–</span>
+            <BaseDatePicker v-model="toDate" class="range-date" :min="fromDate || minDate"
+              :max="maxDate || todayDate" :aria-label="t('winStats.dateTo')" />
+          </div>
           <!-- 形态切换：单日固定饼图，不给切。只画图标，文案进提示与读屏名 -->
           <SegmentedTabs v-if="!isSingleDay" v-model="chartMode" class="chart-mode" :options="chartModeOptions"
             icon-only />
-        </div>
-
-        <!-- 自定义时间段：两个日期框单独占第二行，第一行只留实例下拉、开关与形态切换 -->
-        <div v-if="customRange" class="range-row">
-          <BaseDatePicker v-model="fromDate" class="range-date" :min="minDate"
-            :max="toDate || maxDate || todayDate" :aria-label="t('winStats.dateFrom')" />
-          <span class="range-sep">–</span>
-          <BaseDatePicker v-model="toDate" class="range-date" :min="fromDate || minDate"
-            :max="maxDate || todayDate" :aria-label="t('winStats.dateTo')" />
         </div>
 
         <div class="play-stats">
@@ -838,7 +837,7 @@ function instanceLabel(inst: StatsInstanceDto): string {
   border-radius: 12px;
 }
 
-/* 工具条固定两行：第一行标题 / 实例 / 时间区间，第二行三个区间统计 */
+/* 工具条：第一行标题 / 实例 / 时间区间（含自定义日期），第二行三个区间统计 */
 .play-bar {
   display: flex;
   flex-direction: column;
@@ -846,10 +845,9 @@ function instanceLabel(inst: StatsInstanceDto): string {
   padding-bottom: 12px;
 }
 
-/* 第一行：标题 / 实例下拉 / 时间区间 / 形态切换。
+/* 第一行：标题 / 实例下拉 / 时间区间（含自定义日期）/ 形态切换。
    下拉吃掉标题与区间控件之间的剩余宽度，宽度只由窗口决定，不随选中项的长短变。
-   自定义时间段那两个日期框很占地方，窄窗时一行放不下：允许换行，
-   别把最后的形态切换挤到面板外面 */
+   日期框缩到 120px 后与开关同排；窄窗时整组换行，别把形态切换挤到面板外面 */
 .play-top {
   display: flex;
   align-items: center;
@@ -879,11 +877,12 @@ function instanceLabel(inst: StatsInstanceDto): string {
   flex: none;
 }
 
-/* 自定义时间段的两个日期框：单独一行，贴着工具条左缘排 */
+/* 自定义时间段的两个日期框：跟在时间开关后面，不参与伸缩 */
 .range-row {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 0 0 auto;
 }
 
 /* 自定义时间段：开关 + 文案；选预设时这一对保留，7 / 30 / 90 隐藏 */
@@ -898,9 +897,9 @@ function instanceLabel(inst: StatsInstanceDto): string {
   white-space: nowrap;
 }
 
-/* 日期选择器：宽度挂在组件根元素上，外观由组件自己管 */
+/* 日期选择器：宽度挂在组件根元素上，外观由组件自己管；120px 够放 YYYY-MM-DD */
 .range-date {
-  width: 140px;
+  width: 120px;
 }
 
 .range-sep {

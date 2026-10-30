@@ -853,16 +853,7 @@
   object-fit: contain;
 }
 
-/* ---------- 扫描 / 导入中的加载弹窗 ---------- */
-
-.settings-layout .loading-modal {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  color: var(--text-dim);
-  font-size: 14px;
-}
+/* ---------- 加载转圈：本地文件行内与按钮内 ---------- */
 
 .settings-layout .loading-spin {
   width: 20px;

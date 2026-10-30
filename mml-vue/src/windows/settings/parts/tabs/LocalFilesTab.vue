@@ -9,6 +9,7 @@ import { formatSize } from "../../../../lib/format";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../../components/ui/BaseModal.vue";
 import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
+import VirtualList from "../../../../components/ui/VirtualList.vue";
 import SettingsGroup from "../SettingsGroup.vue";
 import type { useSettingsLocalFiles } from "../../composables/useSettingsLocalFiles";
 
@@ -26,6 +27,9 @@ const pending = ref("");
 
 /** 展开了明细的行 id；目前只有「游戏实例」这一行带 children */
 const expanded = ref<Set<string>>(new Set());
+
+/** 实例明细行高，单位 px；与 .local-file-child 的 height 一致 */
+const INSTANCE_ROW_H = 34;
 
 /** 确认框里要显示的名字，取当前语言的文案 */
 const pendingName = computed(() => {
@@ -131,13 +135,16 @@ async function onConfirmClear() {
           </div>
         </div>
 
-        <!-- 每个实例一行：名字贴左、大小靠右 -->
-        <div v-if="e.children.length && isExpanded(e.id)" class="local-file-children">
-          <div v-for="child in e.children" :key="child.uuid" class="local-file-child">
-            <span class="local-file-child-name" :title="child.path">{{ child.name }}</span>
-            <span class="local-file-size">{{ formatSize(child.size) }}</span>
-          </div>
-        </div>
+        <!-- 每个实例一条：名字贴左、大小靠右；实例多时只渲染视口附近的行 -->
+        <VirtualList v-if="e.children.length && isExpanded(e.id)" class="local-file-children"
+          :count="e.children.length" :row-h="INSTANCE_ROW_H" :row-gap="0">
+          <template #default="{ start, end }">
+            <div v-for="child in e.children.slice(start, end)" :key="child.uuid" class="local-file-child">
+              <span class="local-file-child-name" :title="child.path">{{ child.name }}</span>
+              <span class="local-file-size">{{ formatSize(child.size) }}</span>
+            </div>
+          </template>
+        </VirtualList>
       </div>
     </div>
   </SettingsGroup>
@@ -169,7 +176,7 @@ async function onConfirmClear() {
   min-width: 0;
 }
 
-/* 24px 的可点方块：18px 太小，悬停时也没有可辨认的边界 */
+/* 24px 的可点区域，但不画外框；悬停只给一点底色 */
 .local-file-expand {
   display: inline-flex;
   align-items: center;
@@ -178,17 +185,16 @@ async function onConfirmClear() {
   height: 24px;
   flex-shrink: 0;
   padding: 0;
-  border: 1px solid var(--border);
+  border: none;
   border-radius: 6px;
-  background: var(--bg-card);
+  background: transparent;
   color: var(--text-dim);
   cursor: pointer;
-  transition: transform 0.15s ease, color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+  transition: transform 0.15s ease, color 0.12s ease, background 0.12s ease;
 }
 
 .local-file-expand:hover {
   color: var(--accent);
-  border-color: var(--accent);
   background: var(--bg-hover);
 }
 
@@ -196,24 +202,27 @@ async function onConfirmClear() {
   transform: rotate(180deg);
 }
 
-/* 明细是一块有边界的缩进面板，别和上面的合计行糊成一片 */
+/* 明细是一条条的行：外框只负责分组，行与行之间用分隔线；超过上限自己滚 */
 .local-file-children {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  max-height: 240px;
   margin: 6px 12px 0 42px;
-  padding: 6px 8px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--bg);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .local-file-child {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 6px 8px;
-  border-radius: 6px;
+  height: 34px;
+  flex-shrink: 0;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border);
   font-size: 12.5px;
 }
 

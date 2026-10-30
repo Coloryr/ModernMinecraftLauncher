@@ -41,7 +41,7 @@ const {
   downloadJava,
 } = props.settings;
 
-// 删除确认框：Esc = 取消；扫描中的加载弹窗不可关闭，忽略
+// 删除确认框：Esc = 取消
 useModalKeys((e) => {
   if (e.key !== "Escape") return;
   if (confirmRemoveAll.value) confirmRemoveAll.value = false;
@@ -57,22 +57,29 @@ useModalKeys((e) => {
           spellcheck="false" autocomplete="off" />
         <input v-model="newJavaPath" class="field-input grow" :placeholder="t('winSettings.javaPath')"
           spellcheck="false" autocomplete="off" />
-        <BaseButton size="sm" @click="browseJava">{{ t("args.browse") }}</BaseButton>
-        <BaseButton size="sm" variant="accent" :disabled="addingJava || !newJavaName.trim() || !newJavaPath.trim()"
-          @click="addJava">
+        <BaseButton size="sm" :disabled="scanning || scanningDir" @click="browseJava">{{ t("args.browse") }}</BaseButton>
+        <BaseButton size="sm" variant="accent"
+          :disabled="addingJava || scanning || scanningDir || !newJavaName.trim() || !newJavaPath.trim()" @click="addJava">
           {{ t("winSettings.javaAdd") }}
         </BaseButton>
       </div>
       <div class="set-save-row java-add-actions">
         <BaseButton size="sm" :disabled="scanning || scanningDir" @click="scanJava">
+          <span v-if="scanning" class="loading-spin sm" />
           {{ scanning ? t("winSettings.javaScanning") : t("winSettings.javaScan") }}
         </BaseButton>
         <BaseButton size="sm" :disabled="scanning || scanningDir" @click="scanJavaDir">
-          {{ t("winSettings.javaScanDir") }}
+          <span v-if="scanningDir" class="loading-spin sm" />
+          {{ scanningDir ? t("winSettings.javaScanning") : t("winSettings.javaScanDir") }}
         </BaseButton>
-        <BaseButton size="sm" @click="importJavaArchive">{{ t("winSettings.javaImport") }}</BaseButton>
-        <BaseButton size="sm" variant="primary" @click="downloadJava">{{ t("winSettings.javaDownload") }}</BaseButton>
-        <BaseButton size="sm" variant="danger" :disabled="javaList.length === 0" @click="confirmRemoveAll = true">
+        <BaseButton size="sm" :disabled="scanning || scanningDir" @click="importJavaArchive">
+          {{ t("winSettings.javaImport") }}
+        </BaseButton>
+        <BaseButton size="sm" variant="primary" :disabled="scanning || scanningDir" @click="downloadJava">
+          {{ t("winSettings.javaDownload") }}
+        </BaseButton>
+        <BaseButton size="sm" variant="danger" :disabled="javaList.length === 0 || scanning || scanningDir"
+          @click="confirmRemoveAll = true">
           {{ t("winSettings.javaRemoveAll") }}
         </BaseButton>
       </div>
@@ -103,7 +110,8 @@ useModalKeys((e) => {
             <div v-for="j in g.items" :key="j.name" class="java-card">
               <div class="java-card-top">
                 <span class="java-name" v-tip="j.name">{{ j.name }}</span>
-                <BaseButton size="sm" variant="danger" @click="removeJava(j.name)">
+                <BaseButton size="sm" variant="danger" :disabled="scanning || scanningDir"
+                  @click="removeJava(j.name)">
                   {{ t("winSettings.javaRemove") }}
                 </BaseButton>
               </div>
@@ -125,13 +133,6 @@ useModalKeys((e) => {
       </div>
     </BaseModal>
 
-    <!-- 扫描 Java 加载弹窗：扫描期间显示，完成自动消失 -->
-    <BaseModal v-if="scanning || scanningDir" :width="300" :closable="false">
-      <div class="loading-modal">
-        <span class="loading-spin" />
-        <span>{{ t("winSettings.javaScanning") }}</span>
-      </div>
-    </BaseModal>
   </template>
   <p v-else class="field-desc">{{ t("winSettings.tauriOnly") }}</p>
 </template>

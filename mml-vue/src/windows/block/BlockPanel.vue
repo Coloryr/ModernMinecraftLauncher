@@ -485,7 +485,7 @@ async function onDetailRemove() {
       <div class="block-content">
         <div class="block-filters">
           <SearchBox v-model="keyword" :placeholder="t('blocks.search')" :clear-label="t('blocks.searchClear')"
-            width="240px" />
+            width="100%" />
           <BaseButton v-if="inSkinCat" size="sm" variant="accent" @click="skinOpen = true">
             {{ t("blocks.addSkin") }}
           </BaseButton>
@@ -649,6 +649,11 @@ async function onDetailRemove() {
   gap: 10px;
   /* 面板右侧是通栏的，这里补回窗口内边距 */
   margin-right: 26px;
+}
+
+/* 搜索框占满整行，右侧的「添加皮肤」按内容宽度跟在后面（与资源收藏窗口一致） */
+.block-filters :deep(.search-box) {
+  flex: 1;
 }
 
 /* ---------- 尺寸滑杆（右下角） ---------- */
