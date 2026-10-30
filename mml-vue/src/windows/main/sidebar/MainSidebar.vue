@@ -53,6 +53,8 @@ const props = defineProps<{
   isInstInsertEnd: (groupId: string) => boolean;
   /** 该下标处是否显示分组插入占位 */
   isGroupInsert: (index: number) => boolean;
+  /** 侧栏是否已经向右占满，右侧详情区收起 */
+  maximized?: boolean;
 }>();
 
 /** 侧栏动作，一律抛给主窗口执行 */
@@ -65,6 +67,8 @@ const emit = defineEmits<{
   (e: "add-group"): void;
   /** 收起整个侧栏 */
   (e: "collapse"): void;
+  /** 向右占满 / 收回 */
+  (e: "toggle-maximize"): void;
 }>();
 
 /** 搜索框输入：把最新文本抛给父组件的 `v-model` */
@@ -81,7 +85,7 @@ function isGroupOpen(id: string) {
 </script>
 
 <template>
-  <aside class="sidebar">
+  <aside class="sidebar" :class="{ 'is-max': maximized }">
     <!-- 搜索框与收起按钮同一行：侧栏顶部只占一行，下面整段留给列表 -->
     <div class="sidebar-head">
       <div class="search-box">
@@ -96,6 +100,14 @@ function isGroupOpen(id: string) {
           <GlyphIcon name="close" :size="12" :weight="2.4" />
         </button>
       </div>
+
+      <!-- 向右占满：把详情区让出来，实例按多列排开；多选时锁死在这一档 -->
+      <button class="icon-btn" :class="{ on: maximized }" :disabled="multiSelect"
+        v-tip="multiSelect ? t('sidebar.maximizeLocked') : (maximized ? t('sidebar.restore') : t('sidebar.maximize'))"
+        :aria-label="maximized ? t('sidebar.restore') : t('sidebar.maximize')"
+        @click="emit('toggle-maximize')">
+        <GlyphIcon :name="maximized ? 'restore' : 'maximize'" :size="16" />
+      </button>
 
       <button class="icon-btn" v-tip="t('sidebar.collapse')" @click="emit('collapse')">
         <GlyphIcon name="chevron-left" :size="16" />
@@ -146,12 +158,14 @@ function isGroupOpen(id: string) {
                     active: selected?.uuid === inst.uuid,
                     'multi-checked': multiSelect && selectedIds.has(inst.uuid),
                     running: inst.running,
+                    'inst-card': maximized,
                   }" @pointerdown="onDragPointerDown($event, { kind: 'instance', instance: inst })"
                     @click="onInstClick(inst, $event)" @contextmenu.prevent="onInstContext($event, inst)">
                     <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(inst.uuid) }">
                       <GlyphIcon name="check" :size="12" :weight="2.6" />
                     </span>
-                    <InstanceIcon :name="inst.name" :uuid="inst.uuid" :size="38" />
+                    <!-- 占满后每项是一张渲染图卡片，图标放到 88px -->
+                    <InstanceIcon :name="inst.name" :uuid="inst.uuid" :size="maximized ? 88 : 38" />
                     <span v-if="inst.loader !== 'normal'" class="loader-text" :class="`loader-${inst.loader}`">{{
                       t(`add.loader.${inst.loader}`) }}</span>
                     <span class="inst-name"><HighlightText :text="inst.name" :query="searchText" /></span>
@@ -238,9 +252,21 @@ function isGroupOpen(id: string) {
   --side-pad-x: 12px;
 }
 
+/* 占满：宽度跟着槽位走，两侧边框都不要 —— 这时它已经铺到窗口边缘 */
+.sidebar.is-max {
+  width: 100%;
+  min-width: 0;
+  border-right: none;
+  border-left: none;
+}
+
 .main.side-right .sidebar {
   border-right: none;
   border-left: 1px solid var(--border);
+}
+
+.main.side-right .sidebar.is-max {
+  border-left: none;
 }
 
 /* 搜索框 + 收起按钮同一行：行内间距由这里给，搜索框自己不留外边距 */
@@ -304,9 +330,21 @@ function isGroupOpen(id: string) {
   flex-shrink: 0;
 }
 
-.icon-btn:hover {
+.icon-btn:hover:not(:disabled) {
   background: var(--bg-hover);
   border-color: var(--accent);
+}
+
+/* 占满态：这一枚是"点一下就收回"，用强调色标出当前状态 */
+.icon-btn.on {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.icon-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 /* ----- 分组模式列表 ----- */
@@ -394,6 +432,76 @@ function isGroupOpen(id: string) {
   /* 收起时裁掉内容（配合 0fr 行高），同时给出过渡的最小高度基准 */
   overflow: hidden;
   min-height: 0;
+}
+
+/* 占满后横向空间大：组内实例按渲染图卡片多列排开。
+   overflow 不能改：分组收起靠的是外层 0fr 行高 + 这里的裁切 */
+.sidebar.is-max .group-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 8px;
+}
+
+/* 卡片：渲染图在上，名字 / 加载器在下。底色与描边必须有 ——
+   行模式靠底色区分，卡片模式下没有底色时图片像是浮在空处，运行中的绿点也看不出落在哪张卡上 */
+.inst-row.inst-card {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px;
+  min-height: 0;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+.inst-row.inst-card:hover {
+  border-color: var(--accent-border);
+}
+
+.inst-row.inst-card .inst-name {
+  order: 1;
+  flex: none;
+  width: 100%;
+  white-space: normal;
+  word-break: break-all;
+  font-size: 12.5px;
+}
+
+.inst-row.inst-card .loader-text {
+  order: 2;
+}
+
+/* 卡片里运行点钉在右上角，别挤在名字后面 */
+.inst-row.inst-card.running .run-dot {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  transform: none;
+}
+
+.inst-row.inst-card.running .inst-name {
+  padding-right: 0;
+}
+
+/* 多选勾选圈钉在卡片左上角，不参与纵向排布 */
+.inst-row.inst-card .row-check {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+}
+
+/* 占满态下「添加实例」也做成一张同样高的卡片，不然网格里塌成一窄条 */
+.sidebar.is-max .add-inst-row {
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  min-height: 132px;
+}
+
+/* 平铺占满后格子跟着放大一档，不然一排全是 96px 的小方块 */
+.sidebar.is-max .tile-list {
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
 }
 
 /* 添加实例行（与实例行同尺寸，位于实例上方）。

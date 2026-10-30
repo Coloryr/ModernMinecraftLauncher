@@ -263,6 +263,9 @@ export default {
   // 侧栏
   "sidebar.collapse": "收起侧栏",
   "sidebar.expand": "展开侧栏",
+  "sidebar.maximize": "占满窗口",
+  "sidebar.restore": "收回右侧详情",
+  "sidebar.maximizeLocked": "多选时固定占满，退出多选后可收回",
 
   // 右侧视图
   "view.detail": "实例详情",

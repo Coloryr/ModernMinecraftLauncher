@@ -64,6 +64,9 @@ export type GlyphName =
   | "server"
   | "sun"
   | "cube"
+  // 主窗口侧栏：向右占满 / 收回（四角外扩与内收的括号）
+  | "maximize"
+  | "restore"
   // 实验性功能：锥形瓶
   | "flask"
   // 设置窗口左侧导航：人像（皮肤与头像）、咖啡杯（Java）
@@ -300,6 +303,20 @@ withDefaults(
       <path d="M17 8h1a4 4 0 1 1 0 8h-1" />
       <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" />
       <path d="M6 2v2M10 2v2M14 2v2" />
+    </g>
+    <!-- 四角括号朝外：向右占满 -->
+    <g v-else-if="name === 'maximize'">
+      <path d="M4 9V4h5" />
+      <path d="M20 9V4h-5" />
+      <path d="M4 15v5h5" />
+      <path d="M20 15v5h-5" />
+    </g>
+    <!-- 同一组括号朝内：收回 -->
+    <g v-else-if="name === 'restore'">
+      <path d="M9 4v5H4" />
+      <path d="M15 4v5h5" />
+      <path d="M9 20v-5H4" />
+      <path d="M15 20v-5h5" />
     </g>
   </svg>
 </template>

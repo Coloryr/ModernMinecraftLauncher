@@ -39,7 +39,7 @@ npm run shots -- --clean
 
 ## 场景表
 
-共 234 个场景，按窗口分组。
+共 243 个场景，按窗口分组。
 「窗口」列是页面的 `kind`，窗口族场景会自动带上实例参数，不需要在命令里另写；
 控件场景的 `control` 是截图工具里的预览页，不是启动器窗口。
 
@@ -65,6 +65,9 @@ npm run shots -- --clean
 | `main-multi-delete` | 主窗口 · 批量删除 | `main` | 1280×800 |
 | `main-search-empty` | 主窗口 · 搜索 · 空状态 | `main` | 1280×800 |
 | `main-add-group-modal` | 主窗口 · 添加分组弹窗 | `main` | 1280×800 |
+| `main-group-max` | 主窗口 · 分组 · 占满 | `main` | 1280×800 |
+| `main-grid-max` | 主窗口 · 网格 · 占满 | `main` | 1280×800 |
+| `main-multi-max` | 主窗口 · 多选 · 占满 | `main` | 1280×800 |
 | `main-launch` | 主窗口 · 点击启动（断言命令） | `main` | 1280×800 |
 | `main-delete-confirm` | 主窗口 · 删除 · 确认 | `main` | 1280×800 |
 | `main-create-group` | 主窗口 · 新建分组（断言命令） | `main` | 1280×800 |
@@ -224,7 +227,7 @@ npm run shots -- --clean
 | `collect-group-pick` | 收藏 · 选中分组 | `collect` | 1100×760 |
 | `collect-group-empty` | 收藏 · 空分组 | `collect` | 1100×760 |
 | `collect-card-menu` | 收藏 · 卡片菜单 | `collect` | 1100×760 |
-| `collect-card-menu-group` | 收藏 · 分组内卡片菜单 | `collect` | 1100×760 |
+| `collect-card-menu-group` | 收藏 · 卡片菜单 · 分组 | `collect` | 1100×760 |
 | `collect-remove-modal` | 收藏 · 移除弹窗 | `collect` | 1100×760 |
 | `collect-group-menu` | 收藏 · 分组菜单 | `collect` | 1100×760 |
 | `collect-drag-group` | 收藏 · 拖到分组 | `collect` | 1100×760 |
@@ -296,6 +299,12 @@ npm run shots -- --clean
 | `export-mmc` | 导出实例 · MMC | `export` | 1100×800 |
 | `export-hmcl` | 导出实例 · HMCL | `export` | 1100×800 |
 | `export-modrinth` | 导出实例 · Modrinth | `export` | 1100×760 |
+| `export-curseforge-files` | 导出实例 · CurseForge · 文件 | `export` | 1100×800 |
+| `export-modrinth-mods` | 导出实例 · Modrinth · 模组 | `export` | 1100×800 |
+| `export-modrinth-files` | 导出实例 · Modrinth · 文件 | `export` | 1100×800 |
+| `export-mmc-files` | 导出实例 · MMC · 文件 | `export` | 1100×800 |
+| `export-hmcl-files` | 导出实例 · HMCL · 文件 | `export` | 1100×800 |
+| `export-mml-files` | 导出实例 · 直接压缩 · 文件 | `export` | 1100×800 |
 | `export-progress` | 导出实例 · 进度 | `export` | 1100×760 |
 
 ### 联机大厅

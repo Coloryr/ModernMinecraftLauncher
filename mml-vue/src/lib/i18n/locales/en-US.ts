@@ -263,6 +263,9 @@ export default {
   // Sidebar
   "sidebar.collapse": "Collapse sidebar",
   "sidebar.expand": "Expand sidebar",
+  "sidebar.maximize": "Fill the window",
+  "sidebar.restore": "Restore the details pane",
+  "sidebar.maximizeLocked": "Fixed while selecting: exit multi-select to restore",
 
   // Right view
   "view.detail": "Instance",

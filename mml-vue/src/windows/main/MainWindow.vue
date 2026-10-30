@@ -250,12 +250,33 @@ const SIDEBAR_ANIM_MS = 300;
 
 /** 用户主动收起 / 展开侧栏（唯一会播放动画的入口） */
 function collapseSidebar(collapsed: boolean) {
+  // 收起时一定先收回占满：占满态下槽位吃掉整行，收起按钮就没意义了
+  if (collapsed) paneMaximized.value = false;
   sidebarAnim.value = true;
   setSidebarCollapsed(collapsed);
   window.clearTimeout(sidebarAnimTimer);
   sidebarAnimTimer = window.setTimeout(() => {
     sidebarAnim.value = false;
   }, SIDEBAR_ANIM_MS);
+}
+
+// ================= 侧栏向右占满 =================
+
+/**
+ * 侧栏是否向右占满：占满时右侧的实例详情收起，分组里的实例按多列排开
+ *
+ * 只是这一屏的显示状态，不进配置：换个界面回来按原样展开没有意义。
+ */
+const paneMaximized = ref(false);
+/** 进多选之前是不是占满的，退出多选时还原 */
+let maximizedBeforeMulti = false;
+
+/** 占满 / 收回；多选期间锁死在这一档，不许缩小 */
+function togglePaneMaximize() {
+  if (multiSelect.value) return;
+  paneMaximized.value = !paneMaximized.value;
+  // 占满时侧栏必须是展开的，否则只剩一条窄槽
+  if (paneMaximized.value && sidebarCollapsed.value) collapseSidebar(false);
 }
 
 // ================= 启动器主页 =================
@@ -269,6 +290,12 @@ const newsLoading = ref(false);
 function toggleNews() {
   newsActive.value = !newsActive.value;
 }
+
+// 主页画在右侧内容区，占满时它没有地方显示：进主页就把侧栏收回去。
+// 多选期间不让它破功 —— 那一档固定占满，退出多选时再按出来前收回
+watch(newsActive, (on) => {
+  if (on && !multiSelect.value) paneMaximized.value = false;
+});
 
 // ---- 自定义主页面：服主导入的 zip 顶替内置主页，导入 / 删除在设置窗口「客户端设置」 ----
 // 启用与否在 gui_config.client.customHome，已导入情况来自常驻压缩包，都由 status 现算
@@ -517,6 +544,16 @@ const {
   newsActive,
   collapsedGroups,
   onExit: closeCtxMenu,
+});
+
+// 多选固定占满，退出时回到进来之前那一档
+watch(multiSelect, (on) => {
+  if (on) {
+    maximizedBeforeMulti = paneMaximized.value;
+    paneMaximized.value = true;
+  } else {
+    paneMaximized.value = maximizedBeforeMulti;
+  }
 });
 
 const {
@@ -1985,7 +2022,8 @@ onMounted(async () => {
            ResourceTitleIndicator），对应弹窗由 App.vue 渲染：内容区不再留卡片占位 -->
 
       <!-- 主体 -->
-      <main class="main" :class="{ 'side-right': sidebarSide === 'Right', 'sidebar-anim': sidebarAnim }">
+      <main class="main"
+        :class="{ 'side-right': sidebarSide === 'Right', 'sidebar-anim': sidebarAnim, 'pane-max': paneMaximized }">
         <!-- 多选模式浮动工具栏 -->
         <div v-if="multiSelect" class="multi-bar" @contextmenu.prevent @click.stop>
           <span class="multi-count">{{ t("multi.selected", { count: selectedIds.size }) }}</span>
@@ -2121,6 +2159,7 @@ onMounted(async () => {
             <MainSidebar :mode="effectiveMode" :search-text="searchText" :groups="groups"
               :filtered-groups="filteredGroups" :filtered-instances="filteredInstances" :searching="searching"
               :selected="selected" :multi-select="multiSelect" :selected-ids="selectedIds" :drag-active="dragActive"
+              :maximized="paneMaximized" @toggle-maximize="togglePaneMaximize"
               :dragging-uuid="draggingUuid" :ghost="instanceGhost" :is-collapsed="isCollapsed"
               :on-drag-pointer-down="onDragPointerDown"
               :on-inst-click="onInstClick" :on-inst-context="onInstContext" :on-group-context="onGroupContext"

@@ -120,6 +120,17 @@
   width: 24px;
 }
 
+/* 侧栏向右占满：槽位吃掉整行，右侧详情区收起。两者一起过渡，
+   不然详情是"啪"地消失、槽位却还在滑 */
+.main.pane-max .sidebar-slot {
+  width: auto;
+  flex: 1;
+}
+
+.main.pane-max .detail {
+  display: none;
+}
+
 /* 侧栏贴右时，让侧栏钉在槽位右缘，收窄时从左侧裁掉（视觉上向右滑出） */
 .main.side-right .sidebar-slot {
   justify-content: flex-end;

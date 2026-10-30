@@ -211,6 +211,44 @@ export const scenarios = [
     commands: base({}, { viewMode: "group" }),
     actions: [{ eval: click(".sidebar-slot .add-group-row"), after: 450 }],
   },
+  // 侧栏向右占满：分组里的实例变成渲染图卡片，右侧详情区收起
+  {
+    id: "main-group-max",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({}, { viewMode: "group", startupPage: "List" }),
+    actions: [
+      { eval: click('[aria-label="占满窗口"]'), after: 700 },
+      { assert: "document.querySelector('.main.pane-max') !== null", label: "分组已向右占满" },
+      { assert: "document.querySelectorAll('.inst-card').length > 0", label: "实例按渲染图卡片展示" },
+    ],
+  },
+  {
+    id: "main-grid-max",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({}, { viewMode: "grid", startupPage: "List" }),
+    actions: [
+      { eval: click('[aria-label="占满窗口"]'), after: 700 },
+      { assert: "document.querySelector('.main.pane-max') !== null", label: "平铺已向右占满" },
+    ],
+  },
+  // 多选固定占满：进多选自动铺满，左上角的收回入口置灰
+  {
+    id: "main-multi-max",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({}, { viewMode: "group", startupPage: "List" }),
+    actions: [
+      { eval: "(() => { const g = [...document.querySelectorAll('.group-title-row')].find((x) => x.textContent.includes('生存')); if (!g) return false; g.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 150, clientY: 250, button: 2 })); return true; })()", after: 350 },
+      { eval: clickText("全选", ".ctx-menu"), after: 700 },
+      { assert: "document.querySelector('.main.pane-max') !== null", label: "多选时固定占满" },
+      { assert: "document.querySelector('.sidebar-head button[aria-label=\"收回右侧详情\"]').disabled", label: "占满期间不允许收回" },
+    ],
+  },
 
   /* ---------------- 设置 ---------------- */
   { id: "settings-ui", kind: "settings", label: "mml-settings", size: [1100, 760], commands: base(), actions: [{ eval: clickTab("界面"), after: 400 }] },
@@ -1411,6 +1449,80 @@ export const scenarios = [
     query: "uuid=inst-1",
     commands: base(),
     actions: [{ eval: clickText("Modrinth"), after: 500 }],
+  },
+  // 每个格式 × 每个页签都出一张：模组页只有 CurseForge / Modrinth 有，文件页每种格式都有
+  {
+    id: "export-curseforge-files",
+    kind: "export",
+    label: "mml-export",
+    size: [1100, 800],
+    query: "uuid=inst-1",
+    commands: base(),
+    actions: [
+      { eval: clickText("CurseForge"), after: 400 },
+      { eval: clickText("文件"), after: 700 },
+    ],
+  },
+  {
+    id: "export-modrinth-mods",
+    kind: "export",
+    label: "mml-export",
+    size: [1100, 800],
+    query: "uuid=inst-1",
+    commands: base(),
+    actions: [
+      { eval: clickText("Modrinth"), after: 400 },
+      { eval: clickText("模组"), after: 600 },
+    ],
+  },
+  {
+    id: "export-modrinth-files",
+    kind: "export",
+    label: "mml-export",
+    size: [1100, 800],
+    query: "uuid=inst-1",
+    commands: base(),
+    actions: [
+      { eval: clickText("Modrinth"), after: 400 },
+      { eval: clickText("文件"), after: 700 },
+    ],
+  },
+  {
+    id: "export-mmc-files",
+    kind: "export",
+    label: "mml-export",
+    size: [1100, 800],
+    query: "uuid=inst-1",
+    commands: base(),
+    actions: [
+      { eval: clickText("MMC"), after: 400 },
+      { eval: clickText("文件"), after: 700 },
+    ],
+  },
+  {
+    id: "export-hmcl-files",
+    kind: "export",
+    label: "mml-export",
+    size: [1100, 800],
+    query: "uuid=inst-1",
+    commands: base(),
+    actions: [
+      { eval: clickText("HMCL"), after: 400 },
+      { eval: clickText("文件"), after: 700 },
+    ],
+  },
+  // 「直接压缩」没有模组页，信息页也不出现，只有实例文件这一档
+  {
+    id: "export-mml-files",
+    kind: "export",
+    label: "mml-export",
+    size: [1100, 800],
+    query: "uuid=inst-1",
+    commands: base(),
+    actions: [
+      { eval: clickText("直接压缩"), after: 400 },
+      { eval: clickText("文件"), after: 700 },
+    ],
   },
   {
     id: "export-progress",
