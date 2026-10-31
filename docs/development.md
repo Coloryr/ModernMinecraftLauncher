@@ -68,7 +68,7 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
 | `cd mml-gui && .\tauri.ps1 dev` | 桌面开发模式（自动还原 vendor 插件；Linux / macOS 用 `bash tauri.sh dev`；端口 1420 必须空闲） |
 | `build/dev-frontend.ps1` | 只起 Vite，配合 debug 版 Rust 后端单独运行；`tauri dev` 已自带 Vite，不要重复起 |
 | `build/build-release.ps1` | 正式发布构建（fat LTO，含安装包，按版本收集到 `build_out/`；Windows 默认 x64 / arm64；Linux / macOS 的 x64 / arm64 由 CI 原生 runner 出） |
-| `build/build-prerelease.ps1` | 预发布构建（thin LTO，只出 exe，更快；Windows 三种架构，`target/prerelease/mml-gui-<arch>.exe`） |
+| `build/build-prerelease.ps1` | 预发布构建（thin LTO，只出 exe，更快；Windows 两种架构，`target/prerelease/mml-gui-<arch>.exe`） |
 | `bash build/package-flatpak.sh` | 用已构建的二进制打 `.flatpak`，需要 `flatpak`，不重新编译 |
 | `bash build/package-arch.sh` | 用已构建的二进制打 `.pkg.tar.zst`，不依赖 `makepkg`，任一 Linux 可跑 |
 | `.\check.ps1 --all` | 根目录整仓检查，先还原 vendor 插件再 `cargo check`（bash 版 `bash check.sh --all`） |
@@ -155,7 +155,6 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 | 推送预发布标签（如 `v1.0.0-pre`） | 标签带 `-pre` 这类后缀时走预发布通道：各平台跑 `build-prerelease`，只出可执行文件，最后汇总成一个标记为 Pre-release 的 GitHub Release |
 | 推送测试构建标签（如 `testbuild`） | 完整跑一遍构建，版本取最近的可达标签、通道按其后缀决定；产物全部丢弃——`upload-artifact` 步骤、Flatpak / Arch 附加包与 Release 都不执行，只看构建是否通过 |
 | 推送 `releases/**` 分支 | 只构建、把产物传成 Actions artifact，不发 Release，用来验证构建 |
-| Actions 页面手动 `workflow_dispatch` | 同上，验证用 |
 
 每个平台都走同一套骨架，正式版与预发布只在构建脚本和打包方式上分叉：
 

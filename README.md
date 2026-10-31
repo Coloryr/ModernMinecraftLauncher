@@ -46,7 +46,7 @@
 
 ### 环境要求
 
-- **通用**：Rust stable（edition 2024，需 1.85+）、Node.js 20.19+ 或 22.12+（Vite 8 要求，建议 LTS）、
+- **通用**：Rust stable（edition 2024，需 1.85+）、Node.js 24 LTS（Vite 8 要求 20.19+ / 22.12+，CI 用 24）、
   `cargo install tauri-cli --version "^2" --locked`（提供 `cargo tauri`）。
 - **Windows**：Rust 的 MSVC 工具链、Visual Studio 生成工具（勾选「使用 C++ 的桌面开发」）、
   WebView2 运行时（Windows 11 和较新的 Windows 10 已自带）。
@@ -153,7 +153,7 @@ CI 的 `windows-11-arm` 与 `ubuntu-24.04-arm` 是 GitHub 公共预览 runner，
 | macOS x64 | `mml-macos-x64-0.0.1.dmg`、`mml-macos-x64-0.0.1.app.tar.gz` |
 | macOS arm64 | `mml-macos-arm64-0.0.1.dmg`、`mml-macos-arm64-0.0.1.app.tar.gz` |
 
-Windows 本地默认把三种架构都构建出来；Linux / macOS 本地构建当前架构（macOS 可用
+Windows 本地默认把两种架构都构建出来；Linux / macOS 本地构建当前架构（macOS 可用
 `MML_TARGETS=x86_64-apple-darwin` 交叉出 x64），各架构齐全靠 GitHub Actions：
 [`.github/workflows/build.yml`](.github/workflows/build.yml)。
 
@@ -163,7 +163,6 @@ Windows 本地默认把三种架构都构建出来；Linux / macOS 本地构建�
 | 推送预发布标签（如 `v1.0.0-pre`） | 走预发布构建，只出可执行文件，汇总成一个标记为 Pre-release 的 GitHub Release |
 | 推送测试构建标签（如 `testbuild`、`testbuild-1`） | 跑完整的构建流程，版本取最近的可达标签、通道按其后缀决定；**产物全部丢弃**：不上传 artifact、不打包附加包、不发 Release |
 | 推送 `releases/**` 分支 | 只构建并把产物传成 Actions artifact，不发 Release，用于验证 |
-| Actions 页面手动 `workflow_dispatch` | 同上，验证用 |
 
 走 CI 发版只要两步：提交、打标签推送。正式版与预发布都这样，标签分别是
 `v0.0.1` 与 `v1.0.0-pre`。CI 每个平台都走同一套脚本（`build/init.*` 装依赖，正式版用
@@ -247,8 +246,8 @@ ModernColoryrMinecraftLauncher/
 │  └─ preview/                     预览脚本
 ├─ .github/workflows/              GitHub Actions：三平台构建与发版
 ├─ build/
-│  ├─ version                      发布版本，发版时只改这里
-│  ├─ set-version.mjs              把版本同步到应用清单
+│  ├─ version.mjs                  版本解析：从 Git 标签取，可被 MML_VERSION 覆盖
+│  ├─ set-version.mjs              把解析到的版本同步到应用清单
 │  ├─ package-release.mjs          安装包按版本重命名后收集到 build_out/
 │  ├─ linux/                       桌面文件与 AppStream 元数据
 │  └─ *.ps1 / *.sh                 初始化、开发、正式发布、预发布、Flatpak / Arch 打包脚本
