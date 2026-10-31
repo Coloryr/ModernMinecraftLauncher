@@ -6,7 +6,7 @@
 
 [ColorMC](https://github.com/Coloryr/ColorMC) 的迭代软件，一个 Minecraft 启动器。
 
-**未完成，请勿使用任何东西~~也不要催~~**
+**预览版，欢迎测试与提出问题**
 
 > **重要限制**：未登录过微软正版账户时，启动器禁止启动离线账户。请先添加并登录一个微软账户。
 
@@ -27,10 +27,22 @@
 | 下载 | 多线程、断点续传、哈希校验，带独立的下载管理窗口 |
 | 渲染 | 从客户端 jar 离线渲染方块 / 物品图标；皮肤、披风、头像的 2D / 3D 绘制 |
 | 迁移 | 从 ColorMC 迁移数据；导入 `.minecraft`（官方 / HMCL / PCL）；MMC 通过实例导入 |
-| 联机 | 陶瓦联机：正版账户验证、创建 / 加入房间、邀请码与直连地址；映射大厅预留 |
+| 联机(制作中) | 陶瓦联机：正版账户验证、创建 / 加入房间、邀请码与直连地址；映射大厅预留 |
 | 统计 | 每日游玩时间图、实例明细、启动次数与失败统计 |
 | 分发 | 实例导出（直接压缩 / CurseForge / Modrinth / MMC / HMCL）、生成实例信息、服务器包、服务器实例（MML / HMCL） |
 | 界面 | 多窗口与单窗口两种模式，暗色 / 亮色 / 跟随系统，中英双语；可导入自定义主页面、样式包，或整页重写主窗口 |
+
+## 截图
+
+| 启动器主页 | 实例主页 |
+| --- | --- |
+| <img src="pics/image1.png" width="440" alt="启动器主页"> | <img src="pics/image2.png" width="440" alt="实例主页"> |
+| **整合包搜索** | **资源管理** |
+| <img src="pics/image3.png" width="440" alt="整合包搜索"> | <img src="pics/image4.png" width="440" alt="资源管理"> |
+| **模组依赖关系** | **游玩统计** |
+| <img src="pics/image5.png" width="440" alt="模组依赖关系"> | <img src="pics/image6.png" width="440" alt="游玩统计"> |
+| **资源收藏** | **账户管理** |
+| <img src="pics/image7.png" width="440" alt="资源收藏"> | <img src="pics/image8.png" width="440" alt="账户管理"> |
 
 ## 快速上手
 
