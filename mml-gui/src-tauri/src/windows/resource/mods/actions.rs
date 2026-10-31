@@ -73,8 +73,25 @@ pub async fn resource_mod_disable(uuid: String, mod_uuid: String) -> Result<ModR
 #[gui_macros::command]
 pub async fn resource_delete_mod(uuid: String, mod_uuid: String) -> Result<(), String> {
     let instance = parse_instance(&uuid)?;
+    let link = instance.clone();
     let obj = find_mod(instance, &mod_uuid).await?;
     obj.delete().map_err(|err| err.to_string())?;
+    // 映射记录也要删：留着的话下次启动检查会把刚删掉的模组重新链回来
+    let (id, base) = {
+        let game = link.read().unwrap();
+        (game.uuid, game.get_base_path())
+    };
+    let mut target = obj.file.clone();
+    if obj.disable {
+        let text = target.to_string_lossy().to_string();
+        for ext in [names::DISABLE_DOT_EXT, names::DISABLED_DOT_EXT] {
+            if let Some(stripped) = text.strip_suffix(ext) {
+                target = std::path::PathBuf::from(stripped);
+                break;
+            }
+        }
+    }
+    mml_link::remove_link(id, &base, &target);
     // 窗口模型里那一条也去掉，别让更新检查再去查一个已经不存在的包
     if let Ok(model) = window_model(&uuid) {
         model.remove_mod(&mod_uuid);

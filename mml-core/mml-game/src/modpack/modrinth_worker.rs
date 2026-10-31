@@ -211,7 +211,7 @@ impl ModPackWorker for ModrinthPackWorker {
     /// 统一下载所有模组文件。
     async fn download(&self) {
         // 取出下载列表并在 .await 前释放 MutexGuard；取走后列表为空，重复调用不会重复下载
-        let items = {
+        let mut items = {
             let Ok(mut guard) = self.base.downloads.lock() else {
                 return;
             };
@@ -220,13 +220,21 @@ impl ModPackWorker for ModrinthPackWorker {
         if items.is_empty() {
             return;
         }
-        // 挂上取消令牌：安装任务取消时同步中断剩余文件的下载，并把字节进度写进任务子进度
-        crate::add_game::download_with_progress(
-            items,
-            self.base.pack_gui.clone(),
-            self.base.cancel.clone(),
-        )
-        .await;
+
+        let mut plans = Vec::new();
+        if let Some(game) = self.base.game.clone() {
+            plans = crate::game_link::prepare_downloads(&game, &mut items);
+        }
+        if !items.is_empty() {
+            // 挂上取消令牌：安装任务取消时同步中断剩余文件的下载，并把字节进度写进任务子进度
+            crate::add_game::download_with_progress(
+                items,
+                self.base.pack_gui.clone(),
+                self.base.cancel.clone(),
+            )
+            .await;
+        }
+        crate::game_link::finish_downloads(plans);
     }
 
     /// 更新游戏实例版本信息

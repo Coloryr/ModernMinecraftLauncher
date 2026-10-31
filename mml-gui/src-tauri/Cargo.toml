@@ -1,6 +1,6 @@
 [package]
 name = "mml-gui"
-version = "0.0.1"
+version = "0.1.2-pre"
 description = "M²L Launcher"
 authors = ["coloryr"]
 edition = "2024"
@@ -57,6 +57,8 @@ mml-jvms = { path = "../../mml-core/mml-jvms" }
 # 单开与唤回：端口记录、通知已运行实例、接收显示 / 参数请求
 mml-ipc = { path = "../../mml-core/mml-ipc" }
 mml-downloader = { path = "../../mml-core/mml-downloader" }
+# 资源映射：公共目录与实例之间的硬链接
+mml-link = { path = "../../mml-core/mml-link" }
 mml-sys = { path = "../../mml-core/mml-sys" }
 mml-net = { path = "../../mml-core/mml-net" }
 mml-log = { path = "../../mml-core/mml-log" }

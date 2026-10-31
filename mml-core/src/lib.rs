@@ -104,6 +104,7 @@ pub fn init(arg: CoreInitObj) -> CoreResult<()> {
     mml_game::init(&path)?;
     mml_jvms::init(&path)?;
     mml_downloader::init(&path)?;
+    mml_link::init(&path)?;
 
     config_save::start();
 

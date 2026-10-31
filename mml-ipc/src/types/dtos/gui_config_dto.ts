@@ -73,6 +73,7 @@ export type ClientConfigDto = {
 export type ExperimentalConfigDto = {
   launcherAdmin: boolean,
   instanceAdmin: boolean,
+  resourceLink: boolean,
   uriLaunch: boolean,
   sandboxLaunch: boolean,
 };

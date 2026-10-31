@@ -218,6 +218,7 @@ pub(crate) async fn launch_game(
     };
     let auto = lobby.map(|(_, auto)| auto).unwrap_or(auto);
     let setting = inst.clone();
+    let link_instance = core.instance.clone();
 
     lock_user(&account, core.uuid);
 
@@ -293,6 +294,39 @@ pub(crate) async fn launch_game(
             let panic_app = app.clone();
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 runtime.block_on(async move {
+                    // 启动前检查资源映射：缺文件先补下载 / 硬链接，失败就中止这次启动
+                    if let Err(err) =
+                        mml_game::game_link::check_instance_links(&link_instance, cancel.clone())
+                            .await
+                    {
+                        if !matches!(err, ErrorType::TaskCancel) {
+                            game_count::launch_error(&launch_uuid);
+                        }
+                        unlock_user(&launch_uuid);
+                        if matches!(err, ErrorType::TaskCancel) {
+                            emit_launch_state(
+                                &app,
+                                StateEvent {
+                                    uuid: uuid.clone(),
+                                    state: "cancelled".into(),
+                                    progress: None,
+                                },
+                            );
+                            return;
+                        }
+                        mml_log::error_type(err.clone());
+                        let text = i18::get_error(err);
+                        emit_log_line(&app, &uuid, &text, false);
+                        emit_launch_error(
+                            &app,
+                            ErrorEvent {
+                                uuid: Some(uuid.clone()),
+                                message: text,
+                            },
+                        );
+                        return;
+                    }
+
                     match setting.start_game(&mut arg, Some(gui), cancel).await {
                         Ok(()) => {
                             emit_log_line(&app, &uuid, &LogText::LaunchProcessStarted.text(), false)

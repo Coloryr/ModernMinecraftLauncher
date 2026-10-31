@@ -1,0 +1,19 @@
+[package]
+name = "mml-link"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+mml-log = { path = "../mml-log" }
+mml-names = { path = "../mml-names" }
+mml-base = { path = "../mml-base" }
+mml-sys = { path = "../mml-sys" }
+mml-config = { path = "../mml-config" }
+mml-downloader = { path = "../mml-downloader" }
+serde.workspace = true
+serde_json.workspace = true
+serde_repr.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+mml-testutil = { path = "../mml-testutil" }

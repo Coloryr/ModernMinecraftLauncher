@@ -3209,6 +3209,7 @@ dependencies = [
  "mml-downloader",
  "mml-game",
  "mml-jvms",
+ "mml-link",
  "mml-log",
  "mml-names",
  "mml-net",
@@ -3257,6 +3258,7 @@ dependencies = [
  "mml-config",
  "mml-downloader",
  "mml-jvms",
+ "mml-link",
  "mml-log",
  "mml-names",
  "mml-nbt",
@@ -3304,7 +3306,7 @@ dependencies = [
 
 [[package]]
 name = "mml-gui"
-version = "0.0.1"
+version = "0.1.2-pre"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -3327,6 +3329,7 @@ dependencies = [
  "mml-gamepad",
  "mml-ipc",
  "mml-jvms",
+ "mml-link",
  "mml-log",
  "mml-names",
  "mml-nbt",
@@ -3384,6 +3387,23 @@ dependencies = [
  "mml-sys",
  "mml-testutil",
  "tokio",
+]
+
+[[package]]
+name = "mml-link"
+version = "0.1.0"
+dependencies = [
+ "mml-base",
+ "mml-config",
+ "mml-downloader",
+ "mml-log",
+ "mml-names",
+ "mml-sys",
+ "mml-testutil",
+ "serde",
+ "serde_json",
+ "serde_repr",
+ "uuid",
 ]
 
 [[package]]

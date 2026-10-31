@@ -341,8 +341,8 @@ impl Default for ClientConfig {
 
 /// 实验性功能开关
 ///
-/// `launcher_admin` 与 `instance_admin` 已接线；`uri_launch` 与 `sandbox_launch` 目前只保存
-/// 用户的选择，生效要等各自的实现落地。
+/// `launcher_admin`、`instance_admin` 与 `resource_link` 已接线；`uri_launch` 与
+/// `sandbox_launch` 目前只保存用户的选择，生效要等各自的实现落地。
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "PascalCase")]
 pub struct ExperimentalConfig {
@@ -350,6 +350,8 @@ pub struct ExperimentalConfig {
     pub launcher_admin: bool,
     /// 启动实例时提升到管理员身份
     pub instance_admin: bool,
+    /// 模组与资源包下载到公共目录，实例内用硬链接映射
+    pub resource_link: bool,
     /// 允许通过 URI（自定义协议）直接启动实例
     pub uri_launch: bool,
     /// 在沙盒里启动实例
@@ -504,6 +506,7 @@ pub fn init<P: AsRef<Path>>(path: P) {
         GuiConfig::default()
     };
     normalize_window_effect(&mut config);
+    mml_link::set_enabled(config.experimental.resource_link);
     let _ = CONFIG.set(Arc::new(RwLock::new(config)));
 }
 
@@ -592,6 +595,7 @@ pub fn sync_core_lang(locale: Lang) {
 /// - `config`: 新配置
 pub fn set(config: GuiConfig) {
     sync_core_lang(config.locale);
+    mml_link::set_enabled(config.experimental.resource_link);
 
     if let Some(c) = CONFIG.get() {
         *c.write().unwrap() = config;

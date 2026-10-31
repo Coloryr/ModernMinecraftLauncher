@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use mml_base::file_item::FileItemObj;
 use mml_game::GameInstance;
+use mml_link::info::ResourceType;
 use tauri::WebviewWindow;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
@@ -270,7 +271,33 @@ pub(super) async fn run_update(
         );
     }
 
-    // ③ 逐个收尾：**下成了的才换**，没下成或被取消的那几条原文件一个字不动
+    // ③ 先接入资源映射：新文件已经落在实例里，把它收进公共目录并补硬链接
+    if mml_link::is_enabled() {
+        let (uuid, base) = {
+            let game = instance.read().unwrap();
+            (game.uuid, game.get_base_path())
+        };
+        for entry in &pending {
+            if entry.disable {
+                continue;
+            }
+            if let Err(err) = mml_link::map_existing(
+                ResourceType::Mod,
+                uuid,
+                &base,
+                &entry.obj.file,
+                &entry.info.modid,
+                &entry.info.fileid,
+                &entry.info.name,
+                &entry.info.sha1,
+                &entry.info.url,
+            ) {
+                mml_log::error_type(err);
+            }
+        }
+    }
+
+    // ④ 逐个收尾：**下成了的才换**，没下成或被取消的那几条原文件一个字不动
     for (index, entry) in pending.into_iter().enumerate() {
         let project_id = entry.project_id.clone();
         if entry.obj.check_hash() {

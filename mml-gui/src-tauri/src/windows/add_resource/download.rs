@@ -9,6 +9,7 @@ use mml_base::file_item::FileItemObj;
 use mml_game::launcher::file_online_info_obj::OnlineInfoObj;
 use mml_game::launcher::{FileType, ModPackType};
 use mml_game::{curseforge, modrinth};
+use mml_link::info::ResourceType;
 use mml_names::names;
 use mml_net::{curseforge_api, modrinth_api};
 use tauri::AppHandle;
@@ -20,13 +21,51 @@ use crate::err_keys;
 use super::status::{build_status, emit_add_resource_status};
 use super::{DOWNLOAD_NOW, SourceDownloadInfo, SourceInfo};
 
+/// 一次资源映射收尾：下载到公共目录后要补到实例里的信息
+struct LinkPlan {
+    /// 资源类型
+    resource: ResourceType,
+    /// 实例根目录
+    base: PathBuf,
+    /// 实例内目标文件
+    target: PathBuf,
+    /// 公共目录里的源文件
+    source: PathBuf,
+    /// 项目 ID
+    pid: String,
+    /// 文件 ID
+    fid: String,
+    /// 显示名
+    name: String,
+    /// 文件 SHA1
+    hash: String,
+    /// 下载地址
+    url: String,
+}
+
+/// 资源类型是否支持资源映射
+///
+/// - `file_type`: 资源类型
+///
+/// # 返回值
+///
+/// 模组 / 资源包返回对应类型，其余返回 `None`
+fn link_type(file_type: FileType) -> Option<ResourceType> {
+    match file_type {
+        FileType::Mod => Some(ResourceType::Mod),
+        FileType::Resourcepack => Some(ResourceType::ResourcePack),
+        _ => None,
+    }
+}
+
 /// 下载资源到实例
 ///
 /// 模组 / 资源包 / 光影包直接放入实例对应目录；数据包必须指定存档 `world`，
 /// zip 原样放入其 datapacks 目录；存档先下到下载目录，
 /// 下载完成后再走 `import_save` 解压导入。
 ///
-/// 下载走全局下载器，进度在下载窗口可见，命令立即返回；
+/// 开启资源映射时，模组 / 资源包先落到公共目录，再硬链接进实例；公共目录已有同一份文件
+/// 时直接链接，不再下载。下载走全局下载器，进度在下载窗口可见，命令立即返回；
 /// 进度按目标文件路径匹配后经 add-resource-status 事件推给前端，
 /// 终态条目留在任务表里不自动移除，由「清除已完成」手动清，窗口顶部进度条停在「完成」
 ///
@@ -185,7 +224,7 @@ pub async fn add_resource_download(
     }
     .await;
 
-    let (obj, online_info) = match res {
+    let (mut obj, online_info) = match res {
         Ok(item) => item,
         Err(err) => {
             DOWNLOAD_NOW
@@ -215,6 +254,49 @@ pub async fn add_resource_download(
     }
     .unwrap_or_default();
 
+    // 资源映射：公共目录里已有同一份文件就直接硬链接，否则下载到公共目录后再映射回来
+    let target = obj.file.clone();
+    let base = instance.read().unwrap().get_base_path();
+    let mut reused = false;
+    let mut link_plan = None;
+    if mml_link::is_enabled()
+        && let Some(resource) = link_type(file_type)
+        && !online_info.sha1.is_empty()
+    {
+        match mml_link::try_link(
+            resource,
+            uuid,
+            &base,
+            &target,
+            &online_info.modid,
+            &online_info.fileid,
+            &online_info.name,
+            &online_info.sha1,
+            &online_info.url,
+        ) {
+            Ok(true) => reused = true,
+            Ok(false) => {
+                if let Some(source) =
+                    mml_link::download_path(resource, &online_info.sha1, &online_info.file)
+                {
+                    obj.file = source.clone();
+                    link_plan = Some(LinkPlan {
+                        resource,
+                        base: base.clone(),
+                        target: target.clone(),
+                        source,
+                        pid: online_info.modid.clone(),
+                        fid: online_info.fileid.clone(),
+                        name: online_info.name.clone(),
+                        hash: online_info.sha1.clone(),
+                        url: online_info.url.clone(),
+                    });
+                }
+            }
+            Err(err) => mml_log::error_type(err),
+        }
+    }
+
     // 补全条目的显示名与目标路径，进度回调按路径匹配
     {
         let mut map = DOWNLOAD_NOW.write().unwrap();
@@ -224,6 +306,32 @@ pub async fn add_resource_download(
             info.icon = project_icon;
         }
     }
+
+    // 公共目录已有同一份文件：链接已建好，不再走下载器
+    if reused {
+        {
+            let mut map = DOWNLOAD_NOW.write().unwrap();
+            if let Some(info) = map.get_mut(&uuid).and_then(|entry| entry.get_mut(&key)) {
+                info.now = 100.0;
+                info.done = true;
+            }
+        }
+        emit_add_resource_status(&app, build_status(&app));
+
+        let name = online_info.name.clone();
+        let game = instance.read().unwrap();
+        let mut list = game.read_online_info();
+        list.insert(pid.clone(), online_info);
+        game.save_online_info(&list);
+        drop(game);
+
+        crate::notify::notify_if_unfocused(
+            &app,
+            crate::log_text::NotifyText::ResourceDone { name },
+        );
+        return Ok(());
+    }
+
     emit_add_resource_status(&app, build_status(&app));
 
     let is_save = file_type == FileType::Save;
@@ -234,6 +342,27 @@ pub async fn add_resource_download(
     // 后台任务：下载 → 终态标记 → 存档导入 / 已下载标记 → 延时移除
     tauri::async_runtime::spawn(async move {
         let outcome = mml_downloader::start_download_task_outcome(vec![obj]).await;
+        let mut mapped = true;
+
+        // 下载到公共目录的任务：收尾时把文件映射回实例，失败要按资源失败处理
+        if outcome.is_done()
+            && let Some(plan) = link_plan
+            && let Err(err) = mml_link::finish_download(
+                plan.resource,
+                uuid,
+                &plan.base,
+                &plan.target,
+                &plan.source,
+                &plan.pid,
+                &plan.fid,
+                &plan.name,
+                &plan.hash,
+                &plan.url,
+            )
+        {
+            mml_log::error_type(err);
+            mapped = false;
+        }
 
         // 结束通知用条目里的显示名；先读，标完终态后前端「清除已完成」可能已经把它清掉。
         // 成功与失败各发一条，取消是用户自己按的，不打扰
@@ -250,7 +379,7 @@ pub async fn add_resource_download(
         {
             let mut map = DOWNLOAD_NOW.write().unwrap();
             if let Some(info) = map.get_mut(&uuid).and_then(|entry| entry.get_mut(&key)) {
-                if outcome.is_done() {
+                if outcome.is_done() && mapped {
                     info.now = 100.0;
                     info.done = true;
                 } else if outcome.is_cancelled() {
@@ -263,7 +392,7 @@ pub async fn add_resource_download(
         }
         emit_add_resource_status(&app2, build_status(&app2));
 
-        if outcome.is_done() {
+        if outcome.is_done() && mapped {
             if is_save {
                 let instance = instance.clone();
                 // 只关心"解包失败"；spawn_blocking 自身的 JoinError 沿用原来的忽略口径

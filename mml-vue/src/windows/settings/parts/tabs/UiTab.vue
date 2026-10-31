@@ -245,16 +245,12 @@ function toggleCustomPage(on: boolean) {
   </SettingsGroup>
 
   <SettingsGroup id="window" title-key="winSettings.secWindow" :flash="flashGroup === 'window'">
-    <!-- 两态设置用 Switch 开关 -->
-    <div class="switch-row">
-      <div class="switch-text">
-        <span class="switch-label">{{ t("winSettings.windowMode") }}</span>
-        <span class="switch-state">{{ windowMode === "Multi" ? t("winSettings.multi") : t("winSettings.single")
-        }}</span>
-      </div>
-      <BaseSwitch :model-value="windowMode === 'Multi'"
-        @update:model-value="(v) => onModeChange(v ? 'Multi' : 'Single')" />
-    </div>
+    <!-- 窗口模式：与主窗口启动页同一套两态分段选择 -->
+    <label class="field-label">{{ t("winSettings.windowMode") }}</label>
+    <SegmentedTabs :model-value="windowMode" :options="[
+      { value: 'Single', label: t('winSettings.single') },
+      { value: 'Multi', label: t('winSettings.multi') },
+    ]" @update:model-value="onModeChange" />
     <p v-if="inTauri" class="hint">{{ t("winSettings.windowModeRestart") }}</p>
   </SettingsGroup>
 

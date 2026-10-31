@@ -5,7 +5,7 @@
 
 ## 技术栈
 
-- **内核**：Rust workspace（`mml-core/` 本体 + 19 个子 crate，edition 2024）
+- **内核**：Rust workspace（`mml-core/` 本体 + 20 个子 crate，edition 2024）
 - **界面**：Tauri 2 桌面壳（`mml-gui/`）+ Vue 3 / Vite 前端（`mml-vue/`）
 - **IPC**：Rust 源码是命令与 DTO 的唯一来源，`ipc-gen` 生成独立的 npm 契约包 `mml-ipc`，
   启动器前端与自定义主页面共用

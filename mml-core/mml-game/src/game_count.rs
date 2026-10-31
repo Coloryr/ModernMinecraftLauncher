@@ -29,7 +29,7 @@ use mml_nbt::{
 use mml_sys::path_helper;
 use uuid::Uuid;
 
-use crate::{get_instance, get_instances, launcher::game_time_obj::GameTimeObj};
+use crate::get_instances;
 
 /// 统计数据共享句柄
 pub type GameCountObj = Arc<RwLock<CountObj>>;
@@ -58,14 +58,6 @@ static READ_OK: AtomicBool = AtomicBool::new(true);
 
 /// 正在运行的游戏及其上次统计时间
 static TIME_LIST: LazyLock<Mutex<HashMap<Uuid, DateTime<Local>>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-
-/// 本次运行累积的游戏时长
-static SPAN_TIME_LIST: LazyLock<Mutex<HashMap<Uuid, TimeDelta>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-
-/// 运行中游戏的启动数据缓存
-static LAUNCH_DATA_MAP: LazyLock<Mutex<HashMap<Uuid, GameTimeObj>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// 落盘到 COUNT_DATA_FILE 的统计总表
@@ -495,14 +487,13 @@ fn merge_pending(dir: &Path) {
 
 /// 统计线程主体：每 100 毫秒累加一次运行中实例的时长
 fn run() {
-    let mut a: u32 = 0;
     while IS_RUN.load(Ordering::Relaxed) {
         thread::sleep(StdDuration::from_millis(100));
 
         let now = Local::now();
         let keys: Vec<Uuid> = TIME_LIST.lock().unwrap().keys().copied().collect();
 
-        let should_save = a >= 10;
+        let mut total = TimeDelta::zero();
         for uuid in keys {
             let span = {
                 let mut time_list = TIME_LIST.lock().unwrap();
@@ -513,42 +504,12 @@ fn run() {
                 *prev = now;
                 span
             };
-
-            {
-                let mut span_list = SPAN_TIME_LIST.lock().unwrap();
-                if let Some(value) = span_list.get_mut(&uuid) {
-                    *value += span;
-                }
-            }
-
-            {
-                let mut data_list = LAUNCH_DATA_MAP.lock().unwrap();
-                if let Some(data) = data_list.get_mut(&uuid) {
-                    data.game_time += span;
-                }
-            }
-
-            {
-                let mut count = COUNT.write().unwrap();
-                count.all_time += span;
-            }
-
-            // 每 10 次统计约 1 秒，保存一次启动数据
-            if should_save {
-                let data = {
-                    let data_list = LAUNCH_DATA_MAP.lock().unwrap();
-                    data_list.get(&uuid).map(copy_game_time)
-                };
-                if let Some(data) = data
-                    && let Some(game) = get_instance(&uuid)
-                {
-                    let read = game.read().unwrap();
-                    read.save_launch_count_data(&data);
-                }
-            }
+            total += span;
         }
 
-        a = if should_save { 0 } else { a + 1 };
+        if total > TimeDelta::zero() {
+            COUNT.write().unwrap().all_time += total;
+        }
     }
 }
 
@@ -714,24 +675,6 @@ pub fn launch_done(uuid: &Uuid) {
         time_list.insert(*uuid, now);
     }
     {
-        let mut span_list = SPAN_TIME_LIST.lock().unwrap();
-        span_list.insert(*uuid, TimeDelta::zero());
-    }
-    {
-        let mut data_map = LAUNCH_DATA_MAP.lock().unwrap();
-        let game = get_instance(uuid);
-        let mut data = match &game {
-            Some(game) => game.read().unwrap().read_launch_count_data(),
-            None => GameTimeObj::default(),
-        };
-        // 上次启动时间与 ColorMC 一致：LaunchDone 里先写 LastTime，再落一份实例统计
-        data.last_time = Local::now().fixed_offset();
-        if let Some(game) = &game {
-            game.read().unwrap().save_launch_count_data(&data);
-        }
-        data_map.insert(*uuid, data);
-    }
-    {
         let mut count = COUNT.write().unwrap();
         count.launch_count += 1;
         count.launch_done_count += 1;
@@ -782,54 +725,19 @@ pub fn game_close(uuid: &Uuid) {
     save_async();
 }
 
-/// 结掉一局运行：只改内存与实例的最后游玩，不负责落盘
+/// 结掉一局运行：只改内存，不负责落盘
 ///
 /// - `uuid`: 游戏实例标识
 fn close_run(uuid: &Uuid) {
     let now = Local::now();
     TIME_LIST.lock().unwrap().remove(uuid);
 
-    if let Some(span) = SPAN_TIME_LIST.lock().unwrap().remove(uuid) {
-        if let Some(game) = get_instance(uuid) {
-            let data = {
-                let mut data_map = LAUNCH_DATA_MAP.lock().unwrap();
-                data_map.remove(uuid)
-            };
-            let mut data = match data {
-                Some(data) => data,
-                None => game.read().unwrap().read_launch_count_data(),
-            };
-            data.last_play = span;
-
-            let read = game.read().unwrap();
-            read.save_launch_count_data(&data);
-        } else {
-            LAUNCH_DATA_MAP.lock().unwrap().remove(uuid);
+    let mut count = COUNT.write().unwrap();
+    if let Some(list) = count.game_runs.get_mut(uuid) {
+        if let Some(item) = list.iter_mut().find(|a| a.now) {
+            item.now = false;
+            item.stop_time = now;
         }
-    } else {
-        LAUNCH_DATA_MAP.lock().unwrap().remove(uuid);
-    }
-
-    {
-        let mut count = COUNT.write().unwrap();
-        if let Some(list) = count.game_runs.get_mut(uuid) {
-            if let Some(item) = list.iter_mut().find(|a| a.now) {
-                item.now = false;
-                item.stop_time = now;
-            }
-        }
-    }
-}
-
-/// 复制一份启动数据
-///
-/// `GameTimeObj` 未实现 `Clone`，但其字段均为可复制类型，这里逐字段复制。
-fn copy_game_time(data: &GameTimeObj) -> GameTimeObj {
-    GameTimeObj {
-        add_time: data.add_time,
-        last_time: data.last_time,
-        game_time: data.game_time,
-        last_play: data.last_play,
     }
 }
 

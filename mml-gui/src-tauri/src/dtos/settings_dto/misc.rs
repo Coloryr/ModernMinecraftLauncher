@@ -25,6 +25,20 @@ pub struct SettingsDefaultsDto {
     pub window: WindowSettingDto,
 }
 
+/// 批量资源映射结果
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ResourceMapResultDto {
+    /// 处理的实例数
+    pub instances: u32,
+    /// 映射成功的文件数
+    pub mapped: u32,
+    /// 映射失败的文件数
+    pub failed: u32,
+    /// 实例文件不存在、禁用或缺少哈希而跳过的文件数
+    pub skipped: u32,
+}
+
 /// 游戏窗口设置，前端 wire 为 camelCase，字段即 core `WindowSettingObj`
 ///
 /// core 侧是 `Option` 字段，DTO 落到 `WindowSettingObj::new()` 同款默认值；

@@ -41,13 +41,13 @@ const SERVER_LOCK_TYPES = ["authlib", "selflittleskin", "nide8"];
  * - `addCustomCss` / `setCustomCssEnabled` / `moveCustomCss` / `removeCustomCss` / `openCustomUiDir`: 自定义 CSS 的安装、启停、排序与删除
  * - `pickMusicFile`: 选一个本地音频文件填进"自定义音乐"
  * - `programIcon` / `pickProgramIcon` / `clearProgramIcon`: 自定义程序图标（落成运行目录下的图标文件）
- * - `experimental` / `applyExperimental`: 实验性功能四开关（界面先行，行为未接线）
+ * - `experimental` / `applyExperimental`: 实验性功能开关（资源映射已接线）
  * - `applyWindowOpacity`: 透明度写进 CSS 变量并落盘，界面页的窗口外观用
  * - `load` / `applyClient` / `saveState` / `resetGroup`: 加载、落盘与分组级恢复默认
  */
 export function useSettingsClient() {
   const client = ref<ClientConfig>({ ...defaultConfig().client });
-  /** 实验性功能四个开关：界面先行，行为未接线 */
+  /** 实验性功能开关：资源映射已接线，URI / 沙盒待实现 */
   const experimental = ref<ExperimentalConfig>({ ...defaultConfig().experimental });
   /** 启动前检查开关：加载器 / 内存 */
   const launchCheck = ref<LaunchCheckConfig>({ ...defaultConfig().launchCheck });

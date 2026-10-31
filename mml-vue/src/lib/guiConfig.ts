@@ -181,6 +181,8 @@ export interface ExperimentalConfig {
   launcherAdmin: boolean;
   /** 启动实例时提升到管理员身份 */
   instanceAdmin: boolean;
+  /** 模组与资源包下载到公共目录，实例内用硬链接映射 */
+  resourceLink: boolean;
   /** 允许通过 URI 直接启动实例 */
   uriLaunch: boolean;
   /** 在沙盒里启动实例 */
@@ -467,6 +469,7 @@ export function defaultConfig(): GuiConfig {
     experimental: {
       launcherAdmin: false,
       instanceAdmin: false,
+      resourceLink: false,
       uriLaunch: false,
       sandboxLaunch: false,
     },

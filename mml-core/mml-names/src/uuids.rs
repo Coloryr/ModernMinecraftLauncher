@@ -19,8 +19,6 @@ pub const LITELOADER_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000004");
 pub const BACKUP_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000005");
 /// 在线文件信息保存任务
 pub const ONLINE_FILE_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000006");
-/// 启动计数 launch.json 的保存任务
-pub const LAUNCH_COUNT_DATA_FILE_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000007");
 /// 整合包服务端信息保存任务
 pub const SERVERPACK_FILE_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000008");
 /// 窗口几何 window_save.json 的保存任务
@@ -41,6 +39,16 @@ pub const BLOCK_GROUPS_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000012"
 /// 云同步与手柄 integrations.json 的保存任务。
 pub const INTEGRATIONS_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000013");
 
+/// 实例映射记录 link_info.json 的保存任务命名空间
+///
+/// 每个实例用 `mix_uuid(实例 uuid, LINK_UUID)` 派生自己的保存任务。
+pub const LINK_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000014");
+
+/// 公共模组索引 mod_download.json 的保存任务
+pub const MOD_DOWNLOAD_INFO_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000015");
+/// 公共资源包索引 resourcepack_download.json 的保存任务
+pub const RESOURCE_PACK_DOWNLOAD_INFO_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000016");
+
 /// 全部内置保留 UUID，供 [`check_uuid`] 遍历
 static UUIDS: LazyLock<Vec<Uuid>> = LazyLock::new(|| {
     vec![
@@ -50,7 +58,6 @@ static UUIDS: LazyLock<Vec<Uuid>> = LazyLock::new(|| {
         LITELOADER_UUID,
         BACKUP_UUID,
         ONLINE_FILE_UUID,
-        LAUNCH_COUNT_DATA_FILE_UUID,
         SERVERPACK_FILE_UUID,
         WINDOW_FILE_UUID,
         GUI_CONFIG_FILE_UUID,
@@ -59,6 +66,9 @@ static UUIDS: LazyLock<Vec<Uuid>> = LazyLock::new(|| {
         GROUP_UUID,
         BLOCK_GROUPS_UUID,
         INTEGRATIONS_UUID,
+        LINK_UUID,
+        MOD_DOWNLOAD_INFO_UUID,
+        RESOURCE_PACK_DOWNLOAD_INFO_UUID,
     ]
 });
 

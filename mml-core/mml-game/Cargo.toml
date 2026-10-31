@@ -14,6 +14,7 @@ mml-jvms = { path = "../mml-jvms" }
 mml-nbt = { path = "../mml-nbt" }
 mml-sys = { path = "../mml-sys" }
 mml-downloader = { path = "../mml-downloader" }
+mml-link = { path = "../mml-link" }
 zip.workspace = true
 serde.workspace = true
 serde_json.workspace = true

@@ -21,7 +21,6 @@ use mml_sys::path_helper;
 use crate::launcher::{
     custom_game_arg_obj::CustomGameArgObj,
     file_online_info_obj::OnlineInfoObj,
-    game_time_obj::GameTimeObj,
     instance_setting_obj::CustomLoaderObj,
     instance_setting_obj::InstanceSettingObj,
     mod_update_obj::{ModUpdateList, ModUpdateRecordObj},
@@ -555,19 +554,6 @@ impl InstanceSettingObj {
             .join(names::MOD_UPDATE_FILE)
     }
 
-    /// 获取启动记录数据文件
-    ///
-    /// # 返回值
-    ///
-    /// 实例目录下的绝对路径，不检查是否存在
-    pub fn get_launch_file(&self) -> PathBuf {
-        BASE_DIR
-            .get()
-            .unwrap()
-            .join(&self.dir)
-            .join(names::LAUNCH_COUNT_FILE)
-    }
-
     /// 获取安全Log4j文件
     ///
     /// # 返回值
@@ -690,34 +676,6 @@ impl InstanceSettingObj {
         }
 
         Ok(())
-    }
-
-    /// 读取启动统计数据
-    ///
-    /// # 返回值
-    ///
-    /// 返回统计数据；文件不存在或解析失败返回默认值
-    pub fn read_launch_count_data(&self) -> GameTimeObj {
-        let file = self.get_launch_file();
-        if file.exists() && file.is_file() {
-            let obj = serialize_tools::json_from_file::<GameTimeObj>(&file);
-            if let Ok(obj) = obj {
-                return obj;
-            }
-        }
-
-        Default::default()
-    }
-
-    /// 保存启动统计数据
-    ///
-    /// - `obj`: 统计数据
-    pub fn save_launch_count_data(&self, obj: &GameTimeObj) {
-        config_save::save(
-            uuids::mix_uuid(self.uuid, uuids::LAUNCH_COUNT_DATA_FILE_UUID),
-            obj,
-            &self.get_launch_file(),
-        );
     }
 
     /// 读取模组更新记录

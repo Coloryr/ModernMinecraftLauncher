@@ -10,6 +10,13 @@ export type SettingsDefaultsDto = {
   window: WindowSettingDto,
 };
 
+export type ResourceMapResultDto = {
+  instances: number,
+  mapped: number,
+  failed: number,
+  skipped: number,
+};
+
 export type WindowSettingDto = {
   fullScreen: boolean,
   width: number,

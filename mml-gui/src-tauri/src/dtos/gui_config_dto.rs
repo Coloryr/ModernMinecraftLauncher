@@ -288,7 +288,7 @@ impl From<ClientConfigDto> for ClientConfig {
     }
 }
 
-/// 实验性功能开关，wire 为 camelCase；行为未接线，只有选择落盘
+/// 实验性功能开关，wire 为 camelCase
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct ExperimentalConfigDto {
@@ -296,6 +296,8 @@ pub struct ExperimentalConfigDto {
     pub launcher_admin: bool,
     /// 启动实例时提升到管理员身份
     pub instance_admin: bool,
+    /// 模组与资源包下载到公共目录，实例内用硬链接映射
+    pub resource_link: bool,
     /// 允许通过 URI（自定义协议）直接启动实例
     pub uri_launch: bool,
     /// 在沙盒里启动实例
@@ -426,6 +428,7 @@ impl From<GuiConfig> for GuiConfigDto {
             experimental: ExperimentalConfigDto {
                 launcher_admin: c.experimental.launcher_admin,
                 instance_admin: c.experimental.instance_admin,
+                resource_link: c.experimental.resource_link,
                 uri_launch: c.experimental.uri_launch,
                 sandbox_launch: c.experimental.sandbox_launch,
             },
@@ -509,6 +512,7 @@ impl From<GuiConfigDto> for GuiConfig {
             experimental: ExperimentalConfig {
                 launcher_admin: d.experimental.launcher_admin,
                 instance_admin: d.experimental.instance_admin,
+                resource_link: d.experimental.resource_link,
                 uri_launch: d.experimental.uri_launch,
                 sandbox_launch: d.experimental.sandbox_launch,
             },

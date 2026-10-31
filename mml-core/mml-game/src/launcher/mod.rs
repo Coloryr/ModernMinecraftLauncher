@@ -7,7 +7,6 @@
 //! | `custom_game_arg_obj` | 自定义游戏参数 |
 //! | `custom_loader_obj` | 自定义加载器 |
 //! | `file_online_info_obj` | 在线文件信息 |
-//! | `game_time_obj` | 游戏运行时长记录 |
 //! | `instance_setting_obj` | 实例设置 |
 //! | `mod_update_obj` | 模组更新记录 |
 //! | `project_save_obj` | 项目保存信息 |
@@ -18,7 +17,6 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 pub mod custom_game_arg_obj;
 pub mod custom_loader_obj;
 pub mod file_online_info_obj;
-pub mod game_time_obj;
 pub mod instance_setting_obj;
 pub mod mod_update_obj;
 pub mod project_save_obj;

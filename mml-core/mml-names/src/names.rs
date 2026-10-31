@@ -68,7 +68,6 @@ pub const MODRINTH_FILE: &str = "modrinth.index.json";
 pub const ICON_FILE: &str = "icon.png";
 pub const SERVER_FILE: &str = "server.json";
 pub const SERVER_OLD_FILE: &str = "server.old.json";
-pub const LAUNCH_COUNT_FILE: &str = "launch.json";
 pub const LOG4J_FILE: &str = "log4j-rce-patch.xml";
 pub const LOADER_FILE: &str = "loader.jar";
 pub const LEVEL_FILE: &str = "level.dat";
@@ -105,6 +104,9 @@ pub const BLOCK_GROUPS_FILE: &str = "block_groups.json";
 pub const COLORMC_MIGRATE_FILE: &str = "colormc_migrate.json";
 pub const MINECRAFT_MIGRATE_FILE: &str = "minecraft_migrate.json";
 pub const COUNT_IMPORT_FILE: &str = "count.import.dat";
+pub const LINK_INFO_FILE: &str = "link_info.json";
+pub const MOD_DOWNLOAD_FILE: &str = "mod_download.json";
+pub const RESOURCEPACK_DOWNLOAD_FILE: &str = "resourcepack_download.json";
 
 pub const MINECRAFT_KEY: &str = "minecraft";
 pub const LANG_KEY1: &str = "minecraft/lang/";
@@ -329,7 +331,6 @@ mod tests {
             ICON_FILE,
             SERVER_FILE,
             SERVER_OLD_FILE,
-            LAUNCH_COUNT_FILE,
             LOG4J_FILE,
             LOADER_FILE,
             LEVEL_FILE,
@@ -363,6 +364,9 @@ mod tests {
             COLORMC_MIGRATE_FILE,
             MINECRAFT_MIGRATE_FILE,
             COUNT_IMPORT_FILE,
+            LINK_INFO_FILE,
+            MOD_DOWNLOAD_FILE,
+            RESOURCEPACK_DOWNLOAD_FILE,
             IPC_PORT_FILE,
         ] {
             assert!(!name.is_empty(), "文件常量不应为空: {name:?}");

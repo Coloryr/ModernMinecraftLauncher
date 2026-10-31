@@ -490,6 +490,19 @@ pub fn copy_file<P: AsRef<Path>>(input: P, output: P) -> CoreResult<()> {
     Ok(())
 }
 
+/// 创建文件硬链接
+///
+/// - `input`: 源文件路径
+/// - `output`: 新链接路径
+///
+/// # 返回值
+///
+/// 创建成功返回 `Ok(())`，失败返回相应错误
+pub fn hard_link<P: AsRef<Path>>(input: P, output: P) -> CoreResult<()> {
+    fs::hard_link(input.as_ref(), output.as_ref()).map_err(|err| fs_error(input.as_ref(), err))?;
+    Ok(())
+}
+
 /// 异步复制文件
 ///
 /// - `input`: 源文件路径
@@ -1126,6 +1139,24 @@ mod tests {
         assert_eq!(buf, "content");
 
         assert!(open_read_write(root.join("no_such.txt")).is_err());
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// hard_link 共用同一份文件内容
+    #[test]
+    fn test_hard_link() {
+        let root = make_test_root("hardlink");
+        let src = root.join("src.txt");
+        write_text(&src, "data").unwrap();
+
+        let link = root.join("link.txt");
+        hard_link(&src, &link).unwrap();
+        assert_eq!(read_text(&link).unwrap(), "data");
+
+        // 删掉原文件后链接仍能读到内容
+        delete(&src).unwrap();
+        assert_eq!(read_text(&link).unwrap(), "data");
 
         let _ = fs::remove_dir_all(&root);
     }
