@@ -16,19 +16,21 @@ pub struct LocalFileEntryDto {
     pub size: u64,
     /// 是否允许清理；界面数据、游戏实例这类只统计不删除
     pub deletable: bool,
-    /// 游戏实例的占用明细，仅 `instances` 这一行有；其他行为空
-    pub children: Vec<LocalFileInstanceDto>,
+    /// 可展开的占用明细；实例行是各实例，下载内容行是 mods / resourcepacks
+    pub children: Vec<LocalFileChildDto>,
 }
 
-/// 单个游戏实例的占用
+/// 本地文件夹下的明细行
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct LocalFileInstanceDto {
-    /// 实例 uuid
-    pub uuid: String,
-    /// 实例显示名
+pub struct LocalFileChildDto {
+    /// 稳定 id：实例 uuid，或 mods / resourcepacks
+    pub id: String,
+    /// 明细类型：instance / mods / resourcepacks
+    pub kind: String,
+    /// 实例显示名；下载子目录留空，由界面按 kind 翻译
     pub name: String,
-    /// 实例根目录绝对路径，界面悬停展示
+    /// 绝对路径，界面悬停展示
     pub path: String,
     /// 占用字节数
     pub size: u64,

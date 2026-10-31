@@ -1,7 +1,7 @@
 //! 资源映射：下载前接入公共目录，启动前检查并修复硬链接
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     path::{Path, PathBuf},
 };
 
@@ -68,6 +68,20 @@ fn disabled_exists(target: &Path) -> bool {
             let path = format!("{}{}", target.to_string_lossy(), ext);
             Path::new(&path).is_file()
         })
+}
+
+/// 删除实例内文件后清掉对应映射记录
+///
+/// 整合包升级移除文件时调用，避免启动检查按旧记录把文件重新链回来。
+///
+/// - game: 实例句柄
+/// - target: 已删除的实例内文件
+pub(crate) fn forget_link(game: &GameInstance, target: &Path) {
+    let (uuid, base) = {
+        let game = game.read().unwrap();
+        (game.uuid, game.get_base_path())
+    };
+    mml_link::remove_link(uuid, &base, target);
 }
 
 /// 把一批模组下载项改到公共目录，并返回下载后要补链的计划
@@ -184,6 +198,36 @@ pub struct MapResourceCount {
     pub skipped: u32,
 }
 
+/// 统计一个实例里可处理的在线资源条目数
+///
+/// 与 map_instance_resources_with 的遍历口径一致，供批量处理进度条使用。
+///
+/// - game: 实例句柄
+///
+/// # 返回值
+///
+/// 该实例里能被 target_of 定位到的条目数
+pub fn count_instance_resources(game: &GameInstance) -> u32 {
+    if !mml_link::is_enabled() {
+        return 0;
+    }
+
+    let (game_path, mods, resourcepacks, online) = {
+        let game = game.read().unwrap();
+        (
+            game.get_game_path(),
+            game.get_mods_path(),
+            game.get_resourcepacks_path(),
+            game.read_online_info(),
+        )
+    };
+
+    online
+        .values()
+        .filter(|info| target_of(&game_path, &mods, &resourcepacks, info).is_some())
+        .count() as u32
+}
+
 /// 把一个实例里所有带在线信息的模组 / 资源包搬进公共目录并补硬链接
 ///
 /// 只处理实例里实际存在的文件；禁用文件、缺少 SHA1 的条目跳过。
@@ -194,6 +238,21 @@ pub struct MapResourceCount {
 ///
 /// 见 MapResourceCount
 pub fn map_instance_resources(game: &GameInstance) -> MapResourceCount {
+    map_instance_resources_with(game, |_| {})
+}
+
+/// 带逐条回调的实例批量映射
+///
+/// - game: 实例句柄
+/// - on_item: 每处理完一个在线资源条目调用一次，供批量命令刷新进度并写日志
+///
+/// # 返回值
+///
+/// 见 MapResourceCount
+pub fn map_instance_resources_with<F>(game: &GameInstance, mut on_item: F) -> MapResourceCount
+where
+    F: FnMut(&OnlineInfoObj),
+{
     if !mml_link::is_enabled() {
         return MapResourceCount::default();
     }
@@ -210,12 +269,6 @@ pub fn map_instance_resources(game: &GameInstance) -> MapResourceCount {
         )
     };
 
-    let linked: HashSet<String> = mml_link::get_instance_link_data(uuid, &base)
-        .into_iter()
-        .filter(|link| link.is_link)
-        .map(|link| link.path)
-        .collect();
-
     let mut count = MapResourceCount::default();
     for info in online.values() {
         let Some((resource, target)) = target_of(&game_path, &mods, &resourcepacks, info) else {
@@ -223,18 +276,9 @@ pub fn map_instance_resources(game: &GameInstance) -> MapResourceCount {
         };
         if !target.is_file() || disabled_exists(&target) || info.sha1.is_empty() {
             count.skipped += 1;
+            on_item(info);
             continue;
         }
-        let path = target
-            .strip_prefix(&base)
-            .unwrap_or(&target)
-            .to_string_lossy()
-            .replace('\\', "/");
-        if linked.contains(&path) {
-            count.skipped += 1;
-            continue;
-        }
-
         match mml_link::map_existing(
             resource,
             uuid,
@@ -252,6 +296,7 @@ pub fn map_instance_resources(game: &GameInstance) -> MapResourceCount {
                 count.failed += 1;
             }
         }
+        on_item(info);
     }
 
     count

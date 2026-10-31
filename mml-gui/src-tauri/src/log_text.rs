@@ -235,6 +235,31 @@ pub enum LogText {
         /// 失败的条目数
         failed: u32,
     },
+    /// 存量资源映射开始
+    ResourceMapStarted {
+        /// 处理的实例数
+        instances: u32,
+        /// 待处理条目总数
+        total: u32,
+    },
+    /// 存量资源映射处理一条
+    ResourceMapItem {
+        /// 资源显示名
+        name: String,
+        /// 已处理条目数
+        done: u32,
+        /// 待处理条目总数
+        total: u32,
+    },
+    /// 存量资源映射结束
+    ResourceMapFinished {
+        /// 映射成功数
+        mapped: u32,
+        /// 失败数
+        failed: u32,
+        /// 跳过数
+        skipped: u32,
+    },
     /// 日志窗口：运行库路径那一行
     LogRuntimeLib {
         /// 运行库文件路径
@@ -725,6 +750,17 @@ impl LogText {
             LogText::ModUpdateFinished { ok, failed } => {
                 format!("模组更新：收尾完成 ok={ok} failed={failed}")
             }
+            LogText::ResourceMapStarted { instances, total } => {
+                format!("资源映射：开始处理 {instances} 个实例，共 {total} 个文件")
+            }
+            LogText::ResourceMapItem { name, done, total } => {
+                format!("资源映射：{done}/{total} {name}")
+            }
+            LogText::ResourceMapFinished {
+                mapped,
+                failed,
+                skipped,
+            } => format!("资源映射：处理完成 映射={mapped} 失败={failed} 跳过={skipped}"),
             LogText::LogRuntimeLib { path } => format!("运行库：{path}"),
             LogText::LogJavaRedirect => String::from("Java 输出已重定向"),
             LogText::LogJavaLocalRedirect => String::from("Java 切换回本地查找"),
@@ -1035,6 +1071,19 @@ impl LogText {
             LogText::ModUpdateFinished { ok, failed } => {
                 format!("mod update: wrapping up done ok={ok} failed={failed}")
             }
+            LogText::ResourceMapStarted { instances, total } => {
+                format!("resource mapping: starting {total} files across {instances} instances")
+            }
+            LogText::ResourceMapItem { name, done, total } => {
+                format!("resource mapping: {done}/{total} {name}")
+            }
+            LogText::ResourceMapFinished {
+                mapped,
+                failed,
+                skipped,
+            } => format!(
+                "resource mapping: finished mapped={mapped} failed={failed} skipped={skipped}"
+            ),
             LogText::LogRuntimeLib { path } => format!("runtime library: {path}"),
             LogText::LogJavaRedirect => String::from("Java output has been redirected"),
             LogText::LogJavaLocalRedirect => String::from("Java fell back to a local lookup"),

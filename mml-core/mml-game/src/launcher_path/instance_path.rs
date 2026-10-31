@@ -636,6 +636,19 @@ impl InstanceSettingObj {
         );
     }
 
+    /// 同步保存在线文件信息
+    ///
+    /// 整合包安装 / 升级紧接着要读它来准备资源映射，异步队列可能还没落盘。
+    ///
+    /// - `info`: 在线文件信息表
+    ///
+    /// # 返回值
+    ///
+    /// 写盘失败时返回对应错误
+    pub fn save_online_info_sync(&self, info: &OnlineInfoList) -> CoreResult<()> {
+        serialize_tools::json_to_file(info, self.get_online_info_file())
+    }
+
     /// 读取自定义游戏启动配置
     ///
     /// # 返回值

@@ -39,6 +39,18 @@ pub struct ResourceMapResultDto {
     pub skipped: u32,
 }
 
+/// 批量资源映射进度
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ResourceMapProgressDto {
+    /// 实例总数
+    pub instances: u32,
+    /// 待处理条目总数
+    pub total: u32,
+    /// 已处理条目数
+    pub done: u32,
+}
+
 /// 游戏窗口设置，前端 wire 为 camelCase，字段即 core `WindowSettingObj`
 ///
 /// core 侧是 `Option` 字段，DTO 落到 `WindowSettingObj::new()` 同款默认值；

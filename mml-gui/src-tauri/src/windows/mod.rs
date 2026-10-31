@@ -1397,6 +1397,10 @@ pub fn window_drop_model(kind: String) -> Result<(), String> {
 /// - `app`: 应用句柄，退出当前进程用它
 #[gui_macros::command]
 pub fn window_restart_app(app: AppHandle) {
+    // 存量映射正在搬文件：重启会直接把进程杀掉
+    if settings::resource_link::running() {
+        return;
+    }
     mml_core::stop();
     mml_game::game_count::stop();
 

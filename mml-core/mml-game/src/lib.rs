@@ -11,8 +11,8 @@
 //! - **分组** — 实例的分组展示，组名到实例 UUID 的映射保存在内存
 //! - **运行句柄** — 启动后的实例由 [`game_launch::InstanceHandle`] 跟踪，
 //!   后台线程每秒轮询退出状态并触发 [`InstanceExit`] 事件
-//! - **事件** — 实例退出 / 变更 / 运行日志分别通过
-//!   [`add_exit`] / [`add_change`] / [`add_run_log`] 订阅
+//! - **事件** — 实例退出 / 变更 / 运行日志 / 目录外部增删分别通过
+//!   [`add_exit`] / [`add_change`] / [`add_run_log`] / [`add_watch_change`] 订阅
 //!
 //! # 子模块
 //!
@@ -147,6 +147,16 @@ pub enum InstanceChange {
     MoveGroup(Uuid, Option<Uuid>),
 }
 
+/// 实例目录被外部增删的事件参数
+///
+/// 只由实例根目录的监视线程发出；启动器自己的增删走 `InstanceChange`。
+pub enum InstanceWatchChange {
+    /// 外部新增实例，携带实例 UUID
+    Add(Uuid),
+    /// 外部删除实例，携带实例 UUID
+    Remove(Uuid),
+}
+
 /// 实例日志事件参数
 pub enum InstanceLogType {
     /// 新增一条日志
@@ -187,6 +197,9 @@ static CHANGE_EVENT: LazyLock<EventArgHandler<InstanceChange>> =
     LazyLock::new(|| EventArgHandler::new());
 /// 实例运行日志事件
 static LOG_EVENT: LazyLock<EventArgHandler<InstanceLog>> = LazyLock::new(|| EventArgHandler::new());
+/// 实例目录外部增删事件
+static WATCH_EVENT: LazyLock<EventArgHandler<InstanceWatchChange>> =
+    LazyLock::new(|| EventArgHandler::new());
 
 /// 订阅实例退出事件
 ///
@@ -214,6 +227,20 @@ where
     F: Fn(&InstanceChange) + Send + Sync + 'static,
 {
     CHANGE_EVENT.add_handler(handler)
+}
+
+/// 订阅实例目录外部增删事件
+///
+/// - `handler`: 事件回调
+///
+/// # 返回值
+///
+/// 返回回调 ID，供 `remove_watch_change` 取消订阅
+pub fn add_watch_change<F>(handler: F) -> u64
+where
+    F: Fn(&InstanceWatchChange) + Send + Sync + 'static,
+{
+    WATCH_EVENT.add_handler(handler)
 }
 
 /// 订阅实例运行日志事件
@@ -244,6 +271,13 @@ pub fn remove_change(id: u64) {
     CHANGE_EVENT.remove_handel(id);
 }
 
+/// 取消订阅实例目录外部增删事件
+///
+/// - `id`: `add_watch_change` 返回的回调 ID
+pub fn remove_watch_change(id: u64) {
+    WATCH_EVENT.remove_handel(id);
+}
+
 /// 取消订阅实例运行日志事件
 ///
 /// - `id`: `add_run_log` 返回的回调 ID
@@ -264,6 +298,13 @@ pub(crate) fn invoke_exit(uuid: Uuid, code: i32) {
 /// - `change`: 变更内容
 pub(crate) fn invoke_change(change: InstanceChange) {
     CHANGE_EVENT.emit(change);
+}
+
+/// 发出实例目录外部增删事件
+///
+/// - `change`: 变更内容
+pub(crate) fn invoke_watch_change(change: InstanceWatchChange) {
+    WATCH_EVENT.emit(change);
 }
 
 /// 发出实例运行日志事件
@@ -365,6 +406,9 @@ pub fn load() -> CoreResult<()> {
     for item in installs {
         add_to_group(item, None);
     }
+
+    // 初始实例登记完才开监听：启动时的事件没有对应记录，开了也只会空转
+    path_watch::start_watch();
 
     Ok(())
 }
@@ -782,6 +826,9 @@ fn add_to_group(obj: InstanceSettingObj, group: Option<Uuid>) -> GameInstance {
 pub fn delete_instance(uuid: &Uuid) -> CoreResult<()> {
     let instance = get_instance(uuid).ok_or(ErrorType::ArgEmpty(ArgEmptyData::UUID))?;
 
+    // 启动器自己的删除不走外部监听，避免移除记录与删除命令各广播一次
+    let _watch = path_watch::WatchPause::new();
+
     // 先删实例文件并移入回收站，失败则保留实例数据，避免 UI 消失但文件还在
     instance.read().unwrap().delete_files()?;
 
@@ -896,12 +943,11 @@ pub fn copy_instance(uuid: &Uuid, name: &str) -> CoreResult<GameInstance> {
 
     // 监视一直停到新实例登记完成：中途恢复的话，复制出来的目录会被当成外部导入，
     // 带着源实例的 uuid 再登记一遍
-    path_watch::stop_watch();
+    let _watch = path_watch::WatchPause::new();
     let copied = path_helper::copy_dir(&src, &dest);
     if let Err(e) = copied {
         // 失败留下的半份目录要清掉：里面已经有一份 game.json，下次启动会被当成实例导入
         let _ = std::fs::remove_dir_all(&dest);
-        path_watch::start_watch();
         return Err(e);
     }
 
@@ -911,7 +957,6 @@ pub fn copy_instance(uuid: &Uuid, name: &str) -> CoreResult<GameInstance> {
     obj.save();
 
     let game = add_to_group(obj, get_instance_group(uuid));
-    path_watch::start_watch();
     Ok(game)
 }
 
@@ -1054,7 +1099,7 @@ impl InstanceSettingObj {
         gui: AddInstanceGui,
         group: Option<Uuid>,
     ) -> CoreResult<GameInstance> {
-        path_watch::stop_watch();
+        let _watch = path_watch::WatchPause::new();
 
         // 首尾空白不算名字的一部分，落盘与目录名都用去掉空白后的值
         self.name = self.name.trim().to_string();
@@ -1120,8 +1165,6 @@ impl InstanceSettingObj {
         }
 
         self.save();
-
-        path_watch::start_watch();
 
         // 分组归属不在实例配置里，落在独立的 group_save.json，`None` 即默认分组
         Ok(add_to_group(self, group))

@@ -349,6 +349,7 @@ export function createCommands(invoke: Invoke) {
       removeAllJava: () => invoke<void>("settings_remove_all_java"),
       removeJava: (name: string) => invoke<void>("settings_remove_java", { name }),
       resizeBg: (percent: number) => invoke<string>("settings_resize_bg", { percent }),
+      resourceMapRunning: () => invoke<boolean>("settings_resource_map_running"),
       saveLaunch: (run: RunArgSettingDto, window: WindowSettingDto) => invoke<void>("settings_save_launch", { run, window }),
       saveNetwork: (dto: NetworkSettingDto) => invoke<void>("settings_save_network", { dto }),
       scanJava: () => invoke<JavaInfoDto[]>("settings_scan_java"),

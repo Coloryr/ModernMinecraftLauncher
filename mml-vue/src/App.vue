@@ -5,6 +5,8 @@ import { t } from "./lib/i18n";
 import { bgImage, bgLayerStyle } from "./lib/appearance";
 import { customPageOn, customUiPageUrl, resolveWindowPage, windowPageVersion } from "./lib/customUi";
 import { api, onCloseBlocked } from "./lib/api";
+import { commands } from "./lib/bindings";
+import { showToast } from "./lib/toast";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   closeWindow,
@@ -139,9 +141,14 @@ onMounted(async () => {
    * 放在根组件而不是下载窗口里，是因为单窗口模式下任何页面点 ✕ 都算退出应用，
    * 而各窗口自己收不到这条事件（下载弹窗也可能根本没开着）。
    */
-  unsubCloseBlocked = await onCloseBlocked((blocked) => {
+  unsubCloseBlocked = await onCloseBlocked(async (blocked) => {
     // 事件带的是被拦下的那个窗口的标签：不是自己就忽略，别在别的窗口也弹一遍
     if (blocked && blocked !== myLabel) return;
+    // 资源映射正在搬文件：后端拒绝关闭，给一句提示，不要弹下载退出确认
+    if (await commands.settings.resourceMapRunning().catch(() => false)) {
+      showToast(t("winSettings.resourceLinkBusy"));
+      return;
+    }
     // 导出窗口自己处理：导出中它拦下关闭并问"取消导出并关窗"，这里不再插一句
     if (currentKind.value === "export" || currentKind.value === "server_pack") return;
     // 单窗口模式：唯一的真实窗口就是主窗口，任何页面都算退出；

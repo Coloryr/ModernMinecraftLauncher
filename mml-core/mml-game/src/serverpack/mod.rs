@@ -128,7 +128,10 @@ impl InstanceSettingObj {
                 if cancel.is_cancelled() {
                     return Err(ErrorType::TaskCancel);
                 }
-                delete_with_disabled(paths::file_path(&game_path, &item.file)?);
+                let target = paths::file_path(&game_path, &item.file)?;
+                delete_with_disabled(&target);
+                // 服务器包同步会删掉客户端里的旧模组，映射记录也要一起清
+                mml_link::remove_link(self.uuid, &self.get_base_path(), &target);
             }
 
             // 删除已移除的配置文件，仅删除由该配置独享的目录

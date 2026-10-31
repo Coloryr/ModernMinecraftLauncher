@@ -200,7 +200,7 @@ impl ModPackWorker for ModrinthPackWorker {
         let downloads = list.list;
         let mods = list.online;
 
-        game.read().unwrap().save_online_info(&mods);
+        game.read().unwrap().save_online_info_sync(&mods)?;
 
         let mut guard = self.base.downloads.lock().unwrap();
         *guard = downloads;
@@ -299,7 +299,9 @@ impl ModPackWorker for ModrinthPackWorker {
 
             // 删除被移除的文件
             for item in &remove_list {
-                delete_with_disabled(path.join(&item.path));
+                let target = path.join(&item.path);
+                delete_with_disabled(&target);
+                crate::game_link::forget_link(game, &target);
 
                 let url = item
                     .downloads
@@ -355,7 +357,9 @@ impl ModPackWorker for ModrinthPackWorker {
 
             // 删除旧文件
             for item in &remove_list {
-                delete_with_disabled(path.join(&item.path).join(&item.file));
+                let target = path.join(&item.path).join(&item.file);
+                delete_with_disabled(&target);
+                crate::game_link::forget_link(game, &target);
                 online_info.remove(&item.modid);
             }
 
@@ -374,7 +378,7 @@ impl ModPackWorker for ModrinthPackWorker {
         }
 
         // 保存更新后的在线信息
-        game.read().unwrap().save_online_info(&online_info);
+        game.read().unwrap().save_online_info_sync(&online_info)?;
 
         // 写入当前整合包 manifest，放在最后一步：前面任何 `?` 提前返回都不会动到旧清单
         manifest::write_manifest(

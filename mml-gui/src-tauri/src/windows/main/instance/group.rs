@@ -240,6 +240,10 @@ pub(crate) enum Busy {
 ///
 /// 忙时的种类；空闲是 `None`
 pub(crate) fn busy_of(instance: &Uuid, base: &Path) -> Option<Busy> {
+    // 资源映射批量处理会搬所有实例的模组，整批实例都按忙处理
+    if crate::windows::settings::resource_link::running() {
+        return Some(Busy::Task);
+    }
     // 游戏进程还在跑
     if mml_game::is_running(instance) {
         return Some(Busy::Running);

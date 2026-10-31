@@ -99,9 +99,9 @@ pub use server_instance_dto::{
     ServerInstanceProgressDto, ServerInstanceResultDto,
 };
 pub use settings_dto::{
-    BgInfoDto, DnsSettingDto, GameCheckSettingDto, LaunchSettingDto, LocalFileEntryDto,
-    LocalFileInstanceDto, NetworkSettingDto, ResourceMapResultDto, RunArgSettingDto,
-    SettingsDefaultsDto, WindowSettingDto,
+    BgInfoDto, DnsSettingDto, GameCheckSettingDto, LaunchSettingDto, LocalFileChildDto,
+    LocalFileEntryDto, NetworkSettingDto, ResourceMapProgressDto, ResourceMapResultDto,
+    RunArgSettingDto, SettingsDefaultsDto, WindowSettingDto,
 };
 pub use stats_dto::{StatsDataDto, StatsInstanceDto, StatsPlayDayDto, StatsPlaytimeDto};
 pub use theme_dto::ThemeKindDto;

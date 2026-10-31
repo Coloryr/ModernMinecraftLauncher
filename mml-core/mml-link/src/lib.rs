@@ -390,31 +390,32 @@ pub fn find_file(resource: ResourceType, hash: &str) -> Option<PathBuf> {
 
 /// 公共存储中的下载目标路径
 ///
-/// 文件名用 SHA1 加原扩展名，同一个文件在多个实例间共用一个路径。
-/// 已有同名文件但校验不通过时先删掉，避免下载器因目标已存在而无法收尾。
+/// 文件名沿用原始文件名，同一个文件在多个实例间共用一个路径。
+/// 同名文件内容不同时加 SHA1 前 8 位后缀，不覆盖已有文件。
 ///
 /// - `resource`: 资源类型
 /// - `hash`: 文件 SHA1
-/// - `name`: 原始文件名，只用来取扩展名
+/// - `name`: 原始文件名
 ///
 /// # 返回值
 ///
 /// 哈希非法或目录创建失败时返回 `None`
 pub fn download_path(resource: ResourceType, hash: &str, name: &str) -> Option<PathBuf> {
     let hash = normalize_hash(hash)?;
-    let file = resource.download_dir().join(file_name(&hash, name));
-    if let Some(parent) = file.parent()
+    let file_name = file_name(name).unwrap_or_else(|| hash.clone());
+    let base = resource.download_dir().join(file_name);
+    if let Some(parent) = base.parent()
         && let Err(err) = path_helper::create_dir_all(parent)
     {
         mml_log::error_type(err);
         return None;
     }
 
-    if file.is_file() && !hash_matches(&file, &hash) {
-        let _ = path_helper::delete(&file);
+    // 同名文件内容不同：保留原来的文件，给新文件加哈希后缀，不能覆盖别人的模组
+    if !base.exists() || hash_matches(&base, &hash) {
+        return Some(base);
     }
-
-    Some(file)
+    Some(unique_file(&base, &hash))
 }
 
 /// 为一次新下载准备公共目录路径
@@ -468,6 +469,7 @@ pub fn plan_download(
             });
         }
 
+        let source = prefer_source(resource, &hash, target, source);
         if target.exists() {
             // 实例里是同一份文件就不用动；内容不同则补一份链接计划，让调用方覆盖它
             if !verify_target || hash_matches(target, &hash) {
@@ -503,7 +505,11 @@ pub fn plan_download(
         return None;
     }
 
-    let source = download_path(resource, &hash, name)?;
+    let target_name = target
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(name);
+    let source = download_path(resource, &hash, target_name)?;
     Some(LinkPlan {
         resource,
         instance,
@@ -546,10 +552,17 @@ pub fn try_link(
     hash: &str,
     url: &str,
 ) -> CoreResult<bool> {
-    let Some(source) = find_file(resource, hash) else {
+    let Some(hash) = normalize_hash(hash) else {
         return Ok(false);
     };
-    if target.exists() || !hash_matches(&source, hash) {
+    let Some(source) = find_file(resource, &hash) else {
+        return Ok(false);
+    };
+    if !hash_matches(&source, &hash) {
+        return Ok(false);
+    }
+    let source = prefer_source(resource, &hash, target, source);
+    if target.exists() {
         return Ok(false);
     }
 
@@ -560,7 +573,7 @@ pub fn try_link(
         ResourceInfoObj {
             pid: pid.to_string(),
             name: name.to_string(),
-            hash: normalize_hash(hash).unwrap_or_default(),
+            hash,
             file: source
                 .file_name()
                 .and_then(|file| file.to_str())
@@ -693,16 +706,20 @@ pub fn map_existing(
     let Some(hash) = normalize_hash(hash) else {
         return Err(ErrorType::DataNotFound(DataNotFoundData::Info));
     };
+    let target_name = target
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(name);
     let source = if let Some(source) = find_file(resource, &hash) {
         if hash_matches(&source, &hash) {
-            source
+            prefer_source(resource, &hash, target, source)
         } else {
             let _ = path_helper::delete(&source);
-            download_path(resource, &hash, name)
+            download_path(resource, &hash, target_name)
                 .ok_or(ErrorType::DataNotFound(DataNotFoundData::Info))?
         }
     } else {
-        download_path(resource, &hash, name)
+        download_path(resource, &hash, target_name)
             .ok_or(ErrorType::DataNotFound(DataNotFoundData::Info))?
     };
 
@@ -725,6 +742,63 @@ pub fn map_existing(
     }
 }
 
+/// 把旧的 `<sha1>.扩展名` 公共文件改成实例里的真实文件名
+///
+/// 只改文件名以哈希命名的旧文件；已有真实目标名时保持原样。
+///
+/// - resource: 资源类型
+/// - hash: 小写 SHA1
+/// - target: 实例内目标文件，用来取真实文件名
+/// - source: 当前公共文件
+///
+/// # 返回值
+///
+/// 迁移后或保持不变的公共文件路径
+fn prefer_source(resource: ResourceType, hash: &str, target: &Path, source: PathBuf) -> PathBuf {
+    let Some(name) = target.file_name().and_then(|name| name.to_str()) else {
+        return source;
+    };
+    let Some(name) = file_name(name) else {
+        return source;
+    };
+    if source.file_stem().and_then(|stem| stem.to_str()) != Some(hash) {
+        return source;
+    }
+
+    let preferred = resource.download_dir().join(&name);
+    if preferred == source || preferred.exists() {
+        return source;
+    }
+    if let Err(err) = path_helper::move_file(&source, &preferred) {
+        mml_log::error_type(err);
+        return source;
+    }
+
+    if let Some(old) = source.file_name().and_then(|name| name.to_str()) {
+        rename_index_file(resource, old, &name);
+    }
+    preferred
+}
+
+/// 把索引里指向旧文件名的记录改成新文件名
+///
+/// - resource: 资源类型
+/// - old: 旧公共文件名
+/// - new: 新公共文件名
+fn rename_index_file(resource: ResourceType, old: &str, new: &str) {
+    {
+        let mut items = resource.items().write().unwrap();
+        for list in items.values_mut() {
+            for item in list {
+                if item.file == old {
+                    item.file = new.to_string();
+                }
+            }
+        }
+    }
+    save_index(resource);
+}
+
 /// 下载失败但实例里已有同哈希文件时，把它复制进公共目录再补链
 ///
 /// - `plan`: 本次下载计划
@@ -736,7 +810,11 @@ pub fn adopt_existing(plan: &LinkPlan) -> CoreResult<()> {
     if !plan.target.is_file() || !hash_matches(&plan.target, &plan.hash) {
         return Err(ErrorType::DataNotFound(DataNotFoundData::Info));
     }
-    path_helper::copy_file(&plan.target, &plan.source)?;
+    if let Some(parent) = plan.source.parent() {
+        path_helper::create_dir_all(parent)?;
+    }
+    // 搬运而不是复制：实例文件先移进公共目录，再硬链接回原位
+    path_helper::move_file(&plan.target, &plan.source)?;
     finish_plan(plan)
 }
 
@@ -867,27 +945,90 @@ fn normalize_hash(hash: &str) -> Option<String> {
     Some(hash.to_ascii_lowercase())
 }
 
-/// 生成公共文件名
+/// 从原始文件名取出安全的单段文件名
 ///
-/// - `hash`: 小写 SHA1
-/// - `name`: 原始文件名
+/// Windows 不允许的字符替换成下划线；空名或路径片段返回 None。
+///
+/// - name: 原始文件名，可能带目录
 ///
 /// # 返回值
 ///
-/// `<sha1>.<扩展名>`；原文件名没有可用扩展名时只剩 SHA1
-fn file_name(hash: &str, name: &str) -> String {
-    let ext = Path::new(name)
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .filter(|ext| {
-            !ext.is_empty()
-                && ext.len() <= 8
-                && ext.bytes().all(|byte| byte.is_ascii_alphanumeric())
-        });
+/// 可用的文件名；无法得到时返回 None
+fn file_name(name: &str) -> Option<String> {
+    let file = Path::new(name).file_name()?.to_str()?.trim();
+    if file.is_empty() || file == "." || file == ".." {
+        return None;
+    }
 
-    match ext {
-        Some(ext) => format!("{hash}.{}", ext.to_ascii_lowercase()),
-        None => hash.to_string(),
+    let file: String = file
+        .chars()
+        .map(|ch| {
+            if ch.is_control() || matches!(ch, '<' | '>' | ':' | '"' | '/' | '|' | '?' | '*') {
+                '_'
+            } else {
+                ch
+            }
+        })
+        .collect();
+    if file.is_empty() || file == "." || file == ".." {
+        None
+    } else {
+        Some(file)
+    }
+}
+
+/// 同名冲突时的候选文件名：名字.sha1前8位.扩展名
+///
+/// - base: 原目标路径
+/// - hash: 小写 SHA1
+///
+/// # 返回值
+///
+/// 带哈希后缀的路径
+fn collide_file(base: &Path, hash: &str) -> PathBuf {
+    let stem = base
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or("file");
+    let short = &hash[..hash.len().min(8)];
+    let name = match base.extension().and_then(|ext| ext.to_str()) {
+        Some(ext) if !ext.is_empty() => format!("{stem}.{short}.{ext}"),
+        _ => format!("{stem}.{short}"),
+    };
+    base.with_file_name(name)
+}
+
+/// 为冲突文件找一个不覆盖已有内容的路径
+///
+/// - base: 原目标路径
+/// - hash: 新文件 SHA1
+///
+/// # 返回值
+///
+/// 可写入的路径；已存在同哈希文件时返回它
+fn unique_file(base: &Path, hash: &str) -> PathBuf {
+    let mut file = collide_file(base, hash);
+    if file.is_file() && hash_matches(&file, hash) {
+        return file;
+    }
+
+    let stem = base
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or("file");
+    let short = &hash[..hash.len().min(8)];
+    let ext = base.extension().and_then(|ext| ext.to_str());
+    let mut index = 1;
+    loop {
+        let name = match ext {
+            Some(ext) if !ext.is_empty() => format!("{stem}.{short}-{index}.{ext}"),
+            _ => format!("{stem}.{short}-{index}"),
+        };
+        file = base.with_file_name(name);
+        if !file.exists() || hash_matches(&file, hash) {
+            return file;
+        }
+        index += 1;
     }
 }
 
@@ -913,13 +1054,13 @@ fn hash_matches(file: &Path, hash: &str) -> bool {
 mod tests {
     use super::*;
 
-    /// 公共文件名只保留合法扩展名
+    /// 公共文件名保留真实文件名，只清掉路径片段和非法字符
     #[test]
-    fn file_name_keeps_safe_extension() {
-        let hash = "a".repeat(40);
-        assert_eq!(file_name(&hash, "Demo.JAR"), format!("{hash}.jar"));
-        assert_eq!(file_name(&hash, "no-extension"), hash);
-        assert_eq!(file_name(&hash, "bad.extension!"), hash);
+    fn file_name_keeps_real_name() {
+        assert_eq!(file_name("Demo.JAR").as_deref(), Some("Demo.JAR"));
+        assert_eq!(file_name("dir/foo.jar").as_deref(), Some("foo.jar"));
+        assert_eq!(file_name("bad<name>.jar").as_deref(), Some("bad_name_.jar"));
+        assert!(file_name("").is_none());
     }
 
     /// 非 SHA1 不接受
@@ -942,11 +1083,27 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         mml_downloader::init(&dir).unwrap();
         init(&dir).unwrap();
+        set_enabled(true);
         config_save::start();
 
         let hash = "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d";
         let source = download_path(ResourceType::Mod, hash, "demo.jar").unwrap();
+        assert_eq!(
+            source.file_name().and_then(|name| name.to_str()),
+            Some("demo.jar")
+        );
         fs::write(&source, b"hello").unwrap();
+        add_download_info(
+            ResourceType::Mod,
+            ResourceInfoObj {
+                pid: "p".to_string(),
+                name: "Demo".to_string(),
+                hash: hash.to_string(),
+                file: "demo.jar".to_string(),
+                url: "https://example.com/demo.jar".to_string(),
+            },
+            "p".to_string(),
+        );
 
         let instance = Uuid::new_v4();
         let base = dir.join("instance");
@@ -986,6 +1143,42 @@ mod tests {
             .unwrap()
         );
         assert!(target2.is_file());
+
+        // 旧的哈希文件名要原地改成真实文件名，同时把实例里的文件搬进去
+        let world_hash = "7c211433f02071597741e6ff5a8ea34789abbf43";
+        let old_central = get_mod_download_path().join(format!("{world_hash}.jar"));
+        fs::write(&old_central, b"world").unwrap();
+        add_download_info(
+            ResourceType::Mod,
+            ResourceInfoObj {
+                pid: "p3".to_string(),
+                name: "World".to_string(),
+                hash: world_hash.to_string(),
+                file: format!("{world_hash}.jar"),
+                url: "https://example.com/world.jar".to_string(),
+            },
+            "p3".to_string(),
+        );
+        let instance3 = Uuid::new_v4();
+        let base3 = dir.join("instance3");
+        let target3 = base3.join(".minecraft").join("mods").join("world.jar");
+        fs::create_dir_all(target3.parent().unwrap()).unwrap();
+        fs::write(&target3, b"world").unwrap();
+        map_existing(
+            ResourceType::Mod,
+            instance3,
+            &base3,
+            &target3,
+            "p3",
+            "f3",
+            "World",
+            world_hash,
+            "https://example.com/world.jar",
+        )
+        .unwrap();
+        assert!(get_mod_download_path().join("world.jar").is_file());
+        assert!(!old_central.exists());
+        assert_eq!(fs::read(&target3).unwrap(), b"world",);
 
         config_save::stop();
 

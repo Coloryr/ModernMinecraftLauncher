@@ -11,6 +11,7 @@ import BaseModal from "../../../../components/ui/BaseModal.vue";
 import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
 import VirtualList from "../../../../components/ui/VirtualList.vue";
 import SettingsGroup from "../SettingsGroup.vue";
+import type { LocalFileChildDto } from "../../../../lib/bindings";
 import type { useSettingsLocalFiles } from "../../composables/useSettingsLocalFiles";
 
 const props = defineProps<{
@@ -28,8 +29,8 @@ const pending = ref("");
 /** 展开了明细的行 id；目前只有「游戏实例」这一行带 children */
 const expanded = ref<Set<string>>(new Set());
 
-/** 实例明细行高，单位 px；与 .local-file-child 的 height 一致 */
-const INSTANCE_ROW_H = 34;
+/** 明细行高，单位 px；与 .local-file-child 的 height 一致 */
+const CHILD_ROW_H = 34;
 
 /** 确认框里要显示的名字，取当前语言的文案 */
 const pendingName = computed(() => {
@@ -37,9 +38,26 @@ const pendingName = computed(() => {
   return entry ? t(`winSettings.localFile.${entry.id}`) : "";
 });
 
-/** 某一行的实例明细是否展开 */
+/** 某一行的明细是否展开 */
 function isExpanded(id: string) {
   return expanded.value.has(id);
+}
+
+/**
+ * 明细行的显示名
+ *
+ * 实例用实例名；下载内容下的 mods / resourcepacks 按类型翻译。
+ *
+ * - `child`: 明细行
+ *
+ * # 返回值
+ *
+ * 已翻译的显示名
+ */
+function childName(child: LocalFileChildDto): string {
+  return child.kind === "instance"
+    ? child.name
+    : t(`winSettings.localFile.${child.kind}`);
 }
 
 /**
@@ -108,11 +126,11 @@ async function onConfirmClear() {
         <div class="local-file-row">
           <div class="local-file-main">
             <span class="local-file-title">
-              <!-- 只有带明细的行（目前是「游戏实例」）才有展开箭头 -->
+              <!-- 游戏实例与下载内容带明细，可展开查看各子项占用 -->
               <button v-if="e.children.length" class="local-file-expand" :class="{ flip: isExpanded(e.id) }"
                 :aria-expanded="isExpanded(e.id)"
-                v-tip="isExpanded(e.id) ? t('winSettings.localFileInstancesCollapse') : t('winSettings.localFileInstancesExpand')"
-                :aria-label="isExpanded(e.id) ? t('winSettings.localFileInstancesCollapse') : t('winSettings.localFileInstancesExpand')"
+                v-tip="isExpanded(e.id) ? t('winSettings.localFileChildrenCollapse') : t('winSettings.localFileChildrenExpand')"
+                :aria-label="isExpanded(e.id) ? t('winSettings.localFileChildrenCollapse') : t('winSettings.localFileChildrenExpand')"
                 @click="toggle(e.id)">
                 <GlyphIcon name="chevron-down" :size="14" :weight="2.4" />
               </button>
@@ -135,12 +153,12 @@ async function onConfirmClear() {
           </div>
         </div>
 
-        <!-- 每个实例一条：名字贴左、大小靠右；实例多时只渲染视口附近的行 -->
+        <!-- 每条明细：名字贴左、大小靠右；实例多时只渲染视口附近的行 -->
         <VirtualList v-if="e.children.length && isExpanded(e.id)" class="local-file-children" :count="e.children.length"
-          :row-h="INSTANCE_ROW_H" :row-gap="0">
+          :row-h="CHILD_ROW_H" :row-gap="0">
           <template #default="{ start, end }">
-            <div v-for="child in e.children.slice(start, end)" :key="child.uuid" class="local-file-child">
-              <span class="local-file-child-name" :title="child.path">{{ child.name }}</span>
+            <div v-for="child in e.children.slice(start, end)" :key="child.id" class="local-file-child">
+              <span class="local-file-child-name" :title="child.path">{{ childName(child) }}</span>
               <span class="local-file-size">{{ formatSize(child.size) }}</span>
             </div>
           </template>

@@ -162,6 +162,8 @@ pub const EXPORT_FIELDS: &str = "err.exportFields";
 pub const EXPORT_RUNNING: &str = "err.exportRunning";
 /// 资源映射未开启
 pub const RESOURCE_LINK_OFF: &str = "err.resourceLinkOff";
+/// 资源映射正在处理
+pub const RESOURCE_MAP_RUNNING: &str = "err.resourceMapRunning";
 /// 不支持的整合包类型
 pub const EXPORT_PACK_TYPE: &str = "err.exportPackType";
 

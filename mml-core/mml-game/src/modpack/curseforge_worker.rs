@@ -203,7 +203,7 @@ impl ModPackWorker for CurseForgeWorker {
         let downloads = list.list;
         let mods = list.online;
 
-        game.read().unwrap().save_online_info(&mods);
+        game.read().unwrap().save_online_info_sync(&mods)?;
 
         let mut guard = self.base.downloads.lock().unwrap();
         *guard = downloads;
@@ -363,11 +363,12 @@ async fn check_upgrade_with_old_manifest(
             let project_id_str = item.project_id.to_string();
             if let Some(mod_info) = online_info.remove(&project_id_str) {
                 let local = game_path.join(&mod_info.path).join(&mod_info.file);
-                delete_with_disabled(local);
+                delete_with_disabled(&local);
+                mml_link::remove_link(game.uuid, &game.get_base_path(), &local);
             }
         }
 
-        game.save_online_info(&online_info);
+        game.save_online_info_sync(&online_info)?;
     }
 
     if cancel.is_cancelled() {
@@ -439,7 +440,7 @@ async fn check_upgrade_with_old_manifest(
     }
 
     // 保存更新后的在线信息
-    game.read().unwrap().save_online_info(&online_info);
+    game.read().unwrap().save_online_info_sync(&online_info)?;
     *downloads.lock().unwrap() = new_downloads;
 
     Ok(())
@@ -562,7 +563,9 @@ async fn check_upgrade_sha1(
 
     // 删除旧文件
     for item in &remove_list {
-        delete_with_disabled(game_path.join(&item.path).join(&item.file));
+        let target = game_path.join(&item.path).join(&item.file);
+        delete_with_disabled(&target);
+        crate::game_link::forget_link(game, &target);
         online_info.remove(&item.modid);
     }
 
@@ -577,7 +580,7 @@ async fn check_upgrade_sha1(
     }
 
     // 保存更新后的在线信息
-    game.read().unwrap().save_online_info(&online_info);
+    game.read().unwrap().save_online_info_sync(&online_info)?;
     *downloads.lock().unwrap() = new_downloads;
 
     Ok(())

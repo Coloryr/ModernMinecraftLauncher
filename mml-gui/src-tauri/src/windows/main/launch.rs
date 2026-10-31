@@ -147,6 +147,11 @@ pub(crate) async fn launch_game(
     server_pack: Option<String>,
     lobby: Option<(mml_auth::UserKeyObj, AutoJoinType)>,
 ) -> Result<(), String> {
+    // 批量资源映射正在搬模组文件，这时启动会和它抢同一批文件
+    if crate::windows::settings::resource_link::running() {
+        return Err(err_keys::RESOURCE_MAP_RUNNING.to_string());
+    }
+
     let id = Uuid::parse_str(&uuid).map_err(|_| err_keys::GAME_NOT_FOUND.to_string())?;
     let reservation = launch_gate::begin_launch(id)?;
     let core = core_instance(&uuid).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())?;

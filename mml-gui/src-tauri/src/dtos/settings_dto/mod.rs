@@ -11,8 +11,9 @@ mod misc;
 mod network;
 
 pub use self::launch::RunArgSettingDto;
-pub use self::local_files::{LocalFileEntryDto, LocalFileInstanceDto};
+pub use self::local_files::{LocalFileChildDto, LocalFileEntryDto};
 pub use self::misc::{
-    BgInfoDto, LaunchSettingDto, ResourceMapResultDto, SettingsDefaultsDto, WindowSettingDto,
+    BgInfoDto, LaunchSettingDto, ResourceMapProgressDto, ResourceMapResultDto, SettingsDefaultsDto,
+    WindowSettingDto,
 };
 pub use self::network::{DnsSettingDto, GameCheckSettingDto, NetworkSettingDto};

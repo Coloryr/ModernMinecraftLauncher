@@ -240,6 +240,10 @@ pub(crate) fn quit_idle(app: &AppHandle) {
 ///
 /// - `app`: 应用句柄
 fn quit(app: &AppHandle) {
+    // 存量资源映射正在搬文件：这时退出会留下半套公共目录 / 实例链接
+    if crate::windows::settings::resource_link::running() {
+        return;
+    }
     if QUITTING.swap(true, Ordering::SeqCst) {
         return;
     }

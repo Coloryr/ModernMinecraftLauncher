@@ -192,6 +192,16 @@ pub fn run() {
                 windows::main::launch::forward_game_exit(&handle, event);
             });
 
+            // 实例目录被外部增删：内核监视线程更新列表后，广播 `instance-change`
+            let handle = app.handle().clone();
+            mml_game::add_watch_change(move |change| {
+                let r#type = match change {
+                    mml_game::InstanceWatchChange::Add(_) => "add",
+                    mml_game::InstanceWatchChange::Remove(_) => "remove",
+                };
+                main::emit_instance_change(&handle, r#type);
+            });
+
             // 下载器：挂接 UI 回调并转发为前端事件，随后启动下载线程池
             let handle = app.handle().clone();
             mml_downloader::set_gui_handel(Box::new(download::DownloadGuiHook::new(handle)));
@@ -250,7 +260,9 @@ pub fn run() {
         if let tauri::RunEvent::ExitRequested { api, code, .. } = event
             && code.is_none()
         {
-            if tray::has_running_instance() {
+            if windows::settings::resource_link::running() {
+                api.prevent_exit();
+            } else if tray::has_running_instance() {
                 api.prevent_exit();
             } else if mml_core::get_state() {
                 // 兜底：关窗时实例恰好在退出，那条路径可能没来得及停核心

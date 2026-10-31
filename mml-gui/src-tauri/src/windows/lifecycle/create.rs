@@ -65,7 +65,8 @@ pub(crate) fn close_guarded(uuid: &Uuid) -> bool {
     // 主窗口：有实例在跑时退回后台，下载在后台继续跑，关窗不会停它，不必拦；
     // 没有实例在跑时关窗就是退出应用，仍按老规矩先拒绝、由前端问一句
     if *uuid == MAIN_WINDOW_UUID {
-        return !crate::tray::has_running_instance() && !mml_downloader::get_tasks().is_empty();
+        return crate::windows::settings::resource_link::running()
+            || (!crate::tray::has_running_instance() && !mml_downloader::get_tasks().is_empty());
     }
 
     // 方块窗口：渲染进行中拒绝关闭 —— 渲染任务虽独立于窗口存活，

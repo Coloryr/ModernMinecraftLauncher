@@ -4,7 +4,9 @@
 import { computed, ref } from "vue";
 import { t, tErr } from "../../../../lib/i18n";
 import { showToast } from "../../../../lib/toast";
-import { commands, type ResourceMapResultDto } from "../../../../lib/bindings";
+import { commands, type ResourceMapProgressDto, type ResourceMapResultDto } from "../../../../lib/bindings";
+import { ResourceMapProgress } from "../../../../lib/listens";
+import { listen } from "@tauri-apps/api/event";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
 import SettingsGroup from "../SettingsGroup.vue";
@@ -33,11 +35,32 @@ const locked = computed(() => client.value.lockClient && !props.clientUnlocked);
 const mappingResources = ref(false);
 /** 上一次存量映射结果 */
 const mapResult = ref<ResourceMapResultDto | null>(null);
+/** 处理中的进度 */
+const mapProgress = ref<ResourceMapProgressDto | null>(null);
+
+/** 处理进度百分比 */
+const mapPercent = computed(() => {
+  const total = mapProgress.value?.total ?? 0;
+  if (total <= 0) return 0;
+  return Math.min(100, ((mapProgress.value?.done ?? 0) / total) * 100);
+});
+
+/** 处理中的 done/total 文字 */
+const mapProgressText = computed(() =>
+  t("winSettings.resourceLinkProgress", {
+    done: mapProgress.value?.done ?? 0,
+    total: mapProgress.value?.total ?? 0,
+  }),
+);
 
 /** 处理所有实例里带在线信息的模组 / 资源包 */
 async function mapResources() {
   mappingResources.value = true;
   mapResult.value = null;
+  mapProgress.value = null;
+  const unlisten = await listen<ResourceMapProgressDto>(ResourceMapProgress, (event) => {
+    mapProgress.value = event.payload;
+  });
   try {
     mapResult.value = await commands.settings.mapResources();
     showToast(t("winSettings.resourceLinkMapDone", {
@@ -49,6 +72,7 @@ async function mapResources() {
   } catch (e) {
     showToast(tErr(e));
   } finally {
+    unlisten();
     mappingResources.value = false;
   }
 }
@@ -95,6 +119,12 @@ const mapState = computed(() =>
         </BaseButton>
         <span v-if="mapState" class="map-state">{{ mapState }}</span>
       </div>
+      <div v-if="mappingResources" class="map-progress">
+        <div class="map-progress-track">
+          <div class="map-progress-fill" :style="{ width: mapPercent + '%' }" />
+        </div>
+        <span class="map-state">{{ mapProgressText }}</span>
+      </div>
       <p class="field-desc">{{ t("winSettings.resourceLinkMapHint") }}</p>
     </template>
 
@@ -140,5 +170,26 @@ const mapState = computed(() =>
 .map-state {
   font-size: 11.5px;
   color: var(--text-dim);
+}
+
+.map-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.map-progress-track {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.map-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.15s;
 }
 </style>

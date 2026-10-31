@@ -11,7 +11,7 @@ use mml_names::names;
 use mml_sys::{open_helper, path_helper};
 use tauri::{AppHandle, Manager};
 
-use crate::dtos::{LocalFileEntryDto, LocalFileInstanceDto};
+use crate::dtos::{LocalFileChildDto, LocalFileEntryDto};
 use crate::err_keys;
 use crate::log_text::LogText;
 
@@ -100,10 +100,10 @@ fn collect() -> Vec<LocalFileEntryDto> {
     kinds()
         .into_iter()
         .map(|kind| {
-            let children = if kind.id == "instances" {
-                instance_sizes()
-            } else {
-                Vec::new()
+            let children = match kind.id {
+                "instances" => instance_sizes(),
+                "download" => download_sizes(),
+                _ => Vec::new(),
             };
             // 实例行按明细求和，避免为了一个总数再整棵实例目录扫第二遍
             let size = if kind.id == "instances" {
@@ -127,8 +127,8 @@ fn collect() -> Vec<LocalFileEntryDto> {
 /// # 返回值
 ///
 /// 每个实例的 uuid / 名字 / 根目录与字节数；没有实例时为空列表
-fn instance_sizes() -> Vec<LocalFileInstanceDto> {
-    let mut list: Vec<LocalFileInstanceDto> = mml_game::get_instances()
+fn instance_sizes() -> Vec<LocalFileChildDto> {
+    let mut list: Vec<LocalFileChildDto> = mml_game::get_instances()
         .into_iter()
         .map(|instance| {
             // 扫目录可能很慢：先把字段取出来放锁，别攥着实例读锁做磁盘遍历
@@ -140,8 +140,9 @@ fn instance_sizes() -> Vec<LocalFileInstanceDto> {
                     instance.get_base_path(),
                 )
             };
-            LocalFileInstanceDto {
-                uuid,
+            LocalFileChildDto {
+                id: uuid,
+                kind: String::from("instance"),
                 name,
                 size: path_helper::get_folder_size(&path),
                 path: path.to_string_lossy().to_string(),
@@ -150,6 +151,31 @@ fn instance_sizes() -> Vec<LocalFileInstanceDto> {
         .collect();
     list.sort_by(|a, b| b.size.cmp(&a.size).then_with(|| a.name.cmp(&b.name)));
     list
+}
+
+/// 下载内容里的模组与资源包占用
+///
+/// # 返回值
+///
+/// mods / resourcepacks 两个子目录的大小；目录不存在时为 0
+fn download_sizes() -> Vec<LocalFileChildDto> {
+    let dir = mml_downloader::get_download_path();
+    [
+        (String::from("mods"), names::GAME_MODS_DIR),
+        (String::from("resourcepacks"), names::GAME_RESOURCEPACKS_DIR),
+    ]
+    .into_iter()
+    .map(|(kind, name)| {
+        let path = dir.join(name);
+        LocalFileChildDto {
+            id: kind.clone(),
+            kind,
+            name: String::new(),
+            size: path_helper::get_folder_size(&path),
+            path: path.to_string_lossy().to_string(),
+        }
+    })
+    .collect()
 }
 
 /// 读取各文件夹占用，界面打开本标签时调用一次

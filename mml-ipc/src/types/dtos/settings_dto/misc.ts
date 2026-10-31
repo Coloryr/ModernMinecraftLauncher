@@ -17,6 +17,12 @@ export type ResourceMapResultDto = {
   skipped: number,
 };
 
+export type ResourceMapProgressDto = {
+  instances: number,
+  total: number,
+  done: number,
+};
+
 export type WindowSettingDto = {
   fullScreen: boolean,
   width: number,
