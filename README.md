@@ -3,10 +3,11 @@
 </p>
 
 # ModernMinecraftLauncher (M²L)
+~~现代化改装我的世界启动器~~
 
-[ColorMC](https://github.com/Coloryr/ColorMC) 的迭代软件，一个 Minecraft 启动器。
+[ColorMC](https://github.com/Coloryr/ColorMC) 的迭代软件，现代化 Minecraft 启动器。
 
-**预览版，欢迎测试与提出问题**
+**预览版已发布，欢迎测试与提出问题**
 
 > **重要限制**：未登录过微软正版账户时，启动器禁止启动离线账户。请先添加并登录一个微软账户。
 
