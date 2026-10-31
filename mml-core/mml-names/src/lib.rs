@@ -41,7 +41,7 @@ pub const VERSION_NUM: i32 = 0;
 /// 小版本号
 pub const VERSION_SEC_NUM: i32 = 1;
 /// 修订号
-pub const VERSION_PATCH_NUM: i32 = 2;
+pub const VERSION_PATCH_NUM: i32 = 3;
 /// 构建日期，格式 yyyymmdd，由 `build.rs` 在编译期注入；只有测试版用得上
 #[cfg(debug_assertions)]
 const BUILD_DATE: &str = env!("MML_NAMES_BUILD_DATE");
