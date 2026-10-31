@@ -503,6 +503,78 @@ pub fn hard_link<P: AsRef<Path>>(input: P, output: P) -> CoreResult<()> {
     Ok(())
 }
 
+/// 文件身份，同一份数据的不同硬链接共享同一个值
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct FileId {
+    /// 卷标识：Windows 是卷序列号，Unix 是设备号
+    pub volume: u64,
+    /// 文件索引：Windows 是 file index，Unix 是 inode
+    pub index: u64,
+}
+
+/// 读取文件身份
+///
+/// 硬链接的不同路径会得到相同结果，可用来判断两个文件是否共享同一份数据。
+///
+/// - `path`: 文件路径
+///
+/// # 返回值
+///
+/// 平台不支持或读取失败时返回 `None`
+#[cfg(windows)]
+pub fn file_id<P: AsRef<Path>>(path: P) -> Option<FileId> {
+    use std::os::windows::io::AsRawHandle;
+    use windows::Win32::{
+        Foundation::HANDLE,
+        Storage::FileSystem::{BY_HANDLE_FILE_INFORMATION, GetFileInformationByHandle},
+    };
+
+    let file = fs::File::open(path).ok()?;
+    let mut info = BY_HANDLE_FILE_INFORMATION::default();
+    unsafe {
+        GetFileInformationByHandle(HANDLE(file.as_raw_handle() as _), &mut info).ok()?;
+    }
+
+    Some(FileId {
+        volume: u64::from(info.dwVolumeSerialNumber),
+        index: (u64::from(info.nFileIndexHigh) << 32) | u64::from(info.nFileIndexLow),
+    })
+}
+
+/// 读取文件身份
+///
+/// 硬链接的不同路径会得到相同结果，可用来判断两个文件是否共享同一份数据。
+///
+/// - `path`: 文件路径
+///
+/// # 返回值
+///
+/// 平台不支持或读取失败时返回 `None`
+#[cfg(unix)]
+pub fn file_id<P: AsRef<Path>>(path: P) -> Option<FileId> {
+    use std::os::unix::fs::MetadataExt;
+
+    let meta = fs::metadata(path).ok()?;
+    Some(FileId {
+        volume: meta.dev(),
+        index: meta.ino(),
+    })
+}
+
+/// 读取文件身份
+///
+/// 当前平台不支持时返回 `None`，调用方应退回按路径统计。
+///
+/// - `path`: 文件路径
+///
+/// # 返回值
+///
+/// 恒为 `None`
+#[cfg(not(any(windows, unix)))]
+pub fn file_id<P: AsRef<Path>>(_path: P) -> Option<FileId> {
+    None
+}
+
 /// 异步复制文件
 ///
 /// - `input`: 源文件路径
@@ -1153,6 +1225,7 @@ mod tests {
         let link = root.join("link.txt");
         hard_link(&src, &link).unwrap();
         assert_eq!(read_text(&link).unwrap(), "data");
+        assert_eq!(file_id(&src), file_id(&link));
 
         // 删掉原文件后链接仍能读到内容
         delete(&src).unwrap();

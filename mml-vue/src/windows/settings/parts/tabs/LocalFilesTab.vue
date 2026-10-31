@@ -92,7 +92,7 @@ async function onConfirmClear() {
 <template>
   <SettingsGroup id="localFiles" title-key="winSettings.secLocalFiles" :flash="flashGroup === 'localFiles'">
     <div class="local-files-head">
-      <span class="local-files-total">
+      <span class="local-files-total" v-tip="t('winSettings.localFilesLinkHint')">
         {{ t("winSettings.localFilesTotal") }}
         <b :class="{ 'is-scanning': loading }">
           {{ loading && entries.length === 0 ? t("winSettings.localFilesScanning") : formatSize(total) }}

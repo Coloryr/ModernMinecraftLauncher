@@ -649,6 +649,33 @@ impl InstanceSettingObj {
         serialize_tools::json_to_file(info, self.get_online_info_file())
     }
 
+    /// 删除实例内文件对应的在线信息
+    ///
+    /// 资源窗口删除模组 / 材质包时调用，否则启动前检查会按在线信息把文件补回来。
+    ///
+    /// - `target`: 已删除的实例内文件，正常文件名
+    ///
+    /// # 返回值
+    ///
+    /// 写盘失败时返回对应错误
+    pub fn remove_online_info(&self, target: &Path) -> CoreResult<()> {
+        let game_path = self.get_game_path();
+        let Ok(relative) = target.strip_prefix(&game_path) else {
+            return Ok(());
+        };
+        let Some(file) = relative.file_name().and_then(|name| name.to_str()) else {
+            return Ok(());
+        };
+        let dir = relative
+            .parent()
+            .map(|parent| parent.to_string_lossy().replace('\\', "/"))
+            .unwrap_or_default();
+
+        let mut info = self.read_online_info();
+        info.retain(|_, item| !(item.path == dir && item.file == file));
+        self.save_online_info_sync(&info)
+    }
+
     /// 读取自定义游戏启动配置
     ///
     /// # 返回值

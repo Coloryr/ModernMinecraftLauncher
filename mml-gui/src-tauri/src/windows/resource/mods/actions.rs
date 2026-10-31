@@ -76,11 +76,7 @@ pub async fn resource_delete_mod(uuid: String, mod_uuid: String) -> Result<(), S
     let link = instance.clone();
     let obj = find_mod(instance, &mod_uuid).await?;
     obj.delete().map_err(|err| err.to_string())?;
-    // 映射记录也要删：留着的话下次启动检查会把刚删掉的模组重新链回来
-    let (id, base) = {
-        let game = link.read().unwrap();
-        (game.uuid, game.get_base_path())
-    };
+    // 映射记录与在线信息都要删：留着的话下次启动检查会把刚删掉的模组重新链回来
     let mut target = obj.file.clone();
     if obj.disable {
         let text = target.to_string_lossy().to_string();
@@ -91,7 +87,12 @@ pub async fn resource_delete_mod(uuid: String, mod_uuid: String) -> Result<(), S
             }
         }
     }
-    mml_link::remove_link(id, &base, &target);
+    {
+        let game = link.read().unwrap();
+        game.remove_online_info(&target)
+            .map_err(|err| err.to_string())?;
+        mml_link::remove_link(game.uuid, &game.get_base_path(), &target);
+    }
     // 窗口模型里那一条也去掉，别让更新检查再去查一个已经不存在的包
     if let Ok(model) = window_model(&uuid) {
         model.remove_mod(&mod_uuid);

@@ -71,12 +71,11 @@ pub async fn resource_delete_resourcepack(uuid: String, file: String) -> Result<
     let instance = parse_instance(&uuid)?;
     let file = resource_file(&instance, KIND_RESOURCEPACKS, &file)?;
     path_helper::move_to_trash(&file).map_err(|err| err.to_string())?;
-    // 同步删掉映射记录，避免启动检查把删掉的资源链回来
-    let (id, base) = {
-        let game = instance.read().unwrap();
-        (game.uuid, game.get_base_path())
-    };
-    mml_link::remove_link(id, &base, &file);
+    // 同步删掉映射记录与在线信息，避免启动检查把删掉的资源链回来
+    let game = instance.read().unwrap();
+    game.remove_online_info(&file)
+        .map_err(|err| err.to_string())?;
+    mml_link::remove_link(game.uuid, &game.get_base_path(), &file);
     Ok(())
 }
 

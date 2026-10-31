@@ -1684,6 +1684,7 @@ export default {
   "winSettings.tabDesc.files": "占用与清理",
   "winSettings.secLocalFiles": "文件夹占用",
   "winSettings.localFilesTotal": "合计",
+  "winSettings.localFilesLinkHint": "硬链接文件只计一次，已计入下载内容",
   "winSettings.localFilesScanning": "正在统计…",
   "winSettings.localFilesRefresh": "重新统计",
   "winSettings.localFile.cache": "缓存",

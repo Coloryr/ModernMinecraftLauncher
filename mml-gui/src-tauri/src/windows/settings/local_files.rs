@@ -4,8 +4,11 @@
 //! 图标缓存在 image_manager，实例目录在 mml-game，Java 在 mml-jvms。
 //! 命令带分组标记，值填原始组名 `settings`，免得组键随文件名变掉，见 AGENTS.md §4。
 
-use std::fs;
-use std::path::PathBuf;
+use std::{
+    collections::HashSet,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use mml_names::names;
 use mml_sys::{open_helper, path_helper};
@@ -97,11 +100,14 @@ fn size_of(kind: &LocalFileKind) -> u64 {
 ///
 /// 与 [`kinds`] 同序的 DTO 列表
 fn collect() -> Vec<LocalFileEntryDto> {
+    // 实例里的模组是 download 的硬链接；实例行要把这部分排除，否则总计会算两遍
+    let download_ids = file_ids_of(&mml_downloader::get_download_path());
+
     kinds()
         .into_iter()
         .map(|kind| {
             let children = match kind.id {
-                "instances" => instance_sizes(),
+                "instances" => instance_sizes(&download_ids),
                 "download" => download_sizes(),
                 _ => Vec::new(),
             };
@@ -122,12 +128,49 @@ fn collect() -> Vec<LocalFileEntryDto> {
         .collect()
 }
 
-/// 各游戏实例的占用，按大小降序
+/// 收集目录下所有文件的身份
+///
+/// - `path`: 目录
 ///
 /// # 返回值
 ///
-/// 每个实例的 uuid / 名字 / 根目录与字节数；没有实例时为空列表
-fn instance_sizes() -> Vec<LocalFileChildDto> {
+/// 文件身份集合；读不到身份的文件会被忽略
+fn file_ids_of(path: &Path) -> HashSet<path_helper::FileId> {
+    path_helper::get_all_files(path)
+        .into_iter()
+        .filter_map(path_helper::file_id)
+        .collect()
+}
+
+/// 统计目录大小，跳过已在别处计过的文件
+///
+/// - `path`: 目录
+/// - `excluded`: 已经计入其他目录的文件身份
+///
+/// # 返回值
+///
+/// 未重复文件的字节数
+fn size_excluding(path: &Path, excluded: &HashSet<path_helper::FileId>) -> u64 {
+    path_helper::get_all_files(path)
+        .into_iter()
+        .filter_map(|file| {
+            let len = fs::metadata(&file).ok()?.len();
+            match path_helper::file_id(&file) {
+                Some(id) if excluded.contains(&id) => None,
+                _ => Some(len),
+            }
+        })
+        .sum()
+}
+
+/// 各游戏实例的占用，按大小降序
+///
+/// - `excluded`: 已经计入下载内容的文件身份
+///
+/// # 返回值
+///
+/// 每个实例的 uuid / 名字 / 根目录与独占字节数；没有实例时为空列表
+fn instance_sizes(excluded: &HashSet<path_helper::FileId>) -> Vec<LocalFileChildDto> {
     let mut list: Vec<LocalFileChildDto> = mml_game::get_instances()
         .into_iter()
         .map(|instance| {
@@ -144,7 +187,7 @@ fn instance_sizes() -> Vec<LocalFileChildDto> {
                 id: uuid,
                 kind: String::from("instance"),
                 name,
-                size: path_helper::get_folder_size(&path),
+                size: size_excluding(&path, excluded),
                 path: path.to_string_lossy().to_string(),
             }
         })

@@ -1683,6 +1683,7 @@ export default {
   "winSettings.tabDesc.files": "Usage & cleanup",
   "winSettings.secLocalFiles": "Folder usage",
   "winSettings.localFilesTotal": "Total",
+  "winSettings.localFilesLinkHint": "Hard-linked files are counted once, under downloads",
   "winSettings.localFilesScanning": "Scanning…",
   "winSettings.localFilesRefresh": "Rescan",
   "winSettings.localFile.cache": "Cache",

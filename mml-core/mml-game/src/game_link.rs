@@ -1,13 +1,13 @@
 //! 资源映射：下载前接入公共目录，启动前检查并修复硬链接
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
 use mml_base::file_item::{FileHash, FileItemObj, LaterRun};
 use mml_link::LinkPlan;
-use mml_link::info::ResourceType;
+use mml_link::info::{LinkInfoObj, ResourceType};
 use mml_names::{
     i18_items::error_type::{CoreResult, ErrorType},
     names,
@@ -52,6 +52,22 @@ fn target_of(
     };
 
     Some((resource, target))
+}
+
+/// 实例内路径在映射记录里的写法：相对实例根目录，统一用正斜杠
+///
+/// - base: 实例根目录
+/// - target: 实例内文件
+///
+/// # 返回值
+///
+/// 与 link_info.json 的 path 字段同口径
+fn link_path(base: &Path, target: &Path) -> String {
+    target
+        .strip_prefix(base)
+        .unwrap_or(target)
+        .to_string_lossy()
+        .replace('\\', "/")
 }
 
 /// 实例里是否有该文件的禁用副本
@@ -333,7 +349,7 @@ pub async fn check_instance_links(
         )
     };
 
-    let links = mml_link::get_instance_link_data(uuid, &base);
+    let mut links = mml_link::get_instance_link_data(uuid, &base);
     let mut by_target: HashMap<PathBuf, OnlineInfoObj> = HashMap::new();
     for info in online.values() {
         if let Some((_, target)) = target_of(&game_path, &mods, &resourcepacks, info) {
@@ -341,10 +357,33 @@ pub async fn check_instance_links(
         }
     }
 
+    // 在线信息里有、但从未映射过的条目也要检查：旧实例没有 link_info.json，
+    // 只遍历记录等于什么都不做。先补成未链接记录，下面的循环会按需搬文件 / 补链。
+    let mut known: HashSet<String> = links.iter().map(|link| link.path.clone()).collect();
+    let mut synthetic = HashSet::new();
+    for (pid, info) in &online {
+        let Some((_, target)) = target_of(&game_path, &mods, &resourcepacks, info) else {
+            continue;
+        };
+        let path = link_path(&base, &target);
+        if known.insert(path.clone()) {
+            synthetic.insert(path.clone());
+            links.push(LinkInfoObj {
+                is_link: false,
+                pid: pid.clone(),
+                fid: info.fileid.clone(),
+                path,
+            });
+        }
+    }
+
     let mut plans = Vec::new();
     let mut items = Vec::new();
     let mut failed = false;
     for link in links {
+        if cancel.is_cancelled() {
+            return Err(ErrorType::TaskCancel);
+        }
         if link.path.is_empty() {
             continue;
         }
@@ -389,6 +428,18 @@ pub async fn check_instance_links(
             continue;
         }
 
+        // 从未映射过的条目：实例里已有文件就强制搬进公共目录再链回来。
+        // plan_download 在"公共文件已存在且目标也存在"时会直接返回 None；
+        // 已记为 false 的是跨盘回退，不再每次启动重搬，免得反复进回收站
+        if target.is_file() && synthetic.contains(&link.path) {
+            match mml_link::map_existing(
+                resource, uuid, &base, &target, &pid, &fid, &name, &hash, &url,
+            ) {
+                Ok(()) => continue,
+                Err(err) => mml_log::error_type(err),
+            }
+        }
+
         let Some(plan) = mml_link::plan_download(
             resource, uuid, &base, &target, &pid, &fid, &name, &hash, &url, false,
         ) else {
@@ -407,6 +458,14 @@ pub async fn check_instance_links(
                 }
             }
             continue;
+        }
+
+        // 公共目录没有、实例里却有：搬回公共目录再补链，不要为了它重新下一遍
+        if target.is_file() {
+            match mml_link::adopt_existing(&plan) {
+                Ok(()) => continue,
+                Err(err) => mml_log::error_type(err),
+            }
         }
 
         if url.is_empty() {
