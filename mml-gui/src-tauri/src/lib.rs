@@ -14,6 +14,7 @@
 //! | [`image_manager`] | 图片资源加载，走 `mml-image://` 协议 |
 //! | [`integrations`] | 云连接与跨电脑实例绑定配置，文件 integrations.json |
 //! | [`log_text`] | 界面侧日志文案，中英两套，不进内核 i18n |
+//! | [`menu`] | macOS 应用菜单：按焦点窗口重建，动作发给该窗口 |
 //! | [`music`] | 自定义音乐，走 `mml-music` 协议 |
 //! | [`notify`] | 系统通知，启动器不在前台时把结果推给用户 |
 //! | [`single_instance`] | 单开与唤回，运行目录下的端口文件 `temp` |
@@ -43,6 +44,9 @@ pub mod gui_setting;
 pub mod image_manager;
 pub mod integrations;
 pub mod log_text;
+// 菜单只在 macOS 上真正挂出去：其余平台的构建照样编译它，只是这些条目没有调用点
+#[cfg_attr(not(target_os = "macos"), allow(dead_code, unused_imports))]
+pub(crate) mod menu;
 pub mod music;
 pub mod notify;
 pub mod single_instance;
@@ -146,6 +150,10 @@ pub fn run() {
         // 系统通知：启动器不在前台时把下载 / 安装结果推给系统，见 notify.rs
         .plugin(tauri_plugin_notification::init())
         .on_window_event(windows::on_window_event)
+        // macOS 的菜单栏是应用级的：关掉 Tauri 的默认菜单，改成按焦点窗口重建，见 menu.rs；
+        // 其它平台不设原生菜单，窗口操作都在各自标题栏上
+        .enable_macos_default_menu(false)
+        .on_menu_event(|app, event| menu::on_event(app, event.id.as_ref()))
         .setup(|app| {
             // 托盘不在这里建：只有实例在运行时才出现，见 tray::sync
 
@@ -158,6 +166,9 @@ pub fn run() {
             if let Err(e) = windows::show_main_window(app.handle()) {
                 err_box::fatal_error_text(&mml_base::get_base_dir(), &e);
             }
+
+            // macOS 的菜单栏先在主窗口上挂好，别只等焦点事件：窗口被系统抢走焦点时那一条不一定来
+            menu::sync(app.handle(), windows::main_window_label());
 
             // Java 列表变更：mml_jvms 添加 / 删除 / 配置加载完成 → 通知前端刷新
             let handle = app.handle().clone();

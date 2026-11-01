@@ -30,6 +30,17 @@ pub struct DropPathDto {
     pub url: String,
 }
 
+/// 原生菜单点中的动作，由 `emit_menu_action` 发给当前窗口
+///
+/// 菜单项由后端按焦点窗口重建，见 [`crate::menu`]；前端按 `action` 分发，
+/// 不认识的动作直接忽略。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MenuActionEvent {
+    /// 动作 id：`refresh` / `add` / `settings` / `stats` / `collect` / `help` / `download`
+    pub action: String,
+}
+
 /// 拖入文件的真实路径，由 DOM 拖放的"路径桥"上报，见 [`crate::windows::file_drop`]
 ///
 /// DOM 的 `drop` 事件里 `File` 对象**没有路径**，这是浏览器的安全设计，所以文件拖入由注入

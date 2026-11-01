@@ -16,6 +16,7 @@ import {
   onJavaChange,
   onLaunchError,
   onLaunchState,
+  onMenuAction,
   onStartArg,
   openInstanceDir,
 } from "../../lib/api";
@@ -1991,6 +1992,18 @@ onActivated(() => void refreshBlocksRendered());
 
 onMounted(async () => {
   subscribeEvents();
+  // macOS 菜单栏：动作 id 见 mml-gui 的 menu 模块，与顶栏那几个入口一一对应
+  trackAsync(
+    onMenuAction((action) => {
+      if (action === "add") {
+        openAdd();
+        return;
+      }
+      if (action === "settings" || action === "stats" || action === "collect" || action === "help") {
+        openWindow(action);
+      }
+    }),
+  );
   void refreshBlocksRendered();
   trackAsync(initModpackStatus());
   document.addEventListener("click", onDocClick);

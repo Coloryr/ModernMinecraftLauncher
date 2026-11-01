@@ -108,7 +108,7 @@ pub use stats_dto::{StatsDataDto, StatsInstanceDto, StatsPlayDayDto, StatsPlayti
 pub use theme_dto::ThemeKindDto;
 pub use upgrade_dto::UpgradeStatusDto;
 pub use version_dto::VersionInfoDto;
-pub use window_dto::{DropPathDto, FileDropDto, WindowSizeDto};
+pub use window_dto::{DropPathDto, FileDropDto, MenuActionEvent, WindowSizeDto};
 
 mod lobby_dto;
 pub use lobby_dto::{

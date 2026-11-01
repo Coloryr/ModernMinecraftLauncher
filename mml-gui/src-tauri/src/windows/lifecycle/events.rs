@@ -120,6 +120,10 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
                 let _ = save_window_state(&uuid, &win, false);
             }
         }
+        // 菜单栏跟着焦点窗口走：macOS 的应用菜单是全局的，只能按窗口类型重建一份
+        tauri::WindowEvent::Focused(true) => {
+            crate::menu::sync(window.app_handle(), &label);
+        }
         _ => {}
     }
 }

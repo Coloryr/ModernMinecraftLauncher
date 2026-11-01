@@ -96,8 +96,9 @@ import type {
   VersionInfoDto,
   GuiThemeDto,
   ViewMode,
+  MenuActionEvent,
 } from "./bindings";
-import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, CustomUiChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiThemeChange, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, MinecraftProgress, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress, ServerInstanceFocus, ServerInstanceProgress, StartArg } from "./listens";
+import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, CustomUiChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiThemeChange, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, MenuAction, MinecraftProgress, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress, ServerInstanceFocus, ServerInstanceProgress, StartArg } from "./listens";
 
 export interface CreateInstanceOpts {
   /** 加载器 ID，缺省为 `normal` */
@@ -1792,6 +1793,21 @@ export function onStartArg(cb: () => void): Promise<UnlistenFn> {
  */
 export function onInstanceChange(cb: (type: string) => void): Promise<UnlistenFn> {
   return listen<{ type: string }>(InstanceChange, (e) => cb(e.payload.type));
+}
+
+/**
+ * 原生菜单动作（macOS 菜单栏，见 mml-gui 的 menu 模块）
+ *
+ * 菜单按焦点窗口重建，点中的动作只发给那个窗口；窗口按 id 分发，不认识的就忽略。
+ *
+ * - `cb`: 动作 id，取值 refresh / add / settings / stats / collect / help / download
+ *
+ * # 返回值
+ *
+ * 取消监听的函数
+ */
+export function onMenuAction(cb: (action: string) => void): Promise<UnlistenFn> {
+  return listen<MenuActionEvent>(MenuAction, (e) => cb(e.payload.action));
 }
 
 /**

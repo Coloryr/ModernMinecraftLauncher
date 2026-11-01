@@ -11,6 +11,10 @@ export type DropPathDto = {
   url: string,
 };
 
+export type MenuActionEvent = {
+  action: string,
+};
+
 export type FileDropDto = {
   paths: string[],
 };

@@ -48,6 +48,11 @@ pub enum LogText {
         /// 失败原因
         error: String,
     },
+    /// macOS 应用菜单建不起来或挂不上去
+    MenuBuildFailed {
+        /// 失败原因
+        error: String,
+    },
     /// 托盘显示或收起失败
     TrayVisibleFailed {
         /// true 为显示，false 为收起
@@ -646,6 +651,9 @@ impl LogText {
             LogText::TrayInitFailed { error } => {
                 format!("[tray] 建系统托盘失败，后台将没有托盘可用：{error}")
             }
+            LogText::MenuBuildFailed { error } => {
+                format!("[menu] 应用菜单构建失败：{error}")
+            }
             LogText::TrayVisibleFailed { visible, error } => {
                 let action = if *visible { "显示" } else { "收起" };
                 format!("[tray] {action}托盘失败：{error}")
@@ -956,6 +964,7 @@ impl LogText {
             LogText::TrayInitFailed { error } => format!(
                 "[tray] failed to create the tray icon, there will be no tray in the background: {error}"
             ),
+            LogText::MenuBuildFailed { error } => format!("[menu] failed to build the app menu: {error}"),
             LogText::TrayVisibleFailed { visible, error } => {
                 let action = if *visible { "show" } else { "hide" };
                 format!("[tray] failed to {action} the tray icon: {error}")

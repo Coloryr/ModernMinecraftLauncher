@@ -89,6 +89,8 @@ pub use self::geometry::init;
 pub use self::lifecycle::{on_window_event, show_main_window};
 // `add.rs` 用 `windows::model_for_kind` 取窗口模型，按原路径再导出
 pub(crate) use self::lifecycle::{model_for_kind, window_model};
+// 菜单按窗口类型重建时要认窗口族的标签，registry 是唯一来源，见 menu.rs
+pub(crate) use self::registry::family_of_label;
 
 use self::lifecycle::{
     close_window, close_window_from_uuid, drop_model_for_kind, ensure_model_for_kind, open_window,
@@ -461,6 +463,26 @@ pub async fn window_reopen_window(
 #[gui_macros::emit]
 fn emit_file_drop(app: &AppHandle, label: &str, payload: crate::dtos::FileDropDto) {
     let _ = app.emit_to(label, listens::FILE_DROP, payload);
+}
+
+/// 原生菜单点中的动作交给窗口处理
+///
+/// 菜单按焦点窗口重建，见 [`crate::menu`]；这里只把动作 id 送到那个窗口，
+/// 具体做什么由前端按窗口分发。
+///
+/// - `app`: 应用句柄，发事件用它
+/// - `label`: 接收事件的窗口标签
+/// - `action`: 动作 id，如 `refresh` / `settings`
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+#[gui_macros::emit]
+pub(crate) fn emit_menu_action(app: &AppHandle, label: &str, action: &str) {
+    let _ = app.emit_to(
+        label,
+        listens::MENU_ACTION,
+        crate::dtos::MenuActionEvent {
+            action: action.to_string(),
+        },
+    );
 }
 
 /// 从拖入的**文本**里取地址，网页卡片那种：`text/uri-list` / `text/plain` / `text/html`
