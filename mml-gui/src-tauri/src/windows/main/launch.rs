@@ -69,29 +69,26 @@ fn global_auto_join() -> Option<ServerObj> {
 ///
 /// 新实例第一次启动时还没有 options.txt，游戏会按英文起；这里补上启动器语言，
 /// 之后玩家在游戏里改的语言也会留在 options.txt，再次启动以它为准。
+/// 语言只走 options.txt，不进启动参数：`--userProperties` 的 JSON 形状按版本
+/// 各不相同（1.7.10 要数组、1.8.x 要 authlib 的 PropertyMap），塞字符串会崩在 Main。
 ///
 /// - `inst`: 实例配置
-///
-/// # 返回值
-///
-/// 当前应使用的语言代码；options.txt 读不出来时返回 `None`
-fn ensure_game_lang(inst: &InstanceSettingObj) -> Option<String> {
+fn ensure_game_lang(inst: &InstanceSettingObj) {
     let options = match inst.get_minecraft_options() {
         Ok(options) => options,
         Err(err) => {
             mml_log::error_type(err);
-            return None;
+            return;
         }
     };
-    if let Some(lang) = options.get("lang").filter(|lang| !lang.trim().is_empty()) {
-        return Some(lang.clone());
+    if options.get("lang").is_some_and(|lang| !lang.trim().is_empty()) {
+        return;
     }
 
     let lang = mml_names::get_lang(crate::gui_config::locale()).to_string();
     if let Err(err) = inst.set_minecraft_option("lang", Some(&lang)) {
         mml_log::error_type(err);
     }
-    Some(lang)
 }
 
 /// 启动游戏
@@ -249,12 +246,13 @@ pub(crate) async fn launch_game(
         }),
         _ => None,
     };
+    // options.txt 里还没有语言时按启动器语言补一条
+    ensure_game_lang(&inst);
     let mut arg = GameLaunchArg {
         auth,
         auto,
         admin: gui_config::get().experimental.instance_admin,
         mixin,
-        lang: ensure_game_lang(&inst),
         // 用户在这次升级弹窗里选了「直接启动」：启动时不再比对服务器包清单
         skip_server_pack: server_pack.as_deref() == Some("skip"),
     };

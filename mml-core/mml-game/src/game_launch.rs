@@ -71,8 +71,6 @@ pub struct GameLaunchArg {
     pub admin: bool,
     /// ColorASM IPC 连接参数，未启用时为 `None`
     pub mixin: Option<MixinArg>,
-    /// 启动时设置语言
-    pub lang: Option<String>,
     /// 启动时是否跳过服务器包同步；用户在升级弹窗里选了「直接启动」时为真
     pub skip_server_pack: bool,
 }

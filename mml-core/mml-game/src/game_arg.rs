@@ -590,7 +590,6 @@ impl InstanceSettingObj {
     /// - `args`: 需要替换的参数列表
     /// - `classpath`: 运行库列表
     /// - `native`: 本地库路径
-    /// - `lang`: 启动时的语言
     /// - `assets`: 资源文件
     fn replace_all_value(
         &self,
@@ -598,7 +597,6 @@ impl InstanceSettingObj {
         args: &mut Vec<String>,
         classpath: &str,
         native: &Path,
-        lang: &Option<String>,
         assets: &Option<String>,
     ) {
         let assets_path = assets_path::get_assets_dir();
@@ -628,10 +626,11 @@ impl InstanceSettingObj {
             auth.access_token.clone()
         };
 
-        let user_properties = lang
-            .as_ref()
-            .map(|l| format!("{{\"language\":\"{l}\"}}"))
-            .unwrap_or_else(|| "{}".to_string());
+        // 只能给空对象：游戏按版本把它读成不同的类型 —— 1.7.10 是
+        // Map<String, Collection<String>>，1.8.x 是 authlib 的 PropertyMap，
+        // 塞一个字符串进去会直接 JsonSyntaxException 崩在 Main。
+        // 语言走 options.txt（启动前由 ensure_game_lang 写好），与这个参数无关
+        let user_properties = "{}".to_string();
 
         let user_type = if auth.auth_type == AuthType::OAuth {
             "msa"
@@ -749,7 +748,6 @@ impl InstanceSettingObj {
             &mut obj.jvm_args,
             &classpath,
             &obj.native_dir,
-            &arg.lang,
             &Some(obj.assets.id.clone()),
         );
         self.replace_all_value(
@@ -757,7 +755,6 @@ impl InstanceSettingObj {
             &mut obj.game_args,
             &classpath,
             &obj.native_dir,
-            &arg.lang,
             &Some(obj.assets.id.clone()),
         );
 
@@ -1462,6 +1459,24 @@ mod tests {
         }
     }
 
+    /// `--userProperties` 只能是空对象
+    ///
+    /// 游戏按版本按不同形状读它：1.7.10 是 `Map<String, Collection<String>>`、
+    /// 1.8.x 是 authlib 的 `PropertyMap`。塞 `{"language":"zh_CN"}` 会让 GTNH 这类
+    /// 1.7.10 整合包直接崩在 `Main.main` 的 `JsonSyntaxException`；语言本来就由
+    /// options.txt 决定，与这个参数无关。
+    #[test]
+    fn user_properties_is_empty_object() {
+        let _guard = setup();
+        let obj = instance(RunArgObj::default());
+        let mut args = vec![
+            "--userProperties".to_string(),
+            "${user_properties}".to_string(),
+        ];
+        obj.replace_all_value(&LoginObj::default(), &mut args, "", Path::new("."), &None);
+        assert_eq!(args[1], "{}");
+    }
+
     /// 隔离用户目录：HOME / APPDATA 指到实例目录，并补 `user.home`
     #[tokio::test]
     async fn isolate_home_paths() {
@@ -1723,7 +1738,6 @@ mod tests {
             auto: AutoJoinType::None,
             admin: false,
             mixin: None,
-            lang: None,
             skip_server_pack: false,
         };
         let args = instance.make_run_arg(&launch_arg, &mut obj, false);
