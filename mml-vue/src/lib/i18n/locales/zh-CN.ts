@@ -1400,6 +1400,7 @@ export default {
   "account.reloginHint": "重新输入密码验证该账户，成功后更新登录凭据",
   "account.reloginServerLocked": "登录地址随账户固定，重新登录不能修改",
   "account.relogin": "重新登录",
+  "account.reloginNoAccount": "没有可重新登录的当前账户",
   "account.delete": "删除账户",
   "account.deleteConfirm": "确定删除账户「{name}」？",
   "account.refreshed": "Token 已刷新",

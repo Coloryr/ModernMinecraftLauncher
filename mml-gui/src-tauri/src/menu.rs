@@ -2,11 +2,11 @@
 //!
 //! macOS 的菜单栏是**应用级**的：`WebviewWindow::set_menu` 在 macOS 上不生效，全应用只有一份。
 //! 所以这里关掉 Tauri 的默认菜单（见 lib.rs 的 `enable_macos_default_menu`），改成
-//! **焦点窗口变化时按窗口类型重建一份**：主窗口给设置 / 统计这类入口，其它窗口给刷新，
-//! 编辑与关闭用系统预定义项。Windows / Linux 不设原生菜单，窗口操作都在各自标题栏上，
+//! **焦点窗口变化时按窗口类型重建一份**。主窗口按功能分组（实例 / 账户 / 收藏 / 设置 / 统计），
+//! 其余窗口只有应用菜单。Windows / Linux 不设原生菜单，窗口操作都在各自标题栏上，
 //! [`sync`] 与 [`on_event`] 直接返回。
 //!
-//! 点击自建项时把动作 id 发给当前窗口，见 `windows::emit_menu_action`；前端按窗口分发。
+//! 点击菜单项时把动作 id 发给当前窗口，见 `windows::emit_menu_action`；前端按 id 分发。
 
 use std::sync::Mutex;
 
@@ -27,7 +27,7 @@ const ID_PREFIX: &str = "mml.";
 /// 当前菜单对应的窗口标签：同一个窗口重复聚焦时不重建
 static CURRENT: Mutex<Option<String>> = Mutex::new(None);
 
-/// 一个窗口动作
+/// 一个菜单动作
 struct Action {
     /// 动作 id，随事件发给窗口
     id: &'static str,
@@ -53,104 +53,77 @@ impl Action {
     }
 }
 
-/// 新开一个实例
+/// 实例 → 添加实例
 const ADD: Action = Action {
     id: "add",
     zh: "添加实例",
     en: "New Instance",
 };
-/// 打开设置
-const SETTINGS: Action = Action {
-    id: "settings",
-    zh: "设置",
-    en: "Settings",
+/// 实例 → 下载整合包
+const ADD_MODPACK: Action = Action {
+    id: "add_modpack",
+    zh: "下载整合包",
+    en: "Download Modpack",
 };
-/// 打开游戏统计
-const STATS: Action = Action {
-    id: "stats",
-    zh: "统计",
-    en: "Statistics",
+/// 实例 → 实例管理（回到主窗口的实例列表）
+const MANAGE: Action = Action {
+    id: "manage",
+    zh: "实例管理",
+    en: "Manage Instances",
 };
-/// 打开收藏
-const COLLECT: Action = Action {
+/// 账户 → 添加账户
+const ADD_ACCOUNT: Action = Action {
+    id: "add_account",
+    zh: "添加账户",
+    en: "Add Account",
+};
+/// 账户 → 重新登录当前账户
+const RELOGIN: Action = Action {
+    id: "relogin",
+    zh: "重新登录",
+    en: "Re-login",
+};
+/// 收藏 → 打开收藏窗口
+const OPEN_COLLECT: Action = Action {
     id: "collect",
-    zh: "收藏",
-    en: "Favorites",
+    zh: "打开收藏",
+    en: "Open Favorites",
 };
-/// 打开帮助
-const HELP: Action = Action {
-    id: "help",
-    zh: "帮助",
-    en: "Help",
+/// 设置 → 打开设置窗口
+const OPEN_SETTINGS: Action = Action {
+    id: "settings",
+    zh: "打开设置",
+    en: "Open Settings",
 };
-/// 打开「下载资源」
-const DOWNLOAD: Action = Action {
-    id: "download",
-    zh: "下载资源",
-    en: "Browse Resources",
+/// 统计 → 打开统计窗口
+const OPEN_STATS: Action = Action {
+    id: "stats",
+    zh: "打开统计",
+    en: "Open Statistics",
 };
-/// 刷新当前窗口的数据
-const REFRESH: Action = Action {
-    id: "refresh",
-    zh: "刷新",
-    en: "Refresh",
+/// 应用菜单 → 关于（打开关于窗口）
+const ABOUT: Action = Action {
+    id: "about",
+    zh: "关于 M²L",
+    en: "About M²L",
 };
 
-/// 该窗口类型要放进菜单的动作，空表示只有系统项
-///
-/// 只列前端确实接了刷新的窗口（见 `useWindowRefresh`）：菜单项点下去不能没反应。
-///
-/// - `kind`: 窗口类型，标签去掉 `mml-` 前缀与末尾实例 uuid 后的那一段
-fn actions_of(kind: &str) -> &'static [&'static Action] {
-    match kind {
-        // 主窗口：放的是应用入口，与顶栏那几个按钮一致
-        "main" => &[&ADD, &SETTINGS, &STATS, &COLLECT, &HELP, &REFRESH],
-        // 资源管理：标题栏只有「下载资源」
-        "resource" => &[&DOWNLOAD, &REFRESH],
-        "account" | "stats" | "collect" | "block" | "download" | "config" | "export"
-        | "server_instance" | "log" | "java_download" | "add_resource" | "add_modpack" => {
-            &[&REFRESH]
-        }
-        _ => &[],
-    }
-}
-
-/// 菜单上的固定文案
+/// 菜单栏上的固定文案
 enum Text {
-    /// 关于
+    /// 应用菜单里的「关于」
     About,
-    /// 隐藏应用
-    Hide,
-    /// 隐藏其他应用
-    HideOthers,
-    /// 显示全部
-    ShowAll,
-    /// 退出
+    /// 应用菜单里的「退出」
     Quit,
-    /// 编辑菜单标题
-    Edit,
-    /// 撤销
-    Undo,
-    /// 重做
-    Redo,
-    /// 剪切
-    Cut,
-    /// 复制
-    Copy,
-    /// 粘贴
-    Paste,
-    /// 全选
-    SelectAll,
-    /// 窗口菜单标题
-    Window,
-    /// 最小化
-    Minimize,
-    /// 缩放
-    Zoom,
-    /// 关闭窗口
-    Close,
-    /// 当前窗口的动作菜单标题
-    Actions,
+    /// 实例菜单标题
+    Instance,
+    /// 账户菜单标题
+    Account,
+    /// 收藏菜单标题
+    Collect,
+    /// 设置菜单标题
+    Settings,
+    /// 统计菜单标题
+    Stats,
 }
 
 /// 取固定文案
@@ -166,115 +139,38 @@ enum Text {
 fn text(lang: Lang, which: Text) -> &'static str {
     match (lang, which) {
         (Lang::zh_cn, Text::About) => "关于 M²L",
-        (Lang::zh_cn, Text::Hide) => "隐藏 M²L",
-        (Lang::zh_cn, Text::HideOthers) => "隐藏其他",
-        (Lang::zh_cn, Text::ShowAll) => "显示全部",
         (Lang::zh_cn, Text::Quit) => "退出 M²L",
-        (Lang::zh_cn, Text::Edit) => "编辑",
-        (Lang::zh_cn, Text::Undo) => "撤销",
-        (Lang::zh_cn, Text::Redo) => "重做",
-        (Lang::zh_cn, Text::Cut) => "剪切",
-        (Lang::zh_cn, Text::Copy) => "复制",
-        (Lang::zh_cn, Text::Paste) => "粘贴",
-        (Lang::zh_cn, Text::SelectAll) => "全选",
-        (Lang::zh_cn, Text::Window) => "窗口",
-        (Lang::zh_cn, Text::Minimize) => "最小化",
-        (Lang::zh_cn, Text::Zoom) => "缩放",
-        (Lang::zh_cn, Text::Close) => "关闭窗口",
-        (Lang::zh_cn, Text::Actions) => "操作",
+        (Lang::zh_cn, Text::Instance) => "实例",
+        (Lang::zh_cn, Text::Account) => "账户",
+        (Lang::zh_cn, Text::Collect) => "收藏",
+        (Lang::zh_cn, Text::Settings) => "设置",
+        (Lang::zh_cn, Text::Stats) => "统计",
         (Lang::en_us, Text::About) => "About M²L",
-        (Lang::en_us, Text::Hide) => "Hide M²L",
-        (Lang::en_us, Text::HideOthers) => "Hide Others",
-        (Lang::en_us, Text::ShowAll) => "Show All",
         (Lang::en_us, Text::Quit) => "Quit M²L",
-        (Lang::en_us, Text::Edit) => "Edit",
-        (Lang::en_us, Text::Undo) => "Undo",
-        (Lang::en_us, Text::Redo) => "Redo",
-        (Lang::en_us, Text::Cut) => "Cut",
-        (Lang::en_us, Text::Copy) => "Copy",
-        (Lang::en_us, Text::Paste) => "Paste",
-        (Lang::en_us, Text::SelectAll) => "Select All",
-        (Lang::en_us, Text::Window) => "Window",
-        (Lang::en_us, Text::Minimize) => "Minimize",
-        (Lang::en_us, Text::Zoom) => "Zoom",
-        (Lang::en_us, Text::Close) => "Close Window",
-        (Lang::en_us, Text::Actions) => "Actions",
+        (Lang::en_us, Text::Instance) => "Instance",
+        (Lang::en_us, Text::Account) => "Account",
+        (Lang::en_us, Text::Collect) => "Favorites",
+        (Lang::en_us, Text::Settings) => "Settings",
+        (Lang::en_us, Text::Stats) => "Statistics",
     }
 }
 
-/// 按窗口类型建一份菜单
+/// 建一个「标题 + 一串动作」的子菜单
 ///
-/// - `app`: 应用句柄，菜单挂在它上面
-/// - `kind`: 窗口类型
+/// - `app`: 应用句柄，菜单项挂在它上面
+/// - `lang`: 界面语言，决定动作文案
+/// - `title`: 子菜单标题，已按语言取好
+/// - `actions`: 这个子菜单里的动作
 ///
 /// # 返回值
 ///
-/// 建好的菜单；失败返回 tauri 的错误
-fn build(app: &AppHandle, kind: &str) -> tauri::Result<Menu<Wry>> {
-    let lang = gui_config::locale();
-
-    // 应用菜单：关于 / 隐藏 / 退出
-    let about = PredefinedMenuItem::about(app, Some(text(lang, Text::About)), None)?;
-    let sep_about = PredefinedMenuItem::separator(app)?;
-    let hide = PredefinedMenuItem::hide(app, Some(text(lang, Text::Hide)))?;
-    let hide_others = PredefinedMenuItem::hide_others(app, Some(text(lang, Text::HideOthers)))?;
-    let show_all = PredefinedMenuItem::show_all(app, Some(text(lang, Text::ShowAll)))?;
-    let sep_quit = PredefinedMenuItem::separator(app)?;
-    let quit = PredefinedMenuItem::quit(app, Some(text(lang, Text::Quit)))?;
-    let app_menu = Submenu::with_items(
-        app,
-        APP_NAME,
-        true,
-        &[
-            &about,
-            &sep_about,
-            &hide,
-            &hide_others,
-            &show_all,
-            &sep_quit,
-            &quit,
-        ],
-    )?;
-
-    // 编辑：macOS 的复制 / 粘贴快捷键由菜单项转发，没有这一栏文本框里 Cmd+C 不响应
-    let undo = PredefinedMenuItem::undo(app, Some(text(lang, Text::Undo)))?;
-    let redo = PredefinedMenuItem::redo(app, Some(text(lang, Text::Redo)))?;
-    let sep_edit = PredefinedMenuItem::separator(app)?;
-    let cut = PredefinedMenuItem::cut(app, Some(text(lang, Text::Cut)))?;
-    let copy = PredefinedMenuItem::copy(app, Some(text(lang, Text::Copy)))?;
-    let paste = PredefinedMenuItem::paste(app, Some(text(lang, Text::Paste)))?;
-    let select_all = PredefinedMenuItem::select_all(app, Some(text(lang, Text::SelectAll)))?;
-    let edit_menu = Submenu::with_items(
-        app,
-        text(lang, Text::Edit),
-        true,
-        &[
-            &undo,
-            &redo,
-            &sep_edit,
-            &cut,
-            &copy,
-            &paste,
-            &select_all,
-        ],
-    )?;
-
-    // 窗口：最小化 / 缩放 / 关闭
-    let minimize = PredefinedMenuItem::minimize(app, Some(text(lang, Text::Minimize)))?;
-    let zoom = PredefinedMenuItem::maximize(app, Some(text(lang, Text::Zoom)))?;
-    let close = PredefinedMenuItem::close_window(app, Some(text(lang, Text::Close)))?;
-    let window_menu = Submenu::with_items(
-        app,
-        text(lang, Text::Window),
-        true,
-        &[&minimize, &zoom, &close],
-    )?;
-
-    let actions = actions_of(kind);
-    if actions.is_empty() {
-        return Menu::with_items(app, &[&app_menu, &edit_menu, &window_menu]);
-    }
-
+/// 建好的子菜单；失败返回 tauri 的错误
+fn action_menu(
+    app: &AppHandle,
+    lang: Lang,
+    title: &str,
+    actions: &[&Action],
+) -> tauri::Result<Submenu<Wry>> {
     let mut items = Vec::with_capacity(actions.len());
     for action in actions {
         items.push(MenuItem::with_id(
@@ -289,10 +185,64 @@ fn build(app: &AppHandle, kind: &str) -> tauri::Result<Menu<Wry>> {
         .iter()
         .map(|item| item as &dyn IsMenuItem<Wry>)
         .collect();
-    let actions_menu = Submenu::with_items(app, text(lang, Text::Actions), true, &refs)?;
+    Submenu::with_items(app, title, true, &refs)
+}
+
+/// 按窗口类型建一份菜单
+///
+/// 主窗口是唯一带功能分组的窗口；其余窗口只有应用菜单（关于 / 退出）。
+///
+/// - `app`: 应用句柄，菜单挂在它上面
+/// - `kind`: 窗口类型
+///
+/// # 返回值
+///
+/// 建好的菜单；失败返回 tauri 的错误
+fn build(app: &AppHandle, kind: &str) -> tauri::Result<Menu<Wry>> {
+    let lang = gui_config::locale();
+
+    // 应用菜单：关于打开的是应用自己的关于窗口，不是系统默认面板
+    let about = MenuItem::with_id(
+        app,
+        format!("{ID_PREFIX}{}", ABOUT.id),
+        text(lang, Text::About),
+        true,
+        None::<&str>,
+    )?;
+    let sep = PredefinedMenuItem::separator(app)?;
+    let quit = PredefinedMenuItem::quit(app, Some(text(lang, Text::Quit)))?;
+    let app_menu = Submenu::with_items(app, APP_NAME, true, &[&about, &sep, &quit])?;
+
+    if kind != "main" {
+        return Menu::with_items(app, &[&app_menu]);
+    }
+
+    let instance_menu = action_menu(
+        app,
+        lang,
+        text(lang, Text::Instance),
+        &[&ADD, &ADD_MODPACK, &MANAGE],
+    )?;
+    let account_menu = action_menu(
+        app,
+        lang,
+        text(lang, Text::Account),
+        &[&ADD_ACCOUNT, &RELOGIN],
+    )?;
+    let collect_menu = action_menu(app, lang, text(lang, Text::Collect), &[&OPEN_COLLECT])?;
+    let settings_menu = action_menu(app, lang, text(lang, Text::Settings), &[&OPEN_SETTINGS])?;
+    let stats_menu = action_menu(app, lang, text(lang, Text::Stats), &[&OPEN_STATS])?;
+
     Menu::with_items(
         app,
-        &[&app_menu, &edit_menu, &actions_menu, &window_menu],
+        &[
+            &app_menu,
+            &instance_menu,
+            &account_menu,
+            &collect_menu,
+            &settings_menu,
+            &stats_menu,
+        ],
     )
 }
 
@@ -358,13 +308,19 @@ pub(crate) fn on_event(app: &AppHandle, id: &str) {
         let Some(action) = id.strip_prefix(ID_PREFIX) else {
             return;
         };
-        let Some(window) = app
+        // 菜单项都是主窗口的（应用菜单的「关于」也从主窗口分发），统一送给主窗口；
+        // 主窗口已经关掉时退回当前焦点窗口，交给它自己忽略
+        let label = if let Some(main) = app.get_webview_window(crate::windows::main_window_label()) {
+            main.label().to_string()
+        } else if let Some(window) = app
             .webview_windows()
             .into_values()
             .find(|window| window.is_focused().unwrap_or(false))
-        else {
+        {
+            window.label().to_string()
+        } else {
             return;
         };
-        crate::windows::emit_menu_action(app, window.label(), action);
+        crate::windows::emit_menu_action(app, &label, action);
     }
 }
