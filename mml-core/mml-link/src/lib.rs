@@ -920,12 +920,12 @@ pub fn remove_link(instance: Uuid, instance_base: &Path, target: &Path) {
         .replace('\\', "/");
 
     ensure_link_data(instance, instance_base);
-    {
-        let mut data = link_data().write().unwrap();
-        if let Some(list) = data.get_mut(&instance) {
-            list.retain(|item| item.path != path);
-        }
+    let mut data = link_data().write().unwrap();
+    if let Some(list) = data.get_mut(&instance) {
+        list.retain(|item| item.path != path);
     }
+
+    drop(data);
     save_link_data(instance, instance_base);
     // 删除要立刻生效：否则强杀后旧记录还在，下次启动又把它链回去
     flush_link_data();

@@ -39,10 +39,10 @@ fn add_current_style(list: &RwLock<HashMap<String, Arc<String>>>, item: String) 
 
 /// 修复写法：**先释放写锁**再 save
 fn add_fixed_style(list: &RwLock<HashMap<String, Arc<String>>>, item: String) -> usize {
-    {
-        let mut guard = list.write().unwrap();
-        guard.insert(item.clone(), Arc::new(item));
-    } // ← 写锁在此释放
+    let mut guard = list.write().unwrap();
+    guard.insert(item.clone(), Arc::new(item));
+
+    drop(guard); // ← 写锁在此释放
     save_like(list)
 }
 

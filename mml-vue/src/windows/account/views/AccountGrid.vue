@@ -132,10 +132,12 @@ function hidePreview() {
         <span class="validity-badge" :class="acc.tokenStatus">{{ tokenLabel(acc) }}</span>
         <!-- 加载中：图上叠转圈，onload 后消失（img 先渲染，加载完才能触发事件） -->
         <div v-if="!imageFailed(acc, 'avatar')" class="img-box img-avatar-box">
-          <img :src="accountAvatarUrl(acc)" class="img-avatar" :class="{ pending: imageLoading(acc, 'avatar') }"
-            :alt="t('account.avatar')" data-no-fallback @load="markImageLoaded(acc, 'avatar')"
-            @error="markImageFailed(acc, 'avatar')" @mouseenter="showPreview($event, acc, 'avatar')"
-            @mousemove="movePreview" @mouseleave="hidePreview" />
+          <!-- 头像也点开皮肤弹窗：三者是同一个入口，描边与悬停大图的口径要一致 -->
+          <img :src="accountAvatarUrl(acc)" class="img-avatar" role="button" tabindex="0"
+            :class="{ pending: imageLoading(acc, 'avatar') }" :alt="t('account.avatar')" data-no-fallback
+            @load="markImageLoaded(acc, 'avatar')" @error="markImageFailed(acc, 'avatar')"
+            @mouseenter="showPreview($event, acc, 'avatar')" @mousemove="movePreview" @mouseleave="hidePreview"
+            @click.stop="openSkin(acc)" @dblclick.stop="openSkin(acc)" @keydown.enter.prevent="openSkin(acc)" />
           <div v-if="imageLoading(acc, 'avatar')" class="img-spin" />
         </div>
         <!-- 头像由皮肤渲染而来：皮肤都没有时不再显示"无头像"，只留皮肤/披风占位 -->
@@ -353,13 +355,16 @@ function hidePreview() {
   image-rendering: pixelated;
 }
 
-/* 皮肤 / 披风图点开皮肤弹窗（与操作按钮里的「查看皮肤」同一入口）：
+/* 头像 / 皮肤 / 披风三张图都点开皮肤弹窗（与操作按钮里的「查看皮肤」同一入口）：
    跟随鼠标的大图只说明"能看大图"，要点得动还得给个描边信号 */
+.img-avatar,
 .img-skin,
 .img-cape {
   cursor: pointer;
 }
 
+.img-avatar:hover,
+.img-avatar:focus-visible,
 .img-skin:hover,
 .img-skin:focus-visible,
 .img-cape:hover,

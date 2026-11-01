@@ -56,10 +56,10 @@ pub(crate) fn begin(uuid: &str) -> Result<TaskGuard, String> {
     if crate::windows::main::launch_gate::is_launching(id) {
         return Err(err_keys::INSTANCE_BUSY.to_string());
     }
-    {
-        let mut map = TASKS.lock().unwrap();
-        *map.entry(id).or_insert(0) += 1;
-    }
+    let mut map = TASKS.lock().unwrap();
+    *map.entry(id).or_insert(0) += 1;
+
+    drop(map);
     // 守卫在锁释放之后才造出来：丢弃它会去拿同一把锁，边持锁边丢就是自死锁
     Ok(TaskGuard(id))
 }

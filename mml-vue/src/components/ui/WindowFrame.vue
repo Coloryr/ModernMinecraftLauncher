@@ -247,6 +247,10 @@ defineExpose({ bodyEl });
    不加在 .frame-body 上无条件生效 —— 多数窗口的内容区是 height: 100% 布局、
    滚动交给内部容器，那些窗口的 .frame-body 根本不滚，预留只会白窄 9px */
 .frame-body.gutter {
+  /* WebKit 的 scrollbar-gutter 只在真的溢出时才占位，内容刚好装下时不预留，
+     于是右边只剩 17px，比左边窄 9px（添加实例的"从头新建 / 在线实例"就是这样）。
+     overflow-y: scroll 把滚动条钉成常驻：两个引擎都稳定占 9px，边距不再随内容长短变 */
+  overflow-y: scroll;
   scrollbar-gutter: stable;
   padding-right: calc(26px - 9px);
 }

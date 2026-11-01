@@ -143,24 +143,24 @@ pub fn save() {
 ///
 /// - `obj`: 待删除的收藏条目，只看 source 与 pid，不看 uuid
 pub fn remove_item(obj: CollectItemObj) {
+    let mut collect = COLLECT.write().unwrap();
+
+    let key = match collect
+        .items
+        .iter()
+        .find(|(_, value)| value.source == obj.source && value.pid == obj.pid)
     {
-        let mut collect = COLLECT.write().unwrap();
+        Some((key, _)) => key.clone(),
+        None => return,
+    };
 
-        let key = match collect
-            .items
-            .iter()
-            .find(|(_, value)| value.source == obj.source && value.pid == obj.pid)
-        {
-            Some((key, _)) => key.clone(),
-            None => return,
-        };
-
-        for (_, value) in collect.groups.iter_mut() {
-            value.remove(&key);
-        }
-
-        collect.items.remove(&key);
+    for (_, value) in collect.groups.iter_mut() {
+        value.remove(&key);
     }
+
+    collect.items.remove(&key);
+
+    drop(collect);
 
     save();
 }
@@ -169,15 +169,15 @@ pub fn remove_item(obj: CollectItemObj) {
 ///
 /// - `uuid`: 收藏条目 uuid
 pub fn remove_uuid(uuid: &str) {
-    {
-        let mut collect = COLLECT.write().unwrap();
+    let mut collect = COLLECT.write().unwrap();
 
-        collect.items.remove(uuid);
+    collect.items.remove(uuid);
 
-        for (_, value) in collect.groups.iter_mut() {
-            value.remove(uuid);
-        }
+    for (_, value) in collect.groups.iter_mut() {
+        value.remove(uuid);
     }
+
+    drop(collect);
 
     save();
 }
@@ -190,25 +190,24 @@ pub fn remove_uuid(uuid: &str) {
 ///
 /// 新条目的 uuid；已收藏过返回 `None`（收藏后按类型归组要用它）
 pub fn add_item(mut obj: CollectItemObj) -> Option<String> {
-    let uuid = {
-        let mut collect = COLLECT.write().unwrap();
+    let mut collect = COLLECT.write().unwrap();
 
-        let have = collect
-            .items
-            .iter()
-            .any(|(_, value)| value.source == obj.source && value.pid == obj.pid);
+    let have = collect
+        .items
+        .iter()
+        .any(|(_, value)| value.source == obj.source && value.pid == obj.pid);
 
-        if have {
-            return None;
-        }
+    if have {
+        return None;
+    }
 
-        // 收藏时间由这里落，调用方不必各自取时钟；重复收藏已在上面提前返回，不会刷新时间
-        obj.fav_time = now_ms();
+    // 收藏时间由这里落，调用方不必各自取时钟；重复收藏已在上面提前返回，不会刷新时间
+    obj.fav_time = now_ms();
 
-        let uuid = Uuid::new_v4().to_string();
-        collect.items.insert(uuid.clone(), obj);
-        uuid
-    };
+    let uuid = Uuid::new_v4().to_string();
+    collect.items.insert(uuid.clone(), obj);
+
+    drop(collect);
 
     save();
     Some(uuid)
@@ -222,21 +221,21 @@ pub fn add_item(mut obj: CollectItemObj) -> Option<String> {
 /// - `group`: 分组名，新收藏按资源类型归类时用的就是它
 /// - `uuid`: 收藏条目 uuid
 pub fn add_to_group(group: &str, uuid: &str) {
-    {
-        let mut collect = COLLECT.write().unwrap();
+    let mut collect = COLLECT.write().unwrap();
 
-        for (name, value) in collect.groups.iter_mut() {
-            if name != group {
-                value.remove(uuid);
-            }
+    for (name, value) in collect.groups.iter_mut() {
+        if name != group {
+            value.remove(uuid);
         }
-
-        collect
-            .groups
-            .entry(group.to_string())
-            .or_default()
-            .insert(uuid.to_string());
     }
+
+    collect
+        .groups
+        .entry(group.to_string())
+        .or_default()
+        .insert(uuid.to_string());
+
+    drop(collect);
 
     save();
 }
@@ -253,16 +252,16 @@ fn now_ms() -> i64 {
 ///
 /// - `name`: 分组名
 pub fn add_group(name: &str) {
-    {
-        let mut collect = COLLECT.write().unwrap();
+    let mut collect = COLLECT.write().unwrap();
 
-        if collect.groups.contains_key(name) {
-            return;
-        }
-
-        collect.groups.insert(name.to_string(), Default::default());
-        collect.order.push(name.to_string());
+    if collect.groups.contains_key(name) {
+        return;
     }
+
+    collect.groups.insert(name.to_string(), Default::default());
+    collect.order.push(name.to_string());
+
+    drop(collect);
 
     save();
 }
@@ -271,11 +270,11 @@ pub fn add_group(name: &str) {
 ///
 /// - `name`: 分组名
 pub fn remove_group(name: &str) {
-    {
-        let mut collect = COLLECT.write().unwrap();
-        collect.groups.remove(name);
-        collect.order.retain(|each| each != name);
-    }
+    let mut collect = COLLECT.write().unwrap();
+    collect.groups.remove(name);
+    collect.order.retain(|each| each != name);
+
+    drop(collect);
 
     save();
 }
@@ -284,28 +283,28 @@ pub fn remove_group(name: &str) {
 ///
 /// - `order`: 新的完整顺序，只留仍然存在的分组
 pub fn set_group_order(order: Vec<String>) {
-    {
-        let mut collect = COLLECT.write().unwrap();
-        collect.order = order
-            .into_iter()
-            .filter(|name| collect.groups.contains_key(name))
-            .collect();
-    }
+    let mut collect = COLLECT.write().unwrap();
+    collect.order = order
+        .into_iter()
+        .filter(|name| collect.groups.contains_key(name))
+        .collect();
+
+    drop(collect);
 
     save();
 }
 
 /// 清空全部收藏，分组保留，只清成员
 pub fn clear() {
-    {
-        let mut collect = COLLECT.write().unwrap();
+    let mut collect = COLLECT.write().unwrap();
 
-        collect.items.clear();
+    collect.items.clear();
 
-        for (_, value) in collect.groups.iter_mut() {
-            value.clear();
-        }
+    for (_, value) in collect.groups.iter_mut() {
+        value.clear();
     }
+
+    drop(collect);
 
     save();
 }
@@ -314,13 +313,13 @@ pub fn clear() {
 ///
 /// - `name`: 分组名，不存在时不做任何事
 pub fn clear_group(name: &str) {
-    {
-        let mut collect = COLLECT.write().unwrap();
+    let mut collect = COLLECT.write().unwrap();
 
-        if let Some(value) = collect.groups.get_mut(name) {
-            value.clear();
-        }
+    if let Some(value) = collect.groups.get_mut(name) {
+        value.clear();
     }
+
+    drop(collect);
 
     save();
 }
@@ -330,15 +329,15 @@ pub fn clear_group(name: &str) {
 /// - `group`: 分组名，不存在时不做任何事
 /// - `uuids`: 要移除的收藏条目 uuid
 pub fn remove_group_items(group: &str, uuids: &[String]) {
-    {
-        let mut collect = COLLECT.write().unwrap();
+    let mut collect = COLLECT.write().unwrap();
 
-        if let Some(value) = collect.groups.get_mut(group) {
-            for uuid in uuids {
-                value.remove(uuid);
-            }
+    if let Some(value) = collect.groups.get_mut(group) {
+        for uuid in uuids {
+            value.remove(uuid);
         }
     }
+
+    drop(collect);
 
     save();
 }
@@ -352,29 +351,29 @@ pub fn remove_group_items(group: &str, uuids: &[String]) {
 /// 收藏时不带分组参数，新收藏天然落在那边。既然具名分组之外还有默认分组，
 /// 一项就只能属于一个具名分组，否则各组计数相加不等于收藏总数。
 pub fn set_group_items(group: &str, uuids: &[String]) {
-    {
-        let mut collect = COLLECT.write().unwrap();
+    let mut collect = COLLECT.write().unwrap();
 
-        if !collect.groups.contains_key(group) {
-            return;
+    if !collect.groups.contains_key(group) {
+        return;
+    }
+
+    // 先摘出其它分组
+    for (name, value) in collect.groups.iter_mut() {
+        if name == group {
+            continue;
         }
-
-        // 先摘出其它分组
-        for (name, value) in collect.groups.iter_mut() {
-            if name == group {
-                continue;
-            }
-            for uuid in uuids {
-                value.remove(uuid);
-            }
-        }
-
-        if let Some(value) = collect.groups.get_mut(group) {
-            for uuid in uuids {
-                value.insert(uuid.clone());
-            }
+        for uuid in uuids {
+            value.remove(uuid);
         }
     }
+
+    if let Some(value) = collect.groups.get_mut(group) {
+        for uuid in uuids {
+            value.insert(uuid.clone());
+        }
+    }
+
+    drop(collect);
 
     save();
 }
@@ -398,19 +397,19 @@ pub fn set_support(
     loaders: Vec<String>,
     game_versions: Vec<String>,
 ) -> bool {
-    {
-        let mut collect = COLLECT.write().unwrap();
-        let Some(item) = collect
-            .items
-            .values_mut()
-            .find(|item| item.source == source && item.pid == pid)
-        else {
-            return false;
-        };
+    let mut collect = COLLECT.write().unwrap();
+    let Some(item) = collect
+        .items
+        .values_mut()
+        .find(|item| item.source == source && item.pid == pid)
+    else {
+        return false;
+    };
 
-        item.loaders = loaders;
-        item.game_versions = game_versions;
-    }
+    item.loaders = loaders;
+    item.game_versions = game_versions;
+
+    drop(collect);
 
     save();
     true

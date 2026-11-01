@@ -234,12 +234,12 @@ fn run() {
     };
 
     // 启动前已经连着的手柄
-    {
-        let mut pads = PADS.write().unwrap();
-        for (id, gamepad) in gilrs.gamepads() {
-            pads.insert(pad_id(id), Pad::from_gamepad(&gamepad));
-        }
+    let mut pads = PADS.write().unwrap();
+    for (id, gamepad) in gilrs.gamepads() {
+        pads.insert(pad_id(id), Pad::from_gamepad(&gamepad));
     }
+
+    drop(pads);
 
     loop {
         // 超时返回 None，让循环有机会结束；进程退出时线程直接随进程走

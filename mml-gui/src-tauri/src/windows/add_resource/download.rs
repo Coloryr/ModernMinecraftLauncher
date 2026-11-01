@@ -167,6 +167,7 @@ pub async fn add_resource_download(
             },
         );
     }
+
     emit_add_resource_status(&app, build_status(&app));
 
     // 构建下载项目与已下载标记，失败路径都要移除 DOWNLOAD_NOW 条目
@@ -298,24 +299,24 @@ pub async fn add_resource_download(
     }
 
     // 补全条目的显示名与目标路径，进度回调按路径匹配
-    {
-        let mut map = DOWNLOAD_NOW.write().unwrap();
-        if let Some(info) = map.get_mut(&uuid).and_then(|entry| entry.get_mut(&key)) {
-            info.file = obj.file.clone();
-            info.name = obj.name.clone();
-            info.icon = project_icon;
-        }
+    let mut map = DOWNLOAD_NOW.write().unwrap();
+    if let Some(info) = map.get_mut(&uuid).and_then(|entry| entry.get_mut(&key)) {
+        info.file = obj.file.clone();
+        info.name = obj.name.clone();
+        info.icon = project_icon;
     }
+
+    drop(map);
 
     // 公共目录已有同一份文件：链接已建好，不再走下载器
     if reused {
-        {
-            let mut map = DOWNLOAD_NOW.write().unwrap();
-            if let Some(info) = map.get_mut(&uuid).and_then(|entry| entry.get_mut(&key)) {
-                info.now = 100.0;
-                info.done = true;
-            }
+        let mut map = DOWNLOAD_NOW.write().unwrap();
+        if let Some(info) = map.get_mut(&uuid).and_then(|entry| entry.get_mut(&key)) {
+            info.now = 100.0;
+            info.done = true;
         }
+
+        drop(map);
         emit_add_resource_status(&app, build_status(&app));
 
         let name = online_info.name.clone();
@@ -376,6 +377,7 @@ pub async fn add_resource_download(
 
         // 终态：完成 / 失败 / 取消三态互斥（与整合包那套一致）；取消时进度停在原地，
         // 不拉满 —— 用户看得见它是被中途停掉的
+        // 后面还有 await，写锁只能靠块作用域在 await 前释放，drop 不能满足 Send 检查
         {
             let mut map = DOWNLOAD_NOW.write().unwrap();
             if let Some(info) = map.get_mut(&uuid).and_then(|entry| entry.get_mut(&key)) {
@@ -390,6 +392,7 @@ pub async fn add_resource_download(
                 }
             }
         }
+
         emit_add_resource_status(&app2, build_status(&app2));
 
         if outcome.is_done() && mapped {

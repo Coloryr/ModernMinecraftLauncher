@@ -472,12 +472,12 @@ fn get_mod_dependencies_inner(
         };
 
         // 原子检查并插入：HashSet::insert 在元素已存在时返回 false
-        {
-            let mut ids_guard = ids.lock().unwrap();
-            if !ids_guard.insert(project_id.clone()) {
-                return;
-            }
+        let mut ids_guard = ids.lock().unwrap();
+        if !ids_guard.insert(project_id.clone()) {
+            return;
         }
+
+        drop(ids_guard);
 
         let id = project_id.clone();
         // 只保留"要用户去下"的两种类型。embedded 是打包在 jar 里的、incompatible 是明确

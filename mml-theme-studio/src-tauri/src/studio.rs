@@ -542,18 +542,18 @@ impl Studio {
             }
         };
 
-        {
-            let mut preview = self.preview.lock().await;
-            // 报告就绪与进程退出可能只差几毫秒，退出回调已经把 pid 清掉时不再对外报地址
-            if preview.pid != Some(pid) {
-                drop(preview);
-                process::kill_tree(pid).await;
-                return Err(StudioError::new(MessageKey::PreviewFailed));
-            }
-            preview.url = url.clone();
-            // 持锁广播，避免退出回调的"空地址"被这次广播盖回去
-            self.emit_preview(&url);
+        let mut preview = self.preview.lock().await;
+        // 报告就绪与进程退出可能只差几毫秒，退出回调已经把 pid 清掉时不再对外报地址
+        if preview.pid != Some(pid) {
+            drop(preview);
+            process::kill_tree(pid).await;
+            return Err(StudioError::new(MessageKey::PreviewFailed));
         }
+        preview.url = url.clone();
+        // 持锁广播，避免退出回调的"空地址"被这次广播盖回去
+        self.emit_preview(&url);
+
+        drop(preview);
         self.message(MessageKey::PreviewReady, &[("url", url.clone())])
             .await;
         Ok(url)

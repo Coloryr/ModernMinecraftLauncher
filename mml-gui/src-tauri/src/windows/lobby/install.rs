@@ -90,6 +90,7 @@ pub(super) async fn executable(
         view.downloading = true;
         view.download_percent = 0;
     }
+
     let cancel = model.cancel.child_token();
     let _cancel_on_drop = cancel.clone().drop_guard();
     let work = async {

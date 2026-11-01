@@ -174,10 +174,10 @@ pub fn remove(name: &str) {
 
 /// 删除所有 Java 并保存配置
 pub fn remove_all() {
-    {
-        let mut list = JVMS.write().unwrap();
-        list.clear();
-    }
+    let mut list = JVMS.write().unwrap();
+    list.clear();
+
+    drop(list);
 
     // 先释放写锁再保存：save() 内部要拿 CONFIG 读锁，同线程写锁未释放时重入会死锁
     {
@@ -227,10 +227,10 @@ pub fn add_item(name: Option<String>, file: String) -> Option<Arc<JavaInfoObj>> 
 
             let info = Arc::new(info);
 
-            {
-                let mut list = JVMS.write().unwrap();
-                list.insert(name.clone(), info.clone());
-            }
+            let mut list = JVMS.write().unwrap();
+            list.insert(name.clone(), info.clone());
+
+            drop(list);
 
             invoke_jvm_change();
 
@@ -273,30 +273,30 @@ pub fn add_info_item(info: JavaInfoObj) -> Arc<JavaInfoObj> {
 pub fn add_info_items(list: Vec<JavaInfoObj>) -> Vec<Arc<JavaInfoObj>> {
     let mut added = Vec::with_capacity(list.len());
 
-    {
-        let mut jvms = JVMS.write().unwrap();
-        let mut config = mml_config::write_config();
+    let mut jvms = JVMS.write().unwrap();
+    let mut config = mml_config::write_config();
 
-        for item in list {
-            let name = unique_java_name(&jvms, &item);
+    for item in list {
+        let name = unique_java_name(&jvms, &item);
 
-            jvms.remove(&name);
-            config
-                .java_list
-                .retain(|saved| !saved.name.eq_ignore_ascii_case(&name));
+        jvms.remove(&name);
+        config
+            .java_list
+            .retain(|saved| !saved.name.eq_ignore_ascii_case(&name));
 
-            let info = Arc::new(JavaInfoObj {
-                name: name.clone(),
-                ..item
-            });
-            jvms.insert(name.clone(), info.clone());
-            config.java_list.push(JvmConfigObj {
-                name,
-                local: info.path.to_string_lossy().to_string(),
-            });
-            added.push(info);
-        }
+        let info = Arc::new(JavaInfoObj {
+            name: name.clone(),
+            ..item
+        });
+        jvms.insert(name.clone(), info.clone());
+        config.java_list.push(JvmConfigObj {
+            name,
+            local: info.path.to_string_lossy().to_string(),
+        });
+        added.push(info);
     }
+
+    drop(jvms);
 
     // 事件回调会读 JVMS，save() 要拿配置读锁，都得在锁释放后触发
     invoke_jvm_change();
@@ -370,10 +370,10 @@ fn add_list(list: &Vec<JvmConfigObj>) {
     let dir = mml_base::get_base_dir();
     let list_cloned = list.clone();
 
-    {
-        let mut list1 = JVMS.write().unwrap();
-        list1.clear();
-    }
+    let mut list1 = JVMS.write().unwrap();
+    list1.clear();
+
+    drop(list1);
 
     // 在异步任务中逐个测试 Java
     tokio::task::spawn(async move {

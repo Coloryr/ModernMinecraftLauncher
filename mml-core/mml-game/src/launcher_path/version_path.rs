@@ -543,10 +543,10 @@ pub fn add_optifine(obj: OptifineObj) -> Arc<OptifineObj> {
     let info = Arc::new(obj);
     // 写锁必须**先释放**再调 `save_optifine`：后者内部要取 OPTIFINE_LOADER 的**读锁**，
     // 而 `std::sync::RwLock` 不可重入，同线程持写锁时再取读锁会永久阻塞 = 自死锁。
-    {
-        let mut list = OPTIFINE_LOADER.write().unwrap();
-        list.insert(info.version.clone(), info.clone());
-    }
+    let mut list = OPTIFINE_LOADER.write().unwrap();
+    list.insert(info.version.clone(), info.clone());
+
+    drop(list);
 
     save_optifine();
 
@@ -559,10 +559,10 @@ pub fn add_optifine(obj: OptifineObj) -> Arc<OptifineObj> {
 pub fn add_liteloader(obj: LiteloaderMetaObj) {
     // 同 `add_optifine`：写锁先释放，再调内部取读锁的 `save_liteloader`，
     // 否则同线程自死锁，这是"加载器列表卡在 1/6"的直接原因。
-    {
-        let mut list = LITE_LOADER.write().unwrap();
-        list.extend(obj.versions.into_iter().map(|(k, v)| (k, Arc::new(v))));
-    }
+    let mut list = LITE_LOADER.write().unwrap();
+    list.extend(obj.versions.into_iter().map(|(k, v)| (k, Arc::new(v))));
+
+    drop(list);
 
     save_liteloader();
 }

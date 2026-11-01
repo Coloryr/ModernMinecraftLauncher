@@ -759,7 +759,7 @@ function tokenLabel(acc: AccountStoreDto): string {
 
 <template>
   <WindowFrame :title="showSkin ? t('account.viewSkin') : t('account.manage')"
-    :body-fill="view === 'detail' || showSkin || filtered.length === 0" body-gutter
+    :body-fill="view === 'detail' || showSkin || filtered.length === 0" :body-flush="showSkin" body-gutter
     :back="showSkin ? t('winCommon.back') : undefined" @back="showSkin = false" @close="$emit('close')">
     <!-- 工具栏：类型筛选 + 搜索 + 视图切换 + 添加账户。高度必须压在 --titlebar-h 内，
          否则会撑高整条顶栏；「查看皮肤」是针对单个账户的动作，留在各条目的按钮里 -->

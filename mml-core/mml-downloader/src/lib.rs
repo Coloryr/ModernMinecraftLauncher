@@ -402,13 +402,13 @@ pub fn pause_task(id: u64) -> bool {
 ///
 /// 成功返回 `true`，任务不存在、已完成或已取消时返回 `false`
 pub fn resume_task(id: u64) -> bool {
-    {
-        let read = TASKS.read().unwrap();
-        match read.iter().find(|t| t.id == id) {
-            Some(task) => task.resume(),
-            None => return false,
-        }
+    let read = TASKS.read().unwrap();
+    match read.iter().find(|t| t.id == id) {
+        Some(task) => task.resume(),
+        None => return false,
     }
+
+    drop(read);
 
     // 暂停期间线程可能已空闲，恢复后需要重新唤醒
     for item in THREADS.read().unwrap().iter() {

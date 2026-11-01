@@ -54,6 +54,7 @@ export function createCommands(invoke: Invoke) {
       refreshAccountToken: (uuid: string) => invoke<boolean>("account_refresh_account_token", { uuid }),
       refreshSkin: (uuid: string) => invoke<void>("account_refresh_skin", { uuid }),
       removeAccount: (uuid: string) => invoke<boolean>("account_remove_account", { uuid }),
+      saveSkin: (sha1: string, path: string) => invoke<void>("account_save_skin", { sha1, path }),
       setActiveCape: (accountType: string, uuid: string, sha1: string) => invoke<void>("account_set_active_cape", { accountType, uuid, sha1 }),
       setActiveSkin: (accountType: string, uuid: string, sha1: string) => invoke<void>("account_set_active_skin", { accountType, uuid, sha1 }),
       setCurrentAccount: (uuid: string) => invoke<boolean>("account_set_current_account", { uuid }),

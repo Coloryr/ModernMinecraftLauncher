@@ -36,12 +36,12 @@ impl Drop for Deleting {
 ///
 /// 标记成功返回守卫，丢弃后标记撤销；同一实例已经在删时返回 `None`
 pub(crate) fn begin(instance: Uuid) -> Option<Deleting> {
-    {
-        let mut set = DELETING.lock().unwrap();
-        if !set.insert(instance) {
-            return None;
-        }
+    let mut set = DELETING.lock().unwrap();
+    if !set.insert(instance) {
+        return None;
     }
+
+    drop(set);
     // 守卫必须在锁释放之后才造出来：丢弃它会去拿同一把锁，边持锁边丢就是自死锁
     Some(Deleting(instance))
 }

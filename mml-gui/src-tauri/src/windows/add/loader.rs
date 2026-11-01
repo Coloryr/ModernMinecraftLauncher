@@ -154,16 +154,16 @@ pub async fn add_get_support_loaders(app: AppHandle, mc: String) -> Result<Vec<S
             Ok(list) => return Ok(list.clone()),
             Err(e) => {
                 // 失败不缓存：把这个单元摘掉，下次查询重新发起，好拿到新代理或重新联网
+                let mut cache = SUPPORT_LOADERS_CACHE.lock().await;
+                // 只摘掉还是同一个单元的那条：期间可能已被别的请求换成新的，别误删
+                if cache
+                    .get(&mc)
+                    .is_some_and(|current| Arc::ptr_eq(current, &cell))
                 {
-                    let mut cache = SUPPORT_LOADERS_CACHE.lock().await;
-                    // 只摘掉还是同一个单元的那条：期间可能已被别的请求换成新的，别误删
-                    if cache
-                        .get(&mc)
-                        .is_some_and(|current| Arc::ptr_eq(current, &cell))
-                    {
-                        cache.remove(&mc);
-                    }
+                    cache.remove(&mc);
                 }
+
+                drop(cache);
 
                 // 被中断即用户改了代理 → 用新客户端重跑一次
                 if mml_net::is_aborted(&e) && attempt < RETRY_ON_ABORT {

@@ -172,12 +172,12 @@ pub(crate) async fn list_projects(
                 cached.push((pid, item));
             }
 
-            {
-                let mut map = MODRINTH_INFO.write().await;
-                for (pid, item) in cached {
-                    map.insert(pid, item);
-                }
+            let mut map = MODRINTH_INFO.write().await;
+            for (pid, item) in cached {
+                map.insert(pid, item);
             }
+
+            drop(map);
 
             Ok(ProjectDto {
                 items: list1,

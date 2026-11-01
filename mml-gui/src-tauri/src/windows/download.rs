@@ -220,23 +220,23 @@ impl mml_downloader::IDownloadGui for DownloadGuiHook {
         crate::windows::add_resource::on_download_item(file, &self.app);
 
         // 事件按文件名与状态去重，避免按块刷屏
-        {
-            let mut last = self.last.lock().unwrap();
-            match last.get(&thread) {
-                Some(old) if old.name == name && old.state == state_num => {
-                    return;
-                }
-                _ => {
-                    last.insert(
-                        thread,
-                        LastReport {
-                            name: name.clone(),
-                            state: state_num,
-                        },
-                    );
-                }
+        let mut last = self.last.lock().unwrap();
+        match last.get(&thread) {
+            Some(old) if old.name == name && old.state == state_num => {
+                return;
+            }
+            _ => {
+                last.insert(
+                    thread,
+                    LastReport {
+                        name: name.clone(),
+                        state: state_num,
+                    },
+                );
             }
         }
+
+        drop(last);
 
         emit_download_item(
             &self.app,

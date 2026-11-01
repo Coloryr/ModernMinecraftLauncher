@@ -840,8 +840,7 @@ pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'stati
     }
 
     // macOS 的红黄绿是 AppKit 原生按钮，位置必须在激活之后、显示之前定好，
-    // 见插件 docs/platforms.md。第一个参数是关闭钮距左缘的点数，第二个加在按钮高度上
-    // 形成容器高度（AppKit 在容器里垂直居中）：按钮 14 + 38 = 52，与 --titlebar-h 对齐
+    // 见插件 docs/platforms.md
     #[cfg(target_os = "macos")]
     {
         if is_april_fools() {
@@ -850,7 +849,10 @@ pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'stati
             if let Err(error) = hide_native_traffic_lights(&window) {
                 mml_log::info(crate::log_text::LogText::TrafficLightsFailed { error }.text());
             }
-        } else if let Err(error) = window.set_traffic_lights_inset(16.0, 38.0).await {
+        } else if let Err(error) = window
+            .set_traffic_lights_inset(TRAFFIC_LIGHTS_INSET_X, TRAFFIC_LIGHTS_INSET_Y)
+            .await
+        {
             mml_log::info(
                 crate::log_text::LogText::TrafficLightsFailed {
                     error: error.to_string(),
@@ -875,6 +877,13 @@ pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'stati
     self::effects::apply(&window, &crate::gui_config::get().client.window_effect);
     Ok("custom")
 }
+
+/// macOS 原生红黄绿距窗口左缘的点数
+#[cfg(target_os = "macos")]
+const TRAFFIC_LIGHTS_INSET_X: f32 = 16.0;
+/// macOS 原生红黄绿所在标题栏容器比按钮多出的高度，按钮 14 + 38 = 52，与 `--titlebar-h` 对齐
+#[cfg(target_os = "macos")]
+const TRAFFIC_LIGHTS_INSET_Y: f32 = 38.0;
 
 /// 按本地日期判断今天是否要换用另一套标题栏样式
 ///
@@ -1216,6 +1225,10 @@ pub fn window_fill_screen(window: WebviewWindow) -> Result<(), String> {
 /// 窗口创建时统一叫 `names::MML`；自绘标题栏文案由前端持有，已 i18n，
 /// 因此由前端在标题变化时同步过来，语言切换后原生标题也能跟随
 ///
+/// macOS 上还要补一次红黄绿的位置。位置只在窗口激活时下发过一次，而任何让 AppKit
+/// 重算标题栏容器的操作（改标题就是其中之一）之后，原生按钮会停回系统默认位置，
+/// 直到下一次窗口尺寸变化或重新获得焦点；这里补发的成本只有一次主线程往返。
+///
 /// - `window`: 调用方窗口，由 tauri 注入
 /// - `title`: 新的原生标题，用前端已 i18n 好的文案
 ///
@@ -1223,8 +1236,29 @@ pub fn window_fill_screen(window: WebviewWindow) -> Result<(), String> {
 ///
 /// 设置成功返回 `Ok(())`，失败返回错误文案
 #[gui_macros::command]
-pub fn window_set_title(window: WebviewWindow, title: String) -> Result<(), String> {
-    window.set_title(&title).map_err(|err| err.to_string())
+pub async fn window_set_title(window: WebviewWindow, title: String) -> Result<(), String> {
+    window.set_title(&title).map_err(|err| err.to_string())?;
+
+    // 见上：标题一变就把原生按钮摆回自绘标题栏里（另一套标题栏样式下原生按钮是藏掉的，不用摆）
+    #[cfg(target_os = "macos")]
+    {
+        use tauri_plugin_decoration::WebviewWindowExt;
+
+        if !is_april_fools()
+            && let Err(error) = window
+                .set_traffic_lights_inset(TRAFFIC_LIGHTS_INSET_X, TRAFFIC_LIGHTS_INSET_Y)
+                .await
+        {
+            mml_log::info(
+                crate::log_text::LogText::TrafficLightsFailed {
+                    error: error.to_string(),
+                }
+                .text(),
+            );
+        }
+    }
+
+    Ok(())
 }
 
 /// 确保某个窗口 kind 的模型存在，单窗口模式下前端页面挂载时调用

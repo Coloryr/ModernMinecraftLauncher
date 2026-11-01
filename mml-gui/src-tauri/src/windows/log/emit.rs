@@ -66,29 +66,29 @@ pub(super) fn queue_game_log(uuid: String, line: LogLine) {
 pub(crate) fn flush_pending_logs(app: &AppHandle) {
     let mut groups: Vec<(String, Vec<LogLine>)> = Vec::new();
     let mut rest: Vec<PendingLog> = Vec::new();
-    {
-        let mut pending = PENDING_LOG.lock().unwrap();
-        if pending.is_empty() {
-            return;
-        }
-        for item in pending.drain(..) {
-            let PendingLog { uuid, line } = item;
-            // 日志基本来自同一个实例，线性找一下足够
-            let idx = match groups.iter().position(|(u, _)| u == &uuid) {
-                Some(idx) => idx,
-                None => {
-                    groups.push((uuid.clone(), Vec::new()));
-                    groups.len() - 1
-                }
-            };
-            if groups[idx].1.len() < LOG_FLUSH_MAX_LINES {
-                groups[idx].1.push(line);
-            } else {
-                rest.push(PendingLog { uuid, line });
-            }
-        }
-        *pending = rest;
+    let mut pending = PENDING_LOG.lock().unwrap();
+    if pending.is_empty() {
+        return;
     }
+    for item in pending.drain(..) {
+        let PendingLog { uuid, line } = item;
+        // 日志基本来自同一个实例，线性找一下足够
+        let idx = match groups.iter().position(|(u, _)| u == &uuid) {
+            Some(idx) => idx,
+            None => {
+                groups.push((uuid.clone(), Vec::new()));
+                groups.len() - 1
+            }
+        };
+        if groups[idx].1.len() < LOG_FLUSH_MAX_LINES {
+            groups[idx].1.push(line);
+        } else {
+            rest.push(PendingLog { uuid, line });
+        }
+    }
+    *pending = rest;
+
+    drop(pending);
 
     for (uuid, lines) in groups {
         emit_game_log(

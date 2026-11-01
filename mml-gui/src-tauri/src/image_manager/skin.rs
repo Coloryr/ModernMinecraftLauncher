@@ -261,25 +261,35 @@ pub(super) async fn load_skinraw_image(uri: &[&str], res: UriSchemeResponder) {
         return;
     }
 
-    {
-        let image = SKINRAW_IMAGE.read().unwrap().get(uri[1]).cloned();
-        if let Some(data) = image {
-            send_png(res, data);
-            return;
-        }
-    }
-
-    let Some(data) = load_texture_bytes(uri[1]).await else {
+    let Some(data) = raw_skin_bytes(uri[1]).await else {
         send_bad(res);
         return;
     };
 
+    send_png(res, data);
+}
+
+/// 原始皮肤贴图 PNG：先看内存缓存，再看本地皮肤目录 / 登记的源地址
+///
+/// 没命中缓存时回源，并把结果按 sha1 收进 `SKINRAW_IMAGE`，供协议请求与
+/// 「另存为本地文件」共用同一份字节。
+///
+/// - `sha1`: 皮肤贴图内容 SHA1
+///
+/// # 返回值
+///
+/// PNG 字节；取不到时返回 `None`
+pub(crate) async fn raw_skin_bytes(sha1: &str) -> Option<Vec<u8>> {
+    if let Some(data) = SKINRAW_IMAGE.read().unwrap().get(sha1).cloned() {
+        return Some(data);
+    }
+
+    let data = load_texture_bytes(sha1).await?;
     SKINRAW_IMAGE
         .write()
         .unwrap()
-        .insert(uri[1].to_string(), data.clone());
-
-    send_png(res, data);
+        .insert(sha1.to_string(), data.clone());
+    Some(data)
 }
 
 /// 按配置的头像类型渲染头像

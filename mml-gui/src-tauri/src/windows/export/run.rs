@@ -313,12 +313,12 @@ pub async fn export_run(
             .await
         };
         // 任务收尾：摘掉取消令牌，别让下一轮导出看见上一轮的取消位
-        {
-            let mut slot = EXPORT_CANCEL.lock().unwrap();
-            if slot.as_ref().is_some_and(|flag| Arc::ptr_eq(flag, &cancel)) {
-                *slot = None;
-            }
+        let mut slot = EXPORT_CANCEL.lock().unwrap();
+        if slot.as_ref().is_some_and(|flag| Arc::ptr_eq(flag, &cancel)) {
+            *slot = None;
         }
+
+        drop(slot);
         // 耗时统计：直接压缩的四段明细在 write_zip 里已经打过，这里只补其它格式的
         let end = Instant::now();
         if pack != ExportPackType::MML {

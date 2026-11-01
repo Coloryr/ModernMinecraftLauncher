@@ -203,7 +203,6 @@ fn get_run_path() -> PathBuf {
 
     get_config_path().unwrap_or({
         let dir = dirs::home_dir().unwrap();
-
         dir.join(names::MML_INNER_DIR)
     })
 }

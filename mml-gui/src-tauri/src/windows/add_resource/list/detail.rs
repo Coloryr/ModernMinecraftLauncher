@@ -111,26 +111,26 @@ pub async fn add_resource_file(
 
             let mut list1 = Vec::new();
 
-            {
-                let mut lock = CURSEFOGRE_FILE.write().await;
-                let list2 = lock.entry(pid.clone()).or_default();
+            let mut lock = CURSEFOGRE_FILE.write().await;
+            let list2 = lock.entry(pid.clone()).or_default();
 
-                for item in list.data {
-                    let info = info.get(&item.mod_id.to_string());
-                    let download = match info {
-                        Some(data) => data.fileid == item.id.to_string(),
-                        None => false,
-                    };
+            for item in list.data {
+                let info = info.get(&item.mod_id.to_string());
+                let download = match info {
+                    Some(data) => data.fileid == item.id.to_string(),
+                    None => false,
+                };
 
-                    list1.push(FileListItemDto::new_curseforge(
-                        &item,
-                        file_type,
-                        download,
-                        check_version_download_now(uuid.as_ref(), &pid, &item.id.to_string()),
-                    ));
-                    list2.insert(item.id.to_string(), item);
-                }
+                list1.push(FileListItemDto::new_curseforge(
+                    &item,
+                    file_type,
+                    download,
+                    check_version_download_now(uuid.as_ref(), &pid, &item.id.to_string()),
+                ));
+                list2.insert(item.id.to_string(), item);
             }
+
+            drop(lock);
 
             Ok(FileListDto {
                 list: list1,
@@ -152,29 +152,29 @@ pub async fn add_resource_file(
 
             let len = list.len() as u64;
 
-            {
-                let mut lock = MODRINTH_FILE.write().await;
-                let list2 = lock.entry(pid.clone()).or_default();
+            let mut lock = MODRINTH_FILE.write().await;
+            let list2 = lock.entry(pid.clone()).or_default();
 
-                for item in list {
-                    let info = info.get(&item.project_id);
-                    let download = match info {
-                        Some(data) => data.fileid == item.id,
-                        None => false,
-                    };
+            for item in list {
+                let info = info.get(&item.project_id);
+                let download = match info {
+                    Some(data) => data.fileid == item.id,
+                    None => false,
+                };
 
-                    // 没有文件可下的版本直接跳过，理由见 new_modrinth 的注释
-                    if let Some(dto) = FileListItemDto::new_modrinth(
-                        &item,
-                        file_type,
-                        download,
-                        check_version_download_now(uuid.as_ref(), &pid, &item.id),
-                    ) {
-                        list1.push(dto);
-                    }
-                    list2.insert(item.id.to_string(), item);
+                // 没有文件可下的版本直接跳过，理由见 new_modrinth 的注释
+                if let Some(dto) = FileListItemDto::new_modrinth(
+                    &item,
+                    file_type,
+                    download,
+                    check_version_download_now(uuid.as_ref(), &pid, &item.id),
+                ) {
+                    list1.push(dto);
                 }
+                list2.insert(item.id.to_string(), item);
             }
+
+            drop(lock);
 
             Ok(FileListDto {
                 list: list1,

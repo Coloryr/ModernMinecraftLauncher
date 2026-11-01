@@ -248,11 +248,11 @@ pub fn main_update_instance_args(
     args: InstanceArgsDto,
 ) -> Result<bool, String> {
     if let Some(core) = core_instance(&uuid) {
-        {
-            let mut obj = core.instance.write().unwrap();
-            apply_args_to_core(&mut obj, &args);
-            obj.save();
-        }
+        let mut obj = core.instance.write().unwrap();
+        apply_args_to_core(&mut obj, &args);
+        obj.save();
+
+        drop(obj);
         // 这里**不发** instance-change：启动参数不进实例列表，也不需要刷新图标。
         // 发了的后果是每改一次设置，图标就换 URL 重拉一次、列表也白刷一遍
         return Ok(true);

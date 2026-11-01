@@ -266,10 +266,10 @@ impl PackProgressGui {
     /// - `force`: 无视节流立即发出
     /// - `f`: 就地改快照字段的闭包
     fn update_sub(&self, force: bool, f: impl FnOnce(&mut PackProgressDto)) {
-        {
-            let mut dto = self.dto.lock().unwrap();
-            f(&mut dto);
-        }
+        let mut dto = self.dto.lock().unwrap();
+        f(&mut dto);
+
+        drop(dto);
         let mut last = self.last_sub.lock().unwrap();
         if !force && last.elapsed().as_millis() < 100 {
             return;

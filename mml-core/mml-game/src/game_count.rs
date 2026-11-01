@@ -422,42 +422,42 @@ fn parse_file(file: &Path) -> CoreResult<CountObj> {
 /// 合并成功返回 `Ok(())`；文件读不出来返回错误
 pub fn merge_file(file: &Path) -> CoreResult<()> {
     let other = parse_file(file)?;
-    {
-        let mut count = COUNT.write().unwrap();
-        count.launch_count += other.launch_count;
-        count.launch_done_count += other.launch_done_count;
-        count.launch_error_count += other.launch_error_count;
-        count.all_time += other.all_time;
+    let mut count = COUNT.write().unwrap();
+    count.launch_count += other.launch_count;
+    count.launch_done_count += other.launch_done_count;
+    count.launch_error_count += other.launch_error_count;
+    count.all_time += other.all_time;
 
-        for (uuid, runs) in other.game_runs {
-            let list = count.game_runs.entry(uuid).or_default();
-            for run in runs {
-                // 同一段时间重复导入时不重复计，删掉迁移标记再搬一次也不会翻倍
-                let dup = list
-                    .iter()
-                    .any(|old| old.start_time == run.start_time && old.stop_time == run.stop_time);
-                if !dup {
-                    list.push(run);
-                }
+    for (uuid, runs) in other.game_runs {
+        let list = count.game_runs.entry(uuid).or_default();
+        for run in runs {
+            // 同一段时间重复导入时不重复计，删掉迁移标记再搬一次也不会翻倍
+            let dup = list
+                .iter()
+                .any(|old| old.start_time == run.start_time && old.stop_time == run.stop_time);
+            if !dup {
+                list.push(run);
             }
-        }
-
-        for (uuid, logs) in other.launch_logs {
-            let list = count.launch_logs.entry(uuid).or_default();
-            for log in logs {
-                let dup = list
-                    .iter()
-                    .any(|old| old.time == log.time && old.error == log.error);
-                if !dup {
-                    list.push(log);
-                }
-            }
-        }
-
-        for (uuid, name) in other.game_names {
-            count.game_names.entry(uuid).or_insert(name);
         }
     }
+
+    for (uuid, logs) in other.launch_logs {
+        let list = count.launch_logs.entry(uuid).or_default();
+        for log in logs {
+            let dup = list
+                .iter()
+                .any(|old| old.time == log.time && old.error == log.error);
+            if !dup {
+                list.push(log);
+            }
+        }
+    }
+
+    for (uuid, name) in other.game_names {
+        count.game_names.entry(uuid).or_insert(name);
+    }
+
+    drop(count);
 
     save();
     Ok(())
@@ -670,28 +670,28 @@ fn save() {
 /// - `uuid`: 游戏实例标识
 pub fn launch_done(uuid: &Uuid) {
     let now = Local::now();
-    {
-        let mut time_list = TIME_LIST.lock().unwrap();
-        time_list.insert(*uuid, now);
-    }
-    {
-        let mut count = COUNT.write().unwrap();
-        count.launch_count += 1;
-        count.launch_done_count += 1;
+    let mut time_list = TIME_LIST.lock().unwrap();
+    time_list.insert(*uuid, now);
 
-        let time = GameTimeData {
-            now: true,
-            start_time: now,
-            stop_time: now,
-        };
-        count.game_runs.entry(*uuid).or_default().push(time);
+    drop(time_list);
+    let mut count = COUNT.write().unwrap();
+    count.launch_count += 1;
+    count.launch_done_count += 1;
 
-        let log = LaunchLogData {
-            time: now,
-            error: false,
-        };
-        count.launch_logs.entry(*uuid).or_default().push(log);
-    }
+    let time = GameTimeData {
+        now: true,
+        start_time: now,
+        stop_time: now,
+    };
+    count.game_runs.entry(*uuid).or_default().push(time);
+
+    let log = LaunchLogData {
+        time: now,
+        error: false,
+    };
+    count.launch_logs.entry(*uuid).or_default().push(log);
+
+    drop(count);
 
     save_async();
 }
@@ -701,18 +701,18 @@ pub fn launch_done(uuid: &Uuid) {
 /// - `uuid`: 游戏实例标识
 pub fn launch_error(uuid: &Uuid) {
     let now = Local::now();
-    {
-        let mut count = COUNT.write().unwrap();
-        count.launch_count += 1;
-        count.launch_error_count += 1;
+    let mut count = COUNT.write().unwrap();
+    count.launch_count += 1;
+    count.launch_error_count += 1;
 
-        // 与原版一致：错误日志同样记录为 Error=false
-        let log = LaunchLogData {
-            time: now,
-            error: false,
-        };
-        count.launch_logs.entry(*uuid).or_default().push(log);
-    }
+    // 与原版一致：错误日志同样记录为 Error=false
+    let log = LaunchLogData {
+        time: now,
+        error: false,
+    };
+    count.launch_logs.entry(*uuid).or_default().push(log);
+
+    drop(count);
 
     save_async();
 }

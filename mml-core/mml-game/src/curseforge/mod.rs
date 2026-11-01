@@ -213,12 +213,12 @@ fn get_mod_dependencies_inner(
 
     dep.par_iter().for_each(|item| {
         // 原子检查并插入：HashSet::insert 在元素已存在时返回 false
-        {
-            let mut ids_guard = ids.lock().unwrap();
-            if !ids_guard.insert(item.mod_id) {
-                return;
-            }
+        let mut ids_guard = ids.lock().unwrap();
+        if !ids_guard.insert(item.mod_id) {
+            return;
         }
+
+        drop(ids_guard);
 
         let id = item.mod_id.to_string();
         // 只保留"要用户去下"的两种关系：1 内嵌库 / 4 工具 / 5 明确冲突 / 6 包含都不算前置。

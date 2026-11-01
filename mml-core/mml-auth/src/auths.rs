@@ -227,10 +227,10 @@ pub fn clear_auths() {
         return;
     }
     // 先释放写锁再落盘：save() 内部要拿读锁，同线程写锁未释放时重入会死锁
-    {
-        let mut auths = AUTHS.write().unwrap();
-        auths.clear();
-    }
+    let mut auths = AUTHS.write().unwrap();
+    auths.clear();
+
+    drop(auths);
 
     save();
 }
@@ -297,10 +297,10 @@ impl LoginObj {
         let mut item = self.clone();
         item.uuid = normalize_uuid(&item.uuid);
         // 同 clear_auths：先释放写锁再落盘，防重入死锁
-        {
-            let mut auths = AUTHS.write().unwrap();
-            auths.insert(item.get_key(), item);
-        }
+        let mut auths = AUTHS.write().unwrap();
+        auths.insert(item.get_key(), item);
+
+        drop(auths);
 
         save();
     }
@@ -316,10 +316,10 @@ impl LoginObj {
         }
 
         // 同 clear_auths：先释放写锁再落盘，防重入死锁
-        {
-            let mut auths = AUTHS.write().unwrap();
-            auths.remove(&key);
-        }
+        let mut auths = AUTHS.write().unwrap();
+        auths.remove(&key);
+
+        drop(auths);
 
         save();
         true

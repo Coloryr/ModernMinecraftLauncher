@@ -47,12 +47,12 @@ fn java_info(name: &str, major: i32, arch: ArchEnum) -> JavaInfoObj {
 
 /// 向全局列表插入测试条目，返回清理函数，避免污染其他用例
 fn insert(entries: Vec<JavaInfoObj>) -> impl FnOnce() {
-    {
-        let mut list = JVMS.write().unwrap();
-        for info in entries {
-            list.insert(info.name.clone(), Arc::new(info));
-        }
+    let mut list = JVMS.write().unwrap();
+    for info in entries {
+        list.insert(info.name.clone(), Arc::new(info));
     }
+
+    drop(list);
     || {
         let mut list = JVMS.write().unwrap();
         // 移除所有 ut- 前缀的测试条目

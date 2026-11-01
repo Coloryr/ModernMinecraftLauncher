@@ -206,56 +206,56 @@ pub fn main_update_instance(
             // 前端传的是分组 uuid；空 / 非法 = 默认分组
             mml_game::move_group(vec![id], windows::parse_group_id(v));
         }
-        {
-            let mut obj = instance.write().unwrap();
-            if let Some(v) = &patch.version {
-                obj.version = v.clone();
-            }
-            if let Some(v) = &patch.version_type {
-                obj.game_type = VersionType::from_id(v);
-            }
-            if let Some(v) = &patch.loader
-                && let Some(l) = LoaderType::from_string(v)
-            {
-                obj.loader = l;
-            }
-            if let Some(v) = patch.loader_version.clone() {
-                obj.loader_version = v;
-            }
-            if let Some(v) = patch.modpack_type.clone() {
-                obj.modpack_type = ModPackType::from_string(v.as_deref().unwrap_or("none"));
-                obj.is_modpack = obj.modpack_type != ModPackType::None;
-            }
-            if let Some(v) = patch.pid.clone() {
-                obj.pid = v;
-            }
-            if let Some(v) = patch.fid.clone() {
-                obj.fid = v;
-            }
-            if let Some(v) = patch.server_url.clone() {
-                obj.server_url = v;
-            }
-            if let Some(v) = patch.auto_save.clone() {
-                // 空串 / 只有空白都按取消处理，别把空目录名当成有效配置
-                obj.auto_save = v.filter(|dir| !dir.trim().is_empty());
-            }
-            if let Some(v) = &patch.log_encoding {
-                obj.encoding = match v.as_str() {
-                    "gbk" => LogEncoding::GBK,
-                    _ => LogEncoding::UTF8,
-                };
-            }
-            obj.save();
-
-            // 游戏内语言落在 options.txt：游戏读的就是它，下次打开设置也按它回显。
-            // 只改 lang 这一行，别整表重写把别的选项（资源包名里可能带 #）弄坏
-            if let Some(v) = &patch.lang {
-                let value = v.trim();
-                let value = (!value.is_empty()).then_some(value);
-                obj.set_minecraft_option("lang", value)
-                    .map_err(|e| e.to_string())?;
-            }
+        let mut obj = instance.write().unwrap();
+        if let Some(v) = &patch.version {
+            obj.version = v.clone();
         }
+        if let Some(v) = &patch.version_type {
+            obj.game_type = VersionType::from_id(v);
+        }
+        if let Some(v) = &patch.loader
+            && let Some(l) = LoaderType::from_string(v)
+        {
+            obj.loader = l;
+        }
+        if let Some(v) = patch.loader_version.clone() {
+            obj.loader_version = v;
+        }
+        if let Some(v) = patch.modpack_type.clone() {
+            obj.modpack_type = ModPackType::from_string(v.as_deref().unwrap_or("none"));
+            obj.is_modpack = obj.modpack_type != ModPackType::None;
+        }
+        if let Some(v) = patch.pid.clone() {
+            obj.pid = v;
+        }
+        if let Some(v) = patch.fid.clone() {
+            obj.fid = v;
+        }
+        if let Some(v) = patch.server_url.clone() {
+            obj.server_url = v;
+        }
+        if let Some(v) = patch.auto_save.clone() {
+            // 空串 / 只有空白都按取消处理，别把空目录名当成有效配置
+            obj.auto_save = v.filter(|dir| !dir.trim().is_empty());
+        }
+        if let Some(v) = &patch.log_encoding {
+            obj.encoding = match v.as_str() {
+                "gbk" => LogEncoding::GBK,
+                _ => LogEncoding::UTF8,
+            };
+        }
+        obj.save();
+
+        // 游戏内语言落在 options.txt：游戏读的就是它，下次打开设置也按它回显。
+        // 只改 lang 这一行，别整表重写把别的选项（资源包名里可能带 #）弄坏
+        if let Some(v) = &patch.lang {
+            let value = v.trim();
+            let value = (!value.is_empty()).then_some(value);
+            obj.set_minecraft_option("lang", value)
+                .map_err(|e| e.to_string())?;
+        }
+
+        drop(obj);
     }
     let store = model(&window)?;
     let mut store = store.lock().unwrap();

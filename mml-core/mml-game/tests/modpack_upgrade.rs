@@ -914,13 +914,13 @@ async fn upgrade_modpack_end_to_end_matches_new_manifest() {
     };
 
     // ① 实例要记到新版本上：更新检查按 pid / fid 比对，不记的话下次还会报同一个更新
-    {
-        let installed = game.read().unwrap();
-        let fid = installed.fid.clone();
-        let pid = installed.pid.clone();
-        assert_eq!(fid.as_deref(), Some(new_ver_mut.id.as_str()));
-        assert_eq!(pid.as_deref(), Some(new_ver_mut.project_id.as_str()));
-    }
+    let installed = game.read().unwrap();
+    let fid = installed.fid.clone();
+    let pid = installed.pid.clone();
+    assert_eq!(fid.as_deref(), Some(new_ver_mut.id.as_str()));
+    assert_eq!(pid.as_deref(), Some(new_ver_mut.project_id.as_str()));
+
+    drop(installed);
     eprintln!("[e2e] 实例已记到新版本 {}", new_ver_mut.id);
 
     // ② 新清单里的每个文件都在磁盘上，即该下的下了
@@ -958,15 +958,15 @@ async fn upgrade_modpack_end_to_end_matches_new_manifest() {
     eprintln!("[e2e] ③ 旧清单里已移除的文件都已删除");
 
     // ④ 升级传的是 None，图标 / 分组保持原样；实例名换成新版整合包的默认名
-    {
-        let read = game.read().unwrap();
-        assert_eq!(
-            read.name,
-            format!("{}-{}", new_index.name, new_index.version_id),
-            "升级后实例名应换成新版整合包的默认名"
-        );
-        assert_eq!(read.icon, icon_before, "升级不该改图标");
-    }
+    let read = game.read().unwrap();
+    assert_eq!(
+        read.name,
+        format!("{}-{}", new_index.name, new_index.version_id),
+        "升级后实例名应换成新版整合包的默认名"
+    );
+    assert_eq!(read.icon, icon_before, "升级不该改图标");
+
+    drop(read);
     assert_eq!(
         mml_game::game_group::group_of(&uuid),
         group_before,
@@ -1365,15 +1365,15 @@ async fn upgrade_curseforge_pack_end_to_end_matches_new_manifest() {
     eprintln!("[e2e-cf] ② 旧清单里已移除的 project 都已清掉");
 
     // ③ 图标 / 分组没被重建；实例名换成新版整合包的默认名
-    {
-        let read = game.read().unwrap();
-        assert_eq!(
-            read.name,
-            format!("{}-{}", new_index.name, new_index.version),
-            "升级后实例名应换成新版整合包的默认名"
-        );
-        assert_eq!(read.icon, icon_before, "升级不该改图标");
-    }
+    let read = game.read().unwrap();
+    assert_eq!(
+        read.name,
+        format!("{}-{}", new_index.name, new_index.version),
+        "升级后实例名应换成新版整合包的默认名"
+    );
+    assert_eq!(read.icon, icon_before, "升级不该改图标");
+
+    drop(read);
     assert_eq!(
         mml_game::game_group::group_of(&uuid),
         group_before,

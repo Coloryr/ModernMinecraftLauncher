@@ -57,6 +57,10 @@ pub const LOGIN_LOCKED: &str = "err.loginLocked";
 pub const ACCOUNT_IN_USE: &str = "err.accountInUse";
 /// 该账户不是微软登录，刷不了 Token
 pub const NOT_OAUTH: &str = "err.notOauth";
+/// 取不到要保存的皮肤贴图
+pub const SKIN_MISSING: &str = "err.skinMissing";
+/// 皮肤文件写不到目标路径
+pub const SKIN_SAVE_FAILED: &str = "err.skinSaveFailed";
 
 // ---------- 服务器与联机 ----------
 

@@ -87,12 +87,12 @@ pub async fn resource_delete_mod(uuid: String, mod_uuid: String) -> Result<(), S
             }
         }
     }
-    {
-        let game = link.read().unwrap();
-        game.remove_online_info(&target)
-            .map_err(|err| err.to_string())?;
-        mml_link::remove_link(game.uuid, &game.get_base_path(), &target);
-    }
+    let game = link.read().unwrap();
+    game.remove_online_info(&target)
+        .map_err(|err| err.to_string())?;
+    mml_link::remove_link(game.uuid, &game.get_base_path(), &target);
+
+    drop(game);
     // 窗口模型里那一条也去掉，别让更新检查再去查一个已经不存在的包
     if let Ok(model) = window_model(&uuid) {
         model.remove_mod(&mod_uuid);

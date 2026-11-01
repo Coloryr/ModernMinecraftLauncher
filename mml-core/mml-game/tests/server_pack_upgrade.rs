@@ -228,11 +228,11 @@ fn upgrade_applies_add_remove_and_change() {
     let pack: ServerPackObj =
         serde_json::from_slice(&std::fs::read(snapshot.get_server_pack_file()).unwrap()).unwrap();
     assert_eq!(pack.pack_version, "1.0.1");
-    {
-        let game = game.read().unwrap();
-        assert_eq!(game.loader_version.as_deref(), Some("21.1.300"));
-        assert_eq!(game.modpack_type, ModPackType::ServerPack);
-    }
+    let game = game.read().unwrap();
+    assert_eq!(game.loader_version.as_deref(), Some("21.1.300"));
+    assert_eq!(game.modpack_type, ModPackType::ServerPack);
+
+    drop(game);
 
     // 在线信息：只剩 b.jar 那条，项目号 / 文件号来自新清单
     let mut info = snapshot.read_online_info();

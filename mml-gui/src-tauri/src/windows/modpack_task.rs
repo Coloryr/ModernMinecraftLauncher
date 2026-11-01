@@ -215,13 +215,13 @@ pub(crate) fn register_task(
         instance_uuid: Mutex::new(None),
     });
 
-    {
-        let mut map = DOWNLOAD_NOW.write().unwrap();
-        if map.contains_key(&key) {
-            return Err(String::from(err_keys::ALREADY_DOWNLOADING));
-        }
-        map.insert(key, task.clone());
+    let mut map = DOWNLOAD_NOW.write().unwrap();
+    if map.contains_key(&key) {
+        return Err(String::from(err_keys::ALREADY_DOWNLOADING));
     }
+    map.insert(key, task.clone());
+
+    drop(map);
     emit_add_modpack_status(app, build_status(app));
 
     let dirty = Arc::new(AtomicBool::new(false));

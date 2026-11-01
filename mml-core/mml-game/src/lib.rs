@@ -362,12 +362,12 @@ pub fn load() -> CoreResult<()> {
             };
 
             if !to_remove.is_empty() {
-                {
-                    let mut handels = HANDELS.write().unwrap();
-                    for (uuid, _) in &to_remove {
-                        handels.remove(uuid);
-                    }
+                let mut handels = HANDELS.write().unwrap();
+                for (uuid, _) in &to_remove {
+                    handels.remove(uuid);
                 }
+
+                drop(handels);
                 for (uuid, code) in &to_remove {
                     invoke_exit(*uuid, *code);
                 }
@@ -895,12 +895,12 @@ pub fn rename_instance(uuid: &Uuid, name: &str) -> CoreResult<()> {
         })?;
     }
 
-    {
-        let mut obj = instance.write().unwrap();
-        obj.name = name.to_string();
-        obj.dir = new_dir;
-        obj.save();
-    }
+    let mut obj = instance.write().unwrap();
+    obj.name = name.to_string();
+    obj.dir = new_dir;
+    obj.save();
+
+    drop(obj);
     game_count::remember_name(uuid, name);
 
     // 重命名不改分组归属，分组表按 uuid 记录、与名字无关，

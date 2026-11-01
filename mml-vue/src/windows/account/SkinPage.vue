@@ -273,6 +273,31 @@ async function doUpload(variant: "classic" | "slim") {
   }
 }
 
+/** 另存皮肤进行中 */
+const savingSkin = ref(false);
+
+/** 把当前预览的皮肤另存为本地 PNG；默认文件名取列表里的名字，用户可改 */
+async function saveSkinFile() {
+  const item = selectedSkin.value;
+  if (!item || savingSkin.value) return;
+  try {
+    const { save } = await import("@tauri-apps/plugin-dialog");
+    const path = await save({
+      title: t("account.saveSkin"),
+      defaultPath: `${(item.name || "skin").replace(/[\\/:*?"<>|]/g, "_")}.png`,
+      filters: [{ name: "PNG", extensions: ["png"] }],
+    });
+    if (!path) return;
+    savingSkin.value = true;
+    await commands.account.saveSkin(item.sha1, path);
+    showToast(t("account.saveSkinOk"));
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    savingSkin.value = false;
+  }
+}
+
 /** 装备选中的皮肤 / 披风，仅正版账户可用 */
 async function equip(kind: "skin" | "cape", item: TextureItemDto) {
   const acc = target.value;
@@ -505,7 +530,6 @@ onBeforeUnmount(destroyViewer);
           </div>
           <p v-if="noSkin" class="preview-tip">{{ t("winSkin.noSkin") }}</p>
         </div>
-        <p v-if="mode === '3d' && !noSkin" class="stage-hint">{{ t("winSkin.hint") }}</p>
       </div>
 
       <!-- 右侧面板：皮肤类型 + 控制器 + 纹理列表 -->
@@ -543,14 +567,20 @@ onBeforeUnmount(destroyViewer);
         <!-- 纹理列表：点击切换预览，正版可设为装备 -->
         <h2 class="info-title ctl-title list-head">
           {{ t("account.skinsList") }}
-          <BaseButton v-if="isOauth && base" variant="accent" size="sm" :disabled="listLoading || uploading"
-            @click="pickSkinFile">
-            {{ t("account.uploadSkin") }}
-          </BaseButton>
-          <!-- 第三方：皮肤上传 / 装备在皮肤站网页面板完成 -->
-          <BaseButton v-if="isThirdParty" variant="accent" size="sm" :disabled="listLoading" @click="openSkinSite">
-            {{ t("account.openSkinSite") }}
-          </BaseButton>
+          <span class="list-actions">
+            <BaseButton v-if="isOauth && base" variant="accent" size="sm" :disabled="listLoading || uploading"
+              @click="pickSkinFile">
+              {{ t("account.uploadSkin") }}
+            </BaseButton>
+            <!-- 当前预览的这一份存成本地 PNG；皮肤站账户的皮肤同样能存 -->
+            <BaseButton v-if="base" size="sm" :disabled="!selectedSkin || savingSkin" @click="saveSkinFile">
+              {{ t("account.saveSkin") }}
+            </BaseButton>
+            <!-- 第三方：皮肤上传 / 装备在皮肤站网页面板完成 -->
+            <BaseButton v-if="isThirdParty" variant="accent" size="sm" :disabled="listLoading" @click="openSkinSite">
+              {{ t("account.openSkinSite") }}
+            </BaseButton>
+          </span>
         </h2>
         <!-- 待上传文件：选型号直传 -->
         <div v-if="uploadFile" class="tex-item upload-row">
@@ -606,11 +636,14 @@ onBeforeUnmount(destroyViewer);
 </template>
 
 <style scoped>
-/* 皮肤子页面：占满窗口内容区，预览与右侧列表各自管理滚动 */
+/* 皮肤子页面：占满窗口内容区，预览与右侧列表各自管理滚动。
+   账户窗口在子页面态切 body-flush（与资源窗口的依赖图同一做法），所以留白在这里补：
+   右边不留——右侧面板要顶到窗口边缘，滚动条才贴着窗口右边 */
 .skin-page {
   display: flex;
   flex: 1;
   min-height: 0;
+  padding: 22px 0 22px 26px;
 }
 
 .skin-layout {
@@ -629,8 +662,10 @@ onBeforeUnmount(destroyViewer);
   flex-direction: column;
 }
 
-/* SegmentedTabs（2D / 3D）下方留缝 */
+/* SegmentedTabs（2D / 3D）只占自身宽度，下方留缝；
+   不写 align-self 会按 flex 列容器的默认拉伸铺满整行 */
 .mode-toggle {
+  align-self: flex-start;
   margin-bottom: 12px;
 }
 
@@ -718,23 +753,16 @@ onBeforeUnmount(destroyViewer);
   }
 }
 
-.stage-hint {
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--text-dim);
-}
-
 /* 右侧面板自己滚：预览区不会跟着滚走 */
 .skin-side {
   width: 280px;
   flex: none;
   overflow-y: auto;
+  /* 面板右边缘即窗口右边缘（子页面态 body-flush），滚动条就画在最右边；
+     见 styles/scrollbar.css */
   scrollbar-gutter: stable;
-  /* 行与滚动条之间留 8px：滚动容器向外借 8px、再用内边距收回 ——
-     行不往左缩（槽位由上面的 scrollbar-gutter 常驻），滚动条画在这 8px 上
-     （与项目列表 .res-list 同一做法，见 styles/scrollbar.css） */
-  margin-right: -8px;
-  padding-right: 8px;
+  /* 与上面的 scrollbar-gutter 成对：扣掉常驻的 9px，行右缘仍落在 26px 上 */
+  padding-right: calc(26px - 9px);
 }
 
 .info-title {
@@ -770,12 +798,19 @@ onBeforeUnmount(destroyViewer);
   gap: 6px;
 }
 
-/* 列表标题行：标题 + 上传按钮 */
+/* 列表标题行：标题 + 右侧动作按钮 */
 .list-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+/* 标题右侧的动作按钮组：上传 / 保存到本地 / 打开皮肤站 */
+.list-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* 待上传文件行 */

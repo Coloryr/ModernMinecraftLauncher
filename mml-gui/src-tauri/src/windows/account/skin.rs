@@ -294,6 +294,25 @@ pub async fn account_upload_skin(
     Ok(())
 }
 
+/// 把某个皮肤贴图另存为本地 PNG 文件
+///
+/// 贴图按内容 SHA1 缓存，直接取本地那份写出去，不再走网络。
+///
+/// - `sha1`: 贴图内容 SHA1，即纹理列表项里的 `sha1`
+/// - `path`: 保存路径，由前端弹保存对话框选好
+///
+/// # 返回值
+///
+/// 取不到贴图返回 `err.skinMissing`；写文件失败返回 `err.skinSaveFailed`
+#[gui_macros::ipc_group("account")]
+#[gui_macros::command]
+pub async fn account_save_skin(sha1: String, path: String) -> Result<(), String> {
+    let data = crate::image_manager::raw_skin_bytes(&sha1)
+        .await
+        .ok_or(err_keys::SKIN_MISSING)?;
+    std::fs::write(&path, data).map_err(|_| String::from(err_keys::SKIN_SAVE_FAILED))
+}
+
 /// 打开第三方账户对应皮肤站的网页；皮肤上传与装备在皮肤站的网页面板上完成
 ///
 /// LittleSkin 开官网，统一通行证开对应服务器页，自建皮肤站 / 外置登录开

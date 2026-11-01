@@ -46,6 +46,8 @@ use self::icon::{icon_name, load_icon_image, load_url_image, save_url_image};
 use self::load::{load_block_image, load_instance_image, load_item_image, load_screenshot_image};
 use self::respond::{send_bad, split_path};
 use self::skin::{load_skin_image, load_skinraw_image};
+// 「另存为本地文件」要取原始贴图字节，跨模块用，走 crate 可见
+pub(crate) use self::skin::raw_skin_bytes;
 
 /// 实例图标内存缓存
 pub(super) static INSTANCE_IMAGE: LazyLock<RwLock<HashMap<Uuid, Vec<u8>>>> =

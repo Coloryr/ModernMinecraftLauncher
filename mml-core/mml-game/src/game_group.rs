@@ -865,12 +865,12 @@ pub(crate) fn forget_instance(uuid: &Uuid) {
 /// - `uuid`: 实例 uuid
 /// - `group`: 目标分组 uuid；`None` 表示默认分组
 pub fn register_instance(uuid: Uuid, group: Option<Uuid>) {
-    {
-        let store = STORE.read().unwrap();
-        if store.contains(&uuid) {
-            return;
-        }
+    let store = STORE.read().unwrap();
+    if store.contains(&uuid) {
+        return;
     }
+
+    drop(store);
     move_group(vec![uuid], group);
 }
 
