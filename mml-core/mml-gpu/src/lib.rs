@@ -6,13 +6,29 @@
 //! 像素约定：tiny_skia `Pixmap` 内部是**预乘 BGRA8**；wgpu 纹理统一用
 //! **straight 直乘 RGBA8**。上传时 premul→straight，读回时按需转回。
 
-use std::sync::OnceLock;
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use pollster::block_on;
 use tiny_skia::{IntSize, Pixmap};
 
 /// 全局设备；初始化失败同样记入，避免每次调用反复重试
 static GPU: OnceLock<Option<GpuDevice>> = OnceLock::new();
+
+/// GPU 提交与轮询的全局串行锁
+///
+/// wgpu 的 `Device::poll` 会先拿设备的资源回收读锁，再一直等到 GPU 完成；并行渲染时
+/// 别的线程建缓冲 / 回收资源要那把写锁，两边互等就整轮卡死（方块图标的 rayon 并行实测如此）。
+/// 凡是「提交命令并等它完成」的都先取这把锁，CPU 侧的模型烘焙仍然并行。
+static GPU_LOCK: Mutex<()> = Mutex::new(());
+
+/// 取 GPU 串行锁，见 [`GPU_LOCK`]
+///
+/// # 返回值
+///
+/// 互斥锁守卫；只在提交与读回这一段持有，别跨长任务或 await
+pub fn gpu_lock() -> MutexGuard<'static, ()> {
+    GPU_LOCK.lock().unwrap_or_else(|err| err.into_inner())
+}
 
 /// wgpu 逻辑设备 + 命令队列，跨 crate 共享一个实例
 pub struct GpuDevice {
@@ -520,6 +536,20 @@ pub fn readback(
     width: u32,
     height: u32,
 ) -> Option<Vec<u8>> {
+    let _guard = gpu_lock();
+    readback_locked(device, queue, color, width, height)
+}
+
+/// 同 [`readback`]，但**不取** [`gpu_lock`]：调用方已持锁时用，否则会自我死锁
+///
+/// - 参数与返回值见 [`readback`]
+pub fn readback_locked(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    color: &wgpu::Texture,
+    width: u32,
+    height: u32,
+) -> Option<Vec<u8>> {
     // 拷贝要求 bytes_per_row 256 对齐，目标行宽不足时补齐
     let row = width * 4;
     let aligned =
@@ -553,7 +583,24 @@ pub fn readback(
 
     let slice = read_buf.slice(..);
     slice.map_async(wgpu::MapMode::Read, |_| {});
-    device.poll(wgpu::PollType::wait_indefinitely()).ok()?;
+    // 等 GPU 完成：驱动异常时不能无限等 —— 调用方是 rayon 的渲染线程池，挂住就再也出不来。
+    // 每 5 秒重试一次，累计 30 秒仍未完成就判这张图失败，让上层跳过
+    let mut waited = 0;
+    loop {
+        match device.poll(wgpu::PollType::Wait {
+            submission_index: None,
+            timeout: Some(std::time::Duration::from_secs(5)),
+        }) {
+            Ok(_) => break,
+            Err(wgpu::PollError::Timeout) => {
+                waited += 1;
+                if waited >= 6 {
+                    return None;
+                }
+            }
+            Err(_) => return None,
+        }
+    }
     let data = slice.get_mapped_range().ok()?;
     if data.len() < (aligned * height) as usize {
         return None;

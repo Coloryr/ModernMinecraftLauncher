@@ -648,10 +648,14 @@ impl GpuCtx {
             }
         }
 
+        // 提交到读回这一段必须串行：rayon 多线程共用一台设备，wgpu 的 poll 在等待期间
+        // 占着资源回收锁，并行提交 + 轮询会互等（见 mml_gpu::gpu_lock）。
+        // 只有这一段进锁，模型烘焙与贴图准备仍在各自线程里并行
+        let _gpu = mml_gpu::gpu_lock();
         self.queue.submit(Some(encoder.finish()));
 
         // 读回预乘 RGBA，再按 premultiplied 语义反除回 straight，得到透明背景 PNG
-        let premul = mml_gpu::readback(&self.device, &self.queue, &target.color, size, size)?;
+        let premul = mml_gpu::readback_locked(&self.device, &self.queue, &target.color, size, size)?;
         let mut out = vec![0u8; premul.len()];
         for (dst, src) in out.chunks_exact_mut(4).zip(premul.chunks_exact(4)) {
             let a = src[3];
