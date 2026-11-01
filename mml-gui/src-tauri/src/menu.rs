@@ -114,6 +114,20 @@ enum Text {
     About,
     /// 应用菜单里的「退出」
     Quit,
+    /// 编辑菜单标题
+    Edit,
+    /// 撤销
+    Undo,
+    /// 重做
+    Redo,
+    /// 剪切
+    Cut,
+    /// 复制
+    Copy,
+    /// 粘贴
+    Paste,
+    /// 全选
+    SelectAll,
     /// 实例菜单标题
     Instance,
     /// 账户菜单标题
@@ -140,6 +154,13 @@ fn text(lang: Lang, which: Text) -> &'static str {
     match (lang, which) {
         (Lang::zh_cn, Text::About) => "关于 M²L",
         (Lang::zh_cn, Text::Quit) => "退出 M²L",
+        (Lang::zh_cn, Text::Edit) => "编辑",
+        (Lang::zh_cn, Text::Undo) => "撤销",
+        (Lang::zh_cn, Text::Redo) => "重做",
+        (Lang::zh_cn, Text::Cut) => "剪切",
+        (Lang::zh_cn, Text::Copy) => "复制",
+        (Lang::zh_cn, Text::Paste) => "粘贴",
+        (Lang::zh_cn, Text::SelectAll) => "全选",
         (Lang::zh_cn, Text::Instance) => "实例",
         (Lang::zh_cn, Text::Account) => "账户",
         (Lang::zh_cn, Text::Collect) => "收藏",
@@ -147,6 +168,13 @@ fn text(lang: Lang, which: Text) -> &'static str {
         (Lang::zh_cn, Text::Stats) => "统计",
         (Lang::en_us, Text::About) => "About M²L",
         (Lang::en_us, Text::Quit) => "Quit M²L",
+        (Lang::en_us, Text::Edit) => "Edit",
+        (Lang::en_us, Text::Undo) => "Undo",
+        (Lang::en_us, Text::Redo) => "Redo",
+        (Lang::en_us, Text::Cut) => "Cut",
+        (Lang::en_us, Text::Copy) => "Copy",
+        (Lang::en_us, Text::Paste) => "Paste",
+        (Lang::en_us, Text::SelectAll) => "Select All",
         (Lang::en_us, Text::Instance) => "Instance",
         (Lang::en_us, Text::Account) => "Account",
         (Lang::en_us, Text::Collect) => "Favorites",
@@ -188,9 +216,36 @@ fn action_menu(
     Submenu::with_items(app, title, true, &refs)
 }
 
+/// 建编辑菜单
+///
+/// macOS 文本框的复制 / 粘贴 / 撤销快捷键由菜单项转发，没有这一栏 Cmd+C 不响应；
+/// 条目全部是系统预定义项，点中由系统处理，不走我们的动作事件。
+///
+/// - `app`: 应用句柄，菜单项挂在它上面
+/// - `lang`: 界面语言
+///
+/// # 返回值
+///
+/// 建好的编辑菜单；失败返回 tauri 的错误
+fn edit_menu(app: &AppHandle, lang: Lang) -> tauri::Result<Submenu<Wry>> {
+    let undo = PredefinedMenuItem::undo(app, Some(text(lang, Text::Undo)))?;
+    let redo = PredefinedMenuItem::redo(app, Some(text(lang, Text::Redo)))?;
+    let sep = PredefinedMenuItem::separator(app)?;
+    let cut = PredefinedMenuItem::cut(app, Some(text(lang, Text::Cut)))?;
+    let copy = PredefinedMenuItem::copy(app, Some(text(lang, Text::Copy)))?;
+    let paste = PredefinedMenuItem::paste(app, Some(text(lang, Text::Paste)))?;
+    let select_all = PredefinedMenuItem::select_all(app, Some(text(lang, Text::SelectAll)))?;
+    Submenu::with_items(
+        app,
+        text(lang, Text::Edit),
+        true,
+        &[&undo, &redo, &sep, &cut, &copy, &paste, &select_all],
+    )
+}
+
 /// 按窗口类型建一份菜单
 ///
-/// 主窗口是唯一带功能分组的窗口；其余窗口只有应用菜单（关于 / 退出）。
+/// 每个窗口都有应用菜单（关于 / 退出）与编辑菜单；主窗口另有功能分组。
 ///
 /// - `app`: 应用句柄，菜单挂在它上面
 /// - `kind`: 窗口类型
@@ -212,9 +267,10 @@ fn build(app: &AppHandle, kind: &str) -> tauri::Result<Menu<Wry>> {
     let sep = PredefinedMenuItem::separator(app)?;
     let quit = PredefinedMenuItem::quit(app, Some(text(lang, Text::Quit)))?;
     let app_menu = Submenu::with_items(app, APP_NAME, true, &[&about, &sep, &quit])?;
+    let edit_menu = edit_menu(app, lang)?;
 
     if kind != "main" {
-        return Menu::with_items(app, &[&app_menu]);
+        return Menu::with_items(app, &[&app_menu, &edit_menu]);
     }
 
     let instance_menu = action_menu(
@@ -237,6 +293,7 @@ fn build(app: &AppHandle, kind: &str) -> tauri::Result<Menu<Wry>> {
         app,
         &[
             &app_menu,
+            &edit_menu,
             &instance_menu,
             &account_menu,
             &collect_menu,
