@@ -118,6 +118,8 @@ export interface WindowOpenParams {
   logBottom?: boolean;
   /** 要直接打开的类别 id，资源管理窗口用；"右键实例 → 查看模组"靠它落到模组页 */
   category?: string;
+  /** 打开后要做的一次性动作；账户窗口用：add（打开添加表单）/ relogin（重新登录当前账户） */
+  action?: "add" | "relogin";
 }
 
 /**
@@ -141,6 +143,8 @@ export interface WindowParamsState {
   logBottom: boolean;
   /** 要直接打开的资源类别 id */
   category: string | null;
+  /** 打开后要做的一次性动作，见 {@link WindowOpenParams.action} */
+  action: string | null;
 }
 
 /** 一份空参数，字段与 {@link WindowOpenParams} 一一对应；重置点共用它，别各抄一份 */
@@ -153,6 +157,7 @@ function emptyWindowParams(): WindowParamsState {
     logFile: null,
     logBottom: false,
     category: null,
+    action: null,
   };
 }
 
@@ -426,6 +431,9 @@ const LOG_PARAMS = {
 /** 资源类别参数在 URL 上的键；资源管理窗口用 */
 const CATEGORY_PARAM = "rcat";
 
+/** 一次性动作参数在 URL 上的键；账户窗口用（多窗口模式下只能靠 URL 送） */
+const ACTION_PARAM = "wact";
+
 /** 按 kind 与带入参数拼出目标窗口的 URL；多窗口模式下新窗口靠它取参数 */
 function urlFor(
   kind: WindowKind,
@@ -461,6 +469,11 @@ function urlFor(
     url.searchParams.set(CATEGORY_PARAM, params.category);
   } else {
     url.searchParams.delete(CATEGORY_PARAM);
+  }
+  if (params?.action) {
+    url.searchParams.set(ACTION_PARAM, params.action);
+  } else {
+    url.searchParams.delete(ACTION_PARAM);
   }
   if (params?.drop) {
     url.searchParams.set(DROP_PARAMS.path, params.drop.path);
@@ -550,6 +563,17 @@ export function projectFromUrl(): WindowProjectParam | null {
  *
  * 没有路径参数或 `kind` 不合法时为 null
  */
+/**
+ * 从 URL 读取一次性动作参数
+ *
+ * # 返回值
+ *
+ * 没有该参数时为 null
+ */
+export function actionFromUrl(): string | null {
+  return new URLSearchParams(window.location.search).get(ACTION_PARAM);
+}
+
 export function dropFromUrl(): WindowDropParam | null {
   const q = new URLSearchParams(window.location.search);
   const path = q.get(DROP_PARAMS.path);
@@ -694,6 +718,7 @@ export async function openWindow(kind: WindowKind, params?: WindowOpenParams) {
       logFile: params?.logFile ?? null,
       logBottom: params?.logBottom ?? false,
       category: params?.category ?? null,
+      action: params?.action ?? null,
     };
     if (!isTauri()) window.history.pushState({}, "", urlFor(kind, params));
     return;
@@ -717,6 +742,7 @@ export async function openWindow(kind: WindowKind, params?: WindowOpenParams) {
       params?.logFile ||
       params?.logBottom ||
       params?.category ||
+      params?.action ||
       params?.project ||
       (kind === "server_pack" && !!params?.uuid)
     ) {

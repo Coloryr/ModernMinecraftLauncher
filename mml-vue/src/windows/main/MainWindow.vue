@@ -1992,15 +1992,35 @@ onActivated(() => void refreshBlocksRendered());
 
 onMounted(async () => {
   subscribeEvents();
-  // macOS 菜单栏：动作 id 见 mml-gui 的 menu 模块，与顶栏那几个入口一一对应
+  // macOS 菜单栏：动作 id 见 mml-gui 的 menu 模块
   trackAsync(
     onMenuAction((action) => {
-      if (action === "add") {
-        openAdd();
-        return;
-      }
-      if (action === "settings" || action === "stats" || action === "collect" || action === "help") {
-        openWindow(action);
+      switch (action) {
+        case "add":
+          openAdd();
+          break;
+        case "add_modpack":
+          void openWindow("add_modpack");
+          break;
+        case "manage":
+          // 回到实例列表：单窗口模式下从别的功能页切回来，多窗口模式下聚焦主窗口
+          void openWindow("main");
+          break;
+        case "add_account":
+          void openWindow("account", { action: "add" });
+          break;
+        case "relogin":
+          void openWindow("account", { action: "relogin" });
+          break;
+        case "collect":
+        case "settings":
+        case "stats":
+          void openWindow(action);
+          break;
+        case "about":
+          // 应用菜单的「关于」打开应用自己的关于窗口（帮助窗口顶部那一块）
+          void openWindow("help");
+          break;
       }
     }),
   );

@@ -6,9 +6,7 @@
 // **只对当前活动的页面生效**：单窗口模式里窗口组件被 KeepAlive 缓存，
 // 同时挂着的可能有五六个，不能按一次 F5 让所有窗口都去拉一遍。
 import { onMounted, onUnmounted } from "vue";
-import { onMenuAction } from "../lib/api";
 import { usePageActive } from "../lib/pageActive";
-import { useUnlisteners } from "./useUnlisteners";
 
 /**
  * 给当前窗口绑上 F5 刷新
@@ -27,17 +25,6 @@ export function useRefreshKey(refresh: () => void | Promise<void>) {
     void refresh();
   }
 
-  // macOS 菜单栏的「刷新」与 F5 走同一个入口，同样只对当前页生效
-  const { track } = useUnlisteners();
-
-  onMounted(() => {
-    window.addEventListener("keydown", onKeyDown);
-    track(
-      onMenuAction((action) => {
-        if (action !== "refresh" || !active.value) return;
-        void refresh();
-      }),
-    );
-  });
+  onMounted(() => window.addEventListener("keydown", onKeyDown));
   onUnmounted(() => window.removeEventListener("keydown", onKeyDown));
 }

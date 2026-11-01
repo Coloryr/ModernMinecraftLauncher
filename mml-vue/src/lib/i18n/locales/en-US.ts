@@ -1399,6 +1399,7 @@ export default {
   "account.reloginHint": "Re-enter the password to re-authenticate this account",
   "account.reloginServerLocked": "The sign-in address is fixed by the account and can't be changed on re-login",
   "account.relogin": "Re-login",
+  "account.reloginNoAccount": "There is no current account to re-login",
   "account.delete": "Delete account",
   "account.deleteConfirm": "Delete account “{name}”?",
   "account.refreshed": "Token refreshed",

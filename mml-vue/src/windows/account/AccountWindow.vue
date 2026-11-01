@@ -11,7 +11,7 @@ import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import { useFileDrop } from "../../composables/useFileDrop";
 import { useUnlisteners } from "../../composables/useUnlisteners";
 import type { FileDropPayload } from "../../composables/useFileDrop";
-import { dropFromUrl, multiWindow, windowParams } from "../windowManager";
+import { actionFromUrl, dropFromUrl, multiWindow, windowParams } from "../windowManager";
 import type { WindowDropParam } from "../windowManager";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
@@ -118,10 +118,17 @@ onMounted(() => {
 });
 
 // 单窗口模式：窗口被 KeepAlive 缓存，切回不会重新挂载 → 自己补一次（账户可能在别处被加/删）
-useWindowRefresh(loadAccounts);
+// 菜单带来的"添加账户 / 重新登录"也在这里消费一次
+useWindowRefresh(async () => {
+  await loadAccounts();
+  await consumeAction();
+});
 
 // 主窗口拖入的登录快捷方式：多窗口模式下这次挂载就是为它来的（参数挂在 URL 上）
-onMounted(() => void consumeDrop());
+onMounted(() => {
+  void consumeDrop();
+  void consumeAction();
+});
 
 const VIEW_OPTIONS = computed(() => [
   { value: "grid", label: t("account.view.grid"), icon: "grid" },
@@ -333,6 +340,40 @@ function applyAuthDrop(url: string) {
   }
 }
 
+/** 菜单带来的账户动作是否已消费：多窗口模式下参数留在 URL 上，只认第一次 */
+let actionApplied = false;
+
+/** 消费菜单带来的账户动作：添加账户 / 重新登录当前账户，参数从哪读见 windowManager */
+async function consumeAction() {
+  let action: string | null;
+  if (multiWindow.value) {
+    if (actionApplied) return;
+    action = actionFromUrl();
+    if (!action) return;
+    actionApplied = true;
+  } else {
+    action = windowParams.value.action;
+    if (!action) return;
+    // 单窗口：参数用完就清，同 consumeDrop 的做法
+    windowParams.value = { ...windowParams.value, action: null };
+  }
+  if (action === "add") {
+    openAdd();
+    return;
+  }
+  if (action === "relogin") {
+    // 重新登录的是当前账户，与顶栏账户选择器选中的那个一致；
+    // 窗口刚挂载时列表可能还没读完，先补一次再取
+    if (!currentAccount.value) await loadAccounts();
+    const acc = currentAccount.value;
+    if (!acc || !acc.canRelogin) {
+      showToast(t("account.reloginNoAccount"));
+      return;
+    }
+    relogin(acc);
+  }
+}
+
 /** 消费"拖入的登录快捷方式"，参数从哪读见 windowManager 的 targetDrop */
 async function consumeDrop() {
   let drop: WindowDropParam | null;
@@ -390,6 +431,10 @@ useWindowRefresh(() => consumeDrop());
 watch(
   () => windowParams.value.drop,
   () => void consumeDrop(),
+);
+watch(
+  () => windowParams.value.action,
+  () => void consumeAction(),
 );
 
 /** 添加弹窗是否在处理中（防止重复提交） */
