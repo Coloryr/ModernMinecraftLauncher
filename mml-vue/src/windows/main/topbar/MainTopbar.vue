@@ -154,7 +154,7 @@ const emit = defineEmits<{
 
 /* 按系统而不是按标题栏样式：Windows 的插件接管不发布 left-clearance，带上会白多一段内边距 */
 .topbar.is-macos.is-plugin-controls {
-  padding-left: max(18px, var(--tauri-plugin-decoration-left-clearance, 76px));
+  padding-left: var(--titlebar-left-clearance);
 }
 
 /* macOS 全屏时窗口铺满整屏，顶栏顶在屏幕最上沿，刘海与菜单栏会挡住内容：
