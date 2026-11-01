@@ -40,7 +40,12 @@
   --green: #3ecf8e;
   --red: #ff5f56;
   --yellow: #f5b944;
-  /* 加载器标签：与 Forge/Fabric/Quilt/NeoForge 的固定色区分 */
+  /* 加载器标签的实心底色：主窗口实例列表与资源窗口的模组行共用。
+     色相彼此拉开，一眼能分（蓝 / 黄 / 紫 / 青 / 橙 / 玫红） */
+  --loader-forge: #1d4ed8;
+  --loader-fabric: #a16207;
+  --loader-quilt: #7c3aed;
+  --loader-neoforge: #0d9488;
   --loader-cleanroom: #c2410c;
   --loader-liteloader: #be185d;
 
@@ -108,7 +113,11 @@
   --green: #16a34a;
   --red: #dc2626;
   --yellow: #d97706;
-  /* 口径同暗色那份 */
+  /* 加载器标签口径同暗色那份：实心底色 + 白字，两套主题取同一组值 */
+  --loader-forge: #1d4ed8;
+  --loader-fabric: #a16207;
+  --loader-quilt: #7c3aed;
+  --loader-neoforge: #0d9488;
   --loader-cleanroom: #c2410c;
   --loader-liteloader: #be185d;
 

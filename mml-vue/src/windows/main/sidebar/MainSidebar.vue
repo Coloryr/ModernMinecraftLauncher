@@ -1226,26 +1226,26 @@ defineExpose({ scrollToInstance });
    黄是浅底 → 配深字；其余深底配白字。
    类名必须与模板里的 `loader-${inst.loader}` 一致（loader-forge / loader-fabric …） */
 .loader-text.loader-forge {
-  background: #1d4ed8;
   /* 蓝 */
+  background: var(--loader-forge);
   color: #fff;
 }
 
 .loader-text.loader-fabric {
-  background: #a16207;
   /* 黄（压深到能配白字的金褐） */
+  background: var(--loader-fabric);
   color: #fff;
 }
 
 .loader-text.loader-quilt {
-  background: #7c3aed;
   /* 紫 */
+  background: var(--loader-quilt);
   color: #fff;
 }
 
 .loader-text.loader-neoforge {
-  background: #0d9488;
   /* 青 */
+  background: var(--loader-neoforge);
   color: #fff;
 }
 

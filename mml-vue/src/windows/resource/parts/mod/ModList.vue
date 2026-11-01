@@ -154,8 +154,8 @@ const visible = computed(() => rows.value.slice(start.value, end.value));
       <template #badges>
         <!-- 支持的加载器：一个包可能不止一个，比如同时带 fabric.mod.json 与 mods.toml；
               后端已汇总去重，这里逐个显示 -->
-        <span v-for="name in row.item.loaders" :key="name" class="badge badge-dim">{{ t(`resource.loader.${name}`)
-          }}</span>
+        <span v-for="name in row.item.loaders" :key="name" class="badge badge-loader"
+          :class="`loader-${name}`">{{ t(`resource.loader.${name}`) }}</span>
         <!-- 内置的**库**：没有模组元数据的内置 jar，如 asm / mixinextras。
               它不是模组，标出来免得和真正的内置模组混在一起 -->
         <span v-if="row.item.library" class="badge badge-dim">{{ t("resource.modLibrary") }}</span>
@@ -171,7 +171,7 @@ const visible = computed(() => rows.value.slice(start.value, end.value));
           {{ t("resource.modBuiltinCount", { n: row.item.jarInJar.length }) }}
         </span>
         <!-- 硬链接：这个文件还挂在公共目录，多实例共用一份 -->
-        <span v-if="row.item.hardLink" class="badge badge-dim">{{ t("resource.modHardLink") }}</span>
+        <span v-if="row.item.hardLink" class="badge badge-link">{{ t("resource.modHardLink") }}</span>
       </template>
 
       <!--

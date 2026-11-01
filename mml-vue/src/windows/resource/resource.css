@@ -323,6 +323,37 @@
   color: var(--text-dim);
 }
 
+/* 加载器徽标：沿用主窗口实例列表那套实心底色（--loader-* 变量），6 种各一色；
+   认不出来的加载器（如 OptiFine）退回强调色，与实例列表的兜底一致 */
+.resource-layout .badge-loader {
+  background: var(--accent);
+  color: #fff;
+}
+
+.resource-layout .badge-loader.loader-forge {
+  background: var(--loader-forge);
+}
+
+.resource-layout .badge-loader.loader-fabric {
+  background: var(--loader-fabric);
+}
+
+.resource-layout .badge-loader.loader-quilt {
+  background: var(--loader-quilt);
+}
+
+.resource-layout .badge-loader.loader-neoforge {
+  background: var(--loader-neoforge);
+}
+
+.resource-layout .badge-loader.loader-cleanroom {
+  background: var(--loader-cleanroom);
+}
+
+.resource-layout .badge-loader.loader-liteloader {
+  background: var(--loader-liteloader);
+}
+
 .resource-layout .badge-red {
   background: color-mix(in srgb, var(--red) 14%, transparent);
   color: var(--red);
@@ -335,9 +366,11 @@
   color: var(--yellow);
 }
 
-/* 「已启用」徽标：绿色。数据包这类"开 / 关"两态用两种颜色分开，
-   扫一眼就知道哪些是开着的（只有两态，没登记进 level.dat 的按开着算） */
-.resource-layout .badge-on {
+/* 绿色徽标的两个角色：「已启用」表示数据包开着（只有两态，没登记进 level.dat 的按开着算），
+   「硬链接」表示这份文件还挂在公共目录、多个实例共用一份 —— 它说的是磁盘占用，不是模组属性。
+   两者不在同一屏（数据包 / 模组），共用一套颜色，别混进加载器那堆灰标签里 */
+.resource-layout .badge-on,
+.resource-layout .badge-link {
   background: color-mix(in srgb, var(--green) 14%, transparent);
   color: var(--green);
 }
