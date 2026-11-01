@@ -19,6 +19,7 @@ pub(crate) mod record;
 pub(crate) mod run;
 
 #[cfg(test)]
+#[path = "../../../../tests/unit/windows_resource_update_mod_tests.rs"]
 mod tests;
 
 pub(super) use self::query::{LatestFile, newest_curseforge, newest_modrinth};

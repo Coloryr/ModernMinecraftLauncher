@@ -40,6 +40,7 @@ mod migrate;
 pub(crate) mod window;
 
 #[cfg(test)]
+#[path = "../../../tests/unit/windows_colormc_mod_tests.rs"]
 mod tests;
 
 pub(crate) use self::window::progress;

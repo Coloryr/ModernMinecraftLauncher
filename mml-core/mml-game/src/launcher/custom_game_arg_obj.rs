@@ -37,4 +37,17 @@ pub struct CustomGameArgObj {
     /// 对应的 Minecraft 版本
     #[serde(rename = "_minecraftVersion")]
     pub minecraft_version: Option<String>,
+    /// 与哪些 MMC 组件冲突，即这份补丁顶掉了谁
+    ///
+    /// 例：GTNH 的 `org.lwjgl3` 声明 `conflicts: [{ uid: "org.lwjgl" }]`，
+    /// 表示 LWJGL2 那份组件不能再叠加。
+    pub conflicts: Option<Vec<CustomConflictObj>>,
+}
+
+/// MMC 的组件冲突声明
+#[derive(Serialize, Deserialize, Debug, Default)]
+#[serde(default)]
+pub struct CustomConflictObj {
+    /// 被顶掉的组件 UID，如 `org.lwjgl`
+    pub uid: String,
 }

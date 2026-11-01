@@ -52,6 +52,7 @@ pub mod windows;
 
 /// 单元测试的共用启动，内核单例每进程只 boot 一次，见 AGENTS.md §6.1
 #[cfg(test)]
+#[path = "../tests/unit/lib_test_support.rs"]
 mod test_support;
 
 include!(concat!(env!("OUT_DIR"), "/invokes_gen.rs"));

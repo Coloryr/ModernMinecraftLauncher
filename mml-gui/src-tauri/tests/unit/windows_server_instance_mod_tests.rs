@@ -1,0 +1,556 @@
+use super::*;
+use crate::dtos::server_instance_dto::{ServerInstanceConfigDto, ServerInstancePickDto};
+use mml_game::{
+    launcher::file_online_info_obj::OnlineInfoObj, loader::LoaderType,
+    other_launcher::hmcl_obj::HMCLServerObj, serverpack::serverpack_obj::ServerPackObj,
+};
+
+/// 勾选一组模组路径
+fn picks(paths: &[&str]) -> Vec<ServerInstancePickDto> {
+    paths
+        .iter()
+        .map(|path| ServerInstancePickDto {
+            path: path.to_string(),
+            exclude: false,
+            url: String::new(),
+        })
+        .collect()
+}
+
+/// 测试用的生成选项
+fn options(
+    format: &str,
+    mods: &[&str],
+    configs: &[(&str, &str)],
+    packs: &[&str],
+) -> ServerInstanceOptionsDto {
+    ServerInstanceOptionsDto {
+        format: format.into(),
+        folder: String::new(),
+        url: "https://example.invalid/pack".into(),
+        name: "服务器".into(),
+        version: "1.0.0".into(),
+        text: "说明".into(),
+        mods: picks(mods),
+        configs: configs
+            .iter()
+            .map(|(dir, mode)| ServerInstanceConfigDto {
+                dir: dir.to_string(),
+                mode: mode.to_string(),
+            })
+            .collect(),
+        resource_packs: packs.iter().map(|path| path.to_string()).collect(),
+    }
+}
+
+/// 按选项展开勾选，等价于 generate 里的那一步
+fn contents(base: &Path, options: &ServerInstanceOptionsDto) -> Contents {
+    Contents {
+        mods: files::mods(base, &options.mods).unwrap(),
+        configs: options
+            .configs
+            .iter()
+            .map(|item| ConfigDir {
+                dir: item.dir.clone(),
+                mode: ConfigMode::parse(&item.mode).unwrap(),
+            })
+            .collect(),
+        packs: options
+            .resource_packs
+            .iter()
+            .map(|path| files::file(base, path).unwrap())
+            .collect(),
+    }
+}
+
+/// 一个原版 Forge 实例
+fn game() -> InstanceSettingObj {
+    InstanceSettingObj {
+        name: "服务器".into(),
+        version: "1.21.1".into(),
+        loader: LoaderType::Forge,
+        loader_version: Some("52.0.1".into()),
+        ..Default::default()
+    }
+}
+
+/// 游戏的 SHA1，用来核对清单里写出来的值
+fn sha1(bytes: &[u8]) -> String {
+    mml_base::hash_helper::gen_hash(HashType::Sha1, bytes)
+}
+
+/// 一个模组的在线来源
+fn online(file: &str, pid: &str, fid: &str) -> OnlineInfoObj {
+    OnlineInfoObj {
+        file: file.into(),
+        modid: pid.into(),
+        fileid: fid.into(),
+        url: format!("https://example.invalid/{file}"),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn normalize_url_requires_http_and_drops_trailing_slash() {
+    assert_eq!(
+        normalize_url(" https://example.invalid/pack/ ").unwrap(),
+        "https://example.invalid/pack"
+    );
+    assert_eq!(
+        normalize_url("http://127.0.0.1:8080").unwrap(),
+        "http://127.0.0.1:8080"
+    );
+    for bad in [
+        "",
+        "  ",
+        "example.invalid",
+        "ftp://example.invalid",
+        "https://",
+    ] {
+        assert!(normalize_url(bad).is_err(), "{bad}");
+    }
+}
+
+#[test]
+fn prepare_folder_rejects_instance_directory() {
+    let instance = crate::test_support::temp_dir("server-instance-prepare");
+    let inside = instance.join("out");
+    assert_eq!(
+        prepare_folder(&instance, inside.to_str().unwrap()).unwrap_err(),
+        err_keys::SERVER_INSTANCE_FOLDER
+    );
+
+    let outside = crate::test_support::temp_dir("server-instance-prepare-out");
+    assert_eq!(
+        prepare_folder(&instance, outside.to_str().unwrap()).unwrap(),
+        outside.canonicalize().unwrap()
+    );
+    assert!(prepare_folder(&instance, "  ").is_err());
+
+    crate::test_support::cleanup(&[&instance, &outside]);
+}
+
+/// 模组可以整个目录勾，也能单独取消其中一个
+#[test]
+fn mods_follow_selection_and_exclusions() {
+    let base = crate::test_support::temp_dir("server-instance-mods");
+    fs::create_dir_all(base.join("mods/sub")).unwrap();
+    fs::write(base.join("mods/a.jar"), b"a").unwrap();
+    fs::write(base.join("mods/sub/b.jar"), b"b").unwrap();
+
+    let paths = |list: Vec<files::ModPick>| -> Vec<PathBuf> {
+        list.into_iter().map(|item| item.path).collect()
+    };
+
+    let list = files::mods(&base, &picks(&["mods"])).unwrap();
+    assert_eq!(
+        paths(list),
+        vec![PathBuf::from("mods/a.jar"), PathBuf::from("mods/sub/b.jar")]
+    );
+
+    let mut exclude = picks(&["mods"]);
+    exclude.push(ServerInstancePickDto {
+        path: "mods/sub/b.jar".into(),
+        exclude: true,
+        url: String::new(),
+    });
+    assert_eq!(
+        paths(files::mods(&base, &exclude).unwrap()),
+        vec![PathBuf::from("mods/a.jar")]
+    );
+
+    assert!(files::mods(&base, &[]).unwrap().is_empty());
+
+    crate::test_support::cleanup(&[&base]);
+}
+
+/// 目录同步方式：压缩包与逐文件各写各的
+#[test]
+fn mml_pack_writes_manifest_sidecar_and_archive() {
+    // 打压缩包会打日志，日志系统每进程只 boot 一次
+    crate::test_support::ensure_boot();
+    let base = crate::test_support::temp_dir("server-instance-mml");
+    let out = crate::test_support::temp_dir("server-instance-mml-out");
+    fs::create_dir_all(base.join("mods")).unwrap();
+    fs::create_dir_all(base.join("config")).unwrap();
+    fs::write(base.join("mods/online.jar"), b"online").unwrap();
+    fs::write(base.join("mods/local.jar"), b"local").unwrap();
+    fs::write(base.join("config/a.toml"), b"a = 1").unwrap();
+
+    let online =
+        HashMap::from([("online.jar".to_string(), online("online.jar", "123", "456"))]);
+    let options = options("mml", &["mods"], &[("config", "archive")], &[]);
+    let contents = contents(&base, &options);
+    let result = generate_mml(
+        &game(),
+        &online,
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    let manifest = fs::read(out.join("server.json")).unwrap();
+    let pack: ServerPackObj = serde_json::from_slice(&manifest).unwrap();
+    assert_eq!(pack.online_list.len(), 2);
+    let online_jar = pack
+        .online_list
+        .iter()
+        .find(|item| item.file == "mods/online.jar")
+        .unwrap();
+    assert_eq!(online_jar.pid.as_deref(), Some("123"));
+    assert_eq!(online_jar.sha1.as_deref(), Some(sha1(b"online").as_str()));
+    // 有在线来源的不复制进文件夹
+    assert!(!out.join("mods/online.jar").exists());
+
+    // 没有在线来源的由我们托管：复制进文件夹并给托管地址
+    let local = pack
+        .online_list
+        .iter()
+        .find(|item| item.file == "mods/local.jar")
+        .unwrap();
+    assert!(local.pid.is_none() && local.fid.is_none());
+    assert_eq!(
+        local.url.as_deref(),
+        Some("https://example.invalid/pack/mods/local.jar")
+    );
+    assert_eq!(fs::read(out.join("mods/local.jar")).unwrap(), b"local");
+    assert_eq!(pack.archive_list.len(), 1);
+    assert_eq!(pack.archive_list[0].file, "config.zip");
+    assert_eq!(pack.archive_list[0].dir, "config");
+    assert!(pack.archive_list[0].delete_old);
+    assert_eq!(
+        pack.archive_list[0].url,
+        "https://example.invalid/pack/config.zip"
+    );
+    assert!(out.join("config.zip").is_file());
+
+    // 客户端逐字比对 SHA1，末尾多一个换行就永远对不上
+    let sidecar = fs::read_to_string(out.join("server.json.sha1")).unwrap();
+    assert_eq!(sidecar, sha1(&manifest));
+    assert!(!sidecar.ends_with('\n'));
+
+    assert_eq!(result.manifest, "server.json");
+    assert_eq!(result.files, ["config.zip", "mods"]);
+    // 三个文件都同步：online.jar、local.jar 与 config/a.toml
+    assert_eq!(result.count, 3);
+
+    crate::test_support::cleanup(&[&base, &out]);
+}
+
+/// 两个目录各用各的方式：config 打压缩包，kubejs 逐文件
+#[test]
+fn mml_mixes_archive_and_per_file_dirs() {
+    crate::test_support::ensure_boot();
+    let base = crate::test_support::temp_dir("server-instance-mixed");
+    let out = crate::test_support::temp_dir("server-instance-mixed-out");
+    fs::create_dir_all(base.join("config")).unwrap();
+    fs::create_dir_all(base.join("kubejs")).unwrap();
+    fs::write(base.join("config/a.toml"), b"a").unwrap();
+    fs::write(base.join("kubejs/startup.js"), b"js").unwrap();
+
+    let options = options(
+        "mml",
+        &[],
+        &[("config", "archive"), ("kubejs", "files")],
+        &[],
+    );
+    let contents = contents(&base, &options);
+    let result = generate_mml(
+        &game(),
+        &HashMap::new(),
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    let pack: ServerPackObj =
+        serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
+    assert_eq!(pack.archive_list.len(), 1);
+    assert_eq!(pack.archive_list[0].file, "config.zip");
+    // 逐文件目录进清单，文件也复制进输出文件夹
+    assert_eq!(pack.online_list.len(), 1);
+    assert_eq!(pack.online_list[0].file, "kubejs/startup.js");
+    assert_eq!(
+        pack.online_list[0].url.as_deref(),
+        Some("https://example.invalid/pack/kubejs/startup.js")
+    );
+    assert_eq!(fs::read(out.join("kubejs/startup.js")).unwrap(), b"js");
+    assert_eq!(result.files, ["config.zip", "kubejs"]);
+    assert_eq!(result.count, 2);
+
+    crate::test_support::cleanup(&[&base, &out]);
+}
+
+/// 手填的下载地址优先于实例记录；既没地址又没编号的只能本地托管
+#[test]
+fn mods_take_manual_url_over_recorded() {
+    crate::test_support::ensure_boot();
+    let base = crate::test_support::temp_dir("server-instance-manual");
+    let out = crate::test_support::temp_dir("server-instance-manual-out");
+    fs::create_dir_all(base.join("mods")).unwrap();
+    fs::write(base.join("mods/a.jar"), b"a").unwrap();
+    fs::write(base.join("mods/b.jar"), b"b").unwrap();
+
+    let mut manual = picks(&["mods/a.jar", "mods/b.jar"]);
+    manual[0].url = " https://typed.example/a.jar ".into();
+
+    let online = HashMap::from([("a.jar".to_string(), online("a.jar", "1", "2"))]);
+    let options = options("mml", &[], &[], &[]);
+    let contents = Contents {
+        mods: files::mods(&base, &manual).unwrap(),
+        configs: Vec::new(),
+        packs: Vec::new(),
+    };
+    generate_mml(
+        &game(),
+        &online,
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    let pack: ServerPackObj =
+        serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
+    assert_eq!(pack.online_list.len(), 2);
+
+    // a：手填地址盖掉实例记录，编号仍是记录里的，文件不复制
+    let a = pack
+        .online_list
+        .iter()
+        .find(|item| item.file == "mods/a.jar")
+        .unwrap();
+    assert_eq!(a.url.as_deref(), Some("https://typed.example/a.jar"));
+    assert_eq!(a.pid.as_deref(), Some("1"));
+    assert_eq!(a.fid.as_deref(), Some("2"));
+    assert!(!out.join("mods/a.jar").exists());
+
+    // b：没有地址也没有编号，复制进文件夹并给托管地址
+    let b = pack
+        .online_list
+        .iter()
+        .find(|item| item.file == "mods/b.jar")
+        .unwrap();
+    assert_eq!(
+        b.url.as_deref(),
+        Some("https://example.invalid/pack/mods/b.jar")
+    );
+    assert_eq!(fs::read(out.join("mods/b.jar")).unwrap(), b"b");
+
+    crate::test_support::cleanup(&[&base, &out]);
+}
+
+/// 资源包有在线来源时走平台下载，不复制进文件夹
+#[test]
+fn mml_resource_pack_with_source_is_not_copied() {
+    crate::test_support::ensure_boot();
+    let base = crate::test_support::temp_dir("server-instance-pack-online");
+    let out = crate::test_support::temp_dir("server-instance-pack-online-out");
+    fs::create_dir_all(base.join("resourcepacks")).unwrap();
+    fs::write(base.join("resourcepacks/p.zip"), b"p").unwrap();
+
+    let online = HashMap::from([(
+        "p.zip".to_string(),
+        OnlineInfoObj {
+            file: "p.zip".into(),
+            modid: "111".into(),
+            fileid: "222".into(),
+            url: "https://cdn.example.invalid/p.zip".into(),
+            ..Default::default()
+        },
+    )]);
+    let options = options("mml", &[], &[], &["resourcepacks/p.zip"]);
+    let contents = contents(&base, &options);
+    let result = generate_mml(
+        &game(),
+        &online,
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    let pack: ServerPackObj =
+        serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
+    assert_eq!(pack.online_list.len(), 1);
+    assert_eq!(
+        pack.online_list[0].url.as_deref(),
+        Some("https://cdn.example.invalid/p.zip")
+    );
+    assert_eq!(pack.online_list[0].pid.as_deref(), Some("111"));
+    // 用了在线地址就不复制
+    assert!(!out.join("resourcepacks/p.zip").exists());
+    assert!(result.files.is_empty());
+    assert_eq!(result.count, 1);
+
+    crate::test_support::cleanup(&[&base, &out]);
+}
+
+/// 资源包没有在线来源时逐个下发，路径要转义
+#[test]
+fn mml_resource_packs_are_hosted_per_file() {
+    crate::test_support::ensure_boot();
+    let base = crate::test_support::temp_dir("server-instance-packs");
+    let out = crate::test_support::temp_dir("server-instance-packs-out");
+    fs::create_dir_all(base.join("resourcepacks")).unwrap();
+    fs::write(base.join("resourcepacks/中文 1.zip"), b"pack").unwrap();
+
+    let options = options("mml", &[], &[], &["resourcepacks/中文 1.zip"]);
+    let contents = contents(&base, &options);
+    let result = generate_mml(
+        &game(),
+        &HashMap::new(),
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    let pack: ServerPackObj =
+        serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
+    assert_eq!(pack.online_list.len(), 1);
+    assert_eq!(
+        pack.online_list[0].url.as_deref(),
+        Some("https://example.invalid/pack/resourcepacks/%E4%B8%AD%E6%96%87%201.zip")
+    );
+    assert_eq!(
+        pack.online_list[0].sha1.as_deref(),
+        Some(sha1(b"pack").as_str())
+    );
+    assert!(pack.archive_list.is_empty());
+    assert_eq!(
+        fs::read(out.join("resourcepacks/中文 1.zip")).unwrap(),
+        b"pack"
+    );
+    assert_eq!(result.files, ["resourcepacks"]);
+    assert_eq!(result.count, 1);
+
+    crate::test_support::cleanup(&[&base, &out]);
+}
+
+#[test]
+fn hmcl_pack_copies_files_and_lists_hashes() {
+    let base = crate::test_support::temp_dir("server-instance-hmcl");
+    let out = crate::test_support::temp_dir("server-instance-hmcl-out");
+    fs::create_dir_all(base.join("mods")).unwrap();
+    fs::create_dir_all(base.join("config")).unwrap();
+    fs::create_dir_all(base.join("resourcepacks")).unwrap();
+    fs::write(base.join("mods/a.jar"), b"mod").unwrap();
+    fs::write(base.join("config/x.toml"), b"x = 1").unwrap();
+    fs::write(base.join("resourcepacks/p.zip"), b"p").unwrap();
+
+    let options = options(
+        "hmcl",
+        &["mods"],
+        &[("config", "archive")],
+        &["resourcepacks/p.zip"],
+    );
+    let contents = contents(&base, &options);
+    let result = generate_hmcl(
+        &game(),
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    assert_eq!(fs::read(out.join("mods/a.jar")).unwrap(), b"mod");
+    assert_eq!(fs::read(out.join("config/x.toml")).unwrap(), b"x = 1");
+    assert_eq!(fs::read(out.join("resourcepacks/p.zip")).unwrap(), b"p");
+
+    let manifest = fs::read(out.join("server-manifest.json")).unwrap();
+    let pack: HMCLServerObj = serde_json::from_slice(&manifest).unwrap();
+    assert_eq!(pack.name, "服务器");
+    assert_eq!(pack.file_api, "https://example.invalid/pack");
+    assert_eq!(pack.addons.len(), 2);
+    assert_eq!(pack.files.len(), 3);
+    let paths: Vec<&str> = pack.files.iter().map(|f| f.path.as_str()).collect();
+    assert_eq!(
+        paths,
+        ["config/x.toml", "mods/a.jar", "resourcepacks/p.zip"]
+    );
+    assert_eq!(pack.files[1].hash, sha1(b"mod"));
+
+    assert_eq!(result.manifest, "server-manifest.json");
+    assert_eq!(result.files, ["config", "mods", "resourcepacks"]);
+    assert_eq!(result.count, 3);
+
+    crate::test_support::cleanup(&[&base, &out]);
+}
+
+#[test]
+fn hmcl_pack_rejects_loader_it_cannot_express() {
+    let base = crate::test_support::temp_dir("server-instance-hmcl-loader");
+    let out = crate::test_support::temp_dir("server-instance-hmcl-loader-out");
+    fs::create_dir_all(base.join("mods")).unwrap();
+    fs::write(base.join("mods/a.jar"), b"mod").unwrap();
+
+    let mut item = game();
+    item.loader = LoaderType::OptiFine;
+    let options = options("hmcl", &["mods"], &[], &[]);
+    let contents = contents(&base, &options);
+    let err = generate_hmcl(
+        &item,
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap_err();
+    assert_eq!(err, err_keys::SERVER_INSTANCE_LOADER);
+
+    crate::test_support::cleanup(&[&base, &out]);
+}
+
+/// 实例自带图标时复制进输出文件夹，没有图标时返回 None
+#[test]
+fn copy_icon_follows_instance_icon() {
+    crate::test_support::ensure_boot();
+    let dir = crate::test_support::temp_dir("icon-src");
+    let out = crate::test_support::temp_dir("icon-out");
+
+    let mut game = InstanceSettingObj {
+        // 绝对路径：脱离测试运行目录，直接指向临时目录本身
+        dir: dir.to_string_lossy().to_string(),
+        icon: Some(names::ICON_FILE.to_string()),
+        ..Default::default()
+    };
+    assert_eq!(copy_icon(&game, &out).unwrap(), None, "没有图标文件时不带");
+
+    let bytes = b"fake png bytes";
+    std::fs::write(dir.join(names::ICON_FILE), bytes).unwrap();
+    assert_eq!(
+        copy_icon(&game, &out).unwrap(),
+        Some(names::ICON_FILE.to_string())
+    );
+    assert_eq!(std::fs::read(out.join(names::ICON_FILE)).unwrap(), bytes);
+
+    // 图标名被清掉时按默认 icon.png 找
+    game.icon = None;
+    assert!(copy_icon(&game, &out).unwrap().is_some());
+
+    crate::test_support::cleanup(&[&dir, &out]);
+}
+

@@ -16,4 +16,5 @@ pub(crate) mod files;
 mod saves;
 
 #[cfg(test)]
+#[path = "../../../../tests/unit/windows_resource_import_mod_tests.rs"]
 mod tests;

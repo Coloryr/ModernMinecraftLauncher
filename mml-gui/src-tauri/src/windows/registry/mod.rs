@@ -12,6 +12,7 @@ mod spec;
 mod uuids;
 
 #[cfg(test)]
+#[path = "../../../tests/unit/windows_registry_mod_tests.rs"]
 mod tests;
 
 pub(crate) use self::uuids::{

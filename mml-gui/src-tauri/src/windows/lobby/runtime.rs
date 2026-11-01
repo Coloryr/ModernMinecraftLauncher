@@ -445,5 +445,5 @@ pub(super) fn join_server(
 }
 
 #[cfg(test)]
-#[path = "runtime_tests.rs"]
+#[path = "../../../tests/unit/windows_lobby_runtime_tests.rs"]
 mod tests;

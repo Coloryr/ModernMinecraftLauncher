@@ -1,6 +1,7 @@
 //! 实例导出为整合包
 
 #[cfg(test)]
+#[path = "../tests/unit/game_export_tests.rs"]
 mod tests;
 
 use std::{

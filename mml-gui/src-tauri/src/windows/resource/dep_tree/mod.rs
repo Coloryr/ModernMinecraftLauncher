@@ -17,4 +17,5 @@ mod draft;
 pub(crate) mod related;
 
 #[cfg(test)]
+#[path = "../../../../tests/unit/windows_resource_dep_tree_mod_tests.rs"]
 mod tests;

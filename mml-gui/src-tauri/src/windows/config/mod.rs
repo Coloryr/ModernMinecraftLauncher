@@ -28,6 +28,7 @@ mod source;
 pub(crate) mod state;
 
 #[cfg(test)]
+#[path = "../../../tests/unit/windows_config_mod_tests.rs"]
 mod tests;
 
 pub use self::files::{

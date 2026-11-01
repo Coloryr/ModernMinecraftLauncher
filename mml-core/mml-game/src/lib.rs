@@ -124,6 +124,7 @@ pub mod serverpack;
 pub use name_check::check_name;
 
 #[cfg(test)]
+#[path = "../tests/unit/lib_test_support.rs"]
 mod test_support;
 
 /// 实例共享句柄，全局以 `Arc<RwLock>` 形式持有实例设置

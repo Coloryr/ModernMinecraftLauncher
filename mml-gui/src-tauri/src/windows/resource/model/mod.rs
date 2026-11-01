@@ -15,6 +15,7 @@ mod cache;
 mod window;
 
 #[cfg(test)]
+#[path = "../../../../tests/unit/windows_resource_model_mod_tests.rs"]
 mod tests;
 
 pub(crate) use self::window::{begin_if_open, cancel_window, instance_busy, window_model};
