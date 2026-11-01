@@ -1,10 +1,13 @@
 //! 客户端设置锁：密码只存加盐哈希，落在隐藏文件里，不写进 gui_config。
 //!
-//! 运行目录与内部数据目录各存一份，只存在一侧时互相补齐；解锁时两份一起删。
+//! 运行目录一份；内部数据目录再按运行目录区分一份，只存在一侧时互相补齐，解锁时两份一起删。
+//! 内部数据目录是同一用户共用的，那份文件名带运行目录摘要：装了多个启动器时各锁各的，
+//! 不会因为其中一个上了锁就把另一个也锁上。
 //! Windows 给它打隐藏属性，其它平台靠点开头的文件名并把权限收到 600。
 
 use crate::err_keys;
 use serde::{Deserialize, Serialize};
+use sha2::Digest;
 use std::{
     fs,
     io::ErrorKind,
@@ -95,21 +98,36 @@ fn parts(text: &str) -> Option<LockParts<'_>> {
     {
         return None;
     }
-    Some(LockParts { rounds, salt, hash })
+    Some(LockParts {
+        rounds,
+        salt,
+        hash,
+    })
 }
 
-/// 锁文件路径
+/// 内部数据目录那份锁文件名：带运行目录摘要，几个安装各锁各的
 ///
-/// - `dir`: 某个落点
-fn lock_path(dir: &Path) -> PathBuf {
-    dir.join(FILE_NAME)
+/// - `run`: 运行目录
+///
+/// # 返回值
+///
+/// 形如 `.client_lock.<16 位十六进制>.json`
+fn mirror_name(run: &Path) -> String {
+    let mut text = run.to_string_lossy().into_owned();
+    // Windows 路径不分大小写，同一个目录换个写法不能算成两个名字
+    if cfg!(windows) {
+        text = text.to_lowercase();
+    }
+    let digest = sha2::Sha256::digest(text.as_bytes());
+    let tag: String = digest[..8].iter().map(|byte| format!("{byte:02x}")).collect();
+    format!(".client_lock.{tag}.json")
 }
 
 /// 读锁文件；不存在、写坏或字段为空都当作没有锁
 ///
-/// - `dir`: 某个落点
-fn read(dir: &Path) -> Option<String> {
-    let data = fs::read(lock_path(dir)).ok()?;
+/// - `path`: 某个落点
+fn read(path: &Path) -> Option<String> {
+    let data = fs::read(path).ok()?;
     if data.len() > 4096 {
         return None;
     }
@@ -143,51 +161,51 @@ fn data_dir() -> PathBuf {
     mml_base::inner_path::get_inner_path()
 }
 
-/// 锁文件的两个落点：运行目录 + 内部数据目录，同一个路径只留一份
+/// 锁文件的两个落点：运行目录一份，内部数据目录按运行目录区分的一份
+///
+/// # 返回值
+///
+/// 两个落点的文件路径；运行目录还没初始化时只剩内部数据目录那份，退回不带摘要的名字
 fn targets() -> Vec<PathBuf> {
-    let mut dirs = Vec::new();
-    if let Some(dir) = run_dir() {
-        dirs.push(dir);
-    }
     let data = data_dir();
-    if !dirs.contains(&data) {
-        dirs.push(data);
+    match run_dir() {
+        Some(run) => vec![run.join(FILE_NAME), data.join(mirror_name(&run))],
+        None => vec![data.join(FILE_NAME)],
     }
-    dirs
 }
 
 /// 两侧对齐：运行目录那份为准，缺的或不一样的都按它补齐；只有内部数据目录有时反向补回
 ///
-/// - `dirs`: 两个落点，运行目录在前
-fn sync(dirs: &[PathBuf]) {
-    let Some(source) = dirs.iter().find(|dir| lock_path(dir).is_file()) else {
+/// - `paths`: 两个落点，运行目录在前
+fn sync(paths: &[PathBuf]) {
+    let Some(source) = paths.iter().find(|path| path.is_file()) else {
         return;
     };
-    let Ok(data) = fs::read(lock_path(source)) else {
+    let Ok(data) = fs::read(source) else {
         return;
     };
-    for dir in dirs {
+    for path in paths {
         // 内容一样就不重写，免得每次取配置都刷一遍修改时间
-        if fs::read(lock_path(dir)).is_ok_and(|current| current == data) {
+        if fs::read(path).is_ok_and(|current| current == data) {
             continue;
         }
-        let _ = install(dir, &data);
+        let _ = install(path, &data);
     }
 }
 
 /// 两侧任意一侧有锁文件就算锁定；文件写坏也算，免得删两行就能绕过
 ///
-/// - `dirs`: 两个落点
-fn exists(dirs: &[PathBuf]) -> bool {
-    dirs.iter().any(|dir| lock_path(dir).is_file())
+/// - `paths`: 两个落点
+fn exists(paths: &[PathBuf]) -> bool {
+    paths.iter().any(|path| path.is_file())
 }
 
 /// 同步两侧后判断有没有锁
 ///
-/// - `dirs`: 两个落点
-fn locked_in(dirs: &[PathBuf]) -> bool {
-    sync(dirs);
-    exists(dirs)
+/// - `paths`: 两个落点
+fn locked_in(paths: &[PathBuf]) -> bool {
+    sync(paths);
+    exists(paths)
 }
 
 /// 当前是否锁定：运行目录与内部数据目录任一侧有锁文件
@@ -197,18 +215,18 @@ pub(crate) fn locked() -> bool {
 
 /// 校验密码；两侧都没有锁文件时直接放行
 ///
-/// - `dirs`: 两个落点
+/// - `paths`: 两个落点
 /// - `password`: 用户输入
 ///
 /// # 返回值
 ///
 /// 任一侧的锁文件能验证通过、或根本没有锁时返回 `true`
-fn verify_in(dirs: &[PathBuf], password: &str) -> bool {
-    sync(dirs);
-    if !exists(dirs) {
+fn verify_in(paths: &[PathBuf], password: &str) -> bool {
+    sync(paths);
+    if !exists(paths) {
         return true;
     }
-    dirs.iter().filter_map(|dir| read(dir)).any(|lock| {
+    paths.iter().filter_map(|path| read(path)).any(|lock| {
         parts(&lock).is_some_and(|parsed| {
             hash_password(password, parsed.salt, parsed.rounds).as_str() == parsed.hash
         })
@@ -228,13 +246,13 @@ pub(crate) fn verify(password: &str) -> bool {
 
 /// 把锁文件内容写到两个落点
 ///
-/// - `dirs`: 两个落点
+/// - `paths`: 两个落点
 /// - `data`: 锁文件 JSON
-fn write_all(dirs: &[PathBuf], data: &[u8]) -> Result<(), String> {
+fn write_all(paths: &[PathBuf], data: &[u8]) -> Result<(), String> {
     let mut written = 0;
     let mut last = None;
-    for dir in dirs {
-        match install(dir, data) {
+    for path in paths {
+        match install(path, data) {
             Ok(()) => written += 1,
             Err(error) => last = Some(error),
         }
@@ -249,9 +267,9 @@ fn write_all(dirs: &[PathBuf], data: &[u8]) -> Result<(), String> {
 
 /// 写入新密码
 ///
-/// - `dirs`: 两个落点
+/// - `paths`: 两个落点
 /// - `password`: 新密码，不能为空
-fn set_in(dirs: &[PathBuf], password: &str) -> Result<(), String> {
+fn set_in(paths: &[PathBuf], password: &str) -> Result<(), String> {
     if password.is_empty() {
         return Err(err_keys::CLIENT_LOCK_EMPTY.into());
     }
@@ -261,7 +279,7 @@ fn set_in(dirs: &[PathBuf], password: &str) -> Result<(), String> {
         password: encode(&salt, &hash),
     };
     let data = serde_json::to_vec_pretty(&lock).map_err(|e| e.to_string())?;
-    write_all(dirs, &data)
+    write_all(paths, &data)
 }
 
 /// 写入新密码：运行目录与内部数据目录各一份
@@ -275,11 +293,11 @@ pub(crate) fn set(password: &str) -> Result<(), String> {
     set_in(&targets(), password)
 }
 
-/// 删除一侧的锁文件；本来就没有也算成功
+/// 删除一个落点的锁文件；本来就没有也算成功
 ///
-/// - `dir`: 某个落点
-fn remove(dir: &Path) -> Result<(), String> {
-    match fs::remove_file(lock_path(dir)) {
+/// - `path`: 某个落点
+fn remove(path: &Path) -> Result<(), String> {
+    match fs::remove_file(path) {
         Ok(()) => Ok(()),
         Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
         Err(error) => Err(error.to_string()),
@@ -288,11 +306,11 @@ fn remove(dir: &Path) -> Result<(), String> {
 
 /// 删除两侧的锁文件
 ///
-/// - `dirs`: 两个落点
-fn clear_in(dirs: &[PathBuf]) -> Result<(), String> {
+/// - `paths`: 两个落点
+fn clear_in(paths: &[PathBuf]) -> Result<(), String> {
     let mut first = None;
-    for dir in dirs {
-        if let Err(error) = remove(dir) {
+    for path in paths {
+        if let Err(error) = remove(path) {
             first.get_or_insert(error);
         }
     }
@@ -314,26 +332,28 @@ pub(crate) fn clear() -> Result<(), String> {
 ///
 /// 两侧都没有时返回 `None`
 pub(crate) fn read_bytes() -> Option<Vec<u8>> {
-    let dirs = targets();
-    sync(&dirs);
-    dirs.iter().find_map(|dir| fs::read(lock_path(dir)).ok())
+    let paths = targets();
+    sync(&paths);
+    paths.iter().find_map(|path| fs::read(path).ok())
 }
 
 /// 把一份锁文件内容原子写入某个落点，并补隐藏属性
 ///
-/// - `dir`: 两个落点中的一个
+/// - `path`: 两个落点中的一个
 /// - `data`: 要写入的 JSON 内容
-pub(crate) fn install(dir: &Path, data: &[u8]) -> Result<(), String> {
-    fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    let temp = dir.join(format!(".{}.tmp", Uuid::new_v4().simple()));
+fn install(path: &Path, data: &[u8]) -> Result<(), String> {
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    let temp = path.with_file_name(format!(".{}.tmp", Uuid::new_v4().simple()));
     fs::write(&temp, data).map_err(|e| e.to_string())?;
     hide(&temp);
     // 先写临时文件再改名，写到一半不会留下半份锁
-    fs::rename(&temp, lock_path(dir)).map_err(|e| {
+    fs::rename(&temp, path).map_err(|e| {
         let _ = fs::remove_file(&temp);
         e.to_string()
     })?;
-    hide(&lock_path(dir));
+    hide(path);
     Ok(())
 }
 

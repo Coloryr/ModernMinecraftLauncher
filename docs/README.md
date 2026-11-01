@@ -595,9 +595,11 @@ MML 服务器包填到 `server.json`（只填发布目录，离开输入框时�
   窗口外观、背景图、自定义样式、完全自定义界面，游戏启动页的 JVM、游戏参数、启动前后命令、
   自动进入存档确认，实验性功能页的全部开关。解锁入口在实验性功能页，只对本次设置窗口有效。
   密码只存一条自描述哈希串
-  `$pbkdf2-sha256$轮数$盐$哈希`，在运行目录与系统内部数据目录（Windows `%LOCALAPPDATA%\mml`、
-  Linux / macOS `~/.local/share/mml/`）各存一份隐藏文件 `.client_lock.json`；
-  只存在一侧时会从另一侧补齐，两份不一致时以运行目录为准，解锁时两份一起删除。
+  `$pbkdf2-sha256$轮数$盐$哈希`，运行目录一份隐藏文件 `.client_lock.json`，
+  系统内部数据目录（Windows `%LOCALAPPDATA%\mml`、Linux / macOS `~/.local/share/mml/`）
+  再按运行目录区分一份 `.client_lock.<运行目录摘要>.json`；只存在一侧时会从另一侧补齐，
+  两份不一致时以运行目录为准，解锁时两份一起删除。内部数据目录是同一用户共用的，
+  文件名带运行目录摘要，同一台机器上装了几个启动器时各锁各的，不会互相锁上。
   不写进 `gui_config.json`；服务器包带界面配置时
   会把它一并带走。
 - **自定义音乐**：本地 mp3 / m4a / wav / ogg / flac，或 http(s) 直链；标题栏出现播放 / 暂停 / 停止。
@@ -814,7 +816,7 @@ Linux 与 macOS 都是当前账户家目录下的 `~/.mml/`。主要目录：
 | `mod_download.json` | 公共模组索引 |
 | `resourcepack_download.json` | 公共资源包索引 |
 | `custom_ui/` | 样式包与主题包 |
-| `.client_lock.json` | 客户端设置锁（运行目录与内部数据目录各一份，隐藏文件） |
+| `.client_lock.json` | 客户端设置锁，运行目录一份；内部数据目录另有按运行目录区分的 `.client_lock.<摘要>.json`，都是隐藏文件 |
 
 实例目录 `minecraft/instances/<名字>/` 里主要是：`game.json`（实例设置）、`gui_setting.json`
 （模组分组 / 资源窗口 / 日志设置）、`.minecraft/`（游戏目录）、`backup/`（存档备份）、`mods/`、
