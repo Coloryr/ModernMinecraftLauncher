@@ -14,7 +14,7 @@ pub(crate) use format::is_server_pack;
 pub(crate) use import::{ImportedPack, import_pack};
 
 /// 包内清单文件名，也是「这是不是一个服务器包」的判据
-const MANIFEST: &str = "mml-server.json";
+pub(crate) const MANIFEST: &str = "mml-server.json";
 /// 包内内核配置，可选
 const CONFIG: &str = "mml/config.json";
 /// 包内界面配置，可选

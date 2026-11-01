@@ -90,6 +90,7 @@ windows = { version = "~0.62.2", features = [
     "Win32_UI_Shell_Common",
 ] }
 zip = { version = "~9.0.5", default-features = false, features = ["deflate-flate2", "chrono"] }
+memmap2 = "~0.9.12"
 tar = "~0.4.46"
 flate2 = { version = "~1.1.10", default-features = false, features = ["rust_backend"] }
 sevenz-rust2 = { version = "~0.20.2", default-features = false, features = ["compress", "util"] }

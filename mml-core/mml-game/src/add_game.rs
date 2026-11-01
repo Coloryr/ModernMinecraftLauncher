@@ -44,7 +44,7 @@ use crate::{
     launcher_path::version_path,
     modpack::{
         BaseModPackWorker, ModPackWorker, curseforge_worker::CurseForgeWorker,
-        modrinth_worker::ModrinthPackWorker,
+        modrinth_worker::ModrinthPackWorker, pack_extract_gui,
     },
     modrinth,
     other_launcher::{
@@ -206,7 +206,18 @@ fn archive_cfg_name(archive: &BaseArchive) -> String {
 pub fn detect_pack<P: AsRef<Path>>(file: P) -> CoreResult<DetectedPack> {
     let file = file.as_ref();
     let archive = BaseArchive::open(file)?;
+    detect_pack_of(&archive, file)
+}
 
+/// 在已经打开的压缩包上识别类型，省掉重复解析中央目录
+///
+/// - `archive`: 已打开的压缩包
+/// - `file`: 压缩包路径，只用来兜底取文件名
+///
+/// # 返回值
+///
+/// 见 [`DetectedPack`]
+pub fn detect_pack_of(archive: &BaseArchive, file: &Path) -> CoreResult<DetectedPack> {
     let find_entry = |suffix: &str| -> Option<String> {
         archive
             .entries()
@@ -232,14 +243,14 @@ pub fn detect_pack<P: AsRef<Path>>(file: P) -> CoreResult<DetectedPack> {
         (names::GAME_FILE, PackType::ArchivePack),
     ] {
         if let Some(entry) = find_entry(suffix) {
-            detected = Some((pack_type, archive_json_name(&archive, &entry)));
+            detected = Some((pack_type, archive_json_name(archive, &entry)));
             break;
         }
     }
 
     let (pack_type, name) = match detected {
         Some((PackType::MMC, json_name)) if json_name.is_empty() => {
-            (PackType::MMC, archive_cfg_name(&archive))
+            (PackType::MMC, archive_cfg_name(archive))
         }
         Some((pack_type, name)) => (pack_type, name),
         None if find_minecraft_prefix(archive.entries()).is_some() => {
@@ -548,7 +559,8 @@ async fn modpack<P: AsRef<Path>>(
 /// - `output_dir`: 解压目标目录，实例基础目录
 /// - `unselect`: 按压缩包内完整条目名排除的文件列表
 /// - `strip_dir`: 压缩包整体套的顶层目录名，不剥时传 `None`
-/// - `archive_gui`: 可选的进度回调
+/// - `pack_gui`: 安装进度回调，逐条解压进度写进它的子进度
+/// - `archive_gui`: 可选的压缩包弹窗回调
 ///
 /// # 返回值
 ///
@@ -558,9 +570,13 @@ fn extract_pack<P: AsRef<Path>>(
     output_dir: P,
     unselect: Vec<String>,
     strip_dir: Option<String>,
+    pack_gui: &AddModPackGui,
     archive_gui: BaseArchiveGui,
 ) -> CoreResult<()> {
-    archive.extract_all(output_dir, Some(unselect), strip_dir, archive_gui)
+    // 桥由内核统一挂：只等调用方传 archive_gui 的话，漏挂一处整段解压就没有
+    // 文件名与子进度条。安装弹窗与压缩包弹窗拿的是同一份逐条进度
+    let gui = pack_extract_gui(pack_gui.clone(), archive_gui);
+    archive.extract_all(output_dir, Some(unselect), strip_dir, gui)
 }
 
 /// 直接解压
@@ -641,6 +657,7 @@ async fn archive<P: AsRef<Path>>(
         game.read().unwrap().get_base_path(),
         unselect,
         strip_dir,
+        &pack_gui,
         archive_gui,
     )?;
 
@@ -685,7 +702,13 @@ async fn mmc_archive<P: AsRef<Path>>(
         pack_gui.set_now(1, Some(3));
     }
 
+    mml_log::info(format!("[TEMP] mmc open begin t={}", temp_ms()));
     let archive = BaseArchive::open(&file)?;
+    mml_log::info(format!(
+        "[TEMP] mmc open t={} entries={}",
+        temp_ms(),
+        archive.entries().len()
+    ));
 
     let mut path = String::new();
     let mut mmc = None;
@@ -708,6 +731,8 @@ async fn mmc_archive<P: AsRef<Path>>(
             break;
         }
     }
+
+    mml_log::info(format!("[TEMP] mmc meta t={}", temp_ms()));
 
     if mmc.is_none() || cfg.is_none() {
         return Err(ErrorType::DataNotFound(DataNotFoundData::Info));
@@ -738,6 +763,7 @@ async fn mmc_archive<P: AsRef<Path>>(
 
     let game = obj.create_instance_in_group(instance_gui, group).await?;
     let uuid = game.read().unwrap().uuid;
+    mml_log::info(format!("[TEMP] mmc instance t={}", temp_ms()));
 
     if cancel.is_cancelled() {
         crate::delete_instance(&uuid)?;
@@ -752,13 +778,16 @@ async fn mmc_archive<P: AsRef<Path>>(
     // 解压到实例基础目录，`.minecraft/` 下的内容自然落到游戏目录 base/.minecraft。
     // mmc-pack.json 所在目录即包裹层，解压时去掉
     let strip_dir = path.trim_end_matches(['/', '\\']).to_string();
+    mml_log::info(format!("[TEMP] mmc extract begin t={}", temp_ms()));
     extract_pack(
         &archive,
         game.read().unwrap().get_base_path(),
         unselect,
         (!strip_dir.is_empty()).then_some(strip_dir),
+        &pack_gui,
         archive_gui.clone(),
     )?;
+    mml_log::info(format!("[TEMP] mmc extract end t={}", temp_ms()));
 
     let json = game.read().unwrap().read_custom_json();
     if !json.is_empty() {
@@ -893,6 +922,7 @@ async fn hmcl_archive<P: AsRef<Path>>(
         game.read().unwrap().get_base_path(),
         unselect,
         Some(dir),
+        &pack_gui,
         archive_gui.clone(),
     )?;
 
@@ -1045,6 +1075,7 @@ async fn hmcl_server_archive<P: AsRef<Path>>(
         game.read().unwrap().get_base_path(),
         unselect,
         Some(dir),
+        &pack_gui,
         archive_gui.clone(),
     )?;
 
@@ -1456,6 +1487,11 @@ pub async fn install_archive_from_file<P: AsRef<Path>>(
     pack_type: PackType,
     cancel: CancellationToken,
 ) -> CoreResult<Uuid> {
+    mml_log::info(format!(
+        "[TEMP] import start t={} file={}",
+        temp_ms(),
+        file.as_ref().display()
+    ));
     let uuid = match pack_type {
         PackType::CurseForge => {
             modpack(
@@ -1556,6 +1592,7 @@ pub async fn install_archive_from_file<P: AsRef<Path>>(
 
     // 本地包没有项目 / 文件 ID 时，类型留「无」：否则界面上会显示成可更新平台
     clear_modpack_type_without_ids(&uuid);
+    mml_log::info(format!("[TEMP] import done t={}", temp_ms()));
     Ok(uuid)
 }
 
@@ -1612,6 +1649,14 @@ pub async fn install_archive_from_url(
         cancel,
     )
     .await
+}
+
+/// [TEMP] 诊断用时间戳，单位 ms；跨模块对齐日志用
+pub(crate) fn temp_ms() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0)
 }
 
 /// 把用户填的在线实例地址规整成 `server.json` 的下载地址

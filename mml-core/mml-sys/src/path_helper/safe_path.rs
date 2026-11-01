@@ -11,6 +11,30 @@ use super::{CoreResult, ErrorType, Path, PathBuf, fs, fs_error, io};
 ///
 /// 返回安全目标路径；路径越界、经过链接或无法检查时返回错误。
 pub fn safe_join(root: &Path, name: &str) -> CoreResult<PathBuf> {
+    let canonical_root = match root.canonicalize() {
+        Ok(path) => Some(path),
+        Err(err) if err.kind() == io::ErrorKind::NotFound => None,
+        Err(err) => return Err(fs_error(root, err)),
+    };
+    safe_join_with_root(root, canonical_root.as_deref(), name)
+}
+
+/// 同 [`safe_join`]，但根的规范路径由调用方算好传进来
+///
+/// 解的条目动辄上万，每条都 canonicalize 一次根路径是纯开销
+///
+/// - `root`: 可信根目录，可以尚未创建
+/// - `canonical_root`: `root.canonicalize()` 的结果，`None` 表示根还不存在
+/// - `name`: 相对路径，同时识别两种平台的分隔符
+///
+/// # 返回值
+///
+/// 返回安全目标路径；路径越界、经过链接或无法检查时返回错误。
+pub fn safe_join_with_root(
+    root: &Path,
+    canonical_root: Option<&Path>,
+    name: &str,
+) -> CoreResult<PathBuf> {
     let reject = || ErrorType::UnsafePath {
         root: root.to_path_buf(),
         path: PathBuf::from(name),
@@ -30,11 +54,6 @@ pub fn safe_join(root: &Path, name: &str) -> CoreResult<PathBuf> {
         }
         relative.push(part);
     }
-    let canonical_root = match root.canonicalize() {
-        Ok(path) => Some(path),
-        Err(err) if err.kind() == io::ErrorKind::NotFound => None,
-        Err(err) => return Err(fs_error(root, err)),
-    };
     let mut path = root.to_path_buf();
     for part in relative.components() {
         path.push(part);
@@ -43,9 +62,9 @@ pub fn safe_join(root: &Path, name: &str) -> CoreResult<PathBuf> {
                 if metadata.file_type().is_symlink() {
                     return Err(reject());
                 }
-                if let Some(root) = &canonical_root {
+                if let Some(canonical_root) = canonical_root {
                     let canonical = path.canonicalize().map_err(|err| fs_error(&path, err))?;
-                    if !canonical.starts_with(root) {
+                    if !canonical.starts_with(canonical_root) {
                         return Err(reject());
                     }
                 }

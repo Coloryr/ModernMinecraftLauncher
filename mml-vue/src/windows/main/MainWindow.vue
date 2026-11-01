@@ -24,6 +24,7 @@ import { loadGuiConfig, type ClientConfig } from "../../lib/guiConfig";
 import { t, tErr } from "../../lib/i18n";
 import { ISSUES_URL } from "../../lib/links";
 import { showToast } from "../../lib/toast";
+import { isArchivePath } from "../../lib/archiveFile";
 import { stateText } from "../../lib/launchState";
 import { useDownloadProgress } from "../../composables/useDownloadProgress";
 import { useRefreshKey } from "../../composables/useRefreshKey";
@@ -1319,6 +1320,12 @@ const features: Array<{ id: FeatureId; icon: string }> = [
  * - `path`: 本机绝对路径
  */
 async function openFromPath(path: string) {
+  // 压缩包按后缀直接开「添加实例」：探测要开一次包，1GB 的包要等好几秒，
+  // 拖进来会觉得"窗口迟迟不出来"。服务器包改由读条目那一步顺手识别
+  if (isArchivePath(path)) {
+    openWindow("add", { drop: { path, kind: "archive" } });
+    return;
+  }
   let probe: { kind: string; url: string };
   try {
     probe = await commands.windows.probeDrop(path);
@@ -1356,6 +1363,8 @@ async function onFilesDropped(payload: FileDropPayload) {
     return;
   }
   const first = payload.paths[0];
+  // [TEMP] 拖入时刻：与后端 probe drop 日志对齐
+  console.warn("[TEMP] drop", Date.now(), first ?? "");
   if (!first) {
     // 路径桥没把真实路径送回来：说一声，别静默什么都不做
     showToast(t("drop.noPath"));

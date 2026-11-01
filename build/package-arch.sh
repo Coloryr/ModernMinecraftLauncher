@@ -16,7 +16,7 @@ version="$(node "$root/build/version.mjs")"
 pkg_version="$(node "$root/build/version.mjs" --package)"
 
 binary="$root/target/release/ModernMinecraftLauncher"
-# tauri build 会按 productName 重命名；没改名时退回 crate 名
+# tauri 只有配了 mainBinaryName 才按 productName 改名，默认产物是 crate 名，两种都收
 [ -f "$binary" ] || binary="$root/target/release/mml-gui"
 if [ ! -f "$binary" ]; then
     echo "找不到 ${binary}，请先跑 build/build-release.sh。" >&2

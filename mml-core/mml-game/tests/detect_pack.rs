@@ -53,7 +53,7 @@ fn detect_curseforge() {
 
     let detected = detect_pack(&zip).expect("检测失败");
     assert!(matches!(detected.pack_type, PackType::CurseForge));
-    assert_eq!(detected.name, "Stone Block");
+    assert_eq!(detected.name, "Stone Block-1.0.0");
 
     let _ = std::fs::remove_file(&zip);
     let _ = std::fs::remove_dir(&dir);
@@ -83,7 +83,7 @@ fn detect_modrinth() {
 
     let detected = detect_pack(&zip).expect("检测失败");
     assert!(matches!(detected.pack_type, PackType::Modrinth));
-    assert_eq!(detected.name, "Fabulously Optimized");
+    assert_eq!(detected.name, "Fabulously Optimized-1.0");
 
     let _ = std::fs::remove_file(&zip);
     let _ = std::fs::remove_dir(&dir);
@@ -98,7 +98,7 @@ fn detect_hmcl() {
 
     let detected = detect_pack(&zip).expect("检测失败");
     assert!(matches!(detected.pack_type, PackType::HMCL));
-    assert_eq!(detected.name, "HMCL Pack");
+    assert_eq!(detected.name, "HMCL Pack-1.20.1");
 
     let _ = std::fs::remove_file(&zip);
     let _ = std::fs::remove_dir(&dir);
@@ -176,7 +176,7 @@ fn detect_hmcl_server() {
 
     let detected = detect_pack(&zip).expect("检测失败");
     assert!(matches!(detected.pack_type, PackType::HMCLServer));
-    assert_eq!(detected.name, "Server Pack");
+    assert_eq!(detected.name, "Server Pack-1.0");
 
     let _ = std::fs::remove_file(&zip);
     let _ = std::fs::remove_dir(&dir);

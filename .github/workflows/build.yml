@@ -5,7 +5,6 @@ on:
     branches:
       - 'releases/**'
     tags:
-      # 带 v 与不带 v 都认：版本号取自标签，开头的 v 会被剥掉
       - '[0-9]*'
       - 'v[0-9]*'
       - 'testbuild*'
@@ -32,19 +31,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          # 版本取自标签：浅克隆不带标签与历史，git describe 无从下手
           fetch-depth: 0
       - name: 解析版本与发布通道
         id: resolve
         shell: bash
         run: |
-          # 测试构建标签：跑完整构建流程，但产物一律丢弃，版本取最近的版本标签
           test=false
           if [[ "$GITHUB_REF" == refs/tags/testbuild* ]]; then
             test=true
           fi
 
-          # 发版标签本身就是版本号；分支推送上没有标签，留给脚本回落到最近的标签
           if [ "$test" = false ] && [[ "$GITHUB_REF" == refs/tags/* ]]; then
             export MML_VERSION="$GITHUB_REF_NAME"
           fi
@@ -56,7 +52,6 @@ jobs:
             channel=release
           fi
 
-          # 两个通道走同一条构建链路，预发布只是多带一个 feature 让界面标出「预发布版」
           if [ "$channel" = prerelease ]; then
             features=custom-protocol,prerelease
           else
@@ -78,10 +73,8 @@ jobs:
   build-windows:
     needs: check-version
     env:
-      # 版本由 check-version 从标签解析，构建机是浅克隆，自己取不到标签
       MML_VERSION: ${{ needs.check-version.outputs.version }}
       MML_FEATURES: ${{ needs.check-version.outputs.features }}
-      # 预发布只出 exe，不打 MSI / NSIS 安装文件
       MML_NO_BUNDLE: ${{ needs.check-version.outputs.channel == 'prerelease' && '1' || '' }}
     strategy:
       fail-fast: false
@@ -208,15 +201,32 @@ jobs:
           name: mml-linux-${{ matrix.arch }}
           path: build_out/*
           if-no-files-found: error
+      - name: 整理 Linux x64 可执行文件
+        if: matrix.arch == 'x64' && needs.check-version.outputs.test != 'true'
+        shell: bash
+        run: |
+          bin=""
+          for name in mml-gui ModernMinecraftLauncher; do
+            if [ -f "target/release/$name" ]; then
+              bin="target/release/$name"
+              break
+            fi
+          done
+          if [ -z "$bin" ]; then
+            echo 'target/release 下没有可执行文件：'
+            find target/release -maxdepth 1 -type f -printf '%f\n'
+            exit 1
+          fi
+          echo "可执行文件：$bin"
+          if [ "$bin" != "target/release/ModernMinecraftLauncher" ]; then
+            cp -f "$bin" target/release/ModernMinecraftLauncher
+          fi
       - name: 上传 Linux x64 二进制
         if: matrix.arch == 'x64' && needs.check-version.outputs.test != 'true'
         uses: actions/upload-artifact@v6
         with:
           name: linux-x64-bin
-          # tauri build 会按 productName 重命名产物；两种名字都收，版本行为有差异时也不空手
-          path: |
-            target/release/ModernMinecraftLauncher
-            target/release/mml-gui
+          path: target/release/ModernMinecraftLauncher
           if-no-files-found: error
 
   package-linux-extra:
@@ -257,13 +267,11 @@ jobs:
     env:
       MML_VERSION: ${{ needs.check-version.outputs.version }}
       MML_FEATURES: ${{ needs.check-version.outputs.features }}
-      # 预发布只出可执行文件，不打 dmg
       MML_NO_BUNDLE: ${{ needs.check-version.outputs.channel == 'prerelease' && '1' || '' }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          # 两行都在 arm64 的 macos-latest 上跑，x64 用 MML_TARGETS 交叉编译
           - arch: arm64
             triple: aarch64-apple-darwin
           - arch: x64
@@ -340,15 +348,12 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          # 没有证书也必须签名：Apple Silicon 上未签名的二进制根本起不来，Intel 上
-          # 也会被 Gatekeeper 判成"已损坏"。用 ad-hoc 兜底，伪身份就是 "-"
           if [ -z "${APPLE_CERTIFICATE:-}" ] || [ -z "${APPLE_CERTIFICATE_PASSWORD:-}" ]; then
             unset APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD
             if [ -z "${APPLE_SIGNING_IDENTITY:-}" ]; then
               export APPLE_SIGNING_IDENTITY="-"
             fi
           fi
-          # 公证凭据缺任何一项都不公证：Tauri 只看变量在不在，空串会被当成已配置
           for name in APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
             if [ -z "${!name:-}" ]; then
               unset "$name"
@@ -358,8 +363,6 @@ jobs:
       - name: 预发布产物 ad-hoc 签名
         if: needs.check-version.outputs.channel == 'prerelease'
         run: |
-          # 预发布只有单个可执行文件，没经过 Tauri 打包，得自己签一道 ——
-          # 否则 arm64 上连启动都过不去
           for f in build_out/*; do
             codesign --force --sign - "$f"
             codesign --verify --verbose=1 "$f"

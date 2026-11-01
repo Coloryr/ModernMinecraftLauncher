@@ -38,8 +38,6 @@ const subPercent = computed(() =>
         :aria-valuenow="progress.now">
         <div class="progress-fill" :style="{ width: percent + '%' }" />
       </div>
-      <div v-if="progress.total" class="install-num">{{ progress.now }} / {{ progress.total }}</div>
-
       <template v-if="progress.subText || progress.subTotal">
         <div class="install-sub" v-tip="progress.subText || ''">{{ shortPath(progress.subText || "") }}</div>
         <div class="progress-track sub">
@@ -79,12 +77,6 @@ const subPercent = computed(() =>
 
 .progress-track.sub {
   height: 6px;
-}
-
-.install-num {
-  font-size: 12px;
-  color: var(--text-dim);
-  text-align: right;
 }
 
 .install-sub {

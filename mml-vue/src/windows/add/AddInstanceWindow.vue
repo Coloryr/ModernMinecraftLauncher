@@ -44,6 +44,7 @@ import { commands } from "../../lib/bindings";
 import type { FolderInstanceDto, GroupDto, PackProgressDto, ServerPackProbeDto } from "../../lib/bindings";
 import { ADD_MODES, type AddMode } from "./types";
 import { isArchiveUrl, serverPackUrl } from "../../lib/onlineInstance";
+import { isArchivePath } from "../../lib/archiveFile";
 
 const emit = defineEmits<{
   /** 请求关闭本窗口 */
@@ -203,13 +204,15 @@ async function applyArchivePath(path: string) {
     return;
   }
   // 读条目 + 识别类型都是磁盘活，期间给个滚动进度条并挡住模式切换
-  archiveScanning.value = true;
+  archivePhase.value = "list";
+  // [TEMP] 页面侧读条目起点
+  console.warn("[TEMP] archive-list start", Date.now());
   try {
-    // 读取压缩包真实条目，目录以 / 结尾，buildTree 直接解析
+    // 一次打开压缩包：条目、类型、名字、是不是服务器包都由后端一并给出，
+    // 分成三次命令就要把 1GB 的包反复解析三遍
+    let probe: Awaited<ReturnType<typeof commands.add.listArchive>>;
     try {
-      const list = await commands.add.listArchive(path);
-      if (isLeaving()) return;
-      resetArchive(buildTree(list), true);
+      probe = await commands.add.listArchive(path);
     } catch {
       if (isLeaving()) return;
       resetArchive();
@@ -217,19 +220,28 @@ async function applyArchivePath(path: string) {
       failField("archive", t("add.archiveReadFail"));
       return;
     }
-    // 识别整合包类型，自动填入类型和实例名（用户改过名字则不动）
-    try {
-      const detected = await api.addDetectArchive(path);
-      if (isLeaving()) return;
-      addPackType.value = detected.packType;
-      if (!nameEdited && detected.name) {
-        newName.value = detected.name;
+    if (isLeaving()) return;
+    // [TEMP] 条目到手，看 buildTree 是否拖慢界面
+    console.warn("[TEMP] archive-list done", Date.now(), probe.entries.length);
+    if (probe.serverPack) {
+      // 服务器包：交给服务器包导入，别当实例装
+      showToast(t("serverPack.importing"));
+      try {
+        await commands.export.importServerPack(path);
+      } catch (e) {
+        showToast(tErr(e));
       }
-    } catch {
-      // 识别失败保持手动选择
+      return;
+    }
+    resetArchive(buildTree(probe.entries), true);
+    console.warn("[TEMP] archive-tree done", Date.now());
+    // 类型与实例名由后端识别结果填，用户改过名字则不动
+    addPackType.value = probe.packType;
+    if (!nameEdited && probe.name) {
+      newName.value = probe.name;
     }
   } finally {
-    archiveScanning.value = false;
+    archivePhase.value = "idle";
   }
 }
 
@@ -258,8 +270,14 @@ async function pickArchive() {
   archiveInput.value?.click();
 }
 
-/** 压缩包读取 / 类型识别中：整合包条目多、要解析 manifest，会明显耗时 */
-const archiveScanning = ref(false);
+/**
+ * 压缩包扫描阶段：idle 空闲 / list 读条目 / detect 识别类型
+ *
+ * 两个阶段分开报：整合包条目多，读列表可能几秒；识别 manifest 又是另一件事
+ */
+const archivePhase = ref<"idle" | "list">("idle");
+/** 扫描中：期间挡住模式切换与底部按钮 */
+const archiveScanning = computed(() => archivePhase.value !== "idle");
 
 // ================= 模式三：添加文件夹，路径框 + 实例列表 / 内容树，懒加载 =================
 
@@ -434,6 +452,12 @@ async function onFilesDropped(payload: FileDropPayload) {
   const first = payload.paths[0];
   if (!first) return;
   if (payload.paths.length > 1) showToast(t("drop.onlyFirst"));
+  // 压缩包按后缀直接进"导入压缩包"：探测要开一次包，1GB 的包要等好几秒，
+  // 服务器包判断改由读条目那一步顺手做掉，见 applyArchivePath
+  if (isArchivePath(first)) {
+    await applyDrop({ path: first, kind: "archive" });
+    return;
+  }
   let probe: { kind: string; url: string };
   try {
     probe = await commands.windows.probeDrop(first);
@@ -696,6 +720,8 @@ async function create() {
   }
 
   const group = addGroup.value;
+  // [TEMP] 与后端日志对齐用：记下点"开始"的时刻
+  console.warn("[TEMP] add-start", Date.now(), addMode.value);
   addError.value = "";
   addErrorField.value = "";
   // 先复位：上一条在线实例失败后留下的「下载」标题不能带到压缩包安装里
@@ -716,6 +742,8 @@ async function create() {
         groupId,
       );
     } else if (addMode.value === "archive") {
+      // 这一档是把压缩包整包导进来，标题别说成"安装整合包"
+      packTitleKey.value = "add.importingArchive";
       // 文件树未勾选的文件按压缩包内条目名排除（全选时传 null）
       const unselected = archiveUnselected();
       uuid = await api.addImportArchive(
@@ -771,7 +799,9 @@ watch(
 );
 
 /** 进度弹窗的标题键：导入在线实例是「下载在线实例」，其余是「安装整合包」 */
-const packTitleKey = ref<"add.installing" | "add.downloadingOnline">("add.installing");
+const packTitleKey = ref<"add.installing" | "add.importingArchive" | "add.downloadingOnline">(
+  "add.installing",
+);
 
 // ================= 创建成功后的继续添加询问 =================
 
@@ -898,6 +928,17 @@ onMounted(async () => {
   // 整合包安装进度，压缩包 / 网址 / 在线整合包安装共用
   track(
     onAddPackProgress((e) => {
+      // [TEMP] 定位"解压卡住"用：看事件到达时刻与子进度字段
+      console.warn(
+        "[TEMP] pack-progress",
+        Date.now(),
+        e.state,
+        e.now,
+        e.total,
+        e.subNow,
+        e.subTotal,
+        e.subText ?? "",
+      );
       packProgress.value = e;
       if (e.state === "done") {
         setTimeout(() => {
@@ -974,7 +1015,7 @@ onUnmounted(() => {
           @update:loader-path="loaderPath = $event" />
         <ArchiveMode v-else-if="addMode === 'archive'" :path="addArchivePath" :tree="archiveTree"
           :checked="archiveChecked" :expanded="archiveExpanded" :pack-types="packTypes" :pack-type="addPackType"
-          :scanning="archiveScanning" :invalid="addErrorField === 'archive'"
+          :phase="archivePhase" :invalid="addErrorField === 'archive'"
           :error="addErrorField === 'archive' ? addError : ''" @update:path="addArchivePath = $event"
           @pick="pickArchive" @toggle-file="onArchiveToggleFile" @toggle-dir="onArchiveToggleDir"
           @toggle-expand="onArchiveToggleExpand" @set-all="setAllArchive" @update:pack-type="addPackType = $event" />

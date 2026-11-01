@@ -10,7 +10,7 @@ use tokio_util::sync::CancellationToken;
 
 use mml_game::add_game::PackType;
 
-use crate::dtos::{DetectedPackDto, DirEntry, FolderInstanceDto};
+use crate::dtos::{ArchiveProbeDto, DirEntry, FolderInstanceDto};
 
 use crate::windows::add::model::{AddWindowModel, model};
 
@@ -127,6 +127,14 @@ pub async fn add_scan_folder(path: String) -> Result<Vec<FolderInstanceDto>, Str
     .map_err(|e| e.to_string())
 }
 
+/// [TEMP] 诊断时间戳，单位 ms
+fn temp_ms() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0)
+}
+
 /// 列出压缩包内的条目路径，目录以 `/` 结尾，添加实例窗口预览内容树用
 ///
 /// **必须异步**：要打开压缩包并读出全部条目，整合包里几千个文件时会明显耗时，
@@ -139,38 +147,40 @@ pub async fn add_scan_folder(path: String) -> Result<Vec<FolderInstanceDto>, Str
 /// 包内全部条目的名字；打不开压缩包返回 `Err`
 #[gui_macros::ipc_group("add")]
 #[gui_macros::command]
-pub async fn add_list_archive(path: String) -> Result<Vec<String>, String> {
+pub async fn add_list_archive(path: String) -> Result<ArchiveProbeDto, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let started = temp_ms();
+        mml_log::info(format!("[TEMP] list archive begin t={started}"));
         let archive = mml_base::archives::BaseArchive::open(&path).map_err(|e| e.to_string())?;
-        Ok(archive
+        let entries = archive
             .entries()
             .iter()
             .map(|e| e.name.clone())
-            .collect::<Vec<String>>())
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-/// 检测压缩包的整合包类型与推荐实例名，选择压缩包后自动填表用
-///
-/// **必须异步**：要打开压缩包扫条目、再解析包内 manifest，同 `add_list_archive`。
-///
-/// - `path`: 压缩包路径
-///
-/// # 返回值
-///
-/// 探测结果；无法识别或读包失败返回 `Err`
-#[gui_macros::ipc_group("add")]
-#[gui_macros::command]
-pub async fn add_detect_archive(path: String) -> Result<DetectedPackDto, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let pack = mml_game::add_game::detect_pack(&path).map_err(|e| e.to_string())?;
-        Ok(DetectedPackDto {
-            pack_type: pack.pack_type.id().to_string(),
-            name: pack.name,
+            .collect::<Vec<String>>();
+        // 类型识别与服务器包判断都在这一份已打开的包上顺手做掉，
+        // 每个都单开一次的话，1GB 的包每次都是好几秒
+        let detected = mml_game::add_game::detect_pack_of(&archive, std::path::Path::new(&path))
+            .map_err(|e| e.to_string())?;
+        let server_pack = entries
+            .iter()
+            .any(|name| name == crate::windows::export::server_pack::MANIFEST);
+        mml_log::info(format!(
+            "[TEMP] list archive end t={} took={}ms n={} type={} server={}",
+            temp_ms(),
+            temp_ms().saturating_sub(started),
+            entries.len(),
+            detected.pack_type.id(),
+            server_pack
+        ));
+        Ok(ArchiveProbeDto {
+            entries,
+            pack_type: detected.pack_type.id().to_string(),
+            name: detected.name,
+            server_pack,
         })
     })
     .await
     .map_err(|e| e.to_string())?
 }
+
+

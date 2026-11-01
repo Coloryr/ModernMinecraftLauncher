@@ -40,8 +40,8 @@ pub mod window_dto;
 
 pub use account_dto::{AccountStoreDto, AccountStoreViewDto};
 pub use add_dto::{
-    DetectedPackDto, DirEntry, FolderInstanceDto, LoaderProgressDto, NameConflictDto,
-    PackProgressDto, ServerPackProbeDto,
+    ArchiveProbeDto, DetectedPackDto, DirEntry, FolderInstanceDto, LoaderProgressDto,
+    NameConflictDto, PackProgressDto, ServerPackProbeDto,
 };
 pub use add_modpack_dto::{ModPackStatusDto, ModPackTaskDto};
 pub use add_resource_dto::{

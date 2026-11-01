@@ -76,6 +76,20 @@ pub struct ServerPackProbeDto {
     pub archive_count: u64,
 }
 
+/// 一次打开压缩包拿到的全部信息：条目、识别出的类型与名字、是不是服务器包
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchiveProbeDto {
+    /// 包内全部条目名，目录以 `/` 结尾
+    pub entries: Vec<String>,
+    /// 识别出的压缩包类型 ID
+    pub pack_type: String,
+    /// 元数据里的实例名，取不到为空串
+    pub name: String,
+    /// 是不是本启动器的服务器包
+    pub server_pack: bool,
+}
+
 /// 整合包安装进度，state 取值：downloadPack / readInfo / getInfo / downloadFile / extract / done
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]

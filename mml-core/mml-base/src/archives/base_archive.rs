@@ -4,10 +4,10 @@
 
 use std::{
     fs,
-    io::{Read, Write},
+    io::{Cursor, Read, Write},
     path::{Path, PathBuf},
     sync::{
-        Arc, Mutex,
+        Mutex,
         atomic::{AtomicUsize, Ordering},
     },
 };
@@ -17,10 +17,20 @@ use mml_sys::path_helper;
 use uuid::Uuid;
 
 use crate::archives::{
-    ArchiveAddFile, ArchiveHandle, ArchiveType, BaseArchiveGui, IBaseArchiveGui, TarMode, fs_err,
-    r7z_reader::R7zReader, replace_invalid_name, tar_reader::TarReader, write_error,
-    zip_reader::ZipReader,
+    ArchiveAddFile, ArchiveHandle, ArchiveType, BaseArchiveGui, IBaseArchiveGui, TarMode,
+    archive_err, fs_err, r7z_reader::R7zReader, read_error, replace_invalid_name,
+    tar_reader::TarReader, write_error, zip_reader::ZipReader,
 };
+
+/// 走 mmap 并行解压的压缩包大小下限，单位字节
+///
+/// 更小的包线程调度与逐线程解析中央目录的开销盖过解压本身，顺序解压更快
+const ZIP_PARALLEL_MIN_SIZE: u64 = 64 * 1024 * 1024;
+
+/// 并行解压最多开几个工作线程
+///
+/// 每个线程要在内存里解析一份中央目录，线程数并不是越多越好
+const ZIP_PARALLEL_MAX_THREADS: usize = 8;
 
 /// 压缩包条目信息
 #[derive(Debug, Clone)]
@@ -565,6 +575,101 @@ impl BaseArchive {
             .extract_file(name, output_path, gui)
     }
 
+    /// 并行提取 zip 的一批条目
+    ///
+    /// 整个包只 mmap 一次，各线程在内存里各自解析一份中央目录 —— 不是每个线程去开一次文件，
+    /// 所以没有"重开包、重读中央目录"的磁盘开销，解压本身（DEFLATE）才是并行的大头
+    ///
+    /// - `tasks`: 待提取任务列表，见 [`ExtractTask`]
+    /// - `gui`: 可选的进度回调，每提取完一个文件触发一次
+    ///
+    /// # 返回值
+    ///
+    /// 任一任务失败时返回相应错误；映射失败时退回顺序解压
+    fn extract_tasks_zip_parallel(
+        &self,
+        tasks: &[ExtractTask],
+        gui: Option<&dyn IBaseArchiveGui>,
+    ) -> CoreResult<()> {
+        let file = path_helper::open_read(&self.path)?;
+        // SAFETY: 只读映射，解压期间不写这个压缩包
+        let map = match unsafe { memmap2::Mmap::map(&file) } {
+            Ok(map) => map,
+            // 映射不了（网络盘、权限）就按原来的顺序解压走
+            Err(_) => return self.extract_tasks_sequential(tasks, gui),
+        };
+        let data: &[u8] = &map;
+
+        let threads = std::thread::available_parallelism()
+            .map(|count| count.get())
+            .unwrap_or(4)
+            .min(ZIP_PARALLEL_MAX_THREADS)
+            .clamp(1, tasks.len());
+        if threads <= 1 {
+            return self.extract_tasks_sequential(tasks, gui);
+        }
+
+        let current = AtomicUsize::new(0);
+        let error: Mutex<Option<ErrorType>> = Mutex::new(None);
+
+        std::thread::scope(|scope| {
+            for chunk in tasks.chunks(tasks.len().div_ceil(threads)) {
+                let current = &current;
+                let error = &error;
+                scope.spawn(move || {
+                    let mut zip = match zip::ZipArchive::new(Cursor::new(data)) {
+                        Ok(zip) => zip,
+                        Err(err) => {
+                            *error.lock().unwrap() = Some(read_error(err));
+                            return;
+                        }
+                    };
+                    for task in chunk {
+                        if error.lock().unwrap().is_some() {
+                            return;
+                        }
+                        // 先报名字再解压：大文件或慢盘时界面不能干等
+                        if let Some(gui) = gui {
+                            gui.update(Some(task.name.clone()), current.load(Ordering::SeqCst));
+                        }
+                        if let Some(parent) = task.output_path.parent()
+                            && let Err(err) = path_helper::create_dir_all(parent)
+                        {
+                            *error.lock().unwrap() = Some(err);
+                            return;
+                        }
+                        let copied = zip.by_name(&task.name).map_err(read_error).and_then(
+                            |mut entry| {
+                                let mut outfile = path_helper::open_write(&task.output_path)?;
+                                std::io::copy(&mut entry, &mut outfile).map_err(|err| {
+                                    archive_err(
+                                        task.name.clone(),
+                                        task.output_path.display().to_string(),
+                                        err,
+                                    )
+                                })?;
+                                Ok(())
+                            },
+                        );
+                        if let Err(err) = copied {
+                            *error.lock().unwrap() = Some(err);
+                            return;
+                        }
+                        let now = current.fetch_add(1, Ordering::SeqCst) + 1;
+                        if let Some(gui) = gui {
+                            gui.update(Some(task.name.clone()), now);
+                        }
+                    }
+                });
+            }
+        });
+
+        match error.into_inner().unwrap() {
+            Some(err) => Err(err),
+            None => Ok(()),
+        }
+    }
+
     /// 顺序提取一组条目
     ///
     /// - `tasks`: 待提取任务列表，见 [`ExtractTask`]
@@ -580,90 +685,15 @@ impl BaseArchive {
     ) -> CoreResult<()> {
         let mut current = 0usize;
         for task in tasks {
+            // 先报名字再解压：等文件写完才报的话，首个条目偏大时界面会空等很久
+            if let Some(gui) = gui {
+                gui.update(Some(task.name.clone()), current);
+            }
             self.extract_resolved(&task.name, &task.output_path, None)?;
             current += 1;
             if let Some(gui) = gui {
                 gui.update(Some(task.name.clone()), current);
             }
-        }
-        Ok(())
-    }
-
-    /// 并行提取一组条目，仅用于 Zip，每个线程持有独立读取句柄随机访问
-    ///
-    /// - `tasks`: 待提取任务列表，见 [`ExtractTask`]
-    /// - `gui`: 可选的进度回调，每提取完一个文件触发一次
-    ///
-    /// # 返回值
-    ///
-    /// 任一任务失败时返回该错误；可用线程数不足 2 时退化为顺序提取
-    fn extract_tasks_parallel(
-        &self,
-        tasks: &[ExtractTask],
-        gui: Option<&dyn IBaseArchiveGui>,
-    ) -> CoreResult<()> {
-        let thread_count = std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(4)
-            .min(tasks.len());
-        if thread_count <= 1 {
-            return self.extract_tasks_sequential(tasks, gui);
-        }
-
-        let current = Arc::new(AtomicUsize::new(0));
-        let error: Arc<Mutex<Option<ErrorType>>> = Arc::new(Mutex::new(None));
-
-        std::thread::scope(|scope| {
-            for chunk in tasks.chunks(tasks.len().div_ceil(thread_count)) {
-                let chunk = chunk.to_vec();
-                let path = self.path.clone();
-                let gui = gui;
-                let current = current.clone();
-                let error = error.clone();
-                scope.spawn(move || {
-                    // 任一线程出错则尽早退出
-                    if error.lock().unwrap().is_some() {
-                        return;
-                    }
-                    let file = match path_helper::open_read(&path) {
-                        Ok(file) => file,
-                        Err(err) => {
-                            *error.lock().unwrap() = Some(err);
-                            return;
-                        }
-                    };
-                    let mut handle = match Self::make_handle(ArchiveType::Zip, &path, file) {
-                        Ok(handle) => handle,
-                        Err(err) => {
-                            *error.lock().unwrap() = Some(err);
-                            return;
-                        }
-                    };
-                    for task in chunk {
-                        if error.lock().unwrap().is_some() {
-                            return;
-                        }
-                        if let Some(parent) = task.output_path.parent() {
-                            if let Err(err) = path_helper::create_dir_all(parent) {
-                                *error.lock().unwrap() = Some(err);
-                                return;
-                            }
-                        }
-                        if let Err(err) = handle.extract_file(&task.name, &task.output_path, None) {
-                            *error.lock().unwrap() = Some(err);
-                            return;
-                        }
-                        let now = current.fetch_add(1, Ordering::SeqCst) + 1;
-                        if let Some(gui) = gui {
-                            gui.update(Some(task.name.clone()), now);
-                        }
-                    }
-                });
-            }
-        });
-
-        if let Some(err) = error.lock().unwrap().take() {
-            return Err(err);
         }
         Ok(())
     }
@@ -688,6 +718,8 @@ impl BaseArchive {
         gui: BaseArchiveGui,
     ) -> CoreResult<()> {
         let output_dir = output_dir.as_ref();
+        // 解压前把根的规范路径算一次：几万条目逐个 canonicalize 是纯开销
+        let canonical_root = output_dir.canonicalize().ok();
 
         // 需要剥离目录或存在排除项时逐条提取，批量解压路径无法调整条目位置
         if strip_dir.is_some() || unselect.is_some() {
@@ -698,12 +730,12 @@ impl BaseArchive {
                             return Ok(None);
                         }
                     }
-                    path_helper::safe_join(output_dir, &entry.name)?;
                     let rel = match &strip_dir {
                         Some(dir) => strip_dir_prefix(&entry.name, dir),
                         None => entry.name.clone(),
                     };
-                    path_helper::safe_join(output_dir, &rel).map(Some)
+                    path_helper::safe_join_with_root(output_dir, canonical_root.as_deref(), &rel)
+                        .map(Some)
                 },
                 Some(output_dir),
                 gui.as_deref(),
@@ -752,14 +784,14 @@ impl BaseArchive {
             if let Some(base) = map(entry)? {
                 let output = self.resolve_output_path(&entry.name, base, gui)?;
                 if let Some(root) = root {
-                    let relative =
-                        output
-                            .strip_prefix(root)
-                            .map_err(|_| ErrorType::UnsafePath {
-                                root: root.to_path_buf(),
-                                path: output.clone(),
-                            })?;
-                    path_helper::safe_join(root, &relative.to_string_lossy())?;
+                    // 目标路径已经由上面的 safe_join 限制在 root 之内，这里只再确认一次
+                    // 前缀：逐条重跑 safe_join 要为几万个条目再做一遍链接检查，纯开销
+                    output
+                        .strip_prefix(root)
+                        .map_err(|_| ErrorType::UnsafePath {
+                            root: root.to_path_buf(),
+                            path: output.clone(),
+                        })?;
                 }
                 tasks.push(ExtractTask {
                     name: entry.name.clone(),
@@ -770,10 +802,24 @@ impl BaseArchive {
 
         if let Some(gui) = gui {
             gui.start(tasks.len());
+            // 并行解压要先给每个线程开一遍压缩包，大包在机械盘上这一段不短：
+            // 先把第一条名字亮出来，界面不至于只看到一条不动的进度条
+            if let Some(first) = tasks.first() {
+                gui.update(Some(first.name.clone()), 0);
+            }
         }
 
-        let result = if self.archive_type == ArchiveType::Zip {
-            self.extract_tasks_parallel(&tasks, gui)
+        // zip 大包走 mmap 并行：整包只映射一次，线程间共享同一份字节，解压并行；
+        // 其余格式与太小的包走顺序解压，复用已经打开的句柄
+        let parallel = self.archive_type == ArchiveType::Zip
+            && tasks.len() > 1
+            && self
+                .path
+                .metadata()
+                .map(|meta| meta.len() >= ZIP_PARALLEL_MIN_SIZE)
+                .unwrap_or(false);
+        let result = if parallel {
+            self.extract_tasks_zip_parallel(&tasks, gui)
         } else {
             self.extract_tasks_sequential(&tasks, gui)
         };

@@ -502,34 +502,61 @@ pub fn window_url_of_text(text: String) -> String {
 /// `kind` 取 `folder` / `archive` / `serverPack` / `shortcut` / `other`；
 /// `shortcut` 时 `url` 为解析出的地址，其余情况为空串
 #[gui_macros::command]
-pub fn window_probe_drop(path: String) -> DropPathDto {
+pub async fn window_probe_drop(path: String) -> DropPathDto {
+    // 认服务器包要打开压缩包读中央目录，整合包动辄 1GB、几万条目；
+    // 同步命令会占着主线程，拖进来那一下窗口直接卡住，所以丢到阻塞线程
+    tauri::async_runtime::spawn_blocking(move || probe_drop_inner(&path))
+        .await
+        .unwrap_or_else(|_| DropPathDto {
+            kind: "other".to_string(),
+            url: String::new(),
+        })
+}
+
+/// [TEMP] 诊断时间戳，单位 ms
+fn temp_ms() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0)
+}
+
+/// 拖入路径的实际判定，跑在阻塞线程上
+///
+/// - `path`: 拖入文件的绝对路径
+///
+/// # 返回值
+///
+/// 见 [`DropPathDto`]
+fn probe_drop_inner(path: &str) -> DropPathDto {
+    let started = temp_ms();
+    mml_log::info(format!("[TEMP] probe drop begin t={started}"));
     let other = |kind: &str| DropPathDto {
         kind: kind.to_string(),
         url: String::new(),
     };
 
-    if std::fs::metadata(&path)
+    let result = if std::fs::metadata(path)
         .map(|meta| meta.is_dir())
         .unwrap_or(false)
     {
-        return other("folder");
-    }
-
-    match path
-        .to_ascii_lowercase()
-        .rsplit_once('.')
-        .map(|(_, ext)| ext)
+        other("folder")
+    } else {
+        match path
+            .to_ascii_lowercase()
+            .rsplit_once('.')
+            .map(|(_, ext)| ext)
     {
-        Some("zip") if export::server_pack::is_server_pack(std::path::Path::new(&path)) => {
+        Some("zip") if export::server_pack::is_server_pack(std::path::Path::new(path)) => {
             other("serverPack")
         }
         Some("zip" | "mrpack" | "modpack") => other("archive"),
-        Some("url" | "webloc" | "website") => shortcut_of(&path),
+        Some("url" | "webloc" | "website") => shortcut_of(path),
         // 卡片拖到桌面后不一定是 `.url`：有的站点给的是 `.json` / `.txt`。
         // 这两类**只在"整份内容就只有一个地址"时才认**，见 single_url_of_text ——
         // 否则 modpack 的 manifest.json 这类里面也含地址的文件会被误判成登录快捷方式。
-        Some("json" | "txt") if std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0) <= 4096 => {
-            let url = read_whole_text(&path)
+        Some("json" | "txt") if std::fs::metadata(path).map(|m| m.len()).unwrap_or(0) <= 4096 => {
+            let url = read_whole_text(path)
                 .map(|text| single_url_of_text(&text))
                 .unwrap_or_default();
             if url.is_empty() {
@@ -542,7 +569,16 @@ pub fn window_probe_drop(path: String) -> DropPathDto {
             }
         }
         _ => other("other"),
-    }
+        }
+    };
+
+    mml_log::info(format!(
+        "[TEMP] probe drop end t={} took={}ms kind={}",
+        temp_ms(),
+        temp_ms().saturating_sub(started),
+        result.kind
+    ));
+    result
 }
 
 /// 快捷方式文件 `.url` / `.webloc` / `.website` → 解析出的地址

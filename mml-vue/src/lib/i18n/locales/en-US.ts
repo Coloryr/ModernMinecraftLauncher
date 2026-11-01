@@ -1252,7 +1252,7 @@ export default {
   "add.archivePlaceholder": "Click to choose a .zip / .mrpack archive",
   "add.archiveHint": "The archive will be extracted and an instance created",
   "add.archiveEmpty": "Please choose an archive first",
-  "add.archiveReading": "Reading the archive and detecting its type…",
+  "add.archiveReading": "Reading archive entries…",
   "add.folder": "Game folder",
   "add.folderPlaceholder": "Click to choose an extracted game folder",
   "add.folderHint": "Use an existing folder as the instance",
@@ -1993,6 +1993,7 @@ export default {
 
   // Modpack mode (add instance window)
   "add.installing": "Installing Modpack",
+  "add.importingArchive": "Importing archive",
   "add.downloadingOnline": "Downloading online instance",
   "add.packState.downloadPack": "Downloading modpack",
   "add.packState.readInfo": "Reading info",

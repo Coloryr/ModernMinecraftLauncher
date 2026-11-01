@@ -1253,7 +1253,7 @@ export default {
   "add.archivePlaceholder": "点击选择 .zip / .mrpack 压缩包",
   "add.archiveHint": "导入后自动解压并创建实例",
   "add.archiveEmpty": "请先选择压缩包文件",
-  "add.archiveReading": "正在读取压缩包并识别类型…",
+  "add.archiveReading": "正在读取压缩包条目…",
   "add.folder": "游戏文件夹",
   "add.folderPlaceholder": "点击选择已解压的游戏文件夹",
   "add.folderHint": "直接使用已有文件夹作为实例",
@@ -1994,6 +1994,7 @@ export default {
 
   // 整合包模式（添加实例窗口）
   "add.installing": "正在安装整合包",
+  "add.importingArchive": "正在导入压缩包",
   "add.downloadingOnline": "正在下载在线实例",
   "add.packState.downloadPack": "下载整合包",
   "add.packState.readInfo": "读取信息",

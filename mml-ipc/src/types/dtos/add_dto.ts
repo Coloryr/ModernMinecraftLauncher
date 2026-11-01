@@ -38,6 +38,13 @@ export type ServerPackProbeDto = {
   archiveCount: number,
 };
 
+export type ArchiveProbeDto = {
+  entries: string[],
+  packType: string,
+  name: string,
+  serverPack: boolean,
+};
+
 export type PackProgressDto = {
   state: string,
   now: number,

@@ -21,7 +21,6 @@ import type {
   ConfigTextDto,
   DataPackItemDto,
   DepProblemDto,
-  DetectedPackDto,
   LogLine,
   MinecraftImportDto,
   MinecraftInfoDto,
@@ -392,19 +391,6 @@ export const api = {
    */
   async addProbeServerPack(url: string): Promise<ServerPackProbeDto> {
     return commands.add.probeServerPack(url);
-  },
-
-  /**
-   * 检测压缩包的整合包类型与推荐实例名
-   *
-   * - `path`: 压缩包路径
-   *
-   * # 返回值
-   *
-   * 识别出的类型与推荐实例名；识别失败抛错
-   */
-  async addDetectArchive(path: string): Promise<DetectedPackDto> {
-    return commands.add.detectArchive(path);
   },
 
   // ---------------- 在线整合包 ----------------

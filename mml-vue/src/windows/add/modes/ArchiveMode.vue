@@ -20,8 +20,8 @@ const props = defineProps<{
   packTypes: string[];
   /** 已选压缩包类型 ID，决定按普通压缩包还是整合包安装 */
   packType: string;
-  /** 正在读压缩包条目 / 识别整合包类型 */
-  scanning: boolean;
+  /** 扫描阶段：idle 空闲 / list 读条目并识别类型 */
+  phase: "idle" | "list";
   /** 校验失败：压缩包必填（高亮 + 自动聚焦） */
   invalid?: boolean;
   /** 校验失败的文案，贴在路径框下面 */
@@ -47,6 +47,8 @@ const emit = defineEmits<{
 
 const pathInput = ref<HTMLInputElement | null>(null);
 
+
+
 // 必填校验失败：聚焦路径框，高亮见模板的 is-invalid
 watch(
   () => props.invalid,
@@ -70,11 +72,12 @@ watch(
   <!-- 校验失败的原因贴在框下面，别让它落到底部按钮上方去找 -->
   <p v-if="error" class="error-text" role="alert">{{ error }}</p>
 
-  <!-- 读取条目 / 识别类型中：不确定滚动进度条，与加载器查询、目录扫描同一套观感 -->
-  <LoaderQueryProgress v-if="scanning" kind="versions" :visible="true" :step="0" :total="0"
+  <!-- 读取条目 / 识别类型中：不确定滚动进度条，与加载器查询、目录扫描同一套观感。
+       两个阶段分开报，扫描期间下面的类型下拉与文件树一律不显示（此时它们还没定下来） -->
+  <LoaderQueryProgress v-if="phase !== 'idle'" kind="versions" :visible="true" :step="0" :total="0"
     :label="t('add.archiveReading')" />
 
-  <template v-if="tree.length">
+  <template v-if="phase === 'idle' && tree.length">
     <!-- 压缩包类型决定按普通包还是整合包安装，放到文件列表上面 -->
     <label class="field-label">{{ t("add.packType") }}</label>
     <select :value="packType" class="field-select pack-type"
@@ -86,8 +89,8 @@ watch(
       @toggle-dir="(n: FileNode, on: boolean) => emit('toggle-dir', n, on)"
       @toggle-expand="emit('toggle-expand', $event)" @set-all="emit('set-all', $event)" />
   </template>
-  <!-- 还没选包时的空状态：说明这一步之后会发生什么 -->
-  <p v-else class="field-hint">{{ t("add.archiveHint") }}</p>
+  <!-- 还没选包时的空状态：说明这一步之后会发生什么。扫描期间不显示 -->
+  <p v-else-if="phase === 'idle'" class="field-hint">{{ t("add.archiveHint") }}</p>
 </template>
 
 <style scoped>

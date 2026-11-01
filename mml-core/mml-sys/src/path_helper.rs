@@ -33,7 +33,7 @@ use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType, FileSys
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 
 mod safe_path;
-pub use safe_path::safe_join;
+pub use safe_path::{safe_join, safe_join_with_root};
 
 /// 把底层 io 错误包成带路径的文件系统错误
 ///
