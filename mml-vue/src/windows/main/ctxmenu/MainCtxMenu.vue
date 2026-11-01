@@ -1,15 +1,14 @@
 <script setup lang="ts">
 // 主窗口右键菜单：分组 / 实例 / 多选 三种视图
-// 所有动作通过事件抛给父组件处理
+//
+// 外观与交互直接复用资源管理的 RowMenu（紧凑样式、贴边内收、点外面 / Esc 收起），
+// 这里只把三种视图翻译成菜单项，再把动作抛给主窗口执行。
 //
 // 目标分组的选择**不在这里**：那是个弹窗，见 MainWindow 的"选择目标分组"。
-// 菜单视图只由 `menu.kind` 决定，别再加第二级视图 —— 父级 kind 不变时永远渲染不到。
-//
-// 定位：`position: fixed` 钉在点击处，但**渲染后要量一次并收进窗口**——
-// 否则靠近窗口下/右边缘点开时，菜单会超出可视区被裁掉 —— 实例菜单十来项，比分组菜单高一截。
-import { computed, nextTick, ref, watchEffect } from "vue";
+import { computed } from "vue";
 import { t } from "../../../lib/i18n";
 import { isSourceBuild } from "../../../lib/buildInfo";
+import RowMenu, { type RowMenuItem } from "../../../components/ui/RowMenu.vue";
 import type { CtxMenuState, GroupView, InstMenuAction } from "../types";
 
 const props = defineProps<{
@@ -19,7 +18,7 @@ const props = defineProps<{
   groups: GroupView[];
 }>();
 
-/** 当前右键的分组；空分组时"全选 / 启动全部"置灰，"转移分组"另见 canMoveGroup */
+/** 当前右键的分组；空分组时"全选 / 启动全部"置灰 */
 const currentGroup = computed(() =>
   props.menu?.kind === "group"
     ? props.groups.find((x) => x.id === props.menu?.groupId)
@@ -33,9 +32,7 @@ const canDeleteGroup = computed(() => !!currentGroup.value && !currentGroup.valu
 /**
  * 分组菜单"转移分组"能不能点
  *
- * 两个前提缺一不可：组里有实例可转移，**而且除它自己以外还有别的组可去**。
- * 后者以前没判——只有一个默认分组时点开弹窗才发现下拉是空的，
- * 所以现在直接置灰，工具提示见 MainWindow 的工具栏按钮。
+ * 组里有实例可转移，而且除它自己以外还有别的组可去
  */
 const canMoveGroup = computed(() => {
   const source = currentGroup.value;
@@ -45,6 +42,46 @@ const canMoveGroup = computed(() => {
 
 /** 改分组（多选菜单与实例菜单共用）：表里只有默认分组一个组时无处可去 */
 const canChangeGroup = computed(() => props.groups.length > 1);
+
+/** 菜单项：三种视图各一份，动作 id 见 onPick */
+const items = computed<RowMenuItem[]>(() => {
+  const menu = props.menu;
+  if (!menu) return [];
+  if (menu.kind === "group") {
+    return [
+      { id: "select-all", label: t("multi.selectAll"), disabled: groupEmpty.value },
+      { id: "launch-group", label: t("multi.launch"), disabled: groupEmpty.value },
+      { id: "move-group", label: t("group.moveTo"), disabled: !canMoveGroup.value },
+      { id: "delete-group", label: t("group.delete"), danger: true, disabled: !canDeleteGroup.value, separated: true },
+    ];
+  }
+  if (menu.kind === "instance") {
+    const list: RowMenuItem[] = [
+      { id: "launch", label: t("launch.play") },
+      { id: "multiSelect", label: t("multi.enter") },
+      { id: "viewMods", label: t("actions.viewMods"), separated: true },
+      { id: "manageResource", label: t("actions.manageResource") },
+      { id: "viewLog", label: t("actions.viewLog") },
+      { id: "openFolder", label: t("actions.openFolder") },
+      { id: "changeIcon", label: t("actions.changeIcon"), separated: true },
+      { id: "rename", label: t("actions.rename") },
+      { id: "moveGroup", label: t("multi.moveGroup"), disabled: !canChangeGroup.value },
+      { id: "export", label: t("actions.export"), separated: true },
+      { id: "serverInstance", label: t("actions.serverInstance") },
+      { id: "shortcut", label: t("actions.shortcut") },
+      { id: "copy", label: t("actions.copyInstance") },
+    ];
+    // 云存档同步：功能还没做，只在源码启动（测试版）时露出来，点了提示「制作中」
+    if (isSourceBuild) list.push({ id: "cloudSave", label: t("actions.cloudSync") });
+    list.push({ id: "delete", label: t("actions.delete"), danger: true, separated: true });
+    return list;
+  }
+  return [
+    { id: "multi-move", label: t("multi.moveGroup"), disabled: !canChangeGroup.value },
+    { id: "multi-delete", label: t("multi.delete"), danger: true },
+    { id: "multi-launch", label: t("multi.launch") },
+  ];
+});
 
 /** 菜单动作，一律抛给父组件执行 */
 const emit = defineEmits<{
@@ -64,198 +101,45 @@ const emit = defineEmits<{
   (e: "multi-delete"): void;
   /** 多选菜单"启动全部" */
   (e: "multi-launch"): void;
+  /** 菜单要收起（点了外面或按了 Esc） */
+  (e: "close"): void;
 }>();
 
-/** 菜单根元素与最终落点（先按点击处放，量完再修正） */
-const el = ref<HTMLElement | null>(null);
-const pos = ref({ x: 0, y: 0 });
-/** 与窗口边缘至少留这么宽，单位 px */
-const MARGIN = 8;
-
-let positionSeq = 0;
-
-watchEffect(async () => {
-  // 菜单高度随视图（分组 / 实例 / 多选）变化，读一下 menu 就能在切换时重新定位
+/**
+ * 选中一项：按 id 分发到对应的 emit
+ *
+ * - `id`: 菜单项 id，见 items
+ */
+function onPick(id: string) {
   const menu = props.menu;
-  const seq = ++positionSeq;
-  if (!menu) return;
-
-  pos.value = { x: menu.x, y: menu.y };
-  // 等菜单渲染出来才有尺寸可量；内容由 v-if 分支决定，量不到就保持点击处
-  await nextTick();
-  // 快速换菜单时旧的一次定位可能晚到：作废，别拿旧坐标盖新菜单
-  if (seq !== positionSeq) return;
-  const rect = el.value?.getBoundingClientRect();
-  if (!rect) return;
-
-  const overX = rect.right - (window.innerWidth - MARGIN);
-  const overY = rect.bottom - (window.innerHeight - MARGIN);
-  pos.value = {
-    x: overX > 0 ? Math.max(MARGIN, menu.x - overX) : menu.x,
-    y: overY > 0 ? Math.max(MARGIN, menu.y - overY) : menu.y,
-  };
-});
+  switch (id) {
+    case "select-all":
+      emit("select-all", menu?.groupId);
+      break;
+    case "launch-group":
+      emit("launch-group", menu?.groupId);
+      break;
+    case "move-group":
+      emit("move-group");
+      break;
+    case "delete-group":
+      emit("delete-group", menu?.groupId);
+      break;
+    case "multi-move":
+      emit("multi-move");
+      break;
+    case "multi-delete":
+      emit("multi-delete");
+      break;
+    case "multi-launch":
+      emit("multi-launch");
+      break;
+    default:
+      emit("inst-action", id as InstMenuAction);
+  }
+}
 </script>
 
 <template>
-  <div v-if="menu" ref="el" class="ctx-menu" :style="{ left: pos.x + 'px', top: pos.y + 'px' }" @contextmenu.prevent
-    @click.stop>
-    <!-- 分组菜单：全选 / 启动全部 / 转移分组 / 删除分组
-         空分组时"全选 / 启动全部"没有实例可操作，置灰而不是让用户点了没反应；
-         "转移分组"还要多一条：除本组外得有别的组可去（见 canMoveGroup）；
-         "删除分组"对默认分组永远置灰 -->
-    <template v-if="menu.kind === 'group'">
-      <button class="ctx-item" :disabled="groupEmpty" @click="emit('select-all', menu.groupId)">
-        {{ t("multi.selectAll") }}
-      </button>
-      <button class="ctx-item" :disabled="groupEmpty" @click="emit('launch-group', menu.groupId)">
-        {{ t("multi.launch") }}
-      </button>
-      <button class="ctx-item" :disabled="!canMoveGroup" @click="emit('move-group')">
-        {{ t("group.moveTo") }}
-      </button>
-      <div class="ctx-sep"></div>
-      <button class="ctx-item danger" :disabled="!canDeleteGroup" @click="emit('delete-group', menu.groupId)">
-        {{ t("group.delete") }}
-      </button>
-    </template>
-
-    <!-- 实例菜单：按功能归类 —— 启动 / 多选 / 管理 / 组织 / 分享 / 删除 -->
-    <template v-else-if="menu.kind === 'instance'">
-      <button class="ctx-item" @click="emit('inst-action', 'launch')">
-        {{ t("launch.play") }}
-      </button>
-      <!-- 多选：以这一项为起点进入多选，之后勾别的实例、用顶部工具栏批量操作 -->
-      <button class="ctx-item" @click="emit('inst-action', 'multiSelect')">
-        {{ t("multi.enter") }}
-      </button>
-      <div class="ctx-sep"></div>
-      <button class="ctx-item" @click="emit('inst-action', 'viewMods')">
-        {{ t("actions.viewMods") }}
-      </button>
-      <button class="ctx-item" @click="emit('inst-action', 'manageResource')">
-        {{ t("actions.manageResource") }}
-      </button>
-      <button class="ctx-item" @click="emit('inst-action', 'viewLog')">
-        {{ t("actions.viewLog") }}
-      </button>
-      <button class="ctx-item" @click="emit('inst-action', 'openFolder')">
-        {{ t("actions.openFolder") }}
-      </button>
-      <div class="ctx-sep"></div>
-      <button class="ctx-item" @click="emit('inst-action', 'changeIcon')">
-        {{ t("actions.changeIcon") }}
-      </button>
-      <button class="ctx-item" @click="emit('inst-action', 'rename')">
-        {{ t("actions.rename") }}
-      </button>
-      <button class="ctx-item" :disabled="!canChangeGroup" @click="emit('inst-action', 'moveGroup')">
-        {{ t("multi.moveGroup") }}
-      </button>
-      <div class="ctx-sep"></div>
-      <button class="ctx-item" @click="emit('inst-action', 'export')">
-        {{ t("actions.export") }}
-      </button>
-      <button class="ctx-item" @click="emit('inst-action', 'serverInstance')">
-        {{ t("actions.serverInstance") }}
-      </button>
-      <button class="ctx-item" @click="emit('inst-action', 'shortcut')">
-        {{ t("actions.shortcut") }}
-      </button>
-      <button class="ctx-item" @click="emit('inst-action', 'copy')">
-        {{ t("actions.copyInstance") }}
-      </button>
-      <!-- 云存档同步：功能还没做，只在源码启动（测试版）时露出来，点了提示「制作中」 -->
-      <button v-if="isSourceBuild" class="ctx-item" @click="emit('inst-action', 'cloudSave')">
-        {{ t("actions.cloudSync") }}
-      </button>
-      <div class="ctx-sep"></div>
-      <button class="ctx-item danger" @click="emit('inst-action', 'delete')">
-        {{ t("actions.delete") }}
-      </button>
-    </template>
-
-    <!-- 多选实例操作菜单 -->
-    <template v-else>
-      <button class="ctx-item" :disabled="!canChangeGroup" @click="emit('multi-move')">
-        {{ t("multi.moveGroup") }}
-      </button>
-      <button class="ctx-item danger" @click="emit('multi-delete')">
-        {{ t("multi.delete") }}
-      </button>
-      <button class="ctx-item" @click="emit('multi-launch')">
-        {{ t("multi.launch") }}
-      </button>
-    </template>
-  </div>
+  <RowMenu v-if="menu" :x="menu.x" :y="menu.y" :items="items" @pick="onPick" @close="emit('close')" />
 </template>
-
-<style scoped>
-.ctx-menu {
-  position: fixed;
-  z-index: 120;
-  min-width: 180px;
-  /* 屏幕很矮、收进窗口后仍放不下时才内部滚动；正常窗口下列表项全部可见 */
-  max-height: calc(100vh - 16px);
-  overflow-y: auto;
-  padding: 6px;
-  background: var(--bg-modal);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: var(--shadow-lg);
-  animation: ctx-in 0.12s ease;
-}
-
-@keyframes ctx-in {
-  from {
-    opacity: 0;
-    transform: translateY(-4px) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.ctx-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 9px 12px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text);
-  font-size: 13px;
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.1s;
-}
-
-.ctx-item:hover {
-  background: var(--bg-hover);
-}
-
-.ctx-item.danger {
-  color: var(--red);
-}
-
-.ctx-item.danger:hover {
-  background: color-mix(in srgb, var(--red) 12%, transparent);
-}
-
-.ctx-item:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  background: transparent;
-}
-
-.ctx-sep {
-  height: 1px;
-  background: var(--border);
-  margin: 4px 6px;
-}
-</style>

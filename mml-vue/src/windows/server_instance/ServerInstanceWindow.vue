@@ -634,7 +634,8 @@ onBeforeUnmount(() => {
             <!-- 生成中：进度条 + 当前文件 -->
             <template v-if="busy">
               <div class="progress-track">
-                <div class="progress-fill" :style="percent < 0 ? undefined : { width: percent + '%' }" />
+                <div class="progress-fill" :class="{ 'is-roll': percent < 0 }"
+                  :style="percent < 0 ? undefined : { width: percent + '%' }" />
               </div>
               <div class="run-info">
                 <span v-if="progress && progress.total > 0">

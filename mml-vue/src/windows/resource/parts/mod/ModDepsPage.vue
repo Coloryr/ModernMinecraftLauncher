@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 依赖图弹窗：画与交互全部交给 @vue-flow/core —— 拖节点、滚轮缩放、拖画布平移、
+// 依赖图子页面：整窗铺开，画与交互全部交给 @vue-flow/core —— 拖节点、滚轮缩放、拖画布平移、
 // 点连线都是它自带的。
 //
 // **关系在后端**：节点与连线由 `resource_mods_dep_tree` 算好（见 AGENTS.md §12.1），
@@ -7,8 +7,8 @@
 // 后翻成 vue-flow 的 nodes / edges。这里只做三件事：
 // - 取图、布局、翻成 vue-flow 的两张表，节点上的"装没装"标记直接读后端给的 problem；
 // - 点连线时在鼠标旁说明"谁需要谁、要什么版本"；
-// - 一个重置视图的按钮，拖乱了能一键回到全图可见。
-import { computed, nextTick, ref, watch } from "vue";
+// - 打开 / 换目标时按 100% 缩放把根节点摆在视口中央；「重置视图」缩到全图可见。
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import {
   MarkerType,
   VueFlow,
@@ -22,9 +22,8 @@ import "@vue-flow/core/dist/style.css";
 import "@vue-flow/core/dist/theme-default.css";
 import { t, tErr } from "../../../../lib/i18n";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
-import BaseModal from "../../../../components/ui/BaseModal.vue";
 import type { ModDepEdgeDto, ModItemDto } from "../../../../lib/bindings";
-import { type ModDepGraph, type ModDepGraphNode } from "../../composables/modDepGraph";
+import { NODE_H, NODE_W, type ModDepGraph, type ModDepGraphNode } from "../../composables/modDepGraph";
 import ModDepNode from "./ModDepNode.vue";
 
 const props = defineProps<{
@@ -41,9 +40,10 @@ const emit = defineEmits<{
   (e: "target", key: string): void;
 }>();
 
-/** vue-flow 的实例：重置视图要调它的 fitView */
-const { fitView } = useVueFlow();
-/** 所有节点是否都量好尺寸了；换目标后要等它，见 fitAfterLayout */
+/** vue-flow 的实例：默认视图用 setCenter，重置视图用 fitView */
+const { fitView, setCenter } = useVueFlow();
+
+/** 所有节点是否都量好尺寸了；换目标或重置视图前要等它，见 waitForNodes */
 const nodesReady = useNodesInitialized();
 
 /** 当前这张图；还没取回来时是 null */
@@ -255,25 +255,39 @@ function onEdgeClick(payload: { edge: Edge; event: MouseEvent | TouchEvent }) {
 }
 
 /**
- * 等节点量好尺寸再摆视图
+ * 等节点量好尺寸
  *
- * 刚加进来的节点还没有 bounds（量尺寸是 ResizeObserver 的异步回调），这时候 fit
- * 会按 0 尺寸算，视图是歪的 —— 换目标之后新节点一批批进来，必须等。
- * 尺寸已经在的（如"重置视图"）第一轮就过，最多等 30 帧，免得量不出来时卡住。
+ * 刚加进来的节点还没有 bounds（量尺寸是 ResizeObserver 的异步回调），
+ * 这时候摆视图会按 0 尺寸算。尺寸已经在的（换目标 / 重置）第一轮就过，
+ * 最多等 30 帧，免得量不出来时卡住。
  */
-async function fitAfterLayout() {
+async function waitForNodes() {
   for (let frame = 0; frame < 30; frame += 1) {
     await nextTick();
     if (nodesReady.value) break;
     await new Promise((resolve) => requestAnimationFrame(resolve));
   }
-  void fitView({ padding: 0.16 });
 }
 
-/** 拖乱了 / 缩放过了：回到全图可见 */
-function resetView() {
+/**
+ * 打开或换目标后的默认视图
+ *
+ * 100% 缩放、把根节点摆到视口中央：图大时 fitView 会把整张图缩到看不清，
+ * 默认先看清当前模组，看全图交给「重置视图」。
+ */
+async function centerOnRoot() {
+  await waitForNodes();
+  const nodes = graph.value?.nodes ?? [];
+  if (!nodes.length) return;
+  const root = nodes.find((node) => node.root) ?? nodes[0];
+  void setCenter(root.x + NODE_W / 2, root.y + NODE_H / 2, { zoom: 1 });
+}
+
+/** 拖乱了 / 缩放过了：缩到全图可见 */
+async function resetView() {
   hidePopup();
-  void fitAfterLayout();
+  await waitForNodes();
+  void fitView({ padding: 0.16 });
 }
 
 // 打开或换目标：向后端要图
@@ -287,33 +301,49 @@ watch(
 );
 
 // 换目标后图整张换掉，但画布的缩放 / 平移还留着上一张的值：
-// 按新图重摆一次，否则新节点可能整片落在视野外
+// 按默认视图（100% + 根节点居中）重摆一次，否则新节点可能整片落在视野外
 watch(graph, () => {
   hidePopup();
-  void fitAfterLayout();
+  void centerOnRoot();
 });
+
+/** Esc 返回模组列表：子页面没有 ✕，键盘也要能退出 */
+function onKeyDown(event: KeyboardEvent) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    emit("close");
+  }
+}
+
+onMounted(() => window.addEventListener("keydown", onKeyDown));
+onUnmounted(() => window.removeEventListener("keydown", onKeyDown));
+
+// 重置视图的按钮在窗口标题栏上，由窗口层调这里
+defineExpose({ resetView });
 </script>
 
-<template>
-  <!-- 没有前置时不锁高度：锁了会是一个空荡荡的大面板 -->
-  <BaseModal :title="t('resource.depTreeTitle', { name: props.item.name || props.item.file })" :width="960"
-    :fixed-height="graph?.edges.length ? '76vh' : undefined" :closable="false" @close="emit('close')">
-    <div v-if="loading" class="empty-tip">{{ t("resource.loading") }}</div>
 
-    <div v-else-if="error" class="empty-tip">
+<template>
+  <!-- 窗口子页面：标题与返回键由外层的 WindowFrame 提供，这里只铺画布 -->
+  <div class="dep-page">
+    <div v-if="loading" class="empty-tip dep-page-body">{{ t("resource.loading") }}</div>
+
+    <div v-else-if="error" class="empty-tip dep-page-body">
       <p>{{ error }}</p>
       <BaseButton size="sm" @click="load(props.item)">{{ t("modpack.retry") }}</BaseButton>
     </div>
 
-    <p v-else-if="!graph?.edges.length" class="empty-tip">{{ t("resource.depTreeNone") }}</p>
+    <p v-else-if="!graph?.edges.length" class="empty-tip dep-page-body">{{ t("resource.depTreeNone") }}</p>
 
     <div v-else ref="flowEl" class="dep-flow" @mousedown.capture="onFlowMouseDown">
       <!-- 拖节点、滚轮缩放、拖画布平移全是 vue-flow 的默认行为；
            连线本身带 nopan，从线上起手的情况由 onFlowMouseDown 补一次 -->
+      <!-- 不要 fit-view-on-init：图大时会把整张图缩到看不清，默认视图由 centerOnRoot 给 -->
       <VueFlow :nodes="flowNodes" :edges="flowEdges" :min-zoom="0.2" :max-zoom="2.5" :nodes-connectable="false"
-        :fit-view-on-init="true" @edge-click="onEdgeClick" @node-click="hidePopup"
+        @edge-click="onEdgeClick" @node-click="hidePopup"
         @node-double-click="onNodeDoubleClick" @node-drag-start="hidePopup" @pane-click="hidePopup">
-        <Background :gap="18" :size="1.1" :pattern-color="'var(--border)'" />
+        <!-- 点阵：尺寸按 100% 缩放给 2px，缩得太小又会看不见；颜色与压淡见样式里的点阵规则 -->
+        <Background :gap="20" :size="2" :pattern-color="'var(--text-dim)'" />
         <template #node-mod="nodeProps">
           <ModDepNode :data="nodeProps.data" :selected="nodeProps.selected" />
         </template>
@@ -324,23 +354,35 @@ watch(graph, () => {
     <p v-if="popupText" ref="popupEl" class="dep-edge-popup"
       :style="{ left: popupPos.x + 'px', top: popupPos.y + 'px' }">{{
         popupText }}</p>
-
-    <div class="modal-actions">
-      <BaseButton @click="resetView">{{ t("resource.depGraphReset") }}</BaseButton>
-      <BaseButton variant="accent" @click="emit('close')">{{ t("actions.confirm") }}</BaseButton>
-    </div>
-  </BaseModal>
+  </div>
 </template>
 
 <style scoped>
 /* 画布吃掉剩余高度；vue-flow 自己铺满它 */
+.dep-page {
+  /* 铺满窗口内容区，不留边距：画布就是整块内容 */
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.dep-page-body {
+  flex: 1;
+  min-height: 0;
+  padding: 24px;
+}
+
 .dep-flow {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 10px;
   background: var(--bg-raised);
+}
+
+/* 点阵压淡：--border 跟画布底色几乎同亮度，直接用等于没有；
+   换成次要文字色再压到 45%，深浅两套主题都够看清又不抢连线 */
+.dep-flow :deep(.vue-flow__background) {
+  opacity: 0.45;
 }
 
 /* 选中的那条线加粗走主色：默认样式太细，点中了也看不出来 */

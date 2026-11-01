@@ -6,7 +6,8 @@
 // 动作作用在选中的那一批 —— 两者的区别只在调用方传进来的 `items` 与 `title`。
 //
 // 只负责画与定位，动作抛回调用方执行：确认弹窗、备注弹窗、目录打开都在各自的 Pane 里。
-// 外观与分组菜单 ModGroupMenu 共用一套（`.row-ctx-menu*`），定位方式也一样。
+// 外观在 `styles/parts/ctxmenu.css`（与分组菜单 ModGroupMenu 共用一套 `.row-ctx-menu*`），
+// 主窗口的实例右键菜单也用它，两个窗口的右键菜单因此长得一样。
 import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 
 /** 一个菜单项 */
@@ -21,6 +22,8 @@ export interface RowMenuItem {
   disabled?: boolean;
   /** 在这一项**之前**画一条分隔线，用来分组 */
   separated?: boolean;
+  /** 悬停提示，调用方已 `t()` 好的成品；空串或省略表示不显示 */
+  tip?: string;
 }
 
 const props = defineProps<{
@@ -70,7 +73,11 @@ function onOutside(e: PointerEvent) {
 }
 
 function onKey(e: KeyboardEvent) {
-  if (e.key === "Escape") emit("close");
+  if (e.key !== "Escape") return;
+  // 菜单开着时 Esc 只收菜单：不再往下传，免得顺手把窗口也关了
+  e.preventDefault();
+  e.stopPropagation();
+  emit("close");
 }
 
 /** 选中一项：先抛动作再关菜单 */
@@ -86,68 +93,10 @@ function pick(id: string) {
     <span v-if="title" class="row-ctx-menu-title">{{ title }}</span>
     <template v-for="item in items" :key="item.id">
       <span v-if="item.separated" class="row-ctx-menu-sep" />
-      <button class="row-ctx-menu-item" :class="{ danger: item.danger }" :disabled="item.disabled"
+      <button class="row-ctx-menu-item" :class="{ danger: item.danger }" :disabled="item.disabled" v-tip="item.tip"
         @click="pick(item.id)">
         {{ item.label }}
       </button>
     </template>
   </div>
 </template>
-
-<style scoped>
-/* 菜单外观自己带着：以前只在 resource.css 里按 `.resource-layout` 前缀写，
-   配置文件窗口没有那个容器，菜单就退化成窗口底下两个裸按钮 */
-.row-ctx-menu {
-  position: fixed;
-  z-index: 40;
-  min-width: 150px;
-  padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-modal-raised);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.28);
-}
-
-/* 批量菜单顶部的"已选 n 项"（说明动作作用在这一批上） */
-.row-ctx-menu-title {
-  display: block;
-  padding: 4px 10px 6px;
-  color: var(--text-dim);
-  font-size: 11.5px;
-}
-
-.row-ctx-menu-item {
-  display: block;
-  width: 100%;
-  padding: 6px 10px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text);
-  font-size: 12.5px;
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.row-ctx-menu-item:hover:not(:disabled) {
-  background: var(--bg-hover);
-}
-
-.row-ctx-menu-item.danger:hover:not(:disabled) {
-  color: var(--red);
-}
-
-.row-ctx-menu-item:disabled {
-  color: var(--text-dim);
-  cursor: default;
-  opacity: 0.55;
-}
-
-.row-ctx-menu-sep {
-  display: block;
-  height: 1px;
-  margin: 4px 6px;
-  background: var(--border);
-}
-</style>

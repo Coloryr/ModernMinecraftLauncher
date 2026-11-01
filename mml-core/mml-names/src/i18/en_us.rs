@@ -45,6 +45,16 @@ impl I18Lang for EnUs {
             InfoType::GameCountKeepBigger { disk, mem } => format!(
                 "count file on disk has more data than memory ({disk} launches > {mem}), not overwriting"
             ),
+            InfoType::DownloadIndexMigrated {
+                mods,
+                resourcepacks,
+                failed,
+            } => format!(
+                "legacy download index imported: {mods} mods, {resourcepacks} resource packs, {failed} skipped"
+            ),
+            InfoType::DownloadIndexImportFailed { file, error } => {
+                format!("failed to import legacy download index {file}, kept as is: {error}")
+            }
             InfoType::DownloadTaskDone {
                 total,
                 completed,

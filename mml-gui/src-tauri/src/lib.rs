@@ -232,6 +232,12 @@ pub fn run() {
 
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
+                // 旧数据升级：核心加载之前跑完，界面靠 UPGRADE_PROGRESS 画进度
+                if windows::upgrade::pending() {
+                    // 升级完成要发系统通知；Windows 便携版先补开始菜单快捷方式，否则吐司会被系统丢掉
+                    std::thread::spawn(notify::register_start_menu_shortcut);
+                    windows::upgrade::run(handle.clone()).await;
+                }
                 match mml_core::load() {
                     Ok(()) => {
                         // 统计要在实例表加载完之后读：read() 会拿当前实例刷新名字快照

@@ -1322,6 +1322,13 @@ pub enum NotifyText {
         /// 资源显示名
         name: String,
     },
+    /// 旧数据升级完成
+    UpgradeDone {
+        /// 导入的模组记录数
+        mods: usize,
+        /// 导入的资源包记录数
+        resourcepacks: usize,
+    },
 }
 
 impl NotifyText {
@@ -1362,6 +1369,13 @@ impl NotifyText {
                 String::from("资源下载失败"),
                 format!("{name} 下载失败，打开添加资源窗口查看原因"),
             ),
+            NotifyText::UpgradeDone {
+                mods,
+                resourcepacks,
+            } => (
+                String::from("数据更新完成"),
+                format!("已导入 {mods} 条模组、{resourcepacks} 条资源包索引"),
+            ),
         }
     }
 
@@ -1391,6 +1405,13 @@ impl NotifyText {
             NotifyText::ResourceFailed { name } => (
                 String::from("Resource download failed"),
                 format!("failed to download {name}, open the add resource window for details"),
+            ),
+            NotifyText::UpgradeDone {
+                mods,
+                resourcepacks,
+            } => (
+                String::from("Data update finished"),
+                format!("imported {mods} mods and {resourcepacks} resource pack index records"),
             ),
         }
     }

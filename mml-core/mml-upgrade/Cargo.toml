@@ -1,0 +1,14 @@
+[package]
+name = "mml-upgrade"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+mml-link = { path = "../mml-link" }
+mml-names = { path = "../mml-names" }
+mml-log = { path = "../mml-log" }
+serde_json.workspace = true
+
+[dev-dependencies]
+mml-testutil = { path = "../mml-testutil" }
+uuid.workspace = true

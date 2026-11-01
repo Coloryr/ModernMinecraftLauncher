@@ -20,7 +20,7 @@ import MotdCard from "../../../components/MotdCard.vue";
 import ContentHead from "./ContentHead.vue";
 import ListSkeleton from "./ListSkeleton.vue";
 import ResourceRow from "./ResourceRow.vue";
-import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
+import RowMenu, { type RowMenuItem } from "../../../components/ui/RowMenu.vue";
 import ServerFormModal from "./ServerFormModal.vue";
 import VirtualList from "../../../components/ui/VirtualList.vue";
 import { RESOURCE_ROW_GAP } from "../../../composables/useVirtualRows";

@@ -162,7 +162,6 @@ pub async fn add_import_archive(
         Err(err) => Err(err.to_string()),
     };
 
-    mml_log::info(format!("[TEMP] import result {:?}", res));
     // 终态：整合包任务自己记录并广播，成功时连同 instance-change 一起发；
     // 其它类型补一条 instance-change 与系统通知
     match &task {

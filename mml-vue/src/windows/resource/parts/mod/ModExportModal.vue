@@ -86,7 +86,7 @@ async function saveList() {
 </template>
 
 <style scoped>
-/* 弹窗在 body 下，样式走 scoped（与 ModUpdateModal / ModDepsModal 同一处理） */
+/* 弹窗在 body 下，样式走 scoped（与 ModUpdateModal / ModDepsPage 同一处理） */
 .export-options {
   border: 0;
   padding: 0;

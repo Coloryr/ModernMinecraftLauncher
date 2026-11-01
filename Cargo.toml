@@ -33,6 +33,7 @@ members = [
     "mml-core/mml-analysis",
     "mml-core/mml-cloud",
     "mml-core/mml-link",
+    "mml-core/mml-upgrade",
     "mml-cloud-server",
     "mml-gui/src-tauri",
     "mml-theme-studio/src-tauri",
@@ -91,6 +92,7 @@ windows = { version = "~0.62.2", features = [
 ] }
 zip = { version = "~9.0.5", default-features = false, features = ["deflate-flate2", "chrono"] }
 memmap2 = "~0.9.12"
+fjall = "~3.1.13"
 tar = "~0.4.46"
 flate2 = { version = "~1.1.10", default-features = false, features = ["rust_backend"] }
 sevenz-rust2 = { version = "~0.20.2", default-features = false, features = ["compress", "util"] }

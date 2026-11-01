@@ -61,6 +61,11 @@ const hasFailed = computed(() => tasks.value.some((task) => task.failed));
 /** 总进度 = 各进行中任务的主进度均值；全结束时 100 */
 const percent = computed(() => overallPercent(tasks.value));
 
+/** 还没有任何总数可报（0 / 0）：细条走无限滚动 */
+const rolling = computed(
+  () => running.value.length > 0 && running.value.every((task) => !task.total && !task.subTotal),
+);
+
 /** 悬停提示：进行中报进度，结束后报结果 */
 const tipText = computed(() => {
   if (running.value.length) {
@@ -96,7 +101,8 @@ function onClick() {
     </span>
     <!-- 进度：细条贴在图标下沿，进行中才显示（结束后它是满格，没信息量） -->
     <span v-if="running.length" class="mp-ind-track">
-      <span class="mp-ind-fill" :style="{ width: percent + '%' }" />
+      <span class="mp-ind-fill" :class="{ 'is-roll': rolling }"
+        :style="rolling ? undefined : { width: percent + '%' }" />
     </span>
   </button>
 </template>

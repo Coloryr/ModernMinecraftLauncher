@@ -15,7 +15,7 @@ import { t } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
 import { clearScreenshots, deleteScreenshot } from "../../../lib/api";
 import ContentHead from "./ContentHead.vue";
-import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
+import RowMenu, { type RowMenuItem } from "../../../components/ui/RowMenu.vue";
 import { useRowSelect } from "../composables/useRowSelect";
 import { createListScroll, visibleWindow } from "../../../composables/useVirtualRows";
 import type { useResourceData } from "../composables/useResourceData";

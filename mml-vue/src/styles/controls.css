@@ -584,3 +584,23 @@ select.field-select {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
+/* 总数未知（0 / 0）的进度条：色块无限来回滚动，表示"在跑，但还算不出百分比"。
+   用法：给 fill 元素加 .is-roll，并且不要再给内联 width —— 内联宽度会盖掉这里的 40% */
+.progress-fill.is-roll,
+.block-progress-fill.is-roll,
+.map-progress-fill.is-roll,
+.java-progress-fill.is-roll,
+.mp-ind-fill.is-roll {
+  width: 40%;
+  animation: progress-roll 1.1s ease-in-out infinite;
+}
+
+@keyframes progress-roll {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(300%);
+  }
+}

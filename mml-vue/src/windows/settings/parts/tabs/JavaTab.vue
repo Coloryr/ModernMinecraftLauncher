@@ -90,7 +90,8 @@ useModalKeys((e) => {
       <div v-if="importingJava || importProgress" class="java-progress">
         <span class="java-progress-label">{{ t("winSettings.javaImporting") }}</span>
         <div class="java-progress-track">
-          <div class="java-progress-fill" :style="{ width: importPercent + '%' }" />
+          <div class="java-progress-fill" :class="{ rolling: !importProgress?.total }"
+          :style="importProgress?.total ? { width: importPercent + '%' } : undefined" />
         </div>
         <span class="java-progress-text">{{ importProgress ? `${importProgress.now}/${importProgress.total}` : ""
         }}</span>

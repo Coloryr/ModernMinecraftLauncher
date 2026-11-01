@@ -64,7 +64,7 @@ const changed = computed(
     </template>
     <div class="modal-actions">
       <BaseButton @click="emit('close')">{{ t("resource.cancel") }}</BaseButton>
-      <!-- 与模组更新弹窗、依赖图弹窗的确认按钮同一档（accent），别在同一个窗口里两套 -->
+      <!-- 与模组更新弹窗的确认按钮同一档（accent），别在同一个窗口里两套 -->
       <BaseButton variant="accent" @click="emit('update', props.result.newFileId)">
         {{ t(serverPack ? "resource.serverPackUpdate" : "resource.modpackUpdate") }}
       </BaseButton>

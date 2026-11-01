@@ -127,14 +127,6 @@ pub async fn add_scan_folder(path: String) -> Result<Vec<FolderInstanceDto>, Str
     .map_err(|e| e.to_string())
 }
 
-/// [TEMP] 诊断时间戳，单位 ms
-fn temp_ms() -> u128 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0)
-}
-
 /// 列出压缩包内的条目路径，目录以 `/` 结尾，添加实例窗口预览内容树用
 ///
 /// **必须异步**：要打开压缩包并读出全部条目，整合包里几千个文件时会明显耗时，
@@ -149,8 +141,6 @@ fn temp_ms() -> u128 {
 #[gui_macros::command]
 pub async fn add_list_archive(path: String) -> Result<ArchiveProbeDto, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let started = temp_ms();
-        mml_log::info(format!("[TEMP] list archive begin t={started}"));
         let archive = mml_base::archives::BaseArchive::open(&path).map_err(|e| e.to_string())?;
         let entries = archive
             .entries()
@@ -164,14 +154,6 @@ pub async fn add_list_archive(path: String) -> Result<ArchiveProbeDto, String> {
         let server_pack = entries
             .iter()
             .any(|name| name == crate::windows::export::server_pack::MANIFEST);
-        mml_log::info(format!(
-            "[TEMP] list archive end t={} took={}ms n={} type={} server={}",
-            temp_ms(),
-            temp_ms().saturating_sub(started),
-            entries.len(),
-            detected.pack_type.id(),
-            server_pack
-        ));
         Ok(ArchiveProbeDto {
             entries,
             pack_type: detected.pack_type.id().to_string(),

@@ -32,6 +32,7 @@ pub mod resource;
 pub(crate) mod server_instance;
 pub mod settings;
 pub mod stats;
+pub(crate) mod upgrade;
 
 // 内部子模块：**只放实现细节**，IPC 命令一律留在本文件。
 // `bindings.ts` 的命令分组键取"来源 .rs 模块最后一段"，命令一搬组键就变，前端会断。
@@ -513,14 +514,6 @@ pub async fn window_probe_drop(path: String) -> DropPathDto {
         })
 }
 
-/// [TEMP] 诊断时间戳，单位 ms
-fn temp_ms() -> u128 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0)
-}
-
 /// 拖入路径的实际判定，跑在阻塞线程上
 ///
 /// - `path`: 拖入文件的绝对路径
@@ -529,8 +522,6 @@ fn temp_ms() -> u128 {
 ///
 /// 见 [`DropPathDto`]
 fn probe_drop_inner(path: &str) -> DropPathDto {
-    let started = temp_ms();
-    mml_log::info(format!("[TEMP] probe drop begin t={started}"));
     let other = |kind: &str| DropPathDto {
         kind: kind.to_string(),
         url: String::new(),
@@ -572,12 +563,6 @@ fn probe_drop_inner(path: &str) -> DropPathDto {
         }
     };
 
-    mml_log::info(format!(
-        "[TEMP] probe drop end t={} took={}ms kind={}",
-        temp_ms(),
-        temp_ms().saturating_sub(started),
-        result.kind
-    ));
     result
 }
 

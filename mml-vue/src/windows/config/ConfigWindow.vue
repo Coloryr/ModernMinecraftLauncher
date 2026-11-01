@@ -37,7 +37,7 @@ import ImageView from "./parts/ImageView.vue";
 import McaTable from "./parts/McaTable.vue";
 import NbtTree from "./parts/NbtTree.vue";
 import { clearCleanSessions, closeSessions } from "./parts/nbtSession";
-import RowMenu, { type RowMenuItem } from "../resource/parts/RowMenu.vue";
+import RowMenu, { type RowMenuItem } from "../../components/ui/RowMenu.vue";
 import McaFindModal from "./parts/McaFindModal.vue";
 import type { FileItemDto, SaveItemDto } from "../../lib/bindings";
 

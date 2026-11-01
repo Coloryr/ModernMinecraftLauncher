@@ -6,11 +6,13 @@
 
 mod conv;
 mod launch;
+mod link_resources;
 mod local_files;
 mod misc;
 mod network;
 
 pub use self::launch::RunArgSettingDto;
+pub use self::link_resources::LinkResourceDto;
 pub use self::local_files::{LocalFileChildDto, LocalFileEntryDto};
 pub use self::misc::{
     BgInfoDto, LaunchSettingDto, ResourceMapProgressDto, ResourceMapResultDto, SettingsDefaultsDto,

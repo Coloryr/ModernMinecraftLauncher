@@ -1363,8 +1363,6 @@ async function onFilesDropped(payload: FileDropPayload) {
     return;
   }
   const first = payload.paths[0];
-  // [TEMP] 拖入时刻：与后端 probe drop 日志对齐
-  console.warn("[TEMP] drop", Date.now(), first ?? "");
   if (!first) {
     // 路径桥没把真实路径送回来：说一声，别静默什么都不做
     showToast(t("drop.noPath"));
@@ -2467,9 +2465,10 @@ onMounted(async () => {
       </div>
 
       <!-- ===== 右键菜单（MainCtxMenu 组件） ===== -->
-      <MainCtxMenu :menu="ctxMenu" :groups="groups" @select-all="onGroupSelectAll" @launch-group="launchGroupAll"
-        @move-group="onMoveGroupClick" @delete-group="onDeleteGroup" @inst-action="onInstMenuAction"
-        @multi-move="openMoveGroupPicker(null)" @multi-delete="onMultiDelete" @multi-launch="multiLaunch" />
+      <MainCtxMenu :menu="ctxMenu" :groups="groups" @close="closeCtxMenu" @select-all="onGroupSelectAll"
+        @launch-group="launchGroupAll" @move-group="onMoveGroupClick" @delete-group="onDeleteGroup"
+        @inst-action="onInstMenuAction" @multi-move="openMoveGroupPicker(null)" @multi-delete="onMultiDelete"
+        @multi-launch="multiLaunch" />
     </template>
 
     <!-- ===== 关闭游戏确认 ===== -->

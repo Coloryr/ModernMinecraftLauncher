@@ -144,18 +144,11 @@ struct PackExtractGui {
     pack: AddModPackGui,
     /// 本批总文件数；`start` 写入，`update` 时用来带上总数
     total: AtomicUsize,
-    /// [TEMP] 是否已打过"第一条子进度"的日志
-    logged_first: std::sync::atomic::AtomicBool,
 }
 
 impl IBaseArchiveGui for PackExtractGui {
     fn start(&self, total: usize) {
         self.total.store(total, Ordering::Relaxed);
-        mml_log::info(format!(
-            "[TEMP] extract start t={} total={}",
-            crate::add_game::temp_ms(),
-            total
-        ));
         if let Some(pack) = &self.pack {
             pack.set_sub_text(None);
             pack.set_sub_now(0, Some(total));
@@ -166,15 +159,6 @@ impl IBaseArchiveGui for PackExtractGui {
     }
 
     fn update(&self, filename: Option<String>, current: usize) {
-        // [TEMP] 只打第一条：这里每个文件都会被调，全打会刷屏
-        if !self.logged_first.swap(true, Ordering::Relaxed) {
-            mml_log::info(format!(
-                "[TEMP] extract first update t={} current={} name={}",
-                crate::add_game::temp_ms(),
-                current,
-                filename.as_deref().unwrap_or("")
-            ));
-        }
         let total = self.total.load(Ordering::Relaxed);
         if let Some(pack) = &self.pack {
             // 完整路径交给前端按宽度截成一行；这里只保留原值，别提前丢了上级目录
@@ -188,11 +172,6 @@ impl IBaseArchiveGui for PackExtractGui {
 
     fn done(&self) {
         let total = self.total.load(Ordering::Relaxed);
-        mml_log::info(format!(
-            "[TEMP] extract done t={} total={}",
-            crate::add_game::temp_ms(),
-            total
-        ));
         if let Some(pack) = &self.pack {
             pack.set_sub_text(None);
             pack.set_sub_now(total, Some(total));
@@ -233,7 +212,6 @@ pub(crate) fn pack_extract_gui(pack: AddModPackGui, archive: BaseArchiveGui) -> 
         archive,
         pack,
         total: AtomicUsize::new(0),
-        logged_first: std::sync::atomic::AtomicBool::new(false),
     }) as Arc<dyn IBaseArchiveGui>)
 }
 
@@ -309,7 +287,6 @@ impl BaseModPackWorker {
                 archive: self.archive_gui.clone(),
                 pack: self.pack_gui.clone(),
                 total: AtomicUsize::new(0),
-                logged_first: std::sync::atomic::AtomicBool::new(false),
             }) as Arc<dyn IBaseArchiveGui>)
         } else {
             None

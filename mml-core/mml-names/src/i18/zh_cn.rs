@@ -48,6 +48,16 @@ impl I18Lang for ZhCn {
             InfoType::GameCountKeepBigger { disk, mem } => {
                 format!("磁盘上的统计比内存里的多（{disk} 次启动 > {mem} 次），本次不覆盖")
             }
+            InfoType::DownloadIndexMigrated {
+                mods,
+                resourcepacks,
+                failed,
+            } => format!(
+                "旧下载索引已导入新库：模组 {mods} 条，资源包 {resourcepacks} 条，跳过 {failed} 条"
+            ),
+            InfoType::DownloadIndexImportFailed { file, error } => {
+                format!("旧下载索引 {file} 导入失败，文件保持原样：{error}")
+            }
             InfoType::DownloadTaskDone {
                 total,
                 completed,

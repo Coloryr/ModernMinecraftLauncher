@@ -47,7 +47,16 @@ pub(crate) fn notify_if_unfocused(app: &AppHandle, text: NotifyText) {
         mml_log::info(LogText::NotificationSkipped { window }.text());
         return;
     }
+    notify(app, text);
+}
 
+/// 直接发一条系统通知，不看前台
+///
+/// 用于一次性、用户会希望事后确认的结果，如启动时的数据升级完成
+///
+/// - `app`: 应用句柄
+/// - `text`: 通知文案
+pub(crate) fn notify(app: &AppHandle, text: NotifyText) {
     let (title, body) = text.parts();
     match app
         .notification()

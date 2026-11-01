@@ -701,14 +701,7 @@ async fn mmc_archive<P: AsRef<Path>>(
         pack_gui.set_state(AddModPackState::ReadInfo);
         pack_gui.set_now(1, Some(3));
     }
-
-    mml_log::info(format!("[TEMP] mmc open begin t={}", temp_ms()));
     let archive = BaseArchive::open(&file)?;
-    mml_log::info(format!(
-        "[TEMP] mmc open t={} entries={}",
-        temp_ms(),
-        archive.entries().len()
-    ));
 
     let mut path = String::new();
     let mut mmc = None;
@@ -731,8 +724,6 @@ async fn mmc_archive<P: AsRef<Path>>(
             break;
         }
     }
-
-    mml_log::info(format!("[TEMP] mmc meta t={}", temp_ms()));
 
     if mmc.is_none() || cfg.is_none() {
         return Err(ErrorType::DataNotFound(DataNotFoundData::Info));
@@ -763,7 +754,6 @@ async fn mmc_archive<P: AsRef<Path>>(
 
     let game = obj.create_instance_in_group(instance_gui, group).await?;
     let uuid = game.read().unwrap().uuid;
-    mml_log::info(format!("[TEMP] mmc instance t={}", temp_ms()));
 
     if cancel.is_cancelled() {
         crate::delete_instance(&uuid)?;
@@ -778,7 +768,6 @@ async fn mmc_archive<P: AsRef<Path>>(
     // 解压到实例基础目录，`.minecraft/` 下的内容自然落到游戏目录 base/.minecraft。
     // mmc-pack.json 所在目录即包裹层，解压时去掉
     let strip_dir = path.trim_end_matches(['/', '\\']).to_string();
-    mml_log::info(format!("[TEMP] mmc extract begin t={}", temp_ms()));
     extract_pack(
         &archive,
         game.read().unwrap().get_base_path(),
@@ -787,7 +776,6 @@ async fn mmc_archive<P: AsRef<Path>>(
         &pack_gui,
         archive_gui.clone(),
     )?;
-    mml_log::info(format!("[TEMP] mmc extract end t={}", temp_ms()));
 
     let json = game.read().unwrap().read_custom_json();
     if !json.is_empty() {
@@ -1487,11 +1475,6 @@ pub async fn install_archive_from_file<P: AsRef<Path>>(
     pack_type: PackType,
     cancel: CancellationToken,
 ) -> CoreResult<Uuid> {
-    mml_log::info(format!(
-        "[TEMP] import start t={} file={}",
-        temp_ms(),
-        file.as_ref().display()
-    ));
     let uuid = match pack_type {
         PackType::CurseForge => {
             modpack(
@@ -1592,7 +1575,6 @@ pub async fn install_archive_from_file<P: AsRef<Path>>(
 
     // 本地包没有项目 / 文件 ID 时，类型留「无」：否则界面上会显示成可更新平台
     clear_modpack_type_without_ids(&uuid);
-    mml_log::info(format!("[TEMP] import done t={}", temp_ms()));
     Ok(uuid)
 }
 
@@ -1649,14 +1631,6 @@ pub async fn install_archive_from_url(
         cancel,
     )
     .await
-}
-
-/// [TEMP] 诊断用时间戳，单位 ms；跨模块对齐日志用
-pub(crate) fn temp_ms() -> u128 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0)
 }
 
 /// 把用户填的在线实例地址规整成 `server.json` 的下载地址

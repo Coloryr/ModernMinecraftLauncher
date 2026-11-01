@@ -4,11 +4,12 @@
 // 配置窗口的文本视图用它；与日志视图共用同一套 Monaco 环境（worker / 主题在 lib/monaco、
 // 语言包在 lib/monacoCode）与同一份自动换行偏好（lib/editorWrap，Alt+Z 切）。**不要**在这里
 // import monaco-editor 的其它入口，那会把整套语言包（含各类语言服务与 worker）拉进包里。
-import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onActivated, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { editor } from "monaco-editor/editor/editor.api";
 import { applyCodeTheme, monaco } from "../../lib/monacoCode";
 import { toggleWordWrap, wordWrap } from "../../lib/editorWrap";
 import { t } from "../../lib/i18n";
+import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -56,7 +57,6 @@ const MENU_ITEMS: EditMenuItem[] = [
 ];
 
 const hostEl = ref<HTMLElement | null>(null);
-const menuEl = ref<HTMLElement | null>(null);
 let ed: editor.IStandaloneCodeEditor | null = null;
 
 /** 右键菜单位置，视口坐标；null = 没开 */
@@ -68,14 +68,14 @@ const canUndo = ref(false);
 const canRedo = ref(false);
 
 /**
- * 真正画出来的条目
- *
- * 只读时会改内容的那几项置灰；历史到底了撤销 / 重做置灰；当前语言没有格式化器的
- * （只有 json 有）干脆不列"格式化代码"。
+ * 真正画出来的条目：只读时改内容的那几项置灰，历史到底了撤销 / 重做置灰，
+ * 当前语言没有格式化器的干脆不列「格式化代码」
  */
-const menuItems = computed(() =>
+const menuItems = computed<RowMenuItem[]>(() =>
   MENU_ITEMS.filter((item) => !item.format || canFormat.value).map((item) => ({
-    ...item,
+    id: item.command,
+    label: t(item.label),
+    separated: item.separated,
     disabled:
       (!!item.edit && props.readonly) ||
       (item.history === "undo" && !canUndo.value) ||
@@ -126,16 +126,6 @@ async function openMenu(x: number, y: number) {
   canUndo.value = model?.canUndo() ?? false;
   canRedo.value = model?.canRedo() ?? false;
   menu.value = { x, y };
-  // 先画出来才有宽高可量
-  await nextTick();
-  const box = menuEl.value?.getBoundingClientRect();
-  if (!box) return;
-  // 菜单与窗口边缘的最小距离，单位 px
-  const pad = 8;
-  menu.value = {
-    x: Math.max(pad, Math.min(x, window.innerWidth - box.width - pad)),
-    y: Math.max(pad, Math.min(y, window.innerHeight - box.height - pad)),
-  };
 }
 
 /**
@@ -149,20 +139,12 @@ function pick(command: string) {
   ed?.trigger("mml-menu", command, null);
 }
 
-/** 点到菜单外面：收起 */
-function onOutside(e: Event) {
-  if (!menu.value || menuEl.value?.contains(e.target as Node)) return;
-  menu.value = null;
-}
-
-/** Esc 收起菜单；这一下不再往下传，免得顺手把窗口也关了 */
-function onMenuKey(e: KeyboardEvent) {
-  if (e.key !== "Escape" || !menu.value) return;
-  e.preventDefault();
-  e.stopPropagation();
+/** 收起菜单并把焦点还给编辑器：点外面 / Esc 都走这里 */
+function closeMenu() {
   menu.value = null;
   ed?.focus();
 }
+
 
 // 主题落在 <html data-theme> 上，盯着这个属性比自己监听 theme ref 全面：
 // 设置窗口改主题、其它窗口同步过来的改动、跟随系统时系统切换，最终都只是改这个属性
@@ -207,8 +189,6 @@ onMounted(() => {
     menu.value = null;
   });
   themeWatcher.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-  window.addEventListener("pointerdown", onOutside, true);
-  window.addEventListener("keydown", onMenuKey, true);
 });
 
 // Monaco 的主题是全局的：单窗口模式下日志视图可能也还挂着，切回本窗口时把自己的那套刷回来
@@ -216,8 +196,6 @@ onActivated(applyCodeTheme);
 
 onBeforeUnmount(() => {
   themeWatcher.disconnect();
-  window.removeEventListener("pointerdown", onOutside, true);
-  window.removeEventListener("keydown", onMenuKey, true);
   ed?.dispose();
   ed = null;
 });
@@ -250,16 +228,8 @@ watch(wordWrap, (on) => {
 <template>
   <div ref="hostEl" class="monaco-text"></div>
 
-  <!-- 右键菜单：固定定位、贴点击处弹出，越界由 openMenu 夹回窗口里 -->
-  <div v-if="menu" ref="menuEl" class="text-menu" :style="{ left: menu.x + 'px', top: menu.y + 'px' }" @pointerdown.stop
-    @contextmenu.prevent>
-    <template v-for="item in menuItems" :key="item.command">
-      <span v-if="item.separated" class="text-menu-sep" />
-      <button class="text-menu-item" :disabled="item.disabled" @click="pick(item.command)">
-        {{ t(item.label) }}
-      </button>
-    </template>
-  </div>
+  <!-- 右键菜单：外观与收起都由 RowMenu 统一负责 -->
+  <RowMenu v-if="menu" :x="menu.x" :y="menu.y" :items="menuItems" @pick="pick" @close="closeMenu" />
 </template>
 
 <style scoped>
@@ -274,5 +244,3 @@ watch(wordWrap, (on) => {
 }
 </style>
 
-<!-- 右键菜单的样式与日志视图共用，见 styles/parts/text-menu.css -->
-<style scoped src="../../styles/parts/text-menu.css"></style>

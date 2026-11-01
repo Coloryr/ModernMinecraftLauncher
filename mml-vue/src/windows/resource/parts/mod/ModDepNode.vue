@@ -116,9 +116,11 @@ const tip = computed(() => {
 }
 
 /* 图的根，即当前打开的这个模组：用浅主色**底纹**标记，不占边框色。
-   边框色一档一个含义（必装 / 可选 / 游戏加载器），选中还要用它，根再插一脚就分不清了 */
+   边框色一档一个含义（必装 / 可选 / 游戏加载器），选中还要用它，根再插一脚就分不清了。
+   底纹要垫在画布底色上再叠：--accent-soft 本身带透明度，直接当背景会让画布的点阵透过来 */
 .dep-node-root {
-  background: var(--accent-soft);
+  background-color: var(--bg-raised);
+  background-image: linear-gradient(var(--accent-soft), var(--accent-soft));
 }
 
 /* 缺失：红虚线框盖过上面几档 —— 它一定是必装，红色说明"还没装" */

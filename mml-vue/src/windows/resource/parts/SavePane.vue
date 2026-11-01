@@ -29,7 +29,7 @@ import CloudSavePane from "./CloudSavePane.vue";
 import FormattedText from "../../../components/ui/FormattedText.vue";
 import ListSkeleton from "./ListSkeleton.vue";
 import ResourceRow from "./ResourceRow.vue";
-import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
+import RowMenu, { type RowMenuItem } from "../../../components/ui/RowMenu.vue";
 import SaveTabs from "./SaveTabs.vue";
 import VirtualList from "../../../components/ui/VirtualList.vue";
 import { RESOURCE_ROW_GAP } from "../../../composables/useVirtualRows";

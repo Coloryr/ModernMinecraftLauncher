@@ -22,12 +22,11 @@ import ListSkeleton from "./ListSkeleton.vue";
 import ModExportModal from "./mod/ModExportModal.vue";
 import ModList from "./mod/ModList.vue";
 import ModTable from "./mod/ModTable.vue";
-import ModDepsModal from "./mod/ModDepsModal.vue";
 import ModReplaceModal from "./mod/ModReplaceModal.vue";
 import ModUpdateLogModal from "./mod/ModUpdateLogModal.vue";
 import ModUpdateModal from "./mod/ModUpdateModal.vue";
 import ModGroupMenu, { type GroupMenuAction } from "./mod/ModGroupMenu.vue";
-import RowMenu, { type RowMenuItem } from "./RowMenu.vue";
+import RowMenu, { type RowMenuItem } from "../../../components/ui/RowMenu.vue";
 import {
   api,
   deleteMod,
@@ -83,6 +82,13 @@ const props = defineProps<{
   ops: ReturnType<typeof useResourceOps>;
   /** 视图偏好，模组展示方式、列宽与表头排序从这里取 */
   view: ReturnType<typeof useResourceView>;
+  /** 依赖关系：依赖图与"要和哪几个一起改"都在后端算，见 useModDeps */
+  deps: ReturnType<typeof useModDeps>;
+}>();
+
+const emit = defineEmits<{
+  /** 打开某个模组的依赖图：整页子页面由资源管理窗口切换，见 ResourceWindow */
+  (e: "open-deps", item: ModItemDto): void;
 }>();
 
 const {
@@ -688,23 +694,7 @@ watch(
 
 const groups = useModGroups(props.data);
 
-/** 依赖关系：依赖图与"要和哪几个一起改"都在后端算，见 useModDeps */
-const { depTreeOf, relatedOf, itemOf } = useModDeps(mods, instanceUuid);
-
-/** 打开着依赖图的那个模组；null = 没开 */
-const depTreeItem = ref<ModItemDto | null>(null);
-
-/**
- * 依赖图里双击某个节点：把这张图换成以它为目标
- *
- * 图上只有 modid，条目要回 useModDeps 查；缺失的前置与虚拟前置查不到，那就不动。
- *
- * - `key`: 被双击节点的 modid（小写）
- */
-function rerootGraph(key: string) {
-  const item = itemOf(key);
-  if (item) depTreeItem.value = item;
-}
+const { relatedOf } = props.deps;
 
 // ---------- 归组 / 改状态 ----------
 
@@ -1326,7 +1316,7 @@ function onMenuPick(id: string) {
       openUpdateLog(item.projectId);
       break;
     case "dep-tree":
-      depTreeItem.value = item;
+      emit("open-deps", item);
       break;
     case "remove":
       remove(item);
@@ -2157,10 +2147,6 @@ onBeforeUnmount(() => {
     <GlyphIcon name="folder" :size="14" />
     <span>{{ sectionGhostLabel }}</span>
   </DragGhost>
-
-  <!-- 依赖图：选一个模组，展开它声明的强制 / 推荐前置；共用前置只画一个节点 -->
-  <ModDepsModal v-if="depTreeItem" :item="depTreeItem" :load-tree="depTreeOf" @target="rerootGraph"
-    @close="depTreeItem = null" />
 
   <!--
     改启用状态时问一句要不要顺带处理相关模组：

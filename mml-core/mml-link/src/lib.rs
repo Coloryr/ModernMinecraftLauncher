@@ -4,7 +4,7 @@
 //! 每个实例的映射记录写在实例目录的 link_info.json
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
     sync::{
@@ -19,7 +19,12 @@ use mml_base::{
 };
 use mml_config::config_save;
 use mml_names::{
-    i18_items::error_type::{CoreResult, DataNotFoundData, DownloadFileHashErrorData, ErrorType},
+    i18_items::{
+        error_type::{
+            CoreResult, DataNotFoundData, DownloadFileHashErrorData, ErrorType,
+            FileSystemErrorData,
+        },
+    },
     names, uuids,
 };
 use mml_sys::path_helper;
@@ -27,22 +32,28 @@ use uuid::Uuid;
 
 use crate::info::{LinkInfoObj, ResourceInfoObj, ResourceType};
 
+mod index_store;
 pub mod info;
+
+pub use index_store::{IndexKind, Store};
 
 /// 公共模组目录
 static MOD_DOWNLOAD_PATH: OnceLock<PathBuf> = OnceLock::new();
 /// 公共资源包目录
 static RESOURCE_PACK_DOWNLOAD_PATH: OnceLock<PathBuf> = OnceLock::new();
-/// 公共模组索引文件
-static MOD_DOWNLOAD_FILE: OnceLock<PathBuf> = OnceLock::new();
-/// 公共资源包索引文件
-static RESOURCE_DOWNLOAD_FILE: OnceLock<PathBuf> = OnceLock::new();
+/// 公共索引库文件，模组与资源包共用
+static INDEX_PATH: OnceLock<PathBuf> = OnceLock::new();
+/// 公共索引库；打不开时为空，索引退化成只在内存里
+static INDEX: OnceLock<Store> = OnceLock::new();
 
 /// 资源映射总开关，由 GUI 配置同步
 static ENABLED: AtomicBool = AtomicBool::new(false);
 
 /// 游戏实例链接资源文件存储
 static LINK_DATA: OnceLock<RwLock<HashMap<Uuid, Vec<LinkInfoObj>>>> = OnceLock::new();
+/// 待写盘的映射记录：实例 uuid 与根目录
+static LINK_DIRTY: LazyLock<Mutex<HashSet<(Uuid, PathBuf)>>> =
+    LazyLock::new(Default::default);
 
 /// 下载到公共目录后补链所需的全部信息
 #[derive(Clone, Debug)]
@@ -69,19 +80,6 @@ pub struct LinkPlan {
     pub url: String,
 }
 
-/// 公共模组索引，按项目 ID 分组
-static MOD_ITEMS: LazyLock<RwLock<HashMap<String, Vec<ResourceInfoObj>>>> =
-    LazyLock::new(|| RwLock::new(HashMap::new()));
-
-/// 公共资源包索引，按项目 ID 分组
-static RESOURCE_PACK_ITEMS: LazyLock<RwLock<HashMap<String, Vec<ResourceInfoObj>>>> =
-    LazyLock::new(|| RwLock::new(HashMap::new()));
-
-/// 索引与映射记录的"克隆快照 + 入队"串行化
-///
-/// 多个下载同时完成时，若各自克隆后再入队，先克隆的旧快照可能后入队，把新记录盖掉。
-static SAVE_LOCK: Mutex<()> = Mutex::new(());
-
 impl ResourceType {
     /// 公共存储目录
     fn download_dir(self) -> &'static PathBuf {
@@ -91,27 +89,11 @@ impl ResourceType {
         }
     }
 
-    /// 索引内存表
-    fn items(self) -> &'static RwLock<HashMap<String, Vec<ResourceInfoObj>>> {
+    /// 索引库里的资源类型
+    fn kind(self) -> IndexKind {
         match self {
-            Self::Mod => &MOD_ITEMS,
-            Self::ResourcePack => &RESOURCE_PACK_ITEMS,
-        }
-    }
-
-    /// 索引落盘文件
-    fn index_file(self) -> &'static PathBuf {
-        match self {
-            Self::Mod => MOD_DOWNLOAD_FILE.get().unwrap(),
-            Self::ResourcePack => RESOURCE_DOWNLOAD_FILE.get().unwrap(),
-        }
-    }
-
-    /// 索引保存任务的 UUID
-    fn save_uuid(self) -> Uuid {
-        match self {
-            Self::Mod => uuids::MOD_DOWNLOAD_INFO_UUID,
-            Self::ResourcePack => uuids::RESOURCE_PACK_DOWNLOAD_INFO_UUID,
+            Self::Mod => IndexKind::Mod,
+            Self::ResourcePack => IndexKind::ResourcePack,
         }
     }
 }
@@ -151,44 +133,32 @@ pub fn init<P: AsRef<Path>>(path: P) -> CoreResult<()> {
         RESOURCE_PACK_DOWNLOAD_PATH.get_or_init(|| download.join(names::GAME_RESOURCEPACKS_DIR));
     path_helper::create_dir_all(dir)?;
 
-    MOD_DOWNLOAD_FILE.get_or_init(|| path.join(names::MOD_DOWNLOAD_FILE));
-    RESOURCE_DOWNLOAD_FILE.get_or_init(|| path.join(names::RESOURCEPACK_DOWNLOAD_FILE));
+    INDEX_PATH.get_or_init(|| path.join(names::DOWNLOAD_INDEX_DIR));
     LINK_DATA.get_or_init(Default::default);
 
-    read_mod_download_data();
-    read_resourcepack_download_data();
+    // 索引换成了事务库；旧 JSON 的导入由 mml-upgrade 在启动时单独跑
+    let index_path = INDEX_PATH.get().unwrap();
+    match Store::open(index_path) {
+        Ok(store) => {
+            let _ = INDEX.set(store);
+        }
+        // 打不开就别拦启动：索引退化成只在内存里，下次下载仍会照常写文件
+        Err(err) => mml_log::error_type(ErrorType::FileSystemError(FileSystemErrorData {
+            path: index_path.clone(),
+            error: err,
+        })),
+    }
 
     Ok(())
 }
 
-/// 读取公共模组索引
-fn read_mod_download_data() {
-    let file = MOD_DOWNLOAD_FILE.get().unwrap();
-    if !file.is_file() {
-        return;
-    }
-
-    match serialize_tools::json_from_file::<HashMap<String, Vec<ResourceInfoObj>>>(file) {
-        Ok(data) => {
-            *MOD_ITEMS.write().unwrap() = data;
-        }
-        Err(err) => mml_log::error_type(err),
-    }
-}
-
-/// 读取公共资源包索引
-fn read_resourcepack_download_data() {
-    let file = RESOURCE_DOWNLOAD_FILE.get().unwrap();
-    if !file.is_file() {
-        return;
-    }
-
-    match serialize_tools::json_from_file::<HashMap<String, Vec<ResourceInfoObj>>>(file) {
-        Ok(data) => {
-            *RESOURCE_PACK_ITEMS.write().unwrap() = data;
-        }
-        Err(err) => mml_log::error_type(err),
-    }
+/// 取索引库句柄
+///
+/// # 返回值
+///
+/// 库没打开时返回 `None`
+pub fn index_store() -> Option<&'static Store> {
+    INDEX.get()
 }
 
 /// 读取一个实例的映射记录
@@ -213,42 +183,90 @@ fn read_link_data(base: &Path) -> Vec<LinkInfoObj> {
     }
 }
 
-/// 保存一份公共索引
+/// 写入一条索引记录，键相同的覆盖
 ///
-/// - `resource`: 要保存的资源类型
-fn save_index(resource: ResourceType) {
-    let _guard = SAVE_LOCK.lock().unwrap();
-    let data = resource.items().read().unwrap();
-    config_save::save(resource.save_uuid(), &*data, resource.index_file());
+/// - `resource`: 资源类型
+/// - `pid`: 项目 ID
+/// - `info`: 记录
+fn save_entry(resource: ResourceType, pid: &str, info: &ResourceInfoObj) {
+    let Some(store) = INDEX.get() else {
+        return;
+    };
+    let payload = match serde_json::to_vec(info) {
+        Ok(payload) => payload,
+        Err(err) => {
+            log_index_error(err.to_string());
+            return;
+        }
+    };
+    if let Err(err) = store.put(resource.kind(), pid, &info.hash, &payload) {
+        log_index_error(err);
+    }
 }
 
-/// 保存公共模组索引
-fn save_mod_download_data() {
-    save_index(ResourceType::Mod);
-}
-
-/// 保存公共资源包索引
-fn save_resource_pack_download_data() {
-    save_index(ResourceType::ResourcePack);
-}
-
-/// 保存一个实例的映射记录
+/// 把索引里攒着的改动落盘
 ///
-/// - `instance`: 实例 uuid，用来派生保存任务
+/// 批量映射几万条时逐条 fsync 太慢，[Store] 会先攒批次；每个实例处理完调一次这里，
+/// 被强杀也只丢最后一个实例的记录
+pub fn flush_index() {
+    let Some(store) = INDEX.get() else {
+        return;
+    };
+    if let Err(err) = store.flush() {
+        log_index_error(err);
+    }
+}
+
+/// 记录一次索引读写失败
+///
+/// - `error`: 错误描述
+fn log_index_error(error: String) {
+    let path = INDEX_PATH
+        .get()
+        .cloned()
+        .unwrap_or_else(|| PathBuf::from(names::DOWNLOAD_INDEX_DIR));
+    mml_log::error_type(ErrorType::FileSystemError(FileSystemErrorData { path, error }));
+}
+
+/// 标记一个实例的映射记录待保存
+///
+/// 不立刻写盘：批量映射几万个文件时，每条都整份序列化一次就是 O(n²)。
+/// 先记在这里，由 [`flush_pending`] 每个实例收尾时统一写一次
+///
+/// - `instance`: 实例 uuid
 /// - `base`: 实例根目录，记录文件就写在这里
 fn save_link_data(instance: Uuid, base: &Path) {
-    let _guard = SAVE_LOCK.lock().unwrap();
-    let data = link_data()
-        .read()
+    LINK_DIRTY
+        .lock()
         .unwrap()
-        .get(&instance)
-        .cloned()
-        .unwrap_or_default();
-    config_save::save(
-        uuids::mix_uuid(instance, uuids::LINK_UUID),
-        &data,
-        base.join(names::LINK_INFO_FILE),
-    );
+        .insert((instance, base.to_path_buf()));
+}
+
+/// 把待写的映射记录落盘
+pub fn flush_link_data() {
+    let dirty: Vec<(Uuid, PathBuf)> = {
+        let mut dirty = LINK_DIRTY.lock().unwrap();
+        dirty.drain().collect()
+    };
+    for (instance, base) in dirty {
+        let data = link_data()
+            .read()
+            .unwrap()
+            .get(&instance)
+            .cloned()
+            .unwrap_or_default();
+        config_save::save(
+            uuids::mix_uuid(instance, uuids::LINK_UUID),
+            &data,
+            base.join(names::LINK_INFO_FILE),
+        );
+    }
+}
+
+/// 把索引与映射记录里攒着的改动一起落盘
+pub fn flush_pending() {
+    flush_index();
+    flush_link_data();
 }
 
 /// 获取公共模组目录
@@ -287,22 +305,8 @@ pub fn add_download_info(resource: ResourceType, mut info: ResourceInfoObj, pid:
         info.file = file.to_string();
     }
 
-    {
-        let mut items = resource.items().write().unwrap();
-        let list = items.entry(pid).or_default();
-        if let Some(old) = list.iter_mut().find(|item| item.hash == info.hash) {
-            old.name = info.name;
-            old.file = info.file;
-            old.url = info.url;
-        } else {
-            list.push(info);
-        }
-    }
-
-    match resource {
-        ResourceType::Mod => save_mod_download_data(),
-        ResourceType::ResourcePack => save_resource_pack_download_data(),
-    }
+    // 单条写进索引库，反查键由库自己维护；旧版本记录留在主索引里，点查不会互相覆盖
+    save_entry(resource, &pid, &info);
 }
 
 /// 获取实例的映射记录
@@ -334,8 +338,15 @@ pub fn get_instance_link_data(uuid: Uuid, instance_base: &Path) -> Vec<LinkInfoO
 ///
 /// 找到时返回索引记录；否则 None
 pub fn get_download_info(resource: ResourceType, pid: &str) -> Option<ResourceInfoObj> {
-    let items = resource.items().read().unwrap();
-    items.get(pid)?.last().cloned()
+    let store = INDEX.get()?;
+    let (_, payload) = match store.latest_of(resource.kind(), pid) {
+        Ok(row) => row?,
+        Err(err) => {
+            log_index_error(err);
+            return None;
+        }
+    };
+    serde_json::from_slice(&payload).ok()
 }
 
 /// 公共存储中是否已有该 SHA1 的文件
@@ -348,20 +359,20 @@ pub fn get_download_info(resource: ResourceType, pid: &str) -> Option<ResourceIn
 /// 找到且校验通过时返回公共文件路径
 pub fn find_file(resource: ResourceType, hash: &str) -> Option<PathBuf> {
     let hash = normalize_hash(hash)?;
-    {
-        let items = resource.items().read().unwrap();
-        for list in items.values() {
-            for item in list {
-                if !item.hash.eq_ignore_ascii_case(&hash) {
-                    continue;
-                }
-                let file = resource.download_dir().join(&item.file);
-                // 索引是下载完成时记的，文件在就当作有效；每次启动都对几百个模组重算
-                // SHA1 太慢，坏文件留给实际加载报错
-                if file.is_file() {
-                    return Some(file);
+    if let Some(store) = INDEX.get() {
+        match store.find(resource.kind(), &hash) {
+            Ok(Some((_, payload))) => {
+                if let Ok(item) = serde_json::from_slice::<ResourceInfoObj>(&payload) {
+                    let file = resource.download_dir().join(&item.file);
+                    // 索引是下载完成时记的，文件在就当作有效；每次启动都对几百个模组重算
+                    // SHA1 太慢，坏文件留给实际加载报错
+                    if file.is_file() {
+                        return Some(file);
+                    }
                 }
             }
+            Ok(None) => {}
+            Err(err) => log_index_error(err),
         }
     }
 
@@ -585,6 +596,8 @@ pub fn try_link(
     );
     record_link(instance, instance_base, target, pid, fid, is_link);
     save_link_data(instance, instance_base);
+    // 单条手动链接：立刻落盘，别等下一次批量收尾
+    flush_link_data();
     Ok(true)
 }
 
@@ -786,17 +799,12 @@ fn prefer_source(resource: ResourceType, hash: &str, target: &Path, source: Path
 /// - old: 旧公共文件名
 /// - new: 新公共文件名
 fn rename_index_file(resource: ResourceType, old: &str, new: &str) {
-    {
-        let mut items = resource.items().write().unwrap();
-        for list in items.values_mut() {
-            for item in list {
-                if item.file == old {
-                    item.file = new.to_string();
-                }
-            }
-        }
+    let Some(store) = INDEX.get() else {
+        return;
+    };
+    if let Err(err) = store.rename_file(resource.kind(), old, new) {
+        log_index_error(err);
     }
-    save_index(resource);
 }
 
 /// 下载失败但实例里已有同哈希文件时，把它复制进公共目录再补链
@@ -919,6 +927,8 @@ pub fn remove_link(instance: Uuid, instance_base: &Path, target: &Path) {
         }
     }
     save_link_data(instance, instance_base);
+    // 删除要立刻生效：否则强杀后旧记录还在，下次启动又把它链回去
+    flush_link_data();
 }
 
 /// 实例映射记录表

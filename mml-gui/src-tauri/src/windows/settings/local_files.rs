@@ -100,14 +100,11 @@ fn size_of(kind: &LocalFileKind) -> u64 {
 ///
 /// 与 [`kinds`] 同序的 DTO 列表
 fn collect() -> Vec<LocalFileEntryDto> {
-    // 实例里的模组是 download 的硬链接；实例行要把这部分排除，否则总计会算两遍
-    let download_ids = file_ids_of(&mml_downloader::get_download_path());
-
-    kinds()
+    let list: Vec<LocalFileEntryDto> = kinds()
         .into_iter()
         .map(|kind| {
             let children = match kind.id {
-                "instances" => instance_sizes(&download_ids),
+                "instances" => instance_sizes(),
                 "download" => download_sizes(),
                 _ => Vec::new(),
             };
@@ -125,52 +122,74 @@ fn collect() -> Vec<LocalFileEntryDto> {
                 children,
             }
         })
-        .collect()
+        .collect();
+    list
 }
 
-/// 收集目录下所有文件的身份
+/// 实例里已算进 `download` 的那部分文件，按实例根目录的相对路径
 ///
-/// - `path`: 目录
+/// 只认 `is_link` 的记录：跨盘回退成复制的那些数据仍然只在实例里，大小要算给实例。
+/// 用映射记录代替逐文件取身份 —— 取身份要开一次文件句柄，十几万个文件走一遍就是几分钟，
+/// 而记录里本来就写着哪些文件是硬链接
+///
+/// - `uuid`: 实例 uuid
+/// - `base`: 实例根目录
 ///
 /// # 返回值
 ///
-/// 文件身份集合；读不到身份的文件会被忽略
-fn file_ids_of(path: &Path) -> HashSet<path_helper::FileId> {
-    path_helper::get_all_files(path)
+/// 相对路径集合，统一用 `/` 分隔；没有映射记录时为空
+fn linked_paths(uuid: uuid::Uuid, base: &Path) -> HashSet<String> {
+    mml_link::get_instance_link_data(uuid, base)
         .into_iter()
-        .filter_map(path_helper::file_id)
+        .filter(|item| item.is_link)
+        .map(|item| item.path.replace('\\', "/"))
         .collect()
 }
 
-/// 统计目录大小，跳过已在别处计过的文件
+/// 统计目录大小，跳过已计入别处的文件
 ///
-/// - `path`: 目录
-/// - `excluded`: 已经计入其他目录的文件身份
+/// - `base`: 实例根目录，用来算相对路径
+/// - `dir`: 当前遍历的目录
+/// - `linked`: 已计入 `download` 的相对路径
 ///
 /// # 返回值
 ///
 /// 未重复文件的字节数
-fn size_excluding(path: &Path, excluded: &HashSet<path_helper::FileId>) -> u64 {
-    path_helper::get_all_files(path)
-        .into_iter()
-        .filter_map(|file| {
-            let len = fs::metadata(&file).ok()?.len();
-            match path_helper::file_id(&file) {
-                Some(id) if excluded.contains(&id) => None,
-                _ => Some(len),
-            }
-        })
-        .sum()
+fn size_excluding(base: &Path, dir: &Path, linked: &HashSet<String>) -> u64 {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return 0;
+    };
+    let mut total = 0;
+    for entry in entries.flatten() {
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
+        if kind.is_dir() {
+            total += size_excluding(base, &entry.path(), linked);
+            continue;
+        }
+        if !kind.is_file() {
+            continue;
+        }
+        let path = entry.path();
+        let relative = path
+            .strip_prefix(base)
+            .map(|item| item.to_string_lossy().replace('\\', "/"))
+            .unwrap_or_default();
+        if linked.contains(&relative) {
+            continue;
+        }
+        total += entry.metadata().map(|meta| meta.len()).unwrap_or(0);
+    }
+    total
 }
 
 /// 各游戏实例的占用，按大小降序
 ///
-/// - `excluded`: 已经计入下载内容的文件身份
-///
 /// # 返回值
 ///
 /// 每个实例的 uuid / 名字 / 根目录与独占字节数；没有实例时为空列表
-fn instance_sizes(excluded: &HashSet<path_helper::FileId>) -> Vec<LocalFileChildDto> {
+fn instance_sizes() -> Vec<LocalFileChildDto> {
     let mut list: Vec<LocalFileChildDto> = mml_game::get_instances()
         .into_iter()
         .map(|instance| {
@@ -178,16 +197,18 @@ fn instance_sizes(excluded: &HashSet<path_helper::FileId>) -> Vec<LocalFileChild
             let (uuid, name, path) = {
                 let instance = instance.read().unwrap();
                 (
-                    instance.uuid.to_string(),
+                    instance.uuid,
                     instance.name.clone(),
                     instance.get_base_path(),
                 )
             };
+            // 实例里的模组是 download 的硬链接，按映射记录把这部分排除，否则总计会算两遍
+            let linked = linked_paths(uuid, &path);
             LocalFileChildDto {
-                id: uuid,
+                id: uuid.to_string(),
                 kind: String::from("instance"),
                 name,
-                size: size_excluding(&path, excluded),
+                size: size_excluding(&path, &path, &linked),
                 path: path.to_string_lossy().to_string(),
             }
         })

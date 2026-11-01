@@ -794,7 +794,7 @@
   color: var(--text-dim);
 }
 
-/* 右键菜单样式见 MainCtxMenu.vue */
+/* 右键菜单外观在 styles/parts/ctxmenu.css，与资源管理共用（MainCtxMenu 走 RowMenu） */
 
 /* ================= 拖拽文件遮罩层 ================= */
 

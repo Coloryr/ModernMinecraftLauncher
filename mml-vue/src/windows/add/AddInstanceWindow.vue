@@ -205,8 +205,6 @@ async function applyArchivePath(path: string) {
   }
   // 读条目 + 识别类型都是磁盘活，期间给个滚动进度条并挡住模式切换
   archivePhase.value = "list";
-  // [TEMP] 页面侧读条目起点
-  console.warn("[TEMP] archive-list start", Date.now());
   try {
     // 一次打开压缩包：条目、类型、名字、是不是服务器包都由后端一并给出，
     // 分成三次命令就要把 1GB 的包反复解析三遍
@@ -221,8 +219,6 @@ async function applyArchivePath(path: string) {
       return;
     }
     if (isLeaving()) return;
-    // [TEMP] 条目到手，看 buildTree 是否拖慢界面
-    console.warn("[TEMP] archive-list done", Date.now(), probe.entries.length);
     if (probe.serverPack) {
       // 服务器包：交给服务器包导入，别当实例装
       showToast(t("serverPack.importing"));
@@ -234,7 +230,6 @@ async function applyArchivePath(path: string) {
       return;
     }
     resetArchive(buildTree(probe.entries), true);
-    console.warn("[TEMP] archive-tree done", Date.now());
     // 类型与实例名由后端识别结果填，用户改过名字则不动
     addPackType.value = probe.packType;
     if (!nameEdited && probe.name) {
@@ -720,8 +715,6 @@ async function create() {
   }
 
   const group = addGroup.value;
-  // [TEMP] 与后端日志对齐用：记下点"开始"的时刻
-  console.warn("[TEMP] add-start", Date.now(), addMode.value);
   addError.value = "";
   addErrorField.value = "";
   // 先复位：上一条在线实例失败后留下的「下载」标题不能带到压缩包安装里
@@ -928,17 +921,6 @@ onMounted(async () => {
   // 整合包安装进度，压缩包 / 网址 / 在线整合包安装共用
   track(
     onAddPackProgress((e) => {
-      // [TEMP] 定位"解压卡住"用：看事件到达时刻与子进度字段
-      console.warn(
-        "[TEMP] pack-progress",
-        Date.now(),
-        e.state,
-        e.now,
-        e.total,
-        e.subNow,
-        e.subTotal,
-        e.subText ?? "",
-      );
       packProgress.value = e;
       if (e.state === "done") {
         setTimeout(() => {

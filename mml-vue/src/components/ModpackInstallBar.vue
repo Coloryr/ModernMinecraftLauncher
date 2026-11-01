@@ -61,6 +61,16 @@ function taskProgress(task: ModPackTaskDto): number {
   if (task.done) return 100;
   return progressPercent(task) ?? 0;
 }
+
+/** 单任务总数还不知道（0 / 0）：进度条走无限滚动 */
+function taskRolling(task: ModPackTaskDto): boolean {
+  return isRunning(task) && !task.total && !task.subTotal;
+}
+
+/** 总进度也没数可报：所有进行中的任务都还没有总数 */
+const overallRolling = computed(
+  () => running.value.length > 0 && running.value.every((task) => !task.total && !task.subTotal),
+);
 /** 标题行文案：还有在装的按"正在安装 N 个"说，全结束了改说"已结束"（别再报 0 个正在安装） */
 const headText = computed(() =>
   running.value.length
@@ -101,7 +111,8 @@ async function clearDone() {
     <!-- 总进度条：只有多个任务时才画；单个任务下面那条就是它自己的进度，
          再画一条总进度只会重复。全结束时也不画，满格蓝杠没有信息量 -->
     <div v-if="running.length > 1" class="progress-track">
-      <div class="progress-fill" :style="{ width: percent + '%' }" />
+      <div class="progress-fill" :class="{ 'is-roll': overallRolling }"
+        :style="overallRolling ? undefined : { width: percent + '%' }" />
     </div>
 
     <!-- 展开的任务详情；fillHeight 时滚动落在 CollapsePanel 内层，见 .mp-bar.fill-h -->
@@ -132,13 +143,14 @@ async function clearDone() {
                已完成才走 100%。进行中有子进度时让位，避免一条阶段条压在子进度条上面不动 -->
           <div v-if="!task.failed && !task.cancelled && !(isRunning(task) && task.subTotal > 0)"
             class="progress-track sub">
-            <div class="progress-fill" :style="{ width: taskProgress(task) + '%' }" />
+            <div class="progress-fill" :class="{ 'is-roll': taskRolling(task) }"
+              :style="taskRolling(task) ? undefined : { width: taskProgress(task) + '%' }" />
           </div>
           <template v-if="isRunning(task) && (task.subText || task.subTotal)">
             <div class="mp-task-sub" v-tip="task.subText || ''">{{ shortPath(task.subText || "") }}</div>
             <div class="progress-track sub">
-              <div class="progress-fill"
-                :style="{ width: task.subTotal ? (task.subNow / task.subTotal) * 100 + '%' : '0%' }" />
+              <div class="progress-fill" :class="{ 'is-roll': !task.subTotal }"
+                :style="task.subTotal ? { width: (task.subNow / task.subTotal) * 100 + '%' } : undefined" />
             </div>
           </template>
         </div>

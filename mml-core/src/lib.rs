@@ -124,6 +124,8 @@ pub fn load() -> CoreResult<()> {
     mml_game::load()?;
     mml_tex_draw::load()?;
 
+    // 退出前把索引与映射记录里攒着的改动写下去
+    CORE_STOP_EVENT.add_handler(mml_link::flush_pending);
     CORE_STOP_EVENT.add_handler(config_save::stop);
     CORE_STOP_EVENT.add_handler(mml_downloader::stop);
     // 退出时中断贴图渲染：渲染循环是协作式的，不打断会一直跑到本轮结束

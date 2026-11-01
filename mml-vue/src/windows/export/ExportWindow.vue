@@ -644,6 +644,9 @@ const percent = computed(() => {
   return Math.min(100, Math.round((p.now / p.total) * 100));
 });
 
+/** 总数还不知道（0 / 0）：进度条走无限滚动 */
+const rolling = computed(() => (progress.value?.total ?? 0) <= 0);
+
 /** 勾选表 → 后端要的入参：路径 + 下载地址 */
 function picksOf(picked: Map<string, ExportEntryDto>) {
   return [...picked.keys()].map((path) => ({
@@ -1134,7 +1137,8 @@ onBeforeUnmount(() => {
         {{ progress.text || t("winExport.progressPreparing") }}
       </p>
       <div class="progress-track">
-        <div class="progress-fill" :style="{ width: percent + '%' }" />
+        <div class="progress-fill" :class="{ 'is-roll': rolling }"
+          :style="rolling ? undefined : { width: percent + '%' }" />
       </div>
       <p v-if="progress.state === 'running'" class="prog-count">
         {{ progress.total > 0 ? t("winExport.progressCount", { now: progress.now, total: progress.total }) : percent +

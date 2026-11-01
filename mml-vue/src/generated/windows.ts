@@ -72,7 +72,6 @@ export { default as WinResourcePartsModPane } from "../windows/resource/parts/Mo
 export { default as WinResourcePartsPackPane } from "../windows/resource/parts/PackPane.vue";
 export { default as WinResourcePartsRenameModal } from "../windows/resource/parts/RenameModal.vue";
 export { default as WinResourcePartsResourceRow } from "../windows/resource/parts/ResourceRow.vue";
-export { default as WinResourcePartsRowMenu } from "../windows/resource/parts/RowMenu.vue";
 export { default as WinResourcePartsSavePane } from "../windows/resource/parts/SavePane.vue";
 export { default as WinResourcePartsSaveTabs } from "../windows/resource/parts/SaveTabs.vue";
 export { default as WinResourcePartsSchematicPane } from "../windows/resource/parts/SchematicPane.vue";
@@ -81,7 +80,7 @@ export { default as WinResourcePartsServerFormModal } from "../windows/resource/
 export { default as WinResourcePartsServerPane } from "../windows/resource/parts/ServerPane.vue";
 export { default as WinResourcePartsShaderPane } from "../windows/resource/parts/ShaderPane.vue";
 export { default as WinResourcePartsModModDepNode } from "../windows/resource/parts/mod/ModDepNode.vue";
-export { default as WinResourcePartsModModDepsModal } from "../windows/resource/parts/mod/ModDepsModal.vue";
+export { default as WinResourcePartsModModDepsPage } from "../windows/resource/parts/mod/ModDepsPage.vue";
 export { default as WinResourcePartsModModExportModal } from "../windows/resource/parts/mod/ModExportModal.vue";
 export { default as WinResourcePartsModModGroupMenu } from "../windows/resource/parts/mod/ModGroupMenu.vue";
 export { default as WinResourcePartsModModList } from "../windows/resource/parts/mod/ModList.vue";
@@ -93,6 +92,7 @@ export { default as ServerInstanceWindow } from "../windows/server_instance/Serv
 export { default as SettingsWindow } from "../windows/settings/SettingsWindow.vue";
 export { default as WinSettingsPartsActionSelect } from "../windows/settings/parts/ActionSelect.vue";
 export { default as WinSettingsPartsGamepadTestPanel } from "../windows/settings/parts/GamepadTestPanel.vue";
+export { default as WinSettingsPartsLinkResourcesModal } from "../windows/settings/parts/LinkResourcesModal.vue";
 export { default as WinSettingsPartsSaveStateText } from "../windows/settings/parts/SaveStateText.vue";
 export { default as WinSettingsPartsSettingsGroup } from "../windows/settings/parts/SettingsGroup.vue";
 export { default as WinSettingsPartsSettingsRail } from "../windows/settings/parts/SettingsRail.vue";

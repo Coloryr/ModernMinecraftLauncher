@@ -11,6 +11,7 @@ M²L（Modern Minecraft Launcher）是一个 Minecraft 启动器。它把“一�
 
 - 想参与开发或自行构建：见[开发与构建](development.md)。
 - 开源许可与第三方组件：见[开源许可](licensing.md)。
+- 每个版本改了什么：见[更新日志](changelog.md)。
 
 > 当前发布版本从 **v0.0.1** 开始。界面上的「测试版 / 预发布版」徽章只表示构建通道，不代表功能差异。
 

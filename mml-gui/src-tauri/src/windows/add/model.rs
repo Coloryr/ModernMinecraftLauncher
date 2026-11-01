@@ -246,16 +246,6 @@ pub(super) struct PackProgressGui {
     dto: Mutex<PackProgressDto>,
     /// 上一次子进度事件的时间；子进度最多 100ms 发一次
     last_sub: Mutex<Instant>,
-    /// [TEMP] 是否已打过"第一条子进度"的日志
-    logged_first_sub: std::sync::atomic::AtomicBool,
-}
-
-/// [TEMP] 诊断时间戳，单位 ms
-fn temp_ms() -> u128 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0)
 }
 
 impl PackProgressGui {
@@ -286,14 +276,6 @@ impl PackProgressGui {
         }
         *last = Instant::now();
         drop(last);
-        if force {
-            mml_log::info(format!("[TEMP] emit sub start t={}", temp_ms()));
-        } else if !self
-            .logged_first_sub
-            .swap(true, std::sync::atomic::Ordering::Relaxed)
-        {
-            mml_log::info(format!("[TEMP] emit sub first t={}", temp_ms()));
-        }
         emit_add_pack_progress(&self.window, self.dto.lock().unwrap().clone());
     }
 }
@@ -304,7 +286,6 @@ impl IAddModPackGui for PackProgressGui {
     /// - `state`: 内核给出的安装阶段
     fn set_state(&self, state: AddModPackState) {
         let id = pack_state_id(state);
-        mml_log::info(format!("[TEMP] emit state {} t={}", id, temp_ms()));
         self.update(|dto| dto.state = id.into());
     }
 
@@ -351,7 +332,6 @@ pub(super) fn pack_gui(window: &WebviewWindow) -> AddModPackGui {
     Some(Arc::new(PackProgressGui {
         window: window.clone(),
         last_sub: Mutex::new(Instant::now()),
-        logged_first_sub: std::sync::atomic::AtomicBool::new(false),
         dto: Mutex::new(PackProgressDto {
             state: "downloadPack".into(),
             now: 0,

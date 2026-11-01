@@ -4,13 +4,14 @@
 //
 // **筛选不在这里**：等级 / 线程 / 分组都归日志窗口的工具栏管，筛完的行才传进来，
 // 免得同一套筛选条件在两边各存一份、还要互相同步。
-import { nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onActivated, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { editor } from "monaco-editor/editor/editor.api";
 import { applyLogTheme, monaco } from "../lib/monaco";
 import { t } from "../lib/i18n";
 import { LOG_LANGUAGE, registerLog } from "../lib/monacoLog";
 import { toggleWordWrap, wordWrap } from "../lib/editorWrap";
 import type { LogLine } from "../lib/bindings";
+import RowMenu, { type RowMenuItem } from "./ui/RowMenu.vue";
 
 const props = defineProps<{
   /** 日志行，按时间顺序；调用方已按等级 / 线程 / 分组筛过 */
@@ -147,7 +148,6 @@ const LOG_MENU = [
 
 /** 右键菜单的视口坐标；null = 没开 */
 const menu = ref<{ x: number; y: number } | null>(null);
-const menuEl = ref<HTMLElement | null>(null);
 /** 有选区才让点「复制」 */
 const canCopy = ref(false);
 
@@ -174,19 +174,25 @@ function onContextMenu(e: editor.IEditorMouseEvent) {
   void openMenu(e.event.browserEvent.clientX, e.event.browserEvent.clientY);
 }
 
-/** 贴着点击处弹菜单；先画出来量宽高，再夹回窗口里 */
-async function openMenu(x: number, y: number) {
+/** 菜单项：日志只读，只有复制 / 全选；没有选区时复制置灰 */
+const menuItems = computed<RowMenuItem[]>(() =>
+  LOG_MENU.map((item) => ({
+    id: item.command,
+    label: t(item.label),
+    disabled: item.command === "editor.action.clipboardCopyAction" && !canCopy.value,
+  })),
+);
+
+/** 弹菜单：定位交给 RowMenu，这里只记坐标 */
+function openMenu(x: number, y: number) {
   menu.value = { x, y };
-  await nextTick();
-  const box = menuEl.value?.getBoundingClientRect();
-  if (!box) return;
-  const pad = 8;
-  menu.value = {
-    x: Math.max(pad, Math.min(x, window.innerWidth - box.width - pad)),
-    y: Math.max(pad, Math.min(y, window.innerHeight - box.height - pad)),
-  };
 }
 
+/** 收起菜单并把焦点还给编辑器 */
+function closeMenu() {
+  menu.value = null;
+  monacoEditor?.focus();
+}
 /** 跑一项：先收起菜单、把焦点还给编辑器，再发命令 */
 function pick(command: string) {
   menu.value = null;
@@ -194,20 +200,6 @@ function pick(command: string) {
   monacoEditor?.trigger("mml-menu", command, null);
 }
 
-/** 点到菜单外面：收起 */
-function onOutside(e: Event) {
-  if (!menu.value || menuEl.value?.contains(e.target as Node)) return;
-  menu.value = null;
-}
-
-/** Esc 收起菜单；这一下不再往下传，免得顺手把窗口也关了 */
-function onMenuKey(e: KeyboardEvent) {
-  if (e.key !== "Escape" || !menu.value) return;
-  e.preventDefault();
-  e.stopPropagation();
-  menu.value = null;
-  monacoEditor?.focus();
-}
 
 // 主题落在 <html data-theme> 上，盯着这个属性比自己监听 theme ref 全面：
 // 设置窗口改主题、其它窗口同步过来的改动、跟随系统时系统切换，最终都只是改这个属性
@@ -247,8 +239,6 @@ onMounted(() => {
   });
   decorations = monacoEditor.createDecorationsCollection([]);
   monacoEditor.onContextMenu(onContextMenu);
-  window.addEventListener("pointerdown", onOutside, true);
-  window.addEventListener("keydown", onMenuKey, true);
   // Alt+Z：与 VS Code 同键位，写的是全局偏好，配置编辑器与其它窗口跟着变
   monacoEditor.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.KeyZ, toggleWordWrap);
   themeWatcher.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
@@ -276,8 +266,6 @@ onActivated(applyLogTheme);
 
 onBeforeUnmount(() => {
   themeWatcher.disconnect();
-  window.removeEventListener("pointerdown", onOutside, true);
-  window.removeEventListener("keydown", onMenuKey, true);
   monacoEditor?.dispose();
   monacoEditor = null;
   logModel?.dispose();
@@ -327,16 +315,8 @@ watch(wordWrap, (on) => {
       </div>
     </div>
 
-    <!-- 右键菜单：全选 / 复制，越界由 openMenu 夹回窗口里 -->
-    <div v-if="menu" ref="menuEl" class="text-menu" :style="{ left: menu.x + 'px', top: menu.y + 'px' }"
-      @pointerdown.stop @contextmenu.prevent>
-      <button class="text-menu-item" :disabled="!canCopy" @click="pick(LOG_MENU[0].command)">
-        {{ t(LOG_MENU[0].label) }}
-      </button>
-      <button class="text-menu-item" @click="pick(LOG_MENU[1].command)">
-        {{ t(LOG_MENU[1].label) }}
-      </button>
-    </div>
+    <!-- 右键菜单：外观与收起都由 RowMenu 统一负责 -->
+    <RowMenu v-if="menu" :x="menu.x" :y="menu.y" :items="menuItems" @pick="pick" @close="closeMenu" />
   </div>
 </template>
 
@@ -386,7 +366,6 @@ watch(wordWrap, (on) => {
 </style>
 
 <!-- 右键菜单：与配置编辑器的 MonacoText 共用一份样式 -->
-<style scoped src="../styles/parts/text-menu.css"></style>
 
 <!-- 着色类供 monaco 内部渲染层使用，无 scope、全局生效 -->
 <style>

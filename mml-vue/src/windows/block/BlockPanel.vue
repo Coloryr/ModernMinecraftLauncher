@@ -14,6 +14,7 @@ import BlockGrid from "./parts/BlockGrid.vue";
 import BlockDetailModal from "./parts/BlockDetailModal.vue";
 import InstancePickModal from "./parts/InstancePickModal.vue";
 import SkinAddModal from "./parts/SkinAddModal.vue";
+import RowMenu, { type RowMenuItem } from "../../components/ui/RowMenu.vue";
 import SearchBox from "../../components/ui/SearchBox.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
@@ -118,14 +119,22 @@ const groupRemove = ref<{ uuid: string; label: string } | null>(null);
 function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }) {
   // 自带分类不能改名 / 删除，右键不给菜单
   if (!isCustomGroup(payload.id)) return;
-  // 贴边时往回收，菜单别被窗口裁掉
   groupMenu.value = {
-    x: Math.min(payload.event.clientX, window.innerWidth - 160),
-    y: Math.min(payload.event.clientY, window.innerHeight - 80),
+    x: payload.event.clientX,
+    y: payload.event.clientY,
     id: payload.id,
     label: payload.label,
   };
 }
+
+/** 分组菜单项：改名 / 删除 */
+const groupMenuItems = computed<RowMenuItem[]>(() => {
+  if (!groupMenu.value) return [];
+  return [
+    { id: "rename", label: t("blocks.groupRename") },
+    { id: "remove", label: t("blocks.groupRemove"), danger: true },
+  ];
+});
 
 /**
  * 分组菜单分发：改名或删除
@@ -174,6 +183,44 @@ const inCustomGroupView = computed(() => isCustomGroup(cat.value));
 /** 主菜单；null = 没开 */
 const blockMenu = ref<{ x: number; y: number; item: BlockItemDto } | null>(null);
 
+/** 方块右键菜单项：多选、设置实例 / 分组，自建分组视图里多一条「移出分组」 */
+const blockMenuItems = computed<RowMenuItem[]>(() => {
+  const menu = blockMenu.value;
+  if (!menu) return [];
+  const list: RowMenuItem[] = [];
+  if (!props.multiSelect) {
+    list.push({ id: "multi", label: t("blocks.multiSelect") });
+    list.push({ id: "set-icon", label: t("blocks.menuSetIcon") });
+    list.push({ id: "set-group", label: t("blocks.menuSetGroup") });
+  }
+  if (inCustomGroupView.value && groupOf(menu.item.id)) {
+    list.push({ id: "deassign", label: t("blocks.groupDeassign"), danger: true });
+  }
+  return list;
+});
+
+/**
+ * 方块右键菜单的动作分发
+ *
+ * - `id`: 菜单项 id，见 blockMenuItems
+ */
+function onBlockMenuPick(id: string) {
+  switch (id) {
+    case "multi":
+      enterMultiSelectFromMenu();
+      break;
+    case "set-icon":
+      menuSetIcon();
+      break;
+    case "set-group":
+      menuSetGroup();
+      break;
+    case "deassign":
+      menuRemoveGroup();
+      break;
+  }
+}
+
 /** 设置分组弹窗里的方块 id；空数组表示没开（多选时一次设置多个） */
 const groupTargets = ref<string[]>([]);
 
@@ -214,11 +261,7 @@ const groupPickValue = computed(() => {
  * - `payload.item`: 右键的那个方块
  */
 function openBlockMenu(payload: { event: MouseEvent; item: BlockItemDto }) {
-  blockMenu.value = {
-    x: Math.min(payload.event.clientX, window.innerWidth - 200),
-    y: Math.min(payload.event.clientY, window.innerHeight - 160),
-    item: payload.item,
-  };
+  blockMenu.value = { x: payload.event.clientX, y: payload.event.clientY, item: payload.item };
 }
 
 /** 设置实例：走详情那套选实例弹窗，目标是右键的这个方块 */
@@ -452,7 +495,8 @@ async function onDetailRemove() {
         {{ status?.text || (preparing ? t("blocks.downloadingCore") : t("blocks.rendering")) }}
       </span>
       <div class="block-progress-bar">
-        <div class="block-progress-fill" :style="{ width: percent + '%' }"></div>
+        <div class="block-progress-fill" :class="{ 'is-roll': preparing }"
+          :style="preparing ? undefined : { width: percent + '%' }"></div>
       </div>
       <span class="block-progress-percent">{{ preparing ? "—" : percent.toFixed(1) + "%" }}</span>
       <span v-if="!preparing" class="block-progress-num">
@@ -540,27 +584,13 @@ async function onDetailRemove() {
       @set-icon="openDetailIconPick" @toggle-favorite="onDetailFavorite" @set-group="onDetailSetGroup" />
 
     <!-- 分组右键菜单：改名 / 删除；点空白处关掉 -->
-    <div v-if="groupMenu" class="menu-backdrop" @pointerdown="groupMenu = null" @contextmenu.prevent />
-    <div v-if="groupMenu" class="group-menu" :style="{ left: groupMenu.x + 'px', top: groupMenu.y + 'px' }"
-      @pointerdown.stop @contextmenu.prevent>
-      <button class="group-menu-item" @click="onGroupPick('rename')">{{ t("blocks.groupRename") }}</button>
-      <button class="group-menu-item danger" @click="onGroupPick('remove')">{{ t("blocks.groupRemove") }}</button>
-    </div>
+    <!-- 分组右键菜单：改名 / 删除 -->
+    <RowMenu v-if="groupMenu" :x="groupMenu.x" :y="groupMenu.y" :items="groupMenuItems" @pick="onGroupPick"
+      @close="groupMenu = null" />
 
     <!-- 方块右键菜单：设置实例 / 设置分组；自建分组视图里多一个「移出分组」 -->
-    <div v-if="blockMenu" class="menu-backdrop" @pointerdown="blockMenu = null" @contextmenu.prevent />
-    <div v-if="blockMenu" class="group-menu" :style="{ left: blockMenu.x + 'px', top: blockMenu.y + 'px' }"
-      @pointerdown.stop @contextmenu.prevent>
-      <button v-if="!multiSelect" class="group-menu-item" @click="enterMultiSelectFromMenu">
-        {{ t("blocks.multiSelect") }}
-      </button>
-      <button v-if="!multiSelect" class="group-menu-item" @click="menuSetIcon">{{ t("blocks.menuSetIcon") }}</button>
-      <button v-if="!multiSelect" class="group-menu-item" @click="menuSetGroup">{{ t("blocks.menuSetGroup") }}</button>
-      <button v-if="inCustomGroupView && groupOf(blockMenu.item.id)" class="group-menu-item danger"
-        @click="menuRemoveGroup">
-        {{ t("blocks.groupDeassign") }}
-      </button>
-    </div>
+    <RowMenu v-if="blockMenu" :x="blockMenu.x" :y="blockMenu.y" :items="blockMenuItems" @pick="onBlockMenuPick"
+      @close="blockMenu = null" />
 
     <!-- 设置分组：下拉选一个分组，空串表示未分组；多选时一次应用到所有勾选的方块 -->
     <BaseModal v-if="groupPickOpen" :title="t('blocks.menuSetGroup')" :width="380" :closable="false"
@@ -685,29 +715,6 @@ async function onDetailRemove() {
   cursor: pointer;
 }
 
-/* ---------- 分组右键菜单 ---------- */
-
-/* 右键菜单挂在窗口最上层：遮罩与菜单同为 250 档，菜单在 DOM 里靠后，自然压在遮罩上 */
-.menu-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 250;
-}
-
-.group-menu {
-  position: fixed;
-  z-index: 250;
-  min-width: 140px;
-  /* 分组多时在菜单内滚动，不把菜单撑出窗口 */
-  max-height: 70vh;
-  overflow-y: auto;
-  padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-modal);
-  box-shadow: var(--shadow-lg);
-}
-
 /* ---------- 设置分组弹窗 ---------- */
 
 /* 方块名跟在标题下面，与分组列表拉开一点 */
@@ -728,28 +735,6 @@ async function onDetailRemove() {
 /* 新建分组靠左，其余操作留在右侧 */
 .group-pick-new {
   margin-right: auto;
-}
-
-.group-menu-item {
-  display: block;
-  width: 100%;
-  padding: 6px 10px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text);
-  font-size: 13px;
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.group-menu-item:hover {
-  background: var(--bg-hover);
-}
-
-.group-menu-item.danger:hover {
-  color: var(--red);
 }
 
 .group-tip {

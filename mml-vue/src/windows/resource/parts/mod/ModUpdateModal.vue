@@ -123,7 +123,7 @@ function apply() {
 </template>
 
 <style scoped>
-/* 弹窗在 body 下，样式走 scoped（与 ModDepsModal 同一处理） */
+/* 弹窗在 body 下，样式走 scoped（与 ModExportModal 同一处理） */
 .upd-toolbar {
   display: flex;
   align-items: center;

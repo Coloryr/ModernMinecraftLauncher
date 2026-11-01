@@ -1083,6 +1083,7 @@ export default {
   "actions.deleteConfirm": "确定删除实例「{name}」？此操作不可恢复。",
   "actions.close": "关闭",
   "actions.confirm": "确定",
+  "actions.back": "返回",
   "actions.cancel": "取消",
 
   // 复制实例
@@ -1523,6 +1524,16 @@ export default {
   "winSettings.resourceLinkBusy": "正在处理资源映射，暂时不能退出启动器",
   "winSettings.resourceLinkMapHint": "把已有实例里带在线信息的模组 / 资源包搬进公共目录并补硬链接",
   "winSettings.resourceLinkMapDone": "已处理 {instances} 个实例：映射 {mapped}，失败 {failed}，跳过 {skipped}",
+  "winSettings.resourceLinkList": "已下载资源",
+  "winSettings.resourceLinkListTitle": "已下载资源列表",
+  "winSettings.resourceLinkListSearch": "搜索模组 / 资源包",
+  "winSettings.resourceLinkListCount": "共 {count} 份 · 占用 {size}",
+  "winSettings.resourceLinkListLoading": "正在读取…",
+  "winSettings.resourceLinkListEmpty": "还没有已下载的资源",
+  "winSettings.resourceLinkListMissing": "文件已不在",
+  "winSettings.resourceLinkListOpen": "打开位置",
+  "winSettings.resourceLinkKindMod": "模组",
+  "winSettings.resourceLinkKindPack": "资源包",
   "winSettings.uriLaunch": "URI 启动",
   "winSettings.sandboxLaunch": "沙盒启动实例",
   "winSettings.gcMode": "GC 模式",
@@ -2228,6 +2239,12 @@ export default {
   "titlebar.exitFullscreen": "退出全屏",
   "titlebar.fillScreen": "占满屏幕",
   "titlebar.close": "关闭",
+
+  // 启动时的旧数据升级
+  "upgrade.title": "正在更新数据",
+  "upgrade.hint": "正在把旧版下载索引迁移到新格式。可以停止，下次启动会接着迁移。",
+  "upgrade.stop": "停止",
+  "upgrade.stopped": "已停止更新数据，下次启动会接着迁移",
 
   // 后端错误：命令的 Err 返回的就是这些键，前端 t() 后展示
   "err.sourceType": "未知的下载源",

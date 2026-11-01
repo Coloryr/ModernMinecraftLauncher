@@ -35,6 +35,7 @@ pub mod settings_dto;
 pub mod skin_dto;
 pub mod stats_dto;
 pub mod theme_dto;
+pub mod upgrade_dto;
 pub mod version_dto;
 pub mod window_dto;
 
@@ -99,12 +100,13 @@ pub use server_instance_dto::{
     ServerInstanceProgressDto, ServerInstanceResultDto,
 };
 pub use settings_dto::{
-    BgInfoDto, DnsSettingDto, GameCheckSettingDto, LaunchSettingDto, LocalFileChildDto,
-    LocalFileEntryDto, NetworkSettingDto, ResourceMapProgressDto, ResourceMapResultDto,
-    RunArgSettingDto, SettingsDefaultsDto, WindowSettingDto,
+    BgInfoDto, DnsSettingDto, GameCheckSettingDto, LaunchSettingDto, LinkResourceDto,
+    LocalFileChildDto, LocalFileEntryDto, NetworkSettingDto, ResourceMapProgressDto,
+    ResourceMapResultDto, RunArgSettingDto, SettingsDefaultsDto, WindowSettingDto,
 };
 pub use stats_dto::{StatsDataDto, StatsInstanceDto, StatsPlayDayDto, StatsPlaytimeDto};
 pub use theme_dto::ThemeKindDto;
+pub use upgrade_dto::UpgradeStatusDto;
 pub use version_dto::VersionInfoDto;
 pub use window_dto::{DropPathDto, FileDropDto, WindowSizeDto};
 

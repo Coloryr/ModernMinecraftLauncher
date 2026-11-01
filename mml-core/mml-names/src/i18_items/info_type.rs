@@ -56,6 +56,24 @@ pub enum InfoType {
         mem: i64,
     },
 
+    /// 旧 JSON 下载索引已导入新库：模组 / 资源包条数与跳过条数
+    DownloadIndexMigrated {
+        /// 导入的模组记录数
+        mods: usize,
+        /// 导入的资源包记录数
+        resourcepacks: usize,
+        /// 记录不完整、跳过的条数
+        failed: usize,
+    },
+
+    /// 旧下载索引导入失败，文件保持原样
+    DownloadIndexImportFailed {
+        /// 旧文件名
+        file: String,
+        /// 错误描述
+        error: String,
+    },
+
     /// 下载任务结束：总数 / 成功数 / 失败数
     DownloadTaskDone {
         /// 文件总数

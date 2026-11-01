@@ -7,7 +7,7 @@ use std::{
 
 use mml_base::file_item::{FileHash, FileItemObj, LaterRun};
 use mml_link::LinkPlan;
-use mml_link::info::{LinkInfoObj, ResourceType};
+use mml_link::info::ResourceType;
 use mml_names::{
     i18_items::error_type::{CoreResult, ErrorType},
     names,
@@ -52,22 +52,6 @@ fn target_of(
     };
 
     Some((resource, target))
-}
-
-/// 实例内路径在映射记录里的写法：相对实例根目录，统一用正斜杠
-///
-/// - base: 实例根目录
-/// - target: 实例内文件
-///
-/// # 返回值
-///
-/// 与 link_info.json 的 path 字段同口径
-fn link_path(base: &Path, target: &Path) -> String {
-    target
-        .strip_prefix(base)
-        .unwrap_or(target)
-        .to_string_lossy()
-        .replace('\\', "/")
 }
 
 /// 实例里是否有该文件的禁用副本
@@ -201,6 +185,8 @@ pub(crate) fn finish_downloads(plans: Vec<LinkPlan>) {
             mml_log::error_type(err);
         }
     }
+    // 一批下载补链完统一落盘，别每条索引记录都 fsync
+    mml_link::flush_pending();
 }
 
 /// 单个实例的批量映射结果
@@ -285,11 +271,29 @@ where
         )
     };
 
+    // 已经映射过的文件不用再跑一遍：以前每条都要重算整份 SHA1，40G 的实例重开一次
+    // 就是几分钟。实例里的 link_info.json 就记着哪些文件已经链好了
+    let linked: HashSet<String> = mml_link::get_instance_link_data(uuid, &base)
+        .into_iter()
+        .filter(|item| item.is_link)
+        .map(|item| item.path.replace('\\', "/"))
+        .collect();
+
     let mut count = MapResourceCount::default();
     for info in online.values() {
         let Some((resource, target)) = target_of(&game_path, &mods, &resourcepacks, info) else {
             continue;
         };
+        let relative = target
+            .strip_prefix(&base)
+            .map(|path| path.to_string_lossy().replace('\\', "/"))
+            .ok();
+        if relative.as_ref().is_some_and(|path| linked.contains(path)) {
+            // 中断后重开接着处理：这一条不用再验哈希，直接算过
+            count.skipped += 1;
+            on_item(info);
+            continue;
+        }
         if !target.is_file() || disabled_exists(&target) || info.sha1.is_empty() {
             count.skipped += 1;
             on_item(info);
@@ -315,6 +319,8 @@ where
         on_item(info);
     }
 
+    // 一个实例处理完把绑定的索引 / 映射记录落一次盘
+    mml_link::flush_pending();
     count
 }
 
@@ -349,7 +355,7 @@ pub async fn check_instance_links(
         )
     };
 
-    let mut links = mml_link::get_instance_link_data(uuid, &base);
+    let links = mml_link::get_instance_link_data(uuid, &base);
     let mut by_target: HashMap<PathBuf, OnlineInfoObj> = HashMap::new();
     for info in online.values() {
         if let Some((_, target)) = target_of(&game_path, &mods, &resourcepacks, info) {
@@ -357,26 +363,8 @@ pub async fn check_instance_links(
         }
     }
 
-    // 在线信息里有、但从未映射过的条目也要检查：旧实例没有 link_info.json，
-    // 只遍历记录等于什么都不做。先补成未链接记录，下面的循环会按需搬文件 / 补链。
-    let mut known: HashSet<String> = links.iter().map(|link| link.path.clone()).collect();
-    let mut synthetic = HashSet::new();
-    for (pid, info) in &online {
-        let Some((_, target)) = target_of(&game_path, &mods, &resourcepacks, info) else {
-            continue;
-        };
-        let path = link_path(&base, &target);
-        if known.insert(path.clone()) {
-            synthetic.insert(path.clone());
-            links.push(LinkInfoObj {
-                is_link: false,
-                pid: pid.clone(),
-                fid: info.fileid.clone(),
-                path,
-            });
-        }
-    }
-
+    // 启动前只修复**已经映射过**的条目：没映射过的文件留给设置里「处理现有实例」，
+    // 那是用户明确点的动作，不能变成每次启动都自动搬一遍整个实例
     let mut plans = Vec::new();
     let mut items = Vec::new();
     let mut failed = false;
@@ -426,18 +414,6 @@ pub async fn check_instance_links(
         let (pid, fid, name, hash, url) = meta;
         if hash.is_empty() {
             continue;
-        }
-
-        // 从未映射过的条目：实例里已有文件就强制搬进公共目录再链回来。
-        // plan_download 在"公共文件已存在且目标也存在"时会直接返回 None；
-        // 已记为 false 的是跨盘回退，不再每次启动重搬，免得反复进回收站
-        if target.is_file() && synthetic.contains(&link.path) {
-            match mml_link::map_existing(
-                resource, uuid, &base, &target, &pid, &fid, &name, &hash, &url,
-            ) {
-                Ok(()) => continue,
-                Err(err) => mml_log::error_type(err),
-            }
         }
 
         let Some(plan) = mml_link::plan_download(

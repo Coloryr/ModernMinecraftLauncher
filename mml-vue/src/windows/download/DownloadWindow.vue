@@ -79,6 +79,16 @@ const threads = computed(() => status.value.threads.filter((x) => x.state !== "d
 /** 总体进度：与单任务同一口径，汇总全部任务 */
 const overall = computed(() => downloadOverallPercent(tasks.value));
 
+/** 所有任务都还没拿到总数（0 / 0）：总进度条走无限滚动 */
+const overallRolling = computed(
+  () => tasks.value.length > 0 && tasks.value.every((task) => !task.total && !task.allBytes),
+);
+
+/** 单任务总数未知时，它那一条也走无限滚动 */
+function taskRolling(task: { total: number; allBytes: number }): boolean {
+  return !task.total && !task.allBytes;
+}
+
 /** 总体字节：已下载 / 总大小 */
 const overallBytes = computed(() => ({
   now: tasks.value.reduce((n, x) => n + x.nowBytes, 0),
@@ -341,7 +351,8 @@ onUnmounted(() => {
         </div>
         <div class="ov-progress">
           <span class="progress-track ov-track">
-            <span class="progress-fill" :style="{ width: overall + '%' }" />
+            <span class="progress-fill" :class="{ 'is-roll': overallRolling }"
+              :style="overallRolling ? undefined : { width: overall + '%' }" />
           </span>
           <span class="ov-percent">{{ overall.toFixed(1) }}%</span>
         </div>
@@ -374,8 +385,9 @@ onUnmounted(() => {
             </div>
             <div class="task-foot">
               <span class="progress-track">
-                <span class="progress-fill" :class="{ failed: task.failed > 0, paused: task.paused }"
-                  :style="{ width: downloadTaskPercent(task) + '%' }" />
+                <span class="progress-fill"
+                  :class="{ failed: task.failed > 0, paused: task.paused, 'is-roll': taskRolling(task) }"
+                  :style="taskRolling(task) ? undefined : { width: downloadTaskPercent(task) + '%' }" />
               </span>
               <span class="task-percent">{{ downloadTaskPercent(task).toFixed(1) }}%</span>
             </div>

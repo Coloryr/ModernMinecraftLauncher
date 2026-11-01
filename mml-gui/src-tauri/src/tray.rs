@@ -244,6 +244,10 @@ fn quit(app: &AppHandle) {
     if crate::windows::settings::resource_link::running() {
         return;
     }
+    // 旧数据升级写到一半退出，下次会重新导一遍；直接挡住
+    if crate::windows::upgrade::running() {
+        return;
+    }
     if QUITTING.swap(true, Ordering::SeqCst) {
         return;
     }

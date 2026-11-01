@@ -38,6 +38,7 @@ export { default as CompResourceDownloadBar } from "../components/ResourceDownlo
 export { default as CompResourcePopup } from "../components/ResourcePopup.vue";
 export { default as CompResourceTitleIndicator } from "../components/ResourceTitleIndicator.vue";
 export { default as CompServerPackUpdateModal } from "../components/ServerPackUpdateModal.vue";
+export { default as CompUpgradeOverlay } from "../components/UpgradeOverlay.vue";
 export { default as CompUiAppToast } from "../components/ui/AppToast.vue";
 export { default as CompUiAsyncImage } from "../components/ui/AsyncImage.vue";
 export { default as CompUiAuthorTag } from "../components/ui/AuthorTag.vue";
@@ -51,6 +52,7 @@ export { default as CompUiIconTabs } from "../components/ui/IconTabs.vue";
 export { default as CompUiImagePreview } from "../components/ui/ImagePreview.vue";
 export { default as CompUiInstanceChip } from "../components/ui/InstanceChip.vue";
 export { default as CompUiMonacoText } from "../components/ui/MonacoText.vue";
+export { default as CompUiRowMenu } from "../components/ui/RowMenu.vue";
 export { default as CompUiSplashScreen } from "../components/ui/SplashScreen.vue";
 export { default as CompUiVirtualList } from "../components/ui/VirtualList.vue";
 export { default as CompUiWindowControls } from "../components/ui/WindowControls.vue";

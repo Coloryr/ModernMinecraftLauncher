@@ -1082,6 +1082,7 @@ export default {
   "actions.deleteConfirm": "Delete instance “{name}”? This cannot be undone.",
   "actions.close": "Close",
   "actions.confirm": "Confirm",
+  "actions.back": "Back",
   "actions.cancel": "Cancel",
 
   // Copy instance
@@ -1522,6 +1523,16 @@ export default {
   "winSettings.resourceLinkBusy": "Resource mapping is running; the launcher can't exit yet",
   "winSettings.resourceLinkMapHint": "Move mods and resource packs with online info from existing instances into the shared folder and link them",
   "winSettings.resourceLinkMapDone": "Processed {instances} instances: mapped {mapped}, failed {failed}, skipped {skipped}",
+  "winSettings.resourceLinkList": "Downloaded resources",
+  "winSettings.resourceLinkListTitle": "Downloaded resources",
+  "winSettings.resourceLinkListSearch": "Search mods / resource packs",
+  "winSettings.resourceLinkListCount": "{count} files · {size} on disk",
+  "winSettings.resourceLinkListLoading": "Loading…",
+  "winSettings.resourceLinkListEmpty": "Nothing downloaded yet",
+  "winSettings.resourceLinkListMissing": "file missing",
+  "winSettings.resourceLinkListOpen": "Show in folder",
+  "winSettings.resourceLinkKindMod": "Mod",
+  "winSettings.resourceLinkKindPack": "Resource pack",
   "winSettings.uriLaunch": "URI launch",
   "winSettings.sandboxLaunch": "Sandboxed instance",
   "winSettings.gcMode": "GC mode",
@@ -2227,6 +2238,12 @@ export default {
   "titlebar.exitFullscreen": "Exit fullscreen",
   "titlebar.fillScreen": "Fill the screen",
   "titlebar.close": "Close",
+
+  // Startup data upgrade
+  "upgrade.title": "Updating data",
+  "upgrade.hint": "Migrating the old download index to the new format. You can stop now; it resumes on the next launch.",
+  "upgrade.stop": "Stop",
+  "upgrade.stopped": "Data update stopped; it will resume on the next launch",
 
   // Backend errors: commands return these keys from Err, the frontend runs t() on them
   "err.sourceType": "Unknown source",

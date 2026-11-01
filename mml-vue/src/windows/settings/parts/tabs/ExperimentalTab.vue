@@ -1,13 +1,17 @@
 <script setup lang="ts">
 // 设置窗口 · 实验性功能页：管理员启动与资源映射已接线；URI / 沙盒启动尚未实现，开关禁用。
 // 客户端设置被锁定时，开关同样隐藏，这一页只剩解锁入口。
-import { computed, ref } from "vue";
-import { t, tErr } from "../../../../lib/i18n";
-import { showToast } from "../../../../lib/toast";
-import { commands, type ResourceMapProgressDto, type ResourceMapResultDto } from "../../../../lib/bindings";
-import { ResourceMapProgress } from "../../../../lib/listens";
-import { listen } from "@tauri-apps/api/event";
+import { computed, onMounted, ref } from "vue";
+import { t } from "../../../../lib/i18n";
+import {
+  attachMapping,
+  mapping as mappingResources,
+  progress as mapProgress,
+  result as mapResult,
+  startMapping,
+} from "../../../../lib/resourceMap";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
+import LinkResourcesModal from "../LinkResourcesModal.vue";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
 import SettingsGroup from "../SettingsGroup.vue";
 import type { useSettingsClient } from "../../composables/useSettingsClient";
@@ -31,12 +35,11 @@ const { client, experimental, applyExperimental } = props.settings;
 /** 开关属于锁定范围：锁着且本次未解锁时整组隐藏，只留解锁入口 */
 const locked = computed(() => client.value.lockClient && !props.clientUnlocked);
 
-/** 存量映射是否正在跑 */
-const mappingResources = ref(false);
-/** 上一次存量映射结果 */
-const mapResult = ref<ResourceMapResultDto | null>(null);
-/** 处理中的进度 */
-const mapProgress = ref<ResourceMapProgressDto | null>(null);
+/** 已下载资源列表弹窗是否打开 */
+const showResources = ref(false);
+
+// 存量映射的状态放在 lib/resourceMap 里：切到别的设置页再回来，组件会重建，
+// 状态留在组件里的话进度条就没了
 
 /** 处理进度百分比 */
 const mapPercent = computed(() => {
@@ -44,6 +47,9 @@ const mapPercent = computed(() => {
   if (total <= 0) return 0;
   return Math.min(100, ((mapProgress.value?.done ?? 0) / total) * 100);
 });
+
+/** 总数还不知道（0 / 0）：进度条走无限滚动 */
+const mapRolling = computed(() => (mapProgress.value?.total ?? 0) <= 0);
 
 /** 处理中的 done/total 文字 */
 const mapProgressText = computed(() =>
@@ -53,29 +59,8 @@ const mapProgressText = computed(() =>
   }),
 );
 
-/** 处理所有实例里带在线信息的模组 / 资源包 */
-async function mapResources() {
-  mappingResources.value = true;
-  mapResult.value = null;
-  mapProgress.value = null;
-  const unlisten = await listen<ResourceMapProgressDto>(ResourceMapProgress, (event) => {
-    mapProgress.value = event.payload;
-  });
-  try {
-    mapResult.value = await commands.settings.mapResources();
-    showToast(t("winSettings.resourceLinkMapDone", {
-      instances: mapResult.value.instances,
-      mapped: mapResult.value.mapped,
-      failed: mapResult.value.failed,
-      skipped: mapResult.value.skipped,
-    }));
-  } catch (e) {
-    showToast(tErr(e));
-  } finally {
-    unlisten();
-    mappingResources.value = false;
-  }
-}
+// 窗口重新打开时任务可能还在跑：把状态接回来，进度条立刻续上
+onMounted(() => void attachMapping());
 
 /** 上一次处理的统计文字 */
 const mapState = computed(() =>
@@ -114,14 +99,16 @@ const mapState = computed(() =>
     </div>
     <template v-if="experimental.resourceLink">
       <div class="map-actions">
-        <BaseButton size="sm" variant="accent" :disabled="mappingResources" @click="mapResources">
+        <BaseButton size="sm" variant="accent" :disabled="mappingResources" @click="startMapping">
           {{ mappingResources ? t("winSettings.resourceLinkMapping") : t("winSettings.resourceLinkMap") }}
         </BaseButton>
+        <BaseButton size="sm" @click="showResources = true">{{ t("winSettings.resourceLinkList") }}</BaseButton>
         <span v-if="mapState" class="map-state">{{ mapState }}</span>
       </div>
       <div v-if="mappingResources" class="map-progress">
         <div class="map-progress-track">
-          <div class="map-progress-fill" :style="{ width: mapPercent + '%' }" />
+          <div class="map-progress-fill" :class="{ 'is-roll': mapRolling }"
+            :style="mapRolling ? undefined : { width: mapPercent + '%' }" />
         </div>
         <span class="map-state">{{ mapProgressText }}</span>
       </div>
@@ -142,6 +129,9 @@ const mapState = computed(() =>
       <BaseSwitch v-model="experimental.sandboxLaunch" disabled />
     </div>
   </SettingsGroup>
+
+  <!-- 已下载资源列表：只读，用于核对公共目录里到底有哪些文件 -->
+  <LinkResourcesModal v-if="showResources" @close="showResources = false" />
 
   <!-- 锁定客户端设置：那一页在锁定时隐藏，解锁入口放这里 -->
   <SettingsGroup v-if="client.lockClient" id="clientLock" title-key="winSettings.secClientLock"

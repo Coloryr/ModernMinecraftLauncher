@@ -25,6 +25,7 @@ import { setModpackFallbackToast, useModpackStatus } from "./lib/modpackTasks";
 import { initMusic } from "./lib/music";
 import { useResourceStatus } from "./lib/resourceTasks";
 import AppToast from "./components/ui/AppToast.vue";
+import UpgradeOverlay from "./components/UpgradeOverlay.vue";
 import BaseButton from "./components/ui/BaseButton.vue";
 import BaseModal from "./components/ui/BaseModal.vue";
 import ModpackPopup from "./components/ModpackPopup.vue";
@@ -144,6 +145,11 @@ onMounted(async () => {
   unsubCloseBlocked = await onCloseBlocked(async (blocked) => {
     // 事件带的是被拦下的那个窗口的标签：不是自己就忽略，别在别的窗口也弹一遍
     if (blocked && blocked !== myLabel) return;
+    // 启动数据升级还没跑完：后端拒绝关闭，给一句提示
+    if (await commands.windows.upgradeStatus().then((s) => s.running).catch(() => false)) {
+      showToast(t("upgrade.hint"));
+      return;
+    }
     // 资源映射正在搬文件：后端拒绝关闭，给一句提示，不要弹下载退出确认
     if (await commands.settings.resourceMapRunning().catch(() => false)) {
       showToast(t("winSettings.resourceLinkBusy"));
@@ -239,6 +245,9 @@ const closeAskButton = computed(() =>
       </div>
     </BaseModal>
   </template>
+
+  <!-- 启动数据升级：盖住整个界面，升级结束后自己消失 -->
+  <UpgradeOverlay />
 
   <!-- 账户占用确认：任何窗口里点启动都可能弹，所以挂在根上 -->
   <AccountLockModal />

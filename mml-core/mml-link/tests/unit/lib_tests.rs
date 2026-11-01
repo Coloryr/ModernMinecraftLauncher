@@ -136,14 +136,13 @@ fn link_info_is_written_inside_instance() {
     assert_eq!(data[0].path, ".minecraft/mods/demo.jar");
     assert!(data[0].is_link);
 
-    let index: HashMap<String, Vec<ResourceInfoObj>> =
-        serde_json::from_str(&fs::read_to_string(dir.join(names::MOD_DOWNLOAD_FILE)).unwrap())
-            .unwrap();
-    assert!(
-        index
-            .values()
-            .flatten()
-            .any(|item| { item.url == "https://example.com/demo.jar" })
+    // 索引落在键值库里：库目录在、且有内容；记录本身从内存表查
+    let index_dir = dir.join(names::DOWNLOAD_INDEX_DIR);
+    assert!(index_dir.is_dir());
+    assert!(fs::read_dir(&index_dir).unwrap().next().is_some());
+    assert_eq!(
+        get_download_info(ResourceType::Mod, "p").map(|item| item.url),
+        Some("https://example.com/demo.jar".to_string())
     );
 
     let _ = fs::remove_dir_all(&dir);

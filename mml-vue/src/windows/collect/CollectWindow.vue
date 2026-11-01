@@ -18,6 +18,7 @@ import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import SearchBox from "../../components/ui/SearchBox.vue";
 import HighlightText from "../../components/ui/HighlightText.vue";
 import DragGhost from "../../components/ui/DragGhost.vue";
+import RowMenu, { type RowMenuItem } from "../../components/ui/RowMenu.vue";
 import InstallModal from "./parts/InstallModal.vue";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import { useInstanceChange } from "../../composables/useInstanceChange";
@@ -891,17 +892,71 @@ async function loadInstances() {
 
 const menu = ref<{ x: number; y: number; item: CollectItemDto } | null>(null);
 
-/** 菜单尺寸估值（钳边用；最多六项 + 两条分隔 + 内边距） */
-const MENU_W = 170;
-const MENU_H = 240;
+/** 卡片菜单项：多选、安装、打开链接、分组相关、删除收藏 */
+const itemMenuItems = computed<RowMenuItem[]>(() => {
+  const item = menu.value?.item;
+  if (!item) return [];
+  const list: RowMenuItem[] = [];
+  if (!multiSelect.value) {
+    list.push({ id: "multi", label: t("collect.multiSelect") });
+  }
+  if (multiSelect.value || canInstall(item)) {
+    list.push({ id: "install", label: t("collect.installDo") });
+  }
+  list.push({ id: "open-url", label: t("collect.openUrl") });
+  // 分组那两条成一组：先移出、再加到别的组
+  let grouped = false;
+  if (canLeaveGroup()) {
+    list.push({ id: "leave-group", label: t("collect.removeFromGroup"), separated: true });
+    grouped = true;
+  }
+  list.push({
+    id: "add-to-group",
+    label: t("collect.addToGroup"),
+    disabled: customGroups.value.length === 0,
+    tip: customGroups.value.length === 0 ? t("collect.addToGroupNone") : undefined,
+    separated: !grouped,
+  });
+  list.push({ id: "remove", label: t("collect.deleteFav"), danger: true, separated: true });
+  return list;
+});
+
+/**
+ * 卡片菜单的动作分发
+ *
+ * - `id`: 菜单项 id，见 itemMenuItems
+ */
+function onItemMenuPick(id: string) {
+  switch (id) {
+    case "multi": {
+      const item = menu.value?.item;
+      closeMenu();
+      if (item) enterMultiSelect(item);
+      break;
+    }
+    case "install":
+      menuInstall();
+      break;
+    case "open-url": {
+      const item = menu.value?.item;
+      if (item) openUrl(item);
+      closeMenu();
+      break;
+    }
+    case "leave-group":
+      leaveGroup();
+      break;
+    case "add-to-group":
+      askAddToGroup();
+      break;
+    case "remove":
+      askRemove();
+      break;
+  }
+}
 
 function openMenu(e: MouseEvent, item: CollectItemDto) {
-  // 钳进窗口：贴着右/下边缘右键时，菜单会整个露在可视区之外
-  menu.value = {
-    x: Math.max(8, Math.min(e.clientX, window.innerWidth - MENU_W - 8)),
-    y: Math.max(8, Math.min(e.clientY, window.innerHeight - MENU_H - 8)),
-    item,
-  };
+  menu.value = { x: e.clientX, y: e.clientY, item };
   // 多选模式下右键顺带把该项勾上；默认模式不动勾选，菜单只作用于点中的这一项
   if (multiSelect.value) {
     toggleCheck(item.uuid, true);
@@ -928,9 +983,35 @@ function menuInstall() {
 
 /** 右键分组标题弹出的菜单；null = 没开 */
 const groupMenu = ref<{ x: number; y: number; group: string } | null>(null);
-/** 分组右键菜单尺寸估值（两项 + 内边距） */
-const GROUP_MENU_W = 150;
-const GROUP_MENU_H = 92;
+
+/** 分组菜单项：清空 / 删除（删除只对自建分组给） */
+const groupMenuItems = computed<RowMenuItem[]>(() => {
+  const group = groupMenu.value?.group;
+  if (!group) return [];
+  const list: RowMenuItem[] = [
+    { id: "clear", label: t("collect.clear"), disabled: !itemsOfGroup(group).length },
+  ];
+  if (!isDefaultGroupKey(group)) {
+    list.push({ id: "delete-group", label: t("collect.deleteGroup"), danger: true });
+  }
+  return list;
+});
+
+/**
+ * 分组菜单的动作分发
+ *
+ * - `id`: 菜单项 id，见 groupMenuItems
+ */
+function onGroupMenuPick(id: string) {
+  const group = groupMenu.value?.group;
+  groupMenu.value = null;
+  if (!group) return;
+  if (id === "clear") {
+    askClear(group);
+  } else if (id === "delete-group") {
+    deleteGroupTarget.value = group;
+  }
+}
 
 /**
  * 右键左栏的分组：弹出该组的菜单
@@ -939,11 +1020,7 @@ const GROUP_MENU_H = 92;
  */
 function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }) {
   menu.value = null;
-  groupMenu.value = {
-    x: Math.max(8, Math.min(payload.event.clientX, window.innerWidth - GROUP_MENU_W - 8)),
-    y: Math.max(8, Math.min(payload.event.clientY, window.innerHeight - GROUP_MENU_H - 8)),
-    group: payload.id,
-  };
+  groupMenu.value = { x: payload.event.clientX, y: payload.event.clientY, group: payload.id };
 }
 </script>
 
@@ -1080,40 +1157,12 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
         @close="installTargets = []" @install="doInstall" />
 
       <!-- 分组右键菜单：清空 / 删除（删除只对自建分组给） -->
-      <div v-if="groupMenu" class="ctx-menu" :style="{ left: groupMenu.x + 'px', top: groupMenu.y + 'px' }" @click.stop>
-        <button class="ctx-item" :disabled="!itemsOfGroup(groupMenu.group).length" @click="askClear(groupMenu.group)">
-          {{ t("collect.clear") }}
-        </button>
-        <button v-if="!isDefaultGroupKey(groupMenu.group)" class="ctx-item danger"
-          @click="deleteGroupTarget = groupMenu.group; groupMenu = null">
-          {{ t("collect.deleteGroup") }}
-        </button>
-      </div>
+      <RowMenu v-if="groupMenu" :x="groupMenu.x" :y="groupMenu.y" :items="groupMenuItems"
+        @pick="onGroupMenuPick" @close="groupMenu = null" />
 
-      <!-- 右键菜单 -->
-      <div v-if="menu" class="ctx-menu" :style="{ left: menu.x + 'px', top: menu.y + 'px' }" @click.stop>
-        <button v-if="!multiSelect" class="ctx-item" @click="enterMultiSelect(menu.item)">
-          {{ t("collect.multiSelect") }}
-        </button>
-        <button v-if="multiSelect || canInstall(menu.item)" class="ctx-item" @click="menuInstall">
-          {{ t("collect.installDo") }}
-        </button>
-        <button class="ctx-item" @click="openUrl(menu.item); closeMenu()">
-          {{ t("collect.openUrl") }}
-        </button>
-        <span class="ctx-sep"></span>
-        <button v-if="canLeaveGroup()" class="ctx-item" @click="leaveGroup">
-          {{ t("collect.removeFromGroup") }}
-        </button>
-        <button class="ctx-item" :disabled="customGroups.length === 0"
-          v-tip="customGroups.length === 0 ? t('collect.addToGroupNone') : ''" @click="askAddToGroup">
-          {{ t("collect.addToGroup") }}
-        </button>
-        <span class="ctx-sep"></span>
-        <button class="ctx-item danger" @click="askRemove">
-          {{ t("collect.deleteFav") }}
-        </button>
-      </div>
+      <!-- 卡片右键菜单：多选、安装、打开链接、分组相关、删除收藏 -->
+      <RowMenu v-if="menu" :x="menu.x" :y="menu.y" :items="itemMenuItems" @pick="onItemMenuPick"
+        @close="closeMenu" />
     </div>
 
     <!-- 添加分组 -->

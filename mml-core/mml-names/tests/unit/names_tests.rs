@@ -107,6 +107,7 @@ fn file_constants_have_no_separators() {
         LINK_INFO_FILE,
         MOD_DOWNLOAD_FILE,
         RESOURCEPACK_DOWNLOAD_FILE,
+        DOWNLOAD_INDEX_DIR,
         IPC_PORT_FILE,
     ] {
         assert!(!name.is_empty(), "文件常量不应为空: {name:?}");

@@ -27,6 +27,10 @@ const percent = computed(() => progressPercent(props.progress) ?? 0);
 const subPercent = computed(() =>
   props.progress.subTotal ? (props.progress.subNow / props.progress.subTotal) * 100 : 0,
 );
+/** 总数还不知道（0 / 0）：进度条走无限滚动 */
+const mainRolling = computed(() => progressPercent(props.progress) === null);
+/** 子任务只有文字没有总数：细条也走无限滚动 */
+const subRolling = computed(() => !!props.progress.subText && props.progress.subTotal === 0);
 </script>
 
 <template>
@@ -36,12 +40,14 @@ const subPercent = computed(() =>
 
       <div class="progress-track" role="progressbar" aria-valuemin="0" :aria-valuemax="progress.total || 1"
         :aria-valuenow="progress.now">
-        <div class="progress-fill" :style="{ width: percent + '%' }" />
+        <div class="progress-fill" :class="{ 'is-roll': mainRolling }"
+          :style="mainRolling ? undefined : { width: percent + '%' }" />
       </div>
       <template v-if="progress.subText || progress.subTotal">
         <div class="install-sub" v-tip="progress.subText || ''">{{ shortPath(progress.subText || "") }}</div>
         <div class="progress-track sub">
-          <div class="progress-fill" :style="{ width: subPercent + '%' }" />
+          <div class="progress-fill" :class="{ 'is-roll': subRolling }"
+            :style="subRolling ? undefined : { width: subPercent + '%' }" />
         </div>
       </template>
     </div>

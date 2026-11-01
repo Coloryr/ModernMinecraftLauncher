@@ -18,7 +18,7 @@ import { showToast } from "../../lib/toast";
 import AccountGrid from "./views/AccountGrid.vue";
 import AccountList from "./views/AccountList.vue";
 import AccountDetail from "./views/AccountDetail.vue";
-import RowMenu, { type RowMenuItem } from "../resource/parts/RowMenu.vue";
+import RowMenu, { type RowMenuItem } from "../../components/ui/RowMenu.vue";
 import {
   ACCOUNT_TYPES,
   accounts,

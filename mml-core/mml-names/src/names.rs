@@ -107,6 +107,7 @@ pub const COUNT_IMPORT_FILE: &str = "count.import.dat";
 pub const LINK_INFO_FILE: &str = "link_info.json";
 pub const MOD_DOWNLOAD_FILE: &str = "mod_download.json";
 pub const RESOURCEPACK_DOWNLOAD_FILE: &str = "resourcepack_download.json";
+pub const DOWNLOAD_INDEX_DIR: &str = "download_index";
 
 pub const MINECRAFT_KEY: &str = "minecraft";
 pub const LANG_KEY1: &str = "minecraft/lang/";

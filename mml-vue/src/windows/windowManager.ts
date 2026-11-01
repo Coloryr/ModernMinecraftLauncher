@@ -802,11 +802,21 @@ function closeInstanceArg(kind: WindowKind): string | null {
  *
  * "回上一层"是另一回事，走 closeWindow —— 标题栏的 ‹ 箭头与各窗口的"取消"都走它。
  */
-export function quitWindow() {
+export async function quitWindow() {
   if (!isTauri()) {
     // 浏览器预览：非脚本打开的标签页关不掉，失败就作罢
     window.close();
     return;
+  }
+  // 单窗口模式下 ✕ 就是退出应用，但资源映射在跑时后端拒绝关主窗口。
+  // 这时如果当前不在主页面，就把 ✕ 当成"关掉这一页" —— 否则用户会被困在设置页里，
+  // 点 ✕ 只弹一句"正在处理资源映射"。主页面照旧交给后端的关闭保护拦
+  if (!multiWindow.value && currentKind.value !== "main") {
+    const busy = await commands.settings.resourceMapRunning().catch(() => false);
+    if (busy) {
+      closeWindow();
+      return;
+    }
   }
   // 单窗口模式只有主窗口是真的：那里 kind 是"当前页"而不是窗口标签，拿它去找窗口会 not found
   const target = multiWindow.value ? currentKind.value : "main";
@@ -836,7 +846,8 @@ let closing = false;
  * - 多窗口模式：每个功能就是一个独立窗口，收起 = 关掉它
  * - 单窗口模式：应用内页面切换，弹返回栈回上一层（没有上一层就回主页面）
  *
- * ✕ 不走这里，走 quitWindow：单窗口模式下 ✕ 是真的退出应用，不是退一层
+ * ✕ 一般不走这里，走 quitWindow：单窗口模式下 ✕ 是退出应用，不是退一层；
+ * 唯一例外是资源映射期间停在功能页时 —— 那时退出会被后端拒绝，✕ 改为关掉当前页
  */
 export function closeWindow() {
   // 同一次事件里的重复调用直接丢掉，原因见上面 closing 的说明

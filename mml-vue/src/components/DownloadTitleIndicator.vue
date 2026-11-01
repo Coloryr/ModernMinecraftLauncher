@@ -43,6 +43,13 @@ const busy = computed(() => tasks.value.some(isDownloading));
 /** 进度条显示与否：只要还有没下完的（含暂停）就显示，别让暂停时进度凭空消失 */
 const showBar = computed(() => tasks.value.some(isIncomplete));
 
+/** 还没拿到总数（0 / 0）：细条走无限滚动 */
+const rolling = computed(
+  () =>
+    tasks.value.length > 0 &&
+    tasks.value.filter(isIncomplete).every((task) => !task.total && !task.allBytes),
+);
+
 /** 有失败的任务（图标变警示色） */
 const hasFailed = computed(() => tasks.value.some((task) => task.failed > 0));
 
@@ -73,7 +80,8 @@ const iconState = computed(() => {
     </span>
     <!-- 进度：细条贴在图标下沿。还有没下完的就显示（结束是满格，没信息量） -->
     <span v-if="showBar" class="dl-ind-track">
-      <span class="dl-ind-fill" :style="{ width: percent + '%' }" />
+      <span class="dl-ind-fill" :class="{ 'is-roll': rolling }"
+        :style="rolling ? undefined : { width: percent + '%' }" />
     </span>
   </button>
 </template>

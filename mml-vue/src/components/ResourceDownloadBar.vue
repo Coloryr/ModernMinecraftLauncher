@@ -48,6 +48,11 @@ const headText = computed(() =>
 /** 总进度，与标题栏指示器同一口径，见 lib/progress.ts */
 const percent = computed(() => resourceOverallPercent(props.status.tasks));
 
+/** 在下项目的总数都还不知道（0 / 0）：总进度条走无限滚动 */
+const overallRolling = computed(
+  () => running.value.length > 0 && running.value.every((group) => !group.total),
+);
+
 /** 终态标签；未结束时返回 `null` */
 function stateTag(group: ResourceGroupProgress): string | null {
   if (group.done) return t("addResource.bar.done");
@@ -86,7 +91,8 @@ function progressText(group: ResourceGroupProgress): string {
     </div>
     <!-- 总进度条只在还有在下的时候画：全结束时它是条满格蓝杠，什么信息都没表达 -->
     <div v-if="running.length" class="progress-track">
-      <div class="progress-fill" :style="{ width: percent + '%' }" />
+      <div class="progress-fill" :class="{ 'is-roll': overallRolling }"
+        :style="overallRolling ? undefined : { width: percent + '%' }" />
     </div>
 
     <!-- 每个下载项目的进度。**只有一个项目时也列**：名字是用户唯一能确认"下的是哪个"的东西；
@@ -105,7 +111,8 @@ function progressText(group: ResourceGroupProgress): string {
           <span v-else class="res-task-percent">{{ progressText(group) }}</span>
         </div>
         <div v-if="visibleGroups.length > 1" class="progress-track sub">
-          <div class="progress-fill" :style="{ width: group.percent + '%' }" />
+          <div class="progress-fill" :class="{ 'is-roll': !group.total }"
+            :style="group.total ? { width: group.percent + '%' } : undefined" />
         </div>
       </div>
     </div>

@@ -2,9 +2,12 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use mml_link::IndexKind;
+use mml_link::info::{ResourceInfoObj, ResourceType};
+use mml_sys::open_helper;
 use tauri::{AppHandle, Emitter};
 
-use crate::dtos::{ResourceMapProgressDto, ResourceMapResultDto};
+use crate::dtos::{LinkResourceDto, ResourceMapProgressDto, ResourceMapResultDto};
 use crate::err_keys;
 use crate::listens;
 use crate::log_text::LogText;
@@ -110,6 +113,8 @@ pub async fn settings_map_resources(app: AppHandle) -> Result<ResourceMapResultD
             result.mapped += count.mapped;
             result.failed += count.failed;
             result.skipped += count.skipped;
+            // 一个实例处理完落一次盘：被强杀时最多丢这一个实例的索引记录
+            mml_link::flush_pending();
         }
         mml_log::info(
             LogText::ResourceMapFinished {
@@ -138,3 +143,85 @@ pub async fn settings_map_resources(app: AppHandle) -> Result<ResourceMapResultD
 pub fn settings_resource_map_running() -> bool {
     running()
 }
+
+/// 列出公共目录里已下载的资源
+///
+/// 读的是索引库里的记录；文件已被删掉的也列出来，标 `exists = false`
+///
+/// # 返回值
+///
+/// 按大小降序；索引没打开时为空列表
+#[gui_macros::ipc_group("settings")]
+#[gui_macros::command]
+pub async fn settings_list_link_resources() -> Vec<LinkResourceDto> {
+    tauri::async_runtime::spawn_blocking(list_link_resources)
+        .await
+        .unwrap_or_default()
+}
+
+/// 收集公共目录里的资源记录
+///
+/// # 返回值
+///
+/// 见 [`LinkResourceDto`]，按大小降序
+fn list_link_resources() -> Vec<LinkResourceDto> {
+    let Some(store) = mml_link::index_store() else {
+        return Vec::new();
+    };
+    let mut list = Vec::new();
+    for (kind, resource, id) in [
+        (IndexKind::Mod, ResourceType::Mod, "mod"),
+        (IndexKind::ResourcePack, ResourceType::ResourcePack, "resourcepack"),
+    ] {
+        let dir = match resource {
+            ResourceType::Mod => mml_link::get_mod_download_path(),
+            ResourceType::ResourcePack => mml_link::get_resource_pack_download_path(),
+        };
+        let Ok(rows) = store.load(kind) else {
+            continue;
+        };
+        for (pid, payload) in rows {
+            let Ok(info) = serde_json::from_slice::<ResourceInfoObj>(&payload) else {
+                continue;
+            };
+            let meta = std::fs::metadata(dir.join(&info.file)).ok();
+            list.push(LinkResourceDto {
+                kind: id.to_string(),
+                pid,
+                name: info.name,
+                file: info.file,
+                hash: info.hash,
+                size: meta.as_ref().map(|meta| meta.len()).unwrap_or(0),
+                exists: meta.is_some(),
+            });
+        }
+    }
+    list.sort_by(|a, b| b.size.cmp(&a.size).then_with(|| a.name.cmp(&b.name)));
+    list
+}
+
+/// 在资源管理器里定位一份已下载资源
+///
+/// - `kind`: 资源类型，`mod` / `resourcepack`
+/// - `file`: 公共目录下的文件名，取自 [`settings_list_link_resources`]
+///
+/// # 返回值
+///
+/// 类型不认识时返回错误键；文件不在时退而打开所在目录
+#[gui_macros::ipc_group("settings")]
+#[gui_macros::command]
+pub fn settings_open_link_resource(kind: String, file: String) -> Result<(), String> {
+    let dir = match kind.as_str() {
+        "mod" => mml_link::get_mod_download_path(),
+        "resourcepack" => mml_link::get_resource_pack_download_path(),
+        _ => return Err(err_keys::LOCAL_FILE_UNKNOWN.to_string()),
+    };
+    let path = dir.join(&file);
+    if path.is_file() {
+        open_helper::open_file_with_explorer(&path);
+    } else {
+        open_helper::open_dir(&dir);
+    }
+    Ok(())
+}
+

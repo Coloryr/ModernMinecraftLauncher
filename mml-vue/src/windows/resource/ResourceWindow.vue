@@ -16,12 +16,13 @@ import BaseButton from "../../components/ui/BaseButton.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
-import { commands } from "../../lib/bindings";
+import { commands, type ModItemDto } from "../../lib/bindings";
 import { useFileDrop } from "../../composables/useFileDrop";
 import type { FileDropPayload } from "../../composables/useFileDrop";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import { useResourceStatus } from "../../lib/resourceTasks";
 import { clearTargetCategory, openWindow, targetCategory } from "../windowManager";
+import { useModDeps } from "./composables/useModDeps";
 import { useResourceData } from "./composables/useResourceData";
 import { useResourceOps } from "./composables/useResourceOps";
 import { useResourceView } from "./composables/useResourceView";
@@ -33,6 +34,7 @@ import DropConflictModal from "./parts/DropConflictModal.vue";
 import DropOverlay from "../../components/ui/DropOverlay.vue";
 import InstanceChip from "../../components/ui/InstanceChip.vue";
 import ModPane from "./parts/ModPane.vue";
+import ModDepsPage from "./parts/mod/ModDepsPage.vue";
 import PackPane from "./parts/PackPane.vue";
 import SavePane from "./parts/SavePane.vue";
 import SchematicPane from "./parts/SchematicPane.vue";
@@ -60,9 +62,40 @@ defineEmits<{
 const data = useResourceData();
 const view = useResourceView(data);
 const ops = useResourceOps(data);
-const { category, saveTab, instance, instanceUuid, dpSave, sync } = data;
+const { category, saveTab, instance, instanceUuid, dpSave, sync, mods } = data;
 const { confirmBox, renameAsk } = ops;
 const { load: loadView } = view;
+
+/**
+ * 依赖关系：依赖图与"要和哪几个一起改"都在后端算，见 useModDeps
+ *
+ * 放在窗口层是因为依赖图是**整页子页面**：标题栏换成模组名、带返回键，
+ * 内容区整块换成画布，与「下载整合包」窗口的子页面同一套做法
+ */
+const deps = useModDeps(mods, instanceUuid);
+
+/** 正在看依赖图的模组；null 表示不在子页面 */
+const depItem = ref<ModItemDto | null>(null);
+
+/** 依赖图子页面：重置视图的按钮在标题栏，方法从这里调 */
+const depPage = ref<{ resetView: () => void } | null>(null);
+
+/** 子页面标题：有名字用名字，没有用文件名 */
+const depTitle = computed(() =>
+  depItem.value
+    ? t("resource.depTreeTitle", { name: depItem.value.name || depItem.value.file })
+    : t("resource.title"),
+);
+
+/**
+ * 依赖图里双击节点：把这张图换成以它为目标
+ *
+ * - `key`: 被双击节点的 modid（小写）
+ */
+function rerootDep(key: string) {
+  const item = deps.itemOf(key);
+  if (item) depItem.value = item;
+}
 
 data.setInstanceReadyHook(async () => {
   await loadView();
@@ -257,18 +290,30 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
 </script>
 
 <template>
-  <WindowFrame :title="t('resource.title')" @close="$emit('close')">
-    <!-- 标题栏：当前实例（原先挤在左侧分类栏顶部）+ 下载资源入口 -->
+  <WindowFrame :title="depTitle" :back="depItem ? t('actions.back') : ''" :body-flush="!!depItem"
+    @back="depItem = null" @close="$emit('close')">
+    <!-- 依赖图子页面：整块内容换成画布，标题与返回键在窗口标题栏上 -->
+    <ModDepsPage v-if="depItem" ref="depPage" :item="depItem" :load-tree="deps.depTreeOf"
+      @target="rerootDep" @close="depItem = null" />
+
+    <!-- 标题栏：当前实例（原先挤在左侧分类栏顶部）+ 下载资源入口；子页面不显示 -->
     <template #head-right>
-      <InstanceChip :instance="instance" />
-      <!-- 资源下载窗口也是一个实例一个，没有实例就无处可放，按钮跟着灰掉 -->
-      <BaseButton size="sm" variant="accent" class="icon-btn-head" :disabled="!instanceUuid"
-        v-tip="t('resource.download')" :aria-label="t('resource.download')" @click="openDownload">
-        <GlyphIcon name="download" :size="15" />
+      <!-- 子页面：重置视图放标题栏，画布就能铺满整个内容区；标题栏按钮只留图标，文字进提示 -->
+      <BaseButton v-if="depItem" size="sm" variant="ghost" class="icon-btn-head"
+        v-tip="t('resource.depGraphReset')" :aria-label="t('resource.depGraphReset')" @click="depPage?.resetView()">
+        <GlyphIcon name="maximize" :size="15" :weight="1.8" />
       </BaseButton>
+      <template v-else>
+        <InstanceChip :instance="instance" />
+        <!-- 资源下载窗口也是一个实例一个，没有实例就无处可放，按钮跟着灰掉 -->
+        <BaseButton size="sm" variant="accent" class="icon-btn-head" :disabled="!instanceUuid"
+          v-tip="t('resource.download')" :aria-label="t('resource.download')" @click="openDownload">
+          <GlyphIcon name="download" :size="15" />
+        </BaseButton>
+      </template>
     </template>
 
-    <div class="resource-layout">
+    <div v-if="!depItem" class="resource-layout">
       <CategoryRail :data="data" :view="view" @select="selectCategory" />
 
       <section class="cat-content">
@@ -286,7 +331,8 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
           <div v-else :key="paneKey" class="pane-swap">
             <ScreenshotPane v-if="category === 'screenshots'" :data="data" :ops="ops" />
             <ServerPane v-else-if="category === 'servers'" :data="data" :ops="ops" />
-            <ModPane v-else-if="category === 'mods'" :data="data" :ops="ops" :view="view" />
+            <ModPane v-else-if="category === 'mods'" :data="data" :ops="ops" :view="view" :deps="deps"
+              @open-deps="depItem = $event" />
             <PackPane v-else-if="category === 'resourcepacks'" :data="data" :ops="ops" />
             <ShaderPane v-else-if="category === 'shaders'" :data="data" :ops="ops" />
             <SchematicPane v-else-if="category === 'schematics'" :data="data" :ops="ops" />
