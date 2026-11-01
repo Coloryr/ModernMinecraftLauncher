@@ -29,6 +29,11 @@ pub struct ModItemDto {
     pub disable: bool,
     /// 是否读取失败，元数据解析出错
     pub fail: bool,
+    /// 这个文件是不是**硬链接**，即同一份数据还挂在别的路径上
+    ///
+    /// 真的去问系统要链接数，只有大于 1 才算；拷贝出来的文件不是。
+    /// 内置模组（jar-in-jar）没有独立文件，恒为 `false`。
+    pub hard_link: bool,
     /// 是否为 Core 模组
     pub core: bool,
     /// 是否是**库**，即内置 jar 里没有模组元数据的那些

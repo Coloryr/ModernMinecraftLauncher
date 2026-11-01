@@ -7,6 +7,7 @@ export type ModItemDto = {
   path: string,
   disable: boolean,
   fail: boolean,
+  hardLink: boolean,
   core: boolean,
   library: boolean,
   modId: string,

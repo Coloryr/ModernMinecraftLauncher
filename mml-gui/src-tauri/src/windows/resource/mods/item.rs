@@ -106,12 +106,17 @@ pub(super) fn mod_item(item: &ModObj, ctx: &ModCtx, nested: bool) -> Option<ModI
     // 前置本身不进前端，只报"有没有"：右键菜单靠它决定「依赖图」给不给点
     let has_dependencies = !mod_dependencies(item, ctx.loader).is_empty();
 
+    // 真的问系统要链接数：同一份数据还挂在别的路径上才算硬链接。
+    // 内置模组装在父 jar 里，没有独立文件可查
+    let hard_link = !nested && path_helper::link_count(&item.file).is_some_and(|count| count > 1);
+
     Some(ModItemDto {
         uuid: item.uuid.to_string(),
         sha1,
         path: mod_rel_path(&item.file, ctx.game_path),
         disable: item.disable,
         fail: item.fail,
+        hard_link,
         core: item.core,
         library,
         mod_id,

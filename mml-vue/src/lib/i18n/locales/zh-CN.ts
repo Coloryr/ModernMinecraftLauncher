@@ -695,6 +695,8 @@ export default {
   "resource.modBuiltin": "内置",
   // 内置的库：没有模组元数据的内置 jar，如 asm / mixinextras，不是模组
   "resource.modLibrary": "库",
+  // 文件在磁盘上是硬链接：同一份数据还挂在公共目录等别的路径上
+  "resource.modHardLink": "硬链接",
   "resource.modBuiltinExpand": "展开内置模组",
   "resource.modBuiltinCollapse": "收起内置模组",
   // 表格的列，顺序与 ModTable 的 COLUMNS 一致

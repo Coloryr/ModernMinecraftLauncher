@@ -497,6 +497,8 @@ function onNoteEnter(event: KeyboardEvent) {
           <span v-if="row.item.jarInJar.length" class="badge">
             {{ t("resource.modBuiltinCount", { n: row.item.jarInJar.length }) }}
           </span>
+          <!-- 硬链接：这个文件还挂在公共目录，多实例共用一份 -->
+          <span v-if="row.item.hardLink" class="badge badge-dim">{{ t("resource.modHardLink") }}</span>
           <span v-if="row.item.fail" class="badge badge-red">{{ t("resource.modFail") }}</span>
           <!-- 「有更新」：这一行在更新检查里查到了新版本；下不下由更新弹窗里勾 -->
           <span v-if="updateKeys?.has(modSelectKey(row.item))" class="badge">{{ t("resource.updateTag") }}</span>

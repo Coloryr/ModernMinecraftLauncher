@@ -512,6 +512,59 @@ pub struct FileId {
     pub index: u64,
 }
 
+/// 文件被几个路径指向，即硬链接数
+///
+/// 只有链接数大于 1 才是真正意义上的硬链接；拷贝出来的文件恒为 1。
+///
+/// - `path`: 文件路径
+///
+/// # 返回值
+///
+/// 链接数；平台不支持或读取失败时返回 `None`
+#[cfg(windows)]
+pub fn link_count<P: AsRef<Path>>(path: P) -> Option<u32> {
+    use std::os::windows::io::AsRawHandle;
+    use windows::Win32::{
+        Foundation::HANDLE,
+        Storage::FileSystem::{BY_HANDLE_FILE_INFORMATION, GetFileInformationByHandle},
+    };
+
+    let file = fs::File::open(path).ok()?;
+    let mut info = BY_HANDLE_FILE_INFORMATION::default();
+    unsafe {
+        GetFileInformationByHandle(HANDLE(file.as_raw_handle() as _), &mut info).ok()?;
+    }
+    Some(info.nNumberOfLinks)
+}
+
+/// 文件被几个路径指向，即硬链接数
+///
+/// 只有链接数大于 1 才是真正意义上的硬链接；拷贝出来的文件恒为 1。
+///
+/// - `path`: 文件路径
+///
+/// # 返回值
+///
+/// 链接数；平台不支持或读取失败时返回 `None`
+#[cfg(unix)]
+pub fn link_count<P: AsRef<Path>>(path: P) -> Option<u32> {
+    use std::os::unix::fs::MetadataExt;
+
+    fs::metadata(path).ok().map(|meta| meta.nlink() as u32)
+}
+
+/// 文件被几个路径指向，即硬链接数
+///
+/// - `path`: 文件路径
+///
+/// # 返回值
+///
+/// 当前平台不支持时返回 `None`
+#[cfg(not(any(windows, unix)))]
+pub fn link_count<P: AsRef<Path>>(_path: P) -> Option<u32> {
+    None
+}
+
 /// 读取文件身份
 ///
 /// 硬链接的不同路径会得到相同结果，可用来判断两个文件是否共享同一份数据。
@@ -1226,10 +1279,14 @@ mod tests {
         hard_link(&src, &link).unwrap();
         assert_eq!(read_text(&link).unwrap(), "data");
         assert_eq!(file_id(&src), file_id(&link));
+        // 两个路径指向同一份数据，拷贝出来的文件不会是 2
+        assert_eq!(link_count(&src), Some(2));
+        assert_eq!(link_count(&link), Some(2));
 
-        // 删掉原文件后链接仍能读到内容
+        // 删掉原文件后链接仍能读到内容，此时只剩一个链接
         delete(&src).unwrap();
         assert_eq!(read_text(&link).unwrap(), "data");
+        assert_eq!(link_count(&link), Some(1));
 
         let _ = fs::remove_dir_all(&root);
     }

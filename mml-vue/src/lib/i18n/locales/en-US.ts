@@ -695,6 +695,8 @@ export default {
   "resource.modBuiltin": "Bundled",
   // Bundled library (a nested jar with no mod metadata, e.g. asm / mixinextras)
   "resource.modLibrary": "Library",
+  // The file is a hard link: the same data is also reachable from another path
+  "resource.modHardLink": "Hard link",
   "resource.modBuiltinExpand": "Show bundled mods",
   "resource.modBuiltinCollapse": "Hide bundled mods",
   // Table columns (order matches ModTable's COLUMNS)

@@ -170,6 +170,8 @@ const visible = computed(() => rows.value.slice(start.value, end.value));
         <span v-if="row.depth === depth && row.item.jarInJar.length" class="badge">
           {{ t("resource.modBuiltinCount", { n: row.item.jarInJar.length }) }}
         </span>
+        <!-- 硬链接：这个文件还挂在公共目录，多实例共用一份 -->
+        <span v-if="row.item.hardLink" class="badge badge-dim">{{ t("resource.modHardLink") }}</span>
       </template>
 
       <!--
