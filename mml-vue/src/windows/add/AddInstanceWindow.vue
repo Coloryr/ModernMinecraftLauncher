@@ -33,6 +33,8 @@ import {
   answerNameConflict,
 } from "../../lib/api";
 import { showToast } from "../../lib/toast";
+import { setTaskbarProgress } from "../../lib/taskbarProgress";
+import { progressPercent } from "../../lib/packProgress";
 import { KEYS, emitChange, writeRaw } from "../../lib/storage";
 import { usePageActive } from "../../lib/pageActive";
 import { t, tErr } from "../../lib/i18n";
@@ -760,6 +762,14 @@ async function create() {
 /** 安装进度，由 add-pack-progress 事件驱动；null 表示未在安装 */
 const packProgress = ref<PackProgressDto | null>(null);
 
+// 任务栏图标跟着同一条进度走：装完 packProgress 置空，进度条随之收掉。
+// 百分比按「阶段 + 阶段内细项」算，只按阶段数会在整段解压里钉住不动
+watch(
+  packProgress,
+  (p) => setTaskbarProgress(p ? (progressPercent(p) ?? "indeterminate") : null),
+  { immediate: true },
+);
+
 /** 进度弹窗的标题键：导入在线实例是「下载在线实例」，其余是「安装整合包」 */
 const packTitleKey = ref<"add.installing" | "add.downloadingOnline">("add.installing");
 
@@ -914,6 +924,8 @@ onUnmounted(() => {
   unbindKeys();
   // 直接点标题栏关窗、不走 finishAdding 时也要停止轮询、丢弃在途结果
   leaving = true;
+  // 单窗口模式下这页只是被切走，任务栏图标还在，进度条不能跟着留下去
+  setTaskbarProgress(null);
 });
 </script>
 

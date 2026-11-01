@@ -16,6 +16,7 @@ import { showToast } from "./toast";
 import { KEYS, emitChange, writeRaw } from "./storage";
 import { currentKind, multiWindow } from "../windows/windowManager";
 import type { ModPackStatusDto, ModPackTaskDto } from "./bindings";
+import { progressPercent } from "./packProgress";
 
 /** 单窗口模式下"下载整合包"这一页是否正显示在前台 */
 function modpackPageActive(): boolean {
@@ -133,6 +134,25 @@ export function useModpackStatus(
   }
 
   return { status, init };
+}
+
+/**
+ * 进行中任务的总体进度
+ *
+ * 多个整合包同时安装时取各任务主进度的均值
+ *
+ * - `tasks`: 任务快照里的全部任务
+ *
+ * # 返回值
+ *
+ * 0–100；没有进行中的任务时返回 100
+ */
+export function overallPercent(tasks: ModPackTaskDto[]): number {
+  const running = tasks.filter(isRunning);
+  if (!running.length) return 100;
+  // 单任务用同一套「阶段 + 细项」换算：整段解压期间任务的主进度是不动的
+  const sum = running.reduce((acc, task) => acc + (progressPercent(task) ?? 0), 0);
+  return sum / running.length;
 }
 
 /**

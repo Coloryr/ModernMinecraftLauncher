@@ -13,7 +13,7 @@
 // 自包含状态：自己订阅安装任务，不依赖父组件传参（两处挂载点都能直接放）。
 import { computed, onMounted, onUnmounted } from "vue";
 import { t } from "../lib/i18n";
-import { isRunning, useModpackStatus } from "../lib/modpackTasks";
+import { isRunning, overallPercent, useModpackStatus } from "../lib/modpackTasks";
 import { openModpackPopup } from "../windows/windowManager";
 
 const props = withDefaults(
@@ -59,14 +59,7 @@ const running = computed(() => tasks.value.filter(isRunning));
 const hasFailed = computed(() => tasks.value.some((task) => task.failed));
 
 /** 总进度 = 各进行中任务的主进度均值；全结束时 100 */
-const percent = computed(() => {
-  if (!running.value.length) return 100;
-  const sum = running.value.reduce(
-    (acc, task) => acc + (task.total ? (task.now / task.total) * 100 : 0),
-    0,
-  );
-  return sum / running.value.length;
-});
+const percent = computed(() => overallPercent(tasks.value));
 
 /** 悬停提示：进行中报进度，结束后报结果 */
 const tipText = computed(() => {

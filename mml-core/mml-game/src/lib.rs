@@ -68,14 +68,14 @@ use mml_names::{
 };
 
 use mml_net::{get_work_client, input_file::InputFile};
-use mml_sys::{Os, path_helper};
+use mml_sys::path_helper;
 use uuid::Uuid;
 
 use crate::{
     game_launch::InstanceHandle,
     game_log::{GameLog, GameLogItemObj, InstanceRuntimeLog},
     gui_hook::{AddInstanceGui, ProgressGui},
-    launcher::{LogEncoding, instance_setting_obj::InstanceSettingObj},
+    launcher::instance_setting_obj::InstanceSettingObj,
     launcher_path::{
         assets_path,
         instance_path::{self},
@@ -1160,10 +1160,6 @@ impl InstanceSettingObj {
         path_helper::create_dir_all(self.get_resourcepacks_path())?;
 
         self.save_online_info(&HashMap::new());
-
-        if mml_sys::get_system_info().os == Os::Windows {
-            self.encoding = LogEncoding::GBK;
-        }
 
         self.save();
 

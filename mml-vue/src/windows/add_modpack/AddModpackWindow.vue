@@ -2,12 +2,13 @@
 // 下载整合包窗口：CurseForge / Modrinth 在线搜索 + 选版本安装
 // 安装是多任务的：命令立即返回，进度由 add-modpack-status 事件驱动，
 // 顶部进度条显示任务数与详情，见 ModpackInstallBar。
-import { onMounted, ref } from "vue";
+import { onMounted, onUnmounted, ref, watch } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import { api } from "../../lib/api";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
-import { useModpackStatus } from "../../lib/modpackTasks";
+import { isRunning, overallPercent, useModpackStatus } from "../../lib/modpackTasks";
+import { setTaskbarProgress } from "../../lib/taskbarProgress";
 import { useUnlisteners } from "../../composables/useUnlisteners";
 import type { GroupDto } from "../../lib/bindings";
 import ModpackMode from "./ModpackMode.vue";
@@ -28,6 +29,18 @@ const groups = ref<GroupDto[]>([]);
 
 /** 安装任务状态：本窗口负责显示，终态 toast 由这里弹 */
 const { status: modpackStatus, init: initModpackStatus } = useModpackStatus(true);
+
+// 任务栏图标跟着安装进度走：进行中画条进度，全部结束再收掉
+watch(
+  () => {
+    const tasks = modpackStatus.value?.tasks ?? [];
+    return tasks.some(isRunning) ? overallPercent(tasks) : null;
+  },
+  (percent) => setTaskbarProgress(percent),
+  { immediate: true },
+);
+
+onUnmounted(() => setTaskbarProgress(null));
 
 /** 事件订阅卸载时统一注销：onMounted 里的 await 之后登记 onUnmounted 是无效写法 */
 const { track } = useUnlisteners();

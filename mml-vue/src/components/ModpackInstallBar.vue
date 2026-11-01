@@ -10,6 +10,7 @@ import { showToast } from "../lib/toast";
 import type { ModPackStatusDto, ModPackTaskDto } from "../lib/bindings";
 import AsyncImage from "./ui/AsyncImage.vue";
 import { isRunning } from "../lib/modpackTasks";
+import { progressPercent } from "../lib/packProgress";
 import { shortPath } from "../lib/format";
 
 const props = withDefaults(
@@ -51,17 +52,14 @@ const percent = computed(() => {
   if (!running.value.length) {
     return 100;
   }
-  const sum = running.value.reduce(
-    (acc, task) => acc + (task.total ? (task.now / task.total) * 100 : 0),
-    0,
-  );
+  const sum = running.value.reduce((acc, task) => acc + taskProgress(task), 0);
   return sum / running.value.length;
 });
 
 /** 单任务主进度，单位 %；总数未知时按 0 算，别凭"不是进行中"就当成完成 */
 function taskProgress(task: ModPackTaskDto): number {
   if (task.done) return 100;
-  return task.total ? (task.now / task.total) * 100 : 0;
+  return progressPercent(task) ?? 0;
 }
 /** 标题行文案：还有在装的按"正在安装 N 个"说，全结束了改说"已结束"（别再报 0 个正在安装） */
 const headText = computed(() =>

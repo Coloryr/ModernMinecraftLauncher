@@ -12,6 +12,7 @@
 //! | `project_save_obj` | 项目保存信息 |
 
 use mml_base::tools;
+use mml_sys::{Os, get_system_info};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 pub mod custom_game_arg_obj;
@@ -89,9 +90,14 @@ pub enum LogEncoding {
 }
 
 impl Default for LogEncoding {
-    /// 默认为 UTF-8
+    /// 默认为 UTF-8；Windows 上控制台与游戏输出本来就是 GBK，
+    /// 配置里没写 Encoding 的实例按 GBK 读，否则日志一打开就是乱码
     fn default() -> Self {
-        LogEncoding::UTF8
+        if get_system_info().os == Os::Windows {
+            LogEncoding::GBK
+        } else {
+            LogEncoding::UTF8
+        }
     }
 }
 
