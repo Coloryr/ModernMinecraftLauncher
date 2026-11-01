@@ -127,7 +127,7 @@ build/dev-frontend.sh     # Linux / macOS / Git Bash
   feature。两种预发布的主界面都会显示「预发布版」，并保留 DevTools（F12 打开控制台，独立窗口），正式发布不含。
 - Windows 默认构建 x64 / arm64；只要一种用 `-Arch x64`。arm64 只打 NSIS，x64 出 MSI + NSIS。
   arm64 交叉编译需要对应架构的 MSVC 工具链，CI 的 arm64 跑在原生 ARM runner 上。
-- Linux 出 x64 / arm64；macOS 出 x64 / arm64（x64 跑 `macos-26-intel`，arm64 跑 `macos-latest`）。
+- Linux 出 x64 / arm64；macOS 两架构都在 `macos-latest` 上出，x64 用 `MML_TARGETS` 交叉编译。
 - Windows 两种架构各有独立 target 子目录（`target/<三元组>/release`、`target/<三元组>/prerelease`）；
   宿主直接构建（不带 `--target`）仍在 `target/release`、`target/prerelease`，来回切不会互相刷缓存。
 

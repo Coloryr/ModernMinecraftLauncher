@@ -166,9 +166,9 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
    `--pkg-fmt`，避免回退到源码编译；
 3. Windows 拆成 x64 / arm64 两行 matrix，各跑 `build/init.ps1` 再跑
    `build/build-release.ps1 -Arch <arch>`（arm64 用 `windows-11-arm` 原生 runner）；
-   Linux 跑 x64（`ubuntu-22.04`）与 arm64（`ubuntu-24.04-arm`），macOS 的 x64 跑
-   `macos-26-intel`（原生 Intel）、arm64 跑 `macos-latest`，都执行 `bash build/init.sh`
-   再跑 `bash build/build-release.sh`；
+   Linux 跑 x64（`ubuntu-22.04`）与 arm64（`ubuntu-24.04-arm`）；macOS 两行都跑
+   `macos-latest`，用 `MML_TARGETS` 指定 `aarch64-apple-darwin` / `x86_64-apple-darwin`
+   （x64 交叉编译），都执行 `bash build/init.sh` 再跑 `bash build/build-release.sh`；
 4. Linux x64 构建完先上传 deb / rpm / AppImage，再单独上传原始二进制；`package-linux-extra` job
    下载这份二进制后跑 `build/package-flatpak.sh` 与 `build/package-arch.sh`，把 `.flatpak` 与
    `.pkg.tar.zst` 也放进 `build_out/`。附加包失败不影响主产物，但发版 job 会等它，缺包时不发 Release；
@@ -184,13 +184,13 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
   FUSE 运行时 x64 用 `libfuse2`、arm64 用 `libfuse2t64`。`libdbus-1-dev` 是 `mml-sys` 在 Linux 上
   「在文件管理器中显示」用的 D-Bus 绑定，缺了会编译失败；`libudev-dev` 是手柄读取在 Linux 上的后端依赖；
   `libarchive-tools` 与 `zstd` 给 Arch 包生成 `.MTREE`。
-- macOS 的 x64 跑 `macos-26-intel`：这代 Intel 镜像是最后一代 —— Apple 已说明 macOS 26 是
-  最后一个支持 Intel 的系统，不会再有 `macos-27-intel`。等它退役时 Intel 这条线也就结束了，
-  那时要么只出 arm64，要么回退到在 `macos-latest` 上交叉编译（`MML_TARGETS=x86_64-apple-darwin`
-  加 `rustup target add` 即可，签名与公证不看宿主架构）。
+- macOS 的 x64 在 arm64 的 `macos-latest` 上交叉编译：Tauri 只把 `--target` 透传给 cargo，
+  打包与签名都在宿主上跑，不看目标架构，所以不需要单独的 Intel runner
+  （`macos-26-intel` 是最后一代 Intel 镜像）。工作流用 `rustup target add x86_64-apple-darwin`
+  装好目标三元组，再把 `MML_TARGETS` 传给它。
 - 产物名与本地一致：`mml-windows-x64-0.0.1.msi`、`mml-linux-x64-0.0.1.deb`、
   `mml-linux-x64-0.0.1.flatpak`、`mml-arch-x64-0.0.1.pkg.tar.zst`、
-  `mml-macos-arm64-0.0.1.dmg` 等，架构取自 `runner.arch`。
+  `mml-macos-arm64-0.0.1.dmg` 等，架构取自产物目录里的目标三元组。
 - 预发布产物与正式版同形，只是文件名带标签后缀：`mml-windows-x64-1.0.0-pre.msi`、
   `mml-linux-x64-1.0.0-pre.deb`、`mml-macos-arm64-1.0.0-pre.dmg`。安装包内部版本是
   `1.0.0`（WiX 不收 `-pre`），文件名的后缀让两个通道区分得开。

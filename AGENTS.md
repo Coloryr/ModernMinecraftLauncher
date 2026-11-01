@@ -48,8 +48,8 @@
     漏了即使 profile 是 release-like 也会被当成 dev 构建，exe 去连 localhost:1420，
     没起 vite 就是"进程在跑、窗口不出来"。
     `[profile.prerelease]` 是 thin LTO + `codegen-units = 16`：快很多，体积略大，只出 exe。
-    Linux / macOS 的各架构由 CI 出：Linux x64 / arm64、macOS x64 / arm64 都是原生 runner
-    （见 `.github/workflows/build.yml`）。
+    Linux / macOS 的各架构由 CI 出：Linux x64 / arm64 是原生 runner，macOS 两架构都在
+    arm64 的 `macos-latest` 上出、x64 交叉编译（见 `.github/workflows/build.yml`）。
     Windows 默认两种架构，产物按架构命名：`target/prerelease/mml-gui-<arch>.exe`（`-Arch` 同样可过滤）。
   - 本地要出**带预发布标记的安装包**：给 `build-release` 传 feature 即可，CI 也走这条：
     `MML_FEATURES=custom-protocol,prerelease bash build/build-release.sh`，PowerShell 先

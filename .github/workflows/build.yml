@@ -259,11 +259,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-26-intel
-            arch: x64
-          - runner: macos-latest
-            arch: arm64
-    runs-on: ${{ matrix.runner }}
+          # 两行都在 arm64 的 macos-latest 上跑，x64 用 MML_TARGETS 交叉编译
+          - arch: arm64
+            triple: aarch64-apple-darwin
+          - arch: x64
+            triple: x86_64-apple-darwin
+    runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -276,12 +277,15 @@ jobs:
             mml-vue/package-lock.json
       - name: 设置 Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.triple }}
       - name: 还原 vendor 插件
         run: bash mml-gui/vendor/prepare.sh
       - name: 缓存 Rust
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: .
+          key: ${{ matrix.arch }}
       - name: 安装 cargo-binstall
         uses: taiki-e/install-action@v2
         with:
@@ -324,6 +328,7 @@ jobs:
       - name: 构建并打包
         shell: bash
         env:
+          MML_TARGETS: ${{ matrix.triple }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
