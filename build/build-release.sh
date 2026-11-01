@@ -42,19 +42,26 @@ feature_args=""
 if [ -n "${MML_FEATURES:-}" ]; then
   feature_args="--features $MML_FEATURES"
 fi
+# 预发布只出可执行文件、不打安装包时由 CI 置 1
+bundle_args=""
+if [ -n "${MML_NO_BUNDLE:-}" ]; then
+  bundle_args="--no-bundle"
+fi
 
 echo '正在构建 release（fat LTO，含安装包）...'
 if [ -n "${MML_TARGETS:-}" ]; then
   for target in $MML_TARGETS; do
     echo "  -> $target"
-    if [ -n "${MML_BUNDLES:-}" ]; then
+    if [ -n "${MML_NO_BUNDLE:-}" ]; then
+      cargo tauri build --target "$target" $bundle_args $feature_args
+    elif [ -n "${MML_BUNDLES:-}" ]; then
       cargo tauri build --target "$target" --bundles "$MML_BUNDLES" $feature_args
     else
       cargo tauri build --target "$target" $feature_args
     fi
   done
 else
-  cargo tauri build $feature_args
+  cargo tauri build $bundle_args $feature_args
 fi
 
 # 把 Tauri 的安装包按版本标签重命名后集中到 build_out/

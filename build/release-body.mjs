@@ -78,12 +78,16 @@ if (!files.length) {
 }
 
 const lines = [`M²L ${version} ${kind === "prerelease" ? "预发布构建" : "构建产物"}`, ""];
-if (kind === "prerelease") {
-    lines.push("- 预发布与正式版出同样的安装包；安装包元数据里是去掉 `-pre` 后缀的版本，主界面会提示「预发布版」。");
+if (kind === "release") {
+    lines.push("- Windows：x64 / arm64（MSI / NSIS；arm64 为 NSIS）");
+    lines.push("- Linux：x64 / arm64（deb / rpm / AppImage；x64 另有 Flatpak / Arch）");
+    lines.push("- macOS：x64 / arm64（dmg / app.tar.gz）");
+} else {
+    lines.push("- 预发布不打安装包：Windows / macOS 只出单个可执行文件，Linux 与正式版一样出安装包。");
+    lines.push("- Windows：x64 / arm64（直接运行的 exe）");
+    lines.push("- Linux：x64 / arm64（deb / rpm / AppImage；x64 另有 Flatpak / Arch）");
+    lines.push("- macOS：x64 / arm64（下载后 `chmod +x`）");
 }
-lines.push("- Windows：x64 / arm64（MSI / NSIS；arm64 为 NSIS）");
-lines.push("- Linux：x64 / arm64（deb / rpm / AppImage；x64 另有 Flatpak / Arch）");
-lines.push("- macOS：x64 / arm64（dmg / app.tar.gz）");
 lines.push("");
 lines.push("### 校验和");
 lines.push("");

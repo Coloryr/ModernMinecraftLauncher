@@ -81,6 +81,8 @@ jobs:
       # 版本由 check-version 从标签解析，构建机是浅克隆，自己取不到标签
       MML_VERSION: ${{ needs.check-version.outputs.version }}
       MML_FEATURES: ${{ needs.check-version.outputs.features }}
+      # 预发布只出 exe，不打 MSI / NSIS 安装文件
+      MML_NO_BUNDLE: ${{ needs.check-version.outputs.channel == 'prerelease' && '1' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -255,6 +257,8 @@ jobs:
     env:
       MML_VERSION: ${{ needs.check-version.outputs.version }}
       MML_FEATURES: ${{ needs.check-version.outputs.features }}
+      # 预发布只出可执行文件，不打 dmg
+      MML_NO_BUNDLE: ${{ needs.check-version.outputs.channel == 'prerelease' && '1' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -351,6 +355,15 @@ jobs:
             fi
           done
           bash build/build-release.sh
+      - name: 预发布产物 ad-hoc 签名
+        if: needs.check-version.outputs.channel == 'prerelease'
+        run: |
+          # 预发布只有单个可执行文件，没经过 Tauri 打包，得自己签一道 ——
+          # 否则 arm64 上连启动都过不去
+          for f in build_out/*; do
+            codesign --force --sign - "$f"
+            codesign --verify --verbose=1 "$f"
+          done
       - name: 上传 macOS 产物
         if: needs.check-version.outputs.test != 'true'
         uses: actions/upload-artifact@v6

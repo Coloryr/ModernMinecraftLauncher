@@ -1,4 +1,4 @@
-# 正式发布构建：fat LTO + 单代码生成单元，体积最小、运行最快，但出包慢 ——
+﻿# 正式发布构建：fat LTO + 单代码生成单元，体积最小、运行最快，但出包慢 ——
 # 末尾的跨 crate 优化是单线程的，会看到只有一个核在跑；产出安装包（tauri 打包链）。
 # 预发布 / 日常打包用 build\build-prerelease.ps1。
 #
@@ -68,12 +68,20 @@ foreach ($t in $targets) {
 
 # 额外的 cargo feature，预发布走同一条构建链路时由 CI 传 custom-protocol,prerelease
 $features = $env:MML_FEATURES
+# 预发布只出可执行文件、不打安装包时由 CI 置 1
+$noBundle = $env:MML_NO_BUNDLE
 
 Push-Location (Join-Path $root 'mml-gui')
 try {
     foreach ($t in $targets) {
         Write-Host "正在构建 release $($t['arch'])（$($t['triple'])）..."
-        $tauriArgs = @('tauri', 'build', '--target', $t['triple'], '--bundles', $t['bundles'])
+        $tauriArgs = @('tauri', 'build', '--target', $t['triple'])
+        if ($noBundle) {
+            $tauriArgs += '--no-bundle'
+        }
+        else {
+            $tauriArgs += @('--bundles', $t['bundles'])
+        }
         if ($features) { $tauriArgs += @('--features', $features) }
         cargo @tauriArgs
         if ($LASTEXITCODE -ne 0) {

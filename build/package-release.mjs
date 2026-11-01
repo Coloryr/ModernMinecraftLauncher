@@ -62,6 +62,20 @@ function archOf(triple) {
     return triple;
 }
 
+/** 找出所有构建输出目录：宿主一份 + 每个 --target 一份，不含 bundle */
+function execDirs() {
+    const found = [];
+    if (!fs.existsSync(targetDir)) return found;
+    for (const entry of fs.readdirSync(targetDir, { withFileTypes: true })) {
+        if (!entry.isDirectory() || entry.name === "release") continue;
+        const dir = path.join(targetDir, entry.name, "release");
+        if (fs.existsSync(dir)) found.push({ dir, triple: entry.name });
+    }
+    const host = path.join(targetDir, "release");
+    if (fs.existsSync(host)) found.push({ dir: host, triple: "release" });
+    return found;
+}
+
 /** 找出所有 Tauri 产物目录：宿主一份 + 每个 --target 一份 */
 function bundleDirs() {
     const found = [];
@@ -120,13 +134,9 @@ function releaseName(file, arch) {
 }
 
 const dirs = bundleDirs();
-if (!dirs.length) {
-    console.error("找不到 Tauri 产物目录：target/release/bundle 或 target/<三元组>/release/bundle");
-    process.exit(1);
-}
-
-fs.mkdirSync(outDir, { recursive: true });
 const copied = new Map();
+fs.mkdirSync(outDir, { recursive: true });
+
 for (const item of dirs) {
     const arch = archOf(item.triple);
     for (const file of walk(item.dir)) {
@@ -143,8 +153,28 @@ for (const item of dirs) {
     }
 }
 
+// 不打包的预发布（Windows / macOS）只留可执行文件，产物在 target/<三元组>/release 下
 if (!copied.size) {
-    console.error("没有在 " + path.relative(root, targetDir) + " 下找到当前平台的安装包。");
+    const ext = os === "windows" ? ".exe" : "";
+    const candidates = ["mml-gui" + ext, "ModernMinecraftLauncher" + ext];
+    for (const item of execDirs()) {
+        const src = candidates.map((name) => path.join(item.dir, name)).find((file) => fs.existsSync(file));
+        if (!src) continue;
+        const name = "mml-" + os + "-" + archOf(item.triple) + "-" + version + ext;
+        if (copied.has(name)) continue;
+        copied.set(name, src);
+        const dest = path.join(outDir, name);
+        fs.copyFileSync(src, dest);
+        console.log(path.relative(root, src) + " -> " + path.relative(root, dest));
+    }
+    // macOS 的可执行文件下载后要能直接跑
+    for (const name of copied.keys()) fs.chmodSync(path.join(outDir, name), 0o755);
+}
+
+if (!copied.size) {
+    console.error(
+        "没有在 " + path.relative(root, targetDir) + " 下找到安装包或可执行文件（找过 target/release、target/<三元组>/release）",
+    );
     process.exit(1);
 }
 

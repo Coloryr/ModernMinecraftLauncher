@@ -152,11 +152,11 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 | 触发 | 行为 |
 | --- | --- |
 | 推送正式版标签（如 `v0.0.1`） | `check-version` 用标签名作为版本，随后并行构建三平台安装包，最后汇总成一个 GitHub Release |
-| 推送预发布标签（如 `v1.0.0-pre`） | 产物与正式版相同（安装包齐全），只多带 `prerelease` feature 让界面标「预发布版」，最后汇总成一个标记为 Pre-release 的 GitHub Release |
+| 推送预发布标签（如 `v1.0.0-pre`） | 多带 `prerelease` feature 让界面标「预发布版」；Windows / macOS 用 `--no-bundle` 跳过安装文件、只出可执行文件，Linux 仍出安装包，最后汇总成一个标记为 Pre-release 的 GitHub Release |
 | 推送测试构建标签（如 `testbuild`） | 完整跑一遍构建，版本取最近的可达标签、通道按其后缀决定；产物全部丢弃——`upload-artifact` 步骤、Flatpak / Arch 附加包与 Release 都不执行，只看构建是否通过 |
 | 推送 `releases/**` 分支 | 只构建、把产物传成 Actions artifact，不发 Release，用来验证构建 |
 
-每个平台都走同一套骨架，两个通道只在 `MML_FEATURES` 上分叉：
+每个平台都走同一套骨架，两个通道只在 `MML_FEATURES` 与 `MML_NO_BUNDLE` 上分叉：
 
 1. `actions/checkout@v5` + `actions/setup-node@v5`（Node 24，按 lockfile 缓存）+
    `dtolnay/rust-toolchain@stable` + `Swatinem/rust-cache@v2`；
@@ -191,9 +191,10 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 - 产物名与本地一致：`mml-windows-x64-0.0.1.msi`、`mml-linux-x64-0.0.1.deb`、
   `mml-linux-x64-0.0.1.flatpak`、`mml-arch-x64-0.0.1.pkg.tar.zst`、
   `mml-macos-arm64-0.0.1.dmg` 等，架构取自产物目录里的目标三元组。
-- 预发布产物与正式版同形，只是文件名带标签后缀：`mml-windows-x64-1.0.0-pre.msi`、
-  `mml-linux-x64-1.0.0-pre.deb`、`mml-macos-arm64-1.0.0-pre.dmg`。安装包内部版本是
-  `1.0.0`（WiX 不收 `-pre`），文件名的后缀让两个通道区分得开。
+- 预发布在 Windows / macOS 只留可执行文件：`mml-windows-x64-1.0.0-pre.exe`、
+  `mml-macos-arm64-1.0.0-pre`（下载后 `chmod +x`，macOS 由工作流补一道 ad-hoc 签名）；
+  Linux 与正式版一样出 `mml-linux-x64-1.0.0-pre.deb` 等。安装包内部版本是 `1.0.0`
+  （WiX 不收 `-pre`），文件名的后缀让两个通道区分得开。
 - Flatpak 不需要在 runner 上装 `org.freedesktop.Platform`：封装只做 OSTree 提交与 bundle，
   runtime 是安装时由用户从 Flathub 获取的依赖。Arch 包只是把二进制与 `.PKGINFO` 打成 tar.zst，
   不需要装 `base-devel` 或 WebKitGTK。
