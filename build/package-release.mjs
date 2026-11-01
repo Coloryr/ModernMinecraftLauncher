@@ -7,7 +7,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveVersion } from "./version.mjs";
+import { packageVersionOf, resolveVersion } from "./version.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -19,7 +19,8 @@ try {
     process.exit(1);
 }
 
-// 应用清单必须与发布版本一致，否则安装包元数据和产物名会对不上
+// 清单里写的是安装包版本（标签去掉 -pre 后缀）；产物名仍用标签版本，预发布才分得清
+const packageVersion = packageVersionOf(version);
 const cargoVersion = (fs.readFileSync(
     path.join(root, "mml-gui", "src-tauri", "Cargo.toml"),
     "utf8",
@@ -27,9 +28,9 @@ const cargoVersion = (fs.readFileSync(
 const tauriVersion = JSON.parse(
     fs.readFileSync(path.join(root, "mml-gui", "src-tauri", "tauri.conf.json"), "utf8"),
 ).version;
-if (cargoVersion !== version || tauriVersion !== version) {
+if (cargoVersion !== packageVersion || tauriVersion !== packageVersion) {
     console.error(
-        "版本不一致：标签版本=" + version + "，Cargo.toml=" + cargoVersion + "，tauri.conf.json=" + tauriVersion,
+        "版本不一致：安装包版本=" + packageVersion + "（标签 " + version + "），Cargo.toml=" + cargoVersion + "，tauri.conf.json=" + tauriVersion,
     );
     process.exit(1);
 }

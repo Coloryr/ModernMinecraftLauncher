@@ -38,8 +38,9 @@
     只要一种用 `-Arch x64`；arm64 只打 NSIS。
     `[profile.release]` 是 fat LTO + `codegen-units = 1`：体积最小、运行最快，但末尾的
     跨 crate 优化是单线程的，**构建时会看到只有一个核在跑**，含安装包。
-  - 预发布：`build/build-prerelease.ps1`（bash 版 `build/build-prerelease.sh`；
+  - 预发布（本地快速，不打包）：`build/build-prerelease.ps1`（bash 版 `build/build-prerelease.sh`；
     = `cd mml-gui/src-tauri && cargo build --profile prerelease --features custom-protocol,prerelease`）。
+    CI 的预发布不走这条：它跑同一个 `build-release`，只是多带 `prerelease` feature，产物与正式版同形。
     **`prerelease` feature 也不能漏**：主页面据它显示「预发布版」提示，见 `src-tauri/src/build_info.rs`。
     三个通道的界面口径：直接拉源码启动（`cargo run` / `tauri dev`，`debug_assertions`）是
     「测试版」，带 `prerelease` feature 的是「预发布版」，正式发布不提示。
@@ -50,13 +51,11 @@
     Linux / macOS 的各架构由 CI 出：Linux x64 / arm64、macOS x64 / arm64 都是原生 runner
     （见 `.github/workflows/build.yml`）。
     Windows 默认两种架构，产物按架构命名：`target/prerelease/mml-gui-<arch>.exe`（`-Arch` 同样可过滤）。
-  - 预发布也要**安装包**时：`tauri` CLI 不认 `--profile`（`--` 透传给 cargo 会让它去
-    `target/release` 找错文件），只能覆盖 release 的设置：
-    `CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 cargo tauri build --features prerelease`。
-    PowerShell 里环境变量写成 `$env:CARGO_PROFILE_RELEASE_LTO = 'thin'` 单独两行再跑
-    `cargo tauri build --features prerelease`；`--features prerelease` 不能省，
-    否则这样出的包与正式版一模一样，主页面不会提示「预发布版」。
-    代价是它与正式发布共用 target 目录，来回切会重编末尾那几个单元。
+  - 本地要出**带预发布标记的安装包**：给 `build-release` 传 feature 即可，CI 也走这条：
+    `MML_FEATURES=custom-protocol,prerelease bash build/build-release.sh`，PowerShell 先
+    `$env:MML_FEATURES = 'custom-protocol,prerelease'` 再跑 `build/build-release.ps1`。
+    feature 不能省，否则这样出的包与正式版一模一样，主页面不会提示「预发布版」。
+    安装包版本写的是标签去掉 `-pre` 的纯数字版本（WiX 只收纯数字），文件名仍带后缀。
 - Rust workspace 在**仓库根目录**（根 `Cargo.toml` 收编 `mml-core/` 全部子 crate 与
   `mml-gui/src-tauri` + `ipc-gen` / `ipc-gen/macros`；`workspace.dependencies` 与 `[profile.*]`
   也统一在根清单维护）。target 目录在根目录 `target\`（首次编译较慢）。

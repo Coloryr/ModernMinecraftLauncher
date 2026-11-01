@@ -26,6 +26,7 @@ jobs:
     outputs:
       channel: ${{ steps.resolve.outputs.channel }}
       version: ${{ steps.resolve.outputs.version }}
+      features: ${{ steps.resolve.outputs.features }}
       test: ${{ steps.resolve.outputs.test }}
     steps:
       - name: Checkout
@@ -55,8 +56,16 @@ jobs:
             channel=release
           fi
 
+          # 两个通道走同一条构建链路，预发布只是多带一个 feature 让界面标出「预发布版」
+          if [ "$channel" = prerelease ]; then
+            features=custom-protocol,prerelease
+          else
+            features=""
+          fi
+
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "channel=${channel}" >> "$GITHUB_OUTPUT"
+          echo "features=${features}" >> "$GITHUB_OUTPUT"
           echo "test=${test}" >> "$GITHUB_OUTPUT"
           echo "版本=${version}，发布通道=${channel}，测试构建=${test}"
 
@@ -71,6 +80,7 @@ jobs:
     env:
       # 版本由 check-version 从标签解析，构建机是浅克隆，自己取不到标签
       MML_VERSION: ${{ needs.check-version.outputs.version }}
+      MML_FEATURES: ${{ needs.check-version.outputs.features }}
     strategy:
       fail-fast: false
       matrix:
@@ -115,26 +125,12 @@ jobs:
       - name: 安装依赖
         run: pwsh -NoProfile -File build/init.ps1
       - name: 构建并打包（${{ matrix.arch }}）
-        if: needs.check-version.outputs.channel == 'release'
         run: pwsh -NoProfile -File build/build-release.ps1 -Arch ${{ matrix.arch }}
       - name: 上传 Windows 产物
-        if: needs.check-version.outputs.channel == 'release' && needs.check-version.outputs.test != 'true'
+        if: needs.check-version.outputs.test != 'true'
         uses: actions/upload-artifact@v6
         with:
           name: mml-windows-${{ matrix.arch }}
-          path: build_out/*
-          if-no-files-found: error
-      - name: 构建预发布（${{ matrix.arch }}）
-        if: needs.check-version.outputs.channel == 'prerelease'
-        run: pwsh -NoProfile -File build/build-prerelease.ps1 -Arch ${{ matrix.arch }}
-      - name: 收集预发布产物
-        if: needs.check-version.outputs.channel == 'prerelease'
-        run: node build/package-prerelease.mjs --os windows --arch ${{ matrix.arch }}
-      - name: 上传预发布产物
-        if: needs.check-version.outputs.channel == 'prerelease' && needs.check-version.outputs.test != 'true'
-        uses: actions/upload-artifact@v6
-        with:
-          name: mml-prerelease-windows-${{ matrix.arch }}
           path: build_out/*
           if-no-files-found: error
 
@@ -142,6 +138,7 @@ jobs:
     needs: check-version
     env:
       MML_VERSION: ${{ needs.check-version.outputs.version }}
+      MML_FEATURES: ${{ needs.check-version.outputs.features }}
     strategy:
       fail-fast: false
       matrix:
@@ -201,17 +198,16 @@ jobs:
       - name: 安装依赖
         run: bash build/init.sh
       - name: 构建并打包
-        if: needs.check-version.outputs.channel == 'release'
         run: bash build/build-release.sh
       - name: 上传 Linux 产物
-        if: needs.check-version.outputs.channel == 'release' && needs.check-version.outputs.test != 'true'
+        if: needs.check-version.outputs.test != 'true'
         uses: actions/upload-artifact@v6
         with:
           name: mml-linux-${{ matrix.arch }}
           path: build_out/*
           if-no-files-found: error
       - name: 上传 Linux x64 二进制
-        if: needs.check-version.outputs.channel == 'release' && matrix.arch == 'x64' && needs.check-version.outputs.test != 'true'
+        if: matrix.arch == 'x64' && needs.check-version.outputs.test != 'true'
         uses: actions/upload-artifact@v6
         with:
           name: linux-x64-bin
@@ -220,22 +216,9 @@ jobs:
             target/release/ModernMinecraftLauncher
             target/release/mml-gui
           if-no-files-found: error
-      - name: 构建预发布
-        if: needs.check-version.outputs.channel == 'prerelease'
-        run: bash build/build-prerelease.sh
-      - name: 收集预发布产物
-        if: needs.check-version.outputs.channel == 'prerelease'
-        run: node build/package-prerelease.mjs --os linux --arch ${{ matrix.arch }}
-      - name: 上传预发布产物
-        if: needs.check-version.outputs.channel == 'prerelease' && needs.check-version.outputs.test != 'true'
-        uses: actions/upload-artifact@v6
-        with:
-          name: mml-prerelease-linux-${{ matrix.arch }}
-          path: build_out/*
-          if-no-files-found: error
 
   package-linux-extra:
-    if: needs.check-version.outputs.channel == 'release' && needs.check-version.outputs.test != 'true'
+    if: needs.check-version.outputs.test != 'true'
     needs: [check-version, build-linux]
     runs-on: ubuntu-22.04
     env:
@@ -271,6 +254,7 @@ jobs:
     needs: check-version
     env:
       MML_VERSION: ${{ needs.check-version.outputs.version }}
+      MML_FEATURES: ${{ needs.check-version.outputs.features }}
     strategy:
       fail-fast: false
       matrix:
@@ -312,7 +296,6 @@ jobs:
           cargo binstall --no-confirm --pkg-fmt "$pkg_fmt" tauri-cli@^2
           cargo tauri --version
       - name: 检查签名配置
-        if: needs.check-version.outputs.channel == 'release'
         shell: bash
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -339,7 +322,6 @@ jobs:
       - name: 安装依赖
         run: bash build/init.sh
       - name: 构建并打包
-        if: needs.check-version.outputs.channel == 'release'
         shell: bash
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -365,32 +347,10 @@ jobs:
           done
           bash build/build-release.sh
       - name: 上传 macOS 产物
-        if: needs.check-version.outputs.channel == 'release' && needs.check-version.outputs.test != 'true'
+        if: needs.check-version.outputs.test != 'true'
         uses: actions/upload-artifact@v6
         with:
           name: mml-macos-${{ matrix.arch }}
-          path: build_out/*
-          if-no-files-found: error
-      - name: 构建预发布
-        if: needs.check-version.outputs.channel == 'prerelease'
-        run: bash build/build-prerelease.sh
-      - name: 收集预发布产物
-        if: needs.check-version.outputs.channel == 'prerelease'
-        run: node build/package-prerelease.mjs --os macos --arch ${{ matrix.arch }}
-      - name: 预发布产物 ad-hoc 签名
-        if: needs.check-version.outputs.channel == 'prerelease'
-        run: |
-          # 预发布只有裸可执行文件，不经过 Tauri 打包，得自己签一道 ——
-          # 否则 arm64 上连启动都过不去
-          for f in build_out/*; do
-            codesign --force --sign - "$f"
-            codesign --verify --verbose=1 "$f"
-          done
-      - name: 上传预发布产物
-        if: needs.check-version.outputs.channel == 'prerelease' && needs.check-version.outputs.test != 'true'
-        uses: actions/upload-artifact@v6
-        with:
-          name: mml-prerelease-macos-${{ matrix.arch }}
           path: build_out/*
           if-no-files-found: error
 
@@ -436,17 +396,17 @@ jobs:
 
   prerelease:
     if: startsWith(github.ref, 'refs/tags/') && needs.check-version.outputs.channel == 'prerelease' && needs.check-version.outputs.test != 'true'
-    needs: [check-version, build-windows, build-linux, build-macos]
+    needs: [check-version, build-windows, build-linux, package-linux-extra, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-      - name: 下载预发布产物
+      - name: 下载全部产物
         uses: actions/download-artifact@v7
         with:
-          pattern: mml-prerelease-*
+          pattern: mml-*
           merge-multiple: false
           path: artifacts
       - name: 检查产物重名

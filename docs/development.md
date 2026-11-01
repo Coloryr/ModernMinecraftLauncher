@@ -68,7 +68,7 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
 | `cd mml-gui && .\tauri.ps1 dev` | 桌面开发模式（自动还原 vendor 插件；Linux / macOS 用 `bash tauri.sh dev`；端口 1420 必须空闲） |
 | `build/dev-frontend.ps1` | 只起 Vite，配合 debug 版 Rust 后端单独运行；`tauri dev` 已自带 Vite，不要重复起 |
 | `build/build-release.ps1` | 正式发布构建（fat LTO，含安装包，按版本收集到 `build_out/`；Windows 默认 x64 / arm64；Linux / macOS 的 x64 / arm64 由 CI 原生 runner 出） |
-| `build/build-prerelease.ps1` | 预发布构建（thin LTO，只出 exe，更快；Windows 两种架构，`target/prerelease/mml-gui-<arch>.exe`） |
+| `build/build-prerelease.ps1` | 本地快速预发布构建（thin LTO，只出 exe，不打包；Windows 两种架构，`target/prerelease/mml-gui-<arch>.exe`） |
 | `bash build/package-flatpak.sh` | 用已构建的二进制打 `.flatpak`，需要 `flatpak`，不重新编译 |
 | `bash build/package-arch.sh` | 用已构建的二进制打 `.pkg.tar.zst`，不依赖 `makepkg`，任一 Linux 可跑 |
 | `.\check.ps1 --all` | 根目录整仓检查，先还原 vendor 插件再 `cargo check`（bash 版 `bash check.sh --all`） |
@@ -93,8 +93,9 @@ Flatpak 默认声明 `org.freedesktop.Platform//25.08`，安装时由 Flathub �
 编出的二进制可能要求更高版本的 glibc，只有 CI 在 `ubuntu-22.04` 上编的包才与 25.08 匹配；
 要换运行时用 `MML_FLATPAK_RUNTIME=26.08 bash build/package-flatpak.sh`。
 
-发布版本从 `0.0.1` 开始，唯一来源是 Git 标签；`build-release` 先把标签版本同步到
-`mml-gui/src-tauri/Cargo.toml` 与 `tauri.conf.json`，再把 Tauri 产物按版本重命名到 `build_out/`。
+发布版本从 `0.0.1` 开始，唯一来源是 Git 标签；`build-release` 先把**去掉 `-pre` 后缀**的版本
+同步到 `mml-gui/src-tauri/Cargo.toml` 与 `tauri.conf.json`，再把 Tauri 产物按标签版本重命名到
+`build_out/`。安装包元数据只收纯数字（WiX 拒绝 `0.1.1-pre`），所以标签带后缀、清单不带。
 完整发版流程见根 README 的[版本与发布](../README.md#版本与发布)。
 
 **版本号在界面上的写法按通道区分**（见 `src-tauri/src/build_info.rs`）：
@@ -102,7 +103,7 @@ Flatpak 默认声明 `org.freedesktop.Platform//25.08`，安装时由 Flathub �
 | 通道 | 写法 |
 | --- | --- |
 | 正式发布 | `1.0.0`，不带日期 |
-| 预发布版（`prerelease` feature） | `1.0.0.20261028`；清单本身带后缀时是 `1.0.0-pre.20261028` |
+| 预发布版（`prerelease` feature） | `1.0.0.20261028`；清单带后缀时是 `1.0.0-pre.20261028` |
 | 测试版（`cargo run` / `tauri dev`） | `1.0.0.20261028` |
 
 日期由 `src-tauri/build.rs` 在编译期取当天写进 `MML_BUILD_DATE`，所以查版本时看到的是
@@ -145,18 +146,17 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 
 ## 自动化构建（GitHub Actions）
 
-[`.github/workflows/build.yml`](../.github/workflows/build.yml) 把 `init`、`build-release` 与
-`build-prerelease` 三个本地脚本串成三平台流水线，按标签后缀决定走正式发布还是预发布，
-不另写一份构建逻辑：
+[`.github/workflows/build.yml`](../.github/workflows/build.yml) 把 `init` 与 `build-release`
+两个本地脚本串成三平台流水线，两个通道共用同一套构建，标签后缀只决定发出去的是正式版还是 Pre-release：
 
 | 触发 | 行为 |
 | --- | --- |
 | 推送正式版标签（如 `v0.0.1`） | `check-version` 用标签名作为版本，随后并行构建三平台安装包，最后汇总成一个 GitHub Release |
-| 推送预发布标签（如 `v1.0.0-pre`） | 标签带 `-pre` 这类后缀时走预发布通道：各平台跑 `build-prerelease`，只出可执行文件，最后汇总成一个标记为 Pre-release 的 GitHub Release |
+| 推送预发布标签（如 `v1.0.0-pre`） | 产物与正式版相同（安装包齐全），只多带 `prerelease` feature 让界面标「预发布版」，最后汇总成一个标记为 Pre-release 的 GitHub Release |
 | 推送测试构建标签（如 `testbuild`） | 完整跑一遍构建，版本取最近的可达标签、通道按其后缀决定；产物全部丢弃——`upload-artifact` 步骤、Flatpak / Arch 附加包与 Release 都不执行，只看构建是否通过 |
 | 推送 `releases/**` 分支 | 只构建、把产物传成 Actions artifact，不发 Release，用来验证构建 |
 
-每个平台都走同一套骨架，正式版与预发布只在构建脚本和打包方式上分叉：
+每个平台都走同一套骨架，两个通道只在 `MML_FEATURES` 上分叉：
 
 1. `actions/checkout@v5` + `actions/setup-node@v5`（Node 24，按 lockfile 缓存）+
    `dtolnay/rust-toolchain@stable` + `Swatinem/rust-cache@v2`；
@@ -164,21 +164,19 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
    `cargo-tauri`（GitHub Release 资产），不跑 `cargo install`。上游 binstall 元数据只给
    x64 的 zip 包写了格式覆盖，macOS / Windows 的 ARM64 产物其实也是 zip，工作流按平台显式传
    `--pkg-fmt`，避免回退到源码编译；
-3. Windows 拆成 x64 / arm64 两行 matrix，各跑 `build/init.ps1` 再按通道跑
-   `build/build-release.ps1 -Arch <arch>` 或 `build/build-prerelease.ps1 -Arch <arch>`
-   （arm64 用 `windows-11-arm` 原生 runner）；Linux 跑 x64（`ubuntu-22.04`）与 arm64（`ubuntu-24.04-arm`），
-   macOS 的 x64 跑 `macos-26-intel`（原生 Intel）、arm64 跑 `macos-latest`，都执行
-   `bash build/init.sh` 再按通道跑 `build/build-release.sh` 或 `build/build-prerelease.sh`；
-4. 正式版的 Linux x64 构建完先上传 deb / rpm / AppImage，再单独上传原始二进制；`package-linux-extra` job
+3. Windows 拆成 x64 / arm64 两行 matrix，各跑 `build/init.ps1` 再跑
+   `build/build-release.ps1 -Arch <arch>`（arm64 用 `windows-11-arm` 原生 runner）；
+   Linux 跑 x64（`ubuntu-22.04`）与 arm64（`ubuntu-24.04-arm`），macOS 的 x64 跑
+   `macos-26-intel`（原生 Intel）、arm64 跑 `macos-latest`，都执行 `bash build/init.sh`
+   再跑 `bash build/build-release.sh`；
+4. Linux x64 构建完先上传 deb / rpm / AppImage，再单独上传原始二进制；`package-linux-extra` job
    下载这份二进制后跑 `build/package-flatpak.sh` 与 `build/package-arch.sh`，把 `.flatpak` 与
    `.pkg.tar.zst` 也放进 `build_out/`。附加包失败不影响主产物，但发版 job 会等它，缺包时不发 Release；
    arm64 只出 deb / rpm / AppImage；
-5. 正式版由脚本把安装包按版本改名到 `build_out/`，预发布由 `build/package-prerelease.mjs`
-   把可执行文件按 平台 / 架构 / 版本 改名到 `build_out/`，`actions/upload-artifact@v6` 收走；
-   发版 job（正式版与预发布各一个）用 `actions/download-artifact@v7` 取产物并保留每个
-   artifact 的子目录：正式版按 `mml-*`，预发布按 `mml-prerelease-*`；先检查文件名有无重复，
-   再由 `build/release-body.mjs` 用产物现算 SHA1 / SHA256 生成发布说明，最后交给
-   `softprops/action-gh-release@v3`。
+5. 两个通道都由脚本把安装包按标签版本改名到 `build_out/`，`actions/upload-artifact@v6` 收走；
+   发版 job（正式版与预发布各一个）用 `actions/download-artifact@v7` 取产物，都按 `mml-*`；
+   先检查文件名有无重复，再由 `build/release-body.mjs` 用产物现算 SHA1 / SHA256 生成发布说明，
+   最后交给 `softprops/action-gh-release@v3`。
 
 - Linux runner 固定 `ubuntu-22.04` 作为 glibc 基线，并预装 Tauri 需要的
   `libwebkit2gtk-4.1-dev` / `libayatana-appindicator3-dev` / `librsvg2-dev` /
@@ -193,14 +191,15 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 - 产物名与本地一致：`mml-windows-x64-0.0.1.msi`、`mml-linux-x64-0.0.1.deb`、
   `mml-linux-x64-0.0.1.flatpak`、`mml-arch-x64-0.0.1.pkg.tar.zst`、
   `mml-macos-arm64-0.0.1.dmg` 等，架构取自 `runner.arch`。
-- 预发布只出可执行文件：`mml-windows-x64-1.0.0-pre.exe`、`mml-linux-arm64-1.0.0-pre`、
-  `mml-macos-x64-1.0.0-pre` 等；Linux / macOS 下载后要 `chmod +x`。预发布不打安装包，
-  安装包的版本字段放不下 `-pre` 这类后缀。
+- 预发布产物与正式版同形，只是文件名带标签后缀：`mml-windows-x64-1.0.0-pre.msi`、
+  `mml-linux-x64-1.0.0-pre.deb`、`mml-macos-arm64-1.0.0-pre.dmg`。安装包内部版本是
+  `1.0.0`（WiX 不收 `-pre`），文件名的后缀让两个通道区分得开。
 - Flatpak 不需要在 runner 上装 `org.freedesktop.Platform`：封装只做 OSTree 提交与 bundle，
   runtime 是安装时由用户从 Flathub 获取的依赖。Arch 包只是把二进制与 `.PKGINFO` 打成 tar.zst，
   不需要装 `base-devel` 或 WebKitGTK。
 - 版本号只来自标签：`check-version` 用标签名作为版本，标签不是版本号时直接失败，
-  避免发出错版本的包。标签带 `-` 后缀（如 `v1.0.0-pre`）时走预发布通道。
+  避免发出错版本的包。标签带 `-` 后缀（如 `v1.0.0-pre`）时走预发布通道，产物名保留后缀、
+  清单与安装包元数据去掉后缀。
 - macOS runner 的 `bash` 是 3.2，`build/*.sh` 与 `mml-gui/vendor/prepare.sh` 都不能用
   `mapfile` / `readarray` 这类 bash 4 语法。
 - FUSE 运行时包在 24.04 改名为 `libfuse2t64`：工作流装依赖前先用 `apt-cache show` 断言包名存在，

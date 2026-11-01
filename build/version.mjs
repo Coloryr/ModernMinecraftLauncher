@@ -105,10 +105,26 @@ export function resolveVersion() {
     throw new Error("仓库里没有版本标签：先打一个（如 v0.1.0）再构建。");
 }
 
+/**
+ * 把标签版本收成安装包能接受的形式
+ *
+ * Windows 安装包要求版本纯数字，`0.1.1-pre` 会被 WiX 直接拒绝；
+ * 标签保留后缀用于产物命名与 Release，清单与安装包元数据用去掉后缀的版本。
+ *
+ * - `version`: 三段版本号，可带 -pre 这类后缀
+ *
+ * # 返回值
+ *
+ * 纯数字三段版本号，如 `0.1.1`
+ */
+export function packageVersionOf(version) {
+    return version.replace(/[-+].*$/, "");
+}
+
 // 直接执行时打印版本，供脚本与 bash 取用；被 import 时只导出函数
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
     try {
-        console.log(resolveVersion());
+        console.log(process.argv.includes("--package") ? packageVersionOf(resolveVersion()) : resolveVersion());
     } catch (error) {
         console.error(error.message);
         process.exit(1);

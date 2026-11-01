@@ -36,18 +36,25 @@ cd "$root/mml-gui"
 #
 # 打包类型默认交给 tauri 自己决定（Linux 上是 deb / rpm / AppImage）。交叉编译、
 # 或该架构没有某个打包工具时用 MML_BUNDLES 限定，例如 MML_BUNDLES=deb,rpm。
+# 额外的 cargo feature，预发布走同一条构建链路时由 CI 传 custom-protocol,prerelease。
+# 用字符串而不是数组：macOS runner 的 bash 3.2 在 set -u 下展开空数组会报错。
+feature_args=""
+if [ -n "${MML_FEATURES:-}" ]; then
+  feature_args="--features $MML_FEATURES"
+fi
+
 echo '正在构建 release（fat LTO，含安装包）...'
 if [ -n "${MML_TARGETS:-}" ]; then
   for target in $MML_TARGETS; do
     echo "  -> $target"
     if [ -n "${MML_BUNDLES:-}" ]; then
-      cargo tauri build --target "$target" --bundles "$MML_BUNDLES"
+      cargo tauri build --target "$target" --bundles "$MML_BUNDLES" $feature_args
     else
-      cargo tauri build --target "$target"
+      cargo tauri build --target "$target" $feature_args
     fi
   done
 else
-  cargo tauri build
+  cargo tauri build $feature_args
 fi
 
 # 把 Tauri 的安装包按版本标签重命名后集中到 build_out/

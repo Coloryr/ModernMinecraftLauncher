@@ -117,13 +117,14 @@ build/dev-frontend.sh     # Linux / macOS / Git Bash
 | 目标 | 命令 | 产物 |
 | --- | --- | --- |
 | 正式发布 | `build/build-release.ps1`（或 `.sh`） | `build_out/` 下带版本号的安装包；Windows 默认 x64 / arm64，Linux / macOS 由 CI 出 x64 / arm64 |
-| 预发布 | `build/build-prerelease.ps1`（或 `.sh`） | `target/prerelease/mml-gui-<arch>.exe` |
+| 预发布（本地快速） | `build/build-prerelease.ps1`（或 `.sh`） | `target/prerelease/mml-gui-<arch>.exe`，不打包；CI 的预发布走正式发布链路出同样的安装包 |
 | Linux 附加包 | `bash build/package-flatpak.sh` / `bash build/package-arch.sh` | `build_out/` 下的 `.flatpak` 与 `.pkg.tar.zst` |
 
 - 正式发布用 fat LTO + `codegen-units = 1`，体积最小、运行最快；末尾的跨 crate 优化只能单线程跑，
   构建期间只会看到一个核在工作。
-- 预发布用 thin LTO + `codegen-units = 16`，快很多，体积略大；主界面会显示「预发布版」，
-  并保留 DevTools（F12 打开控制台，独立窗口），正式发布不含。
+- 本地快速预发布（`build-prerelease`）用 thin LTO + `codegen-units = 16`，快很多，只出 exe；
+  CI 的预发布不走 profile 这条路，它跑 `build-release` 出同样的安装包，只多带 `prerelease`
+  feature。两种预发布的主界面都会显示「预发布版」，并保留 DevTools（F12 打开控制台，独立窗口），正式发布不含。
 - Windows 默认构建 x64 / arm64；只要一种用 `-Arch x64`。arm64 只打 NSIS，x64 出 MSI + NSIS。
   arm64 交叉编译需要对应架构的 MSVC 工具链，CI 的 arm64 跑在原生 ARM runner 上。
 - Linux 出 x64 / arm64；macOS 出 x64 / arm64（x64 跑 `macos-26-intel`，arm64 跑 `macos-latest`）。
@@ -148,8 +149,9 @@ CI 的 `windows-11-arm` 与 `ubuntu-24.04-arm` 是 GitHub 公共预览 runner，
 ### 版本与发布
 
 发布版本从 **v0.0.1** 开始。版本号的唯一来源是 **Git 标签**：标签写 `v0.0.1`，
-构建时自动同步到 `mml-gui/src-tauri/Cargo.toml` 与 `tauri.conf.json`。带 `-pre` 这类后缀的
-标签走预发布，如 `v1.0.0-pre`；`testbuild` 这类不是版本号的标签，版本取最近的可达标签。
+构建时自动同步到 `mml-gui/src-tauri/Cargo.toml` 与 `tauri.conf.json`（去掉 `-pre` 后缀的
+纯数字版本，安装包只收这种）。带 `-pre` 这类后缀的标签走预发布，如 `v1.0.0-pre`；
+`testbuild` 这类不是版本号的标签，版本取最近的可达标签。
 
 1. 打标签：`git tag v0.0.1`。HEAD 不在标签上时按最近的标签构建，脚本会给出提示。
 2. 跑 `build/build-release.ps1`（Windows）或 `bash build/build-release.sh`（Linux / macOS）。
@@ -174,16 +176,17 @@ Windows 本地默认把两种架构都构建出来；Linux / macOS 本地构建�
 | 触发 | 行为 |
 | --- | --- |
 | 推送正式版标签（如 `v0.0.1`） | 版本直接取自标签，再按 Windows 2 种、Linux 2 种、macOS 2 种架构并行构建安装包，最后汇总成一个 GitHub Release |
-| 推送预发布标签（如 `v1.0.0-pre`） | 走预发布构建，只出可执行文件，汇总成一个标记为 Pre-release 的 GitHub Release |
+| 推送预发布标签（如 `v1.0.0-pre`） | 与正式版同一套构建、同样的安装包，只多带 `prerelease` feature（界面标「预发布版」），汇总成一个标记为 Pre-release 的 GitHub Release |
 | 推送测试构建标签（如 `testbuild`、`testbuild-1`） | 跑完整的构建流程，版本取最近的可达标签、通道按其后缀决定；**产物全部丢弃**：不上传 artifact、不打包附加包、不发 Release |
 | 推送 `releases/**` 分支 | 只构建并把产物传成 Actions artifact，不发 Release，用于验证 |
 
 走 CI 发版只要两步：提交、打标签推送。正式版与预发布都这样，标签分别是
-`v0.0.1` 与 `v1.0.0-pre`。CI 每个平台都走同一套脚本（`build/init.*` 装依赖，正式版用
-`build/build-release.*`、预发布用 `build/build-prerelease.*`），正式版产物名与本地一致。
-预发布只出可执行文件，如 `mml-windows-x64-1.0.0-pre.exe`、`mml-linux-arm64-1.0.0-pre`、
-`mml-macos-x64-1.0.0-pre`；Linux / macOS 下载后要 `chmod +x`。发布说明由 CI 生成，
-附每个产物的 SHA1 与 SHA256。细节见[开发与构建](docs/development.md#自动化构建github-actions)。
+`v0.0.1` 与 `v1.0.0-pre`。两个通道在每个平台都走同一套脚本（`build/init.*` 装依赖、
+`build/build-release.*` 构建并打包），预发布只是多带一个 `prerelease` feature，
+所以产物形状与正式版一致，只是文件名带着标签后缀：`mml-windows-x64-1.0.0-pre.msi`、
+`mml-linux-x64-1.0.0-pre.deb`、`mml-macos-arm64-1.0.0-pre.dmg`；安装包内部版本是 `1.0.0`。
+发布说明由 CI 生成，附每个产物的 SHA1 与 SHA256。细节见
+[开发与构建](docs/development.md#自动化构建github-actions)。
 
 ### 其它常用命令
 
