@@ -43,7 +43,9 @@ use self::cape::{
 };
 use self::head::load_head_image;
 use self::icon::{icon_name, load_icon_image, load_url_image, save_url_image};
-use self::load::{load_block_image, load_instance_image, load_item_image, load_screenshot_image};
+use self::load::{
+    load_block2d_image, load_block_image, load_instance_image, load_item_image, load_screenshot_image,
+};
 use self::respond::{send_bad, split_path};
 use self::skin::{load_skin_image, load_skinraw_image};
 // 「另存为本地文件」要取原始贴图字节，跨模块用，走 crate 可见
@@ -199,6 +201,7 @@ pub async fn url_image(req: Request<Vec<u8>>, res: UriSchemeResponder) {
         "elytra3d" => load_elytra_3d_image(&uri, res).await,
         "icon" => load_icon_image(&uri, res).await,
         "block" => load_block_image(&uri, res),
+        "block2d" => load_block2d_image(&uri, res),
         "item" => load_item_image(&uri, res),
         "screenshot" => load_screenshot_image(&uri, res),
         _ => send_bad(res),

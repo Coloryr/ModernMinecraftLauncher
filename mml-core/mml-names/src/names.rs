@@ -40,6 +40,7 @@ pub const NATIVE_DIR: &str = "native";
 pub const MML_DIR: &str = "mml";
 pub const MML_INNER_DIR: &str = ".mml";
 pub const BLOCK_DIR: &str = "block";
+pub const BLOCK2D_DIR: &str = "block2d";
 pub const LANG_DIR: &str = "langs";
 pub const ITEM_DIR: &str = "items";
 pub const MINECRAFT_DIR: &str = "minecraft";

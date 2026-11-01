@@ -421,11 +421,6 @@ function confirmRemoveGroup() {
   if (cat.value === target.uuid) cat.value = "";
 }
 
-/** 详情里收藏 / 取消收藏 */
-function onDetailFavorite() {
-  if (detail.value) toggleFavorite(detail.value.id);
-}
-
 /** 详情里换分组：空表示未分组 */
 function onDetailSetGroup(uuid: string | null) {
   if (detail.value) setGroup(detail.value.id, uuid);
@@ -445,6 +440,8 @@ const descText = computed(() =>
 
 /** 正在选实例图标的方块；null = 没开 */
 const iconTarget = ref<BlockItemDto | null>(null);
+/** 设图标时用的是哪个 2D 面；空串表示用 3D 图标 */
+const iconFace = ref("");
 const iconBusy = ref(false);
 
 /**
@@ -454,11 +451,18 @@ const iconBusy = ref(false);
  */
 function openIconPick(block: BlockItemDto) {
   iconTarget.value = block;
+  iconFace.value = "";
 }
 
-/** 详情里点「设为实例图标」 */
-function openDetailIconPick() {
-  if (detail.value) openIconPick(detail.value);
+/**
+ * 详情里点「设为实例图标」
+ *
+ * - `face`: 详情里选的 2D 面，空串表示 3D；列表右键菜单进来的没有这个参数
+ */
+function openDetailIconPick(face = "") {
+  if (!detail.value) return;
+  openIconPick(detail.value);
+  iconFace.value = face;
 }
 
 /**
@@ -471,7 +475,7 @@ async function onIconPick(inst: InstanceInfoDto) {
   if (!b || iconBusy.value) return;
   iconBusy.value = true;
   try {
-    if (await setIcon(inst.uuid, b.id, inst.name)) {
+    if (await setIcon(inst.uuid, b.id, inst.name, iconFace.value)) {
       iconTarget.value = null;
       closeDetail();
     }
@@ -579,9 +583,9 @@ async function onDetailRemove() {
 
     <!-- 方块详情：打开选实例弹窗时先让位，避免两层遮罩叠着 -->
     <BlockDetailModal v-if="detail && !iconTarget" :block="detail" :category="catLabel(detail.catUuid)"
-      :keyword="keyword" :removable="detail.catId === SKIN_CAT" :busy="iconBusy" :favorite="isFavorite(detail.id)"
+      :keyword="keyword" :removable="detail.catId === SKIN_CAT" :busy="iconBusy"
       :groups="groupList" :group="groupOf(detail.id)" @close="closeDetail" @remove="onDetailRemove"
-      @set-icon="openDetailIconPick" @toggle-favorite="onDetailFavorite" @set-group="onDetailSetGroup" />
+      @set-icon="openDetailIconPick" @set-group="onDetailSetGroup" />
 
     <!-- 分组右键菜单：改名 / 删除；点空白处关掉 -->
     <!-- 分组右键菜单：改名 / 删除 -->

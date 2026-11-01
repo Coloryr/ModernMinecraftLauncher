@@ -113,7 +113,7 @@ export function createCommands(invoke: Invoke) {
       renderCancel: () => invoke<boolean>("block_render_cancel"),
       renderStart: (force: boolean) => invoke<boolean>("block_render_start", { force }),
       setGroups: (data: BlockGroupsDto) => invoke<void>("block_set_groups", { data }),
-      setIcon: (uuid: string, id: string) => invoke<boolean>("block_set_icon", { uuid, id }),
+      setIcon: (uuid: string, id: string, face: string) => invoke<boolean>("block_set_icon", { uuid, id, face }),
       setIconArea: (uuid: string, path: string, x: number, y: number, w: number, h: number, size: number) => invoke<boolean>("block_set_icon_area", { uuid, path, x, y, w, h, size }),
       skinAdd: (input: string) => invoke<string>("block_skin_add", { input }),
       skinRemove: (name: string) => invoke<void>("block_skin_remove", { name }),

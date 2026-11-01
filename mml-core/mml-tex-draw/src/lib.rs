@@ -42,7 +42,7 @@ use mml_names::{
 use mml_sys::path_helper;
 use tokio_util::sync::CancellationToken;
 
-use crate::block::obj::{BlocksObj, ItemsObj};
+use crate::block::obj::{BlockFace2d, BlocksObj, ItemsObj};
 
 pub mod block;
 pub mod gpu;
@@ -139,7 +139,8 @@ async fn load_blocks_impl(gui: gui_hook::ProgressGui, force: bool) -> CoreResult
     // 版本清单用本地缓存，缺了才在线拉；方块与物品分开短路，只补渲染缺的那部分
     let versions = version_path::get_version_obj_online().await?;
     let last = versions.latest.release.clone();
-    let block_done = !force && block::mml_tex_draw_id() == last;
+    // 2D 图标是后加的：老数据只有 3D，表里为空时要补渲染一轮，否则永远没有 2D 图标
+    let block_done = !force && block::mml_tex_draw_id() == last && !BLOCKS.read().unwrap().tex2d.is_empty();
     let item_done = !force && item::items_id() == last;
     // 语言文件也算"已完成"：客户端 jar 只带 en_us，中文要按资源索引单独补下
     // 已渲染过的版本也可能还没下过，短路掉就永远补不上
@@ -245,6 +246,7 @@ pub fn get_lang(lang: Lang, key: &str) -> Option<String> {
 
 static BLOCK_FILE: OnceLock<PathBuf> = OnceLock::new();
 static BLOCK_DIR: OnceLock<PathBuf> = OnceLock::new();
+static BLOCK2D_DIR: OnceLock<PathBuf> = OnceLock::new();
 static LANG_DIR: OnceLock<PathBuf> = OnceLock::new();
 static ITEM_FILE: OnceLock<PathBuf> = OnceLock::new();
 static ITEM_DIR: OnceLock<PathBuf> = OnceLock::new();
@@ -264,6 +266,12 @@ pub fn init<P: AsRef<Path>>(path: P) -> CoreResult<()> {
     ITEM_FILE.get_or_init(|| path.as_ref().join(names::ITEM_FILE));
 
     let dir = BLOCK_DIR.get_or_init(|| path.as_ref().join(names::BLOCK_DIR));
+    if !dir.exists() {
+        path_helper::create_dir_all(dir)?;
+    }
+
+    // 2D 平面图标与 3D 图标分开存放：两套要能同时存在，切换时不用重渲染
+    let dir = BLOCK2D_DIR.get_or_init(|| path.as_ref().join(names::BLOCK2D_DIR));
     if !dir.exists() {
         path_helper::create_dir_all(dir)?;
     }
@@ -340,6 +348,73 @@ pub fn get_block_path(id: &str) -> Option<PathBuf> {
     Some(dir.join(file))
 }
 
+/// 方块是否有 2D 平面图标
+///
+/// - `id`: 方块 ID，`minecraft:stone` 或裸 ID `stone`
+///
+/// # 返回值
+///
+/// 渲染过 2D 图标时返回 `true`
+pub fn has_block_2d(id: &str) -> bool {
+    BLOCKS
+        .read()
+        .unwrap()
+        .tex2d
+        .get(id)
+        .is_some_and(|groups| !groups.is_empty())
+}
+
+/// 方块的 2D 贴图分组
+///
+/// 顶面与底面共用同一张贴图时（石头、原木这类）会合成一组，界面上只给一个选项。
+///
+/// - `id`: 方块 ID，`minecraft:stone` 或裸 ID `stone`
+///
+/// # 返回值
+///
+/// 按顶 / 侧 / 底顺序排好的分组；没渲染过 2D 时返回空表
+pub fn block_2d_faces(id: &str) -> Vec<BlockFace2d> {
+    BLOCKS
+        .read()
+        .unwrap()
+        .tex2d
+        .get(id)
+        .cloned()
+        .unwrap_or_default()
+}
+
+/// 取方块的 2D 平面图标路径，取侧面，与 `get_block_path_2d_face(id, "side")` 等价
+///
+/// - `id`: 方块 ID，`minecraft:stone` 或裸 ID `stone`
+///
+/// # 返回值
+///
+/// 返回图标 PNG 路径，未渲染过 2D 图标时返回 `None`
+pub fn get_block_path_2d(id: &str) -> Option<PathBuf> {
+    get_block_path_2d_face(id, "side")
+}
+
+/// 取方块某个面的 2D 平面贴图路径
+///
+/// - `id`: 方块 ID，`minecraft:stone` 或裸 ID `stone`
+/// - `face`: `top` / `side` / `bottom`，其它值按侧面
+///
+/// # 返回值
+///
+/// 返回该面的 PNG 路径；没渲染过或该面没有贴图时返回 `None`
+pub fn get_block_path_2d_face(id: &str, face: &str) -> Option<PathBuf> {
+    let dir = BLOCK2D_DIR.get()?;
+    let binding = BLOCKS.read().unwrap();
+    let groups = binding.tex2d.get(id)?;
+    // 该面所在的分组；面名未知时退回第一组
+    let group = groups
+        .iter()
+        .find(|group| group.faces.iter().any(|each| each == face))
+        .or_else(|| groups.first())?;
+
+    Some(dir.join(&group.file))
+}
+
 pub use block::icons::SpecialForm;
 pub use block::skin::{SKIN_CAT, add_skin_block, remove_skin_block};
 
@@ -378,6 +453,11 @@ pub fn get_block_path_form(id: &str, form: SpecialForm) -> Option<PathBuf> {
 /// 获取方块数据目录
 pub(crate) fn get_block_dir() -> Option<PathBuf> {
     BLOCK_DIR.get().cloned()
+}
+
+/// 获取 2D 平面方块图标目录
+pub(crate) fn get_block2d_dir() -> Option<PathBuf> {
+    BLOCK2D_DIR.get().cloned()
 }
 
 /// 获取方块语言文件目录

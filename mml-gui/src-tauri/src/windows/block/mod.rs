@@ -210,12 +210,29 @@ pub fn block_list(lang: String) -> Vec<BlockItemDto> {
             let name = name_key
                 .and_then(|key| mml_tex_draw::get_lang(lang, &key))
                 .unwrap_or_else(|| entry.id.rsplit(':').next().unwrap_or(&entry.id).to_string());
+            // 2D 平面贴图按贴图分组（上下同图已合并）；物品与头颅没有，列表为空
+            let faces2d = if dir == "block" {
+                mml_tex_draw::block_2d_faces(&entry.id)
+                    .into_iter()
+                    .map(|group| {
+                        let face = group.faces.first().map(String::as_str).unwrap_or("side");
+                        crate::dtos::Block2dFaceDto {
+                            faces: group.faces.join(","),
+                            image: format!("{base}/block2d/{face}/{}?v={ver}", entry.id),
+                        }
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
+
             BlockItemDto {
                 name,
                 cat: cat_name(entry.cat.clone()),
                 cat_id: entry.cat,
                 cat_uuid,
                 image: format!("{base}/{dir}/{}?v={ver}", entry.id),
+                faces2d,
                 id: entry.id,
             }
         })

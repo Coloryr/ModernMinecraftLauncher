@@ -362,10 +362,21 @@ export function useBlockList(hooks?: BlockListHooks) {
     }
   }
 
-  /** 把方块设为某实例的图标；返回是否成功 */
-  async function setIcon(uuid: string, blockId: string, instanceName: string): Promise<boolean> {
+  /**
+   * 把方块设为某实例的图标
+   *
+   * - `uuid`: 实例 uuid
+   * - `blockId`: 方块 / 物品 id
+   * - `instanceName`: 实例名，成功提示里用
+   * - `face`: 取哪个 2D 面，空串表示 3D 图标
+   *
+   * # 返回值
+   *
+   * 成功返回 `true`
+   */
+  async function setIcon(uuid: string, blockId: string, instanceName: string, face = ""): Promise<boolean> {
     try {
-      await blockSetIcon(uuid, blockId);
+      await blockSetIcon(uuid, blockId, face);
       showToast(t("blocks.setIconOk", { name: instanceName }));
       return true;
     } catch (e) {

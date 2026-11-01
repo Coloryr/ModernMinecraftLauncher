@@ -2107,6 +2107,7 @@ export function getBlockStatus(): Promise<BlockStatusDto> {
   return commands.block.status();
 }
 
+
 /**
  * 取方块窗口的用户数据（左栏顺序 / 自建分组 / 收藏）
  *
@@ -2164,8 +2165,8 @@ export function blockRenderCancel(): Promise<boolean> {
  *
  * 成功写入返回 true；该 id 没有可用贴图时抛错
  */
-export function blockSetIcon(uuid: string, id: string): Promise<boolean> {
-  return commands.block.setIcon(uuid, id);
+export function blockSetIcon(uuid: string, id: string, face = ""): Promise<boolean> {
+  return commands.block.setIcon(uuid, id, face);
 }
 
 /**

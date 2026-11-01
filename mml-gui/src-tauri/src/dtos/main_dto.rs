@@ -327,6 +327,18 @@ pub struct BlockItemDto {
     pub cat_uuid: String,
     /// 贴图地址，mml-image 完整 URL，带 ?v= 版本参数
     pub image: String,
+    /// 2D 平面贴图分组，每组是一个可选项：共用同一张贴图的面已经合并
+    pub faces2d: Vec<Block2dFaceDto>,
+}
+
+/// 方块 2D 平面贴图的一个分组
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Block2dFaceDto {
+    /// 组内的面名，逗号分隔，如 `top,bottom`；界面据此拼选项文案
+    pub faces: String,
+    /// 图片地址，取组内第一个面的文件
+    pub image: String,
 }
 
 /// 图标裁剪的源图预览，供"修改图标"的截图弹窗使用

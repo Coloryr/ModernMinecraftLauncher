@@ -78,7 +78,7 @@ pub use java_download_dto::{JavaDownloadItemDto, JavaDownloadOptionsDto, JavaTyp
 pub use java_dto::{JavaImportProgressDto, JavaInfoDto};
 pub use log_dto::{LogFocusDto, LogSettingDto};
 pub use main_dto::{
-    AutoSaveTargetDto, BlockGroupDto, BlockGroupsDto, BlockItemDto, BlockStatusDto,
+    AutoSaveTargetDto, Block2dFaceDto, BlockGroupDto, BlockGroupsDto, BlockItemDto, BlockStatusDto,
     CustomJsonItemDto, ErrorEvent, ExitEvent, IconSourceDto, InstanceChangeEvent, InstanceLangDto,
     InstancePatch, LaunchPrecheckDto, LogEvent, NewsItem, StartArgDto, StateEvent, SystemMemoryDto,
 };

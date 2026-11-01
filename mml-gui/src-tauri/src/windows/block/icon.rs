@@ -250,17 +250,24 @@ pub async fn block_set_icon_area(
 /// - `app`: 窗口句柄，写完广播实例变更事件
 /// - `uuid`: 实例 uuid
 /// - `id`: 方块 / 物品 id，形如 `minecraft:stone`
+/// - `face`: 取方块的哪个 2D 面，如 `top`；空串表示用 3D 图标
 ///
 /// # 返回值
 ///
 /// 成功写入返回 `Ok(true)`；该 id 没有可用贴图或实例不存在时返回 `Err`，内容为 i18n 键
 #[gui_macros::ipc_group("block")]
 #[gui_macros::command]
-pub async fn block_set_icon(app: AppHandle, uuid: String, id: String) -> Result<bool, String> {
+pub async fn block_set_icon(app: AppHandle, uuid: String, id: String, face: String) -> Result<bool, String> {
     // 方块优先，未作为方块出现的 id 回退物品贴图
     let Some(_) = mml_tex_draw::get_block_path(&id).or_else(|| mml_tex_draw::get_item_path(&id))
     else {
         return Err(err_keys::FILE_NOT_FOUND.to_string());
+    };
+    // 2D 面没渲染出来时按 3D 存，别让图标读取落到一个不存在的文件
+    let face = if !face.is_empty() && mml_tex_draw::get_block_path_2d_face(&id, &face).is_some() {
+        face
+    } else {
+        String::new()
     };
 
     let Some(core) = core_instance(&uuid) else {
@@ -270,7 +277,7 @@ pub async fn block_set_icon(app: AppHandle, uuid: String, id: String) -> Result<
     // 写方块 ID 并清空 Icon：两步必须一起做，只写一个会让图标读取走错分支
     {
         let inst = core.instance.read().unwrap().clone();
-        crate::gui_setting::set_block(&inst, id.clone());
+        crate::gui_setting::set_block(&inst, id.clone(), face.clone());
     }
     {
         let mut inst = core.instance.write().unwrap();

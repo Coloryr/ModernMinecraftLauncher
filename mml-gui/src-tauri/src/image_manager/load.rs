@@ -45,12 +45,20 @@ pub(super) fn load_instance_image(uri: &[&str], res: UriSchemeResponder) {
     };
 
     // 分支一：设了方块 ID → 用方块渲染结果；锁内只读配置，不整份 clone 实例
-    let block_id = {
+    let (block_id, block_face) = {
         let inst = instance.read().unwrap();
-        crate::gui_setting::block_icon_id(&inst)
+        (
+            crate::gui_setting::block_icon_id(&inst),
+            crate::gui_setting::block_face(&inst),
+        )
     };
     if let Some(id) = block_id {
-        let file = mml_tex_draw::get_block_path(&id).or_else(|| mml_tex_draw::get_item_path(&id));
+        // 设了 2D 面就取那个面的平面贴图，文件缺失时回落到 3D 图标
+        let file = block_face
+            .as_deref()
+            .and_then(|face| mml_tex_draw::get_block_path_2d_face(&id, face))
+            .or_else(|| mml_tex_draw::get_block_path(&id))
+            .or_else(|| mml_tex_draw::get_item_path(&id));
         let Some(file) = file else {
             // 方块贴图还没渲染 / 该 id 不存在：此时没有可用的图标
             send_bad(res);
@@ -114,6 +122,32 @@ pub(super) fn load_block_image(uri: &[&str], res: UriSchemeResponder) {
         return;
     }
     let Some(file) = mml_tex_draw::get_block_path(uri[1]) else {
+        send_bad(res);
+        return;
+    };
+    match path_helper::read_byte(&file) {
+        Ok(data) => send_png(res, data),
+        Err(_) => send_bad(res),
+    }
+}
+
+/// 2D 平面方块贴图，URI 形如 `block2d/<面>/<方块ID>`
+///
+/// 面取 `top` / `side` / `bottom`；不带面（`block2d/<方块ID>`）时按侧面。
+/// 与 `block` 同一套读盘透传
+///
+/// - `uri`: 协议路径片段，第 1 段是路由名 `block2d`，之后是可选的面与方块 ID
+/// - `res`: 响应回写句柄
+pub(super) fn load_block2d_image(uri: &[&str], res: UriSchemeResponder) {
+    let (face, id) = match uri {
+        [_, id] => ("side", *id),
+        [_, face, id] => (*face, *id),
+        _ => {
+            send_bad(res);
+            return;
+        }
+    };
+    let Some(file) = mml_tex_draw::get_block_path_2d_face(id, face) else {
         send_bad(res);
         return;
     };

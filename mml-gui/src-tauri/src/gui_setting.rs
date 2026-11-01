@@ -174,6 +174,9 @@ pub struct GameGuiSettingObj {
     /// 显示方块：实例图标的方块 ID，与 `InstanceSettingObj.icon` 二选一
     #[serde(rename = "Block")]
     pub block: Option<String>,
+    /// 实例图标取方块的那个 2D 面，如 `top` / `side` / `bottom`；没有时表示用 3D 图标
+    #[serde(rename = "BlockFace")]
+    pub block_face: Option<String>,
     /// 自动打开日志窗口，游戏启动后生效
     #[serde(rename = "LogAutoShow")]
     pub log_auto_show: bool,
@@ -217,10 +220,23 @@ pub fn save(instance: &InstanceSettingObj, obj: &GameGuiSettingObj) {
 ///
 /// - `instance`: 实例配置，用它定位文件
 /// - `block`: 方块 ID
-pub fn set_block(instance: &InstanceSettingObj, block: String) {
+/// - `face`: 取方块的哪个 2D 面，如 `top`；空串表示用 3D 图标
+pub fn set_block(instance: &InstanceSettingObj, block: String, face: String) {
     let mut obj = load(instance);
     obj.block = Some(block);
+    obj.block_face = (!face.is_empty()).then_some(face);
     save(instance, &obj);
+}
+
+/// 实例图标要用的 2D 面
+///
+/// - `instance`: 实例配置
+///
+/// # 返回值
+///
+/// 设过 2D 面时返回面名；用 3D 图标时返回 `None`
+pub fn block_face(instance: &InstanceSettingObj) -> Option<String> {
+    load(instance).block_face
 }
 
 /// 清掉方块 ID，上传自定义图标图片时调用
@@ -228,8 +244,9 @@ pub fn set_block(instance: &InstanceSettingObj, block: String) {
 /// - `instance`: 实例配置，用它定位文件
 pub fn clear_block(instance: &InstanceSettingObj) {
     let mut obj = load(instance);
-    if obj.block.is_some() {
+    if obj.block.is_some() || obj.block_face.is_some() {
         obj.block = None;
+        obj.block_face = None;
         save(instance, &obj);
     }
 }

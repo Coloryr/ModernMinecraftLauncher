@@ -120,6 +120,12 @@ export type BlockItemDto = {
   catId: string,
   catUuid: string,
   image: string,
+  faces2d: Block2dFaceDto[],
+};
+
+export type Block2dFaceDto = {
+  faces: string,
+  image: string,
 };
 
 export type IconSourceDto = {

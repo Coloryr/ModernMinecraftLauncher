@@ -43,11 +43,23 @@ fn foreground_window(app: &AppHandle) -> Option<String> {
 /// - `app`: 应用句柄
 /// - `text`: 通知文案，标题与正文都跟界面语言走
 pub(crate) fn notify_if_unfocused(app: &AppHandle, text: NotifyText) {
-    if let Some(window) = foreground_window(app) {
-        mml_log::info(LogText::NotificationSkipped { window }.text());
-        return;
+    // 可见 / 聚焦只能问窗口，而窗口查询要走事件循环、等主线程；这里不需要结果，
+    // 排进主线程就行。同步等的话，下载线程会和主线程上的下载任务锁互等而卡死
+    let handle = app.clone();
+    if let Err(error) = app.run_on_main_thread(move || {
+        if let Some(window) = foreground_window(&handle) {
+            mml_log::info(LogText::NotificationSkipped { window }.text());
+            return;
+        }
+        notify(&handle, text);
+    }) {
+        mml_log::error(
+            LogText::NotificationFailed {
+                error: error.to_string(),
+            }
+            .text(),
+        );
     }
-    notify(app, text);
 }
 
 /// 直接发一条系统通知，不看前台

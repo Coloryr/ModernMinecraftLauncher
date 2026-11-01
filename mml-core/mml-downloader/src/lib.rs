@@ -289,11 +289,14 @@ pub(crate) fn get_item() -> Option<DownloadObj> {
 ///
 /// - `task`: 已完成的任务
 pub(crate) fn task_done(task: &DownloadTask) {
-    let mut tasks = TASKS.write().unwrap();
     let id = task.id;
+    {
+        let mut tasks = TASKS.write().unwrap();
+        tasks.retain(|t| t.id != id);
+    }
 
-    tasks.retain(|t| t.id != task.id);
-
+    // 锁外再通知界面：回调会进 Tauri 事件循环（判断前台窗口要问主线程），
+    // 持着写锁等主线程时，主线程上的 get_tasks 正卡在读锁上 —— 下载一完成就整程序死锁
     remove_task(id);
 }
 
