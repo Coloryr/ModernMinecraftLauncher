@@ -79,6 +79,11 @@
      值不一样标题栏就会跳高。弹窗 / 覆盖层想避开标题栏时也用这个值 */
   --titlebar-h: 52px;
 
+  /* 插件接管标题栏时左侧要让出的宽度：主窗口顶栏、加载期顶栏、子窗口框架三处共用。
+     插件只把红黄绿的清空量给到按钮右缘 + 8px，这里再补 8px 让内容离按钮远一点；
+     Windows 不发布这个变量，走 76px 兜底。全屏时清空量为 0，退回 18px 常规内边距 */
+  --titlebar-left-clearance: max(18px, calc(var(--tauri-plugin-decoration-left-clearance, 76px) + 8px));
+
   /* 左侧分类栏宽度：资源管理的 .cat-nav 与方块列表的 .cat-rail 共用这一个值。
      两个窗口经常并排看，两边宽度必须一致 */
   --rail-w: 168px;

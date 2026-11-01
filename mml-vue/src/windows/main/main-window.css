@@ -822,7 +822,7 @@
 /* macOS：插件把原生红黄绿摆在左端，品牌要让出插件发布的清空量；
    与 MainTopbar 的 .topbar.is-macos.is-plugin-controls 同口径 */
 .boot-head.is-macos.is-plugin-controls {
-  padding-left: max(18px, var(--tauri-plugin-decoration-left-clearance, 76px));
+  padding-left: var(--titlebar-left-clearance);
 }
 
 /* macOS 全屏：顶栏顶到刘海下沿，整体下压安全区、总高不变，与 MainTopbar 同口径 */
