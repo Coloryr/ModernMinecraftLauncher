@@ -17,7 +17,9 @@ import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
 import { commands, type ModItemDto } from "../../lib/bindings";
+import { onMenuAction } from "../../lib/api";
 import { useFileDrop } from "../../composables/useFileDrop";
+import { useUnlisteners } from "../../composables/useUnlisteners";
 import type { FileDropPayload } from "../../composables/useFileDrop";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import { useResourceStatus } from "../../lib/resourceTasks";
@@ -164,6 +166,16 @@ function openDownload() {
   // 与本窗口看的可能不是同一个。实例已被删掉时留空，由那边自己兜底
   openWindow("add_resource", { uuid: instanceUuid.value || undefined });
 }
+
+// macOS 菜单栏：本窗口只有「下载资源」一项，见 mml-gui 的 menu 模块
+const { track: trackMenu } = useUnlisteners();
+onMounted(() => {
+  trackMenu(
+    onMenuAction((action) => {
+      if (action === "download") openDownload();
+    }),
+  );
+});
 
 // ================= 拖拽导入（落点 = 当前面板对应的目录） =================
 
