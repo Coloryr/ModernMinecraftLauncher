@@ -22,12 +22,16 @@ import { listen } from "@tauri-apps/api/event";
 import type {
   CustomCssContext,
   CustomCssReplaceOptions,
+  MmlApi,
   WindowPageRegistry,
 } from "mml-ipc";
 import { onClientConfigChange, onCustomUiChange } from "./api";
 import { commands, type CustomUiInfoDto } from "./bindings";
 import { saveGuiConfig } from "./guiConfig";
+import { t } from "./i18n";
 import { resolvedTheme, theme } from "./theme";
+import { isWindowKind } from "../windows/registry";
+import { openWindow } from "../windows/windowManager";
 
 /** 后端状态；null 表示还没拉到或后端不可用 */
 export const customUiStatus = ref<CustomUiInfoDto | null>(null);
@@ -298,6 +302,7 @@ function makeContext(pkg: PackageState): CustomCssContext {
 /** host 侧的 window.mml：整页包组件直接跑在窗口里时用它，命令与事件走 Tauri */
 interface HostMml {
   invoke<T = unknown>(cmd: string, args?: Record<string, unknown> | null): Promise<T>;
+  openWindow: NonNullable<MmlApi["openWindow"]>;
   on(event: string, cb: (payload: unknown) => void): () => void;
   onTheme(cb: (theme: "Dark" | "Light") => void): () => void;
   readonly theme: "Dark" | "Light";
@@ -310,6 +315,10 @@ export function ensureHostMml(): void {
   if (target.mml) return;
   target.mml = {
     invoke: (cmd, args) => invoke(cmd, args ?? undefined),
+    async openWindow(kind, instance) {
+      if (!isWindowKind(kind)) throw new Error(t("err.customUiWindowKind", { kind }));
+      await openWindow(kind, instance ? { uuid: instance } : undefined);
+    },
     on(event, cb) {
       let off: (() => void) | null = null;
       let cancelled = false;

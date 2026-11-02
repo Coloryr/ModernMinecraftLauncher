@@ -1622,6 +1622,7 @@ export default {
   "err.javaInvalid": "Invalid Java path",
   "err.pageArchiveLimit": "The archive has too many entries, is too large, or has an abnormal compression ratio; import rejected",
   "err.customUiId": "Style pack entry is missing or invalid",
+  "err.customUiWindowKind": "The theme requested an unknown window: {kind}",
   "err.gamepadProfileInvalid": "Invalid profile name: must not be empty, start or end with a dot, or contain \\ / : * ? \" < > |",
   "err.gamepadProfileExists": "A gamepad profile with that name already exists",
   "err.gamepadProfileMissing": "That gamepad profile was not found",
