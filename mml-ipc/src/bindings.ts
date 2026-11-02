@@ -21,6 +21,7 @@ export function createCommands(invoke: Invoke) {
       clientLockClear: () => invoke<void>("window_client_lock_clear"),
       clientLockSet: (password: string) => invoke<void>("window_client_lock_set", { password }),
       clientLockVerify: (password: string) => invoke<boolean>("window_client_lock_verify", { password }),
+      closeOtherWindows: () => invoke<void>("window_close_other_windows"),
       closeWindow: (kind: string, instance: string | null) => invoke<void>("window_close_window", { kind, instance }),
       dropModel: (kind: string) => invoke<void>("window_drop_model", { kind }),
       ensureModel: (kind: string) => invoke<void>("window_ensure_model", { kind }),

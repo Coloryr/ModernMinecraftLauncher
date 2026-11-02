@@ -14,7 +14,7 @@
 //   **文本 / 链接**派给页面。文件拖入两条都会到，原生先给出路径，DOM 那条让开。
 //
 // 几个来源合成同一个回调，调用方只看 `paths` 与 `url`。
-import { onMounted, onUnmounted, ref } from "vue";
+import { onActivated, onDeactivated, onMounted, onUnmounted, ref } from "vue";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import type { DragDropEvent } from "@tauri-apps/api/webview";
@@ -165,6 +165,25 @@ export function useFileDrop(
    */
   let wryDropAt = 0;
 
+  /**
+   * 本页是不是在前台
+   *
+   * 单窗口模式下各页面共用同一个文档、被 App.vue 的 KeepAlive 缓存：切走的页面只是失活，
+   * 挂在 window 上的监听还在，一次拖入会挨个触发所有挂过的页面 —— 主窗口把 jar 当成
+   * 不支持的文件拒一次，资源窗口又照常导入，一次拖放弹两句。多窗口模式下每页各在自己的
+   * webview 里，从没失活过，保持默认开着。
+   */
+  const active = ref(true);
+  onActivated(() => {
+    active.value = true;
+  });
+  onDeactivated(() => {
+    active.value = false;
+    dragSeq++;
+    fileDragOver.value = false;
+    dragKind.value = "";
+  });
+
   /** 这次拖入接不接（没传 accept 就一律接） */
   async function accepted(payload: FileDropPayload): Promise<boolean> {
     if (!options.accept) return true;
@@ -196,6 +215,7 @@ export function useFileDrop(
    * - `event`: Tauri 的 `DragDrop` 事件，进 / 出 / 悬停 / 松手四种
    */
   function onWryDrop(event: { payload: DragDropEvent }) {
+    if (!active.value) return;
     const payload = event.payload;
     if (payload.type === "enter") {
       if (!payload.paths.length) return;
@@ -247,6 +267,7 @@ export function useFileDrop(
   }
 
   function onDomEnter(event: DragEvent) {
+    if (!active.value) return;
     const types = event.dataTransfer ? [...event.dataTransfer.types] : [];
     const items = event.dataTransfer ? [...event.dataTransfer.items] : [];
     const isDirectory = hoverIsDirectory(items);
@@ -265,6 +286,7 @@ export function useFileDrop(
   }
 
   function onDomOver(event: DragEvent) {
+    if (!active.value) return;
     // 不接的内容**不 preventDefault**：系统画"禁止"光标、松手也没有 drop（"不符合就拖不进来"）
     if (!fileDragOver.value) {
       if (event.dataTransfer) {
@@ -292,6 +314,7 @@ export function useFileDrop(
   }
 
   function onDomLeave(event: DragEvent) {
+    if (!active.value) return;
     // 在子元素之间移动也会派发 dragleave：relatedTarget 为 null 才是真的离开窗口
     if (event.relatedTarget) return;
     dragSeq++;
@@ -300,6 +323,7 @@ export function useFileDrop(
   }
 
   function onDomDrop(event: DragEvent) {
+    if (!active.value) return;
     event.preventDefault();
     dragSeq++;
     fileDragOver.value = false;
@@ -333,6 +357,7 @@ export function useFileDrop(
 
   /** 路径桥送来真实路径（文件拖入） */
   function onNativePaths(paths: string[]) {
+    if (!active.value) return;
     const entry = pending;
     clearPending();
     void onDrop({

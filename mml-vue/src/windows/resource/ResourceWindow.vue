@@ -307,8 +307,8 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
         <InstanceChip :instance="instance" />
         <!-- 资源下载窗口也是一个实例一个，没有实例就无处可放，按钮跟着灰掉 -->
         <BaseButton size="sm" variant="accent" class="icon-btn-head" :disabled="!instanceUuid"
-          v-tip="t('resource.download')" :aria-label="t('resource.download')" @click="openDownload">
-          <GlyphIcon name="download" :size="15" />
+          v-tip="t('winTitle.addResource')" :aria-label="t('winTitle.addResource')" @click="openDownload">
+          <GlyphIcon name="plus" :size="16" />
         </BaseButton>
       </template>
     </template>

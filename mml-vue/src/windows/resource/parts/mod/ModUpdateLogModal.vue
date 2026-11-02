@@ -282,16 +282,17 @@ function shortSha1(value: string): string {
             <span class="log-group-count">{{ t("resource.updateLogGroupCount", { n: group.update.length }) }}</span>
           </button>
 
-          <!-- 每条记录两行：上行是「版本跃迁 + 文件名 + 时间」，下行是文件号与 SHA1 两枚小标签。
-               左侧一条时间轴把同一模组的更新按时间串起来，比一叠卡片更容易看出前后顺序 -->
+          <!--
+            每条记录三行：版本跃迁（右边跟时间与删除）、文件名、文件号与 SHA1。
+            记录之间靠一条分界线隔开，不再各自套一个卡片框 —— 版本号里带着模组名，
+            一行放不下时会把右边的文件名挤成一列竖排
+          -->
           <div v-if="!isCollapsed(group.projectId)" class="log-rows">
             <div v-for="(item, index) in group.update" :key="index" class="log-row">
-              <span class="log-dot"></span>
-              <div class="log-head">
+              <div class="log-top">
                 <span class="log-ver">{{ t("resource.updateLogVersion", {
                   from: dash(item.oldVersion), to:
                     dash(item.version) }) }}</span>
-                <span class="log-file">{{ item.file }}</span>
                 <span class="log-right">
                   <span class="log-time">{{ formatTime(item.time) }}</span>
                   <button class="log-del" :disabled="busy" v-tip="t('resource.updateLogDelete')"
@@ -300,6 +301,7 @@ function shortSha1(value: string): string {
                   </button>
                 </span>
               </div>
+              <div class="log-file">{{ item.file }}</div>
               <div class="log-meta">
                 <span class="log-chip">
                   {{ t("resource.updateLogFileId", { from: dash(item.oldFileId), to: dash(item.fileId) }) }}
@@ -477,76 +479,49 @@ function shortSha1(value: string): string {
   font-weight: 400;
 }
 
-/* 时间轴：一条竖线把同一模组的更新串起来，每条记录左缘一枚圆点。
-   26px 的左边距与组名对齐（组头 6px 内边距 + 12px 箭头 + 8px 间距） */
+/* 记录列表：缩进到组名下面（组头 6px 内边距 + 12px 箭头 + 8px 间距），
+   条目之间只留一条分界线，不再各自套框 */
 .log-rows {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  position: relative;
-  padding: 8px 0 2px 26px;
-}
-
-.log-rows::before {
-  content: "";
-  position: absolute;
-  /* 与下面圆点的圆心对齐：26px 左内边距 - 16px 偏移 + 4px 半径 */
-  left: 13px;
-  top: 14px;
-  bottom: 14px;
-  width: 2px;
-  border-radius: 1px;
-  background: var(--border);
+  padding: 6px 0 0 26px;
 }
 
 .log-row {
-  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-card);
+  gap: 5px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
 }
 
-/* 圆点压在时间轴上，用强调色描一圈底色把它与竖线分开 */
-.log-dot {
-  position: absolute;
-  left: -16px;
-  top: 14px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 3px var(--bg-card);
+.log-row:last-child {
+  border-bottom: none;
+  padding-bottom: 2px;
 }
 
-.log-head {
+/* 第一行：版本跃迁占满左侧，时间与删除固定贴右，版本再长也只在自己这一行折行 */
+.log-top {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 3px 8px;
+  align-items: flex-start;
+  gap: 10px;
 }
 
-/* 版本跃迁是本条记录的主信息：底色淡强调、等宽数字，扫一眼就能看出换了哪一版 */
+/* 版本跃迁是本条记录的主信息：强调色加重，长版本号（带模组名）自己折行 */
 .log-ver {
-  flex-shrink: 0;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--accent-soft);
+  flex: 1;
+  min-width: 0;
   color: var(--accent);
   font-size: 11.5px;
   font-weight: 600;
-  white-space: nowrap;
+  line-height: 1.6;
+  word-break: break-word;
 }
 
+/* 文件名单独一行：它可能很长且没有空格，独占一行才不会把别的挤成竖条 */
 .log-file {
-  flex: 1;
-  min-width: 0;
   color: var(--text);
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 12px;
   word-break: break-all;
 }
 
@@ -555,7 +530,6 @@ function shortSha1(value: string): string {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-left: auto;
   flex-shrink: 0;
 }
 

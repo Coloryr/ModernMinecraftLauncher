@@ -36,7 +36,7 @@ import {
 } from "../../../lib/theme";
 import { fontFamily, setFontFamily } from "../../../lib/fonts";
 import { showToast } from "../../../lib/toast";
-import { isTauri, multiWindow, setMultiWindow } from "../../windowManager";
+import { isTauri, multiWindow, resetToMain, setMultiWindow } from "../../windowManager";
 import { commands } from "../../../lib/bindings";
 
 /** 界面标签里"即改即存"的默认值，与 Rust 侧 GuiConfig::default 一致 */
@@ -56,7 +56,7 @@ const SLIDER_COMMIT_DELAY = 250;
  *
  * # 返回值
  *
- * - `windowMode` / `onModeChange`: 单窗口 / 多窗口，切换后要重启进程
+ * - `windowMode` / `onModeChange`: 单窗口 / 多窗口，切换后重载界面
  * - `locale` / `onLangChange` / `side` / `onSideChange` / `themeValue` / `onThemeChange`: 语言、侧栏、主题
  * - `startup` / `onStartupChange`: 启动器启动时先显示启动器主页还是项目列表
  * - `view` / `onViewModeChange`: 实例列表按分组 / 平铺 / 列表哪种方式显示
@@ -98,21 +98,29 @@ export function useSettingsUi() {
 
   // ---------- 各项改动（都经各自 lib 落盘） ----------
 
-  /** 窗口模式：切换后要重启进程才干净 —— 已开着的窗口是旧模式下建的，就地切换它们留在旧模式里 */
+  /**
+   * 窗口模式：换的只是"新窗口怎么开"，多窗口开真实窗口、单窗口走应用内页面
+   *
+   * 所以就地改掉模式、把旧模式建出来的窗口收掉就够：**不重载界面、不重启进程** ——
+   * 重载会让窗口在几秒里先落回原生标题栏，游戏在跑时重启更会把它一起带走
+   */
   async function onModeChange(v: string) {
     const multi = v === "Multi";
     windowMode.value = v;
     if (multi === multiWindow.value) return;
-    // 先等配置真写下去：下面重启会立刻刷盘退出，写请求还在路上就白改了
+    // 先等配置写下去：别的地方（以及下次启动）都按这个值走
     await setMultiWindow(multi);
-    // 浏览器预览没有进程可重启
-    if (!inTauri) return;
-    showToast(t("winSettings.restarting"));
-    try {
-      await commands.windows.restartApp();
-    } catch (e) {
-      showToast(tErr(e));
+    // 浏览器预览没有真实窗口要关
+    if (inTauri) {
+      try {
+        await commands.windows.closeOtherWindows();
+      } catch (e) {
+        showToast(tErr(e));
+      }
     }
+    // 切到多窗口：当前这一页会变成主窗口里的一页，先回主页面 ——
+    // 否则在那页点标题栏的 ✕ 会被当成关主窗口。切到单窗口时这边是设置窗口，马上被关掉
+    if (multi) resetToMain();
   }
 
   /** 语言：只认 zh_cn / en_us，其余回落到默认 */

@@ -19,6 +19,7 @@ import {
   multiWindow,
   quitWindow,
   resourcePopupOpen,
+  watchWindowMode,
 } from "./windows/windowManager";
 import type { WindowKind } from "./windows/registry";
 import { setModpackFallbackToast, useModpackStatus } from "./lib/modpackTasks";
@@ -128,6 +129,7 @@ const closeAskQuit = ref(false);
 
 /** 自定义音乐的配置订阅（配了音乐才需要） */
 let unsubMusic: (() => void) | null = null;
+let unsubWindowMode: (() => void) | null = null;
 let unsubCloseBlocked: (() => void) | null = null;
 let unsubModpackStatus: (() => void) | null = null;
 let unsubResourceStatus: (() => void) | null = null;
@@ -163,6 +165,8 @@ onMounted(async () => {
     closeAsk.value = true;
   });
 
+  // 窗口模式在别的窗口里被切掉时，这一侧跟着改（模式是每个 webview 各自一份内存状态）
+  unsubWindowMode = await watchWindowMode();
   // 整合包安装状态订阅：挂在这里而不是各窗口里，安装跑在后台、进度要能在任何页面显示
   unsubModpackStatus = await initModpackStatus();
   // 资源下载同理：进度弹窗是全局浮层，下载跑在后台
@@ -173,6 +177,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   unsubMusic?.();
+  unsubWindowMode?.();
   unsubCloseBlocked?.();
   unsubModpackStatus?.();
   unsubResourceStatus?.();

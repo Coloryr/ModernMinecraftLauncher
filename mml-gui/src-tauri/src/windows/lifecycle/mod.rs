@@ -23,7 +23,7 @@ pub(crate) use self::models::remove_window_model;
 pub use self::close::show_main_window;
 
 pub(crate) use self::close::{
-    close_instance_windows, close_window, close_window_from_uuid, open_window,
+    close_instance_windows, close_other_windows, close_window, close_window_from_uuid, open_window,
     open_window_from_uuid,
 };
 

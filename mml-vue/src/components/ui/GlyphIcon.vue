@@ -53,6 +53,8 @@ export type GlyphName =
   | "download"
   // 导出：与「下载」互为镜像，表示把东西从这里送出去
   | "export"
+  // 导出列表：一页纸 + 从纸角送出去的箭头，与「检查更新」的向上箭头区分开
+  | "export-list"
   | "update"
   | "refresh"
   | "folder"
@@ -234,6 +236,17 @@ withDefaults(
       <path d="M12 15V3" />
       <path d="m7 8 5-5 5 5" />
       <path d="M4 20h16" />
+    </g>
+    <!--
+      导出列表：一页纸 + 从纸右上角送出去的箭头
+      原来用的是上面那颗「托盘 + 向上箭头」，在模组工具条里紧挨着「检查更新」的向上箭头，
+      两个都读作"往上"，一眼分不出来
+    -->
+    <g v-else-if="name === 'export-list'">
+      <rect x="3" y="6" width="11.5" height="14.5" rx="2" />
+      <path d="M6.5 11.5h5M6.5 15.5h3.5" />
+      <path d="M14.5 10.5 21 4" />
+      <path d="M16 4h5v5" />
     </g>
     <!-- 升级：向上的箭头（版本往上走），与"下载"那条向下的箭头区分开 -->
     <g v-else-if="name === 'update'">

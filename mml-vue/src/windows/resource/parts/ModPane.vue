@@ -7,7 +7,7 @@
 //
 // 数据：模组列表在 useResourceData，分组在 useModGroups（自己的 JSON），
 // 拖动分组头调整分组顺序在 useReorderDrag。
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
 import SegmentedTabs from "../../../components/ui/SegmentedTabs.vue";
@@ -692,6 +692,40 @@ watch(
   { immediate: true },
 );
 
+/**
+ * 从依赖图回到列表时要摆回去的滚动位置
+ *
+ * 依赖图是整页子页面，ResourceWindow 用 v-if 把内容区整块换掉，模组页连同滚动容器一起
+ * 卸载，回来就停在列表开头。打开之前记下位置，重新挂载时先摆回去。
+ * 放模块级是因为模组页自己会被卸载，组件内的变量活不到回来那一刻。
+ */
+let restoreScroll: { uuid: string; top: number } | null = null;
+
+/** 记下列表当前滚到哪儿，交给 restoreListScroll 摆回去 */
+function rememberListScroll() {
+  const top = listScroll.container.value?.scrollTop ?? 0;
+  restoreScroll = top > 0 ? { uuid: instanceUuid.value, top } : null;
+}
+
+/**
+ * 把列表滚回打开依赖图之前的位置
+ *
+ * 等一个 tick 再摆：容器是模板 ref，挂载钩子跑的时候不一定已经 attach 上。
+ * 摆完把滚动状态一并改掉，行虚拟化按恢复后的位置算窗口，不会先按顶部渲染一帧。
+ */
+function restoreListScroll() {
+  const saved = restoreScroll;
+  restoreScroll = null;
+  if (!saved || saved.uuid !== instanceUuid.value) return;
+  void nextTick(() => {
+    const el = listScroll.container.value;
+    if (!el) return;
+    el.scrollTop = saved.top;
+    listScroll.top.value = saved.top;
+    listScroll.attach(el);
+  });
+}
+
 const groups = useModGroups(props.data);
 
 const { relatedOf } = props.deps;
@@ -1316,6 +1350,7 @@ function onMenuPick(id: string) {
       openUpdateLog(item.projectId);
       break;
     case "dep-tree":
+      rememberListScroll();
       emit("open-deps", item);
       break;
     case "remove":
@@ -1846,6 +1881,7 @@ async function mountPackWatch() {
 }
 
 onMounted(() => {
+  restoreListScroll();
   void groups.load();
   void mountPackWatch();
 });
@@ -1935,7 +1971,7 @@ onBeforeUnmount(() => {
            放在图标组末尾、两种模式都在 —— 导出弹窗可以只导选中的模组 -->
       <button class="mini-btn icon-btn icon-only" :disabled="busy || loading" v-tip="t('modExport.title')"
         :aria-label="t('modExport.title')" @click="exportOpen = true">
-        <GlyphIcon name="export" :size="14" />
+        <GlyphIcon name="export-list" :size="14" />
       </button>
     </template>
   </ContentHead>
@@ -2232,7 +2268,7 @@ onBeforeUnmount(() => {
     重复安装提示：列表加载完由后端事件推来，自动弹，与手动触发的依赖检测分开。
     同名文件同时启用属安装冲突，不必等用户自己去点检测
   -->
-  <BaseModal v-if="modDuplicates.length" :title="t('resource.modDupTitle')" :closable="false"
+  <BaseModal v-if="modDuplicates.length" :title="t('resource.modDupTitle')" :width="640" :closable="false"
     @close="dismissModDuplicates">
     <p class="dep-note">{{ t("resource.modDupHint") }}</p>
     <div class="dep-list mod-dup-list">

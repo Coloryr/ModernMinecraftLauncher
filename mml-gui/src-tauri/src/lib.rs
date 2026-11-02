@@ -61,11 +61,12 @@ mod test_support;
 
 include!(concat!(env!("OUT_DIR"), "/invokes_gen.rs"));
 
-/// 给进程钉一个固定的任务栏身份
+/// 给进程钉一个任务栏身份
 ///
 /// 不设的话 Windows 会按"从哪个快捷方式启动"来猜任务栏图标：桌面快捷方式带的是实例图标
 /// （见 `windows::main::instance::shortcut`），从它启动时任务栏就跟着显示实例图标。
-/// 钉成与 `tauri.conf.json` 相同的 identifier，任务栏始终认这个启动器。
+/// 具体身份见 `notify::app_user_model_id`：同一份安装每次启动都一样，两份安装互不相同，
+/// 否则任务栏会把它们并成一个按钮。
 #[cfg(windows)]
 fn set_app_user_model_id() {
     // 这里必须写绝对路径：本 crate 自己也有一个叫 `windows` 的模块
@@ -73,15 +74,12 @@ fn set_app_user_model_id() {
     use ::windows::core::HSTRING;
 
     // 失败也只是任务栏图标退回到旧行为，不影响启动，忽略即可
-    let _ = unsafe { SetCurrentProcessExplicitAppUserModelID(&HSTRING::from(APP_USER_MODEL_ID)) };
+    let id = crate::notify::app_user_model_id();
+    let _ = unsafe { SetCurrentProcessExplicitAppUserModelID(&HSTRING::from(id)) };
 }
 
 #[cfg(not(windows))]
 fn set_app_user_model_id() {}
-
-/// 任务栏身份，与 `tauri.conf.json` 的 `identifier` 一致
-#[cfg(windows)]
-const APP_USER_MODEL_ID: &str = "com.coloryr.mml";
 
 /// 启动 Tauri 应用
 ///
@@ -245,17 +243,19 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 // 旧数据升级：核心加载之前跑完，界面靠 UPGRADE_PROGRESS 画进度
                 if windows::upgrade::pending() {
-                    // 升级完成要发系统通知；Windows 便携版先补开始菜单快捷方式，否则吐司会被系统丢掉
-                    std::thread::spawn(notify::register_start_menu_shortcut);
+                    // 升级完成要发系统通知；先登记通知身份，否则吐司会被系统丢掉
+                    let identity = handle.clone();
+                    std::thread::spawn(move || notify::register_notification_identity(&identity));
                     windows::upgrade::run(handle.clone()).await;
                 }
                 match mml_core::load() {
                     Ok(()) => {
                         // 统计要在实例表加载完之后读：read() 会拿当前实例刷新名字快照
                         mml_game::game_count::init(mml_base::get_base_dir());
-                        // Windows 便携版：系统通知要求有带 AUMID 的开始菜单快捷方式。
+                        // Windows：未打包的程序要先把通知身份登记进注册表，系统才认它发的吐司。
                         // 放这里而不是 setup：写盘与日志都要等内核（日志系统）起来，见 notify.rs
-                        std::thread::spawn(notify::register_start_menu_shortcut);
+                        let identity = handle.clone();
+                        std::thread::spawn(move || notify::register_notification_identity(&identity));
                         main::emit_load_done(&handle, None);
                     }
                     Err(err) => {

@@ -46,6 +46,7 @@ export const SettingsJavaProgress = "settings-java-progress"
 export const SkinConfigChange = "skin-config-change"
 export const StartArg = "start-arg"
 export const UpgradeProgress = "upgrade-progress"
+export const WindowModeChange = "window-mode-change"
 
 /** 事件名 -> payload 类型；无 payload 的事件是 void */
 export interface EventPayloads {
@@ -93,6 +94,7 @@ export interface EventPayloads {
   [SkinConfigChange]: void;
   [StartArg]: void;
   [UpgradeProgress]: UpgradeStatusDto;
+  [WindowModeChange]: boolean;
 }
 
 /** 订阅传输层：命令的 invoke 对应这里的 on，由调用方给 */
@@ -154,5 +156,6 @@ export function createEvents(on: EventOn) {
     onSkinConfigChange: (cb: () => void) => on(SkinConfigChange, cb),
     onStartArg: (cb: () => void) => on(StartArg, cb),
     onUpgradeProgress: (cb: (payload: UpgradeStatusDto) => void) => on(UpgradeProgress, cb),
+    onWindowModeChange: (cb: (payload: boolean) => void) => on(WindowModeChange, cb),
   };
 }

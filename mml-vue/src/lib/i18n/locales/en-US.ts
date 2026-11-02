@@ -679,7 +679,6 @@ export default {
 
   // Resource window
   "resource.title": "Resource Manager",
-  "resource.download": "Download Resources",
   // Drag & drop import (target = the current category's folder)
   "resource.dropTitleTo": "Drop to import into “{name}”",
   "resource.dropUnsupported": "This category doesn't take folders or login shortcuts",
@@ -1443,8 +1442,7 @@ export default {
   "winSettings.windowMode": "Window Mode",
   "winSettings.single": "Single",
   "winSettings.multi": "Multi",
-  "winSettings.windowModeRestart": "Switching window mode restarts the launcher immediately",
-  "winSettings.restarting": "Restarting the launcher…",
+  "winSettings.windowModeRestart": "Switching closes the other windows; a running game is unaffected",
   "winSettings.animations": "Animations",
   "winSettings.animationsDesc": "Instant UI response when off",
   "winSettings.bgImage": "Background Image",

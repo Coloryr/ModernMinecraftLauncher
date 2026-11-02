@@ -28,6 +28,26 @@ pub(crate) fn close_instance_windows(app: &AppHandle, instance: &Uuid) {
     }
 }
 
+/// 关掉主窗口以外的所有窗口，切换窗口模式时用
+///
+/// 走 [`close_window`] 的正常流程：几何照常保存，关闭保护照常生效。拒绝关闭的
+/// （导出进行中、添加实例还在取数据）留着不动，等用户自己处理。
+///
+/// - `app`: 应用句柄
+/// - `main_label`: 主窗口标签，不关它
+pub(crate) fn close_other_windows(app: &AppHandle, main_label: &str) {
+    let targets: Vec<(Uuid, String)> = OPEN_WINDOWS
+        .read()
+        .unwrap()
+        .iter()
+        .filter(|(_, window)| window.label() != main_label)
+        .map(|(uuid, window)| (*uuid, window.label().to_string()))
+        .collect();
+    for (uuid, label) in targets {
+        let _ = close_window(app, &uuid, &label);
+    }
+}
+
 /// 关闭指定窗口：先保存几何，再真正关闭窗口
 ///
 /// - `app`: 应用句柄，按标签补查窗口用

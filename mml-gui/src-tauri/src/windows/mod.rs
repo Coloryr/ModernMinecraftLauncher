@@ -93,8 +93,8 @@ pub(crate) use self::lifecycle::{model_for_kind, window_model};
 pub(crate) use self::registry::family_of_label;
 
 use self::lifecycle::{
-    close_window, close_window_from_uuid, drop_model_for_kind, ensure_model_for_kind, open_window,
-    open_window_from_uuid,
+    close_other_windows, close_window, close_window_from_uuid, drop_model_for_kind,
+    ensure_model_for_kind, open_window, open_window_from_uuid,
 };
 
 use self::geometry::{clamp_runtime_min_size, reconcile_min_size};
@@ -1349,6 +1349,35 @@ pub fn window_restart_app(app: AppHandle) {
         std::thread::sleep(std::time::Duration::from_millis(wait));
         app.exit(0);
     });
+}
+
+/// 切换窗口模式后收掉旧模式下的窗口：关掉主窗口以外的全部
+///
+/// 窗口模式只决定"新窗口怎么开"（多窗口开真实窗口，单窗口走应用内页面），所以
+/// 单窗口 → 多窗口没有别的窗口要关，多窗口 → 单窗口必须关掉它们，否则它们停在旧模式里。
+///
+/// **不重载界面、也不重启进程**：重载会让窗口在几秒里先落回原生标题栏再被装饰插件摘掉，
+/// 游戏在跑时重启更会把它一起带走。
+///
+/// - `app`: 应用句柄，关窗用它
+#[gui_macros::command]
+pub fn window_close_other_windows(app: AppHandle) {
+    close_other_windows(&app, main_window_label());
+    // 模式存在每个 webview 自己那份内存里：剩下的窗口得知道它变了
+    let multi = matches!(
+        crate::gui_config::get().window_mode,
+        crate::gui_config::WindowMode::Multi
+    );
+    emit_window_mode_change(&app, multi);
+}
+
+/// 窗口模式变了：各窗口照着改，免得还按旧模式开窗
+///
+/// - `app`: 应用句柄，广播用它
+/// - `multi`: 切换后的模式，true 为多窗口
+#[gui_macros::emit]
+pub fn emit_window_mode_change(app: &AppHandle, multi: bool) {
+    let _ = app.emit(listens::WINDOW_MODE_CHANGE, multi);
 }
 
 /// 获取 GUI 状态；无文件时返回默认值。前端 wire 为 DTO，TS 命名 camelCase

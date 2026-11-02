@@ -8,6 +8,7 @@
 // 单窗口模式：应用内页面切换（history 同步，可返回）
 
 import { ref } from "vue";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { commands } from "../lib/bindings";
@@ -17,6 +18,7 @@ import { t, tErr } from "../lib/i18n";
 import { showToast } from "../lib/toast";
 import { KEYS, readString, writeString } from "../lib/storage";
 import { isTauri } from "../lib/util";
+import { WindowModeChange } from "../lib/listens";
 import { isWindowKind, type WindowKind, WINDOW_REGISTRY } from "./registry";
 
 const WIN_PARAM = "window";
@@ -53,6 +55,21 @@ function familyKindOfLabel(label: string): WindowKind | null {
 
 /** 是否多窗口模式（默认多窗口） */
 export const multiWindow = ref(readString(KEYS.windowMode) !== "Single");
+
+/**
+ * 本窗口是不是主窗口
+ *
+ * 只有主窗口会在单窗口模式下装"页面"。窗口模式在别处被切换时，只有它需要把模式与当前页
+ * 一起换掉；其余窗口会被后端直接关掉，若被关闭保护拦下（导出进行中）也应当保持原样。
+ */
+const IS_MAIN_WINDOW = (() => {
+  if (!isTauri()) return true;
+  try {
+    return getCurrentWindow().label === "mml-main";
+  } catch {
+    return false;
+  }
+})();
 
 /**
  * 单窗口模式的返回栈：记着"上一层是谁"，关窗时先回上一层
@@ -380,12 +397,12 @@ export function restoreMultiWindow(v: boolean) {
  *
  * # 返回值
  *
- * 配置落盘的 Promise；紧接着要重启进程的调用方必须等它，否则写请求会随重启丢掉
+ * 配置落盘的 Promise；紧接着要重载界面的调用方必须等它，否则重载后读到的还是旧模式
  */
 export function setMultiWindow(v: boolean): Promise<void> {
   restoreMultiWindow(v);
-  // 返回保存的 Promise：要紧接着重启进程的调用方必须等这次写入真的落盘。
-  // 重启会立刻刷盘并退出，写请求还在路上就丢了，见 useSettingsUi 的窗口模式切换
+  // 返回保存的 Promise：要紧接着重载界面的调用方必须等这次写入真的落盘，
+  // 见 useSettingsUi 的窗口模式切换
   return saveGuiConfig({ windowMode: v ? "Multi" : "Single" });
 }
 
@@ -934,6 +951,39 @@ export function closeWindow() {
     // 浏览器多窗口：由脚本打开的标签页允许 window.close()
     window.close();
   }
+}
+
+/**
+ * 跟着别的窗口切换窗口模式
+ *
+ * 模式是每个 webview 各自一份内存状态：在设置窗口里切完，主窗口收不到任何通知，
+ * 仍旧按旧模式开窗。切换的那一侧发事件，其余窗口照着改并回到主页面。
+ *
+ * # 返回值
+ *
+ * 退订函数；浏览器预览里是空操作
+ */
+export async function watchWindowMode(): Promise<() => void> {
+  if (!isTauri() || !IS_MAIN_WINDOW) return () => { };
+  return listen<boolean>(WindowModeChange, (event) => {
+    restoreMultiWindow(event.payload);
+    resetToMain();
+  });
+}
+
+/**
+ * 回到主页面，连返回栈一起清空
+ *
+ * 切窗口模式时用：单窗口模式下当前拿在手里的是"页"，切到多窗口后它就成了主窗口里的
+ * 一页 —— 那时点标题栏的 ✕ 会被当成关主窗口，直接退出应用。
+ */
+export function resetToMain() {
+  backStack.value = [];
+  if (currentKind.value === "main") {
+    windowParams.value = emptyWindowParams();
+    return;
+  }
+  goTo("main");
 }
 
 /** 单窗口模式的应用内跳转；只管显示状态与 URL，不动返回栈 */

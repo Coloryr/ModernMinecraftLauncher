@@ -679,7 +679,6 @@ export default {
 
   // 资源管理窗口
   "resource.title": "资源管理",
-  "resource.download": "下载资源",
   // 拖拽导入（落点 = 当前分类对应的目录）
   "resource.dropTitleTo": "松开以导入到「{name}」",
   "resource.dropUnsupported": "这一类不收目录与登录快捷方式",
@@ -1444,8 +1443,7 @@ export default {
   "winSettings.windowMode": "窗口模式",
   "winSettings.single": "单窗口",
   "winSettings.multi": "多窗口",
-  "winSettings.windowModeRestart": "切换窗口模式会立即重启启动器",
-  "winSettings.restarting": "正在重启启动器…",
+  "winSettings.windowModeRestart": "切换会关掉其它窗口，正在运行的游戏不受影响",
   "winSettings.animations": "界面动画",
   "winSettings.animationsDesc": "关闭后界面瞬时应答",
   "winSettings.bgImage": "背景图",

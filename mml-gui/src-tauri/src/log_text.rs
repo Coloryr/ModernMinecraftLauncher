@@ -597,13 +597,8 @@ pub enum LogText {
         /// 处于前台的窗口标签
         window: String,
     },
-    /// 已为系统通知注册开始菜单快捷方式
-    NotificationShortcut {
-        /// 快捷方式路径
-        path: String,
-    },
-    /// 为系统通知注册开始菜单快捷方式失败
-    NotificationShortcutFailed {
+    /// 登记系统通知身份失败
+    NotificationRegisterFailed {
         /// 失败原因
         error: String,
     },
@@ -937,11 +932,8 @@ impl LogText {
             LogText::NotificationSkipped { window } => {
                 format!("[notify] 启动器有窗口在前台（{window}），不发系统通知")
             }
-            LogText::NotificationShortcut { path } => {
-                format!("[notify] 已为系统通知注册开始菜单快捷方式：{path}")
-            }
-            LogText::NotificationShortcutFailed { error } => {
-                format!("[notify] 为系统通知注册开始菜单快捷方式失败：{error}")
+            LogText::NotificationRegisterFailed { error } => {
+                format!("[notify] 登记系统通知身份失败：{error}")
             }
         }
     }
@@ -1283,11 +1275,8 @@ impl LogText {
             LogText::NotificationSkipped { window } => format!(
                 "[notify] launcher window \"{window}\" is focused, system notification skipped"
             ),
-            LogText::NotificationShortcut { path } => format!(
-                "[notify] registered the start menu shortcut for system notifications: {path}"
-            ),
-            LogText::NotificationShortcutFailed { error } => format!(
-                "[notify] failed to register the start menu shortcut for system notifications: {error}"
+            LogText::NotificationRegisterFailed { error } => format!(
+                "[notify] failed to register the notification identity: {error}"
             ),
         }
     }
@@ -1358,7 +1347,7 @@ impl NotifyText {
         match self {
             NotifyText::DownloadDone { count } => (
                 String::from("下载完成"),
-                format!("{count} 个下载任务已结束，打开下载窗口查看结果"),
+                format!("{count} 个下载任务已结束"),
             ),
             NotifyText::ModpackDone { name } => {
                 (String::from("整合包安装完成"), format!("{name} 已安装完成"))
@@ -1393,7 +1382,7 @@ impl NotifyText {
         match self {
             NotifyText::DownloadDone { count } => (
                 String::from("Download finished"),
-                format!("{count} download tasks finished, open the download window for details"),
+                format!("{count} download tasks finished"),
             ),
             NotifyText::ModpackDone { name } => (
                 String::from("Modpack installed"),
