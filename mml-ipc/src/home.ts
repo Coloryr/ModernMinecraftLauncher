@@ -54,6 +54,13 @@ export interface MmlApi {
    */
   onTheme(cb: (theme: MmlTheme) => void): () => void;
 
+  /**
+   * 通过宿主导航打开工具页面，自动遵循单窗口 / 多窗口设置。
+   * instance 为资源、日志、配置文件等实例窗口的目标 uuid。
+   * 仅直接运行在宿主内的组件可用；iframe 与旧版宿主不提供此方法。
+   */
+  openWindow?(kind: string, instance?: string | null): Promise<void>;
+
   /** 当前主题（启动器下发，实时更新） */
   theme: MmlTheme;
 

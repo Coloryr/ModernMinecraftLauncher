@@ -1623,6 +1623,7 @@ export default {
   "err.javaInvalid": "无效的 Java 路径",
   "err.pageArchiveLimit": "压缩包条目太多、体积过大或压缩比异常，已拒绝导入",
   "err.customUiId": "样式包条目不存在或不合法",
+  "err.customUiWindowKind": "主题请求了未知窗口：{kind}",
   "err.gamepadProfileInvalid": "配置名不合法：不能为空、不能以 . 开头或结尾，不能含 \\ / : * ? \" < > |",
   "err.gamepadProfileExists": "同名手柄配置已存在",
   "err.gamepadProfileMissing": "找不到这份手柄配置",
