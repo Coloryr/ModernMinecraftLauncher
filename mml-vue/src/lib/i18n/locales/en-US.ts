@@ -2148,7 +2148,7 @@ export default {
   "winGamepad.detected": "Detected: {name}",
   "winGamepad.extraButtons": "Extra buttons",
   "winGamepad.xinput": "XInput compatibility",
-  "winGamepad.xinputHint": "Turn on when WGI cannot read the gamepad. Windows only; takes effect immediately.",
+  "winGamepad.xinputHint": "On by default; turn off to use WGI only, which needs a focused window to receive events. Windows only.",
   "winGamepad.refresh": "Scan again",
   "winGamepad.new": "Add profile",
   "winGamepad.delete": "Delete profile",

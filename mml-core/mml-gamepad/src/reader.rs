@@ -303,13 +303,11 @@ fn run() {
     for (id, gamepad) in gilrs.gamepads() {
         pads.insert(pad_id(id), Pad::from_gamepad(&gamepad));
     }
-
-
     drop(pads);
 
     loop {
-        // 超时返回 None，让循环有机会结束；进程退出时线程直接随进程走。
-        // 16ms 一拍：摇杆要走 XInput 轮询，太慢输入会一顿一顿
+        // 阻塞 16ms：没事件时让出 CPU，有事件立刻返回；同时这也是 XInput 的轮询节拍，
+        // 慢过 16ms 摇杆会一顿一顿
         if let Some(event) = gilrs.next_event_blocking(Some(Duration::from_millis(16))) {
             handle(&mut gilrs, event);
         }
@@ -362,15 +360,23 @@ static XINPUT_SLOTS: std::sync::Mutex<[Option<u64>; crate::xinput::SLOT_COUNT]> 
 
 /// XInput 兼容模式是否打开，见 [set_xinput]
 ///
-/// **默认关**：正常走 gilrs（WGI）就够，WGI 读不到输入的手柄才需要在界面里打开它。
-static XINPUT: AtomicBool = AtomicBool::new(false);
+/// **默认开**：WGI 要求进程有前台窗口才收得到手柄事件，手柄映射的典型场景是
+/// "游戏在前台、启动器在后台"，那时 WGI 一个事件都没有，只有 XInput 照常。
+static XINPUT: AtomicBool = AtomicBool::new(true);
 
 /// 读取选项，落盘用大驼峰
-#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 #[serde(default, rename_all = "PascalCase")]
 struct ReaderSettings {
-    /// 是否用 XInput 补读；只影响 Windows
+    /// 是否用 XInput 读取；只影响 Windows
     xinput: bool,
+}
+
+impl Default for ReaderSettings {
+    fn default() -> Self {
+        // 文件里没写这一项时按打开处理，和 XINPUT 的初值一致
+        Self { xinput: true }
+    }
 }
 
 /// 读一次 `gamepad/reader.json` 里的读取选项
@@ -410,11 +416,11 @@ pub fn set_xinput(enabled: bool) -> Result<(), GamepadError> {
         .map_err(|err| GamepadError::Io(err.to_string()))
 }
 
-/// 用 XInput 补齐蓝牙 Xbox 手柄的输入
+/// 用 XInput 读手柄
 ///
-/// gilrs 走 WGI，对这类手柄只报"已连接"、收不到按键（实机确认），而 XInput 那边完全正常。
-/// 这里按槽位轮询，把值写进同一份手柄状态：槽位优先认领已有的 Xbox 外观手柄，
-/// 认领不到才新建一份，界面因此不会看到两只手柄。
+/// gilrs 走 WGI，而 WGI 要求进程有前台窗口才收得到事件：后台时一个按键都没有，
+/// 只有 XInput 照常。这里按槽位轮询，把值写进同一份手柄状态：槽位优先认领已有的
+/// Xbox 外观手柄，认领不到才新建一份，界面因此不会看到两只手柄。
 #[cfg(windows)]
 fn sync_xinput() {
     let mut slots = XINPUT_SLOTS.lock().unwrap();
