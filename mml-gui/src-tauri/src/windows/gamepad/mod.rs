@@ -3,13 +3,13 @@
 //! 读取、映射与转发都在内核 crate mml-gamepad 里；这里只做 DTO 转换与错误键映射。
 
 use mml_gamepad::{
-    Axis, AxisRule, Button, ButtonRule, GamepadConfig, GamepadError, MouseRule, Stick,
+    Axis, AxisRule, Button, ButtonRule, GamepadConfig, GamepadError, MouseRule, PadLayout, Stick,
 };
 
 use crate::dtos::{
     GamepadAxisDto, GamepadAxisRuleDto, GamepadAxisValueDto, GamepadButtonDto,
-    GamepadButtonRuleDto, GamepadButtonValueDto, GamepadConfigDto, GamepadDto, GamepadMouseDto,
-    GamepadProfileDto, GamepadStateDto, GamepadStickDto,
+    GamepadButtonRuleDto, GamepadButtonValueDto, GamepadConfigDto, GamepadDto, GamepadLayoutDto,
+    GamepadMouseDto, GamepadProfileDto, GamepadStateDto, GamepadStickDto,
 };
 use crate::err_keys;
 
@@ -241,6 +241,22 @@ fn axis_to_dto(axis: Axis) -> GamepadAxisDto {
     }
 }
 
+/// 内核外观转 DTO
+fn layout_to_dto(layout: PadLayout) -> GamepadLayoutDto {
+    match layout {
+        PadLayout::Xbox => GamepadLayoutDto::Xbox,
+        PadLayout::Playstation => GamepadLayoutDto::Playstation,
+    }
+}
+
+/// DTO 外观转内核枚举
+fn layout_from_dto(layout: GamepadLayoutDto) -> PadLayout {
+    match layout {
+        GamepadLayoutDto::Xbox => PadLayout::Xbox,
+        GamepadLayoutDto::Playstation => PadLayout::Playstation,
+    }
+}
+
 /// 摇杆 DTO 转内核枚举
 fn stick_from_dto(stick: GamepadStickDto) -> Stick {
     match stick {
@@ -261,6 +277,8 @@ fn stick_to_dto(stick: Stick) -> GamepadStickDto {
 fn config_to_dto(config: &GamepadConfig) -> GamepadConfigDto {
     GamepadConfigDto {
         selected: config.selected,
+        layout: layout_to_dto(config.layout),
+        swap_ab: config.swap_ab,
         buttons: config
             .buttons
             .iter()
@@ -294,6 +312,8 @@ fn config_to_dto(config: &GamepadConfig) -> GamepadConfigDto {
 fn config_from_dto(dto: GamepadConfigDto) -> GamepadConfig {
     GamepadConfig {
         selected: dto.selected,
+        layout: layout_from_dto(dto.layout),
+        swap_ab: dto.swap_ab,
         buttons: dto
             .buttons
             .into_iter()

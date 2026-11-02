@@ -49,8 +49,12 @@ export type GamepadMouseDto = {
   deadzone: number,
 };
 
+export type GamepadLayoutDto = "xbox" | "playstation";
+
 export type GamepadConfigDto = {
   selected: boolean,
+  layout: GamepadLayoutDto,
+  swapAb: boolean,
   buttons: GamepadButtonRuleDto[],
   axes: GamepadAxisRuleDto[],
   mouse: GamepadMouseDto,

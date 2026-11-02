@@ -1,10 +1,8 @@
 // 中文（简体）语言包
 export default {
-  "winGamepad.testTitle": "手柄实时测试",
-  "winGamepad.testDevice": "测试设备",
-  "winGamepad.testHint": "显示设备原始数值。此面板不发送输入，已生效的游戏映射仍会继续运行。",
-  "winGamepad.testEmpty": "未检测到手柄，连接后可在这里测试摇杆和按钮。",
-  "winGamepad.testNoButtons": "未按下按钮",
+  "winGamepad.testTitle": "手柄状态",
+  "winGamepad.testHint": "实时显示摇杆与按键；此面板不发送输入，生效中的映射照常运行。",
+  "winGamepad.testEmpty": "未检测到手柄，连接后可在这里查看摇杆与按钮。",
   "cloud.title": "存档云同步",
   "cloud.connection": "服务器连接",
   "cloud.server": "服务器地址",
@@ -1929,7 +1927,7 @@ export default {
   "winHelp.qqCopied": "群号已复制",
 
   // 首启向导：语言 → 旧数据 → 主页面设置
-  "firstRunLang.title": "界面语言",
+  "firstRunLang.title": "基本设置",
   "firstRunLang.hint": "之后可以在设置里改。",
   "firstRunLang.next": "继续",
   // 主页面设置：首启向导的最后一步
@@ -1946,7 +1944,7 @@ export default {
   "firstRun.materialNone": "关闭",
   "firstRun.materialMica": "云母（Windows 11）",
   "firstRun.materialAcrylic": "亚克力（Windows 10 1809+）",
-  "firstRun.materialHint": "由系统在窗口背后合成；切换后需重开窗口生效",
+  "firstRun.materialHint": "由系统在窗口背后合成",
   "firstRun.done": "完成",
   "winHelp.version": "启动器版本",
   "winHelp.author": "作者",
@@ -2141,8 +2139,16 @@ export default {
   "winTitle.serverInstance": "生成服务器实例",
 
   "winGamepad.profiles": "配置",
-  "winGamepad.new": "新建",
-  "winGamepad.delete": "删除",
+  "winGamepad.devices": "手柄",
+  "winGamepad.layoutTitle": "手柄外观",
+  "winGamepad.layoutXbox": "Xbox",
+  "winGamepad.layoutPlaystation": "PlayStation",
+  "winGamepad.swapAbTitle": "A / B 键位",
+  "winGamepad.swapAbNormal": "标准",
+  "winGamepad.swapAbSwapped": "交换",
+  "winGamepad.layoutHint": "外观与 A / B 交换只改记号与状态图，映射仍按按键位置生效。",
+  "winGamepad.new": "添加配置",
+  "winGamepad.delete": "删除配置",
   "winGamepad.activate": "设为生效",
   "winGamepad.active": "生效中",
   "winGamepad.empty": "还没有手柄配置",

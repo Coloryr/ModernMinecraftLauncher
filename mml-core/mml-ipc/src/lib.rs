@@ -28,6 +28,7 @@
 //! | 设置标题 | 10 | 启动器 -> 游戏 | 标题(String) |
 //! | 窗口大小 | 11 | 游戏 -> 启动器 | uuid(String) + 宽(i32) + 高(i32) |
 //! | 连接验证 | 12 | 启动器 -> 游戏 | 密钥(String) |
+//! | 窗口聚焦 | 13 | 游戏 -> 启动器 | uuid(String) + 状态(bool) |
 //!
 //! 游戏连接建立后，启动器先把「连接验证」(12) 发给游戏，密钥由 IPC 服务启动时随机生成，
 //! 经 get_auth_key 取出后作为启动参数传给游戏；游戏校验通过后才注册游戏通道。
@@ -98,6 +99,7 @@ const TYPE_GAME_CHANNEL: i32 = 9;
 const TYPE_SET_TITLE: i32 = 10;
 const TYPE_GAME_WINDOW_SIZE: i32 = 11;
 const TYPE_GAME_AUTH: i32 = 12;
+const TYPE_GAME_WINDOW_FOCUS: i32 = 13;
 
 /// 单个消息体的最大长度，单位字节；本地 IPC 正常数据远小于该值，用于防御异常长度
 const MAX_FRAME_SIZE: usize = 1 << 20;
@@ -119,6 +121,9 @@ static MOUSE_STATES: LazyLock<RwLock<HashMap<Uuid, bool>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 /// 游戏上报的窗口大小，键为实例 ID
 static WINDOW_SIZES: LazyLock<RwLock<HashMap<Uuid, WindowSize>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+/// 游戏上报的窗口聚焦状态，键为实例 ID
+static FOCUS_STATES: LazyLock<RwLock<HashMap<Uuid, bool>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 /// IPC 服务端口，只初始化一次
 static IPC_PORT: OnceLock<u16> = OnceLock::new();
@@ -255,6 +260,17 @@ pub fn get_game_uuids() -> Vec<Uuid> {
 /// 见 [`WindowSize`]；未上报过返回 `None`
 pub fn get_window_size(uuid: Uuid) -> Option<WindowSize> {
     WINDOW_SIZES.read().unwrap().get(&uuid).copied()
+}
+
+/// 获取游戏窗口是否在前台
+///
+/// - `uuid`: 游戏实例 ID
+///
+/// # 返回值
+///
+/// 游戏上报过则返回最近一次状态；未上报过返回 `None`
+pub fn get_focus_state(uuid: Uuid) -> Option<bool> {
+    FOCUS_STATES.read().unwrap().get(&uuid).copied()
 }
 
 /// 添加服务器信息，用于向游戏广播 MOTD
@@ -663,6 +679,11 @@ fn message_len(buf: &[u8]) -> CoreResult<Option<usize>> {
                 return Ok(None);
             }
         }
+        TYPE_GAME_WINDOW_FOCUS => {
+            if !string_field(buf, &mut offset)? || !advance(buf, &mut offset, 1)? {
+                return Ok(None);
+            }
+        }
         _ => {
             mml_log::warn_type(InfoType::IpcUnknownMessageType { msg_type });
             return Ok(Some(4));
@@ -726,6 +747,13 @@ async fn process_message(
                 .write()
                 .unwrap()
                 .insert(guid, WindowSize { width, height });
+        }
+        TYPE_GAME_WINDOW_FOCUS => {
+            let uuid_str = data.read_string();
+            let guid = Uuid::parse_str(&uuid_str)
+                .map_err(|err| SocketError(ErrorData::from_error(err)))?;
+            let value = data.read_bool();
+            FOCUS_STATES.write().unwrap().insert(guid, value);
         }
         _ => {
             mml_log::warn_type(InfoType::IpcUnknownMessageType { msg_type });

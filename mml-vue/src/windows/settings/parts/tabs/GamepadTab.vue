@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 手柄设置页：左侧配置列表，右侧编辑按钮 / 轴映射与摇杆参数
+// 手柄设置页：顶部配置下拉与配置操作，接着是手柄状态图，往下才是按钮 / 轴 / 摇杆设置
 //
 // 状态在 useSettingsGamepad：切到别的标签时本组件会被卸载，未保存的编辑内容
 // 必须留在设置窗口那一层。
@@ -9,7 +9,9 @@ import BaseModal from "../../../../components/ui/BaseModal.vue";
 import SettingsGroup from "../SettingsGroup.vue";
 import ActionSelect from "../ActionSelect.vue";
 import GamepadTestPanel from "../GamepadTestPanel.vue";
+import { ALL_AXES, ALL_BUTTONS, axisLabel, buttonLabel } from "../../gamepadLabels";
 import { t } from "../../../../lib/i18n";
+import type { GamepadAxisDto, GamepadButtonDto, GamepadLayoutDto } from "../../../../lib/bindings";
 import type { useSettingsGamepad } from "../../composables/useSettingsGamepad";
 
 const props = defineProps<{
@@ -25,7 +27,6 @@ const {
   config,
   dirty,
   active,
-  loading,
   saving,
   actions,
   newButton,
@@ -35,10 +36,6 @@ const {
   createError,
   deleteOpen,
   pendingName,
-  BUTTON_LABEL,
-  AXIS_LABEL,
-  ALL_BUTTONS,
-  ALL_AXES,
   isTaken,
   init,
   requestSelect,
@@ -53,164 +50,191 @@ const {
 } = props.settings;
 
 onMounted(init);
+
+/** 取按钮记号：随外观与 A / B 交换变 */
+function label(button: GamepadButtonDto): string {
+  return buttonLabel(button, config.value?.layout ?? "xbox", config.value?.swapAb ?? false);
+}
+
+/** 取轴记号 */
+function axisName(axis: GamepadAxisDto): string {
+  return axisLabel(axis);
+}
+
+/**
+ * 下拉换配置：有未保存改动时先问一句
+ *
+ * 下拉自己已经先跳到新项了，答完再切；这里立刻退回当前项，免得显示的和编辑的不是同一份。
+ *
+ * - `event`: 下拉的 change 事件
+ */
+function onPick(event: Event) {
+  const el = event.target as HTMLSelectElement;
+  const name = el.value;
+  if (name === editing.value) return;
+  requestSelect(name);
+  el.value = editing.value;
+}
+
+/**
+ * 换外观：只改记号，映射仍是按位置走的
+ *
+ * - `value`: `xbox` / `playstation`
+ */
+function setLayout(value: GamepadLayoutDto) {
+  if (config.value) config.value.layout = value;
+}
+
+/**
+ * 换 A / B 位置
+ *
+ * - `value`: 是否交换
+ */
+function setSwapAb(value: boolean) {
+  if (config.value) config.value.swapAb = value;
+}
 </script>
 
 <template>
   <SettingsGroup id="gamepad" :flash="flashGroup === 'gamepad'">
-    <div class="gp-body">
-      <!-- 左侧：配置文件列表 + 新建 / 生效 / 删除 -->
-      <aside class="gp-side">
-        <div class="gp-side-head">
-          <span class="gp-side-title">{{ t("winGamepad.profiles") }}</span>
-          <BaseButton size="sm" @click="openCreate">{{ t("winGamepad.new") }}</BaseButton>
-        </div>
-
-        <div class="gp-list">
-          <button v-for="item in profiles" :key="item.name" class="gp-item"
-            :class="{ 'is-active': item.name === editing, 'is-broken': !!item.error }" :title="item.error ?? ''"
-            @click="requestSelect(item.name)">
-            <span class="gp-item-name">{{ item.name }}</span>
-            <span v-if="item.active" class="gp-badge">{{ t("winGamepad.active") }}</span>
-          </button>
-          <p v-if="!profiles.length" class="empty-tip">{{ t("winGamepad.empty") }}</p>
-        </div>
-
-        <div class="gp-side-foot">
-          <BaseButton size="sm" :disabled="!config || active" @click="activate">
-            {{ t("winGamepad.activate") }}
-          </BaseButton>
-          <BaseButton size="sm" variant="danger" :disabled="!editing" @click="deleteOpen = true">
-            {{ t("winGamepad.delete") }}
-          </BaseButton>
-        </div>
-      </aside>
-
-      <!-- 右侧：映射编辑 -->
-      <section class="gp-main" :aria-busy="loading">
-        <p v-if="!editing" class="empty-tip">{{ t("winGamepad.empty") }}</p>
-        <p v-else-if="!config" class="empty-tip">{{ t("winGamepad.broken") }}</p>
-
-        <template v-else>
-          <div class="gp-head">
-            <h2 class="gp-title">{{ editing }}</h2>
-            <span v-if="dirty" class="gp-dirty">{{ t("winGamepad.unsaved") }}</span>
-            <BaseButton size="sm" variant="accent" :disabled="!config || saving" @click="save">
-              {{ t("winGamepad.save") }}
-            </BaseButton>
-          </div>
-
-          <GamepadTestPanel />
-          <section class="gp-sec">
-            <h3 class="gp-sec-title">{{ t("winGamepad.buttons") }}</h3>
-            <p class="field-desc">{{ t("winGamepad.buttonHint") }}</p>
-            <div class="gp-row gp-row-head gp-row-button">
-              <span>{{ t("winGamepad.button") }}</span>
-              <span>{{ t("winGamepad.modifier") }}</span>
-              <span>{{ t("winGamepad.action") }}</span>
-              <span></span>
-            </div>
-            <div v-for="(rule, index) in config.buttons" :key="index" class="gp-row gp-row-button">
-              <span class="gp-key">{{ BUTTON_LABEL[rule.button] }}</span>
-              <select v-model="rule.modifier" class="field-select">
-                <option :value="null">{{ t("winGamepad.modifierNone") }}</option>
-                <option v-for="button in ALL_BUTTONS" :key="button" :value="button" :disabled="button === rule.button">
-                  {{ BUTTON_LABEL[button] }}
-                </option>
-              </select>
-              <ActionSelect v-model="rule.action" :actions="actions" />
-              <BaseButton size="sm" variant="ghost" class="gp-remove" @click="config.buttons.splice(index, 1)">
-                ✕
-              </BaseButton>
-            </div>
-            <div class="gp-row gp-row-add-button">
-              <select v-model="newButton.button" class="field-select">
-                <option v-for="button in ALL_BUTTONS" :key="button" :value="button">
-                  {{ BUTTON_LABEL[button] }}
-                </option>
-              </select>
-              <select v-model="newButton.modifier" class="field-select">
-                <option :value="null">{{ t("winGamepad.modifierNone") }}</option>
-                <option v-for="button in ALL_BUTTONS" :key="button" :value="button"
-                  :disabled="button === newButton.button">
-                  {{ BUTTON_LABEL[button] }}
-                </option>
-              </select>
-              <ActionSelect v-model="newButton.action" :actions="actions" />
-              <BaseButton size="sm"
-                :disabled="isTaken(newButton.button, newButton.modifier) || newButton.modifier === newButton.button"
-                @click="addButton">
-                {{ t("winGamepad.addButton") }}
-              </BaseButton>
-            </div>
-          </section>
-
-          <section class="gp-sec">
-            <h3 class="gp-sec-title">{{ t("winGamepad.axes") }}</h3>
-            <p class="field-desc">{{ t("winGamepad.axisHint") }}</p>
-            <div class="gp-row gp-row-head gp-row-axis">
-              <span>{{ t("winGamepad.axis") }}</span>
-              <span>{{ t("winGamepad.from") }}</span>
-              <span>{{ t("winGamepad.to") }}</span>
-              <span>{{ t("winGamepad.action") }}</span>
-              <span></span>
-            </div>
-            <div v-for="(rule, index) in config.axes" :key="index" class="gp-row gp-row-axis">
-              <select v-model="rule.axis" class="field-select">
-                <option v-for="axis in ALL_AXES" :key="axis" :value="axis">{{ AXIS_LABEL[axis] }}</option>
-              </select>
-              <input v-model.number="rule.from" class="field-input" type="number" step="0.05" min="-1" max="1" />
-              <input v-model.number="rule.to" class="field-input" type="number" step="0.05" min="-1" max="1" />
-              <ActionSelect v-model="rule.action" :actions="actions" />
-              <BaseButton size="sm" variant="ghost" class="gp-remove" @click="config.axes.splice(index, 1)">
-                ✕
-              </BaseButton>
-            </div>
-            <div class="gp-row gp-row-add-axis">
-              <select v-model="newAxis.axis" class="field-select">
-                <option v-for="axis in ALL_AXES" :key="axis" :value="axis">{{ AXIS_LABEL[axis] }}</option>
-              </select>
-              <input v-model.number="newAxis.from" class="field-input" type="number" step="0.05" min="-1" max="1" />
-              <input v-model.number="newAxis.to" class="field-input" type="number" step="0.05" min="-1" max="1" />
-              <ActionSelect v-model="newAxis.action" :actions="actions" />
-              <BaseButton size="sm" @click="addAxis">{{ t("winGamepad.addAxis") }}</BaseButton>
-            </div>
-          </section>
-
-          <section class="gp-sec">
-            <h3 class="gp-sec-title">{{ t("winGamepad.mouse") }}</h3>
-            <div class="gp-field-row">
-              <div class="gp-field">
-                <label class="field-label">{{ t("winGamepad.cursorStick") }}</label>
-                <select v-model="config.mouse.cursorStick" class="field-select">
-                  <option value="left">{{ t("winGamepad.stickLeft") }}</option>
-                  <option value="right">{{ t("winGamepad.stickRight") }}</option>
-                </select>
-              </div>
-              <div class="gp-field">
-                <label class="field-label">{{ t("winGamepad.turnStick") }}</label>
-                <select v-model="config.mouse.turnStick" class="field-select">
-                  <option value="left">{{ t("winGamepad.stickLeft") }}</option>
-                  <option value="right">{{ t("winGamepad.stickRight") }}</option>
-                </select>
-              </div>
-              <div class="gp-field">
-                <label class="field-label">{{ t("winGamepad.cursorSpeed") }}</label>
-                <input v-model.number="config.mouse.cursorSpeed" class="field-input" type="number" step="50" min="0" />
-              </div>
-              <div class="gp-field">
-                <label class="field-label">{{ t("winGamepad.turnSpeed") }}</label>
-                <input v-model.number="config.mouse.turnSpeed" class="field-input" type="number" step="50" min="0" />
-              </div>
-              <div class="gp-field">
-                <label class="field-label">{{ t("winGamepad.deadzone") }}</label>
-                <input v-model.number="config.mouse.deadzone" class="field-input" type="number" step="0.05" min="0"
-                  max="1" />
-              </div>
-            </div>
-          </section>
-        </template>
-      </section>
+    <!-- 配置：下拉选一份，右边是保存 / 删除 / 新建 -->
+    <div class="gp-bar">
+      <span class="gp-bar-label">{{ t("winGamepad.profiles") }}</span>
+      <select class="field-select gp-select" :value="editing" :aria-label="t('winGamepad.profiles')"
+        @change="onPick">
+        <option v-for="item in profiles" :key="item.name" :value="item.name">{{ item.name }}</option>
+      </select>
+      <BaseButton size="sm" :disabled="!config || active" @click="activate">
+        {{ active ? t("winGamepad.active") : t("winGamepad.activate") }}
+      </BaseButton>
+      <span class="gp-bar-gap" />
+      <span v-if="dirty" class="gp-dirty">{{ t("winGamepad.unsaved") }}</span>
+      <BaseButton size="sm" variant="accent" :disabled="!config || saving" @click="save">
+        {{ t("winGamepad.save") }}
+      </BaseButton>
+      <BaseButton size="sm" variant="danger" :disabled="profiles.length <= 1" @click="deleteOpen = true">
+        {{ t("winGamepad.delete") }}
+      </BaseButton>
+      <BaseButton size="sm" @click="openCreate">{{ t("winGamepad.new") }}</BaseButton>
     </div>
+
+    <!-- 手柄列表与状态图：没有可编辑的配置时也照样显示实时状态 -->
+    <GamepadTestPanel :layout="config?.layout ?? null" :swap-ab="config?.swapAb ?? null"
+      @update:layout="setLayout" @update:swap-ab="setSwapAb" />
+
+    <p v-if="!editing" class="empty-tip">{{ t("winGamepad.empty") }}</p>
+    <p v-else-if="!config" class="empty-tip">{{ t("winGamepad.broken") }}</p>
+
+    <template v-else>
+      <section class="gp-sec">
+        <h3 class="gp-sec-title">{{ t("winGamepad.buttons") }}</h3>
+        <p class="field-desc">{{ t("winGamepad.buttonHint") }}</p>
+        <div class="gp-row gp-row-head gp-row-button">
+          <span>{{ t("winGamepad.button") }}</span>
+          <span>{{ t("winGamepad.modifier") }}</span>
+          <span>{{ t("winGamepad.action") }}</span>
+          <span></span>
+        </div>
+        <div v-for="(rule, index) in config.buttons" :key="index" class="gp-row gp-row-button">
+          <span class="gp-key">{{ label(rule.button) }}</span>
+          <select v-model="rule.modifier" class="field-select">
+            <option :value="null">{{ t("winGamepad.modifierNone") }}</option>
+            <option v-for="button in ALL_BUTTONS" :key="button" :value="button" :disabled="button === rule.button">
+              {{ label(button) }}
+            </option>
+          </select>
+          <ActionSelect v-model="rule.action" :actions="actions" />
+          <BaseButton size="sm" variant="ghost" class="gp-remove" @click="config.buttons.splice(index, 1)">
+            ✕
+          </BaseButton>
+        </div>
+        <div class="gp-row gp-row-add-button">
+          <select v-model="newButton.button" class="field-select">
+            <option v-for="button in ALL_BUTTONS" :key="button" :value="button">
+              {{ label(button) }}
+            </option>
+          </select>
+          <select v-model="newButton.modifier" class="field-select">
+            <option :value="null">{{ t("winGamepad.modifierNone") }}</option>
+            <option v-for="button in ALL_BUTTONS" :key="button" :value="button"
+              :disabled="button === newButton.button">
+              {{ label(button) }}
+            </option>
+          </select>
+          <ActionSelect v-model="newButton.action" :actions="actions" />
+          <BaseButton size="sm"
+            :disabled="isTaken(newButton.button, newButton.modifier) || newButton.modifier === newButton.button"
+            @click="addButton">
+            {{ t("winGamepad.addButton") }}
+          </BaseButton>
+        </div>
+      </section>
+
+      <section class="gp-sec">
+        <h3 class="gp-sec-title">{{ t("winGamepad.axes") }}</h3>
+        <p class="field-desc">{{ t("winGamepad.axisHint") }}</p>
+        <div class="gp-row gp-row-head gp-row-axis">
+          <span>{{ t("winGamepad.axis") }}</span>
+          <span>{{ t("winGamepad.from") }}</span>
+          <span>{{ t("winGamepad.to") }}</span>
+          <span>{{ t("winGamepad.action") }}</span>
+          <span></span>
+        </div>
+        <div v-for="(rule, index) in config.axes" :key="index" class="gp-row gp-row-axis">
+          <select v-model="rule.axis" class="field-select">
+            <option v-for="axis in ALL_AXES" :key="axis" :value="axis">{{ axisName(axis) }}</option>
+          </select>
+          <input v-model.number="rule.from" class="field-input" type="number" step="0.05" min="-1" max="1" />
+          <input v-model.number="rule.to" class="field-input" type="number" step="0.05" min="-1" max="1" />
+          <ActionSelect v-model="rule.action" :actions="actions" />
+          <BaseButton size="sm" variant="ghost" class="gp-remove" @click="config.axes.splice(index, 1)">
+            ✕
+          </BaseButton>
+        </div>
+        <div class="gp-row gp-row-add-axis">
+          <select v-model="newAxis.axis" class="field-select">
+            <option v-for="axis in ALL_AXES" :key="axis" :value="axis">{{ axisName(axis) }}</option>
+          </select>
+          <input v-model.number="newAxis.from" class="field-input" type="number" step="0.05" min="-1" max="1" />
+          <input v-model.number="newAxis.to" class="field-input" type="number" step="0.05" min="-1" max="1" />
+          <ActionSelect v-model="newAxis.action" :actions="actions" />
+          <BaseButton size="sm" @click="addAxis">{{ t("winGamepad.addAxis") }}</BaseButton>
+        </div>
+      </section>
+
+      <section class="gp-sec">
+        <h3 class="gp-sec-title">{{ t("winGamepad.mouse") }}</h3>
+        <div class="gp-field-row">
+          <div class="gp-field">
+            <label class="field-label">{{ t("winGamepad.cursorStick") }}</label>
+            <select v-model="config.mouse.cursorStick" class="field-select">
+              <option value="left">{{ t("winGamepad.stickLeft") }}</option>
+              <option value="right">{{ t("winGamepad.stickRight") }}</option>
+            </select>
+          </div>
+          <div class="gp-field">
+            <label class="field-label">{{ t("winGamepad.turnStick") }}</label>
+            <select v-model="config.mouse.turnStick" class="field-select">
+              <option value="left">{{ t("winGamepad.stickLeft") }}</option>
+              <option value="right">{{ t("winGamepad.stickRight") }}</option>
+            </select>
+          </div>
+          <div class="gp-field">
+            <label class="field-label">{{ t("winGamepad.cursorSpeed") }}</label>
+            <input v-model.number="config.mouse.cursorSpeed" class="field-input" type="number" step="50" min="0" />
+          </div>
+          <div class="gp-field">
+            <label class="field-label">{{ t("winGamepad.turnSpeed") }}</label>
+            <input v-model.number="config.mouse.turnSpeed" class="field-input" type="number" step="50" min="0" />
+          </div>
+          <div class="gp-field">
+            <label class="field-label">{{ t("winGamepad.deadzone") }}</label>
+            <input v-model.number="config.mouse.deadzone" class="field-input" type="number" step="0.05" min="0"
+              max="1" />
+          </div>
+        </div>
+      </section>
+    </template>
 
     <!-- 新建配置 -->
     <BaseModal v-if="createOpen" :title="t('winGamepad.createTitle')" @close="createOpen = false">
@@ -245,111 +269,34 @@ onMounted(init);
 </template>
 
 <style scoped>
-.gp-body {
-  display: flex;
-  align-items: flex-start;
-  gap: 20px;
-}
-
-.gp-side {
-  width: 200px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.gp-side-head {
+/* 顶部配置行：下拉吃掉剩余宽度，动作按钮靠右 */
+.gp-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
-  padding: 0 0 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
 }
 
-.gp-side-title {
-  font-size: 13px;
-  font-weight: 600;
+.gp-bar-label {
+  flex-shrink: 0;
+  font-size: 12.5px;
   color: var(--text-dim);
 }
 
-.gp-list {
-  max-height: 260px;
-  overflow-y: auto;
-  padding: 0 2px 4px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.gp-select {
+  width: 220px;
+  max-width: 100%;
 }
 
-.gp-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 10px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text);
-  font-size: 12.5px;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-}
-
-.gp-item:hover {
-  background: var(--bg-hover);
-}
-
-.gp-item.is-active {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-/* 读不出来的配置：名字标红，原因在悬停提示里 */
-.gp-item.is-broken .gp-item-name {
-  color: var(--red);
-}
-
-.gp-item-name {
+.gp-bar-gap {
   flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+.gp-dirty {
+  color: var(--yellow);
+  font-size: 11.5px;
   white-space: nowrap;
-}
-
-.gp-badge {
-  flex-shrink: 0;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 10.5px;
-}
-
-.gp-side-foot {
-  display: flex;
-  gap: 8px;
-  padding-top: 10px;
-}
-
-.gp-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.gp-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.gp-title {
-  flex: 1;
-  margin: 0;
-  font-size: 15px;
 }
 
 .gp-sec {
@@ -418,11 +365,5 @@ onMounted(init);
   flex-direction: column;
   flex: 1 1 0;
   min-width: 0;
-}
-
-.gp-dirty {
-  color: var(--yellow);
-  font-size: 11.5px;
-  white-space: nowrap;
 }
 </style>

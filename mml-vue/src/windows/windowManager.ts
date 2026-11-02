@@ -358,6 +358,22 @@ export function targetLogBottom(): boolean {
 }
 
 /**
+ * 按配置恢复窗口模式：只同步内存与本地存储，不回写配置
+ *
+ * 启动时用这条。走 setMultiWindow 会写一次 gui_config，后端随即不再认为这是首次启动，
+ * 首启向导就不弹了。
+ *
+ * - `v`: true 为多窗口，false 为单窗口
+ */
+export function restoreMultiWindow(v: boolean) {
+  multiWindow.value = v;
+  // 换了模式，之前的返回栈与带入参数都不再成立
+  backStack.value = [];
+  windowParams.value = emptyWindowParams();
+  writeString(KEYS.windowMode, v ? "Multi" : "Single");
+}
+
+/**
  * 切换单窗口 / 多窗口模式
  *
  * - `v`: true 为多窗口，false 为单窗口
@@ -367,11 +383,7 @@ export function targetLogBottom(): boolean {
  * 配置落盘的 Promise；紧接着要重启进程的调用方必须等它，否则写请求会随重启丢掉
  */
 export function setMultiWindow(v: boolean): Promise<void> {
-  multiWindow.value = v;
-  // 换了模式，之前的返回栈与带入参数都不再成立
-  backStack.value = [];
-  windowParams.value = emptyWindowParams();
-  writeString(KEYS.windowMode, v ? "Multi" : "Single");
+  restoreMultiWindow(v);
   // 返回保存的 Promise：要紧接着重启进程的调用方必须等这次写入真的落盘。
   // 重启会立刻刷盘并退出，写请求还在路上就丢了，见 useSettingsUi 的窗口模式切换
   return saveGuiConfig({ windowMode: v ? "Multi" : "Single" });

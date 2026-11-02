@@ -27,7 +27,7 @@ import {
   applyWindowMaterial,
   restoreBg,
 } from "./lib/appearance";
-import { setMultiWindow } from "./windows/windowManager";
+import { restoreMultiWindow } from "./windows/windowManager";
 import { restoreFontFamily } from "./lib/fonts";
 import { installImageFallback } from "./lib/imageFallback";
 import { buildChannel, loadBuildInfo } from "./lib/buildInfo";
@@ -101,6 +101,9 @@ if (import.meta.env.PROD) {
 
 /** 启动引导：GUI 状态由 Rust 的 gui_config.json 提供，浏览器回退本地存储 */
 async function bootstrap() {
+  // 先读一次配置把"首次启动"钉住：下面的初始化有的会写盘（窗口模式、自定义界面兜底），
+  // 写完之后后端就不再认为这是首次启动，首启向导会整段不显示
+  await loadGuiConfig();
   // 自定义界面先就位：模式与整页地址都来自后端，必须在挂载前拿到，
   // 否则整页模式会先闪一下内置界面
   await initCustomUi();
@@ -119,7 +122,8 @@ async function bootstrap() {
     viewMode.value = cfg.mainWindow.viewMode;
     restoreSelectedInstance(cfg.mainWindow.selectedInstance);
     restoreStartupPage(cfg.mainWindow.startupPage);
-    setMultiWindow(cfg.windowMode !== "Single");
+    // 恢复模式不写配置：写一次就会把"首次启动"标记用掉，见 restoreMultiWindow
+    restoreMultiWindow(cfg.windowMode !== "Single");
     // 字体 / 皮肤与头像显示模式：只同步内存状态，不回写配置
     restoreFontFamily(cfg.font);
     restoreSkinConfig(cfg.skin.display, cfg.skin.pitch, cfg.skin.yaw);

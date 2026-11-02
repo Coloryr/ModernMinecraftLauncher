@@ -92,6 +92,7 @@ export { default as WinResourcePartsModModUpdateModal } from "../windows/resourc
 export { default as ServerInstanceWindow } from "../windows/server_instance/ServerInstanceWindow.vue";
 export { default as SettingsWindow } from "../windows/settings/SettingsWindow.vue";
 export { default as WinSettingsPartsActionSelect } from "../windows/settings/parts/ActionSelect.vue";
+export { default as WinSettingsPartsGamepadDiagram } from "../windows/settings/parts/GamepadDiagram.vue";
 export { default as WinSettingsPartsGamepadTestPanel } from "../windows/settings/parts/GamepadTestPanel.vue";
 export { default as WinSettingsPartsLinkResourcesModal } from "../windows/settings/parts/LinkResourcesModal.vue";
 export { default as WinSettingsPartsSaveStateText } from "../windows/settings/parts/SaveStateText.vue";

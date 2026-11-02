@@ -1,10 +1,34 @@
 <script setup lang="ts">
-// 复用内核采样快照，测试面板本身不发送输入，也不启动第二套设备线程。
+// 手柄面板：设备列表 + 外观选项 + 实时状态图
+//
+// 复用内核采样快照，本身不发送输入，也不启动第二套设备线程。
+// 外观与 A / B 交换存在配置里，由调用方传下来、改完再 emit 回去。
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { commands, type GamepadAxisDto, type GamepadDto, type GamepadStateDto } from "../../../lib/bindings";
+import {
+  commands,
+  type GamepadDto,
+  type GamepadLayoutDto,
+  type GamepadStateDto,
+} from "../../../lib/bindings";
 import { t, tErr } from "../../../lib/i18n";
 import { usePageActive } from "../../../lib/pageActive";
 import { isTauri } from "../../windowManager";
+import SegmentedTabs from "../../../components/ui/SegmentedTabs.vue";
+import GamepadDiagram from "./GamepadDiagram.vue";
+
+defineProps<{
+  /** 当前配置的外观；没有可编辑的配置时为 null，选项区不显示 */
+  layout: GamepadLayoutDto | null;
+  /** 当前配置的 A / B 交换；没有可编辑的配置时为 null */
+  swapAb: boolean | null;
+}>();
+
+const emit = defineEmits<{
+  /** 换外观：xbox / playstation */
+  (e: "update:layout", value: GamepadLayoutDto): void;
+  /** 换 A / B 位置 */
+  (e: "update:swap-ab", value: boolean): void;
+}>();
 
 const devices = ref<GamepadDto[]>([]);
 const selected = ref<number | null>(null);
@@ -14,15 +38,46 @@ const active = usePageActive();
 let disposed = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
-const sticks: { label: string; x: GamepadAxisDto; y: GamepadAxisDto }[] = [
-  { label: "winGamepad.stickLeft", x: "leftStickX", y: "leftStickY" },
-  { label: "winGamepad.stickRight", x: "rightStickX", y: "rightStickY" },
-];
-const pressed = computed(() => state.value?.buttons.filter((button) => button.value >= 0.5) ?? []);
+/** 外观选项 */
+const layoutOptions = computed(() => [
+  { value: "xbox", label: t("winGamepad.layoutXbox") },
+  { value: "playstation", label: t("winGamepad.layoutPlaystation") },
+]);
 
-/** 查询当前轴值；设备断开时回到中点。 */
-function axis(name: GamepadAxisDto): number {
-  return state.value?.axes.find((axis) => axis.axis === name)?.value ?? 0;
+/** A / B 选项：值是"是否交换"，这里转成两档字符串给分段控件 */
+const swapOptions = computed(() => [
+  { value: "normal", label: t("winGamepad.swapAbNormal") },
+  { value: "swapped", label: t("winGamepad.swapAbSwapped") },
+]);
+
+/**
+ * 选中一个设备
+ *
+ * - `id`: 设备编号
+ */
+function select(id: number) {
+  if (id === selected.value) return;
+  selected.value = id;
+  // 换设备后旧快照不属于它，等下一轮轮询再画
+  state.value = null;
+}
+
+/**
+ * 换外观
+ *
+ * - `value`: `xbox` / `playstation`
+ */
+function pickLayout(value: string) {
+  emit("update:layout", value === "playstation" ? "playstation" : "xbox");
+}
+
+/**
+ * 换 A / B 位置
+ *
+ * - `value`: `normal` / `swapped`
+ */
+function pickSwap(value: string) {
+  emit("update:swap-ab", value === "swapped");
 }
 
 /** 串行查询，窗口停用或销毁后不再轮询。 */
@@ -60,136 +115,111 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="gamepad-test" :aria-label="t('winGamepad.testTitle')">
-    <div class="gamepad-test-head">
-      <h3>{{ t("winGamepad.testTitle") }}</h3>
-      <select v-if="devices.length" v-model="selected" class="field-select" :aria-label="t('winGamepad.testDevice')"
-        @change="state = null">
-        <option v-for="device in devices" :key="device.id" :value="device.id">{{ device.name }}</option>
-      </select>
+  <section class="gp-test" :aria-label="t('winGamepad.testTitle')">
+    <div class="gp-test-head">
+      <h3 class="gp-test-title">{{ t("winGamepad.devices") }}</h3>
+      <p class="field-hint">{{ t("winGamepad.testHint") }}</p>
     </div>
-    <p class="field-hint">{{ t("winGamepad.testHint") }}</p>
-    <p v-if="error" class="gamepad-error" role="alert">{{ error }}</p>
-    <p v-else-if="!devices.length" class="field-hint">{{ t("winGamepad.testEmpty") }}</p>
-    <template v-else>
-      <div class="gamepad-sticks">
-        <div v-for="stick in sticks" :key="stick.x" class="gamepad-stick">
-          <span>{{ t(stick.label) }}</span>
-          <div class="gamepad-axis" aria-hidden="true">
-            <i :style="{ transform: `translate(${axis(stick.x) * 38}px, ${-axis(stick.y) * 38}px)` }" />
-          </div>
-          <span class="gamepad-values">{{ axis(stick.x).toFixed(2) }} / {{ axis(stick.y).toFixed(2) }}</span>
+
+    <!-- 手柄列表：选中哪个就画哪个，断开后回到列表第一个 -->
+    <div v-if="devices.length" class="gp-devices">
+      <button v-for="device in devices" :key="device.id" type="button" class="gp-device"
+        :class="{ 'is-active': device.id === selected }" @click="select(device.id)">
+        {{ device.name }}
+      </button>
+    </div>
+    <p v-else class="field-hint">{{ t("winGamepad.testEmpty") }}</p>
+
+    <p v-if="error" class="gp-error" role="alert">{{ error }}</p>
+
+    <!-- 外观只影响记号，不改映射；没有可编辑的配置时不显示 -->
+    <div v-if="layout !== null" class="gp-look-wrap">
+      <div class="gp-look">
+        <div class="gp-look-item">
+          <span class="field-label">{{ t("winGamepad.layoutTitle") }}</span>
+          <SegmentedTabs :model-value="layout" :options="layoutOptions" @update:model-value="pickLayout" />
+        </div>
+        <div class="gp-look-item">
+          <span class="field-label">{{ t("winGamepad.swapAbTitle") }}</span>
+          <SegmentedTabs :model-value="swapAb ? 'swapped' : 'normal'" :options="swapOptions"
+            @update:model-value="pickSwap" />
         </div>
       </div>
-      <div class="gamepad-buttons">
-        <span v-for="button in pressed" :key="button.button">{{ button.button }} {{ button.value.toFixed(2) }}</span>
-        <span v-if="!pressed.length" class="field-hint">{{ t("winGamepad.testNoButtons") }}</span>
-      </div>
-    </template>
+      <p class="field-hint">{{ t("winGamepad.layoutHint") }}</p>
+    </div>
+
+    <GamepadDiagram v-if="state" :state="state" :layout="layout ?? 'xbox'" :swap-ab="swapAb ?? false" />
   </section>
 </template>
 
 <style scoped>
-.gamepad-test {
+.gp-test {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   padding: 16px;
+  margin-bottom: 20px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--bg-card);
 }
 
-.gamepad-test-head {
+.gp-test-head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
   flex-wrap: wrap;
-  gap: 12px;
 }
 
-.gamepad-test-head h3 {
+.gp-test-title {
   margin: 0;
   font-size: 13px;
+  font-weight: 600;
 }
 
-.gamepad-test-head select {
-  width: auto;
-  max-width: 100%;
-}
-
-.gamepad-sticks {
+/* 设备列表：一行一个胶囊，选中用强调色描边 */
+.gp-devices {
   display: flex;
-  justify-content: space-around;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 8px;
 }
 
-.gamepad-stick {
+.gp-device {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-card);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+}
+
+.gp-device:hover {
+  border-color: var(--accent-border);
+}
+
+.gp-device.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.gp-look {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.gp-look-item {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  font-size: 11.5px;
-}
-
-.gamepad-axis {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 96px;
-  height: 96px;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  background: var(--accent-soft);
-}
-
-.gamepad-axis::before,
-.gamepad-axis::after {
-  content: "";
-  position: absolute;
-  background: var(--border);
-}
-
-.gamepad-axis::before {
-  width: 100%;
-  height: 1px;
-}
-
-.gamepad-axis::after {
-  width: 1px;
-  height: 100%;
-}
-
-.gamepad-axis i {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--accent);
-  z-index: 1;
-}
-
-.gamepad-values {
-  font-variant-numeric: tabular-nums;
-  color: var(--text-dim);
-}
-
-.gamepad-buttons {
-  display: flex;
-  flex-wrap: wrap;
   gap: 6px;
 }
 
-.gamepad-buttons span:not(.field-hint) {
-  border: 1px solid var(--accent);
-  border-radius: 8px;
-  padding: 4px 8px;
-  font-size: 11.5px;
-  color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.gamepad-error {
+.gp-error {
+  margin: 0;
   color: var(--red);
   font-size: var(--ctl-font);
 }

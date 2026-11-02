@@ -166,12 +166,26 @@ pub struct GamepadMouseDto {
     pub deadzone: f32,
 }
 
+/// 手柄外观，只影响配置界面上的按钮记号与状态图
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum GamepadLayoutDto {
+    /// Xbox 布局：A / B / X / Y，LB / RB，LT / RT
+    Xbox,
+    /// PlayStation 布局：✕ / ○ / □ / △，L1 / R1，L2 / R2
+    Playstation,
+}
+
 /// 一份手柄映射，配置窗口读写的就是它
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GamepadConfigDto {
     /// 是否当前生效
     pub selected: bool,
+    /// 手柄外观，只影响配置界面的记号
+    pub layout: GamepadLayoutDto,
+    /// 是否交换 A / B 两个位置
+    pub swap_ab: bool,
     /// 按钮绑定
     pub buttons: Vec<GamepadButtonRuleDto>,
     /// 轴区间绑定

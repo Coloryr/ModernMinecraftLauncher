@@ -21,7 +21,7 @@ import {
   openInstanceDir,
 } from "../../lib/api";
 import { commands } from "../../lib/bindings";
-import { loadGuiConfig, saveGuiConfig, type ClientConfig } from "../../lib/guiConfig";
+import { loadGuiConfig, saveGuiConfig, startupIsFresh, type ClientConfig } from "../../lib/guiConfig";
 import { locale, t, tErr } from "../../lib/i18n";
 import { ISSUES_URL } from "../../lib/links";
 import { showToast } from "../../lib/toast";
@@ -30,7 +30,7 @@ import { stateText } from "../../lib/launchState";
 import { useDownloadProgress } from "../../composables/useDownloadProgress";
 import { useRefreshKey } from "../../composables/useRefreshKey";
 import { KEYS, onStorageChange, readJson, writeJson } from "../../lib/storage";
-import { openWindow } from "../windowManager";
+import { multiWindow, openWindow } from "../windowManager";
 import { latestCrash } from "../../lib/crash";
 import { launchGame } from "../../lib/launch";
 import {
@@ -1630,12 +1630,13 @@ const firstRunSetup = ref(false);
 /**
  * 判断要不要走首启向导：没有 gui_config.json 才算首次启动
  *
- * 客户端被锁时整段跳过 —— 服主已经把界面定好，别再弹。非首次启动要立刻解开
+ * 用启动时第一次读到的标记（见 startupIsFresh）：初始化会写配置，之后再问后端永远是
+ * 非首次。客户端被锁时整段跳过 —— 服主已经把界面定好，别再弹。非首次启动要立刻解开
  * `langReady`，否则 doInit 会一直等在加载页上。
  */
 async function checkFirstRun() {
   const cfg = await configReady;
-  if (!cfg?.fresh || cfg.client.lockClient) {
+  if (!startupIsFresh() || cfg?.client.lockClient) {
     endLang();
     return;
   }
@@ -1670,13 +1671,18 @@ function onLangClosed() {
 /**
  * 首启向导走完
  *
- * 向导里语言只改了界面（见 FirstRunLanguage），这里落盘一次；主题没在向导里问过，
- * 按「跟随系统」存，别把此刻解析出来的明暗固化下来。落盘后 is_fresh 变 false，向导不再出现。
+ * 向导里语言与窗口模式只改了内存（见 FirstRunLanguage），这里落盘一次；主题没在向导里
+ * 问过，按「跟随系统」存，别把此刻解析出来的明暗固化下来。落盘后 is_fresh 变 false，
+ * 向导不再出现。
  */
 function onFirstRunDone() {
   firstRunSetup.value = false;
   if (!firstRun.value) return;
-  void saveGuiConfig({ locale: locale.value, theme: "System" });
+  void saveGuiConfig({
+    locale: locale.value,
+    theme: "System",
+    windowMode: multiWindow.value ? "Multi" : "Single",
+  });
 }
 
 /**

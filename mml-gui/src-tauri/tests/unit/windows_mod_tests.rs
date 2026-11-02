@@ -61,29 +61,29 @@ fn shortcut_without_url_is_empty() {
 }
 
 /// 探测：`.url` → shortcut；"只有一个地址"的 `.txt` / `.json` → 也认
-#[test]
-fn probe_shortcut_files() {
+#[tokio::test]
+async fn probe_shortcut_files() {
     assert_eq!(
         probe(
             "a.url",
             b"[InternetShortcut]\nURL=https://littleskin.cn/api/yggdrasil\n"
-        ),
+        ).await,
         "shortcut"
     );
     // 卡片拖到桌面有时是这些后缀：内容可能是裸地址、带引号、或包一层 json
     assert_eq!(
-        probe("card.txt", b"  https://littleskin.cn/api/yggdrasil  \n"),
+        probe("card.txt", b"  https://littleskin.cn/api/yggdrasil  \n").await,
         "shortcut"
     );
     assert_eq!(
-        probe("quoted.json", b"\"https://littleskin.cn/api/yggdrasil\""),
+        probe("quoted.json", b"\"https://littleskin.cn/api/yggdrasil\"").await,
         "shortcut"
     );
     assert_eq!(
         probe(
             "wrapped.json",
             br#"{"url":"https://littleskin.cn/api/yggdrasil"}"#
-        ),
+        ).await,
         "shortcut"
     );
     // 里面夹着别的东西，如 modpack 的 manifest.json 有多个地址 + 大段内容，不能当登录快捷方式
@@ -91,21 +91,21 @@ fn probe_shortcut_files() {
         probe(
             "manifest.json",
             br#"{"files":[{"url":"https://a.com/1.jar"},{"url":"https://a.com/2.jar"}]}"#
-        ),
+        ).await,
         "other"
     );
-    assert_eq!(probe("readme.txt", b"hello"), "other");
+    assert_eq!(probe("readme.txt", b"hello").await, "other");
     // 太长的小文本也不认：只有一个地址但夹着一大段说明
     let long = format!("{}https://a.com/x", "说明文字".repeat(30));
-    assert_eq!(probe("note.txt", long.as_bytes()), "other");
+    assert_eq!(probe("note.txt", long.as_bytes()).await, "other");
 }
 
 /// 写法统一：建临时文件 → 探测 → 拿 kind
-fn probe(name: &str, content: &[u8]) -> String {
+async fn probe(name: &str, content: &[u8]) -> String {
     let dir = temp_dir("probe-kind");
     let file = dir.join(name);
     std::fs::write(&file, content).unwrap();
-    let kind = window_probe_drop(file.to_string_lossy().to_string()).kind;
+    let kind = window_probe_drop(file.to_string_lossy().to_string()).await.kind;
     cleanup(&[&dir]);
     kind
 }

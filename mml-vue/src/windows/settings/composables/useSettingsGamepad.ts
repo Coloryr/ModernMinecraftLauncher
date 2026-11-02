@@ -14,44 +14,7 @@ import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
 import { useWindowRefresh } from "../../../composables/useWindowRefresh";
 import { isTauri } from "../../windowManager";
-
-/** 按钮在手柄上的记号，设备标识不翻译 */
-const BUTTON_LABEL: Record<GamepadButtonDto, string> = {
-  south: "A",
-  east: "B",
-  north: "Y",
-  west: "X",
-  c: "C",
-  z: "Z",
-  leftTrigger: "LT",
-  leftTrigger2: "LB",
-  rightTrigger: "RT",
-  rightTrigger2: "RB",
-  select: "Select",
-  start: "Start",
-  mode: "Mode",
-  leftThumb: "L3",
-  rightThumb: "R3",
-  dPadUp: "↑",
-  dPadDown: "↓",
-  dPadLeft: "←",
-  dPadRight: "→",
-};
-
-/** 轴的记号 */
-const AXIS_LABEL: Record<GamepadAxisDto, string> = {
-  leftStickX: "LS X",
-  leftStickY: "LS Y",
-  leftZ: "LT",
-  rightStickX: "RS X",
-  rightStickY: "RS Y",
-  rightZ: "RT",
-  dPadX: "DPad X",
-  dPadY: "DPad Y",
-};
-
-const ALL_BUTTONS = Object.keys(BUTTON_LABEL) as GamepadButtonDto[];
-const ALL_AXES = Object.keys(AXIS_LABEL) as GamepadAxisDto[];
+import { ALL_BUTTONS } from "../gamepadLabels";
 
 /**
  * 手柄标签的状态与操作
@@ -63,7 +26,6 @@ const ALL_AXES = Object.keys(AXIS_LABEL) as GamepadAxisDto[];
  * - `actions`: 可选动作名，来自后端
  * - `newButton` / `newAxis`: 新增绑定的草稿
  * - `createOpen` / `createName` / `createError` / `deleteOpen` / `pendingName`: 弹窗状态
- * - `BUTTON_LABEL` / `AXIS_LABEL` / `ALL_BUTTONS` / `ALL_AXES`: 按钮与轴的显示名
  * - `init` / `requestSelect` / `discardAndSelect`: 首次装载与切换配置
  * - `openCreate` / `doCreate` / `doDelete` / `activate` / `save`: 新建、删除、设为生效、保存
  * - `addButton` / `addAxis`: 往当前配置里加一条绑定
@@ -377,10 +339,6 @@ export function useSettingsGamepad() {
     createError,
     deleteOpen,
     pendingName,
-    BUTTON_LABEL,
-    AXIS_LABEL,
-    ALL_BUTTONS,
-    ALL_AXES,
     isTaken,
     init,
     requestSelect,

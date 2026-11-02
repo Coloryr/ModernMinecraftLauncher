@@ -94,12 +94,32 @@ pub enum Axis {
     DPadY,
 }
 
+/// 手柄外观：只影响配置界面上的按钮记号与状态图，不参与映射
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PadLayout {
+    /// Xbox 布局：A / B / X / Y，LB / RB，LT / RT
+    Xbox,
+    /// PlayStation 布局：✕ / ○ / □ / △，L1 / R1，L2 / R2
+    Playstation,
+}
+
+impl Default for PadLayout {
+    fn default() -> Self {
+        Self::Xbox
+    }
+}
+
 /// 一份映射配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "PascalCase")]
 pub struct GamepadConfig {
     /// 是否当前生效的配置；多份为 true 时取文件名排序第一份
     pub selected: bool,
+    /// 手柄外观，只影响配置界面的记号
+    pub layout: PadLayout,
+    /// 是否交换 A / B 两个位置，按 Nintendo 布局的习惯显示
+    pub swap_ab: bool,
     /// 按钮绑定
     pub buttons: Vec<ButtonRule>,
     /// 轴区间绑定
@@ -273,6 +293,8 @@ impl Default for GamepadConfig {
         Self {
             // 缺 Selected 的配置不参与生效，默认那份在写文件时显式打开
             selected: false,
+            layout: PadLayout::default(),
+            swap_ab: false,
             buttons: vec![
                 button_rule(Button::South, "Space"),
                 button_rule(Button::East, "E"),

@@ -57,7 +57,7 @@ export interface ThirdPartyService {
 export const PROJECT_WORKS: ThirdPartyItem[] = [
   {
     name: "ColorASM",
-    version: "1.2.1",
+    version: "1.2.2",
     license: "Apache-2.0",
     url: "https://github.com/Coloryr/ColorMC",
     note: "winHelp.noteColorasm",

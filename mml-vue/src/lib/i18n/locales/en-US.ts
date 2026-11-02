@@ -1,10 +1,8 @@
 // English (US) language pack
 export default {
-  "winGamepad.testTitle": "Live controller test",
-  "winGamepad.testDevice": "Test device",
-  "winGamepad.testHint": "Shows raw device values. This panel does not send input; active game mappings continue to run.",
-  "winGamepad.testEmpty": "No controller detected. Connect one to test its sticks and buttons here.",
-  "winGamepad.testNoButtons": "No buttons pressed",
+  "winGamepad.testTitle": "Gamepad state",
+  "winGamepad.testHint": "Live stick and button state. This panel sends no input; the active mapping keeps running.",
+  "winGamepad.testEmpty": "No gamepad detected. Connect one to see its sticks and buttons here.",
   "cloud.title": "World cloud sync",
   "cloud.connection": "Server connection",
   "cloud.server": "Server address",
@@ -1928,7 +1926,7 @@ export default {
   "winHelp.qqCopied": "Group number copied",
 
   // First-start wizard: language -> old data -> main page settings
-  "firstRunLang.title": "Language",
+  "firstRunLang.title": "Basics",
   "firstRunLang.hint": "You can change this later in Settings.",
   "firstRunLang.next": "Continue",
   // Main page settings: last step of the first-start wizard
@@ -1945,7 +1943,7 @@ export default {
   "firstRun.materialNone": "Off",
   "firstRun.materialMica": "Mica (Windows 11)",
   "firstRun.materialAcrylic": "Acrylic (Windows 10 1809+)",
-  "firstRun.materialHint": "Composited by the system behind the window; reopen the window after switching",
+  "firstRun.materialHint": "Composited by the system behind the window",
   "firstRun.done": "Done",
   "winHelp.version": "Launcher version",
   "winHelp.author": "Author",
@@ -2140,8 +2138,16 @@ export default {
   "winTitle.serverInstance": "Generate Server Instance",
 
   "winGamepad.profiles": "Profiles",
-  "winGamepad.new": "New",
-  "winGamepad.delete": "Delete",
+  "winGamepad.devices": "Gamepad",
+  "winGamepad.layoutTitle": "Appearance",
+  "winGamepad.layoutXbox": "Xbox",
+  "winGamepad.layoutPlaystation": "PlayStation",
+  "winGamepad.swapAbTitle": "A / B layout",
+  "winGamepad.swapAbNormal": "Standard",
+  "winGamepad.swapAbSwapped": "Swapped",
+  "winGamepad.layoutHint": "Appearance and A / B swapping only change labels and the diagram; mappings still bind by button position.",
+  "winGamepad.new": "Add profile",
+  "winGamepad.delete": "Delete profile",
   "winGamepad.activate": "Use this profile",
   "winGamepad.active": "Active",
   "winGamepad.empty": "No gamepad profiles yet",

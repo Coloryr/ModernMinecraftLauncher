@@ -305,6 +305,14 @@ export interface WindowState {
 }
 
 /**
+ * 启动后第一次读到的"首次启动"标记
+ *
+ * 启动初始化会写配置（恢复窗口模式、自定义界面兜底），写盘之后后端就不再认为这是
+ * 首次启动，所以首启判断只认第一次读到的那一份。
+ */
+let startupFresh: boolean | null = null;
+
+/**
  * 读取 GUI 状态
  *
  * # 返回值
@@ -313,10 +321,23 @@ export interface WindowState {
  */
 export async function loadGuiConfig(): Promise<GuiConfig | null> {
   try {
-    return await commands.windows.getGuiConfig();
+    const config = await commands.windows.getGuiConfig();
+    if (startupFresh === null) startupFresh = config.fresh;
+    return config;
   } catch {
     return null;
   }
+}
+
+/**
+ * 本次启动是不是首次启动
+ *
+ * # 返回值
+ *
+ * 第一次读配置时后端说没有配置文件才是 true；还没读过或读取失败都是 false
+ */
+export function startupIsFresh(): boolean {
+  return startupFresh === true;
 }
 
 /** GUI 状态局部更新：mainWindow / head 内部可只给一个字段，saveGuiConfig 会深合并 */
