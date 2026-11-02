@@ -4,6 +4,7 @@
 // 支持多架构：Tauri 用 --target 构建时产物在 target/<三元组>/release/bundle/，
 // 宿主直接构建的产物在 target/release/bundle/。两处都扫，按目录里的三元组
 // 判断产物架构，文件名带上 x64 / x86 / arm64。
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -111,6 +112,55 @@ function walk(dir) {
 }
 
 /**
+ * 取 Tauri 打出的 macOS .app 目录
+ *
+ * - `dir`: Tauri 产物目录，形如 target/<三元组>/release/bundle
+ *
+ * # 返回值
+ *
+ * .app 的绝对路径；没有时返回 null
+ */
+function appBundleOf(dir) {
+    const macos = path.join(dir, "macos");
+    if (!fs.existsSync(macos)) return null;
+    const found = fs
+        .readdirSync(macos, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && entry.name.endsWith(".app"));
+    return found.length ? path.join(macos, found[0].name) : null;
+}
+
+/**
+ * 给 .app 补一道 ad-hoc 签名
+ *
+ * 配置了证书时 Tauri 已经签过，这里验过就保留；没签过才补 `--sign -`，
+ * 免得把证书签名覆盖成 ad-hoc。
+ *
+ * - `app`: .app 的绝对路径
+ */
+function signApp(app) {
+    try {
+        execFileSync("codesign", ["--verify", "--deep", "--verbose=1", app], { stdio: "inherit" });
+        return;
+    } catch {
+        console.warn("签名缺失或无效，补一道 ad-hoc 签名：" + path.relative(root, app));
+    }
+    execFileSync("codesign", ["--force", "--deep", "--sign", "-", app], { stdio: "inherit" });
+    execFileSync("codesign", ["--verify", "--deep", "--verbose=1", app], { stdio: "inherit" });
+}
+
+/**
+ * 把 .app 压成 zip
+ *
+ * 用 ditto 而不是 zip：它保留 .app 里的符号链接、扩展属性与可执行位。
+ *
+ * - `app`: .app 的绝对路径
+ * - `dest`: zip 的绝对路径
+ */
+function zipApp(app, dest) {
+    execFileSync("ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", app, dest], { stdio: "inherit" });
+}
+
+/**
  * 按系统、架构与扩展名给出发布包文件名
  *
  * - file: Tauri 产出的文件路径
@@ -139,7 +189,23 @@ fs.mkdirSync(outDir, { recursive: true });
 
 for (const item of dirs) {
     const arch = archOf(item.triple);
-    for (const file of walk(item.dir)) {
+    const files = walk(item.dir);
+    // macOS 预发布只打 .app（没有 dmg）：自签后压成 zip，不发裸可执行文件
+    if (os === "macos" && !files.some((file) => file.toLowerCase().endsWith(".dmg"))) {
+        const app = appBundleOf(item.dir);
+        if (app) {
+            const name = "mml-macos-" + arch + "-" + version + ".app.zip";
+            if (!copied.has(name)) {
+                const dest = path.join(outDir, name);
+                signApp(app);
+                zipApp(app, dest);
+                copied.set(name, app);
+                console.log(path.relative(root, app) + " -> " + path.relative(root, dest));
+            }
+            continue;
+        }
+    }
+    for (const file of files) {
         const name = releaseName(file, arch);
         if (!name) continue;
         if (copied.has(name)) {
@@ -153,7 +219,7 @@ for (const item of dirs) {
     }
 }
 
-// 不打包的预发布（Windows / macOS）只留可执行文件，产物在 target/<三元组>/release 下
+// 不打包的预发布（Windows）只留可执行文件，产物在 target/<三元组>/release 下
 if (!copied.size) {
     const ext = os === "windows" ? ".exe" : "";
     const candidates = ["mml-gui" + ext, "ModernMinecraftLauncher" + ext];

@@ -21,12 +21,13 @@ const messages: Record<Locale, Record<string, string>> = {
  * 切换语言
  *
  * - `l`: 目标语言
+ * - `persist`: 是否立刻写进 gui_config；首启向导里先只改界面，走完最后一步再一起落盘
  */
-export function setLocale(l: Locale) {
+export function setLocale(l: Locale, persist = true) {
   locale.value = l;
   writeString(KEYS.locale, l);
   applyLocale();
-  saveGuiConfig({ locale: l });
+  if (persist) void saveGuiConfig({ locale: l });
 }
 
 /**

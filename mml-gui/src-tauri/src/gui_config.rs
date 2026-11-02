@@ -503,7 +503,10 @@ pub fn init<P: AsRef<Path>>(path: P) {
         data
     } else {
         FRESH_CONFIG.store(true, Ordering::Release);
-        GuiConfig::default()
+        let mut config = GuiConfig::default();
+        // 首次启动：界面语言跟系统走，用户没在任何地方选过之前每次启动都按当前系统语言
+        config.locale = system_locale();
+        config
     };
     normalize_window_effect(&mut config);
     mml_link::set_enabled(config.experimental.resource_link);
@@ -523,6 +526,30 @@ fn normalize_window_effect(config: &mut GuiConfig) {
         _ => "none",
     }
     .to_string();
+}
+
+/// 系统语言：首次启动没有配置文件时按它选界面语言
+///
+/// # 返回值
+///
+/// 见 [`lang_of_locale`]；检测不到时按英文
+fn system_locale() -> Lang {
+    lang_of_locale(sys_locale::get_locale().as_deref().unwrap_or_default())
+}
+
+/// 语言标识转界面语言：界面只有中文与英文两套
+///
+/// - `locale`: 系统语言标识，如 `zh-CN` / `en-US` / `ja-JP`
+///
+/// # 返回值
+///
+/// 以 `zh` 开头取简体中文，其余一律取英文
+fn lang_of_locale(locale: &str) -> Lang {
+    if locale.to_ascii_lowercase().starts_with("zh") {
+        Lang::zh_cn
+    } else {
+        Lang::en_us
+    }
 }
 
 /// 启动时是否没有配置文件，前端据此让默认主题跟随系统

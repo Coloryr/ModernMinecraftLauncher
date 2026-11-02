@@ -40,8 +40,9 @@
     跨 crate 优化是单线程的，**构建时会看到只有一个核在跑**，含安装包。
   - 预发布（本地快速，不打包）：`build/build-prerelease.ps1`（bash 版 `build/build-prerelease.sh`；
     = `cd mml-gui/src-tauri && cargo build --profile prerelease --features custom-protocol,prerelease`）。
-    CI 的预发布不走这条：它跑同一个 `build-release`，多带 `prerelease` feature，并在 Windows /
-    macOS 上用 `MML_NO_BUNDLE` 跳过安装文件、只留可执行文件（Linux 仍出安装包）。
+    CI 的预发布不走这条：它跑同一个 `build-release`，多带 `prerelease` feature；
+    Windows 用 `MML_NO_BUNDLE` 只留可执行文件，macOS 用 `MML_BUNDLES=app` 只打 `.app`、
+    自签后压成 zip（Linux 仍出安装包）。
     **`prerelease` feature 也不能漏**：主页面据它显示「预发布版」提示，见 `src-tauri/src/build_info.rs`。
     三个通道的界面口径：直接拉源码启动（`cargo run` / `tauri dev`，`debug_assertions`）是
     「测试版」，带 `prerelease` feature 的是「预发布版」，正式发布不提示。

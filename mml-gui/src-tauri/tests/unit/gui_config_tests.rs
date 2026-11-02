@@ -17,3 +17,17 @@ fn window_effect_normalizes_removed_options() {
     }
 }
 
+/// 首次启动按系统语言选界面语言：只有中文与英文两套，其余语言落英文
+#[test]
+fn system_locale_maps_to_supported_languages() {
+    for (raw, want) in [
+        ("zh-CN", Lang::zh_cn),
+        ("zh-TW", Lang::zh_cn),
+        ("ZH-HANS", Lang::zh_cn),
+        ("en-US", Lang::en_us),
+        ("ja-JP", Lang::en_us),
+        ("", Lang::en_us),
+    ] {
+        assert_eq!(lang_of_locale(raw), want, "raw={raw}");
+    }
+}

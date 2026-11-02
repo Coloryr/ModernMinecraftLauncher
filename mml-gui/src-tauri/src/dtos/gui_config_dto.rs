@@ -354,6 +354,8 @@ pub struct GuiConfigDto {
     pub bg_blur: u32,
     /// 背景图原始分辨率，单位 %，取值 10–100
     pub bg_native_size: u32,
+    /// 是否首次启动（运行目录里还没有 gui_config.json）；只读，前端据此决定要不要走首启向导
+    pub fresh: bool,
 }
 
 /// 主题 / 强调色变更事件的负载
@@ -451,6 +453,8 @@ impl From<GuiConfig> for GuiConfigDto {
             bg_opacity: c.bg_opacity,
             bg_blur: c.bg_blur,
             bg_native_size: c.bg_native_size,
+            // 只读标记，真实值由 window_get_gui_config 填，转回磁盘配置时丢弃
+            fresh: false,
         }
     }
 }

@@ -12,7 +12,10 @@ fn writes_hidden_lock_and_verifies() {
     assert!(locked_in(&paths));
     // 单串里带算法与轮数，以后调参数也能验旧密码
     let raw = fs::read_to_string(&paths[0]).unwrap();
-    assert!(raw.contains(r#""Password": "$pbkdf2-sha256$120000$"#), "{raw}");
+    assert!(
+        raw.contains(r#""Password": "$pbkdf2-sha256$120000$"#),
+        "{raw}"
+    );
     assert!(verify_in(&paths, "pw"));
     assert!(!verify_in(&paths, "bad"));
     clear_in(&paths).unwrap();
@@ -139,4 +142,22 @@ fn corrupt_lock_stays_locked_but_never_verifies() {
     assert!(!verify_in(&paths, "pw"));
     clear_in(&paths).unwrap();
     test_support::cleanup(&[&dir]);
+}
+
+/// 运行目录就是内部数据目录时只能有一个落点，别再算出一份带摘要的
+#[test]
+fn same_directory_keeps_single_lock_file() {
+    let dir = test_support::temp_dir("client-lock-same-dir");
+    let data = test_support::temp_dir("client-lock-same-data");
+    fs::create_dir_all(&dir).unwrap();
+    fs::create_dir_all(&data).unwrap();
+
+    // 同一个目录：只留不带摘要的那份
+    assert_eq!(targets_in(&dir, &dir), vec![dir.join(FILE_NAME)]);
+    // 两个不同目录：多一份带运行目录摘要的
+    let paths = targets_in(&dir, &data);
+    assert_eq!(paths.len(), 2);
+    assert_eq!(paths[0], dir.join(FILE_NAME));
+    assert_eq!(paths[1], data.join(mirror_name(&dir)));
+    test_support::cleanup(&[&dir, &data]);
 }

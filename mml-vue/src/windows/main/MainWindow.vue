@@ -21,8 +21,8 @@ import {
   openInstanceDir,
 } from "../../lib/api";
 import { commands } from "../../lib/bindings";
-import { loadGuiConfig, type ClientConfig } from "../../lib/guiConfig";
-import { t, tErr } from "../../lib/i18n";
+import { loadGuiConfig, saveGuiConfig, type ClientConfig } from "../../lib/guiConfig";
+import { locale, t, tErr } from "../../lib/i18n";
 import { ISSUES_URL } from "../../lib/links";
 import { showToast } from "../../lib/toast";
 import { isArchivePath } from "../../lib/archiveFile";
@@ -66,6 +66,7 @@ import IconPickModal from "./IconPickModal.vue";
 import BlockIconPickModal from "./BlockIconPickModal.vue";
 import OldDataModal from "./OldDataModal.vue";
 import FirstRunSetup from "./FirstRunSetup.vue";
+import FirstRunLanguage from "./FirstRunLanguage.vue";
 import { useInstanceDrag } from "../../composables/useInstanceDrag";
 import { useMultiSelect } from "../../composables/useMultiSelect";
 import { useFileDrop } from "../../composables/useFileDrop";
@@ -1601,15 +1602,82 @@ async function subscribeEvents() {
 // 只初始化一次：load-done 事件与下面的状态查询兜底可能先后到达
 let inited = false;
 
+/** 启动时读一次配置：首启判断与客户端设置都用它 */
+const configReady = loadGuiConfig();
+
+/** 首启向导：语言 → 旧数据 → 主页面设置 */
+const firstRun = ref(false);
+/** 第一步（语言）弹窗是否显示中 */
+const langSetup = ref(false);
+/** 语言那一步是否已经结束 */
+const langDone = ref(false);
+/** 等语言那一步答完；不是首次启动时由 checkFirstRun 立刻解开 */
+let langSettled: (() => void) | null = null;
+const langReady = new Promise<void>((resolve) => (langSettled = resolve));
+
 /** 首次启动的「发现旧数据」弹窗数据（非空 = 弹窗显示中） */
 const oldData = ref<{ colormc: ColorMcInfoDto | null; minecraft: MinecraftInfoDto | null } | null>(
   null,
 );
 /** 弹窗"已结束"信号：答完或直接关掉时解开 */
 let oldDataSettled: (() => void) | null = null;
+/** 旧数据探测已经有结论，不管有没有要问的 */
+let oldDataChecked = false;
 
 /** 主页面设置弹窗是否打开；旧数据那段询问结束后出现 */
 const firstRunSetup = ref(false);
+
+/**
+ * 判断要不要走首启向导：没有 gui_config.json 才算首次启动
+ *
+ * 客户端被锁时整段跳过 —— 服主已经把界面定好，别再弹。非首次启动要立刻解开
+ * `langReady`，否则 doInit 会一直等在加载页上。
+ */
+async function checkFirstRun() {
+  const cfg = await configReady;
+  if (!cfg?.fresh || cfg.client.lockClient) {
+    endLang();
+    return;
+  }
+  firstRun.value = true;
+  langSetup.value = true;
+}
+
+/** 语言那一步结束：收起弹窗，后面的步骤接着走 */
+function endLang() {
+  langDone.value = true;
+  langSettled?.();
+  langSettled = null;
+}
+
+/**
+ * 首启向导往下走一步：语言与旧数据都问过了，就进主页面设置
+ *
+ * 三个步骤的顺序在这里定：语言 → 旧数据 → 主页面设置。旧数据没探测到就跳过那一步。
+ */
+function advanceFirstRun() {
+  if (!firstRun.value || !langDone.value || !oldDataChecked || oldData.value) return;
+  firstRunSetup.value = true;
+}
+
+/** 语言弹窗关闭：进入下一步 */
+function onLangClosed() {
+  langSetup.value = false;
+  endLang();
+  advanceFirstRun();
+}
+
+/**
+ * 首启向导走完
+ *
+ * 向导里语言只改了界面（见 FirstRunLanguage），这里落盘一次；主题没在向导里问过，
+ * 按「跟随系统」存，别把此刻解析出来的明暗固化下来。落盘后 is_fresh 变 false，向导不再出现。
+ */
+function onFirstRunDone() {
+  firstRunSetup.value = false;
+  if (!firstRun.value) return;
+  void saveGuiConfig({ locale: locale.value, theme: "System" });
+}
 
 /**
  * 问后端有没有可迁移的旧数据（ColorMC / .minecraft），**在加载期间问，主页面之前**
@@ -1628,6 +1696,9 @@ async function checkOldData() {
     });
   } catch {
     oldData.value = null;
+  } finally {
+    oldDataChecked = true;
+    advanceFirstRun();
   }
 }
 
@@ -1636,8 +1707,6 @@ function onOldDataClosed() {
   oldData.value = null;
   oldDataSettled?.();
   oldDataSettled = null;
-  // 旧数据这段询问结束（搬没搬都算）就进入主页面设置
-  firstRunSetup.value = true;
 }
 
 /**
@@ -1655,9 +1724,11 @@ function onOldDataDone() {
 }
 
 /**
- * 迁移探测任务：**建组件时就发起**（此刻还在加载页上），与核心加载并行；
- * `doInit` 里 await 它，答完（或关掉弹窗）才关启动页 —— 于是"搬运在主页面之前"。
+ * 首启向导的两个任务都在**建组件时**发起（此刻还在加载页上），与核心加载并行：
+ * 先判断要不要问语言，再探测有没有可迁移的旧数据；`doInit` 里依次 await 它们，
+ * 都答完才关启动页 —— 于是整个向导都跑在主页面之前。
  */
+void checkFirstRun();
 const oldDataReady = checkOldData();
 
 async function doInit() {
@@ -1666,7 +1737,8 @@ async function doInit() {
   try {
     await Promise.all([loadInstances(), loadGroups(), loadJava(), loadCustomHome()]);
     restoreSelection();
-    // 旧数据迁移在主页面**之前**：加载期间就弹了，这里等它答完再关启动页
+    // 首启向导在主页面**之前**：先语言、再旧数据，都答完才关启动页
+    await langReady;
     await oldDataReady;
     closeSplash();
     // 启动参数（命令行 / 协议）留到实例表就绪之后再执行
@@ -2031,7 +2103,7 @@ onMounted(async () => {
   unlistenAdded = onStorageChange(KEYS.addedInstance, (v) => void onAddedInstanceStorage(v));
   // 客户端设置：初始加载 + 设置窗口保存后实时跟随
   try {
-    const cfg = await loadGuiConfig();
+    const cfg = await configReady;
     if (cfg?.client) onClientConfig(cfg.client);
   } catch {
     /* 浏览器环境忽略 */
@@ -2600,12 +2672,16 @@ onMounted(async () => {
     <BlockIconPickModal v-if="blockIconInst" :uuid="blockIconInst.uuid" :name="blockIconInst.name"
       @close="blockIconInst = null" />
 
-    <!-- ===== 首次启动：把旧启动器的数据搬过来（见 doInit 的探测）===== -->
-    <OldDataModal v-if="oldData" :colormc="oldData.colormc" :minecraft="oldData.minecraft" @close="onOldDataClosed"
-      @done="onOldDataDone" />
+    <!-- ===== 首启向导第一步：界面语言（见 checkFirstRun）===== -->
+    <FirstRunLanguage v-if="langSetup" @close="onLangClosed" />
 
-    <!-- ===== 主页面设置：旧数据询问结束后问一次（见 onOldDataClosed）===== -->
-    <FirstRunSetup v-if="firstRunSetup" @close="firstRunSetup = false" />
+    <!-- ===== 首启向导第二步：把旧启动器的数据搬过来（见 checkOldData）=====
+         语言那一步答完才显示，免得两个弹窗叠在一起 -->
+    <OldDataModal v-if="oldData && langDone" :colormc="oldData.colormc" :minecraft="oldData.minecraft"
+      @close="onOldDataClosed" @done="onOldDataDone" />
+
+    <!-- ===== 首启向导第三步：主页面设置（见 advanceFirstRun）===== -->
+    <FirstRunSetup v-if="firstRunSetup" @close="onFirstRunDone" />
 
     <!-- ===== 选择目标分组：转移分组与移动选中实例共用 ===== -->
     <BaseModal v-if="showMoveGroupPick" :title="t('group.pickTitle')" :closable="false"

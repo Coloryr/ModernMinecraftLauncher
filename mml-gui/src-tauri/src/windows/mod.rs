@@ -1363,14 +1363,18 @@ pub fn window_restart_app(app: AppHandle) {
 /// 当前 GUI 状态；首次启动时 `theme` 已按系统深浅色填好
 #[gui_macros::command]
 pub fn window_get_gui_config(window: WebviewWindow) -> GuiConfigDto {
+    let fresh = crate::gui_config::is_fresh();
     let mut config = crate::gui_config::get();
-    if crate::gui_config::is_fresh() {
+    if fresh {
         config.theme = match window.theme() {
             Ok(tauri::Theme::Light) => crate::gui_config::Theme::Light,
             _ => crate::gui_config::Theme::Dark,
         };
     }
-    config.into()
+    let mut dto: GuiConfigDto = config.into();
+    // 首启向导（语言 → 旧数据 → 主页面设置）只在没有配置文件时走一遍
+    dto.fresh = fresh;
+    dto
 }
 
 /// 设置密码并锁定客户端设置

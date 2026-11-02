@@ -61,7 +61,11 @@ if [ -n "${MML_TARGETS:-}" ]; then
     fi
   done
 else
-  cargo tauri build $bundle_args $feature_args
+  if [ -n "${MML_BUNDLES:-}" ]; then
+    cargo tauri build --bundles "$MML_BUNDLES" $feature_args
+  else
+    cargo tauri build $bundle_args $feature_args
+  fi
 fi
 
 # 把 Tauri 的安装包按版本标签重命名后集中到 build_out/

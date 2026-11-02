@@ -1928,7 +1928,11 @@ export default {
   "winHelp.qqCopy": "复制群号",
   "winHelp.qqCopied": "群号已复制",
 
-  // 主页面设置：旧数据询问结束后问一次
+  // 首启向导：语言 → 旧数据 → 主页面设置
+  "firstRunLang.title": "界面语言",
+  "firstRunLang.hint": "之后可以在设置里改。",
+  "firstRunLang.next": "继续",
+  // 主页面设置：首启向导的最后一步
   "firstRun.title": "主页面设置",
   "firstRun.modeTitle": "主页面样式",
   "firstRun.modeGroupDesc": "按分组铺开，组可以收起",

@@ -1927,7 +1927,11 @@ export default {
   "winHelp.qqCopy": "Copy group number",
   "winHelp.qqCopied": "Group number copied",
 
-  // Main page settings: asked once after the old-data prompt is done
+  // First-start wizard: language -> old data -> main page settings
+  "firstRunLang.title": "Language",
+  "firstRunLang.hint": "You can change this later in Settings.",
+  "firstRunLang.next": "Continue",
+  // Main page settings: last step of the first-start wizard
   "firstRun.title": "Main page settings",
   "firstRun.modeTitle": "Main page layout",
   "firstRun.modeGroupDesc": "Grouped list, groups can collapse",

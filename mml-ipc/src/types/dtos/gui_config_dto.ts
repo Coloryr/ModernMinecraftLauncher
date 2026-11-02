@@ -102,6 +102,7 @@ export type GuiConfigDto = {
   bgOpacity: number,
   bgBlur: number,
   bgNativeSize: number,
+  fresh: boolean,
 };
 
 export type GuiThemeDto = {

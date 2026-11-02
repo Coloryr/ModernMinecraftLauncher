@@ -86,6 +86,11 @@ build/init.ps1      # Windows
 bash build/init.sh  # Linux / macOS / Git Bash
 ```
 
+PowerShell 策略问题
+```ps1
+powershell -ExecutionPolicy Bypass -File ".\build\init.ps1
+```
+
 脚本只装 `mml-vue` 的 npm 依赖，并检查 `cargo tauri` 是否可用；不构建、不启动程序。
 
 ### 开发运行
@@ -118,13 +123,13 @@ build/dev-frontend.sh     # Linux / macOS / Git Bash
 | 目标 | 命令 | 产物 |
 | --- | --- | --- |
 | 正式发布 | `build/build-release.ps1`（或 `.sh`） | `build_out/` 下带版本号的安装包；Windows 默认 x64 / arm64，Linux / macOS 由 CI 出 x64 / arm64 |
-| 预发布（本地快速） | `build/build-prerelease.ps1`（或 `.sh`） | `target/prerelease/mml-gui-<arch>.exe`，不打包；CI 走正式发布链路，但 Windows / macOS 只出可执行文件 |
+| 预发布（本地快速） | `build/build-prerelease.ps1`（或 `.sh`） | `target/prerelease/mml-gui-<arch>.exe`，不打包；CI 走正式发布链路，Windows 只出可执行文件、macOS 只出自签的 `.app` 压缩包 |
 | Linux 附加包 | `bash build/package-flatpak.sh` / `bash build/package-arch.sh` | `build_out/` 下的 `.flatpak` 与 `.pkg.tar.zst` |
 
 - 正式发布用 fat LTO + `codegen-units = 1`，体积最小、运行最快；末尾的跨 crate 优化只能单线程跑，
   构建期间只会看到一个核在工作。
 - 本地快速预发布（`build-prerelease`）用 thin LTO + `codegen-units = 16`，快很多，只出 exe；
-  CI 的预发布走 `build-release`，Windows / macOS 不打安装文件、只留可执行文件，Linux 仍出
+  CI 的预发布走 `build-release`，Windows 只留可执行文件、macOS 只出 `.app` 压缩包，Linux 仍出
   deb / rpm / AppImage 与附加包。两种预发布都会显示「预发布版」，并保留 DevTools（F12 打开控制台，
   独立窗口），正式发布不含。
 - Windows 默认构建 x64 / arm64；只要一种用 `-Arch x64`。arm64 只打 NSIS，x64 出 MSI + NSIS。
@@ -144,7 +149,8 @@ tar.zst，不依赖 `makepkg`，Ubuntu 上也能打。CI 只在 Linux x64 执行
 
 macOS 产物在配置了 `APPLE_*` secrets 时自动签名并公证；没配置时走 ad-hoc 签名 —— Apple Silicon 上
 未签名的二进制根本起不来，Intel 上也会被 Gatekeeper 判成「已损坏」。ad-hoc 不等于公证，
-首次打开仍要在「隐私与安全性」里放行。预发布只出裸可执行文件，工作流在收集完之后单独签一道。
+首次打开仍要在「隐私与安全性」里放行。预发布在 Windows 只出裸可执行文件；macOS 只打 `.app`，
+由 `build/package-release.mjs` 自签后压成 zip。
 CI 的 `windows-11-arm` 与 `ubuntu-24.04-arm` 是 GitHub 公共预览 runner，私有仓库可能不可用，
 届时改自托管或回退到 x64 runner 交叉编译。
 
@@ -178,16 +184,16 @@ Windows 本地默认把两种架构都构建出来；Linux / macOS 本地构建�
 | 触发 | 行为 |
 | --- | --- |
 | 推送正式版标签（如 `v0.0.1`） | 版本直接取自标签，再按 Windows 2 种、Linux 2 种、macOS 2 种架构并行构建安装包，最后汇总成一个 GitHub Release |
-| 推送预发布标签（如 `v1.0.0-pre`） | 与正式版同一套构建，多带 `prerelease` feature（界面标「预发布版」）；Windows / macOS 不打包安装文件，只出可执行文件，最后汇总成一个标记为 Pre-release 的 GitHub Release |
+| 推送预发布标签（如 `v1.0.0-pre`） | 与正式版同一套构建，多带 `prerelease` feature（界面标「预发布版」）；Windows 不打包安装文件、只出可执行文件，macOS 只出自签的 `.app` 压缩包，最后汇总成一个标记为 Pre-release 的 GitHub Release |
 | 推送测试构建标签（如 `testbuild`、`testbuild-1`） | 跑完整的构建流程，版本取最近的可达标签、通道按其后缀决定；**产物全部丢弃**：不上传 artifact、不打包附加包、不发 Release |
 | 推送 `releases/**` 分支 | 只构建并把产物传成 Actions artifact，不发 Release，用于验证 |
 
 走 CI 发版只要两步：提交、打标签推送。正式版与预发布都这样，标签分别是
 `v0.0.1` 与 `v1.0.0-pre`。两个通道都在每个平台跑同一套脚本（`build/init.*` 装依赖、
-`build/build-release.*` 构建）；预发布多带一个 `prerelease` feature，并在 Windows / macOS 上
-用 `--no-bundle` 跳过安装包，只留可执行文件：`mml-windows-x64-1.0.0-pre.exe`、
-`mml-linux-x64-1.0.0-pre.deb`、`mml-macos-arm64-1.0.0-pre`。安装包内部版本是 `1.0.0`。
-发布说明由 CI 生成，附每个产物的 SHA1 与 SHA256。细节见
+`build/build-release.*` 构建）；预发布多带一个 `prerelease` feature，Windows 用 `--no-bundle`
+只留可执行文件，macOS 只打 `.app` 并自签压成 zip：`mml-windows-x64-1.0.0-pre.exe`、
+`mml-linux-x64-1.0.0-pre.deb`、`mml-macos-arm64-1.0.0-pre.app.zip`。安装包内部版本是 `1.0.0`。
+发布说明由 CI 生成：更新日志取自 `docs/changelog.md` 对应版本的条目，后面附每个产物的 SHA1 与 SHA256。细节见
 [开发与构建](docs/development.md#自动化构建github-actions)。
 
 ### 其它常用命令

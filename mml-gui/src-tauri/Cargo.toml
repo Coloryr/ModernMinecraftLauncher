@@ -48,6 +48,8 @@ tar.workspace = true
 sha2.workspace = true
 pbkdf2 = "~0.13.0"
 reqwest.workspace = true
+# 系统语言：首次启动没有配置文件时用它选界面语言，见 gui_config::system_locale
+sys-locale.workspace = true
 
 mml-core = { path = "../../mml-core" }
 mml-game = { path = "../../mml-core/mml-game" }

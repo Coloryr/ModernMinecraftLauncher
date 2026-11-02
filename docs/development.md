@@ -152,11 +152,11 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 | 触发 | 行为 |
 | --- | --- |
 | 推送正式版标签（如 `v0.0.1`） | `check-version` 用标签名作为版本，随后并行构建三平台安装包，最后汇总成一个 GitHub Release |
-| 推送预发布标签（如 `v1.0.0-pre`） | 多带 `prerelease` feature 让界面标「预发布版」；Windows / macOS 用 `--no-bundle` 跳过安装文件、只出可执行文件，Linux 仍出安装包，最后汇总成一个标记为 Pre-release 的 GitHub Release |
+| 推送预发布标签（如 `v1.0.0-pre`） | 多带 `prerelease` feature 让界面标「预发布版」；Windows 用 `--no-bundle` 跳过安装文件、只出可执行文件，macOS 用 `--bundles app` 只打自签的 `.app` 压缩包，Linux 仍出安装包，最后汇总成一个标记为 Pre-release 的 GitHub Release |
 | 推送测试构建标签（如 `testbuild`） | 完整跑一遍构建，版本取最近的可达标签、通道按其后缀决定；产物全部丢弃——`upload-artifact` 步骤、Flatpak / Arch 附加包与 Release 都不执行，只看构建是否通过 |
 | 推送 `releases/**` 分支 | 只构建、把产物传成 Actions artifact，不发 Release，用来验证构建 |
 
-每个平台都走同一套骨架，两个通道只在 `MML_FEATURES` 与 `MML_NO_BUNDLE` 上分叉：
+每个平台都走同一套骨架，两个通道只在 `MML_FEATURES` / `MML_NO_BUNDLE` / `MML_BUNDLES` 上分叉：
 
 1. `actions/checkout@v5` + `actions/setup-node@v5`（Node 24，按 lockfile 缓存）+
    `dtolnay/rust-toolchain@stable` + `Swatinem/rust-cache@v2`；
@@ -175,8 +175,8 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
    arm64 只出 deb / rpm / AppImage；
 5. 两个通道都由脚本把安装包按标签版本改名到 `build_out/`，`actions/upload-artifact@v6` 收走；
    发版 job（正式版与预发布各一个）用 `actions/download-artifact@v7` 取产物，都按 `mml-*`；
-   先检查文件名有无重复，再由 `build/release-body.mjs` 用产物现算 SHA1 / SHA256 生成发布说明，
-   最后交给 `softprops/action-gh-release@v3`。
+   先检查文件名有无重复，再由 `build/release-body.mjs` 从 `docs/changelog.md` 取本版本的更新日志、
+   并用产物现算 SHA1 / SHA256 生成发布说明，最后交给 `softprops/action-gh-release@v3`。
 
 - Linux runner 固定 `ubuntu-22.04` 作为 glibc 基线，并预装 Tauri 需要的
   `libwebkit2gtk-4.1-dev` / `libayatana-appindicator3-dev` / `librsvg2-dev` /
@@ -191,8 +191,8 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 - 产物名与本地一致：`mml-windows-x64-0.0.1.msi`、`mml-linux-x64-0.0.1.deb`、
   `mml-linux-x64-0.0.1.flatpak`、`mml-arch-x64-0.0.1.pkg.tar.zst`、
   `mml-macos-arm64-0.0.1.dmg` 等，架构取自产物目录里的目标三元组。
-- 预发布在 Windows / macOS 只留可执行文件：`mml-windows-x64-1.0.0-pre.exe`、
-  `mml-macos-arm64-1.0.0-pre`（下载后 `chmod +x`，macOS 由工作流补一道 ad-hoc 签名）；
+- 预发布在 Windows 只留可执行文件，macOS 只出自签的 `.app` 压缩包：
+  `mml-windows-x64-1.0.0-pre.exe`、`mml-macos-arm64-1.0.0-pre.app.zip`（解压得到 `.app`）；
   Linux 与正式版一样出 `mml-linux-x64-1.0.0-pre.deb` 等。安装包内部版本是 `1.0.0`
   （WiX 不收 `-pre`），文件名的后缀让两个通道区分得开。
 - Flatpak 不需要在 runner 上装 `org.freedesktop.Platform`：封装只做 OSTree 提交与 bundle，
@@ -211,9 +211,12 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
   而 Tauri 只看变量是否存在，所以工作流先把空值 `unset`。**没有证书时一定要补一道 ad-hoc 签名**：
   把 `APPLE_SIGNING_IDENTITY` 设成单个 `-`，Tauri 就会用 `codesign --sign -` 签一遍。
   Apple Silicon 上未签名的二进制根本起不来，Intel 上也会被 Gatekeeper 判成「已损坏」。
-  预发布只有裸可执行文件、不过 Tauri 打包，工作流在收集完之后自己签一道。
+  预发布在 macOS 上仍走 Tauri 打包（`--bundles app`，不出 dmg），由 `build/package-release.mjs`
+  给 `.app` 补一道 ad-hoc 签名再压成 zip；Windows 预发布只有裸可执行文件。
   ad-hoc 不等于公证，首次打开仍需在「隐私与安全性」里放行。
 - 发版前检查产物重名：不同平台产物同名时会在 GitHub Release 上互相覆盖，发现重名直接失败。
+- 发布说明的「更新日志」取自 `docs/changelog.md`：发版前要有 `## <三段版本号>` 一节，
+  后面可以带「（开发中）」这类说明；缺了这一节发版 job 会直接失败。
 - 发布说明里的校验和是当场对下载下来的产物算的：SHA1 与 SHA256 各一列，随 Release 正文发布。
 - `windows-11-arm` 与 `ubuntu-24.04-arm` 是 GitHub 公共预览 runner，私有仓库可能不可用；
   届时改自托管，或回退到 x64 runner 交叉编译。

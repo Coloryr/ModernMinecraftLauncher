@@ -284,6 +284,8 @@ export interface GuiConfig {
   bgBlur: number;
   /** 背景图原始分辨率，单位 %，取值 10–100 */
   bgNativeSize: number;
+  /** 是否首次启动（运行目录里还没有 gui_config.json）；只读，前端据此走首启向导 */
+  fresh: boolean;
 }
 
 /** 窗口几何，对应 window_save.json 的一条记录 */
@@ -494,5 +496,7 @@ export function defaultConfig(): GuiConfig {
     bgOpacity: readNumber(KEYS.bgOpacity, 100),
     bgBlur: readNumber(KEYS.bgBlur, 0),
     bgNativeSize: 100,
+    // 浏览器预览没有首启向导：只有后端知道运行目录里有没有配置文件
+    fresh: false,
   };
 }

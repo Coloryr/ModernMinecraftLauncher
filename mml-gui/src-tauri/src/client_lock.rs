@@ -151,9 +151,11 @@ fn from_bytes(data: &[u8]) -> Option<String> {
     Some(encode(&lock.salt, &lock.hash))
 }
 
-/// 运行目录：与 `gui_config.json` 同级，配置还没初始化时为 `None`
-fn run_dir() -> Option<PathBuf> {
-    crate::gui_config::dir()
+/// 运行目录：与 `gui_config.json` 同级
+///
+/// 调用方全在命令里，启动时 `gui_config::init` 早就跑过了，所以这里不可能没值。
+fn run_dir() -> PathBuf {
+    crate::gui_config::dir().expect("gui_config 必须在 client_lock 之前初始化")
 }
 
 /// 系统内部数据目录：Windows `%LOCALAPPDATA%\mml`，Linux / macOS `~/.local/share/mml`
@@ -163,15 +165,56 @@ fn data_dir() -> PathBuf {
 
 /// 锁文件的两个落点：运行目录一份，内部数据目录按运行目录区分的一份
 ///
+/// 运行目录本身就是内部数据目录时只留运行目录那份 —— 同一个目录里摆两个名字，
+/// 解锁要删两次，手动删掉一个又会被另一个补回来。
+///
 /// # 返回值
 ///
-/// 两个落点的文件路径；运行目录还没初始化时只剩内部数据目录那份，退回不带摘要的名字
+/// 落点的文件路径，运行目录在前
 fn targets() -> Vec<PathBuf> {
-    let data = data_dir();
-    match run_dir() {
-        Some(run) => vec![run.join(FILE_NAME), data.join(mirror_name(&run))],
-        None => vec![data.join(FILE_NAME)],
+    targets_in(&run_dir(), &data_dir())
+}
+
+/// 由运行目录与内部数据目录算出落点，`targets` 的纯函数版本，测试直接调
+///
+/// - `run`: 运行目录
+/// - `data`: 内部数据目录
+///
+/// # 返回值
+///
+/// 见 [`targets`]
+fn targets_in(run: &Path, data: &Path) -> Vec<PathBuf> {
+    let file = run.join(FILE_NAME);
+    if same_dir(run, data) {
+        return vec![file];
     }
+    vec![file, data.join(mirror_name(run))]
+}
+
+/// 两个路径是不是同一个目录
+///
+/// 都存在时按规范化路径比，能吃掉大小写 / 短文件名 / 符号链接的差异；
+/// 规范化失败就退回文本比较，至少去掉末尾分隔符。
+///
+/// - `a` / `b`: 待比较的两个路径
+///
+/// # 返回值
+///
+/// 指向同一个目录返回 `true`
+fn same_dir(a: &Path, b: &Path) -> bool {
+    if let (Ok(a), Ok(b)) = (fs::canonicalize(a), fs::canonicalize(b)) {
+        return a == b;
+    }
+    let norm = |path: &Path| {
+        let text = path.to_string_lossy();
+        let text = text.trim_end_matches(['/', '\\']);
+        if cfg!(windows) {
+            text.to_lowercase()
+        } else {
+            text.to_string()
+        }
+    };
+    norm(a) == norm(b)
 }
 
 /// 两侧对齐：运行目录那份为准，缺的或不一样的都按它补齐；只有内部数据目录有时反向补回

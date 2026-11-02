@@ -267,7 +267,8 @@ jobs:
     env:
       MML_VERSION: ${{ needs.check-version.outputs.version }}
       MML_FEATURES: ${{ needs.check-version.outputs.features }}
-      MML_NO_BUNDLE: ${{ needs.check-version.outputs.channel == 'prerelease' && '1' || '' }}
+      # 预发布只打 .app（不出 dmg）：由 package-release 自签后压成 zip
+      MML_BUNDLES: ${{ needs.check-version.outputs.channel == 'prerelease' && 'app' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -360,13 +361,6 @@ jobs:
             fi
           done
           bash build/build-release.sh
-      - name: 预发布产物 ad-hoc 签名
-        if: needs.check-version.outputs.channel == 'prerelease'
-        run: |
-          for f in build_out/*; do
-            codesign --force --sign - "$f"
-            codesign --verify --verbose=1 "$f"
-          done
       - name: 上传 macOS 产物
         if: needs.check-version.outputs.test != 'true'
         uses: actions/upload-artifact@v6
