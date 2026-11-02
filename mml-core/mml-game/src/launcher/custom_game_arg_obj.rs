@@ -26,6 +26,9 @@ pub struct CustomGameArgObj {
     /// 附加 JVM 参数
     #[serde(rename = "+jvmArgs")]
     pub add_jvm_args: Option<Vec<String>>,
+    /// MMC 启动特性，如 `FirstThreadOnMacOS`
+    #[serde(rename = "+traits")]
+    pub add_traits: Option<Vec<String>>,
     /// 版本号
     pub version: String,
     /// 这次使用的客户端 jar，替换语义

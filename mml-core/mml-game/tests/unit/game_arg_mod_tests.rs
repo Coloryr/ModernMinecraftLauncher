@@ -499,3 +499,35 @@ async fn arm_native_fallback_skips_platform_in_artifact() {
     }
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// MMC 的 FirstThreadOnMacOS 要落成 -XstartOnFirstThread，且只在 macOS 加
+///
+/// GTNH 的 lwjgl3ify 用 RFB 的 MainStartOnFirstThread，没有这个 JVM 参数时
+/// 事件循环跑不到主线程，SDL 初始化报 No available video device。
+#[test]
+fn custom_trait_first_thread_on_macos() {
+    let patch: CustomGameArgObj = mml_base::serialize_tools::json_from_str(
+        r#"{"uid":"me.eigenraven.lwjgl3ify.launchargs","+traits":["FirstThreadOnMacOS"]}"#,
+    )
+    .unwrap();
+    let traits = patch.add_traits.unwrap();
+
+    let mut args = Vec::new();
+    super::custom::apply_traits(&mut args, &traits);
+    if mml_sys::get_system_info().os == mml_sys::Os::MacOS {
+        assert_eq!(args, vec!["-XstartOnFirstThread"]);
+    } else {
+        assert!(args.is_empty(), "非 macOS 不该加 -XstartOnFirstThread");
+    }
+
+    // 不认识的特性不产生参数；重复应用不会加第二遍
+    let mut args = Vec::new();
+    super::custom::apply_traits(&mut args, &["SomethingElse".to_string()]);
+    assert!(args.is_empty());
+    super::custom::apply_traits(&mut args, &traits);
+    super::custom::apply_traits(&mut args, &traits);
+    assert_eq!(
+        args.len(),
+        usize::from(mml_sys::get_system_info().os == mml_sys::Os::MacOS)
+    );
+}

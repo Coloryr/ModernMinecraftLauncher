@@ -26,7 +26,7 @@ const emit = defineEmits<{ (e: "close"): void }>();
 const pageActive = usePageActive();
 
 /** 轮询间隔，单位毫秒 */
-const REFRESH_MS = 700;
+const REFRESH_MS = 100;
 
 /**
  * 外壳两用：多窗口模式下是独立窗口 `WindowFrame`；单窗口模式下是**悬浮弹窗** `BaseModal`，
@@ -50,7 +50,7 @@ const shellProps = computed(() =>
       // 线程行是固定列宽的网格，26 + 文件名 + 116 + 124 + 78 + 88，加间距与内边距约 612，
       // 700 刚好还给文件名留一截；再窄就被压成省略号了（独立窗口最小宽是 670）
       width: 700,
-      // 锁死高度：线程表每 700ms 都在增删行，不锁的话弹窗会跟着一直长高变矮
+      // 锁死高度：线程表每 100ms 都在增删行，不锁的话弹窗会跟着一直长高变矮
       fixedHeight: "520px",
       // 贴着自绘标题栏下沿，别盖住窗口按钮
       belowTitlebar: true,
@@ -174,7 +174,7 @@ let keepOpen = false;
 /** 上一轮任务里是否有失败：有失败就不自动关窗，留着让用户看到 */
 let lastFailed = false;
 
-/** 上一轮刷新是否报过 IPC 错误：每段故障只报一次，别让 700ms 的轮询刷屏 */
+/** 上一轮刷新是否报过 IPC 错误：每段故障只报一次，别让 100ms 的轮询刷屏 */
 let ipcErrorReported = false;
 
 /** 拉一次状态快照，任务全部结束时按需自动关窗 */
@@ -257,7 +257,21 @@ function requestClose() {
   emit("close");
 }
 
-/** 轮询开关：单窗口模式下窗口会被 KeepAlive 缓存，切走必须停掉，否则 700ms 一直空转 */
+/** 事件触发的刷新合并窗口，单位毫秒；与 100ms 轮询同档，事件不必逐条拉 */
+const EVENT_REFRESH_MS = 100;
+/** 合并窗口的定时器；null 表示没有排队的刷新 */
+let eventTimer: number | null = null;
+
+/** 合并事件触发的刷新：窗口内只拉一次，尾沿补上最后一次 */
+function scheduleRefresh() {
+  if (eventTimer !== null) return;
+  eventTimer = window.setTimeout(() => {
+    eventTimer = null;
+    void refresh();
+  }, EVENT_REFRESH_MS);
+}
+
+/** 轮询开关：单窗口模式下窗口会被 KeepAlive 缓存，切走必须停掉，否则 100ms 一直空转 */
 function startTimer() {
   if (timer === null) {
     timer = window.setInterval(refresh, REFRESH_MS);
@@ -275,8 +289,8 @@ function stopTimer() {
 onMounted(async () => {
   await refresh();
 
-  unsubs.push(await onDownloadTask(() => void refresh()));
-  unsubs.push(await onDownloadItem(() => void refresh()));
+  unsubs.push(await onDownloadTask(scheduleRefresh));
+  unsubs.push(await onDownloadItem(scheduleRefresh));
   // 关闭被 Rust 拦下（close-blocked）不在这里处理：关下载窗口 / 退出应用
   // 共用根组件那一个确认框（App.vue）
 
@@ -290,6 +304,10 @@ onDeactivated(stopTimer);
 
 onUnmounted(() => {
   stopTimer();
+  if (eventTimer !== null) {
+    window.clearTimeout(eventTimer);
+    eventTimer = null;
+  }
   unsubs.forEach((fn) => fn());
   unsubs = [];
 });

@@ -2,6 +2,22 @@ use super::*;
 use super::args::*;
 use super::libs::*;
 
+/// 应用 MMC 补丁的启动特性
+///
+/// 只认 `FirstThreadOnMacOS`：macOS 上要给 JVM 加 `-XstartOnFirstThread`，
+/// 否则 RFB 的事件循环跑不到主线程，SDL 初始化会报 No available video device。
+///
+/// - `jvm_args`: 待追加的 JVM 参数
+/// - `traits`: 补丁里的 `+traits` 列表
+pub(super) fn apply_traits(jvm_args: &mut Vec<String>, traits: &[String]) {
+    if traits.iter().any(|item| item == "FirstThreadOnMacOS")
+        && mml_sys::get_system_info().os == Os::MacOS
+        && !jvm_args.iter().any(|item| item == "-XstartOnFirstThread")
+    {
+        jvm_args.push("-XstartOnFirstThread".to_string());
+    }
+}
+
 impl InstanceSettingObj {
     /// 创建自定义json启动内容，走MMC整合包格式
     ///
@@ -192,6 +208,11 @@ impl InstanceSettingObj {
                 for ver in java_majors {
                     obj.java_versions.insert(*ver);
                 }
+            }
+
+            // MMC特性：启动特性，macOS 的首线程要求落成 JVM 参数
+            if let Some(traits) = &item.add_traits {
+                apply_traits(&mut obj.jvm_args, traits);
             }
 
             // MMC特性：AddJvmArgs

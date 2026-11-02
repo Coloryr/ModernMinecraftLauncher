@@ -14,7 +14,7 @@ use std::{
         Arc, LazyLock, Mutex, RwLock,
         atomic::{AtomicUsize, Ordering},
     },
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use mml_downloader::{
@@ -112,7 +112,16 @@ struct LastReport {
     name: String,
     /// 内核下载状态编号，取自 `DownloadItemState::state_to_int()`，只用于比较是否变化
     state: u32,
+    /// 上次发事件的时间；同一线程两次事件至少隔 `EMIT_MIN_GAP`
+    at: Instant,
 }
+
+/// 同一线程两次进度事件的最小间隔
+///
+/// 下载器按 HTTP 块回调、换文件也会触发一次，几千个小文件的下载一秒能刷出几百条事件；
+/// 每条都要在 webview 主线程跑一遍 JS 回调，界面就会卡到收不了输入。
+/// 界面本来还有 100ms 轮询兜底，这里限流到 10Hz 足够看出当前文件与状态。
+const EMIT_MIN_GAP: Duration = Duration::from_millis(100);
 
 /// 下载线程 → 最近一次上报的文件名与状态两项
 ///
@@ -221,8 +230,12 @@ impl mml_downloader::IDownloadGui for DownloadGuiHook {
 
         // 事件按文件名与状态去重，避免按块刷屏
         let mut last = self.last.lock().unwrap();
+        let now = Instant::now();
         match last.get(&thread) {
             Some(old) if old.name == name && old.state == state_num => {
+                return;
+            }
+            Some(old) if now.duration_since(old.at) < EMIT_MIN_GAP => {
                 return;
             }
             _ => {
@@ -231,6 +244,7 @@ impl mml_downloader::IDownloadGui for DownloadGuiHook {
                     LastReport {
                         name: name.clone(),
                         state: state_num,
+                        at: now,
                     },
                 );
             }
