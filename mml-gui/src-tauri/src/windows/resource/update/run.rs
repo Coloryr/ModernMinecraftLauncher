@@ -149,9 +149,6 @@ pub(super) async fn run_update(
     let mut ok = 0u32;
     let mut failed = 0u32;
     mml_log::info(LogText::ModUpdateStarted { total }.text());
-    // TEMP 定位"下载完成后要等很久才重拉列表"：把每一段的耗时打出来
-    let started = std::time::Instant::now();
-    let mut phase = std::time::Instant::now();
 
     // ① 准备这一批的下载项：平台数据**批量取**（见 fetch_new_files），本地拼装再并发做。
     //
@@ -236,14 +233,6 @@ pub(super) async fn run_update(
         }
     }
 
-    // TEMP 定位用：准备阶段耗时
-    mml_log::info(format!(
-        "[TEMP] mods update prepare {} ms, pending {}",
-        phase.elapsed().as_millis(),
-        pending.len()
-    ));
-    phase = std::time::Instant::now();
-
     // ② 合成一个下载任务跑完：并发由下载器按配置的线程数决定。
     //    窗口关了就把令牌一取消，下载器会收手，这一批不再往下走
     let batch = pending.len();
@@ -282,13 +271,6 @@ pub(super) async fn run_update(
         );
     }
 
-    // TEMP 定位用：下载阶段耗时（与那条"下载任务已结束"通知基本同时）
-    mml_log::info(format!(
-        "[TEMP] mods update download {} ms",
-        phase.elapsed().as_millis()
-    ));
-    phase = std::time::Instant::now();
-
     // ③ 先接入资源映射：新文件已经落在实例里，把它收进公共目录并补硬链接
     if mml_link::is_enabled() {
         let (uuid, base) = {
@@ -299,7 +281,6 @@ pub(super) async fn run_update(
             if entry.disable {
                 continue;
             }
-            let one = std::time::Instant::now();
             if let Err(err) = mml_link::map_existing(
                 ResourceType::Mod,
                 uuid,
@@ -313,46 +294,14 @@ pub(super) async fn run_update(
             ) {
                 mml_log::error_type(err);
             }
-            // TEMP 定位用：单个文件的映射耗时
-            let one = one.elapsed().as_millis();
-            if one >= 200 {
-                mml_log::info(format!(
-                    "[TEMP] mods update link one {} ms: {}",
-                    one,
-                    entry.obj.file.display()
-                ));
-            }
         }
     }
-
-    // TEMP 定位用：资源映射阶段耗时
-    mml_log::info(format!(
-        "[TEMP] mods update link {} ms",
-        phase.elapsed().as_millis()
-    ));
-    phase = std::time::Instant::now();
 
     // ④ 逐个收尾：**下成了的才换**，没下成或被取消的那几条原文件一个字不动
     for (index, entry) in pending.into_iter().enumerate() {
         let project_id = entry.project_id.clone();
-        let chk = std::time::Instant::now();
-        let checked = entry.obj.check_hash();
-        // TEMP 定位用：哈希校验耗时（下载器已经校验过，这里再算一遍）
-        if chk.elapsed().as_millis() >= 200 {
-            mml_log::info(format!(
-                "[TEMP] mods update check_hash {} ms",
-                chk.elapsed().as_millis()
-            ));
-        }
-        if checked {
-            let one = std::time::Instant::now();
-            let finished = finish_one(&instance, entry);
-            // TEMP 定位用：单条收尾耗时（删旧文件 / 写在线信息 / 记更新记录）
-            let one = one.elapsed().as_millis();
-            if one >= 200 {
-                mml_log::info(format!("[TEMP] mods update finish one {} ms", one));
-            }
-            match finished {
+        if entry.obj.check_hash() {
+            match finish_one(&instance, entry) {
                 Ok(()) => ok += 1,
                 Err(err) => {
                     failed += 1;
@@ -379,12 +328,6 @@ pub(super) async fn run_update(
         );
     }
 
-    // TEMP 定位用：收尾阶段与总耗时
-    mml_log::info(format!(
-        "[TEMP] mods update finish {} ms, total {} ms",
-        phase.elapsed().as_millis(),
-        started.elapsed().as_millis()
-    ));
     mml_log::info(LogText::ModUpdateFinished { ok, failed }.text());
     UpdateCounts { ok, failed }
 }

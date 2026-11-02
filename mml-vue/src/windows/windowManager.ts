@@ -397,11 +397,11 @@ export function restoreMultiWindow(v: boolean) {
  *
  * # 返回值
  *
- * 配置落盘的 Promise；紧接着要重载界面的调用方必须等它，否则重载后读到的还是旧模式
+ * 配置落盘的 Promise；紧接着要切换窗口模式的调用方必须等它，否则切换后读到的还是旧值
  */
 export function setMultiWindow(v: boolean): Promise<void> {
   restoreMultiWindow(v);
-  // 返回保存的 Promise：要紧接着重载界面的调用方必须等这次写入真的落盘，
+  // 返回保存的 Promise：要紧接着切换窗口模式的调用方必须等这次写入真的落盘，
   // 见 useSettingsUi 的窗口模式切换
   return saveGuiConfig({ windowMode: v ? "Multi" : "Single" });
 }
@@ -954,14 +954,15 @@ export function closeWindow() {
 }
 
 /**
- * 跟着别的窗口切换窗口模式
+ * 跟着切换窗口模式（只有主窗口需要）
  *
- * 模式是每个 webview 各自一份内存状态：在设置窗口里切完，主窗口收不到任何通知，
- * 仍旧按旧模式开窗。切换的那一侧发事件，其余窗口照着改并回到主页面。
+ * 模式是每个 webview 各自一份内存状态：在设置窗口里切完，主窗口收不到任何通知、仍旧按
+ * 旧模式开窗。切换的那一侧发事件，主窗口照着改并把当前页退回主页面；其余窗口在切换时
+ * 已被后端关掉，不跟着改。
  *
  * # 返回值
  *
- * 退订函数；浏览器预览里是空操作
+ * 退订函数；浏览器预览与非主窗口上是空操作
  */
 export async function watchWindowMode(): Promise<() => void> {
   if (!isTauri() || !IS_MAIN_WINDOW) return () => { };

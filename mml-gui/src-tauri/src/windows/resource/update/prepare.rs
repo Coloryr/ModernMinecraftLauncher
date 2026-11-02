@@ -116,43 +116,26 @@ pub(super) async fn prepare_one(
 ///
 /// 删旧文件或写盘失败返回错误串
 pub(super) fn finish_one(instance: &GameInstance, entry: PendingUpdate) -> Result<(), String> {
-    // TEMP 定位"收尾每条 700+ ms"：把这一步拆开计时
-    let t0 = std::time::Instant::now();
     // 正常情况旧文件已由下载器的 `LaterRun::ReplaceOld` 换掉（下完一个换一个），
     // 这里只是兜底；同名时 `stale_file` 本来就返回 `None`
     if let Some(stale) = stale_file(&entry.old, &entry.obj.file) {
         old_delete(stale)?;
     }
-    let t_old = t0.elapsed().as_millis();
-    let t1 = std::time::Instant::now();
     // 原本禁用着：给新文件补上后缀，别让更新把用户禁用的模组启用了
     if entry.disable {
         add_disable_suffix(&entry.obj.file).map_err(|err| err.to_string())?;
     }
-    let t_dis = t1.elapsed().as_millis();
 
-    let t2 = std::time::Instant::now();
     let game = instance.read().unwrap();
-    let t_lock = t2.elapsed().as_millis();
-    let t3 = std::time::Instant::now();
     let mut online = game.read_online_info();
-    let t_read = t3.elapsed().as_millis();
-    let t4 = std::time::Instant::now();
     online.insert(entry.project_id.clone(), entry.info);
     game.save_online_info(&online);
-    let t_save = t4.elapsed().as_millis();
 
     // 记一条更新记录：从哪个版本换到哪个版本、两边的文件号、时间与新文件的 SHA1。
     // 记录是附属品，写失败只记日志，不让这次更新算失败
-    let t5 = std::time::Instant::now();
     if let Err(err) = game.append_mod_update(&entry.project_id, &entry.name, entry.record) {
         mml_log::error_type(err);
     }
-    let t_upd = t5.elapsed().as_millis();
-    mml_log::info(format!(
-        "[TEMP] finish parts old={t_old} dis={t_dis} lock={t_lock} read={t_read} save={t_save} upd={t_upd} total={}",
-        t0.elapsed().as_millis()
-    ));
     Ok(())
 }
 

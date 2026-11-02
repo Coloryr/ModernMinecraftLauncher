@@ -11,13 +11,28 @@ pub fn open_url(url: &str) {
     open_url_inner(url);
 }
 
-/// Windows 实现：用 cmd start 打开网址
+/// Windows 实现：交给外壳用默认程序打开
+///
+/// 不用 `cmd /C start`：cmd 是控制台程序，从界面进程拉起来会先冒出一个命令行窗口，
+/// "打开文件夹"时尤其显眼。`ShellExecuteW` 由资源管理器代劳，没有控制台。
 #[cfg(target_os = "windows")]
 fn open_url_inner(url: &str) {
-    Command::new("cmd")
-        .args(&["/C", "start", "", url])
-        .spawn()
-        .unwrap();
+    use windows::Win32::UI::Shell::ShellExecuteW;
+    use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+    use windows::core::{HSTRING, PCWSTR, w};
+
+    let target = HSTRING::from(url);
+    // 失败也只是没打开，不必打断调用方：目录不存在这类情况交给系统自己决定
+    unsafe {
+        ShellExecuteW(
+            None,
+            w!("open"),
+            &target,
+            PCWSTR::null(),
+            PCWSTR::null(),
+            SW_SHOWNORMAL,
+        );
+    }
 }
 
 /// Linux 实现：用 xdg-open 打开网址

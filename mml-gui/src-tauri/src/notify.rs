@@ -198,8 +198,8 @@ mod windows_toast {
         let icon = std::env::current_exe()
             .map(|exe| exe.to_string_lossy().into_owned())
             .unwrap_or_default();
-        let result =
-            write_string(key, "DisplayName", name).and_then(|()| write_string(key, "IconUri", &icon));
+        let result = write_string(key, "DisplayName", name)
+            .and_then(|()| write_string(key, "IconUri", &icon));
         unsafe {
             let _ = RegCloseKey(key);
         }

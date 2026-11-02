@@ -701,7 +701,7 @@ watch(
  */
 let restoreScroll: { uuid: string; top: number } | null = null;
 
-/** 记下列表当前滚到哪儿，交给 restoreListScroll 摆回去 */
+/** 记下列表当前滚到哪儿，交给 `restoreListScroll` 摆回去 */
 function rememberListScroll() {
   const top = listScroll.container.value?.scrollTop ?? 0;
   restoreScroll = top > 0 ? { uuid: instanceUuid.value, top } : null;

@@ -321,11 +321,11 @@ async function applyOpenParams() {
 const running = ref(false);
 
 /**
- * 启动中：点了"测试启动"、进程还没起来的那一段
+ * 启动中：进程还没起来的那一段
  *
  * 后端要到**进程真正起来**才把实例算作运行中（内核 add_run_game），这期间 getRunning() 还是
- * false；所以"启动中"由这份本地状态顶住，"运行中"以后端为准（进程起来后内核推一次
- * LaunchState::End，我们据此刷新，见 onLaunchState）。
+ * false。所以启动态由本地顶住：**主窗口点的启动也算**，否则"检查文件"那几秒里这颗按钮
+ * 仍然可点；进程起来时内核推 End / Post，据此换成停止，见 onLaunchState。
  */
 const launching = ref(false);
 /** 当前阶段名与进度，来自 launch-state 事件 */
@@ -590,12 +590,19 @@ onMounted(async () => {
       statePct.value = null;
       return;
     }
+    // 与主窗口同一口径：end / post 表示进程已经起来，其余阶段都算"启动中"。
+    // **启动可能是主窗口点的**，只认自己那颗按钮的话，检查文件那几秒里这里仍然可点
+    if (e.state === "end" || e.state === "post") {
+      running.value = true;
+      launching.value = false;
+    } else {
+      launching.value = true;
+    }
     // 启动一开始（不管从主窗口还是这里的测试启动）就切回运行日志：
     // 停在历史文件上会看不到这次启动的输出
     if (!liveSource.value && !running.value) file.value = "";
     stageKey.value = e.state;
     statePct.value = e.progress ?? null;
-    void refreshRunning();
   });
   unlistenLaunchError = await onLaunchError((e) => {
     if (e.uuid && e.uuid !== lockedUuid.value) return;
