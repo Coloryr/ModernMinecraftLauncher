@@ -171,10 +171,14 @@ pub(crate) fn create_window(
         .title(names::MML)
         // 原生 frame 起步 + 隐藏：装饰激活成功后再显示，失败则退回原生 frame 显示
         .decorations(true)
-        // 关掉框架 wry 自己那份拖放实现：它会顶掉 WebView2 的拖放目标且只认文件，网页上
-        // 拖下来的卡片连 dragenter 都收不到。关掉后 DOM 拖放全功能，路径由 file_drop 补上
-        .disable_drag_drop_handler()
         .visible(false);
+
+    // 只有 Windows 关掉框架 wry 那份拖放实现：它会顶掉 WebView2 的拖放目标且只认文件，
+    // 网页上拖下来的卡片连 dragenter 都收不到。关掉后 DOM 拖放全功能，路径由 file_drop 补上。
+    // macOS / Linux 反过来：DOM 拿不到真实路径，路径只从 wry 的 DragDrop 事件来，
+    // 关掉等于整条拖放链路断开，前端按平台二选一订阅，见 useFileDrop
+    #[cfg(windows)]
+    let builder = builder.disable_drag_drop_handler();
 
     // macOS：标题栏用 Overlay 并藏掉标题文字，内容才铺得到窗口顶部、红黄绿能浮在自绘顶栏上。
     // 插件摆的就是这几个原生按钮（见 docs/platforms.md），不开 Overlay 就变成两条栏：

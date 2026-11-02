@@ -1,23 +1,28 @@
 // 拖拽外部文件 / 文本到窗口
 //
-// 走 **DOM 拖放**：监听 `dragenter` / `dragover` / `dragleave` / `drop` 四个事件。
-// 框架 wry 那份原生实现会顶掉 WebView2 自己的拖放目标、而且只认文件，网页上拖下来的
-// 卡片是文本 / 链接，连 `dragenter` 都收不到，拖动时鼠标显示"禁止"。现在建窗时已经
-// 把它关掉，见 `mml-gui/src-tauri/src/windows/lifecycle.rs`，DOM 拖放因此是全功能的。
+// 按平台二选一，两套不能同时开，建窗那边的开关见
+// `mml-gui/src-tauri/src/windows/lifecycle/create.rs`：
 //
-// 唯一缺的是**文件的真实路径** —— DOM 的 `File` 对象按浏览器安全设计不给路径，
-// 由 Rust 侧的"路径桥"补：注入脚本把 `File` 对象交给原生，原生取出路径后发 `file-drop`
-// 事件，见 `windows/file_drop.rs`。于是这里有两个来源：
+// - **Windows**：建窗时关掉了 wry 的拖放句柄，走 **DOM 拖放**（`dragenter` / `dragover` /
+//   `dragleave` / `drop`）。框架那份实现会顶掉 WebView2 的拖放目标、只认文件，网页上
+//   拖下来的卡片连 `dragenter` 都收不到。DOM 全功能，只缺**文件真实路径** —— 由 Rust 侧
+//   的"路径桥"补：注入脚本把 `File` 对象交给原生，原生取路径后发 `file-drop`，
+//   见 `windows/file_drop.rs`。
+// - **macOS**：wry 的句柄还在，DOM 收不到拖放事件，路径与进出都来自
+//   `DragDrop` 原生事件（`onDragDropEvent`）。
+// - **Linux**：同一个原生句柄管文件，但 wry 的 `drag-motion` 放行，WebKit 照旧把
+//   **文本 / 链接**派给页面。文件拖入两条都会到，原生先给出路径，DOM 那条让开。
 //
-//   ① DOM 的 `drop`    → 文本 / 链接、`Files` 类型清单
-//   ② `file-drop` 事件 → 文件真实路径
-//
-// 两者合成同一个回调，调用方只看 `paths` 与 `url`。
+// 几个来源合成同一个回调，调用方只看 `paths` 与 `url`。
 import { onMounted, onUnmounted, ref } from "vue";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import type { DragDropEvent } from "@tauri-apps/api/webview";
+import { isArchivePath } from "../lib/archiveFile";
 import { commands } from "../lib/bindings";
 import type { FileDropDto } from "../lib/bindings";
 import { FileDrop } from "../lib/listens";
+import { detectOs } from "../lib/titlebar";
 import { isTauri } from "../lib/util";
 import { useUnlisteners } from "./useUnlisteners";
 
@@ -67,6 +72,17 @@ function readDropText(data: DataTransfer | null): string {
  * `webkitGetAsEntry()` 与每项的 MIME 凑：它认不出目录时，MIME 全为空才按 `folder` 猜。
  */
 export type DragKind = "" | "text" | "archive" | "folder" | "files";
+
+/**
+ * 这一平台的文件拖放走 wry 原生事件
+ *
+ * Windows 要关掉 wry 的句柄，WebView2 才会把拖放事件交给页面；其余平台反过来，
+ * 路径只在原生事件里。开关在建窗那边，见 `mml-gui/src-tauri/src/windows/lifecycle/create.rs`。
+ *
+ * Linux 上 WebKit 与原生句柄会同时看到同一次拖入，所以 DOM 那条不能整个关掉：
+ * 文本 / 链接只有 DOM 拿得到，文件要避让原生（见 `wryDropAt`）。
+ */
+const USE_WRY_DROP = isTauri() && detectOs() !== "windows";
 
 /** 认得出是压缩包的 MIME；Chromium 按扩展名映射，未知扩展名给空串 */
 const ARCHIVE_MIME = [
@@ -141,6 +157,13 @@ export function useFileDrop(
   let dragSeq = 0;
   /** 等路径桥那一步的暂存：DOM 的 drop 有文件时先不发，等 `file-drop` 送来真实路径 */
   let pending: { url: string; types: string[]; timer: number } | null = null;
+  /**
+   * 最近一次原生 drop 的时刻
+   *
+   * Linux 上 wry 的 `drag-motion` 放行，WebKit 仍会把拖放派给页面，同一次文件拖入
+   * 原生与 DOM 都会到；原生已经给出路径时 DOM 那条要让开，免得处理两遍
+   */
+  let wryDropAt = 0;
 
   /** 这次拖入接不接（没传 accept 就一律接） */
   async function accepted(payload: FileDropPayload): Promise<boolean> {
@@ -151,6 +174,66 @@ export function useFileDrop(
       console.error("[useFileDrop] 判定拖入是否可接受失败", err);
       return false;
     }
+  }
+
+  /** 撤掉等路径桥的暂存：原生已经给出路径时不必再等 */
+  function clearPending() {
+    if (!pending) return;
+    window.clearTimeout(pending.timer);
+    pending = null;
+  }
+
+  /** 原生拖入的细分类型：拿不到目录与 MIME，只按后缀认压缩包 */
+  function nativeKindOf(paths: string[]): DragKind {
+    return paths.some(isArchivePath) ? "archive" : "files";
+  }
+
+  /**
+   * wry 原生拖放事件（macOS / Linux）
+   *
+   * 没有路径的拖入是文本 / 链接：原生这边读不到内容，直接忽略，别亮一个最后什么也做不了的遮罩。
+   *
+   * - `event`: Tauri 的 `DragDrop` 事件，进 / 出 / 悬停 / 松手四种
+   */
+  function onWryDrop(event: { payload: DragDropEvent }) {
+    const payload = event.payload;
+    if (payload.type === "enter") {
+      if (!payload.paths.length) return;
+      dragKind.value = nativeKindOf(payload.paths);
+      // 同一世代号才落状态：悬停期间会连发 enter，慢的那次不能盖掉后一次
+      const seq = ++dragSeq;
+      void accepted({
+        paths: payload.paths,
+        url: "",
+        types: ["Files"],
+        isDirectory: null,
+      }).then((ok) => {
+        if (seq === dragSeq && ok) fileDragOver.value = true;
+      });
+      return;
+    }
+    // over 只是位置变化，遮罩状态由 enter / leave 定
+    if (payload.type === "over") return;
+
+    dragSeq++;
+    fileDragOver.value = false;
+    dragKind.value = "";
+    if (payload.type === "leave" || !payload.paths.length) return;
+
+    // DOM 那条可能已经先把这次拖入记成"等路径"，这里给出路径后它不必再等
+    wryDropAt = Date.now();
+    clearPending();
+    const data: FileDropPayload = {
+      paths: payload.paths,
+      url: "",
+      types: ["Files"],
+      isDirectory: null,
+    };
+    void (async () => {
+      // 原生句柄拿到的 drop 无法拒绝，悬停时判过的这里要再判一次
+      if (!(await accepted(data))) return;
+      await onDrop(data);
+    })();
   }
 
   /** 文本 → 地址；规则与 Rust 侧的 `window_url_of_text` 共用一份 */
@@ -225,6 +308,8 @@ export function useFileDrop(
     const data = event.dataTransfer;
     const types = data ? [...data.types] : [];
     const hasFiles = !!data && data.files.length > 0;
+    // 原生句柄刚处理过这次文件拖入：路径已经用它那份，DOM 这条再来一遍就是重复
+    if (hasFiles && Date.now() - wryDropAt < 500) return;
     const text = readDropText(data);
 
     void (async () => {
@@ -234,7 +319,8 @@ export function useFileDrop(
         await onDrop({ paths: [], url, types, isDirectory: null });
         return;
       }
-      // 有文件：路径只有原生拿得到，等 `file-drop`
+      // 有文件：真实路径只有原生拿得到 —— Windows 等 `file-drop` 路径桥，macOS / Linux
+      // 等原生 DragDrop。都没等到就按"没拿到路径"提示，不静默丢
       const entry = { url, types, timer: 0 };
       entry.timer = window.setTimeout(() => {
         if (pending !== entry) return;
@@ -248,10 +334,7 @@ export function useFileDrop(
   /** 路径桥送来真实路径（文件拖入） */
   function onNativePaths(paths: string[]) {
     const entry = pending;
-    if (entry) {
-      window.clearTimeout(entry.timer);
-      pending = null;
-    }
+    clearPending();
     void onDrop({
       paths,
       url: entry?.url ?? "",
@@ -268,9 +351,17 @@ export function useFileDrop(
     window.addEventListener("dragleave", onDomLeave);
     window.addEventListener("drop", onDomDrop);
 
-    // 路径桥只在 Tauri 下有：浏览器预览里文件拖入拿不到路径（文本那条照旧可用）
-    if (!isTauri()) return;
     // 订阅交给 track：卸载早于订阅完成时就地退订，别把监听留到窗口关掉之后
+    if (USE_WRY_DROP) {
+      const subscribing = getCurrentWebview().onDragDropEvent(onWryDrop);
+      subscribing.catch((err) => {
+        console.error("[useFileDrop] 注册原生拖放失败（文件拖入将没有反应）", err);
+      });
+      track(subscribing);
+      return;
+    }
+    // 路径桥只在 Windows 的 Tauri 下有：浏览器预览里文件拖入拿不到路径（文本那条照旧可用）
+    if (!isTauri()) return;
     const subscribing = listen<FileDropDto>(FileDrop, (event) => {
       onNativePaths(event.payload.paths ?? []);
     });
