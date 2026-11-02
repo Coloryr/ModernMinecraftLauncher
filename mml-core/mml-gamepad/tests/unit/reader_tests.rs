@@ -29,8 +29,8 @@ fn empty_state() {
 /// 快照按顺序带上全部按钮 / 轴，并保留设置的值
 #[test]
 fn snapshot_keeps_values() {
-    let mut pad = Pad::empty(String::from("test pad"));
-    pad.set_button(GilrsButton::South, 1.0);
+    let mut pad = Pad::empty(String::from("test pad"), None);
+    pad.set_button(GilrsButton::South, 0x130, 1.0);
     pad.set_axis(GilrsAxis::LeftStickX, -0.5);
 
     let state = pad.snapshot(7);
@@ -38,6 +38,8 @@ fn snapshot_keeps_values() {
     assert_eq!(state.name, "test pad");
     assert_eq!(state.buttons.len(), BUTTON_COUNT);
     assert_eq!(state.axes.len(), AXIS_COUNT);
+    // 固定表里的按钮走 buttons，不进额外按键列表
+    assert!(state.extras.is_empty());
     assert_eq!(
         state
             .buttons
@@ -54,6 +56,22 @@ fn snapshot_keeps_values() {
             .map(|item| item.value),
         Some(-0.5)
     );
+}
+
+/// 固定表以外的按键按第一次出现的顺序往后追加，松开后仍留在列表里
+#[test]
+fn extras_append_in_first_seen_order() {
+    let mut pad = Pad::empty(String::from("test pad"), None);
+    pad.set_button(GilrsButton::Unknown, 0x130, 1.0);
+    pad.set_button(GilrsButton::Unknown, 0x131, 1.0);
+    // 松开第一颗：值归零，但它仍在原来的位置
+    pad.set_button(GilrsButton::Unknown, 0x130, 0.0);
+
+    let state = pad.snapshot(1);
+    let codes: Vec<u32> = state.extras.iter().map(|item| item.code).collect();
+    assert_eq!(codes, vec![0x130, 0x131]);
+    assert_eq!(state.extras[0].value, 0.0);
+    assert_eq!(state.extras[1].value, 1.0);
 }
 
 /// 手动验证手柄读取：接上手柄后运行

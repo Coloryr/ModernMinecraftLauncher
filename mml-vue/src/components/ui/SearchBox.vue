@@ -6,7 +6,7 @@
 // 之前账户窗口与设置窗口各抄了一份标题栏搜索，底色一个 --bg-card 一个 --bg-solid、
 // 字号一个 13 一个 12.5，就是这么走样的。
 // 结果下拉由调用方通过 `drop` 具名插槽给（设置窗口用，账户窗口不用），自己只提供定位参照。
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import GlyphIcon from "./GlyphIcon.vue";
 
 const props = withDefaults(
@@ -40,16 +40,26 @@ const emit = defineEmits<{
 
 const hasText = computed(() => props.modelValue.length > 0);
 
+/** 输入框本体；给下拉这类"打开后直接打字"的调用方留一个聚焦入口 */
+const inputEl = ref<HTMLInputElement | null>(null);
+
 /** 清空键：回写空串 */
 function clear() {
   emit("update:modelValue", "");
 }
+
+/** 让输入框拿到焦点；不滚动页面，浮层刚展开时别把滚动容器顶走 */
+function focus() {
+  inputEl.value?.focus({ preventScroll: true });
+}
+
+defineExpose({ focus });
 </script>
 
 <template>
   <div class="search-box" :style="{ width }">
     <GlyphIcon class="sb-icon" name="search" :size="13" :weight="2" />
-    <input :value="modelValue" class="field-input sb-input" :placeholder="placeholder" spellcheck="false"
+    <input ref="inputEl" :value="modelValue" class="field-input sb-input" :placeholder="placeholder" spellcheck="false"
       autocomplete="off" @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
       @focus="emit('focus')" @blur="emit('blur')" @keydown="emit('keydown', $event)" />
     <!-- 清空键与输入框内的其它清空键同一枚：20px 方形热区，见 styles/controls.css；

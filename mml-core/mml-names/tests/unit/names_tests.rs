@@ -100,6 +100,7 @@ fn file_constants_have_no_separators() {
         INTEGRATIONS_FILE,
         GAMEPAD_DIR,
         GAMEPAD_DEFAULT_MAP_FILE,
+        GAMEPAD_READER_FILE,
         BLOCK_GROUPS_FILE,
         COLORMC_MIGRATE_FILE,
         MINECRAFT_MIGRATE_FILE,

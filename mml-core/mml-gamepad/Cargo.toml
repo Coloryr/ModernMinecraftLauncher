@@ -12,5 +12,9 @@ serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
 
+[target.'cfg(windows)'.dependencies]
+# XInput 后备读取，见 src/xinput.rs
+windows.workspace = true
+
 [dev-dependencies]
 mml-testutil = { path = "../mml-testutil" }

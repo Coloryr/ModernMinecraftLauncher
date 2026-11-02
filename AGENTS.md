@@ -380,6 +380,24 @@ windows/<窗口>/mod.rs 里：
 - **恢复路径**：整页页面自己挂掉时删掉 `custom_ui/page.zip` 或关掉 `customPageOn`；
   开发构建的整页右下角另有「退出整页界面」按钮。
 
+### 12.3 实例选择器统一用 `components/InstanceSelect.vue`
+
+- **凡是从实例列表里挑一个的界面，一律用 `mml-vue/src/components/InstanceSelect.vue`**，
+  不要再写原生 `<select>` 加 `<option v-for>`：实例一多只能一行行翻，名字长了还会把标题栏挤变形。
+  现有接入点：主窗口列表模式、导出、生成服务器实例、设为实例图标、收藏安装、联机、统计、
+  添加资源、设置里的实例锁定；新窗口照这个接法加。
+- 它自带**搜索**与**分组**：搜索匹配名称 / 版本 / 加载器 / 分组名，输入即筛，↑↓ 选、
+  Enter 确认、Esc 收起；分组按 `main_get_groups` 的顺序分节，空组不画，只有一组时不画标题；
+  列表虚拟滚动，浮层 Teleport 到 body 并固定定位，父级滚动容器裁不到它。
+- 两档外观：`variant="card"` 是主窗口列表模式的大按钮，名字 + 版本 / 加载器；
+  默认 `field` 是表单 / 标题栏的一行下拉，外观全走 `.field-select`。
+- 实例项用 `lib/instancePicker.ts` 的 `InstanceOption`：`InstanceInfoDto` 直接传；
+  没有 `group` 字段的列表（统计窗口）传 `{ uuid, name, running }`，它们是平铺的、只有搜索。
+  **不要在窗口里另写一套分组 / 匹配逻辑**，分组名也不要在前端拼，默认分组用 `t("group.default")`。
+- 额外项用 `emptyLabel`，如「全部实例」「不锁定」，值为空串；底部入口用 `addLabel` 配 `add` 事件。
+- 选择器自己按需拉分组表，不读调用方手里的分组状态；新增显示实例列表的窗口仍按 §4 挂
+  `useInstanceChange`，实例增删后重拉并回退失效的选中项。
+
 ## 13. 复杂问题先写日志调试（硬性）
 
 - **凡是「原因不明显」的问题，先加日志把链路打断点，再动手改代码**；不要靠读代码猜、
@@ -640,6 +658,7 @@ i18n 表，**不写死中文或英文字面量**。三张表各管一摊，改�
   裸标签写 `.ui-btn` + `.v-*` + `.s-*`。
 - 表单行：`.field-label` / `.field-input` / `.field-select` / `.field-hint` /
   `.field-row-2` / `.path-row` / `.is-invalid`。
+- **实例下拉：一律用 `components/InstanceSelect.vue`，见 §12.3**；不要用原生 `<select>` 列实例。
 - **存量类名不许新增**：`.mini-btn`、`.icon-btn`、`.refresh-btn` 那一批已列在
   `controls.css` 的头注释里。改到该文件时顺手换成上面的写法；某个类的最后一个使用点被换掉时，
   把它的定义与清单条目一起删。

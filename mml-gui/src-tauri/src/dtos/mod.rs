@@ -66,8 +66,8 @@ pub use download_dto::{
 pub use export_dto::{ExportConfigDto, ExportEntryDto, ExportInfoDto, ExportProgressDto};
 pub use gamepad_dto::{
     GamepadAxisDto, GamepadAxisRuleDto, GamepadAxisValueDto, GamepadButtonDto,
-    GamepadButtonRuleDto, GamepadButtonValueDto, GamepadConfigDto, GamepadDto, GamepadLayoutDto,
-    GamepadMouseDto, GamepadProfileDto, GamepadStateDto, GamepadStickDto,
+    GamepadButtonRuleDto, GamepadButtonValueDto, GamepadConfigDto, GamepadDto, GamepadExtraDto,
+    GamepadLayoutDto, GamepadMouseDto, GamepadProfileDto, GamepadStateDto, GamepadStickDto,
 };
 pub use gui_config_dto::{
     ClientConfigDto, CustomCssItemDto, ExperimentalConfigDto, GuiConfigDto, GuiThemeDto,

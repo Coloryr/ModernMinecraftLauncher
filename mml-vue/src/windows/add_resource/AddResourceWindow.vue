@@ -9,6 +9,7 @@
 import { computed, nextTick, onActivated, onDeactivated, onMounted, ref, watch } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import InstanceChip from "../../components/ui/InstanceChip.vue";
+import InstanceSelect from "../../components/InstanceSelect.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
@@ -981,11 +982,8 @@ onActivated(async () => {
       <BaseModal v-if="pendingFile" :title="t('addResource.chooseInstance')" :width="420" below-titlebar
         :closable="false" @close="cancelInstance">
         <p class="modal-text">{{ t("addResource.chooseInstanceHint") }}</p>
-        <select v-model="pickInstanceUuid" class="field-select">
-          <option v-for="inst in pickableInstances" :key="inst.uuid" :value="inst.uuid">
-            {{ inst.name }} · {{ inst.version }}
-          </option>
-        </select>
+        <InstanceSelect :instances="pickableInstances" :model-value="pickInstanceUuid" :menu-min-width="360"
+          @update:model-value="pickInstanceUuid = $event" />
         <div class="modal-actions">
           <BaseButton @click="cancelInstance">{{ t("actions.cancel") }}</BaseButton>
           <BaseButton variant="accent" :disabled="!pickInstanceUuid" @click="confirmInstance">

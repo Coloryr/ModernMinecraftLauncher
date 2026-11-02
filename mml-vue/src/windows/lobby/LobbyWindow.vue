@@ -2,6 +2,7 @@
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
+import InstanceSelect from "../../components/InstanceSelect.vue";
 import MappingLobby from "./MappingLobby.vue";
 import { commands, type InstanceInfoDto, type LobbyViewDto } from "../../lib/bindings";
 import { t, tErr } from "../../lib/i18n";
@@ -209,13 +210,11 @@ onBeforeUnmount(deactivate);
             <p v-if="view.state.exception !== null" class="error">{{ t(`lobby.exception.${view.state.exception}`) }}</p>
           </section>
           <section class="panel">
-            <label class="field" for="lobby-instance">
+            <div class="field">
               <span>{{ t('lobby.instance') }}</span>
-              <select id="lobby-instance" v-model="instance" :disabled="busy">
-                <option value="" disabled>{{ t('lobby.selectInstance') }}</option>
-                <option v-for="item in instances" :key="item.uuid" :value="item.uuid">{{ item.name }}</option>
-              </select>
-            </label>
+              <InstanceSelect :instances="instances" :model-value="instance" :disabled="busy"
+                :placeholder="t('lobby.selectInstance')" @update:model-value="instance = $event" />
+            </div>
             <p v-if="!instances.length" class="muted">{{ t('lobby.noInstances') }}</p>
             <div class="actions">
               <BaseButton variant="primary" :disabled="busy || !canLaunch" @click="launchGame">{{ t('lobby.launchGame')
@@ -379,8 +378,7 @@ onBeforeUnmount(deactivate);
   font-size: var(--ctl-font);
 }
 
-.field input,
-.field select {
+.field input {
   width: 100%;
   min-width: 0;
   min-height: var(--ctl-h);

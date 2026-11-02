@@ -465,6 +465,13 @@ pub fn reload_if_changed() {
     refresh(dir);
 }
 
+/// 配置目录，`init` 之后才有
+///
+/// 和下面的 `dir` 不是一回事：这个是给"目录还没就绪就当作没有"的调用方用的。
+pub(crate) fn config_dir() -> Option<PathBuf> {
+    DIR.get().cloned()
+}
+
 /// 当前生效的映射
 pub fn current() -> CompiledMap {
     MAP.read().unwrap().clone()
@@ -541,6 +548,10 @@ fn config_files(dir: &Path) -> Vec<PathBuf> {
         .flatten()
         .map(|entry| entry.path())
         .filter(|path| path.extension().and_then(|ext| ext.to_str()) == Some("json"))
+        // reader.json 存的是读取选项，不是一份映射，别当配置去解析
+        .filter(|path| {
+            path.file_name().and_then(|name| name.to_str()) != Some(names::GAMEPAD_READER_FILE)
+        })
         .collect();
     files.sort();
     files

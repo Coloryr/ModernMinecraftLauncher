@@ -10,6 +10,8 @@
 mod map;
 mod reader;
 mod relay;
+#[cfg(windows)]
+mod xinput;
 
 use std::{path::Path, sync::Once};
 
@@ -17,7 +19,9 @@ pub use map::{
     Axis, AxisRule, Button, ButtonRule, GamepadConfig, GamepadError, MouseRule, PadLayout,
     ProfileInfo, Stick, action_names, config, create, delete, profiles, save, set_active,
 };
-pub use reader::{AxisValue, ButtonValue, PadInfo, PadState, pad_state, pads};
+pub use reader::{
+    AxisValue, ButtonValue, ExtraButton, PadInfo, PadState, pad_state, pads, set_xinput, xinput,
+};
 
 /// 启动只做一次
 static INIT: Once = Once::new();
@@ -28,6 +32,10 @@ static INIT: Once = Once::new();
 pub fn init(base: &Path) {
     INIT.call_once(|| {
         map::init(base);
+        // 读取选项（XInput 兼容模式）和映射放在同一个目录，见 reader::load_settings
+        if let Some(dir) = map::config_dir() {
+            reader::load_settings(&dir);
+        }
         reader::start();
         relay::start();
     });

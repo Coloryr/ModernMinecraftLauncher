@@ -3,12 +3,13 @@
 //
 // 游戏标题那组的数据属于 `window`，由 useSettingsLaunch 持有，所以这里额外接一个 `win`。
 // 窗口外观（材质 / 透明度）属 gui_config.client，但显示在界面页，见 UiTab。
-import { nextTick, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { t } from "../../../../lib/i18n";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../../components/ui/BaseModal.vue";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
 import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
+import InstanceSelect from "../../../../components/InstanceSelect.vue";
 import NumberStepper from "../../../../components/ui/NumberStepper.vue";
 import SettingsGroup from "../SettingsGroup.vue";
 import SaveStateText from "../SaveStateText.vue";
@@ -16,6 +17,7 @@ import { selectedInstance } from "../../../../lib/settings";
 import { openWindow } from "../../../../windows/windowManager";
 import type { useSettingsClient } from "../../composables/useSettingsClient";
 import type { WindowSettingDto } from "../../../../lib/bindings";
+import type { InstanceOption } from "../../../../lib/instancePicker";
 
 const props = defineProps<{
   /** 客户端设置标签的状态与保存方法，来自 useSettingsClient */
@@ -73,6 +75,27 @@ const {
   setClientLock,
   clearClientLock,
 } = props.settings;
+
+/**
+ * 实例锁定下拉的选项
+ *
+ * 锁定的实例被删掉后补一条占位项：用户能看到当前锁的是什么，
+ * 也能从这里切回「不锁定」，而不是看到一个空白下拉。
+ */
+const lockItems = computed<InstanceOption[]>(() => {
+  const list: InstanceOption[] = lockInstances.value.map((inst) => ({
+    uuid: inst.uuid,
+    name: inst.name,
+    group: inst.group,
+    version: inst.version,
+    loader: inst.loader,
+    running: inst.running,
+  }));
+  if (lockMissing.value) {
+    list.push({ uuid: client.value.lockInstance, name: t("winSettings.instanceLockMissing") });
+  }
+  return list;
+});
 
 /** 锁定客户端设置的密码弹窗 */
 const lockOpen = ref(false);
@@ -220,15 +243,8 @@ watch(lockServerError, async (msg) => {
         <span class="switch-label">{{ t("winSettings.instanceLockOn") }}</span>
         <span class="switch-state">{{ t("winSettings.instanceLockOnDesc") }}</span>
       </div>
-      <select class="field-select lock-select" :value="client.lockInstance"
-        @change="onLockInstanceChange(($event.target as HTMLSelectElement).value)">
-        <option value="">{{ t("winSettings.instanceLockNone") }}</option>
-        <option v-for="i in lockInstances" :key="i.uuid" :value="i.uuid">{{ i.name }}</option>
-        <!-- 锁定的实例已被删掉：补一条选中项，让用户能看到当前锁的是什么并切回「不锁定」 -->
-        <option v-if="lockMissing" :value="client.lockInstance">
-          {{ t("winSettings.instanceLockMissing") }}
-        </option>
-      </select>
+      <InstanceSelect class="lock-select" :instances="lockItems" :model-value="client.lockInstance"
+        :empty-label="t('winSettings.instanceLockNone')" @update:model-value="onLockInstanceChange" />
     </div>
   </SettingsGroup>
 

@@ -18,6 +18,7 @@ import BaseButton from "../../components/ui/BaseButton.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import HighlightText from "../../components/ui/HighlightText.vue";
+import InstanceSelect from "../../components/InstanceSelect.vue";
 import FilePicker from "./parts/FilePicker.vue";
 import { isPickedPath } from "./picked";
 import InfoExportButton from "./parts/InfoExportButton.vue";
@@ -885,11 +886,11 @@ onBeforeUnmount(() => {
   <WindowFrame body-fill :title="t(serverPack ? 'winTitle.serverPack' : 'winExport.title')" @close="askClose">
     <!-- 实例选择与导出按钮放进标题栏：不占内容区高度，也不随选项卡滚动 -->
     <template #head-right>
-      <select v-if="!serverPack" v-model="currentUuid" class="field-select head-select" :disabled="busy">
-        <!-- 标题栏里位置窄，占位用短文案；内容区的空态另有一句更长的提示 -->
-        <option value="" disabled>{{ t("winExport.instance") }}</option>
-        <option v-for="i in instances" :key="i.uuid" :value="i.uuid">{{ i.name }}</option>
-      </select>
+      <!-- 实例多时靠搜索 / 分组找，见 components/InstanceSelect：标题栏里位置窄，
+           占位用短文案，内容区的空态另有一句更长的提示 -->
+      <InstanceSelect v-if="!serverPack" class="head-select" :instances="instances" :model-value="currentUuid"
+        :placeholder="t('winExport.instance')" :disabled="busy" :menu-min-width="260"
+        @update:model-value="currentUuid = $event" />
       <InfoExportButton v-if="!serverPack" :uuid="currentUuid" :name="info?.name ?? ''"
         :disabled="busy || loadingInfo || !info" />
       <BaseButton size="sm" variant="primary" class="icon-btn-head" :disabled="busy || loadingInfo || !info"

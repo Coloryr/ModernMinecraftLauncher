@@ -10,11 +10,13 @@ import { instanceColor } from "../../lib/instanceColor";
 import BaseDatePicker from "../../components/ui/BaseDatePicker.vue";
 import BaseSwitch from "../../components/ui/BaseSwitch.vue";
 import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
+import InstanceSelect from "../../components/InstanceSelect.vue";
 import { api } from "../../lib/api";
 import { t } from "../../lib/i18n";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import { createListScroll, useVirtualRows } from "../../composables/useVirtualRows";
 import type { StatsDataDto, StatsInstanceDto, StatsPlaytimeDto } from "../../lib/bindings";
+import type { InstanceOption } from "../../lib/instancePicker";
 
 // 必须显式声明 close：不声明的话 Vue 会把父级的 @close 当 attrs 透传到根组件（WindowFrame），
 // 与模板里的 @close="$emit('close')" 合并成两个处理器 —— 一次返回会调两遍 closeWindow()，
@@ -174,9 +176,6 @@ const maxDate = computed(() => {
   return max === null ? "" : localDate(new Date(max));
 });
 
-/** 实例下拉是否展开 */
-const instOpen = ref(false);
-
 /** 图表数据；null 表示还没读到 */
 const playtime = ref<StatsPlaytimeDto | null>(null);
 /** 至少成功读过一次，用来区分"正在读"与"这段时间真没有记录" */
@@ -184,8 +183,14 @@ const playtimeLoaded = ref(false);
 /** 图表请求序号：换实例 / 换时间段后旧请求的结果直接丢掉 */
 let playtimeSeq = 0;
 
-/** 图表的实例下拉：全部实例 + 现有与有历史记录的实例 */
-const instanceOptions = computed(() => data.value?.instances ?? []);
+/** 图表的实例下拉：全部实例 + 现有与有历史记录的实例；已删除的带标记，免得重名时分不清 */
+const instanceOptions = computed<InstanceOption[]>(() =>
+  (data.value?.instances ?? []).map((inst) => ({
+    uuid: inst.uuid,
+    name: instanceLabel(inst),
+    running: inst.running,
+  })),
+);
 
 /** 图表覆盖的天数：日均与单日判断按它算 */
 const dayCount = computed(() => playtime.value?.days.length ?? 0);
@@ -449,7 +454,6 @@ function pickRange(from: string, to: string) {
  */
 function pickInstance(uuid: string) {
   selectedUuid.value = uuid;
-  instOpen.value = false;
 }
 
 
@@ -599,29 +603,14 @@ function instanceLabel(inst: StatsInstanceDto): string {
 
     <!-- 游玩时间图：工具条里选实例与时间段，图表跟着两者变 -->
     <section class="play-panel">
-      <!-- 点下拉外面收起：遮罩铺满本面板，实例列表再长也不会盖到汇总卡片上 -->
-      <div v-if="instOpen" class="inst-backdrop" @click="instOpen = false"></div>
       <!-- 工具条固定两行：第一行标题 + 实例 + 时间区间，第二行三个区间统计。
            标题与两个控件组各占自己的格子，谁都不按内容去挤别人，换实例时版式不动 -->
       <div class="play-bar">
         <div class="play-top">
           <h2 class="play-title">{{ t("winStats.playTitle") }}</h2>
-          <div class="inst-picker">
-            <button type="button" class="field-select inst-select" :aria-label="t('winStats.colInstance')"
-              :title="selectedInstance ? instanceLabel(selectedInstance) : undefined" @click="instOpen = !instOpen">
-              <span class="inst-select-text">{{ selectedInstance ? instanceLabel(selectedInstance) :
-                t("winStats.allInstances") }}</span>
-            </button>
-            <div v-if="instOpen" class="inst-menu">
-              <button type="button" class="inst-option" :class="{ active: !selectedUuid }" @click="pickInstance('')">
-                {{ t("winStats.allInstances") }}
-              </button>
-              <button v-for="inst in instanceOptions" :key="inst.uuid" type="button" class="inst-option"
-                :class="{ active: inst.uuid === selectedUuid }" @click="pickInstance(inst.uuid)">
-                {{ instanceLabel(inst) }}
-              </button>
-            </div>
-          </div>
+          <InstanceSelect class="inst-picker" :instances="instanceOptions" :model-value="selectedUuid"
+            :empty-label="t('winStats.allInstances')" :menu-min-width="240"
+            @update:model-value="pickInstance" />
           <div class="range-controls">
             <label class="range-custom">
               <BaseSwitch :model-value="customRange" @update:model-value="setCustomRange" />
@@ -907,81 +896,12 @@ function instanceLabel(inst: StatsInstanceDto): string {
   color: var(--text-dim);
 }
 
-/* 实例下拉是自绘的：原生 <select> 的宽度由最长选项文字决定，实例名一长就把
-   后面的控件挤走。这里让它吃掉第一行的剩余宽度，文字在按钮里省略 */
+/* 实例下拉吃掉第一行的剩余宽度：原生 <select> 的宽度由最长选项文字决定，
+   实例名一长就把后面的控件挤走。文字在按钮里省略，完整名字进悬停提示 */
 .inst-picker {
-  position: relative;
   /* 剩余宽度归它；下限保证窄窗时还认得出是哪个实例 */
   flex: 1 1 auto;
   min-width: 120px;
-}
-
-.inst-select {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  /* 借用 .field-select 的外观（底色 / 边框 / 箭头 / 高度），按钮要把文字对齐与省略补上 */
-  text-align: left;
-  overflow: hidden;
-}
-
-.inst-select-text {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 停在面板图标层之上：下拉开着时它压在面板其它内容上，点哪儿都是收起，
-   而不是让首次点击穿透去改开关 / 日期 */
-.inst-backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: 20;
-}
-
-.inst-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 40;
-  min-width: 100%;
-  max-width: 360px;
-  max-height: 260px;
-  overflow-y: auto;
-  padding: 5px;
-  background: var(--bg-solid, var(--bg-card));
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: var(--shadow-lg);
-}
-
-.inst-option {
-  display: block;
-  width: 100%;
-  padding: 6px 10px;
-  border: none;
-  border-radius: var(--ctl-radius);
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: var(--ctl-font);
-  text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-}
-
-.inst-option:hover {
-  background: var(--bg-hover);
-}
-
-.inst-option.active {
-  color: var(--accent);
-  font-weight: 600;
 }
 
 .play-stats {

@@ -17,6 +17,12 @@ export type GamepadAxisValueDto = {
 export type GamepadDto = {
   id: number,
   name: string,
+  layout: GamepadLayoutDto | null,
+};
+
+export type GamepadExtraDto = {
+  code: number,
+  value: number,
 };
 
 export type GamepadStateDto = {
@@ -24,6 +30,7 @@ export type GamepadStateDto = {
   name: string,
   buttons: GamepadButtonValueDto[],
   axes: GamepadAxisValueDto[],
+  extras: GamepadExtraDto[],
 };
 
 export type GamepadStickDto = "left" | "right";

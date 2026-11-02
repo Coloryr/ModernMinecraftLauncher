@@ -3,13 +3,15 @@
 //
 // 状态在 useSettingsGamepad：切到别的标签时本组件会被卸载，未保存的编辑内容
 // 必须留在设置窗口那一层。
-import { onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../../components/ui/BaseModal.vue";
+import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
 import SettingsGroup from "../SettingsGroup.vue";
 import ActionSelect from "../ActionSelect.vue";
 import GamepadTestPanel from "../GamepadTestPanel.vue";
 import { ALL_AXES, ALL_BUTTONS, axisLabel, buttonLabel } from "../../gamepadLabels";
+import { detectOs } from "../../../../lib/titlebar";
 import { t } from "../../../../lib/i18n";
 import type { GamepadAxisDto, GamepadButtonDto, GamepadLayoutDto } from "../../../../lib/bindings";
 import type { useSettingsGamepad } from "../../composables/useSettingsGamepad";
@@ -21,6 +23,9 @@ const props = defineProps<{
   flashGroup?: string;
 }>();
 
+// XInput 兜底只有 Windows 有，其它平台连代码都不编译，界面上也就不显示这一项
+const onWindows = detectOs() === "windows";
+
 const {
   profiles,
   editing,
@@ -29,6 +34,8 @@ const {
   active,
   saving,
   actions,
+  xinput,
+  setXinput,
   newButton,
   newAxis,
   createOpen,
@@ -51,9 +58,15 @@ const {
 
 onMounted(init);
 
+/** 后端按手柄认出来的外观；没接手柄或认不出时为 null，回落到配置里存的那份 */
+const detected = ref<GamepadLayoutDto | null>(null);
+
+/** 表格里实际用的外观 */
+const effectiveLayout = computed(() => detected.value ?? config.value?.layout ?? "xbox");
+
 /** 取按钮记号：随外观与 A / B 交换变 */
 function label(button: GamepadButtonDto): string {
-  return buttonLabel(button, config.value?.layout ?? "xbox", config.value?.swapAb ?? false);
+  return buttonLabel(button, effectiveLayout.value, config.value?.swapAb ?? false);
 }
 
 /** 取轴记号 */
@@ -118,9 +131,18 @@ function setSwapAb(value: boolean) {
       <BaseButton size="sm" @click="openCreate">{{ t("winGamepad.new") }}</BaseButton>
     </div>
 
+    <!-- XInput 兜底：WGI 读不到手柄时才需要打开，只影响 Windows -->
+    <div v-if="onWindows" class="switch-row">
+      <div class="switch-text">
+        <span class="switch-label">{{ t("winGamepad.xinput") }}</span>
+        <span class="switch-state">{{ t("winGamepad.xinputHint") }}</span>
+      </div>
+      <BaseSwitch :model-value="xinput" @update:model-value="setXinput" />
+    </div>
+
     <!-- 手柄列表与状态图：没有可编辑的配置时也照样显示实时状态 -->
     <GamepadTestPanel :layout="config?.layout ?? null" :swap-ab="config?.swapAb ?? null"
-      @update:layout="setLayout" @update:swap-ab="setSwapAb" />
+      @detected="detected = $event" @update:layout="setLayout" @update:swap-ab="setSwapAb" />
 
     <p v-if="!editing" class="empty-tip">{{ t("winGamepad.empty") }}</p>
     <p v-else-if="!config" class="empty-tip">{{ t("winGamepad.broken") }}</p>

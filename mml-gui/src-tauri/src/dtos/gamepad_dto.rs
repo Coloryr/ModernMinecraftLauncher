@@ -98,6 +98,18 @@ pub struct GamepadDto {
     pub id: u64,
     /// 系统给出的手柄名称
     pub name: String,
+    /// 自动认出的外观；认不出时为 null，界面按配置里的外观显示
+    pub layout: Option<GamepadLayoutDto>,
+}
+
+/// 固定按钮表里没有的按键
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GamepadExtraDto {
+    /// 底层编号，界面上直接显示
+    pub code: u32,
+    /// 按下程度，0.0 到 1.0
+    pub value: f32,
 }
 
 /// 手柄状态快照
@@ -112,6 +124,8 @@ pub struct GamepadStateDto {
     pub buttons: Vec<GamepadButtonValueDto>,
     /// 全部轴的当前值
     pub axes: Vec<GamepadAxisValueDto>,
+    /// 固定表里没有的按键，按第一次按下的顺序往后追加；高级手柄背面的拨片这类在这里
+    pub extras: Vec<GamepadExtraDto>,
 }
 
 /// 摇杆

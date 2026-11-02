@@ -99,6 +99,7 @@ pub const ITEM_FILE: &str = "items.json";
 pub const GUI_CONFIG_FILE: &str = "gui_config.json";
 pub const GAMEPAD_DIR: &str = "gamepad";
 pub const GAMEPAD_DEFAULT_MAP_FILE: &str = "default.json";
+pub const GAMEPAD_READER_FILE: &str = "reader.json";
 pub const COLLECT_FILE: &str = "collect.json";
 pub const INTEGRATIONS_FILE: &str = "integrations.json";
 pub const BLOCK_GROUPS_FILE: &str = "block_groups.json";

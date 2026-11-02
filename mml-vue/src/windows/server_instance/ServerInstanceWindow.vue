@@ -12,6 +12,7 @@ import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
+import InstanceSelect from "../../components/InstanceSelect.vue";
 // 通用行虚拟列表（资源窗口那几个分类也在用）：几百个模组时只渲染视口附近的行
 import VirtualList from "../../components/ui/VirtualList.vue";
 import { api, onServerInstanceFocus, onServerInstanceProgress } from "../../lib/api";
@@ -270,10 +271,13 @@ function focusInstance(uuid: string) {
 }
 
 /** 下拉换实例 */
-function onInstanceChange() {
+function pickInstance(uuid: string) {
+  // 选了同一个实例不用重铺：用户刚挑好的模组 / 配置目录不能被清掉
+  if (currentUuid.value === uuid) return;
+  currentUuid.value = uuid;
   const inst = current.value;
   if (inst) name.value = inst.name;
-  void loadInstance(currentUuid.value);
+  void loadInstance(uuid);
 }
 
 /** 定位到 openWindow 带入的目标实例 */
@@ -409,10 +413,9 @@ onBeforeUnmount(() => {
   <WindowFrame :title="t('winTitle.serverInstance')" body-fill body-flush @close="emit('close')">
     <!-- 实例放标题栏：换实例不用回到总体设定 -->
     <template #head-right>
-      <select v-model="currentUuid" class="field-select head-select" :disabled="busy" @change="onInstanceChange">
-        <option value="" disabled>{{ t("winExport.instance") }}</option>
-        <option v-for="i in instances" :key="i.uuid" :value="i.uuid">{{ i.name }}</option>
-      </select>
+      <InstanceSelect class="head-select" :instances="instances" :model-value="currentUuid"
+        :placeholder="t('winExport.instance')" :disabled="busy" :menu-min-width="260"
+        @update:model-value="pickInstance" />
     </template>
 
     <div class="si-layout">

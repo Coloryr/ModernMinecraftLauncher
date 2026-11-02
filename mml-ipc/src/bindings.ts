@@ -192,7 +192,9 @@ export function createCommands(invoke: Invoke) {
       list: () => invoke<GamepadDto[]>("gamepad_list"),
       saveConfig: (name: string, config: GamepadConfigDto) => invoke<void>("gamepad_save_config", { name, config }),
       setActive: (name: string) => invoke<void>("gamepad_set_active", { name }),
+      setXinput: (enabled: boolean) => invoke<void>("gamepad_set_xinput", { enabled }),
       state: (id: number) => invoke<GamepadStateDto | null>("gamepad_state", { id }),
+      xinput: () => invoke<boolean>("gamepad_xinput"),
     },
     javaDownload: {
       getList: (source: JavaTypes, javaType: string, major: number, system: string, arch: string) => invoke<JavaDownloadItemDto[]>("java_download_get_list", { source, javaType, major, system, arch }),

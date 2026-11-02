@@ -6,6 +6,7 @@
 import { computed, ref, watch } from "vue";
 import BaseButton from "../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../components/ui/BaseModal.vue";
+import InstanceSelect from "../../../components/InstanceSelect.vue";
 import { t } from "../../../lib/i18n";
 import type { CollectItemDto, InstanceInfoDto } from "../../../lib/bindings";
 
@@ -111,11 +112,7 @@ function summary(list: string[], limited: boolean): string {
     <p class="inst-line">{{ t("collect.installVersions", { value: summary(versions, hasVersionLimit) }) }}</p>
     <template v-if="candidates.length">
       <label class="field-label inst-label">{{ t("collect.installTo") }}</label>
-      <select v-model="pick" class="field-select">
-        <option v-for="inst in candidates" :key="inst.uuid" :value="inst.uuid">
-          {{ inst.name }} · {{ inst.version }}
-        </option>
-      </select>
+      <InstanceSelect :instances="candidates" :model-value="pick" @update:model-value="pick = $event" />
     </template>
     <p v-else class="empty-tip">{{ t("collect.installNoFit") }}</p>
     <div class="modal-actions">

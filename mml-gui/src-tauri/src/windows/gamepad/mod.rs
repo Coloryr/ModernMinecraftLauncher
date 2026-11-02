@@ -8,8 +8,8 @@ use mml_gamepad::{
 
 use crate::dtos::{
     GamepadAxisDto, GamepadAxisRuleDto, GamepadAxisValueDto, GamepadButtonDto,
-    GamepadButtonRuleDto, GamepadButtonValueDto, GamepadConfigDto, GamepadDto, GamepadLayoutDto,
-    GamepadMouseDto, GamepadProfileDto, GamepadStateDto, GamepadStickDto,
+    GamepadButtonRuleDto, GamepadButtonValueDto, GamepadConfigDto, GamepadDto, GamepadExtraDto,
+    GamepadLayoutDto, GamepadMouseDto, GamepadProfileDto, GamepadStateDto, GamepadStickDto,
 };
 use crate::err_keys;
 
@@ -25,6 +25,7 @@ pub fn gamepad_list() -> Vec<GamepadDto> {
         .map(|pad| GamepadDto {
             id: pad.id,
             name: pad.name,
+            layout: pad.layout.map(layout_to_dto),
         })
         .collect()
 }
@@ -54,6 +55,14 @@ pub fn gamepad_state(id: u64) -> Option<GamepadStateDto> {
             .into_iter()
             .map(|item| GamepadAxisValueDto {
                 axis: axis_to_dto(item.axis),
+                value: item.value,
+            })
+            .collect(),
+        extras: state
+            .extras
+            .into_iter()
+            .map(|item| GamepadExtraDto {
+                code: item.code,
                 value: item.value,
             })
             .collect(),
@@ -139,6 +148,30 @@ pub fn gamepad_delete_profile(name: String) -> Result<(), String> {
 #[gui_macros::command]
 pub fn gamepad_set_active(name: String) -> Result<(), String> {
     mml_gamepad::set_active(&name).map_err(error_key)
+}
+
+/// XInput 兼容模式是否打开
+///
+/// 只影响 Windows：其它平台的输入本来就走 gilrs，界面上也不显示这一项。
+///
+/// # 返回值
+///
+/// 打开着返回 `true`
+#[gui_macros::command]
+pub fn gamepad_xinput() -> bool {
+    mml_gamepad::xinput()
+}
+
+/// 打开 / 关掉 XInput 兼容模式
+///
+/// - `enabled`: 是否打开
+///
+/// # 返回值
+///
+/// 落盘成功返回 Ok；写盘失败返回错误键
+#[gui_macros::command]
+pub fn gamepad_set_xinput(enabled: bool) -> Result<(), String> {
+    mml_gamepad::set_xinput(enabled).map_err(error_key)
 }
 
 /// 配置界面可选的键鼠动作名

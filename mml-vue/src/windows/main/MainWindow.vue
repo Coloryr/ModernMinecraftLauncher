@@ -2267,7 +2267,8 @@ onMounted(async () => {
               <p v-if="listStats" class="list-stats">{{ listStats }}</p>
 
               <!-- 实例锁定生效：只有这一个实例可用，切换入口整块隐藏 -->
-              <InstanceSelect v-if="!lockActive" :instances="instances" :model-value="selected?.uuid ?? null"
+              <InstanceSelect v-if="!lockActive" variant="card" :instances="instances"
+                :model-value="selected?.uuid ?? null" :add-label="t('add.title')"
                 @update:model-value="onPickInstance" @add="openAdd" />
 
               <!-- 启动按钮一行、次级操作一行方形图标键，两块宽度不同、整块居中不撑满，

@@ -5,6 +5,7 @@ import { t } from "../../../lib/i18n";
 import { useModalKeys } from "../../../composables/useModalKeys";
 import BaseModal from "../../../components/ui/BaseModal.vue";
 import BaseButton from "../../../components/ui/BaseButton.vue";
+import InstanceSelect from "../../../components/InstanceSelect.vue";
 import { api } from "../../../lib/api";
 import type { InstanceInfoDto } from "../../../lib/bindings";
 
@@ -48,21 +49,6 @@ onMounted(async () => {
   }
 });
 
-/**
- * 下拉选项文案：名字 · 版本，当前实例额外标出来
- *
- * - `inst`: 要显示的那个实例
- *
- * # 返回值
- *
- * 拼好的单行文案
- */
-function labelOf(inst: InstanceInfoDto): string {
-  const parts = [inst.name, inst.version];
-  if (inst.uuid === props.currentUuid) parts.push(t("blocks.currentInstance"));
-  return parts.join(" · ");
-}
-
 /** 确认选择：没选中实例时什么都不做 */
 function confirm() {
   if (picked.value) emit("pick", picked.value);
@@ -75,10 +61,8 @@ function confirm() {
 
     <div v-if="loading" class="empty-tip">{{ t("blocks.loading") }}</div>
     <div v-else-if="!instances.length" class="empty-tip">{{ t("blocks.noInstances") }}</div>
-    <select v-else v-model="selected" class="field-select" :disabled="busy">
-      <option value="" disabled>{{ t("blocks.pickInstance") }}</option>
-      <option v-for="inst in instances" :key="inst.uuid" :value="inst.uuid">{{ labelOf(inst) }}</option>
-    </select>
+    <InstanceSelect v-else :instances="instances" :model-value="selected" :disabled="busy"
+      :placeholder="t('blocks.pickInstance')" @update:model-value="selected = $event" />
 
     <div class="modal-actions">
       <BaseButton :disabled="busy" @click="emit('close')">{{ t("add.cancel") }}</BaseButton>
