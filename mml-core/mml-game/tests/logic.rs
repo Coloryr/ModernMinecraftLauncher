@@ -7,7 +7,7 @@ use mml_game::launcher_path::version_path::get_forge_json_name;
 use mml_game::loader::{LoaderKey, LoaderType};
 use mml_game::mojang::check_allow;
 use mml_game::mojang::game_arg_obj::{GameOsObj, GameRulesObj};
-use mml_sys::Os;
+use mml_sys::{ArchEnum, Os};
 
 /// 生成 Forge / NeoForge 的 JSON 文件名。
 #[test]
@@ -156,4 +156,37 @@ fn check_allow_rules() {
         }),
     };
     assert_eq!(check_allow(&vec![disallow_x86]), sys.is_arm);
+}
+
+/// 架构后缀与多条 allow 规则：GTNH 的 arm64 原生库就是这种写法
+#[test]
+fn check_allow_arch_suffix_rules() {
+    let sys = mml_sys::get_system_info();
+    let rule = |action: &str, name: &str| GameRulesObj {
+        action: action.to_string(),
+        os: Some(GameOsObj {
+            name: name.to_string(),
+            arch: String::new(),
+        }),
+    };
+
+    // [allow osx, allow osx-arm64]：macOS 上任意架构都放行，第二条不能覆盖第一条
+    let rules = vec![rule("allow", "osx"), rule("allow", "osx-arm64")];
+    assert_eq!(check_allow(&rules), sys.os == Os::MacOS);
+
+    // 单独的 osx-arm64 只在 Apple Silicon 上命中
+    let expect_arm = sys.os == Os::MacOS && sys.system_arch == ArchEnum::AArch64;
+    assert_eq!(check_allow(&vec![rule("allow", "osx-arm64")]), expect_arm);
+
+    // 其它系统的架构后缀同样按架构判断
+    let expect_win_arm = sys.os == Os::Windows && sys.system_arch == ArchEnum::AArch64;
+    assert_eq!(
+        check_allow(&vec![rule("allow", "windows-arm64")]),
+        expect_win_arm
+    );
+    let expect_linux_arm = sys.os == Os::Linux && sys.system_arch == ArchEnum::AArch64;
+    assert_eq!(
+        check_allow(&vec![rule("allow", "linux-arm64")]),
+        expect_linux_arm
+    );
 }

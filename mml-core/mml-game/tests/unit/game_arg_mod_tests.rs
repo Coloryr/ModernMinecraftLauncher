@@ -441,3 +441,61 @@ public static void main(String[] args) {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// 构件名带平台的原生库不能被 ARM 回退当成三段坐标
+///
+/// GTNH 的 lwjgl3 patch 写作 `org.lwjgl:lwjgl-natives-macos:3.4.3`：平台在构件名里，
+/// 最后一段仍是版本。按最后一个 `:` 截断只剩两段，回退再取 `path[2]` 就越界 ——
+/// 整条启动线程 panic，表现是 GTNH 点了启动直接"游戏启动线程异常退出"。
+#[tokio::test]
+async fn arm_native_fallback_skips_platform_in_artifact() {
+    let _guard = setup();
+    let json = r#"{
+        "libraries": [
+            {
+                "name": "org.lwjgl:lwjgl-natives-macos:3.4.3",
+                "rules": [{"action": "allow", "os": {"name": "osx"}}],
+                "downloads": {"artifact": {
+                    "path": "org/lwjgl/lwjgl-natives-macos/3.4.3/lwjgl-natives-macos-3.4.3.jar",
+                    "sha1": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "url": "https://example.invalid/lwjgl-natives-macos.jar"
+                }}
+            },
+            {
+                "name": "org.lwjgl:lwjgl-natives-macos-arm64:3.4.3",
+                "rules": [
+                    {"action": "allow", "os": {"name": "osx"}},
+                    {"action": "allow", "os": {"name": "osx-arm64"}}
+                ],
+                "downloads": {"artifact": {
+                    "path": "org/lwjgl/lwjgl-natives-macos-arm64/3.4.3/lwjgl-natives-macos-arm64-3.4.3.jar",
+                    "sha1": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                    "url": "https://example.invalid/lwjgl-natives-macos-arm64.jar"
+                }}
+            }
+        ]
+    }"#;
+    let game: GameArgObj = mml_base::serialize_tools::json_from_str(json).unwrap();
+    let dir = mml_testutil::temp_path(format!("mml-arm-native-{}", Uuid::new_v4().simple()));
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let libs = game.build_game_libraries(&dir, None).await;
+
+    // 其它系统被 osx 规则整批滤掉，只验证不 panic
+    if cfg!(target_os = "macos") {
+        assert!(
+            libs.iter()
+                .any(|item| item.name.ends_with("-natives-macos:3.4.3"))
+        );
+    }
+    // Apple Silicon 上必须带上 arm64 那份：lwjgl3 的 dylib 只从 classpath 里取
+    if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+        assert!(
+            libs.iter()
+                .any(|item| item.name.contains("-natives-macos-arm64:")),
+            "arm64 原生库被规则滤掉了：{:?}",
+            libs.iter().map(|item| &item.name).collect::<Vec<_>>()
+        );
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -11,12 +11,12 @@
 
 use mml_base::file_item::{FileHash, FileItemObj};
 use mml_net::url_helper;
-use mml_sys::Os;
+use mml_sys::{ArchEnum, Os, SystemInfo};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::{
     launcher_path::{assets_path, libraries_path, version_path},
-    mojang::game_arg_obj::{GameArgObj, GameRulesObj, LoggingObj},
+    mojang::game_arg_obj::{GameArgObj, GameOsObj, GameRulesObj, LoggingObj},
 };
 
 pub mod assets_obj;
@@ -76,7 +76,48 @@ impl VersionType {
     }
 }
 
+/// 规则里的系统条件是否匹配当前系统
+///
+/// 系统名可以带架构后缀，GTNH 的 lwjgl3 patch 就写成 `osx-arm64` / `windows-arm64`。
+/// 后缀参与判断：`osx-arm64` 只在 Apple Silicon 上匹配，`osx` 两种架构都匹配。
+///
+/// - `os`: 规则里的系统条件
+/// - `sys`: 当前系统信息
+///
+/// # 返回值
+///
+/// 系统名与架构都匹配时返回 `true`；不认识的系统名或架构返回 `false`
+fn rule_os_matches(os: &GameOsObj, sys: &SystemInfo) -> bool {
+    let (name, arch) = os.name.split_once('-').unwrap_or((os.name.as_str(), ""));
+    let os_ok = match name {
+        "" => true,
+        "osx" => sys.os == Os::MacOS,
+        "windows" => sys.os == Os::Windows,
+        "linux" => sys.os == Os::Linux,
+        "freebsd" => cfg!(target_os = "freebsd"),
+        _ => false,
+    };
+    if !os_ok {
+        return false;
+    }
+
+    if !arch.is_empty() {
+        return match arch {
+            "arm64" | "aarch64" => sys.system_arch == ArchEnum::AArch64,
+            "arm32" | "arm" => sys.system_arch == ArchEnum::Arm,
+            "x86_64" | "x64" | "amd64" | "x86" => !sys.is_arm,
+            _ => false,
+        };
+    }
+
+    // 老规则把架构写在 os.arch 里，x86 一直按"非 ARM"口径
+    os.arch.is_empty() || (os.arch == "x86" && !sys.is_arm)
+}
+
 /// 检查规则是否适用
+///
+/// 多条 allow 规则按"任一命中即放行"处理，GTNH 的 `osx` + `osx-arm64` 就是这种写法；
+/// 命中的 disallow 规则可以否决。只有 disallow 规则时默认放行。
 ///
 /// - `list`: 规则列表
 ///
@@ -84,48 +125,37 @@ impl VersionType {
 ///
 /// 返回规则是否允许当前系统
 pub fn check_allow(list: &Vec<GameRulesObj>) -> bool {
-    let mut allow = true;
     let sys = mml_sys::get_system_info();
+    let mut allow = true;
+    let mut allow_seen = false;
+    let mut allow_matched = false;
+
     for item in list.iter() {
-        if item.action == "allow" {
-            if let Some(os) = &item.os {
-                if os.name == "osx" && sys.os == Os::MacOS {
-                    allow = true;
-                } else if os.name == "windows" && sys.os == Os::Windows {
-                    allow = true;
-                } else if os.name == "linux" && sys.os == Os::Linux {
-                    allow = true;
-                } else {
-                    allow = false;
-                }
-
-                if os.arch == "x86" && !sys.is_arm {
+        let matched = match &item.os {
+            Some(os) => rule_os_matches(os, &sys),
+            None => true,
+        };
+        match item.action.as_str() {
+            "allow" => {
+                allow_seen = true;
+                if matched {
+                    allow_matched = true;
                     allow = true;
                 }
-            } else {
-                allow = true;
             }
-        } else if item.action == "disallow" {
-            if let Some(os) = &item.os {
-                if os.name == "osx" && sys.os == Os::MacOS {
-                    allow = false;
-                } else if os.name == "windows" && sys.os == Os::Windows {
-                    allow = false;
-                } else if os.name == "linux" && sys.os == Os::Linux {
-                    allow = false;
-                } else {
-                    allow = true;
-                }
-
-                if os.arch == "x86" && !sys.is_arm {
+            "disallow" => {
+                if matched {
                     allow = false;
                 }
-            } else {
-                allow = false;
             }
+            _ => {}
         }
     }
 
+    // 有 allow 规则却一条都没命中，说明当前系统不在允许范围内
+    if allow_seen && !allow_matched {
+        return false;
+    }
     allow
 }
 

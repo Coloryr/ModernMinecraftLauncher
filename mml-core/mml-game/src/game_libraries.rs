@@ -98,6 +98,12 @@ impl GameArgObj {
 
             for item in natives.keys() {
                 let path: Vec<&str> = item.split(':').collect();
+                // 平台写在构件名里的原生库（GTNH 的 org.lwjgl:lwjgl-natives-macos）
+                // 登记时已按最后一个冒号截掉版本，只剩两段，拼不出 ARM 变体；
+                // 这类 patch 本来就逐平台声明，直接跳过
+                if path.len() < 3 {
+                    continue;
+                }
                 let path1: Vec<&str> = path[0].split('.').collect();
 
                 let mut base_dir = String::new();

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct GameOsObj {
-    /// 系统名，取值 `windows` / `linux` / `osx`
+    /// 系统名，取值 `windows` / `linux` / `osx`，可带架构后缀如 `osx-arm64`
     pub name: String,
     /// 架构，如 `x86`
     pub arch: String,
