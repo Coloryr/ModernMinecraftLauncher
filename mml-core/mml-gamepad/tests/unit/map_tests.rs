@@ -141,6 +141,8 @@ fn scan_picks_selected_profile() {
     second.selected = true;
     write_config(&dir.join("b.json"), &second);
     std::fs::write(dir.join("broken.json"), "{").unwrap();
+    // 旧读取选项不能因 serde(default) 被当成第三份有效映射。
+    std::fs::write(dir.join("reader.json"), r#"{"XInput":true}"#).unwrap();
 
     let scan = scan(&dir);
     assert_eq!(scan.profiles.len(), 2);

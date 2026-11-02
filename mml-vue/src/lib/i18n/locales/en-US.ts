@@ -2147,8 +2147,6 @@ export default {
   "winGamepad.layoutHint": "The layout follows the connected gamepad; pick it manually when it can't be detected. Appearance and A / B swapping only change labels and the diagram; mappings still bind by button position.",
   "winGamepad.detected": "Detected: {name}",
   "winGamepad.extraButtons": "Extra buttons",
-  "winGamepad.xinput": "XInput compatibility",
-  "winGamepad.xinputHint": "On by default; turn off to use WGI only, which needs a focused window to receive events. Windows only.",
   "winGamepad.refresh": "Scan again",
   "winGamepad.new": "Add profile",
   "winGamepad.delete": "Delete profile",

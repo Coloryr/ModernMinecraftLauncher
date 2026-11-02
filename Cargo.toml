@@ -88,7 +88,6 @@ windows = { version = "~0.62.2", features = [
     "Win32_UI_Shell",
     "Win32_UI_Shell_Common",
     "Win32_UI_WindowsAndMessaging",
-    "Win32_UI_Input_XboxController",
     "Win32_System_Com",
 ] }
 zip = { version = "~9.0.5", default-features = false, features = ["deflate-flate2", "chrono"] }
@@ -130,7 +129,7 @@ wgpu = { version = "~30.0.1", default-features = false, features = [
 ] }
 pollster = "~1.0.1"
 bytemuck = { version = "~1.25.2", features = ["derive"] }
-gilrs = "~0.11.2"
+sdl2 = { version = "0.38", features = ["bundled", "static-link"] }
 
 tauri-plugin-dialog = "~2.7.3"
 window-vibrancy = "~0.8.1"

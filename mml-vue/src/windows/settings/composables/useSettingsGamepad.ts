@@ -45,9 +45,6 @@ export function useSettingsGamepad() {
   /** 可选动作名 */
   const actions = ref<string[]>([]);
 
-  /** XInput 兼容模式是否打开；只有 Windows 上界面上会显示这一项 */
-  const xinput = ref(false);
-
   /** 有无未保存的改动 */
   const dirty = computed(() => !!config.value && JSON.stringify(config.value) !== origin.value);
 
@@ -129,7 +126,6 @@ export function useSettingsGamepad() {
     initializing = true;
     try {
       actions.value = await commands.gamepad.getActions();
-      xinput.value = await commands.gamepad.xinput();
       await loadProfiles();
       const current = profiles.value.find((item) => item.active) ?? profiles.value[0];
       await openProfile(current?.name ?? "");
@@ -138,23 +134,6 @@ export function useSettingsGamepad() {
       showToast(tErr(e));
     } finally {
       initializing = false;
-    }
-  }
-
-  /**
-   * 打开 / 关掉 XInput 兼容模式
-   *
-   * 只影响读取手柄的那条兜底路径，不动映射配置：改完立即生效，不用重开窗口。
-   *
-   * - `enabled`: 是否打开
-   */
-  async function setXinput(enabled: boolean) {
-    if (!isTauri()) return;
-    try {
-      await commands.gamepad.setXinput(enabled);
-      xinput.value = enabled;
-    } catch (e) {
-      showToast(tErr(e));
     }
   }
 
@@ -353,8 +332,6 @@ export function useSettingsGamepad() {
     loading,
     saving,
     actions,
-    xinput,
-    setXinput,
     newButton,
     newAxis,
     createOpen,

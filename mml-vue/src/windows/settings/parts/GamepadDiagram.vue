@@ -232,7 +232,7 @@ function dpadArm(side: "up" | "down" | "left" | "right"): { x: number; y: number
           :y="dpadArm('right').y" width="14" height="14" rx="3" />
       </g>
 
-      <!-- 功能键：View / Menu。中间那颗 Guide 不画：XInput 读不到它，永远点不亮 -->
+      <!-- 功能键只显示 View / Menu -->
       <g>
         <circle class="pad-key" :class="{ on: pressed('select') }" :cx="geo.select.x" :cy="geo.select.y"
           r="10" />
