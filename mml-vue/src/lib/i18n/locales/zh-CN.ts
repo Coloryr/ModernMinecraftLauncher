@@ -1211,7 +1211,7 @@ export default {
   "add.pack.mmc": "MMC 导出包",
   "add.pack.hmcl": "HMCL 导出包",
   "add.pack.hmcl_server": "HMCL 服务器包",
-  "add.pack.archive": "直接解压",
+  "add.pack.archive": "M²L 压缩包",
   "add.pack.launcher_pack": "其他启动器包",
   "add.loading": "版本列表加载中…",
   "add.noVersion": "该类型下暂无版本，可点击刷新",

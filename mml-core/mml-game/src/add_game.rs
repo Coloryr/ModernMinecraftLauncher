@@ -196,9 +196,11 @@ fn archive_cfg_name(archive: &BaseArchive) -> String {
 ///
 /// - `file`: 压缩包路径
 ///
-/// 按元数据文件判定类型，HMCL 包内可能同时带 `mcbbs.packmeta` 与 `manifest.json`，
-/// 所以 CurseForge 的判定放在 HMCL 之后；无元数据时按 `.minecraft` 目录判启动器包，
-/// 否则视为直接解压。名字取元数据里的 `name`，MMC 读 `instance.cfg`，取不到用文件名去扩展名。
+/// 按元数据文件判定类型：**`game.json` 优先**，M²L 导出的实例包只要带它就直接按实例包处理，
+/// 不被包内附带的其它启动器元数据抢走；其次 HMCL（包内可能同时带 `mcbbs.packmeta` 与
+/// `manifest.json`，所以 CurseForge 放在 HMCL 之后）；无元数据时按 `.minecraft` 目录判
+/// 启动器包，否则视为直接解压。名字取元数据里的 `name`，MMC 读 `instance.cfg`，
+/// 取不到用文件名去扩展名。
 ///
 /// # 返回值
 ///
@@ -235,12 +237,13 @@ pub fn detect_pack_of(archive: &BaseArchive, file: &Path) -> CoreResult<Detected
 
     let mut detected: Option<(PackType, String)> = None;
     for (suffix, pack_type) in [
+        // game.json 优先级最大：本启动器导出的实例包一定带它，包内再有别的元数据也按实例包装
+        (names::GAME_FILE, PackType::ArchivePack),
         (names::HMCLFILE, PackType::HMCL),
         (names::SERVER_MANIFEST_FILE, PackType::HMCLServer),
         (names::MMCJSON_FILE, PackType::MMC),
         (MODRINTH_INDEX_FILE, PackType::Modrinth),
         (names::MANIFEST_FILE, PackType::CurseForge),
-        (names::GAME_FILE, PackType::ArchivePack),
     ] {
         if let Some(entry) = find_entry(suffix) {
             detected = Some((pack_type, archive_json_name(archive, &entry)));

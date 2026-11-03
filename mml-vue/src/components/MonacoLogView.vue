@@ -139,7 +139,11 @@ function applyDecorations() {
     if (cls) {
       items.push({
         range: new monaco.Range(i + 1, 1, i + 1, 1),
-        options: { isWholeLine: true, className: cls },
+        options: {
+          isWholeLine: true,
+          className: cls,
+          stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+        },
       });
     }
 
@@ -147,7 +151,12 @@ function applyDecorations() {
     for (const seg of ansiOf(props.logs[i]).segments) {
       items.push({
         range: new monaco.Range(i + 1, seg.start + 1, i + 1, seg.end + 1),
-        options: { inlineClassName: seg.classes },
+        options: {
+          inlineClassName: seg.classes,
+          // 粘性必须钉死：追加是在最后一行的行尾插文本，默认粘性会把装饰一起撑长，
+          // 于是一行的颜色会一路吃到之后追加的所有行
+          stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+        },
       });
     }
   }

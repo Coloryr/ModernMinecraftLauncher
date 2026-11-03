@@ -241,6 +241,28 @@ fn detect_archive_pack_with_game_json() {
     let _ = std::fs::remove_dir(&dir);
 }
 
+/// 包里同时有 `game.json` 与其它启动器元数据 → 按本启动器实例包识别（优先级最大）。
+#[test]
+fn detect_game_json_wins() {
+    let dir = work_dir();
+    let zip = make_zip(
+        &dir,
+        "mixed",
+        &[
+            entry("manifest.json", br#"{"name":"Other Launcher"}"#),
+            entry("game.json", br#"{"name":"MML Instance"}"#),
+            entry("mods/a.jar", b"a"),
+        ],
+    );
+
+    let detected = detect_pack(&zip).expect("检测失败");
+    assert!(matches!(detected.pack_type, PackType::ArchivePack));
+    assert_eq!(detected.name, "MML Instance");
+
+    let _ = std::fs::remove_file(&zip);
+    let _ = std::fs::remove_dir(&dir);
+}
+
 /// 完全没有可识别元数据的压缩包 → 直接解压，名字用文件名去扩展名。
 #[test]
 fn detect_archive_pack_fallback_name() {

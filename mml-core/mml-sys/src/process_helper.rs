@@ -179,7 +179,9 @@ fn launch_inner<P: AsRef<Path>>(
         .stderr(Stdio::piped());
 
     if hidden {
-        cmd.stdin(Stdio::null());
+        // 空设备在 Windows 上算字符设备，`isatty()` 会返回真，脚本里的 input() 照样会打印提示
+        // 并等按键。用管道再把写端关掉，子进程看到的是 EOF，isatty() 才是假
+        cmd.stdin(Stdio::piped());
         // 启动器是 GUI 进程、自己没有控制台，控制台程序会自建一个空窗口出来
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
@@ -194,6 +196,10 @@ fn launch_inner<P: AsRef<Path>>(
     }
 
     let mut child = cmd.spawn().map_err(process_err)?;
+    if hidden {
+        // 立刻关掉写端：子进程读 stdin 拿到 EOF
+        drop(child.stdin.take());
+    }
     let stdout = child.stdout.take().map(OutputStream::Stdout);
     let stderr = child.stderr.take().map(OutputStream::Stderr);
 

@@ -1210,7 +1210,7 @@ export default {
   "add.pack.mmc": "MMC pack",
   "add.pack.hmcl": "HMCL pack",
   "add.pack.hmcl_server": "HMCL server pack",
-  "add.pack.archive": "Plain archive",
+  "add.pack.archive": "M²L pack",
   "add.pack.launcher_pack": "Launcher pack",
   "add.loading": "Loading versions…",
   "add.noVersion": "No versions of this type, try refresh",
