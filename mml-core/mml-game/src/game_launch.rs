@@ -9,7 +9,7 @@ use std::{
         atomic::{AtomicBool, AtomicI32, Ordering},
     },
     thread,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use encoding_rs_io::DecodeReaderBytesBuilder;
@@ -667,48 +667,51 @@ impl InstanceSettingObj {
     ///
     /// - `cmd`: 命令行文本
     /// - `env`: 额外环境变量
-    /// - `wait_run`: 是否等待执行完成
+    /// - `wait_run`: 是否等待执行完成；等的时候可以取消
     /// - `admin`: 是否以管理员方式启动
+    /// - `cancel`: 取消令牌，等命令跑完期间被取消就掐掉它
     ///
     /// # 返回值
     ///
-    /// 程序找不到或启动失败时返回错误
-    fn cmd_run(
+    /// 程序找不到或启动失败时返回错误；等待期间被取消返回 `TaskCancel`
+    async fn cmd_run(
         &self,
         cmd: &str,
         env: &HashMap<String, String>,
         wait_run: bool,
         admin: bool,
+        cancel: &CancellationToken,
     ) -> CoreResult<()> {
         let base = self.get_base_path();
         let command = cmd_shell::resolve(cmd, &base, &self.get_game_path())?;
 
+        let mut run_env = env.clone();
+        if command.python {
+            // Python 往管道写是块缓冲，不设这个日志会攒到进程退出才一次性出来；
+            // 输出编码跟实例的日志编码走，读写两边才对得上
+            run_env.insert("PYTHONUNBUFFERED".to_string(), "1".to_string());
+            run_env.insert(
+                "PYTHONIOENCODING".to_string(),
+                self.encoding.codec_name().to_string(),
+            );
+        }
+
         // 工作目录是实例根目录，和双击 bat 一致：相对路径照 bat 写，游戏目录用 %GAME_DIR% 取
-        match process_helper::launch(&command.program, command.args, env.clone(), &base, admin) {
+        match process_helper::launch_hidden(&command.program, command.args, run_env, &base, admin) {
             Ok(mut result) => {
-                // 读取 stdout 线程
+                // 命令输出按实例的日志编码解，和游戏日志同一套；命令不等退出，标志给个不会置位的
+                let encoding = self.encoding;
                 if let Some(stdout) = result.stdout {
-                    let uuid1 = self.uuid;
+                    let uuid = self.uuid;
                     std::thread::spawn(move || {
-                        let reader = std::io::BufReader::new(stdout);
-                        for line in reader.lines() {
-                            if let Ok(line) = line {
-                                crate::add_game_log(&uuid1, &line);
-                            }
-                        }
+                        read_process_stream(stdout, uuid, encoding, Arc::new(AtomicBool::new(false)));
                     });
                 }
 
-                // 读取 stderr 线程
                 if let Some(stderr) = result.stderr {
-                    let uuid2 = self.uuid;
+                    let uuid = self.uuid;
                     std::thread::spawn(move || {
-                        let reader = std::io::BufReader::new(stderr);
-                        for line in reader.lines() {
-                            if let Ok(line) = line {
-                                crate::add_game_log(&uuid2, &line);
-                            }
-                        }
+                        read_process_stream(stderr, uuid, encoding, Arc::new(AtomicBool::new(false)));
                     });
                 }
 
@@ -717,9 +720,23 @@ impl InstanceSettingObj {
                     return Ok(());
                 }
 
-                result.child.wait().map_err(stream_err)?;
+                // 等它跑完，期间允许取消：点「取消启动」就掐掉这条命令，连带子进程
+                loop {
+                    if cancel.is_cancelled() {
+                        // 提权启动时真正的进程挂在辅助进程下面，先让它去收尾
+                        if let Some(control) = &result.control {
+                            let _ = control.request_stop();
+                        }
+                        let _ = process_helper::kill_tree(&mut result.child);
+                        return Err(ErrorType::TaskCancel);
+                    }
 
-                Ok(())
+                    match result.child.try_wait() {
+                        Ok(Some(_)) => return Ok(()),
+                        Ok(None) => tokio::time::sleep(Duration::from_millis(150)).await,
+                        Err(err) => return Err(stream_err(err)),
+                    }
+                }
             }
             Err(err) => Err(err),
         }
@@ -961,7 +978,8 @@ impl InstanceSettingObj {
                 let temp = self.replace_arg(&jvm, &jvm_arg, &pre_run_cmd);
                 cmd_shell::ensure_runner(&temp, &self.get_base_path(), &self.get_game_path())
                     .await?;
-                self.cmd_run(&temp, &env, prerun, arg.admin)?;
+                self.cmd_run(&temp, &env, prerun, arg.admin, &cancel)
+                    .await?;
                 let time = start.elapsed();
                 crate::add_game_log_item(&self.uuid, GameLog::CmdPreTime(time));
             }
@@ -1016,7 +1034,8 @@ impl InstanceSettingObj {
                 let temp = self.replace_arg(&jvm, &jvm_arg, &post_run_cmd);
                 cmd_shell::ensure_runner(&temp, &self.get_base_path(), &self.get_game_path())
                     .await?;
-                self.cmd_run(&temp, &env, false, arg.admin)?;
+                self.cmd_run(&temp, &env, false, arg.admin, &cancel)
+                    .await?;
                 let time = start.elapsed();
                 crate::add_game_log_item(&self.uuid, GameLog::CmdPostTime(time));
             }

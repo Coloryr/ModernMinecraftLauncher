@@ -23,6 +23,13 @@ use std::{
 
 use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType};
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+/// 不给子进程建控制台窗口
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
 /// 出错原因转 ProcessError
 fn process_err(err: impl std::fmt::Display) -> ErrorType {
     ErrorType::ProcessError(ErrorData::from_error(err))
@@ -132,35 +139,97 @@ pub fn launch<P: AsRef<Path>>(
     working_dir: P,
     admin: bool,
 ) -> CoreResult<LaunchResult> {
+    launch_inner(path, args, env, working_dir, admin, false)
+}
+
+/// 启动进程，Windows 上不弹控制台窗口
+///
+/// 用在输出已经接到日志的命令上：那个窗口本身是空的，脚本里的交互式提问也没人能回答，
+/// 所以 stdin 直接接空设备，`input()` 这类调用会立刻读到 EOF 而不是一直挂着。
+///
+/// 参数含义同 [`launch`]。
+pub fn launch_hidden<P: AsRef<Path>>(
+    path: P,
+    args: Vec<String>,
+    env: HashMap<String, String>,
+    working_dir: P,
+    admin: bool,
+) -> CoreResult<LaunchResult> {
+    launch_inner(path, args, env, working_dir, admin, true)
+}
+
+/// 启动进程的实现
+///
+/// - `hidden`: Windows 上是否隐藏控制台窗口并断开 stdin
+fn launch_inner<P: AsRef<Path>>(
+    path: P,
+    args: Vec<String>,
+    env: HashMap<String, String>,
+    working_dir: P,
+    admin: bool,
+    hidden: bool,
+) -> CoreResult<LaunchResult> {
     if admin && !is_run_as_admin() {
-        launch_with_elevation(path, args, env, working_dir)
-    } else {
-        let mut cmd = Command::new(path.as_ref());
-        cmd.current_dir(working_dir)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-
-        for (key, value) in env {
-            cmd.env(key, value);
-        }
-
-        for arg in args {
-            cmd.arg(arg);
-        }
-
-        let mut child = cmd.spawn().map_err(process_err)?;
-        let stdout = child.stdout.take().map(OutputStream::Stdout);
-        let stderr = child.stderr.take().map(OutputStream::Stderr);
-
-        Ok(LaunchResult {
-            child,
-            is_admin: false,
-            pid: None,
-            control: None,
-            stdout,
-            stderr,
-        })
+        return launch_with_elevation(path, args, env, working_dir);
     }
+
+    let mut cmd = Command::new(path.as_ref());
+    cmd.current_dir(working_dir)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    if hidden {
+        cmd.stdin(Stdio::null());
+        // 启动器是 GUI 进程、自己没有控制台，控制台程序会自建一个空窗口出来
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    for (key, value) in env {
+        cmd.env(key, value);
+    }
+
+    for arg in args {
+        cmd.arg(arg);
+    }
+
+    let mut child = cmd.spawn().map_err(process_err)?;
+    let stdout = child.stdout.take().map(OutputStream::Stdout);
+    let stderr = child.stderr.take().map(OutputStream::Stderr);
+
+    Ok(LaunchResult {
+        child,
+        is_admin: false,
+        pid: None,
+        control: None,
+        stdout,
+        stderr,
+    })
+}
+
+/// 结束进程及其子进程
+///
+/// - `child`: 要结束的子进程
+///
+/// # 返回值
+///
+/// 进程已结束（或本来就不在了）返回 `Ok(())`；等待失败返回相应错误
+///
+/// Windows 走 `taskkill /T /F`，连带子进程一起结束；其它平台只结束直接子进程。
+pub fn kill_tree(child: &mut Child) -> io::Result<()> {
+    #[cfg(windows)]
+    {
+        // 启动器没有控制台，taskkill 自己也得带上不建窗口的标志，否则会闪一下黑框
+        let _ = std::process::Command::new("taskkill")
+            .args(["/T", "/F", "/PID", &child.id().to_string()])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .creation_flags(CREATE_NO_WINDOW)
+            .status();
+    }
+
+    let _ = child.kill();
+    child.wait().map(|_| ())
 }
 
 /// 以管理员权限启动进程，平台特定实现

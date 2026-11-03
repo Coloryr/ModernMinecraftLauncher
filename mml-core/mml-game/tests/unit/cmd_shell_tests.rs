@@ -76,6 +76,7 @@ fn resolve_keeps_one_argument_per_line() {
         command.args,
         vec!["first arg".to_string(), "second arg".to_string()]
     );
+    assert!(!command.python, "普通程序不该标成 Python");
 
     let _ = std::fs::remove_dir_all(&dir);
 }

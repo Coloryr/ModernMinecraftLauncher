@@ -19,6 +19,8 @@ pub(crate) struct ShellCommand {
     pub(crate) program: PathBuf,
     /// 程序参数；脚本本身是解释器的第一个参数
     pub(crate) args: Vec<String>,
+    /// 跑的是 Python：调用方要给它补上不缓冲、UTF-8 的环境变量
+    pub(crate) python: bool,
 }
 
 /// 解析命令文本，找出要启动的程序与参数
@@ -62,6 +64,11 @@ pub(crate) fn resolve(cmd: &str, base: &Path, game: &Path) -> CoreResult<ShellCo
         }
     };
 
+    let python = is_python_name(&name)
+        || program
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("py"));
+
     match script_runner(&program)? {
         Some((runner, prefix)) => {
             let mut all = prefix;
@@ -70,9 +77,14 @@ pub(crate) fn resolve(cmd: &str, base: &Path, game: &Path) -> CoreResult<ShellCo
             Ok(ShellCommand {
                 program: runner,
                 args: all,
+                python,
             })
         }
-        None => Ok(ShellCommand { program, args }),
+        None => Ok(ShellCommand {
+            program,
+            args,
+            python,
+        }),
     }
 }
 

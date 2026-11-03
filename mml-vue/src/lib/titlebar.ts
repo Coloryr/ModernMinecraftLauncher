@@ -87,6 +87,9 @@ const INTERACTIVE = "button, a, input, select, textarea, label, [data-no-drag]";
 /** 判定双击的最大间隔，单位毫秒 */
 const DOUBLE_CLICK_MS = 400;
 
+/** 拖动窗口的启动阈值，单位 px；指针移动超过它才真正开始拖动 */
+const DRAG_START_PX = 4;
+
 function isInteractive(target: EventTarget | null): boolean {
   // 注意用 Element 而非 HTMLElement：按钮内是 SVG 图标，
   // 点击目标是 SVGElement，instanceof HTMLElement 会判定为非交互元素，
@@ -98,6 +101,50 @@ function isInteractive(target: EventTarget | null): boolean {
 let lastDownAt = 0;
 /** 上一次按下的事件目标，用来区分两次是否点在同一个元素上 */
 let lastDownTarget: EventTarget | null = null;
+/** 已按下、还没超过拖动阈值的指针；松开或开始拖动后清空 */
+let pendingDrag: { pointerId: number; x: number; y: number } | null = null;
+/** 拖动监听是否已经挂上（只在第一次按下时挂） */
+let dragListenersInstalled = false;
+
+/**
+ * 按下后移动超过阈值才开始拖窗口
+ *
+ * 不能像以前那样在按下时就 startDragging：第一下就起原生移动循环，
+ * 双击（最大化）与拖动抢同一次按下，会出现"双击标题栏后窗口被关掉"。
+ * 等到真的拖动再起循环，单击 / 双击都还留在 webview 里处理。
+ *
+ * - `e`: 指针移动事件
+ */
+function onTitleBarPointerMove(e: PointerEvent) {
+  const pending = pendingDrag;
+  if (!pending || e.pointerId !== pending.pointerId) return;
+  if (Math.hypot(e.clientX - pending.x, e.clientY - pending.y) < DRAG_START_PX) return;
+  pendingDrag = null;
+  // 这次是拖动，不是单击：紧随其后的点击不能再被判成双击
+  lastDownAt = 0;
+  lastDownTarget = null;
+  commands.windows.startDragging().catch(() => { });
+}
+
+/**
+ * 松开 / 取消：丢掉还没开始拖的按下
+ *
+ * - `e`: 指针松开或取消事件
+ */
+function onTitleBarPointerUp(e: PointerEvent) {
+  if (pendingDrag && e.pointerId === pendingDrag.pointerId) {
+    pendingDrag = null;
+  }
+}
+
+/** 挂一次拖动判定用的窗口级监听 */
+function installDragListeners() {
+  if (dragListenersInstalled) return;
+  dragListenersInstalled = true;
+  window.addEventListener("pointermove", onTitleBarPointerMove, { passive: true });
+  window.addEventListener("pointerup", onTitleBarPointerUp, { passive: true });
+  window.addEventListener("pointercancel", onTitleBarPointerUp, { passive: true });
+}
 
 /**
  * 标题栏按下：单击拖动窗口，双击最大化 / 还原
@@ -114,16 +161,18 @@ export function onTitleBarPointerDown(e: PointerEvent) {
 
   const now = Date.now();
   if (now - lastDownAt < DOUBLE_CLICK_MS && e.target === lastDownTarget) {
-    // 双击：只在这一次里最大化，且不再起拖拽
+    // 双击：只在这一次里最大化，不再等拖动
     lastDownAt = 0;
     lastDownTarget = null;
+    pendingDrag = null;
     commands.windows.toggleMaximize().catch(() => { });
     return;
   }
 
   lastDownAt = now;
   lastDownTarget = e.target;
-  commands.windows.startDragging().catch(() => { });
+  pendingDrag = { pointerId: e.pointerId, x: e.clientX, y: e.clientY };
+  installDragListeners();
 }
 
 /** 最小化当前窗口 */

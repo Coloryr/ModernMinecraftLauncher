@@ -101,6 +101,20 @@ impl Default for LogEncoding {
     }
 }
 
+impl LogEncoding {
+    /// 对应的编码名，喂给 Python 的 `PYTHONIOENCODING` 用
+    ///
+    /// # 返回值
+    ///
+    /// `utf-8` 或 `gbk`
+    pub fn codec_name(&self) -> &'static str {
+        match self {
+            LogEncoding::UTF8 => "utf-8",
+            LogEncoding::GBK => "gbk",
+        }
+    }
+}
+
 /// 文件类型
 #[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]

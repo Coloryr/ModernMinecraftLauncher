@@ -90,6 +90,56 @@ fn test_launch_normal_captures_stdout() {
     );
 }
 
+/// kill_tree 能结束还在跑的子进程
+#[test]
+fn test_kill_tree_stops_child() {
+    #[cfg(windows)]
+    let (cmd, args) = (
+        "cmd",
+        vec![
+            "/c".to_string(),
+            "ping".to_string(),
+            "-n".to_string(),
+            "30".to_string(),
+            "127.0.0.1".to_string(),
+        ],
+    );
+    #[cfg(not(windows))]
+    let (cmd, args) = ("sleep", vec!["30".to_string()]);
+
+    let mut result = process_helper::launch(cmd, args, HashMap::new(), test_working_dir(), false)
+        .expect("launch should succeed");
+    process_helper::kill_tree(&mut result.child).expect("kill_tree should succeed");
+
+    assert!(
+        result.child.try_wait().expect("try_wait").is_some(),
+        "子进程应该已经被结束"
+    );
+}
+
+/// 无窗口启动同样能抓到 stdout
+#[test]
+fn test_launch_hidden_captures_stdout() {
+    let cmd = get_test_echo_cmd();
+    let result = process_helper::launch_hidden(
+        cmd.cmd,
+        cmd.args,
+        HashMap::new(),
+        test_working_dir(),
+        false,
+    )
+    .expect("launch_hidden should succeed");
+
+    let mut stdout = result.stdout.expect("stdout should be captured");
+    let mut buf = String::new();
+    stdout.read_to_string(&mut buf).expect("read stdout");
+    assert!(
+        buf.contains("hello_test"),
+        "stdout should contain 'hello_test', got: '{}'",
+        buf.trim()
+    );
+}
+
 /// launch 返回的 child 句柄可 try_wait
 #[test]
 fn test_launch_result_child_wait() {

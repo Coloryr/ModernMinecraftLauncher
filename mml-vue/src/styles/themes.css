@@ -59,6 +59,25 @@
   --nbt-compound: #c9a7ff;
   --nbt-list: #4fd6c8;
 
+  /* 终端色：启动前 / 后命令输出里的 ANSI 16 色，日志窗口按这几个值还原。
+     亮色那份在 [data-theme="Light"] 里，改色时两套一起改 */
+  --ansi-black: #4b5563;
+  --ansi-red: #f87171;
+  --ansi-green: #4ade80;
+  --ansi-yellow: #facc15;
+  --ansi-blue: #60a5fa;
+  --ansi-magenta: #c084fc;
+  --ansi-cyan: #22d3ee;
+  --ansi-white: #e8eaed;
+  --ansi-bright-black: #6b7280;
+  --ansi-bright-red: #ff5f56;
+  --ansi-bright-green: #3ecf8e;
+  --ansi-bright-yellow: #f5b944;
+  --ansi-bright-blue: #4f8cff;
+  --ansi-bright-magenta: #e879f9;
+  --ansi-bright-cyan: #67e8f9;
+  --ansi-bright-white: #ffffff;
+
   /* 阴影 */
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
   --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
@@ -134,6 +153,24 @@
   --nbt-str: #16a34a;
   --nbt-compound: #7c3aed;
   --nbt-list: #0e7490;
+
+  /* 终端色：口径同暗色那份，亮底上整体加深一档 */
+  --ansi-black: #374151;
+  --ansi-red: #b91c1c;
+  --ansi-green: #15803d;
+  --ansi-yellow: #a16207;
+  --ansi-blue: #1d4ed8;
+  --ansi-magenta: #7e22ce;
+  --ansi-cyan: #0e7490;
+  --ansi-white: #1f2937;
+  --ansi-bright-black: #6b7280;
+  --ansi-bright-red: #dc2626;
+  --ansi-bright-green: #16a34a;
+  --ansi-bright-yellow: #d97706;
+  --ansi-bright-blue: #2563eb;
+  --ansi-bright-magenta: #9333ea;
+  --ansi-bright-cyan: #0891b2;
+  --ansi-bright-white: #111827;
 
   --shadow-md: 0 4px 14px rgba(30, 40, 60, 0.12);
   --shadow-lg: 0 16px 44px rgba(30, 40, 60, 0.2);

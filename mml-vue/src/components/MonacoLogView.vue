@@ -9,6 +9,7 @@ import type { editor } from "monaco-editor/editor/editor.api";
 import { applyLogTheme, monaco } from "../lib/monaco";
 import { t } from "../lib/i18n";
 import { LOG_LANGUAGE, registerLog } from "../lib/monacoLog";
+import { parseAnsi, type AnsiText } from "../lib/ansi";
 import { toggleWordWrap, wordWrap } from "../lib/editorWrap";
 import type { LogLine } from "../lib/bindings";
 import RowMenu, { type RowMenuItem } from "./ui/RowMenu.vue";
@@ -38,8 +39,29 @@ let logModel: editor.ITextModel | null = null;
 let decorations: editor.IEditorDecorationsCollection | null = null;
 /** 模型当前已应用的行数；用于追加式更新，避免整篇 setValue */
 let appliedCount = 0;
-/** 已经上过整行底色的行数；底色只补新增那一段 */
+/** 已经上过整行底色 / 内联色的行数；只补新增那一段 */
 let decoratedCount = 0;
+
+/** 每行剥掉 ANSI 的结果；LogLine 对象在追加时是稳定的，缓存省掉重复解析 */
+const ansiCache = new WeakMap<LogLine, AnsiText>();
+
+/**
+ * 取一行的正文与着色区间，首次用到时解析
+ *
+ * - `line`: 日志行
+ *
+ * # 返回值
+ *
+ * 剥掉转义后的正文与要着色的区间
+ */
+function ansiOf(line: LogLine): AnsiText {
+  let hit = ansiCache.get(line);
+  if (!hit) {
+    hit = parseAnsi(line.text);
+    ansiCache.set(line, hit);
+  }
+  return hit;
+}
 
 /** 上一次看到的滚动位置，单位 px：只有它变小才说明用户在往上滚 */
 let lastScrollTop = 0;
@@ -68,7 +90,7 @@ function levelClass(level: string): string | null {
 /** 全量重建模型内容 + 底色 */
 function rebuild() {
   if (!monacoEditor || !logModel) return;
-  const value = props.logs.map((l) => l.text).join("\n");
+  const value = props.logs.map((l) => ansiOf(l).text).join("\n");
   appliedCount = props.logs.length;
   // 整篇替换会把滚动位置清掉，别让那次事件被当成用户往上滚
   markProgrammatic();
@@ -89,7 +111,7 @@ function append() {
   }
   const lineCount = logModel.getLineCount();
   const lastLine = logModel.getLineContent(lineCount);
-  const text = added.map((l) => l.text).join("\n");
+  const text = added.map((l) => ansiOf(l).text).join("\n");
   appliedCount += added.length;
   // 内容走模型，不走编辑器：编辑器是只读的，而 executeEdits 在只读编辑器上直接返回 false
   // （见 Monaco codeEditorWidget.executeEdits 的 readOnly 分支），会被静默吞掉
@@ -107,18 +129,27 @@ function append() {
   applyDecorations();
 }
 
-/** 给新增行补整行底色 */
+/** 给新增行补整行底色与 ANSI 颜色 */
 function applyDecorations() {
   if (!decorations) return;
   const items: editor.IModelDeltaDecoration[] = [];
   // 只补新增那一段：日志是逐行追加的，每次都重建全量是 O(N²)
   for (let i = decoratedCount; i < props.logs.length; i++) {
     const cls = levelClass(props.logs[i].level);
-    if (!cls) continue;
-    items.push({
-      range: new monaco.Range(i + 1, 1, i + 1, 1),
-      options: { isWholeLine: true, className: cls },
-    });
+    if (cls) {
+      items.push({
+        range: new monaco.Range(i + 1, 1, i + 1, 1),
+        options: { isWholeLine: true, className: cls },
+      });
+    }
+
+    // 命令输出自带 ANSI 色码：转义已经剥掉，颜色补成内联类
+    for (const seg of ansiOf(props.logs[i]).segments) {
+      items.push({
+        range: new monaco.Range(i + 1, seg.start + 1, i + 1, seg.end + 1),
+        options: { inlineClassName: seg.classes },
+      });
+    }
   }
   decoratedCount = props.logs.length;
   if (items.length > 0) decorations.append(items);
@@ -369,6 +400,83 @@ watch(wordWrap, (on) => {
 
 <!-- 着色类供 monaco 内部渲染层使用，无 scope、全局生效 -->
 <style>
+/* ANSI 16 色：命令输出按原色显示。多带一层 .view-lines 是为了盖过 token 的 .mtk 色 */
+.monaco-editor .view-lines .ansi-fg-30 {
+  color: var(--ansi-black);
+}
+
+.monaco-editor .view-lines .ansi-fg-31 {
+  color: var(--ansi-red);
+}
+
+.monaco-editor .view-lines .ansi-fg-32 {
+  color: var(--ansi-green);
+}
+
+.monaco-editor .view-lines .ansi-fg-33 {
+  color: var(--ansi-yellow);
+}
+
+.monaco-editor .view-lines .ansi-fg-34 {
+  color: var(--ansi-blue);
+}
+
+.monaco-editor .view-lines .ansi-fg-35 {
+  color: var(--ansi-magenta);
+}
+
+.monaco-editor .view-lines .ansi-fg-36 {
+  color: var(--ansi-cyan);
+}
+
+.monaco-editor .view-lines .ansi-fg-37 {
+  color: var(--ansi-white);
+}
+
+.monaco-editor .view-lines .ansi-fg-90 {
+  color: var(--ansi-bright-black);
+}
+
+.monaco-editor .view-lines .ansi-fg-91 {
+  color: var(--ansi-bright-red);
+}
+
+.monaco-editor .view-lines .ansi-fg-92 {
+  color: var(--ansi-bright-green);
+}
+
+.monaco-editor .view-lines .ansi-fg-93 {
+  color: var(--ansi-bright-yellow);
+}
+
+.monaco-editor .view-lines .ansi-fg-94 {
+  color: var(--ansi-bright-blue);
+}
+
+.monaco-editor .view-lines .ansi-fg-95 {
+  color: var(--ansi-bright-magenta);
+}
+
+.monaco-editor .view-lines .ansi-fg-96 {
+  color: var(--ansi-bright-cyan);
+}
+
+.monaco-editor .view-lines .ansi-fg-97 {
+  color: var(--ansi-bright-white);
+}
+
+.monaco-editor .view-lines .ansi-bold {
+  font-weight: 600;
+}
+
+.monaco-editor .view-lines .ansi-dim {
+  opacity: 0.7;
+}
+
+.monaco-editor .view-lines .ansi-underline {
+  text-decoration: underline;
+}
+
 /* 整行底色：只铺背景，正文颜色交给 log 语法的 token 色 —— 整行改文字颜色会盖住 token */
 .monaco-editor .mml-log-line-error {
   background: rgb(248 81 73 / 0.12);

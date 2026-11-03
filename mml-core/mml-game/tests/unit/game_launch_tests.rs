@@ -82,6 +82,19 @@ fn handle_starts_process_and_forwards_output() {
     let _ = std::fs::remove_dir_all(&path);
 }
 
+/// 命令输出按实例设置的编码解：GBK 字节要读成中文
+#[test]
+fn read_stream_decodes_gbk() {
+    boot();
+    let uuid = Uuid::new_v4();
+    // "中文" 的 GBK 字节
+    let data: &[u8] = &[0xD6, 0xD0, 0xCE, 0xC4, b'\n'];
+
+    read_process_stream(data, uuid, LogEncoding::GBK, Arc::new(AtomicBool::new(false)));
+
+    assert!(log_has(&uuid, "中文"), "GBK 输出应解成中文");
+}
+
 /// 每一行输出都要发一次日志事件
 ///
 /// GUI 的实时日志就靠这条事件流。只在"新建日志"那一次发（日志已在表里就只入库、不发），
