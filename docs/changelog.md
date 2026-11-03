@@ -14,9 +14,13 @@
 
 ### 修复
 
-- 手柄读取统一改用 SDL2，并开启后台事件读取；移除「XInput 兼容模式」开关与自建双后端合并逻辑。
+- 手柄读取统一改用 SDL3，并开启后台事件读取；移除「XInput 兼容模式」开关与自建双后端合并逻辑。
   摇杆方向、扳机按钮与现有映射保持兼容；旧的 `gamepad/reader.json` 不再使用，也不会出现在映射列表里。
-  SDL2 静态打包，运行时无需另装 SDL2。
+  SDL3 静态打包，运行时无需另装运行库。用 SDL3 而不是 SDL2：SDL2 自带版本在 Windows 上优先走 WGI，
+  而 WGI 在窗口失去焦点时读数全为零，后台根本没输入；SDL3 的 Windows 后端只有 XInput 与 DirectInput，
+  读写不依赖前台窗口。
+- 肩键与扳机不再写反：LB / RB 记到 `LeftTrigger2` / `RightTrigger2`，扳机行程记到
+  `LeftTrigger` / `RightTrigger` 并同步 `LeftZ` / `RightZ` 两个轴。
 
 ### 改进
 

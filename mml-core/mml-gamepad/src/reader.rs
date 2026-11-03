@@ -11,10 +11,11 @@ use std::{
 };
 
 use mml_names::i18_items::info_type::InfoType;
-use sdl2::{
-    GameControllerSubsystem,
-    controller::{Axis as SdlAxis, Button as SdlButton, GameController},
+use sdl3::{
+    GamepadSubsystem,
     event::Event,
+    gamepad::{Axis as SdlAxis, Button as SdlButton, Gamepad},
+    joystick::JoystickId,
 };
 
 use crate::map::{Axis, Button, PadLayout};
@@ -61,12 +62,14 @@ const AXES: [Axis; AXIS_COUNT] = [
 
 /// SDL 标准按钮与原有配置枚举的对应关系
 const SDL_BUTTONS: [(SdlButton, Button); 15] = [
-    (SdlButton::A, Button::South),
-    (SdlButton::B, Button::East),
-    (SdlButton::Y, Button::North),
-    (SdlButton::X, Button::West),
-    (SdlButton::LeftShoulder, Button::LeftTrigger),
-    (SdlButton::RightShoulder, Button::RightTrigger),
+    (SdlButton::South, Button::South),
+    (SdlButton::East, Button::East),
+    (SdlButton::North, Button::North),
+    (SdlButton::West, Button::West),
+    // 肩键是纯数字的那两颗，对应 LeftTrigger2 / RightTrigger2；
+    // LeftTrigger / RightTrigger 留给扳机的模拟量，见 set_axis
+    (SdlButton::LeftShoulder, Button::LeftTrigger2),
+    (SdlButton::RightShoulder, Button::RightTrigger2),
     (SdlButton::Back, Button::Select),
     (SdlButton::Start, Button::Start),
     (SdlButton::Guide, Button::Mode),
@@ -89,12 +92,17 @@ const SDL_AXES: [SdlAxis; 6] = [
 ];
 
 /// SDL 能识别、但不在原有固定按钮表内的按键
-const EXTRA_BUTTONS: [SdlButton; 6] = [
+const EXTRA_BUTTONS: [SdlButton; 11] = [
     SdlButton::Misc1,
-    SdlButton::Paddle1,
-    SdlButton::Paddle2,
-    SdlButton::Paddle3,
-    SdlButton::Paddle4,
+    SdlButton::Misc2,
+    SdlButton::Misc3,
+    SdlButton::Misc4,
+    SdlButton::Misc5,
+    SdlButton::Misc6,
+    SdlButton::LeftPaddle1,
+    SdlButton::RightPaddle1,
+    SdlButton::LeftPaddle2,
+    SdlButton::RightPaddle2,
     SdlButton::Touchpad,
 ];
 
@@ -130,8 +138,9 @@ impl Pad {
     }
 
     /// 连接时采样，避免漏掉打开设备前已按住的按钮
-    fn from_controller(controller: &GameController) -> Self {
-        let mut pad = Self::empty(controller.name(), detect_layout(controller));
+    fn from_controller(controller: &Gamepad, vendor: Option<u16>) -> Self {
+        let name = controller.name().unwrap_or_default();
+        let mut pad = Self::empty(name.clone(), detect_layout(&name, vendor));
         for (button, _) in SDL_BUTTONS {
             pad.set_button(button, controller.button(button));
         }
@@ -177,12 +186,12 @@ impl Pad {
             SdlAxis::RightY => (Axis::RightStickY, -value),
             SdlAxis::TriggerLeft => {
                 let value = value.max(0.0);
-                self.buttons[button_index(Button::LeftTrigger2).unwrap()] = value;
+                self.buttons[button_index(Button::LeftTrigger).unwrap()] = value;
                 (Axis::LeftZ, value)
             }
             SdlAxis::TriggerRight => {
                 let value = value.max(0.0);
-                self.buttons[button_index(Button::RightTrigger2).unwrap()] = value;
+                self.buttons[button_index(Button::RightTrigger).unwrap()] = value;
                 (Axis::RightZ, value)
             }
         };
@@ -219,19 +228,20 @@ impl Pad {
 ///
 /// 只影响界面上的按钮记号与状态图，猜错也能在设置里手动改。
 ///
-/// - `gamepad`: SDL 的手柄
+/// - `name`: SDL 给的手柄名
+/// - `vendor`: 厂商号，取不到时为 `None`
 ///
 /// # 返回值
 ///
 /// 认得出是 Xbox 还是 PlayStation 时返回对应外观；认不出返回 `None`
-fn detect_layout(gamepad: &GameController) -> Option<PadLayout> {
+fn detect_layout(name: &str, vendor: Option<u16>) -> Option<PadLayout> {
+    let name = name.to_lowercase();
     // 蓝牙手柄的名字普遍带 "wireless controller"，先认 Xbox，免得把 Xbox 判成索尼
-    if gamepad.vendor_id() == Some(0x045E) || gamepad.name().to_lowercase().contains("xbox") {
+    if vendor == Some(0x045E) || name.contains("xbox") {
         return Some(PadLayout::Xbox);
     }
     // 索尼：DualShock / DualSense，Windows 上常报成通用的 "Wireless Controller"
-    let name = gamepad.name().to_lowercase();
-    if gamepad.vendor_id() == Some(0x054C)
+    if vendor == Some(0x054C)
         || name.contains("dualsense")
         || name.contains("dualshock")
         || name.contains("playstation")
@@ -314,44 +324,44 @@ fn run() {
 
 /// 在同一线程内初始化、持有和释放所有 SDL 对象
 fn read_events() -> Result<(), String> {
-    // 游戏在前台时启动器仍需读取；提示必须在控制器子系统初始化前设置。
-    sdl2::hint::set("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "1");
-    let sdl = sdl2::init()?;
-    let subsystem = sdl.game_controller()?;
-    let mut events = sdl.event_pump()?;
+    // 游戏在前台时启动器仍需读取；提示必须在手柄子系统初始化前设置。
+    sdl3::hint::set("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "1");
+    let sdl = sdl3::init().map_err(|error| error.to_string())?;
+    let subsystem = sdl.gamepad().map_err(|error| error.to_string())?;
+    let mut events = sdl.event_pump().map_err(|error| error.to_string())?;
     let mut controllers = BTreeMap::new();
 
-    for index in 0..subsystem.num_joysticks()? {
-        open_controller(&subsystem, &mut controllers, index);
+    for id in subsystem.gamepads().map_err(|error| error.to_string())? {
+        open_controller(&subsystem, &mut controllers, id);
     }
 
     loop {
         for event in events.poll_iter() {
             match event {
-                Event::ControllerDeviceAdded { which, .. } => {
+                Event::GamepadAdded { which, .. } => {
                     open_controller(&subsystem, &mut controllers, which);
                 }
-                Event::ControllerDeviceRemoved { which, .. } => {
+                Event::GamepadRemoved { which, .. } => {
                     controllers.remove(&which);
-                    let removed = PADS.write().unwrap().remove(&u64::from(which));
+                    let removed = PADS.write().unwrap().remove(&pad_id(which));
                     if let Some(pad) = removed {
                         mml_log::info_type(InfoType::GamepadDisconnected { name: pad.name });
                     }
                 }
-                Event::ControllerButtonDown { which, button, .. } => {
-                    if let Some(pad) = PADS.write().unwrap().get_mut(&u64::from(which)) {
+                Event::GamepadButtonDown { which, button, .. } => {
+                    if let Some(pad) = PADS.write().unwrap().get_mut(&pad_id(which)) {
                         pad.set_button(button, true);
                     }
                 }
-                Event::ControllerButtonUp { which, button, .. } => {
-                    if let Some(pad) = PADS.write().unwrap().get_mut(&u64::from(which)) {
+                Event::GamepadButtonUp { which, button, .. } => {
+                    if let Some(pad) = PADS.write().unwrap().get_mut(&pad_id(which)) {
                         pad.set_button(button, false);
                     }
                 }
-                Event::ControllerAxisMotion {
+                Event::GamepadAxisMotion {
                     which, axis, value, ..
                 } => {
-                    if let Some(pad) = PADS.write().unwrap().get_mut(&u64::from(which)) {
+                    if let Some(pad) = PADS.write().unwrap().get_mut(&pad_id(which)) {
                         pad.set_axis(axis, value);
                     }
                 }
@@ -363,16 +373,25 @@ fn read_events() -> Result<(), String> {
     }
 }
 
-/// 新增事件的编号是设备索引，打开后的实例编号才用于后续状态与拔出事件
+/// SDL 的实例编号转成对外编号
+fn pad_id(id: JoystickId) -> u64 {
+    u64::from(u32::from(id))
+}
+
+/// 打开一只手柄；编号在 SDL3 里就是实例编号，初始枚举与新增事件都用它
 fn open_controller(
-    subsystem: &GameControllerSubsystem,
-    controllers: &mut BTreeMap<u32, GameController>,
-    index: u32,
+    subsystem: &GamepadSubsystem,
+    controllers: &mut BTreeMap<JoystickId, Gamepad>,
+    id: JoystickId,
 ) {
-    if !subsystem.is_game_controller(index) {
+    if !subsystem.is_gamepad(id) {
         return;
     }
-    let controller = match subsystem.open(index) {
+    // 初始枚举与队列里的新增事件可能指向同一只手柄。
+    if controllers.contains_key(&id) {
+        return;
+    }
+    let controller = match subsystem.open(id) {
         Ok(controller) => controller,
         Err(error) => {
             mml_log::warn_type(InfoType::GamepadInitFailed {
@@ -381,16 +400,11 @@ fn open_controller(
             return;
         }
     };
-    let id = controller.instance_id();
-    // 初始枚举与队列里的新增事件可能指向同一只手柄。
-    if controllers.contains_key(&id) {
-        return;
-    }
-    let pad = Pad::from_controller(&controller);
+    let pad = Pad::from_controller(&controller, subsystem.vendor_for_id(id));
     mml_log::info_type(InfoType::GamepadConnected {
         name: pad.name.clone(),
     });
-    PADS.write().unwrap().insert(u64::from(id), pad);
+    PADS.write().unwrap().insert(pad_id(id), pad);
     controllers.insert(id, controller);
 }
 

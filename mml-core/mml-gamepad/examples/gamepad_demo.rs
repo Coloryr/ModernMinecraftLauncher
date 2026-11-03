@@ -1,8 +1,13 @@
-//! SDL2 手柄读取验收：按键、摇杆、扳机、热插拔与后台输入。
+//! SDL3 手柄读取验收：按键、摇杆、扳机、热插拔与后台输入。
 //!
 //! 用法：cargo run -p mml-gamepad --example gamepad_demo -- 40
 //! 参数为时长秒数，缺省 30；每 0.5 秒打印快照，切到游戏前台后应仍有读数。
+//! 中途按 Ctrl+C 结束，会先打完当前这行再退出。
 use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     thread,
     time::{Duration, Instant},
 };
@@ -14,7 +19,7 @@ fn main() {
     let seconds = std::env::args()
         .nth(1)
         .and_then(|value| value.parse::<u64>().ok())
-        .unwrap_or(30)
+        .unwrap_or(20000)
         .max(2);
 
     // 日志与配置文件都落在 target/temp，不碰真实运行目录
@@ -24,16 +29,25 @@ fn main() {
     mml_log::start(&dir).unwrap();
     mml_gamepad::init(&dir);
 
-    println!("=== SDL2 手柄读取：{seconds} 秒 ===");
-    println!("请按键、推摇杆并插拔手柄；切到游戏前台后继续操作以检查后台输入。");
+    println!("=== SDL3 手柄读取：{seconds} 秒 ===");
+    println!("请按键、推摇杆并插拔手柄；切到游戏前台后继续操作以检查后台输入。按 Ctrl+C 结束。");
+
+    // Ctrl+C 只置一个标志，循环下一拍就退出，不会打断正在打的那一行
+    let stop = Arc::new(AtomicBool::new(false));
+    {
+        let stop = Arc::clone(&stop);
+        if ctrlc::set_handler(move || stop.store(true, Ordering::SeqCst)).is_err() {
+            println!("Ctrl+C 监听没装上，只能用时长参数结束");
+        }
+    }
 
     let started = Instant::now();
-    while started.elapsed() < Duration::from_secs(seconds) {
+    while !stop.load(Ordering::SeqCst) && started.elapsed() < Duration::from_secs(seconds) {
         dump(started.elapsed().as_secs_f64());
         thread::sleep(TICK);
     }
 
-    println!("\n=== 结束 ===");
+    println!("\n=== 结束（已跑 {:.1} 秒）===", started.elapsed().as_secs_f64());
 }
 
 /// 打一次当前手柄状态

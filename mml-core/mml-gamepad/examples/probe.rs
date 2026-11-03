@@ -1,14 +1,15 @@
-//! 只枚举 SDL 控制器，不创建窗口、不启动映射线程或发送游戏输入。
+//! 只枚举 SDL 手柄，不创建窗口、不启动映射线程或发送游戏输入。
 
 fn main() -> Result<(), String> {
-    let sdl = sdl2::init()?;
-    let subsystem = sdl.game_controller()?;
-    for index in 0..subsystem.num_joysticks()? {
-        if !subsystem.is_game_controller(index) {
-            continue;
-        }
-        let controller = subsystem.open(index).map_err(|error| error.to_string())?;
-        println!("[{}] {}", controller.instance_id(), controller.name());
+    let sdl = sdl3::init().map_err(|error| error.to_string())?;
+    let subsystem = sdl.gamepad().map_err(|error| error.to_string())?;
+    for id in subsystem.gamepads().map_err(|error| error.to_string())? {
+        let name = subsystem
+            .name_for_id(id)
+            .unwrap_or_else(|_| String::from("?"));
+        let vendor = subsystem.vendor_for_id(id).unwrap_or_default();
+        let product = subsystem.product_for_id(id).unwrap_or_default();
+        println!("[{id:?}] {name} vendor={vendor:#06x} product={product:#06x}");
     }
     Ok(())
 }

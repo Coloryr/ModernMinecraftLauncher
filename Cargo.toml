@@ -129,8 +129,7 @@ wgpu = { version = "~30.0.1", default-features = false, features = [
 ] }
 pollster = "~1.0.1"
 bytemuck = { version = "~1.25.2", features = ["derive"] }
-sdl2 = { version = "0.38", features = ["bundled", "static-link"] }
-
+sdl3 = { version = "~0.22", features = ["build-from-source", "static-link"] }
 tauri-plugin-dialog = "~2.7.3"
 window-vibrancy = "~0.8.1"
 font-kit = "~0.14.3"

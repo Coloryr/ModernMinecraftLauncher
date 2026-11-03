@@ -31,7 +31,7 @@ fn empty_state() {
 #[test]
 fn snapshot_keeps_values() {
     let mut pad = Pad::empty(String::from("test pad"), None);
-    pad.set_button(SdlButton::A, true);
+    pad.set_button(SdlButton::South, true);
     pad.set_axis(SdlAxis::LeftX, -i16::MAX);
 
     let state = pad.snapshot(7);
@@ -64,18 +64,21 @@ fn snapshot_keeps_values() {
 fn extras_append_in_first_seen_order() {
     let mut pad = Pad::empty(String::from("test pad"), None);
     // 初始松开事件不能让未用过的额外按钮提前出现在界面上。
-    pad.set_button(SdlButton::Paddle1, false);
+    pad.set_button(SdlButton::LeftPaddle1, false);
     assert!(pad.extras.is_empty());
-    pad.set_button(SdlButton::Paddle2, true);
-    pad.set_button(SdlButton::Paddle1, true);
+    pad.set_button(SdlButton::RightPaddle1, true);
+    pad.set_button(SdlButton::LeftPaddle1, true);
     // 松开第一颗：值归零，但它仍在原来的位置
-    pad.set_button(SdlButton::Paddle2, false);
+    pad.set_button(SdlButton::RightPaddle1, false);
 
     let state = pad.snapshot(1);
     let codes: Vec<u32> = state.extras.iter().map(|item| item.code).collect();
     assert_eq!(
         codes,
-        vec![SdlButton::Paddle2 as u32, SdlButton::Paddle1 as u32]
+        vec![
+            SdlButton::RightPaddle1 as u32,
+            SdlButton::LeftPaddle1 as u32
+        ]
     );
     assert_eq!(state.extras[0].value, 0.0);
     assert_eq!(state.extras[1].value, 1.0);
@@ -111,16 +114,16 @@ fn triggers_update_both_axis_and_button() {
         (
             SdlAxis::TriggerLeft,
             Axis::LeftZ,
-            Button::LeftTrigger2,
-            SdlButton::LeftShoulder,
             Button::LeftTrigger,
+            SdlButton::LeftShoulder,
+            Button::LeftTrigger2,
         ),
         (
             SdlAxis::TriggerRight,
             Axis::RightZ,
-            Button::RightTrigger2,
-            SdlButton::RightShoulder,
             Button::RightTrigger,
+            SdlButton::RightShoulder,
+            Button::RightTrigger2,
         ),
     ] {
         pad.set_button(shoulder, true);
