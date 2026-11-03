@@ -393,6 +393,18 @@
   min-width: 0;
 }
 
+/* ---------- 依赖提示条：某个功能需要游戏内 mod 才能生效 ---------- */
+
+.settings-layout .tip-note {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--text-dim);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
 /* ---------- 两态设置行：左标题 + 当前值，右 Switch ---------- */
 
 .settings-layout .switch-row {

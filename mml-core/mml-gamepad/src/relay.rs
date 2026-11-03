@@ -130,7 +130,13 @@ impl Relay {
         values: Option<&PadValues>,
         map: &CompiledMap,
         delta: f64,
-    ) {
+    ) {        // 游戏内手柄关着时什么都不发，并松开可能还按住的键
+        if !map.enabled {
+            self.release_all();
+            self.pad = None;
+            return;
+        }
+
         if target != self.target {
             self.release_all();
             self.target = target;

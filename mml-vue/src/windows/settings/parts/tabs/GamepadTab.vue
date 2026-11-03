@@ -6,6 +6,7 @@
 import { computed, onMounted, ref } from "vue";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../../components/ui/BaseModal.vue";
+import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
 import SettingsGroup from "../SettingsGroup.vue";
 import GamepadTestPanel from "../GamepadTestPanel.vue";
 import GamepadKeyPicker from "../GamepadKeyPicker.vue";
@@ -172,6 +173,16 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
     <GamepadTestPanel :layout="config?.layout ?? null" :swap-ab="config?.swapAb ?? null"
       @detected="detected = $event" @update:layout="setLayout" @update:swap-ab="setSwapAb" />
 
+    <!-- 游戏内手柄总开关：关着时只用于界面上的测试与预览 -->
+    <div v-if="config" class="switch-row">
+      <div class="switch-text">
+        <span class="switch-label">{{ t("winGamepad.ingame") }}</span>
+        <span class="switch-state">{{ t("winGamepad.ingameHint") }}</span>
+      </div>
+      <BaseSwitch :model-value="config.enabled" @update:model-value="(value) => config && (config.enabled = value)" />
+    </div>
+    <p v-if="config?.enabled" class="tip-note">{{ t("winGamepad.ingameAsm") }}</p>
+
     <p v-if="!editing" class="empty-tip">{{ t("winGamepad.empty") }}</p>
     <p v-else-if="!config" class="empty-tip">{{ t("winGamepad.broken") }}</p>
 
@@ -321,9 +332,10 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
 .gp-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
-  margin-bottom: 16px;
+  /* 上面是分组标题与副标题，紧贴着会看着像标题的附属控件 */
+  margin: 14px 0 16px;
 }
 
 .gp-bar-label {

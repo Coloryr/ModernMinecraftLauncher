@@ -117,6 +117,9 @@ impl Default for PadLayout {
 pub struct GamepadConfig {
     /// 是否当前生效的配置；多份为 true 时取文件名排序第一份
     pub selected: bool,
+    /// 是否启用游戏内手柄：关掉时转发线程不下发任何输入
+    #[serde(default)]
+    pub enabled: bool,
     /// 手柄外观，只影响配置界面的记号
     pub layout: PadLayout,
     /// 是否交换 A / B 两个位置，按 Nintendo 布局的习惯显示
@@ -229,6 +232,8 @@ pub enum GamepadError {
 /// 编译后的映射表，转发线程按状态数组下标直接查
 #[derive(Debug, Clone)]
 pub struct CompiledMap {
+    /// 是否启用游戏内手柄
+    pub enabled: bool,
     /// 按钮规则
     pub buttons: Vec<ButtonRuleCompiled>,
     /// 轴规则
@@ -338,6 +343,8 @@ impl Default for GamepadConfig {
         Self {
             // 缺 Selected 的配置不参与生效，默认那份在写文件时显式打开
             selected: false,
+            // 游戏内手柄默认关：要配好映射、装好 coloryrasm 再打开
+            enabled: false,
             layout: PadLayout::default(),
             swap_ab: false,
             buttons: vec![
@@ -433,6 +440,7 @@ impl GamepadConfig {
         }
 
         Ok(CompiledMap {
+            enabled: self.enabled,
             buttons,
             axes,
             mouse: MouseRuleCompiled {

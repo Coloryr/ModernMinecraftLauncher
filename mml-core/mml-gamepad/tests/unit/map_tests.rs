@@ -220,3 +220,15 @@ fn missing_mode_defaults_to_normal() {
     let rule: ButtonRule = serde_json::from_str(text).unwrap();
     assert_eq!(rule.mode, ButtonMode::Normal);
 }
+
+/// 游戏内手柄默认关，编译后原样带给转发线程
+#[test]
+fn enabled_defaults_to_false() {
+    let config = GamepadConfig::default();
+    assert!(!config.enabled);
+    assert!(!config.compile().unwrap().enabled);
+
+    let mut on = GamepadConfig::default();
+    on.enabled = true;
+    assert!(on.compile().unwrap().enabled);
+}

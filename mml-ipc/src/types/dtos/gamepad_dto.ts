@@ -63,6 +63,7 @@ export type GamepadLayoutDto = "xbox" | "playstation";
 
 export type GamepadConfigDto = {
   selected: boolean,
+  enabled: boolean,
   layout: GamepadLayoutDto,
   swapAb: boolean,
   buttons: GamepadButtonRuleDto[],

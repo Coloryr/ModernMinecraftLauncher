@@ -210,6 +210,8 @@ pub enum GamepadLayoutDto {
 pub struct GamepadConfigDto {
     /// 是否当前生效
     pub selected: bool,
+    /// 是否启用游戏内手柄；关掉时不下发任何输入
+    pub enabled: bool,
     /// 手柄外观，只影响配置界面的记号
     pub layout: GamepadLayoutDto,
     /// 是否交换 A / B 两个位置

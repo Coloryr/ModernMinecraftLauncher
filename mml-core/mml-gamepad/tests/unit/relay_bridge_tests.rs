@@ -119,7 +119,10 @@ fn tcp_relay_releases_on_mode_device_target_changes_and_reconnect() {
     let mut other = connect(port, other_uuid, false);
     assert!(mml_ipc::is_game_connected(uuid));
     assert_eq!(target_instance(), Some(uuid));
-    let map = GamepadConfig::default().compile().unwrap();
+    // 转发默认是关的，这里显式打开
+    let mut config = GamepadConfig::default();
+    config.enabled = true;
+    let map = config.compile().unwrap();
     let mut relay = Relay::new();
     let mut values = PadValues {
         buttons: [0.0; BUTTON_COUNT],

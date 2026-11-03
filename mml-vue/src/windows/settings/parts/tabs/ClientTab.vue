@@ -332,6 +332,10 @@ watch(lockServerError, async (msg) => {
         <BaseSwitch :model-value="win.cycleTitle" @update:model-value="updateWindow('cycleTitle', $event)" />
       </div>
     </div>
+    <!-- 游戏窗口标题由 coloryrasm 在游戏内改，没装就看不到效果 -->
+    <p v-if="win.editTitle || win.randomTitle || win.cycleTitle" class="tip-note">
+      {{ t("winSettings.gameTitleAsm") }}
+    </p>
     <template v-if="win.editTitle">
       <label class="field-label">{{ t("winSettings.gameTitle") }}</label>
       <input :value="win.gameTitle" class="field-input" spellcheck="false" autocomplete="off"

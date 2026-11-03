@@ -306,6 +306,7 @@ fn stick_to_dto(stick: Stick) -> GamepadStickDto {
 fn config_to_dto(config: &GamepadConfig) -> GamepadConfigDto {
     GamepadConfigDto {
         selected: config.selected,
+        enabled: config.enabled,
         layout: layout_to_dto(config.layout),
         swap_ab: config.swap_ab,
         buttons: config
@@ -342,6 +343,7 @@ fn config_to_dto(config: &GamepadConfig) -> GamepadConfigDto {
 fn config_from_dto(dto: GamepadConfigDto) -> GamepadConfig {
     GamepadConfig {
         selected: dto.selected,
+        enabled: dto.enabled,
         layout: layout_from_dto(dto.layout),
         swap_ab: dto.swap_ab,
         buttons: dto
