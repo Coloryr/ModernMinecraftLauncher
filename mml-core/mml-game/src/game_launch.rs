@@ -20,7 +20,7 @@ use mml_base::{
     serialize_tools,
 };
 use mml_names::{
-    i18_items::error_type::{CoreResult, ErrorType, PathNotExistsData},
+    i18_items::error_type::{CoreResult, ErrorType},
     names,
 };
 use mml_sys::{path_helper, process_helper};
@@ -29,6 +29,7 @@ use uuid::Uuid;
 
 use crate::error::stream_err;
 use crate::{
+    cmd_shell,
     game_arg::GameLaunchObj,
     game_log::GameLog,
     game_saves::SaveObj,
@@ -662,7 +663,9 @@ impl InstanceSettingObj {
 
     /// 按命令行文本启动一个进程，并把输出接到实例日志上
     ///
-    /// - `cmd`: 命令行文本，首行是程序名，其余按空白拆成参数
+    /// 命令怎么拆、脚本用哪个解释器见 [`crate::cmd_shell`]。
+    ///
+    /// - `cmd`: 命令行文本
     /// - `env`: 额外环境变量
     /// - `wait_run`: 是否等待执行完成
     /// - `admin`: 是否以管理员方式启动
@@ -677,33 +680,11 @@ impl InstanceSettingObj {
         wait_run: bool,
         admin: bool,
     ) -> CoreResult<()> {
-        let args: Vec<&str> = cmd.split('\n').collect();
-        let name = args[0].trim();
+        let base = self.get_base_path();
+        let command = cmd_shell::resolve(cmd, &base, &self.get_game_path())?;
 
-        let mut path = PathBuf::from(name);
-        if !path.exists() {
-            path = self.get_base_path().join(name);
-        }
-
-        if !path.exists() {
-            path = self.get_game_path().join(name);
-        }
-
-        if !path.exists() {
-            return Err(ErrorType::PathNotExists(PathNotExistsData {
-                path: PathBuf::from(name),
-            }));
-        }
-
-        // 收集参数，跳过第 0 个，那是程序名本身
-        let proc_args: Vec<String> = args
-            .iter()
-            .skip(1)
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
-
-        match process_helper::launch(&path, proc_args, env.clone(), &self.get_game_path(), admin) {
+        // 工作目录是实例根目录，和双击 bat 一致：相对路径照 bat 写，游戏目录用 %GAME_DIR% 取
+        match process_helper::launch(&command.program, command.args, env.clone(), &base, admin) {
             Ok(mut result) => {
                 // 读取 stdout 线程
                 if let Some(stdout) = result.stdout {
@@ -978,6 +959,8 @@ impl InstanceSettingObj {
                 }
                 let start = Instant::now();
                 let temp = self.replace_arg(&jvm, &jvm_arg, &pre_run_cmd);
+                cmd_shell::ensure_runner(&temp, &self.get_base_path(), &self.get_game_path())
+                    .await?;
                 self.cmd_run(&temp, &env, prerun, arg.admin)?;
                 let time = start.elapsed();
                 crate::add_game_log_item(&self.uuid, GameLog::CmdPreTime(time));
@@ -1031,6 +1014,8 @@ impl InstanceSettingObj {
                 }
                 let start = Instant::now();
                 let temp = self.replace_arg(&jvm, &jvm_arg, &post_run_cmd);
+                cmd_shell::ensure_runner(&temp, &self.get_base_path(), &self.get_game_path())
+                    .await?;
                 self.cmd_run(&temp, &env, false, arg.admin)?;
                 let time = start.elapsed();
                 crate::add_game_log_item(&self.uuid, GameLog::CmdPostTime(time));

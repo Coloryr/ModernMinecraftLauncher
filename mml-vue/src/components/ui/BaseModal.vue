@@ -152,4 +152,5 @@ const active = usePageActive();
   opacity: 0.45;
   cursor: default;
 }
+
 </style>

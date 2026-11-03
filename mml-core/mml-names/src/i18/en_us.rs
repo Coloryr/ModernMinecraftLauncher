@@ -31,6 +31,7 @@ impl I18Lang for EnUs {
             InfoType::CoreStart => format!("M²L started, version: {}", *VERSION),
             InfoType::CoreStop => String::from("M²L stopped"),
             InfoType::TempFile => String::from("Temporary files"),
+            InfoType::PythonRuntime => String::from("Python runtime"),
             InfoType::AdoptMmcInstance { name } => format!("adopted MMC instance: {name}"),
             InfoType::ImportLegacyGroups { groups, instances } => format!(
                 "imported legacy group file instgroups.json: {groups} new groups, {instances} instances"
@@ -174,6 +175,14 @@ impl I18Lang for EnUs {
             ErrorType::SerializerError(data) => format!("JSON parse failed: {}", data.error),
             ErrorType::PathNotExists(data) => {
                 format!("Path not found: {}", data.path.display().to_string())
+            }
+            ErrorType::ScriptRunnerMissing(data) => format!(
+                "Cannot run script {}: {} was not found",
+                data.path.display(),
+                data.runner
+            ),
+            ErrorType::ScriptUnsupported(data) => {
+                format!("Script {} cannot run on this system", data.path.display())
             }
 
             ErrorType::AuthFail(data) => format!("Account operation failed: {}", data),

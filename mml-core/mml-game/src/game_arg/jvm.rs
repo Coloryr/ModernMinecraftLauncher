@@ -61,6 +61,9 @@ impl InstanceSettingObj {
         }
 
         if colorasm && let Some(mixin) = mixin {
+            // 内置 jar 要先落到运行库目录：检查阶段会跳过没有下载地址的本地库，
+            // 没人写它时 -javaagent 指向一个不存在的文件，JVM 直接起不来
+            launcher_path::ready_colorasm()?;
             args.push(format!("-Dcoloryrasm.mixin.port={}", mixin.port));
             args.push(format!("-Dcoloryrasm.mixin.uuid={}", self.uuid));
             args.push(format!("-Dcoloryrasm.mixin.key={}", mixin.key));

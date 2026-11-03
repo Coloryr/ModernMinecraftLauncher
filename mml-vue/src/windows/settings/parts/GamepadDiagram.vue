@@ -22,6 +22,13 @@ const props = defineProps<{
   layout: GamepadLayoutDto;
   /** 是否交换 A / B 两个位置 */
   swapAb: boolean;
+  /** 是否允许点击图上的按键选中它们 */
+  interactive?: boolean;
+}>();
+
+const emit = defineEmits<{
+  /** 点中图上某个按键 */
+  (event: "pick", value: GamepadButtonDto): void;
 }>();
 
 /** 一个点的坐标，单位与 SVG 的 viewBox 一致 */
@@ -107,6 +114,15 @@ function value(button: GamepadButtonDto): number {
   return props.state?.buttons.find((item) => item.button === button)?.value ?? 0;
 }
 
+/**
+ * 点中图上的按键
+ *
+ * - `button`: 被点到的键
+ */
+function pick(button: GamepadButtonDto) {
+  if (props.interactive) emit("pick", button);
+}
+
 /** 按钮是否算按下 */
 function pressed(button: GamepadButtonDto): boolean {
   return value(button) >= 0.5;
@@ -185,13 +201,15 @@ function dpadArm(side: "up" | "down" | "left" | "right"): { x: number; y: number
 
       <!-- 扳机：键程用底部细条表示，标签不压在填充上 -->
       <g>
-        <rect class="pad-key" :class="{ on: pressed('leftTrigger') }" :x="geo.bumperLeft.x"
+        <rect class="pad-key" :class="{ on: pressed('leftTrigger'), pickable: interactive }" :x="geo.bumperLeft.x"
+          @click="pick('leftTrigger')"
           :y="geo.triggerY" :width="geo.bumperLeft.w" :height="geo.triggerH" rx="9" />
         <rect class="pad-fill" :x="geo.bumperLeft.x + 2" :y="geo.triggerY + geo.triggerH - 7"
           :width="triggerWidth('leftTrigger')" height="3" rx="1.5" />
         <text class="pad-cap" :class="{ on: pressed('leftTrigger') }" :x="midX(geo.bumperLeft)"
           :y="geo.triggerY + geo.triggerH / 2">{{ label("leftTrigger") }}</text>
-        <rect class="pad-key" :class="{ on: pressed('rightTrigger') }" :x="geo.bumperRight.x"
+        <rect class="pad-key" :class="{ on: pressed('rightTrigger'), pickable: interactive }" :x="geo.bumperRight.x"
+          @click="pick('rightTrigger')"
           :y="geo.triggerY" :width="geo.bumperRight.w" :height="geo.triggerH" rx="9" />
         <rect class="pad-fill" :x="geo.bumperRight.x + 2" :y="geo.triggerY + geo.triggerH - 7"
           :width="triggerWidth('rightTrigger')" height="3" rx="1.5" />
@@ -201,11 +219,13 @@ function dpadArm(side: "up" | "down" | "left" | "right"): { x: number; y: number
 
       <!-- 肩键 -->
       <g>
-        <rect class="pad-key" :class="{ on: pressed('leftTrigger2') }" :x="geo.bumperLeft.x"
+        <rect class="pad-key" :class="{ on: pressed('leftTrigger2'), pickable: interactive }" :x="geo.bumperLeft.x"
+          @click="pick('leftTrigger2')"
           :y="geo.shoulderY" :width="geo.bumperLeft.w" :height="geo.shoulderH" rx="8" />
         <text class="pad-cap" :class="{ on: pressed('leftTrigger2') }" :x="midX(geo.bumperLeft)"
           :y="geo.shoulderY + geo.shoulderH / 2">{{ label("leftTrigger2") }}</text>
-        <rect class="pad-key" :class="{ on: pressed('rightTrigger2') }" :x="geo.bumperRight.x"
+        <rect class="pad-key" :class="{ on: pressed('rightTrigger2'), pickable: interactive }" :x="geo.bumperRight.x"
+          @click="pick('rightTrigger2')"
           :y="geo.shoulderY" :width="geo.bumperRight.w" :height="geo.shoulderH" rx="8" />
         <text class="pad-cap" :class="{ on: pressed('rightTrigger2') }" :x="midX(geo.bumperRight)"
           :y="geo.shoulderY + geo.shoulderH / 2">{{ label("rightTrigger2") }}</text>
@@ -213,7 +233,7 @@ function dpadArm(side: "up" | "down" | "left" | "right"): { x: number; y: number
 
       <!-- 左摇杆：外圈按下（L3）时高亮，内点按轴偏移 -->
       <g>
-        <circle class="pad-stick" :class="{ on: pressed('leftThumb') }" :cx="geo.leftStick.x"
+        <circle class="pad-stick" :class="{ on: pressed('leftThumb'), pickable: interactive }" @click="pick('leftThumb')" :cx="geo.leftStick.x"
           :cy="geo.leftStick.y" r="20" />
         <circle class="pad-dot" :cx="geo.leftStick.x + axis('leftStickX') * 9"
           :cy="geo.leftStick.y - axis('leftStickY') * 9" r="7" />
@@ -222,21 +242,21 @@ function dpadArm(side: "up" | "down" | "left" | "right"): { x: number; y: number
       <!-- 十字键：底下一个十字，四个方向的键单独叠上去，按下就点亮 -->
       <g>
         <path class="pad-key" :d="dpadPath()" />
-        <rect class="pad-arm" :class="{ on: pressed('dPadUp') }" :x="dpadArm('up').x" :y="dpadArm('up').y"
+        <rect class="pad-arm" :class="{ on: pressed('dPadUp'), pickable: interactive }" @click="pick('dPadUp')" :x="dpadArm('up').x" :y="dpadArm('up').y"
           width="14" height="14" rx="3" />
-        <rect class="pad-arm" :class="{ on: pressed('dPadDown') }" :x="dpadArm('down').x"
+        <rect class="pad-arm" :class="{ on: pressed('dPadDown'), pickable: interactive }" @click="pick('dPadDown')" :x="dpadArm('down').x"
           :y="dpadArm('down').y" width="14" height="14" rx="3" />
-        <rect class="pad-arm" :class="{ on: pressed('dPadLeft') }" :x="dpadArm('left').x"
+        <rect class="pad-arm" :class="{ on: pressed('dPadLeft'), pickable: interactive }" @click="pick('dPadLeft')" :x="dpadArm('left').x"
           :y="dpadArm('left').y" width="14" height="14" rx="3" />
-        <rect class="pad-arm" :class="{ on: pressed('dPadRight') }" :x="dpadArm('right').x"
+        <rect class="pad-arm" :class="{ on: pressed('dPadRight'), pickable: interactive }" @click="pick('dPadRight')" :x="dpadArm('right').x"
           :y="dpadArm('right').y" width="14" height="14" rx="3" />
       </g>
 
       <!-- 功能键只显示 View / Menu -->
       <g>
-        <circle class="pad-key" :class="{ on: pressed('select') }" :cx="geo.select.x" :cy="geo.select.y"
+        <circle class="pad-key" :class="{ on: pressed('select'), pickable: interactive }" @click="pick('select')" :cx="geo.select.x" :cy="geo.select.y"
           r="10" />
-        <circle class="pad-key" :class="{ on: pressed('start') }" :cx="geo.start.x" :cy="geo.start.y"
+        <circle class="pad-key" :class="{ on: pressed('start'), pickable: interactive }" @click="pick('start')" :cx="geo.start.x" :cy="geo.start.y"
           r="10" />
         <text class="pad-cap pad-cap-key" :class="{ on: pressed('select') }" :x="geo.select.x"
           :y="geo.select.y">{{ label("select")[0] }}</text>
@@ -246,7 +266,7 @@ function dpadArm(side: "up" | "down" | "left" | "right"): { x: number; y: number
 
       <!-- 右摇杆 -->
       <g>
-        <circle class="pad-stick" :class="{ on: pressed('rightThumb') }" :cx="geo.rightStick.x"
+        <circle class="pad-stick" :class="{ on: pressed('rightThumb'), pickable: interactive }" @click="pick('rightThumb')" :cx="geo.rightStick.x"
           :cy="geo.rightStick.y" r="20" />
         <circle class="pad-dot" :cx="geo.rightStick.x + axis('rightStickX') * 9"
           :cy="geo.rightStick.y - axis('rightStickY') * 9" r="7" />
@@ -254,8 +274,8 @@ function dpadArm(side: "up" | "down" | "left" | "right"): { x: number; y: number
 
       <!-- 右侧四键：位置由外观决定，记号跟着外观与 A / B 交换走 -->
       <g>
-        <circle v-for="side in FACE_SIDES" :key="side" class="pad-key" :class="{ on: pressed(side) }"
-          :cx="facePoint(side).x" :cy="facePoint(side).y" :r="geo.faceRadius" />
+        <circle v-for="side in FACE_SIDES" :key="side" class="pad-key" :class="{ on: pressed(side), pickable: interactive }"
+          :cx="facePoint(side).x" :cy="facePoint(side).y" :r="geo.faceRadius" @click="pick(side)" />
         <text v-for="side in FACE_SIDES" :key="side" class="pad-label" :class="{ on: pressed(side) }"
           :x="facePoint(side).x" :y="facePoint(side).y">{{ label(side) }}</text>
       </g>
@@ -333,6 +353,13 @@ function dpadArm(side: "up" | "down" | "left" | "right"): { x: number; y: number
 
 .pad-dot {
   fill: var(--accent);
+}
+
+/* 选择器里图上的键都能点，鼠标移上去给个手型 */
+.pad-key.pickable,
+.pad-arm.pickable,
+.pad-stick.pickable {
+  cursor: pointer;
 }
 
 .pad-cap,

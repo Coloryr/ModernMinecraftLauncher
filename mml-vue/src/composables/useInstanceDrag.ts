@@ -131,13 +131,16 @@ export function useInstanceDrag(deps: DragDeps) {
     document.body.classList.remove("drag-active");
   }
 
-  /** 按指针位置算插入占位 */
+  /** 按指针位置算插入位置 */
   function updateDragInsert(e: PointerEvent) {
     const active = dragActive.value;
     if (!active) return;
     const el = elementBeneathShield(e.clientX, e.clientY);
-    // 靠近分组列表边缘自动滚动，方便投放到远处的分组
-    const listEl = el?.closest?.(".group-list") as HTMLElement | null;
+    // 靠近分组列表边缘自动滚动，方便投放到远处的分组。
+    // 粘滞分组头盖在列表顶部、本身不在滚动容器里，只按 closest 找会拿不到容器，往上拖时就不滚了
+    const listEl = (el?.closest?.(".group-list") ??
+      el?.closest?.(".sidebar")?.querySelector?.(".group-list") ??
+      null) as HTMLElement | null;
     if (listEl) {
       const rect = listEl.getBoundingClientRect();
       // 边缘热区，单位 px
@@ -146,8 +149,6 @@ export function useInstanceDrag(deps: DragDeps) {
       else if (e.clientY > rect.bottom - threshold) listEl.scrollTop += 10;
     }
     if (active.kind === "instance") {
-      // 行是虚拟滚动的，只渲染视口附近那几行：落点按"压在哪一行、行上半还是下半"加该行的
-      // data-idx 算，不能数渲染出来的行数（被藏起来的行没有 DOM）
       const groupEl = (el?.closest?.("[data-group]") ?? null) as HTMLElement | null;
       if (!groupEl) {
         dragInsert.value = null;
@@ -155,6 +156,45 @@ export function useInstanceDrag(deps: DragDeps) {
       }
       // data-group 存的是分组 uuid（身份；组名可改）；默认分组也有 uuid，只有拿不到分组表时才是空串
       const groupId = groupEl.dataset.group ?? "";
+      // data-idx 是组内完整下标（含正在拖的那个），接口要的是"拿掉它之后"的下标
+      const dragged =
+        deps.groups.value
+          .find((g) => g.id === groupId)
+          ?.items.findIndex((i) => i.uuid === active.instance?.uuid) ?? -1;
+      const setIndex = (index: number) => {
+        dragInsert.value = { groupId, index: dragged >= 0 && dragged < index ? index - 1 : index };
+      };
+
+      // 占满模式下组内是网格卡片：按指针落在卡片左 / 右半区算插到它前面还是后面
+      const tile = el?.closest?.(".tile") as HTMLElement | null;
+      if (tile) {
+        if (tile.classList.contains("add-tile")) {
+          setIndex(0);
+          return;
+        }
+        const rect = tile.getBoundingClientRect();
+        const at = Number(tile.dataset.idx ?? 0);
+        setIndex(e.clientX > rect.left + rect.width / 2 ? at + 1 : at);
+        return;
+      }
+      // 落在卡片之间的空隙里：按同一行卡片的水平中线找插入点
+      const tileRow = el?.closest?.(".vrow-tiles") as HTMLElement | null;
+      if (tileRow) {
+        const tiles = [...tileRow.querySelectorAll(".tile[data-idx]")] as HTMLElement[];
+        let index = tiles.length ? Number(tiles[tiles.length - 1].dataset.idx ?? 0) + 1 : 0;
+        for (const item of tiles) {
+          const rect = item.getBoundingClientRect();
+          if (e.clientX < rect.left + rect.width / 2) {
+            index = Number(item.dataset.idx ?? 0);
+            break;
+          }
+        }
+        setIndex(index);
+        return;
+      }
+
+      // 列表模式：行是虚拟滚动的，只渲染视口附近那几行，落点按"压在哪一行、行上半还是下半"
+      // 加该行的 data-idx 算，不能数渲染出来的行数（被藏起来的行没有 DOM）
       const rows = listEl
         ? ([...listEl.querySelectorAll(".inst-row")] as HTMLElement[]).filter(
           (r) => r.dataset.group === groupId,
@@ -170,13 +210,7 @@ export function useInstanceDrag(deps: DragDeps) {
         }
         index = at + 1;
       }
-      // data-idx 是组内完整下标（含正在拖的那个），接口要的是"拿掉它之后"的下标
-      const dragged =
-        deps.groups.value
-          .find((g) => g.id === groupId)
-          ?.items.findIndex((i) => i.uuid === active.instance?.uuid) ?? -1;
-      if (dragged >= 0 && dragged < index) index -= 1;
-      dragInsert.value = { groupId, index };
+      setIndex(index);
     } else {
       // 分组标题行带 data-gi，同样按它算插到第几个分组之前
       const headers = listEl ? ([...listEl.querySelectorAll("[data-gi]")] as HTMLElement[]) : [];

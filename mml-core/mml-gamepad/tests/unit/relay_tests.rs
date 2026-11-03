@@ -82,3 +82,33 @@ fn dpad_maps_to_scroll() {
     assert!(desired_actions(&map, &values, true).contains(&Action::Scroll(1)));
 }
 
+/// 组合规则命中后按书写顺序给出步骤，松开时反序
+#[test]
+fn combo_rule_keeps_order() {
+    let mut config = map::GamepadConfig::default();
+    // 只留这一条规则，免得默认绑定（LT 就是 MouseLeft）混进来
+    config.buttons.clear();
+    config.axes.clear();
+    config.buttons.push(map::ButtonRule {
+        button: Button::DPadLeft,
+        modifier: Some(Button::LeftTrigger),
+        action: String::from("LeftAlt+E"),
+    });
+    let map = config.compile().unwrap();
+
+    let mut values = empty_values();
+    values.buttons[button_index(Button::LeftTrigger).unwrap()] = 1.0;
+    values.buttons[button_index(Button::DPadLeft).unwrap()] = 1.0;
+
+    let rules = desired_rules(&map, &values, true);
+    assert_eq!(rules.len(), 1);
+    let combo = combo_of(&map, *rules.iter().next().unwrap()).unwrap();
+    assert_eq!(
+        combo.press().collect::<Vec<_>>(),
+        vec![Action::Key(342), Action::Key(69)]
+    );
+    assert_eq!(
+        combo.release().collect::<Vec<_>>(),
+        vec![Action::Key(69), Action::Key(342)]
+    );
+}

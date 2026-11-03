@@ -11,10 +11,14 @@ import BaseButton from "../../components/ui/BaseButton.vue";
 
 /** .minecraft 探测结果：目录、版本列表与会搬的顶层条目 */
 const props = defineProps<{ info: MinecraftInfoDto }>();
-/** `done` 表示实例已建好，父组件据此重拉实例列表；`busy` 表示正在搬，弹窗不许关 */
+/**
+ * `done` 表示实例已建好，父组件据此重拉实例列表；`busy` 表示正在搬，弹窗不许关；
+ * `skip` 表示选了不导入，父组件在没别的待答节时收起弹窗
+ */
 const emit = defineEmits<{
   (e: "done"): void;
   (e: "busy", busy: boolean): void;
+  (e: "skip"): void;
 }>();
 
 /** 版本列表，按 id 排序 */
@@ -86,7 +90,7 @@ async function importVersion() {
   }
 }
 
-/** 不导入：记下标记后收起 */
+/** 不导入：记下标记后收起本节，并让父组件判断整个弹窗是否该关 */
 async function skip() {
   try {
     await api.skipMinecraft();
@@ -94,6 +98,7 @@ async function skip() {
     /* 标记没写上顶多下次再问一次 */
   }
   settled.value = true;
+  emit("skip");
 }
 </script>
 

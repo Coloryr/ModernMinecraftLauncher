@@ -21,7 +21,7 @@ fn default_map_compiles() {
     assert!(
         map.buttons
             .iter()
-            .any(|rule| rule.index == south && rule.action == Action::Key(32))
+            .any(|rule| rule.index == south && rule.combo.steps.contains(&Action::Key(32)))
     );
 }
 
@@ -182,3 +182,19 @@ fn signature_changes_with_file() {
     assert_eq!(first, signature(&dir));
 }
 
+/// 组合动作保留书写顺序，松开时反序
+#[test]
+fn combo_keeps_press_and_release_order() {
+    let combo = parse_combo("LeftAlt+E").unwrap();
+    assert_eq!(
+        combo.press().collect::<Vec<_>>(),
+        vec![Action::Key(342), Action::Key(69)]
+    );
+    assert_eq!(
+        combo.release().collect::<Vec<_>>(),
+        vec![Action::Key(69), Action::Key(342)]
+    );
+    // 空项与重复都要拒绝
+    assert!(parse_combo("LeftAlt+").is_err());
+    assert!(parse_combo("E+E").is_err());
+}

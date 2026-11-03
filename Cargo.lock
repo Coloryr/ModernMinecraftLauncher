@@ -3362,6 +3362,7 @@ dependencies = [
  "mml-net",
  "mml-sys",
  "mml-testutil",
+ "mml-tools",
  "notify",
  "rayon",
  "regex",
@@ -3644,6 +3645,17 @@ dependencies = [
  "uuid",
  "webview2-com",
  "windows 0.62.2",
+]
+
+[[package]]
+name = "mml-tools"
+version = "0.1.0"
+dependencies = [
+ "mml-base",
+ "mml-downloader",
+ "mml-names",
+ "mml-sys",
+ "mml-testutil",
 ]
 
 [[package]]

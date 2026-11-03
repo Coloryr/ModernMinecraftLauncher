@@ -7,9 +7,10 @@ import { computed, onMounted, ref } from "vue";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../../components/ui/BaseModal.vue";
 import SettingsGroup from "../SettingsGroup.vue";
-import ActionSelect from "../ActionSelect.vue";
 import GamepadTestPanel from "../GamepadTestPanel.vue";
-import { ALL_AXES, ALL_BUTTONS, axisLabel, buttonLabel } from "../../gamepadLabels";
+import GamepadKeyPicker from "../GamepadKeyPicker.vue";
+import GamepadActionPicker from "../GamepadActionPicker.vue";
+import { ALL_AXES, axisLabel } from "../../gamepadLabels";
 import { t } from "../../../../lib/i18n";
 import type { GamepadAxisDto, GamepadButtonDto, GamepadLayoutDto } from "../../../../lib/bindings";
 import type { useSettingsGamepad } from "../../composables/useSettingsGamepad";
@@ -57,11 +58,6 @@ const detected = ref<GamepadLayoutDto | null>(null);
 /** 表格里实际用的外观 */
 const effectiveLayout = computed(() => detected.value ?? config.value?.layout ?? "xbox");
 
-/** 取按钮记号：随外观与 A / B 交换变 */
-function label(button: GamepadButtonDto): string {
-  return buttonLabel(button, effectiveLayout.value, config.value?.swapAb ?? false);
-}
-
 /** 取轴记号 */
 function axisName(axis: GamepadAxisDto): string {
   return axisLabel(axis);
@@ -98,6 +94,27 @@ function setLayout(value: GamepadLayoutDto) {
  */
 function setSwapAb(value: boolean) {
   if (config.value) config.value.swapAb = value;
+}
+
+/**
+ * 选择器改主键：清空时保留原值，避免把一行弄成没有触发键
+ *
+ * - `rule`: 正在编辑的按钮规则
+ * - `value`: 选中的主键，null 表示用户没选
+ */
+function setRuleButton(rule: { button: GamepadButtonDto }, value: GamepadButtonDto | null) {
+  if (!value) return;
+  rule.button = value;
+}
+
+/**
+ * 选择器改组合键的修饰键
+ *
+ * - `rule`: 正在编辑的按钮规则
+ * - `value`: 修饰键，null 表示取消组合
+ */
+function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: GamepadButtonDto | null) {
+  rule.modifier = value;
 }
 </script>
 
@@ -137,37 +154,23 @@ function setSwapAb(value: boolean) {
         <p class="field-desc">{{ t("winGamepad.buttonHint") }}</p>
         <div class="gp-row gp-row-head gp-row-button">
           <span>{{ t("winGamepad.button") }}</span>
-          <span>{{ t("winGamepad.modifier") }}</span>
           <span>{{ t("winGamepad.action") }}</span>
           <span></span>
         </div>
         <div v-for="(rule, index) in config.buttons" :key="index" class="gp-row gp-row-button">
-          <span class="gp-key">{{ label(rule.button) }}</span>
-          <select v-model="rule.modifier" class="field-select">
-            <option :value="null">{{ t("winGamepad.modifierNone") }}</option>
-            <option v-for="button in ALL_BUTTONS" :key="button" :value="button" :disabled="button === rule.button">
-              {{ label(button) }}
-            </option>
-          </select>
-          <ActionSelect v-model="rule.action" :actions="actions" />
+          <GamepadKeyPicker :button="rule.button" :modifier="rule.modifier" :layout="effectiveLayout"
+            :swap-ab="config.swapAb" @update:button="(value) => setRuleButton(rule, value)"
+            @update:modifier="(value) => setRuleModifier(rule, value)" />
+          <GamepadActionPicker v-model="rule.action" :actions="actions" />
           <BaseButton size="sm" variant="ghost" class="gp-remove" @click="config.buttons.splice(index, 1)">
             ✕
           </BaseButton>
         </div>
         <div class="gp-row gp-row-add-button">
-          <select v-model="newButton.button" class="field-select">
-            <option v-for="button in ALL_BUTTONS" :key="button" :value="button">
-              {{ label(button) }}
-            </option>
-          </select>
-          <select v-model="newButton.modifier" class="field-select">
-            <option :value="null">{{ t("winGamepad.modifierNone") }}</option>
-            <option v-for="button in ALL_BUTTONS" :key="button" :value="button"
-              :disabled="button === newButton.button">
-              {{ label(button) }}
-            </option>
-          </select>
-          <ActionSelect v-model="newButton.action" :actions="actions" />
+          <GamepadKeyPicker :button="newButton.button" :modifier="newButton.modifier" :layout="effectiveLayout"
+            :swap-ab="config.swapAb" @update:button="(value) => newButton.button = value ?? 'south'"
+            @update:modifier="(value) => newButton.modifier = value" />
+          <GamepadActionPicker v-model="newButton.action" :actions="actions" />
           <BaseButton size="sm"
             :disabled="isTaken(newButton.button, newButton.modifier) || newButton.modifier === newButton.button"
             @click="addButton">
@@ -192,7 +195,7 @@ function setSwapAb(value: boolean) {
           </select>
           <input v-model.number="rule.from" class="field-input" type="number" step="0.05" min="-1" max="1" />
           <input v-model.number="rule.to" class="field-input" type="number" step="0.05" min="-1" max="1" />
-          <ActionSelect v-model="rule.action" :actions="actions" />
+          <GamepadActionPicker v-model="rule.action" :actions="actions" />
           <BaseButton size="sm" variant="ghost" class="gp-remove" @click="config.axes.splice(index, 1)">
             ✕
           </BaseButton>
@@ -203,7 +206,7 @@ function setSwapAb(value: boolean) {
           </select>
           <input v-model.number="newAxis.from" class="field-input" type="number" step="0.05" min="-1" max="1" />
           <input v-model.number="newAxis.to" class="field-input" type="number" step="0.05" min="-1" max="1" />
-          <ActionSelect v-model="newAxis.action" :actions="actions" />
+          <GamepadActionPicker v-model="newAxis.action" :actions="actions" />
           <BaseButton size="sm" @click="addAxis">{{ t("winGamepad.addAxis") }}</BaseButton>
         </div>
       </section>
@@ -324,7 +327,7 @@ function setSwapAb(value: boolean) {
 }
 
 .gp-row-button {
-  grid-template-columns: 64px 110px minmax(0, 1fr) 30px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 30px;
 }
 
 .gp-row-axis {
@@ -338,7 +341,7 @@ function setSwapAb(value: boolean) {
 }
 
 .gp-row-add-button {
-  grid-template-columns: 64px 110px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
 }
 
 .gp-row-add-axis {

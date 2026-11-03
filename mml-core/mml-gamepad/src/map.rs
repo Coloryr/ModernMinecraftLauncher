@@ -3,6 +3,7 @@
 //! 映射配置放在运行目录的 gamepad 下，一份映射一个 json，字段用大驼峰；
 //! Selected 为 true 的那份生效，没有就取文件名排序第一份。动作写字符串：
 //! 键盘键名（W / Space / F5）、MouseLeft / MouseRight / MouseMiddle / Mouse4 到 Mouse8、
+//! 多个用 `+` 连起来表示按顺序输出（LeftAlt+E），松开时反序；
 //! ScrollUp / ScrollDown。目录里没有可用配置时用内置默认。
 //!
 //! 摇杆不写进按钮 / 轴表：光标模式与游戏内转动模式各用一个摇杆，
@@ -223,25 +224,29 @@ pub struct CompiledMap {
 /// 编译后的按钮规则
 #[derive(Debug, Clone)]
 pub struct ButtonRuleCompiled {
+    /// 规则编号，按钮与轴共用一套，转发线程用它记哪些规则正按住
+    pub id: usize,
     /// 按钮在状态数组中的下标
     pub index: usize,
     /// 修饰键在状态数组中的下标；None 表示不需要
     pub modifier: Option<usize>,
-    /// 动作
-    pub action: Action,
+    /// 要输出的动作序列
+    pub combo: Combo,
 }
 
 /// 编译后的轴规则
 #[derive(Debug, Clone)]
 pub struct AxisRuleCompiled {
+    /// 规则编号，与按钮规则同一套编号
+    pub id: usize,
     /// 轴在状态数组中的下标
     pub index: usize,
     /// 区间起点
     pub from: f32,
     /// 区间终点
     pub to: f32,
-    /// 动作
-    pub action: Action,
+    /// 要输出的动作序列
+    pub combo: Combo,
     /// 轴所属的摇杆；十字键这类不归属任何摇杆时为 None
     pub stick: Option<Stick>,
 }
@@ -278,7 +283,7 @@ pub struct StickAxes {
 }
 
 /// 手柄动作，编译后直接对应一条 IPC 消息
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Action {
     /// 键盘按键，GLFW 键码
     Key(i32),
@@ -286,6 +291,28 @@ pub enum Action {
     Mouse(i32),
     /// 滚轮，格数正数向上
     Scroll(i32),
+}
+
+/// 一条绑定要输出的动作序列
+///
+/// 配置里写成 `LeftAlt+E` 这样的形式，按下按左到右的顺序发，松开按反序发，
+/// 保证"先按住修饰键、再按主键、最后按反序松开"。
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct Combo {
+    /// 按下顺序
+    pub steps: Vec<Action>,
+}
+
+impl Combo {
+    /// 按下顺序
+    pub fn press(&self) -> impl Iterator<Item = Action> + '_ {
+        self.steps.iter().copied()
+    }
+
+    /// 松开顺序：按下顺序反过来
+    pub fn release(&self) -> impl Iterator<Item = Action> + '_ {
+        self.steps.iter().rev().copied()
+    }
 }
 
 impl Default for GamepadConfig {
@@ -347,9 +374,10 @@ impl GamepadConfig {
                 None => None,
             };
             buttons.push(ButtonRuleCompiled {
+                id: buttons.len(),
                 index,
                 modifier,
-                action: parse_action(&rule.action)?,
+                combo: parse_combo(&rule.action)?,
             });
         }
 
@@ -367,10 +395,12 @@ impl GamepadConfig {
                 return Err(format!("轴区间起点与终点相同：{}", rule.from));
             }
             axes.push(AxisRuleCompiled {
+                // 编号接着按钮规则往下排，两条列表合起来是唯一的
+                id: buttons.len() + axes.len(),
                 index,
                 from: rule.from,
                 to: rule.to,
-                action: parse_action(&rule.action)?,
+                combo: parse_combo(&rule.action)?,
                 stick: stick_of_axis(rule.axis),
             });
         }
@@ -884,6 +914,45 @@ fn stick_of_axis(axis: Axis) -> Option<Stick> {
         Axis::RightStickX | Axis::RightStickY | Axis::RightZ => Some(Stick::Right),
         Axis::DPadX | Axis::DPadY => None,
     }
+}
+
+/// 解析配置里的动作字符串，`+` 连接表示按顺序输出
+///
+/// 例：`LeftAlt+E` 先按住 LeftAlt 再按 E，松开时反序。
+fn parse_combo(text: &str) -> Result<Combo, String> {
+    let mut steps = Vec::new();
+    for part in text.split('+') {
+        let part = part.trim();
+        if part.is_empty() {
+            return Err(format!("动作里有空项：{text}"));
+        }
+        let action = parse_action(part)?;
+        if steps.contains(&action) {
+            return Err(format!("动作重复：{text}"));
+        }
+        steps.push(action);
+    }
+    if steps.is_empty() {
+        return Err(format!("动作为空：{text}"));
+    }
+    Ok(Combo { steps })
+}
+
+/// 按规则编号取动作序列
+///
+/// - `map`: 编译后的映射
+/// - `id`: 按钮与轴共用的规则编号
+pub(crate) fn combo_of(map: &CompiledMap, id: usize) -> Option<&Combo> {
+    map.buttons
+        .iter()
+        .find(|rule| rule.id == id)
+        .map(|rule| &rule.combo)
+        .or_else(|| {
+            map.axes
+                .iter()
+                .find(|rule| rule.id == id)
+                .map(|rule| &rule.combo)
+        })
 }
 
 /// 解析配置里的动作字符串

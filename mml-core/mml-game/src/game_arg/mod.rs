@@ -25,9 +25,7 @@ use mml_sys::{Os, path_helper};
 use crate::{
     game_launch::{AutoJoinType, GameLaunchArg, MixinArg},
     game_log::GameLog,
-    launcher::{
-        custom_game_arg_obj::CustomGameArgObj, instance_setting_obj::InstanceSettingObj,
-    },
+    launcher::{custom_game_arg_obj::CustomGameArgObj, instance_setting_obj::InstanceSettingObj},
     launcher_path::{self, assets_path, libraries_path, version_path},
     loader::{LoaderType, liteloader::find_loader_obj},
     mojang::{
@@ -84,7 +82,6 @@ const V1_JVM_ARG: [&str; 3] = [
     "-cp",
     "${classpath}",
 ];
-
 
 impl InstanceSettingObj {
     /// 创建游戏启动参数
@@ -188,7 +185,6 @@ impl InstanceSettingObj {
 
         args
     }
-
 
     /// 创建启动参数
     ///
@@ -318,7 +314,6 @@ impl InstanceSettingObj {
         })
     }
 
-
     /// 替换参数中的占位符
     ///
     /// - `jvm`: 使用的JAVA路径
@@ -334,12 +329,11 @@ impl InstanceSettingObj {
             .replace(names::ARG_GAME_DIR, &self.get_game_path().to_string_lossy())
             .replace(
                 names::ARG_GAME_BASE_DIR,
-                &self.get_game_path().to_string_lossy(),
+                &self.get_base_path().to_string_lossy(),
             )
             .replace(names::ARG_JAVA_LOCAL, &jvm.to_string_lossy())
             .replace(names::ARG_JAVA_ARG, &tools::build_vec_string(arg))
     }
-
 
     /// 创建游戏完整启动内容
     ///

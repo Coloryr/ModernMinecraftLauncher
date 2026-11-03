@@ -188,7 +188,7 @@ fn tcp_relay_releases_on_mode_device_target_changes_and_reconnect() {
     }
     assert!(!mml_ipc::send_mouse_button(uuid, 0, false));
     relay.forward(None, None, None, &map, 0.016);
-    assert!(relay.held.is_empty());
+    assert!(relay.active.is_empty());
     let mut stream = connect(port, uuid, true);
     values.axes[axis_index(Axis::LeftStickY).unwrap()] = 1.0;
     frame(&mut relay, &values, &map);

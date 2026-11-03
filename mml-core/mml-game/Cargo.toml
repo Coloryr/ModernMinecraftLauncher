@@ -13,6 +13,7 @@ mml-net = { path = "../mml-net" }
 mml-jvms = { path = "../mml-jvms" }
 mml-nbt = { path = "../mml-nbt" }
 mml-sys = { path = "../mml-sys" }
+mml-tools = { path = "../mml-tools" }
 mml-downloader = { path = "../mml-downloader" }
 mml-link = { path = "../mml-link" }
 zip.workspace = true

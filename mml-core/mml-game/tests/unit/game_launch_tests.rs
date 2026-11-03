@@ -117,4 +117,3 @@ fn every_output_line_emits_log_event() {
         "日志已存在时也要发事件，实际：{seen:?}"
     );
 }
-

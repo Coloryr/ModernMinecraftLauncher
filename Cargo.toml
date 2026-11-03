@@ -29,6 +29,7 @@ members = [
     "mml-core/mml-skin",
     "mml-core/mml-skin-draw",
     "mml-core/mml-sys",
+    "mml-core/mml-tools",
     "mml-core/mml-testutil",
     "mml-core/mml-analysis",
     "mml-core/mml-cloud",

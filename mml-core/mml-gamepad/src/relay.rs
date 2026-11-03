@@ -8,7 +8,7 @@
 //! 目标实例优先选已抓取鼠标的那个；只有一个游戏连接时直接用它。
 
 use std::{
-    collections::HashSet,
+    collections::{BTreeMap, BTreeSet},
     thread,
     time::{Duration, Instant},
 };
@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 use mml_names::i18_items::info_type::InfoType;
 
-use crate::map::{self, Action, CompiledMap, in_range};
+use crate::map::{self, Action, CompiledMap, combo_of, in_range};
 use crate::reader::{BUTTON_COUNT, PadValues, first_pad_id, pad_values};
 
 /// 转发间隔，约 60 帧每秒
@@ -37,8 +37,10 @@ struct Relay {
     pad: Option<u64>,
     /// 上次看到的鼠标抓取状态
     grabbed: Option<bool>,
-    /// 已按下的动作
-    held: HashSet<Action>,
+    /// 当前按住的规则编号
+    active: BTreeSet<usize>,
+    /// 每个动作被几条规则同时按住；最后一条松开时才真的发抬起
+    counts: BTreeMap<Action, usize>,
     /// 切目标、设备或模式时仍按住的按钮，松开后才允许触发
     blocked: [bool; BUTTON_COUNT],
     /// 累计的水平位移，单位像素
@@ -82,7 +84,8 @@ impl Relay {
             target: None,
             pad: None,
             grabbed: None,
-            held: HashSet::new(),
+            active: BTreeSet::new(),
+            counts: BTreeMap::new(),
             blocked: [false; BUTTON_COUNT],
             acc_x: 0.0,
             acc_y: 0.0,
@@ -154,18 +157,16 @@ impl Relay {
                 filtered.buttons[index] = 0.0;
             }
         }
-        let desired = desired_actions(map, &filtered, grabbed);
-        for action in &self.held {
-            if !desired.contains(action) {
-                send_action(uuid, *action, false);
-            }
+        let desired = desired_rules(map, &filtered, grabbed);
+        let released: Vec<usize> = self.active.difference(&desired).copied().collect();
+        for id in released {
+            self.release_rule(uuid, map, id);
         }
-        for action in &desired {
-            if !self.held.contains(action) {
-                send_action(uuid, *action, true);
-            }
+        let pressed: Vec<usize> = desired.difference(&self.active).copied().collect();
+        for id in pressed {
+            self.press_rule(uuid, map, id);
         }
-        self.held = desired;
+        self.active = desired;
 
         let rule = if grabbed {
             map.mouse.turn
@@ -193,14 +194,65 @@ impl Relay {
         }
     }
 
+    /// 按下一条规则：按序列顺序逐条按下
+    ///
+    /// - `uuid`: 目标实例
+    /// - `map`: 编译后的映射
+    /// - `id`: 规则编号
+    fn press_rule(&mut self, uuid: Uuid, map: &CompiledMap, id: usize) {
+        let Some(combo) = combo_of(map, id) else {
+            return;
+        };
+        for action in combo.press() {
+            self.press(uuid, action);
+        }
+    }
+
+    /// 松开一条规则：按按下顺序的反序逐条松开
+    ///
+    /// - `uuid`: 目标实例
+    /// - `map`: 编译后的映射
+    /// - `id`: 规则编号
+    fn release_rule(&mut self, uuid: Uuid, map: &CompiledMap, id: usize) {
+        let Some(combo) = combo_of(map, id) else {
+            return;
+        };
+        for action in combo.release() {
+            self.release(uuid, action);
+        }
+    }
+
+    /// 按下某个动作，同一个动作被多条规则同时按住时只发一次
+    fn press(&mut self, uuid: Uuid, action: Action) {
+        let count = self.counts.entry(action).or_insert(0);
+        if *count == 0 {
+            send_action(uuid, action, true);
+        }
+        *count += 1;
+    }
+
+    /// 松开某个动作，计数归零时才真的发抬起
+    fn release(&mut self, uuid: Uuid, action: Action) {
+        let Some(count) = self.counts.get_mut(&action) else {
+            return;
+        };
+        if *count > 1 {
+            *count -= 1;
+            return;
+        }
+        self.counts.remove(&action);
+        send_action(uuid, action, false);
+    }
+
     /// 松开全部已按下的动作，并清掉位移累计
     fn release_all(&mut self) {
         if let Some(uuid) = self.target {
-            for action in &self.held {
+            for action in self.counts.keys() {
                 send_action(uuid, *action, false);
             }
         }
-        self.held.clear();
+        self.active.clear();
+        self.counts.clear();
         self.grabbed = None;
         self.blocked.fill(false);
         self.acc_x = 0.0;
@@ -224,9 +276,9 @@ fn target_instance() -> Option<Uuid> {
     }
 }
 
-/// 按映射算出这一帧要按下的动作
-fn desired_actions(map: &CompiledMap, values: &PadValues, grabbed: bool) -> HashSet<Action> {
-    let mut actions = HashSet::new();
+/// 按映射算出这一帧命中的规则编号
+fn desired_rules(map: &CompiledMap, values: &PadValues, grabbed: bool) -> BTreeSet<usize> {
+    let mut rules = BTreeSet::new();
 
     // 组合键优先：同一按钮上带修饰键的规则命中时，不触发它不带修饰的绑定
     let mut combo = [false; BUTTON_COUNT];
@@ -248,12 +300,12 @@ fn desired_actions(map: &CompiledMap, values: &PadValues, grabbed: bool) -> Hash
         match rule.modifier {
             Some(modifier) => {
                 if values.buttons[modifier] >= BUTTON_DOWN {
-                    actions.insert(rule.action);
+                    rules.insert(rule.id);
                 }
             }
             None => {
                 if !combo[rule.index] {
-                    actions.insert(rule.action);
+                    rules.insert(rule.id);
                 }
             }
         }
@@ -265,11 +317,25 @@ fn desired_actions(map: &CompiledMap, values: &PadValues, grabbed: bool) -> Hash
             continue;
         }
         if in_range(values.axes[rule.index], rule.from, rule.to) {
-            actions.insert(rule.action);
+            rules.insert(rule.id);
         }
     }
 
-    actions
+    rules
+}
+
+/// 测试用：把命中的规则展开成动作集合，忽略顺序与重复计数
+#[cfg(test)]
+fn desired_actions(
+    map: &CompiledMap,
+    values: &PadValues,
+    grabbed: bool,
+) -> std::collections::HashSet<Action> {
+    desired_rules(map, values, grabbed)
+        .into_iter()
+        .filter_map(|id| combo_of(map, id))
+        .flat_map(|combo| combo.press())
+        .collect()
 }
 
 /// 发一个动作的按下或抬起

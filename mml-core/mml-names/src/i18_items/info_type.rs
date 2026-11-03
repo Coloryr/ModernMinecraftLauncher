@@ -15,6 +15,8 @@ pub enum InfoType {
 
     /// 临时文件
     TempFile,
+    /// 下载的 Python 运行环境，下载任务里显示的名字
+    PythonRuntime,
 
     /// 接管了一个 MMC 实例，带实例名
     AdoptMmcInstance {

@@ -2,7 +2,8 @@
 // 发现旧数据：ColorMC 与官方启动器 .minecraft 放在同一个弹窗里，各一节
 //
 // 两节各自独立：谁没问过就显示谁（"问过了"标记在后端，见 windows/colormc 与
-// windows/minecraft），答完一节另一节照常操作。关掉整个弹窗不算回答，下次还问。
+// windows/minecraft），答完一节另一节照常操作。关掉整个弹窗不算回答，下次还问；
+// 两节都选了不导入 / 不迁移时没有别的事要问，自动收起免得用户再点一次关闭。
 import { computed, ref } from "vue";
 import type { ColorMcInfoDto, MinecraftInfoDto } from "../../lib/bindings";
 import { t } from "../../lib/i18n";
@@ -24,6 +25,9 @@ const emit = defineEmits<{ (e: "close"): void; (e: "done"): void }>();
 /** 正在搬数据的节数：两节可以同时跑，按计数算，不能用一个布尔 */
 const busySections = ref(0);
 
+/** 各节是否选了跳过；都跳过了才自动收起弹窗 */
+const skipped = ref({ colormc: false, minecraft: false });
+
 /** 有任务在跑时不许关弹窗 */
 const busy = computed(() => busySections.value > 0);
 
@@ -35,6 +39,20 @@ const busy = computed(() => busySections.value > 0);
 function onBusy(value: boolean) {
   busySections.value = Math.max(0, busySections.value + (value ? 1 : -1));
 }
+
+/**
+ * 一节选了跳过
+ *
+ * - `which`: 哪一节，取 `colormc` / `minecraft`
+ *
+ * 本机没有别的待答节时一并收起弹窗；另一节还在就让用户接着答。
+ */
+function onSkip(which: "colormc" | "minecraft") {
+  skipped.value[which] = true;
+  const colormcLeft = props.colormc !== null && !skipped.value.colormc;
+  const minecraftLeft = props.minecraft !== null && !skipped.value.minecraft;
+  if (!colormcLeft && !minecraftLeft) emit("close");
+}
 </script>
 
 <template>
@@ -43,8 +61,10 @@ function onBusy(value: boolean) {
     <div class="old-modal">
       <p class="old-hint">{{ t("oldData.hint") }}</p>
 
-      <ColorMcMigrateSection v-if="props.colormc" :info="props.colormc" @done="emit('done')" @busy="onBusy" />
-      <MinecraftImportSection v-if="props.minecraft" :info="props.minecraft" @done="emit('done')" @busy="onBusy" />
+      <ColorMcMigrateSection v-if="props.colormc" :info="props.colormc" @done="emit('done')"
+        @busy="onBusy" @skip="onSkip('colormc')" />
+      <MinecraftImportSection v-if="props.minecraft" :info="props.minecraft" @done="emit('done')"
+        @busy="onBusy" @skip="onSkip('minecraft')" />
 
       <div class="modal-actions">
         <BaseButton variant="accent" :disabled="busy" @click="emit('close')">{{

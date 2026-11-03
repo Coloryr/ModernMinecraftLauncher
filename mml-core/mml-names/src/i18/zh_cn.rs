@@ -34,6 +34,7 @@ impl I18Lang for ZhCn {
             InfoType::CoreStart => format!("M²L启动，版本：{}", *VERSION),
             InfoType::CoreStop => format!("M²L停止"),
             InfoType::TempFile => format!("临时文件"),
+            InfoType::PythonRuntime => String::from("Python 运行环境"),
             InfoType::AdoptMmcInstance { name } => format!("检测到 MMC 实例并已接管：{name}"),
             InfoType::ImportLegacyGroups { groups, instances } => format!(
                 "已把旧版分组文件 instgroups.json 并入分组表：新建 {groups} 个分组，归入 {instances} 个实例"
@@ -167,6 +168,14 @@ impl I18Lang for ZhCn {
             ErrorType::SerializerError(data) => format!("Json解析失败：{}", data.error),
             ErrorType::PathNotExists(data) => {
                 format!("路径不存在：{}", data.path.display().to_string())
+            }
+            ErrorType::ScriptRunnerMissing(data) => format!(
+                "运行脚本 {} 需要 {}，本机没有找到",
+                data.path.display(),
+                data.runner
+            ),
+            ErrorType::ScriptUnsupported(data) => {
+                format!("脚本 {} 不能在当前系统上运行", data.path.display())
             }
 
             ErrorType::AuthFail(data) => format!("账户操作失败：{}", data),

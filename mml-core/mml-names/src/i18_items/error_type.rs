@@ -42,6 +42,22 @@ pub struct PathNotExistsData {
     pub path: PathBuf,
 }
 
+/// 运行脚本缺解释器
+#[derive(Clone, Debug)]
+pub struct ScriptRunnerMissingData {
+    /// 要运行的脚本
+    pub path: PathBuf,
+    /// 缺的解释器程序名，如 `python3`
+    pub runner: String,
+}
+
+/// 脚本在当前平台上没有可用解释器
+#[derive(Clone, Debug)]
+pub struct ScriptUnsupportedData {
+    /// 要运行的脚本
+    pub path: PathBuf,
+}
+
 /// 文件系统错误
 #[derive(Clone, Debug)]
 pub struct FileSystemErrorData {
@@ -258,6 +274,10 @@ pub enum ErrorType {
     FileReadError(ErrorData),
     /// 路径不存在
     PathNotExists(PathNotExistsData),
+    /// 运行脚本要用的解释器没有找到
+    ScriptRunnerMissing(ScriptRunnerMissingData),
+    /// 脚本只能在别的平台上运行，比如 `.bat` 在 Linux / macOS 上
+    ScriptUnsupported(ScriptUnsupportedData),
 
     /// 压缩包打开错误
     ArchiveOpenError(FileSystemErrorData),

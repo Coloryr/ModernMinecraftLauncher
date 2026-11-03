@@ -219,8 +219,8 @@ const GROUP_ANIM_MS = 220;
 /** 侧栏列表的顶部内边距，单位 px；与 .sidebar-list 的 padding-top 同源 */
 const LIST_PAD_TOP = 2;
 
-/** 平铺模式的一格：添加卡或实例卡 */
-type TileCell = { kind: "add" } | { kind: "inst"; inst: InstanceInfoDto };
+/** 平铺模式的一格：添加卡或实例卡；实例卡带组内下标，拖拽落点按它算 */
+type TileCell = { kind: "add" } | { kind: "inst"; inst: InstanceInfoDto; idx: number };
 
 /** 虚拟列表的一行 */
 type Row =
@@ -229,7 +229,7 @@ type Row =
   | { kind: "add"; key: string; gi: number; groupId: string }
   | { kind: "inst"; key: string; gi: number; group: GroupView; idx: number; inst: InstanceInfoDto }
   | { kind: "ghost-inst"; key: string; gi: number; groupId: string }
-  | { kind: "tiles"; key: string; gi: number; cells: TileCell[] };
+  | { kind: "tiles"; key: string; gi: number; cells: TileCell[]; groupId: string; lastIdx: number };
 
 /** 滚动容器（VirtualList 的根），量宽度与按行滚动都通过它 */
 const listRef = ref<{
@@ -275,6 +275,8 @@ let listEl: HTMLElement | null = null;
  * 按当前滚动位置与行高重算粘滞分组
  *
  * 只有下标真的变化时才改 ref：滚动事件很密，每帧都换一个新值会让整列跟着重渲染。
+ * 已经收起的分组不挂粘滞头 —— 组里没有可滚的内容，钉着只会多出一条重复的标题；
+ * 搜索 / 多选 / 拖实例会把收起的分组强制展开，这时仍按展开处理。
  */
 function updateStickyIndex() {
   let next = -1;
@@ -284,15 +286,15 @@ function updateStickyIndex() {
     if (list.length) {
       const top = listScrollTop;
       let y = LIST_PAD_TOP;
-      let active: { gi: number; headerTop: number } | null = null;
+      let active: { gi: number; headerTop: number; collapsed: boolean } | null = null;
       for (let i = 0; i < list.length; i += 1) {
         const row = list[i];
         if (row.kind === "group" && y <= top + 0.5) {
-          active = { gi: row.gi, headerTop: y };
+          active = { gi: row.gi, headerTop: y, collapsed: !isGroupOpen(row.group.id) };
         }
         y += heights[i] ?? 0;
       }
-      if (active && top > active.headerTop + 0.5) next = active.gi;
+      if (active && !active.collapsed && top > active.headerTop + 0.5) next = active.gi;
     }
   }
   if (stickyIndex.value !== next) stickyIndex.value = next;
@@ -354,11 +356,24 @@ watch(
  *
  * 见 [`Row`] 里的 tiles 行
  */
-function chunkTiles(cells: TileCell[], key: string, gi: number): Row[] {
+function chunkTiles(
+  cells: TileCell[],
+  key: string,
+  gi: number,
+  groupId = "",
+  lastIdx = -1,
+): Row[] {
   const out: Row[] = [];
   const cols = Math.max(1, columns.value);
   for (let i = 0; i < cells.length; i += cols) {
-    out.push({ kind: "tiles", key: "t-" + key + "-" + i, gi, cells: cells.slice(i, i + cols) });
+    out.push({
+      kind: "tiles",
+      key: "t-" + key + "-" + i,
+      gi,
+      cells: cells.slice(i, i + cols),
+      groupId,
+      lastIdx,
+    });
   }
   return out;
 }
@@ -367,7 +382,7 @@ function chunkTiles(cells: TileCell[], key: string, gi: number): Row[] {
 function gridRows(list: InstanceInfoDto[]): Row[] {
   const cells: TileCell[] = [];
   if (!props.multiSelect) cells.push({ kind: "add" });
-  for (const inst of list) cells.push({ kind: "inst", inst });
+  list.forEach((inst, idx) => cells.push({ kind: "inst", inst, idx }));
   return chunkTiles(cells, "grid", -1);
 }
 
@@ -387,8 +402,8 @@ const rows = computed<Row[]>(() => {
     if (props.maximized) {
       const cells: TileCell[] = [];
       if (!props.multiSelect) cells.push({ kind: "add" });
-      for (const inst of g.items) cells.push({ kind: "inst", inst });
-      out.push(...chunkTiles(cells, g.id, gi));
+      g.items.forEach((inst, idx) => cells.push({ kind: "inst", inst, idx }));
+      out.push(...chunkTiles(cells, g.id, gi, g.id, g.items.length - 1));
       return;
     }
     if (!props.multiSelect) out.push({ kind: "add", key: "a-" + g.id, gi, groupId: g.id });
@@ -512,9 +527,10 @@ const stickyGroup = computed<GroupView | null>(() => {
   return index >= 0 ? (props.filteredGroups[index] ?? null) : null;
 });
 
-watch([rows, rowHeights, () => props.mode, () => props.filteredGroups], () => {
-  updateStickyIndex();
-});
+watch(
+  [rows, rowHeights, collapseState, () => props.mode, () => props.filteredGroups],
+  () => updateStickyIndex(),
+);
 
 /**
  * 平铺卡按下：只有分组模式（占满）支持拖拽，平铺模式的卡片不拖
@@ -628,7 +644,8 @@ defineExpose({ scrollToInstance });
             </div>
 
             <!-- 平铺卡片行：占满时与平铺模式同一套卡，外观、角标、运行点位置都一致 -->
-            <div v-else-if="row.kind === 'tiles'" class="vrow vrow-tiles" :style="rowStyle(row)">
+            <div v-else-if="row.kind === 'tiles'" class="vrow vrow-tiles" :data-group="row.groupId"
+              :style="rowStyle(row)">
               <div class="tile-grid" :style="tileGridStyle">
                 <template v-for="(cell, ci) in row.cells" :key="ci">
                   <div v-if="cell.kind === 'add'" class="tile add-tile" @click="emit('add-instance')">
@@ -637,9 +654,14 @@ defineExpose({ scrollToInstance });
                     </span>
                     <span class="tile-name">{{ t("group.add") }}</span>
                   </div>
-                  <div v-else class="tile" :data-uuid="cell.inst.uuid" :class="{
+                  <div v-else class="tile" :data-uuid="cell.inst.uuid" :data-idx="cell.idx" :class="{
                     active: selected?.uuid === cell.inst.uuid,
                     'multi-checked': multiSelect && selectedIds.has(cell.inst.uuid),
+                    dragging: cell.inst.uuid === draggingUuid,
+                    'drop-before': dragActive?.kind === 'instance' && cell.inst.uuid !== draggingUuid
+                      && isInstInsert(row.groupId, cell.idx),
+                    'drop-after': dragActive?.kind === 'instance' && cell.inst.uuid !== draggingUuid
+                      && cell.idx === row.lastIdx && isInstInsertEnd(row.groupId),
                   }" @pointerdown="onTilePointerDown($event, cell.inst)" @click="onInstClick(cell.inst, $event)"
                     @contextmenu.prevent="onInstContext($event, cell.inst)">
                     <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(cell.inst.uuid) }">
@@ -1117,6 +1139,31 @@ defineExpose({ scrollToInstance });
 .tile.active {
   border-color: var(--accent);
   background: var(--accent-soft);
+}
+
+/* 拖拽中的卡片留在原位并压暗：网格不像行列表那样能给插入占位，抽走会让整片重排 */
+.tile.dragging {
+  opacity: 0.35;
+}
+
+/* 卡片落点：贴左 / 右缘画一条强调色竖线，悬出卡片 5px 才看得见 */
+.tile.drop-before::before,
+.tile.drop-after::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.tile.drop-before::before {
+  left: -5px;
+}
+
+.tile.drop-after::after {
+  right: -5px;
 }
 
 .tile.add-tile {

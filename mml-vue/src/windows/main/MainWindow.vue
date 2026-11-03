@@ -492,7 +492,9 @@ function toggleSettings() {
 }
 // 启动参数（懒加载骨架值 / 防抖写回）与启动统计（时长 / 次数）：见 composables/ 下的组合式函数
 const { argsOf, updateArgs, onServerIp, onServerJoin } = useInstanceArgs({ selected });
-const { statsOf, playHoursOf, refresh: refreshStats } = useInstanceStats();
+const { statsOf, playHoursOf, refresh: refreshStats } = useInstanceStats({
+  running: () => selected.value?.running ?? false,
+});
 
 /** 列表模式图标下那行：选中实例的启动统计；未选中实例时为空串，那一行不渲染 */
 const listStats = computed(() => {
@@ -1540,6 +1542,8 @@ async function subscribeEvents() {
       // 否则主界面不知道有人在启动，按钮一直停在「启动游戏」
       if (e.state === "end" || e.state === "post") {
         markStarted(e.uuid);
+        // 进程起来的这一刻内核记了一次启动，列表 / 详情里的次数要立刻跟上
+        if (e.state === "end") void refreshStats();
       } else {
         markLaunching(e.uuid);
       }
@@ -1553,6 +1557,8 @@ async function subscribeEvents() {
       clearLaunching(e.uuid);
       // 非 0 退出：不管退出的是不是当前选中的实例，都自动开日志看崩溃
       if (e.code !== 0) void openLogForCrash(e.uuid);
+      // 这一局的时长 / 次数刚记进内核统计；后台实例退出也要重拉，别只认当前选中的那个
+      void refreshStats();
       if (e.uuid !== selected.value?.uuid) return;
       statusText.value =
         e.code === 0 ? t("launch.exited") : t("launch.exitedCode", { code: e.code });
@@ -1560,11 +1566,13 @@ async function subscribeEvents() {
       statePct.value = null;
       // 状态行只在运行中显示，退出之后界面上什么都不剩：非正常退出得说出来
       if (e.code !== 0) showToast(t("launch.exitedCode", { code: e.code }));
-      // 这一局的时长 / 次数刚记进内核统计，重拉一次，界面上那行不是启动前的旧值
-      void refreshStats();
     }),
     onLaunchError((e) => {
-      if (e.uuid) clearLaunching(e.uuid);
+      if (e.uuid) {
+        clearLaunching(e.uuid);
+        // 失败也记一次启动，次数与失败数都要重拉
+        void refreshStats();
+      }
       // 同上：失败的结论不能只写在那行状态里，它随 running 一起消失
       showToast(t("launch.error", { msg: e.message }));
       if (e.uuid && e.uuid !== selected.value?.uuid) return;
@@ -1741,7 +1749,14 @@ async function doInit() {
   if (inited) return;
   inited = true;
   try {
-    await Promise.all([loadInstances(), loadGroups(), loadJava(), loadCustomHome()]);
+    // 统计在这一步重拉一次：挂在 onMounted 上的那次可能早于核心加载完成，只拿到空表
+    await Promise.all([
+      loadInstances(),
+      loadGroups(),
+      loadJava(),
+      loadCustomHome(),
+      refreshStats(),
+    ]);
     restoreSelection();
     // 首启向导在主页面**之前**：先语言、再旧数据，都答完才关启动页
     await langReady;

@@ -15,10 +15,14 @@ import BaseButton from "../../components/ui/BaseButton.vue";
 
 /** ColorMC 探测结果：数据目录、命中来源与可迁移实例数 */
 const props = defineProps<{ info: ColorMcInfoDto }>();
-/** `done` 表示数据已搬完，父组件据此重拉实例与分组；`busy` 表示正在搬，弹窗不许关 */
+/**
+ * `done` 表示数据已搬完，父组件据此重拉实例与分组；`busy` 表示正在搬，弹窗不许关；
+ * `skip` 表示选了不迁移，父组件在没别的待答节时收起弹窗
+ */
 const emit = defineEmits<{
   (e: "done"): void;
   (e: "busy", busy: boolean): void;
+  (e: "skip"): void;
 }>();
 
 /** 迁移进行中（按钮禁用 + 不允许关闭） */
@@ -93,7 +97,7 @@ async function run(mode: "copy" | "move") {
   }
 }
 
-/** 不迁移：记下标记后收起 */
+/** 不迁移：记下标记后收起本节，并让父组件判断整个弹窗是否该关 */
 async function skip() {
   try {
     await api.skipColorMc();
@@ -101,6 +105,7 @@ async function skip() {
     /* 标记没写上顶多下次再问一次 */
   }
   settled.value = true;
+  emit("skip");
 }
 
 </script>

@@ -170,7 +170,20 @@ async fn jvm_arg_colorasm() {
     assert!(args.contains(&"-Dcoloryrasm.mixin.port=12345".to_string()));
     assert!(args.contains(&format!("-Dcoloryrasm.mixin.uuid={}", obj.uuid)));
     assert!(args.contains(&"-Dcoloryrasm.mixin.key=test-key".to_string()));
-    assert!(args.iter().any(|a| a.starts_with("-javaagent:")));
+
+    // 下载检查会跳过没有下载地址的本地库，jar 必须由这一步自己写出来：
+    // 文件不存在时 JVM 会直接以 "agent library failed to init" 退出
+    let agent = args
+        .iter()
+        .find_map(|a| a.strip_prefix("-javaagent:"))
+        .expect("启用 ColorASM 时必须注入 javaagent");
+    let agent = std::path::Path::new(agent);
+    assert!(agent.is_file(), "注入的 ColorASM jar 不存在：{}", agent.display());
+    assert_eq!(
+        std::fs::read(agent).unwrap().get(..2),
+        Some(&b"PK"[..]),
+        "注入的 ColorASM jar 不是有效的 zip"
+    );
 }
 
 /// 内存：最小填 `-Xms`、最大填 `-Xmx`，且 `-Xms` 排在前面

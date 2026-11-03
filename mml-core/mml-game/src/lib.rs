@@ -85,6 +85,7 @@ use crate::{
 
 pub mod add_game;
 pub mod class_scan;
+mod cmd_shell;
 pub mod curseforge;
 pub mod data_res;
 mod error;

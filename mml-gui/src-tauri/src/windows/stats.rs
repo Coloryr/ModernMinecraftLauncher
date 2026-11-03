@@ -47,13 +47,15 @@ pub fn stats_get_data() -> Result<StatsDataDto, String> {
     let now = Local::now();
     let mut agg: HashMap<Uuid, InstanceAgg> = HashMap::new();
     for (uuid, runs) in &count.game_runs {
-        let mut secs = 0u64;
+        // 按毫秒累加最后再折成秒：逐局取整会把每局不足 1 秒的部分都丢掉，
+        // 启动次数一多，实例累计时长就会比实际少几分钟
+        let mut millis = 0i64;
         let mut first: Option<i64> = None;
         let mut last: Option<i64> = None;
         let mut running = false;
         for run in runs {
             let end = if run.now { now } else { run.stop_time };
-            secs += (end - run.start_time).num_seconds().max(0) as u64;
+            millis += (end - run.start_time).num_milliseconds().max(0);
 
             let start_ms = run.start_time.timestamp_millis();
             if first.is_none_or(|v| start_ms < v) {
@@ -71,7 +73,7 @@ pub fn stats_get_data() -> Result<StatsDataDto, String> {
             InstanceAgg {
                 count: runs.len() as u64,
                 failed: 0,
-                seconds: secs,
+                seconds: (millis / 1000) as u64,
                 first,
                 last,
                 running,

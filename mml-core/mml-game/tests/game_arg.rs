@@ -315,14 +315,15 @@ fn replace_arg_placeholders() {
 
     let uuid = instance.uuid.to_string();
     let game_path = instance.get_game_path().to_string_lossy().to_string();
+    let base_path = instance.get_base_path().to_string_lossy().to_string();
     let java_arg = format!("-Xmx1024m{e}-Xms512m{e}", e = get_line_ending());
 
     let mut parts = out.split('|');
     assert_eq!(parts.next(), Some("arg-test"));
     assert_eq!(parts.next(), Some(uuid.as_str()));
-    // %GAME_DIR% 与 %GAME_BASE_DIR% 都替换为游戏目录 .minecraft
     assert_eq!(parts.next(), Some(game_path.as_str()));
-    assert_eq!(parts.next(), Some(game_path.as_str()));
+    // %GAME_BASE_DIR% 是实例根目录，%GAME_DIR% 是它下面的 .minecraft
+    assert_eq!(parts.next(), Some(base_path.as_str()));
     assert_eq!(parts.next(), Some("java-bin"));
     // %JAVA_ARG% 用换行符拼接
     assert_eq!(parts.next(), Some(java_arg.as_str()));
