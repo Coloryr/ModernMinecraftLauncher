@@ -6,12 +6,10 @@
 import { computed, onMounted, ref } from "vue";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../../components/ui/BaseModal.vue";
-import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
 import SettingsGroup from "../SettingsGroup.vue";
 import ActionSelect from "../ActionSelect.vue";
 import GamepadTestPanel from "../GamepadTestPanel.vue";
 import { ALL_AXES, ALL_BUTTONS, axisLabel, buttonLabel } from "../../gamepadLabels";
-import { detectOs } from "../../../../lib/titlebar";
 import { t } from "../../../../lib/i18n";
 import type { GamepadAxisDto, GamepadButtonDto, GamepadLayoutDto } from "../../../../lib/bindings";
 import type { useSettingsGamepad } from "../../composables/useSettingsGamepad";
@@ -23,9 +21,6 @@ const props = defineProps<{
   flashGroup?: string;
 }>();
 
-// XInput 兜底只有 Windows 有，其它平台连代码都不编译，界面上也就不显示这一项
-const onWindows = detectOs() === "windows";
-
 const {
   profiles,
   editing,
@@ -34,8 +29,6 @@ const {
   active,
   saving,
   actions,
-  xinput,
-  setXinput,
   newButton,
   newAxis,
   createOpen,
@@ -129,15 +122,6 @@ function setSwapAb(value: boolean) {
         {{ t("winGamepad.delete") }}
       </BaseButton>
       <BaseButton size="sm" @click="openCreate">{{ t("winGamepad.new") }}</BaseButton>
-    </div>
-
-    <!-- XInput 兜底：WGI 读不到手柄时才需要打开，只影响 Windows -->
-    <div v-if="onWindows" class="switch-row">
-      <div class="switch-text">
-        <span class="switch-label">{{ t("winGamepad.xinput") }}</span>
-        <span class="switch-state">{{ t("winGamepad.xinputHint") }}</span>
-      </div>
-      <BaseSwitch :model-value="xinput" @update:model-value="setXinput" />
     </div>
 
     <!-- 手柄列表与状态图：没有可编辑的配置时也照样显示实时状态 -->

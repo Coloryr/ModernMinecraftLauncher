@@ -150,30 +150,6 @@ pub fn gamepad_set_active(name: String) -> Result<(), String> {
     mml_gamepad::set_active(&name).map_err(error_key)
 }
 
-/// XInput 兼容模式是否打开
-///
-/// 只影响 Windows：其它平台的输入本来就走 gilrs，界面上也不显示这一项。
-///
-/// # 返回值
-///
-/// 打开着返回 `true`
-#[gui_macros::command]
-pub fn gamepad_xinput() -> bool {
-    mml_gamepad::xinput()
-}
-
-/// 打开 / 关掉 XInput 兼容模式
-///
-/// - `enabled`: 是否打开
-///
-/// # 返回值
-///
-/// 落盘成功返回 Ok；写盘失败返回错误键
-#[gui_macros::command]
-pub fn gamepad_set_xinput(enabled: bool) -> Result<(), String> {
-    mml_gamepad::set_xinput(enabled).map_err(error_key)
-}
-
 /// 配置界面可选的键鼠动作名
 ///
 /// # 返回值

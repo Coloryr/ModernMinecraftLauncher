@@ -1,54 +1,30 @@
 //! 手柄读取
 //!
-//! 用 gilrs 在独立线程监听系统手柄，维护每个手柄的按钮 / 摇杆快照，
-//! 供状态查询与转发线程使用。按钮与轴统一到 Xbox 布局，见 crate::map 的 Button / Axis。
+//! SDL 上下文、控制器句柄与事件泵始终留在读取线程，不初始化视频子系统。
+//! 对外保持原来的按钮 / 轴顺序与 Y 轴向上为正的口径，供状态查询与转发线程使用。
 
 use std::{
     collections::BTreeMap,
-    path::Path,
-    sync::{
-        LazyLock, Once, RwLock,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::{LazyLock, Once, RwLock},
     thread,
     time::Duration,
 };
 
-use gilrs::{Axis as GilrsAxis, Button as GilrsButton, Event, EventType, Gamepad, Gilrs};
 use mml_names::i18_items::info_type::InfoType;
-use serde::{Deserialize, Serialize};
+use sdl2::{
+    GameControllerSubsystem,
+    controller::{Axis as SdlAxis, Button as SdlButton, GameController},
+    event::Event,
+};
 
-use crate::map::{Axis, Button, GamepadError, PadLayout};
+use crate::map::{Axis, Button, PadLayout};
 
-/// 支持的按钮数
+/// 支持的按钮数，保留 C / Z 与模拟扳机的原有槽位
 pub(crate) const BUTTON_COUNT: usize = 19;
-/// 支持的轴数
+/// 支持的轴数，包含由十字键合成的两根轴
 pub(crate) const AXIS_COUNT: usize = 8;
 
-/// 支持的按钮，按固定顺序与状态数组对应
-const GILRS_BUTTONS: [GilrsButton; BUTTON_COUNT] = [
-    GilrsButton::South,
-    GilrsButton::East,
-    GilrsButton::North,
-    GilrsButton::West,
-    GilrsButton::C,
-    GilrsButton::Z,
-    GilrsButton::LeftTrigger,
-    GilrsButton::LeftTrigger2,
-    GilrsButton::RightTrigger,
-    GilrsButton::RightTrigger2,
-    GilrsButton::Select,
-    GilrsButton::Start,
-    GilrsButton::Mode,
-    GilrsButton::LeftThumb,
-    GilrsButton::RightThumb,
-    GilrsButton::DPadUp,
-    GilrsButton::DPadDown,
-    GilrsButton::DPadLeft,
-    GilrsButton::DPadRight,
-];
-
-/// 支持的按钮对应的公开枚举，顺序与 GILRS_BUTTONS 一致
+/// 对外按钮顺序，映射与转发线程按此索引
 const BUTTONS: [Button; BUTTON_COUNT] = [
     Button::South,
     Button::East,
@@ -71,19 +47,7 @@ const BUTTONS: [Button; BUTTON_COUNT] = [
     Button::DPadRight,
 ];
 
-/// 支持的轴，按固定顺序与状态数组对应
-const GILRS_AXES: [GilrsAxis; AXIS_COUNT] = [
-    GilrsAxis::LeftStickX,
-    GilrsAxis::LeftStickY,
-    GilrsAxis::LeftZ,
-    GilrsAxis::RightStickX,
-    GilrsAxis::RightStickY,
-    GilrsAxis::RightZ,
-    GilrsAxis::DPadX,
-    GilrsAxis::DPadY,
-];
-
-/// 支持的轴对应的公开枚举，顺序与 GILRS_AXES 一致
+/// 对外轴顺序，保持已有配置的索引不变
 const AXES: [Axis; AXIS_COUNT] = [
     Axis::LeftStickX,
     Axis::LeftStickY,
@@ -95,9 +59,47 @@ const AXES: [Axis; AXIS_COUNT] = [
     Axis::DPadY,
 ];
 
-/// 已连接手柄的状态，键为运行期间的编号
-static PADS: LazyLock<RwLock<BTreeMap<u64, Pad>>> = LazyLock::new(|| RwLock::new(BTreeMap::new()));
+/// SDL 标准按钮与原有配置枚举的对应关系
+const SDL_BUTTONS: [(SdlButton, Button); 15] = [
+    (SdlButton::A, Button::South),
+    (SdlButton::B, Button::East),
+    (SdlButton::Y, Button::North),
+    (SdlButton::X, Button::West),
+    (SdlButton::LeftShoulder, Button::LeftTrigger),
+    (SdlButton::RightShoulder, Button::RightTrigger),
+    (SdlButton::Back, Button::Select),
+    (SdlButton::Start, Button::Start),
+    (SdlButton::Guide, Button::Mode),
+    (SdlButton::LeftStick, Button::LeftThumb),
+    (SdlButton::RightStick, Button::RightThumb),
+    (SdlButton::DPadUp, Button::DPadUp),
+    (SdlButton::DPadDown, Button::DPadDown),
+    (SdlButton::DPadLeft, Button::DPadLeft),
+    (SdlButton::DPadRight, Button::DPadRight),
+];
 
+/// 连接时读取的模拟轴
+const SDL_AXES: [SdlAxis; 6] = [
+    SdlAxis::LeftX,
+    SdlAxis::LeftY,
+    SdlAxis::RightX,
+    SdlAxis::RightY,
+    SdlAxis::TriggerLeft,
+    SdlAxis::TriggerRight,
+];
+
+/// SDL 能识别、但不在原有固定按钮表内的按键
+const EXTRA_BUTTONS: [SdlButton; 6] = [
+    SdlButton::Misc1,
+    SdlButton::Paddle1,
+    SdlButton::Paddle2,
+    SdlButton::Paddle3,
+    SdlButton::Paddle4,
+    SdlButton::Touchpad,
+];
+
+/// 已连接手柄的状态，键为 SDL 实例编号
+static PADS: LazyLock<RwLock<BTreeMap<u64, Pad>>> = LazyLock::new(|| RwLock::new(BTreeMap::new()));
 /// 读取线程只启动一次
 static INIT: Once = Once::new();
 
@@ -105,21 +107,18 @@ static INIT: Once = Once::new();
 struct Pad {
     /// 系统给出的名称
     name: String,
-    /// 自动认出的外观；认不出时为 `None`，界面按配置里的外观显示
+    /// 自动认出的外观，认不出时由界面回落到配置
     layout: Option<PadLayout>,
-    /// 与 BUTTONS 同序的按钮值，0.0 到 1.0
+    /// 与 BUTTONS 同序，取值 0 到 1
     buttons: [f32; BUTTON_COUNT],
-    /// 与 AXES 同序的轴值，-1.0 到 1.0
+    /// 与 AXES 同序，摇杆取值 -1 到 1，扳机取值 0 到 1
     axes: [f32; AXIS_COUNT],
-    /// 固定按钮表里没有的按键，按第一次按下的顺序排
+    /// 按第一次按下的顺序追加，松开后保留编号
     extras: Vec<ExtraButton>,
-    /// 这份状态是不是 XInput 单独建的（仅 Windows）：WGI 稍后报到同一只手柄时，把名字补进来
-    #[cfg_attr(not(windows), allow(dead_code))]
-    synthetic: bool,
 }
 
 impl Pad {
-    /// 建一个空状态
+    /// 建立空状态
     fn empty(name: String, layout: Option<PadLayout>) -> Self {
         Self {
             name,
@@ -127,46 +126,67 @@ impl Pad {
             buttons: [0.0; BUTTON_COUNT],
             axes: [0.0; AXIS_COUNT],
             extras: Vec::new(),
-            synthetic: false,
         }
     }
 
-    /// 从 gilrs 的当前状态建快照，用于刚连上的手柄
-    fn from_gamepad(gamepad: &Gamepad<'_>) -> Self {
-        let mut pad = Self::empty(gamepad.name().to_string(), detect_layout(gamepad));
-        for (index, button) in GILRS_BUTTONS.iter().enumerate() {
-            if let Some(data) = gamepad.button_data(*button) {
-                pad.buttons[index] = data.value();
+    /// 连接时采样，避免漏掉打开设备前已按住的按钮
+    fn from_controller(controller: &GameController) -> Self {
+        let mut pad = Self::empty(controller.name(), detect_layout(controller));
+        for (button, _) in SDL_BUTTONS {
+            pad.set_button(button, controller.button(button));
+        }
+        for button in EXTRA_BUTTONS {
+            if controller.button(button) {
+                pad.set_button(button, true);
             }
         }
-        for (index, axis) in GILRS_AXES.iter().enumerate() {
-            if let Some(data) = gamepad.axis_data(*axis) {
-                pad.axes[index] = data.value();
-            }
+        for axis in SDL_AXES {
+            pad.set_axis(axis, controller.axis(axis));
         }
         pad
     }
 
-    /// 记录一个按钮值
-    ///
-    /// 固定表里没有的按键（高级手柄背面的拨片这类）按底层编号单独记一份，
-    /// 界面上在手柄下面**按出现的先后往后追加**；松开只把值归零，编号留着，
-    /// 列表不会跳来跳去。
-    fn set_button(&mut self, button: GilrsButton, code: u32, value: f32) {
-        match GILRS_BUTTONS.iter().position(|item| *item == button) {
-            Some(index) => self.buttons[index] = value,
-            None => match self.extras.iter_mut().find(|item| item.code == code) {
+    /// 更新标准按钮与额外按钮，并同步十字键轴
+    fn set_button(&mut self, button: SdlButton, pressed: bool) {
+        let value = u8::from(pressed) as f32;
+        if let Some((_, mapped)) = SDL_BUTTONS.iter().find(|(item, _)| *item == button) {
+            self.buttons[button_index(*mapped).unwrap()] = value;
+            self.axes[axis_index(Axis::DPadX).unwrap()] = self.buttons
+                [button_index(Button::DPadRight).unwrap()]
+                - self.buttons[button_index(Button::DPadLeft).unwrap()];
+            self.axes[axis_index(Axis::DPadY).unwrap()] = self.buttons
+                [button_index(Button::DPadUp).unwrap()]
+                - self.buttons[button_index(Button::DPadDown).unwrap()];
+        } else {
+            let code = button as u32;
+            match self.extras.iter_mut().find(|item| item.code == code) {
                 Some(item) => item.value = value,
-                None => self.extras.push(ExtraButton { code, value }),
-            },
+                None if pressed => self.extras.push(ExtraButton { code, value }),
+                None => {}
+            }
         }
     }
 
-    /// 记录一个轴值
-    fn set_axis(&mut self, axis: GilrsAxis, value: f32) {
-        if let Some(index) = GILRS_AXES.iter().position(|item| *item == axis) {
-            self.axes[index] = value;
-        }
+    /// 归一化 SDL 轴值，模拟扳机同时更新按钮槽位
+    fn set_axis(&mut self, axis: SdlAxis, raw: i16) {
+        let value = (raw as f32 / i16::MAX as f32).clamp(-1.0, 1.0);
+        let (mapped, value) = match axis {
+            SdlAxis::LeftX => (Axis::LeftStickX, value),
+            SdlAxis::LeftY => (Axis::LeftStickY, -value),
+            SdlAxis::RightX => (Axis::RightStickX, value),
+            SdlAxis::RightY => (Axis::RightStickY, -value),
+            SdlAxis::TriggerLeft => {
+                let value = value.max(0.0);
+                self.buttons[button_index(Button::LeftTrigger2).unwrap()] = value;
+                (Axis::LeftZ, value)
+            }
+            SdlAxis::TriggerRight => {
+                let value = value.max(0.0);
+                self.buttons[button_index(Button::RightTrigger2).unwrap()] = value;
+                (Axis::RightZ, value)
+            }
+        };
+        self.axes[axis_index(mapped).unwrap()] = value;
     }
 
     /// 转成对外快照
@@ -199,12 +219,12 @@ impl Pad {
 ///
 /// 只影响界面上的按钮记号与状态图，猜错也能在设置里手动改。
 ///
-/// - `gamepad`: gilrs 的手柄
+/// - `gamepad`: SDL 的手柄
 ///
 /// # 返回值
 ///
 /// 认得出是 Xbox 还是 PlayStation 时返回对应外观；认不出返回 `None`
-fn detect_layout(gamepad: &Gamepad<'_>) -> Option<PadLayout> {
+fn detect_layout(gamepad: &GameController) -> Option<PadLayout> {
     // 蓝牙手柄的名字普遍带 "wireless controller"，先认 Xbox，免得把 Xbox 判成索尼
     if gamepad.vendor_id() == Some(0x045E) || gamepad.name().to_lowercase().contains("xbox") {
         return Some(PadLayout::Xbox);
@@ -272,7 +292,7 @@ pub struct PadState {
     pub buttons: Vec<ButtonValue>,
     /// 全部轴的当前值
     pub axes: Vec<AxisValue>,
-    /// 固定表里没有的按键，按编号升序
+    /// 固定表里没有的按键，按第一次按下的顺序
     pub extras: Vec<ExtraButton>,
 }
 
@@ -285,252 +305,93 @@ pub(crate) fn start() {
     });
 }
 
-/// 读取线程主体
+/// 初始化失败时保留空列表，不影响启动器其它功能
 fn run() {
-    let mut gilrs = match Gilrs::new() {
-        Ok(gilrs) => gilrs,
-        // 没有可用的手柄后端时保持空列表，不影响启动与其它功能
-        Err(err) => {
+    if let Err(error) = read_events() {
+        mml_log::warn_type(InfoType::GamepadInitFailed { error });
+    }
+}
+
+/// 在同一线程内初始化、持有和释放所有 SDL 对象
+fn read_events() -> Result<(), String> {
+    // 游戏在前台时启动器仍需读取；提示必须在控制器子系统初始化前设置。
+    sdl2::hint::set("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "1");
+    let sdl = sdl2::init()?;
+    let subsystem = sdl.game_controller()?;
+    let mut events = sdl.event_pump()?;
+    let mut controllers = BTreeMap::new();
+
+    for index in 0..subsystem.num_joysticks()? {
+        open_controller(&subsystem, &mut controllers, index);
+    }
+
+    loop {
+        for event in events.poll_iter() {
+            match event {
+                Event::ControllerDeviceAdded { which, .. } => {
+                    open_controller(&subsystem, &mut controllers, which);
+                }
+                Event::ControllerDeviceRemoved { which, .. } => {
+                    controllers.remove(&which);
+                    let removed = PADS.write().unwrap().remove(&u64::from(which));
+                    if let Some(pad) = removed {
+                        mml_log::info_type(InfoType::GamepadDisconnected { name: pad.name });
+                    }
+                }
+                Event::ControllerButtonDown { which, button, .. } => {
+                    if let Some(pad) = PADS.write().unwrap().get_mut(&u64::from(which)) {
+                        pad.set_button(button, true);
+                    }
+                }
+                Event::ControllerButtonUp { which, button, .. } => {
+                    if let Some(pad) = PADS.write().unwrap().get_mut(&u64::from(which)) {
+                        pad.set_button(button, false);
+                    }
+                }
+                Event::ControllerAxisMotion {
+                    which, axis, value, ..
+                } => {
+                    if let Some(pad) = PADS.write().unwrap().get_mut(&u64::from(which)) {
+                        pad.set_axis(axis, value);
+                    }
+                }
+                _ => {}
+            }
+        }
+        // 每轮先排空事件，再短暂休眠，兼顾摇杆响应与空闲占用。
+        thread::sleep(Duration::from_millis(8));
+    }
+}
+
+/// 新增事件的编号是设备索引，打开后的实例编号才用于后续状态与拔出事件
+fn open_controller(
+    subsystem: &GameControllerSubsystem,
+    controllers: &mut BTreeMap<u32, GameController>,
+    index: u32,
+) {
+    if !subsystem.is_game_controller(index) {
+        return;
+    }
+    let controller = match subsystem.open(index) {
+        Ok(controller) => controller,
+        Err(error) => {
             mml_log::warn_type(InfoType::GamepadInitFailed {
-                error: err.to_string(),
+                error: error.to_string(),
             });
             return;
         }
     };
-
-    // 启动前已经连着的手柄
-    let mut pads = PADS.write().unwrap();
-    for (id, gamepad) in gilrs.gamepads() {
-        pads.insert(pad_id(id), Pad::from_gamepad(&gamepad));
-    }
-    drop(pads);
-
-    loop {
-        // 阻塞 16ms：没事件时让出 CPU，有事件立刻返回；同时这也是 XInput 的轮询节拍，
-        // 慢过 16ms 摇杆会一顿一顿
-        if let Some(event) = gilrs.next_event_blocking(Some(Duration::from_millis(16))) {
-            handle(&mut gilrs, event);
-        }
-        #[cfg(windows)]
-        if xinput() {
-            sync_xinput();
-        }
-    }
-}
-
-/// 处理一条 gilrs 事件
-///
-/// - `gilrs`: 读取器，取刚连上的手柄快照
-/// - `event`: 本次事件
-fn handle(gilrs: &mut Gilrs, event: Event) {
-    let id = pad_id(event.id);
-    match event.event {
-        EventType::Connected => {
-            let pad = Pad::from_gamepad(&gilrs.gamepad(event.id));
-            let name = pad.name.clone();
-            // 已经被 XInput 接手的那只手柄：WGI 这条只是同一只手柄的另一份枚举
-            #[cfg(windows)]
-            if adopt_xinput_name(&name) {
-                mml_log::info_type(InfoType::GamepadConnected { name });
-                return;
-            }
-            PADS.write().unwrap().insert(id, pad);
-            mml_log::info_type(InfoType::GamepadConnected { name });
-        }
-        EventType::Disconnected => {
-            let name = PADS.write().unwrap().remove(&id).map(|pad| pad.name);
-            if let Some(name) = name {
-                mml_log::info_type(InfoType::GamepadDisconnected { name });
-            }
-        }
-        EventType::ButtonPressed(button, code) => set_button(id, button, code.into_u32(), 1.0),
-        EventType::ButtonReleased(button, code) => set_button(id, button, code.into_u32(), 0.0),
-        EventType::ButtonChanged(button, value, code) => {
-            set_button(id, button, code.into_u32(), value)
-        }
-        EventType::AxisChanged(axis, value, _) => set_axis(id, axis, value),
-        _ => {}
-    }
-}
-
-/// XInput 槽位 → 手柄编号的归属
-#[cfg(windows)]
-static XINPUT_SLOTS: std::sync::Mutex<[Option<u64>; crate::xinput::SLOT_COUNT]> =
-    std::sync::Mutex::new([None; crate::xinput::SLOT_COUNT]);
-
-/// XInput 兼容模式是否打开，见 [set_xinput]
-///
-/// **默认开**：WGI 要求进程有前台窗口才收得到手柄事件，手柄映射的典型场景是
-/// "游戏在前台、启动器在后台"，那时 WGI 一个事件都没有，只有 XInput 照常。
-static XINPUT: AtomicBool = AtomicBool::new(true);
-
-/// 读取选项，落盘用大驼峰
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
-#[serde(default, rename_all = "PascalCase")]
-struct ReaderSettings {
-    /// 是否用 XInput 读取；只影响 Windows
-    xinput: bool,
-}
-
-impl Default for ReaderSettings {
-    fn default() -> Self {
-        // 文件里没写这一项时按打开处理，和 XINPUT 的初值一致
-        Self { xinput: true }
-    }
-}
-
-/// 读一次 `gamepad/reader.json` 里的读取选项
-///
-/// - `dir`: 手柄配置目录
-pub(crate) fn load_settings(dir: &Path) {
-    let file = dir.join(mml_names::names::GAMEPAD_READER_FILE);
-    let Ok(text) = std::fs::read_to_string(&file) else {
+    let id = controller.instance_id();
+    // 初始枚举与队列里的新增事件可能指向同一只手柄。
+    if controllers.contains_key(&id) {
         return;
-    };
-    match serde_json::from_str::<ReaderSettings>(&text) {
-        Ok(settings) => XINPUT.store(settings.xinput, Ordering::Release),
-        Err(_) => mml_log::info(String::from("[gamepad] reader.json 解析失败，按默认选项读手柄")),
     }
-}
-
-/// XInput 兼容模式是否打开
-///
-/// 只影响 Windows：其它平台的输入本来就来自 gilrs。
-pub fn xinput() -> bool {
-    XINPUT.load(Ordering::Acquire)
-}
-
-/// 打开 / 关掉 XInput 兼容模式并落盘
-///
-/// - `enabled`: 是否打开
-///
-/// # 返回值
-///
-/// 写盘失败返回对应错误；配置目录还没就绪时返回 `GamepadError::Missing`
-pub fn set_xinput(enabled: bool) -> Result<(), GamepadError> {
-    XINPUT.store(enabled, Ordering::Release);
-    let dir = crate::map::config_dir().ok_or(GamepadError::Missing)?;
-    let text = serde_json::to_string_pretty(&ReaderSettings { xinput: enabled })
-        .map_err(|err| GamepadError::Io(err.to_string()))?;
-    std::fs::write(dir.join(mml_names::names::GAMEPAD_READER_FILE), text)
-        .map_err(|err| GamepadError::Io(err.to_string()))
-}
-
-/// 用 XInput 读手柄
-///
-/// gilrs 走 WGI，而 WGI 要求进程有前台窗口才收得到事件：后台时一个按键都没有，
-/// 只有 XInput 照常。这里按槽位轮询，把值写进同一份手柄状态：槽位优先认领已有的
-/// Xbox 外观手柄，认领不到才新建一份，界面因此不会看到两只手柄。
-#[cfg(windows)]
-fn sync_xinput() {
-    let mut slots = XINPUT_SLOTS.lock().unwrap();
-    for slot in 0..crate::xinput::SLOT_COUNT {
-        let Some(state) = crate::xinput::poll(slot as u32) else {
-            // 槽空了：自己新建的那份要收掉，认领来的交给 gilrs 的断开事件处理
-            if let Some(id) = slots[slot].take()
-                && id >= XINPUT_ID_BASE
-            {
-                PADS.write().unwrap().remove(&id);
-            }
-            continue;
-        };
-
-        let id = match slots[slot] {
-            Some(id) if PADS.read().unwrap().contains_key(&id) => id,
-            _ => {
-                let id = claim_xinput(slot as u64, &slots);
-                slots[slot] = Some(id);
-                id
-            }
-        };
-        if let Some(pad) = PADS.write().unwrap().get_mut(&id) {
-            pad.buttons = state.buttons;
-            pad.axes = state.axes;
-        }
-    }
-}
-
-/// 把 WGI 报上来的名字补给 XInput 单独建的那份状态
-///
-/// 蓝牙 Xbox 手柄会先后被两个后端看到：XInput 先给出读数，WGI 稍后才报"已连接"。
-/// 后者是同一只手柄的另一份枚举，不能单独登记，否则界面上会出现两只手柄。
-///
-/// - `name`: WGI 给出的名字
-///
-/// # 返回值
-///
-/// 真的补上了（说明它是 XInput 建的那份）时返回 `true`，调用方不再登记这只手柄
-#[cfg(windows)]
-fn adopt_xinput_name(name: &str) -> bool {
-    let slots = XINPUT_SLOTS.lock().unwrap();
-    let mut pads = PADS.write().unwrap();
-    for id in slots.iter().flatten() {
-        if *id < XINPUT_ID_BASE {
-            continue;
-        }
-        if let Some(pad) = pads.get_mut(id)
-            && pad.synthetic
-        {
-            pad.name = name.to_string();
-            pad.synthetic = false;
-            return true;
-        }
-    }
-    false
-}
-
-/// XInput 单独新建的手柄编号从这里开始，避开 gilrs 的小整数编号
-#[cfg(windows)]
-const XINPUT_ID_BASE: u64 = 0x0005_8000_0000;
-
-/// 给一个 XInput 槽找一份手柄状态：优先认领还没被别的槽占用的 Xbox 外观手柄
-///
-/// - `slot`: 槽位
-/// - `slots`: 当前归属，用来跳过已被认领的
-///
-/// # 返回值
-///
-/// 该槽使用的编号；没有可认领的时新建一份并返回它的编号
-#[cfg(windows)]
-fn claim_xinput(slot: u64, slots: &[Option<u64>; crate::xinput::SLOT_COUNT]) -> u64 {
-    let claimed: Vec<u64> = slots.iter().flatten().copied().collect();
-    let mut pads = PADS.write().unwrap();
-    if let Some((id, _)) = pads
-        .iter()
-        .find(|(id, pad)| pad.layout == Some(PadLayout::Xbox) && !claimed.contains(id))
-    {
-        return *id;
-    }
-    let id = XINPUT_ID_BASE + slot;
-    let mut pad = Pad::empty(String::from("Xbox Controller"), Some(PadLayout::Xbox));
-    pad.synthetic = true;
-    pads.insert(id, pad);
-    id
-}
-
-/// 更新一个手柄的按钮值
-///
-/// - `id`: 手柄编号
-/// - `button`: gilrs 的按钮
-/// - `code`: 底层编号，固定表里没有的按键靠它区分
-/// - `value`: 按下程度
-fn set_button(id: u64, button: GilrsButton, code: u32, value: f32) {
-    if let Some(pad) = PADS.write().unwrap().get_mut(&id) {
-        pad.set_button(button, code, value);
-    }
-}
-
-/// 更新一个手柄的轴值
-fn set_axis(id: u64, axis: GilrsAxis, value: f32) {
-    if let Some(pad) = PADS.write().unwrap().get_mut(&id) {
-        pad.set_axis(axis, value);
-    }
-}
-
-/// gilrs 的手柄编号转成跨线程的编号
-fn pad_id(id: gilrs::GamepadId) -> u64 {
-    let raw: usize = id.into();
-    raw as u64
+    let pad = Pad::from_controller(&controller);
+    mml_log::info_type(InfoType::GamepadConnected {
+        name: pad.name.clone(),
+    });
+    PADS.write().unwrap().insert(u64::from(id), pad);
+    controllers.insert(id, controller);
 }
 
 /// 按钮在状态数组中的下标

@@ -182,7 +182,7 @@ impl Relay {
         }
         let delta = delta.clamp(0.0, MAX_DELTA);
         self.acc_x += f64::from(x) * f64::from(rule.speed) * delta;
-        // gilrs 的 Y 轴向上为正，鼠标位移向下为正，这里取反
+        // 读取层的 Y 轴向上为正，鼠标位移向下为正，这里取反
         self.acc_y -= f64::from(y) * f64::from(rule.speed) * delta;
         let dx = self.acc_x.trunc();
         let dy = self.acc_y.trunc();

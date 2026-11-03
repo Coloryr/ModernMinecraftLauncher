@@ -2148,8 +2148,6 @@ export default {
   "winGamepad.layoutHint": "外观会按手柄自动识别，认不出时可手动选；外观与 A / B 交换只改记号与状态图，映射仍按按键位置生效。",
   "winGamepad.detected": "已自动识别：{name}",
   "winGamepad.extraButtons": "额外按键",
-  "winGamepad.xinput": "XInput 兼容模式",
-  "winGamepad.xinputHint": "默认开启；关掉后只用 WGI，而 WGI 需要窗口在前台才收得到事件。仅 Windows。",
   "winGamepad.refresh": "重新扫描",
   "winGamepad.new": "添加配置",
   "winGamepad.delete": "删除配置",
