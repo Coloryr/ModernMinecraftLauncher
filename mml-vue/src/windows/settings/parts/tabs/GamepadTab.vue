@@ -10,9 +10,16 @@ import SettingsGroup from "../SettingsGroup.vue";
 import GamepadTestPanel from "../GamepadTestPanel.vue";
 import GamepadKeyPicker from "../GamepadKeyPicker.vue";
 import GamepadActionPicker from "../GamepadActionPicker.vue";
+import AxisRangeBar from "../AxisRangeBar.vue";
 import { ALL_AXES, axisLabel } from "../../gamepadLabels";
 import { t } from "../../../../lib/i18n";
-import type { GamepadAxisDto, GamepadButtonDto, GamepadLayoutDto } from "../../../../lib/bindings";
+import { useGamepadState } from "../../composables/useGamepadState";
+import type {
+  GamepadAxisDto,
+  GamepadButtonDto,
+  GamepadButtonModeDto,
+  GamepadLayoutDto,
+} from "../../../../lib/bindings";
 import type { useSettingsGamepad } from "../../composables/useSettingsGamepad";
 
 const props = defineProps<{
@@ -51,6 +58,26 @@ const {
 } = props.settings;
 
 onMounted(init);
+
+/** 按钮触发方式的三档，顺序即下拉顺序 */
+const MODES: GamepadButtonModeDto[] = ["normal", "toggle", "repeat"];
+
+/** 手柄实时状态：轴区间条显示当前值用 */
+const { axisValue } = useGamepadState();
+
+/**
+ * 触发方式的界面文字
+ *
+ * - `value`: normal / toggle / repeat
+ */
+function modeLabel(value: GamepadButtonModeDto): string {
+  const keys: Record<GamepadButtonModeDto, string> = {
+    normal: "winGamepad.modeNormal",
+    toggle: "winGamepad.modeToggle",
+    repeat: "winGamepad.modeRepeat",
+  };
+  return t(keys[value]);
+}
 
 /** 后端按手柄认出来的外观；没接手柄或认不出时为 null，回落到配置里存的那份 */
 const detected = ref<GamepadLayoutDto | null>(null);
@@ -155,6 +182,7 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
         <div class="gp-row gp-row-head gp-row-button">
           <span>{{ t("winGamepad.button") }}</span>
           <span>{{ t("winGamepad.action") }}</span>
+          <span>{{ t("winGamepad.mode") }}</span>
           <span></span>
         </div>
         <div v-for="(rule, index) in config.buttons" :key="index" class="gp-row gp-row-button">
@@ -162,6 +190,9 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
             :swap-ab="config.swapAb" @update:button="(value) => setRuleButton(rule, value)"
             @update:modifier="(value) => setRuleModifier(rule, value)" />
           <GamepadActionPicker v-model="rule.action" :actions="actions" />
+          <select v-model="rule.mode" class="field-select gp-mode">
+            <option v-for="item in MODES" :key="item" :value="item">{{ modeLabel(item) }}</option>
+          </select>
           <BaseButton size="sm" variant="ghost" class="gp-remove" @click="config.buttons.splice(index, 1)">
             ✕
           </BaseButton>
@@ -171,6 +202,9 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
             :swap-ab="config.swapAb" @update:button="(value) => newButton.button = value ?? 'south'"
             @update:modifier="(value) => newButton.modifier = value" />
           <GamepadActionPicker v-model="newButton.action" :actions="actions" />
+          <select v-model="newButton.mode" class="field-select gp-mode">
+            <option v-for="item in MODES" :key="item" :value="item">{{ modeLabel(item) }}</option>
+          </select>
           <BaseButton size="sm"
             :disabled="isTaken(newButton.button, newButton.modifier) || newButton.modifier === newButton.button"
             @click="addButton">
@@ -189,17 +223,21 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
           <span>{{ t("winGamepad.action") }}</span>
           <span></span>
         </div>
-        <div v-for="(rule, index) in config.axes" :key="index" class="gp-row gp-row-axis">
-          <select v-model="rule.axis" class="field-select">
-            <option v-for="axis in ALL_AXES" :key="axis" :value="axis">{{ axisName(axis) }}</option>
-          </select>
-          <input v-model.number="rule.from" class="field-input" type="number" step="0.05" min="-1" max="1" />
-          <input v-model.number="rule.to" class="field-input" type="number" step="0.05" min="-1" max="1" />
-          <GamepadActionPicker v-model="rule.action" :actions="actions" />
-          <BaseButton size="sm" variant="ghost" class="gp-remove" @click="config.axes.splice(index, 1)">
-            ✕
-          </BaseButton>
-        </div>
+        <template v-for="(rule, index) in config.axes" :key="index">
+          <div class="gp-row gp-row-axis">
+            <select v-model="rule.axis" class="field-select">
+              <option v-for="axis in ALL_AXES" :key="axis" :value="axis">{{ axisName(axis) }}</option>
+            </select>
+            <input v-model.number="rule.from" class="field-input" type="number" step="0.05" min="-1" max="1" />
+            <input v-model.number="rule.to" class="field-input" type="number" step="0.05" min="-1" max="1" />
+            <GamepadActionPicker v-model="rule.action" :actions="actions" />
+              <BaseButton size="sm" variant="ghost" class="gp-remove" @click="config.axes.splice(index, 1)">
+                ✕
+              </BaseButton>
+            </div>
+          <!-- 这条轴现在的读数，落在区间里时高亮 -->
+          <AxisRangeBar :from="rule.from" :to="rule.to" :value="axisValue(rule.axis)" />
+        </template>
         <div class="gp-row gp-row-add-axis">
           <select v-model="newAxis.axis" class="field-select">
             <option v-for="axis in ALL_AXES" :key="axis" :value="axis">{{ axisName(axis) }}</option>
@@ -209,6 +247,7 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
           <GamepadActionPicker v-model="newAxis.action" :actions="actions" />
           <BaseButton size="sm" @click="addAxis">{{ t("winGamepad.addAxis") }}</BaseButton>
         </div>
+        <AxisRangeBar :from="newAxis.from" :to="newAxis.to" :value="axisValue(newAxis.axis)" />
       </section>
 
       <section class="gp-sec">
@@ -327,7 +366,7 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
 }
 
 .gp-row-button {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 30px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 96px 30px;
 }
 
 .gp-row-axis {
@@ -341,7 +380,7 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
 }
 
 .gp-row-add-button {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 96px auto;
 }
 
 .gp-row-add-axis {

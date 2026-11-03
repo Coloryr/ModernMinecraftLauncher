@@ -14,8 +14,9 @@ mod relay;
 use std::{path::Path, sync::Once};
 
 pub use map::{
-    Axis, AxisRule, Button, ButtonRule, GamepadConfig, GamepadError, MouseRule, PadLayout,
-    ProfileInfo, Stick, action_names, config, create, delete, profiles, save, set_active,
+    Axis, AxisRule, Button, ButtonMode, ButtonRule, GamepadConfig, GamepadError, MouseRule,
+    PadLayout, ProfileInfo, Stick, action_names, config, create, delete, profiles, save,
+    set_active,
 };
 pub use reader::{
     AxisValue, ButtonValue, ExtraButton, PadInfo, PadState, pad_state, pads,

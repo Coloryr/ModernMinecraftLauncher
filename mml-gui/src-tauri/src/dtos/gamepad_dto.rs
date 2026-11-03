@@ -138,6 +138,18 @@ pub enum GamepadStickDto {
     Right,
 }
 
+/// 按钮的触发方式
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum GamepadButtonModeDto {
+    /// 普通：按下就按下，抬起就抬起
+    Normal,
+    /// 连续：按一次保持按下，再按一次松开
+    Toggle,
+    /// 循环按下：按住期间反复触发
+    Repeat,
+}
+
 /// 一条按钮绑定
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -148,6 +160,8 @@ pub struct GamepadButtonRuleDto {
     pub modifier: Option<GamepadButtonDto>,
     /// 动作，键名或 MouseLeft / ScrollUp 这类写法
     pub action: String,
+    /// 触发方式
+    pub mode: GamepadButtonModeDto,
 }
 
 /// 一条轴区间绑定

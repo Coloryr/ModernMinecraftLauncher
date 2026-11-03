@@ -54,6 +54,7 @@ fn modifier_combo_overrides_plain_binding() {
         button: Button::South,
         modifier: Some(Button::LeftTrigger),
         action: String::from("F"),
+        mode: map::ButtonMode::Normal,
     });
     let map = config.compile().unwrap();
 
@@ -93,6 +94,7 @@ fn combo_rule_keeps_order() {
         button: Button::DPadLeft,
         modifier: Some(Button::LeftTrigger),
         action: String::from("LeftAlt+E"),
+        mode: map::ButtonMode::Normal,
     });
     let map = config.compile().unwrap();
 
@@ -111,4 +113,59 @@ fn combo_rule_keeps_order() {
         combo.release().collect::<Vec<_>>(),
         vec![Action::Key(69), Action::Key(342)]
     );
+}
+
+/// 切换模式：按一次保持按下，再按一次松开
+#[test]
+fn toggle_mode_holds_until_next_press() {
+    let mut config = map::GamepadConfig::default();
+    config.buttons.clear();
+    config.axes.clear();
+    config.buttons.push(map::ButtonRule {
+        button: Button::South,
+        modifier: None,
+        action: String::from("Space"),
+        mode: ButtonMode::Toggle,
+    });
+    let map = config.compile().unwrap();
+    let id = map.buttons[0].id;
+    let mut relay = Relay::new();
+    let mut down = BTreeSet::new();
+    down.insert(id);
+
+    // 第一帧按下：进入保持
+    let frame = relay.step(&map, Instant::now(), &down);
+    assert!(frame.active.contains(&id));
+    // 松开后仍然保持
+    let frame = relay.step(&map, Instant::now(), &BTreeSet::new());
+    assert!(frame.active.contains(&id));
+    // 再按一次才松开
+    let frame = relay.step(&map, Instant::now(), &down);
+    assert!(!frame.active.contains(&id));
+}
+
+/// 循环按下：按住期间按间隔给出一次点击
+#[test]
+fn repeat_mode_pulses_on_interval() {
+    let mut config = map::GamepadConfig::default();
+    config.buttons.clear();
+    config.axes.clear();
+    config.buttons.push(map::ButtonRule {
+        button: Button::South,
+        modifier: None,
+        action: String::from("Space"),
+        mode: ButtonMode::Repeat,
+    });
+    let map = config.compile().unwrap();
+    let id = map.buttons[0].id;
+    let mut relay = Relay::new();
+    let mut down = BTreeSet::new();
+    down.insert(id);
+
+    let start = Instant::now();
+    assert_eq!(relay.step(&map, start, &down).pulses, vec![id]);
+    // 间隔没到不重复触发
+    assert!(relay.step(&map, start + Duration::from_millis(10), &down).pulses.is_empty());
+    // 到了就再来一次
+    assert_eq!(relay.step(&map, start + REPEAT_INTERVAL, &down).pulses, vec![id]);
 }

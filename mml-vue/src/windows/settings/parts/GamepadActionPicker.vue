@@ -25,19 +25,122 @@ const open = ref(false);
 /** 面板里正在拼的动作顺序 */
 const order = ref<string[]>([]);
 
-/** 键盘上的候选键，按 QWERTY 摆；不支持的会被过滤掉 */
-const KEY_ROWS: string[][] = [
-  ["Escape", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"],
-  ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
-  ["Tab", "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
-  ["Backspace", "A", "S", "D", "F", "G", "H", "J", "K", "L", "Enter"],
-  ["Shift", "Z", "X", "C", "V", "B", "N", "M"],
+/** 一颗键：label 是显示文字，action 是后端动作名，span 是宽度（单位键） */
+interface KeyDef {
+  /** 键帽上的字 */
+  label: string;
+  /** 后端动作名；没有表示这颗键只是占位，点了没反应 */
+  action?: string;
+  /** 宽度，单位键 */
+  span: number;
+}
+
+/// 一行键
+type KeyRow = KeyDef[];
+
+/** 主键盘：按真实键盘的行排，宽度用单位键算 */
+const KEY_ROWS: KeyRow[] = [
+  [
+    { label: "Esc", action: "Escape", span: 1.15 },
+    { label: "F1", action: "F1", span: 1.15 },
+    { label: "F2", action: "F2", span: 1.15 },
+    { label: "F3", action: "F3", span: 1.15 },
+    { label: "F4", action: "F4", span: 1.15 },
+    { label: "F5", action: "F5", span: 1.15 },
+    { label: "F6", action: "F6", span: 1.15 },
+    { label: "F7", action: "F7", span: 1.15 },
+    { label: "F8", action: "F8", span: 1.15 },
+    { label: "F9", action: "F9", span: 1.15 },
+    { label: "F10", action: "F10", span: 1.15 },
+    { label: "F11", action: "F11", span: 1.15 },
+    { label: "F12", action: "F12", span: 1.15 },
+  ],
+  [
+    { label: "`", action: "Grave", span: 1 },
+    { label: "1", action: "1", span: 1 },
+    { label: "2", action: "2", span: 1 },
+    { label: "3", action: "3", span: 1 },
+    { label: "4", action: "4", span: 1 },
+    { label: "5", action: "5", span: 1 },
+    { label: "6", action: "6", span: 1 },
+    { label: "7", action: "7", span: 1 },
+    { label: "8", action: "8", span: 1 },
+    { label: "9", action: "9", span: 1 },
+    { label: "0", action: "0", span: 1 },
+    { label: "-", action: "Minus", span: 1 },
+    { label: "=", action: "Equal", span: 1 },
+    { label: "Backspace", action: "Backspace", span: 2 },
+  ],
+  [
+    { label: "Tab", action: "Tab", span: 1.5 },
+    { label: "Q", action: "Q", span: 1 },
+    { label: "W", action: "W", span: 1 },
+    { label: "E", action: "E", span: 1 },
+    { label: "R", action: "R", span: 1 },
+    { label: "T", action: "T", span: 1 },
+    { label: "Y", action: "Y", span: 1 },
+    { label: "U", action: "U", span: 1 },
+    { label: "I", action: "I", span: 1 },
+    { label: "O", action: "O", span: 1 },
+    { label: "P", action: "P", span: 1 },
+    { label: "[", action: "LeftBracket", span: 1 },
+    { label: "]", action: "RightBracket", span: 1 },
+    { label: "\\", action: "Backslash", span: 1.5 },
+  ],
+  [
+    { label: "Caps", action: "CapsLock", span: 1.75 },
+    { label: "A", action: "A", span: 1 },
+    { label: "S", action: "S", span: 1 },
+    { label: "D", action: "D", span: 1 },
+    { label: "F", action: "F", span: 1 },
+    { label: "G", action: "G", span: 1 },
+    { label: "H", action: "H", span: 1 },
+    { label: "J", action: "J", span: 1 },
+    { label: "K", action: "K", span: 1 },
+    { label: "L", action: "L", span: 1 },
+    { label: ";", action: "Semicolon", span: 1 },
+    { label: "'", action: "Apostrophe", span: 1 },
+    { label: "Enter", action: "Enter", span: 2.25 },
+  ],
+  [
+    { label: "Shift", action: "LeftShift", span: 2.25 },
+    { label: "Z", action: "Z", span: 1 },
+    { label: "X", action: "X", span: 1 },
+    { label: "C", action: "C", span: 1 },
+    { label: "V", action: "V", span: 1 },
+    { label: "B", action: "B", span: 1 },
+    { label: "N", action: "N", span: 1 },
+    { label: "M", action: "M", span: 1 },
+    { label: ",", action: "Comma", span: 1 },
+    { label: ".", action: "Period", span: 1 },
+    { label: "/", action: "Slash", span: 1 },
+    { label: "Shift", action: "LeftShift", span: 2.75 },
+  ],
+  [
+    { label: "Ctrl", action: "LeftControl", span: 1.25 },
+    { label: "Win", action: "LeftSuper", span: 1.25 },
+    { label: "Alt", action: "LeftAlt", span: 1.25 },
+    { label: "Space", action: "Space", span: 6.25 },
+    { label: "Alt", action: "LeftAlt", span: 1.25 },
+    { label: "Win", action: "LeftSuper", span: 1.25 },
+    { label: "Menu", action: "Menu", span: 1.25 },
+    { label: "Ctrl", action: "LeftControl", span: 1.25 },
+  ],
 ];
 
-/** 单独一行的特殊键 */
-const SPECIAL_KEYS = [
-  "Space", "Enter", "Tab", "Backspace", "Escape", "Insert", "Delete",
-  "Home", "End", "PageUp", "PageDown", "Up", "Down", "Left", "Right",
+/** 方向键：单独一小块，摆在键盘右边 */
+const ARROW_ROWS: KeyRow[] = [
+  [{ label: "↑", action: "Up", span: 1 }],
+  [
+    { label: "←", action: "Left", span: 1 },
+    { label: "↓", action: "Down", span: 1 },
+    { label: "→", action: "Right", span: 1 },
+  ],
+];
+
+/** 编辑键：键盘右边一竖排 */
+const EDIT_KEYS: string[] = [
+  "Insert", "Delete", "Home", "End", "PageUp", "PageDown",
 ];
 
 /** 修饰键，组合里排在主键前面 */
@@ -49,6 +152,42 @@ const MOUSE_KEYS = ["MouseLeft", "MouseRight", "MouseMiddle", "Mouse4", "Mouse5"
 /** 滚轮 */
 const SCROLL_KEYS = ["ScrollUp", "ScrollDown"];
 
+
+
+/** 单位键宽，单位像素 */
+const UNIT = 26;
+/** 键与键的间距，单位像素 */
+const GAP = 4;
+
+/** 按单位键算一颗键的宽度 */
+function keyWidth(span: number): string {
+  return Math.round(UNIT * span + GAP * (span - 1)) + "px";
+}
+
+/** 这颗键在当前后端支持的动作里 */
+function isActive(key: KeyDef): boolean {
+  return !!key.action && props.actions.includes(key.action);
+}
+
+/** 这个动作是不是顺序里的最后一颗 */
+function isLastAction(name: string): boolean {
+  return name === order.value[order.value.length - 1];
+}
+
+/** 这个动作是否已经在顺序里 */
+function isPickedAction(name: string): boolean {
+  return order.value.includes(name);
+}
+
+/** 这颗键是不是顺序里的最后一颗 */
+function isLast(key: KeyDef): boolean {
+  return !!key.action && isLastAction(key.action);
+}
+
+/** 这颗键是否已经在顺序里 */
+function isPicked(key: KeyDef): boolean {
+  return !!key.action && isPickedAction(key.action);
+}
 /** 过滤出后端真正支持的那些键 */
 function supported(keys: string[]): string[] {
   return keys.filter((key) => props.actions.includes(key));
@@ -111,6 +250,20 @@ function fromKeyboard(event: KeyboardEvent): string | null {
     ShiftLeft: "LeftShift",
     ControlLeft: "LeftControl",
     AltLeft: "LeftAlt",
+    MetaLeft: "LeftSuper",
+    Backquote: "Grave",
+    Minus: "Minus",
+    Equal: "Equal",
+    BracketLeft: "LeftBracket",
+    BracketRight: "RightBracket",
+    Backslash: "Backslash",
+    Semicolon: "Semicolon",
+    Quote: "Apostrophe",
+    Comma: "Comma",
+    Period: "Period",
+    Slash: "Slash",
+    CapsLock: "CapsLock",
+    ContextMenu: "Menu",
   };
   return map[code] ?? null;
 }
@@ -123,29 +276,41 @@ function addModifier(name: string) {
   );
 }
 
-/** 收尾：修饰键 + 主键组成一段动作 */
-function commit(name: string) {
+/**
+ * 记录一个键：修饰键进修饰位，其它键当主键放在最后
+ *
+ * 面板开着的时候只记录、不关闭，也不回写配置；确认要等用户点「确定」。
+ *
+ * - `name`: 动作名
+ */
+function record(name: string) {
   if (!props.actions.includes(name)) return;
-  const steps = [...order.value.filter((item) => item !== name), name];
-  emit("update:modelValue", steps.join("+"));
-  close();
-}
-
-/** 点一个键：修饰键只进顺序，其它键直接收尾 */
-function choose(name: string) {
   if (MODIFIER_KEYS.includes(name)) {
     addModifier(name);
     return;
   }
-  commit(name);
+  // 主键只有一个：保留修饰键，替换掉之前的主键
+  const modifiers = order.value.filter((item) => MODIFIER_KEYS.includes(item));
+  order.value = [...modifiers, name];
 }
 
-/** 物理键盘：修饰键进顺序，主键收尾 */
+/** 点一个键：只记录 */
+function choose(name: string) {
+  record(name);
+}
+
+/**
+ * 物理键盘：只记录，且拦截浏览器默认行为
+ *
+ * 面板开着时键盘完全归这里：不触发焦点按钮、不切换焦点、不响应回车 / 空格，
+ * 无论这颗键认不认得都吞掉，避免弹窗被按钮误触关掉。
+ */
 function onKeydown(event: KeyboardEvent) {
-  const name = fromKeyboard(event);
-  if (!name || !props.actions.includes(name)) return;
   event.preventDefault();
-  choose(name);
+  event.stopPropagation();
+  const name = fromKeyboard(event);
+  if (!name) return;
+  record(name);
 }
 
 /** 打开面板，先按当前值把顺序摆好 */
@@ -174,12 +339,14 @@ function confirm() {
   close();
 }
 
+// 捕获阶段监听：抢在焦点元素之前把按键吃掉
 watch(open, (value) => {
-  if (value) window.addEventListener("keydown", onKeydown);
-  else window.removeEventListener("keydown", onKeydown);
+  if (value) window.addEventListener("keydown", onKeydown, true);
+  else window.removeEventListener("keydown", onKeydown, true);
 });
 
-onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
+onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
+
 </script>
 <template>
   <div class="ap">
@@ -188,46 +355,50 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
       <span class="ap-chip-hint">▾</span>
     </button>
 
-    <BaseModal v-if="open" :title="t('winGamepad.actionTitle')" :width="640" :closable="false"
+    <BaseModal v-if="open" :title="t('winGamepad.actionTitle')" :width="720" :closable="false"
       @close="close">
       <p class="field-desc">{{ t("winGamepad.actionHint") }}</p>
 
       <div class="ap-layout">
+        <!-- 主键盘：按真实键盘的行与宽度排，后端不支持的键只占位 -->
         <div class="ap-keyboard">
           <div v-for="(row, index) in KEY_ROWS" :key="index" class="ap-row">
-            <button v-for="key in supported(row)" :key="key" type="button" class="ap-key"
-              :class="{ on: key === order[order.length - 1], mod: order.includes(key) }"
-              @click="choose(key)">
-              {{ key }}
-            </button>
-          </div>
-          <div class="ap-row">
-            <button v-for="key in supported(SPECIAL_KEYS)" :key="key" type="button" class="ap-key wide"
-              :class="{ on: key === order[order.length - 1], mod: order.includes(key) }"
-              @click="choose(key)">
-              {{ key }}
-            </button>
-          </div>
-          <div class="ap-row">
-            <button v-for="key in supported(MODIFIER_KEYS)" :key="key" type="button" class="ap-key wide"
-              :class="{ on: key === order[order.length - 1], mod: order.includes(key) }"
-              @click="choose(key)">
-              {{ actionLabel(key) }}
+            <button v-for="(key, i) in row" :key="i" type="button" class="ap-key"
+              :class="{ on: isLast(key), mod: isPicked(key), ghost: !isActive(key) }"
+              :style="{ width: keyWidth(key.span) }" :disabled="!isActive(key)"
+              @click="key.action && choose(key.action)">
+              {{ key.label }}
             </button>
           </div>
         </div>
 
+        <!-- 编辑键：键盘右边一竖排 -->
+        <div class="ap-edits">
+          <button v-for="name in supported(EDIT_KEYS)" :key="name" type="button" class="ap-key"
+            :class="{ on: isLastAction(name), mod: isPickedAction(name) }" @click="choose(name)">
+            {{ name }}
+          </button>
+        </div>
+
+        <!-- 方向键 + 鼠标 + 滚轮 -->
         <div class="ap-side">
+          <div class="ap-side-title">{{ t("winGamepad.arrowKeys") }}</div>
+          <div v-for="(row, index) in ARROW_ROWS" :key="index" class="ap-arrows">
+            <button v-for="key in row" :key="key.label" type="button" class="ap-key"
+              :class="{ on: isLast(key), mod: isPicked(key) }"
+              :style="{ width: keyWidth(key.span) }"
+              @click="key.action && choose(key.action)">
+              {{ key.label }}
+            </button>
+          </div>
           <div class="ap-side-title">{{ t("winGamepad.mouseActions") }}</div>
           <button v-for="key in supported(MOUSE_KEYS)" :key="key" type="button" class="ap-key wide"
-            :class="{ on: key === order[order.length - 1], mod: order.includes(key) }"
-            @click="choose(key)">
+            :class="{ on: isLastAction(key), mod: isPickedAction(key) }" @click="choose(key)">
             {{ actionLabel(key) }}
           </button>
           <div class="ap-side-title">{{ t("winGamepad.scrollActions") }}</div>
           <button v-for="key in supported(SCROLL_KEYS)" :key="key" type="button" class="ap-key wide"
-            :class="{ on: key === order[order.length - 1], mod: order.includes(key) }"
-            @click="choose(key)">
+            :class="{ on: isLastAction(key), mod: isPickedAction(key) }" @click="choose(key)">
             {{ actionLabel(key) }}
           </button>
         </div>
@@ -253,8 +424,8 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
     </BaseModal>
   </div>
 </template>
+
 <style scoped>
-/* 芯片：和手柄按键选择器同一套外观 */
 .ap-chip {
   display: flex;
   align-items: center;
@@ -281,18 +452,17 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
   color: var(--text-dim);
 }
 
+/* 三块并排：主键盘 / 编辑键 / 方向与鼠标 */
 .ap-layout {
   display: flex;
-  gap: 14px;
+  gap: 12px;
   align-items: flex-start;
 }
 
 .ap-keyboard {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
+  gap: 4px;
   padding: 10px;
   border-radius: 12px;
   background: var(--bg-hover);
@@ -301,18 +471,25 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
 .ap-row {
   display: flex;
   gap: 4px;
-  flex-wrap: wrap;
 }
 
+/* 方向键：两行都居中，↑ 正好落在 ↓ 上方 */
+.ap-arrows {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+/* 一颗键：宽度由单位键算，矮一点才像键盘 */
 .ap-key {
-  min-width: 30px;
-  min-height: 30px;
-  padding: 2px 6px;
+  height: 30px;
+  padding: 0;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--bg-card);
   color: var(--text);
-  font-size: 11.5px;
+  font-size: 11px;
+  overflow: hidden;
   cursor: pointer;
   transition: border-color 0.12s, background 0.12s, color 0.12s;
 }
@@ -321,7 +498,16 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
   border-color: var(--accent);
 }
 
-/* 已在顺序里的键（一般是修饰键） */
+/* 占位键：后端不支持，只用来撑出键盘的形状 */
+.ap-key.ghost {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* 已经在顺序里的键（通常是修饰键） */
 .ap-key.mod {
   border-color: var(--accent);
   color: var(--accent);
@@ -335,24 +521,36 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
   color: var(--bg-card);
 }
 
-.ap-key.wide {
-  min-width: 48px;
+/* 编辑键一竖排 */
+.ap-edits {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ap-edits .ap-key {
+  width: 64px;
 }
 
 .ap-side {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  width: 110px;
+  gap: 4px;
+  width: 112px;
   flex-shrink: 0;
+}
+
+.ap-side .ap-key {
+  width: 100%;
 }
 
 .ap-side-title {
   font-size: 11.5px;
   color: var(--text-dim);
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
+/* 顺序行 */
 .ap-order {
   display: flex;
   align-items: center;

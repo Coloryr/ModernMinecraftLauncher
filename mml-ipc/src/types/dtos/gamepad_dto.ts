@@ -35,10 +35,13 @@ export type GamepadStateDto = {
 
 export type GamepadStickDto = "left" | "right";
 
+export type GamepadButtonModeDto = "normal" | "toggle" | "repeat";
+
 export type GamepadButtonRuleDto = {
   button: GamepadButtonDto,
   modifier: GamepadButtonDto | null,
   action: string,
+  mode: GamepadButtonModeDto,
 };
 
 export type GamepadAxisRuleDto = {

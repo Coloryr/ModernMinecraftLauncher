@@ -129,6 +129,19 @@ pub struct GamepadConfig {
     pub mouse: MouseRule,
 }
 
+/// 按钮的触发方式
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ButtonMode {
+    /// 普通：按下就按下，抬起就抬起
+    #[default]
+    Normal,
+    /// 连续：按一次保持按下，再按一次松开
+    Toggle,
+    /// 循环按下：按住期间反复触发
+    Repeat,
+}
+
 /// 一个按钮的绑定
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -140,6 +153,9 @@ pub struct ButtonRule {
     pub modifier: Option<Button>,
     /// 动作
     pub action: String,
+    /// 触发方式；旧配置里没有这一项时按普通处理
+    #[serde(default)]
+    pub mode: ButtonMode,
 }
 
 /// 一个轴区间的绑定
@@ -230,6 +246,8 @@ pub struct ButtonRuleCompiled {
     pub index: usize,
     /// 修饰键在状态数组中的下标；None 表示不需要
     pub modifier: Option<usize>,
+    /// 触发方式
+    pub mode: ButtonMode,
     /// 要输出的动作序列
     pub combo: Combo,
 }
@@ -377,6 +395,7 @@ impl GamepadConfig {
                 id: buttons.len(),
                 index,
                 modifier,
+                mode: rule.mode,
                 combo: parse_combo(&rule.action)?,
             });
         }
@@ -837,6 +856,21 @@ pub fn action_names() -> Vec<String> {
         "LeftShift",
         "LeftControl",
         "LeftAlt",
+        // 标点与这些功能键也要能绑：键盘图上它们都是实键，不是占位
+        "Grave",
+        "Minus",
+        "Equal",
+        "LeftBracket",
+        "RightBracket",
+        "Backslash",
+        "Semicolon",
+        "Apostrophe",
+        "Comma",
+        "Period",
+        "Slash",
+        "CapsLock",
+        "LeftSuper",
+        "Menu",
     ] {
         names.push(name.to_string());
     }
@@ -873,6 +907,7 @@ fn button_rule(button: Button, action: &str) -> ButtonRule {
         button,
         modifier: None,
         action: action.to_string(),
+        mode: ButtonMode::Normal,
     }
 }
 

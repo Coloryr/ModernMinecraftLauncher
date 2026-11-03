@@ -93,6 +93,7 @@ fn invalid_action_is_rejected() {
         button: Button::South,
         modifier: None,
         action: String::from("Nope"),
+        mode: ButtonMode::Normal,
     });
     assert!(config.compile().is_err());
 }
@@ -197,4 +198,25 @@ fn combo_keeps_press_and_release_order() {
     // 空项与重复都要拒绝
     assert!(parse_combo("LeftAlt+").is_err());
     assert!(parse_combo("E+E").is_err());
+}
+
+/// 标点、CapsLock、Win、Menu 这些键也要能绑，列表里的名字必须全部可解析
+#[test]
+fn every_action_name_parses() {
+    for name in action_names() {
+        assert!(parse_action(&name).is_ok(), "{name} 解析失败");
+    }
+    assert_eq!(parse_action("Grave"), Ok(Action::Key(96)));
+    assert_eq!(parse_action("CapsLock"), Ok(Action::Key(280)));
+    assert_eq!(parse_action("LeftBracket"), Ok(Action::Key(91)));
+    assert_eq!(parse_action("LeftSuper"), Ok(Action::Key(343)));
+    assert_eq!(parse_action("Menu"), Ok(Action::Key(348)));
+}
+
+/// 旧配置里没有 Mode 字段时按普通处理
+#[test]
+fn missing_mode_defaults_to_normal() {
+    let text = "{\"Button\":\"south\",\"Action\":\"Space\"}";
+    let rule: ButtonRule = serde_json::from_str(text).unwrap();
+    assert_eq!(rule.mode, ButtonMode::Normal);
 }

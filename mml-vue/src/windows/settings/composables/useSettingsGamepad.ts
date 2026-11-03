@@ -7,6 +7,7 @@ import {
   commands,
   type GamepadAxisDto,
   type GamepadButtonDto,
+  type GamepadButtonModeDto,
   type GamepadConfigDto,
   type GamepadProfileDto,
 } from "../../../lib/bindings";
@@ -58,6 +59,7 @@ export function useSettingsGamepad() {
     button: "south" as GamepadButtonDto,
     modifier: null as GamepadButtonDto | null,
     action: "Space",
+    mode: "normal" as GamepadButtonModeDto,
   });
   /** 新建轴绑定时的草稿 */
   const newAxis = reactive({ axis: "leftStickY" as GamepadAxisDto, from: -1, to: -0.35, action: "W" });
@@ -307,6 +309,7 @@ export function useSettingsGamepad() {
       button: newButton.button,
       modifier: newButton.modifier,
       action: newButton.action,
+      mode: newButton.mode,
     });
     const next = ALL_BUTTONS.find((button) => !isBound(button));
     if (next) newButton.button = next;

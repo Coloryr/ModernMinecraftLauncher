@@ -3,12 +3,14 @@
 //! 读取、映射与转发都在内核 crate mml-gamepad 里；这里只做 DTO 转换与错误键映射。
 
 use mml_gamepad::{
-    Axis, AxisRule, Button, ButtonRule, GamepadConfig, GamepadError, MouseRule, PadLayout, Stick,
+    Axis, AxisRule, Button, ButtonMode, ButtonRule, GamepadConfig, GamepadError, MouseRule,
+    PadLayout, Stick,
 };
 
 use crate::dtos::{
     GamepadAxisDto, GamepadAxisRuleDto, GamepadAxisValueDto, GamepadButtonDto,
-    GamepadButtonRuleDto, GamepadButtonValueDto, GamepadConfigDto, GamepadDto, GamepadExtraDto,
+    GamepadButtonModeDto, GamepadButtonRuleDto, GamepadButtonValueDto, GamepadConfigDto,
+    GamepadDto, GamepadExtraDto,
     GamepadLayoutDto, GamepadMouseDto, GamepadProfileDto, GamepadStateDto, GamepadStickDto,
 };
 use crate::err_keys;
@@ -258,6 +260,24 @@ fn layout_to_dto(layout: PadLayout) -> GamepadLayoutDto {
     }
 }
 
+/// 内核触发方式转 DTO
+fn mode_to_dto(mode: ButtonMode) -> GamepadButtonModeDto {
+    match mode {
+        ButtonMode::Normal => GamepadButtonModeDto::Normal,
+        ButtonMode::Toggle => GamepadButtonModeDto::Toggle,
+        ButtonMode::Repeat => GamepadButtonModeDto::Repeat,
+    }
+}
+
+/// DTO 触发方式转内核枚举
+fn mode_from_dto(mode: GamepadButtonModeDto) -> ButtonMode {
+    match mode {
+        GamepadButtonModeDto::Normal => ButtonMode::Normal,
+        GamepadButtonModeDto::Toggle => ButtonMode::Toggle,
+        GamepadButtonModeDto::Repeat => ButtonMode::Repeat,
+    }
+}
+
 /// DTO 外观转内核枚举
 fn layout_from_dto(layout: GamepadLayoutDto) -> PadLayout {
     match layout {
@@ -295,6 +315,7 @@ fn config_to_dto(config: &GamepadConfig) -> GamepadConfigDto {
                 button: button_to_dto(rule.button),
                 modifier: rule.modifier.map(button_to_dto),
                 action: rule.action.clone(),
+                mode: mode_to_dto(rule.mode),
             })
             .collect(),
         axes: config
@@ -329,6 +350,7 @@ fn config_from_dto(dto: GamepadConfigDto) -> GamepadConfig {
             .map(|rule| ButtonRule {
                 button: button_from_dto(rule.button),
                 modifier: rule.modifier.map(button_from_dto),
+            mode: mode_from_dto(rule.mode),
                 action: rule.action,
             })
             .collect(),

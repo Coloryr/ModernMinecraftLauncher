@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 use mml_names::i18_items::info_type::InfoType;
 
-use crate::map::{self, Action, CompiledMap, combo_of, in_range};
+use crate::map::{self, Action, ButtonMode, CompiledMap, combo_of, in_range};
 use crate::reader::{BUTTON_COUNT, PadValues, first_pad_id, pad_values};
 
 /// 转发间隔，约 60 帧每秒
@@ -28,6 +28,17 @@ const RELOAD_CHECK: Duration = Duration::from_secs(1);
 const BUTTON_DOWN: f32 = 0.5;
 /// 单帧时间上限，单位秒；进程被挂起后避免位移突跳
 const MAX_DELTA: f64 = 0.1;
+/// 连发模式的触发间隔
+const REPEAT_INTERVAL: Duration = Duration::from_millis(120);
+
+/// 一帧要做的动作
+#[derive(Default)]
+struct Frame {
+    /// 该保持按下的规则编号
+    active: BTreeSet<usize>,
+    /// 该点一下的规则编号，连发模式用
+    pulses: Vec<usize>,
+}
 
 /// 转发状态
 struct Relay {
@@ -41,6 +52,12 @@ struct Relay {
     active: BTreeSet<usize>,
     /// 每个动作被几条规则同时按住；最后一条松开时才真的发抬起
     counts: BTreeMap<Action, usize>,
+    /// 上一帧按下的规则编号，用来找按下 / 松开的边沿
+    pressed: BTreeSet<usize>,
+    /// 切换模式里当前保持按下的规则
+    toggled: BTreeSet<usize>,
+    /// 连发模式里每条规则的下次触发时间
+    repeat_at: BTreeMap<usize, Instant>,
     /// 切目标、设备或模式时仍按住的按钮，松开后才允许触发
     blocked: [bool; BUTTON_COUNT],
     /// 累计的水平位移，单位像素
@@ -86,6 +103,9 @@ impl Relay {
             grabbed: None,
             active: BTreeSet::new(),
             counts: BTreeMap::new(),
+            pressed: BTreeSet::new(),
+            toggled: BTreeSet::new(),
+            repeat_at: BTreeMap::new(),
             blocked: [false; BUTTON_COUNT],
             acc_x: 0.0,
             acc_y: 0.0,
@@ -157,16 +177,21 @@ impl Relay {
                 filtered.buttons[index] = 0.0;
             }
         }
-        let desired = desired_rules(map, &filtered, grabbed);
-        let released: Vec<usize> = self.active.difference(&desired).copied().collect();
+        let frame = self.step(map, Instant::now(), &desired_rules(map, &filtered, grabbed));
+        let released: Vec<usize> = self.active.difference(&frame.active).copied().collect();
         for id in released {
             self.release_rule(uuid, map, id);
         }
-        let pressed: Vec<usize> = desired.difference(&self.active).copied().collect();
+        let pressed: Vec<usize> = frame.active.difference(&self.active).copied().collect();
         for id in pressed {
             self.press_rule(uuid, map, id);
         }
-        self.active = desired;
+        self.active = frame.active;
+        // 连发：按间隔点一下，按下与抬起在同一帧里成对发出
+        for id in frame.pulses {
+            self.press_rule(uuid, map, id);
+            self.release_rule(uuid, map, id);
+        }
 
         let rule = if grabbed {
             map.mouse.turn
@@ -193,6 +218,61 @@ impl Relay {
             self.acc_y -= dy;
         }
     }
+
+    /**
+     * 根据这一帧按下的规则算出实际生效的规则
+     *
+     * 普通规则按下即生效；切换规则在按下边沿翻转保持状态；连发规则不进常驻集合，
+     * 而是按间隔给出"点一下"。
+     *
+     * - `map`: 编译后的映射
+     * - `now`: 这一帧的时间，连发按它算间隔
+     * - `pressed`: 这一帧原始命中的规则编号
+     */
+    fn step(&mut self, map: &CompiledMap, now: Instant, pressed: &BTreeSet<usize>) -> Frame {
+        let mut frame = Frame::default();
+        for rule in &map.buttons {
+            let down = pressed.contains(&rule.id);
+            match rule.mode {
+                ButtonMode::Normal => {
+                    if down {
+                        frame.active.insert(rule.id);
+                    }
+                }
+                ButtonMode::Toggle => {
+                    // 只在按下的那一帧翻转，按住不放不会来回跳
+                    if down && !self.pressed.contains(&rule.id) {
+                        if !self.toggled.remove(&rule.id) {
+                            self.toggled.insert(rule.id);
+                        }
+                    }
+                    if self.toggled.contains(&rule.id) {
+                        frame.active.insert(rule.id);
+                    }
+                }
+                ButtonMode::Repeat => {
+                    if down {
+                        let due = self.repeat_at.entry(rule.id).or_insert(now);
+                        if now >= *due {
+                            frame.pulses.push(rule.id);
+                            self.repeat_at.insert(rule.id, now + REPEAT_INTERVAL);
+                        }
+                    } else {
+                        self.repeat_at.remove(&rule.id);
+                    }
+                }
+            }
+        }
+        // 轴规则没有触发方式，命中即生效
+        for rule in &map.axes {
+            if pressed.contains(&rule.id) {
+                frame.active.insert(rule.id);
+            }
+        }
+        self.pressed = pressed.clone();
+        frame
+    }
+
 
     /// 按下一条规则：按序列顺序逐条按下
     ///
@@ -253,6 +333,9 @@ impl Relay {
         }
         self.active.clear();
         self.counts.clear();
+        self.pressed.clear();
+        self.toggled.clear();
+        self.repeat_at.clear();
         self.grabbed = None;
         self.blocked.fill(false);
         self.acc_x = 0.0;
