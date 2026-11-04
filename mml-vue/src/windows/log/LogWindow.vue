@@ -381,6 +381,22 @@ async function testLaunch() {
   }
 }
 
+/**
+ * 启动中再点一次：取消这次启动
+ *
+ * 进程还没起来时后端才有取消令牌；已经起来返回 `false`，那时按钮已换成停止键。
+ */
+async function cancelLaunch() {
+  try {
+    if (!(await api.cancelLaunch(lockedUuid.value))) return;
+    launching.value = false;
+    stageKey.value = "";
+    statePct.value = null;
+  } catch (e) {
+    showToast(tErr(e));
+  }
+}
+
 /** 停止确认弹窗 */
 const stopAsk = ref(false);
 
@@ -694,10 +710,12 @@ onBeforeUnmount(() => {
             <rect x="6.5" y="6.5" width="11" height="11" rx="2" />
           </svg>
         </BaseButton>
+        <!-- 启动中不锁按钮：检查资源 / 下载阶段再点一次就是取消启动 -->
         <BaseButton v-else size="sm" :variant="launching ? 'primary' : 'accent'" class="icon-btn-head"
-          :class="{ 'launch-live': launching }" :disabled="launching"
-          v-tip="launching ? stageText : t('logWindow.testLaunch')"
-          :aria-label="launching ? stageText : t('logWindow.testLaunch')" @click="testLaunch">
+          :class="{ 'launch-live': launching }"
+          v-tip="launching ? t('launch.cancel') : t('logWindow.testLaunch')"
+          :aria-label="launching ? t('launch.cancel') : t('logWindow.testLaunch')"
+          @click="launching ? cancelLaunch() : testLaunch()">
           <LaunchProgress v-if="launching" :text="stageText" :percent="stagePct" />
           <GlyphIcon v-else name="play" :size="15" />
         </BaseButton>

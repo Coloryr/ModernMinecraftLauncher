@@ -21,6 +21,7 @@ import {
 import { isTauri } from "../windowManager";
 import { detectOs } from "../../lib/titlebar";
 import { isRunning, javaTasks } from "../../lib/javaTasks";
+import JavaTitleIndicator from "../../components/JavaTitleIndicator.vue";
 
 /** 请求关闭本窗口 */
 defineEmits<{ (e: "close"): void }>();
@@ -170,10 +171,12 @@ async function loadOptions() {
 /**
  * 这一项是不是正在装
  *
- * - `uuid`: 列表项 uuid
+ * 按名字比对而不是 uuid：列表每次重新拉取都会换一批 uuid。
+ *
+ * - `name`: 包的显示名
  */
-function isInstalling(uuid: string): boolean {
-  return javaTasks.value.some((task) => task.id === uuid && isRunning(task));
+function isInstalling(name: string): boolean {
+  return javaTasks.value.some((task) => task.name === name && isRunning(task));
 }
 
 /** 下载并注册选中的包：后端按 uuid 取缓存里的下载信息 */
@@ -229,6 +232,10 @@ async function loadList() {
 
 <template>
   <WindowFrame :title="t('winJavaDownload.title')" @close="$emit('close')">
+    <!-- 安装进度入口：和主窗口顶栏、资源窗口标题栏上那枚指示器是同一个组件 -->
+    <template #head-right>
+      <JavaTitleIndicator />
+    </template>
     <div class="java-download-body">
       <!-- 切换搜索源 / 加载选项或列表时弹窗提示，加载完自动消失 -->
       <BaseModal v-if="optionsLoading || listLoading" :width="300" :closable="false">
@@ -283,9 +290,9 @@ async function loadList() {
         <div v-for="item in items" :key="item.uuid" class="item-card">
           <div class="item-head">
             <div class="item-title">{{ item.javaVersion }}</div>
-            <BaseButton variant="accent" :disabled="isInstalling(item.uuid)"
+            <BaseButton variant="accent" :disabled="isInstalling(item.name)"
               @click="startDownload(item.uuid)">
-              {{ isInstalling(item.uuid) ? t("winJavaDownload.downloading") : t("winJavaDownload.download") }}
+              {{ isInstalling(item.name) ? t("winJavaDownload.downloading") : t("winJavaDownload.download") }}
             </BaseButton>
           </div>
           <div class="item-sub">{{ item.name }}</div>

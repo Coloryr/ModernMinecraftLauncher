@@ -210,6 +210,11 @@ pub async fn java_download_start(app: AppHandle, uuid: String) -> Result<(), Str
         return Err(err_keys::JAVA_ITEM_NOT_FOUND.to_string());
     };
 
+    // 同一个包已经在装：直接当作成功，别重复登记
+    if task::is_running_name(&item.name) {
+        return Ok(());
+    }
+
     task::begin(&app, id, &item.name);
     let handle = app.clone();
     tauri::async_runtime::spawn(async move {

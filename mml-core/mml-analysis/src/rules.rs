@@ -158,6 +158,8 @@ pub(crate) fn analyze(report: &CrashReport) -> CrashAnalysis {
     check_wrong_loader(&scan, &mut findings);
     check_duplicate(&scan, &mut findings);
     check_mixin(report, &scan, &mut findings);
+    // 加载器点名"这些模组出错"比按异常形态泛泛归类有用，排在通用异常规则之前
+    check_errored_mods(report, &mut findings);
     runtime::check(report, &scan, &mut findings);
     check_missing_class(report, &scan, &mut findings);
     check_missing_method(report, &scan, &mut findings);
@@ -1120,6 +1122,40 @@ fn check_dimension(scan: &Scan, out: &mut Vec<Finding>) {
     });
 }
 
+/// 报告把模组标成 Errored
+///
+/// Forge 的模组列表用状态字母记每个模组的进度，末尾带 `E` 表示加载器在它身上捕获到异常。
+/// 这是"哪个模组出的问题"最直接的证据，比按栈帧包名推断可靠。
+fn check_errored_mods(report: &CrashReport, out: &mut Vec<Finding>) {
+    let errored: Vec<_> = report
+        .environment
+        .mods
+        .iter()
+        .filter(|entry| entry.errored())
+        .collect();
+    if errored.is_empty() {
+        return;
+    }
+
+    out.push(Finding {
+        id: FindingId::ModErrored,
+        severity: Severity::Error,
+        confidence: Confidence::High,
+        evidence: errored
+            .iter()
+            .map(|entry| clip(&entry.line, 240))
+            .filter(|line| !line.is_empty())
+            .take(6)
+            .collect(),
+        mods: errored
+            .iter()
+            .take(8)
+            .map(|entry| entry.id.clone())
+            .collect(),
+        details: Vec::new(),
+    });
+}
+
 /// 模组初始化失败
 fn check_mod_init(scan: &Scan, has_finding: bool, out: &mut Vec<Finding>) {
     // 已经命中更具体的原因时不再补一条泛泛的"模组加载失败"
@@ -1287,6 +1323,13 @@ fn collect_suspected(
         let id = entry.id.to_lowercase();
         if id.len() >= 4 && message.contains(&id) {
             *score.entry(entry.id.clone()).or_default() += 6;
+        }
+    }
+
+    // 报告标成 Errored 的模组在加载阶段就抛过异常，比栈帧猜出来的包名可靠
+    for entry in &report.environment.mods {
+        if entry.errored() {
+            *score.entry(entry.id.clone()).or_default() += 5;
         }
     }
 

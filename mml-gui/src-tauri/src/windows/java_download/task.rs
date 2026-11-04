@@ -144,6 +144,28 @@ pub fn finish(app: &AppHandle, id: Uuid, error: Option<String>) {
     emit(app);
 }
 
+/// 这个名字是不是已经在装了
+///
+/// 列表每次拉取都会换一批 uuid，同名的包重新拉回来对不上 uuid，
+/// 所以重装判断按名字来：同一个包在装时再点一次不会重复登记。
+///
+/// - `name`: 包的显示名
+///
+/// # 返回值
+///
+/// 已有同名任务在跑时返回 `true`
+pub fn is_running_name(name: &str) -> bool {
+    TASKS.lock().unwrap().iter().any(|task| {
+        task.name == name
+            && matches!(
+                task.stage,
+                JavaInstallStageDto::Download
+                    | JavaInstallStageDto::Extract
+                    | JavaInstallStageDto::Probe
+            )
+    })
+}
+
 /// 清掉已经结束的任务
 ///
 /// - `app`: 应用句柄

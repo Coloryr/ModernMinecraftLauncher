@@ -97,6 +97,21 @@ pub struct ModEntry {
     pub name: String,
     /// 版本；取不到时为空串
     pub version: String,
+    /// Forge 的状态字母，如 `UCE`；其它格式的列表为空串
+    pub states: String,
+    /// 列表里的原始行，已去首尾空白；拿不到时为空串
+    pub line: String,
+}
+
+impl ModEntry {
+    /// 列表是否把该模组标成 Errored，即状态字母含 `E`
+    ///
+    /// # 返回值
+    ///
+    /// 加载器在这一模组上捕获到异常时返回 `true`
+    pub fn errored(&self) -> bool {
+        self.states.contains('E')
+    }
 }
 
 /// 异常链里的一层
@@ -289,6 +304,8 @@ pub enum FindingId {
     WatchdogTimeout,
     /// 维度注册缺失，通常是维度模组与存档不匹配
     DimensionMissing,
+    /// 报告把某些模组标成 Errored，即加载器在它们身上捕获到异常
+    ModErrored,
     /// 模组初始化失败
     ModInitFailure,
     /// 安全管理器或权限问题
@@ -335,6 +352,7 @@ impl FindingId {
             FindingId::RenderFailure => "render_failure",
             FindingId::WatchdogTimeout => "watchdog_timeout",
             FindingId::DimensionMissing => "dimension_missing",
+            FindingId::ModErrored => "mod_errored",
             FindingId::ModInitFailure => "mod_init_failure",
             FindingId::Security => "security",
             FindingId::Unclassified => "unclassified",

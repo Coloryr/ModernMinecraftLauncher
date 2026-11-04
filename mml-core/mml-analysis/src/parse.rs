@@ -22,14 +22,14 @@ static RE_MEMORY: LazyLock<Regex> =
 static RE_LOG_TIME: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^\[\d{2}:\d{2}:\d{2}\]").unwrap());
 
-/// Forge 1.7 的状态、id、版本和显示名。
+/// Forge 1.7 的状态字母、id、版本和显示名；状态里带 `E` 表示该模组加载出错。
 static RE_LEGACY_MOD: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^[UDLCHIJAE]+\s+([A-Za-z0-9_.-]+)\{([^}]*)\}\s+\[([^]]*)\]").unwrap()
+    Regex::new(r"^([UDLCHIJAE]+)\s+([A-Za-z0-9_.-]+)\{([^}]*)\}\s+\[([^]]*)\]").unwrap()
 });
 
 /// Forge 1.12 的状态表，排除表头和分隔行。
 static RE_LEGACY_TABLE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^\|\s*[UDLCHIJAE]+\s*\|\s*([A-Za-z0-9_.-]+)\s*\|\s*([^|]*?)\s*\|").unwrap()
+    Regex::new(r"^\|\s*([UDLCHIJAE]+)\s*\|\s*([A-Za-z0-9_.-]+)\s*\|\s*([^|]*?)\s*\|").unwrap()
 });
 
 /// 解析一份崩溃报告或日志
@@ -303,6 +303,8 @@ fn parse_mod_issues(lines: &[&str]) -> Vec<ModEntry> {
                     id: id.to_string(),
                     name: id.to_string(),
                     version: String::new(),
+                    states: String::new(),
+                    line: trimmed.to_string(),
                 });
                 current = Some(mods.len() - 1);
             }
@@ -325,15 +327,19 @@ fn parse_mods(lines: &[&str]) -> Vec<ModEntry> {
         let line = line.trim();
         let entry = if let Some(captures) = RE_LEGACY_MOD.captures(line) {
             Some(ModEntry {
-                id: captures[1].to_string(),
-                name: captures[3].to_string(),
-                version: captures[2].to_string(),
+                id: captures[2].to_string(),
+                name: captures[4].to_string(),
+                version: captures[3].to_string(),
+                states: captures[1].to_string(),
+                line: line.to_string(),
             })
         } else {
             RE_LEGACY_TABLE.captures(line).map(|captures| ModEntry {
-                id: captures[1].to_string(),
-                name: captures[1].to_string(),
-                version: captures[2].trim().to_string(),
+                id: captures[2].to_string(),
+                name: captures[2].to_string(),
+                version: captures[3].trim().to_string(),
+                states: captures[1].to_string(),
+                line: line.to_string(),
             })
         };
         if let Some(entry) = entry
@@ -403,6 +409,8 @@ fn parse_mod_line(line: &str) -> Option<ModEntry> {
                 fields[1].to_string()
             },
             version: fields[3].to_string(),
+            states: fields[0].to_string(),
+            line: line.to_string(),
         });
     }
 
@@ -418,6 +426,8 @@ fn parse_mod_line(line: &str) -> Option<ModEntry> {
             id: id.to_string(),
             name: id.to_string(),
             version: String::new(),
+            states: String::new(),
+            line: line.to_string(),
         });
     }
 
@@ -438,6 +448,8 @@ fn parse_mod_line(line: &str) -> Option<ModEntry> {
             name.to_string()
         },
         version: version.to_string(),
+        states: String::new(),
+        line: line.to_string(),
     })
 }
 
