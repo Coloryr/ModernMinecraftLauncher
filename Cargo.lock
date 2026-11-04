@@ -3484,6 +3484,7 @@ version = "0.1.0"
 dependencies = [
  "mml-base",
  "mml-config",
+ "mml-log",
  "mml-names",
  "mml-sys",
  "mml-testutil",

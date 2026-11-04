@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+# TEMP 仅为工作区里未提交的 [TEMP] 诊断日志临时补的依赖，联调结束删除
+mml-log = { path = "../mml-log" }
 mml-names = { path = "../mml-names" }
 mml-config = { path = "../mml-config" }
 mml-base = { path = "../mml-base" }

@@ -38,6 +38,7 @@ import type {
   ExportEntryDto,
   ExportInfoDto,
   ExportProgressDto,
+  JavaInstallTaskDto,
   GroupDto,
   InstanceArgsDto,
   InstanceInfoDto,
@@ -98,7 +99,7 @@ import type {
   ViewMode,
   MenuActionEvent,
 } from "./bindings";
-import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, CustomUiChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiThemeChange, GuiViewModeChange, InstanceChange, JavaChange, LaunchError, LaunchState, MenuAction, MinecraftProgress, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress, ServerInstanceFocus, ServerInstanceProgress, StartArg } from "./listens";
+import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, CustomUiChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiThemeChange, GuiViewModeChange, InstanceChange, JavaChange, JavaInstallStatus, LaunchError, LaunchState, MenuAction, MinecraftProgress, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress, ServerInstanceFocus, ServerInstanceProgress, StartArg } from "./listens";
 
 export interface CreateInstanceOpts {
   /** 加载器 ID，缺省为 `normal` */
@@ -2037,6 +2038,21 @@ export function onAddPackProgress(cb: (e: PackProgressDto) => void): Promise<Unl
  *
  * 给多任务进度条用，下载整合包窗口与主窗口共用
  */
+/**
+ * Java 安装任务变化事件
+ *
+ * - `cb`: 任务列表变化时回调
+ *
+ * # 返回值
+ *
+ * 取消监听的函数
+ *
+ * 每次下载 / 解压推进、阶段变化与结束时广播整份列表
+ */
+export function onJavaInstallStatus(cb: (tasks: JavaInstallTaskDto[]) => void): Promise<UnlistenFn> {
+  return listen<JavaInstallTaskDto[]>(JavaInstallStatus, (e) => cb(e.payload));
+}
+
 export function onAddModpackStatus(cb: (e: ModPackStatusDto) => void): Promise<UnlistenFn> {
   return listen<ModPackStatusDto>(AddModpackStatus, (e) => cb(e.payload));
 }

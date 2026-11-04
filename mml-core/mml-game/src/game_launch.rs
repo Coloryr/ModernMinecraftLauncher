@@ -574,28 +574,35 @@ impl InstanceSettingObj {
     ///
     /// 返回 Java 路径；找不到可用的 Java 返回 `None`
     fn get_java(&self, obj: &GameLaunchObj, gui: LaunchGui) -> Option<PathBuf> {
-        if let Some(data) = &self.jvm_local {
-            let path = PathBuf::from(data);
-
-            if path.exists() {
-                return Some(path);
-            } else {
-                crate::add_game_log_item(&self.uuid, GameLog::JavaLocalRedirect);
-            }
-        }
-
         if mml_jvms::get_all_java().is_empty() {
             mml_jvms::scan_java();
         }
 
-        if let Some(name) = &self.jvm_name {
-            if let Some(data) = mml_jvms::get_java_info(&name) {
-                if data.path.exists() {
-                    return Some(data.path.clone());
+        // 选了具体 Java 就按名字取，custom 才用自定义路径。
+        // 老配置里两项都有的，以名字为准 —— 否则改过 Java 的实例还会从旧路径启动
+        match self.jvm_name.as_deref() {
+            Some(name) if name != "custom" => {
+                if let Some(data) = mml_jvms::get_java_info(name) {
+                    if data.path.exists() {
+                        return Some(data.path.clone());
+                    }
+                }
+                // 名字失效（被删 / 没扫到）：直接按版本要求自动选，不退回旧的自定义路径
+                crate::add_game_log_item(&self.uuid, GameLog::JavaLocalRedirect);
+            }
+            Some("custom") => {
+                if let Some(data) = &self.jvm_local {
+                    let path = PathBuf::from(data);
+
+                    if path.exists() {
+                        return Some(path);
+                    }
+
+                    crate::add_game_log_item(&self.uuid, GameLog::JavaLocalRedirect);
                 }
             }
-
-            crate::add_game_log_item(&self.uuid, GameLog::JavaLocalRedirect);
+            // 自动：旧配置里残留的自定义路径不再生效，按版本要求重新挑
+            _ => {}
         }
 
         // 从小往大取：声明的兼容集合是一个范围，取里面最低的那个最保守。
@@ -649,16 +656,23 @@ impl InstanceSettingObj {
             return;
         }
 
-        let major = mml_jvms::get_all_java()
-            .iter()
-            .find(|item| item.path.as_path() == java)
-            .map(|item| item.major_version);
-
         // 只有 Java 18–23 需要显式放行：8 没有这个开关，24 起 SecurityManager 已被移除
-        if major.is_some_and(|major| (18..=23).contains(&major)) {
+        if java_major_of(java).is_some_and(|major| (18..=23).contains(&major)) {
             obj.jvm_args
                 .push("-Djava.security.manager=allow".to_string());
         }
+    }
+
+    /// 按实际选中的 Java 版本补 / 去 ZGC 的分代开关
+    ///
+    /// 声明的兼容版本只决定走不走 ZGC；真正跑的是 `get_java` 挑出来的那份。
+    /// 21 / 22 的 ZGC 默认不分代，要显式加 `-XX:+ZGenerational`；23 起分代是默认，
+    /// 该选项已废弃，26 起 JVM 直接报 Unrecognized VM option。取不到版本时一律不加。
+    ///
+    /// - `obj`: 启动内容，`jvm_args` 在此就地修正
+    /// - `java`: 实际要用的 Java 路径
+    fn fix_zgc_generational(obj: &mut GameLaunchObj, java: &std::path::Path) {
+        fix_zgc_args(&mut obj.jvm_args, java_major_of(java));
     }
 
     /// 按命令行文本启动一个进程，并把输出接到实例日志上
@@ -811,6 +825,7 @@ impl InstanceSettingObj {
         }
 
         InstanceSettingObj::allow_security_manager(&mut obj, java.as_ref().unwrap());
+        InstanceSettingObj::fix_zgc_generational(&mut obj, java.as_ref().unwrap());
         let args = self.make_run_arg(&arg, &mut obj, false);
         let env = self.make_env_arg();
 
@@ -911,6 +926,7 @@ impl InstanceSettingObj {
         }
 
         InstanceSettingObj::allow_security_manager(&mut obj, &jvm);
+        InstanceSettingObj::fix_zgc_generational(&mut obj, &jvm);
 
         // 创建启动参数
         // 完整命令行 = JVM 参数 + 主类 + 游戏参数；`check` 为真时跳过仍缺失的库文件。
@@ -1042,6 +1058,37 @@ impl InstanceSettingObj {
         }
 
         Ok(())
+    }
+}
+
+/// 实际选中的 Java 大版本；不在已扫描的 Java 列表里返回 `None`
+///
+/// - `java`: 实际要用的 Java 路径
+///
+/// # 返回值
+///
+/// 主版本号，如 21 / 26
+fn java_major_of(java: &std::path::Path) -> Option<i32> {
+    mml_jvms::get_all_java()
+        .iter()
+        .find(|item| item.path.as_path() == java)
+        .map(|item| item.major_version)
+}
+
+/// 按 Java 大版本修正 ZGC 分代开关
+///
+/// - `args`: 已生成的 JVM 参数
+/// - `major`: 实际 Java 大版本；`None` 表示取不到
+///
+/// 只有 21 / 22 需要 `-XX:+ZGenerational`；23 起分代是默认、该选项已废弃，
+/// 26 起 JVM 不再认识它，所以其它版本（以及取不到版本时）一律不带。
+fn fix_zgc_args(args: &mut Vec<String>, major: Option<i32>) {
+    // 先摘掉：23 起它是默认、已废弃，26 起 JVM 直接不认；取不到版本时也按不加处理
+    args.retain(|arg| arg != "-XX:+ZGenerational");
+    if major.is_some_and(|major| (21..23).contains(&major))
+        && args.iter().any(|arg| arg == "-XX:+UseZGC")
+    {
+        args.push("-XX:+ZGenerational".to_string());
     }
 }
 

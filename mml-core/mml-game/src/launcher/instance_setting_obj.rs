@@ -96,10 +96,10 @@ pub struct InstanceSettingObj {
     /// JVM 参数
     #[serde(rename = "JvmArg")]
     pub jvm_arg: Option<RunArgObj>,
-    /// JVM 预设名，仅作展示，实际参数取 `jvm_arg`
+    /// 选用的 Java：注册表里的名字，取 `custom` 表示改用 `jvm_local` 的路径，缺省为自动
     #[serde(rename = "JvmName")]
     pub jvm_name: Option<String>,
-    /// 指定使用的 Java 可执行文件路径，缺省则自动选择
+    /// 自定义 Java 可执行文件路径，只在 `jvm_name` 为 `custom` 时生效
     #[serde(rename = "JvmLocal")]
     pub jvm_local: Option<String>,
     /// 窗口设置

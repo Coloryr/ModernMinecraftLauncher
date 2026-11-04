@@ -3,6 +3,8 @@
 use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    thread,
+    time::{Duration, Instant},
 };
 
 use mml_sys::ArchEnum;
@@ -57,13 +59,30 @@ pub fn test_java<P: AsRef<Path>>(file: P) -> Option<JavaInfoObj> {
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| PathBuf::from("."));
 
-    let output = match Command::new(&path)
+    // 扫描软件偶尔会把刚解压出来的 exe 卡住，别让一次检测把整个安装挂死
+    let mut child = match Command::new(&path)
         .arg("-version")
         .current_dir(working_dir)
         .stderr(Stdio::piped())
         .stdout(Stdio::piped())
-        .output()
+        .spawn()
     {
+        Ok(child) => child,
+        Err(_) => return None,
+    };
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) if Instant::now() < deadline => thread::sleep(Duration::from_millis(50)),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+        }
+    }
+    let output = match child.wait_with_output() {
         Ok(output) => output,
         Err(_) => return None,
     };

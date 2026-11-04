@@ -55,3 +55,35 @@ pub struct JavaDownloadOptionsDto {
     /// 架构：x86 / x64 / arm64
     pub archs: Vec<String>,
 }
+
+/// Java 安装的阶段
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum JavaInstallStageDto {
+    /// 下载 zip
+    Download,
+    /// 解压
+    Extract,
+    /// 识别并注册
+    Probe,
+    /// 完成
+    Done,
+    /// 失败
+    Failed,
+}
+
+/// 一条 Java 安装任务，`java-install-status` 事件与 `java_download_status` 共用
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JavaInstallTaskDto {
+    /// 列表项 uuid
+    pub id: String,
+    /// 显示名
+    pub name: String,
+    /// 当前阶段
+    pub stage: JavaInstallStageDto,
+    /// 当前阶段进度，0.0 到 1.0
+    pub progress: f32,
+    /// 失败原因；非失败阶段为 null
+    pub error: Option<String>,
+}

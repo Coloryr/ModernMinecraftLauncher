@@ -1,11 +1,24 @@
 use super::*;
 
+/// 这条 JVM 参数是不是在选择垃圾回收器
+///
+/// - `arg`: 单条 JVM 参数
+///
+/// # 返回值
+///
+/// `-XX:+Use…GC` 形式的选择器（UseZGC / UseG1GC / UseShenandoahGC 等）返回 `true`；
+/// 带参数值的开关（`UseGCOverheadLimit`）不算
+pub(super) fn is_gc_arg(arg: &str) -> bool {
+    arg.starts_with("-XX:+Use") && arg.ends_with("GC")
+}
+
 impl InstanceSettingObj {
     /// 创建Jvm参数
     ///
     /// - `auth`: 登陆使用的账户
     /// - `java`: 使用的JAVA主版本号
     /// - `mixin`: ColorASM IPC 连接参数，`None` 表示不注入
+    /// - `existing`: 版本 JSON / 加载器已经给出的 JVM 参数；自动档据此避让它们自带的 GC
     ///
     /// # 返回值
     ///
@@ -15,6 +28,7 @@ impl InstanceSettingObj {
         auth: &LoginObj,
         java: u8,
         mixin: Option<&MixinArg>,
+        existing: &[String],
     ) -> CoreResult<Vec<String>> {
         let config = &mml_config::read_config().jvm_arg;
 
@@ -74,10 +88,15 @@ impl InstanceSettingObj {
         }
 
         if gc == GCType::Auto {
-            if java >= 21 {
-                gc = GCType::ZGC;
-            } else {
-                gc = GCType::G1GC;
+            // 版本 JSON / 加载器 / 自定义参数已经指定了 GC 就听它们的，自动档不再叠一套
+            // （新版客户端的 jvm 参数自带 UseZGC / UseG1GC，重复追加会互相覆盖）
+            let custom_has_gc = jvm_args.split('\n').any(|item| is_gc_arg(item.trim()));
+            if !custom_has_gc && !existing.iter().any(|arg| is_gc_arg(arg)) {
+                if java >= 21 {
+                    gc = GCType::ZGC;
+                } else {
+                    gc = GCType::G1GC;
+                }
             }
         }
 

@@ -185,8 +185,11 @@ pub(super) fn apply_args_to_core(inst: &mut InstanceSettingObj, a: &InstanceArgs
         win.height = Some(a.height.clamp(0, u16::MAX as i64) as u16);
     }
 
+    // 两项只能留一项：选了具体 Java 就清掉旧的自定义路径，
+    // 否则 get_java 会优先用那条旧路径，界面换了 Java 却仍按旧的启动
+    let custom_java = a.java_name == "custom";
     inst.jvm_name = (!a.java_name.is_empty()).then(|| a.java_name.clone());
-    inst.jvm_local = (!a.java_path.is_empty()).then(|| a.java_path.clone());
+    inst.jvm_local = (custom_java && !a.java_path.is_empty()).then(|| a.java_path.clone());
 
     let adv = inst.advance_jvm.get_or_insert_with(AdvanceJvmObj::default);
     adv.main_class = (!a.main_class.is_empty()).then(|| a.main_class.clone());
@@ -230,3 +233,7 @@ pub(crate) fn core_instance(uuid: &str) -> Option<CoreInstance> {
         })
     })
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/windows_main_args_tests.rs"]
+mod tests;

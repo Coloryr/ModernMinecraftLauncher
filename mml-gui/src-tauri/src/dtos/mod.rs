@@ -75,7 +75,9 @@ pub use gui_config_dto::{
     LoginLockItemDto, MainWindowConfigDto,
 };
 pub use instance_dto::{GroupDto, InstanceInfoDto};
-pub use java_download_dto::{JavaDownloadItemDto, JavaDownloadOptionsDto, JavaTypes};
+pub use java_download_dto::{
+    JavaDownloadItemDto, JavaDownloadOptionsDto, JavaInstallStageDto, JavaInstallTaskDto, JavaTypes,
+};
 pub use java_dto::{JavaImportProgressDto, JavaInfoDto};
 pub use log_dto::{LogFocusDto, LogSettingDto};
 pub use main_dto::{

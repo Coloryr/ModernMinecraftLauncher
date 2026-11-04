@@ -224,6 +224,18 @@ export function closeModpackPopup() {
  * 与下载管理 / 整合包安装同一个路子：下载跑在后台，用户可能已经离开了"添加资源"那一页，
  * 所以进度不能只挂在那个页面上。弹窗只影响"看不看得见进度"，关掉它不影响下载。
  */
+/** Java 安装进度弹窗是否打开；入口是标题栏上的 JavaTitleIndicator */
+export const javaPopupOpen = ref(false);
+
+/** 打开 Java 安装进度弹窗 */
+export function openJavaPopup() {
+  javaPopupOpen.value = true;
+}
+
+/** 关闭 Java 安装进度弹窗；安装任务不受影响 */
+export function closeJavaPopup() {
+  javaPopupOpen.value = false;
+}
 export const resourcePopupOpen = ref(false);
 
 /** 打开资源下载进度弹窗 */

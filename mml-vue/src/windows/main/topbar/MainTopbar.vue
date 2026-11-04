@@ -8,6 +8,7 @@ import WindowControls from "../../../components/ui/WindowControls.vue";
 import ModpackTitleIndicator from "../../../components/ModpackTitleIndicator.vue";
 import DownloadTitleIndicator from "../../../components/DownloadTitleIndicator.vue";
 import ResourceTitleIndicator from "../../../components/ResourceTitleIndicator.vue";
+import JavaTitleIndicator from "../../../components/JavaTitleIndicator.vue";
 import { detectOs, onTitleBarPointerDown, titleBarStyle } from "../../../lib/titlebar";
 import { useWindowFullscreen } from "../../../lib/useWindowFullscreen";
 import { useModpackStatus } from "../../../lib/modpackTasks";
@@ -78,6 +79,7 @@ const emit = defineEmits<{
       <ModpackTitleIndicator v-if="!modpackWindowOpen" />
       <DownloadTitleIndicator v-if="!modpackWindowOpen" />
       <ResourceTitleIndicator />
+      <JavaTitleIndicator />
 
       <!-- 启动器主页（切换按钮） -->
       <button class="topbar-icon-btn" :class="{ pressed: newsActive }" v-tip="t('home.entry')"

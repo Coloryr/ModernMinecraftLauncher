@@ -7,17 +7,21 @@
 
 use std::{
     collections::HashMap,
-    sync::{LazyLock, RwLock},
+    sync::{Arc, LazyLock, RwLock},
+    time::Duration,
 };
 
 use mml_base::file_item::FileItemObj;
+use tauri::AppHandle;
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use crate::dtos::{JavaDownloadOptionsDto, JavaTypes};
+use crate::dtos::{JavaDownloadOptionsDto, JavaInstallStageDto, JavaInstallTaskDto, JavaTypes};
 use crate::err_keys;
 
 // 带命令的子模块必须 `pub(crate)`：生成的 `tauri_commands!` 从 crate 根引用它
 pub(crate) mod list;
+pub(crate) mod task;
 
 // 集成测试 tests/java_download_test.rs 按原路径引用它，故再导出
 pub use self::list::java_download_get_list;
@@ -184,43 +188,103 @@ fn zulu_arch(arch: &str, bitness: &str) -> String {
     }
 }
 
-/// 下载选定的 Java 包并解包注册
+/// 开始安装：登记任务后立刻返回，下载 / 解压 / 注册在后台跑，进度走 `java-install-status`
 ///
-/// `java_download_get_list` 缓存的下载信息 `JAVA_ITEMS` 按 uuid 取出，
-/// 压缩包经下载器落到下载目录，随后 `mml_jvms::unzip_java` 解包识别并
-/// 注册进 Java 列表，`java-change` 事件由 mml_jvms 回调自动发出。
-///
+/// - `app`: 应用句柄，广播进度与失败原因用
 /// - `uuid`: 列表项 uuid，取自 `java_download_get_list` 返回的 `uuid` 字段
 ///
 /// # 返回值
 ///
-/// 下载并注册成功返回 `Ok(())`；uuid 非法、缓存里没有该项、下载或解包失败时
-/// 返回 `Err`，内容为 i18n 键
+/// 任务登记成功返回 `Ok(())`；uuid 非法或缓存里没有该项时返回 `Err`，内容为 i18n 键
 #[gui_macros::command]
-pub async fn java_download_start(uuid: String) -> Result<(), String> {
-    let Ok(uuid) = Uuid::parse_str(&uuid) else {
+pub async fn java_download_start(app: AppHandle, uuid: String) -> Result<(), String> {
+    let Ok(id) = Uuid::parse_str(&uuid) else {
         return Err(err_keys::JAVA_ITEM_NOT_FOUND.to_string());
     };
 
     let item = {
         let locker = JAVA_ITEMS.read().unwrap();
-        locker.get(&uuid).cloned()
+        locker.get(&id).cloned()
     };
     let Some(item) = item else {
         return Err(err_keys::JAVA_ITEM_NOT_FOUND.to_string());
     };
 
-    // 下载压缩包，进度在下载窗口可见
-    let ok = mml_downloader::start_download_task(vec![item.clone()]).await;
-    if !ok {
+    task::begin(&app, id, &item.name);
+    let handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let result = install(&handle, id, item).await;
+        task::finish(&handle, id, result.err());
+    });
+    Ok(())
+}
+
+/// 当前安装任务列表
+///
+/// # 返回值
+///
+/// 按开始顺序排列的任务；窗口打开时先拉一次，之后靠事件更新
+#[gui_macros::command]
+pub fn java_download_status() -> Vec<JavaInstallTaskDto> {
+    task::list()
+}
+
+/// 清掉已经结束的安装任务
+///
+/// - `app`: 应用句柄
+///
+/// # 返回值
+///
+/// 清理后的任务列表
+#[gui_macros::command]
+pub fn java_download_clear(app: AppHandle) -> Vec<JavaInstallTaskDto> {
+    task::clear_finished(&app);
+    task::list()
+}
+
+/// 安装主体：下载 zip → 解压 → 识别注册
+///
+/// - `app`: 应用句柄
+/// - `id`: 列表项 uuid
+/// - `item`: 下载信息
+///
+/// # 返回值
+///
+/// 成功返回 `Ok(())`；任一步失败时返回 i18n 键或原始说明
+async fn install(app: &AppHandle, id: Uuid, item: FileItemObj) -> Result<(), String> {
+    // 下载只负责把 zip 拿到本地，解压单独作为下一段
+    task::set_stage(app, id, JavaInstallStageDto::Download);
+    let Some(handle) = mml_downloader::start_download_task_handle(
+        vec![item.clone()],
+        CancellationToken::new(),
+    ) else {
+        return Err(err_keys::DOWNLOAD_FAILED.to_string());
+    };
+    while !handle.is_finished() {
+        let status = handle.status();
+        if status.all_bytes > 0 {
+            task::set_progress(
+
+                app,
+                id,
+                status.now_bytes as f32 / status.all_bytes as f32,
+            );
+        }
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+    if !handle.wait().await.is_done() {
         return Err(err_keys::DOWNLOAD_FAILED.to_string());
     }
 
-    // 解包识别并注册，解包无需进度回调，传 None
-    let archive = item.file.clone();
-    mml_jvms::unzip_java(Some(item.name.clone()), &archive, None)
+    task::set_stage(app, id, JavaInstallStageDto::Extract);
+    let gui = Arc::new(task::ExtractGui::new(app, id));
+    let dir = mml_jvms::extract_java(Some(item.name.clone()), &item.file, Some(gui))
         .await
         .map_err(|err| err.to_string())?;
 
+    task::set_stage(app, id, JavaInstallStageDto::Probe);
+    mml_jvms::register_java_dir(dir)
+        .await
+        .map_err(|err| err.to_string())?;
     Ok(())
 }

@@ -17,3 +17,13 @@ export type JavaDownloadOptionsDto = {
   archs: string[],
 };
 
+export type JavaInstallStageDto = "download" | "extract" | "probe" | "done" | "failed";
+
+export type JavaInstallTaskDto = {
+  id: string,
+  name: string,
+  stage: JavaInstallStageDto,
+  progress: number,
+  error: string | null,
+};
+

@@ -132,7 +132,7 @@ async fn isolate_home_paths() {
     assert_eq!(env.get("USERPROFILE"), Some(&home));
     assert!(env["XDG_CONFIG_HOME"].ends_with(".config"));
     let args = obj
-        .make_jvm_arg(&LoginObj::default(), 21, None)
+        .make_jvm_arg(&LoginObj::default(), 21, None, &[])
         .await
         .unwrap();
     assert!(args.iter().any(|a| a == &format!("-Duser.home={home}")));
@@ -143,7 +143,7 @@ async fn isolate_home_paths() {
     });
     assert!(!off.make_env_arg().contains_key("HOME"));
     let args = off
-        .make_jvm_arg(&LoginObj::default(), 21, None)
+        .make_jvm_arg(&LoginObj::default(), 21, None, &[])
         .await
         .unwrap();
     assert!(!args.iter().any(|a| a.starts_with("-Duser.home=")));
@@ -163,7 +163,7 @@ async fn jvm_arg_colorasm() {
     };
 
     let args = obj
-        .make_jvm_arg(&LoginObj::default(), 21, Some(&mixin))
+        .make_jvm_arg(&LoginObj::default(), 21, Some(&mixin), &[])
         .await
         .unwrap();
 
@@ -199,7 +199,7 @@ async fn jvm_arg_memory() {
     });
 
     let args = obj
-        .make_jvm_arg(&LoginObj::default(), 21, None)
+        .make_jvm_arg(&LoginObj::default(), 21, None, &[])
         .await
         .unwrap();
 
@@ -226,7 +226,7 @@ async fn jvm_arg_memory_zero_skips() {
     });
 
     let args = obj
-        .make_jvm_arg(&LoginObj::default(), 21, None)
+        .make_jvm_arg(&LoginObj::default(), 21, None, &[])
         .await
         .unwrap();
 
@@ -250,7 +250,7 @@ async fn jvm_arg_gc() {
         ..Default::default()
     });
 
-    let zgc = auto.make_jvm_arg(&auth, 21, None).await.unwrap();
+    let zgc = auto.make_jvm_arg(&auth, 21, None, &[]).await.unwrap();
     assert!(
         names::GCZGC
             .iter()
@@ -261,8 +261,20 @@ async fn jvm_arg_gc() {
         !zgc.contains(&names::G1GC[0].to_string()),
         "自动档不该同时给 G1GC"
     );
+    // 分代开关要等选好实际 Java 再按版本补（见 game_launch 的 fix_zgc_args），这里只出基础参数
+    for java in [21u8, 22, 23, 26] {
+        let args = auto.make_jvm_arg(&auth, java, None, &[]).await.unwrap();
+        assert!(
+            args.contains(&"-XX:+UseZGC".to_string()),
+            "Java {java} 应走 ZGC"
+        );
+        assert!(
+            !args.contains(&"-XX:+ZGenerational".to_string()),
+            "Java {java} 的分代开关不该在这里加"
+        );
+    }
 
-    let g1 = auto.make_jvm_arg(&auth, 17, None).await.unwrap();
+    let g1 = auto.make_jvm_arg(&auth, 17, None, &[]).await.unwrap();
     assert!(
         names::G1GC
             .iter()
@@ -279,13 +291,57 @@ async fn jvm_arg_gc() {
         gc_mode: Some(GCType::G1GC),
         ..Default::default()
     });
-    let forced = forced.make_jvm_arg(&auth, 21, None).await.unwrap();
+    let forced = forced.make_jvm_arg(&auth, 21, None, &[]).await.unwrap();
     assert!(
         names::G1GC
             .iter()
             .all(|item| forced.contains(&item.to_string())),
         "显式 G1GC 应压过自动档"
     );
+}
+
+/// 版本 JSON / 加载器已经带了 GC 时，自动档不再叠一套；显式档仍按用户选的追加
+#[tokio::test]
+async fn jvm_arg_gc_skips_when_existing_has_gc() {
+    let _guard = setup();
+    let auth = LoginObj::default();
+    let existing = vec![
+        "-XX:+UnlockExperimentalVMOptions".to_string(),
+        "-XX:+UseZGC".to_string(),
+    ];
+
+    let auto = instance(RunArgObj {
+        gc_mode: Some(GCType::Auto),
+        ..Default::default()
+    });
+    let args = auto.make_jvm_arg(&auth, 21, None, &existing).await.unwrap();
+    assert!(
+        !args.iter().any(|arg| arg == "-XX:+UseZGC"
+            || arg == "-XX:+UseG1GC"),
+        "已有 GC 时自动档不应再追加: {args:?}"
+    );
+
+    // 自定义参数里已经写了 GC 时同样不叠加
+    let custom = instance(RunArgObj {
+        gc_mode: Some(GCType::Auto),
+        jvm_args: Some("-XX:+UseZGC".to_string()),
+        ..Default::default()
+    });
+    let args = custom.make_jvm_arg(&auth, 21, None, &[]).await.unwrap();
+    assert_eq!(
+        args.iter().filter(|arg| *arg == "-XX:+UseZGC").count(),
+        1,
+        "自定义参数里的 ZGC 不应再被自动档复制一份"
+    );
+    assert!(!args.contains(&"-XX:+UseG1GC".to_string()));
+
+    // 显式选择是用户的主动覆盖，照旧追加在后面，JVM 取最后一条
+    let forced = instance(RunArgObj {
+        gc_mode: Some(GCType::G1GC),
+        ..Default::default()
+    });
+    let args = forced.make_jvm_arg(&auth, 21, None, &existing).await.unwrap();
+    assert!(args.contains(&"-XX:+UseG1GC".to_string()));
 }
 
 /// 自定义 JVM 参数：按行追加，首尾空白与空行都去掉
@@ -299,7 +355,7 @@ async fn jvm_arg_custom_lines() {
     });
 
     let args = obj
-        .make_jvm_arg(&LoginObj::default(), 17, None)
+        .make_jvm_arg(&LoginObj::default(), 17, None, &[])
         .await
         .unwrap();
 
@@ -377,7 +433,7 @@ public static void main(String[] args) {
         ..Default::default()
     });
     let jvm = instance
-        .make_jvm_arg(&LoginObj::default(), 21, None)
+        .make_jvm_arg(&LoginObj::default(), 21, None, &[])
         .await
         .unwrap();
 

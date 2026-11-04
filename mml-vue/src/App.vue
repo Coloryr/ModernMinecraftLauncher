@@ -11,10 +11,12 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   closeWindow,
   closeDownloadPopup,
+  closeJavaPopup,
   closeModpackPopup,
   closeResourcePopup,
   currentKind,
   downloadPopupOpen,
+  javaPopupOpen,
   modpackPopupOpen,
   multiWindow,
   quitWindow,
@@ -25,12 +27,14 @@ import type { WindowKind } from "./windows/registry";
 import { setModpackFallbackToast, useModpackStatus } from "./lib/modpackTasks";
 import { initMusic } from "./lib/music";
 import { useResourceStatus } from "./lib/resourceTasks";
+import { initJavaTasks, javaTasks } from "./lib/javaTasks";
 import AppToast from "./components/ui/AppToast.vue";
 import UpgradeOverlay from "./components/UpgradeOverlay.vue";
 import BaseButton from "./components/ui/BaseButton.vue";
 import BaseModal from "./components/ui/BaseModal.vue";
 import ModpackPopup from "./components/ModpackPopup.vue";
 import ResourcePopup from "./components/ResourcePopup.vue";
+import JavaInstallPopup from "./components/JavaInstallPopup.vue";
 import CustomUiPage from "./components/CustomUiPage.vue";
 import AccountLockModal from "./components/AccountLockModal.vue";
 import AutoSaveModal from "./components/AutoSaveModal.vue";
@@ -133,6 +137,7 @@ let unsubWindowMode: (() => void) | null = null;
 let unsubCloseBlocked: (() => void) | null = null;
 let unsubModpackStatus: (() => void) | null = null;
 let unsubResourceStatus: (() => void) | null = null;
+let unsubJavaStatus: (() => void) | null = null;
 
 onMounted(async () => {
   /**
@@ -171,6 +176,8 @@ onMounted(async () => {
   unsubModpackStatus = await initModpackStatus();
   // 资源下载同理：进度弹窗是全局浮层，下载跑在后台
   unsubResourceStatus = await initResourceStatus();
+  // Java 安装任务：标题栏指示器与进度弹窗共用这一份
+  unsubJavaStatus = await initJavaTasks();
   // 自定义音乐：读一遍配置，配了就起播（自动播放被拦时停在未播放，等标题栏那枚按钮）
   unsubMusic = await initMusic();
 });
@@ -181,6 +188,7 @@ onUnmounted(() => {
   unsubCloseBlocked?.();
   unsubModpackStatus?.();
   unsubResourceStatus?.();
+  unsubJavaStatus?.();
 });
 
 /** 确认「停止并关闭 / 停止并退出」：先停掉所有下载，任务清空后 Rust 侧不再拦截，再重放这次关闭 */
@@ -237,6 +245,9 @@ const closeAskButton = computed(() =>
     <!-- 资源下载进度弹窗：入口是标题栏上的 ResourceTitleIndicator，关掉只收起、下载照跑 -->
     <ResourcePopup v-if="resourcePopupOpen && resourceStatus?.tasks.length" :status="resourceStatus"
       @close="closeResourcePopup" />
+    <!-- Java 安装进度弹窗：入口是标题栏上的 JavaTitleIndicator，关掉只收起、安装照跑 -->
+    <JavaInstallPopup v-if="javaPopupOpen && javaTasks.length" :tasks="javaTasks"
+      @close="closeJavaPopup" />
     <!-- 全局轻提示（所有窗口统一） -->
     <AppToast />
 

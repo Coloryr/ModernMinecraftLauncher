@@ -20,6 +20,7 @@ import {
 } from "../../lib/bindings";
 import { isTauri } from "../windowManager";
 import { detectOs } from "../../lib/titlebar";
+import { isRunning, javaTasks } from "../../lib/javaTasks";
 
 /** 请求关闭本窗口 */
 defineEmits<{ (e: "close"): void }>();
@@ -122,6 +123,7 @@ async function loadSources() {
   }
 }
 
+// 单窗口模式：窗口被 KeepAlive 缓存，切回不会重新挂载 → 自己补一次
 onMounted(loadSources);
 
 // 单窗口模式：窗口被 KeepAlive 缓存，切回不会重新挂载 → 自己补一次
@@ -163,19 +165,25 @@ async function loadOptions() {
   await loadList();
 }
 
-/** 正在下载的项（uuid），同一时间只允许一个 */
-const starting = ref<string | null>(null);
+/** 正在安装的项（uuid）看全局任务列表：还在进行就禁用按钮 */
 
-/** 下载选中的包：后端按 uuid 取缓存里的下载信息 */
+/**
+ * 这一项是不是正在装
+ *
+ * - `uuid`: 列表项 uuid
+ */
+function isInstalling(uuid: string): boolean {
+  return javaTasks.value.some((task) => task.id === uuid && isRunning(task));
+}
+
+/** 下载并注册选中的包：后端按 uuid 取缓存里的下载信息 */
 async function startDownload(uuid: string) {
-  if (starting.value) return;
-  starting.value = uuid;
+  if (isInstalling(uuid)) return;
   try {
+    // 命令只负责登记任务，下载与解压都在后台跑，进度看标题栏的 Java 指示器
     await commands.javaDownload.start(uuid);
   } catch (e) {
     showToast(tErr(e));
-  } finally {
-    starting.value = null;
   }
 }
 
@@ -275,8 +283,9 @@ async function loadList() {
         <div v-for="item in items" :key="item.uuid" class="item-card">
           <div class="item-head">
             <div class="item-title">{{ item.javaVersion }}</div>
-            <BaseButton variant="accent" :disabled="starting !== null" @click="startDownload(item.uuid)">
-              {{ t("winJavaDownload.download") }}
+            <BaseButton variant="accent" :disabled="isInstalling(item.uuid)"
+              @click="startDownload(item.uuid)">
+              {{ isInstalling(item.uuid) ? t("winJavaDownload.downloading") : t("winJavaDownload.download") }}
             </BaseButton>
           </div>
           <div class="item-sub">{{ item.name }}</div>

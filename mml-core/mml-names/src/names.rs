@@ -237,8 +237,12 @@ pub const G1GC: [&str; 8] = [
     "-XX:ParallelGCThreads=8",
 ];
 
-/// ZGC 垃圾回收器的默认 JVM 参数
-pub const GCZGC: [&str; 2] = ["-XX:+UseZGC", "-XX:+ZGenerational"];
+/// ZGC 垃圾回收器的基础 JVM 参数
+///
+/// 分代开关不在这里：Java 21 / 22 要显式加 `-XX:+ZGenerational`，23 起分代是默认，
+/// 该选项已废弃，26 起直接不认。等选好实际要跑的 Java 再按版本补，
+/// 见 `game_launch` 的 ZGC 分代修正。
+pub const GCZGC: [&str; 1] = ["-XX:+UseZGC"];
 
 pub const LANG_ZH_CN: &str = "zh_CN";
 pub const LANG_EN_US: &str = "en_US";

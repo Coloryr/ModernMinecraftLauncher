@@ -149,7 +149,12 @@ impl InstanceSettingObj {
         // 创建启动器自定义JVM参数
         let java_version = obj.java_versions.iter().next().copied().unwrap_or(8);
         let jvm_args = self
-            .make_jvm_arg(&arg.auth, java_version as u8, arg.mixin.as_ref())
+            .make_jvm_arg(
+                &arg.auth,
+                java_version as u8,
+                arg.mixin.as_ref(),
+                &obj.jvm_args,
+            )
             .await?;
 
         obj.jvm_args.extend(jvm_args);

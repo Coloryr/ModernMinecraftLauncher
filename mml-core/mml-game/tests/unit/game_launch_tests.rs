@@ -130,3 +130,36 @@ fn every_output_line_emits_log_event() {
         "日志已存在时也要发事件，实际：{seen:?}"
     );
 }
+/// ZGC 分代开关只按实际 Java 版本补：21 / 22 要，23 起默认、26 起不认
+#[test]
+fn zgc_generational_only_on_java_21_22() {
+    let with_zgc = || vec!["-XX:+UseZGC".to_string()];
+
+    for major in [21, 22] {
+        let mut args = with_zgc();
+        fix_zgc_args(&mut args, Some(major));
+        assert!(
+            args.contains(&"-XX:+ZGenerational".to_string()),
+            "Java {major} 要显式打开分代 ZGC"
+        );
+    }
+
+    for major in [17, 23, 24, 25, 26] {
+        let mut args = with_zgc();
+        fix_zgc_args(&mut args, Some(major));
+        assert!(
+            !args.contains(&"-XX:+ZGenerational".to_string()),
+            "Java {major} 不该带 ZGenerational"
+        );
+    }
+
+    // 取不到实际版本时保守处理：不加，避免 Java 26 起不来
+    let mut unknown = with_zgc();
+    fix_zgc_args(&mut unknown, None);
+    assert!(!unknown.contains(&"-XX:+ZGenerational".to_string()));
+
+    // 非 ZGC 的旧参数里残留这条也要摘掉
+    let mut stale = vec!["-XX:+UseG1GC".to_string(), "-XX:+ZGenerational".to_string()];
+    fix_zgc_args(&mut stale, Some(26));
+    assert!(!stale.contains(&"-XX:+ZGenerational".to_string()));
+}
