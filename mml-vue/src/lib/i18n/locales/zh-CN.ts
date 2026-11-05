@@ -1994,6 +1994,7 @@ export default {
   "winHelp.version": "启动器版本",
   "winHelp.author": "作者",
   "winHelp.authorName": "Coloryr",
+  "winHelp.testers": "测试人员",
   "winHelp.exeSha1": "exe SHA1",
   "winHelp.sha1Reading": "读取中…",
   "winHelp.license": "开源许可",

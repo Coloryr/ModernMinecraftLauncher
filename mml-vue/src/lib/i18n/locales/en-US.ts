@@ -1993,6 +1993,7 @@ export default {
   "winHelp.version": "Launcher version",
   "winHelp.author": "Author",
   "winHelp.authorName": "Coloryr",
+  "winHelp.testers": "Testers",
   "winHelp.exeSha1": "exe SHA1",
   "winHelp.sha1Reading": "Reading…",
   "winHelp.license": "Open source licenses",

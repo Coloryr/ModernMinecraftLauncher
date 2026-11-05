@@ -40,6 +40,12 @@ defineEmits<{ (e: "close"): void }>();
 
 // ---------------- 启动器信息 ----------------
 
+/** 参与测试的人员，显示在「作者」下面；名字原样展示，不进 i18n */
+const TESTERS = ["huige233"];
+
+/** 测试人员一行的文本：中文用顿号、英文用逗号分隔 */
+const testersText = computed(() => TESTERS.join(locale.value === "en_us" ? ", " : "、"));
+
 /** 当前 exe 的 SHA1，小写十六进制；还没算完时为空串 */
 const exeSha1 = ref("");
 /** exe 的绝对路径，挂在 SHA1 上的悬浮提示 */
@@ -163,6 +169,10 @@ async function copyQq() {
         <div class="about-row">
           <span class="about-label">{{ t("winHelp.author") }}</span>
           <span class="about-value">{{ t("winHelp.authorName") }}</span>
+        </div>
+        <div class="about-row">
+          <span class="about-label">{{ t("winHelp.testers") }}</span>
+          <span class="about-value">{{ testersText }}</span>
         </div>
         <div class="about-row">
           <span class="about-label">{{ t("winHelp.exeSha1") }}</span>

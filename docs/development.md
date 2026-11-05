@@ -5,7 +5,7 @@
 
 ## 技术栈
 
-- **内核**：Rust workspace（`mml-core/` 本体 + 20 个子 crate，edition 2024）
+- **内核**：Rust workspace（`mml-core/` 本体 + 23 个子 crate，edition 2024）；云同步服务端是独立 workspace 成员 `mml-cloud-server/`
 - **界面**：Tauri 2 桌面壳（`mml-gui/`）+ Vue 3 / Vite 前端（`mml-vue/`）
 - **IPC**：Rust 源码是命令与 DTO 的唯一来源，`ipc-gen` 生成独立的 npm 契约包 `mml-ipc`，
   启动器前端与自定义主页面共用
@@ -52,11 +52,27 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
   不参与扫描；`custom-main-demo` 从这里取类型、事件名与生成的 `onXxx` 函数，不再自建一份。
 - 生成规则、分组方式与常见坑见 [AGENTS.md](../AGENTS.md) §4；包内用法见 [mml-ipc/README.md](../mml-ipc/README.md)。
 
+## 环境要求
+
+- **通用**：Rust stable（edition 2024，需 1.85+）、Node.js 24（Vite 8 要求 20.19+ / 22.12+，CI 用 24）、
+  `cargo install tauri-cli --version "^2" --locked`（提供 `cargo tauri`）。
+- **Windows**：Rust 的 MSVC 工具链、Visual Studio 生成工具（勾选「使用 C++ 的桌面开发」）、
+  WebView2 运行时（Windows 11 和较新的 Windows 10 已自带）。
+- **Linux**：Tauri 2 需要的 WebKitGTK 4.1、GTK 3、libappindicator、librsvg、patchelf、libxdo，
+  以及 `mml-sys`「在文件管理器中显示」用的 D-Bus 开发包、手柄读取用的 libudev 开发包。
+  Debian / Ubuntu 上：
+
+  ```bash
+  sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+      librsvg2-dev patchelf libxdo-dev libdbus-1-dev libudev-dev rpm
+  ```
+
+  打 AppImage 还要 FUSE 2 运行库（Ubuntu 24.04 起包名是 `libfuse2t64`）；
+  打 Flatpak 需要 `flatpak`；Arch 包由脚本直接组装，不依赖 `makepkg`。
+- **macOS**：Xcode Command Line Tools。
+
 ## 开发与构建
 
-环境要求（Windows 的 MSVC / WebView2 等）、依赖安装与出包产物见根 README 的[构建与运行](../README.md#构建与运行)。
-
-依赖：Rust（含 cargo 与 `cargo install tauri-cli --version "^2" --locked`）、Node.js。
 启动器本体先跑 `build/init.ps1` 或 `bash build/init.sh`，它会装好 `mml-vue` 的 npm 依赖并检查
 `cargo tauri`；`custom/` 下前三个示例各自 `npm install`。
 示例的 `mml-ipc` / `mml-vue` 由 `scripts/deps.mjs` 在安装前链接到本仓库，仓库不在时
@@ -73,14 +89,18 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
 | `bash build/package-arch.sh` | 用已构建的二进制打 `.pkg.tar.zst`，不依赖 `makepkg`，任一 Linux 可跑 |
 | `.\check.ps1 --all` | 根目录整仓检查，先还原 vendor 插件再 `cargo check`（bash 版 `bash check.sh --all`） |
 | `cd mml-gui && cargo check --manifest-path src-tauri/Cargo.toml` | 改过 Rust 侧命令 / DTO 后重新生成 `mml-ipc` 契约 |
+| `cd mml-vue && npm run build` | 只构建前端到 `mml-vue/dist/` |
+| `cd mml-vue && npm run lint` | 前端 lint，必须 0 error |
+| `cd mml-vue && npm test` | 前端单测 |
 | `cd mml-vue && npm run shots` | 无后端渲染前端页面截图，`--scene=<名字>` 只跑一张；场景表见[前端页面截图目录](screenshots.md) |
 | `cd mml-vue && npm run shots:docs` | 按 `scenarios.mjs` 重新生成 `docs/screenshots.md` |
 | `cd mml-gui && .\tauri.ps1 icon ../design/icon/f-blend.svg` | 改过程序图标后重新生成 `src-tauri/icons/`；会顺带产出 `android/` 与 `ios/`，桌面端用不到可删 |
 | `cd custom/custom-main-demo && npm run build` | 构建自定义主页面示例并打包成 `custom-main-demo.zip`（四个示例的用法见 [custom/README.md](../custom/README.md)） |
 
 `build/` 下带 PowerShell 版（`.ps1`，Windows）与 bash 版（`.sh`，Linux / macOS / Git Bash）：
-PowerShell 版在 Windows 默认出三架构，bash 版构建当前架构；`build/*.mjs` 是版本同步与产物打包用的
-跨平台辅助脚本。
+PowerShell 版在 Windows 默认出 x64 / arm64 两架构，bash 版构建当前架构；`build/*.mjs` 是版本同步与产物打包用的
+跨平台辅助脚本。Windows 上执行策略拦脚本时，用
+`powershell -ExecutionPolicy Bypass -File .\build\init.ps1`（其它脚本同理）。
 
 独立服务器实例更新器 `mml-server-sync` 已拆到 [Coloryr/mml-server-sync](https://github.com/Coloryr/mml-server-sync)，
 源码、构建与用法都在那个仓库。本仓库只留构建好的 `mml-gui/src-tauri/resources/mml-server-sync.jar`：
@@ -101,7 +121,7 @@ Flatpak 默认声明 `org.freedesktop.Platform//25.08`，安装时由 Flathub �
 发布版本从 `0.0.1` 开始，唯一来源是 Git 标签；`build-release` 先把**去掉 `-pre` 后缀**的版本
 同步到 `mml-gui/src-tauri/Cargo.toml` 与 `tauri.conf.json`，再把 Tauri 产物按标签版本重命名到
 `build_out/`。安装包元数据只收纯数字（WiX 拒绝 `0.1.1-pre`），所以标签带后缀、清单不带。
-完整发版流程见根 README 的[版本与发布](../README.md#版本与发布)。
+标签规则与发布流程见[自动化构建](#自动化构建github-actions)。
 
 **版本号在界面上的写法按通道区分**（见 `src-tauri/src/build_info.rs`）：
 
@@ -134,6 +154,22 @@ Windows 的正式 / 预发布脚本默认构建 **x64 / arm64**：
   （需先 `rustup target add x86_64-apple-darwin`）；Linux arm64 建议直接在 arm64 机器上构建。
   打包类型用 `MML_BUNDLES` 限定（如 `MML_BUNDLES=deb,rpm`），不写就交给 tauri 决定该平台的全套。
   macOS 通用包可用 `MML_TARGETS=universal-apple-darwin`，仅正式发布支持。
+
+产物按平台与版本命名，本地与 CI 一致，统一收集到 `build_out/`：
+
+| 平台 | 产物示例 |
+| --- | --- |
+| Windows x64 | `mml-windows-x64-0.0.1.msi`、`mml-windows-x64-0.0.1-setup.exe` |
+| Windows arm64 | `mml-windows-arm64-0.0.1-setup.exe` |
+| Linux x64 | `mml-linux-x64-0.0.1.deb`、`mml-linux-x64-0.0.1.rpm`、`mml-linux-x64-0.0.1.AppImage` |
+| Linux arm64 | `mml-linux-arm64-0.0.1.deb`、`mml-linux-arm64-0.0.1.rpm`、`mml-linux-arm64-0.0.1.AppImage` |
+| Linux（Flatpak） | `mml-linux-x64-0.0.1.flatpak` |
+| Arch Linux | `mml-arch-x64-0.0.1.pkg.tar.zst` |
+| macOS x64 | `mml-macos-x64-0.0.1.dmg`、`mml-macos-x64-0.0.1.app.tar.gz` |
+| macOS arm64 | `mml-macos-arm64-0.0.1.dmg`、`mml-macos-arm64-0.0.1.app.tar.gz` |
+
+预发布在 Windows 只出裸可执行文件、macOS 只出自签的 `.app` 压缩包，文件名保留 `-pre` 后缀，
+安装包内部版本仍是纯数字。
 
 预发布也要安装包时，只能覆盖 release 的设置（`tauri` CLI 不认 `--profile`）：
 
