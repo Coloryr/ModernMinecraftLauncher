@@ -163,3 +163,57 @@ fn zgc_generational_only_on_java_21_22() {
     fix_zgc_args(&mut stale, Some(26));
     assert!(!stale.contains(&"-XX:+ZGenerational".to_string()));
 }
+
+/// 检查游戏文件要留下可诊断的日志
+///
+/// 这一步以前只有一行用时，出问题时看不出查没查、缺不缺。这里用一份空启动内容：
+/// 核心与运行库都有统计，资源索引读不到则记「跳过」，两条路径都覆盖。
+#[tokio::test]
+async fn check_game_file_writes_logs() {
+    let run = boot();
+    crate::init(&run).unwrap();
+
+    let uuid = Uuid::new_v4();
+    let instance = InstanceSettingObj {
+        uuid,
+        name: "check-log-test".to_string(),
+        dir: "check-log-test".to_string(),
+        version: "1.20.4".to_string(),
+        ..Default::default()
+    };
+
+    instance
+        .get_lost_game_file(&GameLaunchObj::default())
+        .await
+        .unwrap();
+
+    let logs = {
+        let logs = crate::RUNTIME_LOGS.read().unwrap();
+        let log = logs.get(&uuid).expect("检查过就应当有运行日志");
+        log.logs.read().unwrap().clone()
+    };
+
+    let mut core = false;
+    let mut libs = false;
+    let mut assets_skipped = false;
+    for item in logs.iter() {
+        match &item.log {
+            GameLog::CheckCount { kind, total, lost }
+                if *kind == crate::game_log::CheckKind::Core && *total == 1 && *lost == 0 =>
+            {
+                core = true;
+            }
+            GameLog::CheckCount { kind, total, lost }
+                if *kind == crate::game_log::CheckKind::Libs && *total == 0 && *lost == 0 =>
+            {
+                libs = true;
+            }
+            GameLog::CheckSkipped(crate::game_log::CheckKind::Assets) => assets_skipped = true,
+            _ => {}
+        }
+    }
+
+    assert!(core, "游戏核心要有统计行");
+    assert!(libs, "运行库要有统计行");
+    assert!(assets_skipped, "资源索引缺失要记一行跳过");
+}

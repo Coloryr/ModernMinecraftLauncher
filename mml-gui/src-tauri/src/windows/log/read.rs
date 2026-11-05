@@ -279,6 +279,71 @@ pub(crate) fn log_line_from_item(item: &GameLogItemObj) -> LogLine {
             String::new(),
             String::new(),
         ),
+        GameLog::CheckStart { version, loader } => (
+            item_time(item),
+            LogText::LogCheckStart {
+                version: version.clone(),
+                loader: loader.clone(),
+            }
+            .text(),
+            String::new(),
+            String::new(),
+            String::new(),
+        ),
+        GameLog::CheckCount { kind, total, lost } => (
+            item_time(item),
+            LogText::LogCheckCount {
+                kind: *kind,
+                total: *total,
+                lost: *lost,
+            }
+            .text(),
+            String::new(),
+            String::new(),
+            String::new(),
+        ),
+        GameLog::CheckSkipped(kind) => (
+            item_time(item),
+            LogText::LogCheckSkipped { kind: *kind }.text(),
+            String::new(),
+            String::new(),
+            String::new(),
+        ),
+        GameLog::CheckFailed(kind) => (
+            item_time(item),
+            LogText::LogCheckFailed { kind: *kind }.text(),
+            String::new(),
+            String::new(),
+            String::new(),
+        ),
+        GameLog::CustomPatch(count) => (
+            item_time(item),
+            LogText::LogCustomPatch { count: *count }.text(),
+            String::new(),
+            String::new(),
+            String::new(),
+        ),
+        GameLog::MainClass(main) => (
+            item_time(item),
+            LogText::LogMainClass { main: main.clone() }.text(),
+            String::new(),
+            String::new(),
+            String::new(),
+        ),
+        GameLog::DownloadStart(count) => (
+            item_time(item),
+            LogText::LogDownloadStart { count: *count }.text(),
+            String::new(),
+            String::new(),
+            String::new(),
+        ),
+        GameLog::JavaVersion(java) => (
+            item_time(item),
+            LogText::LogJavaVersion { java: *java }.text(),
+            String::new(),
+            String::new(),
+            String::new(),
+        ),
     };
     if time.is_empty() {
         time = item_time(item);

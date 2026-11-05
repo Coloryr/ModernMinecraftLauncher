@@ -16,9 +16,27 @@ use mml_sys::path_helper;
 use tokio::task;
 
 use crate::{
-    game_arg::GameLaunchObj, launcher::instance_setting_obj::InstanceSettingObj,
+    game_arg::GameLaunchObj,
+    game_log::{CheckKind, GameLog},
+    launcher::instance_setting_obj::InstanceSettingObj,
     launcher_path::assets_path,
 };
+
+/// 一类文件的检查结果
+struct CheckResult {
+    /// 这一类要检查的文件总数；`None` 表示这次没法检查
+    total: Option<usize>,
+    /// 缺失、需要下载的文件
+    lost: Vec<FileItemObj>,
+}
+
+/// 一类文件的检查任务
+struct CheckTask {
+    /// 文件分类
+    kind: CheckKind,
+    /// 检查任务
+    handle: task::JoinHandle<CheckResult>,
+}
 
 /// 检查文件是否需要添加到下载列表
 ///
@@ -144,13 +162,14 @@ impl InstanceSettingObj {
             )
         };
 
-        let mut handles: Vec<task::JoinHandle<Vec<FileItemObj>>> = Vec::new();
+        let mut handles: Vec<CheckTask> = Vec::new();
 
         //检查游戏核心文件
         if check_core {
             let game_jar = obj.game_jar.clone();
             let log4j = obj.log4j_xml.clone();
-            handles.push(task::spawn_blocking(move || {
+            let handle = task::spawn_blocking(move || {
+                let total = 1 + usize::from(log4j.is_some());
                 let mut list = Vec::new();
                 if check_to_add(&game_jar, check_core_sha1) {
                     list.push(game_jar);
@@ -160,17 +179,31 @@ impl InstanceSettingObj {
                         list.push(log4j);
                     }
                 }
-                list
-            }));
+                CheckResult {
+                    total: Some(total),
+                    lost: list,
+                }
+            });
+            handles.push(CheckTask {
+                kind: CheckKind::Core,
+                handle,
+            });
         }
 
         //检查游戏资源文件
         if check_assets {
             let assets = obj.assets.clone();
-            handles.push(task::spawn_blocking(move || {
+            let uuid = self.uuid;
+            let handle = task::spawn_blocking(move || {
+                // 索引还没下载时这里没东西可查，记一行免得日志里像是漏了资源这一项
                 let Ok(assets) = assets_path::get_index(&assets) else {
-                    return Vec::new();
+                    crate::add_game_log_item(&uuid, GameLog::CheckSkipped(CheckKind::Assets));
+                    return CheckResult {
+                        total: None,
+                        lost: Vec::new(),
+                    };
                 };
+                let total = assets.objects.len();
 
                 // 一个版本几千个 object，逐个算 SHA1 是这趟检查最贵的一段 —— 并行扫它
                 // （ColorMC 同一处是 Parallel.ForEach，见 CheckHelpers.cs:251）
@@ -204,11 +237,19 @@ impl InstanceSettingObj {
 
                 // 同一个 object 被多个名字引用时只留一份：目标文件相同，重复任务会让两个线程写同一路径
                 let mut seen = HashSet::new();
-                found
+                let lost = found
                     .into_iter()
                     .filter(|item| seen.insert(item.file.clone()))
-                    .collect()
-            }));
+                    .collect();
+                CheckResult {
+                    total: Some(total),
+                    lost,
+                }
+            });
+            handles.push(CheckTask {
+                kind: CheckKind::Assets,
+                handle,
+            });
         }
 
         //检查运行库
@@ -216,7 +257,8 @@ impl InstanceSettingObj {
             let game_libs = obj.game_libs.clone();
             let loader_libs = obj.loader_libs.clone();
             let installer_libs = obj.installer_libs.clone();
-            handles.push(task::spawn_blocking(move || {
+            let handle = task::spawn_blocking(move || {
+                let total = game_libs.len() + loader_libs.len() + installer_libs.len();
                 // 三份运行库清单各自并行筛（ColorMC 同样用 Parallel.ForEach，见 CheckHelpers.cs:368/375/382）
                 let pick = |items: &[FileItemObj]| -> Vec<FileItemObj> {
                     items
@@ -229,8 +271,15 @@ impl InstanceSettingObj {
                 let mut list = pick(&game_libs);
                 list.extend(pick(&loader_libs));
                 list.extend(pick(&installer_libs));
-                list
-            }));
+                CheckResult {
+                    total: Some(total),
+                    lost: list,
+                }
+            });
+            handles.push(CheckTask {
+                kind: CheckKind::Libs,
+                handle,
+            });
         }
 
         //检查整合包mod
@@ -238,7 +287,11 @@ impl InstanceSettingObj {
             let mods_path = self.get_mods_path();
             let game_path = self.get_game_path();
             let online_info = self.read_online_info();
-            handles.push(task::spawn_blocking(move || {
+            let handle = task::spawn_blocking(move || {
+                let total = online_info
+                    .values()
+                    .filter(|info| info.path == names::GAME_MODS_DIR)
+                    .count();
                 let mut mod_files = path_helper::get_all_files(&mods_path);
                 let mut sha1_cache: HashMap<PathBuf, String> = HashMap::new();
                 let mut list = Vec::new();
@@ -304,15 +357,52 @@ impl InstanceSettingObj {
                         });
                     }
                 }
-                list
-            }));
+                CheckResult {
+                    total: Some(total),
+                    lost: list,
+                }
+            });
+            handles.push(CheckTask {
+                kind: CheckKind::Mods,
+                handle,
+            });
+        }
+
+        // 按设置关掉的分类也记一行：日志里看不到这几类，用户才知道是没查、不是没缺
+        for (kind, enabled) in [
+            (CheckKind::Core, check_core),
+            (CheckKind::Assets, check_assets),
+            (CheckKind::Libs, check_lib),
+        ] {
+            if !enabled {
+                crate::add_game_log_item(&self.uuid, GameLog::CheckSkipped(kind));
+            }
+        }
+        if self.is_modpack && !check_mod {
+            crate::add_game_log_item(&self.uuid, GameLog::CheckSkipped(CheckKind::Mods));
         }
 
         // 等待所有任务完成
         let mut list = Vec::new();
-        for handle in handles {
-            if let Ok(section_list) = handle.await {
-                list.extend(section_list);
+        for task in handles {
+            match task.handle.await {
+                Ok(result) => {
+                    if let Some(total) = result.total {
+                        crate::add_game_log_item(
+                            &self.uuid,
+                            GameLog::CheckCount {
+                                kind: task.kind,
+                                total,
+                                lost: result.lost.len(),
+                            },
+                        );
+                    }
+                    list.extend(result.lost);
+                }
+                Err(_) => {
+                    // 线程 panic 时这一类的文件一个都不会补，日志里必须看得出来
+                    crate::add_game_log_item(&self.uuid, GameLog::CheckFailed(task.kind));
+                }
             }
         }
 

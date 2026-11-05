@@ -58,6 +58,11 @@ impl InstanceSettingObj {
         // 触发 "Sealing violation in already loaded package org.lwjgl.openal"
         drop_conflicting_patches(&mut custom);
 
+        // 主类、运行库、JVM 参数全靠这些补丁，条数对不上就说明有补丁没读出来
+        if !custom.is_empty() {
+            crate::add_game_log_item(&self.uuid, GameLog::CustomPatch(custom.len()));
+        }
+
         // 补丁里有 net.minecraft 组件时，它就是原版那一层的完整替换，Mojang 清单的运行库
         // 不能再补一遍；否则被顶掉的 LWJGL2 之类会顺着"补空缺"溜回 classpath
         let override_minecraft = has_minecraft_component(&custom);

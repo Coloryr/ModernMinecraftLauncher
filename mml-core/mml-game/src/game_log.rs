@@ -78,9 +78,50 @@ pub struct GameLogObj {
     pub category: String,
 }
 
+/// 启动前检查的文件分类
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CheckKind {
+    /// 游戏核心，客户端 jar 与 log4j 配置
+    Core,
+    /// 资源文件，assets/objects
+    Assets,
+    /// 运行库，客户端与加载器的依赖
+    Libs,
+    /// 整合包自带的文件，由在线整合包信息给出
+    Mods,
+}
+
 /// 日志面板里的一行内容，游戏输出与启动器自己的消息共用
 #[derive(Clone)]
 pub enum GameLog {
+    /// 开始检查游戏文件
+    CheckStart {
+        /// 实例游戏版本
+        version: String,
+        /// 加载器与版本，形如 `forge 10.13.4.1614`
+        loader: String,
+    },
+    /// 一类文件的检查结果
+    CheckCount {
+        /// 文件分类
+        kind: CheckKind,
+        /// 这一类要检查的文件总数
+        total: usize,
+        /// 缺失、需要下载的数量
+        lost: usize,
+    },
+    /// 一类文件按设置没检查
+    CheckSkipped(CheckKind),
+    /// 一类文件的检查任务失败
+    CheckFailed(CheckKind),
+    /// 自定义启动配置的份数，MMC 实例的补丁都给在这里
+    CustomPatch(usize),
+    /// 启动主类
+    MainClass(String),
+    /// 这次启动要下载的文件数
+    DownloadStart(usize),
+    /// 实际使用的 Java 大版本
+    JavaVersion(u32),
     /// 不匹配日志格式的原始输出
     Text(String),
     /// 解析成结构的游戏日志

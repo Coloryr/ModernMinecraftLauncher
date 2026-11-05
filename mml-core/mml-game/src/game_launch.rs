@@ -353,9 +353,25 @@ impl InstanceSettingObj {
             gui.update_state(self, LaunchState::Check);
         }
 
+        // 检查几乎没有可见输出，出了问题只能猜；先把这一步在做什么记下来
+        let loader = match &self.loader_version {
+            Some(version) if !version.is_empty() => {
+                format!("{} {version}", self.loader.id())
+            }
+            _ => self.loader.id().to_string(),
+        };
+        crate::add_game_log_item(
+            &self.uuid,
+            GameLog::CheckStart {
+                version: self.version.clone(),
+                loader,
+            },
+        );
+
         let start = Instant::now();
         let authlib = libraries_path::check_authlib(&arg.auth.auth_type).await?;
         let obj = self.make_game_launch_obj(arg).await?;
+        crate::add_game_log_item(&self.uuid, GameLog::MainClass(obj.main_class.clone()));
         // 原生库 jar 已存在时下载线程不会再跑解压，启动前补一遍
         crate::game_check::unpack_existing_natives(&obj);
         let mut check = self.get_lost_game_file(&obj).await?;
@@ -386,6 +402,7 @@ impl InstanceSettingObj {
                 if let Some(gui) = &gui {
                     gui.update_state(self, LaunchState::Download);
                 }
+                crate::add_game_log_item(&self.uuid, GameLog::DownloadStart(check.len()));
                 let start = Instant::now();
                 let res =
                     mml_downloader::start_download_task_cancellable(check, cancel.clone()).await;
@@ -951,6 +968,9 @@ impl InstanceSettingObj {
         }
 
         let jvm = jvm.unwrap();
+        if let Some(major) = java_major_of(&jvm) {
+            crate::add_game_log_item(&self.uuid, GameLog::JavaVersion(major as u32));
+        }
 
         if cancel.is_cancelled() {
             return Err(ErrorType::TaskCancel);

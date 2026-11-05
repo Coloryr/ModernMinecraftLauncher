@@ -6,6 +6,7 @@
 //!
 //! 用法：`mml_log::error(LogText::IconCacheSaveFailed { path, error }.text())`。
 
+use mml_game::game_log::CheckKind;
 use mml_names::Lang;
 
 use crate::gui_config;
@@ -313,6 +314,52 @@ pub enum LogText {
     LogJavaPath {
         /// Java 可执行文件路径
         path: String,
+    },
+    /// 日志窗口：开始检查游戏文件
+    LogCheckStart {
+        /// 实例游戏版本
+        version: String,
+        /// 加载器与版本，形如 `forge 10.13.4.1614`
+        loader: String,
+    },
+    /// 日志窗口：一类文件的检查结果
+    LogCheckCount {
+        /// 文件分类
+        kind: CheckKind,
+        /// 这一类要检查的文件总数
+        total: usize,
+        /// 缺失、需要下载的数量
+        lost: usize,
+    },
+    /// 日志窗口：一类文件按设置没检查
+    LogCheckSkipped {
+        /// 文件分类
+        kind: CheckKind,
+    },
+    /// 日志窗口：一类文件的检查任务失败
+    LogCheckFailed {
+        /// 文件分类
+        kind: CheckKind,
+    },
+    /// 日志窗口：自定义启动配置份数
+    LogCustomPatch {
+        /// 补丁份数
+        count: usize,
+    },
+    /// 日志窗口：启动主类
+    LogMainClass {
+        /// 主类全名
+        main: String,
+    },
+    /// 日志窗口：需要下载的文件数
+    LogDownloadStart {
+        /// 文件数
+        count: usize,
+    },
+    /// 日志窗口：实际使用的 Java 大版本
+    LogJavaVersion {
+        /// 主版本号
+        java: u32,
     },
     /// 主窗口：游戏正在启动
     LaunchStarting,
@@ -806,6 +853,22 @@ impl LogText {
                 text
             }
             LogText::LogJavaPath { path } => format!("Java 路径：{path}"),
+            LogText::LogCheckStart { version, loader } => {
+                format!("开始检查游戏文件：{version} / {loader}")
+            }
+            LogText::LogCheckCount { kind, total, lost } => {
+                format!("{}：共 {total} 个，缺失 {lost} 个", check_kind_zh(*kind))
+            }
+            LogText::LogCheckSkipped { kind } => {
+                format!("{}：跳过检查", check_kind_zh(*kind))
+            }
+            LogText::LogCheckFailed { kind } => {
+                format!("{}：检查失败", check_kind_zh(*kind))
+            }
+            LogText::LogCustomPatch { count } => format!("自定义启动配置：{count} 份"),
+            LogText::LogMainClass { main } => format!("启动主类：{main}"),
+            LogText::LogDownloadStart { count } => format!("需要下载 {count} 个文件"),
+            LogText::LogJavaVersion { java } => format!("Java 版本：{java}"),
             LogText::LaunchStarting => String::from("游戏启动中…"),
             LogText::LaunchProcessStarted => String::from("游戏进程已启动"),
             LogText::LaunchPanicked { reason } => {
@@ -1131,6 +1194,23 @@ impl LogText {
                 text
             }
             LogText::LogJavaPath { path } => format!("Java path: {path}"),
+            LogText::LogCheckStart { version, loader } => {
+                format!("checking game files: {version} / {loader}")
+            }
+            LogText::LogCheckCount { kind, total, lost } => format!(
+                "{}: {total} files, {lost} missing",
+                check_kind_en(*kind)
+            ),
+            LogText::LogCheckSkipped { kind } => {
+                format!("{}: check skipped", check_kind_en(*kind))
+            }
+            LogText::LogCheckFailed { kind } => {
+                format!("{}: check failed", check_kind_en(*kind))
+            }
+            LogText::LogCustomPatch { count } => format!("custom launch configs: {count}"),
+            LogText::LogMainClass { main } => format!("main class: {main}"),
+            LogText::LogDownloadStart { count } => format!("files to download: {count}"),
+            LogText::LogJavaVersion { java } => format!("Java version: {java}"),
             LogText::LaunchStarting => String::from("launching the game…"),
             LogText::LaunchProcessStarted => String::from("the game process has started"),
             LogText::LaunchPanicked { reason } => {
@@ -1437,6 +1517,39 @@ impl NotifyText {
                 format!("imported {mods} mods and {resourcepacks} resource pack index records"),
             ),
         }
+    }
+}
+
+
+/// 检查分类的中文名
+///
+/// - `kind`: 文件分类
+///
+/// # 返回值
+///
+/// 日志里显示的分类名
+fn check_kind_zh(kind: CheckKind) -> &'static str {
+    match kind {
+        CheckKind::Core => "游戏核心",
+        CheckKind::Assets => "资源文件",
+        CheckKind::Libs => "运行库",
+        CheckKind::Mods => "整合包文件",
+    }
+}
+
+/// 检查分类的英文名
+///
+/// - `kind`: 文件分类
+///
+/// # 返回值
+///
+/// 日志里显示的分类名
+fn check_kind_en(kind: CheckKind) -> &'static str {
+    match kind {
+        CheckKind::Core => "game core",
+        CheckKind::Assets => "assets",
+        CheckKind::Libs => "libraries",
+        CheckKind::Mods => "modpack files",
     }
 }
 
