@@ -10,6 +10,7 @@
 
 mod files;
 mod mapping;
+mod pack;
 
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
@@ -134,6 +135,45 @@ pub async fn server_instance_generate(
     .map_err(|e| e.to_string())?;
     drop(task);
     drop(guard);
+    result
+}
+
+/// 导出服务器包：MMC 结构的实例 zip，同时带 `game.json` 供 M²L 识别
+///
+/// - `uuid`: 源实例 uuid
+/// - `options`: 生成选项，包名 / 发布地址 / 勾选都取自它
+/// - `file`: 输出的 zip 路径，父目录不存在会创建
+/// - `complete`: `true` 连同模组 / 资源包 / 配置目录一起打包，`false` 只带基础文件
+///
+/// # 返回值
+///
+/// 写盘成功返回 `Ok(())`；参数不合法、源实例本身是服务器实例或打包失败返回错误
+#[gui_macros::ipc_group("server_instance")]
+#[gui_macros::command]
+pub async fn server_instance_export_pack(
+    uuid: String,
+    options: ServerInstanceOptionsDto,
+    file: String,
+    complete: bool,
+) -> Result<(), String> {
+    let file = file.trim().to_string();
+    if file.is_empty() {
+        return Err(err_keys::FILE_NAME.to_string());
+    }
+    // 导出期间整个实例都在被读，删实例要等它结束
+    let task = crate::windows::instance_task::begin(&uuid)?;
+    let game = instance_snapshot(&uuid)?;
+    // 服务器实例本身就是同步结果，再导出会循环覆盖，直接拒绝
+    if game.modpack_type == ModPackType::ServerPack {
+        return Err(err_keys::SERVER_INSTANCE_FROM_SERVER.to_string());
+    }
+    let path = PathBuf::from(file);
+    let result = tokio::task::spawn_blocking(move || {
+        pack::export_pack(&game, &options, &path, complete)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    drop(task);
     result
 }
 

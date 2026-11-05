@@ -1346,6 +1346,27 @@ export const api = {
   },
 
   /**
+   * 把生成结果打包成 zip，导出服务器包
+   *
+   * - `uuid`: 源实例 uuid
+   * - `options`: 生成选项，见 `ServerInstanceOptionsDto`
+   * - `file`: 保存的 zip 路径
+   * - `complete`: 为 true 时打包完整服务器包，否则只带基础文件
+   *
+   * # 返回值
+   *
+   * 保存完成时 resolve；失败时 reject，错误信息交给调用方展示
+   */
+  async exportServerPack(
+    uuid: string,
+    options: ServerInstanceOptionsDto,
+    file: string,
+    complete: boolean,
+  ): Promise<void> {
+    return commands.serverInstance.exportPack(uuid, options, file, complete);
+  },
+
+  /**
    * 读取上次生成保存的名字 / 版本 / 说明 / 网址等
    *
    * - `uuid`: 实例 uuid

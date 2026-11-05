@@ -1,0 +1,324 @@
+//! 服务器包导出
+//!
+//! 把一个本地实例打成 MMC 结构的实例包，同时带一份 `game.json`，MultiMC / Prism 与 M²L
+//! 都能直接导入。包内顶层目录是服务器实例名，`instance.cfg` 用 MMC 变量 `$INST_DIR`
+//! 挂上同步 agent，`game.json` 只带发布地址，导入后由启动器自己同步。
+
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{Path, PathBuf},
+};
+
+use mml_base::{
+    archives::{ArchiveAddFile, ArchiveType, BaseArchive},
+    serialize_tools,
+};
+use mml_config::config_obj::RunArgObj;
+use mml_game::{
+    launcher::{ModPackType, instance_setting_obj::InstanceSettingObj},
+    loader::LoaderType,
+    other_launcher::mmc_obj::{ComponentsObj, MMCObj},
+};
+use mml_names::names;
+use uuid::Uuid;
+
+use super::{config_dir, files, normalize_url};
+use crate::{dtos::server_instance_dto::ServerInstanceOptionsDto, err_keys};
+
+/// 内嵌的同步 agent，导入后由 MMC 的 `JvmArgs` 拉起来
+pub(super) const SYNC_JAR: &[u8] = include_bytes!("../../../resources/mml-server-sync.jar");
+
+/// 同步 agent 的文件名，同时用作包内条目名与 `instance.cfg` 里的引用名
+const SYNC_JAR_NAME: &str = "mml-server-sync.jar";
+
+/// 自动生成的顶层条目，基础文件勾到同名文件时跳过
+const RESERVED_NAMES: [&str; 4] = [
+    SYNC_JAR_NAME,
+    names::MMCJSON_FILE,
+    names::MMCCFG_FILE,
+    names::GAME_FILE,
+];
+
+/// 导出服务器包
+///
+/// - `game`: 源实例
+/// - `options`: 生成选项，包名 / 发布地址 / 勾选都取自它
+/// - `file`: 输出的 zip 路径，父目录不存在会创建
+/// - `complete`: `true` 连同模组 / 资源包 / 配置目录一起打包，`false` 只带基础文件
+///
+/// # 返回值
+///
+/// 写盘成功返回 `Ok(())`；格式不是 `mml`、包名为空、路径越界或打包失败返回错误文案
+pub(super) fn export_pack(
+    game: &InstanceSettingObj,
+    options: &ServerInstanceOptionsDto,
+    file: &Path,
+    complete: bool,
+) -> Result<(), String> {
+    // 两种包都靠 MML 的 server.json 同步，别的格式没有可同步的清单
+    if options.format.trim() != "mml" {
+        return Err(err_keys::SERVER_INSTANCE_FORMAT.to_string());
+    }
+    let name = options.name.trim();
+    if name.is_empty() {
+        return Err(err_keys::FILE_NAME.to_string());
+    }
+    let base_url = normalize_url(&options.url)?;
+    let manifest_url = format!("{base_url}/{}", names::SERVER_FILE);
+    let icon = icon_file(game);
+
+    let data = serialize_tools::json_to_bytes(&MMCObj {
+        components: components(game),
+    })
+    .map_err(|e| e.to_string())?;
+    let cfg = instance_cfg(name, &manifest_url, game.jvm_arg.as_ref());
+    let game_json = game_json(
+        game,
+        name,
+        &base_url,
+        icon.as_ref().map(|(name, _)| name.as_str()),
+    )?;
+
+    // 键是包内相对实例根的路径，基础文件与完整包内容重名时自然去重
+    let mut pending: BTreeMap<PathBuf, PathBuf> = BTreeMap::new();
+    let root = game.get_base_path();
+    for rel in files::base_files(&root, &options.base_files)? {
+        pending.insert(rel.clone(), root.join(&rel));
+    }
+    if complete {
+        let game_path = game.get_game_path();
+        for pick in files::mods(&game_path, &options.mods)? {
+            let rel = PathBuf::from(names::GAME_DIR).join(&pick.path);
+            pending.insert(rel.clone(), game_path.join(&pick.path));
+        }
+        for pick in &options.resource_packs {
+            let rel = files::file(&game_path, &pick.path)?;
+            pending.insert(
+                PathBuf::from(names::GAME_DIR).join(&rel),
+                game_path.join(&rel),
+            );
+        }
+        for item in &options.configs {
+            let dir = config_dir(&item.dir)?;
+            for rel in files::dir_files(&game_path, &dir)? {
+                pending.insert(
+                    PathBuf::from(names::GAME_DIR).join(&rel),
+                    game_path.join(&rel),
+                );
+            }
+        }
+    }
+    // 实例图标放在包根：M²L 的 game.json 按 Icon 字段找它，MMC 侧忽略
+    if let Some((icon_name, icon_path)) = &icon {
+        pending.insert(PathBuf::from(icon_name), icon_path.clone());
+    }
+    pending.retain(|rel, _| !is_reserved(rel));
+
+    // 只给文件名没有父目录时不用建目录
+    if let Some(parent) = file
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let inst = format!("{name}/");
+    let mut zip =
+        BaseArchive::create_empty(ArchiveType::Zip, file).map_err(|e| e.to_string())?;
+    zip.add_data(&format!("{inst}{}", names::MMCJSON_FILE), &data)
+        .map_err(|e| e.to_string())?;
+    zip.add_data(&format!("{inst}{}", names::MMCCFG_FILE), cfg.as_bytes())
+        .map_err(|e| e.to_string())?;
+    zip.add_data(&format!("{inst}{}", names::GAME_FILE), &game_json)
+        .map_err(|e| e.to_string())?;
+    zip.add_data(&format!("{inst}{SYNC_JAR_NAME}"), SYNC_JAR)
+        .map_err(|e| e.to_string())?;
+
+    let mut pending_files = Vec::with_capacity(pending.len());
+    for (rel, src) in pending {
+        pending_files.push(ArchiveAddFile {
+            src,
+            dest: PathBuf::from(format!("{inst}{}", files::wire_path(&rel))),
+        });
+    }
+    zip.add_files(&pending_files, None)
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// 按实例信息生成 MMC 组件表
+///
+/// - `game`: 源实例
+///
+/// # 返回值
+///
+/// 第一个固定是 `net.minecraft`；加载器能在 MMC 里表达时再跟一个加载器组件
+fn components(game: &InstanceSettingObj) -> Vec<ComponentsObj> {
+    let mut components = vec![ComponentsObj {
+        cached_version: game.version.clone(),
+        uid: "net.minecraft".to_string(),
+        version: game.version.clone(),
+    }];
+    let uid = match game.loader {
+        LoaderType::Forge => Some("net.minecraftforge"),
+        LoaderType::NeoForge => Some("net.neoforged"),
+        LoaderType::Fabric => Some("net.fabricmc.fabric-loader"),
+        LoaderType::Quilt => Some("org.quiltmc.quilt-loader"),
+        _ => None,
+    };
+    if let Some(uid) = uid {
+        let version = game.loader_version.clone().unwrap_or_default();
+        components.push(ComponentsObj {
+            cached_version: version.clone(),
+            uid: uid.to_string(),
+            version,
+        });
+    }
+    components
+}
+
+/// MMC 的 `instance.cfg` 文本
+///
+/// agent 的地址是包内 `server.json` 的发布地址，MMC 变量 `$INST_DIR` 指向解压出来的实例目录。
+///
+/// - `name`: 服务器实例名
+/// - `manifest_url`: 包内 agent 要读的 `server.json` 地址
+/// - `jvm`: 源实例的 JVM 设置，内存上下限写进 MMC
+///
+/// # 返回值
+///
+/// 行尾为 `\n` 的 INI 文本
+fn instance_cfg(name: &str, manifest_url: &str, jvm: Option<&RunArgObj>) -> String {
+    let mut text = String::from("InstanceType=OneSix\n");
+    text.push_str("iconKey=default\n");
+    text.push_str(&format!("name={name}\n"));
+    if let Some(jvm) = jvm {
+        if let Some(max) = jvm.max_memory {
+            text.push_str(&format!("MaxMemAlloc={max}\n"));
+        }
+        if let Some(min) = jvm.min_memory {
+            text.push_str(&format!("MinMemAlloc={min}\n"));
+        }
+    }
+    // 源实例的自定义参数也带上：内存另有 MaxMemAlloc，其它开关照原样转成 MMC 变量；
+    // 旧的同步 agent 由下面这条新的替代，避免一份参数里出现两个 agent
+    let mut args: Vec<String> = jvm
+        .and_then(|jvm| jvm.jvm_args.as_deref())
+        .unwrap_or("")
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !is_sync_agent(line))
+        .map(mml_game::game_export::mmc_vars)
+        .collect();
+    args.push(format!(
+        "-javaagent:$INST_DIR/{SYNC_JAR_NAME}={manifest_url}"
+    ));
+    text.push_str(&format!("JvmArgs={}\n", args.join(" ")));
+    text
+}
+
+/// 生成给 M²L 识别的 `game.json`
+///
+/// 只保留实例设置：名字 / 标识 / 目录换成包里的，类型标成服务器实例，
+/// Java 清掉（玩家机器上不一定有同名 Java），图标保留并在包里带上同名文件。
+///
+/// - `game`: 源实例
+/// - `name`: 服务器实例名
+/// - `base_url`: 发布地址，去掉末尾斜杠
+/// - `icon`: 包根下的图标文件名；没有图标时为 `None`
+///
+/// # 返回值
+///
+/// 序列化后的 JSON 字节；失败时返回错误文案
+fn game_json(
+    game: &InstanceSettingObj,
+    name: &str,
+    base_url: &str,
+    icon: Option<&str>,
+) -> Result<Vec<u8>, String> {
+    let mut obj = game.clone();
+    obj.name = name.to_string();
+    obj.uuid = Uuid::new_v4();
+    obj.dir = String::new();
+    obj.is_modpack = true;
+    obj.modpack_type = ModPackType::ServerPack;
+    obj.server_url = Some(base_url.to_string());
+    obj.jvm_name = None;
+    obj.jvm_local = None;
+    obj.icon = icon.map(str::to_string);
+    strip_sync_agent(&mut obj);
+    serialize_tools::json_to_bytes(&obj).map_err(|e| e.to_string())
+}
+
+/// 源实例的图标：文件名与绝对路径
+///
+/// - `game`: 源实例
+///
+/// # 返回值
+///
+/// 图标文件存在时返回 `(文件名, 绝对路径)`；没有图标文件返回 `None`
+fn icon_file(game: &InstanceSettingObj) -> Option<(String, PathBuf)> {
+    let path = game.get_icon_file_or_default();
+    if !path.is_file() {
+        return None;
+    }
+    let name = path.file_name()?.to_string_lossy().into_owned();
+    Some((name, path))
+}
+
+/// 去掉 JVM 参数里指向旧实例根的同步 agent
+///
+/// MML 导入后按 `ServerUrl` 自己同步，再留一条 `-javaagent:` 会指向不存在的路径。
+///
+/// - `game`: 待处理的实例设置
+fn strip_sync_agent(game: &mut InstanceSettingObj) {
+    let Some(jvm) = game.jvm_arg.as_mut() else {
+        return;
+    };
+    let Some(args) = jvm.jvm_args.as_deref() else {
+        return;
+    };
+    let kept: Vec<&str> = args
+        .lines()
+        .filter(|line| !is_sync_agent(line))
+        .collect();
+    if kept.len() == args.lines().count() {
+        return;
+    }
+    let text = kept.join("\n");
+    jvm.jvm_args = if text.trim().is_empty() {
+        None
+    } else {
+        Some(text)
+    };
+}
+
+/// 这一行是否是指向同步 agent 的 `-javaagent:` 参数
+///
+/// - `line`: 一行 JVM 参数
+///
+/// # 返回值
+///
+/// 同时含 `-javaagent:` 与 agent 文件名时返回 true
+fn is_sync_agent(line: &str) -> bool {
+    line.contains("-javaagent:") && line.contains(SYNC_JAR_NAME)
+}
+
+/// 是否与自动生成的顶层条目重名
+///
+/// - `rel`: 相对实例根的路径
+///
+/// # 返回值
+///
+/// 顶层且命中保留名时返回 true
+fn is_reserved(rel: &Path) -> bool {
+    if rel.components().count() != 1 {
+        return false;
+    }
+    let Some(name) = rel.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    RESERVED_NAMES
+        .iter()
+        .any(|item| name.eq_ignore_ascii_case(item))
+}

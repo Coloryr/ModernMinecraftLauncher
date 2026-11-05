@@ -2526,7 +2526,6 @@ export default {
   "serverInstance.configRemove": "移除",
   "serverInstance.configCount": "{n} 个目录",
   "serverInstance.configEmpty": "还没有添加配置目录，从上面选一个加进来。",
-  "serverInstance.baseAll": "整个实例文件夹",
   "serverInstance.baseCount": "{n} 个文件",
   "serverInstance.baseEmpty": "实例根目录下没有可同步的文件。",
   "serverInstance.baseHint":
@@ -2565,6 +2564,13 @@ export default {
   "serverInstance.manifest": "清单",
   "serverInstance.files": "附带文件",
   "serverInstance.count": "同步 {n} 个文件",
+  "serverInstance.packThin": "生成服务器包",
+  "serverInstance.packFull": "生成服务器包完整",
+  "serverInstance.packSaveTitle": "保存服务器包",
+  "serverInstance.packSaved": "服务器包已保存到 {file}",
+  "serverInstance.packHint":
+    "不用先生成服务器实例，填好发布地址即可导出。服务器包只带基础文件；完整包带基础文件与其余同步内容。两种包都可在 MMC / Prism 与 M²L 中导入。",
+  "serverInstance.packMmlOnly": "服务器包依赖 MML 清单，请先把格式切到 MML 并填好发布地址",
 };
 
 export const faqs: Array<{ q: string; a: string }> = [

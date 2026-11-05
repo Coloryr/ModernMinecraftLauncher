@@ -19,6 +19,8 @@ const {
   ready,
   pickedCount,
   generate,
+  exportPack,
+  packing,
   percent,
   progress,
   result,
@@ -74,10 +76,23 @@ const {
   </div>
 
   <div class="si-actions">
-    <BaseButton variant="primary" size="lg" :disabled="busy || !ready || !pickedCount" @click="generate">
+    <BaseButton variant="primary" size="lg" :disabled="busy || packing || !ready || !pickedCount" @click="generate">
       {{ busy ? t("serverInstance.running") : t("serverInstance.generate") }}
     </BaseButton>
   </div>
+
+  <!-- 服务器包不依赖生成结果：随时可以直接导出，只要格式是 MML、发布地址填好 -->
+  <div class="si-pack-actions" v-tip="format !== 'mml' ? t('serverInstance.packMmlOnly') : ''">
+    <BaseButton size="sm" :disabled="busy || packing || !ready || format !== 'mml'"
+      v-tip="format !== 'mml' ? t('serverInstance.packMmlOnly') : ''" @click="exportPack(false)">
+      {{ t("serverInstance.packThin") }}
+    </BaseButton>
+    <BaseButton size="sm" :disabled="busy || packing || !ready || format !== 'mml'"
+      v-tip="format !== 'mml' ? t('serverInstance.packMmlOnly') : ''" @click="exportPack(true)">
+      {{ t("serverInstance.packFull") }}
+    </BaseButton>
+  </div>
+  <p class="field-hint">{{ t("serverInstance.packHint") }}</p>
 
   <!-- 生成中：进度条 + 当前文件 -->
   <template v-if="busy">

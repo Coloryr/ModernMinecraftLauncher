@@ -545,6 +545,13 @@ select.si-cell-control {
   background: var(--bg-card);
 }
 
+/* 服务器包导出：结果下面一行按钮，说明另起一行 */
+.si-pack-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 .si-content .si-error {
   margin: 0;
   color: var(--red);

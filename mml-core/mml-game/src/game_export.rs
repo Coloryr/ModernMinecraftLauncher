@@ -637,9 +637,41 @@ fn instance_cfg(game: &InstanceSettingObj) -> String {
         if let Some(min) = jvm.min_memory {
             text.push_str(&format!("MinMemAlloc={min}\n"));
         }
+        // 用户填的参数里可能带 %GAME_BASE_DIR% 这类占位符：MMC 有对应变量，
+        // 原样写过去在别的启动器里只是一个不存在的路径
+        let args = jvm
+            .jvm_args
+            .as_deref()
+            .unwrap_or("")
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ");
+        if !args.is_empty() {
+            text.push_str(&format!("JvmArgs={}\n", mmc_vars(&args)));
+        }
     }
 
     text
+}
+
+/// 把 MML 路径占位符换成 MMC 变量
+///
+/// MMC 的变量是单个 $ 前缀、没有结尾 $，如 $INST_DIR；由启动器在启动前做文本替换。
+///
+/// - `text`: 待替换的 JVM 参数 / 命令文本
+///
+/// # 返回值
+///
+/// 替换后的文本；没有对应 MMC 变量的占位符（如 %LAUNCH_DIR%）原样保留
+pub fn mmc_vars(text: &str) -> String {
+    text.replace(names::ARG_GAME_BASE_DIR, "$INST_DIR")
+        .replace(names::ARG_GAME_DIR, "$INST_MC_DIR")
+        .replace(names::ARG_JAVA_LOCAL, "$INST_JAVA")
+        .replace(names::ARG_JAVA_ARG, "$INST_JAVA_ARGS")
+        .replace(names::ARG_GAME_NAME, "$INST_NAME")
+        .replace(names::ARG_GAME_UUID, "$INST_ID")
 }
 
 /// 导出为 HMCL 整合包：整包实例，供 HMCL 导入

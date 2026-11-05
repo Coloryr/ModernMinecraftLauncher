@@ -334,6 +334,7 @@ export function createCommands(invoke: Invoke) {
       viewSet: (uuid: string, order: string[], category: string, modView: string, modColWidths: Record<string, number>) => invoke<void>("resource_view_set", { uuid, order, category, modView, modColWidths }),
     },
     serverInstance: {
+      exportPack: (uuid: string, options: ServerInstanceOptionsDto, file: string, complete: boolean) => invoke<void>("server_instance_export_pack", { uuid, options, file, complete }),
       generate: (uuid: string, options: ServerInstanceOptionsDto) => invoke<ServerInstanceResultDto>("server_instance_generate", { uuid, options }),
       getIds: (uuid: string) => invoke<ServerInstanceIdDto[]>("server_instance_get_ids", { uuid }),
       getMeta: (uuid: string) => invoke<ServerInstanceMetaDto | null>("server_instance_get_meta", { uuid }),

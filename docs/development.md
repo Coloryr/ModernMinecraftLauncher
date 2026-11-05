@@ -83,6 +83,10 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
 PowerShell 版在 Windows 默认出三架构，bash 版构建当前架构；`build/*.mjs` 是版本同步与产物打包用的
 跨平台辅助脚本。
 
+`tools/server-sync` 的 jar 构建后要复制到 `mml-gui/src-tauri/resources/mml-server-sync.jar`，
+启动器用 `include_bytes!` 从这里把 jar 嵌进 exe，放到别处不会被打进产物；改了 Java 工具就重新构建并
+复制一次，否则 exe 里嵌的还是旧 jar。
+
 Flatpak 与 Arch 包不在 `build-release` 里自动跑，由 `build/package-flatpak.sh`、
 `build/package-arch.sh` 单独完成，输入都是 `target/release/ModernMinecraftLauncher`：
 Flatpak 走 `flatpak build-export` + `build-bundle`，不依赖 SDK / runtime；

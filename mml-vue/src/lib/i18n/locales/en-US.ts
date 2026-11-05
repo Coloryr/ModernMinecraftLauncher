@@ -2527,7 +2527,6 @@ export default {
   "serverInstance.configRemove": "Remove",
   "serverInstance.configCount": "{n} folders",
   "serverInstance.configEmpty": "No config folder yet — pick one above to add it.",
-  "serverInstance.baseAll": "Whole instance folder",
   "serverInstance.baseCount": "{n} files",
   "serverInstance.baseEmpty": "No files next to .minecraft.",
   "serverInstance.baseHint":
@@ -2566,6 +2565,13 @@ export default {
   "serverInstance.manifest": "Manifest",
   "serverInstance.files": "Included files",
   "serverInstance.count": "{n} files synced",
+  "serverInstance.packThin": "Generate server pack",
+  "serverInstance.packFull": "Generate complete server pack",
+  "serverInstance.packSaveTitle": "Save server pack",
+  "serverInstance.packSaved": "Server pack saved to {file}",
+  "serverInstance.packHint":
+    "No need to generate the server instance first — just fill in the publish URL. The server pack carries the base files only; the complete pack adds the rest of the synced content. Both import into MMC / Prism and M²L.",
+  "serverInstance.packMmlOnly": "The server pack relies on the MML manifest; switch the format to MML and fill in the publish URL.",
 };
 
 export const faqs: Array<{ q: string; a: string }> = [

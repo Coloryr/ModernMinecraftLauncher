@@ -1,8 +1,10 @@
 use super::*;
 use crate::dtos::server_instance_dto::{ServerInstanceConfigDto, ServerInstancePickDto};
+use mml_config::config_obj::RunArgObj;
 use mml_game::{
     launcher::file_online_info_obj::OnlineInfoObj, loader::LoaderType,
-    other_launcher::hmcl_obj::HMCLServerObj, serverpack::serverpack_obj::ServerPackObj,
+    other_launcher::{hmcl_obj::HMCLServerObj, mmc_obj::MMCObj},
+    serverpack::serverpack_obj::ServerPackObj,
 };
 
 /// 勾选一组模组路径
@@ -1117,5 +1119,149 @@ fn copy_icon_follows_instance_icon() {
     assert!(copy_icon(&game, &out).unwrap().is_some());
 
     crate::test_support::cleanup(&[&dir, &out]);
+}
+
+/// 服务器包只带基础文件，完整包再补上 .minecraft 里的模组与配置
+#[test]
+fn export_pack_writes_thin_and_complete_zips() {
+    crate::test_support::ensure_boot();
+    let instance = crate::test_support::temp_dir("server-instance-export-pack");
+    let game_dir = instance.join(".minecraft");
+    fs::create_dir_all(game_dir.join("mods")).unwrap();
+    fs::create_dir_all(game_dir.join("config")).unwrap();
+    fs::write(game_dir.join("mods").join("a.jar"), b"mod").unwrap();
+    fs::write(game_dir.join("config").join("x.toml"), b"x = 1").unwrap();
+    fs::write(game_dir.join("options.txt"), b"lang:zh_cn").unwrap();
+    fs::write(instance.join("server.properties"), b"motd=test").unwrap();
+    fs::write(instance.join("icon.png"), b"icon").unwrap();
+
+    let mut game = game();
+    // 绝对路径：get_base_path / get_game_path 直接落在临时目录里
+    game.dir = instance.to_string_lossy().to_string();
+    game.icon = Some(names::ICON_FILE.to_string());
+    game.jvm_name = Some("Java 17".to_string());
+    game.jvm_local = Some(instance.join("java.exe").to_string_lossy().to_string());
+    game.jvm_arg = Some(RunArgObj {
+        max_memory: Some(4096),
+        min_memory: Some(1024),
+        jvm_args: Some(
+            "-Xmx2G\n-javaagent:%GAME_DIR%/mml-server-sync.jar=https://old.invalid/server.json\n-Dfoo=1"
+                .to_string(),
+        ),
+        ..Default::default()
+    });
+
+    let mut options = options("mml", &["mods/a.jar"], &[("config", "archive")], &[]);
+    options.base_files = vec!["server.properties".to_string()];
+
+    let out = crate::test_support::temp_dir("server-instance-export-pack-out");
+    let thin = out.join("thin.zip");
+    let complete = out.join("complete.zip");
+    pack::export_pack(&game, &options, &thin, false).unwrap();
+    pack::export_pack(&game, &options, &complete, true).unwrap();
+
+    let in_pack = |item: &str| format!("{}/{}", options.name, item);
+
+    // 服务器包：只有基础文件与四个自动生成条目
+    let thin_zip = mml_base::archives::BaseArchive::open_readonly(&thin).unwrap();
+    let thin_names: Vec<&str> = thin_zip.entries().iter().map(|item| item.name.as_str()).collect();
+    for item in [
+        "mmc-pack.json",
+        "instance.cfg",
+        "game.json",
+        "mml-server-sync.jar",
+        "server.properties",
+        "icon.png",
+    ] {
+        assert!(
+            thin_names.contains(&in_pack(item).as_str()),
+            "服务器包缺少 {item}: {thin_names:?}"
+        );
+    }
+    assert!(
+        !thin_names.contains(&in_pack(".minecraft/mods/a.jar").as_str()),
+        "服务器包不该带模组: {thin_names:?}"
+    );
+
+    let mmc: MMCObj = serde_json::from_slice(&thin_zip.read(&in_pack("mmc-pack.json")).unwrap())
+        .unwrap();
+    let minecraft = mmc
+        .components
+        .iter()
+        .find(|item| item.uid == "net.minecraft")
+        .unwrap();
+    assert_eq!(minecraft.version, "1.21.1");
+    let forge = mmc
+        .components
+        .iter()
+        .find(|item| item.uid == "net.minecraftforge")
+        .unwrap();
+    assert_eq!(forge.version, "52.0.1");
+
+    let cfg = String::from_utf8(thin_zip.read(&in_pack("instance.cfg")).unwrap()).unwrap();
+    assert!(cfg.contains("InstanceType=OneSix"));
+    assert!(cfg.contains("name=服务器"));
+    assert!(cfg.contains("MaxMemAlloc=4096"));
+    assert!(cfg.contains("MinMemAlloc=1024"));
+    assert!(
+        cfg.contains(
+            "JvmArgs=-Xmx2G -Dfoo=1 -javaagent:$INST_DIR/mml-server-sync.jar=https://example.invalid/pack/server.json"
+        ),
+        "{cfg}"
+    );
+
+    let saved: InstanceSettingObj =
+        serde_json::from_slice(&thin_zip.read(&in_pack("game.json")).unwrap()).unwrap();
+    assert_eq!(saved.name, "服务器");
+    assert_eq!(saved.dir, "");
+    assert!(saved.is_modpack);
+    assert_eq!(saved.modpack_type, ModPackType::ServerPack);
+    assert_eq!(
+        saved.server_url.as_deref(),
+        Some("https://example.invalid/pack")
+    );
+    assert_ne!(saved.uuid, uuid::Uuid::nil());
+    assert_eq!(saved.icon.as_deref(), Some("icon.png"));
+    assert!(saved.jvm_name.is_none());
+    assert!(saved.jvm_local.is_none());
+    let jvm_args = saved
+        .jvm_arg
+        .as_ref()
+        .and_then(|jvm| jvm.jvm_args.as_deref())
+        .unwrap_or_default();
+    assert!(!jvm_args.contains("mml-server-sync.jar"), "{jvm_args}");
+    assert!(jvm_args.contains("-Dfoo=1"), "{jvm_args}");
+
+    let jar = thin_zip
+        .entries()
+        .iter()
+        .find(|item| item.name == in_pack("mml-server-sync.jar"))
+        .unwrap();
+    assert!(jar.size > 0);
+    assert_eq!(jar.size, pack::SYNC_JAR.len() as u64);
+
+    // 完整包：基础文件 + 勾选的模组与配置目录
+    let complete_zip = mml_base::archives::BaseArchive::open_readonly(&complete).unwrap();
+    let complete_names: Vec<&str> = complete_zip
+        .entries()
+        .iter()
+        .map(|item| item.name.as_str())
+        .collect();
+    for item in [
+        "server.properties",
+        ".minecraft/mods/a.jar",
+        ".minecraft/config/x.toml",
+    ] {
+        assert!(
+            complete_names.contains(&in_pack(item).as_str()),
+            "完整包缺少 {item}: {complete_names:?}"
+        );
+    }
+    assert!(
+        !complete_names.contains(&in_pack(".minecraft/options.txt").as_str()),
+        "没勾的文件不该进包: {complete_names:?}"
+    );
+
+    crate::test_support::cleanup(&[&instance, &out]);
 }
 

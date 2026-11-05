@@ -73,3 +73,29 @@ async fn modrinth_archive_uses_portable_paths_for_both_download_sources() {
     fs::remove_file(output).unwrap();
     fs::remove_dir_all(root).unwrap();
 }
+/// MMC 的 instance.cfg 要把自定义 JVM 参数写进去，占位符换成 MMC 变量
+#[test]
+fn mmc_instance_cfg_converts_jvm_placeholders() {
+    let game = InstanceSettingObj {
+        name: "mmc-args".into(),
+        version: "1.20.1".into(),
+        jvm_arg: Some(mml_config::config_obj::RunArgObj {
+            max_memory: Some(4096),
+            min_memory: Some(1024),
+            jvm_args: Some(
+                "-Dfoo=1\n-javaagent:%GAME_BASE_DIR%/mml-server-sync.jar=https://a/server.json".into(),
+            ),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let text = instance_cfg(&game);
+    assert!(text.contains("MaxMemAlloc=4096"), "{text}");
+    assert!(text.contains("MinMemAlloc=1024"), "{text}");
+    assert!(
+        text.contains("JvmArgs=-Dfoo=1 -javaagent:$INST_DIR/mml-server-sync.jar=https://a/server.json"),
+        "{text}"
+    );
+    assert!(!text.contains("%GAME_BASE_DIR%"), "{text}");
+}

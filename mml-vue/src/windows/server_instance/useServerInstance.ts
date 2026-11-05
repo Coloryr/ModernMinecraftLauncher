@@ -19,6 +19,7 @@ import type {
   InstanceInfoDto,
   ServerInstanceIdDto,
   ServerInstanceMetaDto,
+  ServerInstanceOptionsDto,
   ServerInstanceProgressDto,
   ServerInstanceResultDto,
   ServerInstanceSnapshotDto,
@@ -130,6 +131,8 @@ const newMode = ref<ConfigMode>("archive");
 // ---------------- 运行状态 ----------------
 
 const busy = ref(false);
+/** 导出服务器包中；与生成分开，导出时结果区要留着 */
+const packing = ref(false);
 const progress = ref<ServerInstanceProgressDto | null>(null);
 const result = ref<ServerInstanceResultDto | null>(null);
 /** 上次生成保存的快照，用来在生成前预览变化 */
@@ -772,9 +775,62 @@ function hasDuplicateProjectId(): boolean {
   return false;
 }
 
+/**
+ * 按当前填表与勾选拼出生成选项，生成与导出服务器包共用
+ *
+ * # 返回值
+ *
+ * 生成选项，见 `ServerInstanceOptionsDto`
+ */
+function buildOptions(): ServerInstanceOptionsDto {
+  return {
+    format: format.value,
+    folder: folder.value.trim(),
+    url: url.value.trim(),
+    name: name.value.trim(),
+    version: version.value.trim(),
+    text: text.value.trim(),
+    mods: [...pickedMods.value].map((path) => {
+      const edited = modIdEdits.value.has(path);
+      const row = mods.value.find((item) => item.path === path);
+      return {
+        path,
+        exclude: false,
+        url: urlOf(path),
+        pid: edited ? modPidOf(path) : "",
+        fid: edited ? modFidOf(path) : "",
+        custom: isCustomType(path, row?.customId ?? false),
+        edited,
+        typeChanged: modIdTypeEdits.value.has(path),
+      };
+    }),
+    configs: configs.value.map((item) => ({
+      dir: item.dir,
+      mode: item.mode,
+      deleteOld: item.deleteOld,
+    })),
+    baseFiles: [...pickedBase.value],
+    resourcePacks: packs.value
+      .filter((row) => pickedPacks.value.has(row.path))
+      .map((row) => {
+        const edited = packIdEdits.value.has(row.path);
+        return {
+          path: row.path,
+          exclude: false,
+          url: packUrlOf(row.path),
+          pid: edited ? packPidOf(row.path) : "",
+          fid: edited ? packFidOf(row.path) : "",
+          custom: isPackCustomType(row.path, row.customId),
+          edited,
+          typeChanged: packIdTypeEdits.value.has(row.path),
+        };
+      }),
+  };
+}
+
 /** 开始生成，进度经 server-instance-progress 上报 */
 async function generate() {
-  if (busy.value || !ready.value) return;
+  if (busy.value || packing.value || !ready.value) return;
   if (hasDuplicateProjectId()) {
     error.value = t("err.serverInstanceProjectIdDuplicate");
     showToast(error.value);
@@ -787,49 +843,7 @@ async function generate() {
   changedPaths.value = new Set();
   section.value = "start";
   try {
-    result.value = await api.generateServerInstance(currentUuid.value, {
-      format: format.value,
-      folder: folder.value.trim(),
-      url: url.value.trim(),
-      name: name.value.trim(),
-      version: version.value.trim(),
-      text: text.value.trim(),
-      mods: [...pickedMods.value].map((path) => {
-        const edited = modIdEdits.value.has(path);
-        const row = mods.value.find((item) => item.path === path);
-        return {
-          path,
-          exclude: false,
-          url: urlOf(path),
-          pid: edited ? modPidOf(path) : "",
-          fid: edited ? modFidOf(path) : "",
-          custom: isCustomType(path, row?.customId ?? false),
-          edited,
-          typeChanged: modIdTypeEdits.value.has(path),
-        };
-      }),
-      configs: configs.value.map((item) => ({
-        dir: item.dir,
-        mode: item.mode,
-        deleteOld: item.deleteOld,
-      })),
-      baseFiles: [...pickedBase.value],
-      resourcePacks: packs.value
-        .filter((row) => pickedPacks.value.has(row.path))
-        .map((row) => {
-          const edited = packIdEdits.value.has(row.path);
-          return {
-            path: row.path,
-            exclude: false,
-            url: packUrlOf(row.path),
-            pid: edited ? packPidOf(row.path) : "",
-            fid: edited ? packFidOf(row.path) : "",
-            custom: isPackCustomType(row.path, row.customId),
-            edited,
-            typeChanged: packIdTypeEdits.value.has(row.path),
-          };
-        }),
-    });
+    result.value = await api.generateServerInstance(currentUuid.value, buildOptions());
     changedPaths.value = new Set(result.value.changed);
     await refreshSavedIds();
     const snapshot = await api.getServerInstanceSnapshot(currentUuid.value).catch(() => null);
@@ -839,6 +853,39 @@ async function generate() {
     error.value = tErr(e);
   } finally {
     busy.value = false;
+  }
+}
+
+/**
+ * 把当前实例导出成服务器包 zip
+ *
+ * 不依赖先用「生成」：服务器包只读实例、勾选与发布地址，随时可以直接导出。
+ *
+ * - `complete`: 为 true 时导出完整服务器包，否则只带基础文件
+ */
+async function exportPack(complete: boolean) {
+  if (busy.value || packing.value || !ready.value) return;
+  let picked: string | null;
+  try {
+    const { save } = await import("@tauri-apps/plugin-dialog");
+    picked = await save({
+      title: t("serverInstance.packSaveTitle"),
+      defaultPath: `${name.value || "server"}-${complete ? "full" : "server"}.zip`,
+      filters: [{ name: "zip", extensions: ["zip"] }],
+    });
+  } catch (e) {
+    showToast(tErr(e));
+    return;
+  }
+  if (!picked) return;
+  packing.value = true;
+  try {
+    await api.exportServerPack(currentUuid.value, buildOptions(), picked, complete);
+    showToast(t("serverInstance.packSaved", { file: picked }));
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    packing.value = false;
   }
 }
 
@@ -898,7 +945,7 @@ onBeforeUnmount(() => {
     configs, newDir, newMode, dirChoices, addConfig, setConfigMode,
     setConfigDeleteOld, removeConfig,
     pickInstance, openGuide,
-    current, ready, pickedCount, generate, percent, progress, result, error,
+    current, ready, pickedCount, generate, exportPack, packing, percent, progress, result, error,
     modChanges, addedMods, removedMods, modifiedMods,
     packChanges, addedPacks, removedPacks, modifiedPacks,
   };

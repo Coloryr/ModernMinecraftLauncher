@@ -902,20 +902,13 @@ onBeforeUnmount(() => {
 
 <template>
   <WindowFrame body-fill :title="t(serverPack ? 'winTitle.serverPack' : 'winExport.title')" @close="askClose">
-    <!-- 实例选择与导出按钮放进标题栏：不占内容区高度，也不随选项卡滚动 -->
+    <!-- 实例选择放进标题栏：不占内容区高度，也不随选项卡滚动 -->
     <template #head-right>
       <!-- 实例多时靠搜索 / 分组找，见 components/InstanceSelect：标题栏里位置窄，
            占位用短文案，内容区的空态另有一句更长的提示 -->
       <InstanceSelect v-if="!serverPack" class="head-select" :instances="instances" :model-value="currentUuid"
         :placeholder="t('winExport.instance')" :disabled="busy" :menu-min-width="260"
         @update:model-value="currentUuid = $event" />
-      <InfoExportButton v-if="!serverPack" :uuid="currentUuid" :name="info?.name ?? ''"
-        :disabled="busy || loadingInfo || !info" />
-      <BaseButton size="sm" variant="primary" class="icon-btn-head" :disabled="busy || loadingInfo || !info"
-        v-tip="running ? t('winExport.exporting') : t('winExport.exportBtn')"
-        :aria-label="running ? t('winExport.exporting') : t('winExport.exportBtn')" @click="startExport()">
-        <GlyphIcon name="export" :size="15" :weight="1.8" />
-      </BaseButton>
     </template>
 
     <div class="export-window">
@@ -1139,6 +1132,17 @@ onBeforeUnmount(() => {
       <div v-else class="hint-full">{{ t("winExport.pickInstance") }}</div>
     </div>
 
+    <!-- 底部操作条：生成实例信息在左，导出在右；固定在这一屏最下方，不随内容区滚动 -->
+    <div class="export-foot">
+      <InfoExportButton v-if="!serverPack" :uuid="currentUuid" :name="info?.name ?? ''"
+        :disabled="busy || loadingInfo || !info" />
+      <BaseButton size="sm" variant="primary" class="export-submit" :disabled="busy || loadingInfo || !info"
+        @click="startExport()">
+        <GlyphIcon name="export" :size="15" :weight="1.8" />
+        {{ running ? t("winExport.exporting") : t("winExport.exportBtn") }}
+      </BaseButton>
+    </div>
+
     <!-- 服务器包：实例 / 登录方式没锁时先问一句，避免玩家拿到包后还能随意切换 -->
     <BaseModal v-if="lockWarnOpen" :title="t('winExport.lockWarnTitle')" @close="lockWarnOpen = false">
       <p class="modal-text">{{ t("winExport.lockWarnText") }}</p>
@@ -1195,7 +1199,8 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  height: 100%;
+  /* 底部还有一条操作条，这里只占剩下的高度，滚动留给内容自己 */
+  flex: 1;
   min-height: 0;
   box-sizing: border-box;
   overflow-y: auto;
@@ -1210,8 +1215,23 @@ onBeforeUnmount(() => {
   margin-bottom: 0;
 }
 
+/* 底部操作条：生成实例信息贴左，导出贴右；不随内容区滚动 */
+.export-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* 服务器包模式左侧没有按钮时，导出仍然贴右 */
+.export-submit {
+  margin-left: auto;
+}
+
 /* 这一排的通用标准在 styles/titlebar.css；这里只留导出窗口自己的例外：
-   实例名可能很长，比标准下拉宽一档，好让名字完整显示、别把导出按钮挤出去 */
+   实例名可能很长，比标准下拉宽一档，好让名字完整显示 */
 .head-select {
   min-width: 260px;
   max-width: 340px;
