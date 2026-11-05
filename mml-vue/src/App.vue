@@ -38,6 +38,7 @@ import JavaInstallPopup from "./components/JavaInstallPopup.vue";
 import CustomUiPage from "./components/CustomUiPage.vue";
 import AccountLockModal from "./components/AccountLockModal.vue";
 import AutoSaveModal from "./components/AutoSaveModal.vue";
+import LaunchCommandModal from "./components/LaunchCommandModal.vue";
 import LaunchCheckModal from "./components/LaunchCheckModal.vue";
 import ServerPackUpdateModal from "./components/ServerPackUpdateModal.vue";
 
@@ -269,6 +270,8 @@ const closeAskButton = computed(() =>
   <AccountLockModal />
   <!-- 启动后自动进入存档的确认，与上面同理 -->
   <AutoSaveModal />
+  <!-- 启动前 / 后命令的确认：配了命令的实例启动前问一次 -->
+  <LaunchCommandModal />
   <!-- 启动前检查：加载器没启用 / 模组多而内存低时问一次 -->
   <LaunchCheckModal />
   <!-- 服务器包有新版本时问一句：更新后启动 / 直接启动 / 取消 -->

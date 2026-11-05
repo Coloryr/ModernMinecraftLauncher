@@ -193,6 +193,8 @@ pub struct ClientConfigDto {
     pub account_check: bool,
     /// 实例配了自动进入存档时，启动前是否弹窗确认
     pub auto_save_notice: bool,
+    /// 实例配了启动前 / 后命令时，启动前是否弹窗确认要不要执行
+    pub command_notice: bool,
     /// 游戏自动进服地址，host 或 host:port，空串表示不自动进服
     pub auto_join_server: String,
     /// MOTD 显示地址，host 或 host:port，空串表示不显示真实服务器信息
@@ -238,6 +240,7 @@ impl From<ClientConfig> for ClientConfigDto {
             auto_join: c.auto_join,
             account_check: c.account_check,
             auto_save_notice: c.auto_save_notice,
+            command_notice: c.command_notice,
             auto_join_server: c.auto_join_server,
             motd_server: c.motd_server,
             lock_instance: c.lock_instance,
@@ -272,6 +275,7 @@ impl From<ClientConfigDto> for ClientConfig {
             auto_join: c.auto_join,
             account_check: c.account_check,
             auto_save_notice: c.auto_save_notice,
+            command_notice: c.command_notice,
             auto_join_server: c.auto_join_server,
             motd_server: c.motd_server,
             lock_instance: c.lock_instance,
@@ -413,6 +417,7 @@ impl From<GuiConfig> for GuiConfigDto {
                 auto_join: c.client.auto_join,
                 account_check: c.client.account_check,
                 auto_save_notice: c.client.auto_save_notice,
+                command_notice: c.client.command_notice,
                 auto_join_server: c.client.auto_join_server,
                 motd_server: c.client.motd_server,
                 lock_instance: c.client.lock_instance,
@@ -500,6 +505,7 @@ impl From<GuiConfigDto> for GuiConfig {
                 auto_join: d.client.auto_join,
                 account_check: d.client.account_check,
                 auto_save_notice: d.client.auto_save_notice,
+                command_notice: d.client.command_notice,
                 auto_join_server: d.client.auto_join_server,
                 motd_server: d.client.motd_server,
                 lock_instance: d.client.lock_instance,

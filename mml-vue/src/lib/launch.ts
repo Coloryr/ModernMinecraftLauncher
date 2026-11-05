@@ -5,20 +5,21 @@
 import { api, modpackCheck } from "./api";
 import { askAccountLock } from "./accountLock";
 import { askAutoSave } from "./autoSavePrompt";
+import { askLaunchCommand } from "./launchCommandPrompt";
 import { askLaunchCheck } from "./launchCheck";
 import { askServerPackUpdate } from "./serverPackPrompt";
 import { saveGuiConfig } from "./guiConfig";
 import { openWindow } from "../windows/windowManager";
 
 /**
- * 启动实例；自动进入存档与账户占用都要先问，实例开了「自动打开日志窗口」时启动后把日志带出来
+ * 启动实例；启动命令、自动进入存档与账户占用都要先问，实例开了「自动打开日志窗口」时启动后把日志带出来
  *
  * - `uuid`: 实例 uuid
  * - `world`: 启动后直接进入的存档目录名，可选；这是用户明确点的「进入存档」，不再问自动进入
  *
  * # 返回值
  *
- * 启动请求已交给后端时返回 `true`；用户在内存提醒或账户占用弹窗里取消返回 `false`；
+ * 启动请求已交给后端时返回 `true`；用户在任一弹窗里取消返回 `false`；
  * 其它失败抛出后端错误文案
  */
 export async function launchGame(uuid: string, world?: string): Promise<boolean> {
@@ -39,6 +40,19 @@ export async function launchGame(uuid: string, world?: string): Promise<boolean>
         await saveGuiConfig({ launchCheck: { checkMemory: false } }).catch(() => { });
       }
     }
+  }
+
+  // 实例配了启动前 / 后命令时先问一次：跳过由后端记着不跑，取消则中止这次启动。
+  // 提醒开关、两条命令有没有配都由后端判断，返回 null 表示这次不用问
+  let runCommands: boolean | undefined;
+  const launchCommands = await api.launchCommands(uuid).catch(() => null);
+  if (launchCommands) {
+    const answer = await askLaunchCommand(launchCommands);
+    if (answer.action === "cancel") return false;
+    if (!answer.notice && answer.action === "run") {
+      await saveGuiConfig({ client: { commandNotice: false } }).catch(() => { });
+    }
+    runCommands = answer.action === "run";
   }
 
   // 在线服务器包：启动时后端本来会直接按发布地址同步，这里先问一句，别悄悄升级
@@ -73,7 +87,7 @@ export async function launchGame(uuid: string, world?: string): Promise<boolean>
   }
 
   try {
-    await api.launchGame(uuid, enterWorld, undefined, autoSave, serverPack);
+    await api.launchGame(uuid, enterWorld, undefined, autoSave, serverPack, runCommands);
   } catch (e) {
     if (String(e) !== "err.accountInUse") throw e;
 
@@ -83,7 +97,7 @@ export async function launchGame(uuid: string, world?: string): Promise<boolean>
       await saveGuiConfig({ client: { accountCheck: false } }).catch(() => { });
     }
     // 这一次先放行；检查关掉后后续启动不会再被拦
-    await api.launchGame(uuid, enterWorld, true, autoSave, serverPack);
+    await api.launchGame(uuid, enterWorld, true, autoSave, serverPack, runCommands);
   }
 
   if (autoShow) {

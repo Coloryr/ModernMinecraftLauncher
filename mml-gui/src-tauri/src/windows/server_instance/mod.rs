@@ -9,6 +9,7 @@
 //! 生成是一次性的阻塞任务，关窗不会打断它：任务在后台跑完，期间再次生成会返回忙。
 
 mod files;
+mod mapping;
 
 use std::{
     collections::{BTreeSet, HashMap},
@@ -19,7 +20,9 @@ use std::{
 
 use mml_base::hash_helper::{HashType, gen_hash};
 use mml_game::{
-    launcher::{file_online_info_obj::OnlineInfoObj, instance_setting_obj::InstanceSettingObj},
+    launcher::{
+        ModPackType, file_online_info_obj::OnlineInfoObj, instance_setting_obj::InstanceSettingObj,
+    },
     other_launcher::hmcl_obj::HMCLServerFileObj,
     serverpack::{
         generate,
@@ -30,10 +33,12 @@ use mml_names::names;
 use tauri::{AppHandle, Emitter};
 
 use super::instance_snapshot;
+use crate::windows::export::list::custom_ids;
 use crate::{
     dtos::log_dto::LogFocusDto,
     dtos::server_instance_dto::{
-        ServerInstanceOptionsDto, ServerInstanceProgressDto, ServerInstanceResultDto,
+        ServerInstanceMetaDto, ServerInstanceOptionsDto, ServerInstanceProgressDto,
+        ServerInstanceResultDto,
     },
     err_keys,
 };
@@ -129,6 +134,31 @@ pub async fn server_instance_generate(
     drop(task);
     drop(guard);
     result
+}
+
+/// 读取上次生成保存的名字 / 版本 / 说明 / 网址等
+///
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// 没有生成过时返回 `None`
+#[gui_macros::ipc_group("server_instance")]
+#[gui_macros::command]
+pub async fn server_instance_get_meta(
+    uuid: String,
+) -> Result<Option<ServerInstanceMetaDto>, String> {
+    let game = instance_snapshot(&uuid)?;
+    Ok(mapping::IdMap::load(&game.get_base_path())
+        .meta()
+        .map(|meta| ServerInstanceMetaDto {
+            name: meta.name.clone(),
+            version: meta.version.clone(),
+            text: meta.text.clone(),
+            url: meta.url.clone(),
+            format: meta.format.clone(),
+            folder: meta.folder.clone(),
+        }))
 }
 
 /// 配置文件的同步方式
@@ -240,6 +270,10 @@ fn generate(
     options: &ServerInstanceOptionsDto,
     progress: Progress<'_>,
 ) -> Result<ServerInstanceResultDto, String> {
+    // 服务器实例本身就是同步结果，再导出会循环覆盖，直接拒绝
+    if game.modpack_type == ModPackType::ServerPack {
+        return Err(err_keys::SERVER_INSTANCE_FROM_SERVER.to_string());
+    }
     let format = Format::parse(&options.format)?;
     let url = normalize_url(&options.url)?;
     let base = game.get_game_path();
@@ -401,6 +435,8 @@ fn generate_mml(
     let mut now = 0;
     let mut items = Vec::new();
     let mut written = BTreeSet::new();
+    let mut ids = mapping::IdMap::load(&game.get_base_path());
+    let mut changed = BTreeSet::new();
 
     // 基础文件：实例根目录下、与 .minecraft 同级的文件，打成一个固定包。
     // 客户端只在第一次同步时解压，后续版本不再拉取。
@@ -444,12 +480,21 @@ fn generate_mml(
 
         // 地址优先，其次是"项目号 + 文件号"能解析出来的；都没有就只能自己托管
         let online_download = !download.is_empty() || (!pid.is_empty() && !fid.is_empty());
-        let item = if online_download {
-            source_item(&wire, pid, fid, &download, base, &entry.path)?
+        let mut item = if online_download {
+            source_item(&wire, pid, fid, &download, base, &entry.path, true)?
         } else {
             written.insert(top_of(&wire));
-            hosted_item(base, out, &entry.path, url)?
+            hosted_item(base, out, &entry.path, url, true)?
         };
+        if item.custom {
+            let key = mod_key(base, &entry.path, &wire);
+            let assigned = ids.assign(&key, &wire, item.sha1.as_deref().unwrap_or_default());
+            item.pid = Some(assigned.project_id);
+            item.fid = Some(assigned.file_id);
+            if assigned.changed {
+                changed.insert(wire.clone());
+            }
+        }
         items.push(item);
     }
 
@@ -462,13 +507,19 @@ fn generate_mml(
 
                 let zip = out.join(&name);
                 files::zip_dir(base, dir, list, &zip)?;
+                let sha1 = files::sha1(&zip)?;
+                let assigned =
+                    ids.assign(&format!("config-archive:{dir}"), dir, &sha1);
+                if assigned.changed {
+                    changed.insert(dir.clone());
+                }
                 archives.push(ServerArchiveItemObj {
                     file: name.clone(),
                     dir: dir.clone(),
                     // 由用户在生成窗口里选：勾选时先删目标目录，不勾就解压覆盖
                     delete_old: *delete_old,
                     url: format!("{url}/{}", files::encode_url_path(&name)),
-                    sha1: Some(files::sha1(&zip)?),
+                    sha1: Some(sha1),
                     sha256: None,
                 });
                 archived += list.len();
@@ -479,7 +530,19 @@ fn generate_mml(
                     let wire = files::wire_path(rel);
                     progress(now, total, wire.clone());
                     now += 1;
-                    items.push(hosted_item(base, out, rel, url)?);
+                    let mut item = hosted_item(base, out, rel, url, true)?;
+                    let assigned = ids.assign(
+                        &format!("config:{wire}"),
+                        &wire,
+                        item.sha1.as_deref().unwrap_or_default(),
+                    );
+                    item.pid = Some(assigned.project_id);
+                    item.fid = Some(assigned.file_id);
+                    if assigned.changed {
+                        changed.insert(wire.clone());
+                        changed.insert(dir.clone());
+                    }
+                    items.push(item);
                     written.insert(top_of(&wire));
                 }
             }
@@ -492,13 +555,25 @@ fn generate_mml(
         now += 1;
 
         // 资源包同理：能在线下载的就不复制
-        let item = match online.get(&file_name(rel)) {
-            Some(info) => source_item(&wire, &info.modid, &info.fileid, &info.url, base, rel)?,
+        let mut item = match online.get(&file_name(rel)) {
+            Some(info) => source_item(&wire, &info.modid, &info.fileid, &info.url, base, rel, true)?,
             None => {
                 written.insert(top_of(&wire));
-                hosted_item(base, out, rel, url)?
+                hosted_item(base, out, rel, url, true)?
             }
         };
+        if item.custom {
+            let assigned = ids.assign(
+                &format!("pack:{wire}"),
+                &wire,
+                item.sha1.as_deref().unwrap_or_default(),
+            );
+            item.pid = Some(assigned.project_id);
+            item.fid = Some(assigned.file_id);
+            if assigned.changed {
+                changed.insert(wire.clone());
+            }
+        }
         items.push(item);
     }
 
@@ -522,11 +597,21 @@ fn generate_mml(
         &format!("{}{}", names::SERVER_FILE, names::SHA1_DOT_EXT),
         sha1.as_bytes(),
     )?;
+    ids.set_meta(mapping::Meta {
+        name: options.name.clone(),
+        version: options.version.clone(),
+        text: options.text.clone(),
+        url: url.to_string(),
+        format: "mml".to_string(),
+        folder: options.folder.clone(),
+    });
+    ids.save(&game.get_base_path())?;
 
     Ok(ServerInstanceResultDto {
         manifest: names::SERVER_FILE.to_string(),
         files: written.into_iter().collect(),
         count,
+        changed: changed.into_iter().collect(),
     })
 }
 
@@ -556,6 +641,7 @@ fn generate_hmcl(
     contents: &Contents,
     progress: Progress<'_>,
 ) -> Result<ServerInstanceResultDto, String> {
+    let mut ids = mapping::IdMap::load(&game.get_base_path());
     let addons =
         generate::hmcl_addons(game).ok_or_else(|| err_keys::SERVER_INSTANCE_LOADER.to_string())?;
 
@@ -591,11 +677,21 @@ fn generate_hmcl(
     );
     let bytes = serde_json::to_vec_pretty(&pack).map_err(|e| e.to_string())?;
     write(out, names::SERVER_MANIFEST_FILE, &bytes)?;
+    ids.set_meta(mapping::Meta {
+        name: options.name.clone(),
+        version: options.version.clone(),
+        text: options.text.clone(),
+        url: url.to_string(),
+        format: "hmcl".to_string(),
+        folder: options.folder.clone(),
+    });
+    ids.save(&game.get_base_path())?;
 
     Ok(ServerInstanceResultDto {
         manifest: names::SERVER_MANIFEST_FILE.to_string(),
         files: top.into_iter().collect(),
         count: total,
+        changed: Vec::new(),
     })
 }
 
@@ -617,6 +713,29 @@ fn pick(typed: &str, recorded: Option<&str>) -> String {
         .unwrap_or_default()
 }
 
+/// 取模组的稳定逻辑键：优先真实 modid，读不到时退回路径
+///
+/// - `base`: 游戏目录
+/// - `rel`: 模组相对游戏目录的路径
+/// - `wire`: 正斜杠相对路径
+///
+/// # 返回值
+///
+/// 形如 `mod:jei`；读不到元数据时是 `mod:mods/foo.jar`
+fn mod_key(base: &Path, rel: &Path, wire: &str) -> String {
+    let modid = mml_game::game_mods::read_mod_info(base.join(rel))
+        .ok()
+        .and_then(|item| {
+            item.info
+                .iter()
+                .map(|info| info.mod_id.trim().to_string())
+                .find(|modid| !modid.is_empty())
+        });
+    modid
+        .map(|modid| format!("mod:{modid}"))
+        .unwrap_or_else(|| format!("mod:{wire}"))
+}
+
 /// 在线下载的条目：不复制文件，客户端按地址或项目号自己下载
 ///
 /// - `wire`: 相对游戏目录的正斜杠路径
@@ -625,6 +744,7 @@ fn pick(typed: &str, recorded: Option<&str>) -> String {
 /// - `download`: 下载地址，可为空
 /// - `base`: 游戏目录
 /// - `rel`: 相对游戏目录的路径
+/// - `with_custom`: 没有编号时是否生成自定义编号；配置逐文件下发不生成
 ///
 /// # 返回值
 ///
@@ -636,14 +756,28 @@ fn source_item(
     download: &str,
     base: &Path,
     rel: &Path,
+    with_custom: bool,
 ) -> Result<ServerItemObj, String> {
+    let pid = pid.trim();
+    let fid = fid.trim();
+    let (pid, fid, custom) = if with_custom && pid.is_empty() && fid.is_empty() {
+        let (pid, fid) = custom_ids(wire);
+        (Some(pid), Some(fid), true)
+    } else {
+        (
+            Some(pid.to_string()).filter(|id| !id.is_empty()),
+            Some(fid.to_string()).filter(|id| !id.is_empty()),
+            false,
+        )
+    };
     Ok(ServerItemObj {
         file: wire.to_string(),
-        pid: Some(pid.trim().to_string()).filter(|id| !id.is_empty()),
-        fid: Some(fid.trim().to_string()).filter(|id| !id.is_empty()),
+        pid,
+        fid,
         url: Some(download.trim().to_string()).filter(|url| !url.is_empty()),
         sha1: Some(files::sha1(&base.join(rel))?),
         sha256: None,
+        custom,
     })
 }
 
@@ -653,20 +787,34 @@ fn source_item(
 /// - `out`: 输出文件夹
 /// - `rel`: 相对游戏目录的路径
 /// - `url`: 发布地址
+/// - `with_custom`: 是否生成自定义编号；配置逐文件下发不生成
 ///
 /// # 返回值
 ///
 /// 见 [`ServerItemObj`]；复制或算哈希失败返回错误文案
-fn hosted_item(base: &Path, out: &Path, rel: &Path, url: &str) -> Result<ServerItemObj, String> {
+fn hosted_item(
+    base: &Path,
+    out: &Path,
+    rel: &Path,
+    url: &str,
+    with_custom: bool,
+) -> Result<ServerItemObj, String> {
     files::copy_into(base, out, rel)?;
     let wire = files::wire_path(rel);
+    let (pid, fid, custom) = if with_custom {
+        let (pid, fid) = custom_ids(&wire);
+        (Some(pid), Some(fid), true)
+    } else {
+        (None, None, false)
+    };
     Ok(ServerItemObj {
         file: wire.clone(),
-        pid: None,
-        fid: None,
+        pid,
+        fid,
         url: Some(format!("{url}/{}", files::encode_url_path(&wire))),
         sha1: Some(files::sha1(&base.join(rel))?),
         sha256: None,
+        custom,
     })
 }
 

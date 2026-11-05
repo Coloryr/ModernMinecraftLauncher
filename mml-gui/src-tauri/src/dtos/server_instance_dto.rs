@@ -80,6 +80,24 @@ pub struct ServerInstanceProgressDto {
     pub text: String,
 }
 
+/// 上次生成保存的选项，即 `server_instance_get_meta` 的返回值
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerInstanceMetaDto {
+    /// 服务器实例名
+    pub name: String,
+    /// 包版本
+    pub version: String,
+    /// 说明
+    pub text: String,
+    /// 发布地址
+    pub url: String,
+    /// 格式：mml / hmcl
+    pub format: String,
+    /// 保存文件夹
+    pub folder: String,
+}
+
 /// 生成结果，即 `server_instance_generate` 的返回值
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -90,4 +108,6 @@ pub struct ServerInstanceResultDto {
     pub files: Vec<String>,
     /// 同步的文件数
     pub count: usize,
+    /// 与上次生成相比有变化的相对路径或配置目录
+    pub changed: Vec<String>,
 }

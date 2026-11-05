@@ -202,7 +202,7 @@ impl InstanceSettingObj {
         let need_resolve: Vec<&ServerItemObj> = new_pack
             .online_list
             .iter()
-            .filter(|i| i.url.as_deref().map_or(true, |u| u.is_empty()))
+            .filter(|i| !i.custom && i.url.as_deref().map_or(true, |u| u.is_empty()))
             .collect();
         let url_map = resolve_download_urls(&need_resolve, &cancel).await;
 
@@ -402,7 +402,7 @@ impl InstanceSettingObj {
             .collect();
         info.retain(|_, item| !owned.contains(&item.file) && local_file(game_path, item).is_file());
 
-        for item in &new_pack.online_list {
+        for item in new_pack.online_list.iter().filter(|item| !item.custom) {
             let (Some(pid), Some(fid)) =
                 (trimmed(item.pid.as_deref()), trimmed(item.fid.as_deref()))
             else {
@@ -617,7 +617,12 @@ fn extract_base(base: &Path, file: &Path) -> CoreResult<()> {
         let name = item.name.replace('\\', "/");
         let parts: Vec<&str> = name.split('/').collect();
         let first = parts.first().copied().unwrap_or_default();
-        let blocked = [names::GAME_FILE, names::ICON_FILE, names::SERVER_FILE];
+        let blocked = [
+            names::GAME_FILE,
+            names::ICON_FILE,
+            names::SERVER_FILE,
+            names::SERVER_INSTANCE_ID_FILE,
+        ];
         if blocked
             .iter()
             .any(|reserved| first.eq_ignore_ascii_case(reserved))

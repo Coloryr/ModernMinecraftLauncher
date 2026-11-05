@@ -24,6 +24,24 @@ use crate::windows::{config::resolve_under, instance_snapshot};
 /// 导出任务进行中，同时只允许一个导出任务
 pub(crate) static EXPORT_RUNNING: AtomicBool = AtomicBool::new(false);
 
+/// 给没有平台编号的文件生成稳定的自定义编号
+///
+/// 编号只由相对游戏目录的路径决定，同一路径在生成窗口与表格里得到同一组值；
+/// 前缀保证不会被当成 CurseForge / Modrinth 编号。
+///
+/// - `wire`: 相对游戏目录的正斜杠路径
+///
+/// # 返回值
+///
+/// 项目编号与文件编号
+pub(crate) fn custom_ids(wire: &str) -> (String, String) {
+    let hash = hash_helper::gen_hash(hash_helper::HashType::Sha1, wire.as_bytes());
+    (
+        format!("custom-p-{}", &hash[..16]),
+        format!("custom-f-{}", &hash[..16]),
+    )
+}
+
 /// 切换目标实例事件：窗口已存在时再次打开会推送，前端据此切换实例
 ///
 /// - `app`: 应用句柄，广播用它
@@ -116,8 +134,20 @@ pub(super) fn list_entries(
         let is_dir = path.is_dir();
         let info = online.get(&item.file_name().to_string_lossy().to_string());
 
+        let wire = rel.to_string_lossy().replace('\\', "/");
+        let no_ids = info.map_or(true, |x| {
+            x.modid.trim().is_empty() && x.fileid.trim().is_empty()
+        });
+        let (custom_project_id, custom_file_id) = if !is_dir && no_ids {
+            let (pid, fid) = custom_ids(&wire);
+            (Some(pid), Some(fid))
+        } else {
+            (None, None)
+        };
+        let custom_id = custom_project_id.is_some();
+
         list.push(ExportEntryDto {
-            path: rel.to_string_lossy().replace('\\', "/"),
+            path: wire,
             dir: is_dir,
             // 根目录不递归统计大小：大实例上这一趟会扫全部文件，导出窗口打开就卡住
             size: if is_dir {
@@ -128,6 +158,9 @@ pub(super) fn list_entries(
             url: info.map(|x| x.url.clone()).unwrap_or_default(),
             mod_id: info.map(|x| x.modid.clone()),
             file_id: info.map(|x| x.fileid.clone()),
+            custom_project_id,
+            custom_file_id,
+            custom_id,
             sha1: info.map(|x| x.sha1.clone()).unwrap_or_default(),
         });
     }

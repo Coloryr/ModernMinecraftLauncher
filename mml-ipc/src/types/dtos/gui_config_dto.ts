@@ -55,6 +55,7 @@ export type ClientConfigDto = {
   autoJoin: boolean,
   accountCheck: boolean,
   autoSaveNotice: boolean,
+  commandNotice: boolean,
   autoJoinServer: string,
   motdServer: string,
   lockInstance: string,

@@ -238,6 +238,16 @@ pub struct AutoSaveTargetDto {
     pub level_name: String,
 }
 
+/// 启动前确认的启动前 / 启动后命令
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LaunchCommandDto {
+    /// 启动前命令；没启用或内容为空时是 None
+    pub pre: Option<String>,
+    /// 启动后命令；没启用或内容为空时是 None
+    pub post: Option<String>,
+}
+
 /// 实例更新补丁，即前端 Partial<InstanceInfoDto> 的 IPC 形态
 ///
 /// 字段缺失 = 不改；`null` = 清空，仅标注 `double_option` 的字段支持。

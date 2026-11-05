@@ -291,6 +291,18 @@ watch(memoryConflict, async (bad) => {
       </div>
     </SettingsGroup>
 
+    <!-- 启动命令提示：实例配了启动前 / 后命令时，启动前先问一次 -->
+    <SettingsGroup v-if="!locked" id="commandNotice" title-key="winSettings.secLaunchCmdNotice"
+      :flash="flashGroup === 'commandNotice'">
+      <div class="switch-row">
+        <div class="switch-text">
+          <span class="switch-label">{{ t("winSettings.commandNotice") }}</span>
+          <span class="switch-state">{{ t("winSettings.commandNoticeDesc") }}</span>
+        </div>
+        <BaseSwitch v-model="client.commandNotice" @update:model-value="applyClient" />
+      </div>
+    </SettingsGroup>
+
     <!-- 启动前检查：加载器与内存，开关存 gui_config -->
     <SettingsGroup id="launchCheck" title-key="winSettings.secLaunchCheck" :flash="flashGroup === 'launchCheck'">
       <div class="switch-row">

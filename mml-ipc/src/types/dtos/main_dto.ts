@@ -85,6 +85,11 @@ export type AutoSaveTargetDto = {
   levelName: string,
 };
 
+export type LaunchCommandDto = {
+  pre: string | null,
+  post: string | null,
+};
+
 export type InstancePatch = {
   group?: string | null,
   name?: string | null,

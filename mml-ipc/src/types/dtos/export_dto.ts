@@ -7,6 +7,9 @@ export type ExportEntryDto = {
   url: string,
   modId: string | null,
   fileId: string | null,
+  customProjectId: string | null,
+  customFileId: string | null,
+  customId: boolean,
   sha1: string,
 };
 

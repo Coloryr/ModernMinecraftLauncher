@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
 
 use mml_auth::{AuthType, auths, lock_user, locked_by_other, unlock_user};
+use mml_config::config_obj::RunArgObj;
 use mml_game::game_launch::{AutoJoinType, GameLaunchArg, MixinArg};
 use mml_game::gui_hook::{ILaunchGui, LaunchState, ProcessRunType};
 use mml_game::launcher::instance_setting_obj::{InstanceSettingObj, ServerObj};
@@ -23,7 +24,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use crate::dtos::{AutoSaveTargetDto, ErrorEvent, ExitEvent, StateEvent};
+use crate::dtos::{AutoSaveTargetDto, ErrorEvent, ExitEvent, LaunchCommandDto, StateEvent};
 use crate::err_keys;
 use crate::gui_config;
 use crate::i18;
@@ -102,6 +103,7 @@ fn ensure_game_lang(inst: &InstanceSettingObj) {
 /// - `auto_save`: 实例配的自动进入存档这次用不用，`Some(false)` 为用户在弹窗里选了不进入
 /// - `server_pack`: 在线服务器包这次怎么处理：`Some("skip")` 不比对清单直接启动，
 ///   其余（含 `None`）照旧按发布地址同步；要不要问用户由前端在启动前决定
+/// - `run_commands`: 启动前 / 后命令这次执不执行，`Some(false)` 为用户在弹窗里选了跳过
 ///
 /// # 返回值
 ///
@@ -116,8 +118,19 @@ pub async fn main_launch_game(
     force: Option<bool>,
     auto_save: Option<bool>,
     server_pack: Option<String>,
+    run_commands: Option<bool>,
 ) -> Result<(), String> {
-    launch_game(app, uuid, world, force, auto_save, server_pack, None).await
+    launch_game(
+        app,
+        uuid,
+        world,
+        force,
+        auto_save,
+        server_pack,
+        run_commands,
+        None,
+    )
+    .await
 }
 
 /// 启动实例的完整实现，主窗口命令与大厅共用
@@ -130,6 +143,7 @@ pub async fn main_launch_game(
 /// - `force`: 账户被占用时是否跳过占用检查
 /// - `auto_save`: 实例配的自动进入存档这次用不用，`Some(false)` 为不进入
 /// - `server_pack`: 服务器包处理方式，`Some("skip")` 表示不比对清单直接启动
+/// - `run_commands`: 启动前 / 后命令这次执不执行，`Some(false)` 为跳过；`None` 为执行
 /// - `lobby`: 大厅的临时账户与进服方式，`None` 表示走当前账户与常规规则
 ///
 /// # 返回值
@@ -142,6 +156,7 @@ pub(crate) async fn launch_game(
     force: Option<bool>,
     auto_save: Option<bool>,
     server_pack: Option<String>,
+    run_commands: Option<bool>,
     lobby: Option<(mml_auth::UserKeyObj, AutoJoinType)>,
 ) -> Result<(), String> {
     // 批量资源映射正在搬模组文件，这时启动会和它抢同一批文件
@@ -237,6 +252,7 @@ pub(crate) async fn launch_game(
     let gui = Arc::new(LaunchGuiHook {
         app: app.clone(),
         uuid: core.uuid,
+        run_commands: run_commands.unwrap_or(true),
     });
     // IPC 服务没起来时不注入 ColorASM，免得游戏连到一个不存在的端口
     let mixin = match (mml_ipc::get_port(), mml_ipc::get_auth_key()) {
@@ -472,6 +488,65 @@ pub async fn main_auto_save_target(uuid: String) -> Result<Option<AutoSaveTarget
     Ok(Some(AutoSaveTargetDto { dir, level_name }))
 }
 
+/// 取实例这次启动会执行的启动前 / 后命令，给前端弹窗确认用
+///
+/// 实例自己没配时回落到启动器设置里的全局命令，口径与内核 `start_game` 一致。
+/// 提醒被关掉、两种命令都没配时返回 `None`，前端直接启动即可。
+///
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// 需要确认时返回命令文本；实例不存在返回 `err.gameNotFound`
+#[gui_macros::ipc_group("main")]
+#[gui_macros::command]
+pub fn main_launch_commands(uuid: String) -> Result<Option<LaunchCommandDto>, String> {
+    if !gui_config::get().client.command_notice {
+        return Ok(None);
+    }
+    let core = core_instance(&uuid).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())?;
+    let inst = core.instance.read().unwrap().clone();
+    let commands = effective_commands(&inst, &mml_config::read_config().jvm_arg);
+    Ok((commands.pre.is_some() || commands.post.is_some()).then_some(commands))
+}
+
+/// 实例这次启动会执行的启动前 / 后命令
+///
+/// 与内核 `start_game` 同一口径：实例设了用实例的，没设回落到全局；
+/// 开关打开且命令非空才算会执行。
+///
+/// - `inst`: 实例配置
+/// - `fallback`: 全局启动参数
+///
+/// # 返回值
+///
+/// 见 [`LaunchCommandDto`]；不会执行的命令是 `None`
+fn effective_commands(inst: &InstanceSettingObj, fallback: &RunArgObj) -> LaunchCommandDto {
+    let run = inst.jvm_arg.as_ref().unwrap_or(fallback);
+    let pre_on = run
+        .launch_pre_run
+        .or(fallback.launch_pre_run)
+        .unwrap_or(false);
+    let pre_cmd = run
+        .pre_run_arg
+        .as_deref()
+        .or(fallback.pre_run_arg.as_deref())
+        .unwrap_or("");
+    let post_on = run
+        .launch_post_run
+        .or(fallback.launch_post_run)
+        .unwrap_or(false);
+    let post_cmd = run
+        .post_run_arg
+        .as_deref()
+        .or(fallback.post_run_arg.as_deref())
+        .unwrap_or("");
+    LaunchCommandDto {
+        pre: (pre_on && !pre_cmd.is_empty()).then(|| pre_cmd.to_string()),
+        post: (post_on && !post_cmd.is_empty()).then(|| post_cmd.to_string()),
+    }
+}
+
 /// 停止游戏
 ///
 /// 退出事件由内核的退出轮询线程发出，这里只负责结束进程；没在跑时静默返回。
@@ -556,6 +631,8 @@ struct LaunchGuiHook {
     app: AppHandle,
     /// 实例 uuid
     uuid: Uuid,
+    /// 这次启动是否执行启动前 / 后命令，用户在弹窗里选了跳过时为 false
+    run_commands: bool,
 }
 
 #[async_trait::async_trait]
@@ -599,9 +676,9 @@ impl ILaunchGui for LaunchGuiHook {
         );
     }
 
-    /// 启动前 / 后命令：都放行
+    /// 启动前 / 后命令：按用户在弹窗里的选择放行或跳过
     fn launch_process(&self, _run_type: ProcessRunType) -> bool {
-        true
+        self.run_commands
     }
 }
 

@@ -68,6 +68,8 @@ pub const MANIFEST_FILE: &str = "manifest.json";
 pub const MODRINTH_FILE: &str = "modrinth.index.json";
 pub const ICON_FILE: &str = "icon.png";
 pub const SERVER_FILE: &str = "server.json";
+/// 服务器实例自定义编号映射，放在实例根目录
+pub const SERVER_INSTANCE_ID_FILE: &str = "server_instance_ids.json";
 pub const SERVER_OLD_FILE: &str = "server.old.json";
 pub const LOG4J_FILE: &str = "log4j-rce-patch.xml";
 pub const LOADER_FILE: &str = "loader.jar";

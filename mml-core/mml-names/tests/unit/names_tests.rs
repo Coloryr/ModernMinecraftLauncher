@@ -70,6 +70,7 @@ fn file_constants_have_no_separators() {
         MODRINTH_FILE,
         ICON_FILE,
         SERVER_FILE,
+        SERVER_INSTANCE_ID_FILE,
         SERVER_OLD_FILE,
         LOG4J_FILE,
         LOADER_FILE,

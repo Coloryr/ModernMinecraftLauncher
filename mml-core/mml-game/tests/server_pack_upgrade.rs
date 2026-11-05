@@ -630,6 +630,41 @@ fn nested_archives_skip_unchanged_parts() {
     );
 }
 
+
+/// 自定义编号不能被当成平台编号写回在线信息
+#[test]
+fn custom_ids_are_not_written_to_online_info() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _run = ensure_init();
+    let (routes, port) = Routes::start();
+
+    let mut item = plain(port, "mods/local.jar", "local.jar", b"jar");
+    item.pid = Some("custom-p-abc".to_string());
+    item.fid = Some("custom-f-abc".to_string());
+    item.custom = true;
+    let v1 = manifest("1.0.0", "21.1.259", vec![item]);
+    routes.set(vec![
+        ("/pack/server.json", manifest_bytes(&v1)),
+        ("/pack/local.jar", b"jar".to_vec()),
+    ]);
+
+    let uuid = block_on(mml_game::add_game::install_server_pack_from_url(
+        &format!("http://127.0.0.1:{port}/pack"),
+        None,
+        None,
+        None,
+        None,
+        CancellationToken::new(),
+    ))
+    .expect("导入应成功");
+    let game = mml_game::get_instance(&uuid).expect("实例应已登记");
+    let snapshot = game.read().unwrap().clone();
+    assert!(
+        snapshot.read_online_info().is_empty(),
+        "自定义编号不该进在线信息"
+    );
+}
+
 /// 基础文件包只在第一次同步时下载，后续版本即使清单换了也不再拉取
 #[test]
 fn base_archive_is_downloaded_once() {

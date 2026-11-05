@@ -124,4 +124,18 @@ pub struct ServerItemObj {
     /// SHA256 校验
     #[serde(rename = "Sha256")]
     pub sha256: Option<String>,
+    /// 是否为自动生成的自定义编号；true 时 ProjectId / FileId 不按平台编号解析
+    #[serde(rename = "Custom", default, skip_serializing_if = "is_false")]
+    pub custom: bool,
+}
+
+/// 序列化时省略 false
+///
+/// - `value`: 字段值
+///
+/// # 返回值
+///
+/// 值为 false 时返回 true
+fn is_false(value: &bool) -> bool {
+    !*value
 }

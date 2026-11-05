@@ -233,7 +233,9 @@ fn mml_pack_writes_manifest_sidecar_and_archive() {
         .iter()
         .find(|item| item.file == "mods/local.jar")
         .unwrap();
-    assert!(local.pid.is_none() && local.fid.is_none());
+    assert!(local.custom);
+    assert!(local.pid.as_deref().unwrap_or_default().starts_with("custom-p-"));
+    assert!(local.fid.as_deref().unwrap_or_default().starts_with("custom-f-"));
     assert_eq!(
         local.url.as_deref(),
         Some("https://example.invalid/pack/mods/local.jar")
@@ -468,6 +470,7 @@ fn mml_resource_packs_are_hosted_per_file() {
 
 #[test]
 fn hmcl_pack_copies_files_and_lists_hashes() {
+    crate::test_support::ensure_boot();
     let base = crate::test_support::temp_dir("server-instance-hmcl");
     let out = crate::test_support::temp_dir("server-instance-hmcl-out");
     fs::create_dir_all(base.join("mods")).unwrap();
@@ -521,6 +524,7 @@ fn hmcl_pack_copies_files_and_lists_hashes() {
 
 #[test]
 fn hmcl_pack_rejects_loader_it_cannot_express() {
+    crate::test_support::ensure_boot();
     let base = crate::test_support::temp_dir("server-instance-hmcl-loader");
     let out = crate::test_support::temp_dir("server-instance-hmcl-loader-out");
     fs::create_dir_all(base.join("mods")).unwrap();
@@ -772,6 +776,168 @@ fn base_files_allow_minecraft_but_reject_metadata() {
     assert!(files::base_files(&base, &[".minecraft/server.json".to_string()]).is_err());
 
     crate::test_support::cleanup(&[&base]);
+}
+
+
+/// 本地模组 / 资源包没有平台编号时写自定义编号并打 Custom 标记
+#[test]
+fn mml_marks_generated_ids_as_custom() {
+    crate::test_support::ensure_boot();
+    let base = crate::test_support::temp_dir("server-instance-custom-id");
+    let out = crate::test_support::temp_dir("server-instance-custom-id-out");
+    fs::create_dir_all(base.join("mods")).unwrap();
+    fs::create_dir_all(base.join("resourcepacks")).unwrap();
+    fs::write(base.join("mods").join("local.jar"), b"jar").unwrap();
+    fs::write(base.join("resourcepacks").join("pack.zip"), b"pack").unwrap();
+
+    let options = options(
+        "mml",
+        &["mods/local.jar"],
+        &[],
+        &["resourcepacks/pack.zip"],
+    );
+    let contents = contents(&base, &options);
+    let _ = generate_mml(
+        &game(),
+        &HashMap::new(),
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    let pack: ServerPackObj =
+        serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
+    let local = pack
+        .online_list
+        .iter()
+        .find(|item| item.file == "mods/local.jar")
+        .expect("应有本地模组");
+    assert!(local.custom);
+    assert!(local.pid.as_deref().unwrap_or_default().starts_with("custom-p-"));
+    assert!(local.fid.as_deref().unwrap_or_default().starts_with("custom-f-"));
+
+    let resource = pack
+        .online_list
+        .iter()
+        .find(|item| item.file == "resourcepacks/pack.zip")
+        .expect("应有资源包");
+    assert!(resource.custom);
+
+    crate::test_support::cleanup(&[&base, &out]);
+}
+
+
+/// 再次生成时按映射复用项目编号、更新文件号，并把变化的模组 / 资源包 / 配置目录标出来
+#[test]
+fn mml_reuses_ids_and_reports_changed_entries() {
+    crate::test_support::ensure_boot();
+    let dir = format!("server-instance-map-{}", uuid::Uuid::new_v4());
+    let instance = mml_base::get_base_dir()
+        .join("minecraft")
+        .join("instances")
+        .join(&dir);
+    let game_dir = instance.join(".minecraft");
+    fs::create_dir_all(game_dir.join("mods")).unwrap();
+    fs::create_dir_all(game_dir.join("resourcepacks")).unwrap();
+    fs::create_dir_all(game_dir.join("config")).unwrap();
+    fs::write(game_dir.join("mods").join("local.jar"), b"v1").unwrap();
+    fs::write(game_dir.join("resourcepacks").join("pack.zip"), b"p1").unwrap();
+    fs::write(game_dir.join("config").join("a.toml"), b"c1").unwrap();
+
+    let out1 = crate::test_support::temp_dir("server-instance-map-out-1");
+    let out2 = crate::test_support::temp_dir("server-instance-map-out-2");
+    let mut game = game();
+    game.dir = dir;
+    let options = options(
+        "mml",
+        &["mods/local.jar"],
+        &[("config", "archive")],
+        &["resourcepacks/pack.zip"],
+    );
+    let contents = contents(&game_dir, &options);
+
+    let first = generate_mml(
+        &game,
+        &HashMap::new(),
+        &game_dir,
+        &out1,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+    assert!(first.changed.is_empty(), "第一次生成不该有变化");
+    assert!(instance.join(names::SERVER_INSTANCE_ID_FILE).is_file());
+
+    let pack1: ServerPackObj =
+        serde_json::from_slice(&fs::read(out1.join("server.json")).unwrap()).unwrap();
+    let mod1 = pack1
+        .online_list
+        .iter()
+        .find(|item| item.file == "mods/local.jar")
+        .unwrap();
+
+    // 三个都换内容，再生成一次
+    fs::write(game_dir.join("mods").join("local.jar"), b"v2").unwrap();
+    fs::write(game_dir.join("resourcepacks").join("pack.zip"), b"p2").unwrap();
+    fs::write(game_dir.join("config").join("a.toml"), b"c2").unwrap();
+    let second = generate_mml(
+        &game,
+        &HashMap::new(),
+        &game_dir,
+        &out2,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    assert!(second.changed.iter().any(|path| path == "mods/local.jar"));
+    assert!(second.changed.iter().any(|path| path == "resourcepacks/pack.zip"));
+    assert!(second.changed.iter().any(|path| path == "config"));
+
+    let pack2: ServerPackObj =
+        serde_json::from_slice(&fs::read(out2.join("server.json")).unwrap()).unwrap();
+    let mod2 = pack2
+        .online_list
+        .iter()
+        .find(|item| item.file == "mods/local.jar")
+        .unwrap();
+    assert_eq!(mod1.pid, mod2.pid, "同一 modid / 路径应复用项目编号");
+    assert_ne!(mod1.fid, mod2.fid, "内容变了文件号要更新");
+
+    let saved = mapping::IdMap::load(&instance);
+    let meta = saved.meta().expect("应保存生成选项");
+    assert_eq!(meta.name, options.name);
+    assert_eq!(meta.version, options.version);
+    assert_eq!(meta.text, options.text);
+    assert_eq!(meta.url, "https://example.invalid/pack");
+    assert_eq!(meta.format, "mml");
+    assert_eq!(meta.folder, options.folder);
+
+    let _ = fs::remove_dir_all(&instance);
+    crate::test_support::cleanup(&[&out1, &out2]);
+}
+
+
+/// 服务器实例本身不允许再生成服务器实例
+#[test]
+fn server_pack_cannot_generate() {
+    crate::test_support::ensure_boot();
+    let mut game = game();
+    game.modpack_type = ModPackType::ServerPack;
+    let options = options("mml", &[], &[], &[]);
+    let result = generate(&game, &options, &|_, _, _| {});
+    assert_eq!(
+        result.err().as_deref(),
+        Some(err_keys::SERVER_INSTANCE_FROM_SERVER)
+    );
 }
 
 /// 实例自带图标时复制进输出文件夹，没有图标时返回 None

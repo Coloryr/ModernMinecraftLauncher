@@ -285,6 +285,8 @@ pub struct ClientConfig {
     pub account_check: bool,
     /// 实例配了"启动后自动进入存档"时，启动前是否弹窗确认
     pub auto_save_notice: bool,
+    /// 实例配了启动前 / 启动后命令时，启动前是否弹窗确认要不要执行
+    pub command_notice: bool,
     /// 游戏自动进服地址，host 或 host:port；空串表示不自动进服
     pub auto_join_server: String,
     /// MOTD 显示地址，host 或 host:port；空串表示不显示真实服务器信息
@@ -323,6 +325,7 @@ impl Default for ClientConfig {
             auto_join: false,
             account_check: true,
             auto_save_notice: true,
+            command_notice: true,
             auto_join_server: String::new(),
             motd_server: String::new(),
             lock_instance: String::new(),

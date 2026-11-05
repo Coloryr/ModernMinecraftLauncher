@@ -195,6 +195,8 @@ pub const SERVER_INSTANCE_MODE: &str = "err.serverInstanceMode";
 pub const SERVER_INSTANCE_DIR: &str = "err.serverInstanceDir";
 /// 基础文件不合法，只能是实例根目录下、.minecraft 之外的文件
 pub const SERVER_INSTANCE_BASE_FILE: &str = "err.serverInstanceBaseFile";
+/// 服务器实例不能再生成服务器实例
+pub const SERVER_INSTANCE_FROM_SERVER: &str = "err.serverInstanceFromServer";
 
 // ---------- 主题包 ----------
 

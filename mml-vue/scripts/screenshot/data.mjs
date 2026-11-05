@@ -40,6 +40,7 @@ export const baseConfig = {
     autoJoin: false,
     accountCheck: false,
     autoSaveNotice: false,
+    commandNotice: false,
     autoJoinServer: "",
     motdServer: "",
     lockInstance: "",

@@ -22,6 +22,12 @@ pub struct ExportEntryDto {
     pub mod_id: Option<String>,
     /// 文件 ID，只有在线来源的模组才有
     pub file_id: Option<String>,
+    /// 自动生成的自定义项目编号；没有在线编号时才有
+    pub custom_project_id: Option<String>,
+    /// 自动生成的自定义文件编号；没有在线编号时才有
+    pub custom_file_id: Option<String>,
+    /// 是否使用自定义编号
+    pub custom_id: bool,
     /// 实例记录的 SHA1；没有在线来源时是空串，服务器实例窗口的表格用它显示哈希值
     pub sha1: String,
 }

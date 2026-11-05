@@ -31,9 +31,19 @@ export type ServerInstanceProgressDto = {
   text: string,
 };
 
+export type ServerInstanceMetaDto = {
+  name: string,
+  version: string,
+  text: string,
+  url: string,
+  format: string,
+  folder: string,
+};
+
 export type ServerInstanceResultDto = {
   manifest: string,
   files: string[],
   count: number,
+  changed: string[],
 };
 

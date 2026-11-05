@@ -1480,7 +1480,7 @@ async fn launcher_pack<P: AsRef<Path>>(
 ///
 /// 类型下拉只对能回查在线项目的包有意义；本地包留着 CurseForge / Modrinth 会让
 /// 「检查更新」指向不存在的项目。`is_modpack` 保持原样，启动与模组检查照旧。
-/// 服务器实例例外：它本来就没有平台项目号，类型留着才能同步 / 再生成服务器实例。
+/// 服务器实例例外：它本来就没有平台项目号，类型留着才能继续同步服务器包。
 ///
 /// - `uuid`: 刚安装好的实例 uuid
 fn clear_modpack_type_without_ids(uuid: &Uuid) {
@@ -1491,8 +1491,7 @@ fn clear_modpack_type_without_ids(uuid: &Uuid) {
     if game.pid.is_some() && game.fid.is_some() {
         return;
     }
-    // 服务器实例本来就没有平台项目号：它的类型要留着，
-    // 否则导入后既不能同步也不能再生成 MML 服务器实例
+    // 服务器实例本来就没有平台项目号：它的类型要留着，否则导入后不能继续同步
     if matches!(
         game.modpack_type,
         ModPackType::None | ModPackType::ServerPack

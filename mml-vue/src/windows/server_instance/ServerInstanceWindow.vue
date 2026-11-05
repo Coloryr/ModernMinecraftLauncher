@@ -24,6 +24,7 @@ import { targetUuid, windowParams } from "../windowManager";
 import type {
   ExportEntryDto,
   InstanceInfoDto,
+  ServerInstanceMetaDto,
   ServerInstanceProgressDto,
   ServerInstanceResultDto,
 } from "../../lib/bindings";
@@ -53,9 +54,20 @@ const SKIP_DIRS = [
 const FILES_DIRS = ["kubejs"];
 
 /** 实例根目录里不能当基础文件同步的启动器文件 */
-const BASE_SKIP = ["game.json", "icon.png", "server.json", "server.json.sha1", "server.json.old"];
+const BASE_SKIP = [
+  "game.json",
+  "icon.png",
+  "server.json",
+  "server.json.sha1",
+  "server.json.old",
+  "server_instance_ids.json",
+];
 /** 实例根目录里不列出的运行期目录 */
 const BASE_DIR_SKIP = ["cache", "temp", "backup"];
+
+/** 服务器实例操作指导 */
+const GUIDE_URL =
+  "https://github.com/Coloryr/ModernMinecraftLauncher/blob/master/docs/server-instance.md";
 
 const instances = ref<InstanceInfoDto[]>([]);
 const currentUuid = ref("");
@@ -100,6 +112,8 @@ const newMode = ref<ConfigMode>("archive");
 const busy = ref(false);
 const progress = ref<ServerInstanceProgressDto | null>(null);
 const result = ref<ServerInstanceResultDto | null>(null);
+/** 与上次生成相比有变化的路径 / 配置目录，用于行高亮 */
+const changedPaths = ref(new Set<string>());
 const error = ref("");
 
 /** 进度事件取消订阅 */
@@ -193,6 +207,11 @@ function toggled(set: Set<string>, path: string): Set<string> {
   return next;
 }
 
+/** 打开服务器实例操作指导 */
+function openGuide() {
+  void api.openUrl(GUIDE_URL);
+}
+
 /** 全选 / 全不选基础文件 */
 function pickAllBase(all: boolean) {
   pickedBase.value = all ? new Set(baseEntries.value.map((item) => item.path)) : new Set();
@@ -269,9 +288,11 @@ let loadSeq = 0;
 /** 重新读一个实例的模组、资源包与顶层目录，勾选与配置列表重置成默认值 */
 async function loadInstance(uuid: string) {
   const seq = ++loadSeq;
+  let instanceName = "";
   try {
     const info = await api.getExportInfo(uuid);
     if (seq !== loadSeq) return;
+    instanceName = info.name;
     mods.value = info.mods.filter((item) => !item.dir);
     pickedMods.value = new Set(mods.value.map((item) => item.path));
     modUrls.value = new Map(mods.value.map((item) => [item.path, item.url ?? ""]));
@@ -281,6 +302,31 @@ async function loadInstance(uuid: string) {
     pickedMods.value = new Set();
     modUrls.value = new Map();
     showToast(tErr(e));
+  }
+
+  // 上次生成保存的名字 / 版本 / 说明 / 网址等，跟编号映射在同一份文件里
+  let meta: ServerInstanceMetaDto | null = null;
+  try {
+    meta = await api.getServerInstanceMeta(uuid);
+  } catch {
+    // 没有生成过或读不到就按默认值铺
+  }
+  if (seq !== loadSeq) return;
+  const fallbackName = instanceName || current.value?.name || "";
+  if (meta) {
+    format.value = meta.format === "hmcl" ? "hmcl" : "mml";
+    name.value = meta.name || fallbackName;
+    version.value = meta.version || "1.0.0";
+    text.value = meta.text;
+    url.value = meta.url;
+    folder.value = meta.folder;
+  } else {
+    format.value = "mml";
+    name.value = fallbackName;
+    version.value = "1.0.0";
+    text.value = "";
+    url.value = "";
+    folder.value = "";
   }
 
   let packsNext: ExportEntryDto[] = [];
@@ -330,6 +376,7 @@ async function loadInstance(uuid: string) {
   newMode.value = "archive";
   result.value = null;
   progress.value = null;
+  changedPaths.value = new Set();
   error.value = "";
 }
 
@@ -378,13 +425,15 @@ function clearInstance() {
   newDir.value = "";
   result.value = null;
   progress.value = null;
+  changedPaths.value = new Set();
   error.value = "";
 }
 
 /** 重新拉实例列表并定位目标实例；当前实例被删掉时落到第一个 */
 async function syncInstances() {
   try {
-    instances.value = await api.getInstances();
+    // 服务器实例本身已经是同步结果，不能再当源实例导出
+    instances.value = (await api.getInstances()).filter((item) => item.modpackType !== "serverpack");
   } catch (e) {
     console.error("[ServerInstanceWindow] 读取实例列表失败", e);
     return;
@@ -423,6 +472,7 @@ async function generate() {
   error.value = "";
   result.value = null;
   progress.value = null;
+  changedPaths.value = new Set();
   section.value = "start";
   try {
     result.value = await api.generateServerInstance(currentUuid.value, {
@@ -445,6 +495,7 @@ async function generate() {
       baseFiles: [...pickedBase.value],
       resourcePacks: [...pickedPacks.value],
     });
+    changedPaths.value = new Set(result.value.changed);
     showToast(t("serverInstance.done", { path: folder.value.trim() }));
   } catch (e) {
     error.value = tErr(e);
@@ -494,9 +545,15 @@ onBeforeUnmount(() => {
   <WindowFrame :title="t('winTitle.serverInstance')" body-fill body-flush @close="emit('close')">
     <!-- 实例放标题栏：换实例不用回到总体设定 -->
     <template #head-right>
-      <InstanceSelect class="head-select" :instances="instances" :model-value="currentUuid"
-        :placeholder="t('winExport.instance')" :disabled="busy" :menu-min-width="260"
-        @update:model-value="pickInstance" />
+      <div class="si-head-actions">
+        <BaseButton class="si-guide" size="sm" @click="openGuide">
+          <GlyphIcon name="document" :size="13" />
+          {{ t("serverInstance.guide") }}
+        </BaseButton>
+        <InstanceSelect class="head-select" :instances="instances" :model-value="currentUuid"
+          :placeholder="t('winExport.instance')" :disabled="busy" :menu-min-width="260"
+          @update:model-value="pickInstance" />
+      </div>
     </template>
 
     <div class="si-layout">
@@ -613,14 +670,21 @@ onBeforeUnmount(() => {
               </template>
               <template #default="{ start, end }">
                 <p v-if="!mods.length" class="empty-tip">{{ t("serverInstance.noMods") }}</p>
-                <div v-for="row in mods.slice(start, end)" :key="row.path" class="si-mod-row">
+                <div v-for="row in mods.slice(start, end)" :key="row.path" class="si-mod-row"
+                  :class="{ 'is-changed': changedPaths.has(row.path) }">
                   <span class="si-cell-check">
                     <input type="checkbox" class="si-box" :checked="pickedMods.has(row.path)" :disabled="busy"
                       @change="pickedMods = toggled(pickedMods, row.path)" />
                   </span>
                   <span class="si-cell-name" :title="row.path">{{ baseName(row.path) }}</span>
-                  <span class="si-cell-id">{{ row.modId || "—" }}</span>
-                  <span class="si-cell-id">{{ row.fileId || "—" }}</span>
+                  <span class="si-cell-id">
+                    <em v-if="row.customId" class="si-id-custom">{{ t("serverInstance.customId") }}</em>
+                    <template v-else>{{ row.modId || "—" }}</template>
+                  </span>
+                  <span class="si-cell-id">
+                    <em v-if="row.customId" class="si-id-custom">{{ t("serverInstance.customId") }}</em>
+                    <template v-else>{{ row.fileId || "—" }}</template>
+                  </span>
                   <input class="field-input si-cell-control" :value="urlOf(row.path)" :disabled="busy"
                     spellcheck="false" :placeholder="t('serverInstance.cellUrl')"
                     @input="setModUrl(row.path, $event)" />
@@ -644,10 +708,14 @@ onBeforeUnmount(() => {
             <VirtualList class="si-list" :count="packs.length" :row-h="PACK_ROW_H" :row-gap="2">
               <template #default="{ start, end }">
                 <p v-if="!packs.length" class="empty-tip">{{ t("serverInstance.noPacks") }}</p>
-                <label v-for="row in packs.slice(start, end)" :key="row.path" class="si-row-item">
+                <label v-for="row in packs.slice(start, end)" :key="row.path" class="si-row-item"
+                  :class="{ 'is-changed': changedPaths.has(row.path) }">
                   <input type="checkbox" class="si-box" :checked="pickedPacks.has(row.path)" :disabled="busy"
                     @change="pickedPacks = toggled(pickedPacks, row.path)" />
                   <span class="si-name" :title="row.path">{{ baseName(row.path) }}</span>
+                  <span v-if="format === 'mml' && row.customId" class="si-id-custom">
+                    {{ t("serverInstance.customId") }}
+                  </span>
                   <span v-if="format === 'mml'" class="si-tag" :class="{ on: packOnline(row) }">
                     {{ packOnline(row) ? t("serverInstance.modOnline") : t("serverInstance.noSource") }}
                   </span>
@@ -679,7 +747,6 @@ onBeforeUnmount(() => {
                 {{ t("serverInstance.configAdd") }}
               </BaseButton>
             </div>
-            <p class="field-hint">{{ t("serverInstance.configHint") }}</p>
 
             <!-- 与模组页同一套表格外观：表头吸顶、行内直接改同步方式 -->
             <div class="si-table">
@@ -690,7 +757,8 @@ onBeforeUnmount(() => {
                 <span></span>
               </div>
               <p v-if="!configs.length" class="empty-tip">{{ t("serverInstance.configEmpty") }}</p>
-              <div v-for="item in configs" :key="item.dir" class="si-table-row">
+              <div v-for="item in configs" :key="item.dir" class="si-table-row"
+                :class="{ 'is-changed': changedPaths.has(item.dir) }">
                 <span class="si-name" :title="item.dir">{{ item.dir }}/</span>
                 <select class="field-select si-cell-control" :value="item.mode" :disabled="busy"
                   @change="setConfigMode(item.dir, ($event.target as HTMLSelectElement).value as ConfigMode)">
@@ -707,7 +775,6 @@ onBeforeUnmount(() => {
                   <GlyphIcon name="trash" :size="13" />
                 </button>
               </div>
-              <p class="field-hint">{{ t("serverInstance.configDeleteOldHint") }}</p>
             </div>
           </section>
 
@@ -1072,6 +1139,18 @@ onBeforeUnmount(() => {
   background: var(--bg-hover);
 }
 
+.si-mod-row.is-changed,
+.si-table-row.is-changed,
+.si-row-item.is-changed {
+  background: color-mix(in srgb, var(--yellow) 16%, transparent);
+}
+
+.si-mod-row.is-changed:hover,
+.si-table-row.is-changed:hover,
+.si-row-item.is-changed:hover {
+  background: color-mix(in srgb, var(--yellow) 24%, transparent);
+}
+
 /* 列宽各表不同，其余外观共用上面几条 */
 .si-mod-head,
 .si-mod-row {
@@ -1111,6 +1190,12 @@ select.si-cell-control {
 }
 
 /* 编号是只读的，用等宽字对齐，空值显示 — */
+.si-add-mode,
+.si-table-row .field-select {
+  text-align: center;
+  text-align-last: center;
+}
+
 .si-cell-id {
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 11.5px;
@@ -1118,6 +1203,18 @@ select.si-cell-control {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.si-id-custom {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-style: normal;
+  line-height: 16px;
 }
 
 .si-cell-hash {
@@ -1235,5 +1332,17 @@ select.si-cell-control {
 .head-select {
   min-width: 200px;
   max-width: 300px;
+}
+
+.si-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.si-guide {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 </style>

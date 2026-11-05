@@ -83,7 +83,8 @@ pub use log_dto::{LogFocusDto, LogSettingDto};
 pub use main_dto::{
     AutoSaveTargetDto, Block2dFaceDto, BlockGroupDto, BlockGroupsDto, BlockItemDto, BlockStatusDto,
     CustomJsonItemDto, ErrorEvent, ExitEvent, IconSourceDto, InstanceChangeEvent, InstanceLangDto,
-    InstancePatch, LaunchPrecheckDto, LogEvent, NewsItem, StartArgDto, StateEvent, SystemMemoryDto,
+    InstancePatch, LaunchCommandDto, LaunchPrecheckDto, LogEvent, NewsItem, StartArgDto, StateEvent,
+    SystemMemoryDto,
 };
 pub use minecraft_dto::{
     MinecraftImportDto, MinecraftInfoDto, MinecraftProgressDto, MinecraftVersionDto,
@@ -99,8 +100,8 @@ pub use resource_dto::{
     ServerItemDto, ShaderItemDto,
 };
 pub use server_instance_dto::{
-    ServerInstanceConfigDto, ServerInstanceOptionsDto, ServerInstancePickDto,
-    ServerInstanceProgressDto, ServerInstanceResultDto,
+    ServerInstanceConfigDto, ServerInstanceMetaDto, ServerInstanceOptionsDto,
+    ServerInstancePickDto, ServerInstanceProgressDto, ServerInstanceResultDto,
 };
 pub use settings_dto::{
     BgInfoDto, DnsSettingDto, GameCheckSettingDto, LaunchSettingDto, LinkResourceDto,

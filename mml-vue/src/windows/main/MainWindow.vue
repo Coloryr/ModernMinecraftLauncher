@@ -900,7 +900,11 @@ function onInstMenuAction(id: InstMenuAction) {
       break;
     case "serverInstance":
       // 独立窗口：带目标实例，已开着时由壳层推送 server-instance-focus 换实例
-      if (target) openWindow("server_instance", { uuid: target.uuid });
+      if (target && target.modpackType !== "serverpack") {
+        openWindow("server_instance", { uuid: target.uuid });
+      } else if (target) {
+        showToast(t("err.serverInstanceFromServer"));
+      }
       break;
     case "cloudSave":
       // 还没做：给一条「制作中」提示，别让菜单点了没反应
@@ -1410,6 +1414,7 @@ const clientConfig = ref<ClientConfig>({
   autoJoin: false,
   accountCheck: true,
   autoSaveNotice: true,
+  commandNotice: true,
   autoJoinServer: "",
   motdServer: "",
   lockInstance: "",

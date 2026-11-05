@@ -67,7 +67,11 @@ const items = computed<RowMenuItem[]>(() => {
       { id: "rename", label: t("actions.rename") },
       { id: "moveGroup", label: t("multi.moveGroup"), disabled: !canChangeGroup.value },
       { id: "export", label: t("actions.export"), separated: true },
-      { id: "serverInstance", label: t("actions.serverInstance") },
+      {
+        id: "serverInstance",
+        label: t("actions.serverInstance"),
+        disabled: props.menu?.instance?.modpackType === "serverpack",
+      },
       { id: "shortcut", label: t("actions.shortcut") },
       { id: "copy", label: t("actions.copyInstance") },
     ];

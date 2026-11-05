@@ -453,6 +453,7 @@ impl HMCLServerObj {
                 url: join_file_url(&self.file_api, &item.path),
                 sha1: Some(item.hash.trim().to_string()).filter(|hash| !hash.is_empty()),
                 sha256: None,
+                custom: false,
             })
             .collect();
 

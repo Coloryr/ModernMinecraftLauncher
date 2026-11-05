@@ -44,6 +44,7 @@ import type {
   InstanceInfoDto,
   InstanceLangDto,
   JavaInfoDto,
+  LaunchCommandDto,
   LaunchPrecheckDto,
   LoadState,
   LogEvent,
@@ -81,6 +82,7 @@ import type {
   SaveItemDto,
   ScreenshotItemDto,
   ServerPackProbeDto,
+  ServerInstanceMetaDto,
   ServerInstanceOptionsDto,
   ServerInstanceProgressDto,
   ServerInstanceResultDto,
@@ -1056,6 +1058,7 @@ export const api = {
    * - `force`: 账户被其它实例占用时是否跳过检查
    * - `autoSave`: 实例配的自动进入存档这次用不用；`false` = 用户选了不进入
    * - `serverPack`: 在线服务器包怎么处理；`skip` = 这次不比对清单直接启动
+   * - `runCommands`: 启动前 / 后命令这次执不执行；`false` = 用户选了跳过
    *
    * 启动用户名由后端从当前账户解析
    */
@@ -1065,6 +1068,7 @@ export const api = {
     force?: boolean,
     autoSave?: boolean,
     serverPack?: "update" | "skip",
+    runCommands?: boolean,
   ): Promise<void> {
     return commands.main.launchGame(
       uuid,
@@ -1072,6 +1076,7 @@ export const api = {
       force ?? null,
       autoSave ?? null,
       serverPack ?? null,
+      runCommands ?? null,
     );
   },
 
@@ -1099,6 +1104,19 @@ export const api = {
    */
   async autoSaveTarget(uuid: string): Promise<AutoSaveTargetDto | null> {
     return commands.main.autoSaveTarget(uuid);
+  },
+
+  /**
+   * 取实例这次启动会执行的启动前 / 后命令，启动前弹窗确认用
+   *
+   * - `uuid`: 实例 uuid
+   *
+   * # 返回值
+   *
+   * 需要确认时返回命令文本；提醒已关或两种命令都没配时返回 null
+   */
+  async launchCommands(uuid: string): Promise<LaunchCommandDto | null> {
+    return commands.main.launchCommands(uuid);
   },
 
   /**
@@ -1323,6 +1341,19 @@ export const api = {
     options: ServerInstanceOptionsDto,
   ): Promise<ServerInstanceResultDto> {
     return commands.serverInstance.generate(uuid, options);
+  },
+
+  /**
+   * 读取上次生成保存的名字 / 版本 / 说明 / 网址等
+   *
+   * - `uuid`: 实例 uuid
+   *
+   * # 返回值
+   *
+   * 没有生成过时是 `null`
+   */
+  async getServerInstanceMeta(uuid: string): Promise<ServerInstanceMetaDto | null> {
+    return commands.serverInstance.getMeta(uuid);
   },
 
   /**
@@ -2724,6 +2755,7 @@ export function enableResourcepack(uuid: string, file: string): Promise<void> {
  * - `uuid`: 实例 uuid
  * - `world`: 存档目录名；不传按实例自己的自启配置来
  * - `serverPack`: 在线服务器包怎么处理；`skip` = 这次不比对清单直接启动
+ * - `runCommands`: 启动前 / 后命令这次执不执行；`false` = 用户选了跳过
  */
 export function launchGame(
   uuid: string,
@@ -2731,6 +2763,7 @@ export function launchGame(
   force?: boolean,
   autoSave?: boolean,
   serverPack?: "update" | "skip",
+  runCommands?: boolean,
 ): Promise<void> {
   return commands.main.launchGame(
     uuid,
@@ -2738,6 +2771,7 @@ export function launchGame(
     force ?? null,
     autoSave ?? null,
     serverPack ?? null,
+    runCommands ?? null,
   );
 }
 

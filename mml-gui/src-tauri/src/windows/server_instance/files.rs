@@ -246,9 +246,14 @@ fn first_component(path: &Path) -> &str {
 ///
 /// game.json / icon.png / server.json / server.json.old 返回 true
 fn is_reserved_base(name: &str) -> bool {
-    [names::GAME_FILE, names::ICON_FILE, names::SERVER_FILE]
-        .iter()
-        .any(|item| name.eq_ignore_ascii_case(item))
+    [
+        names::GAME_FILE,
+        names::ICON_FILE,
+        names::SERVER_FILE,
+        names::SERVER_INSTANCE_ID_FILE,
+    ]
+    .iter()
+    .any(|item| name.eq_ignore_ascii_case(item))
         || name.eq_ignore_ascii_case(&format!("{}.sha1", names::SERVER_FILE))
         || name.eq_ignore_ascii_case(&format!("{}.old", names::SERVER_FILE))
 }

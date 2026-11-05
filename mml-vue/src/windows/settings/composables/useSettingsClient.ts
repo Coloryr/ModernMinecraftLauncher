@@ -489,6 +489,9 @@ export function useSettingsClient() {
       case "autoSave":
         client.value.autoSaveNotice = d.autoSaveNotice;
         break;
+      case "commandNotice":
+        client.value.commandNotice = d.commandNotice;
+        break;
       case "customHome":
         // 只把开关恢复成默认；导入的压缩包是用户的东西，恢复默认不动它
         client.value.customHome = d.customHome;

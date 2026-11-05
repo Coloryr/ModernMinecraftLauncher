@@ -215,6 +215,8 @@ export interface ClientConfig {
   accountCheck: boolean;
   /** 实例配了自动进入存档时，启动前是否弹窗确认 */
   autoSaveNotice: boolean;
+  /** 实例配了启动前 / 后命令时，启动前是否弹窗确认 */
+  commandNotice: boolean;
   /** 游戏自动进服地址：host 或 host:port，空表示不自动进服 */
   autoJoinServer: string;
   /** 窗口材质：auto（云母→亚克力→模糊降级）/ mica / acrylic / blur / none */
@@ -471,6 +473,8 @@ export function defaultConfig(): GuiConfig {
       accountCheck: true,
       // 自动进入存档的启动提醒默认开，同样以 gui_config.json 为准
       autoSaveNotice: true,
+      // 启动前 / 后命令的提醒同样默认开
+      commandNotice: true,
       autoJoinServer: readString(KEYS.autoJoinServer),
       // 这两项不做 localStorage 首帧缓存：真值一律来自 gui_config.json
       windowEffect: "none",
