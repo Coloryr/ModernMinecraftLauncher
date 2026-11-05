@@ -288,6 +288,9 @@ ModernColoryrMinecraftLauncher/
 各子项目的详细说明见其 README：[mml-gui](mml-gui/README.md)、[mml-vue](mml-vue/README.md)、
 [mml-ipc](mml-ipc/README.md)、[custom](custom/README.md)、[mml-theme-studio](mml-theme-studio/README.md)。
 
+服务器实例更新器 `mml-server-sync` 单独维护在 [Coloryr/mml-server-sync](https://github.com/Coloryr/mml-server-sync)，
+本仓库只保留构建好的 jar（`mml-gui/src-tauri/resources/mml-server-sync.jar`，随 exe 内嵌）。
+
 ## 文档
 
 | 文档 | 内容 |

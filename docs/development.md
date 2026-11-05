@@ -77,15 +77,15 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
 | `cd mml-vue && npm run shots:docs` | 按 `scenarios.mjs` 重新生成 `docs/screenshots.md` |
 | `cd mml-gui && .\tauri.ps1 icon ../design/icon/f-blend.svg` | 改过程序图标后重新生成 `src-tauri/icons/`；会顺带产出 `android/` 与 `ios/`，桌面端用不到可删 |
 | `cd custom/custom-main-demo && npm run build` | 构建自定义主页面示例并打包成 `custom-main-demo.zip`（四个示例的用法见 [custom/README.md](../custom/README.md)） |
-| `cd tools/server-sync && .\gradlew.bat build` | 构建独立服务器实例更新器 `build/libs/mml-server-sync.jar`（Linux/macOS 用 `./gradlew build`；用法见 [tools/server-sync/README.md](../tools/server-sync/README.md)） |
 
 `build/` 下带 PowerShell 版（`.ps1`，Windows）与 bash 版（`.sh`，Linux / macOS / Git Bash）：
 PowerShell 版在 Windows 默认出三架构，bash 版构建当前架构；`build/*.mjs` 是版本同步与产物打包用的
 跨平台辅助脚本。
 
-`tools/server-sync` 的 jar 构建后要复制到 `mml-gui/src-tauri/resources/mml-server-sync.jar`，
-启动器用 `include_bytes!` 从这里把 jar 嵌进 exe，放到别处不会被打进产物；改了 Java 工具就重新构建并
-复制一次，否则 exe 里嵌的还是旧 jar。
+独立服务器实例更新器 `mml-server-sync` 已拆到 [Coloryr/mml-server-sync](https://github.com/Coloryr/mml-server-sync)，
+源码、构建与用法都在那个仓库。本仓库只留构建好的 `mml-gui/src-tauri/resources/mml-server-sync.jar`：
+启动器用 `include_bytes!` 从这里把 jar 嵌进 exe，放到别处不会被打进产物。改了 Java 工具就在独立仓库里
+重新构建，再把 jar 复制回来一次，否则 exe 里嵌的还是旧 jar。
 
 Flatpak 与 Arch 包不在 `build-release` 里自动跑，由 `build/package-flatpak.sh`、
 `build/package-arch.sh` 单独完成，输入都是 `target/release/ModernMinecraftLauncher`：
