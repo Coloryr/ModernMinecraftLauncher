@@ -2,7 +2,7 @@
 use std::{
     collections::HashMap,
     io::{BufRead, BufReader},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Child,
     sync::{
         Arc, Mutex,
@@ -439,6 +439,9 @@ impl InstanceSettingObj {
     /// 返回启动进程使用的环境变量表
     pub(crate) fn make_env_arg(&self) -> HashMap<String, String> {
         let mut env = HashMap::new();
+        // 游戏内的 Java agent 靠这两个变量识别 MML 启动，避免重复同步服务器包
+        env.insert("MML_LAUNCHER".to_string(), "1".to_string());
+        env.insert("MML_LAUNCHER_VERSION".to_string(), mml_names::VERSION.clone());
         // 先铺隔离路径，用户自己写的环境变量随后覆盖，手动指定优先
         if self.isolate_home() {
             let home = self.isolated_home();
@@ -491,6 +494,36 @@ impl InstanceSettingObj {
         }
 
         env
+    }
+
+    /// 写入供游戏内 Java agent 识别的 MML 启动参数环境变量
+    ///
+    /// - `env`: 目标环境变量表
+    /// - `java`: 实际使用的 Java 可执行文件
+    /// - `jvm_args`: 已生成的 JVM 参数
+    fn add_launcher_env(&self, env: &mut HashMap<String, String>, java: &Path, jvm_args: &[String]) {
+        env.insert(
+            "ARG_JAVA_LOCAL".to_string(),
+            java.to_string_lossy().into_owned(),
+        );
+        env.insert(
+            "ARG_JAVA_ARG".to_string(),
+            jvm_args.join(" "),
+        );
+        env.insert(
+            "ARG_LAUNCHER_DIR".to_string(),
+            mml_base::get_base_dir().to_string_lossy().into_owned(),
+        );
+        env.insert("ARG_GAME_NAME".to_string(), self.name.clone());
+        env.insert("ARG_GAME_UUID".to_string(), self.uuid.to_string());
+        env.insert(
+            "ARG_GAME_DIR".to_string(),
+            self.get_game_path().to_string_lossy().into_owned(),
+        );
+        env.insert(
+            "ARG_GAME_BASE_DIR".to_string(),
+            self.get_base_path().to_string_lossy().into_owned(),
+        );
     }
 
     /// 检查服务器包更新
@@ -824,13 +857,15 @@ impl InstanceSettingObj {
             gui.update_state(&self, LaunchState::Jvm);
         }
 
-        InstanceSettingObj::allow_security_manager(&mut obj, java.as_ref().unwrap());
-        InstanceSettingObj::fix_zgc_generational(&mut obj, java.as_ref().unwrap());
+        let java = java.unwrap();
+        InstanceSettingObj::allow_security_manager(&mut obj, &java);
+        InstanceSettingObj::fix_zgc_generational(&mut obj, &java);
         let args = self.make_run_arg(&arg, &mut obj, false);
-        let env = self.make_env_arg();
+        let mut env = self.make_env_arg();
+        self.add_launcher_env(&mut env, &java, &obj.jvm_args);
 
         Ok(LaunchCmd {
-            java: java.unwrap(),
+            java,
             dir: self.get_game_path(),
             arg: args,
             env,
@@ -959,7 +994,8 @@ impl InstanceSettingObj {
             return Err(ErrorType::TaskCancel);
         }
 
-        let env = self.make_env_arg();
+        let mut env = self.make_env_arg();
+        self.add_launcher_env(&mut env, &jvm, &obj.jvm_args);
 
         if cancel.is_cancelled() {
             return Err(ErrorType::TaskCancel);

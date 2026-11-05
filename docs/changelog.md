@@ -101,6 +101,11 @@
 - 服务器实例新增「基础文件」分组：可以勾选实例根目录下的文件或顶层目录（`.minecraft`、`libraries`、
   `patches` 等），打成固定的 `base.zip`；客户端只在第一次导入 / 同步时下载并解压到实例根目录，
   后续版本不会再次下载。实例图标仍单独输出为 `icon.png`，不进基础包。
+- 新增独立服务器实例更新器 `mml-server-sync.jar`，供 PCL2 / HMCL / MultiMC 等非 MML 启动器
+  在启动前同步 MML 的 `server.json`；支持增量下载、SHA1/SHA256 校验、
+  旧文件清理、配置压缩包与基础包；既可命令行运行，也可通过
+  `-javaagent:mml-server-sync.jar=<URL>` 在游戏 main 前执行，并自动识别 MML 启动器跳过。
+  源码与用法见 `tools/server-sync/`。
 - 导入压缩包的类型「直接解压」改名「M²L 压缩包」；包内带 `game.json` 时优先按它识别，
   不会被 `manifest.json` 等其它启动器元数据抢走。
 - Java 安装进度改用和整合包 / 资源下载同一套：标题栏上的 Java 指示器显示进行中数量与总进度，

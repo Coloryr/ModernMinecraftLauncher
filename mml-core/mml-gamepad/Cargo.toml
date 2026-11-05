@@ -8,6 +8,21 @@ mml-ipc = { path = "../mml-ipc" }
 mml-log = { path = "../mml-log" }
 mml-names = { path = "../mml-names" }
 sdl3.workspace = true
+# sdl3 wrapper 没有把 sdl3-sys 的 no-sdl-* feature 转发出来；这里直接依赖同一份
+# sdl3-sys，把用不到的子系统并进同一个 CMake 构建关掉，只保留手柄需要的
+# joystick / gamepad / hidapi。
+sdl3-sys = { version = "0.7.2", default-features = false, features = [
+    "no-sdl-audio",
+    "no-sdl-video",
+    "no-sdl-gpu",
+    "no-sdl-render",
+    "no-sdl-camera",
+    "no-sdl-dialog",
+    "no-sdl-haptic",
+    "no-sdl-power",
+    "no-sdl-sensor",
+    "no-sdl-tray",
+] }
 serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true

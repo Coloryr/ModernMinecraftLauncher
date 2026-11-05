@@ -3389,6 +3389,7 @@ dependencies = [
  "mml-names",
  "mml-testutil",
  "sdl3",
+ "sdl3-sys",
  "serde",
  "serde_json",
  "uuid",

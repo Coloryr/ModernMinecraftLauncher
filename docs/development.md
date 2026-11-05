@@ -77,6 +77,7 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
 | `cd mml-vue && npm run shots:docs` | 按 `scenarios.mjs` 重新生成 `docs/screenshots.md` |
 | `cd mml-gui && .\tauri.ps1 icon ../design/icon/f-blend.svg` | 改过程序图标后重新生成 `src-tauri/icons/`；会顺带产出 `android/` 与 `ios/`，桌面端用不到可删 |
 | `cd custom/custom-main-demo && npm run build` | 构建自定义主页面示例并打包成 `custom-main-demo.zip`（四个示例的用法见 [custom/README.md](../custom/README.md)） |
+| `cd tools/server-sync && .\gradlew.bat build` | 构建独立服务器实例更新器 `build/libs/mml-server-sync.jar`（Linux/macOS 用 `./gradlew build`；用法见 [tools/server-sync/README.md](../tools/server-sync/README.md)） |
 
 `build/` 下带 PowerShell 版（`.ps1`，Windows）与 bash 版（`.sh`，Linux / macOS / Git Bash）：
 PowerShell 版在 Windows 默认出三架构，bash 版构建当前架构；`build/*.mjs` 是版本同步与产物打包用的
