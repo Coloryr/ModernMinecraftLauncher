@@ -27,6 +27,8 @@ pub struct RunArgSettingDto {
     pub jvm_env: String,
     /// 是否把 HOME / APPDATA / XDG 等系统目录隔离到实例目录
     pub isolate_home: bool,
+    /// 是否把 MML 环境变量传给游戏进程
+    pub mml_env: bool,
     /// GC 模式：Auto / G1GC / ZGC / None
     pub gc_mode: String,
     /// 最小内存，单位 MB
@@ -63,6 +65,7 @@ impl From<&RunArgObj> for RunArgSettingDto {
             game_args: r.game_args.clone().unwrap_or_default(),
             jvm_env: r.jvm_env.clone().unwrap_or_default(),
             isolate_home: r.isolate_home.unwrap_or(true),
+            mml_env: r.mml_env.unwrap_or(true),
             gc_mode: gc_to_str(r.gc_mode.unwrap_or(GCType::Auto)),
             min_memory: r.min_memory.unwrap_or(512),
             max_memory: r.max_memory.unwrap_or(4096),
@@ -92,6 +95,7 @@ impl From<RunArgSettingDto> for RunArgObj {
             game_args: Some(d.game_args),
             jvm_env: Some(d.jvm_env),
             isolate_home: Some(d.isolate_home),
+            mml_env: Some(d.mml_env),
             gc_mode: Some(gc_from_str(&d.gc_mode)),
             max_memory: Some(d.max_memory),
             min_memory: Some(d.min_memory),

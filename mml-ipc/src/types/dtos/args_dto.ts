@@ -23,6 +23,7 @@ export type InstanceArgsDto = {
   classPath: string[],
   envVars: EnvVarLineDto[],
   isolateHome: boolean,
+  mmlEnv: boolean,
   lang: string,
   logEncoding: string,
   preEnabled: boolean,

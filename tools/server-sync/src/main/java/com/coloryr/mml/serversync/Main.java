@@ -40,13 +40,24 @@ public final class Main {
                     : options.stateDir.toAbsolutePath().normalize();
             Files.createDirectories(options.gameDir);
             Files.createDirectories(options.baseDir);
-            new Sync(options).run();
+            Log.open(options.logFile == null
+                    ? options.stateDir.resolve(Log.FILE_NAME)
+                    : options.logFile.toAbsolutePath().normalize());
+            Log.info("开始同步，游戏目录 " + options.gameDir);
+            try {
+                new Sync(options).run();
+            } catch (Exception e) {
+                Log.error("同步失败: " + e.getMessage());
+                throw e;
+            } finally {
+                Log.close();
+            }
         } catch (UsageException e) {
-            System.err.println("参数错误: " + e.getMessage());
-            System.err.println("使用 --help 查看用法");
+            System.err.println(Log.PREFIX + "参数错误: " + e.getMessage());
+            System.err.println(Log.PREFIX + "使用 --help 查看用法");
             System.exit(2);
         } catch (Exception e) {
-            System.err.println("同步失败: " + e.getMessage());
+            System.err.println(Log.PREFIX + "同步失败: " + e.getMessage());
             System.exit(1);
         }
     }
@@ -86,6 +97,8 @@ public final class Main {
                 options.stateDir = Paths.get(arg.substring("--state-dir=".length()));
             } else if (arg.startsWith("--curseforge-api-key=")) {
                 options.apiKey = arg.substring("--curseforge-api-key=".length());
+            } else if (arg.startsWith("--log=")) {
+                options.logFile = Paths.get(arg.substring("--log=".length()));
             } else if ("--manifest".equals(arg) || "-m".equals(arg)) {
                 options.manifest = value(args, ++i, arg);
             } else if ("--game-dir".equals(arg) || "-g".equals(arg)) {
@@ -96,6 +109,8 @@ public final class Main {
                 options.stateDir = Paths.get(value(args, ++i, arg));
             } else if ("--curseforge-api-key".equals(arg)) {
                 options.apiKey = value(args, ++i, arg);
+            } else if ("--log".equals(arg)) {
+                options.logFile = Paths.get(value(args, ++i, arg));
             } else if (!arg.startsWith("-")) {
                 throw new UsageException("不认识的参数: " + arg);
             } else {
@@ -124,7 +139,7 @@ public final class Main {
         System.out.println();
         System.out.println("Java Agent（推荐）:");
         System.out.println("  -javaagent:mml-server-sync.jar=<server.json 的 URL>");
-        System.out.println("  MML 启动器启动时自动跳过；游戏工作目录必须是 .minecraft。");
+        System.out.println("  MML 启动器启动时自动跳过，MML_SKIP=true 可强制不跳过；游戏工作目录必须是 .minecraft。");
         System.out.println();
         System.out.println("命令行用法:");
         System.out.println("  java -jar mml-server-sync.jar --manifest <URL|文件> --game-dir <目录> [选项]");
@@ -138,6 +153,7 @@ public final class Main {
         System.out.println("  --dry-run           只打印计划，不下载/删除/解压");
         System.out.println("  --no-delete         不删除旧文件/旧配置目录");
         System.out.println("  --curseforge-api-key CurseForge API Key；缺省读 CURSEFORGE_API_KEY");
+        System.out.println("  --log               同步日志文件；默认 <状态目录>/mml-server-sync.log");
         System.out.println("  --quiet             少输出");
         System.out.println("  --version           显示版本");
         System.out.println("  --help, -h          显示帮助");
@@ -151,6 +167,7 @@ public final class Main {
         System.out.println("  - 只读取 MML server.json 的 Files / Archives / Base。");
         System.out.println("  - CurseForge 没有 URL 时用 fileId 推 CDN；Modrinth 用公开 API 查地址。");
         System.out.println("  - 只支持 zip 配置包；生成器的 Archives / Base 都是 zip。");
+        System.out.println("  - 环境变量 MML_SKIP=true 跳过 MML 启动器识别。");
         System.out.println("  - 会删除旧清单里有、当前清单没有的受管文件；不碰清单外的用户文件。");
     }
 

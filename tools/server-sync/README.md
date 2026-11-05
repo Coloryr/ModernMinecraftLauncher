@@ -20,25 +20,28 @@ MML 服务器实例专用更新器，只读取 MML 生成的 `server.json`，同
 - 状态目录可用 `-Dmml.serverSync.stateDir=...` 或环境变量 `MML_SERVER_SYNC_STATE_DIR` 覆盖。
 - 需要忽略 `PackVersion` 强制检查时，加 `-Dmml.serverSync.force=true` 或环境变量
   `MML_SERVER_SYNC_FORCE=1`。
+- 需要在 MML 启动器下强制走同步时，设环境变量 `MML_SKIP=true`，跳过 MML 识别。
 - CurseForge API Key 读环境变量 `CURSEFORGE_API_KEY`。
 - 识别到 MML 启动器会直接跳过，不重复同步。
+- 同步日志写在 `<状态目录>/mml-server-sync.log`，每行以 `[MML-SERVER-SYNC]` 开头，
+  日志文件可用 `-Dmml.serverSync.log=...` 覆盖。
 - 命令行模式仍然可用，见下文；两种模式共用同一个 jar。
 
 ### 怎么识别 MML 启动器
 
-按顺序检查：
+先看环境变量 `MML_SKIP`：为真时整段检查都不做，直接按非 MML 启动器同步。
+否则按顺序检查：
 
-1. 环境变量 `MML_LAUNCHER=1`（部分构建 / 启动器配置可能不传）；
-2. JVM 属性 `-Dmml.launcher=1`；
-3. **MML 自己写的 ARG_ 启动变量**：
+1. JVM 属性 `-Dmml.launcher=1`；
+2. **MML 自己写的 ARG_ 启动变量**：
    - `ARG_GAME_DIR` 与当前游戏目录一致；
    - `ARG_GAME_BASE_DIR` 与游戏目录的父目录一致；
    - `ARG_GAME_UUID` / `ARG_GAME_NAME` 非空时进一步确认。
-4. **MML 的默认用户目录隔离**：
+3. **MML 的默认用户目录隔离**：
    - `HOME`、`USERPROFILE`、`APPDATA`、`LOCALAPPDATA` 指向实例根目录；
    - `XDG_CONFIG_HOME` / `XDG_DATA_HOME` / `XDG_CACHE_HOME` 位于实例根目录下；
    - agent 用「游戏目录的父目录」和这些环境变量比对。
-5. Java 9+ 反射读取父进程命令行，匹配 `mml-gui` / `ModernMinecraftLauncher` /
+4. Java 9+ 反射读取父进程命令行，匹配 `mml-gui` / `ModernMinecraftLauncher` /
    `mml_launcher`。
 
 MML 启动游戏时会写入：
@@ -53,10 +56,9 @@ ARG_GAME_DIR
 ARG_GAME_BASE_DIR
 ```
 
-Agent 用 `ARG_GAME_DIR` / `ARG_GAME_BASE_DIR` 做路径匹配，不依赖 `MML_LAUNCHER` 是否被转发。
+Agent 用 `ARG_GAME_DIR` / `ARG_GAME_BASE_DIR` 做路径匹配，不依赖某个开关是否被转发。
 Java 8 没有 `ProcessHandle`，靠第 1–3 条；只要 MML 开着默认用户目录隔离就能识别。
-如果要在非 MML 启动器里强行测试更新，把 `MML_LAUNCHER` 设为空或 `0`，并避免把
-`HOME` / `APPDATA` 指向实例根目录。
+如果要在 MML 启动器里强行测试更新，把 `MML_SKIP` 设为 `true`。
 
 ## 要求
 
@@ -137,6 +139,7 @@ java -jar mml-server-sync.jar -m ./server.json -g ./Instance/game --base-dir ./I
 | `--dry-run` | 只打印计划，不下载、不删除、不解压 |
 | `--no-delete` | 不删除旧清单里已移除的受管文件 / 目录 |
 | `--quiet` | 少输出 |
+| `--log` | 同步日志文件；默认 `<state-dir>/mml-server-sync.log` |
 
 退出码：`0` 成功或版本未变跳过，`1` 同步失败，`2` 参数错误。
 
@@ -175,6 +178,7 @@ if errorlevel 1 exit /b 1
 
 ```text
 <game-dir>/.mml-server-sync/last-manifest.json
+<game-dir>/.mml-server-sync/mml-server-sync.log
 ```
 
 第一次运行时如果状态不存在，会尝试用实例根目录的 `server.json` 作为旧清单；之后只读写

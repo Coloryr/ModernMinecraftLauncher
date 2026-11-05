@@ -34,6 +34,7 @@ const ARGS_DEFAULTS: InstanceArgsDto = {
   classPath: [],
   envVars: [],
   isolateHome: true,
+  mmlEnv: true,
   lang: "zh_cn",
   logEncoding: "utf8",
   preEnabled: false,

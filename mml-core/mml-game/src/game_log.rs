@@ -128,6 +128,19 @@ pub enum GameLog {
     GameLog(GameLogObj),
     /// 运行库输出，值是运行库文件路径
     RuntimeLib(PathBuf),
+    /// 实例设置里的附加 JVM 参数，占位符已替换
+    ExtraJvmArg(String),
+    /// 实例设置里的附加游戏参数，占位符已替换
+    ExtraGameArg(String),
+    /// 实例设置里的附加 classpath，已按平台拼好
+    ExtraClassPath(String),
+    /// 传给游戏进程的环境变量
+    EnvVar {
+        /// 变量名
+        key: String,
+        /// 变量值
+        value: String,
+    },
     /// 日志已重定向到文件
     JavaRedirect,
     /// Java 切换回启动器查找
@@ -140,6 +153,8 @@ pub enum GameLog {
     CheckGameFileTime(Duration),
     /// 文件下载用时
     DownloadFileTime(Duration),
+    /// 完整启动命令行之前的说明行
+    LaunchArgsStart,
     /// 启动参数
     LaunchArgs(String),
     /// Java 路径

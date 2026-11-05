@@ -54,6 +54,8 @@ pub struct InstanceArgsDto {
     pub env_vars: Vec<EnvVarLineDto>,
     /// 是否把 HOME / APPDATA / XDG 等系统目录隔离到实例目录
     pub isolate_home: bool,
+    /// 是否把 MML 环境变量（MML_LAUNCHER / ARG_*）传给游戏进程
+    pub mml_env: bool,
     /// 游戏内语言
     pub lang: String,
     /// 日志编码：utf8 / gbk
@@ -108,6 +110,7 @@ impl Default for InstanceArgsDto {
             class_path: Vec::new(),
             env_vars: Vec::new(),
             isolate_home: true,
+            mml_env: true,
             lang: "zh_cn".into(),
             log_encoding: "utf8".into(),
             pre_enabled: false,

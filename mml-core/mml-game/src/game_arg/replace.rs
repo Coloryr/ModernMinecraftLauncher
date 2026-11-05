@@ -96,6 +96,7 @@ impl InstanceSettingObj {
     ///
     /// 自定义 JVM 参数、游戏参数与附加 classpath 都从这里过一遍：用户会写
     /// `-javaagent:%GAME_BASE_DIR%/xxx.jar=...`，原样交给 JVM 就是一个不存在的文件。
+    /// 路径占位符后面接的那一截按平台换分隔符，同一个参数里的 URL 不受影响。
     ///
     /// - `jvm`: 实际使用的 Java 路径，`%JAVA_LOCAL%` 用它
     /// - `item`: 待替换的参数
@@ -105,18 +106,18 @@ impl InstanceSettingObj {
     /// 替换后的参数。`%JAVA_ARG%` 不在这里处理：它要展开成整条 JVM 参数，
     /// 写在 JVM 参数自己里面会自我引用，只有启动前 / 后命令用得上。
     pub(super) fn replace_custom_arg(&self, jvm: &Path, item: &str) -> String {
-        item.replace(names::ARG_GAME_NAME, &self.name)
-            .replace(names::ARG_GAME_UUID, &self.uuid.to_string())
-            .replace(names::ARG_GAME_DIR, &self.get_game_path().to_string_lossy())
-            .replace(
-                names::ARG_GAME_BASE_DIR,
-                &self.get_base_path().to_string_lossy(),
-            )
-            .replace(
-                names::ARG_LAUNCHER_DIR,
-                &mml_base::get_base_dir().to_string_lossy(),
-            )
-            .replace(names::ARG_JAVA_LOCAL, &jvm.to_string_lossy())
+        let mut out = item
+            .replace(names::ARG_GAME_NAME, &self.name)
+            .replace(names::ARG_GAME_UUID, &self.uuid.to_string());
+        for (var, path) in [
+            (names::ARG_GAME_DIR, self.get_game_path()),
+            (names::ARG_GAME_BASE_DIR, self.get_base_path()),
+            (names::ARG_LAUNCHER_DIR, mml_base::get_base_dir()),
+            (names::ARG_JAVA_LOCAL, jvm.to_path_buf()),
+        ] {
+            out = replace_path_var(&out, var, &path.to_string_lossy());
+        }
+        out
     }
 
     /// 替换启动前 / 后命令里的占位符
@@ -131,5 +132,71 @@ impl InstanceSettingObj {
     pub fn replace_arg(&self, jvm: &Path, arg: &Vec<String>, item: &str) -> String {
         self.replace_custom_arg(jvm, item)
             .replace(names::ARG_JAVA_ARG, &tools::build_vec_string(arg))
+    }
+}
+
+/// 把路径占位符换成真实路径，并把后面跟着的相对路径换成平台分隔符
+///
+/// `-javaagent:%GAME_BASE_DIR%/x.jar=https://a/b` 里只有占位符到 `=` 之间是路径，
+/// 整条参数一起换会把 URL 里的 `/` 也改掉。
+///
+/// - `text`: 待替换的参数
+/// - `var`: 占位符
+/// - `value`: 占位符对应的路径
+///
+/// # 返回值
+///
+/// 替换后的参数
+fn replace_path_var(text: &str, var: &str, value: &str) -> String {
+    let mut out = String::with_capacity(text.len() + value.len());
+    let mut rest = text;
+    while let Some(index) = rest.find(var) {
+        out.push_str(&rest[..index]);
+        out.push_str(value);
+        rest = &rest[index + var.len()..];
+        let end = path_end(rest);
+        let (segment, tail) = rest.split_at(end);
+        out.push_str(&native_path(segment));
+        rest = tail;
+    }
+    out.push_str(rest);
+    out
+}
+
+/// 紧跟占位符的路径到哪儿结束
+///
+/// 未加引号时空白、`=`、`;`、`,` 与下一个占位符都算结束，引号里的空白不算。
+///
+/// - `text`: 占位符之后的文本
+///
+/// # 返回值
+///
+/// 路径段的字节长度
+fn path_end(text: &str) -> usize {
+    let mut quoted = false;
+    for (index, c) in text.char_indices() {
+        match c {
+            '"' | '\'' => quoted = !quoted,
+            c if !quoted && (c.is_whitespace() || matches!(c, '=' | ';' | ',' | '%')) => {
+                return index;
+            }
+            _ => {}
+        }
+    }
+    text.len()
+}
+
+/// 把一段路径里的分隔符换成当前平台的写法
+///
+/// - `path`: 路径段
+///
+/// # 返回值
+///
+/// Windows 上 `/` 换 `\`，其它平台 `\` 换 `/`
+fn native_path(path: &str) -> String {
+    if cfg!(windows) {
+        path.replace('/', "\\")
+    } else {
+        path.replace('\\', "/")
     }
 }

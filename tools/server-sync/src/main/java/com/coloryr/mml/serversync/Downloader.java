@@ -126,7 +126,7 @@ final class Downloader {
         }
         if (Files.isRegularFile(target) && matches(target, sha1, sha256)) {
             if (!quiet) {
-                System.out.println("[skip] " + target);
+                Log.info("[skip] " + target);
             }
             return false;
         }
@@ -163,7 +163,7 @@ final class Downloader {
                 Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
             }
             if (!quiet) {
-                System.out.println("[down] " + target);
+                Log.info("[down] " + target);
             }
             return true;
         } finally {

@@ -22,6 +22,7 @@ use uuid::Uuid;
 
 use crate::game_launch::{AutoJoinType, GameLaunchArg, GameRunObj, InstanceHandle};
 use crate::launcher::LogEncoding;
+use crate::launcher::instance_setting_obj::AdvanceJvmObj;
 use crate::test_support::{boot, run_log_texts};
 
 /// 取全局配置锁，改配置与读配置的用例串行
@@ -144,9 +145,10 @@ fn custom_arg_placeholders_replaced() {
     let args = instance.make_run_arg(Path::new("java-bin"), &launch_arg, &mut obj, false);
     let base = instance.get_base_path().to_string_lossy().to_string();
     let dir = instance.get_game_path().to_string_lossy().to_string();
+    let sep = std::path::MAIN_SEPARATOR;
     assert!(
         args.contains(&format!(
-            "-javaagent:{base}/mml-server-sync.jar=http://a"
+            "-javaagent:{base}{sep}mml-server-sync.jar=http://a"
         )),
         "JVM 参数里的占位符没换: {args:?}"
     );
@@ -158,6 +160,124 @@ fn custom_arg_placeholders_replaced() {
         !args.iter().any(|arg| arg.contains('%')),
         "命令行里还有没替换的占位符: {args:?}"
     );
+}
+
+/// 占位符后面那截路径按平台换分隔符，同一参数里的 URL 原样保留
+#[test]
+fn custom_arg_separator_follows_platform() {
+    let _guard = setup();
+    let instance = instance(RunArgObj::default());
+    let base = instance.get_base_path().to_string_lossy().to_string();
+    let dir = instance.get_game_path().to_string_lossy().to_string();
+    let sep = std::path::MAIN_SEPARATOR;
+
+    let jvm = Path::new("java-bin");
+    let out = instance.replace_custom_arg(
+        jvm,
+        "-javaagent:%GAME_BASE_DIR%/libs/agent.jar=https://api.example.com/a/b.json",
+    );
+    assert_eq!(
+        out,
+        format!("-javaagent:{base}{sep}libs{sep}agent.jar=https://api.example.com/a/b.json")
+    );
+
+    // 从别的平台拷来的配置反着写也认
+    let out = instance.replace_custom_arg(jvm, "-Ddir=%GAME_DIR%\\config\\x.json");
+    assert_eq!(out, format!("-Ddir={dir}{sep}config{sep}x.json"));
+}
+
+/// 启动时把附加 JVM 参数、游戏参数、classpath 与环境变量写进日志
+#[test]
+fn extra_args_logged() {
+    let _guard = setup();
+    let mut obj = instance(RunArgObj {
+        jvm_args: Some("-Dfoo=%GAME_DIR%/cfg".to_string()),
+        game_args: Some("--width 1280".to_string()),
+        ..Default::default()
+    });
+    obj.advance_jvm = Some(AdvanceJvmObj {
+        class_path: Some("%GAME_BASE_DIR%/extra/classes".to_string()),
+        ..Default::default()
+    });
+    let uuid = obj.uuid;
+    let dir = obj.get_game_path().to_string_lossy().to_string();
+    let base = obj.get_base_path().to_string_lossy().to_string();
+    let sep = std::path::MAIN_SEPARATOR;
+
+    let launch_arg = GameLaunchArg {
+        auth: LoginObj::default(),
+        auto: AutoJoinType::None,
+        admin: false,
+        mixin: None,
+        skip_server_pack: false,
+    };
+    let mut launch = GameLaunchObj {
+        main_class: "Main".to_string(),
+        ..Default::default()
+    };
+    obj.make_run_arg(Path::new("java-bin"), &launch_arg, &mut launch, false);
+
+    let mut env = obj.make_env_arg();
+    obj.add_launcher_env(&mut env, Path::new("java-bin"), &[]);
+    obj.log_launch_env(&env);
+
+    let logs = {
+        let logs = crate::RUNTIME_LOGS.read().unwrap();
+        logs.get(&uuid)
+            .expect("生成启动参数就应当有运行日志")
+            .logs
+            .read()
+            .unwrap()
+            .clone()
+    };
+
+    let mut jvm = Vec::new();
+    let mut game = Vec::new();
+    let mut class_path = Vec::new();
+    let mut envs = Vec::new();
+    for item in logs.iter() {
+        match &item.log {
+            GameLog::ExtraJvmArg(arg) => jvm.push(arg.clone()),
+            GameLog::ExtraGameArg(arg) => game.push(arg.clone()),
+            GameLog::ExtraClassPath(path) => class_path.push(path.clone()),
+            GameLog::EnvVar { key, value } => envs.push((key.clone(), value.clone())),
+            _ => {}
+        }
+    }
+
+    assert_eq!(jvm, vec![format!("-Dfoo={dir}{sep}cfg")], "附加 JVM 参数要记一行");
+    assert_eq!(game, vec!["--width 1280".to_string()], "附加游戏参数要记一行");
+    assert_eq!(class_path.len(), 1, "附加 classpath 要记一行: {class_path:?}");
+    assert!(
+        class_path[0].ends_with(&format!("extra{sep}classes")),
+        "附加 classpath 应是替换后的路径: {class_path:?}"
+    );
+    assert!(
+        envs.iter()
+            .any(|(key, value)| key == "ARG_GAME_BASE_DIR" && value == &base),
+        "环境变量要按名字记下来: {envs:?}"
+    );
+}
+
+/// MML 环境变量默认写入，关掉后 MML_LAUNCHER 与 ARG_* 整组不给
+#[test]
+fn mml_env_toggle() {
+    let _guard = setup();
+    let on = instance(RunArgObj::default());
+    let mut env = on.make_env_arg();
+    assert_eq!(env.get("MML_LAUNCHER").map(String::as_str), Some("1"));
+    on.add_launcher_env(&mut env, Path::new("java"), &[]);
+    assert!(env.contains_key("ARG_GAME_BASE_DIR"));
+
+    let off = instance(RunArgObj {
+        mml_env: Some(false),
+        ..Default::default()
+    });
+    let mut env = off.make_env_arg();
+    off.add_launcher_env(&mut env, Path::new("java"), &[]);
+    assert!(!env.contains_key("MML_LAUNCHER"));
+    assert!(!env.contains_key("MML_LAUNCHER_VERSION"));
+    assert!(!env.keys().any(|key| key.starts_with("ARG_")));
 }
 
 /// 隔离用户目录：HOME / APPDATA 指到实例目录，并补 `user.home`

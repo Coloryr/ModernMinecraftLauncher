@@ -178,6 +178,41 @@ pub(crate) fn log_line_from_item(item: &GameLogItemObj) -> LogLine {
             String::new(),
             String::new(),
         ),
+        GameLog::ExtraJvmArg(arg) => (
+            item_time(item),
+            LogText::LogExtraJvmArg { arg: arg.clone() }.text(),
+            String::new(),
+            String::new(),
+            String::new(),
+        ),
+        GameLog::ExtraGameArg(arg) => (
+            item_time(item),
+            LogText::LogExtraGameArg { arg: arg.clone() }.text(),
+            String::new(),
+            String::new(),
+            String::new(),
+        ),
+        GameLog::ExtraClassPath(path) => (
+            item_time(item),
+            LogText::LogExtraClassPath {
+                path: path.clone(),
+            }
+            .text(),
+            String::new(),
+            String::new(),
+            String::new(),
+        ),
+        GameLog::EnvVar { key, value } => (
+            item_time(item),
+            LogText::LogEnvVar {
+                key: key.clone(),
+                value: value.clone(),
+            }
+            .text(),
+            String::new(),
+            String::new(),
+            String::new(),
+        ),
         GameLog::JavaRedirect => (
             item_time(item),
             LogText::LogJavaRedirect.text(),
@@ -258,6 +293,13 @@ pub(crate) fn log_line_from_item(item: &GameLogItemObj) -> LogLine {
                 secs: d.as_secs_f64(),
             }
             .text(),
+            String::new(),
+            String::new(),
+            String::new(),
+        ),
+        GameLog::LaunchArgsStart => (
+            item_time(item),
+            LogText::LogLaunchArgsStart.text(),
             String::new(),
             String::new(),
             String::new(),

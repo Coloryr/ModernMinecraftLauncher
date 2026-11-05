@@ -214,6 +214,7 @@ impl InstanceSettingObj {
         }
 
         let mut libs = self.get_libs(obj);
+        let mut extra_class_path: Vec<PathBuf> = Vec::new();
         if let Some(jvm) = &self.advance_jvm
             && let Some(classpath) = &jvm.class_path
             && !classpath.is_empty()
@@ -236,6 +237,7 @@ impl InstanceSettingObj {
                     // 存在即可：这里既可能是 jar，也可能是一个类目录（advance_jvm 的 ClassPath
                     // 常被填成编译输出目录），只认 is_file 会把目录整条丢掉
                     if !check || path.exists() {
+                        extra_class_path.push(path.clone());
                         libs.push(path);
                     }
                 }
@@ -256,6 +258,13 @@ impl InstanceSettingObj {
             }
         }
         let classpath = classpath_parts.join(&sep.to_string());
+
+        for path in &extra_class_path {
+            crate::add_game_log_item(
+                &self.uuid,
+                GameLog::ExtraClassPath(path.display().to_string()),
+            );
+        }
 
         let mut args = Vec::new();
         self.replace_all_value(
@@ -279,11 +288,47 @@ impl InstanceSettingObj {
             *item = self.replace_custom_arg(jvm, item);
         }
 
+        // 附加参数按替换后的值记录，日志里看到的就是真正交给 JVM 的那几条
+        self.log_extra_args(jvm);
+
         args.extend(obj.jvm_args.clone());
         args.push(obj.main_class.clone());
         args.extend(obj.game_args.clone());
 
         args
+    }
+
+    /// 输出实例设置里的附加 JVM 参数与游戏参数
+    ///
+    /// 只记用户填的那几条，版本 JSON 与加载器生成的不算；占位符已替换。
+    ///
+    /// - `jvm`: 实际使用的 Java 路径
+    fn log_extra_args(&self, jvm: &Path) {
+        let config = mml_config::read_config();
+        let jvm_args = self
+            .jvm_arg
+            .as_ref()
+            .and_then(|arg| arg.jvm_args.as_deref())
+            .or(config.jvm_arg.jvm_args.as_deref())
+            .unwrap_or("");
+        for line in jvm_args.lines().map(str::trim).filter(|line| !line.is_empty()) {
+            crate::add_game_log_item(
+                &self.uuid,
+                GameLog::ExtraJvmArg(self.replace_custom_arg(jvm, line)),
+            );
+        }
+
+        let game_args = self
+            .jvm_arg
+            .as_ref()
+            .and_then(|arg| arg.game_args.as_deref())
+            .unwrap_or("");
+        for line in game_args.lines().map(str::trim).filter(|line| !line.is_empty()) {
+            crate::add_game_log_item(
+                &self.uuid,
+                GameLog::ExtraGameArg(self.replace_custom_arg(jvm, line)),
+            );
+        }
     }
 
     /// 获取启动主类

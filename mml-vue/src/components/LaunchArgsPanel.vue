@@ -413,6 +413,12 @@ const gcOptions = computed(() => [
             <BaseSwitch :model-value="args.isolateHome" @update:model-value="update({ isolateHome: $event })" />
           </div>
 
+          <!-- MML 环境变量：MML_LAUNCHER / ARG_* 是否随启动传给游戏 -->
+          <div class="args-row">
+            <span class="args-label" v-tip="t('args.mmlEnvDesc')">{{ t("args.mmlEnv") }}</span>
+            <BaseSwitch :model-value="args.mmlEnv" @update:model-value="update({ mmlEnv: $event })" />
+          </div>
+
           <!-- 附加环境变量（键值对） -->
           <label class="args-label">{{ t("args.env") }}</label>
           <div v-for="(line, i) in args.envVars" :key="i" class="line-row">

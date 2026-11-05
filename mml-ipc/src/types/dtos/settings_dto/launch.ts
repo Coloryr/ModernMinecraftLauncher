@@ -7,6 +7,7 @@ export type RunArgSettingDto = {
   gameArgs: string,
   jvmEnv: string,
   isolateHome: boolean,
+  mmlEnv: boolean,
   gcMode: string,
   minMemory: number,
   maxMemory: number,

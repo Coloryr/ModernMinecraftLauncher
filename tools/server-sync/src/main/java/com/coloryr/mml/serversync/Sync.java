@@ -303,13 +303,13 @@ final class Sync {
 
     private void progress(int done, int total) {
         if (!options.quiet && total > 0) {
-            System.out.println("[progress] " + done + "/" + total);
+            Log.info("[progress] " + done + "/" + total);
         }
     }
 
     private void info(String message) {
         if (!options.quiet) {
-            System.out.println("[info] " + message);
+            Log.info(message);
         }
     }
 

@@ -224,6 +224,14 @@ watch(memoryConflict, async (bad) => {
         </div>
       </div>
 
+      <div class="switch-row">
+        <div class="switch-text">
+          <span class="switch-label">{{ t("winSettings.mmlEnv") }}</span>
+          <span class="switch-state">{{ t("winSettings.mmlEnvDesc") }}</span>
+        </div>
+        <BaseSwitch v-model="run!.mmlEnv" />
+      </div>
+
       <label class="field-label">{{ t("winSettings.jvmEnv") }}</label>
       <div class="dns-lines">
         <div v-for="(_, i) in envLines" :key="i" class="line-row">

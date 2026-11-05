@@ -11,14 +11,17 @@ import java.util.Optional;
  *
  * 用法：-javaagent:mml-server-sync.jar=http://example.com/server.json
  * agent 在游戏 main 之前执行同步；如果认出是 MML 启动器，直接跳过。
+ * 设环境变量 MML_SKIP=true 可以强制跳过这段识别，用于在 MML 下验证同步。
  */
 public final class Agent {
     private Agent() {}
 
     public static void premain(String agentArgs, Instrumentation instrumentation) {
         Path gameDir = gameDir();
-        if (isMmlLauncher(gameDir)) {
-            System.out.println("[mml-server-sync] 检测到 MML 启动器，跳过服务器包同步");
+        if (skipLauncherCheck()) {
+            System.out.println(Log.PREFIX + "MML_SKIP 已设置，跳过 MML 启动器检查");
+        } else if (isMmlLauncher(gameDir)) {
+            System.out.println(Log.PREFIX + "检测到 MML 启动器，跳过服务器包同步");
             return;
         }
         String manifest = agentArgs == null ? "" : agentArgs.trim();
@@ -36,9 +39,18 @@ public final class Agent {
                     || truthy(System.getenv("MML_SERVER_SYNC_FORCE"));
             String apiKey = System.getenv("CURSEFORGE_API_KEY");
             options.apiKey = apiKey == null ? "" : apiKey.trim();
-            new Sync(options).run();
+            options.logFile = logFile(options.stateDir);
+            Log.open(options.logFile);
+            Log.info("开始同步，游戏目录 " + gameDir);
+            try {
+                new Sync(options).run();
+            } catch (Exception e) {
+                Log.error("更新失败: " + e.getMessage());
+                throw e;
+            } finally {
+                Log.close();
+            }
         } catch (Exception e) {
-            System.err.println("[mml-server-sync] 更新失败: " + e.getMessage());
             throw new RuntimeException("mml-server-sync 更新失败，已中止游戏启动", e);
         }
     }
@@ -55,6 +67,15 @@ public final class Agent {
         return Paths.get(System.getProperty("user.dir", ".")).toAbsolutePath().normalize();
     }
 
+    /** 日志文件路径：JVM 属性可覆盖，默认放在状态目录下。 */
+    private static Path logFile(Path stateDir) {
+        String property = System.getProperty("mml.serverSync.log", "").trim();
+        if (!property.isEmpty()) {
+            return Paths.get(property).toAbsolutePath().normalize();
+        }
+        return stateDir.resolve(Log.FILE_NAME);
+    }
+
     private static Path stateDir(Path gameDir) {
         String property = System.getProperty("mml.serverSync.stateDir", "").trim();
         if (!property.isEmpty()) {
@@ -67,11 +88,13 @@ public final class Agent {
         return gameDir.resolve(".mml-server-sync");
     }
 
+    /** 是否强制跳过 MML 启动器识别，由环境变量 MML_SKIP 控制。 */
+    private static boolean skipLauncherCheck() {
+        return truthy(System.getenv("MML_SKIP"));
+    }
+
     /** 是否是 MML 启动器起的游戏进程。 */
     static boolean isMmlLauncher(Path gameDir) {
-        if (truthy(System.getenv("MML_LAUNCHER"))) {
-            return true;
-        }
         if (truthy(System.getProperty("mml.launcher"))) {
             return true;
         }
@@ -98,7 +121,7 @@ public final class Agent {
 
     /**
      * MML 会默认隔离用户目录，把 HOME / USERPROFILE / APPDATA / LOCALAPPDATA 指到实例根目录。
-     * 这是比 MML_LAUNCHER 更早、且现有 MML 版本已经在传的环境变量特征。
+     * 这是现有 MML 版本一定会传的环境变量特征。
      */
     private static boolean isolatedToInstance(Path gameDir) {
         Path instance = gameDir.getParent();

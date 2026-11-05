@@ -449,6 +449,20 @@ impl InstanceSettingObj {
         self.get_base_path()
     }
 
+    /// 是否把 MML 环境变量传给游戏进程
+    ///
+    /// 实例没有单独设置时跟随启动器设置，缺省按启用处理。
+    ///
+    /// # 返回值
+    ///
+    /// 启用返回 `true`
+    pub(crate) fn mml_env(&self) -> bool {
+        self.jvm_arg
+            .as_ref()
+            .and_then(|item| item.mml_env)
+            .unwrap_or_else(|| mml_config::read_config().jvm_arg.mml_env.unwrap_or(true))
+    }
+
     /// 创建环境变量
     ///
     /// # 返回值
@@ -457,8 +471,10 @@ impl InstanceSettingObj {
     pub(crate) fn make_env_arg(&self) -> HashMap<String, String> {
         let mut env = HashMap::new();
         // 游戏内的 Java agent 靠这两个变量识别 MML 启动，避免重复同步服务器包
-        env.insert("MML_LAUNCHER".to_string(), "1".to_string());
-        env.insert("MML_LAUNCHER_VERSION".to_string(), mml_names::VERSION.clone());
+        if self.mml_env() {
+            env.insert("MML_LAUNCHER".to_string(), "1".to_string());
+            env.insert("MML_LAUNCHER_VERSION".to_string(), mml_names::VERSION.clone());
+        }
         // 先铺隔离路径，用户自己写的环境变量随后覆盖，手动指定优先
         if self.isolate_home() {
             let home = self.isolated_home();
@@ -515,10 +531,20 @@ impl InstanceSettingObj {
 
     /// 写入供游戏内 Java agent 识别的 MML 启动参数环境变量
     ///
+    /// 关掉「加入 MML 环境变量」时整组不写。
+    ///
     /// - `env`: 目标环境变量表
     /// - `java`: 实际使用的 Java 可执行文件
     /// - `jvm_args`: 已生成的 JVM 参数
-    fn add_launcher_env(&self, env: &mut HashMap<String, String>, java: &Path, jvm_args: &[String]) {
+    pub(crate) fn add_launcher_env(
+        &self,
+        env: &mut HashMap<String, String>,
+        java: &Path,
+        jvm_args: &[String],
+    ) {
+        if !self.mml_env() {
+            return;
+        }
         env.insert(
             "ARG_JAVA_LOCAL".to_string(),
             java.to_string_lossy().into_owned(),
@@ -541,6 +567,23 @@ impl InstanceSettingObj {
             "ARG_GAME_BASE_DIR".to_string(),
             self.get_base_path().to_string_lossy().into_owned(),
         );
+    }
+
+    /// 输出这次启动传给游戏进程的环境变量，按变量名排序
+    ///
+    /// - `env`: 已经拼好的环境变量表
+    pub(crate) fn log_launch_env(&self, env: &HashMap<String, String>) {
+        let mut keys: Vec<&String> = env.keys().collect();
+        keys.sort();
+        for key in keys {
+            crate::add_game_log_item(
+                &self.uuid,
+                GameLog::EnvVar {
+                    key: key.clone(),
+                    value: env[key].clone(),
+                },
+            );
+        }
     }
 
     /// 检查服务器包更新
@@ -880,6 +923,7 @@ impl InstanceSettingObj {
         let args = self.make_run_arg(&java, &arg, &mut obj, false);
         let mut env = self.make_env_arg();
         self.add_launcher_env(&mut env, &java, &obj.jvm_args);
+        self.log_launch_env(&env);
 
         Ok(LaunchCmd {
             java,
@@ -990,6 +1034,7 @@ impl InstanceSettingObj {
         let jvm_arg = self.make_run_arg(&jvm, &arg, &mut obj, true);
 
         crate::add_game_log_item(&self.uuid, GameLog::JavaPath(jvm.clone()));
+        crate::add_game_log_item(&self.uuid, GameLog::LaunchArgsStart);
 
         let mut hide = false;
 
@@ -1016,6 +1061,7 @@ impl InstanceSettingObj {
 
         let mut env = self.make_env_arg();
         self.add_launcher_env(&mut env, &jvm, &obj.jvm_args);
+        self.log_launch_env(&env);
 
         if cancel.is_cancelled() {
             return Err(ErrorType::TaskCancel);

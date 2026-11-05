@@ -271,6 +271,28 @@ pub enum LogText {
         /// 运行库文件路径
         path: String,
     },
+    /// 日志窗口：附加 JVM 参数
+    LogExtraJvmArg {
+        /// 参数文本，占位符已替换
+        arg: String,
+    },
+    /// 日志窗口：附加游戏参数
+    LogExtraGameArg {
+        /// 参数文本，占位符已替换
+        arg: String,
+    },
+    /// 日志窗口：附加 classpath
+    LogExtraClassPath {
+        /// classpath 条目
+        path: String,
+    },
+    /// 日志窗口：传给游戏进程的环境变量
+    LogEnvVar {
+        /// 变量名
+        key: String,
+        /// 变量值
+        value: String,
+    },
     /// 日志窗口：Java 输出已重定向
     LogJavaRedirect,
     /// 日志窗口：Java 改回本地查找
@@ -310,6 +332,8 @@ pub enum LogText {
         /// 耗时，单位秒
         secs: f64,
     },
+    /// 日志窗口：完整启动命令行之前的说明
+    LogLaunchArgsStart,
     /// 日志窗口：实际用的 Java 路径
     LogJavaPath {
         /// Java 可执行文件路径
@@ -812,6 +836,10 @@ impl LogText {
                 skipped,
             } => format!("资源映射：处理完成 映射={mapped} 失败={failed} 跳过={skipped}"),
             LogText::LogRuntimeLib { path } => format!("运行库：{path}"),
+            LogText::LogExtraJvmArg { arg } => format!("附加 JVM 参数：{arg}"),
+            LogText::LogExtraGameArg { arg } => format!("附加游戏参数：{arg}"),
+            LogText::LogExtraClassPath { path } => format!("附加 classpath：{path}"),
+            LogText::LogEnvVar { key, value } => format!("环境变量：{key}={value}"),
             LogText::LogJavaRedirect => String::from("Java 输出已重定向"),
             LogText::LogJavaLocalRedirect => String::from("Java 切换回本地查找"),
             LogText::LogLoginTime { secs } => format!("登录用时：{secs:.2}s"),
@@ -852,6 +880,7 @@ impl LogText {
                 text.push_str(&format!("，共 {entries} 个条目"));
                 text
             }
+            LogText::LogLaunchArgsStart => String::from("下面是实例启动参数："),
             LogText::LogJavaPath { path } => format!("Java 路径：{path}"),
             LogText::LogCheckStart { version, loader } => {
                 format!("开始检查游戏文件：{version} / {loader}")
@@ -1149,6 +1178,12 @@ impl LogText {
                 "resource mapping: finished mapped={mapped} failed={failed} skipped={skipped}"
             ),
             LogText::LogRuntimeLib { path } => format!("runtime library: {path}"),
+            LogText::LogExtraJvmArg { arg } => format!("extra JVM arg: {arg}"),
+            LogText::LogExtraGameArg { arg } => format!("extra game arg: {arg}"),
+            LogText::LogExtraClassPath { path } => format!("extra classpath: {path}"),
+            LogText::LogEnvVar { key, value } => {
+                format!("environment variable: {key}={value}")
+            }
             LogText::LogJavaRedirect => String::from("Java output has been redirected"),
             LogText::LogJavaLocalRedirect => String::from("Java fell back to a local lookup"),
             LogText::LogLoginTime { secs } => format!("login took {secs:.2}s"),
@@ -1193,6 +1228,7 @@ impl LogText {
                 text.push_str(&format!(" ({entries} entries)"));
                 text
             }
+            LogText::LogLaunchArgsStart => String::from("Instance launch arguments:"),
             LogText::LogJavaPath { path } => format!("Java path: {path}"),
             LogText::LogCheckStart { version, loader } => {
                 format!("checking game files: {version} / {loader}")

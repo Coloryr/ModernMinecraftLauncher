@@ -8,6 +8,8 @@ final class Options {
     Path gameDir;
     Path baseDir;
     Path stateDir;
+    /** 日志文件；为空时用状态目录下的默认文件名 */
+    Path logFile;
     String apiKey = "";
     boolean force;
     boolean dryRun;

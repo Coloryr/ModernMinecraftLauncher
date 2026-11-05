@@ -85,6 +85,12 @@ pub(super) fn args_from_core(inst: &InstanceSettingObj) -> InstanceArgsDto {
         .as_ref()
         .and_then(|jvm| jvm.isolate_home)
         .unwrap_or(global_isolate);
+    // 与隔离用户目录同一口径：实例没写就跟随启动器设置
+    a.mml_env = inst
+        .jvm_arg
+        .as_ref()
+        .and_then(|jvm| jvm.mml_env)
+        .unwrap_or(global.jvm_arg.mml_env.unwrap_or(true));
     // 窗口同理：全屏 / 宽 / 高全都没设才算跟随全局
     a.window_inherit = inst
         .window
@@ -170,6 +176,7 @@ pub(super) fn apply_args_to_core(inst: &mut InstanceSettingObj, a: &InstanceArgs
             .join("\n"),
     );
     jvm.isolate_home = Some(a.isolate_home);
+    jvm.mml_env = Some(a.mml_env);
     jvm.launch_pre_run = Some(a.pre_enabled);
     jvm.pre_run_arg = Some(a.pre_cmd.clone());
     jvm.launch_post_run = Some(a.post_enabled);

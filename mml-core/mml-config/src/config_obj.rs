@@ -246,6 +246,9 @@ pub struct RunArgObj {
     /// 缺省为 `None`（按启用处理）
     #[serde(rename = "IsolateHome")]
     pub isolate_home: Option<bool>,
+    /// 是否把 MML 环境变量传给游戏进程，对应 JSON 键 `MmlEnv`，缺省为 `None`（按启用处理）
+    #[serde(rename = "MmlEnv")]
+    pub mml_env: Option<bool>,
     /// GC 模式，对应 JSON 键 `GC`，缺省为 `None`
     #[serde(rename = "GC")]
     pub gc_mode: Option<GCType>,
@@ -285,6 +288,7 @@ impl Default for RunArgObj {
             game_args: Option::None,
             jvm_env: Option::None,
             isolate_home: Option::None,
+            mml_env: Option::None,
             gc_mode: Option::None,
             max_memory: Option::None,
             min_memory: Option::None,
@@ -314,6 +318,7 @@ impl RunArgObj {
             game_args: Option::Some(String::new()),
             jvm_env: Option::Some(String::new()),
             isolate_home: Option::Some(true),
+            mml_env: Option::Some(true),
             gc_mode: Option::Some(GCType::Auto),
             max_memory: Option::Some(4096),
             min_memory: Option::Some(512),
