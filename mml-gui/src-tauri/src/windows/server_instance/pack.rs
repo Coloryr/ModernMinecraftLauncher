@@ -14,7 +14,6 @@ use mml_base::{
     archives::{ArchiveAddFile, ArchiveType, BaseArchive},
     serialize_tools,
 };
-use mml_config::config_obj::RunArgObj;
 use mml_game::{
     launcher::{ModPackType, instance_setting_obj::InstanceSettingObj},
     loader::LoaderType,
@@ -72,7 +71,31 @@ pub(super) fn export_pack(
         components: components(game),
     })
     .map_err(|e| e.to_string())?;
-    let cfg = instance_cfg(name, &manifest_url, game.jvm_arg.as_ref());
+    let icon_key = icon.as_ref().and_then(|(icon_name, _)| {
+        Path::new(icon_name)
+            .file_stem()
+            .map(|stem| stem.to_string_lossy().into_owned())
+    });
+    // 源实例的自定义参数也带上；旧的同步 agent 由下面这条新的替代
+    let mut jvm_args: Vec<String> = game
+        .jvm_arg
+        .as_ref()
+        .and_then(|jvm| jvm.jvm_args.as_deref())
+        .unwrap_or("")
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !is_sync_agent(line))
+        .map(mml_game::game_export::mmc_vars)
+        .collect();
+    jvm_args.push(format!(
+        "-javaagent:$INST_DIR/{SYNC_JAR_NAME}={manifest_url}"
+    ));
+    let cfg = mml_game::game_export::mmc_instance_cfg(
+        name,
+        icon_key.as_deref(),
+        game.jvm_arg.as_ref(),
+        &jvm_args,
+    );
     let game_json = game_json(
         game,
         name,
@@ -109,7 +132,7 @@ pub(super) fn export_pack(
             }
         }
     }
-    // 实例图标放在包根：M²L 的 game.json 按 Icon 字段找它，MMC 侧忽略
+    // 实例图标原样放在包根：M²L 的 game.json 按 Icon 字段找它，MMC 的 iconKey 就是文件名去扩展名
     if let Some((icon_name, icon_path)) = &icon {
         pending.insert(PathBuf::from(icon_name), icon_path.clone());
     }
@@ -175,46 +198,6 @@ fn components(game: &InstanceSettingObj) -> Vec<ComponentsObj> {
         });
     }
     components
-}
-
-/// MMC 的 `instance.cfg` 文本
-///
-/// agent 的地址是包内 `server.json` 的发布地址，MMC 变量 `$INST_DIR` 指向解压出来的实例目录。
-///
-/// - `name`: 服务器实例名
-/// - `manifest_url`: 包内 agent 要读的 `server.json` 地址
-/// - `jvm`: 源实例的 JVM 设置，内存上下限写进 MMC
-///
-/// # 返回值
-///
-/// 行尾为 `\n` 的 INI 文本
-fn instance_cfg(name: &str, manifest_url: &str, jvm: Option<&RunArgObj>) -> String {
-    let mut text = String::from("InstanceType=OneSix\n");
-    text.push_str("iconKey=default\n");
-    text.push_str(&format!("name={name}\n"));
-    if let Some(jvm) = jvm {
-        if let Some(max) = jvm.max_memory {
-            text.push_str(&format!("MaxMemAlloc={max}\n"));
-        }
-        if let Some(min) = jvm.min_memory {
-            text.push_str(&format!("MinMemAlloc={min}\n"));
-        }
-    }
-    // 源实例的自定义参数也带上：内存另有 MaxMemAlloc，其它开关照原样转成 MMC 变量；
-    // 旧的同步 agent 由下面这条新的替代，避免一份参数里出现两个 agent
-    let mut args: Vec<String> = jvm
-        .and_then(|jvm| jvm.jvm_args.as_deref())
-        .unwrap_or("")
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty() && !is_sync_agent(line))
-        .map(mml_game::game_export::mmc_vars)
-        .collect();
-    args.push(format!(
-        "-javaagent:$INST_DIR/{SYNC_JAR_NAME}={manifest_url}"
-    ));
-    text.push_str(&format!("JvmArgs={}\n", args.join(" ")));
-    text
 }
 
 /// 生成给 M²L 识别的 `game.json`

@@ -90,7 +90,13 @@ fn mmc_instance_cfg_converts_jvm_placeholders() {
         ..Default::default()
     };
 
-    let text = instance_cfg(&game);
+    let args = mmc_jvm_args(game.jvm_arg.as_ref());
+    let text = mmc_instance_cfg(&game.name, Some("gtnh_icon"), game.jvm_arg.as_ref(), &args);
+    assert!(text.contains("[General]"), "{text}");
+    assert!(text.contains("ConfigVersion=1.2"), "{text}");
+    assert!(text.contains("OverrideJavaArgs=true"), "{text}");
+    assert!(text.contains("OverrideMemory=true"), "{text}");
+    assert!(text.contains("iconKey=gtnh_icon"), "{text}");
     assert!(text.contains("MaxMemAlloc=4096"), "{text}");
     assert!(text.contains("MinMemAlloc=1024"), "{text}");
     assert!(

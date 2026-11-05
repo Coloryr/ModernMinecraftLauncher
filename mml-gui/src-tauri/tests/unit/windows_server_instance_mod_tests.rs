@@ -1133,12 +1133,12 @@ fn export_pack_writes_thin_and_complete_zips() {
     fs::write(game_dir.join("config").join("x.toml"), b"x = 1").unwrap();
     fs::write(game_dir.join("options.txt"), b"lang:zh_cn").unwrap();
     fs::write(instance.join("server.properties"), b"motd=test").unwrap();
-    fs::write(instance.join("icon.png"), b"icon").unwrap();
+    fs::write(instance.join("gtnh_icon.png"), b"icon").unwrap();
 
     let mut game = game();
     // 绝对路径：get_base_path / get_game_path 直接落在临时目录里
     game.dir = instance.to_string_lossy().to_string();
-    game.icon = Some(names::ICON_FILE.to_string());
+    game.icon = Some("gtnh_icon.png".to_string());
     game.jvm_name = Some("Java 17".to_string());
     game.jvm_local = Some(instance.join("java.exe").to_string_lossy().to_string());
     game.jvm_arg = Some(RunArgObj {
@@ -1171,7 +1171,7 @@ fn export_pack_writes_thin_and_complete_zips() {
         "game.json",
         "mml-server-sync.jar",
         "server.properties",
-        "icon.png",
+        "gtnh_icon.png",
     ] {
         assert!(
             thin_names.contains(&in_pack(item).as_str()),
@@ -1181,6 +1181,10 @@ fn export_pack_writes_thin_and_complete_zips() {
     assert!(
         !thin_names.contains(&in_pack(".minecraft/mods/a.jar").as_str()),
         "服务器包不该带模组: {thin_names:?}"
+    );
+    assert!(
+        !thin_names.contains(&in_pack("icon.png").as_str()),
+        "图标按原名带，不该再补 icon.png: {thin_names:?}"
     );
 
     let mmc: MMCObj = serde_json::from_slice(&thin_zip.read(&in_pack("mmc-pack.json")).unwrap())
@@ -1200,6 +1204,7 @@ fn export_pack_writes_thin_and_complete_zips() {
 
     let cfg = String::from_utf8(thin_zip.read(&in_pack("instance.cfg")).unwrap()).unwrap();
     assert!(cfg.contains("InstanceType=OneSix"));
+    assert!(cfg.contains("iconKey=gtnh_icon"), "{cfg}");
     assert!(cfg.contains("name=服务器"));
     assert!(cfg.contains("MaxMemAlloc=4096"));
     assert!(cfg.contains("MinMemAlloc=1024"));
@@ -1221,7 +1226,7 @@ fn export_pack_writes_thin_and_complete_zips() {
         Some("https://example.invalid/pack")
     );
     assert_ne!(saved.uuid, uuid::Uuid::nil());
-    assert_eq!(saved.icon.as_deref(), Some("icon.png"));
+    assert_eq!(saved.icon.as_deref(), Some("gtnh_icon.png"));
     assert!(saved.jvm_name.is_none());
     assert!(saved.jvm_local.is_none());
     let jvm_args = saved

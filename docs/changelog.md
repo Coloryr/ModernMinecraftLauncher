@@ -51,6 +51,12 @@
 - 导出 MMC 时自定义 JVM 参数原来完全没有写进 `instance.cfg`；现在会逐条写进 `JvmArgs`，并把
   `%GAME_BASE_DIR%` / `%GAME_DIR%` / `%JAVA_LOCAL%` 等换成 MMC 的 `$INST_DIR` /
   `$INST_MC_DIR` / `$INST_JAVA`（MMC 变量是单个 `$` 前缀，不带结尾 `$`）。
+- MMC 导出补上实例图标：实例有图标时按原文件名放在包根，`instance.cfg` 的 `iconKey` 用文件名
+  去掉扩展名（如 `gtnh_icon.png` → `gtnh_icon`），Prism / MultiMC 导入后能把图标装进自己的
+  图标库，不再一直是默认图标。
+- MMC 导出的 `instance.cfg` 按 MMC 的完整格式写：补上 `[General]`、`ConfigVersion`、各 Override
+  与 ManagedPack 字段，不再只有 `InstanceType` / `name` / 内存几项；Prism / MultiMC 导入后
+  设置能正常落位。
 - 自定义 JVM 参数、游戏参数与附加 classpath 里的占位符（`%GAME_BASE_DIR%`、`%GAME_DIR%`、
   `%JAVA_LOCAL%` 等）原来原样交给 JVM，`-javaagent:%GAME_BASE_DIR%/mml-server-sync.jar=...`
   因为路径里带着 `%` 而找不到 agent 文件；现在与启动前 / 后命令走同一套替换。

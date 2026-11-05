@@ -278,6 +278,10 @@ async fn mmc_and_hmcl_export_roundtrip() {
         .join("test.json");
     std::fs::create_dir_all(inst_file.parent().unwrap()).unwrap();
     std::fs::write(&inst_file, b"{}").unwrap();
+    // 实例图标：MMC 导出按原文件名放进包，iconKey 用文件名去掉扩展名
+    let icon = game.read().unwrap().get_base_path().join("gtnh_icon.png");
+    std::fs::write(&icon, b"icon").unwrap();
+    game.write().unwrap().icon = Some("gtnh_icon.png".to_string());
 
     for pack in [ExportPackType::MMC, ExportPackType::HMCL] {
         let export_file = mml_testutil::temp_dir().join(format!(
@@ -333,6 +337,22 @@ async fn mmc_and_hmcl_export_roundtrip() {
             entries.iter().any(|n| n.ends_with(game_file)),
             "{pack:?} 包内应有 {game_file}，实际: {entries:?}"
         );
+        if pack == ExportPackType::MMC {
+            assert!(
+                entries.iter().any(|n| n.ends_with("/gtnh_icon.png")),
+                "MMC 包内应有 gtnh_icon.png: {entries:?}"
+            );
+            assert!(
+                !entries.iter().any(|n| n.ends_with("/icon.png")),
+                "不该另造一份 icon.png: {entries:?}"
+            );
+            let cfg_name = entries
+                .iter()
+                .find(|n| n.ends_with("/instance.cfg"))
+                .expect("应有 instance.cfg");
+            let cfg = String::from_utf8(archive.read(cfg_name).unwrap()).unwrap();
+            assert!(cfg.contains("iconKey=gtnh_icon"), "{cfg}");
+        }
         if pack == ExportPackType::MMC {
             assert!(
                 entries.iter().any(|n| n.ends_with("patches/test.json")),
