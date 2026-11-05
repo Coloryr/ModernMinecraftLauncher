@@ -1,29 +1,29 @@
 //! Java 安装任务表
 //!
 //! 一次安装分三段：下载 zip（交给下载器）→ 解压 → 识别注册。
-//! 每段的进度与结果都记在这里，并经 `java-install-status` 事件广播给界面。
+//! 每段的进度与结果都记在这里，并经 `java-install-status` 事件广播给界面；
+//! 取消令牌也挂在任务上，界面点取消后由安装流程自己收尾。
 
 use std::{
-    sync::{
-        LazyLock, Mutex,
-        atomic::{AtomicUsize, Ordering},
-    },
+    sync::{LazyLock, Mutex},
     time::{Duration, Instant},
 };
 
-use mml_base::archives::IBaseArchiveGui;
 use tauri::{AppHandle, Emitter};
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::dtos::{JavaInstallStageDto, JavaInstallTaskDto};
 use crate::listens;
+
+use super::JavaInstallResult;
 
 /// 进度事件的节流间隔
 const EMIT_GAP: Duration = Duration::from_millis(120);
 
 /// 一条安装任务
 struct Task {
-    /// 列表项 uuid
+    /// 稳定包 id，由下载地址派生
     id: Uuid,
     /// 显示名
     name: String,
@@ -33,6 +33,8 @@ struct Task {
     progress: f32,
     /// 失败原因
     error: Option<String>,
+    /// 取消令牌，点"取消"后置位
+    cancel: CancellationToken,
 }
 
 /// 全部安装任务，按开始顺序
@@ -77,9 +79,14 @@ fn emit(app: &AppHandle) {
 /// 登记一条新任务并广播
 ///
 /// - `app`: 应用句柄
-/// - `id`: 列表项 uuid
+/// - `id`: 稳定包 id
 /// - `name`: 显示名
-pub fn begin(app: &AppHandle, id: Uuid, name: &str) {
+///
+/// # 返回值
+///
+/// 这条任务的取消令牌，交给安装流程
+pub fn begin(app: &AppHandle, id: Uuid, name: &str) -> CancellationToken {
+    let cancel = CancellationToken::new();
     let mut tasks = TASKS.lock().unwrap();
     tasks.retain(|task| task.id != id);
     tasks.push(Task {
@@ -88,15 +95,43 @@ pub fn begin(app: &AppHandle, id: Uuid, name: &str) {
         stage: JavaInstallStageDto::Download,
         progress: 0.0,
         error: None,
+        cancel: cancel.clone(),
     });
     drop(tasks);
     emit(app);
+    cancel
+}
+
+/// 取消一条正在跑的任务
+///
+/// 取消是协作式的：下载会立刻收手，解压按条目检查，识别阶段无法中断。
+///
+/// - `id`: 稳定包 id
+///
+/// # 返回值
+///
+/// 任务存在且仍在进行时返回 `true`
+pub fn cancel(id: Uuid) -> bool {
+    let tasks = TASKS.lock().unwrap();
+    let Some(task) = tasks.iter().find(|task| task.id == id) else {
+        return false;
+    };
+    if !matches!(
+        task.stage,
+        JavaInstallStageDto::Download
+            | JavaInstallStageDto::Extract
+            | JavaInstallStageDto::Probe
+    ) {
+        return false;
+    }
+    task.cancel.cancel();
+    true
 }
 
 /// 换阶段并把进度清零
 ///
 /// - `app`: 应用句柄
-/// - `id`: 列表项 uuid
+/// - `id`: 稳定包 id
 /// - `stage`: 新阶段
 pub fn set_stage(app: &AppHandle, id: Uuid, stage: JavaInstallStageDto) {
     if let Some(task) = TASKS.lock().unwrap().iter_mut().find(|task| task.id == id) {
@@ -109,7 +144,7 @@ pub fn set_stage(app: &AppHandle, id: Uuid, stage: JavaInstallStageDto) {
 /// 更新当前阶段进度，带节流
 ///
 /// - `app`: 应用句柄
-/// - `id`: 列表项 uuid
+/// - `id`: 稳定包 id
 /// - `progress`: 0.0 到 1.0
 pub fn set_progress(app: &AppHandle, id: Uuid, progress: f32) {
     let value = progress.clamp(0.0, 1.0);
@@ -125,38 +160,44 @@ pub fn set_progress(app: &AppHandle, id: Uuid, progress: f32) {
     emit(app);
 }
 
-/// 标记结束：`error` 为 `None` 表示成功
+/// 标记结束
 ///
 /// - `app`: 应用句柄
-/// - `id`: 列表项 uuid
-/// - `error`: 失败原因
-pub fn finish(app: &AppHandle, id: Uuid, error: Option<String>) {
+/// - `id`: 稳定包 id
+/// - `result`: 安装结果，决定 `done` / `cancelled` / `failed`
+pub fn finish(app: &AppHandle, id: Uuid, result: JavaInstallResult) {
     if let Some(task) = TASKS.lock().unwrap().iter_mut().find(|task| task.id == id) {
-        match &error {
-            Some(_) => task.stage = JavaInstallStageDto::Failed,
-            None => {
+        match result {
+            JavaInstallResult::Done => {
                 task.stage = JavaInstallStageDto::Done;
                 task.progress = 1.0;
+                task.error = None;
+            }
+            JavaInstallResult::Cancelled => {
+                task.stage = JavaInstallStageDto::Cancelled;
+                task.error = None;
+            }
+            JavaInstallResult::Failed(error) => {
+                task.stage = JavaInstallStageDto::Failed;
+                task.error = Some(error);
             }
         }
-        task.error = error;
     }
     emit(app);
 }
 
-/// 这个名字是不是已经在装了
+/// 这个包是不是已经在装了
 ///
-/// 列表每次拉取都会换一批 uuid，同名的包重新拉回来对不上 uuid，
-/// 所以重装判断按名字来：同一个包在装时再点一次不会重复登记。
+/// id 由下载地址派生，换列表、换筛选都不变，所以按 id 判断即可。
 ///
-/// - `name`: 包的显示名
+/// - `id`: 稳定包 id
 ///
 /// # 返回值
 ///
-/// 已有同名任务在跑时返回 `true`
-pub fn is_running_name(name: &str) -> bool {
+/// 已有同一条任务在跑时返回 `true`
+pub fn is_running(id: Uuid) -> bool {
     TASKS.lock().unwrap().iter().any(|task| {
-        task.name == name
+        task.id == id
             && matches!(
                 task.stage,
                 JavaInstallStageDto::Download
@@ -173,62 +214,10 @@ pub fn clear_finished(app: &AppHandle) {
     TASKS.lock().unwrap().retain(|task| {
         !matches!(
             task.stage,
-            JavaInstallStageDto::Done | JavaInstallStageDto::Failed
+            JavaInstallStageDto::Done
+                | JavaInstallStageDto::Failed
+                | JavaInstallStageDto::Cancelled
         )
     });
     emit(app);
-}
-
-/// 解压进度回调，把条目推进折算成任务进度
-pub struct ExtractGui {
-    /// 应用句柄
-    app: AppHandle,
-    /// 列表项 uuid
-    id: Uuid,
-    /// 解压总条目数，`start` 时下发
-    total: AtomicUsize,
-}
-
-impl ExtractGui {
-    /// 建一个解压进度回调
-    ///
-    /// - `app`: 应用句柄
-    /// - `id`: 列表项 uuid
-    ///
-    /// # 返回值
-    ///
-    /// 给 `mml_jvms::extract_java` 用的回调
-    pub fn new(app: &AppHandle, id: Uuid) -> Self {
-        Self {
-            app: app.clone(),
-            id,
-            total: AtomicUsize::new(0),
-        }
-    }
-}
-
-impl IBaseArchiveGui for ExtractGui {
-    /// 记下总条目数
-    fn start(&self, total: usize) {
-        self.total.store(total, Ordering::Relaxed);
-        set_progress(&self.app, self.id, 0.0);
-    }
-
-    /// 按已完成条目推进进度
-    fn update(&self, _filename: Option<String>, current: usize) {
-        let total = self.total.load(Ordering::Relaxed);
-        if total > 0 {
-            set_progress(&self.app, self.id, current as f32 / total as f32);
-        }
-    }
-
-    /// 解压完成：进度拉满
-    fn done(&self) {
-        set_progress(&self.app, self.id, 1.0);
-    }
-
-    /// 条目名含非法字符时一律替换，安装流程不弹窗
-    fn file_rename(&self, _name: &str) -> bool {
-        true
-    }
 }

@@ -8,6 +8,7 @@ import WindowControls from "./WindowControls.vue";
 import ModpackTitleIndicator from "../ModpackTitleIndicator.vue";
 import DownloadTitleIndicator from "../DownloadTitleIndicator.vue";
 import ResourceTitleIndicator from "../ResourceTitleIndicator.vue";
+import JavaTitleIndicator from "../JavaTitleIndicator.vue";
 import MusicTitleIndicator from "../MusicTitleIndicator.vue";
 import { detectOs, onTitleBarPointerDown, titleBarStyle, useWindowTitle } from "../../lib/titlebar";
 import { useWindowFullscreen } from "../../lib/useWindowFullscreen";
@@ -130,6 +131,9 @@ defineExpose({ bodyEl });
       <ModpackTitleIndicator v-if="showTaskIndicators && !hideModpackIndicator" />
       <DownloadTitleIndicator v-if="showTaskIndicators && !hideDownloadIndicator" />
       <ResourceTitleIndicator />
+      <!-- Java 安装进度：哪个窗口都可能发起安装（设置页的「下载 Java」），
+           所以每个窗口都挂；没有任务时组件自己整块不存在 -->
+      <JavaTitleIndicator />
       <!-- 自定义音乐：只有持有播放器的那个窗口会画出来（多窗口模式 = 主窗口） -->
       <MusicTitleIndicator />
 

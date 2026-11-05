@@ -2,6 +2,14 @@
 //!
 //! 从 `java_download/mod.rs` 拆出来：四个源各一套查询参数与解析，分支互相独立。
 //! 命令带分组标记，值填原始组名 `java_download`，把组键钉回 `javaDownload`，见 AGENTS.md §4。
+//!
+//! 列表项的 uuid 由下载地址派生（UUIDv5）：同一份包重新拉列表还是同一个 id，
+//! 正在安装的判断、重复点击的拦截、解压目录都靠它，不再依赖每次都会变的随机值。
+
+use std::{
+    collections::HashMap,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use mml_base::file_item::{FileHash, FileItemObj, LaterRun};
 use mml_net::adoptium_api;
@@ -11,6 +19,9 @@ use crate::dtos::{JavaDownloadItemDto, JavaTypes};
 
 use super::JAVA_ITEMS;
 use super::zulu_arch;
+
+/// 列表请求代次：网络慢的旧请求晚到时不能覆盖新请求写下的缓存
+static LIST_SEQ: AtomicU64 = AtomicU64::new(0);
 
 /// 获取按当前筛选条件匹配的 Java 包列表，即窗口下方的文本列表
 ///
@@ -23,7 +34,7 @@ use super::zulu_arch;
 /// # 返回值
 ///
 /// 匹配到的包列表，每项含 uuid / 显示名 / 版本 / 文件名 / 大小，大小单位为字节、未知为 0；
-/// 每次调用先清空 `JAVA_ITEMS` 再填入本次结果，网络失败时返回 `Err`
+/// 成功时用本次结果替换 `JAVA_ITEMS`，网络失败时返回 `Err` 且保留上一次的缓存
 #[gui_macros::ipc_group("java_download")]
 #[gui_macros::command]
 pub async fn java_download_get_list(
@@ -33,34 +44,43 @@ pub async fn java_download_get_list(
     system: String,
     arch: String,
 ) -> Result<Vec<JavaDownloadItemDto>, String> {
-    {
-        let mut locker = JAVA_ITEMS.write().unwrap();
-        locker.clear();
-    }
+    let seq = LIST_SEQ.fetch_add(1, Ordering::SeqCst) + 1;
+    let mut cache = HashMap::new();
     let mut out = Vec::new();
+
     match source {
         JavaTypes::Adoptium => {
             let list = adoptium_api::get_java_list(major, &system)
                 .await
                 .map_err(|err| err.to_string())?;
 
-            let mut locker = JAVA_ITEMS.write().unwrap();
-
             for item in list {
-                if item.binary.image_type == "debugimage" {
-                    continue;
-                }
+                // image_type 还有 debugimage / sbom / staticlibs，只留 jdk / jre
                 if item.binary.architecture != arch || item.binary.image_type != java_type {
                     continue;
                 }
-                let uuid = Uuid::new_v4();
-                let name = format!("{}_{}", item.binary.scm_ref, item.binary.image_type);
-                locker.insert(
+                let filename = item.binary.name;
+                if !unpackable(&filename) {
+                    continue;
+                }
+                let ext = extension_of(&filename);
+                let url = item.binary.package.link;
+                let name = display_name(
+                    "Temurin",
+                    &item.version.semver,
+                    &item.binary.image_type,
+                    &item.binary.os,
+                    &item.binary.architecture,
+                    &ext,
+                    false,
+                );
+                let uuid = uuid_of(&url);
+                cache.insert(
                     uuid,
                     FileItemObj {
                         name: name.clone(),
-                        file: mml_downloader::get_download_path().join(&item.binary.name),
-                        url: item.binary.package.link,
+                        file: mml_downloader::get_download_path().join(&filename),
+                        url,
                         hash: FileHash::Sha256(item.binary.package.checksum),
                         later: LaterRun::None,
                     },
@@ -70,8 +90,8 @@ pub async fn java_download_get_list(
                     uuid: uuid.to_string(),
                     name,
                     java_version: item.version.semver,
-                    filename: item.binary.name,
-                    size: item.binary.package.size as u64,
+                    filename,
+                    size: item.binary.package.size.max(0) as u64,
                 });
             }
         }
@@ -80,11 +100,14 @@ pub async fn java_download_get_list(
                 .await
                 .map_err(|err| err.to_string())?;
 
-            // 先过滤再按 zulu 版本倒序，新版本在前
+            // latest 是"该平台 / 类型下的最新版"，旧补丁与 EA 版不进列表；
+            // 列表按 zulu 版本倒序，新版本在前
             let mut list: Vec<_> = list
                 .into_iter()
                 .filter(|item| {
-                    item.bundle_type == java_type
+                    item.latest
+                        && item.release_status == "ga"
+                        && item.bundle_type == java_type
                         && item.java_version.first().copied() == Some(major as i32)
                         && item.os == system
                         && zulu_arch(&item.arch, &item.hw_bitness) == arch
@@ -93,22 +116,26 @@ pub async fn java_download_get_list(
                 .collect();
             list.sort_by(|a, b| b.zulu_version.cmp(&a.zulu_version));
 
-            let mut locker = JAVA_ITEMS.write().unwrap();
-
             for item in list {
-                let uuid = Uuid::new_v4();
-                let name = format!(
-                    "{}_{}",
-                    item.zulu_version
-                        .iter()
-                        .map(|v| v.to_string())
-                        .collect::<Vec<_>>()
-                        .join("."),
-                    item.bundle_type
-                );
-                // Zulu 列表没有文件名，从下载地址取最后一段
                 let filename = file_name_of(&item.url).to_string();
-                locker.insert(
+                let ext = extension_of(&filename);
+                let java_version = item
+                    .java_version
+                    .iter()
+                    .map(|v| v.to_string())
+                    .collect::<Vec<_>>()
+                    .join(".");
+                let name = display_name(
+                    "Zulu",
+                    &java_version,
+                    &item.bundle_type,
+                    &item.os,
+                    &arch,
+                    &ext,
+                    item.javafx,
+                );
+                let uuid = uuid_of(&item.url);
+                cache.insert(
                     uuid,
                     FileItemObj {
                         name: name.clone(),
@@ -122,12 +149,7 @@ pub async fn java_download_get_list(
                 out.push(JavaDownloadItemDto {
                     uuid: uuid.to_string(),
                     name,
-                    java_version: item
-                        .java_version
-                        .iter()
-                        .map(|v| v.to_string())
-                        .collect::<Vec<_>>()
-                        .join("."),
+                    java_version,
                     filename,
                     // Zulu 列表接口不带包大小
                     size: 0,
@@ -145,29 +167,31 @@ pub async fn java_download_get_list(
             .map_err(|err| err.to_string())?
             .map_err(|err| err.to_string())?;
 
-            let mut locker = JAVA_ITEMS.write().unwrap();
-
             for item in obj.download {
                 if item.version != major as i32 || item.os != system || item.arch != arch {
                     continue;
                 }
                 // 每个条目 jdk / jre 各一个直链，按所选类型取对应侧
-                let side = if java_type == "jre" {
-                    item.jre
-                } else {
-                    item.jdk
-                };
-                if side.opt1.download_link.is_empty() {
-                    continue;
-                }
+                let jdk = item.jdk;
+                let jre = item.jre;
+                let side = if java_type == "jre" { jre } else { jdk };
                 let url = side.opt1.download_link;
-                if !unpackable(&url) {
+                if url.is_empty() || !unpackable(&url) {
                     continue;
                 }
-                let uuid = Uuid::new_v4();
-                let name = format!("{}_{}", item.name, java_type);
                 let filename = file_name_of(&url).to_string();
-                locker.insert(
+                let ext = extension_of(&filename);
+                let name = display_name(
+                    "Semeru",
+                    &item.name,
+                    &java_type,
+                    &item.os,
+                    &item.arch,
+                    &ext,
+                    false,
+                );
+                let uuid = uuid_of(&url);
+                cache.insert(
                     uuid,
                     FileItemObj {
                         name: name.clone(),
@@ -196,15 +220,22 @@ pub async fn java_download_get_list(
             // API 返回顺序是乱的，按 OpenJDK 版本号倒序，新版本在前
             list.sort_by_key(|a| std::cmp::Reverse(version_key(&a.java_version)));
 
-            let mut locker = JAVA_ITEMS.write().unwrap();
-
             for item in list {
                 if !unpackable(&item.filename) {
                     continue;
                 }
-                let uuid = Uuid::new_v4();
-                let name = format!("{}_{}", item.distribution_version, item.package_type);
-                locker.insert(
+                let ext = extension_of(&item.filename);
+                let name = display_name(
+                    &cap(&item.distribution),
+                    &item.distribution_version,
+                    &item.package_type,
+                    &item.operating_system,
+                    &item.architecture,
+                    &ext,
+                    item.javafx_bundled,
+                );
+                let uuid = uuid_of(&item.links.pkg_download_redirect);
+                cache.insert(
                     uuid,
                     FileItemObj {
                         name: name.clone(),
@@ -229,7 +260,87 @@ pub async fn java_download_get_list(
         }
     }
 
+    // 只有最新一发能写缓存：旧请求晚到就丢掉，免得它把新列表的 uuid 换回去
+    if seq == LIST_SEQ.load(Ordering::SeqCst) {
+        let mut locker = JAVA_ITEMS.write().unwrap();
+        locker.clear();
+        locker.extend(cache);
+    }
+
     Ok(out)
+}
+
+/// 从下载地址生成稳定的包 id
+///
+/// 同一份包每次拉列表都得到同一个 id，正在安装的判断与解压目录都靠它；
+/// 换包（发行版 / 平台 / 格式不同）时地址不同，id 随之不同。
+///
+/// - `url`: 下载地址
+///
+/// # 返回值
+///
+/// 该地址对应的 UUIDv5
+pub(super) fn uuid_of(url: &str) -> Uuid {
+    Uuid::new_v5(&Uuid::NAMESPACE_URL, url.as_bytes())
+}
+
+/// 拼列表显示名：发行版 + 版本 + 类型 / 平台 / 格式
+///
+/// - `dist`: 发行版名，如 `Temurin`
+/// - `version`: 发行版版本号
+/// - `java_type`: `jdk` / `jre`
+/// - `os`: 目标系统
+/// - `arch`: 目标架构
+/// - `ext`: 包格式，如 `zip` / `tar.gz`
+/// - `fx`: 是否内置 JavaFX
+///
+/// # 返回值
+///
+/// 形如 `Temurin 21.0.13+9 (jdk, windows x64, zip)`
+pub(super) fn display_name(
+    dist: &str,
+    version: &str,
+    java_type: &str,
+    os: &str,
+    arch: &str,
+    ext: &str,
+    fx: bool,
+) -> String {
+    let fx = if fx { ", FX" } else { "" };
+    format!("{dist} {version} ({java_type}, {os} {arch}, {ext}{fx})")
+}
+
+/// 取包格式，保留 `tar.gz` / `tar.xz` 这样的一段
+///
+/// - `name`: 文件名或下载地址
+///
+/// # 返回值
+///
+/// 小写格式名；没有扩展名时为空串
+pub(super) fn extension_of(name: &str) -> String {
+    let lower = name.to_ascii_lowercase();
+    if let Some((_, tail)) = lower.rsplit_once(".tar.") {
+        return format!("tar.{tail}");
+    }
+    lower
+        .rsplit_once('.')
+        .map(|(_, tail)| tail.to_string())
+        .unwrap_or_default()
+}
+
+/// 发行版标识转显示名首字母大写
+///
+/// - `value`: 如 `temurin`
+///
+/// # 返回值
+///
+/// 如 `Temurin`
+fn cap(value: &str) -> String {
+    let mut chars = value.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().chain(chars).collect(),
+        None => String::new(),
+    }
 }
 
 /// 从下载地址取文件名，即最后一段路径
@@ -245,7 +356,8 @@ pub(super) fn file_name_of(url: &str) -> &str {
 
 /// 只保留能被 `mml_jvms::unzip_java` 解包的压缩包
 ///
-/// msi / exe / pkg / dmg 是安装器 / 磁盘镜像，无法解包注册，不应进列表
+/// msi / exe / pkg / dmg 是安装器 / 磁盘镜像，deb / rpm / apk 是包管理器格式，
+/// 都解不开，不应进列表
 ///
 /// - `name`: 文件名或下载地址，只看扩展名且大小写不敏感
 ///
@@ -257,7 +369,12 @@ pub(super) fn unpackable(name: &str) -> bool {
     !(lower.ends_with(".msi")
         || lower.ends_with(".exe")
         || lower.ends_with(".pkg")
-        || lower.ends_with(".dmg"))
+        || lower.ends_with(".dmg")
+        || lower.ends_with(".deb")
+        || lower.ends_with(".rpm")
+        || lower.ends_with(".apk")
+        || lower.ends_with(".zst")
+        || lower.ends_with(".sh"))
 }
 
 /// 版本号拆成数值段供逐段比较排序，如 "21.0.5+11" 拆成 [21, 0, 5, 11]
@@ -274,4 +391,37 @@ pub(super) fn version_key(version: &str) -> Vec<u32> {
         .split(['.', '+', '_'])
         .filter_map(|item| item.parse().ok())
         .collect()
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unpackable_skips_installer_formats() {
+        for name in [
+            "a.msi", "a.exe", "a.pkg", "a.dmg", "a.deb", "a.rpm", "a.apk", "a.tar.zst", "a.sh",
+        ] {
+            assert!(!unpackable(name), "{name} 不该进列表");
+        }
+        for name in ["a.zip", "a.tar.gz", "a.tgz", "a.tar.xz", "a.7z", "a.tar", "A.ZIP"] {
+            assert!(unpackable(name), "{name} 应该能解包");
+        }
+    }
+
+    #[test]
+    fn extension_keeps_compound_suffix() {
+        assert_eq!(extension_of("jdk-21.tar.gz"), "tar.gz");
+        assert_eq!(extension_of("jdk-21.tar.xz"), "tar.xz");
+        assert_eq!(extension_of("jdk-21.zip"), "zip");
+        assert_eq!(extension_of("jdk-21"), "");
+    }
+
+    #[test]
+    fn uuid_is_stable_and_url_specific() {
+        let a = uuid_of("https://example.com/a.zip");
+        assert_eq!(a, uuid_of("https://example.com/a.zip"));
+        assert_ne!(a, uuid_of("https://example.com/b.zip"));
+    }
 }

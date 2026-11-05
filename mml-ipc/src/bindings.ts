@@ -195,6 +195,7 @@ export function createCommands(invoke: Invoke) {
       state: (id: number) => invoke<GamepadStateDto | null>("gamepad_state", { id }),
     },
     javaDownload: {
+      cancel: (uuid: string) => invoke<boolean>("java_download_cancel", { uuid }),
       clear: () => invoke<JavaInstallTaskDto[]>("java_download_clear"),
       getList: (source: JavaTypes, javaType: string, major: number, system: string, arch: string) => invoke<JavaDownloadItemDto[]>("java_download_get_list", { source, javaType, major, system, arch }),
       getOptions: (source: JavaTypes) => invoke<JavaDownloadOptionsDto>("java_download_get_options", { source }),

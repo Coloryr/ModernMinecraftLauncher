@@ -15,7 +15,7 @@ export const javaTasks = ref<JavaInstallTaskDto[]>([]);
  * - `task`: 安装任务
  */
 export function isRunning(task: JavaInstallTaskDto): boolean {
-  return task.stage !== "done" && task.stage !== "failed";
+  return task.stage !== "done" && task.stage !== "failed" && task.stage !== "cancelled";
 }
 
 /**

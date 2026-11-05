@@ -17,10 +17,16 @@ pub struct ZuluObj {
     pub hw_bitness: String,
     /// Java 版本号分段，如 [21, 0, 5]
     pub java_version: Vec<i32>,
+    /// 该包在所在平台 / 类型里是不是最新版本
+    pub latest: bool,
     /// 包显示名称
     pub name: String,
     /// 目标操作系统
     pub os: String,
+    /// 发布状态，取值 ga / ea
+    pub release_status: String,
+    /// 是否内置 JavaFX
+    pub javafx: bool,
     /// 安装包 SHA-256 校验值
     pub sha256_hash: String,
     /// 安装包下载直链

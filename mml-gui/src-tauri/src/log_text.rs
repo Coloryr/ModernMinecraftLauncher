@@ -1305,6 +1305,16 @@ pub enum NotifyText {
         /// 整合包显示名
         name: String,
     },
+    /// Java 安装完成
+    JavaDone {
+        /// Java 显示名
+        name: String,
+    },
+    /// Java 安装失败
+    JavaFailed {
+        /// Java 显示名
+        name: String,
+    },
     /// 实例添加完成
     InstanceAdded {
         /// 实例显示名
@@ -1357,6 +1367,13 @@ impl NotifyText {
                 String::from("整合包安装失败"),
                 format!("{name} 安装失败，打开下载窗口查看原因"),
             ),
+            NotifyText::JavaDone { name } => {
+                (String::from("Java 安装完成"), format!("{name} 已安装完成"))
+            }
+            NotifyText::JavaFailed { name } => (
+                String::from("Java 安装失败"),
+                format!("{name} 安装失败，点标题栏的 Java 图标查看原因"),
+            ),
             NotifyText::InstanceAdded { name } => {
                 (String::from("添加完成"), format!("{name} 已添加完成"))
             }
@@ -1391,6 +1408,14 @@ impl NotifyText {
             NotifyText::ModpackFailed { name } => (
                 String::from("Modpack installation failed"),
                 format!("failed to install {name}, open the download window for details"),
+            ),
+            NotifyText::JavaDone { name } => (
+                String::from("Java installed"),
+                format!("{name} has been installed"),
+            ),
+            NotifyText::JavaFailed { name } => (
+                String::from("Java installation failed"),
+                format!("failed to install {name}, open the Java tasks from the title bar for details"),
             ),
             NotifyText::InstanceAdded { name } => (
                 String::from("Instance added"),

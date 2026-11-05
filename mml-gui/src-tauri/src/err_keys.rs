@@ -102,6 +102,10 @@ pub const MOD_UPDATE_FAILED: &str = "err.modUpdateFailed";
 pub const JAVA_INVALID: &str = "err.javaInvalid";
 /// 下载项已失效
 pub const JAVA_ITEM_NOT_FOUND: &str = "err.javaItemNotFound";
+/// 压缩包解开了，但里面没有可运行的 Java
+pub const JAVA_NOT_REGISTERED: &str = "err.javaNotRegistered";
+/// 旧的 Java 解压目录清理失败
+pub const JAVA_DIR_CLEAN: &str = "err.javaDirClean";
 /// 分组名为空
 pub const GROUP_EMPTY: &str = "err.groupEmpty";
 /// 分组已存在

@@ -70,6 +70,8 @@ pub enum JavaInstallStageDto {
     Done,
     /// 失败
     Failed,
+    /// 用户取消
+    Cancelled,
 }
 
 /// 一条 Java 安装任务，`java-install-status` 事件与 `java_download_status` 共用

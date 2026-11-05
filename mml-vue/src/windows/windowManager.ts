@@ -218,12 +218,6 @@ export function closeModpackPopup() {
   modpackPopupOpen.value = false;
 }
 
-/**
- * 资源下载进度以"悬浮弹窗"出现，入口是标题栏上的 ResourceTitleIndicator
- *
- * 与下载管理 / 整合包安装同一个路子：下载跑在后台，用户可能已经离开了"添加资源"那一页，
- * 所以进度不能只挂在那个页面上。弹窗只影响"看不看得见进度"，关掉它不影响下载。
- */
 /** Java 安装进度弹窗是否打开；入口是标题栏上的 JavaTitleIndicator */
 export const javaPopupOpen = ref(false);
 
@@ -236,6 +230,13 @@ export function openJavaPopup() {
 export function closeJavaPopup() {
   javaPopupOpen.value = false;
 }
+
+/**
+ * 资源下载进度以"悬浮弹窗"出现，入口是标题栏上的 ResourceTitleIndicator
+ *
+ * 与下载管理 / 整合包安装同一个路子：下载跑在后台，用户可能已经离开了"添加资源"那一页，
+ * 所以进度不能只挂在那个页面上。弹窗只影响"看不看得见进度"，关掉它不影响下载。
+ */
 export const resourcePopupOpen = ref(false);
 
 /** 打开资源下载进度弹窗 */

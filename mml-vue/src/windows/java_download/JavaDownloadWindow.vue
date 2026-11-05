@@ -8,7 +8,6 @@
 import { onMounted, ref } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
-import BaseModal from "../../components/ui/BaseModal.vue";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
@@ -21,7 +20,6 @@ import {
 import { isTauri } from "../windowManager";
 import { detectOs } from "../../lib/titlebar";
 import { isRunning, javaTasks } from "../../lib/javaTasks";
-import JavaTitleIndicator from "../../components/JavaTitleIndicator.vue";
 
 /** 请求关闭本窗口 */
 defineEmits<{ (e: "close"): void }>();
@@ -93,6 +91,54 @@ const OS_CANDIDATES: Record<string, string[]> = {
   linux: ["linux"],
 };
 
+/** 搜索源的显示名 */
+const SOURCE_KEYS: Record<JavaTypes, string> = {
+  adoptium: "winJavaDownload.sourceAdoptium",
+  zulu: "winJavaDownload.sourceZulu",
+  openj9: "winJavaDownload.sourceOpenJ9",
+  foojay: "winJavaDownload.sourceFoojay",
+};
+
+/** 各源系统写法的显示名，认不出的原样显示 */
+const SYSTEM_KEYS: Record<string, string> = {
+  windows: "winJavaDownload.systemWindows",
+  linux: "winJavaDownload.systemLinux",
+  linux_musl: "winJavaDownload.systemLinuxMusl",
+  mac: "winJavaDownload.systemMac",
+  macos: "winJavaDownload.systemMac",
+  "alpine-linux": "winJavaDownload.systemAlpine",
+  aix: "winJavaDownload.systemAix",
+  solaris: "winJavaDownload.systemSolaris",
+};
+
+/**
+ * 搜索源显示名
+ *
+ * - `source`: 后端的搜索源枚举值
+ */
+function sourceLabel(source: JavaTypes): string {
+  return t(SOURCE_KEYS[source]);
+}
+
+/**
+ * 系统显示名
+ *
+ * - `system`: 各源给的原始系统名，大小写不敏感
+ */
+function systemLabel(system: string): string {
+  const key = SYSTEM_KEYS[system.toLowerCase()];
+  return key ? t(key) : system;
+}
+
+/**
+ * 发行类型显示名，JDK / JRE 这类缩写只统一大写
+ *
+ * - `javaType`: 后端的发行类型
+ */
+function typeLabel(javaType: string): string {
+  return javaType.toUpperCase();
+}
+
 /** 从候选列表里按优先级找本机平台对应的项（归一化后精确比对） */
 function pickMatch(list: string[], candidates: string[]): string | null {
   const norm = (s: string) => s.toLowerCase().replace(/[-_]/g, "");
@@ -105,6 +151,12 @@ function pickMatch(list: string[], candidates: string[]): string | null {
 
 /** 刷新代次：F5 连续触发时，旧的一发不能再改源、也不能再启动选项请求 */
 let sourcesSeq = 0;
+
+/** 换搜索源：先清掉上一源的卡片，再拉新候选 */
+async function onSourceChange() {
+  items.value = [];
+  await loadOptions();
+}
 
 /** 拉下载源并加载其选项：首次挂载与切回本窗口都走这里，保留用户已选的源 */
 async function loadSources() {
@@ -153,11 +205,16 @@ async function loadOptions() {
     const archDetected = await detectArch();
     if (mine !== optionsSeq) return;
     arch.value =
-      pickMatch(data.archs, archDetected ? ARCH_CANDIDATES[archDetected] : []) ?? data.archs[0] ?? "";
+      pickMatch(data.archs, archDetected ? ARCH_CANDIDATES[archDetected] : []) ??
+      // 探不出本机架构时优先落到常见桌面架构，别默认选到 ARM
+      pickMatch(data.archs, ["x64", "x86_64", "amd64"]) ??
+      data.archs[0] ??
+      "";
   } catch (e) {
     if (mine !== optionsSeq) return;
     showToast(tErr(e));
     // 候选没拉到就别按旧条件拉列表，否则列表与下拉显示的源对不上
+    items.value = [];
     return;
   } finally {
     if (mine === optionsSeq) optionsLoading.value = false;
@@ -166,25 +223,23 @@ async function loadOptions() {
   await loadList();
 }
 
-/** 正在安装的项（uuid）看全局任务列表：还在进行就禁用按钮 */
-
 /**
  * 这一项是不是正在装
  *
- * 按名字比对而不是 uuid：列表每次重新拉取都会换一批 uuid。
+ * id 由下载地址派生，重新拉列表也不会变，所以按 id 比对即可。
  *
- * - `name`: 包的显示名
+ * - `id`: 列表项的稳定 id
  */
-function isInstalling(name: string): boolean {
-  return javaTasks.value.some((task) => task.name === name && isRunning(task));
+function isInstalling(id: string): boolean {
+  return javaTasks.value.some((task) => task.id === id && isRunning(task));
 }
 
 /** 下载并注册选中的包：后端按 uuid 取缓存里的下载信息 */
-async function startDownload(uuid: string) {
-  if (isInstalling(uuid)) return;
+async function startDownload(item: JavaDownloadItemDto) {
+  if (isInstalling(item.uuid)) return;
   try {
     // 命令只负责登记任务，下载与解压都在后台跑，进度看标题栏的 Java 指示器
-    await commands.javaDownload.start(uuid);
+    await commands.javaDownload.start(item.uuid);
   } catch (e) {
     showToast(tErr(e));
   }
@@ -223,6 +278,8 @@ async function loadList() {
     items.value = list;
   } catch (e) {
     if (mine !== listSeq) return;
+    // 失败时清空，别让旧结果继续冒充当前筛选条件
+    items.value = [];
     showToast(tErr(e));
   } finally {
     if (mine === listSeq) listLoading.value = false;
@@ -232,31 +289,19 @@ async function loadList() {
 
 <template>
   <WindowFrame :title="t('winJavaDownload.title')" @close="$emit('close')">
-    <!-- 安装进度入口：和主窗口顶栏、资源窗口标题栏上那枚指示器是同一个组件 -->
-    <template #head-right>
-      <JavaTitleIndicator />
-    </template>
     <div class="java-download-body">
-      <!-- 切换搜索源 / 加载选项或列表时弹窗提示，加载完自动消失 -->
-      <BaseModal v-if="optionsLoading || listLoading" :width="300" :closable="false">
-        <div class="loading-modal">
-          <span class="loading-spin" />
-          <span>{{ t("winJavaDownload.loadingTitle") }}</span>
-        </div>
-      </BaseModal>
-
       <div class="field-row">
         <div class="field">
           <label class="field-label">{{ t("winJavaDownload.source") }}</label>
-          <select v-model="source" class="field-select" :disabled="optionsLoading" @change="loadOptions">
-            <option v-for="s in sources" :key="s" :value="s">{{ s }}</option>
+          <select v-model="source" class="field-select" :disabled="optionsLoading" @change="onSourceChange">
+            <option v-for="s in sources" :key="s" :value="s">{{ sourceLabel(s) }}</option>
           </select>
         </div>
 
         <div class="field">
           <label class="field-label">{{ t("winJavaDownload.type") }}</label>
           <select v-model="javaType" class="field-select" :disabled="optionsLoading" @change="loadList">
-            <option v-for="tp in options?.types ?? []" :key="tp" :value="tp">{{ tp }}</option>
+            <option v-for="tp in options?.types ?? []" :key="tp" :value="tp">{{ typeLabel(tp) }}</option>
           </select>
         </div>
 
@@ -270,7 +315,7 @@ async function loadList() {
         <div class="field">
           <label class="field-label">{{ t("winJavaDownload.system") }}</label>
           <select v-model="system" class="field-select" :disabled="optionsLoading" @change="loadList">
-            <option v-for="s in options?.systems ?? []" :key="s" :value="s">{{ s }}</option>
+            <option v-for="s in options?.systems ?? []" :key="s" :value="s">{{ systemLabel(s) }}</option>
           </select>
         </div>
 
@@ -282,17 +327,23 @@ async function loadList() {
         </div>
       </div>
 
+      <!-- 加载提示放行内：改筛选时不该弹一层面板盖住列表 -->
+      <div v-if="optionsLoading || listLoading" class="list-loading">
+        <span class="loading-spin" />
+        <span>{{ t("winJavaDownload.loadingTitle") }}</span>
+      </div>
+
       <!-- 匹配的包列表：grid 文本卡片 -->
-      <div v-if="!items.length && !listLoading" class="list-empty">
+      <div v-if="!items.length && !listLoading && !optionsLoading" class="list-empty">
         {{ t("winJavaDownload.listEmpty") }}
       </div>
       <div class="item-grid">
         <div v-for="item in items" :key="item.uuid" class="item-card">
           <div class="item-head">
             <div class="item-title">{{ item.javaVersion }}</div>
-            <BaseButton variant="accent" :disabled="isInstalling(item.name)"
-              @click="startDownload(item.uuid)">
-              {{ isInstalling(item.name) ? t("winJavaDownload.downloading") : t("winJavaDownload.download") }}
+            <BaseButton variant="accent" :disabled="isInstalling(item.uuid)"
+              @click="startDownload(item)">
+              {{ isInstalling(item.uuid) ? t("winJavaDownload.downloading") : t("winJavaDownload.download") }}
             </BaseButton>
           </div>
           <div class="item-sub">{{ item.name }}</div>
@@ -312,20 +363,20 @@ async function loadList() {
   overflow-y: auto;
 }
 
-/* 加载弹窗内容：转圈 + 提示文字 */
-.loading-modal {
+/* 行内加载提示：换筛选时只占一行，不弹面板盖住列表 */
+.list-loading {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
+  gap: 8px;
+  margin-top: 12px;
   color: var(--text-dim);
-  font-size: 13px;
+  font-size: 12.5px;
 }
 
 .loading-spin {
-  width: 20px;
-  height: 20px;
-  border: 2.5px solid var(--border);
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: loading-spin 0.8s linear infinite;
@@ -337,16 +388,17 @@ async function loadList() {
   }
 }
 
-/* 五个下拉框一行排开，每列标签在上、选择器在下 */
+/* 五个下拉框排开；窗口窄时自动换行，别把英文标签挤在一起 */
 .field-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  flex: 1 1 0;
+  flex: 1 1 110px;
   min-width: 0;
 }
 

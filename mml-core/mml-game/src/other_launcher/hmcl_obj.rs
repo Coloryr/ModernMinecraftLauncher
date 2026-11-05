@@ -91,6 +91,9 @@ pub struct HMCLServerObj {
     /// 描述
     pub description: String,
     /// 文件下载源地址，相对该地址拼出每个文件的下载 URL
+    ///
+    /// HMCL 的键名是 `fileApi`；旧数据里可能写成 `file_api`，两种都收
+    #[serde(rename = "fileApi", alias = "file_api")]
     pub file_api: String,
     /// 需要同步的文件列表
     pub files: Vec<HMCLServerFileObj>,

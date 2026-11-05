@@ -1,12 +1,13 @@
 // 设置窗口 · Java 标签
 //
 // Java 列表来自 core 的全局注册表，即 `settings_get_launch` 里的 javaList，
-// 增删 / 扫描 / 导入 / 扫描目录都会改这份注册表，所以每次操作后统一 `refresh()`。
+// 增删 / 扫描 / 导入 / 扫描目录都会改这份注册表，所以每次操作后统一 `load()`。
 // 导入进度经 `settings-java-progress` 事件推进，订阅用 useUnlisteners，卸载时一定注销。
 import { computed, onMounted, ref } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
 import { useUnlisteners } from "../../../composables/useUnlisteners";
+import { onJavaChange } from "../../../lib/api";
 import { commands } from "../../../lib/bindings";
 import { SettingsJavaProgress } from "../../../lib/listens";
 import { listen } from "@tauri-apps/api/event";
@@ -79,6 +80,10 @@ export function useSettingsJava() {
         importProgress.value = e.payload;
       }),
     );
+    // 下载窗口装完会发 java-change；不重拉的话设置页会一直停在旧列表
+    trackUnlisten(onJavaChange(() => {
+      void load();
+    }));
   });
 
   // ---------- 分组展开 ----------

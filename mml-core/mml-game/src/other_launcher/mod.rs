@@ -23,6 +23,7 @@ use crate::{
     },
     launcher_path::version_path,
     loader::LoaderType,
+    serverpack::serverpack_obj::{ServerItemObj, ServerPackObj},
     other_launcher::{
         hmcl_obj::{HMCLObj, HMCLServerObj},
         mmc_obj::MMCObj,
@@ -430,5 +431,68 @@ impl HMCLServerObj {
         }
 
         obj
+    }
+
+    /// 把 HMCL 服务器清单转成本启动器的服务器实例清单
+    ///
+    /// HMCL 的文件全部由 `fileApi` 托管、没有平台项目号；转换后写进实例的
+    /// `server.json`，之后与 MML 服务器实例走同一条同步 / 再生成链路。
+    ///
+    /// # 返回值
+    ///
+    /// 见 [`ServerPackObj`]；`fileApi` 为空时文件只有哈希、没有下载地址
+    pub fn to_server_pack(&self) -> ServerPackObj {
+        let instance = self.to_instance();
+        let online_list = self
+            .files
+            .iter()
+            .map(|item| ServerItemObj {
+                file: item.path.replace('\\', "/"),
+                pid: None,
+                fid: None,
+                url: join_file_url(&self.file_api, &item.path),
+                sha1: Some(item.hash.trim().to_string()).filter(|hash| !hash.is_empty()),
+                sha256: None,
+            })
+            .collect();
+
+        ServerPackObj {
+            name: self.name.clone(),
+            icon: None,
+            version: instance.version,
+            loader: instance.loader,
+            loader_version: instance.loader_version,
+            run_arg: None,
+            window: None,
+            start_server: None,
+            advance_jvm: None,
+            text: self.description.clone(),
+            pack_version: self.version.clone(),
+            online_list,
+            archive_list: Vec::new(),
+        }
+    }
+}
+
+/// 把 HMCL 的文件源地址与相对路径拼成下载地址
+///
+/// - `base`: HMCL 的 `fileApi`
+/// - `path`: 相对游戏目录的路径
+///
+/// # 返回值
+///
+/// 拼好的地址；`base` 为空时返回 `None`
+fn join_file_url(base: &str, path: &str) -> Option<String> {
+    let base = base.trim().trim_end_matches('/');
+    if base.is_empty() {
+        return None;
+    }
+    let path = path.replace('\\', "/");
+    let path = path.trim_start_matches('/');
+    match url::Url::parse(&format!("{base}/")) {
+        // 用 Url::join 顺带把空格、中文转义成合法的下载地址
+        Ok(url) => url.join(path).ok().map(|url| url.to_string()),
+        // fileApi 本身不是合法地址时按原样拼，交给下游报错
+        Err(_) => Some(format!("{base}/{path}")),
     }
 }

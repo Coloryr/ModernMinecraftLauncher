@@ -1,16 +1,19 @@
 //! Java 下载链路集成测试
 //!
-//! 走完整链路：foojay `/packages` 拉取候选列表 → `java_download_start`
-//! 经下载器下载压缩包 → `mml_jvms::unzip_java` 解包识别并注册进 Java 列表。
+//! 走完整链路：foojay /packages 拉取候选列表 → 从列表缓存取出下载项 →
+//! 下载压缩包 → 解包识别并注册进 Java 列表。
 //!
-//! 真实联网 + 真实解包；运行目录在仓库 `target/temp`，git 忽略，可反复复用。
+//! 真实联网 + 真实解包；运行目录在仓库 target/temp，git 忽略，可反复复用。
 //! 注意：本测试会下载几十 MB 的压缩包，比一般单测慢。
 
 use std::path::PathBuf;
 use std::sync::Once;
 
 use mml_gui_lib::dtos::JavaTypes;
-use mml_gui_lib::windows::java_download::{java_download_get_list, java_download_start};
+use mml_gui_lib::windows::java_download::{
+    JavaInstallResult, install_cached, java_download_get_list,
+};
+use tokio_util::sync::CancellationToken;
 
 static INIT: Once = Once::new();
 
@@ -18,12 +21,12 @@ static INIT: Once = Once::new();
 ///
 /// # 返回值
 ///
-/// 仓库 `target/temp` 下的固定目录，git 忽略，可跨进程复用
+/// 仓库 target/temp 下的固定目录，git 忽略，可跨进程复用
 fn run_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/temp/java-download-test")
 }
 
-/// 初始化全局依赖链，进程内只执行一次，与应用 `mml_core::init` 同构
+/// 初始化全局依赖链，进程内只执行一次，与应用 mml_core::init 同构
 fn setup() {
     INIT.call_once(|| {
         std::fs::create_dir_all(run_dir()).unwrap();
@@ -56,17 +59,41 @@ async fn foojay_download_and_register() {
     };
     let arch = if cfg!(target_arch = "aarch64") { "aarch64" } else { "x64" };
 
-    // jre 包比 jdk 小很多，下载快；只挑 zip，其他格式可能是不支持的安装器
-    let list = java_download_get_list(JavaTypes::Foojay, "jre".to_string(), 21, system.to_string(), arch.to_string())
-        .await
-        .expect("foojay 拉取列表失败");
+    // jre 包比 jdk 小很多，下载快
+    let list = java_download_get_list(
+        JavaTypes::Foojay,
+        "jre".to_string(),
+        21,
+        system.to_string(),
+        arch.to_string(),
+    )
+    .await
+    .expect("foojay 拉取列表失败");
     assert!(
         !list.is_empty(),
         "foojay 21/jre/{system}/{arch} 应有候选包"
     );
 
-    let Some(picked) = list.iter().find(|item| item.filename.ends_with(".zip")) else {
-        panic!("候选包里应存在 zip 压缩包");
+    // 列表只留能解包的格式：deb / rpm / apk 这类包管理器格式不能出现
+    for item in &list {
+        let lower = item.filename.to_ascii_lowercase();
+        assert!(
+            [".zip", ".tar", ".tar.gz", ".tgz", ".tar.xz", ".txz", ".7z"]
+                .iter()
+                .any(|ext| lower.ends_with(ext)),
+            "不可解包的格式混进列表: {}",
+            item.filename
+        );
+    }
+
+    // 优先 Temurin：包更小、下载地址最稳定；没有 zip 再退到 tar.gz
+    let Some(picked) = list
+        .iter()
+        .find(|item| item.name.starts_with("Temurin") && item.filename.ends_with(".zip"))
+        .or_else(|| list.iter().find(|item| item.filename.ends_with(".zip")))
+        .or_else(|| list.iter().find(|item| item.filename.ends_with(".tar.gz")))
+    else {
+        panic!("候选包里应存在可解包的压缩包");
     };
     println!(
         "候选包 {} 个，选择下载: {} ({})",
@@ -75,10 +102,12 @@ async fn foojay_download_and_register() {
         picked.filename
     );
 
-    // 下载 → 解包 → 注册
-    java_download_start(picked.uuid.clone())
-        .await
-        .expect("下载 + 解包注册失败");
+    // 下载 → 解包 → 注册；与命令走同一条安装流程
+    let result = install_cached(&picked.uuid, CancellationToken::new(), |_| {}).await;
+    assert!(
+        matches!(result, JavaInstallResult::Done),
+        "下载 + 解包注册失败: {result:?}"
+    );
 
     // 全新运行目录下，注册进来的 Java 必然来自本次下载
     let all = mml_jvms::get_all_java();
