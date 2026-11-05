@@ -109,10 +109,10 @@ Windows 默认出 x64 / arm64，只要一种用 `-Arch x64`；Linux / macOS 本�
 
 ### 版本与发布
 
-版本号的唯一来源是 **Git 标签**：`v0.0.1` 出正式版，`v1.0.0-pre` 出预发布版，
-`testbuild` 只验证结果、产物全部丢弃。提交、打标签、推送后由 GitHub Actions 按平台并行构建并发 Release，
-安装包统一收集到 `build_out/`（不入库）。发版流程见[自动化构建](docs/development.md#自动化构建github-actions)，
-产物命名与签名见[开发与构建](docs/development.md)。
+版本号写在仓库根的 `docs/version`（一行，如 `0.1.9`；带 `-pre` 后缀就是预发布版），
+构建前自动同步进应用清单。发版推标签只是触发器：标签的版本必须与文件一致，`testbuild` 只验证结果、
+产物全部丢弃。推送后由 GitHub Actions 按平台并行构建并发 Release，安装包统一收集到 `build_out/`（不入库）。
+发版流程见[自动化构建](docs/development.md#自动化构建github-actions)，产物命名与签名见[开发与构建](docs/development.md)。
 
 常用开发命令（重新生成 IPC 契约、整仓检查、lint、测试、图标）与 IPC 生成规则见
 [开发与构建](docs/development.md)。
@@ -188,13 +188,14 @@ ModernColoryrMinecraftLauncher/
 │  └─ cloud-server.example.json    配置样例：两种密钥与每账户配额
 ├─ .github/workflows/              GitHub Actions：三平台构建与发版
 ├─ build/
-│  ├─ version.mjs                  版本解析：从 Git 标签取，可被 MML_VERSION 覆盖
+│  ├─ version.mjs                  版本解析：读 docs/version，可被 MML_VERSION 覆盖
 │  ├─ set-version.mjs              把解析到的版本同步到应用清单
 │  ├─ package-release.mjs          安装包按版本重命名后收集到 build_out/
 │  ├─ linux/                       桌面文件与 AppStream 元数据
 │  └─ *.ps1 / *.sh                 初始化、开发、正式发布、预发布、Flatpak / Arch 打包脚本
 ├─ design/                         程序图标 SVG 源文件
 ├─ docs/                           软件手册、服务器实例指导、开发与构建、更新日志、开源许可
+│  └─ version                      版本号，构建从这里取，见「版本与发布」
 └─ pics/                           README 截图
 ```
 

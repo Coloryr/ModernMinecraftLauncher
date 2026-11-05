@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 收集 Tauri 的安装包，按版本标签命名后复制到 build_out/。
+// 收集 Tauri 的安装包，按版本命名后复制到 build_out/。
 //
 // 支持多架构：Tauri 用 --target 构建时产物在 target/<三元组>/release/bundle/，
 // 宿主直接构建的产物在 target/release/bundle/。两处都扫，按目录里的三元组
@@ -20,7 +20,7 @@ try {
     process.exit(1);
 }
 
-// 清单里写的是安装包版本（标签去掉 -pre 后缀）；产物名仍用标签版本，预发布才分得清
+// 清单里写的是安装包版本（版本去掉 -pre 后缀）；产物名仍用完整版本，预发布才分得清
 const packageVersion = packageVersionOf(version);
 const cargoVersion = (fs.readFileSync(
     path.join(root, "mml-gui", "src-tauri", "Cargo.toml"),
@@ -31,7 +31,7 @@ const tauriVersion = JSON.parse(
 ).version;
 if (cargoVersion !== packageVersion || tauriVersion !== packageVersion) {
     console.error(
-        "版本不一致：安装包版本=" + packageVersion + "（标签 " + version + "），Cargo.toml=" + cargoVersion + "，tauri.conf.json=" + tauriVersion,
+        "版本不一致：安装包版本=" + packageVersion + "（版本 " + version + "），Cargo.toml=" + cargoVersion + "，tauri.conf.json=" + tauriVersion,
     );
     process.exit(1);
 }

@@ -1,4 +1,4 @@
-﻿# 正式发布构建：fat LTO + 单代码生成单元，体积最小、运行最快，但出包慢 ——
+# 正式发布构建：fat LTO + 单代码生成单元，体积最小、运行最快，但出包慢 ——
 # 末尾的跨 crate 优化是单线程的，会看到只有一个核在跑；产出安装包（tauri 打包链）。
 # 预发布 / 日常打包用 build\build-prerelease.ps1。
 #
@@ -48,7 +48,7 @@ $env:MML_BUILD_TMP = $buildTmp
 $env:TMP = $buildTmp
 $env:TEMP = $buildTmp
 
-# 版本来自 Git 标签，先同步到应用清单
+# 版本来自 docs/version，先同步到应用清单
 node (Join-Path $root 'build\set-version.mjs')
 if ($LASTEXITCODE -ne 0) { throw '版本同步失败，已中止构建。' }
 
@@ -93,7 +93,7 @@ finally {
     Pop-Location
 }
 
-# 把 Tauri 的安装包按版本标签重命名后集中到 build_out/
+# 把 Tauri 的安装包按版本重命名后集中到 build_out/
 Write-Host '正在收集安装包到 build_out ...'
 node (Join-Path $root 'build\package-release.mjs')
 if ($LASTEXITCODE -ne 0) { throw "安装包收集失败（退出码 $LASTEXITCODE）" }

@@ -2009,6 +2009,7 @@ export default {
   "winHelp.licenseUpstream": "上游",
   "winHelp.licenseSpdx": "许可原文（SPDX 许可列表）",
   "winHelp.noteColorasm": "内嵌于启动器，作为 javaagent 注入游戏进程",
+  "winHelp.noteServerSync": "内嵌于启动器，生成服务器包时写进包根",
   "winHelp.noteEmbedded": "内嵌于二进制，首次使用时写到 libraries/ 下",
   "winHelp.noteLocalPatch": "本仓库对其打了两个 patch，改动处已标「M²L 本地修改」",
   "winHelp.noteMonacoBundles": "自身还打包了 marked 14.0.0、dompurify 3.4.8 与 Codicon 字体",

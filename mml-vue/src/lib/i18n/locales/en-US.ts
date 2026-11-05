@@ -2008,6 +2008,7 @@ export default {
   "winHelp.licenseUpstream": "Upstream",
   "winHelp.licenseSpdx": "License texts (SPDX license list)",
   "winHelp.noteColorasm": "Embedded in the launcher, injected into the game process as a javaagent",
+  "winHelp.noteServerSync": "Embedded in the launcher; written to the pack root when exporting a server pack",
   "winHelp.noteEmbedded": "Embedded in the binary; written to libraries/ on first use",
   "winHelp.noteLocalPatch": "Patched twice in this repository; changes are marked “M²L 本地修改”",
   "winHelp.noteMonacoBundles": "Also bundles marked 14.0.0, dompurify 3.4.8 and the Codicon font",

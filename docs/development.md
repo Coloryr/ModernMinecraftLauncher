@@ -60,7 +60,7 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
   WebView2 运行时（Windows 11 和较新的 Windows 10 已自带）。
 - **Linux**：Tauri 2 需要的 WebKitGTK 4.1、GTK 3、libappindicator、librsvg、patchelf、libxdo，
   以及 `mml-sys`「在文件管理器中显示」用的 D-Bus 开发包、手柄读取用的 libudev 开发包。
-  Debian / Ubuntu 上：
+  SDL3 只启用手柄子系统，不要求 X11 / Wayland 开发包。Debian / Ubuntu 上：
 
   ```bash
   sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
@@ -118,10 +118,11 @@ Flatpak 默认声明 `org.freedesktop.Platform//25.08`，安装时由 Flathub �
 编出的二进制可能要求更高版本的 glibc，只有 CI 在 `ubuntu-22.04` 上编的包才与 25.08 匹配；
 要换运行时用 `MML_FLATPAK_RUNTIME=26.08 bash build/package-flatpak.sh`。
 
-发布版本从 `0.0.1` 开始，唯一来源是 Git 标签；`build-release` 先把**去掉 `-pre` 后缀**的版本
-同步到 `mml-gui/src-tauri/Cargo.toml` 与 `tauri.conf.json`，再把 Tauri 产物按标签版本重命名到
-`build_out/`。安装包元数据只收纯数字（WiX 拒绝 `0.1.1-pre`），所以标签带后缀、清单不带。
-标签规则与发布流程见[自动化构建](#自动化构建github-actions)。
+版本号写在仓库根的 `docs/version`（一行，可带 `-pre` 后缀）；`build-release` 先把**去掉后缀**的版本
+同步到 `mml-gui/src-tauri/Cargo.toml` 与 `tauri.conf.json`，再把 Tauri 产物按版本重命名到
+`build_out/`。安装包元数据只收纯数字（WiX 拒绝 `0.1.1-pre`），所以版本文件带后缀、清单不带。
+`MML_VERSION` 可以临时覆盖文件里的版本，只用于试构建；发版标签只决定什么时候发，
+CI 会校验标签与文件一致，见[自动化构建](#自动化构建github-actions)。
 
 **版本号在界面上的写法按通道区分**（见 `src-tauri/src/build_info.rs`）：
 
@@ -194,7 +195,7 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 | --- | --- |
 | 推送正式版标签（如 `v0.0.1`） | `check-version` 用标签名作为版本，随后并行构建三平台安装包，最后汇总成一个 GitHub Release |
 | 推送预发布标签（如 `v1.0.0-pre`） | 多带 `prerelease` feature 让界面标「预发布版」；Windows 用 `--no-bundle` 跳过安装文件、只出可执行文件，macOS 用 `--bundles app` 只打自签的 `.app` 压缩包，Linux 仍出安装包，最后汇总成一个标记为 Pre-release 的 GitHub Release |
-| 推送测试构建标签（如 `testbuild`） | 完整跑一遍构建，版本取最近的可达标签、通道按其后缀决定；产物全部丢弃——`upload-artifact` 步骤、Flatpak / Arch 附加包与 Release 都不执行，只看构建是否通过 |
+| 推送测试构建标签（如 `testbuild`） | 完整跑一遍构建，版本取 `docs/version`、通道按其后缀决定；产物全部丢弃——`upload-artifact` 步骤、Flatpak / Arch 附加包与 Release 都不执行，只看构建是否通过 |
 | 推送 `releases/**` 分支 | 只构建、把产物传成 Actions artifact，不发 Release，用来验证构建 |
 
 每个平台都走同一套骨架，两个通道只在 `MML_FEATURES` / `MML_NO_BUNDLE` / `MML_BUNDLES` 上分叉：
@@ -214,7 +215,7 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
    下载这份二进制后跑 `build/package-flatpak.sh` 与 `build/package-arch.sh`，把 `.flatpak` 与
    `.pkg.tar.zst` 也放进 `build_out/`。附加包失败不影响主产物，但发版 job 会等它，缺包时不发 Release；
    arm64 只出 deb / rpm / AppImage；
-5. 两个通道都由脚本把安装包按标签版本改名到 `build_out/`，`actions/upload-artifact@v6` 收走；
+5. 两个通道都由脚本把安装包按版本改名到 `build_out/`，`actions/upload-artifact@v6` 收走；
    发版 job（正式版与预发布各一个）用 `actions/download-artifact@v7` 取产物，都按 `mml-*`；
    先检查文件名有无重复，再由 `build/release-body.mjs` 从 `docs/changelog.md` 取本版本的更新日志、
    并用产物现算 SHA1 / SHA256 生成发布说明，最后交给 `softprops/action-gh-release@v3`。
@@ -239,9 +240,9 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 - Flatpak 不需要在 runner 上装 `org.freedesktop.Platform`：封装只做 OSTree 提交与 bundle，
   runtime 是安装时由用户从 Flathub 获取的依赖。Arch 包只是把二进制与 `.PKGINFO` 打成 tar.zst，
   不需要装 `base-devel` 或 WebKitGTK。
-- 版本号只来自标签：`check-version` 用标签名作为版本，标签不是版本号时直接失败，
-  避免发出错版本的包。标签带 `-` 后缀（如 `v1.0.0-pre`）时走预发布通道，产物名保留后缀、
-  清单与安装包元数据去掉后缀。
+- 版本号只来自 `docs/version`：`check-version` 读文件，发版标签必须与它一致（`build/version.mjs --tag`
+  解析后比对），不一致直接失败，避免打出与标签不符的包。文件带 `-` 后缀（如 `0.1.9-pre`）时走预发布通道，
+  产物名保留后缀、清单与安装包元数据去掉后缀。
 - macOS runner 的 `bash` 是 3.2，`build/*.sh` 与 `mml-gui/vendor/prepare.sh` 都不能用
   `mapfile` / `readarray` 这类 bash 4 语法。
 - FUSE 运行时包在 24.04 改名为 `libfuse2t64`：工作流装依赖前先用 `apt-cache show` 断言包名存在，

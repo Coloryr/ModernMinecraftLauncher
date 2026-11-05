@@ -1,4 +1,4 @@
-﻿# 预发布构建：thin LTO + 16 个代码生成单元，能并行，出包快很多。
+# 预发布构建：thin LTO + 16 个代码生成单元，能并行，出包快很多。
 # 带 prerelease feature：主页面会提示「预发布版」，见 mml-gui/src-tauri/src/build_info.rs。
 # 只产出可执行文件，不打安装包；Windows 默认两种架构，集中在 <仓库>\target\prerelease\：
 #   mml-gui-x64.exe / mml-gui-arm64.exe
@@ -41,7 +41,7 @@ $env:MML_BUILD_TMP = $buildTmp
 $env:TMP = $buildTmp
 $env:TEMP = $buildTmp
 
-# 版本来自 Git 标签，先同步到应用清单
+# 版本来自 docs/version，先同步到应用清单
 node (Join-Path $root 'build\set-version.mjs')
 if ($LASTEXITCODE -ne 0) { throw '版本同步失败，已中止构建。' }
 

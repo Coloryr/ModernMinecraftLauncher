@@ -41,10 +41,16 @@ jobs:
             test=true
           fi
 
-          if [ "$test" = false ] && [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            export MML_VERSION="$GITHUB_REF_NAME"
-          fi
           version="$(node build/version.mjs)"
+
+          # 版本以 docs/version 为准；发版标签只是触发器，与文件不一致就停下
+          if [ "$test" = false ] && [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            tag_version="$(node build/version.mjs --tag "$GITHUB_REF_NAME")"
+            if [ "$tag_version" != "$version" ]; then
+              echo "标签 $GITHUB_REF_NAME（$tag_version）与 docs/version（$version）不一致" >&2
+              exit 1
+            fi
+          fi
 
           if [[ "$version" == *-* ]]; then
             channel=prerelease

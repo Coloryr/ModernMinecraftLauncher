@@ -20,7 +20,7 @@ export MML_BUILD_TMP="$build_tmp"
 export TMP="$build_tmp"
 export TEMP="$build_tmp"
 
-# 版本来自 Git 标签，先同步到应用清单
+# 版本来自 docs/version，先同步到应用清单
 node "$root/build/set-version.mjs"
 
 # vendor 插件（tauri-plugin-decoration）要先还原：cargo 解析依赖图时就要读它的
@@ -68,6 +68,6 @@ else
   fi
 fi
 
-# 把 Tauri 的安装包按版本标签重命名后集中到 build_out/
+# 把 Tauri 的安装包按版本重命名后集中到 build_out/
 echo '正在收集安装包到 build_out ...'
 node "$root/build/package-release.mjs"

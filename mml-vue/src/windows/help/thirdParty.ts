@@ -62,6 +62,13 @@ export const PROJECT_WORKS: ThirdPartyItem[] = [
     url: "https://github.com/Coloryr/ColorMC",
     note: "winHelp.noteColorasm",
   },
+  {
+    name: "mml-server-sync",
+    version: "1.0.0",
+    license: "Apache-2.0",
+    url: "https://github.com/Coloryr/mml-server-sync",
+    note: "winHelp.noteServerSync",
+  },
 ];
 
 /** 随发行物分发的第三方组件 */

@@ -57,7 +57,7 @@
     `MML_FEATURES=custom-protocol,prerelease bash build/build-release.sh`，PowerShell 先
     `$env:MML_FEATURES = 'custom-protocol,prerelease'` 再跑 `build/build-release.ps1`。
     feature 不能省，否则这样出的包与正式版一模一样，主页面不会提示「预发布版」。
-    安装包版本写的是标签去掉 `-pre` 的纯数字版本（WiX 只收纯数字），文件名仍带后缀。
+    安装包版本写的是 `docs/version` 去掉 `-pre` 的纯数字版本（WiX 只收纯数字），文件名仍带后缀。
 - Rust workspace 在**仓库根目录**（根 `Cargo.toml` 收编 `mml-core/` 全部子 crate 与
   `mml-gui/src-tauri` + `ipc-gen` / `ipc-gen/macros`；`workspace.dependencies` 与 `[profile.*]`
   也统一在根清单维护）。target 目录在根目录 `target\`（首次编译较慢）。

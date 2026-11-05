@@ -1,22 +1,23 @@
 #!/usr/bin/env node
-// 版本号的唯一来源是 Git 标签，不再维护版本文件：
-// HEAD 落在版本标签上就用标签名，否则取最近的可达标签（本地构建、releases/** 分支）。
-// CI 的 check-version 用 MML_VERSION 把发版标签传进来，构建机不必带完整标签历史。
+// 版本号的唯一来源是仓库里的版本文件 docs/version：一行，可带 -pre 这类后缀。
+// 构建前由 set-version 同步进应用清单；MML_VERSION 环境变量可以临时覆盖（不改文件试构建）。
 //
-// 用法：node build/version.mjs 打印版本；set-version 与 package-*.mjs 以模块方式引用。
-import { execFileSync } from "node:child_process";
+// 用法：node build/version.mjs 打印版本；--package 打印安装包版本；
+//       --tag v0.1.9 把标签解析成版本号（CI 校验标签与文件是否一致）。
+// set-version 与 package-*.mjs 以模块方式引用这里的函数。
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-/** 版本标签的 glob：0.1.0 / v0.1.0 / v0.1.0-pre 都算，testbuild-1 这类不算 */
-const TAG_PATTERNS = ["[0-9]*", "v[0-9]*"];
+/** 版本文件，相对仓库根 */
+const VERSION_FILE = "docs/version";
 
 /**
- * 把标签或环境变量里的版本号补齐成三段
+ * 把版本号补齐成三段
  *
- * 标签写 `v1.0` 时清单里要落成 `1.0.0`：少一段会被安装包拼成 1.0.20261028。
+ * 版本文件写 `1.0` 时清单里要落成 `1.0.0`：少一段会被安装包拼成 1.0.20261028。
  *
  * - `text`: 版本号，可带 v 前缀与 -pre 这类后缀
  *
@@ -32,55 +33,40 @@ export function normalizeVersion(text) {
 }
 
 /**
- * 在仓库里跑一条 git 命令
- *
- * - `args`: 传给 git 的参数
+ * 读版本文件
  *
  * # 返回值
  *
- * 命令输出并去掉首尾空白；命令失败或不在 Git 仓库里时返回空串
+ * 三段版本号，如 `0.1.9` 或 `0.1.9-pre`
+ *
+ * # 异常
+ *
+ * 文件不存在或内容不是版本号时抛错
  */
-function git(args) {
+function readVersionFile() {
+    let text;
     try {
-        return execFileSync("git", args, {
-            cwd: root,
-            encoding: "utf8",
-            stdio: ["ignore", "pipe", "ignore"],
-        }).trim();
+        text = fs.readFileSync(path.join(root, VERSION_FILE), "utf8").trim();
     } catch {
-        return "";
+        throw new Error(`读不到版本文件：${VERSION_FILE}`);
     }
-}
-
-/**
- * 列出描述 HEAD 的版本标签
- *
- * - `extra`: describe 的附加参数，如 `--exact-match` / `--abbrev=0`
- *
- * # 返回值
- *
- * 标签名数组；一个都匹配不上时是空数组
- */
-function describe(extra) {
-    const matched = TAG_PATTERNS.flatMap((pattern) => ["--match", pattern]);
-    return git(["describe", "--tags", ...extra, ...matched])
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean);
+    const version = normalizeVersion(text);
+    if (!version) throw new Error(`${VERSION_FILE} 不是版本号：${text}`);
+    return version;
 }
 
 /**
  * 解析本次构建的版本
  *
- * 顺序：MML_VERSION 环境变量、HEAD 上的版本标签、最近的可达版本标签。
+ * 顺序：MML_VERSION 环境变量、版本文件。
  *
  * # 返回值
  *
- * 三段版本号，如 `0.1.0-pre`
+ * 三段版本号，如 `0.1.9` 或 `0.1.9-pre`
  *
  * # 异常
  *
- * 三处都拿不到版本号时抛错，提示补标签
+ * 版本文件缺失、内容不是版本号，或 MML_VERSION 不是版本号时抛错
  */
 export function resolveVersion() {
     const fromEnv = (process.env.MML_VERSION ?? "").trim();
@@ -89,27 +75,14 @@ export function resolveVersion() {
         if (!version) throw new Error(`MML_VERSION 不是版本号：${fromEnv}`);
         return version;
     }
-
-    for (const tag of describe(["--exact-match"])) {
-        const version = normalizeVersion(tag);
-        if (version) return version;
-    }
-
-    for (const tag of describe(["--abbrev=0"])) {
-        const version = normalizeVersion(tag);
-        if (!version) continue;
-        console.warn(`HEAD 不在版本标签上，按最近的标签 ${tag} 构建。`);
-        return version;
-    }
-
-    throw new Error("仓库里没有版本标签：先打一个（如 v0.1.0）再构建。");
+    return readVersionFile();
 }
 
 /**
- * 把标签版本收成安装包能接受的形式
+ * 把版本收成安装包能接受的形式
  *
  * Windows 安装包要求版本纯数字，`0.1.1-pre` 会被 WiX 直接拒绝；
- * 标签保留后缀用于产物命名与 Release，清单与安装包元数据用去掉后缀的版本。
+ * 后缀保留用于产物命名与 Release，清单与安装包元数据用去掉后缀的版本。
  *
  * - `version`: 三段版本号，可带 -pre 这类后缀
  *
@@ -121,10 +94,20 @@ export function packageVersionOf(version) {
     return version.replace(/[-+].*$/, "");
 }
 
-// 直接执行时打印版本，供脚本与 bash 取用；被 import 时只导出函数
+// 直接执行时按参数输出，供脚本与 bash 取用；被 import 时只导出函数
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+    const args = process.argv.slice(2);
+    const tagAt = args.indexOf("--tag");
     try {
-        console.log(process.argv.includes("--package") ? packageVersionOf(resolveVersion()) : resolveVersion());
+        if (tagAt >= 0) {
+            const tag = (args[tagAt + 1] ?? "").trim();
+            const version = normalizeVersion(tag);
+            if (!version) throw new Error(`不是版本标签：${tag}`);
+            console.log(version);
+        } else {
+            const version = resolveVersion();
+            console.log(args.includes("--package") ? packageVersionOf(version) : version);
+        }
     } catch (error) {
         console.error(error.message);
         process.exit(1);
