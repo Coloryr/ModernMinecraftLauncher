@@ -18,7 +18,7 @@ const props = defineProps<{
   picked: Map<string, unknown>;
   /** 取消勾选的路径；父目录勾着时单独去掉某一条，默认空 */
   unpicked?: Set<string>;
-  /** 根目录：game = 游戏目录（默认），instance = 实例目录；「直接压缩」用后者 */
+  /** 根目录：game = 游戏目录（默认），instance = 实例目录；「直接压缩」与 MMC 用后者 */
   base?: "game" | "instance";
   /** 初始展开的目录（相对根目录）；默认勾选落在子目录里时靠它露出来 */
   expand?: string[];

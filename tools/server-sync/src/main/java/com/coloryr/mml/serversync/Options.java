@@ -15,6 +15,10 @@ final class Options {
     boolean dryRun;
     boolean noDelete;
     boolean quiet;
+    /** 清单拉不到时只记日志、不中止启动；仅 Agent 模式打开 */
+    boolean lenient;
+    /** 同时下载的文件数，1-64 */
+    int threads = 16;
     boolean help;
     boolean version;
 }

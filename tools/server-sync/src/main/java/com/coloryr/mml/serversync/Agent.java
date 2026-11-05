@@ -35,12 +35,15 @@ public final class Agent {
             options.baseDir = Main.defaultBaseDir(gameDir);
             options.stateDir = stateDir(gameDir);
             options.quiet = false;
+            options.lenient = true;
+            options.threads = threadsOf(System.getProperty("mml.serverSync.threads"));
             options.force = truthy(System.getProperty("mml.serverSync.force"))
                     || truthy(System.getenv("MML_SERVER_SYNC_FORCE"));
             String apiKey = System.getenv("CURSEFORGE_API_KEY");
             options.apiKey = apiKey == null ? "" : apiKey.trim();
             options.logFile = logFile(options.stateDir);
             Log.open(options.logFile);
+            Log.info("mml-server-sync " + Main.VERSION);
             Log.info("开始同步，游戏目录 " + gameDir);
             try {
                 new Sync(options).run();
@@ -65,6 +68,18 @@ public final class Agent {
             return Paths.get(env.trim()).toAbsolutePath().normalize();
         }
         return Paths.get(System.getProperty("user.dir", ".")).toAbsolutePath().normalize();
+    }
+
+    /** 下载线程数，缺省或非法时用 16。 */
+    private static int threadsOf(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return 16;
+        }
+        try {
+            return Math.max(1, Math.min(64, Integer.parseInt(value.trim())));
+        } catch (NumberFormatException e) {
+            return 16;
+        }
     }
 
     /** 日志文件路径：JVM 属性可覆盖，默认放在状态目录下。 */

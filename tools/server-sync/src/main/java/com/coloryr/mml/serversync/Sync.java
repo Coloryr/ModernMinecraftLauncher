@@ -11,6 +11,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** 一次服务器实例更新。 */
 final class Sync {
@@ -25,12 +30,29 @@ final class Sync {
     }
 
     void run() throws IOException {
-        String manifestUrl = toUrl(options.manifest);
-        byte[] data = downloader.fetch(manifestUrl);
-        Manifest current = Manifest.parse(data);
-        current.resolveUrls(manifestUrl);
+        String manifestUrl;
+        byte[] data;
+        Manifest current;
+        try {
+            manifestUrl = toUrl(options.manifest);
+            data = downloader.fetch(manifestUrl);
+            current = Manifest.parse(data);
+            current.resolveUrls(manifestUrl);
+        } catch (IOException e) {
+            // 清单没拉到等于一个文件都没动：游戏模式只记日志，别让服务器掉线锁死启动
+            if (!options.lenient) {
+                throw e;
+            }
+            Log.error("清单获取失败，跳过本次同步: " + e.getMessage());
+            return;
+        }
 
         Manifest old = loadOld(current);
+        if (old == null) {
+            info("本地无同步记录，远程包版本 " + packVersionOf(current));
+        } else {
+            info("本地包版本 " + packVersionOf(old) + "，远程包版本 " + packVersionOf(current));
+        }
         if (!options.force && sameVersion(old, current)) {
             info("包版本未变（" + current.packVersion + "），跳过同步");
             return;
@@ -69,43 +91,39 @@ final class Sync {
 
         Files.createDirectories(tempDir);
         Path baseTemp = null;
-        int done = 0;
+        List<DownloadTask> tasks = new ArrayList<>();
         if (needBase) {
             Manifest.BaseEntry base = current.base;
-            baseTemp = tempDir.resolve("base-" + safeName(base.file));
-            downloader.download(base.url, baseTemp, base.sha1, base.sha256);
-            info("下载基础包完成，解压到 " + options.baseDir);
-            done++;
-            progress(done, total);
+            baseTemp = tempDir.resolve(safeName(base.file));
+            tasks.add(new DownloadTask(base.url, baseTemp, base.sha1, base.sha256, null));
         }
 
         for (Manifest.FileEntry item : files) {
             Path target = Fs.resolveSafe(options.gameDir, item.path);
-            String url = downloader.resolveFile(item);
-            downloader.download(url, target, item.sha1, item.sha256);
-            done++;
-            progress(done, total);
+            tasks.add(new DownloadTask(null, target, item.sha1, item.sha256, item));
         }
 
         List<ArchivePlan> downloaded = new ArrayList<>();
+        int archiveIndex = 0;
         for (ArchivePlan plan : archives) {
             if (plan.skip) {
                 continue;
             }
-            Path temp = tempDir.resolve("archive-" + done + "-" + safeName(plan.item.file));
             String url = plan.item.url.trim();
             if (url.isEmpty()) {
                 throw new IOException("配置压缩包没有下载地址: " + plan.item.file);
             }
-            downloader.download(url, temp, plan.item.sha1, plan.item.sha256);
+            Path temp = tempDir.resolve("archive-" + (archiveIndex++) + "-" + safeName(plan.item.file));
+            tasks.add(new DownloadTask(url, temp, plan.item.sha1, plan.item.sha256, null));
             downloaded.add(new ArchivePlan(plan.item, temp, false));
-            done++;
-            progress(done, total);
         }
+
+        downloadAll(tasks, total);
 
         if (baseTemp != null) {
             Fs.extractZip(baseTemp, options.baseDir, true);
             Files.deleteIfExists(baseTemp);
+            info("基础包已解压到 " + options.baseDir);
         }
 
         downloaded.sort(Comparator.comparingInt((ArchivePlan plan) -> depth(plan.item.dir)));
@@ -121,6 +139,12 @@ final class Sync {
 
         saveState(data);
         info("同步完成，当前包版本 " + current.packVersion);
+    }
+
+    /** 清单的包版本，空串按「未标注」显示。 */
+    private static String packVersionOf(Manifest manifest) {
+        String version = manifest.packVersion == null ? "" : manifest.packVersion.trim();
+        return version.isEmpty() ? "未标注" : version;
     }
 
     private Manifest loadOld(Manifest current) {
@@ -310,6 +334,78 @@ final class Sync {
     private void info(String message) {
         if (!options.quiet) {
             Log.info(message);
+        }
+    }
+
+    /**
+     * 按选项里的线程数并发下载
+     *
+     * 任一条失败就取消其余任务并抛出第一个错误，避免半套文件继续被解压。
+     *
+     * - `tasks`: 待下载条目
+     * - `total`: 条目总数，进度按它报
+     */
+    private void downloadAll(List<DownloadTask> tasks, int total) throws IOException {
+        if (tasks.isEmpty()) {
+            return;
+        }
+        int threads = Math.max(1, Math.min(options.threads, tasks.size()));
+        ExecutorService pool = Executors.newFixedThreadPool(threads, runnable -> {
+            Thread thread = new Thread(runnable, "mml-server-sync-download");
+            thread.setDaemon(true);
+            return thread;
+        });
+        AtomicInteger finished = new AtomicInteger();
+        List<Future<?>> futures = new ArrayList<>(tasks.size());
+        try {
+            for (DownloadTask task : tasks) {
+                futures.add(pool.submit(() -> {
+                    String url = task.entry == null
+                            ? task.url
+                            : downloader.resolveFile(task.entry);
+                    downloader.download(url, task.target, task.sha1, task.sha256);
+                    progress(finished.incrementAndGet(), total);
+                    return null;
+                }));
+            }
+            for (Future<?> future : futures) {
+                try {
+                    future.get();
+                } catch (ExecutionException e) {
+                    Throwable cause = e.getCause();
+                    if (cause instanceof IOException) {
+                        throw (IOException) cause;
+                    }
+                    throw new IOException(cause == null ? "下载失败" : cause.toString(), cause);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("下载被中断", e);
+                }
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    /** 一个待下载条目 */
+    private static final class DownloadTask {
+        /// 直接可用的地址；为空时用 `entry` 解析平台地址
+        final String url;
+        /// 落盘位置
+        final Path target;
+        /// SHA1，空串表示不校验
+        final String sha1;
+        /// SHA256，空串表示不校验
+        final String sha256;
+        /// 清单里的文件条目；基础包与配置包为 null
+        final Manifest.FileEntry entry;
+
+        DownloadTask(String url, Path target, String sha1, String sha256, Manifest.FileEntry entry) {
+            this.url = url;
+            this.target = target;
+            this.sha1 = sha1;
+            this.sha256 = sha256;
+            this.entry = entry;
         }
     }
 

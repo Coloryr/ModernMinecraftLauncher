@@ -347,13 +347,6 @@ function setPackId(path: string, field: "pid" | "fid", event: Event) {
   }
 }
 
-/** 文件大小，按档显示 */
-function sizeText(size: number): string {
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / 1024 / 1024).toFixed(1)} MB`;
-}
-
 /** 文件名 */
 function baseName(path: string): string {
   return path.split("/").pop() ?? path;
@@ -584,12 +577,8 @@ async function loadInstance(uuid: string) {
     if (entry.dir) return !BASE_DIR_SKIP.includes(entry.path);
     return !entry.path.includes("/") && !BASE_SKIP.includes(entry.path);
   });
-  const savedBase = new Set(meta?.baseFiles ?? []);
-  pickedBase.value = new Set(
-    baseEntries.value
-      .map((entry) => entry.path)
-      .filter((path) => savedBase.has(path)),
-  );
+  // 保存的是勾选时的相对路径，可能展开到了 .minecraft 里面，不能按根条目过滤
+  pickedBase.value = new Set(meta?.baseFiles ?? []);
 
   const children = await loadConfigChildren(uuid, dirsNext);
   if (seq !== loadSeq) return;
@@ -908,7 +897,7 @@ onBeforeUnmount(() => {
     setPackId, setPackUrl, packIdTypeOf, isPackCustomType, setPackIdType,
     configs, newDir, newMode, dirChoices, addConfig, setConfigMode,
     setConfigDeleteOld, removeConfig,
-    pickInstance, openGuide, sizeText,
+    pickInstance, openGuide,
     current, ready, pickedCount, generate, percent, progress, result, error,
     modChanges, addedMods, removedMods, modifiedMods,
     packChanges, addedPacks, removedPacks, modifiedPacks,

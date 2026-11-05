@@ -231,8 +231,8 @@ pub async fn export_run(
     });
 
     let online = online_of(&game);
-    // 直接压缩的勾选相对实例目录（含 .minecraft 那一段），其余格式相对游戏目录
-    let pick_base = if pack == ExportPackType::MML {
+    // 直接压缩与 MMC 的勾选相对实例目录（含 .minecraft 那一段），其余格式相对游戏目录
+    let pick_base = if matches!(pack, ExportPackType::MML | ExportPackType::MMC) {
         game.get_base_path()
     } else {
         base.clone()

@@ -12,8 +12,9 @@ MML 服务器实例专用更新器，只读取 MML 生成的 `server.json`，同
 -javaagent:D:\Launcher\mml-server-sync.jar=https://example.com/server.json
 ```
 
-`Agent.premain` 在游戏 `main` 之前执行同步，完成后再进游戏。失败会抛异常中止启动，
-不会带着旧文件继续进服。
+`Agent.premain` 在游戏 `main` 之前执行同步，完成后再进游戏。下载失败会抛异常中止启动，
+不会带着旧文件继续进服；但**清单本身拉不到**（网络故障、404、清单格式错）时只记日志并
+跳过本次同步，游戏照常启动 —— 这时一个文件都还没动过。
 
 - 工作目录必须是游戏目录（`.minecraft`）。启动器没有设置工作目录时，额外加：
   `-Dmml.serverSync.gameDir=D:\Instance\.minecraft`
@@ -23,8 +24,10 @@ MML 服务器实例专用更新器，只读取 MML 生成的 `server.json`，同
 - 需要在 MML 启动器下强制走同步时，设环境变量 `MML_SKIP=true`，跳过 MML 识别。
 - CurseForge API Key 读环境变量 `CURSEFORGE_API_KEY`。
 - 识别到 MML 启动器会直接跳过，不重复同步。
+- 同时下载的文件数默认 16，可用 `-Dmml.serverSync.threads=8` 调整。
 - 同步日志写在 `<状态目录>/mml-server-sync.log`，每行以 `[MML-SERVER-SYNC]` 开头，
   日志文件可用 `-Dmml.serverSync.log=...` 覆盖。
+- 下载时每秒打一条字节进度，例如 `[download] config.zip 43% (9.2/22.0 MB, 6.3 MB/s)`。
 - 命令行模式仍然可用，见下文；两种模式共用同一个 jar。
 
 ### 怎么识别 MML 启动器
@@ -140,6 +143,7 @@ java -jar mml-server-sync.jar -m ./server.json -g ./Instance/game --base-dir ./I
 | `--no-delete` | 不删除旧清单里已移除的受管文件 / 目录 |
 | `--quiet` | 少输出 |
 | `--log` | 同步日志文件；默认 `<state-dir>/mml-server-sync.log` |
+| `--threads` | 同时下载的文件数，1-64；默认 16 |
 
 退出码：`0` 成功或版本未变跳过，`1` 同步失败，`2` 参数错误。
 

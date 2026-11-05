@@ -89,11 +89,12 @@
 
 ### 3.5 基础文件
 
-- 列出实例根目录下、与 `.minecraft` 同级的文件，不包含
-  `game.json` / `icon.png` / `server.json` 等启动器元数据。
-- 也可以勾选顶层目录（`.minecraft`、`libraries`、`patches` 等），整个目录一起进 `base.zip`；
-  `.minecraft` 里的 `server.json` / `server.json.sha1` / `server.json.old` 会自动排除。
-  `cache` / `temp` / `backup` 这些运行期目录不列。
+- 以实例目录为根，列出可同步的文件与目录；`game.json` / `icon.png` / `server.json` 等
+  启动器元数据不列。
+- 勾「整个实例文件夹」等于全选根目录下的条目；目录可以逐层展开，勾 `.minecraft`、`libraries`、
+  `patches` 或其中的子目录，整个目录一起进 `base.zip`。`.minecraft` 里的
+  `server.json` / `server.json.sha1` / `server.json.old` 会自动排除，`cache` / `temp` /
+  `backup` 这些顶层的运行期目录不列。
 - 实例图标不在这里选：生成时会单独复制成发布目录的 `icon.png`，并写进清单的 `Icon` 字段。
 - 勾选的文件打成一个固定的 `base.zip`，清单里写进 `Base`。
 - 客户端**只在第一次导入 / 同步时下载并解压到实例根目录**，后续版本更新不会再下载，也不会覆盖。

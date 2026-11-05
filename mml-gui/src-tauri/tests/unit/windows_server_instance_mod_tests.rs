@@ -776,6 +776,8 @@ fn base_files_allow_minecraft_but_reject_metadata() {
     fs::create_dir_all(base.join("patches")).unwrap();
     fs::write(base.join("server.properties"), b"x").unwrap();
     fs::write(base.join(".minecraft").join("a.txt"), b"x").unwrap();
+    fs::create_dir_all(base.join(".minecraft").join("mods")).unwrap();
+    fs::write(base.join(".minecraft").join("mods").join("a.jar"), b"x").unwrap();
     fs::write(base.join(".minecraft").join("server.json"), b"{}").unwrap();
     fs::write(base.join(".minecraft").join("server.json.sha1"), b"x").unwrap();
     fs::write(base.join("libraries").join("foo.jar"), b"x").unwrap();
@@ -788,11 +790,19 @@ fn base_files_allow_minecraft_but_reject_metadata() {
     );
     assert_eq!(
         files::base_files(&base, &[".minecraft".to_string()]).unwrap(),
-        vec![PathBuf::from(".minecraft/a.txt")]
+        vec![
+            PathBuf::from(".minecraft/a.txt"),
+            PathBuf::from(".minecraft/mods/a.jar"),
+        ]
     );
     assert_eq!(
         files::base_files(&base, &[".minecraft/a.txt".to_string()]).unwrap(),
         vec![PathBuf::from(".minecraft/a.txt")]
+    );
+    // 展开 .minecraft 后可以只勾里面的子目录
+    assert_eq!(
+        files::base_files(&base, &[".minecraft/mods".to_string()]).unwrap(),
+        vec![PathBuf::from(".minecraft/mods/a.jar")]
     );
     assert_eq!(
         files::base_files(&base, &["libraries".to_string()]).unwrap(),

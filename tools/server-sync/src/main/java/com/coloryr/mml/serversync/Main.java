@@ -7,7 +7,8 @@ import java.nio.file.Paths;
 
 /** 独立服务器实例更新器入口。 */
 public final class Main {
-    private static final String VERSION = "1.0.0";
+    /** 工具版本号，启动日志与 --version 都用它 */
+    static final String VERSION = "1.0.0";
 
     private Main() {}
 
@@ -43,6 +44,7 @@ public final class Main {
             Log.open(options.logFile == null
                     ? options.stateDir.resolve(Log.FILE_NAME)
                     : options.logFile.toAbsolutePath().normalize());
+            Log.info("mml-server-sync " + VERSION);
             Log.info("开始同步，游戏目录 " + options.gameDir);
             try {
                 new Sync(options).run();
@@ -99,6 +101,8 @@ public final class Main {
                 options.apiKey = arg.substring("--curseforge-api-key=".length());
             } else if (arg.startsWith("--log=")) {
                 options.logFile = Paths.get(arg.substring("--log=".length()));
+            } else if (arg.startsWith("--threads=")) {
+                options.threads = threadsOf(arg.substring("--threads=".length()));
             } else if ("--manifest".equals(arg) || "-m".equals(arg)) {
                 options.manifest = value(args, ++i, arg);
             } else if ("--game-dir".equals(arg) || "-g".equals(arg)) {
@@ -111,6 +115,8 @@ public final class Main {
                 options.apiKey = value(args, ++i, arg);
             } else if ("--log".equals(arg)) {
                 options.logFile = Paths.get(value(args, ++i, arg));
+            } else if ("--threads".equals(arg)) {
+                options.threads = threadsOf(value(args, ++i, arg));
             } else if (!arg.startsWith("-")) {
                 throw new UsageException("不认识的参数: " + arg);
             } else {
@@ -124,6 +130,15 @@ public final class Main {
             }
         }
         return options;
+    }
+
+    /** 解析线程数，限制在 1-64 */
+    private static int threadsOf(String value) throws UsageException {
+        try {
+            return Math.max(1, Math.min(64, Integer.parseInt(value.trim())));
+        } catch (NumberFormatException e) {
+            throw new UsageException("--threads 需要整数: " + value);
+        }
     }
 
     private static String value(String[] args, int index, String option) throws UsageException {
@@ -154,6 +169,7 @@ public final class Main {
         System.out.println("  --no-delete         不删除旧文件/旧配置目录");
         System.out.println("  --curseforge-api-key CurseForge API Key；缺省读 CURSEFORGE_API_KEY");
         System.out.println("  --log               同步日志文件；默认 <状态目录>/mml-server-sync.log");
+        System.out.println("  --threads           同时下载的文件数，1-64；默认 16");
         System.out.println("  --quiet             少输出");
         System.out.println("  --version           显示版本");
         System.out.println("  --help, -h          显示帮助");

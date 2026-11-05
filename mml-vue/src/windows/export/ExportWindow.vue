@@ -6,7 +6,7 @@
 // `export-focus` 是窗口已存在时再次打开，由壳层推送。
 // 打包在 Rust 侧后台任务执行，即 export_run，进度经 export-progress 事件上报。
 //
-// 勾选分两块：**模组**（`mods` 目录，来自 export_get_info）与**文件**（游戏目录下的懒加载树）。
+// 勾选分两块：**模组**（`mods` 目录，来自 export_get_info）与**文件**（按格式以实例或游戏目录为根的懒加载树）。
 // 每一条都能填下载地址：Modrinth 格式下填了地址的写进 index 的下载清单，没填的与目录一起打进
 // overrides；CurseForge 的清单格式里只有项目号 / 文件号，地址那一块在那个格式下不作数。
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
@@ -225,6 +225,9 @@ const customLoaderLost = computed(
 /** 实例目录下的游戏目录名；「直接压缩」以实例目录为根，需要它来展开子项 */
 const GAME_DIR = ".minecraft";
 
+/** MMC 包默认不带的启动器自己的文件：实例配置与图标是 MML 的，别的启动器用不上 */
+const MMC_SKIP = new Set(["game.json", "icon.png"]);
+
 /** 默认跳过的目录名：运行期产物，打进包里没用还占体积；其余默认全勾 */
 const DEFAULT_SKIP = new Set([
   "logs",
@@ -236,11 +239,15 @@ const DEFAULT_SKIP = new Set([
   "backups",
 ]);
 
-/** 文件树的根：直接压缩看实例目录，其余格式看游戏目录 */
-const fileBase = computed<"game" | "instance">(() => (pack.value === "mml" ? "instance" : "game"));
+/** 文件树的根：直接压缩与 MMC 看实例目录，其余格式看游戏目录 */
+const fileBase = computed<"game" | "instance">(() =>
+  pack.value === "mml" || pack.value === "mmc" ? "instance" : "game",
+);
 
-/** 直接压缩时把 .minecraft 展开：默认勾的是它的子项，不展开看不见 */
-const fileExpand = computed(() => (pack.value === "mml" ? [GAME_DIR] : []));
+/** 以实例目录为根时把 .minecraft 展开：默认勾的是它，不展开看不见里面的内容 */
+const fileExpand = computed(() =>
+  pack.value === "mml" || pack.value === "mmc" ? [GAME_DIR] : [],
+);
 
 /**
  * 直接压缩时实例根上的条目是否必选
@@ -424,8 +431,9 @@ let picksSeq = 0;
 /**
  * 按当前格式铺文件树的默认勾选
  *
- * 先全勾、再把运行期目录单独取消：直接压缩以实例目录为根，`.minecraft` 整目录勾上，
- * 里面的内容靠继承一起算上；其余格式以游戏目录为根，根下逐项勾。
+ * 先全勾、再把运行期目录单独取消：直接压缩与 MMC 以实例目录为根，`.minecraft` 整目录勾上，
+ * 里面的内容靠继承一起算上；MMC 只不带 MML 自己的 game.json / icon.png；
+ * 其余格式以游戏目录为根，根下逐项勾。
  *
  * - `uuid`: 目标实例
  */
@@ -437,6 +445,16 @@ async function reseedFilePicks(uuid: string) {
     if (pack.value === "mml") {
       // 实例根上全勾，运行期目录随后单独排除；`.minecraft` 里面的内容靠继承算上
       for (const entry of await api.listExportInstanceDir(uuid, "")) picked.set(entry.path, entry);
+      for (const name of DEFAULT_SKIP) {
+        unpicked.add(name);
+        unpicked.add(`${GAME_DIR}/${name}`);
+      }
+    } else if (pack.value === "mmc") {
+      // MMC 包是"一份实例目录"：根上全勾，只剔掉 MML 自己的实例配置与图标；
+      // 运行期目录在 .minecraft 里，按 DEFAULT_SKIP 单独排除
+      for (const entry of await api.listExportInstanceDir(uuid, "")) {
+        if (!MMC_SKIP.has(entry.path)) picked.set(entry.path, entry);
+      }
       for (const name of DEFAULT_SKIP) {
         unpicked.add(name);
         unpicked.add(`${GAME_DIR}/${name}`);

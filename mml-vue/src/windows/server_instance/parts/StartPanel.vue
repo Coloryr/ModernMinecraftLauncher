@@ -9,7 +9,6 @@ const {
   current,
   format,
   pickedBase,
-  baseEntries,
   pickedMods,
   mods,
   pickedPacks,
@@ -42,7 +41,7 @@ const {
     </div>
     <div class="si-line">
       {{ t("serverInstance.summaryBase") }}{{ t("common.detailSep") }}
-      <code>{{ pickedBase.size }} / {{ baseEntries.length }}</code>
+      <code>{{ pickedBase.size }}</code>
     </div>
     <div class="si-line">
       {{ t("serverInstance.summaryMods") }}{{ t("common.detailSep") }}

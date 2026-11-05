@@ -269,6 +269,15 @@ async fn mmc_and_hmcl_export_roundtrip() {
     std::fs::create_dir_all(game_dir.join("mods")).unwrap();
     let mod_file = game_dir.join("mods").join("testmod.jar");
     std::fs::write(&mod_file, b"test mod").unwrap();
+    // 实例根上的文件：MMC 以实例目录为根，勾了就要按原位置进包
+    let inst_file = game
+        .read()
+        .unwrap()
+        .get_base_path()
+        .join("patches")
+        .join("test.json");
+    std::fs::create_dir_all(inst_file.parent().unwrap()).unwrap();
+    std::fs::write(&inst_file, b"{}").unwrap();
 
     for pack in [ExportPackType::MMC, ExportPackType::HMCL] {
         let export_file = mml_testutil::temp_dir().join(format!(
@@ -289,8 +298,12 @@ async fn mmc_and_hmcl_export_roundtrip() {
                 mods: Vec::new(),
                 files: Vec::new(),
                 unselect: Vec::new(),
-                // 整包格式没有下载清单，选中的文件直接进包
-                select: vec![mod_file.clone()],
+                // 整包格式没有下载清单，选中的文件直接进包；MMC 还能带实例根上的文件
+                select: if pack == ExportPackType::MMC {
+                    vec![mod_file.clone(), inst_file.clone()]
+                } else {
+                    vec![mod_file.clone()]
+                },
                 cancel: None,
                 name: "整包导出测试".to_string(),
                 author: "mml".to_string(),
@@ -320,6 +333,12 @@ async fn mmc_and_hmcl_export_roundtrip() {
             entries.iter().any(|n| n.ends_with(game_file)),
             "{pack:?} 包内应有 {game_file}，实际: {entries:?}"
         );
+        if pack == ExportPackType::MMC {
+            assert!(
+                entries.iter().any(|n| n.ends_with("patches/test.json")),
+                "MMC 包内应有实例根上的文件，实际: {entries:?}"
+            );
+        }
         drop(archive);
 
         // 重新识别：本启动器要能把它认成对应的整包格式，并读出实例名

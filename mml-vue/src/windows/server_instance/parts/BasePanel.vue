@@ -1,11 +1,24 @@
 <script setup lang="ts">
-import { inject } from "vue";
+import { computed, inject } from "vue";
 import BaseButton from "../../../components/ui/BaseButton.vue";
 import { t } from "../../../lib/i18n";
 import { ServerInstanceKey } from "../context";
+import BaseFileTree from "./BaseFileTree.vue";
 const ctx = inject(ServerInstanceKey);
 if (!ctx) throw new Error("server instance context missing");
-const { baseEntries, pickedBase, pickAllBase, toggleBase, format, busy, sizeText } = ctx;
+const { baseEntries, pickedBase, pickAllBase, toggleBase, format, busy, currentUuid } = ctx;
+
+/** 根条目全勾上就等于整个实例进包 */
+const allPicked = computed(
+  () =>
+    baseEntries.value.length > 0 &&
+    baseEntries.value.every((entry) => pickedBase.value.has(entry.path)),
+);
+
+/** 勾 / 取消整个实例：根条目全选或全不选 */
+function toggleAll() {
+  pickAllBase(!allPicked.value);
+}
 </script>
 
 <template>
@@ -19,16 +32,31 @@ const { baseEntries, pickedBase, pickAllBase, toggleBase, format, busy, sizeText
       {{ t("serverInstance.pickNone") }}
     </BaseButton>
   </div>
-  <p v-if="!baseEntries.length" class="empty-tip">{{ t("serverInstance.baseEmpty") }}</p>
+  <div v-if="!baseEntries.length" class="empty-tip">{{ t("serverInstance.baseEmpty") }}</div>
   <div v-else class="si-list">
-    <label v-for="entry in baseEntries" :key="entry.path" class="si-row-item">
-      <input type="checkbox" class="si-box" :checked="pickedBase.has(entry.path)"
-        :disabled="busy || format === 'hmcl'" @change="toggleBase(entry.path)" />
-      <span class="si-name" :title="entry.path">{{ entry.path }}{{ entry.dir ? "/" : "" }}</span>
-      <span class="si-size">{{ entry.dir ? "—" : sizeText(entry.size) }}</span>
+    <!-- 根行：整份实例进包；下面才是实例目录里的条目，目录可以逐层展开 -->
+    <label class="si-row-item si-root">
+      <span class="si-caret"></span>
+      <input type="checkbox" class="si-box" :checked="allPicked" :disabled="busy || format === 'hmcl'"
+        @change="toggleAll" />
+      <span class="si-name">{{ t("serverInstance.baseAll") }}</span>
     </label>
+    <BaseFileTree :uuid="currentUuid" :root="baseEntries" :picked="pickedBase"
+      :disabled="busy || format === 'hmcl'" @toggle="toggleBase" />
   </div>
   <p class="field-hint">{{ t("serverInstance.baseHint") }}</p>
   <p class="field-hint">{{ t("serverInstance.baseIconHint") }}</p>
 </section>
 </template>
+
+<style scoped>
+/* 根行没有箭头，但要占住与树行相同的宽度，勾选框才对得齐 */
+.si-root .si-caret {
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.si-root {
+  cursor: default;
+}
+</style>

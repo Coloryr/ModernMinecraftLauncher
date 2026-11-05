@@ -490,12 +490,13 @@ async fn modrinth(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
     Ok(())
 }
 
-/// 把游戏目录下的一批文件按 `<prefix>/<相对游戏目录的路径>` 加进压缩包
+/// 把根目录下的一批文件按 `<prefix>/<相对根目录的路径>` 加进压缩包
 ///
-/// 两种整包格式的差别只在包内前缀：MMC 是 `<实例名>/.minecraft`，HMCL 是 overrides。
+/// 两种整包格式的差别只在根与包内前缀：MMC 以实例目录为根、前缀是实例名；
+/// HMCL 以游戏目录为根、前缀是 overrides。
 ///
 /// - `zip`: 目标压缩包
-/// - `base`: 游戏目录，即 `.minecraft`
+/// - `base`: 选文件时的根目录
 /// - `prefix`: 包内前缀，末尾不带 `/`
 /// - `files`: 待打包的文件
 /// - `gui`: 进度回调，`None` 时不上报
@@ -549,7 +550,8 @@ fn pack_all_files(arg: &ExportArg) -> Vec<PathBuf> {
 /// 导出为 MMC 实例包：整包实例，供 MultiMC / Prism 导入
 ///
 /// 包内是"一个实例目录"：`mmc-pack.json` 写组件、`instance.cfg` 写实例设置，
-/// 游戏文件放在 `.minecraft/` 下。组件 uid 与导入侧 `other_launcher` 的
+/// 勾选的文件按实例目录结构放入：`.minecraft/` 仍在 `.minecraft/`，实例根上的文件留在根。
+/// 组件 uid 与导入侧 `other_launcher` 的
 /// `to_instance` 判据一一对应，导出的包能被本启动器原样导回来。
 ///
 /// - `game`: 目标实例
@@ -585,7 +587,6 @@ fn mmc(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
     let mut zip = BaseArchive::create_empty(ArchiveType::Zip, &arg.file)?;
     // 顶层套一层实例目录：MMC / Prism 从 zip 导入时按它建实例
     let inst_dir = format!("{}/", game.name);
-    let game_dir = format!("{inst_dir}{}", names::GAME_DIR);
     let files = pack_all_files(&arg);
 
     if let Some(gui) = &arg.gui {
@@ -605,10 +606,11 @@ fn mmc(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
         instance_cfg(game).as_bytes(),
     )?;
 
+    // 勾选相对实例目录：.minecraft 原样落在实例目录下，实例根上的文件也按原位置带走
     add_game_files(
         &mut zip,
-        &game.get_game_path(),
-        &game_dir,
+        &game.get_base_path(),
+        inst_dir.trim_end_matches('/'),
         &files,
         &arg.gui,
         2,

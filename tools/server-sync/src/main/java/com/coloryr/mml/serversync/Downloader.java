@@ -15,13 +15,18 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /** HTTP 下载、平台地址解析与哈希校验。 */
 final class Downloader {
+    /** 字节进度两条日志的最小间隔，单位纳秒 */
+    private static final long REPORT_INTERVAL = 1_000_000_000L;
+
     private final String apiKey;
     private final boolean quiet;
-    private final Map<String, String> resolved = new HashMap<>();
+    private final Map<String, String> resolved = new ConcurrentHashMap<>();
 
     Downloader(String apiKey, boolean quiet) {
         this.apiKey = apiKey == null ? "" : apiKey.trim();
@@ -137,6 +142,10 @@ final class Downloader {
         MessageDigest sha256Digest = digest("SHA-256");
         try {
             URLConnection connection = open(url, Collections.<String, String>emptyMap());
+            long total = connection.getContentLengthLong();
+            long done = 0;
+            long lastDone = 0;
+            long lastTime = System.nanoTime();
             try (InputStream input = connection.getInputStream();
                  OutputStream output = Files.newOutputStream(temp)) {
                 byte[] buffer = new byte[64 * 1024];
@@ -148,6 +157,13 @@ final class Downloader {
                     }
                     if (!sha256.isEmpty()) {
                         sha256Digest.update(buffer, 0, read);
+                    }
+                    done += read;
+                    long now = System.nanoTime();
+                    if (!quiet && now - lastTime >= REPORT_INTERVAL) {
+                        report(target, done, total, done - lastDone, now - lastTime);
+                        lastDone = done;
+                        lastTime = now;
                     }
                 }
             }
@@ -171,11 +187,36 @@ final class Downloader {
         }
     }
 
+    /**
+     * 打印一条下载字节进度，约每秒一条
+     *
+     * - `target`: 目标文件，只取文件名
+     * - `done`: 已下载字节数
+     * - `total`: 总字节数，服务端没给长度时为 0 或负数
+     * - `delta`: 距上一条进度新增的字节数
+     * - `elapsed`: 距上一条进度的纳秒数
+     */
+    private static void report(Path target, long done, long total, long delta, long elapsed) {
+        double seconds = elapsed / 1_000_000_000.0;
+        double speed = seconds <= 0 ? 0 : delta / 1048576.0 / seconds;
+        String size = total > 0
+                ? String.format(Locale.ROOT, "%.1f/%.1f MB", done / 1048576.0, total / 1048576.0)
+                : String.format(Locale.ROOT, "%.1f MB", done / 1048576.0);
+        String percent = total > 0
+                ? String.format(Locale.ROOT, " %d%%", done * 100 / total)
+                : "";
+        Log.info("[download] " + target.getFileName() + percent + " (" + size + ", "
+                + String.format(Locale.ROOT, "%.1f MB/s", speed) + ")");
+    }
+
     byte[] fetch(String url) throws IOException {
         return fetch(url, Collections.<String, String>emptyMap());
     }
 
     byte[] fetch(String url, Map<String, String> headers) throws IOException {
+        if (!quiet) {
+            Log.info("获取 JSON: " + url);
+        }
         URLConnection connection = open(url, headers);
         try (InputStream input = connection.getInputStream()) {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -183,6 +224,9 @@ final class Downloader {
             int read;
             while ((read = input.read(buffer)) >= 0) {
                 out.write(buffer, 0, read);
+            }
+            if (!quiet) {
+                Log.info("JSON 已获取，共 " + out.size() + " 字节: " + url);
             }
             return out.toByteArray();
         }

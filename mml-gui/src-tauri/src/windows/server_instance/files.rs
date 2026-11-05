@@ -202,11 +202,11 @@ fn relative(base: &Path, name: &str) -> Result<PathBuf, String> {
 /// server.json / server.json.sha1 / server.json.old 会被跳过，避免覆盖同步元数据。
 ///
 /// - `base`: 实例根目录
-/// - `picks`: 前端勾选的相对路径
+/// - `picks`: 前端勾选的相对路径，可以是文件、顶层目录或其中的子目录
 ///
 /// # 返回值
 ///
-/// 相对实例根目录的文件路径，排序去重；越界、非顶层目录或启动器元数据返回错误
+/// 相对实例根目录的文件路径，排序去重；越界或启动器元数据返回错误
 pub(super) fn base_files(base: &Path, picks: &[String]) -> Result<Vec<PathBuf>, String> {
     let mut list = Vec::new();
     for pick in picks {
@@ -217,12 +217,9 @@ pub(super) fn base_files(base: &Path, picks: &[String]) -> Result<Vec<PathBuf>, 
             return Err(err_keys::SERVER_INSTANCE_BASE_FILE.to_string());
         }
 
-        // 顶层目录整目录带上，展开成每个文件一条；.minecraft 的清单文件跳过
+        // 目录整目录带上，展开成每个文件一条；.minecraft 的清单文件跳过
         let path = base.join(&rel);
         if path.is_dir() {
-            if rel.components().count() != 1 {
-                return Err(err_keys::SERVER_INSTANCE_BASE_FILE.to_string());
-            }
             for file in archive::files_under(&path)? {
                 let item = file
                     .strip_prefix(base)

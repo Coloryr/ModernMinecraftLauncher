@@ -99,7 +99,7 @@ pub(crate) const LOG_MIN_WIDTH: f64 = 800.0;
 pub(crate) const LOG_MIN_HEIGHT: f64 = 480.0;
 
 /// 实例导出窗口最小宽度，元数据表单加两侧勾选列表
-pub(crate) const EXPORT_MIN_WIDTH: f64 = 780.0;
+pub(crate) const EXPORT_MIN_WIDTH: f64 = 800.0;
 
 /// 实例导出窗口最小高度
 pub(crate) const EXPORT_MIN_HEIGHT: f64 = 640.0;
