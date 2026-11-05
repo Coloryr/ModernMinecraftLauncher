@@ -27,9 +27,9 @@ const { instances, currentUuid, busy, section, sections, pickInstance, openGuide
     <!-- 实例放标题栏：换实例不用回到总体设定 -->
     <template #head-right>
       <div class="si-head-actions">
-        <BaseButton class="icon-btn-head" size="sm" v-tip="t('serverInstance.guide')"
-          :aria-label="t('serverInstance.guide')" @click="openGuide">
-          <GlyphIcon name="document" :size="16" />
+        <BaseButton variant="ghost" size="sm" class="icon-btn-head"
+          v-tip="t('serverInstance.guide')" :aria-label="t('serverInstance.guide')" @click="openGuide">
+          <GlyphIcon name="document" :size="15" :weight="1.8" />
         </BaseButton>
         <InstanceSelect class="head-select" :instances="instances" :model-value="currentUuid"
           :placeholder="t('winExport.instance')" :disabled="busy" :menu-min-width="260"

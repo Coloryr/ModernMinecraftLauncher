@@ -52,6 +52,17 @@ export type ServerInstanceMetaDto = {
   baseFiles: string[],
 };
 
+export type ServerInstanceSnapshotDto = {
+  generated: boolean,
+  mods: ServerInstanceSnapshotEntryDto[],
+  packs: ServerInstanceSnapshotEntryDto[],
+};
+
+export type ServerInstanceSnapshotEntryDto = {
+  path: string,
+  sha1: string,
+};
+
 export type ServerInstanceChangesDto = {
   added: string[],
   removed: string[],

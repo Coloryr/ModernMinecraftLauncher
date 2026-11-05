@@ -84,6 +84,7 @@ import type {
   ServerPackProbeDto,
   ServerInstanceIdDto,
   ServerInstanceMetaDto,
+  ServerInstanceSnapshotDto,
   ServerInstanceOptionsDto,
   ServerInstanceProgressDto,
   ServerInstanceResultDto,
@@ -1368,6 +1369,19 @@ export const api = {
    */
   async getServerInstanceIds(uuid: string): Promise<ServerInstanceIdDto[]> {
     return commands.serverInstance.getIds(uuid);
+  },
+
+  /**
+   * 读取上次生成保存的模组 / 资源包快照，给生成前的变化预览用
+   *
+   * - `uuid`: 实例 uuid
+   *
+   * # 返回值
+   *
+   * 快照路径与 SHA1；没有生成过时 `generated` 为 false
+   */
+  async getServerInstanceSnapshot(uuid: string): Promise<ServerInstanceSnapshotDto> {
+    return commands.serverInstance.getSnapshot(uuid);
   },
 
   /**

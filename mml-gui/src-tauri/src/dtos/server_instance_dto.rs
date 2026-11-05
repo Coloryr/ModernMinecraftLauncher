@@ -127,6 +127,28 @@ pub struct ServerInstanceMetaDto {
     pub base_files: Vec<String>,
 }
 
+/// 上次生成保存的模组 / 资源包快照
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerInstanceSnapshotDto {
+    /// 映射文件是否来自上次生成；false 时表示还没有基线
+    pub generated: bool,
+    /// 上次生成写进清单的模组
+    pub mods: Vec<ServerInstanceSnapshotEntryDto>,
+    /// 上次生成写进清单的资源包
+    pub packs: Vec<ServerInstanceSnapshotEntryDto>,
+}
+
+/// 快照里的一个文件
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerInstanceSnapshotEntryDto {
+    /// 相对游戏目录的路径
+    pub path: String,
+    /// 上次生成时的文件 SHA1
+    pub sha1: String,
+}
+
 /// 条目变化汇总，用于生成后给模组 / 资源包表格着色
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]

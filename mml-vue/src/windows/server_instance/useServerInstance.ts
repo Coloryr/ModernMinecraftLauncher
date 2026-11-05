@@ -21,6 +21,7 @@ import type {
   ServerInstanceMetaDto,
   ServerInstanceProgressDto,
   ServerInstanceResultDto,
+  ServerInstanceSnapshotDto,
 } from "../../lib/bindings";
 
 /** 生成格式：mml 写 server.json，hmcl 写 server-manifest.json */
@@ -131,13 +132,49 @@ const newMode = ref<ConfigMode>("archive");
 const busy = ref(false);
 const progress = ref<ServerInstanceProgressDto | null>(null);
 const result = ref<ServerInstanceResultDto | null>(null);
-/** 上次生成后模组的新增 / 删除 / 修改汇总 */
-const modChanges = computed(() => result.value?.modChanges ?? null);
+/** 上次生成保存的快照，用来在生成前预览变化 */
+const lastSnapshot = ref<ServerInstanceSnapshotDto | null>(null);
+
+/** 按当前勾选与上次快照比较，生成前就能看到模组变化 */
+const previewModChanges = computed(() => {
+  const snapshot = lastSnapshot.value;
+  if (!snapshot?.generated) return null;
+  const old = new Map(snapshot.mods.map((item) => [item.path, item.sha1]));
+  const current = mods.value.filter((item) => pickedMods.value.has(item.path));
+  const added: string[] = [];
+  const modified: string[] = [];
+  for (const item of current) {
+    if (!old.has(item.path)) added.push(item.path);
+    else if (old.get(item.path) !== item.sha1) modified.push(item.path);
+  }
+  const currentPaths = new Set(current.map((item) => item.path));
+  const removed = [...old.keys()].filter((path) => !currentPaths.has(path));
+  return { added, removed, modified };
+});
+
+const previewPackChanges = computed(() => {
+  const snapshot = lastSnapshot.value;
+  if (!snapshot?.generated) return null;
+  const old = new Map(snapshot.packs.map((item) => [item.path, item.sha1]));
+  const current = packs.value.filter((item) => pickedPacks.value.has(item.path));
+  const added: string[] = [];
+  const modified: string[] = [];
+  for (const item of current) {
+    if (!old.has(item.path)) added.push(item.path);
+    else if (old.get(item.path) !== item.sha1) modified.push(item.path);
+  }
+  const currentPaths = new Set(current.map((item) => item.path));
+  const removed = [...old.keys()].filter((path) => !currentPaths.has(path));
+  return { added, removed, modified };
+});
+
+/** 生成后用后端结果；生成前用快照预览 */
+const modChanges = computed(() => result.value?.modChanges ?? previewModChanges.value);
 const addedMods = computed(() => new Set(modChanges.value?.added ?? []));
 const removedMods = computed(() => new Set(modChanges.value?.removed ?? []));
 const modifiedMods = computed(() => new Set(modChanges.value?.modified ?? []));
-/** 上次生成后资源包的新增 / 删除 / 修改汇总 */
-const packChanges = computed(() => result.value?.packChanges ?? null);
+/** 生成后用后端结果；生成前用快照预览 */
+const packChanges = computed(() => result.value?.packChanges ?? previewPackChanges.value);
 const addedPacks = computed(() => new Set(packChanges.value?.added ?? []));
 const removedPacks = computed(() => new Set(packChanges.value?.removed ?? []));
 const modifiedPacks = computed(() => new Set(packChanges.value?.modified ?? []));
@@ -411,6 +448,43 @@ let loadSeq = 0;
 /** 重新读一个实例的模组、资源包与顶层目录，勾选与配置列表重置成默认值 */
 async function loadInstance(uuid: string) {
   const seq = ++loadSeq;
+  lastSnapshot.value = null;
+  result.value = null;
+  progress.value = null;
+  changedPaths.value = new Set();
+  const fallbackName = current.value?.name ?? "";
+  // 名字先用实例列表里的值铺上，不等慢的目录扫描
+  name.value = fallbackName;
+
+  // 上次生成保存的名字 / 版本 / 说明 / 网址等，跟编号映射在同一份文件里
+  const meta: ServerInstanceMetaDto | null = await api
+    .getServerInstanceMeta(uuid)
+    .catch(() => null);
+  if (seq !== loadSeq) return;
+
+  if (meta) {
+    format.value = meta.format === "hmcl" ? "hmcl" : "mml";
+    name.value = meta.name || fallbackName;
+    version.value = meta.version || "1.0.0";
+    text.value = meta.text;
+    url.value = meta.url;
+    folder.value = meta.folder;
+  } else {
+    format.value = "mml";
+    version.value = "1.0.0";
+    text.value = "";
+    url.value = "";
+    folder.value = "";
+  }
+
+  // 编号与快照都只读同一份小文件，先取完再开始慢的目录扫描
+  const savedIds: ServerInstanceIdDto[] = await api
+    .getServerInstanceIds(uuid)
+    .catch(() => []);
+  if (seq !== loadSeq) return;
+  const snapshot = await api.getServerInstanceSnapshot(uuid).catch(() => null);
+  if (seq !== loadSeq) return;
+
   let instanceName = "";
   try {
     const info = await api.getExportInfo(uuid);
@@ -426,21 +500,11 @@ async function loadInstance(uuid: string) {
     modUrls.value = new Map();
     showToast(tErr(e));
   }
+  // 没有保存过名字时，用刚读到的实例名补上
+  if (!meta?.name) {
+    name.value = instanceName || fallbackName;
+  }
 
-  // 上次生成保存的名字 / 版本 / 说明 / 网址等，跟编号映射在同一份文件里
-  let meta: ServerInstanceMetaDto | null = null;
-  try {
-    meta = await api.getServerInstanceMeta(uuid);
-  } catch {
-    // 没有生成过或读不到就按默认值铺
-  }
-  let savedIds: ServerInstanceIdDto[] = [];
-  try {
-    savedIds = await api.getServerInstanceIds(uuid);
-  } catch {
-    // 没有生成过或读不到就按当前来源铺
-  }
-  if (seq !== loadSeq) return;
   const savedById = new Map(savedIds.map((item) => [item.path, item]));
   lockedProjectIds.value = new Set(savedById.keys());
   modPids.value = new Map(
@@ -465,23 +529,6 @@ async function loadInstance(uuid: string) {
     mods.value.map((item) => [item.path, item.customId ? "custom" : "online"]),
   );
   modIdTypeEdits.value = new Set();
-
-  const fallbackName = instanceName || current.value?.name || "";
-  if (meta) {
-    format.value = meta.format === "hmcl" ? "hmcl" : "mml";
-    name.value = meta.name || fallbackName;
-    version.value = meta.version || "1.0.0";
-    text.value = meta.text;
-    url.value = meta.url;
-    folder.value = meta.folder;
-  } else {
-    format.value = "mml";
-    name.value = fallbackName;
-    version.value = "1.0.0";
-    text.value = "";
-    url.value = "";
-    folder.value = "";
-  }
 
   let packsNext: ExportEntryDto[] = [];
   try {
@@ -515,6 +562,8 @@ async function loadInstance(uuid: string) {
     packs.value.map((item) => [item.path, item.customId ? "custom" : "online"]),
   );
   packIdTypeEdits.value = new Set();
+  // 等两张表都填好再启用快照预览，避免资源包加载前闪一下全部删除
+  lastSnapshot.value = snapshot;
 
   let dirsNext: ExportEntryDto[] = [];
   try {
@@ -620,6 +669,7 @@ function clearInstance() {
   topDirs.value = [];
   newDir.value = "";
   result.value = null;
+  lastSnapshot.value = null;
   progress.value = null;
   changedPaths.value = new Set();
   error.value = "";
@@ -793,6 +843,8 @@ async function generate() {
     });
     changedPaths.value = new Set(result.value.changed);
     await refreshSavedIds();
+    const snapshot = await api.getServerInstanceSnapshot(currentUuid.value).catch(() => null);
+    if (snapshot) lastSnapshot.value = snapshot;
     showToast(t("serverInstance.done", { path: folder.value.trim() }));
   } catch (e) {
     error.value = tErr(e);
@@ -819,6 +871,14 @@ watch(() => windowParams.value.uuid, applyTarget);
 // 下拉换目录时把同步方式拨到该目录的常见做法，用户仍可自己改
 watch(newDir, (dir) => {
   if (dir) newMode.value = FILES_DIRS.includes(dir) ? "files" : "archive";
+});
+
+// 生成后改了勾选，旧结果就不再代表当前选择；清掉后走快照预览
+watch([pickedMods, pickedPacks], () => {
+  if (result.value) {
+    result.value = null;
+    changedPaths.value = new Set();
+  }
 });
 
 onMounted(async () => {

@@ -39,6 +39,7 @@ use crate::{
     dtos::server_instance_dto::{
         ServerInstanceChangesDto, ServerInstanceIdDto, ServerInstanceMetaDto,
         ServerInstanceOptionsDto, ServerInstanceProgressDto, ServerInstanceResultDto,
+        ServerInstanceSnapshotDto, ServerInstanceSnapshotEntryDto,
     },
     err_keys,
 };
@@ -182,6 +183,36 @@ pub async fn server_instance_get_ids(uuid: String) -> Result<Vec<ServerInstanceI
             file_id: item.file_id,
         })
         .collect())
+}
+
+/// 读取上次生成保存的模组 / 资源包快照，给生成前的变化预览用
+///
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// 快照路径与 SHA1；没有生成过时 `generated` 为 false
+#[gui_macros::ipc_group("server_instance")]
+#[gui_macros::command]
+pub async fn server_instance_get_snapshot(
+    uuid: String,
+) -> Result<ServerInstanceSnapshotDto, String> {
+    let game = instance_snapshot(&uuid)?;
+    let ids = mapping::IdMap::load(&game.get_base_path());
+    let entries = |items: &BTreeMap<String, mapping::EntrySnapshot>| {
+        items
+            .values()
+            .map(|item| ServerInstanceSnapshotEntryDto {
+                path: item.path.clone(),
+                sha1: item.sha1.clone(),
+            })
+            .collect::<Vec<_>>()
+    };
+    Ok(ServerInstanceSnapshotDto {
+        generated: ids.loaded(),
+        mods: entries(ids.mods()),
+        packs: entries(ids.packs()),
+    })
 }
 
 /// 配置文件的同步方式

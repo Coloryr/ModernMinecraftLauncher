@@ -101,7 +101,8 @@ pub use resource_dto::{
 };
 pub use server_instance_dto::{
     ServerInstanceChangesDto, ServerInstanceConfigDto, ServerInstanceIdDto,
-    ServerInstanceMetaDto,
+    ServerInstanceMetaDto, ServerInstanceSnapshotDto,
+    ServerInstanceSnapshotEntryDto,
     ServerInstanceOptionsDto, ServerInstancePickDto, ServerInstanceProgressDto,
     ServerInstanceResultDto,
 };

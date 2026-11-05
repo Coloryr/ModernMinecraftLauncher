@@ -723,9 +723,11 @@ i18n 表，**不写死中文或英文字面量**。三张表各管一摊，改�
 
 ### 16.10 标题栏按钮
 
-- **标题栏里只放图标按钮**：`WindowFrame` 的 `#head-right` 槽里，按钮一律
-  `icon-btn-head` + `v-tip` + `aria-label`，内容只放图标（如 `GlyphIcon`）；文字放进
-  tooltip 与 aria-label，不放在按钮里。标题栏空间有限，文字按钮会把实例下拉挤变形。
+- **标题栏里只放图标按钮**：`WindowFrame` 的 `#head-right` 槽里，按钮统一写成
+  `BaseButton size="sm" variant="ghost" class="icon-btn-head"`，图标用 `GlyphIcon` 15px /
+  `weight=1.8`，再配 `v-tip` + `aria-label`；文字放进 tooltip 与 aria-label，不放在按钮里。
+  这就是主窗口顶栏图标键的外观：32px 见方、透明底、悬停浅底，不要用 `BaseButton` 默认的
+  填充描边样式。标题栏空间有限，文字按钮会把实例下拉挤变形。
 - 唯一例外是日志窗口的测试启动按钮：它要显示启动阶段文本，继续用
   `icon-btn-head launch-live` 的定宽文本档。
 - 图标按钮的尺寸、圆角、悬停由全局 `styles/titlebar.css` 的 `.icon-btn-head` 统一给，
