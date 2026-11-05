@@ -2509,7 +2509,9 @@ export default {
   "serverInstance.baseCount": "{n} files",
   "serverInstance.baseEmpty": "No files next to .minecraft.",
   "serverInstance.baseHint":
-    "Base files are packed into one archive, downloaded and extracted to the instance root on first import / sync only, and not downloaded again on later updates; selecting .minecraft packs the whole folder (manifest files are excluded); MML format only.",
+    "Base files are packed into one archive, downloaded and extracted to the instance root on first import / sync only, and not downloaded again on later updates; selecting a top-level folder such as .minecraft, libraries or patches packs the whole folder (.minecraft manifest files are excluded); MML format only.",
+  "serverInstance.baseIconHint":
+    "The instance icon is not selected here: generation copies it separately as icon.png and writes it into the manifest Icon field.",
   "serverInstance.summaryInstance": "Instance",
   "serverInstance.summaryBase": "Base files",
   "serverInstance.summaryFormat": "Format",

@@ -68,8 +68,10 @@
 
 - 列出实例根目录下、与 `.minecraft` 同级的文件，不包含
   `game.json` / `icon.png` / `server.json` 等启动器元数据。
-- 也可以直接勾选 `.minecraft`，整个游戏目录会一起进 `base.zip`；其中的 `server.json` /
-  `server.json.sha1` / `server.json.old` 会自动排除。
+- 也可以勾选顶层目录（`.minecraft`、`libraries`、`patches` 等），整个目录一起进 `base.zip`；
+  `.minecraft` 里的 `server.json` / `server.json.sha1` / `server.json.old` 会自动排除。
+  `cache` / `temp` / `backup` 这些运行期目录不列。
+- 实例图标不在这里选：生成时会单独复制成发布目录的 `icon.png`，并写进清单的 `Icon` 字段。
 - 勾选的文件打成一个固定的 `base.zip`，清单里写进 `Base`。
 - 客户端**只在第一次导入 / 同步时下载并解压到实例根目录**，后续版本更新不会再下载，也不会覆盖。
 - 适合放 `server.properties`、启动脚本、`eula.txt` 这类与 `.minecraft` 同级、一次配好的文件。

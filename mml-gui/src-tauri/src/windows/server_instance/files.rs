@@ -172,7 +172,8 @@ fn relative(base: &Path, name: &str) -> Result<PathBuf, String> {
 
 /// 校验基础文件并转成相对实例根目录的路径
 ///
-/// 基础文件取自实例根目录：可以勾选与 .minecraft 同级的文件，也可以整个勾选 .minecraft。
+/// 基础文件取自实例根目录：可以勾选顶层文件，也可以整个勾选 .minecraft、libraries、
+/// patches 这类顶层目录。
 ///
 /// 启动器自己的 game.json / icon.png / server.json 不允许；.minecraft 里的清单文件
 /// server.json / server.json.sha1 / server.json.old 会被跳过，避免覆盖同步元数据。
@@ -182,7 +183,7 @@ fn relative(base: &Path, name: &str) -> Result<PathBuf, String> {
 ///
 /// # 返回值
 ///
-/// 相对实例根目录的文件路径，排序去重；越界、普通目录或启动器元数据返回错误
+/// 相对实例根目录的文件路径，排序去重；越界、非顶层目录或启动器元数据返回错误
 pub(super) fn base_files(base: &Path, picks: &[String]) -> Result<Vec<PathBuf>, String> {
     let mut list = Vec::new();
     for pick in picks {
@@ -193,13 +194,13 @@ pub(super) fn base_files(base: &Path, picks: &[String]) -> Result<Vec<PathBuf>, 
             return Err(err_keys::SERVER_INSTANCE_BASE_FILE.to_string());
         }
 
-        // .minecraft 允许整目录带上，展开成每个文件一条
-        if rel.to_string_lossy().eq_ignore_ascii_case(names::GAME_DIR) {
-            let root = base.join(&rel);
-            if !root.is_dir() {
+        // 顶层目录整目录带上，展开成每个文件一条；.minecraft 的清单文件跳过
+        let path = base.join(&rel);
+        if path.is_dir() {
+            if rel.components().count() != 1 {
                 return Err(err_keys::SERVER_INSTANCE_BASE_FILE.to_string());
             }
-            for file in archive::files_under(&root)? {
+            for file in archive::files_under(&path)? {
                 let item = file
                     .strip_prefix(base)
                     .map_err(|_| err_keys::SERVER_INSTANCE_BASE_FILE.to_string())?;

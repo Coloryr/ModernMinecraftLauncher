@@ -656,14 +656,25 @@ fn mml_packs_base_files_outside_minecraft() {
         .join(&dir);
     let game_dir = instance.join(".minecraft");
     fs::create_dir_all(&game_dir).unwrap();
+    fs::create_dir_all(instance.join("libraries")).unwrap();
+    fs::create_dir_all(instance.join("patches")).unwrap();
     fs::write(instance.join("server.properties"), b"motd=test").unwrap();
+    fs::write(instance.join("icon.png"), b"icon").unwrap();
     fs::write(game_dir.join("options.txt"), b"lang:zh_cn").unwrap();
+    fs::write(instance.join("libraries").join("foo.jar"), b"lib").unwrap();
+    fs::write(instance.join("patches").join("a.json"), b"patch").unwrap();
 
     let out = crate::test_support::temp_dir("server-instance-base-out");
     let mut game = game();
     game.dir = dir;
+    game.icon = Some(names::ICON_FILE.to_string());
     let mut options = options("mml", &[], &[], &[]);
-    options.base_files = vec!["server.properties".to_string(), ".minecraft".to_string()];
+    options.base_files = vec![
+        "server.properties".to_string(),
+        ".minecraft".to_string(),
+        "libraries".to_string(),
+        "patches".to_string(),
+    ];
     let contents = contents(&game_dir, &options);
     let result = generate_mml(
         &game,
@@ -695,8 +706,27 @@ fn mml_packs_base_files_outside_minecraft() {
             .any(|item| item.name == ".minecraft/options.txt"),
         "基础包应包含 .minecraft 里的文件"
     );
-    assert_eq!(result.count, 2);
+    assert!(
+        archive
+            .entries()
+            .iter()
+            .any(|item| item.name == "libraries/foo.jar"),
+        "基础包应包含 libraries 里的文件"
+    );
+    assert!(
+        archive
+            .entries()
+            .iter()
+            .any(|item| item.name == "patches/a.json"),
+        "基础包应包含 patches 里的文件"
+    );
+    assert!(
+        !archive.entries().iter().any(|item| item.name == "icon.png"),
+        "实例图标不进基础包"
+    );
+    assert_eq!(result.count, 4);
     assert!(result.files.iter().any(|name| name == "base.zip"));
+    assert!(result.files.iter().any(|name| name == names::ICON_FILE));
 
     let _ = fs::remove_dir_all(&instance);
     crate::test_support::cleanup(&[&out]);
@@ -708,10 +738,14 @@ fn base_files_allow_minecraft_but_reject_metadata() {
     crate::test_support::ensure_boot();
     let base = crate::test_support::temp_dir("server-instance-base-reject");
     fs::create_dir_all(base.join(".minecraft")).unwrap();
+    fs::create_dir_all(base.join("libraries")).unwrap();
+    fs::create_dir_all(base.join("patches")).unwrap();
     fs::write(base.join("server.properties"), b"x").unwrap();
     fs::write(base.join(".minecraft").join("a.txt"), b"x").unwrap();
     fs::write(base.join(".minecraft").join("server.json"), b"{}").unwrap();
     fs::write(base.join(".minecraft").join("server.json.sha1"), b"x").unwrap();
+    fs::write(base.join("libraries").join("foo.jar"), b"x").unwrap();
+    fs::write(base.join("patches").join("a.json"), b"x").unwrap();
     fs::write(base.join("game.json"), b"{}").unwrap();
 
     assert_eq!(
@@ -725,6 +759,14 @@ fn base_files_allow_minecraft_but_reject_metadata() {
     assert_eq!(
         files::base_files(&base, &[".minecraft/a.txt".to_string()]).unwrap(),
         vec![PathBuf::from(".minecraft/a.txt")]
+    );
+    assert_eq!(
+        files::base_files(&base, &["libraries".to_string()]).unwrap(),
+        vec![PathBuf::from("libraries/foo.jar")]
+    );
+    assert_eq!(
+        files::base_files(&base, &["patches".to_string()]).unwrap(),
+        vec![PathBuf::from("patches/a.json")]
     );
     assert!(files::base_files(&base, &["game.json".to_string()]).is_err());
     assert!(files::base_files(&base, &[".minecraft/server.json".to_string()]).is_err());

@@ -2508,7 +2508,9 @@ export default {
   "serverInstance.baseCount": "{n} 个文件",
   "serverInstance.baseEmpty": "实例根目录下没有可同步的文件。",
   "serverInstance.baseHint":
-    "基础文件打成一个固定压缩包，只在第一次导入 / 同步时下载并解压到实例根目录，后续版本更新不会再次下载；勾选 .minecraft 会整目录打包（清单文件自动排除）；仅 MML 格式支持。",
+    "基础文件打成一个固定压缩包，只在第一次导入 / 同步时下载并解压到实例根目录，后续版本更新不会再次下载；勾选 .minecraft、libraries、patches 这类顶层目录会整目录打包（.minecraft 的清单文件自动排除）；仅 MML 格式支持。",
+  "serverInstance.baseIconHint":
+    "实例图标不在这里选：生成时会单独复制成发布目录的 icon.png，并写进清单的 Icon 字段。",
   "serverInstance.summaryInstance": "实例",
   "serverInstance.summaryBase": "基础文件",
   "serverInstance.summaryFormat": "格式",

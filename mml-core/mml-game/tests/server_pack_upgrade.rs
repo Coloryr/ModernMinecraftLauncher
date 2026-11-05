@@ -640,6 +640,8 @@ fn base_archive_is_downloaded_once() {
     let base_v1 = zip_bytes(&[
         ("server.properties", b"motd=v1"),
         (".minecraft/options.txt", b"lang:zh_cn"),
+        ("libraries/foo.jar", b"lib"),
+        ("patches/a.json", b"patch"),
     ]);
     let mut v1 = manifest("1.0.0", "21.1.259", Vec::new());
     v1.base = Some(ServerBaseObj {
@@ -671,6 +673,14 @@ fn base_archive_is_downloaded_once() {
     assert_eq!(
         std::fs::read(instance_base.join(".minecraft/options.txt")).unwrap(),
         b"lang:zh_cn"
+    );
+    assert_eq!(
+        std::fs::read(instance_base.join("libraries/foo.jar")).unwrap(),
+        b"lib"
+    );
+    assert_eq!(
+        std::fs::read(instance_base.join("patches/a.json")).unwrap(),
+        b"patch"
     );
 
     let snapshot = game.read().unwrap().clone();

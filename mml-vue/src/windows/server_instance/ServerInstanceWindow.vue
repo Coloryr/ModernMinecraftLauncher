@@ -54,6 +54,8 @@ const FILES_DIRS = ["kubejs"];
 
 /** 实例根目录里不能当基础文件同步的启动器文件 */
 const BASE_SKIP = ["game.json", "icon.png", "server.json", "server.json.sha1", "server.json.old"];
+/** 实例根目录里不列出的运行期目录 */
+const BASE_DIR_SKIP = ["cache", "temp", "backup"];
 
 const instances = ref<InstanceInfoDto[]>([]);
 const currentUuid = ref("");
@@ -306,9 +308,9 @@ async function loadInstance(uuid: string) {
   }
   if (seq !== loadSeq) return;
   baseEntries.value = baseNext.filter((entry) => {
-    // .minecraft 允许整目录带上；其它目录不列，只列顶层文件
-    if (entry.path === ".minecraft") return entry.dir;
-    return !entry.dir && !entry.path.includes("/") && !BASE_SKIP.includes(entry.path);
+    // 顶层目录都可以整目录带上，但缓存 / 临时 / 备份目录不列
+    if (entry.dir) return !BASE_DIR_SKIP.includes(entry.path);
+    return !entry.path.includes("/") && !BASE_SKIP.includes(entry.path);
   });
   pickedBase.value = new Set();
 
@@ -581,6 +583,7 @@ onBeforeUnmount(() => {
               </label>
             </div>
             <p class="field-hint">{{ t("serverInstance.baseHint") }}</p>
+            <p class="field-hint">{{ t("serverInstance.baseIconHint") }}</p>
           </section>
 
           <!-- ===== 模组 ===== -->
