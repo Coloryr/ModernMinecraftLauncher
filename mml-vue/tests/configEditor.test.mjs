@@ -20,6 +20,8 @@ function editor(overrides = {}) {
     TEXT_TYPES: ["json"], clearCleanSessions: async () => {},
     requestGeneration: 0,
     rowMenu: ref(null), deleteConfigFile: async () => {},
+    // 打开文件时会清掉上一次「查找实体 / 方块」留下的定位目标
+    mcaTarget: ref(null),
     listConfigFiles: async () => [], readConfigFile: async () => ({ text: "second", sha1: "new-hash" }),
     showToast: () => {}, t: (key) => key, tErr: (error) => String(error),
     applyHunks, diffLines, joinLines, splitLines,

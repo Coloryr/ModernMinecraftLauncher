@@ -10,13 +10,17 @@ export type ServerInstanceOptionsDto = {
   mods: ServerInstancePickDto[],
   configs: ServerInstanceConfigDto[],
   baseFiles: string[],
-  resourcePacks: string[],
+  resourcePacks: ServerInstancePickDto[],
 };
 
 export type ServerInstancePickDto = {
   path: string,
   exclude: boolean,
   url: string,
+  pid: string,
+  fid: string,
+  custom: boolean,
+  edited: boolean,
 };
 
 export type ServerInstanceConfigDto = {
@@ -29,6 +33,12 @@ export type ServerInstanceProgressDto = {
   now: number,
   total: number,
   text: string,
+};
+
+export type ServerInstanceIdDto = {
+  path: string,
+  projectId: string,
+  fileId: string,
 };
 
 export type ServerInstanceMetaDto = {

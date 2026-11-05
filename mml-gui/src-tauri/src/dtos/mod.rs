@@ -100,8 +100,9 @@ pub use resource_dto::{
     ServerItemDto, ShaderItemDto,
 };
 pub use server_instance_dto::{
-    ServerInstanceConfigDto, ServerInstanceMetaDto, ServerInstanceOptionsDto,
-    ServerInstancePickDto, ServerInstanceProgressDto, ServerInstanceResultDto,
+    ServerInstanceConfigDto, ServerInstanceIdDto, ServerInstanceMetaDto,
+    ServerInstanceOptionsDto, ServerInstancePickDto, ServerInstanceProgressDto,
+    ServerInstanceResultDto,
 };
 pub use settings_dto::{
     BgInfoDto, DnsSettingDto, GameCheckSettingDto, LaunchSettingDto, LinkResourceDto,

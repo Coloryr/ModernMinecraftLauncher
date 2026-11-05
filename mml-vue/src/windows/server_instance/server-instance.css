@@ -1,0 +1,498 @@
+/* 左导航 + 右内容，与设置窗口同一套骨架：外壳 body-fill + body-flush，这里 flex: 1 就占满 */
+.si-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.si-rail {
+  width: 176px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 10px 14px 16px;
+  border-right: 1px solid var(--border);
+  background: var(--bg-side);
+  overflow-y: auto;
+}
+
+.si-rail-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.si-rail-item:hover {
+  background: var(--bg-card);
+  color: var(--text);
+}
+
+.si-rail-item.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.si-rail-item:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.si-rail-icon {
+  flex-shrink: 0;
+  display: flex;
+}
+
+.si-rail-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  min-width: 0;
+}
+
+.si-rail-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.si-rail-desc {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.si-rail-item.active .si-rail-desc {
+  color: inherit;
+}
+
+/* 右侧内容：每页自己滚。
+   右侧**不留内边距**：滚动条是子元素（.si-section）画的，只有让它贴着内容区右缘，
+   滚动条才贴着窗口右边；留白改由下面两条按"26px - 9px 槽位"补回来 */
+.si-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* 自己不出滚动条：滚的都是下面的 .si-section，这样滚动条才贴着窗口右边 */
+  overflow: hidden;
+  padding: 22px 0 22px 26px;
+}
+
+/* 页头不在滚动容器里，没有槽位，直接留 26px，与下方内容的右缘对齐 */
+.si-head,
+.si-content>.empty-tip {
+  padding-right: 26px;
+}
+
+.si-head {
+  margin-bottom: 14px;
+}
+
+.si-title {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.si-sub {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+/* 每页一块：默认整页滚；带 .stretch 的页把剩余高度交给列表。
+   右内边距 = 26 - 9：9px 是常驻的滚动条槽位，内容右缘因此仍在 26px 上，
+   而滚动条贴在窗口右边（见 .si-content 的说明） */
+.si-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-right: calc(26px - 9px);
+}
+
+/* 撑满的页自己不滚（滚动交给里面的列表 / 表格），没有槽位，右缘直接留 26px */
+.si-section.stretch {
+  overflow: hidden;
+  padding-right: 26px;
+}
+
+/* 一行：标签与控件并排 */
+.si-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.si-row .field-label {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+/* 添加行：两个下拉按固定宽度排在计数右边，高度与行内控件同一档 */
+.si-add-dir {
+  width: 220px;
+}
+
+.si-add-mode {
+  width: 140px;
+}
+
+.si-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 计数靠左、按钮靠右：第一个元素吃掉剩余宽度 */
+.si-section-head> :first-child {
+  flex: 1;
+}
+
+.si-counter {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 列表：吃掉这一页剩下的高度；滚动与行虚拟化交给 VirtualList，这里只管外观。
+   行间距由 :row-gap 传进去，别再写 gap —— 虚拟化按行高算窗口，写死的 gap 会算偏 */
+.si-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  scrollbar-gutter: stable;
+}
+
+.si-row-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* 基础文件列表的行高 */
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.si-row-item:hover {
+  background: var(--bg-hover);
+}
+
+.si-box {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.si-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.si-tag {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  color: var(--text-dim);
+  background: var(--bg-hover);
+}
+
+/* 在线下载：用强调色的浅底，和"本地托管"一眼分得开 */
+.si-tag.on {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.si-size {
+  flex-shrink: 0;
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+
+/* 两张表共用一套外观：模组表（VirtualList，行虚拟化）与配置目录表（本页自绘行）。
+   容器的框、表头吸顶、行高与内边距只写在这里，改一处两张表一起变 */
+.si-mod-table,
+.si-table {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+}
+
+.si-mod-head,
+.si-table-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: grid;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+
+.si-mod-row,
+.si-table-row {
+  display: grid;
+  align-items: center;
+  gap: 8px;
+  /* 行高必须与 MOD_ROW_H 一致：虚拟化按下标估算位置 */
+  height: 36px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  border-bottom: 1px solid var(--border);
+}
+
+.si-mod-row:hover,
+.si-table-row:hover {
+  background: var(--bg-hover);
+}
+
+.si-mod-row.is-changed,
+.si-table-row.is-changed,
+.si-row-item.is-changed {
+  background: color-mix(in srgb, var(--yellow) 16%, transparent);
+}
+
+.si-mod-row.is-changed:hover,
+.si-table-row.is-changed:hover,
+.si-row-item.is-changed:hover {
+  background: color-mix(in srgb, var(--yellow) 24%, transparent);
+}
+
+/* 列宽各表不同，其余外观共用上面几条 */
+.si-mod-head,
+.si-mod-row {
+  grid-template-columns: 44px minmax(180px, 1.2fr) 130px 130px minmax(220px, 1.8fr) 180px;
+  /* 列宽总和超过窄窗口时让表头 / 行本身跟着变宽，横向滚动到底也有底色和下边框 */
+  min-width: 960px;
+}
+
+.si-table-head,
+.si-table-row {
+  grid-template-columns: minmax(160px, 1fr) 160px 120px 40px;
+}
+
+.si-cell-check {
+  display: flex;
+  align-items: center;
+}
+
+.si-cell-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 行内控件：输入框与下拉同一个尺寸，26px 才收得进 36px 的行。
+   min-height 必须清掉 —— .field-select 的下限是 --ctl-h（32px），不清就比输入框高一截 */
+.si-cell-control {
+  height: 26px;
+  min-height: 0;
+  min-width: 0;
+  padding: 0 8px;
+}
+
+select.si-cell-control {
+  /* 箭头那一侧的间距要留住，否则文字压到箭头上 */
+  padding-right: 24px;
+  background-position: right 6px center;
+}
+
+/* 配置目录的同步方式：文字水平居中，行高吃掉上下内边距，避免贴顶 / 贴底 */
+.si-add-mode,
+.si-table-row .field-select {
+  text-align: center;
+  text-align-last: center;
+  line-height: 24px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.si-table-row .field-select {
+  height: 26px;
+  min-height: 0;
+}
+
+.si-cell-id {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.si-id-input {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 11.5px;
+}
+
+.si-id-custom {
+  flex: none;
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-style: normal;
+  line-height: 16px;
+}
+
+.si-cell-hash {
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 10.5px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 配置目录表：名字 | 同步方式 | 删除。容器、表头、行高与模组表共用上面那组规则 */
+.si-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.si-remove:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--red) 14%, transparent);
+  color: var(--red);
+}
+
+/* 开始生成页 */
+.si-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card);
+}
+
+.si-line {
+  font-size: 12.5px;
+  line-height: 1.7;
+  word-break: break-all;
+}
+
+.si-line.dim {
+  color: var(--text-dim);
+}
+
+.si-line code {
+  font-family: "Cascadia Code", Consolas, monospace;
+  color: var(--text);
+  margin-right: 8px;
+}
+
+.si-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+/* 进度条：弹窗内用 8px 档 */
+.si-content .progress-track {
+  height: 8px;
+  margin-top: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--bg-hover);
+}
+
+.si-content .progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent-grad, var(--accent));
+  transition: width 0.3s;
+}
+
+.si-content .run-info {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.si-content .run-info .cur {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.si-result {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card);
+}
+
+.si-content .si-error {
+  margin: 0;
+  color: var(--red);
+  font-size: 12.5px;
+  word-break: break-all;
+}
+
+

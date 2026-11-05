@@ -30,9 +30,9 @@ pub struct ServerInstanceOptionsDto {
     /// 基础文件，相对实例根目录；打包成固定 zip，只在首次同步时下载
     #[serde(default)]
     pub base_files: Vec<String>,
-    /// 要同步的资源包文件，路径相对游戏目录
+    /// 要同步的资源包文件，路径相对游戏目录，可带手填编号与地址
     #[serde(default)]
-    pub resource_packs: Vec<String>,
+    pub resource_packs: Vec<ServerInstancePickDto>,
 }
 
 /// 前端勾选的一个路径
@@ -47,6 +47,18 @@ pub struct ServerInstancePickDto {
     /// 手动填的下载地址；空串表示用实例记录的那一份
     #[serde(default)]
     pub url: String,
+    /// 手动填的项目编号；空串表示用实例记录的那一份
+    #[serde(default)]
+    pub pid: String,
+    /// 手动填的文件编号；空串表示用实例记录的那一份
+    #[serde(default)]
+    pub fid: String,
+    /// 是否使用自定义编号；用于保留「自定义」标记
+    #[serde(default)]
+    pub custom: bool,
+    /// 编号是否被用户改过；改过时优先用手填值，不再套用映射
+    #[serde(default)]
+    pub edited: bool,
 }
 
 /// 一个要同步的配置目录
@@ -78,6 +90,18 @@ pub struct ServerInstanceProgressDto {
     pub total: u64,
     /// 当前处理的文件名，相对游戏目录
     pub text: String,
+}
+
+/// 已保存的自定义编号，即 `server_instance_get_ids` 的返回值
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerInstanceIdDto {
+    /// 相对游戏目录的路径
+    pub path: String,
+    /// 项目编号
+    pub project_id: String,
+    /// 文件编号
+    pub file_id: String,
 }
 
 /// 上次生成保存的选项，即 `server_instance_get_meta` 的返回值

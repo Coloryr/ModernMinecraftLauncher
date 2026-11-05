@@ -82,6 +82,7 @@ import type {
   SaveItemDto,
   ScreenshotItemDto,
   ServerPackProbeDto,
+  ServerInstanceIdDto,
   ServerInstanceMetaDto,
   ServerInstanceOptionsDto,
   ServerInstanceProgressDto,
@@ -1354,6 +1355,19 @@ export const api = {
    */
   async getServerInstanceMeta(uuid: string): Promise<ServerInstanceMetaDto | null> {
     return commands.serverInstance.getMeta(uuid);
+  },
+
+  /**
+   * 读取已保存的自定义编号，给模组 / 资源包表格回填
+   *
+   * - `uuid`: 实例 uuid
+   *
+   * # 返回值
+   *
+   * 每个已保存条目的路径与项目 / 文件编号
+   */
+  async getServerInstanceIds(uuid: string): Promise<ServerInstanceIdDto[]> {
+    return commands.serverInstance.getIds(uuid);
   },
 
   /**

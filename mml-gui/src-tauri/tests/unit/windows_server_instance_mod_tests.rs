@@ -13,6 +13,10 @@ fn picks(paths: &[&str]) -> Vec<ServerInstancePickDto> {
             path: path.to_string(),
             exclude: false,
             url: String::new(),
+            pid: String::new(),
+            fid: String::new(),
+            custom: false,
+            edited: false,
         })
         .collect()
 }
@@ -41,7 +45,18 @@ fn options(
             })
             .collect(),
         base_files: Vec::new(),
-        resource_packs: packs.iter().map(|path| path.to_string()).collect(),
+        resource_packs: packs
+            .iter()
+            .map(|path| ServerInstancePickDto {
+                path: path.to_string(),
+                exclude: false,
+                url: String::new(),
+                pid: String::new(),
+                fid: String::new(),
+                custom: true,
+                edited: false,
+            })
+            .collect(),
     }
 }
 
@@ -61,7 +76,14 @@ fn contents(base: &Path, options: &ServerInstanceOptionsDto) -> Contents {
         packs: options
             .resource_packs
             .iter()
-            .map(|path| files::file(base, path).unwrap())
+            .map(|pick| PackPick {
+                path: files::file(base, &pick.path).unwrap(),
+                url: pick.url.clone(),
+                pid: pick.pid.clone(),
+                fid: pick.fid.clone(),
+                custom: pick.custom,
+                edited: pick.edited,
+            })
             .collect(),
     }
 }
@@ -174,6 +196,10 @@ fn mods_follow_selection_and_exclusions() {
         path: "mods/sub/b.jar".into(),
         exclude: true,
         url: String::new(),
+        pid: String::new(),
+        fid: String::new(),
+        custom: false,
+        edited: false,
     });
     assert_eq!(
         paths(files::mods(&base, &exclude).unwrap()),
@@ -938,6 +964,88 @@ fn server_pack_cannot_generate() {
         result.err().as_deref(),
         Some(err_keys::SERVER_INSTANCE_FROM_SERVER)
     );
+}
+
+
+/// 自定义编号被用户改过后，生成时优先用手填值，并且仍然按本地托管
+#[test]
+fn mml_uses_edited_custom_ids() {
+    crate::test_support::ensure_boot();
+    let dir = format!("server-instance-edit-{}", uuid::Uuid::new_v4());
+    let instance = mml_base::get_base_dir()
+        .join("minecraft")
+        .join("instances")
+        .join(&dir);
+    let base = instance.join(".minecraft");
+    let out = crate::test_support::temp_dir("server-instance-edit-id-out");
+    let out2 = crate::test_support::temp_dir("server-instance-edit-id-out-2");
+    fs::create_dir_all(base.join("mods")).unwrap();
+    fs::write(base.join("mods").join("local.jar"), b"jar").unwrap();
+
+    let mut game = game();
+    game.dir = dir;
+    let mut options = options("mml", &["mods/local.jar"], &[], &[]);
+    options.mods[0].pid = "my-project".to_string();
+    options.mods[0].fid = "my-file".to_string();
+    options.mods[0].custom = true;
+    options.mods[0].edited = true;
+    let first_contents = contents(&base, &options);
+    let _ = generate_mml(
+        &game,
+        &HashMap::new(),
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &first_contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    let pack: ServerPackObj =
+        serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
+    let item = pack
+        .online_list
+        .iter()
+        .find(|item| item.file == "mods/local.jar")
+        .unwrap();
+    assert_eq!(item.pid.as_deref(), Some("my-project"));
+    assert_eq!(item.fid.as_deref(), Some("my-file"));
+    assert!(item.custom);
+    assert_eq!(
+        item.url.as_deref(),
+        Some("https://example.invalid/pack/mods/local.jar")
+    );
+    assert!(out.join("mods/local.jar").is_file());
+
+    // 已生成过的自定义项目编号锁定，改项目号无效；文件号仍可改
+    let mut second_options = options.clone();
+    second_options.mods[0].pid = "other-project".to_string();
+    second_options.mods[0].fid = "other-file".to_string();
+    let second_contents = contents(&base, &second_options);
+    let _ = generate_mml(
+        &game,
+        &HashMap::new(),
+        &base,
+        &out2,
+        "https://example.invalid/pack",
+        &second_options,
+        &second_contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+    let pack2: ServerPackObj =
+        serde_json::from_slice(&fs::read(out2.join("server.json")).unwrap()).unwrap();
+    let item2 = pack2
+        .online_list
+        .iter()
+        .find(|item| item.file == "mods/local.jar")
+        .unwrap();
+    assert_eq!(item2.pid.as_deref(), Some("my-project"));
+    assert_eq!(item2.fid.as_deref(), Some("other-file"));
+
+    let _ = fs::remove_dir_all(&instance);
+    crate::test_support::cleanup(&[&out, &out2]);
 }
 
 /// 实例自带图标时复制进输出文件夹，没有图标时返回 None

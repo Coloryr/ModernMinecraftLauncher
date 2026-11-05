@@ -37,8 +37,8 @@ use crate::windows::export::list::custom_ids;
 use crate::{
     dtos::log_dto::LogFocusDto,
     dtos::server_instance_dto::{
-        ServerInstanceMetaDto, ServerInstanceOptionsDto, ServerInstanceProgressDto,
-        ServerInstanceResultDto,
+        ServerInstanceIdDto, ServerInstanceMetaDto, ServerInstanceOptionsDto,
+        ServerInstanceProgressDto, ServerInstanceResultDto,
     },
     err_keys,
 };
@@ -161,6 +161,28 @@ pub async fn server_instance_get_meta(
         }))
 }
 
+/// 读取已保存的自定义编号，给模组 / 资源包表格回填
+///
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// 每个已保存条目的路径与项目 / 文件编号
+#[gui_macros::ipc_group("server_instance")]
+#[gui_macros::command]
+pub async fn server_instance_get_ids(uuid: String) -> Result<Vec<ServerInstanceIdDto>, String> {
+    let game = instance_snapshot(&uuid)?;
+    Ok(mapping::IdMap::load(&game.get_base_path())
+        .snapshot()
+        .into_iter()
+        .map(|item| ServerInstanceIdDto {
+            path: item.path,
+            project_id: item.project_id,
+            file_id: item.file_id,
+        })
+        .collect())
+}
+
 /// 配置文件的同步方式
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ConfigMode {
@@ -228,8 +250,24 @@ struct Contents {
     mods: Vec<files::ModPick>,
     /// 配置目录与各自的同步方式
     configs: Vec<ConfigDir>,
-    /// 资源包文件，路径相对游戏目录
-    packs: Vec<PathBuf>,
+    /// 资源包文件，带手填的编号与地址
+    packs: Vec<PackPick>,
+}
+
+/// 一个要同步的资源包
+struct PackPick {
+    /// 相对游戏目录的路径
+    path: PathBuf,
+    /// 手动填的下载地址
+    url: String,
+    /// 手动填的项目编号
+    pid: String,
+    /// 手动填的文件编号
+    fid: String,
+    /// 是否使用自定义编号
+    custom: bool,
+    /// 编号是否被用户改过
+    edited: bool,
 }
 
 /// 校验并规范化配置目录
@@ -292,8 +330,17 @@ fn generate(
     let packs = options
         .resource_packs
         .iter()
-        .map(|path| files::file(&base, path))
-        .collect::<Result<Vec<_>, _>>()?;
+        .map(|pick| {
+            Ok(PackPick {
+                path: files::file(&base, &pick.path)?,
+                url: pick.url.trim().to_string(),
+                pid: pick.pid.trim().to_string(),
+                fid: pick.fid.trim().to_string(),
+                custom: pick.custom,
+                edited: pick.edited,
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
 
     let has_base = matches!(format, Format::Mml) && !options.base_files.is_empty();
     if mods.is_empty() && configs.is_empty() && packs.is_empty() && !has_base {
@@ -473,22 +520,47 @@ fn generate_mml(
         // 只有地址能改，编号一律用实例记录的
         let recorded = online.get(&file_name(&entry.path));
         let download = pick(&entry.url, recorded.map(|info| info.url.as_str()));
-        let pid = recorded.map(|info| info.modid.as_str()).unwrap_or_default();
-        let fid = recorded
-            .map(|info| info.fileid.as_str())
-            .unwrap_or_default();
+        let pid = if entry.edited {
+            entry.pid.as_str()
+        } else {
+            recorded.map(|info| info.modid.as_str()).unwrap_or_default()
+        };
+        let fid = if entry.edited {
+            entry.fid.as_str()
+        } else {
+            recorded.map(|info| info.fileid.as_str()).unwrap_or_default()
+        };
 
         // 地址优先，其次是"项目号 + 文件号"能解析出来的；都没有就只能自己托管
-        let online_download = !download.is_empty() || (!pid.is_empty() && !fid.is_empty());
+        let has_ids = recorded.is_some_and(|info| {
+            !info.modid.trim().is_empty() || !info.fileid.trim().is_empty()
+        });
+        let custom = if entry.edited { entry.custom } else { !has_ids };
+        // 自定义编号不能拿去平台解析；没有地址时仍然复制托管
+        let online_download =
+            !download.is_empty() || (!custom && !pid.is_empty() && !fid.is_empty());
         let mut item = if online_download {
-            source_item(&wire, pid, fid, &download, base, &entry.path, true)?
+            source_item(&wire, pid, fid, &download, base, &entry.path, custom)?
         } else {
             written.insert(top_of(&wire));
-            hosted_item(base, out, &entry.path, url, true)?
+            hosted_item(
+                base,
+                out,
+                &entry.path,
+                url,
+                custom,
+                &entry.pid,
+                &entry.fid,
+            )?
         };
         if item.custom {
             let key = mod_key(base, &entry.path, &wire);
-            let assigned = ids.assign(&key, &wire, item.sha1.as_deref().unwrap_or_default());
+            let sha1 = item.sha1.as_deref().unwrap_or_default();
+            let assigned = if entry.edited {
+                ids.save_edited(&key, &wire, sha1, &entry.pid, &entry.fid)
+            } else {
+                ids.assign(&key, &wire, sha1)
+            };
             item.pid = Some(assigned.project_id);
             item.fid = Some(assigned.file_id);
             if assigned.changed {
@@ -530,7 +602,7 @@ fn generate_mml(
                     let wire = files::wire_path(rel);
                     progress(now, total, wire.clone());
                     now += 1;
-                    let mut item = hosted_item(base, out, rel, url, true)?;
+                    let mut item = hosted_item(base, out, rel, url, true, "", "")?;
                     let assigned = ids.assign(
                         &format!("config:{wire}"),
                         &wire,
@@ -549,25 +621,46 @@ fn generate_mml(
         }
     }
 
-    for rel in &contents.packs {
+    for pack in &contents.packs {
+        let rel = &pack.path;
         let wire = files::wire_path(rel);
         progress(now, total, wire.clone());
         now += 1;
 
-        // 资源包同理：能在线下载的就不复制
-        let mut item = match online.get(&file_name(rel)) {
-            Some(info) => source_item(&wire, &info.modid, &info.fileid, &info.url, base, rel, true)?,
-            None => {
-                written.insert(top_of(&wire));
-                hosted_item(base, out, rel, url, true)?
-            }
+        // 资源包同理：手填地址 / 编号优先，其次用实例记录
+        let recorded = online.get(&file_name(rel));
+        let download = pick(&pack.url, recorded.map(|info| info.url.as_str()));
+        let pid = if pack.edited {
+            pack.pid.as_str()
+        } else {
+            recorded.map(|info| info.modid.as_str()).unwrap_or_default()
+        };
+        let fid = if pack.edited {
+            pack.fid.as_str()
+        } else {
+            recorded.map(|info| info.fileid.as_str()).unwrap_or_default()
+        };
+        let has_ids = recorded.is_some_and(|info| {
+            !info.modid.trim().is_empty() || !info.fileid.trim().is_empty()
+        });
+        let custom = if pack.edited { pack.custom } else { !has_ids };
+        // 自定义编号不能拿去平台解析；没有地址时仍然复制托管
+        let online_download =
+            !download.is_empty() || (!custom && !pid.is_empty() && !fid.is_empty());
+        let mut item = if online_download {
+            source_item(&wire, pid, fid, &download, base, rel, custom)?
+        } else {
+            written.insert(top_of(&wire));
+            hosted_item(base, out, rel, url, custom, &pack.pid, &pack.fid)?
         };
         if item.custom {
-            let assigned = ids.assign(
-                &format!("pack:{wire}"),
-                &wire,
-                item.sha1.as_deref().unwrap_or_default(),
-            );
+            let key = format!("pack:{wire}");
+            let sha1 = item.sha1.as_deref().unwrap_or_default();
+            let assigned = if pack.edited {
+                ids.save_edited(&key, &wire, sha1, &pack.pid, &pack.fid)
+            } else {
+                ids.assign(&key, &wire, sha1)
+            };
             item.pid = Some(assigned.project_id);
             item.fid = Some(assigned.file_id);
             if assigned.changed {
@@ -650,7 +743,7 @@ fn generate_hmcl(
     for config in &contents.configs {
         all.extend(files::dir_files(base, &config.dir)?);
     }
-    all.extend(contents.packs.iter().cloned());
+    all.extend(contents.packs.iter().map(|pick| pick.path.clone()));
 
     let mut list = Vec::new();
     let mut top = BTreeSet::new();
@@ -744,7 +837,7 @@ fn mod_key(base: &Path, rel: &Path, wire: &str) -> String {
 /// - `download`: 下载地址，可为空
 /// - `base`: 游戏目录
 /// - `rel`: 相对游戏目录的路径
-/// - `with_custom`: 没有编号时是否生成自定义编号；配置逐文件下发不生成
+/// - `custom`: 是否按自定义编号处理；没有编号时自动生成
 ///
 /// # 返回值
 ///
@@ -756,18 +849,18 @@ fn source_item(
     download: &str,
     base: &Path,
     rel: &Path,
-    with_custom: bool,
+    custom: bool,
 ) -> Result<ServerItemObj, String> {
     let pid = pid.trim();
     let fid = fid.trim();
-    let (pid, fid, custom) = if with_custom && pid.is_empty() && fid.is_empty() {
+    let (pid, fid, custom) = if custom && pid.is_empty() && fid.is_empty() {
         let (pid, fid) = custom_ids(wire);
         (Some(pid), Some(fid), true)
     } else {
         (
             Some(pid.to_string()).filter(|id| !id.is_empty()),
             Some(fid.to_string()).filter(|id| !id.is_empty()),
-            false,
+            custom,
         )
     };
     Ok(ServerItemObj {
@@ -787,7 +880,7 @@ fn source_item(
 /// - `out`: 输出文件夹
 /// - `rel`: 相对游戏目录的路径
 /// - `url`: 发布地址
-/// - `with_custom`: 是否生成自定义编号；配置逐文件下发不生成
+/// - `custom`: 是否生成自定义编号
 ///
 /// # 返回值
 ///
@@ -797,11 +890,21 @@ fn hosted_item(
     out: &Path,
     rel: &Path,
     url: &str,
-    with_custom: bool,
+    custom: bool,
+    pid: &str,
+    fid: &str,
 ) -> Result<ServerItemObj, String> {
     files::copy_into(base, out, rel)?;
     let wire = files::wire_path(rel);
-    let (pid, fid, custom) = if with_custom {
+    let pid = pid.trim();
+    let fid = fid.trim();
+    let (pid, fid, custom) = if !pid.is_empty() || !fid.is_empty() {
+        (
+            Some(pid.to_string()).filter(|id| !id.is_empty()),
+            Some(fid.to_string()).filter(|id| !id.is_empty()),
+            custom,
+        )
+    } else if custom {
         let (pid, fid) = custom_ids(&wire);
         (Some(pid), Some(fid), true)
     } else {

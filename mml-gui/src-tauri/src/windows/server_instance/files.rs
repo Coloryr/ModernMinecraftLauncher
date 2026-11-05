@@ -25,6 +25,14 @@ pub(super) struct ModPick {
     pub(super) path: PathBuf,
     /// 手动填的下载地址，空串表示用实例记录的
     pub(super) url: String,
+    /// 手动填的项目编号
+    pub(super) pid: String,
+    /// 手动填的文件编号
+    pub(super) fid: String,
+    /// 是否使用自定义编号
+    pub(super) custom: bool,
+    /// 编号是否被用户改过
+    pub(super) edited: bool,
 }
 
 /// 按勾选展开模组文件，路径相对游戏目录
@@ -64,6 +72,18 @@ pub(super) fn mods(base: &Path, picks: &[ServerInstancePickDto]) -> Result<Vec<M
                 } else {
                     String::new()
                 },
+                pid: if single {
+                    pick.pid.trim().to_string()
+                } else {
+                    String::new()
+                },
+                fid: if single {
+                    pick.fid.trim().to_string()
+                } else {
+                    String::new()
+                },
+                custom: single && pick.custom,
+                edited: single && pick.edited,
             };
             selected.insert(rel, entry);
         }

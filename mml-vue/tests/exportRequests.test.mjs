@@ -96,6 +96,8 @@ function packFixture(save) {
     pickedMods: new Map([["mods/a.jar", {}]]), pickedFiles: new Map(), unpickedFiles: new Set(),
     urls: new Map([["mods/a.jar", "https://example.invalid/a"]]), modIds: new Map(),
     serverPack: false, serverPicked: [], guiConfig: null,
+    // 服务器包要一起带的 Java 列表；单实例导出用不到，但 startExport 会读它
+    javaPicked: [],
   }).map(([key, value]) => [key, ref(value)]));
   const serverOptions = { config: true, guiConfig: true, page: false, css: false, home: false };
   const busy = computed(() => state.preparing.value || state.progress.value?.state === "running");

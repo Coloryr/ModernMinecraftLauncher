@@ -11,10 +11,12 @@ fn local_entries_get_stable_custom_ids() {
         &dir,
         &std::collections::HashMap::new(),
         false,
+        true,
     )
     .unwrap();
     let entry = &entries[0];
     assert!(entry.custom_id);
+    assert!(!entry.sha1.is_empty(), "本地文件也要算哈希");
     let (expected, _) = custom_ids(&entry.path);
     assert_eq!(entry.custom_project_id.as_deref(), Some(expected.as_str()));
     assert!(

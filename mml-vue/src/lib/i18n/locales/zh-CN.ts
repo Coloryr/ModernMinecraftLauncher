@@ -2490,6 +2490,7 @@ export default {
   "serverInstance.tabDesc.configs": "默认带上所有文件夹，可逐个改同步方式或删除",
   "serverInstance.tabDesc.start": "确认内容后生成到文件夹",
   "serverInstance.customId": "自定义",
+  "serverInstance.projectIdLocked": "已生成的项目编号不可修改",
   "serverInstance.guide": "指南",
   "serverInstance.pickAll": "全选",
   "serverInstance.pickNone": "全不选",

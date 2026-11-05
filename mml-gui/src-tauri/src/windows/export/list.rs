@@ -9,6 +9,7 @@ use crate::err_keys;
 
 use mml_base::{file_item::FileHash, hash_helper};
 use mml_game::launcher::file_online_info_obj::OnlineInfoObj;
+use mml_names::names;
 use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 use mml_game::loader::LoaderType;
 use tauri::{AppHandle, Emitter};
@@ -111,6 +112,7 @@ fn dir_size(path: &Path) -> u64 {
 /// - `base`: 游戏目录，即 `.minecraft`
 /// - `online`: 在线来源表，见 [`online_of`]
 /// - `deep_size`: 是否递归统计目录大小；根目录传 `false`，避免打开文件树时扫遍整个实例
+/// - `with_hash`: 是否给本地文件算 SHA1；模组 / 资源包表需要显示哈希
 ///
 /// # 返回值
 ///
@@ -120,6 +122,7 @@ pub(super) fn list_entries(
     base: &Path,
     online: &HashMap<String, OnlineInfoObj>,
     deep_size: bool,
+    with_hash: bool,
 ) -> Result<Vec<ExportEntryDto>, String> {
     let mut list = Vec::new();
 
@@ -145,6 +148,17 @@ pub(super) fn list_entries(
             (None, None)
         };
         let custom_id = custom_project_id.is_some();
+        let recorded_sha1 = info
+            .map(|item| item.sha1.trim().to_string())
+            .filter(|item| !item.is_empty());
+        let sha1 = if with_hash && !is_dir {
+            hash_helper::gen_hash_from_file(hash_helper::HashType::Sha1, &path)
+                .ok()
+                .or(recorded_sha1)
+                .unwrap_or_default()
+        } else {
+            recorded_sha1.unwrap_or_default()
+        };
 
         list.push(ExportEntryDto {
             path: wire,
@@ -161,7 +175,7 @@ pub(super) fn list_entries(
             custom_project_id,
             custom_file_id,
             custom_id,
-            sha1: info.map(|x| x.sha1.clone()).unwrap_or_default(),
+            sha1,
         });
     }
 
@@ -186,7 +200,7 @@ pub async fn export_get_info(uuid: String) -> Result<ExportInfoDto, String> {
         let online = online_of(&game);
         let mods_path = game.get_mods_path();
         let mods = if mods_path.exists() {
-            list_entries(&mods_path, &game.get_game_path(), &online, true)?
+            list_entries(&mods_path, &game.get_game_path(), &online, true, true)?
         } else {
             Vec::new()
         };
@@ -228,7 +242,13 @@ pub async fn export_list_dir(uuid: String, dir: String) -> Result<Vec<ExportEntr
         }
 
         let online = online_of(&game);
-        list_entries(&path, &base, &online, !dir.trim().is_empty())
+        list_entries(
+            &path,
+            &base,
+            &online,
+            !dir.trim().is_empty(),
+            dir.trim() == names::GAME_RESOURCEPACKS_DIR,
+        )
     })
     .await
     .map_err(|e| e.to_string())?
@@ -264,7 +284,13 @@ pub async fn export_list_instance_dir(
         }
 
         let online = online_of(&game);
-        list_entries(&path, &base, &online, !dir.trim().is_empty())
+        list_entries(
+            &path,
+            &base,
+            &online,
+            !dir.trim().is_empty(),
+            dir.trim() == names::GAME_RESOURCEPACKS_DIR,
+        )
     })
     .await
     .map_err(|e| e.to_string())?

@@ -38,10 +38,12 @@ function deferred() {
 function fixture(api) {
   const refs = Object.fromEntries(Object.entries({ currentUuid: "a", info: null, loadingInfo: false,
     packName: "", summary: "", pickedMods: new Map(), pickedFiles: new Map(), unpickedFiles: new Set(),
-    autoExcluded: new Set(), urls: new Map(), modIds: new Map(), pack: "curseforge", modsInManifest: true })
+    autoExcluded: new Set(), urls: new Map(), modIds: new Map(), pack: "curseforge" })
     .map(([key, value]) => [key, { value }]));
+  // 模组页只在带清单的格式下出现：组件里是 computed，这里照着 pack 现算
+  const showModsTab = { get value() { return refs.pack.value === "curseforge" || refs.pack.value === "modrinth"; } };
   const errors = [];
-  const context = { ...refs,
+  const context = { ...refs, showModsTab,
     api: { getExportInfo: async () => null, listExportDir: async () => [], listExportInstanceDir: async () => [], ...api },
     DEFAULT_SKIP: new Set(["logs", "crash-reports"]), GAME_DIR: ".minecraft",
     showToast: (e) => errors.push(e), tErr: String };
