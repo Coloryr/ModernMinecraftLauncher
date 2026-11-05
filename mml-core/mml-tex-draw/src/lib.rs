@@ -182,7 +182,7 @@ async fn load_blocks_impl(gui: gui_hook::ProgressGui, force: bool) -> CoreResult
     }
 
     // 打开 jar 并渲染
-    let archive = BaseArchive::open(&item.file)?;
+    let archive = BaseArchive::open_readonly(&item.file)?;
     if !block_done {
         block::render_blocks(&archive, gui.clone())?;
         blocks_write().id = last.clone();

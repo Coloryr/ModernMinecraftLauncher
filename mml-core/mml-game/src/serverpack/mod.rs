@@ -25,7 +25,9 @@ use crate::{
     launcher::{
         ModPackType, file_online_info_obj::OnlineInfoObj, instance_setting_obj::InstanceSettingObj,
     },
-    serverpack::serverpack_obj::{ServerArchiveItemObj, ServerItemObj, ServerPackObj},
+    serverpack::serverpack_obj::{
+        ServerArchiveItemObj, ServerBaseObj, ServerItemObj, ServerPackObj,
+    },
 };
 
 pub mod generate;
@@ -63,6 +65,36 @@ impl InstanceSettingObj {
         let obj = serialize_tools::json_from_file::<ServerPackObj>(file)?;
 
         Ok(Some(obj))
+    }
+
+    /// 同步保存服务器包信息
+    ///
+    /// 导入流程紧接着要读清单时用，异步队列可能还没落盘。
+    ///
+    /// - `pack`: 服务器包信息
+    ///
+    /// # 返回值
+    ///
+    /// 写盘失败时返回对应错误
+    pub fn save_serverpack_sync(&self, pack: &ServerPackObj) -> CoreResult<()> {
+        serialize_tools::json_to_file(pack, self.get_server_pack_file())
+    }
+
+    /// 本地清单的包版本是否与给定版本相同
+    ///
+    /// - `version`: 远端清单的包版本
+    ///
+    /// # 返回值
+    ///
+    /// 本地有清单、版本非空且与参数相同返回 `true`
+    pub fn same_pack_version(&self, version: &str) -> bool {
+        let version = version.trim();
+        if version.is_empty() {
+            return false;
+        }
+        serialize_tools::json_from_file::<ServerPackObj>(self.get_server_pack_file())
+            .ok()
+            .is_some_and(|old| old.pack_version.trim() == version)
     }
 
     /// 保存服务器包信息
@@ -111,6 +143,18 @@ impl InstanceSettingObj {
         progress: Option<ServerPackProgress<'_>>,
     ) -> CoreResult<()> {
         let old = self.get_old_serverpack()?;
+        // 旧清单里被移除、且要求删目录的配置目录：后面判断子目录要不要跟着重解时要用
+        let mut removed_dirs: Vec<String> = Vec::new();
+
+        // 只有包版本变了才动文件：发布者没改版本号时，远端清单再怎么变都只恢复本地清单
+        if let Some(old) = &old
+            && !new_pack.pack_version.trim().is_empty()
+            && old.pack_version.trim() == new_pack.pack_version.trim()
+        {
+            self.save_serverpack_sync(old)?;
+            path_helper::delete(self.get_server_pack_old_file())?;
+            return Ok(());
+        }
 
         let game_path = self.get_game_path();
         let temp_path = self.get_temp_path();
@@ -134,12 +178,19 @@ impl InstanceSettingObj {
                 mml_link::remove_link(self.uuid, &self.get_base_path(), &target);
             }
 
-            // 删除已移除的配置文件，仅删除由该配置独享的目录
-            for item in &plan.dirs {
+            // 删除已移除的配置文件，仅删除由该配置独享的目录；先删更深的，
+            // 否则父目录进回收站后子目录已经不存在
+            let mut dirs: Vec<&ServerArchiveItemObj> = plan.dirs.clone();
+            dirs.sort_by_key(|item| std::cmp::Reverse(item.dir.matches('/').count()));
+            for item in dirs {
                 if cancel.is_cancelled() {
                     return Err(ErrorType::TaskCancel);
                 }
-                path_helper::move_to_trash(paths::file_path(&game_path, &item.dir)?)?;
+                let dir = paths::file_path(&game_path, &item.dir)?;
+                if dir.exists() {
+                    path_helper::move_to_trash(dir)?;
+                }
+                removed_dirs.push(item.dir.clone());
             }
         }
 
@@ -158,10 +209,62 @@ impl InstanceSettingObj {
         // 下什么、从哪下、按什么哈希校验：同样由纯函数算
         let plan = plan::plan_downloads(&new_pack, &url_map);
 
+        // 旧清单里按压缩包名索引：同名的才可能内容没变
+        let previous_archives: HashMap<&str, &ServerArchiveItemObj> = old
+            .as_ref()
+            .map(|old| {
+                old.archive_list
+                    .iter()
+                    .map(|item| (item.file.as_str(), item))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        // 先判断哪些压缩包可以跳过。父包被重新解压（Over）或被删除时，
+        // 子目录即使哈希没变也必须重解，否则父包会把它擦掉。
+        let mut skipped: HashSet<&str> = HashSet::new();
+        for planned in &plan.archives {
+            if archive_unchanged(
+                previous_archives.get(planned.item.file.as_str()).copied(),
+                planned.item,
+                &game_path,
+            ) {
+                skipped.insert(planned.item.dir.as_str());
+            }
+        }
+        let mut cleared: Vec<&str> = removed_dirs.iter().map(String::as_str).collect();
+        for planned in &plan.archives {
+            if !skipped.contains(planned.item.dir.as_str()) && planned.item.delete_old {
+                cleared.push(planned.item.dir.as_str());
+            }
+        }
+
         let mut downloads: Vec<FileItemObj> = Vec::new();
         let mut archives: Vec<(&ServerArchiveItemObj, PathBuf)> = Vec::new();
 
+        // 基础文件包只发一次：旧清单已经有基础包就跳过，后续版本不再拉取
+        let base_pending = new_pack
+            .base
+            .as_ref()
+            .filter(|_| old.as_ref().and_then(|pack| pack.base.as_ref()).is_none());
+        let mut base_task: Option<(&ServerBaseObj, PathBuf)> = None;
+        if let Some(base) = base_pending {
+            let temp = paths::file_path(&temp_path, &base.file)?;
+            downloads.push(FileItemObj {
+                url: base.url.clone(),
+                name: base.file.clone(),
+                file: temp.clone(),
+                hash: plan::make_hash(&base.sha1, &base.sha256),
+                later: LaterRun::None,
+            });
+            base_task = Some((base, temp));
+        }
+
         for planned in &plan.files {
+            // 本地文件已经和清单一致就不重复下载：只补缺失、内容和清单不一致的
+            if local_matches(planned.item, &game_path) {
+                continue;
+            }
             downloads.push(FileItemObj {
                 url: planned.url.clone(),
                 name: planned.item.file.clone(),
@@ -172,6 +275,14 @@ impl InstanceSettingObj {
         }
 
         for planned in &plan.archives {
+            // 内容没变、目标目录也还在时可以跳过；但祖先目录会被清掉时不能跳
+            let skip = skipped.contains(planned.item.dir.as_str())
+                && !cleared
+                    .iter()
+                    .any(|ancestor| under(planned.item.dir.as_str(), ancestor));
+            if skip {
+                continue;
+            }
             let temp = paths::file_path(&temp_path, &planned.item.file)?;
             downloads.push(FileItemObj {
                 url: planned.url.clone(),
@@ -184,6 +295,16 @@ impl InstanceSettingObj {
         }
 
         download_all(downloads, &cancel, progress).await?;
+
+        // 基础包解压到实例根目录（.minecraft 所在的那一级），只解这一次
+        if let Some((_, temp)) = &base_task {
+            let result = extract_base(&self.get_base_path(), temp);
+            path_helper::delete(temp)?;
+            result?;
+        }
+
+        // 父目录的包先解，子目录的包后解；同层保持清单顺序
+        archives.sort_by_key(|(item, _)| item.dir.matches('/').count());
 
         for (item, temp) in archives.iter() {
             if cancel.is_cancelled() {
@@ -438,6 +559,158 @@ async fn download_all(
     Ok(())
 }
 
+/// 本地文件是否已经与清单一致
+///
+/// 清单给了 SHA1 就比 SHA1，只给 SHA256 就比 SHA256；没有校验值、文件不存在或读不到时
+/// 一律当作需要下载，交给后面的下载流程覆盖。
+///
+/// - `item`: 清单条目
+/// - `game_path`: 游戏目录
+///
+/// # 返回值
+///
+/// 文件存在且校验值一致返回 `true`
+fn local_matches(item: &ServerItemObj, game_path: &Path) -> bool {
+    let Ok(path) = paths::file_path(game_path, &item.file) else {
+        return false;
+    };
+    if !path.is_file() {
+        return false;
+    }
+    let check = item
+        .sha1
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| (HashType::Sha1, value))
+        .or_else(|| {
+            item.sha256
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(|value| (HashType::Sha256, value))
+        });
+    let Some((hash_type, expected)) = check else {
+        return false;
+    };
+    matches!(
+        gen_hash_from_file(hash_type, &path),
+        Ok(hash) if hash.eq_ignore_ascii_case(expected)
+    )
+}
+
+/// 解压基础文件包到实例根目录
+///
+/// 基础包可以包含 .minecraft，但顶层仍是 game.json、icon.png、server.json 这类
+/// 启动器自己的文件时拒绝；.minecraft 里的 server.json / server.json.sha1 /
+/// server.json.old 也拒绝，避免覆盖同步元数据。
+///
+/// - `base`: 实例根目录
+/// - `file`: 已经下载到临时目录的基础包
+///
+/// # 返回值
+///
+/// 解压成功返回 `Ok(())`；包内有保留文件或解压失败返回对应错误
+fn extract_base(base: &Path, file: &Path) -> CoreResult<()> {
+    let archive = BaseArchive::open_readonly(file)?;
+    for item in archive.entries() {
+        let name = item.name.replace('\\', "/");
+        let parts: Vec<&str> = name.split('/').collect();
+        let first = parts.first().copied().unwrap_or_default();
+        let blocked = [names::GAME_FILE, names::ICON_FILE, names::SERVER_FILE];
+        if blocked
+            .iter()
+            .any(|reserved| first.eq_ignore_ascii_case(reserved))
+            || first.eq_ignore_ascii_case(&format!("{}.sha1", names::SERVER_FILE))
+            || first.eq_ignore_ascii_case(&format!("{}.old", names::SERVER_FILE))
+            || (first.eq_ignore_ascii_case(names::GAME_DIR)
+                && parts.get(1).is_some_and(|second| server_metadata(second)))
+        {
+            return Err(ErrorType::UnsafePath {
+                root: base.to_path_buf(),
+                path: base.join(&name),
+            });
+        }
+    }
+    drop(archive);
+
+    let archive_type = ArchiveType::try_from_path(file).ok_or_else(|| {
+        ErrorType::ArchiveOpenError(FileSystemErrorData {
+            path: file.to_path_buf(),
+            error: String::new(),
+        })
+    })?;
+    BaseArchive::decompress(archive_type, file, base, None)
+}
+
+/// 是否是服务器包清单文件
+///
+/// - `name`: 文件名
+///
+/// # 返回值
+///
+/// server.json、server.json.sha1、server.json.old 返回 `true`
+fn server_metadata(name: &str) -> bool {
+    name.eq_ignore_ascii_case(names::SERVER_FILE)
+        || name.eq_ignore_ascii_case(&format!("{}.sha1", names::SERVER_FILE))
+        || name.eq_ignore_ascii_case(&format!("{}.old", names::SERVER_FILE))
+}
+
+/// `dir` 是否位于 `ancestor` 目录之下
+///
+/// - `dir`: 相对游戏目录的路径，如 `config/setting`
+/// - `ancestor`: 祖先目录，如 `config`
+///
+/// # 返回值
+///
+/// 严格位于祖先目录里时返回 `true`；相等或只是名称前缀时返回 `false`
+fn under(dir: &str, ancestor: &str) -> bool {
+    dir.starts_with(ancestor) && dir.as_bytes().get(ancestor.len()) == Some(&b'/')
+}
+
+/// 压缩包是否与上一次同步一致且目标目录还在
+///
+/// 同名、同目标目录、同删除设置，并且 SHA1（没有时 SHA256）相同，目标目录仍存在时，
+/// 客户端不需要重新下载 / 解压这个配置目录。
+///
+/// - `previous`: 旧清单里的同名条目，没有时传 `None`
+/// - `current`: 新清单条目
+/// - `game_path`: 游戏目录
+///
+/// # 返回值
+///
+/// 可以跳过下载时返回 `true`
+fn archive_unchanged(
+    previous: Option<&ServerArchiveItemObj>,
+    current: &ServerArchiveItemObj,
+    game_path: &Path,
+) -> bool {
+    let Some(previous) = previous else {
+        return false;
+    };
+    if previous.dir.trim() != current.dir.trim() || previous.delete_old != current.delete_old {
+        return false;
+    }
+    let same_hash = match (
+        trimmed(previous.sha1.as_deref()),
+        trimmed(current.sha1.as_deref()),
+    ) {
+        (Some(a), Some(b)) => a.eq_ignore_ascii_case(b),
+        _ => match (
+            trimmed(previous.sha256.as_deref()),
+            trimmed(current.sha256.as_deref()),
+        ) {
+            (Some(a), Some(b)) => a.eq_ignore_ascii_case(b),
+            _ => false,
+        },
+    };
+    if !same_hash {
+        return false;
+    }
+    // 目录被手动删掉或上次没解出来时要补一次
+    paths::file_path(game_path, &current.dir).is_ok_and(|dir| dir.is_dir())
+}
+
 /// 删除文件；若文件已被禁用，即追加了 `.disable`/`.disabled` 后缀，则一并删除
 ///
 /// - `file`: 文件路径
@@ -534,4 +807,18 @@ async fn resolve_download_urls(
     }
 
     urls
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn under_only_matches_descendants() {
+        assert!(under("config/setting", "config"));
+        assert!(under("config/setting/deep", "config/setting"));
+        assert!(!under("config", "config"));
+        assert!(!under("config2", "config"));
+        assert!(!under("config/setting", "config2"));
+    }
 }

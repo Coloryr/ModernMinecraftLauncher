@@ -27,6 +27,9 @@ pub struct ServerInstanceOptionsDto {
     /// 要同步的配置目录，每个目录各自带同步方式
     #[serde(default)]
     pub configs: Vec<ServerInstanceConfigDto>,
+    /// 基础文件，相对实例根目录；打包成固定 zip，只在首次同步时下载
+    #[serde(default)]
+    pub base_files: Vec<String>,
     /// 要同步的资源包文件，路径相对游戏目录
     #[serde(default)]
     pub resource_packs: Vec<String>,
@@ -55,6 +58,14 @@ pub struct ServerInstanceConfigDto {
     /// 同步方式：`archive` 打成压缩包，`files` 逐个文件下发
     #[serde(default)]
     pub mode: String,
+    /// 压缩包同步时是否先删掉目标目录；默认删，与旧行为一致
+    #[serde(default = "default_true")]
+    pub delete_old: bool,
+}
+
+/// 缺省值：默认删除目标目录
+fn default_true() -> bool {
+    true
 }
 
 /// 生成进度事件，事件名 `server-instance-progress`

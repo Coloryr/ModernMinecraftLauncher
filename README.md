@@ -293,6 +293,7 @@ ModernColoryrMinecraftLauncher/
 | 文档 | 内容 |
 | --- | --- |
 | [软件手册](docs/README.md) | 完整软件手册：第一次启动、实例、资源、账户、Java、联机、设置、数据备份与排错 |
+| [服务器实例操作指导](docs/server-instance.md) | 生成、发布、玩家导入、更新与排错 |
 | [开发与构建](docs/development.md) | 技术栈、IPC 契约、构建配置、GitHub Actions 发版 |
 | [开源许可](docs/licensing.md) | 内嵌组件、前端库、Rust 依赖、第三方服务与许可说明 |
 | [更新日志](docs/changelog.md) | 每个版本的可见变化 |

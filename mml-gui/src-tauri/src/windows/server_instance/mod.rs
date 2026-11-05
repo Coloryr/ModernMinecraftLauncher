@@ -23,7 +23,7 @@ use mml_game::{
     other_launcher::hmcl_obj::HMCLServerFileObj,
     serverpack::{
         generate,
-        serverpack_obj::{ServerArchiveItemObj, ServerItemObj},
+        serverpack_obj::{ServerArchiveItemObj, ServerBaseObj, ServerItemObj},
     },
 };
 use mml_names::names;
@@ -188,6 +188,8 @@ struct ConfigDir {
     dir: String,
     /// 同步方式
     mode: ConfigMode,
+    /// 压缩包同步时是否先删除目标目录
+    delete_old: bool,
 }
 
 /// 本次要写进包里的内容
@@ -198,6 +200,30 @@ struct Contents {
     configs: Vec<ConfigDir>,
     /// 资源包文件，路径相对游戏目录
     packs: Vec<PathBuf>,
+}
+
+/// 校验并规范化配置目录
+///
+/// 只允许顶层目录与一级子目录，如 `config` / `config/setting`；更深的目录不接受。
+///
+/// - `value`: 前端给的目录名
+///
+/// # 返回值
+///
+/// 统一用 `/` 分隔的目录名；为空、超过两级或含空段 / `.` / `..` 时返回
+/// `err.serverInstanceDir`
+fn config_dir(value: &str) -> Result<String, String> {
+    let dir = value.trim().replace('\\', "/");
+    let parts: Vec<&str> = dir.split('/').collect();
+    if parts.is_empty()
+        || parts.len() > 2
+        || parts
+            .iter()
+            .any(|part| part.is_empty() || *part == "." || *part == "..")
+    {
+        return Err(err_keys::SERVER_INSTANCE_DIR.to_string());
+    }
+    Ok(dir)
 }
 
 /// 生成入口：校验参数 → 展开勾选 → 按格式写盘
@@ -222,14 +248,11 @@ fn generate(
     let mods = files::mods(&base, &options.mods)?;
     let mut configs = Vec::new();
     for item in &options.configs {
-        let dir = item.dir.trim();
-        // 只认顶层目录：压缩包名与清单里的 dir 都按它拼，带路径分层的写不清
-        if dir.is_empty() || dir.contains(['/', '\\']) {
-            return Err(err_keys::SERVER_INSTANCE_DIR.to_string());
-        }
+        let dir = config_dir(&item.dir)?;
         configs.push(ConfigDir {
-            dir: dir.to_string(),
+            dir,
             mode: ConfigMode::parse(&item.mode)?,
+            delete_old: item.delete_old,
         });
     }
     let packs = options
@@ -238,7 +261,8 @@ fn generate(
         .map(|path| files::file(&base, path))
         .collect::<Result<Vec<_>, _>>()?;
 
-    if mods.is_empty() && configs.is_empty() && packs.is_empty() {
+    let has_base = matches!(format, Format::Mml) && !options.base_files.is_empty();
+    if mods.is_empty() && configs.is_empty() && packs.is_empty() && !has_base {
         return Err(err_keys::SERVER_INSTANCE_EMPTY.to_string());
     }
 
@@ -338,20 +362,36 @@ fn generate_mml(
     contents: &Contents,
     progress: Progress<'_>,
 ) -> Result<ServerInstanceResultDto, String> {
+    // 父目录排在子目录前面：清单里的 Archives 按这个顺序，客户端先解父包再解子包
+    let mut selected: Vec<&ConfigDir> = contents.configs.iter().collect();
+    selected.sort_by(|a, b| {
+        let depth = a.dir.matches('/').count();
+        let other = b.dir.matches('/').count();
+        depth.cmp(&other).then_with(|| a.dir.cmp(&b.dir))
+    });
+
     // 先把目录内容列出来：进度总数与后面的打包都要用
     let mut config_files = Vec::new();
-    for config in &contents.configs {
-        config_files.push((
-            config.dir.clone(),
-            config.mode,
-            files::dir_files(base, &config.dir)?,
-        ));
+    for config in selected {
+        let mut list = files::dir_files(base, &config.dir)?;
+        // 父目录的包要排掉已单独选中的一级子目录，子目录自己的包负责那部分
+        let prefix = format!("{}/", config.dir);
+        let children: Vec<&str> = contents
+            .configs
+            .iter()
+            .map(|item| item.dir.as_str())
+            .filter(|dir| dir.starts_with(&prefix) && !dir[prefix.len()..].contains('/'))
+            .collect();
+        if !children.is_empty() {
+            list.retain(|rel| !children.iter().any(|child| rel.starts_with(*child)));
+        }
+        config_files.push((config.dir.clone(), config.mode, config.delete_old, list));
     }
 
     let total = contents.mods.len()
         + config_files
             .iter()
-            .map(|(_, mode, list)| match mode {
+            .map(|(_, mode, _, list)| match mode {
                 ConfigMode::Archive => 1,
                 ConfigMode::Files => list.len(),
             })
@@ -361,6 +401,25 @@ fn generate_mml(
     let mut now = 0;
     let mut items = Vec::new();
     let mut written = BTreeSet::new();
+
+    // 基础文件：实例根目录下、与 .minecraft 同级的文件，打成一个固定包。
+    // 客户端只在第一次同步时解压，后续版本不再拉取。
+    let base_files = files::base_files(&game.get_base_path(), &options.base_files)?;
+    let base_count = base_files.len();
+    let base_item = if base_files.is_empty() {
+        None
+    } else {
+        let name = "base.zip".to_string();
+        let file = out.join(&name);
+        files::zip_files(&game.get_base_path(), &base_files, &file)?;
+        written.insert(name.clone());
+        Some(ServerBaseObj {
+            file: name.clone(),
+            url: format!("{url}/{}", files::encode_url_path(&name)),
+            sha1: Some(files::sha1(&file)?),
+            sha256: None,
+        })
+    };
 
     // 图标也带一份：玩家导入时按清单里的 Icon 去 <发布地址>/icon.png 下载
     let icon = copy_icon(game, out)?;
@@ -394,7 +453,7 @@ fn generate_mml(
         items.push(item);
     }
 
-    for (dir, mode, list) in &config_files {
+    for (dir, mode, delete_old, list) in &config_files {
         match mode {
             ConfigMode::Archive => {
                 let name = generate::archive_name(dir);
@@ -406,8 +465,8 @@ fn generate_mml(
                 archives.push(ServerArchiveItemObj {
                     file: name.clone(),
                     dir: dir.clone(),
-                    // 整个目录都同步，服务端删掉的文件客户端也要清掉
-                    delete_old: true,
+                    // 由用户在生成窗口里选：勾选时先删目标目录，不勾就解压覆盖
+                    delete_old: *delete_old,
                     url: format!("{url}/{}", files::encode_url_path(&name)),
                     sha1: Some(files::sha1(&zip)?),
                     sha256: None,
@@ -443,7 +502,7 @@ fn generate_mml(
         items.push(item);
     }
 
-    let count = items.len() + archived;
+    let count = items.len() + archived + base_count;
     let mut pack = generate::build_server_pack(
         game,
         &options.name,
@@ -453,6 +512,7 @@ fn generate_mml(
         archives,
     );
     pack.icon = icon;
+    pack.base = base_item;
     let bytes = serde_json::to_vec_pretty(&pack).map_err(|e| e.to_string())?;
     // 客户端拿本地 server.json 的 SHA1 与 server.json.sha1 逐字比对，这里不能带换行
     let sha1 = gen_hash(HashType::Sha1, &bytes);

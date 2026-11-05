@@ -37,8 +37,10 @@ fn options(
             .map(|(dir, mode)| ServerInstanceConfigDto {
                 dir: dir.to_string(),
                 mode: mode.to_string(),
+                delete_old: true,
             })
             .collect(),
+        base_files: Vec::new(),
         resource_packs: packs.iter().map(|path| path.to_string()).collect(),
     }
 }
@@ -53,6 +55,7 @@ fn contents(base: &Path, options: &ServerInstanceOptionsDto) -> Contents {
             .map(|item| ConfigDir {
                 dir: item.dir.clone(),
                 mode: ConfigMode::parse(&item.mode).unwrap(),
+                delete_old: item.delete_old,
             })
             .collect(),
         packs: options
@@ -87,6 +90,24 @@ fn online(file: &str, pid: &str, fid: &str) -> OnlineInfoObj {
         fileid: fid.into(),
         url: format!("https://example.invalid/{file}"),
         ..Default::default()
+    }
+}
+
+#[test]
+fn config_dir_allows_only_one_level() {
+    assert_eq!(config_dir("config").unwrap(), "config");
+    assert_eq!(config_dir("config\\setting").unwrap(), "config/setting");
+    for bad in [
+        "",
+        "config/",
+        "/config",
+        "config//setting",
+        "config/setting/deep",
+        ".",
+        "..",
+        "config/..",
+    ] {
+        assert!(config_dir(bad).is_err(), "{bad}");
     }
 }
 
@@ -522,6 +543,193 @@ fn hmcl_pack_rejects_loader_it_cannot_express() {
     assert_eq!(err, err_keys::SERVER_INSTANCE_LOADER);
 
     crate::test_support::cleanup(&[&base, &out]);
+}
+
+
+/// 压缩包同步可以关掉「删除原有目录」，清单里的 Over 随之为 false
+#[test]
+fn mml_archive_delete_old_follows_option() {
+    crate::test_support::ensure_boot();
+    let base = crate::test_support::temp_dir("server-instance-config-keep");
+    let out = crate::test_support::temp_dir("server-instance-config-keep-out");
+    fs::create_dir_all(base.join("config")).unwrap();
+    fs::write(base.join("config/a.toml"), b"a").unwrap();
+
+    let mut options = options("mml", &[], &[("config", "archive")], &[]);
+    options.configs[0].delete_old = false;
+    let contents = contents(&base, &options);
+    generate_mml(
+        &game(),
+        &HashMap::new(),
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    let pack: ServerPackObj =
+        serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
+    assert_eq!(pack.archive_list.len(), 1);
+    assert!(
+        !pack.archive_list[0].delete_old,
+        "关掉删除后 Over 应为 false"
+    );
+
+    crate::test_support::cleanup(&[&base, &out]);
+}
+
+
+/// 选中一级子目录后，父目录的包排除子目录，子目录单独成包并排在父包后面
+#[test]
+fn mml_splits_selected_subdirectory_into_own_archive() {
+    crate::test_support::ensure_boot();
+    let base = crate::test_support::temp_dir("server-instance-nested");
+    let out = crate::test_support::temp_dir("server-instance-nested-out");
+    fs::create_dir_all(base.join("config").join("setting")).unwrap();
+    fs::write(base.join("config").join("a.toml"), b"a").unwrap();
+    fs::write(base.join("config").join("setting").join("b.toml"), b"b").unwrap();
+
+    let options = options(
+        "mml",
+        &[],
+        &[("config", "archive"), ("config/setting", "archive")],
+        &[],
+    );
+    let contents = contents(&base, &options);
+    let result = generate_mml(
+        &game(),
+        &HashMap::new(),
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    let pack: ServerPackObj =
+        serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
+    assert_eq!(pack.archive_list.len(), 2);
+    assert_eq!(pack.archive_list[0].file, "config.zip");
+    assert_eq!(pack.archive_list[0].dir, "config");
+    assert_eq!(pack.archive_list[1].file, "config.setting.zip");
+    assert_eq!(pack.archive_list[1].dir, "config/setting");
+
+    let parent =
+        mml_base::archives::BaseArchive::open_readonly(out.join("config.zip")).unwrap();
+    let names: Vec<String> = parent
+        .entries()
+        .iter()
+        .map(|item| item.name.clone())
+        .collect();
+    assert!(names.iter().any(|name| name == "a.toml"), "{names:?}");
+    assert!(
+        !names.iter().any(|name| name == "setting/b.toml"),
+        "父包不该包含子目录文件: {names:?}"
+    );
+
+    let child =
+        mml_base::archives::BaseArchive::open_readonly(out.join("config.setting.zip")).unwrap();
+    assert!(
+        child.entries().iter().any(|item| item.name == "b.toml"),
+        "子目录包应包含自己的文件"
+    );
+    assert_eq!(result.count, 2);
+
+    crate::test_support::cleanup(&[&base, &out]);
+}
+
+
+/// 实例根目录下的文件打成固定 base.zip，清单里写 Base
+#[test]
+fn mml_packs_base_files_outside_minecraft() {
+    crate::test_support::ensure_boot();
+    let dir = format!("server-instance-base-{}", uuid::Uuid::new_v4());
+    // 实例目录在 run/minecraft/instances 下，get_base_path 按实例根目录拼
+    let instance = mml_base::get_base_dir()
+        .join("minecraft")
+        .join("instances")
+        .join(&dir);
+    let game_dir = instance.join(".minecraft");
+    fs::create_dir_all(&game_dir).unwrap();
+    fs::write(instance.join("server.properties"), b"motd=test").unwrap();
+    fs::write(game_dir.join("options.txt"), b"lang:zh_cn").unwrap();
+
+    let out = crate::test_support::temp_dir("server-instance-base-out");
+    let mut game = game();
+    game.dir = dir;
+    let mut options = options("mml", &[], &[], &[]);
+    options.base_files = vec!["server.properties".to_string(), ".minecraft".to_string()];
+    let contents = contents(&game_dir, &options);
+    let result = generate_mml(
+        &game,
+        &HashMap::new(),
+        &game_dir,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    let pack: ServerPackObj =
+        serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
+    let base = pack.base.expect("应写出基础文件包");
+    assert_eq!(base.file, "base.zip");
+    assert_eq!(base.url, "https://example.invalid/pack/base.zip");
+    let archive =
+        mml_base::archives::BaseArchive::open_readonly(out.join("base.zip")).unwrap();
+    assert!(
+        archive.entries().iter().any(|item| item.name == "server.properties"),
+        "基础包应包含选中的文件"
+    );
+    assert!(
+        archive
+            .entries()
+            .iter()
+            .any(|item| item.name == ".minecraft/options.txt"),
+        "基础包应包含 .minecraft 里的文件"
+    );
+    assert_eq!(result.count, 2);
+    assert!(result.files.iter().any(|name| name == "base.zip"));
+
+    let _ = fs::remove_dir_all(&instance);
+    crate::test_support::cleanup(&[&out]);
+}
+
+/// 基础文件不接受 .minecraft 里的文件与启动器元数据
+#[test]
+fn base_files_allow_minecraft_but_reject_metadata() {
+    crate::test_support::ensure_boot();
+    let base = crate::test_support::temp_dir("server-instance-base-reject");
+    fs::create_dir_all(base.join(".minecraft")).unwrap();
+    fs::write(base.join("server.properties"), b"x").unwrap();
+    fs::write(base.join(".minecraft").join("a.txt"), b"x").unwrap();
+    fs::write(base.join(".minecraft").join("server.json"), b"{}").unwrap();
+    fs::write(base.join(".minecraft").join("server.json.sha1"), b"x").unwrap();
+    fs::write(base.join("game.json"), b"{}").unwrap();
+
+    assert_eq!(
+        files::base_files(&base, &["server.properties".to_string()]).unwrap(),
+        vec![PathBuf::from("server.properties")]
+    );
+    assert_eq!(
+        files::base_files(&base, &[".minecraft".to_string()]).unwrap(),
+        vec![PathBuf::from(".minecraft/a.txt")]
+    );
+    assert_eq!(
+        files::base_files(&base, &[".minecraft/a.txt".to_string()]).unwrap(),
+        vec![PathBuf::from(".minecraft/a.txt")]
+    );
+    assert!(files::base_files(&base, &["game.json".to_string()]).is_err());
+    assert!(files::base_files(&base, &[".minecraft/server.json".to_string()]).is_err());
+
+    crate::test_support::cleanup(&[&base]);
 }
 
 /// 实例自带图标时复制进输出文件夹，没有图标时返回 None

@@ -114,7 +114,7 @@ fn extract(file: &Path) -> CoreResult<PathBuf> {
     let dir = python_dir();
     path_helper::create_dir_all(&dir)?;
 
-    BaseArchive::open(file)?.extract_all(&dir, None, None, None)?;
+    BaseArchive::open_readonly(file)?.extract_all(&dir, None, None, None)?;
 
     find_in(&dir).ok_or_else(|| {
         ErrorType::PathNotExists(PathNotExistsData {

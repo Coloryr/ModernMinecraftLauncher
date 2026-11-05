@@ -193,6 +193,8 @@ pub const SERVER_INSTANCE_BUSY: &str = "err.serverInstanceBusy";
 pub const SERVER_INSTANCE_MODE: &str = "err.serverInstanceMode";
 /// 配置目录或资源包文件不存在
 pub const SERVER_INSTANCE_DIR: &str = "err.serverInstanceDir";
+/// 基础文件不合法，只能是实例根目录下、.minecraft 之外的文件
+pub const SERVER_INSTANCE_BASE_FILE: &str = "err.serverInstanceBaseFile";
 
 // ---------- 主题包 ----------
 

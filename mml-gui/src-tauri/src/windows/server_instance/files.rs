@@ -11,6 +11,7 @@ use std::{
 };
 
 use mml_base::hash_helper::{HashType, gen_hash_from_file};
+use mml_names::names;
 
 use crate::{
     dtos::server_instance_dto::ServerInstancePickDto,
@@ -169,6 +170,111 @@ fn relative(base: &Path, name: &str) -> Result<PathBuf, String> {
         .map_err(|_| err_keys::FILE_NAME.to_string())
 }
 
+/// 校验基础文件并转成相对实例根目录的路径
+///
+/// 基础文件取自实例根目录：可以勾选与 .minecraft 同级的文件，也可以整个勾选 .minecraft。
+///
+/// 启动器自己的 game.json / icon.png / server.json 不允许；.minecraft 里的清单文件
+/// server.json / server.json.sha1 / server.json.old 会被跳过，避免覆盖同步元数据。
+///
+/// - `base`: 实例根目录
+/// - `picks`: 前端勾选的相对路径
+///
+/// # 返回值
+///
+/// 相对实例根目录的文件路径，排序去重；越界、普通目录或启动器元数据返回错误
+pub(super) fn base_files(base: &Path, picks: &[String]) -> Result<Vec<PathBuf>, String> {
+    let mut list = Vec::new();
+    for pick in picks {
+        let rel = relative(base, pick)
+            .map_err(|_| err_keys::SERVER_INSTANCE_BASE_FILE.to_string())?;
+        let first = first_component(&rel);
+        if is_reserved_base(first) {
+            return Err(err_keys::SERVER_INSTANCE_BASE_FILE.to_string());
+        }
+
+        // .minecraft 允许整目录带上，展开成每个文件一条
+        if rel.to_string_lossy().eq_ignore_ascii_case(names::GAME_DIR) {
+            let root = base.join(&rel);
+            if !root.is_dir() {
+                return Err(err_keys::SERVER_INSTANCE_BASE_FILE.to_string());
+            }
+            for file in archive::files_under(&root)? {
+                let item = file
+                    .strip_prefix(base)
+                    .map_err(|_| err_keys::SERVER_INSTANCE_BASE_FILE.to_string())?;
+                if is_reserved_game_file(item) {
+                    continue;
+                }
+                list.push(item.to_path_buf());
+            }
+            continue;
+        }
+
+        let rel = file(base, pick)
+            .map_err(|_| err_keys::SERVER_INSTANCE_BASE_FILE.to_string())?;
+        if is_reserved_game_file(&rel) {
+            return Err(err_keys::SERVER_INSTANCE_BASE_FILE.to_string());
+        }
+        list.push(rel);
+    }
+    list.sort();
+    list.dedup();
+    Ok(list)
+}
+
+/// 路径的第一个组件，用于判断是否命中启动器保留名
+///
+/// - `path`: 相对实例根目录的路径
+///
+/// # 返回值
+///
+/// 第一个组件；空路径返回空串
+fn first_component(path: &Path) -> &str {
+    path.components()
+        .next()
+        .and_then(|part| part.as_os_str().to_str())
+        .unwrap_or_default()
+}
+
+/// 实例根目录下是否是不能进基础包的启动器文件
+///
+/// - `name`: 顶层文件名
+///
+/// # 返回值
+///
+/// game.json / icon.png / server.json / server.json.old 返回 true
+fn is_reserved_base(name: &str) -> bool {
+    [names::GAME_FILE, names::ICON_FILE, names::SERVER_FILE]
+        .iter()
+        .any(|item| name.eq_ignore_ascii_case(item))
+        || name.eq_ignore_ascii_case(&format!("{}.sha1", names::SERVER_FILE))
+        || name.eq_ignore_ascii_case(&format!("{}.old", names::SERVER_FILE))
+}
+
+/// .minecraft 里是否是不能进基础包的清单文件
+///
+/// - `path`: 相对实例根目录的路径
+///
+/// # 返回值
+///
+/// .minecraft/server.json、server.json.sha1、server.json.old 返回 true
+fn is_reserved_game_file(path: &Path) -> bool {
+    let mut parts = path.components().filter_map(|part| part.as_os_str().to_str());
+    let Some(first) = parts.next() else {
+        return false;
+    };
+    if !first.eq_ignore_ascii_case(names::GAME_DIR) {
+        return false;
+    }
+    let Some(second) = parts.next() else {
+        return false;
+    };
+    second.eq_ignore_ascii_case(names::SERVER_FILE)
+        || second.eq_ignore_ascii_case(&format!("{}.sha1", names::SERVER_FILE))
+        || second.eq_ignore_ascii_case(&format!("{}.old", names::SERVER_FILE))
+}
+
 /// 算文件的 SHA1，两份清单校验的都是它
 ///
 /// - `path`: 文件路径
@@ -202,6 +308,25 @@ pub(super) fn zip_dir(
             .strip_prefix(dir)
             .map_err(|_| String::from(err_keys::FILE_NAME))?;
         entries.push((wire_path(name), base.join(rel)));
+    }
+    // 生成是一次性动作，没有取消入口
+    let cancel = AtomicBool::new(false);
+    archive::write_zip(file, &entries, &[], &None, &cancel)
+}
+
+/// 把一组文件按相对实例根目录的路径打进压缩包
+///
+/// - `base`: 实例根目录
+/// - `files`: 相对实例根目录的文件
+/// - `file`: 输出压缩包
+///
+/// # 返回值
+///
+/// 写盘成功返回 `Ok(())`；压缩失败返回错误文案
+pub(super) fn zip_files(base: &Path, files: &[PathBuf], file: &Path) -> Result<(), String> {
+    let mut entries = Vec::with_capacity(files.len());
+    for rel in files {
+        entries.push((wire_path(rel), base.join(rel)));
     }
     // 生成是一次性动作，没有取消入口
     let cancel = AtomicBool::new(false);

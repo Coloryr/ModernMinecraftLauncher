@@ -124,7 +124,7 @@ pub fn test_archive_type<P: AsRef<Path>>(path: P) -> Option<PackType> {
         return Some(PackType::Modrinth);
     }
 
-    let arch = BaseArchive::open(path);
+    let arch = BaseArchive::open_readonly(path);
     if arch.is_err() {
         return None;
     }

@@ -635,7 +635,7 @@ pub async fn upgrade_modpack(
         gui.set_now(2, Some(6));
     }
 
-    let zip = BaseArchive::open(file)?;
+    let zip = BaseArchive::open_readonly(file)?;
     let mut worker = CurseForgeWorker::new(BaseModPackWorker::new(
         zip,
         None,

@@ -141,7 +141,7 @@ pub async fn add_scan_folder(path: String) -> Result<Vec<FolderInstanceDto>, Str
 #[gui_macros::command]
 pub async fn add_list_archive(path: String) -> Result<ArchiveProbeDto, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let archive = mml_base::archives::BaseArchive::open(&path).map_err(|e| e.to_string())?;
+        let archive = mml_base::archives::BaseArchive::open_readonly(&path).map_err(|e| e.to_string())?;
         let entries = archive
             .entries()
             .iter()

@@ -260,7 +260,7 @@ impl InstanceSettingObj {
             path_helper::create_dir_all(&saves_dir)?;
         }
 
-        let archive = BaseArchive::open(file.as_ref())?;
+        let archive = BaseArchive::open_readonly(file.as_ref())?;
 
         // 如果包内所有条目都套在同一个顶层文件夹里，直接解压到 saves 目录；
         // 否则以压缩包文件名新建一个文件夹再解压进去。

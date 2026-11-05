@@ -52,6 +52,30 @@ pub struct ServerPackObj {
     /// 配置文件列表
     #[serde(rename = "Archives")]
     pub archive_list: Vec<ServerArchiveItemObj>,
+    /// 基础文件包：解压到实例根目录，导入时下载一次，后续版本不再下载
+    #[serde(rename = "Base", skip_serializing_if = "Option::is_none")]
+    pub base: Option<ServerBaseObj>,
+}
+
+/// 基础文件压缩包
+///
+/// 内容按实例根目录的相对路径打包，解压目标就是 .minecraft 所在目录；
+/// 只在实例第一次同步时下发，后续版本更新不再拉取。
+#[derive(Serialize, Deserialize, Debug, Default)]
+#[serde(default)]
+pub struct ServerBaseObj {
+    /// 压缩包文件名，如 base.zip
+    #[serde(rename = "File")]
+    pub file: String,
+    /// 下载地址
+    #[serde(rename = "Url")]
+    pub url: String,
+    /// SHA1 校验
+    #[serde(rename = "Sha1")]
+    pub sha1: Option<String>,
+    /// SHA256 校验
+    #[serde(rename = "Sha256")]
+    pub sha256: Option<String>,
 }
 
 /// 服务器包里的配置文件压缩包条目

@@ -82,7 +82,7 @@ pub(super) fn file_name(file: &Path) -> Option<String> {
 /// 口径与 `mml_game` 的 `import_save` 保持一致：包内只有一个顶层目录就用它，
 /// 否则用压缩包文件名。
 pub(super) fn save_dir_name(file: &Path) -> String {
-    if let Ok(archive) = mml_base::archives::BaseArchive::open(file)
+    if let Ok(archive) = mml_base::archives::BaseArchive::open_readonly(file)
         && let Some(top) = archive.single_top_dir()
     {
         return top.to_string();

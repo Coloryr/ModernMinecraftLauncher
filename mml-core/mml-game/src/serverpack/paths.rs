@@ -45,6 +45,10 @@ pub(super) fn validate_pack(pack: &ServerPackObj, game: &Path, temp: &Path) -> C
             safe_join(game, &item.dir)?;
         }
     }
+    if let Some(base) = &pack.base {
+        // 基础包下载到临时目录，解压目标固定在实例根目录，不参与清单路径
+        file_path(temp, &base.file)?;
+    }
     Ok(())
 }
 

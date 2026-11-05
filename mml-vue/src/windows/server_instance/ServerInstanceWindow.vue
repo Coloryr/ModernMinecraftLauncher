@@ -36,7 +36,7 @@ type Format = "mml" | "hmcl";
 /** 配置目录的同步方式 */
 type ConfigMode = "archive" | "files";
 /** 左侧分页 */
-type Section = "general" | "mods" | "packs" | "configs" | "start";
+type Section = "general" | "base" | "mods" | "packs" | "configs" | "start";
 
 /** 模组表格的行高，单位 px；必须与样式里的 .si-mod-row 一致 */
 const MOD_ROW_H = 36;
@@ -51,6 +51,9 @@ const SKIP_DIRS = [
 
 /** 默认逐文件下发的目录：kubejs 是几千个小脚本，服主要逐个比对，打成压缩包反而没法看 */
 const FILES_DIRS = ["kubejs"];
+
+/** 实例根目录里不能当基础文件同步的启动器文件 */
+const BASE_SKIP = ["game.json", "icon.png", "server.json", "server.json.sha1", "server.json.old"];
 
 const instances = ref<InstanceInfoDto[]>([]);
 const currentUuid = ref("");
@@ -67,6 +70,10 @@ const folder = ref("");
 
 // ---------------- 勾选 ----------------
 
+/** 实例根目录下、与 .minecraft 同级的文件 */
+const baseEntries = ref<ExportEntryDto[]>([]);
+/** 勾选的基础文件路径 */
+const pickedBase = ref(new Set<string>());
 /** 模组目录里的文件 */
 const mods = ref<ExportEntryDto[]>([]);
 /** 勾选的模组路径 */
@@ -77,9 +84,9 @@ const modUrls = ref(new Map<string, string>());
 const packs = ref<ExportEntryDto[]>([]);
 /** 勾选的资源包路径 */
 const pickedPacks = ref(new Set<string>());
-/** 已添加的配置目录与各自的同步方式 */
-const configs = ref<Array<{ dir: string; mode: ConfigMode }>>([]);
-/** 游戏目录下的顶层目录，供"添加"下拉用 */
+/** 已添加的配置目录、同步方式与压缩包是否先删旧目录 */
+const configs = ref<Array<{ dir: string; mode: ConfigMode; deleteOld: boolean }>>([]);
+/** 游戏目录下的顶层目录与一级子目录，供"添加"下拉用 */
 const topDirs = ref<ExportEntryDto[]>([]);
 /** 下拉里当前选中的目录 */
 const newDir = ref("");
@@ -102,8 +109,9 @@ let unlistenFocus: UnlistenFn | null = null;
 const current = computed(() => instances.value.find((i) => i.uuid === currentUuid.value));
 
 /** 左侧分页 */
-const sections = computed<Array<{ id: Section; labelKey: string; icon: "gear" | "cube" | "package" | "sliders" | "play" }>>(() => [
+const sections = computed<Array<{ id: Section; labelKey: string; icon: "gear" | "folder" | "cube" | "package" | "sliders" | "play" }>>(() => [
   { id: "general", labelKey: "serverInstance.tab.general", icon: "gear" },
+  { id: "base", labelKey: "serverInstance.tab.base", icon: "folder" },
   { id: "mods", labelKey: "serverInstance.tab.mods", icon: "cube" },
   { id: "packs", labelKey: "serverInstance.tab.packs", icon: "package" },
   { id: "configs", labelKey: "serverInstance.tab.configs", icon: "sliders" },
@@ -137,7 +145,13 @@ const percent = computed(() => {
 const ready = computed(() => !!currentUuid.value && !!name.value.trim() && !!url.value.trim() && !!folder.value.trim());
 
 /** 是否已经选了要打包的东西 */
-const pickedCount = computed(() => pickedMods.value.size + pickedPacks.value.size + configs.value.length);
+const pickedCount = computed(
+  () =>
+    pickedMods.value.size +
+    pickedPacks.value.size +
+    configs.value.length +
+    (format.value === "mml" ? pickedBase.value.size : 0),
+);
 
 /** 这个模组当前填的下载地址 */
 function urlOf(path: string): string {
@@ -177,6 +191,16 @@ function toggled(set: Set<string>, path: string): Set<string> {
   return next;
 }
 
+/** 全选 / 全不选基础文件 */
+function pickAllBase(all: boolean) {
+  pickedBase.value = all ? new Set(baseEntries.value.map((item) => item.path)) : new Set();
+}
+
+/** 勾选 / 取消一个基础文件 */
+function toggleBase(path: string) {
+  pickedBase.value = toggled(pickedBase.value, path);
+}
+
 /** 全选 / 全不选模组 */
 function pickAllMods(all: boolean) {
   pickedMods.value = all ? new Set(mods.value.map((item) => item.path)) : new Set();
@@ -192,7 +216,7 @@ function addConfig() {
   const dir = newDir.value;
   if (!dir || configs.value.some((item) => item.dir === dir)) return;
   const mode = FILES_DIRS.includes(dir) ? "files" : newMode.value;
-  configs.value = [...configs.value, { dir, mode }];
+  configs.value = [...configs.value, { dir, mode, deleteOld: true }];
   newDir.value = "";
 }
 
@@ -204,6 +228,37 @@ function removeConfig(dir: string) {
 /** 改一行的同步方式 */
 function setConfigMode(dir: string, mode: ConfigMode) {
   configs.value = configs.value.map((item) => (item.dir === dir ? { ...item, mode } : item));
+}
+
+/** 改一行「删除原有目录」；只对压缩包同步有效 */
+function setConfigDeleteOld(dir: string, event: Event) {
+  const deleteOld = (event.target as HTMLInputElement).checked;
+  configs.value = configs.value.map((item) => (item.dir === dir ? { ...item, deleteOld } : item));
+}
+
+/**
+ * 读取每个可同步顶层目录的一级子目录，只下钻一层
+ *
+ * - `uuid`: 实例 uuid
+ * - `dirs`: 顶层目录列表
+ *
+ * # 返回值
+ *
+ * 一级子目录条目，路径形如 `config/setting`
+ */
+async function loadConfigChildren(uuid: string, dirs: ExportEntryDto[]): Promise<ExportEntryDto[]> {
+  const parents = dirs.filter((entry) => entry.dir && !SKIP_DIRS.includes(entry.path));
+  const lists = await Promise.all(
+    parents.map(async (entry): Promise<ExportEntryDto[]> => {
+      try {
+        return await api.listExportDir(uuid, entry.path);
+      } catch {
+        // 某个目录读不到就只少它的子目录，不影响其它目录
+        return [];
+      }
+    }),
+  );
+  return lists.flat().filter((entry) => entry.dir);
 }
 
 /** 加载序号：快速切实例时只认最后一次请求的结果 */
@@ -243,14 +298,31 @@ async function loadInstance(uuid: string) {
     // 读不到就当没有可同步的目录
   }
   if (seq !== loadSeq) return;
-  topDirs.value = dirsNext;
+  let baseNext: ExportEntryDto[] = [];
+  try {
+    baseNext = await api.listExportInstanceDir(uuid, "");
+  } catch {
+    // 实例根目录读不到就当没有基础文件
+  }
+  if (seq !== loadSeq) return;
+  baseEntries.value = baseNext.filter((entry) => {
+    // .minecraft 允许整目录带上；其它目录不列，只列顶层文件
+    if (entry.path === ".minecraft") return entry.dir;
+    return !entry.dir && !entry.path.includes("/") && !BASE_SKIP.includes(entry.path);
+  });
+  pickedBase.value = new Set();
 
-  // 默认把所有能同步的文件夹都加上，用户再按需改方式或删掉
+  const children = await loadConfigChildren(uuid, dirsNext);
+  if (seq !== loadSeq) return;
+  topDirs.value = [...dirsNext, ...children];
+
+  // 默认只把顶层文件夹加上，一级子目录按需手动添加
   configs.value = topDirs.value
-    .filter((entry) => entry.dir && !SKIP_DIRS.includes(entry.path))
+    .filter((entry) => entry.dir && !entry.path.includes("/") && !SKIP_DIRS.includes(entry.path))
     .map((entry) => ({
       dir: entry.path,
       mode: (FILES_DIRS.includes(entry.path) ? "files" : "archive") as ConfigMode,
+      deleteOld: true,
     }));
   newDir.value = "";
   newMode.value = "archive";
@@ -293,6 +365,8 @@ function clearInstance() {
   currentUuid.value = "";
   name.value = "";
   mods.value = [];
+  baseEntries.value = [];
+  pickedBase.value = new Set();
   pickedMods.value = new Set();
   modUrls.value = new Map();
   packs.value = [];
@@ -361,7 +435,12 @@ async function generate() {
         exclude: false,
         url: urlOf(path),
       })),
-      configs: configs.value.map((item) => ({ dir: item.dir, mode: item.mode })),
+      configs: configs.value.map((item) => ({
+        dir: item.dir,
+        mode: item.mode,
+        deleteOld: item.deleteOld,
+      })),
+      baseFiles: [...pickedBase.value],
       resourcePacks: [...pickedPacks.value],
     });
     showToast(t("serverInstance.done", { path: folder.value.trim() }));
@@ -481,6 +560,29 @@ onBeforeUnmount(() => {
             <p class="field-hint">{{ t("serverInstance.folderHint") }}</p>
           </section>
 
+          <!-- ===== 基础文件 ===== -->
+          <section v-else-if="section === 'base'" class="si-section stretch">
+            <div class="si-section-head">
+              <span class="si-counter">{{ t("serverInstance.baseCount", { n: pickedBase.size }) }}</span>
+              <BaseButton size="sm" :disabled="busy || !baseEntries.length" @click="pickAllBase(true)">
+                {{ t("serverInstance.pickAll") }}
+              </BaseButton>
+              <BaseButton size="sm" :disabled="busy || !baseEntries.length" @click="pickAllBase(false)">
+                {{ t("serverInstance.pickNone") }}
+              </BaseButton>
+            </div>
+            <p v-if="!baseEntries.length" class="empty-tip">{{ t("serverInstance.baseEmpty") }}</p>
+            <div v-else class="si-list">
+              <label v-for="entry in baseEntries" :key="entry.path" class="si-row-item">
+                <input type="checkbox" class="si-box" :checked="pickedBase.has(entry.path)"
+                  :disabled="busy || format === 'hmcl'" @change="toggleBase(entry.path)" />
+                <span class="si-name" :title="entry.path">{{ entry.path }}{{ entry.dir ? "/" : "" }}</span>
+                <span class="si-size">{{ entry.dir ? "—" : sizeText(entry.size) }}</span>
+              </label>
+            </div>
+            <p class="field-hint">{{ t("serverInstance.baseHint") }}</p>
+          </section>
+
           <!-- ===== 模组 ===== -->
           <section v-else-if="section === 'mods'" class="si-section stretch">
             <div class="si-section-head">
@@ -581,6 +683,7 @@ onBeforeUnmount(() => {
               <div class="si-table-head">
                 <span>{{ t("serverInstance.configName") }}</span>
                 <span>{{ t("serverInstance.configMode") }}</span>
+                <span>{{ t("serverInstance.configDeleteOld") }}</span>
                 <span></span>
               </div>
               <p v-if="!configs.length" class="empty-tip">{{ t("serverInstance.configEmpty") }}</p>
@@ -591,11 +694,17 @@ onBeforeUnmount(() => {
                   <option value="archive">{{ t("serverInstance.mode.archive") }}</option>
                   <option value="files">{{ t("serverInstance.mode.files") }}</option>
                 </select>
+                <label class="si-cell-check">
+                  <input type="checkbox" class="si-box" :checked="item.deleteOld"
+                    :disabled="busy || format === 'hmcl' || item.mode !== 'archive'"
+                    @change="setConfigDeleteOld(item.dir, $event)" />
+                </label>
                 <button class="si-remove" :disabled="busy" :title="t('serverInstance.configRemove')"
                   @click="removeConfig(item.dir)">
                   <GlyphIcon name="trash" :size="13" />
                 </button>
               </div>
+              <p class="field-hint">{{ t("serverInstance.configDeleteOldHint") }}</p>
             </div>
           </section>
 
@@ -609,6 +718,10 @@ onBeforeUnmount(() => {
               <div class="si-line">
                 {{ t("serverInstance.summaryFormat") }}{{ t("common.detailSep") }}
                 <code>{{ format === "mml" ? "MML" : "HMCL" }}</code>
+              </div>
+              <div class="si-line">
+                {{ t("serverInstance.summaryBase") }}{{ t("common.detailSep") }}
+                <code>{{ pickedBase.size }} / {{ baseEntries.length }}</code>
               </div>
               <div class="si-line">
                 {{ t("serverInstance.summaryMods") }}{{ t("common.detailSep") }}
@@ -964,7 +1077,7 @@ onBeforeUnmount(() => {
 
 .si-table-head,
 .si-table-row {
-  grid-template-columns: minmax(160px, 1fr) 180px 40px;
+  grid-template-columns: minmax(160px, 1fr) 160px 120px 40px;
 }
 
 .si-cell-check {

@@ -470,6 +470,7 @@ impl HMCLServerObj {
             pack_version: self.version.clone(),
             online_list,
             archive_list: Vec::new(),
+            base: None,
         }
     }
 }

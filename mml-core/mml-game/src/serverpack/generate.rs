@@ -26,13 +26,16 @@ pub const CONFIG_DIRS: &[&str] = &[
 
 /// 配置目录对应的压缩包文件名
 ///
-/// - `dir`: 游戏目录下的配置目录名，如 `config`
+/// 一级子目录用点连接父目录名，避免压缩包名里带路径分隔符：`config/setting` 对应
+/// `config.setting.zip`。
+///
+/// - `dir`: 游戏目录下的配置目录，顶层如 `config`，一级子目录如 `config/setting`
 ///
 /// # 返回值
 ///
-/// 形如 `config.zip`，与输出文件夹里实际写出的文件同名
+/// 形如 `config.zip` / `config.setting.zip`，与输出文件夹里实际写出的文件同名
 pub fn archive_name(dir: &str) -> String {
-    format!("{dir}.zip")
+    format!("{}.zip", dir.replace(['/', '\\'], "."))
 }
 
 /// 按实例生成 MML 服务器实例清单
@@ -72,6 +75,7 @@ pub fn build_server_pack(
         pack_version: version.to_string(),
         online_list,
         archive_list,
+        base: None,
     }
 }
 

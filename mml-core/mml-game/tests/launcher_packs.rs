@@ -9,11 +9,14 @@
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, Once};
+use std::time::Duration;
 
+use mml_base::serialize_tools;
 use mml_game::add_game::{self, PackType};
 use mml_game::gui_hook::{AddModPackState, IAddModPackGui};
 use mml_game::launcher::ModPackType;
 use mml_game::loader::LoaderType;
+use mml_game::serverpack::serverpack_obj::ServerPackObj;
 use uuid::Uuid;
 use zip::ZipWriter;
 use zip::write::SimpleFileOptions;
@@ -246,6 +249,23 @@ async fn install_hmcl_server_pack() {
         read.get_base_path().join("mods").join("dummy.jar"),
         b"dummy mod jar",
         "mod 应解压",
+    );
+
+    // 导入后必须已经是 MML 服务器实例：实例目录里有一份 server.json
+    let manifest = read.get_server_pack_file();
+    for _ in 0..50 {
+        if manifest.exists() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert!(manifest.exists(), "导入后应写出 MML 清单");
+    let pack: ServerPackObj = serialize_tools::json_from_file(&manifest).unwrap();
+    assert_eq!(pack.name, "HMS测试包");
+    assert_eq!(pack.version, "1.21.1");
+    assert!(
+        !read.get_base_path().join("server-manifest.json").exists(),
+        "HMCL 清单不应留在实例里"
     );
     drop(read);
 

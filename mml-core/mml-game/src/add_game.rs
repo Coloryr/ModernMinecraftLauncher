@@ -207,7 +207,7 @@ fn archive_cfg_name(archive: &BaseArchive) -> String {
 /// 检测结果；压缩包无法打开返回对应错误
 pub fn detect_pack<P: AsRef<Path>>(file: P) -> CoreResult<DetectedPack> {
     let file = file.as_ref();
-    let archive = BaseArchive::open(file)?;
+    let archive = BaseArchive::open_readonly(file)?;
     detect_pack_of(&archive, file)
 }
 
@@ -462,7 +462,7 @@ async fn modpack<P: AsRef<Path>>(
 
     let mut work: Box<dyn ModPackWorker> = if source == ModPackType::CurseForge {
         Box::new(CurseForgeWorker::new(BaseModPackWorker::new(
-            BaseArchive::open(file)?,
+            BaseArchive::open_readonly(file)?,
             instance_gui,
             pack_gui.clone(),
             archive_gui,
@@ -471,7 +471,7 @@ async fn modpack<P: AsRef<Path>>(
         )))
     } else {
         Box::new(ModrinthPackWorker::new(BaseModPackWorker::new(
-            BaseArchive::open(file)?,
+            BaseArchive::open_readonly(file)?,
             instance_gui,
             pack_gui.clone(),
             archive_gui,
@@ -617,7 +617,7 @@ async fn archive<P: AsRef<Path>>(
         pack_gui.set_now(1, Some(3));
     }
 
-    let archive = BaseArchive::open(file)?;
+    let archive = BaseArchive::open_readonly(file)?;
     // 找到 game.json 所在条目，兼容压缩包整体套一层文件夹的情况
     let game_entry = archive
         .entries()
@@ -704,7 +704,7 @@ async fn mmc_archive<P: AsRef<Path>>(
         pack_gui.set_state(AddModPackState::ReadInfo);
         pack_gui.set_now(1, Some(3));
     }
-    let archive = BaseArchive::open(&file)?;
+    let archive = BaseArchive::open_readonly(&file)?;
 
     let mut path = String::new();
     let mut mmc = None;
@@ -830,7 +830,7 @@ async fn hmcl_archive<P: AsRef<Path>>(
         pack_gui.set_now(1, Some(3));
     }
 
-    let archive = BaseArchive::open(&file)?;
+    let archive = BaseArchive::open_readonly(&file)?;
 
     let mut path = String::new();
     let mut hmcl = None;
@@ -925,7 +925,10 @@ async fn hmcl_archive<P: AsRef<Path>>(
     Ok(uuid)
 }
 
-/// 导入 HMCL 服务器包
+/// 导入 HMCL 服务器包，并转成本启动器的 MML 服务器实例
+///
+/// 转换后的清单写进实例的 `server.json`，清单里带地址的文件按 MML 同步流程下载；
+/// HMCL 的 `server-manifest.json` 不留在实例目录里。
 ///
 /// - `file`: 压缩包
 /// - `name`: 实例名，覆盖包内元数据里的名字
@@ -958,7 +961,7 @@ async fn hmcl_server_archive<P: AsRef<Path>>(
         pack_gui.set_now(1, Some(3));
     }
 
-    let archive = BaseArchive::open(&file)?;
+    let archive = BaseArchive::open_readonly(&file)?;
 
     let mut path = String::new();
     let mut hmcl = None;
@@ -999,6 +1002,10 @@ async fn hmcl_server_archive<P: AsRef<Path>>(
         return Err(ErrorType::TaskCancel);
     }
 
+    // 先把 HMCL 清单转成 MML 清单，实例建好后写进 server.json
+    let mut pack = hmcl.to_server_pack();
+    pack.name = obj.name.clone();
+
     if let Some(pack_gui) = &pack_gui {
         pack_gui.set_state(AddModPackState::Extract);
         pack_gui.set_now(2, Some(3));
@@ -1007,50 +1014,15 @@ async fn hmcl_server_archive<P: AsRef<Path>>(
     let game = obj.create_instance_in_group(instance_gui, group).await?;
     let uuid = game.read().unwrap().uuid;
 
-    let mut online = game.read().unwrap().read_online_info();
-
-    if !hmcl.files.is_empty() && !hmcl.file_api.is_empty() {
-        let url = if hmcl.file_api.ends_with('/') {
-            format!("{}/", hmcl.file_api)
-        } else {
-            hmcl.file_api
-        };
-        for item in hmcl.files {
-            let path = Path::new(&item.path);
-            let name = path
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string();
-
-            let dir = path
-                .parent()
-                .map(|item| item.to_string_lossy())
-                .map(|item| item.to_string())
-                .unwrap_or_default();
-            online.insert(
-                item.path.clone(),
-                OnlineInfoObj {
-                    modid: Default::default(),
-                    fileid: Default::default(),
-                    path: dir,
-                    name: name.clone(),
-                    file: name.clone(),
-                    sha1: item.hash,
-                    url: format!("{url}{}", item.path),
-                },
-            );
-        }
-    }
-
     if cancel.is_cancelled() {
         crate::delete_instance(&uuid)?;
         return Err(ErrorType::TaskCancel);
     }
 
-    // HMCL 元数据按完整条目名加入排除列表
+    // HMCL 元数据按完整条目名加入排除列表；服务器清单也不留在实例里
     let mut unselect = unselect.unwrap_or_default();
     unselect.push(format!("{path}{}", names::HMCLFILE));
+    unselect.push(format!("{path}{}", names::SERVER_MANIFEST_FILE));
 
     let over = names::OVERRIDE_DIR.to_string();
     let mut strip_dir = path.trim_end_matches(['/', '\\']).to_string();
@@ -1069,6 +1041,79 @@ async fn hmcl_server_archive<P: AsRef<Path>>(
         &pack_gui,
         archive_gui.clone(),
     )?;
+
+    // 清单里带下载地址的文件按 MML 的同步流程拉下来，同时把 server.json 落进实例；
+    // fileApi 为空时只落清单，文件靠 overrides 里带的那份
+    let online_items: Vec<(String, OnlineInfoObj)> = pack
+        .online_list
+        .iter()
+        .filter_map(|item| {
+            let url = item.url.clone()?;
+            let path = Path::new(&item.file);
+            let name = path.file_name()?.to_string_lossy().to_string();
+            let dir = path
+                .parent()
+                .map(|parent| parent.to_string_lossy().replace('\\', "/"))
+                .unwrap_or_default();
+            let key = item
+                .sha1
+                .clone()
+                .filter(|sha1| !sha1.is_empty())
+                .unwrap_or_else(|| item.file.clone());
+            Some((
+                key,
+                OnlineInfoObj {
+                    modid: String::new(),
+                    fileid: String::new(),
+                    path: dir,
+                    name: name.clone(),
+                    file: name,
+                    sha1: item.sha1.clone().unwrap_or_default(),
+                    url,
+                },
+            ))
+        })
+        .collect();
+
+    let has_online = pack
+        .online_list
+        .iter()
+        .any(|item| item.url.as_deref().is_some_and(|url| !url.is_empty()));
+    if has_online {
+        let total = pack.online_list.len() + pack.archive_list.len();
+        if let Some(pack_gui) = &pack_gui {
+            pack_gui.set_state(AddModPackState::DownloadFile);
+            pack_gui.set_now(0, Some(total));
+        }
+        let progress_gui = pack_gui.clone();
+        let report = move |done: usize, all: usize| {
+            if let Some(gui) = &progress_gui {
+                gui.set_now(done, Some(all));
+            }
+        };
+        let snapshot = game.read().unwrap().clone();
+        if let Err(err) = snapshot
+            .upgrade_serverpack_with(pack, cancel.clone(), Some(&report))
+            .await
+        {
+            // 半成品实例留着只会让人以为导入成功；与在线实例导入同一处理
+            let _ = crate::delete_instance(&uuid);
+            return Err(err);
+        }
+    } else {
+        // 导入返回后马上会读清单，这里同步写，别排进后台队列
+        game.read().unwrap().save_serverpack_sync(&pack)?;
+    }
+
+    // HMCL 的下载地址没有项目号，走不了平台来源；记进在线信息，
+    // 重新生成 MML 服务器实例时还能按地址直接下发，不必再复制一份文件
+    if !online_items.is_empty() {
+        let mut online = game.read().unwrap().read_online_info();
+        for (key, item) in online_items {
+            online.insert(key, item);
+        }
+        game.read().unwrap().save_online_info(&online);
+    }
 
     if let Some(pack_gui) = &pack_gui {
         pack_gui.set_state(AddModPackState::Done);
@@ -1305,7 +1350,7 @@ async fn launcher_pack<P: AsRef<Path>>(
         pack_gui.set_now(1, Some(3));
     }
 
-    let archive = BaseArchive::open(&file)?;
+    let archive = BaseArchive::open_readonly(&file)?;
 
     // 查找 `.minecraft` 文件夹
     let mc_prefix = match find_minecraft_prefix(archive.entries()) {
@@ -1435,6 +1480,7 @@ async fn launcher_pack<P: AsRef<Path>>(
 ///
 /// 类型下拉只对能回查在线项目的包有意义；本地包留着 CurseForge / Modrinth 会让
 /// 「检查更新」指向不存在的项目。`is_modpack` 保持原样，启动与模组检查照旧。
+/// 服务器实例例外：它本来就没有平台项目号，类型留着才能同步 / 再生成服务器实例。
 ///
 /// - `uuid`: 刚安装好的实例 uuid
 fn clear_modpack_type_without_ids(uuid: &Uuid) {
@@ -1445,7 +1491,12 @@ fn clear_modpack_type_without_ids(uuid: &Uuid) {
     if game.pid.is_some() && game.fid.is_some() {
         return;
     }
-    if game.modpack_type == ModPackType::None {
+    // 服务器实例本来就没有平台项目号：它的类型要留着，
+    // 否则导入后既不能同步也不能再生成 MML 服务器实例
+    if matches!(
+        game.modpack_type,
+        ModPackType::None | ModPackType::ServerPack
+    ) {
         return;
     }
     game.modpack_type = ModPackType::None;
@@ -1797,6 +1848,8 @@ pub async fn upgrade_server_pack(
     let icon = pack.icon.clone();
 
     let total = pack.online_list.len() + pack.archive_list.len();
+    // 版本号没变时同步流程会原样保留文件，图标也跟着不动
+    let same_version = game.same_pack_version(&pack.pack_version);
     if let Some(gui) = &gui {
         gui.set_state(AddModPackState::DownloadFile);
         gui.set_now(0, Some(total));
@@ -1814,8 +1867,10 @@ pub async fn upgrade_server_pack(
         .await?;
 
     // 图标会随清单换，按新清单再取一次；下不下来都不影响实例可用
-    let base = server_pack_base_url(&manifest_url);
-    download_server_pack_icon(&game.uuid, game, &base, icon.as_deref()).await;
+    if !same_version {
+        let base = server_pack_base_url(&manifest_url);
+        download_server_pack_icon(&game.uuid, game, &base, icon.as_deref()).await;
+    }
 
     if let Some(gui) = &gui {
         gui.set_state(AddModPackState::Done);

@@ -16,6 +16,8 @@ fn game() -> InstanceSettingObj {
 fn archive_name_appends_zip() {
     assert_eq!(archive_name("config"), "config.zip");
     assert_eq!(archive_name("kubejs"), "kubejs.zip");
+    // 一级子目录用点连接，文件名里不能带路径分隔符
+    assert_eq!(archive_name("config/setting"), "config.setting.zip");
 }
 
 #[test]
@@ -152,3 +154,33 @@ fn hmcl_pack_keeps_file_api_and_files() {
     assert_eq!(pack.addons.len(), 2);
 }
 
+#[test]
+fn hmcl_server_manifest_converts_to_mml() {
+    let json = r#"{"name":"服务器","author":"test","version":"2.0","description":"说明","fileApi":"https://example.invalid/files","files":[{"path":"mods/a.jar","hash":"abc"},{"path":"config/中文 1.toml","hash":""}],"addons":[{"id":"game","version":"1.21.1"},{"id":"forge","version":"52.0.1"}]}"#;
+    let hmcl: HMCLServerObj = serde_json::from_str(json).unwrap();
+    assert_eq!(hmcl.file_api, "https://example.invalid/files");
+
+    let pack = hmcl.to_server_pack();
+    assert_eq!(pack.name, "服务器");
+    assert_eq!(pack.version, "1.21.1");
+    assert_eq!(pack.loader, LoaderType::Forge);
+    assert_eq!(pack.loader_version.as_deref(), Some("52.0.1"));
+    assert_eq!(pack.pack_version, "2.0");
+    assert_eq!(pack.text, "说明");
+    assert_eq!(pack.online_list.len(), 2);
+    assert_eq!(pack.online_list[0].file, "mods/a.jar");
+    assert_eq!(
+        pack.online_list[0].url.as_deref(),
+        Some("https://example.invalid/files/mods/a.jar")
+    );
+    assert_eq!(pack.online_list[0].sha1.as_deref(), Some("abc"));
+    // 空格与中文按 URL 规则转义，HMCL 客户端也能照着下
+    let url = pack.online_list[1].url.as_deref().unwrap();
+    assert!(url.ends_with("/config/%E4%B8%AD%E6%96%87%201.toml"), "{url}");
+    assert!(pack.online_list[1].sha1.is_none());
+    assert!(pack.archive_list.is_empty());
+
+    // 写回 HMCL 时必须是它认的 fileApi，不能是内部字段名
+    let text = serde_json::to_string(&hmcl).unwrap();
+    assert!(text.contains("\"fileApi\""), "{text}");
+}

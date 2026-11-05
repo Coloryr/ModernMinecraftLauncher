@@ -9,6 +9,7 @@ export type ServerInstanceOptionsDto = {
   text: string,
   mods: ServerInstancePickDto[],
   configs: ServerInstanceConfigDto[],
+  baseFiles: string[],
   resourcePacks: string[],
 };
 
@@ -21,6 +22,7 @@ export type ServerInstancePickDto = {
 export type ServerInstanceConfigDto = {
   dir: string,
   mode: string,
+  deleteOld: boolean,
 };
 
 export type ServerInstanceProgressDto = {
