@@ -296,12 +296,64 @@
   background: color-mix(in srgb, var(--yellow) 24%, transparent);
 }
 
+.si-mod-row.is-added {
+  background: color-mix(in srgb, var(--green) 14%, transparent);
+}
+
+.si-mod-row.is-added:hover {
+  background: color-mix(in srgb, var(--green) 22%, transparent);
+}
+
+.si-mod-row.is-modified {
+  background: color-mix(in srgb, var(--yellow) 16%, transparent);
+}
+
+.si-mod-row.is-modified:hover {
+  background: color-mix(in srgb, var(--yellow) 24%, transparent);
+}
+
+.si-changes {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 11.5px;
+}
+
+.si-changes-list {
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.si-change.add,
+.si-mark.add {
+  color: var(--green);
+}
+
+.si-change.del {
+  color: var(--red);
+}
+
+.si-change.mod,
+.si-mark.mod {
+  color: var(--yellow);
+}
+
+.si-mark {
+  margin-right: 4px;
+  font-style: normal;
+  font-weight: 600;
+}
+
 /* 列宽各表不同，其余外观共用上面几条 */
 .si-mod-head,
 .si-mod-row {
-  grid-template-columns: 44px minmax(180px, 1.2fr) 130px 130px minmax(220px, 1.8fr) 180px;
+  grid-template-columns:
+    44px minmax(160px, 1.1fr) 96px 120px 120px minmax(200px, 1.7fr) 170px;
   /* 列宽总和超过窄窗口时让表头 / 行本身跟着变宽，横向滚动到底也有底色和下边框 */
-  min-width: 960px;
+  min-width: 1000px;
 }
 
 .si-table-head,
@@ -368,6 +420,11 @@ select.si-cell-control {
   flex: 1;
   min-width: 0;
   font-family: inherit;
+  font-size: 11.5px;
+}
+
+.si-id-type {
+  min-width: 0;
   font-size: 11.5px;
 }
 

@@ -12,7 +12,7 @@ mod files;
 mod mapping;
 
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     fs,
     path::{Path, PathBuf},
     sync::atomic::AtomicBool,
@@ -37,8 +37,8 @@ use crate::windows::export::list::custom_ids;
 use crate::{
     dtos::log_dto::LogFocusDto,
     dtos::server_instance_dto::{
-        ServerInstanceIdDto, ServerInstanceMetaDto, ServerInstanceOptionsDto,
-        ServerInstanceProgressDto, ServerInstanceResultDto,
+        ServerInstanceChangesDto, ServerInstanceIdDto, ServerInstanceMetaDto,
+        ServerInstanceOptionsDto, ServerInstanceProgressDto, ServerInstanceResultDto,
     },
     err_keys,
 };
@@ -158,6 +158,7 @@ pub async fn server_instance_get_meta(
             url: meta.url.clone(),
             format: meta.format.clone(),
             folder: meta.folder.clone(),
+            base_files: meta.base_files.clone(),
         }))
 }
 
@@ -268,6 +269,8 @@ struct PackPick {
     custom: bool,
     /// 编号是否被用户改过
     edited: bool,
+    /// 编号类型是否被用户改过
+    type_changed: bool,
 }
 
 /// 校验并规范化配置目录
@@ -338,6 +341,7 @@ fn generate(
                 fid: pick.fid.trim().to_string(),
                 custom: pick.custom,
                 edited: pick.edited,
+                type_changed: pick.type_changed,
             })
         })
         .collect::<Result<Vec<_>, String>>()?;
@@ -511,9 +515,11 @@ fn generate_mml(
     }
     let mut archived = 0;
     let mut archives = Vec::new();
+    let mut mod_snapshot: BTreeMap<String, mapping::EntrySnapshot> = BTreeMap::new();
 
     for entry in &contents.mods {
         let wire = files::wire_path(&entry.path);
+        let key = mod_key(base, &entry.path, &wire);
         progress(now, total, wire.clone());
         now += 1;
 
@@ -535,7 +541,11 @@ fn generate_mml(
         let has_ids = recorded.is_some_and(|info| {
             !info.modid.trim().is_empty() || !info.fileid.trim().is_empty()
         });
-        let custom = if entry.edited { entry.custom } else { !has_ids };
+        let custom = if entry.type_changed || entry.edited {
+            entry.custom
+        } else {
+            !has_ids
+        };
         // 自定义编号不能拿去平台解析；没有地址时仍然复制托管
         let online_download =
             !download.is_empty() || (!custom && !pid.is_empty() && !fid.is_empty());
@@ -553,13 +563,19 @@ fn generate_mml(
                 &entry.fid,
             )?
         };
+        let sha1 = item.sha1.clone().unwrap_or_default();
+        mod_snapshot.insert(
+            key.clone(),
+            mapping::EntrySnapshot {
+                path: wire.clone(),
+                sha1: sha1.clone(),
+            },
+        );
         if item.custom {
-            let key = mod_key(base, &entry.path, &wire);
-            let sha1 = item.sha1.as_deref().unwrap_or_default();
             let assigned = if entry.edited {
-                ids.save_edited(&key, &wire, sha1, &entry.pid, &entry.fid)
+                ids.save_edited(&key, &wire, &sha1, &entry.pid, &entry.fid)?
             } else {
-                ids.assign(&key, &wire, sha1)
+                ids.assign(&key, &wire, &sha1)
             };
             item.pid = Some(assigned.project_id);
             item.fid = Some(assigned.file_id);
@@ -569,6 +585,8 @@ fn generate_mml(
         }
         items.push(item);
     }
+    let mod_changes = compare_mods(&ids, &mod_snapshot);
+    ids.set_mods(mod_snapshot);
 
     for (dir, mode, delete_old, list) in &config_files {
         match mode {
@@ -621,9 +639,11 @@ fn generate_mml(
         }
     }
 
+    let mut pack_snapshot: BTreeMap<String, mapping::EntrySnapshot> = BTreeMap::new();
     for pack in &contents.packs {
         let rel = &pack.path;
         let wire = files::wire_path(rel);
+        let key = format!("pack:{wire}");
         progress(now, total, wire.clone());
         now += 1;
 
@@ -643,7 +663,11 @@ fn generate_mml(
         let has_ids = recorded.is_some_and(|info| {
             !info.modid.trim().is_empty() || !info.fileid.trim().is_empty()
         });
-        let custom = if pack.edited { pack.custom } else { !has_ids };
+        let custom = if pack.type_changed || pack.edited {
+            pack.custom
+        } else {
+            !has_ids
+        };
         // 自定义编号不能拿去平台解析；没有地址时仍然复制托管
         let online_download =
             !download.is_empty() || (!custom && !pid.is_empty() && !fid.is_empty());
@@ -653,13 +677,19 @@ fn generate_mml(
             written.insert(top_of(&wire));
             hosted_item(base, out, rel, url, custom, &pack.pid, &pack.fid)?
         };
+        let sha1 = item.sha1.clone().unwrap_or_default();
+        pack_snapshot.insert(
+            key.clone(),
+            mapping::EntrySnapshot {
+                path: wire.clone(),
+                sha1: sha1.clone(),
+            },
+        );
         if item.custom {
-            let key = format!("pack:{wire}");
-            let sha1 = item.sha1.as_deref().unwrap_or_default();
             let assigned = if pack.edited {
-                ids.save_edited(&key, &wire, sha1, &pack.pid, &pack.fid)
+                ids.save_edited(&key, &wire, &sha1, &pack.pid, &pack.fid)?
             } else {
-                ids.assign(&key, &wire, sha1)
+                ids.assign(&key, &wire, &sha1)
             };
             item.pid = Some(assigned.project_id);
             item.fid = Some(assigned.file_id);
@@ -669,6 +699,8 @@ fn generate_mml(
         }
         items.push(item);
     }
+    let pack_changes = compare_packs(&ids, &pack_snapshot);
+    ids.set_packs(pack_snapshot);
 
     let count = items.len() + archived + base_count;
     let mut pack = generate::build_server_pack(
@@ -697,6 +729,7 @@ fn generate_mml(
         url: url.to_string(),
         format: "mml".to_string(),
         folder: options.folder.clone(),
+        base_files: options.base_files.clone(),
     });
     ids.save(&game.get_base_path())?;
 
@@ -705,6 +738,8 @@ fn generate_mml(
         files: written.into_iter().collect(),
         count,
         changed: changed.into_iter().collect(),
+        mod_changes,
+        pack_changes,
     })
 }
 
@@ -737,6 +772,38 @@ fn generate_hmcl(
     let mut ids = mapping::IdMap::load(&game.get_base_path());
     let addons =
         generate::hmcl_addons(game).ok_or_else(|| err_keys::SERVER_INSTANCE_LOADER.to_string())?;
+
+    // 模组快照只统计模组目录，用于生成后的新增 / 删除 / 修改汇总
+    let mut mod_snapshot: BTreeMap<String, mapping::EntrySnapshot> = BTreeMap::new();
+    for pick in &contents.mods {
+        let rel = &pick.path;
+        let wire = files::wire_path(rel);
+        let key = mod_key(base, rel, &wire);
+        mod_snapshot.insert(
+            key,
+            mapping::EntrySnapshot {
+                path: wire,
+                sha1: files::sha1(&base.join(rel))?,
+            },
+        );
+    }
+    let mod_changes = compare_mods(&ids, &mod_snapshot);
+    ids.set_mods(mod_snapshot);
+
+    let mut pack_snapshot: BTreeMap<String, mapping::EntrySnapshot> = BTreeMap::new();
+    for pick in &contents.packs {
+        let rel = &pick.path;
+        let wire = files::wire_path(rel);
+        pack_snapshot.insert(
+            format!("pack:{wire}"),
+            mapping::EntrySnapshot {
+                path: wire,
+                sha1: files::sha1(&base.join(rel))?,
+            },
+        );
+    }
+    let pack_changes = compare_packs(&ids, &pack_snapshot);
+    ids.set_packs(pack_snapshot);
 
     // 模组 + 各配置目录里的文件 + 资源包，按路径去重
     let mut all: BTreeSet<PathBuf> = contents.mods.iter().map(|item| item.path.clone()).collect();
@@ -777,6 +844,7 @@ fn generate_hmcl(
         url: url.to_string(),
         format: "hmcl".to_string(),
         folder: options.folder.clone(),
+        base_files: options.base_files.clone(),
     });
     ids.save(&game.get_base_path())?;
 
@@ -785,6 +853,8 @@ fn generate_hmcl(
         files: top.into_iter().collect(),
         count: total,
         changed: Vec::new(),
+        mod_changes,
+        pack_changes,
     })
 }
 
@@ -827,6 +897,71 @@ fn mod_key(base: &Path, rel: &Path, wire: &str) -> String {
     modid
         .map(|modid| format!("mod:{modid}"))
         .unwrap_or_else(|| format!("mod:{wire}"))
+}
+
+/// 对比上次快照，算新增 / 删除 / 修改的模组
+///
+/// - `ids`: 当前映射
+/// - `current`: 本次实际写进清单的模组快照
+///
+/// # 返回值
+///
+/// 按路径列出的三类变化；第一次生成没有旧快照时全部为空
+fn compare_mods(
+    ids: &mapping::IdMap,
+    current: &BTreeMap<String, mapping::EntrySnapshot>,
+) -> ServerInstanceChangesDto {
+    compare_snapshot(ids.loaded(), ids.mods(), current)
+}
+
+/// 对比上次资源包快照，算新增 / 删除 / 修改
+///
+/// - `ids`: 当前映射
+/// - `current`: 本次实际写进清单的资源包快照
+///
+/// # 返回值
+///
+/// 按路径列出的三类变化；第一次生成没有旧快照时全部为空
+fn compare_packs(
+    ids: &mapping::IdMap,
+    current: &BTreeMap<String, mapping::EntrySnapshot>,
+) -> ServerInstanceChangesDto {
+    compare_snapshot(ids.loaded(), ids.packs(), current)
+}
+
+/// 对比旧快照与本次快照
+///
+/// - `loaded`: 映射文件是否来自上次生成
+/// - `old`: 旧快照
+/// - `current`: 本次快照
+///
+/// # 返回值
+///
+/// 按路径列出的新增 / 删除 / 修改
+fn compare_snapshot(
+    loaded: bool,
+    old: &BTreeMap<String, mapping::EntrySnapshot>,
+    current: &BTreeMap<String, mapping::EntrySnapshot>,
+) -> ServerInstanceChangesDto {
+    let mut changes = ServerInstanceChangesDto::default();
+    if !loaded {
+        return changes;
+    }
+    for (key, item) in current {
+        match old.get(key) {
+            None => changes.added.push(item.path.clone()),
+            Some(previous) if previous.sha1 != item.sha1 || previous.path != item.path => {
+                changes.modified.push(item.path.clone());
+            }
+            Some(_) => {}
+        }
+    }
+    for (key, item) in old {
+        if !current.contains_key(key) {
+            changes.removed.push(item.path.clone());
+        }
+    }
+    changes
 }
 
 /// 在线下载的条目：不复制文件，客户端按地址或项目号自己下载

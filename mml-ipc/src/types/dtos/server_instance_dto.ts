@@ -21,6 +21,7 @@ export type ServerInstancePickDto = {
   fid: string,
   custom: boolean,
   edited: boolean,
+  typeChanged: boolean,
 };
 
 export type ServerInstanceConfigDto = {
@@ -48,6 +49,13 @@ export type ServerInstanceMetaDto = {
   url: string,
   format: string,
   folder: string,
+  baseFiles: string[],
+};
+
+export type ServerInstanceChangesDto = {
+  added: string[],
+  removed: string[],
+  modified: string[],
 };
 
 export type ServerInstanceResultDto = {
@@ -55,5 +63,7 @@ export type ServerInstanceResultDto = {
   files: string[],
   count: number,
   changed: string[],
+  modChanges: ServerInstanceChangesDto,
+  packChanges: ServerInstanceChangesDto,
 };
 

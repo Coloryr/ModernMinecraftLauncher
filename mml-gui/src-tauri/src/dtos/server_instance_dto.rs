@@ -59,6 +59,9 @@ pub struct ServerInstancePickDto {
     /// 编号是否被用户改过；改过时优先用手填值，不再套用映射
     #[serde(default)]
     pub edited: bool,
+    /// 编号类型是否被用户改过；改过时以 custom 为准
+    #[serde(default)]
+    pub type_changed: bool,
 }
 
 /// 一个要同步的配置目录
@@ -120,6 +123,20 @@ pub struct ServerInstanceMetaDto {
     pub format: String,
     /// 保存文件夹
     pub folder: String,
+    /// 勾选的基础文件，相对实例根目录
+    pub base_files: Vec<String>,
+}
+
+/// 条目变化汇总，用于生成后给模组 / 资源包表格着色
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerInstanceChangesDto {
+    /// 新增的模组路径
+    pub added: Vec<String>,
+    /// 删除的模组路径
+    pub removed: Vec<String>,
+    /// 内容或路径变化的模组路径
+    pub modified: Vec<String>,
 }
 
 /// 生成结果，即 `server_instance_generate` 的返回值
@@ -134,4 +151,8 @@ pub struct ServerInstanceResultDto {
     pub count: usize,
     /// 与上次生成相比有变化的相对路径或配置目录
     pub changed: Vec<String>,
+    /// 模组新增 / 删除 / 修改汇总
+    pub mod_changes: ServerInstanceChangesDto,
+    /// 资源包新增 / 删除 / 修改汇总
+    pub pack_changes: ServerInstanceChangesDto,
 }

@@ -35,6 +35,18 @@ const { current, format, pickedBase, baseEntries, pickedMods, mods, pickedPacks,
       {{ t("serverInstance.summaryConfigs") }}{{ t("common.detailSep") }}
       <code>{{ configs.length }}</code>
     </div>
+    <div v-if="result?.modChanges" class="si-line">
+      {{ t("serverInstance.modChanges") }}{{ t("common.detailSep") }}
+      <span class="si-change add">+{{ result?.modChanges?.added.length ?? 0 }}</span>
+      <span class="si-change del">-{{ result?.modChanges?.removed.length ?? 0 }}</span>
+      <span class="si-change mod">·{{ result?.modChanges?.modified.length ?? 0 }}</span>
+    </div>
+    <div v-if="result?.packChanges" class="si-line">
+      {{ t("serverInstance.packChanges") }}{{ t("common.detailSep") }}
+      <span class="si-change add">+{{ result?.packChanges?.added.length ?? 0 }}</span>
+      <span class="si-change del">-{{ result?.packChanges?.removed.length ?? 0 }}</span>
+      <span class="si-change mod">·{{ result?.packChanges?.modified.length ?? 0 }}</span>
+    </div>
     <div class="si-line">
       {{ t("serverInstance.folder") }}{{ t("common.detailSep") }}
       <code>{{ folder || "—" }}</code>

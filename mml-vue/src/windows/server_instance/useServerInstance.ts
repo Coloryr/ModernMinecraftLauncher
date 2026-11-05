@@ -29,6 +29,8 @@ export type Format = "mml" | "hmcl";
 export type ConfigMode = "archive" | "files";
 /** 左侧分页 */
 export type Section = "general" | "base" | "mods" | "packs" | "configs" | "start";
+/** 编号类型 */
+export type IdType = "online" | "custom";
 
 /** 模组表格的行高，单位 px；必须与样式里的 .si-mod-row 一致 */
 export const MOD_ROW_H = 36;
@@ -91,6 +93,12 @@ const modPids = ref(new Map<string, string>());
 const modFids = ref(new Map<string, string>());
 /** 编号被用户改过的模组路径 */
 const modIdEdits = ref(new Set<string>());
+/** 项目编号被用户改过的模组路径 */
+const modPidEdits = ref(new Set<string>());
+/** 模组编号类型 */
+const modIdTypes = ref(new Map<string, IdType>());
+/** 编号类型被用户改过的模组路径 */
+const modIdTypeEdits = ref(new Set<string>());
 /** 已经生成过、项目编号锁定的路径 */
 const lockedProjectIds = ref(new Set<string>());
 /** 资源包目录里的文件 */
@@ -103,6 +111,12 @@ const packPids = ref(new Map<string, string>());
 const packFids = ref(new Map<string, string>());
 /** 编号被用户改过的资源包路径 */
 const packIdEdits = ref(new Set<string>());
+/** 项目编号被用户改过的资源包路径 */
+const packPidEdits = ref(new Set<string>());
+/** 资源包编号类型 */
+const packIdTypes = ref(new Map<string, IdType>());
+/** 编号类型被用户改过的资源包路径 */
+const packIdTypeEdits = ref(new Set<string>());
 /** 已添加的配置目录、同步方式与压缩包是否先删旧目录 */
 const configs = ref<Array<{ dir: string; mode: ConfigMode; deleteOld: boolean }>>([]);
 /** 游戏目录下的顶层目录与一级子目录，供"添加"下拉用 */
@@ -117,6 +131,16 @@ const newMode = ref<ConfigMode>("archive");
 const busy = ref(false);
 const progress = ref<ServerInstanceProgressDto | null>(null);
 const result = ref<ServerInstanceResultDto | null>(null);
+/** 上次生成后模组的新增 / 删除 / 修改汇总 */
+const modChanges = computed(() => result.value?.modChanges ?? null);
+const addedMods = computed(() => new Set(modChanges.value?.added ?? []));
+const removedMods = computed(() => new Set(modChanges.value?.removed ?? []));
+const modifiedMods = computed(() => new Set(modChanges.value?.modified ?? []));
+/** 上次生成后资源包的新增 / 删除 / 修改汇总 */
+const packChanges = computed(() => result.value?.packChanges ?? null);
+const addedPacks = computed(() => new Set(packChanges.value?.added ?? []));
+const removedPacks = computed(() => new Set(packChanges.value?.removed ?? []));
+const modifiedPacks = computed(() => new Set(packChanges.value?.modified ?? []));
 /** 与上次生成相比有变化的路径 / 配置目录，用于行高亮 */
 const changedPaths = ref(new Set<string>());
 const error = ref("");
@@ -179,13 +203,37 @@ function urlOf(path: string): string {
   return modUrls.value.get(path) ?? "";
 }
 
+/** 编号显示时去掉 custom- 前缀；Custom 标记单独表示类型 */
+function displayId(value: string): string {
+  return value.replace(/^custom-/, "");
+}
+
 /** 这个模组当前的项目编号 / 文件编号 */
 function modPidOf(path: string): string {
-  return modPids.value.get(path) ?? "";
+  return displayId(modPids.value.get(path) ?? "");
 }
 
 function modFidOf(path: string): string {
-  return modFids.value.get(path) ?? "";
+  return displayId(modFids.value.get(path) ?? "");
+}
+
+/** 模组当前的编号类型 */
+function modIdTypeOf(path: string, fallbackCustom: boolean): IdType {
+  return modIdTypes.value.get(path) ?? (fallbackCustom ? "custom" : "online");
+}
+
+/** 模组是否按自定义编号处理 */
+function isCustomType(path: string, fallbackCustom: boolean): boolean {
+  return modIdTypeOf(path, fallbackCustom) === "custom";
+}
+
+/** 改模组的编号类型 */
+function setModIdType(path: string, event: Event) {
+  const value = (event.target as HTMLSelectElement).value as IdType;
+  const next = new Map(modIdTypes.value);
+  next.set(path, value);
+  modIdTypes.value = next;
+  modIdTypeEdits.value = new Set([...modIdTypeEdits.value, path]);
 }
 
 /** 改某一行的下载地址 */
@@ -204,6 +252,9 @@ function setModId(path: string, field: "pid" | "fid", event: Event) {
   next.set(path, value);
   target.value = next;
   modIdEdits.value = new Set([...modIdEdits.value, path]);
+  if (field === "pid") {
+    modPidEdits.value = new Set([...modPidEdits.value, path]);
+  }
 }
 
 /** 资源包当前填的地址与编号 */
@@ -212,11 +263,30 @@ function packUrlOf(path: string): string {
 }
 
 function packPidOf(path: string): string {
-  return packPids.value.get(path) ?? "";
+  return displayId(packPids.value.get(path) ?? "");
 }
 
 function packFidOf(path: string): string {
-  return packFids.value.get(path) ?? "";
+  return displayId(packFids.value.get(path) ?? "");
+}
+
+/** 资源包当前的编号类型 */
+function packIdTypeOf(path: string, fallbackCustom: boolean): IdType {
+  return packIdTypes.value.get(path) ?? (fallbackCustom ? "custom" : "online");
+}
+
+/** 资源包是否按自定义编号处理 */
+function isPackCustomType(path: string, fallbackCustom: boolean): boolean {
+  return packIdTypeOf(path, fallbackCustom) === "custom";
+}
+
+/** 改资源包的编号类型 */
+function setPackIdType(path: string, event: Event) {
+  const value = (event.target as HTMLSelectElement).value as IdType;
+  const next = new Map(packIdTypes.value);
+  next.set(path, value);
+  packIdTypes.value = next;
+  packIdTypeEdits.value = new Set([...packIdTypeEdits.value, path]);
 }
 
 /** 改资源包的下载地址 */
@@ -235,6 +305,9 @@ function setPackId(path: string, field: "pid" | "fid", event: Event) {
   next.set(path, value);
   target.value = next;
   packIdEdits.value = new Set([...packIdEdits.value, path]);
+  if (field === "pid") {
+    packPidEdits.value = new Set([...packPidEdits.value, path]);
+  }
 }
 
 /** 文件大小，按档显示 */
@@ -387,6 +460,11 @@ async function loadInstance(uuid: string) {
     ]),
   );
   modIdEdits.value = new Set();
+  modPidEdits.value = new Set();
+  modIdTypes.value = new Map(
+    mods.value.map((item) => [item.path, item.customId ? "custom" : "online"]),
+  );
+  modIdTypeEdits.value = new Set();
 
   const fallbackName = instanceName || current.value?.name || "";
   if (meta) {
@@ -432,6 +510,11 @@ async function loadInstance(uuid: string) {
     ]),
   );
   packIdEdits.value = new Set();
+  packPidEdits.value = new Set();
+  packIdTypes.value = new Map(
+    packs.value.map((item) => [item.path, item.customId ? "custom" : "online"]),
+  );
+  packIdTypeEdits.value = new Set();
 
   let dirsNext: ExportEntryDto[] = [];
   try {
@@ -452,7 +535,12 @@ async function loadInstance(uuid: string) {
     if (entry.dir) return !BASE_DIR_SKIP.includes(entry.path);
     return !entry.path.includes("/") && !BASE_SKIP.includes(entry.path);
   });
-  pickedBase.value = new Set();
+  const savedBase = new Set(meta?.baseFiles ?? []);
+  pickedBase.value = new Set(
+    baseEntries.value
+      .map((entry) => entry.path)
+      .filter((path) => savedBase.has(path)),
+  );
 
   const children = await loadConfigChildren(uuid, dirsNext);
   if (seq !== loadSeq) return;
@@ -515,6 +603,9 @@ function clearInstance() {
   modPids.value = new Map();
   modFids.value = new Map();
   modIdEdits.value = new Set();
+  modPidEdits.value = new Set();
+  modIdTypes.value = new Map();
+  modIdTypeEdits.value = new Set();
   lockedProjectIds.value = new Set();
   packs.value = [];
   pickedPacks.value = new Set();
@@ -522,6 +613,9 @@ function clearInstance() {
   packPids.value = new Map();
   packFids.value = new Map();
   packIdEdits.value = new Set();
+  packPidEdits.value = new Set();
+  packIdTypes.value = new Map();
+  packIdTypeEdits.value = new Set();
   configs.value = [];
   topDirs.value = [];
   newDir.value = "";
@@ -611,9 +705,42 @@ async function refreshSavedIds() {
   }
 }
 
+/** 检查当前表格里是否有重复的自定义项目编号 */
+function hasDuplicateProjectId(): boolean {
+  const seen = new Map<string, boolean>();
+  for (const row of mods.value) {
+    if (!isCustomType(row.path, row.customId)) continue;
+    const projectId = displayId((modPids.value.get(row.path) ?? "").trim());
+    if (!projectId) continue;
+    const edited = modPidEdits.value.has(row.path);
+    if (seen.has(projectId)) {
+      if (edited || seen.get(projectId)) return true;
+    } else {
+      seen.set(projectId, edited);
+    }
+  }
+  for (const row of packs.value) {
+    if (!isPackCustomType(row.path, row.customId)) continue;
+    const projectId = displayId((packPids.value.get(row.path) ?? "").trim());
+    if (!projectId) continue;
+    const edited = packPidEdits.value.has(row.path);
+    if (seen.has(projectId)) {
+      if (edited || seen.get(projectId)) return true;
+    } else {
+      seen.set(projectId, edited);
+    }
+  }
+  return false;
+}
+
 /** 开始生成，进度经 server-instance-progress 上报 */
 async function generate() {
   if (busy.value || !ready.value) return;
+  if (hasDuplicateProjectId()) {
+    error.value = t("err.serverInstanceProjectIdDuplicate");
+    showToast(error.value);
+    return;
+  }
   busy.value = true;
   error.value = "";
   result.value = null;
@@ -637,8 +764,9 @@ async function generate() {
           url: urlOf(path),
           pid: edited ? modPidOf(path) : "",
           fid: edited ? modFidOf(path) : "",
-          custom: row?.customId ?? false,
+          custom: isCustomType(path, row?.customId ?? false),
           edited,
+          typeChanged: modIdTypeEdits.value.has(path),
         };
       }),
       configs: configs.value.map((item) => ({
@@ -657,8 +785,9 @@ async function generate() {
             url: packUrlOf(row.path),
             pid: edited ? packPidOf(row.path) : "",
             fid: edited ? packFidOf(row.path) : "",
-            custom: row.customId,
+            custom: isPackCustomType(row.path, row.customId),
             edited,
+            typeChanged: packIdTypeEdits.value.has(row.path),
           };
         }),
     });
@@ -713,12 +842,15 @@ onBeforeUnmount(() => {
     format, formatOptions, name, version, text, url, folder, hint, pickFolder,
     baseEntries, pickedBase, pickAllBase, toggleBase,
     mods, pickedMods, pickAllMods, toggled, modPidOf, modFidOf, setModId, baseName,
+    modIdTypeOf, isCustomType, setModIdType,
     urlOf, setModUrl, lockedProjectIds, changedPaths,
     packs, pickedPacks, pickAllPacks, packPidOf, packFidOf, packUrlOf,
-    setPackId, setPackUrl,
+    setPackId, setPackUrl, packIdTypeOf, isPackCustomType, setPackIdType,
     configs, newDir, newMode, dirChoices, addConfig, setConfigMode,
     setConfigDeleteOld, removeConfig,
     pickInstance, openGuide, sizeText,
     current, ready, pickedCount, generate, percent, progress, result, error,
+    modChanges, addedMods, removedMods, modifiedMods,
+    packChanges, addedPacks, removedPacks, modifiedPacks,
   };
 }

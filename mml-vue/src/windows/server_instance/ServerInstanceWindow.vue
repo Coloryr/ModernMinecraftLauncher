@@ -27,9 +27,9 @@ const { instances, currentUuid, busy, section, sections, pickInstance, openGuide
     <!-- 实例放标题栏：换实例不用回到总体设定 -->
     <template #head-right>
       <div class="si-head-actions">
-        <BaseButton class="si-guide" size="sm" @click="openGuide">
-          <GlyphIcon name="document" :size="13" />
-          {{ t("serverInstance.guide") }}
+        <BaseButton class="icon-btn-head" size="sm" v-tip="t('serverInstance.guide')"
+          :aria-label="t('serverInstance.guide')" @click="openGuide">
+          <GlyphIcon name="document" :size="16" />
         </BaseButton>
         <InstanceSelect class="head-select" :instances="instances" :model-value="currentUuid"
           :placeholder="t('winExport.instance')" :disabled="busy" :menu-min-width="260"
@@ -86,11 +86,5 @@ const { instances, currentUuid, busy, section, sections, pickInstance, openGuide
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.si-guide {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
 }
 </style>

@@ -17,6 +17,7 @@ fn picks(paths: &[&str]) -> Vec<ServerInstancePickDto> {
             fid: String::new(),
             custom: false,
             edited: false,
+            type_changed: false,
         })
         .collect()
 }
@@ -55,6 +56,7 @@ fn options(
                 fid: String::new(),
                 custom: true,
                 edited: false,
+                type_changed: false,
             })
             .collect(),
     }
@@ -83,6 +85,7 @@ fn contents(base: &Path, options: &ServerInstanceOptionsDto) -> Contents {
                 fid: pick.fid.clone(),
                 custom: pick.custom,
                 edited: pick.edited,
+                type_changed: pick.type_changed,
             })
             .collect(),
     }
@@ -200,6 +203,7 @@ fn mods_follow_selection_and_exclusions() {
         fid: String::new(),
         custom: false,
         edited: false,
+        type_changed: false,
     });
     assert_eq!(
         paths(files::mods(&base, &exclude).unwrap()),
@@ -873,17 +877,19 @@ fn mml_reuses_ids_and_reports_changed_entries() {
     fs::write(game_dir.join("mods").join("local.jar"), b"v1").unwrap();
     fs::write(game_dir.join("resourcepacks").join("pack.zip"), b"p1").unwrap();
     fs::write(game_dir.join("config").join("a.toml"), b"c1").unwrap();
+    fs::write(instance.join("server.properties"), b"p").unwrap();
 
     let out1 = crate::test_support::temp_dir("server-instance-map-out-1");
     let out2 = crate::test_support::temp_dir("server-instance-map-out-2");
     let mut game = game();
     game.dir = dir;
-    let options = options(
+    let mut options = options(
         "mml",
         &["mods/local.jar"],
         &[("config", "archive")],
         &["resourcepacks/pack.zip"],
     );
+    options.base_files = vec!["server.properties".to_string()];
     let contents = contents(&game_dir, &options);
 
     let first = generate_mml(
@@ -898,6 +904,12 @@ fn mml_reuses_ids_and_reports_changed_entries() {
     )
     .unwrap();
     assert!(first.changed.is_empty(), "第一次生成不该有变化");
+    assert!(first.mod_changes.added.is_empty());
+    assert!(first.mod_changes.removed.is_empty());
+    assert!(first.mod_changes.modified.is_empty());
+    assert!(first.pack_changes.added.is_empty());
+    assert!(first.pack_changes.removed.is_empty());
+    assert!(first.pack_changes.modified.is_empty());
     assert!(instance.join(names::SERVER_INSTANCE_ID_FILE).is_file());
 
     let pack1: ServerPackObj =
@@ -925,6 +937,24 @@ fn mml_reuses_ids_and_reports_changed_entries() {
     .unwrap();
 
     assert!(second.changed.iter().any(|path| path == "mods/local.jar"));
+    assert!(
+        second
+            .mod_changes
+            .modified
+            .iter()
+            .any(|path| path == "mods/local.jar")
+    );
+    assert!(second.mod_changes.added.is_empty());
+    assert!(second.mod_changes.removed.is_empty());
+    assert!(
+        second
+            .pack_changes
+            .modified
+            .iter()
+            .any(|path| path == "resourcepacks/pack.zip")
+    );
+    assert!(second.pack_changes.added.is_empty());
+    assert!(second.pack_changes.removed.is_empty());
     assert!(second.changed.iter().any(|path| path == "resourcepacks/pack.zip"));
     assert!(second.changed.iter().any(|path| path == "config"));
 
@@ -946,6 +976,7 @@ fn mml_reuses_ids_and_reports_changed_entries() {
     assert_eq!(meta.url, "https://example.invalid/pack");
     assert_eq!(meta.format, "mml");
     assert_eq!(meta.folder, options.folder);
+    assert_eq!(meta.base_files, options.base_files);
 
     let _ = fs::remove_dir_all(&instance);
     crate::test_support::cleanup(&[&out1, &out2]);

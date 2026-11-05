@@ -100,7 +100,8 @@ pub use resource_dto::{
     ServerItemDto, ShaderItemDto,
 };
 pub use server_instance_dto::{
-    ServerInstanceConfigDto, ServerInstanceIdDto, ServerInstanceMetaDto,
+    ServerInstanceChangesDto, ServerInstanceConfigDto, ServerInstanceIdDto,
+    ServerInstanceMetaDto,
     ServerInstanceOptionsDto, ServerInstancePickDto, ServerInstanceProgressDto,
     ServerInstanceResultDto,
 };

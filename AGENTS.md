@@ -721,6 +721,17 @@ i18n 表，**不写死中文或英文字面量**。三张表各管一摊，改�
 - 标题栏右侧的实例标签、下载入口这类属于主页面，进子页面时一并隐藏。
 - 参考实现：`AddModpackWindow` 的整合包详情、`ResourceWindow` 的模组依赖图。
 
+### 16.10 标题栏按钮
+
+- **标题栏里只放图标按钮**：`WindowFrame` 的 `#head-right` 槽里，按钮一律
+  `icon-btn-head` + `v-tip` + `aria-label`，内容只放图标（如 `GlyphIcon`）；文字放进
+  tooltip 与 aria-label，不放在按钮里。标题栏空间有限，文字按钮会把实例下拉挤变形。
+- 唯一例外是日志窗口的测试启动按钮：它要显示启动阶段文本，继续用
+  `icon-btn-head launch-live` 的定宽文本档。
+- 图标按钮的尺寸、圆角、悬停由全局 `styles/titlebar.css` 的 `.icon-btn-head` 统一给，
+  窗口自己的 scoped 样式不要再抄一套方形按钮外观；只允许按需覆盖宽度 / 特例，并注明理由。
+- 标题栏下拉用 `.head-select`，宽度特例写窗口自己的 scoped 样式并注明理由。
+
 ## 17. 版本控制
 
 - **不要提交**：不跑 `git commit`、`git tag`、`git push`（含 `--force`），也不改写历史
