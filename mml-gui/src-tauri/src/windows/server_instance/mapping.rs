@@ -67,6 +67,20 @@ pub(super) struct Meta {
     pub(super) folder: String,
     /// 勾选的基础文件，相对实例根目录
     pub(super) base_files: Vec<String>,
+    /// 上次生成用的配置目录；老数据为 `None`
+    pub(super) configs: Option<Vec<MetaConfig>>,
+}
+
+/// 上次生成时保存的一个配置目录
+#[derive(Serialize, Deserialize, Default, Clone)]
+#[serde(default, rename_all = "camelCase")]
+pub(super) struct MetaConfig {
+    /// 目录名，相对游戏目录
+    pub(super) dir: String,
+    /// 同步方式：archive / files
+    pub(super) mode: String,
+    /// 压缩包同步时是否先删旧目录
+    pub(super) delete_old: bool,
 }
 
 /// 一条编号记录

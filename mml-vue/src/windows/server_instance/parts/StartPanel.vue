@@ -75,14 +75,11 @@ const {
     </div>
   </div>
 
+  <!-- 三个按钮同一行：生成服务器实例、导出基础包 / 完整包 -->
   <div class="si-actions">
     <BaseButton variant="primary" size="lg" :disabled="busy || packing || !ready || !pickedCount" @click="generate">
       {{ busy ? t("serverInstance.running") : t("serverInstance.generate") }}
     </BaseButton>
-  </div>
-
-  <!-- 服务器包不依赖生成结果：随时可以直接导出，只要格式是 MML、发布地址填好 -->
-  <div class="si-pack-actions" v-tip="format !== 'mml' ? t('serverInstance.packMmlOnly') : ''">
     <BaseButton size="sm" :disabled="busy || packing || !ready || format !== 'mml'"
       v-tip="format !== 'mml' ? t('serverInstance.packMmlOnly') : ''" @click="exportPack(false)">
       {{ t("serverInstance.packThin") }}
@@ -93,6 +90,20 @@ const {
     </BaseButton>
   </div>
   <p class="field-hint">{{ t("serverInstance.packHint") }}</p>
+
+  <!-- 导出服务器包：进度条 + 当前写入的文件 -->
+  <template v-if="packing">
+    <div class="progress-track">
+      <div class="progress-fill" :class="{ 'is-roll': percent < 0 }"
+        :style="percent < 0 ? undefined : { width: percent + '%' }" />
+    </div>
+    <div class="run-info">
+      <span v-if="progress && progress.total > 0">
+        {{ progress.now }} / {{ progress.total }}
+      </span>
+      <span class="cur">{{ progress?.text }}</span>
+    </div>
+  </template>
 
   <!-- 生成中：进度条 + 当前文件 -->
   <template v-if="busy">

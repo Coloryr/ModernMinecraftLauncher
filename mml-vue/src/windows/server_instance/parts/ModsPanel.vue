@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { inject } from "vue";
 import BaseButton from "../../../components/ui/BaseButton.vue";
+import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import VirtualList from "../../../components/ui/VirtualList.vue";
 import { t } from "../../../lib/i18n";
 import { ServerInstanceKey } from "../context";
@@ -13,6 +14,8 @@ const {
   pickAllMods,
   toggled,
   busy,
+  loading,
+  refreshMods,
   modPidOf,
   modFidOf,
   setModId,
@@ -40,6 +43,10 @@ const {
     </BaseButton>
     <BaseButton size="sm" :disabled="busy" @click="pickAllMods(false)">
       {{ t("serverInstance.pickNone") }}
+    </BaseButton>
+    <BaseButton size="sm" :disabled="busy || loading" @click="refreshMods">
+      <GlyphIcon name="refresh" :size="13" :weight="2" />
+      {{ t("serverInstance.refresh") }}
     </BaseButton>
   </div>
   <div v-if="modChanges" class="si-changes">

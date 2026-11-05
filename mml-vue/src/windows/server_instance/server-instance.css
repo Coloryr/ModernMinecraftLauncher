@@ -81,6 +81,7 @@
    右侧**不留内边距**：滚动条是子元素（.si-section）画的，只有让它贴着内容区右缘，
    滚动条才贴着窗口右边；留白改由下面两条按"26px - 9px 槽位"补回来 */
 .si-content {
+  position: relative;
   flex: 1;
   min-width: 0;
   min-height: 0;
@@ -130,6 +131,35 @@
 .si-section.stretch {
   overflow: hidden;
   padding-right: 26px;
+}
+
+/* 切换实例 / 重扫目录：整块内容区盖一层加载，内容本身由 inert 禁用交互 */
+.si-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+}
+
+.si-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: si-spin 0.8s linear infinite;
+}
+
+@keyframes si-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* 一行：标签与控件并排 */
@@ -398,6 +428,16 @@ select.si-cell-control {
   padding-bottom: 0;
 }
 
+/* select 的选中项由内部行盒排版：行高要正好填满内容盒，否则文字会贴顶。
+   行内控件 26px（上下边框各 1）→ 24px；顶部"同步方式"下拉 32px → 30px */
+select.si-cell-control {
+  line-height: 24px;
+}
+
+.si-add-mode {
+  line-height: 30px;
+}
+
 .si-table-row .field-select {
   height: 26px;
   min-height: 0;
@@ -498,6 +538,7 @@ select.si-cell-control {
 
 .si-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
   justify-content: flex-end;
   margin-top: 4px;
@@ -543,13 +584,6 @@ select.si-cell-control {
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--bg-card);
-}
-
-/* 服务器包导出：结果下面一行按钮，说明另起一行 */
-.si-pack-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 4px;
 }
 
 .si-content .si-error {

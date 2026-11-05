@@ -1157,8 +1157,10 @@ fn export_pack_writes_thin_and_complete_zips() {
     let out = crate::test_support::temp_dir("server-instance-export-pack-out");
     let thin = out.join("thin.zip");
     let complete = out.join("complete.zip");
-    pack::export_pack(&game, &options, &thin, false).unwrap();
-    pack::export_pack(&game, &options, &complete, true).unwrap();
+    let quiet: std::sync::Arc<dyn Fn(usize, usize, String) + Send + Sync> =
+        std::sync::Arc::new(|_, _, _| {});
+    pack::export_pack(&game, &options, &thin, false, quiet.clone()).unwrap();
+    pack::export_pack(&game, &options, &complete, true, quiet).unwrap();
 
     let in_pack = |item: &str| format!("{}/{}", options.name, item);
 

@@ -1134,7 +1134,6 @@ export default {
   "args.jvmExtra": "Extra JVM args",
   "args.gameExtra": "Extra game args",
   "args.classPath": "Extra classpath",
-  "args.placeholderHint": "Placeholders: %GAME_DIR% game folder, %GAME_BASE_DIR% instance root, %GAME_NAME%, %GAME_UUID%, %LAUNCH_DIR%, %JAVA_LOCAL%",
   "args.env": "Extra env vars",
   "args.isolateHome": "Isolate user directories",
   "args.isolateHomeDesc": "Point HOME, APPDATA and XDG to the instance folder",
@@ -2565,12 +2564,14 @@ export default {
   "serverInstance.manifest": "Manifest",
   "serverInstance.files": "Included files",
   "serverInstance.count": "{n} files synced",
+  "serverInstance.loading": "Loading instance…",
+  "serverInstance.refresh": "Refresh",
   "serverInstance.packThin": "Generate server pack",
   "serverInstance.packFull": "Generate complete server pack",
   "serverInstance.packSaveTitle": "Save server pack",
   "serverInstance.packSaved": "Server pack saved to {file}",
   "serverInstance.packHint":
-    "No need to generate the server instance first — just fill in the publish URL. The server pack carries the base files only; the complete pack adds the rest of the synced content. Both import into MMC / Prism and M²L.",
+    "Export a modpack importable by MMC / Prism / MML launchers: the base pack carries base files only, the complete pack includes everything selected.",
   "serverInstance.packMmlOnly": "The server pack relies on the MML manifest; switch the format to MML and fill in the publish URL.",
 };
 

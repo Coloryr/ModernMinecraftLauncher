@@ -1135,7 +1135,6 @@ export default {
   "args.jvmExtra": "附加 JVM 参数",
   "args.gameExtra": "附加游戏参数",
   "args.classPath": "附加 classpath",
-  "args.placeholderHint": "可用占位符：%GAME_DIR% 游戏目录、%GAME_BASE_DIR% 实例根目录、%GAME_NAME%、%GAME_UUID%、%LAUNCH_DIR%、%JAVA_LOCAL%",
   "args.env": "附加环境变量",
   "args.isolateHome": "隔离用户目录",
   "args.isolateHomeDesc": "HOME、APPDATA、XDG 等指向实例目录",
@@ -2564,12 +2563,14 @@ export default {
   "serverInstance.manifest": "清单",
   "serverInstance.files": "附带文件",
   "serverInstance.count": "同步 {n} 个文件",
+  "serverInstance.loading": "正在加载实例…",
+  "serverInstance.refresh": "刷新",
   "serverInstance.packThin": "生成服务器包",
   "serverInstance.packFull": "生成服务器包完整",
   "serverInstance.packSaveTitle": "保存服务器包",
   "serverInstance.packSaved": "服务器包已保存到 {file}",
   "serverInstance.packHint":
-    "不用先生成服务器实例，填好发布地址即可导出。服务器包只带基础文件；完整包带基础文件与其余同步内容。两种包都可在 MMC / Prism 与 M²L 中导入。",
+    "导出 MMC / Prism / MML 启动器可导入的整合包：基础包只带基础文件，完整包包含所有已选内容。",
   "serverInstance.packMmlOnly": "服务器包依赖 MML 清单，请先把格式切到 MML 并填好发布地址",
 };
 

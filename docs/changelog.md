@@ -28,14 +28,16 @@
   `MML_LAUNCHER` / `MML_LAUNCHER_VERSION` 与 `ARG_JAVA_LOCAL`、`ARG_GAME_DIR` 等 `ARG_*` 变量。
 - 服务器实例的「基础文件」改成文件树：「全选」可整份带上，目录（含 `.minecraft`）
   能逐层展开，只勾其中的子目录也会整目录打进 `base.zip`；勾选状态与原来一样随实例保存。
+- 服务器实例窗口切换实例时显示加载状态并禁用内容区；模组 / 资源包页加「刷新」按钮；
+  配置文件列表按上次生成保存的目录恢复，不再每次打开都自动重铺；表格里的下拉文字垂直居中。
 - 服务器实例窗口新增「生成服务器包」「生成服务器包完整」两个按钮，不必先生成服务器实例，
   只要格式是 MML、填好发布地址即可导出。产物是可导入的
   MMC / Prism 实例包 zip（顶层 `<实例名>/`，含 `mmc-pack.json`、`instance.cfg`、`game.json` 与
   `mml-server-sync.jar`）。前者只带「基础文件」页勾选的内容，后者再加模组、配置目录、资源包等
   其余同步内容；两种包拖进 M²L 也会按 `game.json` 识别成实例包。MMC / Prism 侧靠 `instance.cfg`
   里的 `-javaagent:$INST_DIR/mml-server-sync.jar=<发布地址>/server.json` 同步，M²L 侧按 `game.json`
-  的发布地址自己同步；包内还带实例图标，`game.json` 的 `Icon` 指向它。`mml-server-sync.jar` 已内嵌进
-  exe，不用另外分发。
+  的发布地址自己同步；包内还带实例图标，`game.json` 的 `Icon` 指向它。导出时按钮下方显示进度条与
+  当前写入的文件名，`mml-server-sync.jar` 已内嵌进 exe，不用另外分发。
 - 启动日志补上附加参数：附加 JVM 参数、附加游戏参数、附加 classpath 与传给游戏进程的环境变量
   各记一行，参数里的占位符已换成实际路径，排查启动问题时不用再回头翻实例设置。
 - 启动日志在完整命令行前加一行「下面是实例启动参数：」，Java 路径后面不再直接接一整串参数。

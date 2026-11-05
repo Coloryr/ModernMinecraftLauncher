@@ -55,7 +55,24 @@
 生成成功会把格式、实例名、包版本、说明、发布地址、保存文件夹记进实例根目录的
 `server_instance_ids.json`，下次打开这个实例时自动回填。
 
-### 3.3 模组
+### 3.3 基础文件
+
+![基础文件页：实例根目录下的文件与目录，目录可逐层展开](pics/server/image2.png)
+
+- 以实例目录为根，列出可同步的文件与目录；`game.json` / `icon.png` / `server.json` 等
+  启动器元数据不列。
+- 「全选」会把根目录下的条目全部勾上；目录可以逐层展开，勾 `.minecraft`、`libraries`、
+  `patches` 或其中的子目录，整个目录一起进 `base.zip`。`.minecraft` 里的
+  `server.json` / `server.json.sha1` / `server.json.old` 会自动排除，`cache` / `temp` /
+  `backup` 这些顶层的运行期目录不列。
+- 实例图标不在这里选：生成时会单独复制成发布目录的 `icon.png`，并写进清单的 `Icon` 字段。
+- 勾选的文件打成一个固定的 `base.zip`，清单里写进 `Base`。
+- 客户端**只在第一次导入 / 同步时下载并解压到实例根目录**，后续版本更新不会再下载，也不会覆盖。
+- 勾选的基础文件会随生成选项一起保存，下次打开这个实例时自动恢复。
+- 适合放 `server.properties`、启动脚本、`eula.txt` 这类与 `.minecraft` 同级、一次配好的文件。
+- 仅 MML 格式支持；HMCL 的 `file_api` 只能表达 `.minecraft` 里的文件。
+
+### 3.4 模组
 
 ![模组页：同步、文件名、编号类型、项目编号、文件编号与下载地址](pics/server/image3.png)
 
@@ -83,7 +100,7 @@
 
 ![打开实例后的变化快照：绿色 +为新增、黄色 ·为修改，红色一行是已删除](pics/server/image7.png)
 
-### 3.4 资源包
+### 3.5 资源包
 
 ![资源包页：与模组页同款的编号与地址列](pics/server/image4.png)
 
@@ -94,23 +111,6 @@
 - 和模组页一样，打开实例后就会按上次快照显示 `+新增` / `-删除` / `·修改`；
   新增行绿色 `+`、修改行黄色 `·`，删除的资源包列在红色汇总里。生成前调整勾选实时更新。
 - 文件夹形式的资源包不会列出；请压成 zip 再放回 `resourcepacks`。
-
-### 3.5 基础文件
-
-![基础文件页：实例根目录下的文件与目录，目录可逐层展开](pics/server/image2.png)
-
-- 以实例目录为根，列出可同步的文件与目录；`game.json` / `icon.png` / `server.json` 等
-  启动器元数据不列。
-- 「全选」会把根目录下的条目全部勾上；目录可以逐层展开，勾 `.minecraft`、`libraries`、
-  `patches` 或其中的子目录，整个目录一起进 `base.zip`。`.minecraft` 里的
-  `server.json` / `server.json.sha1` / `server.json.old` 会自动排除，`cache` / `temp` /
-  `backup` 这些顶层的运行期目录不列。
-- 实例图标不在这里选：生成时会单独复制成发布目录的 `icon.png`，并写进清单的 `Icon` 字段。
-- 勾选的文件打成一个固定的 `base.zip`，清单里写进 `Base`。
-- 客户端**只在第一次导入 / 同步时下载并解压到实例根目录**，后续版本更新不会再下载，也不会覆盖。
-- 勾选的基础文件会随生成选项一起保存，下次打开这个实例时自动恢复。
-- 适合放 `server.properties`、启动脚本、`eula.txt` 这类与 `.minecraft` 同级、一次配好的文件。
-- 仅 MML 格式支持；HMCL 的 `file_api` 只能表达 `.minecraft` 里的文件。
 
 ### 3.6 配置文件
 
@@ -156,7 +156,7 @@
   再带上模组、配置目录、资源包等其余同步内容。包里有什么，取决于「基础文件」「配置文件」页的勾选。
 - **MMC / Prism 侧怎么同步**：`instance.cfg` 的 `JvmArgs` 带
   `-javaagent:$INST_DIR/mml-server-sync.jar=<发布地址>/server.json`，启动游戏前由 agent 按清单同步；
-  发布地址取自「总体设定」。
+  发布地址取自「总体设定」。玩家侧的操作见 5.3。
 - **`game.json` 只给 M²L 用**：写的是 M²L 实例配置（在线服务器实例类型 + 发布地址），**不带** agent 参数；
   M²L 自己按 `server_url` 同步，两套不会重复执行。
 - **实例图标会带上**：实例根目录有图标文件（通常是 `icon.png`）时一起放进包根，`game.json` 的
@@ -167,6 +167,8 @@
   带配置与 exe 的分发包见[软件手册第 16 章](README.md#16-服务器包)。
 
 ### 3.9 输出目录长什么样
+
+![生成完成后的输出文件夹：清单与 sidecar、图标、基础包、配置压缩包，以及需要托管的 mods / resourcepacks](pics/server/image8.png)
 
 MML 示例（有在线来源的模组不在里面）：
 
@@ -218,6 +220,10 @@ publish/
 **方式二**：玩家已有实例时，在实例元信息里把「整合包类型」选成**在线网络整合包**，填上发布地址，
 下次启动按同样流程同步。
 
+**方式三（拖入包）**：把 3.8 生成的服务器包 zip 直接拖进**添加实例**窗口，M²L 会按包内的
+`game.json` 识别成「在线网络整合包」实例。包内带多少内容取决于选的是「生成服务器包」还是
+「生成服务器包完整」，导入后剩下的按在线流程继续同步。
+
 清单里带项目号 / 文件号的模组由客户端从 CurseForge / Modrinth 下载；只有托管地址的从你的发布地址下载。
 
 ### 5.2 HMCL 玩家
@@ -227,7 +233,29 @@ HMCL 能访问的位置，HMCL 侧按服务器包清单逐个下载并校验 SHA
 原版 / Forge / NeoForge / Fabric / Quilt；
 OptiFine、LiteLoader、Cleanroom 与自定义加载器表达不了，生成窗口会直接报错。
 
-### 5.3 把 HMCL 服务器包导入 M²L
+### 5.3 MMC / Prism 玩家
+
+用 3.8 的**生成服务器包**（或**生成服务器包完整**）产出的 zip，拖进 MultiMC / Prism 的
+「添加实例 → 从 zip 导入」即可。包内是一个完整的 MMC 实例目录，含 `mmc-pack.json`、
+`instance.cfg`、`game.json` 与 `mml-server-sync.jar`。
+
+- **启动前自动同步**：`instance.cfg` 的 `JvmArgs` 带着
+  `-javaagent:$INST_DIR/mml-server-sync.jar=<发布地址>/server.json`。游戏 main 之前由 agent
+  按清单同步，同步完才进游戏；首次要下基础包，等得久一点是正常的。
+- **进度看哪里**：MultiMC / Prism 的 Java 控制台会打印 `[MML-SERVER-SYNC]` 开头的日志，
+  同时也写进实例的 `.minecraft/.mml-server-sync/mml-server-sync.log`。下载每秒一条字节进度。
+- **工作目录**：agent 默认把启动器的工作目录当游戏目录（MMC 系列一般就是实例的 `.minecraft`）。
+  启动器改过工作目录时，在 `instance.cfg` 的 `JvmArgs` 里加
+  `-Dmml.serverSync.gameDir=<实例>/.minecraft`。
+- **更新**：发布方递增「包版本」并重新上传即可，玩家下次启动自动增量同步；
+  版本号没变时只取清单、不动文件。
+- **失败**：下载失败会中止启动，不会带着旧文件进服；清单本身拉不到（网络故障、404）时只记日志、
+  跳过本次同步，游戏照常启动。
+- **不用另发 jar**：`mml-server-sync.jar` 就在包里，agent 是 Java 8 字节码，Java 8–25 都能跑。
+- **用 M²L 启动同一个包也不会重复同步**：agent 会认出 MML 启动器并跳过，M²L 自己按
+  `game.json` 的发布地址更新。
+
+### 5.4 把 HMCL 服务器包导入 M²L
 
 HMCL 的服务器包（zip 里有 `server-manifest.json`）可以直接拖进添加实例窗口：
 

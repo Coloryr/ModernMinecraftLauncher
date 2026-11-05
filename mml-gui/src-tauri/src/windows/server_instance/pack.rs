@@ -8,10 +8,11 @@ use std::{
     collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use mml_base::{
-    archives::{ArchiveAddFile, ArchiveType, BaseArchive},
+    archives::{ArchiveAddFile, ArchiveType, BaseArchive, IBaseArchiveGui},
     serialize_tools,
 };
 use mml_game::{
@@ -54,6 +55,7 @@ pub(super) fn export_pack(
     options: &ServerInstanceOptionsDto,
     file: &Path,
     complete: bool,
+    progress: Arc<dyn Fn(usize, usize, String) + Send + Sync>,
 ) -> Result<(), String> {
     // 两种包都靠 MML 的 server.json 同步，别的格式没有可同步的清单
     if options.format.trim() != "mml" {
@@ -146,14 +148,20 @@ pub(super) fn export_pack(
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     let inst = format!("{name}/");
+    // 四个自动条目 + 待打包文件；进度条按"当前写到哪个文件"上报
+    let total = 4 + pending.len();
     let mut zip =
         BaseArchive::create_empty(ArchiveType::Zip, file).map_err(|e| e.to_string())?;
+    progress(0, total, names::MMCJSON_FILE.to_string());
     zip.add_data(&format!("{inst}{}", names::MMCJSON_FILE), &data)
         .map_err(|e| e.to_string())?;
+    progress(1, total, names::MMCCFG_FILE.to_string());
     zip.add_data(&format!("{inst}{}", names::MMCCFG_FILE), cfg.as_bytes())
         .map_err(|e| e.to_string())?;
+    progress(2, total, names::GAME_FILE.to_string());
     zip.add_data(&format!("{inst}{}", names::GAME_FILE), &game_json)
         .map_err(|e| e.to_string())?;
+    progress(3, total, SYNC_JAR_NAME.to_string());
     zip.add_data(&format!("{inst}{SYNC_JAR_NAME}"), SYNC_JAR)
         .map_err(|e| e.to_string())?;
 
@@ -164,8 +172,14 @@ pub(super) fn export_pack(
             dest: PathBuf::from(format!("{inst}{}", files::wire_path(&rel))),
         });
     }
-    zip.add_files(&pending_files, None)
+    let gui = Some(Arc::new(PackProgress {
+        progress: Arc::clone(&progress),
+        total,
+    }) as Arc<dyn IBaseArchiveGui>);
+    zip.add_files_reporting(&pending_files, gui, 4)
         .map_err(|e| e.to_string())?;
+    // 没有待打包文件时上面不会有 update，收尾也要推到 100%
+    progress(total, total, String::new());
     Ok(())
 }
 
@@ -304,4 +318,26 @@ fn is_reserved(rel: &Path) -> bool {
     RESERVED_NAMES
         .iter()
         .any(|item| name.eq_ignore_ascii_case(item))
+}
+
+/// 压缩包逐条写入时的进度回调，转成服务器实例进度事件
+struct PackProgress {
+    /// 进度回调：已写条数、总数、当前文件名
+    progress: Arc<dyn Fn(usize, usize, String) + Send + Sync>,
+    /// 总条数，含四个自动条目
+    total: usize,
+}
+
+impl IBaseArchiveGui for PackProgress {
+    fn start(&self, _total: usize) {}
+
+    fn update(&self, filename: Option<String>, current: usize) {
+        (self.progress)(current, self.total, filename.unwrap_or_default());
+    }
+
+    fn done(&self) {}
+
+    fn file_rename(&self, _name: &str) -> bool {
+        true
+    }
 }

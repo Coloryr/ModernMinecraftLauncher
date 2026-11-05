@@ -50,6 +50,7 @@ export type ServerInstanceMetaDto = {
   format: string,
   folder: string,
   baseFiles: string[],
+  configs: ServerInstanceConfigDto[] | null,
 };
 
 export type ServerInstanceSnapshotDto = {

@@ -16,7 +16,7 @@ use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     fs,
     path::{Path, PathBuf},
-    sync::atomic::AtomicBool,
+    sync::{Arc, atomic::AtomicBool},
 };
 
 use mml_base::hash_helper::{HashType, gen_hash};
@@ -151,6 +151,7 @@ pub async fn server_instance_generate(
 #[gui_macros::ipc_group("server_instance")]
 #[gui_macros::command]
 pub async fn server_instance_export_pack(
+    app: AppHandle,
     uuid: String,
     options: ServerInstanceOptionsDto,
     file: String,
@@ -168,8 +169,19 @@ pub async fn server_instance_export_pack(
         return Err(err_keys::SERVER_INSTANCE_FROM_SERVER.to_string());
     }
     let path = PathBuf::from(file);
+    let progress: Arc<dyn Fn(usize, usize, String) + Send + Sync> =
+        Arc::new(move |now: usize, total: usize, text: String| {
+            emit_server_instance_progress(
+                &app,
+                ServerInstanceProgressDto {
+                    now: now as u64,
+                    total: total as u64,
+                    text,
+                },
+            );
+        });
     let result = tokio::task::spawn_blocking(move || {
-        pack::export_pack(&game, &options, &path, complete)
+        pack::export_pack(&game, &options, &path, complete, progress)
     })
     .await
     .map_err(|e| e.to_string())?;
@@ -200,6 +212,16 @@ pub async fn server_instance_get_meta(
             format: meta.format.clone(),
             folder: meta.folder.clone(),
             base_files: meta.base_files.clone(),
+            configs: meta.configs.as_ref().map(|configs| {
+                configs
+                    .iter()
+                    .map(|item| crate::dtos::server_instance_dto::ServerInstanceConfigDto {
+                        dir: item.dir.clone(),
+                        mode: item.mode.clone(),
+                        delete_old: item.delete_old,
+                    })
+                    .collect()
+            }),
         }))
 }
 
@@ -801,6 +823,17 @@ fn generate_mml(
         format: "mml".to_string(),
         folder: options.folder.clone(),
         base_files: options.base_files.clone(),
+        configs: Some(
+            options
+                .configs
+                .iter()
+                .map(|item| mapping::MetaConfig {
+                    dir: item.dir.clone(),
+                    mode: item.mode.clone(),
+                    delete_old: item.delete_old,
+                })
+                .collect(),
+        ),
     });
     ids.save(&game.get_base_path())?;
 
@@ -916,6 +949,17 @@ fn generate_hmcl(
         format: "hmcl".to_string(),
         folder: options.folder.clone(),
         base_files: options.base_files.clone(),
+        configs: Some(
+            options
+                .configs
+                .iter()
+                .map(|item| mapping::MetaConfig {
+                    dir: item.dir.clone(),
+                    mode: item.mode.clone(),
+                    delete_old: item.delete_old,
+                })
+                .collect(),
+        ),
     });
     ids.save(&game.get_base_path())?;
 

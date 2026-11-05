@@ -65,7 +65,7 @@ pub struct ServerInstancePickDto {
 }
 
 /// 一个要同步的配置目录
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerInstanceConfigDto {
     /// 目录名，相对游戏目录，只认顶层目录，如 `config`
@@ -125,6 +125,8 @@ pub struct ServerInstanceMetaDto {
     pub folder: String,
     /// 勾选的基础文件，相对实例根目录
     pub base_files: Vec<String>,
+    /// 配置文件目录；老数据没有这个字段时为 `None`，前端按默认列表铺
+    pub configs: Option<Vec<ServerInstanceConfigDto>>,
 }
 
 /// 上次生成保存的模组 / 资源包快照

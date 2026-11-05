@@ -20,19 +20,19 @@ const emit = defineEmits<{ (e: "close"): void }>();
 const instance = useServerInstance();
 provide(ServerInstanceKey, instance);
 
-const { instances, currentUuid, busy, section, sections, pickInstance, openGuide } = instance;
+const { instances, currentUuid, busy, loading, section, sections, pickInstance, openGuide } = instance;
 </script>
 <template>
   <WindowFrame :title="t('winTitle.serverInstance')" body-fill body-flush @close="emit('close')">
     <!-- 实例放标题栏：换实例不用回到总体设定 -->
     <template #head-right>
       <div class="si-head-actions">
-        <BaseButton variant="ghost" size="sm" class="icon-btn-head"
+        <BaseButton variant="ghost" size="sm" class="icon-btn-head" :disabled="loading"
           v-tip="t('serverInstance.guide')" :aria-label="t('serverInstance.guide')" @click="openGuide">
           <GlyphIcon name="document" :size="15" :weight="1.8" />
         </BaseButton>
         <InstanceSelect class="head-select" :instances="instances" :model-value="currentUuid"
-          :placeholder="t('winExport.instance')" :disabled="busy" :menu-min-width="260"
+          :placeholder="t('winExport.instance')" :disabled="busy || loading" :menu-min-width="260"
           @update:model-value="pickInstance" />
       </div>
     </template>
@@ -41,7 +41,7 @@ const { instances, currentUuid, busy, section, sections, pickInstance, openGuide
       <!-- 左侧分页 -->
       <nav class="si-rail">
         <button v-for="item in sections" :key="item.id" class="si-rail-item" :class="{ active: section === item.id }"
-          :disabled="busy && item.id === 'start'" @click="section = item.id">
+          :disabled="loading || (busy && item.id === 'start')" @click="section = item.id">
           <span class="si-rail-icon">
             <GlyphIcon :name="item.icon" :size="16" :weight="1.8" />
           </span>
@@ -52,7 +52,7 @@ const { instances, currentUuid, busy, section, sections, pickInstance, openGuide
         </button>
       </nav>
 
-      <div class="si-content">
+      <div class="si-content" :inert="loading">
         <!-- 当前页大标题 + 说明，与设置窗口同款 -->
         <header class="si-head">
           <h2 class="si-title">{{ t(`serverInstance.tab.${section}`) }}</h2>
@@ -69,6 +69,11 @@ const { instances, currentUuid, busy, section, sections, pickInstance, openGuide
             <ConfigsPanel v-else-if="section === 'configs'" />
             <StartPanel v-else />
         </template>
+
+        <div v-if="loading" class="si-loading">
+          <span class="si-spinner" />
+          <span>{{ t("serverInstance.loading") }}</span>
+        </div>
       </div>
     </div>
   </WindowFrame>

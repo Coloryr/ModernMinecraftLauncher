@@ -251,7 +251,6 @@ watch(memoryConflict, async (bad) => {
 
       <label class="field-label">{{ t("winSettings.jvmArgs") }}</label>
       <textarea v-model="run!.jvmArgs" class="field-input args-input" spellcheck="false" />
-      <div class="field-hint">{{ t("args.placeholderHint") }}</div>
     </SettingsGroup>
 
     <SettingsGroup v-if="!locked" id="gameArgs" title-key="winSettings.secGameArgs" :flash="flashGroup === 'gameArgs'">

@@ -131,6 +131,8 @@ const newMode = ref<ConfigMode>("archive");
 // ---------------- 运行状态 ----------------
 
 const busy = ref(false);
+/** 切换实例 / 重扫目录中：内容区盖加载并禁用交互 */
+const loading = ref(false);
 /** 导出服务器包中；与生成分开，导出时结果区要留着 */
 const packing = ref(false);
 const progress = ref<ServerInstanceProgressDto | null>(null);
@@ -444,6 +446,8 @@ let loadSeq = 0;
 /** 重新读一个实例的模组、资源包与顶层目录，勾选与配置列表重置成默认值 */
 async function loadInstance(uuid: string) {
   const seq = ++loadSeq;
+  loading.value = true;
+  try {
   lastSnapshot.value = null;
   result.value = null;
   progress.value = null;
@@ -587,20 +591,136 @@ async function loadInstance(uuid: string) {
   if (seq !== loadSeq) return;
   topDirs.value = [...dirsNext, ...children];
 
-  // 默认只把顶层文件夹加上，一级子目录按需手动添加
-  configs.value = topDirs.value
-    .filter((entry) => entry.dir && !entry.path.includes("/") && !SKIP_DIRS.includes(entry.path))
-    .map((entry) => ({
-      dir: entry.path,
-      mode: (FILES_DIRS.includes(entry.path) ? "files" : "archive") as ConfigMode,
-      deleteOld: true,
-    }));
+  // 生成过的实例按保存的列表恢复；没有保存过（老数据 / 首次打开）才铺默认值
+  const availableDirs = new Set(topDirs.value.filter((entry) => entry.dir).map((entry) => entry.path));
+  if (Array.isArray(meta?.configs)) {
+    configs.value = meta.configs
+      .filter((item) => availableDirs.has(item.dir))
+      .map((item) => ({
+        dir: item.dir,
+        mode: (item.mode === "files" ? "files" : "archive") as ConfigMode,
+        deleteOld: item.deleteOld,
+      }));
+  } else {
+    // 默认只把顶层文件夹加上，一级子目录按需手动添加
+    configs.value = topDirs.value
+      .filter((entry) => entry.dir && !entry.path.includes("/") && !SKIP_DIRS.includes(entry.path))
+      .map((entry) => ({
+        dir: entry.path,
+        mode: (FILES_DIRS.includes(entry.path) ? "files" : "archive") as ConfigMode,
+        deleteOld: true,
+      }));
+  }
   newDir.value = "";
   newMode.value = "archive";
   result.value = null;
   progress.value = null;
   changedPaths.value = new Set();
   error.value = "";
+  } finally {
+    if (seq === loadSeq) loading.value = false;
+  }
+}
+
+/** 重新扫描模组：保留已有勾选与手填内容，新出现的文件默认勾上 */
+async function refreshMods() {
+  const uuid = currentUuid.value;
+  if (!uuid || busy.value || loading.value) return;
+  loading.value = true;
+  try {
+    const info = await api.getExportInfo(uuid);
+    if (uuid !== currentUuid.value) return;
+    const next = info.mods.filter((item) => !item.dir);
+    const oldPaths = new Set(mods.value.map((item) => item.path));
+    const nextPaths = new Set(next.map((item) => item.path));
+    pickedMods.value = new Set(
+      next
+        .filter((item) => !oldPaths.has(item.path) || pickedMods.value.has(item.path))
+        .map((item) => item.path),
+    );
+    for (const item of next) {
+      if (oldPaths.has(item.path)) continue;
+      modUrls.value.set(item.path, item.url ?? "");
+      modPids.value.set(
+        item.path,
+        item.customId ? (item.customProjectId ?? "") : (item.modId ?? ""),
+      );
+      modFids.value.set(
+        item.path,
+        item.customId ? (item.customFileId ?? "") : (item.fileId ?? ""),
+      );
+      modIdTypes.value.set(item.path, item.customId ? "custom" : "online");
+    }
+    for (const path of [...modUrls.value.keys()]) {
+      if (!nextPaths.has(path)) modUrls.value.delete(path);
+    }
+    for (const path of [...modPids.value.keys()]) {
+      if (!nextPaths.has(path)) modPids.value.delete(path);
+    }
+    for (const path of [...modFids.value.keys()]) {
+      if (!nextPaths.has(path)) modFids.value.delete(path);
+    }
+    for (const path of [...modIdTypes.value.keys()]) {
+      if (!nextPaths.has(path)) modIdTypes.value.delete(path);
+    }
+    mods.value = next;
+    result.value = null;
+    changedPaths.value = new Set();
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    loading.value = false;
+  }
+}
+
+/** 重新扫描资源包：口径与模组相同 */
+async function refreshPacks() {
+  const uuid = currentUuid.value;
+  if (!uuid || busy.value || loading.value) return;
+  loading.value = true;
+  try {
+    const next = (await api.listExportDir(uuid, "resourcepacks")).filter((item) => !item.dir);
+    if (uuid !== currentUuid.value) return;
+    const oldPaths = new Set(packs.value.map((item) => item.path));
+    const nextPaths = new Set(next.map((item) => item.path));
+    pickedPacks.value = new Set(
+      next
+        .filter((item) => !oldPaths.has(item.path) || pickedPacks.value.has(item.path))
+        .map((item) => item.path),
+    );
+    for (const item of next) {
+      if (oldPaths.has(item.path)) continue;
+      packUrls.value.set(item.path, item.url ?? "");
+      packPids.value.set(
+        item.path,
+        item.customId ? (item.customProjectId ?? "") : (item.modId ?? ""),
+      );
+      packFids.value.set(
+        item.path,
+        item.customId ? (item.customFileId ?? "") : (item.fileId ?? ""),
+      );
+      packIdTypes.value.set(item.path, item.customId ? "custom" : "online");
+    }
+    for (const path of [...packUrls.value.keys()]) {
+      if (!nextPaths.has(path)) packUrls.value.delete(path);
+    }
+    for (const path of [...packPids.value.keys()]) {
+      if (!nextPaths.has(path)) packPids.value.delete(path);
+    }
+    for (const path of [...packFids.value.keys()]) {
+      if (!nextPaths.has(path)) packFids.value.delete(path);
+    }
+    for (const path of [...packIdTypes.value.keys()]) {
+      if (!nextPaths.has(path)) packIdTypes.value.delete(path);
+    }
+    packs.value = next;
+    result.value = null;
+    changedPaths.value = new Set();
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    loading.value = false;
+  }
 }
 
 /** 切到某个实例 */
@@ -879,6 +999,7 @@ async function exportPack(complete: boolean) {
   }
   if (!picked) return;
   packing.value = true;
+  progress.value = null;
   try {
     await api.exportServerPack(currentUuid.value, buildOptions(), picked, complete);
     showToast(t("serverInstance.packSaved", { file: picked }));
@@ -934,7 +1055,7 @@ onBeforeUnmount(() => {
 });
 
   return {
-    instances, currentUuid, section, sections, busy,
+    instances, currentUuid, section, sections, busy, loading, refreshMods, refreshPacks,
     format, formatOptions, name, version, text, url, folder, hint, pickFolder,
     baseEntries, pickedBase, pickAllBase, toggleBase,
     mods, pickedMods, pickAllMods, toggled, modPidOf, modFidOf, setModId, baseName,

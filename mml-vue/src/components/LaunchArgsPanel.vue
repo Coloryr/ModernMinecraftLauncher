@@ -379,7 +379,6 @@ const gcOptions = computed(() => [
           <button class="line-add" @click="addLine('jvmArgs')">
             <GlyphIcon name="plus" :size="13" :weight="2.2" /> {{ t("args.addLine") }}
           </button>
-          <div class="field-hint">{{ t("args.placeholderHint") }}</div>
 
           <!-- 附加游戏参数 -->
           <label class="args-label">{{ t("args.gameExtra") }}</label>
@@ -407,16 +406,16 @@ const gcOptions = computed(() => [
             <GlyphIcon name="plus" :size="13" :weight="2.2" /> {{ t("args.addLine") }}
           </button>
 
-          <!-- 隔离用户目录：HOME / APPDATA / XDG 等指到实例目录 -->
-          <div class="args-row">
-            <span class="args-label" v-tip="t('args.isolateHomeDesc')">{{ t("args.isolateHome") }}</span>
-            <BaseSwitch :model-value="args.isolateHome" @update:model-value="update({ isolateHome: $event })" />
-          </div>
-
-          <!-- MML 环境变量：MML_LAUNCHER / ARG_* 是否随启动传给游戏 -->
-          <div class="args-row">
-            <span class="args-label" v-tip="t('args.mmlEnvDesc')">{{ t("args.mmlEnv") }}</span>
-            <BaseSwitch :model-value="args.mmlEnv" @update:model-value="update({ mmlEnv: $event })" />
+          <!-- 隔离用户目录 / MML 环境变量：两个开关并排，标签不折行 -->
+          <div class="args-row args-switch-row">
+            <div class="args-switch">
+              <span class="args-label" v-tip="t('args.isolateHomeDesc')">{{ t("args.isolateHome") }}</span>
+              <BaseSwitch :model-value="args.isolateHome" @update:model-value="update({ isolateHome: $event })" />
+            </div>
+            <div class="args-switch">
+              <span class="args-label" v-tip="t('args.mmlEnvDesc')">{{ t("args.mmlEnv") }}</span>
+              <BaseSwitch :model-value="args.mmlEnv" @update:model-value="update({ mmlEnv: $event })" />
+            </div>
           </div>
 
           <!-- 附加环境变量（键值对） -->
@@ -510,6 +509,24 @@ const gcOptions = computed(() => [
 
 .args-chevron.flip {
   transform: rotate(180deg);
+}
+
+/* 两个开关并排：标签定宽改成内容宽，整行不折行 */
+.args-switch-row {
+  flex-wrap: nowrap;
+  gap: 16px;
+}
+
+.args-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.args-switch .args-label {
+  flex: none;
+  white-space: nowrap;
 }
 
 /* 多行参数 */
