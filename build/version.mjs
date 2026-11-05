@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-// 版本号的唯一来源是仓库里的版本文件 docs/version：一行，可带 -pre 这类后缀。
-// 构建前由 set-version 同步进应用清单；MML_VERSION 环境变量可以临时覆盖（不改文件试构建）。
+// 版本号的唯一来源是仓库里的版本文件 docs/version：一行纯数字版本，如 0.1.9。
+// 预览版由发版标签的 -pre 后缀表示，不写进文件；构建前由 set-version 同步进应用清单。
+// MML_VERSION 环境变量可以临时覆盖，CI 用它把带后缀的版号传给各构建机。
 //
 // 用法：node build/version.mjs 打印版本；--package 打印安装包版本；
-//       --tag v0.1.9 把标签解析成版本号（CI 校验标签与文件是否一致）。
+//       --tag v0.1.9-pre 把标签解析成版本号（CI 校验标签与文件是否一致）。
 // set-version 与 package-*.mjs 以模块方式引用这里的函数。
 import fs from "node:fs";
 import path from "node:path";
@@ -35,13 +36,15 @@ export function normalizeVersion(text) {
 /**
  * 读版本文件
  *
+ * 文件只写数字版本；带 `-pre` 这类后缀说明写错了位置——后缀该写在发版标签上。
+ *
  * # 返回值
  *
- * 三段版本号，如 `0.1.9` 或 `0.1.9-pre`
+ * 三段版本号，如 `0.1.9`
  *
  * # 异常
  *
- * 文件不存在或内容不是版本号时抛错
+ * 文件不存在、内容不是版本号，或带后缀时抛错
  */
 function readVersionFile() {
     let text;
@@ -52,6 +55,9 @@ function readVersionFile() {
     }
     const version = normalizeVersion(text);
     if (!version) throw new Error(`${VERSION_FILE} 不是版本号：${text}`);
+    if (version !== packageVersionOf(version)) {
+        throw new Error(`${VERSION_FILE} 只写数字版本，预览版后缀写在发版标签上：${text}`);
+    }
     return version;
 }
 

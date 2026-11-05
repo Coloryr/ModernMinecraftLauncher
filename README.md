@@ -109,9 +109,9 @@ Windows 默认出 x64 / arm64，只要一种用 `-Arch x64`；Linux / macOS 本�
 
 ### 版本与发布
 
-版本号写在仓库根的 `docs/version`（一行，如 `0.1.9`；带 `-pre` 后缀就是预发布版），
-构建前自动同步进应用清单。发版推标签只是触发器：标签的版本必须与文件一致，`testbuild` 只验证结果、
-产物全部丢弃。推送后由 GitHub Actions 按平台并行构建并发 Release，安装包统一收集到 `build_out/`（不入库）。
+版本号写在仓库根的 `docs/version`（一行纯数字，如 `0.1.9`），构建前自动同步进应用清单。
+预览版由发版标签的 `-pre` 后缀表示（如 `v0.1.9-pre`）；标签只是触发器，数字部分必须与文件一致。
+`testbuild` 只验证结果、产物全部丢弃。推送后由 GitHub Actions 按平台并行构建并发 Release，安装包统一收集到 `build_out/`（不入库）。
 发版流程见[自动化构建](docs/development.md#自动化构建github-actions)，产物命名与签名见[开发与构建](docs/development.md)。
 
 常用开发命令（重新生成 IPC 契约、整仓检查、lint、测试、图标）与 IPC 生成规则见
@@ -218,7 +218,7 @@ ModernColoryrMinecraftLauncher/
 
 ## 更新日志
 
-当前版本：0.1.8（开发中）
+当前版本见 [`docs/version`](docs/version)。
 
 ## 未来计划
 - 实验性功能：跨版本迁移助手
