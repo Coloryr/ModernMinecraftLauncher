@@ -1134,6 +1134,7 @@ export default {
   "args.jvmExtra": "Extra JVM args",
   "args.gameExtra": "Extra game args",
   "args.classPath": "Extra classpath",
+  "args.placeholderHint": "Placeholders: %GAME_DIR% game folder, %GAME_BASE_DIR% instance root, %GAME_NAME%, %GAME_UUID%, %LAUNCH_DIR%, %JAVA_LOCAL%",
   "args.env": "Extra env vars",
   "args.isolateHome": "Isolate user directories",
   "args.isolateHomeDesc": "Point HOME, APPDATA and XDG to the instance folder",

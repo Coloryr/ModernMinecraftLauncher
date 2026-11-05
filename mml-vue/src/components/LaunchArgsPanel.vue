@@ -379,6 +379,7 @@ const gcOptions = computed(() => [
           <button class="line-add" @click="addLine('jvmArgs')">
             <GlyphIcon name="plus" :size="13" :weight="2.2" /> {{ t("args.addLine") }}
           </button>
+          <div class="field-hint">{{ t("args.placeholderHint") }}</div>
 
           <!-- 附加游戏参数 -->
           <label class="args-label">{{ t("args.gameExtra") }}</label>

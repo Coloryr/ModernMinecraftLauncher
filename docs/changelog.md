@@ -27,6 +27,9 @@
 
 ### 修复
 
+- 自定义 JVM 参数、游戏参数与附加 classpath 里的占位符（`%GAME_BASE_DIR%`、`%GAME_DIR%`、
+  `%JAVA_LOCAL%` 等）原来原样交给 JVM，`-javaagent:%GAME_BASE_DIR%/mml-server-sync.jar=...`
+  因为路径里带着 `%` 而找不到 agent 文件；现在与启动前 / 后命令走同一套替换。
 - 手柄读取统一改用 SDL3，并开启后台事件读取；移除「XInput 兼容模式」开关与自建双后端合并逻辑。
   摇杆方向、扳机按钮与现有映射保持兼容；旧的 `gamepad/reader.json` 不再使用，也不会出现在映射列表里。
   SDL3 静态打包，运行时无需另装运行库。用 SDL3 而不是 SDL2：SDL2 自带版本在 Windows 上优先走 WGI，

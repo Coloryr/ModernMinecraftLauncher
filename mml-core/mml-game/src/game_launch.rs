@@ -860,7 +860,7 @@ impl InstanceSettingObj {
         let java = java.unwrap();
         InstanceSettingObj::allow_security_manager(&mut obj, &java);
         InstanceSettingObj::fix_zgc_generational(&mut obj, &java);
-        let args = self.make_run_arg(&arg, &mut obj, false);
+        let args = self.make_run_arg(&java, &arg, &mut obj, false);
         let mut env = self.make_env_arg();
         self.add_launcher_env(&mut env, &java, &obj.jvm_args);
 
@@ -967,7 +967,7 @@ impl InstanceSettingObj {
         // 完整命令行 = JVM 参数 + 主类 + 游戏参数；`check` 为真时跳过仍缺失的库文件。
         // 这里原来只取了 make_game_arg 的**游戏参数**，java 会把第一个 `--width`
         // 当成 JVM 选项，直接报"Unrecognized option"起不来
-        let jvm_arg = self.make_run_arg(&arg, &mut obj, true);
+        let jvm_arg = self.make_run_arg(&jvm, &arg, &mut obj, true);
 
         crate::add_game_log_item(&self.uuid, GameLog::JavaPath(jvm.clone()));
 

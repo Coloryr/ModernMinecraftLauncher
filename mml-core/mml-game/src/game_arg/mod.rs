@@ -12,7 +12,7 @@ use std::{
 use mml_auth::{AuthType, LoginObj};
 use mml_base::{
     file_item::{FileHash, FileItemObj, LaterRun},
-    hash_helper, serialize_tools, tools,
+    hash_helper, serialize_tools,
 };
 use mml_config::config_obj::GCType;
 use mml_names::i18_items::error_type::{
@@ -188,6 +188,7 @@ impl InstanceSettingObj {
 
     /// 创建启动参数
     ///
+    /// - `jvm`: 实际使用的 Java 路径，自定义参数里的 `%JAVA_LOCAL%` 用它
     /// - `arg`: 启动配置，含账户与语言
     /// - `obj`: 已生成的启动内容
     /// - `check`: 是否校验运行库文件存在，缺失的将被跳过
@@ -197,6 +198,7 @@ impl InstanceSettingObj {
     /// 返回完整命令行参数，依次为Jvm参数、主类与游戏参数。
     pub fn make_run_arg(
         &self,
+        jvm: &Path,
         arg: &GameLaunchArg,
         obj: &mut GameLaunchObj,
         check: bool,
@@ -271,6 +273,12 @@ impl InstanceSettingObj {
             &Some(obj.assets.id.clone()),
         );
 
+        // 用户填的 JVM / 游戏参数里也能写 %GAME_BASE_DIR% 这类占位符，
+        // 到这里统一换成真实路径，否则原样交给 JVM
+        for item in obj.jvm_args.iter_mut().chain(obj.game_args.iter_mut()) {
+            *item = self.replace_custom_arg(jvm, item);
+        }
+
         args.extend(obj.jvm_args.clone());
         args.push(obj.main_class.clone());
         args.extend(obj.game_args.clone());
@@ -312,27 +320,6 @@ impl InstanceSettingObj {
             LoaderType::OptiFine => "com.coloryr.optifinewrapper.OptifineWrapper".to_string(),
             LoaderType::Custom => self.get_custom_loader_mainclass(),
         })
-    }
-
-    /// 替换参数中的占位符
-    ///
-    /// - `jvm`: 使用的JAVA路径
-    /// - `arg`: JVM参数列表，用于替换 `{java_args}` 类占位符
-    /// - `item`: 待替换的参数
-    ///
-    /// # 返回值
-    ///
-    /// 返回替换后的参数。
-    pub fn replace_arg(&self, jvm: &Path, arg: &Vec<String>, item: &str) -> String {
-        item.replace(names::ARG_GAME_NAME, &self.name)
-            .replace(names::ARG_GAME_UUID, &self.uuid.to_string())
-            .replace(names::ARG_GAME_DIR, &self.get_game_path().to_string_lossy())
-            .replace(
-                names::ARG_GAME_BASE_DIR,
-                &self.get_base_path().to_string_lossy(),
-            )
-            .replace(names::ARG_JAVA_LOCAL, &jvm.to_string_lossy())
-            .replace(names::ARG_JAVA_ARG, &tools::build_vec_string(arg))
     }
 
     /// 创建游戏完整启动内容

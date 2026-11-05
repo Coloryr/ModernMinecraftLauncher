@@ -118,6 +118,48 @@ fn user_properties_is_empty_object() {
     assert_eq!(args[1], "{}");
 }
 
+/// 自定义 JVM / 游戏参数里的占位符要换成真实路径
+///
+/// 典型写法是服务器同步 agent：`-javaagent:%GAME_BASE_DIR%/mml-server-sync.jar=...`。
+/// 原来这几个占位符只在启动前 / 后命令里替换，JVM 参数原样收到 `%GAME_BASE_DIR%`，
+/// JVM 报找不到 agent jar，游戏直接起不来。
+#[test]
+fn custom_arg_placeholders_replaced() {
+    let _guard = setup();
+    let instance = instance(RunArgObj::default());
+    let mut obj = GameLaunchObj {
+        jvm_args: vec!["-javaagent:%GAME_BASE_DIR%/mml-server-sync.jar=http://a".to_string()],
+        main_class: "Main".to_string(),
+        game_args: vec!["--gameDir=%GAME_DIR%".to_string()],
+        ..Default::default()
+    };
+    let launch_arg = GameLaunchArg {
+        auth: LoginObj::default(),
+        auto: AutoJoinType::None,
+        admin: false,
+        mixin: None,
+        skip_server_pack: false,
+    };
+
+    let args = instance.make_run_arg(Path::new("java-bin"), &launch_arg, &mut obj, false);
+    let base = instance.get_base_path().to_string_lossy().to_string();
+    let dir = instance.get_game_path().to_string_lossy().to_string();
+    assert!(
+        args.contains(&format!(
+            "-javaagent:{base}/mml-server-sync.jar=http://a"
+        )),
+        "JVM 参数里的占位符没换: {args:?}"
+    );
+    assert!(
+        args.contains(&format!("--gameDir={dir}")),
+        "游戏参数里的占位符没换: {args:?}"
+    );
+    assert!(
+        !args.iter().any(|arg| arg.contains('%')),
+        "命令行里还有没替换的占位符: {args:?}"
+    );
+}
+
 /// 隔离用户目录：HOME / APPDATA 指到实例目录，并补 `user.home`
 #[tokio::test]
 async fn isolate_home_paths() {
@@ -450,7 +492,7 @@ public static void main(String[] args) {
         mixin: None,
         skip_server_pack: false,
     };
-    let args = instance.make_run_arg(&launch_arg, &mut obj, false);
+    let args = instance.make_run_arg(&java, &launch_arg, &mut obj, false);
     assert!(
         args.contains(&"-Xms256m".to_string()),
         "命令行里应有内存参数"

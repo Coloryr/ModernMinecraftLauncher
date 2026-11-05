@@ -1135,6 +1135,7 @@ export default {
   "args.jvmExtra": "附加 JVM 参数",
   "args.gameExtra": "附加游戏参数",
   "args.classPath": "附加 classpath",
+  "args.placeholderHint": "可用占位符：%GAME_DIR% 游戏目录、%GAME_BASE_DIR% 实例根目录、%GAME_NAME%、%GAME_UUID%、%LAUNCH_DIR%、%JAVA_LOCAL%",
   "args.env": "附加环境变量",
   "args.isolateHome": "隔离用户目录",
   "args.isolateHomeDesc": "HOME、APPDATA、XDG 等指向实例目录",

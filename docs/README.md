@@ -184,7 +184,10 @@ MML 服务器包填到 `server.json`（只填发布目录，离开输入框时�
 - **其它**：实例图标、备注、游玩时长、MOTD；整合包实例有「检查更新」。
 
 启动前 / 后命令支持 `%JAVA_LOCAL%`、`%GAME_DIR%`、`%GAME_BASE_DIR%`（实例根目录）、
-`%GAME_NAME%`、`%JAVA_ARG%` 等占位符；启动前命令可以选择与游戏同时运行。
+`%GAME_NAME%`、`%GAME_UUID%`、`%LAUNCH_DIR%`、`%JAVA_ARG%` 等占位符；启动前命令可以选择与游戏同时运行。
+自定义 JVM 参数、游戏参数与附加 classpath 也认同一套占位符（`%JAVA_ARG%` 除外，
+它要展开成整条 JVM 参数），例如把服务器同步 agent 挂进实例：
+`-javaagent:%GAME_BASE_DIR%/mml-server-sync.jar=https://api.coloryr.com/server.json`。
 
 命令有两种写法：整行写成一条命令行（`python.exe "%GAME_BASE_DIR%\update\updater.py"`，
 按空白拆开、引号只用来分组），或者首行只写程序名、之后每行一个参数。程序只写名字时依次在
