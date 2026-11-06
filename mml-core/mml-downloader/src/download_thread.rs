@@ -154,6 +154,11 @@ impl DownloadThread {
                 // 此前每次唤醒只下载一个文件，多文件任务入队只唤醒一轮，剩余文件会卡住
                 while let Some(item) = crate::get_item() {
                     if is_stop_clone.load(Ordering::SeqCst) {
+                        // 线程正在退出：手里这一项也要记终态，否则任务永远等不到"全部记完"。
+                        // 退出多半来自停止下载或改并发数，按取消记账，不冒充失败
+                        item.item.set_state(DownloadItemState::Cancel);
+                        crate::update(index, &item.item);
+                        item.task.mark_cancelled();
                         break;
                     }
                     // 一拿到项目就上报一次，别等 `download` 里的 HTTP 响应头到达才报：

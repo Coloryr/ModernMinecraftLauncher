@@ -322,7 +322,9 @@ impl I18Lang for ZhCn {
             ErrorType::NamedPipeConnectFailed(data) => {
                 format!("连接命名管道失败：{}", data.error)
             }
-            ErrorType::InstanceVersionError => String::from("版本号错误"),
+            ErrorType::InstanceGameVersionMissing => String::from("未选择游戏版本"),
+            ErrorType::InstanceLoaderVersionMissing => String::from("未选择加载器版本"),
+            ErrorType::InstanceLoaderFileMissing => String::from("自定义加载器文件不存在"),
             ErrorType::Base64Error(data) => format!("BASE64处理失败：{}", data.error),
             ErrorType::StreamError(data) => format!("流处理异常：{}", data.error),
             ErrorType::MotdVarintTooBig => String::from("MOTD 里的 varint 超过长度上限"),

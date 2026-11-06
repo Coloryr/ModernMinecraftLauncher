@@ -57,60 +57,60 @@ const {
   <div v-if="packChanges && packChanges.removed.length" class="si-changes si-changes-list">
     <span v-for="path in packChanges.removed" :key="path" class="si-change del">- {{ baseName(path) }}</span>
   </div>
-  <VirtualList class="si-mod-table" :count="packs.length" :row-h="MOD_ROW_H" :row-gap="0">
-    <template #header>
-      <div class="si-mod-head">
-        <span>{{ t("serverInstance.colSync") }}</span>
-        <span>{{ t("serverInstance.colFile") }}</span>
-        <span>{{ t("serverInstance.colIdType") }}</span>
-        <span>{{ t("serverInstance.colProject") }}</span>
-        <span>{{ t("serverInstance.colFileId") }}</span>
-        <span>{{ t("serverInstance.colUrl") }}</span>
-        <span>{{ t("serverInstance.colSha1") }}</span>
-      </div>
-    </template>
-    <template #default="{ start, end }">
-      <p v-if="!packs.length" class="empty-tip">{{ t("serverInstance.noPacks") }}</p>
-      <div v-for="row in packs.slice(start, end)" :key="row.path" class="si-mod-row"
-        :class="{
-          'is-changed': changedPaths.has(row.path),
-          'is-added': addedPacks.has(row.path),
-          'is-modified': modifiedPacks.has(row.path),
-        }">
-        <span class="si-cell-check">
-          <input type="checkbox" class="si-box" :checked="pickedPacks.has(row.path)" :disabled="busy"
-            @change="pickedPacks = toggled(pickedPacks, row.path)" />
-        </span>
-        <span class="si-cell-name" :title="row.path">
-          <em v-if="addedPacks.has(row.path)" class="si-mark add">+</em>
-          <em v-else-if="modifiedPacks.has(row.path)" class="si-mark mod">·</em>
-          {{ baseName(row.path) }}
-        </span>
-        <select class="field-select si-cell-control si-id-type" :value="packIdTypeOf(row.path, row.customId)"
-          :disabled="busy" @change="setPackIdType(row.path, $event)">
-          <option value="online">{{ t("serverInstance.idType.online") }}</option>
-          <option value="custom">{{ t("serverInstance.idType.custom") }}</option>
-        </select>
-        <div class="si-cell-id">
-          <input class="field-input si-cell-control si-id-input" :value="packPidOf(row.path)"
-            :disabled="busy || (isPackCustomType(row.path, row.customId) && lockedProjectIds.has(row.path))"
-            :title="isPackCustomType(row.path, row.customId) && lockedProjectIds.has(row.path)
-              ? t('serverInstance.projectIdLocked') : undefined"
-            spellcheck="false" @input="setPackId(row.path, 'pid', $event)" />
-          <em v-if="isPackCustomType(row.path, row.customId)" class="si-id-custom">{{ t("serverInstance.customId") }}</em>
+  <div class="si-table-card">
+    <VirtualList class="si-mod-table" :count="packs.length" :row-h="MOD_ROW_H" :row-gap="0">
+      <template #header>
+        <div class="si-mod-head">
+          <span>{{ t("serverInstance.colSync") }}</span>
+          <span>{{ t("serverInstance.colFile") }}</span>
+          <span>{{ t("serverInstance.colIdType") }}</span>
+          <span>{{ t("serverInstance.colProject") }}</span>
+          <span>{{ t("serverInstance.colFileId") }}</span>
+          <span>{{ t("serverInstance.colUrl") }}</span>
+          <span>{{ t("serverInstance.colSha1") }}</span>
         </div>
-        <div class="si-cell-id">
-          <input class="field-input si-cell-control si-id-input" :value="packFidOf(row.path)"
-            :disabled="busy" spellcheck="false"
-            @input="setPackId(row.path, 'fid', $event)" />
-          <em v-if="isPackCustomType(row.path, row.customId)" class="si-id-custom">{{ t("serverInstance.customId") }}</em>
+      </template>
+      <template #default="{ start, end }">
+        <p v-if="!packs.length" class="empty-tip">{{ t("serverInstance.noPacks") }}</p>
+        <div v-for="row in packs.slice(start, end)" :key="row.path" class="si-mod-row"
+          :class="{
+            'is-changed': changedPaths.has(row.path),
+            'is-added': addedPacks.has(row.path),
+            'is-modified': modifiedPacks.has(row.path),
+          }">
+          <span class="si-cell-check">
+            <input type="checkbox" class="si-box" :checked="pickedPacks.has(row.path)" :disabled="busy"
+              @change="pickedPacks = toggled(pickedPacks, row.path)" />
+          </span>
+          <span class="si-cell-name" :title="row.path">
+            <em v-if="addedPacks.has(row.path)" class="si-mark add">+</em>
+            <em v-else-if="modifiedPacks.has(row.path)" class="si-mark mod">·</em>
+            {{ baseName(row.path) }}
+          </span>
+          <select class="field-select si-cell-control si-id-type" :value="packIdTypeOf(row.path, row.customId)"
+            :disabled="busy" @change="setPackIdType(row.path, $event)">
+            <option value="online">{{ t("serverInstance.idType.online") }}</option>
+            <option value="custom">{{ t("serverInstance.idType.custom") }}</option>
+          </select>
+          <div class="si-cell-id">
+            <input class="field-input si-cell-control si-id-input" :value="packPidOf(row.path)"
+              :disabled="busy || (isPackCustomType(row.path, row.customId) && lockedProjectIds.has(row.path))"
+              :title="isPackCustomType(row.path, row.customId) && lockedProjectIds.has(row.path)
+                ? t('serverInstance.projectIdLocked') : undefined"
+              spellcheck="false" @input="setPackId(row.path, 'pid', $event)" />
+          </div>
+          <div class="si-cell-id">
+            <input class="field-input si-cell-control si-id-input" :value="packFidOf(row.path)"
+              :disabled="busy" spellcheck="false"
+              @input="setPackId(row.path, 'fid', $event)" />
+          </div>
+          <input class="field-input si-cell-control" :value="packUrlOf(row.path)" :disabled="busy"
+            spellcheck="false" :placeholder="t('serverInstance.cellUrl')"
+            @input="setPackUrl(row.path, $event)" />
+          <span class="si-cell-hash" :title="row.sha1">{{ row.sha1 || "—" }}</span>
         </div>
-        <input class="field-input si-cell-control" :value="packUrlOf(row.path)" :disabled="busy"
-          spellcheck="false" :placeholder="t('serverInstance.cellUrl')"
-          @input="setPackUrl(row.path, $event)" />
-        <span class="si-cell-hash" :title="row.sha1">{{ row.sha1 || "—" }}</span>
-      </div>
-    </template>
-  </VirtualList>
+      </template>
+    </VirtualList>
+  </div>
 </section>
 </template>

@@ -63,7 +63,7 @@
 
 ### 环境要求
 
-- **通用**：Rust stable（edition 2024，需 1.85+）、Node.js 24、`cargo install tauri-cli --version "^2" --locked`。
+- **通用**：Rust stable（edition 2024，需 1.89+）、Node.js 24、`cargo install tauri-cli --version "^2" --locked`。
 - **Windows**：MSVC 工具链、Visual Studio 生成工具（勾选「使用 C++ 的桌面开发」）、WebView2 运行时。
 - **Linux**：WebKitGTK 4.1、GTK 3、libappindicator、librsvg、patchelf、libxdo，以及 D-Bus 与 libudev 开发包。
 - **macOS**：Xcode Command Line Tools。

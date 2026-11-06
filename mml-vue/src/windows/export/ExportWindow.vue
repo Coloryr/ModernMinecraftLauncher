@@ -1084,35 +1084,37 @@ onBeforeUnmount(() => {
                 <BaseButton size="sm" @click="pickAllMods(false)">{{ t("winExport.selectNone") }}</BaseButton>
               </div>
               <!-- 表格列跟着格式走：只有 Modrinth 的清单带下载地址，多一列它就够宽 -->
-              <div class="mod-table" :class="{ 'with-url': withUrls }">
-                <div class="mod-head">
-                  <span />
-                  <span>{{ t("winExport.modFile") }}</span>
-                  <span>{{ t("winExport.projectId") }}</span>
-                  <span>{{ t("winExport.fileId") }}</span>
-                  <span v-if="withUrls">{{ t("winExport.downloadUrl") }}</span>
-                </div>
-                <p v-if="!mods.length" class="empty-tip">{{ t("winExport.noOnlineMods") }}</p>
-                <div v-for="mod in mods" :key="mod.path" class="mod-line"
-                  :class="{ 'is-local': !isOnlineMod(mod.path) }">
-                  <input type="checkbox" :checked="pickedMods.has(mod.path)" :disabled="!isOnlineMod(mod.path)"
-                    :title="cfIdInvalid(mod.path) ? t('winExport.idNotNumeric') : undefined" @change="toggleMod(mod)" />
-                  <span class="mod-name-cell">
-                    <span class="mod-name" :title="mod.path">
-                      <HighlightText :text="mod.path.split('/').pop() ?? ''" :query="modKeyword" />
+              <div class="mod-table-card">
+                <div class="mod-table" :class="{ 'with-url': withUrls }">
+                  <div class="mod-head">
+                    <span />
+                    <span>{{ t("winExport.modFile") }}</span>
+                    <span>{{ t("winExport.projectId") }}</span>
+                    <span>{{ t("winExport.fileId") }}</span>
+                    <span v-if="withUrls">{{ t("winExport.downloadUrl") }}</span>
+                  </div>
+                  <p v-if="!mods.length" class="empty-tip">{{ t("winExport.noOnlineMods") }}</p>
+                  <div v-for="mod in mods" :key="mod.path" class="mod-line"
+                    :class="{ 'is-local': !isOnlineMod(mod.path) }">
+                    <input type="checkbox" :checked="pickedMods.has(mod.path)" :disabled="!isOnlineMod(mod.path)"
+                      :title="cfIdInvalid(mod.path) ? t('winExport.idNotNumeric') : undefined" @change="toggleMod(mod)" />
+                    <span class="mod-name-cell">
+                      <span class="mod-name" :title="mod.path">
+                        <HighlightText :text="mod.path.split('/').pop() ?? ''" :query="modKeyword" />
+                      </span>
+                      <!-- 编号不成立的在 CF 里点不动：就地标出来，别让人以为是漏掉了 -->
+                      <span v-if="cfIdInvalid(mod.path)" class="mod-tag" v-tip="t('winExport.idNotNumeric')">
+                        {{ t("winExport.notCfMod") }}
+                      </span>
                     </span>
-                    <!-- 编号不成立的在 CF 里点不动：就地标出来，别让人以为是漏掉了 -->
-                    <span v-if="cfIdInvalid(mod.path)" class="mod-tag" v-tip="t('winExport.idNotNumeric')">
-                      {{ t("winExport.notCfMod") }}
-                    </span>
-                  </span>
-                  <input class="field-input" spellcheck="false" :value="modIdOf(mod.path, 'modId')"
-                    @input="setModId(mod.path, 'modId', ($event.target as HTMLInputElement).value)" />
-                  <input class="field-input" spellcheck="false" :value="modIdOf(mod.path, 'fileId')"
-                    @input="setModId(mod.path, 'fileId', ($event.target as HTMLInputElement).value)" />
-                  <input v-if="withUrls" class="field-input" spellcheck="false" :value="urls.get(mod.path) ?? ''"
-                    :placeholder="t('winExport.urlPlaceholder')"
-                    @input="setUrl(mod.path, ($event.target as HTMLInputElement).value)" />
+                    <input class="field-input" spellcheck="false" :value="modIdOf(mod.path, 'modId')"
+                      @input="setModId(mod.path, 'modId', ($event.target as HTMLInputElement).value)" />
+                    <input class="field-input" spellcheck="false" :value="modIdOf(mod.path, 'fileId')"
+                      @input="setModId(mod.path, 'fileId', ($event.target as HTMLInputElement).value)" />
+                    <input v-if="withUrls" class="field-input" spellcheck="false" :value="urls.get(mod.path) ?? ''"
+                      :placeholder="t('winExport.urlPlaceholder')"
+                      @input="setUrl(mod.path, ($event.target as HTMLInputElement).value)" />
+                  </div>
                 </div>
               </div>
             </template>
@@ -1396,6 +1398,19 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
+/* 卡片负责边框与圆角并裁切，滚动交给里面的表格 —— 滚动条是方的，
+   不裁的话它会把右下圆角盖成直角 */
+.mod-table-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-solid, var(--bg-card));
+  overflow: hidden;
+}
+
 /* 模组表：表头吸顶、内容多时自己滚，别把窗口撑长。列宽走同一套 grid，表头与行才对得齐 */
 .mod-table {
   display: flex;
@@ -1403,9 +1418,6 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-solid, var(--bg-card));
 }
 
 .mod-head,

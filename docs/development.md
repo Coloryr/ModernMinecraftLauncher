@@ -54,7 +54,7 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
 
 ## 环境要求
 
-- **通用**：Rust stable（edition 2024，需 1.85+）、Node.js 24（Vite 8 要求 20.19+ / 22.12+，CI 用 24）、
+- **通用**：Rust stable（edition 2024，需 1.89+）、Node.js 24（Vite 8 要求 20.19+ / 22.12+，CI 用 24）、
   `cargo install tauri-cli --version "^2" --locked`（提供 `cargo tauri`）。
 - **Windows**：Rust 的 MSVC 工具链、Visual Studio 生成工具（勾选「使用 C++ 的桌面开发」）、
   WebView2 运行时（Windows 11 和较新的 Windows 10 已自带）。

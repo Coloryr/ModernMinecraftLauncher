@@ -353,7 +353,15 @@ impl I18Lang for EnUs {
             ErrorType::NamedPipeConnectFailed(data) => {
                 format!("Failed to connect the named pipe: {}", data.error)
             }
-            ErrorType::InstanceVersionError => String::from("Invalid version number"),
+            ErrorType::InstanceGameVersionMissing => {
+                String::from("No game version selected")
+            }
+            ErrorType::InstanceLoaderVersionMissing => {
+                String::from("No loader version selected")
+            }
+            ErrorType::InstanceLoaderFileMissing => {
+                String::from("Custom loader file not found")
+            }
             ErrorType::Base64Error(data) => format!("Base64 processing failed: {}", data.error),
             ErrorType::StreamError(data) => format!("Stream processing error: {}", data.error),
             ErrorType::MotdVarintTooBig => String::from("MOTD varint exceeds the length limit"),

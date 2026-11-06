@@ -216,6 +216,13 @@ pub fn run() {
             let handle = app.handle().clone();
             mml_downloader::set_gui_handel(Box::new(download::DownloadGuiHook::new(handle)));
             mml_downloader::start();
+            // 线程池只在启动时与改「下载并发数」时重建，把实际线程数写进日志，方便对账
+            mml_log::info(
+                log_text::LogText::DownloadThreadPool {
+                    count: mml_downloader::thread_count(),
+                }
+                .text(),
+            );
 
             // 方块渲染：内核 `load()` 里的启动自动补渲染经此回调上报界面
             block::set_gui_handel(app.handle());

@@ -519,13 +519,15 @@
 }
 
 /* 整张表共用**一块白底**（用户要求：不要一行一个白底）：白底 + 圆角 + 描边，
-   **自己不滚、也不带内边距** —— 左右内边距挪到了内容 `.mod-group-table` 身上，
-   上下呼吸位挪到滚动容器的 `padding-top`。这样滚动容器铺满卡片，
-   两条滚动条都**贴住白底的右边与下边**（否则会被 padding 顶开一段，用户报过两次）。 */
+   **自己不滚、也不带内边距**，滚动交给里面那层 `.mod-table-scroll`，
+   两条滚动条都贴住白底的右边与下边。
+   `overflow: hidden` 只为圆角：滚动容器与滚动条都是方的，不裁的话内容会把
+   白底的右下圆角盖成直角。 */
 .resource-layout .mod-table-panel {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 10px;
+  overflow: hidden;
   flex: 1;
   min-height: 0;
   min-width: 0;
@@ -542,17 +544,6 @@
   min-width: 0;
   overflow: auto;
   scrollbar-gutter: stable;
-}
-
-/* 滚动条别压住白底的圆角：给滑块的**行程**留出圆角半径那么一段，
-   滑块就永远够不到上/下（竖条）与左/右（横条）那两个圆角。
-   10px 与上面 `.mod-table-panel` 的 `border-radius: 10px` 同源，改了要一起改。 */
-.resource-layout .mod-table-scroll::-webkit-scrollbar-track:vertical {
-  margin-block: 10px;
-}
-
-.resource-layout .mod-table-scroll::-webkit-scrollbar-track:horizontal {
-  margin-inline: 10px;
 }
 
 /* 分组块：**不加内边距** —— 内容四边都贴着白底（用户口径：左、上、右都不留空）。

@@ -357,8 +357,12 @@ pub enum ErrorType {
     NamedPipeWaitFailed(ErrorData),
     /// 连接命名管道失败
     NamedPipeConnectFailed(ErrorData),
-    /// 版本号错误
-    InstanceVersionError,
+    /// 实例没有选游戏版本
+    InstanceGameVersionMissing,
+    /// 实例有加载器但没选加载器版本
+    InstanceLoaderVersionMissing,
+    /// 自定义加载器文件不存在
+    InstanceLoaderFileMissing,
     /// BASE64错误
     Base64Error(ErrorData),
     /// 流处理异常

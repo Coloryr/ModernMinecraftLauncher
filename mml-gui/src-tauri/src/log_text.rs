@@ -168,6 +168,11 @@ pub enum LogText {
         /// 登录客户端的代理类型
         login_proxy_type: String,
     },
+    /// 下载线程池就绪（启动时或改「下载并发数」后）：当前工作线程数
+    DownloadThreadPool {
+        /// 工作线程数
+        count: usize,
+    },
     /// 游戏启动用的 tokio 运行时建不起来
     LaunchRuntimeFailed {
         /// 失败原因，运行时构建报的错
@@ -793,6 +798,9 @@ impl LogText {
             LogText::MainWindowModelMissing => {
                 String::from("[main_get_running] 主窗口模型未初始化")
             }
+            LogText::DownloadThreadPool { count } => {
+                format!("[download] 下载线程池：{count} 个线程")
+            }
             LogText::NetworkSettingsSaved {
                 work_proxy,
                 work_proxy_type,
@@ -1138,6 +1146,9 @@ impl LogText {
             }
             LogText::MainWindowModelMissing => {
                 String::from("[main_get_running] main window model not initialized")
+            }
+            LogText::DownloadThreadPool { count } => {
+                format!("[download] download thread pool: {count} threads")
             }
             LogText::NetworkSettingsSaved {
                 work_proxy,

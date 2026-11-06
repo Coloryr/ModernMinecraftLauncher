@@ -15,9 +15,9 @@
     "mml-ipc": "file:.mml-deps/mml-ipc"
   },
   "devDependencies": {
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "@vitejs/plugin-vue": "^6.0.10",
-    "vite": "^8.3.5",
-    "vue": "^3.5.44"
+    "vite": "^8.3.6",
+    "vue": "^3.5.45"
   }
 }

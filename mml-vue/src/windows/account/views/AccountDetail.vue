@@ -56,55 +56,57 @@ function isCurrent(acc: AccountStoreDto): boolean {
 
 <template>
   <div class="acc-detail">
-    <div v-if="accounts.length > 0" class="table-wrap">
-      <table class="detail-table wide">
-        <thead>
-          <tr>
-            <th class="col-actions">{{ t("account.actions") }}</th>
-            <th>{{ t("account.name") }}</th>
-            <th>{{ t("account.uuid") }}</th>
-            <th>{{ t("account.type") }}</th>
-            <th>{{ t("account.lastLogin") }}</th>
-            <th>{{ t("account.tokenStatus") }}</th>
-            <th>{{ t("account.ext1") }}</th>
-            <th>{{ t("account.ext2") }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="acc in accounts" :key="acc.uuid" :class="{ current: isCurrent(acc) }"
-            @dblclick="!accountLocked && emit('switch', acc)"
-            @contextmenu.prevent="emit('menu', { event: $event, acc })">
-            <td class="col-actions">
-              <!-- 不可见的皮肤探测图：表格不展示皮肤，但「查看皮肤 / 刷新皮肤」要知道有没有皮肤。
-                 没有它就永远不会产生 skin 的失败标记，那俩按钮在没皮肤的账户上照样显示。
-                 1px + opacity 0：不占位、不可见，只为了让 @error / @load 能触发 -->
-              <img class="skin-probe" :src="accountSkinUrl(acc)" alt="" aria-hidden="true" data-no-fallback
-                @error="markImageFailed(acc, 'skin')" @load="markImageLoaded(acc, 'skin')" />
-              <AccountActions :locked="accountLocked && acc.uuid === currentUuid" :can-refresh="acc.canRefresh"
-                :can-relogin="acc.canRelogin" :can-edit="acc.canEdit" :has-skin="!hasNoSkin(acc)"
-                @refresh="emit('refresh', acc)" @view-skin="emit('viewSkin', acc)"
-                @refresh-skin="emit('refreshSkin', acc)" @relogin="emit('relogin', acc)" @edit="emit('edit', acc)"
-                @delete="emit('delete', acc)" />
-            </td>
-            <td class="cell-name">
-              <HighlightText :text="acc.userName" :query="query" />
-              <span v-if="isCurrent(acc)" class="current-tag">{{ t("account.current") }}</span>
-            </td>
-            <td class="mono">
-              <HighlightText :text="acc.uuid" :query="query" />
-            </td>
-            <td>
-              <AccountTypeBadge :auth-type="acc.authType" />
-            </td>
-            <td>{{ acc.loginTime }}</td>
-            <td>
-              <span class="token-tag" :class="acc.tokenStatus">{{ tokenLabel(acc) }}</span>
-            </td>
-            <td class="cell-ext" v-tip="acc.ext1 ?? ''">{{ acc.ext1 ?? "—" }}</td>
-            <td class="cell-ext" v-tip="acc.ext2 ?? ''">{{ acc.ext2 ?? "—" }}</td>
-          </tr>
-        </tbody>
-      </table>
+    <div v-if="accounts.length > 0" class="table-card">
+      <div class="table-wrap">
+        <table class="detail-table wide">
+          <thead>
+            <tr>
+              <th class="col-actions">{{ t("account.actions") }}</th>
+              <th>{{ t("account.name") }}</th>
+              <th>{{ t("account.uuid") }}</th>
+              <th>{{ t("account.type") }}</th>
+              <th>{{ t("account.lastLogin") }}</th>
+              <th>{{ t("account.tokenStatus") }}</th>
+              <th>{{ t("account.ext1") }}</th>
+              <th>{{ t("account.ext2") }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="acc in accounts" :key="acc.uuid" :class="{ current: isCurrent(acc) }"
+              @dblclick="!accountLocked && emit('switch', acc)"
+              @contextmenu.prevent="emit('menu', { event: $event, acc })">
+              <td class="col-actions">
+                <!-- 不可见的皮肤探测图：表格不展示皮肤，但「查看皮肤 / 刷新皮肤」要知道有没有皮肤。
+                   没有它就永远不会产生 skin 的失败标记，那俩按钮在没皮肤的账户上照样显示。
+                   1px + opacity 0：不占位、不可见，只为了让 @error / @load 能触发 -->
+                <img class="skin-probe" :src="accountSkinUrl(acc)" alt="" aria-hidden="true" data-no-fallback
+                  @error="markImageFailed(acc, 'skin')" @load="markImageLoaded(acc, 'skin')" />
+                <AccountActions :locked="accountLocked && acc.uuid === currentUuid" :can-refresh="acc.canRefresh"
+                  :can-relogin="acc.canRelogin" :can-edit="acc.canEdit" :has-skin="!hasNoSkin(acc)"
+                  @refresh="emit('refresh', acc)" @view-skin="emit('viewSkin', acc)"
+                  @refresh-skin="emit('refreshSkin', acc)" @relogin="emit('relogin', acc)" @edit="emit('edit', acc)"
+                  @delete="emit('delete', acc)" />
+              </td>
+              <td class="cell-name">
+                <HighlightText :text="acc.userName" :query="query" />
+                <span v-if="isCurrent(acc)" class="current-tag">{{ t("account.current") }}</span>
+              </td>
+              <td class="mono">
+                <HighlightText :text="acc.uuid" :query="query" />
+              </td>
+              <td>
+                <AccountTypeBadge :auth-type="acc.authType" />
+              </td>
+              <td>{{ acc.loginTime }}</td>
+              <td>
+                <span class="token-tag" :class="acc.tokenStatus">{{ tokenLabel(acc) }}</span>
+              </td>
+              <td class="cell-ext" v-tip="acc.ext1 ?? ''">{{ acc.ext1 ?? "—" }}</td>
+              <td class="cell-ext" v-tip="acc.ext2 ?? ''">{{ acc.ext2 ?? "—" }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
     <AccountEmpty v-else class="detail-empty" :title="filtering ? t('account.searchEmpty') : t('account.emptyTitle')"
       :hint="filtering ? undefined : t('account.emptyHint')" :show-add="!filtering" @add="emit('add')" />
@@ -121,6 +123,19 @@ function isCurrent(acc: AccountStoreDto): boolean {
   min-height: 0;
 }
 
+/* 卡片负责边框与圆角并裁切，滚动交给里面的表格 —— 滚动条是方的，
+   不裁的话它会把右下圆角盖成直角 */
+.table-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card);
+  overflow: hidden;
+}
+
 /* 表格在容器内滚动：上下滚动看行，左右滚动看列；列都是 nowrap，长内容不压缩 */
 .table-wrap {
   overflow: auto;
@@ -128,9 +143,6 @@ function isCurrent(acc: AccountStoreDto): boolean {
      横向滚动条基本常驻，纵向那条随账户数量出现 / 消失，预留它免得行整体左移 */
   scrollbar-gutter: stable;
   /* 见 styles/scrollbar.css */
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-card);
   flex: 1;
   min-height: 0;
 }

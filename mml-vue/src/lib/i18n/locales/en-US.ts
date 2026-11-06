@@ -2509,7 +2509,6 @@ export default {
   "serverInstance.tabDesc.packs": "MML: packs with an online source download from the platform, the rest are copied; HMCL copies everything",
   "serverInstance.tabDesc.configs": "All folders are added by default; change the delivery mode or remove any",
   "serverInstance.tabDesc.start": "Review and generate into the folder",
-  "serverInstance.customId": "Custom",
   "serverInstance.projectIdLocked": "A generated project ID cannot be edited",
   "serverInstance.guide": "Guide",
   "serverInstance.pickAll": "Select all",

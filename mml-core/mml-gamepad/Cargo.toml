@@ -11,7 +11,7 @@ sdl3.workspace = true
 # sdl3 wrapper 没有把 sdl3-sys 的 no-sdl-* feature 转发出来；这里直接依赖同一份
 # sdl3-sys，把用不到的子系统并进同一个 CMake 构建关掉，只保留手柄需要的
 # joystick / gamepad / hidapi。
-sdl3-sys = { version = "0.7.2", default-features = false, features = [
+sdl3-sys = { version = "0.7.3", default-features = false, features = [
     # Linux 上 SDL 的 CMake 默认要求 X11 / Wayland 开发包（即使 video 已经关掉）；
     # 这里只用 joystick，关掉这项检查，CI 与本地都不用另装 X11 / Wayland 头文件。
     "sdl-unix-console-build",

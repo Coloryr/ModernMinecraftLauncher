@@ -104,6 +104,14 @@ pub fn settings_save_network(dto: NetworkSettingDto) {
     drop(config);
     mml_config::save();
     mml_downloader::cancel_all();
+    // 「下载并发数」改了就按新值重建线程池：线程只在启动时建一次，不重建要重启才生效
+    mml_downloader::start();
+    mml_log::info(
+        LogText::DownloadThreadPool {
+            count: mml_downloader::thread_count(),
+        }
+        .text(),
+    );
     mml_net::rebuild();
 }
 

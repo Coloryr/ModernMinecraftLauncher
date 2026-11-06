@@ -886,7 +886,7 @@ impl InstanceSettingObj {
         gui: LaunchGui,
     ) -> CoreResult<LaunchCmd> {
         if self.version.is_empty() {
-            return Err(ErrorType::InstanceVersionError);
+            return Err(ErrorType::InstanceGameVersionMissing);
         }
 
         // 有加载器的实例必须填写加载器版本
@@ -896,12 +896,12 @@ impl InstanceSettingObj {
                 .as_deref()
                 .is_none_or(|data| data.is_empty())
             {
-                return Err(ErrorType::InstanceVersionError);
+                return Err(ErrorType::InstanceLoaderVersionMissing);
             }
         }
 
         if self.loader == LoaderType::Custom && !self.get_loader_file().exists() {
-            return Err(ErrorType::InstanceVersionError);
+            return Err(ErrorType::InstanceLoaderFileMissing);
         }
 
         if let Some(gui) = &gui {
@@ -974,7 +974,7 @@ impl InstanceSettingObj {
 
         // 检查版本号是否合理
         if self.version.is_empty() {
-            return Err(ErrorType::InstanceVersionError);
+            return Err(ErrorType::InstanceGameVersionMissing);
         }
 
         // 有加载器的实例必须填写加载器版本
@@ -984,12 +984,12 @@ impl InstanceSettingObj {
                 .as_deref()
                 .is_none_or(|data| data.is_empty())
             {
-                return Err(ErrorType::InstanceVersionError);
+                return Err(ErrorType::InstanceLoaderVersionMissing);
             }
         }
 
         if self.loader == LoaderType::Custom && !self.get_loader_file().exists() {
-            return Err(ErrorType::InstanceVersionError);
+            return Err(ErrorType::InstanceLoaderFileMissing);
         }
 
         // 登陆账户

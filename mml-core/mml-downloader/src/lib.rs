@@ -300,21 +300,52 @@ pub(crate) fn task_done(task: &DownloadTask) {
     remove_task(id);
 }
 
-/// 启动下载器
+/// 下载线程数配置非法时使用的默认值
+const DEFAULT_THREADS: u32 = 5;
+
+/// 按当前配置同步下载线程池
 ///
-/// 按配置中的下载线程数创建工作线程池，线程数非法时按 5 个处理。
-/// 应在下载前调用一次。
+/// 启动时调用一次；设置里改了「下载并发数」后再调一次即可立即生效。
+/// 缩容会停掉多余线程并等它们退出，调用前应先用 [`cancel_all`] 取消在途任务，
+/// 否则要等当前文件收尾。
 pub fn start() {
-    let config = mml_config::read_config();
-    let mut thread = config.http.download_thread;
-    if thread <= 0 {
-        thread = 5;
+    let want = match mml_config::read_config().http.download_thread {
+        0 => DEFAULT_THREADS,
+        n => n,
+    } as usize;
+
+    // 多余的线程先摘出来再停：`stop` 会 join，线程收尾时可能回调界面，
+    // 持着 THREADS 的写锁等它，界面线程再来读就成了互相等
+    let extra: Vec<DownloadThread> = {
+        let mut list = THREADS.write().unwrap();
+        let keep = list.len().min(want);
+        list.split_off(keep)
+    };
+    for mut thread in extra {
+        thread.stop();
     }
 
-    let mut list = THREADS.write().unwrap();
-    for index in 0..thread {
-        list.push(DownloadThread::new(index));
+    {
+        let mut list = THREADS.write().unwrap();
+        while list.len() < want {
+            let index = list.len() as u32;
+            list.push(DownloadThread::new(index));
+        }
     }
+
+    // 新线程建出来时没有排队中的任务可拿：补一次唤醒，扩建前后入队的都能被取走
+    for thread in THREADS.read().unwrap().iter() {
+        thread.run();
+    }
+}
+
+/// 当前工作线程数
+///
+/// # 返回值
+///
+/// 线程池里在用的下载线程数量
+pub fn thread_count() -> usize {
+    THREADS.read().unwrap().len()
 }
 
 /// 停止下载器

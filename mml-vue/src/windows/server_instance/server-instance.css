@@ -270,15 +270,24 @@
 }
 
 /* 两张表共用一套外观：模组表（VirtualList，行虚拟化）与配置目录表（本页自绘行）。
-   容器的框、表头吸顶、行高与内边距只写在这里，改一处两张表一起变 */
+   框与圆角放在外层卡片上：滚动条和滚动容器都是方的，不裁的话右下圆角会被盖成直角。
+   表头吸顶、行高与内边距仍写在这里，改一处两张表一起变。 */
+.si-table-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  overflow: hidden;
+}
+
 .si-mod-table,
 .si-table {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-card);
 }
 
 .si-mod-head,
@@ -468,18 +477,6 @@ select.si-cell-control {
   font-size: 11.5px;
 }
 
-.si-id-custom {
-  flex: none;
-  display: inline-block;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-family: inherit;
-  font-size: 10.5px;
-  font-style: normal;
-  line-height: 16px;
-}
 
 .si-cell-hash {
   font-family: "Cascadia Code", Consolas, monospace;
