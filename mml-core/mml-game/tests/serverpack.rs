@@ -387,6 +387,14 @@ fn save_then_move_to_old_round_trip() {
         mml_base::serialize_tools::json_from_file(&old_file).expect("读回旧清单");
     assert_eq!(read.online_list.len(), 1);
     assert_eq!(read.online_list[0].file, "mods/a.jar");
+
+    // 启动时点了「跳过更新」要把旧清单挪回来：这里补上，别让本地停在没有清单的状态
+    instance.restore_serverpack_from_old().expect("挪回旧清单");
+    assert!(pack_file.exists(), "挪回后应重新出现 server.json");
+    assert!(!old_file.exists(), "挪回后 server_old.json 不该留下");
+    let read: ServerPackObj =
+        mml_base::serialize_tools::json_from_file(&pack_file).expect("读回清单");
+    assert_eq!(read.online_list[0].file, "mods/a.jar");
 }
 
 /// 没有旧清单时 `move_serverpack_to_old` 是空操作

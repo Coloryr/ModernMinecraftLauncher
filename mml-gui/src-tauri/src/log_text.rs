@@ -314,6 +314,8 @@ pub enum LogText {
         /// 耗时，单位秒
         secs: f64,
     },
+    /// 日志窗口：用户选择跳过这次服务器包更新
+    LogServerPackSkipped,
     /// 日志窗口：检查游戏文件耗时
     LogCheckGameFileTime {
         /// 耗时，单位秒
@@ -860,6 +862,9 @@ impl LogText {
             LogText::LogJavaLocalRedirect => String::from("Java 切换回本地查找"),
             LogText::LogLoginTime { secs } => format!("登录用时：{secs:.2}s"),
             LogText::LogServerPackCheckTime { secs } => format!("服务器包检查用时：{secs:.2}s"),
+            LogText::LogServerPackSkipped => {
+                String::from("已跳过服务器包更新，本次直接启动")
+            }
             LogText::LogCheckGameFileTime { secs } => format!("检查游戏文件用时：{secs:.2}s"),
             LogText::LogDownloadFileTime { secs } => format!("文件下载用时：{secs:.2}s"),
             LogText::LogLaunchTime { secs } => format!("启动用时：{secs:.2}s"),
@@ -1212,6 +1217,9 @@ impl LogText {
             LogText::LogJavaRedirect => String::from("Java output has been redirected"),
             LogText::LogJavaLocalRedirect => String::from("Java fell back to a local lookup"),
             LogText::LogLoginTime { secs } => format!("login took {secs:.2}s"),
+            LogText::LogServerPackSkipped => {
+                String::from("server pack update skipped, launching with the current files")
+            }
             LogText::LogServerPackCheckTime { secs } => {
                 format!("server pack check took {secs:.2}s")
             }

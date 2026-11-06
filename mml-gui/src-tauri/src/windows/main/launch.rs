@@ -42,6 +42,12 @@ pub(crate) use launch_gate::import_guard;
 static LAUNCH_CANCEL: LazyLock<Mutex<HashMap<Uuid, CancellationToken>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+/// 服务器包同步自己的取消令牌：界面上点「跳过更新」时只置位这一份，启动继续
+///
+/// 生命周期与 [`LAUNCH_CANCEL`] 相同：启动线程收工就摘掉，整次启动被取消时两份一起置位。
+static SERVER_PACK_CANCEL: LazyLock<Mutex<HashMap<Uuid, CancellationToken>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
 /// 设置里的全局"自动进服"：实例没配自己的加入服务器时用它
 ///
 /// 对应 ColorMC 的 `ServerCustom.JoinServer`，实例级设置优先。
@@ -269,6 +275,14 @@ pub(crate) async fn launch_game(
     };
     // options.txt 里还没有语言时按启动器语言补一条
     ensure_game_lang(&inst);
+    // 整次启动的取消令牌与服务器包同步那份令牌要一起建：后者是前者的子令牌，
+    // 取消启动会自动带上它，而界面上点「跳过更新」只撤销它，同步停下、启动继续
+    let cancel = CancellationToken::new();
+    let pack_cancel = cancel.child_token();
+    SERVER_PACK_CANCEL
+        .lock()
+        .unwrap()
+        .insert(core.uuid, pack_cancel.clone());
     let mut arg = GameLaunchArg {
         auth,
         auto,
@@ -278,6 +292,8 @@ pub(crate) async fn launch_game(
         skip_server_pack: server_pack.as_deref() == Some("skip"),
         // 同步时这条清单里没勾的模组不下载，旧文件留着
         server_pack_skip,
+        // 只跳过这次服务器包同步的令牌；整次启动的取消走 LAUNCH_CANCEL
+        server_pack_cancel: Some(pack_cancel),
     };
 
     // 命令返回后这次启动还要跑完：实例快照与 app 都搬进后台线程，
@@ -288,7 +304,6 @@ pub(crate) async fn launch_game(
     // 进不了 `tauri::async_runtime::spawn`。线程名带上实例 uuid，排查时认得出来。
     let launch_uuid = core.uuid;
     // 取消令牌与线程一起登记：界面上点「取消启动」时，命令拿到的就是这一份
-    let cancel = CancellationToken::new();
     LAUNCH_CANCEL
         .lock()
         .unwrap()
@@ -310,6 +325,7 @@ pub(crate) async fn launch_game(
                         .text(),
                     );
                     LAUNCH_CANCEL.lock().unwrap().remove(&launch_uuid);
+                    SERVER_PACK_CANCEL.lock().unwrap().remove(&launch_uuid);
                     unlock_user(&launch_uuid);
                     return;
                 }
@@ -412,12 +428,14 @@ pub(crate) async fn launch_game(
                 }
             }
 
-            // 线程收工：成败都已定，把"启动中"与取消令牌摘掉（失败后要允许重试）
+            // 线程收工：成败都已定，把"启动中"与两个取消令牌摘掉（失败后要允许重试）
             LAUNCH_CANCEL.lock().unwrap().remove(&launch_uuid);
+            SERVER_PACK_CANCEL.lock().unwrap().remove(&launch_uuid);
         });
 
     if let Err(err) = spawned {
         LAUNCH_CANCEL.lock().unwrap().remove(&launch_uuid);
+        SERVER_PACK_CANCEL.lock().unwrap().remove(&launch_uuid);
         unlock_user(&launch_uuid);
         return Err(err.to_string());
     }
@@ -444,8 +462,38 @@ pub fn main_cancel_launch(uuid: String) -> Result<bool, String> {
     if is_running(&id) {
         return Ok(false);
     }
+    // 整次启动取消：服务器包同步那份是它的子令牌，会跟着一起停
     let token = LAUNCH_CANCEL.lock().unwrap().get(&id).cloned();
     match token {
+        Some(token) => {
+            token.cancel();
+            Ok(true)
+        }
+        None => Ok(false),
+    }
+}
+
+/// 跳过这次服务器包更新，继续启动
+///
+/// 只置位服务器包同步那份令牌：下载停下，已经落地的文件保持现状，启动照常进游戏。
+/// 下次启动还会按发布地址重新比对，把这次没同步完的补上。
+///
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// 已发出跳过返回 `true`；不在启动中或进程已经起来返回 `false`，uuid 非法返回 `Err`
+#[gui_macros::ipc_group("main")]
+#[gui_macros::command]
+pub fn main_skip_server_pack_update(uuid: String) -> Result<bool, String> {
+    let Ok(id) = Uuid::parse_str(&uuid) else {
+        return Err(err_keys::UUID.to_string());
+    };
+    // 进程已经起来就没什么可跳过的了
+    if is_running(&id) {
+        return Ok(false);
+    }
+    match SERVER_PACK_CANCEL.lock().unwrap().get(&id).cloned() {
         Some(token) => {
             token.cancel();
             Ok(true)

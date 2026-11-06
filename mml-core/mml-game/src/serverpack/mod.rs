@@ -52,6 +52,23 @@ impl InstanceSettingObj {
         path_helper::move_file(file, self.get_server_pack_old_file())
     }
 
+    /// 跳过同步时把旧清单挪回原位
+    ///
+    /// 同步开始前 `server.json` 已经被挪成 `.old`，中途取消时本地就没有清单了；
+    /// 挪回来界面上照样能读到模组与资源包信息，下次启动也会重新比对。
+    ///
+    /// # 返回值
+    ///
+    /// 移动成功返回 `Ok(())`；移动失败返回对应错误
+    pub fn restore_serverpack_from_old(&self) -> CoreResult<()> {
+        let file = self.get_server_pack_file();
+        let old = self.get_server_pack_old_file();
+        if file.exists() || !old.exists() {
+            return Ok(());
+        }
+        path_helper::move_file(old, file)
+    }
+
     /// 读取旧版服务器实例信息
     ///
     /// # 返回值

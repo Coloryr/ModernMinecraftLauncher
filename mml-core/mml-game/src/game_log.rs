@@ -149,6 +149,8 @@ pub enum GameLog {
     LoginTime(Duration),
     /// 服务器包检查用时
     ServerPackCheckTime(Duration),
+    /// 用户在这次启动里选了「跳过更新」：服务器包不同步，直接进游戏
+    ServerPackSkipped,
     /// 检查游戏文件用时
     CheckGameFileTime(Duration),
     /// 文件下载用时

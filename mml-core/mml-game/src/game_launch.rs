@@ -76,6 +76,8 @@ pub struct GameLaunchArg {
     pub skip_server_pack: bool,
     /// 这次同步里先不更新的文件，用户在选择弹窗里去掉的可选模组，取清单里的相对路径
     pub server_pack_skip: Vec<String>,
+    /// 服务器包同步自己的取消令牌：界面上点「跳过更新」时只取消它，启动继续
+    pub server_pack_cancel: Option<CancellationToken>,
 }
 
 /// 游戏实例处理完成后的参数
@@ -591,18 +593,22 @@ impl InstanceSettingObj {
     /// 检查服务器包更新
     ///
     /// - `gui`: 启动界面回调
-    /// - `cancel`: 取消令牌
+    /// - `cancel`: 整次启动的取消令牌
+    /// - `pack_cancel`: 服务器包同步自己的令牌，取消它只跳过这次同步，启动继续
     /// - `skip`: 这次先不更新的文件，取清单里的相对路径；空表示全部更新
     ///
     /// # 返回值
     ///
-    /// 成功返回 `Ok(())`；检查或更新失败返回对应错误
+    /// 成功返回 `Ok(())`；检查或更新失败返回对应错误。`pack_cancel` 被取消时按"跳过更新"处理
     async fn server_pack_update(
         &self,
         gui: LaunchGui,
         cancel: CancellationToken,
+        pack_cancel: Option<CancellationToken>,
         skip: &[String],
     ) -> CoreResult<()> {
+        // 界面上点「跳过更新」只停这一份；整次启动的令牌仍然能中止全部
+        let sync_cancel = pack_cancel.unwrap_or_else(|| cancel.clone());
         // 只有"在线网络整合包"才按服务器包同步：界面上只有这一类会填服务器实例网址，
         // 别的整合包带一个残留地址不该把启动卡在网络上
         if self.is_modpack
@@ -626,7 +632,7 @@ impl InstanceSettingObj {
                 url.push('/');
             }
 
-            if cancel.is_cancelled() {
+            if sync_cancel.is_cancelled() {
                 return Err(ErrorType::TaskCancel);
             }
 
@@ -651,8 +657,18 @@ impl InstanceSettingObj {
 
                 let obj = serialize_tools::json_from_bytes::<ServerPackObj>(&data)?;
                 self.move_serverpack_to_old()?;
-                self.upgrade_serverpack_with(obj, cancel.clone(), None, skip)
-                    .await?;
+                if let Err(err) = self
+                    .upgrade_serverpack_with(obj, sync_cancel, None, skip)
+                    .await
+                {
+                    // 只为这次启动选了「跳过更新」：把旧清单挪回去，接着启动，下次再比对
+                    if matches!(err, ErrorType::TaskCancel) && !cancel.is_cancelled() {
+                        crate::add_game_log_item(&self.uuid, GameLog::ServerPackSkipped);
+                        let _ = self.restore_serverpack_from_old();
+                        return Ok(());
+                    }
+                    return Err(err);
+                }
             }
 
             let time = start.elapsed();
@@ -985,8 +1001,13 @@ impl InstanceSettingObj {
 
         // 服务器包更新：用户在升级弹窗里选了「直接启动」时这次不比对清单
         if !arg.skip_server_pack {
-            self.server_pack_update(gui.clone(), cancel.clone(), &arg.server_pack_skip)
-                .await?;
+            self.server_pack_update(
+                gui.clone(),
+                cancel.clone(),
+                arg.server_pack_cancel.clone(),
+                &arg.server_pack_skip,
+            )
+            .await?;
         }
 
         if cancel.is_cancelled() {

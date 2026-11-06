@@ -255,6 +255,7 @@ export function createCommands(invoke: Invoke) {
       refreshVersions: () => invoke<VersionInfoDto[]>("main_refresh_versions"),
       removeGroup: (uuid: string) => invoke<boolean>("main_remove_group", { uuid }),
       renameInstance: (uuid: string, name: string) => invoke<boolean>("main_rename_instance", { uuid, name }),
+      skipServerPackUpdate: (uuid: string) => invoke<boolean>("main_skip_server_pack_update", { uuid }),
       stopGame: (uuid: string) => invoke<void>("main_stop_game", { uuid }),
       takeStartArg: () => invoke<StartArgDto | null>("main_take_start_arg"),
       updateInstance: (uuid: string, patch: InstancePatch) => invoke<boolean>("main_update_instance", { uuid, patch }),

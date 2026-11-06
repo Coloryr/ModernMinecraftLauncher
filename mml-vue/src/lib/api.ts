@@ -1086,6 +1086,21 @@ export const api = {
   },
 
   /**
+   * 跳过这次服务器包更新，继续启动
+   *
+   * 只停服务器包同步，已经落地的文件保持现状，启动照常进游戏；下次启动会重新比对补上。
+   *
+   * - `uuid`: 实例 uuid
+   *
+   * # 返回值
+   *
+   * 已发出跳过返回 `true`；不在启动中或进程已经起来返回 `false`
+   */
+  async skipServerPackUpdate(uuid: string): Promise<boolean> {
+    return commands.main.skipServerPackUpdate(uuid);
+  },
+
+  /**
    * 取消正在启动中的实例
    *
    * - `uuid`: 实例 uuid

@@ -247,6 +247,13 @@ pub(crate) fn log_line_from_item(item: &GameLogItemObj) -> LogLine {
             String::new(),
             String::new(),
         ),
+        GameLog::ServerPackSkipped => (
+            item_time(item),
+            LogText::LogServerPackSkipped.text(),
+            String::new(),
+            String::new(),
+            String::new(),
+        ),
         GameLog::CheckGameFileTime(d) => (
             item_time(item),
             LogText::LogCheckGameFileTime {

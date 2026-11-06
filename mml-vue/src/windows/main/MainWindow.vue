@@ -26,7 +26,8 @@ import { locale, t, tErr } from "../../lib/i18n";
 import { ISSUES_URL } from "../../lib/links";
 import { showToast } from "../../lib/toast";
 import { isArchivePath } from "../../lib/archiveFile";
-import { stateText } from "../../lib/launchState";
+import { isServerPackStage, stateText } from "../../lib/launchState";
+import { askLaunchCancel } from "../../lib/launchCancelAsk";
 import { useDownloadProgress } from "../../composables/useDownloadProgress";
 import { useRefreshKey } from "../../composables/useRefreshKey";
 import { KEYS, onStorageChange, readJson, writeJson } from "../../lib/storage";
@@ -1929,6 +1930,15 @@ const stopBusy = ref(false);
  */
 async function cancelLaunch(uuid: string) {
   try {
+    // 正在同步服务器包：先问跳过这次更新继续启动，还是结束这次启动
+    if (isServerPackStage(launchStage.value)) {
+      const answer = await askLaunchCancel(launchStage.value);
+      if (answer === "resume") return;
+      if (answer === "skip") {
+        await api.skipServerPackUpdate(uuid);
+        return;
+      }
+    }
     if (!(await api.cancelLaunch(uuid))) return;
     clearLaunching(uuid);
     if (selected.value?.uuid === uuid) {

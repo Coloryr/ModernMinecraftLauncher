@@ -24,6 +24,7 @@ export { default as CompJavaInstallBar } from "../components/JavaInstallBar.vue"
 export { default as CompJavaInstallPopup } from "../components/JavaInstallPopup.vue";
 export { default as CompJavaTitleIndicator } from "../components/JavaTitleIndicator.vue";
 export { default as CompLaunchArgsPanel } from "../components/LaunchArgsPanel.vue";
+export { default as CompLaunchCancelModal } from "../components/LaunchCancelModal.vue";
 export { default as CompLaunchCheckModal } from "../components/LaunchCheckModal.vue";
 export { default as CompLaunchCommandModal } from "../components/LaunchCommandModal.vue";
 export { default as CompLoaderQueryProgress } from "../components/LoaderQueryProgress.vue";

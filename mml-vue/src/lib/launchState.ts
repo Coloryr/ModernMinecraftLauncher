@@ -18,3 +18,18 @@ export function stateText(state: string): string {
   const msg = t(key);
   return msg === key ? state : msg;
 }
+
+/**
+ * 这个启动阶段是不是在同步服务器包
+ *
+ * 这两段里点「取消启动」才值得问一句：跳过更新继续启动，还是结束这次启动。
+ *
+ * - `state`: 后端给的阶段名
+ *
+ * # 返回值
+ *
+ * 检查 / 下载服务器包两个阶段返回 true
+ */
+export function isServerPackStage(state: string): boolean {
+  return state === "checkserverpack" || state === "downloadserverpack";
+}

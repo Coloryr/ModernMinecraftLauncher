@@ -29,7 +29,8 @@ import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
 import { copyText } from "../../lib/clipboard";
 import { api, onGameExit, onGameLog, onLaunchError, onLaunchState } from "../../lib/api";
-import { stateText } from "../../lib/launchState";
+import { isServerPackStage, stateText } from "../../lib/launchState";
+import { askLaunchCancel } from "../../lib/launchCancelAsk";
 import { useDownloadProgress } from "../../composables/useDownloadProgress";
 import { familyInstanceFromLabel, targetLogBottom, targetLogFile, targetUuid } from "../windowManager";
 import { crashTimeOf, latestCrash } from "../../lib/crash";
@@ -388,6 +389,15 @@ async function testLaunch() {
  */
 async function cancelLaunch() {
   try {
+    // 正在同步服务器包：先问跳过这次更新继续启动，还是结束这次启动
+    if (isServerPackStage(stageKey.value)) {
+      const answer = await askLaunchCancel(stageKey.value);
+      if (answer === "resume") return;
+      if (answer === "skip") {
+        await api.skipServerPackUpdate(lockedUuid.value);
+        return;
+      }
+    }
     if (!(await api.cancelLaunch(lockedUuid.value))) return;
     launching.value = false;
     stageKey.value = "";
