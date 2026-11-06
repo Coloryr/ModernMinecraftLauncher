@@ -10,6 +10,7 @@ import BaseButton from "./ui/BaseButton.vue";
 import BaseSwitch from "./ui/BaseSwitch.vue";
 import GlyphIcon from "./ui/GlyphIcon.vue";
 import ModPackUpdateModal from "./ModPackUpdateModal.vue";
+import { askServerPackMods } from "../lib/serverPackMods";
 import LoaderQueryProgress from "./LoaderQueryProgress.vue";
 import type { InstanceInfoDto, ModPackUpdateDto, VersionInfoDto } from "../lib/bindings";
 
@@ -133,13 +134,30 @@ watch(
 /**
  * 确认更新：把任务登记到后端，进度在标题栏 / 整合包任务里看
  *
+ * 在线服务器包还有可选模组要变时，先让玩家挑这次更新哪几个，没勾的保留本地现有版本。
+ *
  * - `fileId`: 要升到的那份文件编号，取检查结果里的 `newFileId`
  */
 async function applyModpackUpdate(fileId: string) {
   if (packBusy.value) return;
+  const result = packResult.value;
+  const mods = result?.mods ?? [];
   packBusy.value = true;
   try {
-    await modpackUpdate(props.instance.uuid, fileId);
+    // 服务器包里的可选模组先让玩家挑：没勾的这次不更新，本地保留现有版本。
+    // 两个弹窗都挂在 body 下，先收起确认窗，否则它压在选择窗上面
+    let skip: string[] = [];
+    if (mods.length) {
+      packResult.value = null;
+      const picked = await askServerPackMods(mods);
+      if (picked === null) {
+        // 取消选择就退回确认窗，用户不用重新点一次检查更新
+        packResult.value = result;
+        return;
+      }
+      skip = picked;
+    }
+    await modpackUpdate(props.instance.uuid, fileId, skip);
     packResult.value = null;
     showToast(t("detail.modpackUpdating"));
   } catch (e) {

@@ -90,7 +90,15 @@ export { default as WinResourcePartsModModTable } from "../windows/resource/part
 export { default as WinResourcePartsModModUpdateLogModal } from "../windows/resource/parts/mod/ModUpdateLogModal.vue";
 export { default as WinResourcePartsModModUpdateModal } from "../windows/resource/parts/mod/ModUpdateModal.vue";
 export { default as ServerInstanceWindow } from "../windows/server_instance/ServerInstanceWindow.vue";
+export { default as WinServerInstancePartsBaseFileTree } from "../windows/server_instance/parts/BaseFileTree.vue";
+export { default as WinServerInstancePartsBasePanel } from "../windows/server_instance/parts/BasePanel.vue";
+export { default as WinServerInstancePartsConfigsPanel } from "../windows/server_instance/parts/ConfigsPanel.vue";
+export { default as WinServerInstancePartsGeneralPanel } from "../windows/server_instance/parts/GeneralPanel.vue";
+export { default as WinServerInstancePartsModsPanel } from "../windows/server_instance/parts/ModsPanel.vue";
+export { default as WinServerInstancePartsPacksPanel } from "../windows/server_instance/parts/PacksPanel.vue";
+export { default as WinServerInstancePartsStartPanel } from "../windows/server_instance/parts/StartPanel.vue";
 export { default as SettingsWindow } from "../windows/settings/SettingsWindow.vue";
+export { default as WinSettingsPartsAxisRangeBar } from "../windows/settings/parts/AxisRangeBar.vue";
 export { default as WinSettingsPartsGamepadActionPicker } from "../windows/settings/parts/GamepadActionPicker.vue";
 export { default as WinSettingsPartsGamepadDiagram } from "../windows/settings/parts/GamepadDiagram.vue";
 export { default as WinSettingsPartsGamepadKeyPicker } from "../windows/settings/parts/GamepadKeyPicker.vue";

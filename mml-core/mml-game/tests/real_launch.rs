@@ -262,6 +262,7 @@ fn make_launch_arg() -> GameLaunchArg {
         admin: false,
         mixin: None,
         skip_server_pack: false,
+        server_pack_skip: Vec::new(),
     }
 }
 

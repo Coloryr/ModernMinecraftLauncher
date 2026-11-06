@@ -320,6 +320,7 @@ pub async fn launch(version: &str, loader: LoaderType, loader_version: &str) -> 
         admin: false,
         mixin: None,
         skip_server_pack: false,
+        server_pack_skip: Vec::new(),
     };
     let check_started = Instant::now();
     let check = match instance

@@ -473,6 +473,8 @@ impl HMCLServerObj {
             online_list,
             archive_list: Vec::new(),
             base: None,
+            // 跳过记录是客户端自己的，别处转出来的清单里没有
+            skipped: Vec::new(),
         }
     }
 }

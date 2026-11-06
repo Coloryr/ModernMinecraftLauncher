@@ -9,7 +9,7 @@ use crate::{
 };
 
 /// 服务器实例
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 #[serde(default)]
 pub struct ServerPackObj {
     /// 实例名
@@ -55,13 +55,37 @@ pub struct ServerPackObj {
     /// 基础文件包：解压到实例根目录，导入时下载一次，后续版本不再下载
     #[serde(rename = "Base", skip_serializing_if = "Option::is_none")]
     pub base: Option<ServerBaseObj>,
+    /// 玩家这次没勾选、先不更新的文件
+    ///
+    /// 只写本地清单，发布端生成的清单里没有这一项；发布方下次换了内容后记录失效，
+    /// 确认窗会重新询问。
+    #[serde(rename = "Skipped", default, skip_serializing_if = "Vec::is_empty")]
+    pub skipped: Vec<ServerSkippedObj>,
+}
+
+/// 玩家跳过的一个更新
+///
+/// 记的是新清单里的路径与内容，加上本地实际留下的那个文件：
+/// 下次发布方换了内容，这条就失效；重新勾上时按 `kept` 把旧文件清掉。
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[serde(default)]
+pub struct ServerSkippedObj {
+    /// 新清单里的相对路径，如 `mods/foo.jar`
+    #[serde(rename = "File")]
+    pub file: String,
+    /// 新清单里那份内容的 SHA1；清单没给校验值时为空
+    #[serde(rename = "Sha1")]
+    pub sha1: String,
+    /// 本地留下来的旧文件，相对游戏目录；当时没有旧文件时为空
+    #[serde(rename = "Kept", skip_serializing_if = "String::is_empty")]
+    pub kept: String,
 }
 
 /// 基础文件压缩包
 ///
 /// 内容按实例根目录的相对路径打包，解压目标就是 .minecraft 所在目录；
 /// 只在实例第一次同步时下发，后续版本更新不再拉取。
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 #[serde(default)]
 pub struct ServerBaseObj {
     /// 压缩包文件名，如 base.zip
@@ -79,7 +103,7 @@ pub struct ServerBaseObj {
 }
 
 /// 服务器包里的配置文件压缩包条目
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 #[serde(default)]
 pub struct ServerArchiveItemObj {
     /// 文件名
@@ -103,7 +127,7 @@ pub struct ServerArchiveItemObj {
 }
 
 /// 服务器包里的模组文件条目
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 #[serde(default)]
 pub struct ServerItemObj {
     /// 游戏目录下的相对路径，如 `mods/foo.jar`、`config/bar.toml`

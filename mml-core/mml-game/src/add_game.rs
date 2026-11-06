@@ -1093,7 +1093,7 @@ async fn hmcl_server_archive<P: AsRef<Path>>(
         };
         let snapshot = game.read().unwrap().clone();
         if let Err(err) = snapshot
-            .upgrade_serverpack_with(pack, cancel.clone(), Some(&report))
+            .upgrade_serverpack_with(pack, cancel.clone(), Some(&report), &[])
             .await
         {
             // 半成品实例留着只会让人以为导入成功；与在线实例导入同一处理
@@ -1800,7 +1800,7 @@ pub async fn install_server_pack_from_url(
         }
     };
     if let Err(e) = snapshot
-        .upgrade_serverpack_with(pack, cancel, Some(&report))
+        .upgrade_serverpack_with(pack, cancel, Some(&report), &[])
         .await
     {
         // 半成品实例留着只会让人以为导入成功，删掉重来更干净
@@ -1827,6 +1827,7 @@ pub async fn install_server_pack_from_url(
 /// - `game`: 目标实例的设置快照
 /// - `gui`: 安装进度回调，`None` 表示不显示进度
 /// - `cancel`: 取消令牌
+/// - `skip`: 这次先不更新的文件，取新清单里的相对路径；空表示全部更新
 ///
 /// # 返回值
 ///
@@ -1835,6 +1836,7 @@ pub async fn upgrade_server_pack(
     game: &InstanceSettingObj,
     gui: AddModPackGui,
     cancel: CancellationToken,
+    skip: &[String],
 ) -> CoreResult<()> {
     let url = game
         .server_url
@@ -1862,7 +1864,7 @@ pub async fn upgrade_server_pack(
     };
     // 旧清单先挪成 `.old`：升级时按新旧两份清单算该删什么，与启动时那条链路一致
     game.move_serverpack_to_old()?;
-    game.upgrade_serverpack_with(pack, cancel, Some(&report))
+    game.upgrade_serverpack_with(pack, cancel, Some(&report), skip)
         .await?;
 
     // 图标会随清单换，按新清单再取一次；下不下来都不影响实例可用

@@ -1060,6 +1060,7 @@ export const api = {
    * - `force`: 账户被其它实例占用时是否跳过检查
    * - `autoSave`: 实例配的自动进入存档这次用不用；`false` = 用户选了不进入
    * - `serverPack`: 在线服务器包怎么处理；`skip` = 这次不比对清单直接启动
+   * - `serverPackSkip`: 同步时先不更新的文件，取清单里的相对路径
    * - `runCommands`: 启动前 / 后命令这次执不执行；`false` = 用户选了跳过
    *
    * 启动用户名由后端从当前账户解析
@@ -1070,6 +1071,7 @@ export const api = {
     force?: boolean,
     autoSave?: boolean,
     serverPack?: "update" | "skip",
+    serverPackSkip?: string[],
     runCommands?: boolean,
   ): Promise<void> {
     return commands.main.launchGame(
@@ -1078,6 +1080,7 @@ export const api = {
       force ?? null,
       autoSave ?? null,
       serverPack ?? null,
+      serverPackSkip ?? null,
       runCommands ?? null,
     );
   },
@@ -2485,14 +2488,19 @@ export function modpackCheck(uuid: string): Promise<ModPackUpdateDto> {
  *
  * - `uuid`: 实例 uuid
  * - `fileId`: 要升到的那份文件编号，取检查结果里的 `newFileId`
+ * - `skip`: 在线服务器包里这次先不更新的文件，取清单里的相对路径
  *
  * # 返回值
  *
  * 任务登记成功就返回，升级在后台跑：进度走 `add-modpack-status` 事件
  * （与「下载整合包」窗口同一套指示器与取消入口），跑完主窗口会刷新并选中这个实例
  */
-export function modpackUpdate(uuid: string, fileId: string): Promise<void> {
-  return commands.resource.modpackUpdate(uuid, fileId);
+export function modpackUpdate(
+  uuid: string,
+  fileId: string,
+  skip: string[] = [],
+): Promise<void> {
+  return commands.resource.modpackUpdate(uuid, fileId, skip);
 }
 
 /**
@@ -2804,6 +2812,7 @@ export function enableResourcepack(uuid: string, file: string): Promise<void> {
  * - `uuid`: 实例 uuid
  * - `world`: 存档目录名；不传按实例自己的自启配置来
  * - `serverPack`: 在线服务器包怎么处理；`skip` = 这次不比对清单直接启动
+ * - `serverPackSkip`: 同步时先不更新的文件，取清单里的相对路径
  * - `runCommands`: 启动前 / 后命令这次执不执行；`false` = 用户选了跳过
  */
 export function launchGame(
@@ -2812,6 +2821,7 @@ export function launchGame(
   force?: boolean,
   autoSave?: boolean,
   serverPack?: "update" | "skip",
+  serverPackSkip?: string[],
   runCommands?: boolean,
 ): Promise<void> {
   return commands.main.launchGame(
@@ -2820,6 +2830,7 @@ export function launchGame(
     force ?? null,
     autoSave ?? null,
     serverPack ?? null,
+    serverPackSkip ?? null,
     runCommands ?? null,
   );
 }

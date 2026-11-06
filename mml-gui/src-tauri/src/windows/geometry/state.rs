@@ -159,6 +159,11 @@ pub(crate) fn save_window_state(
     window: &WebviewWindow,
     maximized: bool,
 ) -> Result<(), String> {
+    // 最小化时系统报的是 0×0 与占位坐标，照常存只会把上次的几何覆盖成最小尺寸；
+    // 此时窗口没有"用户摆出来的"几何，保留上一次的即可
+    if window.is_minimized().unwrap_or(false) {
+        return Ok(());
+    }
     let pos = window.outer_position().map_err(|err| err.to_string())?;
     let size = window.inner_size().map_err(|err| err.to_string())?;
 

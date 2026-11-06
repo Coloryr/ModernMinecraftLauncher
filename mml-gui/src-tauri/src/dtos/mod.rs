@@ -97,7 +97,7 @@ pub use resource_dto::{
     ModUpdateCheckDto, ModUpdateDoneDto, ModUpdateDto, ModUpdateProgressDto, ModUpdateProjectDto,
     ModUpdateRecordDto, PackItemDto, ResourceDropDto, ResourceViewDto, SaveBackupDto, SaveEditDto,
     SaveItemDto, SchematicBlockDto, SchematicDetailDto, SchematicItemDto, ScreenshotItemDto,
-    ServerItemDto, ShaderItemDto,
+    ServerItemDto, ServerPackModDto, ShaderItemDto,
 };
 pub use server_instance_dto::{
     ServerInstanceChangesDto, ServerInstanceConfigDto, ServerInstanceIdDto,

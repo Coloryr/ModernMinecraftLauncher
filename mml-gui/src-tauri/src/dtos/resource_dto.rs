@@ -641,6 +641,25 @@ pub struct ModPackUpdateDto {
     pub removed_files: u32,
     /// 本次内容有变化的文件数，含配置压缩包；同上
     pub changed_files: u32,
+    /// 这次会变的可选模组，确认窗里给玩家勾选要更新哪几个；平台整合包恒为空
+    pub mods: Vec<ServerPackModDto>,
+}
+
+/// 服务器包更新里会变的一个可选模组
+///
+/// 只列可选模组：必装模组必须跟着清单走，没有可选项；玩家没勾的这次不下载，
+/// 本地旧文件原样留着。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerPackModDto {
+    /// 新清单里的相对路径，如 `mods/foo.jar`；勾选结果按它回传
+    pub path: String,
+    /// 文件名，确认窗里显示用
+    pub name: String,
+    /// 清单里新加的条目；旧清单里已经有它、只是换了版本时为 false
+    pub added: bool,
+    /// 本地那份当前是否处于启用状态；本地还没有时为 false
+    pub enabled: bool,
 }
 
 /// 自动标记的进度，即事件 `resource-mods-auto-mark-progress` 的负载

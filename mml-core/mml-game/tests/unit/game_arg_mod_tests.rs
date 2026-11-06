@@ -140,6 +140,7 @@ fn custom_arg_placeholders_replaced() {
         admin: false,
         mixin: None,
         skip_server_pack: false,
+        server_pack_skip: Vec::new(),
     };
 
     let args = instance.make_run_arg(Path::new("java-bin"), &launch_arg, &mut obj, false);
@@ -210,6 +211,7 @@ fn extra_args_logged() {
         admin: false,
         mixin: None,
         skip_server_pack: false,
+        server_pack_skip: Vec::new(),
     };
     let mut launch = GameLaunchObj {
         main_class: "Main".to_string(),
@@ -611,6 +613,7 @@ public static void main(String[] args) {
         admin: false,
         mixin: None,
         skip_server_pack: false,
+        server_pack_skip: Vec::new(),
     };
     let args = instance.make_run_arg(&java, &launch_arg, &mut obj, false);
     assert!(

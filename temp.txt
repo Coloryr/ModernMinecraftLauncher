@@ -1,1 +1,4 @@
 $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
+powershell.exe -ExecutionPolicy Bypass -File .\build\build-prerelease.ps1
+powershell.exe -ExecutionPolicy Bypass -File .\build\init.ps1
+cargo install tauri-cli --version "^2" --locked

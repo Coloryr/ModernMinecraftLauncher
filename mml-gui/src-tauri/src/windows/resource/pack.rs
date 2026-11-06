@@ -10,6 +10,7 @@
 //! 因此取项目下发布时间最晚的那份文件，新版要求的游戏版本与加载器由内核升级时写回实例。
 
 use std::collections::HashMap;
+use std::path::Path;
 
 use mml_base::serialize_tools;
 use mml_game::GameInstance;
@@ -22,7 +23,7 @@ use mml_net::modrinth_api;
 use tauri::AppHandle;
 use tokio_util::sync::CancellationToken;
 
-use crate::dtos::ModPackUpdateDto;
+use crate::dtos::{ModPackUpdateDto, ServerPackModDto};
 use crate::err_keys;
 use crate::windows::add_resource::SourceInfo;
 use crate::windows::modpack_task::{RegisteredTask, finish_task, register_task};
@@ -78,6 +79,8 @@ pub async fn resource_modpack_check(uuid: String) -> Result<ModPackUpdateDto, St
         added_files: 0,
         removed_files: 0,
         changed_files: 0,
+        // 可选模组只对服务器包有意义，平台整合包整包替换
+        mods: Vec::new(),
     })
 }
 
@@ -89,6 +92,7 @@ pub async fn resource_modpack_check(uuid: String) -> Result<ModPackUpdateDto, St
 /// - `app`: 应用句柄，登记任务与广播事件用
 /// - `uuid`: 实例 uuid
 /// - `file_id`: 要升到的那份文件编号，取检查结果里的 `new_file_id`
+/// - `skip`: 在线服务器包里这次先不更新的文件，取清单里的相对路径；平台整合包忽略
 ///
 /// # 返回值
 ///
@@ -100,13 +104,14 @@ pub async fn resource_modpack_update(
     app: AppHandle,
     uuid: String,
     file_id: String,
+    skip: Option<Vec<String>>,
 ) -> Result<(), String> {
     // 读的过程中删实例会被拦住，见 resource::instance_busy
     let _op = super::model::begin_if_open(&uuid);
     let instance = parse_instance(&uuid)?;
     let snapshot = instance.read().unwrap().clone();
     if snapshot.modpack_type == ModPackType::ServerPack {
-        return update_server_pack(app, uuid, snapshot);
+        return update_server_pack(app, uuid, snapshot, skip.unwrap_or_default());
     }
     let id = modpack_of(&instance)?;
     let (name, instance_uuid) = {
@@ -190,6 +195,9 @@ async fn check_server_pack(game: &InstanceSettingObj) -> Result<ModPackUpdateDto
         None => PackDiff::default(),
     };
 
+    // 可选模组清单要在把 local / remote 的字段搬进 DTO 之前算好
+    let mods = changed_optional_mods(local.as_ref(), &remote, &game.get_game_path());
+
     Ok(ModPackUpdateDto {
         has_update,
         source: "serverpack".to_string(),
@@ -203,6 +211,7 @@ async fn check_server_pack(game: &InstanceSettingObj) -> Result<ModPackUpdateDto
         added_files: plan.added,
         removed_files: plan.removed,
         changed_files: plan.changed,
+        mods,
     })
 }
 
@@ -274,6 +283,114 @@ fn pack_diff(old: &ServerPackObj, new: &ServerPackObj) -> PackDiff {
     diff
 }
 
+/// 这次会变的可选模组
+///
+/// 只收清单里标了可选的条目：必装模组没有可选项，必须跟着清单走。玩家上次跳过的条目
+/// 只要发布方没换内容就不再列出来，免得每次查更新都问一遍同一件事。
+///
+/// - `old`: 本地清单，没有时传 `None`
+/// - `new`: 发布地址上的清单
+/// - `game_path`: 游戏目录，用来判断本地那份是不是启用着
+///
+/// # 返回值
+///
+/// 见 [`ServerPackModDto`]，顺序与清单一致
+fn changed_optional_mods(
+    old: Option<&ServerPackObj>,
+    new: &ServerPackObj,
+    game_path: &Path,
+) -> Vec<ServerPackModDto> {
+    let mut out = Vec::new();
+    for item in new.online_list.iter().filter(|item| item.optional) {
+        let unchanged = old.is_some_and(|old| {
+            old.online_list
+                .iter()
+                .find(|row| mod_key(row) == mod_key(item))
+                .is_some_and(|row| same_content(row, item))
+        });
+        if unchanged || old.is_some_and(|old| skipped_before(old, item)) {
+            continue;
+        }
+        // 换文件名时本地那份还在旧路径下，按身份找它现在叫什么
+        let previous = old.and_then(|old| old.online_list.iter().find(|row| mod_key(row) == mod_key(item)));
+        let local = previous.map_or(item.file.as_str(), |row| row.file.as_str());
+        let enabled = local_enabled(game_path, local);
+        out.push(ServerPackModDto {
+            path: item.file.clone(),
+            name: item
+                .file
+                .rsplit('/')
+                .next()
+                .unwrap_or(item.file.as_str())
+                .to_string(),
+            // 旧清单里没有这条才是"新加进来的"，换了文件名不算
+            added: previous.is_none(),
+            enabled,
+        });
+    }
+    out
+}
+
+/// 模组身份：优先项目编号，没有时退回路径
+///
+/// - `item`: 清单条目
+///
+/// # 返回值
+///
+/// 同一模组换了文件名时仍然相同
+fn mod_key(item: &ServerItemObj) -> String {
+    item.pid.clone().unwrap_or_else(|| item.file.clone())
+}
+
+/// 两条清单条目的内容是否一致：先比 SHA1，没有就比 SHA256
+///
+/// - `left`: 一条清单条目
+/// - `right`: 另一条清单条目
+///
+/// # 返回值
+///
+/// 两边都有校验值且相同返回 `true`；都缺校验值时按内容不同处理
+fn same_content(left: &ServerItemObj, right: &ServerItemObj) -> bool {
+    for (a, b) in [
+        (left.sha1.as_deref(), right.sha1.as_deref()),
+        (left.sha256.as_deref(), right.sha256.as_deref()),
+    ] {
+        if let (Some(a), Some(b)) = (a, b) {
+            return a.trim().eq_ignore_ascii_case(b.trim());
+        }
+    }
+    false
+}
+
+/// 玩家之前跳过的是不是同一条内容
+///
+/// - `old`: 本地清单
+/// - `item`: 新清单条目
+///
+/// # 返回值
+///
+/// 路径与 SHA1 都对得上时返回 `true`
+fn skipped_before(old: &ServerPackObj, item: &ServerItemObj) -> bool {
+    let sha1 = item.sha1.as_deref().unwrap_or_default().trim();
+    old.skipped
+        .iter()
+        .any(|marker| marker.file == item.file && marker.sha1.trim().eq_ignore_ascii_case(sha1))
+}
+
+/// 本地这份是不是启用着
+///
+/// 禁用后会追加后缀，只看原始路径会把停用的模组当成没装。
+///
+/// - `game_path`: 游戏目录
+/// - `rel`: 清单里的相对路径
+///
+/// # 返回值
+///
+/// 原始路径上就是启用着的返回 `true`；只有禁用后缀的那份、或本地没有时为 `false`
+fn local_enabled(game_path: &Path, rel: &str) -> bool {
+    game_path.join(rel).is_file()
+}
+
 /// 两份服务器包清单内容是否一致
 ///
 /// 按序列化后的 JSON 比：同一类型的字段顺序固定，等价于逐字段比较，
@@ -286,9 +403,14 @@ fn pack_diff(old: &ServerPackObj, new: &ServerPackObj) -> PackDiff {
 ///
 /// 内容一致返回 `true`；序列化失败按不一致处理
 fn same_pack(left: &ServerPackObj, right: &ServerPackObj) -> bool {
+    // 跳过记录只写本地清单，比内容时两边都清掉，否则跳过一次就永远显示有新版
+    let mut left = left.clone();
+    left.skipped.clear();
+    let mut right = right.clone();
+    right.skipped.clear();
     match (
-        serialize_tools::json_to_string(left),
-        serialize_tools::json_to_string(right),
+        serialize_tools::json_to_string(&left),
+        serialize_tools::json_to_string(&right),
     ) {
         (Ok(left), Ok(right)) => left == right,
         _ => false,
@@ -303,6 +425,7 @@ fn same_pack(left: &ServerPackObj, right: &ServerPackObj) -> bool {
 /// - `app`: 应用句柄
 /// - `uuid`: 实例 uuid
 /// - `game`: 实例设置快照
+/// - `skip`: 这次先不更新的文件，取清单里的相对路径
 ///
 /// # 返回值
 ///
@@ -311,6 +434,7 @@ fn update_server_pack(
     app: AppHandle,
     uuid: String,
     game: InstanceSettingObj,
+    skip: Vec<String>,
 ) -> Result<(), String> {
     let url = game.server_url.clone().unwrap_or_default();
     let key = SourceInfo {
@@ -343,6 +467,7 @@ fn update_server_pack(
                 &game,
                 pack_gui,
                 update_token,
+                &skip,
             ))
             .map_err(|err| err.to_string())
         })

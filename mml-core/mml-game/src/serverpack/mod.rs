@@ -26,7 +26,7 @@ use crate::{
         ModPackType, file_online_info_obj::OnlineInfoObj, instance_setting_obj::InstanceSettingObj,
     },
     serverpack::serverpack_obj::{
-        ServerArchiveItemObj, ServerBaseObj, ServerItemObj, ServerPackObj,
+        ServerArchiveItemObj, ServerBaseObj, ServerItemObj, ServerPackObj, ServerSkippedObj,
     },
 };
 
@@ -121,7 +121,7 @@ impl InstanceSettingObj {
         new_pack: ServerPackObj,
         cancel: CancellationToken,
     ) -> CoreResult<()> {
-        self.upgrade_serverpack_with(new_pack, cancel, None).await
+        self.upgrade_serverpack_with(new_pack, cancel, None, &[]).await
     }
 
     /// 执行升级操作，并把下载进度报给调用方
@@ -132,6 +132,7 @@ impl InstanceSettingObj {
     /// - `new_pack`: 新版服务器包信息
     /// - `cancel`: 取消令牌
     /// - `progress`: 进度回调，参数是已完成数与总数，单位个；`None` 表示不关心
+    /// - `skip`: 这次先不更新的文件，取新清单里的相对路径；空表示全部更新
     ///
     /// # 返回值
     ///
@@ -141,6 +142,7 @@ impl InstanceSettingObj {
         new_pack: ServerPackObj,
         cancel: CancellationToken,
         progress: Option<ServerPackProgress<'_>>,
+        skip: &[String],
     ) -> CoreResult<()> {
         let old = self.get_old_serverpack()?;
         // 旧清单里被移除、且要求删目录的配置目录：后面判断子目录要不要跟着重解时要用
@@ -163,15 +165,37 @@ impl InstanceSettingObj {
             paths::validate_pack(old, &game_path, &temp_path)?;
         }
 
+        // 玩家这次没勾选的条目：路径来自新清单，按身份判断哪些旧文件要跟着留下
+        let skip_set: HashSet<&str> = skip.iter().map(String::as_str).collect();
+        let skipped_keys: HashSet<String> = new_pack
+            .online_list
+            .iter()
+            .filter(|item| skip_set.contains(item.file.as_str()))
+            .map(plan::mod_key)
+            .collect();
+
         // 删旧文件之前先记下玩家启用着的条目：可选模组换文件名时按它延续启用状态，
         // 否则更新一次版本就被重新装成禁用了
         let mut kept_enabled: HashSet<String> = HashSet::new();
         if let Some(old) = &old {
             for item in &old.online_list {
-                let Ok(target) = paths::file_path(&game_path, &item.file) else {
-                    continue;
-                };
-                if existing_file(&target).is_some_and(|(_, disabled)| !disabled) {
+                // 上次跳过、本地留的是旧版本时，那份文件记在跳过记录里，按它的路径看状态
+                let local = paths::file_path(&game_path, &item.file)
+                    .ok()
+                    .and_then(|target| existing_file(&target))
+                    .or_else(|| {
+                        let marker = old
+                            .skipped
+                            .iter()
+                            .find(|marker| marker.file == item.file)?;
+                        let kept = marker.kept.trim();
+                        if kept.is_empty() {
+                            return None;
+                        }
+                        let path = paths::file_path(&game_path, kept).ok()?;
+                        existing_file(&path)
+                    });
+                if local.is_some_and(|(_, disabled)| !disabled) {
                     kept_enabled.insert(plan::mod_key(item));
                 }
             }
@@ -185,6 +209,10 @@ impl InstanceSettingObj {
             for item in &plan.files {
                 if cancel.is_cancelled() {
                     return Err(ErrorType::TaskCancel);
+                }
+                // 这次不更新的条目：旧文件留着，别删完又不装新的
+                if skipped_keys.contains(&plan::mod_key(item)) {
+                    continue;
                 }
                 let target = paths::file_path(&game_path, &item.file)?;
                 delete_with_disabled(&target);
@@ -205,6 +233,31 @@ impl InstanceSettingObj {
                     path_helper::move_to_trash(dir)?;
                 }
                 removed_dirs.push(item.dir.clone());
+            }
+        }
+
+        // 上次跳过、这次重新勾上的条目：清掉当时留下的旧文件，否则两个版本会同时躺在 mods 里
+        if let Some(old) = &old {
+            let wanted: HashSet<&str> = new_pack
+                .online_list
+                .iter()
+                .map(|item| item.file.as_str())
+                .collect();
+            for marker in &old.skipped {
+                // 这次还是没勾：继续留着
+                if skip_set.contains(marker.file.as_str()) {
+                    continue;
+                }
+                let kept = marker.kept.trim();
+                // 新版本用的还是这个路径时交给下载覆盖，不先删
+                if kept.is_empty() || wanted.contains(kept) {
+                    continue;
+                }
+                let Ok(path) = paths::file_path(&game_path, kept) else {
+                    continue;
+                };
+                delete_with_disabled(&path);
+                mml_link::remove_link(self.uuid, &self.get_base_path(), &path);
             }
         }
 
@@ -275,6 +328,10 @@ impl InstanceSettingObj {
         }
 
         for planned in &plan.files {
+            // 玩家这次没勾：不下载，本地旧文件原样留着
+            if skip_set.contains(planned.item.file.as_str()) {
+                continue;
+            }
             let target = paths::file_path(&game_path, &planned.item.file)?;
             // 禁用中的文件同样算已装好：只比内容，不把玩家停用的模组又装回启用
             let existing = existing_file(&target);
@@ -354,14 +411,18 @@ impl InstanceSettingObj {
             path_helper::delete(temp)?;
         }
 
+        // 这次没更新的条目记进本地清单：发布方换了内容才失效，确认窗到时再问一次
+        let mut saved = new_pack;
+        saved.skipped = skipped_markers(&game_path, old.as_ref(), &saved.online_list, &skip_set);
+
         // 保存新版本信息，清理旧文件
-        self.save_serverpack(&new_pack);
+        self.save_serverpack(&saved);
         path_helper::delete(self.get_server_pack_old_file())?;
 
         // 清单里带项目号的文件回写在线信息，导入后才能当平台来源用
-        self.sync_online_info(&new_pack, &game_path);
+        self.sync_online_info(&saved, &game_path);
         // 升版常常连加载器一起往上走，实例得跟着改，否则用旧加载器配新模组
-        self.apply_pack_setting(&new_pack);
+        self.apply_pack_setting(&saved);
 
         Ok(())
     }
@@ -762,6 +823,65 @@ fn archive_unchanged(
     }
     // 目录被手动删掉或上次没解出来时要补一次
     paths::file_path(game_path, &current.dir).is_ok_and(|dir| dir.is_dir())
+}
+
+/// 这次跳过的条目：记下新清单里的路径、内容与本地留下的旧文件
+///
+/// - `game_path`: 游戏目录
+/// - `old`: 升级前的清单，用来找本地留下的旧版本；没有时传 `None`
+/// - `items`: 新清单里的在线文件
+/// - `skip`: 这次不更新的路径
+///
+/// # 返回值
+///
+/// 写进本地清单的跳过记录，顺序与清单一致
+fn skipped_markers(
+    game_path: &Path,
+    old: Option<&ServerPackObj>,
+    items: &[ServerItemObj],
+    skip: &HashSet<&str>,
+) -> Vec<ServerSkippedObj> {
+    items
+        .iter()
+        .filter(|item| skip.contains(item.file.as_str()))
+        .map(|item| {
+            // 本地留下的是旧版本那份，文件名可能已经变了：先按旧清单的身份找，
+            // 找不到再按新路径找；禁用中的那份带着后缀，按实际文件名记
+            let kept = old
+                .and_then(|old| {
+                    old.online_list
+                        .iter()
+                        .find(|row| plan::mod_key(row) == plan::mod_key(item))
+                })
+                .and_then(|row| paths::file_path(game_path, &row.file).ok())
+                .and_then(|target| existing_file(&target))
+                .or_else(|| {
+                    paths::file_path(game_path, &item.file)
+                        .ok()
+                        .and_then(|target| existing_file(&target))
+                })
+                .and_then(|(path, _)| relative_to(game_path, &path))
+                .unwrap_or_default();
+            ServerSkippedObj {
+                file: item.file.clone(),
+                sha1: item.sha1.clone().unwrap_or_default(),
+                kept,
+            }
+        })
+        .collect()
+}
+
+/// 路径相对游戏目录的写法，分隔符统一成 `/`
+///
+/// - `base`: 游戏目录
+/// - `path`: 绝对路径
+///
+/// # 返回值
+///
+/// 形如 `mods/foo.jar`；不在游戏目录下时返回 `None`
+fn relative_to(base: &Path, path: &Path) -> Option<String> {
+    let rel = path.strip_prefix(base).ok()?;
+    Some(rel.to_string_lossy().replace('\\', "/"))
 }
 
 /// 删除文件；若文件已被禁用，即追加了 `.disable`/`.disabled` 后缀，则一并删除

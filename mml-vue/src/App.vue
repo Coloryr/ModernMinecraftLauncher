@@ -41,6 +41,7 @@ import AutoSaveModal from "./components/AutoSaveModal.vue";
 import LaunchCommandModal from "./components/LaunchCommandModal.vue";
 import LaunchCheckModal from "./components/LaunchCheckModal.vue";
 import ServerPackUpdateModal from "./components/ServerPackUpdateModal.vue";
+import ServerPackModsModal from "./components/ServerPackModsModal.vue";
 
 /** 下载管理：既是可切换的窗口页，也会在单窗口模式下当悬浮弹窗用（下面单独渲染一份） */
 const DownloadWindow = defineAsyncComponent(() => import("./windows/download/DownloadWindow.vue"));
@@ -276,4 +277,6 @@ const closeAskButton = computed(() =>
   <LaunchCheckModal />
   <!-- 服务器包有新版本时问一句：更新后启动 / 直接启动 / 取消 -->
   <ServerPackUpdateModal />
+  <!-- 选了更新之后再挑这次要更新哪几个可选模组 -->
+  <ServerPackModsModal />
 </template>

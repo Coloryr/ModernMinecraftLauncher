@@ -76,6 +76,8 @@ pub fn build_server_pack(
         online_list,
         archive_list,
         base: None,
+        // 跳过记录是客户端自己的，发布端生成的清单里没有
+        skipped: Vec::new(),
     }
 }
 

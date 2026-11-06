@@ -74,6 +74,8 @@ pub struct GameLaunchArg {
     pub mixin: Option<MixinArg>,
     /// 启动时是否跳过服务器包同步；用户在升级弹窗里选了「直接启动」时为真
     pub skip_server_pack: bool,
+    /// 这次同步里先不更新的文件，用户在选择弹窗里去掉的可选模组，取清单里的相对路径
+    pub server_pack_skip: Vec<String>,
 }
 
 /// 游戏实例处理完成后的参数
@@ -590,6 +592,7 @@ impl InstanceSettingObj {
     ///
     /// - `gui`: 启动界面回调
     /// - `cancel`: 取消令牌
+    /// - `skip`: 这次先不更新的文件，取清单里的相对路径；空表示全部更新
     ///
     /// # 返回值
     ///
@@ -598,6 +601,7 @@ impl InstanceSettingObj {
         &self,
         gui: LaunchGui,
         cancel: CancellationToken,
+        skip: &[String],
     ) -> CoreResult<()> {
         // 只有"在线网络整合包"才按服务器包同步：界面上只有这一类会填服务器实例网址，
         // 别的整合包带一个残留地址不该把启动卡在网络上
@@ -647,7 +651,8 @@ impl InstanceSettingObj {
 
                 let obj = serialize_tools::json_from_bytes::<ServerPackObj>(&data)?;
                 self.move_serverpack_to_old()?;
-                self.upgrade_serverpack(obj, cancel.clone()).await?;
+                self.upgrade_serverpack_with(obj, cancel.clone(), None, skip)
+                    .await?;
             }
 
             let time = start.elapsed();
@@ -980,7 +985,8 @@ impl InstanceSettingObj {
 
         // 服务器包更新：用户在升级弹窗里选了「直接启动」时这次不比对清单
         if !arg.skip_server_pack {
-            self.server_pack_update(gui.clone(), cancel.clone()).await?;
+            self.server_pack_update(gui.clone(), cancel.clone(), &arg.server_pack_skip)
+                .await?;
         }
 
         if cancel.is_cancelled() {

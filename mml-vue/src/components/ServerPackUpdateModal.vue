@@ -37,6 +37,10 @@ const changed = computed(() => {
         })
       }}
     </p>
+    <!-- 有可选模组要变时，下一步还要挑一次，先说一声 -->
+    <p v-if="serverPackResult.mods.length" class="pack-changes">
+      {{ t("update.serverPackModsPending", { n: serverPackResult.mods.length }) }}
+    </p>
     <div class="modal-actions">
       <BaseButton @click="answerServerPackUpdate(false, false)">{{ t("resource.cancel") }}</BaseButton>
       <BaseButton @click="answerServerPackUpdate(true, false)">{{ t("launch.serverPackSkip") }}</BaseButton>

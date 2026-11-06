@@ -8,6 +8,7 @@ import { askAutoSave } from "./autoSavePrompt";
 import { askLaunchCommand } from "./launchCommandPrompt";
 import { askLaunchCheck } from "./launchCheck";
 import { askServerPackUpdate } from "./serverPackPrompt";
+import { askServerPackMods } from "./serverPackMods";
 import { saveGuiConfig } from "./guiConfig";
 import { openWindow } from "../windows/windowManager";
 
@@ -58,6 +59,8 @@ export async function launchGame(uuid: string, world?: string): Promise<boolean>
   // 在线服务器包：启动时后端本来会直接按发布地址同步，这里先问一句，别悄悄升级
   const serverPack = await askServerPack(uuid);
   if (serverPack === null) return false;
+  const serverPackAction = serverPack?.action;
+  const serverPackSkip = serverPack?.skip;
 
   let autoShow = false;
   try {
@@ -87,7 +90,15 @@ export async function launchGame(uuid: string, world?: string): Promise<boolean>
   }
 
   try {
-    await api.launchGame(uuid, enterWorld, undefined, autoSave, serverPack, runCommands);
+    await api.launchGame(
+      uuid,
+      enterWorld,
+      undefined,
+      autoSave,
+      serverPackAction,
+      serverPackSkip,
+      runCommands,
+    );
   } catch (e) {
     if (String(e) !== "err.accountInUse") throw e;
 
@@ -97,7 +108,15 @@ export async function launchGame(uuid: string, world?: string): Promise<boolean>
       await saveGuiConfig({ client: { accountCheck: false } }).catch(() => { });
     }
     // 这一次先放行；检查关掉后后续启动不会再被拦
-    await api.launchGame(uuid, enterWorld, true, autoSave, serverPack, runCommands);
+    await api.launchGame(
+      uuid,
+      enterWorld,
+      true,
+      autoSave,
+      serverPackAction,
+      serverPackSkip,
+      runCommands,
+    );
   }
 
   if (autoShow) {
@@ -106,18 +125,27 @@ export async function launchGame(uuid: string, world?: string): Promise<boolean>
   return true;
 }
 
+/** 服务器包这次怎么处理 */
+type ServerPackAnswer = {
+  /** `update` 先同步再启动，`skip` 直接启动 */
+  action: "update" | "skip";
+  /** 同步时先不更新的文件，取清单里的相对路径；直接启动时为空 */
+  skip: string[];
+};
+
 /**
  * 启动前查服务器包有没有新版本，有就问用户
  *
  * 只对填了发布地址的在线服务器包实例查；其它实例直接返回 `undefined`，不发请求。
+ * 选「更新并启动」时再问一次可选模组：没勾的这次不下载新版本。
  *
  * - `uuid`: 实例 uuid
  *
  * # 返回值
  *
- * `"update"` 先同步再启动 / `"skip"` 直接启动 / `null` 用户取消启动 / `undefined` 不用问
+ * 见 [`ServerPackAnswer`]；用户取消启动返回 `null`，不用问返回 `undefined`
  */
-async function askServerPack(uuid: string): Promise<"update" | "skip" | null | undefined> {
+async function askServerPack(uuid: string): Promise<ServerPackAnswer | null | undefined> {
   const list = await api.getInstances().catch(() => []);
   const instance = list.find((item) => item.uuid === uuid);
   if (instance?.modpackType !== "serverpack" || !instance.serverUrl) return undefined;
@@ -128,5 +156,10 @@ async function askServerPack(uuid: string): Promise<"update" | "skip" | null | u
 
   const answer = await askServerPackUpdate(result);
   if (!answer.ok) return null;
-  return answer.update ? "update" : "skip";
+  if (!answer.update) return { action: "skip", skip: [] };
+
+  const skip = result.mods.length ? await askServerPackMods(result.mods) : [];
+  // 在可选模组那一层取消：当作取消启动，别带一半的选择去同步
+  if (skip === null) return null;
+  return { action: "update", skip };
 }

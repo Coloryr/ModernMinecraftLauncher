@@ -215,6 +215,8 @@ pub async fn lobby_launch_game(app: AppHandle, uuid: String) -> Result<(), Strin
         None,
         Some(false),
         None,
+        // 大厅没有更新确认弹窗，同步时按清单全部更新
+        Vec::new(),
         // 大厅不弹启动命令确认，按实例配置直接执行
         None,
         Some((key, auto)),

@@ -249,6 +249,7 @@ fn upgrade_applies_add_remove_and_change() {
         &snapshot,
         None,
         CancellationToken::new(),
+        &[],
     ))
     .expect("升级应成功");
 
@@ -341,6 +342,7 @@ fn same_pack_version_skips_file_replacement() {
         &snapshot,
         None,
         CancellationToken::new(),
+        &[],
     ))
     .expect("同版本应直接返回");
 
@@ -424,6 +426,7 @@ fn upgrade_only_downloads_missing_or_changed_files() {
         &snapshot,
         None,
         CancellationToken::new(),
+        &[],
     ))
     .expect("只下载缺失 / 变化的文件应成功");
 
@@ -498,6 +501,7 @@ fn archive_hash_skips_unchanged_and_downloads_changed() {
         &snapshot,
         None,
         CancellationToken::new(),
+        &[],
     ))
     .expect("压缩包没变时不该下载");
     assert_eq!(
@@ -524,6 +528,7 @@ fn archive_hash_skips_unchanged_and_downloads_changed() {
         &snapshot,
         None,
         CancellationToken::new(),
+        &[],
     ))
     .expect("压缩包变了应下载并解压");
     assert_eq!(
@@ -596,6 +601,7 @@ fn nested_archives_skip_unchanged_parts() {
         &snapshot,
         None,
         CancellationToken::new(),
+        &[],
     ))
     .expect("只更新父包应成功");
     assert_eq!(std::fs::read(base.join("config/a.toml")).unwrap(), b"a = 2");
@@ -621,6 +627,7 @@ fn nested_archives_skip_unchanged_parts() {
         &snapshot,
         None,
         CancellationToken::new(),
+        &[],
     ))
     .expect("只更新子包应成功");
     assert_eq!(std::fs::read(base.join("config/a.toml")).unwrap(), b"a = 2");
@@ -744,6 +751,7 @@ fn base_archive_is_downloaded_once() {
         &snapshot,
         None,
         CancellationToken::new(),
+        &[],
     ))
     .expect("基础包已下载过，不该再拉取");
     assert_eq!(
@@ -827,6 +835,7 @@ fn optional_mod_keeps_enabled_state_when_renamed() {
         &snapshot,
         None,
         CancellationToken::new(),
+        &[],
     ))
     .expect("升级应成功");
 
@@ -921,6 +930,7 @@ fn optional_mod_installs_disabled_and_removes_with_pack() {
         &snapshot,
         None,
         CancellationToken::new(),
+        &[],
     ))
     .expect("升级应成功");
 
@@ -948,6 +958,7 @@ fn optional_mod_installs_disabled_and_removes_with_pack() {
         &snapshot,
         None,
         CancellationToken::new(),
+        &[],
     ))
     .expect("升级应成功");
 
@@ -958,4 +969,143 @@ fn optional_mod_installs_disabled_and_removes_with_pack() {
     );
     assert!(!base.join("mods/opt.jar.disabled").exists());
     assert!(base.join("mods/keep.jar").is_file());
+}
+
+/// 玩家在确认窗里去掉的可选模组：这次不下载，本地旧文件留着；下次重新勾上时旧文件被清掉
+#[test]
+fn optional_mod_skipped_keeps_local_copy_until_next_update() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _run = ensure_init();
+    let (routes, port) = Routes::start();
+
+    let a1 = b"opt a v1".to_vec();
+    let keep = b"keep".to_vec();
+    let mut a = indexed(port, "mods/a-1.jar", "a1.jar", &a1, "911", "9111");
+    a.optional = true;
+    let v1 = manifest(
+        "1.0.0",
+        "21.1.259",
+        vec![a, plain(port, "mods/keep.jar", "keep.jar", &keep)],
+    );
+    routes.set(vec![
+        ("/pack/server.json", manifest_bytes(&v1)),
+        ("/pack/a1.jar", a1.clone()),
+        ("/pack/keep.jar", keep.clone()),
+    ]);
+
+    let uuid = block_on(mml_game::add_game::install_server_pack_from_url(
+        &format!("http://127.0.0.1:{port}/pack"),
+        None,
+        None,
+        None,
+        None,
+        CancellationToken::new(),
+    ))
+    .expect("导入应成功");
+    let game = mml_game::get_instance(&uuid).expect("实例应已登记");
+    let base = game.read().unwrap().get_game_path();
+    assert!(base.join("mods/a-1.jar.disabled").is_file());
+    // 玩家自己启用
+    std::fs::rename(
+        base.join("mods/a-1.jar.disabled"),
+        base.join("mods/a-1.jar"),
+    )
+    .unwrap();
+
+    // 版本 2：可选模组换了内容与文件名，但玩家在弹窗里没勾它
+    let a2 = b"opt a v2".to_vec();
+    let mut a2_item = indexed(port, "mods/a-2.jar", "a2.jar", &a2, "911", "9112");
+    a2_item.optional = true;
+    let v2 = manifest(
+        "1.0.1",
+        "21.1.259",
+        vec![a2_item, plain(port, "mods/keep.jar", "keep.jar", &keep)],
+    );
+    routes.set(vec![
+        ("/pack/server.json", manifest_bytes(&v2)),
+        ("/pack/a2.jar", a2.clone()),
+        ("/pack/keep.jar", keep.clone()),
+    ]);
+
+    let snapshot = game.read().unwrap().clone();
+    wait_local_manifest(&snapshot);
+    block_on(mml_game::add_game::upgrade_server_pack(
+        &snapshot,
+        None,
+        CancellationToken::new(),
+        &["mods/a-2.jar".to_string()],
+    ))
+    .expect("升级应成功");
+
+    assert_eq!(
+        std::fs::read(base.join("mods/a-1.jar")).unwrap(),
+        a1,
+        "没勾的可选模组这次不该被更新"
+    );
+    assert!(!base.join("mods/a-2.jar").exists(), "没勾的条目不该下载");
+    assert!(!base.join("mods/a-2.jar.disabled").exists());
+
+    // 本地清单记下这次跳过，并记着留下的是哪个文件
+    let pack = wait_pack_version(&snapshot, "1.0.1");
+    assert_eq!(pack.skipped.len(), 1, "跳过记录应写进本地清单");
+    assert_eq!(pack.skipped[0].file, "mods/a-2.jar");
+    assert_eq!(pack.skipped[0].kept, "mods/a-1.jar");
+
+    // 版本 3：同一模组又换了一版，这次勾上：新文件落地、上次留下的旧文件被清掉
+    let a3 = b"opt a v3".to_vec();
+    let mut a3_item = indexed(port, "mods/a-3.jar", "a3.jar", &a3, "911", "9113");
+    a3_item.optional = true;
+    let v3 = manifest(
+        "1.0.2",
+        "21.1.259",
+        vec![a3_item, plain(port, "mods/keep.jar", "keep.jar", &keep)],
+    );
+    routes.set(vec![
+        ("/pack/server.json", manifest_bytes(&v3)),
+        ("/pack/a3.jar", a3.clone()),
+        ("/pack/keep.jar", keep.clone()),
+    ]);
+
+    let snapshot = game.read().unwrap().clone();
+    block_on(mml_game::add_game::upgrade_server_pack(
+        &snapshot,
+        None,
+        CancellationToken::new(),
+        &[],
+    ))
+    .expect("升级应成功");
+
+    assert_eq!(
+        std::fs::read(base.join("mods/a-3.jar")).unwrap(),
+        a3,
+        "勾上的可选模组要更新；玩家本来启用着，装好仍是启用"
+    );
+    assert!(!base.join("mods/a-1.jar").exists(), "上次留下的旧文件要清掉");
+    assert!(!base.join("mods/a-2.jar").exists());
+    let pack = wait_pack_version(&snapshot, "1.0.2");
+    assert!(pack.skipped.is_empty(), "更新后跳过记录应清空");
+}
+
+/// 等本地清单落到指定包版本
+///
+/// - `snapshot`: 实例设置快照，取清单路径用
+/// - `version`: 期望的包版本
+///
+/// # 返回值
+///
+/// 该版本的清单
+fn wait_pack_version(snapshot: &InstanceSettingObj, version: &str) -> ServerPackObj {
+    let file = snapshot.get_server_pack_file();
+    for _ in 0..100 {
+        let pack = std::fs::read(&file)
+            .ok()
+            .and_then(|data| serde_json::from_slice::<ServerPackObj>(&data).ok());
+        if let Some(pack) = pack
+            && pack.pack_version == version
+        {
+            return pack;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    panic!("本地清单没有落到版本 {version}");
 }

@@ -274,6 +274,14 @@ export type ModPackUpdateDto = {
   addedFiles: number,
   removedFiles: number,
   changedFiles: number,
+  mods: ServerPackModDto[],
+};
+
+export type ServerPackModDto = {
+  path: string,
+  name: string,
+  added: boolean,
+  enabled: boolean,
 };
 
 export type ModAutoMarkProgressDto = {

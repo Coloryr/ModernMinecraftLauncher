@@ -103,6 +103,7 @@ fn ensure_game_lang(inst: &InstanceSettingObj) {
 /// - `auto_save`: 实例配的自动进入存档这次用不用，`Some(false)` 为用户在弹窗里选了不进入
 /// - `server_pack`: 在线服务器包这次怎么处理：`Some("skip")` 不比对清单直接启动，
 ///   其余（含 `None`）照旧按发布地址同步；要不要问用户由前端在启动前决定
+/// - `server_pack_skip`: 这次同步里先不更新的文件，取清单里的相对路径
 /// - `run_commands`: 启动前 / 后命令这次执不执行，`Some(false)` 为用户在弹窗里选了跳过
 ///
 /// # 返回值
@@ -118,6 +119,7 @@ pub async fn main_launch_game(
     force: Option<bool>,
     auto_save: Option<bool>,
     server_pack: Option<String>,
+    server_pack_skip: Option<Vec<String>>,
     run_commands: Option<bool>,
 ) -> Result<(), String> {
     launch_game(
@@ -127,6 +129,7 @@ pub async fn main_launch_game(
         force,
         auto_save,
         server_pack,
+        server_pack_skip.unwrap_or_default(),
         run_commands,
         None,
     )
@@ -143,6 +146,7 @@ pub async fn main_launch_game(
 /// - `force`: 账户被占用时是否跳过占用检查
 /// - `auto_save`: 实例配的自动进入存档这次用不用，`Some(false)` 为不进入
 /// - `server_pack`: 服务器包处理方式，`Some("skip")` 表示不比对清单直接启动
+/// - `server_pack_skip`: 这次同步里先不更新的文件，取清单里的相对路径
 /// - `run_commands`: 启动前 / 后命令这次执不执行，`Some(false)` 为跳过；`None` 为执行
 /// - `lobby`: 大厅的临时账户与进服方式，`None` 表示走当前账户与常规规则
 ///
@@ -156,6 +160,7 @@ pub(crate) async fn launch_game(
     force: Option<bool>,
     auto_save: Option<bool>,
     server_pack: Option<String>,
+    server_pack_skip: Vec<String>,
     run_commands: Option<bool>,
     lobby: Option<(mml_auth::UserKeyObj, AutoJoinType)>,
 ) -> Result<(), String> {
@@ -271,6 +276,8 @@ pub(crate) async fn launch_game(
         mixin,
         // 用户在这次升级弹窗里选了「直接启动」：启动时不再比对服务器包清单
         skip_server_pack: server_pack.as_deref() == Some("skip"),
+        // 同步时这条清单里没勾的模组不下载，旧文件留着
+        server_pack_skip,
     };
 
     // 命令返回后这次启动还要跑完：实例快照与 app 都搬进后台线程，
