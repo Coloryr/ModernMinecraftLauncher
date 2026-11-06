@@ -2533,6 +2533,8 @@ export default {
   "serverInstance.mode.archive": "压缩包同步",
   "serverInstance.mode.files": "逐文件下载",
   "serverInstance.configAdd": "添加",
+  "serverInstance.configAddChildren": "全部子目录",
+  "serverInstance.configAddChildrenHint": "把 {dir} 下的 {n} 个一级子目录一次加进来",
   "serverInstance.configName": "名字",
   "serverInstance.configRemove": "移除",
   "serverInstance.configCount": "{n} 个目录",

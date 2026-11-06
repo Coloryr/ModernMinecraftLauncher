@@ -118,6 +118,14 @@ let dragListenersInstalled = false;
 function onTitleBarPointerMove(e: PointerEvent) {
   const pending = pendingDrag;
   if (!pending || e.pointerId !== pending.pointerId) return;
+  // 左键已经松开却没收到 pointerup（松在窗口外、或被原生拖动循环吃掉）：这次按下作废。
+  // 不丢的话，之后光是把鼠标移过标题栏就会把窗口拖走
+  if ((e.buttons & 1) === 0) {
+    onTitleBarPointerUp(e);
+    lastDownAt = 0;
+    lastDownTarget = null;
+    return;
+  }
   if (Math.hypot(e.clientX - pending.x, e.clientY - pending.y) < DRAG_START_PX) return;
   pendingDrag = null;
   // 这次是拖动，不是单击：紧随其后的点击不能再被判成双击
@@ -137,6 +145,13 @@ function onTitleBarPointerUp(e: PointerEvent) {
   }
 }
 
+/** 窗口失焦：手上没松开的按下作废，免得切回来一动鼠标就把窗口拖走 */
+function onTitleBarBlur() {
+  pendingDrag = null;
+  lastDownAt = 0;
+  lastDownTarget = null;
+}
+
 /** 挂一次拖动判定用的窗口级监听 */
 function installDragListeners() {
   if (dragListenersInstalled) return;
@@ -144,6 +159,7 @@ function installDragListeners() {
   window.addEventListener("pointermove", onTitleBarPointerMove, { passive: true });
   window.addEventListener("pointerup", onTitleBarPointerUp, { passive: true });
   window.addEventListener("pointercancel", onTitleBarPointerUp, { passive: true });
+  window.addEventListener("blur", onTitleBarBlur);
 }
 
 /**
@@ -160,7 +176,10 @@ export function onTitleBarPointerDown(e: PointerEvent) {
   }
 
   const now = Date.now();
-  if (now - lastDownAt < DOUBLE_CLICK_MS && e.target === lastDownTarget) {
+  // 事件自带的连击计数比时间差更准：两次点在同一处才算双击，中间夹了别的点击会重置
+  const doubleClick =
+    e.detail >= 2 || (now - lastDownAt < DOUBLE_CLICK_MS && e.target === lastDownTarget);
+  if (doubleClick) {
     // 双击：只在这一次里最大化，不再等拖动
     lastDownAt = 0;
     lastDownTarget = null;

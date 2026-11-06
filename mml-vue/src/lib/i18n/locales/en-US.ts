@@ -2534,6 +2534,8 @@ export default {
   "serverInstance.mode.archive": "One archive",
   "serverInstance.mode.files": "Per file",
   "serverInstance.configAdd": "Add",
+  "serverInstance.configAddChildren": "Add subdirs",
+  "serverInstance.configAddChildrenHint": "Add the {n} direct subfolders under {dir} at once",
   "serverInstance.configName": "Name",
   "serverInstance.configRemove": "Remove",
   "serverInstance.configCount": "{n} folders",

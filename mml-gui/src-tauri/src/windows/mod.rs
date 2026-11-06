@@ -137,6 +137,7 @@ pub(crate) fn has_self_notifying_task() -> bool {
 ///
 /// - `app`: 应用句柄
 pub(crate) fn summon_main_window(app: &AppHandle) {
+    mml_log::info(crate::log_text::LogText::MainWindowSummoned.text());
     if let Some(win) = app.get_webview_window(main_window_label()) {
         let _ = win.show();
         let _ = win.unminimize();
@@ -873,6 +874,14 @@ pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'stati
     }
 
     show_window(&window)?;
+    // 装饰激活里的"设下限"会落到 tao 的 set_inner_size，而它会把最大化标志清掉并把窗口还原：
+    // "上次是最大化"的窗口开出来就只有那块尺寸、并不是最大化状态，标题栏图标对不上，
+    // 双击标题栏也像没反应。这里按存盘状态补一次
+    if let Some(uuid) = crate::windows::registry::uuid_of_label(window.label())
+        && crate::windows::geometry::window_state_for(&uuid).is_some_and(|state| state.maximized)
+    {
+        let _ = window.maximize();
+    }
     // 材质要在窗口显示之后铺：隐藏状态下铺的会被随后 activate_decoration 改窗口样式一起丢掉
     self::effects::apply(&window, &crate::gui_config::get().client.window_effect);
     Ok("custom")

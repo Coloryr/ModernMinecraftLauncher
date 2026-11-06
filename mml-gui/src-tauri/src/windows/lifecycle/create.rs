@@ -16,7 +16,7 @@ use super::models::{OPEN_WINDOWS, WINDOW_MODELS, ensure_window_model};
 use crate::windows::block;
 use crate::windows::geometry::{
     Placement, RectF, SizeF, center_placement, child_placement, remember_decorated_inset,
-    save_window_state, window_state_for,
+    save_window_state, usable_geometry, window_state_for,
 };
 use crate::windows::registry::{
     ADD_MODPACK_WINDOW_UUID, BLOCK_WINDOW_UUID, EXPORT_WINDOW_UUID, MAIN_WINDOW_UUID,
@@ -146,8 +146,9 @@ pub(crate) fn create_window(
         return Ok(win);
     }
 
-    // 尺寸为 0 的条目按"没有历史几何"处理：serde 对缺失字段给 0，而恢复端不再夹最小尺寸
-    let geom = window_state_for(uuid).filter(|g| g.width > 0 && g.height > 0);
+    // 尺寸为 0 的条目按"没有历史几何"处理：serde 对缺失字段给 0，而恢复端不再夹最小尺寸；
+    // 最小化时存下的 -32000 占位坐标同样不能用，见 geometry::usable_geometry
+    let geom = window_state_for(uuid).filter(usable_geometry);
     // 上次是最大化：按记录里的「最大化之前」几何开窗，开完再最大化，见 save_window_state
     let restore_maximized = geom.as_ref().map(|g| g.maximized).unwrap_or(false);
 
@@ -236,10 +237,19 @@ pub(crate) fn create_window(
     let builder = builder.transparent(transparent);
     let win = match geom {
         Some(g) => {
+            // 中心点落在显示器上才算"这块屏还在"：换过屏 / 拔掉外接屏之后，历史位置可能整窗
+            // 落在屏幕外，照它开窗用户看到的就是"窗口没了"。这种只沿用尺寸，位置改回当前屏中心
+            let center_x = g.x as f64 + f64::from(g.width) / 2.0;
+            let center_y = g.y as f64 + f64::from(g.height) / 2.0;
+            let visible = app
+                .monitor_from_point(center_x, center_y)
+                .ok()
+                .flatten()
+                .is_some();
             // 恢复端 builder.position / inner_size 用逻辑像素，保存端是物理像素：按目标
             // 显示器的缩放系数换算，否则带缩放的屏幕上每开一次窗都乘一遍，窗口逐次变大
             let scale = app
-                .monitor_from_point(g.x as f64, g.y as f64)
+                .monitor_from_point(center_x, center_y)
                 .ok()
                 .flatten()
                 .or_else(|| app.primary_monitor().ok().flatten())
@@ -248,10 +258,14 @@ pub(crate) fn create_window(
 
             // 这里**不夹**最小客户区：存的是带装饰口径，比运行时口径小一个标题栏，夹会把它
             // 顶上去。下限由 clamp_runtime_min_size 在装饰激活后按运行时口径补
-            builder
-                .inner_size(g.width as f64 / scale, g.height as f64 / scale)
-                .position(g.x as f64 / scale, g.y as f64 / scale)
-                .build()
+            let builder = builder
+                .inner_size(g.width as f64 / scale, g.height as f64 / scale);
+            if visible {
+                builder.position(g.x as f64 / scale, g.y as f64 / scale).build()
+            } else {
+                // 屏幕外：尺寸照旧，位置交给系统居中
+                builder.center().build()
+            }
         }
         // 没有历史几何：主窗口在屏幕中心，子窗口叠在锚点窗口那个角的内侧
         None => {

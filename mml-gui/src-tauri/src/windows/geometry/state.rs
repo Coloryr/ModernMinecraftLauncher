@@ -52,6 +52,37 @@ pub(crate) struct WindowState {
     pub maximized: bool,
 }
 
+/// 最小化时 Windows 给窗口报的占位坐标
+///
+/// 最小化过程中 `Moved` 可能先于 `SIZE_MINIMIZED` 到达，那一刻 `is_minimized()` 还是 false，
+/// 照常存就会把上次的几何换成这对坐标，下次开窗直接落到屏幕外 —— 用户看到的是"窗口没了"。
+const ICONIC_POS: i32 = -30000;
+
+/// 位置是不是最小化的占位坐标
+///
+/// - `x`: 外框左上角横坐标，单位物理像素
+/// - `y`: 外框左上角纵坐标，单位物理像素
+///
+/// # 返回值
+///
+/// 两个坐标都落在占位点（≤ -30000）时返回 true
+pub(crate) fn is_iconic_position(x: i32, y: i32) -> bool {
+    x <= ICONIC_POS && y <= ICONIC_POS
+}
+
+/// 存下的几何还能不能用来开窗
+///
+/// 尺寸为 0 的条目与最小化写下的占位坐标都不能用：照它开窗会得到一个看不见的窗口。
+///
+/// - `state`: 存盘里的一条几何
+///
+/// # 返回值
+///
+/// 可以拿来恢复窗口时返回 true
+pub(crate) fn usable_geometry(state: &WindowState) -> bool {
+    state.width > 0 && state.height > 0 && !is_iconic_position(state.x, state.y)
+}
+
 /// 窗口几何状态，键是 uuid，内存中的唯一数据源
 pub(crate) static WINDOWS_STATE: LazyLock<RwLock<HashMap<Uuid, WindowState>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
@@ -165,6 +196,10 @@ pub(crate) fn save_window_state(
         return Ok(());
     }
     let pos = window.outer_position().map_err(|err| err.to_string())?;
+    // 最小化的中间态也会走到这里，见 is_iconic_position
+    if is_iconic_position(pos.x, pos.y) {
+        return Ok(());
+    }
     let size = window.inner_size().map_err(|err| err.to_string())?;
 
     let mut geom = window_state_for(uuid).unwrap_or_default();

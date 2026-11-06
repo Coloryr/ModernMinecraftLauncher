@@ -55,6 +55,10 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
                 let _ = save_window_state(&uuid, &win, maximized);
             }
             if uuid == MAIN_WINDOW_UUID {
+                // 记一条：主窗口是"退回后台"还是"退出启动器"只有这一处能看出来，
+                // 用户报"窗口自己没了"时要靠它分辨
+                let running = crate::tray::has_running_instance();
+                mml_log::info(crate::log_text::LogText::MainWindowCloseRequested { running }.text());
                 // 有实例在跑：退回后台，托盘可见，核心与统计继续 —— 运行中的游戏还要接着计时。
                 // 没有实例在跑：后台没有留下的理由，关窗就是退出应用，先让核心与统计落盘。
                 if !crate::tray::has_running_instance() {

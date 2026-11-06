@@ -12,10 +12,13 @@ const {
   newDir,
   newMode,
   dirChoices,
+  newChildDirs,
+  childAddParent,
   busy,
   format,
   changedPaths,
   addConfig,
+  addChildConfigs,
   setConfigMode,
   setConfigDeleteOld,
   removeConfig,
@@ -42,6 +45,12 @@ const {
     </select>
     <BaseButton size="sm" :disabled="busy || !newDir" @click="addConfig">
       {{ t("serverInstance.configAdd") }}
+    </BaseButton>
+    <!-- 一级子目录几十上百个时逐个加太慢：按当前选中目录的父目录一次全加进来 -->
+    <BaseButton size="sm" :disabled="busy || !newChildDirs.length"
+      :title="newChildDirs.length ? t('serverInstance.configAddChildrenHint', { dir: childAddParent + '/', n: newChildDirs.length }) : ''"
+      @click="addChildConfigs">
+      {{ t("serverInstance.configAddChildren") }}
     </BaseButton>
   </div>
 

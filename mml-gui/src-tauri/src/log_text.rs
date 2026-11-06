@@ -113,6 +113,13 @@ pub enum LogText {
         /// 失败原因，插件给的原文
         error: String,
     },
+    /// 主窗口收到关闭请求：有实例在跑就退回后台，否则退出启动器
+    MainWindowCloseRequested {
+        /// 是否还有实例在运行
+        running: bool,
+    },
+    /// 主窗口被重新唤出：托盘点击、单实例转发、再次打开程序都走这里
+    MainWindowSummoned,
     /// macOS 原生红黄绿没摆到位，按钮留在默认位置
     TrafficLightsFailed {
         /// 失败原因，插件给的原文
@@ -751,6 +758,15 @@ impl LogText {
             LogText::DecorationActivateFailed { label, error } => format!(
                 "[window] 装饰激活失败，窗口退回无边框、按钮由界面自绘：窗口={label} ({error})"
             ),
+            LogText::MainWindowCloseRequested { running } => format!(
+                "[window] 关闭主窗口：{}",
+                if *running {
+                    "还有实例在运行，退回后台"
+                } else {
+                    "没有实例在运行，退出启动器"
+                }
+            ),
+            LogText::MainWindowSummoned => String::from("[window] 唤出主窗口"),
             LogText::TrafficLightsFailed { error } => {
                 format!("[window] 摆放原生窗口按钮失败，按钮留在默认位置: {error}")
             }
@@ -1084,6 +1100,15 @@ impl LogText {
             LogText::DecorationActivateFailed { label, error } => format!(
                 "[window] decoration activation failed, the window falls back to a borderless frame with app-drawn buttons: window={label} ({error})"
             ),
+            LogText::MainWindowCloseRequested { running } => format!(
+                "[window] closing the main window: {}",
+                if *running {
+                    "instances are still running, moving to the background"
+                } else {
+                    "no instance is running, quitting the launcher"
+                }
+            ),
+            LogText::MainWindowSummoned => String::from("[window] summoning the main window"),
             LogText::TrafficLightsFailed { error } => format!(
                 "[window] failed to position the native window buttons, they stay at the default place: {error}"
             ),

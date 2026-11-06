@@ -223,6 +223,33 @@ const dirChoices = computed(() =>
   ),
 );
 
+/**
+ * 一键加子目录的目标目录
+ *
+ * 选中一级子目录时取它的父目录，选中顶层目录时取它自己：两者都能落到"这个目录下的
+ * 一级子目录"上，用户不必额外挑一次父目录。
+ *
+ * # 返回值
+ *
+ * 目录路径；没选目录时是空串
+ */
+const childAddParent = computed(() => {
+  const path = newDir.value;
+  if (!path) return "";
+  return path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : path;
+});
+
+/** 目标目录下还没加进列表的一级子目录 */
+const newChildDirs = computed(() => {
+  const parent = childAddParent.value;
+  if (!parent) return [];
+  const prefix = `${parent}/`;
+  return topDirs.value
+    .filter((entry) => entry.dir && entry.path.startsWith(prefix))
+    .map((entry) => entry.path)
+    .filter((path) => !configs.value.some((item) => item.dir === path));
+});
+
 /** 进度百分比；总数未知时返回 -1 */
 const percent = computed(() => {
   const p = progress.value;
@@ -408,6 +435,27 @@ function addConfig() {
   if (!dir || configs.value.some((item) => item.dir === dir)) return;
   const mode = FILES_DIRS.includes(dir) ? "files" : newMode.value;
   configs.value = [...configs.value, { dir, mode, deleteOld: true }];
+  newDir.value = "";
+}
+
+/**
+ * 把目标目录下的一级子目录一次全加进来
+ *
+ * config 这类目录下常有几十个子目录，逐个从下拉里挑太慢；新加的条目与单条添加同一口径，
+ * 按当前选的同步方式走，默认删除原有目录。
+ */
+function addChildConfigs() {
+  const dirs = newChildDirs.value;
+  if (!dirs.length) return;
+  const mode = newMode.value;
+  configs.value = [
+    ...configs.value,
+    ...dirs.map((dir) => ({
+      dir,
+      mode: (FILES_DIRS.includes(dir) ? "files" : mode) as ConfigMode,
+      deleteOld: true,
+    })),
+  ];
   newDir.value = "";
 }
 
@@ -1085,6 +1133,7 @@ onBeforeUnmount(() => {
     packs, pickedPacks, pickAllPacks, packPidOf, packFidOf, packUrlOf,
     setPackId, setPackUrl, packIdTypeOf, isPackCustomType, setPackIdType,
     configs, newDir, newMode, dirChoices, addConfig, setConfigMode,
+    newChildDirs, childAddParent, addChildConfigs,
     setConfigDeleteOld, removeConfig,
     pickInstance, openGuide,
     current, ready, pickedCount, generate, exportPack, packing, percent, progress, result, error,
