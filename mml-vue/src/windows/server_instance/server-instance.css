@@ -381,9 +381,9 @@
 .si-mod-head,
 .si-mod-row {
   grid-template-columns:
-    44px minmax(160px, 1.1fr) 96px 120px 120px minmax(200px, 1.7fr) 170px;
+    44px 44px minmax(160px, 1.1fr) 96px 120px 120px minmax(200px, 1.7fr) 170px;
   /* 列宽总和超过窄窗口时让表头 / 行本身跟着变宽，横向滚动到底也有底色和下边框 */
-  min-width: 1000px;
+  min-width: 1044px;
 }
 
 .si-table-head,

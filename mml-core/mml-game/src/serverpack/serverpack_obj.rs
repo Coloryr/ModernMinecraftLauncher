@@ -127,6 +127,9 @@ pub struct ServerItemObj {
     /// 是否为自动生成的自定义编号；true 时 ProjectId / FileId 不按平台编号解析
     #[serde(rename = "Custom", default, skip_serializing_if = "is_false")]
     pub custom: bool,
+    /// 是否为可选模组：客户端首次同步时装成禁用状态，玩家可自行启用
+    #[serde(rename = "Optional", default, skip_serializing_if = "is_false")]
+    pub optional: bool,
 }
 
 /// 序列化时省略 false

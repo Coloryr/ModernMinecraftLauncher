@@ -1325,6 +1325,8 @@ where
 
 /// 为文件追加禁用后缀
 ///
+/// 后缀用 `.disabled`，与 MMC / HMCL 一致；旧版留下的 `.disable` 读取时仍然认。
+///
 /// - `path`: 模组文件路径
 ///
 /// # 返回值
@@ -1337,7 +1339,7 @@ pub fn add_disable_suffix(path: &Path) -> CoreResult<PathBuf> {
         .ok_or_else(|| ErrorType::InvalidOperation)?;
 
     let mut new_name = file_name.to_os_string();
-    new_name.push(names::DISABLE_DOT_EXT);
+    new_name.push(names::DISABLED_DOT_EXT);
     let new_path = path.with_file_name(new_name);
 
     path_helper::move_file(path, &new_path)?;

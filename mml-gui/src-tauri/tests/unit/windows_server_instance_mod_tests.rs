@@ -20,6 +20,7 @@ fn picks(paths: &[&str]) -> Vec<ServerInstancePickDto> {
             custom: false,
             edited: false,
             type_changed: false,
+            optional: false,
         })
         .collect()
 }
@@ -59,6 +60,7 @@ fn options(
                 custom: true,
                 edited: false,
                 type_changed: false,
+                optional: false,
             })
             .collect(),
     }
@@ -206,6 +208,7 @@ fn mods_follow_selection_and_exclusions() {
         custom: false,
         edited: false,
         type_changed: false,
+        optional: false,
     });
     assert_eq!(
         paths(files::mods(&base, &exclude).unwrap()),
@@ -1089,6 +1092,49 @@ fn mml_uses_edited_custom_ids() {
 
     let _ = fs::remove_dir_all(&instance);
     crate::test_support::cleanup(&[&out, &out2]);
+}
+
+/// 标成可选的模组要在清单里带 Optional，没标的不能带
+#[test]
+fn mml_marks_optional_mods() {
+    crate::test_support::ensure_boot();
+    let base = crate::test_support::temp_dir("server-instance-optional");
+    let out = crate::test_support::temp_dir("server-instance-optional-out");
+    fs::create_dir_all(base.join("mods")).unwrap();
+    fs::write(base.join("mods").join("opt.jar"), b"opt").unwrap();
+    fs::write(base.join("mods").join("plain.jar"), b"plain").unwrap();
+
+    let mut options = options("mml", &["mods/opt.jar", "mods/plain.jar"], &[], &[]);
+    options.mods[0].optional = true;
+    let contents = contents(&base, &options);
+    let _ = generate_mml(
+        &game(),
+        &HashMap::new(),
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    let pack: ServerPackObj =
+        serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
+    let opt = pack
+        .online_list
+        .iter()
+        .find(|item| item.file == "mods/opt.jar")
+        .expect("应有可选模组");
+    let plain = pack
+        .online_list
+        .iter()
+        .find(|item| item.file == "mods/plain.jar")
+        .expect("应有普通模组");
+    assert!(opt.optional, "标了可选的模组要带 Optional");
+    assert!(!plain.optional, "没标的不能带 Optional");
+
+    crate::test_support::cleanup(&[&base, &out]);
 }
 
 /// 实例自带图标时复制进输出文件夹，没有图标时返回 None

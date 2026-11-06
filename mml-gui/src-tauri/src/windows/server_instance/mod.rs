@@ -267,6 +267,7 @@ pub async fn server_instance_get_snapshot(
             .map(|item| ServerInstanceSnapshotEntryDto {
                 path: item.path.clone(),
                 sha1: item.sha1.clone(),
+                optional: item.optional,
             })
             .collect::<Vec<_>>()
     };
@@ -656,12 +657,15 @@ fn generate_mml(
                 &entry.fid,
             )?
         };
+        // 可选模组由清单下发；客户端首次同步时装成禁用
+        item.optional = entry.optional;
         let sha1 = item.sha1.clone().unwrap_or_default();
         mod_snapshot.insert(
             key.clone(),
             mapping::EntrySnapshot {
                 path: wire.clone(),
                 sha1: sha1.clone(),
+                optional: entry.optional,
             },
         );
         if item.custom {
@@ -776,6 +780,7 @@ fn generate_mml(
             mapping::EntrySnapshot {
                 path: wire.clone(),
                 sha1: sha1.clone(),
+                optional: false,
             },
         );
         if item.custom {
@@ -888,6 +893,7 @@ fn generate_hmcl(
             mapping::EntrySnapshot {
                 path: wire,
                 sha1: files::sha1(&base.join(rel))?,
+                optional: pick.optional,
             },
         );
     }
@@ -903,6 +909,7 @@ fn generate_hmcl(
             mapping::EntrySnapshot {
                 path: wire,
                 sha1: files::sha1(&base.join(rel))?,
+                optional: false,
             },
         );
     }
@@ -1121,6 +1128,7 @@ fn source_item(
         sha1: Some(files::sha1(&base.join(rel))?),
         sha256: None,
         custom,
+        optional: false,
     })
 }
 
@@ -1168,6 +1176,7 @@ fn hosted_item(
         sha1: Some(files::sha1(&base.join(rel))?),
         sha256: None,
         custom,
+        optional: false,
     })
 }
 

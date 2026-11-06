@@ -454,6 +454,7 @@ impl HMCLServerObj {
                 sha1: Some(item.hash.trim().to_string()).filter(|hash| !hash.is_empty()),
                 sha256: None,
                 custom: false,
+                optional: false,
             })
             .collect();
 

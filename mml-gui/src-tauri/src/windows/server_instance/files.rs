@@ -35,6 +35,8 @@ pub(super) struct ModPick {
     pub(super) edited: bool,
     /// 编号类型是否被用户改过
     pub(super) type_changed: bool,
+    /// 是否标成可选：客户端首次同步时装成禁用
+    pub(super) optional: bool,
 }
 
 /// 按勾选展开模组文件，路径相对游戏目录
@@ -87,6 +89,7 @@ pub(super) fn mods(base: &Path, picks: &[ServerInstancePickDto]) -> Result<Vec<M
                 custom: single && pick.custom,
                 edited: single && pick.edited,
                 type_changed: single && pick.type_changed,
+                optional: single && pick.optional,
             };
             selected.insert(rel, entry);
         }

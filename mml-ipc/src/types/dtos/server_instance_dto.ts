@@ -22,6 +22,7 @@ export type ServerInstancePickDto = {
   custom: boolean,
   edited: boolean,
   typeChanged: boolean,
+  optional: boolean,
 };
 
 export type ServerInstanceConfigDto = {
@@ -62,6 +63,7 @@ export type ServerInstanceSnapshotDto = {
 export type ServerInstanceSnapshotEntryDto = {
   path: string,
   sha1: string,
+  optional: boolean,
 };
 
 export type ServerInstanceChangesDto = {

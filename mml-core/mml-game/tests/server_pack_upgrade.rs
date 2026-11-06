@@ -11,6 +11,7 @@ use std::sync::{Arc, Mutex, Once};
 use std::time::Duration;
 
 use mml_base::hash_helper::{HashType, gen_hash};
+use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 use mml_game::launcher::ModPackType;
 use mml_game::loader::LoaderType;
 use mml_game::serverpack::serverpack_obj::{
@@ -750,4 +751,211 @@ fn base_archive_is_downloaded_once() {
         b"motd=v1",
         "后续版本不该覆盖已经解压的基础文件"
     );
+}
+
+/// 等后台线程把本地清单落盘：升级要先看到旧清单，否则算不出该删什么
+fn wait_local_manifest(snapshot: &InstanceSettingObj) {
+    let file = snapshot.get_server_pack_file();
+    for _ in 0..100 {
+        if file.is_file() {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    panic!("旧清单应已落盘");
+}
+
+/// 可选模组换升级换文件名时，启用过的保持启用、停用着的保持停用
+#[test]
+fn optional_mod_keeps_enabled_state_when_renamed() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _run = ensure_init();
+    let (routes, port) = Routes::start();
+
+    let a1 = b"opt a v1".to_vec();
+    let b1 = b"opt b v1".to_vec();
+    let mut a = indexed(port, "mods/a-1.jar", "a1.jar", &a1, "901", "9011");
+    a.optional = true;
+    let mut b = indexed(port, "mods/b-1.jar", "b1.jar", &b1, "902", "9021");
+    b.optional = true;
+    let v1 = manifest("1.0.0", "21.1.259", vec![a, b]);
+    routes.set(vec![
+        ("/pack/server.json", manifest_bytes(&v1)),
+        ("/pack/a1.jar", a1.clone()),
+        ("/pack/b1.jar", b1.clone()),
+    ]);
+
+    let uuid = block_on(mml_game::add_game::install_server_pack_from_url(
+        &format!("http://127.0.0.1:{port}/pack"),
+        None,
+        None,
+        None,
+        None,
+        CancellationToken::new(),
+    ))
+    .expect("导入应成功");
+    let game = mml_game::get_instance(&uuid).expect("实例应已登记");
+    let base = game.read().unwrap().get_game_path();
+
+    assert!(base.join("mods/a-1.jar.disabled").is_file());
+    assert!(base.join("mods/b-1.jar.disabled").is_file());
+
+    // 玩家启用 a，b 保持停用
+    std::fs::rename(
+        base.join("mods/a-1.jar.disabled"),
+        base.join("mods/a-1.jar"),
+    )
+    .unwrap();
+
+    // 版本 2：两个模组都换内容、换文件名，项目号不变
+    let a2 = b"opt a v2".to_vec();
+    let b2 = b"opt b v2".to_vec();
+    let mut a2_item = indexed(port, "mods/a-2.jar", "a2.jar", &a2, "901", "9012");
+    a2_item.optional = true;
+    let mut b2_item = indexed(port, "mods/b-2.jar", "b2.jar", &b2, "902", "9022");
+    b2_item.optional = true;
+    let v2 = manifest("1.0.1", "21.1.259", vec![a2_item, b2_item]);
+    routes.set(vec![
+        ("/pack/server.json", manifest_bytes(&v2)),
+        ("/pack/a2.jar", a2.clone()),
+        ("/pack/b2.jar", b2.clone()),
+    ]);
+
+    let snapshot = game.read().unwrap().clone();
+    wait_local_manifest(&snapshot);
+    block_on(mml_game::add_game::upgrade_server_pack(
+        &snapshot,
+        None,
+        CancellationToken::new(),
+    ))
+    .expect("升级应成功");
+
+    assert_eq!(
+        std::fs::read(base.join("mods/a-2.jar")).unwrap(),
+        a2,
+        "启用过的可选模组换了文件名也要保持启用"
+    );
+    assert!(!base.join("mods/a-2.jar.disabled").exists());
+    assert!(!base.join("mods/a-1.jar").exists(), "旧文件名要删掉");
+
+    assert!(
+        base.join("mods/b-2.jar.disabled").is_file(),
+        "一直停用着的可选模组换了文件名仍要停用"
+    );
+    assert!(!base.join("mods/b-2.jar").exists());
+    assert_eq!(std::fs::read(base.join("mods/b-2.jar.disabled")).unwrap(), b2);
+}
+
+/// 可选模组首次装成禁用；玩家启用后升级保持启用；清单删掉后连禁用文件一起删
+#[test]
+fn optional_mod_installs_disabled_and_removes_with_pack() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _run = ensure_init();
+    let (routes, port) = Routes::start();
+
+    let opt_v1 = b"optional v1".to_vec();
+    let keep = b"keep".to_vec();
+    let mut opt = plain(port, "mods/opt.jar", "opt.jar", &opt_v1);
+    opt.optional = true;
+    let v1 = manifest(
+        "1.0.0",
+        "21.1.259",
+        vec![opt, plain(port, "mods/keep.jar", "keep.jar", &keep)],
+    );
+    routes.set(vec![
+        ("/pack/server.json", manifest_bytes(&v1)),
+        ("/pack/opt.jar", opt_v1.clone()),
+        ("/pack/keep.jar", keep.clone()),
+    ]);
+
+    let uuid = block_on(mml_game::add_game::install_server_pack_from_url(
+        &format!("http://127.0.0.1:{port}/pack"),
+        None,
+        None,
+        None,
+        None,
+        CancellationToken::new(),
+    ))
+    .expect("导入应成功");
+    let game = mml_game::get_instance(&uuid).expect("实例应已登记");
+    let base = game.read().unwrap().get_game_path();
+
+    assert!(
+        !base.join("mods/opt.jar").exists(),
+        "可选模组首次装好应是禁用状态"
+    );
+    assert!(
+        base.join("mods/opt.jar.disabled").is_file(),
+        "禁用后缀与 MMC / HMCL 一致，用 .disabled"
+    );
+    assert_eq!(
+        std::fs::read(base.join("mods/opt.jar.disabled")).unwrap(),
+        opt_v1
+    );
+    assert!(base.join("mods/keep.jar").is_file(), "普通模组照常启用");
+
+    // 玩家自己启用：去掉禁用后缀
+    std::fs::rename(base.join("mods/opt.jar.disabled"), base.join("mods/opt.jar")).unwrap();
+
+    // 版本 2：同一条可选模组换了内容，玩家的启用状态要保留
+    let opt_v2 = b"optional v2".to_vec();
+    let mut opt_v2_item = plain(port, "mods/opt.jar", "opt2.jar", &opt_v2);
+    opt_v2_item.optional = true;
+    let v2 = manifest(
+        "1.0.1",
+        "21.1.259",
+        vec![
+            opt_v2_item,
+            plain(port, "mods/keep.jar", "keep.jar", &keep),
+        ],
+    );
+    routes.set(vec![
+        ("/pack/server.json", manifest_bytes(&v2)),
+        ("/pack/opt2.jar", opt_v2.clone()),
+        ("/pack/keep.jar", keep.clone()),
+    ]);
+
+    let snapshot = game.read().unwrap().clone();
+    wait_local_manifest(&snapshot);
+    block_on(mml_game::add_game::upgrade_server_pack(
+        &snapshot,
+        None,
+        CancellationToken::new(),
+    ))
+    .expect("升级应成功");
+
+    assert_eq!(
+        std::fs::read(base.join("mods/opt.jar")).unwrap(),
+        opt_v2,
+        "玩家启用的可选模组升级后仍是启用状态"
+    );
+    assert!(!base.join("mods/opt.jar.disable").exists());
+
+    // 版本 3：可选模组从清单删掉，启用 / 禁用两种文件名都要清掉
+    let v3 = manifest(
+        "1.0.2",
+        "21.1.259",
+        vec![plain(port, "mods/keep.jar", "keep.jar", &keep)],
+    );
+    routes.set(vec![
+        ("/pack/server.json", manifest_bytes(&v3)),
+        ("/pack/keep.jar", keep.clone()),
+    ]);
+
+    let snapshot = game.read().unwrap().clone();
+    wait_local_manifest(&snapshot);
+    block_on(mml_game::add_game::upgrade_server_pack(
+        &snapshot,
+        None,
+        CancellationToken::new(),
+    ))
+    .expect("升级应成功");
+
+    assert!(!base.join("mods/opt.jar").exists(), "启用的可选模组要删掉");
+    assert!(
+        !base.join("mods/opt.jar.disable").exists(),
+        "禁用后缀的那份也要删掉"
+    );
+    assert!(!base.join("mods/opt.jar.disabled").exists());
+    assert!(base.join("mods/keep.jar").is_file());
 }

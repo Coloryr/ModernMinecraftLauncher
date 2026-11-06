@@ -47,6 +47,8 @@ pub(super) struct EntrySnapshot {
     pub(super) path: String,
     /// 文件内容 SHA1
     pub(super) sha1: String,
+    /// 生成时是否标成可选模组；只对模组有意义
+    pub(super) optional: bool,
 }
 
 /// 上次生成时保存的选项

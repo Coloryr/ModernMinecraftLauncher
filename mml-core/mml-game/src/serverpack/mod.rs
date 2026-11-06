@@ -163,6 +163,20 @@ impl InstanceSettingObj {
             paths::validate_pack(old, &game_path, &temp_path)?;
         }
 
+        // 删旧文件之前先记下玩家启用着的条目：可选模组换文件名时按它延续启用状态，
+        // 否则更新一次版本就被重新装成禁用了
+        let mut kept_enabled: HashSet<String> = HashSet::new();
+        if let Some(old) = &old {
+            for item in &old.online_list {
+                let Ok(target) = paths::file_path(&game_path, &item.file) else {
+                    continue;
+                };
+                if existing_file(&target).is_some_and(|(_, disabled)| !disabled) {
+                    kept_enabled.insert(plan::mod_key(item));
+                }
+            }
+        }
+
         if let Some(old) = &old {
             // 删什么由纯函数算，见 `serverpack::plan`，这里只负责执行
             let plan = plan::plan_removals(old, &new_pack);
@@ -261,14 +275,25 @@ impl InstanceSettingObj {
         }
 
         for planned in &plan.files {
-            // 本地文件已经和清单一致就不重复下载：只补缺失、内容和清单不一致的
-            if local_matches(planned.item, &game_path) {
+            let target = paths::file_path(&game_path, &planned.item.file)?;
+            // 禁用中的文件同样算已装好：只比内容，不把玩家停用的模组又装回启用
+            let existing = existing_file(&target);
+            if let Some((path, _)) = &existing
+                && matches_hash(planned.item, path)
+            {
                 continue;
             }
+            // 玩家之前启用着这条（可能换了文件名）时，新版本照样装成启用
+            let keep_enabled = kept_enabled.contains(&plan::mod_key(planned.item));
+            let file = plan::install_path(
+                &target,
+                existing.as_ref().map(|(path, _)| path.as_path()),
+                planned.item.optional && !keep_enabled,
+            );
             downloads.push(FileItemObj {
                 url: planned.url.clone(),
                 name: planned.item.file.clone(),
-                file: paths::file_path(&game_path, &planned.item.file)?,
+                file,
                 hash: plan::make_hash(&planned.item.sha1, &planned.item.sha256),
                 later: LaterRun::None,
             });
@@ -400,7 +425,9 @@ impl InstanceSettingObj {
             .iter()
             .filter_map(|item| file_name_of(&item.file))
             .collect();
-        info.retain(|_, item| !owned.contains(&item.file) && local_file(game_path, item).is_file());
+        info.retain(|_, item| {
+            !owned.contains(&item.file) && existing_file(&local_file(game_path, item)).is_some()
+        });
 
         for item in new_pack.online_list.iter().filter(|item| !item.custom) {
             let (Some(pid), Some(fid)) =
@@ -408,13 +435,13 @@ impl InstanceSettingObj {
             else {
                 continue;
             };
-            // 本地没有这个文件就没什么可记的
-            let Ok(local) = paths::file_path(game_path, &item.file) else {
+            // 本地没有这个文件就没什么可记的；禁用中的也算，玩家随时会再启用
+            let Ok(target) = paths::file_path(game_path, &item.file) else {
                 continue;
             };
-            if !local.is_file() {
+            let Some((local, _)) = existing_file(&target) else {
                 continue;
-            }
+            };
 
             // 表的主键是 SHA1，按本地文件为准：清单没给校验值就现算
             let sha1 = match trimmed(item.sha1.as_deref()) {
@@ -559,21 +586,42 @@ async fn download_all(
     Ok(())
 }
 
-/// 本地文件是否已经与清单一致
+/// 本地已有的文件：原始名，或追加了 `.disabled` / `.disable` 后缀的禁用版
+///
+/// 模组、资源包被禁用后文件名会变，按原始路径判断存在性会把"已经装好但停用"当成没装，
+/// 每次同步都覆盖一次，玩家停用的东西就又被装回启用了。
+///
+/// - `target`: 清单里的原始路径
+///
+/// # 返回值
+///
+/// 已存在的路径与是否处于禁用状态；三个都没有时是 `None`
+fn existing_file(target: &Path) -> Option<(PathBuf, bool)> {
+    if target.is_file() {
+        return Some((target.to_path_buf(), false));
+    }
+    // 新文件统一 `.disabled`，旧版留下的 `.disable` 也认
+    for suffix in [names::DISABLED_DOT_EXT, names::DISABLE_DOT_EXT] {
+        let path = plan::with_suffix(target, suffix);
+        if path.is_file() {
+            return Some((path, true));
+        }
+    }
+    None
+}
+
+/// 文件内容是否与清单一致
 ///
 /// 清单给了 SHA1 就比 SHA1，只给 SHA256 就比 SHA256；没有校验值、文件不存在或读不到时
 /// 一律当作需要下载，交给后面的下载流程覆盖。
 ///
 /// - `item`: 清单条目
-/// - `game_path`: 游戏目录
+/// - `path`: 本地文件，可能是带禁用后缀的那一个
 ///
 /// # 返回值
 ///
 /// 文件存在且校验值一致返回 `true`
-fn local_matches(item: &ServerItemObj, game_path: &Path) -> bool {
-    let Ok(path) = paths::file_path(game_path, &item.file) else {
-        return false;
-    };
+fn matches_hash(item: &ServerItemObj, path: &Path) -> bool {
     if !path.is_file() {
         return false;
     }
@@ -594,7 +642,7 @@ fn local_matches(item: &ServerItemObj, game_path: &Path) -> bool {
         return false;
     };
     matches!(
-        gen_hash_from_file(hash_type, &path),
+        gen_hash_from_file(hash_type, path),
         Ok(hash) if hash.eq_ignore_ascii_case(expected)
     )
 }
@@ -817,6 +865,33 @@ async fn resolve_download_urls(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 禁用文件两个后缀都认，优先新后缀；模组以外的文件改名停用同样算
+    #[test]
+    fn existing_file_accepts_legacy_suffix() {
+        let dir = mml_testutil::temp_path(format!("mml-existing-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("mods")).unwrap();
+        let target = dir.join("mods/a.jar");
+
+        std::fs::write(dir.join("mods/a.jar.disable"), b"old").unwrap();
+        let found = existing_file(&target).expect("旧后缀也要认");
+        assert!(found.1);
+        assert!(found.0.ends_with("a.jar.disable"));
+
+        std::fs::write(dir.join("mods/a.jar.disabled"), b"new").unwrap();
+        let found = existing_file(&target).expect("新后缀要认");
+        assert!(found.1);
+        assert!(found.0.ends_with("a.jar.disabled"), "两个都在时用新后缀");
+
+        std::fs::write(dir.join("config.toml.disable"), b"x").unwrap();
+        assert!(
+            existing_file(&dir.join("config.toml")).is_some(),
+            "不限于 .jar：任何被改名停用的文件都要认"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn under_only_matches_descendants() {

@@ -15,6 +15,9 @@
 
 ### 新增
 
+- 服务器实例的模组可以标成「可选」：清单里带 `Optional`，玩家首次同步时装成禁用状态，
+  自己启用即可；之后再更新保持玩家当前状态，更新版本换了文件名时按项目号延续，
+  启用过的不会被重新禁用。模组从清单删掉时启用 / 禁用两种文件名都会清掉。
 - 手柄：固定按钮表以外的按键（高级手柄背面的拨片这类）在手柄图下方单独列出来，显示底层编号、
   按下时点亮；新出现的按键按第一次按下的顺序往后追加，松开后仍留在列表里。
 - 启动前 / 启动后命令支持整行写法：一行里写「程序 + 参数」（`python.exe "%GAME_BASE_DIR%\update\updater.py"`），
@@ -65,6 +68,8 @@
 - MMC 导出的 `instance.cfg` 按 MMC 的完整格式写：补上 `[General]`、`ConfigVersion`、各 Override
   与 ManagedPack 字段，不再只有 `InstanceType` / `name` / 内存几项；Prism / MultiMC 导入后
   设置能正常落位。
+- 模组禁用后缀统一成 `.disabled`，与 MMC / HMCL 一致；旧版留下的 `.disable` 仍按禁用处理，
+  两种后缀都会在启用、更新、删除时正确识别。
 - 自定义 JVM 参数、游戏参数与附加 classpath 里的占位符（`%GAME_BASE_DIR%`、`%GAME_DIR%`、
   `%JAVA_LOCAL%` 等）原来原样交给 JVM，`-javaagent:%GAME_BASE_DIR%/mml-server-sync.jar=...`
   因为路径里带着 `%` 而找不到 agent 文件；现在与启动前 / 后命令走同一套替换。

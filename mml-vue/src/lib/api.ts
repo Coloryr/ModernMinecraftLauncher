@@ -2556,7 +2556,7 @@ export function onModsUpdateDone(cb: (e: ModUpdateDoneDto) => void): Promise<Unl
 }
 
 /**
- * 启用模组，去掉 .disable / .disabled 后缀
+ * 启用模组，去掉 .disabled 后缀，旧版的 .disable 也认
  *
  * - `uuid`: 实例 uuid
  * - `modUuid`: 模组当前的 uuid
@@ -2572,7 +2572,7 @@ export function enableMod(uuid: string, modUuid: string): Promise<ModRenameDto> 
 }
 
 /**
- * 禁用模组，追加 .disable 后缀
+ * 禁用模组，追加 .disabled 后缀，与 MMC / HMCL 一致
  *
  * - `uuid`: 实例 uuid
  * - `modUuid`: 模组当前的 uuid

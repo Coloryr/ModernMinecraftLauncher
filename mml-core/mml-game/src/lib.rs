@@ -1241,7 +1241,7 @@ impl InstanceSettingObj {
 
     /// 更新在线文件信息
     ///
-    /// 清理掉磁盘上已不存在的文件记录；被禁用而追加了 `.disabled` 后缀的视作仍存在。
+    /// 清理掉磁盘上已不存在的文件记录；被禁用而追加了 `.disabled` / `.disable` 后缀的视作仍存在。
     pub async fn update_online(&self) {
         let mut online = self.read_online_info();
         let dir = self.get_game_path();
@@ -1250,11 +1250,10 @@ impl InstanceSettingObj {
             if file.exists() {
                 false
             } else {
-                if let Some(ext) = file.extension()
-                    && ext.eq_ignore_ascii_case(names::JAR_EXT)
-                {
+                // 新后缀是 `.disabled`，旧版留下的 `.disable` 同样算还存在
+                for suffix in [names::DISABLED_DOT_EXT, names::DISABLE_DOT_EXT] {
                     let disabled_file =
-                        PathBuf::from(format!("{}{}", file.display(), names::DISABLED_DOT_EXT));
+                        PathBuf::from(format!("{}{}", file.display(), suffix));
                     if disabled_file.exists() {
                         return false;
                     }

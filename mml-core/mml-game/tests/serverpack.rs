@@ -13,8 +13,11 @@
 //! 判定逻辑已抽到 [`mml_game::serverpack::plan`]，纯函数，无 IO 无网络，
 //! 所以"删错文件 / 下错地址"这类最危险的判定都能离线测。
 
-use std::sync::{Mutex, Once};
-use std::time::{Duration, Instant};
+use std::{
+    path::{Path, PathBuf},
+    sync::{Mutex, Once},
+    time::{Duration, Instant},
+};
 
 use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 use mml_game::serverpack::plan;
@@ -139,6 +142,28 @@ fn make_hash_covers_all_combinations() {
 }
 
 /// `is_curseforge`：编号是纯数字才算 CurseForge
+/// 下载落点：首次装可选模组写成禁用名，已有文件保持玩家当前的启用状态
+#[test]
+fn install_path_keeps_state_and_disables_new_optional() {
+    let target = Path::new("mods/a.jar");
+    assert_eq!(
+        plan::install_path(target, None, false),
+        PathBuf::from("mods/a.jar")
+    );
+    assert_eq!(
+        plan::install_path(target, None, true),
+        PathBuf::from("mods/a.jar.disabled")
+    );
+    assert_eq!(
+        plan::install_path(target, Some(Path::new("mods/a.jar")), true),
+        PathBuf::from("mods/a.jar")
+    );
+    assert_eq!(
+        plan::install_path(target, Some(Path::new("mods/a.jar.disabled")), true),
+        PathBuf::from("mods/a.jar.disabled")
+    );
+}
+
 #[test]
 fn is_curseforge_by_numeric_id() {
     // pid 数字 → CF；pid 非数字 → Modrinth

@@ -24,6 +24,9 @@ const {
   setModIdType,
   urlOf,
   setModUrl,
+  format,
+  optionalOf,
+  toggleModOptional,
   lockedProjectIds,
   changedPaths,
   baseName,
@@ -57,12 +60,13 @@ const {
   <div v-if="modChanges && modChanges.removed.length" class="si-changes si-changes-list">
     <span v-for="path in modChanges.removed" :key="path" class="si-change del">- {{ baseName(path) }}</span>
   </div>
-  <!-- 一张表：勾选 / 文件名 / 编号类型 / 项目编号 / 文件编号 / 下载地址 / 哈希值
+  <!-- 一张表：勾选 / 可选 / 文件名 / 编号类型 / 项目编号 / 文件编号 / 下载地址 / 哈希值
        几百个模组逐个渲染太重，行虚拟化只画视口附近那些 -->
   <VirtualList class="si-mod-table" :count="mods.length" :row-h="MOD_ROW_H" :row-gap="0">
     <template #header>
       <div class="si-mod-head">
         <span>{{ t("serverInstance.colSync") }}</span>
+        <span>{{ t("serverInstance.colOptional") }}</span>
         <span>{{ t("serverInstance.colFile") }}</span>
         <span>{{ t("serverInstance.colIdType") }}</span>
         <span>{{ t("serverInstance.colProject") }}</span>
@@ -82,6 +86,12 @@ const {
         <span class="si-cell-check">
           <input type="checkbox" class="si-box" :checked="pickedMods.has(row.path)" :disabled="busy"
             @change="pickedMods = toggled(pickedMods, row.path)" />
+        </span>
+        <span class="si-cell-check">
+          <input type="checkbox" class="si-box" :checked="optionalOf(row.path)"
+            :disabled="busy || format === 'hmcl'"
+            :title="format === 'hmcl' ? t('serverInstance.optionalHmcl') : t('serverInstance.optionalHint')"
+            @change="toggleModOptional(row.path)" />
         </span>
         <span class="si-cell-name" :title="row.path">
           <em v-if="addedMods.has(row.path)" class="si-mark add">+</em>

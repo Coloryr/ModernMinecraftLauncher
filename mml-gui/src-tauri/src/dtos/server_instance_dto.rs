@@ -62,6 +62,9 @@ pub struct ServerInstancePickDto {
     /// 编号类型是否被用户改过；改过时以 custom 为准
     #[serde(default)]
     pub type_changed: bool,
+    /// 是否标成可选模组：客户端首次同步时装成禁用，玩家可自行启用
+    #[serde(default)]
+    pub optional: bool,
 }
 
 /// 一个要同步的配置目录
@@ -149,6 +152,8 @@ pub struct ServerInstanceSnapshotEntryDto {
     pub path: String,
     /// 上次生成时的文件 SHA1
     pub sha1: String,
+    /// 上次生成时是否标成可选模组
+    pub optional: bool,
 }
 
 /// 条目变化汇总，用于生成后给模组 / 资源包表格着色

@@ -15,9 +15,13 @@
 //!
 //! 判定规则**原样搬运**，未做修改。
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use mml_base::file_item::FileHash;
+use mml_names::names;
 use mml_net::modrinth_api::version_obj::ModrinthVersionObj;
 
 use crate::serverpack::serverpack_obj::{ServerArchiveItemObj, ServerItemObj, ServerPackObj};
@@ -149,6 +153,56 @@ pub fn plan_downloads<'a>(
 /// 返回身份标识字符串
 pub fn mod_key(item: &ServerItemObj) -> String {
     item.pid.clone().unwrap_or_else(|| item.file.clone())
+}
+
+/// 给文件名追加后缀
+///
+/// - `path`: 原始文件路径，如 `mods/foo.jar`
+/// - `suffix`: 要追加的后缀，如 `.disabled`
+///
+/// # 返回值
+///
+/// 形如 `mods/foo.jar.disabled`；路径没有文件名时原样返回
+pub fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
+    let Some(name) = path.file_name() else {
+        return path.to_path_buf();
+    };
+    let mut name = name.to_os_string();
+    name.push(suffix);
+    path.with_file_name(name)
+}
+
+/// 禁用状态的文件名：追加 `.disabled`
+///
+/// 后缀与 MMC / HMCL 一致；旧版留下的 `.disable` 在读取时仍然认。
+///
+/// - `target`: 清单里的原始路径
+///
+/// # 返回值
+///
+/// 形如 `mods/foo.jar.disabled`
+pub fn disabled_path(target: &Path) -> PathBuf {
+    with_suffix(target, names::DISABLED_DOT_EXT)
+}
+
+/// 这次下载写到哪个文件
+///
+/// 本地已有同名文件时沿用它的路径：玩家手动启用的保持启用，禁用中的保持禁用。
+/// 本地没有文件、清单又标了可选时写成禁用名，装完默认不加载。
+///
+/// - `target`: 清单里的原始路径
+/// - `existing`: 本地已有的文件路径，含禁用后缀；没有时是 `None`
+/// - `optional`: 清单是否把这一条标成可选
+///
+/// # 返回值
+///
+/// 下载写入的路径
+pub fn install_path(target: &Path, existing: Option<&Path>, optional: bool) -> PathBuf {
+    match existing {
+        Some(path) => path.to_path_buf(),
+        None if optional => disabled_path(target),
+        None => target.to_path_buf(),
+    }
 }
 
 /// 根据校验值构建下载哈希

@@ -88,6 +88,8 @@ const pickedBase = ref(new Set<string>());
 const mods = ref<ExportEntryDto[]>([]);
 /** 勾选的模组路径 */
 const pickedMods = ref(new Set<string>());
+/** 标成可选的模组路径：客户端首次同步时装成禁用，玩家可自行启用 */
+const optionalMods = ref(new Set<string>());
 /** 每个模组的下载地址，路径 → 地址；载入时用实例记录的那份铺底 */
 const modUrls = ref(new Map<string, string>());
 /** 每个模组手填的项目编号 / 文件编号，路径 → 编号 */
@@ -380,6 +382,16 @@ function toggleBase(path: string) {
   pickedBase.value = toggled(pickedBase.value, path);
 }
 
+/** 这个模组有没有标成可选 */
+function optionalOf(path: string): boolean {
+  return optionalMods.value.has(path);
+}
+
+/** 勾选 / 取消可选标记 */
+function toggleModOptional(path: string) {
+  optionalMods.value = toggled(optionalMods.value, path);
+}
+
 /** 全选 / 全不选模组 */
 function pickAllMods(all: boolean) {
   pickedMods.value = all ? new Set(mods.value.map((item) => item.path)) : new Set();
@@ -564,6 +576,10 @@ async function loadInstance(uuid: string) {
   packIdTypeEdits.value = new Set();
   // 等两张表都填好再启用快照预览，避免资源包加载前闪一下全部删除
   lastSnapshot.value = snapshot;
+  // 可选标记跟着上次生成走：生成窗口关掉再开，服务端发布者的选择要还在
+  optionalMods.value = new Set(
+    (snapshot?.mods ?? []).filter((item) => item.optional).map((item) => item.path),
+  );
 
   let dirsNext: ExportEntryDto[] = [];
   try {
@@ -760,6 +776,7 @@ function clearInstance() {
   baseEntries.value = [];
   pickedBase.value = new Set();
   pickedMods.value = new Set();
+  optionalMods.value = new Set();
   modUrls.value = new Map();
   modPids.value = new Map();
   modFids.value = new Map();
@@ -922,6 +939,7 @@ function buildOptions(): ServerInstanceOptionsDto {
         custom: isCustomType(path, row?.customId ?? false),
         edited,
         typeChanged: modIdTypeEdits.value.has(path),
+        optional: optionalMods.value.has(path),
       };
     }),
     configs: configs.value.map((item) => ({
@@ -943,6 +961,8 @@ function buildOptions(): ServerInstanceOptionsDto {
           custom: isPackCustomType(row.path, row.customId),
           edited,
           typeChanged: packIdTypeEdits.value.has(row.path),
+          // 可选只对模组生效，资源包一律照常启用
+          optional: false,
         };
       }),
   };
@@ -1060,6 +1080,7 @@ onBeforeUnmount(() => {
     baseEntries, pickedBase, pickAllBase, toggleBase,
     mods, pickedMods, pickAllMods, toggled, modPidOf, modFidOf, setModId, baseName,
     modIdTypeOf, isCustomType, setModIdType,
+    optionalMods, optionalOf, toggleModOptional,
     urlOf, setModUrl, lockedProjectIds, changedPaths,
     packs, pickedPacks, pickAllPacks, packPidOf, packFidOf, packUrlOf,
     setPackId, setPackUrl, packIdTypeOf, isPackCustomType, setPackIdType,

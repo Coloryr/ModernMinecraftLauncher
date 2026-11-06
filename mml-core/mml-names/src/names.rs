@@ -142,7 +142,9 @@ pub const ZIP_EXT: &str = "zip";
 pub const R7Z_EXT: &str = "7z";
 pub const JAR_EXT: &str = "jar";
 pub const JSON_EXT: &str = "json";
+/// 旧版禁用后缀，读取时仍认；新禁用的文件统一用 `DISABLED_EXT`
 pub const DISABLE_EXT: &str = "disable";
+/// 禁用模组的后缀，与 MMC / HMCL 一致
 pub const DISABLED_EXT: &str = "disabled";
 pub const LITEMATIC_EXT: &str = "litematic";
 pub const SCHEMATIC_EXT: &str = "schematic";
@@ -188,7 +190,9 @@ pub const ZIP_DOT_EXT: &str = ".zip";
 pub const R7Z_DOT_EXT: &str = ".7z";
 pub const JAR_DOT_EXT: &str = ".jar";
 pub const JSON_DOT_EXT: &str = ".json";
+/// 旧版禁用后缀，读取时仍认；新禁用的文件统一用 `DISABLED_DOT_EXT`
 pub const DISABLE_DOT_EXT: &str = ".disable";
+/// 禁用模组的后缀，与 MMC / HMCL 一致
 pub const DISABLED_DOT_EXT: &str = ".disabled";
 pub const LITEMATIC_DOT_EXT: &str = ".litematic";
 pub const SCHEMATIC_DOT_EXT: &str = ".schematic";
