@@ -56,6 +56,8 @@
     if (cmd === "plugin:window|current_monitor" || cmd === "plugin:window|primary_monitor") return null;
     if (cmd === "plugin:window|available_monitors") return [];
     if (cmd === "plugin:webview|position" || cmd === "plugin:webview|size") return null;
+    // 其余插件命令（进度条、角标、拖放开关等）在截图里没有副作用，一律当成功
+    if (cmd.startsWith("plugin:")) return null;
     return undefined;
   }
 

@@ -416,7 +416,7 @@
   border: none;
   border-radius: var(--ctl-radius);
   background: var(--accent-grad);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 13px;
   font-family: inherit;
   font-weight: 600;
@@ -650,5 +650,5 @@
 
 .install-btn:hover {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }

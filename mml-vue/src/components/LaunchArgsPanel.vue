@@ -19,6 +19,7 @@ import MemoryHint from "./MemoryHint.vue";
 import NumberStepper from "./ui/NumberStepper.vue";
 import CollapsePanel from "./ui/CollapsePanel.vue";
 import { memoryLabel } from "../lib/format";
+import { useLineKeys } from "../composables/useLineKeys";
 
 const props = defineProps<{
   /** 当前实例的启动参数 */
@@ -209,6 +210,11 @@ async function pickJava() {
 // ---- 多行字符串参数 ----
 type LineKey = "jvmArgs" | "gameArgs" | "classPath";
 
+const jvmKeys = useLineKeys(() => props.args.jvmArgs.length);
+const gameKeys = useLineKeys(() => props.args.gameArgs.length);
+const classKeys = useLineKeys(() => props.args.classPath.length);
+const envKeys = useLineKeys(() => props.args.envVars.length);
+
 function setLine(key: LineKey, idx: number, value: string) {
   const arr = [...props.args[key]];
   arr[idx] = value;
@@ -219,6 +225,9 @@ function removeLine(key: LineKey, idx: number) {
   const arr = [...props.args[key]];
   arr.splice(idx, 1);
   update({ [key]: arr } as Partial<InstanceArgsDto>);
+  if (key === "jvmArgs") jvmKeys.drop(idx);
+  else if (key === "gameArgs") gameKeys.drop(idx);
+  else classKeys.drop(idx);
 }
 
 function addLine(key: LineKey) {
@@ -240,6 +249,7 @@ function removeEnv(idx: number) {
   const arr = [...props.args.envVars];
   arr.splice(idx, 1);
   update({ envVars: arr });
+  envKeys.drop(idx);
 }
 
 function addEnv() {
@@ -369,7 +379,7 @@ const gcOptions = computed(() => [
 
           <!-- 附加 JVM 参数 -->
           <label class="args-label">{{ t("args.jvmExtra") }}</label>
-          <div v-for="(line, i) in args.jvmArgs" :key="i" class="line-row">
+          <div v-for="(line, i) in args.jvmArgs" :key="jvmKeys.keys[i]" class="line-row">
             <input class="field-input grow" :value="line" placeholder="-XX:+UseG1GC" spellcheck="false"
               @input="setLine('jvmArgs', i, ($event.target as HTMLInputElement).value)" />
             <button class="line-del" v-tip="t('args.removeLine')" @click="removeLine('jvmArgs', i)">
@@ -382,7 +392,7 @@ const gcOptions = computed(() => [
 
           <!-- 附加游戏参数 -->
           <label class="args-label">{{ t("args.gameExtra") }}</label>
-          <div v-for="(line, i) in args.gameArgs" :key="i" class="line-row">
+          <div v-for="(line, i) in args.gameArgs" :key="gameKeys.keys[i]" class="line-row">
             <input class="field-input grow" :value="line" placeholder="--server 127.0.0.1:25565" spellcheck="false"
               @input="setLine('gameArgs', i, ($event.target as HTMLInputElement).value)" />
             <button class="line-del" v-tip="t('args.removeLine')" @click="removeLine('gameArgs', i)">
@@ -395,7 +405,7 @@ const gcOptions = computed(() => [
 
           <!-- 附加 classpath -->
           <label class="args-label">{{ t("args.classPath") }}</label>
-          <div v-for="(line, i) in args.classPath" :key="i" class="line-row">
+          <div v-for="(line, i) in args.classPath" :key="classKeys.keys[i]" class="line-row">
             <input class="field-input grow" :value="line" placeholder="libraries/xxx.jar" spellcheck="false"
               @input="setLine('classPath', i, ($event.target as HTMLInputElement).value)" />
             <button class="line-del" v-tip="t('args.removeLine')" @click="removeLine('classPath', i)">
@@ -420,7 +430,7 @@ const gcOptions = computed(() => [
 
           <!-- 附加环境变量（键值对） -->
           <label class="args-label">{{ t("args.env") }}</label>
-          <div v-for="(line, i) in args.envVars" :key="i" class="line-row">
+          <div v-for="(line, i) in args.envVars" :key="envKeys.keys[i]" class="line-row">
             <input class="field-input env-key" :value="line.key" :placeholder="t('args.envKey')" spellcheck="false"
               @input="setEnvKey(i, ($event.target as HTMLInputElement).value)" />
             <input class="field-input grow" :value="line.value" :placeholder="t('args.envValue')" spellcheck="false"

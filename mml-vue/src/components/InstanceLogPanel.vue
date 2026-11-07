@@ -51,6 +51,17 @@ const filteredLogs = computed(() =>
   ),
 );
 
+/** 同一秒里可能有多条相同日志，key 用「时间 + 级别 + 文本 + 出现次数」，不用下标 */
+const keyedLogs = computed(() => {
+  const seen = new Map<string, number>();
+  return filteredLogs.value.map((line) => {
+    const base = line.time + "|" + (line.level ?? "") + "|" + line.text;
+    const n = seen.get(base) ?? 0;
+    seen.set(base, n + 1);
+    return { line, key: n ? base + "#" + n : base };
+  });
+});
+
 // 日志被清空时重置筛选，清空来自 clear 事件或切换实例
 watch(
   () => props.logs.length === 0,
@@ -82,7 +93,7 @@ watch(
     </div>
 
     <div ref="consoleEl" class="console">
-      <div v-for="(line, i) in filteredLogs" :key="i" class="log-line"
+      <div v-for="{ line, key } in keyedLogs" :key="key" class="log-line"
         :class="{ 'log-error': line.level === 'Error', 'log-warn': line.level === 'Warn' }">
         {{ line.text }}
       </div>
@@ -118,7 +129,7 @@ watch(
 .console {
   height: 46vh;
   max-height: 480px;
-  background: #0d0f12;
+  background: var(--bg-console);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 12px 14px;
@@ -135,19 +146,19 @@ watch(
 .log-line {
   white-space: pre-wrap;
   word-break: break-all;
-  color: #c8d0da;
+  color: var(--log-text);
 }
 
 .log-line.log-error {
-  color: #ff7b72;
+  color: var(--log-error);
 }
 
 .log-line.log-warn {
-  color: #e3b341;
+  color: var(--log-warn);
 }
 
 .log-empty {
-  color: #4d5560;
+  color: var(--log-dim);
   text-align: center;
   margin-top: 80px;
 }

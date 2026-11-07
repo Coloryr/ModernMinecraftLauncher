@@ -363,9 +363,9 @@ function onMenuPick(id: string) {
   height: var(--ctl-h);
   padding: 0 12px;
   border-radius: 8px;
-  border: 1px solid rgb(255 255 255 / 25%);
-  background: rgb(0 0 0 / 55%);
-  color: rgb(255 255 255 / 90%);
+  border: 1px solid var(--on-accent-border);
+  background: var(--overlay);
+  color: var(--on-accent-strong);
   font-size: 12px;
   font-family: inherit;
   cursor: pointer;
@@ -373,8 +373,8 @@ function onMenuPick(id: string) {
 }
 
 .mini-btn:hover {
-  border-color: #fff;
-  color: #fff;
+  border-color: var(--on-accent);
+  color: var(--on-accent);
 }
 
 .mini-btn.danger:hover {

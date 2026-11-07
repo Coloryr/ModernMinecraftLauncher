@@ -33,13 +33,13 @@ npm run shots -- --clean
 
 产物：
 
-- `target/screens/<图片名>.png`：每个场景一张，视口见下表；
-- `target/screens/index.html`：本次与历史截图的索引页；
+- `target/screens/<窗口>/<图片名>.png`：每个场景一张，按窗口 kind 分目录，视口见下表；
+- `target/screens/index.html`：按窗口分组的索引页；
 - `target/screens/report.json`：失败原因、页面错误、未 mock 的命令。
 
 ## 场景表
 
-共 245 个场景，按窗口分组。
+共 250 个场景，按窗口分组。
 「窗口」列是页面的 `kind`，窗口族场景会自动带上实例参数，不需要在命令里另写；
 控件场景的 `control` 是截图工具里的预览页，不是启动器窗口。
 
@@ -54,6 +54,8 @@ npm run shots -- --clean
 | `main-advanced` | 主窗口 · 实例设置 · 扩展参数 | `main` | 1280×900 |
 | `main-advanced-scroll` | 主窗口 · 实例设置 · 扩展参数 · 滚动 | `main` | 1280×900 |
 | `main-home` | 主窗口 · 主页 | `main` | 1280×800 |
+| `main-launching` | 主窗口 · 启动中 | `main` | 1280×800 |
+| `main-running` | 主窗口 · 运行中 | `main` | 1280×800 |
 | `main-empty` | 主窗口 · 空状态 | `main` | 1280×800 |
 | `main-ctx-menu` | 主窗口 · 右键菜单 | `main` | 1280×800 |
 | `main-rename-modal` | 主窗口 · 重命名弹窗 | `main` | 1280×800 |
@@ -104,6 +106,7 @@ npm run shots -- --clean
 | `resource-mods-table` | 资源管理 · 模组 · 表格 | `resource` | 1280×800 |
 | `resource-packs` | 资源管理 · 资源包 | `resource` | 1280×800 |
 | `resource-saves` | 资源管理 · 存档 | `resource` | 1280×800 |
+| `resource-datapacks` | 资源管理 · 数据包 | `resource` | 1280×800 |
 | `resource-shaders` | 资源管理 · 光影 | `resource` | 1280×800 |
 | `resource-servers` | 资源管理 · 服务器 | `resource` | 1280×800 |
 | `resource-schematics` | 资源管理 · 投影 | `resource` | 1280×800 |
@@ -358,6 +361,8 @@ npm run shots -- --clean
 | 图片 | 画面 | 窗口 | 视口 |
 | --- | --- | --- | --- |
 | `help` | 帮助 | `help` | 1050×760 |
+| `help-licenses` | 帮助 · 开源许可 | `help` | 1050×760 |
+| `help-services` | 帮助 · 第三方服务与平台 | `help` | 1050×760 |
 
 ### 统计
 

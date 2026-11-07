@@ -28,35 +28,23 @@ const label = computed(() => t(typeLabelKey(props.authType)));
 }
 
 .acc-type.microsoft {
-  background: rgba(63, 140, 255, 0.16);
-  color: #8fb0ff;
+  background: var(--auth-microsoft-bg);
+  color: var(--auth-microsoft);
 }
 
 .acc-type.littleskin {
-  background: rgba(168, 85, 247, 0.16);
-  color: #c084fc;
+  background: var(--auth-littleskin-bg);
+  color: var(--auth-littleskin);
 }
 
 .acc-type.authlib {
-  background: rgba(245, 158, 11, 0.16);
+  background: var(--auth-authlib-bg);
   color: var(--yellow);
 }
 
 .acc-type.nide8 {
-  background: rgba(6, 182, 212, 0.16);
-  color: #22d3ee;
+  background: var(--auth-nide8-bg);
+  color: var(--auth-nide8);
 }
 
-/* 亮色主题：浅色文字落在白卡片上看不清，换深色系 */
-[data-theme="Light"] .acc-type.microsoft {
-  color: #2563eb;
-}
-
-[data-theme="Light"] .acc-type.littleskin {
-  color: #9333ea;
-}
-
-[data-theme="Light"] .acc-type.nide8 {
-  color: #0e7490;
-}
 </style>

@@ -219,6 +219,11 @@ async function waitReady(cdp, sessionId, scenario) {
   throw new Error("页面没有就绪: " + scenario.id);
 }
 
+/** 场景产物所在的子目录：按窗口 kind 分，控件预览这类独立页面落在 control/ */
+function groupOf(scenario) {
+  return scenario.group || scenario.kind || "misc";
+}
+
 function scenarioSource(scenario) {
   const payload = {
     commands: scenario.commands || {},
@@ -275,7 +280,10 @@ async function shoot(cdp, browser, scenario, index) {
     }
 
     const shot = await cdp.send("Page.captureScreenshot", { format: "png", fromSurface: true }, sessionId);
-    const file = join(OUT_DIR, (scenario.id || "shot-" + index) + ".png");
+    // 一个窗口一个子目录：产物按窗口归类，索引页也按同样的分组排版
+    const dir = join(OUT_DIR, groupOf(scenario));
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, (scenario.id || "shot-" + index) + ".png");
     writeFileSync(file, Buffer.from(shot.data, "base64"));
 
     const runtimeErrors = await evalIn(cdp, sessionId, "JSON.stringify(window.__SHOT__ ? window.__SHOT__.errors : [])");
@@ -345,31 +353,81 @@ async function launchEdge(port, profile) {
 }
 
 
-/** 生成一个可直接打开的索引页：目录里的每张截图都列出，失败与未 mock 一并标出 */
+/** 分组顺序：按场景表里第一次出现的顺序，剩下的按名字排在后面 */
+function groupOrder() {
+  const order = [];
+  for (const s of scenarios) {
+    const g = groupOf(s);
+    if (!order.includes(g)) order.push(g);
+  }
+  return order;
+}
+
+/** 递归数产物：按窗口分目录后，顶层只剩 index.html / report.json */
+function countShots(dir) {
+  let n = 0;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) n += countShots(join(dir, entry.name));
+    else if (entry.name.endsWith(".png")) n += 1;
+  }
+  return n;
+}
+
+/** 生成一个可直接打开的索引页：按窗口分组列出截图，失败与未 mock 一并标出 */
 function writeIndex(report) {
-  // 以目录里的 PNG 为准：只跑部分场景时，旧截图也要留在索引里
   const byId = new Map(report.map((item) => [item.id, item]));
-  const ids = readdirSync(OUT_DIR)
-    .filter((name) => name.endsWith(".png"))
-    .map((name) => name.slice(0, -4))
-    .sort();
+  const shots = [];
+  // 以目录里的 PNG 为准：只跑部分场景时，旧截图也要留在索引里
+  for (const entry of readdirSync(OUT_DIR, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    for (const name of readdirSync(join(OUT_DIR, entry.name))) {
+      if (name.endsWith(".png")) {
+        shots.push({ id: name.slice(0, -4), group: entry.name, rel: entry.name + "/" + name });
+      }
+    }
+  }
   // 失败场景没有 PNG，也要进索引，否则看不出哪张没跑出来
   for (const item of report) {
-    const failed = item.error || (item.unknown && item.unknown.length) || (item.runtimeErrors && item.runtimeErrors.length);
-    if (failed && !ids.includes(item.id)) ids.push(item.id);
+    const failed =
+      item.error || (item.unknown && item.unknown.length) || (item.runtimeErrors && item.runtimeErrors.length);
+    if (!failed || shots.some((s) => s.id === item.id)) continue;
+    const scenario = scenarios.find((s) => s.id === item.id);
+    shots.push({ id: item.id, group: scenario ? groupOf(scenario) : "misc", rel: "" });
   }
-  const cards = ids
-    .map((id) => {
-      const item = byId.get(id) ?? { id };
-      const notes = [];
-      if (item.error) notes.push("失败：" + item.error);
-      for (const u of item.unknown || []) notes.push("未 mock：" + u);
-      for (const e of item.runtimeErrors || []) notes.push("页面错误：" + e);
-      const name = id + ".png";
-      const img = existsSync(join(OUT_DIR, name)) ? '<a href="' + name + '"><img loading="lazy" src="' + name + '" alt="' + id + '"></a>' : "";
-      return '<figure><figcaption>' + id + "</figcaption>" + img + (notes.length ? "<p>" + notes.join("<br>") + "</p>" : "") + "</figure>";
+
+  const order = groupOrder();
+  const rank = (name) => {
+    const i = order.indexOf(name);
+    return i < 0 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  const groups = new Map();
+  for (const shot of shots) {
+    if (!groups.has(shot.group)) groups.set(shot.group, []);
+    groups.get(shot.group).push(shot);
+  }
+  const names = [...groups.keys()].sort((x, y) => rank(x) - rank(y) || x.localeCompare(y));
+
+  const sections = names
+    .map((group) => {
+      const cards = groups
+        .get(group)
+        .sort((x, y) => x.id.localeCompare(y.id))
+        .map(({ id, rel }) => {
+          const item = byId.get(id) ?? { id };
+          const notes = [];
+          if (item.error) notes.push("失败：" + item.error);
+          for (const u of item.unknown || []) notes.push("未 mock：" + u);
+          for (const e of item.runtimeErrors || []) notes.push("页面错误：" + e);
+          const img = rel
+            ? '<a href="' + rel + '"><img loading="lazy" src="' + rel + '" alt="' + id + '"></a>'
+            : "";
+          return '<figure><figcaption>' + id + "</figcaption>" + img + (notes.length ? "<p>" + notes.join("<br>") + "</p>" : "") + "</figure>";
+        })
+        .join("\n");
+      return '<section><h2>' + group + " · " + groups.get(group).length + '</h2><div class="grid">' + cards + "</div></section>";
     })
     .join("\n");
+
   const html = [
     "<!doctype html>",
     '<meta charset="utf-8">',
@@ -377,14 +435,15 @@ function writeIndex(report) {
     "<style>",
     "body{font-family:system-ui,sans-serif;background:#eef1f5;margin:20px;color:#1d2229}",
     "h1{font-size:18px}",
+    "h2{font-size:14px;margin:22px 0 10px}",
     ".grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}",
     "figure{margin:0;background:#fff;border:1px solid #d8dce3;border-radius:10px;padding:8px}",
     "figcaption{font-size:12px;font-weight:600;margin-bottom:6px}",
     "img{width:100%;height:auto;border-radius:6px;display:block}",
     "p{font-size:11px;color:#6a7480;margin:6px 0 0}",
     "</style>",
-    "<h1>M²L 页面截图 · " + ids.length + " 个场景</h1>",
-    '<div class="grid">' + cards + "</div>",
+    "<h1>M²L 页面截图 · " + shots.length + " 个场景 · " + names.length + " 个窗口</h1>",
+    sections,
   ].join("\n");
   writeFileSync(join(OUT_DIR, "index.html"), html);
 }
@@ -465,17 +524,27 @@ function mergeReports(previous, current) {
     .sort((a, b) => order.get(a.id) - order.get(b.id));
 }
 
+/** 旧版本把截图平铺在顶层：按场景挪进窗口目录，新索引只认分目录 */
+function migrateFlatShots() {
+  for (const name of readdirSync(OUT_DIR)) {
+    if (!name.endsWith(".png")) continue;
+    const scenario = scenarios.find((s) => s.id === name.slice(0, -4));
+    if (!scenario) continue;
+    const dir = join(OUT_DIR, groupOf(scenario));
+    mkdirSync(dir, { recursive: true });
+    const from = join(OUT_DIR, name);
+    const to = join(dir, name);
+    if (!existsSync(to)) writeFileSync(to, readFileSync(from));
+    rmSync(from, { force: true });
+  }
+}
+
 async function main() {
   cleanupStaleProfiles();
-  mkdirSync(OUT_DIR, { recursive: true });
   // 只跑部分场景时保留已有截图，方便逐张补齐；要整批重来用 --clean
-  if (clean) {
-    for (const name of readdirSync(OUT_DIR)) {
-      if (name.endsWith(".png") || name === "report.json" || name === "index.html") {
-        rmSync(join(OUT_DIR, name), { force: true });
-      }
-    }
-  }
+  if (clean) rmSync(OUT_DIR, { recursive: true, force: true });
+  mkdirSync(OUT_DIR, { recursive: true });
+  migrateFlatShots();
   let previous = [];
   try {
     const file = join(OUT_DIR, "report.json");
@@ -522,7 +591,7 @@ async function main() {
     if (vite) killTree(vite);
   }
   const failed = report.filter((r) => r.error || (r.unknown && r.unknown.length) || (r.consoleErrors && r.consoleErrors.length));
-  const total = readdirSync(OUT_DIR).filter((name) => name.endsWith(".png")).length;
+  const total = countShots(OUT_DIR);
   console.log("\n[done] 本次 " + report.length + " 张，目录共 " + total + " 张:", OUT_DIR);
   if (failed.length) {
     console.log("[有问题的场景]");

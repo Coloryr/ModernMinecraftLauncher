@@ -210,7 +210,7 @@ function isCurrent(acc: AccountStoreDto): boolean {
   padding: 2px 8px;
   border-radius: 20px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   white-space: nowrap;
   flex-shrink: 0;
   margin-left: 6px;

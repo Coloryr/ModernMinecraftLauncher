@@ -64,8 +64,8 @@ function onChevronClick(node: FileNode) {
             " />
 
         <!-- 图标 -->
-        <svg v-if="node.isDir" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#f5b944" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round" class="ftree-ico">
+        <svg v-if="node.isDir" viewBox="0 0 24 24" width="14" height="14" fill="none" class="ftree-ico tree-folder-icon"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
         </svg>
         <svg v-else viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
@@ -89,6 +89,11 @@ function onChevronClick(node: FileNode) {
 </template>
 
 <style scoped>
+/* 目录图标颜色跟主题的强调黄走 */
+.tree-folder-icon {
+  stroke: var(--yellow);
+}
+
 .ftree-row {
   display: flex;
   align-items: center;

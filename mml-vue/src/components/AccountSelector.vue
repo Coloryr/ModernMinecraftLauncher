@@ -170,7 +170,7 @@ function pick(account: AccountStoreDto) {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 700;
   font-size: 15px;
   flex-shrink: 0;
@@ -214,7 +214,7 @@ function pick(account: AccountStoreDto) {
 
 /* 类型只靠文字颜色区分，不铺底色 */
 .type-ms {
-  color: #8fd0ff;
+  color: var(--auth-avatar);
 }
 
 .type-offline {
@@ -222,16 +222,16 @@ function pick(account: AccountStoreDto) {
 }
 
 .type-external {
-  color: #22d3ee;
+  color: var(--auth-nide8);
 }
 
 /* 亮色主题：浅色文字在白底上看不清，换深色系 */
 [data-theme="Light"] .type-ms {
-  color: #2563eb;
+  color: var(--auth-microsoft);
 }
 
 [data-theme="Light"] .type-external {
-  color: #0e7490;
+  color: var(--auth-nide8);
 }
 
 /* 真实头像图；加载失败回退字母头像 */
@@ -298,7 +298,7 @@ function pick(account: AccountStoreDto) {
   background: var(--bg-modal);
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 6px 18px var(--shadow-avatar);
   padding: 8px;
   z-index: 200;
   /* 菜单贴右缘，展开时以右上角为原点，避免向左"甩" */
@@ -338,8 +338,8 @@ function pick(account: AccountStoreDto) {
 }
 
 .menu-item.active {
-  background: rgba(79, 140, 255, 0.14);
-  outline: 1px solid rgba(79, 140, 255, 0.4);
+  background: var(--accent-soft);
+  outline: 1px solid var(--accent-border);
 }
 
 .menu-meta {

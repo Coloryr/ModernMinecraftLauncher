@@ -129,11 +129,11 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 700;
   flex-shrink: 0;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 2px 6px var(--overlay-faint);
+  border: 1px solid var(--on-accent-line);
   user-select: none;
   overflow: hidden;
   position: relative;
@@ -161,7 +161,7 @@ watch(
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 45%);
+  background: linear-gradient(180deg, var(--on-accent-sheen), transparent 45%);
   pointer-events: none;
 }
 

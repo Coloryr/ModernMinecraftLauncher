@@ -11,7 +11,7 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg-modal-raised);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.28);
+  box-shadow: 0 8px 24px var(--shadow-pop);
 }
 
 /* 批量菜单顶部的"已选 n 项"（说明动作作用在这一批上） */

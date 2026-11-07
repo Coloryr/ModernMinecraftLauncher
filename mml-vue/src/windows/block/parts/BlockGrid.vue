@@ -337,7 +337,7 @@ function onCellKey(e: KeyboardEvent, i: number) {
 .cell-check.on {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .grid-scroll {

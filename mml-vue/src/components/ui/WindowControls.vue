@@ -289,13 +289,13 @@ onUnmounted(() => {
 }
 
 .window-controls.windows .wc-btn.close.snap-hover {
-  background: #e81123;
-  color: #fff;
+  background: var(--window-close);
+  color: var(--on-accent);
 }
 
 .window-controls.windows .wc-btn.close:hover {
-  background: #e81123;
-  color: #fff;
+  background: var(--window-close);
+  color: var(--on-accent);
 }
 
 /* ---------- macos 样式：左端三个圆点 ---------- */
@@ -309,19 +309,19 @@ onUnmounted(() => {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  color: rgb(0 0 0 / 55%);
+  color: var(--overlay);
 }
 
 .window-controls.macos .wc-btn.close {
-  background: #ff5f57;
+  background: var(--mac-red);
 }
 
 .window-controls.macos .wc-btn.minimize {
-  background: #febc2e;
+  background: var(--mac-yellow);
 }
 
 .window-controls.macos .wc-btn.maximize {
-  background: #28c840;
+  background: var(--mac-green);
 }
 
 /* 符号默认不显示，鼠标移到这一组上才出现（与 macOS 一致） */

@@ -9,7 +9,7 @@ import {
   addVersions, blockItems, collectItems, collectWithData, commonCommands, downloadStatus, groups, instances, javaDownloadList, lobbyView,
   statsSingleDay, customHomeStatus, customUiStatus, modpackDetail, modpackFiles, modpackItems, modpackStatus, modpackStatusDone, modpackStatusFailed,
   resourceDeps, resourceFiles, resourceItems, resourceStatusRunning,
-  javaList, resourceView, saves, schematics, servers, shaders,
+  datapacks, javaList, resourceView, saves, schematics, servers, shaders,
 } from "./data.mjs";
 
 function base(extra = {}, view = {}) {
@@ -108,6 +108,24 @@ export const scenarios = [
     ],
   },
   { id: "main-home", kind: "main", label: "mml-main", size: [1280, 800], commands: base({}, { viewMode: "grid", startupPage: "Home" }) },
+  {
+    id: "main-launching",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({}, { viewMode: "list", startupPage: "List" }),
+    actions: [
+      { eval: emit("launch-state", { uuid: "inst-1", state: "download", progress: 42 }), after: 800 },
+    ],
+  },
+  {
+    id: "main-running",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({}, { viewMode: "list", startupPage: "List" }),
+    actions: [{ eval: emit("launch-state", { uuid: "inst-1", state: "end", progress: null }), after: 800 }],
+  },
   { id: "main-empty", kind: "main", label: "mml-main", size: [1280, 800], commands: base({ main_get_instances: [], main_get_groups: [] }, { viewMode: "grid" }) },
   {
     id: "main-ctx-menu",
@@ -344,6 +362,18 @@ export const scenarios = [
   { id: "resource-mods-table", kind: "resource", label: "mml-resource-inst-1", size: [1280, 800], query: "uuid=inst-1", commands: withView("mods", {}, "table") },
   { id: "resource-packs", kind: "resource", label: "mml-resource-inst-1", size: [1280, 800], query: "uuid=inst-1", commands: withView("resourcepacks") },
   { id: "resource-saves", kind: "resource", label: "mml-resource-inst-1", size: [1280, 800], query: "uuid=inst-1", commands: withView("saves", { resource_list_saves: saves }) },
+  {
+    id: "resource-datapacks",
+    kind: "resource",
+    label: "mml-resource-inst-1",
+    size: [1280, 800],
+    query: "uuid=inst-1",
+    commands: withView("saves", { resource_list_saves: saves, resource_list_datapacks: datapacks }),
+    actions: [
+      { eval: clickText("数据包", ".seg-tabs"), after: 400 },
+      { eval: selectAt(".dp-select", 0, "世界一"), after: 500 },
+    ],
+  },
   { id: "resource-shaders", kind: "resource", label: "mml-resource-inst-1", size: [1280, 800], query: "uuid=inst-1", commands: withView("shaders", { resource_list_shaderpacks: shaders }) },
   { id: "resource-servers", kind: "resource", label: "mml-resource-inst-1", size: [1280, 800], query: "uuid=inst-1", commands: withView("servers", { resource_list_servers: servers }) },
   { id: "resource-schematics", kind: "resource", label: "mml-resource-inst-1", size: [1280, 800], query: "uuid=inst-1", commands: withView("schematics", { resource_list_schematics: schematics }) },
@@ -1787,6 +1817,22 @@ export const scenarios = [
     actions: [{ eval: emit("export-progress", { state: "error", now: 12, total: 100, text: "复制失败", error: "目标目录不可写", file: "" }), after: 600 }],
   },
   { id: "help", kind: "help", label: "mml-help", size: [1050, 760], commands: base() },
+  {
+    id: "help-licenses",
+    kind: "help",
+    label: "mml-help",
+    size: [1050, 760],
+    commands: base(),
+    actions: [{ eval: clickText("开源许可"), after: 500 }],
+  },
+  {
+    id: "help-services",
+    kind: "help",
+    label: "mml-help",
+    size: [1050, 760],
+    commands: base(),
+    actions: [{ eval: clickText("第三方服务与平台"), after: 500 }],
+  },
   { id: "stats", kind: "stats", label: "mml-stats", size: [1150, 800], commands: base() },
   {
     id: "stats-other",

@@ -4,6 +4,7 @@
 // - **非代理项**即改即存：下载源 / 线程 / 校验开关 / DNS；
 // - **代理项是"草稿 + 显式保存"**：草稿独立，只有点「保存」才合并进 `network` 并落盘。
 //   直接改 `network` 的话，任一处 `applyNetwork()` 都会整份提交，把没点保存的代理地址顺带写盘。
+import { useLineKeys } from "../../../composables/useLineKeys";
 import { computed, reactive, ref } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
@@ -59,6 +60,8 @@ export function useSettingsNetwork() {
   const network = ref<NetworkSettingDto | null>(null);
   /** DoH 地址逐行草稿（失焦 / 回车才落盘） */
   const dnsLines = ref<string[]>([]);
+  /** 逐行编辑的稳定 key：删中间一行时后面的输入框不会复用错位 */
+  const dnsKeys = useLineKeys(() => dnsLines.value.length);
   /** 代理草稿 */
   const proxy = reactive<ProxyDraft>({ ...EMPTY_DRAFT });
 
@@ -235,6 +238,7 @@ export function useSettingsNetwork() {
   return {
     network,
     dnsLines,
+    dnsKeys,
     proxy,
     proxyDetailVisible,
     proxyDirty,

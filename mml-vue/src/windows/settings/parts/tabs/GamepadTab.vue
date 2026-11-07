@@ -196,7 +196,7 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
           <span>{{ t("winGamepad.mode") }}</span>
           <span></span>
         </div>
-        <div v-for="(rule, index) in config.buttons" :key="index" class="gp-row gp-row-button">
+        <div v-for="(rule, index) in config.buttons" :key="rule.button + '|' + rule.modifier" class="gp-row gp-row-button">
           <GamepadKeyPicker :button="rule.button" :modifier="rule.modifier" :layout="effectiveLayout"
             :swap-ab="config.swapAb" @update:button="(value) => setRuleButton(rule, value)"
             @update:modifier="(value) => setRuleModifier(rule, value)" />
@@ -234,7 +234,7 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
           <span>{{ t("winGamepad.action") }}</span>
           <span></span>
         </div>
-        <template v-for="(rule, index) in config.axes" :key="index">
+        <template v-for="(rule, index) in config.axes" :key="rule.axis">
           <div class="gp-row gp-row-axis">
             <select v-model="rule.axis" class="field-select">
               <option v-for="axis in ALL_AXES" :key="axis" :value="axis">{{ axisName(axis) }}</option>

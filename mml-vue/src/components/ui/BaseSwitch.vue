@@ -64,6 +64,6 @@ const emit = defineEmits<{
   /* 位移 = 内部可用宽 - 圆点 - 两侧内缩 = 1.5H - (H - 6) - 6 = H / 2。
      原来写的 H - 8 会多推一段，圆点在"开"时凸出开关右缘 */
   transform: translateX(calc(var(--sw-h) / 2));
-  background: #fff;
+  background: var(--on-accent);
 }
 </style>

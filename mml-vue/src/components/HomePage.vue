@@ -101,7 +101,7 @@ function onLobby() {
     <!-- 无实例：空实例引导块 -->
     <div v-if="empty" class="empty-block">
       <div class="empty-block-icon">
-        <!-- 图标跟随所在色块的文字色，.empty-block-icon 已把 color 定为 #fff -->
+        <!-- 图标跟随所在色块的文字色，.empty-block-icon 已把 color 定为白色 -->
         <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6"
           stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 3 4.5 7.5v9L12 21l7.5-4.5v-9L12 3z" />
@@ -275,7 +275,7 @@ function onLobby() {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--on-accent);
   box-shadow: 0 14px 36px var(--accent-soft);
   margin-bottom: 14px;
 }
@@ -341,7 +341,7 @@ function onLobby() {
 .empty-block-btn.primary {
   border: none;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .empty-block-btn.primary:hover {
@@ -377,7 +377,7 @@ function onLobby() {
   border-radius: 8px;
   border: none;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 13px;
   font-weight: 600;
   font-family: inherit;
@@ -411,7 +411,7 @@ function onLobby() {
 
 .last-open:hover {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .entry-cards {
@@ -447,7 +447,7 @@ function onLobby() {
 
 .entry-card.lottery:hover {
   border-color: var(--yellow);
-  background: rgba(245, 185, 68, 0.12);
+  background: var(--star-soft);
 }
 
 .entry-icon {
@@ -466,7 +466,7 @@ function onLobby() {
 }
 
 .entry-card.lottery .entry-icon {
-  background: rgba(245, 185, 68, 0.14);
+  background: var(--star-soft-strong);
   color: var(--yellow);
 }
 

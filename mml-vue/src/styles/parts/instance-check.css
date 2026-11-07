@@ -24,7 +24,7 @@
 .row-check.on {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .inst-row.multi-checked {

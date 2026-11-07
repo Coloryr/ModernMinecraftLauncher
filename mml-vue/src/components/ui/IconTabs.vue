@@ -127,7 +127,7 @@ const emit = defineEmits<{
 .tab-btn.active {
   border-color: transparent;
   background: var(--accent-grad);
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 600;
   box-shadow: 0 6px 16px var(--accent-soft);
 }

@@ -210,7 +210,7 @@ async function apply() {
 
 .pick-size-opt.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 600;
 }
 

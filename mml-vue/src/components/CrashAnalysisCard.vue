@@ -59,6 +59,16 @@ const exceptionChain = computed(() => {
   for (const value of analysis.causes) lines.push(t("analysis.causedBy", { value }));
   return lines.join("\n");
 });
+
+/** 说明里同一行可能重复，key 用「文本 + 出现次数」，不用下标 */
+function keyedLines(lines: string[]) {
+  const seen = new Map<string, number>();
+  return lines.map((line) => {
+    const n = seen.get(line) ?? 0;
+    seen.set(line, n + 1);
+    return { line, key: n ? line + "#" + n : line };
+  });
+}
 </script>
 
 <template>
@@ -78,7 +88,7 @@ const exceptionChain = computed(() => {
         <p><strong>{{ t("analysis.advice") }}：</strong>{{ presentation.advice }}</p>
         <p v-for="hint in presentation.hints" :key="hint">{{ hint }}</p>
         <ul v-if="presentation.details.length" class="analysis-details">
-          <li v-for="(line, index) in presentation.details" :key="index">{{ line }}</li>
+          <li v-for="{ line, key } in keyedLines(presentation.details)" :key="key">{{ line }}</li>
         </ul>
       </div>
 
@@ -120,7 +130,7 @@ const exceptionChain = computed(() => {
             <p v-for="hint in item.presentation.hints" :key="hint">{{ hint }}</p>
             <p v-if="item.finding.mods.length">{{ t("analysis.suspects") }}：{{ item.finding.mods.join(", ") }}</p>
             <ul v-if="item.presentation.details.length" class="analysis-details">
-              <li v-for="(line, index) in item.presentation.details" :key="index">{{ line }}</li>
+              <li v-for="{ line, key } in keyedLines(item.presentation.details)" :key="key">{{ line }}</li>
             </ul>
             <pre v-if="item.finding.evidence.length" class="analysis-pre">{{ item.finding.evidence.join("\n") }}</pre>
           </div>

@@ -772,49 +772,49 @@ onUnmounted(() => {
 
 /* 任务状态 */
 .ts-running {
-  color: #6aa8ff;
-  background: rgba(63, 140, 255, 0.16);
+  color: var(--dl-running);
+  background: var(--dl-running-bg);
 }
 
 .ts-paused {
   color: var(--yellow);
-  background: rgba(245, 185, 68, 0.16);
+  background: var(--dl-paused-bg);
 }
 
 .ts-failed {
-  color: #ff8080;
-  background: rgba(255, 90, 90, 0.16);
+  color: var(--dl-failed);
+  background: var(--dl-failed-bg);
 }
 
 .ts-done {
-  color: #5ecf99;
-  background: rgba(76, 175, 125, 0.16);
+  color: var(--dl-done);
+  background: var(--dl-done-bg);
 }
 
 /* 线程状态 */
 .state-download {
-  color: #6aa8ff;
-  background: rgba(63, 140, 255, 0.16);
+  color: var(--dl-running);
+  background: var(--dl-running-bg);
 }
 
 .state-getinfo {
-  color: #4fd1e0;
-  background: rgba(6, 182, 212, 0.16);
+  color: var(--dl-getinfo);
+  background: var(--dl-getinfo-bg);
 }
 
 .state-init {
-  color: #b98cff;
-  background: rgba(168, 85, 247, 0.16);
+  color: var(--dl-init);
+  background: var(--dl-init-bg);
 }
 
 .state-action {
-  color: #ffab5c;
-  background: rgba(255, 150, 56, 0.16);
+  color: var(--dl-action);
+  background: var(--dl-action-bg);
 }
 
 .state-pause {
   color: var(--yellow);
-  background: rgba(245, 185, 68, 0.16);
+  background: var(--dl-paused-bg);
 }
 
 .state-wait {
@@ -823,13 +823,13 @@ onUnmounted(() => {
 }
 
 .state-done {
-  color: #5ecf99;
-  background: rgba(76, 175, 125, 0.16);
+  color: var(--dl-done);
+  background: var(--dl-done-bg);
 }
 
 .state-error {
-  color: #ff8080;
-  background: rgba(255, 90, 90, 0.16);
+  color: var(--dl-failed);
+  background: var(--dl-failed-bg);
 }
 
 /* 取消不是出错：用与"等待中"同一套弱化色区分开 */

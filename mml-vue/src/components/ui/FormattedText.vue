@@ -12,12 +12,22 @@ const props = defineProps<{
 }>();
 
 const segments = computed(() => parseFormatting(props.text));
+
+/** 相同文字的段可能连着出现（只换颜色），key 用「文本 + 出现次数」，不用下标 */
+const keyedSegments = computed(() => {
+  const seen = new Map<string, number>();
+  return segments.value.map((seg) => {
+    const n = seen.get(seg.text) ?? 0;
+    seen.set(seg.text, n + 1);
+    return { seg, key: n ? seg.text + "#" + n : seg.text };
+  });
+});
 </script>
 
 <template>
   <!-- 外层 span 是为了不破坏父级的布局（inline 容器，逐段铺开） -->
   <span class="fmt-text">
-    <span v-for="(seg, i) in segments" :key="i" :style="segmentStyle(seg)">{{ seg.text }}</span>
+    <span v-for="{ seg, key } in keyedSegments" :key="key" :style="segmentStyle(seg)">{{ seg.text }}</span>
   </span>
 </template>
 

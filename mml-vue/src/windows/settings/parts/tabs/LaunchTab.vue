@@ -32,6 +32,7 @@ const {
   run,
   win,
   envLines,
+  envKeys,
   gcOptions,
   memoryConflict,
   commitEnvLines,
@@ -234,7 +235,7 @@ watch(memoryConflict, async (bad) => {
 
       <label class="field-label">{{ t("winSettings.jvmEnv") }}</label>
       <div class="dns-lines">
-        <div v-for="(_, i) in envLines" :key="i" class="line-row">
+        <div v-for="(_, i) in envLines" :key="envKeys.keys[i]" class="line-row">
           <input v-model="envLines[i].key" class="field-input grow" spellcheck="false" autocomplete="off"
             :placeholder="t('winSettings.envKey')" @change="commitEnvLines" />
           <input v-model="envLines[i].value" class="field-input grow" spellcheck="false" autocomplete="off"

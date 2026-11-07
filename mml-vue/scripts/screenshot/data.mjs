@@ -54,7 +54,7 @@ export const baseConfig = {
     windowEffect: "none",
     windowOpacity: 100,
   },
-  experimental: { launcherAdmin: false, instanceAdmin: false, uriLaunch: true, sandboxLaunch: false },
+  experimental: { launcherAdmin: false, instanceAdmin: false, uriLaunch: true, sandboxLaunch: false, resourceLink: false },
   launchCheck: { checkLoader: true, checkMemory: true },
   font: "",
   skin: { display: "Skin2DB", pitch: 15, yaw: 45 },
@@ -210,6 +210,8 @@ export const instanceArgs = {
   fullscreen: false,
   width: 1280,
   height: 720,
+  memoryInherit: false,
+  windowInherit: false,
   javaName: "",
   javaPath: "",
   gc: "auto",
@@ -220,6 +222,7 @@ export const instanceArgs = {
   classPath: [],
   envVars: [],
   isolateHome: true,
+  mmlEnv: false,
   lang: "zh_cn",
   logEncoding: "utf8",
   preEnabled: false,
@@ -359,16 +362,25 @@ export const resourceView = { order: [], category: "mods", modView: "list", modC
 export const modGroups = [];
 export const blockGroups = { order: ["custom-1"], groups: [{ uuid: "custom-1", name: "我的方块" }], members: { "custom-1": ["stone", "glass"] }, favorites: [] };
 export const blockItems = [
-  { id: "stone", name: "石头", cat: "建筑方块", catId: "building", catUuid: "cat-building", image: svgImage("#9ca3af", "石") },
-  { id: "oak-planks", name: "橡木木板", cat: "建筑方块", catId: "building", catUuid: "cat-building", image: svgImage("#c89b6a", "木") },
-  { id: "glass", name: "玻璃", cat: "建筑方块", catId: "building", catUuid: "cat-building", image: svgImage("#a5d8f3", "玻") },
-  { id: "grass", name: "草方块", cat: "建筑方块", catId: "building", catUuid: "cat-building", image: svgImage("#6fbf73", "草") },
-  { id: "lantern", name: "灯笼", cat: "装饰方块", catId: "decor", catUuid: "cat-decor", image: svgImage("#f6c453", "灯") },
-  { id: "bookshelf", name: "书架", cat: "装饰方块", catId: "decor", catUuid: "cat-decor", image: svgImage("#a97a4e", "书") },
-  { id: "chest", name: "箱子", cat: "功能方块", catId: "functional", catUuid: "cat-functional", image: svgImage("#b7793f", "箱") },
-  { id: "furnace", name: "熔炉", cat: "功能方块", catId: "functional", catUuid: "cat-functional", image: svgImage("#8f8f8f", "炉") },
+  { id: "stone", name: "石头", cat: "建筑方块", catId: "building", catUuid: "cat-building", image: svgImage("#9ca3af", "石"),
+    faces2d: [
+      { faces: "top,bottom", image: svgImage("#b6bcc4", "顶") },
+      { faces: "side", image: svgImage("#9ca3af", "侧") },
+    ] },
+  { id: "oak-planks", name: "橡木木板", cat: "建筑方块", catId: "building", catUuid: "cat-building", image: svgImage("#c89b6a", "木"), faces2d: [] },
+  { id: "glass", name: "玻璃", cat: "建筑方块", catId: "building", catUuid: "cat-building", image: svgImage("#a5d8f3", "玻"), faces2d: [] },
+  { id: "grass", name: "草方块", cat: "建筑方块", catId: "building", catUuid: "cat-building", image: svgImage("#6fbf73", "草"),
+    faces2d: [
+      { faces: "top", image: svgImage("#6fbf73", "顶") },
+      { faces: "bottom", image: svgImage("#8a6a4a", "底") },
+      { faces: "side", image: svgImage("#7cc47f", "侧") },
+    ] },
+  { id: "lantern", name: "灯笼", cat: "装饰方块", catId: "decor", catUuid: "cat-decor", image: svgImage("#f6c453", "灯"), faces2d: [] },
+  { id: "bookshelf", name: "书架", cat: "装饰方块", catId: "decor", catUuid: "cat-decor", image: svgImage("#a97a4e", "书"), faces2d: [] },
+  { id: "chest", name: "箱子", cat: "功能方块", catId: "functional", catUuid: "cat-functional", image: svgImage("#b7793f", "箱"), faces2d: [] },
+  { id: "furnace", name: "熔炉", cat: "功能方块", catId: "functional", catUuid: "cat-functional", image: svgImage("#8f8f8f", "炉"), faces2d: [] },
 ];
-export const collectData = { items: [], groups: {} };
+export const collectData = { items: [], groups: {}, groupOrder: [] };
 
 export const lobbyView = {
   account: "Steve",
@@ -589,7 +601,11 @@ export const collectItems = [
   { uuid: "col-2", name: "Iris Shaders", source: "modrinth", fileType: "shaderpack", pid: "iris", icon: null, url: "https://modrinth.com/mod/iris", favTime: 1761290000000, loaders: ["fabric"], gameVersions: ["1.21.1"] },
   { uuid: "col-3", name: "Create", source: "curseforge", fileType: "mod", pid: "create", icon: null, url: "https://www.curseforge.com/minecraft/mc-mods/create", favTime: 1761190000000, loaders: ["forge"], gameVersions: ["1.20.1"] },
 ];
-export const collectWithData = { items: collectItems, groups: { "我的分组": ["col-1"], "模组": ["col-1", "col-3"], "光影包": ["col-2"] } };
+export const collectWithData = {
+  items: collectItems,
+  groups: { "我的分组": ["col-1"], "模组": ["col-1", "col-3"], "光影包": ["col-2"] },
+  groupOrder: ["我的分组", "模组", "光影包"],
+};
 
 export const modpackItems = [
   {
@@ -799,12 +815,12 @@ export function moreCommands(extra = {}) {
     main_get_motd: null,
     settings_get_network: settingsNetwork,
     settings_get_local_files: [
-      { id: "cache", path: "E:\\M2L\\cache", size: 73400320, deletable: true },
-      { id: "image", path: "E:\\M2L\\image", size: 12582912, deletable: true },
-      { id: "download", path: "E:\\M2L\\download", size: 268435456, deletable: true },
-      { id: "webview", path: "E:\\M2L\\webview", size: 10485760, deletable: true },
-      { id: "instances", path: "E:\\M2L\\instances", size: 3221225472, deletable: false },
-      { id: "java", path: "E:\\M2L\\java", size: 536870912, deletable: false },
+      { id: "cache", path: "E:\\M2L\\cache", size: 73400320, deletable: true, children: [] },
+      { id: "image", path: "E:\\M2L\\image", size: 12582912, deletable: true, children: [] },
+      { id: "download", path: "E:\\M2L\\download", size: 268435456, deletable: true, children: [] },
+      { id: "webview", path: "E:\\M2L\\webview", size: 10485760, deletable: true, children: [] },
+      { id: "instances", path: "E:\\M2L\\instances", size: 3221225472, deletable: false, children: [] },
+      { id: "java", path: "E:\\M2L\\java", size: 536870912, deletable: false, children: [] },
     ],
     settings_get_system_fonts: ["Microsoft YaHei UI", "Segoe UI", "Consolas"],
     resource_view_get: resourceView,
@@ -958,6 +974,23 @@ export function moreCommands(extra = {}) {
 export function commonCommands(extra = {}) {
   return {
     window_get_gui_config: baseConfig,
+    // 升级浮层 / 主窗口顶栏的 Java 安装指示 / .minecraft 探测：App 级组件每屏都会读
+    window_upgrade_status: { running: false, done: false, cancelled: false, now: 0, total: 0 },
+    java_download_status: [],
+    window_check_minecraft: null,
+    settings_resource_map_running: false,
+    server_instance_get_meta: {
+      name: "Better MC",
+      version: "1.20.1",
+      text: "服务端整合包",
+      url: "https://example.com/pack",
+      format: "mml",
+      folder: "E:\\M2L\\server\\Better MC",
+      baseFiles: [],
+      configs: null,
+    },
+    server_instance_get_ids: [],
+    server_instance_get_snapshot: { generated: false, mods: [], packs: [] },
     custom_ui_status: customUiStatus,
     custom_home_status: customHomeStatus,
     app_build_info: buildInfo,
@@ -977,6 +1010,9 @@ export function commonCommands(extra = {}) {
     main_music_base_url: "",
     main_image_base_url: "",
     main_take_start_arg: null,
+    // 启动命令预览：null 表示不弹「确认命令」
+    main_launch_commands: null,
+    account_add_account: null,
     main_get_versions: addVersions,
     main_refresh_versions: addVersions,
     add_get_loader_versions: ["0.16.10", "0.16.9", "0.15.11"],

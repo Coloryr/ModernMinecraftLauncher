@@ -488,7 +488,7 @@ select.field-select {
 /* 变体 */
 .v-primary {
   background: var(--accent-grad);
-  color: #fff;
+  color: var(--on-accent);
   /* 光晕跟着强调色走：写死默认蓝的话，换强调色主题（黄 / 绿 / 粉 …）就露馅 */
   box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 22%, transparent);
 }
@@ -520,7 +520,7 @@ select.field-select {
 
 .v-accent:hover {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .v-danger {

@@ -85,7 +85,7 @@ const ICONS: Record<string, string> = {
 
 .seg-btn.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 600;
 }
 

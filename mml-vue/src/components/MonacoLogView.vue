@@ -488,28 +488,28 @@ watch(wordWrap, (on) => {
 
 /* 整行底色：只铺背景，正文颜色交给 log 语法的 token 色 —— 整行改文字颜色会盖住 token */
 .monaco-editor .mml-log-line-error {
-  background: rgb(248 81 73 / 0.12);
+  background: var(--log-error-bg);
 }
 
 .monaco-editor .mml-log-line-warn {
-  background: rgb(210 153 34 / 0.12);
+  background: var(--log-warn-bg);
 }
 
 .monaco-editor .mml-log-line-debug {
-  background: rgb(110 118 129 / 0.1);
+  background: var(--log-info-bg);
 }
 
 /* 亮色底上同浓度偏重，各降一档 */
 [data-theme="Light"] .monaco-editor .mml-log-line-error {
-  background: rgb(207 34 46 / 0.1);
+  background: var(--log-debug-bg);
 }
 
 [data-theme="Light"] .monaco-editor .mml-log-line-warn {
-  background: rgb(154 103 0 / 0.12);
+  background: var(--log-trace-bg);
 }
 
 [data-theme="Light"] .monaco-editor .mml-log-line-debug {
-  background: rgb(110 119 129 / 0.12);
+  background: var(--log-other-bg);
 }
 
 /* 光标闪烁：Monaco 对**只读**编辑器一律走实心光标（源码 ViewCursors 里 readOnly 直接

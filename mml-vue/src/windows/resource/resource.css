@@ -327,7 +327,7 @@
    认不出来的加载器（如 OptiFine）退回强调色，与实例列表的兜底一致 */
 .resource-layout .badge-loader {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .resource-layout .badge-loader.loader-forge {
@@ -475,7 +475,7 @@
   width: 22px;
   height: 22px;
   border-radius: 6px;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--overlay);
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.12s;

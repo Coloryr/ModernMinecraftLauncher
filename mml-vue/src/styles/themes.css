@@ -2,6 +2,87 @@
    M²L 全局主题样式（暗色 / 亮色两套，通过 <html data-theme> 切换）
    ============================================================ */
 
+/* ---------- 与主题无关的语义常量 ----------
+ * 品牌色、日志终端色、下载状态色这类跨主题不变的值集中在这里；
+ * 亮色主题需要另一套取值的（账号类型、日志文字）在下面的 Light 块里覆盖。 */
+:root {
+  /* 强调色 / 深色块上的文字与描边 */
+  --on-accent: #ffffff;
+  --on-accent-soft: rgb(255 255 255 / 35%);
+  --on-accent-border: rgb(255 255 255 / 25%);
+  --on-accent-text: rgb(255 255 255 / 85%);
+  --on-accent-line: rgba(255, 255, 255, 0.14);
+  --on-accent-strong: rgb(255 255 255 / 90%);
+  --on-accent-sheen: rgba(255, 255, 255, 0.22);
+
+  /* 遮罩与阴影 */
+  --overlay-strong: rgb(0 0 0 / 85%);
+  --overlay-soft: rgba(0, 0, 0, 0.45);
+  --overlay-faint: rgba(0, 0, 0, 0.15);
+  --shadow-pop: rgb(0 0 0 / 28%);
+  --shadow-avatar: rgba(0, 0, 0, 0.22);
+  --shadow-text: rgba(0, 0, 0, 0.6);
+
+  /* 窗口控制按钮 */
+  --window-close: #e81123;
+  --mac-red: #ff5f57;
+  --mac-yellow: #febc2e;
+  --mac-green: #28c840;
+
+  /* 账号类型：品牌色固定，亮色主题在 Light 块里换深色版 */
+  --auth-microsoft: #8fb0ff;
+  --auth-microsoft-bg: rgba(63, 140, 255, 0.16);
+  --auth-littleskin: #c084fc;
+  --auth-littleskin-bg: rgba(168, 85, 247, 0.16);
+  --auth-nide8: #22d3ee;
+  --auth-nide8-bg: rgba(6, 182, 212, 0.16);
+  --auth-authlib-bg: rgba(245, 158, 11, 0.16);
+  --auth-avatar: #8fd0ff;
+
+  /* 日志控制台（终端配色，亮暗主题一致） */
+  --log-text: #c8d0da;
+  --log-error: #ff7b72;
+  --log-warn: #e3b341;
+  --log-dim: #4d5560;
+  --log-error-bg: rgb(248 81 73 / 0.12);
+  --log-warn-bg: rgb(210 153 34 / 0.12);
+  --log-info-bg: rgb(110 118 129 / 0.1);
+  --log-debug-bg: rgb(207 34 46 / 0.1);
+  --log-trace-bg: rgb(154 103 0 / 0.12);
+  --log-other-bg: rgb(110 119 129 / 0.12);
+
+  /* 下载状态（任务行 / 线程行共用） */
+  --dl-running: #6aa8ff;
+  --dl-running-bg: rgba(63, 140, 255, 0.16);
+  --dl-getinfo: #4fd1e0;
+  --dl-getinfo-bg: rgba(6, 182, 212, 0.16);
+  --dl-init: #b98cff;
+  --dl-init-bg: rgba(168, 85, 247, 0.16);
+  --dl-action: #ffab5c;
+  --dl-action-bg: rgba(255, 150, 56, 0.16);
+  --dl-failed: #ff8080;
+  --dl-failed-bg: rgba(255, 90, 90, 0.16);
+  --dl-done: #5ecf99;
+  --dl-done-bg: rgba(76, 175, 125, 0.16);
+  --dl-paused-bg: rgba(245, 185, 68, 0.16);
+
+  /* 启动画面 */
+  --splash-a: #4f8cff;
+  --splash-b: #7c5cff;
+  --splash-glow: rgba(79, 140, 255, 0.35);
+  --splash-error: #ff6363;
+  --splash-error-bg: rgba(255, 99, 99, 0.14);
+
+  /* 黄色强调的浅底（主页提示块） */
+  --star-soft: rgba(245, 185, 68, 0.12);
+  --star-soft-strong: rgba(245, 185, 68, 0.14);
+
+  /* 主窗口条纹高光 */
+  --shine: rgba(255, 255, 255, 0.32);
+}
+
+
+
 :root,
 [data-theme="Dark"] {
   color-scheme: dark;
@@ -51,13 +132,6 @@
 
   /* 收藏星标：收藏是跨主题的通用标记，固定黄色，两套主题取同一个值 */
   --star: #f6b500;
-
-  /* NBT 类型徽章：四个类型各一色。写成固定值而不是引用状态色 / 强调色 ——
-     强调色有十几个预设，跟了就会和用户选的那一色撞成一样，类型就分不出来了 */
-  --nbt-num: #6ea8ff;
-  --nbt-str: #3ecf8e;
-  --nbt-compound: #c9a7ff;
-  --nbt-list: #4fd6c8;
 
   /* 终端色：启动前 / 后命令输出里的 ANSI 16 色，日志窗口按这几个值还原。
      亮色那份在 [data-theme="Light"] 里，改色时两套一起改 */
@@ -147,6 +221,11 @@
 
   /* 收藏星标：口径同暗色那份 */
   --star: #f6b500;
+
+  /* 账号类型：亮底上换成深色版，暗色那套见文件头的 :root */
+  --auth-microsoft: #2563eb;
+  --auth-littleskin: #9333ea;
+  --auth-nide8: #0e7490;
 
   /* NBT 类型徽章：口径同暗色那份 */
   --nbt-num: #2f6fe4;

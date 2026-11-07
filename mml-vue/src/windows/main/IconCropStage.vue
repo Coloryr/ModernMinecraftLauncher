@@ -153,7 +153,7 @@ onUnmounted(onUp);
 
 .sel {
   position: absolute;
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 0 9999px var(--overlay-soft);
   outline: 1px solid var(--accent);
   cursor: move;
 }

@@ -4,6 +4,7 @@
 // - 内存冲突（最小 > 最大）不落盘：露出 `memoryConflict` 给界面标红、保存状态标失败，
 //   冲突提示每轮只弹一次，避免"界面显示非法值、磁盘还是旧值"却毫无提示；
 // - 关窗前把还在防抖窗口里的改动立刻保存。
+import { useLineKeys } from "../../../composables/useLineKeys";
 import { computed, onUnmounted, ref, watch } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
@@ -48,6 +49,8 @@ export function useSettingsLaunch() {
   const win = ref<WindowSettingDto | null>(null);
   /** JVM 环境变量逐条编辑，键 / 值两框；落盘时合成回 run.jvmEnv */
   const envLines = ref<EnvLine[]>([]);
+  /** 逐行编辑的稳定 key：删中间一行时后面的输入框不会复用错位 */
+  const envKeys = useLineKeys(() => envLines.value.length);
 
   const { state, track, markError } = useSaveState();
 
@@ -222,6 +225,7 @@ export function useSettingsLaunch() {
     run,
     win,
     envLines,
+    envKeys,
     gcOptions,
     memoryConflict,
     load,

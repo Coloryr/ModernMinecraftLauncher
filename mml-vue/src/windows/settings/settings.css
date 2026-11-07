@@ -79,7 +79,7 @@
 
 /* 自定义强调色上的对勾：白勾压在彩色块上要一点描边阴影才看得清 */
 .settings-layout .accent-check {
-  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.6));
+  filter: drop-shadow(0 0 2px var(--shadow-text));
 }
 
 /* 校验失败的字段（如内存最小值 > 最大值）：红边 + 提示文字 */
@@ -359,7 +359,7 @@
 
 /* 自定义强调色：彩虹色块，点击弹出系统取色器；input 只当取色入口用，不占位 */
 .settings-layout .accent-custom {
-  background: conic-gradient(#ff5f56, #facc15, #34d399, #22d3ee, #4f8cff, #a78bfa, #e879f9, #ff5f56);
+  background: conic-gradient(var(--swatch-1), var(--swatch-2), var(--swatch-3), var(--swatch-4), var(--swatch-5), var(--swatch-6), var(--swatch-7), var(--swatch-1));
   position: relative;
 }
 

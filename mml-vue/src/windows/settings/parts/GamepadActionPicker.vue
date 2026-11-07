@@ -362,8 +362,8 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
       <div class="ap-layout">
         <!-- 主键盘：按真实键盘的行与宽度排，后端不支持的键只占位 -->
         <div class="ap-keyboard">
-          <div v-for="(row, index) in KEY_ROWS" :key="index" class="ap-row">
-            <button v-for="(key, i) in row" :key="i" type="button" class="ap-key"
+          <div v-for="row in KEY_ROWS" :key="row.map((k) => k.label).join('|')" class="ap-row">
+            <button v-for="key in row" :key="key.label" type="button" class="ap-key"
               :class="{ on: isLast(key), mod: isPicked(key), ghost: !isActive(key) }"
               :style="{ width: keyWidth(key.span) }" :disabled="!isActive(key)"
               @click="key.action && choose(key.action)">
@@ -383,7 +383,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
         <!-- 方向键 + 鼠标 + 滚轮 -->
         <div class="ap-side">
           <div class="ap-side-title">{{ t("winGamepad.arrowKeys") }}</div>
-          <div v-for="(row, index) in ARROW_ROWS" :key="index" class="ap-arrows">
+          <div v-for="row in ARROW_ROWS" :key="row.map((k) => k.label).join('|')" class="ap-arrows">
             <button v-for="key in row" :key="key.label" type="button" class="ap-key"
               :class="{ on: isLast(key), mod: isPicked(key) }"
               :style="{ width: keyWidth(key.span) }"

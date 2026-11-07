@@ -37,6 +37,7 @@ export { default as CompMonacoLogView } from "../components/MonacoLogView.vue";
 export { default as CompMotdCard } from "../components/MotdCard.vue";
 export { default as CompMusicTitleIndicator } from "../components/MusicTitleIndicator.vue";
 export { default as CompNewsPanel } from "../components/NewsPanel.vue";
+export { default as CompProjectCard } from "../components/ProjectCard.vue";
 export { default as CompProjectDetailPage } from "../components/ProjectDetailPage.vue";
 export { default as CompProxyPanel } from "../components/ProxyPanel.vue";
 export { default as CompResourceDownloadBar } from "../components/ResourceDownloadBar.vue";

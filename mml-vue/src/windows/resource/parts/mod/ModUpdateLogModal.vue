@@ -288,7 +288,7 @@ function shortSha1(value: string): string {
             一行放不下时会把右边的文件名挤成一列竖排
           -->
           <div v-if="!isCollapsed(group.projectId)" class="log-rows">
-            <div v-for="(item, index) in group.update" :key="index" class="log-row">
+            <div v-for="(item, index) in group.update" :key="item.time + '|' + item.fileId" class="log-row">
               <div class="log-top">
                 <span class="log-ver">{{ t("resource.updateLogVersion", {
                   from: dash(item.oldVersion), to:

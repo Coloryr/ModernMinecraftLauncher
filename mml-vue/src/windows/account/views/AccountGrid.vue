@@ -258,7 +258,7 @@ function hidePreview() {
   padding: 2px 9px;
   border-radius: 20px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   white-space: nowrap;
 }
 

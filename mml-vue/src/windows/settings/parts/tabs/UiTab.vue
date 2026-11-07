@@ -172,8 +172,8 @@ function toggleCustomPage(on: boolean) {
       <!-- 自定义：彩虹色块，点击弹出系统取色器 -->
       <label class="accent-swatch accent-custom" :class="{ active: accent === 'custom' }"
         v-tip="t('winSettings.accent.custom')">
-        <svg v-if="accent === 'custom'" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff"
-          stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" class="accent-check">
+        <svg v-if="accent === 'custom'" viewBox="0 0 24 24" width="16" height="16" fill="none"
+          class="accent-icon accent-check" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="m5 13 4 4L19 7" />
         </svg>
         <input type="color" :value="customAccent" @input="setCustomAccent(($event.target as HTMLInputElement).value)" />
@@ -345,6 +345,11 @@ function toggleCustomPage(on: boolean) {
 </template>
 
 <style scoped>
+/* 自定义强调色色块上的对勾：描边取深色块上的白 */
+.accent-icon {
+  stroke: var(--on-accent);
+}
+
 /* 已安装的样式：一行一条，开关 / 文件名 / 上移下移 / 删除；列表顺序即注入顺序 */
 .custom-css-list {
   margin: 8px 0 0;

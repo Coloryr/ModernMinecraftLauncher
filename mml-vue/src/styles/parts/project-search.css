@@ -1,0 +1,69 @@
+/* 项目搜索条：下载整合包与添加资源两个窗口共用
+ *
+ * 两边结构一致（.modpack-search / .res-search 包一个输入框 + 一个搜索按钮），
+ * 输入框、按钮与按钮里的转圈只在这里写一份；`.btn-spinner` 限定在搜索行里，
+ * 不影响窗口内其它转圈。
+ */
+.modpack-search .search-input,
+.res-search .search-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.modpack-search .search-btn,
+.res-search .search-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent-grad);
+  color: var(--on-accent);
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: filter 0.12s ease, opacity 0.12s ease;
+}
+
+.modpack-search .search-btn:disabled,
+.res-search .search-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 搜索按钮里的转圈（按钮是渐变底，圈用白色） */
+.modpack-search .btn-spinner,
+.res-search .btn-spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--on-accent-soft);
+  border-top-color: var(--on-accent);
+  border-radius: 50%;
+  animation: project-search-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes project-search-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 两个窗口共用的分页文字与加载失败色 */
+.page-num {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  min-width: 60px;
+  text-align: center;
+  /* 末尾带「共 N 个」，窄了会折行 */
+  white-space: nowrap;
+}
+
+/* 加载失败：与「没有内容」的空状态区分开，用错误色 */
+.load-error {
+  color: var(--red);
+}

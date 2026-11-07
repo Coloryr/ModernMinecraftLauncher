@@ -75,18 +75,19 @@ const {
     </div>
   </div>
 
-  <!-- 三个按钮同一行：生成服务器实例、导出基础包 / 完整包 -->
+  <!-- 三个按钮同一行：左侧导出基础包 / 完整包，右侧生成服务器实例 -->
   <div class="si-actions">
-    <BaseButton variant="primary" size="lg" :disabled="busy || packing || !ready || !pickedCount" @click="generate">
-      {{ busy ? t("serverInstance.running") : t("serverInstance.generate") }}
-    </BaseButton>
-    <BaseButton size="sm" :disabled="busy || packing || !ready || format !== 'mml'"
+    <BaseButton size="md" :disabled="busy || packing || !ready || format !== 'mml'"
       v-tip="format !== 'mml' ? t('serverInstance.packMmlOnly') : ''" @click="exportPack(false)">
       {{ t("serverInstance.packThin") }}
     </BaseButton>
-    <BaseButton size="sm" :disabled="busy || packing || !ready || format !== 'mml'"
+    <BaseButton size="md" :disabled="busy || packing || !ready || format !== 'mml'"
       v-tip="format !== 'mml' ? t('serverInstance.packMmlOnly') : ''" @click="exportPack(true)">
       {{ t("serverInstance.packFull") }}
+    </BaseButton>
+    <BaseButton variant="primary" size="md" class="si-actions-main"
+      :disabled="busy || packing || !ready || !pickedCount" @click="generate">
+      {{ busy ? t("serverInstance.running") : t("serverInstance.generate") }}
     </BaseButton>
   </div>
   <p class="field-hint">{{ t("serverInstance.packHint") }}</p>

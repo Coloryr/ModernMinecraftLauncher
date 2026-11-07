@@ -4,15 +4,11 @@
 // 项目详情是共用的 components/ProjectDetailPage.vue（与资源窗口同一份）
 import { computed, nextTick, onActivated, onDeactivated, onMounted, ref, toRef, watch } from "vue";
 import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
-import AsyncImage from "../../components/ui/AsyncImage.vue";
-import AuthorTag from "../../components/ui/AuthorTag.vue";
+import ProjectCard from "../../components/ProjectCard.vue";
 import ProjectDetailPage from "../../components/ProjectDetailPage.vue";
 import { api, getAddModpackSource, setAddModpackSource } from "../../lib/api";
 import { useDownloadBadges } from "../../lib/downloadBadges";
-import { formatCount, t, tErr } from "../../lib/i18n";
-import { svgIcon } from "../../lib/modrinthIcon";
-import { cardTags, hiddenTagTip } from "../../lib/projectTags";
-import HighlightText from "../../components/ui/HighlightText.vue";
+import { t, tErr } from "../../lib/i18n";
 import { toggleStar } from "../../lib/projectCollect";
 import { useCollectStars } from "../../lib/useCollectStars";
 import { useRefreshKey } from "../../composables/useRefreshKey";
@@ -20,7 +16,6 @@ import { usePageKeys } from "../../composables/usePageKeys";
 import { scrollToContentTop } from "../../lib/scrollTop";
 import { projectParamToItem, targetProject } from "../windowManager";
 import type { FileListItemDto, GroupDto, ModPackStatusDto, ProjectItemDto } from "../../lib/bindings";
-import { formatDate } from "../../lib/format";
 
 const props = defineProps<{
   /** 安装到的分组名；空 = 默认分组，提交时由上层转成分组 uuid */
@@ -449,43 +444,9 @@ watch(source, loadSource);
       <div v-else-if="error" class="empty-tip load-error" role="alert">{{ error }}</div>
       <div v-else-if="items.length === 0" class="empty-tip">{{ t("modpack.empty") }}</div>
       <template v-else>
-        <div v-for="item in items" :key="item.source.pid" class="pack-item">
-          <!-- 收藏星标（右上角）：点击收藏 / 取消收藏 -->
-          <button class="pack-star" :class="{ on: item.isStar }"
-            v-tip="item.isStar ? t('modpack.unstar') : t('modpack.star')" @click.stop="toggleStar(item)">
-            <svg viewBox="0 0 24 24" width="17" height="17" stroke-width="2" stroke-linejoin="round">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-            </svg>
-          </button>
-          <div class="pack-main" @click="openDetail(item)">
-            <AsyncImage v-if="item.image" class="pack-icon" :src="item.image" alt="" />
-            <div v-else class="pack-icon pack-icon-fallback">{{ item.name.slice(0, 1).toUpperCase() }}</div>
-            <div class="pack-info">
-              <div class="pack-name">
-                <HighlightText :text="item.name" :query="filter" />
-                <!-- 作者：头像 + 名字的胶囊，与标题明确分开 -->
-                <AuthorTag v-if="item.authors.length" :authors="item.authors" />
-                <span v-if="projectInstalled(item)" class="pack-badge">{{ t("modpack.installed") }}</span>
-                <span v-else-if="projectRunning(item)" class="pack-badge busy">{{ t("modpack.downloading") }}</span>
-              </div>
-              <div class="pack-desc">{{ item.summary }}</div>
-              <div v-if="item.tag.length" class="pack-tags">
-                <span v-for="tag in cardTags(item.tag).shown" :key="tag.name" class="pack-tag">
-                  <span v-if="tag.svg" class="tag-svg" v-html="svgIcon(tag.svg)"></span>
-                  <img v-else-if="tag.logo" class="pack-tag-icon" :src="tag.logo" loading="lazy" alt="" />
-                  {{ tag.name }}
-                </span>
-                <!-- 超过上限的标签用省略号顶上，别把最后一个切掉一半 -->
-                <span v-if="cardTags(item.tag).more" class="pack-tag pack-tag-more"
-                  v-tip="hiddenTagTip(cardTags(item.tag).hidden)">…</span>
-              </div>
-              <div class="pack-meta">
-                {{ t("modpack.downloads", { n: formatCount(item.downloadCount) }) }}
-                <template v-if="item.date"> · {{ formatDate(item.date) }}</template>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ProjectCard v-for="item in items" :key="item.source.pid" :item="item" :filter="filter"
+          :installed="projectInstalled(item)" :running="projectRunning(item)"
+          @star="toggleStar" @open="openDetail" />
       </template>
     </div>
 

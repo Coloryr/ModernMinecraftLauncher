@@ -198,7 +198,7 @@ async function copyQq() {
     </section>
 
     <div class="help-list">
-      <div v-for="(item, i) in faqs" :key="i" class="faq-item">
+      <div v-for="(item, i) in faqs" :key="item.q" class="faq-item">
         <button class="faq-q" @click="toggle(i)">
           <span>{{ item.q }}</span>
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"

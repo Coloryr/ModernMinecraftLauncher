@@ -41,6 +41,16 @@ defineEmits<{
 /** 在线时的 MOTD 分段；离线 / 查询中时为空数组，两种都走下面的兜底文案 */
 const segments = computed(() => (props.motd?.state === "ok" ? props.motd.segments : []));
 
+/** 分段可能重复同一段文字（只换了颜色），key 用「文本 + 出现次数」，不用下标 */
+const keyedSegments = computed(() => {
+  const seen = new Map<string, number>();
+  return segments.value.map((seg) => {
+    const n = seen.get(seg.text) ?? 0;
+    seen.set(seg.text, n + 1);
+    return { seg, key: n ? seg.text + "#" + n : seg.text };
+  });
+});
+
 /** 在线时才有 meta 行（人数 / 版本 / 延迟） */
 const online = computed(() => (props.motd?.state === "ok" ? props.motd : null));
 
@@ -83,7 +93,7 @@ const iconUrl = computed(() => (iconFailed.value ? "" : faviconOf(props.motd)));
       <div class="motd-name">{{ name }}</div>
       <div class="motd-text">
         <template v-if="segments.length">
-          <span v-for="(seg, i) in segments" :key="i" :style="motdSegStyle(seg)">{{
+          <span v-for="{ seg, key } in keyedSegments" :key="key" :style="motdSegStyle(seg)">{{
             seg.text
           }}</span>
         </template>

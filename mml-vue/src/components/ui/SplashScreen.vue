@@ -62,14 +62,14 @@ const emit = defineEmits<{
   width: 72px;
   height: 72px;
   border-radius: 18px;
-  background: linear-gradient(135deg, #4f8cff, #7c5cff);
+  background: linear-gradient(135deg, var(--splash-a), var(--splash-b));
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
   font-size: 30px;
-  color: #fff;
-  box-shadow: 0 8px 24px rgba(79, 140, 255, 0.35);
+  color: var(--on-accent);
+  box-shadow: 0 8px 24px var(--splash-glow);
 }
 
 .splash-name {
@@ -124,8 +124,8 @@ const emit = defineEmits<{
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: rgba(255, 99, 99, 0.14);
-  color: #ff6363;
+  background: var(--splash-error-bg);
+  color: var(--splash-error);
   font-size: 30px;
   font-weight: 800;
   display: flex;

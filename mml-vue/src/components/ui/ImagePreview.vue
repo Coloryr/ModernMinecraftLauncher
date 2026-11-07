@@ -113,7 +113,7 @@ function onWheel(e: WheelEvent) {
   /* 不盖住标题栏 */
   inset: var(--titlebar-h) 0 0 0;
   z-index: 200;
-  background: rgb(0 0 0 / 85%);
+  background: var(--overlay-strong);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -157,8 +157,8 @@ function onWheel(e: WheelEvent) {
 .img-preview-hint {
   padding: 4px 12px;
   border-radius: 999px;
-  background: rgb(0 0 0 / 55%);
-  color: rgb(255 255 255 / 85%);
+  background: var(--overlay);
+  color: var(--on-accent-text);
   font-size: 12px;
   white-space: nowrap;
   pointer-events: none;

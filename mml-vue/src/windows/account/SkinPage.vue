@@ -830,7 +830,7 @@ onBeforeUnmount(destroyViewer);
 }
 
 .tex-item.selected {
-  border-color: var(--accent, #7c6cf6);
+  border-color: var(--accent);
 }
 
 .tex-thumb {

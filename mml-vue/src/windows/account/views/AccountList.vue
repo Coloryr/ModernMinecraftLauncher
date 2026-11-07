@@ -192,7 +192,7 @@ function hidePreview() {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 700;
   font-size: 15px;
   user-select: none;
@@ -236,7 +236,7 @@ function hidePreview() {
   padding: 2px 8px;
   border-radius: 20px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   white-space: nowrap;
   flex-shrink: 0;
 }

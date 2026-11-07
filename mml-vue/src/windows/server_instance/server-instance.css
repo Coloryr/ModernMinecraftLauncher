@@ -537,8 +537,12 @@ select.si-cell-control {
   display: flex;
   align-items: center;
   gap: 8px;
-  justify-content: flex-end;
   margin-top: 4px;
+}
+
+/* 生成是这一页的主操作：左边放两个导出按钮，它靠右 */
+.si-actions-main {
+  margin-left: auto;
 }
 
 /* 进度条：弹窗内用 8px 档 */

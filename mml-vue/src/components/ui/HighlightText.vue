@@ -31,11 +31,22 @@ const parts = computed<Part[]>(() => {
   if (last < props.text.length) out.push({ text: props.text.slice(last), hit: false });
   return out;
 });
+
+/** 命中段与普通段的文字可能相同（如查询词本身就是整段），key 用「类型 + 文本 + 出现次数」 */
+const keyedParts = computed(() => {
+  const seen = new Map<string, number>();
+  return parts.value.map((p) => {
+    const base = (p.hit ? "h:" : "t:") + p.text;
+    const n = seen.get(base) ?? 0;
+    seen.set(base, n + 1);
+    return { p, key: n ? base + "#" + n : base };
+  });
+});
 </script>
 
 <template>
   <span class="hl">
-    <template v-for="(p, i) in parts" :key="i">
+    <template v-for="{ p, key } in keyedParts" :key="key">
       <mark v-if="p.hit" class="hl-hit">{{ p.text }}</mark>
       <template v-else>{{ p.text }}</template>
     </template>
@@ -49,7 +60,7 @@ const parts = computed<Part[]>(() => {
 
 .hl-hit {
   /* 兜底先给一层半透明强调色，再叠 color-mix；不支持 color-mix 的 webview 也有底色 */
-  background: var(--accent-soft, rgba(63, 140, 255, 0.28));
+  background: var(--accent-soft);
   background: color-mix(in srgb, var(--accent) 30%, transparent);
   color: inherit;
   border-radius: 3px;

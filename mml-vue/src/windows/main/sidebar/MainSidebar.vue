@@ -1263,7 +1263,7 @@ defineExpose({ scrollToInstance });
      角标若也用淡底，平铺模式下就和"已选中"混在一起分不出来了。
      底色由下面的 per-loader 类给；这里是兜底（未知加载器） */
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   white-space: nowrap;
   flex-shrink: 0;
   line-height: 1.6;
@@ -1275,37 +1275,37 @@ defineExpose({ scrollToInstance });
 .loader-text.loader-forge {
   /* 蓝 */
   background: var(--loader-forge);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .loader-text.loader-fabric {
   /* 黄（压深到能配白字的金褐） */
   background: var(--loader-fabric);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .loader-text.loader-quilt {
   /* 紫 */
   background: var(--loader-quilt);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .loader-text.loader-neoforge {
   /* 青 */
   background: var(--loader-neoforge);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .loader-text.loader-cleanroom {
   background: var(--loader-cleanroom);
   /* 橙 */
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .loader-text.loader-liteloader {
   background: var(--loader-liteloader);
   /* 玫红 */
-  color: #fff;
+  color: var(--on-accent);
 }
 </style>
 <style scoped src="../../../styles/parts/instance-check.css"></style>

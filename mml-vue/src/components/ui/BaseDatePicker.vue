@@ -245,7 +245,7 @@ watch(
           </div>
 
           <div class="dp-week">
-            <span v-for="(w, i) in WEEKDAYS" :key="i">{{ w }}</span>
+            <span v-for="w in WEEKDAYS" :key="w">{{ w }}</span>
           </div>
 
           <div class="dp-grid">
@@ -409,7 +409,7 @@ watch(
 
 .dp-cell.picked {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 600;
 }
 
