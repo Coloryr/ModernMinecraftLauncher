@@ -20,12 +20,15 @@ const changed = computed(() => {
   <BaseModal v-if="serverPackOpen && serverPackResult" :title="t('launch.serverPackTitle')" :closable="false"
     @close="answerServerPackUpdate(false, false)">
     <p class="pack-line">{{ t("update.instance", { name: serverPackResult.instanceName }) }}</p>
+    <!-- 版本号没变、只换了内容时别写 "1.3 → 1.3"，那看着像没更新 -->
     <p class="pack-version">
       {{
-        t("update.serverPackVersion", {
-          from: serverPackResult.fileId || "-",
-          to: serverPackResult.newVersion || "-",
-        })
+        serverPackResult.fileId === serverPackResult.newVersion
+          ? t("update.serverPackVersionSame", { version: serverPackResult.fileId || "-" })
+          : t("update.serverPackVersion", {
+            from: serverPackResult.fileId || "-",
+            to: serverPackResult.newVersion || "-",
+          })
       }}
     </p>
     <p v-if="changed" class="pack-changes">

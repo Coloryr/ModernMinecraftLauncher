@@ -1849,7 +1849,7 @@ pub async fn upgrade_server_pack(
     let icon = pack.icon.clone();
 
     let total = pack.online_list.len() + pack.archive_list.len();
-    // 版本号没变时同步流程会原样保留文件，图标也跟着不动
+    // 版本号没变就不必重下图标
     let same_version = game.same_pack_version(&pack.pack_version);
     if let Some(gui) = &gui {
         gui.set_state(AddModPackState::DownloadFile);
@@ -1864,8 +1864,14 @@ pub async fn upgrade_server_pack(
     };
     // 旧清单先挪成 `.old`：升级时按新旧两份清单算该删什么，与启动时那条链路一致
     game.move_serverpack_to_old()?;
-    game.upgrade_serverpack_with(pack, cancel, Some(&report), skip)
-        .await?;
+    if let Err(err) = game
+        .upgrade_serverpack_with(pack, cancel, Some(&report), skip)
+        .await
+    {
+        // 同步半途失败时清单已经被挪走：挪回来，别让实例从此没有清单可查
+        let _ = game.restore_serverpack_from_old();
+        return Err(err);
+    }
 
     // 图标会随清单换，按新清单再取一次；下不下来都不影响实例可用
     if !same_version {

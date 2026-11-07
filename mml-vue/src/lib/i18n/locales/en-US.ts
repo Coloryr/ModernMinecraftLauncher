@@ -287,6 +287,7 @@ export default {
   "launch.serverPackTitle": "Server pack has a new version",
   "update.instance": "Instance: “{name}”",
   "update.serverPackVersion": "Server pack: {from} → {to}",
+  "update.serverPackVersionSame": "Server pack: {version}, content updated",
   "update.changes": "{added} files added · {removed} removed · {changed} changed",
   "update.serverPackModsPending": "{n} optional mods can be picked in the next step",
   "update.serverPackModsTitle": "Choose mods to update",

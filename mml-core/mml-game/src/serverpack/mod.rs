@@ -165,16 +165,6 @@ impl InstanceSettingObj {
         // 旧清单里被移除、且要求删目录的配置目录：后面判断子目录要不要跟着重解时要用
         let mut removed_dirs: Vec<String> = Vec::new();
 
-        // 只有包版本变了才动文件：发布者没改版本号时，远端清单再怎么变都只恢复本地清单
-        if let Some(old) = &old
-            && !new_pack.pack_version.trim().is_empty()
-            && old.pack_version.trim() == new_pack.pack_version.trim()
-        {
-            self.save_serverpack_sync(old)?;
-            path_helper::delete(self.get_server_pack_old_file())?;
-            return Ok(());
-        }
-
         let game_path = self.get_game_path();
         let temp_path = self.get_temp_path();
         paths::validate_pack(&new_pack, &game_path, &temp_path)?;

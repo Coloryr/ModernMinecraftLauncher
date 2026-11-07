@@ -287,9 +287,9 @@ fn upgrade_applies_add_remove_and_change() {
     assert_eq!(entry.fileid, "2222");
 }
 
-/// 清单版本号没变时，远端清单换了内容也只恢复本地清单，不动文件
+/// 清单版本号没变但内容变了：文件照样替换，本地清单落到新版
 #[test]
-fn same_pack_version_skips_file_replacement() {
+fn same_pack_version_still_applies_content_changes() {
     let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _run = ensure_init();
     let (routes, port) = Routes::start();
@@ -344,23 +344,23 @@ fn same_pack_version_skips_file_replacement() {
         CancellationToken::new(),
         &[],
     ))
-    .expect("同版本应直接返回");
+    .expect("同版本也应照常同步");
 
     assert_eq!(
         std::fs::read(base.join("mods/a.jar")).unwrap(),
-        A_JAR,
-        "版本号没变时文件不该被替换"
+        B_JAR,
+        "版本号没变时内容变了也要替换"
     );
     let pack: ServerPackObj =
         serde_json::from_slice(&std::fs::read(snapshot.get_server_pack_file()).unwrap()).unwrap();
     assert_eq!(pack.pack_version, "1.0.0");
-    let expected = gen_hash(HashType::Sha1, A_JAR);
+    let expected = gen_hash(HashType::Sha1, B_JAR);
     assert_eq!(pack.online_list[0].sha1.as_deref(), Some(expected.as_str()));
     let game = game.read().unwrap();
     assert_eq!(
         game.loader_version.as_deref(),
-        Some("21.1.259"),
-        "版本号没变时加载器设置也不该跟着换"
+        Some("21.1.999"),
+        "版本号没变时加载器设置也要跟着新清单走"
     );
 }
 

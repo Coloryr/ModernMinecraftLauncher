@@ -289,6 +289,7 @@ export default {
   "launch.serverPackTitle": "服务器包有新版本",
   "update.instance": "实例：「{name}」",
   "update.serverPackVersion": "服务器包：{from} → {to}",
+  "update.serverPackVersionSame": "服务器包：{version}，内容有更新",
   "update.changes": "新增 {added} 个文件 · 删除 {removed} 个 · 修改 {changed} 个",
   "update.serverPackModsPending": "其中 {n} 个可选模组下一步可以自行挑选",
   "update.serverPackModsTitle": "选择要更新的模组",

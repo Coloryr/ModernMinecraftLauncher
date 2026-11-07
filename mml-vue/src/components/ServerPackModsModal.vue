@@ -57,7 +57,7 @@ function toggleAll() {
     : new Set(serverPackModsList.value.map((item) => item.path));
 }
 
-/** 确认：没勾的就是这次不更新 */
+/** 确认：没勾的就是这次不更新；一个都不勾等于只同步必装文件 */
 function apply() {
   answerServerPackMods(
     serverPackModsList.value
@@ -97,7 +97,7 @@ function apply() {
     </div>
     <div class="modal-actions">
       <BaseButton @click="answerServerPackMods(null)">{{ t("resource.cancel") }}</BaseButton>
-      <BaseButton variant="accent" :disabled="!checked.size" @click="apply">
+      <BaseButton variant="accent" @click="apply">
         {{ t("update.serverPackModsConfirm") }}
       </BaseButton>
     </div>

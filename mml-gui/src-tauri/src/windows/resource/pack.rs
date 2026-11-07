@@ -182,7 +182,9 @@ async fn check_server_pack(game: &InstanceSettingObj) -> Result<ModPackUpdateDto
     let (_, remote) = mml_game::add_game::fetch_server_pack(&url)
         .await
         .map_err(|err| err.to_string())?;
-    let local = serialize_tools::json_from_file::<ServerPackObj>(game.get_server_pack_file()).ok();
+    // 上一次同步半途失败时本地清单可能只剩 `.old`：先读它，别把这种情况当成"从没同步过"
+    let local = read_pack_file(&game.get_server_pack_file())
+        .or_else(|| read_pack_file(&game.get_server_pack_old_file()));
 
     let has_update = match &local {
         Some(local) => !same_pack(local, &remote),
@@ -213,6 +215,17 @@ async fn check_server_pack(game: &InstanceSettingObj) -> Result<ModPackUpdateDto
         changed_files: plan.changed,
         mods,
     })
+}
+
+/// 读一份本地清单
+///
+/// - `file`: 清单文件路径
+///
+/// # 返回值
+///
+/// 文件存在且能解析时返回清单，否则返回 `None`
+fn read_pack_file(file: &Path) -> Option<ServerPackObj> {
+    serialize_tools::json_from_file::<ServerPackObj>(file).ok()
 }
 
 /// 两份清单的差异统计
