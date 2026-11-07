@@ -88,11 +88,22 @@ fn ensure_game_lang(inst: &InstanceSettingObj) {
             return;
         }
     };
-    if options.get("lang").is_some_and(|lang| !lang.trim().is_empty()) {
+    if let Some(current) = options.get("lang").filter(|lang| !lang.trim().is_empty()) {
+        // 已经有值：大小写与该版本对不上时改写。旧版写 zh_CN、新版写 zh_cn，
+        // 写错游戏直接不认，表现为"选了语言进去还是英文"
+        if let Some(code) = mml_game::game_lang_code(&inst.version, current.trim())
+            && code != current.trim()
+            && let Err(err) = inst.set_minecraft_option("lang", Some(&code))
+        {
+            mml_log::error_type(err);
+        }
         return;
     }
 
-    let lang = mml_names::get_lang(crate::gui_config::locale()).to_string();
+    // 同一种语言旧版写 zh_CN、新版写 zh_cn：以该版本资源索引里的写法为准，
+    // 写错了游戏不认，进去还是英文
+    let want = mml_names::get_lang(crate::gui_config::locale());
+    let lang = mml_game::game_lang_code(&inst.version, want).unwrap_or_else(|| want.to_string());
     if let Err(err) = inst.set_minecraft_option("lang", Some(&lang)) {
         mml_log::error_type(err);
     }

@@ -4,7 +4,10 @@
 //! 缩放时以它为源、避免反复解码已缩放的图。命令带分组标记，值填原始组名
 //! `settings`，免得组键随文件名变掉，见 AGENTS.md §4。
 
-use std::sync::Mutex;
+use std::{
+    path::{Path, PathBuf},
+    sync::Mutex,
+};
 
 use tauri::{AppHandle, Emitter};
 
@@ -20,6 +23,73 @@ pub(super) struct ImageBytes {
     pub(super) bytes: Vec<u8>,
     /// 实际 mime，取 `image/png` / `image/jpeg` / `image/webp`
     pub(super) mime: String,
+}
+
+/// 复制进启动器目录的源图目录，位于运行目录下
+const BG_DIR: &str = "bg";
+/// 副本文件名（不含扩展名），扩展名按实际图片类型取
+const BG_COPY_STEM: &str = "bg_source";
+
+/// 源图副本目录
+fn bg_dir() -> PathBuf {
+    mml_base::get_base_dir().join(BG_DIR)
+}
+
+/// 这个来源是不是启动器目录下的副本：相对路径 `bg/...` 或绝对路径落在 `bg/` 下
+///
+/// - `source`: 背景图来源
+///
+/// # 返回值
+///
+/// 是副本返回 `true`
+fn is_copy_source(source: &str) -> bool {
+    let path = Path::new(source);
+    if path.is_absolute() {
+        path.starts_with(bg_dir())
+    } else {
+        path.starts_with(BG_DIR)
+    }
+}
+
+/// 删掉副本；换图或清除背景图时调用
+fn remove_copies() {
+    let dir = bg_dir();
+    for ext in ["png", "jpg", "webp"] {
+        let _ = std::fs::remove_file(dir.join(format!("{BG_COPY_STEM}.{ext}")));
+    }
+}
+
+/// 把源图复制进启动器目录
+///
+/// - `source`: 当前来源，本地路径或网址
+///
+/// # 返回值
+///
+/// 副本相对运行目录的路径，如 `bg/bg_source.png`；读不到源图或写盘失败返回错误信息
+async fn copy_to_base(source: &str) -> Result<String, String> {
+    let image = load_bg_bytes(source).await?;
+    let ext = match image.mime.as_str() {
+        "image/jpeg" => "jpg",
+        "image/webp" => "webp",
+        _ => "png",
+    };
+    let dir = bg_dir();
+    std::fs::create_dir_all(&dir).map_err(|err| err.to_string())?;
+    // 扩展名可能换：先清掉另外两种后缀的旧副本
+    for other in ["png", "jpg", "webp"] {
+        if other != ext {
+            let _ = std::fs::remove_file(dir.join(format!("{BG_COPY_STEM}.{other}")));
+        }
+    }
+    let target = dir.join(format!("{BG_COPY_STEM}.{ext}"));
+    let write = target;
+    let bytes = image.bytes;
+    tauri::async_runtime::spawn_blocking(move || std::fs::write(&write, bytes))
+        .await
+        .map_err(|err| err.to_string())?
+        .map_err(|err| err.to_string())?;
+    // 配置里存相对路径：整个启动器目录搬走也还能找到这张图
+    Ok(format!("{BG_DIR}/{BG_COPY_STEM}.{ext}"))
 }
 
 /// 最近一次下载的原图缓存，仅网址来源且仅内存：调「原始大小」时按来源命中缓存，
@@ -73,6 +143,13 @@ pub(super) async fn load_bg_bytes(source: &str) -> Result<ImageBytes, String> {
             mime,
         })
     } else {
+        // 相对路径按运行目录解析：复制进 bg/ 的副本存的就是相对路径
+        let path = Path::new(source);
+        let path = if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            mml_base::get_base_dir().join(path)
+        };
         let mime = match source
             .rsplit('.')
             .next()
@@ -84,7 +161,6 @@ pub(super) async fn load_bg_bytes(source: &str) -> Result<ImageBytes, String> {
             Some("webp") => "image/webp",
             _ => return Err(err_keys::BG_UNSUPPORTED.to_string()),
         };
-        let path = source.to_string();
         let bytes = tauri::async_runtime::spawn_blocking(move || {
             std::fs::read(&path).map_err(|err| err.to_string())
         })
@@ -272,6 +348,11 @@ pub async fn settings_set_bg(
     if source.starts_with("http://") || source.starts_with("https://") {
         cache_bg_original(&source, &image);
     }
+    // 新图不是副本时，上一张复制进启动器的副本已经没用了；是副本就留着，
+    // 它正被这次要存的图用着
+    if !is_copy_source(&source) {
+        remove_copies();
+    }
     store_bg(&app, source, image, percent).await
 }
 
@@ -334,6 +415,25 @@ pub async fn settings_resize_bg(app: AppHandle, percent: u32) -> Result<String, 
     store_bg(&app, source, image, percent).await
 }
 
+/// 把选中的源图复制进启动器目录，返回副本的相对路径
+///
+/// 用在「先问要不要复制、再加载生效」这条路上：只落文件、不写配置，
+/// 配置由随后的 `settings_set_bg` 用这个相对路径写入。
+///
+/// - `source`: 刚选中的来源，本地路径或网址
+///
+/// # 返回值
+///
+/// 副本相对运行目录的路径，如 `bg/bg_source.png`；来源为空、读不到图或写盘失败返回错误
+#[gui_macros::ipc_group("settings")]
+#[gui_macros::command]
+pub async fn settings_bg_copy_source(source: String) -> Result<String, String> {
+    if source.trim().is_empty() {
+        return Err(err_keys::BG_NONE.to_string());
+    }
+    copy_to_base(&source).await
+}
+
 /// 清除背景图：删除落盘文件并清空配置里的来源
 ///
 /// - `app`: 应用句柄，清除后广播背景变更
@@ -350,6 +450,7 @@ pub async fn settings_clear_bg(app: AppHandle) -> Result<(), String> {
         })
         .await;
     }
+    remove_copies();
     let mut config = crate::gui_config::get();
     config.bg_source = String::new();
     crate::gui_config::set(config);

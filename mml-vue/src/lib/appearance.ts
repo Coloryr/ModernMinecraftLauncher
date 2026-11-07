@@ -128,12 +128,16 @@ export async function setBgImage(v: string) {
  * 浏览器模式下把 `source` 当 dataURL 直接显示。
  *
  * - `source`: 文件路径或网址
+ *
+ * # 返回值
+ *
+ * 加载成功返回 `true`；失败时已提示，返回 `false`
  */
-export async function setBgImageFromOriginal(source: string) {
+export async function setBgImageFromOriginal(source: string): Promise<boolean> {
   if (!isTauri()) {
     bgImage.value = source;
     writeString(KEYS.bgImage, source);
-    return;
+    return true;
   }
   bgLoading.value = true;
   try {
@@ -142,9 +146,11 @@ export async function setBgImageFromOriginal(source: string) {
     bgImage.value = dataUrl;
     // 与 applyBgInfo 一样缓存一份：下次启动首帧就有背景，不用等后端
     writeString(KEYS.bgImage, dataUrl);
+    return true;
   } catch (err) {
     // 带上后端的具体错误，方便定位加载失败的原因
     showToast(`${t("winSettings.bgLoadFailed")}${t("common.detailSep")}${String(err)}`);
+    return false;
   } finally {
     bgLoading.value = false;
   }
@@ -171,6 +177,22 @@ export async function resizeBg(percent: number) {
   } finally {
     bgLoading.value = false;
   }
+}
+
+/**
+ * 把选中的源图复制进启动器目录
+ *
+ * 只落文件、不写配置：调用方拿到相对路径（`bg/bg_source.png`）后再加载生效，
+ * 这样原图删掉、整个启动器目录搬走都还能用。
+ *
+ * - `source`: 刚选中的本地路径或网址
+ *
+ * # 返回值
+ *
+ * 副本相对运行目录的路径
+ */
+export async function copyBgSource(source: string): Promise<string> {
+  return commands.settings.bgCopySource(source);
 }
 
 /**

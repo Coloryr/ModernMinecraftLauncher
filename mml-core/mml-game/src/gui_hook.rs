@@ -27,6 +27,10 @@ pub enum AddModPackState {
     ReadInfo,
     /// 获取文件信息
     GetInfo,
+    /// 检查服务器实例信息：下载发布地址上的清单、看有没有新版本
+    CheckServerPack,
+    /// 对比本地文件：算清单差异、逐个文件校验哈希，几万个文件时会停在这一步
+    CheckFile,
     /// 下载文件
     DownloadFile,
     /// 解压文件

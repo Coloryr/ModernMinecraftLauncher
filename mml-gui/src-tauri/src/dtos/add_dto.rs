@@ -2,6 +2,8 @@
 
 use serde::Serialize;
 
+use crate::dtos::resource_dto::ServerPackModDto;
+
 /// 目录项，由 `add_list_dir` 返回
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -74,6 +76,8 @@ pub struct ServerPackProbeDto {
     pub file_count: u64,
     /// 清单里的配置压缩包数
     pub archive_count: u64,
+    /// 清单里标了可选的模组；首次导入前让玩家挑这次要下载哪些
+    pub mods: Vec<ServerPackModDto>,
 }
 
 /// 一次打开压缩包拿到的全部信息：条目、识别出的类型与名字、是不是服务器包

@@ -1082,7 +1082,7 @@ async fn hmcl_server_archive<P: AsRef<Path>>(
     if has_online {
         let total = pack.online_list.len() + pack.archive_list.len();
         if let Some(pack_gui) = &pack_gui {
-            pack_gui.set_state(AddModPackState::DownloadFile);
+            pack_gui.set_state(AddModPackState::CheckFile);
             pack_gui.set_now(0, Some(total));
         }
         let progress_gui = pack_gui.clone();
@@ -1091,9 +1091,15 @@ async fn hmcl_server_archive<P: AsRef<Path>>(
                 gui.set_now(done, Some(all));
             }
         };
+        let phase_gui = pack_gui.clone();
+        let phase = move |state: AddModPackState| {
+            if let Some(gui) = &phase_gui {
+                gui.set_state(state);
+            }
+        };
         let snapshot = game.read().unwrap().clone();
         if let Err(err) = snapshot
-            .upgrade_serverpack_with(pack, cancel.clone(), Some(&report), &[])
+            .upgrade_serverpack_with(pack, cancel.clone(), Some(&report), Some(&phase), &[])
             .await
         {
             // 半成品实例留着只会让人以为导入成功；与在线实例导入同一处理
@@ -1763,6 +1769,41 @@ pub async fn install_server_pack_from_url(
     pack_gui: AddModPackGui,
     cancel: CancellationToken,
 ) -> CoreResult<Uuid> {
+    install_server_pack_from_url_with_skip(url, name, group, &[], instance_gui, pack_gui, cancel)
+        .await
+}
+
+/// 从在线服务器包创建实例，可选模组只下载其中一部分
+///
+/// 与 [`install_server_pack_from_url`] 同一条链路，多一个 `skip`：首次同步时玩家没勾的
+/// 可选模组这次不下载，记进本地清单的 `Skipped`，发布方换了内容才会再问。
+///
+/// - `url`: 用户填的地址，发布目录或 `server.json` 都认
+/// - `name`: 实例名，覆盖清单里的名字
+/// - `group`: 目标分组 uuid，`None` 表示默认分组
+/// - `skip`: 这次先不下载的可选模组路径，取清单里的相对路径
+/// - `instance_gui`: 添加实例界面回调
+/// - `pack_gui`: 安装进度回调
+/// - `cancel`: 取消令牌
+///
+/// # 返回值
+///
+/// 新实例 uuid；失败时已建的半成品实例会被删掉
+pub async fn install_server_pack_from_url_with_skip(
+    url: &str,
+    name: Option<String>,
+    group: Option<Uuid>,
+    skip: &[String],
+    instance_gui: AddInstanceGui,
+    pack_gui: AddModPackGui,
+    cancel: CancellationToken,
+) -> CoreResult<Uuid> {
+    // 先拉远端清单：几千上万条目的包光下载清单就要一会儿，先报"检查服务器实例信息"，
+    // 别让界面停在还没开始的对比上
+    if let Some(gui) = &pack_gui {
+        gui.set_state(AddModPackState::CheckServerPack);
+        gui.set_now(0, None);
+    }
     let (manifest_url, pack) = fetch_server_pack(url).await?;
     let base_url = server_pack_base_url(&manifest_url);
 
@@ -1786,7 +1827,7 @@ pub async fn install_server_pack_from_url(
 
     let total = pack.online_list.len() + pack.archive_list.len();
     if let Some(gui) = &pack_gui {
-        gui.set_state(AddModPackState::DownloadFile);
+        gui.set_state(AddModPackState::CheckFile);
         gui.set_now(0, Some(total));
     }
 
@@ -1799,8 +1840,14 @@ pub async fn install_server_pack_from_url(
             gui.set_now(done, Some(all));
         }
     };
+    let phase_gui = pack_gui.clone();
+    let phase = move |state: AddModPackState| {
+        if let Some(gui) = &phase_gui {
+            gui.set_state(state);
+        }
+    };
     if let Err(e) = snapshot
-        .upgrade_serverpack_with(pack, cancel, Some(&report), &[])
+        .upgrade_serverpack_with(pack, cancel, Some(&report), Some(&phase), skip)
         .await
     {
         // 半成品实例留着只会让人以为导入成功，删掉重来更干净
@@ -1844,6 +1891,11 @@ pub async fn upgrade_server_pack(
         .filter(|item| !item.trim().is_empty())
         .ok_or(ErrorType::DataNotFound(DataNotFoundData::Info))?;
 
+    // 先拉远端清单，再谈对比：几万个条目的包光下载清单就要一会儿
+    if let Some(gui) = &gui {
+        gui.set_state(AddModPackState::CheckServerPack);
+        gui.set_now(0, None);
+    }
     let (manifest_url, pack) = fetch_server_pack(&url).await?;
     // 图标名先取出来：清单本体要整个交给同步流程
     let icon = pack.icon.clone();
@@ -1852,7 +1904,7 @@ pub async fn upgrade_server_pack(
     // 版本号没变就不必重下图标
     let same_version = game.same_pack_version(&pack.pack_version);
     if let Some(gui) = &gui {
-        gui.set_state(AddModPackState::DownloadFile);
+        gui.set_state(AddModPackState::CheckFile);
         gui.set_now(0, Some(total));
     }
 
@@ -1862,10 +1914,16 @@ pub async fn upgrade_server_pack(
             gui.set_now(done, Some(all));
         }
     };
+    let phase_gui = gui.clone();
+    let phase = move |state: AddModPackState| {
+        if let Some(gui) = &phase_gui {
+            gui.set_state(state);
+        }
+    };
     // 旧清单先挪成 `.old`：升级时按新旧两份清单算该删什么，与启动时那条链路一致
     game.move_serverpack_to_old()?;
     if let Err(err) = game
-        .upgrade_serverpack_with(pack, cancel, Some(&report), skip)
+        .upgrade_serverpack_with(pack, cancel, Some(&report), Some(&phase), skip)
         .await
     {
         // 同步半途失败时清单已经被挪走：挪回来，别让实例从此没有清单可查

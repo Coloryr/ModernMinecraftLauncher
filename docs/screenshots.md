@@ -39,7 +39,7 @@ npm run shots -- --clean
 
 ## 场景表
 
-共 251 个场景，按窗口分组。
+共 255 个场景，按窗口分组。
 「窗口」列是页面的 `kind`，窗口族场景会自动带上实例参数，不需要在命令里另写；
 控件场景的 `control` 是截图工具里的预览页，不是启动器窗口。
 
@@ -79,6 +79,9 @@ npm run shots -- --clean
 | 图片 | 画面 | 窗口 | 视口 |
 | --- | --- | --- | --- |
 | `settings-ui` | 设置 · 界面 | `settings` | 1100×760 |
+| `settings-bg` | 设置 · 背景图 | `settings` | 1100×760 |
+| `settings-bg-copy-ask` | 设置 · 复制背景图确认 | `settings` | 1100×760 |
+| `settings-bg-copied` | 设置 · 背景图已复制（相对路径） | `settings` | 1100×760 |
 | `settings-java` | 设置 · Java | `settings` | 1100×860 |
 | `settings-network` | 设置 · 网络与下载 | `settings` | 1100×780 |
 | `settings-launch` | 设置 · 游戏启动 | `settings` | 1100×780 |
@@ -184,6 +187,7 @@ npm run shots -- --clean
 | `add-folder-scan-error` | 添加实例 · 文件夹扫描失败 | `add` | 1100×760 |
 | `add-folder-read-error` | 添加实例 · 文件夹读取失败 | `add` | 1100×760 |
 | `add-folder-empty-error` | 添加实例 · 文件夹 · 空状态 · 错误 | `add` | 1100×760 |
+| `add-online-optional-mods` | 添加实例 · 首次导入挑选可选模组 | `add` | 1100×760 |
 | `add-online-probing` | 添加实例 · 在线地址 · 探测中 | `add` | 1100×760 |
 | `add-online-loaded` | 添加实例 · 在线地址 · 已加载 | `add` | 1100×760 |
 | `add-online-error` | 添加实例 · 在线地址 · 错误 | `add` | 1100×760 |

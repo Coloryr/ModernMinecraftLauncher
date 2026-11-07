@@ -8,7 +8,12 @@ import { t } from "../lib/i18n";
 import BaseButton from "./ui/BaseButton.vue";
 import BaseModal from "./ui/BaseModal.vue";
 import type { ServerPackModDto } from "../lib/bindings";
-import { answerServerPackMods, serverPackModsList, serverPackModsOpen } from "../lib/serverPackMods";
+import {
+  answerServerPackMods,
+  serverPackModsInstall,
+  serverPackModsList,
+  serverPackModsOpen,
+} from "../lib/serverPackMods";
 
 /** 勾选中的文件路径 */
 const checked = ref<Set<string>>(new Set());
@@ -68,9 +73,12 @@ function apply() {
 </script>
 
 <template>
-  <BaseModal v-if="serverPackModsOpen" :title="t('update.serverPackModsTitle')" :width="620" :closable="false"
-    @close="answerServerPackMods(null)">
-    <p class="mods-hint">{{ t("update.serverPackModsHint") }}</p>
+  <BaseModal v-if="serverPackModsOpen"
+    :title="t(serverPackModsInstall ? 'update.serverPackModsTitleInstall' : 'update.serverPackModsTitle')"
+    :width="620" :closable="false" @close="answerServerPackMods(null)">
+    <p class="mods-hint">
+      {{ t(serverPackModsInstall ? "update.serverPackModsHintInstall" : "update.serverPackModsHint") }}
+    </p>
     <div class="mods-toolbar">
       <label class="mods-all">
         <input type="checkbox" class="mods-check" :checked="allChecked" :indeterminate="someChecked"
@@ -89,7 +97,9 @@ function apply() {
           <span class="mods-head">
             <span class="mods-name">{{ item.name }}</span>
             <span v-if="item.added" class="mods-tag">{{ t("update.serverPackModsAdded") }}</span>
-            <span v-else-if="!item.enabled" class="mods-tag">{{ t("update.serverPackModsDisabled") }}</span>
+            <span v-else-if="!item.enabled && !serverPackModsInstall" class="mods-tag">
+              {{ t("update.serverPackModsDisabled") }}
+            </span>
           </span>
           <span class="mods-path">{{ item.path }}</span>
         </span>
@@ -98,7 +108,7 @@ function apply() {
     <div class="modal-actions">
       <BaseButton @click="answerServerPackMods(null)">{{ t("resource.cancel") }}</BaseButton>
       <BaseButton variant="accent" @click="apply">
-        {{ t("update.serverPackModsConfirm") }}
+        {{ t(serverPackModsInstall ? "update.serverPackModsConfirmInstall" : "update.serverPackModsConfirm") }}
       </BaseButton>
     </div>
   </BaseModal>

@@ -1086,6 +1086,61 @@ fn optional_mod_skipped_keeps_local_copy_until_next_update() {
     assert!(pack.skipped.is_empty(), "更新后跳过记录应清空");
 }
 
+/// 更新只删文件时不下载任何东西：服务端只回清单，一旦发起下载就会 404
+#[test]
+fn deletion_only_update_downloads_nothing() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _run = ensure_init();
+    let (routes, port) = Routes::start();
+
+    let v1 = manifest(
+        "1.0.0",
+        "21.1.259",
+        vec![
+            plain(port, "mods/a.jar", "a1.jar", A_JAR),
+            plain(port, "mods/b.jar", "b1.jar", B_JAR),
+        ],
+    );
+    routes.set(vec![
+        ("/pack/server.json", manifest_bytes(&v1)),
+        ("/pack/a1.jar", A_JAR.to_vec()),
+        ("/pack/b1.jar", B_JAR.to_vec()),
+    ]);
+
+    let uuid = block_on(mml_game::add_game::install_server_pack_from_url(
+        &format!("http://127.0.0.1:{port}/pack"),
+        None,
+        None,
+        None,
+        None,
+        CancellationToken::new(),
+    ))
+    .expect("导入应成功");
+    let game = mml_game::get_instance(&uuid).expect("实例应已登记");
+    let base = game.read().unwrap().get_game_path();
+    assert_eq!(std::fs::read(base.join("mods/a.jar")).unwrap(), A_JAR);
+
+    // 新版只删掉 b.jar：服务端不再提供任何 jar，真要下载就会 404
+    let v2 = manifest(
+        "1.0.1",
+        "21.1.259",
+        vec![plain(port, "mods/a.jar", "a1.jar", A_JAR)],
+    );
+    routes.set(vec![("/pack/server.json", manifest_bytes(&v2))]);
+
+    let snapshot = game.read().unwrap().clone();
+    block_on(mml_game::add_game::upgrade_server_pack(
+        &snapshot,
+        None,
+        CancellationToken::new(),
+        &[],
+    ))
+    .expect("只删文件不应该发起下载");
+
+    assert!(!base.join("mods/b.jar").exists(), "被删的文件要清掉");
+    assert_eq!(std::fs::read(base.join("mods/a.jar")).unwrap(), A_JAR, "没变的不该重下");
+}
+
 /// 等本地清单落到指定包版本
 ///
 /// - `snapshot`: 实例设置快照，取清单路径用

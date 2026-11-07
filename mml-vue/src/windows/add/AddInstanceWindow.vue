@@ -25,6 +25,7 @@ import { useUnlisteners } from "../../composables/useUnlisteners";
 import { useFileDrop } from "../../composables/useFileDrop";
 import type { FileDropPayload } from "../../composables/useFileDrop";
 import { buildTree, type FileNode } from "../../lib/fileTree";
+import { askServerPackMods } from "../../lib/serverPackMods";
 import {
   api,
   onCloseBlocked,
@@ -542,6 +543,8 @@ const onlineProbe = ref<ServerPackProbeDto | null>(null);
 const onlineProbing = ref(false);
 /** 读清单失败的原因 */
 const onlineProbeError = ref("");
+/** 摘要对应的地址：创建前核对，免得拿上一次的清单去问可选模组 */
+const onlineProbeUrl = ref("");
 /** 防抖计时器：边打字边发请求既慢又吵 */
 let onlineProbeTimer: ReturnType<typeof setTimeout> | undefined;
 /** 探测代次：地址改过之后，旧请求的结果丢掉 */
@@ -552,6 +555,7 @@ function clearOnlineProbe() {
   onlineProbeSeq += 1;
   onlineProbing.value = false;
   onlineProbe.value = null;
+  onlineProbeUrl.value = "";
   onlineProbeError.value = "";
 }
 
@@ -570,6 +574,7 @@ async function probeOnline() {
     const info = await api.addProbeServerPack(url);
     if (seq !== onlineProbeSeq) return;
     onlineProbe.value = info;
+    onlineProbeUrl.value = url;
     // 实例名没手填过就用清单里的名字，与压缩包识别同一套自动填写口径
     if (!nameEdited && info.name) newName.value = info.name;
   } catch (e) {
@@ -578,6 +583,26 @@ async function probeOnline() {
   } finally {
     if (seq === onlineProbeSeq) onlineProbing.value = false;
   }
+}
+
+/**
+ * 首次导入前挑可选模组
+ *
+ * 探清单还没回来、或探的是旧地址时先补一次，保证对标的是当前地址。
+ *
+ * - `url`: 用户填的地址
+ *
+ * # 返回值
+ *
+ * 这次不下载的路径；用户取消返回 null
+ */
+async function pickOnlineOptionalMods(url: string): Promise<string[] | null> {
+  if (!onlineProbe.value || onlineProbeUrl.value !== url) {
+    onlineProbe.value = await api.addProbeServerPack(url);
+    onlineProbeUrl.value = url;
+  }
+  const mods = onlineProbe.value.mods ?? [];
+  return mods.length ? askServerPackMods(mods, true) : [];
 }
 
 // 停手 0.6 秒再发：否则每敲一个字母就是一次网络请求
@@ -714,6 +739,19 @@ async function create() {
     return failField("url", t("add.urlArchiveNotAllowed"));
   }
 
+  // 在线实例：先让玩家挑这次要下载的可选模组，取消就什么都不建
+  let onlineSkip: string[] = [];
+  if (addMode.value === "online") {
+    try {
+      const skip = await pickOnlineOptionalMods(addUrl.value.trim());
+      if (skip === null) return;
+      onlineSkip = skip;
+    } catch (e) {
+      // 补探测失败（地址不通 / 清单坏了）归到地址这一格，与在线模式其它错误一致
+      return failField("url", tErr(e));
+    }
+  }
+
   const group = addGroup.value;
   addError.value = "";
   addErrorField.value = "";
@@ -762,7 +800,7 @@ async function create() {
       // 在线实例：按服务器包清单（server.json）登记，压缩包地址已在上面拦掉
       const target = addUrl.value.trim();
       packTitleKey.value = "add.downloadingOnline";
-      uuid = await api.addImportServerPack(serverPackUrl(target), name, groupId);
+      uuid = await api.addImportServerPack(serverPackUrl(target), name, groupId, onlineSkip);
     }
     if (isLeaving()) return;
     // 通知主窗口选中新实例，后端已发 instance-change 刷新列表，然后询问是否继续添加

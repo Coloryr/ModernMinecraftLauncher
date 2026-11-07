@@ -2,12 +2,12 @@
 
 use std::{
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::Stdio,
     thread,
     time::{Duration, Instant},
 };
 
-use mml_sys::ArchEnum;
+use mml_sys::{ArchEnum, process_helper};
 
 use crate::JavaInfoObj;
 
@@ -60,7 +60,7 @@ pub fn test_java<P: AsRef<Path>>(file: P) -> Option<JavaInfoObj> {
         .unwrap_or_else(|| PathBuf::from("."));
 
     // 扫描软件偶尔会把刚解压出来的 exe 卡住，别让一次检测把整个安装挂死
-    let mut child = match Command::new(&path)
+    let mut child = match process_helper::hidden_command(&path)
         .arg("-version")
         .current_dir(working_dir)
         .stderr(Stdio::piped())

@@ -265,6 +265,20 @@
   padding: 13px 16px;
 }
 
+/* 背景图的三条滑杆直接浮在图上：不要卡片底色与描边，也不留卡片那圈内边距 ——
+   留了就在行与行之间空出一大块，左边还会比同组其它内容缩进 16px */
+.settings-layout .row-card.is-plain {
+  background: transparent;
+  border-color: transparent;
+  padding: 0;
+}
+
+/* 这三条是一组：彼此只隔 4px，别按普通块的 16px 排 */
+.settings-layout .row-card.is-plain+.row-card.is-plain {
+  margin-top: 4px;
+}
+
+
 .settings-layout .field-desc {
   font-size: 12px;
   color: var(--text-dim);
@@ -482,6 +496,8 @@
    并限定在 .range-row 内，避免影响其它窗口 */
 .settings-layout .range-row .range {
   flex: 1;
+  /* 浏览器给 range 自带上下外边距，会把行撑高，这里的行距由分组节奏管 */
+  margin: 0;
   accent-color: var(--accent);
 }
 

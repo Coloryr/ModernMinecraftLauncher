@@ -17,6 +17,7 @@ import {
   bgNativeSize,
   bgOpacity,
   bgSource,
+  copyBgSource,
   setBgBlur,
   setBgImage,
   setBgImageFromOriginal,
@@ -63,6 +64,7 @@ const SLIDER_COMMIT_DELAY = 250;
  * - `fonts` / `fontsLoading` / `loadFonts` / `fontPick` / `setFontFamily`: 系统字体
  * - `animations` / `setAnimations` / `accent` / `setAccent` / `customAccent` / `setCustomAccent` / `ACCENTS`: 动画与强调色
  * - `bgImage` / `setBgImage` / `bgLoading` / `bgFileInput` / `bgSourceInput` / `loadBgSource` / `pickBgImage` / `onBgFile`: 背景图加载与清除
+ * - `bgCopyAsk` / `answerBgCopy`: 选完本地图后问要不要复制进启动器目录
  * - `bgSizeDraft` / `applyBgSize` / `bgNativeSize` / `bgOpacity` / `setBgOpacity` / `bgBlur` / `setBgBlur`: 背景图缩放、不透明度与模糊，均为草稿加延迟落盘
  * - `inTauri` / `resetGroup`: 环境判断与分组级"恢复默认"
  */
@@ -192,13 +194,63 @@ export function useSettingsUi() {
     reader.readAsDataURL(file);
   }
 
+  /** 选完图、加载生效前的复制询问；true 表示弹窗开着 */
+  const bgCopyAsk = ref(false);
+  /** 等待回答的回调；再次询问时按"不复制"放掉上一次 */
+  let bgCopyResolve: ((copy: boolean) => void) | null = null;
+
+  /**
+   * 问一句要不要把这张图复制进启动器目录（在加载生效之前问）
+   *
+   * # 返回值
+   *
+   * 用户选择复制返回 true
+   */
+  function askBgCopy(): Promise<boolean> {
+    bgCopyResolve?.(false);
+    bgCopyResolve = null;
+    return new Promise((resolve) => {
+      bgCopyResolve = resolve;
+      bgCopyAsk.value = true;
+    });
+  }
+
+  /**
+   * 回答"是否复制进启动器目录"
+   *
+   * - `copy`: true 表示先复制成 `bg/` 下的副本再加载
+   */
+  function answerBgCopy(copy: boolean) {
+    bgCopyAsk.value = false;
+    const resolve = bgCopyResolve;
+    bgCopyResolve = null;
+    resolve?.(copy);
+  }
+
+  /** 这个地址是不是启动器目录下的副本（相对路径 `bg/...`） */
+  function isCopyPath(source: string) {
+    return source.replace(/\\/g, "/").startsWith("bg/");
+  }
+
   /** 按输入框里的地址（本地路径或网址）加载背景 */
   async function loadBgSource() {
     const source = bgSourceInput.value.trim();
     if (!source) return;
+    // 本地图在生效前先问一句：复制的话先把文件落进 bg/，再用相对路径加载
+    let target = source;
+    const local = !source.startsWith("http://") && !source.startsWith("https://");
+    if (inTauri && local && !isCopyPath(source) && (await askBgCopy())) {
+      try {
+        target = await copyBgSource(source);
+      } catch (err) {
+        showToast(`${t("winSettings.bgCopyFailed")}${t("common.detailSep")}${String(err)}`);
+        return;
+      }
+      bgSourceInput.value = target;
+    }
     // 后端加载 → 缩放 → 落盘并记入配置，失败时由 setBgImageFromOriginal 内部提示；
     // 输入框里的地址保留不清空，方便看到当前用的是哪张图
-    await setBgImageFromOriginal(source);
+    await setBgImageFromOriginal(target);
   }
 
   /** 原始大小：拖动只改草稿，点「应用」才触发后端重新缩放 */
@@ -297,6 +349,8 @@ export function useSettingsUi() {
     ACCENTS,
     bgImage,
     setBgImage,
+    bgCopyAsk,
+    answerBgCopy,
     bgLoading,
     bgFileInput,
     bgSourceInput,

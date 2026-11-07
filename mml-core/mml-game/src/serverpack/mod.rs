@@ -22,6 +22,7 @@ use mml_sys::path_helper;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
+    gui_hook::AddModPackState,
     launcher::{
         ModPackType, file_online_info_obj::OnlineInfoObj, instance_setting_obj::InstanceSettingObj,
     },
@@ -138,7 +139,8 @@ impl InstanceSettingObj {
         new_pack: ServerPackObj,
         cancel: CancellationToken,
     ) -> CoreResult<()> {
-        self.upgrade_serverpack_with(new_pack, cancel, None, &[]).await
+        self.upgrade_serverpack_with(new_pack, cancel, None, None, &[])
+            .await
     }
 
     /// 执行升级操作，并把下载进度报给调用方
@@ -159,8 +161,14 @@ impl InstanceSettingObj {
         new_pack: ServerPackObj,
         cancel: CancellationToken,
         progress: Option<ServerPackProgress<'_>>,
+        phase: Option<ServerPackPhase<'_>>,
         skip: &[String],
     ) -> CoreResult<()> {
+        // 从比对本地文件到下完所有文件是一个任务，但前半段可能比下载还久
+        // （几万个文件要逐个算哈希），先报出来，界面别一直停在"下载缺失文件 0"
+        if let Some(phase) = phase {
+            phase(AddModPackState::CheckFile);
+        }
         let old = self.get_old_serverpack()?;
         // 旧清单里被移除、且要求删目录的配置目录：后面判断子目录要不要跟着重解时要用
         let mut removed_dirs: Vec<String> = Vec::new();
@@ -272,16 +280,39 @@ impl InstanceSettingObj {
             return Err(ErrorType::TaskCancel);
         }
 
-        // 在线文件的 url 为空时从 pid/fid 解析；配置文件暂存到实例临时目录，下载完成后解压
-        let need_resolve: Vec<&ServerItemObj> = new_pack
-            .online_list
+        // 先按本地哈希筛出真正要下的文件：只删不增的更新在这里就没有待下载项，
+        // 后面既不解析下载地址、也不进下载阶段
+        let check_total = new_pack.online_list.len();
+        let mut pending: Vec<&ServerItemObj> = Vec::new();
+        for (index, item) in new_pack.online_list.iter().enumerate() {
+            // 对比期间每 128 个报一次：几万个文件逐个算哈希，界面不能一直停在 0
+            if index % 128 == 0
+                && let Some(report) = progress
+            {
+                report(index, check_total);
+            }
+            // 玩家这次没勾：不下载，本地旧文件原样留着
+            if skip_set.contains(item.file.as_str()) {
+                continue;
+            }
+            let target = paths::file_path(&game_path, &item.file)?;
+            // 禁用中的文件同样算已装好：只比内容，不把玩家停用的模组又装回启用
+            let existing = existing_file(&target);
+            if let Some((path, _)) = &existing
+                && matches_hash(item, path)
+            {
+                continue;
+            }
+            pending.push(item);
+        }
+
+        // 地址解析只针对真要下的那几个：整份清单逐个查接口，在只删不增的更新里纯属白跑
+        let need_resolve: Vec<&ServerItemObj> = pending
             .iter()
+            .copied()
             .filter(|i| !i.custom && i.url.as_deref().map_or(true, |u| u.is_empty()))
             .collect();
         let url_map = resolve_download_urls(&need_resolve, &cancel).await;
-
-        // 下什么、从哪下、按什么哈希校验：同样由纯函数算
-        let plan = plan::plan_downloads(&new_pack, &url_map);
 
         // 旧清单里按压缩包名索引：同名的才可能内容没变
         let previous_archives: HashMap<&str, &ServerArchiveItemObj> = old
@@ -297,19 +328,19 @@ impl InstanceSettingObj {
         // 先判断哪些压缩包可以跳过。父包被重新解压（Over）或被删除时，
         // 子目录即使哈希没变也必须重解，否则父包会把它擦掉。
         let mut skipped: HashSet<&str> = HashSet::new();
-        for planned in &plan.archives {
+        for item in &new_pack.archive_list {
             if archive_unchanged(
-                previous_archives.get(planned.item.file.as_str()).copied(),
-                planned.item,
+                previous_archives.get(item.file.as_str()).copied(),
+                item,
                 &game_path,
             ) {
-                skipped.insert(planned.item.dir.as_str());
+                skipped.insert(item.dir.as_str());
             }
         }
         let mut cleared: Vec<&str> = removed_dirs.iter().map(String::as_str).collect();
-        for planned in &plan.archives {
-            if !skipped.contains(planned.item.dir.as_str()) && planned.item.delete_old {
-                cleared.push(planned.item.dir.as_str());
+        for item in &new_pack.archive_list {
+            if !skipped.contains(item.dir.as_str()) && item.delete_old {
+                cleared.push(item.dir.as_str());
             }
         }
 
@@ -334,55 +365,57 @@ impl InstanceSettingObj {
             base_task = Some((base, temp));
         }
 
-        for planned in &plan.files {
-            // 玩家这次没勾：不下载，本地旧文件原样留着
-            if skip_set.contains(planned.item.file.as_str()) {
-                continue;
-            }
-            let target = paths::file_path(&game_path, &planned.item.file)?;
-            // 禁用中的文件同样算已装好：只比内容，不把玩家停用的模组又装回启用
-            let existing = existing_file(&target);
-            if let Some((path, _)) = &existing
-                && matches_hash(planned.item, path)
-            {
-                continue;
-            }
+        for item in &pending {
             // 玩家之前启用着这条（可能换了文件名）时，新版本照样装成启用
-            let keep_enabled = kept_enabled.contains(&plan::mod_key(planned.item));
+            let keep_enabled = kept_enabled.contains(&plan::mod_key(item));
+            let target = paths::file_path(&game_path, &item.file)?;
+            let existing = existing_file(&target);
             let file = plan::install_path(
                 &target,
                 existing.as_ref().map(|(path, _)| path.as_path()),
-                planned.item.optional && !keep_enabled,
+                item.optional && !keep_enabled,
             );
+            let url = item
+                .url
+                .clone()
+                .filter(|u| !u.is_empty())
+                .or_else(|| item.fid.as_ref().and_then(|f| url_map.get(f).cloned()))
+                .unwrap_or_default();
             downloads.push(FileItemObj {
-                url: planned.url.clone(),
-                name: planned.item.file.clone(),
+                url,
+                name: item.file.clone(),
                 file,
-                hash: plan::make_hash(&planned.item.sha1, &planned.item.sha256),
+                hash: plan::make_hash(&item.sha1, &item.sha256),
                 later: LaterRun::None,
             });
         }
 
-        for planned in &plan.archives {
+        for item in &new_pack.archive_list {
             // 内容没变、目标目录也还在时可以跳过；但祖先目录会被清掉时不能跳
-            let skip = skipped.contains(planned.item.dir.as_str())
+            let skip = skipped.contains(item.dir.as_str())
                 && !cleared
                     .iter()
-                    .any(|ancestor| under(planned.item.dir.as_str(), ancestor));
+                    .any(|ancestor| under(item.dir.as_str(), ancestor));
             if skip {
                 continue;
             }
-            let temp = paths::file_path(&temp_path, &planned.item.file)?;
+            let temp = paths::file_path(&temp_path, &item.file)?;
             downloads.push(FileItemObj {
-                url: planned.url.clone(),
-                name: planned.item.file.clone(),
+                url: item.url.clone(),
+                name: item.file.clone(),
                 file: temp.clone(),
-                hash: plan::make_hash(&planned.item.sha1, &planned.item.sha256),
+                hash: plan::make_hash(&item.sha1, &item.sha256),
                 later: LaterRun::None,
             });
-            archives.push((planned.item, temp));
+            archives.push((item, temp));
         }
 
+        // 真要下载时才切「下载缺失文件」：只删不增的更新没有待下载项，别让界面停在下载上
+        if !downloads.is_empty()
+            && let Some(phase) = phase
+        {
+            phase(AddModPackState::DownloadFile);
+        }
         download_all(downloads, &cancel, progress).await?;
 
         // 基础包解压到实例根目录（.minecraft 所在的那一级），只解这一次
@@ -596,6 +629,9 @@ fn local_file(game_path: &Path, info: &OnlineInfoObj) -> PathBuf {
 
 /// 服务器包同步的进度回调：已完成数与总数，单位个
 pub type ServerPackProgress<'a> = &'a (dyn Fn(usize, usize) + Sync);
+
+/// 服务器包同步的阶段回调：对比本地文件、开始下载时各调一次
+pub type ServerPackPhase<'a> = &'a (dyn Fn(AddModPackState) + Sync);
 
 /// 下载服务器包里的文件
 ///

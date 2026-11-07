@@ -30,6 +30,23 @@ use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
+/// 建一个不给子进程开控制台窗口的命令
+///
+/// 启动器是 GUI 进程，`java -version`、`where` 这类控制台程序默认会自建一个窗口闪一下；
+/// 只跑一次、只要输出的探测类调用都走这里。
+///
+/// - `path`: 可执行文件路径或命令名
+///
+/// # 返回值
+///
+/// 已配好隐藏标志的命令，调用方继续加参数 / 配 stdio
+pub fn hidden_command<P: AsRef<std::ffi::OsStr>>(path: P) -> Command {
+    let mut cmd = Command::new(path);
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
 /// 出错原因转 ProcessError
 fn process_err(err: impl std::fmt::Display) -> ErrorType {
     ErrorType::ProcessError(ErrorData::from_error(err))
@@ -391,7 +408,7 @@ pub fn launch_admin(args: &[String]) -> CoreResult<()> {
 ///
 /// 返回按行拆分、去空的 stdout；命令启动失败报错，非零退出码返回空列表
 pub fn run_command(command: &str) -> CoreResult<Vec<String>> {
-    let output = Command::new(command).output().map_err(process_err)?;
+    let output = hidden_command(command).output().map_err(process_err)?;
 
     if !output.status.success() {
         return Ok(Vec::new());
@@ -418,7 +435,7 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<std::ffi::OsStr>,
 {
-    let output = Command::new(command)
+    let output = hidden_command(command)
         .args(args)
         .output()
         .map_err(process_err)?;

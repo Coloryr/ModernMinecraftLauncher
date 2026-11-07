@@ -13,6 +13,7 @@ use crate::windows::modpack_task::{LOCAL_PACK_PID, RegisteredTask, finish_task, 
 use uuid::Uuid;
 
 use super::prepare::{PreparedTask, is_modpack, pack_file_stem, prepare};
+use crate::dtos::resource_dto::ServerPackModDto;
 use crate::dtos::ServerPackProbeDto;
 use crate::windows::add::loader::{parse_loader, parse_pack_type};
 use crate::windows::add::model::{instance_gui, pack_gui};
@@ -300,6 +301,7 @@ pub async fn add_create_new(
 /// - `url`: 服务器实例地址，发布目录或 server.json 都认
 /// - `name`: 实例名，缺省用清单里的名字
 /// - `group`: 分组 uuid；空 / 非法 = 默认分组
+/// - `skip`: 这次先不下载的可选模组路径，取探清单结果里的 `mods`；缺省表示全下
 ///
 /// # 返回值
 ///
@@ -312,6 +314,7 @@ pub async fn add_import_server_pack(
     url: String,
     name: Option<String>,
     group: Option<String>,
+    skip: Option<Vec<String>>,
 ) -> Result<String, String> {
     let PreparedTask {
         model: _store,
@@ -325,9 +328,13 @@ pub async fn add_import_server_pack(
         mml_game::check_name(name).map_err(|e| e.to_string())?;
     }
     let progress = pack_gui(&window);
+    let skip = skip.unwrap_or_default();
     let uuid = tauri::async_runtime::spawn_blocking(move || {
         tauri::async_runtime::block_on(async {
-            add_game::install_server_pack_from_url(&url, name, group, gui, progress, token).await
+            add_game::install_server_pack_from_url_with_skip(
+                &url, name, group, &skip, gui, progress, token,
+            )
+            .await
         })
     })
     .await
@@ -355,6 +362,24 @@ pub async fn add_probe_server_pack(url: String) -> Result<ServerPackProbeDto, St
     let (manifest, pack) = add_game::fetch_server_pack(&url)
         .await
         .map_err(|e| e.to_string())?;
+    // 首次导入也要能挑可选模组：清单里的可选项先摆出来，没勾的这次不下
+    let mods = pack
+        .online_list
+        .iter()
+        .filter(|item| item.optional)
+        .map(|item| ServerPackModDto {
+            path: item.file.clone(),
+            name: item
+                .file
+                .rsplit('/')
+                .next()
+                .unwrap_or(item.file.as_str())
+                .to_string(),
+            // 首次导入没有"新增"可言，全都不打标
+            added: false,
+            enabled: false,
+        })
+        .collect();
     Ok(ServerPackProbeDto {
         url: manifest,
         name: pack.name,
@@ -365,5 +390,6 @@ pub async fn add_probe_server_pack(url: String) -> Result<ServerPackProbeDto, St
         text: pack.text,
         file_count: pack.online_list.len() as u64,
         archive_count: pack.archive_list.len() as u64,
+        mods,
     })
 }

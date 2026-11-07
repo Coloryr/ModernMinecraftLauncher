@@ -345,11 +345,29 @@ async function onLoaderChange(value: string) {
 // 语言列表从实例的资源索引 minecraft/lang/*.json 里查；
 // 资源未下载 / 查询失败时保留默认（简体中文 + English）
 // label 是语言自称，与界面语言无关，取的就是游戏资源里的原文，所以不进 i18n
+// 取值与内核写进 options.txt 的写法一致：旧版（1.7.10）语言代码是大写，
+// 只在资源索引还没读到时兜底用；真实列表到达后以索引里的代码为准
 const DEFAULT_LANGS = [
-  { value: "zh_cn", label: "简体中文" },
-  { value: "en_us", label: "English" },
+  { value: "zh_CN", label: "简体中文" },
+  { value: "en_US", label: "English" },
 ];
 const langs = ref([...DEFAULT_LANGS]);
+
+/**
+ * 下拉框的当前值
+ *
+ * 后端给的是 options.txt 里的原始写法：旧版 `zh_CN`、新版 `zh_cn`，
+ * 而列表里的代码跟版本走，大小写可能对不上，这里按忽略大小写匹配一次，
+ * 否则列表加载完下拉框会变成空的。
+ */
+const langValue = computed(() => {
+  const want = (props.instance.lang ?? "zh_CN").toLowerCase();
+  return (
+    langs.value.find((item) => item.value.toLowerCase() === want)?.value
+    ?? props.instance.lang
+    ?? "zh_CN"
+  );
+});
 // 查询要读整份资源索引，耗时较长；期间下拉框显示"加载中"并禁用，
 // 免得用户选到还没被真实列表替换掉的默认项
 const langsLoading = ref(false);
@@ -540,7 +558,7 @@ function onPlatformChange(value: string) {
 
     <!-- 游戏内语言 + 日志编码 -->
     <span class="meta-label">{{ t("meta.lang") }}</span>
-    <select class="field-select" :value="instance.lang ?? 'zh_cn'" :disabled="langsLoading"
+    <select class="field-select" :value="langValue" :disabled="langsLoading"
       @change="change({ lang: ($event.target as HTMLSelectElement).value })">
       <option v-if="langsLoading" value="">{{ t("meta.langLoading") }}</option>
       <template v-else>

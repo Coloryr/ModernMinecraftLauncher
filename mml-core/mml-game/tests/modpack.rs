@@ -39,6 +39,8 @@ fn state_id(state: &AddModPackState) -> &'static str {
         AddModPackState::DownloadPack => "downloadPack",
         AddModPackState::ReadInfo => "readInfo",
         AddModPackState::GetInfo => "getInfo",
+        AddModPackState::CheckServerPack => "checkServerPack",
+        AddModPackState::CheckFile => "checkFile",
         AddModPackState::DownloadFile => "downloadFile",
         AddModPackState::Extract => "extract",
         AddModPackState::Done => "done",

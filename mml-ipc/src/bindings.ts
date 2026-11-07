@@ -72,7 +72,7 @@ export function createCommands(invoke: Invoke) {
       getVersionTypes: () => invoke<string[]>("add_get_version_types"),
       importArchive: (path: string, packType: string, name: string | null, group: string | null, unselect: string[] | null) => invoke<string>("add_import_archive", { path, packType, name, group, unselect }),
       importFolder: (path: string, name: string | null, group: string | null) => invoke<string>("add_import_folder", { path, name, group }),
-      importServerPack: (url: string, name: string | null, group: string | null) => invoke<string>("add_import_server_pack", { url, name, group }),
+      importServerPack: (url: string, name: string | null, group: string | null, skip: string[] | null) => invoke<string>("add_import_server_pack", { url, name, group, skip }),
       importUrl: (url: string, name: string | null, group: string | null) => invoke<string>("add_import_url", { url, name, group }),
       listArchive: (path: string) => invoke<ArchiveProbeDto>("add_list_archive", { path }),
       listDir: (path: string) => invoke<DirEntry[]>("add_list_dir", { path }),
@@ -343,6 +343,7 @@ export function createCommands(invoke: Invoke) {
     },
     settings: {
       addJava: (name: string | null, path: string) => invoke<JavaInfoDto>("settings_add_java", { name, path }),
+      bgCopySource: (source: string) => invoke<string>("settings_bg_copy_source", { source }),
       clearBg: () => invoke<void>("settings_clear_bg"),
       clearLocalFile: (id: string) => invoke<void>("settings_clear_local_file", { id }),
       clearProgramIcon: () => invoke<void>("settings_clear_program_icon"),

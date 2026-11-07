@@ -8,6 +8,7 @@ import { t } from "../../../../lib/i18n";
 import { detectOs } from "../../../../lib/titlebar";
 import { fontStack } from "../../../../lib/fonts";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
+import BaseModal from "../../../../components/ui/BaseModal.vue";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
 import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
 import NumberStepper from "../../../../components/ui/NumberStepper.vue";
@@ -55,6 +56,8 @@ const {
   ACCENTS,
   bgImage,
   setBgImage,
+  bgCopyAsk,
+  answerBgCopy,
   bgLoading,
   bgFileInput,
   bgSourceInput,
@@ -318,13 +321,13 @@ function toggleCustomPage(on: boolean) {
       @change="onBgFile" />
 
     <template v-if="bgImage">
-      <div class="range-row row-card">
+      <div class="range-row row-card is-plain">
         <span class="range-label">{{ t("winSettings.bgOpacity") }}</span>
         <input class="range" type="range" min="5" max="100" :value="bgOpacity"
           @input="setBgOpacity(Number(($event.target as HTMLInputElement).value))" />
         <span class="range-value">{{ bgOpacity }}%</span>
       </div>
-      <div class="range-row row-card">
+      <div class="range-row row-card is-plain">
         <span class="range-label">{{ t("winSettings.bgBlur") }}</span>
         <input class="range" type="range" min="0" max="40" :value="bgBlur"
           @input="setBgBlur(Number(($event.target as HTMLInputElement).value))" />
@@ -332,19 +335,55 @@ function toggleCustomPage(on: boolean) {
       </div>
       <!-- 原始大小：后端把图片分辨率缩放到原图的百分之多少；点「应用」才生效，
            且只改分辨率，不改变图在窗口里的显示大小 -->
-      <div class="range-row row-card">
+      <div class="range-row row-card is-plain">
         <span class="range-label">{{ t("winSettings.bgNativeSize") }}</span>
         <input class="range" type="range" min="10" max="100" :value="bgSizeDraft"
           @input="bgSizeDraft = Number(($event.target as HTMLInputElement).value)" />
         <span class="range-value">{{ bgSizeDraft }}%</span>
-        <BaseButton size="sm" variant="accent" :disabled="bgLoading || bgSizeDraft === bgNativeSize"
-          @click="applyBgSize">{{ bgLoading ? t("winSettings.bgLoading") : t("winSettings.bgApply") }}</BaseButton>
+        <!-- 行内文字按钮：标准按钮 32px 会把这一行撑高，三条滑杆的 4px 行距就乱了 -->
+        <button type="button" class="range-apply" :disabled="bgLoading || bgSizeDraft === bgNativeSize"
+          @click="applyBgSize">{{ bgLoading ? t("winSettings.bgLoading") : t("winSettings.bgApply") }}</button>
       </div>
     </template>
   </SettingsGroup>
+
+  <!-- 选完本地图问一句：复制进启动器目录后来源改成相对路径，原图删掉、整个目录搬走都不影响 -->
+  <BaseModal v-if="bgCopyAsk" :title="t('winSettings.bgCopyAskTitle')" @close="answerBgCopy(false)">
+    <p class="modal-text">{{ t("winSettings.bgCopyAskText") }}</p>
+    <div class="modal-actions">
+      <BaseButton @click="answerBgCopy(false)">{{ t("winSettings.bgCopyAskNo") }}</BaseButton>
+      <BaseButton variant="accent" :disabled="bgLoading" @click="answerBgCopy(true)">
+        {{ t("winSettings.bgCopyAskYes") }}
+      </BaseButton>
+    </div>
+  </BaseModal>
 </template>
 
 <style scoped>
+/* 行内文字按钮：放在滑杆行末尾，高度与行内文字一致，不把行撑高 */
+.range-apply {
+  flex-shrink: 0;
+  height: 20px;
+  padding: 0 2px;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.range-apply:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.range-apply:disabled {
+  color: var(--text-dim);
+  cursor: default;
+  opacity: 0.6;
+}
+
 /* 自定义强调色色块上的对勾：描边取深色块上的白 */
 .accent-icon {
   stroke: var(--on-accent);

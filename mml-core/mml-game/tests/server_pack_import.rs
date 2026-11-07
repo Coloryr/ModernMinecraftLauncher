@@ -280,6 +280,64 @@ fn import_downloads_files() {
     assert_eq!(steps.last(), Some(&(1, Some(1))), "进度应走完：{steps:?}");
 }
 
+/// 首次导入时没勾的可选模组不下载，勾上的装成禁用状态
+#[test]
+fn first_import_skips_unchecked_optional_mods() {
+    let _guard = serial();
+    ensure_init();
+    let (port, slot) = json_server_slot();
+    *slot.lock().unwrap() = manifest_with_optional_files(port);
+
+    let uuid = block_on(mml_game::add_game::install_server_pack_from_url_with_skip(
+        &format!("http://127.0.0.1:{port}/pack"),
+        None,
+        None,
+        &["mods/skip.jar".to_string()],
+        None,
+        None,
+        CancellationToken::new(),
+    ))
+    .expect("导入应成功");
+
+    let instance = mml_game::get_instance(&uuid).expect("实例应已登记");
+    let instance = instance.read().unwrap();
+    let game_path = instance.get_game_path();
+    assert!(game_path.join("mods/keep.jar.disabled").is_file());
+    assert!(!game_path.join("mods/skip.jar").exists());
+    assert!(!game_path.join("mods/skip.jar.disabled").exists());
+
+    // 跳过要记进本地清单：下次清单没变时不必再问同一份内容
+    let manifest = instance.get_server_pack_file();
+    for _ in 0..50 {
+        if manifest.exists() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let local: ServerPackObj =
+        serde_json::from_slice(&std::fs::read(&manifest).unwrap()).unwrap();
+    let skipped: Vec<&str> = local.skipped.iter().map(|row| row.file.as_str()).collect();
+    assert_eq!(skipped, vec!["mods/skip.jar"]);
+}
+
+/// 两个可选模组，内容都指向本机那份固定字节
+fn manifest_with_optional_files(port: u16) -> String {
+    let mut pack = decode_manifest();
+    for file in ["mods/keep.jar", "mods/skip.jar"] {
+        pack.online_list.push(ServerItemObj {
+            file: file.to_string(),
+            url: Some(format!("http://127.0.0.1:{port}/tiny.jar")),
+            sha1: Some(mml_base::hash_helper::gen_hash(
+                mml_base::hash_helper::HashType::Sha1,
+                TINY_JAR,
+            )),
+            optional: true,
+            ..Default::default()
+        });
+    }
+    serde_json::to_string(&pack).unwrap()
+}
+
 /// 清单里带一个要下载的文件，地址指向本机服务
 fn manifest_with_file(port: u16) -> String {
     let mut pack = decode_manifest();

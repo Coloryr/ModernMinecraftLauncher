@@ -1049,9 +1049,16 @@ export function commonCommands(extra = {}) {
       text: "服务端整合包，包含 128 个模组",
       fileCount: 132,
       archiveCount: 4,
+      // 清单里的可选模组：首次导入前让玩家挑这次下哪些
+      mods: [],
     },
     main_get_custom_json: [],
     settings_get_bg: { source: "", dataUrl: "", opacity: 100, blur: 0, nativeSize: 0 },
+    // 加载背景图：后端返回处理后的 dataURL，这里给一张 8×8 占位图
+    settings_set_bg:
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAJUlEQVR4nGP8z8Dwn4EIwESMolGFlCscVUiyQoYRrIBAYRg5CgEAPi0EAcHZ5fEAAAAASUVORK5CYII=",
+    // 复制进启动器目录：返回副本的相对路径（不写配置，随后由 settings_set_bg 生效）
+    settings_bg_copy_source: "bg/bg_source.png",
     // 没设自定义程序图标：预览位是占位字形
     settings_get_program_icon: null,
     log_get_setting: {

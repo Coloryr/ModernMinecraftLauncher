@@ -9,6 +9,8 @@ import type { ServerPackModDto } from "./bindings";
 export const serverPackModsOpen = ref(false);
 /** 这次会变的可选模组；关闭时清空 */
 export const serverPackModsList = ref<ServerPackModDto[]>([]);
+/** 这次是首次导入（true）还是更新（false）：两边的标题与说明不同 */
+export const serverPackModsInstall = ref(false);
 
 /** 等待回答的 promise 回调 */
 let pending: ((skip: string[] | null) => void) | null = null;
@@ -17,12 +19,16 @@ let pending: ((skip: string[] | null) => void) | null = null;
  * 打开可选模组选择弹窗并等待用户确认
  *
  * - `mods`: 这次会变的可选模组，取更新检查结果里的 mods
+ * - `install`: 首次导入时为 true，弹窗换成"要下载哪些"的说法
  *
  * # 返回值
  *
- * 这次不更新的文件路径；用户取消返回 null
+ * 这次不下载 / 不更新的文件路径；用户取消返回 null
  */
-export function askServerPackMods(mods: ServerPackModDto[]): Promise<string[] | null> {
+export function askServerPackMods(
+  mods: ServerPackModDto[],
+  install = false,
+): Promise<string[] | null> {
   // 上一问未回答时按"取消"放掉，避免旧 Promise 永远不 settle
   pending?.(null);
   pending = null;
@@ -30,6 +36,7 @@ export function askServerPackMods(mods: ServerPackModDto[]): Promise<string[] | 
   return new Promise((resolve) => {
     pending = resolve;
     serverPackModsList.value = mods;
+    serverPackModsInstall.value = install;
     serverPackModsOpen.value = true;
   });
 }
@@ -42,6 +49,7 @@ export function askServerPackMods(mods: ServerPackModDto[]): Promise<string[] | 
 export function answerServerPackMods(skip: string[] | null): void {
   serverPackModsOpen.value = false;
   serverPackModsList.value = [];
+  serverPackModsInstall.value = false;
   const resolve = pending;
   pending = null;
   resolve?.(skip);

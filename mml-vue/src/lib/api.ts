@@ -375,13 +375,19 @@ export const api = {
    * - `url`: 服务器实例地址，发布目录或 server.json 都认
    * - `name`: 实例名
    * - `group`: 分组 uuid，null = 默认分组
+   * - `skip`: 这次先不下载的可选模组路径，取探清单结果里的 `mods`
    *
    * # 返回值
    *
    * 新实例的 uuid
    */
-  async addImportServerPack(url: string, name: string, group: string | null): Promise<string> {
-    return commands.add.importServerPack(url, name, group);
+  async addImportServerPack(
+    url: string,
+    name: string,
+    group: string | null,
+    skip: string[] = [],
+  ): Promise<string> {
+    return commands.add.importServerPack(url, name, group, skip.length ? skip : null);
   },
 
   /**

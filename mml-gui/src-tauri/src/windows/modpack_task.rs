@@ -293,12 +293,15 @@ pub(crate) fn finish_task(
 ///
 /// # 返回值
 ///
-/// `downloadPack` / `readInfo` / `getInfo` / `downloadFile` / `extract` / `done` 之一
+/// `downloadPack` / `readInfo` / `getInfo` / `checkServerPack` / `checkFile` /
+/// `downloadFile` / `extract` / `done` 之一
 pub(super) fn pack_state_id(state: AddModPackState) -> &'static str {
     match state {
         AddModPackState::DownloadPack => "downloadPack",
         AddModPackState::ReadInfo => "readInfo",
         AddModPackState::GetInfo => "getInfo",
+        AddModPackState::CheckServerPack => "checkServerPack",
+        AddModPackState::CheckFile => "checkFile",
         AddModPackState::DownloadFile => "downloadFile",
         AddModPackState::Extract => "extract",
         AddModPackState::Done => "done",

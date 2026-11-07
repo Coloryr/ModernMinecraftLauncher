@@ -270,6 +270,69 @@ export const scenarios = [
 
   /* ---------------- 设置 ---------------- */
   { id: "settings-ui", kind: "settings", label: "mml-settings", size: [1100, 760], commands: base(), actions: [{ eval: clickTab("界面"), after: 400 }] },
+  // 设了背景图：三条滑杆直接浮在图上（不再套卡片底色），并给出「复制到启动器目录」开关
+  {
+    id: "settings-bg",
+    kind: "settings",
+    label: "mml-settings",
+    size: [1100, 760],
+    commands: base({
+      settings_get_bg: {
+        source: "C:\\Users\\User\\Pictures\\bg.png",
+        dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAJUlEQVR4nGP8z8Dwn4EIwESMolGFlCscVUiyQoYRrIBAYRg5CgEAPi0EAcHZ5fEAAAAASUVORK5CYII=",
+        opacity: 100,
+        blur: 0,
+        nativeSize: 100,
+      },
+    }),
+    actions: [
+      { eval: clickTab("界面"), after: 500 },
+      { eval: "(() => { const el = [...document.querySelectorAll('.group-title')].find((x) => x.textContent.includes('背景图')); if (!el) return false; el.scrollIntoView({ block: 'start' }); return true; })()", after: 500 },
+      { assert: "document.querySelector('.row-card.is-plain') !== null", label: "滑杆行不再套卡片底色" },
+      { assert: "getComputedStyle(document.querySelectorAll('.row-card.is-plain')[1]).marginTop === '4px'", label: "三条滑杆之间隔 4px" },
+      {
+        assert: "(() => { const y = [...document.querySelectorAll('.row-card.is-plain .range-label')].map((el) => el.getBoundingClientRect().top); return y.length === 3 && Math.abs(y[1] - y[0] - (y[2] - y[1])) <= 2; })()",
+        label: "三条滑杆等距",
+      },
+    ],
+  },
+  // 选完本地图后弹窗问是否复制进启动器目录
+  {
+    id: "settings-bg-copy-ask",
+    kind: "settings",
+    label: "mml-settings",
+    size: [1100, 760],
+    commands: base(),
+    actions: [
+      { eval: clickTab("界面"), after: 500 },
+      { eval: "(() => { const el = [...document.querySelectorAll('.group-title')].find((x) => x.textContent.includes('背景图')); if (!el) return false; el.scrollIntoView({ block: 'start' }); return true; })()", after: 400 },
+      { eval: setInput(".bg-url-input", "C:\\Users\\User\\Pictures\\bg.png"), after: 200 },
+      { eval: clickText("加载"), after: 700 },
+      { assert: "document.body.innerText.includes('复制背景图')", label: "弹窗询问是否复制" },
+      { assert: "document.querySelector('.bg-url-input').value === 'C:\\\\Users\\\\User\\\\Pictures\\\\bg.png'", label: "还没生效：输入框仍是原路径" },
+    ],
+  },
+  // 复制到启动器目录后：地址是相对路径（跟整个目录一起搬也还能用）
+  {
+    id: "settings-bg-copied",
+    kind: "settings",
+    label: "mml-settings",
+    size: [1100, 760],
+    commands: base({
+      settings_get_bg: {
+        source: "bg/bg_source.png",
+        dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAJUlEQVR4nGP8z8Dwn4EIwESMolGFlCscVUiyQoYRrIBAYRg5CgEAPi0EAcHZ5fEAAAAASUVORK5CYII=",
+        opacity: 100,
+        blur: 0,
+        nativeSize: 100,
+      },
+    }),
+    actions: [
+      { eval: clickTab("界面"), after: 500 },
+      { eval: "(() => { const el = [...document.querySelectorAll('.group-title')].find((x) => x.textContent.includes('背景图')); if (!el) return false; el.scrollIntoView({ block: 'start' }); return true; })()", after: 400 },
+      { assert: "document.querySelector('.bg-url-input').value === 'bg/bg_source.png'", label: "复制后地址为相对路径" },
+    ],
+  },
   { id: "settings-java", kind: "settings", label: "mml-settings", size: [1100, 860], commands: base(), actions: [{ eval: clickTab("Java"), after: 500 }] },
   { id: "settings-network", kind: "settings", label: "mml-settings", size: [1100, 780], commands: base(), actions: [{ eval: clickTab("网络与下载"), after: 500 }] },
   { id: "settings-launch", kind: "settings", label: "mml-settings", size: [1100, 780], commands: base(), actions: [{ eval: clickTab("游戏启动"), after: 500 }] },
@@ -937,6 +1000,35 @@ export const scenarios = [
       { eval: clickText("添加文件夹"), after: 250 },
       { eval: setInput("#add-name", "文件夹测试"), after: 250 },
       { eval: clickText("添加"), after: 500 },
+    ],
+  },
+  {
+    id: "add-online-optional-mods",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    commands: base({
+      add_probe_server_pack: {
+        url: "https://example.com/pack/server.json",
+        name: "GTNH290",
+        version: "1.7.10",
+        loader: "forge",
+        loaderVersion: "10.13.4.1614",
+        packVersion: "1.6",
+        text: "GTNH-2.9.x-深空矩阵 · 电脑端",
+        fileCount: 18395,
+        archiveCount: 0,
+        mods: [
+          { path: "mods/[C][自选][FPS减帧器]FpsReducer-mc1.7.10-1.10.3.jar", name: "FpsReducer-mc1.7.10-1.10.3.jar", added: false, enabled: false },
+          { path: "mods/[C][自选][NEI合成树]neirecipe-tree-0.0.5-fix.jar", name: "neirecipe-tree-0.0.5-fix.jar", added: false, enabled: false },
+          { path: "mods/[C][自选][光影补丁]EuphoriaPatcher-1.10.5-r5.9.3-forge1.7.10.jar", name: "EuphoriaPatcher-1.10.5-r5.9.3-forge1.7.10.jar", added: false, enabled: false },
+        ],
+      },
+    }),
+    actions: [
+      { eval: clickText("在线实例"), after: 250 },
+      { eval: setInput(".add-card-content input", "https://example.com/pack/server.json"), after: 900 },
+      { eval: click(".add-body .modal-actions .v-primary"), after: 700 },
     ],
   },
   {

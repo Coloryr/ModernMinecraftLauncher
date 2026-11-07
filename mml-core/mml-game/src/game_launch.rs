@@ -658,7 +658,7 @@ impl InstanceSettingObj {
                 let obj = serialize_tools::json_from_bytes::<ServerPackObj>(&data)?;
                 self.move_serverpack_to_old()?;
                 if let Err(err) = self
-                    .upgrade_serverpack_with(obj, sync_cancel, None, skip)
+                    .upgrade_serverpack_with(obj, sync_cancel, None, None, skip)
                     .await
                 {
                     // 只为这次启动选了「跳过更新」：把旧清单挪回去，接着启动，下次再比对
