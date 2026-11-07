@@ -131,7 +131,7 @@ wgpu = { version = "~30.0.1", default-features = false, features = [
 pollster = "~1.0.1"
 bytemuck = { version = "~1.25.2", features = ["derive"] }
 sdl3 = { version = "~0.22", features = ["build-from-source", "static-link"] }
-tauri-plugin-dialog = "~2.8.4"
+tauri-plugin-dialog = { version = "~2.8.4", default-features = false, features = ["xdg-portal"] }
 window-vibrancy = "~0.8.1"
 font-kit = "~0.14.3"
 dirs = "~7.0.0"
@@ -141,7 +141,7 @@ image = { version = "~0.25.10", default-features = false, features = [
     "jpeg",
     "webp",
 ] }
-rfd = "~0.17.2"
+rfd = { version = "~0.16.0", default-features = false, features = ["xdg-portal", "tokio"] }
 
 [profile.dev.package.miniz_oxide]
 opt-level = 3
