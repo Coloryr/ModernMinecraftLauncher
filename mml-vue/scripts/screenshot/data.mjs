@@ -1016,15 +1016,20 @@ export function commonCommands(extra = {}) {
     main_get_versions: addVersions,
     main_refresh_versions: addVersions,
     add_get_loader_versions: ["0.16.10", "0.16.9", "0.15.11"],
-    add_list_archive: [
-      "manifest.json",
-      "mods/",
-      "mods/sodium.jar",
-      "mods/iris.jar",
-      "config/",
-      "config/sodium-options.json",
-    ],
-    add_detect_archive: { packType: "curseforge", name: "Better MC" },
+    // 一次打开压缩包的结果：条目 + 类型 + 名字 + 是否服务器包
+    add_list_archive: {
+      entries: [
+        "manifest.json",
+        "mods/",
+        "mods/sodium.jar",
+        "mods/iris.jar",
+        "config/",
+        "config/sodium-options.json",
+      ],
+      packType: "curseforge",
+      name: "Better MC",
+      serverPack: false,
+    },
     add_scan_folder: [
       { path: "E:\\M2L\\instances\\Better MC", name: "Better MC" },
       { path: "E:\\M2L\\instances\\RLCraft", name: "RLCraft" },

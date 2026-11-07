@@ -793,7 +793,12 @@ export const scenarios = [
     label: "mml-add",
     size: [1100, 760],
     openPath: "E:\\packs\\BetterMC.zip",
-    commands: base({ add_list_archive: { __delay: 2200, value: ["manifest.json", "mods/", "mods/sodium.jar"] } }),
+    commands: base({
+      add_list_archive: {
+        __delay: 2200,
+        value: { entries: ["manifest.json", "mods/", "mods/sodium.jar"], packType: "curseforge", name: "Better MC", serverPack: false },
+      },
+    }),
     actions: [
       { eval: clickText("导入压缩包"), after: 250 },
       { eval: click(".add-card-content .pick-btn"), after: 300 },
@@ -805,7 +810,17 @@ export const scenarios = [
     label: "mml-add",
     size: [1100, 760],
     openPath: "E:\\packs\\BetterMC.zip",
-    commands: base({ add_list_archive: { __delay: 700, value: ["manifest.json", "mods/", "mods/sodium.jar", "config/", "config/sodium-options.json"] } }),
+    commands: base({
+      add_list_archive: {
+        __delay: 700,
+        value: {
+          entries: ["manifest.json", "mods/", "mods/sodium.jar", "config/", "config/sodium-options.json"],
+          packType: "curseforge",
+          name: "Better MC",
+          serverPack: false,
+        },
+      },
+    }),
     actions: [
       { eval: clickText("导入压缩包"), after: 250 },
       { eval: click(".add-card-content .pick-btn"), after: 1200 },
@@ -897,6 +912,19 @@ export const scenarios = [
       { eval: clickText("添加文件夹"), after: 250 },
       { eval: click(".add-card-content .pick-btn"), after: 450 },
       { eval: clickText("允许", ".modal"), after: 700 },
+    ],
+  },
+  {
+    id: "add-folder-read-error",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    openPath: "E:\\M2L\\instances",
+    commands: base({ add_scan_folder: { value: [] }, add_list_dir: { __error: "没有权限读取该目录" } }),
+    actions: [
+      { eval: clickText("添加文件夹"), after: 250 },
+      { eval: click(".add-card-content .pick-btn"), after: 450 },
+      { eval: clickText("允许", ".modal"), after: 900 },
     ],
   },
   {

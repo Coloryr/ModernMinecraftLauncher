@@ -271,6 +271,7 @@ const OVERRIDE = {
   "add-pack-progress-modal": "添加实例 · 整合包进度弹窗",
   "add-archive-read-error": "添加实例 · 压缩包读取失败",
   "add-folder-scan-error": "添加实例 · 文件夹扫描失败",
+  "add-folder-read-error": "添加实例 · 文件夹读取失败",
   "addmodpack-install-popup": "下载整合包 · 安装进度弹窗",
   "collect-group-pick": "收藏 · 选中分组",
   "collect-group-empty": "收藏 · 空分组",

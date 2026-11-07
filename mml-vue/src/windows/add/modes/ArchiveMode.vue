@@ -89,8 +89,8 @@ watch(
       @toggle-dir="(n: FileNode, on: boolean) => emit('toggle-dir', n, on)"
       @toggle-expand="emit('toggle-expand', $event)" @set-all="emit('set-all', $event)" />
   </template>
-  <!-- 还没选包时的空状态：说明这一步之后会发生什么。扫描期间不显示 -->
-  <p v-else-if="phase === 'idle'" class="field-hint">{{ t("add.archiveHint") }}</p>
+  <!-- 还没选包时的空状态：说明这一步之后会发生什么。扫描期间与出错时都不显示 -->
+  <p v-else-if="phase === 'idle' && !error" class="field-hint">{{ t("add.archiveHint") }}</p>
 </template>
 
 <style scoped>

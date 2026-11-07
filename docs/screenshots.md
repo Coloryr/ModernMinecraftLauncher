@@ -39,7 +39,7 @@ npm run shots -- --clean
 
 ## 场景表
 
-共 250 个场景，按窗口分组。
+共 251 个场景，按窗口分组。
 「窗口」列是页面的 `kind`，窗口族场景会自动带上实例参数，不需要在命令里另写；
 控件场景的 `control` 是截图工具里的预览页，不是启动器窗口。
 
@@ -182,6 +182,7 @@ npm run shots -- --clean
 | `add-folder-loaded` | 添加实例 · 文件夹 · 已加载 | `add` | 1100×760 |
 | `add-folder-tree-loaded` | 添加实例 · 文件夹 · 目录树 · 已加载 | `add` | 1100×760 |
 | `add-folder-scan-error` | 添加实例 · 文件夹扫描失败 | `add` | 1100×760 |
+| `add-folder-read-error` | 添加实例 · 文件夹读取失败 | `add` | 1100×760 |
 | `add-folder-empty-error` | 添加实例 · 文件夹 · 空状态 · 错误 | `add` | 1100×760 |
 | `add-online-probing` | 添加实例 · 在线地址 · 探测中 | `add` | 1100×760 |
 | `add-online-loaded` | 添加实例 · 在线地址 · 已加载 | `add` | 1100×760 |

@@ -127,8 +127,8 @@ watch(
       @set-all="emit('set-all', $event)" />
   </template>
 
-  <!-- 还没选文件夹 / 选了个没扫到实例又读不出内容的目录 -->
-  <p v-else class="field-hint">{{ path ? t("add.folderNone") : t("add.folderHint") }}</p>
+  <!-- 还没选文件夹 / 选了个没扫到实例又读不出内容的目录。出错时只留红字，不再叠提示 -->
+  <p v-else-if="!error" class="field-hint">{{ path ? t("add.folderNone") : t("add.folderHint") }}</p>
 </template>
 
 <style scoped>

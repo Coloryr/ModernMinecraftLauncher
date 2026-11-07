@@ -59,7 +59,8 @@ function fillManifest() {
 
   <p v-else-if="archiveUrl" class="error-text" role="alert">{{ t("add.urlArchiveNotAllowed") }}</p>
 
-  <p v-else class="field-hint">{{ t("add.urlHint") }}</p>
+  <!-- 读清单期间与失败时都只留状态行，不再在它上面叠那行说明 -->
+  <p v-else-if="!probing && !probeError" class="field-hint">{{ t("add.urlHint") }}</p>
 
   <!-- 填完地址自动读一次清单：先让人看清会装成什么，再决定要不要下载 -->
   <p v-if="probing" class="probe-tip">{{ t("add.probeReading") }}</p>
