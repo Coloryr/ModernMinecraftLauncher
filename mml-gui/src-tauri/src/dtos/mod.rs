@@ -83,8 +83,8 @@ pub use log_dto::{LogFocusDto, LogSettingDto};
 pub use main_dto::{
     AutoSaveTargetDto, Block2dFaceDto, BlockGroupDto, BlockGroupsDto, BlockItemDto, BlockStatusDto,
     CustomJsonItemDto, ErrorEvent, ExitEvent, IconSourceDto, InstanceChangeEvent, InstanceLangDto,
-    DebuggerInfoDto, InstancePatch, LaunchCommandDto, LaunchPrecheckDto, LogEvent, NewsItem,
-    NsightInstallDto, RenderDocLaunchDto, StartArgDto, StateEvent, SystemMemoryDto,
+    DebugLaunchDto, DebuggerInfoDto, InstancePatch, LaunchCommandDto, LaunchPrecheckDto, LogEvent,
+    NewsItem, NsightInstallDto, StartArgDto, StateEvent, SystemMemoryDto,
 };
 pub use minecraft_dto::{
     MinecraftImportDto, MinecraftInfoDto, MinecraftProgressDto, MinecraftVersionDto,

@@ -73,9 +73,9 @@ import type {
   PackItemDto,
   PackProgressDto,
   DebuggerInfoDto,
+  DebugLaunchDto,
   ProjectDetailDto,
   ProjectDto,
-  RenderDocLaunchDto,
   ResourceDependencyDto,
   ResourceSaveDto,
   ResourceStatusDto,
@@ -1072,6 +1072,7 @@ export const api = {
    * - `runCommands`: 启动前 / 后命令这次执不执行；`false` = 用户选了跳过
    * - `renderdoc`: 是否用 RenderDoc 启动
    * - `nsight`: 是否用本机安装的 Nsight Graphics 启动
+   * - `jvmDebug`: JVM 远程调试端口；不给就不加 JDWP 参数
    *
    * 启动用户名由后端从当前账户解析
    */
@@ -1085,6 +1086,7 @@ export const api = {
     runCommands?: boolean,
     renderdoc?: boolean,
     nsight?: boolean,
+    jvmDebug?: number,
   ): Promise<void> {
     return commands.main.launchGame(
       uuid,
@@ -1096,6 +1098,7 @@ export const api = {
       runCommands ?? null,
       renderdoc ?? null,
       nsight ?? null,
+      jvmDebug ?? null,
     );
   },
 
@@ -1124,18 +1127,19 @@ export const api = {
   },
 
   /**
-   * 生成 RenderDoc 界面启动要填的参数
+   * 生成调试参数：调试器界面启动要填的四项
    *
    * 走的是真实启动那套参数生成，只是不拉起进程；结果里含登录令牌，只给用户复制。
    *
    * - `uuid`: 实例 uuid
+   * - `jvmDebug`: JVM 远程调试端口；给了就在参数里加 JDWP
    *
    * # 返回值
    *
-   * 见 `RenderDocLaunchDto`；实例不存在、没有当前账户或生成失败时抛错
+   * 见 `DebugLaunchDto`；实例不存在、没有当前账户或生成失败时抛错
    */
-  async renderdocLaunchInfo(uuid: string): Promise<RenderDocLaunchDto> {
-    return commands.main.renderdocLaunchInfo(uuid);
+  async debugLaunchInfo(uuid: string, jvmDebug?: number): Promise<DebugLaunchDto> {
+    return commands.main.debugLaunchInfo(uuid, jvmDebug ?? null);
   },
 
   /**
@@ -2900,6 +2904,7 @@ export function enableResourcepack(uuid: string, file: string): Promise<void> {
  * - `runCommands`: 启动前 / 后命令这次执不执行；`false` = 用户选了跳过
  * - `renderdoc`: 是否用 RenderDoc 启动
  * - `nsight`: 是否用本机安装的 Nsight Graphics 启动
+ * - `jvmDebug`: JVM 远程调试端口；不给就不加 JDWP 参数
  */
 export function launchGame(
   uuid: string,
@@ -2911,6 +2916,7 @@ export function launchGame(
   runCommands?: boolean,
   renderdoc?: boolean,
   nsight?: boolean,
+  jvmDebug?: number,
 ): Promise<void> {
   return commands.main.launchGame(
     uuid,
@@ -2922,6 +2928,7 @@ export function launchGame(
     runCommands ?? null,
     renderdoc ?? null,
     nsight ?? null,
+    jvmDebug ?? null,
   );
 }
 

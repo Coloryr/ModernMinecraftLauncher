@@ -199,13 +199,13 @@ pub struct StateEvent {
     pub progress: Option<u32>,
 }
 
-/// RenderDoc 界面启动要填的参数
+/// 调试器界面启动要填的参数
 ///
-/// 对应 qrenderdoc「Launch Application」的四个输入框，由启动器按真实启动参数生成；
-/// 启动参数里含登录令牌，只在弹窗里给用户复制，不进日志。
+/// 对应 qrenderdoc / Nsight Graphics 的「Launch Application」四个输入框，
+/// 由启动器按真实启动参数生成；启动参数里含登录令牌，只在弹窗里给用户复制，不进日志。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RenderDocLaunchDto {
+pub struct DebugLaunchDto {
     /// 可执行文件，实际要用的 Java 路径
     pub executable: String,
     /// 工作目录，游戏根目录

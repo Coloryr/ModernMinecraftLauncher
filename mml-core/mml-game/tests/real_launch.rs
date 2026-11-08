@@ -264,7 +264,7 @@ fn make_launch_arg() -> GameLaunchArg {
         skip_server_pack: false,
         server_pack_skip: Vec::new(),
         server_pack_cancel: None,
-        debugger: LaunchDebugger::None,
+        debugger: LaunchDebugger::None, jvm_debug: None,
     }
 }
 

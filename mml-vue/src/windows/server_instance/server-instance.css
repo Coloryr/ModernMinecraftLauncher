@@ -269,7 +269,7 @@
   font-weight: 500;
 }
 
-/* 配置目录树：三列对齐，名字按层级缩进，大小右对齐，末列放同步方式 */
+/* 配置目录树：三列对齐，名字按层级缩进，大小居中，末列放同步方式 */
 .si-config-tree {
   flex: 1;
   min-height: 0;
@@ -297,13 +297,13 @@
   border-bottom: 1px solid var(--border);
 }
 
-/* 表头首列让开箭头与勾选框的宽度，第三列与行内下拉右对齐 */
+/* 表头首列对齐文件行的勾选框：箭头 16 + 间距 8，网格自身的 10 已经算在里面 */
 .si-config-head > :first-child {
-  padding-left: 48px;
+  padding-left: 24px;
 }
 
 .si-config-head > :nth-child(3) {
-  text-align: right;
+  text-align: left;
 }
 
 .si-config-row {
@@ -342,7 +342,7 @@
 }
 
 .si-config-size {
-  text-align: right;
+  text-align: center;
   font-size: 11.5px;
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;

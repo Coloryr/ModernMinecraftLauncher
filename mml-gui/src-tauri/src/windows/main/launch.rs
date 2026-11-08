@@ -26,8 +26,8 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::dtos::{
-    AutoSaveTargetDto, DebuggerInfoDto, ErrorEvent, ExitEvent, LaunchCommandDto, NsightInstallDto,
-    RenderDocLaunchDto, StateEvent,
+    AutoSaveTargetDto, DebugLaunchDto, DebuggerInfoDto, ErrorEvent, ExitEvent, LaunchCommandDto,
+    NsightInstallDto, StateEvent,
 };
 use crate::err_keys;
 use crate::gui_config;
@@ -157,6 +157,7 @@ pub async fn main_launch_game(
     run_commands: Option<bool>,
     renderdoc: Option<bool>,
     nsight: Option<bool>,
+    jvm_debug: Option<u16>,
 ) -> Result<(), String> {
     // Nsight Graphics 只能由用户自己装，启动时再确认一次本机还在
     let debugger = if nsight.unwrap_or(false) {
@@ -177,6 +178,7 @@ pub async fn main_launch_game(
         server_pack_skip.unwrap_or_default(),
         run_commands,
         debugger,
+        jvm_debug,
         None,
     )
     .await
@@ -210,6 +212,7 @@ pub(crate) async fn launch_game(
     server_pack_skip: Vec<String>,
     run_commands: Option<bool>,
     debugger: LaunchDebugger,
+    jvm_debug: Option<u16>,
     lobby: Option<(mml_auth::UserKeyObj, AutoJoinType)>,
 ) -> Result<(), String> {
     // 批量资源映射正在搬模组文件，这时启动会和它抢同一批文件
@@ -339,6 +342,7 @@ pub(crate) async fn launch_game(
         // 只跳过这次服务器包同步的令牌；整次启动的取消走 LAUNCH_CANCEL
         server_pack_cancel: Some(pack_cancel),
         debugger,
+        jvm_debug,
     };
 
     // 命令返回后这次启动还要跑完：实例快照与 app 都搬进后台线程，
@@ -894,19 +898,23 @@ pub fn main_detect_debuggers() -> DebuggerInfoDto {
     }
 }
 
-/// 生成 RenderDoc 界面启动要填的参数
+/// 生成调试参数：调试器界面启动要填的四项
 ///
 /// 与正常启动走同一套参数生成：登录、挑 Java、拼 JVM 参数与环境变量，只是不拉起进程。
 /// 生成期间占住实例的启动位，免得和真正的启动同时进行。
 ///
 /// - `uuid`: 实例 uuid
+/// - `jvm_debug`: JVM 远程调试端口；`None` 表示不加 JDWP 参数
 ///
 /// # 返回值
 ///
-/// 见 [`RenderDocLaunchDto`]；实例不存在、没有当前账户或生成参数失败时返回错误
+/// 见 [`DebugLaunchDto`]；实例不存在、没有当前账户或生成参数失败时返回错误
 #[gui_macros::ipc_group("main")]
 #[gui_macros::command]
-pub async fn main_renderdoc_launch_info(uuid: String) -> Result<RenderDocLaunchDto, String> {
+pub async fn main_debug_launch_info(
+    uuid: String,
+    jvm_debug: Option<u16>,
+) -> Result<DebugLaunchDto, String> {
     let id = Uuid::parse_str(&uuid).map_err(|_| err_keys::UUID.to_string())?;
     let _reservation = launch_gate::begin_launch(id)?;
     let core = core_instance(&uuid).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())?;
@@ -928,6 +936,7 @@ pub async fn main_renderdoc_launch_info(uuid: String) -> Result<RenderDocLaunchD
         server_pack_skip: Vec::new(),
         server_pack_cancel: None,
         debugger: LaunchDebugger::None,
+        jvm_debug,
     };
     // 参数生成要跨 await 持有配置的 std 读锁，future 不是 Send，不能直接在命令里跑；
     // 与启动线程同一个办法：另开一个 current-thread 运行时，在阻塞线程里跑完再把结果带回来
@@ -951,7 +960,7 @@ pub async fn main_renderdoc_launch_info(uuid: String) -> Result<RenderDocLaunchD
         .collect();
     environment.sort();
 
-    Ok(RenderDocLaunchDto {
+    Ok(DebugLaunchDto {
         executable: cmd.java.to_string_lossy().into_owned(),
         working_dir: cmd.dir.to_string_lossy().into_owned(),
         arguments: quote_args(&cmd.arg),

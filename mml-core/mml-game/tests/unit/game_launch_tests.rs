@@ -245,3 +245,16 @@ async fn check_game_file_writes_logs() {
     assert!(libs, "运行库要有统计行");
     assert!(assets_skipped, "资源索引缺失要记一行跳过");
 }
+
+/// Java 8 只写端口；Java 9 起要写 *:端口，否则只监听本机
+#[test]
+fn jdwp_address_switches_between_java8_and_java9() {
+    let java8 = jdwp_arg_for(Some(8), 5005);
+    assert!(java8.ends_with("address=5005"), "{java8}");
+
+    let java9 = jdwp_arg_for(Some(9), 5005);
+    assert!(java9.ends_with("address=*:5005"), "{java9}");
+
+    let unknown = jdwp_arg_for(None, 5006);
+    assert!(unknown.ends_with("address=5006"), "{unknown}");
+}

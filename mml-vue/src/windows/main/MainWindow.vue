@@ -2078,8 +2078,9 @@ async function handleStartArg() {
  * 启动选中实例
  *
  * - `kind`: 用哪个图形调试器启动；不传就是普通启动
+ * - `jvmDebug`: JVM 远程调试端口；给了就加 JDWP 参数
  */
-async function launch(kind: "renderdoc" | "nsight" | null = null) {
+async function launch(kind: "renderdoc" | "nsight" | null = null, jvmDebug: number | null = null) {
   if (!selected.value || selected.value.running) return;
   if (offlineLaunchBlocked.value) {
     showToast(t("err.offlineNeedPremium"));
@@ -2091,7 +2092,7 @@ async function launch(kind: "renderdoc" | "nsight" | null = null) {
   launchStage.value = "";
   statePct.value = null;
   try {
-    if (!(await launchGame(uuid, undefined, kind === "renderdoc", kind === "nsight"))) {
+    if (!(await launchGame(uuid, undefined, kind === "renderdoc", kind === "nsight", jvmDebug ?? undefined))) {
       clearLaunching(uuid);
       statusText.value = t("launch.ready");
       return;
@@ -2115,6 +2116,19 @@ const hasNsight = computed(() => !!nsightInstall.value);
 function launchDebugger() {
   if (!renderdocSupported || !selected.value || selected.value.running) return;
   debuggerAsk.value = true;
+}
+
+/**
+ * 调试器弹窗的启动请求
+ *
+ * - `payload.kind`: 渲染调试用的调试器；null 表示不做渲染调试
+ * - `payload.jvmDebug`: JVM 调试端口；null 表示不开 JVM 调试
+ */
+function onDebuggerLaunch(payload: {
+  kind: "renderdoc" | "nsight" | null;
+  jvmDebug: number | null;
+}) {
+  void launch(payload.kind, payload.jvmDebug);
 }
 
 /** 拉一次本机的调试器情况；失败按没装处理，不影响普通启动 */
@@ -2434,10 +2448,9 @@ onMounted(async () => {
                     @click="onAction('manageResource')">
                     <GlyphIcon name="package" :size="15" :weight="1.8" /> {{ t("actions.manageResource") }}
                   </BaseButton>
-                  <!-- 图形调试器启动：RenderDoc 首次会下载；本机装了 Nsight Graphics 时入口改成「从调试器启动」 -->
+                  <!-- 调试器启动：JVM 调试 + 渲染调试都在弹窗里；RenderDoc 首次会下载 -->
                   <BaseButton v-if="renderdocSupported" size="sm" class="icon-btn-head"
-                    v-tip="hasNsight ? t('debugger.entryTip') : t('launch.renderdocTip')"
-                    :aria-label="hasNsight ? t('debugger.entry') : t('launch.renderdoc')"
+                    v-tip="t('debugger.entryTip')" :aria-label="t('debugger.entry')"
                     :disabled="!selected || offlineLaunchBlocked || isLaunching" @click="launchDebugger">
                     <GlyphIcon name="bug" :size="15" :weight="1.8" />
                   </BaseButton>
@@ -2717,8 +2730,7 @@ onMounted(async () => {
       </div>
 
       <!-- ===== 右键菜单（MainCtxMenu 组件） ===== -->
-      <MainCtxMenu :menu="ctxMenu" :groups="groups" :renderdoc-available="renderdocSupported"
-        :nsight-available="hasNsight" @close="closeCtxMenu" @select-all="onGroupSelectAll"
+      <MainCtxMenu :menu="ctxMenu" :groups="groups" :renderdoc-available="renderdocSupported" @close="closeCtxMenu" @select-all="onGroupSelectAll"
         @launch-group="launchGroupAll" @move-group="onMoveGroupClick" @delete-group="onDeleteGroup"
         @inst-action="onInstMenuAction" @multi-move="openMoveGroupPicker(null)" @multi-delete="onMultiDelete"
         @multi-launch="multiLaunch" />
@@ -2814,7 +2826,7 @@ onMounted(async () => {
 
     <!-- ===== 图形调试器：选哪个调试器启动，或只生成界面要填的参数 ===== -->
     <DebuggerLaunchModal :open="debuggerAsk && !!selected" :uuid="selected?.uuid ?? ''" :nsight="hasNsight"
-      @close="debuggerAsk = false" @launch="launch($event)" />
+      @close="debuggerAsk = false" @launch="onDebuggerLaunch" />
 
     <!-- ===== 修改实例图标：右键实例 → 选择图片 → 截图范围 ===== -->
     <IconPickModal v-if="iconPickInst" :uuid="iconPickInst.uuid" :name="iconPickInst.name" :path="iconPickPath"

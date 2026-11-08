@@ -66,7 +66,7 @@ export type StateEvent = {
   progress: number | null,
 };
 
-export type RenderDocLaunchDto = {
+export type DebugLaunchDto = {
   executable: string,
   workingDir: string,
   arguments: string,

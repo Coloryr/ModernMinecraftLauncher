@@ -322,7 +322,7 @@ pub async fn launch(version: &str, loader: LoaderType, loader_version: &str) -> 
         skip_server_pack: false,
         server_pack_skip: Vec::new(),
         server_pack_cancel: None,
-        debugger: LaunchDebugger::None,
+        debugger: LaunchDebugger::None, jvm_debug: None,
     };
     let check_started = Instant::now();
     let check = match instance

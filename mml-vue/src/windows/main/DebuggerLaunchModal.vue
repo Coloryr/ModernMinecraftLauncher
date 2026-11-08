@@ -1,39 +1,46 @@
 <script setup lang="ts">
-// 启动前的图形调试器选择：
-// - 本机装了 Nsight Graphics 时，把「从调试器启动」拆成 RenderDoc / Nsight 两个子选项；
-// - 没装就还是原来的 renderdoccmd 一项；
-// - 另有一项「生成启动指令」，不启动游戏，只给出调试器界面要填的四项。
+// 使用调试器启动：JVM 远程调试（JDWP）与渲染调试（RenderDoc / Nsight Graphics）两个开关。
 //
-// 生成结果里带本次登录令牌，所以只在这个弹窗里给复制，不写进日志。
+// 「生成调试参数」不启动游戏，只给出调试器界面要填的四项；「使用 xxx」才真的按当前开关拉起。
+// 生成结果含本次登录令牌，所以只在这个弹窗里给复制，不写进日志。
 import { computed, ref, watch } from "vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
+import BaseSwitch from "../../components/ui/BaseSwitch.vue";
 import { api } from "../../lib/api";
 import { t, tErr } from "../../lib/i18n";
 import { copyText } from "../../lib/clipboard";
-import type { RenderDocLaunchDto } from "../../lib/bindings";
+import type { DebugLaunchDto } from "../../lib/bindings";
 
 const props = defineProps<{
   /** 是否显示 */
   open: boolean;
   /** 选中的实例 uuid，生成参数要用 */
   uuid: string;
-  /** 本机装没装 Nsight Graphics；装了才多出那个子选项 */
+  /** 本机装没装 Nsight Graphics；装了才多出这个渲染调试选项 */
   nsight: boolean;
 }>();
 
 const emit = defineEmits<{
   /** 关掉弹窗 */
   (e: "close"): void;
-  /** 用选中的调试器启动游戏 */
-  (e: "launch", kind: "renderdoc" | "nsight"): void;
+  /** 按当前开关启动：`kind` 为 null 表示不做渲染调试 */
+  (e: "launch", payload: { kind: "renderdoc" | "nsight" | null; jvmDebug: number | null }): void;
 }>();
 
-/** 当前步骤：选方式 → 生成中 → 展示结果 */
+/** 当前步骤：选参数 → 生成中 → 展示结果 */
 const step = ref<"choice" | "loading" | "result">("choice");
 
+/** JVM 远程调试开关与端口；端口默认 JDWP 的惯例值 */
+const jvmOn = ref(false);
+const jvmPort = ref("5005");
+
+/** 渲染调试开关与选中的调试器 */
+const renderOn = ref(true);
+const picked = ref<"renderdoc" | "nsight">("renderdoc");
+
 /** 生成出来的四项 */
-const info = ref<RenderDocLaunchDto | null>(null);
+const info = ref<DebugLaunchDto | null>(null);
 
 /** 生成失败的文案，显示在选项下面 */
 const error = ref("");
@@ -41,16 +48,42 @@ const error = ref("");
 /** 刚复制过的那一项，只用来短暂改按钮文字 */
 const copied = ref("");
 
-// 每次打开都从选择开始：上一次生成的结果带着令牌，不能留着
+// 每次打开都回到默认状态：上一次生成的结果带着令牌，不能留着
 watch(
   () => props.open,
   (open) => {
     if (!open) return;
     step.value = "choice";
+    jvmOn.value = false;
+    jvmPort.value = "5005";
+    renderOn.value = true;
+    picked.value = "renderdoc";
     info.value = null;
     error.value = "";
     copied.value = "";
   },
+);
+
+/** 端口号；没开 JVM 调试或不合法时为 null */
+const jvmDebug = computed(() => {
+  if (!jvmOn.value) return null;
+  const port = Number(jvmPort.value.trim());
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return null;
+  return port;
+});
+
+/** 端口格式对不对；没开 JVM 调试时不用校验 */
+const portValid = computed(() => !jvmOn.value || jvmDebug.value !== null);
+
+/** 主按钮文案：跟着渲染调试的选择走 */
+const launchLabel = computed(() => {
+  if (!renderOn.value) return t("debugger.launchPlain");
+  return picked.value === "nsight" ? t("debugger.useNsight") : t("debugger.useRenderdoc");
+});
+
+/** 渲染调试的说明行 */
+const renderHint = computed(() =>
+  picked.value === "nsight" ? t("debugger.nsightHint") : t("debugger.renderdocHint"),
 );
 
 /** 四项参数的展示顺序；环境变量为空时给一行占位 */
@@ -58,13 +91,13 @@ const fields = computed(() => {
   const data = info.value;
   if (!data) return [];
   return [
-    { key: "executable", label: t("renderdoc.executable"), value: data.executable },
-    { key: "workingDir", label: t("renderdoc.workingDir"), value: data.workingDir },
-    { key: "arguments", label: t("renderdoc.arguments"), value: data.arguments },
+    { key: "executable", label: t("debugger.executable"), value: data.executable },
+    { key: "workingDir", label: t("debugger.workingDir"), value: data.workingDir },
+    { key: "arguments", label: t("debugger.arguments"), value: data.arguments },
     {
       key: "environment",
-      label: t("renderdoc.environment"),
-      value: data.environment.length ? data.environment.join("\n") : t("renderdoc.emptyEnv"),
+      label: t("debugger.environment"),
+      value: data.environment.length ? data.environment.join("\n") : t("debugger.emptyEnv"),
     },
   ];
 });
@@ -88,22 +121,23 @@ async function copy(value: string, key: string) {
   }, 1500);
 }
 
-/**
- * 选某个调试器启动，交给主窗口走正常启动流程
- *
- * - `kind`: renderdoc 或 nsight
- */
-function useDebugger(kind: "renderdoc" | "nsight") {
-  emit("launch", kind);
+/** 按当前开关启动，交给主窗口走正常启动流程 */
+function onLaunch() {
+  if (!portValid.value) return;
+  emit("launch", {
+    kind: renderOn.value ? picked.value : null,
+    jvmDebug: jvmDebug.value,
+  });
   emit("close");
 }
 
-/** 选「生成启动指令」：走一次真实启动的参数生成，只是不拉起进程 */
+/** 选「生成调试参数」：走一次真实启动的参数生成，只是不拉起进程 */
 async function generate() {
+  if (!portValid.value) return;
   step.value = "loading";
   error.value = "";
   try {
-    info.value = await api.renderdocLaunchInfo(props.uuid);
+    info.value = await api.debugLaunchInfo(props.uuid, jvmDebug.value ?? undefined);
     step.value = "result";
   } catch (e) {
     error.value = tErr(e);
@@ -113,65 +147,65 @@ async function generate() {
 </script>
 
 <template>
-  <BaseModal v-if="open" :title="nsight ? t('debugger.title') : t('renderdoc.title')" :width="560"
-    @close="emit('close')">
+  <BaseModal v-if="open" :title="t('debugger.title')" :width="560" @close="emit('close')">
     <template v-if="step === 'choice'">
-      <p class="modal-text">{{ nsight ? t("debugger.desc") : t("renderdoc.desc") }}</p>
+      <p class="modal-text">{{ t("debugger.desc") }}</p>
 
-      <!-- 装了 Nsight：两种调试器收在「从调试器启动」下面 -->
-      <div v-if="nsight" class="rd-group">
-        <span class="rd-group-title">{{ t("debugger.group") }}</span>
-        <BaseButton variant="primary" block class="rd-choice" @click="useDebugger('renderdoc')">
-          <span class="rd-choice-title">RenderDoc</span>
-          <span class="rd-choice-hint">{{ t("debugger.renderdocHint") }}</span>
-        </BaseButton>
-        <BaseButton variant="primary" block class="rd-choice" @click="useDebugger('nsight')">
-          <span class="rd-choice-title">Nsight Graphics</span>
-          <span class="rd-choice-hint">{{ t("debugger.nsightHint") }}</span>
-        </BaseButton>
+      <!-- 第一行：JVM 远程调试，开了才让填端口 -->
+      <div class="dbg-row">
+        <div class="dbg-row-head">
+          <BaseSwitch v-model="jvmOn" />
+          <span class="dbg-row-label">{{ t("debugger.jvm") }}</span>
+        </div>
+        <input v-if="jvmOn" v-model="jvmPort" class="field-input dbg-port" inputmode="numeric"
+          maxlength="5" :placeholder="t('debugger.jvmPort')" :aria-label="t('debugger.jvmPort')" />
       </div>
+      <p v-if="jvmOn" class="dbg-hint">{{ t("debugger.jvmHint") }}</p>
+      <p v-if="jvmOn && !portValid" class="dbg-error">{{ t("debugger.portInvalid") }}</p>
 
-      <!-- 没装：保持原来的一项 -->
-      <div v-else class="rd-choices">
-        <BaseButton variant="primary" block class="rd-choice" @click="useDebugger('renderdoc')">
-          <span class="rd-choice-title">{{ t("renderdoc.useCmd") }}</span>
-          <span class="rd-choice-hint">{{ t("renderdoc.useCmdHint") }}</span>
-        </BaseButton>
+      <!-- 第二行：渲染调试，开了才让选调试器 -->
+      <div class="dbg-row">
+        <div class="dbg-row-head">
+          <BaseSwitch v-model="renderOn" />
+          <span class="dbg-row-label">{{ t("debugger.render") }}</span>
+        </div>
+        <select v-if="renderOn" v-model="picked" class="field-select dbg-select">
+          <option value="renderdoc">RenderDoc</option>
+          <option v-if="nsight" value="nsight">Nsight Graphics</option>
+        </select>
       </div>
+      <p v-if="renderOn" class="dbg-hint">{{ renderHint }}</p>
 
-      <BaseButton variant="plain" block class="rd-choice rd-generate" @click="generate">
-        <span class="rd-choice-title">{{ t("renderdoc.genInfo") }}</span>
-        <span class="rd-choice-hint">{{ t("renderdoc.genInfoHint") }}</span>
-      </BaseButton>
-
-      <p v-if="error" class="rd-error">{{ t("renderdoc.genFailed", { msg: error }) }}</p>
+      <p v-if="error" class="dbg-error">{{ t("debugger.genFailed", { msg: error }) }}</p>
       <div class="modal-actions">
         <BaseButton @click="emit('close')">{{ t("actions.cancel") }}</BaseButton>
+        <BaseButton :disabled="!portValid" @click="generate">{{ t("debugger.gen") }}</BaseButton>
+        <BaseButton variant="primary" :disabled="!portValid" @click="onLaunch">{{ launchLabel }}</BaseButton>
       </div>
     </template>
 
     <template v-else-if="step === 'loading'">
-      <p class="modal-text">{{ t("renderdoc.generating") }}</p>
+      <p class="modal-text">{{ t("debugger.generating") }}</p>
       <div class="modal-actions">
-        <BaseButton @click="step = 'choice'">{{ t("renderdoc.back") }}</BaseButton>
+        <BaseButton @click="step = 'choice'">{{ t("debugger.back") }}</BaseButton>
       </div>
     </template>
 
     <template v-else>
-      <p class="modal-text">{{ t("renderdoc.tokenHint") }}</p>
-      <div v-for="item in fields" :key="item.key" class="rd-field">
-        <div class="rd-field-head">
+      <p class="modal-text">{{ t("debugger.tokenHint") }}</p>
+      <div v-for="item in fields" :key="item.key" class="dbg-field">
+        <div class="dbg-field-head">
           <span class="field-label">{{ item.label }}</span>
           <BaseButton size="sm" variant="ghost" @click="copy(item.value, item.key)">
-            {{ copied === item.key ? t("renderdoc.copied") : t("renderdoc.copy") }}
+            {{ copied === item.key ? t("debugger.copied") : t("debugger.copy") }}
           </BaseButton>
         </div>
-        <pre class="rd-value">{{ item.value }}</pre>
+        <pre class="dbg-value">{{ item.value }}</pre>
       </div>
       <div class="modal-actions">
-        <BaseButton @click="step = 'choice'">{{ t("renderdoc.back") }}</BaseButton>
+        <BaseButton @click="step = 'choice'">{{ t("debugger.back") }}</BaseButton>
         <BaseButton variant="primary" @click="copy(allText, 'all')">
-          {{ copied === "all" ? t("renderdoc.copied") : t("renderdoc.copyAll") }}
+          {{ copied === "all" ? t("debugger.copied") : t("debugger.copyAll") }}
         </BaseButton>
       </div>
     </template>
@@ -179,61 +213,49 @@ async function generate() {
 </template>
 
 <style scoped>
-.rd-group {
+.dbg-row {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 12px 0 4px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
 }
 
-.rd-group-title {
+.dbg-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dbg-row-label {
+  font-size: 13px;
+}
+
+.dbg-port {
+  width: 88px;
+}
+
+.dbg-select {
+  width: 168px;
+}
+
+.dbg-hint {
+  margin: 4px 0 0;
   color: var(--text-dim);
   font-size: 11.5px;
 }
 
-.rd-choices {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 12px 0 4px;
-}
-
-.rd-generate {
-  margin-top: 8px;
-}
-
-/* 选项是两行字的卡片按钮：默认那套单行排版在这里不够用 */
-.rd-choice {
-  height: auto;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 10px 12px;
-  text-align: left;
-}
-
-.rd-choice-title {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.rd-choice-hint {
-  font-size: 11.5px;
-  font-weight: 400;
-  opacity: 0.75;
-}
-
-.rd-error {
-  margin-top: 8px;
+.dbg-error {
+  margin: 4px 0 0;
   color: var(--red);
   font-size: 11.5px;
 }
 
-.rd-field {
+.dbg-field {
   margin-top: 12px;
 }
 
-.rd-field-head {
+.dbg-field-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -242,7 +264,7 @@ async function generate() {
 }
 
 /* 值按原样展示：等宽字、保留换行，长了在框内滚动，不把弹窗撑宽 */
-.rd-value {
+.dbg-value {
   max-height: 120px;
   margin: 0;
   padding: 8px 10px;

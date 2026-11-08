@@ -19,6 +19,7 @@ import { openWindow } from "../windows/windowManager";
  * - `world`: 启动后直接进入的存档目录名，可选；这是用户明确点的「进入存档」，不再问自动进入
  * - `renderdoc`: 是否用 RenderDoc 启动
  * - `nsight`: 是否用本机安装的 Nsight Graphics 启动
+ * - `jvmDebug`: JVM 远程调试端口；不给就不加 JDWP 参数
  *
  * # 返回值
  *
@@ -30,6 +31,7 @@ export async function launchGame(
   world?: string,
   renderdoc = false,
   nsight = false,
+  jvmDebug?: number,
 ): Promise<boolean> {
   // 启动前检查：有模组却用原版加载器、模组多而最大内存偏低时各问一次
   const check = await api.checkLaunch(uuid).catch(() => null);
@@ -107,6 +109,7 @@ export async function launchGame(
       runCommands,
       renderdoc,
       nsight,
+      jvmDebug,
     );
   } catch (e) {
     if (String(e) !== "err.accountInUse") throw e;
@@ -127,6 +130,7 @@ export async function launchGame(
       runCommands,
       renderdoc,
       nsight,
+      jvmDebug,
     );
   }
 

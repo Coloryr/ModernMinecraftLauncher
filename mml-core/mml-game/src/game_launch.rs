@@ -80,6 +80,8 @@ pub struct GameLaunchArg {
     pub server_pack_cancel: Option<CancellationToken>,
     /// 这次用哪个图形调试器包一层
     pub debugger: LaunchDebugger,
+    /// JVM 远程调试端口；`None` 表示不加 JDWP 参数
+    pub jvm_debug: Option<u16>,
 }
 
 /// 启动时包在 Java 外面的图形调试器
@@ -994,7 +996,10 @@ impl InstanceSettingObj {
         let java = java.unwrap();
         InstanceSettingObj::allow_security_manager(&mut obj, &java);
         InstanceSettingObj::fix_zgc_generational(&mut obj, &java);
-        let args = self.make_run_arg(&java, &arg, &mut obj, false);
+        let mut args = self.make_run_arg(&java, &arg, &mut obj, false);
+        if let Some(port) = arg.jvm_debug {
+            args.insert(0, jdwp_arg(&java, port));
+        }
         let mut env = self.make_env_arg();
         self.add_launcher_env(&mut env, &java, &obj.jvm_args);
 
@@ -1110,7 +1115,10 @@ impl InstanceSettingObj {
         // 完整命令行 = JVM 参数 + 主类 + 游戏参数；`check` 为真时跳过仍缺失的库文件。
         // 这里原来只取了 make_game_arg 的**游戏参数**，java 会把第一个 `--width`
         // 当成 JVM 选项，直接报"Unrecognized option"起不来
-        let jvm_arg = self.make_run_arg(&jvm, &arg, &mut obj, true);
+        let mut jvm_arg = self.make_run_arg(&jvm, &arg, &mut obj, true);
+        if let Some(port) = arg.jvm_debug {
+            jvm_arg.insert(0, jdwp_arg(&jvm, port));
+        }
 
         crate::add_game_log_item(&self.uuid, GameLog::JavaPath(jvm.clone()));
         crate::add_game_log_item(&self.uuid, GameLog::LaunchArgsStart);
@@ -1347,6 +1355,37 @@ fn capture_stem(name: &str) -> String {
 /// 统一转成进程错误
 fn debugger_dir_error(err: std::io::Error) -> ErrorType {
     ErrorType::ProcessError(mml_names::i18_items::error_type::ErrorData::from_error(err))
+}
+
+/// 拼出 JVM 远程调试的 JDWP 参数
+///
+/// Java 9 起 `address` 只写端口时仅监听 localhost，要写成 `*:port` 才能被别的机器连上；
+/// Java 8 不认 `*:` 前缀，所以两边各按各的写法。
+///
+/// - `java`: 实际要用的 Java 路径
+/// - `port`: 调试端口
+///
+/// # 返回值
+///
+/// 可直接放进 JVM 参数的 `-agentlib:jdwp=...` 文本
+fn jdwp_arg(java: &std::path::Path, port: u16) -> String {
+    jdwp_arg_for(java_major_of(java), port)
+}
+
+/// 按 Java 大版本拼 JDWP 参数
+///
+/// - `major`: Java 大版本；取不到按 Java 8 的写法处理
+/// - `port`: 调试端口
+///
+/// # 返回值
+///
+/// `-agentlib:jdwp=...` 文本
+fn jdwp_arg_for(major: Option<i32>, port: u16) -> String {
+    let address = match major {
+        Some(major) if major >= 9 => format!("*:{port}"),
+        _ => port.to_string(),
+    };
+    format!("-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address={address}")
 }
 
 /// 实际选中的 Java 大版本；不在已扫描的 Java 列表里返回 `None`
