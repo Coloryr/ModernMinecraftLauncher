@@ -231,6 +231,23 @@
   background: var(--bg-hover);
 }
 
+/* 目录树的展开箭头：文件行也占同样宽度，名字才对得齐。收起朝右、展开朝下 */
+.si-caret {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  flex-shrink: 0;
+  color: var(--text-dim);
+  cursor: pointer;
+  transform: rotate(-90deg);
+  transition: transform 0.12s;
+}
+
+.si-caret.open {
+  transform: rotate(0);
+}
+
 .si-box {
   flex-shrink: 0;
   width: 15px;
@@ -246,6 +263,115 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.si-name.dir {
+  font-weight: 500;
+}
+
+/* 配置目录树：三列对齐，名字按层级缩进，大小右对齐，末列放同步方式 */
+.si-config-tree {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.si-config-head,
+.si-config-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px 190px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+}
+
+.si-config-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  min-height: 32px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+
+/* 表头首列让开箭头与勾选框的宽度，第三列与行内下拉右对齐 */
+.si-config-head > :first-child {
+  padding-left: 48px;
+}
+
+.si-config-head > :nth-child(3) {
+  text-align: right;
+}
+
+.si-config-row {
+  height: 34px;
+  font-size: 12.5px;
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+.si-config-row:hover {
+  background: var(--bg-hover);
+}
+
+.si-config-row.is-changed {
+  background: color-mix(in srgb, var(--yellow) 16%, transparent);
+}
+
+.si-config-row.is-changed:hover {
+  background: color-mix(in srgb, var(--yellow) 24%, transparent);
+}
+
+.si-config-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* 勾选框占位：目录行留空，文件行才画，名字才能对齐 */
+.si-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.si-config-size {
+  text-align: right;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.si-config-mode-cell {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+/* 行内控件与控件表同一档高度，才收得进 34px 的行 */
+.si-config-mode {
+  width: 100%;
+  height: 26px;
+  min-height: 0;
+}
+
+/* 被上级递归方式覆盖：不再给下拉，直接说明跟随上级 */
+.si-config-follow {
+  padding-right: 6px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.si-config-loading {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: var(--text-dim);
 }
 
 .si-tag {

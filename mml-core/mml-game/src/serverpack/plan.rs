@@ -2,8 +2,8 @@
 //!
 //! 从 `upgrade_serverpack` 里抽出来的两类判定：
 //!
-//! 1. **要删什么** —— [`plan_removals`]：旧有新无的在线文件、同一项目换了路径的旧文件、
-//!    旧有新无且 `delete_old` 的配置目录；
+//! 1. **要删什么** —— [`plan_removals`]：旧有新无的在线文件、同一项目换了路径的旧文件；
+//!    配置压缩包条目消失**不删目录**，客户端已解压的内容原样保留；
 //! 2. **要下什么** —— [`plan_downloads`]：每个文件的下载地址与校验哈希，地址自带 `url`
 //!    优先，为空时用 `pid`/`fid` 解析出来的那个；
 //!
@@ -13,7 +13,7 @@
 //! 抽出来的理由与上一轮 `modpack/diff.rs` 相同：**删错文件 / 下错地址这类判定离线就能测**，
 //! 见 `tests/serverpack.rs`；内联在带网络与磁盘操作的 async 函数里时测不到。
 //!
-//! 判定规则**原样搬运**，未做修改。
+//! 判定规则与原内联逻辑一致；唯一的变化是配置压缩包条目消失时不再删目录。
 
 use std::{
     collections::HashMap,
@@ -31,7 +31,7 @@ use crate::serverpack::serverpack_obj::{ServerArchiveItemObj, ServerItemObj, Ser
 pub struct ServerPackRemovals<'a> {
     /// 要删除的文件：旧有新无，或同一项目换了路径
     pub files: Vec<&'a ServerItemObj>,
-    /// 要删除的目录：旧有新无、`delete_old` 为真且 `dir` 非空
+    /// 要删除的目录；配置压缩包条目消失时不再删目录，字段保留但恒为空
     pub dirs: Vec<&'a ServerArchiveItemObj>,
 }
 
@@ -41,7 +41,9 @@ pub struct ServerPackRemovals<'a> {
 ///
 /// - 在线文件按 [`mod_key`] 配对，即 `pid`，缺失时退回文件名：新包里没有 → 删除旧文件；
 ///   同一项目但 `file` 路径变了 → 删除旧路径的文件；路径没变 → 不动，下载阶段覆盖。
-/// - 配置压缩包按 `file` 配对：新包里没有、且 `delete_old` 为真、`dir` 非空 → 删除该目录。
+/// - 配置压缩包按 `file` 配对只用来判断要不要下载：条目从新清单消失时**不删除**它的
+///   `dir`，客户端已解压的目录与玩家修改保留；要清理目录请保留同名条目并让
+///   `delete_old` 为真，由解压前的覆盖逻辑处理。
 ///
 /// 注意：**路径变了就删旧路径**这条只对"同一项目"成立；不同项目但同一路径的文件不会被删，
 /// 由下载阶段直接覆盖；这是原实现的取舍，未改动。
@@ -62,13 +64,6 @@ pub fn plan_removals<'a>(old: &'a ServerPackObj, new: &ServerPackObj) -> ServerP
             // 同一文件但路径改变，删除旧文件
             Some(n) if n.file != item.file => out.files.push(item),
             _ => {}
-        }
-    }
-
-    for item in &old.archive_list {
-        let removed = !new.archive_list.iter().any(|n| n.file == item.file);
-        if removed && item.delete_old && !item.dir.is_empty() {
-            out.dirs.push(item);
         }
     }
 

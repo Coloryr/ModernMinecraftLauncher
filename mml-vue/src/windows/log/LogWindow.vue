@@ -37,7 +37,7 @@ import { crashTimeOf, latestCrash } from "../../lib/crash";
 import { launchGame } from "../../lib/launch";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import { usePageActive } from "../../lib/pageActive";
-import type { CrashAnalysisDto, InstanceInfoDto, LogLine, LogSettingDto } from "../../lib/bindings";
+import type { CrashAnalysisDto, InstanceInfoDto, LogLine, LogSettingDto, StateEvent } from "../../lib/bindings";
 import { uniq } from "../../lib/util";
 
 /** 请求关闭本窗口 / 收起面板 */
@@ -359,6 +359,56 @@ async function refreshRunning() {
   }
 }
 
+/**
+ * 应用一条启动阶段事件
+ *
+ * - `e`: 后端 `launch-state` 的快照
+ */
+function applyLaunchState(e: StateEvent) {
+  if (e.uuid !== lockedUuid.value) return;
+  // 用户取消：启动线程退出，收回启动态
+  if (e.state === "cancelled") {
+    launching.value = false;
+    stageKey.value = "";
+    statePct.value = null;
+    return;
+  }
+  // 与主窗口同一口径：end / post 表示进程已经起来，其余阶段都算"启动中"。
+  // **启动可能是主窗口点的**，只认自己那颗按钮的话，检查文件那几秒里这里仍然可点
+  if (e.state === "end" || e.state === "post") {
+    running.value = true;
+    launching.value = false;
+  } else {
+    launching.value = true;
+  }
+  // 启动一开始（不管从主窗口还是这里的测试启动）就切回运行日志：
+  // 停在历史文件上会看不到这次启动的输出
+  if (!liveSource.value && !running.value) file.value = "";
+  stageKey.value = e.state;
+  statePct.value = e.progress ?? null;
+}
+
+/** 窗口打开 / 切回时补一次启动阶段，事件可能已经错过 */
+async function syncLaunchState() {
+  if (!lockedUuid.value) return;
+  try {
+    const state = await api.launchState(lockedUuid.value);
+    if (state) {
+      applyLaunchState(state);
+      return;
+    }
+    // 后端没有在途启动：本地启动态一律收回，再按运行态刷一次按钮。
+    // 不能拿 instance.value.launching 兜底——那是窗口打开时拉的一份快照，这次启动早就结束了，
+    // 拿它按住按钮会把上一轮的阶段名与百分比重新顶出来，表现为一直停在「启动完成 75%」
+    launching.value = false;
+    stageKey.value = "";
+    statePct.value = null;
+    await refreshRunning();
+  } catch {
+    // 查询失败不影响日志本身
+  }
+}
+
 /** 测试启动：与主页面同一个命令，日志会流进本窗口 */
 async function testLaunch() {
   // 点了就先按住按钮：后端起进程之前 getRunning() 还是 false，光靠它按钮会一直像"可点"
@@ -519,6 +569,7 @@ async function syncInstance(applyParams = false) {
     await loadSource();
   }
   await refreshRunning();
+  await syncLaunchState();
 }
 
 // 单窗口模式：本页被 KeepAlive 缓存，切回时补一次数据；只刷新当前来源，不重放打开参数
@@ -591,7 +642,19 @@ function dropPending() {
   }
 }
 
+/** 回到前台：启动阶段事件可能已经错过，补一次 */
+function onWindowFocus() {
+  void syncLaunchState();
+}
+
 onMounted(async () => {
+  window.addEventListener("focus", onWindowFocus);
+  // 先挂启动状态：后面的实例 / 日志加载期间也可能推进阶段
+  try {
+    unlistenLaunchState = await onLaunchState(applyLaunchState);
+  } catch (e) {
+    console.error("[LogWindow] 启动状态事件订阅失败", e);
+  }
   await syncInstance(true);
 
   unlistenGameLog = await onGameLog((e) => {
@@ -607,29 +670,6 @@ onMounted(async () => {
   });
 
   // 本实例的启停：切换「测试启动 / 停止」按钮
-  unlistenLaunchState = await onLaunchState((e) => {
-    if (e.uuid !== lockedUuid.value) return;
-    // 用户在主窗口点了「取消启动」：启动线程退出，收回启动态
-    if (e.state === "cancelled") {
-      launching.value = false;
-      stageKey.value = "";
-      statePct.value = null;
-      return;
-    }
-    // 与主窗口同一口径：end / post 表示进程已经起来，其余阶段都算"启动中"。
-    // **启动可能是主窗口点的**，只认自己那颗按钮的话，检查文件那几秒里这里仍然可点
-    if (e.state === "end" || e.state === "post") {
-      running.value = true;
-      launching.value = false;
-    } else {
-      launching.value = true;
-    }
-    // 启动一开始（不管从主窗口还是这里的测试启动）就切回运行日志：
-    // 停在历史文件上会看不到这次启动的输出
-    if (!liveSource.value && !running.value) file.value = "";
-    stageKey.value = e.state;
-    statePct.value = e.progress ?? null;
-  });
   unlistenLaunchError = await onLaunchError((e) => {
     if (e.uuid && e.uuid !== lockedUuid.value) return;
     launching.value = false;
@@ -637,8 +677,11 @@ onMounted(async () => {
   });
   unlistenGameExit = await onGameExit((e) => {
     if (e.uuid !== lockedUuid.value) return;
+    // 退出后连阶段一起清掉：留着的话下次窗口获得焦点会被 syncLaunchState 当成"启动中"顶出来
     launching.value = false;
     running.value = false;
+    stageKey.value = "";
+    statePct.value = null;
     // 非 0 退出：刷一次文件列表（崩溃报告刚写出来），问一句要不要上传，
     // 并切到最新崩溃报告；没有就回运行日志并滚到底
     if (e.code !== 0) {
@@ -664,6 +707,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   dropPending();
   window.removeEventListener("keydown", onFindKey, true);
+  window.removeEventListener("focus", onWindowFocus);
   unlistenGameLog?.();
   unlistenLaunchState?.();
   unlistenLaunchError?.();

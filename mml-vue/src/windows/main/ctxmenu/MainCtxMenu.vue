@@ -16,6 +16,10 @@ const props = defineProps<{
   menu: CtxMenuState | null;
   /** 全部分组视图，用来算置灰与"转移分组"的候选 */
   groups: GroupView[];
+  /** 当前平台能不能用图形调试器启动 */
+  renderdocAvailable: boolean;
+  /** 本机装没装 Nsight Graphics：装了就把入口叫「从调试器启动」 */
+  nsightAvailable: boolean;
 }>();
 
 /** 当前右键的分组；空分组时"全选 / 启动全部"置灰 */
@@ -58,6 +62,13 @@ const items = computed<RowMenuItem[]>(() => {
   if (menu.kind === "instance") {
     const list: RowMenuItem[] = [
       { id: "launch", label: t("launch.play") },
+      ...(props.renderdocAvailable
+        ? [{
+          id: "launchRenderDoc",
+          label: props.nsightAvailable ? t("debugger.entry") : t("launch.renderdoc"),
+          disabled: props.menu?.instance?.running,
+        }]
+        : []),
       { id: "multiSelect", label: t("multi.enter") },
       { id: "viewMods", label: t("actions.viewMods"), separated: true },
       { id: "manageResource", label: t("actions.manageResource") },

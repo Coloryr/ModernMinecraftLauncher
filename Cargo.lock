@@ -3454,6 +3454,7 @@ dependencies = [
  "mml-sys",
  "mml-testutil",
  "mml-tex-draw",
+ "mml-tools",
  "mml-upgrade",
  "objc2",
  "objc2-app-kit",

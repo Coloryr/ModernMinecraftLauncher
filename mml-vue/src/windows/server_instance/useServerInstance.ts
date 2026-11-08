@@ -25,12 +25,34 @@ import type {
   ServerInstanceSnapshotDto,
 } from "../../lib/bindings";
 
-/** 配置目录的同步方式 */
-export type ConfigMode = "archive" | "files";
+/** 文件夹的同步方式 */
+export type ConfigMode =
+  | "none"
+  | "archiveAll"
+  | "archiveSelf"
+  | "filesAll"
+  | "filesSelf"
+  | "delete";
 /** 左侧分页 */
 export type Section = "general" | "base" | "mods" | "packs" | "configs" | "start";
 /** 编号类型 */
 export type IdType = "online" | "custom";
+
+/** 配置树展开后的一行 */
+export interface ConfigRow {
+  /** 相对游戏目录的路径 */
+  path: string;
+  /** 显示名，路径最后一段 */
+  name: string;
+  /** 是否目录 */
+  dir: boolean;
+  /** 缩进层级，顶层为 0 */
+  depth: number;
+  /** 文件或整个目录的大小，单位字节 */
+  size: number;
+  /** 所属顶层目录，用于取同步方式与高亮变化 */
+  root: string;
+}
 
 /** 模组表格的行高，单位 px；必须与样式里的 .si-mod-row 一致 */
 export const MOD_ROW_H = 36;
@@ -118,14 +140,18 @@ const packPidEdits = ref(new Set<string>());
 const packIdTypes = ref(new Map<string, IdType>());
 /** 编号类型被用户改过的资源包路径 */
 const packIdTypeEdits = ref(new Set<string>());
-/** 已添加的配置目录、同步方式与压缩包是否先删旧目录 */
-const configs = ref<Array<{ dir: string; mode: ConfigMode; deleteOld: boolean }>>([]);
-/** 游戏目录下的顶层目录与一级子目录，供"添加"下拉用 */
-const topDirs = ref<ExportEntryDto[]>([]);
-/** 下拉里当前选中的目录 */
-const newDir = ref("");
-/** 新添加目录默认的同步方式 */
-const newMode = ref<ConfigMode>("archive");
+/** 可同步的顶层目录，配置树的根 */
+const configDirs = ref<ExportEntryDto[]>([]);
+/** 目录路径 → 同步方式；没配过的子目录按不同步处理 */
+const configModes = ref(new Map<string, ConfigMode>());
+/** 取消勾选的文件，相对游戏目录 */
+const configExcluded = ref(new Set<string>());
+/** 展开后加载到的子项，目录路径 → 直接子项 */
+const configChildren = ref(new Map<string, ExportEntryDto[]>());
+/** 展开着的目录 */
+const configOpened = ref(new Set<string>());
+/** 正在读取的目录，防重复请求 */
+const configLoading = ref(new Set<string>());
 
 // ---------------- 运行状态 ----------------
 
@@ -204,39 +230,34 @@ const sections = computed<Array<{ id: Section; labelKey: string; icon: "gear" | 
   { id: "start", labelKey: "serverInstance.tab.start", icon: "play" },
 ]);
 
-/** 还没加进列表的顶层目录 */
-const dirChoices = computed(() =>
-  topDirs.value.filter(
-    (entry) => entry.dir && !SKIP_DIRS.includes(entry.path) && !configs.value.some((c) => c.dir === entry.path),
-  ),
+/** 配置树展开后的可见行：目录按需展开，子项由 listExportDir 补上 */
+const configRows = computed<ConfigRow[]>(() => {
+  const rows: ConfigRow[] = [];
+  const walk = (entries: ExportEntryDto[], depth: number, root: string) => {
+    for (const entry of entries) {
+      rows.push({
+        path: entry.path,
+        name: entry.path.split("/").pop() ?? entry.path,
+        dir: entry.dir,
+        depth,
+        size: entry.size,
+        root: depth === 0 ? entry.path : root,
+      });
+      if (!entry.dir || !configOpened.value.has(entry.path)) continue;
+      // 删除目录的子树不展开：里面既不能选方式，也不能勾文件
+      if (configModeOf(entry.path) === "delete") continue;
+      walk(configChildren.value.get(entry.path) ?? [], depth + 1, root);
+    }
+  };
+  walk(configDirs.value, 0, "");
+  return rows;
+});
+
+/** 实际会生成条目的目录数：被上级覆盖的子目录不重复计 */
+const configCount = computed(
+  () =>
+    [...configModes.value].filter(([path, mode]) => mode !== "none" && !configCovered(path)).length,
 );
-
-/**
- * 一键加子目录的目标目录
- *
- * 选中一级子目录时取它的父目录，选中顶层目录时取它自己：两者都能落到"这个目录下的
- * 一级子目录"上，用户不必额外挑一次父目录。
- *
- * # 返回值
- *
- * 目录路径；没选目录时是空串
- */
-const childAddParent = computed(() => {
-  const path = newDir.value;
-  if (!path) return "";
-  return path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : path;
-});
-
-/** 目标目录下还没加进列表的一级子目录 */
-const newChildDirs = computed(() => {
-  const parent = childAddParent.value;
-  if (!parent) return [];
-  const prefix = `${parent}/`;
-  return topDirs.value
-    .filter((entry) => entry.dir && entry.path.startsWith(prefix))
-    .map((entry) => entry.path)
-    .filter((path) => !configs.value.some((item) => item.dir === path));
-});
 
 /** 进度百分比；总数未知时返回 -1 */
 const percent = computed(() => {
@@ -251,7 +272,7 @@ const ready = computed(() => !!currentUuid.value && !!name.value.trim() && !!url
 /** 是否已经选了要打包的东西 */
 const pickedCount = computed(
   () =>
-    pickedMods.value.size + pickedPacks.value.size + configs.value.length + pickedBase.value.size,
+    pickedMods.value.size + pickedPacks.value.size + configCount.value + pickedBase.value.size,
 );
 
 /** 这个模组当前填的下载地址 */
@@ -414,75 +435,176 @@ function pickAllPacks(all: boolean) {
   pickedPacks.value = all ? new Set(packs.value.map((item) => item.path)) : new Set();
 }
 
-/** 把下拉里选中的目录加进配置列表 */
-function addConfig() {
-  const dir = newDir.value;
-  if (!dir || configs.value.some((item) => item.dir === dir)) return;
-  const mode = FILES_DIRS.includes(dir) ? "files" : newMode.value;
-  configs.value = [...configs.value, { dir, mode, deleteOld: true }];
-  newDir.value = "";
+/** 新目录默认的同步方式：kubejs 这类小脚本目录逐文件更合适 */
+function defaultConfigMode(dir: string): ConfigMode {
+  return FILES_DIRS.includes(dir) ? "filesAll" : "archiveAll";
+}
+
+/** 目录的同步方式；没配过的顶层按默认值，子目录按不同步 */
+function configModeOf(path: string): ConfigMode {
+  return configModes.value.get(path) ?? (path.includes("/") ? "none" : defaultConfigMode(path));
 }
 
 /**
- * 把目标目录下的一级子目录一次全加进来
+ * 上级目录对当前行的锁定类型
  *
- * config 这类目录下常有几十个子目录，逐个从下拉里挑太慢；新加的条目与单条添加同一口径，
- * 按当前选的同步方式走，默认删除原有目录。
+ * - `none`：上级选了不同步，整棵子树都锁成不同步；
+ * - `recursive`：上级选了整包 / 整目录，方式跟着上级走；
+ * - `delete`：上级要删目录，子树不能展开也不能选；
+ * - `null`：没有上级锁定，按自己的方式同步。
  */
-function addChildConfigs() {
-  const dirs = newChildDirs.value;
-  if (!dirs.length) return;
-  const mode = newMode.value;
-  configs.value = [
-    ...configs.value,
-    ...dirs.map((dir) => ({
-      dir,
-      mode: (FILES_DIRS.includes(dir) ? "files" : mode) as ConfigMode,
-      deleteOld: true,
-    })),
-  ];
-  newDir.value = "";
+function configAncestorLock(path: string): "none" | "recursive" | "delete" | null {
+  const parts = path.split("/");
+  for (let index = 1; index < parts.length; index += 1) {
+    const dir = parts.slice(0, index).join("/");
+    const mode = configModeOf(dir);
+    if (mode === "none") return "none";
+    if (mode === "delete") return "delete";
+    if (mode === "archiveAll" || mode === "filesAll") return "recursive";
+  }
+  return null;
 }
 
-/** 移除一个配置目录 */
-function removeConfig(dir: string) {
-  configs.value = configs.value.filter((item) => item.dir !== dir);
+/** 是否被上级目录锁定，自己设置的方式不生效 */
+function configCovered(path: string): boolean {
+  return configAncestorLock(path) !== null;
 }
 
-/** 改一行的同步方式 */
-function setConfigMode(dir: string, mode: ConfigMode) {
-  configs.value = configs.value.map((item) => (item.dir === dir ? { ...item, mode } : item));
+/** 这个目录是否在删除目录的覆盖范围内；在的话不能展开也不能勾文件 */
+function configDeleteLocked(path: string): boolean {
+  const parts = path.split("/");
+  for (let index = 1; index <= parts.length; index += 1) {
+    const dir = parts.slice(0, index).join("/");
+    if (configModeOf(dir) === "delete") return true;
+  }
+  return false;
 }
 
-/** 改一行「删除原有目录」；只对压缩包同步有效 */
-function setConfigDeleteOld(dir: string, event: Event) {
-  const deleteOld = (event.target as HTMLInputElement).checked;
-  configs.value = configs.value.map((item) => (item.dir === dir ? { ...item, deleteOld } : item));
+/** 文件归属的同步条目；没有任何目录覆盖时返回 null */
+function configFileOwner(path: string): { dir: string; mode: ConfigMode } | null {
+  const parts = path.split("/");
+  const parent = parts.slice(0, -1).join("/");
+  for (let index = 1; index < parts.length; index += 1) {
+    const dir = parts.slice(0, index).join("/");
+    const mode = configModeOf(dir);
+    // 上级不同步时整棵子树都不参与，里面的文件没有归属
+    if (mode === "none") return null;
+    if (mode === "delete") return { dir, mode };
+    if (mode === "archiveAll" || mode === "filesAll") return { dir, mode };
+    if ((mode === "archiveSelf" || mode === "filesSelf") && dir === parent) {
+      return { dir, mode };
+    }
+  }
+  return null;
 }
 
-/**
- * 读取每个可同步顶层目录的一级子目录，只下钻一层
- *
- * - `uuid`: 实例 uuid
- * - `dirs`: 顶层目录列表
- *
- * # 返回值
- *
- * 一级子目录条目，路径形如 `config/setting`
- */
-async function loadConfigChildren(uuid: string, dirs: ExportEntryDto[]): Promise<ExportEntryDto[]> {
-  const parents = dirs.filter((entry) => entry.dir && !SKIP_DIRS.includes(entry.path));
-  const lists = await Promise.all(
-    parents.map(async (entry): Promise<ExportEntryDto[]> => {
-      try {
-        return await api.listExportDir(uuid, entry.path);
-      } catch {
-        // 某个目录读不到就只少它的子目录，不影响其它目录
-        return [];
-      }
-    }),
-  );
-  return lists.flat().filter((entry) => entry.dir);
+/** 文件勾选状态：没归属、被删除目录锁定、已勾、取消勾选 */
+function configFileState(path: string): "on" | "off" | "locked" | "none" {
+  const owner = configFileOwner(path);
+  if (!owner) return "none";
+  if (owner.mode === "delete") return "locked";
+  return configExcluded.value.has(path) ? "off" : "on";
+}
+
+/** 勾选 / 取消一个文件 */
+function setConfigFile(path: string, on: boolean) {
+  const next = new Set(configExcluded.value);
+  if (on) next.delete(path);
+  else next.add(path);
+  configExcluded.value = next;
+}
+
+/** 点文件名时切换文件勾选；目录名由调用方负责展开 */
+function toggleConfigFile(path: string) {
+  const state = configFileState(path);
+  if (state === "on" || state === "off") setConfigFile(path, state !== "on");
+}
+
+/** 改一个目录的同步方式 */
+function setConfigMode(dir: string, event: Event) {
+  // 被上级锁定的行是禁用状态，这里再挡一次，别让程序调用改掉
+  if (configAncestorLock(dir) !== null) return;
+  const mode = (event.target as HTMLSelectElement).value as ConfigMode;
+  const next = new Map(configModes.value);
+  next.set(dir, mode);
+  configModes.value = next;
+}
+
+/** 全部整包同步 / 全部不同步；清掉子目录各自的设置 */
+function setAllConfigs(on: boolean) {
+  const next = new Map<string, ConfigMode>();
+  for (const entry of configDirs.value) {
+    next.set(entry.path, on ? defaultConfigMode(entry.path) : "none");
+  }
+  configModes.value = next;
+}
+
+/** 旧数据里的同步方式转成新值 */
+function normalizeConfigMode(value: string): ConfigMode {
+  switch (value.trim()) {
+    case "archive":
+    case "archiveAll":
+      return "archiveAll";
+    case "archiveSelf":
+      return "archiveSelf";
+    case "files":
+    case "filesAll":
+      return "filesAll";
+    case "filesSelf":
+      return "filesSelf";
+    case "delete":
+      return "delete";
+    default:
+      return "none";
+  }
+}
+
+/** 某个配置目录是否展开着 */
+function isConfigOpen(path: string): boolean {
+  return configOpened.value.has(path);
+}
+
+/** 某个目录是否正在读子项 */
+function isConfigLoading(path: string): boolean {
+  return configLoading.value.has(path);
+}
+
+/** 读一个目录的直接子项，读过的缓存起来 */
+async function loadConfigChildren(path: string) {
+  if (configChildren.value.has(path) || configLoading.value.has(path)) return;
+  const uuid = currentUuid.value;
+  if (!uuid) return;
+  const pending = new Set(configLoading.value);
+  pending.add(path);
+  configLoading.value = pending;
+  try {
+    const list = await api.listExportDir(uuid, path);
+    if (uuid !== currentUuid.value) return;
+    const next = new Map(configChildren.value);
+    next.set(path, list);
+    configChildren.value = next;
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    const done = new Set(configLoading.value);
+    done.delete(path);
+    configLoading.value = done;
+  }
+}
+
+/** 展开 / 收起一个目录，首次展开时读子项 */
+async function toggleConfigExpand(path: string) {
+  // 删除目录的子树不展开，避免对着马上要被删的内容勾选
+  if (configDeleteLocked(path)) return;
+  const next = new Set(configOpened.value);
+  if (next.has(path)) {
+    next.delete(path);
+    configOpened.value = next;
+    return;
+  }
+  next.add(path);
+  configOpened.value = next;
+  await loadConfigChildren(path);
 }
 
 /** 加载序号：快速切实例时只认最后一次请求的结果 */
@@ -614,7 +736,8 @@ async function loadInstance(uuid: string) {
 
   let dirsNext: ExportEntryDto[] = [];
   try {
-    dirsNext = await api.listExportDir(uuid, "");
+    // 顶层目录也要递归统计大小，树里才有文件夹体积
+    dirsNext = await api.listExportDirSized(uuid, "");
   } catch {
     // 读不到就当没有可同步的目录
   }
@@ -634,32 +757,50 @@ async function loadInstance(uuid: string) {
   // 保存的是勾选时的相对路径，可能展开到了 .minecraft 里面，不能按根条目过滤
   pickedBase.value = new Set(meta?.baseFiles ?? []);
 
-  const children = await loadConfigChildren(uuid, dirsNext);
-  if (seq !== loadSeq) return;
-  topDirs.value = [...dirsNext, ...children];
+  configDirs.value = dirsNext.filter((entry) => entry.dir && !SKIP_DIRS.includes(entry.path));
+  configChildren.value = new Map();
+  configOpened.value = new Set();
+  configLoading.value = new Set();
 
-  // 生成过的实例按保存的列表恢复；没有保存过（老数据 / 首次打开）才铺默认值
-  const availableDirs = new Set(topDirs.value.filter((entry) => entry.dir).map((entry) => entry.path));
+  const modes = new Map<string, ConfigMode>();
   if (Array.isArray(meta?.configs)) {
-    configs.value = meta.configs
-      .filter((item) => availableDirs.has(item.dir))
-      .map((item) => ({
-        dir: item.dir,
-        mode: (item.mode === "files" ? "files" : "archive") as ConfigMode,
-        deleteOld: item.deleteOld,
-      }));
+    // 生成过的实例按保存的方式恢复；没保存过的顶层目录保持不同步
+    for (const entry of configDirs.value) modes.set(entry.path, "none");
+    const roots = new Set(configDirs.value.map((entry) => entry.path));
+    const restored = await Promise.all(
+      meta.configs.map(async (item) => {
+        const dir = item.dir.trim().replace(/\\/g, "/");
+        if (!dir) return null;
+        // 只恢复配置树里列得出来的目录：模组 / 日志这类运行目录不参与同步
+        if (![...roots].some((root) => dir === root || dir.startsWith(`${root}/`))) return null;
+        // 子目录可能已经被删掉：读不到就不恢复，免得生成时指着一个不存在的目录
+        if (!roots.has(dir)) {
+          try {
+            await api.listExportDir(uuid, dir);
+          } catch {
+            return null;
+          }
+        }
+        return [dir, normalizeConfigMode(item.mode)] as const;
+      }),
+    );
+    if (seq !== loadSeq) return;
+    for (const entry of restored) {
+      if (entry) modes.set(entry[0], entry[1]);
+    }
   } else {
-    // 默认只把顶层文件夹加上，一级子目录按需手动添加
-    configs.value = topDirs.value
-      .filter((entry) => entry.dir && !entry.path.includes("/") && !SKIP_DIRS.includes(entry.path))
-      .map((entry) => ({
-        dir: entry.path,
-        mode: (FILES_DIRS.includes(entry.path) ? "files" : "archive") as ConfigMode,
-        deleteOld: true,
-      }));
+    // 首次打开沿用老口径：顶层目录默认整包同步，kubejs 这类走逐文件
+    for (const entry of configDirs.value) modes.set(entry.path, defaultConfigMode(entry.path));
   }
-  newDir.value = "";
-  newMode.value = "archive";
+  configModes.value = modes;
+  // 取消勾选跟着上次生成走：发布者只排掉个别文件的设置要还在
+  const excluded = new Set<string>();
+  if (Array.isArray(meta?.configs)) {
+    for (const item of meta.configs) {
+      for (const path of item.exclude) excluded.add(path);
+    }
+  }
+  configExcluded.value = excluded;
   result.value = null;
   progress.value = null;
   changedPaths.value = new Set();
@@ -825,9 +966,12 @@ function clearInstance() {
   packPidEdits.value = new Set();
   packIdTypes.value = new Map();
   packIdTypeEdits.value = new Set();
-  configs.value = [];
-  topDirs.value = [];
-  newDir.value = "";
+  configModes.value = new Map();
+  configExcluded.value = new Set();
+  configDirs.value = [];
+  configChildren.value = new Map();
+  configOpened.value = new Set();
+  configLoading.value = new Set();
   result.value = null;
   lastSnapshot.value = null;
   progress.value = null;
@@ -972,11 +1116,17 @@ function buildOptions(): ServerInstanceOptionsDto {
         optional: optionalMods.value.has(path),
       };
     }),
-    configs: configs.value.map((item) => ({
-      dir: item.dir,
-      mode: item.mode,
-      deleteOld: item.deleteOld,
-    })),
+    // 被上级递归方式覆盖的子目录不重复下发，交给上级那一条
+    configs: [...configModes.value]
+      .filter(([path, mode]) => mode !== "none" && !configCovered(path))
+      .map(([dir, mode]) => ({
+        dir,
+        mode,
+        // 只把这条目录负责的范围里的取消勾选传下去，子目录自己的条目另算
+        exclude: [...configExcluded.value].filter(
+          (path) => path === dir || path.startsWith(`${dir}/`),
+        ),
+      })),
     baseFiles: [...pickedBase.value],
     resourcePacks: packs.value
       .filter((row) => pickedPacks.value.has(row.path))
@@ -1075,11 +1225,6 @@ useInstanceChange(syncInstances);
 // 已经停在本窗口时又被打开：openWindow 只更新参数、不换组件，跟着参数换实例
 watch(() => windowParams.value.uuid, applyTarget);
 
-// 下拉换目录时把同步方式拨到该目录的常见做法，用户仍可自己改
-watch(newDir, (dir) => {
-  if (dir) newMode.value = FILES_DIRS.includes(dir) ? "files" : "archive";
-});
-
 // 生成后改了勾选，旧结果就不再代表当前选择；清掉后走快照预览
 watch([pickedMods, pickedPacks], () => {
   if (result.value) {
@@ -1114,9 +1259,10 @@ onBeforeUnmount(() => {
     urlOf, setModUrl, lockedProjectIds, changedPaths,
     packs, pickedPacks, pickAllPacks, packPidOf, packFidOf, packUrlOf,
     setPackId, setPackUrl, packIdTypeOf, isPackCustomType, setPackIdType,
-    configs, newDir, newMode, dirChoices, addConfig, setConfigMode,
-    newChildDirs, childAddParent, addChildConfigs,
-    setConfigDeleteOld, removeConfig,
+    configDirs, configModes, configRows, configCount, configModeOf, configAncestorLock,
+    configDeleteLocked, configFileState, setConfigFile, toggleConfigFile,
+    setAllConfigs, setConfigMode,
+    toggleConfigExpand, isConfigOpen, isConfigLoading,
     pickInstance, openGuide,
     current, ready, pickedCount, generate, exportPack, packing, percent, progress, result, error,
     modChanges, addedMods, removedMods, modifiedMods,

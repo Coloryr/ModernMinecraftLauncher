@@ -143,6 +143,8 @@ pub enum GameLog {
     },
     /// 日志已重定向到文件
     JavaRedirect,
+    /// RenderDoc 正在拉起游戏；启动参数含令牌，不回显
+    RenderDocLaunch,
     /// Java 切换回启动器查找
     JavaLocalRedirect,
     /// 登录用时
@@ -161,6 +163,20 @@ pub enum GameLog {
     LaunchArgs(String),
     /// Java 路径
     JavaPath(PathBuf),
+    /// RenderDoc 路径与捕获文件目录
+    RenderDoc {
+        /// `renderdoccmd.exe` 路径
+        path: PathBuf,
+        /// 捕获文件目录
+        captures: PathBuf,
+    },
+    /// Nsight Graphics 路径与捕获文件目录
+    Nsight {
+        /// `ngfx-capture.exe` 路径
+        path: PathBuf,
+        /// 捕获文件目录
+        captures: PathBuf,
+    },
     /// 启动用时
     LaunchTime(Duration),
     /// 启动前执行用时

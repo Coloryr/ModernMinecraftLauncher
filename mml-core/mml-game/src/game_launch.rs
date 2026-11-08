@@ -78,6 +78,19 @@ pub struct GameLaunchArg {
     pub server_pack_skip: Vec<String>,
     /// 服务器包同步自己的取消令牌：界面上点「跳过更新」时只取消它，启动继续
     pub server_pack_cancel: Option<CancellationToken>,
+    /// 这次用哪个图形调试器包一层
+    pub debugger: LaunchDebugger,
+}
+
+/// 启动时包在 Java 外面的图形调试器
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LaunchDebugger {
+    /// 直接起 Java，不注入
+    None,
+    /// RenderDoc：`renderdoccmd capture` 包住 Java，首次会先下载工具
+    RenderDoc,
+    /// Nsight Graphics：它的 `ngfx-capture` 包住 Java，路径是本机安装的命令行工具
+    Nsight(PathBuf),
 }
 
 /// 游戏实例处理完成后的参数
@@ -90,14 +103,16 @@ pub struct GameRunObj {
     pub auth: LoginObj,
     /// 工作目录，即游戏根目录
     pub path: PathBuf,
-    /// Java 可执行文件路径
+    /// 实际启动的可执行文件；调试器启动时是调试器的命令行工具
     pub java: PathBuf,
-    /// 启动参数
+    /// 实际启动参数；调试器启动时是它拉起 Java 的参数
     pub args: Vec<String>,
     /// 环境变量
     pub env: HashMap<String, String>,
     /// 是否管理员方式启动
     pub admin: bool,
+    /// 实际包在 Java 外面的调试器；不是调试器启动时为 `None`
+    pub debugger: LaunchDebugger,
 }
 
 /// 启动命令的参数集合
@@ -125,6 +140,8 @@ pub(crate) struct InstanceHandle {
     exit_code: AtomicI32,
     /// 通过已提权的辅助进程停止游戏。
     elevation_control: Option<process_helper::ElevationControl>,
+    /// 进程外面是不是包着调试器：停止时要连它的子进程一起结束
+    wrapped: bool,
 }
 
 impl InstanceHandle {
@@ -139,8 +156,13 @@ impl InstanceHandle {
         // 创建工作目录
         path_helper::create_dir_all(&run.path)?;
 
-        // 启动进程
-        let result = process_helper::launch(run.java, run.args, run.env, run.path, run.admin)?;
+        // 启动进程。调试器是控制台程序，藏掉它的窗口；停止时也要结束整棵进程树
+        let wrapped = run.debugger != LaunchDebugger::None;
+        let result = if wrapped {
+            process_helper::launch_hidden_in_group(run.java, run.args, run.env, run.path, run.admin)?
+        } else {
+            process_helper::launch(run.java, run.args, run.env, run.path, run.admin)?
+        };
 
         if result.is_admin {
             crate::add_game_log_item(&run.uuid, GameLog::JavaRedirect);
@@ -148,6 +170,8 @@ impl InstanceHandle {
 
         let process = Arc::new(Mutex::new(Some(result.child)));
         let is_exit = Arc::new(AtomicBool::new(false));
+        // 调试器会把完整 Java 命令行再打印一遍，里面有 access token；这层输出要盖掉
+        let mask_launch_args = wrapped;
 
         // 读取 stdout 线程
         if let Some(reader) = result.stdout {
@@ -157,7 +181,7 @@ impl InstanceHandle {
             let _ = thread::Builder::new()
                 .name(format!("Mml Game {} StandardOutput", uuid))
                 .spawn(move || {
-                    read_process_stream(reader, uuid, encoding, exit);
+                    read_process_stream(reader, uuid, encoding, exit, mask_launch_args);
                 });
         }
 
@@ -169,7 +193,7 @@ impl InstanceHandle {
             let _ = thread::Builder::new()
                 .name(format!("Mml Game {} StandardError", uuid))
                 .spawn(move || {
-                    read_process_stream(reader, uuid, encoding, exit);
+                    read_process_stream(reader, uuid, encoding, exit, mask_launch_args);
                 });
         }
 
@@ -179,6 +203,7 @@ impl InstanceHandle {
             is_exit,
             exit_code: AtomicI32::new(0),
             elevation_control: result.control,
+            wrapped,
         })
     }
 
@@ -191,11 +216,17 @@ impl InstanceHandle {
             // 保留等待句柄，由 tick 确认游戏及辅助进程真正退出。
             return;
         }
-        if let Ok(mut guard) = self.process.lock() {
-            if let Some(ref mut child) = *guard {
-                if child.kill().is_ok() {
-                    self.is_exit.store(true, Ordering::SeqCst);
-                }
+        if let Ok(mut guard) = self.process.lock()
+            && let Some(ref mut child) = *guard
+        {
+            let result = if self.wrapped {
+                // 调试器下面还挂着 Java，只杀它自己会留下一个还在跑的游戏
+                process_helper::kill_tree_group(child)
+            } else {
+                child.kill()
+            };
+            if result.is_ok() {
+                self.is_exit.store(true, Ordering::SeqCst);
             }
         }
     }
@@ -251,6 +282,7 @@ impl InstanceHandle {
 /// - `uuid`: 游戏实例 uuid
 /// - `encoding`: 日志编码，UTF-8 或 GBK
 /// - `exit_flag`: 退出标志，用于停止读取
+/// - `mask_launch_args`: 是否过滤 RenderDoc 的命令行回显
 ///
 /// 流关闭或收到退出标志后结束。
 fn read_process_stream<R: std::io::Read>(
@@ -258,6 +290,7 @@ fn read_process_stream<R: std::io::Read>(
     uuid: Uuid,
     encoding: LogEncoding,
     exit_flag: Arc<AtomicBool>,
+    mask_launch_args: bool,
 ) {
     match encoding {
         LogEncoding::UTF8 => {
@@ -267,7 +300,7 @@ fn read_process_stream<R: std::io::Read>(
                     break;
                 }
                 if let Ok(line) = line {
-                    crate::add_game_log(&uuid, &line);
+                    forward_game_line(&uuid, &line, mask_launch_args);
                 }
             }
         }
@@ -281,10 +314,30 @@ fn read_process_stream<R: std::io::Read>(
                     break;
                 }
                 if let Ok(line) = line {
-                    crate::add_game_log(&uuid, &line);
+                    forward_game_line(&uuid, &line, mask_launch_args);
                 }
             }
         }
+    }
+}
+
+/// 把一行进程输出转进游戏日志
+///
+/// renderdoccmd 启动时会把完整 Java 命令行打印一遍，里面带 access token；
+/// 这一行换成固定文案，其余输出原样转发。
+///
+/// - `uuid`: 游戏实例 uuid
+/// - `line`: 进程输出的一行
+/// - `mask_launch_args`: 是否过滤 renderdoccmd 的命令行回显
+fn forward_game_line(uuid: &Uuid, line: &str, mask_launch_args: bool) {
+    if mask_launch_args
+        && (line.starts_with("Launching '")
+            || line.contains("--accessToken")
+            || line.contains("--accesstoken"))
+    {
+        crate::add_game_log_item(uuid, GameLog::RenderDocLaunch);
+    } else {
+        crate::add_game_log(uuid, line);
     }
 }
 
@@ -832,14 +885,14 @@ impl InstanceSettingObj {
                 if let Some(stdout) = result.stdout {
                     let uuid = self.uuid;
                     std::thread::spawn(move || {
-                        read_process_stream(stdout, uuid, encoding, Arc::new(AtomicBool::new(false)));
+                        read_process_stream(stdout, uuid, encoding, Arc::new(AtomicBool::new(false)), false);
                     });
                 }
 
                 if let Some(stderr) = result.stderr {
                     let uuid = self.uuid;
                     std::thread::spawn(move || {
-                        read_process_stream(stderr, uuid, encoding, Arc::new(AtomicBool::new(false)));
+                        read_process_stream(stderr, uuid, encoding, Arc::new(AtomicBool::new(false)), false);
                     });
                 }
 
@@ -944,7 +997,6 @@ impl InstanceSettingObj {
         let args = self.make_run_arg(&java, &arg, &mut obj, false);
         let mut env = self.make_env_arg();
         self.add_launcher_env(&mut env, &java, &obj.jvm_args);
-        self.log_launch_env(&env);
 
         Ok(LaunchCmd {
             java,
@@ -1134,16 +1186,83 @@ impl InstanceSettingObj {
             return Err(ErrorType::TaskCancel);
         }
 
+        // RenderDoc：先把工具准备好，再用 renderdoccmd 拉起 Java。
+        // 放在启动前命令之后：那条命令可能还在补文件，准备工具不必抢在它前面。
+        let (run_java, run_args) = match &arg.debugger {
+            LaunchDebugger::None => (jvm.clone(), jvm_arg.clone()),
+            LaunchDebugger::RenderDoc => {
+                #[cfg(any(windows, target_os = "linux"))]
+                {
+                    if let Some(gui) = &gui {
+                        gui.update_state(self, LaunchState::RenderDoc);
+                    }
+                    let cmd = mml_tools::renderdoc::ensure().await?;
+                    let captures = mml_tools::renderdoc::captures_dir();
+                    std::fs::create_dir_all(&captures).map_err(debugger_dir_error)?;
+                    let stem = format!(
+                        "{}_{}_{}",
+                        capture_stem(&self.name),
+                        self.uuid,
+                        chrono::Local::now().format("%Y%m%d_%H%M%S")
+                    );
+                    let args = mml_tools::renderdoc::capture_args(
+                        &jvm,
+                        &jvm_arg,
+                        &self.get_game_path(),
+                        &captures,
+                        &stem,
+                    );
+                    crate::add_game_log_item(
+                        &self.uuid,
+                        GameLog::RenderDoc {
+                            path: cmd.clone(),
+                            captures: captures.clone(),
+                        },
+                    );
+                    (cmd, args)
+                }
+                #[cfg(not(any(windows, target_os = "linux")))]
+                {
+                    return Err(ErrorType::RenderDocUnsupported);
+                }
+            }
+            LaunchDebugger::Nsight(cli) => {
+                let captures = mml_tools::nsight::captures_dir();
+                std::fs::create_dir_all(&captures).map_err(debugger_dir_error)?;
+                let args = mml_tools::nsight::capture_args(
+                    &jvm,
+                    &jvm_arg,
+                    &self.get_game_path(),
+                    &captures,
+                    &env,
+                );
+                crate::add_game_log_item(
+                    &self.uuid,
+                    GameLog::Nsight {
+                        path: cli.clone(),
+                        captures: captures.clone(),
+                    },
+                );
+                (cli.clone(), args)
+            }
+        };
+
+        // RenderDoc 首次下载可能很久，下完再看一眼用户是不是已经取消
+        if cancel.is_cancelled() {
+            return Err(ErrorType::TaskCancel);
+        }
+
         let start = Instant::now();
         let run = GameRunObj {
             uuid: self.uuid,
             encoding: self.encoding,
             auth: arg.auth.clone(),
             path: self.get_game_path(),
-            java: jvm.clone(),
-            args: jvm_arg.clone(),
+            java: run_java,
+            args: run_args,
             env: env.clone(),
             admin: arg.admin,
+            debugger: arg.debugger.clone(),
         };
         let handel = InstanceHandle::new(run)?;
         let time = start.elapsed();
@@ -1188,6 +1307,46 @@ impl InstanceSettingObj {
 
         Ok(())
     }
+}
+
+/// 捕获文件名里能安全使用的实例名片段
+///
+/// 实例名可以带空格、斜杠、中文，直接当文件名会出问题；这里只留 ASCII 字母数字、
+/// 短横线与下划线，其余换成下划线。
+///
+/// - `name`: 实例名
+///
+/// # 返回值
+///
+/// 文件名片段；实例名为空时返回 `instance`
+#[cfg(any(windows, target_os = "linux"))]
+fn capture_stem(name: &str) -> String {
+    let stem: String = name
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    if stem.is_empty() {
+        String::from("instance")
+    } else {
+        stem
+    }
+}
+
+/// 建调试器捕获目录失败时的错误
+///
+/// - `err`: 建目录时的 IO 错误
+///
+/// # 返回值
+///
+/// 统一转成进程错误
+fn debugger_dir_error(err: std::io::Error) -> ErrorType {
+    ErrorType::ProcessError(mml_names::i18_items::error_type::ErrorData::from_error(err))
 }
 
 /// 实际选中的 Java 大版本；不在已扫描的 Java 列表里返回 `None`

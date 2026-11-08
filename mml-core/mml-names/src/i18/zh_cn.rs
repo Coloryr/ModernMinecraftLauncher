@@ -35,6 +35,7 @@ impl I18Lang for ZhCn {
             InfoType::CoreStop => format!("M²L停止"),
             InfoType::TempFile => format!("临时文件"),
             InfoType::PythonRuntime => String::from("Python 运行环境"),
+            InfoType::RenderDoc => String::from("RenderDoc"),
             InfoType::AdoptMmcInstance { name } => format!("检测到 MMC 实例并已接管：{name}"),
             InfoType::ImportLegacyGroups { groups, instances } => format!(
                 "已把旧版分组文件 instgroups.json 并入分组表：新建 {groups} 个分组，归入 {instances} 个实例"
@@ -247,6 +248,7 @@ impl I18Lang for ZhCn {
                 DataNotFoundData::Version(ver) => format!("找不到游戏版本：{ver}"),
             },
             ErrorType::JavaNotFound => String::from("找不到合适的Java"),
+            ErrorType::RenderDocUnsupported => String::from("当前平台不支持 RenderDoc 启动"),
             ErrorType::GpuNotAvailable => String::from("没有可用的 GPU 后端，无法渲染图标"),
             ErrorType::InstanceNameExists(name) => format!("实例名字 {name} 已存在"),
             ErrorType::NameInvalid(NameInvalidData { name, reason }) => match reason {

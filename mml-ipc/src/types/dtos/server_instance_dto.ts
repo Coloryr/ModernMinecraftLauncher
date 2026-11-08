@@ -27,7 +27,7 @@ export type ServerInstancePickDto = {
 export type ServerInstanceConfigDto = {
   dir: string,
   mode: string,
-  deleteOld: boolean,
+  exclude: string[],
 };
 
 export type ServerInstanceProgressDto = {

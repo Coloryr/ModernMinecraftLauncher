@@ -74,6 +74,8 @@ mml-skin = { path = "../../mml-core/mml-skin" }
 mml-skin-draw = { path = "../../mml-core/mml-skin-draw" }
 mml-tex-draw = { path = "../../mml-core/mml-tex-draw" }
 mml-analysis = { path = "../../mml-core/mml-analysis" }
+# 自带的 RenderDoc：抓帧结束后用 Qt 版界面打开捕获，见 windows/main/launch.rs
+mml-tools = { path = "../../mml-core/mml-tools" }
 window-vibrancy.workspace = true
 # 手柄：读取、映射与转发都在内核 crate 里
 mml-gamepad = { path = "../../mml-core/mml-gamepad" }

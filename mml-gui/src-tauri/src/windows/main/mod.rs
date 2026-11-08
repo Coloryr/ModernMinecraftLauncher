@@ -134,5 +134,8 @@ pub fn emit_java_change(app: &AppHandle) {
 /// - `event`: 失败详情，含错误文案与实例 uuid；启动前的错误没有 uuid
 #[gui_macros::emit]
 pub(super) fn emit_launch_error(app: &AppHandle, event: ErrorEvent) {
+    if let Some(uuid) = &event.uuid {
+        launch::clear_launch_state(uuid);
+    }
     let _ = app.emit(listens::LAUNCH_ERROR, event);
 }

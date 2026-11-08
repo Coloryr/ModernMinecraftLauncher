@@ -72,8 +72,10 @@ import type {
   NewsItem,
   PackItemDto,
   PackProgressDto,
+  DebuggerInfoDto,
   ProjectDetailDto,
   ProjectDto,
+  RenderDocLaunchDto,
   ResourceDependencyDto,
   ResourceSaveDto,
   ResourceStatusDto,
@@ -1068,6 +1070,8 @@ export const api = {
    * - `serverPack`: 在线服务器包怎么处理；`skip` = 这次不比对清单直接启动
    * - `serverPackSkip`: 同步时先不更新的文件，取清单里的相对路径
    * - `runCommands`: 启动前 / 后命令这次执不执行；`false` = 用户选了跳过
+   * - `renderdoc`: 是否用 RenderDoc 启动
+   * - `nsight`: 是否用本机安装的 Nsight Graphics 启动
    *
    * 启动用户名由后端从当前账户解析
    */
@@ -1079,6 +1083,8 @@ export const api = {
     serverPack?: "update" | "skip",
     serverPackSkip?: string[],
     runCommands?: boolean,
+    renderdoc?: boolean,
+    nsight?: boolean,
   ): Promise<void> {
     return commands.main.launchGame(
       uuid,
@@ -1088,7 +1094,48 @@ export const api = {
       serverPack ?? null,
       serverPackSkip ?? null,
       runCommands ?? null,
+      renderdoc ?? null,
+      nsight ?? null,
     );
+  },
+
+  /**
+   * 检测本机可用的图形调试器
+   *
+   * RenderDoc 由启动器自带，不用检测；只返回本机装没装 Nsight Graphics。
+   */
+  async detectDebuggers(): Promise<DebuggerInfoDto> {
+    return commands.main.detectDebuggers();
+  },
+
+  /**
+   * 当前实例还没走完的启动阶段
+   *
+   * 窗口重载或日志窗口在启动中途才打开时，用它补一次状态；没有进行中的启动返回 null。
+   *
+   * - `uuid`: 实例 uuid
+   *
+   * # 返回值
+   *
+   * 见 `StateEvent`；不在启动中时返回 null
+   */
+  async launchState(uuid: string): Promise<StateEvent | null> {
+    return commands.main.launchState(uuid);
+  },
+
+  /**
+   * 生成 RenderDoc 界面启动要填的参数
+   *
+   * 走的是真实启动那套参数生成，只是不拉起进程；结果里含登录令牌，只给用户复制。
+   *
+   * - `uuid`: 实例 uuid
+   *
+   * # 返回值
+   *
+   * 见 `RenderDocLaunchDto`；实例不存在、没有当前账户或生成失败时抛错
+   */
+  async renderdocLaunchInfo(uuid: string): Promise<RenderDocLaunchDto> {
+    return commands.main.renderdocLaunchInfo(uuid);
   },
 
   /**
@@ -1315,6 +1362,22 @@ export const api = {
    */
   async listExportDir(uuid: string, dir: string): Promise<ExportEntryDto[]> {
     return commands.export.listDir(uuid, dir);
+  },
+
+  /**
+   * 浏览游戏目录下的一个目录，目录大小递归统计
+   *
+   * 与 `listExportDir` 的区别只在 `size`：顶层目录也返回整棵子树的大小。
+   *
+   * - `uuid`: 实例 uuid
+   * - `dir`: 相对游戏目录的路径；空串表示游戏目录本身
+   *
+   * # 返回值
+   *
+   * 该目录的直接子项，目录的 `size` 为整棵子树大小
+   */
+  async listExportDirSized(uuid: string, dir: string): Promise<ExportEntryDto[]> {
+    return commands.export.listDirSized(uuid, dir);
   },
 
   /**
@@ -2835,6 +2898,8 @@ export function enableResourcepack(uuid: string, file: string): Promise<void> {
  * - `serverPack`: 在线服务器包怎么处理；`skip` = 这次不比对清单直接启动
  * - `serverPackSkip`: 同步时先不更新的文件，取清单里的相对路径
  * - `runCommands`: 启动前 / 后命令这次执不执行；`false` = 用户选了跳过
+ * - `renderdoc`: 是否用 RenderDoc 启动
+ * - `nsight`: 是否用本机安装的 Nsight Graphics 启动
  */
 export function launchGame(
   uuid: string,
@@ -2844,6 +2909,8 @@ export function launchGame(
   serverPack?: "update" | "skip",
   serverPackSkip?: string[],
   runCommands?: boolean,
+  renderdoc?: boolean,
+  nsight?: boolean,
 ): Promise<void> {
   return commands.main.launchGame(
     uuid,
@@ -2853,6 +2920,8 @@ export function launchGame(
     serverPack ?? null,
     serverPackSkip ?? null,
     runCommands ?? null,
+    renderdoc ?? null,
+    nsight ?? null,
   );
 }
 

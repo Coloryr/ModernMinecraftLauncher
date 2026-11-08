@@ -12,6 +12,7 @@ export type InstanceInfoDto = {
   loaderVersion: string | null,
   dir: string,
   running: boolean,
+  launching: boolean,
   modpackType: string | null,
   pid: string | null,
   fid: string | null,

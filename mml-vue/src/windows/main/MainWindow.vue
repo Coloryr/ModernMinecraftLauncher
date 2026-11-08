@@ -43,7 +43,7 @@ import {
   startupPage,
   viewMode,
 } from "../../lib/settings";
-import type { AccountStoreDto, ColorMcInfoDto, CustomHomeInfoDto, GroupDto, InstanceInfoDto, JavaInfoDto, LoadState, MinecraftInfoDto, NewsItem, StartArgDto, VersionInfoDto, ViewMode } from "../../lib/bindings";
+import type { AccountStoreDto, ColorMcInfoDto, CustomHomeInfoDto, GroupDto, InstanceInfoDto, JavaInfoDto, LoadState, MinecraftInfoDto, NewsItem, NsightInstallDto, StartArgDto, StateEvent, VersionInfoDto, ViewMode } from "../../lib/bindings";
 import InstanceIcon from "../../components/InstanceIcon.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import DropOverlay from "../../components/ui/DropOverlay.vue";
@@ -64,6 +64,7 @@ import MainSidebar from "./sidebar/MainSidebar.vue";
 import MainCtxMenu from "./ctxmenu/MainCtxMenu.vue";
 import LaunchProgress from "../../components/LaunchProgress.vue";
 import IconPickModal from "./IconPickModal.vue";
+import DebuggerLaunchModal from "./DebuggerLaunchModal.vue";
 import BlockIconPickModal from "./BlockIconPickModal.vue";
 import OldDataModal from "./OldDataModal.vue";
 import FirstRunSetup from "./FirstRunSetup.vue";
@@ -150,6 +151,8 @@ function select(inst: InstanceInfoDto) {
   // 持久化当前选中实例到 gui_config.json；uuid 未变时内部跳过，不会重复写盘
   setSelectedInstance(inst.uuid);
   newsActive.value = false;
+  // 切到正在启动的实例时补一次阶段，避免停在别的页面期间错过事件
+  void syncLaunchState(inst.uuid);
   // 分组模式下展开所在分组
   if (mode.value === "group") {
     const key = groupIdOf(inst);
@@ -882,6 +885,9 @@ function onInstMenuAction(id: InstMenuAction) {
     case "launch":
       launch();
       break;
+    case "launchRenderDoc":
+      launchDebugger();
+      break;
     case "multiSelect":
       // 以这一项为起点进多选：之后勾别的实例，批量操作走顶部工具栏
       if (target) enterMultiSelect([target.uuid]);
@@ -1530,35 +1536,79 @@ function trackAsync(subscribing: Promise<() => void>) {
 // 所以不取 status，只用 init 返回的订阅。
 const { init: initModpackStatus } = useModpackStatus(false, adoptAddedInstance);
 
-async function subscribeEvents() {
-  const fns = await Promise.all([
-    onLaunchState((e) => {
-      // 用户取消：后端不算失败，只把启动态收回去
-      if (e.state === "cancelled") {
-        clearLaunching(e.uuid);
-        if (e.uuid === selected.value?.uuid) {
-          statusText.value = t("launch.ready");
-          launchStage.value = "";
-          statePct.value = null;
-        }
-        return;
-      }
-      // 进程起来之后推 end / post：按钮从「启动中」转「运行中」。
-      // 其余状态可能是别处发起的启动（资源窗口右键「进入存档」），要置成启动中，
-      // 否则主界面不知道有人在启动，按钮一直停在「启动游戏」
-      if (e.state === "end" || e.state === "post") {
-        markStarted(e.uuid);
-        // 进程起来的这一刻内核记了一次启动，列表 / 详情里的次数要立刻跟上
-        if (e.state === "end") void refreshStats();
+/**
+ * 应用一条启动阶段事件
+ *
+ * - `e`: 后端 `launch-state` 的快照
+ */
+function applyLaunchState(e: StateEvent) {
+  // 用户取消：后端不算失败，只把启动态收回去
+  if (e.state === "cancelled") {
+    clearLaunching(e.uuid);
+    if (e.uuid === selected.value?.uuid) {
+      statusText.value = t("launch.ready");
+      launchStage.value = "";
+      statePct.value = null;
+    }
+    return;
+  }
+  // 进程起来之后推 end / post：按钮从「启动中」转「运行中」。
+  // 其余状态可能是别处发起的启动（资源窗口右键「进入存档」），要置成启动中，
+  // 否则主界面不知道有人在启动，按钮一直停在「启动游戏」
+  if (e.state === "end" || e.state === "post") {
+    markStarted(e.uuid);
+    // 进程起来的这一刻内核记了一次启动，列表 / 详情里的次数要立刻跟上
+    if (e.state === "end") void refreshStats();
+  } else {
+    markLaunching(e.uuid);
+  }
+  if (e.uuid !== selected.value?.uuid) return;
+  statusText.value = stateText(e.state);
+  launchStage.value = e.state;
+  statePct.value = e.progress ?? null;
+}
+
+/**
+ * 主动补一次当前启动阶段
+ *
+ * 窗口重载、或在启动中途才切回主窗口时，事件可能已经错过；后端留了最后一份快照。
+ *
+ * - `uuid`: 要查询的实例
+ */
+async function syncLaunchState(uuid: string) {
+  try {
+    const state = await api.launchState(uuid);
+    if (state) applyLaunchState(state);
+  } catch {
+    // 查询失败不影响界面，后续事件仍会推进
+  }
+}
+
+/**
+ * 订阅启动状态事件；失败时重试，避免主窗口启动早期注册失败后再也收不到启动信号
+ *
+ * - `attempt`: 当前第几次尝试
+ */
+function listenLaunchState(attempt = 0) {
+  onLaunchState(applyLaunchState)
+    .then((fn) => {
+      if (gone) fn();
+      else unlistens.push(fn);
+    })
+    .catch((error) => {
+      if (attempt < 5) {
+        window.setTimeout(() => listenLaunchState(attempt + 1), 400);
       } else {
-        markLaunching(e.uuid);
+        console.error("[MainWindow] 启动状态事件订阅失败", error);
       }
-      if (e.uuid !== selected.value?.uuid) return;
-      statusText.value = stateText(e.state);
-      launchStage.value = e.state;
-      statePct.value = e.progress ?? null;
-    }),
-    onGameExit((e) => {
+    });
+}
+
+async function subscribeEvents() {
+  listenLaunchState();
+  const fns = await Promise.all(
+    [
+      onGameExit((e) => {
       // 先收状态：后台实例退出时也要把按钮/绿点放开，不能只在选中时才清
       clearLaunching(e.uuid);
       // 非 0 退出：不管退出的是不是当前选中的实例，都自动开日志看崩溃
@@ -1607,8 +1657,14 @@ async function subscribeEvents() {
     onGuiViewModeChange((v) => {
       viewMode.value = v;
     }),
-  ]);
-  unlistens.push(...fns);
+    ].map((p) =>
+      p.catch((error) => {
+        console.error("[MainWindow] 事件订阅失败", error);
+        return null;
+      }),
+    ),
+  );
+  unlistens.push(...fns.filter((fn): fn is () => void => fn !== null));
 }
 
 // ================= 初始化 =================
@@ -1786,10 +1842,13 @@ function openFeedback() {
 // ================= 数据加载 =================
 
 async function loadInstances() {
-  instances.value = (await api.getInstances()).map((i) =>
-    // 启动中的实例后端还没登记成运行中，别让它在这一刻变回可点
-    launching.value.has(i.uuid) ? { ...i, running: true } : i,
-  );
+  const list = await api.getInstances();
+  // 启动中的实例后端还没登记成运行中，别让它在这一刻变回可点。
+  // 后端 DTO 也带 launching：窗口重载 / 事件错过时靠它恢复按钮。
+  // 列表是当前真相：launching 由后端按"进程没起来"判定，事件错过时也能恢复 / 清掉
+  const active = new Set(list.filter((i) => i.launching).map((i) => i.uuid));
+  launching.value = active;
+  instances.value = list.map((i) => (active.has(i.uuid) ? { ...i, running: true } : i));
   instancesLoaded.value = true;
   // 保留当前选中；不自动选中实例（默认停在启动器主页）
   if (selected.value) {
@@ -1797,6 +1856,7 @@ async function loadInstances() {
     if (now) selected.value = now;
     else selected.value = null;
   }
+  if (selected.value) void syncLaunchState(selected.value.uuid);
 }
 
 /**
@@ -2014,7 +2074,12 @@ async function handleStartArg() {
   await launch();
 }
 
-async function launch() {
+/**
+ * 启动选中实例
+ *
+ * - `kind`: 用哪个图形调试器启动；不传就是普通启动
+ */
+async function launch(kind: "renderdoc" | "nsight" | null = null) {
   if (!selected.value || selected.value.running) return;
   if (offlineLaunchBlocked.value) {
     showToast(t("err.offlineNeedPremium"));
@@ -2022,11 +2087,11 @@ async function launch() {
   }
   const uuid = selected.value.uuid;
   markLaunching(uuid);
-  statusText.value = t("launch.launching");
+  statusText.value = kind ? t("debugger.preparing") : t("launch.launching");
   launchStage.value = "";
   statePct.value = null;
   try {
-    if (!(await launchGame(uuid))) {
+    if (!(await launchGame(uuid, undefined, kind === "renderdoc", kind === "nsight"))) {
       clearLaunching(uuid);
       statusText.value = t("launch.ready");
       return;
@@ -2035,6 +2100,29 @@ async function launch() {
     clearLaunching(uuid);
     statusText.value = t("launch.failed");
     showToast(t("launch.error", { msg: tErr(e) }));
+  }
+}
+
+/** 调试器弹窗是否打开：选哪个调试器，或只生成启动指令 */
+const debuggerAsk = ref(false);
+
+/** 本机装的 Nsight Graphics；没装为 null，弹窗里就不出那个子选项 */
+const nsightInstall = ref<NsightInstallDto | null>(null);
+/** 本机有没有比 RenderDoc 多出来的调试器：有就把入口改名成「从调试器启动」 */
+const hasNsight = computed(() => !!nsightInstall.value);
+
+/** 右键菜单 / 按钮的调试器入口；非 Windows 不提供。选择交给弹窗，见 DebuggerLaunchModal */
+function launchDebugger() {
+  if (!renderdocSupported || !selected.value || selected.value.running) return;
+  debuggerAsk.value = true;
+}
+
+/** 拉一次本机的调试器情况；失败按没装处理，不影响普通启动 */
+async function loadDebuggers() {
+  try {
+    nsightInstall.value = (await api.detectDebuggers()).nsight;
+  } catch {
+    nsightInstall.value = null;
   }
 }
 
@@ -2087,6 +2175,8 @@ const rootEl = ref<HTMLElement | null>(null);
 // 加载期间标题栏的平台口径：macOS 的插件按钮占住左端、全屏还要让出刘海，
 // 与 MainTopbar 同一套，见 main-window.css 的 .boot-head
 const isMac = detectOs() === "macos";
+/** RenderDoc 有 Windows / Linux x64 包；macOS 上不提供入口 */
+const renderdocSupported = detectOs() !== "macos";
 const bootFullscreen = useWindowFullscreen();
 const bootPluginControls = computed(() => isMac && titleBarStyle === "macos");
 
@@ -2096,10 +2186,22 @@ const bootPluginControls = computed(() => isMac && titleBarStyle === "macos");
 useWindowDecoration(rootEl);
 
 // 从方块窗口渲染完回来时刷新一次：这个入口只在方块列表可用时出现
-onActivated(() => void refreshBlocksRendered());
+onActivated(() => {
+  void refreshBlocksRendered();
+  onWindowFocus();
+});
+
+/** 回到前台：重拉列表并补一次当前实例的启动阶段 */
+function onWindowFocus() {
+  void loadInstances();
+}
 
 onMounted(async () => {
   subscribeEvents();
+  // 本机装没装 Nsight Graphics：界面上的调试器入口按它换文案，弹窗按它多一个子选项
+  void loadDebuggers();
+  // 多窗口模式下主窗口可能被日志窗口盖住：回到前台时补一次启动阶段
+  window.addEventListener("focus", onWindowFocus);
   // macOS 菜单栏：动作 id 见 mml-gui 的 menu 模块
   trackAsync(
     onMenuAction((action) => {
@@ -2149,6 +2251,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   gone = true;
+  window.removeEventListener("focus", onWindowFocus);
   unlistens.forEach((fn) => fn());
   document.removeEventListener("click", onDocClick);
   document.removeEventListener("keydown", onDocKeyDown);
@@ -2330,6 +2433,13 @@ onMounted(async () => {
                   <BaseButton size="sm" class="has-text" :aria-label="t('actions.manageResource')" :disabled="!selected"
                     @click="onAction('manageResource')">
                     <GlyphIcon name="package" :size="15" :weight="1.8" /> {{ t("actions.manageResource") }}
+                  </BaseButton>
+                  <!-- 图形调试器启动：RenderDoc 首次会下载；本机装了 Nsight Graphics 时入口改成「从调试器启动」 -->
+                  <BaseButton v-if="renderdocSupported" size="sm" class="icon-btn-head"
+                    v-tip="hasNsight ? t('debugger.entryTip') : t('launch.renderdocTip')"
+                    :aria-label="hasNsight ? t('debugger.entry') : t('launch.renderdoc')"
+                    :disabled="!selected || offlineLaunchBlocked || isLaunching" @click="launchDebugger">
+                    <GlyphIcon name="bug" :size="15" :weight="1.8" />
                   </BaseButton>
                   <!-- 实例日志：主页面不展示日志内容，直接开独立日志窗口 -->
                   <BaseButton size="sm" class="icon-btn-head" v-tip="t('detail.logs')" :aria-label="t('detail.logs')"
@@ -2607,7 +2717,8 @@ onMounted(async () => {
       </div>
 
       <!-- ===== 右键菜单（MainCtxMenu 组件） ===== -->
-      <MainCtxMenu :menu="ctxMenu" :groups="groups" @close="closeCtxMenu" @select-all="onGroupSelectAll"
+      <MainCtxMenu :menu="ctxMenu" :groups="groups" :renderdoc-available="renderdocSupported"
+        :nsight-available="hasNsight" @close="closeCtxMenu" @select-all="onGroupSelectAll"
         @launch-group="launchGroupAll" @move-group="onMoveGroupClick" @delete-group="onDeleteGroup"
         @inst-action="onInstMenuAction" @multi-move="openMoveGroupPicker(null)" @multi-delete="onMultiDelete"
         @multi-launch="multiLaunch" />
@@ -2700,6 +2811,10 @@ onMounted(async () => {
         </BaseButton>
       </div>
     </BaseModal>
+
+    <!-- ===== 图形调试器：选哪个调试器启动，或只生成界面要填的参数 ===== -->
+    <DebuggerLaunchModal :open="debuggerAsk && !!selected" :uuid="selected?.uuid ?? ''" :nsight="hasNsight"
+      @close="debuggerAsk = false" @launch="launch($event)" />
 
     <!-- ===== 修改实例图标：右键实例 → 选择图片 → 截图范围 ===== -->
     <IconPickModal v-if="iconPickInst" :uuid="iconPickInst.uuid" :name="iconPickInst.name" :path="iconPickPath"

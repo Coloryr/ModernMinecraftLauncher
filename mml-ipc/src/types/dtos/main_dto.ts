@@ -66,6 +66,22 @@ export type StateEvent = {
   progress: number | null,
 };
 
+export type RenderDocLaunchDto = {
+  executable: string,
+  workingDir: string,
+  arguments: string,
+  environment: string[],
+};
+
+export type DebuggerInfoDto = {
+  nsight: NsightInstallDto | null,
+};
+
+export type NsightInstallDto = {
+  cli: string,
+  gui: string | null,
+};
+
 export type ExitEvent = {
   uuid: string,
   code: number,

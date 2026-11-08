@@ -170,8 +170,6 @@ impl InstanceSettingObj {
             phase(AddModPackState::CheckFile);
         }
         let old = self.get_old_serverpack()?;
-        // 旧清单里被移除、且要求删目录的配置目录：后面判断子目录要不要跟着重解时要用
-        let mut removed_dirs: Vec<String> = Vec::new();
 
         let game_path = self.get_game_path();
         let temp_path = self.get_temp_path();
@@ -233,21 +231,6 @@ impl InstanceSettingObj {
                 delete_with_disabled(&target);
                 // 服务器包同步会删掉客户端里的旧模组，映射记录也要一起清
                 mml_link::remove_link(self.uuid, &self.get_base_path(), &target);
-            }
-
-            // 删除已移除的配置文件，仅删除由该配置独享的目录；先删更深的，
-            // 否则父目录进回收站后子目录已经不存在
-            let mut dirs: Vec<&ServerArchiveItemObj> = plan.dirs.clone();
-            dirs.sort_by_key(|item| std::cmp::Reverse(item.dir.matches('/').count()));
-            for item in dirs {
-                if cancel.is_cancelled() {
-                    return Err(ErrorType::TaskCancel);
-                }
-                let dir = paths::file_path(&game_path, &item.dir)?;
-                if dir.exists() {
-                    path_helper::move_to_trash(dir)?;
-                }
-                removed_dirs.push(item.dir.clone());
             }
         }
 
@@ -325,7 +308,7 @@ impl InstanceSettingObj {
             })
             .unwrap_or_default();
 
-        // 先判断哪些压缩包可以跳过。父包被重新解压（Over）或被删除时，
+        // 先判断哪些压缩包可以跳过。父包会被重新解压（Over）时，
         // 子目录即使哈希没变也必须重解，否则父包会把它擦掉。
         let mut skipped: HashSet<&str> = HashSet::new();
         for item in &new_pack.archive_list {
@@ -337,12 +320,13 @@ impl InstanceSettingObj {
                 skipped.insert(item.dir.as_str());
             }
         }
-        let mut cleared: Vec<&str> = removed_dirs.iter().map(String::as_str).collect();
-        for item in &new_pack.archive_list {
-            if !skipped.contains(item.dir.as_str()) && item.delete_old {
-                cleared.push(item.dir.as_str());
-            }
-        }
+        // 条目从新清单消失不删目录，只有这次会重解的压缩包才需要让子目录跟着重解
+        let cleared: Vec<&str> = new_pack
+            .archive_list
+            .iter()
+            .filter(|item| item.delete_old && !skipped.contains(item.dir.as_str()))
+            .map(|item| item.dir.as_str())
+            .collect();
 
         let mut downloads: Vec<FileItemObj> = Vec::new();
         let mut archives: Vec<(&ServerArchiveItemObj, PathBuf)> = Vec::new();
@@ -445,6 +429,13 @@ impl InstanceSettingObj {
                     error: String::new(),
                 })
             })?;
+
+            // 空包 + 覆盖：旧目录已移走，不再解压出一个空目录
+            if item.delete_old && archive_has_no_files(temp, archive_type) {
+                path_helper::delete(temp)?;
+                continue;
+            }
+
             BaseArchive::decompress(archive_type, temp, &output, None)?;
 
             // 清理临时压缩包
@@ -825,6 +816,23 @@ fn under(dir: &str, ancestor: &str) -> bool {
     dir.starts_with(ancestor) && dir.as_bytes().get(ancestor.len()) == Some(&b'/')
 }
 
+/// 压缩包是否没有任何文件条目
+///
+/// 目录条目不算内容：空包 + 覆盖解压按"删除目录"处理，不再解出一个空目录。
+/// 打不开时按有内容处理，交给正常解压报错，不能把损坏的包当成删除信号。
+///
+/// - `path`: 压缩包路径
+/// - `archive_type`: 压缩包格式
+///
+/// # 返回值
+///
+/// 没有文件条目时返回 `true`
+fn archive_has_no_files(path: &Path, archive_type: ArchiveType) -> bool {
+    BaseArchive::open_readonly_as(path, archive_type)
+        .map(|archive| archive.entries().iter().all(|item| item.is_dir))
+        .unwrap_or(false)
+}
+
 /// 压缩包是否与上一次同步一致且目标目录还在
 ///
 /// 同名、同目标目录、同删除设置，并且 SHA1（没有时 SHA256）相同，目标目录仍存在时，
@@ -1063,5 +1071,25 @@ mod tests {
         assert!(!under("config", "config"));
         assert!(!under("config2", "config"));
         assert!(!under("config/setting", "config2"));
+    }
+
+    /// 空包按删除目录处理；带文件的包不能误判
+    #[test]
+    fn empty_archive_counts_as_directory_delete() {
+        let dir = mml_testutil::temp_path(format!("mml-archive-empty-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let empty = dir.join("empty.zip");
+        drop(BaseArchive::create_empty(ArchiveType::Zip, &empty).unwrap());
+        assert!(archive_has_no_files(&empty, ArchiveType::Zip));
+
+        let full = dir.join("full.zip");
+        let mut archive = BaseArchive::create_empty(ArchiveType::Zip, &full).unwrap();
+        archive.add_data("a.txt", b"x").unwrap();
+        drop(archive);
+        assert!(!archive_has_no_files(&full, ArchiveType::Zip));
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

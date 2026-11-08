@@ -27,6 +27,9 @@ pub struct InstanceInfoDto {
     pub dir: String,
     /// 是否正在运行
     pub running: bool,
+    /// 是否处于启动准备中，进程还没起来
+    #[serde(default)]
+    pub launching: bool,
     /// 整合包平台：CurseForge / Modrinth / McMod / 本地压缩包 / 文件夹
     pub modpack_type: Option<String>,
     /// 整合包项目 ID

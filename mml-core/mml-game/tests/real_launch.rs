@@ -26,7 +26,7 @@ use std::time::{Duration, Instant};
 use mml_auth::LoginObj;
 use mml_config::config_obj::{GCType, ProxyState, ProxyType, RunArgObj};
 use mml_downloader::{DownloadTaskState, IDownloadGui, download_item::DownloadItem};
-use mml_game::game_launch::{AutoJoinType, GameLaunchArg};
+use mml_game::game_launch::{AutoJoinType, GameLaunchArg, LaunchDebugger};
 use mml_game::game_log::GameLog;
 use mml_game::launcher::instance_setting_obj::{AdvanceJvmObj, InstanceSettingObj};
 use mml_game::{InstanceLog, InstanceLogType};
@@ -264,6 +264,7 @@ fn make_launch_arg() -> GameLaunchArg {
         skip_server_pack: false,
         server_pack_skip: Vec::new(),
         server_pack_cancel: None,
+        debugger: LaunchDebugger::None,
     }
 }
 

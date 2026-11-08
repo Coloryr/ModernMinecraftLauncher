@@ -20,7 +20,9 @@ use mml_config::config_obj::{GCType, RunArgObj};
 use mml_names::names;
 use uuid::Uuid;
 
-use crate::game_launch::{AutoJoinType, GameLaunchArg, GameRunObj, InstanceHandle};
+use crate::game_launch::{
+    AutoJoinType, GameLaunchArg, GameRunObj, InstanceHandle, LaunchDebugger,
+};
 use crate::launcher::LogEncoding;
 use crate::launcher::instance_setting_obj::AdvanceJvmObj;
 use crate::test_support::{boot, run_log_texts};
@@ -142,6 +144,7 @@ fn custom_arg_placeholders_replaced() {
         skip_server_pack: false,
         server_pack_skip: Vec::new(),
         server_pack_cancel: None,
+        debugger: LaunchDebugger::None,
     };
 
     let args = instance.make_run_arg(Path::new("java-bin"), &launch_arg, &mut obj, false);
@@ -214,6 +217,7 @@ fn extra_args_logged() {
         skip_server_pack: false,
         server_pack_skip: Vec::new(),
         server_pack_cancel: None,
+        debugger: LaunchDebugger::None,
     };
     let mut launch = GameLaunchObj {
         main_class: "Main".to_string(),
@@ -617,6 +621,7 @@ public static void main(String[] args) {
         skip_server_pack: false,
         server_pack_skip: Vec::new(),
         server_pack_cancel: None,
+        debugger: LaunchDebugger::None,
     };
     let args = instance.make_run_arg(&java, &launch_arg, &mut obj, false);
     assert!(
@@ -639,6 +644,7 @@ public static void main(String[] args) {
         args,
         env: Default::default(),
         admin: false,
+        debugger: LaunchDebugger::None,
     })
     .expect("启动 Java 进程失败");
 

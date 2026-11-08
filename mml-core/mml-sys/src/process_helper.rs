@@ -25,6 +25,8 @@ use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
 
 /// 不给子进程建控制台窗口
 #[cfg(windows)]
@@ -156,7 +158,7 @@ pub fn launch<P: AsRef<Path>>(
     working_dir: P,
     admin: bool,
 ) -> CoreResult<LaunchResult> {
-    launch_inner(path, args, env, working_dir, admin, false)
+    launch_inner(path, args, env, working_dir, admin, false, false)
 }
 
 /// 启动进程，Windows 上不弹控制台窗口
@@ -172,12 +174,29 @@ pub fn launch_hidden<P: AsRef<Path>>(
     working_dir: P,
     admin: bool,
 ) -> CoreResult<LaunchResult> {
-    launch_inner(path, args, env, working_dir, admin, true)
+    launch_inner(path, args, env, working_dir, admin, true, false)
+}
+
+/// 启动进程并让它在 Unix 上独占一个进程组
+///
+/// 用在 RenderDoc 这类会再拉起子进程的工具上：停止时整组结束，避免只杀掉
+/// renderdoccmd 却留下还在跑的游戏。Windows 上等价于 launch_hidden。
+///
+/// 参数含义同 launch。
+pub fn launch_hidden_in_group<P: AsRef<Path>>(
+    path: P,
+    args: Vec<String>,
+    env: HashMap<String, String>,
+    working_dir: P,
+    admin: bool,
+) -> CoreResult<LaunchResult> {
+    launch_inner(path, args, env, working_dir, admin, true, true)
 }
 
 /// 启动进程的实现
 ///
 /// - `hidden`: Windows 上是否隐藏控制台窗口并断开 stdin
+/// - `new_group`: Unix 上是否让子进程自成进程组，停止时可整组结束
 fn launch_inner<P: AsRef<Path>>(
     path: P,
     args: Vec<String>,
@@ -185,7 +204,11 @@ fn launch_inner<P: AsRef<Path>>(
     working_dir: P,
     admin: bool,
     hidden: bool,
+    new_group: bool,
 ) -> CoreResult<LaunchResult> {
+    #[cfg(not(unix))]
+    let _ = new_group;
+
     if admin && !is_run_as_admin() {
         return launch_with_elevation(path, args, env, working_dir);
     }
@@ -194,6 +217,10 @@ fn launch_inner<P: AsRef<Path>>(
     cmd.current_dir(working_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    #[cfg(unix)]
+    if new_group {
+        cmd.process_group(0);
+    }
 
     if hidden {
         // 空设备在 Windows 上算字符设备，`isatty()` 会返回真，脚本里的 input() 照样会打印提示
@@ -253,6 +280,35 @@ pub fn kill_tree(child: &mut Child) -> io::Result<()> {
 
     let _ = child.kill();
     child.wait().map(|_| ())
+}
+
+/// 结束由 launch_hidden_in_group 启动的整组进程
+///
+/// Unix 上子进程是组长，向负 PID 发信号即可带上 RenderDoc 拉起的游戏；
+/// Windows 上仍走 taskkill /T。
+///
+/// - child: 要结束的子进程
+///
+/// # 返回值
+///
+/// 等待进程退出失败时返回错误
+pub fn kill_tree_group(child: &mut Child) -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        let pid = child.id() as i32;
+        if pid > 1 {
+            // SAFETY: 只向本进程组的组长发信号；组长就是这里的子进程
+            unsafe {
+                libc::kill(-pid, libc::SIGKILL);
+            }
+        }
+        let _ = child.kill();
+        child.wait().map(|_| ())
+    }
+    #[cfg(not(unix))]
+    {
+        kill_tree(child)
+    }
 }
 
 /// 以管理员权限启动进程，平台特定实现

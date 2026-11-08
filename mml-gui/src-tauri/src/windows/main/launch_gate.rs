@@ -17,8 +17,10 @@ static GATE: LazyLock<Gate> = LazyLock::new(Gate::default);
 /// 启动、导入与同步共用的互斥状态。
 #[derive(Default)]
 struct State {
-    /// 从读取快照到启动结束的实例。
+    /// 从读取快照到启动线程收工的实例，文件占用按它算。
     launching: HashSet<Uuid>,
+    /// 已经拉起进程的实例：启动后命令可能还在跑，但界面不该再显示"启动中"。
+    started: HashSet<Uuid>,
     /// 正在同步存档，阻止启动与第二次同步。
     syncing: HashSet<Uuid>,
     /// 正在导入或等待重启。
@@ -56,7 +58,9 @@ impl Drop for SyncGuard<'_> {
 
 impl Drop for LaunchGuard<'_> {
     fn drop(&mut self) {
-        self.gate.state.lock().unwrap().launching.remove(&self.uuid);
+        let mut state = self.gate.state.lock().unwrap();
+        state.launching.remove(&self.uuid);
+        state.started.remove(&self.uuid);
     }
 }
 
@@ -109,7 +113,30 @@ impl Gate {
         if mml_game::is_running(&uuid) || !state.launching.insert(uuid) {
             return Err(err_keys::INSTANCE_RUNNING.into());
         }
+        state.started.remove(&uuid);
         Ok(LaunchGuard { gate: self, uuid })
+    }
+
+    /// 实例是否还占着启动线程
+    fn launching(&self, uuid: Uuid) -> bool {
+        self.state.lock().unwrap().launching.contains(&uuid)
+    }
+
+    /// 实例是否还在进程没起来的启动阶段
+    fn starting(&self, uuid: Uuid) -> bool {
+        if mml_game::is_running(&uuid) {
+            return false;
+        }
+        let state = self.state.lock().unwrap();
+        state.launching.contains(&uuid) && !state.started.contains(&uuid)
+    }
+
+    /// 标记进程已经拉起；只对还在启动线程里的实例生效
+    fn mark_started(&self, uuid: Uuid) {
+        let mut state = self.state.lock().unwrap();
+        if state.launching.contains(&uuid) {
+            state.started.insert(uuid);
+        }
     }
 
     /// 预约全局导入：已有导入、启动、同步或运行中的实例时拒绝
@@ -147,9 +174,40 @@ pub(super) fn begin_launch(uuid: Uuid) -> Result<LaunchGuard<'static>, String> {
 ///
 /// # 返回值
 ///
-/// 已登记启动、还没完成启动前返回 true；服务器包同步也在这段时间里
+/// 实例是否仍占着启动线程，包括进程起来后的启动后命令
+///
+/// 文件操作按它判断占用；界面显示用 is_starting，进程起来后就不再显示启动中。
+///
+/// - uuid: 实例 uuid
+///
+/// # 返回值
+///
+/// 启动线程还没收工时返回 true
 pub(crate) fn is_launching(uuid: Uuid) -> bool {
-    GATE.state.lock().unwrap().launching.contains(&uuid)
+    GATE.launching(uuid)
+}
+
+/// 实例是否还在"进程没起来"的启动阶段
+///
+/// 进程已经拉起，或启动线程已经跑了 End / Post 时返回 false。
+/// 界面按钮、实例列表用它，避免启动后命令还没跑完时一直卡在启动中。
+///
+/// - uuid: 实例 uuid
+///
+/// # 返回值
+///
+/// 进程还没起来且启动线程还没跑到 End 时返回 true
+pub(crate) fn is_starting(uuid: Uuid) -> bool {
+    GATE.starting(uuid)
+}
+
+/// 标记实例进程已经拉起
+///
+/// 启动线程还要继续跑启动后命令，文件占用不释放，但界面可以切到"运行中"。
+///
+/// - uuid: 实例 uuid
+pub(crate) fn mark_started(uuid: Uuid) {
+    GATE.mark_started(uuid);
 }
 
 /// 预约服务器包导入

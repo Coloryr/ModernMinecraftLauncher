@@ -107,6 +107,8 @@ pub enum LaunchState {
     Download,
     /// 准备启动参数
     Jvm,
+    /// 准备 RenderDoc
+    RenderDoc,
     /// 启动前运行
     Pre,
     /// 启动后运行
@@ -137,14 +139,15 @@ impl LaunchState {
             LaunchState::ReadInfo => 2,
             LaunchState::Download => 3,
             LaunchState::Jvm => 4,
-            LaunchState::Pre => 5,
-            LaunchState::Post => 6,
-            LaunchState::End => 7,
-            LaunchState::LoadServerPack => 8,
-            LaunchState::CheckServerPack => 9,
-            LaunchState::DownloadServerPack => 10,
+            LaunchState::RenderDoc => 5,
+            LaunchState::Pre => 6,
+            LaunchState::Post => 7,
+            LaunchState::End => 8,
+            LaunchState::LoadServerPack => 9,
+            LaunchState::CheckServerPack => 10,
+            LaunchState::DownloadServerPack => 11,
         };
-        (idx + 1) * 100 / 11
+        (idx + 1) * 100 / 12
     }
 }
 

@@ -123,6 +123,64 @@ pub(super) fn dir_files(base: &Path, dir: &str) -> Result<Vec<PathBuf>, String> 
     Ok(list)
 }
 
+/// 列一个目录下的直接文件，不递归子目录
+///
+/// - `base`: 游戏目录
+/// - `dir`: 目录名，相对游戏目录
+///
+/// # 返回值
+///
+/// 相对游戏目录的文件路径，按路径排序；目录不存在或读不了时返回错误文案
+pub(super) fn dir_direct_files(base: &Path, dir: &str) -> Result<Vec<PathBuf>, String> {
+    let root = relative(base, dir)?;
+    let path = base.join(&root);
+    if !path.is_dir() {
+        return Err(err_keys::SERVER_INSTANCE_DIR.to_string());
+    }
+    let mut list = Vec::new();
+    for item in fs::read_dir(&path).map_err(|e| e.to_string())? {
+        let Ok(item) = item else {
+            continue;
+        };
+        if !item.path().is_file() {
+            continue;
+        }
+        let rel = item
+            .path()
+            .strip_prefix(base)
+            .map_err(|_| err_keys::FILE_NAME.to_string())?
+            .to_path_buf();
+        list.push(rel);
+    }
+    list.sort();
+    Ok(list)
+}
+
+/// 去掉取消勾选的文件；目录路径按前缀排除
+///
+/// - `base`: 游戏目录
+/// - `list`: 相对游戏目录的文件列表，原地删减
+/// - `exclude`: 取消勾选的路径，相对游戏目录
+///
+/// # 返回值
+///
+/// 路径非法时返回错误文案
+pub(super) fn retain_excluded(
+    base: &Path,
+    list: &mut Vec<PathBuf>,
+    exclude: &[String],
+) -> Result<(), String> {
+    if exclude.is_empty() {
+        return Ok(());
+    }
+    let mut excluded = Vec::with_capacity(exclude.len());
+    for item in exclude {
+        excluded.push(relative(base, item)?);
+    }
+    list.retain(|rel| !excluded.iter().any(|item| rel == item || rel.starts_with(item)));
+    Ok(())
+}
+
 /// 校验一个单个文件并转成相对路径
 ///
 /// - `base`: 游戏目录

@@ -46,6 +46,7 @@ pub fn main_get_instances() -> Vec<InstanceInfoDto> {
                 loader_version: inst.loader_version.clone(),
                 dir: inst.dir.clone(),
                 running: mml_game::is_running(&inst.uuid),
+                launching: crate::windows::main::launch_gate::is_starting(inst.uuid),
                 modpack_type: inst.is_modpack.then(|| inst.modpack_type.to_string()),
                 pid: inst.pid.clone(),
                 fid: inst.fid.clone(),

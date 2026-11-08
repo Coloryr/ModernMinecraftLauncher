@@ -16,6 +16,8 @@ pub const UUID_CONFLICT: &str = "err.uuidConflict";
 pub const GAME_NOT_FOUND: &str = "err.gameNotFound";
 /// 实例已在运行中
 pub const INSTANCE_RUNNING: &str = "err.instanceRunning";
+/// 本机没有找到 Nsight Graphics
+pub const NSIGHT_MISSING: &str = "err.nsightMissing";
 /// 右键「进入存档」时那个存档已经不在了（被删或改名）
 pub const WORLD_GONE: &str = "err.worldGone";
 /// 实例正在下载或处理任务，暂时不能删

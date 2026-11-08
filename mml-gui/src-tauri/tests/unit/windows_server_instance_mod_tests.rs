@@ -43,7 +43,7 @@ fn options(
             .map(|(dir, mode)| ServerInstanceConfigDto {
                 dir: dir.to_string(),
                 mode: mode.to_string(),
-                delete_old: true,
+                exclude: Vec::new(),
             })
             .collect(),
         base_files: Vec::new(),
@@ -74,7 +74,7 @@ fn contents(base: &Path, options: &ServerInstanceOptionsDto) -> Contents {
             .map(|item| ConfigDir {
                 dir: item.dir.clone(),
                 mode: ConfigMode::parse(&item.mode).unwrap(),
-                delete_old: item.delete_old,
+                exclude: item.exclude.clone(),
             })
             .collect(),
         packs: options
@@ -121,21 +121,215 @@ fn online(file: &str, pid: &str, fid: &str) -> OnlineInfoObj {
 }
 
 #[test]
-fn config_dir_allows_only_one_level() {
+fn config_dir_allows_nested_dirs() {
     assert_eq!(config_dir("config").unwrap(), "config");
     assert_eq!(config_dir("config\\setting").unwrap(), "config/setting");
+    assert_eq!(
+        config_dir("config/setting/deep").unwrap(),
+        "config/setting/deep"
+    );
     for bad in [
         "",
         "config/",
         "/config",
         "config//setting",
-        "config/setting/deep",
         ".",
         "..",
         "config/..",
     ] {
         assert!(config_dir(bad).is_err(), "{bad}");
     }
+}
+
+/// 「本目录」列文件时不含子目录
+#[test]
+fn dir_direct_files_skip_subdirectories() {
+    crate::test_support::ensure_boot();
+    let base = crate::test_support::temp_dir("server-instance-config-direct");
+    fs::create_dir_all(base.join("config").join("sub")).unwrap();
+    fs::write(base.join("config").join("a.toml"), b"a").unwrap();
+    fs::write(base.join("config").join("b.toml"), b"b").unwrap();
+    fs::write(base.join("config").join("sub").join("c.toml"), b"c").unwrap();
+
+    assert_eq!(
+        files::dir_direct_files(&base, "config").unwrap(),
+        vec![
+            PathBuf::from("config/a.toml"),
+            PathBuf::from("config/b.toml"),
+        ],
+        "只列当前层的文件"
+    );
+    assert_eq!(
+        files::dir_files(&base, "config").unwrap(),
+        vec![
+            PathBuf::from("config/a.toml"),
+            PathBuf::from("config/b.toml"),
+            PathBuf::from("config/sub/c.toml"),
+        ],
+        "整包 / 整目录才递归"
+    );
+    assert!(files::dir_direct_files(&base, "missing").is_err());
+
+    crate::test_support::cleanup(&[&base]);
+}
+
+/// 「压缩包本目录同步」只打当前层的文件，且不删玩家原有目录
+#[test]
+fn self_archive_only_packs_direct_files() {
+    crate::test_support::ensure_boot();
+    let instance = crate::test_support::temp_dir("server-instance-config-self");
+    let base = instance.join(names::GAME_DIR);
+    let out = crate::test_support::temp_dir("server-instance-config-self-out");
+    fs::create_dir_all(base.join("config").join("sub")).unwrap();
+    fs::write(base.join("config").join("a.toml"), b"a").unwrap();
+    fs::write(base.join("config").join("sub").join("c.toml"), b"c").unwrap();
+
+    let mut game = game();
+    game.dir = instance.to_string_lossy().to_string();
+    let options = options(&[], &[("config", "archiveSelf")], &[]);
+    let contents = contents(&base, &options);
+    generate_mml(
+        &game,
+        &HashMap::new(),
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    let pack: ServerPackObj =
+        serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
+    let archive = pack.archive_list.first().expect("应写出配置压缩包");
+    assert!(!archive.delete_old, "本目录同步不能删掉子目录");
+    let zip = mml_base::archives::BaseArchive::open_readonly(out.join("config.zip")).unwrap();
+    let names: Vec<&str> = zip.entries().iter().map(|item| item.name.as_str()).collect();
+    assert_eq!(names, vec!["a.toml"], "压缩包只装当前层的文件");
+
+    crate::test_support::cleanup(&[&instance, &out]);
+}
+
+/// 整包同步可以取消勾选单个文件；本目录同步不受更深处的排除影响
+#[test]
+fn config_exclusions_filter_packed_files() {
+    crate::test_support::ensure_boot();
+    let instance = crate::test_support::temp_dir("server-instance-config-exclude");
+    let base = instance.join(names::GAME_DIR);
+    let out = crate::test_support::temp_dir("server-instance-config-exclude-out");
+    fs::create_dir_all(base.join("config").join("sub")).unwrap();
+    fs::write(base.join("config").join("a.toml"), b"a").unwrap();
+    fs::write(base.join("config").join("b.toml"), b"b").unwrap();
+    fs::write(base.join("config").join("sub").join("c.toml"), b"c").unwrap();
+
+    let mut game = game();
+    game.dir = instance.to_string_lossy().to_string();
+
+    // 整包：取消 b.toml 后只打 a.toml 与子目录
+    let mut all_options = options(&[], &[("config", "archiveAll")], &[]);
+    all_options.configs[0].exclude = vec!["config/b.toml".to_string()];
+    let all_contents = contents(&base, &all_options);
+    generate_mml(
+        &game,
+        &HashMap::new(),
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &all_options,
+        &all_contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+    assert!(out.join(names::SERVER_FILE).is_file());
+    let zip = mml_base::archives::BaseArchive::open_readonly(out.join("config.zip")).unwrap();
+    let names: Vec<&str> = zip.entries().iter().map(|item| item.name.as_str()).collect();
+    assert_eq!(names, vec!["a.toml", "sub/c.toml"]);
+
+    // 本目录：b.toml 仍被排除，子目录里的 c.toml 不归它管
+    let out2 = crate::test_support::temp_dir("server-instance-config-exclude-out-2");
+    let mut self_options = options(&[], &[("config", "archiveSelf")], &[]);
+    self_options.configs[0].exclude = vec!["config/b.toml".to_string()];
+    let self_contents = contents(&base, &self_options);
+    generate_mml(
+        &game,
+        &HashMap::new(),
+        &base,
+        &out2,
+        "https://example.invalid/pack",
+        &self_options,
+        &self_contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+    let zip = mml_base::archives::BaseArchive::open_readonly(out2.join("config.zip")).unwrap();
+    let names: Vec<&str> = zip.entries().iter().map(|item| item.name.as_str()).collect();
+    assert_eq!(names, vec!["a.toml"]);
+
+    // 整包全取消勾选：不写空包，客户端目录不会被误删
+    let out3 = crate::test_support::temp_dir("server-instance-config-exclude-out-3");
+    let mut none_options = options(&[], &[("config", "archiveAll")], &[]);
+    none_options.configs[0].exclude = vec![
+        "config/a.toml".to_string(),
+        "config/b.toml".to_string(),
+        "config/sub/c.toml".to_string(),
+    ];
+    let none_contents = contents(&base, &none_options);
+    generate_mml(
+        &game,
+        &HashMap::new(),
+        &base,
+        &out3,
+        "https://example.invalid/pack",
+        &none_options,
+        &none_contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+    let pack: ServerPackObj =
+        serde_json::from_slice(&fs::read(out3.join("server.json")).unwrap()).unwrap();
+    assert!(pack.archive_list.is_empty(), "全取消勾选不能变成删除目录");
+    assert!(!out3.join("config.zip").exists());
+
+    crate::test_support::cleanup(&[&instance, &out, &out2, &out3]);
+}
+
+/// 「删除目录」产出空压缩包并带 Over，客户端据此删掉目录
+#[test]
+fn delete_mode_writes_empty_archive_with_over() {
+    crate::test_support::ensure_boot();
+    let instance = crate::test_support::temp_dir("server-instance-config-delete");
+    let base = instance.join(names::GAME_DIR);
+    let out = crate::test_support::temp_dir("server-instance-config-delete-out");
+    fs::create_dir_all(base.join("config")).unwrap();
+    fs::write(base.join("config").join("a.toml"), b"a").unwrap();
+
+    let mut game = game();
+    game.dir = instance.to_string_lossy().to_string();
+    let options = options(&[], &[("config", "delete")], &[]);
+    let contents = contents(&base, &options);
+    let result = generate_mml(
+        &game,
+        &HashMap::new(),
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    let pack: ServerPackObj =
+        serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
+    let archive = pack.archive_list.first().expect("应写出删除用的压缩包");
+    assert_eq!(archive.file, "config.zip");
+    assert!(archive.delete_old, "删除目录需要 Over=true");
+    let zip = mml_base::archives::BaseArchive::open_readonly(out.join("config.zip")).unwrap();
+    assert!(zip.entries().is_empty(), "删除目录的包不能带文件");
+    assert!(result.files.iter().any(|name| name == "config.zip"));
+
+    crate::test_support::cleanup(&[&instance, &out]);
 }
 
 #[test]
@@ -499,42 +693,6 @@ fn mml_resource_packs_are_hosted_per_file() {
 
     crate::test_support::cleanup(&[&base, &out]);
 }
-
-/// 压缩包同步可以关掉「删除原有目录」，清单里的 Over 随之为 false
-#[test]
-fn mml_archive_delete_old_follows_option() {
-    crate::test_support::ensure_boot();
-    let base = crate::test_support::temp_dir("server-instance-config-keep");
-    let out = crate::test_support::temp_dir("server-instance-config-keep-out");
-    fs::create_dir_all(base.join("config")).unwrap();
-    fs::write(base.join("config/a.toml"), b"a").unwrap();
-
-    let mut options = options(&[], &[("config", "archive")], &[]);
-    options.configs[0].delete_old = false;
-    let contents = contents(&base, &options);
-    generate_mml(
-        &game(),
-        &HashMap::new(),
-        &base,
-        &out,
-        "https://example.invalid/pack",
-        &options,
-        &contents,
-        &|_, _, _| {},
-    )
-    .unwrap();
-
-    let pack: ServerPackObj =
-        serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
-    assert_eq!(pack.archive_list.len(), 1);
-    assert!(
-        !pack.archive_list[0].delete_old,
-        "关掉删除后 Over 应为 false"
-    );
-
-    crate::test_support::cleanup(&[&base, &out]);
-}
-
 
 /// 选中一级子目录后，父目录的包排除子目录，子目录单独成包并排在父包后面
 #[test]

@@ -62,6 +62,7 @@ fn handle_starts_process_and_forwards_output() {
         args,
         env: HashMap::new(),
         admin: false,
+        debugger: LaunchDebugger::None,
     })
     .expect("启动假游戏进程失败");
 
@@ -90,9 +91,36 @@ fn read_stream_decodes_gbk() {
     // "中文" 的 GBK 字节
     let data: &[u8] = &[0xD6, 0xD0, 0xCE, 0xC4, b'\n'];
 
-    read_process_stream(data, uuid, LogEncoding::GBK, Arc::new(AtomicBool::new(false)));
+    read_process_stream(
+        data,
+        uuid,
+        LogEncoding::GBK,
+        Arc::new(AtomicBool::new(false)),
+        false,
+    );
 
     assert!(log_has(&uuid, "中文"), "GBK 输出应解成中文");
+}
+
+/// renderdoccmd 的命令行回显不能进日志：里面有 access token
+#[test]
+fn renderdoc_launch_line_is_masked() {
+    boot();
+    let uuid = Uuid::new_v4();
+    let data = b"Launching 'java.exe' with params: --accessToken SECRET_TOKEN\n";
+
+    read_process_stream(
+        &data[..],
+        uuid,
+        LogEncoding::UTF8,
+        Arc::new(AtomicBool::new(false)),
+        true,
+    );
+
+    assert!(
+        !log_has(&uuid, "SECRET_TOKEN"),
+        "access token 不能进运行日志"
+    );
 }
 
 /// 每一行输出都要发一次日志事件

@@ -199,6 +199,43 @@ pub struct StateEvent {
     pub progress: Option<u32>,
 }
 
+/// RenderDoc 界面启动要填的参数
+///
+/// 对应 qrenderdoc「Launch Application」的四个输入框，由启动器按真实启动参数生成；
+/// 启动参数里含登录令牌，只在弹窗里给用户复制，不进日志。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenderDocLaunchDto {
+    /// 可执行文件，实际要用的 Java 路径
+    pub executable: String,
+    /// 工作目录，游戏根目录
+    pub working_dir: String,
+    /// 启动参数，已按命令行规则拼成一行
+    pub arguments: String,
+    /// 环境变量，每项形如 `KEY=VALUE`，按变量名排序
+    pub environment: Vec<String>,
+}
+
+/// 本机可用的图形调试器
+///
+/// RenderDoc 由启动器自带，不用检测；Nsight Graphics 只能由用户自己装，装没装要问本机。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DebuggerInfoDto {
+    /// 本机安装的 Nsight Graphics；没装为 null
+    pub nsight: Option<NsightInstallDto>,
+}
+
+/// 本机安装的 Nsight Graphics
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NsightInstallDto {
+    /// 命令行抓帧工具 `ngfx-capture.exe` 的路径
+    pub cli: String,
+    /// 带界面的主程序路径，包里没有时为空
+    pub gui: Option<String>,
+}
+
 /// 游戏退出事件
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]

@@ -320,6 +320,8 @@ pub enum ErrorType {
     SkinBlockError(SkinBlockErrorData),
     /// 找不到合适的Java
     JavaNotFound,
+    /// 当前平台不支持 RenderDoc 启动
+    RenderDocUnsupported,
 
     /// 下载文件覆盖错误
     DownloadFileOverFail(DownloadFileOverFailData),

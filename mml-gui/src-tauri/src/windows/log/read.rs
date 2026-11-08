@@ -328,6 +328,35 @@ pub(crate) fn log_line_from_item(item: &GameLogItemObj) -> LogLine {
             String::new(),
             String::new(),
         ),
+        GameLog::RenderDocLaunch => (
+            item_time(item),
+            LogText::LogRenderDocLaunch.text(),
+            String::new(),
+            String::new(),
+            String::new(),
+        ),
+        GameLog::RenderDoc { path, captures } => (
+            item_time(item),
+            LogText::LogRenderDoc {
+                path: path.display().to_string(),
+                captures: captures.display().to_string(),
+            }
+            .text(),
+            String::new(),
+            String::new(),
+            String::new(),
+        ),
+        GameLog::Nsight { path, captures } => (
+            item_time(item),
+            LogText::LogNsight {
+                path: path.display().to_string(),
+                captures: captures.display().to_string(),
+            }
+            .text(),
+            String::new(),
+            String::new(),
+            String::new(),
+        ),
         GameLog::CheckStart { version, loader } => (
             item_time(item),
             LogText::LogCheckStart {

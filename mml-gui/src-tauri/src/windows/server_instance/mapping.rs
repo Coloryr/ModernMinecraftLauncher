@@ -77,10 +77,10 @@ pub(super) struct Meta {
 pub(super) struct MetaConfig {
     /// 目录名，相对游戏目录
     pub(super) dir: String,
-    /// 同步方式：archive / files
+    /// 同步方式：archiveAll / archiveSelf / filesAll / filesSelf / delete
     pub(super) mode: String,
-    /// 压缩包同步时是否先删旧目录
-    pub(super) delete_old: bool,
+    /// 取消勾选的文件，相对游戏目录
+    pub(super) exclude: Vec<String>,
 }
 
 /// 一条编号记录

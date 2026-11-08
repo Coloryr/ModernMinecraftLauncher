@@ -25,7 +25,7 @@ use mml_game::{
 use mml_names::names;
 use uuid::Uuid;
 
-use super::{config_dir, files, normalize_url};
+use super::{config_dir, files, normalize_url, ConfigMode};
 use crate::{dtos::server_instance_dto::ServerInstanceOptionsDto, err_keys};
 
 /// 内嵌的同步 agent，导入后由 MMC 的 `JvmArgs` 拉起来
@@ -126,7 +126,16 @@ pub(super) fn export_pack(
         }
         for item in &options.configs {
             let dir = config_dir(&item.dir)?;
-            for rel in files::dir_files(&game_path, &dir)? {
+            // 删除目录没有可放进包里的内容，清单里的空压缩包由同步 agent 处理
+            let mut list = match ConfigMode::parse(&item.mode)? {
+                ConfigMode::ArchiveAll | ConfigMode::FilesAll => files::dir_files(&game_path, &dir)?,
+                ConfigMode::ArchiveSelf | ConfigMode::FilesSelf => {
+                    files::dir_direct_files(&game_path, &dir)?
+                }
+                ConfigMode::Delete => continue,
+            };
+            files::retain_excluded(&game_path, &mut list, &item.exclude)?;
+            for rel in list {
                 pending.insert(
                     PathBuf::from(names::GAME_DIR).join(&rel),
                     game_path.join(&rel),

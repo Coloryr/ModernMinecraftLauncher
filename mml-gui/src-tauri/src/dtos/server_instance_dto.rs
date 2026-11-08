@@ -69,19 +69,14 @@ pub struct ServerInstancePickDto {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerInstanceConfigDto {
-    /// 目录名，相对游戏目录，只认顶层目录，如 `config`
+    /// 目录名，相对游戏目录，如 `config`、`config/setting`
     pub dir: String,
-    /// 同步方式：`archive` 打成压缩包，`files` 逐个文件下发
+    /// 同步方式：`archiveAll` / `archiveSelf` / `filesAll` / `filesSelf` / `delete`
     #[serde(default)]
     pub mode: String,
-    /// 压缩包同步时是否先删掉目标目录；默认删，与旧行为一致
-    #[serde(default = "default_true")]
-    pub delete_old: bool,
-}
-
-/// 缺省值：默认删除目标目录
-fn default_true() -> bool {
-    true
+    /// 取消勾选的文件，相对游戏目录；只对这个目录负责的范围生效
+    #[serde(default)]
+    pub exclude: Vec<String>,
 }
 
 /// 生成进度事件，事件名 `server-instance-progress`

@@ -360,6 +360,36 @@ pub enum LogText {
         /// Java 可执行文件路径
         path: String,
     },
+    /// RenderDoc 已启动游戏，启动参数不回显
+    LogRenderDocLaunch,
+    /// RenderDoc 路径与捕获目录
+    LogRenderDoc {
+        /// `renderdoccmd.exe` 路径
+        path: String,
+        /// 捕获文件目录
+        captures: String,
+    },
+    /// Nsight Graphics 路径与捕获目录
+    LogNsight {
+        /// `ngfx-capture.exe` 路径
+        path: String,
+        /// 捕获文件目录
+        captures: String,
+    },
+    /// RenderDoc 捕获已交给 Qt 版界面打开
+    RenderDocOpened {
+        /// 捕获文件路径
+        path: String,
+    },
+    /// RenderDoc 界面启动失败
+    RenderDocOpenFailed {
+        /// 捕获文件路径
+        path: String,
+        /// 启动界面时的错误
+        error: String,
+    },
+    /// 这一局没有产生 RenderDoc 捕获
+    RenderDocNoCapture,
     /// 日志窗口：开始检查游戏文件
     LogCheckStart {
         /// 实例游戏版本
@@ -921,6 +951,20 @@ impl LogText {
             }
             LogText::LogLaunchArgsStart => String::from("下面是实例启动参数："),
             LogText::LogJavaPath { path } => format!("Java 路径：{path}"),
+            LogText::LogRenderDocLaunch => {
+                String::from("RenderDoc 正在启动游戏，启动参数已省略")
+            }
+            LogText::LogRenderDoc { path, captures } => {
+                format!("RenderDoc：{path}，捕获目录：{captures}（游戏内按 F12 捕获）")
+            }
+            LogText::LogNsight { path, captures } => {
+                format!("Nsight Graphics：{path}，捕获目录：{captures}（游戏内按 F11 抓帧）")
+            }
+            LogText::RenderDocOpened { path } => format!("已用 RenderDoc 打开捕获：{path}"),
+            LogText::RenderDocOpenFailed { path, error } => {
+                format!("打开 RenderDoc 捕获失败：{path}，{error}")
+            }
+            LogText::RenderDocNoCapture => String::from("这一局没有产生 RenderDoc 捕获"),
             LogText::LogCheckStart { version, loader } => {
                 format!("开始检查游戏文件：{version} / {loader}")
             }
@@ -1287,6 +1331,22 @@ impl LogText {
             }
             LogText::LogLaunchArgsStart => String::from("Instance launch arguments:"),
             LogText::LogJavaPath { path } => format!("Java path: {path}"),
+            LogText::LogRenderDocLaunch => {
+                String::from("RenderDoc is launching the game; launch arguments are hidden")
+            }
+            LogText::LogRenderDoc { path, captures } => {
+                format!("RenderDoc: {path}, captures: {captures} (press F12 in game to capture)")
+            }
+            LogText::LogNsight { path, captures } => {
+                format!("Nsight Graphics: {path}, captures: {captures} (press F11 in game to capture)")
+            }
+            LogText::RenderDocOpened { path } => format!("opened capture in RenderDoc: {path}"),
+            LogText::RenderDocOpenFailed { path, error } => {
+                format!("failed to open RenderDoc capture: {path}, {error}")
+            }
+            LogText::RenderDocNoCapture => {
+                String::from("no RenderDoc capture was created in this run")
+            }
             LogText::LogCheckStart { version, loader } => {
                 format!("checking game files: {version} / {loader}")
             }

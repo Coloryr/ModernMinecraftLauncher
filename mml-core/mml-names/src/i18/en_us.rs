@@ -32,6 +32,7 @@ impl I18Lang for EnUs {
             InfoType::CoreStop => String::from("M²L stopped"),
             InfoType::TempFile => String::from("Temporary files"),
             InfoType::PythonRuntime => String::from("Python runtime"),
+            InfoType::RenderDoc => String::from("RenderDoc"),
             InfoType::AdoptMmcInstance { name } => format!("adopted MMC instance: {name}"),
             InfoType::ImportLegacyGroups { groups, instances } => format!(
                 "imported legacy group file instgroups.json: {groups} new groups, {instances} instances"
@@ -262,6 +263,9 @@ impl I18Lang for EnUs {
                 DataNotFoundData::Version(ver) => format!("Game version not found: {ver}"),
             },
             ErrorType::JavaNotFound => String::from("No suitable Java found"),
+            ErrorType::RenderDocUnsupported => {
+                String::from("RenderDoc launch is not supported on this platform")
+            }
             ErrorType::GpuNotAvailable => {
                 String::from("No available GPU backend for icon rendering")
             }

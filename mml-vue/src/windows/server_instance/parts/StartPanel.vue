@@ -12,7 +12,7 @@ const {
   mods,
   pickedPacks,
   packs,
-  configs,
+  configCount,
   folder,
   busy,
   ready,
@@ -50,7 +50,7 @@ const {
     </div>
     <div class="si-line">
       {{ t("serverInstance.summaryConfigs") }}{{ t("common.detailSep") }}
-      <code>{{ configs.length }}</code>
+      <code>{{ configCount }}</code>
     </div>
     <div v-if="modChanges" class="si-line">
       {{ t("serverInstance.modChanges") }}{{ t("common.detailSep") }}

@@ -219,6 +219,8 @@ pub async fn lobby_launch_game(app: AppHandle, uuid: String) -> Result<(), Strin
         Vec::new(),
         // 大厅不弹启动命令确认，按实例配置直接执行
         None,
+        // 大厅不是图形调试器的入口
+        mml_game::game_launch::LaunchDebugger::None,
         Some((key, auto)),
     )
     .await

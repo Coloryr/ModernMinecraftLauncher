@@ -12,10 +12,11 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
+use std::time::SystemTime;
 
 use mml_auth::{AuthType, auths, lock_user, locked_by_other, unlock_user};
 use mml_config::config_obj::RunArgObj;
-use mml_game::game_launch::{AutoJoinType, GameLaunchArg, MixinArg};
+use mml_game::game_launch::{AutoJoinType, GameLaunchArg, LaunchDebugger, MixinArg};
 use mml_game::gui_hook::{ILaunchGui, LaunchState, ProcessRunType};
 use mml_game::launcher::instance_setting_obj::{InstanceSettingObj, ServerObj};
 use mml_game::{InstanceExit, game_count, get_running_instances, is_running, stop_game};
@@ -24,7 +25,10 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use crate::dtos::{AutoSaveTargetDto, ErrorEvent, ExitEvent, LaunchCommandDto, StateEvent};
+use crate::dtos::{
+    AutoSaveTargetDto, DebuggerInfoDto, ErrorEvent, ExitEvent, LaunchCommandDto, NsightInstallDto,
+    RenderDocLaunchDto, StateEvent,
+};
 use crate::err_keys;
 use crate::gui_config;
 use crate::i18;
@@ -46,6 +50,18 @@ static LAUNCH_CANCEL: LazyLock<Mutex<HashMap<Uuid, CancellationToken>>> =
 ///
 /// 生命周期与 [`LAUNCH_CANCEL`] 相同：启动线程收工就摘掉，整次启动被取消时两份一起置位。
 static SERVER_PACK_CANCEL: LazyLock<Mutex<HashMap<Uuid, CancellationToken>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// 最近一次启动阶段：窗口重载 / 启动后才打开日志窗口时，靠它补回当前阶段
+///
+/// 只保留"进程还没起来"的阶段；end / post / cancelled / 失败 / 退出都会删掉。
+static LAUNCH_STATES: LazyLock<Mutex<HashMap<Uuid, StateEvent>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// 这一局用 RenderDoc 启动的实例：记下进程起来的时刻
+///
+/// 退出时按它挑出本次产生的捕获，再交给 Qt 版界面；不是 RenderDoc 启动的实例没有这一项。
+static RENDERDOC_SESSIONS: LazyLock<Mutex<HashMap<Uuid, SystemTime>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// 设置里的全局"自动进服"：实例没配自己的加入服务器时用它
@@ -122,6 +138,7 @@ fn ensure_game_lang(inst: &InstanceSettingObj) {
 ///   其余（含 `None`）照旧按发布地址同步；要不要问用户由前端在启动前决定
 /// - `server_pack_skip`: 这次同步里先不更新的文件，取清单里的相对路径
 /// - `run_commands`: 启动前 / 后命令这次执不执行，`Some(false)` 为用户在弹窗里选了跳过
+/// - `renderdoc`: 是否用 RenderDoc 启动
 ///
 /// # 返回值
 ///
@@ -138,7 +155,18 @@ pub async fn main_launch_game(
     server_pack: Option<String>,
     server_pack_skip: Option<Vec<String>>,
     run_commands: Option<bool>,
+    renderdoc: Option<bool>,
+    nsight: Option<bool>,
 ) -> Result<(), String> {
+    // Nsight Graphics 只能由用户自己装，启动时再确认一次本机还在
+    let debugger = if nsight.unwrap_or(false) {
+        let install = mml_tools::nsight::find().ok_or_else(|| err_keys::NSIGHT_MISSING.to_string())?;
+        LaunchDebugger::Nsight(install.cli)
+    } else if renderdoc.unwrap_or(false) {
+        LaunchDebugger::RenderDoc
+    } else {
+        LaunchDebugger::None
+    };
     launch_game(
         app,
         uuid,
@@ -148,6 +176,7 @@ pub async fn main_launch_game(
         server_pack,
         server_pack_skip.unwrap_or_default(),
         run_commands,
+        debugger,
         None,
     )
     .await
@@ -165,6 +194,7 @@ pub async fn main_launch_game(
 /// - `server_pack`: 服务器包处理方式，`Some("skip")` 表示不比对清单直接启动
 /// - `server_pack_skip`: 这次同步里先不更新的文件，取清单里的相对路径
 /// - `run_commands`: 启动前 / 后命令这次执不执行，`Some(false)` 为跳过；`None` 为执行
+/// - `renderdoc`: 是否用 RenderDoc 启动
 /// - `lobby`: 大厅的临时账户与进服方式，`None` 表示走当前账户与常规规则
 ///
 /// # 返回值
@@ -179,6 +209,7 @@ pub(crate) async fn launch_game(
     server_pack: Option<String>,
     server_pack_skip: Vec<String>,
     run_commands: Option<bool>,
+    debugger: LaunchDebugger,
     lobby: Option<(mml_auth::UserKeyObj, AutoJoinType)>,
 ) -> Result<(), String> {
     // 批量资源映射正在搬模组文件，这时启动会和它抢同一批文件
@@ -275,6 +306,8 @@ pub(crate) async fn launch_game(
         app: app.clone(),
         uuid: core.uuid,
         run_commands: run_commands.unwrap_or(true),
+        // 只有 RenderDoc 那一局要在退出后打开捕获；Nsight 由它自己的界面看
+        renderdoc: matches!(debugger, LaunchDebugger::RenderDoc),
     });
     // IPC 服务没起来时不注入 ColorASM，免得游戏连到一个不存在的端口
     let mixin = match (mml_ipc::get_port(), mml_ipc::get_auth_key()) {
@@ -305,6 +338,7 @@ pub(crate) async fn launch_game(
         server_pack_skip,
         // 只跳过这次服务器包同步的令牌；整次启动的取消走 LAUNCH_CANCEL
         server_pack_cancel: Some(pack_cancel),
+        debugger,
     };
 
     // 命令返回后这次启动还要跑完：实例快照与 app 都搬进后台线程，
@@ -663,6 +697,8 @@ pub(crate) fn forward_game_exit(app: &AppHandle, event: &InstanceExit) {
             code: event.code,
         },
     );
+    // RenderDoc 启动的这一局结束了：把本次的捕获交给 Qt 版界面
+    open_renderdoc_capture(app, &event.uuid);
     // 运行态变了：托盘跟着显隐。最后一个实例退出、主界面又已经关掉时，
     // 托盘收掉之后就再没有唤回入口了，直接退出，见 tray::quit_idle
     crate::tray::sync(app);
@@ -672,6 +708,43 @@ pub(crate) fn forward_game_exit(app: &AppHandle, event: &InstanceExit) {
     {
         crate::tray::quit_idle(app);
     }
+}
+
+/// RenderDoc 启动的这一局结束了：用 Qt 版界面打开本次产生的捕获
+///
+/// 没按过 F12、或便携包里没带界面程序时只记一行日志，不当成错误。
+///
+/// - `app`: 应用句柄，用于写日志
+/// - `uuid`: 实例 uuid
+fn open_renderdoc_capture(app: &AppHandle, uuid: &Uuid) {
+    let Some(since) = RENDERDOC_SESSIONS.lock().unwrap().remove(uuid) else {
+        return;
+    };
+    let uuid = uuid.to_string();
+    let app = app.clone();
+    // qrenderdoc 起界面要一两秒，别占着退出轮询线程
+    let _ = std::thread::Builder::new()
+        .name("Mml RenderDoc Capture".to_string())
+        .spawn(move || {
+            let text = match (
+                mml_tools::renderdoc::find_gui(),
+                mml_tools::renderdoc::latest_capture(since),
+            ) {
+                (Some(gui), Some(capture)) => {
+                    let path = capture.to_string_lossy().into_owned();
+                    match std::process::Command::new(&gui).arg(&capture).spawn() {
+                        Ok(_) => LogText::RenderDocOpened { path }.text(),
+                        Err(err) => LogText::RenderDocOpenFailed {
+                            path,
+                            error: err.to_string(),
+                        }
+                        .text(),
+                    }
+                }
+                _ => LogText::RenderDocNoCapture.text(),
+            };
+            emit_log_line(&app, &uuid, &text, false);
+        });
 }
 
 /// 从 panic 载荷里取可读文本，取不到时返回空串
@@ -699,6 +772,8 @@ struct LaunchGuiHook {
     uuid: Uuid,
     /// 这次启动是否执行启动前 / 后命令，用户在弹窗里选了跳过时为 false
     run_commands: bool,
+    /// 这次是否用 RenderDoc 启动：进程起来时登记，退出时按它决定要不要打开捕获
+    renderdoc: bool,
 }
 
 #[async_trait::async_trait]
@@ -709,6 +784,13 @@ impl ILaunchGui for LaunchGuiHook {
         // 与 ColorMC 在拿到进程句柄后调 LaunchDone 同一位置
         if matches!(&state, LaunchState::End) {
             game_count::launch_done(&self.uuid);
+            // RenderDoc 启动的这一局：记下进程起来的时刻，退出时按它挑本次的捕获
+            if self.renderdoc {
+                RENDERDOC_SESSIONS
+                    .lock()
+                    .unwrap()
+                    .insert(self.uuid, SystemTime::now());
+            }
             // 进程真正起来了：托盘这时才出现，关窗之后靠它唤回界面
             crate::tray::sync(&self.app);
         }
@@ -762,6 +844,7 @@ fn state_key(state: &LaunchState) -> &'static str {
         LaunchState::ReadInfo => "readinfo",
         LaunchState::Download => "download",
         LaunchState::Jvm => "jvm",
+        LaunchState::RenderDoc => "renderdoc",
         LaunchState::Pre => "pre",
         LaunchState::Post => "post",
         LaunchState::End => "end",
@@ -777,7 +860,186 @@ fn state_key(state: &LaunchState) -> &'static str {
 /// - `event`: 状态快照，含实例 uuid、状态标识与进度百分比；进度可缺省
 #[gui_macros::emit]
 fn emit_launch_state(app: &AppHandle, event: StateEvent) {
+    if let Ok(uuid) = Uuid::parse_str(&event.uuid) {
+        // End 表示进程已经拉起：启动后命令还没跑完，但界面不再显示启动中
+        if event.state == "end" {
+            launch_gate::mark_started(uuid);
+        }
+        let mut states = LAUNCH_STATES.lock().unwrap();
+        if matches!(event.state.as_str(), "end" | "post" | "cancelled") {
+            states.remove(&uuid);
+        } else {
+            states.insert(uuid, event.clone());
+        }
+    }
     let _ = app.emit(listens::LAUNCH_STATE, event);
+}
+
+/// 检测本机可用的图形调试器
+///
+/// RenderDoc 由启动器自带，不用检测；这里只找 Nsight Graphics——它得用户自己装，
+/// 而且只认 NVIDIA 的默认安装位置。
+///
+/// # 返回值
+///
+/// 见 [`DebuggerInfoDto`]；没装时 `nsight` 为 `None`
+#[gui_macros::ipc_group("main")]
+#[gui_macros::command]
+pub fn main_detect_debuggers() -> DebuggerInfoDto {
+    DebuggerInfoDto {
+        nsight: mml_tools::nsight::find().map(|install| NsightInstallDto {
+            cli: install.cli.to_string_lossy().into_owned(),
+            gui: install.gui.map(|path| path.to_string_lossy().into_owned()),
+        }),
+    }
+}
+
+/// 生成 RenderDoc 界面启动要填的参数
+///
+/// 与正常启动走同一套参数生成：登录、挑 Java、拼 JVM 参数与环境变量，只是不拉起进程。
+/// 生成期间占住实例的启动位，免得和真正的启动同时进行。
+///
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// 见 [`RenderDocLaunchDto`]；实例不存在、没有当前账户或生成参数失败时返回错误
+#[gui_macros::ipc_group("main")]
+#[gui_macros::command]
+pub async fn main_renderdoc_launch_info(uuid: String) -> Result<RenderDocLaunchDto, String> {
+    let id = Uuid::parse_str(&uuid).map_err(|_| err_keys::UUID.to_string())?;
+    let _reservation = launch_gate::begin_launch(id)?;
+    let core = core_instance(&uuid).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())?;
+    let auth = auths::get_current()
+        .and_then(|key| auths::get(&key.uuid, key.auth_type))
+        .ok_or_else(|| err_keys::ACCOUNT_MISSING.to_string())?;
+    if offline_needs_premium(auth.auth_type, auths::check_online_user()) {
+        return Err(err_keys::OFFLINE_NEED_PREMIUM.to_string());
+    }
+
+    let inst = core.instance.read().unwrap().clone();
+    let mut arg = GameLaunchArg {
+        auth,
+        auto: AutoJoinType::None,
+        admin: false,
+        mixin: None,
+        // 只是生成命令：不比对服务器包，也没有启动线程要取消
+        skip_server_pack: true,
+        server_pack_skip: Vec::new(),
+        server_pack_cancel: None,
+        debugger: LaunchDebugger::None,
+    };
+    // 参数生成要跨 await 持有配置的 std 读锁，future 不是 Send，不能直接在命令里跑；
+    // 与启动线程同一个办法：另开一个 current-thread 运行时，在阻塞线程里跑完再把结果带回来
+    let cmd = tauri::async_runtime::spawn_blocking(move || -> Result<_, String> {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|err| err.to_string())?;
+        runtime
+            .block_on(inst.create_game_cmd(&mut arg, &CancellationToken::new(), None))
+            .map_err(i18::get_error)
+    })
+    .await
+    .map_err(|err| err.to_string())??;
+
+    // qrenderdoc 的环境变量框是一行一条 KEY=VALUE，排序后两次生成的结果也一致
+    let mut environment: Vec<String> = cmd
+        .env
+        .iter()
+        .map(|(key, value)| format!("{key}={value}"))
+        .collect();
+    environment.sort();
+
+    Ok(RenderDocLaunchDto {
+        executable: cmd.java.to_string_lossy().into_owned(),
+        working_dir: cmd.dir.to_string_lossy().into_owned(),
+        arguments: quote_args(&cmd.arg),
+        environment,
+    })
+}
+
+/// 把参数列表拼成一行命令行文本
+///
+/// - `args`: 已拆好的参数
+///
+/// # 返回值
+///
+/// 每个参数按 Windows 命令行规则加引号后用空格连接，可直接粘进 qrenderdoc 的「启动参数」
+fn quote_args(args: &[String]) -> String {
+    args.iter()
+        .map(|arg| quote_arg(arg))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// 单个参数按 Windows 命令行规则加引号
+///
+/// 不含空白与引号的参数原样返回；引号与末尾反斜杠按 CRT 规则转义，粘进别的程序解析回来才是原值。
+///
+/// - `arg`: 参数原文
+///
+/// # 返回值
+///
+/// 加好引号的文本
+fn quote_arg(arg: &str) -> String {
+    if !arg.is_empty() && !arg.contains([' ', '\t', '"']) {
+        return arg.to_string();
+    }
+    let mut out = String::with_capacity(arg.len() + 2);
+    out.push('"');
+    let mut pending = 0;
+    for ch in arg.chars() {
+        match ch {
+            '\\' => pending += 1,
+            '"' => {
+                out.push_str(&"\\".repeat(pending * 2 + 1));
+                out.push('"');
+                pending = 0;
+            }
+            _ => {
+                out.push_str(&"\\".repeat(pending));
+                out.push(ch);
+                pending = 0;
+            }
+        }
+    }
+    // 末尾反斜杠要加倍，否则会把收尾的引号转义掉
+    out.push_str(&"\\".repeat(pending * 2));
+    out.push('"');
+    out
+}
+
+/// 清掉某个实例的启动阶段快照
+///
+/// 启动失败的事件没有阶段状态，由 `emit_launch_error` 调这里收尾。
+///
+/// - `uuid`: 实例 uuid
+pub(crate) fn clear_launch_state(uuid: &str) {
+    if let Ok(id) = Uuid::parse_str(uuid) {
+        LAUNCH_STATES.lock().unwrap().remove(&id);
+    }
+}
+
+/// 当前实例还没走完的启动阶段
+///
+/// 窗口重载或日志窗口在启动中途才打开时，前端先用它补一次状态；没有进行中的启动返回 `None`。
+///
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// 见 [`StateEvent`]；不在启动中返回 `None`
+#[gui_macros::ipc_group("main")]
+#[gui_macros::command]
+pub fn main_launch_state(uuid: String) -> Option<StateEvent> {
+    let id = Uuid::parse_str(&uuid).ok()?;
+    // 进程已经起来或预约已释放时快照一定是旧的：顺手清掉，别让按钮停在启动中
+    if !launch_gate::is_starting(id) {
+        LAUNCH_STATES.lock().unwrap().remove(&id);
+        return None;
+    }
+    LAUNCH_STATES.lock().unwrap().get(&id).cloned()
 }
 
 /// 游戏退出事件
@@ -786,6 +1048,9 @@ fn emit_launch_state(app: &AppHandle, event: StateEvent) {
 /// - `event`: 退出信息，含实例 uuid 与进程退出码
 #[gui_macros::emit]
 fn emit_game_exit(app: &AppHandle, event: ExitEvent) {
+    if let Ok(uuid) = Uuid::parse_str(&event.uuid) {
+        LAUNCH_STATES.lock().unwrap().remove(&uuid);
+    }
     let _ = app.emit(listens::GAME_EXIT, event);
 }
 

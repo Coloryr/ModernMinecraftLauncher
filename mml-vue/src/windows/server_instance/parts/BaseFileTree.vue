@@ -126,26 +126,3 @@ watch(
     </div>
   </template>
 </template>
-
-<style scoped>
-/* 箭头占位：文件行也要占同样的宽度，名字才对得齐。收起朝右、展开朝下 */
-.si-caret {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  flex-shrink: 0;
-  color: var(--text-dim);
-  cursor: pointer;
-  transform: rotate(-90deg);
-  transition: transform 0.12s;
-}
-
-.si-caret.open {
-  transform: rotate(0);
-}
-
-.si-name.dir {
-  font-weight: 500;
-}
-</style>

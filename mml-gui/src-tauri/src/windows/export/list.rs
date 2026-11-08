@@ -254,6 +254,41 @@ pub async fn export_list_dir(uuid: String, dir: String) -> Result<Vec<ExportEntr
     .map_err(|e| e.to_string())?
 }
 
+/// 浏览游戏目录下的一个目录，目录大小递归统计
+///
+/// 与 [`export_list_dir`] 的区别只在 `size`：顶层目录也递归统计，给需要显示文件夹大小的树用。
+///
+/// - `uuid`: 实例 uuid
+/// - `dir`: 相对游戏目录的路径；空串表示游戏目录本身
+///
+/// # 返回值
+///
+/// 该目录的直接子项，目录的 `size` 是整棵子树的大小；路径非法或目录不存在返回错误
+#[gui_macros::ipc_group("export")]
+#[gui_macros::command]
+pub async fn export_list_dir_sized(
+    uuid: String,
+    dir: String,
+) -> Result<Vec<ExportEntryDto>, String> {
+    tokio::task::spawn_blocking(move || {
+        let game = instance_snapshot(&uuid)?;
+        let base = game.get_game_path();
+        let path = if dir.trim().is_empty() {
+            base.clone()
+        } else {
+            resolve_under(&base, &dir)?
+        };
+        if !path.is_dir() {
+            return Err(err_keys::FILE_NOT_FOUND.to_string());
+        }
+
+        let online = online_of(&game);
+        list_entries(&path, &base, &online, true, false)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// 浏览实例目录下的一个目录，给「直接压缩」的文件树用
 ///
 /// 与 [`export_list_dir`] 的区别只在根：这里从实例目录（含 `.minecraft`、`game.json`）起，

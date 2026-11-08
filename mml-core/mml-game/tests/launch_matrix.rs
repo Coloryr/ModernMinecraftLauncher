@@ -44,7 +44,7 @@ use std::time::{Duration, Instant};
 use mml_auth::LoginObj;
 use mml_config::config_obj::{GCType, ProxyState, ProxyType, RunArgObj};
 use mml_downloader::{DownloadTaskState, IDownloadGui, download_item::DownloadItem};
-use mml_game::game_launch::{AutoJoinType, GameLaunchArg};
+use mml_game::game_launch::{AutoJoinType, GameLaunchArg, LaunchDebugger};
 use mml_game::launcher::instance_setting_obj::{AdvanceJvmObj, InstanceSettingObj};
 use mml_game::loader::LoaderType;
 use mml_game::loader::loader_versions::get_loader_versions;
@@ -322,6 +322,7 @@ pub async fn launch(version: &str, loader: LoaderType, loader_version: &str) -> 
         skip_server_pack: false,
         server_pack_skip: Vec::new(),
         server_pack_cancel: None,
+        debugger: LaunchDebugger::None,
     };
     let check_started = Instant::now();
     let check = match instance

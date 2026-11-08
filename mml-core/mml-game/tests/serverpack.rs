@@ -98,13 +98,6 @@ fn removed_files(removals: &plan::ServerPackRemovals<'_>) -> Vec<String> {
     v
 }
 
-/// 排序后的"要删除的目录"
-fn removed_dirs(removals: &plan::ServerPackRemovals<'_>) -> Vec<String> {
-    let mut v: Vec<String> = removals.dirs.iter().map(|i| i.dir.clone()).collect();
-    v.sort();
-    v
-}
-
 // ===================== 身份标识 / 哈希 / 来源判定，纯函数 =====================
 
 /// `mod_key`：有 `pid` 用 `pid`，没有才退回文件名
@@ -245,9 +238,9 @@ fn removals_fall_back_to_file_name_without_pid() {
     );
 }
 
-/// 配置目录：只有"新清单里没有 + `delete_old` + `dir` 非空"才删
+/// 配置压缩包条目消失不删目录：不管 delete_old 与 dir 怎么填
 #[test]
-fn removals_of_archive_dirs_follow_delete_old_flag() {
+fn removals_never_include_archive_dirs() {
     let old = pack(
         vec![],
         vec![
@@ -257,14 +250,50 @@ fn removals_of_archive_dirs_follow_delete_old_flag() {
             archive("cfg-d.zip", "scripts", true, ""),
         ],
     );
-    // cfg-d 仍在新清单里 → 不删
+    // cfg-d 仍在新清单里；其余条目消失
     let new = pack(vec![], vec![archive("cfg-d.zip", "scripts", true, "")]);
 
     let r = plan::plan_removals(&old, &new);
-    assert_eq!(
-        removed_dirs(&r),
-        vec!["config"],
-        "delete_old=false / dir 为空 / 仍在新清单里的都不删"
+    assert!(
+        r.dirs.is_empty(),
+        "条目消失只停发文件，客户端已解压的目录与玩家修改要保留"
+    );
+}
+
+/// 同名压缩包仍在新清单里（内容变化）→ 也不产生待删目录，交给解压前的 Over 逻辑
+#[test]
+fn removals_ignore_archive_that_stays_in_pack() {
+    let mut old_archive = archive("cfg.zip", "config", true, "https://cdn/cfg-1.zip");
+    old_archive.sha1 = Some("old-sha1".to_string());
+    let mut new_archive = archive("cfg.zip", "config", true, "https://cdn/cfg-2.zip");
+    new_archive.sha1 = Some("new-sha1".to_string());
+
+    let old = pack(vec![], vec![old_archive]);
+    let new = pack(vec![], vec![new_archive]);
+
+    let r = plan::plan_removals(&old, &new);
+    assert!(
+        r.dirs.is_empty(),
+        "同名条目还在清单里，重解旧目录由 delete_old 的覆盖逻辑负责"
+    );
+}
+
+/// 新清单删掉全部压缩包 → 仍不产生待删目录
+#[test]
+fn removals_keep_archive_dirs_when_all_archives_removed() {
+    let old = pack(
+        vec![],
+        vec![
+            archive("cfg-a.zip", "config", true, ""),
+            archive("cfg-b.zip", "config/setting", true, ""),
+        ],
+    );
+    let new = pack(vec![], vec![]);
+
+    let r = plan::plan_removals(&old, &new);
+    assert!(
+        r.dirs.is_empty(),
+        "整批压缩包下掉也不能清客户端目录"
     );
 }
 

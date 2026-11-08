@@ -62,6 +62,7 @@ pub fn main_create_instance(
         loader_version,
         dir,
         running: false,
+        launching: false,
         modpack_type,
         pid: None,
         fid: None,

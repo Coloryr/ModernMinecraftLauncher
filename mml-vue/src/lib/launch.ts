@@ -17,13 +17,20 @@ import { openWindow } from "../windows/windowManager";
  *
  * - `uuid`: 实例 uuid
  * - `world`: 启动后直接进入的存档目录名，可选；这是用户明确点的「进入存档」，不再问自动进入
+ * - `renderdoc`: 是否用 RenderDoc 启动
+ * - `nsight`: 是否用本机安装的 Nsight Graphics 启动
  *
  * # 返回值
  *
  * 启动请求已交给后端时返回 `true`；用户在任一弹窗里取消返回 `false`；
  * 其它失败抛出后端错误文案
  */
-export async function launchGame(uuid: string, world?: string): Promise<boolean> {
+export async function launchGame(
+  uuid: string,
+  world?: string,
+  renderdoc = false,
+  nsight = false,
+): Promise<boolean> {
   // 启动前检查：有模组却用原版加载器、模组多而最大内存偏低时各问一次
   const check = await api.checkLaunch(uuid).catch(() => null);
   if (check) {
@@ -98,6 +105,8 @@ export async function launchGame(uuid: string, world?: string): Promise<boolean>
       serverPackAction,
       serverPackSkip,
       runCommands,
+      renderdoc,
+      nsight,
     );
   } catch (e) {
     if (String(e) !== "err.accountInUse") throw e;
@@ -116,6 +125,8 @@ export async function launchGame(uuid: string, world?: string): Promise<boolean>
       serverPackAction,
       serverPackSkip,
       runCommands,
+      renderdoc,
+      nsight,
     );
   }
 

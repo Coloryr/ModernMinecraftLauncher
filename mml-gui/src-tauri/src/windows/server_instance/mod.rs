@@ -217,7 +217,7 @@ pub async fn server_instance_get_meta(
                     .map(|item| crate::dtos::server_instance_dto::ServerInstanceConfigDto {
                         dir: item.dir.clone(),
                         mode: item.mode.clone(),
-                        delete_old: item.delete_old,
+                        exclude: item.exclude.clone(),
                     })
                     .collect()
             }),
@@ -280,37 +280,63 @@ pub async fn server_instance_get_snapshot(
 /// 配置文件的同步方式
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ConfigMode {
-    /// 整个目录打成一个压缩包，客户端下载后解压
-    Archive,
-    /// 目录里的文件逐个列进清单，客户端按原路径下载
-    Files,
+    /// 整个子树的文件打成一个压缩包，客户端解压前先删旧目录
+    ArchiveAll,
+    /// 只把本目录的直接文件打成一个压缩包，子目录由各自的条目负责
+    ArchiveSelf,
+    /// 整个子树的文件逐个列进清单，客户端按原路径下载
+    FilesAll,
+    /// 只把本目录的直接文件逐个列进清单
+    FilesSelf,
+    /// 生成一个空压缩包，让客户端删掉这个目录
+    Delete,
 }
 
 impl ConfigMode {
     /// 按前端给的值解析同步方式
     ///
-    /// - `value`: `archive` / `files`；空串按压缩包处理
+    /// `archive` / `files` 是旧版的值，按整包 / 整目录处理。
+    ///
+    /// - `value`: `archiveAll` / `archiveSelf` / `filesAll` / `filesSelf` / `delete`
     ///
     /// # 返回值
     ///
     /// 不认识时返回 `err.serverInstanceMode`
     fn parse(value: &str) -> Result<Self, String> {
         match value.trim() {
-            "" | "archive" => Ok(ConfigMode::Archive),
-            "files" => Ok(ConfigMode::Files),
+            "" | "archive" | "archiveAll" => Ok(Self::ArchiveAll),
+            "archiveSelf" => Ok(Self::ArchiveSelf),
+            "files" | "filesAll" => Ok(Self::FilesAll),
+            "filesSelf" => Ok(Self::FilesSelf),
+            "delete" => Ok(Self::Delete),
             _ => Err(err_keys::SERVER_INSTANCE_MODE.to_string()),
         }
+    }
+
+    /// 是否按压缩包下发；删除目录同样借助空压缩包
+    fn is_archive(self) -> bool {
+        matches!(self, Self::ArchiveAll | Self::ArchiveSelf | Self::Delete)
+    }
+
+    /// 是否先把玩家原有目录删掉
+    fn deletes_old(self) -> bool {
+        matches!(self, Self::ArchiveAll | Self::Delete)
+    }
+
+    /// 是否递归覆盖子目录
+    fn recursive(self) -> bool {
+        matches!(self, Self::ArchiveAll | Self::FilesAll | Self::Delete)
     }
 }
 
 /// 一个要同步的配置目录
 struct ConfigDir {
-    /// 目录名，相对游戏目录，只允许顶层目录
+    /// 目录名，相对游戏目录，如 `config`、`config/setting`
     dir: String,
     /// 同步方式
     mode: ConfigMode,
-    /// 压缩包同步时是否先删除目标目录
-    delete_old: bool,
+    /// 取消勾选的文件，相对游戏目录
+    exclude: Vec<String>,
 }
 
 /// 本次要写进包里的内容
@@ -343,19 +369,18 @@ struct PackPick {
 
 /// 校验并规范化配置目录
 ///
-/// 只允许顶层目录与一级子目录，如 `config` / `config/setting`；更深的目录不接受。
+/// 允许任意层级的子目录，如 `config` / `config/setting/sub`。
 ///
 /// - `value`: 前端给的目录名
 ///
 /// # 返回值
 ///
-/// 统一用 `/` 分隔的目录名；为空、超过两级或含空段 / `.` / `..` 时返回
+/// 统一用 `/` 分隔的目录名；为空或含空段 / `.` / `..` 时返回
 /// `err.serverInstanceDir`
 fn config_dir(value: &str) -> Result<String, String> {
     let dir = value.trim().replace('\\', "/");
     let parts: Vec<&str> = dir.split('/').collect();
     if parts.is_empty()
-        || parts.len() > 2
         || parts
             .iter()
             .any(|part| part.is_empty() || *part == "." || *part == "..")
@@ -394,7 +419,7 @@ fn generate(
         configs.push(ConfigDir {
             dir,
             mode: ConfigMode::parse(&item.mode)?,
-            delete_old: item.delete_old,
+            exclude: item.exclude.clone(),
         });
     }
     let packs = options
@@ -520,10 +545,17 @@ fn generate_mml(
     });
 
     // 先把目录内容列出来：进度总数与后面的打包都要用
-    let mut config_files = Vec::new();
+    let mut config_files: Vec<(&ConfigDir, Vec<PathBuf>)> = Vec::new();
     for config in selected {
-        let mut list = files::dir_files(base, &config.dir)?;
-        // 父目录的包要排掉已单独选中的一级子目录，子目录自己的包负责那部分
+        let mut list = match config.mode {
+            ConfigMode::ArchiveAll | ConfigMode::FilesAll => files::dir_files(base, &config.dir)?,
+            ConfigMode::ArchiveSelf | ConfigMode::FilesSelf => {
+                files::dir_direct_files(base, &config.dir)?
+            }
+            // 删除目录不需要读内容
+            ConfigMode::Delete => Vec::new(),
+        };
+        // 父目录的包要排掉已单独选中的子目录，子目录自己的包负责那部分
         let prefix = format!("{}/", config.dir);
         let children: Vec<&str> = contents
             .configs
@@ -531,19 +563,24 @@ fn generate_mml(
             .map(|item| item.dir.as_str())
             .filter(|dir| dir.starts_with(&prefix) && !dir[prefix.len()..].contains('/'))
             .collect();
-        if !children.is_empty() {
+        if !children.is_empty() && config.mode.recursive() {
             list.retain(|rel| !children.iter().any(|child| rel.starts_with(*child)));
         }
-        config_files.push((config.dir.clone(), config.mode, config.delete_old, list));
+        files::retain_excluded(base, &mut list, &config.exclude)?;
+        // 删除目录与空目录整包同步要留空压缩包；其余情况没有文件就不生成条目。
+        // 整包同步把文件全取消勾选时不写空包，避免误删客户端目录。
+        let keep_empty = matches!(config.mode, ConfigMode::Delete)
+            || (matches!(config.mode, ConfigMode::ArchiveAll) && config.exclude.is_empty());
+        if list.is_empty() && !keep_empty {
+            continue;
+        }
+        config_files.push((config, list));
     }
 
     let total = contents.mods.len()
         + config_files
             .iter()
-            .map(|(_, mode, _, list)| match mode {
-                ConfigMode::Archive => 1,
-                ConfigMode::Files => list.len(),
-            })
+            .map(|(config, list)| if config.mode.is_archive() { 1 } else { list.len() })
             .sum::<usize>()
         + contents.packs.len();
 
@@ -655,54 +692,53 @@ fn generate_mml(
     let mod_changes = compare_mods(&ids, &mod_snapshot);
     ids.set_mods(mod_snapshot);
 
-    for (dir, mode, delete_old, list) in &config_files {
-        match mode {
-            ConfigMode::Archive => {
-                let name = generate::archive_name(dir);
-                progress(now, total, name.clone());
-                now += 1;
+    for (config, list) in &config_files {
+        let dir = &config.dir;
+        if config.mode.is_archive() {
+            let name = generate::archive_name(dir);
+            progress(now, total, name.clone());
+            now += 1;
 
-                let zip = out.join(&name);
-                files::zip_dir(base, dir, list, &zip)?;
-                let sha1 = files::sha1(&zip)?;
-                let assigned =
-                    ids.assign(&format!("config-archive:{dir}"), dir, &sha1);
-                if assigned.changed {
-                    changed.insert(dir.clone());
-                }
-                archives.push(ServerArchiveItemObj {
-                    file: name.clone(),
-                    dir: dir.clone(),
-                    // 由用户在生成窗口里选：勾选时先删目标目录，不勾就解压覆盖
-                    delete_old: *delete_old,
-                    url: format!("{url}/{}", files::encode_url_path(&name)),
-                    sha1: Some(sha1),
-                    sha256: None,
-                });
-                archived += list.len();
-                written.insert(name);
+            // 删除目录也走空压缩包：客户端解压前删掉旧目录，发现包里没有文件就不再解压
+            let zip = out.join(&name);
+            files::zip_dir(base, dir, list, &zip)?;
+            let sha1 = files::sha1(&zip)?;
+            let assigned = ids.assign(&format!("config-archive:{dir}"), dir, &sha1);
+            if assigned.changed {
+                changed.insert(dir.clone());
             }
-            ConfigMode::Files => {
-                for rel in list {
-                    let wire = files::wire_path(rel);
-                    progress(now, total, wire.clone());
-                    now += 1;
-                    let mut item = hosted_item(base, out, rel, url, true, "", "")?;
-                    let assigned = ids.assign(
-                        &format!("config:{wire}"),
-                        &wire,
-                        item.sha1.as_deref().unwrap_or_default(),
-                    );
-                    item.pid = Some(assigned.project_id);
-                    item.fid = Some(assigned.file_id);
-                    if assigned.changed {
-                        changed.insert(wire.clone());
-                        changed.insert(dir.clone());
-                    }
-                    items.push(item);
-                    written.insert(top_of(&wire));
-                }
+            archives.push(ServerArchiveItemObj {
+                file: name.clone(),
+                dir: dir.clone(),
+                // 整包与删除目录先删旧目录；"本目录"只覆盖自己的直接文件，不能动子目录
+                delete_old: config.mode.deletes_old(),
+                url: format!("{url}/{}", files::encode_url_path(&name)),
+                sha1: Some(sha1),
+                sha256: None,
+            });
+            archived += list.len();
+            written.insert(name);
+            continue;
+        }
+
+        for rel in list {
+            let wire = files::wire_path(rel);
+            progress(now, total, wire.clone());
+            now += 1;
+            let mut item = hosted_item(base, out, rel, url, true, "", "")?;
+            let assigned = ids.assign(
+                &format!("config:{wire}"),
+                &wire,
+                item.sha1.as_deref().unwrap_or_default(),
+            );
+            item.pid = Some(assigned.project_id);
+            item.fid = Some(assigned.file_id);
+            if assigned.changed {
+                changed.insert(wire.clone());
+                changed.insert(dir.clone());
             }
+            items.push(item);
+            written.insert(top_of(&wire));
         }
     }
 
@@ -804,7 +840,7 @@ fn generate_mml(
                 .map(|item| mapping::MetaConfig {
                     dir: item.dir.clone(),
                     mode: item.mode.clone(),
-                    delete_old: item.delete_old,
+                    exclude: item.exclude.clone(),
                 })
                 .collect(),
         ),
