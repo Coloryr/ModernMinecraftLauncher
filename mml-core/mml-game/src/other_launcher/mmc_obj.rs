@@ -6,8 +6,20 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct MMCObj {
+    /// 清单格式版本，Prism / MultiMC 只认 1；旧文件没写时按 1 处理
+    #[serde(rename = "formatVersion", default = "default_format_version")]
+    pub format_version: u32,
     /// 组件列表
     pub components: Vec<ComponentsObj>,
+}
+
+/// 缺省清单格式版本
+///
+/// # 返回值
+///
+/// 固定的 1，对应 Prism / MultiMC 的组件清单格式
+fn default_format_version() -> u32 {
+    1
 }
 
 /// 单个组件

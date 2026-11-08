@@ -151,6 +151,7 @@ export default {
   "err.serverInstanceDir": "The config folder or resource pack file does not exist.",
   "err.serverInstanceBaseFile": "Base files must be files next to .minecraft, not inside it.",
   "err.serverInstanceFromServer": "A server instance cannot generate another server instance.",
+  "err.serverInstanceManifest": "The server manifest hasn't been generated yet. Generate it on the Generate page, then export the server pack.",
   "err.serverInstanceProjectIdDuplicate": "Duplicate project ID. Every entry must use a different project ID.",
   "serverPack.importing": "Validating and importing the server package. The launcher will restart when done.",
   "winExport.generateInfo": "Export instance info",
@@ -2600,7 +2601,7 @@ export default {
   "serverInstance.packSaveTitle": "Save server pack",
   "serverInstance.packSaved": "Server pack saved to {file}",
   "serverInstance.packHint":
-    "Export a modpack importable by MMC / Prism / MML launchers: the base pack carries base files only, the complete pack includes everything selected.",
+    "Export a modpack importable by MMC / Prism / MML launchers: the base pack carries base files only, the complete pack includes everything selected. The pack bundles the generated server.json, so generate once before exporting.",
   "serverInstance.packMmlOnly": "The server pack relies on the MML manifest; switch the format to MML and fill in the publish URL.",
 };
 

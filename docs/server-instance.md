@@ -157,11 +157,11 @@
 
 ### 3.8 生成 MMC / Prism 服务器包
 
-「开始生成」页下方随时有两个按钮：**生成服务器包**、**生成服务器包完整**，不必先生成服务器实例，
-只要格式是 MML、发布地址已填即可。产物是一个 zip，
-包内是 MMC 实例结构（顶层一个 `<实例名>/` 目录，含 `mmc-pack.json`、`instance.cfg`、`game.json`
-与 `mml-server-sync.jar`），拖进 MultiMC / Prism 能直接导入，拖进 M²L 会按包内的 `game.json`
-自动识别成实例包。
+「开始生成」页下方随时有两个按钮：**生成服务器包**、**生成服务器包完整**。导出前要先在
+「开始生成」页生成一次，包里会附带生成出来的 `server.json`；格式是 MML、发布地址已填即可。
+产物是一个 zip，包内是 MMC 实例结构（顶层一个 `<实例名>/` 目录，含 `mmc-pack.json`、
+`instance.cfg`、`game.json`、`server.json` 与 `mml-server-sync.jar`），拖进 MultiMC / Prism
+能直接导入，拖进 M²L 会按包内的 `game.json` 自动识别成实例包。
 
 - **内容差别**：**生成服务器包**只含「基础文件」页勾选的内容；**生成服务器包完整**在基础文件之外，
   再带上模组、配置目录、资源包等其余同步内容。包里有什么，取决于「基础文件」「配置文件」页的勾选。
@@ -174,6 +174,8 @@
   `Icon` 指向它；`instance.cfg` 的 `iconKey` 就是图标文件名去掉扩展名（如 `gtnh_icon.png` →
   `gtnh_icon`），MMC / Prism 导入时按它在实例根目录找到同名图片并装进自己的图标库。
 - **不用另发 jar**：`mml-server-sync.jar` 已随启动器 exe 内嵌，生成时从启动器里解出写进包。
+- **带上生成好的 `server.json`**：放在实例根，M²L 与 MMC 侧的同步 agent 第一次同步时
+  拿它当旧清单，删除旧文件、可选模组的启用状态才对得上。没有生成过时导出会直接提示先点「生成」。
 - **和设置里的「服务器包」不是一回事**：这里只出实例包本身，不带启动器配置，也不带 exe；
   带配置与 exe 的分发包见[软件手册第 16 章](README.md#16-服务器包)。
 
@@ -248,11 +250,13 @@ OptiFine、LiteLoader、Cleanroom 与自定义加载器表达不了，生成窗�
 
 用 3.8 的**生成服务器包**（或**生成服务器包完整**）产出的 zip，拖进 MultiMC / Prism 的
 「添加实例 → 从 zip 导入」即可。包内是一个完整的 MMC 实例目录，含 `mmc-pack.json`、
-`instance.cfg`、`game.json` 与 `mml-server-sync.jar`。
+`instance.cfg`、`game.json`、`server.json` 与 `mml-server-sync.jar`。
 
 - **启动前自动同步**：`instance.cfg` 的 `JvmArgs` 带着
   `-javaagent:$INST_DIR/mml-server-sync.jar=<发布地址>/server.json`。游戏 main 之前由 agent
   按清单同步，同步完才进游戏；首次要下基础包，等得久一点是正常的。
+- **包内 `server.json` 只当旧清单**：agent 仍按上面的发布地址拉最新清单；实例根这份是首次
+  同步时用来比对已有文件的，之后不会自己更新。
 - **进度看哪里**：MultiMC / Prism 的 Java 控制台会打印 `[MML-SERVER-SYNC]` 开头的日志，
   同时也写进实例的 `.minecraft/.mml-server-sync/mml-server-sync.log`。下载每秒一条字节进度。
 - **工作目录**：agent 默认把启动器的工作目录当游戏目录（MMC 系列一般就是实例的 `.minecraft`）。

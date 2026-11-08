@@ -595,7 +595,10 @@ fn mmc(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
         gui.update(Some(names::MMCJSON_FILE.to_string()), 0);
     }
 
-    let data = serialize_tools::json_to_bytes(&MMCObj { components })?;
+    let data = serialize_tools::json_to_bytes(&MMCObj {
+        format_version: 1,
+        components,
+    })?;
     zip.add_data(&format!("{inst_dir}{}", names::MMCJSON_FILE), &data)?;
 
     // 图标：MMC 的 iconKey 就是图标文件名去掉扩展名，导入时按它在实例根目录找同名图片；

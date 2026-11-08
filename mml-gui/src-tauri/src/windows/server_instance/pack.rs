@@ -2,7 +2,8 @@
 //!
 //! 把一个本地实例打成 MMC 结构的实例包，同时带一份 `game.json`，MultiMC / Prism 与 M²L
 //! 都能直接导入。包内顶层目录是服务器实例名，`instance.cfg` 用 MMC 变量 `$INST_DIR`
-//! 挂上同步 agent，`game.json` 只带发布地址，导入后由启动器自己同步。
+//! 挂上同步 agent，`game.json` 只带发布地址，导入后由启动器自己同步。包根另放一份
+//! 生成好的 `server.json`，首次同步拿它当旧清单。
 
 use std::{
     collections::BTreeMap,
@@ -19,6 +20,7 @@ use mml_game::{
     launcher::{ModPackType, instance_setting_obj::InstanceSettingObj},
     loader::LoaderType,
     other_launcher::mmc_obj::{ComponentsObj, MMCObj},
+    serverpack::serverpack_obj::ServerPackObj,
 };
 use mml_names::names;
 use uuid::Uuid;
@@ -33,11 +35,12 @@ pub(super) const SYNC_JAR: &[u8] = include_bytes!("../../../resources/mml-server
 const SYNC_JAR_NAME: &str = "mml-server-sync.jar";
 
 /// 自动生成的顶层条目，基础文件勾到同名文件时跳过
-const RESERVED_NAMES: [&str; 4] = [
+const RESERVED_NAMES: [&str; 5] = [
     SYNC_JAR_NAME,
     names::MMCJSON_FILE,
     names::MMCCFG_FILE,
     names::GAME_FILE,
+    names::SERVER_FILE,
 ];
 
 /// 导出服务器包
@@ -68,8 +71,11 @@ pub(super) fn export_pack(
     let base_url = normalize_url(&options.url)?;
     let manifest_url = format!("{base_url}/{}", names::SERVER_FILE);
     let icon = icon_file(game);
+    // 包内带一份生成好的清单：导入后第一次同步拿它当旧清单，删除与可选模组状态才对得上
+    let manifest = read_manifest(options)?;
 
     let data = serialize_tools::json_to_bytes(&MMCObj {
+        format_version: 1,
         components: components(game),
     })
     .map_err(|e| e.to_string())?;
@@ -148,8 +154,8 @@ pub(super) fn export_pack(
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     let inst = format!("{name}/");
-    // 四个自动条目 + 待打包文件；进度条按"当前写到哪个文件"上报
-    let total = 4 + pending.len();
+    // 五个自动条目 + 待打包文件；进度条按"当前写到哪个文件"上报
+    let total = 5 + pending.len();
     let mut zip =
         BaseArchive::create_empty(ArchiveType::Zip, file).map_err(|e| e.to_string())?;
     progress(0, total, names::MMCJSON_FILE.to_string());
@@ -164,6 +170,9 @@ pub(super) fn export_pack(
     progress(3, total, SYNC_JAR_NAME.to_string());
     zip.add_data(&format!("{inst}{SYNC_JAR_NAME}"), SYNC_JAR)
         .map_err(|e| e.to_string())?;
+    progress(4, total, names::SERVER_FILE.to_string());
+    zip.add_data(&format!("{inst}{}", names::SERVER_FILE), &manifest)
+        .map_err(|e| e.to_string())?;
 
     let mut pending_files = Vec::with_capacity(pending.len());
     for (rel, src) in pending {
@@ -176,7 +185,7 @@ pub(super) fn export_pack(
         progress: Arc::clone(&progress),
         total,
     }) as Arc<dyn IBaseArchiveGui>);
-    zip.add_files_reporting(&pending_files, gui, 4)
+    zip.add_files_reporting(&pending_files, gui, 5)
         .map_err(|e| e.to_string())?;
     // 没有待打包文件时上面不会有 update，收尾也要推到 100%
     progress(total, total, String::new());
@@ -320,11 +329,33 @@ fn is_reserved(rel: &Path) -> bool {
         .any(|item| name.eq_ignore_ascii_case(item))
 }
 
+/// 读取已生成的服务器实例清单
+///
+/// 服务器包会把清单放在实例根：M²L 与同步 agent 第一次同步时拿它当旧清单，
+/// 删除旧文件、可选模组的启用状态才对得上。
+///
+/// - `options`: 生成选项，`folder` 是清单所在目录
+///
+/// # 返回值
+///
+/// 清单字节；目录为空、文件不存在或不是合法清单时返回 `err.serverInstanceManifest`
+fn read_manifest(options: &ServerInstanceOptionsDto) -> Result<Vec<u8>, String> {
+    let folder = options.folder.trim();
+    if folder.is_empty() {
+        return Err(err_keys::SERVER_INSTANCE_MANIFEST.to_string());
+    }
+    let path = Path::new(folder).join(names::SERVER_FILE);
+    let data = fs::read(path).map_err(|_| err_keys::SERVER_INSTANCE_MANIFEST.to_string())?;
+    serialize_tools::json_from_bytes::<ServerPackObj>(&data)
+        .map_err(|_| err_keys::SERVER_INSTANCE_MANIFEST.to_string())?;
+    Ok(data)
+}
+
 /// 压缩包逐条写入时的进度回调，转成服务器实例进度事件
 struct PackProgress {
     /// 进度回调：已写条数、总数、当前文件名
     progress: Arc<dyn Fn(usize, usize, String) + Send + Sync>,
-    /// 总条数，含四个自动条目
+    /// 总条数，含五个自动条目
     total: usize,
 }
 

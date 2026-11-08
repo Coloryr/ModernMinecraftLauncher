@@ -1199,6 +1199,14 @@ fn export_pack_writes_thin_and_complete_zips() {
 
     let mut options = options("mml", &["mods/a.jar"], &[("config", "archive")], &[]);
     options.base_files = vec!["server.properties".to_string()];
+    // 服务器包会附带生成好的清单；导出前发布目录里得有它
+    let publish = crate::test_support::temp_dir("server-instance-export-pack-publish");
+    fs::write(
+        publish.join(names::SERVER_FILE),
+        br#"{"Name":"server","Version":"1.21.1","PackVersion":"1.0.0","Files":[]}"#,
+    )
+    .unwrap();
+    options.folder = publish.to_string_lossy().to_string();
 
     let out = crate::test_support::temp_dir("server-instance-export-pack-out");
     let thin = out.join("thin.zip");
@@ -1210,7 +1218,7 @@ fn export_pack_writes_thin_and_complete_zips() {
 
     let in_pack = |item: &str| format!("{}/{}", options.name, item);
 
-    // 服务器包：只有基础文件与四个自动生成条目
+    // 服务器包：只有基础文件与五个自动生成条目
     let thin_zip = mml_base::archives::BaseArchive::open_readonly(&thin).unwrap();
     let thin_names: Vec<&str> = thin_zip.entries().iter().map(|item| item.name.as_str()).collect();
     for item in [
@@ -1218,6 +1226,7 @@ fn export_pack_writes_thin_and_complete_zips() {
         "instance.cfg",
         "game.json",
         "mml-server-sync.jar",
+        "server.json",
         "server.properties",
         "gtnh_icon.png",
     ] {
@@ -1234,9 +1243,15 @@ fn export_pack_writes_thin_and_complete_zips() {
         !thin_names.contains(&in_pack("icon.png").as_str()),
         "图标按原名带，不该再补 icon.png: {thin_names:?}"
     );
+    // 包里的清单就是生成出来的那份，不重新拼
+    assert_eq!(
+        thin_zip.read(&in_pack("server.json")).unwrap(),
+        fs::read(publish.join(names::SERVER_FILE)).unwrap()
+    );
 
     let mmc: MMCObj = serde_json::from_slice(&thin_zip.read(&in_pack("mmc-pack.json")).unwrap())
         .unwrap();
+    assert_eq!(mmc.format_version, 1, "Prism / MultiMC 只认 formatVersion 1");
     let minecraft = mmc
         .components
         .iter()
@@ -1315,6 +1330,6 @@ fn export_pack_writes_thin_and_complete_zips() {
         "没勾的文件不该进包: {complete_names:?}"
     );
 
-    crate::test_support::cleanup(&[&instance, &out]);
+    crate::test_support::cleanup(&[&instance, &publish, &out]);
 }
 

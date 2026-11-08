@@ -200,6 +200,8 @@ pub const SERVER_INSTANCE_PROJECT_ID_DUPLICATE: &str =
     "err.serverInstanceProjectIdDuplicate";
 /// 服务器实例不能再生成服务器实例
 pub const SERVER_INSTANCE_FROM_SERVER: &str = "err.serverInstanceFromServer";
+/// 还没生成服务器实例清单，服务器包里没有可附带的 server.json
+pub const SERVER_INSTANCE_MANIFEST: &str = "err.serverInstanceManifest";
 
 // ---------- 主题包 ----------
 

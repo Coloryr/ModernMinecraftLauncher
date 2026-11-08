@@ -151,6 +151,7 @@ export default {
   "err.serverInstanceDir": "配置目录或资源包文件不存在。",
   "err.serverInstanceBaseFile": "基础文件只能是实例根目录下、.minecraft 之外的文件。",
   "err.serverInstanceFromServer": "服务器实例不能再生成服务器实例。",
+  "err.serverInstanceManifest": "还没有生成服务器实例清单，请先在「开始生成」页生成一次再导出服务器包。",
   "err.serverInstanceProjectIdDuplicate": "项目编号重复，请给每个条目使用不同的项目编号。",
   "serverPack.importing": "正在校验和导入服务器包，完成后将重启启动器。",
   "winExport.generateInfo": "生成实例信息",
@@ -2599,7 +2600,7 @@ export default {
   "serverInstance.packSaveTitle": "保存服务器包",
   "serverInstance.packSaved": "服务器包已保存到 {file}",
   "serverInstance.packHint":
-    "导出 MMC / Prism / MML 启动器可导入的整合包：基础包只带基础文件，完整包包含所有已选内容。",
+    "导出 MMC / Prism / MML 启动器可导入的整合包：基础包只带基础文件，完整包包含所有已选内容；包里附带生成好的 server.json，导出前请先生成一次。",
   "serverInstance.packMmlOnly": "服务器包依赖 MML 清单，请先把格式切到 MML 并填好发布地址",
 };
 
