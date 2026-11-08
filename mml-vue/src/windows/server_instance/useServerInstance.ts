@@ -25,8 +25,6 @@ import type {
   ServerInstanceSnapshotDto,
 } from "../../lib/bindings";
 
-/** 生成格式：mml 写 server.json，hmcl 写 server-manifest.json */
-export type Format = "mml" | "hmcl";
 /** 配置目录的同步方式 */
 export type ConfigMode = "archive" | "files";
 /** 左侧分页 */
@@ -71,7 +69,6 @@ const section = ref<Section>("general");
 
 // ---------------- 总体设定 ----------------
 
-const format = ref<Format>("mml");
 const name = ref("");
 const version = ref("1.0.0");
 const text = ref("");
@@ -207,15 +204,6 @@ const sections = computed<Array<{ id: Section; labelKey: string; icon: "gear" | 
   { id: "start", labelKey: "serverInstance.tab.start", icon: "play" },
 ]);
 
-/** 格式选项 */
-const formatOptions = computed(() => [
-  { value: "mml", label: t("serverInstance.mml") },
-  { value: "hmcl", label: t("serverInstance.hmcl") },
-]);
-
-/** 当前格式的说明 */
-const hint = computed(() => t(`serverInstance.hint.${format.value}`));
-
 /** 还没加进列表的顶层目录 */
 const dirChoices = computed(() =>
   topDirs.value.filter(
@@ -263,10 +251,7 @@ const ready = computed(() => !!currentUuid.value && !!name.value.trim() && !!url
 /** 是否已经选了要打包的东西 */
 const pickedCount = computed(
   () =>
-    pickedMods.value.size +
-    pickedPacks.value.size +
-    configs.value.length +
-    (format.value === "mml" ? pickedBase.value.size : 0),
+    pickedMods.value.size + pickedPacks.value.size + configs.value.length + pickedBase.value.size,
 );
 
 /** 这个模组当前填的下载地址 */
@@ -523,14 +508,12 @@ async function loadInstance(uuid: string) {
   if (seq !== loadSeq) return;
 
   if (meta) {
-    format.value = meta.format === "hmcl" ? "hmcl" : "mml";
     name.value = meta.name || fallbackName;
     version.value = meta.version || "1.0.0";
     text.value = meta.text;
     url.value = meta.url;
     folder.value = meta.folder;
   } else {
-    format.value = "mml";
     version.value = "1.0.0";
     text.value = "";
     url.value = "";
@@ -969,7 +952,6 @@ function hasDuplicateProjectId(): boolean {
  */
 function buildOptions(): ServerInstanceOptionsDto {
   return {
-    format: format.value,
     folder: folder.value.trim(),
     url: url.value.trim(),
     name: name.value.trim(),
@@ -1124,7 +1106,7 @@ onBeforeUnmount(() => {
 
   return {
     instances, currentUuid, section, sections, busy, loading, refreshMods, refreshPacks,
-    format, formatOptions, name, version, text, url, folder, hint, pickFolder,
+    name, version, text, url, folder, pickFolder,
     baseEntries, pickedBase, pickAllBase, toggleBase,
     mods, pickedMods, pickAllMods, toggled, modPidOf, modFidOf, setModId, baseName,
     modIdTypeOf, isCustomType, setModIdType,

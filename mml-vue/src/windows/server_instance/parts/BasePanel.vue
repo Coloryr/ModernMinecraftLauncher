@@ -6,7 +6,7 @@ import { ServerInstanceKey } from "../context";
 import BaseFileTree from "./BaseFileTree.vue";
 const ctx = inject(ServerInstanceKey);
 if (!ctx) throw new Error("server instance context missing");
-const { baseEntries, pickedBase, pickAllBase, toggleBase, format, busy, currentUuid } = ctx;
+const { baseEntries, pickedBase, pickAllBase, toggleBase, busy, currentUuid } = ctx;
 </script>
 
 <template>
@@ -23,7 +23,7 @@ const { baseEntries, pickedBase, pickAllBase, toggleBase, format, busy, currentU
   <div v-if="!baseEntries.length" class="empty-tip">{{ t("serverInstance.baseEmpty") }}</div>
   <div v-else class="si-list">
     <BaseFileTree :uuid="currentUuid" :root="baseEntries" :picked="pickedBase"
-      :disabled="busy || format === 'hmcl'" @toggle="toggleBase" />
+      :disabled="busy" @toggle="toggleBase" />
   </div>
   <p class="field-hint">{{ t("serverInstance.baseHint") }}</p>
   <p class="field-hint">{{ t("serverInstance.baseIconHint") }}</p>

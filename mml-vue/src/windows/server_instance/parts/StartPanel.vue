@@ -7,7 +7,6 @@ const ctx = inject(ServerInstanceKey);
 if (!ctx) throw new Error("server instance context missing");
 const {
   current,
-  format,
   pickedBase,
   pickedMods,
   mods,
@@ -36,10 +35,6 @@ const {
     <div class="si-line">
       {{ t("serverInstance.summaryInstance") }}{{ t("common.detailSep") }}
       <code>{{ current?.name }}</code>
-    </div>
-    <div class="si-line">
-      {{ t("serverInstance.summaryFormat") }}{{ t("common.detailSep") }}
-      <code>{{ format === "mml" ? "MML" : "HMCL" }}</code>
     </div>
     <div class="si-line">
       {{ t("serverInstance.summaryBase") }}{{ t("common.detailSep") }}
@@ -77,12 +72,10 @@ const {
 
   <!-- 三个按钮同一行：左侧导出基础包 / 完整包，右侧生成服务器实例 -->
   <div class="si-actions">
-    <BaseButton size="md" :disabled="busy || packing || !ready || format !== 'mml'"
-      v-tip="format !== 'mml' ? t('serverInstance.packMmlOnly') : ''" @click="exportPack(false)">
+    <BaseButton size="md" :disabled="busy || packing || !ready" @click="exportPack(false)">
       {{ t("serverInstance.packThin") }}
     </BaseButton>
-    <BaseButton size="md" :disabled="busy || packing || !ready || format !== 'mml'"
-      v-tip="format !== 'mml' ? t('serverInstance.packMmlOnly') : ''" @click="exportPack(true)">
+    <BaseButton size="md" :disabled="busy || packing || !ready" @click="exportPack(true)">
       {{ t("serverInstance.packFull") }}
     </BaseButton>
     <BaseButton variant="primary" size="md" class="si-actions-main"

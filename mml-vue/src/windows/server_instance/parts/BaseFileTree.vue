@@ -14,7 +14,7 @@ const props = defineProps<{
   root: ExportEntryDto[];
   /** 已勾选的相对路径，精确匹配 */
   picked: Set<string>;
-  /** 生成中或 HMCL 格式时整棵树不能改 */
+  /** 生成中时整棵树不能改 */
   disabled?: boolean;
 }>();
 

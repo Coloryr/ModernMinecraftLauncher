@@ -1,9 +1,9 @@
 //! 服务器包导出
 //!
-//! 把一个本地实例打成 MMC 结构的实例包，同时带一份 `game.json`，MultiMC / Prism 与 M²L
-//! 都能直接导入。包内顶层目录是服务器实例名，`instance.cfg` 用 MMC 变量 `$INST_DIR`
-//! 挂上同步 agent，`game.json` 只带发布地址，导入后由启动器自己同步。包根另放一份
-//! 生成好的 `server.json`，首次同步拿它当旧清单。
+//! 把一个本地实例打成 MMC 结构的实例包，同时带一份 `game.json`，MultiMC / Prism / HMCL
+//! 与 M²L 都能直接导入。包内顶层目录是服务器实例名，同步 agent 与生成好的 `server.json`
+//! 放在 `.minecraft`，`instance.cfg` 用相对路径挂上 agent：MMC / Prism 的工作目录是
+//! `.minecraft`，HMCL 导入时把 `.minecraft` 内容摊到实例根，两边都能按相对路径找到。
 
 use std::{
     collections::BTreeMap,
@@ -35,8 +35,7 @@ pub(super) const SYNC_JAR: &[u8] = include_bytes!("../../../resources/mml-server
 const SYNC_JAR_NAME: &str = "mml-server-sync.jar";
 
 /// 自动生成的顶层条目，基础文件勾到同名文件时跳过
-const RESERVED_NAMES: [&str; 5] = [
-    SYNC_JAR_NAME,
+const RESERVED_NAMES: [&str; 4] = [
     names::MMCJSON_FILE,
     names::MMCCFG_FILE,
     names::GAME_FILE,
@@ -60,10 +59,6 @@ pub(super) fn export_pack(
     complete: bool,
     progress: Arc<dyn Fn(usize, usize, String) + Send + Sync>,
 ) -> Result<(), String> {
-    // 两种包都靠 MML 的 server.json 同步，别的格式没有可同步的清单
-    if options.format.trim() != "mml" {
-        return Err(err_keys::SERVER_INSTANCE_FORMAT.to_string());
-    }
     let name = options.name.trim();
     if name.is_empty() {
         return Err(err_keys::FILE_NAME.to_string());
@@ -95,9 +90,8 @@ pub(super) fn export_pack(
         .filter(|line| !line.is_empty() && !is_sync_agent(line))
         .map(mml_game::game_export::mmc_vars)
         .collect();
-    jvm_args.push(format!(
-        "-javaagent:$INST_DIR/{SYNC_JAR_NAME}={manifest_url}"
-    ));
+    // 相对路径：MMC / Prism 的工作目录是 .minecraft，HMCL 导入后把 .minecraft 内容摊到实例根
+    jvm_args.push(format!("-javaagent:{SYNC_JAR_NAME}={manifest_url}"));
     let cfg = mml_game::game_export::mmc_instance_cfg(
         name,
         icon_key.as_deref(),
@@ -144,7 +138,7 @@ pub(super) fn export_pack(
     if let Some((icon_name, icon_path)) = &icon {
         pending.insert(PathBuf::from(icon_name), icon_path.clone());
     }
-    pending.retain(|rel, _| !is_reserved(rel));
+    pending.retain(|rel, _| !is_reserved(rel) && !is_reserved_inside(rel));
 
     // 只给文件名没有父目录时不用建目录
     if let Some(parent) = file
@@ -154,8 +148,9 @@ pub(super) fn export_pack(
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     let inst = format!("{name}/");
-    // 五个自动条目 + 待打包文件；进度条按"当前写到哪个文件"上报
-    let total = 5 + pending.len();
+    let inner = format!("{}/", names::GAME_DIR);
+    // 六个自动条目 + 待打包文件；进度条按"当前写到哪个文件"上报
+    let total = 6 + pending.len();
     let mut zip =
         BaseArchive::create_empty(ArchiveType::Zip, file).map_err(|e| e.to_string())?;
     progress(0, total, names::MMCJSON_FILE.to_string());
@@ -167,11 +162,16 @@ pub(super) fn export_pack(
     progress(2, total, names::GAME_FILE.to_string());
     zip.add_data(&format!("{inst}{}", names::GAME_FILE), &game_json)
         .map_err(|e| e.to_string())?;
-    progress(3, total, SYNC_JAR_NAME.to_string());
-    zip.add_data(&format!("{inst}{SYNC_JAR_NAME}"), SYNC_JAR)
-        .map_err(|e| e.to_string())?;
-    progress(4, total, names::SERVER_FILE.to_string());
+    progress(3, total, names::SERVER_FILE.to_string());
     zip.add_data(&format!("{inst}{}", names::SERVER_FILE), &manifest)
+        .map_err(|e| e.to_string())?;
+    // agent 与清单也放进 .minecraft：HMCL 导入 MMC 包时只搬 .minecraft，
+    // 摊到实例根后相对路径的 agent 与 server.json 都在
+    progress(4, total, format!("{inner}{SYNC_JAR_NAME}"));
+    zip.add_data(&format!("{inst}{inner}{SYNC_JAR_NAME}"), SYNC_JAR)
+        .map_err(|e| e.to_string())?;
+    progress(5, total, format!("{inner}{}", names::SERVER_FILE));
+    zip.add_data(&format!("{inst}{inner}{}", names::SERVER_FILE), &manifest)
         .map_err(|e| e.to_string())?;
 
     let mut pending_files = Vec::with_capacity(pending.len());
@@ -185,7 +185,7 @@ pub(super) fn export_pack(
         progress: Arc::clone(&progress),
         total,
     }) as Arc<dyn IBaseArchiveGui>);
-    zip.add_files_reporting(&pending_files, gui, 5)
+    zip.add_files_reporting(&pending_files, gui, 6)
         .map_err(|e| e.to_string())?;
     // 没有待打包文件时上面不会有 update，收尾也要推到 100%
     progress(total, total, String::new());
@@ -329,6 +329,22 @@ fn is_reserved(rel: &Path) -> bool {
         .any(|item| name.eq_ignore_ascii_case(item))
 }
 
+/// 包内 .minecraft 下由导出代码固定的条目
+///
+/// 基础文件勾到 .minecraft 整目录时跳过这两个，避免同一路径写两遍。
+///
+/// - rel: 相对实例根的路径
+///
+/// # 返回值
+///
+/// .minecraft/mml-server-sync.jar 或 .minecraft/server.json 返回 true
+fn is_reserved_inside(rel: &Path) -> bool {
+    let dir = Path::new(names::GAME_DIR);
+    let jar = dir.join(SYNC_JAR_NAME);
+    let manifest = dir.join(names::SERVER_FILE);
+    rel == jar.as_path() || rel == manifest.as_path()
+}
+
 /// 读取已生成的服务器实例清单
 ///
 /// 服务器包会把清单放在实例根：M²L 与同步 agent 第一次同步时拿它当旧清单，
@@ -355,7 +371,7 @@ fn read_manifest(options: &ServerInstanceOptionsDto) -> Result<Vec<u8>, String> 
 struct PackProgress {
     /// 进度回调：已写条数、总数、当前文件名
     progress: Arc<dyn Fn(usize, usize, String) + Send + Sync>,
-    /// 总条数，含五个自动条目
+    /// 总条数，含六个自动条目
     total: usize,
 }
 

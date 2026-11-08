@@ -1,7 +1,8 @@
 //! 服务器实例生成
 //!
 //! 把本地实例导出成"在线实例"的服务端清单：MML 的 `server.json` 与 `server.json.sha1`，
-//! 或 HMCL 的 `server-manifest.json`；要托管的文件一并写进用户选的文件夹。
+//! 要托管的文件一并写进用户选的文件夹。HMCL 玩家改用「生成服务器包」的 MMC 包，不再生成
+//! `server-manifest.json`。
 //!
 //! 独立窗口，标签 `mml-server_instance`，入口在主窗口实例右键菜单，
 //! 见 `ServerInstanceWindow.vue`。窗口已开着时再次打开只推送目标实例，不重建。
@@ -24,7 +25,6 @@ use mml_game::{
     launcher::{
         ModPackType, file_online_info_obj::OnlineInfoObj, instance_setting_obj::InstanceSettingObj,
     },
-    other_launcher::hmcl_obj::HMCLServerFileObj,
     serverpack::{
         generate,
         serverpack_obj::{ServerArchiveItemObj, ServerBaseObj, ServerItemObj},
@@ -209,7 +209,6 @@ pub async fn server_instance_get_meta(
             version: meta.version.clone(),
             text: meta.text.clone(),
             url: meta.url.clone(),
-            format: meta.format.clone(),
             folder: meta.folder.clone(),
             base_files: meta.base_files.clone(),
             configs: meta.configs.as_ref().map(|configs| {
@@ -304,31 +303,6 @@ impl ConfigMode {
     }
 }
 
-/// 生成目标格式
-enum Format {
-    /// MML 的 `server.json`，配 `server.json.sha1`
-    Mml,
-    /// HMCL 的 `server-manifest.json`
-    Hmcl,
-}
-
-impl Format {
-    /// 按前端给的值解析格式
-    ///
-    /// - `value`: `mml` 或 `hmcl`
-    ///
-    /// # 返回值
-    ///
-    /// 不认识时返回 `err.serverInstanceFormat`
-    fn parse(value: &str) -> Result<Self, String> {
-        match value {
-            "mml" => Ok(Format::Mml),
-            "hmcl" => Ok(Format::Hmcl),
-            _ => Err(err_keys::SERVER_INSTANCE_FORMAT.to_string()),
-        }
-    }
-}
-
 /// 一个要同步的配置目录
 struct ConfigDir {
     /// 目录名，相对游戏目录，只允许顶层目录
@@ -391,7 +365,7 @@ fn config_dir(value: &str) -> Result<String, String> {
     Ok(dir)
 }
 
-/// 生成入口：校验参数 → 展开勾选 → 按格式写盘
+/// 生成入口：校验参数 → 展开勾选 → 写 MML 清单
 ///
 /// - `game`: 源实例
 /// - `options`: 生成选项
@@ -409,7 +383,6 @@ fn generate(
     if game.modpack_type == ModPackType::ServerPack {
         return Err(err_keys::SERVER_INSTANCE_FROM_SERVER.to_string());
     }
-    let format = Format::parse(&options.format)?;
     let url = normalize_url(&options.url)?;
     let base = game.get_game_path();
     let out = prepare_folder(&game.get_base_path(), &options.folder)?;
@@ -440,8 +413,11 @@ fn generate(
         })
         .collect::<Result<Vec<_>, String>>()?;
 
-    let has_base = matches!(format, Format::Mml) && !options.base_files.is_empty();
-    if mods.is_empty() && configs.is_empty() && packs.is_empty() && !has_base {
+    if mods.is_empty()
+        && configs.is_empty()
+        && packs.is_empty()
+        && options.base_files.is_empty()
+    {
         return Err(err_keys::SERVER_INSTANCE_EMPTY.to_string());
     }
 
@@ -450,16 +426,10 @@ fn generate(
         configs,
         packs,
     };
-
-    match format {
-        Format::Mml => {
-            let online = online_sources(game);
-            generate_mml(
-                game, &online, &base, &out, &url, options, &contents, progress,
-            )
-        }
-        Format::Hmcl => generate_hmcl(game, &base, &out, &url, options, &contents, progress),
-    }
+    let online = online_sources(game);
+    generate_mml(
+        game, &online, &base, &out, &url, options, &contents, progress,
+    )
 }
 
 /// 校验发布地址并去掉末尾的斜杠
@@ -825,7 +795,6 @@ fn generate_mml(
         version: options.version.clone(),
         text: options.text.clone(),
         url: url.to_string(),
-        format: "mml".to_string(),
         folder: options.folder.clone(),
         base_files: options.base_files.clone(),
         configs: Some(
@@ -847,134 +816,6 @@ fn generate_mml(
         files: written.into_iter().collect(),
         count,
         changed: changed.into_iter().collect(),
-        mod_changes,
-        pack_changes,
-    })
-}
-
-/// 生成 HMCL 服务器实例
-///
-/// HMCL 没有压缩包，也没有"按项目号去平台下载"这条路，所有文件都得由服务端托管；
-/// 配置目录的同步方式对它不起作用，一律逐文件复制。
-///
-/// - `game`: 源实例，加载器组件从它取
-/// - `base`: 游戏目录
-/// - `out`: 输出文件夹
-/// - `url`: 发布地址，写进 `file_api`，客户端按 `file_api/路径` 下载
-/// - `options`: 生成选项
-/// - `contents`: 勾选展开后的内容
-/// - `progress`: 进度回调
-///
-/// # 返回值
-///
-/// 见 [`ServerInstanceResultDto`]；加载器 HMCL 表达不了时返回
-/// `err.serverInstanceLoader`
-fn generate_hmcl(
-    game: &InstanceSettingObj,
-    base: &Path,
-    out: &Path,
-    url: &str,
-    options: &ServerInstanceOptionsDto,
-    contents: &Contents,
-    progress: Progress<'_>,
-) -> Result<ServerInstanceResultDto, String> {
-    let mut ids = mapping::IdMap::load(&game.get_base_path());
-    let addons =
-        generate::hmcl_addons(game).ok_or_else(|| err_keys::SERVER_INSTANCE_LOADER.to_string())?;
-
-    // 模组快照只统计模组目录，用于生成后的新增 / 删除 / 修改汇总
-    let mut mod_snapshot: BTreeMap<String, mapping::EntrySnapshot> = BTreeMap::new();
-    for pick in &contents.mods {
-        let rel = &pick.path;
-        let wire = files::wire_path(rel);
-        let key = mod_key(base, rel, &wire);
-        mod_snapshot.insert(
-            key,
-            mapping::EntrySnapshot {
-                path: wire,
-                sha1: files::sha1(&base.join(rel))?,
-                optional: pick.optional,
-            },
-        );
-    }
-    let mod_changes = compare_mods(&ids, &mod_snapshot);
-    ids.set_mods(mod_snapshot);
-
-    let mut pack_snapshot: BTreeMap<String, mapping::EntrySnapshot> = BTreeMap::new();
-    for pick in &contents.packs {
-        let rel = &pick.path;
-        let wire = files::wire_path(rel);
-        pack_snapshot.insert(
-            format!("pack:{wire}"),
-            mapping::EntrySnapshot {
-                path: wire,
-                sha1: files::sha1(&base.join(rel))?,
-                optional: false,
-            },
-        );
-    }
-    let pack_changes = compare_packs(&ids, &pack_snapshot);
-    ids.set_packs(pack_snapshot);
-
-    // 模组 + 各配置目录里的文件 + 资源包，按路径去重
-    let mut all: BTreeSet<PathBuf> = contents.mods.iter().map(|item| item.path.clone()).collect();
-    for config in &contents.configs {
-        all.extend(files::dir_files(base, &config.dir)?);
-    }
-    all.extend(contents.packs.iter().map(|pick| pick.path.clone()));
-
-    let mut list = Vec::new();
-    let mut top = BTreeSet::new();
-    let total = all.len();
-    for (now, rel) in all.iter().enumerate() {
-        let wire = files::wire_path(rel);
-        progress(now, total, wire.clone());
-
-        files::copy_into(base, out, rel)?;
-        top.insert(top_of(&wire));
-        list.push(HMCLServerFileObj {
-            path: wire,
-            hash: files::sha1(&base.join(rel))?,
-        });
-    }
-
-    let pack = generate::build_hmcl_pack(
-        &options.name,
-        &options.version,
-        &options.text,
-        url,
-        addons,
-        list,
-    );
-    let bytes = serde_json::to_vec_pretty(&pack).map_err(|e| e.to_string())?;
-    write(out, names::SERVER_MANIFEST_FILE, &bytes)?;
-    ids.set_meta(mapping::Meta {
-        name: options.name.clone(),
-        version: options.version.clone(),
-        text: options.text.clone(),
-        url: url.to_string(),
-        format: "hmcl".to_string(),
-        folder: options.folder.clone(),
-        base_files: options.base_files.clone(),
-        configs: Some(
-            options
-                .configs
-                .iter()
-                .map(|item| mapping::MetaConfig {
-                    dir: item.dir.clone(),
-                    mode: item.mode.clone(),
-                    delete_old: item.delete_old,
-                })
-                .collect(),
-        ),
-    });
-    ids.save(&game.get_base_path())?;
-
-    Ok(ServerInstanceResultDto {
-        manifest: names::SERVER_MANIFEST_FILE.to_string(),
-        files: top.into_iter().collect(),
-        count: total,
-        changed: Vec::new(),
         mod_changes,
         pack_changes,
     })

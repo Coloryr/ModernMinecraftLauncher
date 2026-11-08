@@ -8,17 +8,15 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerInstanceOptionsDto {
-    /// 目标格式：`mml` 写 `server.json`，`hmcl` 写 `server-manifest.json`
-    pub format: String,
     /// 输出文件夹，前端目录对话框选好的完整路径；不存在会创建
     pub folder: String,
     /// 发布地址，玩家填进启动器的那个网址；托管文件按它拼出下载地址
     pub url: String,
     /// 服务器实例名，写进清单
     pub name: String,
-    /// 包版本，写进 `PackVersion` / HMCL 的 `version`
+    /// 包版本，写进 `PackVersion`
     pub version: String,
-    /// 说明，写进 `Text` / HMCL 的 `description`
+    /// 说明，写进 `Text`
     #[serde(default)]
     pub text: String,
     /// 勾选的模组，路径相对游戏目录；目录会展开成其中的文件
@@ -122,8 +120,6 @@ pub struct ServerInstanceMetaDto {
     pub text: String,
     /// 发布地址
     pub url: String,
-    /// 格式：mml / hmcl
-    pub format: String,
     /// 保存文件夹
     pub folder: String,
     /// 勾选的基础文件，相对实例根目录

@@ -141,10 +141,8 @@ export default {
   "err.shortcutPlatform": "创建快捷方式只在 Windows 上支持",
   "err.serverPackPlatform": "当前系统不支持将启动器程序加入服务器包。",
   "err.serverPackBusy": "请停止游戏并等待启动任务结束后再导入服务器包。",
-  "err.serverInstanceFormat": "不认识的生成格式。",
   "err.serverInstanceUrl": "请填写 http:// 或 https:// 开头的发布地址。",
   "err.serverInstanceFolder": "保存文件夹无效，或落在实例目录里。",
-  "err.serverInstanceLoader": "HMCL 表达不了这个加载器，只支持原版 / Forge / NeoForge / Fabric / Quilt。",
   "err.serverInstanceEmpty": "实例里没有可同步的模组或配置。",
   "err.serverInstanceBusy": "上一个生成任务还没结束，请等它完成。",
   "err.serverInstanceMode": "不认识的配置打包方式。",
@@ -2507,7 +2505,6 @@ export default {
   "minecraft.skipped": "已跳过，以后不再询问",
 
   // 服务器实例生成：把本地实例导出成在线实例的服务端清单
-  "serverInstance.format": "格式",
   "serverInstance.tab.general": "总体设定",
   "serverInstance.tab.base": "基础文件",
   "serverInstance.tab.mods": "模组",
@@ -2516,8 +2513,8 @@ export default {
   "serverInstance.tab.start": "开始生成",
   "serverInstance.tabDesc.general": "实例名、版本、发布地址与保存位置",
   "serverInstance.tabDesc.base": "实例根目录下、与 .minecraft 同级的文件，只下载一次",
-  "serverInstance.tabDesc.mods": "MML 下有在线来源的走平台下载，其余复制进文件夹；HMCL 全部复制",
-  "serverInstance.tabDesc.packs": "MML 下有在线来源的走平台下载，其余复制进文件夹；HMCL 全部复制",
+  "serverInstance.tabDesc.mods": "有在线来源的走平台下载，其余复制进文件夹",
+  "serverInstance.tabDesc.packs": "有在线来源的走平台下载，其余复制进文件夹",
   "serverInstance.tabDesc.configs": "默认带上所有文件夹，可逐个改同步方式或删除",
   "serverInstance.tabDesc.start": "确认内容后生成到文件夹",
   "serverInstance.projectIdLocked": "已生成的项目编号不可修改",
@@ -2531,7 +2528,6 @@ export default {
   "serverInstance.colSync": "同步",
   "serverInstance.colOptional": "可选",
   "serverInstance.optionalHint": "客户端首次同步时装成禁用，玩家可自行启用",
-  "serverInstance.optionalHmcl": "HMCL 清单不支持可选模组",
   "serverInstance.colFile": "文件名",
   "serverInstance.colIdType": "编号类型",
   "serverInstance.idType.online": "在线",
@@ -2565,16 +2561,11 @@ export default {
   "serverInstance.summaryBase": "基础文件",
   "serverInstance.modChanges": "模组变化",
   "serverInstance.packChanges": "资源包变化",
-  "serverInstance.summaryFormat": "格式",
   "serverInstance.summaryMods": "模组",
   "serverInstance.summaryPacks": "资源包",
   "serverInstance.summaryConfigs": "配置目录",
-  "serverInstance.mml": "MML",
-  "serverInstance.hmcl": "HMCL",
   "serverInstance.hint.mml":
     "写出 server.json 与 server.json.sha1：模组按下载来源写进清单，配置文件按下面选的方式下发。",
-  "serverInstance.hint.hmcl":
-    "写出 server-manifest.json：模组与配置整份复制进文件夹，逐个文件列 SHA1，全部要由你托管。",
   "serverInstance.name": "实例名",
   "serverInstance.version": "包版本",
   "serverInstance.desc": "说明",
@@ -2601,7 +2592,6 @@ export default {
   "serverInstance.packSaved": "服务器包已保存到 {file}",
   "serverInstance.packHint":
     "导出 MMC / Prism / MML 启动器可导入的整合包：基础包只带基础文件，完整包包含所有已选内容；包里附带生成好的 server.json，导出前请先生成一次。",
-  "serverInstance.packMmlOnly": "服务器包依赖 MML 清单，请先把格式切到 MML 并填好发布地址",
 };
 
 export const faqs: Array<{ q: string; a: string }> = [

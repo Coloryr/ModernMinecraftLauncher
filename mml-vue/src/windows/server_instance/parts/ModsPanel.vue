@@ -24,7 +24,6 @@ const {
   setModIdType,
   urlOf,
   setModUrl,
-  format,
   optionalOf,
   toggleModOptional,
   lockedProjectIds,
@@ -89,10 +88,8 @@ const {
               @change="pickedMods = toggled(pickedMods, row.path)" />
           </span>
           <span class="si-cell-check">
-            <input type="checkbox" class="si-box" :checked="optionalOf(row.path)"
-              :disabled="busy || format === 'hmcl'"
-              :title="format === 'hmcl' ? t('serverInstance.optionalHmcl') : t('serverInstance.optionalHint')"
-              @change="toggleModOptional(row.path)" />
+            <input type="checkbox" class="si-box" :checked="optionalOf(row.path)" :disabled="busy"
+              :title="t('serverInstance.optionalHint')" @change="toggleModOptional(row.path)" />
           </span>
           <span class="si-cell-name" :title="row.path">
             <em v-if="addedMods.has(row.path)" class="si-mark add">+</em>

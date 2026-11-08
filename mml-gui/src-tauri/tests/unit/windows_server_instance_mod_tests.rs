@@ -3,7 +3,7 @@ use crate::dtos::server_instance_dto::{ServerInstanceConfigDto, ServerInstancePi
 use mml_config::config_obj::RunArgObj;
 use mml_game::{
     launcher::file_online_info_obj::OnlineInfoObj, loader::LoaderType,
-    other_launcher::{hmcl_obj::HMCLServerObj, mmc_obj::MMCObj},
+    other_launcher::mmc_obj::MMCObj,
     serverpack::serverpack_obj::ServerPackObj,
 };
 
@@ -27,13 +27,11 @@ fn picks(paths: &[&str]) -> Vec<ServerInstancePickDto> {
 
 /// 测试用的生成选项
 fn options(
-    format: &str,
     mods: &[&str],
     configs: &[(&str, &str)],
     packs: &[&str],
 ) -> ServerInstanceOptionsDto {
     ServerInstanceOptionsDto {
-        format: format.into(),
         folder: String::new(),
         url: "https://example.invalid/pack".into(),
         name: "服务器".into(),
@@ -235,7 +233,7 @@ fn mml_pack_writes_manifest_sidecar_and_archive() {
 
     let online =
         HashMap::from([("online.jar".to_string(), online("online.jar", "123", "456"))]);
-    let options = options("mml", &["mods"], &[("config", "archive")], &[]);
+    let options = options(&["mods"], &[("config", "archive")], &[]);
     let contents = contents(&base, &options);
     let result = generate_mml(
         &game(),
@@ -311,7 +309,6 @@ fn mml_mixes_archive_and_per_file_dirs() {
     fs::write(base.join("kubejs/startup.js"), b"js").unwrap();
 
     let options = options(
-        "mml",
         &[],
         &[("config", "archive"), ("kubejs", "files")],
         &[],
@@ -361,7 +358,7 @@ fn mods_take_manual_url_over_recorded() {
     manual[0].url = " https://typed.example/a.jar ".into();
 
     let online = HashMap::from([("a.jar".to_string(), online("a.jar", "1", "2"))]);
-    let options = options("mml", &[], &[], &[]);
+    let options = options(&[], &[], &[]);
     let contents = Contents {
         mods: files::mods(&base, &manual).unwrap(),
         configs: Vec::new(),
@@ -428,7 +425,7 @@ fn mml_resource_pack_with_source_is_not_copied() {
             ..Default::default()
         },
     )]);
-    let options = options("mml", &[], &[], &["resourcepacks/p.zip"]);
+    let options = options(&[], &[], &["resourcepacks/p.zip"]);
     let contents = contents(&base, &options);
     let result = generate_mml(
         &game(),
@@ -467,7 +464,7 @@ fn mml_resource_packs_are_hosted_per_file() {
     fs::create_dir_all(base.join("resourcepacks")).unwrap();
     fs::write(base.join("resourcepacks/中文 1.zip"), b"pack").unwrap();
 
-    let options = options("mml", &[], &[], &["resourcepacks/中文 1.zip"]);
+    let options = options(&[], &[], &["resourcepacks/中文 1.zip"]);
     let contents = contents(&base, &options);
     let result = generate_mml(
         &game(),
@@ -503,88 +500,6 @@ fn mml_resource_packs_are_hosted_per_file() {
     crate::test_support::cleanup(&[&base, &out]);
 }
 
-#[test]
-fn hmcl_pack_copies_files_and_lists_hashes() {
-    crate::test_support::ensure_boot();
-    let base = crate::test_support::temp_dir("server-instance-hmcl");
-    let out = crate::test_support::temp_dir("server-instance-hmcl-out");
-    fs::create_dir_all(base.join("mods")).unwrap();
-    fs::create_dir_all(base.join("config")).unwrap();
-    fs::create_dir_all(base.join("resourcepacks")).unwrap();
-    fs::write(base.join("mods/a.jar"), b"mod").unwrap();
-    fs::write(base.join("config/x.toml"), b"x = 1").unwrap();
-    fs::write(base.join("resourcepacks/p.zip"), b"p").unwrap();
-
-    let options = options(
-        "hmcl",
-        &["mods"],
-        &[("config", "archive")],
-        &["resourcepacks/p.zip"],
-    );
-    let contents = contents(&base, &options);
-    let result = generate_hmcl(
-        &game(),
-        &base,
-        &out,
-        "https://example.invalid/pack",
-        &options,
-        &contents,
-        &|_, _, _| {},
-    )
-    .unwrap();
-
-    assert_eq!(fs::read(out.join("mods/a.jar")).unwrap(), b"mod");
-    assert_eq!(fs::read(out.join("config/x.toml")).unwrap(), b"x = 1");
-    assert_eq!(fs::read(out.join("resourcepacks/p.zip")).unwrap(), b"p");
-
-    let manifest = fs::read(out.join("server-manifest.json")).unwrap();
-    let pack: HMCLServerObj = serde_json::from_slice(&manifest).unwrap();
-    assert_eq!(pack.name, "服务器");
-    assert_eq!(pack.file_api, "https://example.invalid/pack");
-    assert_eq!(pack.addons.len(), 2);
-    assert_eq!(pack.files.len(), 3);
-    let paths: Vec<&str> = pack.files.iter().map(|f| f.path.as_str()).collect();
-    assert_eq!(
-        paths,
-        ["config/x.toml", "mods/a.jar", "resourcepacks/p.zip"]
-    );
-    assert_eq!(pack.files[1].hash, sha1(b"mod"));
-
-    assert_eq!(result.manifest, "server-manifest.json");
-    assert_eq!(result.files, ["config", "mods", "resourcepacks"]);
-    assert_eq!(result.count, 3);
-
-    crate::test_support::cleanup(&[&base, &out]);
-}
-
-#[test]
-fn hmcl_pack_rejects_loader_it_cannot_express() {
-    crate::test_support::ensure_boot();
-    let base = crate::test_support::temp_dir("server-instance-hmcl-loader");
-    let out = crate::test_support::temp_dir("server-instance-hmcl-loader-out");
-    fs::create_dir_all(base.join("mods")).unwrap();
-    fs::write(base.join("mods/a.jar"), b"mod").unwrap();
-
-    let mut item = game();
-    item.loader = LoaderType::OptiFine;
-    let options = options("hmcl", &["mods"], &[], &[]);
-    let contents = contents(&base, &options);
-    let err = generate_hmcl(
-        &item,
-        &base,
-        &out,
-        "https://example.invalid/pack",
-        &options,
-        &contents,
-        &|_, _, _| {},
-    )
-    .unwrap_err();
-    assert_eq!(err, err_keys::SERVER_INSTANCE_LOADER);
-
-    crate::test_support::cleanup(&[&base, &out]);
-}
-
-
 /// 压缩包同步可以关掉「删除原有目录」，清单里的 Over 随之为 false
 #[test]
 fn mml_archive_delete_old_follows_option() {
@@ -594,7 +509,7 @@ fn mml_archive_delete_old_follows_option() {
     fs::create_dir_all(base.join("config")).unwrap();
     fs::write(base.join("config/a.toml"), b"a").unwrap();
 
-    let mut options = options("mml", &[], &[("config", "archive")], &[]);
+    let mut options = options(&[], &[("config", "archive")], &[]);
     options.configs[0].delete_old = false;
     let contents = contents(&base, &options);
     generate_mml(
@@ -632,7 +547,6 @@ fn mml_splits_selected_subdirectory_into_own_archive() {
     fs::write(base.join("config").join("setting").join("b.toml"), b"b").unwrap();
 
     let options = options(
-        "mml",
         &[],
         &[("config", "archive"), ("config/setting", "archive")],
         &[],
@@ -707,7 +621,7 @@ fn mml_packs_base_files_outside_minecraft() {
     let mut game = game();
     game.dir = dir;
     game.icon = Some(names::ICON_FILE.to_string());
-    let mut options = options("mml", &[], &[], &[]);
+    let mut options = options(&[], &[], &[]);
     options.base_files = vec![
         "server.properties".to_string(),
         ".minecraft".to_string(),
@@ -836,7 +750,6 @@ fn mml_marks_generated_ids_as_custom() {
     fs::write(base.join("resourcepacks").join("pack.zip"), b"pack").unwrap();
 
     let options = options(
-        "mml",
         &["mods/local.jar"],
         &[],
         &["resourcepacks/pack.zip"],
@@ -899,7 +812,6 @@ fn mml_reuses_ids_and_reports_changed_entries() {
     let mut game = game();
     game.dir = dir;
     let mut options = options(
-        "mml",
         &["mods/local.jar"],
         &[("config", "archive")],
         &["resourcepacks/pack.zip"],
@@ -989,7 +901,6 @@ fn mml_reuses_ids_and_reports_changed_entries() {
     assert_eq!(meta.version, options.version);
     assert_eq!(meta.text, options.text);
     assert_eq!(meta.url, "https://example.invalid/pack");
-    assert_eq!(meta.format, "mml");
     assert_eq!(meta.folder, options.folder);
     assert_eq!(meta.base_files, options.base_files);
 
@@ -1004,7 +915,7 @@ fn server_pack_cannot_generate() {
     crate::test_support::ensure_boot();
     let mut game = game();
     game.modpack_type = ModPackType::ServerPack;
-    let options = options("mml", &[], &[], &[]);
+    let options = options(&[], &[], &[]);
     let result = generate(&game, &options, &|_, _, _| {});
     assert_eq!(
         result.err().as_deref(),
@@ -1030,7 +941,7 @@ fn mml_uses_edited_custom_ids() {
 
     let mut game = game();
     game.dir = dir;
-    let mut options = options("mml", &["mods/local.jar"], &[], &[]);
+    let mut options = options(&["mods/local.jar"], &[], &[]);
     options.mods[0].pid = "my-project".to_string();
     options.mods[0].fid = "my-file".to_string();
     options.mods[0].custom = true;
@@ -1104,7 +1015,7 @@ fn mml_marks_optional_mods() {
     fs::write(base.join("mods").join("opt.jar"), b"opt").unwrap();
     fs::write(base.join("mods").join("plain.jar"), b"plain").unwrap();
 
-    let mut options = options("mml", &["mods/opt.jar", "mods/plain.jar"], &[], &[]);
+    let mut options = options(&["mods/opt.jar", "mods/plain.jar"], &[], &[]);
     options.mods[0].optional = true;
     let contents = contents(&base, &options);
     let _ = generate_mml(
@@ -1197,7 +1108,7 @@ fn export_pack_writes_thin_and_complete_zips() {
         ..Default::default()
     });
 
-    let mut options = options("mml", &["mods/a.jar"], &[("config", "archive")], &[]);
+    let mut options = options(&["mods/a.jar"], &[("config", "archive")], &[]);
     options.base_files = vec!["server.properties".to_string()];
     // 服务器包会附带生成好的清单；导出前发布目录里得有它
     let publish = crate::test_support::temp_dir("server-instance-export-pack-publish");
@@ -1218,15 +1129,16 @@ fn export_pack_writes_thin_and_complete_zips() {
 
     let in_pack = |item: &str| format!("{}/{}", options.name, item);
 
-    // 服务器包：只有基础文件与五个自动生成条目
+    // 服务器包：只有基础文件与六个自动生成条目
     let thin_zip = mml_base::archives::BaseArchive::open_readonly(&thin).unwrap();
     let thin_names: Vec<&str> = thin_zip.entries().iter().map(|item| item.name.as_str()).collect();
     for item in [
         "mmc-pack.json",
         "instance.cfg",
         "game.json",
-        "mml-server-sync.jar",
         "server.json",
+        ".minecraft/mml-server-sync.jar",
+        ".minecraft/server.json",
         "server.properties",
         "gtnh_icon.png",
     ] {
@@ -1246,6 +1158,10 @@ fn export_pack_writes_thin_and_complete_zips() {
     // 包里的清单就是生成出来的那份，不重新拼
     assert_eq!(
         thin_zip.read(&in_pack("server.json")).unwrap(),
+        fs::read(publish.join(names::SERVER_FILE)).unwrap()
+    );
+    assert_eq!(
+        thin_zip.read(&in_pack(".minecraft/server.json")).unwrap(),
         fs::read(publish.join(names::SERVER_FILE)).unwrap()
     );
 
@@ -1273,7 +1189,7 @@ fn export_pack_writes_thin_and_complete_zips() {
     assert!(cfg.contains("MinMemAlloc=1024"));
     assert!(
         cfg.contains(
-            "JvmArgs=-Xmx2G -Dfoo=1 -javaagent:$INST_DIR/mml-server-sync.jar=https://example.invalid/pack/server.json"
+            "JvmArgs=-Xmx2G -Dfoo=1 -javaagent:mml-server-sync.jar=https://example.invalid/pack/server.json"
         ),
         "{cfg}"
     );
@@ -1303,7 +1219,7 @@ fn export_pack_writes_thin_and_complete_zips() {
     let jar = thin_zip
         .entries()
         .iter()
-        .find(|item| item.name == in_pack("mml-server-sync.jar"))
+        .find(|item| item.name == in_pack(".minecraft/mml-server-sync.jar"))
         .unwrap();
     assert!(jar.size > 0);
     assert_eq!(jar.size, pack::SYNC_JAR.len() as u64);

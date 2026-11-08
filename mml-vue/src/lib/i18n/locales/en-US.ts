@@ -141,10 +141,8 @@ export default {
   "err.shortcutPlatform": "Creating shortcuts is only supported on Windows",
   "err.serverPackPlatform": "Bundling the launcher executable is only supported on Windows.",
   "err.serverPackBusy": "Stop all games and wait for launch tasks before importing a server package.",
-  "err.serverInstanceFormat": "Unknown generation format.",
   "err.serverInstanceUrl": "Enter a publish URL starting with http:// or https://.",
   "err.serverInstanceFolder": "Invalid output folder, or it is inside the instance directory.",
-  "err.serverInstanceLoader": "HMCL cannot express this loader; only vanilla / Forge / NeoForge / Fabric / Quilt are supported.",
   "err.serverInstanceEmpty": "The instance has no mods or configs to sync.",
   "err.serverInstanceBusy": "The previous generation is still running — wait for it to finish.",
   "err.serverInstanceMode": "Unknown config delivery mode.",
@@ -2508,7 +2506,6 @@ export default {
   "minecraft.skipped": "Skipped, will not ask again",
 
   // Server instance generation: export a local instance as an online instance's server manifest
-  "serverInstance.format": "Format",
   "serverInstance.tab.general": "General",
   "serverInstance.tab.base": "Base files",
   "serverInstance.tab.mods": "Mods",
@@ -2517,8 +2514,8 @@ export default {
   "serverInstance.tab.start": "Generate",
   "serverInstance.tabDesc.general": "Name, version, publish URL and output folder",
   "serverInstance.tabDesc.base": "Files next to .minecraft, downloaded once",
-  "serverInstance.tabDesc.mods": "MML: mods with an online source download from the platform, the rest are copied; HMCL copies everything",
-  "serverInstance.tabDesc.packs": "MML: packs with an online source download from the platform, the rest are copied; HMCL copies everything",
+  "serverInstance.tabDesc.mods": "Mods with an online source download from the platform, the rest are copied",
+  "serverInstance.tabDesc.packs": "Packs with an online source download from the platform, the rest are copied",
   "serverInstance.tabDesc.configs": "All folders are added by default; change the delivery mode or remove any",
   "serverInstance.tabDesc.start": "Review and generate into the folder",
   "serverInstance.projectIdLocked": "A generated project ID cannot be edited",
@@ -2532,7 +2529,6 @@ export default {
   "serverInstance.colSync": "Sync",
   "serverInstance.colOptional": "Optional",
   "serverInstance.optionalHint": "Installed disabled on first sync; players can enable it",
-  "serverInstance.optionalHmcl": "HMCL manifests don't support optional mods",
   "serverInstance.colFile": "File name",
   "serverInstance.colIdType": "ID type",
   "serverInstance.idType.online": "Online",
@@ -2566,16 +2562,11 @@ export default {
   "serverInstance.summaryBase": "Base files",
   "serverInstance.modChanges": "Mod changes",
   "serverInstance.packChanges": "Resource pack changes",
-  "serverInstance.summaryFormat": "Format",
   "serverInstance.summaryMods": "Mods",
   "serverInstance.summaryPacks": "Resource packs",
   "serverInstance.summaryConfigs": "Config folders",
-  "serverInstance.mml": "MML",
-  "serverInstance.hmcl": "HMCL",
   "serverInstance.hint.mml":
     "Writes server.json and server.json.sha1: mods go into the manifest by download source, config files are distributed the way you pick below.",
-  "serverInstance.hint.hmcl":
-    "Writes server-manifest.json: mods and configs are copied into the folder with a SHA1 per file — you host all of them.",
   "serverInstance.name": "Instance name",
   "serverInstance.version": "Pack version",
   "serverInstance.desc": "Description",
@@ -2602,7 +2593,6 @@ export default {
   "serverInstance.packSaved": "Server pack saved to {file}",
   "serverInstance.packHint":
     "Export a modpack importable by MMC / Prism / MML launchers: the base pack carries base files only, the complete pack includes everything selected. The pack bundles the generated server.json, so generate once before exporting.",
-  "serverInstance.packMmlOnly": "The server pack relies on the MML manifest; switch the format to MML and fill in the publish URL.",
 };
 
 export const faqs: Array<{ q: string; a: string }> = [

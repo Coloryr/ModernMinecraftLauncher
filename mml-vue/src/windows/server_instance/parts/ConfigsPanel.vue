@@ -15,7 +15,6 @@ const {
   newChildDirs,
   childAddParent,
   busy,
-  format,
   changedPaths,
   addConfig,
   addChildConfigs,
@@ -74,7 +73,7 @@ const {
         </select>
         <label class="si-cell-check">
           <input type="checkbox" class="si-box" :checked="item.deleteOld"
-            :disabled="busy || format === 'hmcl' || item.mode !== 'archive'"
+            :disabled="busy || item.mode !== 'archive'"
             @change="setConfigDeleteOld(item.dir, $event)" />
         </label>
         <button class="si-remove" :disabled="busy" :title="t('serverInstance.configRemove')"

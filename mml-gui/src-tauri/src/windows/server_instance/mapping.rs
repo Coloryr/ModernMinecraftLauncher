@@ -63,8 +63,6 @@ pub(super) struct Meta {
     pub(super) text: String,
     /// 发布地址
     pub(super) url: String,
-    /// 格式：mml / hmcl
-    pub(super) format: String,
     /// 保存文件夹
     pub(super) folder: String,
     /// 勾选的基础文件，相对实例根目录

@@ -5,7 +5,23 @@
 
 0.1.x 都是预发布版，标签带 `-pre` 后缀；界面上的「测试版 / 预发布版」徽章只表示构建通道。
 
-## 0.1.10（开发中）
+## 0.1.11（开发中）
+
+### 改进
+
+- 服务器实例不再生成 HMCL 的 `server-manifest.json`：HMCL 改用「生成服务器包」的 MMC 包。
+  包内 `mml-server-sync.jar` 与 `server.json` 放进 `.minecraft`，`instance.cfg` 的 agent 改成
+  相对路径；MultiMC / Prism / HMCL 导入后都能直接同步，M²L 仍按 `game.json` 自己更新。
+
+### 修复
+
+- 服务器实例的「生成服务器包」原来不带 `server.json`，导入后第一次同步没有旧清单可比对，
+  删除旧文件与可选模组的启用状态会错乱；现在把生成好的清单放进包内实例根，导出前先点一次
+  「生成」即可。
+- MMC 导出的 `mmc-pack.json` 缺 `formatVersion`，Prism / MultiMC 会判成无效清单拒绝导入；
+  现在写 `formatVersion: 1`。
+
+## 0.1.10
 
 ### 新增
 
@@ -41,11 +57,6 @@
 
 ### 修复
 
-- 服务器实例的「生成服务器包」原来不带 `server.json`，导入后第一次同步没有旧清单可比对，
-  删除旧文件与可选模组的启用状态会错乱；现在把生成好的清单放进包内实例根，导出前先点一次
-  「生成」即可。
-- MMC 导出的 `mmc-pack.json` 缺 `formatVersion`，Prism / MultiMC 会判成无效清单拒绝导入；
-  现在写 `formatVersion: 1`。
 - 1.7.10 及更早的游戏内语言列不出来：旧版语言文件是 `minecraft/lang/*.lang`、代码大写
   （`zh_CN`），之前只认 1.13 起的 `*.json`，一份都匹配不上，下拉只剩默认两项；
   选中项也因为大小写对不上而不显示。现在两种格式都读，显示名按 `language.name=` 行解析；

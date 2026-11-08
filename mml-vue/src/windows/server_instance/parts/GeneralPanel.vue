@@ -1,23 +1,16 @@
 <script setup lang="ts">
 import { inject } from "vue";
-import SegmentedTabs from "../../../components/ui/SegmentedTabs.vue";
 import BaseButton from "../../../components/ui/BaseButton.vue";
 import { t } from "../../../lib/i18n";
 import { ServerInstanceKey } from "../context";
-import type { Format } from "../useServerInstance";
 const ctx = inject(ServerInstanceKey);
 if (!ctx) throw new Error("server instance context missing");
-const { format, formatOptions, busy, hint, name, version, text, url, folder, pickFolder } = ctx;
+const { busy, name, version, text, url, folder, pickFolder } = ctx;
 </script>
 
 <template>
 <section class="si-section">
-  <div class="si-row">
-    <span class="field-label">{{ t("serverInstance.format") }}</span>
-    <SegmentedTabs :options="formatOptions" :model-value="format" :disabled="busy"
-      @update:model-value="format = $event as Format" />
-  </div>
-  <p class="field-hint">{{ hint }}</p>
+  <p class="field-hint">{{ t("serverInstance.hint.mml") }}</p>
 
   <div class="field-row-2">
     <div>
