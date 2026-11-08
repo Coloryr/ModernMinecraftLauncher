@@ -14,7 +14,25 @@ use mml_names::{
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::{GameInstance, launcher::file_online_info_obj::OnlineInfoObj};
+use crate::{
+    GameInstance,
+    launcher::{ModPackType, file_online_info_obj::OnlineInfoObj},
+};
+
+/// 实例是不是服务器实例
+///
+/// 服务器实例的文件直接落在实例目录，不进 mml-link 的公共目录，也不建映射记录。
+///
+/// - `game`: 实例句柄
+///
+/// # 返回值
+///
+/// `ModPackType::ServerPack` 时为 true
+pub fn is_server_pack(game: &GameInstance) -> bool {
+    game.read()
+        .map(|obj| obj.modpack_type == ModPackType::ServerPack)
+        .unwrap_or(false)
+}
 
 /// 解析在线信息对应的实例内路径与资源类型
 ///
@@ -99,7 +117,8 @@ pub(crate) fn prepare_downloads(
     game: &GameInstance,
     items: &mut Vec<FileItemObj>,
 ) -> Vec<LinkPlan> {
-    if !mml_link::is_enabled() {
+    // 服务器实例的下载直接落实例目录，不接入公共目录
+    if is_server_pack(game) || !mml_link::is_enabled() {
         return Vec::new();
     }
 
@@ -210,7 +229,7 @@ pub struct MapResourceCount {
 ///
 /// 该实例里能被 target_of 定位到的条目数
 pub fn count_instance_resources(game: &GameInstance) -> u32 {
-    if !mml_link::is_enabled() {
+    if is_server_pack(game) || !mml_link::is_enabled() {
         return 0;
     }
 
@@ -255,7 +274,7 @@ pub fn map_instance_resources_with<F>(game: &GameInstance, mut on_item: F) -> Ma
 where
     F: FnMut(&OnlineInfoObj),
 {
-    if !mml_link::is_enabled() {
+    if is_server_pack(game) || !mml_link::is_enabled() {
         return MapResourceCount::default();
     }
 
@@ -324,6 +343,10 @@ where
     count
 }
 
+#[cfg(test)]
+#[path = "../tests/unit/game_link_tests.rs"]
+mod tests;
+
 /// 启动前检查实例资源的硬链接
 ///
 /// 在线信息里的模组 / 资源包逐个检查：公共目录有文件就补链接，没有就按记录的下载地址
@@ -339,7 +362,8 @@ pub async fn check_instance_links(
     game: &GameInstance,
     cancel: CancellationToken,
 ) -> CoreResult<()> {
-    if !mml_link::is_enabled() {
+    // 服务器实例不补链、不修复，启动时也不去碰公共目录
+    if is_server_pack(game) || !mml_link::is_enabled() {
         return Ok(());
     }
 

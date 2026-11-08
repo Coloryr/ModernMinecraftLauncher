@@ -271,8 +271,9 @@ pub(super) async fn run_update(
         );
     }
 
-    // ③ 先接入资源映射：新文件已经落在实例里，把它收进公共目录并补硬链接
-    if mml_link::is_enabled() {
+    // ③ 先接入资源映射：新文件已经落在实例里，把它收进公共目录并补硬链接。
+    // 服务器实例不接入公共目录，跳过这一步
+    if mml_link::is_enabled() && !mml_game::game_link::is_server_pack(&instance) {
         let (uuid, base) = {
             let game = instance.read().unwrap();
             (game.uuid, game.get_base_path())

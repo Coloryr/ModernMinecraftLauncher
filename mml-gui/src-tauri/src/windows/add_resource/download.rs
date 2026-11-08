@@ -260,7 +260,9 @@ pub async fn add_resource_download(
     let base = instance.read().unwrap().get_base_path();
     let mut reused = false;
     let mut link_plan = None;
-    if mml_link::is_enabled()
+    // 服务器实例不接入公共目录：文件直接下载到实例里
+    if !mml_game::game_link::is_server_pack(&instance)
+        && mml_link::is_enabled()
         && let Some(resource) = link_type(file_type)
         && !online_info.sha1.is_empty()
     {
