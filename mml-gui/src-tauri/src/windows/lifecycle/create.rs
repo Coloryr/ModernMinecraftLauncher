@@ -23,6 +23,33 @@ use crate::windows::registry::{
     SERVER_PACK_WINDOW_UUID, min_size_of_label,
 };
 
+/// Linux 窗口强制走客户端装饰
+///
+/// KDE 在 Wayland 会通过 `org_kde_kwin_server_decoration` 告诉 GTK 用服务端装饰，
+/// GTK 因此不建 CSD；而 `set_decorations(false)` 在 GTK 的 Wayland 后端是空实现，
+/// KWin 会一直画原生标题栏。放一个不显示的 GtkHeaderBar 让 GTK 切到客户端装饰，
+/// 再关掉装饰：KWin 不再画 frame，GTK 的标题栏也保持隐藏。
+///
+/// - `window`: 刚建好、尚未显示的窗口
+///
+/// # 返回值
+///
+/// 取 GTK 窗口失败时返回错误文案
+#[cfg(target_os = "linux")]
+fn force_client_side_decoration(window: &WebviewWindow) -> Result<(), String> {
+    use gtk::prelude::*;
+
+    let gtk_window = window.gtk_window().map_err(|error| error.to_string())?;
+    let header = gtk::HeaderBar::new();
+    header.set_show_close_button(false);
+    // show_all 不能把它放出来
+    header.set_no_show_all(true);
+    header.hide();
+    gtk_window.set_titlebar(Some(&header));
+    gtk_window.set_decorated(false);
+    Ok(())
+}
+
 /// 窗口内允许导航的地址：启动器自身页面与本地自定义协议
 ///
 /// - `url`: 导航目标
@@ -160,7 +187,8 @@ pub(crate) fn create_window(
         .unwrap_or((600.0, 400.0));
 
     // 所有窗口都走插件装饰：必须以 decorations(true) 建出来，插件才能在原生 frame 上激活，
-    // 激活前先藏起来。收益是 Win11 贴靠布局（矩形由前端量好交给插件，见 decoration.ts），
+    // 激活前先藏起来；Linux 建完窗后再切到客户端装饰，见下面的 force_client_side_decoration。
+    // 收益是 Win11 贴靠布局（矩形由前端量好交给插件，见 decoration.ts），
     // 以及 macOS 上由插件摆位的原生红黄绿，见插件 docs/platforms.md
 
     // 建窗时**不设**最小尺寸：此刻窗口是带装饰口径，最小客户区加上边框带算出的下限是外框 639，
@@ -302,6 +330,20 @@ pub(crate) fn create_window(
     // 必须在**这一刻**量：此时窗口还是 decorations(true)，差值包含原生标题栏；插件激活摘掉
     // 装饰后标题栏并进客户区就再也量不到它，而关窗保存正发生在那个状态
     remember_decorated_inset(uuid, &win);
+
+    // Linux：KDE Wayland 下原生标题栏不是靠 set_decorations(false) 摘掉的，
+    // 必须在显示前把 GTK 切到客户端装饰，见 force_client_side_decoration。
+    // 放在 remember_decorated_inset 之后：存盘几何仍按带装饰口径算
+    #[cfg(target_os = "linux")]
+    if let Err(error) = force_client_side_decoration(&win) {
+        mml_log::error(
+            LogText::LinuxDecorationSwitchFailed {
+                label: label.to_string(),
+                error,
+            }
+            .text(),
+        );
+    }
 
     OPEN_WINDOWS.write().unwrap().insert(*uuid, win.clone());
     ensure_window_model(uuid);

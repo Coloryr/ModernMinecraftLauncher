@@ -113,6 +113,13 @@ pub enum LogText {
         /// 失败原因，插件给的原文
         error: String,
     },
+    /// Linux 上切到客户端装饰失败，可能仍会显示系统标题栏
+    LinuxDecorationSwitchFailed {
+        /// 窗口标签，用来看是哪个窗口出的问题
+        label: String,
+        /// 失败原因
+        error: String,
+    },
     /// 主窗口收到关闭请求：有实例在跑就退回后台，否则退出启动器
     MainWindowCloseRequested {
         /// 是否还有实例在运行
@@ -765,6 +772,9 @@ impl LogText {
             LogText::DecorationActivateFailed { label, error } => format!(
                 "[window] 装饰激活失败，窗口退回无边框、按钮由界面自绘：窗口={label} ({error})"
             ),
+            LogText::LinuxDecorationSwitchFailed { label, error } => format!(
+                "[window] 切换 Linux 客户端装饰失败，可能仍会显示系统标题栏：窗口={label} ({error})"
+            ),
             LogText::MainWindowCloseRequested { running } => format!(
                 "[window] 关闭主窗口：{}",
                 if *running {
@@ -1112,6 +1122,9 @@ impl LogText {
             ),
             LogText::DecorationActivateFailed { label, error } => format!(
                 "[window] decoration activation failed, the window falls back to a borderless frame with app-drawn buttons: window={label} ({error})"
+            ),
+            LogText::LinuxDecorationSwitchFailed { label, error } => format!(
+                "[window] failed to switch the Linux window to client-side decorations, the system titlebar may still be shown: window={label} ({error})"
             ),
             LogText::MainWindowCloseRequested { running } => format!(
                 "[window] closing the main window: {}",

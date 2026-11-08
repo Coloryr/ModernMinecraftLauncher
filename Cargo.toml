@@ -141,7 +141,14 @@ image = { version = "~0.25.10", default-features = false, features = [
     "jpeg",
     "webp",
 ] }
-rfd = "~0.17.2"
+# rfd 0.17 默认启用 xdg-portal，而 tauri-plugin-dialog 默认启用 gtk3；
+# 两个后端同时打开会让 rfd 的 build.rs 直接 panic，Linux 构建失败。
+# 这里跟随 tauri-plugin-dialog 选 gtk3，关掉默认特性。
+rfd = { version = "~0.17.2", default-features = false, features = ["gtk3"] }
+# Linux 窗口装饰：直接操作 GTK 窗口切到客户端装饰，见 windows/lifecycle/create.rs
+gtk = "~0.18.2"
+# Linux 托盘：用 ksni 后端（DBus StatusNotifierItem），不依赖 libappindicator
+tray-icon = { version = "~0.25.1", default-features = false, features = ["ksni"] }
 
 [profile.dev.package.miniz_oxide]
 opt-level = 3

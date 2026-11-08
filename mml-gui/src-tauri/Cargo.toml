@@ -97,6 +97,11 @@ objc2-app-kit = { version = "=0.3.2", default-features = false, features = [
 # Wayland 会话里 GDK 的 workarea 是整块屏幕；读 XWayland 根窗口的 _NET_WORKAREA
 # 才能拿到左侧 Dock / 顶栏扣掉后的工作区
 x11-dl = "2"
+# KDE Wayland 默认让 GTK 走服务端装饰，set_decorations(false) 在 Wayland 后端是空实现；
+# 建窗后需要拿 GTK 窗口强制切到客户端装饰，见 windows/lifecycle/create.rs
+gtk.workspace = true
+# 托盘用 tray-icon 的 ksni 后端；tray-icon 由 tauri 引入，这里显式开 feature 覆盖它的默认后端
+tray-icon.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 # 文件拖放的"路径桥"（见 src/windows/file_drop.rs）：

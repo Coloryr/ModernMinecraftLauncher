@@ -8,4 +8,4 @@ Icon=com.coloryr.mml
 Terminal=false
 Categories=Game;
 Keywords=minecraft;launcher;
-StartupWMClass=ModernMinecraftLauncher
+StartupWMClass=com.coloryr.mml

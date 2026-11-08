@@ -22,6 +22,7 @@ use mml_names::{
 use mml_sys::path_helper;
 
 /// 下载的 Python 版本
+#[cfg(windows)]
 const PYTHON_VERSION: &str = "3.13.5";
 
 /// 自带的 Python 目录，`tools/python`

@@ -153,6 +153,10 @@ pub fn run() {
         .enable_macos_default_menu(false)
         .on_menu_event(|app, event| menu::on_event(app, event.id.as_ref()))
         .setup(|app| {
+            // Linux 任务栏按 app_id / WM_CLASS 找 desktop 文件；GTK 已经起来，这里补 WM_CLASS
+            #[cfg(target_os = "linux")]
+            gtk::gdk::set_program_class("com.coloryr.mml");
+
             // 托盘不在这里建：只有实例在运行时才出现，见 tray::sync
 
             // macOS 首次要问用户要通知权限；Windows 与 Linux 上直接就是已授权

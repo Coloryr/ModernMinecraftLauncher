@@ -12,6 +12,12 @@ use mml_sys::path_helper;
 
 /// 程序入口：确定运行路径，处理提权与单开，初始化各单例后进入 Tauri 事件循环
 fn main() {
+    // Linux 的 Wayland app_id 取自 GLib 程序名，缺省是二进制名 mml-gui；
+    // 与安装的 com.coloryr.mml.desktop 对不上时，任务栏只能显示通用图标。
+    // GDK 还没初始化，WM_CLASS 留到 setup 里再设
+    #[cfg(target_os = "linux")]
+    gtk::glib::set_prgname(Some("com.coloryr.mml"));
+
     let mut obj = CoreInitObj {
         path: Default::default(),
         curseforge_key: "$2a$10$6L8AkVsaGMcZR36i8XvCr.O4INa2zvDwMhooYdLZU0bb/E78AsT0m".to_string(),

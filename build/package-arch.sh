@@ -73,7 +73,6 @@ depend = fontconfig
 depend = gtk3
 depend = webkit2gtk-4.1
 depend = hicolor-icon-theme
-optdepend = libayatana-appindicator: tray icon
 EOF
 
 out="$root/build_out/mml-arch-$label-$version.pkg.tar.zst"

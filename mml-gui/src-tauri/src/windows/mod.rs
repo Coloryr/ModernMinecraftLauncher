@@ -800,8 +800,9 @@ fn show_without_activate(window: &WebviewWindow) -> Result<(), String> {
 
 /// 激活插件装饰并显示窗口；所有窗口都走插件装饰，建窗逻辑见 `lifecycle/create.rs`
 ///
-/// 窗口建出来时是 `decorations: true` + 隐藏的；
-/// 这里在原生 frame 上激活装饰、再显示：
+/// 窗口建出来时是 `decorations: true` + 隐藏的。Linux 在建窗后先切到客户端装饰，
+/// 见 `create.rs` 的 `force_client_side_decoration`；插件激活仍负责控件与生命周期。
+/// Windows / macOS 在原生 frame 上激活：
 ///
 /// - Windows：自绘装饰接管标题栏右侧，Win11 贴靠布局挂在最大化按钮上
 /// - macOS：插件摆的是**原生红黄绿**，位置要在激活之后、显示之前用
