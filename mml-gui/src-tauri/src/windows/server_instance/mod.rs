@@ -218,6 +218,7 @@ pub async fn server_instance_get_meta(
                         dir: item.dir.clone(),
                         mode: item.mode.clone(),
                         exclude: item.exclude.clone(),
+                        delete_old: item.delete_old,
                     })
                     .collect()
             }),
@@ -340,6 +341,8 @@ struct ConfigDir {
     mode: ConfigMode,
     /// 取消勾选的文件，相对游戏目录
     exclude: Vec<String>,
+    /// 压缩包解压前先删掉客户端旧目录
+    delete_old: bool,
 }
 
 /// 本次要写进包里的内容
@@ -419,10 +422,15 @@ fn generate(
     let mut configs = Vec::new();
     for item in &options.configs {
         let dir = config_dir(&item.dir)?;
+        let mode = ConfigMode::parse(&item.mode)?;
+        // 没单独给就用方式自带的默认值；删除目录必须删旧目录，不给关
+        let delete_old = matches!(mode, ConfigMode::Delete)
+            || item.delete_old.unwrap_or_else(|| mode.deletes_old());
         configs.push(ConfigDir {
             dir,
-            mode: ConfigMode::parse(&item.mode)?,
+            mode,
             exclude: item.exclude.clone(),
+            delete_old,
         });
     }
     let packs = options
@@ -717,8 +725,8 @@ fn generate_mml(
             archives.push(ServerArchiveItemObj {
                 file: name.clone(),
                 dir: dir.clone(),
-                // 整包与删除目录先删旧目录；"本目录"只覆盖自己的直接文件，不能动子目录
-                delete_old: config.mode.deletes_old(),
+                // 是否先删旧目录由界面上的勾选决定；删除目录恒为真
+                delete_old: config.delete_old,
                 url: format!("{url}/{}", files::encode_url_path(&name)),
                 sha1: Some(sha1),
                 sha256: None,
@@ -848,6 +856,7 @@ fn generate_mml(
                     dir: item.dir.clone(),
                     mode: item.mode.clone(),
                     exclude: item.exclude.clone(),
+                    delete_old: item.delete_old,
                 })
                 .collect(),
         ),

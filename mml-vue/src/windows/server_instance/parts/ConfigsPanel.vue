@@ -13,6 +13,7 @@ const {
   configDirs,
   configRows,
   configCount,
+  configModeOf,
   configAncestorLock,
   configDeleteLocked,
   configFileState,
@@ -21,6 +22,9 @@ const {
   configDirOn,
   configDirEditable,
   setConfigDir,
+  setConfigDeleteOld,
+  configArchiveOwner,
+  configRowDeleteOld,
   configUnderRecursive,
   configModeSelect,
   setAllConfigs,
@@ -41,13 +45,30 @@ function fileTitle(path: string): string | undefined {
   return undefined;
 }
 
-/** 目录复选框不可用时的说明 */
+/** 目录勾选框不可用时的说明 */
 function dirTitle(path: string): string | undefined {
   if (configDeleteLocked(path)) return t("serverInstance.configFileLocked");
   const lock = configAncestorLock(path);
   if (lock === "none") return t("serverInstance.configNoneLock");
   if (lock === "recursive") return t("serverInstance.configFollowHint");
   return undefined;
+}
+
+/** 这一行能不能自己改"删旧目录"：自己有压缩包、且不是删除目录 */
+function deleteOldEditable(path: string): boolean {
+  return configArchiveOwner(path) === path && configModeOf(path) !== "delete";
+}
+
+/** 删旧目录勾选框的说明 */
+function deleteOldTitle(path: string): string {
+  const owner = configArchiveOwner(path);
+  if (owner === path) {
+    return configModeOf(path) === "delete"
+      ? t("serverInstance.configDeleteOldLocked")
+      : t("serverInstance.configDeleteOldHint");
+  }
+  if (owner) return t("serverInstance.configDeleteOldFollow", { dir: owner });
+  return t("serverInstance.configDeleteOldNone");
 }
 
 /** 文件或文件夹大小，按档显示 */
@@ -71,19 +92,20 @@ function sizeText(size: number): string {
     </BaseButton>
   </div>
 
-  <!-- 三列对齐：名字（按层级缩进）/ 大小 / 同步方式 -->
+  <!-- 四列对齐：名字（按层级缩进）/ 大小 / 同步方式 / 删除原有目录 -->
   <div class="si-table-card">
     <div class="si-config-tree">
       <div class="si-config-head">
         <span>{{ t("serverInstance.configName") }}</span>
         <span class="si-config-size">{{ t("serverInstance.configSize") }}</span>
         <span>{{ t("serverInstance.configMode") }}</span>
+        <span class="si-config-delete">{{ t("serverInstance.configDeleteOld") }}</span>
       </div>
       <p v-if="!configDirs.length" class="empty-tip">{{ t("serverInstance.configEmpty") }}</p>
       <div v-for="row in configRows" :key="row.path" class="si-config-row"
         :class="{ 'is-changed': changedPaths.has(row.path) || (row.depth === 0 && changedPaths.has(row.root)) }">
         <div class="si-config-name" :style="{ paddingLeft: `${row.depth * 16}px` }">
-          <!-- 勾选框在最左：文件直接勾选，目录勾上就是按默认方式同步 -->
+          <!-- 勾选框：文件 / 目录都可以取消同步；目录的"删旧目录"在右边单独一列 -->
           <span class="si-check">
             <input v-if="row.dir" type="checkbox" class="si-box"
               :checked="configDirOn(row.path)" :disabled="busy || !configDirEditable(row.path)"
@@ -137,6 +159,13 @@ function sizeText(size: number): string {
               </option>
             </select>
           </template>
+        </div>
+        <div class="si-config-delete-cell">
+          <input v-if="row.dir" type="checkbox" class="si-box"
+            :checked="configRowDeleteOld(row.path)"
+            :disabled="busy || !deleteOldEditable(row.path)"
+            :title="deleteOldTitle(row.path)"
+            @change="setConfigDeleteOld(row.path, ($event.target as HTMLInputElement).checked)" />
         </div>
       </div>
     </div>

@@ -280,7 +280,7 @@
 .si-config-head,
 .si-config-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 96px 190px;
+  grid-template-columns: minmax(0, 1fr) 96px 190px 96px;
   align-items: center;
   gap: 10px;
   padding: 0 10px;
@@ -352,6 +352,12 @@
   display: flex;
   justify-content: flex-end;
   min-width: 0;
+}
+
+/* 删除原有目录：勾选框单独一列，跟在同步方式后面 */
+.si-config-delete-cell {
+  display: flex;
+  align-items: center;
 }
 
 /* 行内控件与控件表同一档高度，才收得进 34px 的行 */

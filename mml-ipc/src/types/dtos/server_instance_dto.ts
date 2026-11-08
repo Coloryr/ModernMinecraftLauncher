@@ -28,6 +28,7 @@ export type ServerInstanceConfigDto = {
   dir: string,
   mode: string,
   exclude: string[],
+  deleteOld: boolean | null,
 };
 
 export type ServerInstanceProgressDto = {

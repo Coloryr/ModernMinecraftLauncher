@@ -147,6 +147,8 @@ const packIdTypeEdits = ref(new Set<string>());
 const configDirs = ref<ExportEntryDto[]>([]);
 /** 目录路径 → 同步方式；没配过的子目录按不同步处理 */
 const configModes = ref(new Map<string, ConfigMode>());
+/** 目录 → 压缩包解压前是否先删旧目录；没记过按同步方式的默认值 */
+const configDeleteOld = ref(new Map<string, boolean>());
 /** 取消勾选的文件，相对游戏目录 */
 const configExcluded = ref(new Set<string>());
 /** 展开后加载到的子项，目录路径 → 直接子项 */
@@ -449,6 +451,27 @@ function configModeOf(path: string): ConfigMode {
 }
 
 /**
+ * 一个目录实际生效的同步方式
+ *
+ * 自己没配、上级又是整包 / 整目录时，它跟着上级走；上级不覆盖时才按"子目录默认不同步"。
+ * 少了这一步，第二层往后没单独配过的目录会被当成"不同步"，界面上就显示成不同步而不是跟随上级。
+ *
+ * - `path`: 目录路径
+ *
+ * # 返回值
+ *
+ * 实际生效的方式
+ */
+function configEffectiveMode(path: string): ConfigMode {
+  const own = configModes.value.get(path);
+  if (own) return own;
+  const cut = path.lastIndexOf("/");
+  if (cut < 0) return defaultConfigMode(path);
+  const parent = configEffectiveMode(path.slice(0, cut));
+  return parent === "archiveAll" || parent === "filesAll" ? parent : "none";
+}
+
+/**
  * 上级目录对当前行的锁定类型
  *
  * - `none`：上级选了不同步，整棵子树都锁成不同步；
@@ -462,7 +485,7 @@ function configAncestorLock(path: string): "none" | "recursive" | "delete" | nul
   const parts = path.split("/");
   for (let index = 1; index < parts.length; index += 1) {
     const dir = parts.slice(0, index).join("/");
-    const mode = configModeOf(dir);
+    const mode = configEffectiveMode(dir);
     if (mode === "none") return "none";
     if (mode === "delete") return "delete";
     if (mode === "filesAll") return "recursive";
@@ -484,7 +507,7 @@ function configAncestorLock(path: string): "none" | "recursive" | "delete" | nul
 function configUnderRecursive(path: string): boolean {
   const parts = path.split("/");
   for (let index = 1; index < parts.length; index += 1) {
-    const mode = configModeOf(parts.slice(0, index).join("/"));
+    const mode = configEffectiveMode(parts.slice(0, index).join("/"));
     if (mode === "archiveAll" || mode === "filesAll") return true;
   }
   return false;
@@ -505,22 +528,104 @@ function configDeleteLocked(path: string): boolean {
   return false;
 }
 
-/** 文件归属的同步条目；没有任何目录覆盖时返回 null */
+/**
+ * 文件归属的同步条目；没有任何目录覆盖时返回 null
+ *
+ * 从最近的上级往上找第一个定过方式的目录：近的说了算，否则外层整包会把里层的
+ * 「不同步」盖掉，表现为子目录已经灰了、里面的文件却还能勾。
+ */
 function configFileOwner(path: string): { dir: string; mode: ConfigMode } | null {
   const parts = path.split("/");
   const parent = parts.slice(0, -1).join("/");
-  for (let index = 1; index < parts.length; index += 1) {
+  for (let index = parts.length - 1; index >= 1; index -= 1) {
     const dir = parts.slice(0, index).join("/");
-    const mode = configModeOf(dir);
-    // 上级不同步时整棵子树都不参与，里面的文件没有归属
+    // 没单独配过的中间目录跳过，继续往上；顶层没配过时按默认方式
+    const mode = configModes.value.get(dir) ?? (dir.includes("/") ? null : defaultConfigMode(dir));
+    if (!mode) continue;
     if (mode === "none") return null;
     if (mode === "delete") return { dir, mode };
     if (mode === "archiveAll" || mode === "filesAll") return { dir, mode };
-    if ((mode === "archiveSelf" || mode === "filesSelf") && dir === parent) {
-      return { dir, mode };
-    }
+    // 「本目录」只管直接文件：更深层的文件不属于这个条目
+    return dir === parent ? { dir, mode } : null;
   }
   return null;
+}
+
+/** 同步方式自带的"解压前删旧目录"默认值 */
+function modeDeletesOld(mode: ConfigMode): boolean {
+  return mode === "archiveAll" || mode === "delete";
+}
+
+/**
+ * 这个目录的压缩包解压前删不删旧目录
+ *
+ * - `path`: 目录路径
+ *
+ * # 返回值
+ *
+ * 单独改过就用改过的值，否则按当前同步方式的默认值
+ */
+function configDeleteOldOf(path: string): boolean {
+  const own = configDeleteOld.value.get(path);
+  if (own !== undefined) return own;
+  return modeDeletesOld(configModeOf(path));
+}
+
+/**
+ * 这一行由哪个压缩包带走
+ *
+ * 自己有压缩包方式就是它自己；否则看最近一层有配置的上级——整包会把它一起带走，
+ * 逐文件 / 本目录 / 不同步都不算。都没配过时按顶层默认方式算。
+ *
+ * - `path`: 目录路径
+ *
+ * # 返回值
+ *
+ * 负责它的目录路径；不在任何压缩包里时为 null
+ */
+function configArchiveOwner(path: string): string | null {
+  const own = configModes.value.get(path);
+  if (own === "archiveAll" || own === "archiveSelf" || own === "delete") return path;
+  // 自己选了逐文件 / 不同步：不再是压缩包，也不跟着上级
+  if (own) return null;
+  const parts = path.split("/");
+  for (let index = parts.length - 1; index >= 1; index -= 1) {
+    const dir = parts.slice(0, index).join("/");
+    const mode = configModes.value.get(dir);
+    if (!mode) continue;
+    return mode === "archiveAll" || mode === "delete" ? dir : null;
+  }
+  const top = parts[0];
+  return defaultConfigMode(top) === "archiveAll" ? top : null;
+}
+
+/**
+ * 这一行实际生效的"解压前删旧目录"
+ *
+ * - `path`: 目录路径
+ *
+ * # 返回值
+ *
+ * 跟着带它的那个压缩包走；不在压缩包里时为 false
+ */
+function configRowDeleteOld(path: string): boolean {
+  const owner = configArchiveOwner(path);
+  return owner ? configDeleteOldOf(owner) : false;
+}
+
+/**
+ * 改一个目录的"解压前删旧目录"
+ *
+ * 删除目录恒为真（空包就是用来删目录的），这里直接挡掉。
+ *
+ * - `path`: 目录路径
+ * - `on`: 是否先删旧目录
+ */
+function setConfigDeleteOld(path: string, on: boolean) {
+  if (configModeOf(path) === "delete") return;
+  const next = new Map(configDeleteOld.value);
+  next.set(path, on);
+  configDeleteOld.value = next;
 }
 
 /**
@@ -546,7 +651,7 @@ function configDirOn(path: string): boolean {
 /**
  * 目录的勾选框能不能点
  *
- * 上级已经决定（整棵子树不同步 / 整包同步）或目录要删除时，自己的设置不生效。
+ * 上级已经决定（整棵子树不同步、整目录逐文件）或目录要删除时，自己的设置不生效。
  *
  * - `path`: 目录路径
  *
@@ -905,6 +1010,12 @@ async function loadInstance(uuid: string) {
     for (const entry of configDirs.value) modes.set(entry.path, defaultConfigMode(entry.path));
   }
   configModes.value = modes;
+  // 解压前删旧目录跟着上次生成走；没记过的按同步方式的默认值
+  configDeleteOld.value = new Map(
+    (meta?.configs ?? [])
+      .filter((item) => item.deleteOld !== null)
+      .map((item) => [item.dir, item.deleteOld as boolean]),
+  );
   // 取消勾选跟着上次生成走：发布者只排掉个别文件的设置要还在
   const excluded = new Set<string>();
   if (Array.isArray(meta?.configs)) {
@@ -1079,6 +1190,7 @@ function clearInstance() {
   packIdTypes.value = new Map();
   packIdTypeEdits.value = new Set();
   configModes.value = new Map();
+  configDeleteOld.value = new Map();
   configExcluded.value = new Set();
   configDirs.value = [];
   configChildren.value = new Map();
@@ -1235,6 +1347,8 @@ function buildOptions(): ServerInstanceOptionsDto {
       .map(([dir, mode]) => ({
         dir,
         mode,
+        // 压缩包解压前先删旧目录；界面上的勾选，删除目录恒为真
+        deleteOld: configDeleteOldOf(dir),
         // 只把这条目录负责的范围里的取消勾选传下去，子目录自己的条目另算
         exclude: [...configExcluded.value].filter(
           (path) => path === dir || path.startsWith(`${dir}/`),
@@ -1374,7 +1488,9 @@ onBeforeUnmount(() => {
     setPackId, setPackUrl, packIdTypeOf, isPackCustomType, setPackIdType,
     configDirs, configModes, configRows, configCount, configModeOf, configAncestorLock,
     configDeleteLocked, configFileState, setConfigFile, toggleConfigFile,
-    configDirOn, configDirEditable, setConfigDir, configUnderRecursive, configModeSelect,
+    configDirOn, configDirEditable, setConfigDir,
+    configDeleteOldOf, setConfigDeleteOld, configArchiveOwner, configRowDeleteOld,
+    configUnderRecursive, configModeSelect,
     setAllConfigs, setConfigMode,
     toggleConfigExpand, isConfigOpen, isConfigLoading,
     pickInstance, openGuide,

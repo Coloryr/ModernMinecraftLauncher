@@ -44,6 +44,7 @@ fn options(
                 dir: dir.to_string(),
                 mode: mode.to_string(),
                 exclude: Vec::new(),
+                delete_old: None,
             })
             .collect(),
         base_files: Vec::new(),
@@ -71,10 +72,17 @@ fn contents(base: &Path, options: &ServerInstanceOptionsDto) -> Contents {
         configs: options
             .configs
             .iter()
-            .map(|item| ConfigDir {
-                dir: item.dir.clone(),
-                mode: ConfigMode::parse(&item.mode).unwrap(),
-                exclude: item.exclude.clone(),
+            .map(|item| {
+                let mode = ConfigMode::parse(&item.mode).unwrap();
+                // 与生成时同一套默认：不给就按方式自带的，删除目录恒为真
+                let delete_old = matches!(mode, ConfigMode::Delete)
+                    || item.delete_old.unwrap_or_else(|| mode.deletes_old());
+                ConfigDir {
+                    dir: item.dir.clone(),
+                    mode,
+                    exclude: item.exclude.clone(),
+                    delete_old,
+                }
             })
             .collect(),
         packs: options
@@ -799,6 +807,38 @@ fn mml_excludes_none_subdirectory_from_parent_archive() {
         "父包不该包含被排除的子目录: {names:?}"
     );
     assert_eq!(result.count, 1);
+
+    crate::test_support::cleanup(&[&base, &out]);
+}
+
+/// 整包同步关掉"解压前删旧目录"后，清单里的 delete_old 跟着变
+#[test]
+fn mml_honours_delete_old_override() {
+    crate::test_support::ensure_boot();
+    let base = crate::test_support::temp_dir("server-instance-delete-old");
+    let out = crate::test_support::temp_dir("server-instance-delete-old-out");
+    fs::create_dir_all(base.join("config")).unwrap();
+    fs::write(base.join("config").join("a.toml"), b"a").unwrap();
+
+    let mut options = options(&[], &[("config", "archive")], &[]);
+    options.configs[0].delete_old = Some(false);
+    let contents = contents(&base, &options);
+    generate_mml(
+        &game(),
+        &HashMap::new(),
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    let pack: ServerPackObj =
+        serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
+    assert_eq!(pack.archive_list.len(), 1);
+    assert!(!pack.archive_list[0].delete_old, "关掉后不该再删旧目录");
 
     crate::test_support::cleanup(&[&base, &out]);
 }
