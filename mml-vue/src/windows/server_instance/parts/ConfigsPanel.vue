@@ -4,7 +4,7 @@ import BaseButton from "../../../components/ui/BaseButton.vue";
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import { t } from "../../../lib/i18n";
 import { ServerInstanceKey } from "../context";
-import type { ConfigMode } from "../useServerInstance";
+import { CONFIG_MODE_INHERIT, type ConfigMode } from "../useServerInstance";
 const ctx = inject(ServerInstanceKey);
 if (!ctx) throw new Error("server instance context missing");
 const {
@@ -13,12 +13,16 @@ const {
   configDirs,
   configRows,
   configCount,
-  configModeOf,
   configAncestorLock,
   configDeleteLocked,
   configFileState,
   setConfigFile,
   toggleConfigFile,
+  configDirOn,
+  configDirEditable,
+  setConfigDir,
+  configUnderRecursive,
+  configModeSelect,
   setAllConfigs,
   setConfigMode,
   toggleConfigExpand,
@@ -34,6 +38,15 @@ function fileTitle(path: string): string | undefined {
   const state = configFileState(path);
   if (state === "none") return t("serverInstance.configFileNoOwner");
   if (state === "locked") return t("serverInstance.configFileLocked");
+  return undefined;
+}
+
+/** 目录复选框不可用时的说明 */
+function dirTitle(path: string): string | undefined {
+  if (configDeleteLocked(path)) return t("serverInstance.configFileLocked");
+  const lock = configAncestorLock(path);
+  if (lock === "none") return t("serverInstance.configNoneLock");
+  if (lock === "recursive") return t("serverInstance.configFollowHint");
   return undefined;
 }
 
@@ -70,16 +83,21 @@ function sizeText(size: number): string {
       <div v-for="row in configRows" :key="row.path" class="si-config-row"
         :class="{ 'is-changed': changedPaths.has(row.path) || (row.depth === 0 && changedPaths.has(row.root)) }">
         <div class="si-config-name" :style="{ paddingLeft: `${row.depth * 16}px` }">
-          <span class="si-caret" :class="{ open: isConfigOpen(row.path) }"
-            @click="row.dir && !configDeleteLocked(row.path) && toggleConfigExpand(row.path)">
-            <GlyphIcon v-if="row.dir && !configDeleteLocked(row.path)" name="chevron-down" :size="12" :weight="2.4" />
-          </span>
+          <!-- 勾选框在最左：文件直接勾选，目录勾上就是按默认方式同步 -->
           <span class="si-check">
-            <input v-if="!row.dir" type="checkbox" class="si-box"
+            <input v-if="row.dir" type="checkbox" class="si-box"
+              :checked="configDirOn(row.path)" :disabled="busy || !configDirEditable(row.path)"
+              :title="dirTitle(row.path)"
+              @change="setConfigDir(row.path, ($event.target as HTMLInputElement).checked)" />
+            <input v-else type="checkbox" class="si-box"
               :checked="configFileState(row.path) === 'on'"
               :disabled="busy || configFileState(row.path) === 'none' || configFileState(row.path) === 'locked'"
               :title="fileTitle(row.path)"
               @change="setConfigFile(row.path, ($event.target as HTMLInputElement).checked)" />
+          </span>
+          <span class="si-caret" :class="{ open: isConfigOpen(row.path) }"
+            @click="row.dir && !configDeleteLocked(row.path) && toggleConfigExpand(row.path)">
+            <GlyphIcon v-if="row.dir && !configDeleteLocked(row.path)" name="chevron-down" :size="12" :weight="2.4" />
           </span>
           <span class="si-name" :class="{ dir: row.dir }" :title="row.path"
             @click="row.dir
@@ -107,9 +125,13 @@ function sizeText(size: number): string {
               :title="t('serverInstance.configNoneLock')" :aria-label="t('serverInstance.configMode')">
               <option value="none">{{ t("serverInstance.sync.none") }}</option>
             </select>
-            <select v-else class="field-select si-cell-control si-config-mode" :value="configModeOf(row.path)"
+            <select v-else class="field-select si-cell-control si-config-mode" :value="configModeSelect(row.path)"
               :disabled="busy" :aria-label="t('serverInstance.configMode')"
               @change="setConfigMode(row.path, $event)">
+              <!-- 整包 / 整目录底下才有"跟着上级"这一项：选了就不单独配方式 -->
+              <option v-if="configUnderRecursive(row.path)" :value="CONFIG_MODE_INHERIT">
+                {{ t("serverInstance.configFollow") }}
+              </option>
               <option v-for="mode in MODES" :key="mode" :value="mode">
                 {{ t(`serverInstance.sync.${mode}`) }}
               </option>
@@ -119,7 +141,5 @@ function sizeText(size: number): string {
       </div>
     </div>
   </div>
-  <p class="field-hint">{{ t("serverInstance.configHint") }}</p>
-  <p class="field-hint">{{ t("serverInstance.configSelfHint") }}</p>
 </section>
 </template>

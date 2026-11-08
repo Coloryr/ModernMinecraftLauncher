@@ -77,7 +77,7 @@ pub(super) struct Meta {
 pub(super) struct MetaConfig {
     /// 目录名，相对游戏目录
     pub(super) dir: String,
-    /// 同步方式：archiveAll / archiveSelf / filesAll / filesSelf / delete
+    /// 同步方式：archiveAll / archiveSelf / filesAll / filesSelf / delete / none
     pub(super) mode: String,
     /// 取消勾选的文件，相对游戏目录
     pub(super) exclude: Vec<String>,

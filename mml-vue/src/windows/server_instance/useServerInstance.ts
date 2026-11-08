@@ -25,6 +25,9 @@ import type {
   ServerInstanceSnapshotDto,
 } from "../../lib/bindings";
 
+/** 同步方式下拉里"跟着上级走"的占位值：选中它就删掉自己的条目 */
+export const CONFIG_MODE_INHERIT = "inherit";
+
 /** 文件夹的同步方式 */
 export type ConfigMode =
   | "none"
@@ -449,9 +452,11 @@ function configModeOf(path: string): ConfigMode {
  * 上级目录对当前行的锁定类型
  *
  * - `none`：上级选了不同步，整棵子树都锁成不同步；
- * - `recursive`：上级选了整包 / 整目录，方式跟着上级走；
+ * - `recursive`：上级选了整目录逐文件，方式跟着上级走；
  * - `delete`：上级要删目录，子树不能展开也不能选；
  * - `null`：没有上级锁定，按自己的方式同步。
+ *
+ * 整包同步不锁子目录：子目录可以取消勾选，从父包的压缩包里排出去。
  */
 function configAncestorLock(path: string): "none" | "recursive" | "delete" | null {
   const parts = path.split("/");
@@ -460,9 +465,29 @@ function configAncestorLock(path: string): "none" | "recursive" | "delete" | nul
     const mode = configModeOf(dir);
     if (mode === "none") return "none";
     if (mode === "delete") return "delete";
-    if (mode === "archiveAll" || mode === "filesAll") return "recursive";
+    if (mode === "filesAll") return "recursive";
   }
   return null;
+}
+
+/**
+ * 上级里有没有整包 / 整目录的目录
+ *
+ * 有的话"跟随上级"是一个可选项：不给自己配方式，就跟着上级的包一起下发。
+ *
+ * - `path`: 目录路径
+ *
+ * # 返回值
+ *
+ * 有整包 / 整目录的上级时为 true
+ */
+function configUnderRecursive(path: string): boolean {
+  const parts = path.split("/");
+  for (let index = 1; index < parts.length; index += 1) {
+    const mode = configModeOf(parts.slice(0, index).join("/"));
+    if (mode === "archiveAll" || mode === "filesAll") return true;
+  }
+  return false;
 }
 
 /** 是否被上级目录锁定，自己设置的方式不生效 */
@@ -498,6 +523,62 @@ function configFileOwner(path: string): { dir: string; mode: ConfigMode } | null
   return null;
 }
 
+/**
+ * 目录的勾选状态：这个目录参不参与同步
+ *
+ * 与右侧「同步方式」是同一个开关的两种说法：勾上按默认方式同步，取消就是不同步。
+ *
+ * - `path`: 目录路径
+ *
+ * # 返回值
+ *
+ * 参与同步时为 true
+ */
+function configDirOn(path: string): boolean {
+  const own = configModes.value.get(path);
+  if (own) return own !== "none" && own !== "delete";
+  const mode = configModeOf(path);
+  if (mode !== "none" && mode !== "delete") return true;
+  // 自己没配过的子目录：上级整包 / 整目录时是跟着一起进包的
+  return configUnderRecursive(path);
+}
+
+/**
+ * 目录的勾选框能不能点
+ *
+ * 上级已经决定（整棵子树不同步 / 整包同步）或目录要删除时，自己的设置不生效。
+ *
+ * - `path`: 目录路径
+ *
+ * # 返回值
+ *
+ * 可以自由切换时为 true
+ */
+function configDirEditable(path: string): boolean {
+  return configAncestorLock(path) === null && !configDeleteLocked(path);
+}
+
+/**
+ * 勾选 / 取消一个目录
+ *
+ * - 取消：显式记成不同步，父目录整包时会把这块排出去；
+ * - 勾上：已经有自己的方式就保持，否则在整包 / 整目录的上级底下收回条目，回到"跟着上级"。
+ */
+function setConfigDir(path: string, on: boolean) {
+  if (!configDirEditable(path)) return;
+  if (!on) {
+    applyConfigMode(path, "none");
+    return;
+  }
+  const own = configModes.value.get(path);
+  if (own && own !== "none" && own !== "delete") return;
+  if (configUnderRecursive(path)) {
+    if (own) dropConfigMode(path);
+    return;
+  }
+  applyConfigMode(path, defaultConfigMode(path));
+}
+
 /** 文件勾选状态：没归属、被删除目录锁定、已勾、取消勾选 */
 function configFileState(path: string): "on" | "off" | "locked" | "none" {
   const owner = configFileOwner(path);
@@ -520,14 +601,45 @@ function toggleConfigFile(path: string) {
   if (state === "on" || state === "off") setConfigFile(path, state !== "on");
 }
 
-/** 改一个目录的同步方式 */
+/** 改一个目录的同步方式；选"跟随上级"就收回自己的条目 */
 function setConfigMode(dir: string, event: Event) {
   // 被上级锁定的行是禁用状态，这里再挡一次，别让程序调用改掉
   if (configAncestorLock(dir) !== null) return;
-  const mode = (event.target as HTMLSelectElement).value as ConfigMode;
+  const value = (event.target as HTMLSelectElement).value;
+  if (value === CONFIG_MODE_INHERIT) {
+    dropConfigMode(dir);
+    return;
+  }
+  applyConfigMode(dir, value as ConfigMode);
+}
+
+/** 写一个目录的同步方式 */
+function applyConfigMode(dir: string, mode: ConfigMode) {
   const next = new Map(configModes.value);
   next.set(dir, mode);
   configModes.value = next;
+}
+
+/** 删掉一个目录自己的同步方式，回到跟随上级 */
+function dropConfigMode(dir: string) {
+  const next = new Map(configModes.value);
+  next.delete(dir);
+  configModes.value = next;
+}
+
+/**
+ * 同步方式下拉当前该显示什么
+ *
+ * - `path`: 目录路径
+ *
+ * # 返回值
+ *
+ * 自己配过就用自己的方式；否则在整包 / 整目录底下显示"跟随上级"的占位值
+ */
+function configModeSelect(path: string): string {
+  const own = configModes.value.get(path);
+  if (own) return own;
+  return configUnderRecursive(path) ? CONFIG_MODE_INHERIT : configModeOf(path);
 }
 
 /** 全部整包同步 / 全部不同步；清掉子目录各自的设置 */
@@ -1116,9 +1228,10 @@ function buildOptions(): ServerInstanceOptionsDto {
         optional: optionalMods.value.has(path),
       };
     }),
-    // 被上级递归方式覆盖的子目录不重复下发，交给上级那一条
+    // 被上级递归方式覆盖的子目录不重复下发，交给上级那一条；
+    // 不同步的条目也要带上——父目录整包时靠它把这块子目录从压缩包里排出去
     configs: [...configModes.value]
-      .filter(([path, mode]) => mode !== "none" && !configCovered(path))
+      .filter(([path]) => !configCovered(path))
       .map(([dir, mode]) => ({
         dir,
         mode,
@@ -1261,6 +1374,7 @@ onBeforeUnmount(() => {
     setPackId, setPackUrl, packIdTypeOf, isPackCustomType, setPackIdType,
     configDirs, configModes, configRows, configCount, configModeOf, configAncestorLock,
     configDeleteLocked, configFileState, setConfigFile, toggleConfigFile,
+    configDirOn, configDirEditable, setConfigDir, configUnderRecursive, configModeSelect,
     setAllConfigs, setConfigMode,
     toggleConfigExpand, isConfigOpen, isConfigLoading,
     pickInstance, openGuide,

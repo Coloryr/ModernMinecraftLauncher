@@ -132,7 +132,7 @@ pub(super) fn export_pack(
                 ConfigMode::ArchiveSelf | ConfigMode::FilesSelf => {
                     files::dir_direct_files(&game_path, &dir)?
                 }
-                ConfigMode::Delete => continue,
+                ConfigMode::Delete | ConfigMode::None => continue,
             };
             files::retain_excluded(&game_path, &mut list, &item.exclude)?;
             for rel in list {

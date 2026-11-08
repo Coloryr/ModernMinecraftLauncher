@@ -297,9 +297,9 @@
   border-bottom: 1px solid var(--border);
 }
 
-/* 表头首列对齐文件行的勾选框：箭头 16 + 间距 8，网格自身的 10 已经算在里面 */
+/* 表头首列对齐名字：勾选框 16 + 间距 8 + 箭头 16 + 间距 8，网格自身的 10 已经算在里面 */
 .si-config-head > :first-child {
-  padding-left: 24px;
+  padding-left: 48px;
 }
 
 .si-config-head > :nth-child(3) {
@@ -332,7 +332,7 @@
   min-width: 0;
 }
 
-/* 勾选框占位：目录行留空，文件行才画，名字才能对齐 */
+/* 勾选框占位：文件与目录都有，压在展开箭头左边，名字才能对齐 */
 .si-check {
   display: flex;
   align-items: center;

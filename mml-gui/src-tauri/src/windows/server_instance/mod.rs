@@ -290,6 +290,8 @@ enum ConfigMode {
     FilesSelf,
     /// 生成一个空压缩包，让客户端删掉这个目录
     Delete,
+    /// 这个子目录不参与同步：父目录整包 / 整目录时把它排出去，自己不产出条目
+    None,
 }
 
 impl ConfigMode {
@@ -305,6 +307,7 @@ impl ConfigMode {
     fn parse(value: &str) -> Result<Self, String> {
         match value.trim() {
             "" | "archive" | "archiveAll" => Ok(Self::ArchiveAll),
+            "none" => Ok(Self::None),
             "archiveSelf" => Ok(Self::ArchiveSelf),
             "files" | "filesAll" => Ok(Self::FilesAll),
             "filesSelf" => Ok(Self::FilesSelf),
@@ -552,25 +555,29 @@ fn generate_mml(
             ConfigMode::ArchiveSelf | ConfigMode::FilesSelf => {
                 files::dir_direct_files(base, &config.dir)?
             }
-            // 删除目录不需要读内容
-            ConfigMode::Delete => Vec::new(),
+            // 删除目录与被排除的子目录不需要读内容
+            ConfigMode::Delete | ConfigMode::None => Vec::new(),
         };
-        // 父目录的包要排掉已单独选中的子目录，子目录自己的包负责那部分
+        // 父目录的包要排掉所有单独配置过的下级目录，那些目录自己的条目负责。
+        // 用全部下级而不是直接子目录：中间层保持"跟随上级"时不会出现在清单里，
+        // 只排直接子目录会漏掉更深的排除项。
         let prefix = format!("{}/", config.dir);
         let children: Vec<&str> = contents
             .configs
             .iter()
             .map(|item| item.dir.as_str())
-            .filter(|dir| dir.starts_with(&prefix) && !dir[prefix.len()..].contains('/'))
+            .filter(|dir| dir.starts_with(&prefix))
             .collect();
         if !children.is_empty() && config.mode.recursive() {
             list.retain(|rel| !children.iter().any(|child| rel.starts_with(*child)));
         }
         files::retain_excluded(base, &mut list, &config.exclude)?;
         // 删除目录与空目录整包同步要留空压缩包；其余情况没有文件就不生成条目。
-        // 整包同步把文件全取消勾选时不写空包，避免误删客户端目录。
+        // 整包同步把文件全取消勾选、或所有下级都单独配过时不写空包，避免误删客户端目录。
         let keep_empty = matches!(config.mode, ConfigMode::Delete)
-            || (matches!(config.mode, ConfigMode::ArchiveAll) && config.exclude.is_empty());
+            || (matches!(config.mode, ConfigMode::ArchiveAll)
+                && config.exclude.is_empty()
+                && children.is_empty());
         if list.is_empty() && !keep_empty {
             continue;
         }

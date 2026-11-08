@@ -754,6 +754,54 @@ fn mml_splits_selected_subdirectory_into_own_archive() {
     crate::test_support::cleanup(&[&base, &out]);
 }
 
+/// 整包同步的父目录下把子目录显式设为不同步：父包排除它，也不为它单独生成条目
+#[test]
+fn mml_excludes_none_subdirectory_from_parent_archive() {
+    crate::test_support::ensure_boot();
+    let base = crate::test_support::temp_dir("server-instance-none-child");
+    let out = crate::test_support::temp_dir("server-instance-none-child-out");
+    fs::create_dir_all(base.join("config").join("keep")).unwrap();
+    fs::write(base.join("config").join("a.toml"), b"a").unwrap();
+    fs::write(base.join("config").join("keep").join("b.toml"), b"b").unwrap();
+
+    let options = options(
+        &[],
+        &[("config", "archive"), ("config/keep", "none")],
+        &[],
+    );
+    let contents = contents(&base, &options);
+    let result = generate_mml(
+        &game(),
+        &HashMap::new(),
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    let pack: ServerPackObj =
+        serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
+    assert_eq!(pack.archive_list.len(), 1, "被排除的子目录不该有自己的包");
+    assert_eq!(pack.archive_list[0].file, "config.zip");
+
+    let parent = mml_base::archives::BaseArchive::open_readonly(out.join("config.zip")).unwrap();
+    let names: Vec<String> = parent
+        .entries()
+        .iter()
+        .map(|item| item.name.clone())
+        .collect();
+    assert!(names.iter().any(|name| name == "a.toml"), "{names:?}");
+    assert!(
+        !names.iter().any(|name| name == "keep/b.toml"),
+        "父包不该包含被排除的子目录: {names:?}"
+    );
+    assert_eq!(result.count, 1);
+
+    crate::test_support::cleanup(&[&base, &out]);
+}
 
 /// 实例根目录下的文件打成固定 base.zip，清单里写 Base
 #[test]
