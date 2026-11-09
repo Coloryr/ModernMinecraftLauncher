@@ -127,9 +127,12 @@
   padding-right: calc(26px - 9px);
 }
 
-/* 撑满的页自己不滚（滚动交给里面的列表 / 表格），没有槽位，右缘直接留 26px */
+/* 撑满的页自己不滚（滚动交给里面的列表 / 表格），没有槽位，右缘直接留 26px。
+   scrollbar-gutter 必须显式取消：基类的 stable 在 overflow: hidden 下照样占 9px，
+   不取消的话这四页的内容右缘会比页头多缩 9px（同 WindowFrame 的 .frame-body.fill） */
 .si-section.stretch {
   overflow: hidden;
+  scrollbar-gutter: auto;
   padding-right: 26px;
 }
 

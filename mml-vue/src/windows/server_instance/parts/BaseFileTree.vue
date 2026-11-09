@@ -92,17 +92,12 @@ function sizeText(size: number): string {
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
-// 换实例就整棵树重来，默认展开 .minecraft：基础文件通常都从它里面挑
+// 换实例就整棵树重来；目录默认全部收起，由用户自己展开
 watch(
   () => [props.uuid, props.root] as const,
-  async () => {
+  () => {
     children.value = new Map();
     opened.value = new Set();
-    if (!props.uuid) return;
-    const game = props.root.find((entry) => entry.dir && entry.path === ".minecraft");
-    if (!game) return;
-    opened.value.add(game.path);
-    await load(game.path);
   },
   { immediate: true },
 );

@@ -44,10 +44,11 @@ const {
     <BaseButton size="sm" :disabled="busy" @click="pickAllPacks(false)">
       {{ t("serverInstance.pickNone") }}
     </BaseButton>
-    <BaseButton size="sm" :disabled="busy || loading" @click="refreshPacks">
-      <GlyphIcon name="refresh" :size="13" :weight="2" />
-      {{ t("serverInstance.refresh") }}
-    </BaseButton>
+    <button class="ui-btn-icon" :disabled="busy || loading"
+      v-tip="t('serverInstance.refresh')" :aria-label="t('serverInstance.refresh')"
+      @click="refreshPacks">
+      <GlyphIcon name="refresh" :size="14" :weight="2" />
+    </button>
   </div>
   <div v-if="packChanges" class="si-changes">
     <span class="si-change add" :title="packChanges.added.join('\n')">+{{ addedPacks.size }}</span>

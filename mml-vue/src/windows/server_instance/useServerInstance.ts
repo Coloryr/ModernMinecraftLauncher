@@ -88,6 +88,7 @@ const FILES_DIRS = ["kubejs"];
 const BASE_SKIP = [
   "game.json",
   "icon.png",
+  "modfileinfo.json",
   "server.json",
   "server.json.sha1",
   "server.json.old",
@@ -95,6 +96,12 @@ const BASE_SKIP = [
 ];
 /** 实例根目录里不列出的运行期目录 */
 const BASE_DIR_SKIP = ["cache", "temp", "backup"];
+
+/** 实例根目录的这一条要不要列进基础文件：运行期目录与启动器元数据不列 */
+function baseEntryKept(entry: ExportEntryDto): boolean {
+  if (entry.dir) return !BASE_DIR_SKIP.includes(entry.path);
+  return !entry.path.includes("/") && !BASE_SKIP.includes(entry.path);
+}
 
 /** 服务器实例操作指导 */
 const GUIDE_URL =
@@ -1209,13 +1216,10 @@ async function loadInstance(uuid: string) {
     // 实例根目录读不到就当没有基础文件
   }
   if (seq !== loadSeq) return;
-  baseEntries.value = baseNext.filter((entry) => {
-    // 顶层目录都可以整目录带上，但缓存 / 临时 / 备份目录不列
-    if (entry.dir) return !BASE_DIR_SKIP.includes(entry.path);
-    return !entry.path.includes("/") && !BASE_SKIP.includes(entry.path);
-  });
-  // 保存的是勾选时的相对路径，可能展开到了 .minecraft 里面，不能按根条目过滤
-  pickedBase.value = new Set(meta?.baseFiles ?? []);
+  baseEntries.value = baseNext.filter(baseEntryKept);
+  // 保存的是勾选时的相对路径，可能展开到了 .minecraft 里面，不能按根条目过滤；
+  // 隐藏的启动器元数据同时从勾选里去掉，免得看不见却仍被打进包
+  pickedBase.value = new Set((meta?.baseFiles ?? []).filter((path) => !BASE_SKIP.includes(path)));
 
   configDirs.value = dirsNext.filter((entry) => entry.dir && !SKIP_DIRS.includes(entry.path));
   configChildren.value = new Map();
@@ -1290,6 +1294,24 @@ async function loadInstance(uuid: string) {
   error.value = "";
   } finally {
     if (seq === loadSeq) loading.value = false;
+  }
+}
+
+/** 重新扫描实例根目录的基础文件；勾选保留，列表随根目录换一份 */
+async function refreshBase() {
+  const uuid = currentUuid.value;
+  if (!uuid || busy.value || loading.value) return;
+  loading.value = true;
+  try {
+    const next = await api.listExportInstanceDir(uuid, "");
+    if (uuid !== currentUuid.value) return;
+    baseEntries.value = next.filter(baseEntryKept);
+    result.value = null;
+    changedPaths.value = new Set();
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    loading.value = false;
   }
 }
 
@@ -1758,7 +1780,7 @@ onBeforeUnmount(() => {
   return {
     instances, currentUuid, section, sections, busy, loading, refreshMods, refreshPacks,
     name, version, text, url, folder, pickFolder,
-    baseEntries, pickedBase, pickAllBase, toggleBase,
+    baseEntries, pickedBase, pickAllBase, toggleBase, refreshBase,
     mods, modsShown, modQuery, modView, modGroups, pickedMods, pickAllMods, toggled, modPidOf, modFidOf, setModId, baseName,
     modIdTypeOf, isCustomType, setModIdType,
     optionalMods, optionalOf, toggleModOptional,

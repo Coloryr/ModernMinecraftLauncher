@@ -10,8 +10,6 @@ const { busy, name, version, text, url, folder, pickFolder } = ctx;
 
 <template>
 <section class="si-section">
-  <p class="field-hint">{{ t("serverInstance.hint.mml") }}</p>
-
   <div class="field-row-2">
     <div>
       <label class="field-label" for="si-name">{{ t("serverInstance.name") }}</label>

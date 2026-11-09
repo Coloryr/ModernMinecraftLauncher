@@ -54,20 +54,22 @@ const viewOptions = computed(() => [
 <section class="si-section stretch">
   <div class="si-section-head">
     <span class="si-counter">{{ pickedMods.size }} / {{ mods.length }}</span>
+    <span class="si-head-tools">
+      <SearchBox v-model="modQuery" :placeholder="t('serverInstance.modSearch')" width="200px" />
+      <SegmentedTabs v-model="modView" :options="viewOptions" />
+    </span>
+    <!-- 勾选与刷新统一放在工具条最右端 -->
     <BaseButton size="sm" :disabled="busy" @click="pickAllMods(true)">
       {{ t("serverInstance.pickAll") }}
     </BaseButton>
     <BaseButton size="sm" :disabled="busy" @click="pickAllMods(false)">
       {{ t("serverInstance.pickNone") }}
     </BaseButton>
-    <BaseButton size="sm" :disabled="busy || loading" @click="refreshMods">
-      <GlyphIcon name="refresh" :size="13" :weight="2" />
-      {{ t("serverInstance.refresh") }}
-    </BaseButton>
-    <span class="si-head-tools">
-      <SearchBox v-model="modQuery" :placeholder="t('serverInstance.modSearch')" width="200px" />
-      <SegmentedTabs v-model="modView" :options="viewOptions" />
-    </span>
+    <button class="ui-btn-icon" :disabled="busy || loading"
+      v-tip="t('serverInstance.refresh')" :aria-label="t('serverInstance.refresh')"
+      @click="refreshMods">
+      <GlyphIcon name="refresh" :size="14" :weight="2" />
+    </button>
   </div>
   <div v-if="modChanges" class="si-changes">
     <span class="si-change add" :title="modChanges.added.join('\n')">+{{ addedMods.size }}</span>

@@ -2627,10 +2627,6 @@ export default {
   "serverInstance.sync.delete": "删除目录",
   "serverInstance.baseCount": "{n} 个文件",
   "serverInstance.baseEmpty": "实例根目录下没有可同步的文件。",
-  "serverInstance.baseHint":
-    "基础文件打成一个固定压缩包，只在第一次导入 / 同步时下载并解压到实例根目录，后续版本更新不会再次下载；目录可以逐层展开，勾选目录表示整目录打包（.minecraft 的清单文件自动排除）；仅 MML 格式支持。",
-  "serverInstance.baseIconHint":
-    "实例图标不在这里选：生成时会单独复制成发布目录的 icon.png，并写进清单的 Icon 字段。",
   "serverInstance.summaryInstance": "实例",
   "serverInstance.summaryBase": "基础文件",
   "serverInstance.modChanges": "模组变化",
@@ -2638,8 +2634,6 @@ export default {
   "serverInstance.summaryMods": "模组",
   "serverInstance.summaryPacks": "资源包",
   "serverInstance.summaryConfigs": "配置目录",
-  "serverInstance.hint.mml":
-    "写出 server.json 与 server.json.sha1：模组按下载来源写进清单，配置文件按下面选的方式下发。",
   "serverInstance.name": "实例名",
   "serverInstance.version": "包版本",
   "serverInstance.desc": "说明",

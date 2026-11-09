@@ -2628,10 +2628,6 @@ export default {
   "serverInstance.sync.delete": "Delete folder",
   "serverInstance.baseCount": "{n} files",
   "serverInstance.baseEmpty": "No files next to .minecraft.",
-  "serverInstance.baseHint":
-    "Base files are packed into one archive, downloaded and extracted to the instance root on first import / sync only, and not downloaded again on later updates; folders can be expanded level by level and selecting a folder packs all of it (.minecraft manifest files are excluded); MML format only.",
-  "serverInstance.baseIconHint":
-    "The instance icon is not selected here: generation copies it separately as icon.png and writes it into the manifest Icon field.",
   "serverInstance.summaryInstance": "Instance",
   "serverInstance.summaryBase": "Base files",
   "serverInstance.modChanges": "Mod changes",
@@ -2639,8 +2635,6 @@ export default {
   "serverInstance.summaryMods": "Mods",
   "serverInstance.summaryPacks": "Resource packs",
   "serverInstance.summaryConfigs": "Config folders",
-  "serverInstance.hint.mml":
-    "Writes server.json and server.json.sha1: mods go into the manifest by download source, config files are distributed the way you pick below.",
   "serverInstance.name": "Instance name",
   "serverInstance.version": "Pack version",
   "serverInstance.desc": "Description",
