@@ -108,8 +108,6 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
             OPEN_WINDOWS.write().unwrap().remove(&uuid);
             remove_window_model(&uuid);
             if uuid == MAIN_WINDOW_UUID {
-                // 窗口没了，最小化标记跟着作废，下次建窗按没最小化算
-                crate::tray::main_minimized(window.app_handle(), false);
                 // 主界面关掉了：若此刻已经没有实例在跑，后台没有留下的理由。
                 // 与"最后一个实例退出"两处互相兜底，谁后发生谁收尾，见 tray::quit_idle
                 if mml_core::get_state() {
@@ -121,12 +119,8 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
         // 最大化 / 全屏时不记，否则还原后会以最大化尺寸打开
         tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_) => {
             if let Some(win) = window.app_handle().get_webview_window(&label) {
-                // 最小化时系统报的是 0×0 与占位坐标，照常存会把几何写成最小尺寸；
-                // 主窗口收进任务栏这件事本身也要让托盘知道，见 tray::main_minimized
+                // 最小化时系统报的是 0×0 与占位坐标，照常存会把几何写成最小尺寸
                 let minimized = win.is_minimized().unwrap_or(false);
-                if uuid == MAIN_WINDOW_UUID {
-                    crate::tray::main_minimized(window.app_handle(), minimized);
-                }
                 if minimized {
                     return;
                 }

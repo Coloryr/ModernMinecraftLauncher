@@ -306,18 +306,11 @@ fn first_import_skips_unchecked_optional_mods() {
     assert!(!game_path.join("mods/skip.jar").exists());
     assert!(!game_path.join("mods/skip.jar.disabled").exists());
 
-    // 跳过要记进本地清单：下次清单没变时不必再问同一份内容
-    let manifest = instance.get_server_pack_file();
-    for _ in 0..50 {
-        if manifest.exists() {
-            break;
-        }
-        std::thread::sleep(Duration::from_millis(20));
-    }
-    let local: ServerPackObj =
-        serde_json::from_slice(&std::fs::read(&manifest).unwrap()).unwrap();
-    let skipped: Vec<&str> = local.skipped.iter().map(|row| row.file.as_str()).collect();
-    assert_eq!(skipped, vec!["mods/skip.jar"]);
+    // 跳过记录写进实例的 gui_setting.json
+    let gui: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(instance.get_gui_setting_file()).unwrap()).unwrap();
+    assert_eq!(gui["ServerPack"]["Skipped"][0]["File"], "mods/skip.jar");
+
 }
 
 /// 两个可选模组，内容都指向本机那份固定字节

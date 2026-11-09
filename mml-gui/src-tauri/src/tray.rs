@@ -1,17 +1,12 @@
-//! 系统托盘：**有实例在跑、或主窗口收进任务栏时显示**。
+//! 系统托盘：**只在有实例运行时显示** —— 这时关掉主窗口进程仍留在后台
+//! （给运行中的游戏计时、随时从托盘唤回界面），托盘是后台唯一的退出入口。
 //!
-//! 有实例在跑：关掉主窗口进程仍留在后台，要给运行中的游戏计时、随时从托盘唤回界面，
-//! 托盘是后台唯一的退出入口。
+//! 没有实例在跑时既没有托盘，关窗就是退出启动器：后台没有要干的事，也不该留下
+//! 一个唤不回来的幽灵进程，见 windows::lifecycle::events 的关闭处理与
+//! lib.rs 的 ExitRequested。最小化只是把窗口收进任务栏，不是"退到后台"，不建托盘。
 //!
-//! 主窗口最小化：界面只剩任务栏按钮，再给一个不离屏的唤回入口；最小化不是关窗，
-//! 进程本来就该留着，托盘不算幽灵进程。
-//!
-//! 两者都没有时托盘收起来，关窗就是退出启动器：后台没有要干的事，见
-//! windows::lifecycle::events 的关闭处理与 lib.rs 的 ExitRequested。
-//!
-//! 托盘跟着这两件事走：实例真正启动时 sync 把它建出来，最后一个实例退出时收掉；
-//! 主窗口最小化 / 还原时同步显隐。若收掉的那一刻主界面也已经关掉，进程没有留下的理由，
-//! quit_idle 收工。
+//! 托盘跟着运行态走：实例真正启动时 sync 把它建出来，最后一个实例退出时收掉；
+//! 若收掉的那一刻主界面也已经关掉，进程没有留下的理由，quit_idle 收工。
 
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -34,9 +29,6 @@ const MENU_QUIT: &str = "quit";
 
 /// 托盘是否正在显示
 static SHOWN: AtomicBool = AtomicBool::new(false);
-
-/// 主窗口是否最小化：最小化之后任务栏之外还得有个唤回入口
-static MAIN_MINIMIZED: AtomicBool = AtomicBool::new(false);
 
 /// 是否已经在退出流程里：最后一个实例退出与主窗口销毁两处都会触发，只执行一次
 static QUITTING: AtomicBool = AtomicBool::new(false);
@@ -102,47 +94,19 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     Menu::with_items(app, &[&show, &quit])
 }
 
-/// 托盘该不该显示：有实例在跑，或主窗口正收在任务栏里
+/// 按运行态同步托盘：有实例在跑就显示，没有就收起来
 ///
-/// # 返回值
-///
-/// 任一条件成立即返回 true
-fn should_show() -> bool {
-    has_running_instance() || MAIN_MINIMIZED.load(Ordering::Relaxed)
-}
-
-/// 按运行态与主窗口状态同步托盘：该显示就显示，否则收起来
-///
-/// 实例真正启动（LaunchState::End）与实例退出时各调一次，见 windows::main::launch；
-/// 主窗口最小化 / 还原走 [`main_minimized`]。
+/// 实例真正启动（LaunchState::End）与实例退出时各调一次，见 windows::main::launch。
 ///
 /// - `app`: 应用句柄，建图标 / 取回图标都用它
 pub(crate) fn sync(app: &AppHandle) {
     // 加锁时忽略中毒：这里只是串行化建图标，状态都在这几个原子量里
     let _lock = SYNC.lock().unwrap_or_else(|err| err.into_inner());
-    if should_show() {
+    if has_running_instance() {
         show(app);
     } else {
         hide(app);
     }
-}
-
-/// 主窗口最小化状态变了：记下来并同步托盘
-///
-/// 最小化后窗口只剩任务栏按钮，托盘要留着，否则界面收起来就没处唤回了。
-/// 事件在窗口线程上回调，**不能在这里直接 sync**：建图标要排回主线程，
-/// 而实例退出线程可能正占着 sync 的锁等主线程。
-///
-/// - `app`: 应用句柄
-/// - `minimized`: 主窗口当前是否最小化
-pub(crate) fn main_minimized(app: &AppHandle, minimized: bool) {
-    if MAIN_MINIMIZED.swap(minimized, Ordering::Relaxed) == minimized {
-        return;
-    }
-    let app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        sync(&app);
-    });
 }
 
 /// 显示托盘：还没建过就现在建

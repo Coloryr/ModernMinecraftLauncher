@@ -254,36 +254,53 @@ exit $code
         .and_then(|_| file.write_all(script.as_bytes()))
         .map_err(process_err)?;
     drop(file);
-    let arguments = format!(
-        "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File {}",
-        quote_arg(&script_file.0.to_string_lossy())
-    );
-    let wrapper = format!(
-        "$ErrorActionPreference='Stop'; $p=Start-Process powershell.exe {} -WindowStyle Hidden -PassThru -ArgumentList {}; [Console]::Out.WriteLine($p.Id); $p.WaitForExit(); exit $p.ExitCode",
-        if elevate { "-Verb RunAs" } else { "" },
-        ps_literal(&arguments)
-    );
-    let mut child = powershell()
-        .args(["-EncodedCommand", &encoded(&wrapper)])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(process_err)?;
-    let stdout = child.stdout.take().unwrap();
-    let (sender, receiver) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        let mut line = String::new();
-        let result = BufReader::new(stdout)
-            .read_line(&mut line)
-            .map(|_| line.trim().parse::<u32>().ok());
-        let _ = sender.send(result);
-    });
-    let connected = (|| {
-        let pid = receiver
+    // 不提权就直接起脚本：少一层 Start-Process，pid 与退出码都是这个进程自己的。
+    // 提权必须经由 ShellExecute，只能包一层 Start-Process -Verb RunAs 拿 pid。
+    let mut child = if elevate {
+        let arguments = format!(
+            "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File {}",
+            quote_arg(&script_file.0.to_string_lossy())
+        );
+        let wrapper = format!(
+            "$ErrorActionPreference='Stop'; $p=Start-Process powershell.exe -Verb RunAs -WindowStyle Hidden -PassThru -ArgumentList {}; [Console]::Out.WriteLine($p.Id); $p.WaitForExit(); exit $p.ExitCode",
+            ps_literal(&arguments)
+        );
+        powershell()
+            .args(["-EncodedCommand", &encoded(&wrapper)])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(process_err)?
+    } else {
+        powershell()
+            .args(["-ExecutionPolicy", "Bypass", "-File"])
+            .arg(&script_file.0)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(process_err)?
+    };
+
+    let pid = if elevate {
+        let stdout = child.stdout.take().unwrap();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let mut line = String::new();
+            let result = BufReader::new(stdout)
+                .read_line(&mut line)
+                .map(|_| line.trim().parse::<u32>().ok());
+            let _ = sender.send(result);
+        });
+        receiver
             .recv_timeout(Duration::from_secs(90))
             .map_err(process_err)?
             .map_err(process_err)?
-            .ok_or_else(|| process_err("Elevation cancelled or helper failed"))?;
+            .ok_or_else(|| process_err("Elevation cancelled or helper failed"))?
+    } else {
+        child.id()
+    };
+
+    let connected = (|| {
         let stdout = connect_named_pipe_with_timeout(HANDLE(output.into_raw_handle()), 15000)?;
         let stderr = connect_named_pipe_with_timeout(HANDLE(error.into_raw_handle()), 15000)?;
         let control = connect_named_pipe_with_timeout(HANDLE(control.into_raw_handle()), 15000)?;

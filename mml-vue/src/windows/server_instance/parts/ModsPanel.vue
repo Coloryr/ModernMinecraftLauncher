@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { inject } from "vue";
+import { computed, inject } from "vue";
 import BaseButton from "../../../components/ui/BaseButton.vue";
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
+import SearchBox from "../../../components/ui/SearchBox.vue";
+import SegmentedTabs from "../../../components/ui/SegmentedTabs.vue";
 import VirtualList from "../../../components/ui/VirtualList.vue";
 import { t } from "../../../lib/i18n";
 import { ServerInstanceKey } from "../context";
@@ -10,6 +12,10 @@ const ctx = inject(ServerInstanceKey);
 if (!ctx) throw new Error("server instance context missing");
 const {
   mods,
+  modsShown,
+  modQuery,
+  modView,
+  modGroups,
   pickedMods,
   pickAllMods,
   toggled,
@@ -24,6 +30,8 @@ const {
   setModIdType,
   urlOf,
   setModUrl,
+  modTextOf,
+  setModText,
   optionalOf,
   toggleModOptional,
   lockedProjectIds,
@@ -34,6 +42,12 @@ const {
   removedMods,
   modifiedMods,
 } = ctx;
+
+/** 视图切换：普通表格 / 分组按变化 */
+const viewOptions = computed(() => [
+  { value: "normal", label: t("serverInstance.viewNormal"), icon: "list" },
+  { value: "group", label: t("serverInstance.viewGroup"), icon: "grid" },
+]);
 </script>
 
 <template>
@@ -50,6 +64,10 @@ const {
       <GlyphIcon name="refresh" :size="13" :weight="2" />
       {{ t("serverInstance.refresh") }}
     </BaseButton>
+    <span class="si-head-tools">
+      <SearchBox v-model="modQuery" :placeholder="t('serverInstance.modSearch')" width="200px" />
+      <SegmentedTabs v-model="modView" :options="viewOptions" />
+    </span>
   </div>
   <div v-if="modChanges" class="si-changes">
     <span class="si-change add" :title="modChanges.added.join('\n')">+{{ addedMods.size }}</span>
@@ -61,13 +79,32 @@ const {
   </div>
   <!-- 一张表：勾选 / 可选 / 文件名 / 编号类型 / 项目编号 / 文件编号 / 下载地址 / 哈希值
        几百个模组逐个渲染太重，行虚拟化只画视口附近那些 -->
-  <div class="si-table-card">
-    <VirtualList class="si-mod-table" :count="mods.length" :row-h="MOD_ROW_H" :row-gap="0">
+  <!-- 分组：按 新增 / 修改 / 删除 回顾，只读 -->
+  <div v-if="modView === 'group'" class="si-table-card si-group-card">
+    <p v-if="!modGroups.some((group) => group.rows.length)" class="empty-tip">
+      {{ t("serverInstance.configNoChange") }}
+    </p>
+    <template v-for="group in modGroups" :key="group.key">
+      <div v-if="group.rows.length">
+        <div class="si-group-head" :class="`is-${group.key}`">
+          {{ t(`serverInstance.group.${group.key}`) }}
+          <span class="si-group-count">{{ group.rows.length }}</span>
+        </div>
+        <div v-for="row in group.rows" :key="row.path" class="si-group-row">
+          <span>{{ row.name }}</span>
+          <span class="si-group-path">{{ row.path }}</span>
+        </div>
+      </div>
+    </template>
+  </div>
+  <div v-else class="si-table-card">
+    <VirtualList class="si-mod-table" :count="modsShown.length" :row-h="MOD_ROW_H" :row-gap="0">
       <template #header>
         <div class="si-mod-head">
           <span>{{ t("serverInstance.colSync") }}</span>
           <span>{{ t("serverInstance.colOptional") }}</span>
           <span>{{ t("serverInstance.colFile") }}</span>
+          <span>{{ t("serverInstance.colText") }}</span>
           <span>{{ t("serverInstance.colIdType") }}</span>
           <span>{{ t("serverInstance.colProject") }}</span>
           <span>{{ t("serverInstance.colFileId") }}</span>
@@ -76,8 +113,10 @@ const {
         </div>
       </template>
       <template #default="{ start, end }">
-        <p v-if="!mods.length" class="empty-tip">{{ t("serverInstance.noMods") }}</p>
-        <div v-for="row in mods.slice(start, end)" :key="row.path" class="si-mod-row"
+        <p v-if="!modsShown.length" class="empty-tip">
+          {{ mods.length ? t("serverInstance.noModMatch") : t("serverInstance.noMods") }}
+        </p>
+        <div v-for="row in modsShown.slice(start, end)" :key="row.path" class="si-mod-row"
           :class="{
             'is-changed': changedPaths.has(row.path),
             'is-added': addedMods.has(row.path),
@@ -96,6 +135,9 @@ const {
             <em v-else-if="modifiedMods.has(row.path)" class="si-mark mod">·</em>
             {{ baseName(row.path) }}
           </span>
+          <input class="field-input si-cell-control" :value="modTextOf(row.path)" :disabled="busy"
+            spellcheck="false" :placeholder="t('serverInstance.cellText')"
+            :title="modTextOf(row.path)" @input="setModText(row.path, $event)" />
           <select class="field-select si-cell-control si-id-type" :value="modIdTypeOf(row.path, row.customId)"
             :disabled="busy" @change="setModIdType(row.path, $event)">
             <option value="online">{{ t("serverInstance.idType.online") }}</option>

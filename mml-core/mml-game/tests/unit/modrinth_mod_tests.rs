@@ -15,4 +15,3 @@ fn author_ids_dedups_and_skips_empty() {
     assert_eq!(author_ids(&hits), vec!["a".to_string(), "b".to_string()]);
     assert!(author_ids(&[]).is_empty());
 }
-

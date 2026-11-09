@@ -97,4 +97,3 @@ async fn builds_cleanroom_artifacts() {
         "https://repo.cleanroommc.com/releases/com/cleanroommc/cleanroom/0.7.11-alpha/cleanroom-0.7.11-alpha-universal.jar"
     );
 }
-

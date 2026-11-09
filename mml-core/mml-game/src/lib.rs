@@ -933,6 +933,38 @@ pub(crate) fn remove_instance_record(uuid: &Uuid) {
     invoke_change(InstanceChange::RemoveInstance(*uuid));
 }
 
+/// 给实例目录改名，遇到短暂占用时重试
+///
+/// 杀毒 / 索引服务会在目录刚建好时短暂持有句柄，第一次改名可能报拒绝访问或共享冲突；
+/// 这类错误过几十毫秒就消失，重试几次即可，别把瞬时占用报成改名失败。
+///
+/// - `from`: 原目录
+/// - `to`: 新目录
+///
+/// # 返回值
+///
+/// 改名成功返回 `Ok(())`；重试后仍失败返回最后一次的错误
+fn rename_instance_dir(from: &Path, to: &Path) -> std::io::Result<()> {
+    const RETRY: u32 = 6;
+
+    let mut last = None;
+    for attempt in 0..RETRY {
+        match std::fs::rename(from, to) {
+            Ok(()) => return Ok(()),
+            Err(err) => {
+                // 5 = ACCESS_DENIED，32 = SHARING_VIOLATION，33 = LOCK_VIOLATION
+                let transient = matches!(err.raw_os_error(), Some(5) | Some(32) | Some(33));
+                last = Some(err);
+                if !transient || attempt + 1 == RETRY {
+                    break;
+                }
+                thread::sleep(Duration::from_millis(30 * u64::from(attempt + 1)));
+            }
+        }
+    }
+    Err(last.unwrap())
+}
+
 /// 重命名实例，名字与实例目录一起改
 ///
 /// 新名字与其他实例重复时拒绝；成功后发一次变更事件刷新前端列表。
@@ -966,7 +998,7 @@ pub fn rename_instance(uuid: &Uuid, name: &str) -> CoreResult<()> {
         .map(|p| p.join(&new_dir))
         .unwrap_or_else(|| old_base.clone());
     if old_base != new_base && old_base.exists() {
-        std::fs::rename(&old_base, &new_base).map_err(|e| {
+        rename_instance_dir(&old_base, &new_base).map_err(|e| {
             ErrorType::FileSystemError(FileSystemErrorData {
                 path: old_base,
                 error: e.to_string(),

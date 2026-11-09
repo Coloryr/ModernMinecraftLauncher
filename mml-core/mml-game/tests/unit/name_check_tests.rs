@@ -57,4 +57,3 @@ fn reason(name: &str) -> NameInvalidReason {
         Err(err) => panic!("{name} 的错误类型不对：{err}"),
     }
 }
-

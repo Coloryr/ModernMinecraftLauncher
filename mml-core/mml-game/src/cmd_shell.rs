@@ -187,10 +187,7 @@ fn script_runner(path: &Path) -> CoreResult<Option<(PathBuf, Vec<String>)>> {
             }
             let cmd = find_on_path("cmd").ok_or_else(|| missing("cmd"))?;
             // `cmd /c call <脚本>`：走 call 才不会因为脚本路径带空格而把第一段当成命令
-            let prefix = ["/c", "call"]
-                .iter()
-                .map(|item| item.to_string())
-                .collect();
+            let prefix = ["/c", "call"].iter().map(|item| item.to_string()).collect();
             Ok(Some((cmd, prefix)))
         }
         _ => Ok(None),
@@ -291,7 +288,11 @@ pub(crate) async fn ensure_runner(cmd: &str, base: &Path, game: &Path) -> CoreRe
 
 /// Windows 商店版 Python 的"应用执行别名"只是个空壳
 fn is_store_stub(path: &Path) -> bool {
-    cfg!(windows) && path.to_string_lossy().to_ascii_lowercase().contains(r"\windowsapps\")
+    cfg!(windows)
+        && path
+            .to_string_lossy()
+            .to_ascii_lowercase()
+            .contains(r"\windowsapps\")
 }
 
 /// 按 Windows 命令行习惯把一行拆成程序名与参数
@@ -336,7 +337,10 @@ fn split_command_line(line: &str) -> Vec<String> {
 /// 去掉参数两端成对的英文双引号
 fn unquote(item: &str) -> &str {
     let item = item.trim();
-    match item.strip_prefix('"').and_then(|rest| rest.strip_suffix('"')) {
+    match item
+        .strip_prefix('"')
+        .and_then(|rest| rest.strip_suffix('"'))
+    {
         Some(inner) => inner,
         None => item,
     }

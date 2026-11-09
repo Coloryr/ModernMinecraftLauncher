@@ -33,4 +33,3 @@ fn test_parse_textures_invalid() {
     assert!(parse_textures("!!!").is_none());
     assert!(parse_textures("aGVsbG8=").is_none());
 }
-

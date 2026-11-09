@@ -280,6 +280,7 @@ export type ModPackUpdateDto = {
 export type ServerPackModDto = {
   path: string,
   name: string,
+  text: string,
   added: boolean,
   enabled: boolean,
 };

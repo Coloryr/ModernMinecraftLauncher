@@ -1776,7 +1776,7 @@ pub async fn install_server_pack_from_url(
 /// 从在线服务器包创建实例，可选模组只下载其中一部分
 ///
 /// 与 [`install_server_pack_from_url`] 同一条链路，多一个 `skip`：首次同步时玩家没勾的
-/// 可选模组这次不下载，记进本地清单的 `Skipped`，发布方换了内容才会再问。
+/// 可选模组这次不下载，本地旧文件保持原样。
 ///
 /// - `url`: 用户填的地址，发布目录或 `server.json` 都认
 /// - `name`: 实例名，覆盖清单里的名字

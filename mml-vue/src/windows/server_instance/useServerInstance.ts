@@ -17,6 +17,7 @@ import { targetUuid, windowParams } from "../windowManager";
 import type {
   ExportEntryDto,
   InstanceInfoDto,
+  ServerInstanceConfigDiffDto,
   ServerInstanceIdDto,
   ServerInstanceMetaDto,
   ServerInstanceOptionsDto,
@@ -30,6 +31,16 @@ export const CONFIG_MODE_INHERIT = "inherit";
 
 /** 单个文件的处理方式：跟随目录同步 / 不进包 / 下次同步删掉 */
 export type ConfigFileAction = "sync" | "skip" | "delete";
+
+/** 一条自定义文件：额外纳入同步，或让客户端删掉 */
+export interface CustomEntry {
+  /** 相对游戏目录的路径；添加内容时是客户端上的目标位置 */
+  path: string;
+  /** 动作：纳入同步 / 删除客户端文件 */
+  action: "add" | "delete";
+  /** 添加时直接写成客户端文件的内容；null 表示从实例里取现有文件 */
+  content: string | null;
+}
 
 /** 文件夹的同步方式 */
 export type ConfigMode =
@@ -117,6 +128,8 @@ const pickedMods = ref(new Set<string>());
 const optionalMods = ref(new Set<string>());
 /** 每个模组的下载地址，路径 → 地址；载入时用实例记录的那份铺底 */
 const modUrls = ref(new Map<string, string>());
+/** 每个模组的说明，路径 → 文字；生成时写进清单的 Text */
+const modTexts = ref(new Map<string, string>());
 /** 每个模组手填的项目编号 / 文件编号，路径 → 编号 */
 const modPids = ref(new Map<string, string>());
 const modFids = ref(new Map<string, string>());
@@ -162,6 +175,14 @@ const configChildren = ref(new Map<string, ExportEntryDto[]>());
 const configOpened = ref(new Set<string>());
 /** 正在读取的目录，防重复请求 */
 const configLoading = ref(new Set<string>());
+/** 配置文件相对上次生成的变化；未生成或还没读到时为 null */
+const configDiff = ref<ServerInstanceConfigDiffDto | null>(null);
+/** 配置页视图：normal 按目录树，group 按变化分三组 */
+const configView = ref<"normal" | "group">("normal");
+/** 配置文件搜索词；非空时显示跨目录的扁平结果 */
+const configQuery = ref("");
+/** 自定义条目：额外纳入同步或删除的路径 */
+const customEntries = ref<CustomEntry[]>([]);
 
 // ---------------- 运行状态 ----------------
 
@@ -263,10 +284,137 @@ const configRows = computed<ConfigRow[]>(() => {
   return rows;
 });
 
+/** 路径 → 变化状态：add / mod / del */
+const configChanges = computed(() => {
+  const map = new Map<string, "add" | "mod" | "del">();
+  const diff = configDiff.value;
+  if (!diff?.generated) return map;
+  for (const path of diff.added) map.set(path, "add");
+  for (const path of diff.modified) map.set(path, "mod");
+  for (const path of diff.deleted) map.set(path, "del");
+  return map;
+});
+
+/** 目录 → 子树里最重的变化状态；删除压过修改、修改压过新增 */
+const configDirChanges = computed(() => {
+  const rank = { add: 0, mod: 1, del: 2 } as const;
+  const map = new Map<string, "add" | "mod" | "del">();
+  for (const [path, status] of configChanges.value) {
+    const parts = path.split("/");
+    for (let index = 1; index < parts.length; index += 1) {
+      const dir = parts.slice(0, index).join("/");
+      const old = map.get(dir);
+      if (!old || rank[status] > rank[old]) map.set(dir, status);
+    }
+  }
+  return map;
+});
+
+/**
+ * 一个树行的变化状态
+ *
+ * - `path`: 相对游戏目录的路径
+ * - `dir`: 这一行是不是目录
+ *
+ * # 返回值
+ *
+ * `add` / `mod` / `del`；没有变化时是空串，目录取子树汇总
+ */
+function configRowChange(path: string, dir: boolean): "add" | "mod" | "del" | "" {
+  return configChanges.value.get(path) ?? (dir ? (configDirChanges.value.get(path) ?? "") : "");
+}
+
+/** 搜索命中的文件：跨目录扁平列出，已删除的也算 */
+const configSearchRows = computed(() => {
+  const query = configQuery.value.trim().toLowerCase();
+  const diff = configDiff.value;
+  if (!query || !diff) return [];
+  const all = new Set<string>([...diff.files, ...diff.deleted]);
+  return [...all]
+    .filter((path) => path.toLowerCase().includes(query))
+    .sort()
+    .map((path) => ({
+      path,
+      name: path.split("/").pop() ?? path,
+      change: configChanges.value.get(path) ?? "",
+      deleted: diff.deleted.includes(path),
+    }));
+});
+
+/** 分组视图：新增 / 修改 / 删除，每组是一棵按目录层级铺开的树 */
+const configGroups = computed(() => {
+  const diff = configDiff.value;
+  if (!diff?.generated) return [];
+  return [
+    { key: "add" as const, paths: diff.added },
+    { key: "mod" as const, paths: diff.modified },
+    { key: "del" as const, paths: diff.deleted },
+  ].map((group) => ({ ...group, rows: buildPathRows(group.paths) }));
+});
+
+/** 把一组文件路径按目录层级铺成树行，分组视图用 */
+function buildPathRows(paths: string[]): ConfigRow[] {
+  interface Node {
+    name: string;
+    path: string;
+    dir: boolean;
+    children: Map<string, Node>;
+  }
+  const root = new Map<string, Node>();
+  for (const full of paths) {
+    const parts = full.split("/");
+    let level = root;
+    let prefix = "";
+    parts.forEach((part, index) => {
+      prefix = prefix ? `${prefix}/${part}` : part;
+      let node = level.get(part);
+      if (!node) {
+        node = { name: part, path: prefix, dir: index < parts.length - 1, children: new Map() };
+        level.set(part, node);
+      }
+      level = node.children;
+    });
+  }
+  const rows: ConfigRow[] = [];
+  const walk = (nodes: Map<string, Node>, depth: number) => {
+    const sorted = [...nodes.values()].sort((a, b) =>
+      a.dir === b.dir ? a.name.localeCompare(b.name) : a.dir ? -1 : 1,
+    );
+    for (const node of sorted) {
+      rows.push({ path: node.path, name: node.name, dir: node.dir, depth, size: 0, root: "" });
+      walk(node.children, depth + 1);
+    }
+  };
+  walk(root, 0);
+  return rows;
+}
+
+/** 模组搜索词 */
+const modQuery = ref("");
+/** 模组页视图：normal 表格 / group 按变化分三组 */
+const modView = ref<"normal" | "group">("normal");
+/** 搜索过滤后的模组列表，表格显示用 */
+const modsShown = computed(() => {
+  const query = modQuery.value.trim().toLowerCase();
+  if (!query) return mods.value;
+  return mods.value.filter((item) => item.path.toLowerCase().includes(query));
+});
+
+/** 分组视图：新增 / 修改 / 删除；删除的模组已经不在当前列表里 */
+const modGroups = computed(() => {
+  const rows = (paths: string[]) => paths.map((path) => ({ path, name: baseName(path) }));
+  return [
+    { key: "add" as const, rows: rows([...addedMods.value]) },
+    { key: "mod" as const, rows: rows([...modifiedMods.value]) },
+    { key: "del" as const, rows: rows([...removedMods.value]) },
+  ];
+});
+
 /** 实际会生成条目的目录数：被上级覆盖的子目录不重复计 */
 const configCount = computed(
   () =>
-    [...configModes.value].filter(([path, mode]) => mode !== "none" && !configCovered(path)).length,
+    [...configModes.value].filter(([path, mode]) => mode !== "none" && configEmits(path, mode))
+      .length,
 );
 
 /** 进度百分比；总数未知时返回 -1 */
@@ -288,6 +436,11 @@ const pickedCount = computed(
 /** 这个模组当前填的下载地址 */
 function urlOf(path: string): string {
   return modUrls.value.get(path) ?? "";
+}
+
+/** 模组说明的当前值 */
+function modTextOf(path: string): string {
+  return modTexts.value.get(path) ?? "";
 }
 
 /** 编号显示时去掉 custom- 前缀；Custom 标记单独表示类型 */
@@ -329,6 +482,47 @@ function setModUrl(path: string, event: Event) {
   const next = new Map(modUrls.value);
   next.set(path, value);
   modUrls.value = next;
+}
+
+/**
+ * 加一条自定义条目
+ *
+ * 同路径同动作的条目直接替换：改内容不用先删再加。
+ *
+ * - `path`: 相对游戏目录的路径
+ * - `action`: `add` 纳入同步 / `delete` 删除客户端文件
+ * - `content`: 添加时直接写进客户端文件的内容；`null` 表示从实例里取现有文件
+ *
+ * # 返回值
+ *
+ * 加入成功返回 true；空路径返回 false
+ */
+function addCustomEntry(
+  path: string,
+  action: "add" | "delete",
+  content: string | null = null,
+): boolean {
+  const value = path.trim().replace(/\\/g, "/");
+  if (!value) return false;
+  const entry: CustomEntry = { path: value, action, content: action === "add" ? content : null };
+  const rest = customEntries.value.filter(
+    (item) => !(item.path === value && item.action === action),
+  );
+  customEntries.value = [...rest, entry];
+  return true;
+}
+
+/** 删掉第几条第自定义条目 */
+function removeCustomEntry(index: number) {
+  customEntries.value = customEntries.value.filter((_, item) => item !== index);
+}
+
+/** 改模组说明；生成时写进清单的 Text */
+function setModText(path: string, event: Event) {
+  const value = (event.target as HTMLInputElement).value;
+  const next = new Map(modTexts.value);
+  next.set(path, value);
+  modTexts.value = next;
 }
 
 /** 改模组的项目编号 / 文件编号；记下改过，生成时优先用这份值 */
@@ -479,21 +673,22 @@ function configEffectiveMode(path: string): ConfigMode {
 /**
  * 上级目录对当前行的锁定类型
  *
- * - `none`：上级选了不同步，整棵子树都锁成不同步；
+ * - `none`：上级选了不同步，内容不再跟着同步，只允许把这一层改成「删除目录」；
  * - `recursive`：上级选了整目录逐文件，方式跟着上级走；
  * - `delete`：上级要删目录，子树不能展开也不能选；
  * - `null`：没有上级锁定，按自己的方式同步。
  *
  * 整包同步不锁子目录：子目录可以取消勾选，从父包的压缩包里排出去。
+ * 从最近的上级往上找，整包 / 本目录这类不锁的方式继续往上，别让近处的整包
+ * 盖掉更外层的「不同步」。
  */
 function configAncestorLock(path: string): "none" | "recursive" | "delete" | null {
   const parts = path.split("/");
-  for (let index = 1; index < parts.length; index += 1) {
-    const dir = parts.slice(0, index).join("/");
-    const mode = configEffectiveMode(dir);
-    if (mode === "none") return "none";
+  for (let index = parts.length - 1; index >= 1; index -= 1) {
+    const mode = configEffectiveMode(parts.slice(0, index).join("/"));
     if (mode === "delete") return "delete";
     if (mode === "filesAll") return "recursive";
+    if (mode === "none") return "none";
   }
   return null;
 }
@@ -521,6 +716,24 @@ function configUnderRecursive(path: string): boolean {
 /** 是否被上级目录锁定，自己设置的方式不生效 */
 function configCovered(path: string): boolean {
   return configAncestorLock(path) !== null;
+}
+
+/**
+ * 这个目录自己的设置会不会跟着选项下发
+ *
+ * 被上级覆盖的子目录不单独下发，交给上级那一条；只有「上级不同步、自己删目录」是例外，
+ * 那正是不同步之后还要清掉客户端旧内容的情况。
+ *
+ * - `path`: 目录路径
+ * - `mode`: 这个目录自己配的同步方式
+ *
+ * # 返回值
+ *
+ * 要写进生成选项时为 true
+ */
+function configEmits(path: string, mode: ConfigMode): boolean {
+  if (!configCovered(path)) return true;
+  return mode === "delete" && configAncestorLock(path) === "none";
 }
 
 /** 这个目录是否在删除目录的覆盖范围内；在的话不能展开也不能勾文件 */
@@ -621,7 +834,7 @@ function configRowDeleteOld(path: string): boolean {
 /**
  * 改一个目录的"解压前删旧目录"
  *
- * 删除目录恒为真（空包就是用来删目录的），这里直接挡掉。
+ * 删除目录恒为真（delete 条目就是用来删目录的），这里直接挡掉。
  *
  * - `path`: 目录路径
  * - `on`: 是否先删旧目录
@@ -719,18 +932,21 @@ function setConfigFile(path: string, on: boolean) {
   setConfigFileAction(path, on ? "sync" : "skip");
 }
 
-/** 点文件名时在同步与不同步之间切换；目录名由调用方负责展开 */
+/** 点文件名时切换勾选：删除也算勾着，点一下变成不同步；目录名由调用方负责展开 */
 function toggleConfigFile(path: string) {
   const state = configFileState(path);
-  if (state === "sync") setConfigFileAction(path, "skip");
-  else if (state === "skip" || state === "delete") setConfigFileAction(path, "sync");
+  if (state === "sync" || state === "delete") setConfigFileAction(path, "skip");
+  else if (state === "skip") setConfigFileAction(path, "sync");
 }
 
 /** 改一个目录的同步方式；选"跟随上级"就收回自己的条目 */
 function setConfigMode(dir: string, event: Event) {
-  // 被上级锁定的行是禁用状态，这里再挡一次，别让程序调用改掉
-  if (configAncestorLock(dir) !== null) return;
   const value = (event.target as HTMLSelectElement).value;
+  // 被上级锁定的行是禁用状态，这里再挡一次；上级不同步时只放开「删除目录」
+  const lock = configAncestorLock(dir);
+  const allowed =
+    lock === null || (lock === "none" && (value === "none" || value === "delete"));
+  if (!allowed) return;
   if (value === CONFIG_MODE_INHERIT) {
     dropConfigMode(dir);
     return;
@@ -895,11 +1111,18 @@ async function loadInstance(uuid: string) {
     mods.value = info.mods.filter((item) => !item.dir);
     pickedMods.value = new Set(mods.value.map((item) => item.path));
     modUrls.value = new Map(mods.value.map((item) => [item.path, item.url ?? ""]));
+    // 说明跟着上次生成走，按路径回填；没有的不占位
+    modTexts.value = new Map(
+      mods.value
+        .map((item) => [item.path, meta?.modTexts?.[item.path] ?? ""] as const)
+        .filter(([, value]) => value !== ""),
+    );
   } catch (e) {
     if (seq !== loadSeq) return;
     mods.value = [];
     pickedMods.value = new Set();
     modUrls.value = new Map();
+    modTexts.value = new Map();
     showToast(tErr(e));
   }
   // 没有保存过名字时，用刚读到的实例名补上
@@ -1047,6 +1270,20 @@ async function loadInstance(uuid: string) {
   }
   configExcluded.value = excluded;
   configDeleted.value = deleted;
+  // 上次生成后的文件对比：跨目录扫描，慢一点；失败就当没有对比
+  configDiff.value = await api.getServerInstanceConfigDiff(uuid).catch(() => null);
+  if (seq !== loadSeq) return;
+  configQuery.value = "";
+  configView.value = "normal";
+  // 自定义条目跟着上次生成走
+  customEntries.value = (meta?.custom ?? [])
+    .filter((item) => item.path.trim() && (item.action === "add" || item.action === "delete"))
+    .map((item) => ({
+      path: item.path.trim(),
+      action: item.action as "add" | "delete",
+      // 老数据没有内容：按"实例里的现有文件"处理
+      content: item.content ?? null,
+    }));
   result.value = null;
   progress.value = null;
   changedPaths.value = new Set();
@@ -1216,6 +1453,13 @@ function clearInstance() {
   configDeleteOld.value = new Map();
   configExcluded.value = new Set();
   configDeleted.value = new Set();
+  modTexts.value = new Map();
+  modQuery.value = "";
+  modView.value = "normal";
+  configDiff.value = null;
+  configQuery.value = "";
+  configView.value = "normal";
+  customEntries.value = [];
   configDirs.value = [];
   configChildren.value = new Map();
   configOpened.value = new Set();
@@ -1356,6 +1600,7 @@ function buildOptions(): ServerInstanceOptionsDto {
         path,
         exclude: false,
         url: urlOf(path),
+        text: modTextOf(path),
         pid: edited ? modPidOf(path) : "",
         fid: edited ? modFidOf(path) : "",
         custom: isCustomType(path, row?.customId ?? false),
@@ -1367,7 +1612,7 @@ function buildOptions(): ServerInstanceOptionsDto {
     // 被上级递归方式覆盖的子目录不重复下发，交给上级那一条；
     // 不同步的条目也要带上——父目录整包时靠它把这块子目录从压缩包里排出去
     configs: [...configModes.value]
-      .filter(([path]) => !configCovered(path))
+      .filter(([path, mode]) => configEmits(path, mode))
       .map(([dir, mode]) => ({
         dir,
         mode,
@@ -1382,6 +1627,11 @@ function buildOptions(): ServerInstanceOptionsDto {
           (path) => configFileOwner(path)?.dir === dir,
         ),
       })),
+    custom: customEntries.value.map((item) => ({
+      path: item.path,
+      action: item.action,
+      content: item.content,
+    })),
     baseFiles: [...pickedBase.value],
     resourcePacks: packs.value
       .filter((row) => pickedPacks.value.has(row.path))
@@ -1391,6 +1641,7 @@ function buildOptions(): ServerInstanceOptionsDto {
           path: row.path,
           exclude: false,
           url: packUrlOf(row.path),
+          text: "",
           pid: edited ? packPidOf(row.path) : "",
           fid: edited ? packFidOf(row.path) : "",
           custom: isPackCustomType(row.path, row.customId),
@@ -1508,13 +1759,15 @@ onBeforeUnmount(() => {
     instances, currentUuid, section, sections, busy, loading, refreshMods, refreshPacks,
     name, version, text, url, folder, pickFolder,
     baseEntries, pickedBase, pickAllBase, toggleBase,
-    mods, pickedMods, pickAllMods, toggled, modPidOf, modFidOf, setModId, baseName,
+    mods, modsShown, modQuery, modView, modGroups, pickedMods, pickAllMods, toggled, modPidOf, modFidOf, setModId, baseName,
     modIdTypeOf, isCustomType, setModIdType,
     optionalMods, optionalOf, toggleModOptional,
-    urlOf, setModUrl, lockedProjectIds, changedPaths,
+    urlOf, setModUrl, modTextOf, setModText, lockedProjectIds, changedPaths,
     packs, pickedPacks, pickAllPacks, packPidOf, packFidOf, packUrlOf,
     setPackId, setPackUrl, packIdTypeOf, isPackCustomType, setPackIdType,
     configDirs, configModes, configRows, configCount, configModeOf, configAncestorLock,
+    configDiff, configView, configQuery, configRowChange, configSearchRows, configGroups,
+    customEntries, addCustomEntry, removeCustomEntry,
     configDeleteLocked, configFileState, setConfigFile, setConfigFileAction, toggleConfigFile,
     configDirOn, configDirEditable, setConfigDir,
     configDeleteOldOf, setConfigDeleteOld, configArchiveOwner, configRowDeleteOld,

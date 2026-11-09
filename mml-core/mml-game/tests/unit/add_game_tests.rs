@@ -43,4 +43,3 @@ fn instance_keeps_publish_directory() {
         "https://example.com/pack"
     );
 }
-

@@ -353,6 +353,19 @@ pub async fn launch(version: &str, loader: LoaderType, loader_version: &str) -> 
                 check_started.elapsed()
             )
         }
+        // 镜像源缺文件时下载会失败：这是上游缺口，不是启动链路的问题，跳过而不是判失败
+        Err(ErrorType::DownloadFileFail)
+            if mml_config::read_config().http.source
+                == mml_config::config_obj::SourceLocal::Bmclapi =>
+        {
+            return Outcome {
+                combo: format!("{}:{version}", loader.id()),
+                loader_version: loader_version.to_string(),
+                check: "跳过（镜像缺文件，下载失败，见 logs.log）".into(),
+                launch: "未跑".into(),
+                failed: false,
+            };
+        }
         Err(err) => {
             let text = format!("失败 {err:?}");
             return Outcome {

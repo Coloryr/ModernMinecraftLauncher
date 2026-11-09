@@ -23,12 +23,12 @@ use crate::{
     },
     launcher_path::version_path,
     loader::LoaderType,
-    serverpack::serverpack_obj::{ServerItemObj, ServerPackObj},
     other_launcher::{
         hmcl_obj::{HMCLObj, HMCLServerObj},
         mmc_obj::MMCObj,
         official_obj::OfficialObj,
     },
+    serverpack::serverpack_obj::{ServerItemObj, ServerPackObj},
 };
 
 pub mod hmcl_obj;
@@ -448,6 +448,7 @@ impl HMCLServerObj {
             .iter()
             .map(|item| ServerItemObj {
                 file: item.path.replace('\\', "/"),
+                text: String::new(),
                 pid: None,
                 fid: None,
                 url: join_file_url(&self.file_api, &item.path),
@@ -473,8 +474,6 @@ impl HMCLServerObj {
             online_list,
             archive_list: Vec::new(),
             base: None,
-            // 跳过记录是客户端自己的，别处转出来的清单里没有
-            skipped: Vec::new(),
         }
     }
 }

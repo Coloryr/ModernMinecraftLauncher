@@ -1,5 +1,5 @@
 use super::*;
-use crate::serverpack::serverpack_obj::ServerArchiveItemObj;
+use crate::serverpack::serverpack_obj::{ServerArchiveAction, ServerArchiveItemObj};
 
 /// 一个带版本与加载器的实例
 fn game() -> InstanceSettingObj {
@@ -10,6 +10,42 @@ fn game() -> InstanceSettingObj {
         loader_version: Some("52.0.1".into()),
         ..Default::default()
     }
+}
+
+/// 删除条目只写 Action 与 Path，解压条目才带包信息
+#[test]
+fn archive_entry_serializes_by_action() {
+    let delete_file = ServerArchiveItemObj {
+        action: ServerArchiveAction::DeleteFile,
+        dir: "config/a.toml".into(),
+        ..Default::default()
+    };
+    assert_eq!(
+        serde_json::to_string(&delete_file).unwrap(),
+        r#"{"Action":"deleteFile","File":"","Path":"config/a.toml","Over":false,"Url":null,"Sha1":null,"Sha256":null}"#
+    );
+
+    let delete_path = ServerArchiveItemObj {
+        action: ServerArchiveAction::DeletePath,
+        dir: "config/old".into(),
+        ..Default::default()
+    };
+    let text = serde_json::to_string(&delete_path).unwrap();
+    assert!(text.contains(r#""Action":"deletePath""#), "{text}");
+
+    let extract = ServerArchiveItemObj {
+        action: ServerArchiveAction::Extract,
+        file: "config.zip".into(),
+        dir: "config".into(),
+        url: Some("https://example.invalid/config.zip".into()),
+        ..Default::default()
+    };
+    let text = serde_json::to_string(&extract).unwrap();
+    assert!(text.contains(r#""Action":"extract""#), "{text}");
+    assert!(text.contains(r#""File":"config.zip""#), "{text}");
+    // 字段一个不少：false / null 也照写，客户端不用区分“缺字段”和“默认值”
+    assert!(text.contains(r#""Over":false"#), "{text}");
+    assert!(text.contains(r#""Sha1":null"#), "{text}");
 }
 
 #[test]
@@ -38,7 +74,7 @@ fn server_pack_carries_instance_metadata() {
             file: archive_name("config"),
             dir: "config".into(),
             delete_old: true,
-            url: "https://example.invalid/config.zip".into(),
+            url: Some("https://example.invalid/config.zip".into()),
             ..Default::default()
         }],
     );
@@ -72,7 +108,7 @@ fn server_pack_survives_json_roundtrip() {
             file: "config.zip".into(),
             dir: "config".into(),
             delete_old: true,
-            url: "https://example.invalid/config.zip".into(),
+            url: Some("https://example.invalid/config.zip".into()),
             sha1: Some("def".into()),
             ..Default::default()
         }],
@@ -176,7 +212,10 @@ fn hmcl_server_manifest_converts_to_mml() {
     assert_eq!(pack.online_list[0].sha1.as_deref(), Some("abc"));
     // 空格与中文按 URL 规则转义，HMCL 客户端也能照着下
     let url = pack.online_list[1].url.as_deref().unwrap();
-    assert!(url.ends_with("/config/%E4%B8%AD%E6%96%87%201.toml"), "{url}");
+    assert!(
+        url.ends_with("/config/%E4%B8%AD%E6%96%87%201.toml"),
+        "{url}"
+    );
     assert!(pack.online_list[1].sha1.is_none());
     assert!(pack.archive_list.is_empty());
 

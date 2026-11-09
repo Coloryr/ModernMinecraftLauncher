@@ -20,9 +20,7 @@ use mml_config::config_obj::{GCType, RunArgObj};
 use mml_names::names;
 use uuid::Uuid;
 
-use crate::game_launch::{
-    AutoJoinType, GameLaunchArg, GameRunObj, InstanceHandle, LaunchDebugger,
-};
+use crate::game_launch::{AutoJoinType, GameLaunchArg, GameRunObj, InstanceHandle, LaunchDebugger};
 use crate::launcher::LogEncoding;
 use crate::launcher::instance_setting_obj::AdvanceJvmObj;
 use crate::test_support::{boot, run_log_texts};
@@ -144,7 +142,8 @@ fn custom_arg_placeholders_replaced() {
         skip_server_pack: false,
         server_pack_skip: Vec::new(),
         server_pack_cancel: None,
-        debugger: LaunchDebugger::None, jvm_debug: None,
+        debugger: LaunchDebugger::None,
+        jvm_debug: None,
     };
 
     let args = instance.make_run_arg(Path::new("java-bin"), &launch_arg, &mut obj, false);
@@ -217,7 +216,8 @@ fn extra_args_logged() {
         skip_server_pack: false,
         server_pack_skip: Vec::new(),
         server_pack_cancel: None,
-        debugger: LaunchDebugger::None, jvm_debug: None,
+        debugger: LaunchDebugger::None,
+        jvm_debug: None,
     };
     let mut launch = GameLaunchObj {
         main_class: "Main".to_string(),
@@ -253,9 +253,21 @@ fn extra_args_logged() {
         }
     }
 
-    assert_eq!(jvm, vec![format!("-Dfoo={dir}{sep}cfg")], "附加 JVM 参数要记一行");
-    assert_eq!(game, vec!["--width 1280".to_string()], "附加游戏参数要记一行");
-    assert_eq!(class_path.len(), 1, "附加 classpath 要记一行: {class_path:?}");
+    assert_eq!(
+        jvm,
+        vec![format!("-Dfoo={dir}{sep}cfg")],
+        "附加 JVM 参数要记一行"
+    );
+    assert_eq!(
+        game,
+        vec!["--width 1280".to_string()],
+        "附加游戏参数要记一行"
+    );
+    assert_eq!(
+        class_path.len(),
+        1,
+        "附加 classpath 要记一行: {class_path:?}"
+    );
     assert!(
         class_path[0].ends_with(&format!("extra{sep}classes")),
         "附加 classpath 应是替换后的路径: {class_path:?}"
@@ -348,7 +360,11 @@ async fn jvm_arg_colorasm() {
         .find_map(|a| a.strip_prefix("-javaagent:"))
         .expect("启用 ColorASM 时必须注入 javaagent");
     let agent = std::path::Path::new(agent);
-    assert!(agent.is_file(), "注入的 ColorASM jar 不存在：{}", agent.display());
+    assert!(
+        agent.is_file(),
+        "注入的 ColorASM jar 不存在：{}",
+        agent.display()
+    );
     assert_eq!(
         std::fs::read(agent).unwrap().get(..2),
         Some(&b"PK"[..]),
@@ -486,8 +502,9 @@ async fn jvm_arg_gc_skips_when_existing_has_gc() {
     });
     let args = auto.make_jvm_arg(&auth, 21, None, &existing).await.unwrap();
     assert!(
-        !args.iter().any(|arg| arg == "-XX:+UseZGC"
-            || arg == "-XX:+UseG1GC"),
+        !args
+            .iter()
+            .any(|arg| arg == "-XX:+UseZGC" || arg == "-XX:+UseG1GC"),
         "已有 GC 时自动档不应再追加: {args:?}"
     );
 
@@ -510,7 +527,10 @@ async fn jvm_arg_gc_skips_when_existing_has_gc() {
         gc_mode: Some(GCType::G1GC),
         ..Default::default()
     });
-    let args = forced.make_jvm_arg(&auth, 21, None, &existing).await.unwrap();
+    let args = forced
+        .make_jvm_arg(&auth, 21, None, &existing)
+        .await
+        .unwrap();
     assert!(args.contains(&"-XX:+UseG1GC".to_string()));
 }
 
@@ -621,7 +641,8 @@ public static void main(String[] args) {
         skip_server_pack: false,
         server_pack_skip: Vec::new(),
         server_pack_cancel: None,
-        debugger: LaunchDebugger::None, jvm_debug: None,
+        debugger: LaunchDebugger::None,
+        jvm_debug: None,
     };
     let args = instance.make_run_arg(&java, &launch_arg, &mut obj, false);
     assert!(

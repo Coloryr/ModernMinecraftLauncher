@@ -25,6 +25,8 @@ pub(super) struct ModPick {
     pub(super) path: PathBuf,
     /// 手动填的下载地址，空串表示用实例记录的
     pub(super) url: String,
+    /// 模组说明，写进清单的 `Text`；空串表示不写
+    pub(super) text: String,
     /// 手动填的项目编号
     pub(super) pid: String,
     /// 手动填的文件编号
@@ -73,6 +75,11 @@ pub(super) fn mods(base: &Path, picks: &[ServerInstancePickDto]) -> Result<Vec<M
                 path: rel.clone(),
                 url: if single {
                     pick.url.trim().to_string()
+                } else {
+                    String::new()
+                },
+                text: if single {
+                    pick.text.trim().to_string()
                 } else {
                     String::new()
                 },
@@ -197,10 +204,10 @@ pub(super) fn file(base: &Path, name: &str) -> Result<PathBuf, String> {
     Ok(rel)
 }
 
-/// 校验一个要删除的文件路径
+/// 校验一条自定义条目的目标路径
 ///
-/// 不要求文件还在：发布者可能先删了实例里的文件再来标记；但指向目录的路径拒绝，
-/// 整目录清理要用「删除目录」的同步方式。
+/// 不要求文件还在：可能是要删掉的文件，也可能是发布者要直接写内容的客户端文件；
+/// 指向目录的路径拒绝，整目录清理要用「删除目录」的同步方式。
 ///
 /// - `base`: 游戏目录
 /// - `name`: 相对游戏目录的路径
@@ -208,7 +215,7 @@ pub(super) fn file(base: &Path, name: &str) -> Result<PathBuf, String> {
 /// # 返回值
 ///
 /// 相对路径；越界、非法或指向目录时返回错误文案
-pub(super) fn delete_target(base: &Path, name: &str) -> Result<PathBuf, String> {
+pub(super) fn custom_target(base: &Path, name: &str) -> Result<PathBuf, String> {
     let rel = relative(base, name)?;
     if base.join(&rel).is_dir() {
         return Err(err_keys::SERVER_INSTANCE_DIR.to_string());
@@ -439,22 +446,6 @@ pub(super) fn zip_files(base: &Path, files: &[PathBuf], file: &Path) -> Result<(
     archive::write_zip(file, &entries, &[], &None, &cancel)
 }
 
-/// 写一个空压缩包，用来让客户端删掉清单里的目标路径
-///
-/// 客户端把「空包 + Over」当成删除指令，目标由条目的 `Path` 决定：目录用
-/// `<目录>.zip`，单个文件用 `<文件>.delete.zip`，两边是同一条解压前清理逻辑。
-///
-/// - `file`: 输出压缩包
-///
-/// # 返回值
-///
-/// 写盘成功返回 `Ok(())`；压缩失败返回错误文案
-pub(super) fn empty_zip(file: &Path) -> Result<(), String> {
-    // 生成是一次性动作，没有取消入口
-    let cancel = AtomicBool::new(false);
-    archive::write_zip(file, &[], &[], &None, &cancel)
-}
-
 /// 把文件按相对路径复制到输出文件夹，父目录不存在就建
 ///
 /// - `base`: 游戏目录
@@ -471,6 +462,23 @@ pub(super) fn copy_into(base: &Path, out: &Path, rel: &Path) -> Result<(), Strin
     }
     fs::copy(base.join(rel), &target).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+/// 把一段文字写进输出文件夹，父目录不存在就建
+///
+/// - `out`: 输出文件夹
+/// - `rel`: 相对游戏目录的路径，也是客户端上的目标位置
+/// - `text`: 文件内容
+///
+/// # 返回值
+///
+/// 写盘成功返回 `Ok(())`；建目录或写文件失败返回错误文案
+pub(super) fn write_into(out: &Path, rel: &Path, text: &str) -> Result<(), String> {
+    let target = out.join(rel);
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    fs::write(&target, text).map_err(|e| e.to_string())
 }
 
 /// 相对路径转清单里的正斜杠写法

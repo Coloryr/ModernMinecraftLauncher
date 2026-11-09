@@ -19,4 +19,3 @@ fn version_ge_compares_by_segment() {
     assert!(version_ge("1.21", "1.20.1"));
     assert!(!version_ge("1.12.2", "1.20.1"));
 }
-

@@ -24,7 +24,9 @@ use mml_base::file_item::FileHash;
 use mml_names::names;
 use mml_net::modrinth_api::version_obj::ModrinthVersionObj;
 
-use crate::serverpack::serverpack_obj::{ServerArchiveItemObj, ServerItemObj, ServerPackObj};
+use crate::serverpack::serverpack_obj::{
+    ServerArchiveAction, ServerArchiveItemObj, ServerItemObj, ServerPackObj,
+};
 
 /// 升级时要删除的旧内容
 #[derive(Debug, Default)]
@@ -130,9 +132,11 @@ pub fn plan_downloads<'a>(
     let archives = pack
         .archive_list
         .iter()
+        // 删除条目没有包可下，归到清理阶段
+        .filter(|item| item.action == ServerArchiveAction::Extract)
         .map(|item| ServerArchiveDownload {
             item,
-            url: item.url.clone(),
+            url: item.url.clone().unwrap_or_default(),
         })
         .collect();
 

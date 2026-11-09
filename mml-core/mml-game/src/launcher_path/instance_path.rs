@@ -458,8 +458,9 @@ impl InstanceSettingObj {
     /// 获取实例 GUI 设置文件 gui_setting.json，与 game.json 并列
     ///
     /// **归属 GUI**：实例 GUI 设置，含日志窗口、模组分组、方块背景、自开日志窗与
-    /// 排列顺序，是界面状态，内核不读也不写它，读写实现在
-    /// `mml-gui/src-tauri/src/gui_setting.rs`。这里只提供路径：
+    /// 排列顺序，是界面状态，读写实现在 `mml-gui/src-tauri/src/gui_setting.rs`。
+    /// 唯一的例外是 `ServerPack` 段：服务器包跳过记录由内核同步时直接读写，
+    /// 见 `mml_game::serverpack`。这里只提供路径：
     /// "实例目录在哪"是内核的知识，"目录里放什么 GUI 文件"不是。
     ///
     /// # 返回值

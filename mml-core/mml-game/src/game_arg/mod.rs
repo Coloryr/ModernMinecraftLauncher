@@ -311,7 +311,11 @@ impl InstanceSettingObj {
             .and_then(|arg| arg.jvm_args.as_deref())
             .or(config.jvm_arg.jvm_args.as_deref())
             .unwrap_or("");
-        for line in jvm_args.lines().map(str::trim).filter(|line| !line.is_empty()) {
+        for line in jvm_args
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+        {
             crate::add_game_log_item(
                 &self.uuid,
                 GameLog::ExtraJvmArg(self.replace_custom_arg(jvm, line)),
@@ -323,7 +327,11 @@ impl InstanceSettingObj {
             .as_ref()
             .and_then(|arg| arg.game_args.as_deref())
             .unwrap_or("");
-        for line in game_args.lines().map(str::trim).filter(|line| !line.is_empty()) {
+        for line in game_args
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+        {
             crate::add_game_log_item(
                 &self.uuid,
                 GameLog::ExtraGameArg(self.replace_custom_arg(jvm, line)),

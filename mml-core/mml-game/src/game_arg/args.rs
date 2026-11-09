@@ -248,4 +248,3 @@ pub(super) async fn make_loader_jvm_arg(v2: bool, obj: &InstanceSettingObj) -> V
         LoaderType::LiteLoader => Vec::new(),
     }
 }
-

@@ -151,8 +151,7 @@ fn parse_pack_meta_shapes() {
         "一句话！"
     );
     assert_eq!(
-        parse(r#"{"pack":{"description":{"translate":"k","fallback":"兜底文字"}}}"#)
-            .description,
+        parse(r#"{"pack":{"description":{"translate":"k","fallback":"兜底文字"}}}"#).description,
         "兜底文字"
     );
     // 简介缺失 / 给 null / 给数字：兜空串，**不算读取失败**
@@ -201,4 +200,3 @@ fn pack_lang_file_shape() {
     // zip 里的目录条目也不是语言表，真实包里就有 `assets/fo/lang/` 这么一条
     assert!(!is_pack_lang_file("assets/fo/lang/", "zh_cn"));
 }
-

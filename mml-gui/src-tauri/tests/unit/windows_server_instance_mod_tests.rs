@@ -1,10 +1,12 @@
 use super::*;
-use crate::dtos::server_instance_dto::{ServerInstanceConfigDto, ServerInstancePickDto};
+use crate::dtos::server_instance_dto::{
+    ServerInstanceConfigDto, ServerInstanceCustomDto, ServerInstancePickDto,
+};
 use mml_config::config_obj::RunArgObj;
 use mml_game::{
     launcher::file_online_info_obj::OnlineInfoObj, loader::LoaderType,
     other_launcher::mmc_obj::MMCObj,
-    serverpack::serverpack_obj::ServerPackObj,
+    serverpack::serverpack_obj::{ServerArchiveAction, ServerPackObj},
 };
 
 /// 勾选一组模组路径
@@ -15,6 +17,7 @@ fn picks(paths: &[&str]) -> Vec<ServerInstancePickDto> {
             path: path.to_string(),
             exclude: false,
             url: String::new(),
+            text: String::new(),
             pid: String::new(),
             fid: String::new(),
             custom: false,
@@ -55,6 +58,7 @@ fn options(
                 path: path.to_string(),
                 exclude: false,
                 url: String::new(),
+                text: String::new(),
                 pid: String::new(),
                 fid: String::new(),
                 custom: true,
@@ -63,6 +67,7 @@ fn options(
                 optional: false,
             })
             .collect(),
+        custom: Vec::new(),
     }
 }
 
@@ -98,6 +103,32 @@ fn contents(base: &Path, options: &ServerInstanceOptionsDto) -> Contents {
                 custom: pick.custom,
                 edited: pick.edited,
                 type_changed: pick.type_changed,
+            })
+            .collect(),
+        custom: options
+            .custom
+            .iter()
+            .map(|item| {
+                let action = if item.action == "add" {
+                    CustomAction::Add
+                } else {
+                    CustomAction::Delete
+                };
+                let (path, content) = match action {
+                    CustomAction::Add => match &item.content {
+                        Some(text) => (
+                            files::custom_target(base, &item.path).unwrap(),
+                            Some(text.clone()),
+                        ),
+                        None => (files::file(base, &item.path).unwrap(), None),
+                    },
+                    CustomAction::Delete => (files::custom_target(base, &item.path).unwrap(), None),
+                };
+                CustomPick {
+                    path,
+                    action,
+                    content,
+                }
             })
             .collect(),
     }
@@ -304,9 +335,9 @@ fn config_exclusions_filter_packed_files() {
     crate::test_support::cleanup(&[&instance, &out, &out2, &out3]);
 }
 
-/// 「删除目录」产出空压缩包并带 Over，客户端据此删掉目录
+/// 「删除目录」写一条 DeletePath 动作的清单项，客户端据此删掉目录
 #[test]
-fn delete_mode_writes_empty_archive_with_over() {
+fn delete_mode_writes_delete_path() {
     crate::test_support::ensure_boot();
     let instance = crate::test_support::temp_dir("server-instance-config-delete");
     let base = instance.join(names::GAME_DIR);
@@ -332,19 +363,19 @@ fn delete_mode_writes_empty_archive_with_over() {
 
     let pack: ServerPackObj =
         serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
-    let archive = pack.archive_list.first().expect("应写出删除用的压缩包");
-    assert_eq!(archive.file, "config.zip");
-    assert!(archive.delete_old, "删除目录需要 Over=true");
-    let zip = mml_base::archives::BaseArchive::open_readonly(out.join("config.zip")).unwrap();
-    assert!(zip.entries().is_empty(), "删除目录的包不能带文件");
-    assert!(result.files.iter().any(|name| name == "config.zip"));
+    let archive = pack.archive_list.first().expect("应写出删除条目");
+    assert_eq!(archive.action, ServerArchiveAction::DeletePath);
+    assert!(archive.file.is_empty(), "删除条目不写压缩包文件名");
+    assert!(archive.url.is_none(), "删除条目不写下载地址");
+    assert!(!out.join("config.zip").exists(), "删除目录不再写压缩包");
+    assert!(!result.files.iter().any(|name| name == "config.zip"));
 
     crate::test_support::cleanup(&[&instance, &out]);
 }
 
-/// 单文件标记删除：不进包，另写空包让客户端删掉这个路径
+/// 单文件标记删除：不进包，写一条 DeleteFile 动作的清单项让客户端删掉这个路径
 #[test]
-fn file_delete_writes_tombstone_archive() {
+fn file_delete_writes_delete_file() {
     crate::test_support::ensure_boot();
     let instance = crate::test_support::temp_dir("server-instance-config-file-delete");
     let base = instance.join(names::GAME_DIR);
@@ -372,7 +403,7 @@ fn file_delete_writes_tombstone_archive() {
 
     let pack: ServerPackObj =
         serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
-    assert_eq!(pack.archive_list.len(), 2, "目录包与删除空包各一条");
+    assert_eq!(pack.archive_list.len(), 2, "目录包与删除项各一条");
     let dir_archive = pack
         .archive_list
         .iter()
@@ -382,15 +413,51 @@ fn file_delete_writes_tombstone_archive() {
     let names: Vec<&str> = zip.entries().iter().map(|item| item.name.as_str()).collect();
     assert_eq!(names, vec!["a.toml"], "标记删除的文件不能进目录包");
 
-    let tombstone = pack
+    let deletion = pack
         .archive_list
         .iter()
         .find(|item| item.dir == "config/b.toml")
-        .expect("应写出删除空包");
-    assert!(tombstone.delete_old, "删除单个文件同样要 Over");
-    assert_eq!(tombstone.file, "config.b.toml.delete.zip");
-    let zip = mml_base::archives::BaseArchive::open_readonly(out.join(&tombstone.file)).unwrap();
-    assert!(zip.entries().is_empty(), "删除空包不能带文件");
+        .expect("应写出删除条目");
+    assert_eq!(deletion.action, ServerArchiveAction::DeleteFile);
+    assert!(deletion.file.is_empty(), "删除条目不写压缩包文件名");
+    assert!(deletion.url.is_none(), "删除条目不写下载地址");
+
+    crate::test_support::cleanup(&[&instance, &out]);
+}
+
+/// 上级不同步、子目录单独删：只写子目录的 DeletePath 条目，父目录不产出内容
+#[test]
+fn skipped_parent_allows_child_delete() {
+    crate::test_support::ensure_boot();
+    let instance = crate::test_support::temp_dir("server-instance-config-skip-child-delete");
+    let base = instance.join(names::GAME_DIR);
+    let out = crate::test_support::temp_dir("server-instance-config-skip-child-delete-out");
+    fs::create_dir_all(base.join("config").join("old")).unwrap();
+    fs::write(base.join("config").join("a.toml"), b"a").unwrap();
+    fs::write(base.join("config").join("old").join("b.toml"), b"b").unwrap();
+
+    let mut game = game();
+    game.dir = instance.to_string_lossy().to_string();
+    let options = options(&[], &[("config", "none"), ("config/old", "delete")], &[]);
+    let contents = contents(&base, &options);
+    generate_mml(
+        &game,
+        &HashMap::new(),
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    let pack: ServerPackObj =
+        serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
+    assert_eq!(pack.archive_list.len(), 1, "只写子目录这一条删除项");
+    assert_eq!(pack.archive_list[0].action, ServerArchiveAction::DeletePath);
+    assert_eq!(pack.archive_list[0].dir, "config/old");
+    assert!(pack.online_list.is_empty(), "不同步的父目录不生成文件条目");
 
     crate::test_support::cleanup(&[&instance, &out]);
 }
@@ -458,6 +525,7 @@ fn mods_follow_selection_and_exclusions() {
         path: "mods/sub/b.jar".into(),
         exclude: true,
         url: String::new(),
+        text: String::new(),
         pid: String::new(),
         fid: String::new(),
         custom: false,
@@ -536,8 +604,8 @@ fn mml_pack_writes_manifest_sidecar_and_archive() {
     assert_eq!(pack.archive_list[0].dir, "config");
     assert!(pack.archive_list[0].delete_old);
     assert_eq!(
-        pack.archive_list[0].url,
-        "https://example.invalid/pack/config.zip"
+        pack.archive_list[0].url.as_deref(),
+        Some("https://example.invalid/pack/config.zip")
     );
     assert!(out.join("config.zip").is_file());
 
@@ -620,6 +688,7 @@ fn mods_take_manual_url_over_recorded() {
         mods: files::mods(&base, &manual).unwrap(),
         configs: Vec::new(),
         packs: Vec::new(),
+        custom: Vec::new(),
     };
     generate_mml(
         &game(),
@@ -1548,5 +1617,169 @@ fn export_pack_writes_thin_and_complete_zips() {
     );
 
     crate::test_support::cleanup(&[&instance, &publish, &out]);
+}
+
+/// 自定义条目：添加的文件进清单，删除的写 delete 条目
+#[test]
+fn custom_entries_add_file_and_delete_path() {
+    crate::test_support::ensure_boot();
+    let instance = crate::test_support::temp_dir("server-instance-custom");
+    let base = instance.join(names::GAME_DIR);
+    let out = crate::test_support::temp_dir("server-instance-custom-out");
+    fs::create_dir_all(base.join("mods")).unwrap();
+    fs::write(base.join("mods").join("custom.jar"), b"c").unwrap();
+    fs::write(base.join("options.txt"), b"x").unwrap();
+
+    let mut game = game();
+    game.dir = instance.to_string_lossy().to_string();
+    let mut options = options(&[], &[], &[]);
+    options.custom = vec![
+        ServerInstanceCustomDto {
+            path: "mods/custom.jar".into(),
+            action: "add".into(),
+            content: None,
+        },
+        ServerInstanceCustomDto {
+            path: "config/gone.toml".into(),
+            action: "delete".into(),
+            content: None,
+        },
+    ];
+    let contents = contents(&base, &options);
+    generate_mml(
+        &game,
+        &HashMap::new(),
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    let pack: ServerPackObj =
+        serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
+    assert!(
+        pack.online_list.iter().any(|item| item.file == "mods/custom.jar"),
+        "添加的文件应进清单"
+    );
+    assert!(
+        pack.archive_list
+            .iter()
+            .any(|item| item.action == ServerArchiveAction::DeleteFile
+                && item.dir == "config/gone.toml"),
+        "删除条目应写进清单"
+    );
+
+    crate::test_support::cleanup(&[&instance, &out]);
+}
+
+/// 自定义内容：文字直接写成输出文件夹里的文件，清单带地址与 SHA1
+#[test]
+fn custom_content_writes_hosted_file() {
+    crate::test_support::ensure_boot();
+    let instance = crate::test_support::temp_dir("server-instance-custom-content");
+    let base = instance.join(names::GAME_DIR);
+    let out = crate::test_support::temp_dir("server-instance-custom-content-out");
+    fs::create_dir_all(&base).unwrap();
+    let text = "late = 1\n";
+
+    let mut game = game();
+    game.dir = instance.to_string_lossy().to_string();
+    let mut options = options(&[], &[], &[]);
+    options.custom = vec![ServerInstanceCustomDto {
+        path: "config/late.toml".into(),
+        action: "add".into(),
+        content: Some(text.into()),
+    }];
+    let contents = contents(&base, &options);
+    generate_mml(
+        &game,
+        &HashMap::new(),
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    assert_eq!(
+        fs::read_to_string(out.join("config").join("late.toml")).unwrap(),
+        text,
+        "内容要落到输出文件夹"
+    );
+    let pack: ServerPackObj =
+        serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
+    let item = pack.online_list.first().expect("内容文件应进清单");
+    assert_eq!(item.file, "config/late.toml");
+    assert!(item.custom, "内容文件走自定义编号");
+    assert_eq!(
+        item.url.as_deref(),
+        Some("https://example.invalid/pack/config/late.toml")
+    );
+    assert_eq!(item.sha1.as_deref(), Some(sha1(text.as_bytes()).as_str()));
+
+    crate::test_support::cleanup(&[&instance, &out]);
+}
+
+/// 自定义内容只能写到文件位置，指向目录要拒绝
+#[test]
+fn custom_content_rejects_directory_path() {
+    crate::test_support::ensure_boot();
+    let instance = crate::test_support::temp_dir("server-instance-custom-content-dir");
+    let base = instance.join(names::GAME_DIR);
+    fs::create_dir_all(base.join("config")).unwrap();
+    assert!(files::custom_target(&base, "config").is_err());
+    assert!(files::custom_target(&base, "config/late.toml").is_ok());
+    crate::test_support::cleanup(&[&instance]);
+}
+
+/// 模组说明写进清单的 Text，并随生成选项保存到实例
+#[test]
+fn mod_text_goes_to_manifest_and_meta() {
+    crate::test_support::ensure_boot();
+    let instance = crate::test_support::temp_dir("server-instance-mod-text");
+    let base = instance.join(names::GAME_DIR);
+    let out = crate::test_support::temp_dir("server-instance-mod-text-out");
+    fs::create_dir_all(base.join("mods")).unwrap();
+    fs::write(base.join("mods").join("a.jar"), b"a").unwrap();
+
+    let mut game = game();
+    game.dir = instance.to_string_lossy().to_string();
+    let mut options = options(&["mods/a.jar"], &[], &[]);
+    options.mods[0].text = "这是说明".to_string();
+    let contents = contents(&base, &options);
+    generate_mml(
+        &game,
+        &HashMap::new(),
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    let pack: ServerPackObj =
+        serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
+    let item = pack
+        .online_list
+        .iter()
+        .find(|item| item.file == "mods/a.jar")
+        .expect("应写出模组条目");
+    assert_eq!(item.text, "这是说明");
+
+    let ids = mapping::IdMap::load(&game.get_base_path());
+    let meta = ids.meta().expect("生成后应保存选项");
+    assert_eq!(
+        meta.mod_texts.get("mods/a.jar").map(String::as_str),
+        Some("这是说明")
+    );
+
+    crate::test_support::cleanup(&[&instance, &out]);
 }
 

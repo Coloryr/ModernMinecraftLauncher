@@ -375,6 +375,7 @@ pub async fn add_probe_server_pack(url: String) -> Result<ServerPackProbeDto, St
                 .next()
                 .unwrap_or(item.file.as_str())
                 .to_string(),
+            text: item.text.clone(),
             // 首次导入没有"新增"可言，全都不打标
             added: false,
             enabled: false,

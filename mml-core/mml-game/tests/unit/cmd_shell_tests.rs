@@ -91,7 +91,11 @@ fn bat_runs_through_cmd_call() {
         .expect("bat 是脚本");
 
     assert_eq!(
-        runner.file_name().unwrap().to_string_lossy().to_ascii_lowercase(),
+        runner
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_ascii_lowercase(),
         "cmd.exe"
     );
     assert_eq!(prefix, vec!["/c".to_string(), "call".to_string()]);
@@ -138,4 +142,3 @@ fn separators_follow_unix() {
         "python3 update/updater.py"
     );
 }
-

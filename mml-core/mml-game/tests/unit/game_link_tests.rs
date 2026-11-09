@@ -2,7 +2,10 @@
 //!
 //! 服务器实例的文件直接落在实例目录，不建公共目录硬链接、不写映射记录。
 //! 这里用真实例句柄覆盖四个入口，并对照普通实例确认开关只对服务器实例生效。
-use std::{collections::HashMap, sync::{Arc, RwLock}};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 use mml_base::file_item::{FileHash, FileItemObj, LaterRun};
 use tokio_util::sync::CancellationToken;
@@ -64,7 +67,11 @@ fn server_pack_skips_link_mapping() {
     let game = make_instance(ModPackType::ServerPack);
     assert!(is_server_pack(&game));
 
-    assert_eq!(count_instance_resources(&game), 0, "服务器实例没有可映射的资源");
+    assert_eq!(
+        count_instance_resources(&game),
+        0,
+        "服务器实例没有可映射的资源"
+    );
     let count = map_instance_resources(&game);
     assert_eq!(
         (count.mapped, count.failed, count.skipped),
@@ -80,7 +87,10 @@ fn server_pack_skips_link_mapping() {
         hash: FileHash::None,
         later: LaterRun::None,
     }];
-    assert!(prepare_downloads(&game, &mut items).is_empty(), "不该生成补链计划");
+    assert!(
+        prepare_downloads(&game, &mut items).is_empty(),
+        "不该生成补链计划"
+    );
     assert_eq!(items.len(), 1);
     assert_eq!(
         items[0].file, target,

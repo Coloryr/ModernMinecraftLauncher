@@ -364,8 +364,7 @@ fn default_group_can_be_reordered() {
     let _guard = DISK_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     boot();
 
-    let dir =
-        mml_testutil::temp_dir().join(format!("mml-group-reorder-{}", std::process::id()));
+    let dir = mml_testutil::temp_dir().join(format!("mml-group-reorder-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     init(dir.clone()).unwrap();
@@ -446,4 +445,3 @@ fn import_legacy_merges_and_removes_file() {
     assert_eq!(list[1].name, "整合包");
     assert_eq!(group_items(&list[1].uuid), vec![uuid]);
 }
-

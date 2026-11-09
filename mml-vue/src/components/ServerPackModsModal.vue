@@ -102,6 +102,7 @@ function apply() {
             </span>
           </span>
           <span class="mods-path">{{ item.path }}</span>
+          <span v-if="item.text" class="mods-text">{{ item.text }}</span>
         </span>
       </label>
     </div>
@@ -209,5 +210,18 @@ function apply() {
   color: var(--text-dim);
   font-size: 11.5px;
   word-break: break-all;
+}
+
+/* 发布端写的说明：跟在路径下面，最多两行，别把弹窗撑成整页 */
+.mods-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  line-height: 1.5;
+  word-break: break-word;
 }
 </style>

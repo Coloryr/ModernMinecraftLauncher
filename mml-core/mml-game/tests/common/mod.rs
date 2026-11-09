@@ -11,6 +11,7 @@
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::OnceLock;
+use std::time::Duration;
 
 use mml_base::serialize_tools::json_from_bytes;
 use mml_net::modrinth_api::version_obj::ModrinthVersionObj;
@@ -37,6 +38,37 @@ fn block_on<F: std::future::Future>(future: F) -> F::Output {
             .expect("构建测试 tokio runtime 失败")
     });
     runtime.block_on(future)
+}
+
+/// 单次网络请求的超时，单位秒；`MML_TEST_HTTP_TIMEOUT` 可覆盖
+///
+/// 没有超时时，卡住的连接会把整个测试二进制永远挂住；CDN 限速到十几 KB/s 时
+/// 也会表现为“卡在某个用例上”。默认 300 秒，慢网下的小文件仍然下得完。
+fn http_timeout() -> Duration {
+    std::env::var("MML_TEST_HTTP_TIMEOUT")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .map(Duration::from_secs)
+        .unwrap_or(Duration::from_secs(300))
+}
+
+/// 带超时的 GET：失败与超时都返回 `None`，并打一行说明
+fn get_bytes(url: &str) -> Option<Vec<u8>> {
+    init_net();
+    let limit = http_timeout();
+    block_on(async {
+        match tokio::time::timeout(limit, mml_net::get_work_client().get_bytes(url)).await {
+            Ok(Ok(data)) => Some(data),
+            Ok(Err(err)) => {
+                eprintln!("[网络] {url} 失败：{err}");
+                None
+            }
+            Err(_) => {
+                eprintln!("[网络] {url} 超时（{}s）", limit.as_secs());
+                None
+            }
+        }
+    })
 }
 
 /// 下载缓存目录，位于系统临时目录下，跨测试与跨进程复用
@@ -77,8 +109,7 @@ pub fn download(url: &str) -> Option<PathBuf> {
     if path.exists() {
         return Some(path);
     }
-    init_net();
-    let data = block_on(mml_net::get_work_client().get_bytes(url)).ok()?;
+    let data = get_bytes(url)?;
     if data.is_empty() {
         return None;
     }
@@ -153,6 +184,23 @@ pub fn download_latest(slug: &str) -> Option<PathBuf> {
     download(&file.url)
 }
 
+/// 异步版带超时请求：失败与超时都返回 `None`
+async fn get_bytes_async(url: &str) -> Option<Vec<u8>> {
+    init_net();
+    let limit = http_timeout();
+    match tokio::time::timeout(limit, mml_net::get_work_client().get_bytes(url)).await {
+        Ok(Ok(data)) => Some(data),
+        Ok(Err(err)) => {
+            eprintln!("[网络] {url} 失败：{err}");
+            None
+        }
+        Err(_) => {
+            eprintln!("[网络] {url} 超时（{}s）", limit.as_secs());
+            None
+        }
+    }
+}
+
 /// 取项目的全部版本，Modrinth 的返回顺序是**最新在前**
 ///
 /// 与 [`resolve_project_version`] 的区别：那个只要某个版本号的主文件地址，这个要
@@ -167,13 +215,8 @@ pub fn download_latest(slug: &str) -> Option<PathBuf> {
 ///
 /// 返回该项目的版本列表；请求或解析失败返回 `None`
 pub async fn project_versions_async(slug: &str) -> Option<Vec<ModrinthVersionObj>> {
-    init_net();
-    let data = mml_net::get_work_client()
-        .get_bytes(&format!(
-            "https://api.modrinth.com/v2/project/{slug}/version"
-        ))
-        .await
-        .ok()?;
+    let url = format!("https://api.modrinth.com/v2/project/{slug}/version");
+    let data = get_bytes_async(&url).await?;
     json_from_bytes(&data).ok()
 }
 
@@ -195,8 +238,7 @@ pub async fn download_version_async(version: &ModrinthVersionObj) -> Option<Path
     if path.exists() {
         return Some(path);
     }
-    init_net();
-    let data = mml_net::get_work_client().get_bytes(&file.url).await.ok()?;
+    let data = get_bytes_async(&file.url).await?;
     if data.is_empty() {
         return None;
     }
@@ -206,8 +248,7 @@ pub async fn download_version_async(version: &ModrinthVersionObj) -> Option<Path
 
 /// 请求 Modrinth API 并反序列化
 fn get_json<T: serde::de::DeserializeOwned>(url: &str) -> Option<T> {
-    init_net();
-    let data = block_on(mml_net::get_work_client().get_bytes(url)).ok()?;
+    let data = get_bytes(url)?;
     json_from_bytes(&data).ok()
 }
 

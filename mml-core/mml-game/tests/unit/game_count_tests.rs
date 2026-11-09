@@ -119,4 +119,3 @@ fn unreadable_count_is_not_overwritten() {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
-

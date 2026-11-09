@@ -39,4 +39,3 @@ fn parses_line_without_level() {
     assert_eq!(parsed.log, line);
     assert!(matches!(parsed.level, LogLevel::None));
 }
-

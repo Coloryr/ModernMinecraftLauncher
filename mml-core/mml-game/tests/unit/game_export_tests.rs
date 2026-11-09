@@ -83,7 +83,8 @@ fn mmc_instance_cfg_converts_jvm_placeholders() {
             max_memory: Some(4096),
             min_memory: Some(1024),
             jvm_args: Some(
-                "-Dfoo=1\n-javaagent:%GAME_BASE_DIR%/mml-server-sync.jar=https://a/server.json".into(),
+                "-Dfoo=1\n-javaagent:%GAME_BASE_DIR%/mml-server-sync.jar=https://a/server.json"
+                    .into(),
             ),
             ..Default::default()
         }),
@@ -100,7 +101,9 @@ fn mmc_instance_cfg_converts_jvm_placeholders() {
     assert!(text.contains("MaxMemAlloc=4096"), "{text}");
     assert!(text.contains("MinMemAlloc=1024"), "{text}");
     assert!(
-        text.contains("JvmArgs=-Dfoo=1 -javaagent:$INST_DIR/mml-server-sync.jar=https://a/server.json"),
+        text.contains(
+            "JvmArgs=-Dfoo=1 -javaagent:$INST_DIR/mml-server-sync.jar=https://a/server.json"
+        ),
         "{text}"
     );
     assert!(!text.contains("%GAME_BASE_DIR%"), "{text}");

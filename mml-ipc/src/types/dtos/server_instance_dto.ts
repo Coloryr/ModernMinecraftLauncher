@@ -10,12 +10,20 @@ export type ServerInstanceOptionsDto = {
   configs: ServerInstanceConfigDto[],
   baseFiles: string[],
   resourcePacks: ServerInstancePickDto[],
+  custom: ServerInstanceCustomDto[],
+};
+
+export type ServerInstanceCustomDto = {
+  path: string,
+  action: string,
+  content: string | null,
 };
 
 export type ServerInstancePickDto = {
   path: string,
   exclude: boolean,
   url: string,
+  text: string,
   pid: string,
   fid: string,
   custom: boolean,
@@ -30,6 +38,14 @@ export type ServerInstanceConfigDto = {
   exclude: string[],
   delete: string[],
   deleteOld: boolean | null,
+};
+
+export type ServerInstanceConfigDiffDto = {
+  generated: boolean,
+  added: string[],
+  modified: string[],
+  deleted: string[],
+  files: string[],
 };
 
 export type ServerInstanceProgressDto = {
@@ -52,6 +68,8 @@ export type ServerInstanceMetaDto = {
   folder: string,
   baseFiles: string[],
   configs: ServerInstanceConfigDto[] | null,
+  modTexts: Record<string, string>,
+  custom: ServerInstanceCustomDto[],
 };
 
 export type ServerInstanceSnapshotDto = {

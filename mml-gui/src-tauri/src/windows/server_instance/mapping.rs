@@ -69,6 +69,24 @@ pub(super) struct Meta {
     pub(super) base_files: Vec<String>,
     /// 上次生成用的配置目录；老数据为 `None`
     pub(super) configs: Option<Vec<MetaConfig>>,
+    /// 模组说明：相对游戏目录的路径 → 发布端填的文字
+    pub(super) mod_texts: BTreeMap<String, String>,
+    /// 上次生成时配置目录下的文件内容：相对游戏目录的路径 → SHA1
+    pub(super) config_files: BTreeMap<String, String>,
+    /// 上次生成的自定义条目
+    pub(super) custom: Vec<MetaCustom>,
+}
+
+/// 上次生成的一条自定义条目
+#[derive(Serialize, Deserialize, Default, Clone)]
+#[serde(default, rename_all = "camelCase")]
+pub(super) struct MetaCustom {
+    /// 相对游戏目录的路径
+    pub(super) path: String,
+    /// 动作：add / delete
+    pub(super) action: String,
+    /// 添加时直接写成客户端文件的内容；老数据没有这一项
+    pub(super) content: Option<String>,
 }
 
 /// 上次生成时保存的一个配置目录

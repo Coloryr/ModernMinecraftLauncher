@@ -676,4 +676,3 @@ fn mcmod_logo_file_absent() {
     assert_eq!(mcmod_logo_file_in("{}"), None);
     assert_eq!(mcmod_logo_file_in("not a json"), None);
 }
-

@@ -38,6 +38,11 @@ pub(super) fn validate_pack(pack: &ServerPackObj, game: &Path, temp: &Path) -> C
         file_path(game, &item.file)?;
     }
     for item in &pack.archive_list {
+        // 删除条目没有压缩包，只校验目标；目标不能是整个游戏目录
+        if item.action.is_delete() {
+            file_path(game, &item.dir)?;
+            continue;
+        }
         file_path(temp, &item.file)?;
         if item.delete_old {
             file_path(game, &item.dir)?;

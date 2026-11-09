@@ -380,6 +380,203 @@
   color: var(--text-dim);
 }
 
+/* 配置页工具条右侧：搜索框 + 普通 / 分组切换 */
+.si-head-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* 文件变化：新增绿、修改黄、删除红；分组行与普通树共用 */
+.si-config-row.is-add {
+  background: color-mix(in srgb, var(--green) 14%, transparent);
+}
+.si-config-row.is-mod {
+  background: color-mix(in srgb, var(--yellow) 16%, transparent);
+}
+.si-config-row.is-del {
+  background: color-mix(in srgb, var(--red) 14%, transparent);
+}
+.si-config-row.is-add:hover {
+  background: color-mix(in srgb, var(--green) 22%, transparent);
+}
+.si-config-row.is-mod:hover {
+  background: color-mix(in srgb, var(--yellow) 24%, transparent);
+}
+.si-config-row.is-del:hover {
+  background: color-mix(in srgb, var(--red) 22%, transparent);
+}
+
+/* 分组视图的组标题：颜色跟这一组的状态走；配置与模组共用 */
+.si-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+.si-group-head.is-add {
+  color: var(--green);
+}
+.si-group-head.is-mod {
+  color: var(--yellow);
+}
+.si-group-head.is-del {
+  color: var(--red);
+}
+/* 表格模式的分组行：与模组表的分组行同一观感，比数据行重一档 */
+.si-config-row.si-config-group-row {
+  background: var(--bg-side);
+  font-weight: 600;
+}
+
+.si-config-row.si-config-group-row:hover {
+  background: var(--bg-side);
+}
+
+/* 分组名前的折叠箭头：与目录树的箭头同一档宽度 */
+.si-config-caret {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.si-caret-icon {
+  transition: transform 0.12s;
+}
+
+/* 收起时箭头转成"向右" */
+.si-caret-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+.si-config-group-label {
+  cursor: pointer;
+}
+
+.si-config-group-count {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.si-group-count {
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+/* 分组视图的一行：名字 + 路径，模组这类没有多列控件的列表用 */
+.si-group-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.si-group-row .si-group-path {
+  color: var(--text-dim);
+  font-size: 11.5px;
+  word-break: break-all;
+}
+
+/* 分组视图整块可滚动：条目多时不要撑破卡片 */
+.si-group-card {
+  overflow: auto;
+}
+
+.si-hint {
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+
+.si-custom-add {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.si-custom-add .field-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.si-custom-add .field-select {
+  width: 110px;
+}
+
+/* 直接填写内容的输入框：多行，跟在添加行下面 */
+.si-custom-content {
+  min-height: 76px;
+  resize: vertical;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* 自定义文件的添加条：在卡片底部，与表体之间一条分隔线 */
+.si-custom-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+/* 自定义条目的动作标签放在"同步方式"列，靠右对齐 */
+.si-custom-row .si-config-mode-cell {
+  align-items: center;
+  gap: 6px;
+}
+
+/* 移除按钮放在末列右侧 */
+.si-config-delete-cell.si-custom-remove {
+  justify-content: flex-end;
+}
+
+.si-tag.add {
+  color: var(--green);
+}
+
+.si-tag.delete {
+  color: var(--red);
+}
+
+/* 内容是发布者直接填的，不是实例里的文件 */
+.si-tag.content {
+  color: var(--text-dim);
+}
+
+/* 搜索结果左侧的状态点 */
+.si-change-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.si-change-dot.is-add {
+  background: var(--green);
+}
+.si-change-dot.is-mod {
+  background: var(--yellow);
+}
+.si-change-dot.is-del {
+  background: var(--red);
+}
+
 .si-tag {
   flex-shrink: 0;
   padding: 2px 8px;
@@ -522,9 +719,9 @@
 .si-mod-head,
 .si-mod-row {
   grid-template-columns:
-    44px 44px minmax(160px, 1.1fr) 96px 120px 120px minmax(200px, 1.7fr) 170px;
+    44px 44px minmax(150px, 1fr) minmax(160px, 1.2fr) 96px 120px 120px minmax(200px, 1.7fr) 170px;
   /* 列宽总和超过窄窗口时让表头 / 行本身跟着变宽，横向滚动到底也有底色和下边框 */
-  min-width: 1044px;
+  min-width: 1188px;
 }
 
 .si-table-head,

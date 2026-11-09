@@ -161,7 +161,9 @@ impl InstanceHandle {
         // 启动进程。调试器是控制台程序，藏掉它的窗口；停止时也要结束整棵进程树
         let wrapped = run.debugger != LaunchDebugger::None;
         let result = if wrapped {
-            process_helper::launch_hidden_in_group(run.java, run.args, run.env, run.path, run.admin)?
+            process_helper::launch_hidden_in_group(
+                run.java, run.args, run.env, run.path, run.admin,
+            )?
         } else {
             process_helper::launch(run.java, run.args, run.env, run.path, run.admin)?
         };
@@ -532,7 +534,10 @@ impl InstanceSettingObj {
         // 游戏内的 Java agent 靠这两个变量识别 MML 启动，避免重复同步服务器包
         if self.mml_env() {
             env.insert("MML_LAUNCHER".to_string(), "1".to_string());
-            env.insert("MML_LAUNCHER_VERSION".to_string(), mml_names::VERSION.clone());
+            env.insert(
+                "MML_LAUNCHER_VERSION".to_string(),
+                mml_names::VERSION.clone(),
+            );
         }
         // 先铺隔离路径，用户自己写的环境变量随后覆盖，手动指定优先
         if self.isolate_home() {
@@ -608,10 +613,7 @@ impl InstanceSettingObj {
             "ARG_JAVA_LOCAL".to_string(),
             java.to_string_lossy().into_owned(),
         );
-        env.insert(
-            "ARG_JAVA_ARG".to_string(),
-            jvm_args.join(" "),
-        );
+        env.insert("ARG_JAVA_ARG".to_string(), jvm_args.join(" "));
         env.insert(
             "ARG_LAUNCHER_DIR".to_string(),
             mml_base::get_base_dir().to_string_lossy().into_owned(),
@@ -887,14 +889,26 @@ impl InstanceSettingObj {
                 if let Some(stdout) = result.stdout {
                     let uuid = self.uuid;
                     std::thread::spawn(move || {
-                        read_process_stream(stdout, uuid, encoding, Arc::new(AtomicBool::new(false)), false);
+                        read_process_stream(
+                            stdout,
+                            uuid,
+                            encoding,
+                            Arc::new(AtomicBool::new(false)),
+                            false,
+                        );
                     });
                 }
 
                 if let Some(stderr) = result.stderr {
                     let uuid = self.uuid;
                     std::thread::spawn(move || {
-                        read_process_stream(stderr, uuid, encoding, Arc::new(AtomicBool::new(false)), false);
+                        read_process_stream(
+                            stderr,
+                            uuid,
+                            encoding,
+                            Arc::new(AtomicBool::new(false)),
+                            false,
+                        );
                     });
                 }
 
@@ -1306,8 +1320,7 @@ impl InstanceSettingObj {
                 let temp = self.replace_arg(&jvm, &jvm_arg, &post_run_cmd);
                 cmd_shell::ensure_runner(&temp, &self.get_base_path(), &self.get_game_path())
                     .await?;
-                self.cmd_run(&temp, &env, false, arg.admin, &cancel)
-                    .await?;
+                self.cmd_run(&temp, &env, false, arg.admin, &cancel).await?;
                 let time = start.elapsed();
                 crate::add_game_log_item(&self.uuid, GameLog::CmdPostTime(time));
             }

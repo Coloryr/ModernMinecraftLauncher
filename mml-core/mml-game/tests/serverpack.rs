@@ -77,7 +77,7 @@ fn archive(file: &str, dir: &str, delete_old: bool, url: &str) -> ServerArchiveI
         file: file.to_string(),
         dir: dir.to_string(),
         delete_old,
-        url: url.to_string(),
+        url: Some(url.to_string()),
         ..Default::default()
     }
 }

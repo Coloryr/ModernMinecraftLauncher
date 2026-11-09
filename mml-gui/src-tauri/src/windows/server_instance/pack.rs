@@ -126,7 +126,7 @@ pub(super) fn export_pack(
         }
         for item in &options.configs {
             let dir = config_dir(&item.dir)?;
-            // 删除目录没有可放进包里的内容，清单里的空压缩包由同步 agent 处理
+            // 删除目录没有可放进包里的内容，清单里的删除条目由同步端处理
             let mut list = match ConfigMode::parse(&item.mode)? {
                 ConfigMode::ArchiveAll | ConfigMode::FilesAll => files::dir_files(&game_path, &dir)?,
                 ConfigMode::ArchiveSelf | ConfigMode::FilesSelf => {
@@ -135,7 +135,7 @@ pub(super) fn export_pack(
                 ConfigMode::Delete | ConfigMode::None => continue,
             };
             files::retain_excluded(&game_path, &mut list, &item.exclude)?;
-            // 标记删除的文件不进包，清单里的空包负责让客户端删掉
+            // 标记删除的文件不进包，清单里的删除条目负责让客户端删掉
             files::retain_excluded(&game_path, &mut list, &item.delete)?;
             for rel in list {
                 pending.insert(

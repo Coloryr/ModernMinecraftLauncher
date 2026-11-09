@@ -656,6 +656,8 @@ pub struct ServerPackModDto {
     pub path: String,
     /// 文件名，确认窗里显示用
     pub name: String,
+    /// 清单里的模组说明；没有时为空串
+    pub text: String,
     /// 清单里新加的条目；旧清单里已经有它、只是换了版本时为 false
     pub added: bool,
     /// 本地那份当前是否处于启用状态；本地还没有时为 false

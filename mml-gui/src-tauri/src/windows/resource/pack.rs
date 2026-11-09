@@ -298,8 +298,8 @@ fn pack_diff(old: &ServerPackObj, new: &ServerPackObj) -> PackDiff {
 
 /// 这次会变的可选模组
 ///
-/// 只收清单里标了可选的条目：必装模组没有可选项，必须跟着清单走。玩家上次跳过的条目
-/// 只要发布方没换内容就不再列出来，免得每次查更新都问一遍同一件事。
+/// 只收清单里标了可选的条目：必装模组没有可选项，必须跟着清单走。内容没变的条目
+/// 不再列出来，免得每次查更新都问一遍同一件事。
 ///
 /// - `old`: 本地清单，没有时传 `None`
 /// - `new`: 发布地址上的清单
@@ -321,7 +321,7 @@ fn changed_optional_mods(
                 .find(|row| mod_key(row) == mod_key(item))
                 .is_some_and(|row| same_content(row, item))
         });
-        if unchanged || old.is_some_and(|old| skipped_before(old, item)) {
+        if unchanged {
             continue;
         }
         // 换文件名时本地那份还在旧路径下，按身份找它现在叫什么
@@ -336,6 +336,7 @@ fn changed_optional_mods(
                 .next()
                 .unwrap_or(item.file.as_str())
                 .to_string(),
+            text: item.text.clone(),
             // 旧清单里没有这条才是"新加进来的"，换了文件名不算
             added: previous.is_none(),
             enabled,
@@ -375,21 +376,6 @@ fn same_content(left: &ServerItemObj, right: &ServerItemObj) -> bool {
     false
 }
 
-/// 玩家之前跳过的是不是同一条内容
-///
-/// - `old`: 本地清单
-/// - `item`: 新清单条目
-///
-/// # 返回值
-///
-/// 路径与 SHA1 都对得上时返回 `true`
-fn skipped_before(old: &ServerPackObj, item: &ServerItemObj) -> bool {
-    let sha1 = item.sha1.as_deref().unwrap_or_default().trim();
-    old.skipped
-        .iter()
-        .any(|marker| marker.file == item.file && marker.sha1.trim().eq_ignore_ascii_case(sha1))
-}
-
 /// 本地这份是不是启用着
 ///
 /// 禁用后会追加后缀，只看原始路径会把停用的模组当成没装。
@@ -416,14 +402,9 @@ fn local_enabled(game_path: &Path, rel: &str) -> bool {
 ///
 /// 内容一致返回 `true`；序列化失败按不一致处理
 fn same_pack(left: &ServerPackObj, right: &ServerPackObj) -> bool {
-    // 跳过记录只写本地清单，比内容时两边都清掉，否则跳过一次就永远显示有新版
-    let mut left = left.clone();
-    left.skipped.clear();
-    let mut right = right.clone();
-    right.skipped.clear();
     match (
-        serialize_tools::json_to_string(&left),
-        serialize_tools::json_to_string(&right),
+        serialize_tools::json_to_string(left),
+        serialize_tools::json_to_string(right),
     ) {
         (Ok(left), Ok(right)) => left == right,
         _ => false,

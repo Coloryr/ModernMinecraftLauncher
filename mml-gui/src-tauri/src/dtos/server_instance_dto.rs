@@ -2,6 +2,8 @@
 //!
 //! 生成选项 / 进度事件 / 结果。清单本身的结构在 `mml-game` 的 `serverpack` 下。
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 /// 生成服务器实例的选项，即 `server_instance_generate` 的入参
@@ -31,6 +33,24 @@ pub struct ServerInstanceOptionsDto {
     /// 要同步的资源包文件，路径相对游戏目录，可带手填编号与地址
     #[serde(default)]
     pub resource_packs: Vec<ServerInstancePickDto>,
+    /// 自定义条目：额外纳入同步的文件，或让客户端删掉的文件
+    #[serde(default)]
+    pub custom: Vec<ServerInstanceCustomDto>,
+}
+
+/// 一条自定义同步项
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerInstanceCustomDto {
+    /// 相对游戏目录的路径
+    #[serde(default)]
+    pub path: String,
+    /// 动作：`add` 纳入同步 / `delete` 删除客户端文件
+    #[serde(default)]
+    pub action: String,
+    /// 添加时直接写成客户端文件的内容；`None` 表示从实例里取现有文件
+    #[serde(default)]
+    pub content: Option<String>,
 }
 
 /// 前端勾选的一个路径
@@ -45,6 +65,9 @@ pub struct ServerInstancePickDto {
     /// 手动填的下载地址；空串表示用实例记录的那一份
     #[serde(default)]
     pub url: String,
+    /// 模组说明，写进清单的 `Text`；空串表示不写
+    #[serde(default)]
+    pub text: String,
     /// 手动填的项目编号；空串表示用实例记录的那一份
     #[serde(default)]
     pub pid: String,
@@ -77,12 +100,28 @@ pub struct ServerInstanceConfigDto {
     /// 取消勾选的文件，相对游戏目录；只对这个目录负责的范围生效
     #[serde(default)]
     pub exclude: Vec<String>,
-    /// 下次同步要删掉的文件，相对游戏目录；不进包，客户端按空包 + Over 删除
+    /// 下次同步要删掉的文件，相对游戏目录；不进包，客户端按 delete 条目删除
     #[serde(default)]
     pub delete: Vec<String>,
     /// 压缩包解压前先删掉客户端旧目录；`None` 按同步方式的默认值
     #[serde(default)]
     pub delete_old: Option<bool>,
+}
+
+/// 配置文件相对上次生成的变化，即 `server_instance_config_diff` 的返回值
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerInstanceConfigDiffDto {
+    /// 有没有可对比的上次生成快照；没生成过时是 `false`
+    pub generated: bool,
+    /// 上次生成之后新增的文件，相对游戏目录
+    pub added: Vec<String>,
+    /// 内容变了的文件
+    pub modified: Vec<String>,
+    /// 上次生成时有、现在磁盘上已经没有的文件
+    pub deleted: Vec<String>,
+    /// 当前参与同步的全部文件路径，搜索用
+    pub files: Vec<String>,
 }
 
 /// 生成进度事件，事件名 `server-instance-progress`
@@ -127,6 +166,10 @@ pub struct ServerInstanceMetaDto {
     pub base_files: Vec<String>,
     /// 配置文件目录；老数据没有这个字段时为 `None`，前端按默认列表铺
     pub configs: Option<Vec<ServerInstanceConfigDto>>,
+    /// 模组说明：相对游戏目录的路径 → 发布端填的文字；老数据为空表
+    pub mod_texts: BTreeMap<String, String>,
+    /// 上次生成的自定义条目；老数据为空表
+    pub custom: Vec<ServerInstanceCustomDto>,
 }
 
 /// 上次生成保存的模组 / 资源包快照

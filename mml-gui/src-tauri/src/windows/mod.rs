@@ -729,12 +729,18 @@ pub fn window_start_dragging(window: WebviewWindow) -> Result<(), String> {
 /// 下一次显示主窗口是否只显示、不抢前台；被 `take_startup_quiet` 消费一次即复位
 static QUIET_STARTUP: AtomicBool = AtomicBool::new(false);
 
+/// 启动时那次"不抢前台"是否已经排过；一个进程只排一次
+static STARTUP_QUIET_TAKEN: AtomicBool = AtomicBool::new(false);
+
 /// 标记下一次显示主窗口不要抢前台，setup 阶段建主窗口之前调一次
 ///
 /// 应用由系统、脚本或开发期的 watcher 拉起来时，把前台从用户正在用的窗口抢走会打断操作，
 /// 所以**进程启动后的第一次**主窗口显示只显示、不激活，之后照常拿焦点。
+/// 关窗后再从托盘唤回的主窗口不算：那次是用户主动点的，本就该拿到前台。
 pub(crate) fn quiet_main_window_startup() {
-    QUIET_STARTUP.store(true, Ordering::SeqCst);
+    if !STARTUP_QUIET_TAKEN.swap(true, Ordering::SeqCst) {
+        QUIET_STARTUP.store(true, Ordering::SeqCst);
+    }
 }
 
 /// 显示窗口：启动时的第一扇主窗口只显示、不激活，其余照旧显示并拿焦点
@@ -767,23 +773,43 @@ fn take_startup_quiet(label: &str) -> bool {
     label == main_window_label() && QUIET_STARTUP.swap(false, Ordering::SeqCst)
 }
 
-/// 显示窗口但不激活：Windows 走 `SW_SHOWNOACTIVATE`，前台窗口保持不动
+/// 显示窗口但不激活：先记下当前前台，显示之后还回去
+///
+/// **必须走 tao 的 `show()`**：直接 `ShowWindow` 只改原生可见性，tao 内部仍认为窗口不可见，
+/// 之后任何一次窗口标志变更（最小化 / 最大化 / 设为无装饰）都会顺手把窗口藏起来 ——
+/// 表现为任务栏图标消失、进程还在。
 ///
 /// - `window`: 要显示的窗口
 ///
 /// # 返回值
 ///
-/// 显示成功返回 `Ok(())`，取窗口句柄失败返回错误文案
+/// 排进窗口线程失败返回错误文案；显示本身在窗口线程上执行
 #[cfg(windows)]
 fn show_without_activate(window: &WebviewWindow) -> Result<(), String> {
-    use windows::Win32::UI::WindowsAndMessaging::{SW_SHOWNOACTIVATE, ShowWindow};
+    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, SetForegroundWindow};
 
-    let hwnd = window.hwnd().map_err(|err| err.to_string())?;
-    // SAFETY: 句柄取自本窗口，调用期间窗口仍然存活；只改显示状态，不解引用其它指针
-    unsafe {
-        let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-    }
-    Ok(())
+    let win = window.clone();
+    // 放窗口线程上做：show() 在那里同步生效，紧接着还前台，中间插不进别的窗口操作
+    window
+        .run_on_main_thread(move || {
+            // SAFETY: 只读当前前台句柄，不解引用；调用期间本窗口仍存活
+            let previous = unsafe { GetForegroundWindow() };
+            if win.show().is_err() {
+                return;
+            }
+            // show() 会先激活本窗口；启动时不打断用户正在用的窗口，把前台还回去
+            if !previous.is_invalid() {
+                // SAFETY: 句柄由系统给出；本进程刚拿到前台，此刻改回原窗口是允许的
+                unsafe {
+                    let _ = SetForegroundWindow(previous);
+                }
+            }
+        })
+        .map_err(|err| {
+            // 排不进窗口线程：退回普通显示，宁可抢一次前台也不能让主窗口不显示
+            let _ = window.show();
+            err.to_string()
+        })
 }
 
 /// 其它平台没有"显示但不激活"的等价开关，退化成只显示、不主动拿焦点

@@ -27,7 +27,9 @@ use mml_game::{
     },
     serverpack::{
         generate,
-        serverpack_obj::{ServerArchiveItemObj, ServerBaseObj, ServerItemObj},
+        serverpack_obj::{
+            ServerArchiveAction, ServerArchiveItemObj, ServerBaseObj, ServerItemObj,
+        },
     },
 };
 use mml_names::names;
@@ -38,9 +40,9 @@ use crate::windows::export::list::custom_ids;
 use crate::{
     dtos::log_dto::LogFocusDto,
     dtos::server_instance_dto::{
-        ServerInstanceChangesDto, ServerInstanceIdDto, ServerInstanceMetaDto,
-        ServerInstanceOptionsDto, ServerInstanceProgressDto, ServerInstanceResultDto,
-        ServerInstanceSnapshotDto, ServerInstanceSnapshotEntryDto,
+        ServerInstanceChangesDto, ServerInstanceConfigDiffDto, ServerInstanceCustomDto,
+        ServerInstanceIdDto, ServerInstanceMetaDto, ServerInstanceOptionsDto, ServerInstanceProgressDto,
+        ServerInstanceResultDto, ServerInstanceSnapshotDto, ServerInstanceSnapshotEntryDto,
     },
     err_keys,
 };
@@ -223,6 +225,16 @@ pub async fn server_instance_get_meta(
                     })
                     .collect()
             }),
+            mod_texts: meta.mod_texts.clone(),
+            custom: meta
+                .custom
+                .iter()
+                .map(|item| ServerInstanceCustomDto {
+                    path: item.path.clone(),
+                    action: item.action.clone(),
+                    content: item.content.clone(),
+                })
+                .collect(),
         }))
 }
 
@@ -279,6 +291,78 @@ pub async fn server_instance_get_snapshot(
     })
 }
 
+/// 配置文件相对上次生成的变化
+///
+/// 对比上次生成保存的 `config_files` 快照：新增 / 内容变化 / 已删除，
+/// 另给一份当前参与同步的全部路径，打开时的搜索与分组都用它。
+///
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// 见 [`ServerInstanceConfigDiffDto`]；没生成过或快照为空时 `generated` 为 `false`
+#[gui_macros::ipc_group("server_instance")]
+#[gui_macros::command]
+pub async fn server_instance_config_diff(
+    uuid: String,
+) -> Result<ServerInstanceConfigDiffDto, String> {
+    let game = instance_snapshot(&uuid)?;
+    let ids = mapping::IdMap::load(&game.get_base_path());
+    let Some(meta) = ids.meta() else {
+        return Ok(ServerInstanceConfigDiffDto::default());
+    };
+    let saved = meta.config_files.clone();
+    if saved.is_empty() {
+        return Ok(ServerInstanceConfigDiffDto::default());
+    }
+    let dirs: Vec<(String, ConfigMode)> = meta
+        .configs
+        .as_ref()
+        .map(|configs| {
+            configs
+                .iter()
+                .filter_map(|item| {
+                    ConfigMode::parse(&item.mode)
+                        .ok()
+                        .map(|mode| (item.dir.clone(), mode))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let base = game.get_game_path();
+    tokio::task::spawn_blocking(move || {
+        let current = collect_config_files(
+            &base,
+            dirs.iter().map(|(dir, mode)| (dir.as_str(), *mode)),
+            false,
+        )
+        .unwrap_or_default();
+        let mut added = Vec::new();
+        let mut modified = Vec::new();
+        for (path, sha1) in &current {
+            match saved.get(path) {
+                None => added.push(path.clone()),
+                Some(old) if old != sha1 => modified.push(path.clone()),
+                _ => {}
+            }
+        }
+        let deleted = saved
+            .keys()
+            .filter(|path| !current.contains_key(*path))
+            .cloned()
+            .collect();
+        Ok::<_, String>(ServerInstanceConfigDiffDto {
+            generated: true,
+            added,
+            modified,
+            deleted,
+            files: current.into_keys().collect(),
+        })
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 /// 配置文件的同步方式
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ConfigMode {
@@ -290,7 +374,7 @@ enum ConfigMode {
     FilesAll,
     /// 只把本目录的直接文件逐个列进清单
     FilesSelf,
-    /// 生成一个空压缩包，让客户端删掉这个目录
+    /// 发一条 delete 清单项，让客户端删掉这个目录
     Delete,
     /// 这个子目录不参与同步：父目录整包 / 整目录时把它排出去，自己不产出条目
     None,
@@ -318,7 +402,7 @@ impl ConfigMode {
         }
     }
 
-    /// 是否按压缩包下发；删除目录同样借助空压缩包
+    /// 是否走 Archives：打成压缩包，或发 delete 条目
     fn is_archive(self) -> bool {
         matches!(self, Self::ArchiveAll | Self::ArchiveSelf | Self::Delete)
     }
@@ -332,6 +416,25 @@ impl ConfigMode {
     fn recursive(self) -> bool {
         matches!(self, Self::ArchiveAll | Self::FilesAll | Self::Delete)
     }
+}
+
+/// 自定义条目的动作
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CustomAction {
+    /// 纳入同步，当普通文件托管
+    Add,
+    /// 删除客户端文件
+    Delete,
+}
+
+/// 一条自定义条目
+struct CustomPick {
+    /// 相对游戏目录的路径
+    path: PathBuf,
+    /// 动作
+    action: CustomAction,
+    /// 添加时直接写成客户端文件的内容；`None` 表示从实例里复制现有文件
+    content: Option<String>,
 }
 
 /// 一个要同步的配置目录
@@ -356,6 +459,8 @@ struct Contents {
     configs: Vec<ConfigDir>,
     /// 资源包文件，带手填的编号与地址
     packs: Vec<PackPick>,
+    /// 自定义条目：额外纳入同步或删除的文件
+    custom: Vec<CustomPick>,
 }
 
 /// 一个要同步的资源包
@@ -399,6 +504,64 @@ fn config_dir(value: &str) -> Result<String, String> {
     Ok(dir)
 }
 
+/// 参与同步的配置目录下的文件内容快照
+///
+/// 路径相对游戏目录（正斜杠）；父目录与子目录重叠时同一路径只算一次。
+/// 不同步与删除目录不参与，避免把没同步的文件算进对比。
+///
+/// - `base`: 游戏目录
+/// - `configs`: 配置目录选项
+///
+/// # 返回值
+///
+/// 路径 → SHA1；读目录或算哈希失败时返回错误文案
+fn config_snapshot(base: &Path, configs: &[ConfigDir]) -> Result<BTreeMap<String, String>, String> {
+    collect_config_files(base, configs.iter().map(|item| (item.dir.as_str(), item.mode)), true)
+}
+
+/// 按目录与同步方式收集文件内容，供生成快照与打开时的对比共用
+///
+/// - `base`: 游戏目录
+/// - `dirs`: 目录与同步方式
+/// - `strict`: `true` 时目录读不了 / 算哈希失败直接报错；`false` 时跳过
+///
+/// # 返回值
+///
+/// 路径 → SHA1；`strict` 为 `true` 时失败返回错误文案
+fn collect_config_files<'a>(
+    base: &Path,
+    dirs: impl Iterator<Item = (&'a str, ConfigMode)>,
+    strict: bool,
+) -> Result<BTreeMap<String, String>, String> {
+    let mut map = BTreeMap::new();
+    for (dir, mode) in dirs {
+        let list = match mode {
+            ConfigMode::ArchiveAll | ConfigMode::FilesAll => files::dir_files(base, dir),
+            ConfigMode::ArchiveSelf | ConfigMode::FilesSelf => files::dir_direct_files(base, dir),
+            ConfigMode::None | ConfigMode::Delete => continue,
+        };
+        let list = match list {
+            Ok(list) => list,
+            Err(error) if strict => return Err(error),
+            Err(_) => continue,
+        };
+        for rel in list {
+            let wire = files::wire_path(&rel);
+            if map.contains_key(&wire) {
+                continue;
+            }
+            match files::sha1(&base.join(&rel)) {
+                Ok(sha1) => {
+                    map.insert(wire, sha1);
+                }
+                Err(error) if strict => return Err(error),
+                Err(_) => {}
+            }
+        }
+    }
+    Ok(map)
+}
+
 /// 收集要删除的文件
 ///
 /// 每条路径只接受它所在条目负责的范围，前端传错路径时不误删别处；重复标记只留一份。
@@ -419,7 +582,7 @@ fn config_deletions(base: &Path, configs: &[ConfigDir]) -> Result<Vec<PathBuf>, 
         }
         let dir = Path::new(&config.dir);
         for path in &config.delete {
-            let rel = files::delete_target(base, path)?;
+            let rel = files::custom_target(base, path)?;
             if rel == dir || !rel.starts_with(dir) {
                 return Err(err_keys::SERVER_INSTANCE_DIR.to_string());
             }
@@ -482,10 +645,38 @@ fn generate(
             })
         })
         .collect::<Result<Vec<_>, String>>()?;
+    let custom = options
+        .custom
+        .iter()
+        .map(|item| {
+            let action = match item.action.trim() {
+                "add" => CustomAction::Add,
+                "delete" => CustomAction::Delete,
+                _ => return Err(err_keys::SERVER_INSTANCE_DIR.to_string()),
+            };
+            // 添加有两种来源：实例里已有的文件，或者界面里直接填的内容
+            let (path, content) = match action {
+                CustomAction::Add => match &item.content {
+                    Some(text) => (
+                        files::custom_target(&base, &item.path)?,
+                        Some(text.clone()),
+                    ),
+                    None => (files::file(&base, &item.path)?, None),
+                },
+                CustomAction::Delete => (files::custom_target(&base, &item.path)?, None),
+            };
+            Ok(CustomPick {
+                path,
+                action,
+                content,
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
 
     if mods.is_empty()
         && configs.is_empty()
         && packs.is_empty()
+        && custom.is_empty()
         && options.base_files.is_empty()
     {
         return Err(err_keys::SERVER_INSTANCE_EMPTY.to_string());
@@ -495,6 +686,7 @@ fn generate(
         mods,
         configs,
         packs,
+        custom,
     };
     let online = online_sources(game);
     generate_mml(
@@ -589,7 +781,7 @@ fn generate_mml(
         depth.cmp(&other).then_with(|| a.dir.cmp(&b.dir))
     });
 
-    // 单文件删除不进包，另发空包让客户端按路径删掉
+    // 单文件删除不进包，另发 delete 条目让客户端按路径删掉
     let deletions = config_deletions(base, &contents.configs)?;
 
     // 先把目录内容列出来：进度总数与后面的打包都要用
@@ -617,10 +809,10 @@ fn generate_mml(
             list.retain(|rel| !children.iter().any(|child| rel.starts_with(*child)));
         }
         files::retain_excluded(base, &mut list, &config.exclude)?;
-        // 标记删除的文件同样不进包，删掉它们交给下面的空包
+        // 标记删除的文件同样不进包，删掉它们交给下面的删除条目
         files::retain_excluded(base, &mut list, &config.delete)?;
-        // 删除目录与空目录整包同步要留空压缩包；其余情况没有文件就不生成条目。
-        // 整包同步把文件全取消勾选、或所有下级都单独配过时不写空包，避免误删客户端目录。
+        // 删除目录与空目录整包同步要留一条删除项；其余情况没有文件就不生成条目。
+        // 整包同步把文件全取消勾选、或所有下级都单独配过时不写条目，避免误删客户端目录。
         let keep_empty = matches!(config.mode, ConfigMode::Delete)
             || (matches!(config.mode, ConfigMode::ArchiveAll)
                 && config.exclude.is_empty()
@@ -632,13 +824,17 @@ fn generate_mml(
         config_files.push((config, list));
     }
 
+    // 配置目录的文件快照，给下次打开做“改动对比”；失败要在写任何产出之前
+    let config_snapshot = config_snapshot(base, &contents.configs)?;
+
     let total = contents.mods.len()
         + config_files
             .iter()
             .map(|(config, list)| if config.mode.is_archive() { 1 } else { list.len() })
             .sum::<usize>()
         + contents.packs.len()
-        + deletions.len();
+        + deletions.len()
+        + contents.custom.len();
 
     let mut now = 0;
     let mut items = Vec::new();
@@ -722,6 +918,8 @@ fn generate_mml(
         };
         // 可选模组由清单下发；客户端首次同步时装成禁用
         item.optional = entry.optional;
+        // 说明由发布端手填，跟着文件条目走
+        item.text = entry.text.trim().to_string();
         let sha1 = item.sha1.clone().unwrap_or_default();
         mod_snapshot.insert(
             key.clone(),
@@ -755,7 +953,25 @@ fn generate_mml(
             progress(now, total, name.clone());
             now += 1;
 
-            // 删除目录也走空压缩包：客户端解压前删掉旧目录，发现包里没有文件就不再解压
+            // 没有内容可下发：写 DeletePath，客户端按 Path 删掉整个目录，不再打包空 zip
+            if list.is_empty() {
+                let assigned = ids.assign(&format!("config-archive:{dir}"), dir, "");
+                if assigned.changed {
+                    changed.insert(dir.clone());
+                }
+                archives.push(ServerArchiveItemObj {
+                    action: ServerArchiveAction::DeletePath,
+                    file: String::new(),
+                    dir: dir.clone(),
+                    // 删除条目不看 Over：目标一定整个删掉
+                    delete_old: false,
+                    url: None,
+                    sha1: None,
+                    sha256: None,
+                });
+                continue;
+            }
+
             let zip = out.join(&name);
             files::zip_dir(base, dir, list, &zip)?;
             let sha1 = files::sha1(&zip)?;
@@ -764,11 +980,12 @@ fn generate_mml(
                 changed.insert(dir.clone());
             }
             archives.push(ServerArchiveItemObj {
+                action: ServerArchiveAction::Extract,
                 file: name.clone(),
                 dir: dir.clone(),
-                // 是否先删旧目录由界面上的勾选决定；删除目录恒为真
+                // 是否先删旧目录由界面上的勾选决定
                 delete_old: config.delete_old,
-                url: format!("{url}/{}", files::encode_url_path(&name)),
+                url: Some(format!("{url}/{}", files::encode_url_path(&name))),
                 sha1: Some(sha1),
                 sha256: None,
             });
@@ -798,25 +1015,21 @@ fn generate_mml(
         }
     }
 
-    // 单文件删除：空包 + Over，客户端解压前把目标移走，删完不留空目录
+    // 单文件删除：写一条 DeleteFile 条目，客户端按 Path 删掉这个文件，不需要真的打包
     for rel in &deletions {
         let wire = files::wire_path(rel);
         progress(now, total, wire.clone());
         now += 1;
-        let name = generate::delete_archive_name(&wire);
-        let zip = out.join(&name);
-        files::empty_zip(&zip)?;
-        let sha1 = files::sha1(&zip)?;
         archives.push(ServerArchiveItemObj {
-            file: name.clone(),
+            action: ServerArchiveAction::DeleteFile,
+            file: String::new(),
             dir: wire.clone(),
-            delete_old: true,
-            url: format!("{url}/{}", files::encode_url_path(&name)),
-            sha1: Some(sha1),
+            delete_old: false,
+            url: None,
+            sha1: None,
             sha256: None,
         });
         changed.insert(wire);
-        written.insert(name);
     }
 
     let mut pack_snapshot: BTreeMap<String, mapping::EntrySnapshot> = BTreeMap::new();
@@ -883,6 +1096,56 @@ fn generate_mml(
     let pack_changes = compare_packs(&ids, &pack_snapshot);
     ids.set_packs(pack_snapshot);
 
+    // 自定义条目：添加的当普通文件托管，删除的写 DeleteFile 条目
+    for pick in &contents.custom {
+        let wire = files::wire_path(&pick.path);
+        progress(now, total, wire.clone());
+        now += 1;
+        match pick.action {
+            CustomAction::Add => {
+                if items.iter().any(|item| item.file == wire) {
+                    continue;
+                }
+                let mut item = match &pick.content {
+                    Some(text) => {
+                        files::write_into(out, &pick.path, text)?;
+                        content_item(out, &pick.path, url)?
+                    }
+                    None => hosted_item(base, out, &pick.path, url, true, "", "")?,
+                };
+                let assigned = ids.assign(
+                    &format!("custom:add:{wire}"),
+                    &wire,
+                    item.sha1.as_deref().unwrap_or_default(),
+                );
+                item.pid = Some(assigned.project_id);
+                item.fid = Some(assigned.file_id);
+                if assigned.changed {
+                    changed.insert(wire.clone());
+                }
+                items.push(item);
+                written.insert(top_of(&wire));
+            }
+            CustomAction::Delete => {
+                if deletions.iter().any(|rel| files::wire_path(rel) == wire)
+                    || archives.iter().any(|item| item.dir == wire)
+                {
+                    continue;
+                }
+                archives.push(ServerArchiveItemObj {
+                    action: ServerArchiveAction::DeleteFile,
+                    file: String::new(),
+                    dir: wire.clone(),
+                    delete_old: false,
+                    url: None,
+                    sha1: None,
+                    sha256: None,
+                });
+                changed.insert(wire);
+            }
+        }
+    }
+
     let count = items.len() + archived + base_count;
     let mut pack = generate::build_server_pack(
         game,
@@ -894,7 +1157,8 @@ fn generate_mml(
     );
     pack.icon = icon;
     pack.base = base_item;
-    let bytes = serde_json::to_vec_pretty(&pack).map_err(|e| e.to_string())?;
+    // 清单是给客户端读的，压缩成紧凑 JSON，别为可读性多占几倍体积
+    let bytes = serde_json::to_vec(&pack).map_err(|e| e.to_string())?;
     // 客户端拿本地 server.json 的 SHA1 与 server.json.sha1 逐字比对，这里不能带换行
     let sha1 = gen_hash(HashType::Sha1, &bytes);
     write(out, names::SERVER_FILE, &bytes)?;
@@ -923,6 +1187,22 @@ fn generate_mml(
                 })
                 .collect(),
         ),
+        mod_texts: contents
+            .mods
+            .iter()
+            .filter(|item| !item.text.trim().is_empty())
+            .map(|item| (files::wire_path(&item.path), item.text.trim().to_string()))
+            .collect(),
+        config_files: config_snapshot,
+        custom: options
+            .custom
+            .iter()
+            .map(|item| mapping::MetaCustom {
+                path: item.path.trim().to_string(),
+                action: item.action.trim().to_string(),
+                content: item.content.clone(),
+            })
+            .collect(),
     });
     ids.save(&game.get_base_path())?;
 
@@ -1078,6 +1358,7 @@ fn source_item(
     };
     Ok(ServerItemObj {
         file: wire.to_string(),
+        text: String::new(),
         pid,
         fid,
         url: Some(download.trim().to_string()).filter(|url| !url.is_empty()),
@@ -1126,12 +1407,39 @@ fn hosted_item(
     };
     Ok(ServerItemObj {
         file: wire.clone(),
+        text: String::new(),
         pid,
         fid,
         url: Some(format!("{url}/{}", files::encode_url_path(&wire))),
         sha1: Some(files::sha1(&base.join(rel))?),
         sha256: None,
         custom,
+        optional: false,
+    })
+}
+
+/// 内容由发布者填写、直接写进输出文件夹的条目
+///
+/// - `out`: 输出文件夹
+/// - `rel`: 相对游戏目录的路径，文件已经写好
+/// - `url`: 发布地址
+///
+/// # 返回值
+///
+/// 见 [`ServerItemObj`]；算哈希失败返回错误文案
+fn content_item(out: &Path, rel: &Path, url: &str) -> Result<ServerItemObj, String> {
+    let wire = files::wire_path(rel);
+    let encoded = files::encode_url_path(&wire);
+    let (pid, fid) = custom_ids(&wire);
+    Ok(ServerItemObj {
+        file: wire,
+        text: String::new(),
+        pid: Some(pid),
+        fid: Some(fid),
+        url: Some(format!("{url}/{encoded}")),
+        sha1: Some(files::sha1(&out.join(rel))?),
+        sha256: None,
+        custom: true,
         optional: false,
     })
 }

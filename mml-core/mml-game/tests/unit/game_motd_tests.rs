@@ -27,10 +27,9 @@ fn test_chat_from_plain() {
 /// 对象形态：子段落继承父段落颜色，也能覆盖加粗
 #[test]
 fn test_chat_from_value_object() {
-    let v: serde_json::Value = serde_json::from_str(
-        r#"{"text":"A","color":"gold","extra":[{"text":"B","bold":true}]}"#,
-    )
-    .unwrap();
+    let v: serde_json::Value =
+        serde_json::from_str(r#"{"text":"A","color":"gold","extra":[{"text":"B","bold":true}]}"#)
+            .unwrap();
     let chat = chat_from_value(&v);
     let segs = chat_to_segments(&chat);
     assert_eq!(segs.len(), 2);
@@ -91,4 +90,3 @@ fn test_chat_from_value_translate() {
     );
     assert_eq!(flatten(r#"{"translate":"some.key"}"#), "some.key");
 }
-

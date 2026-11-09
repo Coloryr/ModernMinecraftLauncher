@@ -4,6 +4,9 @@
 //! 排列顺序 —— 这些都是"界面怎么看"，与启动流程无关，所以内核不读也不写它：
 //! `InstanceSettingObj` 里没有对应字段，内核只提供 `get_gui_setting_file()` 定位路径。
 //!
+//! 唯一的例外是 `ServerPack` 段：服务器包同步的跳过记录由内核在同步时直接读写，
+//! 因为那份状态是同步流程的输入，且要在启动线程里落盘；其余字段仍只由 GUI 维护。
+//!
 //! 存在实例目录下、与 `game.json` 并列的独立文件 `gui_setting.json`。
 //!
 //! **文件名是 M²L 自己的，与 ColorMC 的 `guisetting.json` 故意不同**：字段名虽然是大写开头、
@@ -17,6 +20,7 @@ use std::collections::{HashMap, HashSet};
 use mml_base::serialize_tools;
 use mml_config::config_save;
 use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
+use mml_game::serverpack::ServerPackSkippedObj;
 use serde::{Deserialize, Serialize};
 
 /// 游戏日志窗口设置，字段与 ColorMC 的 `GameLogSettingObj` 同名
@@ -161,6 +165,17 @@ pub struct GameViewSettingObj {
     pub resource_mod_col_widths: HashMap<String, u32>,
 }
 
+/// 服务器包同步状态，跟实例走
+///
+/// 内核同步时直接读写这一段，见 `mml_game::serverpack`；GUI 只负责原样保存。
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(default)]
+pub struct GameServerPackSettingObj {
+    /// 上次跳过更新时本地留下的旧文件，相对游戏目录
+    #[serde(rename = "Skipped")]
+    pub skipped: Vec<ServerPackSkippedObj>,
+}
+
 /// 实例 GUI 设置，字段与 ColorMC 的 `GameGuiSettingObj` 同名
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
@@ -183,6 +198,9 @@ pub struct GameGuiSettingObj {
     /// 界面视图设置，跟实例走的那部分，见 [`GameViewSettingObj`]
     #[serde(rename = "Gui")]
     pub view: GameViewSettingObj,
+    /// 服务器包同步状态，见 [`GameServerPackSettingObj`]
+    #[serde(rename = "ServerPack")]
+    pub server_pack: GameServerPackSettingObj,
 }
 
 /// 读取某实例的 GUI 设置
@@ -210,7 +228,11 @@ pub fn load(instance: &InstanceSettingObj) -> GameGuiSettingObj {
 /// - `instance`: 实例配置，用它的目录定位文件
 /// - `obj`: 待保存的设置
 pub fn save(instance: &InstanceSettingObj, obj: &GameGuiSettingObj) {
-    config_save::save(instance.uuid, obj, instance.get_gui_setting_file());
+    let mut obj = obj.clone();
+    // `ServerPack` 段由内核同步时直接写盘：这里以磁盘为准，别用旧快照把它冲掉
+    obj.server_pack = load(instance).server_pack;
+    // 实例 GUI 设置是机器状态，不需要给人读，存紧凑 JSON
+    config_save::save_compact(instance.uuid, &obj, instance.get_gui_setting_file());
 }
 
 /// 读-改-写：把方块 ID 设为 `block` 并落盘

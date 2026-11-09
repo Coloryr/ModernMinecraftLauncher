@@ -53,32 +53,8 @@ pub struct ServerPackObj {
     #[serde(rename = "Archives")]
     pub archive_list: Vec<ServerArchiveItemObj>,
     /// 基础文件包：解压到实例根目录，导入时下载一次，后续版本不再下载
-    #[serde(rename = "Base", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "Base")]
     pub base: Option<ServerBaseObj>,
-    /// 玩家这次没勾选、先不更新的文件
-    ///
-    /// 只写本地清单，发布端生成的清单里没有这一项；发布方下次换了内容后记录失效，
-    /// 确认窗会重新询问。
-    #[serde(rename = "Skipped", default, skip_serializing_if = "Vec::is_empty")]
-    pub skipped: Vec<ServerSkippedObj>,
-}
-
-/// 玩家跳过的一个更新
-///
-/// 记的是新清单里的路径与内容，加上本地实际留下的那个文件：
-/// 下次发布方换了内容，这条就失效；重新勾上时按 `kept` 把旧文件清掉。
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-#[serde(default)]
-pub struct ServerSkippedObj {
-    /// 新清单里的相对路径，如 `mods/foo.jar`
-    #[serde(rename = "File")]
-    pub file: String,
-    /// 新清单里那份内容的 SHA1；清单没给校验值时为空
-    #[serde(rename = "Sha1")]
-    pub sha1: String,
-    /// 本地留下来的旧文件，相对游戏目录；当时没有旧文件时为空
-    #[serde(rename = "Kept", skip_serializing_if = "String::is_empty")]
-    pub kept: String,
 }
 
 /// 基础文件压缩包
@@ -102,26 +78,53 @@ pub struct ServerBaseObj {
     pub sha256: Option<String>,
 }
 
-/// 服务器包里的配置文件压缩包条目
+/// 配置条目要做什么
+///
+/// 清单里写成 `"Action": "extract"` / `"deletePath"` / `"deleteFile"`；缺字段按解压处理。
+#[derive(Serialize, Deserialize, Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ServerArchiveAction {
+    /// 下载压缩包并解压到 `Path`
+    #[default]
+    Extract,
+    /// 删除 `Path` 指向的整个目录，不下载
+    DeletePath,
+    /// 删除 `Path` 指向的单个文件，不下载
+    DeleteFile,
+}
+
+impl ServerArchiveAction {
+    /// 是否为删除条目
+    ///
+    /// 删除条目不下载压缩包，只处理 `Path` 指向的目标。
+    pub fn is_delete(self) -> bool {
+        matches!(self, Self::DeletePath | Self::DeleteFile)
+    }
+}
+
+/// 配置条目：解压一个压缩包，或删除一个目录 / 文件
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 #[serde(default)]
 pub struct ServerArchiveItemObj {
-    /// 文件名
-    #[serde(rename = "File")]
+    /// 动作：解压压缩包 / 删除目录 / 删除文件；老清单没有这个字段时按解压处理
+    #[serde(rename = "Action", default)]
+    pub action: ServerArchiveAction,
+    /// 压缩包文件名；删除条目为空
+    #[serde(rename = "File", default)]
     pub file: String,
-    /// 解压到的位置
+    /// 解压目标；删除条目是要删的路径
     #[serde(rename = "Path")]
     pub dir: String,
-    /// 是否删除旧的路径
+    /// 解压前是否先删掉旧目录；删除条目不看这个
     #[serde(rename = "Over")]
     pub delete_old: bool,
-    /// 下载地址
-    #[serde(rename = "Url")]
+    /// 下载地址；删除条目为 `null`
+    #[serde(rename = "Url", default)]
     pub url: Option<String>,
-    /// SHA1 校验
+    /// SHA1 校验；没有时为 `null`
     #[serde(rename = "Sha1")]
     pub sha1: Option<String>,
-    /// SHA256 校验
+    /// SHA256 校验；没有时为 `null`
     #[serde(rename = "Sha256")]
     pub sha256: Option<String>,
 }
@@ -133,6 +136,9 @@ pub struct ServerItemObj {
     /// 游戏目录下的相对路径，如 `mods/foo.jar`、`config/bar.toml`
     #[serde(rename = "File")]
     pub file: String,
+    /// 模组说明，发布端给玩家看的文字；没有时为空串
+    #[serde(rename = "Text")]
+    pub text: String,
     /// 项目编号
     #[serde(rename = "ProjectId")]
     pub pid: Option<String>,
@@ -149,20 +155,10 @@ pub struct ServerItemObj {
     #[serde(rename = "Sha256")]
     pub sha256: Option<String>,
     /// 是否为自动生成的自定义编号；true 时 ProjectId / FileId 不按平台编号解析
-    #[serde(rename = "Custom", default, skip_serializing_if = "is_false")]
+    #[serde(rename = "Custom", default)]
     pub custom: bool,
     /// 是否为可选模组：客户端首次同步时装成禁用状态，玩家可自行启用
-    #[serde(rename = "Optional", default, skip_serializing_if = "is_false")]
+    #[serde(rename = "Optional", default)]
     pub optional: bool,
 }
 
-/// 序列化时省略 false
-///
-/// - `value`: 字段值
-///
-/// # 返回值
-///
-/// 值为 false 时返回 true
-fn is_false(value: &bool) -> bool {
-    !*value
-}

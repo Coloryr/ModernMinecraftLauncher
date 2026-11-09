@@ -92,4 +92,3 @@ fn set_info_writes_back_to_level_dat() {
 
     let _ = fs::remove_dir_all(&dir);
 }
-

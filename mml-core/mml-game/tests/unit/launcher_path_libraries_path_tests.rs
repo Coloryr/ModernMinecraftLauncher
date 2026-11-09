@@ -119,4 +119,3 @@ fn excludes_neoforge_universal_from_classpath() {
         "其余加载器库照旧要在：{paths:?}"
     );
 }
-

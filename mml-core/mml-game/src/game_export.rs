@@ -609,7 +609,10 @@ fn mmc(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
         .map(|name| name.to_string_lossy().into_owned());
     let icon_key = icon
         .is_file()
-        .then(|| icon.file_stem().map(|stem| stem.to_string_lossy().into_owned()))
+        .then(|| {
+            icon.file_stem()
+                .map(|stem| stem.to_string_lossy().into_owned())
+        })
         .flatten();
 
     if let Some(gui) = &arg.gui {
@@ -619,8 +622,13 @@ fn mmc(game: &InstanceSettingObj, arg: ExportArg) -> CoreResult<()> {
     let jvm_args = mmc_jvm_args(game.jvm_arg.as_ref());
     zip.add_data(
         &format!("{inst_dir}{}", names::MMCCFG_FILE),
-        mmc_instance_cfg(&game.name, icon_key.as_deref(), game.jvm_arg.as_ref(), &jvm_args)
-            .as_bytes(),
+        mmc_instance_cfg(
+            &game.name,
+            icon_key.as_deref(),
+            game.jvm_arg.as_ref(),
+            &jvm_args,
+        )
+        .as_bytes(),
     )?;
 
     if let Some(name) = icon_name.filter(|_| icon.is_file()) {
@@ -670,7 +678,10 @@ pub fn mmc_instance_cfg(
     text.push_str("OverrideGameTime=false\n");
     text.push_str(&format!("OverrideJavaArgs={}\n", !jvm_args.is_empty()));
     text.push_str("OverrideJavaLocation=false\n");
-    text.push_str(&format!("OverrideMemory={}\n", max.is_some() || min.is_some()));
+    text.push_str(&format!(
+        "OverrideMemory={}\n",
+        max.is_some() || min.is_some()
+    ));
     text.push_str("OverrideNativeWorkarounds=false\n");
     text.push_str("OverrideWindow=false\n");
     text.push_str(&format!("iconKey={}\n", icon_key.unwrap_or("default")));

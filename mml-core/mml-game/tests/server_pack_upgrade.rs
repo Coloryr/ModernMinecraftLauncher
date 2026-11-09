@@ -130,7 +130,7 @@ fn archive_item(port: u16, file: &str, dir: &str, body: &[u8]) -> ServerArchiveI
         dir: dir.to_string(),
         // 测试环境把目录挪回收站会失败（与其它用例同样的环境限制），这里用覆盖解压
         delete_old: false,
-        url: format!("http://127.0.0.1:{port}/pack/{file}"),
+        url: Some(format!("http://127.0.0.1:{port}/pack/{file}")),
         sha1: Some(gen_hash(HashType::Sha1, body)),
         ..Default::default()
     }
@@ -971,9 +971,10 @@ fn optional_mod_installs_disabled_and_removes_with_pack() {
     assert!(base.join("mods/keep.jar").is_file());
 }
 
-/// 玩家在确认窗里去掉的可选模组：这次不下载，本地旧文件留着；下次重新勾上时旧文件被清掉
+/// 玩家在确认窗里去掉的可选模组：这次不下载，跳过记录写进实例 GUI 设置；
+/// 下次重新勾上时按记录把旧文件清掉，并保持启用状态
 #[test]
-fn optional_mod_skipped_keeps_local_copy_until_next_update() {
+fn optional_mod_skip_records_local_copy_in_gui_setting() {
     let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _run = ensure_init();
     let (routes, port) = Routes::start();
@@ -1045,11 +1046,17 @@ fn optional_mod_skipped_keeps_local_copy_until_next_update() {
     assert!(!base.join("mods/a-2.jar").exists(), "没勾的条目不该下载");
     assert!(!base.join("mods/a-2.jar.disabled").exists());
 
-    // 本地清单记下这次跳过，并记着留下的是哪个文件
+    // 本地清单保存的是新版本；跳过记录写在实例的 gui_setting.json 里
     let pack = wait_pack_version(&snapshot, "1.0.1");
-    assert_eq!(pack.skipped.len(), 1, "跳过记录应写进本地清单");
-    assert_eq!(pack.skipped[0].file, "mods/a-2.jar");
-    assert_eq!(pack.skipped[0].kept, "mods/a-1.jar");
+    assert!(
+        pack.online_list.iter().any(|item| item.file == "mods/a-2.jar"),
+        "本地清单应保存新版本"
+    );
+    let gui_file = game.read().unwrap().get_gui_setting_file();
+    let gui: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&gui_file).unwrap()).unwrap();
+    assert_eq!(gui["ServerPack"]["Skipped"][0]["File"], "mods/a-2.jar");
+    assert_eq!(gui["ServerPack"]["Skipped"][0]["Kept"], "mods/a-1.jar");
 
     // 版本 3：同一模组又换了一版，这次勾上：新文件落地、上次留下的旧文件被清掉
     let a3 = b"opt a v3".to_vec();
@@ -1078,12 +1085,20 @@ fn optional_mod_skipped_keeps_local_copy_until_next_update() {
     assert_eq!(
         std::fs::read(base.join("mods/a-3.jar")).unwrap(),
         a3,
-        "勾上的可选模组要更新；玩家本来启用着，装好仍是启用"
+        "勾上的可选模组要更新；记录里玩家本来启用着，装好仍是启用"
     );
-    assert!(!base.join("mods/a-1.jar").exists(), "上次留下的旧文件要清掉");
+    assert!(!base.join("mods/a-3.jar.disabled").exists());
     assert!(!base.join("mods/a-2.jar").exists());
-    let pack = wait_pack_version(&snapshot, "1.0.2");
-    assert!(pack.skipped.is_empty(), "更新后跳过记录应清空");
+    assert!(!base.join("mods/a-1.jar").exists(), "上次留下的旧文件要清掉");
+    wait_pack_version(&snapshot, "1.0.2");
+    let gui: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&gui_file).unwrap()).unwrap();
+    assert!(
+        gui["ServerPack"]["Skipped"]
+            .as_array()
+            .is_some_and(|list| list.is_empty()),
+        "更新后跳过记录应清空"
+    );
 }
 
 /// 更新只删文件时不下载任何东西：服务端只回清单，一旦发起下载就会 404

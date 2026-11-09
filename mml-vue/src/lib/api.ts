@@ -85,6 +85,7 @@ import type {
   ScreenshotItemDto,
   ServerPackProbeDto,
   ServerInstanceIdDto,
+  ServerInstanceConfigDiffDto,
   ServerInstanceMetaDto,
   ServerInstanceSnapshotDto,
   ServerInstanceOptionsDto,
@@ -1494,6 +1495,16 @@ export const api = {
    */
   async getServerInstanceSnapshot(uuid: string): Promise<ServerInstanceSnapshotDto> {
     return commands.serverInstance.getSnapshot(uuid);
+  },
+
+  /**
+   * 配置文件相对上次生成的变化
+   *
+   * 新增 / 内容变化 / 已删除，另给一份当前参与同步的全部路径；
+   * 没有生成过时 `generated` 为 false
+   */
+  async getServerInstanceConfigDiff(uuid: string): Promise<ServerInstanceConfigDiffDto> {
+    return commands.serverInstance.configDiff(uuid);
   },
 
   /**

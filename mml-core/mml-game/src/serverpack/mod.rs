@@ -27,7 +27,7 @@ use crate::{
         ModPackType, file_online_info_obj::OnlineInfoObj, instance_setting_obj::InstanceSettingObj,
     },
     serverpack::serverpack_obj::{
-        ServerArchiveItemObj, ServerBaseObj, ServerItemObj, ServerPackObj, ServerSkippedObj,
+        ServerArchiveItemObj, ServerBaseObj, ServerItemObj, ServerPackObj,
     },
 };
 
@@ -35,6 +35,24 @@ pub mod generate;
 mod paths;
 pub mod plan;
 pub mod serverpack_obj;
+
+/// `gui_setting.json` 里服务器包状态的键
+const GUI_SERVER_PACK_KEY: &str = "ServerPack";
+/// 服务器包状态里跳过记录的键
+const GUI_SKIPPED_KEY: &str = "Skipped";
+
+/// 玩家上次跳过更新时本地留下的旧文件
+///
+/// 存在实例的 `gui_setting.json` 的 `ServerPack.Skipped` 里，不写进 `server.json`：
+/// 这是本机玩家状态，不是发布内容。
+#[derive(serde::Serialize, serde::Deserialize, Debug, Default, Clone)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct ServerPackSkippedObj {
+    /// 新清单里的相对路径，如 `mods/foo.jar`
+    pub file: String,
+    /// 本地留下来的旧文件，相对游戏目录；当时没有旧文件时为空
+    pub kept: String,
+}
 
 impl InstanceSettingObj {
     /// 将服务器实例信息标记为旧版
@@ -119,11 +137,86 @@ impl InstanceSettingObj {
     ///
     /// - `pack`: 服务器包信息
     pub fn save_serverpack(&self, pack: &ServerPackObj) {
-        config_save::save(
+        // 本地清单是给同步流程读的，紧凑存盘
+        config_save::save_compact(
             uuids::mix_uuid(self.uuid, uuids::SERVERPACK_FILE_UUID),
             pack,
             self.get_server_pack_file(),
         );
+    }
+
+    /// 读实例 `gui_setting.json` 的原始 JSON
+    ///
+    /// 只拿服务器包那一段，其余字段原样保留；文件不存在或读不懂时返回 `None`。
+    ///
+    /// # 返回值
+    ///
+    /// 顶层是对象的 JSON；文件不存在、解析失败时是 `None`
+    fn gui_setting_json(&self) -> Option<serde_json::Value> {
+        let data = std::fs::read(self.get_gui_setting_file()).ok()?;
+        let value = serde_json::from_slice::<serde_json::Value>(&data).ok()?;
+        value.is_object().then_some(value)
+    }
+
+    /// 读上次跳过更新时留下的旧文件记录
+    ///
+    /// # 返回值
+    ///
+    /// `gui_setting.json` 里的跳过记录；没有记录或读不到时是空表
+    fn skipped_state(&self) -> Vec<ServerPackSkippedObj> {
+        let Some(value) = self.gui_setting_json() else {
+            return Vec::new();
+        };
+        let Some(records) = value
+            .get(GUI_SERVER_PACK_KEY)
+            .and_then(|section| section.get(GUI_SKIPPED_KEY))
+            .cloned()
+        else {
+            return Vec::new();
+        };
+        serde_json::from_value(records).unwrap_or_default()
+    }
+
+    /// 把跳过记录写回实例 `gui_setting.json`
+    ///
+    /// 只改 `ServerPack.Skipped` 一段：文件里其它设置原样保留。文件内容读不懂时
+    /// 直接不写，宁可这次没记，也不能把界面设置整份冲掉。
+    ///
+    /// - `list`: 本次同步后要留下的跳过记录
+    fn save_skipped_state(&self, list: &[ServerPackSkippedObj]) {
+        let file = self.get_gui_setting_file();
+        // 没有记录、也还没有这份文件：不必凭空建一个
+        if list.is_empty() && !file.exists() {
+            return;
+        }
+        let mut value = if file.exists() {
+            let Some(value) = self.gui_setting_json() else {
+                return;
+            };
+            value
+        } else {
+            serde_json::json!({})
+        };
+        let Some(root) = value.as_object_mut() else {
+            return;
+        };
+        let section = root
+            .entry(GUI_SERVER_PACK_KEY)
+            .or_insert_with(|| serde_json::json!({}));
+        if !section.is_object() {
+            *section = serde_json::json!({});
+        }
+        let Some(section) = section.as_object_mut() else {
+            return;
+        };
+        let Ok(records) = serde_json::to_value(list) else {
+            return;
+        };
+        section.insert(GUI_SKIPPED_KEY.to_string(), records);
+        let Ok(text) = serde_json::to_string(&value) else {
+            return;
+        };
+        let _ = path_helper::write_text(&file, &text);
     }
 
     /// 执行升级操作
@@ -170,6 +263,8 @@ impl InstanceSettingObj {
             phase(AddModPackState::CheckFile);
         }
         let old = self.get_old_serverpack()?;
+        // 上次跳过更新留下的本地旧文件，存在实例的 gui_setting.json 里
+        let previous_skips = self.skipped_state();
 
         let game_path = self.get_game_path();
         let temp_path = self.get_temp_path();
@@ -197,8 +292,7 @@ impl InstanceSettingObj {
                     .ok()
                     .and_then(|target| existing_file(&target))
                     .or_else(|| {
-                        let marker = old
-                            .skipped
+                        let marker = previous_skips
                             .iter()
                             .find(|marker| marker.file == item.file)?;
                         let kept = marker.kept.trim();
@@ -235,28 +329,26 @@ impl InstanceSettingObj {
         }
 
         // 上次跳过、这次重新勾上的条目：清掉当时留下的旧文件，否则两个版本会同时躺在 mods 里
-        if let Some(old) = &old {
-            let wanted: HashSet<&str> = new_pack
-                .online_list
-                .iter()
-                .map(|item| item.file.as_str())
-                .collect();
-            for marker in &old.skipped {
-                // 这次还是没勾：继续留着
-                if skip_set.contains(marker.file.as_str()) {
-                    continue;
-                }
-                let kept = marker.kept.trim();
-                // 新版本用的还是这个路径时交给下载覆盖，不先删
-                if kept.is_empty() || wanted.contains(kept) {
-                    continue;
-                }
-                let Ok(path) = paths::file_path(&game_path, kept) else {
-                    continue;
-                };
-                delete_with_disabled(&path);
-                mml_link::remove_link(self.uuid, &self.get_base_path(), &path);
+        let wanted: HashSet<&str> = new_pack
+            .online_list
+            .iter()
+            .map(|item| item.file.as_str())
+            .collect();
+        for marker in &previous_skips {
+            // 这次还是没勾：继续留着
+            if skip_set.contains(marker.file.as_str()) {
+                continue;
             }
+            let kept = marker.kept.trim();
+            // 新版本用的还是这个路径时交给下载覆盖，不先删
+            if kept.is_empty() || wanted.contains(kept) {
+                continue;
+            }
+            let Ok(path) = paths::file_path(&game_path, kept) else {
+                continue;
+            };
+            delete_with_disabled(&path);
+            mml_link::remove_link(self.uuid, &self.get_base_path(), &path);
         }
 
         if cancel.is_cancelled() {
@@ -324,12 +416,16 @@ impl InstanceSettingObj {
         let cleared: Vec<&str> = new_pack
             .archive_list
             .iter()
-            .filter(|item| item.delete_old && !skipped.contains(item.dir.as_str()))
+            .filter(|item| {
+                (item.delete_old || item.action.is_delete())
+                    && !skipped.contains(item.dir.as_str())
+            })
             .map(|item| item.dir.as_str())
             .collect();
 
         let mut downloads: Vec<FileItemObj> = Vec::new();
-        let mut archives: Vec<(&ServerArchiveItemObj, PathBuf)> = Vec::new();
+        // 第二个元素是下载到的临时包；None 表示 Url 为空，只按 Path 删除
+        let mut archives: Vec<(&ServerArchiveItemObj, Option<PathBuf>)> = Vec::new();
 
         // 基础文件包只发一次：旧清单已经有基础包就跳过，后续版本不再拉取
         let base_pending = new_pack
@@ -383,15 +479,20 @@ impl InstanceSettingObj {
             if skip {
                 continue;
             }
+            // 删除条目：不下载，按 Path 把目标删掉
+            if item.action.is_delete() {
+                archives.push((item, None));
+                continue;
+            }
             let temp = paths::file_path(&temp_path, &item.file)?;
             downloads.push(FileItemObj {
-                url: item.url.clone(),
+                url: item.url.clone().unwrap_or_default(),
                 name: item.file.clone(),
                 file: temp.clone(),
                 hash: plan::make_hash(&item.sha1, &item.sha256),
                 later: LaterRun::None,
             });
-            archives.push((item, temp));
+            archives.push((item, Some(temp)));
         }
 
         // 真要下载时才切「下载缺失文件」：只删不增的更新没有待下载项，别让界面停在下载上
@@ -418,6 +519,13 @@ impl InstanceSettingObj {
             }
 
             let output = path_helper::safe_join(&game_path, &item.dir)?;
+            // 删除条目：DeletePath 删整棵目录、DeleteFile 删单个文件，都只按 Path 处理，不存在就跳过
+            let Some(temp) = temp else {
+                if output.exists() {
+                    path_helper::move_to_trash(&output)?;
+                }
+                continue;
+            };
             // 覆盖解压时先删除旧目录
             if item.delete_old && output.exists() {
                 path_helper::move_to_trash(&output)?;
@@ -442,18 +550,18 @@ impl InstanceSettingObj {
             path_helper::delete(temp)?;
         }
 
-        // 这次没更新的条目记进本地清单：发布方换了内容才失效，确认窗到时再问一次
-        let mut saved = new_pack;
-        saved.skipped = skipped_markers(&game_path, old.as_ref(), &saved.online_list, &skip_set);
+        // 这次没更新的条目记进实例 GUI 设置：发布方换了内容才失效，确认窗到时再问一次
+        let records = skipped_markers(&game_path, old.as_ref(), &new_pack.online_list, &skip_set);
+        self.save_skipped_state(&records);
 
         // 保存新版本信息，清理旧文件
-        self.save_serverpack(&saved);
+        self.save_serverpack(&new_pack);
         path_helper::delete(self.get_server_pack_old_file())?;
 
         // 清单里带项目号的文件回写在线信息，导入后才能当平台来源用
-        self.sync_online_info(&saved, &game_path);
+        self.sync_online_info(&new_pack, &game_path);
         // 升版常常连加载器一起往上走，实例得跟着改，否则用旧加载器配新模组
-        self.apply_pack_setting(&saved);
+        self.apply_pack_setting(&new_pack);
 
         Ok(())
     }
@@ -850,6 +958,10 @@ fn archive_unchanged(
     current: &ServerArchiveItemObj,
     game_path: &Path,
 ) -> bool {
+    // 删除条目没有压缩包可省：每次同步都要确认目标已经不在
+    if current.action.is_delete() {
+        return false;
+    }
     let Some(previous) = previous else {
         return false;
     };
@@ -885,13 +997,13 @@ fn archive_unchanged(
 ///
 /// # 返回值
 ///
-/// 写进本地清单的跳过记录，顺序与清单一致
+/// 要写进 `gui_setting.json` 的跳过记录，顺序与清单一致
 fn skipped_markers(
     game_path: &Path,
     old: Option<&ServerPackObj>,
     items: &[ServerItemObj],
     skip: &HashSet<&str>,
-) -> Vec<ServerSkippedObj> {
+) -> Vec<ServerPackSkippedObj> {
     items
         .iter()
         .filter(|item| skip.contains(item.file.as_str()))
@@ -913,9 +1025,8 @@ fn skipped_markers(
                 })
                 .and_then(|(path, _)| relative_to(game_path, &path))
                 .unwrap_or_default();
-            ServerSkippedObj {
+            ServerPackSkippedObj {
                 file: item.file.clone(),
-                sha1: item.sha1.clone().unwrap_or_default(),
                 kept,
             }
         })
