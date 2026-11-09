@@ -184,6 +184,8 @@ const configOpened = ref(new Set<string>());
 const configLoading = ref(new Set<string>());
 /** 配置文件相对上次生成的变化；未生成或还没读到时为 null */
 const configDiff = ref<ServerInstanceConfigDiffDto | null>(null);
+/** 这轮配置是否来自上次生成的记录；刷新时新出现的顶层目录按这个口径给默认值 */
+const configsRestored = ref(false);
 /** 配置页视图：normal 按目录树，group 按变化分三组 */
 const configView = ref<"normal" | "group">("normal");
 /** 配置文件搜索词；非空时显示跨目录的扁平结果 */
@@ -1227,6 +1229,7 @@ async function loadInstance(uuid: string) {
   configLoading.value = new Set();
 
   const modes = new Map<string, ConfigMode>();
+  configsRestored.value = Array.isArray(meta?.configs);
   if (Array.isArray(meta?.configs)) {
     // 生成过的实例按保存的方式恢复；没保存过的顶层目录保持不同步
     for (const entry of configDirs.value) modes.set(entry.path, "none");
@@ -1416,6 +1419,62 @@ async function refreshPacks() {
   }
 }
 
+/**
+ * 重新扫描配置目录与改动对比
+ *
+ * 目录被删掉时连它的同步方式一起清掉，免得生成时指向不存在的路径；文件改动对比也重新算一遍。
+ * 生成过的实例里，新出现的顶层目录按不同步处理，与第一次打开时的口径一致。
+ */
+async function refreshConfigs() {
+  const uuid = currentUuid.value;
+  if (!uuid || busy.value || loading.value) return;
+  loading.value = true;
+  try {
+    let next: ExportEntryDto[] = [];
+    try {
+      next = (await api.listExportDirSized(uuid, "")).filter(
+        (entry) => entry.dir && !SKIP_DIRS.includes(entry.path),
+      );
+    } catch {
+      // 读不到就当没有可同步的目录
+    }
+    if (uuid !== currentUuid.value) return;
+    configDirs.value = next;
+
+    const roots = next.map((entry) => entry.path);
+    const kept = (dir: string) => roots.some((root) => dir === root || dir.startsWith(`${root}/`));
+    const modes = new Map<string, ConfigMode>();
+    for (const [dir, mode] of configModes.value) {
+      if (!kept(dir)) continue;
+      // 子目录可能已经被删掉：读不到就不保留，免得生成时指着一个不存在的目录
+      if (!roots.includes(dir)) {
+        try {
+          await api.listExportDir(uuid, dir);
+        } catch {
+          continue;
+        }
+      }
+      modes.set(dir, mode);
+    }
+    if (uuid !== currentUuid.value) return;
+    if (configsRestored.value) {
+      for (const entry of next) {
+        if (!modes.has(entry.path)) modes.set(entry.path, "none");
+      }
+    }
+    configModes.value = modes;
+    configDeleteOld.value = new Map([...configDeleteOld.value].filter(([dir]) => kept(dir)));
+    configChildren.value = new Map();
+    configOpened.value = new Set();
+    configDiff.value = await api.getServerInstanceConfigDiff(uuid).catch(() => null);
+    if (uuid !== currentUuid.value) return;
+    result.value = null;
+    changedPaths.value = new Set();
+  } finally {
+    loading.value = false;
+  }
+}
+
 /** 切到某个实例 */
 function focusInstance(uuid: string) {
   if (!instances.value.some((i) => i.uuid === uuid)) return;
@@ -1479,6 +1538,7 @@ function clearInstance() {
   modQuery.value = "";
   modView.value = "normal";
   configDiff.value = null;
+  configsRestored.value = false;
   configQuery.value = "";
   configView.value = "normal";
   customEntries.value = [];
@@ -1795,7 +1855,7 @@ onBeforeUnmount(() => {
     configDeleteOldOf, setConfigDeleteOld, configArchiveOwner, configRowDeleteOld,
     configUnderRecursive, configModeSelect,
     setAllConfigs, setConfigMode,
-    toggleConfigExpand, isConfigOpen, isConfigLoading,
+    toggleConfigExpand, isConfigOpen, isConfigLoading, refreshConfigs,
     pickInstance, openGuide,
     current, ready, pickedCount, generate, exportPack, packing, percent, progress, result, error,
     modChanges, addedMods, removedMods, modifiedMods,

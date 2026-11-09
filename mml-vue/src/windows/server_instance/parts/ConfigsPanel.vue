@@ -15,6 +15,7 @@ const ctx = inject(ServerInstanceKey);
 if (!ctx) throw new Error("server instance context missing");
 const {
   busy,
+  loading,
   changedPaths,
   configDirs,
   configRows,
@@ -47,6 +48,7 @@ const {
   customEntries,
   addCustomEntry,
   removeCustomEntry,
+  refreshConfigs,
 } = ctx;
 
 /** 两个分组的展开状态：现有文件 / 自定义文件 */
@@ -158,16 +160,22 @@ function sizeText(size: number): string {
 <section class="si-section stretch">
   <div class="si-section-head">
     <span class="si-counter">{{ t("serverInstance.configCount", { n: configCount }) }}</span>
+    <span class="si-head-tools">
+      <SearchBox v-model="configQuery" :placeholder="t('serverInstance.configSearch')" width="200px" />
+      <SegmentedTabs v-model="configView" :options="viewOptions" />
+    </span>
+    <!-- 勾选与刷新统一放在工具条最右端 -->
     <BaseButton size="sm" :disabled="busy || !configDirs.length" @click="setAllConfigs(true)">
       {{ t("serverInstance.configSyncAll") }}
     </BaseButton>
     <BaseButton size="sm" :disabled="busy || !configDirs.length" @click="setAllConfigs(false)">
       {{ t("serverInstance.configSyncNone") }}
     </BaseButton>
-    <span class="si-head-tools">
-      <SearchBox v-model="configQuery" :placeholder="t('serverInstance.configSearch')" width="200px" />
-      <SegmentedTabs v-model="configView" :options="viewOptions" />
-    </span>
+    <button class="ui-btn-icon" :disabled="busy || loading"
+      v-tip="t('serverInstance.refresh')" :aria-label="t('serverInstance.refresh')"
+      @click="refreshConfigs">
+      <GlyphIcon name="refresh" :size="14" :weight="2" />
+    </button>
   </div>
 
   <!-- 配置表：现有文件 / 自定义文件两个分组，组行与模组表格模式同一口径 -->
@@ -336,6 +344,27 @@ function sizeText(size: number): string {
           <div class="si-config-mode-cell"></div>
           <div class="si-config-delete-cell"></div>
         </div>
+        <!-- 添加条放在分组第一行：跟着表体一起滚，不再钉在卡片底部 -->
+        <template v-if="customOpen">
+          <div class="si-custom-add si-custom-add-row">
+            <input v-model="customPath" class="field-input" :disabled="busy" spellcheck="false"
+              :title="t('serverInstance.customHint')" :placeholder="t('serverInstance.customPath')"
+              @keydown.enter="addCustom" />
+            <select v-model="customAction" class="field-select" :disabled="busy">
+              <option value="add">{{ t("serverInstance.customAdd") }}</option>
+              <option value="delete">{{ t("serverInstance.customDelete") }}</option>
+            </select>
+            <SegmentedTabs v-if="customAction === 'add'" v-model="customMode" :options="customModeOptions" />
+            <BaseButton size="sm" :disabled="busy || !customPath.trim()" @click="addCustom">
+              {{ t("serverInstance.customAddBtn") }}
+            </BaseButton>
+          </div>
+          <!-- 输入内容：这段文字会作为客户端上的那个文件下发 -->
+          <div v-if="customAction === 'add' && customMode === 'content'" class="si-custom-add-row is-content">
+            <textarea v-model="customContent" class="field-input si-custom-content" :disabled="busy"
+              spellcheck="false" :placeholder="t('serverInstance.customContentHint')"></textarea>
+          </div>
+        </template>
         <p v-if="customOpen && !customEntries.length" class="empty-tip">
           {{ t("serverInstance.customEmpty") }}
         </p>
@@ -364,26 +393,6 @@ function sizeText(size: number): string {
       </template>
     </div>
 
-    <!-- 自定义文件的添加条：固定在卡片底部；切到分组视图时收起 -->
-    <div v-if="configView === 'normal'" class="si-custom-foot">
-      <div class="si-custom-add">
-        <input v-model="customPath" class="field-input" :disabled="busy" spellcheck="false"
-          :title="t('serverInstance.customHint')" :placeholder="t('serverInstance.customPath')"
-          @keydown.enter="addCustom" />
-        <select v-model="customAction" class="field-select" :disabled="busy">
-          <option value="add">{{ t("serverInstance.customAdd") }}</option>
-          <option value="delete">{{ t("serverInstance.customDelete") }}</option>
-        </select>
-        <SegmentedTabs v-if="customAction === 'add'" v-model="customMode" :options="customModeOptions" />
-        <BaseButton size="sm" :disabled="busy || !customPath.trim()" @click="addCustom">
-          {{ t("serverInstance.customAddBtn") }}
-        </BaseButton>
-      </div>
-      <!-- 输入内容：这段文字会作为客户端上的那个文件下发 -->
-      <textarea v-if="customAction === 'add' && customMode === 'content'"
-        v-model="customContent" class="field-input si-custom-content" :disabled="busy"
-        spellcheck="false" :placeholder="t('serverInstance.customContentHint')"></textarea>
-    </div>
   </div>
 
 </section>

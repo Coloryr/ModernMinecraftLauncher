@@ -529,14 +529,19 @@
   line-height: 1.5;
 }
 
-/* 自定义文件的添加条：在卡片底部，与表体之间一条分隔线 */
-.si-custom-foot {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+/* 自定义文件的添加条：作为分组第一行，跟着表体一起滚动 */
+.si-custom-add-row {
   padding: 8px 10px;
-  border-top: 1px solid var(--border);
-  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+
+/* 内容输入框紧跟在添加行下面，两行不留双份间距 */
+.si-custom-add-row.is-content {
+  padding-top: 0;
+}
+
+.si-custom-add-row .si-custom-content {
+  width: 100%;
 }
 
 /* 自定义条目的动作标签放在"同步方式"列，靠右对齐 */
@@ -548,6 +553,23 @@
 /* 移除按钮放在末列右侧 */
 .si-config-delete-cell.si-custom-remove {
   justify-content: flex-end;
+}
+
+/* 移除按钮按全 app 行内删除键的样子：1px 描边方块、悬停转红（同 .line-del） */
+.si-custom-remove .ui-btn {
+  width: var(--ctl-h);
+  height: var(--ctl-h);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--ctl-radius);
+  background: var(--bg-raised);
+  color: var(--text-dim);
+}
+
+.si-custom-remove .ui-btn:hover:not(:disabled) {
+  color: var(--red);
+  border-color: var(--red);
+  background: color-mix(in srgb, var(--red) 10%, transparent);
 }
 
 .si-tag.add {
@@ -580,19 +602,15 @@
   background: var(--red);
 }
 
+/* 自定义条目的标签：细描边胶囊，颜色跟动作走；不用实心底，
+   否则在着色行上看着像灰掉的按钮 */
 .si-tag {
   flex-shrink: 0;
-  padding: 2px 8px;
+  padding: 1px 8px;
+  border: 1px solid currentColor;
   border-radius: 999px;
   font-size: 10.5px;
   color: var(--text-dim);
-  background: var(--bg-hover);
-}
-
-/* 在线下载：用强调色的浅底，和"本地托管"一眼分得开 */
-.si-tag.on {
-  color: var(--accent);
-  background: var(--accent-soft);
 }
 
 .si-size {
